@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Ընտրված {{label}}, հպեք ընտրությունը փոխելու համար",
       "tapToComment": "{{label}}, հպեք մեկնաբանելու համար",
-      "truncationBanner": "Ցուցադրվում են փոփոխված {{total}} ֆայլերից առաջին {{limit}}-ը — GitHub API-ի սահմանաչափ"
+      "truncationBanner": "Ցուցադրվում են փոփոխված {{total}} ֆայլերից առաջին {{limit}}-ը — GitHub API-ի սահմանաչափ",
+      "statusAdded": "Ավելացված",
+      "statusContext": "Համատեքստ",
+      "statusDeleted": "Ջնջված"
     },
     "linkPasteClipboardEmpty": "Սեղմատախտակը դատարկ է",
     "linkPasteNotAPullRequest": "Սա GitHub-ի pull request հղում չէ",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Այս վերանայումը հնարավոր չէ ուղարկել ներկայիս տեսքով: PR-ը կարող է փոխված լինել, կամ դուք չեք կարող վերանայել ձեր սեփական pull request-ը:",
       "couldNotPostComment": "Չհաջողվեց տեղադրել մեկնաբանությունը:",
       "couldNotSubmitReview": "Չհաջողվեց ուղարկել վերանայումը: Ստուգեք ձեր կապը և կրկին փորձեք:"
+    },
+    "operation": {
+      "couldNotReply": "Չհաջողվեց պատասխանել:",
+      "couldNotCompleteAction": "Չհաջողվեց ավարտել այս գործողությունը:",
+      "mergeResultDefaultError": "GitHub-ը չավարտեց միավորումը:"
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Վճարումն ուշացած է: Խնդրում ենք թարմացնել վճարման եղանակը:",
       "subscriptionCancels": "Բաժանորդագրությունը չեղարկվում է {{date}}-ին",
       "trialDaysRemaining": "Փորձարկում՝ մնացել է {{remaining}}",
-      "trialEndingSoon": "Փորձարկումը շուտով կավարտվի՝ {{remaining}}"
+      "trialEndingSoon": "Փորձարկումը շուտով կավարտվի՝ {{remaining}}",
+      "planName": {
+        "commit": "Հաստատել",
+        "standard": "Ստանդարտ"
+      }
     },
     "changelog": {
       "title": "Ի՞նչ նորություն կա",
@@ -1189,7 +1201,8 @@
       "strongArm": "Ուժեղ թև",
       "talisman": "Թալիսման"
     },
-    "remoteSpawnFilesNotSupported": "Այս մատյանը չի կարող ընդունել ֆայլեր:"
+    "remoteSpawnFilesNotSupported": "Այս մատյանը չի կարող ընդունել ֆայլեր:",
+    "instanceSwitcherTitle": "KiloClaw դեպք"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Ձախողված",
       "cancelled": "Չեղարկված",
       "interrupted": "Ընդհատված"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Խիստ",
+      "balanced": "Հավասարակշռված",
+      "lenient": "Ներողամիտ",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Անվտանգություն",
+      "performance": "Կատարողականություն",
+      "bugs": "Սխալներ",
+      "style": "Ոճ",
+      "testing": "Թեստավորում",
+      "documentation": "Փաստաթղթեր"
+    },
+    "gateThreshold": {
+      "off": "Անջատված",
+      "all": "Բոլորը",
+      "warning": "Նախազգուշացում",
+      "critical": "Կրիտիկական"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Կոդի գրախոսը ուշադրության կարիք ունի",
+        "description": "Կոդի գրախոսն անջատվել է, քանի որ Kilo-ն չի կարող մուտք գործել այս պահոց՝ ակտիվ GitHub App տեղադրմամբ: Թարմացրեք GitHub App-ի տեղադրումը, ապա կրկին միացրեք Կոդի գրախոսին:",
+        "recoveryLabel": "Թարմացնել GitHub App-ը"
+      },
+      "githubIpAllowList": {
+        "title": "Կոդի գրախոսը ուշադրության կարիք ունի",
+        "description": "Կոդի գրախոսն անջատվել է, քանի որ այս GitHub կազմակերպությունը օգտագործում է IP թույլատրելի ցուցակ, որը արգելափակում է Kilo-ն: Օգնության համար կապվեք hi@kilocode.ai-ի հետ, ապա կրկին միացրեք Կոդի գրախոսին:",
+        "recoveryLabel": "Կապվեք աջակցության հետ"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Կոդի գրախոսը ուշադրության կարիք ունի",
+        "description": "Կոդի գրախոսն անջատվել է, քանի որ Kilo-ն չի կարող GitLab Project Access Token ստեղծել այս նախագծի համար: Տրամադրեք Maintainer մուտք կամ միացրեք Project Access Token-երը, ապա կրկին միացրեք Կոդի գրախոսին:",
+        "recoveryLabel": "Թարմացնել GitLab ինտեգրացիան"
+      },
+      "byokInvalidKey": {
+        "title": "Կոդի գրախոսը ուշադրության կարիք ունի",
+        "description": "Կոդի գրախոսն անջատվել է, քանի որ ընտրված BYOK API բանալին անվավեր է, չեղարկված է կամ թույլտվություն չունի: Թարմացրեք բանալին կամ ընտրեք մեկ այլ մոդել, ապա կրկին միացրեք Կոդի գրախոսին:",
+        "recoveryLabel": "Թարմացնել BYOK կարգավորումները"
+      },
+      "selectedModelUnavailable": {
+        "title": "Կոդի գրախոսը ուշադրության կարիք ունի",
+        "description": "Կոդի գրախոսն անջատվել է, քանի որ ընտրված մոդելը հասանելի չէ ամպային գործակալի նիստերի համար: Ընտրեք հասանելի մոդել, ապա կրկին միացրեք Կոդի գրախոսին:",
+        "recoveryLabel": "Թարմացնել Կոդի գրախոսի կարգավորումները"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Կոդի գրախոսը ուշադրության կարիք ունի",
+        "description": "Կոդի գրախոսն անջատվել է այսօր պահոցի կլոնավորման երեք ժամանակի սպառումից հետո: Օգնության համար կապվեք hi@kilocode.ai-ի հետ, ապա կրկին միացրեք Կոդի գրախոսին:",
+        "recoveryLabel": "Կապվեք աջակցության հետ"
+      }
+    },
+    "unknownError": "Անհայտ սխալ"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Գտածոն ավտոմատ խստության շեմից ցածր է։ Ձեռքով շտկումը դեռ կարող է սկսվել, երբ անվտանգության դարպասներն անցնեն։",
       "beforeEnablement": "Վերլուծությունն ավարտվել է մինչև ավտոմատ շտկման միացումը։ Ձեռքով շտկումը դեռ կարող է սկսվել, երբ անվտանգության դարպասներն անցնեն։",
       "generic": "Այս գտածոյի համար շտկումը հասանելի չէ։"
+    },
+    "commandFailure": {
+      "ownerCapReached": "Վերլուծության հզորությունը լիքն է: Սպասեք ակտիվ վերլուծության ավարտին, ապա կրկին փորձեք:",
+      "githubTokenUnavailable": "GitHub-ի թույլտվությունը ուշադրության կարիք ունի: Վերալիազորեք GitHub App-ը, ապա կրկին փորձեք:",
+      "githubAuthInvalid": "GitHub-ի թույլտվությունը ուշադրության կարիք ունի: Վերալիազորեք GitHub App-ը, ապա կրկին փորձեք:",
+      "findingUnavailable": "Գտածոն այլևս հասանելի չէ: Թարմացրեք գտածոները և կրկին փորձեք, եթե այն մնում է բաց:",
+      "repositoryUnavailable": "Պահոցն այլևս հասանելի չէ GitHub App-ին: Թարմացրեք պահոցի մուտքը, ապա կրկին փորձեք:",
+      "invalidDismissTarget": "Գտածոն հնարավոր չէ մերժել, քանի որ դրա Dependabot թիրախն անվավեր է:",
+      "commandStalled": "Հերթագրված գործողությունը ժամանակին չավարտվեց: Կրկին փորձեք գործողությունը:",
+      "queueRetriesExhausted": "Գործողությունը չհաջողվեց ավարտել մի քանի փորձից հետո: Կրկին փորձեք գործողությունը:",
+      "queueAdmissionFailed": "Հերթագրված գործողությունը չկարողացավ ընդունվել: Կրկին փորձեք գործողությունը:",
+      "generic": "Հերթագրված գործողությունը ձախողվեց: Կրկին փորձեք գործողությունը:"
+    },
+    "analysisMode": {
+      "auto": "Ավտոմատ",
+      "shallow": "Մակերեսային",
+      "deep": "Խորը"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Ավելացնել {{name}}-ը նախընտրածներին",
       "removeFromFavorites": "Հեռացնել {{name}}-ը նախընտրածներից",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Միջ"
+      "thinkingEffortMedium": "Միջ",
+      "sessionModel": "Նիստի մոդել"
     },
     "attachmentPreview": {
       "openFailedRetry": "Ֆայլը չհաջողվեց բացել: Խնդրում ենք նորից փորձել:",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Ավելացնել կրեդիտներ",
-    "description": "Ավելացրեք կրեդիտներ՝ օգտագործումը շարունակելու համար:"
+    "description": "Ավելացրեք կրեդիտներ՝ օգտագործումը շարունակելու համար:",
+    "billingPage": "վճարումների էջ"
   },
   "deviceSessions": {
     "couldNotLoad": "Հնարավոր չեղավ բեռնել նիստերը",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Չհաջողվեց վերականգնել գնումները: Կրկին փորձեք:",
     "purchaseFailed": "Չհաջողվեց ավարտել գնումը:",
     "purchaseStartFailed": "Չհաջողվեց սկսել App Store գնումը:",
-    "purchaseOwnedByAnotherAccount": "Այս Apple Account-ի Kilo Pass-ը պատկանում է մեկ այլ Kilo հաշվին:"
+    "purchaseOwnedByAnotherAccount": "Այս Apple Account-ի Kilo Pass-ը պատկանում է մեկ այլ Kilo հաշվին:",
+    "couldNotConnectToAppStore": "Չհաջողվեց միանալ App Store-ին: Ստուգեք կապը և կրկին փորձեք:",
+    "noMatchingProducts": "App Store-ը չվերադարձրեց համապատասխան Kilo Pass ապրանքներ:",
+    "purchaseMissingSignedTransaction": "App Store-ի գնումը չներառեց ստորագրված JWS գործարք:"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Բարելավման կարիք ունի",
     "sorryTitle": "Ցավում ենք դա լսել:",
     "sorryMessage": "Խնդրում ենք հայտնել մեզ, թե ինչն է պետք բարելավել: Հավելվածի պատասխանատու ինժեները կարդում է յուրաքանչյուր հաշվետվություն:",
-    "emailUs": "Էլփոստ ուղարկեք մեզ"
+    "emailUs": "Էլփոստ ուղարկեք մեզ",
+    "emailSubject": "շարժական հավելվածի հետադարձ կապ"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Կրեդիտի գործունեություն չկա",
       "expires": "Ժամկետը լրանում է {{date}}-ին",
       "title": "Կրեդիտի գործունեություն",
-      "transactionFallback": "Կրեդիտի գործարք"
+      "transactionFallback": "Կրեդիտի գործարք",
+      "category": {
+        "organization_custom": "Կազմակերպության հատուկ",
+        "parent_to_child_transfer_in": "Ծնողից երեխա փոխանցում (մուտք)",
+        "parent_to_child_transfer_out": "Ծնողից երեխա փոխանցում (ելք)",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Հաշվապահական ճշգրտում",
+        "credits_expired": "Սպառված կրեդիտներ"
+      }
     },
     "inviteMember": {
       "emailError": "Մուտքագրեք վավեր էլփոստի հասցե",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Հաշիվ-ապրանքագրերը ստեղծվում են ավտոմատ կերպով յուրաքանչյուր վճարման ցիկլում և կհայտնվեն այստեղ, երբ ձեր կազմակերպությունը վճարվի:",
       "emptyTitle": "Հաշիվ-ապրանքագրեր չկան",
       "invoiceFallback": "Հաշիվ-ապրանքագիր",
-      "statusOpen": "Բաց",
-      "statusPaid": "Վճարված",
-      "statusVoid": "Անվավեր",
       "title": "Հաշիվ-ապրանքագրեր",
       "downloadFailed": "Չհաջողվեց ներբեռնել հաշիվ-ապրանքագիրը: Ստուգեք ձեր կապը և կրկին փորձեք:",
-      "sharingUnavailable": "Կիսումը հասանելի չէ այս սարքում:"
+      "sharingUnavailable": "Կիսումը հասանելի չէ այս սարքում:",
+      "status": {
+        "paid": "Վճարված",
+        "open": "Բաց",
+        "void": "Անվավեր",
+        "draft": "Սևագիր",
+        "uncollectible": "Անվերականգնելի",
+        "unknown": "Անհայտ"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Հավաքագրված տվյալներ",
     "free": "Անվճար",
-    "couldNotUpdateFavorites": "Չհաջողվեց թարմացնել նախընտրածները"
+    "couldNotUpdateFavorites": "Չհաջողվեց թարմացնել նախընտրածները",
+    "thinkingEffort": {
+      "none": "Ոչինչ",
+      "minimal": "Նվազագույն",
+      "low": "Ցածր",
+      "medium": "Միջին",
+      "high": "Բարձր",
+      "xhigh": "Շատ բարձր",
+      "max": "Առավելագույն"
+    }
   }
 }

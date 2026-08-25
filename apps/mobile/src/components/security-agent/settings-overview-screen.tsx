@@ -23,7 +23,17 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { getSecurityAgentPath } from '@/lib/security-agent';
-import { capitalize } from '@/lib/utils';
+
+const ANALYSIS_MODE_KEYS = {
+  auto: 'securityAgent.analysisMode.auto',
+  shallow: 'securityAgent.analysisMode.shallow',
+  deep: 'securityAgent.analysisMode.deep',
+} satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
 
 function SettingsOverviewSkeleton() {
   const { t } = useTranslation();
@@ -142,6 +152,7 @@ export function SettingsOverviewScreen({
     data.newFindingNotificationsEnabled,
     data.slaNotificationsEnabled,
   ].filter(Boolean).length;
+  const analysisModeLabel = lookup(ANALYSIS_MODE_KEYS, data.analysisMode) ?? data.analysisMode;
 
   const handleToggle = (value: boolean) => {
     void Haptics.selectionAsync();
@@ -267,7 +278,7 @@ export function SettingsOverviewScreen({
               icon={Cpu}
               title={t('securityAgent.settingsOverview.modelsAndAnalysis')}
               subtitle={t('securityAgent.settingsOverview.analysisModeSubtitle', {
-                mode: capitalize(data.analysisMode),
+                mode: analysisModeLabel,
               })}
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'settings/analysis'));

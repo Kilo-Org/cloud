@@ -587,7 +587,10 @@
     "diff": {
       "selectedTapToChange": "Pasirinkta {{label}}, bakstelėkite, kad pakeistumėte pasirinkimą",
       "tapToComment": "{{label}}, bakstelėkite, kad pakomentuotumėte",
-      "truncationBanner": "Rodoma pirmi {{limit}} iš {{total}} pakeistų failų — „GitHub“ API limitas"
+      "truncationBanner": "Rodoma pirmi {{limit}} iš {{total}} pakeistų failų — „GitHub“ API limitas",
+      "statusAdded": "Pridėta",
+      "statusContext": "Kontekstas",
+      "statusDeleted": "Ištrinta"
     },
     "linkPasteClipboardEmpty": "Iškarpinė tuščia",
     "linkPasteNotAPullRequest": "Tai ne „GitHub“ pull request nuoroda",
@@ -601,6 +604,11 @@
       "reviewNotSubmitted": "Šios peržiūros negalima pateikti tokios, kokia ji yra. PR galėjo pasikeisti arba negalite peržiūrėti savo pull request.",
       "couldNotPostComment": "Nepavyko paskelbti komentaro.",
       "couldNotSubmitReview": "Nepavyko pateikti peržiūros. Patikrinkite ryšį ir bandykite dar kartą."
+    },
+    "operation": {
+      "couldNotReply": "Nepavyko atsakyti.",
+      "couldNotCompleteAction": "Nepavyko užbaigti šio veiksmo.",
+      "mergeResultDefaultError": "„GitHub“ nebaigė sujungimo."
     }
   },
   "notifications": {
@@ -837,7 +845,11 @@
       "paymentPastDue": "Mokėjimas pavėluotas. Atnaujinkite mokėjimo būdą.",
       "subscriptionCancels": "Prenumerata atšaukiama {{date}}",
       "trialDaysRemaining": "Bandomasis laikotarpis: liko {{remaining}}",
-      "trialEndingSoon": "Bandomasis laikotarpis greitai baigiasi: {{remaining}}"
+      "trialEndingSoon": "Bandomasis laikotarpis greitai baigiasi: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Kas naujo",
@@ -1207,7 +1219,8 @@
       "strongArm": "Stipri ranka",
       "talisman": "Talismanas"
     },
-    "remoteSpawnFilesNotSupported": "Šis egzempliorius negali gauti failų."
+    "remoteSpawnFilesNotSupported": "Šis egzempliorius negali gauti failų.",
+    "instanceSwitcherTitle": "KiloClaw egzempliorius"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1405,7 +1418,60 @@
       "failed": "Nepavyko",
       "cancelled": "Atšaukta",
       "interrupted": "Nutraukta"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Griežtas",
+      "balanced": "Subalansuotas",
+      "lenient": "Švelnus",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Sauga",
+      "performance": "Našumas",
+      "bugs": "Klaidos",
+      "style": "Stilius",
+      "testing": "Testavimas",
+      "documentation": "Dokumentacija"
+    },
+    "gateThreshold": {
+      "off": "Išjungta",
+      "all": "Visi",
+      "warning": "Įspėjimas",
+      "critical": "Kritinis"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer reikia dėmesio",
+        "description": "Code Reviewer buvo išjungtas, nes Kilo negali pasiekti šios saugyklos su aktyvia GitHub App įdiegtimi. Atnaujinkite GitHub App įdiegtį, tada vėl įjunkite Code Reviewer.",
+        "recoveryLabel": "Atnaujinti GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer reikia dėmesio",
+        "description": "Code Reviewer buvo išjungtas, nes ši GitHub organizacija naudoja IP leidimų sąrašą, kuris blokuoja Kilo. Susisiekite su hi@kilocode.ai dėl pagalbos, tada vėl įjunkite Code Reviewer.",
+        "recoveryLabel": "Susisiekti su palaikymu"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer reikia dėmesio",
+        "description": "Code Reviewer buvo išjungtas, nes Kilo negali sukurti GitLab projekto prieigos rakto šiam projektui. Suteikite Maintainer prieigą arba įgalinkite projekto prieigos raktus, tada vėl įjunkite Code Reviewer.",
+        "recoveryLabel": "Atnaujinti GitLab integraciją"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer reikia dėmesio",
+        "description": "Code Reviewer buvo išjungtas, nes pasirinktas BYOK API raktas yra netinkamas, atšauktas arba neturi leidimo. Atnaujinkite raktą arba pasirinkite kitą modelį, tada vėl įjunkite Code Reviewer.",
+        "recoveryLabel": "Atnaujinti BYOK nustatymus"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer reikia dėmesio",
+        "description": "Code Reviewer buvo išjungtas, nes pasirinktas modelis neprieinamas debesies agento sesijoms. Pasirinkite pasiekiamą modelį, tada vėl įjunkite Code Reviewer.",
+        "recoveryLabel": "Atnaujinti Code Reviewer nustatymus"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer reikia dėmesio",
+        "description": "Code Reviewer buvo išjungtas po trijų saugyklos klonavimo laukimo laikų šiandien. Susisiekite su hi@kilocode.ai dėl pagalbos, tada vėl įjunkite Code Reviewer.",
+        "recoveryLabel": "Susisiekti su palaikymu"
+      }
+    },
+    "unknownError": "Nežinoma klaida"
   },
   "securityAgent": {
     "filter": {
@@ -1953,6 +2019,23 @@
       "belowThreshold": "Radinys yra žemiau automatinio sunkumo slenksčio. Rankinis taisymas vis tiek gali prasidėti, kai saugos patikros praeina.",
       "beforeEnablement": "Analizė baigta prieš įjungiant automatinį taisymą. Rankinis taisymas vis tiek gali prasidėti, kai saugos patikros praeina.",
       "generic": "Taisymas šiam radiniui nepasiekiamas."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Analizės talpa užpildyta. Palaukite, kol baigsis aktyvi analizė, tada bandykite dar kartą.",
+      "githubTokenUnavailable": "GitHub autorizacijai reikia dėmesio. Iš naujo autorizuokite GitHub App, tada bandykite dar kartą.",
+      "githubAuthInvalid": "GitHub autorizacijai reikia dėmesio. Iš naujo autorizuokite GitHub App, tada bandykite dar kartą.",
+      "findingUnavailable": "Radinys nebegalimas. Atnaujinkite radinius ir bandykite dar kartą, jei jis vis dar atidarytas.",
+      "repositoryUnavailable": "Saugykla nebegalima GitHub App. Atnaujinkite saugyklos prieigą, tada bandykite dar kartą.",
+      "invalidDismissTarget": "Radinio negalima atmesti, nes jo Dependabot tikslas netinkamas.",
+      "commandStalled": "Eilėje esantis veiksmas nebaigtas laiku. Bandykite veiksmą dar kartą.",
+      "queueRetriesExhausted": "Veiksmo nepavyko užbaigti po kelių bandymų. Bandykite veiksmą dar kartą.",
+      "queueAdmissionFailed": "Eilėje esančio veiksmo nepavyko priimti. Bandykite veiksmą dar kartą.",
+      "generic": "Eilėje esantis veiksmas nepavyko. Bandykite veiksmą dar kartą."
+    },
+    "analysisMode": {
+      "auto": "Automatiškai",
+      "shallow": "Paviršinis",
+      "deep": "Išsamus"
     }
   },
   "agents": {
@@ -2428,7 +2511,8 @@
       "addToFavorites": "Įtraukti {{name}} į mėgstamiausius",
       "removeFromFavorites": "Pašalinti {{name}} iš mėgstamiausių",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Sesijos modelis"
     },
     "attachmentPreview": {
       "openFailedRetry": "Nepavyko atidaryti failo. Bandykite dar kartą.",
@@ -2562,7 +2646,8 @@
   },
   "addCredits": {
     "cta": "Pridėti kreditų",
-    "description": "Pridėkite kreditų, kad naudojimas tęstųsi."
+    "description": "Pridėkite kreditų, kad naudojimas tęstųsi.",
+    "billingPage": "atsiskaitymų puslapis"
   },
   "deviceSessions": {
     "couldNotLoad": "Nepavyko įkelti sesijų",
@@ -2750,7 +2835,10 @@
     "restoreFailed": "Nepavyko atkurti pirkinių. Bandykite dar kartą.",
     "purchaseFailed": "Nepavyko užbaigti pirkinio.",
     "purchaseStartFailed": "Nepavyko pradėti App Store pirkinio.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass šioje Apple paskyroje priklauso kitai Kilo paskyrai."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass šioje Apple paskyroje priklauso kitai Kilo paskyrai.",
+    "couldNotConnectToAppStore": "Nepavyko prisijungti prie App Store. Patikrinkite ryšį ir bandykite dar kartą.",
+    "noMatchingProducts": "App Store negrąžino jokių atitinkančių Kilo Pass produktų.",
+    "purchaseMissingSignedTransaction": "App Store pirkinys neapėmė pasirašytos operacijos JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2846,7 +2934,8 @@
     "needsWork": "Reikia patobulinti",
     "sorryTitle": "Mums gaila tai girdėti!",
     "sorryMessage": "Praneškite mums, ką reikia patobulinti. Už programą atsakingas inžinierius perskaito kiekvieną ataskaitą!",
-    "emailUs": "Parašykite mums"
+    "emailUs": "Parašykite mums",
+    "emailSubject": "mobiliosios programėlės atsiliepimai"
   },
   "organization": {
     "boundary": {
@@ -2863,7 +2952,17 @@
       "emptyTitle": "Nėra kreditų veiklos",
       "expires": "Baigia galioti {{date}}",
       "title": "Kreditų veikla",
-      "transactionFallback": "Kreditų operacija"
+      "transactionFallback": "Kreditų operacija",
+      "category": {
+        "organization_custom": "Organizacijos pasirinktinis",
+        "parent_to_child_transfer_in": "Perkėlimas iš pirminės į dukterinę (gauta)",
+        "parent_to_child_transfer_out": "Perkėlimas iš pirminės į dukterinę (išsiųsta)",
+        "oss-sponsorship": "OSS rėmimas",
+        "oss-monthly-reset": "OSS mėnesinis atstatymas",
+        "team-topup-bonus-2025": "Komandos papildymo premija 2025",
+        "accounting_adjustment": "Apskaitos koregavimas",
+        "credits_expired": "Kreditai pasibaigė"
+      }
     },
     "inviteMember": {
       "emailError": "Įveskite galiojantį el. pašto adresą",
@@ -2880,12 +2979,17 @@
       "emptyDescription": "Sąskaitos sugeneruojamos automatiškai kiekvieną atsiskaitymo ciklą ir čia atsiras, kai jūsų organizacija bus apmokėta.",
       "emptyTitle": "Nėra sąskaitų",
       "invoiceFallback": "Sąskaita",
-      "statusOpen": "Atidaryta",
-      "statusPaid": "Apmokėta",
-      "statusVoid": "Negaliojanti",
       "title": "Sąskaitos",
       "downloadFailed": "Nepavyko atsisiųsti sąskaitos. Patikrinkite ryšį ir bandykite dar kartą.",
-      "sharingUnavailable": "Bendrinimas šiame įrenginyje nepasiekiamas."
+      "sharingUnavailable": "Bendrinimas šiame įrenginyje nepasiekiamas.",
+      "status": {
+        "paid": "Apmokėta",
+        "open": "Atidaryta",
+        "void": "Negaliojanti",
+        "draft": "Juodraštis",
+        "uncollectible": "Neišieškoma",
+        "unknown": "Nežinoma"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3013,6 +3117,15 @@
   "models": {
     "dataCollected": "Surinkti duomenys",
     "free": "Nemokama",
-    "couldNotUpdateFavorites": "Nepavyko atnaujinti mėgstamiausių"
+    "couldNotUpdateFavorites": "Nepavyko atnaujinti mėgstamiausių",
+    "thinkingEffort": {
+      "none": "Nėra",
+      "minimal": "Minimalus",
+      "low": "Žemas",
+      "medium": "Vidutinis",
+      "high": "Aukštas",
+      "xhigh": "Ypač aukštas",
+      "max": "Maksimalus"
+    }
   }
 }

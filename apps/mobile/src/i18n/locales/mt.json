@@ -594,7 +594,10 @@
     "diff": {
       "selectedTapToChange": "Magħżul {{label}}, mess biex tibdel l-għażla",
       "tapToComment": "{{label}}, mess biex tikkummenta",
-      "truncationBanner": "Qed juri l-ewwel {{limit}} minn {{total}} fajls mibdula — il-limitu tal-API ta' GitHub"
+      "truncationBanner": "Qed juri l-ewwel {{limit}} minn {{total}} fajls mibdula — il-limitu tal-API ta' GitHub",
+      "statusAdded": "Miżjud",
+      "statusContext": "Kuntest",
+      "statusDeleted": "Imħassar"
     },
     "linkPasteClipboardEmpty": "L-appostru huwa vojt",
     "linkPasteNotAPullRequest": "Mhux link ta' pull request ta' GitHub",
@@ -608,6 +611,11 @@
       "reviewNotSubmitted": "Din ir-reviżjoni ma tistax tintbagħat kif inhi. Il-PR seta' nbidel, jew ma tistax tirrevedi l-pull request tiegħek stess.",
       "couldNotPostComment": "Ma setax jitpoġġa kument.",
       "couldNotSubmitReview": "Ma setgħetx tintbagħat ir-reviżjoni. Iċċekkja l-konnessjoni tiegħek u erġa' pprova."
+    },
+    "operation": {
+      "couldNotReply": "Ma setgħetx tingħata risposta.",
+      "couldNotCompleteAction": "Ma setgħetx titlesta din l-azzjoni.",
+      "mergeResultDefaultError": "GitHub ma lestiex il-merge."
     }
   },
   "notifications": {
@@ -845,7 +853,11 @@
       "paymentPastDue": "Ħlas tard. Jekk jogħġbok aġġorna l-metodu tal-ħlas tiegħek.",
       "subscriptionCancels": "L-abbonament jikkanċella fil-{{date}}",
       "trialDaysRemaining": "Prova: {{remaining}}",
-      "trialEndingSoon": "Il-prova dalwaqt tintemm: {{remaining}}"
+      "trialEndingSoon": "Il-prova dalwaqt tintemm: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "X'Ġdid",
@@ -1216,7 +1228,8 @@
       "strongArm": "Driegħ b'saħħtu",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Din l-istanza ma tistax tirċievi fajls."
+    "remoteSpawnFilesNotSupported": "Din l-istanza ma tistax tirċievi fajls.",
+    "instanceSwitcherTitle": "Istanza ta' KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1414,7 +1427,60 @@
       "failed": "Falla",
       "cancelled": "Ikkkanċellat",
       "interrupted": "Interrott"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Strett",
+      "balanced": "Bilanċjat",
+      "lenient": "Permissiv",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Sigurtà",
+      "performance": "Prestazzjoni",
+      "bugs": "Bugs",
+      "style": "Stil",
+      "testing": "Ittestjar",
+      "documentation": "Dokumentazzjoni"
+    },
+    "gateThreshold": {
+      "off": "Mitfi",
+      "all": "Kollha",
+      "warning": "Twissija",
+      "critical": "Kritiku"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer jeħtieġ attenzjoni",
+        "description": "Code Reviewer ġie diżattivat għaliex Kilo ma jistax jaċċessa dan ir-repository b'installazzjoni attiva tal-GitHub App. Aġġorna l-installazzjoni tal-GitHub App, imbagħad erġa' attiva Code Reviewer.",
+        "recoveryLabel": "Aġġorna l-GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer jeħtieġ attenzjoni",
+        "description": "Code Reviewer ġie diżattivat għaliex din l-organizzazzjoni ta' GitHub tuża lista ta' IP permessi li timblokka lil Kilo. Ikkuntattja hi@kilocode.ai għall-għajnuna, imbagħad erġa' attiva Code Reviewer.",
+        "recoveryLabel": "Ikkuntattja l-appoġġ"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer jeħtieġ attenzjoni",
+        "description": "Code Reviewer ġie diżattivat għaliex Kilo ma jistax joħloq GitLab Project Access Token għal dan il-proġett. Agħti aċċess ta' Maintainer jew attiva l-Project Access Tokens, imbagħad erġa' attiva Code Reviewer.",
+        "recoveryLabel": "Aġġorna l-integrazzjoni tal-GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer jeħtieġ attenzjoni",
+        "description": "Code Reviewer ġie diżattivat għaliex iċ-ċavetta tal-API BYOK magħżula mhix valida, ġiet irtirata, jew m'għandhiex permess. Aġġorna ċ-ċavetta jew agħżel mudell ieħor, imbagħad erġa' attiva Code Reviewer.",
+        "recoveryLabel": "Aġġorna s-settings tal-BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer jeħtieġ attenzjoni",
+        "description": "Code Reviewer ġie diżattivat għaliex il-mudell magħżul mhux disponibbli għas-sessjonijiet tal-cloud agent. Agħżel mudell disponibbli, imbagħad erġa' attiva Code Reviewer.",
+        "recoveryLabel": "Aġġorna s-settings tal-Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer jeħtieġ attenzjoni",
+        "description": "Code Reviewer ġie diżattivat wara tliet timeout tal-clone tar-repository illum. Ikkuntattja hi@kilocode.ai għall-għajnuna, imbagħad erġa' attiva Code Reviewer.",
+        "recoveryLabel": "Ikkuntattja l-appoġġ"
+      }
+    },
+    "unknownError": "Żball mhux magħruf"
   },
   "securityAgent": {
     "filter": {
@@ -1966,6 +2032,23 @@
       "belowThreshold": "Is-sejba hija taħt il-limitu awtomatiku tas-severità. Ir-rimedju manwali xorta jista' jibda meta jgħaddu l-kontrolli tas-sigurtà.",
       "beforeEnablement": "L-analiżi tlestiet qabel ma ġie attivat ir-Rimedju Awtomatiku. Ir-rimedju manwali xorta jista' jibda meta jgħaddu l-kontrolli tas-sigurtà.",
       "generic": "Ir-rimedju mhux disponibbli għal din is-sejba."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Il-kapaċità tal-analiżi hija mimlija. Stenna li tispiċċa analiżi attiva, imbagħad erġa' pprova.",
+      "githubTokenUnavailable": "L-awtorizzazzjoni ta' GitHub teħtieġ attenzjoni. Erġa' awtorizza l-GitHub App, imbagħad erġa' pprova.",
+      "githubAuthInvalid": "L-awtorizzazzjoni ta' GitHub teħtieġ attenzjoni. Erġa' awtorizza l-GitHub App, imbagħad erġa' pprova.",
+      "findingUnavailable": "Is-sejba m'għadhiex disponibbli. Aġġorna s-sejbiet u erġa' pprova jekk tibqa' miftuħa.",
+      "repositoryUnavailable": "Ir-repository m'għadux disponibbli għall-GitHub App. Aġġorna l-aċċess tar-repository, imbagħad erġa' pprova.",
+      "invalidDismissTarget": "Is-sejba ma tistax tiġi skartata għaliex il-mira tagħha ta' Dependabot mhix valida.",
+      "commandStalled": "L-azzjoni fil-kju ma spiċċatx fil-ħin. Erġa' pprova l-azzjoni.",
+      "queueRetriesExhausted": "L-azzjoni ma setgħetx titlesta wara diversi tentattivi. Erġa' pprova l-azzjoni.",
+      "queueAdmissionFailed": "L-azzjoni fil-kju ma setgħetx tiġi ammessa. Erġa' pprova l-azzjoni.",
+      "generic": "L-azzjoni fil-kju fallejt. Erġa' pprova l-azzjoni."
+    },
+    "analysisMode": {
+      "auto": "Awto",
+      "shallow": "Baxx",
+      "deep": "Fond"
     }
   },
   "agents": {
@@ -2447,7 +2530,8 @@
       "addToFavorites": "Żid {{name}} mal-favoriti",
       "removeFromFavorites": "Neħħi {{name}} mill-favoriti",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Mudell tas-sessjoni"
     },
     "attachmentPreview": {
       "openFailedRetry": "Ma setax jinfetaħ il-fajl. Ipprova għal darb'oħra.",
@@ -2582,7 +2666,8 @@
   },
   "addCredits": {
     "cta": "Żid krediti",
-    "description": "Żid krediti biex l-użu jkompli jaħdem."
+    "description": "Żid krediti biex l-użu jkompli jaħdem.",
+    "billingPage": "paġna tal-ħlas"
   },
   "deviceSessions": {
     "couldNotLoad": "Ma setgħux jitgħabbew is-sessjonijiet",
@@ -2770,7 +2855,10 @@
     "restoreFailed": "Ma setgħux jiġu restawrati x-xirjiet. Erġa' pprova.",
     "purchaseFailed": "Ma setax jitlesta x-xiri.",
     "purchaseStartFailed": "Ma setax jibda x-xiri mill-App Store.",
-    "purchaseOwnedByAnotherAccount": "Il-Kilo Pass fuq dan l-Apple Account jappartjeni għal kont ieħor ta' Kilo."
+    "purchaseOwnedByAnotherAccount": "Il-Kilo Pass fuq dan l-Apple Account jappartjeni għal kont ieħor ta' Kilo.",
+    "couldNotConnectToAppStore": "Ma setgħetx tikkonnettja mal-App Store. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+    "noMatchingProducts": "L-ebda prodott ta' Kilo Pass li jaqbel ma rritorna l-App Store.",
+    "purchaseMissingSignedTransaction": "Ix-xiri tal-App Store ma kienx jinkludi JWS ta' transazzjoni ffirmata."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2866,7 +2954,8 @@
     "needsWork": "Għandu bżonn titjib",
     "sorryTitle": "Iddispjċina li nisimgħu dan!",
     "sorryMessage": "Jekk jogħġbok għidilna x'għandu jitjieb. L-inġinier responsabbli mill-app jaqra kull rapport!",
-    "emailUs": "Ibgħatilna email"
+    "emailUs": "Ibgħatilna email",
+    "emailSubject": "feedback dwar l-app tal-mowbajl"
   },
   "organization": {
     "boundary": {
@@ -2883,7 +2972,17 @@
       "emptyTitle": "L-ebda attività ta' kreditu",
       "expires": "Jiskadi {{date}}",
       "title": "Attività ta' kreditu",
-      "transactionFallback": "Transazzjoni ta' kreditu"
+      "transactionFallback": "Transazzjoni ta' kreditu",
+      "category": {
+        "organization_custom": "Organizzazzjoni personalizzata",
+        "parent_to_child_transfer_in": "Trasferiment 'il ġewwa minn ġenitur għal wild",
+        "parent_to_child_transfer_out": "Trasferiment 'il barra minn wild għal ġenitur",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Aġġustament tal-kontabilità",
+        "credits_expired": "Krediti skaduti"
+      }
     },
     "inviteMember": {
       "emailError": "Daħħal indirizz ta' email validu",
@@ -2900,12 +2999,17 @@
       "emptyDescription": "Il-fatturi jiġu ġġenerati awtomatikament kull ċiklu ta' ħlas u se jidhru hawnhekk ladarba l-organizzazzjoni tiegħek tiġi fatturata.",
       "emptyTitle": "L-ebda fattura",
       "invoiceFallback": "Fattura",
-      "statusOpen": "Miftuħ",
-      "statusPaid": "Imħallas",
-      "statusVoid": "Battal",
       "title": "Fatturi",
       "downloadFailed": "Ma setgħetx titniżżel il-fattura. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
-      "sharingUnavailable": "Il-qsim mhux disponibbli fuq dan it-tagħmir."
+      "sharingUnavailable": "Il-qsim mhux disponibbli fuq dan it-tagħmir.",
+      "status": {
+        "paid": "Imħallas",
+        "open": "Miftuħ",
+        "void": "Battal",
+        "draft": "Abbozz",
+        "uncollectible": "Ma jistax jinġabar",
+        "unknown": "Mhux magħruf"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3034,6 +3138,15 @@
   "models": {
     "dataCollected": "Dejta miġbura",
     "free": "B'xejn",
-    "couldNotUpdateFavorites": "Ma setgħux jiġu aġġornati l-favoriti"
+    "couldNotUpdateFavorites": "Ma setgħux jiġu aġġornati l-favoriti",
+    "thinkingEffort": {
+      "none": "Xejn",
+      "minimal": "Minimu",
+      "low": "Baxx",
+      "medium": "Medju",
+      "high": "Għoli",
+      "xhigh": "Għoli ħafna",
+      "max": "Massimu"
+    }
   }
 }

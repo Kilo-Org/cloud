@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} ਚੁਣਿਆ ਗਿਆ, ਚੋਣ ਬਦਲਣ ਲਈ ਟੈਪ ਕਰੋ",
       "tapToComment": "{{label}}, ਟਿੱਪਣੀ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ",
-      "truncationBanner": "ਕੁੱਲ {{total}} ਬਦਲੀਆਂ ਫਾਈਲਾਂ ਵਿੱਚੋਂ ਪਹਿਲੇ {{limit}} ਦਿਖਾਏ ਜਾ ਰਹੇ ਹਨ — GitHub API ਸੀਮਾ"
+      "truncationBanner": "ਕੁੱਲ {{total}} ਬਦਲੀਆਂ ਫਾਈਲਾਂ ਵਿੱਚੋਂ ਪਹਿਲੇ {{limit}} ਦਿਖਾਏ ਜਾ ਰਹੇ ਹਨ — GitHub API ਸੀਮਾ",
+      "statusAdded": "ਜੋੜਿਆ ਗਿਆ",
+      "statusContext": "ਸੰਦਰਭ",
+      "statusDeleted": "ਮਿਟਾਇਆ ਗਿਆ"
     },
     "linkPasteClipboardEmpty": "ਕਲਿੱਪਬੋਰਡ ਖਾਲੀ ਹੈ",
     "linkPasteNotAPullRequest": "ਇਹ GitHub ਪੁੱਲ ਰਿਕਸਟ ਲਿੰਕ ਨਹੀਂ ਹੈ",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "ਇਹ ਰਿਵਿਊ ਜਿਵੇਂ ਹੈ ਉਵੇਂ ਜਮ੍ਹਾਂ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ। PR ਬਦਲੀ ਹੋ ਸਕਦੀ ਹੈ, ਜਾਂ ਤੁਸੀਂ ਆਪਣੀ ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਰਿਵਿਊ ਨਹੀਂ ਕਰ ਸਕਦੇ।",
       "couldNotPostComment": "ਟਿੱਪਣੀ ਪੋਸਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
       "couldNotSubmitReview": "ਰਿਵਿਊ ਜਮ੍ਹਾਂ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਚੈੱਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+    },
+    "operation": {
+      "couldNotReply": "ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ ਜਾ ਸਕਿਆ।",
+      "couldNotCompleteAction": "ਇਹ ਕਾਰਵਾਈ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
+      "mergeResultDefaultError": "GitHub ਨੇ ਮਰਜ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ।"
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "ਭੁਗਤਾਨ ਬਕਾਇਆ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਆਪਣਾ ਭੁਗਤਾਨ ਢੰਗ ਅੱਪਡੇਟ ਕਰੋ।",
       "subscriptionCancels": "ਗਾਹਕੀ {{date}} ਨੂੰ ਰੱਦ ਹੁੰਦੀ ਹੈ",
       "trialDaysRemaining": "ਅਜ਼ਮਾਇਸ਼: {{remaining}} ਬਾਕੀ",
-      "trialEndingSoon": "ਅਜ਼ਮਾਇਸ਼ ਜਲਦੀ ਖਤਮ ਹੋ ਰਹੀ ਹੈ: {{remaining}}"
+      "trialEndingSoon": "ਅਜ਼ਮਾਇਸ਼ ਜਲਦੀ ਖਤਮ ਹੋ ਰਹੀ ਹੈ: {{remaining}}",
+      "planName": {
+        "commit": "ਕਮਿਟ",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "ਕੀ ਨਵਾਂ ਹੈ",
@@ -1189,7 +1201,8 @@
       "strongArm": "ਤਾਕਤਵਰ ਬਾਂਹ",
       "talisman": "ਤਾਵੀਜ਼"
     },
-    "remoteSpawnFilesNotSupported": "ਇਹ ਇੰਸਟੈਂਸ ਫਾਈਲਾਂ ਪ੍ਰਾਪਤ ਨਹੀਂ ਕਰ ਸਕਦਾ।"
+    "remoteSpawnFilesNotSupported": "ਇਹ ਇੰਸਟੈਂਸ ਫਾਈਲਾਂ ਪ੍ਰਾਪਤ ਨਹੀਂ ਕਰ ਸਕਦਾ।",
+    "instanceSwitcherTitle": "KiloClaw ਇੰਸਟੈਂਸ"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "ਅਸਫਲ",
       "cancelled": "ਰੱਦ ਕੀਤਾ ਗਿਆ",
       "interrupted": "ਵਿਚੋਲਿਆ ਗਿਆ"
-    }
+    },
+    "reviewStyle": {
+      "strict": "ਸਖ਼ਤ",
+      "balanced": "ਸੰਤੁਲਿਤ",
+      "lenient": "ਉਦਾਰ",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "ਸੁਰੱਖਿਆ",
+      "performance": "ਪ੍ਰਦਰਸ਼ਨ",
+      "bugs": "ਬੱਗ",
+      "style": "ਸ਼ੈਲੀ",
+      "testing": "ਟੈਸਟਿੰਗ",
+      "documentation": "ਦਸਤਾਵੇਜ਼"
+    },
+    "gateThreshold": {
+      "off": "ਬੰਦ",
+      "all": "ਸਾਰੇ",
+      "warning": "ਚੇਤਾਵਨੀ",
+      "critical": "ਗੰਭੀਰ"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer ਨੂੰ ਧਿਆਨ ਦੀ ਲੋੜ ਹੈ",
+        "description": "Code Reviewer ਅਯੋਗ ਕੀਤਾ ਗਿਆ ਸੀ ਕਿਉਂਕਿ Kilo ਇੱਕ ਸਰਗਰਮ GitHub App ਇੰਸਟਾਲੇਸ਼ਨ ਨਾਲ ਇਸ ਰਿਪੋਜ਼ਟਰੀ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਕਰ ਸਕਦਾ। GitHub App ਇੰਸਟਾਲੇਸ਼ਨ ਅੱਪਡੇਟ ਕਰੋ, ਫਿਰ Code Reviewer ਦੁਬਾਰਾ ਸਮਰੱਥ ਕਰੋ।",
+        "recoveryLabel": "GitHub App ਅੱਪਡੇਟ ਕਰੋ"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer ਨੂੰ ਧਿਆਨ ਦੀ ਲੋੜ ਹੈ",
+        "description": "Code Reviewer ਅਯੋਗ ਕੀਤਾ ਗਿਆ ਸੀ ਕਿਉਂਕਿ ਇਹ GitHub ਸੰਗਠਨ ਇੱਕ IP ਅਨੁਮਤੀ ਸੂਚੀ ਵਰਤਦਾ ਹੈ ਜੋ Kilo ਨੂੰ ਬਲੌਕ ਕਰਦੀ ਹੈ। ਮਦਦ ਲਈ hi@kilocode.ai ਨਾਲ ਸੰਪਰਕ ਕਰੋ, ਫਿਰ Code Reviewer ਦੁਬਾਰਾ ਸਮਰੱਥ ਕਰੋ।",
+        "recoveryLabel": "ਸਹਾਇਤਾ ਨਾਲ ਸੰਪਰਕ ਕਰੋ"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer ਨੂੰ ਧਿਆਨ ਦੀ ਲੋੜ ਹੈ",
+        "description": "Code Reviewer ਅਯੋਗ ਕੀਤਾ ਗਿਆ ਸੀ ਕਿਉਂਕਿ Kilo ਇਸ ਪ੍ਰੋਜੈਕਟ ਲਈ GitLab Project Access Token ਨਹੀਂ ਬਣਾ ਸਕਦਾ। Maintainer ਪਹੁੰਚ ਦਿਓ ਜਾਂ Project Access Tokens ਸਮਰੱਥ ਕਰੋ, ਫਿਰ Code Reviewer ਦੁਬਾਰਾ ਸਮਰੱਥ ਕਰੋ।",
+        "recoveryLabel": "GitLab ਏਕੀਕਰਣ ਅੱਪਡੇਟ ਕਰੋ"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer ਨੂੰ ਧਿਆਨ ਦੀ ਲੋੜ ਹੈ",
+        "description": "Code Reviewer ਅਯੋਗ ਕੀਤਾ ਗਿਆ ਸੀ ਕਿਉਂਕਿ ਚੁਣੀ ਗਈ BYOK API ਕੁੰਜੀ ਅਵੈਧ ਹੈ, ਰੱਦ ਕੀਤੀ ਗਈ ਹੈ, ਜਾਂ ਇਸ ਵਿੱਚ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ। ਕੁੰਜੀ ਅੱਪਡੇਟ ਕਰੋ ਜਾਂ ਕੋਈ ਹੋਰ ਮਾਡਲ ਚੁਣੋ, ਫਿਰ Code Reviewer ਦੁਬਾਰਾ ਸਮਰੱਥ ਕਰੋ।",
+        "recoveryLabel": "BYOK ਸੈਟਿੰਗਾਂ ਅੱਪਡੇਟ ਕਰੋ"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer ਨੂੰ ਧਿਆਨ ਦੀ ਲੋੜ ਹੈ",
+        "description": "Code Reviewer ਅਯੋਗ ਕੀਤਾ ਗਿਆ ਸੀ ਕਿਉਂਕਿ ਚੁਣਿਆ ਗਿਆ ਮਾਡਲ ਕਲਾਉਡ ਏਜੰਟ ਸੈਸ਼ਨਾਂ ਲਈ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕੋਈ ਉਪਲਬਧ ਮਾਡਲ ਚੁਣੋ, ਫਿਰ Code Reviewer ਦੁਬਾਰਾ ਸਮਰੱਥ ਕਰੋ।",
+        "recoveryLabel": "Code Reviewer ਸੈਟਿੰਗਾਂ ਅੱਪਡੇਟ ਕਰੋ"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer ਨੂੰ ਧਿਆਨ ਦੀ ਲੋੜ ਹੈ",
+        "description": "ਅੱਜ ਤਿੰਨ ਰਿਪੋਜ਼ਟਰੀ ਕਲੋਨ ਟਾਈਮਆਊਟ ਤੋਂ ਬਾਅਦ Code Reviewer ਅਯੋਗ ਕੀਤਾ ਗਿਆ ਸੀ। ਮਦਦ ਲਈ hi@kilocode.ai ਨਾਲ ਸੰਪਰਕ ਕਰੋ, ਫਿਰ Code Reviewer ਦੁਬਾਰਾ ਸਮਰੱਥ ਕਰੋ।",
+        "recoveryLabel": "ਸਹਾਇਤਾ ਨਾਲ ਸੰਪਰਕ ਕਰੋ"
+      }
+    },
+    "unknownError": "ਅਣਜਾਣ ਗਲਤੀ"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "ਖੋਜ ਆਟੋਮੈਟਿਕ ਗੰਭੀਰਤਾ ਥ੍ਰੈਸ਼ਹੋਲਡ ਤੋਂ ਹੇਠਾਂ ਹੈ। ਜਦੋਂ ਸੁਰੱਖਿਆ ਗੇਟ ਪਾਸ ਹੁੰਦੇ ਹਨ ਤਾਂ ਦਸਤੀ ਨਿਵਾਰਨ ਅਜੇ ਵੀ ਸ਼ੁਰੂ ਹੋ ਸਕਦਾ ਹੈ।",
       "beforeEnablement": "ਆਟੋ-ਨਿਵਾਰਨ ਸਮਰੱਥ ਹੋਣ ਤੋਂ ਪਹਿਲਾਂ ਵਿਸ਼ਲੇਸ਼ਣ ਪੂਰਾ ਹੋਇਆ। ਜਦੋਂ ਸੁਰੱਖਿਆ ਗੇਟ ਪਾਸ ਹੁੰਦੇ ਹਨ ਤਾਂ ਦਸਤੀ ਨਿਵਾਰਨ ਅਜੇ ਵੀ ਸ਼ੁਰੂ ਹੋ ਸਕਦਾ ਹੈ।",
       "generic": "ਇਸ ਖੋਜ ਲਈ ਨਿਵਾਰਨ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।"
+    },
+    "commandFailure": {
+      "ownerCapReached": "ਵਿਸ਼ਲੇਸ਼ਣ ਸਮਰੱਥਾ ਭਰੀ ਹੋਈ ਹੈ। ਕਿਰਿਆਸ਼ੀਲ ਵਿਸ਼ਲੇਸ਼ਣ ਖਤਮ ਹੋਣ ਦੀ ਉਡੀਕ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "githubTokenUnavailable": "GitHub ਅਧਿਕਾਰ ਨੂੰ ਧਿਆਨ ਦੀ ਲੋੜ ਹੈ। GitHub App ਦੁਬਾਰਾ ਅਧਿਕਾਰ ਦਿਓ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "githubAuthInvalid": "GitHub ਅਧਿਕਾਰ ਨੂੰ ਧਿਆਨ ਦੀ ਲੋੜ ਹੈ। GitHub App ਦੁਬਾਰਾ ਅਧਿਕਾਰ ਦਿਓ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "findingUnavailable": "ਖੋਜ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਖੋਜਾਂ ਨੂੰ ਰਿਫਰੈਸ਼ ਕਰੋ ਅਤੇ ਜੇਕਰ ਇਹ ਖੁੱਲ੍ਹੀ ਰਹਿੰਦੀ ਹੈ ਤਾਂ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "repositoryUnavailable": "ਰਿਪੋਜ਼ਟਰੀ ਹੁਣ GitHub App ਲਈ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਰਿਪੋਜ਼ਟਰੀ ਪਹੁੰਚ ਰਿਫਰੈਸ਼ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "invalidDismissTarget": "ਖੋਜ ਨੂੰ ਖਾਰਜ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ ਕਿਉਂਕਿ ਇਸਦਾ Dependabot ਟੀਚਾ ਅਵੈਧ ਹੈ।",
+      "commandStalled": "ਕਤਾਰਬੱਧ ਕਾਰਵਾਈ ਸਮੇਂ ਸਿਰ ਪੂਰੀ ਨਹੀਂ ਹੋਈ। ਕਾਰਵਾਈ ਦੁਬਾਰਾ ਕਰੋ।",
+      "queueRetriesExhausted": "ਕਈ ਕੋਸ਼ਿਸ਼ਾਂ ਤੋਂ ਬਾਅਦ ਕਾਰਵਾਈ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਕਾਰਵਾਈ ਦੁਬਾਰਾ ਕਰੋ।",
+      "queueAdmissionFailed": "ਕਤਾਰਬੱਧ ਕਾਰਵਾਈ ਸਵੀਕਾਰ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਕਾਰਵਾਈ ਦੁਬਾਰਾ ਕਰੋ।",
+      "generic": "ਕਤਾਰਬੱਧ ਕਾਰਵਾਈ ਅਸਫਲ ਰਹੀ। ਕਾਰਵਾਈ ਦੁਬਾਰਾ ਕਰੋ।"
+    },
+    "analysisMode": {
+      "auto": "ਆਟੋ",
+      "shallow": "ਸਤਹੀ",
+      "deep": "ਡੂੰਘਾ"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "{{name}} ਨੂੰ ਪਸੰਦੀਦਾ ਵਿੱਚ ਜੋੜੋ",
       "removeFromFavorites": "{{name}} ਨੂੰ ਪਸੰਦੀਦਾ ਤੋਂ ਹਟਾਓ",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "ਸੈਸ਼ਨ ਮਾਡਲ"
     },
     "attachmentPreview": {
       "openFailedRetry": "ਫਾਈਲ ਖੋਲ੍ਹਣ ਵਿੱਚ ਅਸਫਲ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "ਕ੍ਰੈਡਿਟ ਜੋੜੋ",
-    "description": "ਵਰਤੋਂ ਚਲਦੀ ਰੱਖਣ ਲਈ ਕ੍ਰੈਡਿਟ ਜੋੜੋ।"
+    "description": "ਵਰਤੋਂ ਚਲਦੀ ਰੱਖਣ ਲਈ ਕ੍ਰੈਡਿਟ ਜੋੜੋ।",
+    "billingPage": "ਬਿਲਿੰਗ ਪੰਨਾ"
   },
   "deviceSessions": {
     "couldNotLoad": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "ਖਰੀਦਾਂ ਬਹਾਲ ਕਰਨ ਵਿੱਚ ਅਸਫਲ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "purchaseFailed": "ਖਰੀਦ ਪੂਰੀ ਕਰਨ ਵਿੱਚ ਅਸਫਲ।",
     "purchaseStartFailed": "ਐਪ ਸਟੋਰ ਖਰੀਦ ਸ਼ੁਰੂ ਕਰਨ ਵਿੱਚ ਅਸਫਲ।",
-    "purchaseOwnedByAnotherAccount": "ਇਸ Apple ਖਾਤੇ 'ਤੇ Kilo Pass ਵੱਖਰੇ Kilo ਖਾਤੇ ਨਾਲ ਸਬੰਧਤ ਹੈ।"
+    "purchaseOwnedByAnotherAccount": "ਇਸ Apple ਖਾਤੇ 'ਤੇ Kilo Pass ਵੱਖਰੇ Kilo ਖਾਤੇ ਨਾਲ ਸਬੰਧਤ ਹੈ।",
+    "couldNotConnectToAppStore": "App Store ਨਾਲ ਕਨੈਕਟ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "noMatchingProducts": "App Store ਦੁਆਰਾ ਕੋਈ ਮੇਲ ਖਾਂਦੇ Kilo Pass ਉਤਪਾਦ ਵਾਪਸ ਨਹੀਂ ਕੀਤੇ ਗਏ।",
+    "purchaseMissingSignedTransaction": "App Store ਖਰੀਦ ਵਿੱਚ ਦਸਤਖਤ ਕੀਤਾ ਟ੍ਰਾਂਜ਼ੈਕਸ਼ਨ JWS ਸ਼ਾਮਲ ਨਹੀਂ ਸੀ।"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "ਸੁਧਾਰ ਦੀ ਲੋੜ ਹੈ",
     "sorryTitle": "ਇਹ ਸੁਣ ਕੇ ਸਾਨੂੰ ਅਫਸੋਸ ਹੈ!",
     "sorryMessage": "ਕਿਰਪਾ ਕਰਕੇ ਸਾਨੂੰ ਦੱਸੋ ਕਿ ਕੀ ਸੁਧਾਰ ਕਰਨ ਦੀ ਲੋੜ ਹੈ। ਐਪ ਦੀ ਜ਼ਿੰਮੇਵਾਰ ਇੰਜੀਨੀਅਰ ਹਰ ਇੱਕ ਰਿਪੋਰਟ ਪੜ੍ਹਦਾ ਹੈ!",
-    "emailUs": "ਸਾਨੂੰ ਈਮੇਲ ਕਰੋ"
+    "emailUs": "ਸਾਨੂੰ ਈਮੇਲ ਕਰੋ",
+    "emailSubject": "ਮੋਬਾਈਲ ਐਪ ਫੀਡਬੈਕ"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "ਕੋਈ ਕ੍ਰੈਡਿਟ ਗਤੀਵਿਧੀ ਨਹੀਂ",
       "expires": "{{date}} ਨੂੰ ਖਤਮ ਹੁੰਦਾ ਹੈ",
       "title": "ਕ੍ਰੈਡਿਟ ਗਤੀਵਿਧੀ",
-      "transactionFallback": "ਕ੍ਰੈਡਿਟ ਲੈਣ-ਦੇਣ"
+      "transactionFallback": "ਕ੍ਰੈਡਿਟ ਲੈਣ-ਦੇਣ",
+      "category": {
+        "organization_custom": "ਸੰਗਠਨ ਕਸਟਮ",
+        "parent_to_child_transfer_in": "ਪੇਰੈਂਟ ਤੋਂ ਚਾਈਲਡ ਟ੍ਰਾਂਸਫਰ (ਅੰਦਰ)",
+        "parent_to_child_transfer_out": "ਪੇਰੈਂਟ ਤੋਂ ਚਾਈਲਡ ਟ੍ਰਾਂਸਫਰ (ਬਾਹਰ)",
+        "oss-sponsorship": "OSS-ਸਪਾਂਸਰਸ਼ਿਪ",
+        "oss-monthly-reset": "OSS-ਮਾਸਿਕ ਰੀਸੈਟ",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "ਲੇਖਾ ਸਮਾਯੋਜਨ",
+        "credits_expired": "ਕ੍ਰੈਡਿਟ ਮਿਆਦ ਪੁੱਗ ਗਏ"
+      }
     },
     "inviteMember": {
       "emailError": "ਵੈਧ ਈਮੇਲ ਪਤਾ ਦਰਜ ਕਰੋ",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "ਇਨਵੌਇਸ ਹਰ ਬਿਲਿੰਗ ਚੱਕਰ 'ਤੇ ਆਪਣੇ ਆਪ ਤਿਆਰ ਕੀਤੇ ਜਾਂਦੇ ਹਨ ਅਤੇ ਤੁਹਾਡੀ ਸੰਸਥਾ ਦੇ ਬਿਲ ਹੋਣ 'ਤੇ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
       "emptyTitle": "ਕੋਈ ਇਨਵੌਇਸ ਨਹੀਂ",
       "invoiceFallback": "ਇਨਵੌਇਸ",
-      "statusOpen": "ਖੁੱਲ੍ਹਾ",
-      "statusPaid": "ਅਦਾ ਕੀਤਾ",
-      "statusVoid": "ਅਵੈਧ",
       "title": "ਇਨਵੌਇਸ",
       "downloadFailed": "ਇਨਵੌਇਸ ਡਾਊਨਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਚੈੱਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "sharingUnavailable": "ਇਸ ਡਿਵਾਈਸ 'ਤੇ ਸਾਂਝਾ ਕਰਨਾ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।"
+      "sharingUnavailable": "ਇਸ ਡਿਵਾਈਸ 'ਤੇ ਸਾਂਝਾ ਕਰਨਾ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+      "status": {
+        "paid": "ਅਦਾ ਕੀਤਾ",
+        "open": "ਖੁੱਲ੍ਹਾ",
+        "void": "ਅਵੈਧ",
+        "draft": "ਡਰਾਫਟ",
+        "uncollectible": "ਅਵਸੂਲਯੋਗ",
+        "unknown": "ਅਣਜਾਣ"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "ਇਕੱਠਾ ਕੀਤਾ ਗਿਆ ਡੇਟਾ",
     "free": "ਮੁਫਤ",
-    "couldNotUpdateFavorites": "ਪਸੰਦੀਦਾ ਅੱਪਡੇਟ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ"
+    "couldNotUpdateFavorites": "ਪਸੰਦੀਦਾ ਅੱਪਡੇਟ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ",
+    "thinkingEffort": {
+      "none": "ਕੋਈ ਨਹੀਂ",
+      "minimal": "ਘੱਟੋ-ਘੱਟ",
+      "low": "ਨੀਵਾਂ",
+      "medium": "ਦਰਮਿਆਨਾ",
+      "high": "ਉੱਚਾ",
+      "xhigh": "ਬਹੁਤ ਉੱਚਾ",
+      "max": "ਅਧਿਕਤਮ"
+    }
   }
 }

@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} ተመርጧል፣ ምርጫውን ለመቀየር ይንኩ",
       "truncationBanner": "ከ{{total}} የተለወጡ ፋይሎች ውስጥ የመጀመሪያዎቹን {{limit}} ያሳያል — GitHub API ገደብ",
-      "tapToComment": "{{label}}፣ አስተያየት ለመስጠት ይንኩ"
+      "tapToComment": "{{label}}፣ አስተያየት ለመስጠት ይንኩ",
+      "statusAdded": "ታክሏል",
+      "statusContext": "አውድ",
+      "statusDeleted": "ተሰርዟል"
     },
     "linkPasteClipboardEmpty": "ቅንጥብ ሰሌዳው ባዶ ነው",
     "linkPasteNotAPullRequest": "የGitHub ፑል እንደጠየቀ አገናኝ አይደለም",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "ይህ ግምገማ እንዳለ ሊቀርብ አይችልም። PR ተለውጦ ሊሆን ይችላል፣ ወይም የራስዎን የጎተራ ጥያቄ መገምገም አይችሉም።",
       "couldNotPostComment": "አስተያየት መለጠፍ አልተቻለም።",
       "couldNotSubmitReview": "ግምገማውን ማስገባት አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።"
+    },
+    "operation": {
+      "couldNotReply": "መልስ መስጠት አልተቻለም።",
+      "couldNotCompleteAction": "ይህን እርምጃ ማጠናቀቅ አልተቻለም።",
+      "mergeResultDefaultError": "GitHub ውህደቱን አላጠናቀቀም።"
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "subscriptionCancels": "ምዝገባ {{date}} ይሰረዛል",
       "trialDaysRemaining": "ሙከራ፡ {{remaining}} ቀርተዋል",
       "trialEndingSoon": "ሙከራ በቅርቡ ያበቃል፡ {{remaining}}",
-      "lessThanOneDay": "ከ1 ቀን በታች"
+      "lessThanOneDay": "ከ1 ቀን በታች",
+      "planName": {
+        "commit": "አስተያይ",
+        "standard": "መደበኛ"
+      }
     },
     "changelog": {
       "title": "ምን አዲስ",
@@ -1189,7 +1201,8 @@
       "strongArm": "ጠንካራ ክንድ",
       "talisman": "ታሊስማን"
     },
-    "remoteSpawnFilesNotSupported": "ይህ አጋጣሚ ፋይሎች መቀበል አይችልም።"
+    "remoteSpawnFilesNotSupported": "ይህ አጋጣሚ ፋይሎች መቀበል አይችልም።",
+    "instanceSwitcherTitle": "የKiloClaw አጋጣሚ"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "አልተሳካም",
       "cancelled": "ተሰርዟል",
       "interrupted": "ተቋርጧል"
-    }
+    },
+    "reviewStyle": {
+      "strict": "ጥብቅ",
+      "balanced": "ሚዛናዊ",
+      "lenient": "ገር",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "ደህንነት",
+      "performance": "አፈጻጸም",
+      "bugs": "ሳንካዎች",
+      "style": "ዘይቤ",
+      "testing": "ሙከራ",
+      "documentation": "ሰነዶች"
+    },
+    "gateThreshold": {
+      "off": "ጠፍቷል",
+      "all": "ሁሉም",
+      "warning": "ማስጠንቀቂያ",
+      "critical": "ወሳኝ"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "የኮድ ገምጋሚ ትኩረት ይፈልጋል",
+        "description": "የኮድ ገምጋሚ የተሰናከለው Kilo በንቁ የGitHub መተግበሪያ ጭነት ወደዚህ መጋዘን መድረስ ስለማይችል ነው። የGitHub መተግበሪያ ጭነቱን ያዘምኑ፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።",
+        "recoveryLabel": "የGitHub መተግበሪያውን ያዘምኑ"
+      },
+      "githubIpAllowList": {
+        "title": "የኮድ ገምጋሚ ትኩረት ይፈልጋል",
+        "description": "የኮድ ገምጋሚ የተሰናከለው ይህ የGitHub ድርጅት Kiloን የሚያግድ የIP ፈቃድ ዝርዝር ስለሚጠቀም ነው። ለእርዳታ hi@kilocode.aiን ያግኙ፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።",
+        "recoveryLabel": "ድጋፍን ያግኙ"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "የኮድ ገምጋሚ ትኩረት ይፈልጋል",
+        "description": "የኮድ ገምጋሚ የተሰናከለው Kilo ለዚህ ፕሮጀክት የGitLab የፕሮጀክት መዳረሻ ቶከን መፍጠር ስለማይችል ነው። የMaintainer መዳረሻ ይስጡ ወይም የፕሮጀክት መዳረሻ ቶከኖችን ያንቁ፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።",
+        "recoveryLabel": "የGitLab ውህደትን ያዘምኑ"
+      },
+      "byokInvalidKey": {
+        "title": "የኮድ ገምጋሚ ትኩረት ይፈልጋል",
+        "description": "የኮድ ገምጋሚ የተሰናከለው የተመረጠው የBYOK API ቁልፍ ልክ ያልሆነ፣ የተሰረዘ ወይም ፍቃድ የሌለው ስለሆነ ነው። ቁልፉን ያዘምኑ ወይም ሌላ ሞዴል ይምረጡ፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።",
+        "recoveryLabel": "የBYOK ቅንብሮችን ያዘምኑ"
+      },
+      "selectedModelUnavailable": {
+        "title": "የኮድ ገምጋሚ ትኩረት ይፈልጋል",
+        "description": "የኮድ ገምጋሚ የተሰናከለው የተመረጠው ሞዴል ለክላውድ ወኪል ክፍለ-ጊዜዎች ስለማይገኝ ነው። የሚገኝ ሞዴል ይምረጡ፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።",
+        "recoveryLabel": "የኮድ ገምጋሚ ቅንብሮችን ያዘምኑ"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "የኮድ ገምጋሚ ትኩረት ይፈልጋል",
+        "description": "የኮድ ገምጋሚ ዛሬ ከሶስት የመጋዘን ቅጂ ጊዜ ማብቂያዎች በኋላ ተሰናክሏል። ለእርዳታ hi@kilocode.aiን ያግኙ፣ ከዚያ የኮድ ገምጋሚውን እንደገና ያንቁ።",
+        "recoveryLabel": "ድጋፍን ያግኙ"
+      }
+    },
+    "unknownError": "የማይታወቅ ስህተት"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "ግኝቱ ከራስ-ሰር ክብደት ደረጃ በታች ነው። የደህንነት መከላከያ በሮች ሲያልፉ የእጅ ጥገና አሁንም ሊጀመር ይችላል።",
       "beforeEnablement": "ራስ-ሰር ጥገና ከመንቃቱ በፊት ትንተናው ተጠናቋል። የደህንነት መከላከያ በሮች ሲያልፉ የእጅ ጥገና አሁንም ሊጀመር ይችላል።",
       "generic": "ለዚህ ግኝት ጥገና አይገኝም።"
+    },
+    "commandFailure": {
+      "ownerCapReached": "የትንታኔ አቅም ሙሉ ነው። ንቁ የሆነ ትንታኔ እስኪጠናቀቅ ይጠብቁ፣ ከዚያ እንደገና ይሞክሩ።",
+      "githubTokenUnavailable": "የGitHub ፍቃድ ትኩረት ይፈልጋል። የGitHub መተግበሪያን እንደገና ያስፈቅዱ፣ ከዚያ እንደገና ይሞክሩ።",
+      "githubAuthInvalid": "የGitHub ፍቃድ ትኩረት ይፈልጋል። የGitHub መተግበሪያን እንደገና ያስፈቅዱ፣ ከዚያ እንደገና ይሞክሩ።",
+      "findingUnavailable": "ግኝቱ ከእንግዲህ አይገኝም። ግኝቶችን ያድሱ እና ክፍት ከሆነ እንደገና ይሞክሩ።",
+      "repositoryUnavailable": "ማከማቻው ከእንግዲህ ለGitHub መተግበሪያ አይገኝም። የማከማቻ መዳረሻን ያድሱ፣ ከዚያ እንደገና ይሞክሩ።",
+      "invalidDismissTarget": "ግኝቱ ሊወገድ አይችልም ምክንያቱም የDependabot ኢላማው ልክ ያልሆነ ነው።",
+      "commandStalled": "የተሰለፈ እርምጃ በሰዓቱ አልጨረሰም። እርምጃውን እንደገና ይሞክሩ።",
+      "queueRetriesExhausted": "እርምጃው ከብዙ ሙከራዎች በኋላ ሊጠናቀቅ አልቻለም። እርምጃውን እንደገና ይሞክሩ።",
+      "queueAdmissionFailed": "የተሰለፈው እርምጃ ተቀባይነት ማግኘት አልቻለም። እርምጃውን እንደገና ይሞክሩ።",
+      "generic": "የተሰለፈ እርምጃ አልተሳካም። እርምጃውን እንደገና ይሞክሩ።"
+    },
+    "analysisMode": {
+      "auto": "አውቶ",
+      "shallow": "ጥልቀት የሌለው",
+      "deep": "ጥልቅ"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "{{name}} ወደ ተወዳጆች ያክሉ",
       "removeFromFavorites": "{{name}} ከተወዳጆች ያስወግዱ",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "መካ"
+      "thinkingEffortMedium": "መካ",
+      "sessionModel": "የክፍለ-ጊዜ ሞዴል"
     },
     "attachmentPreview": {
       "openFailedRetry": "ፋይሉን መክፈት አልተሳካም። እባክዎ እንደገና ይሞክሩ።",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "ክሬዲት ያክሉ",
-    "description": "አጠቃቀሙን ለመቀጠል ክሬዲት ያክሉ።"
+    "description": "አጠቃቀሙን ለመቀጠል ክሬዲት ያክሉ።",
+    "billingPage": "የክፍያ መለያ ገጽ"
   },
   "deviceSessions": {
     "couldNotLoad": "ክፍለ-ጊዜዎችን መጫን አልተቻለም",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "ግዢዎችን መመለስ አልተሳካም። እንደገና ይሞክሩ።",
     "purchaseFailed": "ግዢውን ማጠናቀቅ አልተሳካም።",
     "purchaseStartFailed": "የApp Store ግዢን መጀመር አልተሳካም።",
-    "purchaseOwnedByAnotherAccount": "በዚህ Apple Account ላይ ያለው Kilo Pass የሌላ የKilo መለያ ነው።"
+    "purchaseOwnedByAnotherAccount": "በዚህ Apple Account ላይ ያለው Kilo Pass የሌላ የKilo መለያ ነው።",
+    "couldNotConnectToAppStore": "ከApp Store ጋር መገናኘት አልተቻለም። ግንኙነትዎን ያረጋግጡና እንደገና ይሞክሩ።",
+    "noMatchingProducts": "App Store የሚዛመዱ የKilo Pass ምርቶችን አልመለሰም።",
+    "purchaseMissingSignedTransaction": "የApp Store ግዢ የተፈረመ የግብይት JWS አላካተተም።"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "ማሻሻያ ይፈልጋል",
     "sorryTitle": "ይህን ስለሰማን አዝነናል!",
     "sorryMessage": "እባክዎ ምን ማሻሻል እንዳለበት ያሳውቁን። የመተግበሪያው ሃላፊ መሐንዲስ እያንዳንዱን ሪፖርት ያነባል!",
-    "emailUs": "ይፃፉልን"
+    "emailUs": "ይፃፉልን",
+    "emailSubject": "የሞባይል መተግበሪያ አስተያየት"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "ምንም የክሬዲት እንቅስቃሴ የለም",
       "expires": "የሚያበቃው {{date}}",
       "title": "የክሬዲት እንቅስቃሴ",
-      "transactionFallback": "የክሬዲት ግብይት"
+      "transactionFallback": "የክሬዲት ግብይት",
+      "category": {
+        "organization_custom": "የድርጅት ብጁ",
+        "parent_to_child_transfer_in": "ከወላጅ ወደ ልጅ ዝውውር ገቢ",
+        "parent_to_child_transfer_out": "ከወላጅ ወደ ልጅ ዝውውር ወጪ",
+        "oss-sponsorship": "የOSS ስፖንሰርሺፕ",
+        "oss-monthly-reset": "ወርሃዊ የOSS ዳግም ማስጀመር",
+        "team-topup-bonus-2025": "የቡድን ሙሌት ጉርሻ-2025",
+        "accounting_adjustment": "የሂሳብ ማስተካከያ",
+        "credits_expired": "ክሬዲቶች ጊዜያቸው አልፏል"
+      }
     },
     "inviteMember": {
       "emailError": "ትክክለኛ የኢሜይል አድራሻ ያስገቡ",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "ደረሰኞች በእያንዳንዱ የክፍያ ዑደት በራስ-ሰር ይመነጫሉ እና ድርጅትዎ ከተከፈለ በኋላ እዚህ ይታያሉ።",
       "emptyTitle": "ምንም ደረሰኞች የሉም",
       "invoiceFallback": "ደረሰኝ",
-      "statusOpen": "ክፍት",
-      "statusPaid": "የተከፈለ",
-      "statusVoid": "ልክ ያልሆነ",
       "title": "ደረሰኞች",
       "downloadFailed": "ደረሰኙን ማውረድ አልተቻለም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
-      "sharingUnavailable": "በዚህ መሣሪያ ላይ ማጋራት አይገኝም።"
+      "sharingUnavailable": "በዚህ መሣሪያ ላይ ማጋራት አይገኝም።",
+      "status": {
+        "paid": "የተከፈለ",
+        "open": "ክፍት",
+        "void": "ልክ ያልሆነ",
+        "draft": "ረቂቅ",
+        "uncollectible": "የማይሰበሰብ",
+        "unknown": "የማይታወቅ"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "የተሰበሰበ መረጃ",
     "free": "ነፃ",
-    "couldNotUpdateFavorites": "ተወዳጆችን ማዘመን አልተቻለም"
+    "couldNotUpdateFavorites": "ተወዳጆችን ማዘመን አልተቻለም",
+    "thinkingEffort": {
+      "none": "ምንም",
+      "minimal": "በጣም ትንሽ",
+      "low": "ዝቅተኛ",
+      "medium": "መካከለኛ",
+      "high": "ከፍተኛ",
+      "xhigh": "እጅግ ከፍተኛ",
+      "max": "ከፍተኛው"
+    }
   }
 }

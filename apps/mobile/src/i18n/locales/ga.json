@@ -594,7 +594,10 @@
     "diff": {
       "selectedTapToChange": "Roghnaithe {{label}}, tapáil chun an roghnú a athrú",
       "tapToComment": "{{label}}, tapáil chun trácht a dhéanamh",
-      "truncationBanner": "Ag taispeáint an chéad {{limit}} de na {{total}} chomhad athraithe — teorainn API GitHub"
+      "truncationBanner": "Ag taispeáint an chéad {{limit}} de na {{total}} chomhad athraithe — teorainn API GitHub",
+      "statusAdded": "Curtha leis",
+      "statusContext": "Comhthéacs",
+      "statusDeleted": "Scriosta"
     },
     "linkPasteClipboardEmpty": "Tá an ghearrthaisce folamh",
     "linkPasteNotAPullRequest": "Ní nasc pull request GitHub é seo",
@@ -608,6 +611,11 @@
       "reviewNotSubmitted": "Ní féidir an t-athbhreithniú seo a sheoladh mar atá sé. B'fhéidir gur athraíodh an PR, nó ní féidir leat do iarratas tarraingthe féin a athbhreithniú.",
       "couldNotPostComment": "Níorbh fhéidir an trácht a phostáil.",
       "couldNotSubmitReview": "Níorbh fhéidir an t-athbhreithniú a sheoladh. Seiceáil do nasc agus bain triail as arís."
+    },
+    "operation": {
+      "couldNotReply": "Níorbh fhéidir freagra a thabhairt.",
+      "couldNotCompleteAction": "Níorbh fhéidir an gníomh seo a chríochnú.",
+      "mergeResultDefaultError": "Níor chríochnaigh GitHub an cumaisc."
     }
   },
   "notifications": {
@@ -845,7 +853,11 @@
       "paymentPastDue": "Íocaíocht thar téarma. Nuashonraigh do mhodh íocaíochta le do thoil.",
       "subscriptionCancels": "Cealaítear an síntiús {{date}}",
       "trialDaysRemaining": "Triail: {{remaining}} fágtha",
-      "trialEndingSoon": "Triail ag críochnú go luath: {{remaining}}"
+      "trialEndingSoon": "Triail ag críochnú go luath: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Caighdeánach"
+      }
     },
     "changelog": {
       "title": "Cad atá Nua",
@@ -1216,7 +1228,8 @@
       "strongArm": "Lámh láidir",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Ní féidir leis an gcás seo comhaid a fháil."
+    "remoteSpawnFilesNotSupported": "Ní féidir leis an gcás seo comhaid a fháil.",
+    "instanceSwitcherTitle": "Instance KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1414,7 +1427,60 @@
       "failed": "Theip",
       "cancelled": "Cealaithe",
       "interrupted": "Idirbhriste"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Dian",
+      "balanced": "Cothrom",
+      "lenient": "Maithiúnach",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Slándáil",
+      "performance": "Feidhmíocht",
+      "bugs": "Fabhtanna",
+      "style": "Stíl",
+      "testing": "Tástáil",
+      "documentation": "Doiciméadú"
+    },
+    "gateThreshold": {
+      "off": "As",
+      "all": "Uile",
+      "warning": "Rabhadh",
+      "critical": "Criticiúil"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Teastaíonn aird ar Athbhreithneoir Cóid",
+        "description": "Díchumasaíodh Athbhreithneoir Cóid toisc nach féidir le Kilo rochtain a fháil ar an stór seo le suiteáil ghníomhach GitHub App. Nuashonraigh suiteáil GitHub App, ansin cumasaigh Athbhreithneoir Cóid arís.",
+        "recoveryLabel": "Nuashonraigh GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Teastaíonn aird ar Athbhreithneoir Cóid",
+        "description": "Díchumasaíodh Athbhreithneoir Cóid toisc go n-úsáideann an eagraíocht GitHub seo liosta ceadaithe IP a chuireann bac ar Kilo. Déan teagmháil le hi@kilocode.ai le haghaidh cabhrach, ansin cumasaigh Athbhreithneoir Cóid arís.",
+        "recoveryLabel": "Déan teagmháil le tacaíocht"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Teastaíonn aird ar Athbhreithneoir Cóid",
+        "description": "Díchumasaíodh Athbhreithneoir Cóid toisc nach féidir le Kilo Token Rochtana Tionscadail GitLab a chruthú don tionscadal seo. Deonaigh rochtain Cothaitheora nó cumasaigh Token Rochtana Tionscadail, ansin cumasaigh Athbhreithneoir Cóid arís.",
+        "recoveryLabel": "Nuashonraigh comhtháthú GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Teastaíonn aird ar Athbhreithneoir Cóid",
+        "description": "Díchumasaíodh Athbhreithneoir Cóid toisc go bhfuil an eochair API BYOK roghnaithe neamhbhailí, cúlghairthe, nó gan cead. Nuashonraigh an eochair nó roghnaigh samhail eile, ansin cumasaigh Athbhreithneoir Cóid arís.",
+        "recoveryLabel": "Nuashonraigh socruithe BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Teastaíonn aird ar Athbhreithneoir Cóid",
+        "description": "Díchumasaíodh Athbhreithneoir Cóid toisc nach bhfuil an tsamhail roghnaithe ar fáil do sheisiúin ghníomhaire scamall. Roghnaigh samhail atá ar fáil, ansin cumasaigh Athbhreithneoir Cóid arís.",
+        "recoveryLabel": "Nuashonraigh socruithe Athbhreithneora Cóid"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Teastaíonn aird ar Athbhreithneoir Cóid",
+        "description": "Díchumasaíodh Athbhreithneoir Cóid tar éis trí mhoill chlónála stóir inniu. Déan teagmháil le hi@kilocode.ai le haghaidh cabhrach, ansin cumasaigh Athbhreithneoir Cóid arís.",
+        "recoveryLabel": "Déan teagmháil le tacaíocht"
+      }
+    },
+    "unknownError": "Earráid anaithnid"
   },
   "securityAgent": {
     "filter": {
@@ -1966,6 +2032,23 @@
       "belowThreshold": "Tá an fhionnachtain faoi bhun na tairsí déine uathoibríche. Is féidir leasú láimhe a thosú fós nuair a ritheann na geataí sábháilteachta.",
       "beforeEnablement": "Críochnaíodh an anailís sular cumasaíodh Uath-fheabhsú. Is féidir leasú láimhe a thosú fós nuair a ritheann na geataí sábháilteachta.",
       "generic": "Níl leasú ar fáil don fhionnachtain seo."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Tá acmhainn na hanailíse lán. Fan go gcríochnóidh anailís ghníomhach, ansin bain triail as arís.",
+      "githubTokenUnavailable": "Teastaíonn aird ar údarú GitHub. Údaraigh GitHub App arís, ansin bain triail as arís.",
+      "githubAuthInvalid": "Teastaíonn aird ar údarú GitHub. Údaraigh GitHub App arís, ansin bain triail as arís.",
+      "findingUnavailable": "Níl an fhionnachtain ar fáil a thuilleadh. Athnuaigh fionnachtana agus bain triail as arís má fhanann sí oscailte.",
+      "repositoryUnavailable": "Níl an stór ar fáil do GitHub App a thuilleadh. Athnuaigh rochtain stóir, ansin bain triail as arís.",
+      "invalidDismissTarget": "Ní féidir an fhionnachtain a dhísheachaint toisc go bhfuil a sprioc Dependabot neamhbhailí.",
+      "commandStalled": "Níor chríochnaigh an gníomh scuaineáilte in am. Déan an gníomh arís.",
+      "queueRetriesExhausted": "Níorbh fhéidir an gníomh a chríochnú tar éis roinnt iarrachtaí. Déan an gníomh arís.",
+      "queueAdmissionFailed": "Níorbh fhéidir an gníomh scuaineáilte a ligean isteach. Déan an gníomh arís.",
+      "generic": "Theip ar an ngníomh scuaineáilte. Déan an gníomh arís."
+    },
+    "analysisMode": {
+      "auto": "Uathoibríoch",
+      "shallow": "Éadomhain",
+      "deep": "Domhain"
     }
   },
   "agents": {
@@ -2447,7 +2530,8 @@
       "addToFavorites": "Cuir {{name}} leis na cinn is fearr leat",
       "removeFromFavorites": "Bain {{name}} ó na cinn is fearr leat",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Samhail an tseisiúin"
     },
     "attachmentPreview": {
       "openFailedRetry": "Theip ar an gcomhad a oscailt. Bain triail as arís.",
@@ -2582,7 +2666,8 @@
   },
   "addCredits": {
     "cta": "Cuir creidmheasanna leis",
-    "description": "Cuir creidmheasanna leis le húsáid a choinneáil ar siúl."
+    "description": "Cuir creidmheasanna leis le húsáid a choinneáil ar siúl.",
+    "billingPage": "leathanach billeála"
   },
   "deviceSessions": {
     "couldNotLoad": "Níorbh fhéidir seisiúin a lódáil",
@@ -2770,7 +2855,10 @@
     "restoreFailed": "Theip ar na ceannacháin a chur ar ais. Bain triail as arís.",
     "purchaseFailed": "Theip ar an gceannach a chríochnú.",
     "purchaseStartFailed": "Theip ar cheannach App Store a thosú.",
-    "purchaseOwnedByAnotherAccount": "Baineann an Kilo Pass ar an Apple Account seo le cuntas Kilo éagsúil."
+    "purchaseOwnedByAnotherAccount": "Baineann an Kilo Pass ar an Apple Account seo le cuntas Kilo éagsúil.",
+    "couldNotConnectToAppStore": "Níorbh fhéidir ceangal le App Store. Seiceáil do cheangal agus bain triail as arís.",
+    "noMatchingProducts": "Níor fhill App Store aon táirgí Kilo Pass comhoiriúnacha.",
+    "purchaseMissingSignedTransaction": "Ní raibh idirbheart sínithe JWS san áireamh i gceannach App Store."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2866,7 +2954,8 @@
     "needsWork": "Teastaíonn obair",
     "sorryTitle": "Tá brón orainn é sin a chloisteáil!",
     "sorryMessage": "Inis dúinn cad a chaithfidh a bheith níos fearr. Léann an t-innealtóir atá i gceannas ar an aip gach tuarascáil!",
-    "emailUs": "Seol ríomhphost chugainn"
+    "emailUs": "Seol ríomhphost chugainn",
+    "emailSubject": "aiseolas ar an aip shoghluaiste"
   },
   "organization": {
     "boundary": {
@@ -2883,7 +2972,17 @@
       "emptyTitle": "Níl aon ghníomhaíocht creidmheasa",
       "expires": "Imíonn in éag {{date}}",
       "title": "Gníomhaíocht creidmheasa",
-      "transactionFallback": "Idirbheart creidmheasa"
+      "transactionFallback": "Idirbheart creidmheasa",
+      "category": {
+        "organization_custom": "Saincheaptha eagraíochta",
+        "parent_to_child_transfer_in": "Aistriú isteach ó thuismitheoir go leanbh",
+        "parent_to_child_transfer_out": "Aistriú amach ó thuismitheoir go leanbh",
+        "oss-sponsorship": "Urraíocht OSS",
+        "oss-monthly-reset": "Athshocrú míosúil OSS",
+        "team-topup-bonus-2025": "Bónas forlíonta foirne 2025",
+        "accounting_adjustment": "Coigeartú cuntasaíochta",
+        "credits_expired": "Creidmheasanna imithe in éag"
+      }
     },
     "inviteMember": {
       "emailError": "Iontráil seoladh ríomhphoist bailí",
@@ -2900,12 +2999,17 @@
       "emptyDescription": "Gintear sonraisc go huathoibríoch gach timthriall billeála agus taispeánfar iad anseo nuair a bheidh d'eagraíocht billeáilte.",
       "emptyTitle": "Níl aon sonraisc",
       "invoiceFallback": "Sonrasc",
-      "statusOpen": "Ar oscailt",
-      "statusPaid": "Íoctha",
-      "statusVoid": "Neamhní",
       "title": "Sonraisc",
       "downloadFailed": "Níorbh fhéidir an tsonrasc a íoslódáil. Seiceáil do nasc agus bain triail as arís.",
-      "sharingUnavailable": "Níl roinnt ar fáil ar an ngléas seo."
+      "sharingUnavailable": "Níl roinnt ar fáil ar an ngléas seo.",
+      "status": {
+        "paid": "Íoctha",
+        "open": "Ar oscailt",
+        "void": "Neamhní",
+        "draft": "Dréacht",
+        "uncollectible": "Dobhailithe",
+        "unknown": "Anaithnid"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3034,6 +3138,15 @@
   "models": {
     "dataCollected": "Sonraí bailithe",
     "free": "Saor in aisce",
-    "couldNotUpdateFavorites": "Níorbh fhéidir na cinn is fearr leat a nuashonrú"
+    "couldNotUpdateFavorites": "Níorbh fhéidir na cinn is fearr leat a nuashonrú",
+    "thinkingEffort": {
+      "none": "Aon cheann",
+      "minimal": "Íosta",
+      "low": "Íseal",
+      "medium": "Meánach",
+      "high": "Ard",
+      "xhigh": "An-ard",
+      "max": "Uasmhéid"
+    }
   }
 }

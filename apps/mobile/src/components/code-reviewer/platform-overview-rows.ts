@@ -13,7 +13,29 @@ import { i18n } from '@/i18n';
 import { formatList, formatNumber } from '@/lib/format';
 import { type PLATFORM_CAPABILITIES, type ReviewConfigData } from '@/lib/code-reviewer-config';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
-import { capitalize } from '@/lib/utils';
+
+const reviewStyleLabels = {
+  strict: 'codeReviewer.reviewStyle.strict',
+  balanced: 'codeReviewer.reviewStyle.balanced',
+  lenient: 'codeReviewer.reviewStyle.lenient',
+  roast: 'codeReviewer.reviewStyle.roast',
+} as const;
+
+const focusAreaLabels = {
+  security: 'codeReviewer.focusArea.security',
+  performance: 'codeReviewer.focusArea.performance',
+  bugs: 'codeReviewer.focusArea.bugs',
+  style: 'codeReviewer.focusArea.style',
+  testing: 'codeReviewer.focusArea.testing',
+  documentation: 'codeReviewer.focusArea.documentation',
+} as const;
+
+const gateThresholdLabels = {
+  off: 'codeReviewer.gateThreshold.off',
+  all: 'codeReviewer.gateThreshold.all',
+  warning: 'codeReviewer.gateThreshold.warning',
+  critical: 'codeReviewer.gateThreshold.critical',
+} as const;
 
 type OverviewRow = {
   field: string;
@@ -50,7 +72,7 @@ export function buildOverviewRows({
       field: 'style',
       icon: MessageSquareText,
       title: i18n.t('codeReviewer.overview.reviewStyle'),
-      subtitle: capitalize(data.reviewStyle),
+      subtitle: i18n.t(reviewStyleLabels[data.reviewStyle]),
     },
     {
       field: 'focus-areas',
@@ -58,7 +80,15 @@ export function buildOverviewRows({
       title: i18n.t('codeReviewer.overview.focusAreas'),
       subtitle:
         data.focusAreas.length > 0
-          ? formatList(data.focusAreas.map(capitalize), i18n.language)
+          ? formatList(
+              // An area the app does not know yet reads as its raw code.
+              data.focusAreas.map(area =>
+                area in focusAreaLabels
+                  ? i18n.t(focusAreaLabels[area as keyof typeof focusAreaLabels])
+                  : area
+              ),
+              i18n.language
+            )
           : i18n.t('codeReviewer.overview.allAreas'),
     },
     // Custom Instructions is deprecated in favour of REVIEW.md, so the row is
@@ -86,7 +116,7 @@ export function buildOverviewRows({
             field: 'gate',
             icon: Gauge,
             title: i18n.t('codeReviewer.overview.mergeGate'),
-            subtitle: capitalize(data.gateThreshold),
+            subtitle: i18n.t(gateThresholdLabels[data.gateThreshold]),
           },
         ]
       : []),

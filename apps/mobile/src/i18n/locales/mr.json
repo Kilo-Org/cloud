@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} निवडले, निवड बदलण्यासाठी टॅप करा",
       "tapToComment": "{{label}}, टिप्पणी करण्यासाठी टॅप करा",
-      "truncationBanner": "{{total}} बदललेल्या फाइल्सपैकी पहिल्या {{limit}} दाखवत आहे — GitHub API मर्यादा"
+      "truncationBanner": "{{total}} बदललेल्या फाइल्सपैकी पहिल्या {{limit}} दाखवत आहे — GitHub API मर्यादा",
+      "statusAdded": "जोडले",
+      "statusContext": "संदर्भ",
+      "statusDeleted": "हटवले"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड रिकामा आहे",
     "linkPasteNotAPullRequest": "ही GitHub पुल रिक्वेस्ट लिंक नाही",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "हा पुनरावलोकन जसा आहे तसा सादर करता येत नाही. PR बदलला असू शकतो, किंवा तुम्ही तुमच्या स्वतःच्या पुल रिक्वेस्टचे पुनरावलोकन करू शकत नाही.",
       "couldNotPostComment": "टिप्पणी पोस्ट करता आली नाही.",
       "couldNotSubmitReview": "पुनरावलोकन सादर करता आले नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा."
+    },
+    "operation": {
+      "couldNotReply": "उत्तर देता आले नाही.",
+      "couldNotCompleteAction": "ही क्रिया पूर्ण करता आली नाही.",
+      "mergeResultDefaultError": "GitHub ने मर्ज पूर्ण केले नाही."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "पेमेंट थकीत आहे. कृपया तुमची पेमेंट पद्धत अद्यतनित करा.",
       "subscriptionCancels": "सदस्यत्व {{date}} रोजी रद्द होते",
       "trialDaysRemaining": "ट्रायल: {{remaining}}",
-      "trialEndingSoon": "ट्रायल लवकर संपत आहे: {{remaining}}"
+      "trialEndingSoon": "ट्रायल लवकर संपत आहे: {{remaining}}",
+      "planName": {
+        "commit": "कमिट",
+        "standard": "स्टँडर्ड"
+      }
     },
     "changelog": {
       "title": "नवीन काय आहे",
@@ -1189,7 +1201,8 @@
       "strongArm": "मजबूत हात",
       "talisman": "ताईत"
     },
-    "remoteSpawnFilesNotSupported": "या इन्स्टन्सला फाइल्स मिळू शकत नाहीत."
+    "remoteSpawnFilesNotSupported": "या इन्स्टन्सला फाइल्स मिळू शकत नाहीत.",
+    "instanceSwitcherTitle": "KiloClaw इन्स्टन्स"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "अयशस्वी",
       "cancelled": "रद्द केले",
       "interrupted": "व्यत्यय आला"
-    }
+    },
+    "reviewStyle": {
+      "strict": "कठोर",
+      "balanced": "संतुलित",
+      "lenient": "उदार",
+      "roast": "रोस्ट"
+    },
+    "focusArea": {
+      "security": "सुरक्षा",
+      "performance": "कार्यक्षमता",
+      "bugs": "बग",
+      "style": "शैली",
+      "testing": "चाचणी",
+      "documentation": "दस्तऐवजीकरण"
+    },
+    "gateThreshold": {
+      "off": "बंद",
+      "all": "सर्व",
+      "warning": "चेतावणी",
+      "critical": "गंभीर"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "कोड पुनरावलोककाला लक्ष देणे आवश्यक आहे",
+        "description": "Kilo ला सक्रिय GitHub अॅप स्थापनेसह या रेपॉजिटरीमध्ये प्रवेश करता आला नाही म्हणून कोड पुनरावलोकक अक्षम केला गेला. GitHub अॅप स्थापना अद्यतनित करा, नंतर कोड पुनरावलोकक पुन्हा सक्षम करा.",
+        "recoveryLabel": "GitHub अॅप अद्यतनित करा"
+      },
+      "githubIpAllowList": {
+        "title": "कोड पुनरावलोककाला लक्ष देणे आवश्यक आहे",
+        "description": "या GitHub संस्थेने Kilo ला ब्लॉक करणारी IP परवानगी यादी वापरल्याने कोड पुनरावलोकक अक्षम केला गेला. मदतीसाठी hi@kilocode.ai वर संपर्क करा, नंतर कोड पुनरावलोकक पुन्हा सक्षम करा.",
+        "recoveryLabel": "समर्थनाशी संपर्क साधा"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "कोड पुनरावलोककाला लक्ष देणे आवश्यक आहे",
+        "description": "या प्रकल्पासाठी Kilo ला GitLab प्रोजेक्ट अॅक्सेस टोकन तयार करता आले नाही म्हणून कोड पुनरावलोकक अक्षम केला गेला. मेंटेनर प्रवेश द्या किंवा प्रोजेक्ट अॅक्सेस टोकन सक्षम करा, नंतर कोड पुनरावलोकक पुन्हा सक्षम करा.",
+        "recoveryLabel": "GitLab एकत्रीकरण अद्यतनित करा"
+      },
+      "byokInvalidKey": {
+        "title": "कोड पुनरावलोककाला लक्ष देणे आवश्यक आहे",
+        "description": "निवडलेली BYOK API की अवैध, रद्द किंवा परवानगीहीन असल्याने कोड पुनरावलोकक अक्षम केला गेला. की अद्यतनित करा किंवा दुसरे मॉडेल निवडा, नंतर कोड पुनरावलोकक पुन्हा सक्षम करा.",
+        "recoveryLabel": "BYOK सेटिंग्ज अद्यतनित करा"
+      },
+      "selectedModelUnavailable": {
+        "title": "कोड पुनरावलोककाला लक्ष देणे आवश्यक आहे",
+        "description": "निवडलेले मॉडेल क्लाउड एजंट सत्रांसाठी उपलब्ध नसल्याने कोड पुनरावलोकक अक्षम केला गेला. उपलब्ध मॉडेल निवडा, नंतर कोड पुनरावलोकक पुन्हा सक्षम करा.",
+        "recoveryLabel": "कोड पुनरावलोकक सेटिंग्ज अद्यतनित करा"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "कोड पुनरावलोककाला लक्ष देणे आवश्यक आहे",
+        "description": "आज तीन रेपॉजिटरी क्लोन टाइमआउटनंतर कोड पुनरावलोकक अक्षम केला गेला. मदतीसाठी hi@kilocode.ai वर संपर्क करा, नंतर कोड पुनरावलोकक पुन्हा सक्षम करा.",
+        "recoveryLabel": "समर्थनाशी संपर्क साधा"
+      }
+    },
+    "unknownError": "अज्ञात त्रुटी"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "शोध स्वयंचलित तीव्रता मर्यादेखाली आहे. सुरक्षा गेट्स पूर्ण झाल्यावर मॅन्युअल उपाय सुरू होऊ शकतो.",
       "beforeEnablement": "स्वयं उपाय सक्षम होण्यापूर्वी विश्लेषण पूर्ण झाले. सुरक्षा गेट्स पूर्ण झाल्यावर मॅन्युअल उपाय सुरू होऊ शकतो.",
       "generic": "या शोधासाठी उपाय अनुपलब्ध आहे."
+    },
+    "commandFailure": {
+      "ownerCapReached": "विश्लेषण क्षमता भरलेली आहे. सक्रिय विश्लेषण संपण्याची वाट पहा, नंतर पुन्हा प्रयत्न करा.",
+      "githubTokenUnavailable": "GitHub अधिकाराकडे लक्ष देणे आवश्यक आहे. GitHub अॅप पुन्हा अधिकृत करा, नंतर पुन्हा प्रयत्न करा.",
+      "githubAuthInvalid": "GitHub अधिकाराकडे लक्ष देणे आवश्यक आहे. GitHub अॅप पुन्हा अधिकृत करा, नंतर पुन्हा प्रयत्न करा.",
+      "findingUnavailable": "निष्कर्ष यापुढे उपलब्ध नाही. निष्कर्ष रीफ्रेश करा आणि तो खुला असल्यास पुन्हा प्रयत्न करा.",
+      "repositoryUnavailable": "रेपॉजिटरी GitHub अॅपसाठी यापुढे उपलब्ध नाही. रेपॉजिटरी प्रवेश रीफ्रेश करा, नंतर पुन्हा प्रयत्न करा.",
+      "invalidDismissTarget": "निष्कर्षाचे Dependabot लक्ष्य अवैध असल्याने तो नाकारता येत नाही.",
+      "commandStalled": "रांगेतील क्रिया वेळेत पूर्ण झाली नाही. क्रिया पुन्हा करा.",
+      "queueRetriesExhausted": "अनेक प्रयत्नांनंतर क्रिया पूर्ण करता आली नाही. क्रिया पुन्हा करा.",
+      "queueAdmissionFailed": "रांगेतील क्रिया स्वीकारता आली नाही. क्रिया पुन्हा करा.",
+      "generic": "रांगेतील क्रिया अयशस्वी झाली. क्रिया पुन्हा करा."
+    },
+    "analysisMode": {
+      "auto": "स्वयं",
+      "shallow": "उथळ",
+      "deep": "खोल"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "{{name}} आवडींमध्ये जोडा",
       "removeFromFavorites": "{{name}} आवडींमधून काढा",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "मध्यम"
+      "thinkingEffortMedium": "मध्यम",
+      "sessionModel": "सत्र मॉडेल"
     },
     "attachmentPreview": {
       "openFailedRetry": "फाइल उघडता आली नाही. कृपया पुन्हा प्रयत्न करा.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "क्रेडिट्स जोडा",
-    "description": "वापर सुरू ठेवण्यासाठी क्रेडिट्स जोडा."
+    "description": "वापर सुरू ठेवण्यासाठी क्रेडिट्स जोडा.",
+    "billingPage": "बिलिंग पृष्ठ"
   },
   "deviceSessions": {
     "couldNotLoad": "सत्रे लोड करता आली नाहीत",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "खरेदी पुनर्संचयित करण्यात अयशस्वी. पुन्हा प्रयत्न करा.",
     "purchaseFailed": "खरेदी पूर्ण करण्यात अयशस्वी.",
     "purchaseStartFailed": "App Store खरेदी सुरू करण्यात अयशस्वी.",
-    "purchaseOwnedByAnotherAccount": "या Apple खात्यावरील Kilo Pass वेगळ्या Kilo खात्याशी संबंधित आहे."
+    "purchaseOwnedByAnotherAccount": "या Apple खात्यावरील Kilo Pass वेगळ्या Kilo खात्याशी संबंधित आहे.",
+    "couldNotConnectToAppStore": "App Store शी कनेक्ट होता आले नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+    "noMatchingProducts": "App Store ने जुळणारी Kilo Pass उत्पादने परत केली नाहीत.",
+    "purchaseMissingSignedTransaction": "App Store खरेदीत स्वाक्षरी केलेले व्यवहार JWS समाविष्ट नव्हते."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "सुधारणा आवश्यक",
     "sorryTitle": "हे ऐकून आम्हाला वाईट वाटते!",
     "sorryMessage": "कृपया काय सुधारणे आवश्यक आहे ते कळवा. अ‍ॅपचा प्रभारी अभियंता प्रत्येक रिपोर्ट वाचतो!",
-    "emailUs": "आम्हाला ईमेल करा"
+    "emailUs": "आम्हाला ईमेल करा",
+    "emailSubject": "मोबाइल अॅप अभिप्राय"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "क्रेडिट क्रियाकलाप नाही",
       "expires": "{{date}} रोजी कालबाह्य",
       "title": "क्रेडिट क्रियाकलाप",
-      "transactionFallback": "क्रेडिट व्यवहार"
+      "transactionFallback": "क्रेडिट व्यवहार",
+      "category": {
+        "organization_custom": "संस्था कस्टम",
+        "parent_to_child_transfer_in": "पालक ते मूल हस्तांतरण (आत)",
+        "parent_to_child_transfer_out": "पालक ते मूल हस्तांतरण (बाहेर)",
+        "oss-sponsorship": "OSS प्रायोजकत्व",
+        "oss-monthly-reset": "OSS मासिक रीसेट",
+        "team-topup-bonus-2025": "टीम टॉप-अप बोनस-2025",
+        "accounting_adjustment": "लेखा समायोजन",
+        "credits_expired": "क्रेडिट कालबाह्य झाले"
+      }
     },
     "inviteMember": {
       "emailError": "वैध ईमेल पत्ता प्रविष्ट करा",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "इनव्हॉइस प्रत्येक बिलिंग चक्रात आपोआप निर्माण केले जातात आणि तुमची संस्था बिल केली जाईल तेव्हा येथे दिसतील.",
       "emptyTitle": "इनव्हॉइस नाहीत",
       "invoiceFallback": "इनव्हॉइस",
-      "statusOpen": "उघडे",
-      "statusPaid": "दिलेले",
-      "statusVoid": "रद्द",
       "title": "इनव्हॉइस",
       "downloadFailed": "इनव्हॉइस डाउनलोड करता आले नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
-      "sharingUnavailable": "या डिव्हाइसवर सामायिकरण उपलब्ध नाही."
+      "sharingUnavailable": "या डिव्हाइसवर सामायिकरण उपलब्ध नाही.",
+      "status": {
+        "paid": "दिलेले",
+        "open": "उघडे",
+        "void": "रद्द",
+        "draft": "मसुदा",
+        "uncollectible": "वसूल करता न येणारे",
+        "unknown": "अज्ञात"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "संकलित डेटा",
     "free": "मोफत",
-    "couldNotUpdateFavorites": "आवडी अद्यतनित करता आल्या नाहीत"
+    "couldNotUpdateFavorites": "आवडी अद्यतनित करता आल्या नाहीत",
+    "thinkingEffort": {
+      "none": "काहीही नाही",
+      "minimal": "किमान",
+      "low": "कमी",
+      "medium": "मध्यम",
+      "high": "उच्च",
+      "xhigh": "अति उच्च",
+      "max": "जास्तीत जास्त"
+    }
   }
 }

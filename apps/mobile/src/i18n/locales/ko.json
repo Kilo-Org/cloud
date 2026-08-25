@@ -382,7 +382,11 @@
       "paymentPastDue": "결제가 연체되었습니다. 결제 수단을 업데이트하세요.",
       "subscriptionCancels": "구독이 {{date}}에 취소됩니다",
       "trialDaysRemaining": "체험: {{remaining}} 남음",
-      "trialEndingSoon": "체험 종료 임박: {{remaining}}"
+      "trialEndingSoon": "체험 종료 임박: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "새로운 기능",
@@ -750,7 +754,8 @@
       "strongArm": "강한 팔",
       "talisman": "부적"
     },
-    "remoteSpawnFilesNotSupported": "이 인스턴스는 파일을 받을 수 없습니다."
+    "remoteSpawnFilesNotSupported": "이 인스턴스는 파일을 받을 수 없습니다.",
+    "instanceSwitcherTitle": "KiloClaw 인스턴스"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -948,7 +953,60 @@
       "failed": "실패",
       "cancelled": "취소됨",
       "interrupted": "중단됨"
-    }
+    },
+    "reviewStyle": {
+      "strict": "엄격",
+      "balanced": "균형",
+      "lenient": "관대",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "보안",
+      "performance": "성능",
+      "bugs": "버그",
+      "style": "스타일",
+      "testing": "테스트",
+      "documentation": "문서화"
+    },
+    "gateThreshold": {
+      "off": "꺼짐",
+      "all": "전체",
+      "warning": "경고",
+      "critical": "치명적"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer의 주의가 필요합니다",
+        "description": "Kilo가 활성 GitHub 앱 설치로 이 리포지토리에 액세스할 수 없어 Code Reviewer가 비활성화되었습니다. GitHub 앱 설치를 업데이트한 후 Code Reviewer를 다시 활성화하세요.",
+        "recoveryLabel": "GitHub 앱 업데이트"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer의 주의가 필요합니다",
+        "description": "이 GitHub 조직이 Kilo를 차단하는 IP 허용 목록을 사용하기 때문에 Code Reviewer가 비활성화되었습니다. 도움이 필요하면 hi@kilocode.ai에 문의한 후 Code Reviewer를 다시 활성화하세요.",
+        "recoveryLabel": "지원팀에 문의"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer의 주의가 필요합니다",
+        "description": "Kilo가 이 프로젝트에 대한 GitLab 프로젝트 액세스 토큰을 만들 수 없어 Code Reviewer가 비활성화되었습니다. Maintainer 액세스를 부여하거나 프로젝트 액세스 토큰을 활성화한 후 Code Reviewer를 다시 활성화하세요.",
+        "recoveryLabel": "GitLab 통합 업데이트"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer의 주의가 필요합니다",
+        "description": "선택한 BYOK API 키가 유효하지 않거나, 취소되었거나, 권한이 없어 Code Reviewer가 비활성화되었습니다. 키를 업데이트하거나 다른 모델을 선택한 후 Code Reviewer를 다시 활성화하세요.",
+        "recoveryLabel": "BYOK 설정 업데이트"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer의 주의가 필요합니다",
+        "description": "선택한 모델이 클라우드 에이전트 세션에 사용할 수 없어 Code Reviewer가 비활성화되었습니다. 사용 가능한 모델을 선택한 후 Code Reviewer를 다시 활성화하세요.",
+        "recoveryLabel": "Code Reviewer 설정 업데이트"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer의 주의가 필요합니다",
+        "description": "오늘 리포지토리 복제 시간 초과가 세 번 발생하여 Code Reviewer가 비활성화되었습니다. 도움이 필요하면 hi@kilocode.ai에 문의한 후 Code Reviewer를 다시 활성화하세요.",
+        "recoveryLabel": "지원팀에 문의"
+      }
+    },
+    "unknownError": "알 수 없는 오류"
   },
   "securityAgent": {
     "filter": {
@@ -1488,6 +1546,23 @@
       "belowThreshold": "발견 사항이 자동 심각도 기준보다 낮습니다. 안전 검사를 통과하면 수동 수정을 시작할 수 있습니다.",
       "beforeEnablement": "자동 수정이 활성화되기 전에 분석이 완료되었습니다. 안전 검사를 통과하면 수동 수정을 시작할 수 있습니다.",
       "generic": "이 발견 사항에는 수정을 사용할 수 없습니다."
+    },
+    "commandFailure": {
+      "ownerCapReached": "분석 용량이 가득 찼습니다. 진행 중인 분석이 끝날 때까지 기다린 후 다시 시도하세요.",
+      "githubTokenUnavailable": "GitHub 인증에 주의가 필요합니다. GitHub 앱을 다시 승인한 후 다시 시도하세요.",
+      "githubAuthInvalid": "GitHub 인증에 주의가 필요합니다. GitHub 앱을 다시 승인한 후 다시 시도하세요.",
+      "findingUnavailable": "발견 사항을 더 이상 사용할 수 없습니다. 발견 사항을 새로고침하고, 계속 열려 있으면 다시 시도하세요.",
+      "repositoryUnavailable": "리포지토리를 GitHub 앱에서 더 이상 사용할 수 없습니다. 리포지토리 액세스를 새로고침한 후 다시 시도하세요.",
+      "invalidDismissTarget": "Dependabot 대상이 유효하지 않아 발견 사항을 해제할 수 없습니다.",
+      "commandStalled": "대기 중인 작업이 제시간에 끝나지 않았습니다. 작업을 다시 시도하세요.",
+      "queueRetriesExhausted": "여러 번 시도한 후에도 작업을 완료할 수 없었습니다. 작업을 다시 시도하세요.",
+      "queueAdmissionFailed": "대기 중인 작업을 수락할 수 없습니다. 작업을 다시 시도하세요.",
+      "generic": "대기 중인 작업이 실패했습니다. 작업을 다시 시도하세요."
+    },
+    "analysisMode": {
+      "auto": "자동",
+      "shallow": "얕음",
+      "deep": "심층"
     }
   },
   "agents": {
@@ -1951,7 +2026,8 @@
       "addToFavorites": "{{name}}을(를) 즐겨찾기에 추가",
       "removeFromFavorites": "{{name}}을(를) 즐겨찾기에서 제거",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "세션 모델"
     },
     "attachmentPreview": {
       "openFailedRetry": "파일을 열지 못했습니다. 다시 시도하세요.",
@@ -2083,7 +2159,8 @@
   },
   "addCredits": {
     "cta": "크레딧 추가",
-    "description": "사용을 계속하려면 크레딧을 추가하세요."
+    "description": "사용을 계속하려면 크레딧을 추가하세요.",
+    "billingPage": "결제 페이지"
   },
   "deviceSessions": {
     "couldNotLoad": "세션을 불러올 수 없습니다",
@@ -2271,7 +2348,10 @@
     "restoreFailed": "구매를 복원하지 못했습니다. 다시 시도하세요.",
     "purchaseFailed": "구매를 완료하지 못했습니다.",
     "purchaseStartFailed": "App Store 구매를 시작하지 못했습니다.",
-    "purchaseOwnedByAnotherAccount": "이 Apple 계정의 Kilo Pass는 다른 Kilo 계정에 속합니다."
+    "purchaseOwnedByAnotherAccount": "이 Apple 계정의 Kilo Pass는 다른 Kilo 계정에 속합니다.",
+    "couldNotConnectToAppStore": "App Store에 연결할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
+    "noMatchingProducts": "App Store에서 일치하는 Kilo Pass 상품이 반환되지 않았습니다.",
+    "purchaseMissingSignedTransaction": "App Store 구매에 서명된 거래 JWS가 포함되지 않았습니다."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2779,7 +2859,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} 선택됨, 탭하여 선택 변경",
       "tapToComment": "{{label}}, 탭하여 댓글 달기",
-      "truncationBanner": "변경된 파일 {{total}}개 중 처음 {{limit}}개를 표시 중 — GitHub API 제한"
+      "truncationBanner": "변경된 파일 {{total}}개 중 처음 {{limit}}개를 표시 중 — GitHub API 제한",
+      "statusAdded": "추가됨",
+      "statusContext": "컨텍스트",
+      "statusDeleted": "삭제됨"
     },
     "linkPasteClipboardEmpty": "클립보드가 비어 있습니다",
     "linkPasteNotAPullRequest": "GitHub 풀 리퀘스트 링크가 아닙니다",
@@ -2793,6 +2876,11 @@
       "reviewNotSubmitted": "이 리뷰는 그대로 제출할 수 없습니다. PR이 변경되었거나 자신의 풀 리퀘스트를 리뷰할 수 없습니다.",
       "couldNotPostComment": "댓글을 게시할 수 없습니다.",
       "couldNotSubmitReview": "리뷰를 제출할 수 없습니다. 연결을 확인하고 다시 시도하세요."
+    },
+    "operation": {
+      "couldNotReply": "답글을 달 수 없습니다.",
+      "couldNotCompleteAction": "이 작업을 완료할 수 없습니다.",
+      "mergeResultDefaultError": "GitHub가 병합을 완료하지 않았습니다."
     }
   },
   "organization": {
@@ -2810,7 +2898,17 @@
       "emptyTitle": "크레딧 활동 없음",
       "expires": "{{date}}에 만료",
       "title": "크레딧 활동",
-      "transactionFallback": "크레딧 거래"
+      "transactionFallback": "크레딧 거래",
+      "category": {
+        "organization_custom": "조직 맞춤",
+        "parent_to_child_transfer_in": "상위에서 하위로 전입",
+        "parent_to_child_transfer_out": "상위에서 하위로 전출",
+        "oss-sponsorship": "OSS 후원",
+        "oss-monthly-reset": "OSS 월간 초기화",
+        "team-topup-bonus-2025": "팀 충전 보너스 2025",
+        "accounting_adjustment": "회계 조정",
+        "credits_expired": "크레딧 만료"
+      }
     },
     "hub": {
       "balance": "잔액",
@@ -2837,11 +2935,16 @@
       "emptyTitle": "송장 없음",
       "invoiceFallback": "송장",
       "title": "송장",
-      "statusPaid": "결제 완료",
-      "statusOpen": "미결제",
-      "statusVoid": "무효",
       "downloadFailed": "송장을 다운로드할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
-      "sharingUnavailable": "이 기기에서는 공유를 사용할 수 없습니다."
+      "sharingUnavailable": "이 기기에서는 공유를 사용할 수 없습니다.",
+      "status": {
+        "paid": "결제 완료",
+        "open": "미결제",
+        "void": "무효",
+        "draft": "초안",
+        "uncollectible": "회수 불가",
+        "unknown": "알 수 없음"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2941,7 +3044,8 @@
     "promptTitle": "Kilo 앱은 어떠신가요?",
     "rateKilo": "Kilo 평가하기",
     "sorryMessage": "무엇을 개선해야 하는지 알려주세요. 앱 담당 엔지니어가 모든 보고를 읽습니다!",
-    "sorryTitle": "안타깝네요!"
+    "sorryTitle": "안타깝네요!",
+    "emailSubject": "모바일 앱 피드백"
   },
   "authErrors": {
     "emailAlreadyUsed": "이 이메일로 된 계정이 다른 로그인 방식으로 이미 존재합니다. 다른 방식을 시도하거나 '$t(login.moreSignInOptions)'을 사용하세요.",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "수집된 데이터",
     "free": "무료",
-    "couldNotUpdateFavorites": "즐겨찾기를 업데이트할 수 없습니다"
+    "couldNotUpdateFavorites": "즐겨찾기를 업데이트할 수 없습니다",
+    "thinkingEffort": {
+      "none": "없음",
+      "minimal": "최소",
+      "low": "낮음",
+      "medium": "중간",
+      "high": "높음",
+      "xhigh": "매우 높음",
+      "max": "최대"
+    }
   }
 }

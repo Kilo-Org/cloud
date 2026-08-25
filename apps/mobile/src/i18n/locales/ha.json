@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "An zaɓi {{label}}, danna don canza zaɓi",
       "tapToComment": "{{label}}, danna don tsokaci",
-      "truncationBanner": "Ana nuna farkon {{limit}} na {{total}} fayilolin da aka canza — iyakar GitHub API"
+      "truncationBanner": "Ana nuna farkon {{limit}} na {{total}} fayilolin da aka canza — iyakar GitHub API",
+      "statusAdded": "An ƙara",
+      "statusContext": "Mahallin",
+      "statusDeleted": "An share"
     },
     "linkPasteClipboardEmpty": "Allon kwafi babu kome",
     "linkPasteNotAPullRequest": "Ba hanyar GitHub pull request ba",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Ba za a iya ƙaddamar da wannan bita ba yadda take. Wataƙila PR ya canza, ko kuma ba za ka iya bitar buƙatar janka ba.",
       "couldNotPostComment": "Ba a iya buga tsokaci ba.",
       "couldNotSubmitReview": "Ba a iya ƙaddamar da bita ba. Duba haɗinka ka sake gwadawa."
+    },
+    "operation": {
+      "couldNotReply": "Ba a iya amsawa ba.",
+      "couldNotCompleteAction": "Ba a iya kammala wannan aikin ba.",
+      "mergeResultDefaultError": "GitHub bai kammala haɗawa ba."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Biyan kuɗi ya wuce lokaci. Da fatan sabunta hanyar biyan ka.",
       "subscriptionCancels": "Biyan kuɗi zai soke {{date}}",
       "trialDaysRemaining": "Gwaji: {{remaining}} suka rage",
-      "trialEndingSoon": "Gwaji zai ƙare ba da jimawa: {{remaining}}"
+      "trialEndingSoon": "Gwaji zai ƙare ba da jimawa: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Me Sabo",
@@ -1189,7 +1201,8 @@
       "strongArm": "Hannu mai ƙarfi",
       "talisman": "Layya"
     },
-    "remoteSpawnFilesNotSupported": "Wannan instance ba zai iya karɓar fayiloli ba."
+    "remoteSpawnFilesNotSupported": "Wannan instance ba zai iya karɓar fayiloli ba.",
+    "instanceSwitcherTitle": "Misalin KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Ya kasa",
       "cancelled": "An soke",
       "interrupted": "An katse"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Mai tsauri",
+      "balanced": "Daidaitacce",
+      "lenient": "Sassauƙa",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Tsaro",
+      "performance": "Aiki",
+      "bugs": "Kwari",
+      "style": "Salon",
+      "testing": "Gwaji",
+      "documentation": "Rubuce-rubuce"
+    },
+    "gateThreshold": {
+      "off": "Kashe",
+      "all": "Duk",
+      "warning": "Gargadi",
+      "critical": "Mai tsanani"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Mai Bitar Lambar yana buƙatar kulawa",
+        "description": "An kashe Mai Bitar Lambar domin Kilo ba zai iya shiga wannan ma'ajiya ba tare da shigarwar GitHub App mai aiki. Sabunta shigarwar GitHub App, sannan ka kunna Mai Bitar Lambar.",
+        "recoveryLabel": "Sabunta GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Mai Bitar Lambar yana buƙatar kulawa",
+        "description": "An kashe Mai Bitar Lambar domin wannan ƙungiyar GitHub tana amfani da jerin dama na IP wanda ke toshe Kilo. Tuntuɓi hi@kilocode.ai don taimako, sannan ka kunna Mai Bitar Lambar.",
+        "recoveryLabel": "Tuntuɓi tallafi"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Mai Bitar Lambar yana buƙatar kulawa",
+        "description": "An kashe Mai Bitar Lambar domin Kilo ba zai iya ƙirƙirar Token na shiga aikin GitLab don wannan aikin ba. Ba da damar Maintainer ko kunna Token na shiga aiki, sannan ka kunna Mai Bitar Lambar.",
+        "recoveryLabel": "Sabunta haɗin GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Mai Bitar Lambar yana buƙatar kulawa",
+        "description": "An kashe Mai Bitar Lambar domin zaɓaɓɓen maɓallin API na BYOK bai inganta ba, an soke shi, ko kuma ba shi da izini. Sabunta maɓallin ko zaɓi wani samfuri, sannan ka kunna Mai Bitar Lambar.",
+        "recoveryLabel": "Sabunta saitunan BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Mai Bitar Lambar yana buƙatar kulawa",
+        "description": "An kashe Mai Bitar Lambar domin zaɓaɓɓen samfurin ba ya samuwa don zaman wakilan cloud. Zaɓi samfurin da ke samuwa, sannan ka kunna Mai Bitar Lambar.",
+        "recoveryLabel": "Sabunta saitunan Mai Bitar Lambar"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Mai Bitar Lambar yana buƙatar kulawa",
+        "description": "An kashe Mai Bitar Lambar bayan lokutan ƙarewar clone na ma'ajiya sau uku a yau. Tuntuɓi hi@kilocode.ai don taimako, sannan ka kunna Mai Bitar Lambar.",
+        "recoveryLabel": "Tuntuɓi tallafi"
+      }
+    },
+    "unknownError": "Kuskuren da ba a sani ba"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Sakamako yana ƙasa da matakin tsananin atomatik. Gyaran hannu na iya farawa har yanzu idan ƙofofin aminci suka wuce.",
       "beforeEnablement": "Nazari ya kammala kafin a kunna gyara ta atomatik. Gyaran hannu na iya farawa har yanzu idan ƙofofin aminci suka wuce.",
       "generic": "Gyara ba ya samuwa domin wannan sakamako."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Ƙarfin nazari ya cika. Jira wani nazari mai aiki ya gama, sannan ka sake gwadawa.",
+      "githubTokenUnavailable": "Izinin GitHub yana buƙatar kulawa. Sake ba da izini ga GitHub App, sannan ka sake gwadawa.",
+      "githubAuthInvalid": "Izinin GitHub yana buƙatar kulawa. Sake ba da izini ga GitHub App, sannan ka sake gwadawa.",
+      "findingUnavailable": "Sakamakon ba ya samuwa kuma. Sabunta sakamakon ka sake gwadawa idan har yana buɗe.",
+      "repositoryUnavailable": "Ma'ajiya ba ta samuwa ga GitHub App kuma. Sabunta damar ma'ajiya, sannan ka sake gwadawa.",
+      "invalidDismissTarget": "Ba za a iya watsar da sakamako ba domin manufar Dependabot tasa ba ta inganta.",
+      "commandStalled": "Aikin da ke jere bai ƙare a lokaci ba. Sake gwada aikin.",
+      "queueRetriesExhausted": "Ba a iya kammala aikin ba bayan ƙoƙari da yawa. Sake gwada aikin.",
+      "queueAdmissionFailed": "Ba a iya shigar da aikin da ke jere ba. Sake gwada aikin.",
+      "generic": "Aikin da ke jere ya gaza. Sake gwada aikin."
+    },
+    "analysisMode": {
+      "auto": "Auto",
+      "shallow": "Maras zurfi",
+      "deep": "Mai zurfi"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Ƙara {{name}} zuwa waɗanda ake so",
       "removeFromFavorites": "Cire {{name}} daga waɗanda ake so",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Samfurin zaman"
     },
     "attachmentPreview": {
       "openFailedRetry": "An kasa buɗe fayil. Da fatan za a sake gwadawa.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Ƙara credits",
-    "description": "Ƙara credits don ci gaba da amfani."
+    "description": "Ƙara credits don ci gaba da amfani.",
+    "billingPage": "shafin biyan kuɗi"
   },
   "deviceSessions": {
     "couldNotLoad": "An kasa ɗora zaman",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "An kasa maido da sayayya. Sake gwadawa.",
     "purchaseFailed": "An kasa kammala sayayya.",
     "purchaseStartFailed": "An kasa fara sayayyar App Store.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass akan wannan Apple Account na wani asusun Kilo ne daban."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass akan wannan Apple Account na wani asusun Kilo ne daban.",
+    "couldNotConnectToAppStore": "Ba a iya haɗawa da App Store ba. Duba haɗinka ka sake gwadawa.",
+    "noMatchingProducts": "Babu samfuran Kilo Pass da suka dace da App Store ya dawo da su.",
+    "purchaseMissingSignedTransaction": "Siyayyar App Store ba ta haɗa da JWS na ma'amala mai sa hannu ba."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Yana buƙatar ingantawa",
     "sorryTitle": "Mun yi nadamar jin haka!",
     "sorryMessage": "Da fatan za a sanar da mu abin da ya kamata a inganta. Injiniyan da ke kula da app ɗin yana karanta kowane rahoto!",
-    "emailUs": "Aiko mana imel"
+    "emailUs": "Aiko mana imel",
+    "emailSubject": "ra'ayin app ɗin wayar hannu"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Babu ayyukan credits",
       "expires": "Yana ƙare {{date}}",
       "title": "Ayyukan credits",
-      "transactionFallback": "Ma'amalar credits"
+      "transactionFallback": "Ma'amalar credits",
+      "category": {
+        "organization_custom": "Na musamman na ƙungiya",
+        "parent_to_child_transfer_in": "Canja wuri daga iyaye zuwa yaro (shiga)",
+        "parent_to_child_transfer_out": "Canja wuri daga iyaye zuwa yaro (fita)",
+        "oss-sponsorship": "Tallafin OSS",
+        "oss-monthly-reset": "Sake saitin OSS na wata-wata",
+        "team-topup-bonus-2025": "Kyautar Topup na Ƙungiya 2025",
+        "accounting_adjustment": "Daidaitawar lissafin kuɗi",
+        "credits_expired": "Credits sun ƙare"
+      }
     },
     "inviteMember": {
       "emailError": "Shigar da ingantacciyar adireshin imel",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Ana samar da daftaruwa kai tsaye kowane zagayen biyan kuɗi kuma za su bayyana a nan da zarar an biya ƙungiyarka.",
       "emptyTitle": "Babu daftaruwa",
       "invoiceFallback": "Daftari",
-      "statusOpen": "Buɗe",
-      "statusPaid": "An biya",
-      "statusVoid": "Rasa inganci",
       "title": "Daftaruwa",
       "downloadFailed": "An kasa sauke daftari. Duba haɗinka ka sake gwadawa.",
-      "sharingUnavailable": "Raba ba ya samuwa akan wannan na'ura."
+      "sharingUnavailable": "Raba ba ya samuwa akan wannan na'ura.",
+      "status": {
+        "paid": "An biya",
+        "open": "Buɗe",
+        "void": "Rasa inganci",
+        "draft": "Daftari",
+        "uncollectible": "Ba za a iya karɓa ba",
+        "unknown": "Ba a sani ba"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Bayanan da aka tattara",
     "free": "Kyauta",
-    "couldNotUpdateFavorites": "Ba a iya sabunta waɗanda ake so ba"
+    "couldNotUpdateFavorites": "Ba a iya sabunta waɗanda ake so ba",
+    "thinkingEffort": {
+      "none": "Babu",
+      "minimal": "Kadan",
+      "low": "Ƙanana",
+      "medium": "Matsakaici",
+      "high": "Babba",
+      "xhigh": "Babba sosai",
+      "max": "Mafi girma"
+    }
   }
 }

@@ -10,6 +10,12 @@ export default function ReviewStyleRoute() {
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const { t } = useTranslation();
+  const labels = {
+    strict: 'codeReviewer.reviewStyle.strict',
+    balanced: 'codeReviewer.reviewStyle.balanced',
+    lenient: 'codeReviewer.reviewStyle.lenient',
+    roast: 'codeReviewer.reviewStyle.roast',
+  } as const;
   const descriptions = {
     strict: t('codeReviewer.style.strict'),
     balanced: t('codeReviewer.style.balanced'),
@@ -22,6 +28,7 @@ export default function ReviewStyleRoute() {
       title={t('codeReviewer.style.title')}
       options={REVIEW_STYLES}
       selected={data?.reviewStyle}
+      labels={labels}
       descriptions={descriptions}
       disabled={data == null}
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule

@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Selected {{label}}, tap to change selection",
       "tapToComment": "{{label}}, tap to comment",
-      "truncationBanner": "Showing the first {{limit}} of {{total}} changed files — GitHub API limit"
+      "truncationBanner": "Showing the first {{limit}} of {{total}} changed files — GitHub API limit",
+      "statusAdded": "Added",
+      "statusContext": "Context",
+      "statusDeleted": "Deleted"
     },
     "linkPasteClipboardEmpty": "Clipboard is empty",
     "linkPasteNotAPullRequest": "Not a GitHub pull request link",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request.",
       "couldNotPostComment": "Could not post comment.",
       "couldNotSubmitReview": "Could not submit review. Check your connection and try again."
+    },
+    "operation": {
+      "couldNotReply": "Could not reply.",
+      "couldNotCompleteAction": "Could not complete this action.",
+      "mergeResultDefaultError": "GitHub did not complete the merge."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Payment past due. Please update your payment method.",
       "subscriptionCancels": "Subscription cancels {{date}}",
       "trialDaysRemaining": "Trial: {{remaining}} remaining",
-      "trialEndingSoon": "Trial ending soon: {{remaining}}"
+      "trialEndingSoon": "Trial ending soon: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "What's New",
@@ -1189,7 +1201,8 @@
       "strongArm": "Strong arm",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "This instance cannot receive files."
+    "remoteSpawnFilesNotSupported": "This instance cannot receive files.",
+    "instanceSwitcherTitle": "KiloClaw instance"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Failed",
       "cancelled": "Cancelled",
       "interrupted": "Interrupted"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Strict",
+      "balanced": "Balanced",
+      "lenient": "Lenient",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Security",
+      "performance": "Performance",
+      "bugs": "Bugs",
+      "style": "Style",
+      "testing": "Testing",
+      "documentation": "Documentation"
+    },
+    "gateThreshold": {
+      "off": "Off",
+      "all": "All",
+      "warning": "Warning",
+      "critical": "Critical"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer needs attention",
+        "description": "Code Reviewer was disabled because Kilo cannot access this repository with an active GitHub App installation. Update the GitHub App installation, then enable Code Reviewer again.",
+        "recoveryLabel": "Update GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer needs attention",
+        "description": "Code Reviewer was disabled because this GitHub organization uses an IP allow list that blocks Kilo. Contact hi@kilocode.ai for help, then enable Code Reviewer again.",
+        "recoveryLabel": "Contact support"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer needs attention",
+        "description": "Code Reviewer was disabled because Kilo cannot create a GitLab Project Access Token for this project. Grant Maintainer access or enable Project Access Tokens, then enable Code Reviewer again.",
+        "recoveryLabel": "Update GitLab integration"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer needs attention",
+        "description": "Code Reviewer was disabled because the selected BYOK API key is invalid, revoked, or lacks permission. Update the key or choose another model, then enable Code Reviewer again.",
+        "recoveryLabel": "Update BYOK settings"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer needs attention",
+        "description": "Code Reviewer was disabled because the selected model is not available for cloud agent sessions. Choose an available model, then enable Code Reviewer again.",
+        "recoveryLabel": "Update Code Reviewer settings"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer needs attention",
+        "description": "Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.",
+        "recoveryLabel": "Contact support"
+      }
+    },
+    "unknownError": "Unknown error"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Finding is below automatic severity threshold. Manual remediation can still start when safety gates pass.",
       "beforeEnablement": "Analysis completed before Auto Remediation was enabled. Manual remediation can still start when safety gates pass.",
       "generic": "Remediation is unavailable for this finding."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Analysis capacity is full. Wait for an active analysis to finish, then retry.",
+      "githubTokenUnavailable": "GitHub authorization needs attention. Re-authorize GitHub App, then retry.",
+      "githubAuthInvalid": "GitHub authorization needs attention. Re-authorize GitHub App, then retry.",
+      "findingUnavailable": "Finding is no longer available. Refresh findings and retry if it remains open.",
+      "repositoryUnavailable": "Repository is no longer available to GitHub App. Refresh repository access, then retry.",
+      "invalidDismissTarget": "Finding cannot be dismissed because its Dependabot target is invalid.",
+      "commandStalled": "Queued action did not finish in time. Retry action.",
+      "queueRetriesExhausted": "Action could not be completed after several attempts. Retry action.",
+      "queueAdmissionFailed": "Queued action could not be admitted. Retry action.",
+      "generic": "Queued action failed. Retry action."
+    },
+    "analysisMode": {
+      "auto": "Auto",
+      "shallow": "Shallow",
+      "deep": "Deep"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Add {{name}} to favorites",
       "removeFromFavorites": "Remove {{name}} from favorites",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Session model"
     },
     "attachmentPreview": {
       "openFailedRetry": "Failed to open file. Please try again.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Add credits",
-    "description": "Add credits to keep usage running."
+    "description": "Add credits to keep usage running.",
+    "billingPage": "billing page"
   },
   "deviceSessions": {
     "couldNotLoad": "Could not load sessions",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Failed to restore purchases. Try again.",
     "purchaseFailed": "Failed to complete purchase.",
     "purchaseStartFailed": "Failed to start App Store purchase.",
-    "purchaseOwnedByAnotherAccount": "The Kilo Pass on this Apple Account belongs to a different Kilo account."
+    "purchaseOwnedByAnotherAccount": "The Kilo Pass on this Apple Account belongs to a different Kilo account.",
+    "couldNotConnectToAppStore": "Could not connect to the App Store. Check your connection and try again.",
+    "noMatchingProducts": "No matching Kilo Pass products were returned by App Store.",
+    "purchaseMissingSignedTransaction": "App Store purchase did not include a signed transaction JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Needs work",
     "sorryTitle": "We're sorry to hear that!",
     "sorryMessage": "Please let us know what needs to be better. The engineer in charge of the app reads every single report!",
-    "emailUs": "Email us"
+    "emailUs": "Email us",
+    "emailSubject": "mobile app feedback"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "No credit activity",
       "expires": "Expires {{date}}",
       "title": "Credit activity",
-      "transactionFallback": "Credit transaction"
+      "transactionFallback": "Credit transaction",
+      "category": {
+        "organization_custom": "Organization custom",
+        "parent_to_child_transfer_in": "Parent to child transfer in",
+        "parent_to_child_transfer_out": "Parent to child transfer out",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Accounting adjustment",
+        "credits_expired": "Credits expired"
+      }
     },
     "inviteMember": {
       "emailError": "Enter a valid email address",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Invoices are generated automatically each billing cycle and will appear here once your organization is billed.",
       "emptyTitle": "No invoices",
       "invoiceFallback": "Invoice",
-      "statusOpen": "Open",
-      "statusPaid": "Paid",
-      "statusVoid": "Void",
       "title": "Invoices",
       "downloadFailed": "Couldn't download invoice. Check your connection and try again.",
-      "sharingUnavailable": "Sharing is not available on this device."
+      "sharingUnavailable": "Sharing is not available on this device.",
+      "status": {
+        "paid": "Paid",
+        "open": "Open",
+        "void": "Void",
+        "draft": "Draft",
+        "uncollectible": "Uncollectible",
+        "unknown": "Unknown"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Data collected",
     "free": "Free",
-    "couldNotUpdateFavorites": "Could not update favorites"
+    "couldNotUpdateFavorites": "Could not update favorites",
+    "thinkingEffort": {
+      "none": "None",
+      "minimal": "Minimal",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "xhigh": "Extra High",
+      "max": "Max"
+    }
   }
 }

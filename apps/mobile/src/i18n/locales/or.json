@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} ଚୟନ ହେଲା, ଚୟନ ବଦଳାଇବାକୁ ଟାପ୍ କରନ୍ତୁ",
       "tapToComment": "{{label}}, ମନ୍ତବ୍ୟ ଦେବାକୁ ଟାପ୍ କରନ୍ତୁ",
-      "truncationBanner": "ମୋଟ {{total}} ମଧ୍ୟରୁ ପ୍ରଥମ {{limit}} ପରିବର୍ତ୍ତିତ ଫାଇଲ ଦେଖାଯାଉଛି — GitHub API ସୀମା"
+      "truncationBanner": "ମୋଟ {{total}} ମଧ୍ୟରୁ ପ୍ରଥମ {{limit}} ପରିବର୍ତ୍ତିତ ଫାଇଲ ଦେଖାଯାଉଛି — GitHub API ସୀମା",
+      "statusAdded": "ଯୋଡ଼ାଗଲା",
+      "statusContext": "ପ୍ରସଙ୍ଗ",
+      "statusDeleted": "ବିଲୋପ ହେଲା"
     },
     "linkPasteClipboardEmpty": "କ୍ଲିପ୍ବୋର୍ଡ ଖାଲି ଅଛି",
     "linkPasteNotAPullRequest": "ଏହା GitHub ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ନୁହେଁ",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "ଏହି ରିଭ୍ୟୁ ଏହିଭଳି ଦାଖଲ କରାଯାଇ ପାରିବ ନାହିଁ। PR ପରିବର୍ତ୍ତନ ହୋଇଥାଇ ପାରେ, କିମ୍ବା ଆପଣ ନିଜର ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ରିଭ୍ୟୁ କରିପାରିବେ ନାହିଁ।",
       "couldNotPostComment": "ମନ୍ତବ୍ୟ ପୋଷ୍ଟ କରାଯାଇ ପାରିଲା ନାହିଁ।",
       "couldNotSubmitReview": "ରିଭ୍ୟୁ ଦାଖଲ କରାଯାଇ ପାରିଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+    },
+    "operation": {
+      "couldNotReply": "ଉତ୍ତର ଦେବା ଯାଇ ପାରିଲା ନାହିଁ।",
+      "couldNotCompleteAction": "ଏହି କାର୍ଯ୍ୟ ସମ୍ପୂର୍ଣ୍ଣ କରାଯାଇ ପାରିଲା ନାହିଁ।",
+      "mergeResultDefaultError": "GitHub ମର୍ଜ୍ ସମ୍ପୂର୍ଣ୍ଣ କଲା ନାହିଁ।"
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "ଦେୟ ବିଳମ୍ବିତ। ଦୟାକରି ଆପଣଙ୍କ ଦେୟ ପଦ୍ଧତି ଅପଡେଟ୍ କରନ୍ତୁ।",
       "subscriptionCancels": "ସବସ୍କ୍ରିପ୍ସନ୍ {{date}} ରେ ବାତିଲ ହୁଏ",
       "trialDaysRemaining": "ଟ୍ରାଏଲ: {{remaining}} ବାକି",
-      "trialEndingSoon": "ଟ୍ରାଏଲ୍ ଶୀଘ୍ର ସମାପ୍ତ: {{remaining}}"
+      "trialEndingSoon": "ଟ୍ରାଏଲ୍ ଶୀଘ୍ର ସମାପ୍ତ: {{remaining}}",
+      "planName": {
+        "commit": "କମିଟ୍",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "ନୂଆ କ'ଣ",
@@ -1189,7 +1201,8 @@
       "strongArm": "ଶକ୍ତିଶାଳୀ ବାହୁ",
       "talisman": "ତାଲିମନ"
     },
-    "remoteSpawnFilesNotSupported": "ଏହି ଇନସ୍ଟାନ୍ସ ଫାଇଲ ଗ୍ରହଣ କରିପାରିବ ନାହିଁ।"
+    "remoteSpawnFilesNotSupported": "ଏହି ଇନସ୍ଟାନ୍ସ ଫାଇଲ ଗ୍ରହଣ କରିପାରିବ ନାହିଁ।",
+    "instanceSwitcherTitle": "KiloClaw ଇନ୍ସଟାନ୍ସ"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "ବିଫଳ",
       "cancelled": "ବାତିଲ",
       "interrupted": "ବ୍ୟାହତ"
-    }
+    },
+    "reviewStyle": {
+      "strict": "କଠୋର",
+      "balanced": "ସନ୍ତୁଳିତ",
+      "lenient": "ଶିଥିଳ",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "ନିରାପତ୍ତା",
+      "performance": "ପ୍ରଦର୍ଶନ",
+      "bugs": "ବଗ୍",
+      "style": "ଶୈଳୀ",
+      "testing": "ପରୀକ୍ଷା",
+      "documentation": "ଡକ୍ୟୁମେଣ୍ଟେସନ୍"
+    },
+    "gateThreshold": {
+      "off": "ବନ୍ଦ",
+      "all": "ସମସ୍ତ",
+      "warning": "ଚେତାବନୀ",
+      "critical": "ଗୁରୁତ୍ୱପୂର୍ଣ୍ଣ"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer ର ଧ୍ୟାନ ଦରକାର",
+        "description": "Code Reviewer ଅକ୍ଷମ କରାଯାଇଥିଲା କାରଣ Kilo ଏକ ସକ୍ରିୟ GitHub App ଇନଷ୍ଟଲେସନ୍ ସହିତ ଏହି ରିପୋଜିଟୋରୀକୁ ଆକ୍ସେସ୍ କରିପାରିବ ନାହିଁ। GitHub App ଇନଷ୍ଟଲେସନ୍ ଅପଡେଟ୍ କରନ୍ତୁ, ତାପରେ Code Reviewer କୁ ପୁଣି ସକ୍ଷମ କରନ୍ତୁ।",
+        "recoveryLabel": "GitHub App ଅପଡେଟ୍ କରନ୍ତୁ"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer ର ଧ୍ୟାନ ଦରକାର",
+        "description": "Code Reviewer ଅକ୍ଷମ କରାଯାଇଥିଲା କାରଣ ଏହି GitHub ସଂଗଠନ ଏକ IP ଅନୁମତି ତାଲିକା ବ୍ୟବହାର କରେ ଯାହା Kilo କୁ ଅବରୋଧ କରେ। ସାହାଯ୍ୟ ପାଇଁ hi@kilocode.ai ରେ ଯୋଗାଯୋଗ କରନ୍ତୁ, ତାପରେ Code Reviewer କୁ ପୁଣି ସକ୍ଷମ କରନ୍ତୁ।",
+        "recoveryLabel": "ସହାୟତା ସହିତ ଯୋଗାଯୋଗ କରନ୍ତୁ"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer ର ଧ୍ୟାନ ଦରକାର",
+        "description": "Code Reviewer ଅକ୍ଷମ କରାଯାଇଥିଲା କାରଣ Kilo ଏହି ପ୍ରୋଜେକ୍ଟ ପାଇଁ ଏକ GitLab Project Access Token ସୃଷ୍ଟି କରିପାରିବ ନାହିଁ। Maintainer ଆକ୍ସେସ୍ ପ୍ରଦାନ କରନ୍ତୁ କିମ୍ବା Project Access Tokens ସକ୍ଷମ କରନ୍ତୁ, ତାପରେ Code Reviewer କୁ ପୁଣି ସକ୍ଷମ କରନ୍ତୁ।",
+        "recoveryLabel": "GitLab ଏକୀକରଣ ଅପଡେଟ୍ କରନ୍ତୁ"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer ର ଧ୍ୟାନ ଦରକାର",
+        "description": "Code Reviewer ଅକ୍ଷମ କରାଯାଇଥିଲା କାରଣ ଚୟନ କରାଯାଇଥିବା BYOK API କି ଅବୈଧ, ପ୍ରତ୍ୟାହାର, କିମ୍ବା ଅନୁମତି ନାହିଁ। କି ଅପଡେଟ୍ କରନ୍ତୁ କିମ୍ବା ଅନ୍ୟ ଏକ ମଡେଲ ଚୟନ କରନ୍ତୁ, ତାପରେ Code Reviewer କୁ ପୁଣି ସକ୍ଷମ କରନ୍ତୁ।",
+        "recoveryLabel": "BYOK ସେଟିଂ ଅପଡେଟ୍ କରନ୍ତୁ"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer ର ଧ୍ୟାନ ଦରକାର",
+        "description": "Code Reviewer ଅକ୍ଷମ କରାଯାଇଥିଲା କାରଣ ଚୟନ କରାଯାଇଥିବା ମଡେଲ କ୍ଲାଉଡ୍ ଏଜେଣ୍ଟ ସେସନ୍ ପାଇଁ ଉପଲବ୍ଧ ନାହିଁ। ଏକ ଉପଲବ୍ଧ ମଡେଲ ଚୟନ କରନ୍ତୁ, ତାପରେ Code Reviewer କୁ ପୁଣି ସକ୍ଷମ କରନ୍ତୁ।",
+        "recoveryLabel": "Code Reviewer ସେଟିଂ ଅପଡେଟ୍ କରନ୍ତୁ"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer ର ଧ୍ୟାନ ଦରକାର",
+        "description": "ଆଜି ତିନୋଟି ରିପୋଜିଟୋରୀ କ୍ଲୋନ୍ ଟାଇମ୍ଆଉଟ୍ ପରେ Code Reviewer ଅକ୍ଷମ କରାଯାଇଥିଲା। ସାହାଯ୍ୟ ପାଇଁ hi@kilocode.ai ରେ ଯୋଗାଯୋଗ କରନ୍ତୁ, ତାପରେ Code Reviewer କୁ ପୁଣି ସକ୍ଷମ କରନ୍ତୁ।",
+        "recoveryLabel": "ସହାୟତା ସହିତ ଯୋଗାଯୋଗ କରନ୍ତୁ"
+      }
+    },
+    "unknownError": "ଅଜଣା ତ୍ରୁଟି"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "ଫଳାଫଳ ସ୍ୱୟଂଚାଳିତ ତୀବ୍ରତା ସୀମା ତଳେ। ସୁରକ୍ଷା ଗେଟ୍ ପାସ୍ ହେଲେ ମାନୁଆଲ ସମାଧାନ ଏବେ ବି ଆରମ୍ଭ ହୋଇପାରେ।",
       "beforeEnablement": "ସ୍ୱୟଂ ଉପଶମନ ସକ୍ଷମ ହେବା ପୂର୍ବରୁ ବିଶ୍ଳେଷଣ ସମାପ୍ତ ହେଲା। ସୁରକ୍ଷା ଗେଟ୍ ପାସ୍ ହେଲେ ମାନୁଆଲ ସମାଧାନ ଏବେ ବି ଆରମ୍ଭ ହୋଇପାରେ।",
       "generic": "ଏହି ଫଳାଫଳ ପାଇଁ ସମାଧାନ ଉପଲବ୍ଧ ନାହିଁ।"
+    },
+    "commandFailure": {
+      "ownerCapReached": "ବିଶ୍ଳେଷଣ କ୍ଷମତା ପୂର୍ଣ୍ଣ। ଏକ ସକ୍ରିୟ ବିଶ୍ଳେଷଣ ସରିବା ପାଇଁ ଅପେକ୍ଷା କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "githubTokenUnavailable": "GitHub ପ୍ରାଧିକରଣର ଧ୍ୟାନ ଦରକାର। GitHub App କୁ ପୁନଃ-ପ୍ରାଧିକୃତ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "githubAuthInvalid": "GitHub ପ୍ରାଧିକରଣର ଧ୍ୟାନ ଦରକାର। GitHub App କୁ ପୁନଃ-ପ୍ରାଧିକୃତ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "findingUnavailable": "ଫାଇଣ୍ଡିଂ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଫାଇଣ୍ଡିଂଗୁଡ଼ିକୁ ରିଫ୍ରେସ୍ କରନ୍ତୁ ଏବଂ ଯଦି ଏହା ଖୋଲା ରହେ ତେବେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "repositoryUnavailable": "ରିପୋଜିଟୋରୀ ଆଉ GitHub App ପାଇଁ ଉପଲବ୍ଧ ନାହିଁ। ରିପୋଜିଟୋରୀ ଆକ୍ସେସ୍ ରିଫ୍ରେସ୍ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "invalidDismissTarget": "ଫାଇଣ୍ଡିଂକୁ ଖାରଜ କରାଯାଇ ପାରିବ ନାହିଁ କାରଣ ଏହାର Dependabot ଟାର୍ଗେଟ୍ ଅବୈଧ।",
+      "commandStalled": "ଧାଡ଼ିରେ ଥିବା କାର୍ଯ୍ୟ ସମୟରେ ସମ୍ପୂର୍ଣ୍ଣ ହେଲା ନାହିଁ। କାର୍ଯ୍ୟ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "queueRetriesExhausted": "ଏକାଧିକ ପ୍ରୟାସ ପରେ କାର୍ଯ୍ୟ ସମ୍ପୂର୍ଣ୍ଣ ହୋଇପାରିଲା ନାହିଁ। କାର୍ଯ୍ୟ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "queueAdmissionFailed": "ଧାଡ଼ିରେ ଥିବା କାର୍ଯ୍ୟ ସ୍ୱୀକୃତ ହୋଇପାରିଲା ନାହିଁ। କାର୍ଯ୍ୟ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "generic": "ଧାଡ଼ିରେ ଥିବା କାର୍ଯ୍ୟ ବିଫଳ ହେଲା। କାର୍ଯ୍ୟ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+    },
+    "analysisMode": {
+      "auto": "ଅଟୋ",
+      "shallow": "ଅଗଭୀର",
+      "deep": "ଗଭୀର"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "ପସନ୍ଦରେ {{name}} ଯୋଡ଼ନ୍ତୁ",
       "removeFromFavorites": "ପସନ୍ଦରୁ {{name}} ଅପସାରଣ କରନ୍ତୁ",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "ସେସନ୍ ମଡେଲ"
     },
     "attachmentPreview": {
       "openFailedRetry": "ଫାଇଲ ଖୋଲିବାରେ ବିଫଳ। ଦୟାକରି ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "କ୍ରେଡିଟ୍ ଯୋଡ଼ନ୍ତୁ",
-    "description": "ବ୍ୟବହାର ଜାରି ରଖିବାକୁ କ୍ରେଡିଟ୍ ଯୋଡ଼ନ୍ତୁ।"
+    "description": "ବ୍ୟବହାର ଜାରି ରଖିବାକୁ କ୍ରେଡିଟ୍ ଯୋଡ଼ନ୍ତୁ।",
+    "billingPage": "ବିଲିଂ ପୃଷ୍ଠା"
   },
   "deviceSessions": {
     "couldNotLoad": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "କ୍ରୟ ପୁନଃସ୍ଥାପନ ବିଫଳ ହେଲା। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "purchaseFailed": "କ୍ରୟ ସମ୍ପୂର୍ଣ୍ଣ କରିବାରେ ବିଫଳ।",
     "purchaseStartFailed": "App Store କ୍ରୟ ଆରମ୍ଭ କରିବାରେ ବିଫଳ।",
-    "purchaseOwnedByAnotherAccount": "ଏହି Apple ଆକାଉଣ୍ଟରେ ଥିବା Kilo Pass ଅନ୍ୟ ଏକ Kilo ଆକାଉଣ୍ଟର ଅଟେ।"
+    "purchaseOwnedByAnotherAccount": "ଏହି Apple ଆକାଉଣ୍ଟରେ ଥିବା Kilo Pass ଅନ୍ୟ ଏକ Kilo ଆକାଉଣ୍ଟର ଅଟେ।",
+    "couldNotConnectToAppStore": "App Store ସହିତ ସଂଯୋଗ ହୋଇପାରିଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "noMatchingProducts": "App Store ଦ୍ୱାରା କୌଣସି ମେଳ ଖାଉଥିବା Kilo Pass ଉତ୍ପାଦ ଫେରସ୍ତ କରାଯାଇ ନାହିଁ।",
+    "purchaseMissingSignedTransaction": "App Store କ୍ରୟରେ ଏକ ସ୍ୱାକ୍ଷରିତ ଲେଣଦେଣ JWS ଅନ୍ତର୍ଭୁକ୍ତ ନଥିଲା।"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "ଉନ୍ନତି ଦରକାର",
     "sorryTitle": "ଏହା ଶୁଣି ଆମେ ଦୁଃଖିତ!",
     "sorryMessage": "କ'ଣ ଉନ୍ନତ ହେବା ଦରକାର ଆମକୁ ଜଣାନ୍ତୁ। ଆପ୍ ର ଦାୟିତ୍ୱରେ ଥିବା ଇଞ୍ଜିନିୟର ପ୍ରତ୍ୟେକ ରିପୋର୍ଟ ପଢ଼ନ୍ତି!",
-    "emailUs": "ଆମକୁ ଇମେଲ୍ କରନ୍ତୁ"
+    "emailUs": "ଆମକୁ ଇମେଲ୍ କରନ୍ତୁ",
+    "emailSubject": "ମୋବାଇଲ୍ ଆପ୍ ଫିଡବ୍ୟାକ୍"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "କୌଣସି କ୍ରେଡିଟ୍ କାର୍ଯ୍ୟକଳାପ ନାହିଁ",
       "expires": "{{date}}ରେ ମିଆଦ ଶେଷ",
       "title": "କ୍ରେଡିଟ୍ କାର୍ଯ୍ୟକଳାପ",
-      "transactionFallback": "କ୍ରେଡିଟ୍ ଲେଣଦେଣ"
+      "transactionFallback": "କ୍ରେଡିଟ୍ ଲେଣଦେଣ",
+      "category": {
+        "organization_custom": "ସଂଗଠନ କଷ୍ଟମ",
+        "parent_to_child_transfer_in": "ମୁଖ୍ୟରୁ ଅଧୀନକୁ ସ୍ଥାନାନ୍ତର (ଇନ୍)",
+        "parent_to_child_transfer_out": "ମୁଖ୍ୟରୁ ଅଧୀନକୁ ସ୍ଥାନାନ୍ତର (ଆଉଟ୍)",
+        "oss-sponsorship": "OSS-ପ୍ରାୟୋଜିତ",
+        "oss-monthly-reset": "OSS-ମାସିକ ରିସେଟ୍",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "ହିସାବ ସଂଶୋଧନ",
+        "credits_expired": "କ୍ରେଡିଟ୍ ସମାପ୍ତ"
+      }
     },
     "inviteMember": {
       "emailError": "ଏକ ବୈଧ ଇମେଲ୍ ଠିକଣା ପ୍ରବେଶ କରନ୍ତୁ",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "ପ୍ରତ୍ୟେକ ବିଲିଂ ଚକ୍ରରେ ଇନଭଏସ୍ ସ୍ୱୟଂକ୍ରିୟ ଭାବେ ଉତ୍ପନ୍ନ ହୁଏ ଏବଂ ଆପଣଙ୍କ ସଂଗଠନ ବିଲ୍ ହେଲେ ଏଠାରେ ଦେଖାଯିବ।",
       "emptyTitle": "କୌଣସି ଇନଭଏସ୍ ନାହିଁ",
       "invoiceFallback": "ଇନଭଏସ୍",
-      "statusOpen": "ଖୋଲା",
-      "statusPaid": "ପୈଠ",
-      "statusVoid": "ଅବୈଧ",
       "title": "ଇନଭଏସ୍",
       "downloadFailed": "ଇନଭଏସ୍ ଡାଉନଲୋଡ୍ କରାଯାଇ ପାରିଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "sharingUnavailable": "ଏହି ଡିଭାଇସ୍ ରେ ଅଂଶୀଦାର ଉପଲବ୍ଧ ନାହିଁ।"
+      "sharingUnavailable": "ଏହି ଡିଭାଇସ୍ ରେ ଅଂଶୀଦାର ଉପଲବ୍ଧ ନାହିଁ।",
+      "status": {
+        "paid": "ପୈଠ",
+        "open": "ଖୋଲା",
+        "void": "ଅବୈଧ",
+        "draft": "ଡ୍ରାଫ୍ଟ",
+        "uncollectible": "ଅସଂଗ୍ରହଣୀୟ",
+        "unknown": "ଅଜଣା"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "ସଂଗୃହୀତ ଡାଟା",
     "free": "ମାଗଣା",
-    "couldNotUpdateFavorites": "ପସନ୍ଦଗୁଡ଼ିକ ଅଦ୍ୟତନ କରାଯାଇ ପାରିଲା ନାହିଁ"
+    "couldNotUpdateFavorites": "ପସନ୍ଦଗୁଡ଼ିକ ଅଦ୍ୟତନ କରାଯାଇ ପାରିଲା ନାହିଁ",
+    "thinkingEffort": {
+      "none": "ନାହିଁ",
+      "minimal": "ସର୍ବନିମ୍ନ",
+      "low": "ନିମ୍ନ",
+      "medium": "ମଧ୍ୟମ",
+      "high": "ଉଚ୍ଚ",
+      "xhigh": "ଅତି ଉଚ୍ଚ",
+      "max": "ସର୍ବାଧିକ"
+    }
   }
 }

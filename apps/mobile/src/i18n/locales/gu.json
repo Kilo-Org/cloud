@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} પસંદ કર્યું, પસંદગી બદલવા ટેપ કરો",
       "tapToComment": "{{label}}, ટિપ્પણી કરવા ટેપ કરો",
-      "truncationBanner": "બદલાયેલી {{total}} ફાઇલોમાંથી પ્રથમ {{limit}} બતાવી રહ્યાં છીએ — GitHub API મર્યાદા"
+      "truncationBanner": "બદલાયેલી {{total}} ફાઇલોમાંથી પ્રથમ {{limit}} બતાવી રહ્યાં છીએ — GitHub API મર્યાદા",
+      "statusAdded": "ઉમેરાયું",
+      "statusContext": "સંદર્ભ",
+      "statusDeleted": "કાઢી નાખવામાં આવ્યું"
     },
     "linkPasteClipboardEmpty": "ક્લિપબોર્ડ ખાલી છે",
     "linkPasteNotAPullRequest": "આ GitHub પુલ રિક્વેસ્ટ લિંક નથી",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "આ સમીક્ષા જેમ છે તેમ સબમિટ કરી શકાતી નથી. PR બદલાયું હોઈ શકે છે, અથવા તમે તમારી પોતાની પુલ રિક્વેસ્ટની સમીક્ષા કરી શકતા નથી.",
       "couldNotPostComment": "ટિપ્પણી પોસ્ટ કરી શકાઈ નહીં.",
       "couldNotSubmitReview": "સમીક્ષા સબમિટ કરી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો."
+    },
+    "operation": {
+      "couldNotReply": "જવાબ આપી શકાયો નહીં.",
+      "couldNotCompleteAction": "આ ક્રિયા પૂર્ણ કરી શકાઈ નહીં.",
+      "mergeResultDefaultError": "GitHub એ મર્જ પૂર્ણ કર્યું નથી."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "ચુકવણી મોડી છે. કૃપા કરીને તમારી ચુકવણી પદ્ધતિ અપડેટ કરો.",
       "subscriptionCancels": "સબ્સ્ક્રિપ્શન {{date}} ના રોજ રદ થાય છે",
       "trialDaysRemaining": "ટ્રાયલ: {{remaining}} બાકી",
-      "trialEndingSoon": "ટ્રાયલ ટૂંક સમયમાં સમાપ્ત: {{remaining}}"
+      "trialEndingSoon": "ટ્રાયલ ટૂંક સમયમાં સમાપ્ત: {{remaining}}",
+      "planName": {
+        "commit": "કમિટ",
+        "standard": "સ્ટાન્ડર્ડ"
+      }
     },
     "changelog": {
       "title": "નવું શું છે",
@@ -1189,7 +1201,8 @@
       "strongArm": "મજબૂત હાથ",
       "talisman": "તાવીજ"
     },
-    "remoteSpawnFilesNotSupported": "આ ઇન્સ્ટન્સ ફાઇલો મેળવી શકતું નથી."
+    "remoteSpawnFilesNotSupported": "આ ઇન્સ્ટન્સ ફાઇલો મેળવી શકતું નથી.",
+    "instanceSwitcherTitle": "KiloClaw ઇન્સ્ટન્સ"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "નિષ્ફળ",
       "cancelled": "રદ કરેલ",
       "interrupted": "વિક્ષેપિત"
-    }
+    },
+    "reviewStyle": {
+      "strict": "કડક",
+      "balanced": "સંતુલિત",
+      "lenient": "ઉદાર",
+      "roast": "રોસ્ટ"
+    },
+    "focusArea": {
+      "security": "સુરક્ષા",
+      "performance": "પ્રદર્શન",
+      "bugs": "બગ્સ",
+      "style": "શૈલી",
+      "testing": "પરીક્ષણ",
+      "documentation": "દસ્તાવેજીકરણ"
+    },
+    "gateThreshold": {
+      "off": "બંધ",
+      "all": "બધા",
+      "warning": "ચેતવણી",
+      "critical": "નિર્ણાયક"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "કોડ સમીક્ષકને ધ્યાનની જરૂર છે",
+        "description": "કોડ સમીક્ષક અક્ષમ કરવામાં આવ્યું કારણ કે Kilo સક્રિય GitHub ઍપ ઇન્સ્ટોલેશન સાથે આ રિપોઝિટરીને ઍક્સેસ કરી શકતું નથી. GitHub ઍપ ઇન્સ્ટોલેશન અપડેટ કરો, પછી કોડ સમીક્ષક ફરી સક્ષમ કરો.",
+        "recoveryLabel": "GitHub ઍપ અપડેટ કરો"
+      },
+      "githubIpAllowList": {
+        "title": "કોડ સમીક્ષકને ધ્યાનની જરૂર છે",
+        "description": "કોડ સમીક્ષક અક્ષમ કરવામાં આવ્યું કારણ કે આ GitHub સંસ્થા Kilo ને અવરોધતી IP અનુમતિ યાદી વાપરે છે. મદદ માટે hi@kilocode.ai નો સંપર્ક કરો, પછી કોડ સમીક્ષક ફરી સક્ષમ કરો.",
+        "recoveryLabel": "સપોર્ટનો સંપર્ક કરો"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "કોડ સમીક્ષકને ધ્યાનની જરૂર છે",
+        "description": "કોડ સમીક્ષક અક્ષમ કરવામાં આવ્યું કારણ કે Kilo આ પ્રોજેક્ટ માટે GitLab પ્રોજેક્ટ એક્સેસ ટોકન બનાવી શકતું નથી. મેન્ટેનર એક્સેસ આપો અથવા પ્રોજેક્ટ એક્સેસ ટોકન્સ સક્ષમ કરો, પછી કોડ સમીક્ષક ફરી સક્ષમ કરો.",
+        "recoveryLabel": "GitLab એકીકરણ અપડેટ કરો"
+      },
+      "byokInvalidKey": {
+        "title": "કોડ સમીક્ષકને ધ્યાનની જરૂર છે",
+        "description": "કોડ સમીક્ષક અક્ષમ કરવામાં આવ્યું કારણ કે પસંદ કરેલ BYOK API કી અમાન્ય, રદ કરેલ, અથવા પરવાનગી વગરની છે. કી અપડેટ કરો અથવા બીજું મોડલ પસંદ કરો, પછી કોડ સમીક્ષક ફરી સક્ષમ કરો.",
+        "recoveryLabel": "BYOK સેટિંગ્સ અપડેટ કરો"
+      },
+      "selectedModelUnavailable": {
+        "title": "કોડ સમીક્ષકને ધ્યાનની જરૂર છે",
+        "description": "કોડ સમીક્ષક અક્ષમ કરવામાં આવ્યું કારણ કે પસંદ કરેલ મોડલ ક્લાઉડ એજન્ટ સત્રો માટે ઉપલબ્ધ નથી. ઉપલબ્ધ મોડલ પસંદ કરો, પછી કોડ સમીક્ષક ફરી સક્ષમ કરો.",
+        "recoveryLabel": "કોડ સમીક્ષક સેટિંગ્સ અપડેટ કરો"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "કોડ સમીક્ષકને ધ્યાનની જરૂર છે",
+        "description": "ત્રણ રિપોઝિટરી ક્લોન ટાઇમઆઉટ પછી આજે કોડ સમીક્ષક અક્ષમ કરવામાં આવ્યું. મદદ માટે hi@kilocode.ai નો સંપર્ક કરો, પછી કોડ સમીક્ષક ફરી સક્ષમ કરો.",
+        "recoveryLabel": "સપોર્ટનો સંપર્ક કરો"
+      }
+    },
+    "unknownError": "અજ્ઞાત ભૂલ"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "શોધ સ્વચાલિત ગંભીરતા થ્રેશોલ્ડથી નીચે છે. સલામતી ગેટ પસાર થાય ત્યારે મેન્યુઅલ સુધારણા હજુ શરૂ થઈ શકે છે.",
       "beforeEnablement": "ઓટો સુધારણા સક્ષમ થતા પહેલા વિશ્લેષણ પૂર્ણ થયું. સલામતી ગેટ પસાર થાય ત્યારે મેન્યુઅલ સુધારણા હજુ શરૂ થઈ શકે છે.",
       "generic": "આ શોધ માટે સુધારણા ઉપલબ્ધ નથી."
+    },
+    "commandFailure": {
+      "ownerCapReached": "વિશ્લેષણ ક્ષમતા ભરેલી છે. સક્રિય વિશ્લેષણ પૂરું થાય ત્યાં સુધી રાહ જુઓ, પછી ફરી પ્રયત્ન કરો.",
+      "githubTokenUnavailable": "GitHub અધિકૃતતાને ધ્યાનની જરૂર છે. GitHub ઍપ ફરી અધિકૃત કરો, પછી ફરી પ્રયત્ન કરો.",
+      "githubAuthInvalid": "GitHub અધિકૃતતાને ધ્યાનની જરૂર છે. GitHub ઍપ ફરી અધિકૃત કરો, પછી ફરી પ્રયત્ન કરો.",
+      "findingUnavailable": "શોધ હવે ઉપલબ્ધ નથી. શોધો તાજી કરો અને તે ખુલ્લી રહે તો ફરી પ્રયત્ન કરો.",
+      "repositoryUnavailable": "રિપોઝિટરી હવે GitHub ઍપ માટે ઉપલબ્ધ નથી. રિપોઝિટરી ઍક્સેસ તાજી કરો, પછી ફરી પ્રયત્ન કરો.",
+      "invalidDismissTarget": "તેનું Dependabot લક્ષ્ય અમાન્ય હોવાથી શોધને કાઢી નાખી શકાતી નથી.",
+      "commandStalled": "કતારમાં રહેલી ક્રિયા સમયસર પૂર્ણ થઈ નહીં. ક્રિયા ફરી પ્રયત્ન કરો.",
+      "queueRetriesExhausted": "ઘણા પ્રયત્નો પછી ક્રિયા પૂર્ણ કરી શકાઈ નહીં. ક્રિયા ફરી પ્રયત્ન કરો.",
+      "queueAdmissionFailed": "કતારમાં રહેલી ક્રિયા સ્વીકારી શકાઈ નહીં. ક્રિયા ફરી પ્રયત્ન કરો.",
+      "generic": "કતારમાં રહેલી ક્રિયા નિષ્ફળ થઈ. ક્રિયા ફરી પ્રયત્ન કરો."
+    },
+    "analysisMode": {
+      "auto": "ઓટો",
+      "shallow": "છીછરું",
+      "deep": "ઊંડું"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "{{name}} ફેવરિટમાં ઉમેરો",
       "removeFromFavorites": "{{name}} ફેવરિટમાંથી દૂર કરો",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "સત્ર મોડલ"
     },
     "attachmentPreview": {
       "openFailedRetry": "ફાઇલ ખોલવામાં નિષ્ફળ. કૃપા કરીને ફરી પ્રયાસ કરો.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "ક્રેડિટ ઉમેરો",
-    "description": "વપરાશ ચાલુ રાખવા માટે ક્રેડિટ ઉમેરો."
+    "description": "વપરાશ ચાલુ રાખવા માટે ક્રેડિટ ઉમેરો.",
+    "billingPage": "બિલિંગ પૃષ્ઠ"
   },
   "deviceSessions": {
     "couldNotLoad": "સત્રો લોડ કરી શકાયા નહીં",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "ખરીદીઓ પુનઃસ્થાપિત કરવામાં નિષ્ફળ. ફરી પ્રયત્ન કરો.",
     "purchaseFailed": "ખરીદી પૂર્ણ કરવામાં નિષ્ફળ.",
     "purchaseStartFailed": "App Store ખરીદી શરૂ કરવામાં નિષ્ફળ.",
-    "purchaseOwnedByAnotherAccount": "આ Apple ખાતા પરનું Kilo Pass એ અલગ Kilo ખાતા સાથે સંબંધિત છે."
+    "purchaseOwnedByAnotherAccount": "આ Apple ખાતા પરનું Kilo Pass એ અલગ Kilo ખાતા સાથે સંબંધિત છે.",
+    "couldNotConnectToAppStore": "App Store થી કનેક્ટ થઈ શકાયું નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
+    "noMatchingProducts": "App Store દ્વારા કોઈ મેળ ખાતા Kilo Pass ઉત્પાદનો પરત આપવામાં આવ્યા નથી.",
+    "purchaseMissingSignedTransaction": "App Store ખરીદીમાં સહી કરેલ ટ્રાન્ઝેક્શન JWS સમાવિષ્ટ ન હતું."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "સુધારણાની જરૂર છે",
     "sorryTitle": "આ સાંભળીને અમને દિલગીરી થઈ!",
     "sorryMessage": "શું સુધારવાની જરૂર છે તે અમને જણાવો. એપ માટે જવાબદાર એન્જિનિયર દરેક રિપોર્ટ વાંચે છે!",
-    "emailUs": "અમને ઇમેઇલ કરો"
+    "emailUs": "અમને ઇમેઇલ કરો",
+    "emailSubject": "મોબાઇલ એપ પ્રતિસાદ"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "કોઈ ક્રેડિટ પ્રવૃત્તિ નથી",
       "expires": "{{date}} ને સમાપ્ત",
       "title": "ક્રેડિટ પ્રવૃત્તિ",
-      "transactionFallback": "ક્રેડિટ ટ્રાન્ઝેક્શન"
+      "transactionFallback": "ક્રેડિટ ટ્રાન્ઝેક્શન",
+      "category": {
+        "organization_custom": "સંગઠન કસ્ટમ",
+        "parent_to_child_transfer_in": "પેરન્ટથી ચાઇલ્ડમાં સ્થાનાંતરણ (ઇન)",
+        "parent_to_child_transfer_out": "પેરન્ટથી ચાઇલ્ડમાં સ્થાનાંતરણ (આઉટ)",
+        "oss-sponsorship": "OSS સ્પોન્સરશિપ",
+        "oss-monthly-reset": "OSS માસિક રીસેટ",
+        "team-topup-bonus-2025": "ટીમ ટોપઅપ બોનસ 2025",
+        "accounting_adjustment": "એકાઉન્ટિંગ ગોઠવણ",
+        "credits_expired": "ક્રેડિટ સમાપ્ત થઈ"
+      }
     },
     "inviteMember": {
       "emailError": "માન્ય ઇમેઇલ સરનામું દાખલ કરો",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "ઇનવોઇસ દરેક બિલિંગ ચક્ર પર આપમેળે ઉત્પન્ન થાય છે અને તમારા સંગઠનને બિલ થતાં જ અહીં દેખાશે.",
       "emptyTitle": "કોઈ ઇનવોઇસ નથી",
       "invoiceFallback": "ઇનવોઇસ",
-      "statusOpen": "ખુલ્લું",
-      "statusPaid": "ચૂકવેલ",
-      "statusVoid": "રદ",
       "title": "ઇનવોઇસ",
       "downloadFailed": "ઇનવોઇસ ડાઉનલોડ કરી શકાયું નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
-      "sharingUnavailable": "આ ઉપકરણ પર શેરિંગ ઉપલબ્ધ નથી."
+      "sharingUnavailable": "આ ઉપકરણ પર શેરિંગ ઉપલબ્ધ નથી.",
+      "status": {
+        "paid": "ચૂકવેલ",
+        "open": "ખુલ્લું",
+        "void": "રદ",
+        "draft": "ડ્રાફ્ટ",
+        "uncollectible": "વસૂલ કરી ન શકાય તેવું",
+        "unknown": "અજ્ઞાત"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "એકત્રિત ડેટા",
     "free": "મફત",
-    "couldNotUpdateFavorites": "ફેવરિટ અપડેટ કરી શકાયાં નહીં"
+    "couldNotUpdateFavorites": "ફેવરિટ અપડેટ કરી શકાયાં નહીં",
+    "thinkingEffort": {
+      "none": "કંઈ નહીં",
+      "minimal": "ન્યૂનતમ",
+      "low": "નીચું",
+      "medium": "મધ્યમ",
+      "high": "ઉચ્ચ",
+      "xhigh": "અતિ ઉચ્ચ",
+      "max": "મહત્તમ"
+    }
   }
 }

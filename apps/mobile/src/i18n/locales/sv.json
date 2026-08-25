@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Valt {{label}}, tryck för att ändra markering",
       "tapToComment": "{{label}}, tryck för att kommentera",
-      "truncationBanner": "Visar de första {{limit}} av {{total}} ändrade filer — GitHub API-begränsning"
+      "truncationBanner": "Visar de första {{limit}} av {{total}} ändrade filer — GitHub API-begränsning",
+      "statusAdded": "Tillagd",
+      "statusContext": "Kontext",
+      "statusDeleted": "Borttagen"
     },
     "linkPasteClipboardEmpty": "Urklipp är tomt",
     "linkPasteNotAPullRequest": "Inte en GitHub-pull request-länk",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Den här granskningen kan inte skickas som den är. PR:en kan ha ändrats, eller så kan du inte granska din egen pull request.",
       "couldNotPostComment": "Kunde inte posta kommentaren.",
       "couldNotSubmitReview": "Kunde inte skicka granskningen. Kontrollera anslutningen och försök igen."
+    },
+    "operation": {
+      "couldNotReply": "Kunde inte svara.",
+      "couldNotCompleteAction": "Kunde inte slutföra den här åtgärden.",
+      "mergeResultDefaultError": "GitHub slutförde inte sammanslagningen."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Betalning förfallen. Uppdatera din betalningsmetod.",
       "subscriptionCancels": "Abonnemanget avslutas {{date}}",
       "trialDaysRemaining": "Provperiod: {{remaining}} dagar kvar",
-      "trialEndingSoon": "Provperioden avslutas snart: {{remaining}}"
+      "trialEndingSoon": "Provperioden avslutas snart: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Vad är nytt",
@@ -1189,7 +1201,8 @@
       "strongArm": "Stark arm",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Den här instansen kan inte ta emot filer."
+    "remoteSpawnFilesNotSupported": "Den här instansen kan inte ta emot filer.",
+    "instanceSwitcherTitle": "KiloClaw-instans"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Misslyckades",
       "cancelled": "Avbruten",
       "interrupted": "Avbruten"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Strikt",
+      "balanced": "Balanserad",
+      "lenient": "Mild",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Säkerhet",
+      "performance": "Prestanda",
+      "bugs": "Buggar",
+      "style": "Stil",
+      "testing": "Testning",
+      "documentation": "Dokumentation"
+    },
+    "gateThreshold": {
+      "off": "Av",
+      "all": "Alla",
+      "warning": "Varning",
+      "critical": "Kritisk"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Kodgranskaren behöver uppmärksamhet",
+        "description": "Kodgranskaren inaktiverades eftersom Kilo inte kan komma åt detta arkiv med en aktiv GitHub App-installation. Uppdatera GitHub App-installationen och aktivera sedan Kodgranskaren igen.",
+        "recoveryLabel": "Uppdatera GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Kodgranskaren behöver uppmärksamhet",
+        "description": "Kodgranskaren inaktiverades eftersom denna GitHub-organisation använder en IP-tillåtelselista som blockerar Kilo. Kontakta hi@kilocode.ai för hjälp och aktivera sedan Kodgranskaren igen.",
+        "recoveryLabel": "Kontakta support"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Kodgranskaren behöver uppmärksamhet",
+        "description": "Kodgranskaren inaktiverades eftersom Kilo inte kan skapa en GitLab Project Access Token för detta projekt. Ge Maintainer-åtkomst eller aktivera Project Access Tokens och aktivera sedan Kodgranskaren igen.",
+        "recoveryLabel": "Uppdatera GitLab-integreringen"
+      },
+      "byokInvalidKey": {
+        "title": "Kodgranskaren behöver uppmärksamhet",
+        "description": "Kodgranskaren inaktiverades eftersom den valda BYOK-API-nyckeln är ogiltig, återkallad eller saknar behörighet. Uppdatera nyckeln eller välj en annan modell och aktivera sedan Kodgranskaren igen.",
+        "recoveryLabel": "Uppdatera BYOK-inställningar"
+      },
+      "selectedModelUnavailable": {
+        "title": "Kodgranskaren behöver uppmärksamhet",
+        "description": "Kodgranskaren inaktiverades eftersom den valda modellen inte är tillgänglig för molnagentsessioner. Välj en tillgänglig modell och aktivera sedan Kodgranskaren igen.",
+        "recoveryLabel": "Uppdatera Kodgranskarens inställningar"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Kodgranskaren behöver uppmärksamhet",
+        "description": "Kodgranskaren inaktiverades efter tre arkivklonings-timeouts idag. Kontakta hi@kilocode.ai för hjälp och aktivera sedan Kodgranskaren igen.",
+        "recoveryLabel": "Kontakta support"
+      }
+    },
+    "unknownError": "Okänt fel"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Findingen ligger under tröskeln för automatisk allvarlighet. Manuell åtgärd kan fortfarande startas när säkerhetsgrindarna passeras.",
       "beforeEnablement": "Analysen slutfördes innan automatisk åtgärd aktiverades. Manuell åtgärd kan fortfarande startas när säkerhetsgrindarna passeras.",
       "generic": "Åtgärd är inte tillgänglig för denna finding."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Analyskapaciteten är full. Vänta tills en aktiv analys är klar och försök sedan igen.",
+      "githubTokenUnavailable": "GitHub-auktoriseringen behöver uppmärksamhet. Auktorisera GitHub App på nytt och försök sedan igen.",
+      "githubAuthInvalid": "GitHub-auktoriseringen behöver uppmärksamhet. Auktorisera GitHub App på nytt och försök sedan igen.",
+      "findingUnavailable": "Fyndet är inte längre tillgängligt. Uppdatera fynden och försök igen om det fortfarande är öppet.",
+      "repositoryUnavailable": "Arkivet är inte längre tillgängligt för GitHub App. Uppdatera arkivåtkomsten och försök sedan igen.",
+      "invalidDismissTarget": "Fyndet kan inte avfärdas eftersom dess Dependabot-mål är ogiltigt.",
+      "commandStalled": "Den köade åtgärden blev inte klar i tid. Försök igen med åtgärden.",
+      "queueRetriesExhausted": "Åtgärden kunde inte slutföras efter flera försök. Försök igen med åtgärden.",
+      "queueAdmissionFailed": "Den köade åtgärden kunde inte godkännas. Försök igen med åtgärden.",
+      "generic": "Den köade åtgärden misslyckades. Försök igen med åtgärden."
+    },
+    "analysisMode": {
+      "auto": "Auto",
+      "shallow": "Ytlig",
+      "deep": "Djup"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Lägg till {{name}} i favoriter",
       "removeFromFavorites": "Ta bort {{name}} från favoriter",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Sessionmodell"
     },
     "attachmentPreview": {
       "openFailedRetry": "Det gick inte att öppna filen. Försök igen.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Lägg till krediter",
-    "description": "Lägg till krediter för att hålla användningen igång."
+    "description": "Lägg till krediter för att hålla användningen igång.",
+    "billingPage": "faktureringssidan"
   },
   "deviceSessions": {
     "couldNotLoad": "Det gick inte att läsa in sessioner",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Det gick inte att återställa köpen. Försök igen.",
     "purchaseFailed": "Det gick inte att slutföra köpet.",
     "purchaseStartFailed": "Det gick inte att starta App Store-köpet.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass på detta Apple-konto tillhör ett annat Kilo-konto."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass på detta Apple-konto tillhör ett annat Kilo-konto.",
+    "couldNotConnectToAppStore": "Kunde inte ansluta till App Store. Kontrollera anslutningen och försök igen.",
+    "noMatchingProducts": "App Store returnerade inga matchande Kilo Pass-produkter.",
+    "purchaseMissingSignedTransaction": "App Store-köpet innehöll ingen signerad transaktion JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Behöver förbättras",
     "sorryTitle": "Vi är ledsna att höra det!",
     "sorryMessage": "Berätta gärna vad som behöver bli bättre. Ingenjören som ansvarar för appen läser varje enskild rapport!",
-    "emailUs": "E-posta oss"
+    "emailUs": "E-posta oss",
+    "emailSubject": "feedback om mobilappen"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Ingen kreditaktivitet",
       "expires": "Upphör {{date}}",
       "title": "Kreditaktivitet",
-      "transactionFallback": "Kredittransaktion"
+      "transactionFallback": "Kredittransaktion",
+      "category": {
+        "organization_custom": "Organisationsanpassad",
+        "parent_to_child_transfer_in": "Överföring från förälder till barn (in)",
+        "parent_to_child_transfer_out": "Överföring från förälder till barn (ut)",
+        "oss-sponsorship": "OSS-sponsring",
+        "oss-monthly-reset": "OSS månatlig återställning",
+        "team-topup-bonus-2025": "Team-påfyllnadsbonus 2025",
+        "accounting_adjustment": "Redovisningsjustering",
+        "credits_expired": "Krediter upphörde"
+      }
     },
     "inviteMember": {
       "emailError": "Ange en giltig e-postadress",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Fakturor genereras automatiskt varje faktureringscykel och visas här när din organisation har fakturerats.",
       "emptyTitle": "Inga fakturor",
       "invoiceFallback": "Faktura",
-      "statusOpen": "Öppen",
-      "statusPaid": "Betald",
-      "statusVoid": "Ogiltig",
       "title": "Fakturor",
       "downloadFailed": "Det gick inte att ladda ner fakturan. Kontrollera anslutningen och försök igen.",
-      "sharingUnavailable": "Delning är inte tillgänglig på den här enheten."
+      "sharingUnavailable": "Delning är inte tillgänglig på den här enheten.",
+      "status": {
+        "paid": "Betald",
+        "open": "Öppen",
+        "void": "Ogiltig",
+        "draft": "Utkast",
+        "uncollectible": "Oindrivbar",
+        "unknown": "Okänd"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Data samlas in",
     "free": "Gratis",
-    "couldNotUpdateFavorites": "Kunde inte uppdatera favoriter"
+    "couldNotUpdateFavorites": "Kunde inte uppdatera favoriter",
+    "thinkingEffort": {
+      "none": "Ingen",
+      "minimal": "Minimal",
+      "low": "Låg",
+      "medium": "Medel",
+      "high": "Hög",
+      "xhigh": "Extra hög",
+      "max": "Max"
+    }
   }
 }

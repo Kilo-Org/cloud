@@ -386,7 +386,11 @@
       "subscriptionCancels": "يُلغى الاشتراك في {{date}}",
       "trialDaysRemaining": "النسخة التجريبية: متبقٍ {{remaining}}",
       "trialEndingSoon": "تنتهي النسخة التجريبية قريبًا: {{remaining}}",
-      "lessThanOneDay": "أقل من يوم واحد"
+      "lessThanOneDay": "أقل من يوم واحد",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "ما الجديد",
@@ -758,7 +762,8 @@
       "strongArm": "ذراع قوية",
       "talisman": "طلسم"
     },
-    "remoteSpawnFilesNotSupported": "لا يمكن لهذا المثيل استقبال الملفات."
+    "remoteSpawnFilesNotSupported": "لا يمكن لهذا المثيل استقبال الملفات.",
+    "instanceSwitcherTitle": "مثيل KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -956,7 +961,60 @@
       "failed": "فشل",
       "cancelled": "تم الإلغاء",
       "interrupted": "تمت المقاطعة"
-    }
+    },
+    "reviewStyle": {
+      "strict": "صارم",
+      "balanced": "متوازن",
+      "lenient": "متساهل",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "الأمان",
+      "performance": "الأداء",
+      "bugs": "الأخطاء",
+      "style": "الأسلوب",
+      "testing": "الاختبار",
+      "documentation": "التوثيق"
+    },
+    "gateThreshold": {
+      "off": "إيقاف",
+      "all": "الكل",
+      "warning": "تحذير",
+      "critical": "حرجة"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "مراجع الكود يحتاج إلى انتباه",
+        "description": "تم تعطيل مراجع الكود لأن Kilo لا يمكنه الوصول إلى هذا المستودع مع وجود تثبيت نشط لتطبيق GitHub. حدّث تثبيت تطبيق GitHub، ثم أعد تفعيل مراجع الكود.",
+        "recoveryLabel": "تحديث تطبيق GitHub"
+      },
+      "githubIpAllowList": {
+        "title": "مراجع الكود يحتاج إلى انتباه",
+        "description": "تم تعطيل مراجع الكود لأن هذه المؤسسة على GitHub تستخدم قائمة عناوين IP مسموح بها تحظر Kilo. تواصل مع hi@kilocode.ai للمساعدة، ثم أعد تفعيل مراجع الكود.",
+        "recoveryLabel": "الاتصال بالدعم"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "مراجع الكود يحتاج إلى انتباه",
+        "description": "تم تعطيل مراجع الكود لأن Kilo لا يمكنه إنشاء رمز وصول للمشروع في GitLab لهذا المشروع. امنح وصول المشرف أو فعّل رموز وصول المشروع، ثم أعد تفعيل مراجع الكود.",
+        "recoveryLabel": "تحديث تكامل GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "مراجع الكود يحتاج إلى انتباه",
+        "description": "تم تعطيل مراجع الكود لأن مفتاح BYOK API المحدد غير صالح أو تم إلغاؤه أو يفتقر إلى الصلاحية. حدّث المفتاح أو اختر نموذجًا آخر، ثم أعد تفعيل مراجع الكود.",
+        "recoveryLabel": "تحديث إعدادات BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "مراجع الكود يحتاج إلى انتباه",
+        "description": "تم تعطيل مراجع الكود لأن النموذج المحدد غير متاح لجلسات وكيل السحابة. اختر نموذجًا متاحًا، ثم أعد تفعيل مراجع الكود.",
+        "recoveryLabel": "تحديث إعدادات مراجع الكود"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "مراجع الكود يحتاج إلى انتباه",
+        "description": "تم تعطيل مراجع الكود بعد ثلاث مهلات لاستنساخ المستودع اليوم. تواصل مع hi@kilocode.ai للمساعدة، ثم أعد تفعيل مراجع الكود.",
+        "recoveryLabel": "الاتصال بالدعم"
+      }
+    },
+    "unknownError": "خطأ غير معروف"
   },
   "securityAgent": {
     "filter": {
@@ -1512,6 +1570,23 @@
       "belowThreshold": "النتيجة أقل من حد الخطورة التلقائي. لا تزال المعالجة اليدوية قابلة للبدء عند اجتياز بوابات الأمان.",
       "beforeEnablement": "اكتمل التحليل قبل تمكين المعالجة التلقائية. لا تزال المعالجة اليدوية قابلة للبدء عند اجتياز بوابات الأمان.",
       "generic": "المعالجة غير متاحة لهذه النتيجة."
+    },
+    "commandFailure": {
+      "ownerCapReached": "سعة التحليل ممتلئة. انتظر انتهاء تحليل نشط، ثم أعد المحاولة.",
+      "githubTokenUnavailable": "تفويض GitHub يحتاج إلى انتباه. أعد تفويض تطبيق GitHub، ثم أعد المحاولة.",
+      "githubAuthInvalid": "تفويض GitHub يحتاج إلى انتباه. أعد تفويض تطبيق GitHub، ثم أعد المحاولة.",
+      "findingUnavailable": "لم تعد النتيجة متاحة. حدّث النتائج وأعد المحاولة إذا ظلت مفتوحة.",
+      "repositoryUnavailable": "لم يعد المستودع متاحًا لتطبيق GitHub. حدّث وصول المستودع، ثم أعد المحاولة.",
+      "invalidDismissTarget": "لا يمكن رفض النتيجة لأن هدف Dependabot الخاص بها غير صالح.",
+      "commandStalled": "لم يكتمل الإجراء في قائمة الانتظار في الوقت المحدد. أعد محاولة الإجراء.",
+      "queueRetriesExhausted": "تعذّر إكمال الإجراء بعد عدة محاولات. أعد محاولة الإجراء.",
+      "queueAdmissionFailed": "تعذّر قبول الإجراء في قائمة الانتظار. أعد محاولة الإجراء.",
+      "generic": "فشل الإجراء في قائمة الانتظار. أعد محاولة الإجراء."
+    },
+    "analysisMode": {
+      "auto": "تلقائي",
+      "shallow": "سطحي",
+      "deep": "عميق"
     }
   },
   "agents": {
@@ -1999,7 +2074,8 @@
       "addToFavorites": "إضافة {{name}} إلى المفضلة",
       "removeFromFavorites": "إزالة {{name}} من المفضلة",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "متوسط"
+      "thinkingEffortMedium": "متوسط",
+      "sessionModel": "نموذج الجلسة"
     },
     "attachmentPreview": {
       "openFailedRetry": "تعذّر فتح الملف. يرجى المحاولة مرة أخرى.",
@@ -2135,7 +2211,8 @@
   },
   "addCredits": {
     "cta": "إضافة أرصدة",
-    "description": "أضف أرصدة للحفاظ على استمرار الاستخدام."
+    "description": "أضف أرصدة للحفاظ على استمرار الاستخدام.",
+    "billingPage": "صفحة الفوترة"
   },
   "deviceSessions": {
     "couldNotLoad": "تعذّر تحميل الجلسات",
@@ -2323,7 +2400,10 @@
     "restoreFailed": "فشل استعادة المشتريات. حاول مرة أخرى.",
     "purchaseFailed": "فشل إكمال عملية الشراء.",
     "purchaseStartFailed": "فشل بدء عملية شراء من App Store.",
-    "purchaseOwnedByAnotherAccount": "ينتمي Kilo Pass على حساب Apple هذا إلى حساب Kilo مختلف."
+    "purchaseOwnedByAnotherAccount": "ينتمي Kilo Pass على حساب Apple هذا إلى حساب Kilo مختلف.",
+    "couldNotConnectToAppStore": "تعذّر الاتصال بـ App Store. تحقق من اتصالك وحاول مرة أخرى.",
+    "noMatchingProducts": "لم يُرجع App Store منتجات Kilo Pass مطابقة.",
+    "purchaseMissingSignedTransaction": "لم تتضمن عملية الشراء من App Store معاملة موقعة بصيغة JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2859,7 +2939,10 @@
     "diff": {
       "selectedTapToChange": "تم تحديد {{label}}، اضغط لتغيير التحديد",
       "truncationBanner": "عرض أول {{limit}} من أصل {{total}} ملفًا تم تغييرها — حد GitHub API",
-      "tapToComment": "{{label}}، اضغط للتعليق"
+      "tapToComment": "{{label}}، اضغط للتعليق",
+      "statusAdded": "تمت الإضافة",
+      "statusContext": "السياق",
+      "statusDeleted": "تم الحذف"
     },
     "linkPasteClipboardEmpty": "الحافظة فارغة",
     "linkPasteNotAPullRequest": "ليس رابط طلب سحب على GitHub",
@@ -2873,6 +2956,11 @@
       "reviewNotSubmitted": "لا يمكن إرسال هذه المراجعة كما هي. ربما تغيّر PR، أو لا يمكنك مراجعة طلب السحب الخاص بك.",
       "couldNotPostComment": "تعذّر نشر التعليق.",
       "couldNotSubmitReview": "تعذّر إرسال المراجعة. تحقق من اتصالك وحاول مرة أخرى."
+    },
+    "operation": {
+      "couldNotReply": "تعذّر الرد.",
+      "couldNotCompleteAction": "تعذّر إكمال هذا الإجراء.",
+      "mergeResultDefaultError": "لم يكمل GitHub الدمج."
     }
   },
   "organization": {
@@ -2890,7 +2978,17 @@
       "emptyTitle": "لا يوجد نشاط رصيد",
       "expires": "تنتهي في {{date}}",
       "title": "نشاط الرصيد",
-      "transactionFallback": "معاملة رصيد"
+      "transactionFallback": "معاملة رصيد",
+      "category": {
+        "organization_custom": "مخصص للمؤسسة",
+        "parent_to_child_transfer_in": "تحويل من الأصل إلى الفرع (داخل)",
+        "parent_to_child_transfer_out": "تحويل من الأصل إلى الفرع (خارج)",
+        "oss-sponsorship": "رعاية OSS",
+        "oss-monthly-reset": "إعادة تعيين OSS الشهرية",
+        "team-topup-bonus-2025": "مكافأة شحن الفريق 2025",
+        "accounting_adjustment": "تعديل محاسبي",
+        "credits_expired": "انتهت صلاحية الأرصدة"
+      }
     },
     "hub": {
       "balance": "الرصيد",
@@ -2917,11 +3015,16 @@
       "emptyTitle": "لا توجد فواتير",
       "invoiceFallback": "فاتورة",
       "title": "الفواتير",
-      "statusPaid": "مدفوع",
-      "statusOpen": "مفتوح",
-      "statusVoid": "ملغى",
       "downloadFailed": "تعذّر تنزيل الفاتورة. تحقق من اتصالك وحاول مرة أخرى.",
-      "sharingUnavailable": "المشاركة غير متاحة على هذا الجهاز."
+      "sharingUnavailable": "المشاركة غير متاحة على هذا الجهاز.",
+      "status": {
+        "paid": "مدفوع",
+        "open": "مفتوح",
+        "void": "ملغى",
+        "draft": "مسودة",
+        "uncollectible": "غير قابل للتحصيل",
+        "unknown": "غير معروف"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3025,7 +3128,8 @@
     "promptTitle": "ما رأيك في تطبيق Kilo؟",
     "rateKilo": "قيّم Kilo",
     "sorryMessage": "يرجى إخبارنا بما يحتاج إلى تحسين. المهندس المسؤول عن التطبيق يقرأ كل تقرير!",
-    "sorryTitle": "نأسف لسماع ذلك!"
+    "sorryTitle": "نأسف لسماع ذلك!",
+    "emailSubject": "ملاحظات حول تطبيق الجوال"
   },
   "authErrors": {
     "emailAlreadyUsed": "يوجد حساب بهذا البريد الإلكتروني مسجل بطريقة تسجيل دخول مختلفة. جرّب طريقة أخرى أو استخدم \"$t(login.moreSignInOptions)\".",
@@ -3055,6 +3159,15 @@
   "models": {
     "dataCollected": "البيانات التي تم جمعها",
     "free": "مجاني",
-    "couldNotUpdateFavorites": "تعذّر تحديث المفضلة"
+    "couldNotUpdateFavorites": "تعذّر تحديث المفضلة",
+    "thinkingEffort": {
+      "none": "لا شيء",
+      "minimal": "أدنى",
+      "low": "منخفض",
+      "medium": "متوسط",
+      "high": "عالٍ",
+      "xhigh": "عالٍ جدًا",
+      "max": "الحد الأقصى"
+    }
   }
 }

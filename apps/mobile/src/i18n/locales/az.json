@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} seçildi, seçimi dəyişmək üçün toxunun",
       "truncationBanner": "Dəyişdirilmiş {{total}} fayldan ilk {{limit}} fayl göstərilir — GitHub API limiti",
-      "tapToComment": "{{label}}, şərh üçün toxunun"
+      "tapToComment": "{{label}}, şərh üçün toxunun",
+      "statusAdded": "Əlavə edildi",
+      "statusContext": "Kontekst",
+      "statusDeleted": "Silindi"
     },
     "linkPasteClipboardEmpty": "Panoda heç nə yoxdur",
     "linkPasteNotAPullRequest": "Bu, GitHub pull request linki deyil",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Bu icmal olduğu kimi təqdim edilə bilməz. PR dəyişmiş ola bilər və ya öz pull request'inizi icmal edə bilməzsiniz.",
       "couldNotPostComment": "Şərh yerləşdirilə bilmədi.",
       "couldNotSubmitReview": "İcmal təqdim edilə bilmədi. Bağlantınızı yoxlayın və yenidən cəhd edin."
+    },
+    "operation": {
+      "couldNotReply": "Cavab vermək mümkün olmadı.",
+      "couldNotCompleteAction": "Bu əməliyyatı tamamlamaq mümkün olmadı.",
+      "mergeResultDefaultError": "GitHub birləşməni tamamlamadı."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "subscriptionCancels": "Abunəlik {{date}} tarixində ləğv olunur",
       "trialDaysRemaining": "Sınaq: {{remaining}} qalıb",
       "trialEndingSoon": "Sınaq tezliklə bitir: {{remaining}}",
-      "lessThanOneDay": "1 gündən az"
+      "lessThanOneDay": "1 gündən az",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Nə Yeni Var",
@@ -1189,7 +1201,8 @@
       "strongArm": "Güclü qol",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Bu nümunə fayl qəbul edə bilmir."
+    "remoteSpawnFilesNotSupported": "Bu nümunə fayl qəbul edə bilmir.",
+    "instanceSwitcherTitle": "KiloClaw nümunəsi"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Uğursuz",
       "cancelled": "Ləğv edildi",
       "interrupted": "Kəsildi"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Ciddi",
+      "balanced": "Balanslı",
+      "lenient": "Yumşaq",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Təhlükəsizlik",
+      "performance": "Performans",
+      "bugs": "Səhvlər",
+      "style": "Stil",
+      "testing": "Testlər",
+      "documentation": "Sənədləşmə"
+    },
+    "gateThreshold": {
+      "off": "Söndürülüb",
+      "all": "Hamısı",
+      "warning": "Xəbərdarlıq",
+      "critical": "Kritik"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer diqqət tələb edir",
+        "description": "Code Reviewer Kilo aktiv GitHub App quraşdırması ilə bu repozitoriyaya daxil ola bilmədiyi üçün söndürüldü. GitHub App quraşdırmasını yeniləyin, sonra Code Reviewer-ı yenidən aktiv edin.",
+        "recoveryLabel": "GitHub App-i yenilə"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer diqqət tələb edir",
+        "description": "Code Reviewer bu GitHub təşkilatı Kilo-nu bloklayan IP icazə siyahısından istifadə etdiyi üçün söndürüldü. Kömək üçün hi@kilocode.ai ilə əlaqə saxlayın, sonra Code Reviewer-ı yenidən aktiv edin.",
+        "recoveryLabel": "Dəstəklə əlaqə saxla"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer diqqət tələb edir",
+        "description": "Code Reviewer Kilo bu layihə üçün GitLab Project Access Token yarada bilmədiyi üçün söndürüldü. Maintainer girişi verin və ya Project Access Token-ları aktiv edin, sonra Code Reviewer-ı yenidən aktiv edin.",
+        "recoveryLabel": "GitLab inteqrasiyasını yenilə"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer diqqət tələb edir",
+        "description": "Code Reviewer seçilmiş BYOK API açarı etibarsız, ləğv edilmiş və ya icazəsiz olduğu üçün söndürüldü. Açarı yeniləyin və ya başqa model seçin, sonra Code Reviewer-ı yenidən aktiv edin.",
+        "recoveryLabel": "BYOK parametrlərini yenilə"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer diqqət tələb edir",
+        "description": "Code Reviewer seçilmiş model cloud agent sessiyaları üçün mövcud olmadığı üçün söndürüldü. Mövcud model seçin, sonra Code Reviewer-ı yenidən aktiv edin.",
+        "recoveryLabel": "Code Reviewer parametrlərini yenilə"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer diqqət tələb edir",
+        "description": "Code Reviewer bu gün üç repozitoriya klonlanması vaxt aşımından sonra söndürüldü. Kömək üçün hi@kilocode.ai ilə əlaqə saxlayın, sonra Code Reviewer-ı yenidən aktiv edin.",
+        "recoveryLabel": "Dəstəklə əlaqə saxla"
+      }
+    },
+    "unknownError": "Naməlum xəta"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Tapıntı avtomatik şiddət həddindən aşağıdır. Təhlükəsizlik qapıları keçəndə əl ilə düzəltmə hələ də başlaya bilər.",
       "beforeEnablement": "Avtomatik düzəltmə aktivləşdirilməzdən əvvəl analiz tamamlanıb. Təhlükəsizlik qapıları keçəndə əl ilə düzəltmə hələ də başlaya bilər.",
       "generic": "Bu tapıntı üçün düzəltmə mövcud deyil."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Analiz tutumu doludur. Aktiv analizin bitməsini gözləyin, sonra yenidən cəhd edin.",
+      "githubTokenUnavailable": "GitHub icazəsi diqqət tələb edir. GitHub App-i yenidən icazələndirin, sonra yenidən cəhd edin.",
+      "githubAuthInvalid": "GitHub icazəsi diqqət tələb edir. GitHub App-i yenidən icazələndirin, sonra yenidən cəhd edin.",
+      "findingUnavailable": "Tapıntı artıq mövcud deyil. Tapıntıları yeniləyin və açıq qalırsa yenidən cəhd edin.",
+      "repositoryUnavailable": "Repozitoriya artıq GitHub App üçün mövcud deyil. Repozitoriya girişini yeniləyin, sonra yenidən cəhd edin.",
+      "invalidDismissTarget": "Tapıntı Dependabot hədəfi etibarsız olduğu üçün silinə bilməz.",
+      "commandStalled": "Növbəyə alınmış əməliyyat vaxtında bitmədi. Əməliyyatı yenidən cəhd edin.",
+      "queueRetriesExhausted": "Əməliyyat bir neçə cəhddən sonra tamamlana bilmədi. Əməliyyatı yenidən cəhd edin.",
+      "queueAdmissionFailed": "Növbəyə alınmış əməliyyat qəbul edilə bilmədi. Əməliyyatı yenidən cəhd edin.",
+      "generic": "Növbəyə alınmış əməliyyat uğursuz oldu. Əməliyyatı yenidən cəhd edin."
+    },
+    "analysisMode": {
+      "auto": "Avtomatik",
+      "shallow": "Dayaz",
+      "deep": "Dərin"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "{{name}}-i sevimlilərə əlavə et",
       "removeFromFavorites": "{{name}}-i sevimlilərdən sil",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Orta"
+      "thinkingEffortMedium": "Orta",
+      "sessionModel": "Sessiya modeli"
     },
     "attachmentPreview": {
       "openFailedRetry": "Fayl açıla bilmədi. Zəhmət olmasa yenidən cəhd edin.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Kredit əlavə et",
-    "description": "İstifadənin davam etməsi üçün kredit əlavə edin."
+    "description": "İstifadənin davam etməsi üçün kredit əlavə edin.",
+    "billingPage": "faktura səhifəsi"
   },
   "deviceSessions": {
     "couldNotLoad": "Sessiyalar yüklənə bilmədi",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Alışlar bərpa edilə bilmədi. Yenidən cəhd edin.",
     "purchaseFailed": "Alış tamamlana bilmədi.",
     "purchaseStartFailed": "App Store alışı başladıla bilmədi.",
-    "purchaseOwnedByAnotherAccount": "Bu Apple Hesabındakı Kilo Pass başqa Kilo hesabına aiddir."
+    "purchaseOwnedByAnotherAccount": "Bu Apple Hesabındakı Kilo Pass başqa Kilo hesabına aiddir.",
+    "couldNotConnectToAppStore": "App Store-a qoşulmaq mümkün olmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
+    "noMatchingProducts": "App Store uyğun Kilo Pass məhsulu qaytarmadı.",
+    "purchaseMissingSignedTransaction": "App Store alışı imzalanmış əməliyyat JWS-i daxil etmədi."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Təkmilləşdirmə lazımdır",
     "sorryTitle": "Bunu eşitdiyimizə təəssüflənirik!",
     "sorryMessage": "Zəhmət olmasa nəyin yaxşılaşdırılması lazım olduğunu bizə bildirin. Tətbiqə cavabdeh olan mühəndis hər hesabatı oxuyur!",
-    "emailUs": "Bizə e-poçt göndərin"
+    "emailUs": "Bizə e-poçt göndərin",
+    "emailSubject": "mobil tətbiq rəyi"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Kredit fəaliyyəti yoxdur",
       "expires": "{{date}} tarixində başa çatır",
       "title": "Kredit fəaliyyəti",
-      "transactionFallback": "Kredit əməliyyatı"
+      "transactionFallback": "Kredit əməliyyatı",
+      "category": {
+        "organization_custom": "Təşkilat xüsusi",
+        "parent_to_child_transfer_in": "Valideyndən uşaqa köçürmə (daxil)",
+        "parent_to_child_transfer_out": "Valideyndən uşaqa köçürmə (xaric)",
+        "oss-sponsorship": "OSS sponsorluğu",
+        "oss-monthly-reset": "OSS aylıq sıfırlama",
+        "team-topup-bonus-2025": "Komanda doldurma bonusu-2025",
+        "accounting_adjustment": "Mühasibat düzəlişi",
+        "credits_expired": "Kreditlərin müddəti bitib"
+      }
     },
     "inviteMember": {
       "emailError": "Etibarlı e-poçt ünvanı daxil edin",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Fakturalar hər ödəniş dövründə avtomatik yaradılır və təşkilatınız ödənildikdən sonra burada görünəcək.",
       "emptyTitle": "Faktura yoxdur",
       "invoiceFallback": "Faktura",
-      "statusOpen": "Açıq",
-      "statusPaid": "Ödənilib",
-      "statusVoid": "Etibarsız",
       "title": "Fakturalar",
       "downloadFailed": "Faktura endirilə bilmədi. Bağlantınızı yoxlayın və yenidən cəhd edin.",
-      "sharingUnavailable": "Paylaşım bu cihazda mövcud deyil."
+      "sharingUnavailable": "Paylaşım bu cihazda mövcud deyil.",
+      "status": {
+        "paid": "Ödənilib",
+        "open": "Açıq",
+        "void": "Etibarsız",
+        "draft": "Qaralama",
+        "uncollectible": "Yığıla bilməyən",
+        "unknown": "Naməlum"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Toplanan məlumatlar",
     "free": "Pulsuz",
-    "couldNotUpdateFavorites": "Sevimlilər yenilənə bilmədi"
+    "couldNotUpdateFavorites": "Sevimlilər yenilənə bilmədi",
+    "thinkingEffort": {
+      "none": "Heç biri",
+      "minimal": "Minimal",
+      "low": "Aşağı",
+      "medium": "Orta",
+      "high": "Yüksək",
+      "xhigh": "Çox yüksək",
+      "max": "Maksimum"
+    }
   }
 }

@@ -580,7 +580,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} seleccionat, toca per canviar la selecció",
       "truncationBanner": "Es mostren els primers {{limit}} de {{total}} fitxers modificats — límit de l'API de GitHub",
-      "tapToComment": "{{label}}, toca per comentar"
+      "tapToComment": "{{label}}, toca per comentar",
+      "statusAdded": "Afegit",
+      "statusContext": "Context",
+      "statusDeleted": "Eliminat"
     },
     "linkPasteClipboardEmpty": "El porta-retalls és buit",
     "linkPasteNotAPullRequest": "No és un enllaç de pull request de GitHub",
@@ -594,6 +597,11 @@
       "reviewNotSubmitted": "Aquesta revisió no es pot enviar tal com està. Pot ser que la PR hagi canviat, o no pots revisar la teva pròpia pull request.",
       "couldNotPostComment": "No s'ha pogut publicar el comentari.",
       "couldNotSubmitReview": "No s'ha pogut enviar la revisió. Comprova la connexió i torna-ho a provar."
+    },
+    "operation": {
+      "couldNotReply": "No s'ha pogut respondre.",
+      "couldNotCompleteAction": "No s'ha pogut completar aquesta acció.",
+      "mergeResultDefaultError": "GitHub no ha completat la fusió."
     }
   },
   "notifications": {
@@ -829,7 +837,11 @@
       "subscriptionCancels": "La subscripció es cancel·la el {{date}}",
       "trialDaysRemaining": "Prova: queden {{remaining}}",
       "trialEndingSoon": "La prova acaba aviat: {{remaining}}",
-      "lessThanOneDay": "Menys d'1 dia"
+      "lessThanOneDay": "Menys d'1 dia",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Novetats",
@@ -1198,7 +1210,8 @@
       "strongArm": "Braç fort",
       "talisman": "Talismà"
     },
-    "remoteSpawnFilesNotSupported": "Aquesta instància no pot rebre fitxers."
+    "remoteSpawnFilesNotSupported": "Aquesta instància no pot rebre fitxers.",
+    "instanceSwitcherTitle": "Instància de KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1396,7 +1409,60 @@
       "failed": "Fallit",
       "cancelled": "Cancel·lat",
       "interrupted": "Interromput"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Estricte",
+      "balanced": "Equilibrat",
+      "lenient": "Flexible",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Seguretat",
+      "performance": "Rendiment",
+      "bugs": "Errors",
+      "style": "Estil",
+      "testing": "Proves",
+      "documentation": "Documentació"
+    },
+    "gateThreshold": {
+      "off": "Desactivat",
+      "all": "Tots",
+      "warning": "Avís",
+      "critical": "Crític"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "El Revisor de codi requereix atenció",
+        "description": "El Revisor de codi s'ha desactivat perquè Kilo no pot accedir a aquest repositori amb una instal·lació activa de l'aplicació de GitHub. Actualitza la instal·lació de l'aplicació de GitHub i torna a activar el Revisor de codi.",
+        "recoveryLabel": "Actualitza l'aplicació de GitHub"
+      },
+      "githubIpAllowList": {
+        "title": "El Revisor de codi requereix atenció",
+        "description": "El Revisor de codi s'ha desactivat perquè aquesta organització de GitHub utilitza una llista d'IP permeses que bloqueja Kilo. Contacta amb hi@kilocode.ai per demanar ajuda i torna a activar el Revisor de codi.",
+        "recoveryLabel": "Contacta amb el suport"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "El Revisor de codi requereix atenció",
+        "description": "El Revisor de codi s'ha desactivat perquè Kilo no pot crear un token d'accés de projecte de GitLab per a aquest projecte. Concedeix accés de Maintainer o activa els tokens d'accés de projecte i torna a activar el Revisor de codi.",
+        "recoveryLabel": "Actualitza la integració de GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "El Revisor de codi requereix atenció",
+        "description": "El Revisor de codi s'ha desactivat perquè la clau d'API BYOK seleccionada no és vàlida, s'ha revocat o no té permisos. Actualitza la clau o tria un altre model i torna a activar el Revisor de codi.",
+        "recoveryLabel": "Actualitza la configuració de BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "El Revisor de codi requereix atenció",
+        "description": "El Revisor de codi s'ha desactivat perquè el model seleccionat no està disponible per a les sessions de Cloud Agent. Tria un model disponible i torna a activar el Revisor de codi.",
+        "recoveryLabel": "Actualitza la configuració del Revisor de codi"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "El Revisor de codi requereix atenció",
+        "description": "El Revisor de codi s'ha desactivat després de tres temps d'espera de clonació de repositoris avui. Contacta amb hi@kilocode.ai per demanar ajuda i torna a activar el Revisor de codi.",
+        "recoveryLabel": "Contacta amb el suport"
+      }
+    },
+    "unknownError": "Error desconegut"
   },
   "securityAgent": {
     "filter": {
@@ -1940,6 +2006,23 @@
       "belowThreshold": "El resultat està per sota del llindar automàtic de gravetat. La correcció manual encara pot començar quan passin les comprovacions de seguretat.",
       "beforeEnablement": "L'anàlisi es va completar abans d'activar la correcció automàtica. La correcció manual encara pot començar quan passin les comprovacions de seguretat.",
       "generic": "La correcció no està disponible per a aquest resultat."
+    },
+    "commandFailure": {
+      "ownerCapReached": "La capacitat d'anàlisi està plena. Espera que acabi una anàlisi activa i torna-ho a provar.",
+      "githubTokenUnavailable": "L'autorització de GitHub requereix atenció. Torna a autoritzar l'aplicació de GitHub i torna-ho a provar.",
+      "githubAuthInvalid": "L'autorització de GitHub requereix atenció. Torna a autoritzar l'aplicació de GitHub i torna-ho a provar.",
+      "findingUnavailable": "El resultat ja no està disponible. Actualitza els resultats i torna-ho a provar si continua obert.",
+      "repositoryUnavailable": "El repositori ja no està disponible per a l'aplicació de GitHub. Actualitza l'accés al repositori i torna-ho a provar.",
+      "invalidDismissTarget": "El resultat no es pot descartar perquè el seu objectiu de Dependabot no és vàlid.",
+      "commandStalled": "L'acció en cua no ha acabat a temps. Torna a provar l'acció.",
+      "queueRetriesExhausted": "L'acció no s'ha pogut completar després de diversos intents. Torna a provar l'acció.",
+      "queueAdmissionFailed": "L'acció en cua no s'ha pogut admetre. Torna a provar l'acció.",
+      "generic": "L'acció en cua ha fallat. Torna a provar l'acció."
+    },
+    "analysisMode": {
+      "auto": "Automàtic",
+      "shallow": "Superficial",
+      "deep": "Profunda"
     }
   },
   "agents": {
@@ -2409,7 +2492,8 @@
       "addToFavorites": "Afegeix {{name}} als favorits",
       "removeFromFavorites": "Treu {{name}} dels favorits",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Model de sessió"
     },
     "attachmentPreview": {
       "openFailedRetry": "No s'ha pogut obrir el fitxer. Torna-ho a provar.",
@@ -2542,7 +2626,8 @@
   },
   "addCredits": {
     "cta": "Afegeix crèdits",
-    "description": "Afegeix crèdits per mantenir l'ús actiu."
+    "description": "Afegeix crèdits per mantenir l'ús actiu.",
+    "billingPage": "pàgina de facturació"
   },
   "deviceSessions": {
     "couldNotLoad": "No s'han pogut carregar les sessions",
@@ -2730,7 +2815,10 @@
     "restoreFailed": "No s'han pogut restaurar les compres. Torna-ho a provar.",
     "purchaseFailed": "No s'ha pogut completar la compra.",
     "purchaseStartFailed": "No s'ha pogut iniciar la compra a l'App Store.",
-    "purchaseOwnedByAnotherAccount": "El Kilo Pass d'aquest Apple Account pertany a un compte de Kilo diferent."
+    "purchaseOwnedByAnotherAccount": "El Kilo Pass d'aquest Apple Account pertany a un compte de Kilo diferent.",
+    "couldNotConnectToAppStore": "No s'ha pogut connectar amb l'App Store. Comprova la connexió i torna-ho a provar.",
+    "noMatchingProducts": "L'App Store no ha retornat cap producte de Kilo Pass que coincideixi.",
+    "purchaseMissingSignedTransaction": "La compra de l'App Store no incloïa una JWS de transacció signada."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2826,7 +2914,8 @@
     "needsWork": "Necessita millores",
     "sorryTitle": "Ens sap greu sentir-ho!",
     "sorryMessage": "Si us plau, feu-nos saber què cal millorar. L'enginyer responsable de l'aplicació llegeix tots i cadascun dels informes!",
-    "emailUs": "Escriu-nos"
+    "emailUs": "Escriu-nos",
+    "emailSubject": "comentaris de l'aplicació mòbil"
   },
   "organization": {
     "boundary": {
@@ -2843,7 +2932,17 @@
       "emptyTitle": "No hi ha activitat de crèdit",
       "expires": "Caduca el {{date}}",
       "title": "Activitat de crèdit",
-      "transactionFallback": "Transacció de crèdit"
+      "transactionFallback": "Transacció de crèdit",
+      "category": {
+        "organization_custom": "Personalitzat d'organització",
+        "parent_to_child_transfer_in": "Transferència entrant de l'organització principal a la filial",
+        "parent_to_child_transfer_out": "Transferència sortint de l'organització principal a la filial",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Ajust comptable",
+        "credits_expired": "Crèdits caducats"
+      }
     },
     "inviteMember": {
       "emailError": "Introduïu una adreça de correu vàlida",
@@ -2860,12 +2959,17 @@
       "emptyDescription": "Les factures es generen automàticament cada cicle de facturació i apareixeran aquí un cop l'organització sigui facturada.",
       "emptyTitle": "No hi ha factures",
       "invoiceFallback": "Factura",
-      "statusOpen": "Oberta",
-      "statusPaid": "Pagada",
-      "statusVoid": "Anul·lada",
       "title": "Factures",
       "downloadFailed": "No s'ha pogut descarregar la factura. Comprova la connexió i torna-ho a provar.",
-      "sharingUnavailable": "La compartició no està disponible en aquest dispositiu."
+      "sharingUnavailable": "La compartició no està disponible en aquest dispositiu.",
+      "status": {
+        "paid": "Pagada",
+        "open": "Oberta",
+        "void": "Anul·lada",
+        "draft": "Esborrany",
+        "uncollectible": "No cobrable",
+        "unknown": "Desconegut"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2992,6 +3096,15 @@
   "models": {
     "dataCollected": "Dades recollides",
     "free": "Gratuït",
-    "couldNotUpdateFavorites": "No s'han pogut actualitzar els favorits"
+    "couldNotUpdateFavorites": "No s'han pogut actualitzar els favorits",
+    "thinkingEffort": {
+      "none": "Cap",
+      "minimal": "Mínim",
+      "low": "Baix",
+      "medium": "Mitjà",
+      "high": "Alt",
+      "xhigh": "Extra alt",
+      "max": "Màxim"
+    }
   }
 }

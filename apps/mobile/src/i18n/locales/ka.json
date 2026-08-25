@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "არჩეულია {{label}}, შეეხეთ არჩევანის შესაცვლელად",
       "tapToComment": "{{label}}, შეეხეთ კომენტარისთვის",
-      "truncationBanner": "ნაჩვენებია შეცვლილი ფაილების {{total}}-დან პირველი {{limit}} — GitHub API ლიმიტი"
+      "truncationBanner": "ნაჩვენებია შეცვლილი ფაილების {{total}}-დან პირველი {{limit}} — GitHub API ლიმიტი",
+      "statusAdded": "დამატებულია",
+      "statusContext": "კონტექსტი",
+      "statusDeleted": "წაშლილია"
     },
     "linkPasteClipboardEmpty": "ბუფერი ცარიელია",
     "linkPasteNotAPullRequest": "არ არის GitHub pull request ბმული",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "ამ რეცენზიის გაგზავნა ამ ფორმით შეუძლებელია. PR შესაძლოა შეცვლილია, ან ვერ ახერხებთ საკუთარი პულ-რექვესთის რეცენზიას.",
       "couldNotPostComment": "კომენტარის გამოქვეყნება ვერ მოხერხდა.",
       "couldNotSubmitReview": "რეცენზიის გაგზავნა ვერ მოხერხდა. შეამოწმეთ თქვენი კავშირი და სცადეთ კიდევ."
+    },
+    "operation": {
+      "couldNotReply": "პასუხი ვერ მოხერხდა.",
+      "couldNotCompleteAction": "ამ მოქმედების დასრულება ვერ მოხერხდა.",
+      "mergeResultDefaultError": "GitHub-მა შერწყმა ვერ დაასრულა."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "გადახდა დაგვიანებულია. გთხოვთ, განაახლოთ გადახდის მეთოდი.",
       "subscriptionCancels": "გამოწერა გაუქმდება {{date}}",
       "trialDaysRemaining": "საცდელი პერიოდი: {{remaining}} დარჩა",
-      "trialEndingSoon": "საცდელი პერიოდი მალე მთავრდება: {{remaining}}"
+      "trialEndingSoon": "საცდელი პერიოდი მალე მთავრდება: {{remaining}}",
+      "planName": {
+        "commit": "ვალდებულება",
+        "standard": "სტანდარტული"
+      }
     },
     "changelog": {
       "title": "რა არის ახალი",
@@ -1189,7 +1201,8 @@
       "strongArm": "ძლიერი მკლავი",
       "talisman": "თილისმა"
     },
-    "remoteSpawnFilesNotSupported": "ამ ინსტანციას ფაილების მიღება არ შეუძლია."
+    "remoteSpawnFilesNotSupported": "ამ ინსტანციას ფაილების მიღება არ შეუძლია.",
+    "instanceSwitcherTitle": "KiloClaw ინსტანცია"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "ჩაიშალა",
       "cancelled": "გაუქმებულია",
       "interrupted": "შეწყვეტილია"
-    }
+    },
+    "reviewStyle": {
+      "strict": "მკაცრი",
+      "balanced": "დაბალანსებული",
+      "lenient": "დამთმობი",
+      "roast": "როსტი"
+    },
+    "focusArea": {
+      "security": "უსაფრთხოება",
+      "performance": "შესრულება",
+      "bugs": "ბაგები",
+      "style": "სტილი",
+      "testing": "ტესტირება",
+      "documentation": "დოკუმენტაცია"
+    },
+    "gateThreshold": {
+      "off": "გამორთულია",
+      "all": "ყველა",
+      "warning": "გაფრთხილება",
+      "critical": "კრიტიკული"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "კოდის რეცენზენტს ყურადღება სჭირდება",
+        "description": "კოდის რეცენზენტი გამორთულია, რადგან Kilo ვერ წვდება ამ საცავს აქტიური GitHub App ინსტალაციით. განაახლეთ GitHub App ინსტალაცია და კვლავ ჩართეთ კოდის რეცენზენტი.",
+        "recoveryLabel": "GitHub App-ის განახლება"
+      },
+      "githubIpAllowList": {
+        "title": "კოდის რეცენზენტს ყურადღება სჭირდება",
+        "description": "კოდის რეცენზენტი გამორთულია, რადგან ეს GitHub ორგანიზაცია იყენებს IP დაშვების სიას, რომელიც ბლოკავს Kilo-ს. დახმარებისთვის დაუკავშირდით hi@kilocode.ai-ს და კვლავ ჩართეთ კოდის რეცენზენტი.",
+        "recoveryLabel": "მხარდაჭერასთან დაკავშირება"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "კოდის რეცენზენტს ყურადღება სჭირდება",
+        "description": "კოდის რეცენზენტი გამორთულია, რადგან Kilo ვერ ქმნის GitLab Project Access Token-ს ამ პროექტისთვის. მიანიჭეთ Maintainer წვდომა ან ჩართეთ Project Access Tokens და კვლავ ჩართეთ კოდის რეცენზენტი.",
+        "recoveryLabel": "GitLab ინტეგრაციის განახლება"
+      },
+      "byokInvalidKey": {
+        "title": "კოდის რეცენზენტს ყურადღება სჭირდება",
+        "description": "კოდის რეცენზენტი გამორთულია, რადგან არჩეული BYOK API გასაღები არასწორია, გაუქმებულია ან არ აქვს ნებართვა. განაახლეთ გასაღები ან აირჩიეთ სხვა მოდელი და კვლავ ჩართეთ კოდის რეცენზენტი.",
+        "recoveryLabel": "BYOK პარამეტრების განახლება"
+      },
+      "selectedModelUnavailable": {
+        "title": "კოდის რეცენზენტს ყურადღება სჭირდება",
+        "description": "კოდის რეცენზენტი გამორთულია, რადგან არჩეული მოდელი მიუწვდომელია cloud agent სესიებისთვის. აირჩიეთ ხელმისაწვდომი მოდელი და კვლავ ჩართეთ კოდის რეცენზენტი.",
+        "recoveryLabel": "კოდის რეცენზენტის პარამეტრების განახლება"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "კოდის რეცენზენტს ყურადღება სჭირდება",
+        "description": "კოდის რეცენზენტი გამორთულია დღეს სამი საცავის კლონირების ტაიმაუტის შემდეგ. დახმარებისთვის დაუკავშირდით hi@kilocode.ai-ს და კვლავ ჩართეთ კოდის რეცენზენტი.",
+        "recoveryLabel": "მხარდაჭერასთან დაკავშირება"
+      }
+    },
+    "unknownError": "უცნობი შეცდომა"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "მონაპოვარი ავტომატური სიმძიმის ზღვარზე დაბალია. ხელით აღდგენა მაინც შეიძლება დაიწყოს, როცა უსაფრთხოების კარიბჭეები გაივლის.",
       "beforeEnablement": "ანალიზი დასრულდა ავტო შესწორების ჩართვამდე. ხელით აღდგენა მაინც შეიძლება დაიწყოს, როცა უსაფრთხოების კარიბჭეები გაივლის.",
       "generic": "აღდგენა მიუწვდომელია ამ მონაპოვრისთვის."
+    },
+    "commandFailure": {
+      "ownerCapReached": "ანალიზის სიმძლავრე სავსეა. დაელოდეთ აქტიური ანალიზის დასრულებას და ხელახლა სცადეთ.",
+      "githubTokenUnavailable": "GitHub ავტორიზაციას ყურადღება სჭირდება. ხელახლა უფლება მიეცით GitHub App-ს და ხელახლა სცადეთ.",
+      "githubAuthInvalid": "GitHub ავტორიზაციას ყურადღება სჭირდება. ხელახლა უფლება მიეცით GitHub App-ს და ხელახლა სცადეთ.",
+      "findingUnavailable": "აღმოჩენა აღარ არის ხელმისაწვდომი. განაახლეთ აღმოჩენები და ხელახლა სცადეთ, თუ ის ღია რჩება.",
+      "repositoryUnavailable": "საცავი აღარ არის ხელმისაწვდომი GitHub App-ისთვის. განაახლეთ საცავის წვდომა და ხელახლა სცადეთ.",
+      "invalidDismissTarget": "აღმოჩენის გაუქმება შეუძლებელია, რადგან მისი Dependabot სამიზნე არასწორია.",
+      "commandStalled": "დაყენებული მოქმედება დროულად არ დასრულდა. ხელახლა სცადეთ მოქმედება.",
+      "queueRetriesExhausted": "მოქმედების დასრულება ვერ მოხერხდა რამდენიმე ცდის შემდეგ. ხელახლა სცადეთ მოქმედება.",
+      "queueAdmissionFailed": "დაყენებული მოქმედების მიღება ვერ მოხერხდა. ხელახლა სცადეთ მოქმედება.",
+      "generic": "დაყენებული მოქმედება ვერ მოხერხდა. ხელახლა სცადეთ მოქმედება."
+    },
+    "analysisMode": {
+      "auto": "ავტო",
+      "shallow": "ზედაპირული",
+      "deep": "სიღრმისეული"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "{{name}} რჩეულებში დამატება",
       "removeFromFavorites": "{{name}} რჩეულებიდან ამოღება",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "სესიის მოდელი"
     },
     "attachmentPreview": {
       "openFailedRetry": "ფაილის გახსნა ვერ მოხერხდა. გთხოვთ, სცადოთ თავიდან.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "კრედიტების დამატება",
-    "description": "დაამატეთ კრედიტები გამოყენების გასაგრძელებლად."
+    "description": "დაამატეთ კრედიტები გამოყენების გასაგრძელებლად.",
+    "billingPage": "ბილინგის გვერდი"
   },
   "deviceSessions": {
     "couldNotLoad": "სესიების ჩატვირთვა ვერ მოხერხდა",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "შესყიდვების აღდგენა ვერ მოხერხდა. სცადეთ კიდევ.",
     "purchaseFailed": "შესყიდვის დასრულება ვერ მოხერხდა.",
     "purchaseStartFailed": "App Store შესყიდვის დაწყება ვერ მოხერხდა.",
-    "purchaseOwnedByAnotherAccount": "ეს Apple ანგარიშზე არსებული Kilo Pass სხვა Kilo ანგარიშს ეკუთვნის."
+    "purchaseOwnedByAnotherAccount": "ეს Apple ანგარიშზე არსებული Kilo Pass სხვა Kilo ანგარიშს ეკუთვნის.",
+    "couldNotConnectToAppStore": "App Store-თან დაკავშირება ვერ მოხერხდა. შეამოწმეთ თქვენი კავშირი და სცადეთ კიდევ.",
+    "noMatchingProducts": "App Store-მა არ დააბრუნა შესაბამისი Kilo Pass პროდუქტები.",
+    "purchaseMissingSignedTransaction": "App Store-ის შესყიდვა არ შეიცავდა ხელმოწერილ ტრანზაქციის JWS-ს."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "გასაუმჯობესებელია",
     "sorryTitle": "ბოდიშს ვიხდით, რომ ეს გვესმის!",
     "sorryMessage": "გთხოვთ, გვითხრათ, რა უნდა გაუმჯობესდეს. აპზე პასუხისმგებელი ინჟინერი ყველა ანგარიშს კითხულობს!",
-    "emailUs": "მოგვწერეთ"
+    "emailUs": "მოგვწერეთ",
+    "emailSubject": "მობილური აპლიკაციის გამოხმაურება"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "კრედიტის აქტივობა არ არის",
       "expires": "ვადა გაუვა {{date}}",
       "title": "კრედიტის აქტივობა",
-      "transactionFallback": "კრედიტის ტრანზაქცია"
+      "transactionFallback": "კრედიტის ტრანზაქცია",
+      "category": {
+        "organization_custom": "ორგანიზაციის მორგებული",
+        "parent_to_child_transfer_in": "მშობლიდან შვილზე გადარიცხვა (შემოსული)",
+        "parent_to_child_transfer_out": "მშობლიდან შვილზე გადარიცხვა (გასული)",
+        "oss-sponsorship": "OSS სპონსორობა",
+        "oss-monthly-reset": "OSS ყოველთვიური გადატვირთვა",
+        "team-topup-bonus-2025": "გუნდის შევსების ბონუსი 2025",
+        "accounting_adjustment": "ბუღალტრული კორექტირება",
+        "credits_expired": "ვადაგასული კრედიტები"
+      }
     },
     "inviteMember": {
       "emailError": "შეიყვანეთ მოქმედი ელფოსტის მისამართი",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "ინვოისები ავტომატურად იქმნება ყოველ ბილინგ ციკლში და აქ გამოჩნდება, როცა თქვენი ორგანიზაცია დაიბილინგება.",
       "emptyTitle": "ინვოისები არ არის",
       "invoiceFallback": "ინვოისი",
-      "statusOpen": "ღიაა",
-      "statusPaid": "გადახდილია",
-      "statusVoid": "ბათილია",
       "title": "ინვოისები",
       "downloadFailed": "ინვოისის ჩამოტვირთვა ვერ მოხერხდა. შეამოწმეთ თქვენი კავშირი და სცადეთ კიდევ.",
-      "sharingUnavailable": "ამ მოწყობილობაზე გაზიარება მიუწვდომელია."
+      "sharingUnavailable": "ამ მოწყობილობაზე გაზიარება მიუწვდომელია.",
+      "status": {
+        "paid": "გადახდილია",
+        "open": "ღიაა",
+        "void": "ბათილია",
+        "draft": "მონახაზი",
+        "uncollectible": "ამოუღებელი",
+        "unknown": "უცნობი"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "შეგროვებული მონაცემები",
     "free": "უფასო",
-    "couldNotUpdateFavorites": "რჩეულების განახლება ვერ მოხერხდა"
+    "couldNotUpdateFavorites": "რჩეულების განახლება ვერ მოხერხდა",
+    "thinkingEffort": {
+      "none": "არცერთი",
+      "minimal": "მინიმალური",
+      "low": "დაბალი",
+      "medium": "საშუალო",
+      "high": "მაღალი",
+      "xhigh": "ძალიან მაღალი",
+      "max": "მაქსიმალური"
+    }
   }
 }

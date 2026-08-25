@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Waa la doortay {{label}}, taabo si aad u beddesho xulista",
       "tapToComment": "{{label}}, taabo si aad faallo u dajiso",
-      "truncationBanner": "Waxaa la muujinayaa {{limit}}-ka ugu horreeya ee {{total}} fayl oo la beddelay — xadka API-ga GitHub"
+      "truncationBanner": "Waxaa la muujinayaa {{limit}}-ka ugu horreeya ee {{total}} fayl oo la beddelay — xadka API-ga GitHub",
+      "statusAdded": "Waa la daray",
+      "statusContext": "Xaalad",
+      "statusDeleted": "Waa la tirtiray"
     },
     "linkPasteClipboardEmpty": "Qalabka koobigu waa madhan",
     "linkPasteNotAPullRequest": "Kuma aha xiriiriyaha codsiga jiidista GitHub",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Dib-u-eegistan lama gudbin karo sida ay tahay. PR-ka ayaa laga yaabaa inuu isbeddelo, ama ma dib u eegi kartid pull request-kaaga.",
       "couldNotPostComment": "Faallada lama dajin karin.",
       "couldNotSubmitReview": "Dib-u-eegista lama gudbin karin. Hubi xiriirkaaga oo mar kale isku day."
+    },
+    "operation": {
+      "couldNotReply": "Lama jawaabi karin.",
+      "couldNotCompleteAction": "Falkan lama dhammayn karin.",
+      "mergeResultDefaultError": "GitHub kama dhammaystirin isku-darka."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Bixinta way gabi dhacday. Fadlan cusboonaysii habka bixinta.",
       "subscriptionCancels": "Rukunintu way joogsanaysaa {{date}}",
       "trialDaysRemaining": "Tijaabo: {{remaining}} maalmood ayaa harsan",
-      "trialEndingSoon": "Tijaabadu way dhammaanaysaa: {{remaining}}"
+      "trialEndingSoon": "Tijaabadu way dhammaanaysaa: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Waa Maxay Cusub",
@@ -1189,7 +1201,8 @@
       "strongArm": "Gacan adag",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Astaantani ma heli karto faylasha."
+    "remoteSpawnFilesNotSupported": "Astaantani ma heli karto faylasha.",
+    "instanceSwitcherTitle": "Instance-ka KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Way fashilantay",
       "cancelled": "Waa la joojiyay",
       "interrupted": "Waa la hakiyay"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Adag",
+      "balanced": "Dheellitiran",
+      "lenient": "Naxariis badan",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Ammaanka",
+      "performance": "Waxqabadka",
+      "bugs": "Cilladaha",
+      "style": "Qaabka",
+      "testing": "Tijaabinta",
+      "documentation": "Dokumentasid"
+    },
+    "gateThreshold": {
+      "off": "Daman",
+      "all": "Dhammaan",
+      "warning": "Digniin",
+      "critical": "Muhiim"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer wuxuu u baahan yahay feejignaan",
+        "description": "Code Reviewer waa la damiyay sababtoo ah Kilo ma heli karo kaydkan iyada oo la isticmaalayo rakibaad GitHub App oo firfircoon. Cusbooneysii rakibaadda GitHub App, ka dib mar kale daare Code Reviewer.",
+        "recoveryLabel": "Cusbooneysii GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer wuxuu u baahan yahay feejignaan",
+        "description": "Code Reviewer waa la damiyay sababtoo ah ururkan GitHub wuxuu isticmaalaa liis ogolaansho IP ah oo xannibaya Kilo. La xiriir hi@kilocode.ai si aad caawimaad u hesho, ka dib mar kale daare Code Reviewer.",
+        "recoveryLabel": "La xiriir taageerada"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer wuxuu u baahan yahay feejignaan",
+        "description": "Code Reviewer waa la damiyay sababtoo ah Kilo ma abuuri karo Token-ka Gelitaanka Mashruuca GitLab ee mashruucan. Sii ogolaanshaha Maintainer ama daare Token-yada Gelitaanka Mashruuca, ka dib mar kale daare Code Reviewer.",
+        "recoveryLabel": "Cusbooneysii isdhexgalka GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer wuxuu u baahan yahay feejignaan",
+        "description": "Code Reviewer waa la damiyay sababtoo ah furaha API-ga ee BYOK ee la doortay waa khalad, waa la laabay, ama ma laha ogolaansho. Cusbooneysii furaha ama dooro model kale, ka dib mar kale daare Code Reviewer.",
+        "recoveryLabel": "Cusbooneysii dejinta BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer wuxuu u baahan yahay feejignaan",
+        "description": "Code Reviewer waa la damiyay sababtoo ah model-ka la doortay ma heli karo kalfadhiyada Cloud Agent. Dooro model la heli karo, ka dib mar kale daare Code Reviewer.",
+        "recoveryLabel": "Cusbooneysii dejinta Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer wuxuu u baahan yahay feejignaan",
+        "description": "Code Reviewer waa la damiyay ka dib saddex waqti oo ka dhacay cloning-ka kaydka maanta. La xiriir hi@kilocode.ai si aad caawimaad u hesho, ka dib mar kale daare Code Reviewer.",
+        "recoveryLabel": "La xiriir taageerada"
+      }
+    },
+    "unknownError": "Khalad aan la aqoon"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Natiijadu waxay ka hooseysaa heerka otomaatigga ah. Dayactirka gacanta wali wuxuu bilaabmi karaa markay marinnada badbaadada gudbaan.",
       "beforeEnablement": "Falanqaynta waxaa la dhammeeyay ka hor inta aan la shidin Dayactirka otomaatigga ah. Dayactirka gacanta wali wuxuu bilaabmi karaa markay marinnada badbaadada gudbaan.",
       "generic": "Dayactirka looma heli karo natiijadan."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Awoodda falanqaynta way buuxday. Sug falanqayn firfircoon inay dhammaato, ka dib mar kale isku day.",
+      "githubTokenUnavailable": "Ogolaanshaha GitHub wuxuu u baahan yahay feejignaan. Mar kale ogolow GitHub App, ka dib mar kale isku day.",
+      "githubAuthInvalid": "Ogolaanshaha GitHub wuxuu u baahan yahay feejignaan. Mar kale ogolow GitHub App, ka dib mar kale isku day.",
+      "findingUnavailable": "Natiijadu mar dambe ma heli karto. Cusbooneysii natiijooyinka oo mar kale isku day haddii ay weli furan tahay.",
+      "repositoryUnavailable": "Kaydku mar dambe ma heli karo GitHub App-ka. Cusbooneysii helitaanka kaydka, ka dib mar kale isku day.",
+      "invalidDismissTarget": "Natiijada lama tirtiri karo sababtoo ah bartilmaameedka Dependabot ee iyada waa khalad.",
+      "commandStalled": "Falka safka ku jira kuma dhammaanin waqtiga la ogol yahay. Mar kale isku day falka.",
+      "queueRetriesExhausted": "Falka lama dhamayn karin ka dib dhowr isku day. Mar kale isku day falka.",
+      "queueAdmissionFailed": "Falka safka ku jira lama aqbalin karin. Mar kale isku day falka.",
+      "generic": "Falka safka ku jira way fashilantay. Mar kale isku day falka."
+    },
+    "analysisMode": {
+      "auto": "Auto",
+      "shallow": "Gacan-ku-dheg",
+      "deep": "Qoto dheer"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Ku dar {{name}} jecel-yada",
       "removeFromFavorites": "Ka saar {{name}} jecel-yada",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Model-ka kalfadhiga"
     },
     "attachmentPreview": {
       "openFailedRetry": "Faylka lama furi karin. Fadlan mar kale isku day.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Ku dar credits",
-    "description": "Ku dar credits si isticmaalku u sii socdo."
+    "description": "Ku dar credits si isticmaalku u sii socdo.",
+    "billingPage": "bogga billing-ka"
   },
   "deviceSessions": {
     "couldNotLoad": "Kalfadhiyada lama soo dejin karin",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Soo celinta iibsashada way fashilantay. Mar kale isku day.",
     "purchaseFailed": "Iibsashada lama dhammayn karin.",
     "purchaseStartFailed": "Bilowga iibsashada App Store waa fashilmay.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass-ka ku yaal Xisaabtan Apple-ka ah waxaa leh koonto Kilo oo kale."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass-ka ku yaal Xisaabtan Apple-ka ah waxaa leh koonto Kilo oo kale.",
+    "couldNotConnectToAppStore": "Lama xiri karin App Store-ka. Hubi xiriirkaaga oo mar kale isku day.",
+    "noMatchingProducts": "App Store-ka ma soo celin badeecado Kilo Pass oo u dhigma.",
+    "purchaseMissingSignedTransaction": "Iibsashada App Store-ka kuma jirin heshiis la saxiixay oo JWS ah."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Waa loo baahan yahay hagaajin",
     "sorryTitle": "Waxaan ka xunnahay inaad taan tiri!",
     "sorryMessage": "Fadlan noo sheeg waxa loo baahan yahay in la wanaajiyo. Injineerka mas'uulka ka ah app-ka ayaa akhriya warbixin kasta!",
-    "emailUs": "Noo e-mayl"
+    "emailUs": "Noo e-mayl",
+    "emailSubject": "jawaab-celinta app-ka mobilada"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Ma jiro hawlo credit ah",
       "expires": "Wuxuu dhamaanayaa {{date}}",
       "title": "Hawlaha credits-ka",
-      "transactionFallback": "Tacsidka credits-ka"
+      "transactionFallback": "Tacsidka credits-ka",
+      "category": {
+        "organization_custom": "Urur gaar ah",
+        "parent_to_child_transfer_in": "Gudasho waalidka ilaa ilmaha (soo gelin)",
+        "parent_to_child_transfer_out": "Gudasho waalidka ilaa ilmaha (ka bixid)",
+        "oss-sponsorship": "Kafaalo OSS",
+        "oss-monthly-reset": "Dib-u-dejinta OSS ee bishii",
+        "team-topup-bonus-2025": "Bonuska kooxda ee dhaaminta 2025",
+        "accounting_adjustment": "Hagaajinta xisaabta",
+        "credits_expired": "Credits oo dhacay"
+      }
     },
     "inviteMember": {
       "emailError": "Geli ciwaan email oo ansax ah",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Invoices waxaa si toos ah loo soo saaraa wareeg kasta oo biil ah oo halkan ka soo muuqan doonaa marka ururkaaga la biil-qaado.",
       "emptyTitle": "Ma jiro invoices",
       "invoiceFallback": "Invoice",
-      "statusOpen": "Furan",
-      "statusPaid": "La bixiyay",
-      "statusVoid": "Baadil",
       "title": "Invoices",
       "downloadFailed": "Invoice-ka lama soo dejin karin. Hubi xiriirkaaga oo mar kale isku day.",
-      "sharingUnavailable": "Wadaagista aaladdan laguma heli karo."
+      "sharingUnavailable": "Wadaagista aaladdan laguma heli karo.",
+      "status": {
+        "paid": "La bixiyay",
+        "open": "Furan",
+        "void": "Baadil",
+        "draft": "Qabyo",
+        "uncollectible": "Lama ururin karo",
+        "unknown": "Lama garanayo"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Xog la ururiyay",
     "free": "Bilaash",
-    "couldNotUpdateFavorites": "Kuwa la jeclaaday lama cusboonaysiin karin"
+    "couldNotUpdateFavorites": "Kuwa la jeclaaday lama cusboonaysiin karin",
+    "thinkingEffort": {
+      "none": "Waxba",
+      "minimal": "Ugu yar",
+      "low": "Hoose",
+      "medium": "Dhexdhexaad",
+      "high": "Sare",
+      "xhigh": "Aad u sare",
+      "max": "Ugu badnaan"
+    }
   }
 }

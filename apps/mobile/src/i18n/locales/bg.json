@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Избрано {{label}}, докосни, за да промениш избора",
       "truncationBanner": "Показват се първите {{limit}} от {{total}} променени файла — лимит на GitHub API",
-      "tapToComment": "{{label}}, докосни, за да коментираш"
+      "tapToComment": "{{label}}, докосни, за да коментираш",
+      "statusAdded": "Добавен",
+      "statusContext": "Контекст",
+      "statusDeleted": "Изтрит"
     },
     "linkPasteClipboardEmpty": "Клипбордът е празен",
     "linkPasteNotAPullRequest": "Не е връзка към pull request в GitHub",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Този преглед не може да бъде изпратен както е. PR може да се е променил или не можете да преглеждате собствения си pull request.",
       "couldNotPostComment": "Не можахме да публикуваме коментара.",
       "couldNotSubmitReview": "Не можахме да изпратим прегледа. Проверете връзката си и опитайте отново."
+    },
+    "operation": {
+      "couldNotReply": "Не можахме да отговорим.",
+      "couldNotCompleteAction": "Не можахме да завършим това действие.",
+      "mergeResultDefaultError": "GitHub не завърши обединяването."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "subscriptionCancels": "Абонаментът се анулира на {{date}}",
       "trialDaysRemaining": "Пробен период: остават {{remaining}}",
       "trialEndingSoon": "Пробният период приключва скоро: {{remaining}}",
-      "lessThanOneDay": "По-малко от 1 ден"
+      "lessThanOneDay": "По-малко от 1 ден",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Какво ново",
@@ -1189,7 +1201,8 @@
       "strongArm": "Силна ръка",
       "talisman": "Талисман"
     },
-    "remoteSpawnFilesNotSupported": "Тази инстанция не може да получава файлове."
+    "remoteSpawnFilesNotSupported": "Тази инстанция не може да получава файлове.",
+    "instanceSwitcherTitle": "Инстанция на KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Неуспешно",
       "cancelled": "Отменено",
       "interrupted": "Прекъснато"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Строг",
+      "balanced": "Балансиран",
+      "lenient": "Снизходителен",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Сигурност",
+      "performance": "Производителност",
+      "bugs": "Грешки",
+      "style": "Стил",
+      "testing": "Тестване",
+      "documentation": "Документация"
+    },
+    "gateThreshold": {
+      "off": "Изключено",
+      "all": "Всички",
+      "warning": "Предупреждение",
+      "critical": "Критично"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer се нуждае от внимание",
+        "description": "Code Reviewer беше деактивиран, защото Kilo не може да получи достъп до това хранилище с активна инсталация на GitHub App. Актуализирайте инсталацията на GitHub App и след това активирайте отново Code Reviewer.",
+        "recoveryLabel": "Актуализирай GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer се нуждае от внимание",
+        "description": "Code Reviewer беше деактивиран, защото тази GitHub организация използва списък с разрешени IP адреси, който блокира Kilo. Свържете се с hi@kilocode.ai за помощ и след това активирайте отново Code Reviewer.",
+        "recoveryLabel": "Свържете се с поддръжката"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer се нуждае от внимание",
+        "description": "Code Reviewer беше деактивиран, защото Kilo не може да създаде GitLab Project Access Token за този проект. Предоставете достъп на Maintainer или активирайте Project Access Tokens и след това активирайте отново Code Reviewer.",
+        "recoveryLabel": "Актуализирай интеграцията с GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer се нуждае от внимание",
+        "description": "Code Reviewer беше деактивиран, защото избраният BYOK API ключ е невалиден, отменен или няма разрешение. Актуализирайте ключа или изберете друг модел и след това активирайте отново Code Reviewer.",
+        "recoveryLabel": "Актуализирай настройките на BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer се нуждае от внимание",
+        "description": "Code Reviewer беше деактивиран, защото избраният модел не е наличен за сесии на облачен агент. Изберете наличен модел и след това активирайте отново Code Reviewer.",
+        "recoveryLabel": "Актуализирай настройките на Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer се нуждае от внимание",
+        "description": "Code Reviewer беше деактивиран след три таймаута при клониране на хранилище днес. Свържете се с hi@kilocode.ai за помощ и след това активирайте отново Code Reviewer.",
+        "recoveryLabel": "Свържете се с поддръжката"
+      }
+    },
+    "unknownError": "Неизвестна грешка"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Откритието е под автоматичния праг на сериозност. Ръчното отстраняване все още може да започне, когато проверките за безопасност преминат.",
       "beforeEnablement": "Анализът е завършен, преди да е активирано автоматичното отстраняване. Ръчното отстраняване все още може да започне, когато проверките за безопасност преминат.",
       "generic": "Отстраняването е недостъпно за това откритие."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Капацитетът за анализ е запълнен. Изчакай активен анализ да приключи и след това опитай отново.",
+      "githubTokenUnavailable": "Оторизацията на GitHub изисква внимание. Ре-оторизирай GitHub App и след това опитай отново.",
+      "githubAuthInvalid": "Оторизацията на GitHub изисква внимание. Ре-оторизирай GitHub App и след това опитай отново.",
+      "findingUnavailable": "Констатацията вече не е налична. Опресни констатациите и опитай отново, ако все още е отворена.",
+      "repositoryUnavailable": "Хранилището вече не е налично за GitHub App. Опресни достъпа до хранилището и след това опитай отново.",
+      "invalidDismissTarget": "Констатацията не може да бъде отхвърлена, защото нейната цел в Dependabot е невалидна.",
+      "commandStalled": "Действие в опашка не приключи навреме. Опитай отново действието.",
+      "queueRetriesExhausted": "Действието не можа да бъде завършено след няколко опита. Опитай отново действието.",
+      "queueAdmissionFailed": "Действие в опашка не можа да бъде прието. Опитай отново действието.",
+      "generic": "Действие в опашка не успя. Опитай отново действието."
+    },
+    "analysisMode": {
+      "auto": "Автоматично",
+      "shallow": "Повърхностно",
+      "deep": "Дълбоко"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Добавете {{name}} към любими",
       "removeFromFavorites": "Премахнете {{name}} от любими",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Сред"
+      "thinkingEffortMedium": "Сред",
+      "sessionModel": "Модел на сесията"
     },
     "attachmentPreview": {
       "openFailedRetry": "Неуспешно отваряне на файла. Моля, опитайте отново.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Добавете кредити",
-    "description": "Добавете кредити, за да продължите използването."
+    "description": "Добавете кредити, за да продължите използването.",
+    "billingPage": "страница за фактуриране"
   },
   "deviceSessions": {
     "couldNotLoad": "Не можаха да се заредят сесиите",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Не можахме да възстановим покупките. Опитайте отново.",
     "purchaseFailed": "Не можахме да завършим покупката.",
     "purchaseStartFailed": "Не можахме да започнем покупката в App Store.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass на този Apple акаунт принадлежи на друг Kilo акаунт."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass на този Apple акаунт принадлежи на друг Kilo акаунт.",
+    "couldNotConnectToAppStore": "Не можахме да се свържем с App Store. Проверете връзката си и опитайте отново.",
+    "noMatchingProducts": "App Store не върна съвпадащи продукти на Kilo Pass.",
+    "purchaseMissingSignedTransaction": "Покупката в App Store не включва подписана транзакция JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Има нужда от подобрение",
     "sorryTitle": "Съжаляваме, че чуваме това!",
     "sorryMessage": "Моля, уведомете ни какво трябва да се подобри. Инженерът, отговарящ за приложението, чете всеки един доклад!",
-    "emailUs": "Пишете ни"
+    "emailUs": "Пишете ни",
+    "emailSubject": "обратна връзка за мобилното приложение"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Няма кредитна активност",
       "expires": "Изтича {{date}}",
       "title": "Кредитна активност",
-      "transactionFallback": "Кредитна транзакция"
+      "transactionFallback": "Кредитна транзакция",
+      "category": {
+        "organization_custom": "Персонализирано за организация",
+        "parent_to_child_transfer_in": "Прехвърляне от родителска към дъщерна организация",
+        "parent_to_child_transfer_out": "Прехвърляне от дъщерна към родителска организация",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Счетоводна корекция",
+        "credits_expired": "Изтекли кредити"
+      }
     },
     "inviteMember": {
       "emailError": "Въведете валиден имейл адрес",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Фактурите се генерират автоматично всеки цикъл на таксуване и ще се появят тук, след като вашата организация бъде таксувана.",
       "emptyTitle": "Няма фактури",
       "invoiceFallback": "Фактура",
-      "statusOpen": "Отворена",
-      "statusPaid": "Платена",
-      "statusVoid": "Невалидна",
       "title": "Фактури",
       "downloadFailed": "Не можахме да изтеглим фактурата. Проверете връзката си и опитайте отново.",
-      "sharingUnavailable": "Споделянето не е налично на това устройство."
+      "sharingUnavailable": "Споделянето не е налично на това устройство.",
+      "status": {
+        "paid": "Платена",
+        "open": "Отворена",
+        "void": "Невалидна",
+        "draft": "Чернова",
+        "uncollectible": "Несъбираема",
+        "unknown": "Неизвестна"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Събрани данни",
     "free": "Безплатно",
-    "couldNotUpdateFavorites": "Не можахме да актуализираме любимите"
+    "couldNotUpdateFavorites": "Не можахме да актуализираме любимите",
+    "thinkingEffort": {
+      "none": "Няма",
+      "minimal": "Минимално",
+      "low": "Ниско",
+      "medium": "Средно",
+      "high": "Високо",
+      "xhigh": "Много високо",
+      "max": "Максимум"
+    }
   }
 }

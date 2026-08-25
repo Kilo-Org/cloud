@@ -382,7 +382,11 @@
       "paymentPastDue": "付款已逾期。请更新您的付款方式。",
       "subscriptionCancels": "订阅将于 {{date}} 取消",
       "trialDaysRemaining": "试用：剩余 {{remaining}} 天",
-      "trialEndingSoon": "试用即将结束：{{remaining}}"
+      "trialEndingSoon": "试用即将结束：{{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "新功能",
@@ -750,7 +754,8 @@
       "strongArm": "强壮手臂",
       "talisman": "护身符"
     },
-    "remoteSpawnFilesNotSupported": "此实例无法接收文件。"
+    "remoteSpawnFilesNotSupported": "此实例无法接收文件。",
+    "instanceSwitcherTitle": "KiloClaw 实例"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -948,7 +953,60 @@
       "failed": "失败",
       "cancelled": "已取消",
       "interrupted": "已中断"
-    }
+    },
+    "reviewStyle": {
+      "strict": "严格",
+      "balanced": "均衡",
+      "lenient": "宽松",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "安全",
+      "performance": "性能",
+      "bugs": "缺陷",
+      "style": "风格",
+      "testing": "测试",
+      "documentation": "文档"
+    },
+    "gateThreshold": {
+      "off": "关闭",
+      "all": "全部",
+      "warning": "警告",
+      "critical": "严重"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "代码审查器需要关注",
+        "description": "代码审查器已被禁用，因为 Kilo 无法通过有效的 GitHub App 安装访问此仓库。请更新 GitHub App 安装，然后重新启用代码审查器。",
+        "recoveryLabel": "更新 GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "代码审查器需要关注",
+        "description": "代码审查器已被禁用，因为此 GitHub 组织使用会阻止 Kilo 的 IP 允许列表。请联系 hi@kilocode.ai 寻求帮助，然后重新启用代码审查器。",
+        "recoveryLabel": "联系支持"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "代码审查器需要关注",
+        "description": "代码审查器已被禁用，因为 Kilo 无法为此项目创建 GitLab 项目访问令牌。请授予 Maintainer 访问权限或启用项目访问令牌，然后重新启用代码审查器。",
+        "recoveryLabel": "更新 GitLab 集成"
+      },
+      "byokInvalidKey": {
+        "title": "代码审查器需要关注",
+        "description": "代码审查器已被禁用，因为所选 BYOK API 密钥无效、已被撤销或缺少权限。请更新密钥或选择其他模型，然后重新启用代码审查器。",
+        "recoveryLabel": "更新 BYOK 设置"
+      },
+      "selectedModelUnavailable": {
+        "title": "代码审查器需要关注",
+        "description": "代码审查器已被禁用，因为所选模型不适用于云端代理会话。请选择一个可用的模型，然后重新启用代码审查器。",
+        "recoveryLabel": "更新代码审查器设置"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "代码审查器需要关注",
+        "description": "代码审查器在今日三次仓库克隆超时后已被禁用。请联系 hi@kilocode.ai 寻求帮助，然后重新启用代码审查器。",
+        "recoveryLabel": "联系支持"
+      }
+    },
+    "unknownError": "未知错误"
   },
   "securityAgent": {
     "filter": {
@@ -1488,6 +1546,23 @@
       "belowThreshold": "发现低于自动修复的严重程度阈值。安全门槛通过后仍可手动开始修复。",
       "beforeEnablement": "分析在启用自动修复之前完成。安全门槛通过后仍可手动开始修复。",
       "generic": "此发现无法进行修复。"
+    },
+    "commandFailure": {
+      "ownerCapReached": "分析容量已满。请等待正在进行的分析完成，然后重试。",
+      "githubTokenUnavailable": "GitHub 授权需要关注。请重新授权 GitHub App，然后重试。",
+      "githubAuthInvalid": "GitHub 授权需要关注。请重新授权 GitHub App，然后重试。",
+      "findingUnavailable": "发现已不再可用。请刷新发现，如果它仍处于打开状态，请重试。",
+      "repositoryUnavailable": "仓库对 GitHub App 已不再可用。请刷新仓库访问权限，然后重试。",
+      "invalidDismissTarget": "无法忽略此发现，因为其 Dependabot 目标无效。",
+      "commandStalled": "排队的操作未按时完成。请重试操作。",
+      "queueRetriesExhausted": "操作经过多次尝试后仍无法完成。请重试操作。",
+      "queueAdmissionFailed": "排队的操作无法被受理。请重试操作。",
+      "generic": "排队的操作失败。请重试操作。"
+    },
+    "analysisMode": {
+      "auto": "自动",
+      "shallow": "浅度",
+      "deep": "深度"
     }
   },
   "agents": {
@@ -1951,7 +2026,8 @@
       "addToFavorites": "将 {{name}} 添加到收藏",
       "removeFromFavorites": "从收藏中移除 {{name}}",
       "thinkingEffortXhigh": "超高",
-      "thinkingEffortMedium": "中"
+      "thinkingEffortMedium": "中",
+      "sessionModel": "会话模型"
     },
     "attachmentPreview": {
       "openFailedRetry": "打开文件失败。请重试。",
@@ -2083,7 +2159,8 @@
   },
   "addCredits": {
     "cta": "添加积分",
-    "description": "添加积分以保持使用运行。"
+    "description": "添加积分以保持使用运行。",
+    "billingPage": "账单页面"
   },
   "deviceSessions": {
     "couldNotLoad": "无法加载会话",
@@ -2271,7 +2348,10 @@
     "restoreFailed": "恢复购买失败。请重试。",
     "purchaseFailed": "完成购买失败。",
     "purchaseStartFailed": "启动 App Store 购买失败。",
-    "purchaseOwnedByAnotherAccount": "此 Apple 账户上的 Kilo Pass 属于另一个 Kilo 账户。"
+    "purchaseOwnedByAnotherAccount": "此 Apple 账户上的 Kilo Pass 属于另一个 Kilo 账户。",
+    "couldNotConnectToAppStore": "无法连接到 App Store。请检查您的网络连接后重试。",
+    "noMatchingProducts": "App Store 未返回匹配的 Kilo Pass 产品。",
+    "purchaseMissingSignedTransaction": "App Store 购买未包含已签名的交易 JWS。"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2779,7 +2859,10 @@
     "diff": {
       "selectedTapToChange": "已选择 {{label}}，点按以更改所选内容",
       "tapToComment": "{{label}}，点按以发表评论",
-      "truncationBanner": "正在显示前 {{limit}} 个（共 {{total}} 个）已更改文件 — GitHub API 限制"
+      "truncationBanner": "正在显示前 {{limit}} 个（共 {{total}} 个）已更改文件 — GitHub API 限制",
+      "statusAdded": "已添加",
+      "statusContext": "上下文",
+      "statusDeleted": "已删除"
     },
     "linkPasteClipboardEmpty": "剪贴板为空",
     "linkPasteNotAPullRequest": "不是 GitHub 拉取请求链接",
@@ -2793,6 +2876,11 @@
       "reviewNotSubmitted": "此审查无法按现状提交。PR 可能已更改，或您无法审查自己的拉取请求。",
       "couldNotPostComment": "无法发布评论。",
       "couldNotSubmitReview": "无法提交审查。请检查网络连接后重试。"
+    },
+    "operation": {
+      "couldNotReply": "无法回复。",
+      "couldNotCompleteAction": "无法完成此操作。",
+      "mergeResultDefaultError": "GitHub 未完成合并。"
     }
   },
   "organization": {
@@ -2810,7 +2898,17 @@
       "emptyTitle": "没有积分动态",
       "expires": "到期时间 {{date}}",
       "title": "积分动态",
-      "transactionFallback": "积分交易"
+      "transactionFallback": "积分交易",
+      "category": {
+        "organization_custom": "组织自定义",
+        "parent_to_child_transfer_in": "上级转入下级",
+        "parent_to_child_transfer_out": "上级转出至下级",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "会计调整",
+        "credits_expired": "积分已过期"
+      }
     },
     "hub": {
       "balance": "余额",
@@ -2837,11 +2935,16 @@
       "emptyTitle": "没有发票",
       "invoiceFallback": "发票",
       "title": "发票",
-      "statusPaid": "已支付",
-      "statusOpen": "待支付",
-      "statusVoid": "已作废",
       "downloadFailed": "无法下载发票。请检查网络连接后重试。",
-      "sharingUnavailable": "此设备不支持分享。"
+      "sharingUnavailable": "此设备不支持分享。",
+      "status": {
+        "paid": "已支付",
+        "open": "待支付",
+        "void": "已作废",
+        "draft": "草稿",
+        "uncollectible": "无法收回",
+        "unknown": "未知"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2941,7 +3044,8 @@
     "promptTitle": "您觉得 Kilo 应用怎么样？",
     "rateKilo": "给 Kilo 评分",
     "sorryMessage": "请告诉我们哪些地方需要改进。负责该应用的工程师会阅读每一份报告！",
-    "sorryTitle": "很抱歉听到您这么说！"
+    "sorryTitle": "很抱歉听到您这么说！",
+    "emailSubject": "移动应用反馈"
   },
   "authErrors": {
     "emailAlreadyUsed": "使用此邮箱的账户已存在，但登录方式不同。请尝试其他方式或使用\"$t(login.moreSignInOptions)\"。",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "收集的数据",
     "free": "免费",
-    "couldNotUpdateFavorites": "无法更新收藏"
+    "couldNotUpdateFavorites": "无法更新收藏",
+    "thinkingEffort": {
+      "none": "无",
+      "minimal": "最低",
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "xhigh": "超高",
+      "max": "最高"
+    }
   }
 }

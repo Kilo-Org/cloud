@@ -382,7 +382,11 @@
       "paymentPastDue": "भुगतान बकाया है। कृपया अपनी भुगतान विधि अपडेट करें।",
       "subscriptionCancels": "सदस्यता {{date}} को रद्द होती है",
       "trialDaysRemaining": "परीक्षण: {{remaining}} शेष",
-      "trialEndingSoon": "परीक्षण जल्द समाप्त हो रहा है: {{remaining}}"
+      "trialEndingSoon": "परीक्षण जल्द समाप्त हो रहा है: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "नया क्या है",
@@ -750,7 +754,8 @@
       "strongArm": "मज़बूत भुजा",
       "talisman": "तावीज़"
     },
-    "remoteSpawnFilesNotSupported": "यह इंस्टेंस फ़ाइलें प्राप्त नहीं कर सकता।"
+    "remoteSpawnFilesNotSupported": "यह इंस्टेंस फ़ाइलें प्राप्त नहीं कर सकता।",
+    "instanceSwitcherTitle": "KiloClaw इंस्टेंस"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -948,7 +953,60 @@
       "failed": "विफल",
       "cancelled": "रद्द किया गया",
       "interrupted": "बाधित"
-    }
+    },
+    "reviewStyle": {
+      "strict": "सख्त",
+      "balanced": "संतुलित",
+      "lenient": "उदार",
+      "roast": "रोस्ट"
+    },
+    "focusArea": {
+      "security": "सुरक्षा",
+      "performance": "प्रदर्शन",
+      "bugs": "बग्स",
+      "style": "शैली",
+      "testing": "परीक्षण",
+      "documentation": "दस्तावेज़ीकरण"
+    },
+    "gateThreshold": {
+      "off": "बंद",
+      "all": "सभी",
+      "warning": "चेतावनी",
+      "critical": "गंभीर"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "कोड समीक्षक को ध्यान देने की आवश्यकता है",
+        "description": "कोड समीक्षक अक्षम किया गया था क्योंकि Kilo सक्रिय GitHub ऐप इंस्टॉलेशन के साथ इस रिपॉज़िटरी तक पहुँच नहीं सकता। GitHub ऐप इंस्टॉलेशन अपडेट करें, फिर कोड समीक्षक को फिर से सक्षम करें।",
+        "recoveryLabel": "GitHub ऐप अपडेट करें"
+      },
+      "githubIpAllowList": {
+        "title": "कोड समीक्षक को ध्यान देने की आवश्यकता है",
+        "description": "कोड समीक्षक अक्षम किया गया था क्योंकि यह GitHub संगठन IP अनुमति सूची का उपयोग करता है जो Kilo को ब्लॉक करती है। सहायता के लिए hi@kilocode.ai से संपर्क करें, फिर कोड समीक्षक को फिर से सक्षम करें।",
+        "recoveryLabel": "सहायता से संपर्क करें"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "कोड समीक्षक को ध्यान देने की आवश्यकता है",
+        "description": "कोड समीक्षक अक्षम किया गया था क्योंकि Kilo इस प्रोजेक्ट के लिए GitLab प्रोजेक्ट एक्सेस टोकन नहीं बना सकता। Maintainer पहुँच दें या Project Access Tokens सक्षम करें, फिर कोड समीक्षक को फिर से सक्षम करें।",
+        "recoveryLabel": "GitLab एकीकरण अपडेट करें"
+      },
+      "byokInvalidKey": {
+        "title": "कोड समीक्षक को ध्यान देने की आवश्यकता है",
+        "description": "कोड समीक्षक अक्षम किया गया था क्योंकि चयनित BYOK API कुंजी अमान्य, निरस्त, या अनुमति-रहित है। कुंजी अपडेट करें या दूसरा मॉडल चुनें, फिर कोड समीक्षक को फिर से सक्षम करें।",
+        "recoveryLabel": "BYOK सेटिंग अपडेट करें"
+      },
+      "selectedModelUnavailable": {
+        "title": "कोड समीक्षक को ध्यान देने की आवश्यकता है",
+        "description": "कोड समीक्षक अक्षम किया गया था क्योंकि चयनित मॉडल क्लाउड एजेंट सत्रों के लिए उपलब्ध नहीं है। उपलब्ध मॉडल चुनें, फिर कोड समीक्षक को फिर से सक्षम करें।",
+        "recoveryLabel": "कोड समीक्षक सेटिंग अपडेट करें"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "कोड समीक्षक को ध्यान देने की आवश्यकता है",
+        "description": "आज तीन रिपॉज़िटरी क्लोन टाइमआउट के बाद कोड समीक्षक अक्षम किया गया था। सहायता के लिए hi@kilocode.ai से संपर्क करें, फिर कोड समीक्षक को फिर से सक्षम करें।",
+        "recoveryLabel": "सहायता से संपर्क करें"
+      }
+    },
+    "unknownError": "अज्ञात त्रुटि"
   },
   "securityAgent": {
     "filter": {
@@ -1488,6 +1546,23 @@
       "belowThreshold": "निष्कर्ष स्वचालित गंभीरता सीमा से नीचे है। सुरक्षा गेट पार होने पर मैन्युअल सुधार फिर भी शुरू हो सकता है।",
       "beforeEnablement": "ऑटो सुधार सक्षम होने से पहले विश्लेषण पूरा हुआ। सुरक्षा गेट पार होने पर मैन्युअल सुधार फिर भी शुरू हो सकता है।",
       "generic": "इस निष्कर्ष के लिए सुधार अनुपलब्ध है।"
+    },
+    "commandFailure": {
+      "ownerCapReached": "विश्लेषण क्षमता भर गई है। किसी सक्रिय विश्लेषण के समाप्त होने की प्रतीक्षा करें, फिर दोबारा प्रयास करें।",
+      "githubTokenUnavailable": "GitHub प्राधिकरण पर ध्यान देने की आवश्यकता है। GitHub ऐप को फिर से अधिकृत करें, फिर दोबारा प्रयास करें।",
+      "githubAuthInvalid": "GitHub प्राधिकरण पर ध्यान देने की आवश्यकता है। GitHub ऐप को फिर से अधिकृत करें, फिर दोबारा प्रयास करें।",
+      "findingUnavailable": "निष्कर्ष अब उपलब्ध नहीं है। निष्कर्ष ताज़ा करें और यदि वह खुला रहता है तो दोबारा प्रयास करें।",
+      "repositoryUnavailable": "रिपॉज़िटरी अब GitHub ऐप के लिए उपलब्ध नहीं है। रिपॉज़िटरी पहुँच ताज़ा करें, फिर दोबारा प्रयास करें।",
+      "invalidDismissTarget": "निष्कर्ष को खारिज नहीं किया जा सकता क्योंकि इसका Dependabot लक्ष्य अमान्य है।",
+      "commandStalled": "कतार में लगी कार्रवाई समय पर पूरी नहीं हुई। कार्रवाई फिर से करें।",
+      "queueRetriesExhausted": "कई प्रयासों के बाद कार्रवाई पूरी नहीं हो सकी। कार्रवाई फिर से करें।",
+      "queueAdmissionFailed": "कतार में लगी कार्रवाई स्वीकार नहीं की जा सकी। कार्रवाई फिर से करें।",
+      "generic": "कतार में लगी कार्रवाई विफल रही। कार्रवाई फिर से करें।"
+    },
+    "analysisMode": {
+      "auto": "ऑटो",
+      "shallow": "उथला",
+      "deep": "गहरा"
     }
   },
   "agents": {
@@ -1917,7 +1992,8 @@
       "addToFavorites": "{{name}} को पसंदीदा में जोड़ें",
       "removeFromFavorites": "{{name}} को पसंदीदा से हटाएँ",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "सत्र मॉडल"
     },
     "attachmentPreview": {
       "openFailedRetry": "फ़ाइल खोलने में विफल। कृपया फिर से कोशिश करें।",
@@ -2083,7 +2159,8 @@
   },
   "addCredits": {
     "cta": "क्रेडिट जोड़ें",
-    "description": "उपयोग जारी रखने के लिए क्रेडिट जोड़ें।"
+    "description": "उपयोग जारी रखने के लिए क्रेडिट जोड़ें।",
+    "billingPage": "बिलिंग पेज"
   },
   "deviceSessions": {
     "couldNotLoad": "सत्र लोड नहीं हो सके",
@@ -2271,7 +2348,10 @@
     "restoreFailed": "खरीदारी पुनर्स्थापित करने में विफल। फिर से प्रयास करें।",
     "purchaseFailed": "खरीदारी पूरी करने में विफल।",
     "purchaseStartFailed": "App Store खरीदारी शुरू करने में विफल।",
-    "purchaseOwnedByAnotherAccount": "इस Apple खाते का Kilo Pass किसी दूसरे Kilo खाते से संबंधित है।"
+    "purchaseOwnedByAnotherAccount": "इस Apple खाते का Kilo Pass किसी दूसरे Kilo खाते से संबंधित है।",
+    "couldNotConnectToAppStore": "App Store से कनेक्ट नहीं हो सका। अपना कनेक्शन जाँचें और फिर से प्रयास करें।",
+    "noMatchingProducts": "App Store द्वारा कोई मिलता-जुलता Kilo Pass उत्पाद नहीं लौटाया गया।",
+    "purchaseMissingSignedTransaction": "App Store खरीद में हस्ताक्षरित लेन-देन JWS शामिल नहीं था।"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2779,7 +2859,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} चुना गया, चयन बदलने के लिए टैप करें",
       "tapToComment": "{{label}}, टिप्पणी करने के लिए टैप करें",
-      "truncationBanner": "बदली गई {{total}} फ़ाइलों में से पहली {{limit}} फ़ाइलें दिखाई जा रही हैं — GitHub API सीमा"
+      "truncationBanner": "बदली गई {{total}} फ़ाइलों में से पहली {{limit}} फ़ाइलें दिखाई जा रही हैं — GitHub API सीमा",
+      "statusAdded": "जोड़ा गया",
+      "statusContext": "संदर्भ",
+      "statusDeleted": "हटाया गया"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली है",
     "linkPasteNotAPullRequest": "यह GitHub पुल रिक्वेस्ट लिंक नहीं है",
@@ -2793,6 +2876,11 @@
       "reviewNotSubmitted": "यह समीक्षा जैसी है वैसी सबमिट नहीं की जा सकती। PR बदल गया हो सकता है, या आप अपनी खुद की पुल रिक्वेस्ट की समीक्षा नहीं कर सकते।",
       "couldNotPostComment": "टिप्पणी पोस्ट नहीं की जा सकी।",
       "couldNotSubmitReview": "समीक्षा सबमिट नहीं की जा सकी। अपना कनेक्शन जाँचें और फिर से प्रयास करें।"
+    },
+    "operation": {
+      "couldNotReply": "उत्तर नहीं दे सका।",
+      "couldNotCompleteAction": "यह कार्रवाई पूरी नहीं हो सकी।",
+      "mergeResultDefaultError": "GitHub ने मर्ज पूरा नहीं किया।"
     }
   },
   "organization": {
@@ -2810,7 +2898,17 @@
       "emptyTitle": "कोई क्रेडिट गतिविधि नहीं",
       "expires": "{{date}} को समाप्त होता है",
       "title": "क्रेडिट गतिविधि",
-      "transactionFallback": "क्रेडिट लेन-देन"
+      "transactionFallback": "क्रेडिट लेन-देन",
+      "category": {
+        "organization_custom": "संगठन कस्टम",
+        "parent_to_child_transfer_in": "पैरेंट से चाइल्ड में स्थानांतरण (आवक)",
+        "parent_to_child_transfer_out": "पैरेंट से चाइल्ड में स्थानांतरण (जावक)",
+        "oss-sponsorship": "OSS प्रायोजन",
+        "oss-monthly-reset": "OSS मासिक रीसेट",
+        "team-topup-bonus-2025": "टीम टॉप-अप बोनस 2025",
+        "accounting_adjustment": "लेखा समायोजन",
+        "credits_expired": "क्रेडिट समाप्त हुए"
+      }
     },
     "hub": {
       "balance": "बैलेंस",
@@ -2837,11 +2935,16 @@
       "emptyTitle": "कोई इनवॉइस नहीं",
       "invoiceFallback": "इनवॉइस",
       "title": "इनवॉइस",
-      "statusPaid": "भुगतान किया गया",
-      "statusOpen": "खुला",
-      "statusVoid": "रद्द",
       "downloadFailed": "इनवॉइस डाउनलोड नहीं हो सका। अपना कनेक्शन जाँचें और फिर से प्रयास करें।",
-      "sharingUnavailable": "इस डिवाइस पर साझा करना उपलब्ध नहीं है।"
+      "sharingUnavailable": "इस डिवाइस पर साझा करना उपलब्ध नहीं है।",
+      "status": {
+        "paid": "भुगतान किया गया",
+        "open": "खुला",
+        "void": "रद्द",
+        "draft": "ड्राफ़्ट",
+        "uncollectible": "वसूली योग्य नहीं",
+        "unknown": "अज्ञात"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2941,7 +3044,8 @@
     "promptTitle": "आपको Kilo ऐप कैसा लग रहा है?",
     "rateKilo": "Kilo को रेट करें",
     "sorryMessage": "कृपया हमें बताएँ कि क्या बेहतर होना चाहिए। ऐप का प्रभारी इंजीनियर हर एक रिपोर्ट पढ़ता है!",
-    "sorryTitle": "यह सुनकर हमें खेद है!"
+    "sorryTitle": "यह सुनकर हमें खेद है!",
+    "emailSubject": "मोबाइल ऐप फ़ीडबैक"
   },
   "authErrors": {
     "emailAlreadyUsed": "इस ईमेल वाला एक खाता पहले से मौजूद है, लेकिन एक अलग साइन-इन विधि के साथ। कोई दूसरी विधि आज़माएँ या '$t(login.moreSignInOptions)' का उपयोग करें।",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "एकत्रित डेटा",
     "free": "निःशुल्क",
-    "couldNotUpdateFavorites": "पसंदीदा अपडेट नहीं हो सके"
+    "couldNotUpdateFavorites": "पसंदीदा अपडेट नहीं हो सके",
+    "thinkingEffort": {
+      "none": "कोई नहीं",
+      "minimal": "न्यूनतम",
+      "low": "निम्न",
+      "medium": "मध्यम",
+      "high": "उच्च",
+      "xhigh": "अति उच्च",
+      "max": "अधिकतम"
+    }
   }
 }

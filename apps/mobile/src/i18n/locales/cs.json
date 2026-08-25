@@ -587,7 +587,10 @@
     "diff": {
       "selectedTapToChange": "Vybráno {{label}}, klepnutím změníte výběr",
       "truncationBanner": "Zobrazuje se prvních {{limit}} z {{total}} změněných souborů — limit rozhraní GitHub API",
-      "tapToComment": "{{label}}, klepnutím okomentujete"
+      "tapToComment": "{{label}}, klepnutím okomentujete",
+      "statusAdded": "Přidáno",
+      "statusContext": "Kontext",
+      "statusDeleted": "Smazáno"
     },
     "linkPasteClipboardEmpty": "Schránka je prázdná",
     "linkPasteNotAPullRequest": "Toto není odkaz na pull request v GitHubu",
@@ -601,6 +604,11 @@
       "reviewNotSubmitted": "Tuto recenzi nelze v aktuálním stavu odeslat. PR se mohl změnit, nebo nemůžete recenzovat vlastní pull request.",
       "couldNotPostComment": "Komentář se nepodařilo odeslat.",
       "couldNotSubmitReview": "Recenzi se nepodařilo odeslat. Zkontrolujte připojení a zkuste to znovu."
+    },
+    "operation": {
+      "couldNotReply": "Odpověď se nepodařilo odeslat.",
+      "couldNotCompleteAction": "Tuto akci se nepodařilo dokončit.",
+      "mergeResultDefaultError": "GitHub nedokončil sloučení."
     }
   },
   "notifications": {
@@ -837,7 +845,11 @@
       "subscriptionCancels": "Předplatné se ruší {{date}}",
       "trialDaysRemaining": "Zkušební verze: zbývá {{remaining}}",
       "trialEndingSoon": "Zkušební verze brzy skončí: {{remaining}}",
-      "lessThanOneDay": "Méně než 1 den"
+      "lessThanOneDay": "Méně než 1 den",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Co je nového",
@@ -1207,7 +1219,8 @@
       "strongArm": "Silná paže",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Tato instance nemůže přijímat soubory."
+    "remoteSpawnFilesNotSupported": "Tato instance nemůže přijímat soubory.",
+    "instanceSwitcherTitle": "Instance KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1405,7 +1418,60 @@
       "failed": "Selhalo",
       "cancelled": "Zrušeno",
       "interrupted": "Přerušeno"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Přísný",
+      "balanced": "Vyvážený",
+      "lenient": "Shovívavý",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Zabezpečení",
+      "performance": "Výkon",
+      "bugs": "Chyby",
+      "style": "Styl",
+      "testing": "Testování",
+      "documentation": "Dokumentace"
+    },
+    "gateThreshold": {
+      "off": "Vypnuto",
+      "all": "Vše",
+      "warning": "Varování",
+      "critical": "Kritické"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer vyžaduje pozornost",
+        "description": "Code Reviewer byl zakázán, protože Kilo nemá přístup k tomuto úložišti s aktivní instalací GitHub App. Aktualizujte instalaci GitHub App a pak Code Reviewer znovu povolte.",
+        "recoveryLabel": "Aktualizovat GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer vyžaduje pozornost",
+        "description": "Code Reviewer byl zakázán, protože tato organizace GitHub používá seznam povolených IP adres, který blokuje Kilo. Kontaktujte hi@kilocode.ai a pak Code Reviewer znovu povolte.",
+        "recoveryLabel": "Kontaktovat podporu"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer vyžaduje pozornost",
+        "description": "Code Reviewer byl zakázán, protože Kilo nemůže pro tento projekt vytvořit token přístupu k projektu GitLab. Udělte přístup správce (Maintainer) nebo povolte tokeny přístupu k projektu a pak Code Reviewer znovu povolte.",
+        "recoveryLabel": "Aktualizovat integraci GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer vyžaduje pozornost",
+        "description": "Code Reviewer byl zakázán, protože vybraný klíč rozhraní API BYOK je neplatný, byl odvolán nebo nemá oprávnění. Aktualizujte klíč nebo zvolte jiný model a pak Code Reviewer znovu povolte.",
+        "recoveryLabel": "Aktualizovat nastavení BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer vyžaduje pozornost",
+        "description": "Code Reviewer byl zakázán, protože vybraný model není k dispozici pro relace cloudového agenta. Vyberte dostupný model a pak Code Reviewer znovu povolte.",
+        "recoveryLabel": "Aktualizovat nastavení Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer vyžaduje pozornost",
+        "description": "Code Reviewer byl zakázán po třech dnešních časových limitech klonování úložiště. Kontaktujte hi@kilocode.ai a pak Code Reviewer znovu povolte.",
+        "recoveryLabel": "Kontaktovat podporu"
+      }
+    },
+    "unknownError": "Neznámá chyba"
   },
   "securityAgent": {
     "filter": {
@@ -1953,6 +2019,23 @@
       "belowThreshold": "Zjištění je pod automatickou hranicí závažnosti. Ruční náprava může stále začít, když projdou bezpečnostní brány.",
       "beforeEnablement": "Analýza byla dokončena před povolením automatické nápravy. Ruční náprava může stále začít, když projdou bezpečnostní brány.",
       "generic": "Náprava není pro toto zjištění k dispozici."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Kapacita analýzy je plná. Počkejte, dokud neskončí aktivní analýza, a zkuste to znovu.",
+      "githubTokenUnavailable": "Autorizace GitHub vyžaduje pozornost. Znovu autorizujte GitHub App a zkuste to znovu.",
+      "githubAuthInvalid": "Autorizace GitHub vyžaduje pozornost. Znovu autorizujte GitHub App a zkuste to znovu.",
+      "findingUnavailable": "Zjištění již není k dispozici. Obnovte zjištění a zkuste to znovu, pokud zůstává otevřené.",
+      "repositoryUnavailable": "Úložiště již není pro GitHub App k dispozici. Obnovte přístup k úložišti a zkuste to znovu.",
+      "invalidDismissTarget": "Zjištění nelze zamítnout, protože jeho cíl Dependabot je neplatný.",
+      "commandStalled": "Akce ve frontě se nedokončila včas. Zkuste akci znovu.",
+      "queueRetriesExhausted": "Akci se nepodařilo dokončit po několika pokusech. Zkuste akci znovu.",
+      "queueAdmissionFailed": "Akci ve frontě se nepodařilo přijmout. Zkuste akci znovu.",
+      "generic": "Akce ve frontě selhala. Zkuste akci znovu."
+    },
+    "analysisMode": {
+      "auto": "Automaticky",
+      "shallow": "Mělká",
+      "deep": "Hluboká"
     }
   },
   "agents": {
@@ -2428,7 +2511,8 @@
       "addToFavorites": "Přidat {{name}} do oblíbených",
       "removeFromFavorites": "Odebrat {{name}} z oblíbených",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Stř"
+      "thinkingEffortMedium": "Stř",
+      "sessionModel": "Model relace"
     },
     "attachmentPreview": {
       "openFailedRetry": "Otevření souboru se nezdařilo. Zkuste to prosím znovu.",
@@ -2562,7 +2646,8 @@
   },
   "addCredits": {
     "cta": "Přidat kredity",
-    "description": "Přidejte kredity, aby využití mohlo pokračovat."
+    "description": "Přidejte kredity, aby využití mohlo pokračovat.",
+    "billingPage": "fakturační stránka"
   },
   "deviceSessions": {
     "couldNotLoad": "Relace se nepodařilo načíst",
@@ -2750,7 +2835,10 @@
     "restoreFailed": "Obnovení nákupů se nezdařilo. Zkuste to znovu.",
     "purchaseFailed": "Nákup se nepodařilo dokončit.",
     "purchaseStartFailed": "Nákup v App Store se nepodařilo zahájit.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass na tomto Apple účtu patří k jinému účtu Kilo."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass na tomto Apple účtu patří k jinému účtu Kilo.",
+    "couldNotConnectToAppStore": "Nepodařilo se připojit k App Store. Zkontrolujte připojení a zkuste to znovu.",
+    "noMatchingProducts": "App Store nevrátil žádné odpovídající produkty Kilo Pass.",
+    "purchaseMissingSignedTransaction": "Nákup v App Store neobsahoval podepsanou transakci JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2846,7 +2934,8 @@
     "needsWork": "Vyžaduje zlepšení",
     "sorryTitle": "Je nám líto, že to slyšíme!",
     "sorryMessage": "Dejte nám prosím vědět, co by mělo být lepší. Inženýr odpovědný za aplikaci čte každou jednotlivou zprávu!",
-    "emailUs": "Napište nám e-mail"
+    "emailUs": "Napište nám e-mail",
+    "emailSubject": "zpětná vazba k mobilní aplikaci"
   },
   "organization": {
     "boundary": {
@@ -2863,7 +2952,17 @@
       "emptyTitle": "Žádná aktivita kreditů",
       "expires": "Platnost do {{date}}",
       "title": "Aktivita kreditů",
-      "transactionFallback": "Kreditní transakce"
+      "transactionFallback": "Kreditní transakce",
+      "category": {
+        "organization_custom": "Vlastní organizace",
+        "parent_to_child_transfer_in": "Převod z rodičovské do dceřiné organizace (příchozí)",
+        "parent_to_child_transfer_out": "Převod z rodičovské do dceřiné organizace (odchozí)",
+        "oss-sponsorship": "Sponzorství OSS",
+        "oss-monthly-reset": "Měsíční obnovení OSS",
+        "team-topup-bonus-2025": "Bonus za doplnění týmu 2025",
+        "accounting_adjustment": "Účetní úprava",
+        "credits_expired": "Kredity s prošlou platností"
+      }
     },
     "inviteMember": {
       "emailError": "Zadejte platnou e-mailovou adresu",
@@ -2880,12 +2979,17 @@
       "emptyDescription": "Faktury se generují automaticky každý fakturační cyklus a zde se zobrazí, jakmile je vaše organizace vyúčtována.",
       "emptyTitle": "Žádné faktury",
       "invoiceFallback": "Faktura",
-      "statusOpen": "Otevřeno",
-      "statusPaid": "Zaplaceno",
-      "statusVoid": "Neplatné",
       "title": "Faktury",
       "downloadFailed": "Fakturu se nepodařilo stáhnout. Zkontrolujte připojení a zkuste to znovu.",
-      "sharingUnavailable": "Sdílení není na tomto zařízení k dispozici."
+      "sharingUnavailable": "Sdílení není na tomto zařízení k dispozici.",
+      "status": {
+        "paid": "Zaplaceno",
+        "open": "Otevřeno",
+        "void": "Neplatné",
+        "draft": "Koncept",
+        "uncollectible": "Nedobytné",
+        "unknown": "Neznámé"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3013,6 +3117,15 @@
   "models": {
     "dataCollected": "Shromažďovaná data",
     "free": "Zdarma",
-    "couldNotUpdateFavorites": "Oblíbené se nepodařilo aktualizovat"
+    "couldNotUpdateFavorites": "Oblíbené se nepodařilo aktualizovat",
+    "thinkingEffort": {
+      "none": "Žádné",
+      "minimal": "Minimální",
+      "low": "Nízké",
+      "medium": "Střední",
+      "high": "Vysoké",
+      "xhigh": "Velmi vysoké",
+      "max": "Maximální"
+    }
   }
 }

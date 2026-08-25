@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Seleccionado {{label}}, toca para cambiar a selección",
       "tapToComment": "{{label}}, toca para comentar",
-      "truncationBanner": "Mostrando os primeiros {{limit}} de {{total}} ficheiros modificados — límite da API de GitHub"
+      "truncationBanner": "Mostrando os primeiros {{limit}} de {{total}} ficheiros modificados — límite da API de GitHub",
+      "statusAdded": "Engadido",
+      "statusContext": "Contexto",
+      "statusDeleted": "Eliminado"
     },
     "linkPasteClipboardEmpty": "O portapapeis está baleiro",
     "linkPasteNotAPullRequest": "Non é unha ligazón de solicitude de cambios de GitHub",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Esta revisión non se pode enviar tal e como está. O PR pode que cambiase, ou non podes revisar o teu propio pull request.",
       "couldNotPostComment": "Non se puido publicar o comentario.",
       "couldNotSubmitReview": "Non se puido enviar a revisión. Comproba a túa conexión e proba de novo."
+    },
+    "operation": {
+      "couldNotReply": "Non se puido responder.",
+      "couldNotCompleteAction": "Non se puido completar esta acción.",
+      "mergeResultDefaultError": "GitHub non completou a fusión."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "O pago está vencido. Actualiza o teu método de pago.",
       "subscriptionCancels": "A subscrición cancelase o {{date}}",
       "trialDaysRemaining": "Probas: quedan {{remaining}}",
-      "trialEndingSoon": "As probas rematan pronto: {{remaining}}"
+      "trialEndingSoon": "As probas rematan pronto: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Novidades",
@@ -1189,7 +1201,8 @@
       "strongArm": "Brazo forte",
       "talisman": "Talismán"
     },
-    "remoteSpawnFilesNotSupported": "Esta instancia non pode recibir arquivos."
+    "remoteSpawnFilesNotSupported": "Esta instancia non pode recibir arquivos.",
+    "instanceSwitcherTitle": "Instancia de KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Fallou",
       "cancelled": "Cancelado",
       "interrupted": "Interrompido"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Estrito",
+      "balanced": "Equilibrado",
+      "lenient": "Indulgente",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Seguridade",
+      "performance": "Rendemento",
+      "bugs": "Erros",
+      "style": "Estilo",
+      "testing": "Probas",
+      "documentation": "Documentación"
+    },
+    "gateThreshold": {
+      "off": "Desactivado",
+      "all": "Todos",
+      "warning": "Aviso",
+      "critical": "Crítico"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "O Revisor de código necesita atención",
+        "description": "O Revisor de código desactivouse porque Kilo non pode acceder a este repositorio cunha instalación activa da app de GitHub. Actualiza a instalación da app de GitHub e volve activar o Revisor de código.",
+        "recoveryLabel": "Actualizar a app de GitHub"
+      },
+      "githubIpAllowList": {
+        "title": "O Revisor de código necesita atención",
+        "description": "O Revisor de código desactivouse porque esta organización de GitHub usa unha lista de permitidos de IP que bloquea Kilo. Contacta con hi@kilocode.ai para obter axuda e volve activar o Revisor de código.",
+        "recoveryLabel": "Contactar co soporte"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "O Revisor de código necesita atención",
+        "description": "O Revisor de código desactivouse porque Kilo non pode crear un token de acceso ao proxecto de GitLab para este proxecto. Concede acceso de mantenedor ou activa os tokens de acceso ao proxecto e volve activar o Revisor de código.",
+        "recoveryLabel": "Actualizar a integración de GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "O Revisor de código necesita atención",
+        "description": "O Revisor de código desactivouse porque a clave de API de BYOK seleccionada é inválida, foi revogada ou carece de permisos. Actualiza a clave ou escolle outro modelo e volve activar o Revisor de código.",
+        "recoveryLabel": "Actualizar a configuración de BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "O Revisor de código necesita atención",
+        "description": "O Revisor de código desactivouse porque o modelo seleccionado non está dispoñible para sesións de axente na nube. Escolle un modelo dispoñible e volve activar o Revisor de código.",
+        "recoveryLabel": "Actualizar a configuración do Revisor de código"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "O Revisor de código necesita atención",
+        "description": "O Revisor de código desactivouse despois de tres tempos de espera de clonación de repositorios hoxe. Contacta con hi@kilocode.ai para obter axuda e volve activar o Revisor de código.",
+        "recoveryLabel": "Contactar co soporte"
+      }
+    },
+    "unknownError": "Erro descoñecido"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "O achado está por baixo do limiar de gravidade automático. A corrección manual aínda pode comezar cando pasen as portas de seguridade.",
       "beforeEnablement": "A análise completouse antes de activarse a Autoremediación. A corrección manual aínda pode comezar cando pasen as portas de seguridade.",
       "generic": "A corrección non está dispoñible para este achado."
+    },
+    "commandFailure": {
+      "ownerCapReached": "A capacidade de análise está chea. Agarda a que remate unha análise activa e reinténtao.",
+      "githubTokenUnavailable": "A autorización de GitHub necesita atención. Volve autorizar a app de GitHub e reinténtao.",
+      "githubAuthInvalid": "A autorización de GitHub necesita atención. Volve autorizar a app de GitHub e reinténtao.",
+      "findingUnavailable": "O achado xa non está dispoñible. Actualiza os achados e reinténtao se permanece aberto.",
+      "repositoryUnavailable": "O repositorio xa non está dispoñible para a app de GitHub. Actualiza o acceso ao repositorio e reinténtao.",
+      "invalidDismissTarget": "O achado non se pode descartar porque o seu obxectivo de Dependabot é inválido.",
+      "commandStalled": "A acción en cola non rematou a tempo. Reintenta a acción.",
+      "queueRetriesExhausted": "A acción non se puido completar despois de varios intentos. Reintenta a acción.",
+      "queueAdmissionFailed": "A acción en cola non se puido admitir. Reintenta a acción.",
+      "generic": "A acción en cola fallou. Reintenta a acción."
+    },
+    "analysisMode": {
+      "auto": "Automático",
+      "shallow": "Superficial",
+      "deep": "Profunda"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Engadir {{name}} aos favoritos",
       "removeFromFavorites": "Eliminar {{name}} dos favoritos",
       "thinkingEffortXhigh": "XA",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Modelo da sesión"
     },
     "attachmentPreview": {
       "openFailedRetry": "Non se puido abrir o ficheiro. Téntao de novo.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Engadir créditos",
-    "description": "Engade créditos para manter o uso en marcha."
+    "description": "Engade créditos para manter o uso en marcha.",
+    "billingPage": "páxina de facturación"
   },
   "deviceSessions": {
     "couldNotLoad": "Non se puideron cargar as sesións",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Non se puideron restaurar as compras. Proba de novo.",
     "purchaseFailed": "Non se puido completar a compra.",
     "purchaseStartFailed": "Non se puido iniciar a compra na App Store.",
-    "purchaseOwnedByAnotherAccount": "O Kilo Pass desta conta de Apple pertence a outra conta de Kilo."
+    "purchaseOwnedByAnotherAccount": "O Kilo Pass desta conta de Apple pertence a outra conta de Kilo.",
+    "couldNotConnectToAppStore": "Non se puido conectar coa App Store. Comproba a túa conexión e téntao de novo.",
+    "noMatchingProducts": "A App Store non devolveu ningún produto de Kilo Pass coincidente.",
+    "purchaseMissingSignedTransaction": "A compra da App Store non incluíu unha transacción asinada en JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Necesita melloras",
     "sorryTitle": "Sentímolo!",
     "sorryMessage": "Por favor, dínos que precisa mellorar. A persoa enxeñeira responsable da app le cada un dos informes!",
-    "emailUs": "Escríbenos"
+    "emailUs": "Escríbenos",
+    "emailSubject": "comentarios sobre a app móbil"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Non hai actividade de crédito",
       "expires": "Caduca {{date}}",
       "title": "Actividade de crédito",
-      "transactionFallback": "Transacción de crédito"
+      "transactionFallback": "Transacción de crédito",
+      "category": {
+        "organization_custom": "Personalizado da organización",
+        "parent_to_child_transfer_in": "Transferencia entrante desde a organización nai",
+        "parent_to_child_transfer_out": "Transferencia saínte cara á organización filla",
+        "oss-sponsorship": "Patrocinio OSS",
+        "oss-monthly-reset": "Restablecemento mensual de OSS",
+        "team-topup-bonus-2025": "Bono de recarga de equipo 2025",
+        "accounting_adjustment": "Axuste contable",
+        "credits_expired": "Créditos caducados"
+      }
     },
     "inviteMember": {
       "emailError": "Introduce un enderezo de correo válido",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "As facturas xéranse automaticamente en cada ciclo de facturación e aparecerán aquí unha vez que se facture a túa organización.",
       "emptyTitle": "Non hai facturas",
       "invoiceFallback": "Factura",
-      "statusOpen": "Aberta",
-      "statusPaid": "Pagada",
-      "statusVoid": "Anulada",
       "title": "Facturas",
       "downloadFailed": "Non se puido descargar a factura. Comproba a túa conexión e proba de novo.",
-      "sharingUnavailable": "O compartido non está dispoñible neste dispositivo."
+      "sharingUnavailable": "O compartido non está dispoñible neste dispositivo.",
+      "status": {
+        "paid": "Pagada",
+        "open": "Aberta",
+        "void": "Anulada",
+        "draft": "Borrador",
+        "uncollectible": "Incobrable",
+        "unknown": "Descoñecido"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "nome@empresa.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Datos recollidos",
     "free": "Grátis",
-    "couldNotUpdateFavorites": "Non se puideron actualizar os favoritos"
+    "couldNotUpdateFavorites": "Non se puideron actualizar os favoritos",
+    "thinkingEffort": {
+      "none": "Ningún",
+      "minimal": "Mínimo",
+      "low": "Baixo",
+      "medium": "Medio",
+      "high": "Alto",
+      "xhigh": "Moi alto",
+      "max": "Máximo"
+    }
   }
 }

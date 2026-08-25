@@ -382,7 +382,11 @@
       "paymentPastDue": "Thanh toán quá hạn. Vui lòng cập nhật phương thức thanh toán.",
       "subscriptionCancels": "Gói đăng ký hủy vào {{date}}",
       "trialDaysRemaining": "Dùng thử: còn {{remaining}} ngày",
-      "trialEndingSoon": "Dùng thử sắp kết thúc: {{remaining}}"
+      "trialEndingSoon": "Dùng thử sắp kết thúc: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Có gì mới",
@@ -750,7 +754,8 @@
       "strongArm": "Cánh tay mạnh mẽ",
       "talisman": "Bùa hộ mệnh"
     },
-    "remoteSpawnFilesNotSupported": "Phiên bản này không thể nhận tệp."
+    "remoteSpawnFilesNotSupported": "Phiên bản này không thể nhận tệp.",
+    "instanceSwitcherTitle": "Phiên bản KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -948,7 +953,60 @@
       "failed": "Thất bại",
       "cancelled": "Đã hủy",
       "interrupted": "Đã bị gián đoạn"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Nghiêm ngặt",
+      "balanced": "Cân bằng",
+      "lenient": "Dễ dãi",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Bảo mật",
+      "performance": "Hiệu năng",
+      "bugs": "Lỗi",
+      "style": "Phong cách",
+      "testing": "Kiểm thử",
+      "documentation": "Tài liệu"
+    },
+    "gateThreshold": {
+      "off": "Tắt",
+      "all": "Tất cả",
+      "warning": "Cảnh báo",
+      "critical": "Nghiêm trọng"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Người xem xét mã cần chú ý",
+        "description": "Người xem xét mã đã bị tắt vì Kilo không thể truy cập kho lưu trữ này với một cài đặt GitHub App đang hoạt động. Hãy cập nhật cài đặt GitHub App, sau đó bật lại Người xem xét mã.",
+        "recoveryLabel": "Cập nhật GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Người xem xét mã cần chú ý",
+        "description": "Người xem xét mã đã bị tắt vì tổ chức GitHub này sử dụng danh sách IP được phép chặn Kilo. Hãy liên hệ hi@kilocode.ai để được trợ giúp, sau đó bật lại Người xem xét mã.",
+        "recoveryLabel": "Liên hệ hỗ trợ"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Người xem xét mã cần chú ý",
+        "description": "Người xem xét mã đã bị tắt vì Kilo không thể tạo Mã thông báo truy cập dự án GitLab cho dự án này. Hãy cấp quyền truy cập Maintainer hoặc bật Mã thông báo truy cập dự án, sau đó bật lại Người xem xét mã.",
+        "recoveryLabel": "Cập nhật tích hợp GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Người xem xét mã cần chú ý",
+        "description": "Người xem xét mã đã bị tắt vì khóa API BYOK đã chọn không hợp lệ, đã bị thu hồi hoặc thiếu quyền. Hãy cập nhật khóa hoặc chọn một mô hình khác, sau đó bật lại Người xem xét mã.",
+        "recoveryLabel": "Cập nhật cài đặt BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Người xem xét mã cần chú ý",
+        "description": "Người xem xét mã đã bị tắt vì mô hình đã chọn không khả dụng cho các phiên tác nhân đám mây. Hãy chọn một mô hình khả dụng, sau đó bật lại Người xem xét mã.",
+        "recoveryLabel": "Cập nhật cài đặt Người xem xét mã"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Người xem xét mã cần chú ý",
+        "description": "Người xem xét mã đã bị tắt sau ba lần hết thời gian sao chép kho lưu trữ hôm nay. Hãy liên hệ hi@kilocode.ai để được trợ giúp, sau đó bật lại Người xem xét mã.",
+        "recoveryLabel": "Liên hệ hỗ trợ"
+      }
+    },
+    "unknownError": "Lỗi không xác định"
   },
   "securityAgent": {
     "filter": {
@@ -1488,6 +1546,23 @@
       "belowThreshold": "Phát hiện dưới ngưỡng mức nghiêm trọng tự động. Vẫn có thể bắt đầu khắc phục thủ công khi các cổng kiểm tra an toàn được thông qua.",
       "beforeEnablement": "Phân tích hoàn tất trước khi bật Tự động khắc phục. Vẫn có thể bắt đầu khắc phục thủ công khi các cổng kiểm tra an toàn được thông qua.",
       "generic": "Không thể khắc phục cho phát hiện này."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Dung lượng phân tích đã đầy. Hãy đợi một phân tích đang chạy hoàn tất, sau đó thử lại.",
+      "githubTokenUnavailable": "Ủy quyền GitHub cần được chú ý. Hãy ủy quyền lại GitHub App, sau đó thử lại.",
+      "githubAuthInvalid": "Ủy quyền GitHub cần được chú ý. Hãy ủy quyền lại GitHub App, sau đó thử lại.",
+      "findingUnavailable": "Phát hiện không còn khả dụng. Hãy làm mới các phát hiện và thử lại nếu nó vẫn còn mở.",
+      "repositoryUnavailable": "Kho lưu trữ không còn khả dụng cho GitHub App. Hãy làm mới quyền truy cập kho lưu trữ, sau đó thử lại.",
+      "invalidDismissTarget": "Không thể bỏ qua phát hiện vì mục tiêu Dependabot của nó không hợp lệ.",
+      "commandStalled": "Hành động đã xếp hàng không hoàn tất đúng hạn. Hãy thử lại hành động.",
+      "queueRetriesExhausted": "Không thể hoàn tất hành động sau nhiều lần thử. Hãy thử lại hành động.",
+      "queueAdmissionFailed": "Không thể tiếp nhận hành động đã xếp hàng. Hãy thử lại hành động.",
+      "generic": "Hành động đã xếp hàng thất bại. Hãy thử lại hành động."
+    },
+    "analysisMode": {
+      "auto": "Tự động",
+      "shallow": "Nông",
+      "deep": "Sâu"
     }
   },
   "agents": {
@@ -1951,7 +2026,8 @@
       "addToFavorites": "Thêm {{name}} vào mục yêu thích",
       "removeFromFavorites": "Xóa {{name}} khỏi mục yêu thích",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Mô hình phiên"
     },
     "attachmentPreview": {
       "openFailedRetry": "Không thể mở tệp. Vui lòng thử lại.",
@@ -2083,7 +2159,8 @@
   },
   "addCredits": {
     "cta": "Thêm tín dụng",
-    "description": "Thêm tín dụng để tiếp tục sử dụng."
+    "description": "Thêm tín dụng để tiếp tục sử dụng.",
+    "billingPage": "trang thanh toán"
   },
   "deviceSessions": {
     "couldNotLoad": "Không thể tải các phiên",
@@ -2271,7 +2348,10 @@
     "restoreFailed": "Không thể khôi phục giao dịch mua. Thử lại.",
     "purchaseFailed": "Không thể hoàn tất giao dịch mua.",
     "purchaseStartFailed": "Không thể bắt đầu giao dịch mua trên App Store.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass trên Tài khoản Apple này thuộc về một tài khoản Kilo khác."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass trên Tài khoản Apple này thuộc về một tài khoản Kilo khác.",
+    "couldNotConnectToAppStore": "Không thể kết nối với App Store. Kiểm tra kết nối của bạn và thử lại.",
+    "noMatchingProducts": "App Store không trả về sản phẩm Kilo Pass nào phù hợp.",
+    "purchaseMissingSignedTransaction": "Giao dịch mua App Store không bao gồm JWS giao dịch đã ký."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2779,7 +2859,10 @@
     "diff": {
       "selectedTapToChange": "Đã chọn {{label}}, chạm để đổi lựa chọn",
       "tapToComment": "{{label}}, chạm để bình luận",
-      "truncationBanner": "Hiển thị {{limit}} tệp đã thay đổi đầu tiên trong tổng số {{total}} — giới hạn API của GitHub"
+      "truncationBanner": "Hiển thị {{limit}} tệp đã thay đổi đầu tiên trong tổng số {{total}} — giới hạn API của GitHub",
+      "statusAdded": "Đã thêm",
+      "statusContext": "Ngữ cảnh",
+      "statusDeleted": "Đã xóa"
     },
     "linkPasteClipboardEmpty": "Bộ nhớ tạm trống",
     "linkPasteNotAPullRequest": "Không phải là liên kết yêu cầu kéo GitHub",
@@ -2793,6 +2876,11 @@
       "reviewNotSubmitted": "Không thể gửi đánh giá này như hiện tại. PR có thể đã thay đổi hoặc bạn không thể đánh giá yêu cầu hợp nhất của chính mình.",
       "couldNotPostComment": "Không thể đăng bình luận.",
       "couldNotSubmitReview": "Không thể gửi đánh giá. Kiểm tra kết nối và thử lại."
+    },
+    "operation": {
+      "couldNotReply": "Không thể trả lời.",
+      "couldNotCompleteAction": "Không thể hoàn tất hành động này.",
+      "mergeResultDefaultError": "GitHub đã không hoàn tất việc hợp nhất."
     }
   },
   "organization": {
@@ -2810,7 +2898,17 @@
       "emptyTitle": "Không có hoạt động tín dụng",
       "expires": "Hết hạn {{date}}",
       "title": "Hoạt động tín dụng",
-      "transactionFallback": "Giao dịch tín dụng"
+      "transactionFallback": "Giao dịch tín dụng",
+      "category": {
+        "organization_custom": "Tùy chỉnh tổ chức",
+        "parent_to_child_transfer_in": "Chuyển khoản từ tổ chức cha sang con (vào)",
+        "parent_to_child_transfer_out": "Chuyển khoản từ tổ chức cha sang con (ra)",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Điều chỉnh kế toán",
+        "credits_expired": "Tín dụng đã hết hạn"
+      }
     },
     "hub": {
       "balance": "Số dư",
@@ -2837,11 +2935,16 @@
       "emptyTitle": "Không có hóa đơn",
       "invoiceFallback": "Hóa đơn",
       "title": "Hóa đơn",
-      "statusPaid": "Đã thanh toán",
-      "statusOpen": "Đang mở",
-      "statusVoid": "Vô hiệu",
       "downloadFailed": "Không thể tải hóa đơn. Kiểm tra kết nối và thử lại.",
-      "sharingUnavailable": "Không thể chia sẻ trên thiết bị này."
+      "sharingUnavailable": "Không thể chia sẻ trên thiết bị này.",
+      "status": {
+        "paid": "Đã thanh toán",
+        "open": "Đang mở",
+        "void": "Vô hiệu",
+        "draft": "Nháp",
+        "uncollectible": "Không thể thu hồi",
+        "unknown": "Không xác định"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2941,7 +3044,8 @@
     "promptTitle": "Bạn thấy ứng dụng Kilo thế nào?",
     "rateKilo": "Đánh giá Kilo",
     "sorryMessage": "Vui lòng cho chúng tôi biết điều cần cải thiện. Kỹ sư phụ trách ứng dụng đọc từng báo cáo một!",
-    "sorryTitle": "Chúng tôi rất tiếc khi nghe điều đó!"
+    "sorryTitle": "Chúng tôi rất tiếc khi nghe điều đó!",
+    "emailSubject": "phản hồi ứng dụng di động"
   },
   "authErrors": {
     "emailAlreadyUsed": "Đã có tài khoản với email này nhưng sử dụng phương thức đăng nhập khác. Hãy thử phương thức khác hoặc dùng '$t(login.moreSignInOptions)'.",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Dữ liệu đã thu thập",
     "free": "Miễn phí",
-    "couldNotUpdateFavorites": "Không thể cập nhật mục yêu thích"
+    "couldNotUpdateFavorites": "Không thể cập nhật mục yêu thích",
+    "thinkingEffort": {
+      "none": "Không",
+      "minimal": "Tối thiểu",
+      "low": "Thấp",
+      "medium": "Trung bình",
+      "high": "Cao",
+      "xhigh": "Rất cao",
+      "max": "Tối đa"
+    }
   }
 }

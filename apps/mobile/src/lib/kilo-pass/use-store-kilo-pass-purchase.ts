@@ -122,7 +122,7 @@ export function isRecoverableKiloPassPurchase(
 function getPurchaseToken(purchase: Purchase): string {
   const token = purchase.purchaseToken;
   if (!token) {
-    throw new Error('App Store purchase did not include a signed transaction JWS.');
+    throw new Error(i18n.t('kiloPass.purchaseMissingSignedTransaction'));
   }
   return token;
 }

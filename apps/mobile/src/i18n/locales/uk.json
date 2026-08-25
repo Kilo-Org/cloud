@@ -384,7 +384,11 @@
       "paymentPastDue": "Платіж прострочено. Оновіть спосіб оплати.",
       "subscriptionCancels": "Підписка скасовується {{date}}",
       "trialDaysRemaining": "Пробний період: залишилося {{remaining}} дн.",
-      "trialEndingSoon": "Пробний період завершується незабаром: {{remaining}}"
+      "trialEndingSoon": "Пробний період завершується незабаром: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Що нового",
@@ -754,7 +758,8 @@
       "strongArm": "Сильна рука",
       "talisman": "Талісман"
     },
-    "remoteSpawnFilesNotSupported": "Цей екземпляр не може отримувати файли."
+    "remoteSpawnFilesNotSupported": "Цей екземпляр не може отримувати файли.",
+    "instanceSwitcherTitle": "Екземпляр KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -952,7 +957,60 @@
       "failed": "Не вдалося",
       "cancelled": "Скасовано",
       "interrupted": "Перервано"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Суворий",
+      "balanced": "Збалансований",
+      "lenient": "Поблажливий",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Безпека",
+      "performance": "Продуктивність",
+      "bugs": "Помилки",
+      "style": "Стиль",
+      "testing": "Тестування",
+      "documentation": "Документація"
+    },
+    "gateThreshold": {
+      "off": "Вимкнено",
+      "all": "Усі",
+      "warning": "Попередження",
+      "critical": "Критичний"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer потребує уваги",
+        "description": "Code Reviewer було вимкнено, оскільки Kilo не може отримати доступ до цього репозиторію з активною установкою застосунку GitHub. Оновіть установку застосунку GitHub, а потім знову ввімкніть Code Reviewer.",
+        "recoveryLabel": "Оновити застосунок GitHub"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer потребує уваги",
+        "description": "Code Reviewer було вимкнено, оскільки ця організація GitHub використовує список дозволених IP-адрес, який блокує Kilo. Зверніться по допомогу на hi@kilocode.ai, а потім знову ввімкніть Code Reviewer.",
+        "recoveryLabel": "Звернутися до підтримки"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer потребує уваги",
+        "description": "Code Reviewer було вимкнено, оскільки Kilo не може створити токен доступу до проєкту GitLab для цього проєкту. Надайте доступ Maintainer або ввімкніть Project Access Tokens, а потім знову ввімкніть Code Reviewer.",
+        "recoveryLabel": "Оновити інтеграцію GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer потребує уваги",
+        "description": "Code Reviewer було вимкнено, оскільки вибраний ключ API BYOK недійсний, відкликаний або не має дозволу. Оновіть ключ або виберіть іншу модель, а потім знову ввімкніть Code Reviewer.",
+        "recoveryLabel": "Оновити налаштування BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer потребує уваги",
+        "description": "Code Reviewer було вимкнено, оскільки вибрана модель недоступна для сеансів хмарного агента. Виберіть доступну модель, а потім знову ввімкніть Code Reviewer.",
+        "recoveryLabel": "Оновити налаштування Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer потребує уваги",
+        "description": "Code Reviewer було вимкнено після трьох тайм-аутів клонування репозиторію сьогодні. Зверніться по допомогу на hi@kilocode.ai, а потім знову ввімкніть Code Reviewer.",
+        "recoveryLabel": "Звернутися до підтримки"
+      }
+    },
+    "unknownError": "Невідома помилка"
   },
   "securityAgent": {
     "filter": {
@@ -1500,6 +1558,23 @@
       "belowThreshold": "Знахідка нижча за поріг автоматичної серйозності. Ручне усунення все ще можна запустити, коли перевірки безпеки пройдуть.",
       "beforeEnablement": "Аналіз завершено до увімкнення Автоусунення. Ручне усунення все ще можна запустити, коли перевірки безпеки пройдуть.",
       "generic": "Усунення недоступне для цієї знахідки."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Потужність аналізу вичерпано. Зачекайте, поки завершиться активний аналіз, а потім повторіть спробу.",
+      "githubTokenUnavailable": "Авторизація GitHub потребує уваги. Повторно авторизуйте застосунок GitHub, а потім повторіть спробу.",
+      "githubAuthInvalid": "Авторизація GitHub потребує уваги. Повторно авторизуйте застосунок GitHub, а потім повторіть спробу.",
+      "findingUnavailable": "Знахідка більше недоступна. Оновіть знахідки та повторіть спробу, якщо вона залишається відкритою.",
+      "repositoryUnavailable": "Репозиторій більше недоступний для застосунку GitHub. Оновіть доступ до репозиторію, а потім повторіть спробу.",
+      "invalidDismissTarget": "Знахідку не можна відхилити, оскільки її ціль Dependabot недійсна.",
+      "commandStalled": "Поставлена в чергу дія не завершилася вчасно. Повторіть дію.",
+      "queueRetriesExhausted": "Дію не вдалося завершити після кількох спроб. Повторіть дію.",
+      "queueAdmissionFailed": "Поставлену в чергу дію не вдалося прийняти. Повторіть дію.",
+      "generic": "Поставлена в чергу дія не вдалася. Повторіть дію."
+    },
+    "analysisMode": {
+      "auto": "Авто",
+      "shallow": "Поверхневий",
+      "deep": "Глибокий"
     }
   },
   "agents": {
@@ -1975,7 +2050,8 @@
       "addToFavorites": "Додати {{name}} до обраного",
       "removeFromFavorites": "Видалити {{name}} з обраного",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Модель сеансу"
     },
     "attachmentPreview": {
       "openFailedRetry": "Не вдалося відкрити файл. Спробуйте ще раз.",
@@ -2109,7 +2185,8 @@
   },
   "addCredits": {
     "cta": "Додати кредити",
-    "description": "Додайте кредити, щоб продовжити використання."
+    "description": "Додайте кредити, щоб продовжити використання.",
+    "billingPage": "сторінка оплати"
   },
   "deviceSessions": {
     "couldNotLoad": "Не вдалося завантажити сеанси",
@@ -2297,7 +2374,10 @@
     "restoreFailed": "Не вдалося відновити покупки. Спробуйте ще раз.",
     "purchaseFailed": "Не вдалося завершити покупку.",
     "purchaseStartFailed": "Не вдалося розпочати покупку в App Store.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass на цьому обліковому записі Apple належить іншому обліковому запису Kilo."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass на цьому обліковому записі Apple належить іншому обліковому запису Kilo.",
+    "couldNotConnectToAppStore": "Не вдалося підключитися до App Store. Перевірте з'єднання та спробуйте ще раз.",
+    "noMatchingProducts": "App Store не повернув відповідних продуктів Kilo Pass.",
+    "purchaseMissingSignedTransaction": "Покупка в App Store не містила підписаної транзакції JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2819,7 +2899,10 @@
     "diff": {
       "selectedTapToChange": "Вибрано {{label}}, торкніться, щоб змінити вибір",
       "tapToComment": "{{label}}, торкніться, щоб додати коментар",
-      "truncationBanner": "Показано перші {{limit}} зі {{total}} змінених файлів — обмеження GitHub API"
+      "truncationBanner": "Показано перші {{limit}} зі {{total}} змінених файлів — обмеження GitHub API",
+      "statusAdded": "Додано",
+      "statusContext": "Контекст",
+      "statusDeleted": "Видалено"
     },
     "linkPasteClipboardEmpty": "Буфер обміну порожній",
     "linkPasteNotAPullRequest": "Це не посилання на pull request GitHub",
@@ -2833,6 +2916,11 @@
       "reviewNotSubmitted": "Цей огляд неможливо надіслати в такому вигляді. PR міг змінитися, або ви не можете перевіряти власний pull request.",
       "couldNotPostComment": "Не вдалося опублікувати коментар.",
       "couldNotSubmitReview": "Не вдалося надіслати огляд. Перевірте з'єднання та спробуйте ще раз."
+    },
+    "operation": {
+      "couldNotReply": "Не вдалося відповісти.",
+      "couldNotCompleteAction": "Не вдалося завершити цю дію.",
+      "mergeResultDefaultError": "GitHub не завершив злиття."
     }
   },
   "organization": {
@@ -2850,7 +2938,17 @@
       "emptyTitle": "Немає активності кредитів",
       "expires": "Спливає {{date}}",
       "title": "Активність кредитів",
-      "transactionFallback": "Транзакція кредитів"
+      "transactionFallback": "Транзакція кредитів",
+      "category": {
+        "organization_custom": "Спеціальний для організації",
+        "parent_to_child_transfer_in": "Переказ від батьківської організації до дочірньої (вхід)",
+        "parent_to_child_transfer_out": "Переказ від батьківської організації до дочірньої (вихід)",
+        "oss-sponsorship": "Спонсорство OSS",
+        "oss-monthly-reset": "Щомісячне скидання OSS",
+        "team-topup-bonus-2025": "Командний бонус поповнення 2025",
+        "accounting_adjustment": "Бухгалтерське коригування",
+        "credits_expired": "Термін дії кредитів минув"
+      }
     },
     "hub": {
       "balance": "Баланс",
@@ -2877,11 +2975,16 @@
       "emptyTitle": "Немає рахунків",
       "invoiceFallback": "Рахунок",
       "title": "Рахунки",
-      "statusPaid": "Сплачено",
-      "statusOpen": "Відкрито",
-      "statusVoid": "Анульовано",
       "downloadFailed": "Не вдалося завантажити рахунок. Перевірте з'єднання та спробуйте ще раз.",
-      "sharingUnavailable": "Поширення недоступне на цьому пристрої."
+      "sharingUnavailable": "Поширення недоступне на цьому пристрої.",
+      "status": {
+        "paid": "Сплачено",
+        "open": "Відкрито",
+        "void": "Анульовано",
+        "draft": "Чернетка",
+        "uncollectible": "Безнадійний",
+        "unknown": "Невідомо"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2983,7 +3086,8 @@
     "promptTitle": "Як вам застосунок Kilo?",
     "rateKilo": "Оцінити Kilo",
     "sorryMessage": "Розкажіть, що варто покращити. Інженер, відповідальний за застосунок, читає кожен звіт!",
-    "sorryTitle": "Нам шкода це чути!"
+    "sorryTitle": "Нам шкода це чути!",
+    "emailSubject": "відгук про мобільний застосунок"
   },
   "authErrors": {
     "emailAlreadyUsed": "Обліковий запис із цією електронною поштою вже існує з іншим способом входу. Спробуйте інший спосіб або скористайтеся пунктом «$t(login.moreSignInOptions)».",
@@ -3013,6 +3117,15 @@
   "models": {
     "dataCollected": "Зібрані дані",
     "free": "Безкоштовно",
-    "couldNotUpdateFavorites": "Не вдалося оновити обрані"
+    "couldNotUpdateFavorites": "Не вдалося оновити обрані",
+    "thinkingEffort": {
+      "none": "Немає",
+      "minimal": "Мінімальний",
+      "low": "Низький",
+      "medium": "Середній",
+      "high": "Високий",
+      "xhigh": "Дуже високий",
+      "max": "Максимальний"
+    }
   }
 }

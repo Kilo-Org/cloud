@@ -580,7 +580,10 @@
     "diff": {
       "selectedTapToChange": "Atlasīts {{label}}, pieskarieties, lai mainītu atlasi",
       "tapToComment": "{{label}}, pieskarieties, lai komentētu",
-      "truncationBanner": "Tiek rādīti pirmie {{limit}} no {{total}} mainītajiem failiem — GitHub API ierobežojums"
+      "truncationBanner": "Tiek rādīti pirmie {{limit}} no {{total}} mainītajiem failiem — GitHub API ierobežojums",
+      "statusAdded": "Pievienots",
+      "statusContext": "Konteksts",
+      "statusDeleted": "Dzēsts"
     },
     "linkPasteClipboardEmpty": "Starpliktuve ir tukša",
     "linkPasteNotAPullRequest": "Nav GitHub pieprasījuma saite",
@@ -594,6 +597,11 @@
       "reviewNotSubmitted": "Šo pārskatu nevar iesniegt tādu, kāds tas ir. PR, iespējams, ir mainījies, vai arī jūs nevarat pārskatīt savu pull request.",
       "couldNotPostComment": "Neizdevās publicēt komentāru.",
       "couldNotSubmitReview": "Neizdevās iesniegt pārskatu. Pārbaudiet savienojumu un mēģiniet vēlreiz."
+    },
+    "operation": {
+      "couldNotReply": "Neizdevās atbildēt.",
+      "couldNotCompleteAction": "Neizdevās pabeigt šo darbību.",
+      "mergeResultDefaultError": "GitHub nepabeidza apvienošanu."
     }
   },
   "notifications": {
@@ -829,7 +837,11 @@
       "paymentPastDue": "Maksājums ir nokavēts. Lūdzu, atjauniniet savu maksājuma metodi.",
       "subscriptionCancels": "Abonements tiek atcelts {{date}}",
       "trialDaysRemaining": "Izmēģinājums: {{remaining}}",
-      "trialEndingSoon": "Izmēģinājums beidzas drīz: {{remaining}}"
+      "trialEndingSoon": "Izmēģinājums beidzas drīz: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Kas jauns",
@@ -1198,7 +1210,8 @@
       "strongArm": "Spēcīga roka",
       "talisman": "Talismans"
     },
-    "remoteSpawnFilesNotSupported": "Šī instance nevar saņemt failus."
+    "remoteSpawnFilesNotSupported": "Šī instance nevar saņemt failus.",
+    "instanceSwitcherTitle": "KiloClaw instance"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1396,7 +1409,60 @@
       "failed": "Neizdevās",
       "cancelled": "Atcelts",
       "interrupted": "Pārtraukts"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Stingrs",
+      "balanced": "Līdzsvarots",
+      "lenient": "Pieļaujošs",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Drošība",
+      "performance": "Veiktspēja",
+      "bugs": "Kļūdas",
+      "style": "Stils",
+      "testing": "Testēšana",
+      "documentation": "Dokumentācija"
+    },
+    "gateThreshold": {
+      "off": "Izslēgts",
+      "all": "Visi",
+      "warning": "Brīdinājumi",
+      "critical": "Kritiski"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Koda pārskatītājam nepieciešama uzmanība",
+        "description": "Koda pārskatītājs tika atspējots, jo Kilo nevar piekļūt šim repozitorijam ar aktīvu GitHub lietotnes instalāciju. Atjauniniet GitHub lietotnes instalāciju, pēc tam iespējojiet Koda pārskatītāju vēlreiz.",
+        "recoveryLabel": "Atjaunināt GitHub lietotni"
+      },
+      "githubIpAllowList": {
+        "title": "Koda pārskatītājam nepieciešama uzmanība",
+        "description": "Koda pārskatītājs tika atspējots, jo šī GitHub organizācija izmanto IP atļauto sarakstu, kas bloķē Kilo. Sazinieties ar hi@kilocode.ai, pēc tam iespējojiet Koda pārskatītāju vēlreiz.",
+        "recoveryLabel": "Sazināties ar atbalstu"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Koda pārskatītājam nepieciešama uzmanība",
+        "description": "Koda pārskatītājs tika atspējots, jo Kilo nevar izveidot GitLab projekta piekļuves pilnvaru šim projektam. Piešķiriet Maintainer piekļuvi vai iespējojiet projekta piekļuves pilnvaras, pēc tam iespējojiet Koda pārskatītāju vēlreiz.",
+        "recoveryLabel": "Atjaunināt GitLab integrāciju"
+      },
+      "byokInvalidKey": {
+        "title": "Koda pārskatītājam nepieciešama uzmanība",
+        "description": "Koda pārskatītājs tika atspējots, jo atlasītā BYOK API atslēga ir nederīga, atsaukta vai tai trūkst atļaujas. Atjauniniet atslēgu vai izvēlieties citu modeli, pēc tam iespējojiet Koda pārskatītāju vēlreiz.",
+        "recoveryLabel": "Atjaunināt BYOK iestatījumus"
+      },
+      "selectedModelUnavailable": {
+        "title": "Koda pārskatītājam nepieciešama uzmanība",
+        "description": "Koda pārskatītājs tika atspējots, jo atlasītais modelis nav pieejams Cloud Agent sesijām. Izvēlieties pieejamu modeli, pēc tam iespējojiet Koda pārskatītāju vēlreiz.",
+        "recoveryLabel": "Atjaunināt Koda pārskatītāja iestatījumus"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Koda pārskatītājam nepieciešama uzmanība",
+        "description": "Koda pārskatītājs tika atspējots pēc trim repozitorija klonēšanas noildzēm šodien. Sazinieties ar hi@kilocode.ai, pēc tam iespējojiet Koda pārskatītāju vēlreiz.",
+        "recoveryLabel": "Sazināties ar atbalstu"
+      }
+    },
+    "unknownError": "Nezināma kļūda"
   },
   "securityAgent": {
     "filter": {
@@ -1940,6 +2006,23 @@
       "belowThreshold": "Atradums ir zem automātiskās smaguma sliekšņa. Manuālā labošana joprojām var sākties, kad drošības vārti ir izturēti.",
       "beforeEnablement": "Analīze pabeigta pirms automātiskās labošanas iespējošanas. Manuālā labošana joprojām var sākties, kad drošības vārti ir izturēti.",
       "generic": "Labošana nav pieejama šim atradumam."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Analīzes kapacitāte ir pilna. Pagaidiet, līdz aktīvā analīze beidzas, pēc tam mēģiniet vēlreiz.",
+      "githubTokenUnavailable": "GitHub autorizācijai nepieciešama uzmanība. Atkārtoti autorizējiet GitHub lietotni, pēc tam mēģiniet vēlreiz.",
+      "githubAuthInvalid": "GitHub autorizācijai nepieciešama uzmanība. Atkārtoti autorizējiet GitHub lietotni, pēc tam mēģiniet vēlreiz.",
+      "findingUnavailable": "Atradums vairs nav pieejams. Atsvaidziniet atradumus un mēģiniet vēlreiz, ja tas paliek atvērts.",
+      "repositoryUnavailable": "Repozitorijs vairs nav pieejams GitHub lietotnei. Atsvaidziniet repozitorija piekļuvi, pēc tam mēģiniet vēlreiz.",
+      "invalidDismissTarget": "Atradumu nevar noraidīt, jo tā Dependabot mērķis ir nederīgs.",
+      "commandStalled": "Rindā esošā darbība nepabeidzās laikā. Mēģiniet darbību vēlreiz.",
+      "queueRetriesExhausted": "Darbību nevarēja pabeigt pēc vairākiem mēģinājumiem. Mēģiniet darbību vēlreiz.",
+      "queueAdmissionFailed": "Rindā esošo darbību nevarēja pieņemt. Mēģiniet darbību vēlreiz.",
+      "generic": "Rindā esošā darbība neizdevās. Mēģiniet darbību vēlreiz."
+    },
+    "analysisMode": {
+      "auto": "Auto",
+      "shallow": "Seķla",
+      "deep": "Dziļa"
     }
   },
   "agents": {
@@ -2409,7 +2492,8 @@
       "addToFavorites": "Pievienot {{name}} izlasei",
       "removeFromFavorites": "Noņemt {{name}} no izlases",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Vid"
+      "thinkingEffortMedium": "Vid",
+      "sessionModel": "Sesijas modelis"
     },
     "attachmentPreview": {
       "openFailedRetry": "Neizdevās atvērt failu. Lūdzu, mēģini vēlreiz.",
@@ -2542,7 +2626,8 @@
   },
   "addCredits": {
     "cta": "Pievienot kredītus",
-    "description": "Pievieno kredītus, lai lietojums turpinātos."
+    "description": "Pievieno kredītus, lai lietojums turpinātos.",
+    "billingPage": "norēķinu lapa"
   },
   "deviceSessions": {
     "couldNotLoad": "Neizdevās ielādēt sesijas",
@@ -2730,7 +2815,10 @@
     "restoreFailed": "Neizdevās atjaunot pirkumus. Mēģiniet vēlreiz.",
     "purchaseFailed": "Neizdevās pabeigt pirkumu.",
     "purchaseStartFailed": "Neizdevās sākt App Store pirkumu.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass šajā Apple kontā pieder citam Kilo kontam."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass šajā Apple kontā pieder citam Kilo kontam.",
+    "couldNotConnectToAppStore": "Neizdevās savienoties ar App Store. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
+    "noMatchingProducts": "App Store neatgrieza atbilstošus Kilo Pass produktus.",
+    "purchaseMissingSignedTransaction": "App Store pirkums neietvēra parakstītu darījuma JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2826,7 +2914,8 @@
     "needsWork": "Vajag uzlabojumus",
     "sorryTitle": "Mums ir žēl to dzirdēt!",
     "sorryMessage": "Lūdzu, ļauj mums uzzināt, kas jāuzlabo. Inženieris, kurš atbild par lietotni, izlasa katru ziņojumu!",
-    "emailUs": "Raksti mums"
+    "emailUs": "Raksti mums",
+    "emailSubject": "mobilās lietotnes atsauksme"
   },
   "organization": {
     "boundary": {
@@ -2843,7 +2932,17 @@
       "emptyTitle": "Nav kredītu aktivitātes",
       "expires": "Beidzas {{date}}",
       "title": "Kredītu aktivitāte",
-      "transactionFallback": "Kredīta darījums"
+      "transactionFallback": "Kredīta darījums",
+      "category": {
+        "organization_custom": "Organizācijas pielāgotais",
+        "parent_to_child_transfer_in": "Pārskaitījums no vecāka bērnam (ienākošais)",
+        "parent_to_child_transfer_out": "Pārskaitījums no vecāka bērnam (izejošais)",
+        "oss-sponsorship": "OSS sponsorēšana",
+        "oss-monthly-reset": "OSS ikmēneša atiestatīšana",
+        "team-topup-bonus-2025": "Komandas papildinājuma bonuss 2025",
+        "accounting_adjustment": "Grāmatvedības korekcija",
+        "credits_expired": "Kredīti beigušies"
+      }
     },
     "inviteMember": {
       "emailError": "Ievadi derīgu e-pasta adresi",
@@ -2860,12 +2959,17 @@
       "emptyDescription": "Rēķini tiek ģenerēti automātiski katrā norēķinu ciklā un parādīsies šeit, kad tava organizācija tiks norēķināta.",
       "emptyTitle": "Nav rēķinu",
       "invoiceFallback": "Rēķins",
-      "statusOpen": "Atvērts",
-      "statusPaid": "Apmaksāts",
-      "statusVoid": "Anulēts",
       "title": "Rēķini",
       "downloadFailed": "Neizdevās lejupielādēt rēķinu. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
-      "sharingUnavailable": "Kopīgošana šajā ierīcē nav pieejama."
+      "sharingUnavailable": "Kopīgošana šajā ierīcē nav pieejama.",
+      "status": {
+        "paid": "Apmaksāts",
+        "open": "Atvērts",
+        "void": "Anulēts",
+        "draft": "Melnraksts",
+        "uncollectible": "Nepiedzenams",
+        "unknown": "Nezināms"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2992,6 +3096,15 @@
   "models": {
     "dataCollected": "Apkopotie dati",
     "free": "Bezmaksas",
-    "couldNotUpdateFavorites": "Neizdevās atjaunināt izlasi"
+    "couldNotUpdateFavorites": "Neizdevās atjaunināt izlasi",
+    "thinkingEffort": {
+      "none": "Nav",
+      "minimal": "Minimāla",
+      "low": "Zema",
+      "medium": "Vidēja",
+      "high": "Augsta",
+      "xhigh": "Īpaši augsta",
+      "max": "Maksimāla"
+    }
   }
 }

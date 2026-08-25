@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} انتخاب شد، برای تغییر انتخاب ضربه بزنید",
       "tapToComment": "{{label}}، برای نظر ضربه بزنید",
-      "truncationBanner": "نمایش {{limit}} فایل اول از {{total}} فایل تغییر یافته — سقف API گیتهاب"
+      "truncationBanner": "نمایش {{limit}} فایل اول از {{total}} فایل تغییر یافته — سقف API گیتهاب",
+      "statusAdded": "افزوده شده",
+      "statusContext": "زمینه",
+      "statusDeleted": "حذف شده"
     },
     "linkPasteClipboardEmpty": "کلیپبورد خالی است",
     "linkPasteNotAPullRequest": "این پیوند درخواست کشش GitHub نیست",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "این بازبینی در وضعیت فعلی قابل ارسال نیست. ممکن است PR تغییر کرده باشد یا نتوانید درخواست pull خودتان را بازبینی کنید.",
       "couldNotPostComment": "ارسال نظر ممکن نشد.",
       "couldNotSubmitReview": "ارسال بازبینی ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید."
+    },
+    "operation": {
+      "couldNotReply": "پاسخ ممکن نشد.",
+      "couldNotCompleteAction": "تکمیل این عمل ممکن نشد.",
+      "mergeResultDefaultError": "GitHub ادغام را تکمیل نکرد."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "پرداخت معوق است. لطفاً روش پرداخت خود را به‌روزرسانی کنید.",
       "subscriptionCancels": "اشتراک در {{date}} لغو می‌شود",
       "trialDaysRemaining": "آزمایشی: {{remaining}} باقی‌مانده",
-      "trialEndingSoon": "به زودی پایان آزمایشی: {{remaining}}"
+      "trialEndingSoon": "به زودی پایان آزمایشی: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "چه خبر",
@@ -1189,7 +1201,8 @@
       "strongArm": "بازوی قوی",
       "talisman": "طلسم"
     },
-    "remoteSpawnFilesNotSupported": "این نمونه نمی‌تواند فایل دریافت کند."
+    "remoteSpawnFilesNotSupported": "این نمونه نمی‌تواند فایل دریافت کند.",
+    "instanceSwitcherTitle": "نمونهٔ KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "شکست خورد",
       "cancelled": "لغو شد",
       "interrupted": "قطع شد"
-    }
+    },
+    "reviewStyle": {
+      "strict": "سخت‌گیرانه",
+      "balanced": "متعادل",
+      "lenient": "سهل‌گیر",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "امنیت",
+      "performance": "عملکرد",
+      "bugs": "باگ‌ها",
+      "style": "سبک",
+      "testing": "تست",
+      "documentation": "مستندات"
+    },
+    "gateThreshold": {
+      "off": "خاموش",
+      "all": "همه",
+      "warning": "هشدار",
+      "critical": "بحرانی"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "بررسی‌کننده کد نیاز به توجه دارد",
+        "description": "بررسی‌کننده کد غیرفعال شد، زیرا Kilo نمی‌تواند با نصب فعال GitHub App به این مخزن دسترسی پیدا کند. نصب GitHub App را به‌روزرسانی کنید، سپس دوباره بررسی‌کننده کد را فعال کنید.",
+        "recoveryLabel": "به‌روزرسانی GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "بررسی‌کننده کد نیاز به توجه دارد",
+        "description": "بررسی‌کننده کد غیرفعال شد، زیرا این سازمان GitHub از فهرست مجاز IP استفاده می‌کند که Kilo را مسدود می‌کند. برای کمک با hi@kilocode.ai تماس بگیرید، سپس دوباره بررسی‌کننده کد را فعال کنید.",
+        "recoveryLabel": "تماس با پشتیبانی"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "بررسی‌کننده کد نیاز به توجه دارد",
+        "description": "بررسی‌کننده کد غیرفعال شد، زیرا Kilo نمی‌تواند برای این پروژه Token دسترسی پروژه GitLab ایجاد کند. دسترسی نگهدارنده را اعطا کنید یا Tokenهای دسترسی پروژه را فعال کنید، سپس دوباره بررسی‌کننده کد را فعال کنید.",
+        "recoveryLabel": "به‌روزرسانی یکپارچه‌سازی GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "بررسی‌کننده کد نیاز به توجه دارد",
+        "description": "بررسی‌کننده کد غیرفعال شد، زیرا کلید API BYOK انتخاب‌شده نامعتبر، لغو شده یا فاقد مجوز است. کلید را به‌روزرسانی کنید یا مدل دیگری انتخاب کنید، سپس دوباره بررسی‌کننده کد را فعال کنید.",
+        "recoveryLabel": "به‌روزرسانی تنظیمات BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "بررسی‌کننده کد نیاز به توجه دارد",
+        "description": "بررسی‌کننده کد غیرفعال شد، زیرا مدل انتخاب‌شده برای جلسات عامل ابری در دسترس نیست. یک مدل در دسترس انتخاب کنید، سپس دوباره بررسی‌کننده کد را فعال کنید.",
+        "recoveryLabel": "به‌روزرسانی تنظیمات بررسی‌کننده کد"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "بررسی‌کننده کد نیاز به توجه دارد",
+        "description": "بررسی‌کننده کد پس از سه وقفهٔ مهلت شبیه‌سازی مخزن امروز غیرفعال شد. برای کمک با hi@kilocode.ai تماس بگیرید، سپس دوباره بررسی‌کننده کد را فعال کنید.",
+        "recoveryLabel": "تماس با پشتیبانی"
+      }
+    },
+    "unknownError": "خطای ناشناخته"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "یافته زیر آستانهٔ شدت خودکار است. اصلاح دستی همچنان می‌تواند وقتی دروازه‌های امنیتی عبور کنند شروع شود.",
       "beforeEnablement": "تحلیل قبل از فعال‌سازی اصلاح خودکار کامل شد. اصلاح دستی همچنان می‌تواند وقتی دروازه‌های امنیتی عبور کنند شروع شود.",
       "generic": "اصلاح برای این یافته در دسترس نیست."
+    },
+    "commandFailure": {
+      "ownerCapReached": "ظرفیت تحلیل کامل است. صبر کنید تا تحلیل فعال پایان یابد، سپس دوباره تلاش کنید.",
+      "githubTokenUnavailable": "مجوز GitHub نیاز به توجه دارد. GitHub App را دوباره مجاز کنید، سپس دوباره تلاش کنید.",
+      "githubAuthInvalid": "مجوز GitHub نیاز به توجه دارد. GitHub App را دوباره مجاز کنید، سپس دوباره تلاش کنید.",
+      "findingUnavailable": "یافته دیگر در دسترس نیست. یافته‌ها را تازه‌سازی کنید و اگر همچنان باز است، دوباره تلاش کنید.",
+      "repositoryUnavailable": "مخزن دیگر برای GitHub App در دسترس نیست. دسترسی به مخزن را تازه‌سازی کنید، سپس دوباره تلاش کنید.",
+      "invalidDismissTarget": "یافته را نمی‌توان رد کرد، زیرا هدف Dependabot آن نامعتبر است.",
+      "commandStalled": "عمل در صف به‌موقع تمام نشد. عمل را دوباره تلاش کنید.",
+      "queueRetriesExhausted": "پس از چند بار تلاش، عمل تکمیل نشد. عمل را دوباره تلاش کنید.",
+      "queueAdmissionFailed": "عمل در صف پذیرفته نشد. عمل را دوباره تلاش کنید.",
+      "generic": "عمل در صف ناموفق بود. عمل را دوباره تلاش کنید."
+    },
+    "analysisMode": {
+      "auto": "خودکار",
+      "shallow": "سطحی",
+      "deep": "عمیق"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "افزودن {{name}} به موارد دلخواه",
       "removeFromFavorites": "حذف {{name}} از موارد دلخواه",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "متوسط"
+      "thinkingEffortMedium": "متوسط",
+      "sessionModel": "مدل جلسه"
     },
     "attachmentPreview": {
       "openFailedRetry": "باز کردن فایل ناموفق بود. لطفاً دوباره تلاش کنید.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "افزودن اعتبار",
-    "description": "برای ادامه استفاده، اعتبار اضافه کنید."
+    "description": "برای ادامه استفاده، اعتبار اضافه کنید.",
+    "billingPage": "صفحه صورتحساب"
   },
   "deviceSessions": {
     "couldNotLoad": "جلسات بارگذاری نشدند",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "بازیابی خریدها ممکن نشد. دوباره تلاش کنید.",
     "purchaseFailed": "تکمیل خرید ممکن نشد.",
     "purchaseStartFailed": "شروع خرید App Store ممکن نشد.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass روی این Apple Account متعلق به یک حساب Kilo دیگر است."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass روی این Apple Account متعلق به یک حساب Kilo دیگر است.",
+    "couldNotConnectToAppStore": "اتصال به App Store ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+    "noMatchingProducts": "App Store هیچ محصول منطبقی از Kilo Pass برنگرداند.",
+    "purchaseMissingSignedTransaction": "خرید App Store شامل تراکنش امضاشدهٔ JWS نبود."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "نیاز به بهبود دارد",
     "sorryTitle": "از شنیدن این متأسفیم!",
     "sorryMessage": "لطفاً به ما اطلاع دهید چه چیزی باید بهتر شود. مهندس مسئول برنامه هر گزارش را می‌خواند!",
-    "emailUs": "برای ما ایمیل بفرستید"
+    "emailUs": "برای ما ایمیل بفرستید",
+    "emailSubject": "بازخورد برنامه موبایل"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "فعالیت اعتباری نیست",
       "expires": "انقضا در {{date}}",
       "title": "فعالیت اعتباری",
-      "transactionFallback": "تراکنش اعتباری"
+      "transactionFallback": "تراکنش اعتباری",
+      "category": {
+        "organization_custom": "سفارشی سازمان",
+        "parent_to_child_transfer_in": "انتقال از والد به فرزند (ورودی)",
+        "parent_to_child_transfer_out": "انتقال از والد به فرزند (خروجی)",
+        "oss-sponsorship": "حمایت مالی OSS",
+        "oss-monthly-reset": "بازنشانی ماهانه OSS",
+        "team-topup-bonus-2025": "پاداش شارژ تیم 2025",
+        "accounting_adjustment": "تعدیل حسابداری",
+        "credits_expired": "اعتبارها منقضی شدند"
+      }
     },
     "inviteMember": {
       "emailError": "یک آدرس ایمیل معتبر وارد کنید",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "فاکتورها به‌صورت خودکار در هر چرخه صورتحساب تولید می‌شوند و پس از صدور صورتحساب سازمان شما در اینجا ظاهر می‌شوند.",
       "emptyTitle": "فاکتوری نیست",
       "invoiceFallback": "فاکتور",
-      "statusOpen": "باز",
-      "statusPaid": "پرداخت شده",
-      "statusVoid": "باطل",
       "title": "فاکتورها",
       "downloadFailed": "دانلود فاکتور ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
-      "sharingUnavailable": "اشتراک‌گذاری در این دستگاه در دسترس نیست."
+      "sharingUnavailable": "اشتراک‌گذاری در این دستگاه در دسترس نیست.",
+      "status": {
+        "paid": "پرداخت شده",
+        "open": "باز",
+        "void": "باطل",
+        "draft": "پیش‌نویس",
+        "uncollectible": "وصول‌نشدنی",
+        "unknown": "ناشناخته"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "دادههای جمعآوریشده",
     "free": "رایگان",
-    "couldNotUpdateFavorites": "به‌روزرسانی موردعلاقه‌ها ممکن نشد"
+    "couldNotUpdateFavorites": "به‌روزرسانی موردعلاقه‌ها ممکن نشد",
+    "thinkingEffort": {
+      "none": "هیچ",
+      "minimal": "حداقلی",
+      "low": "کم",
+      "medium": "متوسط",
+      "high": "زیاد",
+      "xhigh": "خیلی زیاد",
+      "max": "حداکثر"
+    }
   }
 }

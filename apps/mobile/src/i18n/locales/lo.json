@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "ເລືອກ {{label}}, ແຕະເພື່ອປ່ຽນການເລືອກ",
       "tapToComment": "{{label}}, ແຕະເພື່ອໃສ່ຄຳເຫັນ",
-      "truncationBanner": "ກຳລັງສະແດງ {{limit}} ທຳອິດຈາກ {{total}} ໄຟລ໌ທີ່ປ່ຽນແປງ — ຂີດຈຳກັດ GitHub API"
+      "truncationBanner": "ກຳລັງສະແດງ {{limit}} ທຳອິດຈາກ {{total}} ໄຟລ໌ທີ່ປ່ຽນແປງ — ຂີດຈຳກັດ GitHub API",
+      "statusAdded": "ເພີ່ມແລ້ວ",
+      "statusContext": "ບໍລິບົດ",
+      "statusDeleted": "ລຶບແລ້ວ"
     },
     "linkPasteClipboardEmpty": "ຄລິບບອດວ່າງເປົ່າ",
     "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງ pull request ຂອງ GitHub",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "ການກວດສອບນີ້ບໍ່ສາມາດສົ່ງຕາມສະພາບປັດຈຸບັນໄດ້. PR ອາດປ່ຽນໄປ, ຫຼື ທ່ານບໍ່ສາມາດກວດສອບ pull request ຂອງຕົວເອງໄດ້.",
       "couldNotPostComment": "ບໍ່ສາມາດໂພສຄຳເຫັນໄດ້.",
       "couldNotSubmitReview": "ບໍ່ສາມາດສົ່ງການກວດສອບໄດ້. ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ ແລະ ລອງອີກຄັ້ງ."
+    },
+    "operation": {
+      "couldNotReply": "ບໍ່ສາມາດຕອບໄດ້.",
+      "couldNotCompleteAction": "ບໍ່ສາມາດເຮັດການກະທຳນີ້ໃຫ້ສຳເລັດໄດ້.",
+      "mergeResultDefaultError": "GitHub ບໍ່ໄດ້ເຮັດການ merge ໃຫ້ສຳເລັດ."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "ການຈ່າຍເງິນເກີນກຳນົດ. ກະລຸນາອັບເດດວິທີການຈ່າຍເງິນຂອງທ່ານ.",
       "subscriptionCancels": "ສະມາຊິກຈະຖືກຍົກເລີກໃນ {{date}}",
       "trialDaysRemaining": "ທົດລອງ: {{remaining}} ເຫຼືອ",
-      "trialEndingSoon": "ທົດລອງຈະສິ້ນສຸດອີກບໍ່ດົນ: {{remaining}}"
+      "trialEndingSoon": "ທົດລອງຈະສິ້ນສຸດອີກບໍ່ດົນ: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "ມີອັນໃໝ່ຫຍັງ",
@@ -1189,7 +1201,8 @@
       "strongArm": "Strong arm",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "instance ນີ້ບໍ່ສາມາດຮັບໄຟລ໌ໄດ້."
+    "remoteSpawnFilesNotSupported": "instance ນີ້ບໍ່ສາມາດຮັບໄຟລ໌ໄດ້.",
+    "instanceSwitcherTitle": "KiloClaw ອິນສະແຕນ"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "ລົ້ມເຫຼວ",
       "cancelled": "ຖືກຍົກເລີກ",
       "interrupted": "ຖືກຂັດຈັງ"
-    }
+    },
+    "reviewStyle": {
+      "strict": "ເຄັ່ງຄັດ",
+      "balanced": "ສົມດຸນ",
+      "lenient": "ຜ່ອນຜັນ",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "ຄວາມປອດໄພ",
+      "performance": "ປະສິດທິພາບ",
+      "bugs": "ບັກ",
+      "style": "ຮູບແບບ",
+      "testing": "ການທົດສອບ",
+      "documentation": "ເອກະສານ"
+    },
+    "gateThreshold": {
+      "off": "ປິດ",
+      "all": "ທັງໝົດ",
+      "warning": "ຄຳເຕືອນ",
+      "critical": "ສຳຄັນ"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer ຕ້ອງການຄວາມເອົາໃຈໃສ່",
+        "description": "Code Reviewer ຖືກປິດໃຊ້ງານ ເພາະ Kilo ບໍ່ສາມາດເຂົ້າເຖິງບ່ອນເກັບລະຫັດນີ້ດ້ວຍການຕິດຕັ້ງ GitHub App ທີ່ເຄື່ອນໄຫວ. ອັບເດດການຕິດຕັ້ງ GitHub App, ແລ້ວເປີດໃຊ້ Code Reviewer ອີກຄັ້ງ.",
+        "recoveryLabel": "ອັບເດດ GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer ຕ້ອງການຄວາມເອົາໃຈໃສ່",
+        "description": "Code Reviewer ຖືກປິດໃຊ້ງານ ເພາະອົງກອນ GitHub ນີ້ໃຊ້ລາຍຊື່ອະນຸຍາດ IP ທີ່ກັ້ນ Kilo. ຕິດຕໍ່ hi@kilocode.ai ເພື່ອຂໍຄວາມຊ່ວຍເຫຼືອ, ແລ້ວເປີດໃຊ້ Code Reviewer ອີກຄັ້ງ.",
+        "recoveryLabel": "ຕິດຕໍ່ຝ່າຍສະໜັບສະໜູນ"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer ຕ້ອງການຄວາມເອົາໃຈໃສ່",
+        "description": "Code Reviewer ຖືກປິດໃຊ້ງານ ເພາະ Kilo ບໍ່ສາມາດສ້າງ GitLab Project Access Token ສຳລັບໂຄງການນີ້. ໃຫ້ສິດ Maintainer ຫຼື ເປີດໃຊ້ Project Access Tokens, ແລ້ວເປີດໃຊ້ Code Reviewer ອີກຄັ້ງ.",
+        "recoveryLabel": "ອັບເດດການເຊື່ອມຕໍ່ GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer ຕ້ອງການຄວາມເອົາໃຈໃສ່",
+        "description": "Code Reviewer ຖືກປິດໃຊ້ງານ ເພາະປຸ່ມ API BYOK ທີ່ເລືອກໄວ້ບໍ່ຖືກຕ້ອງ, ຖືກເພີ່ງ, ຫຼື ຂາດສິດ. ອັບເດດປຸ່ມ ຫຼື ເລືອກຮູບແບບອື່ນ, ແລ້ວເປີດໃຊ້ Code Reviewer ອີກຄັ້ງ.",
+        "recoveryLabel": "ອັບເດດການຕັ້ງຄ່າ BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer ຕ້ອງການຄວາມເອົາໃຈໃສ່",
+        "description": "Code Reviewer ຖືກປິດໃຊ້ງານ ເພາະຮູບແບບທີ່ເລືອກບໍ່ມີສຳລັບເຊດຊັນ cloud agent. ເລືອກຮູບແບບທີ່ມີ, ແລ້ວເປີດໃຊ້ Code Reviewer ອີກຄັ້ງ.",
+        "recoveryLabel": "ອັບເດດການຕັ້ງຄ່າ Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer ຕ້ອງການຄວາມເອົາໃຈໃສ່",
+        "description": "Code Reviewer ຖືກປິດໃຊ້ງານຫຼັງຈາກເວລາສຳເນົາບ່ອນເກັບລະຫັດໝົດ 3 ຄັ້ງໃນມື້ນີ້. ຕິດຕໍ່ hi@kilocode.ai ເພື່ອຂໍຄວາມຊ່ວຍເຫຼືອ, ແລ້ວເປີດໃຊ້ Code Reviewer ອີກຄັ້ງ.",
+        "recoveryLabel": "ຕິດຕໍ່ຝ່າຍສະໜັບສະໜູນ"
+      }
+    },
+    "unknownError": "ຂໍ້ຜິດພາດທີ່ບໍ່ຮູ້ຈັກ"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "ການກວດພົບຕ່ຳກວ່າຂອບເຂດຄວາມຮ້າຍແຮງອັດຕະໂນມັດ. ການແກ້ໄຂດ້ວຍມືຍັງສາມາດເລີ່ມໄດ້ເມື່ອຜ່ານເກນຄວາມປອດໄພ.",
       "beforeEnablement": "ການວິເຄາະສຳເລັດກ່ອນການແກ້ໄຂອັດຕະໂນມັດຈະຖືກເປີດໃຊ້. ການແກ້ໄຂດ້ວຍມືຍັງສາມາດເລີ່ມໄດ້ເມື່ອຜ່ານເກນຄວາມປອດໄພ.",
       "generic": "ການແກ້ໄຂບໍ່ສາມາດໃຊ້ໄດ້ສຳລັບການກວດພົບນີ້."
+    },
+    "commandFailure": {
+      "ownerCapReached": "ຄວາມສາມາດວິເຄາະເຕັມ. ລໍຖ້າການວິເຄາະທີ່ກຳລັງດຳເນີນການຢູ່ໃຫ້ສຳເລັດ, ແລ້ວລອງໃໝ່.",
+      "githubTokenUnavailable": "ການອະນຸຍາດ GitHub ຕ້ອງການຄວາມເອົາໃຈໃສ່. ອະນຸຍາດ GitHub App ໃໝ່, ແລ້ວລອງໃໝ່.",
+      "githubAuthInvalid": "ການອະນຸຍາດ GitHub ຕ້ອງການຄວາມເອົາໃຈໃສ່. ອະນຸຍາດ GitHub App ໃໝ່, ແລ້ວລອງໃໝ່.",
+      "findingUnavailable": "ການຄົ້ນພົບບໍ່ມີອີກແລ້ວ. ໂຫຼດການຄົ້ນພົບຄືນ ແລະ ລອງໃໝ່ຖ້າຍັງເປີດຢູ່.",
+      "repositoryUnavailable": "ບ່ອນເກັບລະຫັດບໍ່ມີສຳລັບ GitHub App ອີກຕໍ່ໄປ. ໂຫຼດການເຂົ້າເຖິງບ່ອນເກັບລະຫັດຄືນ, ແລ້ວລອງໃໝ່.",
+      "invalidDismissTarget": "ບໍ່ສາມາດຍົກເລີກການຄົ້ນພົບໄດ້ ເພາະເປົ້າໝາຍ Dependabot ຂອງມັນບໍ່ຖືກຕ້ອງ.",
+      "commandStalled": "ການກະທຳທີ່ລໍຖ້າຢູ່ບໍ່ສຳເລັດທັນເວລາ. ລອງການກະທຳອີກ.",
+      "queueRetriesExhausted": "ບໍ່ສາມາດເຮັດການກະທຳໃຫ້ສຳເລັດໄດ້ຫຼັງຈາກພະຍາຍາມຫຼາຍຄັ້ງ. ລອງການກະທຳອີກ.",
+      "queueAdmissionFailed": "ບໍ່ສາມາດຮັບການກະທຳທີ່ລໍຖ້າຢູ່ໄດ້. ລອງການກະທຳອີກ.",
+      "generic": "ການກະທຳທີ່ລໍຖ້າຢູ່ລົ້ມເຫຼວ. ລອງການກະທຳອີກ."
+    },
+    "analysisMode": {
+      "auto": "ອັດຕະໂນມັດ",
+      "shallow": "ຕື້ນ",
+      "deep": "ເລິກ"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "ເພີ່ມ {{name}} ໃສ່ລາຍການທີ່ມັກ",
       "removeFromFavorites": "ລຶບ {{name}} ອອກຈາກລາຍການທີ່ມັກ",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "ຮູບແບບເຊດຊັນ"
     },
     "attachmentPreview": {
       "openFailedRetry": "ບໍ່ສາມາດເປີດໄຟລ໌. ກະລຸນາລອງອີກ.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "ເພີ່ມເຄຣດິດ",
-    "description": "ເພີ່ມເຄຣດິດເພື່ອຮັກສາການໃຊ້ງານ."
+    "description": "ເພີ່ມເຄຣດິດເພື່ອຮັກສາການໃຊ້ງານ.",
+    "billingPage": "ໜ້າການອອກບິນ"
   },
   "deviceSessions": {
     "couldNotLoad": "ບໍ່ສາມາດໂຫລດເຊດຊັນ",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "ການກູ້ຄືນການຊື້ລົ້ມເຫລວ. ລອງອີກຄັ້ງ.",
     "purchaseFailed": "ການເຮັດການຊື້ໃຫ້ສຳເລັດລົ້ມເຫລວ.",
     "purchaseStartFailed": "ການເລີ່ມການຊື້ App Store ລົ້ມເຫລວ.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass ໃນ Apple Account ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass ໃນ Apple Account ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ.",
+    "couldNotConnectToAppStore": "ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບ App Store ໄດ້. ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ ແລະ ລອງອີກຄັ້ງ.",
+    "noMatchingProducts": "App Store ບໍ່ໄດ້ສົ່ງຄືນສິນຄ້າ Kilo Pass ທີ່ກົງກັນ.",
+    "purchaseMissingSignedTransaction": "ການຊື້ App Store ບໍ່ໄດ້ລວມມີ JWS ລາຍການທີ່ມີລາຍເຊັນ."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "ຕ້ອງປັບປຸງ",
     "sorryTitle": "ຂໍໂທດທີ່ໄດ້ຍິນ!",
     "sorryMessage": "ກະລຸນາແຈ້ງໃຫ້ເຮົາຮູ້ສິ່ງທີ່ຕ້ອງດີຂຶ້ນ. ວິສະວະກອນທີ່ຮັບຜິດຊອບແອັບອ່ານທຸກລາຍງານ!",
-    "emailUs": "ສົ່ງອີເມວຫາເຮົາ"
+    "emailUs": "ສົ່ງອີເມວຫາເຮົາ",
+    "emailSubject": "ຄຳຕິຊົມແອັບມືຖື"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "ບໍ່ມີກິດຈະກຳເຄຣດິດ",
       "expires": "ໝົດອາຍຸ {{date}}",
       "title": "ກິດຈະກຳເຄຣດິດ",
-      "transactionFallback": "ລາຍການເຄຣດິດ"
+      "transactionFallback": "ລາຍການເຄຣດິດ",
+      "category": {
+        "organization_custom": "ອົງກອນກຳນົດເອງ",
+        "parent_to_child_transfer_in": "ໂອນເຂົ້າຈາກພໍ່ແມ່ຫາລູກ",
+        "parent_to_child_transfer_out": "ໂອນອອກຈາກພໍ່ແມ່ຫາລູກ",
+        "oss-sponsorship": "ການສະໜັບສະໜູນ OSS",
+        "oss-monthly-reset": "ການຕັ້ງຄ່າລາຍເດືອນ OSS",
+        "team-topup-bonus-2025": "ໂບນັດເຕີມເງິນທີມ 2025",
+        "accounting_adjustment": "ການປັບບັນຊີ",
+        "credits_expired": "ເຄຣດິດໝົດອາຍຸ"
+      }
     },
     "inviteMember": {
       "emailError": "ໃສ່ທີ່ຢູ່ອີເມວທີ່ຖືກຕ້ອງ",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "ໃບແຈ້ງຫນີ້ຖືກສ້າງອັດຕະໂນມັດທຸກຮອບການຄິດໄລ່ ແລະ ຈະປະກົດຢູ່ທີ່ນີ້ເມື່ອອົງກອນຂອງທ່ານຖືກຄິດໄລ່.",
       "emptyTitle": "ບໍ່ມີໃບແຈ້ງຫນີ້",
       "invoiceFallback": "ໃບແຈ້ງຫນີ້",
-      "statusOpen": "ເປີດ",
-      "statusPaid": "ຊຳລະແລ້ວ",
-      "statusVoid": "ຍົກເລີກ",
       "title": "ໃບແຈ້ງຫນີ້",
       "downloadFailed": "ບໍ່ສາມາດດາວໂຫລດໃບແຈ້ງຫນີ້ໄດ້. ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ ແລະ ລອງອີກຄັ້ງ.",
-      "sharingUnavailable": "ການແບ່ງປັນບໍ່ມີໃນອຸປະກອນນີ້."
+      "sharingUnavailable": "ການແບ່ງປັນບໍ່ມີໃນອຸປະກອນນີ້.",
+      "status": {
+        "paid": "ຊຳລະແລ້ວ",
+        "open": "ເປີດ",
+        "void": "ຍົກເລີກ",
+        "draft": "ຮ່າງ",
+        "uncollectible": "ເກັບບໍ່ໄດ້",
+        "unknown": "ບໍ່ຮູ້"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "ຂໍ້ມູນທີ່ເກັບກຳ",
     "free": "ຟຣີ",
-    "couldNotUpdateFavorites": "ບໍ່ສາມາດອັບເດດລາຍການທີ່ມັກໄດ້"
+    "couldNotUpdateFavorites": "ບໍ່ສາມາດອັບເດດລາຍການທີ່ມັກໄດ້",
+    "thinkingEffort": {
+      "none": "ບໍ່ມີ",
+      "minimal": "ໜ້ອຍທີ່ສຸດ",
+      "low": "ຕໍ່າ",
+      "medium": "ປານກາງ",
+      "high": "ສູງ",
+      "xhigh": "ສູງພິເສດ",
+      "max": "ສູງສຸດ"
+    }
   }
 }

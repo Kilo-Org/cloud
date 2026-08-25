@@ -580,7 +580,10 @@
     "diff": {
       "selectedTapToChange": "Selectat {{label}}, atinge pentru a schimba selecția",
       "tapToComment": "{{label}}, atinge pentru a comenta",
-      "truncationBanner": "Se afișează primele {{limit}} din {{total}} fișiere modificate — limita API GitHub"
+      "truncationBanner": "Se afișează primele {{limit}} din {{total}} fișiere modificate — limita API GitHub",
+      "statusAdded": "Adăugat",
+      "statusContext": "Context",
+      "statusDeleted": "Șters"
     },
     "linkPasteClipboardEmpty": "Clipboard-ul este gol",
     "linkPasteNotAPullRequest": "Nu este un link de pull request GitHub",
@@ -594,6 +597,11 @@
       "reviewNotSubmitted": "Această revizuire nu poate fi trimisă așa cum este. PR-ul s-ar putea să se fi schimbat, sau nu poți revizui propriul tău pull request.",
       "couldNotPostComment": "Nu s-a putut posta comentariul.",
       "couldNotSubmitReview": "Nu s-a putut trimite revizuirea. Verifică conexiunea și încearcă din nou."
+    },
+    "operation": {
+      "couldNotReply": "Nu s-a putut răspunde.",
+      "couldNotCompleteAction": "Nu s-a putut finaliza această acțiune.",
+      "mergeResultDefaultError": "GitHub nu a finalizat fuzionarea."
     }
   },
   "notifications": {
@@ -829,7 +837,11 @@
       "paymentPastDue": "Plată întârziată. Te rugăm să actualizezi metoda de plată.",
       "subscriptionCancels": "Abonamentul se anulează pe {{date}}",
       "trialDaysRemaining": "Perioadă de probă: {{remaining}} rămase",
-      "trialEndingSoon": "Perioada de probă se încheie curând: {{remaining}}"
+      "trialEndingSoon": "Perioada de probă se încheie curând: {{remaining}}",
+      "planName": {
+        "commit": "Angajare",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Ce e nou",
@@ -1198,7 +1210,8 @@
       "strongArm": "Braț puternic",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Această instanță nu poate primi fișiere."
+    "remoteSpawnFilesNotSupported": "Această instanță nu poate primi fișiere.",
+    "instanceSwitcherTitle": "Instanță KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1396,7 +1409,60 @@
       "failed": "Eșuat",
       "cancelled": "Anulat",
       "interrupted": "Întrerupt"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Strict",
+      "balanced": "Echilibrat",
+      "lenient": "Îngăduitor",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Securitate",
+      "performance": "Performanță",
+      "bugs": "Bug-uri",
+      "style": "Stil",
+      "testing": "Testare",
+      "documentation": "Documentație"
+    },
+    "gateThreshold": {
+      "off": "Dezactivat",
+      "all": "Toate",
+      "warning": "Avertisment",
+      "critical": "Critic"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer are nevoie de atenție",
+        "description": "Code Reviewer a fost dezactivat deoarece Kilo nu poate accesa acest depozit cu o instalare activă a aplicației GitHub. Actualizează instalarea aplicației GitHub, apoi activează din nou Code Reviewer.",
+        "recoveryLabel": "Actualizează aplicația GitHub"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer are nevoie de atenție",
+        "description": "Code Reviewer a fost dezactivat deoarece această organizație GitHub folosește o listă de IP-uri permise care blochează Kilo. Contactează hi@kilocode.ai pentru ajutor, apoi activează din nou Code Reviewer.",
+        "recoveryLabel": "Contactează asistența"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer are nevoie de atenție",
+        "description": "Code Reviewer a fost dezactivat deoarece Kilo nu poate crea un GitLab Project Access Token pentru acest proiect. Acordă acces de Maintainer sau activează Project Access Tokens, apoi activează din nou Code Reviewer.",
+        "recoveryLabel": "Actualizează integrarea GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer are nevoie de atenție",
+        "description": "Code Reviewer a fost dezactivat deoarece cheia API BYOK selectată este invalidă, revocată sau nu are permisiune. Actualizează cheia sau alege alt model, apoi activează din nou Code Reviewer.",
+        "recoveryLabel": "Actualizează setările BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer are nevoie de atenție",
+        "description": "Code Reviewer a fost dezactivat deoarece modelul selectat nu este disponibil pentru sesiunile de cloud agent. Alege un model disponibil, apoi activează din nou Code Reviewer.",
+        "recoveryLabel": "Actualizează setările Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer are nevoie de atenție",
+        "description": "Code Reviewer a fost dezactivat după trei timeout-uri de clonare a depozitului astăzi. Contactează hi@kilocode.ai pentru ajutor, apoi activează din nou Code Reviewer.",
+        "recoveryLabel": "Contactează asistența"
+      }
+    },
+    "unknownError": "Eroare necunoscută"
   },
   "securityAgent": {
     "filter": {
@@ -1940,6 +2006,23 @@
       "belowThreshold": "Constatarea este sub pragul automat de severitate. Remedierea manuală poate începe totuși când verificările de siguranță trec.",
       "beforeEnablement": "Analiza s-a finalizat înainte ca auto-remedierea să fie activată. Remedierea manuală poate începe totuși când verificările de siguranță trec.",
       "generic": "Remedierea nu este disponibilă pentru această constatare."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Capacitatea de analiză este plină. Așteaptă finalizarea unei analize active, apoi reîncearcă.",
+      "githubTokenUnavailable": "Autorizarea GitHub necesită atenție. Autorizează din nou aplicația GitHub, apoi reîncearcă.",
+      "githubAuthInvalid": "Autorizarea GitHub necesită atenție. Autorizează din nou aplicația GitHub, apoi reîncearcă.",
+      "findingUnavailable": "Constatarea nu mai este disponibilă. Reîmprospătează constatările și reîncearcă dacă rămâne deschisă.",
+      "repositoryUnavailable": "Depozitul nu mai este disponibil pentru aplicația GitHub. Reîmprospătează accesul la depozit, apoi reîncearcă.",
+      "invalidDismissTarget": "Constatarea nu poate fi eliminată deoarece ținta sa Dependabot este invalidă.",
+      "commandStalled": "Acțiunea în coadă nu s-a finalizat la timp. Reîncearcă acțiunea.",
+      "queueRetriesExhausted": "Acțiunea nu a putut fi finalizată după mai multe încercări. Reîncearcă acțiunea.",
+      "queueAdmissionFailed": "Acțiunea în coadă nu a putut fi acceptată. Reîncearcă acțiunea.",
+      "generic": "Acțiunea în coadă a eșuat. Reîncearcă acțiunea."
+    },
+    "analysisMode": {
+      "auto": "Auto",
+      "shallow": "Superficială",
+      "deep": "Profundă"
     }
   },
   "agents": {
@@ -2409,7 +2492,8 @@
       "addToFavorites": "Adaugă {{name}} la favorite",
       "removeFromFavorites": "Elimină {{name}} din favorite",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Modelul sesiunii"
     },
     "attachmentPreview": {
       "openFailedRetry": "Fișierul nu a putut fi deschis. Încearcă din nou.",
@@ -2542,7 +2626,8 @@
   },
   "addCredits": {
     "cta": "Adaugă credite",
-    "description": "Adaugă credite pentru a menține utilizarea activă."
+    "description": "Adaugă credite pentru a menține utilizarea activă.",
+    "billingPage": "pagina de facturare"
   },
   "deviceSessions": {
     "couldNotLoad": "Sesiunile nu au putut fi încărcate",
@@ -2730,7 +2815,10 @@
     "restoreFailed": "Restaurarea achizițiilor a eșuat. Încearcă din nou.",
     "purchaseFailed": "Finalizarea achiziției a eșuat.",
     "purchaseStartFailed": "Nu s-a putut începe achiziția din App Store.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass de pe acest Apple Account aparține unui alt cont Kilo."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass de pe acest Apple Account aparține unui alt cont Kilo.",
+    "couldNotConnectToAppStore": "Nu s-a putut conecta la App Store. Verifică conexiunea și încearcă din nou.",
+    "noMatchingProducts": "App Store nu a returnat produse Kilo Pass corespunzătoare.",
+    "purchaseMissingSignedTransaction": "Achiziția din App Store nu a inclus o tranzacție semnată JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2826,7 +2914,8 @@
     "needsWork": "Trebuie îmbunătățit",
     "sorryTitle": "Ne pare rău să auzim asta!",
     "sorryMessage": "Te rugăm să ne spui ce trebuie îmbunătățit. Inginerul responsabil de aplicație citește fiecare raport!",
-    "emailUs": "Trimite-ne un email"
+    "emailUs": "Trimite-ne un email",
+    "emailSubject": "feedback despre aplicația mobilă"
   },
   "organization": {
     "boundary": {
@@ -2843,7 +2932,17 @@
       "emptyTitle": "Nicio activitate de credite",
       "expires": "Expiră {{date}}",
       "title": "Activitate de credite",
-      "transactionFallback": "Tranzacție de credite"
+      "transactionFallback": "Tranzacție de credite",
+      "category": {
+        "organization_custom": "Personalizat organizație",
+        "parent_to_child_transfer_in": "Transfer primit de la organizația părinte",
+        "parent_to_child_transfer_out": "Transfer trimis către organizația copil",
+        "oss-sponsorship": "Sponsorizare OSS",
+        "oss-monthly-reset": "Resetare lunară OSS",
+        "team-topup-bonus-2025": "Bonus pentru reîncărcarea echipei 2025",
+        "accounting_adjustment": "Ajustare contabilă",
+        "credits_expired": "Credite expirate"
+      }
     },
     "inviteMember": {
       "emailError": "Introdu o adresă de email validă",
@@ -2860,12 +2959,17 @@
       "emptyDescription": "Facturile sunt generate automat la fiecare ciclu de facturare și vor apărea aici odată ce organizația ta este facturată.",
       "emptyTitle": "Nicio factură",
       "invoiceFallback": "Factură",
-      "statusOpen": "Deschisă",
-      "statusPaid": "Plătită",
-      "statusVoid": "Anulată",
       "title": "Facturi",
       "downloadFailed": "Factura nu a putut fi descărcată. Verifică conexiunea și încearcă din nou.",
-      "sharingUnavailable": "Distribuirea nu este disponibilă pe acest dispozitiv."
+      "sharingUnavailable": "Distribuirea nu este disponibilă pe acest dispozitiv.",
+      "status": {
+        "paid": "Plătită",
+        "open": "Deschisă",
+        "void": "Anulată",
+        "draft": "Ciornă",
+        "uncollectible": "Neîncasabilă",
+        "unknown": "Necunoscut"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2992,6 +3096,15 @@
   "models": {
     "dataCollected": "Date colectate",
     "free": "Gratuit",
-    "couldNotUpdateFavorites": "Nu s-au putut actualiza favoritele"
+    "couldNotUpdateFavorites": "Nu s-au putut actualiza favoritele",
+    "thinkingEffort": {
+      "none": "Niciunul",
+      "minimal": "Minimal",
+      "low": "Scăzut",
+      "medium": "Mediu",
+      "high": "Ridicat",
+      "xhigh": "Extra ridicat",
+      "max": "Maxim"
+    }
   }
 }

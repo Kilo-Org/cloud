@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} tanlandi, tanlovni o'zgartirish uchun bosing",
       "tapToComment": "{{label}}, izoh qoldirish uchun bosing",
-      "truncationBanner": "Jami {{total}} ta o'zgartirilgan fayldan dastlabki {{limit}} tasi ko'rsatilmoqda — GitHub API chegarasi"
+      "truncationBanner": "Jami {{total}} ta o'zgartirilgan fayldan dastlabki {{limit}} tasi ko'rsatilmoqda — GitHub API chegarasi",
+      "statusAdded": "Qo'shildi",
+      "statusContext": "Kontekst",
+      "statusDeleted": "O'chirildi"
     },
     "linkPasteClipboardEmpty": "Vaqtinchalik xotira bo‘sh",
     "linkPasteNotAPullRequest": "Bu GitHub pull request havolasi emas",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Bu sharhni xuddi shunday yuborib bo'lmaydi. PR o'zgargan bo'lishi mumkin yoki siz o'z pull requestingizni ko'rib chiqa olmaysiz.",
       "couldNotPostComment": "Izoh joylashtirib bo'lmadi.",
       "couldNotSubmitReview": "Sharhni yuborib bo'lmadi. Ulanishingizni tekshiring va qayta urinib ko'ring."
+    },
+    "operation": {
+      "couldNotReply": "Javob bera olmadi.",
+      "couldNotCompleteAction": "Bu amalni yakunlab bo'lmadi.",
+      "mergeResultDefaultError": "GitHub birlashtirishni yakunlamadi."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "To'lov muddati o'tgan. Iltimos, to'lov usulini yangilang.",
       "subscriptionCancels": "Obuna {{date}} da bekor qilinadi",
       "trialDaysRemaining": "Sinov: {{remaining}} kun qoldi",
-      "trialEndingSoon": "Sinov tugamoqda: {{remaining}}"
+      "trialEndingSoon": "Sinov tugamoqda: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Nima yangi",
@@ -1189,7 +1201,8 @@
       "strongArm": "Kuchli qo'l",
       "talisman": "Tumor"
     },
-    "remoteSpawnFilesNotSupported": "Bu instansiya fayllarni qabul qila olmaydi."
+    "remoteSpawnFilesNotSupported": "Bu instansiya fayllarni qabul qila olmaydi.",
+    "instanceSwitcherTitle": "KiloClaw instansiyasi"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Amalga oshmadi",
       "cancelled": "Bekor qilindi",
       "interrupted": "Uzildi"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Qattiq",
+      "balanced": "Balanslangan",
+      "lenient": "Yumshoq",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Xavfsizlik",
+      "performance": "Ishlash",
+      "bugs": "Xatolar",
+      "style": "Uslub",
+      "testing": "Testlash",
+      "documentation": "Hujjatlar"
+    },
+    "gateThreshold": {
+      "off": "O'chirilgan",
+      "all": "Barchasi",
+      "warning": "Ogohlantirish",
+      "critical": "Muhim"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Kod ko'rib chiquvchisi e'tibor talab qiladi",
+        "description": "Kod ko'rib chiquvchisi o'chirildi, chunki Kilo faol GitHub App o'rnatmasi bilan bu repozitoriyaga kira olmaydi. GitHub App o'rnatmasini yangilang, so'ng Kod ko'rib chiquvchisini qayta yoqing.",
+        "recoveryLabel": "GitHub App'ni yangilash"
+      },
+      "githubIpAllowList": {
+        "title": "Kod ko'rib chiquvchisi e'tibor talab qiladi",
+        "description": "Kod ko'rib chiquvchisi o'chirildi, chunki bu GitHub tashkiloti Kiloni bloklaydigan IP ruxsat ro'yxatidan foydalanadi. Yordam uchun hi@kilocode.ai ga murojaat qiling, so'ng Kod ko'rib chiquvchisini qayta yoqing.",
+        "recoveryLabel": "Qo'llab-quvvatlash bilan bog'lanish"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Kod ko'rib chiquvchisi e'tibor talab qiladi",
+        "description": "Kod ko'rib chiquvchisi o'chirildi, chunki Kilo bu loyiha uchun GitLab Project Access Token yarata olmaydi. Maintainer kirishini bering yoki Project Access Tokenlarni yoqing, so'ng Kod ko'rib chiquvchisini qayta yoqing.",
+        "recoveryLabel": "GitLab integratsiyasini yangilash"
+      },
+      "byokInvalidKey": {
+        "title": "Kod ko'rib chiquvchisi e'tibor talab qiladi",
+        "description": "Kod ko'rib chiquvchisi o'chirildi, chunki tanlangan BYOK API kaliti noto'g'ri, bekor qilingan yoki ruxsatsiz. Kalitni yangilang yoki boshqa modelni tanlang, so'ng Kod ko'rib chiquvchisini qayta yoqing.",
+        "recoveryLabel": "BYOK sozlamalarini yangilash"
+      },
+      "selectedModelUnavailable": {
+        "title": "Kod ko'rib chiquvchisi e'tibor talab qiladi",
+        "description": "Kod ko'rib chiquvchisi o'chirildi, chunki tanlangan model cloud agent seanslari uchun mavjud emas. Mavjud modelni tanlang, so'ng Kod ko'rib chiquvchisini qayta yoqing.",
+        "recoveryLabel": "Kod ko'rib chiquvchisi sozlamalarini yangilash"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Kod ko'rib chiquvchisi e'tibor talab qiladi",
+        "description": "Kod ko'rib chiquvchisi bugun uch marta repozitoriy klonlash muddati tugagach o'chirildi. Yordam uchun hi@kilocode.ai ga murojaat qiling, so'ng Kod ko'rib chiquvchisini qayta yoqing.",
+        "recoveryLabel": "Qo'llab-quvvatlash bilan bog'lanish"
+      }
+    },
+    "unknownError": "Noma'lum xato"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Natija avtomatik jiddiylik chegarasidan past. Xavfsizlik shlyuzlari o'tganda qo'lda bartaraf etish hali ham boshlanishi mumkin.",
       "beforeEnablement": "Tahlil Avto tuzatish yoqilishidan oldin yakunlandi. Xavfsizlik shlyuzlari o'tganda qo'lda bartaraf etish hali ham boshlanishi mumkin.",
       "generic": "Bartaraf etish ushbu natija uchun mavjud emas."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Tahlil sig'imi to'la. Faol tahlil tugashini kuting, so'ng qayta urinib ko'ring.",
+      "githubTokenUnavailable": "GitHub avtorizatsiyasi e'tibor talab qiladi. GitHub App'ni qayta avtorizatsiya qiling, so'ng qayta urinib ko'ring.",
+      "githubAuthInvalid": "GitHub avtorizatsiyasi e'tibor talab qiladi. GitHub App'ni qayta avtorizatsiya qiling, so'ng qayta urinib ko'ring.",
+      "findingUnavailable": "Topilma endi mavjud emas. Topilmalarni yangilang va u ochiq bo'lib qolsa, qayta urinib ko'ring.",
+      "repositoryUnavailable": "Repozitoriya GitHub App uchun endi mavjud emas. Repozitoriya kirishini yangilang, so'ng qayta urinib ko'ring.",
+      "invalidDismissTarget": "Topilmani rad etib bo'lmaydi, chunki uning Dependabot maqsadi noto'g'ri.",
+      "commandStalled": "Navbatdagi amal o'z vaqtida tugamadi. Amalni qayta urinib ko'ring.",
+      "queueRetriesExhausted": "Amalni bir necha urinishdan keyin ham yakunlab bo'lmadi. Amalni qayta urinib ko'ring.",
+      "queueAdmissionFailed": "Navbatdagi amalni qabul qilib bo'lmadi. Amalni qayta urinib ko'ring.",
+      "generic": "Navbatdagi amal amalga oshmadi. Amalni qayta urinib ko'ring."
+    },
+    "analysisMode": {
+      "auto": "Avto",
+      "shallow": "Sayoz",
+      "deep": "Chuqur"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "{{name}} sevimlilarga qo'shish",
       "removeFromFavorites": "{{name}} sevimlilardan olib tashlash",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Seans modeli"
     },
     "attachmentPreview": {
       "openFailedRetry": "Faylni ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Kreditlar qo'shish",
-    "description": "Foydalanishni davom ettirish uchun kreditlar qo'shing."
+    "description": "Foydalanishni davom ettirish uchun kreditlar qo'shing.",
+    "billingPage": "to'lov sahifasi"
   },
   "deviceSessions": {
     "couldNotLoad": "Sessiyalarni yuklab bo'lmadi",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Xaridlarni tiklab bo'lmadi. Qayta urinib ko'ring.",
     "purchaseFailed": "Xaridni yakunlab bo'lmadi.",
     "purchaseStartFailed": "App Store xaridini boshlab bo'lmadi.",
-    "purchaseOwnedByAnotherAccount": "Bu Apple hisobidagi Kilo Pass boshqa Kilo hisobiga tegishli."
+    "purchaseOwnedByAnotherAccount": "Bu Apple hisobidagi Kilo Pass boshqa Kilo hisobiga tegishli.",
+    "couldNotConnectToAppStore": "App Store'ga ulanib bo'lmadi. Ulanishingizni tekshiring va qayta urinib ko'ring.",
+    "noMatchingProducts": "App Store tomonidan mos Kilo Pass mahsulotlari qaytarilmadi.",
+    "purchaseMissingSignedTransaction": "App Store xaridi imzolangan tranzaksiya JWS'ini o'z ichiga olmadi."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Yaxshilash kerak",
     "sorryTitle": "Buni eshitganimizdan afsusdamiz!",
     "sorryMessage": "Iltimos, nimani yaxshilash kerakligini aytib bering. Ilova uchun mas'ul muhandis har bir hisobotni o'qiydi!",
-    "emailUs": "Bizga email yozing"
+    "emailUs": "Bizga email yozing",
+    "emailSubject": "mobil ilova fikr-mulohazasi"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Kredit faoliyati yo'q",
       "expires": "{{date}} da tugaydi",
       "title": "Kredit faoliyati",
-      "transactionFallback": "Kredit tranzaksiyasi"
+      "transactionFallback": "Kredit tranzaksiyasi",
+      "category": {
+        "organization_custom": "Tashkilot maxsus",
+        "parent_to_child_transfer_in": "Ota tashkilotdan bolaga kiruvchi o'tkazma",
+        "parent_to_child_transfer_out": "Ota tashkilotdan bolaga chiquvchi o'tkazma",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Buxgalteriya tuzatmasi",
+        "credits_expired": "Kreditlar muddati tugadi"
+      }
     },
     "inviteMember": {
       "emailError": "To'g'ri email manzil kiriting",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Fakturalar har bir to'lov sikli avtomatik ravishda yaratiladi va tashkilotingiz hisoblanishi bilan shu yerda ko'rinadi.",
       "emptyTitle": "Fakturalar yo'q",
       "invoiceFallback": "Faktura",
-      "statusOpen": "Ochiq",
-      "statusPaid": "To'langan",
-      "statusVoid": "Bekor qilingan",
       "title": "Fakturalar",
       "downloadFailed": "Hisob-fakturani yuklab bo'lmadi. Ulanishingizni tekshiring va qayta urinib ko'ring.",
-      "sharingUnavailable": "Bu qurilmada ulashish mavjud emas."
+      "sharingUnavailable": "Bu qurilmada ulashish mavjud emas.",
+      "status": {
+        "paid": "To'langan",
+        "open": "Ochiq",
+        "void": "Bekor qilingan",
+        "draft": "Qoralama",
+        "uncollectible": "Undirib bo'lmaydigan",
+        "unknown": "Noma'lum"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Yig‘ilgan ma’lumotlar",
     "free": "Bepul",
-    "couldNotUpdateFavorites": "Sevimlilarni yangilab bo'lmadi"
+    "couldNotUpdateFavorites": "Sevimlilarni yangilab bo'lmadi",
+    "thinkingEffort": {
+      "none": "Yo'q",
+      "minimal": "Minimal",
+      "low": "Past",
+      "medium": "O'rta",
+      "high": "Yuqori",
+      "xhigh": "Juda yuqori",
+      "max": "Maksimal"
+    }
   }
 }

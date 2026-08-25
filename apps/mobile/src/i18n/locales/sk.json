@@ -587,7 +587,10 @@
     "diff": {
       "selectedTapToChange": "Vybrané {{label}}, klepnutím zmeníte výber",
       "tapToComment": "{{label}}, klepnutím komentujete",
-      "truncationBanner": "Zobrazuje sa prvých {{limit}} z {{total}} zmenených súborov — limit GitHub API"
+      "truncationBanner": "Zobrazuje sa prvých {{limit}} z {{total}} zmenených súborov — limit GitHub API",
+      "statusAdded": "Pridané",
+      "statusContext": "Kontext",
+      "statusDeleted": "Vymazané"
     },
     "linkPasteClipboardEmpty": "Schránka je prázdna",
     "linkPasteNotAPullRequest": "Nie je to odkaz na GitHub pull request",
@@ -601,6 +604,11 @@
       "reviewNotSubmitted": "Túto kontrolu nemožno odoslať v tejto podobe. PR sa mohol zmeniť alebo nemôžete kontrolovať vlastný pull request.",
       "couldNotPostComment": "Komentár sa nepodarilo odoslať.",
       "couldNotSubmitReview": "Kontrolu sa nepodarilo odoslať. Skontrolujte pripojenie a skúste to znova."
+    },
+    "operation": {
+      "couldNotReply": "Nepodarilo sa odpovedať.",
+      "couldNotCompleteAction": "Túto akciu sa nepodarilo dokončiť.",
+      "mergeResultDefaultError": "GitHub nedokončil zlúčenie."
     }
   },
   "notifications": {
@@ -837,7 +845,11 @@
       "paymentPastDue": "Platba je po splatnosti. Aktualizujte svoj spôsob platby.",
       "subscriptionCancels": "Predplatné sa ruší {{date}}",
       "trialDaysRemaining": "Skúšobné obdobie: zostáva {{remaining}} dní",
-      "trialEndingSoon": "Skúšobné obdobie sa čoskoro končí: {{remaining}}"
+      "trialEndingSoon": "Skúšobné obdobie sa čoskoro končí: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Čo je nové",
@@ -1207,7 +1219,8 @@
       "strongArm": "Silné rameno",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Táto inštancia nemôže prijímať súbory."
+    "remoteSpawnFilesNotSupported": "Táto inštancia nemôže prijímať súbory.",
+    "instanceSwitcherTitle": "Inštancia KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1405,7 +1418,60 @@
       "failed": "Zlyhalo",
       "cancelled": "Zrušené",
       "interrupted": "Prerušené"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Prísny",
+      "balanced": "Vyvážený",
+      "lenient": "Zhovievavý",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Bezpečnosť",
+      "performance": "Výkon",
+      "bugs": "Chyby",
+      "style": "Štýl",
+      "testing": "Testovanie",
+      "documentation": "Dokumentácia"
+    },
+    "gateThreshold": {
+      "off": "Vypnuté",
+      "all": "Všetko",
+      "warning": "Upozornenia",
+      "critical": "Kritické"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer vyžaduje pozornosť",
+        "description": "Code Reviewer bol zakázaný, pretože Kilo nemá prístup k tomuto repozitáru s aktívnou inštaláciou GitHub aplikácie. Aktualizujte inštaláciu GitHub aplikácie a potom znova povoľte Code Reviewer.",
+        "recoveryLabel": "Aktualizovať GitHub aplikáciu"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer vyžaduje pozornosť",
+        "description": "Code Reviewer bol zakázaný, pretože táto GitHub organizácia používa zoznam povolených IP adries, ktorý blokuje Kilo. Požiadajte o pomoc na hi@kilocode.ai a potom znova povoľte Code Reviewer.",
+        "recoveryLabel": "Kontaktovať podporu"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer vyžaduje pozornosť",
+        "description": "Code Reviewer bol zakázaný, pretože Kilo nemôže vytvoriť token na prístup k projektu GitLab pre tento projekt. Udeľte prístup Maintainer alebo povoľte tokeny na prístup k projektom a potom znova povoľte Code Reviewer.",
+        "recoveryLabel": "Aktualizovať integráciu GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer vyžaduje pozornosť",
+        "description": "Code Reviewer bol zakázaný, pretože vybraný BYOK API kľúč je neplatný, odvolaný alebo nemá povolenia. Aktualizujte kľúč alebo vyberte iný model a potom znova povoľte Code Reviewer.",
+        "recoveryLabel": "Aktualizovať nastavenia BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer vyžaduje pozornosť",
+        "description": "Code Reviewer bol zakázaný, pretože vybraný model nie je dostupný pre relácie cloud agenta. Vyberte dostupný model a potom znova povoľte Code Reviewer.",
+        "recoveryLabel": "Aktualizovať nastavenia Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer vyžaduje pozornosť",
+        "description": "Code Reviewer bol zakázaný po troch dnešných prekročeniach časového limitu klonovania repozitára. Požiadajte o pomoc na hi@kilocode.ai a potom znova povoľte Code Reviewer.",
+        "recoveryLabel": "Kontaktovať podporu"
+      }
+    },
+    "unknownError": "Neznáma chyba"
   },
   "securityAgent": {
     "filter": {
@@ -1953,6 +2019,23 @@
       "belowThreshold": "Nález je pod prahom automatickej závažnosti. Manuálna náprava sa môže stále spustiť, keď prejdú bezpečnostné brány.",
       "beforeEnablement": "Analýza sa dokončila pred povolením Auto nápravy. Manuálna náprava sa môže stále spustiť, keď prejdú bezpečnostné brány.",
       "generic": "Náprava nie je pre tento nález dostupná."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Kapacita analýzy je plná. Počkajte, kým sa dokončí aktívna analýza, a potom to skúste znova.",
+      "githubTokenUnavailable": "Autorizácia GitHub vyžaduje pozornosť. Znova autorizujte GitHub aplikáciu a potom to skúste znova.",
+      "githubAuthInvalid": "Autorizácia GitHub vyžaduje pozornosť. Znova autorizujte GitHub aplikáciu a potom to skúste znova.",
+      "findingUnavailable": "Nález už nie je dostupný. Obnovte nálezy a ak zostane otvorený, skúste to znova.",
+      "repositoryUnavailable": "Repozitár už nie je dostupný pre GitHub aplikáciu. Obnovte prístup k repozitáru a potom to skúste znova.",
+      "invalidDismissTarget": "Nález nemožno zamietnuť, pretože jeho cieľ Dependabot je neplatný.",
+      "commandStalled": "Zaradená akcia sa nedokončila včas. Zopakujte akciu.",
+      "queueRetriesExhausted": "Akciu sa po niekoľkých pokusoch nepodarilo dokončiť. Zopakujte akciu.",
+      "queueAdmissionFailed": "Zaradenú akciu sa nepodarilo prijať. Zopakujte akciu.",
+      "generic": "Zaradená akcia zlyhala. Zopakujte akciu."
+    },
+    "analysisMode": {
+      "auto": "Automaticky",
+      "shallow": "Plytká",
+      "deep": "Hlboká"
     }
   },
   "agents": {
@@ -2428,7 +2511,8 @@
       "addToFavorites": "Pridať {{name}} do obľúbených",
       "removeFromFavorites": "Odstrániť {{name}} z obľúbených",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Model sedenia"
     },
     "attachmentPreview": {
       "openFailedRetry": "Súbor sa nepodarilo otvoriť. Skúste to znova.",
@@ -2562,7 +2646,8 @@
   },
   "addCredits": {
     "cta": "Pridať kredity",
-    "description": "Pridajte kredity, aby využívanie pokračovalo."
+    "description": "Pridajte kredity, aby využívanie pokračovalo.",
+    "billingPage": "fakturačná stránka"
   },
   "deviceSessions": {
     "couldNotLoad": "Relácie sa nepodarilo načítať",
@@ -2750,7 +2835,10 @@
     "restoreFailed": "Obnovenie nákupov zlyhalo. Skúste to znova.",
     "purchaseFailed": "Nákup sa nepodarilo dokončiť.",
     "purchaseStartFailed": "Nákup v App Store sa nepodarilo spustiť.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass na tomto Apple Account patrí inému účtu Kilo."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass na tomto Apple Account patrí inému účtu Kilo.",
+    "couldNotConnectToAppStore": "Nepodarilo sa pripojiť k App Store. Skontrolujte pripojenie a skúste to znova.",
+    "noMatchingProducts": "App Store nevrátil žiadne zodpovedajúce produkty Kilo Pass.",
+    "purchaseMissingSignedTransaction": "Nákup v App Store neobsahoval podpísanú transakciu JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2846,7 +2934,8 @@
     "needsWork": "Treba vylepšiť",
     "sorryTitle": "Mrzí nás, že to počujeme!",
     "sorryMessage": "Dajte nám prosím vedieť, čo treba zlepšiť. Inžinier zodpovedný za aplikáciu číta každé jednotlivé hlásenie!",
-    "emailUs": "Napíšte nám e-mail"
+    "emailUs": "Napíšte nám e-mail",
+    "emailSubject": "spätná väzba k mobilnej aplikácii"
   },
   "organization": {
     "boundary": {
@@ -2863,7 +2952,17 @@
       "emptyTitle": "Žiadna aktivita kreditov",
       "expires": "Platnosť končí {{date}}",
       "title": "Aktivita kreditov",
-      "transactionFallback": "Kreditná transakcia"
+      "transactionFallback": "Kreditná transakcia",
+      "category": {
+        "organization_custom": "Vlastná organizácia",
+        "parent_to_child_transfer_in": "Prijatý prevod z materskej organizácie",
+        "parent_to_child_transfer_out": "Odoslaný prevod do dcérskej organizácie",
+        "oss-sponsorship": "Sponzorstvo OSS",
+        "oss-monthly-reset": "Mesačný reset OSS",
+        "team-topup-bonus-2025": "Tímový bonus za doplnenie kreditov 2025",
+        "accounting_adjustment": "Účtovná úprava",
+        "credits_expired": "Kredity vypršali"
+      }
     },
     "inviteMember": {
       "emailError": "Zadajte platnú e-mailovú adresu",
@@ -2880,12 +2979,17 @@
       "emptyDescription": "Faktúry sa generujú automaticky každý fakturačný cyklus a objavia sa tu, keď bude vaša organizácia vyfakturovaná.",
       "emptyTitle": "Žiadne faktúry",
       "invoiceFallback": "Faktúra",
-      "statusOpen": "Otvorená",
-      "statusPaid": "Zaplatená",
-      "statusVoid": "Neplatná",
       "title": "Faktúry",
       "downloadFailed": "Faktúru sa nepodarilo stiahnuť. Skontrolujte pripojenie a skúste to znova.",
-      "sharingUnavailable": "Zdieľanie nie je na tomto zariadení dostupné."
+      "sharingUnavailable": "Zdieľanie nie je na tomto zariadení dostupné.",
+      "status": {
+        "paid": "Zaplatená",
+        "open": "Otvorená",
+        "void": "Neplatná",
+        "draft": "Koncept",
+        "uncollectible": "Nevymožiteľná",
+        "unknown": "Neznáme"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3013,6 +3117,15 @@
   "models": {
     "dataCollected": "Zhromaždené údaje",
     "free": "Zadarmo",
-    "couldNotUpdateFavorites": "Obľúbené sa nepodarilo aktualizovať"
+    "couldNotUpdateFavorites": "Obľúbené sa nepodarilo aktualizovať",
+    "thinkingEffort": {
+      "none": "Žiadna",
+      "minimal": "Minimálna",
+      "low": "Nízka",
+      "medium": "Stredná",
+      "high": "Vysoká",
+      "xhigh": "Veľmi vysoká",
+      "max": "Maximálna"
+    }
   }
 }

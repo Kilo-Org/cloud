@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Сонгосон {{label}}, сонголтыг өөрчлөхийн тулд товшино уу",
       "tapToComment": "{{label}}, сэтгэгдэл бичихийн тулд товшино уу",
-      "truncationBanner": "Өөрчлөгдсөн {{total}} файлаас эхний {{limit}}-ыг харуулж байна — GitHub API хязгаар"
+      "truncationBanner": "Өөрчлөгдсөн {{total}} файлаас эхний {{limit}}-ыг харуулж байна — GitHub API хязгаар",
+      "statusAdded": "Нэмсэн",
+      "statusContext": "Контекст",
+      "statusDeleted": "Устгасан"
     },
     "linkPasteClipboardEmpty": "Хуулбар самбар хоосон байна",
     "linkPasteNotAPullRequest": "Энэ нь GitHub pull request холбоос биш",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Энэ тоймыг байгаагаар нь илгээх боломжгүй. PR өөрчлөгдсөн эсвэл та өөрийн pull request-оо тоймлож чадахгүй байж болзошгүй.",
       "couldNotPostComment": "Сэтгэгдэл нийтлэх боломжгүй.",
       "couldNotSubmitReview": "Тойм илгээх боломжгүй. Холболтоо шалгаад дахин оролдоно уу."
+    },
+    "operation": {
+      "couldNotReply": "Хариулах боломжгүй.",
+      "couldNotCompleteAction": "Энэ үйлдлийг гүйцэтгэх боломжгүй.",
+      "mergeResultDefaultError": "GitHub нэгтгэлтийг гүйцээгүй."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Төлбөр хугацаа хэтэрсэн. Төлбөрийн аргаа шинэчлээрэй.",
       "subscriptionCancels": "Захиалга {{date}} өдөр цуцлагдана",
       "trialDaysRemaining": "Туршилт: {{remaining}}",
-      "trialEndingSoon": "Туршилт удахгүй дуусна: {{remaining}}"
+      "trialEndingSoon": "Туршилт удахгүй дуусна: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Стандарт"
+      }
     },
     "changelog": {
       "title": "Шинэ юу байна",
@@ -1189,7 +1201,8 @@
       "strongArm": "Хүчтэй гар",
       "talisman": "Талисман"
     },
-    "remoteSpawnFilesNotSupported": "Энэ инстанц файл хүлээн авах боломжгүй."
+    "remoteSpawnFilesNotSupported": "Энэ инстанц файл хүлээн авах боломжгүй.",
+    "instanceSwitcherTitle": "KiloClaw инстанц"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Амжилтгүй болсон",
       "cancelled": "Цуцлагдсан",
       "interrupted": "Тасарсан"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Хатуу",
+      "balanced": "Тэнцвэртэй",
+      "lenient": "Зөөлөн",
+      "roast": "Роаст"
+    },
+    "focusArea": {
+      "security": "Аюулгүй байдал",
+      "performance": "Гүйцэтгэл",
+      "bugs": "Алдаанууд",
+      "style": "Стиль",
+      "testing": "Туршилт",
+      "documentation": "Баримтжуулалт"
+    },
+    "gateThreshold": {
+      "off": "Унтарсан",
+      "all": "Бүгд",
+      "warning": "Анхааруулга",
+      "critical": "Чухал"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Кодын шалгагч анхаарал шаардаж байна",
+        "description": "Kilo GitHub App-ийн идэвхтэй суулгацтай энэ репозиторт хандах боломжгүй тул Кодын шалгагчийг идэвхгүйжүүлсэн. GitHub App суулгацыг шинэчилж, дараа нь Кодын шалгагчийг дахин идэвхжүүлнэ үү.",
+        "recoveryLabel": "GitHub App шинэчлэх"
+      },
+      "githubIpAllowList": {
+        "title": "Кодын шалгагч анхаарал шаардаж байна",
+        "description": "Энэ GitHub байгууллага Kilo-г блоклодог IP зөвшөөрлийн жагсаалт ашигладаг тул Кодын шалгагчийг идэвхгүйжүүлсэн. Тусламж авахын тулд hi@kilocode.ai хаягаар холбогдож, дараа нь Кодын шалгагчийг дахин идэвхжүүлнэ үү.",
+        "recoveryLabel": "Дэмжлэгтэй холбогдох"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Кодын шалгагч анхаарал шаардаж байна",
+        "description": "Kilo энэ төсөлд зориулж GitLab Project Access Token үүсгэж чадахгүй тул Кодын шалгагчийг идэвхгүйжүүлсэн. Maintainer хандалт олгох эсвэл Project Access Token-ыг идэвхжүүлж, дараа нь Кодын шалгагчийг дахин идэвхжүүлнэ үү.",
+        "recoveryLabel": "GitLab интеграцийг шинэчлэх"
+      },
+      "byokInvalidKey": {
+        "title": "Кодын шалгагч анхаарал шаардаж байна",
+        "description": "Сонгосон BYOK API түлхүүр хүчингүй, хүчингүй болсон, эсвэл зөвшөөрөлгүй тул Кодын шалгагчийг идэвхгүйжүүлсэн. Түлхүүрийг шинэчилж эсвэл өөр загвар сонгож, дараа нь Кодын шалгагчийг дахин идэвхжүүлнэ үү.",
+        "recoveryLabel": "BYOK тохиргоог шинэчлэх"
+      },
+      "selectedModelUnavailable": {
+        "title": "Кодын шалгагч анхаарал шаардаж байна",
+        "description": "Сонгосон загвар cloud agent сессүүдэд боломжгүй тул Кодын шалгагчийг идэвхгүйжүүлсэн. Боломжтой загвар сонгож, дараа нь Кодын шалгагчийг дахин идэвхжүүлнэ үү.",
+        "recoveryLabel": "Кодын шалгагчийн тохиргоог шинэчлэх"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Кодын шалгагч анхаарал шаардаж байна",
+        "description": "Өнөөдөр гурван удаа репозиторын клонны хугацаа дууссны дараа Кодын шалгагчийг идэвхгүйжүүлсэн. Тусламж авахын тулд hi@kilocode.ai хаягаар холбогдож, дараа нь Кодын шалгагчийг дахин идэвхжүүлнэ үү.",
+        "recoveryLabel": "Дэмжлэгтэй холбогдох"
+      }
+    },
+    "unknownError": "Тодорхойгүй алдаа"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Олдвор автомат ноцтой байдлын босгоос доогуур байна. Аюулгүй байдлын хаалтууд хангагдвал гараар засвар эхлүүлэх боломжтой хэвээр.",
       "beforeEnablement": "Автомат засвар идэвхжихээс өмнө дүн шинжилгээ дууссан. Аюулгүй байдлын хаалтууд хангагдвал гараар засвар эхлүүлэх боломжтой хэвээр.",
       "generic": "Энэ олдворын хувьд засвар боломжгүй."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Дүн шинжилгээний багтаамж дүүрсэн байна. Идэвхтэй дүн шинжилгээ дуусахыг хүлээж, дараа нь дахин оролдоно уу.",
+      "githubTokenUnavailable": "GitHub зөвшөөрөлд анхаарал шаардлагатай. GitHub App-ыг дахин зөвшөөрч, дараа нь дахин оролдоно уу.",
+      "githubAuthInvalid": "GitHub зөвшөөрөлд анхаарал шаардлагатай. GitHub App-ыг дахин зөвшөөрч, дараа нь дахин оролдоно уу.",
+      "findingUnavailable": "Олдвор цаашид боломжгүй байна. Олдворуудыг сэргээж, нээлттэй хэвээр байвал дахин оролдоно уу.",
+      "repositoryUnavailable": "Репозитор GitHub App-д цаашид боломжгүй. Репозиторын хандалтыг сэргээж, дараа нь дахин оролдоно уу.",
+      "invalidDismissTarget": "Олдворын Dependabot зорилт хүчингүй тул олдворыг хаях боломжгүй.",
+      "commandStalled": "Дараалалд орсон үйлдэл хугацаанд нь дуусаагүй. Үйлдлийг дахин оролдоно уу.",
+      "queueRetriesExhausted": "Хэд хэдэн оролдлогын дараа үйлдлийг гүйцэтгэх боломжгүй. Үйлдлийг дахин оролдоно уу.",
+      "queueAdmissionFailed": "Дараалалд орсон үйлдлийг хүлээн авах боломжгүй. Үйлдлийг дахин оролдоно уу.",
+      "generic": "Дараалалд орсон үйлдэл амжилтгүй болсон. Үйлдлийг дахин оролдоно уу."
+    },
+    "analysisMode": {
+      "auto": "Авто",
+      "shallow": "Гүехэн",
+      "deep": "Гүн"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "{{name}}-г дуртай зүйлсэд нэмэх",
       "removeFromFavorites": "{{name}}-г дуртай зүйлсээс хасах",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Сессийн загвар"
     },
     "attachmentPreview": {
       "openFailedRetry": "Файлыг нээж чадсангүй. Дахин оролдоно уу.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Кредит нэмэх",
-    "description": "Ашиглалтыг үргэлжлүүлэхийн тулд кредит нэмнэ үү."
+    "description": "Ашиглалтыг үргэлжлүүлэхийн тулд кредит нэмнэ үү.",
+    "billingPage": "биллингийн хуудас"
   },
   "deviceSessions": {
     "couldNotLoad": "Сессийг ачаалж чадсангүй",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Худалдан авалтуудыг сэргээж чадсангүй. Дахин оролдоно уу.",
     "purchaseFailed": "Худалдан авалтыг дуусгаж чадсангүй.",
     "purchaseStartFailed": "App Store худалдан авалтыг эхлүүлж чадсангүй.",
-    "purchaseOwnedByAnotherAccount": "Энэ Apple Account дээрх Kilo Pass нь өөр Kilo бүртгэлд харьяалагдана."
+    "purchaseOwnedByAnotherAccount": "Энэ Apple Account дээрх Kilo Pass нь өөр Kilo бүртгэлд харьяалагдана.",
+    "couldNotConnectToAppStore": "App Store-д холбогдох боломжгүй. Холболтоо шалгаад дахин оролдоно уу.",
+    "noMatchingProducts": "App Store тохирох Kilo Pass бүтээгдэхүүн буцаасангүй.",
+    "purchaseMissingSignedTransaction": "App Store худалдан авалтад гарын үсэгтэй transaction JWS ороогүй байна."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Сайжруулах шаардлагатай",
     "sorryTitle": "Сонсоход харамсалтай байна!",
     "sorryMessage": "Юуг сайжруулах шаардлагатайг бидэнд мэдэгдэнэ үү. Аппыг хариуцсан инженер тайлан бүрийг уншдаг!",
-    "emailUs": "Бидэнд имэйл илгээх"
+    "emailUs": "Бидэнд имэйл илгээх",
+    "emailSubject": "гар утасны апп-ын санал хүсэлт"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Кредитийн үйл ажиллагаа алга",
       "expires": "Хугацаа дуусах {{date}}",
       "title": "Кредитийн үйл ажиллагаа",
-      "transactionFallback": "Кредитийн гүйлгээ"
+      "transactionFallback": "Кредитийн гүйлгээ",
+      "category": {
+        "organization_custom": "Байгууллагын тусгай",
+        "parent_to_child_transfer_in": "Эцэг эхээс хүүхэд рүү шилжүүлэх (орж ирсэн)",
+        "parent_to_child_transfer_out": "Эцэг эхээс хүүхэд рүү шилжүүлэх (гарсан)",
+        "oss-sponsorship": "OSS ивээн тэтгэлэг",
+        "oss-monthly-reset": "OSS сарын дахин тохируулга",
+        "team-topup-bonus-2025": "Багийн топ-ап бонус-2025",
+        "accounting_adjustment": "Нягтлан бодох бүртгэлийн тохируулга",
+        "credits_expired": "Кредит дууссан"
+      }
     },
     "inviteMember": {
       "emailError": "Хүчинтэй имэйл хаяг оруулна уу",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Нэхэмжлэхүүд төлбөрийн мөчлөг бүрт автоматаар үүсгэгдэж, байгууллага тань төлбөр төлсний дараа энд харагдана.",
       "emptyTitle": "Нэхэмжлэх алга",
       "invoiceFallback": "Нэхэмжлэх",
-      "statusOpen": "Нээлттэй",
-      "statusPaid": "Төлсөн",
-      "statusVoid": "Хүчингүй",
       "title": "Нэхэмжлэхүүд",
       "downloadFailed": "Нэхэмжлэхийг татах боломжгүй. Холболтоо шалгаад дахин оролдоно уу.",
-      "sharingUnavailable": "Энэ төхөөрөмж дээр хуваалцах боломжгүй."
+      "sharingUnavailable": "Энэ төхөөрөмж дээр хуваалцах боломжгүй.",
+      "status": {
+        "paid": "Төлсөн",
+        "open": "Нээлттэй",
+        "void": "Хүчингүй",
+        "draft": "Ноорог",
+        "uncollectible": "Цуглуулах боломжгүй",
+        "unknown": "Тодорхойгүй"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Цуглуулсан өгөгдөл",
     "free": "Үнэгүй",
-    "couldNotUpdateFavorites": "Дуртай зүйлсийг шинэчлэх боломжгүй"
+    "couldNotUpdateFavorites": "Дуртай зүйлсийг шинэчлэх боломжгүй",
+    "thinkingEffort": {
+      "none": "Байхгүй",
+      "minimal": "Хамгийн бага",
+      "low": "Бага",
+      "medium": "Дунд",
+      "high": "Өндөр",
+      "xhigh": "Маш өндөр",
+      "max": "Дээд"
+    }
   }
 }

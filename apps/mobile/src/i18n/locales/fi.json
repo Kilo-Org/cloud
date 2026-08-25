@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Valittu {{label}}, napauta vaihtaaksesi valinnan",
       "tapToComment": "{{label}}, napauta kommentoidaksesi",
-      "truncationBanner": "Näytetään ensimmäiset {{limit}} muutetuista {{total}} tiedostosta — GitHub API:n raja"
+      "truncationBanner": "Näytetään ensimmäiset {{limit}} muutetuista {{total}} tiedostosta — GitHub API:n raja",
+      "statusAdded": "Lisätty",
+      "statusContext": "Konteksti",
+      "statusDeleted": "Poistettu"
     },
     "linkPasteClipboardEmpty": "Leikepöytä on tyhjä",
     "linkPasteNotAPullRequest": "Ei GitHub-pull request -linkki",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Tätä arviointia ei voi lähettää sellaisenaan. PR on saatettu muuttaa, tai et voi arvioida omaa pull requestiasi.",
       "couldNotPostComment": "Kommenttia ei voitu lähettää.",
       "couldNotSubmitReview": "Arviointia ei voitu lähettää. Tarkista yhteys ja yritä uudelleen."
+    },
+    "operation": {
+      "couldNotReply": "Vastaaminen epäonnistui.",
+      "couldNotCompleteAction": "Tätä toimintoa ei voitu suorittaa loppuun.",
+      "mergeResultDefaultError": "GitHub ei saattanut yhdistämistä loppuun."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Maksu on erääntynyt. Päivitä maksutapasi.",
       "subscriptionCancels": "Tilaus peruuntuu {{date}}",
       "trialDaysRemaining": "Kokeilu: {{remaining}} jäljellä",
-      "trialEndingSoon": "Kokeilu päättyy pian: {{remaining}}"
+      "trialEndingSoon": "Kokeilu päättyy pian: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Mitä uutta",
@@ -1189,7 +1201,8 @@
       "strongArm": "Vahva käsivarsi",
       "talisman": "Talismaani"
     },
-    "remoteSpawnFilesNotSupported": "Tämä instanssi ei voi vastaanottaa tiedostoja."
+    "remoteSpawnFilesNotSupported": "Tämä instanssi ei voi vastaanottaa tiedostoja.",
+    "instanceSwitcherTitle": "KiloClaw-instanssi"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Epäonnistui",
       "cancelled": "Peruttu",
       "interrupted": "Keskeytetty"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Tiukka",
+      "balanced": "Tasapainoinen",
+      "lenient": "Lempeä",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Turvallisuus",
+      "performance": "Suorituskyky",
+      "bugs": "Bugit",
+      "style": "Tyyli",
+      "testing": "Testaus",
+      "documentation": "Dokumentaatio"
+    },
+    "gateThreshold": {
+      "off": "Pois",
+      "all": "Kaikki",
+      "warning": "Varoitus",
+      "critical": "Kriittinen"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer vaatii huomiota",
+        "description": "Code Reviewer poistettiin käytöstä, koska Kilo ei pääse tähän repositorioon aktiivisella GitHub App -asennuksella. Päivitä GitHub App -asennus ja ota Code Reviewer uudelleen käyttöön.",
+        "recoveryLabel": "Päivitä GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer vaatii huomiota",
+        "description": "Code Reviewer poistettiin käytöstä, koska tämä GitHub-organisaatio käyttää IP-sallittujen luetteloa, joka estää Kilo. Ota yhteyttä hi@kilocode.ai -osoitteeseen saadaksesi apua ja ota Code Reviewer uudelleen käyttöön.",
+        "recoveryLabel": "Ota yhteyttä tukeen"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer vaatii huomiota",
+        "description": "Code Reviewer poistettiin käytöstä, koska Kilo ei voi luoda GitLab-projektin käyttöoikeustunnusta tälle projektille. Myönnä Maintainer-käyttöoikeus tai ota projektin käyttöoikeustunnukset käyttöön ja ota Code Reviewer uudelleen käyttöön.",
+        "recoveryLabel": "Päivitä GitLab-integraatio"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer vaatii huomiota",
+        "description": "Code Reviewer poistettiin käytöstä, koska valittu BYOK API -avain on virheellinen, peruutettu tai siitä puuttuu oikeus. Päivitä avain tai valitse toinen malli ja ota Code Reviewer uudelleen käyttöön.",
+        "recoveryLabel": "Päivitä BYOK-asetukset"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer vaatii huomiota",
+        "description": "Code Reviewer poistettiin käytöstä, koska valittu malli ei ole käytettävissä cloud agent -istunnoissa. Valitse käytettävissä oleva malli ja ota Code Reviewer uudelleen käyttöön.",
+        "recoveryLabel": "Päivitä Code Reviewer -asetukset"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer vaatii huomiota",
+        "description": "Code Reviewer poistettiin käytöstä kolmen repositorion kloonauksen aikakatkaisun jälkeen tänään. Ota yhteyttä hi@kilocode.ai -osoitteeseen saadaksesi apua ja ota Code Reviewer uudelleen käyttöön.",
+        "recoveryLabel": "Ota yhteyttä tukeen"
+      }
+    },
+    "unknownError": "Tuntematon virhe"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Havainto on automaattisen vakavuuskynnyksen alapuolella. Manuaalinen korjaus voi silti alkaa, kun turvaportit läpäistään.",
       "beforeEnablement": "Analyysi valmistui ennen automaattisen korjauksen käyttöönottoa. Manuaalinen korjaus voi silti alkaa, kun turvaportit läpäistään.",
       "generic": "Korjaus ei ole käytettävissä tälle havainnolle."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Analyysikapasiteetti on täynnä. Odota, että käynnissä oleva analyysi päättyy, ja yritä sitten uudelleen.",
+      "githubTokenUnavailable": "GitHub-valtuutus vaatii huomiota. Valtuuta GitHub App uudelleen ja yritä sitten uudelleen.",
+      "githubAuthInvalid": "GitHub-valtuutus vaatii huomiota. Valtuuta GitHub App uudelleen ja yritä sitten uudelleen.",
+      "findingUnavailable": "Havainto ei ole enää käytettävissä. Päivitä havainnot ja yritä uudelleen, jos se on edelleen auki.",
+      "repositoryUnavailable": "Repositorio ei ole enää GitHub Appin käytettävissä. Päivitä repositorion käyttöoikeus ja yritä sitten uudelleen.",
+      "invalidDismissTarget": "Havaintoa ei voi hylätä, koska sen Dependabot-kohde on virheellinen.",
+      "commandStalled": "Jonossa oleva toiminto ei valmistunut ajoissa. Yritä toimintoa uudelleen.",
+      "queueRetriesExhausted": "Toimintoa ei voitu suorittaa loppuun useiden yritysten jälkeen. Yritä toimintoa uudelleen.",
+      "queueAdmissionFailed": "Jonossa olevaa toimintoa ei voitu hyväksyä. Yritä toimintoa uudelleen.",
+      "generic": "Jonossa oleva toiminto epäonnistui. Yritä toimintoa uudelleen."
+    },
+    "analysisMode": {
+      "auto": "Automaattinen",
+      "shallow": "Pinnallinen",
+      "deep": "Syvä"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Lisää {{name}} suosikkeihin",
       "removeFromFavorites": "Poista {{name}} suosikeista",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Istunnon malli"
     },
     "attachmentPreview": {
       "openFailedRetry": "Tiedoston avaaminen epäonnistui. Yritä uudelleen.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Lisää krediittejä",
-    "description": "Lisää krediittejä pitääksesi käytön käynnissä."
+    "description": "Lisää krediittejä pitääksesi käytön käynnissä.",
+    "billingPage": "laskutussivu"
   },
   "deviceSessions": {
     "couldNotLoad": "Istuntoja ei voitu ladata",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Ostosten palauttaminen epäonnistui. Yritä uudelleen.",
     "purchaseFailed": "Oston viimeistely epäonnistui.",
     "purchaseStartFailed": "App Store -oston aloittaminen epäonnistui.",
-    "purchaseOwnedByAnotherAccount": "Tämän Apple-tilin Kilo Pass kuuluu eri Kilo-tilille."
+    "purchaseOwnedByAnotherAccount": "Tämän Apple-tilin Kilo Pass kuuluu eri Kilo-tilille.",
+    "couldNotConnectToAppStore": "Yhteyden muodostaminen App Storeen epäonnistui. Tarkista yhteys ja yritä uudelleen.",
+    "noMatchingProducts": "App Store ei palauttanut yhtään sopivaa Kilo Pass -tuotetta.",
+    "purchaseMissingSignedTransaction": "App Store -osto ei sisältänyt allekirjoitettua tapahtuman JWS:ää."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Vaatii parannuksia",
     "sorryTitle": "Ikävä kuulla se!",
     "sorryMessage": "Kerro meille, mitä pitäisi parantaa. Sovelluksesta vastaava insinööri lukee jokaisen raportin!",
-    "emailUs": "Lähetä sähköpostia"
+    "emailUs": "Lähetä sähköpostia",
+    "emailSubject": "mobiilisovelluksen palaute"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Ei krediittitoimintaa",
       "expires": "Vanhenee {{date}}",
       "title": "Krediittitoiminta",
-      "transactionFallback": "Krediittitapahtuma"
+      "transactionFallback": "Krediittitapahtuma",
+      "category": {
+        "organization_custom": "Organisaation mukautettu",
+        "parent_to_child_transfer_in": "Siirto vanhemmalta lapselle (sisään)",
+        "parent_to_child_transfer_out": "Siirto vanhemmalta lapselle (ulos)",
+        "oss-sponsorship": "OSS-sponsorointi",
+        "oss-monthly-reset": "OSS-kuukausittainen nollaus",
+        "team-topup-bonus-2025": "Tiimin topup-bonus 2025",
+        "accounting_adjustment": "Kirjanpidon oikaisu",
+        "credits_expired": "Krediitit vanhentuivat"
+      }
     },
     "inviteMember": {
       "emailError": "Syötä kelvollinen sähköpostiosoite",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Laskut luodaan automaattisesti jokaisessa laskutusjaksossa ja ne näkyvät täällä, kun organisaatiosi on laskutettu.",
       "emptyTitle": "Ei laskuja",
       "invoiceFallback": "Lasku",
-      "statusOpen": "Avoin",
-      "statusPaid": "Maksettu",
-      "statusVoid": "Mitätöity",
       "title": "Laskut",
       "downloadFailed": "Laskua ei voitu ladata. Tarkista yhteys ja yritä uudelleen.",
-      "sharingUnavailable": "Jakaminen ei ole käytettävissä tässä laitteessa."
+      "sharingUnavailable": "Jakaminen ei ole käytettävissä tässä laitteessa.",
+      "status": {
+        "paid": "Maksettu",
+        "open": "Avoin",
+        "void": "Mitätöity",
+        "draft": "Luonnos",
+        "uncollectible": "Perimiskelvoton",
+        "unknown": "Tuntematon"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Kerätyt tiedot",
     "free": "Ilmainen",
-    "couldNotUpdateFavorites": "Suosikkeja ei voitu päivittää"
+    "couldNotUpdateFavorites": "Suosikkeja ei voitu päivittää",
+    "thinkingEffort": {
+      "none": "Ei mitään",
+      "minimal": "Minimaalinen",
+      "low": "Matala",
+      "medium": "Keskitaso",
+      "high": "Korkea",
+      "xhigh": "Erittäin korkea",
+      "max": "Maksimi"
+    }
   }
 }

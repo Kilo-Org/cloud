@@ -369,7 +369,11 @@
       "paymentPastDue": "Paiement en retard. Veuillez mettre à jour votre mode de paiement.",
       "subscriptionCancels": "L'abonnement sera annulé le {{date}}",
       "trialDaysRemaining": "Essai : {{remaining}} restant",
-      "trialEndingSoon": "L'essai se termine bientôt : {{remaining}}"
+      "trialEndingSoon": "L'essai se termine bientôt : {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Nouveautés",
@@ -738,7 +742,8 @@
       "strongArm": "Bras fort",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Cette instance ne peut pas recevoir de fichiers."
+    "remoteSpawnFilesNotSupported": "Cette instance ne peut pas recevoir de fichiers.",
+    "instanceSwitcherTitle": "Instance KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -936,7 +941,60 @@
       "failed": "Échoué",
       "cancelled": "Annulé",
       "interrupted": "Interrompu"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Strict",
+      "balanced": "Équilibré",
+      "lenient": "Indulgent",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Sécurité",
+      "performance": "Performance",
+      "bugs": "Bugs",
+      "style": "Style",
+      "testing": "Tests",
+      "documentation": "Documentation"
+    },
+    "gateThreshold": {
+      "off": "Désactivé",
+      "all": "Tout",
+      "warning": "Avertissement",
+      "critical": "Critique"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Le Code Reviewer nécessite votre attention",
+        "description": "Le Code Reviewer a été désactivé car Kilo ne peut pas accéder à ce dépôt avec une installation active de la GitHub App. Mettez à jour l'installation de la GitHub App, puis réactivez le Code Reviewer.",
+        "recoveryLabel": "Mettre à jour la GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Le Code Reviewer nécessite votre attention",
+        "description": "Le Code Reviewer a été désactivé car cette organisation GitHub utilise une liste d'autorisation IP qui bloque Kilo. Contactez hi@kilocode.ai pour obtenir de l'aide, puis réactivez le Code Reviewer.",
+        "recoveryLabel": "Contacter le support"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Le Code Reviewer nécessite votre attention",
+        "description": "Le Code Reviewer a été désactivé car Kilo ne peut pas créer de jeton d'accès de projet GitLab pour ce projet. Accordez un accès Maintainer ou activez les jetons d'accès de projet, puis réactivez le Code Reviewer.",
+        "recoveryLabel": "Mettre à jour l'intégration GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Le Code Reviewer nécessite votre attention",
+        "description": "Le Code Reviewer a été désactivé car la clé API BYOK sélectionnée est invalide, révoquée ou ne dispose pas des autorisations nécessaires. Mettez à jour la clé ou choisissez un autre modèle, puis réactivez le Code Reviewer.",
+        "recoveryLabel": "Mettre à jour les paramètres BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Le Code Reviewer nécessite votre attention",
+        "description": "Le Code Reviewer a été désactivé car le modèle sélectionné n'est pas disponible pour les sessions Cloud Agent. Choisissez un modèle disponible, puis réactivez le Code Reviewer.",
+        "recoveryLabel": "Mettre à jour les paramètres du Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Le Code Reviewer nécessite votre attention",
+        "description": "Le Code Reviewer a été désactivé après trois dépassements du délai de clonage de dépôt aujourd'hui. Contactez hi@kilocode.ai pour obtenir de l'aide, puis réactivez le Code Reviewer.",
+        "recoveryLabel": "Contacter le support"
+      }
+    },
+    "unknownError": "Erreur inconnue"
   },
   "securityAgent": {
     "filter": {
@@ -1480,6 +1538,23 @@
       "belowThreshold": "Le résultat est sous le seuil de gravité automatique. La remédiation manuelle peut toujours démarrer lorsque les contrôles de sécurité passent.",
       "beforeEnablement": "L'analyse a été réalisée avant l'activation de la remédiation automatique. La remédiation manuelle peut toujours démarrer lorsque les contrôles de sécurité passent.",
       "generic": "La remédiation n'est pas disponible pour ce résultat."
+    },
+    "commandFailure": {
+      "ownerCapReached": "La capacité d'analyse est pleine. Attendez qu'une analyse active se termine, puis réessayez.",
+      "githubTokenUnavailable": "L'autorisation GitHub nécessite votre attention. Réautorisez la GitHub App, puis réessayez.",
+      "githubAuthInvalid": "L'autorisation GitHub nécessite votre attention. Réautorisez la GitHub App, puis réessayez.",
+      "findingUnavailable": "Le résultat n'est plus disponible. Actualisez les résultats et réessayez s'il reste ouvert.",
+      "repositoryUnavailable": "Le dépôt n'est plus disponible pour la GitHub App. Actualisez l'accès au dépôt, puis réessayez.",
+      "invalidDismissTarget": "Le résultat ne peut pas être ignoré car sa cible Dependabot est invalide.",
+      "commandStalled": "L'action en file d'attente n'a pas abouti à temps. Réessayez l'action.",
+      "queueRetriesExhausted": "L'action n'a pas pu être terminée après plusieurs tentatives. Réessayez l'action.",
+      "queueAdmissionFailed": "L'action en file d'attente n'a pas pu être admise. Réessayez l'action.",
+      "generic": "L'action en file d'attente a échoué. Réessayez l'action."
+    },
+    "analysisMode": {
+      "auto": "Auto",
+      "shallow": "Superficielle",
+      "deep": "Profonde"
     }
   },
   "agentChat": {
@@ -1883,7 +1958,8 @@
       "addToFavorites": "Ajouter {{name}} aux favoris",
       "removeFromFavorites": "Retirer {{name}} des favoris",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Moyen"
+      "thinkingEffortMedium": "Moyen",
+      "sessionModel": "Modèle de session"
     },
     "attachmentPreview": {
       "openFailedRetry": "Échec de l'ouverture du fichier. Veuillez réessayer.",
@@ -2030,7 +2106,8 @@
   },
   "addCredits": {
     "cta": "Ajouter des crédits",
-    "description": "Ajoutez des crédits pour que l'utilisation continue."
+    "description": "Ajoutez des crédits pour que l'utilisation continue.",
+    "billingPage": "page de facturation"
   },
   "deviceSessions": {
     "couldNotLoad": "Impossible de charger les sessions",
@@ -2212,7 +2289,10 @@
     "restoreFailed": "Échec de la restauration des achats. Réessayez.",
     "purchaseFailed": "Échec de l'achat.",
     "purchaseStartFailed": "Impossible de démarrer l'achat sur l'App Store.",
-    "purchaseOwnedByAnotherAccount": "Le Kilo Pass sur ce compte Apple appartient à un autre compte Kilo."
+    "purchaseOwnedByAnotherAccount": "Le Kilo Pass sur ce compte Apple appartient à un autre compte Kilo.",
+    "couldNotConnectToAppStore": "Impossible de se connecter à l'App Store. Vérifiez votre connexion et réessayez.",
+    "noMatchingProducts": "Aucun produit Kilo Pass correspondant n'a été renvoyé par l'App Store.",
+    "purchaseMissingSignedTransaction": "L'achat App Store n'incluait pas de transaction signée JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2799,7 +2879,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} sélectionné, touchez pour modifier la sélection",
       "tapToComment": "{{label}}, touchez pour commenter",
-      "truncationBanner": "Affichage des {{limit}} premiers fichiers modifiés sur {{total}} — limite de l'API GitHub"
+      "truncationBanner": "Affichage des {{limit}} premiers fichiers modifiés sur {{total}} — limite de l'API GitHub",
+      "statusAdded": "Ajouté",
+      "statusContext": "Contexte",
+      "statusDeleted": "Supprimé"
     },
     "linkPasteClipboardEmpty": "Le presse-papiers est vide",
     "linkPasteNotAPullRequest": "Ce n'est pas un lien de pull request GitHub",
@@ -2813,6 +2896,11 @@
       "reviewNotSubmitted": "Cette revue ne peut pas être soumise telle quelle. La PR a peut-être changé, ou vous ne pouvez pas passer en revue votre propre pull request.",
       "couldNotPostComment": "Impossible de publier le commentaire.",
       "couldNotSubmitReview": "Impossible de soumettre la revue. Vérifiez votre connexion et réessayez."
+    },
+    "operation": {
+      "couldNotReply": "Impossible de répondre.",
+      "couldNotCompleteAction": "Impossible de terminer cette action.",
+      "mergeResultDefaultError": "GitHub n'a pas terminé la fusion."
     }
   },
   "organization": {
@@ -2830,7 +2918,17 @@
       "emptyTitle": "Aucune activité de crédits",
       "expires": "Expire le {{date}}",
       "title": "Activité de crédits",
-      "transactionFallback": "Transaction de crédits"
+      "transactionFallback": "Transaction de crédits",
+      "category": {
+        "organization_custom": "Personnalisé pour l'organisation",
+        "parent_to_child_transfer_in": "Transfert entrant depuis l'organisation parente",
+        "parent_to_child_transfer_out": "Transfert sortant vers l'organisation enfant",
+        "oss-sponsorship": "Sponsoring OSS",
+        "oss-monthly-reset": "Réinitialisation mensuelle OSS",
+        "team-topup-bonus-2025": "Bonus de rechargement d'équipe 2025",
+        "accounting_adjustment": "Ajustement comptable",
+        "credits_expired": "Crédits expirés"
+      }
     },
     "hub": {
       "balance": "Solde",
@@ -2857,11 +2955,16 @@
       "emptyTitle": "Aucune facture",
       "invoiceFallback": "Facture",
       "title": "Factures",
-      "statusPaid": "Payée",
-      "statusOpen": "Ouverte",
-      "statusVoid": "Annulée",
       "downloadFailed": "Impossible de télécharger la facture. Vérifiez votre connexion et réessayez.",
-      "sharingUnavailable": "Le partage n'est pas disponible sur cet appareil."
+      "sharingUnavailable": "Le partage n'est pas disponible sur cet appareil.",
+      "status": {
+        "paid": "Payée",
+        "open": "Ouverte",
+        "void": "Annulée",
+        "draft": "Brouillon",
+        "uncollectible": "Irrecouvrable",
+        "unknown": "Inconnu"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "nom@entreprise.com",
@@ -2962,7 +3065,8 @@
     "promptTitle": "Comment trouvez-vous l'app Kilo ?",
     "rateKilo": "Évaluer Kilo",
     "sorryMessage": "Dites-nous ce qui doit être amélioré. L'ingénieur responsable de l'app lit chaque rapport !",
-    "sorryTitle": "Nous sommes désolés de l'entendre !"
+    "sorryTitle": "Nous sommes désolés de l'entendre !",
+    "emailSubject": "retour sur l'app mobile"
   },
   "authErrors": {
     "emailAlreadyUsed": "Un compte avec cet e-mail existe déjà avec une autre méthode de connexion. Essayez une autre méthode ou utilisez « $t(login.moreSignInOptions) ».",
@@ -2992,6 +3096,15 @@
   "models": {
     "dataCollected": "Données collectées",
     "free": "Gratuit",
-    "couldNotUpdateFavorites": "Impossible de mettre à jour les favoris"
+    "couldNotUpdateFavorites": "Impossible de mettre à jour les favoris",
+    "thinkingEffort": {
+      "none": "Aucun",
+      "minimal": "Minimal",
+      "low": "Faible",
+      "medium": "Moyen",
+      "high": "Élevé",
+      "xhigh": "Très élevé",
+      "max": "Maximum"
+    }
   }
 }

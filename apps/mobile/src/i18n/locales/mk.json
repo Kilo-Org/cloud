@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Избрано {{label}}, допрете за да го промените изборот",
       "tapToComment": "{{label}}, допрете за да коментирате",
-      "truncationBanner": "Прикажува првите {{limit}} од {{total}} изменети датотеки — GitHub API лимит"
+      "truncationBanner": "Прикажува првите {{limit}} од {{total}} изменети датотеки — GitHub API лимит",
+      "statusAdded": "Додадено",
+      "statusContext": "Контекст",
+      "statusDeleted": "Избришано"
     },
     "linkPasteClipboardEmpty": "Таблата со клипборд е празна",
     "linkPasteNotAPullRequest": "Ова не е линк до GitHub pull request",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Овој преглед не може да се испрати во сегашната состојба. PR-от можеби е променет, или не можете да прегледувате сопствено барање за повлекување.",
       "couldNotPostComment": "Не можеше да се објави коментар.",
       "couldNotSubmitReview": "Не можеше да се испрати преглед. Проверете ја вашата врска и обидете се повторно."
+    },
+    "operation": {
+      "couldNotReply": "Не можеше да се одговори.",
+      "couldNotCompleteAction": "Не можеше да се заврши оваа акција.",
+      "mergeResultDefaultError": "GitHub не го заврши спојувањето."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Плаќањето е задоцнето. Ажурирај го начинот на плаќање.",
       "subscriptionCancels": "Претплатата се откажува {{date}}",
       "trialDaysRemaining": "Проба: {{remaining}}",
-      "trialEndingSoon": "Пробата наскоро завршува: {{remaining}}"
+      "trialEndingSoon": "Пробата наскоро завршува: {{remaining}}",
+      "planName": {
+        "commit": "Посвети",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Што има ново",
@@ -1189,7 +1201,8 @@
       "strongArm": "Силна рака",
       "talisman": "Талисман"
     },
-    "remoteSpawnFilesNotSupported": "Оваа инстанца не може да прима датотеки."
+    "remoteSpawnFilesNotSupported": "Оваа инстанца не може да прима датотеки.",
+    "instanceSwitcherTitle": "KiloClaw инстанца"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Не успеа",
       "cancelled": "Откажано",
       "interrupted": "Прекинато"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Строго",
+      "balanced": "Избалансирано",
+      "lenient": "Благо",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Безбедност",
+      "performance": "Перформанси",
+      "bugs": "Багови",
+      "style": "Стил",
+      "testing": "Тестирање",
+      "documentation": "Документација"
+    },
+    "gateThreshold": {
+      "off": "Исклучено",
+      "all": "Сите",
+      "warning": "Предупредување",
+      "critical": "Критично"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Потребно е внимание за Code Reviewer",
+        "description": "Code Reviewer е оневозможен затоа што Kilo не може да пристапи до ова складиште со активна GitHub App инсталација. Ажурирајте ја GitHub App инсталацијата, па повторно овозможете го Code Reviewer.",
+        "recoveryLabel": "Ажурирај GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Потребно е внимание за Code Reviewer",
+        "description": "Code Reviewer е оневозможен затоа што оваа GitHub организација користи IP дозволена листа што го блокира Kilo. Контактирајте hi@kilocode.ai за помош, па повторно овозможете го Code Reviewer.",
+        "recoveryLabel": "Контактирај поддршка"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Потребно е внимание за Code Reviewer",
+        "description": "Code Reviewer е оневозможен затоа што Kilo не може да создаде GitLab Project Access Token за овој проект. Дајте Maintainer пристап или овозможете Project Access Tokens, па повторно овозможете го Code Reviewer.",
+        "recoveryLabel": "Ажурирај GitLab интеграција"
+      },
+      "byokInvalidKey": {
+        "title": "Потребно е внимание за Code Reviewer",
+        "description": "Code Reviewer е оневозможен затоа што избраниот BYOK API клуч е невалиден, повлечен или нема дозвола. Ажурирајте го клучот или изберете друг модел, па повторно овозможете го Code Reviewer.",
+        "recoveryLabel": "Ажурирај BYOK поставки"
+      },
+      "selectedModelUnavailable": {
+        "title": "Потребно е внимание за Code Reviewer",
+        "description": "Code Reviewer е оневозможен затоа што избраниот модел не е достапен за сесии на облачни агенти. Изберете достапен модел, па повторно овозможете го Code Reviewer.",
+        "recoveryLabel": "Ажурирај Code Reviewer поставки"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Потребно е внимание за Code Reviewer",
+        "description": "Code Reviewer е оневозможен по три истекувања на време за клонирање на складиште денес. Контактирајте hi@kilocode.ai за помош, па повторно овозможете го Code Reviewer.",
+        "recoveryLabel": "Контактирај поддршка"
+      }
+    },
+    "unknownError": "Непозната грешка"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Наодот е под автоматскиот праг на сериозност. Рачната санација сепак може да започне кога безбедносните пречки ќе бидат поминати.",
       "beforeEnablement": "Анализата е завршена пред да се овозможи автоматската санација. Рачната санација сепак може да започне кога безбедносните пречки ќе бидат поминати.",
       "generic": "Санирањето е недостапно за овој наод."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Капацитетот за анализа е полн. Почекајте активната анализа да заврши, па обидете се повторно.",
+      "githubTokenUnavailable": "Потребно е внимание за GitHub авторизацијата. Повторно авторизирајте го GitHub App, па обидете се повторно.",
+      "githubAuthInvalid": "Потребно е внимание за GitHub авторизацијата. Повторно авторизирајте го GitHub App, па обидете се повторно.",
+      "findingUnavailable": "Наодот повеќе не е достапен. Освежете ги наодите и обидете се повторно ако остане отворен.",
+      "repositoryUnavailable": "Складиштето повеќе не е достапно за GitHub App. Освежете го пристапот до складиштето, па обидете се повторно.",
+      "invalidDismissTarget": "Наодот не може да се отфрли затоа што неговата Dependabot цел е невалидна.",
+      "commandStalled": "Поставената акција не заврши навреме. Повторете ја акцијата.",
+      "queueRetriesExhausted": "Акцијата не можеше да се заврши по неколку обиди. Повторете ја акцијата.",
+      "queueAdmissionFailed": "Поставената акција не можеше да се прифати. Повторете ја акцијата.",
+      "generic": "Поставената акција не успеа. Повторете ја акцијата."
+    },
+    "analysisMode": {
+      "auto": "Автоматски",
+      "shallow": "Плитко",
+      "deep": "Длабоко"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Додади {{name}} во омилени",
       "removeFromFavorites": "Отстрани {{name}} од омилени",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Модел на сесија"
     },
     "attachmentPreview": {
       "openFailedRetry": "Не успеав да ја отворам датотеката. Обидете се повторно.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Додади кредити",
-    "description": "Додајте кредити за да ја одржите употребата активна."
+    "description": "Додајте кредити за да ја одржите употребата активна.",
+    "billingPage": "страница за наплата"
   },
   "deviceSessions": {
     "couldNotLoad": "Не можев да ги вчитам сесиите",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Не успеа враќањето на купувањата. Обидете се повторно.",
     "purchaseFailed": "Не успеа завршувањето на купувањето.",
     "purchaseStartFailed": "Не успеа започнувањето на купување од App Store.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass-от на оваа Apple сметка припаѓа на друга Kilo сметка."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass-от на оваа Apple сметка припаѓа на друга Kilo сметка.",
+    "couldNotConnectToAppStore": "Не можеше да се поврзе со App Store. Проверете ја вашата врска и обидете се повторно.",
+    "noMatchingProducts": "App Store не врати соодветни Kilo Pass производи.",
+    "purchaseMissingSignedTransaction": "Купувањето од App Store не вклучуваше потпишана трансакциска JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Има простор за подобрување",
     "sorryTitle": "Жал ни е што го чуеме тоа!",
     "sorryMessage": "Ве молиме кажете ни што треба да биде подобро. Инженерот задолжен за апликацијата чита секој извештај!",
-    "emailUs": "Испратете ни е-пошта"
+    "emailUs": "Испратете ни е-пошта",
+    "emailSubject": "повратна информација за мобилната апликација"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Нема активност со кредити",
       "expires": "Истекува {{date}}",
       "title": "Активност со кредити",
-      "transactionFallback": "Кредитна трансакција"
+      "transactionFallback": "Кредитна трансакција",
+      "category": {
+        "organization_custom": "Прилагодено за организацијата",
+        "parent_to_child_transfer_in": "Трансфер од родител на дете (влез)",
+        "parent_to_child_transfer_out": "Трансфер од родител на дете (излез)",
+        "oss-sponsorship": "OSS спонзорство",
+        "oss-monthly-reset": "OSS месечно ресетирање",
+        "team-topup-bonus-2025": "Тимски top-up бонус 2025",
+        "accounting_adjustment": "Сметководствена корекција",
+        "credits_expired": "Истечени кредити"
+      }
     },
     "inviteMember": {
       "emailError": "Внесете валидна е-пошта адреса",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Фактурите се генерираат автоматски при секој циклус на наплата и ќе се појават тука откако вашата организација ќе биде наплатена.",
       "emptyTitle": "Нема фактури",
       "invoiceFallback": "Фактура",
-      "statusOpen": "Отворено",
-      "statusPaid": "Платено",
-      "statusVoid": "Поништено",
       "title": "Фактури",
       "downloadFailed": "Не можеше да се преземе фактурата. Проверете ја вашата врска и обидете се повторно.",
-      "sharingUnavailable": "Споделувањето не е достапно на овој уред."
+      "sharingUnavailable": "Споделувањето не е достапно на овој уред.",
+      "status": {
+        "paid": "Платено",
+        "open": "Отворено",
+        "void": "Поништено",
+        "draft": "Нацрт",
+        "uncollectible": "Ненаплатливо",
+        "unknown": "Непознато"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Собрани податоци",
     "free": "Бесплатно",
-    "couldNotUpdateFavorites": "Не успеа ажурирањето на омилените"
+    "couldNotUpdateFavorites": "Не успеа ажурирањето на омилените",
+    "thinkingEffort": {
+      "none": "Ниту една",
+      "minimal": "Минимално",
+      "low": "Ниско",
+      "medium": "Средно",
+      "high": "Високо",
+      "xhigh": "Екстра високо",
+      "max": "Максимално"
+    }
   }
 }

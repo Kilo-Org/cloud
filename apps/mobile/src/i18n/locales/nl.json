@@ -382,7 +382,11 @@
       "paymentPastDue": "Betaling achterstallig. Werk je betaalmethode bij.",
       "subscriptionCancels": "Abonnement wordt geannuleerd op {{date}}",
       "trialDaysRemaining": "Proefperiode: {{remaining}} resterend",
-      "trialEndingSoon": "Proefperiode eindigt binnenkort: {{remaining}}"
+      "trialEndingSoon": "Proefperiode eindigt binnenkort: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Wat is er nieuw",
@@ -750,7 +754,8 @@
       "strongArm": "Sterke arm",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Deze instantie kan geen bestanden ontvangen."
+    "remoteSpawnFilesNotSupported": "Deze instantie kan geen bestanden ontvangen.",
+    "instanceSwitcherTitle": "KiloClaw-instantie"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -948,7 +953,60 @@
       "failed": "Mislukt",
       "cancelled": "Geannuleerd",
       "interrupted": "Onderbroken"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Strict",
+      "balanced": "Gebalanceerd",
+      "lenient": "Soepel",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Beveiliging",
+      "performance": "Prestaties",
+      "bugs": "Bugs",
+      "style": "Stijl",
+      "testing": "Testen",
+      "documentation": "Documentatie"
+    },
+    "gateThreshold": {
+      "off": "Uit",
+      "all": "Alles",
+      "warning": "Waarschuwing",
+      "critical": "Kritiek"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer heeft aandacht nodig",
+        "description": "Code Reviewer is uitgeschakeld omdat Kilo geen toegang tot deze repository heeft met een actieve GitHub App-installatie. Werk de GitHub App-installatie bij en schakel Code Reviewer vervolgens weer in.",
+        "recoveryLabel": "GitHub App bijwerken"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer heeft aandacht nodig",
+        "description": "Code Reviewer is uitgeschakeld omdat deze GitHub-organisatie een IP-toegangslijst gebruikt die Kilo blokkeert. Neem contact op met hi@kilocode.ai voor hulp en schakel Code Reviewer vervolgens weer in.",
+        "recoveryLabel": "Contact opnemen met ondersteuning"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer heeft aandacht nodig",
+        "description": "Code Reviewer is uitgeschakeld omdat Kilo geen GitLab Project Access Token voor dit project kan aanmaken. Verleen Maintainer-toegang of schakel Project Access Tokens in en schakel Code Reviewer vervolgens weer in.",
+        "recoveryLabel": "GitLab-integratie bijwerken"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer heeft aandacht nodig",
+        "description": "Code Reviewer is uitgeschakeld omdat de geselecteerde BYOK API-sleutel ongeldig is, is ingetrokken of onvoldoende rechten heeft. Werk de sleutel bij of kies een ander model en schakel Code Reviewer vervolgens weer in.",
+        "recoveryLabel": "BYOK-instellingen bijwerken"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer heeft aandacht nodig",
+        "description": "Code Reviewer is uitgeschakeld omdat het geselecteerde model niet beschikbaar is voor cloudagentsessies. Kies een beschikbaar model en schakel Code Reviewer vervolgens weer in.",
+        "recoveryLabel": "Code Reviewer-instellingen bijwerken"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer heeft aandacht nodig",
+        "description": "Code Reviewer is uitgeschakeld na drie time-outs bij het klonen van de repository vandaag. Neem contact op met hi@kilocode.ai voor hulp en schakel Code Reviewer vervolgens weer in.",
+        "recoveryLabel": "Contact opnemen met ondersteuning"
+      }
+    },
+    "unknownError": "Onbekende fout"
   },
   "securityAgent": {
     "filter": {
@@ -1488,6 +1546,23 @@
       "belowThreshold": "De bevinding zit onder de automatische ernstdrempel. Handmatig herstel kan nog steeds starten als de veiligheidscontroles slagen.",
       "beforeEnablement": "Analyse is voltooid voordat Automatisch herstel werd ingeschakeld. Handmatig herstel kan nog steeds starten als de veiligheidscontroles slagen.",
       "generic": "Herstel is niet beschikbaar voor deze bevinding."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Analysecapaciteit is vol. Wacht tot een actieve analyse is afgerond en probeer het opnieuw.",
+      "githubTokenUnavailable": "GitHub-autorisatie heeft aandacht nodig. Autoriseer de GitHub App opnieuw en probeer het opnieuw.",
+      "githubAuthInvalid": "GitHub-autorisatie heeft aandacht nodig. Autoriseer de GitHub App opnieuw en probeer het opnieuw.",
+      "findingUnavailable": "De bevinding is niet meer beschikbaar. Vernieuw de bevindingen en probeer het opnieuw als deze nog open is.",
+      "repositoryUnavailable": "De repository is niet meer beschikbaar voor de GitHub App. Vernieuw de repositorytoegang en probeer het opnieuw.",
+      "invalidDismissTarget": "De bevinding kan niet worden genegeerd omdat het Dependabot-doel ongeldig is.",
+      "commandStalled": "De actie in de wachtrij is niet op tijd afgerond. Probeer de actie opnieuw.",
+      "queueRetriesExhausted": "De actie kon na meerdere pogingen niet worden voltooid. Probeer de actie opnieuw.",
+      "queueAdmissionFailed": "De actie in de wachtrij kon niet worden toegelaten. Probeer de actie opnieuw.",
+      "generic": "De actie in de wachtrij is mislukt. Probeer de actie opnieuw."
+    },
+    "analysisMode": {
+      "auto": "Automatisch",
+      "shallow": "Oppervlakkig",
+      "deep": "Diep"
     }
   },
   "agents": {
@@ -1951,7 +2026,8 @@
       "addToFavorites": "{{name}} aan favorieten toevoegen",
       "removeFromFavorites": "{{name}} uit favorieten verwijderen",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Gem"
+      "thinkingEffortMedium": "Gem",
+      "sessionModel": "Sessiemodel"
     },
     "attachmentPreview": {
       "openFailedRetry": "Bestand openen mislukt. Probeer het opnieuw.",
@@ -2083,7 +2159,8 @@
   },
   "addCredits": {
     "cta": "Credits toevoegen",
-    "description": "Voeg credits toe om het gebruik draaiende te houden."
+    "description": "Voeg credits toe om het gebruik draaiende te houden.",
+    "billingPage": "factureringspagina"
   },
   "deviceSessions": {
     "couldNotLoad": "Sessies konden niet worden geladen",
@@ -2271,7 +2348,10 @@
     "restoreFailed": "Aankopen herstellen mislukt. Probeer het opnieuw.",
     "purchaseFailed": "Aankoop voltooien mislukt.",
     "purchaseStartFailed": "App Store-aankoop starten mislukt.",
-    "purchaseOwnedByAnotherAccount": "De Kilo Pass op dit Apple-account hoort bij een ander Kilo-account."
+    "purchaseOwnedByAnotherAccount": "De Kilo Pass op dit Apple-account hoort bij een ander Kilo-account.",
+    "couldNotConnectToAppStore": "Kan geen verbinding maken met de App Store. Controleer je verbinding en probeer het opnieuw.",
+    "noMatchingProducts": "De App Store gaf geen overeenkomende Kilo Pass-producten terug.",
+    "purchaseMissingSignedTransaction": "De App Store-aankoop bevatte geen ondertekende transactie-JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2779,7 +2859,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} geselecteerd, tik om de selectie te wijzigen",
       "tapToComment": "{{label}}, tik om te reageren",
-      "truncationBanner": "De eerste {{limit}} van {{total}} gewijzigde bestanden worden getoond — GitHub API-limiet"
+      "truncationBanner": "De eerste {{limit}} van {{total}} gewijzigde bestanden worden getoond — GitHub API-limiet",
+      "statusAdded": "Toegevoegd",
+      "statusContext": "Context",
+      "statusDeleted": "Verwijderd"
     },
     "linkPasteClipboardEmpty": "Klembord is leeg",
     "linkPasteNotAPullRequest": "Geen GitHub pull-requestlink",
@@ -2793,6 +2876,11 @@
       "reviewNotSubmitted": "Deze review kan niet zo worden ingediend. De PR is mogelijk gewijzigd, of je kunt je eigen pull-aanvraag niet beoordelen.",
       "couldNotPostComment": "Opmerking kon niet worden geplaatst.",
       "couldNotSubmitReview": "Review kon niet worden verzonden. Controleer je verbinding en probeer het opnieuw."
+    },
+    "operation": {
+      "couldNotReply": "Kon niet reageren.",
+      "couldNotCompleteAction": "Deze actie kon niet worden voltooid.",
+      "mergeResultDefaultError": "GitHub heeft de merge niet voltooid."
     }
   },
   "organization": {
@@ -2810,7 +2898,17 @@
       "emptyTitle": "Geen creditactiviteit",
       "expires": "Verloopt {{date}}",
       "title": "Creditactiviteit",
-      "transactionFallback": "Credittransactie"
+      "transactionFallback": "Credittransactie",
+      "category": {
+        "organization_custom": "Aangepast door organisatie",
+        "parent_to_child_transfer_in": "Overdracht van bovenliggende naar onderliggende organisatie (in)",
+        "parent_to_child_transfer_out": "Overdracht van bovenliggende naar onderliggende organisatie (uit)",
+        "oss-sponsorship": "OSS-sponsorschap",
+        "oss-monthly-reset": "OSS-maandelijkse reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Boekhoudkundige correctie",
+        "credits_expired": "Credits verlopen"
+      }
     },
     "hub": {
       "balance": "Saldo",
@@ -2837,11 +2935,16 @@
       "emptyTitle": "Geen facturen",
       "invoiceFallback": "Factuur",
       "title": "Facturen",
-      "statusPaid": "Betaald",
-      "statusOpen": "Open",
-      "statusVoid": "Ongegrond",
       "downloadFailed": "Factuur kon niet worden gedownload. Controleer je verbinding en probeer het opnieuw.",
-      "sharingUnavailable": "Delen is niet beschikbaar op dit apparaat."
+      "sharingUnavailable": "Delen is niet beschikbaar op dit apparaat.",
+      "status": {
+        "paid": "Betaald",
+        "open": "Open",
+        "void": "Ongegrond",
+        "draft": "Concept",
+        "uncollectible": "Oninbaar",
+        "unknown": "Onbekend"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2941,7 +3044,8 @@
     "promptTitle": "Hoe bevalt de Kilo-app je?",
     "rateKilo": "Kilo beoordelen",
     "sorryMessage": "Laat ons weten wat er beter kan. De engineer die over de app gaat, leest elk rapport!",
-    "sorryTitle": "Wat jammer om te horen!"
+    "sorryTitle": "Wat jammer om te horen!",
+    "emailSubject": "feedback op mobiele app"
   },
   "authErrors": {
     "emailAlreadyUsed": "Er bestaat al een account met dit e-mailadres via een andere aanmeldmethode. Probeer een andere methode of gebruik '$t(login.moreSignInOptions)'.",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Verzamelde gegevens",
     "free": "Gratis",
-    "couldNotUpdateFavorites": "Kon favorieten niet bijwerken"
+    "couldNotUpdateFavorites": "Kon favorieten niet bijwerken",
+    "thinkingEffort": {
+      "none": "Geen",
+      "minimal": "Minimaal",
+      "low": "Laag",
+      "medium": "Gemiddeld",
+      "high": "Hoog",
+      "xhigh": "Extra hoog",
+      "max": "Max"
+    }
   }
 }

@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "បានជ្រើសរើស {{label}} ប៉ះដើម្បីប្តូរការជ្រើសរើស",
       "tapToComment": "{{label}} ប៉ះដើម្បីធ្វើអត្ថាធិប្បាយ",
-      "truncationBanner": "កំពុងបង្ហាញ {{limit}} ដំបូងក្នុងចំណោម {{total}} ឯកសារដែលបានផ្លាស់ប្តូរ — ដែនកំណត់ GitHub API"
+      "truncationBanner": "កំពុងបង្ហាញ {{limit}} ដំបូងក្នុងចំណោម {{total}} ឯកសារដែលបានផ្លាស់ប្តូរ — ដែនកំណត់ GitHub API",
+      "statusAdded": "បានបន្ថែម",
+      "statusContext": "បរិបទ",
+      "statusDeleted": "បានលុប"
     },
     "linkPasteClipboardEmpty": "ក្ដារតម្បៀតខ្ទាស់ទទេ",
     "linkPasteNotAPullRequest": "មិនមែនជាតំណ pull request របស់ GitHub ទេ",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "ការពិនិត្យនេះមិនអាចដាក់ស្នើដូចដែលវាគឺបានទេ។ PR អាចប្តូរ ឬអ្នកមិនអាចពិនិត្យសំណើទាញរបស់ខ្លួនឯងបានទេ។",
       "couldNotPostComment": "មិនអាចប្រកាសអត្ថាធិប្បាយបានទេ។",
       "couldNotSubmitReview": "មិនអាចដាក់ស្នើការពិនិត្យបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។"
+    },
+    "operation": {
+      "couldNotReply": "មិនអាចឆ្លើយតបបានទេ។",
+      "couldNotCompleteAction": "មិនអាចបញ្ចប់សកម្មភាពនេះបានទេ។",
+      "mergeResultDefaultError": "GitHub មិនបានបញ្ចប់ការបញ្ចូលទេ។"
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "ការទូទាត់ហួសកំណត់។ សូមធ្វើបច្ចុប្បន្នភាពវិធីសាស្ត្រទូទាត់របស់អ្នក។",
       "subscriptionCancels": "ការជាវនឹងត្រូវលុបចោល {{date}}",
       "trialDaysRemaining": "សាកល្បង៖ នៅសល់ {{remaining}}",
-      "trialEndingSoon": "ការសាកល្បងនឹងបញ្ចប់ឆាប់ៗ៖ {{remaining}}"
+      "trialEndingSoon": "ការសាកល្បងនឹងបញ្ចប់ឆាប់ៗ៖ {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "អ្វីដែលថ្មី",
@@ -1189,7 +1201,8 @@
       "strongArm": "ដៃខ្លាំង",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "instance នេះមិនអាចទទួលឯកសារបានទេ។"
+    "remoteSpawnFilesNotSupported": "instance នេះមិនអាចទទួលឯកសារបានទេ។",
+    "instanceSwitcherTitle": "ឧទាហរណ៍ KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "បានបរាជ័យ",
       "cancelled": "បានលុបចោល",
       "interrupted": "ត្រូវបានរំខាន"
-    }
+    },
+    "reviewStyle": {
+      "strict": "តឹងរ៉ឹង",
+      "balanced": "មានតុល្យភាព",
+      "lenient": "ស្រាល",
+      "roast": "រ៉ូស្ត"
+    },
+    "focusArea": {
+      "security": "សន្តិសុខ",
+      "performance": "ដំណើរការ",
+      "bugs": "កំហុស",
+      "style": "ស្ទីល",
+      "testing": "ការធ្វើតេស្ត",
+      "documentation": "ឯកសារ"
+    },
+    "gateThreshold": {
+      "off": "បិទ",
+      "all": "ទាំងអស់",
+      "warning": "ការព្រមាន",
+      "critical": "សំខាន់"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer ត្រូវការការយកចិត្តទុកដាក់",
+        "description": "Code Reviewer ត្រូវបានបិទ ព្រោះ Kilo មិនអាចចូលប្រើឃ្លាំងនេះជាមួយការដំឡើង GitHub App សកម្មបានទេ។ ធ្វើបច្ចុប្បន្នភាពការដំឡើង GitHub App បន្ទាប់មកបើក Code Reviewer ម្តងទៀត។",
+        "recoveryLabel": "ធ្វើបច្ចុប្បន្នភាព GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer ត្រូវការការយកចិត្តទុកដាក់",
+        "description": "Code Reviewer ត្រូវបានបិទ ព្រោះអង្គការ GitHub នេះប្រើបញ្ជីអនុញ្ញាត IP ដែលរារាំង Kilo។ ទាក់ទង hi@kilocode.ai សម្រាប់ជំនួយ បន្ទាប់មកបើក Code Reviewer ម្តងទៀត។",
+        "recoveryLabel": "ទាក់ទងការគាំទ្រ"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer ត្រូវការការយកចិត្តទុកដាក់",
+        "description": "Code Reviewer ត្រូវបានបិទ ព្រោះ Kilo មិនអាចបង្កើត GitLab Project Access Token សម្រាប់គម្រោងនេះបានទេ។ ផ្តល់សិទ្ធិ Maintainer ឬបើក Project Access Tokens បន្ទាប់មកបើក Code Reviewer ម្តងទៀត។",
+        "recoveryLabel": "ធ្វើបច្ចុប្បន្នភាពការរួមបញ្ចូល GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer ត្រូវការការយកចិត្តទុកដាក់",
+        "description": "Code Reviewer ត្រូវបានបិទ ព្រោះសោ API BYOK ដែលបានជ្រើសរើសមិនត្រឹមត្រូវ ត្រូវបានដកហូត ឬគ្មានការអនុញ្ញាត។ ធ្វើបច្ចុប្បន្នភាពសោ ឬជ្រើសរើសគំរូផ្សេង បន្ទាប់មកបើក Code Reviewer ម្តងទៀត។",
+        "recoveryLabel": "ធ្វើបច្ចុប្បន្នភាពការកំណត់ BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer ត្រូវការការយកចិត្តទុកដាក់",
+        "description": "Code Reviewer ត្រូវបានបិទ ព្រោះគំរូដែលបានជ្រើសរើសមិនអាចប្រើបានសម្រាប់សម័យការ cloud agent ទេ។ ជ្រើសរើសគំរូដែលអាចប្រើបាន បន្ទាប់មកបើក Code Reviewer ម្តងទៀត។",
+        "recoveryLabel": "ធ្វើបច្ចុប្បន្នភាពការកំណត់ Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer ត្រូវការការយកចិត្តទុកដាក់",
+        "description": "Code Reviewer ត្រូវបានបិទ បន្ទាប់ពីការផុតកំណត់ពេលក្លូនឃ្លាំងចំនួនបីនៅថ្ងៃនេះ។ ទាក់ទង hi@kilocode.ai សម្រាប់ជំនួយ បន្ទាប់មកបើក Code Reviewer ម្តងទៀត។",
+        "recoveryLabel": "ទាក់ទងការគាំទ្រ"
+      }
+    },
+    "unknownError": "កំហុសមិនស្គាល់"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "ការរកឃើញទាបជាងកម្រិតភាពធ្ងន់ធ្ងរដោយស្វ័យប្រវត្តិ។ ការដោះស្រាយដោយដៃនៅតែអាចចាប់ផ្តើមបាន នៅពេលដែលច្រកសុវត្ថិភាពឆ្លងកាត់។",
       "beforeEnablement": "ការវិភាគបានបញ្ចប់ មុនពេលការកែតម្រូវដោយស្វ័យប្រវត្តិត្រូវបានបើក។ ការដោះស្រាយដោយដៃនៅតែអាចចាប់ផ្តើមបាន នៅពេលដែលច្រកសុវត្ថិភាពឆ្លងកាត់។",
       "generic": "ការដោះស្រាយមិនអាចប្រើបានសម្រាប់ការរកឃើញនេះ។"
+    },
+    "commandFailure": {
+      "ownerCapReached": "សមត្ថភាពវិភាគពេញហើយ។ រង់ចាំការវិភាគសកម្មបញ្ចប់ បន្ទាប់មកព្យាយាមម្តងទៀត។",
+      "githubTokenUnavailable": "ការអនុញ្ញាត GitHub ត្រូវការការយកចិត្តទុកដាក់។ អនុញ្ញាត GitHub App ឡើងវិញ បន្ទាប់មកព្យាយាមម្តងទៀត។",
+      "githubAuthInvalid": "ការអនុញ្ញាត GitHub ត្រូវការការយកចិត្តទុកដាក់។ អនុញ្ញាត GitHub App ឡើងវិញ បន្ទាប់មកព្យាយាមម្តងទៀត។",
+      "findingUnavailable": "ការរកឃើញមិនអាចប្រើបានទៀតទេ។ ធ្វើឱ្យការរកឃើញស្រស់ ហើយព្យាយាមម្តងទៀត ប្រសិនបើវានៅតែបើក។",
+      "repositoryUnavailable": "ឃ្លាំងមិនអាចប្រើបានសម្រាប់ GitHub App ទៀតទេ។ ធ្វើឱ្យការចូលប្រើឃ្លាំងស្រស់ បន្ទាប់មកព្យាយាមម្តងទៀត។",
+      "invalidDismissTarget": "ការរកឃើញមិនអាចត្រូវបានលុបចោលបានទេ ព្រោះគោលដៅ Dependabot របស់វាមិនត្រឹមត្រូវ។",
+      "commandStalled": "សកម្មភាពក្នុងជួរមិនបានបញ្ចប់ទាន់ពេលទេ។ ព្យាយាមសកម្មភាពម្តងទៀត។",
+      "queueRetriesExhausted": "មិនអាចបញ្ចប់សកម្មភាពបានទេ បន្ទាប់ពីការព្យាយាមជាច្រើនដង។ ព្យាយាមសកម្មភាពម្តងទៀត។",
+      "queueAdmissionFailed": "សកម្មភាពក្នុងជួរមិនអាចទទួលយកបានទេ។ ព្យាយាមសកម្មភាពម្តងទៀត។",
+      "generic": "សកម្មភាពក្នុងជួរបានបរាជ័យ។ ព្យាយាមសកម្មភាពម្តងទៀត។"
+    },
+    "analysisMode": {
+      "auto": "ស្វ័យប្រវត្តិ",
+      "shallow": "រាក់",
+      "deep": "ជ្រៅ"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "បន្ថែម {{name}} ទៅចំណូលចិត្ត",
       "removeFromFavorites": "ដក {{name}} ចេញពីចំណូលចិត្ត",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "គំរូសម័យការ"
     },
     "attachmentPreview": {
       "openFailedRetry": "មិនអាចបើកឯកសារបានទេ។ សូមព្យាយាមម្តងទៀត។",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "បន្ថែមឥណទាន",
-    "description": "បន្ថែមឥណទានដើម្បីរក្សាការប្រើប្រាស់ឱ្យដំណើរការ។"
+    "description": "បន្ថែមឥណទានដើម្បីរក្សាការប្រើប្រាស់ឱ្យដំណើរការ។",
+    "billingPage": "ទំព័រវិក្កយបត្រ"
   },
   "deviceSessions": {
     "couldNotLoad": "មិនអាចផ្ទុកវគ្គបានទេ",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "បរាជ័យក្នុងការស្តារការទិញ។ ព្យាយាមម្តងទៀត។",
     "purchaseFailed": "បរាជ័យក្នុងការបញ្ចប់ការទិញ។",
     "purchaseStartFailed": "បរាជ័យក្នុងការចាប់ផ្ដើមការទិញ App Store។",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass នៅលើ Apple Account នេះជារបស់គណនី Kilo ផ្សេង។"
+    "purchaseOwnedByAnotherAccount": "Kilo Pass នៅលើ Apple Account នេះជារបស់គណនី Kilo ផ្សេង។",
+    "couldNotConnectToAppStore": "មិនអាចភ្ជាប់ទៅ App Store បានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
+    "noMatchingProducts": "App Store មិនបានប្រគល់ផលិតផល Kilo Pass ដែលត្រូវគ្នាទេ។",
+    "purchaseMissingSignedTransaction": "ការទិញ App Store មិនបានរួមបញ្ចូល JWS ប្រតិបត្តិការដែលបានចុះហត្ថលេខាទេ។"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "ត្រូវការកែលម្អ",
     "sorryTitle": "យើងសុំទោសដែលបានឮដូច្នេះ!",
     "sorryMessage": "សូមប្រាប់យើងពីអ្វីដែលត្រូវកែលម្អ។ វិស្វករដែលទទួលបន្ទុកកម្មវិធីអានរាល់របាយការណ៍!",
-    "emailUs": "ផ្ញើអ៊ីមែលមកយើង"
+    "emailUs": "ផ្ញើអ៊ីមែលមកយើង",
+    "emailSubject": "មតិកែលម្អកម្មវិធីទូរស័ព្ទ"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "គ្មានសកម្មភាពឥណទានទេ",
       "expires": "ផុតកំណត់ {{date}}",
       "title": "សកម្មភាពឥណទាន",
-      "transactionFallback": "ប្រតិបត្តិការឥណទាន"
+      "transactionFallback": "ប្រតិបត្តិការឥណទាន",
+      "category": {
+        "organization_custom": "តាមបំណងរបស់អង្គការ",
+        "parent_to_child_transfer_in": "ការផ្ទេរពីមេទៅកូន (ចូល)",
+        "parent_to_child_transfer_out": "ការផ្ទេរពីមេទៅកូន (ចេញ)",
+        "oss-sponsorship": "ការឧបត្ថម្ភ OSS",
+        "oss-monthly-reset": "ការកំណត់ឡើងវិញប្រចាំខែ OSS",
+        "team-topup-bonus-2025": "ប្រាក់រង្វាន់បន្ថែមក្រុម 2025",
+        "accounting_adjustment": "ការកែតម្រូវគណនេយ្យ",
+        "credits_expired": "ឥណទានផុតកំណត់"
+      }
     },
     "inviteMember": {
       "emailError": "បញ្ចូលអាសយដ្ឋានអ៊ីមែលត្រឹមត្រូវ",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "វិក្កយបត្រត្រូវបានបង្កើតដោយស្វ័យប្រវត្តិរាល់វដ្តគិតប្រាក់ ហើយនឹងបង្ហាញនៅទីនេះនៅពេលអង្គការរបស់អ្នកត្រូវបានគិតប្រាក់។",
       "emptyTitle": "គ្មានវិក្កយបត្រទេ",
       "invoiceFallback": "វិក្កយបត្រ",
-      "statusOpen": "បើក",
-      "statusPaid": "បានបង់",
-      "statusVoid": "ទុកចោល",
       "title": "វិក្កយបត្រ",
       "downloadFailed": "មិនអាចទាញយកវិក្កយបត្របានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
-      "sharingUnavailable": "ការចែករំលែកមិនអាចប្រើបាននៅលើឧបករណ៍នេះទេ។"
+      "sharingUnavailable": "ការចែករំលែកមិនអាចប្រើបាននៅលើឧបករណ៍នេះទេ។",
+      "status": {
+        "paid": "បានបង់",
+        "open": "បើក",
+        "void": "ទុកចោល",
+        "draft": "សេចក្តីព្រាង",
+        "uncollectible": "មិនអាចទារបាន",
+        "unknown": "មិនស្គាល់"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "ទិន្នន័យដែលប្រមូលបាន",
     "free": "ឥតគិតថ្លៃ",
-    "couldNotUpdateFavorites": "មិនអាចធ្វើបច្ចុប្បន្នភាពចំណូលចិត្ត"
+    "couldNotUpdateFavorites": "មិនអាចធ្វើបច្ចុប្បន្នភាពចំណូលចិត្ត",
+    "thinkingEffort": {
+      "none": "គ្មាន",
+      "minimal": "តិចតួចបំផុត",
+      "low": "ទាប",
+      "medium": "មធ្យម",
+      "high": "ខ្ពស់",
+      "xhigh": "ខ្ពស់ខ្លាំង",
+      "max": "អតិបរមា"
+    }
   }
 }

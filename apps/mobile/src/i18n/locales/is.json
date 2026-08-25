@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Valið {{label}}, bankaðu til að breyta vali",
       "tapToComment": "{{label}}, bankaðu til að skrifa athugasemd",
-      "truncationBanner": "Sýni fyrstu {{limit}} af {{total}} breyttum skrám — GitHub API takmörk"
+      "truncationBanner": "Sýni fyrstu {{limit}} af {{total}} breyttum skrám — GitHub API takmörk",
+      "statusAdded": "Bætt",
+      "statusContext": "Samhengi",
+      "statusDeleted": "Eytt"
     },
     "linkPasteClipboardEmpty": "Klippiborð er tómt",
     "linkPasteNotAPullRequest": "Ekki GitHub pull request hlekkur",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Ekki er hægt að senda þessa úttekt eins og hún er. PR-inn kann að hafa breyst, eða þú getur ekki yfirfarið þinn eigin pull request.",
       "couldNotPostComment": "Gat ekki birt athugasemd.",
       "couldNotSubmitReview": "Gat ekki sent úttekt. Athugaðu tenginguna og reyndu aftur."
+    },
+    "operation": {
+      "couldNotReply": "Gat ekki svarað.",
+      "couldNotCompleteAction": "Gat ekki lokið þessari aðgerð.",
+      "mergeResultDefaultError": "GitHub kláraði ekki sameininguna."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Greiðsla er komin fram yfir gjalddaga. Uppfærðu greiðslumáta þinn.",
       "subscriptionCancels": "Áskrift fellur úr gildi {{date}}",
       "trialDaysRemaining": "Reynslutímabil: {{remaining}} eftir",
-      "trialEndingSoon": "Reynslutímabili lýkur fljótlega: {{remaining}}"
+      "trialEndingSoon": "Reynslutímabili lýkur fljótlega: {{remaining}}",
+      "planName": {
+        "commit": "Skuldbinda",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Hvað er nýtt",
@@ -1189,7 +1201,8 @@
       "strongArm": "Sterkur handleggur",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Þetta tilvik getur ekki tekið við skrám."
+    "remoteSpawnFilesNotSupported": "Þetta tilvik getur ekki tekið við skrám.",
+    "instanceSwitcherTitle": "KiloClaw tilvik"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Mistókst",
       "cancelled": "Hætt við",
       "interrupted": "Rofið"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Strangt",
+      "balanced": "Jafnvægt",
+      "lenient": "Eftirgefið",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Öryggi",
+      "performance": "Afköst",
+      "bugs": "Gallar",
+      "style": "Stíll",
+      "testing": "Prófanir",
+      "documentation": "Skjölun"
+    },
+    "gateThreshold": {
+      "off": "Af",
+      "all": "Allt",
+      "warning": "Viðvörun",
+      "critical": "Alvarlegt"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer þarfnast athygli",
+        "description": "Code Reviewer var óvirkur vegna þess að Kilo getur ekki nálgast þessa geymslu með virkri GitHub App-uppsetningu. Uppfærðu GitHub App-uppsetninguna, og virkjaðu svo Code Reviewer aftur.",
+        "recoveryLabel": "Uppfæra GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer þarfnast athygli",
+        "description": "Code Reviewer var óvirkur vegna þess að þessi GitHub-stofnun notar IP-leyfislista sem loka á Kilo. Hafðu samband við hi@kilocode.ai til að fá hjálp, og virkjaðu svo Code Reviewer aftur.",
+        "recoveryLabel": "Hafðu samband við þjónustuver"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer þarfnast athygli",
+        "description": "Code Reviewer var óvirkur vegna þess að Kilo getur ekki búið til GitLab Project Access Token fyrir þetta verkefni. Veittu Maintainer-aðgang eða virkjaðu Project Access Tokens, og virkjaðu svo Code Reviewer aftur.",
+        "recoveryLabel": "Uppfæra GitLab-samþættingu"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer þarfnast athygli",
+        "description": "Code Reviewer var óvirkur vegna þess að valdi BYOK API-lykillinn er ógildur, afturkallaður eða skortir heimild. Uppfærðu lykilinn eða veldu annað líkan, og virkjaðu svo Code Reviewer aftur.",
+        "recoveryLabel": "Uppfæra BYOK-stillingar"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer þarfnast athygli",
+        "description": "Code Reviewer var óvirkur vegna þess að valda líkanið er ekki tiltækt fyrir cloud agent-lotur. Veldu tiltækt líkan, og virkjaðu svo Code Reviewer aftur.",
+        "recoveryLabel": "Uppfæra Code Reviewer-stillingar"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer þarfnast athygli",
+        "description": "Code Reviewer var óvirkur eftir þrjú tímamörk á geymsluklónun í dag. Hafðu samband við hi@kilocode.ai til að fá hjálp, og virkjaðu svo Code Reviewer aftur.",
+        "recoveryLabel": "Hafðu samband við þjónustuver"
+      }
+    },
+    "unknownError": "Óþekkt villa"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Atvik er undir lágmarksalvarleika sjálfvirkra úrbóta. Handvirkar úrbætur geta samt hafist þegar öryggisgáttir standast.",
       "beforeEnablement": "Greining lauk áður en sjálfvirkar úrbætur voru virkjaðar. Handvirkar úrbætur geta samt hafist þegar öryggisgáttir standast.",
       "generic": "Úrbætur eru ekki tiltækar fyrir þetta atvik."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Greiningargeta er full. Bíddu þar til virk greining lýkur, og reyndu svo aftur.",
+      "githubTokenUnavailable": "GitHub-heimild þarfnast athygli. Endurheimildu GitHub App, og reyndu svo aftur.",
+      "githubAuthInvalid": "GitHub-heimild þarfnast athygli. Endurheimildu GitHub App, og reyndu svo aftur.",
+      "findingUnavailable": "Atvik er ekki lengur tiltækt. Endurnýjaðu atvik og reyndu aftur ef það er enn opið.",
+      "repositoryUnavailable": "Geymsla er ekki lengur tiltæk GitHub App. Endurnýjaðu geymsluaðgang, og reyndu svo aftur.",
+      "invalidDismissTarget": "Ekki er hægt að vísa atviki frá vegna þess að Dependabot-markmið þess er ógilt.",
+      "commandStalled": "Aðgerð í biðröð lauk ekki í tíma. Reyndu aðgerðina aftur.",
+      "queueRetriesExhausted": "Ekki tókst að klára aðgerðina eftir nokkrar tilraunir. Reyndu aðgerðina aftur.",
+      "queueAdmissionFailed": "Ekki tókst að setja aðgerð í biðröð. Reyndu aðgerðina aftur.",
+      "generic": "Aðgerð í biðröð mistókst. Reyndu aðgerðina aftur."
+    },
+    "analysisMode": {
+      "auto": "Sjálfvirkt",
+      "shallow": "Grunn",
+      "deep": "Djúpt"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Bæta {{name}} við eftirlæti",
       "removeFromFavorites": "Fjarlægja {{name}} af eftirlætum",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Mið"
+      "thinkingEffortMedium": "Mið",
+      "sessionModel": "Lotulíkan"
     },
     "attachmentPreview": {
       "openFailedRetry": "Ekki tókst að opna skrána. Reyndu aftur.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Bæta við kredítum",
-    "description": "Bættu við kredítum til að halda notkuninni gangandi."
+    "description": "Bættu við kredítum til að halda notkuninni gangandi.",
+    "billingPage": "reikningasíðu"
   },
   "deviceSessions": {
     "couldNotLoad": "Ekki tókst að hlaða lotur",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Mistókst að endurheimta kaup. Reyndu aftur.",
     "purchaseFailed": "Mistókst að ljúka kaupum.",
     "purchaseStartFailed": "Mistókst að hefja App Store-kaup.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass á þessum Apple-reikningi tilheyrir öðrum Kilo-reikningi."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass á þessum Apple-reikningi tilheyrir öðrum Kilo-reikningi.",
+    "couldNotConnectToAppStore": "Gat ekki tengst App Store. Athugaðu tenginguna og reyndu aftur.",
+    "noMatchingProducts": "Engar samsvarandi Kilo Pass-vörur komu frá App Store.",
+    "purchaseMissingSignedTransaction": "App Store-kaup innihéldu ekki undirritaða færslu JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Þarfnast úrbóta",
     "sorryTitle": "Okkur þykir leitt að heyra það!",
     "sorryMessage": "Vinsamlega láttu okkur vita hvað þarf að bæta. Verkfræðingurinn sem sér um appið les hverja einustu skýrslu!",
-    "emailUs": "Sendu okkur tölvupóst"
+    "emailUs": "Sendu okkur tölvupóst",
+    "emailSubject": "Ábending um farsímaapp"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Engin kreditvirkni",
       "expires": "Rennur út {{date}}",
       "title": "Kreditvirkni",
-      "transactionFallback": "Kreditfærsla"
+      "transactionFallback": "Kreditfærsla",
+      "category": {
+        "organization_custom": "Sérsniðið fyrir félag",
+        "parent_to_child_transfer_in": "Flutningur inn frá móðurfélagi",
+        "parent_to_child_transfer_out": "Flutningur út til móðurfélags",
+        "oss-sponsorship": "OSS-styrkur",
+        "oss-monthly-reset": "OSS-mánaðarleg endurstilling",
+        "team-topup-bonus-2025": "Hópáfyllingarbónus 2025",
+        "accounting_adjustment": "Bókhaldsleiðrétting",
+        "credits_expired": "Kredítur runnu út"
+      }
     },
     "inviteMember": {
       "emailError": "Sláðu inn gilt tölvupóstfang",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Reikningar eru myndaðir sjálfkrafa á hverju innheimtutímabili og munu birtast hér þegar félagið þitt er innheimt.",
       "emptyTitle": "Engir reikningar",
       "invoiceFallback": "Reikningur",
-      "statusOpen": "Opin",
-      "statusPaid": "Greitt",
-      "statusVoid": "Ógilt",
       "title": "Reikningar",
       "downloadFailed": "Gat ekki hlaðið niður reikningi. Athugaðu tenginguna og reyndu aftur.",
-      "sharingUnavailable": "Deiling er ekki tiltæk á þessu tæki."
+      "sharingUnavailable": "Deiling er ekki tiltæk á þessu tæki.",
+      "status": {
+        "paid": "Greitt",
+        "open": "Opin",
+        "void": "Ógilt",
+        "draft": "Drög",
+        "uncollectible": "Óinnheimtanlegt",
+        "unknown": "Óþekkt"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Upplýsingar safnaðar",
     "free": "Ókeypis",
-    "couldNotUpdateFavorites": "Gat ekki uppfært uppáhald"
+    "couldNotUpdateFavorites": "Gat ekki uppfært uppáhald",
+    "thinkingEffort": {
+      "none": "Ekkert",
+      "minimal": "Lágmark",
+      "low": "Lágt",
+      "medium": "Miðlungs",
+      "high": "Hátt",
+      "xhigh": "Mjög hátt",
+      "max": "Hámark"
+    }
   }
 }

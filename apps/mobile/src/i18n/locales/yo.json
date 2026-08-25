@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Yan {{label}}, tẹ lati yi yiyan pada",
       "tapToComment": "{{label}}, tẹ lati sọ asọye",
-      "truncationBanner": "Ìfihàn àwọn fáìlì àkọ́kọ́ {{limit}} nínú {{total}} fáìlì tí a yí padà — ìpẹ̀kun API GitHub"
+      "truncationBanner": "Ìfihàn àwọn fáìlì àkọ́kọ́ {{limit}} nínú {{total}} fáìlì tí a yí padà — ìpẹ̀kun API GitHub",
+      "statusAdded": "Ti fi kun",
+      "statusContext": "Àyíká",
+      "statusDeleted": "Ti pa"
     },
     "linkPasteClipboardEmpty": "Àtẹ̀ àkójọpọ̀ ti ṣófo",
     "linkPasteNotAPullRequest": "Kì í ṣe ọ̀nà asopọ́ pull request GitHub",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "A kò lè fi àtúnyẹ̀wò yìí sílẹ̀ bí ó ti rí. PR lè ti yí padà, tàbí o kò lè ṣàtúnyẹ̀wò ìbéèrè fìfà tirẹ.",
       "couldNotPostComment": "Kò lè fi àsọyé sílẹ̀.",
       "couldNotSubmitReview": "Kò lè fi àtúnyẹ̀wò sílẹ̀. Ṣàyẹ̀wò àsopọ̀ rẹ kí o gbìyànjú lẹ́ẹ̀kan sí i."
+    },
+    "operation": {
+      "couldNotReply": "Ko le fesi.",
+      "couldNotCompleteAction": "Kò lè parí ìgbésẹ̀ yìí.",
+      "mergeResultDefaultError": "GitHub kò parí ìsopọ̀ náà."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Ìsanwó ti pẹ́. Jọ̀wọ́ mẹ́nu kàn ọ̀nà ìsanwó rẹ.",
       "subscriptionCancels": "Ìfọwọ́sí fagilé {{date}}",
       "trialDaysRemaining": "Ìgbìyànjú: {{remaining}} ọjọ́ ṣẹ́kù",
-      "trialEndingSoon": "Ìgbìyànjú ń parí láìpẹ́: {{remaining}}"
+      "trialEndingSoon": "Ìgbìyànjú ń parí láìpẹ́: {{remaining}}",
+      "planName": {
+        "commit": "Fọwọ́ sí",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Kí ni Tuntun",
@@ -1189,7 +1201,8 @@
       "strongArm": "Apá líle",
       "talisman": "Tálísímán"
     },
-    "remoteSpawnFilesNotSupported": "Àpẹrẹ yìí kò lè gba àwọn fáìlì."
+    "remoteSpawnFilesNotSupported": "Àpẹrẹ yìí kò lè gba àwọn fáìlì.",
+    "instanceSwitcherTitle": "Àpẹrẹ KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Kuna",
       "cancelled": "Ti fagilee",
       "interrupted": "Ti da duro"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Lile",
+      "balanced": "Dídọ̀gba",
+      "lenient": "Rọ̀rùn",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Ààbò",
+      "performance": "Ìṣiṣẹ́",
+      "bugs": "Àwọn àṣìṣe",
+      "style": "Àrà",
+      "testing": "Ìdánwò",
+      "documentation": "Ìwé àkọsílẹ̀"
+    },
+    "gateThreshold": {
+      "off": "Pa",
+      "all": "Gbogbo",
+      "warning": "Ìkìlọ̀",
+      "critical": "Àrà ọ̀tọ̀"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer nílò àfiyèsí",
+        "description": "A ti pa Code Reviewer nítorí pé Kilo kò lè wọlé sí ibi ìpamọ́ yìí pẹ̀lú ìtòlẹ́tò GitHub App tí ń ṣiṣẹ́. Ṣe ìmúdójúiwọn ìtòlẹ́tò GitHub App, lẹ́yìn náà tún Code Reviewer ṣiṣẹ́.",
+        "recoveryLabel": "Ṣe ìmúdójúiwọn GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer nílò àfiyèsí",
+        "description": "A ti pa Code Reviewer nítorí pé àjọ GitHub yìí lo àkójọ ààyè IP tí ń dí Kilo lọ́wọ́. Kàn sí hi@kilocode.ai fún ìrànwọ́, lẹ́yìn náà tún Code Reviewer ṣiṣẹ́.",
+        "recoveryLabel": "Kàn sí ìtìlẹ́yìn"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer nílò àfiyèsí",
+        "description": "A ti pa Code Reviewer nítorí pé Kilo kò lè dá Àmi Wọlé Ìṣẹ́ GitLab fún iṣẹ́ yìí. Fún ni ààyè Maintainer tàbí ṣe àwọn Àmi Wọlé Ìṣẹ́ ṣiṣẹ́, lẹ́yìn náà tún Code Reviewer ṣiṣẹ́.",
+        "recoveryLabel": "Ṣe ìmúdójúiwọn ìsopọ̀ GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer nílò àfiyèsí",
+        "description": "A ti pa Code Reviewer nítorí pé bọ́tìnnì API BYOK tí a yàn kò tọ́, a fagilé rẹ̀, tàbí kò ní ààyè. Ṣe ìmúdójúiwọn bọ́tìnnì náà tàbí yan awoṣe mìíràn, lẹ́yìn náà tún Code Reviewer ṣiṣẹ́.",
+        "recoveryLabel": "Ṣe ìmúdójúiwọn àwọn ètò BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer nílò àfiyèsí",
+        "description": "A ti pa Code Reviewer nítorí pé awoṣe tí a yàn kò sí fún àwọn igba-ijiroro aṣojú àwọsánmọ̀. Yan awoṣe tí ó wà, lẹ́yìn náà tún Code Reviewer ṣiṣẹ́.",
+        "recoveryLabel": "Ṣe ìmúdójúiwọn àwọn ètò Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer nílò àfiyèsí",
+        "description": "A ti pa Code Reviewer lẹ́yìn àkókò ìdarí kòpí ìpamọ́ mẹ́ta lónìí. Kàn sí hi@kilocode.ai fún ìrànwọ́, lẹ́yìn náà tún Code Reviewer ṣiṣẹ́.",
+        "recoveryLabel": "Kàn sí ìtìlẹ́yìn"
+      }
+    },
+    "unknownError": "Àṣìṣe àìmọ̀"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Abawọn wa ni isalẹ ipele iwọn pataki ladaa. Atunṣe ọwọ le tun bẹrẹ nigbati awọn ẹnu-ọna aabo ba kọja.",
       "beforeEnablement": "Itupalẹ pari ṣaaju ki o to mu Atunṣe ladaa ṣiṣẹ. Atunṣe ọwọ le tun bẹrẹ nigbati awọn ẹnu-ọna aabo ba kọja.",
       "generic": "Atunṣe ko wa fun abawọn yii."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Agbara itupalẹ ti kun. Duro fun itupalẹ ti nṣiṣẹ lọwọ lati pari, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i.",
+      "githubTokenUnavailable": "Ìfọwọ́sí GitHub nílò àfiyèsí. Tún fún GitHub App ní aṣẹ, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i.",
+      "githubAuthInvalid": "Ìfọwọ́sí GitHub nílò àfiyèsí. Tún fún GitHub App ní aṣẹ, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i.",
+      "findingUnavailable": "Àwírí náà kò sí mọ́. Tun ṣe àwọn àwírí kí o sì gbìyànjú lẹ́ẹ̀kan sí i bí ó bá ṣì ṣí.",
+      "repositoryUnavailable": "Ibi ìpamọ́ kò sí mọ́ fún GitHub App. Tun ṣe ààyè ibi ìpamọ́, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i.",
+      "invalidDismissTarget": "A kò lè fi àwírí náà sílẹ̀ nítorí pé àfojúsùn Dependabot rẹ̀ kò tọ́.",
+      "commandStalled": "Ìgbésẹ̀ tí ó wà ní ìlà kò parí ní àkókò. Tún gbìyànjú ìgbésẹ̀ náà.",
+      "queueRetriesExhausted": "A kò lè parí ìgbésẹ̀ náà lẹ́yìn àwọn ìgbìyànjú púpọ̀. Tún gbìyànjú ìgbésẹ̀ náà.",
+      "queueAdmissionFailed": "A kò lè gba ìgbésẹ̀ tí ó wà ní ìlà. Tún gbìyànjú ìgbésẹ̀ náà.",
+      "generic": "Ìgbésẹ̀ tí ó wà ní ìlà kùnà. Tún gbìyànjú ìgbésẹ̀ náà."
+    },
+    "analysisMode": {
+      "auto": "Aifọwọyi",
+      "shallow": "Aijinle",
+      "deep": "Jinlẹ"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Fi {{name}} kun si awọn ayanfẹ",
       "removeFromFavorites": "Yọ {{name}} kuro ninu awọn ayanfẹ",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Awoṣe igba-ijiroro"
     },
     "attachmentPreview": {
       "openFailedRetry": "A ti kuna lati ṣii faili. Jọwọ gbiyanju lẹẹkansi.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Fi awọn kirẹditi kun",
-    "description": "Fi awọn kirẹditi kun lati jẹki lilo tẹsiwaju."
+    "description": "Fi awọn kirẹditi kun lati jẹki lilo tẹsiwaju.",
+    "billingPage": "ojú-ewé ìsanwó"
   },
   "deviceSessions": {
     "couldNotLoad": "Ko le ṣagbewọ awọn igba-ijiroro",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Kùnà láti mú àwọn rírà padà. Gbìyànjú lẹ́ẹ̀kan sí i.",
     "purchaseFailed": "Kùnà láti parí rírà.",
     "purchaseStartFailed": "Kùnà láti bẹ̀rẹ̀ rírà App Store.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass lori Apple Account yii jẹ ti Kilo akọọlẹ miiran."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass lori Apple Account yii jẹ ti Kilo akọọlẹ miiran.",
+    "couldNotConnectToAppStore": "A ko le sopọ si App Store. Ṣayẹwo asopọ rẹ ki o gbiyanju lẹẹkansi.",
+    "noMatchingProducts": "Ko si awọn ọja Kilo Pass ti o baamu ti App Store da pada.",
+    "purchaseMissingSignedTransaction": "Rírà App Store kò ní JWS ìṣìṣẹ́ tí a fọwọ́ sí."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Nilo iṣẹ",
     "sorryTitle": "A binu lati gbọ iyẹn!",
     "sorryMessage": "Jọwọ jẹ ki a mọ ohun ti o nilo lati dara. Ẹlẹrọ ti n ṣakoso app ka gbogbo ijabọ kan!",
-    "emailUs": "Fi imeeli ranṣẹ si wa"
+    "emailUs": "Fi imeeli ranṣẹ si wa",
+    "emailSubject": "ìdáhùn ohun-èlò alágbèéká"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Ko si iṣẹ-ṣiṣe kirẹditi",
       "expires": "Pari {{date}}",
       "title": "Iṣẹ-ṣiṣe kirẹditi",
-      "transactionFallback": "Iṣowo kirẹditi"
+      "transactionFallback": "Iṣowo kirẹditi",
+      "category": {
+        "organization_custom": "Àṣà àjọ",
+        "parent_to_child_transfer_in": "Gbigbe láti òbí sí ọmọ (wọlé)",
+        "parent_to_child_transfer_out": "Gbigbe láti òbí sí ọmọ (jàde)",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Àtúnṣe ìṣirò-owó",
+        "credits_expired": "Àwọn kíredìtì ti parí"
+      }
     },
     "inviteMember": {
       "emailError": "Tẹ adirẹsi imeeli ti o wulo",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "A ṣe awọn invoice laifọwọyi ni gbogbo akoko owo ki o si yoo han nibi ni kete ti a ba gba owo ajọ rẹ.",
       "emptyTitle": "Ko si invoice",
       "invoiceFallback": "Invoice",
-      "statusOpen": "Ṣii",
-      "statusPaid": "Ti san",
-      "statusVoid": "Ofo",
       "title": "Awọn invoice",
       "downloadFailed": "Kò lè ṣìgbàsílẹ̀ invoice. Ṣàyẹ̀wò àsopọ̀ rẹ kí o gbìyànjú lẹ́ẹ̀kan sí i.",
-      "sharingUnavailable": "Pípín kò sí lórí ẹ̀rọ yìí."
+      "sharingUnavailable": "Pípín kò sí lórí ẹ̀rọ yìí.",
+      "status": {
+        "paid": "Ti san",
+        "open": "Ṣii",
+        "void": "Ofo",
+        "draft": "Àkọsílẹ̀",
+        "uncollectible": "Àìlègbà",
+        "unknown": "Àìmọ̀"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Ìsọfúnni tí a kó",
     "free": "Ọ̀fẹ́",
-    "couldNotUpdateFavorites": "Ko le ṣe imudojuiwọn awọn aàyàn"
+    "couldNotUpdateFavorites": "Ko le ṣe imudojuiwọn awọn aàyàn",
+    "thinkingEffort": {
+      "none": "Kò sí",
+      "minimal": "Kéré jùlọ",
+      "low": "Kéré",
+      "medium": "Alabọde",
+      "high": "Giga",
+      "xhigh": "Gíga púpọ̀",
+      "max": "Pátápátá"
+    }
   }
 }

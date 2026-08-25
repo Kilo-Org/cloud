@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} منتخب، انتخاب تبدیل کرنے کے لیے تھپتھپائیں",
       "tapToComment": "{{label}}، تبصرہ کرنے کے لیے تھپتھپائیں",
-      "truncationBanner": "کل {{total}} تبدیل شدہ فائلوں میں سے پہلی {{limit}} دکھائی جا رہی ہیں — GitHub API حد"
+      "truncationBanner": "کل {{total}} تبدیل شدہ فائلوں میں سے پہلی {{limit}} دکھائی جا رہی ہیں — GitHub API حد",
+      "statusAdded": "شامل شدہ",
+      "statusContext": "سیاق",
+      "statusDeleted": "حذف شدہ"
     },
     "linkPasteClipboardEmpty": "کلپ بورڈ خالی ہے",
     "linkPasteNotAPullRequest": "یہ GitHub پل ریکویسٹ لنک نہیں ہے",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "یہ جائزہ اسی طرح جمع نہیں کیا جا سکتا۔ PR بدل گیا ہو سکتا ہے، یا آپ اپنی خود کی پل ریکویسٹ کا جائزہ نہیں لے سکتے۔",
       "couldNotPostComment": "تبصرہ پوسٹ نہیں ہو سکا۔",
       "couldNotSubmitReview": "جائزہ جمع نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔"
+    },
+    "operation": {
+      "couldNotReply": "جواب نہیں ہو سکا۔",
+      "couldNotCompleteAction": "یہ کارروائی مکمل نہیں ہو سکی۔",
+      "mergeResultDefaultError": "GitHub نے مرج مکمل نہیں کیا۔"
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "ادائیگی زیر التوا ہے۔ براہ کرم اپنا ادائیگی کا طریقہ اپ ڈیٹ کریں۔",
       "subscriptionCancels": "سبسکرپشن {{date}} کو منسوخ ہوتی ہے",
       "trialDaysRemaining": "آزمائش: {{remaining}} دن باقی",
-      "trialEndingSoon": "آزمائش جلد ختم: {{remaining}}"
+      "trialEndingSoon": "آزمائش جلد ختم: {{remaining}}",
+      "planName": {
+        "commit": "کمٹ",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "نیا کیا ہے",
@@ -1189,7 +1201,8 @@
       "strongArm": "مضبوط بازو",
       "talisman": "تعویذ"
     },
-    "remoteSpawnFilesNotSupported": "یہ انسٹنس فائلیں وصول نہیں کر سکتی۔"
+    "remoteSpawnFilesNotSupported": "یہ انسٹنس فائلیں وصول نہیں کر سکتی۔",
+    "instanceSwitcherTitle": "KiloClaw انسٹنس"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "ناکام",
       "cancelled": "منسوخ",
       "interrupted": "روک دیا گیا"
-    }
+    },
+    "reviewStyle": {
+      "strict": "سخت",
+      "balanced": "متوازن",
+      "lenient": "نرم",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "سکیورٹی",
+      "performance": "کارکردگی",
+      "bugs": "بگز",
+      "style": "انداز",
+      "testing": "ٹیسٹنگ",
+      "documentation": "دستاویزات"
+    },
+    "gateThreshold": {
+      "off": "بند",
+      "all": "تمام",
+      "warning": "انتباہ",
+      "critical": "سنگین"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "کوڈ ریویور کو توجہ درکار ہے",
+        "description": "کوڈ ریویور غیر فعال کیا گیا کیونکہ Kilo ایک فعال GitHub App انسٹالیشن کے ساتھ اس ریپوزٹری تک رسائی حاصل نہیں کر سکتا۔ GitHub App انسٹالیشن اپ ڈیٹ کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔",
+        "recoveryLabel": "GitHub App اپ ڈیٹ کریں"
+      },
+      "githubIpAllowList": {
+        "title": "کوڈ ریویور کو توجہ درکار ہے",
+        "description": "کوڈ ریویور غیر فعال کیا گیا کیونکہ یہ GitHub تنظیم ایک IP اجازت فہرست استعمال کرتی ہے جو Kilo کو بلاک کرتی ہے۔ مدد کے لیے hi@kilocode.ai پر رابطہ کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔",
+        "recoveryLabel": "سپورٹ سے رابطہ کریں"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "کوڈ ریویور کو توجہ درکار ہے",
+        "description": "کوڈ ریویور غیر فعال کیا گیا کیونکہ Kilo اس پروجیکٹ کے لیے GitLab پروجیکٹ ایکسیس ٹوکن نہیں بنا سکتا۔ Maintainer رسائی دیں یا پروجیکٹ ایکسیس ٹوکنز فعال کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔",
+        "recoveryLabel": "GitLab انضمام اپ ڈیٹ کریں"
+      },
+      "byokInvalidKey": {
+        "title": "کوڈ ریویور کو توجہ درکار ہے",
+        "description": "کوڈ ریویور غیر فعال کیا گیا کیونکہ منتخب BYOK API کلید غلط، منسوخ، یا اجازت کے بغیر ہے۔ کلید اپ ڈیٹ کریں یا کوئی اور ماڈل منتخب کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔",
+        "recoveryLabel": "BYOK ترتیبات اپ ڈیٹ کریں"
+      },
+      "selectedModelUnavailable": {
+        "title": "کوڈ ریویور کو توجہ درکار ہے",
+        "description": "کوڈ ریویور غیر فعال کیا گیا کیونکہ منتخب ماڈل کلاؤڈ ایجنٹ سیشنز کے لیے دستیاب نہیں ہے۔ ایک دستیاب ماڈل منتخب کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔",
+        "recoveryLabel": "کوڈ ریویور ترتیبات اپ ڈیٹ کریں"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "کوڈ ریویور کو توجہ درکار ہے",
+        "description": "کوڈ ریویور آج تین ریپوزٹری کلون ٹائم آؤٹ کے بعد غیر فعال کیا گیا۔ مدد کے لیے hi@kilocode.ai پر رابطہ کریں، پھر کوڈ ریویور دوبارہ فعال کریں۔",
+        "recoveryLabel": "سپورٹ سے رابطہ کریں"
+      }
+    },
+    "unknownError": "نامعلوم خرابی"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "نتیجہ خودکار شدت کی حد سے نیچے ہے۔ حفاظتی گیٹس پاس ہونے پر دستی اصلاح پھر بھی شروع ہو سکتی ہے۔",
       "beforeEnablement": "آٹو اصلاح فعال ہونے سے پہلے تجزیہ مکمل ہوا۔ حفاظتی گیٹس پاس ہونے پر دستی اصلاح پھر بھی شروع ہو سکتی ہے۔",
       "generic": "اس نتیجے کے لیے اصلاح دستیاب نہیں۔"
+    },
+    "commandFailure": {
+      "ownerCapReached": "تجزیہ کی گنجائش بھری ہوئی ہے۔ فعال تجزیے کے مکمل ہونے کا انتظار کریں، پھر دوبارہ کوشش کریں۔",
+      "githubTokenUnavailable": "GitHub اجازت کو توجہ درکار ہے۔ GitHub App کو دوبارہ مجاز کریں، پھر دوبارہ کوشش کریں۔",
+      "githubAuthInvalid": "GitHub اجازت کو توجہ درکار ہے۔ GitHub App کو دوبارہ مجاز کریں، پھر دوبارہ کوشش کریں۔",
+      "findingUnavailable": "فائنڈنگ اب دستیاب نہیں ہے۔ فائنڈنگز تازہ کریں اور اگر کھلی رہے تو دوبارہ کوشش کریں۔",
+      "repositoryUnavailable": "ریپوزٹری اب GitHub App کے لیے دستیاب نہیں ہے۔ ریپوزٹری رسائی تازہ کریں، پھر دوبارہ کوشش کریں۔",
+      "invalidDismissTarget": "فائنڈنگ کو مسترد نہیں کیا جا سکتا کیونکہ اس کا Dependabot ہدف غلط ہے۔",
+      "commandStalled": "قطار میں شامل کارروائی وقت پر مکمل نہیں ہوئی۔ کارروائی دوبارہ کریں۔",
+      "queueRetriesExhausted": "کئی کوششوں کے بعد کارروائی مکمل نہیں ہو سکی۔ کارروائی دوبارہ کریں۔",
+      "queueAdmissionFailed": "قطار میں شامل کارروائی قبول نہیں ہو سکی۔ کارروائی دوبارہ کریں۔",
+      "generic": "قطار میں شامل کارروائی ناکام ہو گئی۔ کارروائی دوبارہ کریں۔"
+    },
+    "analysisMode": {
+      "auto": "آٹو",
+      "shallow": "سطحی",
+      "deep": "گہرا"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "{{name}} کو پسندیدہ میں شامل کریں",
       "removeFromFavorites": "{{name}} کو پسندیدہ سے ہٹائیں",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "سیشن ماڈل"
     },
     "attachmentPreview": {
       "openFailedRetry": "فائل کھولنے میں ناکامی۔ براہ کرم دوبارہ کوشش کریں۔",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "کریڈٹ شامل کریں",
-    "description": "استعمال جاری رکھنے کے لیے کریڈٹ شامل کریں۔"
+    "description": "استعمال جاری رکھنے کے لیے کریڈٹ شامل کریں۔",
+    "billingPage": "بلنگ صفحہ"
   },
   "deviceSessions": {
     "couldNotLoad": "سیشنز لوڈ نہیں ہو سکے",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "خریداریاں بحال نہیں ہو سکیں۔ دوبارہ کوشش کریں۔",
     "purchaseFailed": "خریداری مکمل نہیں ہو سکی۔",
     "purchaseStartFailed": "App Store خریداری شروع نہیں ہو سکی۔",
-    "purchaseOwnedByAnotherAccount": "اس Apple اکاؤنٹ پر Kilo Pass کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتا ہے۔"
+    "purchaseOwnedByAnotherAccount": "اس Apple اکاؤنٹ پر Kilo Pass کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتا ہے۔",
+    "couldNotConnectToAppStore": "App Store سے منسلک نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+    "noMatchingProducts": "App Store نے مماثل Kilo Pass مصنوعات واپس نہیں کیں۔",
+    "purchaseMissingSignedTransaction": "App Store خریداری میں دستخط شدہ ٹرانزیکشن JWS شامل نہیں تھی۔"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "بہتری کی ضرورت ہے",
     "sorryTitle": "ہمیں سن کر افسوس ہوا!",
     "sorryMessage": "براہ کرم ہمیں بتائیں کہ کیا بہتر ہونے کی ضرورت ہے۔ ایپ کا ذمہ دار انجینئر ہر ایک رپورٹ پڑھتا ہے!",
-    "emailUs": "ہمیں ای میل کریں"
+    "emailUs": "ہمیں ای میل کریں",
+    "emailSubject": "موبائل ایپ رائے"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "کوئی کریڈٹ سرگرمی نہیں",
       "expires": "{{date}} کو ختم ہوتا ہے",
       "title": "کریڈٹ سرگرمی",
-      "transactionFallback": "کریڈٹ لین دین"
+      "transactionFallback": "کریڈٹ لین دین",
+      "category": {
+        "organization_custom": "تنظیم حسب ضرورت",
+        "parent_to_child_transfer_in": "والد سے بچے کی منتقلی (داخل)",
+        "parent_to_child_transfer_out": "والد سے بچے کی منتقلی (خارج)",
+        "oss-sponsorship": "OSS کفالت",
+        "oss-monthly-reset": "OSS ماہانہ ری سیٹ",
+        "team-topup-bonus-2025": "ٹیم ٹاپ اپ بونس 2025",
+        "accounting_adjustment": "اکاؤنٹنگ ایڈجسٹمنٹ",
+        "credits_expired": "کریڈٹس کی میعاد ختم"
+      }
     },
     "inviteMember": {
       "emailError": "درست ای میل پتہ درج کریں",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "انوائسز ہر بلنگ سائیکل پر خود بخود تیار ہوتی ہیں اور آپ کی تنظیم کو بل ہونے کے بعد یہاں ظاہر ہوں گی۔",
       "emptyTitle": "کوئی انوائسز نہیں",
       "invoiceFallback": "انوائس",
-      "statusOpen": "کھلا",
-      "statusPaid": "ادا شدہ",
-      "statusVoid": "باطل",
       "title": "انوائسز",
       "downloadFailed": "انوائس ڈاؤن لوڈ نہیں ہو سکی۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
-      "sharingUnavailable": "اس ڈیوائس پر شیئرنگ دستیاب نہیں ہے۔"
+      "sharingUnavailable": "اس ڈیوائس پر شیئرنگ دستیاب نہیں ہے۔",
+      "status": {
+        "paid": "ادا شدہ",
+        "open": "کھلا",
+        "void": "باطل",
+        "draft": "ڈرافٹ",
+        "uncollectible": "ناقابل وصول",
+        "unknown": "نامعلوم"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "جمع کردہ ڈیٹا",
     "free": "مفت",
-    "couldNotUpdateFavorites": "پسندیدہ اپ ڈیٹ نہیں ہو سکے"
+    "couldNotUpdateFavorites": "پسندیدہ اپ ڈیٹ نہیں ہو سکے",
+    "thinkingEffort": {
+      "none": "کوئی نہیں",
+      "minimal": "کم سے کم",
+      "low": "کم",
+      "medium": "درمیانہ",
+      "high": "زیادہ",
+      "xhigh": "بہت زیادہ",
+      "max": "زیادہ سے زیادہ"
+    }
   }
 }

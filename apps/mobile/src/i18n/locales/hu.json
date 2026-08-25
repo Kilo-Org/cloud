@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Kijelölve: {{label}}, koppintson a kijelölés módosításához",
       "tapToComment": "{{label}}, koppintson a megjegyzéshez",
-      "truncationBanner": "A módosított {{total}} fájl közül az első {{limit}} megjelenítése — GitHub API-korlát"
+      "truncationBanner": "A módosított {{total}} fájl közül az első {{limit}} megjelenítése — GitHub API-korlát",
+      "statusAdded": "Hozzáadva",
+      "statusContext": "Kontextus",
+      "statusDeleted": "Törölve"
     },
     "linkPasteClipboardEmpty": "A vágólap üres",
     "linkPasteNotAPullRequest": "Nem GitHub pull request hivatkozás",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Ez az ellenőrzés ebben a formában nem küldhető el. Lehet, hogy a PR megváltozott, vagy nem ellenőrizheti a saját pull requestjét.",
       "couldNotPostComment": "Nem sikerült közzétenni a megjegyzést.",
       "couldNotSubmitReview": "Nem sikerült elküldeni az ellenőrzést. Ellenőrizze a kapcsolatot, és próbálja újra."
+    },
+    "operation": {
+      "couldNotReply": "Nem sikerült válaszolni.",
+      "couldNotCompleteAction": "Nem sikerült végrehajtani ezt a műveletet.",
+      "mergeResultDefaultError": "A GitHub nem fejezte be az összevonást."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "A fizetés lejárt. Kérjük, frissítsd a fizetési módodat.",
       "subscriptionCancels": "Az előfizetés {{date}}-kor törlődik",
       "trialDaysRemaining": "Próba: {{remaining}} van hátra",
-      "trialEndingSoon": "Próba hamarosan vége: {{remaining}}"
+      "trialEndingSoon": "Próba hamarosan vége: {{remaining}}",
+      "planName": {
+        "commit": "Elköteleződés",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Mi újság",
@@ -1189,7 +1201,8 @@
       "strongArm": "Erős kar",
       "talisman": "Talizmán"
     },
-    "remoteSpawnFilesNotSupported": "Ez a példány nem fogadhat fájlokat."
+    "remoteSpawnFilesNotSupported": "Ez a példány nem fogadhat fájlokat.",
+    "instanceSwitcherTitle": "KiloClaw-példány"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Sikertelen",
       "cancelled": "Lemondva",
       "interrupted": "Megszakítva"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Szigorú",
+      "balanced": "Kiegyensúlyozott",
+      "lenient": "Engedékeny",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Biztonság",
+      "performance": "Teljesítmény",
+      "bugs": "Hibák",
+      "style": "Stílus",
+      "testing": "Tesztelés",
+      "documentation": "Dokumentáció"
+    },
+    "gateThreshold": {
+      "off": "Ki",
+      "all": "Mind",
+      "warning": "Figyelmeztetés",
+      "critical": "Kritikus"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "A Kódellenőrző figyelmet igényel",
+        "description": "A Kódellenőrző azért lett letiltva, mert a Kilo nem fér hozzá ehhez a tárhelyhez egy aktív GitHub App-telepítéssel. Frissítse a GitHub App telepítését, majd engedélyezze újra a Kódellenőrzőt.",
+        "recoveryLabel": "GitHub App frissítése"
+      },
+      "githubIpAllowList": {
+        "title": "A Kódellenőrző figyelmet igényel",
+        "description": "A Kódellenőrző azért lett letiltva, mert ez a GitHub-szervezet IP-engedélyezési listát használ, amely blokkolja a Kilót. Kérjen segítséget itt: hi@kilocode.ai, majd engedélyezze újra a Kódellenőrzőt.",
+        "recoveryLabel": "Forduljon az ügyfélszolgálathoz"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "A Kódellenőrző figyelmet igényel",
+        "description": "A Kódellenőrző azért lett letiltva, mert a Kilo nem tud GitLab Project Access Tokent létrehozni ehhez a projekthez. Adjon Maintainer hozzáférést vagy engedélyezze a Project Access Tokeneket, majd engedélyezze újra a Kódellenőrzőt.",
+        "recoveryLabel": "GitLab-integráció frissítése"
+      },
+      "byokInvalidKey": {
+        "title": "A Kódellenőrző figyelmet igényel",
+        "description": "A Kódellenőrző azért lett letiltva, mert a kiválasztott BYOK API-kulcs érvénytelen, visszavonták, vagy nincs jogosultsága. Frissítse a kulcsot vagy válasszon másik modellt, majd engedélyezze újra a Kódellenőrzőt.",
+        "recoveryLabel": "BYOK-beállítások frissítése"
+      },
+      "selectedModelUnavailable": {
+        "title": "A Kódellenőrző figyelmet igényel",
+        "description": "A Kódellenőrző azért lett letiltva, mert a kiválasztott modell nem érhető el felhőügynök-munkamenetekhez. Válasszon egy elérhető modellt, majd engedélyezze újra a Kódellenőrzőt.",
+        "recoveryLabel": "A Kódellenőrző beállításainak frissítése"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "A Kódellenőrző figyelmet igényel",
+        "description": "A Kódellenőrző azért lett letiltva, mert ma három tárhely-klónozási időtúllépés történt. Kérjen segítséget itt: hi@kilocode.ai, majd engedélyezze újra a Kódellenőrzőt.",
+        "recoveryLabel": "Forduljon az ügyfélszolgálathoz"
+      }
+    },
+    "unknownError": "Ismeretlen hiba"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Az észlelés az automatikus súlyossági küszöb alatt van. A kézi kijavítás akkor is elindítható, ha a biztonsági átjárók teljesülnek.",
       "beforeEnablement": "Az elemzés az automatikus hibajavítás engedélyezése előtt készült el. A kézi kijavítás akkor is elindítható, ha a biztonsági átjárók teljesülnek.",
       "generic": "Ehhez az észleléshez nem érhető el kijavítás."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Az elemzési kapacitás megtelt. Várja meg, amíg egy aktív elemzés befejeződik, majd próbálja újra.",
+      "githubTokenUnavailable": "A GitHub-hitelesítés figyelmet igényel. Engedélyezze újra a GitHub Appot, majd próbálja újra.",
+      "githubAuthInvalid": "A GitHub-hitelesítés figyelmet igényel. Engedélyezze újra a GitHub Appot, majd próbálja újra.",
+      "findingUnavailable": "Az észlelés már nem érhető el. Frissítse az észleléseket, és próbálja újra, ha még mindig nyitott.",
+      "repositoryUnavailable": "Az adattár már nem érhető el a GitHub App számára. Frissítse az adattár-hozzáférést, majd próbálja újra.",
+      "invalidDismissTarget": "Az észlelés nem vethető el, mert a Dependabot-célja érvénytelen.",
+      "commandStalled": "A sorba állított művelet nem fejeződött be időben. Próbálja újra a műveletet.",
+      "queueRetriesExhausted": "A művelet több próbálkozás után sem fejeződött be. Próbálja újra a műveletet.",
+      "queueAdmissionFailed": "A sorba állított művelet nem került elfogadásra. Próbálja újra a műveletet.",
+      "generic": "A sorba állított művelet meghiúsult. Próbálja újra a műveletet."
+    },
+    "analysisMode": {
+      "auto": "Automatikus",
+      "shallow": "Felszínes",
+      "deep": "Mély"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "{{name}} hozzáadása a kedvencekhez",
       "removeFromFavorites": "{{name}} eltávolítása a kedvencekből",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Köz"
+      "thinkingEffortMedium": "Köz",
+      "sessionModel": "Munkamenet modell"
     },
     "attachmentPreview": {
       "openFailedRetry": "A fájl megnyitása nem sikerült. Próbáld újra.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Kreditek hozzáadása",
-    "description": "Adj hozzá krediteket a használat fenntartásához."
+    "description": "Adj hozzá krediteket a használat fenntartásához.",
+    "billingPage": "számlázási oldal"
   },
   "deviceSessions": {
     "couldNotLoad": "A munkamenetek nem tölthetők be",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Nem sikerült visszaállítani a vásárlásokat. Próbálja újra.",
     "purchaseFailed": "Nem sikerült befejezni a vásárlást.",
     "purchaseStartFailed": "Nem sikerült elindítani az App Store-vásárlást.",
-    "purchaseOwnedByAnotherAccount": "Az ezen Apple-fiókon lévő Kilo Pass egy másik Kilo-fiókhoz tartozik."
+    "purchaseOwnedByAnotherAccount": "Az ezen Apple-fiókon lévő Kilo Pass egy másik Kilo-fiókhoz tartozik.",
+    "couldNotConnectToAppStore": "Nem sikerült csatlakozni az App Store-hoz. Ellenőrizze a kapcsolatot, és próbálja újra.",
+    "noMatchingProducts": "Az App Store nem adott vissza megfelelő Kilo Pass termékeket.",
+    "purchaseMissingSignedTransaction": "Az App Store-vásárlás nem tartalmazott aláírt JWS-tranzakciót."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Javításra szorul",
     "sorryTitle": "Sajnáljuk, hogy ezt halljuk!",
     "sorryMessage": "Kérjük, tudasd velünk, min kellene javítani. Az alkalmazásért felelős mérnök minden egyes jelentést elolvas!",
-    "emailUs": "Írj nekünk e-mailt"
+    "emailUs": "Írj nekünk e-mailt",
+    "emailSubject": "mobilalkalmazás-visszajelzés"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Nincs kredittevékenység",
       "expires": "Lejárat: {{date}}",
       "title": "Kredittevékenység",
-      "transactionFallback": "Kredittranzakció"
+      "transactionFallback": "Kredittranzakció",
+      "category": {
+        "organization_custom": "Egyedi szervezeti",
+        "parent_to_child_transfer_in": "Szülőről gyermekre átutalás (bejövő)",
+        "parent_to_child_transfer_out": "Szülőről gyermekre átutalás (kimenő)",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Számviteli kiigazítás",
+        "credits_expired": "Lejárt kreditek"
+      }
     },
     "inviteMember": {
       "emailError": "Adj meg érvényes e-mail címet",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "A számlák automatikusan generálódnak minden számlázási ciklusban, és itt jelennek meg, amint a szervezetedet kiszámlázták.",
       "emptyTitle": "Nincs számla",
       "invoiceFallback": "Szamla",
-      "statusOpen": "Nyitva",
-      "statusPaid": "Kifizetve",
-      "statusVoid": "Érvénytelen",
       "title": "Számlák",
       "downloadFailed": "Nem sikerült letölteni a számlát. Ellenőrizze a kapcsolatot, és próbálja újra.",
-      "sharingUnavailable": "A megosztás nem érhető el ezen az eszközön."
+      "sharingUnavailable": "A megosztás nem érhető el ezen az eszközön.",
+      "status": {
+        "paid": "Fizetve",
+        "open": "Nyitott",
+        "void": "Érvénytelen",
+        "draft": "Piszkozat",
+        "uncollectible": "Behajthatatlan",
+        "unknown": "Ismeretlen"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Gyűjtött adatok",
     "free": "Ingyenes",
-    "couldNotUpdateFavorites": "Nem sikerült frissíteni a kedvenceket"
+    "couldNotUpdateFavorites": "Nem sikerült frissíteni a kedvenceket",
+    "thinkingEffort": {
+      "none": "Semmi",
+      "minimal": "Minimális",
+      "low": "Alacsony",
+      "medium": "Közepes",
+      "high": "Magas",
+      "xhigh": "Extra magas",
+      "max": "Maximum"
+    }
   }
 }

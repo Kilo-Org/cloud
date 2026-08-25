@@ -19,10 +19,9 @@
 // so this module is testable in plain Node and reusable by any future
 // non-mobile surface (web, CLI, etc.).
 
-export type DiffLineType = 'context' | 'add' | 'del';
+import { i18n } from '@/i18n';
 
-/** Human-readable, screen-reader-friendly status word for a diff line. */
-type DiffLineStatusWord = 'Added' | 'Deleted' | 'Context';
+export type DiffLineType = 'context' | 'add' | 'del';
 
 /**
  * Single-character gutter glyph for a diff line. The CHARACTER is the
@@ -41,14 +40,14 @@ type DiffLineMarker = '+' | '-' | '·';
  * The status word for a diff line. Used in accessibility labels and any
  * future surface that needs to describe the line type in prose.
  */
-export function diffLineStatusWord(type: DiffLineType): DiffLineStatusWord {
+export function diffLineStatusWord(type: DiffLineType): string {
   if (type === 'add') {
-    return 'Added';
+    return i18n.t('prReview.diff.statusAdded');
   }
   if (type === 'del') {
-    return 'Deleted';
+    return i18n.t('prReview.diff.statusDeleted');
   }
-  return 'Context';
+  return i18n.t('prReview.diff.statusContext');
 }
 
 /**

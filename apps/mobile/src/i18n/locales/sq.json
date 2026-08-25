@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "E përzgjedhur {{label}}, prek për të ndryshuar përzgjedhjen",
       "tapToComment": "{{label}}, prek për të komentuar",
-      "truncationBanner": "Duke shfaqur {{limit}}-in e parë nga {{total}} skedarë të ndryshuar — kufiri i API-së së GitHub"
+      "truncationBanner": "Duke shfaqur {{limit}}-in e parë nga {{total}} skedarë të ndryshuar — kufiri i API-së së GitHub",
+      "statusAdded": "I shtuar",
+      "statusContext": "Kontekst",
+      "statusDeleted": "I fshirë"
     },
     "linkPasteClipboardEmpty": "Kujtesa është bosh",
     "linkPasteNotAPullRequest": "Nuk është një lidhje e pull request në GitHub",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Ky rishikim nuk mund të dërgohet siç është. PR mund të ketë ndryshuar, ose nuk mund ta rishikoni kërkesën tuaj të tërheqjes.",
       "couldNotPostComment": "Nuk u arrit të postohej komenti.",
       "couldNotSubmitReview": "Nuk u arrit të dërgohej rishikimi. Kontrolloni lidhjen dhe provoni përsëri."
+    },
+    "operation": {
+      "couldNotReply": "Nuk u arrit të përgjigjeshej.",
+      "couldNotCompleteAction": "Nuk u arrit të përfundohej ky veprim.",
+      "mergeResultDefaultError": "GitHub nuk e përfundoi shkrirjen."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Pagesa është vonuar. Përditëso metodën tënde të pagesës.",
       "subscriptionCancels": "Abonimi anulohet më {{date}}",
       "trialDaysRemaining": "Prova: {{remaining}} ditë të mbetura",
-      "trialEndingSoon": "Prova po mbaron së shpejti: {{remaining}}"
+      "trialEndingSoon": "Prova po mbaron së shpejti: {{remaining}}",
+      "planName": {
+        "commit": "Angazhohu",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Çfarë ka të re",
@@ -1189,7 +1201,8 @@
       "strongArm": "Krahu i fortë",
       "talisman": "Talismani"
     },
-    "remoteSpawnFilesNotSupported": "Kjo instancë nuk mund të marrë skedarë."
+    "remoteSpawnFilesNotSupported": "Kjo instancë nuk mund të marrë skedarë.",
+    "instanceSwitcherTitle": "Instanca KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Dështoi",
       "cancelled": "I anuluar",
       "interrupted": "I ndërprerë"
-    }
+    },
+    "reviewStyle": {
+      "strict": "I rreptë",
+      "balanced": "I ekuilibruar",
+      "lenient": "I butë",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Siguria",
+      "performance": "Performanca",
+      "bugs": "Defektet",
+      "style": "Stili",
+      "testing": "Testimi",
+      "documentation": "Dokumentimi"
+    },
+    "gateThreshold": {
+      "off": "I çaktivizuar",
+      "all": "Të gjitha",
+      "warning": "Paralajmërim",
+      "critical": "Kritike"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Shqyrtuesi i Kodit kërkon vëmendje",
+        "description": "Shqyrtuesi i Kodit u çaktivizua sepse Kilo nuk mund të qaset te kjo depo me një instalim aktiv të Aplikacionit të GitHub. Përditëso instalimin e Aplikacionit të GitHub, pastaj aktivizoje përsëri Shqyrtuesin e Kodit.",
+        "recoveryLabel": "Përditëso Aplikacionin e GitHub"
+      },
+      "githubIpAllowList": {
+        "title": "Shqyrtuesi i Kodit kërkon vëmendje",
+        "description": "Shqyrtuesi i Kodit u çaktivizua sepse kjo organizatë GitHub përdor një listë të lejuar IP-sh që bllokon Kilo. Kontakto hi@kilocode.ai për ndihmë, pastaj aktivizoje përsëri Shqyrtuesin e Kodit.",
+        "recoveryLabel": "Kontakto mbështetjen"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Shqyrtuesi i Kodit kërkon vëmendje",
+        "description": "Shqyrtuesi i Kodit u çaktivizua sepse Kilo nuk mund të krijojë një Token Qasjeje Projekti GitLab për këtë projekt. Jepi akses Maintainer ose aktivizo Token-et e Qasjes në Projekt, pastaj aktivizoje përsëri Shqyrtuesin e Kodit.",
+        "recoveryLabel": "Përditëso integrimin e GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Shqyrtuesi i Kodit kërkon vëmendje",
+        "description": "Shqyrtuesi i Kodit u çaktivizua sepse çelësi i zgjedhur i API-së BYOK është i pavlefshëm, i revokuar ose i mungon leja. Përditëso çelësin ose zgjidh një model tjetër, pastaj aktivizoje përsëri Shqyrtuesin e Kodit.",
+        "recoveryLabel": "Përditëso cilësimet e BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Shqyrtuesi i Kodit kërkon vëmendje",
+        "description": "Shqyrtuesi i Kodit u çaktivizua sepse modeli i zgjedhur nuk është i disponueshëm për seancat e Cloud Agent. Zgjidh një model të disponueshëm, pastaj aktivizoje përsëri Shqyrtuesin e Kodit.",
+        "recoveryLabel": "Përditëso cilësimet e Shqyrtuesit të Kodit"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Shqyrtuesi i Kodit kërkon vëmendje",
+        "description": "Shqyrtuesi i Kodit u çaktivizua pas tre kohëmatjeve të klonimit të depove sot. Kontakto hi@kilocode.ai për ndihmë, pastaj aktivizoje përsëri Shqyrtuesin e Kodit.",
+        "recoveryLabel": "Kontakto mbështetjen"
+      }
+    },
+    "unknownError": "Gabim i panjohur"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Gjetja është nën pragun automatik të ashpërsisë. Zgjidhja manuale mund të fillojë ende kur portat e sigurisë të kalohen.",
       "beforeEnablement": "Analiza u përfundua përpara se të aktivizohej korrigjimi automatik. Zgjidhja manuale mund të fillojë ende kur portat e sigurisë të kalohen.",
       "generic": "Zgjidhja nuk është e disponueshme për këtë gjetje."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Kapaciteti i analizës është i plotë. Prisni që një analizë aktive të përfundojë, pastaj provoni përsëri.",
+      "githubTokenUnavailable": "Autorizimi i GitHub kërkon vëmendje. Riautorizoni Aplikacionin e GitHub, pastaj provoni përsëri.",
+      "githubAuthInvalid": "Autorizimi i GitHub kërkon vëmendje. Riautorizoni Aplikacionin e GitHub, pastaj provoni përsëri.",
+      "findingUnavailable": "Gjetja nuk është më e disponueshme. Rifreskoni gjetjet dhe provoni përsëri nëse mbetet e hapur.",
+      "repositoryUnavailable": "Depoja nuk është më e disponueshme për Aplikacionin e GitHub. Rifreskoni aksesin në depo, pastaj provoni përsëri.",
+      "invalidDismissTarget": "Gjetja nuk mund të hidhet poshtë sepse shënjestra e saj Dependabot është e pavlefshme.",
+      "commandStalled": "Veprimi në radhë nuk përfundoi në kohë. Provoni veprimin përsëri.",
+      "queueRetriesExhausted": "Veprimi nuk mund të përfundohej pas disa përpjekjesh. Provoni veprimin përsëri.",
+      "queueAdmissionFailed": "Veprimi në radhë nuk mund të pranohej. Provoni veprimin përsëri.",
+      "generic": "Veprimi në radhë dështoi. Provoni veprimin përsëri."
+    },
+    "analysisMode": {
+      "auto": "Automatik",
+      "shallow": "E cekët",
+      "deep": "E thellë"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Shto {{name}} te të preferuarat",
       "removeFromFavorites": "Hiq {{name}} nga të preferuarat",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Mes"
+      "thinkingEffortMedium": "Mes",
+      "sessionModel": "Modeli i seancës"
     },
     "attachmentPreview": {
       "openFailedRetry": "Skedari nuk u hap. Ju lutemi provoni përsëri.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Shto kredite",
-    "description": "Shtoni kredite për ta mbajtur përdorimin në funksion."
+    "description": "Shtoni kredite për ta mbajtur përdorimin në funksion.",
+    "billingPage": "faqja e faturimit"
   },
   "deviceSessions": {
     "couldNotLoad": "Seancat nuk mund të ngarkoheshin",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Rivendosja e blerjeve dështoi. Provo përsëri.",
     "purchaseFailed": "Nuk u arrit të përfundohej blerja.",
     "purchaseStartFailed": "Nuk u arrit të fillohej blerja në App Store.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass në këtë Apple Account i përket një llogarie tjetër Kilo."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass në këtë Apple Account i përket një llogarie tjetër Kilo.",
+    "couldNotConnectToAppStore": "Nuk u arrit të lidheshim me App Store. Kontrollo lidhjen dhe provo përsëri.",
+    "noMatchingProducts": "App Store nuk ktheu produkte Kilo Pass që përputhen.",
+    "purchaseMissingSignedTransaction": "Blerja në App Store nuk përfshinte një transaksion të nënshkruar JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Ka nevojë për përmirësim",
     "sorryTitle": "Na vjen keq ta dëgjojmë këtë!",
     "sorryMessage": "Ju lutemi na tregoni se çfarë duhet të përmirësohet. Inxhinieri përgjegjës për aplikacionin e lexon çdo raport!",
-    "emailUs": "Na dërgoni email"
+    "emailUs": "Na dërgoni email",
+    "emailSubject": "përshtypjet për aplikacionin celular"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Nuk ka aktivitet krediti",
       "expires": "Skadon {{date}}",
       "title": "Aktiviteti i krediteve",
-      "transactionFallback": "Transaksion krediti"
+      "transactionFallback": "Transaksion krediti",
+      "category": {
+        "organization_custom": "Organizatë e personalizuar",
+        "parent_to_child_transfer_in": "Transferim nga prindi te fëmija (hyrje)",
+        "parent_to_child_transfer_out": "Transferim nga prindi te fëmija (dalje)",
+        "oss-sponsorship": "Sponsorim OSS",
+        "oss-monthly-reset": "Rivendosja mujore e OSS",
+        "team-topup-bonus-2025": "Bonusi i ekipit për rimbushje 2025",
+        "accounting_adjustment": "Rregullim kontabël",
+        "credits_expired": "Kredite të skaduara"
+      }
     },
     "inviteMember": {
       "emailError": "Futni një adresë email-i të vlefshme",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Faturat gjenerohen automatikisht çdo cikël faturimi dhe do të shfaqen këtu sapo organizata juaj të faturohet.",
       "emptyTitle": "Nuk ka fatura",
       "invoiceFallback": "Fatura",
-      "statusOpen": "E hapur",
-      "statusPaid": "E paguar",
-      "statusVoid": "E pavlefshme",
       "title": "Faturat",
       "downloadFailed": "Fatura nuk mund të shkarkohej. Kontrolloni lidhjen dhe provoni përsëri.",
-      "sharingUnavailable": "Ndarja nuk është e disponueshme në këtë pajisje."
+      "sharingUnavailable": "Ndarja nuk është e disponueshme në këtë pajisje.",
+      "status": {
+        "paid": "E paguar",
+        "open": "E hapur",
+        "void": "E pavlefshme",
+        "draft": "Draft",
+        "uncollectible": "E pakolektueshme",
+        "unknown": "E panjohur"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Të dhënat e mbledhura",
     "free": "Falas",
-    "couldNotUpdateFavorites": "Nuk u arrit të përditësoheshin të preferuarat"
+    "couldNotUpdateFavorites": "Nuk u arrit të përditësoheshin të preferuarat",
+    "thinkingEffort": {
+      "none": "Asnjë",
+      "minimal": "Minimal",
+      "low": "I ulët",
+      "medium": "I mesëm",
+      "high": "I lartë",
+      "xhigh": "Shumë i lartë",
+      "max": "Maksimal"
+    }
   }
 }

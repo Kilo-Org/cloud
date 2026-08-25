@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Valgt {{label}}, tryk for at ændre markering",
       "tapToComment": "{{label}}, tryk for at kommentere",
-      "truncationBanner": "Viser de første {{limit}} af {{total}} ændrede filer — GitHub API-grænse"
+      "truncationBanner": "Viser de første {{limit}} af {{total}} ændrede filer — GitHub API-grænse",
+      "statusAdded": "Tilføjet",
+      "statusContext": "Kontekst",
+      "statusDeleted": "Slettet"
     },
     "linkPasteClipboardEmpty": "Udklipsholderen er tom",
     "linkPasteNotAPullRequest": "Ikke et GitHub pull request-link",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Denne anmeldelse kan ikke sendes, som den er. PR'en kan have ændret sig, eller du kan ikke anmelde din egen pull request.",
       "couldNotPostComment": "Kunne ikke sende kommentaren.",
       "couldNotSubmitReview": "Kunne ikke sende anmeldelsen. Tjek din forbindelse og prøv igen."
+    },
+    "operation": {
+      "couldNotReply": "Kunne ikke svare.",
+      "couldNotCompleteAction": "Kunne ikke fuldføre denne handling.",
+      "mergeResultDefaultError": "GitHub fuldførte ikke fletningen."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Betaling er forfalden. Opdater venligst din betalingsmetode.",
       "subscriptionCancels": "Abonnement annulleres {{date}}",
       "trialDaysRemaining": "Prøveperiode: {{remaining}} tilbage",
-      "trialEndingSoon": "Prøveperiode slutter snart: {{remaining}}"
+      "trialEndingSoon": "Prøveperiode slutter snart: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Hvad er nyt",
@@ -1189,7 +1201,8 @@
       "strongArm": "Stærk arm",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Denne instance kan ikke modtage filer."
+    "remoteSpawnFilesNotSupported": "Denne instance kan ikke modtage filer.",
+    "instanceSwitcherTitle": "KiloClaw-forekomst"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Mislykkedes",
       "cancelled": "Annulleret",
       "interrupted": "Afbrudt"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Streng",
+      "balanced": "Afbalanceret",
+      "lenient": "Mild",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Sikkerhed",
+      "performance": "Ydeevne",
+      "bugs": "Fejl",
+      "style": "Stil",
+      "testing": "Test",
+      "documentation": "Dokumentation"
+    },
+    "gateThreshold": {
+      "off": "Fra",
+      "all": "Alle",
+      "warning": "Advarsel",
+      "critical": "Kritisk"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer kræver opmærksomhed",
+        "description": "Code Reviewer blev deaktiveret, fordi Kilo ikke kan få adgang til dette repository med en aktiv GitHub App-installation. Opdater GitHub App-installationen, og aktiver derefter Code Reviewer igen.",
+        "recoveryLabel": "Opdater GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer kræver opmærksomhed",
+        "description": "Code Reviewer blev deaktiveret, fordi denne GitHub-organisation bruger en IP-allowlist, der blokerer Kilo. Kontakt hi@kilocode.ai for hjælp, og aktiver derefter Code Reviewer igen.",
+        "recoveryLabel": "Kontakt support"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer kræver opmærksomhed",
+        "description": "Code Reviewer blev deaktiveret, fordi Kilo ikke kan oprette en GitLab Project Access Token til dette projekt. Giv Maintainer-adgang eller aktivér Project Access Tokens, og aktiver derefter Code Reviewer igen.",
+        "recoveryLabel": "Opdater GitLab-integration"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer kræver opmærksomhed",
+        "description": "Code Reviewer blev deaktiveret, fordi den valgte BYOK API-nøgle er ugyldig, tilbagekaldt eller mangler tilladelse. Opdater nøglen eller vælg en anden model, og aktiver derefter Code Reviewer igen.",
+        "recoveryLabel": "Opdater BYOK-indstillinger"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer kræver opmærksomhed",
+        "description": "Code Reviewer blev deaktiveret, fordi den valgte model ikke er tilgængelig til cloud agent-sessioner. Vælg en tilgængelig model, og aktiver derefter Code Reviewer igen.",
+        "recoveryLabel": "Opdater Code Reviewer-indstillinger"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer kræver opmærksomhed",
+        "description": "Code Reviewer blev deaktiveret efter tre repository-clone-timeouts i dag. Kontakt hi@kilocode.ai for hjælp, og aktiver derefter Code Reviewer igen.",
+        "recoveryLabel": "Kontakt support"
+      }
+    },
+    "unknownError": "Ukendt fejl"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Fundet er under automatiseringsgrænsen for sværhedsgrad. Manuel afhjælpning kan stadig startes, når sikkerhedsportene er passeret.",
       "beforeEnablement": "Analysen blev fuldført, før Autoudbedring blev aktiveret. Manuel afhjælpning kan stadig startes, når sikkerhedsportene er passeret.",
       "generic": "Afhjælpning er ikke tilgængelig for dette fund."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Analysekapaciteten er fuld. Vent på, at en aktiv analyse er færdig, og prøv derefter igen.",
+      "githubTokenUnavailable": "GitHub-godkendelse kræver opmærksomhed. Genautoriser GitHub App, og prøv derefter igen.",
+      "githubAuthInvalid": "GitHub-godkendelse kræver opmærksomhed. Genautoriser GitHub App, og prøv derefter igen.",
+      "findingUnavailable": "Fundet er ikke længere tilgængeligt. Opdater fundene, og prøv igen, hvis det stadig er åbent.",
+      "repositoryUnavailable": "Repository er ikke længere tilgængeligt for GitHub App. Opdater repository-adgangen, og prøv derefter igen.",
+      "invalidDismissTarget": "Fundet kan ikke afvises, fordi dets Dependabot-mål er ugyldigt.",
+      "commandStalled": "Handlingen i kø blev ikke færdig i tide. Prøv handlingen igen.",
+      "queueRetriesExhausted": "Handlingen kunne ikke fuldføres efter flere forsøg. Prøv handlingen igen.",
+      "queueAdmissionFailed": "Handlingen i kø kunne ikke optages. Prøv handlingen igen.",
+      "generic": "Handlingen i kø mislykkedes. Prøv handlingen igen."
+    },
+    "analysisMode": {
+      "auto": "Auto",
+      "shallow": "Overfladisk",
+      "deep": "Dyb"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Tilføj {{name}} til favoritter",
       "removeFromFavorites": "Fjern {{name}} fra favoritter",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Sessionsmodel"
     },
     "attachmentPreview": {
       "openFailedRetry": "Kunne ikke åbne filen. Prøv igen.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Tilføj kreditter",
-    "description": "Tilføj kreditter for at holde forbruget kørende."
+    "description": "Tilføj kreditter for at holde forbruget kørende.",
+    "billingPage": "faktureringsside"
   },
   "deviceSessions": {
     "couldNotLoad": "Kunne ikke indlæse sessioner",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Kunne ikke gendanne køb. Prøv igen.",
     "purchaseFailed": "Kunne ikke fuldføre købet.",
     "purchaseStartFailed": "Kunne ikke starte App Store-købet.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass på denne Apple-konto tilhører en anden Kilo-konto."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass på denne Apple-konto tilhører en anden Kilo-konto.",
+    "couldNotConnectToAppStore": "Kunne ikke oprette forbindelse til App Store. Tjek din forbindelse, og prøv igen.",
+    "noMatchingProducts": "App Store returnerede ingen matchende Kilo Pass-produkter.",
+    "purchaseMissingSignedTransaction": "App Store-købet inkluderede ikke en signeret transaktions-JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Har brug for forbedringer",
     "sorryTitle": "Vi er kede af at høre det!",
     "sorryMessage": "Fortæl os venligst, hvad der kan blive bedre. Ingeniøren med ansvar for appen læser hver eneste rapport!",
-    "emailUs": "Skriv til os"
+    "emailUs": "Skriv til os",
+    "emailSubject": "feedback til mobilappen"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Ingen kreditaktivitet",
       "expires": "Udløber {{date}}",
       "title": "Kreditaktivitet",
-      "transactionFallback": "Kredittransaktion"
+      "transactionFallback": "Kredittransaktion",
+      "category": {
+        "organization_custom": "Organisationstilpasset",
+        "parent_to_child_transfer_in": "Indgående overførsel fra forælder til barn",
+        "parent_to_child_transfer_out": "Udgående overførsel fra forælder til barn",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Regnskabsmæssig justering",
+        "credits_expired": "Udløbne kreditter"
+      }
     },
     "inviteMember": {
       "emailError": "Angiv en gyldig e-mailadresse",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Fakturaer genereres automatisk hver faktureringscyklus og vises her, når din organisation er faktureret.",
       "emptyTitle": "Ingen fakturaer",
       "invoiceFallback": "Faktura",
-      "statusOpen": "Åben",
-      "statusPaid": "Betalt",
-      "statusVoid": "Annulleret",
       "title": "Fakturaer",
       "downloadFailed": "Kunne ikke downloade fakturaen. Tjek din forbindelse og prøv igen.",
-      "sharingUnavailable": "Deling er ikke tilgængelig på denne enhed."
+      "sharingUnavailable": "Deling er ikke tilgængelig på denne enhed.",
+      "status": {
+        "paid": "Betalt",
+        "open": "Åben",
+        "void": "Annulleret",
+        "draft": "Kladde",
+        "uncollectible": "Uinddrivelig",
+        "unknown": "Ukendt"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "navn@virksomhed.dk",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Indsamlede data",
     "free": "Gratis",
-    "couldNotUpdateFavorites": "Kunne ikke opdatere favoritter"
+    "couldNotUpdateFavorites": "Kunne ikke opdatere favoritter",
+    "thinkingEffort": {
+      "none": "Ingen",
+      "minimal": "Minimal",
+      "low": "Lav",
+      "medium": "Mellem",
+      "high": "Høj",
+      "xhigh": "Ekstra høj",
+      "max": "Maks"
+    }
   }
 }

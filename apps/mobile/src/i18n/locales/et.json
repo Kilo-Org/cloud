@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Valitud {{label}}, puuduta valiku muutmiseks",
       "tapToComment": "{{label}}, puuduta kommenteerimiseks",
-      "truncationBanner": "Kuvatakse esimesed {{limit}} muudetud faili kokku {{total}}-st — GitHubi API piirang"
+      "truncationBanner": "Kuvatakse esimesed {{limit}} muudetud faili kokku {{total}}-st — GitHubi API piirang",
+      "statusAdded": "Lisatud",
+      "statusContext": "Kontekst",
+      "statusDeleted": "Kustutatud"
     },
     "linkPasteClipboardEmpty": "Lõikelaud on tühi",
     "linkPasteNotAPullRequest": "Pole GitHub pull requesti link",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Seda ülevaadet ei saa sellisel kujul esitada. PR võis muutuda või ei saa sa oma pull request'i üle vaadata.",
       "couldNotPostComment": "Kommentaari ei õnnestunud postitada.",
       "couldNotSubmitReview": "Ülevaate esitamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti."
+    },
+    "operation": {
+      "couldNotReply": "Vastamine ebaõnnestus.",
+      "couldNotCompleteAction": "Seda toimingut ei õnnestunud lõpule viia.",
+      "mergeResultDefaultError": "GitHub ei lõpetanud ühendamist."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Makse on ületähtajal. Palun uuendage oma makseviisi.",
       "subscriptionCancels": "Tellimus tühistub {{date}}",
       "trialDaysRemaining": "Prooviperiood: {{remaining}} jäänud",
-      "trialEndingSoon": "Prooviperiood lõpeb varsti: {{remaining}}"
+      "trialEndingSoon": "Prooviperiood lõpeb varsti: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Mis on uut",
@@ -1189,7 +1201,8 @@
       "strongArm": "Tugev käsi",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "See instants ei saa faile vastu võtta."
+    "remoteSpawnFilesNotSupported": "See instants ei saa faile vastu võtta.",
+    "instanceSwitcherTitle": "KiloClaw-i eksemplar"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Ebaõnnestus",
       "cancelled": "Tühistatud",
       "interrupted": "Katkestatud"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Range",
+      "balanced": "Tasakaalustatud",
+      "lenient": "Leebe",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Turvalisus",
+      "performance": "Jõudlus",
+      "bugs": "Vead",
+      "style": "Stiil",
+      "testing": "Testimine",
+      "documentation": "Dokumentatsioon"
+    },
+    "gateThreshold": {
+      "off": "Väljas",
+      "all": "Kõik",
+      "warning": "Hoiatus",
+      "critical": "Kriitiline"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Koodiülevaataja vajab tähelepanu",
+        "description": "Koodiülevaataja keelati, kuna Kilo ei pääse aktiivse GitHub App'i installiga sellele hoidlale ligi. Uuenda GitHub App'i installi, seejärel luba koodiülevaataja uuesti.",
+        "recoveryLabel": "Uuenda GitHub App'i"
+      },
+      "githubIpAllowList": {
+        "title": "Koodiülevaataja vajab tähelepanu",
+        "description": "Koodiülevaataja keelati, kuna see GitHubi organisatsioon kasutab IP-lubatud loendit, mis blokeerib Kilo. Abi saamiseks võta ühendust aadressil hi@kilocode.ai, seejärel luba koodiülevaataja uuesti.",
+        "recoveryLabel": "Võta ühendust toega"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Koodiülevaataja vajab tähelepanu",
+        "description": "Koodiülevaataja keelati, kuna Kilo ei saa selle projekti jaoks GitLabi projekti juurdepääsutunnust luua. Anna haldaja juurdepääs või luba projekti juurdepääsutunnused, seejärel luba koodiülevaataja uuesti.",
+        "recoveryLabel": "Uuenda GitLabi integratsiooni"
+      },
+      "byokInvalidKey": {
+        "title": "Koodiülevaataja vajab tähelepanu",
+        "description": "Koodiülevaataja keelati, kuna valitud BYOK API-võti on kehtetu, tühistatud või puudub tal õigus. Uuenda võtit või vali teine mudel, seejärel luba koodiülevaataja uuesti.",
+        "recoveryLabel": "Uuenda BYOK seadeid"
+      },
+      "selectedModelUnavailable": {
+        "title": "Koodiülevaataja vajab tähelepanu",
+        "description": "Koodiülevaataja keelati, kuna valitud mudel pole pilveagendi seansside jaoks saadaval. Vali saadaolev mudel, seejärel luba koodiülevaataja uuesti.",
+        "recoveryLabel": "Uuenda koodiülevaataja seadeid"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Koodiülevaataja vajab tähelepanu",
+        "description": "Koodiülevaataja keelati pärast kolme hoidla kloonimise ajalõppu täna. Abi saamiseks võta ühendust aadressil hi@kilocode.ai, seejärel luba koodiülevaataja uuesti.",
+        "recoveryLabel": "Võta ühendust toega"
+      }
+    },
+    "unknownError": "Tundmatu viga"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Leid on automaatse tõsidusläve all. Käsitsi parandamine saab siiski alata, kui turvaväravad on läbitud.",
       "beforeEnablement": "Analüüs lõppes enne automaatse parandamise lubamist. Käsitsi parandamine saab siiski alata, kui turvaväravad on läbitud.",
       "generic": "Parandamine pole selle leiu jaoks saadaval."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Analüüsivõimekus on täis. Oota, kuni aktiivne analüüs lõpeb, seejärel proovi uuesti.",
+      "githubTokenUnavailable": "GitHubi volitus vajab tähelepanu. Volita GitHub App uuesti, seejärel proovi uuesti.",
+      "githubAuthInvalid": "GitHubi volitus vajab tähelepanu. Volita GitHub App uuesti, seejärel proovi uuesti.",
+      "findingUnavailable": "Leid pole enam saadaval. Värskenda leide ja proovi uuesti, kui see on endiselt avatud.",
+      "repositoryUnavailable": "Hoidla pole GitHub App'ile enam saadaval. Värskenda hoidla juurdepääsu, seejärel proovi uuesti.",
+      "invalidDismissTarget": "Leidu ei saa tagasi lükata, kuna selle Dependaboti sihtmärk on vigane.",
+      "commandStalled": "Järjekorras olev toiming ei lõppenud õigeaegselt. Proovi toimingut uuesti.",
+      "queueRetriesExhausted": "Toimingut ei õnnestunud pärast mitut katset lõpule viia. Proovi toimingut uuesti.",
+      "queueAdmissionFailed": "Järjekorras olevat toimingut ei õnnestunud vastu võtta. Proovi toimingut uuesti.",
+      "generic": "Järjekorras olev toiming ebaõnnestus. Proovi toimingut uuesti."
+    },
+    "analysisMode": {
+      "auto": "Automaatne",
+      "shallow": "Pindmine",
+      "deep": "Sügav"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Lisa {{name}} lemmikutesse",
       "removeFromFavorites": "Eemalda {{name}} lemmikutest",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Seansi mudel"
     },
     "attachmentPreview": {
       "openFailedRetry": "Faili avamine ebaõnnestus. Proovige uuesti.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Lisa krediiti",
-    "description": "Kasutuse jätkamiseks lisage krediiti."
+    "description": "Kasutuse jätkamiseks lisage krediiti.",
+    "billingPage": "arveldusleht"
   },
   "deviceSessions": {
     "couldNotLoad": "Seansse ei õnnestunud laadida",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Ostude taastamine ebaõnnestus. Proovi uuesti.",
     "purchaseFailed": "Ostu lõpetamine ebaõnnestus.",
     "purchaseStartFailed": "App Store'i ostu alustamine ebaõnnestus.",
-    "purchaseOwnedByAnotherAccount": "Selle Apple kontoga seotud Kilo Pass kuulub teisele Kilo kontole."
+    "purchaseOwnedByAnotherAccount": "Selle Apple kontoga seotud Kilo Pass kuulub teisele Kilo kontole.",
+    "couldNotConnectToAppStore": "App Store'iga ühendamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti.",
+    "noMatchingProducts": "App Store ei tagastanud ühtegi sobivat Kilo Passi toodet.",
+    "purchaseMissingSignedTransaction": "App Store'i ost ei sisaldanud allkirjastatud tehingu JWS-i."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Vajab täiendamist",
     "sorryTitle": "Meil on kahju seda kuulda!",
     "sorryMessage": "Andke meile teada, mida tuleks parandada. Rakenduse eest vastutav insener loeb iga üksikut aruannet!",
-    "emailUs": "Kirjutage meile"
+    "emailUs": "Kirjutage meile",
+    "emailSubject": "mobiilirakenduse tagasiside"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Krediiditegevust pole",
       "expires": "Aegub {{date}}",
       "title": "Krediiditegevus",
-      "transactionFallback": "Krediiditehing"
+      "transactionFallback": "Krediiditehing",
+      "category": {
+        "organization_custom": "Organisatsiooni kohandatud",
+        "parent_to_child_transfer_in": "Ülekanne vanemalt lapsele (sisse)",
+        "parent_to_child_transfer_out": "Ülekanne vanemalt lapsele (välja)",
+        "oss-sponsorship": "OSS-sponsorlus",
+        "oss-monthly-reset": "OSS-i kuu lähtestamine",
+        "team-topup-bonus-2025": "Meeskonna täiendusboonus 2025",
+        "accounting_adjustment": "Raamatupidamiskorrigeerimine",
+        "credits_expired": "Krediidid aegusid"
+      }
     },
     "inviteMember": {
       "emailError": "Sisestage kehtiv e-posti aadress",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Arved genereeritakse automaatselt igal arveldustsüklil ja ilmuvad siia, kui teie organisatsioonile arveldatakse.",
       "emptyTitle": "Arveid pole",
       "invoiceFallback": "Arve",
-      "statusOpen": "Avatud",
-      "statusPaid": "Makstud",
-      "statusVoid": "Tühistatud",
       "title": "Arved",
       "downloadFailed": "Arve allalaadimine ei õnnestunud. Kontrolli ühendust ja proovi uuesti.",
-      "sharingUnavailable": "Jagamine pole sellel seadmel saadaval."
+      "sharingUnavailable": "Jagamine pole sellel seadmel saadaval.",
+      "status": {
+        "paid": "Makstud",
+        "open": "Avatud",
+        "void": "Tühistatud",
+        "draft": "Mustand",
+        "uncollectible": "Sissenõudmatu",
+        "unknown": "Teadmata"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Kogutud andmed",
     "free": "Tasuta",
-    "couldNotUpdateFavorites": "Lemmikute uuendamine ebaõnnestus"
+    "couldNotUpdateFavorites": "Lemmikute uuendamine ebaõnnestus",
+    "thinkingEffort": {
+      "none": "Puudub",
+      "minimal": "Minimaalne",
+      "low": "Madal",
+      "medium": "Keskmine",
+      "high": "Kõrge",
+      "xhigh": "Väga kõrge",
+      "max": "Maksimaalne"
+    }
   }
 }

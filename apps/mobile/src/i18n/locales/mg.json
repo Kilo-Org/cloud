@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Voafidy {{label}}, tsindrio mba hanova ny fisafidianana",
       "tapToComment": "{{label}}, tsindrio mba hanehoana hevitra",
-      "truncationBanner": "Mampiseho ny {{limit}} voalohany amin'ny {{total}} rakitra novaina — fetran'ny API GitHub"
+      "truncationBanner": "Mampiseho ny {{limit}} voalohany amin'ny {{total}} rakitra novaina — fetran'ny API GitHub",
+      "statusAdded": "Nampiana",
+      "statusContext": "Contexte",
+      "statusDeleted": "Voafafa"
     },
     "linkPasteClipboardEmpty": "Foana ny tahiry",
     "linkPasteNotAPullRequest": "Tsy rohy pull request amin'ny GitHub io",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Tsy azo alefa araka izao ity fandinihana ity. Mety niova ny PR, na tsy afaka mandinika ny pull request anao manokana ianao.",
       "couldNotPostComment": "Tsy afaka nametraka hevitra.",
       "couldNotSubmitReview": "Tsy afaka nandefa ny fandinihana. Jereo ny fifandraisanao ary andramana indray."
+    },
+    "operation": {
+      "couldNotReply": "Tsy afaka namaly.",
+      "couldNotCompleteAction": "Tsy afaka nahavita ity hetsika ity.",
+      "mergeResultDefaultError": "Tsy nahavita nampirina ny GitHub."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Tara ny fandoavana. Havaozy ny fomba fandoavanao.",
       "subscriptionCancels": "Hafaomby ny famandrihana amin'ny {{date}}",
       "trialDaysRemaining": "Andrana: {{remaining}}",
-      "trialEndingSoon": "Hifarana tsy ho ela ny andrana: {{remaining}}"
+      "trialEndingSoon": "Hifarana tsy ho ela ny andrana: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Inona ny vaovao",
@@ -1189,7 +1201,8 @@
       "strongArm": "Sandry matanjaka",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Tsy afaka mandray rakitra ity instance ity."
+    "remoteSpawnFilesNotSupported": "Tsy afaka mandray rakitra ity instance ity.",
+    "instanceSwitcherTitle": "Instance KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Tsy nahomby",
       "cancelled": "Nofoanana",
       "interrupted": "Voasakantsakana"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Henjana",
+      "balanced": "Voalanjalanja",
+      "lenient": "Malefaka",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Fiarovana",
+      "performance": "Fahombiazana",
+      "bugs": "Lesoka",
+      "style": "Fomba",
+      "testing": "Fitsapana",
+      "documentation": "Fanamarihana"
+    },
+    "gateThreshold": {
+      "off": "Maty",
+      "all": "Rehetra",
+      "warning": "Fampitandremana",
+      "critical": "Zava-dehibe"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Mila jerena ny Code Reviewer",
+        "description": "Nofoanana ny Code Reviewer satria tsy afaka miditra amin'ity repository ity i Kilo amin'ny fametrahana GitHub App mavitrika. Havaozy ny fametrahana GitHub App, dia avereno alefa ny Code Reviewer.",
+        "recoveryLabel": "Havaozy ny GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Mila jerena ny Code Reviewer",
+        "description": "Nofoanana ny Code Reviewer satria ity fikambanana GitHub ity dia mampiasa lisitra avelan'ny IP izay manakana an'i Kilo. Mifandraisa amin'ny hi@kilocode.ai raha mila fanampiana, dia avereno alefa ny Code Reviewer.",
+        "recoveryLabel": "Mifandraisa amin'ny support"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Mila jerena ny Code Reviewer",
+        "description": "Nofoanana ny Code Reviewer satria tsy afaka mamorona GitLab Project Access Token ho an'ity tetikasa ity i Kilo. Omeo fidirana Maintainer na alefaso ny Project Access Tokens, dia avereno alefa ny Code Reviewer.",
+        "recoveryLabel": "Havaozy ny fampidirana GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Mila jerena ny Code Reviewer",
+        "description": "Nofoanana ny Code Reviewer satria tsy manan-kery, voafoana, na tsy ampy alalana ny BYOK API key voafidy. Havaozy ny key na fidio modely hafa, dia avereno alefa ny Code Reviewer.",
+        "recoveryLabel": "Havaozy ny fika BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Mila jerena ny Code Reviewer",
+        "description": "Nofoanana ny Code Reviewer satria tsy misy ho an'ny session cloud agent ny modely voafidy. Fidio modely azo ampiasaina, dia avereno alefa ny Code Reviewer.",
+        "recoveryLabel": "Havaozy ny fika Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Mila jerena ny Code Reviewer",
+        "description": "Nofoanana ny Code Reviewer rehefa nisy timeout telo tamin'ny clone repository androany. Mifandraisa amin'ny hi@kilocode.ai raha mila fanampiana, dia avereno alefa ny Code Reviewer.",
+        "recoveryLabel": "Mifandraisa amin'ny support"
+      }
+    },
+    "unknownError": "Hadisoana tsy fantatra"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Ambany noho ny fetra hamafy mandeha ho azy ny fikarohana. Mbola afaka manomboka ny fanarenana tanana rehefa mandalo ny vavahady fiarovana.",
       "beforeEnablement": "Vita ny famakafakana talohan'ny nahafahan'ny fanarenana mandeha ho azy. Mbola afaka manomboka ny fanarenana tanana rehefa mandalo ny vavahady fiarovana.",
       "generic": "Tsy misy ny fanarenana ho an'ity fikarohana ity."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Feno ny fahafahana famakafakana. Andraso ho vita ny famakafakana mavitrika, dia andramana indray.",
+      "githubTokenUnavailable": "Mila jerena ny fanomezan-dàlana GitHub. Avereno omena alalana ny GitHub App, dia andramana indray.",
+      "githubAuthInvalid": "Mila jerena ny fanomezan-dàlana GitHub. Avereno omena alalana ny GitHub App, dia andramana indray.",
+      "findingUnavailable": "Tsy misy intsony ny fikarohana. Havaozy ny fikarohana ary andramana indray raha mbola misokatra izy.",
+      "repositoryUnavailable": "Tsy misy intsony ny repository ho an'ny GitHub App. Havaozy ny fidirana amin'ny repository, dia andramana indray.",
+      "invalidDismissTarget": "Tsy azo esorina ny fikarohana satria tsy manan-kery ny target Dependabot-ny.",
+      "commandStalled": "Tsy vita ara-potoana ny hetsika voalahatra. Avereno ny hetsika.",
+      "queueRetriesExhausted": "Tsy afaka nahavita ny hetsika aorian'ny andrana maromaro. Avereno ny hetsika.",
+      "queueAdmissionFailed": "Tsy afaka noraisina ny hetsika voalahatra. Avereno ny hetsika.",
+      "generic": "Tsy nahomby ny hetsika voalahatra. Avereno ny hetsika."
+    },
+    "analysisMode": {
+      "auto": "Auto",
+      "shallow": "Marivo",
+      "deep": "Lalina"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Ampio {{name}} amin'ny ankafizinao",
       "removeFromFavorites": "Esory {{name}} amin'ny ankafizinao",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Modely Session"
     },
     "attachmentPreview": {
       "openFailedRetry": "Tsy nahomby ny fanokafana rakitra. Andramo indray azafady.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Ampio crédits",
-    "description": "Ampio crédits mba hitohizan'ny fampiasana."
+    "description": "Ampio crédits mba hitohizan'ny fampiasana.",
+    "billingPage": "pejy fandoavana"
   },
   "deviceSessions": {
     "couldNotLoad": "Tsy afaka nampidirina ny session",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Tsy nahomby ny famerenana ny fividianana. Andramana indray.",
     "purchaseFailed": "Tsy nahomby ny famitana ny fividianana.",
     "purchaseStartFailed": "Tsy nahomby ny fanombohana ny fividianana App Store.",
-    "purchaseOwnedByAnotherAccount": "Ny Kilo Pass amin'ity Apple Account ity dia an'ny kaonty Kilo hafa."
+    "purchaseOwnedByAnotherAccount": "Ny Kilo Pass amin'ity Apple Account ity dia an'ny kaonty Kilo hafa.",
+    "couldNotConnectToAppStore": "Tsy afaka nifandray tamin'ny App Store. Jereo ny fifandraisanao ary andramana indray.",
+    "noMatchingProducts": "Tsy niverina avy amin'ny App Store ny vokatra Kilo Pass mifanaraka.",
+    "purchaseMissingSignedTransaction": "Tsy nampidirina tamin'ny fividianana App Store ny JWS transaction sonia."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Mila fanatsarana",
     "sorryTitle": "Malahelo izahay mandre izany!",
     "sorryMessage": "Ampahafantaro anay azafady izay tokony ho tsara kokoa. Mamaky ny tatitra rehetra ny injenieran'ny app!",
-    "emailUs": "Alefaso email"
+    "emailUs": "Alefaso email",
+    "emailSubject": "fanehoan-kevitra momba ny app mobile"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Tsy misy hetsika crédit",
       "expires": "Lany daty {{date}}",
       "title": "Hetsika crédit",
-      "transactionFallback": "Famindrana crédit"
+      "transactionFallback": "Famindrana crédit",
+      "category": {
+        "organization_custom": "Manokana ny fikambanana",
+        "parent_to_child_transfer_in": "Famindrana avy amin'ny ray aman-dreny ho an'ny zanaka (miditra)",
+        "parent_to_child_transfer_out": "Famindrana avy amin'ny ray aman-dreny ho an'ny zanaka (mivoaka)",
+        "oss-sponsorship": "Sponsorship OSS",
+        "oss-monthly-reset": "Famerenana isam-bolana OSS",
+        "team-topup-bonus-2025": "Bonus top-up ekipa 2025",
+        "accounting_adjustment": "Fanitsiana kaonty",
+        "credits_expired": "Lany daty ny credits"
+      }
     },
     "inviteMember": {
       "emailError": "Ampidiro adiresy email sahaza",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Vokarina ho azy isaky ny tsingerin'ny faktiora ny faktiora ary hiseho eto rehefa voahazo faktiora ny orinasanao.",
       "emptyTitle": "Tsy misy faktiora",
       "invoiceFallback": "Faktiora",
-      "statusOpen": "Misokatra",
-      "statusPaid": "Voaloa",
-      "statusVoid": "Nofoana",
       "title": "Faktiora",
       "downloadFailed": "Tsy afaka nampidina ny faktiora. Jereo ny fifandraisanao ary andramana indray.",
-      "sharingUnavailable": "Tsy misy ny fifampizarana amin'ity fitaovana ity."
+      "sharingUnavailable": "Tsy misy ny fifampizarana amin'ity fitaovana ity.",
+      "status": {
+        "paid": "Voaloa",
+        "open": "Misokatra",
+        "void": "Nofoana",
+        "draft": "Draft",
+        "uncollectible": "Tsy azo angonina",
+        "unknown": "Tsy fantatra"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Angona voaangona",
     "free": "Maimaimpoana",
-    "couldNotUpdateFavorites": "Tsy afaka nanavao ny ankafizina"
+    "couldNotUpdateFavorites": "Tsy afaka nanavao ny ankafizina",
+    "thinkingEffort": {
+      "none": "Tsy misy",
+      "minimal": "Kely indrindra",
+      "low": "Ambany",
+      "medium": "Antonony",
+      "high": "Avo",
+      "xhigh": "Avo be",
+      "max": "Ambony indrindra"
+    }
   }
 }

@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} таңдалды, таңдауды өзгерту үшін түртіңіз",
       "tapToComment": "{{label}}, пікір қалдыру үшін түртіңіз",
-      "truncationBanner": "Өзгертілген {{total}} файлдың алғашқы {{limit}}-і көрсетілуде — GitHub API шегі"
+      "truncationBanner": "Өзгертілген {{total}} файлдың алғашқы {{limit}}-і көрсетілуде — GitHub API шегі",
+      "statusAdded": "Қосылды",
+      "statusContext": "Контекст",
+      "statusDeleted": "Жойылды"
     },
     "linkPasteClipboardEmpty": "Айырбастау буфері бос",
     "linkPasteNotAPullRequest": "GitHub pull request сілтемесі емес",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Бұл рецензияны осы күйінде жіберу мүмкін емес. PR өзгерген болуы мүмкін немесе өз pull request-іңізді рецензиялай алмайсыз.",
       "couldNotPostComment": "Пікірді жариялау мүмкін болмады.",
       "couldNotSubmitReview": "Рецензияны жіберу мүмкін болмады. Қосылымды тексеріп, қайта көріңіз."
+    },
+    "operation": {
+      "couldNotReply": "Жауап беру мүмкін болмады.",
+      "couldNotCompleteAction": "Бұл әрекетті аяқтау мүмкін болмады.",
+      "mergeResultDefaultError": "GitHub біріктіруді аяқтамады."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Төлем мерзімі өтіп кетті. Төлем әдісін жаңартыңыз.",
       "subscriptionCancels": "Жазылым {{date}} күні жойылады",
       "trialDaysRemaining": "Сынақ: {{remaining}} қалды",
-      "trialEndingSoon": "Сынақ жақында аяқталады: {{remaining}}"
+      "trialEndingSoon": "Сынақ жақында аяқталады: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Не жаңалық",
@@ -1189,7 +1201,8 @@
       "strongArm": "Мықты қол",
       "talisman": "Тұмар"
     },
-    "remoteSpawnFilesNotSupported": "Бұл инстанс файл қабылдай алмайды."
+    "remoteSpawnFilesNotSupported": "Бұл инстанс файл қабылдай алмайды.",
+    "instanceSwitcherTitle": "KiloClaw инстансы"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Сәтсіз аяқталды",
       "cancelled": "Тоқтатылды",
       "interrupted": "Үзілді"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Қатаң",
+      "balanced": "Теңгерімді",
+      "lenient": "Жұмсақ",
+      "roast": "Рост"
+    },
+    "focusArea": {
+      "security": "Қауіпсіздік",
+      "performance": "Өнімділік",
+      "bugs": "Қателер",
+      "style": "Стиль",
+      "testing": "Тестілеу",
+      "documentation": "Құжаттама"
+    },
+    "gateThreshold": {
+      "off": "Өшірулі",
+      "all": "Барлығы",
+      "warning": "Ескерту",
+      "critical": "Критикалық"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer назарды қажет етеді",
+        "description": "Kilo бұл репозиторийге белсенді GitHub App орнату арқылы қол жеткізе алмағандықтан, Code Reviewer өшірілді. GitHub App орнатуды жаңартып, Code Reviewer-ді қайта қосыңыз.",
+        "recoveryLabel": "GitHub App жаңарту"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer назарды қажет етеді",
+        "description": "Бұл GitHub ұйымы Kilo-ны бұғаттайтын IP рұқсат тізімін қолданатындықтан, Code Reviewer өшірілді. Көмек алу үшін hi@kilocode.ai мекенжайына хабарласып, Code Reviewer-ді қайта қосыңыз.",
+        "recoveryLabel": "Қолдау қызметіне хабарласу"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer назарды қажет етеді",
+        "description": "Kilo бұл жоба үшін GitLab Project Access Token жасай алмағандықтан, Code Reviewer өшірілді. Maintainer қолжетімділігін беріңіз немесе Project Access Tokens қосып, Code Reviewer-ді қайта қосыңыз.",
+        "recoveryLabel": "GitLab интеграциясын жаңарту"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer назарды қажет етеді",
+        "description": "Таңдалған BYOK API кілті жарамсыз, қайтарылған немесе рұқсаты жоқ болғандықтан, Code Reviewer өшірілді. Кілтті жаңартыңыз немесе басқа модельді таңдап, Code Reviewer-ді қайта қосыңыз.",
+        "recoveryLabel": "BYOK баптауларын жаңарту"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer назарды қажет етеді",
+        "description": "Таңдалған модель cloud agent сессиялары үшін қолжетімсіз болғандықтан, Code Reviewer өшірілді. Қолжетімді модельді таңдап, Code Reviewer-ді қайта қосыңыз.",
+        "recoveryLabel": "Code Reviewer баптауларын жаңарту"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer назарды қажет етеді",
+        "description": "Бүгін үш репозиторий клондау уақыты аяқталғаннан кейін Code Reviewer өшірілді. Көмек алу үшін hi@kilocode.ai мекенжайына хабарласып, Code Reviewer-ді қайта қосыңыз.",
+        "recoveryLabel": "Қолдау қызметіне хабарласу"
+      }
+    },
+    "unknownError": "Белгісіз қате"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Дерек автоматты ауырлық шегінен төмен. Қолмен түзету қауіпсіздік кедергілері өткенде әлі де бастала алады.",
       "beforeEnablement": "Талдау Автотүзету қосылғанға дейін аяқталды. Қолмен түзету қауіпсіздік кедергілері өткенде әлі де бастала алады.",
       "generic": "Бұл дерек үшін түзету қолжетімсіз."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Талдау сыйымдылығы толы. Белсенді талдау аяқталуын күтіп, қайта көріңіз.",
+      "githubTokenUnavailable": "GitHub авторизациясы назарды қажет етеді. GitHub App-қа қайта рұқсат беріп, қайта көріңіз.",
+      "githubAuthInvalid": "GitHub авторизациясы назарды қажет етеді. GitHub App-қа қайта рұқсат беріп, қайта көріңіз.",
+      "findingUnavailable": "Дерек енді қолжетімсіз. Деректерді жаңартып, егер ол ашық қалса, қайта көріңіз.",
+      "repositoryUnavailable": "Репозиторий GitHub App үшін енді қолжетімсіз. Репозиторий қолжетімділігін жаңартып, қайта көріңіз.",
+      "invalidDismissTarget": "Оның Dependabot нысаны жарамсыз болғандықтан, деректі жою мүмкін емес.",
+      "commandStalled": "Кезектегі әрекет уақытында аяқталмады. Әрекетті қайталаңыз.",
+      "queueRetriesExhausted": "Бірнеше әрекеттен кейін әрекетті аяқтау мүмкін болмады. Әрекетті қайталаңыз.",
+      "queueAdmissionFailed": "Кезектегі әрекет қабылдана алмады. Әрекетті қайталаңыз.",
+      "generic": "Кезектегі әрекет сәтсіз аяқталды. Әрекетті қайталаңыз."
+    },
+    "analysisMode": {
+      "auto": "Авто",
+      "shallow": "Жеңіл",
+      "deep": "Терең"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "{{name}} таңдаулыларға қосу",
       "removeFromFavorites": "{{name}} таңдаулылардан алып тастау",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Сессия моделі"
     },
     "attachmentPreview": {
       "openFailedRetry": "Файлды ашу сәтсіз аяқталды. Қайталап көріңіз.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Кредиттер қосу",
-    "description": "Пайдалануды жалғастыру үшін кредиттер қосыңыз."
+    "description": "Пайдалануды жалғастыру үшін кредиттер қосыңыз.",
+    "billingPage": "төлем беті"
   },
   "deviceSessions": {
     "couldNotLoad": "Сессияларды жүктеу мүмкін болмады",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Сатып алуларды қалпына келтіру сәтсіз аяқталды. Қайта көріңіз.",
     "purchaseFailed": "Сатып алуды аяқтау мүмкін болмады.",
     "purchaseStartFailed": "App Store сатып алуын бастау мүмкін болмады.",
-    "purchaseOwnedByAnotherAccount": "Бұл Apple Аккаунтындағы Kilo Pass басқа Kilo аккаунтына тиесілі."
+    "purchaseOwnedByAnotherAccount": "Бұл Apple Аккаунтындағы Kilo Pass басқа Kilo аккаунтына тиесілі.",
+    "couldNotConnectToAppStore": "App Store-ға қосылу мүмкін болмады. Қосылымды тексеріп, қайта көріңіз.",
+    "noMatchingProducts": "App Store сәйкес Kilo Pass өнімдерін қайтармады.",
+    "purchaseMissingSignedTransaction": "App Store сатып алуы қол қойылған транзакция JWS қамтымады."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Жақсарту қажет",
     "sorryTitle": "Мұны естігенімізге өкінеміз!",
     "sorryMessage": "Не жақсарту керектігін айтыңыз. Қосымшаға жауапты инженер әрбір есепті оқиды!",
-    "emailUs": "Бізге жазыңыз"
+    "emailUs": "Бізге жазыңыз",
+    "emailSubject": "мобильді қосымша туралы кері байланыс"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Кредит әрекеті жоқ",
       "expires": "{{date}} мерзімі аяқталады",
       "title": "Кредит әрекеті",
-      "transactionFallback": "Кредит транзакциясы"
+      "transactionFallback": "Кредит транзакциясы",
+      "category": {
+        "organization_custom": "Ұйымның теңшелетін",
+        "parent_to_child_transfer_in": "Ата-анадан балаға аударым (кіріс)",
+        "parent_to_child_transfer_out": "Ата-анадан балаға аударым (шығыс)",
+        "oss-sponsorship": "OSS демеушілігі",
+        "oss-monthly-reset": "OSS айлық қалпына келтіру",
+        "team-topup-bonus-2025": "Топты толтыру бонусы 2025",
+        "accounting_adjustment": "Есептік түзету",
+        "credits_expired": "Кредиттердің мерзімі аяқталды"
+      }
     },
     "inviteMember": {
       "emailError": "Жарамды электрондық пошта мекенжайын енгізіңіз",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Шоттар әр төлем циклінде автоматты түрде жасалады және ұйымыңыз төленгеннен кейін осында көрсетіледі.",
       "emptyTitle": "Шоттар жоқ",
       "invoiceFallback": "Шот",
-      "statusOpen": "Ашық",
-      "statusPaid": "Төленген",
-      "statusVoid": "Жарамсыз",
       "title": "Шоттар",
       "downloadFailed": "Шотты жүктеу мүмкін болмады. Қосылымды тексеріп, қайта көріңіз.",
-      "sharingUnavailable": "Бұл құрылғыда бөлісу қолжетімсіз."
+      "sharingUnavailable": "Бұл құрылғыда бөлісу қолжетімсіз.",
+      "status": {
+        "paid": "Төленген",
+        "open": "Ашық",
+        "void": "Жарамсыз",
+        "draft": "Жоба",
+        "uncollectible": "Өндіріп алу мүмкін емес",
+        "unknown": "Белгісіз"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Жинақталған деректер",
     "free": "Тегін",
-    "couldNotUpdateFavorites": "Таңдаулыларды жаңарту мүмкін болмады"
+    "couldNotUpdateFavorites": "Таңдаулыларды жаңарту мүмкін болмады",
+    "thinkingEffort": {
+      "none": "Жоқ",
+      "minimal": "Минималды",
+      "low": "Төмен",
+      "medium": "Орташа",
+      "high": "Жоғары",
+      "xhigh": "Өте жоғары",
+      "max": "Максималды"
+    }
   }
 }

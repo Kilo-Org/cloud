@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Chwazi {{label}}, tape pou chanje seleksyon",
       "tapToComment": "{{label}}, tape pou kòmante",
-      "truncationBanner": "Ap montre premye {{limit}} sou {{total}} fichye ki chanje — limit API GitHub"
+      "truncationBanner": "Ap montre premye {{limit}} sou {{total}} fichye ki chanje — limit API GitHub",
+      "statusAdded": "Ajoute",
+      "statusContext": "Kontèks",
+      "statusDeleted": "Efase"
     },
     "linkPasteClipboardEmpty": "Clipboard la vid",
     "linkPasteNotAPullRequest": "Se pa yon lyen pull request GitHub",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Revizyon sa a pa ka soumèt jan li ye a. PR la ka chanje, oswa ou pa ka revize pwòp pull request ou.",
       "couldNotPostComment": "Pa t ka pòste kòmantè.",
       "couldNotSubmitReview": "Pa t ka soumèt revizyon. Tcheke koneksyon ou epi eseye ankò."
+    },
+    "operation": {
+      "couldNotReply": "Pa t ka reponn.",
+      "couldNotCompleteAction": "Pa t ka fini aksyon sa a.",
+      "mergeResultDefaultError": "GitHub pa t fini fizyon an."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Peman an reta. Tanpri mete ajou metòd peman ou a.",
       "subscriptionCancels": "Abònman an anile {{date}}",
       "trialDaysRemaining": "Eseye: {{remaining}} rete",
-      "trialEndingSoon": "Eseye ap fini pito: {{remaining}}"
+      "trialEndingSoon": "Eseye ap fini pito: {{remaining}}",
+      "planName": {
+        "commit": "Konmèt",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Kisa ki Nouvo",
@@ -1189,7 +1201,8 @@
       "strongArm": "Bra fò",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Enstans sa a pa ka resevwa fichye."
+    "remoteSpawnFilesNotSupported": "Enstans sa a pa ka resevwa fichye.",
+    "instanceSwitcherTitle": "Enstans KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Echwe",
       "cancelled": "Anile",
       "interrupted": "Entèwonp"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Sevè",
+      "balanced": "Ekilibre",
+      "lenient": "Toleran",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Sekirite",
+      "performance": "Pèfòmans",
+      "bugs": "Ensek",
+      "style": "Estil",
+      "testing": "Tès",
+      "documentation": "Dokimantasyon"
+    },
+    "gateThreshold": {
+      "off": "Etenn",
+      "all": "Tout",
+      "warning": "Avètisman",
+      "critical": "Kritik"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Revizè Kòd bezwen atansyon",
+        "description": "Revizè Kòd dezaktive paske Kilo pa ka jwenn aksè sou repo sa a ak yon enstalasyon GitHub App aktif. Mete ajou enstalasyon GitHub App la, epi aktive Revizè Kòd ankò.",
+        "recoveryLabel": "Mete ajou GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Revizè Kòd bezwen atansyon",
+        "description": "Revizè Kòd dezaktive paske òganizasyon GitHub sa a itilize yon lis IP otorize ki bloke Kilo. Kontakte hi@kilocode.ai pou jwenn èd, epi aktive Revizè Kòd ankò.",
+        "recoveryLabel": "Kontakte sipò"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Revizè Kòd bezwen atansyon",
+        "description": "Revizè Kòd dezaktive paske Kilo pa ka kreye yon Token Aksè Pwojè GitLab pou pwojè sa a. Bay aksè Maintainer oswa aktive Token Aksè Pwojè yo, epi aktive Revizè Kòd ankò.",
+        "recoveryLabel": "Mete ajou entegrasyon GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Revizè Kòd bezwen atansyon",
+        "description": "Revizè Kòd dezaktive paske kle API BYOK chwazi a pa valid, li revoke, oswa li pa gen pèmisyon. Mete ajou kle a oswa chwazi yon lòt modèl, epi aktive Revizè Kòd ankò.",
+        "recoveryLabel": "Mete ajou paramèt BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Revizè Kòd bezwen atansyon",
+        "description": "Revizè Kòd dezaktive paske modèl la chwazi pa disponib pou sesyon Cloud Agent. Chwazi yon modèl ki disponib, epi aktive Revizè Kòd ankò.",
+        "recoveryLabel": "Mete ajou paramèt Revizè Kòd"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Revizè Kòd bezwen atansyon",
+        "description": "Revizè Kòd dezaktive apre twa tan ekspire klonaj repo jodi a. Kontakte hi@kilocode.ai pou jwenn èd, epi aktive Revizè Kòd ankò.",
+        "recoveryLabel": "Kontakte sipò"
+      }
+    },
+    "unknownError": "Erè enkoni"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Rezilta a anba seuy gravite otomatik. Remedysyon manyèl ka toujou kòmanse lè pòt sekirite yo pase.",
       "beforeEnablement": "Analiz fini anvan yo aktive koreksyon otomatik. Remedysyon manyèl ka toujou kòmanse lè pòt sekirite yo pase.",
       "generic": "Remedysyon pa disponib pou rezilta sa a."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Kapasite analiz la plen. Tann pou yon analiz aktif fini, epi eseye ankò.",
+      "githubTokenUnavailable": "Otorizasyon GitHub bezwen atansyon. Re-otorize GitHub App, epi eseye ankò.",
+      "githubAuthInvalid": "Otorizasyon GitHub bezwen atansyon. Re-otorize GitHub App, epi eseye ankò.",
+      "findingUnavailable": "Rezilta a pa disponib ankò. Rafrechi rezilta yo epi eseye ankò si li rete louvri.",
+      "repositoryUnavailable": "Repo a pa disponib pou GitHub App ankò. Rafrechi aksè repo a, epi eseye ankò.",
+      "invalidDismissTarget": "Rezilta a pa ka rejte paske sib Dependabot li a pa valid.",
+      "commandStalled": "Aksyon an pwosesis la pa t fini alè. Eseye aksyon an ankò.",
+      "queueRetriesExhausted": "Aksyon an pa t ka fini apre plizyè tantativ. Eseye aksyon an ankò.",
+      "queueAdmissionFailed": "Aksyon an pwosesis la pa t ka admèt. Eseye aksyon an ankò.",
+      "generic": "Aksyon an pwosesis la echwe. Eseye aksyon an ankò."
+    },
+    "analysisMode": {
+      "auto": "Otomatik",
+      "shallow": "Supèrfisyèl",
+      "deep": "Pwofon"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Ajoute {{name}} nan favori",
       "removeFromFavorites": "Retire {{name}} nan favori",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Modèl sesyon"
     },
     "attachmentPreview": {
       "openFailedRetry": "Echèk pou louvri fichye a. Tanpri eseye ankò.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Ajoute kredi",
-    "description": "Ajoute kredi pou kenbe itilizasyon an ap mache."
+    "description": "Ajoute kredi pou kenbe itilizasyon an ap mache.",
+    "billingPage": "paj faktirasyon an"
   },
   "deviceSessions": {
     "couldNotLoad": "Pa t ka chaje sesyon",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Echwe pou retabli acha yo. Eseye ankò.",
     "purchaseFailed": "Echwe pou fini acha a.",
     "purchaseStartFailed": "Echwe pou kòmanse acha App Store.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass la sou Kont Apple sa a fè pati yon lòt kont Kilo."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass la sou Kont Apple sa a fè pati yon lòt kont Kilo.",
+    "couldNotConnectToAppStore": "Pa t ka konekte ak App Store. Tcheke koneksyon ou epi eseye ankò.",
+    "noMatchingProducts": "App Store pa t retounen pwodwi Kilo Pass ki matche yo.",
+    "purchaseMissingSignedTransaction": "Acha nan App Store pa t enkli yon JWS transaksyon siyen."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Gen travay pou fè",
     "sorryTitle": "Nou regrèt tande sa!",
     "sorryMessage": "Tanpri fè nou konnen kisa ki bezwen pi byen. Enjenyè ki responsab aplikasyon an li chak rapò!",
-    "emailUs": "Imel nou"
+    "emailUs": "Imel nou",
+    "emailSubject": "kòmantè sou aplikasyon mobil"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Pa gen aktivite kredi",
       "expires": "Ekspire {{date}}",
       "title": "Aktivite kredi",
-      "transactionFallback": "Transaksyon kredi"
+      "transactionFallback": "Transaksyon kredi",
+      "category": {
+        "organization_custom": "Koutim òganizasyon",
+        "parent_to_child_transfer_in": "Transfè paran nan timoun (antre)",
+        "parent_to_child_transfer_out": "Transfè paran nan timoun (sòti)",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Ajisteman kontab",
+        "credits_expired": "Kredi ekspire"
+      }
     },
     "inviteMember": {
       "emailError": "Antre yon adrès imel valid",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Fakti yo jenere otomatikman chak sik bilin epi yo ap parèt isit la yon fwa òganizasyon ou fè bil.",
       "emptyTitle": "Pa gen fakti",
       "invoiceFallback": "Fakti",
-      "statusOpen": "Louvri",
-      "statusPaid": "Peye",
-      "statusVoid": "Anile",
       "title": "Fakti",
       "downloadFailed": "Pa t ka telechaje fakti a. Tcheke koneksyon ou epi eseye ankò.",
-      "sharingUnavailable": "Pataje pa disponib sou aparèy sa a."
+      "sharingUnavailable": "Pataje pa disponib sou aparèy sa a.",
+      "status": {
+        "paid": "Peye",
+        "open": "Louvri",
+        "void": "Envalid",
+        "draft": "Brouyon",
+        "uncollectible": "Enkobrèb",
+        "unknown": "Enkoni"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Done kolekte",
     "free": "Gratis",
-    "couldNotUpdateFavorites": "Pa t ka mete ajou favori yo"
+    "couldNotUpdateFavorites": "Pa t ka mete ajou favori yo",
+    "thinkingEffort": {
+      "none": "Anyen",
+      "minimal": "Minimòm",
+      "low": "Ba",
+      "medium": "Mwayen",
+      "high": "Wo",
+      "xhigh": "Trè wo",
+      "max": "Maksimòm"
+    }
   }
 }

@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Επιλεγμένο {{label}}, πατήστε για αλλαγή επιλογής",
       "tapToComment": "{{label}}, πατήστε για σχόλιο",
-      "truncationBanner": "Εμφάνιση των πρώτων {{limit}} από {{total}} αλλαγμένα αρχεία — όριο API του GitHub"
+      "truncationBanner": "Εμφάνιση των πρώτων {{limit}} από {{total}} αλλαγμένα αρχεία — όριο API του GitHub",
+      "statusAdded": "Προστέθηκε",
+      "statusContext": "Πλαίσιο",
+      "statusDeleted": "Διαγράφηκε"
     },
     "linkPasteClipboardEmpty": "Το πρόχειρο είναι άδειο",
     "linkPasteNotAPullRequest": "Δεν είναι σύνδεσμος pull request του GitHub",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Αυτή η αναθεώρηση δεν μπορεί να υποβληθεί ως έχει. Το PR μπορεί να έχει αλλάξει ή δεν μπορείτε να αναθεωρήσετε το δικό σας pull request.",
       "couldNotPostComment": "Δεν ήταν δυνατή η δημοσίευση του σχολίου.",
       "couldNotSubmitReview": "Δεν ήταν δυνατή η υποβολή της αναθεώρησης. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά."
+    },
+    "operation": {
+      "couldNotReply": "Δεν ήταν δυνατή η απάντηση.",
+      "couldNotCompleteAction": "Δεν ήταν δυνατή η ολοκλήρωση αυτής της ενέργειας.",
+      "mergeResultDefaultError": "Το GitHub δεν ολοκλήρωσε τη συγχώνευση."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Εκπρόθεσμη πληρωμή. Ενημερώστε τη μέθοδο πληρωμής σας.",
       "subscriptionCancels": "Η συνδρομή ακυρώνεται στις {{date}}",
       "trialDaysRemaining": "Δοκιμή: {{remaining}} απομένουν",
-      "trialEndingSoon": "Η δοκιμή λήγει σύντομα: {{remaining}}"
+      "trialEndingSoon": "Η δοκιμή λήγει σύντομα: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Τι νέο υπάρχει",
@@ -1189,7 +1201,8 @@
       "strongArm": "Δυνατό χέρι",
       "talisman": "Φυλαχτό"
     },
-    "remoteSpawnFilesNotSupported": "Αυτό το instance δεν μπορεί να λάβει αρχεία."
+    "remoteSpawnFilesNotSupported": "Αυτό το instance δεν μπορεί να λάβει αρχεία.",
+    "instanceSwitcherTitle": "Παρουσία KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Απέτυχε",
       "cancelled": "Ακυρώθηκε",
       "interrupted": "Διακόπηκε"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Αυστηρή",
+      "balanced": "Ισορροπημένη",
+      "lenient": "Επιεικής",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Ασφάλεια",
+      "performance": "Απόδοση",
+      "bugs": "Σφάλματα",
+      "style": "Στυλ",
+      "testing": "Δοκιμές",
+      "documentation": "Τεκμηρίωση"
+    },
+    "gateThreshold": {
+      "off": "Απενεργοποιημένο",
+      "all": "Όλα",
+      "warning": "Προειδοποίηση",
+      "critical": "Κρίσιμο"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Ο Code Reviewer χρειάζεται προσοχή",
+        "description": "Ο Code Reviewer απενεργοποιήθηκε επειδή το Kilo δεν μπορεί να αποκτήσει πρόσβαση σε αυτό το repository με ενεργή εγκατάσταση της εφαρμογής GitHub. Ενημερώστε την εγκατάσταση της εφαρμογής GitHub και ενεργοποιήστε ξανά τον Code Reviewer.",
+        "recoveryLabel": "Ενημέρωση εφαρμογής GitHub"
+      },
+      "githubIpAllowList": {
+        "title": "Ο Code Reviewer χρειάζεται προσοχή",
+        "description": "Ο Code Reviewer απενεργοποιήθηκε επειδή αυτός ο οργανισμός GitHub χρησιμοποιεί λίστα επιτρεπόμενων διευθύνσεων IP που αποκλείει το Kilo. Επικοινωνήστε με το hi@kilocode.ai για βοήθεια και ενεργοποιήστε ξανά τον Code Reviewer.",
+        "recoveryLabel": "Επικοινωνία με την υποστήριξη"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Ο Code Reviewer χρειάζεται προσοχή",
+        "description": "Ο Code Reviewer απενεργοποιήθηκε επειδή το Kilo δεν μπορεί να δημιουργήσει GitLab Project Access Token για αυτό το έργο. Παραχωρήστε πρόσβαση Maintainer ή ενεργοποιήστε τα Project Access Tokens και ενεργοποιήστε ξανά τον Code Reviewer.",
+        "recoveryLabel": "Ενημέρωση ενσωμάτωσης GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Ο Code Reviewer χρειάζεται προσοχή",
+        "description": "Ο Code Reviewer απενεργοποιήθηκε επειδή το επιλεγμένο κλειδί API BYOK είναι μη έγκυρο, έχει ανακληθεί ή δεν διαθέτει άδεια. Ενημερώστε το κλειδί ή επιλέξτε άλλο μοντέλο και ενεργοποιήστε ξανά τον Code Reviewer.",
+        "recoveryLabel": "Ενημέρωση ρυθμίσεων BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Ο Code Reviewer χρειάζεται προσοχή",
+        "description": "Ο Code Reviewer απενεργοποιήθηκε επειδή το επιλεγμένο μοντέλο δεν είναι διαθέσιμο για συνεδρίες cloud agent. Επιλέξτε ένα διαθέσιμο μοντέλο και ενεργοποιήστε ξανά τον Code Reviewer.",
+        "recoveryLabel": "Ενημέρωση ρυθμίσεων Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Ο Code Reviewer χρειάζεται προσοχή",
+        "description": "Ο Code Reviewer απενεργοποιήθηκε μετά από τρεις λήξεις χρόνου κλωνοποίησης αποθετηρίου σήμερα. Επικοινωνήστε με το hi@kilocode.ai για βοήθεια και ενεργοποιήστε ξανά τον Code Reviewer.",
+        "recoveryLabel": "Επικοινωνία με την υποστήριξη"
+      }
+    },
+    "unknownError": "Άγνωστο σφάλμα"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Το εύρημα είναι κάτω από το αυτόματο όριο σοβαρότητας. Η χειροκίνητη αποκατάσταση μπορεί ακόμα να ξεκινήσει όταν περάσουν οι έλεγχοι ασφάλειας.",
       "beforeEnablement": "Η ανάλυση ολοκληρώθηκε πριν ενεργοποιηθεί η αυτόματη αποκατάσταση. Η χειροκίνητη αποκατάσταση μπορεί ακόμα να ξεκινήσει όταν περάσουν οι έλεγχοι ασφάλειας.",
       "generic": "Η αποκατάσταση δεν είναι διαθέσιμη για αυτό το εύρημα."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Η χωρητικότητα ανάλυσης είναι πλήρης. Περιμένετε να ολοκληρωθεί μια ενεργή ανάλυση και δοκιμάστε ξανά.",
+      "githubTokenUnavailable": "Η εξουσιοδότηση GitHub χρειάζεται προσοχή. Εξουσιοδοτήστε ξανά την εφαρμογή GitHub και δοκιμάστε ξανά.",
+      "githubAuthInvalid": "Η εξουσιοδότηση GitHub χρειάζεται προσοχή. Εξουσιοδοτήστε ξανά την εφαρμογή GitHub και δοκιμάστε ξανά.",
+      "findingUnavailable": "Το εύρημα δεν είναι πλέον διαθέσιμο. Ανανεώστε τα ευρήματα και δοκιμάστε ξανά αν παραμένει ανοιχτό.",
+      "repositoryUnavailable": "Το αποθετήριο δεν είναι πλέον διαθέσιμο στην εφαρμογή GitHub. Ανανεώστε την πρόσβαση στο αποθετήριο και δοκιμάστε ξανά.",
+      "invalidDismissTarget": "Το εύρημα δεν μπορεί να απορριφθεί επειδή ο στόχος του Dependabot δεν είναι έγκυρος.",
+      "commandStalled": "Η ενέργεια στην αναμονή δεν ολοκληρώθηκε εγκαίρως. Επαναλάβετε την ενέργεια.",
+      "queueRetriesExhausted": "Η ενέργεια δεν μπόρεσε να ολοκληρωθεί μετά από πολλές προσπάθειες. Επαναλάβετε την ενέργεια.",
+      "queueAdmissionFailed": "Δεν ήταν δυνατή η εισαγωγή της ενέργειας στην αναμονή. Επαναλάβετε την ενέργεια.",
+      "generic": "Η ενέργεια στην αναμονή απέτυχε. Επαναλάβετε την ενέργεια."
+    },
+    "analysisMode": {
+      "auto": "Αυτόματη",
+      "shallow": "Επιφανειακή",
+      "deep": "Εις βάθος"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Προσθήκη του {{name}} στα αγαπημένα",
       "removeFromFavorites": "Αφαίρεση του {{name}} από τα αγαπημένα",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Μοντέλο συνεδρίας"
     },
     "attachmentPreview": {
       "openFailedRetry": "Αποτυχία ανοίγματος αρχείου. Δοκιμάστε ξανά.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Προσθήκη πιστώσεων",
-    "description": "Προσθέστε πιστώσεις για να συνεχίσει η χρήση."
+    "description": "Προσθέστε πιστώσεις για να συνεχίσει η χρήση.",
+    "billingPage": "σελίδα χρέωσης"
   },
   "deviceSessions": {
     "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση συνεδριών",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Δεν ήταν δυνατή η επαναφορά των αγορών. Δοκιμάστε ξανά.",
     "purchaseFailed": "Δεν ήταν δυνατή η ολοκλήρωση της αγοράς.",
     "purchaseStartFailed": "Δεν ήταν δυνατή η έναρξη της αγοράς από το App Store.",
-    "purchaseOwnedByAnotherAccount": "Το Kilo Pass σε αυτόν τον Λογαριασμό Apple ανήκει σε διαφορετικό λογαριασμό Kilo."
+    "purchaseOwnedByAnotherAccount": "Το Kilo Pass σε αυτόν τον Λογαριασμό Apple ανήκει σε διαφορετικό λογαριασμό Kilo.",
+    "couldNotConnectToAppStore": "Δεν ήταν δυνατή η σύνδεση με το App Store. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",
+    "noMatchingProducts": "Το App Store δεν επέστρεψε προϊόντα Kilo Pass που να ταιριάζουν.",
+    "purchaseMissingSignedTransaction": "Η αγορά στο App Store δεν περιλάμβανε υπογεγραμμένη JWS συναλλαγής."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Χρειάζεται βελτίωση",
     "sorryTitle": "Λυπούμαστε που το ακούμε!",
     "sorryMessage": "Παρακαλούμε ενημερώστε μας τι πρέπει να βελτιωθεί. Ο μηχανικός που είναι υπεύθυνος για την εφαρμογή διαβάζει κάθε αναφορά!",
-    "emailUs": "Στείλτε μας email"
+    "emailUs": "Στείλτε μας email",
+    "emailSubject": "σχόλια για την εφαρμογή για κινητά"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Καμία δραστηριότητα πιστώσεων",
       "expires": "Λήγει {{date}}",
       "title": "Δραστηριότητα πιστώσεων",
-      "transactionFallback": "Συναλλαγή πιστώσεων"
+      "transactionFallback": "Συναλλαγή πιστώσεων",
+      "category": {
+        "organization_custom": "Προσαρμοσμένο οργανισμού",
+        "parent_to_child_transfer_in": "Εισερχόμενη μεταφορά από γονικό σε θυγατρικό",
+        "parent_to_child_transfer_out": "Εξερχόμενη μεταφορά από γονικό σε θυγατρικό",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Λογιστική προσαρμογή",
+        "credits_expired": "Ληγμένες πιστώσεις"
+      }
     },
     "inviteMember": {
       "emailError": "Εισαγάγετε μια έγκυρη διεύθυνση email",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Τα τιμολόγια δημιουργούνται αυτόματα κάθε κύκλο χρέωσης και θα εμφανίζονται εδώ μόλις χρεωθεί ο οργανισμός σας.",
       "emptyTitle": "Κανένα τιμολόγιο",
       "invoiceFallback": "Τιμολόγιο",
-      "statusOpen": "Ανοιχτό",
-      "statusPaid": "Πληρωμένο",
-      "statusVoid": "Άκυρο",
       "title": "Τιμολόγια",
       "downloadFailed": "Δεν ήταν δυνατή η λήψη του τιμολογίου. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",
-      "sharingUnavailable": "Η κοινή χρήση δεν είναι διαθέσιμη σε αυτή τη συσκευή."
+      "sharingUnavailable": "Η κοινή χρήση δεν είναι διαθέσιμη σε αυτή τη συσκευή.",
+      "status": {
+        "paid": "Πληρωμένο",
+        "open": "Ανοιχτό",
+        "void": "Άκυρο",
+        "draft": "Πρόχειρο",
+        "uncollectible": "Μη εισπράξιμο",
+        "unknown": "Άγνωστο"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Δεδομένα που συλλέγονται",
     "free": "Δωρεάν",
-    "couldNotUpdateFavorites": "Δεν ήταν δυνατή η ενημέρωση των αγαπημένων"
+    "couldNotUpdateFavorites": "Δεν ήταν δυνατή η ενημέρωση των αγαπημένων",
+    "thinkingEffort": {
+      "none": "Καθόλου",
+      "minimal": "Ελάχιστη",
+      "low": "Χαμηλή",
+      "medium": "Μεσαία",
+      "high": "Υψηλή",
+      "xhigh": "Πολύ υψηλή",
+      "max": "Μέγιστη"
+    }
   }
 }

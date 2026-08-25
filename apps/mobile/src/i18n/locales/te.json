@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} ఎంచుకోబడింది, ఎంపికను మార్చడానికి తాప్ చేయండి",
       "tapToComment": "{{label}}, వ్యాఖ్య చేయడానికి తాప్ చేయండి",
-      "truncationBanner": "మొదటి {{limit}} / {{total}} మార్చబడిన ఫైళ్లు చూపుతోంది — GitHub API పరిమితి"
+      "truncationBanner": "మొదటి {{limit}} / {{total}} మార్చబడిన ఫైళ్లు చూపుతోంది — GitHub API పరిమితి",
+      "statusAdded": "జోడించబడింది",
+      "statusContext": "సందర్భం",
+      "statusDeleted": "తొలగించబడింది"
     },
     "linkPasteClipboardEmpty": "క్లిప్బోర్డ్ ఖాళీగా ఉంది",
     "linkPasteNotAPullRequest": "GitHub పుల్ రిక్వెస్ట్ లింక్ కాదు",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "ఈ సమీక్షను ఇలాగే సమర్పించలేము. PR మారి ఉండవచ్చు, లేదా మీ స్వంత పుల్ రిక్వెస్ట్‌ను సమీక్షించలేకపోవచ్చు.",
       "couldNotPostComment": "వ్యాఖ్యను పోస్ట్ చేయలేకపోయాము.",
       "couldNotSubmitReview": "సమీక్షను సమర్పించలేకపోయాము. మీ కనెక్షన్ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి."
+    },
+    "operation": {
+      "couldNotReply": "ప్రత్యుత్తరం ఇవ్వలేకపోయింది.",
+      "couldNotCompleteAction": "ఈ చర్యను పూర్తి చేయలేకపోయాము.",
+      "mergeResultDefaultError": "GitHub మెర్జ్ను పూర్తి చేయలేదు."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "చెల్లింపు గడువు ముగిసింది. మీ చెల్లింపు పద్ధతిని నవీకరించండి.",
       "subscriptionCancels": "చందా {{date}}న రద్దవుతుంది",
       "trialDaysRemaining": "ట్రయల్: {{remaining}} రోజులు మిగిలి ఉన్నాయి",
-      "trialEndingSoon": "ట్రయల్ త్వరలో ముగుస్తుంది: {{remaining}}"
+      "trialEndingSoon": "ట్రయల్ త్వరలో ముగుస్తుంది: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "కొత్తగా ఏముంది",
@@ -1189,7 +1201,8 @@
       "strongArm": "బలమైన చేయి",
       "talisman": "టాలిస్మాన్"
     },
-    "remoteSpawnFilesNotSupported": "ఈ ఇన్స్టాన్స్ ఫైల్లను స్వీకరించదు."
+    "remoteSpawnFilesNotSupported": "ఈ ఇన్స్టాన్స్ ఫైల్లను స్వీకరించదు.",
+    "instanceSwitcherTitle": "KiloClaw ఇన్స్టాన్స్"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "విఫలమైంది",
       "cancelled": "రద్దు చేయబడింది",
       "interrupted": "అంతరాయం కలిగింది"
-    }
+    },
+    "reviewStyle": {
+      "strict": "కఠినమైనది",
+      "balanced": "సమతుల్యం",
+      "lenient": "సౌమ్యం",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "సెక్యూరిటీ",
+      "performance": "పనితీరు",
+      "bugs": "బగ్స్",
+      "style": "శైలి",
+      "testing": "టెస్టింగ్",
+      "documentation": "డాక్యుమెంటేషన్"
+    },
+    "gateThreshold": {
+      "off": "ఆఫ్",
+      "all": "అన్నీ",
+      "warning": "హెచ్చరిక",
+      "critical": "క్రిటికల్"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewerకు శ్రద్ధ అవసరం",
+        "description": "చురుకైన GitHub App ఇన్స్టాలేషన్తో Kilo ఈ రిపోజిటరీని యాక్సెస్ చేయలేకపోవడం వల్ల Code Reviewer నిలిపివేయబడింది. GitHub App ఇన్స్టాలేషన్ను అప్డేట్ చేసి, ఆపై Code Reviewerను మళ్ళీ ప్రారంభించండి.",
+        "recoveryLabel": "GitHub Appను అప్డేట్ చేయండి"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewerకు శ్రద్ధ అవసరం",
+        "description": "ఈ GitHub సంస్థ Kiloను బ్లాక్ చేసే IP అనుమతి జాబితాను ఉపయోగిస్తున్నందున Code Reviewer నిలిపివేయబడింది. సహాయం కోసం hi@kilocode.aiని సంప్రదించి, ఆపై Code Reviewerను మళ్ళీ ప్రారంభించండి.",
+        "recoveryLabel": "మద్దతును సంప్రదించండి"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewerకు శ్రద్ధ అవసరం",
+        "description": "ఈ ప్రాజెక్ట్ కోసం Kilo GitLab Project Access Tokenను సృష్టించలేకపోవడం వల్ల Code Reviewer నిలిపివేయబడింది. Maintainer యాక్సెస్ మంజూరు చేయండి లేదా Project Access Tokens ప్రారంభించండి, ఆపై Code Reviewerను మళ్ళీ ప్రారంభించండి.",
+        "recoveryLabel": "GitLab ఇంటిగ్రేషన్ను అప్డేట్ చేయండి"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewerకు శ్రద్ధ అవసరం",
+        "description": "ఎంచుకున్న BYOK API కీ చెల్లదు, రద్దు చేయబడింది లేదా అనుమతి లేకపోవడం వల్ల Code Reviewer నిలిపివేయబడింది. కీని అప్డేట్ చేయండి లేదా మరొక మోడల్ను ఎంచుకోండి, ఆపై Code Reviewerను మళ్ళీ ప్రారంభించండి.",
+        "recoveryLabel": "BYOK సెట్టింగ్లను అప్డేట్ చేయండి"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewerకు శ్రద్ధ అవసరం",
+        "description": "ఎంచుకున్న మోడల్ క్లౌడ్ ఏజెంట్ సెషన్లకు అందుబాటులో లేకపోవడం వల్ల Code Reviewer నిలిపివేయబడింది. అందుబాటులో ఉన్న మోడల్ను ఎంచుకుని, ఆపై Code Reviewerను మళ్ళీ ప్రారంభించండి.",
+        "recoveryLabel": "Code Reviewer సెట్టింగ్లను అప్డేట్ చేయండి"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewerకు శ్రద్ధ అవసరం",
+        "description": "ఈరోజు మూడు రిపోజిటరీ క్లోన్ టైమవుట్ల తర్వాత Code Reviewer నిలిపివేయబడింది. సహాయం కోసం hi@kilocode.aiని సంప్రదించి, ఆపై Code Reviewerను మళ్ళీ ప్రారంభించండి.",
+        "recoveryLabel": "మద్దతును సంప్రదించండి"
+      }
+    },
+    "unknownError": "తెలియని లోపం"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "ఫలితం స్వయంచాలక తీవ్రత థ్రెషోల్డ్ కంటే తక్కువగా ఉంది. భద్రతా గేట్లు దాటినప్పుడు మాన్యువల్ పరిష్కారం ఇప్పటికీ ప్రారంభమవుతుంది.",
       "beforeEnablement": "ఆటో నివారణ ప్రారంభించబడటానికి ముందు విశ్లేషణ పూర్తయింది. భద్రతా గేట్లు దాటినప్పుడు మాన్యువల్ పరిష్కారం ఇప్పటికీ ప్రారంభమవుతుంది.",
       "generic": "ఈ ఫలితానికి పరిష్కారం అందుబాటులో లేదు."
+    },
+    "commandFailure": {
+      "ownerCapReached": "విశ్లేషణ సామర్థ్యం నిండిపోయింది. చురుకైన విశ్లేషణ పూర్తయ్యే వరకు వేచి ఉండి, ఆపై మళ్ళీ ప్రయత్నించండి.",
+      "githubTokenUnavailable": "GitHub ఆథరైజేషన్కు శ్రద్ధ అవసరం. GitHub Appను మళ్ళీ అథరైజ్ చేసి, ఆపై మళ్ళీ ప్రయత్నించండి.",
+      "githubAuthInvalid": "GitHub ఆథరైజేషన్కు శ్రద్ధ అవసరం. GitHub Appను మళ్ళీ అథరైజ్ చేసి, ఆపై మళ్ళీ ప్రయత్నించండి.",
+      "findingUnavailable": "ఫలితం ఇక అందుబాటులో లేదు. ఫలితాలను రిఫ్రెష్ చేసి, అది ఇంకా తెరిచి ఉంటే మళ్ళీ ప్రయత్నించండి.",
+      "repositoryUnavailable": "రిపోజిటరీ ఇక GitHub Appకు అందుబాటులో లేదు. రిపోజిటరీ యాక్సెస్ను రిఫ్రెష్ చేసి, ఆపై మళ్ళీ ప్రయత్నించండి.",
+      "invalidDismissTarget": "ఫలితం యొక్క Dependabot లక్ష్యం చెల్లదు కాబట్టి దానిని తోసివేయలేరు.",
+      "commandStalled": "క్యూ చేసిన చర్య సమయానికి పూర్తి కాలేదు. చర్యను మళ్ళీ ప్రయత్నించండి.",
+      "queueRetriesExhausted": "అనేక ప్రయత్నాల తర్వాత చర్యను పూర్తి చేయలేకపోయాము. చర్యను మళ్ళీ ప్రయత్నించండి.",
+      "queueAdmissionFailed": "క్యూ చేసిన చర్యను అంగీకరించలేకపోయాము. చర్యను మళ్ళీ ప్రయత్నించండి.",
+      "generic": "క్యూ చేసిన చర్య విఫలమైంది. చర్యను మళ్ళీ ప్రయత్నించండి."
+    },
+    "analysisMode": {
+      "auto": "ఆటో",
+      "shallow": "ఉపరితల",
+      "deep": "లోతైన"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "{{name}} ఫేవరిట్లకు జోడించండి",
       "removeFromFavorites": "{{name}} ఫేవరిట్ల నుండి తీసివేయండి",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "సెషన్ మోడల్"
     },
     "attachmentPreview": {
       "openFailedRetry": "ఫైల్ను తెరవడం విఫలమైంది. దయచేసి మళ్లీ ప్రయత్నించండి.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "క్రెడిట్లను జోడించండి",
-    "description": "వినియోగం కొనసాగడానికి క్రెడిట్లను జోడించండి."
+    "description": "వినియోగం కొనసాగడానికి క్రెడిట్లను జోడించండి.",
+    "billingPage": "బిల్లింగ్ పేజీ"
   },
   "deviceSessions": {
     "couldNotLoad": "సెషన్లను లోడ్ చేయలేకపోయాము",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "కొనుగోళ్లను పునరుద్ధరించడంలో విఫలమైంది. మళ్లీ ప్రయత్నించండి.",
     "purchaseFailed": "కొనుగోలును పూర్తి చేయడంలో విఫలమైంది.",
     "purchaseStartFailed": "యాప్ స్టోర్ కొనుగోలును ప్రారంభించడంలో విఫలమైంది.",
-    "purchaseOwnedByAnotherAccount": "ఈ యాపిల్ ఖాతాలోని Kilo Pass వేరే Kilo ఖాతాకు చెందుతుంది."
+    "purchaseOwnedByAnotherAccount": "ఈ యాపిల్ ఖాతాలోని Kilo Pass వేరే Kilo ఖాతాకు చెందుతుంది.",
+    "couldNotConnectToAppStore": "App Storeకు కనెక్ట్ చేయలేకపోయింది. మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి.",
+    "noMatchingProducts": "App Store సరిపోలే Kilo Pass ఉత్పత్తులను ఏవీ తిరిగి ఇవ్వలేదు.",
+    "purchaseMissingSignedTransaction": "App Store కొనుగోలులో సంతకం చేసిన లావాదేవీ JWS చేర్చబడలేదు."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "మెరుగుదల అవసరం",
     "sorryTitle": "విని మేము విచారిస్తున్నాము!",
     "sorryMessage": "ఏమి మెరుగుపరచాలో దయచేసి మాకు తెలియజేయండి. యాప్ బాధ్యత వహించే ఇంజనీర్ ప్రతి రిపోర్ట్ను చదువుతారు!",
-    "emailUs": "మాకు ఇమెయిల్ చేయండి"
+    "emailUs": "మాకు ఇమెయిల్ చేయండి",
+    "emailSubject": "మొబైల్ యాప్ ఫీడ్బ్యాక్"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "క్రెడిట్ కార్యాచరణ లేదు",
       "expires": "{{date}}న గడువు ముగుస్తుంది",
       "title": "క్రెడిట్ కార్యాచరణ",
-      "transactionFallback": "క్రెడిట్ లావాదేవీ"
+      "transactionFallback": "క్రెడిట్ లావాదేవీ",
+      "category": {
+        "organization_custom": "సంస్థ కస్టమ్",
+        "parent_to_child_transfer_in": "పేరెంట్ నుండి చైల్డ్కు బదిలీ (లోపలికి)",
+        "parent_to_child_transfer_out": "పేరెంట్ నుండి చైల్డ్కు బదిలీ (బయటకి)",
+        "oss-sponsorship": "OSS స్పాన్సర్షిప్",
+        "oss-monthly-reset": "OSS నెలవారీ రీసెట్",
+        "team-topup-bonus-2025": "టీమ్ టాప్-అప్ బోనస్ 2025",
+        "accounting_adjustment": "అకౌంటింగ్ సర్దుబాటు",
+        "credits_expired": "క్రెడిట్లు గడువు ముగిశాయి"
+      }
     },
     "inviteMember": {
       "emailError": "చెల్లుబాటు అయ్యే ఇమెయిల్ చిరునామాను నమోదు చేయండి",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "ఇన్వాయిస్లు ప్రతి బిల్లింగ్ చక్రానికి స్వయంచాలకంగా ఉత్పత్తి చేయబడతాయి మరియు మీ ఆర్గనైజేషన్కు బిల్లు వేయబడిన తర్వాత ఇక్కడ కనిపిస్తాయి.",
       "emptyTitle": "ఇన్వాయిస్లు లేవు",
       "invoiceFallback": "ఇన్వాయిస్",
-      "statusOpen": "ఓపెన్",
-      "statusPaid": "చెల్లించినది",
-      "statusVoid": "రద్దు",
       "title": "ఇన్వాయిస్లు",
       "downloadFailed": "ఇన్వాయిస్ డౌన్‌లోడ్ చేయలేకపోయాము. మీ కనెక్షన్ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
-      "sharingUnavailable": "ఈ పరికరంలో షేరింగ్ అందుబాటులో లేదు."
+      "sharingUnavailable": "ఈ పరికరంలో షేరింగ్ అందుబాటులో లేదు.",
+      "status": {
+        "paid": "చెల్లించినది",
+        "open": "ఓపెన్",
+        "void": "రద్దు",
+        "draft": "డ్రాఫ్ట్",
+        "uncollectible": "వసూలు చేయలేనిది",
+        "unknown": "తెలియనిది"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "సేకరించిన డేటా",
     "free": "ఉచితం",
-    "couldNotUpdateFavorites": "ఫేవరిట్లను నవీకరించలేకపోయింది"
+    "couldNotUpdateFavorites": "ఫేవరిట్లను నవీకరించలేకపోయింది",
+    "thinkingEffort": {
+      "none": "ఏదీ లేదు",
+      "minimal": "కనిష్టం",
+      "low": "తక్కువ",
+      "medium": "మధ్యస్థం",
+      "high": "అధికం",
+      "xhigh": "అత్యధికం",
+      "max": "గరిష్టం"
+    }
   }
 }

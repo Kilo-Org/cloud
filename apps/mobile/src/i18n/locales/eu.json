@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} hautatuta, sakatu hautaketa aldatzeko",
       "tapToComment": "{{label}}, sakatu iruzkintzeko",
-      "truncationBanner": "Aldatutako {{total}} fitxategietatik lehenengo {{limit}} erakusten — GitHub API muga"
+      "truncationBanner": "Aldatutako {{total}} fitxategietatik lehenengo {{limit}} erakusten — GitHub API muga",
+      "statusAdded": "Gehituta",
+      "statusContext": "Testuingurua",
+      "statusDeleted": "Ezabatuta"
     },
     "linkPasteClipboardEmpty": "Arbel hutsik dago",
     "linkPasteNotAPullRequest": "Ez da GitHub-en pull request esteka bat",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Berrikuspen hau ezin da bidali hala dagoen bezala. Baliteke PR-a aldatu izana, edo zure pull request bera ezin duzu berrikusi.",
       "couldNotPostComment": "Ezin izan da iruzkina argitaratu.",
       "couldNotSubmitReview": "Ezin izan da berrikuspena bidali. Egiaztatu konexioa eta saiatu berriro."
+    },
+    "operation": {
+      "couldNotReply": "Ezin izan da erantzun.",
+      "couldNotCompleteAction": "Ezin izan da ekintza hau amaitu.",
+      "mergeResultDefaultError": "GitHub-ek ez du batzea amaitu."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Ordainketa atzeratuta dago. Eguneratu zure ordainketa-metodoa.",
       "subscriptionCancels": "Harpidetza {{date}}n bertan behera uzten da",
       "trialDaysRemaining": "Proba: {{remaining}} geratzen dira",
-      "trialEndingSoon": "Proba laster amaitzen da: {{remaining}}"
+      "trialEndingSoon": "Proba laster amaitzen da: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Zer berri",
@@ -1189,7 +1201,8 @@
       "strongArm": "Beso indartsua",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Instantzia honek ezin du fitxategirik jaso."
+    "remoteSpawnFilesNotSupported": "Instantzia honek ezin du fitxategirik jaso.",
+    "instanceSwitcherTitle": "KiloClaw instantzia"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Huts egin du",
       "cancelled": "Bertan behera utzita",
       "interrupted": "Etena"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Zorrotza",
+      "balanced": "Orekatua",
+      "lenient": "Onbera",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Segurtasuna",
+      "performance": "Errendimendua",
+      "bugs": "Akatsak",
+      "style": "Estiloa",
+      "testing": "Probak",
+      "documentation": "Dokumentazioa"
+    },
+    "gateThreshold": {
+      "off": "Desaktibo",
+      "all": "Dena",
+      "warning": "Abisua",
+      "critical": "Kritikoa"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Kode-berrikusleak arreta behar du",
+        "description": "Kode-berrikuslea desgaitu egin da, Kilo-k ezin duelako biltegi honetara sartu GitHub App instalazio aktibo batekin. Eguneratu GitHub App instalazioa, eta gero berriro gaitu Kode-berrikuslea.",
+        "recoveryLabel": "Eguneratu GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Kode-berrikusleak arreta behar du",
+        "description": "Kode-berrikuslea desgaitu egin da, GitHub erakunde honek Kilo blokeatzen duen IP baimen-zerrenda erabiltzen duelako. Jarri harremanetan hi@kilocode.ai helbidearekin laguntza eskuratzeko, eta gero berriro gaitu Kode-berrikuslea.",
+        "recoveryLabel": "Jarri harremanetan laguntzarekin"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Kode-berrikusleak arreta behar du",
+        "description": "Kode-berrikuslea desgaitu egin da, Kilo-k ezin duelako GitLab Proiektu Sarbide Token bat sortu proiektu honetarako. Eman Maintainer sarbidea edo gaitu Proiektu Sarbide Token-ak, eta gero berriro gaitu Kode-berrikuslea.",
+        "recoveryLabel": "Eguneratu GitLab integrazioa"
+      },
+      "byokInvalidKey": {
+        "title": "Kode-berrikusleak arreta behar du",
+        "description": "Kode-berrikuslea desgaitu egin da, hautatutako BYOK API gakoa baliogabea, ezeztatua edo baimenik gabea delako. Eguneratu gakoa edo aukeratu beste modelo bat, eta gero berriro gaitu Kode-berrikuslea.",
+        "recoveryLabel": "Eguneratu BYOK ezarpenak"
+      },
+      "selectedModelUnavailable": {
+        "title": "Kode-berrikusleak arreta behar du",
+        "description": "Kode-berrikuslea desgaitu egin da, hautatutako modeloa ez dagoelako erabilgarri cloud agent saioetarako. Aukeratu modelo erabilgarri bat, eta gero berriro gaitu Kode-berrikuslea.",
+        "recoveryLabel": "Eguneratu Kode-berrikuslearen ezarpenak"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Kode-berrikusleak arreta behar du",
+        "description": "Kode-berrikuslea desgaitu egin da gaur hiru biltegi-klonazio denbora-muga izan ondoren. Jarri harremanetan hi@kilocode.ai helbidearekin laguntza eskuratzeko, eta gero berriro gaitu Kode-berrikuslea.",
+        "recoveryLabel": "Jarri harremanetan laguntzarekin"
+      }
+    },
+    "unknownError": "Errore ezezaguna"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Emaitza automatikoko larritasun-atalasearen azpitik dago. Konponketa manuala oraindik has daiteke segurtasun-ateak gainditzen direnean.",
       "beforeEnablement": "Analisia konponketa automatikoa gaitu aurretik osatu zen. Konponketa manuala oraindik has daiteke segurtasun-ateak gainditzen direnean.",
       "generic": "Konponketa ez dago eskuragarri emaitza honentzat."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Analisi-ahalmena beteta dago. Itxaron martxan dagoen analisia amaitzeko, eta gero saiatu berriro.",
+      "githubTokenUnavailable": "GitHub baimenak arreta behar du. Berriz baimendu GitHub App, eta gero saiatu berriro.",
+      "githubAuthInvalid": "GitHub baimenak arreta behar du. Berriz baimendu GitHub App, eta gero saiatu berriro.",
+      "findingUnavailable": "Emaitza ez dago jada erabilgarri. Freskatu emaitzak eta saiatu berriro irekita badago.",
+      "repositoryUnavailable": "Biltegia ez dago jada erabilgarri GitHub App-entzat. Freskatu biltegirako sarbidea, eta gero saiatu berriro.",
+      "invalidDismissTarget": "Emaitza ezin da baztertu, bere Dependabot helburua baliogabea delako.",
+      "commandStalled": "Ilaratutako ekintza ez da garaiz amaitu. Saiatu ekintza berriro.",
+      "queueRetriesExhausted": "Ekintza ezin izan da amaitu hainbat saiakera egin ondoren. Saiatu ekintza berriro.",
+      "queueAdmissionFailed": "Ilaratutako ekintza ezin izan da onartu. Saiatu ekintza berriro.",
+      "generic": "Ilaratutako ekintzak huts egin du. Saiatu ekintza berriro."
+    },
+    "analysisMode": {
+      "auto": "Automatikoa",
+      "shallow": "Azalekoa",
+      "deep": "Sakona"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Gehitu {{name}} gogokoetara",
       "removeFromFavorites": "Kendu {{name}} gogokoetatik",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Ertaina"
+      "thinkingEffortMedium": "Ertaina",
+      "sessionModel": "Saioaren modeloa"
     },
     "attachmentPreview": {
       "openFailedRetry": "Ezin izan da fitxategia ireki. Saiatu berriro.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Gehitu kredituak",
-    "description": "Gehitu kredituak erabilerak jarrai dezan."
+    "description": "Gehitu kredituak erabilerak jarrai dezan.",
+    "billingPage": "fakturazio-orria"
   },
   "deviceSessions": {
     "couldNotLoad": "Ezin izan dira saioak kargatu",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Ezin dira erosketa berreskuratu. Saiatu berriro.",
     "purchaseFailed": "Ezin izan da erosketa amaitu.",
     "purchaseStartFailed": "Ezin izan da App Store-ko erosketa hasi.",
-    "purchaseOwnedByAnotherAccount": "Apple kontu honetako Kilo Pass beste Kilo kontu bati dagokio."
+    "purchaseOwnedByAnotherAccount": "Apple kontu honetako Kilo Pass beste Kilo kontu bati dagokio.",
+    "couldNotConnectToAppStore": "Ezin izan da App Store-ra konektatu. Egiaztatu konexioa eta saiatu berriro.",
+    "noMatchingProducts": "App Store-k ez du Kilo Pass produktu egokirik itzuli.",
+    "purchaseMissingSignedTransaction": "App Store erosketak ez du sinatutako transakzio JWS bat barne hartu."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Hobetu behar du",
     "sorryTitle": "Sentitzen dugu entzuteagatik!",
     "sorryMessage": "Mesedez, esan iezaguzu zer hobetu behar den. Aplikazioaren arduradunak irakurtzen du txosten bakoitza!",
-    "emailUs": "Bidali iezaguzu posta"
+    "emailUs": "Bidali iezaguzu posta",
+    "emailSubject": "mugikorreko aplikazioaren feedbacka"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Ez dago kreditu-jarduerarik",
       "expires": "Iraungitzen da {{date}}",
       "title": "Kreditu-jarduera",
-      "transactionFallback": "Kreditu-transakzioa"
+      "transactionFallback": "Kreditu-transakzioa",
+      "category": {
+        "organization_custom": "Erakundearen pertsonalizatua",
+        "parent_to_child_transfer_in": "Gurasotik seme-alabara transferentzia (sarrera)",
+        "parent_to_child_transfer_out": "Gurasotik seme-alabara transferentzia (irteera)",
+        "oss-sponsorship": "OSS-espontsoritza",
+        "oss-monthly-reset": "OSS-hileko berrezarpena",
+        "team-topup-bonus-2025": "Taldearen topup-bonua 2025",
+        "accounting_adjustment": "Kontabilitate-doikuntza",
+        "credits_expired": "Kredituak iraungita"
+      }
     },
     "inviteMember": {
       "emailError": "Sartu posta-helbide baliozko bat",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Fakturak automatikoki sortzen dira fakturazio-ziklo bakoitzean eta hemen agertuko dira zure erakundea fakturatu ondoren.",
       "emptyTitle": "Ez dago fakturarik",
       "invoiceFallback": "Faktura",
-      "statusOpen": "Irekituta",
-      "statusPaid": "Ordainduta",
-      "statusVoid": "Ballogabea",
       "title": "Fakturak",
       "downloadFailed": "Ezin izan da faktura deskargatu. Egiaztatu konexioa eta saiatu berriro.",
-      "sharingUnavailable": "Partekatzea ez dago eskuragarri gailu honetan."
+      "sharingUnavailable": "Partekatzea ez dago eskuragarri gailu honetan.",
+      "status": {
+        "paid": "Ordainduta",
+        "open": "Irekituta",
+        "void": "Ballogabea",
+        "draft": "Zirriborroa",
+        "uncollectible": "Kobratu ezina",
+        "unknown": "Ezezaguna"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Bildutako datuak",
     "free": "Doan",
-    "couldNotUpdateFavorites": "Ezin izan dira gogokoak eguneratu"
+    "couldNotUpdateFavorites": "Ezin izan dira gogokoak eguneratu",
+    "thinkingEffort": {
+      "none": "Bat ere ez",
+      "minimal": "Gutxienekoa",
+      "low": "Baxua",
+      "medium": "Ertaina",
+      "high": "Altua",
+      "xhigh": "Oso altua",
+      "max": "Gehienez"
+    }
   }
 }

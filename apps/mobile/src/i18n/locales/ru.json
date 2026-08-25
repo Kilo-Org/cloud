@@ -384,7 +384,11 @@
       "paymentPastDue": "Платеж просрочен. Обновите способ оплаты.",
       "subscriptionCancels": "Подписка отменяется {{date}}",
       "trialDaysRemaining": "Пробный период: осталось {{remaining}}",
-      "trialEndingSoon": "Пробный период скоро закончится: {{remaining}}"
+      "trialEndingSoon": "Пробный период скоро закончится: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Что нового",
@@ -754,7 +758,8 @@
       "strongArm": "Сильная рука",
       "talisman": "Талисман"
     },
-    "remoteSpawnFilesNotSupported": "Этот экземпляр не может принимать файлы."
+    "remoteSpawnFilesNotSupported": "Этот экземпляр не может принимать файлы.",
+    "instanceSwitcherTitle": "Экземпляр KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -952,7 +957,60 @@
       "failed": "Не удалось",
       "cancelled": "Отменено",
       "interrupted": "Прервано"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Строгий",
+      "balanced": "Сбалансированный",
+      "lenient": "Мягкий",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Безопасность",
+      "performance": "Производительность",
+      "bugs": "Ошибки",
+      "style": "Стиль",
+      "testing": "Тестирование",
+      "documentation": "Документация"
+    },
+    "gateThreshold": {
+      "off": "Выкл.",
+      "all": "Все",
+      "warning": "Предупреждения",
+      "critical": "Критические"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer требует внимания",
+        "description": "Code Reviewer был отключен, потому что Kilo не может получить доступ к этому репозиторию с активной установкой приложения GitHub. Обновите установку приложения GitHub, затем снова включите Code Reviewer.",
+        "recoveryLabel": "Обновить приложение GitHub"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer требует внимания",
+        "description": "Code Reviewer был отключен, потому что эта организация GitHub использует список разрешенных IP-адресов, который блокирует Kilo. Обратитесь за помощью на hi@kilocode.ai, затем снова включите Code Reviewer.",
+        "recoveryLabel": "Связаться с поддержкой"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer требует внимания",
+        "description": "Code Reviewer был отключен, потому что Kilo не может создать токен доступа к проекту GitLab для этого проекта. Предоставьте доступ уровня Maintainer или включите токены доступа к проектам, затем снова включите Code Reviewer.",
+        "recoveryLabel": "Обновить интеграцию GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer требует внимания",
+        "description": "Code Reviewer был отключен, потому что выбранный ключ API BYOK недействителен, отозван или не имеет разрешений. Обновите ключ или выберите другую модель, затем снова включите Code Reviewer.",
+        "recoveryLabel": "Обновить настройки BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer требует внимания",
+        "description": "Code Reviewer был отключен, потому что выбранная модель недоступна для облачных сеансов агента. Выберите доступную модель, затем снова включите Code Reviewer.",
+        "recoveryLabel": "Обновить настройки Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer требует внимания",
+        "description": "Code Reviewer был отключен после трех сегодняшних превышений времени ожидания клонирования репозитория. Обратитесь за помощью на hi@kilocode.ai, затем снова включите Code Reviewer.",
+        "recoveryLabel": "Связаться с поддержкой"
+      }
+    },
+    "unknownError": "Неизвестная ошибка"
   },
   "securityAgent": {
     "filter": {
@@ -1500,6 +1558,23 @@
       "belowThreshold": "Находка ниже автоматического порога критичности. Ручное исправление всё ещё может начаться, когда проверки безопасности пройдены.",
       "beforeEnablement": "Анализ завершен до включения автоисправления. Ручное исправление всё ещё может начаться, когда проверки безопасности пройдены.",
       "generic": "Исправление недоступно для этой находки."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Лимит анализа исчерпан. Дождитесь завершения активного анализа, затем повторите попытку.",
+      "githubTokenUnavailable": "Авторизация GitHub требует внимания. Повторно авторизуйте приложение GitHub, затем повторите попытку.",
+      "githubAuthInvalid": "Авторизация GitHub требует внимания. Повторно авторизуйте приложение GitHub, затем повторите попытку.",
+      "findingUnavailable": "Находка больше недоступна. Обновите список находок и повторите, если она останется открытой.",
+      "repositoryUnavailable": "Репозиторий больше недоступен для приложения GitHub. Обновите доступ к репозиторию, затем повторите попытку.",
+      "invalidDismissTarget": "Находку нельзя отклонить, потому что её цель Dependabot недействительна.",
+      "commandStalled": "Поставленное в очередь действие не завершилось вовремя. Повторите действие.",
+      "queueRetriesExhausted": "Действие не удалось выполнить после нескольких попыток. Повторите действие.",
+      "queueAdmissionFailed": "Поставленное в очередь действие не удалось принять. Повторите действие.",
+      "generic": "Поставленное в очередь действие не удалось. Повторите действие."
+    },
+    "analysisMode": {
+      "auto": "Авто",
+      "shallow": "Поверхностная",
+      "deep": "Глубокая"
     }
   },
   "agents": {
@@ -1975,7 +2050,8 @@
       "addToFavorites": "Добавить {{name}} в избранное",
       "removeFromFavorites": "Убрать {{name}} из избранного",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Модель сеанса"
     },
     "attachmentPreview": {
       "openFailedRetry": "Не удалось открыть файл. Попробуйте снова.",
@@ -2109,7 +2185,8 @@
   },
   "addCredits": {
     "cta": "Добавить кредиты",
-    "description": "Добавьте кредиты, чтобы продолжить использование."
+    "description": "Добавьте кредиты, чтобы продолжить использование.",
+    "billingPage": "страница оплаты"
   },
   "deviceSessions": {
     "couldNotLoad": "Не удалось загрузить сеансы",
@@ -2297,7 +2374,10 @@
     "restoreFailed": "Не удалось восстановить покупки. Попробуйте снова.",
     "purchaseFailed": "Не удалось завершить покупку.",
     "purchaseStartFailed": "Не удалось начать покупку в App Store.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass на этом Apple Account принадлежит другому аккаунту Kilo."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass на этом Apple Account принадлежит другому аккаунту Kilo.",
+    "couldNotConnectToAppStore": "Не удалось подключиться к App Store. Проверьте подключение и попробуйте снова.",
+    "noMatchingProducts": "App Store не вернул подходящих продуктов Kilo Pass.",
+    "purchaseMissingSignedTransaction": "Покупка в App Store не включала подписанную транзакцию JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2819,7 +2899,10 @@
     "diff": {
       "selectedTapToChange": "Выбрано {{label}}, нажмите, чтобы изменить выбор",
       "tapToComment": "{{label}}, нажмите, чтобы оставить комментарий",
-      "truncationBanner": "Показаны первые {{limit}} из {{total}} изменённых файлов — лимит API GitHub"
+      "truncationBanner": "Показаны первые {{limit}} из {{total}} изменённых файлов — лимит API GitHub",
+      "statusAdded": "Добавлено",
+      "statusContext": "Контекст",
+      "statusDeleted": "Удалено"
     },
     "linkPasteClipboardEmpty": "Буфер обмена пуст",
     "linkPasteNotAPullRequest": "Это не ссылка на pull request GitHub",
@@ -2833,6 +2916,11 @@
       "reviewNotSubmitted": "Эту проверку нельзя отправить в текущем виде. PR мог измениться, или вы не можете проверять собственный pull request.",
       "couldNotPostComment": "Не удалось отправить комментарий.",
       "couldNotSubmitReview": "Не удалось отправить проверку. Проверьте подключение и попробуйте снова."
+    },
+    "operation": {
+      "couldNotReply": "Не удалось ответить.",
+      "couldNotCompleteAction": "Не удалось выполнить это действие.",
+      "mergeResultDefaultError": "GitHub не завершил слияние."
     }
   },
   "organization": {
@@ -2850,7 +2938,17 @@
       "emptyTitle": "Нет операций с кредитами",
       "expires": "Истекает {{date}}",
       "title": "Операции с кредитами",
-      "transactionFallback": "Кредитная операция"
+      "transactionFallback": "Кредитная операция",
+      "category": {
+        "organization_custom": "Индивидуальная настройка организации",
+        "parent_to_child_transfer_in": "Входящий перевод от родительской организации",
+        "parent_to_child_transfer_out": "Исходящий перевод в дочернюю организацию",
+        "oss-sponsorship": "OSS-спонсорство",
+        "oss-monthly-reset": "OSS-ежемесячный сброс",
+        "team-topup-bonus-2025": "Бонус за пополнение баланса команды 2025",
+        "accounting_adjustment": "Бухгалтерская корректировка",
+        "credits_expired": "Кредиты истекли"
+      }
     },
     "hub": {
       "balance": "Баланс",
@@ -2877,11 +2975,16 @@
       "emptyTitle": "Нет счетов",
       "invoiceFallback": "Счет",
       "title": "Счета",
-      "statusPaid": "Оплачено",
-      "statusOpen": "Открыт",
-      "statusVoid": "Аннулирован",
       "downloadFailed": "Не удалось скачать счёт. Проверьте подключение и попробуйте снова.",
-      "sharingUnavailable": "Поделиться на этом устройстве нельзя."
+      "sharingUnavailable": "Поделиться на этом устройстве нельзя.",
+      "status": {
+        "paid": "Оплачено",
+        "open": "Открыт",
+        "void": "Аннулирован",
+        "draft": "Черновик",
+        "uncollectible": "Не подлежит взысканию",
+        "unknown": "Неизвестно"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2983,7 +3086,8 @@
     "promptTitle": "Как вам приложение Kilo?",
     "rateKilo": "Оценить Kilo",
     "sorryMessage": "Пожалуйста, расскажите, что можно улучшить. Инженер, отвечающий за приложение, читает каждый отчет!",
-    "sorryTitle": "Нам жаль это слышать!"
+    "sorryTitle": "Нам жаль это слышать!",
+    "emailSubject": "отзыв о мобильном приложении"
   },
   "authErrors": {
     "emailAlreadyUsed": "Аккаунт с этим email уже существует с другим способом входа. Попробуйте другой способ или используйте «$t(login.moreSignInOptions)».",
@@ -3013,6 +3117,15 @@
   "models": {
     "dataCollected": "Собранные данные",
     "free": "Бесплатно",
-    "couldNotUpdateFavorites": "Не удалось обновить избранное"
+    "couldNotUpdateFavorites": "Не удалось обновить избранное",
+    "thinkingEffort": {
+      "none": "Нет",
+      "minimal": "Минимальный",
+      "low": "Низкий",
+      "medium": "Средний",
+      "high": "Высокий",
+      "xhigh": "Очень высокий",
+      "max": "Максимальный"
+    }
   }
 }

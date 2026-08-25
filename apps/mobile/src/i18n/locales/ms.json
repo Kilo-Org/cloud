@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Memilih {{label}}, ketik untuk menukar pilihan",
       "tapToComment": "{{label}}, ketik untuk mengomen",
-      "truncationBanner": "Menunjukkan {{limit}} fail pertama daripada {{total}} fail yang diubah — had API GitHub"
+      "truncationBanner": "Menunjukkan {{limit}} fail pertama daripada {{total}} fail yang diubah — had API GitHub",
+      "statusAdded": "Ditambah",
+      "statusContext": "Konteks",
+      "statusDeleted": "Dipadam"
     },
     "linkPasteClipboardEmpty": "Papan keratan kosong",
     "linkPasteNotAPullRequest": "Bukan pautan permintaan tarik GitHub",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Semakan ini tidak boleh dihantar seadanya. PR mungkin telah berubah, atau anda tidak boleh menyemak permintaan tarik anda sendiri.",
       "couldNotPostComment": "Tidak dapat menyiarkan komen.",
       "couldNotSubmitReview": "Tidak dapat menghantar semakan. Semak sambungan anda dan cuba lagi."
+    },
+    "operation": {
+      "couldNotReply": "Tidak dapat membalas.",
+      "couldNotCompleteAction": "Tidak dapat melengkapkan tindakan ini.",
+      "mergeResultDefaultError": "GitHub tidak melengkapkan gabungan."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Pembayaran tertunggak. Sila kemas kini kaedah pembayaran anda.",
       "subscriptionCancels": "Langganan dibatalkan {{date}}",
       "trialDaysRemaining": "Percubaan: {{remaining}}",
-      "trialEndingSoon": "Percubaan tamat tidak lama lagi: {{remaining}}"
+      "trialEndingSoon": "Percubaan tamat tidak lama lagi: {{remaining}}",
+      "planName": {
+        "commit": "Komit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Apakah Baharu",
@@ -1189,7 +1201,8 @@
       "strongArm": "Lengan kuat",
       "talisman": "Azimat"
     },
-    "remoteSpawnFilesNotSupported": "Instance ini tidak boleh menerima fail."
+    "remoteSpawnFilesNotSupported": "Instance ini tidak boleh menerima fail.",
+    "instanceSwitcherTitle": "Instance KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Gagal",
       "cancelled": "Dibatalkan",
       "interrupted": "Terganggu"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Ketat",
+      "balanced": "Seimbang",
+      "lenient": "Longgar",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Keselamatan",
+      "performance": "Prestasi",
+      "bugs": "Bug",
+      "style": "Gaya",
+      "testing": "Pengujian",
+      "documentation": "Dokumentasi"
+    },
+    "gateThreshold": {
+      "off": "Mati",
+      "all": "Semua",
+      "warning": "Amaran",
+      "critical": "Kritikal"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Penyemak Kod memerlukan perhatian",
+        "description": "Penyemak Kod dinyahdayakan kerana Kilo tidak dapat mengakses repositori ini dengan pemasangan Apl GitHub yang aktif. Kemas kini pemasangan Apl GitHub, kemudian dayakan Penyemak Kod semula.",
+        "recoveryLabel": "Kemas Kini Apl GitHub"
+      },
+      "githubIpAllowList": {
+        "title": "Penyemak Kod memerlukan perhatian",
+        "description": "Penyemak Kod dinyahdayakan kerana organisasi GitHub ini menggunakan senarai benarkan IP yang menyekat Kilo. Hubungi hi@kilocode.ai untuk bantuan, kemudian dayakan Penyemak Kod semula.",
+        "recoveryLabel": "Hubungi sokongan"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Penyemak Kod memerlukan perhatian",
+        "description": "Penyemak Kod dinyahdayakan kerana Kilo tidak dapat mencipta Token Akses Projek GitLab untuk projek ini. Beri akses Maintainer atau dayakan Token Akses Projek, kemudian dayakan Penyemak Kod semula.",
+        "recoveryLabel": "Kemas Kini Integrasi GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Penyemak Kod memerlukan perhatian",
+        "description": "Penyemak Kod dinyahdayakan kerana kunci API BYOK yang dipilih tidak sah, telah dibatalkan, atau tiada kebenaran. Kemas kini kunci atau pilih model lain, kemudian dayakan Penyemak Kod semula.",
+        "recoveryLabel": "Kemas Kini Tetapan BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Penyemak Kod memerlukan perhatian",
+        "description": "Penyemak Kod dinyahdayakan kerana model yang dipilih tidak tersedia untuk sesi ejen awan. Pilih model yang tersedia, kemudian dayakan Penyemak Kod semula.",
+        "recoveryLabel": "Kemas Kini Tetapan Penyemak Kod"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Penyemak Kod memerlukan perhatian",
+        "description": "Penyemak Kod dinyahdayakan selepas tiga tamat masa klon repositori hari ini. Hubungi hi@kilocode.ai untuk bantuan, kemudian dayakan Penyemak Kod semula.",
+        "recoveryLabel": "Hubungi sokongan"
+      }
+    },
+    "unknownError": "Ralat tidak diketahui"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Penemuan berada di bawah ambang keterukan automatik. Pemulihan manual masih boleh bermula apabila gerbang keselamatan diluluskan.",
       "beforeEnablement": "Analisis selesai sebelum Pemulihan Auto didayakan. Pemulihan manual masih boleh bermula apabila gerbang keselamatan diluluskan.",
       "generic": "Pemulihan tidak tersedia untuk penemuan ini."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Kapasiti analisis penuh. Tunggu analisis aktif selesai, kemudian cuba lagi.",
+      "githubTokenUnavailable": "Pengesahan GitHub memerlukan perhatian. Sahkan semula Apl GitHub, kemudian cuba lagi.",
+      "githubAuthInvalid": "Pengesahan GitHub memerlukan perhatian. Sahkan semula Apl GitHub, kemudian cuba lagi.",
+      "findingUnavailable": "Penemuan tidak lagi tersedia. Muat semula penemuan dan cuba lagi jika ia masih terbuka.",
+      "repositoryUnavailable": "Repositori tidak lagi tersedia kepada Apl GitHub. Muat semula akses repositori, kemudian cuba lagi.",
+      "invalidDismissTarget": "Penemuan tidak boleh diketepikan kerana sasaran Dependabotnya tidak sah.",
+      "commandStalled": "Tindakan beratur tidak selesai dalam masa. Cuba tindakan semula.",
+      "queueRetriesExhausted": "Tindakan tidak dapat diselesaikan selepas beberapa percubaan. Cuba tindakan semula.",
+      "queueAdmissionFailed": "Tindakan beratur tidak dapat diterima. Cuba tindakan semula.",
+      "generic": "Tindakan beratur gagal. Cuba tindakan semula."
+    },
+    "analysisMode": {
+      "auto": "Auto",
+      "shallow": "Cetek",
+      "deep": "Mendalam"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Tambah {{name}} ke kegemaran",
       "removeFromFavorites": "Buang {{name}} daripada kegemaran",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Model sesi"
     },
     "attachmentPreview": {
       "openFailedRetry": "Gagal membuka fail. Sila cuba lagi.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Tambah kredit",
-    "description": "Tambah kredit untuk mengekalkan penggunaan berjalan."
+    "description": "Tambah kredit untuk mengekalkan penggunaan berjalan.",
+    "billingPage": "halaman bil"
   },
   "deviceSessions": {
     "couldNotLoad": "Tidak dapat memuatkan sesi",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Gagal memulihkan pembelian. Cuba lagi.",
     "purchaseFailed": "Gagal menyiapkan pembelian.",
     "purchaseStartFailed": "Gagal memulakan pembelian App Store.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass pada Akaun Apple ini kepunyaan akaun Kilo yang berbeza."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass pada Akaun Apple ini kepunyaan akaun Kilo yang berbeza.",
+    "couldNotConnectToAppStore": "Tidak dapat menyambung ke App Store. Semak sambungan anda dan cuba lagi.",
+    "noMatchingProducts": "App Store tidak mengembalikan produk Kilo Pass yang sepadan.",
+    "purchaseMissingSignedTransaction": "Pembelian App Store tidak menyertakan transaksi JWS yang ditandatangani."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Perlu diperbaiki",
     "sorryTitle": "Kami minta maaf mendengarnya!",
     "sorryMessage": "Sila beritahu kami apa yang perlu diperbaiki. Jurutera yang bertanggungjawab ke atas apl membaca setiap laporan!",
-    "emailUs": "E-mel kami"
+    "emailUs": "E-mel kami",
+    "emailSubject": "maklum balas apl mudah alih"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Tiada aktiviti kredit",
       "expires": "Tamat {{date}}",
       "title": "Aktiviti kredit",
-      "transactionFallback": "Transaksi kredit"
+      "transactionFallback": "Transaksi kredit",
+      "category": {
+        "organization_custom": "Kustom organisasi",
+        "parent_to_child_transfer_in": "Pemindahan masuk ibu bapa ke anak",
+        "parent_to_child_transfer_out": "Pemindahan keluar ibu bapa ke anak",
+        "oss-sponsorship": "Penajaan OSS",
+        "oss-monthly-reset": "Tetapan semula bulanan OSS",
+        "team-topup-bonus-2025": "Bonus tambah nilai pasukan-2025",
+        "accounting_adjustment": "Pelarasan perakaunan",
+        "credits_expired": "Kredit tamat tempoh"
+      }
     },
     "inviteMember": {
       "emailError": "Masukkan alamat e-mel yang sah",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Invois dijana secara automatik setiap kitaran pengebilan dan akan muncul di sini setelah organisasi anda dibilkan.",
       "emptyTitle": "Tiada invois",
       "invoiceFallback": "Invois",
-      "statusOpen": "Terbuka",
-      "statusPaid": "Berbayar",
-      "statusVoid": "Batal",
       "title": "Invois",
       "downloadFailed": "Tidak dapat memuat turun invois. Semak sambungan anda dan cuba lagi.",
-      "sharingUnavailable": "Perkongsian tidak tersedia pada peranti ini."
+      "sharingUnavailable": "Perkongsian tidak tersedia pada peranti ini.",
+      "status": {
+        "paid": "Berbayar",
+        "open": "Terbuka",
+        "void": "Batal",
+        "draft": "Draf",
+        "uncollectible": "Tidak boleh dituntut",
+        "unknown": "Tidak diketahui"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "nama@syarikat.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Data dikumpul",
     "free": "Percuma",
-    "couldNotUpdateFavorites": "Tidak dapat mengemas kini kegemaran"
+    "couldNotUpdateFavorites": "Tidak dapat mengemas kini kegemaran",
+    "thinkingEffort": {
+      "none": "Tiada",
+      "minimal": "Minimum",
+      "low": "Rendah",
+      "medium": "Sederhana",
+      "high": "Tinggi",
+      "xhigh": "Sangat Tinggi",
+      "max": "Maksimum"
+    }
   }
 }

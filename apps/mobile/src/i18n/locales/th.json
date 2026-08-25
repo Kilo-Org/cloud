@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "เลือก {{label}} แล้ว แตะเพื่อเปลี่ยนการเลือก",
       "tapToComment": "{{label}}, แตะเพื่อแสดงความคิดเห็น",
-      "truncationBanner": "กำลังแสดง {{limit}} ไฟล์แรกจากทั้งหมด {{total}} ไฟล์ที่เปลี่ยนแปลง — ขีดจำกัด API ของ GitHub"
+      "truncationBanner": "กำลังแสดง {{limit}} ไฟล์แรกจากทั้งหมด {{total}} ไฟล์ที่เปลี่ยนแปลง — ขีดจำกัด API ของ GitHub",
+      "statusAdded": "เพิ่มแล้ว",
+      "statusContext": "บริบท",
+      "statusDeleted": "ลบแล้ว"
     },
     "linkPasteClipboardEmpty": "คลิปบอร์ดว่างเปล่า",
     "linkPasteNotAPullRequest": "ไม่ใช่ลิงก์คำขอดึงของ GitHub",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "ไม่สามารถส่งรีวิวนี้ในรูปแบบปัจจุบันได้ PR อาจมีการเปลี่ยนแปลง หรือคุณไม่สามารถรีวิว pull request ของตัวเองได้",
       "couldNotPostComment": "ไม่สามารถโพสต์ความคิดเห็นได้",
       "couldNotSubmitReview": "ไม่สามารถส่งรีวิวได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง"
+    },
+    "operation": {
+      "couldNotReply": "ไม่สามารถตอบกลับได้",
+      "couldNotCompleteAction": "ไม่สามารถดำเนินการนี้ให้เสร็จสมบูรณ์ได้",
+      "mergeResultDefaultError": "GitHub ไม่ได้รวมให้เสร็จสมบูรณ์"
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "การชำระเงินค้างชำระ โปรดอัปเดตวิธีชำระเงินของคุณ",
       "subscriptionCancels": "การสมัครสมาชิกจะยกเลิกใน {{date}}",
       "trialDaysRemaining": "ทดลองใช้: เหลือ {{remaining}} วัน",
-      "trialEndingSoon": "ทดลองใช้จะสิ้นสุดเร็วๆ นี้: {{remaining}}"
+      "trialEndingSoon": "ทดลองใช้จะสิ้นสุดเร็วๆ นี้: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "มีอะไรใหม่",
@@ -1189,7 +1201,8 @@
       "strongArm": "แขนแข็งแรง",
       "talisman": "เครื่องราง"
     },
-    "remoteSpawnFilesNotSupported": "อินสแตนซ์นี้ไม่สามารถรับไฟล์ได้"
+    "remoteSpawnFilesNotSupported": "อินสแตนซ์นี้ไม่สามารถรับไฟล์ได้",
+    "instanceSwitcherTitle": "อินสแตนซ์ KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "ล้มเหลว",
       "cancelled": "ยกเลิกแล้ว",
       "interrupted": "ถูกขัดจังหวะ"
-    }
+    },
+    "reviewStyle": {
+      "strict": "เข้มงวด",
+      "balanced": "สมดุล",
+      "lenient": "ผ่อนปรน",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "ความปลอดภัย",
+      "performance": "ประสิทธิภาพ",
+      "bugs": "บั๊ก",
+      "style": "สไตล์",
+      "testing": "การทดสอบ",
+      "documentation": "เอกสารประกอบ"
+    },
+    "gateThreshold": {
+      "off": "ปิด",
+      "all": "ทั้งหมด",
+      "warning": "คำเตือน",
+      "critical": "วิกฤต"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "ผู้ตรวจสอบโค้ดต้องการความสนใจ",
+        "description": "ผู้ตรวจสอบโค้ดถูกปิดใช้งานเนื่องจาก Kilo ไม่สามารถเข้าถึงที่เก็บนี้ด้วยการติดตั้ง GitHub App ที่ใช้งานอยู่ อัปเดตการติดตั้ง GitHub App แล้วเปิดผู้ตรวจสอบโค้ดอีกครั้ง",
+        "recoveryLabel": "อัปเดต GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "ผู้ตรวจสอบโค้ดต้องการความสนใจ",
+        "description": "ผู้ตรวจสอบโค้ดถูกปิดใช้งานเนื่องจากองค์กร GitHub นี้ใช้รายการอนุญาต IP ที่บล็อก Kilo ติดต่อ hi@kilocode.ai เพื่อขอความช่วยเหลือ แล้วเปิดผู้ตรวจสอบโค้ดอีกครั้ง",
+        "recoveryLabel": "ติดต่อฝ่ายสนับสนุน"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "ผู้ตรวจสอบโค้ดต้องการความสนใจ",
+        "description": "ผู้ตรวจสอบโค้ดถูกปิดใช้งานเนื่องจาก Kilo ไม่สามารถสร้าง GitLab Project Access Token สำหรับโปรเจกต์นี้ได้ ให้สิทธิ์การเข้าถึงแบบ Maintainer หรือเปิดใช้งาน Project Access Tokens แล้วเปิดผู้ตรวจสอบโค้ดอีกครั้ง",
+        "recoveryLabel": "อัปเดตการผสานรวม GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "ผู้ตรวจสอบโค้ดต้องการความสนใจ",
+        "description": "ผู้ตรวจสอบโค้ดถูกปิดใช้งานเนื่องจากคีย์ API BYOK ที่เลือกไม่ถูกต้อง ถูกเพิกถอน หรือขาดสิทธิ์ อัปเดตคีย์หรือเลือกโมเดลอื่น แล้วเปิดผู้ตรวจสอบโค้ดอีกครั้ง",
+        "recoveryLabel": "อัปเดตการตั้งค่า BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "ผู้ตรวจสอบโค้ดต้องการความสนใจ",
+        "description": "ผู้ตรวจสอบโค้ดถูกปิดใช้งานเนื่องจากโมเดลที่เลือกไม่พร้อมใช้งานสำหรับเซสชันคลาวด์เอเจนต์ เลือกโมเดลที่พร้อมใช้งาน แล้วเปิดผู้ตรวจสอบโค้ดอีกครั้ง",
+        "recoveryLabel": "อัปเดตการตั้งค่าผู้ตรวจสอบโค้ด"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "ผู้ตรวจสอบโค้ดต้องการความสนใจ",
+        "description": "ผู้ตรวจสอบโค้ดถูกปิดใช้งานหลังจากการหมดเวลาการคัดลอกที่เก็บสามครั้งในวันนี้ ติดต่อ hi@kilocode.ai เพื่อขอความช่วยเหลือ แล้วเปิดผู้ตรวจสอบโค้ดอีกครั้ง",
+        "recoveryLabel": "ติดต่อฝ่ายสนับสนุน"
+      }
+    },
+    "unknownError": "ข้อผิดพลาดที่ไม่รู้จัก"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "ผลการค้นหาต่ำกว่าเกณฑ์ความรุนแรงอัตโนมัติ การแก้ไขด้วยตนเองยังเริ่มได้เมื่อเกตความปลอดภัยผ่าน",
       "beforeEnablement": "การวิเคราะห์เสร็จสิ้นก่อนเปิดการแก้ไขอัตโนมัติ การแก้ไขด้วยตนเองยังเริ่มได้เมื่อเกตความปลอดภัยผ่าน",
       "generic": "การแก้ไขไม่พร้อมใช้งานสำหรับผลการค้นหานี้"
+    },
+    "commandFailure": {
+      "ownerCapReached": "ความจุการวิเคราะห์เต็ม รอให้การวิเคราะห์ที่กำลังทำงานเสร็จสิ้น แล้วลองอีกครั้ง",
+      "githubTokenUnavailable": "การอนุญาต GitHub ต้องได้รับการดูแล อนุมัติ GitHub App อีกครั้ง แล้วลองอีกครั้ง",
+      "githubAuthInvalid": "การอนุญาต GitHub ต้องได้รับการดูแล อนุมัติ GitHub App อีกครั้ง แล้วลองอีกครั้ง",
+      "findingUnavailable": "ไม่มี finding นี้แล้ว รีเฟรช findings แล้วลองอีกครั้งหากยังเปิดอยู่",
+      "repositoryUnavailable": "Repository ไม่พร้อมใช้งานสำหรับ GitHub App อีกต่อไป รีเฟรชการเข้าถึง repository แล้วลองอีกครั้ง",
+      "invalidDismissTarget": "ไม่สามารถละเว้น finding ได้เนื่องจากเป้าหมาย Dependabot ไม่ถูกต้อง",
+      "commandStalled": "การดำเนินการที่จัดคิวไม่เสร็จสิ้นทันเวลา ลองดำเนินการอีกครั้ง",
+      "queueRetriesExhausted": "ไม่สามารถดำเนินการให้เสร็จสิ้นได้หลังจากการพยายามหลายครั้ง ลองดำเนินการอีกครั้ง",
+      "queueAdmissionFailed": "ไม่สามารถรับการดำเนินการที่จัดคิวได้ ลองดำเนินการอีกครั้ง",
+      "generic": "การดำเนินการที่จัดคิวล้มเหลว ลองดำเนินการอีกครั้ง"
+    },
+    "analysisMode": {
+      "auto": "อัตโนมัติ",
+      "shallow": "ตื้น",
+      "deep": "ลึก"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "เพิ่ม {{name}} ในรายการโปรด",
       "removeFromFavorites": "นำ {{name}} ออกจากรายการโปรด",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "โมเดลเซสชัน"
     },
     "attachmentPreview": {
       "openFailedRetry": "เปิดไฟล์ไม่สำเร็จ กรุณาลองอีกครั้ง",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "เพิ่มเครดิต",
-    "description": "เพิ่มเครดิตเพื่อให้การใช้งานดำเนินต่อไป"
+    "description": "เพิ่มเครดิตเพื่อให้การใช้งานดำเนินต่อไป",
+    "billingPage": "หน้าเรียกเก็บเงิน"
   },
   "deviceSessions": {
     "couldNotLoad": "โหลดเซสชันไม่สำเร็จ",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "คืนค่าการซื้อไม่สำเร็จ ลองอีกครั้ง",
     "purchaseFailed": "ทำการซื้อไม่สำเร็จ",
     "purchaseStartFailed": "เริ่มการซื้อใน App Store ไม่สำเร็จ",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass ใน Apple Account นี้เป็นของบัญชี Kilo อื่น"
+    "purchaseOwnedByAnotherAccount": "Kilo Pass ใน Apple Account นี้เป็นของบัญชี Kilo อื่น",
+    "couldNotConnectToAppStore": "ไม่สามารถเชื่อมต่อกับ App Store ได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
+    "noMatchingProducts": "App Store ไม่ส่งคืนผลิตภัณฑ์ Kilo Pass ที่ตรงกัน",
+    "purchaseMissingSignedTransaction": "การซื้อใน App Store ไม่รวมธุรกรรม JWS ที่ลงนาม"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "ต้องปรับปรุง",
     "sorryTitle": "เราขอโทษที่ได้ยินแบบนั้น!",
     "sorryMessage": "กรุณาแจ้งให้เรารู้ว่าต้องปรับปรุงอะไรบ้าง วิศวกรที่รับผิดชอบแอปอ่านทุกรายงาน!",
-    "emailUs": "ส่งอีเมลถึงเรา"
+    "emailUs": "ส่งอีเมลถึงเรา",
+    "emailSubject": "ข้อเสนอแนะแอปมือถือ"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "ไม่มีกิจกรรมเครดิต",
       "expires": "หมดอายุ {{date}}",
       "title": "กิจกรรมเครดิต",
-      "transactionFallback": "ธุรกรรมเครดิต"
+      "transactionFallback": "ธุรกรรมเครดิต",
+      "category": {
+        "organization_custom": "องค์กรกำหนดเอง",
+        "parent_to_child_transfer_in": "โอนเข้าจากองค์กรแม่ไปยังองค์กรลูก",
+        "parent_to_child_transfer_out": "โอนออกจากองค์กรแม่ไปยังองค์กรลูก",
+        "oss-sponsorship": "การสนับสนุน OSS",
+        "oss-monthly-reset": "การรีเซ็ตรายเดือน OSS",
+        "team-topup-bonus-2025": "โบนัสเติมเงินทีม 2025",
+        "accounting_adjustment": "การปรับปรุงบัญชี",
+        "credits_expired": "เครดิตหมดอายุ"
+      }
     },
     "inviteMember": {
       "emailError": "ป้อนที่อยู่อีเมลที่ถูกต้อง",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "ใบแจ้งหนี้ถูกสร้างโดยอัตโนมัติในแต่ละรอบการเรียกเก็บเงิน และจะปรากฏที่นี่เมื่อองค์กรของคุณถูกเรียกเก็บเงินแล้ว",
       "emptyTitle": "ไม่มีใบแจ้งหนี้",
       "invoiceFallback": "ใบแจ้งหนี้",
-      "statusOpen": "เปิด",
-      "statusPaid": "ชำระแล้ว",
-      "statusVoid": "เป็นโมฆะ",
       "title": "ใบแจ้งหนี้",
       "downloadFailed": "ไม่สามารถดาวน์โหลดใบแจ้งหนี้ได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
-      "sharingUnavailable": "การแชร์ไม่พร้อมใช้งานบนอุปกรณ์นี้"
+      "sharingUnavailable": "การแชร์ไม่พร้อมใช้งานบนอุปกรณ์นี้",
+      "status": {
+        "paid": "ชำระแล้ว",
+        "open": "เปิด",
+        "void": "เป็นโมฆะ",
+        "draft": "ฉบับร่าง",
+        "uncollectible": "เก็บไม่ได้",
+        "unknown": "ไม่ทราบ"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "ข้อมูลที่รวบรวม",
     "free": "ฟรี",
-    "couldNotUpdateFavorites": "ไม่สามารถอัปเดตรายการโปรดได้"
+    "couldNotUpdateFavorites": "ไม่สามารถอัปเดตรายการโปรดได้",
+    "thinkingEffort": {
+      "none": "ไม่มี",
+      "minimal": "น้อยที่สุด",
+      "low": "ต่ำ",
+      "medium": "ปานกลาง",
+      "high": "สูง",
+      "xhigh": "สูงมาก",
+      "max": "สูงสุด"
+    }
   }
 }

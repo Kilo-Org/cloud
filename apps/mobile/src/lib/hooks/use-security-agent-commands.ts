@@ -1,5 +1,4 @@
 import {
-  getSecurityCommandFailureMessage,
   getSecurityCommandInvalidationScopes,
   isActiveSecurityCommand,
   isPersonalSecurityScope,
@@ -11,6 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { type QueryClient, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
+import { getSecurityCommandFailureMessage } from '@/lib/hooks/security-command-failure-copy';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';

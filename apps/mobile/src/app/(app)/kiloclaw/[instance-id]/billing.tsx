@@ -23,7 +23,17 @@ import { useKiloClawBillingStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { formatBillingDate, formatRemainingDays } from '@/lib/hooks/use-kiloclaw-billing';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
-import { capitalize, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+
+const SUBSCRIPTION_PLAN_KEYS = {
+  commit: 'kiloclaw.billing.planName.commit',
+  standard: 'kiloclaw.billing.planName.standard',
+} satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
 
 function DetailRow({
   label,
@@ -132,7 +142,8 @@ function PlanDetails({
     return <FinalCommitTermDetails billing={billing} />;
   }
   if (billing.subscription) {
-    const planName = capitalize(billing.subscription.plan);
+    const planKey = lookup(SUBSCRIPTION_PLAN_KEYS, billing.subscription.plan);
+    const planName = planKey ? t(planKey) : billing.subscription.plan;
     const cancelling = billing.subscription.cancelAtPeriodEnd;
     return (
       <View>

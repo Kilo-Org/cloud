@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Napili ang {{label}}, tap para baguhin ang pagpili",
       "tapToComment": "{{label}}, tap para magkomento",
-      "truncationBanner": "Ipinapakita ang unang {{limit}} sa {{total}} binagong file — limitasyon sa API ng GitHub"
+      "truncationBanner": "Ipinapakita ang unang {{limit}} sa {{total}} binagong file — limitasyon sa API ng GitHub",
+      "statusAdded": "Idinagdag",
+      "statusContext": "Konteksto",
+      "statusDeleted": "Na-delete"
     },
     "linkPasteClipboardEmpty": "Walang laman ang clipboard",
     "linkPasteNotAPullRequest": "Hindi link ng GitHub pull request",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Hindi maisumite ang review na ito nang ganito. Maaaring nagbago ang PR, o hindi mo maaaring i-review ang sarili mong pull request.",
       "couldNotPostComment": "Hindi maipost ang komento.",
       "couldNotSubmitReview": "Hindi maisumite ang review. Suriin ang iyong koneksyon at subukan muli."
+    },
+    "operation": {
+      "couldNotReply": "Hindi makapag-reply.",
+      "couldNotCompleteAction": "Hindi makumpleto ang aksyong ito.",
+      "mergeResultDefaultError": "Hindi kinumpleto ng GitHub ang merge."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Huli na ang bayad. Pakiusap, i-update ang iyong paraan ng pagbabayad.",
       "subscriptionCancels": "Kakanselahin ang subscription sa {{date}}",
       "trialDaysRemaining": "Trial: {{remaining}} ang natitira",
-      "trialEndingSoon": "Malapit nang matapos ang trial: {{remaining}}"
+      "trialEndingSoon": "Malapit nang matapos ang trial: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Ano ang Bago",
@@ -1189,7 +1201,8 @@
       "strongArm": "Malakas na braso",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Hindi makakatanggap ng mga file ang instance na ito."
+    "remoteSpawnFilesNotSupported": "Hindi makakatanggap ng mga file ang instance na ito.",
+    "instanceSwitcherTitle": "Instance ng KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Nabigo",
       "cancelled": "Kinansela",
       "interrupted": "Naantala"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Strict",
+      "balanced": "Balanced",
+      "lenient": "Lenient",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Seguridad",
+      "performance": "Pagganap",
+      "bugs": "Mga Bug",
+      "style": "Estilo",
+      "testing": "Pagsubok",
+      "documentation": "Dokumentasyon"
+    },
+    "gateThreshold": {
+      "off": "Naka-off",
+      "all": "Lahat",
+      "warning": "Babala",
+      "critical": "Critical"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Kailangan ng Code Reviewer ng pansin",
+        "description": "Na-disable ang Code Reviewer dahil hindi ma-access ng Kilo ang repository na ito gamit ang aktibong pag-install ng GitHub App. I-update ang pag-install ng GitHub App, pagkatapos ay i-enable muli ang Code Reviewer.",
+        "recoveryLabel": "I-update ang GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Kailangan ng Code Reviewer ng pansin",
+        "description": "Na-disable ang Code Reviewer dahil gumagamit ang GitHub organization na ito ng IP allow list na humaharang sa Kilo. Makipag-ugnayan sa hi@kilocode.ai para sa tulong, pagkatapos ay i-enable muli ang Code Reviewer.",
+        "recoveryLabel": "Makipag-ugnayan sa suporta"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Kailangan ng Code Reviewer ng pansin",
+        "description": "Na-disable ang Code Reviewer dahil hindi makagawa ang Kilo ng GitLab Project Access Token para sa project na ito. Magbigay ng Maintainer access o i-enable ang Project Access Tokens, pagkatapos ay i-enable muli ang Code Reviewer.",
+        "recoveryLabel": "I-update ang GitLab integration"
+      },
+      "byokInvalidKey": {
+        "title": "Kailangan ng Code Reviewer ng pansin",
+        "description": "Na-disable ang Code Reviewer dahil hindi wasto, na-revoke, o kulang sa pahintulot ang napiling BYOK API key. I-update ang key o pumili ng ibang modelo, pagkatapos ay i-enable muli ang Code Reviewer.",
+        "recoveryLabel": "I-update ang mga setting ng BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Kailangan ng Code Reviewer ng pansin",
+        "description": "Na-disable ang Code Reviewer dahil hindi available ang napiling modelo para sa cloud agent sessions. Pumili ng available na modelo, pagkatapos ay i-enable muli ang Code Reviewer.",
+        "recoveryLabel": "I-update ang mga setting ng Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Kailangan ng Code Reviewer ng pansin",
+        "description": "Na-disable ang Code Reviewer pagkatapos ng tatlong repository clone timeout ngayong araw. Makipag-ugnayan sa hi@kilocode.ai para sa tulong, pagkatapos ay i-enable muli ang Code Reviewer.",
+        "recoveryLabel": "Makipag-ugnayan sa suporta"
+      }
+    },
+    "unknownError": "Hindi kilalang error"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Mababa sa awtomatikong severity threshold ang finding. Maaari pa ring magsimula ang manu-manong remediation kapag pumasa ang mga safety gate.",
       "beforeEnablement": "Natapos ang analysis bago i-enable ang Auto Remediation. Maaari pa ring magsimula ang manu-manong remediation kapag pumasa ang mga safety gate.",
       "generic": "Hindi available ang remediation para sa finding na ito."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Puno na ang capacity ng analysis. Maghintay na matapos ang aktibong analysis, pagkatapos ay subukan muli.",
+      "githubTokenUnavailable": "Kailangan ng pansin ang GitHub authorization. Muling i-authorize ang GitHub App, pagkatapos ay subukan muli.",
+      "githubAuthInvalid": "Kailangan ng pansin ang GitHub authorization. Muling i-authorize ang GitHub App, pagkatapos ay subukan muli.",
+      "findingUnavailable": "Hindi na available ang finding. I-refresh ang mga finding at subukan muli kung mananatiling bukas ito.",
+      "repositoryUnavailable": "Hindi na available ang repository sa GitHub App. I-refresh ang repository access, pagkatapos ay subukan muli.",
+      "invalidDismissTarget": "Hindi ma-dismiss ang finding dahil hindi wasto ang Dependabot target nito.",
+      "commandStalled": "Hindi natapos ang queued action sa tamang oras. Subukan muli ang action.",
+      "queueRetriesExhausted": "Hindi makumpleto ang action pagkatapos ng ilang pagtatangka. Subukan muli ang action.",
+      "queueAdmissionFailed": "Hindi matanggap ang queued action. Subukan muli ang action.",
+      "generic": "Nabigo ang queued action. Subukan muli ang action."
+    },
+    "analysisMode": {
+      "auto": "Auto",
+      "shallow": "Mababaw",
+      "deep": "Malalim"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Idagdag ang {{name}} sa mga paborito",
       "removeFromFavorites": "Alisin ang {{name}} sa mga paborito",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Model ng session"
     },
     "attachmentPreview": {
       "openFailedRetry": "Hindi nabuksan ang file. Pakisubukan muli.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Magdagdag ng credits",
-    "description": "Magdagdag ng credits para patuloy ang paggamit."
+    "description": "Magdagdag ng credits para patuloy ang paggamit.",
+    "billingPage": "pahina ng billing"
   },
   "deviceSessions": {
     "couldNotLoad": "Hindi ma-load ang mga session",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Nabigong i-restore ang mga pagbili. Subukan muli.",
     "purchaseFailed": "Nabigong kumpletuhin ang pagbili.",
     "purchaseStartFailed": "Nabigong simulan ang pagbili sa App Store.",
-    "purchaseOwnedByAnotherAccount": "Ang Kilo Pass sa Apple Account na ito ay kabilang sa ibang Kilo account."
+    "purchaseOwnedByAnotherAccount": "Ang Kilo Pass sa Apple Account na ito ay kabilang sa ibang Kilo account.",
+    "couldNotConnectToAppStore": "Hindi makakonekta sa App Store. Suriin ang iyong koneksyon at subukan muli.",
+    "noMatchingProducts": "Walang tumugmang Kilo Pass product na ibinalik ng App Store.",
+    "purchaseMissingSignedTransaction": "Hindi kasama sa App Store purchase ang naka-sign na transaction JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Kailangan pang ayusin",
     "sorryTitle": "Nalulungkot kaming marinig iyan!",
     "sorryMessage": "Mangyaring ipaalam sa amin kung ano ang kailangang pagbutihin. Binabasa ng engineer na namamahala sa app ang bawat report!",
-    "emailUs": "I-email kami"
+    "emailUs": "I-email kami",
+    "emailSubject": "feedback sa mobile app"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Walang credit activity",
       "expires": "Mag-e-expire {{date}}",
       "title": "Credit activity",
-      "transactionFallback": "Transaksyon ng credit"
+      "transactionFallback": "Transaksyon ng credit",
+      "category": {
+        "organization_custom": "Custom ng organization",
+        "parent_to_child_transfer_in": "Transfer in mula sa parent",
+        "parent_to_child_transfer_out": "Transfer out papunta sa child",
+        "oss-sponsorship": "Sponsorship ng OSS",
+        "oss-monthly-reset": "Buwanang reset ng OSS",
+        "team-topup-bonus-2025": "Team top-up bonus 2025",
+        "accounting_adjustment": "Pagsasaayos ng accounting",
+        "credits_expired": "Nag-expire na credits"
+      }
     },
     "inviteMember": {
       "emailError": "Maglagay ng wastong email address",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Awtomatikong bubuo ang mga invoice bawat billing cycle at lalabas dito kapag na-bill na ang iyong organization.",
       "emptyTitle": "Walang invoice",
       "invoiceFallback": "Invoice",
-      "statusOpen": "Bukas",
-      "statusPaid": "Bayad",
-      "statusVoid": "Wasto",
       "title": "Mga invoice",
       "downloadFailed": "Hindi ma-download ang invoice. Suriin ang iyong koneksyon at subukan muli.",
-      "sharingUnavailable": "Hindi available ang pag-share sa device na ito."
+      "sharingUnavailable": "Hindi available ang pag-share sa device na ito.",
+      "status": {
+        "paid": "Bayad",
+        "open": "Bukas",
+        "void": "Walang bisa",
+        "draft": "Draft",
+        "uncollectible": "Hindi makokolekta",
+        "unknown": "Hindi alam"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Kinokolektang data",
     "free": "Libre",
-    "couldNotUpdateFavorites": "Hindi ma-update ang mga paborito"
+    "couldNotUpdateFavorites": "Hindi ma-update ang mga paborito",
+    "thinkingEffort": {
+      "none": "Wala",
+      "minimal": "Minimal",
+      "low": "Mababa",
+      "medium": "Katamtaman",
+      "high": "Mataas",
+      "xhigh": "Napakataas",
+      "max": "Maksimum"
+    }
   }
 }

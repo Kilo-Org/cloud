@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} चयन गरियो, चयन परिवर्तन गर्न ट्याप गर्नुहोस्",
       "tapToComment": "{{label}}, टिप्पणी गर्न ट्याप गर्नुहोस्",
-      "truncationBanner": "कुल {{total}} परिवर्तन गरिएका फाइलहरूमध्ये पहिलो {{limit}} देखाइँदै — GitHub API सीमा"
+      "truncationBanner": "कुल {{total}} परिवर्तन गरिएका फाइलहरूमध्ये पहिलो {{limit}} देखाइँदै — GitHub API सीमा",
+      "statusAdded": "थपियो",
+      "statusContext": "सन्दर्भ",
+      "statusDeleted": "मेटियो"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली छ",
     "linkPasteNotAPullRequest": "GitHub पुल रिक्वेस्ट लिंक होइन",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "यो समीक्षा जस्तो छ त्यस्तै पेश गर्न सकिँदैन। PR परिवर्तन भएको हुन सक्छ, वा तपाईं आफ्नै पुल अनुरोधको समीक्षा गर्न सक्नुहुन्न।",
       "couldNotPostComment": "टिप्पणी पोस्ट गर्न सकिएन।",
       "couldNotSubmitReview": "समीक्षा पेश गर्न सकिएन। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।"
+    },
+    "operation": {
+      "couldNotReply": "जवाफ दिन सकिएन।",
+      "couldNotCompleteAction": "यो कार्य पूरा गर्न सकिएन।",
+      "mergeResultDefaultError": "GitHub ले मर्ज पूरा गरेन।"
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "भुक्तानी बक्यौता भयो। कृपया आफ्नो भुक्तानी विधि अद्यावधिक गर्नुहोस्।",
       "subscriptionCancels": "सदस्यता {{date}} मा रद्द हुन्छ",
       "trialDaysRemaining": "परीक्षण: {{remaining}} बाँकी",
-      "trialEndingSoon": "परीक्षण चाँडै समाप्त हुँदै: {{remaining}}"
+      "trialEndingSoon": "परीक्षण चाँडै समाप्त हुँदै: {{remaining}}",
+      "planName": {
+        "commit": "कमिट",
+        "standard": "स्ट्यान्डर्ड"
+      }
     },
     "changelog": {
       "title": "के नयाँ छ",
@@ -1189,7 +1201,8 @@
       "strongArm": "बलियो पाखुरा",
       "talisman": "ताबीज"
     },
-    "remoteSpawnFilesNotSupported": "यो instance ले फाइलहरू प्राप्त गर्न सक्दैन।"
+    "remoteSpawnFilesNotSupported": "यो instance ले फाइलहरू प्राप्त गर्न सक्दैन।",
+    "instanceSwitcherTitle": "KiloClaw इन्स्ट्यान्स"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "असफल",
       "cancelled": "रद्द गरियो",
       "interrupted": "बाधित"
-    }
+    },
+    "reviewStyle": {
+      "strict": "कडा",
+      "balanced": "सन्तुलित",
+      "lenient": "नरम",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "सुरक्षा",
+      "performance": "प्रदर्शन",
+      "bugs": "बगहरू",
+      "style": "शैली",
+      "testing": "परीक्षण",
+      "documentation": "दस्तावेज"
+    },
+    "gateThreshold": {
+      "off": "बन्द",
+      "all": "सबै",
+      "warning": "चेतावनी",
+      "critical": "क्रिटिकल"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer लाई ध्यान चाहिन्छ",
+        "description": "Kilo सक्रिय GitHub App स्थापनासहित यो भण्डारमा पहुँच गर्न नसक्ने भएकाले Code Reviewer असक्षम गरियो। GitHub App स्थापना अद्यावधिक गर्नुहोस्, त्यसपछि Code Reviewer फेरि सक्षम गर्नुहोस्।",
+        "recoveryLabel": "GitHub App अद्यावधिक गर्नुहोस्"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer लाई ध्यान चाहिन्छ",
+        "description": "यो GitHub संस्थाले Kilo लाई रोक्ने IP अनुमति सूची प्रयोग गर्ने भएकाले Code Reviewer असक्षम गरियो। मद्दतका लागि hi@kilocode.ai मा सम्पर्क गर्नुहोस्, त्यसपछि Code Reviewer फेरि सक्षम गर्नुहोस्।",
+        "recoveryLabel": "सहयोगलाई सम्पर्क गर्नुहोस्"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer लाई ध्यान चाहिन्छ",
+        "description": "यो परियोजनाका लागि Kilo ले GitLab Project Access Token सिर्जना गर्न नसक्ने भएकाले Code Reviewer असक्षम गरियो। Maintainer पहुँच दिनुहोस् वा Project Access Tokens सक्षम गर्नुहोस्, त्यसपछि Code Reviewer फेरि सक्षम गर्नुहोस्।",
+        "recoveryLabel": "GitLab एकीकरण अद्यावधिक गर्नुहोस्"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer लाई ध्यान चाहिन्छ",
+        "description": "चयन गरिएको BYOK API कुञ्जी अवैध, फिर्ता लिइएको, वा अनुमति नभएको भएकाले Code Reviewer असक्षम गरियो। कुञ्जी अद्यावधिक गर्नुहोस् वा अर्को मोडेल छान्नुहोस्, त्यसपछि Code Reviewer फेरि सक्षम गर्नुहोस्।",
+        "recoveryLabel": "BYOK सेटिङहरू अद्यावधिक गर्नुहोस्"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer लाई ध्यान चाहिन्छ",
+        "description": "चयन गरिएको मोडेल क्लाउड एजेन्ट सत्रहरूका लागि उपलब्ध नभएको भएकाले Code Reviewer असक्षम गरियो। उपलब्ध मोडेल छान्नुहोस्, त्यसपछि Code Reviewer फेरि सक्षम गर्नुहोस्।",
+        "recoveryLabel": "Code Reviewer सेटिङहरू अद्यावधिक गर्नुहोस्"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer लाई ध्यान चाहिन्छ",
+        "description": "आज तीन पटक भण्डार क्लोन टाइमआउट भएपछि Code Reviewer असक्षम गरियो। मद्दतका लागि hi@kilocode.ai मा सम्पर्क गर्नुहोस्, त्यसपछि Code Reviewer फेरि सक्षम गर्नुहोस्।",
+        "recoveryLabel": "सहयोगलाई सम्पर्क गर्नुहोस्"
+      }
+    },
+    "unknownError": "अज्ञात त्रुटि"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "निष्कर्ष स्वचालित गम्भीरता थ्रेसहोल्डभन्दा तल छ। सुरक्षा गेटहरू पार भएमा म्यानुअल सुधार अझै सुरु हुन सक्छ।",
       "beforeEnablement": "विश्लेषण स्वचालित सुधार सक्षम हुनु अघि पूरा भयो। सुरक्षा गेटहरू पार भएमा म्यानुअल सुधार अझै सुरु हुन सक्छ।",
       "generic": "यस निष्कर्षका लागि सुधार उपलब्ध छैन।"
+    },
+    "commandFailure": {
+      "ownerCapReached": "विश्लेषण क्षमता भरिएको छ। सक्रिय विश्लेषण समाप्त हुन पर्खनुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+      "githubTokenUnavailable": "GitHub प्राधिकरणलाई ध्यान चाहिन्छ। GitHub App पुनः अधिकृत गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+      "githubAuthInvalid": "GitHub प्राधिकरणलाई ध्यान चाहिन्छ। GitHub App पुनः अधिकृत गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+      "findingUnavailable": "निष्कर्ष अब उपलब्ध छैन। निष्कर्षहरू ताजा गर्नुहोस् र यदि यो खुला रह्यो भने फेरि प्रयास गर्नुहोस्।",
+      "repositoryUnavailable": "भण्डार अब GitHub App का लागि उपलब्ध छैन। भण्डार पहुँच ताजा गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+      "invalidDismissTarget": "यसको Dependabot लक्ष्य अवैध भएकाले निष्कर्ष खारेज गर्न सकिँदैन।",
+      "commandStalled": "कतारमा राखिएको कार्य समयमै समाप्त भएन। कार्य फेरि प्रयास गर्नुहोस्।",
+      "queueRetriesExhausted": "धेरै प्रयासपछि कार्य पूरा गर्न सकिएन। कार्य फेरि प्रयास गर्नुहोस्।",
+      "queueAdmissionFailed": "कतारमा राखिएको कार्य स्वीकार गर्न सकिएन। कार्य फेरि प्रयास गर्नुहोस्।",
+      "generic": "कतारमा राखिएको कार्य असफल भयो। कार्य फेरि प्रयास गर्नुहोस्।"
+    },
+    "analysisMode": {
+      "auto": "स्वचालित",
+      "shallow": "सतही",
+      "deep": "गहिरो"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "मनपर्नेमा {{name}} थप्नुहोस्",
       "removeFromFavorites": "मनपर्नेबाट {{name}} हटाउनुहोस्",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "मध्यम"
+      "thinkingEffortMedium": "मध्यम",
+      "sessionModel": "सत्र मोडेल"
     },
     "attachmentPreview": {
       "openFailedRetry": "फाइल खोल्न असफल भयो। कृपया फेरि प्रयास गर्नुहोस्।",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "क्रेडिट थप्नुहोस्",
-    "description": "प्रयोग जारी राख्न क्रेडिट थप्नुहोस्।"
+    "description": "प्रयोग जारी राख्न क्रेडिट थप्नुहोस्।",
+    "billingPage": "बिलिङ पृष्ठ"
   },
   "deviceSessions": {
     "couldNotLoad": "सत्रहरू लोड गर्न सकिएन",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "खरिदहरू पुनः स्थापित गर्न असफल भयो। फेरि प्रयास गर्नुहोस्।",
     "purchaseFailed": "खरिद पूरा गर्न असफल भयो।",
     "purchaseStartFailed": "App Store खरिद सुरु गर्न असफल भयो।",
-    "purchaseOwnedByAnotherAccount": "यो Apple खातामा रहेको Kilo Pass अर्को Kilo खातासँग सम्बन्धित छ।"
+    "purchaseOwnedByAnotherAccount": "यो Apple खातामा रहेको Kilo Pass अर्को Kilo खातासँग सम्बन्धित छ।",
+    "couldNotConnectToAppStore": "App Store मा जडान गर्न सकिएन। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+    "noMatchingProducts": "App Store बाट कुनै मिल्ने Kilo Pass उत्पादनहरू फर्काइएन।",
+    "purchaseMissingSignedTransaction": "App Store खरिदमा हस्ताक्षरित लेनदेन JWS समावेश थिएन।"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "सुधार चाहिन्छ",
     "sorryTitle": "यो सुन्दा हामीलाई दुख लाग्यो!",
     "sorryMessage": "के सुधार गर्नुपर्छ कृपया हामीलाई थाहा दिनुहोस्। एपको जिम्मेवार इन्जिनियरले हरेक रिपोर्ट पढ्छ!",
-    "emailUs": "हामीलाई इमेल गर्नुहोस्"
+    "emailUs": "हामीलाई इमेल गर्नुहोस्",
+    "emailSubject": "मोबाइल एप प्रतिक्रिया"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "कुनै क्रेडिट गतिविधि छैन",
       "expires": "{{date}} मा समाप्त हुन्छ",
       "title": "क्रेडिट गतिविधि",
-      "transactionFallback": "क्रेडिट लेनदेन"
+      "transactionFallback": "क्रेडिट लेनदेन",
+      "category": {
+        "organization_custom": "संस्था अनुकूलित",
+        "parent_to_child_transfer_in": "अभिभावकबाट सन्तानमा स्थानान्तरण (भित्र)",
+        "parent_to_child_transfer_out": "सन्तानबाट अभिभावकमा स्थानान्तरण (बाहिर)",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "लेखा समायोजन",
+        "credits_expired": "म्याद सकिएका क्रेडिटहरू"
+      }
     },
     "inviteMember": {
       "emailError": "मान्य इमेल ठेगाना प्रविष्ट गर्नुहोस्",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "इनभ्वाइसहरू प्रत्येक बिलिङ चक्रमा स्वचालित रूपमा उत्पन्न हुन्छन् र तपाईंको संगठन बिल भएपछि यहाँ देखिनेछन्।",
       "emptyTitle": "कुनै इनभ्वाइस छैन",
       "invoiceFallback": "इनभ्वाइस",
-      "statusOpen": "खुला",
-      "statusPaid": "भुक्तान गरिएको",
-      "statusVoid": "रद्द",
       "title": "इनभ्वाइसहरू",
       "downloadFailed": "इनभ्वाइस डाउनलोड गर्न सकिएन। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
-      "sharingUnavailable": "यो यन्त्रमा साझेदारी उपलब्ध छैन।"
+      "sharingUnavailable": "यो यन्त्रमा साझेदारी उपलब्ध छैन।",
+      "status": {
+        "paid": "भुक्तान गरिएको",
+        "open": "खुला",
+        "void": "रद्द",
+        "draft": "मस्यौदा",
+        "uncollectible": "असुली नहुने",
+        "unknown": "अज्ञात"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "सङ्कलन गरिएको डेटा",
     "free": "नि:शुल्क",
-    "couldNotUpdateFavorites": "मनपर्नेहरू अद्यावधिक गर्न सकिएन"
+    "couldNotUpdateFavorites": "मनपर्नेहरू अद्यावधिक गर्न सकिएन",
+    "thinkingEffort": {
+      "none": "कुनै पनि होइन",
+      "minimal": "न्यूनतम",
+      "low": "कम",
+      "medium": "मध्यम",
+      "high": "उच्च",
+      "xhigh": "अति उच्च",
+      "max": "अधिकतम"
+    }
   }
 }

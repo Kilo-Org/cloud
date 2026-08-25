@@ -384,7 +384,11 @@
       "paymentPastDue": "Płatność zaległa. Zaktualizuj metodę płatności.",
       "subscriptionCancels": "Subskrypcja zostanie anulowana {{date}}",
       "trialDaysRemaining": "Okres próbny: pozostało {{remaining}}",
-      "trialEndingSoon": "Okres próbny wkrótce się kończy: {{remaining}}"
+      "trialEndingSoon": "Okres próbny wkrótce się kończy: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Co nowego",
@@ -754,7 +758,8 @@
       "strongArm": "Silne ramię",
       "talisman": "Talizman"
     },
-    "remoteSpawnFilesNotSupported": "Ta instancja nie może odbierać plików."
+    "remoteSpawnFilesNotSupported": "Ta instancja nie może odbierać plików.",
+    "instanceSwitcherTitle": "Instancja KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -952,7 +957,60 @@
       "failed": "Nie powiodło się",
       "cancelled": "Anulowano",
       "interrupted": "Przerwano"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Rygorystyczny",
+      "balanced": "Zrównoważony",
+      "lenient": "Pobłażliwy",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Bezpieczeństwo",
+      "performance": "Wydajność",
+      "bugs": "Błędy",
+      "style": "Styl",
+      "testing": "Testowanie",
+      "documentation": "Dokumentacja"
+    },
+    "gateThreshold": {
+      "off": "Wyłączone",
+      "all": "Wszystkie",
+      "warning": "Ostrzeżenia",
+      "critical": "Krytyczne"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer wymaga uwagi",
+        "description": "Code Reviewer został wyłączony, ponieważ Kilo nie może uzyskać dostępu do tego repozytorium przez aktywną instalację aplikacji GitHub. Zaktualizuj instalację aplikacji GitHub, a następnie włącz Code Reviewer ponownie.",
+        "recoveryLabel": "Zaktualizuj aplikację GitHub"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer wymaga uwagi",
+        "description": "Code Reviewer został wyłączony, ponieważ ta organizacja GitHub używa listy dozwolonych adresów IP, która blokuje Kilo. Skontaktuj się z hi@kilocode.ai, aby uzyskać pomoc, a następnie włącz Code Reviewer ponownie.",
+        "recoveryLabel": "Skontaktuj się z pomocą techniczną"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer wymaga uwagi",
+        "description": "Code Reviewer został wyłączony, ponieważ Kilo nie może utworzyć tokenu dostępu do projektu GitLab dla tego projektu. Przyznaj dostęp typu Maintainer lub włącz tokeny dostępu do projektu, a następnie włącz Code Reviewer ponownie.",
+        "recoveryLabel": "Zaktualizuj integrację z GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer wymaga uwagi",
+        "description": "Code Reviewer został wyłączony, ponieważ wybrany klucz API BYOK jest nieprawidłowy, odwołany lub nie ma wymaganych uprawnień. Zaktualizuj klucz lub wybierz inny model, a następnie włącz Code Reviewer ponownie.",
+        "recoveryLabel": "Zaktualizuj ustawienia BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer wymaga uwagi",
+        "description": "Code Reviewer został wyłączony, ponieważ wybrany model nie jest dostępny dla sesji agenta w chmurze. Wybierz dostępny model, a następnie włącz Code Reviewer ponownie.",
+        "recoveryLabel": "Zaktualizuj ustawienia Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer wymaga uwagi",
+        "description": "Code Reviewer został wyłączony po trzech dzisiejszych przekroczeniach limitu czasu klonowania repozytorium. Skontaktuj się z hi@kilocode.ai, aby uzyskać pomoc, a następnie włącz Code Reviewer ponownie.",
+        "recoveryLabel": "Skontaktuj się z pomocą techniczną"
+      }
+    },
+    "unknownError": "Nieznany błąd"
   },
   "securityAgent": {
     "filter": {
@@ -1500,6 +1558,23 @@
       "belowThreshold": "Ustalenie jest poniżej progu automatycznej krytyczności. Ręczna naprawa może się nadal rozpocząć, gdy kontrole bezpieczeństwa zakończą się powodzeniem.",
       "beforeEnablement": "Analiza została ukończona przed włączeniem automatycznej naprawy. Ręczna naprawa może się nadal rozpocząć, gdy kontrole bezpieczeństwa zakończą się powodzeniem.",
       "generic": "Naprawa jest niedostępna dla tego znaleziska."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Limit analiz jest pełny. Poczekaj, aż aktywna analiza się zakończy, a następnie spróbuj ponownie.",
+      "githubTokenUnavailable": "Autoryzacja GitHub wymaga uwagi. Ponownie autoryzuj aplikację GitHub, a następnie spróbuj ponownie.",
+      "githubAuthInvalid": "Autoryzacja GitHub wymaga uwagi. Ponownie autoryzuj aplikację GitHub, a następnie spróbuj ponownie.",
+      "findingUnavailable": "Ustalenie nie jest już dostępne. Odśwież ustalenia i spróbuj ponownie, jeśli nadal jest otwarte.",
+      "repositoryUnavailable": "Repozytorium nie jest już dostępne dla aplikacji GitHub. Odśwież dostęp do repozytorium, a następnie spróbuj ponownie.",
+      "invalidDismissTarget": "Ustalenie nie może zostać odrzucone, ponieważ jego cel Dependabot jest nieprawidłowy.",
+      "commandStalled": "Zakolejkowana akcja nie została ukończona na czas. Spróbuj ponownie wykonać akcję.",
+      "queueRetriesExhausted": "Akcja nie mogła zostać ukończona po kilku próbach. Spróbuj ponownie wykonać akcję.",
+      "queueAdmissionFailed": "Zakolejkowana akcja nie mogła zostać przyjęta. Spróbuj ponownie wykonać akcję.",
+      "generic": "Zakolejkowana akcja nie powiodła się. Spróbuj ponownie wykonać akcję."
+    },
+    "analysisMode": {
+      "auto": "Auto",
+      "shallow": "Płytka",
+      "deep": "Głęboka"
     }
   },
   "agents": {
@@ -1975,7 +2050,8 @@
       "addToFavorites": "Dodaj {{name}} do ulubionych",
       "removeFromFavorites": "Usuń {{name}} z ulubionych",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Średni"
+      "thinkingEffortMedium": "Średni",
+      "sessionModel": "Model sesji"
     },
     "attachmentPreview": {
       "openFailedRetry": "Nie udało się otworzyć pliku. Spróbuj ponownie.",
@@ -2109,7 +2185,8 @@
   },
   "addCredits": {
     "cta": "Dodaj kredyty",
-    "description": "Dodaj kredyty, aby utrzymać działanie."
+    "description": "Dodaj kredyty, aby utrzymać działanie.",
+    "billingPage": "strona rozliczeń"
   },
   "deviceSessions": {
     "couldNotLoad": "Nie można załadować sesji",
@@ -2297,7 +2374,10 @@
     "restoreFailed": "Nie udało się przywrócić zakupów. Spróbuj ponownie.",
     "purchaseFailed": "Nie udało się dokończyć zakupu.",
     "purchaseStartFailed": "Nie udało się rozpocząć zakupu w App Store.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass na tym koncie Apple należy do innego konta Kilo."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass na tym koncie Apple należy do innego konta Kilo.",
+    "couldNotConnectToAppStore": "Nie udało się połączyć z App Store. Sprawdź połączenie i spróbuj ponownie.",
+    "noMatchingProducts": "App Store nie zwróciła pasujących produktów Kilo Pass.",
+    "purchaseMissingSignedTransaction": "Zakup w App Store nie zawierał podpisanej transakcji JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2819,7 +2899,10 @@
     "diff": {
       "selectedTapToChange": "Wybrano {{label}}, dotknij, aby zmienić wybór",
       "tapToComment": "{{label}}, dotknij, aby skomentować",
-      "truncationBanner": "Wyświetlanie pierwszych {{limit}} z {{total}} zmienionych plików — limit API GitHub"
+      "truncationBanner": "Wyświetlanie pierwszych {{limit}} z {{total}} zmienionych plików — limit API GitHub",
+      "statusAdded": "Dodano",
+      "statusContext": "Kontekst",
+      "statusDeleted": "Usunięto"
     },
     "linkPasteClipboardEmpty": "Schowek jest pusty",
     "linkPasteNotAPullRequest": "To nie jest link do pull requesta na GitHub",
@@ -2833,6 +2916,11 @@
       "reviewNotSubmitted": "Ta recenzja nie może zostać przesłana w tej formie. PR mógł się zmienić lub nie możesz recenzować własnego pull requesta.",
       "couldNotPostComment": "Nie udało się opublikować komentarza.",
       "couldNotSubmitReview": "Nie udało się przesłać recenzji. Sprawdź połączenie i spróbuj ponownie."
+    },
+    "operation": {
+      "couldNotReply": "Nie udało się odpowiedzieć.",
+      "couldNotCompleteAction": "Nie udało się ukończyć tej akcji.",
+      "mergeResultDefaultError": "GitHub nie ukończył scalania."
     }
   },
   "organization": {
@@ -2850,7 +2938,17 @@
       "emptyTitle": "Brak aktywności kredytowej",
       "expires": "Wygasa {{date}}",
       "title": "Aktywność kredytowa",
-      "transactionFallback": "Transakcja kredytowa"
+      "transactionFallback": "Transakcja kredytowa",
+      "category": {
+        "organization_custom": "Niestandardowe organizacji",
+        "parent_to_child_transfer_in": "Przelew z organizacji nadrzędnej do podrzędnej (przychodzący)",
+        "parent_to_child_transfer_out": "Przelew z organizacji nadrzędnej do podrzędnej (wychodzący)",
+        "oss-sponsorship": "Sponsoring OSS",
+        "oss-monthly-reset": "Miesięczny reset OSS",
+        "team-topup-bonus-2025": "Bonus doładowania zespołu 2025",
+        "accounting_adjustment": "Korekta księgowa",
+        "credits_expired": "Kredyty wygasły"
+      }
     },
     "hub": {
       "balance": "Saldo",
@@ -2877,11 +2975,16 @@
       "emptyTitle": "Brak faktur",
       "invoiceFallback": "Faktura",
       "title": "Faktury",
-      "statusPaid": "Opłacono",
-      "statusOpen": "Otwarta",
-      "statusVoid": "Unieważniona",
       "downloadFailed": "Nie udało się pobrać faktury. Sprawdź połączenie i spróbuj ponownie.",
-      "sharingUnavailable": "Udostępnianie nie jest dostępne na tym urządzeniu."
+      "sharingUnavailable": "Udostępnianie nie jest dostępne na tym urządzeniu.",
+      "status": {
+        "paid": "Opłacono",
+        "open": "Otwarta",
+        "void": "Unieważniona",
+        "draft": "Wersja robocza",
+        "uncollectible": "Nieściągalna",
+        "unknown": "Nieznana"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2983,7 +3086,8 @@
     "promptTitle": "Jak podoba Ci się aplikacja Kilo?",
     "rateKilo": "Oceń Kilo",
     "sorryMessage": "Daj nam znać, co należy poprawić. Inżynier odpowiedzialny za aplikację czyta każde zgłoszenie!",
-    "sorryTitle": "Przykro nam to słyszeć!"
+    "sorryTitle": "Przykro nam to słyszeć!",
+    "emailSubject": "opinia o aplikacji mobilnej"
   },
   "authErrors": {
     "emailAlreadyUsed": "Konto z tym adresem e-mail już istnieje i używa innej metody logowania. Spróbuj innej metody lub użyj „$t(login.moreSignInOptions)”.",
@@ -3013,6 +3117,15 @@
   "models": {
     "dataCollected": "Zebrane dane",
     "free": "Bezpłatnie",
-    "couldNotUpdateFavorites": "Nie udało się zaktualizować ulubionych"
+    "couldNotUpdateFavorites": "Nie udało się zaktualizować ulubionych",
+    "thinkingEffort": {
+      "none": "Brak",
+      "minimal": "Minimalny",
+      "low": "Niski",
+      "medium": "Średni",
+      "high": "Wysoki",
+      "xhigh": "Bardzo wysoki",
+      "max": "Maksymalny"
+    }
   }
 }

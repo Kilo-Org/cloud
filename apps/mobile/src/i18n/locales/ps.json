@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} غوره شوی، د انتخاب بدلولو لپاره ټک وکړئ",
       "tapToComment": "{{label}}، د تبصرې لپاره ټک وکړئ",
-      "truncationBanner": "د {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کیږي — د GitHub API حد"
+      "truncationBanner": "د {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کیږي — د GitHub API حد",
+      "statusAdded": "اضافه شوی",
+      "statusContext": "شرایط",
+      "statusDeleted": "ړنګ شوی"
     },
     "linkPasteClipboardEmpty": "کلیپبورډ خالي دی",
     "linkPasteNotAPullRequest": "دا د GitHub pull request لینک نه دی",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "دا بیاکتنه لکه څنګه چې ده نشي سپارل کېدلای. PR ممکن بدل شوی وي، یا تاسو نشئ کولای خپل پل ریکویسټ بیاکتنه کړئ.",
       "couldNotPostComment": "تبصره نشوه خپرېدلای.",
       "couldNotSubmitReview": "بیاکتنه نشوه سپارل کېدلای. خپل اړیکه وګورئ او بیا هڅه وکړئ."
+    },
+    "operation": {
+      "couldNotReply": "ځواب ورکول کیدی نشو.",
+      "couldNotCompleteAction": "دا کړنه بشپړول کیدی نشو.",
+      "mergeResultDefaultError": "GitHub یوځای کول بشپړ نه کړل."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "تادیه له نیټې تېره شوې. مهرباني وکړئ د تادیې طریقه نوي کړئ.",
       "subscriptionCancels": "ګډون په {{date}} لغوه کېږي",
       "trialDaysRemaining": "تجربه: {{remaining}} پاتې دي",
-      "trialEndingSoon": "تجربه ډېر ژر پای ته رسېږي: {{remaining}}"
+      "trialEndingSoon": "تجربه ډېر ژر پای ته رسېږي: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "نوی څه دی",
@@ -1189,7 +1201,8 @@
       "strongArm": "قوي لاس",
       "talisman": "طلسم"
     },
-    "remoteSpawnFilesNotSupported": "دا بیلګه فایلونه نه شي ترلاسه کولای."
+    "remoteSpawnFilesNotSupported": "دا بیلګه فایلونه نه شي ترلاسه کولای.",
+    "instanceSwitcherTitle": "د KiloClaw بیلګه"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "ناکام",
       "cancelled": "لغوه شوی",
       "interrupted": "مداخله شوی"
-    }
+    },
+    "reviewStyle": {
+      "strict": "سخت",
+      "balanced": "متعادل",
+      "lenient": "نرم",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "امنیت",
+      "performance": "کارکردګۍ",
+      "bugs": "بګونه",
+      "style": "سټایل",
+      "testing": "ازموینه",
+      "documentation": "اسناد"
+    },
+    "gateThreshold": {
+      "off": "بند",
+      "all": "ټول",
+      "warning": "خبرداری",
+      "critical": "جدي"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "کوډ بیاکتونکی پاملرنې ته اړتیا لري",
+        "description": "کوډ بیاکتونکی غیر فعال شو ځکه چې Kilo نشي کولای د فعال GitHub App نصبولو سره دې ذخیرې ته لاسرسی ومومي. د GitHub App نصبول تازه کړئ، بیا کوډ بیاکتونکی بیا فعال کړئ.",
+        "recoveryLabel": "د GitHub App نصبول تازه کړئ"
+      },
+      "githubIpAllowList": {
+        "title": "کوډ بیاکتونکی پاملرنې ته اړتیا لري",
+        "description": "کوډ بیاکتونکی غیر فعال شو ځکه چې دا GitHub سازمان د IP اجازه لړلیک کاروي چې Kilo بندوي. د مرستې لپاره له hi@kilocode.ai سره اړیکه ونیسئ، بیا کوډ بیاکتونکی بیا فعال کړئ.",
+        "recoveryLabel": "له ملاتړ سره اړیکه ونیسئ"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "کوډ بیاکتونکی پاملرنې ته اړتیا لري",
+        "description": "کوډ بیاکتونکی غیر فعال شو ځکه چې Kilo نشي کولای د دې پروژې لپاره د GitLab Project Access Token جوړ کړي. د Maintainer لاسرسی ورکړئ یا د Project Access Tokens فعال کړئ، بیا کوډ بیاکتونکی بیا فعال کړئ.",
+        "recoveryLabel": "د GitLab ادغام تازه کړئ"
+      },
+      "byokInvalidKey": {
+        "title": "کوډ بیاکتونکی پاملرنې ته اړتیا لري",
+        "description": "کوډ بیاکتونکی غیر فعال شو ځکه چې غوره شوی BYOK API کلید ناسم، منسوخ، یا پرته له اجازې ده. کلید تازه کړئ یا بل ماډل وټاکئ، بیا کوډ بیاکتونکی بیا فعال کړئ.",
+        "recoveryLabel": "د BYOK ترتیبات تازه کړئ"
+      },
+      "selectedModelUnavailable": {
+        "title": "کوډ بیاکتونکی پاملرنې ته اړتیا لري",
+        "description": "کوډ بیاکتونکی غیر فعال شو ځکه چې غوره شوی ماډل د کلاوډ اجنټ ناستو لپاره شتون نلري. یو شتون لرونکی ماډل وټاکئ، بیا کوډ بیاکتونکی بیا فعال کړئ.",
+        "recoveryLabel": "د کوډ بیاکتونکي ترتیبات تازه کړئ"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "کوډ بیاکتونکی پاملرنې ته اړتیا لري",
+        "description": "کوډ بیاکتونکی نن د دریو ذخیرې کلون وخت څخه د تېریدو وروسته غیر فعال شو. د مرستې لپاره له hi@kilocode.ai سره اړیکه ونیسئ، بیا کوډ بیاکتونکی بیا فعال کړئ.",
+        "recoveryLabel": "له ملاتړ سره اړیکه ونیسئ"
+      }
+    },
+    "unknownError": "نامعلومه تېروتنه"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "موندنه د اتوماتیک کچې حد څخه ښکته ده. کله چې امنیتي دروازې تېرې شي، لاسي اصلاح لاهم پیل کیدی شي.",
       "beforeEnablement": "تحلیل د اتوماتیک اصلاح فعالولو دمخه بشپړ شو. کله چې امنیتي دروازې تېرې شي، لاسي اصلاح لاهم پیل کیدی شي.",
       "generic": "اصلاح د دې موندنې لپاره شتون نلري."
+    },
+    "commandFailure": {
+      "ownerCapReached": "د تحلیل ظرفیت ډک دی. انتظار وکړئ چې یو فعال تحلیل پای ته ورسي، بیا هڅه وکړئ.",
+      "githubTokenUnavailable": "د GitHub اجازه پاملرنې ته اړتیا لري. د GitHub App بیا اجازه ورکړئ، بیا هڅه وکړئ.",
+      "githubAuthInvalid": "د GitHub اجازه پاملرنې ته اړتیا لري. د GitHub App بیا اجازه ورکړئ، بیا هڅه وکړئ.",
+      "findingUnavailable": "موندنه نوره شتون نلري. موندنې تازه کړئ او که خلاصه پاتې وي بیا هڅه وکړئ.",
+      "repositoryUnavailable": "ذخیره نوره د GitHub App لپاره شتون نلري. د ذخیرې لاسرسی تازه کړئ، بیا هڅه وکړئ.",
+      "invalidDismissTarget": "موندنه ردول کیدی نشي ځکه چې د هغې Dependabot هدف ناسم دی.",
+      "commandStalled": "قطار شوې کړنه په وخت کې بشپړه نشوه. کړنه بیا هڅه کړئ.",
+      "queueRetriesExhausted": "کړنه د څو هڅو وروسته بشپړه کیدی نشوه. کړنه بیا هڅه کړئ.",
+      "queueAdmissionFailed": "قطار شوې کړنه منل کیدی نشوه. کړنه بیا هڅه کړئ.",
+      "generic": "قطار شوې کړنه ناکامه شوه. کړنه بیا هڅه کړئ."
+    },
+    "analysisMode": {
+      "auto": "اتومات",
+      "shallow": "سطحي",
+      "deep": "ژور"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "{{name}} غوره شویو ته اضافه کړئ",
       "removeFromFavorites": "{{name}} له غوره شویو څخه لرې کړئ",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "د ناستې ماډل"
     },
     "attachmentPreview": {
       "openFailedRetry": "فایل نه شو خلاصېدلای. مهرباني وکړئ بیا هڅه وکړئ.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "کریډیټونه اضافه کړئ",
-    "description": "د کارولو د دوام لپاره کریډیټونه اضافه کړئ."
+    "description": "د کارولو د دوام لپاره کریډیټونه اضافه کړئ.",
+    "billingPage": "د بلینګ پاڼه"
   },
   "deviceSessions": {
     "couldNotLoad": "غونډې نه شول پورته کېدلای",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "پیرودونه بیرته راوړل ناکام شول. بیا هڅه وکړئ.",
     "purchaseFailed": "پیرود بشپړول ناکام شول.",
     "purchaseStartFailed": "د App Store پیرود پیل کول ناکام شول.",
-    "purchaseOwnedByAnotherAccount": "دا Apple Account باندې Kilo Pass د بل Kilo حساب پورې اړه لري."
+    "purchaseOwnedByAnotherAccount": "دا Apple Account باندې Kilo Pass د بل Kilo حساب پورې اړه لري.",
+    "couldNotConnectToAppStore": "له App Store سره اړیکه نشوه نیول کېدای. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
+    "noMatchingProducts": "د App Store لخوا کوم ورته Kilo Pass محصولات بیرته نه دي راستانه شوي.",
+    "purchaseMissingSignedTransaction": "د App Store پیرود لاسلیک شوی JWS لیږد نه درلود."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "کار ته اړتیا لري",
     "sorryTitle": "موږ د دې اوریدو څخه بخښنه غواړو!",
     "sorryMessage": "مهرباني وکړئ موږ ته خبر راکړئ چې څه باید ښه شي. د ایپ مسؤل انجنیر هر راپور لولي!",
-    "emailUs": "موږ ته بریښنالیک واستوئ"
+    "emailUs": "موږ ته بریښنالیک واستوئ",
+    "emailSubject": "د موبایل ایپ غبرګون"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "هیڅ کریډیټ فعالیت نشته",
       "expires": "{{date}} پای ته رسیږي",
       "title": "د کریډیټ فعالیت",
-      "transactionFallback": "د کریډیټ راکړه ورکړه"
+      "transactionFallback": "د کریډیټ راکړه ورکړه",
+      "category": {
+        "organization_custom": "د سازمان ځانګړی",
+        "parent_to_child_transfer_in": "له والد څخه ماشوم ته لیږد (داخل)",
+        "parent_to_child_transfer_out": "له والد څخه ماشوم ته لیږد (خارج)",
+        "oss-sponsorship": "د OSS سپانسرشيپ",
+        "oss-monthly-reset": "د OSS میاشتنی ریسیټ",
+        "team-topup-bonus-2025": "د ټیم ټاپ اپ بونس 2025",
+        "accounting_adjustment": "د محاسبې سمون",
+        "credits_expired": "کریډیټونه منقضي شوي"
+      }
     },
     "inviteMember": {
       "emailError": "یو سم بریښنالیک آدرس دننه کړئ",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "بیلونه په هر بیلینګ دوره کې په اتومات ډول رامنځته کېږي او یوځل چې ستاسو سازمان بیل شي دلته به ښکاره شي.",
       "emptyTitle": "هیڅ بیل نشته",
       "invoiceFallback": "بیل",
-      "statusOpen": "خلاص",
-      "statusPaid": "ورکړل شوی",
-      "statusVoid": "باطل",
       "title": "بیلونه",
       "downloadFailed": "بیل ډاونلوډ نه شو. خپل اړیکه وګورئ او بیا هڅه وکړئ.",
-      "sharingUnavailable": "شریکول په دې وسیله شتون نلري."
+      "sharingUnavailable": "شریکول په دې وسیله شتون نلري.",
+      "status": {
+        "paid": "ورکړل شوی",
+        "open": "خلاص",
+        "void": "باطل",
+        "draft": "مسوده",
+        "uncollectible": "نه راټولېدونکی",
+        "unknown": "نامعلوم"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "ټول شوي معلومات",
     "free": "وړیا",
-    "couldNotUpdateFavorites": "غوره شوي تازه کول ممکن نه وو"
+    "couldNotUpdateFavorites": "غوره شوي تازه کول ممکن نه وو",
+    "thinkingEffort": {
+      "none": "هېڅ",
+      "minimal": "لږ تر لږه",
+      "low": "ټیټ",
+      "medium": "منځنۍ",
+      "high": "لوړ",
+      "xhigh": "ډېر لوړ",
+      "max": "اعظمي"
+    }
   }
 }

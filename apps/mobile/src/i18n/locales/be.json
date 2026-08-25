@@ -587,7 +587,10 @@
     "diff": {
       "selectedTapToChange": "Выбрана {{label}}, дакраніцеся, каб змяніць выбар",
       "truncationBanner": "Паказаны першыя {{limit}} з {{total}} змененых файлаў — ліміт GitHub API",
-      "tapToComment": "{{label}}, дакраніцеся, каб пакінуць каментар"
+      "tapToComment": "{{label}}, дакраніцеся, каб пакінуць каментар",
+      "statusAdded": "Дададзены",
+      "statusContext": "Кантэкст",
+      "statusDeleted": "Выдалены"
     },
     "linkPasteClipboardEmpty": "Буфер абмену пусты",
     "linkPasteNotAPullRequest": "Гэта не спасылка на pull request GitHub",
@@ -601,6 +604,11 @@
       "reviewNotSubmitted": "Гэтую рэцэнзію нельга адправіць як ёсць. Магчыма, PR змяніўся, або вы не можаце рэцэнзаваць свой уласны pull request.",
       "couldNotPostComment": "Не атрымалася апублікаваць каментар.",
       "couldNotSubmitReview": "Не атрымалася адправіць рэцэнзію. Праверце падключэнне і паспрабуйце яшчэ раз."
+    },
+    "operation": {
+      "couldNotReply": "Не атрымалася адказаць.",
+      "couldNotCompleteAction": "Не атрымалася завяршыць гэтае дзеянне.",
+      "mergeResultDefaultError": "GitHub не завяршыў зліццё."
     }
   },
   "notifications": {
@@ -837,7 +845,11 @@
       "subscriptionCancels": "Падпіска адмяняецца {{date}}",
       "trialDaysRemaining": "Пробная версія: засталося {{remaining}}",
       "trialEndingSoon": "Пробная версія сканчаецца: {{remaining}}",
-      "lessThanOneDay": "Менш за 1 дзень"
+      "lessThanOneDay": "Менш за 1 дзень",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Што новага",
@@ -1207,7 +1219,8 @@
       "strongArm": "Моцная рука",
       "talisman": "Талісман"
     },
-    "remoteSpawnFilesNotSupported": "Гэты экзэмпляр не можа атрымліваць файлы."
+    "remoteSpawnFilesNotSupported": "Гэты экзэмпляр не можа атрымліваць файлы.",
+    "instanceSwitcherTitle": "Экзэмпляр KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1405,7 +1418,60 @@
       "failed": "Не атрымалася",
       "cancelled": "Адменена",
       "interrupted": "Перапынена"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Строгі",
+      "balanced": "Збалансаваны",
+      "lenient": "Паблажлівы",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Бяспека",
+      "performance": "Прадукцыйнасць",
+      "bugs": "Памылкі",
+      "style": "Стыль",
+      "testing": "Тэставанне",
+      "documentation": "Дакументацыя"
+    },
+    "gateThreshold": {
+      "off": "Выключана",
+      "all": "Усё",
+      "warning": "Папярэджанне",
+      "critical": "Крытычна"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer патрабуе ўвагі",
+        "description": "Code Reviewer быў адключаны, таму што Kilo не можа атрымаць доступ да гэтага рэпазіторыя з актыўнай устаноўкай GitHub App. Абнавіце ўстаноўку GitHub App, а потым зноў уключыце Code Reviewer.",
+        "recoveryLabel": "Абнавіць GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer патрабуе ўвагі",
+        "description": "Code Reviewer быў адключаны, таму што гэтая арганізацыя GitHub выкарыстоўвае спіс дазволеных IP-адрасоў, які блакуе Kilo. Звярніцеся па дапамогу на hi@kilocode.ai, а потым зноў уключыце Code Reviewer.",
+        "recoveryLabel": "Звярнуцца ў падтрымку"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer патрабуе ўвагі",
+        "description": "Code Reviewer быў адключаны, таму што Kilo не можа стварыць GitLab Project Access Token для гэтага праекта. Дайце доступ Maintainer або ўключыце Project Access Tokens, а потым зноў уключыце Code Reviewer.",
+        "recoveryLabel": "Абнавіць інтэграцыю з GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer патрабуе ўвагі",
+        "description": "Code Reviewer быў адключаны, таму што выбраны BYOK API ключ несапраўдны, адкліканы або не мае дазволу. Абнавіце ключ або абярыце іншую мадэль, а потым зноў уключыце Code Reviewer.",
+        "recoveryLabel": "Абнавіць налады BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer патрабуе ўвагі",
+        "description": "Code Reviewer быў адключаны, таму што выбраная мадэль недаступная для сеансаў хмарнага агента. Абярыце даступную мадэль, а потым зноў уключыце Code Reviewer.",
+        "recoveryLabel": "Абнавіць налады Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer патрабуе ўвагі",
+        "description": "Code Reviewer быў адключаны пасля трох тайм-аўтаў кланавання рэпазіторыяў сёння. Звярніцеся па дапамогу на hi@kilocode.ai, а потым зноў уключыце Code Reviewer.",
+        "recoveryLabel": "Звярнуцца ў падтрымку"
+      }
+    },
+    "unknownError": "Невядомая памылка"
   },
   "securityAgent": {
     "filter": {
@@ -1953,6 +2019,23 @@
       "belowThreshold": "Знаходка ніжэй аўтаматычнага парога сур'ёзнасці. Ручнае выпраўленне ўсё яшчэ можна пачаць, калі праверкі бяспекі пройдуць.",
       "beforeEnablement": "Аналіз завершаны да ўключэння аўтавыпраўлення. Ручнае выпраўленне ўсё яшчэ можна пачаць, калі праверкі бяспекі пройдуць.",
       "generic": "Выпраўленне недаступна для гэтай знаходкі."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Ёмістасць аналізу занятая. Дачакайцеся завяршэння актыўнага аналізу, а потым паўтарыце спробу.",
+      "githubTokenUnavailable": "Аўтарызацыя GitHub патрабуе ўвагі. Паўторна аўтарызуйце GitHub App, а потым паўтарыце спробу.",
+      "githubAuthInvalid": "Аўтарызацыя GitHub патрабуе ўвагі. Паўторна аўтарызуйце GitHub App, а потым паўтарыце спробу.",
+      "findingUnavailable": "Знаходка больш недаступная. Абнавіце знаходкі і паўтарыце спробу, калі яна застаецца адкрытай.",
+      "repositoryUnavailable": "Рэпазіторый больш недаступны для GitHub App. Абнавіце доступ да рэпазіторыя, а потым паўтарыце спробу.",
+      "invalidDismissTarget": "Знаходку немагчыма адхіліць, таму што яе мэта Dependabot несапраўдная.",
+      "commandStalled": "Пастаўленае ў чаргу дзеянне не скончылася своечасова. Паўтарыце дзеянне.",
+      "queueRetriesExhausted": "Не атрымалася завяршыць дзеянне пасля некалькіх спроб. Паўтарыце дзеянне.",
+      "queueAdmissionFailed": "Пастаўленае ў чаргу дзеянне не ўдалося прыняць. Паўтарыце дзеянне.",
+      "generic": "Пастаўленае ў чаргу дзеянне не атрымалася. Паўтарыце дзеянне."
+    },
+    "analysisMode": {
+      "auto": "Аўта",
+      "shallow": "Павярхоўны",
+      "deep": "Глыбокі"
     }
   },
   "agents": {
@@ -2428,7 +2511,8 @@
       "addToFavorites": "Дадаць {{name}} у абранае",
       "removeFromFavorites": "Прыбраць {{name}} з абранага",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Мадэль сеансу"
     },
     "attachmentPreview": {
       "openFailedRetry": "Не ўдалося адкрыць файл. Паспрабуйце яшчэ раз.",
@@ -2562,7 +2646,8 @@
   },
   "addCredits": {
     "cta": "Дадаць крэдыты",
-    "description": "Дадайце крэдыты, каб карыстанне працягвалася."
+    "description": "Дадайце крэдыты, каб карыстанне працягвалася.",
+    "billingPage": "старонка аплаты"
   },
   "deviceSessions": {
     "couldNotLoad": "Не ўдалося загрузіць сеансы",
@@ -2750,7 +2835,10 @@
     "restoreFailed": "Не атрымалася аднавіць пакупкі. Паспрабуйце яшчэ раз.",
     "purchaseFailed": "Не атрымалася завяршыць пакупку.",
     "purchaseStartFailed": "Не атрымалася пачаць пакупку ў App Store.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass на гэтым Apple Account належыць іншаму ўліковаму запісу Kilo."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass на гэтым Apple Account належыць іншаму ўліковаму запісу Kilo.",
+    "couldNotConnectToAppStore": "Не атрымалася падключыцца да App Store. Праверце падключэнне і паспрабуйце яшчэ раз.",
+    "noMatchingProducts": "App Store не вярнуў прадукты Kilo Pass, якія адпавядаюць запыту.",
+    "purchaseMissingSignedTransaction": "Пакупка ў App Store не ўключала падпісаную транзакцыю JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2846,7 +2934,8 @@
     "needsWork": "Трэба папрацаваць",
     "sorryTitle": "Шкада гэта чуць!",
     "sorryMessage": "Калі ласка, паведаміце нам, што трэба палепшыць. Інжынер, які адказвае за дадатак, чытае кожную справаздачу!",
-    "emailUs": "Напішыце нам"
+    "emailUs": "Напішыце нам",
+    "emailSubject": "водгук аб мабільным дадатку"
   },
   "organization": {
     "boundary": {
@@ -2863,7 +2952,17 @@
       "emptyTitle": "Няма актыўнасці па крэдытах",
       "expires": "Сканчваецца {{date}}",
       "title": "Актыўнасць па крэдытах",
-      "transactionFallback": "Крэдытная транзакцыя"
+      "transactionFallback": "Крэдытная транзакцыя",
+      "category": {
+        "organization_custom": "Уласная арганізацыя",
+        "parent_to_child_transfer_in": "Пераказ ад бацькоўскай да даччынай арганізацыі",
+        "parent_to_child_transfer_out": "Пераказ ад даччынай да бацькоўскай арганізацыі",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Бухгалтарская карэкціроўка",
+        "credits_expired": "Крэдыты скончыліся"
+      }
     },
     "inviteMember": {
       "emailError": "Увядзіце сапраўдны адрас электроннай пошты",
@@ -2880,12 +2979,17 @@
       "emptyDescription": "Рахункі ствараюцца аўтаматычна кожны разліковы перыяд і з'явяцца тут пасля выстаўлення рахунку вашай арганізацыі.",
       "emptyTitle": "Няма рахункаў",
       "invoiceFallback": "Рахунак",
-      "statusOpen": "Адкрыты",
-      "statusPaid": "Аплачаны",
-      "statusVoid": "Несапраўдны",
       "title": "Рахункі",
       "downloadFailed": "Не атрымалася спампаваць рахунак. Праверце падключэнне і паспрабуйце яшчэ раз.",
-      "sharingUnavailable": "Абмен недаступны на гэтай прыладзе."
+      "sharingUnavailable": "Абмен недаступны на гэтай прыладзе.",
+      "status": {
+        "paid": "Аплачаны",
+        "open": "Адкрыты",
+        "void": "Несапраўдны",
+        "draft": "Чарнавік",
+        "uncollectible": "Неспагнаны",
+        "unknown": "Невядомы"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3013,6 +3117,15 @@
   "models": {
     "dataCollected": "Сабраныя даныя",
     "free": "Бясплатна",
-    "couldNotUpdateFavorites": "Не атрымалася абнавіць выбранае"
+    "couldNotUpdateFavorites": "Не атрымалася абнавіць выбранае",
+    "thinkingEffort": {
+      "none": "Няма",
+      "minimal": "Мінімальнае",
+      "low": "Нізкае",
+      "medium": "Сярэдняе",
+      "high": "Высокае",
+      "xhigh": "Вельмі высокае",
+      "max": "Максімум"
+    }
   }
 }

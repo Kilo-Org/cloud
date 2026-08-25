@@ -587,7 +587,10 @@
     "diff": {
       "selectedTapToChange": "Izbrano {{label}}, tapnite za spremembo izbora",
       "tapToComment": "{{label}}, tapnite za komentar",
-      "truncationBanner": "Prikaz prvih {{limit}} od {{total}} spremenjenih datotek — omejitev API GitHub"
+      "truncationBanner": "Prikaz prvih {{limit}} od {{total}} spremenjenih datotek — omejitev API GitHub",
+      "statusAdded": "Dodano",
+      "statusContext": "Kontekst",
+      "statusDeleted": "Izbrisano"
     },
     "linkPasteClipboardEmpty": "Odložišče je prazno",
     "linkPasteNotAPullRequest": "To ni povezava do pull requesta na GitHubu",
@@ -601,6 +604,11 @@
       "reviewNotSubmitted": "Tega pregleda ni mogoče oddati, kot je. PR se je morda spremenil ali pa svojega lastnega pull requesta ne morete pregledati.",
       "couldNotPostComment": "Komentarja ni bilo mogoče objaviti.",
       "couldNotSubmitReview": "Pregleda ni bilo mogoče oddati. Preverite povezavo in poskusite znova."
+    },
+    "operation": {
+      "couldNotReply": "Odgovora ni bilo mogoče poslati.",
+      "couldNotCompleteAction": "Tega dejanja ni bilo mogoče dokončati.",
+      "mergeResultDefaultError": "GitHub ni dokončal združitve."
     }
   },
   "notifications": {
@@ -837,7 +845,11 @@
       "paymentPastDue": "Plačilo je zapadlo. Posodobite svoj način plačila.",
       "subscriptionCancels": "Naročnina se prekliče {{date}}",
       "trialDaysRemaining": "Preizkus: preostalih {{remaining}} dni",
-      "trialEndingSoon": "Preizkus se kmalu konča: {{remaining}}"
+      "trialEndingSoon": "Preizkus se kmalu konča: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Kaj je novega",
@@ -1207,7 +1219,8 @@
       "strongArm": "Močna roka",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Ta primerek ne more prejemati datotek."
+    "remoteSpawnFilesNotSupported": "Ta primerek ne more prejemati datotek.",
+    "instanceSwitcherTitle": "Primerek KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1405,7 +1418,60 @@
       "failed": "Ni uspelo",
       "cancelled": "Preklicano",
       "interrupted": "Prekinjeno"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Strogo",
+      "balanced": "Uravnoteženo",
+      "lenient": "Popustljivo",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Varnost",
+      "performance": "Zmogljivost",
+      "bugs": "Hrošči",
+      "style": "Slog",
+      "testing": "Testiranje",
+      "documentation": "Dokumentacija"
+    },
+    "gateThreshold": {
+      "off": "Izklopljeno",
+      "all": "Vse",
+      "warning": "Opozorilo",
+      "critical": "Kritično"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Pregledovalec kode potrebuje pozornost",
+        "description": "Pregledovalec kode je bil onemogočen, ker Kilo ne more dostopati do tega skladišča z aktivno namestitvijo aplikacije GitHub. Posodobi namestitev aplikacije GitHub in nato znova omogoči Pregledovalca kode.",
+        "recoveryLabel": "Posodobi aplikacijo GitHub"
+      },
+      "githubIpAllowList": {
+        "title": "Pregledovalec kode potrebuje pozornost",
+        "description": "Pregledovalec kode je bil onemogočen, ker ta organizacija GitHub uporablja seznam dovoljenih naslovov IP, ki blokira Kilo. Za pomoč se obrni na hi@kilocode.ai in nato znova omogoči Pregledovalca kode.",
+        "recoveryLabel": "Obrni se na podporo"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Pregledovalec kode potrebuje pozornost",
+        "description": "Pregledovalec kode je bil onemogočen, ker Kilo za ta projekt ne more ustvariti žetona za dostop do projekta GitLab. Dodeli dostop vloge Maintainer ali omogoči žetone za dostop do projektov in nato znova omogoči Pregledovalca kode.",
+        "recoveryLabel": "Posodobi integracijo GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Pregledovalec kode potrebuje pozornost",
+        "description": "Pregledovalec kode je bil onemogočen, ker je izbrani API ključ BYOK neveljaven, preklican ali nima ustreznih dovoljenj. Posodobi ključ ali izberi drug model in nato znova omogoči Pregledovalca kode.",
+        "recoveryLabel": "Posodobi nastavitve BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Pregledovalec kode potrebuje pozornost",
+        "description": "Pregledovalec kode je bil onemogočen, ker izbrani model ni na voljo za seje Cloud Agent. Izberi razpoložljivi model in nato znova omogoči Pregledovalca kode.",
+        "recoveryLabel": "Posodobi nastavitve Pregledovalca kode"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Pregledovalec kode potrebuje pozornost",
+        "description": "Pregledovalec kode je bil onemogočen po treh prekinitvah kloniranja skladišč danes. Za pomoč se obrni na hi@kilocode.ai in nato znova omogoči Pregledovalca kode.",
+        "recoveryLabel": "Obrni se na podporo"
+      }
+    },
+    "unknownError": "Neznana napaka"
   },
   "securityAgent": {
     "filter": {
@@ -1953,6 +2019,23 @@
       "belowThreshold": "Najdba je pod pragom samodejne resnosti. Ročna sanacija se lahko še vedno začne, ko so varnostni pogoji izpolnjeni.",
       "beforeEnablement": "Analiza je bila dokončana, preden je bilo omogočeno samodejno odpravljanje. Ročna sanacija se lahko še vedno začne, ko so varnostni pogoji izpolnjeni.",
       "generic": "Sanacija za to najdbo ni na voljo."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Zmogljivost analize je polna. Počakaj, da se aktivna analiza konča, in nato poskusi znova.",
+      "githubTokenUnavailable": "Pooblastilo GitHub potrebuje pozornost. Znova pooblasti aplikacijo GitHub in nato poskusi znova.",
+      "githubAuthInvalid": "Pooblastilo GitHub potrebuje pozornost. Znova pooblasti aplikacijo GitHub in nato poskusi znova.",
+      "findingUnavailable": "Ugotovitev ni več na voljo. Osveži ugotovitve in poskusi znova, če ostane odprta.",
+      "repositoryUnavailable": "Skladišče ni več na voljo aplikaciji GitHub. Osveži dostop do skladišča in nato poskusi znova.",
+      "invalidDismissTarget": "Ugotovitve ni mogoče opustiti, ker je njena tarča Dependabot neveljavna.",
+      "commandStalled": "Čakalno dejanje ni bilo dokončano pravočasno. Poskusi dejanje znova.",
+      "queueRetriesExhausted": "Dejanja po več poskusih ni bilo mogoče dokončati. Poskusi dejanje znova.",
+      "queueAdmissionFailed": "Čakalnega dejanja ni bilo mogoče sprejeti. Poskusi dejanje znova.",
+      "generic": "Čakalno dejanje ni uspelo. Poskusi dejanje znova."
+    },
+    "analysisMode": {
+      "auto": "Samodejno",
+      "shallow": "Površinsko",
+      "deep": "Poglobljeno"
     }
   },
   "agents": {
@@ -2428,7 +2511,8 @@
       "addToFavorites": "Dodaj {{name}} med priljubljene",
       "removeFromFavorites": "Odstrani {{name}} iz priljubljenih",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Model seje"
     },
     "attachmentPreview": {
       "openFailedRetry": "Odpiranje datoteke ni uspelo. Poskusi znova.",
@@ -2562,7 +2646,8 @@
   },
   "addCredits": {
     "cta": "Dodaj kredite",
-    "description": "Dodaj kredite, da bo poraba tekla naprej."
+    "description": "Dodaj kredite, da bo poraba tekla naprej.",
+    "billingPage": "stran za zaračunavanje"
   },
   "deviceSessions": {
     "couldNotLoad": "Sej ni bilo mogoče naložiti",
@@ -2750,7 +2835,10 @@
     "restoreFailed": "Obnovitev nakupov ni uspela. Poskusite znova.",
     "purchaseFailed": "Nakupa ni bilo mogoče dokončati.",
     "purchaseStartFailed": "Nakupa v App Store ni bilo mogoče začeti.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass na tem Apple računu pripada drugemu Kilo računu."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass na tem Apple računu pripada drugemu Kilo računu.",
+    "couldNotConnectToAppStore": "Ni se bilo mogoče povezati z App Store. Preveri svojo povezavo in poskusi znova.",
+    "noMatchingProducts": "App Store ni vrnil ustreznih izdelkov Kilo Pass.",
+    "purchaseMissingSignedTransaction": "Nakup v App Store ni vključeval podpisanega zapisa transakcije JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2846,7 +2934,8 @@
     "needsWork": "Potrebuje izboljšave",
     "sorryTitle": "Žal nam je, da si to slišali!",
     "sorryMessage": "Prosimo, povej nam, kaj je treba izboljšati. Inženir, odgovoren za aplikacijo, prebere vsako posamezno poročilo!",
-    "emailUs": "Piši nam"
+    "emailUs": "Piši nam",
+    "emailSubject": "povratne informacije o mobilni aplikaciji"
   },
   "organization": {
     "boundary": {
@@ -2863,7 +2952,17 @@
       "emptyTitle": "Ni kreditne aktivnosti",
       "expires": "Poteče {{date}}",
       "title": "Kreditna aktivnost",
-      "transactionFallback": "Kreditna transakcija"
+      "transactionFallback": "Kreditna transakcija",
+      "category": {
+        "organization_custom": "Organizacija po meri",
+        "parent_to_child_transfer_in": "Vhodni prenos iz nadrejene v podrejeno organizacijo",
+        "parent_to_child_transfer_out": "Izhodni prenos iz nadrejene v podrejeno organizacijo",
+        "oss-sponsorship": "Sponzorstvo OSS",
+        "oss-monthly-reset": "Mesečna ponastavitev OSS",
+        "team-topup-bonus-2025": "Ekipni bonus za polnjenje 2025",
+        "accounting_adjustment": "Računovodska prilagoditev",
+        "credits_expired": "Potečeni krediti"
+      }
     },
     "inviteMember": {
       "emailError": "Vnesi veljaven e-poštni naslov",
@@ -2880,12 +2979,17 @@
       "emptyDescription": "Računi se ustvarijo samodejno v vsakem obračunskem ciklu in bodo tukaj prikazani, ko bo organizacija obračunana.",
       "emptyTitle": "Ni računov",
       "invoiceFallback": "Račun",
-      "statusOpen": "Odprto",
-      "statusPaid": "Plačano",
-      "statusVoid": "Nično",
       "title": "Računi",
       "downloadFailed": "Računa ni bilo mogoče prenesti. Preverite povezavo in poskusite znova.",
-      "sharingUnavailable": "Deljenje na tej napravi ni na voljo."
+      "sharingUnavailable": "Deljenje na tej napravi ni na voljo.",
+      "status": {
+        "paid": "Plačano",
+        "open": "Odprto",
+        "void": "Nično",
+        "draft": "Osnutek",
+        "uncollectible": "Neizterljivo",
+        "unknown": "Neznano"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "ime@podjetje.com",
@@ -3013,6 +3117,15 @@
   "models": {
     "dataCollected": "Zbrani podatki",
     "free": "Brezplačno",
-    "couldNotUpdateFavorites": "Priljubljenih ni bilo mogoče posodobiti"
+    "couldNotUpdateFavorites": "Priljubljenih ni bilo mogoče posodobiti",
+    "thinkingEffort": {
+      "none": "Nič",
+      "minimal": "Minimalno",
+      "low": "Nizko",
+      "medium": "Srednje",
+      "high": "Visoko",
+      "xhigh": "Zelo visoko",
+      "max": "Največ"
+    }
   }
 }

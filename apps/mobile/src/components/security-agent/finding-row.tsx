@@ -21,7 +21,14 @@ import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
 import { getDeadlineCopy, getSecurityAnalysisLabel } from '@/lib/security-agent-copy';
-import { capitalize, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+
+const SEVERITY_KEYS = {
+  critical: 'securityAgent.sla.critical',
+  high: 'securityAgent.sla.high',
+  medium: 'securityAgent.sla.medium',
+  low: 'securityAgent.sla.low',
+} satisfies Record<string, string>;
 
 const SEVERITY_TEXT_CLASS = {
   critical: 'text-destructive',
@@ -176,6 +183,8 @@ export function FindingRow({
   const deadline = slaEnabled ? getSecurityDeadlinePresentation(finding) : null;
   const deadlineLabel = deadline ? getDeadlineCopy(deadline.state).label : '';
   const nextAction = getNextActionLabel(finding);
+  const severityKey = lookup(SEVERITY_KEYS, finding.severity);
+  const severityLabel = severityKey ? t(severityKey) : finding.severity;
 
   const AnalysisIcon = FINDING_ICONS[analysis.icon];
   const DeadlineIcon = deadline ? FINDING_ICONS[deadline.icon] : null;
@@ -192,14 +201,14 @@ export function FindingRow({
 
   const accessibilityLabel = deadline
     ? t('securityAgent.findingRow.a11yWithDeadline', {
-        severity: capitalize(finding.severity),
+        severity: severityLabel,
         title: finding.title,
         repo: finding.repo_full_name,
         analysis: analysisLabel,
         deadline: deadlineLabel,
       })
     : t('securityAgent.findingRow.a11y', {
-        severity: capitalize(finding.severity),
+        severity: severityLabel,
         title: finding.title,
         repo: finding.repo_full_name,
         analysis: analysisLabel,
@@ -221,7 +230,7 @@ export function FindingRow({
             lookup(SEVERITY_TEXT_CLASS, finding.severity) ?? 'text-muted-foreground'
           )}
         >
-          {capitalize(finding.severity)}
+          {severityLabel}
         </Text>
         <Text className="text-sm font-medium" numberOfLines={2}>
           {finding.title}

@@ -383,7 +383,11 @@
       "paymentPastDue": "התשלום באיחור. עדכן את אמצעי התשלום שלך.",
       "subscriptionCancels": "המינוי מתבטל ב-{{date}}",
       "trialDaysRemaining": "ניסיון: נותרו {{remaining}}",
-      "trialEndingSoon": "הניסיון מסתיים בקרוב: {{remaining}}"
+      "trialEndingSoon": "הניסיון מסתיים בקרוב: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "מה חדש",
@@ -752,7 +756,8 @@
       "strongArm": "זרוע חזקה",
       "talisman": "קמע"
     },
-    "remoteSpawnFilesNotSupported": "מופע זה אינו יכול לקבל קבצים."
+    "remoteSpawnFilesNotSupported": "מופע זה אינו יכול לקבל קבצים.",
+    "instanceSwitcherTitle": "מופע KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -950,7 +955,60 @@
       "failed": "נכשל",
       "cancelled": "בוטל",
       "interrupted": "הופסק"
-    }
+    },
+    "reviewStyle": {
+      "strict": "מחמיר",
+      "balanced": "מאוזן",
+      "lenient": "מקל",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "אבטחה",
+      "performance": "ביצועים",
+      "bugs": "באגים",
+      "style": "סגנון",
+      "testing": "בדיקות",
+      "documentation": "תיעוד"
+    },
+    "gateThreshold": {
+      "off": "כבוי",
+      "all": "הכל",
+      "warning": "אזהרה",
+      "critical": "קריטי"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "סוקר הקוד זקוק לתשומת לב",
+        "description": "סוקר הקוד הושבת מכיוון ש-Kilo אינו יכול לגשת למאגר זה עם התקנת אפליקציית GitHub פעילה. עדכן את התקנת אפליקציית GitHub, ולאחר מכן הפעל שוב את סוקר הקוד.",
+        "recoveryLabel": "עדכן את אפליקציית GitHub"
+      },
+      "githubIpAllowList": {
+        "title": "סוקר הקוד זקוק לתשומת לב",
+        "description": "סוקר הקוד הושבת מכיוון שארגון GitHub זה משתמש ברשימת היתר IP שחוסמת את Kilo. צור קשר עם hi@kilocode.ai לעזרה, ולאחר מכן הפעל שוב את סוקר הקוד.",
+        "recoveryLabel": "צור קשר עם התמיכה"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "סוקר הקוד זקוק לתשומת לב",
+        "description": "סוקר הקוד הושבת מכיוון ש-Kilo אינו יכול ליצור אסימון גישה לפרויקט GitLab עבור פרויקט זה. הענק גישת Maintainer או הפעל Project Access Tokens, ולאחר מכן הפעל שוב את סוקר הקוד.",
+        "recoveryLabel": "עדכן את שילוב GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "סוקר הקוד זקוק לתשומת לב",
+        "description": "סוקר הקוד הושבת מכיוון שמפתח ה-API של BYOK שנבחר אינו תקין, בוטל או חסר הרשאה. עדכן את המפתח או בחר דגם אחר, ולאחר מכן הפעל שוב את סוקר הקוד.",
+        "recoveryLabel": "עדכן את הגדרות BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "סוקר הקוד זקוק לתשומת לב",
+        "description": "סוקר הקוד הושבת מכיוון שהדגם שנבחר אינו זמין להפעלות סוכן ענן. בחר דגם זמין, ולאחר מכן הפעל שוב את סוקר הקוד.",
+        "recoveryLabel": "עדכן את הגדרות סוקר הקוד"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "סוקר הקוד זקוק לתשומת לב",
+        "description": "סוקר הקוד הושבת לאחר שלושה פסקי זמן של שיבוט מאגר היום. צור קשר עם hi@kilocode.ai לעזרה, ולאחר מכן הפעל שוב את סוקר הקוד.",
+        "recoveryLabel": "צור קשר עם התמיכה"
+      }
+    },
+    "unknownError": "שגיאה לא ידועה"
   },
   "securityAgent": {
     "filter": {
@@ -1494,6 +1552,23 @@
       "belowThreshold": "הממצא מתחת לסף החומרה האוטומטי. תיקון ידני עדיין יכול להתחיל כאשר שערי הבטיחות עוברים.",
       "beforeEnablement": "הניתוח הושלם לפני שהתיקון האוטומטי הופעל. תיקון ידני עדיין יכול להתחיל כאשר שערי הבטיחות עוברים.",
       "generic": "התיקון אינו זמין עבור ממצא זה."
+    },
+    "commandFailure": {
+      "ownerCapReached": "קיבולת הניתוח מלאה. המתן עד שניתוח פעיל יסתיים, ואז נסה שוב.",
+      "githubTokenUnavailable": "אישור GitHub דורש תשומת לב. הענק הרשאה מחדש לאפליקציית GitHub, ואז נסה שוב.",
+      "githubAuthInvalid": "אישור GitHub דורש תשומת לב. הענק הרשאה מחדש לאפליקציית GitHub, ואז נסה שוב.",
+      "findingUnavailable": "הממצא אינו זמין עוד. רענן את הממצאים ונסה שוב אם הוא עדיין פתוח.",
+      "repositoryUnavailable": "המאגר אינו זמין עוד לאפליקציית GitHub. רענן את גישת המאגר, ואז נסה שוב.",
+      "invalidDismissTarget": "לא ניתן לדחות את הממצא מכיוון שיעד ה-Dependabot שלו אינו תקין.",
+      "commandStalled": "הפעולה שהועמדה בתור לא הסתיימה בזמן. נסה שוב את הפעולה.",
+      "queueRetriesExhausted": "לא ניתן היה להשלים את הפעולה לאחר מספר ניסיונות. נסה שוב את הפעולה.",
+      "queueAdmissionFailed": "לא ניתן היה לקבל את הפעולה שהועמדה בתור. נסה שוב את הפעולה.",
+      "generic": "הפעולה שהועמדה בתור נכשלה. נסה שוב את הפעולה."
+    },
+    "analysisMode": {
+      "auto": "אוטומטי",
+      "shallow": "רדוד",
+      "deep": "עמוק"
     }
   },
   "agents": {
@@ -1963,7 +2038,8 @@
       "addToFavorites": "הוסף את {{name}} למועדפים",
       "removeFromFavorites": "הסר את {{name}} מהמועדפים",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "בינוני"
+      "thinkingEffortMedium": "בינוני",
+      "sessionModel": "דגם הפעלה"
     },
     "attachmentPreview": {
       "openFailedRetry": "לא ניתן היה לפתוח את הקובץ. נסה שוב.",
@@ -2096,7 +2172,8 @@
   },
   "addCredits": {
     "cta": "הוסף קרדיטים",
-    "description": "הוסף קרדיטים כדי להמשיך את השימוש."
+    "description": "הוסף קרדיטים כדי להמשיך את השימוש.",
+    "billingPage": "דף החיוב"
   },
   "deviceSessions": {
     "couldNotLoad": "לא ניתן לטעון הפעלות",
@@ -2284,7 +2361,10 @@
     "restoreFailed": "שחזור הרכישות נכשל. נסה שוב.",
     "purchaseFailed": "השלמת הרכישה נכשלה.",
     "purchaseStartFailed": "התחלת הרכישה ב-App Store נכשלה.",
-    "purchaseOwnedByAnotherAccount": "ה-Kilo Pass בחשבון Apple הזה שייך לחשבון Kilo אחר."
+    "purchaseOwnedByAnotherAccount": "ה-Kilo Pass בחשבון Apple הזה שייך לחשבון Kilo אחר.",
+    "couldNotConnectToAppStore": "לא ניתן היה להתחבר ל-App Store. בדוק את החיבור ונסה שוב.",
+    "noMatchingProducts": "לא הוחזרו מוצרי Kilo Pass תואמים מ-App Store.",
+    "purchaseMissingSignedTransaction": "הרכישה ב-App Store לא כללה JWS עסקה חתום."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2799,7 +2879,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} נבחר, הקש כדי לשנות את הבחירה",
       "tapToComment": "{{label}}, הקש כדי להגיב",
-      "truncationBanner": "מציג את {{limit}} הראשונים מתוך {{total}} קבצים ששונו — מגבלת API של GitHub"
+      "truncationBanner": "מציג את {{limit}} הראשונים מתוך {{total}} קבצים ששונו — מגבלת API של GitHub",
+      "statusAdded": "נוסף",
+      "statusContext": "הקשר",
+      "statusDeleted": "נמחק"
     },
     "linkPasteClipboardEmpty": "הלוח ריק",
     "linkPasteNotAPullRequest": "לא קישור לבקשת משיכה ב-GitHub",
@@ -2813,6 +2896,11 @@
       "reviewNotSubmitted": "לא ניתן לשלוח סקירה זו כפי שהיא. ייתכן שה-PR השתנה, או שאינך יכול לסקור בקשת משיכה משלך.",
       "couldNotPostComment": "לא ניתן היה לפרסם תגובה.",
       "couldNotSubmitReview": "לא ניתן היה לשלוח את הסקירה. בדוק את החיבור ונסה שוב."
+    },
+    "operation": {
+      "couldNotReply": "לא ניתן היה להשיב.",
+      "couldNotCompleteAction": "לא ניתן היה להשלים פעולה זו.",
+      "mergeResultDefaultError": "GitHub לא השלים את המיזוג."
     }
   },
   "organization": {
@@ -2830,7 +2918,17 @@
       "emptyTitle": "אין פעילות קרדיטים",
       "expires": "פג תוקף {{date}}",
       "title": "פעילות קרדיטים",
-      "transactionFallback": "עסקת קרדיט"
+      "transactionFallback": "עסקת קרדיט",
+      "category": {
+        "organization_custom": "מותאם אישית של הארגון",
+        "parent_to_child_transfer_in": "העברה נכנסת מהורה לילד",
+        "parent_to_child_transfer_out": "העברה יוצאת מהורה לילד",
+        "oss-sponsorship": "חסות OSS",
+        "oss-monthly-reset": "איפוס חודשי של OSS",
+        "team-topup-bonus-2025": "בונוס טופ-אפ של צוות 2025",
+        "accounting_adjustment": "התאמה חשבונאית",
+        "credits_expired": "הקרדיטים פגו"
+      }
     },
     "hub": {
       "balance": "יתרה",
@@ -2857,11 +2955,16 @@
       "emptyTitle": "אין חשבוניות",
       "invoiceFallback": "חשבונית",
       "title": "חשבוניות",
-      "statusPaid": "שולם",
-      "statusOpen": "פתוח",
-      "statusVoid": "מבוטל",
       "downloadFailed": "לא ניתן היה להוריד את החשבונית. בדוק את החיבור ונסה שוב.",
-      "sharingUnavailable": "שיתוף אינו זמין במכשיר זה."
+      "sharingUnavailable": "שיתוף אינו זמין במכשיר זה.",
+      "status": {
+        "paid": "שולם",
+        "open": "פתוח",
+        "void": "מבוטל",
+        "draft": "טיוטה",
+        "uncollectible": "לא ניתן לגביה",
+        "unknown": "לא ידוע"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2962,7 +3065,8 @@
     "promptTitle": "מה דעתך על אפליקציית Kilo?",
     "rateKilo": "דרג את Kilo",
     "sorryMessage": "ספר לנו מה צריך להשתפר. המהנדס האחראי על האפליקציה קורא כל דוח!",
-    "sorryTitle": "אנחנו מצטערים לשמוע את זה!"
+    "sorryTitle": "אנחנו מצטערים לשמוע את זה!",
+    "emailSubject": "משוב על אפליקציית המובייל"
   },
   "authErrors": {
     "emailAlreadyUsed": "חשבון עם כתובת דוא\"ל זו כבר קיים בשיטת התחברות אחרת. נסה שיטה אחרת או השתמש ב'$t(login.moreSignInOptions)'.",
@@ -2992,6 +3096,15 @@
   "models": {
     "dataCollected": "נתונים שנאספו",
     "free": "חינם",
-    "couldNotUpdateFavorites": "לא ניתן היה לעדכן את המועדפים"
+    "couldNotUpdateFavorites": "לא ניתן היה לעדכן את המועדפים",
+    "thinkingEffort": {
+      "none": "ללא",
+      "minimal": "מינימלי",
+      "low": "נמוך",
+      "medium": "בינוני",
+      "high": "גבוה",
+      "xhigh": "גבוה במיוחד",
+      "max": "מקסימום"
+    }
   }
 }

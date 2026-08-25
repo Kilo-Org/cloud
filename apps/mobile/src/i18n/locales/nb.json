@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Valgte {{label}}, trykk for å endre markeringen",
       "tapToComment": "{{label}}, trykk for å kommentere",
-      "truncationBanner": "Viser de første {{limit}} av {{total}} endrede filene — GitHub API-grense"
+      "truncationBanner": "Viser de første {{limit}} av {{total}} endrede filene — GitHub API-grense",
+      "statusAdded": "Lagt til",
+      "statusContext": "Kontekst",
+      "statusDeleted": "Slettet"
     },
     "linkPasteClipboardEmpty": "Utklippstavlen er tom",
     "linkPasteNotAPullRequest": "Ikke en GitHub-pull request-lenke",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Denne anmeldelsen kan ikke sendes inn som den er. PR-en kan ha endret seg, eller du kan ikke anmelde din egen pull request.",
       "couldNotPostComment": "Kunne ikke publisere kommentaren.",
       "couldNotSubmitReview": "Kunne ikke sende inn anmeldelsen. Sjekk tilkoblingen og prøv igjen."
+    },
+    "operation": {
+      "couldNotReply": "Kunne ikke svare.",
+      "couldNotCompleteAction": "Kunne ikke fullføre denne handlingen.",
+      "mergeResultDefaultError": "GitHub fullførte ikke flettingen."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Betaling er forfalt. Oppdater betalingsmåten din.",
       "subscriptionCancels": "Abonnementet avsluttes {{date}}",
       "trialDaysRemaining": "Prøveperiode: {{remaining}}",
-      "trialEndingSoon": "Prøveperioden slutter snart: {{remaining}}"
+      "trialEndingSoon": "Prøveperioden slutter snart: {{remaining}}",
+      "planName": {
+        "commit": "Bindende plan",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Hva er nytt",
@@ -1189,7 +1201,8 @@
       "strongArm": "Sterk arm",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Denne forekomsten kan ikke motta filer."
+    "remoteSpawnFilesNotSupported": "Denne forekomsten kan ikke motta filer.",
+    "instanceSwitcherTitle": "KiloClaw-forekomst"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Mislyktes",
       "cancelled": "Avbrutt",
       "interrupted": "Avbrutt uventet"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Streng",
+      "balanced": "Balansert",
+      "lenient": "Ettergivende",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Sikkerhet",
+      "performance": "Ytelse",
+      "bugs": "Feil",
+      "style": "Stil",
+      "testing": "Testing",
+      "documentation": "Dokumentasjon"
+    },
+    "gateThreshold": {
+      "off": "Av",
+      "all": "Alle",
+      "warning": "Advarsel",
+      "critical": "Kritisk"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer trenger oppmerksomhet",
+        "description": "Code Reviewer ble deaktivert fordi Kilo ikke kan få tilgang til dette depotet med en aktiv GitHub-appinstallasjon. Oppdater GitHub-appinstallasjonen, og aktiver deretter Code Reviewer igjen.",
+        "recoveryLabel": "Oppdater GitHub-appen"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer trenger oppmerksomhet",
+        "description": "Code Reviewer ble deaktivert fordi denne GitHub-organisasjonen bruker en IP-allowliste som blokkerer Kilo. Kontakt hi@kilocode.ai for hjelp, og aktiver deretter Code Reviewer igjen.",
+        "recoveryLabel": "Kontakt kundestøtte"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer trenger oppmerksomhet",
+        "description": "Code Reviewer ble deaktivert fordi Kilo ikke kan opprette en GitLab Project Access Token for dette prosjektet. Gi Maintainer-tilgang eller aktiver Project Access Tokens, og aktiver deretter Code Reviewer igjen.",
+        "recoveryLabel": "Oppdater GitLab-integrasjonen"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer trenger oppmerksomhet",
+        "description": "Code Reviewer ble deaktivert fordi den valgte BYOK API-nøkkelen er ugyldig, tilbakekalt eller mangler tillatelse. Oppdater nøkkelen eller velg en annen modell, og aktiver deretter Code Reviewer igjen.",
+        "recoveryLabel": "Oppdater BYOK-innstillinger"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer trenger oppmerksomhet",
+        "description": "Code Reviewer ble deaktivert fordi den valgte modellen ikke er tilgjengelig for cloud-agentøkter. Velg en tilgjengelig modell, og aktiver deretter Code Reviewer igjen.",
+        "recoveryLabel": "Oppdater Code Reviewer-innstillingene"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer trenger oppmerksomhet",
+        "description": "Code Reviewer ble deaktivert etter tre timeout for depotkloning i dag. Kontakt hi@kilocode.ai for hjelp, og aktiver deretter Code Reviewer igjen.",
+        "recoveryLabel": "Kontakt kundestøtte"
+      }
+    },
+    "unknownError": "Ukjent feil"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Funnet er under den automatiske alvorlighetsgradsterskelen. Manuell utbedring kan fortsatt starte når sikkerhetsportene er bestått.",
       "beforeEnablement": "Analysen ble fullført før automatisk utbedring ble aktivert. Manuell utbedring kan fortsatt starte når sikkerhetsportene er bestått.",
       "generic": "Utbedring er utilgjengelig for dette funnet."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Analysekapasiteten er full. Vent til en aktiv analyse er ferdig, og prøv igjen.",
+      "githubTokenUnavailable": "GitHub-autorisasjonen trenger oppmerksomhet. Autoriser GitHub-appen på nytt, og prøv igjen.",
+      "githubAuthInvalid": "GitHub-autorisasjonen trenger oppmerksomhet. Autoriser GitHub-appen på nytt, og prøv igjen.",
+      "findingUnavailable": "Funnet er ikke lenger tilgjengelig. Oppdater funnene og prøv igjen hvis det fortsatt er åpent.",
+      "repositoryUnavailable": "Depotet er ikke lenger tilgjengelig for GitHub-appen. Oppdater depottilgangen, og prøv igjen.",
+      "invalidDismissTarget": "Funnet kan ikke avvises fordi Dependabot-målet er ugyldig.",
+      "commandStalled": "Den køede handlingen ble ikke ferdig i tide. Prøv handlingen igjen.",
+      "queueRetriesExhausted": "Handlingen kunne ikke fullføres etter flere forsøk. Prøv handlingen igjen.",
+      "queueAdmissionFailed": "Den køede handlingen kunne ikke bli tatt opp. Prøv handlingen igjen.",
+      "generic": "Den køede handlingen mislyktes. Prøv handlingen igjen."
+    },
+    "analysisMode": {
+      "auto": "Auto",
+      "shallow": "Grunn",
+      "deep": "Dyp"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Legg {{name}} til favoritter",
       "removeFromFavorites": "Fjern {{name}} fra favoritter",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Sesjonsmodell"
     },
     "attachmentPreview": {
       "openFailedRetry": "Kunne ikke åpne filen. Prøv igjen.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Legg til kreditter",
-    "description": "Legg til kreditter for å holde bruken i gang."
+    "description": "Legg til kreditter for å holde bruken i gang.",
+    "billingPage": "faktureringsside"
   },
   "deviceSessions": {
     "couldNotLoad": "Kunne ikke laste økter",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Kunne ikke gjenopprette kjøp. Prøv igjen.",
     "purchaseFailed": "Kunne ikke fullføre kjøpet.",
     "purchaseStartFailed": "Kunne ikke starte App Store-kjøpet.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass på denne Apple-kontoen tilhører en annen Kilo-konto."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass på denne Apple-kontoen tilhører en annen Kilo-konto.",
+    "couldNotConnectToAppStore": "Kunne ikke koble til App Store. Sjekk tilkoblingen og prøv igjen.",
+    "noMatchingProducts": "App Store returnerte ingen samsvarende Kilo Pass-produkter.",
+    "purchaseMissingSignedTransaction": "App Store-kjøpet inneholdt ikke en signert transaksjons-JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Trenger forbedring",
     "sorryTitle": "Så leit å høre!",
     "sorryMessage": "Fortell oss hva som må bli bedre. Ingeniøren som har ansvaret for appen, leser hver eneste rapport!",
-    "emailUs": "Send oss e-post"
+    "emailUs": "Send oss e-post",
+    "emailSubject": "tilbakemelding på mobilappen"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Ingen kredittaktivitet",
       "expires": "Utløper {{date}}",
       "title": "Kredittaktivitet",
-      "transactionFallback": "Kreditttransaksjon"
+      "transactionFallback": "Kreditttransaksjon",
+      "category": {
+        "organization_custom": "Organisasjonsspesifikk",
+        "parent_to_child_transfer_in": "Overføring inn fra overordnet til underordnet",
+        "parent_to_child_transfer_out": "Overføring ut fra underordnet til overordnet",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Regnskapsjustering",
+        "credits_expired": "Kreditter utløpt"
+      }
     },
     "inviteMember": {
       "emailError": "Angi en gyldig e-postadresse",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Fakturaer genereres automatisk hver faktureringssyklus og vil vises her når organisasjonen din faktureres.",
       "emptyTitle": "Ingen fakturaer",
       "invoiceFallback": "Faktura",
-      "statusOpen": "Åpen",
-      "statusPaid": "Betalt",
-      "statusVoid": "Ugyldig",
       "title": "Fakturaer",
       "downloadFailed": "Kunne ikke laste ned fakturaen. Sjekk tilkoblingen og prøv igjen.",
-      "sharingUnavailable": "Deling er ikke tilgjengelig på denne enheten."
+      "sharingUnavailable": "Deling er ikke tilgjengelig på denne enheten.",
+      "status": {
+        "paid": "Betalt",
+        "open": "Åpen",
+        "void": "Ugyldig",
+        "draft": "Kladd",
+        "uncollectible": "Uinnkrevbar",
+        "unknown": "Ukjent"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Data samlet inn",
     "free": "Gratis",
-    "couldNotUpdateFavorites": "Kunne ikke oppdatere favoritter"
+    "couldNotUpdateFavorites": "Kunne ikke oppdatere favoritter",
+    "thinkingEffort": {
+      "none": "Ingen",
+      "minimal": "Minimal",
+      "low": "Lav",
+      "medium": "Middels",
+      "high": "Høy",
+      "xhigh": "Ekstra høy",
+      "max": "Maks"
+    }
   }
 }

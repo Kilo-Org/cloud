@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} ရွေးထားသည်၊ ရွေးချယ်မှုပြောင်းရန် နှိပ်ပါ",
       "tapToComment": "{{label}}, မှတ်ချက်ပေးရန် နှိပ်ပါ",
-      "truncationBanner": "ပြောင်းလဲထားသော ဖိုင် {{total}} ခုအနက် ပထမဆုံး {{limit}} ခုကို ပြသနေသည် — GitHub API ကန့်သတ်ချက်"
+      "truncationBanner": "ပြောင်းလဲထားသော ဖိုင် {{total}} ခုအနက် ပထမဆုံး {{limit}} ခုကို ပြသနေသည် — GitHub API ကန့်သတ်ချက်",
+      "statusAdded": "ထည့်ပြီး",
+      "statusContext": "Context",
+      "statusDeleted": "ဖျက်ပြီး"
     },
     "linkPasteClipboardEmpty": "ကလစ်ဘုတ် ဗလာဖြစ်သည်",
     "linkPasteNotAPullRequest": "GitHub pull request လင့်ခ် မဟုတ်ပါ",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "ဤသုံးသပ်မှုကို လက်ရှိအတိုင်း တင်သွင်း၍မရပါ။ PR ပြောင်းလဲသွားခြင်း သို့မဟုတ် သင့်ကိုယ်ပိုင် pull request ကို သင်သုံးသပ်၍မရခြင်း ဖြစ်နိုင်သည်။",
       "couldNotPostComment": "မှတ်ချက် တင်နိုင်ခြင်း မရှိပါ။",
       "couldNotSubmitReview": "သုံးသပ်မှု တင်သွင်း၍မရပါ။ သင့်ချိတ်ဆက်မှုကို စစ်ပြီး ထပ်စမ်းကြည့်ပါ။"
+    },
+    "operation": {
+      "couldNotReply": "အကြောင်းပြန်မရပါ။",
+      "couldNotCompleteAction": "ဤလုပ်ဆောင်ချက်ကို မပြီးမြောက်နိုင်ပါ။",
+      "mergeResultDefaultError": "GitHub သည် ပေါင်းစည်းမှုကို မပြီးမြောက်ခဲ့ပါ။"
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "ပေးချေမှု နောက်ကျနေသည်။ သင့်ပေးချေနည်းကို မွမ်းမံပါ။",
       "subscriptionCancels": "စာရင်းသွင်းမှု {{date}} တွင် ပယ်ဖျက်မည်",
       "trialDaysRemaining": "စမ်းသုံး- {{remaining}}",
-      "trialEndingSoon": "စမ်းသုံး မကြာမီ ကုန်ဆုံး- {{remaining}}"
+      "trialEndingSoon": "စမ်းသုံး မကြာမီ ကုန်ဆုံး- {{remaining}}",
+      "planName": {
+        "commit": "ကတိပြု",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "အသစ်အဆန်း",
@@ -1189,7 +1201,8 @@
       "strongArm": "သန်မာသောလက်မောင်း",
       "talisman": "လက်ဆွဲရတနာ"
     },
-    "remoteSpawnFilesNotSupported": "ဤ instance သည် ဖိုင်များကို လက်ခံ၍မရပါ။"
+    "remoteSpawnFilesNotSupported": "ဤ instance သည် ဖိုင်များကို လက်ခံ၍မရပါ။",
+    "instanceSwitcherTitle": "KiloClaw အင်စတန့်"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "မအောင်မြင်",
       "cancelled": "ဖျက်သိမ်းပြီး",
       "interrupted": "ကြားဖြတ်ရပ်တန့်"
-    }
+    },
+    "reviewStyle": {
+      "strict": "တင်းကျပ်",
+      "balanced": "ဟန်ချက်ညီ",
+      "lenient": "ဖြေလျှော့",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "လုံခြုံရေး",
+      "performance": "စွမ်းဆောင်ရည်",
+      "bugs": "Bugs",
+      "style": "ပုံစံ",
+      "testing": "စမ်းသပ်ခြင်း",
+      "documentation": "စာရွက်စာတမ်း"
+    },
+    "gateThreshold": {
+      "off": "ပိတ်",
+      "all": "အားလုံး",
+      "warning": "သတိပေးချက်",
+      "critical": "အရေးကြီး"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer အာရုံစိုက်ရန် လိုအပ်သည်",
+        "description": "Code Reviewer ကို ပိတ်ထားခဲ့သည်။ အဘယ်ကြောင့်ဆိုသော် Kilo သည် ဤ repository ကို တက်ကြွသော GitHub App တပ်ဆင်မှုဖြင့် ဝင်ရောက်၍မရသောကြောင့်ဖြစ်သည်။ GitHub App တပ်ဆင်မှုကို ပြန်လည်မွမ်းမံပြီး Code Reviewer ကို ပြန်ဖွင့်ပါ။",
+        "recoveryLabel": "GitHub App ကို မွမ်းမံပါ"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer အာရုံစိုက်ရန် လိုအပ်သည်",
+        "description": "ဤ GitHub အဖွဲ့အစည်းသည် Kilo ကို ပိတ်ဆို့သော IP ခွင့်ပြုစာရင်းကို အသုံးပြုသောကြောင့် Code Reviewer ကို ပိတ်ထားခဲ့သည်။ အကူအညီအတွက် hi@kilocode.ai သို့ ဆက်သွယ်ပြီး Code Reviewer ကို ပြန်ဖွင့်ပါ။",
+        "recoveryLabel": "ပံ့ပိုးမှုကို ဆက်သွယ်ပါ"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer အာရုံစိုက်ရန် လိုအပ်သည်",
+        "description": "Kilo သည် ဤပရောဂျက်အတွက် GitLab Project Access Token ကို ဖန်တီး၍မရသောကြောင့် Code Reviewer ကို ပိတ်ထားခဲ့သည်။ Maintainer ဝင်ရောက်ခွင့် ပေးပါ သို့မဟုတ် Project Access Tokens ကို ဖွင့်ပြီး Code Reviewer ကို ပြန်ဖွင့်ပါ။",
+        "recoveryLabel": "GitLab ပေါင်းစည်းမှုကို မွမ်းမံပါ"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer အာရုံစိုက်ရန် လိုအပ်သည်",
+        "description": "ရွေးချယ်ထားသော BYOK API သော့သည် မမှန်ကန်၊ ရုပ်သိမ်းခံထားရ သို့မဟုတ် ခွင့်ပြုချက်မရှိသောကြောင့် Code Reviewer ကို ပိတ်ထားခဲ့သည်။ သော့ကို မွမ်းမံပါ သို့မဟုတ် အခြားမော်ဒယ်ကို ရွေးပြီး Code Reviewer ကို ပြန်ဖွင့်ပါ။",
+        "recoveryLabel": "BYOK ဆက်တင်များကို မွမ်းမံပါ"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer အာရုံစိုက်ရန် လိုအပ်သည်",
+        "description": "ရွေးချယ်ထားသော မော်ဒယ်သည် cloud agent ဆက်ရှင်များအတွက် မရနိုင်သောကြောင့် Code Reviewer ကို ပိတ်ထားခဲ့သည်။ ရနိုင်သော မော်ဒယ်ကို ရွေးပြီး Code Reviewer ကို ပြန်ဖွင့်ပါ။",
+        "recoveryLabel": "Code Reviewer ဆက်တင်များကို မွမ်းမံပါ"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer အာရုံစိုက်ရန် လိုအပ်သည်",
+        "description": "ယနေ့ repository clone သုံးကြိမ် timeout ဖြစ်ပြီးနောက် Code Reviewer ကို ပိတ်ထားခဲ့သည်။ အကူအညီအတွက် hi@kilocode.ai သို့ ဆက်သွယ်ပြီး Code Reviewer ကို ပြန်ဖွင့်ပါ။",
+        "recoveryLabel": "ပံ့ပိုးမှုကို ဆက်သွယ်ပါ"
+      }
+    },
+    "unknownError": "အမည်မသိ အမှား"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "တွေ့ရှိချက်သည် အလိုအလျောက် အဆင့်သတ်မှတ်ချက်အောက်တွင် ရှိသည်။ လုံခြုံရေးစစ်ဆေးမှုများ အောင်မြင်ပါက ကိုယ်တိုင် ပြုပြင်မှု စတင်နိုင်ဆဲဖြစ်သည်။",
       "beforeEnablement": "ခွဲခြမ်းစိတ်ဖြာမှုကို အလိုအလျောက် ပြုပြင်မှု မဖွင့်မီ ပြီးစီးခဲ့သည်။ လုံခြုံရေးစစ်ဆေးမှုများ အောင်မြင်ပါက ကိုယ်တိုင် ပြုပြင်မှု စတင်နိုင်ဆဲဖြစ်သည်။",
       "generic": "ဤတွေ့ရှိချက်အတွက် ပြုပြင်မှု မရရှိနိုင်ပါ။"
+    },
+    "commandFailure": {
+      "ownerCapReached": "ခွဲခြမ်းစိတ်ဖြာမှု စွမ်းရည် ပြည့်နေပါသည်။ လုပ်ဆောင်နေသော ခွဲခြမ်းစိတ်ဖြာမှု ပြီးသည်အထိ စောင့်ပြီး ထပ်စမ်းပါ။",
+      "githubTokenUnavailable": "GitHub ခွင့်ပြုချက် အာရုံစိုက်ရန် လိုအပ်ပါသည်။ GitHub App ကို ပြန်လည်ခွင့်ပြုပြီး ထပ်စမ်းပါ။",
+      "githubAuthInvalid": "GitHub ခွင့်ပြုချက် အာရုံစိုက်ရန် လိုအပ်ပါသည်။ GitHub App ကို ပြန်လည်ခွင့်ပြုပြီး ထပ်စမ်းပါ။",
+      "findingUnavailable": "တွေ့ရှိချက် မရနိုင်တော့ပါ။ တွေ့ရှိချက်များကို ပြန်ဆန်းပြီး ၎င်းဖွင့်ထားဆဲဖြစ်ပါက ထပ်စမ်းပါ။",
+      "repositoryUnavailable": "Repository သည် GitHub App အတွက် မရနိုင်တော့ပါ။ Repository ဝင်ရောက်ခွင့်ကို ပြန်ဆန်းပြီး ထပ်စမ်းပါ။",
+      "invalidDismissTarget": "၎င်း၏ Dependabot ပစ်မှတ်သည် မမှန်ကန်သောကြောင့် တွေ့ရှိချက်ကို ပယ်ဖျက်၍မရပါ။",
+      "commandStalled": "စောင့်ဆိုင်းထားသော လုပ်ဆောင်ချက်သည် အချိန်မီ မပြီးဆုံးပါ။ လုပ်ဆောင်ချက်ကို ထပ်စမ်းပါ။",
+      "queueRetriesExhausted": "အကြိမ်ပေါင်းများစွာ ကြိုးစားပြီးနောက် လုပ်ဆောင်ချက်ကို မပြီးမြောက်နိုင်ပါ။ လုပ်ဆောင်ချက်ကို ထပ်စမ်းပါ။",
+      "queueAdmissionFailed": "စောင့်ဆိုင်းထားသော လုပ်ဆောင်ချက်ကို လက်ခံ၍မရပါ။ လုပ်ဆောင်ချက်ကို ထပ်စမ်းပါ။",
+      "generic": "စောင့်ဆိုင်းထားသော လုပ်ဆောင်ချက် မအောင်မြင်ပါ။ လုပ်ဆောင်ချက်ကို ထပ်စမ်းပါ။"
+    },
+    "analysisMode": {
+      "auto": "အလိုအလျောက်",
+      "shallow": "ပေါ့ပါး",
+      "deep": "နက်ရှိုင်း"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "{{name}} ကို စိတ်ကြိုက်များသို့ ထည့်ပါ",
       "removeFromFavorites": "{{name}} ကို စိတ်ကြိုက်များမှ ဖယ်ရှားပါ",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "ဆက်ရှင် မော်ဒယ်"
     },
     "attachmentPreview": {
       "openFailedRetry": "ဖိုင်ဖွင့်ရန် မအောင်မြင်ပါ။ ထပ်ကြိုးစားပါ။",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "credit များ ထည့်ပါ",
-    "description": "အသုံးပြုမှု ဆက်လုပ်ရန် credit များ ထည့်ပါ။"
+    "description": "အသုံးပြုမှု ဆက်လုပ်ရန် credit များ ထည့်ပါ။",
+    "billingPage": "ငွေပေးချေမှု စာမျက်နှာ"
   },
   "deviceSessions": {
     "couldNotLoad": "session များကို မဖွင့်နိုင်ပါ",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "ဝယ်ယူမှုများ ပြန်ယူရန် မအောင်မြင်ပါ။ ထပ်ကြိုးစားပါ။",
     "purchaseFailed": "ဝယ်ယူမှု ပြီးမြောက်ရန် မအောင်မြင်ပါ။",
     "purchaseStartFailed": "App Store ဝယ်ယူမှု စတင်ရန် မအောင်မြင်ပါ။",
-    "purchaseOwnedByAnotherAccount": "ဤ Apple Account ရှိ Kilo Pass သည် အခြား Kilo အကောင့်တစ်ခုနှင့် သက်ဆိုင်သည်။"
+    "purchaseOwnedByAnotherAccount": "ဤ Apple Account ရှိ Kilo Pass သည် အခြား Kilo အကောင့်တစ်ခုနှင့် သက်ဆိုင်သည်။",
+    "couldNotConnectToAppStore": "App Store သို့ ချိတ်ဆက်၍မရပါ။ သင့်ချိတ်ဆက်မှုကို စစ်ပြီး ထပ်စမ်းကြည့်ပါ။",
+    "noMatchingProducts": "App Store မှ ကိုက်ညီသော Kilo Pass ထုတ်ကုန်များ ပြန်ပို့ခြင်း မရှိပါ။",
+    "purchaseMissingSignedTransaction": "App Store ဝယ်ယူမှုတွင် လက်မှတ်ရေးထိုးထားသော ငွေပေးငွေယူ JWS မပါဝင်ပါ။"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "တိုးတက်ရန် လိုသည်",
     "sorryTitle": "ထိုသတင်းကြားရသည့်အတွက် ဝမ်းနည်းပါသည်။",
     "sorryMessage": "ဘာတွေ ပိုကောင်းအောင် လုပ်ရန် လိုသည်ကို အသိပေးပါ။ အက်ပ်တာဝန်ခံ အင်ဂျင်နီယာသည် အစီရင်ခံချက်တိုင်းကို ဖတ်ပါသည်။",
-    "emailUs": "ကျွန်ုပ်တို့ထံ အီးမေးလ် ပို့ပါ"
+    "emailUs": "ကျွန်ုပ်တို့ထံ အီးမေးလ် ပို့ပါ",
+    "emailSubject": "မိုဘိုင်းအက်ပ် တုံ့ပြန်ချက်"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "credit လုပ်ဆောင်ချက် မရှိပါ",
       "expires": "{{date}} တွင် သက်တမ်းကုန်သည်",
       "title": "credit လုပ်ဆောင်ချက်",
-      "transactionFallback": "credit အရောင်းအဝယ်"
+      "transactionFallback": "credit အရောင်းအဝယ်",
+      "category": {
+        "organization_custom": "အဖွဲ့အစည်း စိတ်ကြိုက်",
+        "parent_to_child_transfer_in": "ပင်မမှ ကလေးသို့ ဝင်လွှဲပြောင်းမှု",
+        "parent_to_child_transfer_out": "ကလေးမှ ပင်မသို့ ထွက်လွှဲပြောင်းမှု",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "စာရင်းကိုင် ပြုပြင်မှု",
+        "credits_expired": "သက်တမ်းကုန် ခရက်ဒစ်များ"
+      }
     },
     "inviteMember": {
       "emailError": "မှန်ကန်သော အီးမေးလ် လိပ်စာ ထည့်ပါ",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "ငွေတောင်းခံလွှာများကို ငွေကောက်ခံစက်ဝန်း တစ်ခုစီတွင် အလိုအလျောက် ထုတ်ပြီး သင့်အဖွဲ့အစည်းကို ငွေကောက်ခံပြီးသည်နှင့် ဤနေရာတွင် ပေါ်လာပါမည်။",
       "emptyTitle": "ငွေတောင်းခံလွှာများ မရှိပါ",
       "invoiceFallback": "ငွေတောင်းခံလွှာ",
-      "statusOpen": "ဖွင့်ထားသည်",
-      "statusPaid": "ပေးပြီးပါပြီ",
-      "statusVoid": "မတည်တော့",
       "title": "ငွေတောင်းခံလွှာများ",
       "downloadFailed": "ငွေတောင်းခံလွှာကို ဒေါင်းလုဒ်မလုပ်နိုင်ပါ။ သင့်ချိတ်ဆက်မှုကို စစ်ပြီး ထပ်စမ်းကြည့်ပါ။",
-      "sharingUnavailable": "ဤစက်တွင် မျှဝေခြင်း မရနိုင်ပါ။"
+      "sharingUnavailable": "ဤစက်တွင် မျှဝေခြင်း မရနိုင်ပါ။",
+      "status": {
+        "paid": "ပေးပြီးပါပြီ",
+        "open": "ဖွင့်ထားသည်",
+        "void": "မတည်တော့",
+        "draft": "အမူကြမ်း",
+        "uncollectible": "ကောက်ခံ၍မရသော",
+        "unknown": "အမည်မသိ"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "စုဆောင်းထားသော အချက်အလက်",
     "free": "အခမဲ့",
-    "couldNotUpdateFavorites": "အကြိုက်ဆုံးများကို အပ်ဒိတ်လုပ်၍မရပါ"
+    "couldNotUpdateFavorites": "အကြိုက်ဆုံးများကို အပ်ဒိတ်လုပ်၍မရပါ",
+    "thinkingEffort": {
+      "none": "မရှိ",
+      "minimal": "အနည်းငယ်",
+      "low": "နိမ့်",
+      "medium": "အလယ်",
+      "high": "မြင့်",
+      "xhigh": "အလွန်မြင့်",
+      "max": "အမြင့်ဆုံး"
+    }
   }
 }

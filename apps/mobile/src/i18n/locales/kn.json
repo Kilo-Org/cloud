@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} ಆಯ್ಕೆಮಾಡಲಾಗಿದೆ, ಆಯ್ಕೆ ಬದಲಾಯಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ",
       "tapToComment": "{{label}}, ಕಾಮೆಂಟ್ ಮಾಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ",
-      "truncationBanner": "ಬದಲಾದ {{total}} ಫೈಲ್ಗಳಲ್ಲಿ ಮೊದಲ {{limit}} ತೋರಿಸಲಾಗುತ್ತಿದೆ — GitHub API ಮಿತಿ"
+      "truncationBanner": "ಬದಲಾದ {{total}} ಫೈಲ್ಗಳಲ್ಲಿ ಮೊದಲ {{limit}} ತೋರಿಸಲಾಗುತ್ತಿದೆ — GitHub API ಮಿತಿ",
+      "statusAdded": "ಸೇರಿಸಲಾಗಿದೆ",
+      "statusContext": "ಸಂದರ್ಭ",
+      "statusDeleted": "ಅಳಿಸಲಾಗಿದೆ"
     },
     "linkPasteClipboardEmpty": "ಕ್ಲಿಪ್ಬೋರ್ಡ್ ಖಾಲಿಯಾಗಿದೆ",
     "linkPasteNotAPullRequest": "GitHub ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅಲ್ಲ",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "ಈ ವಿಮರ್ಶೆಯನ್ನು ಹಾಗೆಯೇ ಸಲ್ಲಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. PR ಬದಲಾಗಿರಬಹುದು, ಅಥವಾ ನಿಮ್ಮ ಸ್ವಂತ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅನ್ನು ನೀವು ವಿಮರ್ಶಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
       "couldNotPostComment": "ಕಾಮೆಂಟ್ ಪೋಸ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotSubmitReview": "ವಿಮರ್ಶೆ ಸಲ್ಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+    },
+    "operation": {
+      "couldNotReply": "ಉತ್ತರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "couldNotCompleteAction": "ಈ ಕ್ರಿಯೆಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "mergeResultDefaultError": "GitHub ವಿಲೀನವನ್ನು ಪೂರ್ಣಗೊಳಿಸಲಿಲ್ಲ."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "ಪಾವತಿ ಬಾಕಿ ಇದೆ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಪಾವತಿ ವಿಧಾನವನ್ನು ನವೀಕರಿಸಿ.",
       "subscriptionCancels": "ಚಂದಾದಾರಿಕೆ {{date}} ರಂದು ರದ್ದಾಗುತ್ತದೆ",
       "trialDaysRemaining": "ಪ್ರಯೋಗ: {{remaining}} ಉಳಿದಿವೆ",
-      "trialEndingSoon": "ಪ್ರಯೋಗ ಶೀಘ್ರದಲ್ಲೇ ಮುಗಿಯುತ್ತದೆ: {{remaining}}"
+      "trialEndingSoon": "ಪ್ರಯೋಗ ಶೀಘ್ರದಲ್ಲೇ ಮುಗಿಯುತ್ತದೆ: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "ಏನಿದೆ ಹೊಸದು",
@@ -1189,7 +1201,8 @@
       "strongArm": "ಬಲವಾದ ತೋಳು",
       "talisman": "ತಾಯಿತ"
     },
-    "remoteSpawnFilesNotSupported": "ಈ ಉದಾಹರಣೆಯು ಫೈಲ್‌ಗಳನ್ನು ಸ್ವೀಕರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ."
+    "remoteSpawnFilesNotSupported": "ಈ ಉದಾಹರಣೆಯು ಫೈಲ್‌ಗಳನ್ನು ಸ್ವೀಕರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+    "instanceSwitcherTitle": "KiloClaw ಉದಾಹರಣೆ"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "ವಿಫಲವಾಗಿದೆ",
       "cancelled": "ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ",
       "interrupted": "ಅಡಚಣೆಯಾಗಿದೆ"
-    }
+    },
+    "reviewStyle": {
+      "strict": "ಕಟ್ಟುನಿಟ್ಟಾದ",
+      "balanced": "ಸಮತೋಲಿತ",
+      "lenient": "ಸೌಮ್ಯ",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "ಭದ್ರತೆ",
+      "performance": "ಕಾರ್ಯಕ್ಷಮತೆ",
+      "bugs": "ಬಗ್ಗಳು",
+      "style": "ಶೈಲಿ",
+      "testing": "ಪರೀಕ್ಷೆ",
+      "documentation": "ದಸ್ತಾವೇಜು"
+    },
+    "gateThreshold": {
+      "off": "ಆಫ್",
+      "all": "ಎಲ್ಲಾ",
+      "warning": "ಎಚ್ಚರಿಕೆ",
+      "critical": "ನಿರ್ಣಾಯಕ"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer ಗೆ ಗಮನ ಬೇಕು",
+        "description": "Kilo ಈ ರೆಪೊಸಿಟರಿಯನ್ನು ಸಕ್ರಿಯ GitHub App ಸ್ಥಾಪನೆಯೊಂದಿಗೆ ಪ್ರವೇಶಿಸಲು ಸಾಧ್ಯವಾಗದ ಕಾರಣ Code Reviewer ಅನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ. GitHub App ಸ್ಥಾಪನೆಯನ್ನು ನವೀಕರಿಸಿ, ನಂತರ Code Reviewer ಅನ್ನು ಮತ್ತೆ ಸಕ್ರಿಯಗೊಳಿಸಿ.",
+        "recoveryLabel": "GitHub App ನವೀಕರಿಸಿ"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer ಗೆ ಗಮನ ಬೇಕು",
+        "description": "ಈ GitHub ಸಂಸ್ಥೆಯು Kilo ಅನ್ನು ನಿರ್ಬಂಧಿಸುವ IP ಅನುಮತಿ ಪಟ್ಟಿಯನ್ನು ಬಳಸುವುದರಿಂದ Code Reviewer ಅನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ. ಸಹಾಯಕ್ಕಾಗಿ hi@kilocode.ai ಅನ್ನು ಸಂಪರ್ಕಿಸಿ, ನಂತರ Code Reviewer ಅನ್ನು ಮತ್ತೆ ಸಕ್ರಿಯಗೊಳಿಸಿ.",
+        "recoveryLabel": "ಬೆಂಬಲವನ್ನು ಸಂಪರ್ಕಿಸಿ"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer ಗೆ ಗಮನ ಬೇಕು",
+        "description": "Kilo ಈ ಯೋಜನೆಗಾಗಿ GitLab Project Access Token ರಚಿಸಲು ಸಾಧ್ಯವಾಗದ ಕಾರಣ Code Reviewer ಅನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ. Maintainer ಪ್ರವೇಶವನ್ನು ನೀಡಿ ಅಥವಾ Project Access Token ಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ, ನಂತರ Code Reviewer ಅನ್ನು ಮತ್ತೆ ಸಕ್ರಿಯಗೊಳಿಸಿ.",
+        "recoveryLabel": "GitLab ಏಕೀಕರಣ ನವೀಕರಿಸಿ"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer ಗೆ ಗಮನ ಬೇಕು",
+        "description": "ಆಯ್ಕೆಮಾಡಿದ BYOK API ಕೀ ಅಮಾನ್ಯವಾಗಿದೆ, ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ, ಅಥವಾ ಅನುಮತಿಯನ್ನು ಹೊಂದಿಲ್ಲದ ಕಾರಣ Code Reviewer ಅನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ. ಕೀ ಅನ್ನು ನವೀಕರಿಸಿ ಅಥವಾ ಬೇರೆ ಮಾದರಿಯನ್ನು ಆಯ್ಕೆ ಮಾಡಿ, ನಂತರ Code Reviewer ಅನ್ನು ಮತ್ತೆ ಸಕ್ರಿಯಗೊಳಿಸಿ.",
+        "recoveryLabel": "BYOK ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ನವೀಕರಿಸಿ"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer ಗೆ ಗಮನ ಬೇಕು",
+        "description": "ಆಯ್ಕೆಮಾಡಿದ ಮಾದರಿಯು ಕ್ಲೌಡ್ ಏಜೆಂಟ್ ಸೆಷನ್‌ಗಳಿಗೆ ಲಭ್ಯವಿಲ್ಲದ ಕಾರಣ Code Reviewer ಅನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ. ಲಭ್ಯವಿರುವ ಮಾದರಿಯನ್ನು ಆಯ್ಕೆ ಮಾಡಿ, ನಂತರ Code Reviewer ಅನ್ನು ಮತ್ತೆ ಸಕ್ರಿಯಗೊಳಿಸಿ.",
+        "recoveryLabel": "Code Reviewer ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ನವೀಕರಿಸಿ"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer ಗೆ ಗಮನ ಬೇಕು",
+        "description": "ಇಂದು ಮೂರು ರೆಪೊಸಿಟರಿ ಕ್ಲೋನ್ ಸಮಯಮಿತಿಗಳ ನಂತರ Code Reviewer ಅನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ. ಸಹಾಯಕ್ಕಾಗಿ hi@kilocode.ai ಅನ್ನು ಸಂಪರ್ಕಿಸಿ, ನಂತರ Code Reviewer ಅನ್ನು ಮತ್ತೆ ಸಕ್ರಿಯಗೊಳಿಸಿ.",
+        "recoveryLabel": "ಬೆಂಬಲವನ್ನು ಸಂಪರ್ಕಿಸಿ"
+      }
+    },
+    "unknownError": "ಅಪರಿಚಿತ ದೋಷ"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "ಸಂಶೋಧನೆಯು ಸ್ವಯಂಚಾಲಿತ ತೀವ್ರತೆ ಮಿತಿಗಿಂತ ಕಡಿಮೆಯಾಗಿದೆ. ಸುರಕ್ಷತಾ ಗೇಟ್ಗಳು ಪಾಸ್ ಆದಾಗ ಹಸ್ತಚಾಲಿತ ಪರಿಹಾರ ಇನ್ನೂ ಪ್ರಾರಂಭವಾಗಬಹುದು.",
       "beforeEnablement": "ಸ್ವಯಂ ಪರಿಹಾರವನ್ನು ಸಕ್ರಿಯಗೊಳಿಸುವ ಮೊದಲೇ ವಿಶ್ಲೇಷಣೆ ಪೂರ್ಣಗೊಂಡಿದೆ. ಸುರಕ್ಷತಾ ಗೇಟ್ಗಳು ಪಾಸ್ ಆದಾಗ ಹಸ್ತಚಾಲಿತ ಪರಿಹಾರ ಇನ್ನೂ ಪ್ರಾರಂಭವಾಗಬಹುದು.",
       "generic": "ಈ ಸಂಶೋಧನೆಗೆ ಪರಿಹಾರ ಲಭ್ಯವಿಲ್ಲ."
+    },
+    "commandFailure": {
+      "ownerCapReached": "ವಿಶ್ಲೇಷಣೆ ಸಾಮರ್ಥ್ಯ ತುಂಬಿದೆ. ಸಕ್ರಿಯ ವಿಶ್ಲೇಷಣೆ ಮುಗಿಯುವವರೆಗೆ ಕಾಯಿರಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "githubTokenUnavailable": "GitHub ಅಧಿಕಾರಕ್ಕೆ ಗಮನ ಬೇಕು. GitHub App ಅನ್ನು ಮರು-ಅಧಿಕಾರ ಮಾಡಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "githubAuthInvalid": "GitHub ಅಧಿಕಾರಕ್ಕೆ ಗಮನ ಬೇಕು. GitHub App ಅನ್ನು ಮರು-ಅಧಿಕಾರ ಮಾಡಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "findingUnavailable": "ಸಂಶೋಧನೆ ಇನ್ನು ಮುಂದೆ ಲಭ್ಯವಿಲ್ಲ. ಸಂಶೋಧನೆಗಳನ್ನು ರಿಫ್ರೆಶ್ ಮಾಡಿ, ಅದು ತೆರೆದಿದ್ದರೆ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "repositoryUnavailable": "ರೆಪೊಸಿಟರಿ ಇನ್ನು ಮುಂದೆ GitHub App ಗೆ ಲಭ್ಯವಿಲ್ಲ. ರೆಪೊಸಿಟರಿ ಪ್ರವೇಶವನ್ನು ರಿಫ್ರೆಶ್ ಮಾಡಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "invalidDismissTarget": "ಅದರ Dependabot ಗುರಿಯು ಅಮಾನ್ಯವಾಗಿರುವುದರಿಂದ ಸಂಶೋಧನೆಯನ್ನು ತಳ್ಳಿಹಾಕಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+      "commandStalled": "ಕ್ಯೂ ಮಾಡಿದ ಕ್ರಿಯೆಯು ಸಮಯಕ್ಕೆ ಮುಗಿಯಲಿಲ್ಲ. ಕ್ರಿಯೆಯನ್ನು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "queueRetriesExhausted": "ಹಲವಾರು ಪ್ರಯತ್ನಗಳ ನಂತರವೂ ಕ್ರಿಯೆಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಕ್ರಿಯೆಯನ್ನು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "queueAdmissionFailed": "ಕ್ಯೂ ಮಾಡಿದ ಕ್ರಿಯೆಯನ್ನು ಸೇರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಕ್ರಿಯೆಯನ್ನು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "generic": "ಕ್ಯೂ ಮಾಡಿದ ಕ್ರಿಯೆಯು ವಿಫಲವಾಗಿದೆ. ಕ್ರಿಯೆಯನ್ನು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+    },
+    "analysisMode": {
+      "auto": "ಸ್ವಯಂ",
+      "shallow": "ಆಳವಲ್ಲದ",
+      "deep": "ಆಳವಾದ"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "{{name}} ಅನ್ನು ಮೆಚ್ಚಿನವುಗಳಿಗೆ ಸೇರಿಸಿ",
       "removeFromFavorites": "{{name}} ಅನ್ನು ಮೆಚ್ಚಿನವುಗಳಿಂದ ತೆಗೆದುಹಾಕಿ",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "ಸೆಶನ್ ಮಾದರಿ"
     },
     "attachmentPreview": {
       "openFailedRetry": "ಫೈಲ್ ತೆರೆಯಲು ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "ಕ್ರೆಡಿಟ್‌ಗಳನ್ನು ಸೇರಿಸಿ",
-    "description": "ಬಳಕೆಯನ್ನು ಮುಂದುವರಿಸಲು ಕ್ರೆಡಿಟ್‌ಗಳನ್ನು ಸೇರಿಸಿ."
+    "description": "ಬಳಕೆಯನ್ನು ಮುಂದುವರಿಸಲು ಕ್ರೆಡಿಟ್‌ಗಳನ್ನು ಸೇರಿಸಿ.",
+    "billingPage": "ಬಿಲ್ಲಿಂಗ್ ಪುಟ"
   },
   "deviceSessions": {
     "couldNotLoad": "ಸೆಷನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "ಖರೀದಿಗಳನ್ನು ಮರುಸ್ಥಾಪಿಸಲು ವಿಫಲವಾಗಿದೆ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "purchaseFailed": "ಖರೀದಿ ಪೂರ್ಣಗೊಳಿಸಲು ವಿಫಲವಾಗಿದೆ.",
     "purchaseStartFailed": "App Store ಖರೀದಿ ಪ್ರಾರಂಭಿಸಲು ವಿಫಲವಾಗಿದೆ.",
-    "purchaseOwnedByAnotherAccount": "ಈ Apple Account ನಲ್ಲಿನ Kilo Pass ಬೇರೆ Kilo ಖಾತೆಗೆ ಸೇರಿದೆ."
+    "purchaseOwnedByAnotherAccount": "ಈ Apple Account ನಲ್ಲಿನ Kilo Pass ಬೇರೆ Kilo ಖಾತೆಗೆ ಸೇರಿದೆ.",
+    "couldNotConnectToAppStore": "App Store ಗೆ ಸಂಪರ್ಕಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "noMatchingProducts": "App Store ನಿಂದ ಹೊಂದಿಕೆಯಾಗುವ Kilo Pass ಉತ್ಪನ್ನಗಳು ಯಾವುವೂ ಹಿಂತಿರುಗಿಸಲಾಗಿಲ್ಲ.",
+    "purchaseMissingSignedTransaction": "App Store ಖರೀದಿಯು ಸಹಿ ಮಾಡಿದ ವಹಿವಾಟು JWS ಅನ್ನು ಒಳಗೊಂಡಿರಲಿಲ್ಲ."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "ಸುಧಾರಣೆ ಬೇಕು",
     "sorryTitle": "ಅದನ್ನು ಕೇಳಿ ನಮಗೆ ವಿಷಾದವಾಗಿದೆ!",
     "sorryMessage": "ಏನನ್ನು ಸುಧಾರಿಸಬೇಕು ಎಂದು ದಯವಿಟ್ಟು ನಮಗೆ ತಿಳಿಸಿ. ಅಪ್‌ನ ಉಸ್ತುವಾರಿ ಎಂಜಿನಿಯರ್ ಪ್ರತಿ ವರದಿಯನ್ನು ಓದುತ್ತಾರೆ!",
-    "emailUs": "ನಮಗೆ ಇಮೇಲ್ ಮಾಡಿ"
+    "emailUs": "ನಮಗೆ ಇಮೇಲ್ ಮಾಡಿ",
+    "emailSubject": "ಮೊಬೈಲ್ ಅಪ್ಲಿಕೇಶನ್ ಪ್ರತಿಕ್ರಿಯೆ"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "ಯಾವುದೇ ಕ್ರೆಡಿಟ್ ಚಟುವಟಿಕೆಯಿಲ್ಲ",
       "expires": "{{date}} ರಂದು ಮುಕ್ತಾಯಗೊಳ್ಳುತ್ತದೆ",
       "title": "ಕ್ರೆಡಿಟ್ ಚಟುವಟಿಕೆ",
-      "transactionFallback": "ಕ್ರೆಡಿಟ್ ವಹಿವಾಟು"
+      "transactionFallback": "ಕ್ರೆಡಿಟ್ ವಹಿವಾಟು",
+      "category": {
+        "organization_custom": "ಸಂಸ್ಥೆ ಕಸ್ಟಮ್",
+        "parent_to_child_transfer_in": "ಪೋಷಕರಿಂದ ಮಕ್ಕಳಿಗೆ ವರ್ಗಾವಣೆ (ಇನ್)",
+        "parent_to_child_transfer_out": "ಪೋಷಕರಿಂದ ಮಕ್ಕಳಿಗೆ ವರ್ಗಾವಣೆ (ಔಟ್)",
+        "oss-sponsorship": "OSS ಪ್ರಾಯೋಜಕತ್ವ",
+        "oss-monthly-reset": "OSS ಮಾಸಿಕ ಮರುಹೊಂದಿಸುವಿಕೆ",
+        "team-topup-bonus-2025": "ತಂಡದ ಟಾಪ್-ಅಪ್ ಬೋನಸ್ 2025",
+        "accounting_adjustment": "ಲೆಕ್ಕಪತ್ರ ಹೊಂದಾಣಿಕೆ",
+        "credits_expired": "ಕ್ರೆಡಿಟ್‌ಗಳು ಅವಧಿ ಮುಗಿದವು"
+      }
     },
     "inviteMember": {
       "emailError": "ಮಾನ್ಯ ಇಮೇಲ್ ವಿಳಾಸವನ್ನು ನಮೂದಿಸಿ",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "ಇನ್‌ವಾಯ್ಸ್‌ಗಳನ್ನು ಪ್ರತಿ ಬಿಲ್ಲಿಂಗ್ ಚಕ್ರದಲ್ಲಿ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ರಚಿಸಲಾಗುತ್ತದೆ ಮತ್ತು ನಿಮ್ಮ ಸಂಸ್ಥೆಗೆ ಬಿಲ್ ಆದ ನಂತರ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
       "emptyTitle": "ಯಾವುದೇ ಇನ್‌ವಾಯ್ಸ್‌ಗಳಿಲ್ಲ",
       "invoiceFallback": "ಇನ್‌ವಾಯ್ಸ್",
-      "statusOpen": "ತೆರೆದಿದೆ",
-      "statusPaid": "ಪಾವತಿಸಲಾಗಿದೆ",
-      "statusVoid": "ರದ್ದು",
       "title": "ಇನ್‌ವಾಯ್ಸ್‌ಗಳು",
       "downloadFailed": "ಇನ್‌ವಾಯ್ಸ್ ಡೌನ್‌ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-      "sharingUnavailable": "ಈ ಸಾಧನದಲ್ಲಿ ಹಂಚಿಕೆ ಲಭ್ಯವಿಲ್ಲ."
+      "sharingUnavailable": "ಈ ಸಾಧನದಲ್ಲಿ ಹಂಚಿಕೆ ಲಭ್ಯವಿಲ್ಲ.",
+      "status": {
+        "paid": "ಪಾವತಿಸಲಾಗಿದೆ",
+        "open": "ತೆರೆದಿದೆ",
+        "void": "ರದ್ದು",
+        "draft": "ಡ್ರಾಫ್ಟ್",
+        "uncollectible": "ವಸೂಲಿ ಮಾಡಲಾಗದ",
+        "unknown": "ತಿಳಿದಿಲ್ಲ"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "ಸಂಗ್ರಹಿಸಿದ ಡೇಟಾ",
     "free": "ಉಚಿತ",
-    "couldNotUpdateFavorites": "ಮೆಚ್ಚಿನವುಗಳನ್ನು ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"
+    "couldNotUpdateFavorites": "ಮೆಚ್ಚಿನವುಗಳನ್ನು ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+    "thinkingEffort": {
+      "none": "ಯಾವುದೂ ಇಲ್ಲ",
+      "minimal": "ಕನಿಷ್ಠ",
+      "low": "ಕಡಿಮೆ",
+      "medium": "ಮಧ್ಯಮ",
+      "high": "ಹೆಚ್ಚಿನ",
+      "xhigh": "ಹೆಚ್ಚುವರಿ ಹೆಚ್ಚಿನ",
+      "max": "ಗರಿಷ್ಠ"
+    }
   }
 }

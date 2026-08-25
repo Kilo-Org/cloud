@@ -382,7 +382,11 @@
       "paymentPastDue": "お支払いが期限を過ぎています。お支払い方法を更新してください。",
       "subscriptionCancels": "サブスクリプションは{{date}}に解約されます",
       "trialDaysRemaining": "トライアル: 残り{{remaining}}",
-      "trialEndingSoon": "トライアル終了間近: {{remaining}}"
+      "trialEndingSoon": "トライアル終了間近: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "新着情報",
@@ -750,7 +754,8 @@
       "strongArm": "ストロングアーム",
       "talisman": "タリスマン"
     },
-    "remoteSpawnFilesNotSupported": "このインスタンスはファイルを受信できません。"
+    "remoteSpawnFilesNotSupported": "このインスタンスはファイルを受信できません。",
+    "instanceSwitcherTitle": "KiloClawインスタンス"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -948,7 +953,60 @@
       "failed": "失敗",
       "cancelled": "キャンセル済み",
       "interrupted": "中断"
-    }
+    },
+    "reviewStyle": {
+      "strict": "厳格",
+      "balanced": "バランス",
+      "lenient": "寛容",
+      "roast": "容赦なし"
+    },
+    "focusArea": {
+      "security": "セキュリティ",
+      "performance": "パフォーマンス",
+      "bugs": "バグ",
+      "style": "スタイル",
+      "testing": "テスト",
+      "documentation": "ドキュメント"
+    },
+    "gateThreshold": {
+      "off": "オフ",
+      "all": "すべて",
+      "warning": "警告",
+      "critical": "重大"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "コードレビュアーに対応が必要です",
+        "description": "KiloがアクティブなGitHub Appインストールでこのリポジトリにアクセスできないため、コードレビュアーは無効になりました。GitHub Appのインストールを更新してから、コードレビュアーを再度有効にしてください。",
+        "recoveryLabel": "GitHub Appを更新"
+      },
+      "githubIpAllowList": {
+        "title": "コードレビュアーに対応が必要です",
+        "description": "このGitHub組織がKiloをブロックするIP許可リストを使用しているため、コードレビュアーは無効になりました。サポートが必要な場合はhi@kilocode.aiに連絡してから、コードレビュアーを再度有効にしてください。",
+        "recoveryLabel": "サポートに連絡"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "コードレビュアーに対応が必要です",
+        "description": "KiloがこのプロジェクトのGitLab Project Access Tokenを作成できないため、コードレビュアーは無効になりました。Maintainerアクセスを付与するか、Project Access Tokensを有効にしてから、コードレビュアーを再度有効にしてください。",
+        "recoveryLabel": "GitLabインテグレーションを更新"
+      },
+      "byokInvalidKey": {
+        "title": "コードレビュアーに対応が必要です",
+        "description": "選択したBYOK APIキーが無効、失効、または権限がないため、コードレビュアーは無効になりました。キーを更新するか別のモデルを選択してから、コードレビュアーを再度有効にしてください。",
+        "recoveryLabel": "BYOK設定を更新"
+      },
+      "selectedModelUnavailable": {
+        "title": "コードレビュアーに対応が必要です",
+        "description": "選択したモデルがクラウドエージェントセッションで利用できないため、コードレビュアーは無効になりました。利用可能なモデルを選択してから、コードレビュアーを再度有効にしてください。",
+        "recoveryLabel": "コードレビュアー設定を更新"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "コードレビュアーに対応が必要です",
+        "description": "今日3回のリポジトリクローンタイムアウトが発生したため、コードレビュアーは無効になりました。サポートが必要な場合はhi@kilocode.aiに連絡してから、コードレビュアーを再度有効にしてください。",
+        "recoveryLabel": "サポートに連絡"
+      }
+    },
+    "unknownError": "不明なエラー"
   },
   "securityAgent": {
     "filter": {
@@ -1488,6 +1546,23 @@
       "belowThreshold": "所見が自動修復の重大度しきい値を下回っています。安全ゲートを通過すれば、手動修復はまだ開始できます。",
       "beforeEnablement": "分析は自動修復が有効になる前に完了しました。安全ゲートを通過すれば、手動修復はまだ開始できます。",
       "generic": "この所見では修復を利用できません。"
+    },
+    "commandFailure": {
+      "ownerCapReached": "分析キャパシティがいっぱいです。アクティブな分析が終了するまで待ってから、再試行してください。",
+      "githubTokenUnavailable": "GitHubの承認に対応が必要です。GitHub Appを再承認してから、再試行してください。",
+      "githubAuthInvalid": "GitHubの承認に対応が必要です。GitHub Appを再承認してから、再試行してください。",
+      "findingUnavailable": "所見は利用できなくなりました。所見を更新し、未解決のままなら再試行してください。",
+      "repositoryUnavailable": "リポジトリがGitHub Appから利用できなくなりました。リポジトリアクセスを更新してから、再試行してください。",
+      "invalidDismissTarget": "Dependabotターゲットが無効なため、所見を却下できません。",
+      "commandStalled": "キューに入れたアクションが時間内に完了しませんでした。アクションを再試行してください。",
+      "queueRetriesExhausted": "数回試行した後もアクションを完了できませんでした。アクションを再試行してください。",
+      "queueAdmissionFailed": "キューに入れたアクションを受け付けられませんでした。アクションを再試行してください。",
+      "generic": "キューに入れたアクションに失敗しました。アクションを再試行してください。"
+    },
+    "analysisMode": {
+      "auto": "自動",
+      "shallow": "簡易",
+      "deep": "詳細"
     }
   },
   "agents": {
@@ -1951,7 +2026,8 @@
       "addToFavorites": "{{name}}をお気に入りに追加",
       "removeFromFavorites": "{{name}}をお気に入りから削除",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "セッションモデル"
     },
     "attachmentPreview": {
       "openFailedRetry": "ファイルを開けませんでした。もう一度お試しください。",
@@ -2083,7 +2159,8 @@
   },
   "addCredits": {
     "cta": "クレジットを追加",
-    "description": "使用を継続するにはクレジットを追加してください。"
+    "description": "使用を継続するにはクレジットを追加してください。",
+    "billingPage": "請求ページ"
   },
   "deviceSessions": {
     "couldNotLoad": "セッションを読み込めませんでした",
@@ -2271,7 +2348,10 @@
     "restoreFailed": "購入の復元に失敗しました。もう一度お試しください。",
     "purchaseFailed": "購入を完了できませんでした。",
     "purchaseStartFailed": "App Storeでの購入を開始できませんでした。",
-    "purchaseOwnedByAnotherAccount": "このAppleアカウントのKilo Passは別のKiloアカウントに属しています。"
+    "purchaseOwnedByAnotherAccount": "このAppleアカウントのKilo Passは別のKiloアカウントに属しています。",
+    "couldNotConnectToAppStore": "App Storeに接続できませんでした。接続を確認して、もう一度お試しください。",
+    "noMatchingProducts": "App Storeから一致するKilo Pass製品は返されませんでした。",
+    "purchaseMissingSignedTransaction": "App Storeの購入に署名済みトランザクションJWSが含まれていませんでした。"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2779,7 +2859,10 @@
     "diff": {
       "selectedTapToChange": "{{label}}を選択中。タップして選択を変更",
       "tapToComment": "{{label}}をタップしてコメント",
-      "truncationBanner": "変更されたファイル {{total}} 件中、最初の {{limit}} 件を表示中 — GitHub API の制限"
+      "truncationBanner": "変更されたファイル {{total}} 件中、最初の {{limit}} 件を表示中 — GitHub API の制限",
+      "statusAdded": "追加",
+      "statusContext": "コンテキスト",
+      "statusDeleted": "削除"
     },
     "linkPasteClipboardEmpty": "クリップボードが空です",
     "linkPasteNotAPullRequest": "GitHub のプルリクエストリンクではありません",
@@ -2793,6 +2876,11 @@
       "reviewNotSubmitted": "このレビューはこのままでは送信できません。PRが変更されたか、自分のプルリクエストはレビューできない可能性があります。",
       "couldNotPostComment": "コメントを投稿できませんでした。",
       "couldNotSubmitReview": "レビューを送信できませんでした。接続を確認して、もう一度お試しください。"
+    },
+    "operation": {
+      "couldNotReply": "返信できませんでした。",
+      "couldNotCompleteAction": "この操作を完了できませんでした。",
+      "mergeResultDefaultError": "GitHubはマージを完了しませんでした。"
     }
   },
   "organization": {
@@ -2810,7 +2898,17 @@
       "emptyTitle": "クレジットアクティビティはありません",
       "expires": "失効: {{date}}",
       "title": "クレジットアクティビティ",
-      "transactionFallback": "クレジット取引"
+      "transactionFallback": "クレジット取引",
+      "category": {
+        "organization_custom": "組織カスタム",
+        "parent_to_child_transfer_in": "親から子への振替（入）",
+        "parent_to_child_transfer_out": "親から子への振替（出）",
+        "oss-sponsorship": "OSSスポンサーシップ",
+        "oss-monthly-reset": "OSS月次リセット",
+        "team-topup-bonus-2025": "チームチャージボーナス2025",
+        "accounting_adjustment": "会計調整",
+        "credits_expired": "クレジット失効"
+      }
     },
     "hub": {
       "balance": "残高",
@@ -2837,11 +2935,16 @@
       "emptyTitle": "請求書はありません",
       "invoiceFallback": "請求書",
       "title": "請求書",
-      "statusPaid": "支払い済み",
-      "statusOpen": "未払い",
-      "statusVoid": "無効",
       "downloadFailed": "請求書をダウンロードできませんでした。接続を確認して、もう一度お試しください。",
-      "sharingUnavailable": "このデバイスでは共有は利用できません。"
+      "sharingUnavailable": "このデバイスでは共有は利用できません。",
+      "status": {
+        "paid": "支払い済み",
+        "open": "未払い",
+        "void": "無効",
+        "draft": "下書き",
+        "uncollectible": "回収不能",
+        "unknown": "不明"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2941,7 +3044,8 @@
     "promptTitle": "Kiloアプリはいかがですか？",
     "rateKilo": "Kiloを評価",
     "sorryMessage": "どこを改善すべきかお知らせください。アプリ担当のエンジニアがすべての報告を読んでいます！",
-    "sorryTitle": "それは残念です。"
+    "sorryTitle": "それは残念です。",
+    "emailSubject": "モバイルアプリのフィードバック"
   },
   "authErrors": {
     "emailAlreadyUsed": "このメールアドレスのアカウントは、別のサインイン方法ですでに存在します。別の方法を試すか、[$t(login.moreSignInOptions)] を使用してください。",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "収集されるデータ",
     "free": "無料",
-    "couldNotUpdateFavorites": "お気に入りを更新できませんでした"
+    "couldNotUpdateFavorites": "お気に入りを更新できませんでした",
+    "thinkingEffort": {
+      "none": "なし",
+      "minimal": "最小限",
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "xhigh": "非常に高い",
+      "max": "最大"
+    }
   }
 }

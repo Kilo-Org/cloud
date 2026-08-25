@@ -5,7 +5,21 @@ import { API_BASE_URL } from '@/lib/config';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { i18n } from '@/i18n';
 import { collator } from '@/lib/intl-cache';
-import { capitalize } from '@/lib/utils';
+
+const THINKING_EFFORT_KEYS = {
+  none: 'models.thinkingEffort.none',
+  minimal: 'models.thinkingEffort.minimal',
+  low: 'models.thinkingEffort.low',
+  medium: 'models.thinkingEffort.medium',
+  high: 'models.thinkingEffort.high',
+  xhigh: 'models.thinkingEffort.xhigh',
+  max: 'models.thinkingEffort.max',
+} satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -94,10 +108,8 @@ export function toModelOptions(data: ModelResponse | undefined): ModelOption[] {
 }
 
 export function thinkingEffortLabel(variant: string): string {
-  if (variant === 'xhigh') {
-    return 'Extra High';
-  }
-  return capitalize(variant);
+  const key = lookup(THINKING_EFFORT_KEYS, variant);
+  return key ? i18n.t(key) : variant;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────

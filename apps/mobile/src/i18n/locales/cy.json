@@ -601,7 +601,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} wedi'i ddewis, tapiwch i newid y dewis",
       "tapToComment": "{{label}}, tapiwch i sylwebu",
-      "truncationBanner": "Yn dangos y {{limit}} cyntaf o {{total}} ffeil a newidiwyd — terfyn API GitHub"
+      "truncationBanner": "Yn dangos y {{limit}} cyntaf o {{total}} ffeil a newidiwyd — terfyn API GitHub",
+      "statusAdded": "Wedi'i ychwanegu",
+      "statusContext": "Cyd-destun",
+      "statusDeleted": "Wedi'i ddileu"
     },
     "linkPasteClipboardEmpty": "Mae'r clipfwrdd yn wag",
     "linkPasteNotAPullRequest": "Nid dolen GitHub pull request yw hon",
@@ -615,6 +618,11 @@
       "reviewNotSubmitted": "Ni ellir cyflwyno'r adolygiad hwn fel y mae. Efallai fod y PR wedi newid, neu ni allwch adolygu eich cais tynnu eich hun.",
       "couldNotPostComment": "Ni ellid postio'r sylw.",
       "couldNotSubmitReview": "Ni ellid cyflwyno'r adolygiad. Gwiriwch eich cysylltiad a rhoi cynnig arall arni."
+    },
+    "operation": {
+      "couldNotReply": "Ni ellid ateb.",
+      "couldNotCompleteAction": "Ni ellid cwblhau'r weithred hon.",
+      "mergeResultDefaultError": "Ni chwblhaodd GitHub y cyfuniad."
     }
   },
   "notifications": {
@@ -853,7 +861,11 @@
       "paymentPastDue": "Taliad hwyr. Diweddarwch eich dull talu.",
       "subscriptionCancels": "Mae'r tanysgrifiad yn canslo {{date}}",
       "trialDaysRemaining": "Treial: {{remaining}} ar ôl",
-      "trialEndingSoon": "Treial yn dod i ben yn fuan: {{remaining}}"
+      "trialEndingSoon": "Treial yn dod i ben yn fuan: {{remaining}}",
+      "planName": {
+        "commit": "Ymrwymo",
+        "standard": "Safonol"
+      }
     },
     "changelog": {
       "title": "Beth sy'n Newydd",
@@ -1225,7 +1237,8 @@
       "strongArm": "Braich gref",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Ni all yr enghraifft hon dderbyn ffeiliau."
+    "remoteSpawnFilesNotSupported": "Ni all yr enghraifft hon dderbyn ffeiliau.",
+    "instanceSwitcherTitle": "Enghraifft KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1423,7 +1436,60 @@
       "failed": "Wedi methu",
       "cancelled": "Wedi'i ganslo",
       "interrupted": "Wedi'i atal"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Llym",
+      "balanced": "Cytbwys",
+      "lenient": "Llac",
+      "roast": "Rhost"
+    },
+    "focusArea": {
+      "security": "Diogelwch",
+      "performance": "Perfformiad",
+      "bugs": "Chwilod",
+      "style": "Arddull",
+      "testing": "Profi",
+      "documentation": "Dogfennaeth"
+    },
+    "gateThreshold": {
+      "off": "I ffwrdd",
+      "all": "Pob un",
+      "warning": "Rhybuddion",
+      "critical": "Critigol"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Mae angen sylw ar yr Adolygydd Cod",
+        "description": "Analluogwyd yr Adolygydd Cod oherwydd na all Kilo gyrchu'r ystorfa hon gyda gosodiad Ap GitHub gweithredol. Diweddarwch osodiad yr Ap GitHub, yna galluogwch yr Adolygydd Cod eto.",
+        "recoveryLabel": "Diweddaru Ap GitHub"
+      },
+      "githubIpAllowList": {
+        "title": "Mae angen sylw ar yr Adolygydd Cod",
+        "description": "Analluogwyd yr Adolygydd Cod oherwydd bod y sefydliad GitHub hwn yn defnyddio rhestr ganiatáu IP sy'n blocio Kilo. Cysylltwch â hi@kilocode.ai am gymorth, yna galluogwch yr Adolygydd Cod eto.",
+        "recoveryLabel": "Cysylltu â chymorth"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Mae angen sylw ar yr Adolygydd Cod",
+        "description": "Analluogwyd yr Adolygydd Cod oherwydd na all Kilo greu Tocyn Mynediad Prosiect GitLab ar gyfer y prosiect hwn. Rhowch fynediad Cynhalydd neu galluogwch Docynnau Mynediad Prosiect, yna galluogwch yr Adolygydd Cod eto.",
+        "recoveryLabel": "Diweddaru integreiddiad GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Mae angen sylw ar yr Adolygydd Cod",
+        "description": "Analluogwyd yr Adolygydd Cod oherwydd bod yr allwedd API BYOK a ddewiswyd yn annilys, wedi'i dirymu, neu heb ganiatâd. Diweddarwch yr allwedd neu dewiswch fodel arall, yna galluogwch yr Adolygydd Cod eto.",
+        "recoveryLabel": "Diweddaru gosodiadau BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Mae angen sylw ar yr Adolygydd Cod",
+        "description": "Analluogwyd yr Adolygydd Cod oherwydd nad yw'r model a ddewiswyd ar gael ar gyfer sesiynau Cloud Agent. Dewiswch fodel sydd ar gael, yna galluogwch yr Adolygydd Cod eto.",
+        "recoveryLabel": "Diweddaru gosodiadau'r Adolygydd Cod"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Mae angen sylw ar yr Adolygydd Cod",
+        "description": "Analluogwyd yr Adolygydd Cod ar ôl tri oedi clonio ystorfa heddiw. Cysylltwch â hi@kilocode.ai am gymorth, yna galluogwch yr Adolygydd Cod eto.",
+        "recoveryLabel": "Cysylltu â chymorth"
+      }
+    },
+    "unknownError": "Gwall anhysbys"
   },
   "securityAgent": {
     "filter": {
@@ -1979,6 +2045,23 @@
       "belowThreshold": "Mae'r canfyddiad yn is na throthwy difrifoldeb awtomatig. Gall adferiad â llaw ddal i ddechrau pan fydd gatiau diogelwch yn pasio.",
       "beforeEnablement": "Cwblhawyd y dadansoddiad cyn galluogi Adfer Awtomatig. Gall adferiad â llaw ddal i ddechrau pan fydd gatiau diogelwch yn pasio.",
       "generic": "Nid yw adferiad ar gael ar gyfer y canfyddiad hwn."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Mae capasiti dadansoddi'n llawn. Arhoswch i ddadansoddiad gweithredol orffen, yna rhowch gynnig arall arni.",
+      "githubTokenUnavailable": "Mae angen sylw ar awdurdodiad GitHub. Ail-awdurdodwch yr Ap GitHub, yna rhowch gynnig arall arni.",
+      "githubAuthInvalid": "Mae angen sylw ar awdurdodiad GitHub. Ail-awdurdodwch yr Ap GitHub, yna rhowch gynnig arall arni.",
+      "findingUnavailable": "Nid yw'r canfyddiad ar gael mwyach. Adnewyddwch ganfyddiadau a rhowch gynnig arall arni os yw'n parhau ar agor.",
+      "repositoryUnavailable": "Nid yw'r ystorfa ar gael i Ap GitHub mwyach. Adnewyddwch fynediad i'r ystorfa, yna rhowch gynnig arall arni.",
+      "invalidDismissTarget": "Ni ellir gwrthod y canfyddiad oherwydd bod ei darged Dependabot yn annilys.",
+      "commandStalled": "Ni orffennodd y weithred a roddwyd mewn ciw mewn pryd. Rhowch gynnig arall arni.",
+      "queueRetriesExhausted": "Ni ellid cwblhau'r weithred ar ôl sawl cynnig. Rhowch gynnig arall arni.",
+      "queueAdmissionFailed": "Ni ellid derbyn y weithred a roddwyd mewn ciw. Rhowch gynnig arall arni.",
+      "generic": "Methodd y weithred a roddwyd mewn ciw. Rhowch gynnig arall arni."
+    },
+    "analysisMode": {
+      "auto": "Awtomatig",
+      "shallow": "Bas",
+      "deep": "Dwfn"
     }
   },
   "agents": {
@@ -2466,7 +2549,8 @@
       "addToFavorites": "Ychwanegu {{name}} i'r ffefrynnau",
       "removeFromFavorites": "Dileu {{name}} o'r ffefrynnau",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Model y sesiwn"
     },
     "attachmentPreview": {
       "openFailedRetry": "Methwyd agor y ffeil. Ceisiwch eto.",
@@ -2602,7 +2686,8 @@
   },
   "addCredits": {
     "cta": "Ychwanegu credydau",
-    "description": "Ychwanegwch gredydau i gadw defnydd yn rhedeg."
+    "description": "Ychwanegwch gredydau i gadw defnydd yn rhedeg.",
+    "billingPage": "tudalen filio"
   },
   "deviceSessions": {
     "couldNotLoad": "Methwyd llwytho sesiynau",
@@ -2790,7 +2875,10 @@
     "restoreFailed": "Methodd adfer pryniannau. Rhowch gynnig arall arni.",
     "purchaseFailed": "Methodd cwblhau'r pryniant.",
     "purchaseStartFailed": "Methodd cychwyn pryniant App Store.",
-    "purchaseOwnedByAnotherAccount": "Mae'r Kilo Pass ar yr Apple Account hwn yn perthyn i gyfrif Kilo gwahanol."
+    "purchaseOwnedByAnotherAccount": "Mae'r Kilo Pass ar yr Apple Account hwn yn perthyn i gyfrif Kilo gwahanol.",
+    "couldNotConnectToAppStore": "Ni ellid cysylltu â'r App Store. Gwiriwch eich cysylltiad a cheisiwch eto.",
+    "noMatchingProducts": "Ni ddychwelodd yr App Store unrhyw gynhyrchion Kilo Pass cyfatebol.",
+    "purchaseMissingSignedTransaction": "Ni chynhwysodd y pryniant App Store drafodiad JWS wedi'i lofnodi."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2886,7 +2974,8 @@
     "needsWork": "Angen gwaith",
     "sorryTitle": "Mae'n ddrwg gennym glywed hynny!",
     "sorryMessage": "Rhowch wybod i ni beth sydd angen ei wella. Mae'r peiriannydd sy'n gyfrifol am yr ap yn darllen pob adroddiad!",
-    "emailUs": "E-bostiwch ni"
+    "emailUs": "E-bostiwch ni",
+    "emailSubject": "Adborth ap symudol"
   },
   "organization": {
     "boundary": {
@@ -2903,7 +2992,17 @@
       "emptyTitle": "Dim gweithgaredd credyd",
       "expires": "Yn dod i ben {{date}}",
       "title": "Gweithgaredd credyd",
-      "transactionFallback": "Trafodiad credyd"
+      "transactionFallback": "Trafodiad credyd",
+      "category": {
+        "organization_custom": "Addasiad arferiad sefydliad",
+        "parent_to_child_transfer_in": "Trosglwyddiad rhiant i blentyn i mewn",
+        "parent_to_child_transfer_out": "Trosglwyddiad rhiant i blentyn allan",
+        "oss-sponsorship": "Nawdd OSS",
+        "oss-monthly-reset": "Ailosod misol OSS",
+        "team-topup-bonus-2025": "Bonws ail-lenwi tîm 2025",
+        "accounting_adjustment": "Addasiad cyfrifyddu",
+        "credits_expired": "Credydau wedi dod i ben"
+      }
     },
     "inviteMember": {
       "emailError": "Nodwch gyfeiriad e-bost dilys",
@@ -2920,12 +3019,17 @@
       "emptyDescription": "Cynhyrchir anfonebau'n awtomatig bob cylch bilio a byddant yn ymddangos yma unwaith y bydd eich sefydliad yn cael ei filio.",
       "emptyTitle": "Dim anfonebau",
       "invoiceFallback": "Anfoneb",
-      "statusOpen": "Ar agor",
-      "statusPaid": "Wedi'i thalu",
-      "statusVoid": "Gwag",
       "title": "Anfonebau",
       "downloadFailed": "Ni ellid lawrlwytho'r anfoneb. Gwiriwch eich cysylltiad a rhoi cynnig arall arni.",
-      "sharingUnavailable": "Nid yw rhannu ar gael ar y ddyfais hon."
+      "sharingUnavailable": "Nid yw rhannu ar gael ar y ddyfais hon.",
+      "status": {
+        "paid": "Wedi'i thalu",
+        "open": "Ar agor",
+        "void": "Gwag",
+        "draft": "Drafft",
+        "uncollectible": "Anghasgladwy",
+        "unknown": "Anhysbys"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3055,6 +3159,15 @@
   "models": {
     "dataCollected": "Data a gasglwyd",
     "free": "Am ddim",
-    "couldNotUpdateFavorites": "Ni ellid diweddaru ffefrynnau"
+    "couldNotUpdateFavorites": "Ni ellid diweddaru ffefrynnau",
+    "thinkingEffort": {
+      "none": "Dim",
+      "minimal": "Lleiaf",
+      "low": "Isel",
+      "medium": "Canolig",
+      "high": "Uchel",
+      "xhigh": "Uchel iawn",
+      "max": "Uchaf"
+    }
   }
 }

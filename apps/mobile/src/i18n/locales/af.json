@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "Gekies {{label}}, tik om seleksie te verander",
       "truncationBanner": "Wys die eerste {{limit}} van {{total}} veranderde lêers — GitHub API-limiet",
-      "tapToComment": "{{label}}, tik om kommentaar te lewer"
+      "tapToComment": "{{label}}, tik om kommentaar te lewer",
+      "statusAdded": "Bygevoeg",
+      "statusContext": "Konteks",
+      "statusDeleted": "Verwyder"
     },
     "linkPasteClipboardEmpty": "Knipbord is leeg",
     "linkPasteNotAPullRequest": "Nie 'n GitHub-pull-request-skakel nie",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Hierdie resensie kan nie soos dit is ingedien word nie. Die PR het dalk verander, of jy kan nie jou eie trekversoek resenseer nie.",
       "couldNotPostComment": "Kon nie kommentaar plaas nie.",
       "couldNotSubmitReview": "Kon nie resensie indien nie. Kontroleer jou verbinding en probeer weer."
+    },
+    "operation": {
+      "couldNotReply": "Kon nie antwoord nie.",
+      "couldNotCompleteAction": "Kon nie hierdie aksie voltooi nie.",
+      "mergeResultDefaultError": "GitHub het nie die samesmelting voltooi nie."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "subscriptionCancels": "Intekening kanselleer {{date}}",
       "trialDaysRemaining": "Proefperiode: {{remaining}} oor",
       "trialEndingSoon": "Proefperiode eindig binnekort: {{remaining}}",
-      "lessThanOneDay": "Minder as 1 dag"
+      "lessThanOneDay": "Minder as 1 dag",
+      "planName": {
+        "commit": "Vastelê",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Wat's Nuut",
@@ -1189,7 +1201,8 @@
       "strongArm": "Sterk arm",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Hierdie instansie kan nie lêers ontvang nie."
+    "remoteSpawnFilesNotSupported": "Hierdie instansie kan nie lêers ontvang nie.",
+    "instanceSwitcherTitle": "KiloClaw-instansie"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Misluk",
       "cancelled": "Gekanselleer",
       "interrupted": "Onderbreek"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Streng",
+      "balanced": "Gebalanseerd",
+      "lenient": "Toegeeflik",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Sekuriteit",
+      "performance": "Prestasie",
+      "bugs": "Foute",
+      "style": "Styl",
+      "testing": "Toetsing",
+      "documentation": "Dokumentasie"
+    },
+    "gateThreshold": {
+      "off": "Af",
+      "all": "Alles",
+      "warning": "Waarskuwing",
+      "critical": "Krities"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Kode-hersiener benodig aandag",
+        "description": "Kode-hersiener is gedeaktiveer omdat Kilo nie toegang tot hierdie bewaarplek kan kry met 'n aktiewe GitHub App-installasie nie. Werk die GitHub App-installasie by, en aktiveer Kode-hersiener weer.",
+        "recoveryLabel": "Werk GitHub App by"
+      },
+      "githubIpAllowList": {
+        "title": "Kode-hersiener benodig aandag",
+        "description": "Kode-hersiener is gedeaktiveer omdat hierdie GitHub-organisasie 'n IP-toelatingslys gebruik wat Kilo blokkeer. Kontak hi@kilocode.ai vir hulp, en aktiveer Kode-hersiener weer.",
+        "recoveryLabel": "Kontak ondersteuning"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Kode-hersiener benodig aandag",
+        "description": "Kode-hersiener is gedeaktiveer omdat Kilo nie 'n GitLab-projektoegangstoken vir hierdie projek kan skep nie. Verleen Maintainer-toegang of aktiveer projektoegangstokens, en aktiveer Kode-hersiener weer.",
+        "recoveryLabel": "Werk GitLab-integrasie by"
+      },
+      "byokInvalidKey": {
+        "title": "Kode-hersiener benodig aandag",
+        "description": "Kode-hersiener is gedeaktiveer omdat die geselekteerde BYOK API-sleutel ongeldig is, herroep is, of nie toestemming het nie. Werk die sleutel by of kies 'n ander model, en aktiveer Kode-hersiener weer.",
+        "recoveryLabel": "Werk BYOK-instellings by"
+      },
+      "selectedModelUnavailable": {
+        "title": "Kode-hersiener benodig aandag",
+        "description": "Kode-hersiener is gedeaktiveer omdat die geselekteerde model nie vir cloud agent-sessies beskikbaar is nie. Kies 'n beskikbare model, en aktiveer Kode-hersiener weer.",
+        "recoveryLabel": "Werk Kode-hersiener-instellings by"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Kode-hersiener benodig aandag",
+        "description": "Kode-hersiener is gedeaktiveer ná drie bewaarplekkloneer-tydverstrekke vandag. Kontak hi@kilocode.ai vir hulp, en aktiveer Kode-hersiener weer.",
+        "recoveryLabel": "Kontak ondersteuning"
+      }
+    },
+    "unknownError": "Onbekende fout"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Die bevinding is onder die outomatiese ernsgraaddrempel. Handmatige regstelling kan steeds begin wanneer veiligheidshekke slaag.",
       "beforeEnablement": "Ontleding is voltooi voordat Auto-regstelling geaktiveer is. Handmatige regstelling kan steeds begin wanneer veiligheidshekke slaag.",
       "generic": "Regstelling is vir hierdie bevinding onbeskikbaar."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Ontledingskapasiteit is vol. Wag vir 'n aktiewe ontleding om klaar te maak, en probeer dan weer.",
+      "githubTokenUnavailable": "GitHub-magtiging benodig aandag. Her-magtig GitHub App, en probeer dan weer.",
+      "githubAuthInvalid": "GitHub-magtiging benodig aandag. Her-magtig GitHub App, en probeer dan weer.",
+      "findingUnavailable": "Bevinding is nie meer beskikbaar nie. Verfris bevindings en probeer weer as dit oop bly.",
+      "repositoryUnavailable": "Bewaarplek is nie meer vir GitHub App beskikbaar nie. Verfris bewaarplektoegang, en probeer dan weer.",
+      "invalidDismissTarget": "Bevinding kan nie van die hand gemaak word nie omdat sy Dependabot-teiken ongeldig is.",
+      "commandStalled": "Aksie in die tou het nie betyds klaargemaak nie. Probeer aksie weer.",
+      "queueRetriesExhausted": "Aksie kon nie ná verskeie pogings voltooi word nie. Probeer aksie weer.",
+      "queueAdmissionFailed": "Aksie in die tou kon nie toegelaat word nie. Probeer aksie weer.",
+      "generic": "Aksie in die tou het misluk. Probeer aksie weer."
+    },
+    "analysisMode": {
+      "auto": "Outo",
+      "shallow": "Vlak",
+      "deep": "Diep"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Voeg {{name}} by gunstelinge",
       "removeFromFavorites": "Verwyder {{name}} van gunstelinge",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Sessiemodel"
     },
     "attachmentPreview": {
       "openFailedRetry": "Kon nie lêer oopmaak nie. Probeer asseblief weer.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Voeg krediete by",
-    "description": "Voeg krediete by om gebruik aan die gang te hou."
+    "description": "Voeg krediete by om gebruik aan die gang te hou.",
+    "billingPage": "faktureringsbladsy"
   },
   "deviceSessions": {
     "couldNotLoad": "Kon nie sessies laai nie",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Kon nie aankope herstel nie. Probeer weer.",
     "purchaseFailed": "Kon nie aankoop voltooi nie.",
     "purchaseStartFailed": "Kon nie App Store-aankoop begin nie.",
-    "purchaseOwnedByAnotherAccount": "Die Kilo Pass op hierdie Apple-rekening behoort aan 'n ander Kilo-rekening."
+    "purchaseOwnedByAnotherAccount": "Die Kilo Pass op hierdie Apple-rekening behoort aan 'n ander Kilo-rekening.",
+    "couldNotConnectToAppStore": "Kon nie aan die App Store koppel nie. Kontroleer jou verbinding en probeer weer.",
+    "noMatchingProducts": "Geen ooreenstemmende Kilo Pass-produkte is deur App Store teruggegee nie.",
+    "purchaseMissingSignedTransaction": "App Store-aankoop het nie 'n getekende transaksie-JWS ingesluit nie."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Moet werk",
     "sorryTitle": "Ons is jammer om dit te hoor!",
     "sorryMessage": "Laat ons asseblief weet wat beter moet word. Die ingenieur in beheer van die app lees elke verslag!",
-    "emailUs": "E-pos ons"
+    "emailUs": "E-pos ons",
+    "emailSubject": "terugvoer oor mobiele app"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Geen kredietaktiwiteit nie",
       "expires": "Verval {{date}}",
       "title": "Kredietaktiwiteit",
-      "transactionFallback": "Krediettransaksie"
+      "transactionFallback": "Krediettransaksie",
+      "category": {
+        "organization_custom": "Organisasie-aangepas",
+        "parent_to_child_transfer_in": "Ouer-na-kind-oordrag in",
+        "parent_to_child_transfer_out": "Ouer-na-kind-oordrag uit",
+        "oss-sponsorship": "OSS-borgskap",
+        "oss-monthly-reset": "OSS-maandelikse herstel",
+        "team-topup-bonus-2025": "Span-hervulling-bonus-2025",
+        "accounting_adjustment": "Rekeningkundige aanpassing",
+        "credits_expired": "Krediete verval"
+      }
     },
     "inviteMember": {
       "emailError": "Voer 'n geldige e-posadres in",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Fakture word outomaties elke faktuursiklus gegenereer en sal hier verskyn sodra jou organisasie gefaktureer word.",
       "emptyTitle": "Geen fakture nie",
       "invoiceFallback": "Faktuur",
-      "statusOpen": "Oop",
-      "statusPaid": "Betaal",
-      "statusVoid": "Ongeldig",
       "title": "Fakture",
       "downloadFailed": "Kon nie faktuur aflaai nie. Kontroleer jou verbinding en probeer weer.",
-      "sharingUnavailable": "Deling is nie op hierdie toestel beskikbaar nie."
+      "sharingUnavailable": "Deling is nie op hierdie toestel beskikbaar nie.",
+      "status": {
+        "paid": "Betaal",
+        "open": "Oop",
+        "void": "Ongeldig",
+        "draft": "Konsep",
+        "uncollectible": "Oninbaar",
+        "unknown": "Onbekend"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Data ingesamel",
     "free": "Gratis",
-    "couldNotUpdateFavorites": "Kon nie gunstelinge bywerk nie"
+    "couldNotUpdateFavorites": "Kon nie gunstelinge bywerk nie",
+    "thinkingEffort": {
+      "none": "Geen",
+      "minimal": "Minimaal",
+      "low": "Laag",
+      "medium": "Medium",
+      "high": "Hoog",
+      "xhigh": "Ekstra hoog",
+      "max": "Maksimum"
+    }
   }
 }

@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} imechaguliwa, gusa kubadilisha uteuzi",
       "tapToComment": "{{label}}, gusa kutoa maoni",
-      "truncationBanner": "Inaonyesha {{limit}} za kwanza kati ya {{total}} faili zilizobadilishwa — kikomo cha API ya GitHub"
+      "truncationBanner": "Inaonyesha {{limit}} za kwanza kati ya {{total}} faili zilizobadilishwa — kikomo cha API ya GitHub",
+      "statusAdded": "Imeongezwa",
+      "statusContext": "Muktadha",
+      "statusDeleted": "Imefutwa"
     },
     "linkPasteClipboardEmpty": "Ubao wa kunakili ni tupu",
     "linkPasteNotAPullRequest": "Si kiungo cha ombi la kuvuta la GitHub",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "Ukaguzi huu hauwezi kuwasilishwa kama ulivyo. PR huenda imebadilika, au huwezi kukagua pull request yako mwenyewe.",
       "couldNotPostComment": "Imeshindwa kuchapisha maoni.",
       "couldNotSubmitReview": "Imeshindwa kuwasilisha ukaguzi. Angalia muunganisho wako na ujaribu tena."
+    },
+    "operation": {
+      "couldNotReply": "Imeshindwa kujibu.",
+      "couldNotCompleteAction": "Imeshindwa kukamilisha kitendo hiki.",
+      "mergeResultDefaultError": "GitHub haikukamilisha muunganisho."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "Malipo yamechelewa. Tafadhali sasisha njia yako ya malipo.",
       "subscriptionCancels": "Usajili unafutwa {{date}}",
       "trialDaysRemaining": "Jaribio: siku {{remaining}} zimesalia",
-      "trialEndingSoon": "Jaribio linaisha hivi karibuni: {{remaining}}"
+      "trialEndingSoon": "Jaribio linaisha hivi karibuni: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Ni Nini Kipya",
@@ -1189,7 +1201,8 @@
       "strongArm": "Mkono wenye nguvu",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "Tukio hili haliwezi kupokea faili."
+    "remoteSpawnFilesNotSupported": "Tukio hili haliwezi kupokea faili.",
+    "instanceSwitcherTitle": "Tukio la KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "Imeshindwa",
       "cancelled": "Imegairiwa",
       "interrupted": "Imeingiliwa"
-    }
+    },
+    "reviewStyle": {
+      "strict": "Kali",
+      "balanced": "Iliyosawazishwa",
+      "lenient": "Mpole",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Usalama",
+      "performance": "Utendaji",
+      "bugs": "Matatizo",
+      "style": "Mtindo",
+      "testing": "Upimaji",
+      "documentation": "Nyaraka"
+    },
+    "gateThreshold": {
+      "off": "Zima",
+      "all": "Zote",
+      "warning": "Onyo",
+      "critical": "Muhimu"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer inahitaji uangalizi",
+        "description": "Code Reviewer ilizimwa kwa sababu Kilo haiwezi kufikia hazina hii kwa usakinishaji unaoendelea wa GitHub App. Sasisha usakinishaji wa GitHub App, kisha washa Code Reviewer tena.",
+        "recoveryLabel": "Sasisha GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer inahitaji uangalizi",
+        "description": "Code Reviewer ilizimwa kwa sababu shirika hili la GitHub linatumia orodha ya kuruhusu IP inayozuia Kilo. Wasiliana na hi@kilocode.ai kwa usaidizi, kisha washa Code Reviewer tena.",
+        "recoveryLabel": "Wasiliana na usaidizi"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer inahitaji uangalizi",
+        "description": "Code Reviewer ilizimwa kwa sababu Kilo haiwezi kuunda GitLab Project Access Token kwa mradi huu. Toa ufikiaji wa Maintainer au washa Project Access Tokens, kisha washa Code Reviewer tena.",
+        "recoveryLabel": "Sasisha ujumuisho wa GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer inahitaji uangalizi",
+        "description": "Code Reviewer ilizimwa kwa sababu ufunguo wa API wa BYOK uliochaguliwa ni batili, umeondolewa, au hauna ruhusa. Sasisha ufunguo au chagua muundo mwingine, kisha washa Code Reviewer tena.",
+        "recoveryLabel": "Sasisha mipangilio ya BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer inahitaji uangalizi",
+        "description": "Code Reviewer ilizimwa kwa sababu muundo uliochaguliwa haupatikani kwa vipindi vya wakala wa wingu. Chagua muundo unaopatikana, kisha washa Code Reviewer tena.",
+        "recoveryLabel": "Sasisha mipangilio ya Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer inahitaji uangalizi",
+        "description": "Code Reviewer ilizimwa baada ya muda wa kloni wa hazina kuisha mara tatu leo. Wasiliana na hi@kilocode.ai kwa usaidizi, kisha washa Code Reviewer tena.",
+        "recoveryLabel": "Wasiliana na usaidizi"
+      }
+    },
+    "unknownError": "Hitilafu isiyojulikana"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "Matokeo yako chini ya kizingiti cha ukali wa kiotomatiki. Urekebishaji wa mwongozo bado unaweza kuanza milango ya usalama ikipita.",
       "beforeEnablement": "Uchambuzi ulikamilika kabla matengenezo ya kiotomatiki yaliwashwa. Urekebishaji wa mwongozo bado unaweza kuanza milango ya usalama ikipita.",
       "generic": "Urekebishaji haupatikani kwa matokeo haya."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Uwezo wa uchambuzi umejaa. Subiri uchambuzi unaoendelea umalize, kisha ujaribu tena.",
+      "githubTokenUnavailable": "Uidhinishaji wa GitHub unahitaji uangalizi. Idhinisha GitHub App tena, kisha ujaribu tena.",
+      "githubAuthInvalid": "Uidhinishaji wa GitHub unahitaji uangalizi. Idhinisha GitHub App tena, kisha ujaribu tena.",
+      "findingUnavailable": "Matokeo hayapatikani tena. Sasisha matokeo na ujaribu tena ikiwa bado yapo wazi.",
+      "repositoryUnavailable": "Hazina haipatikani tena kwa GitHub App. Sasisha ufikiaji wa hazina, kisha ujaribu tena.",
+      "invalidDismissTarget": "Matokeo hayawezi kuondolewa kwa sababu lengo lake la Dependabot si halali.",
+      "commandStalled": "Kitendo kilichopangwa hakikumaliza kwa wakati. Jaribu kitendo tena.",
+      "queueRetriesExhausted": "Kitendo hakikuweza kukamilika baada ya majaribio kadhaa. Jaribu kitendo tena.",
+      "queueAdmissionFailed": "Kitendo kilichopangwa hakikuweza kukubaliwa. Jaribu kitendo tena.",
+      "generic": "Kitendo kilichopangwa kilishindikana. Jaribu kitendo tena."
+    },
+    "analysisMode": {
+      "auto": "Kiotomatiki",
+      "shallow": "Ya kina kidogo",
+      "deep": "Ya kina kirefu"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "Ongeza {{name}} kwenye vipendwa",
       "removeFromFavorites": "Ondoa {{name}} kwenye vipendwa",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Muundo wa kipindi"
     },
     "attachmentPreview": {
       "openFailedRetry": "Imeshindwa kufungua faili. Tafadhali jaribu tena.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "Ongeza salio",
-    "description": "Ongeza salio ili uendelee kutumia."
+    "description": "Ongeza salio ili uendelee kutumia.",
+    "billingPage": "ukurasa wa malipo"
   },
   "deviceSessions": {
     "couldNotLoad": "Haikuweza kupakia vikao",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "Imeshindwa kurejesha ununuzi. Jaribu tena.",
     "purchaseFailed": "Imeshindwa kukamilisha ununuzi.",
     "purchaseStartFailed": "Imeshindwa kuanza ununuzi wa App Store.",
-    "purchaseOwnedByAnotherAccount": "Kilo Pass kwenye Akaunti hii ya Apple ni ya akaunti nyingine ya Kilo."
+    "purchaseOwnedByAnotherAccount": "Kilo Pass kwenye Akaunti hii ya Apple ni ya akaunti nyingine ya Kilo.",
+    "couldNotConnectToAppStore": "Imeshindwa kuunganishwa kwenye App Store. Angalia muunganisho wako na ujaribu tena.",
+    "noMatchingProducts": "App Store haikurudisha bidhaa zinazolingana za Kilo Pass.",
+    "purchaseMissingSignedTransaction": "Ununuzi wa App Store haukujumuisha JWS ya muamala iliyotiwa saini."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "Inahitaji kazi",
     "sorryTitle": "Tunasikitika kusikia hivyo!",
     "sorryMessage": "Tafadhali tujulishe kile kinachohitaji kuboreshwa. Mhandisi anayesimamia app husoma kila ripoti!",
-    "emailUs": "Tuandikie barua pepe"
+    "emailUs": "Tuandikie barua pepe",
+    "emailSubject": "maoni ya programu ya simu"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "Hakuna shughuli za salio",
       "expires": "Inaisha {{date}}",
       "title": "Shughuli za salio",
-      "transactionFallback": "Shughuli ya salio"
+      "transactionFallback": "Shughuli ya salio",
+      "category": {
+        "organization_custom": "Maalum ya shirika",
+        "parent_to_child_transfer_in": "Uhamisho kutoka mzazi hadi mtoto (ndani)",
+        "parent_to_child_transfer_out": "Uhamisho kutoka mzazi hadi mtoto (nje)",
+        "oss-sponsorship": "Udhamini wa OSS",
+        "oss-monthly-reset": "Uwekaji upya wa kila mwezi wa OSS",
+        "team-topup-bonus-2025": "Bonasi ya kujaza timu 2025",
+        "accounting_adjustment": "Marekebisho ya uhasibu",
+        "credits_expired": "Mikopo imeisha"
+      }
     },
     "inviteMember": {
       "emailError": "Ingiza anwani halali ya barua pepe",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "Ankara hutengenezwa kiotomatiki kila mzunguko wa bili na zitaonekana hapa shirika lako likisha tozwa.",
       "emptyTitle": "Hakuna ankara",
       "invoiceFallback": "Ankara",
-      "statusOpen": "Funguliwa",
-      "statusPaid": "Imelipwa",
-      "statusVoid": "Batilika",
       "title": "Ankara",
       "downloadFailed": "Imeshindwa kupakua ankara. Angalia muunganisho wako na ujaribu tena.",
-      "sharingUnavailable": "Kushiriki hakupatikani kwenye kifaa hiki."
+      "sharingUnavailable": "Kushiriki hakupatikani kwenye kifaa hiki.",
+      "status": {
+        "paid": "Imelipwa",
+        "open": "Funguliwa",
+        "void": "Batilika",
+        "draft": "Rasimu",
+        "uncollectible": "Isiyoweza kukusanywa",
+        "unknown": "Isiyojulikana"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "Data iliyokusanywa",
     "free": "Bure",
-    "couldNotUpdateFavorites": "Haikuweza kusasisha vipendwa"
+    "couldNotUpdateFavorites": "Haikuweza kusasisha vipendwa",
+    "thinkingEffort": {
+      "none": "Hakuna",
+      "minimal": "Kidogo sana",
+      "low": "Chini",
+      "medium": "Kati",
+      "high": "Juu",
+      "xhigh": "Juu zaidi",
+      "max": "Upeo"
+    }
   }
 }

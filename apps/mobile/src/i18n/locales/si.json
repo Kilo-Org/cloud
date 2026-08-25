@@ -573,7 +573,10 @@
     "diff": {
       "selectedTapToChange": "{{label}} තේරී ඇත, තේරීම වෙනස් කිරීමට තට්ටු කරන්න",
       "tapToComment": "{{label}}, අදහස් දැක්වීමට තට්ටු කරන්න",
-      "truncationBanner": "වෙනස් කළ ගොනු {{total}} අතරින් පළමු {{limit}} පෙන්වයි — GitHub API සීමාව"
+      "truncationBanner": "වෙනස් කළ ගොනු {{total}} අතරින් පළමු {{limit}} පෙන්වයි — GitHub API සීමාව",
+      "statusAdded": "එකතු කරන ලදී",
+      "statusContext": "සන්දර්භය",
+      "statusDeleted": "මකා දමන ලදී"
     },
     "linkPasteClipboardEmpty": "පසුරු පුවරුව හිස් ය",
     "linkPasteNotAPullRequest": "GitHub pull request සබැඳියක් නොවේ",
@@ -587,6 +590,11 @@
       "reviewNotSubmitted": "මෙම සමාලෝචනය මෙලෙසම ඉදිරිපත් කළ නොහැක. PR වෙනස් වී තිබිය හැක, නැතහොත් ඔබට ඔබේම pull request එක සමාලෝචනය කළ නොහැක.",
       "couldNotPostComment": "අදහස පළ කිරීමට නොහැකි විය.",
       "couldNotSubmitReview": "සමාලෝචනය ඉදිරිපත් කිරීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න."
+    },
+    "operation": {
+      "couldNotReply": "පිළිතුරු දිය නොහැකි විය.",
+      "couldNotCompleteAction": "මෙම ක්‍රියාව සම්පූර්ණ කිරීමට නොහැකි විය.",
+      "mergeResultDefaultError": "GitHub ඒකාබද්ධ කිරීම සම්පූර්ණ කළේ නැත."
     }
   },
   "notifications": {
@@ -821,7 +829,11 @@
       "paymentPastDue": "ගෙවීම කල් ඉකුත් විය. කරුණාකර ඔබේ ගෙවීම් ක්රමය යාවත්කාලීන කරන්න.",
       "subscriptionCancels": "දායකත්වය {{date}} දින අවලංගු වේ",
       "trialDaysRemaining": "අත්හදා බැලීම: {{remaining}} දින ඉතිරියි",
-      "trialEndingSoon": "අත්හදා බැලීම ඉක්මනින් අවසන් වේ: {{remaining}}"
+      "trialEndingSoon": "අත්හදා බැලීම ඉක්මනින් අවසන් වේ: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "අලුත් මොනවද",
@@ -1189,7 +1201,8 @@
       "strongArm": "Strong arm",
       "talisman": "Talisman"
     },
-    "remoteSpawnFilesNotSupported": "මෙම අවස්ථාවට ගොනු ලබා ගත නොහැක."
+    "remoteSpawnFilesNotSupported": "මෙම අවස්ථාවට ගොනු ලබා ගත නොහැක.",
+    "instanceSwitcherTitle": "KiloClaw අවස්ථාව"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1387,7 +1400,60 @@
       "failed": "අසමත් විය",
       "cancelled": "අවලංගු කර ඇත",
       "interrupted": "බාධා විය"
-    }
+    },
+    "reviewStyle": {
+      "strict": "දැඩි",
+      "balanced": "සමබර",
+      "lenient": "නම්‍යශීලී",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "ආරක්ෂාව",
+      "performance": "කාර්ය සාධනය",
+      "bugs": "දෝෂ",
+      "style": "විලාසය",
+      "testing": "පරීක්ෂාව",
+      "documentation": "ලේඛන"
+    },
+    "gateThreshold": {
+      "off": "ක්‍රියා විරහිතයි",
+      "all": "සියල්ල",
+      "warning": "අනතුරු ඇඟවීම",
+      "critical": "තීරණාත්මක"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer අවධානය අවශ්‍යයි",
+        "description": "Code Reviewer අක්‍රීය කර ඇත, මන්ද Kilo ට සක්‍රීය GitHub App ස්ථාපනයක් සමඟ මෙම ගබඩාවට ප්‍රවේශ විය නොහැක. GitHub App ස්ථාපනය යාවත්කාලීන කර, ඉන්පසු Code Reviewer නැවත සක්‍රීය කරන්න.",
+        "recoveryLabel": "GitHub App යාවත්කාලීන කරන්න"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer අවධානය අවශ්‍යයි",
+        "description": "Code Reviewer අක්‍රීය කර ඇත, මන්ද මෙම GitHub සංවිධානය Kilo අවහිර කරන IP අවසර ලැයිස්තුවක් භාවිතා කරයි. උපකාර සඳහා hi@kilocode.ai අමතන්න, ඉන්පසු Code Reviewer නැවත සක්‍රීය කරන්න.",
+        "recoveryLabel": "සහාය අමතන්න"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer අවධානය අවශ්‍යයි",
+        "description": "Code Reviewer අක්‍රීය කර ඇත, මන්ද Kilo ට මෙම ව්‍යාපෘතිය සඳහා GitLab Project Access Token එකක් සෑදිය නොහැක. Maintainer ප්‍රවේශය ලබා දෙන්න හෝ Project Access Tokens සක්‍රීය කරන්න, ඉන්පසු Code Reviewer නැවත සක්‍රීය කරන්න.",
+        "recoveryLabel": "GitLab ඒකාබද්ධතාව යාවත්කාලීන කරන්න"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer අවධානය අවශ්‍යයි",
+        "description": "Code Reviewer අක්‍රීය කර ඇත, මන්ද තෝරාගත් BYOK API යතුර අවලංගුය, ඉවත් කර ඇත, නැතහොත් අවසරයක් නොමැත. යතුර යාවත්කාලීන කරන්න හෝ වෙනත් මාදිලියක් තෝරන්න, ඉන්පසු Code Reviewer නැවත සක්‍රීය කරන්න.",
+        "recoveryLabel": "BYOK සැකසුම් යාවත්කාලීන කරන්න"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer අවධානය අවශ්‍යයි",
+        "description": "Code Reviewer අක්‍රීය කර ඇත, මන්ද තෝරාගත් මාදිලිය cloud agent සැසි සඳහා ලබා ගත නොහැක. පවතින මාදිලියක් තෝරන්න, ඉන්පසු Code Reviewer නැවත සක්‍රීය කරන්න.",
+        "recoveryLabel": "Code Reviewer සැකසුම් යාවත්කාලීන කරන්න"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer අවධානය අවශ්‍යයි",
+        "description": "අද දින ගබඩා ක්ලෝන කිරීමේ කාල අවසන් තුනකින් පසු Code Reviewer අක්‍රීය කර ඇත. උපකාර සඳහා hi@kilocode.ai අමතන්න, ඉන්පසු Code Reviewer නැවත සක්‍රීය කරන්න.",
+        "recoveryLabel": "සහාය අමතන්න"
+      }
+    },
+    "unknownError": "නොදන්නා දෝෂයක්"
   },
   "securityAgent": {
     "filter": {
@@ -1927,6 +1993,23 @@
       "belowThreshold": "සොයාගැනීම ස්වයංක්‍රීය බරපතලකම සීමාවට වඩා අඩුය. ආරක්ෂක ගේට්ටු සමත් වූ විට අතින් ප්‍රතිකර්මය තවමත් ආරම්භ කළ හැක.",
       "beforeEnablement": "ස්වයං ප්‍රතිකර්මය සක්‍රීය කිරීමට පෙර විශ්ලේෂණය සම්පූර්ණ විය. ආරක්ෂක ගේට්ටු සමත් වූ විට අතින් ප්‍රතිකර්මය තවමත් ආරම්භ කළ හැක.",
       "generic": "මෙම සොයාගැනීම සඳහා ප්‍රතිකර්මය ලබා ගත නොහැක."
+    },
+    "commandFailure": {
+      "ownerCapReached": "විශ්ලේෂණ ධාරිතාව පිරී ඇත. සක්‍රීය විශ්ලේෂණයක් අවසන් වන තෙක් රැඳී සිට, ඉන්පසු නැවත උත්සාහ කරන්න.",
+      "githubTokenUnavailable": "GitHub අවසරය අවධානය අවශ්‍යයි. GitHub App නැවත අවසර දෙන්න, ඉන්පසු නැවත උත්සාහ කරන්න.",
+      "githubAuthInvalid": "GitHub අවසරය අවධානය අවශ්‍යයි. GitHub App නැවත අවසර දෙන්න, ඉන්පසු නැවත උත්සාහ කරන්න.",
+      "findingUnavailable": "සොයාගැනීම තවදුරටත් ලබා ගත නොහැක. සොයාගැනීම් නැවුම් කර එය විවෘතව පැවතුනහොත් නැවත උත්සාහ කරන්න.",
+      "repositoryUnavailable": "ගබඩාව තවදුරටත් GitHub App සඳහා ලබා ගත නොහැක. ගබඩා ප්‍රවේශය නැවුම් කර, ඉන්පසු නැවත උත්සාහ කරන්න.",
+      "invalidDismissTarget": "සොයාගැනීම ඉවතලිය නොහැක, මන්ද එහි Dependabot ඉලක්කය අවලංගුය.",
+      "commandStalled": "පෝලිම් කළ ක්‍රියාව නියමිත වේලාවට අවසන් නොවීය. ක්‍රියාව නැවත උත්සාහ කරන්න.",
+      "queueRetriesExhausted": "උත්සාහ කිහිපයකින් පසු ක්‍රියාව සම්පූර්ණ කිරීමට නොහැකි විය. ක්‍රියාව නැවත උත්සාහ කරන්න.",
+      "queueAdmissionFailed": "පෝලිම් කළ ක්‍රියාව පිළිගැනීමට නොහැකි විය. ක්‍රියාව නැවත උත්සාහ කරන්න.",
+      "generic": "පෝලිම් කළ ක්‍රියාව අසාර්ථක විය. ක්‍රියාව නැවත උත්සාහ කරන්න."
+    },
+    "analysisMode": {
+      "auto": "ස්වයංක්‍රීය",
+      "shallow": "මතුපිටින්",
+      "deep": "ගැඹුරු"
     }
   },
   "agents": {
@@ -2390,7 +2473,8 @@
       "addToFavorites": "ප්‍රියතමයන්ට {{name}} එක් කරන්න",
       "removeFromFavorites": "ප්‍රියතමයන්ගෙන් {{name}} ඉවත් කරන්න",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "සැසියේ ආකෘතිය"
     },
     "attachmentPreview": {
       "openFailedRetry": "ගොනුව විවෘත කිරීම අසාර්ථකයි. කරුණාකර නැවත උත්සාහ කරන්න.",
@@ -2522,7 +2606,8 @@
   },
   "addCredits": {
     "cta": "ණය එක් කරන්න",
-    "description": "භාවිතය ක්‍රියාත්මකව තබා ගැනීමට ණය එක් කරන්න."
+    "description": "භාවිතය ක්‍රියාත්මකව තබා ගැනීමට ණය එක් කරන්න.",
+    "billingPage": "බිල්පත් පිටුව"
   },
   "deviceSessions": {
     "couldNotLoad": "සැසි පූරණය කළ නොහැකි විය",
@@ -2710,7 +2795,10 @@
     "restoreFailed": "මිලදී ගැනීම් ප්‍රතිස්ථාපනය කිරීමට අසමත් විය. නැවත උත්සාහ කරන්න.",
     "purchaseFailed": "මිලදී ගැනීම සම්පූර්ණ කිරීමට අසමත් විය.",
     "purchaseStartFailed": "App Store මිලදී ගැනීම ආරම්භ කිරීමට අසමත් විය.",
-    "purchaseOwnedByAnotherAccount": "මෙම Apple ගිණුමේ Kilo Pass වෙනත් Kilo ගිණුමකට අයත් වේ."
+    "purchaseOwnedByAnotherAccount": "මෙම Apple ගිණුමේ Kilo Pass වෙනත් Kilo ගිණුමකට අයත් වේ.",
+    "couldNotConnectToAppStore": "App Store වෙත සම්බන්ධ වීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+    "noMatchingProducts": "App Store විසින් ගැළපෙන Kilo Pass නිෂ්පාදන ලබා දුන්නේ නැත.",
+    "purchaseMissingSignedTransaction": "App Store මිලදී ගැනීමේදී අත්සන් කළ JWS ගනුදෙනුවක් ඇතුළත් නොවීය."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2806,7 +2894,8 @@
     "needsWork": "වැඩිදියුණු කිරීම අවශ්‍යයි",
     "sorryTitle": "එය ඇසීමට අපට කණගාටුයි!",
     "sorryMessage": "වැඩිදියුණු කළ යුතු දේ අපට දන්වන්න. යෙදුමේ වගකිව යුතු ඉංජිනේරුවා සෑම වාර්තාවක්ම කියවයි!",
-    "emailUs": "අපට ඊමේල් කරන්න"
+    "emailUs": "අපට ඊමේල් කරන්න",
+    "emailSubject": "ජංගම යෙදුම් ප්‍රතිපෝෂණය"
   },
   "organization": {
     "boundary": {
@@ -2823,7 +2912,17 @@
       "emptyTitle": "ණය ක්‍රියාකාරකම් නොමැත",
       "expires": "කල් ඉකුත් වන්නේ {{date}}",
       "title": "ණය ක්‍රියාකාරකම්",
-      "transactionFallback": "ණය ගනුදෙනුව"
+      "transactionFallback": "ණය ගනුදෙනුව",
+      "category": {
+        "organization_custom": "සංවිධාන අභිරුචි",
+        "parent_to_child_transfer_in": "මාපිය සංවිධානයෙන් ලැබුණු මාරුව",
+        "parent_to_child_transfer_out": "දරු සංවිධානයට යවන ලද මාරුව",
+        "oss-sponsorship": "OSS අනුග්‍රහය",
+        "oss-monthly-reset": "OSS මාසික යළි සැකසීම",
+        "team-topup-bonus-2025": "2025 කණ්ඩායම් ඉහළ දැමීමේ ප්‍රසාදය",
+        "accounting_adjustment": "ගිණුම්කරණ ගැලපීම",
+        "credits_expired": "ණය කල් ඉකුත් විය"
+      }
     },
     "inviteMember": {
       "emailError": "වලංගු ඊමේල් ලිපිනයක් ඇතුළු කරන්න",
@@ -2840,12 +2939,17 @@
       "emptyDescription": "ඉන්වොයිසි සෑම බිල්පත් චක්‍රයකම ස්වයංක්‍රීයව ජනනය වන අතර ඔබගේ සංවිධානයට බිල් කළ පසු මෙහි දිස්වනු ඇත.",
       "emptyTitle": "ඉන්වොයිසි නොමැත",
       "invoiceFallback": "ඉන්වොයිසිය",
-      "statusOpen": "විවෘත",
-      "statusPaid": "ගෙවූ",
-      "statusVoid": "අවලංගු",
       "title": "ඉන්වොයිසි",
       "downloadFailed": "ඉන්වොයිසිය බාගත කළ නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
-      "sharingUnavailable": "මෙම උපාංගයේ බෙදාගැනීම ලබා ගත නොහැක."
+      "sharingUnavailable": "මෙම උපාංගයේ බෙදාගැනීම ලබා ගත නොහැක.",
+      "status": {
+        "paid": "ගෙවූ",
+        "open": "විවෘත",
+        "void": "අවලංගු",
+        "draft": "කෙටුම්පත",
+        "uncollectible": "එකතු කළ නොහැකි",
+        "unknown": "නොදන්නා"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2971,6 +3075,15 @@
   "models": {
     "dataCollected": "එකතු කළ දත්ත",
     "free": "නොමිලේ",
-    "couldNotUpdateFavorites": "ප්‍රියතමයන් යාවත්කාලීන කිරීමට නොහැකි විය"
+    "couldNotUpdateFavorites": "ප්‍රියතමයන් යාවත්කාලීන කිරීමට නොහැකි විය",
+    "thinkingEffort": {
+      "none": "කිසිවක් නැත",
+      "minimal": "අවම",
+      "low": "අඩු",
+      "medium": "මධ්‍යම",
+      "high": "ඉහළ",
+      "xhigh": "ඉතා ඉහළ",
+      "max": "උපරිම"
+    }
   }
 }

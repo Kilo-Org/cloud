@@ -1258,13 +1258,15 @@ export const organizationAdminRouter = createTRPCRouter({
           )
         );
       } else if (mode === 'trial') {
-        // Trial: has never had a seats purchase
+        // Trial: has never had a seats purchase. Exclude sales-demo orgs so
+        // they don't appear on both the paying and trial lists.
         statusConditions.push(
           sql`NOT EXISTS (
             SELECT 1 FROM ${organization_seats_purchases}
             WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
           )`
         );
+        statusConditions.push(sql`NOT (${organizations.settings}->>'is_sales_demo' = 'true')`);
       }
       // mode === 'all': no subscription filter
 

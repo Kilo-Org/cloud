@@ -1,6 +1,7 @@
 import {
   getSecurityAnalysisPresentation,
   getSecurityDeadlinePresentation,
+  getSecurityFindingAnalysisState,
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { ExternalLink } from '@/components/ui/icons';
@@ -19,6 +20,7 @@ import { i18n } from '@/i18n';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
+import { getDeadlineCopy, getSecurityAnalysisLabel } from '@/lib/security-agent-copy';
 import { capitalize, cn } from '@/lib/utils';
 
 const SEVERITY_TEXT_CLASS = {
@@ -169,7 +171,10 @@ export function FindingRow({
   const { t } = useTranslation();
 
   const analysis = getSecurityAnalysisPresentation(finding);
+  const analysisState = getSecurityFindingAnalysisState(finding.analysis_status, finding.analysis);
+  const analysisLabel = getSecurityAnalysisLabel(analysisState);
   const deadline = slaEnabled ? getSecurityDeadlinePresentation(finding) : null;
+  const deadlineLabel = deadline ? getDeadlineCopy(deadline.state).label : '';
   const nextAction = getNextActionLabel(finding);
 
   const AnalysisIcon = FINDING_ICONS[analysis.icon];
@@ -190,14 +195,14 @@ export function FindingRow({
         severity: capitalize(finding.severity),
         title: finding.title,
         repo: finding.repo_full_name,
-        analysis: analysis.label,
-        deadline: deadline.label,
+        analysis: analysisLabel,
+        deadline: deadlineLabel,
       })
     : t('securityAgent.findingRow.a11y', {
         severity: capitalize(finding.severity),
         title: finding.title,
         repo: finding.repo_full_name,
-        analysis: analysis.label,
+        analysis: analysisLabel,
       });
 
   return (
@@ -233,7 +238,7 @@ export function FindingRow({
               spinning={Boolean(analysis.spinning)}
             />
             <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[analysis.tone])}>
-              {analysis.label}
+              {analysisLabel}
             </Text>
           </View>
           {deadline && DeadlineIcon && (
@@ -245,7 +250,7 @@ export function FindingRow({
                 spinning={Boolean(deadline.spinning)}
               />
               <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[deadline.tone])}>
-                {deadline.label}
+                {deadlineLabel}
               </Text>
             </View>
           )}

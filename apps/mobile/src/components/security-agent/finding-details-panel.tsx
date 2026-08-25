@@ -1,8 +1,6 @@
 import {
-  getDismissalReasonLabel,
   getFindingLifecycleStatusPresentation,
   getFindingSeverityPresentation,
-  getFindingSourceLabel,
   getSecurityDeadlinePresentation,
   getSupersedingFindingId,
 } from '@kilocode/app-shared/security-agent';
@@ -16,9 +14,11 @@ import {
   FINDING_TONE_TO_KV_ROW_TONE,
 } from '@/components/security-agent/finding-tone';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
+import { getDeadlineCopy } from '@/lib/security-agent-copy';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
 import { cn, firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -27,6 +27,50 @@ type FindingDetailsPanelProps = {
   finding: SecurityFinding;
   scope: string;
 };
+
+// Catalog keys for app-shared presentation codes. The mobile app maps a
+// stable code (severity, status, dismissal reason, source) to a key and
+// renders `t(key)` instead of app-shared's English labels.
+const SEVERITY_KEYS = {
+  critical: 'securityAgent.sla.critical',
+  high: 'securityAgent.sla.high',
+  medium: 'securityAgent.sla.medium',
+  low: 'securityAgent.sla.low',
+} satisfies Record<string, string>;
+
+const FINDING_STATUS_KEYS = {
+  superseded: 'securityAgent.findingDetails.statusSuperseded',
+  fixed: 'securityAgent.findingDetails.statusFixed',
+  dismissed: 'securityAgent.findingDetails.dismissed',
+  open: 'securityAgent.findingDetails.statusOpen',
+} satisfies Record<string, string>;
+
+const DISMISSAL_REASON_KEYS = {
+  fix_started: 'securityAgent.findingDetails.reasonFixStarted',
+  no_bandwidth: 'securityAgent.findingDetails.reasonNoBandwidth',
+  tolerable_risk: 'securityAgent.findingDetails.reasonTolerableRisk',
+  inaccurate: 'securityAgent.findingDetails.reasonInaccurate',
+  not_used: 'securityAgent.findingDetails.reasonNotUsed',
+} satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
+
+function getDismissalReasonLabel(reason: string | null): string {
+  if (!reason) {
+    return i18n.t('securityAgent.findingDetails.reasonAfterReview');
+  }
+  return lookup(DISMISSAL_REASON_KEYS, reason) ?? reason.replaceAll('_', ' ');
+}
+
+function getFindingSourceLabel(source: string): string {
+  if (source === 'dependabot') {
+    return i18n.t('securityAgent.findingDetails.sourceDependabot');
+  }
+  return source.replaceAll('_', ' ');
+}
 
 function DismissalOrSupersessionNote({
   finding,
@@ -84,7 +128,15 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
   const severity = getFindingSeverityPresentation(finding.severity);
   const status = getFindingLifecycleStatusPresentation(finding);
   const deadline = getSecurityDeadlinePresentation(finding);
+  const deadlineCopy = getDeadlineCopy(deadline.state);
   const supersedingFindingId = getSupersedingFindingId(finding);
+  const severityKey =
+    lookup(SEVERITY_KEYS, finding.severity) ?? 'securityAgent.findingDetails.unknown';
+  const dismissedOrUnknownKey =
+    finding.status === 'ignored'
+      ? FINDING_STATUS_KEYS.dismissed
+      : (lookup(FINDING_STATUS_KEYS, finding.status) ?? 'securityAgent.findingDetails.unknown');
+  const statusKey = supersedingFindingId ? FINDING_STATUS_KEYS.superseded : dismissedOrUnknownKey;
   const advisoryUrl = finding.dependabot_html_url;
 
   return (
@@ -95,12 +147,16 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         </Text>
         <View className="flex-row flex-wrap items-center gap-3">
           <Text className={cn('text-xs font-medium', FINDING_TONE_TEXT_CLASS[severity.tone])}>
-            {t('securityAgent.findingDetails.severityLabel', { severity: severity.label })}
+            {t('securityAgent.findingDetails.severityLabel', { severity: t(severityKey) })}
           </Text>
           <Text className={cn('text-xs font-medium', FINDING_TONE_TEXT_CLASS[status.tone])}>
-            {status.label}
+            {t(statusKey)}
           </Text>
-          <FindingStatusBadge icon={deadline.icon} label={deadline.label} tone={deadline.tone} />
+          <FindingStatusBadge
+            icon={deadline.icon}
+            label={deadlineCopy.label}
+            tone={deadline.tone}
+          />
         </View>
         {finding.description ? (
           <Text variant="muted" className="text-sm" selectable>
@@ -182,7 +238,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         {finding.sla_due_at ? (
           <KvRow
             label={t('securityAgent.findingDetails.slaDeadline')}
-            value={deadline.detail}
+            value={deadlineCopy.detail}
             valueTone={FINDING_TONE_TO_KV_ROW_TONE[deadline.tone]}
             last
           />

@@ -27,6 +27,10 @@ import { useSecurityAnalysisCapacity } from '@/lib/hooks/use-security-agent';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAnalysis } from '@/lib/security-agent';
+import {
+  getSecurityAnalysisDetailDescription,
+  getSecurityAnalysisDetailTitle,
+} from '@/lib/security-agent-copy';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 
 type FindingAnalysisPanelProps = {
@@ -81,6 +85,7 @@ export function FindingAnalysisPanel({
     );
   }
 
+  const analysisState = getSecurityFindingAnalysisState(analysis.status, analysis.analysis);
   const presentation = getSecurityAnalysisDetailPresentation(
     analysis.status,
     analysis.analysis,
@@ -88,6 +93,13 @@ export function FindingAnalysisPanel({
   );
   const triage = analysis.analysis?.triage;
   const sandbox = analysis.analysis?.sandboxAnalysis;
+  const presentationTitle = getSecurityAnalysisDetailTitle(analysisState);
+  const presentationDescription = getSecurityAnalysisDetailDescription(analysisState, {
+    analysisError: analysis.error,
+    sandboxSummary: sandbox?.summary,
+    sandboxReasoning: sandbox?.exploitabilityReasoning,
+    triageReasoning: triage?.needsSandboxReasoning,
+  });
   const technicalMarkdown = firstNonEmpty(sandbox?.rawMarkdown, analysis.analysis?.rawMarkdown);
   const uniqueLocations = sandbox ? [...new Set(sandbox.usageLocations)] : [];
   const exploitabilityReasoning = sandbox
@@ -98,7 +110,6 @@ export function FindingAnalysisPanel({
   // Admission mirrors SecurityFindingRow.tsx's showAnalysisAction/canRestartAnalysis
   // — server owns eligibility, this just reads the already-fetched state.
   const findingOpen = analysis.findingState.status === 'open';
-  const analysisState = getSecurityFindingAnalysisState(analysis.status, analysis.analysis);
   // Sandbox/triage evidence is authoritative only once the analysis reached a
   // terminal sandbox/triage state. A stale result left behind by a failed
   // retry must not read as "Analyzed" (completion copy) in queued/running/failed.
@@ -152,12 +163,12 @@ export function FindingAnalysisPanel({
       <View className="gap-1 rounded-lg bg-secondary p-3">
         <FindingStatusBadge
           icon={presentation.icon}
-          label={presentation.title}
+          label={presentationTitle}
           tone={presentation.tone}
           spinning={presentation.spinning}
         />
         <Text variant="muted" className="text-sm" selectable>
-          {presentation.description}
+          {presentationDescription}
         </Text>
       </View>
 

@@ -38,6 +38,7 @@ import {
   WEATHER_LOCATION_SKIPPED_EVENT,
 } from '@/lib/analytics/onboarding-events';
 import { trackEvent } from '@/lib/appsflyer';
+import { dateTimeFormat } from '@/lib/intl-cache';
 import {
   useKiloClawGatewayReady,
   useKiloClawMobileOnboardingState,
@@ -82,7 +83,7 @@ const gatewayReadyStatusSchema = z.number().optional();
 
 function resolveUserTimezone(): string | undefined {
   try {
-    return new Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+    return dateTimeFormat(undefined, {}).resolvedOptions().timeZone || undefined;
   } catch {
     return undefined;
   }

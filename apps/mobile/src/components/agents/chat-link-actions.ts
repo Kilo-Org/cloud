@@ -72,7 +72,7 @@ function showRetryableError(message: string, retry: () => Promise<void>) {
 
 export async function performChatLinkAction(action: ChatLinkAction, href: string): Promise<void> {
   if (action === 'open') {
-    await openExternalUrl(href, { label: 'link', retryOnError: true });
+    await openExternalUrl(href, { retryOnError: true });
     return;
   }
 

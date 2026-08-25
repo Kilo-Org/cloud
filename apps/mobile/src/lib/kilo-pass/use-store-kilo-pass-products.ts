@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { i18n } from '@/i18n';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useTRPC } from '@/lib/trpc';
 import { type StoreKiloPassProduct } from './store-products';
@@ -12,8 +13,7 @@ const STORE_KILO_PASS_PRODUCTS_STALE_TIME_MS = 5 * 60 * 1000;
 // Fixed bound on the App Store connection handshake — raise if real
 // devices routinely need longer than this to connect.
 const APP_STORE_CONNECTION_TIMEOUT_MS = 8000;
-const APP_STORE_CONNECTION_TIMEOUT_MESSAGE =
-  'Could not connect to the App Store. Check your connection and try again.';
+const APP_STORE_CONNECTION_TIMEOUT_MESSAGE = 'kiloPass.couldNotConnectToAppStore';
 
 export type StoreKiloPassProductsOptions = {
   /** Whether the App Store connection (from the IAP owner) is established. */
@@ -36,7 +36,7 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
       return undefined;
     }
     const timer = setTimeout(() => {
-      setStoreErrorMessage(current => current ?? APP_STORE_CONNECTION_TIMEOUT_MESSAGE);
+      setStoreErrorMessage(current => current ?? i18n.t(APP_STORE_CONNECTION_TIMEOUT_MESSAGE));
     }, APP_STORE_CONNECTION_TIMEOUT_MS);
     return () => {
       clearTimeout(timer);

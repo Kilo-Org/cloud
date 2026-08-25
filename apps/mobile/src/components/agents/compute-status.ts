@@ -35,7 +35,7 @@ export function computeStatus(part: Part): string {
   }
   if (part.type === 'text') {
     if (isSnapshotProgressPart(part)) {
-      return SNAPSHOT_PROGRESS_STATUS;
+      return i18n.t('agentChat.computeStatus.initializingSnapshot');
     }
     return i18n.t('agentChat.computeStatus.writingResponse');
   }

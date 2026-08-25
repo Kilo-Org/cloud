@@ -22,7 +22,12 @@
     "copiedToClipboard": "క్లిప్బోర్డ్కు కాపీ చేయబడింది",
     "couldNotCopyToClipboard": "క్లిప్బోర్డ్కు కాపీ చేయలేకపోయింది",
     "required": "అవసరం",
-    "error": "లోపం: {{error}}"
+    "error": "లోపం: {{error}}",
+    "back": "వెనుకకు",
+    "somethingWentWrong": "ఏదో తప్పు జరిగింది",
+    "couldNotOpen": "{{label}} తెరవలేకపోయాము",
+    "link": "లింక్",
+    "takingLonger": "ఇది ఊహించిన దానికంటే ఎక్కువ సమయం తీసుకుంటోంది. మీరు దీన్ని మూసివేసి మళ్లీ తనిఖీ చేయవచ్చు."
   },
   "language": {
     "title": "భాష",
@@ -206,11 +211,11 @@
       "loadingLines": "{{loaded}} / {{total}} లైన్లను లోడ్ చేస్తోంది…",
       "expandContext": "సందర్భం విస్తరించండి",
       "expandMoreContext": "మరింత సందర్భం విస్తరించండి",
-      "expandLines": "{{count}} లైన్లను విస్తరించండి ({{start}}–{{end}})",
-      "expandMoreLines": "మరో {{count}} లైన్లను విస్తరించండి ({{start}}–{{end}})",
-      "expandLinesOfContext": "{{count}} సందర్భ లైన్లను విస్తరించండి",
+      "expandLines": "{{displayCount}} లైన్లను విస్తరించండి ({{start}}–{{end}})",
+      "expandMoreLines": "మరో {{displayCount}} లైన్లను విస్తరించండి ({{start}}–{{end}})",
+      "expandLinesOfContext": "{{displayCount}} సందర్భ లైన్లను విస్తరించండి",
       "expandAll": "అన్నీ విస్తరించండి",
-      "expandAllLines": "అన్ని {{count}} లైన్లను విస్తరించండి",
+      "expandAllLines": "అన్ని {{displayCount}} లైన్లను విస్తరించండి",
       "loadingMoreFiles": "మరిన్ని ఫైల్లను లోడ్ చేస్తోంది…",
       "retryLoadingNextPage": "తదుపరి పేజీని లోడ్ చేయడం మళ్ళీ ప్రయత్నించండి",
       "failedToLoadMoreFiles": "మరిన్ని ఫైల్లను లోడ్ చేయడంలో విఫలమైంది — మళ్ళీ ప్రయత్నించడానికి తాప్ చేయండి",
@@ -219,10 +224,12 @@
       "loadedOfTotalFiles": "{{loaded}} / {{total}} ఫైల్లు లోడ్ అయ్యాయి",
       "loadAllFiles": "అన్ని ఫైల్లను లోడ్ చేయండి",
       "loadAll": "అన్నీ లోడ్ చేయండి",
-      "fileLoaded": "{{count}} ఫైల్ లోడ్ అయింది",
-      "filesLoaded": "{{count}} ఫైల్లు లోడ్ అయ్యాయి",
-      "fileLoadedOfTotal": "మొత్తం {{total}}లో {{count}} ఫైల్ లోడ్ అయింది",
-      "filesLoadedOfTotal": "మొత్తం {{total}}లో {{count}} ఫైల్లు లోడ్ అయ్యాయి",
+      "fileLoadedCount_one": "{{displayCount}} ఫైల్ లోడ్ అయింది",
+      "fileLoadedCount": "{{displayCount}} ఫైల్లు లోడ్ అయ్యాయి",
+      "fileLoadedCount_other": "{{displayCount}} ఫైల్లు లోడ్ అయ్యాయి",
+      "fileLoadedOfTotalCount_one": "మొత్తం {{total}}లో {{displayCount}} ఫైల్ లోడ్ అయింది",
+      "fileLoadedOfTotalCount": "మొత్తం {{total}}లో {{displayCount}} ఫైల్లు లోడ్ అయ్యాయి",
+      "fileLoadedOfTotalCount_other": "మొత్తం {{total}}లో {{displayCount}} ఫైల్లు లోడ్ అయ్యాయి",
       "filesStillLoading": "ఫైల్లు ఇంకా లోడ్ అవుతున్నాయి. రిఫ్రెష్ చేయడానికి లాగండి.",
       "goToOverview": "అవలోకనానికి వెళ్లండి",
       "goToOverviewTab": "అవలోకన ట్యాబ్కు వెళ్లండి"
@@ -278,7 +285,36 @@
         "body": "బ్రాంచ్ను తొలగించలేకపోయింది: {{reason}}",
         "accessibility": "మెర్జ్ అయింది. బ్రాంచ్ను తొలగించలేకపోయింది: {{reason}}"
       },
-      "loadFailedTitle": "మెర్జ్ ఎంపికలను లోడ్ చేయలేకపోయింది"
+      "loadFailedTitle": "మెర్జ్ ఎంపికలను లోడ్ చేయలేకపోయింది",
+      "blocked": {
+        "unknownStateTitle": "GitHub మెర్జబుల్ స్థితిని నివేదించలేదు",
+        "unknownStateDetail": "కొద్ది సేపట్లో అవలోకనాన్ని రిఫ్రెష్ చేయడానికి ప్రయత్నించండి.",
+        "conflictsTitle": "మెర్జ్ వైరుధ్యాలు",
+        "conflictsDetail": "మెర్జ్ చేయడానికి ముందు ఈ బ్రాంచ్లోని మెర్జ్ వైరుధ్యాలను పరిష్కరించండి.",
+        "requiredReviewsTitle": "అవసరమైన సమీక్షలు లేవు",
+        "requiredReviewsDetail": "అవసరమైన సమీక్షకుల ఆమోదాలు లేవు లేదా పెండింగ్లో ఉన్నాయి.",
+        "failingChecksTitle": "అవసరమైన చెక్లు విఫలమవుతున్నాయి",
+        "failingChecksDetail": "అవసరమైన స్టేటస్ చెక్లు విఫలమవుతున్నాయి.",
+        "unstableTitle": "కొన్ని చెక్లు విఫలమవుతున్నాయి",
+        "unstableDetail": "అవసరం లేని చెక్లు విఫలమవుతున్నాయి. అవి మెర్జ్ను నిరోధించవు.",
+        "draftTitle": "డ్రాఫ్ట్ పుల్ రిక్వెస్ట్",
+        "draftDetail": "మెర్జ్ చేయడానికి ముందు పుల్ రిక్వెస్ట్ను సమీక్షకు సిద్ధంగా గుర్తించండి.",
+        "behindTitle": "బ్రాంచ్ పాతది",
+        "behindDetailUpdatable": "మెర్జ్ చేయడానికి ముందు బేస్ నుండి బ్రాంచ్ను నవీకరించండి, లేదా రీబేస్ చేయండి.",
+        "behindDetail": "హెడ్ బ్రాంచ్ బేస్ కంటే వెనుకబడి ఉంది. మెర్జ్ చేయడానికి ముందు బ్రాంచ్ను రీబేస్ చేయండి లేదా నవీకరించండి.",
+        "notMergeableTitle": "ఈ పుల్ రిక్వెస్ట్ ఇంకా మెర్జ్ చేయబడదు",
+        "notMergeableDetail": "GitHub {{state}} మెర్జబుల్ స్థితిని నివేదించింది."
+      },
+      "methodLabels": {
+        "merge": "మెర్జ్ కమిట్ను సృష్టించండి",
+        "squash": "స్క్వాష్ చేసి మెర్జ్ చేయండి",
+        "rebase": "రీబేస్ చేసి మెర్జ్ చేయండి"
+      },
+      "methodDescriptions": {
+        "merge": "ఈ బ్రాంచ్ నుండి అన్ని కమిట్లను మెర్జ్ కమిట్తో బేస్ బ్రాంచ్లోకి కలపండి.",
+        "squash": "ఈ బ్రాంచ్ నుండి అన్ని కమిట్లను బేస్ బ్రాంచ్లో ఒకే కమిట్గా కలపండి.",
+        "rebase": "మెర్జ్ కమిట్ లేకుండా ఈ బ్రాంచ్ నుండి అన్ని కమిట్లను బేస్ బ్రాంచ్లో మళ్ళీ అమలు చేయండి."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "చర్చా త్రెడ్ {{anchorLabel}}",
@@ -288,8 +324,9 @@
       "resolved": "పరిష్కరించబడింది",
       "outdated": "పాతది",
       "file": "ఫైల్",
-      "oneComment": "1 వ్యాఖ్య",
-      "commentCount": "{{count}} వ్యాఖ్యలు",
+      "comment_one": "1 వ్యాఖ్య",
+      "comment": "{{displayCount}} వ్యాఖ్యలు",
+      "comment_other": "{{displayCount}} వ్యాఖ్యలు",
       "startedRelative": " · {{relative}}కి ప్రారంభమైంది",
       "couldNotLoadMore": "మరిన్ని వ్యాఖ్యలను లోడ్ చేయలేకపోయింది.",
       "retryLoadingMore": "మరిన్ని వ్యాఖ్యలను లోడ్ చేయడం మళ్ళీ ప్రయత్నించండి",
@@ -298,9 +335,10 @@
       "closeReactions": "ప్రతిచర్యలను మూసివేయండి",
       "reactionsTitle": "ప్రతిచర్యలు",
       "addReaction": "ప్రతిచర్య జోడించండి",
-      "reactionPill": "{{emoji}} ప్రతిచర్య, {{count}} {{countLabel}}",
-      "reactionSingular": "ప్రతిచర్య",
-      "reactionPlural": "ప్రతిచర్యలు",
+      "reactionPill": "{{emoji}} ప్రతిచర్య, {{displayCount}} {{countLabel}}",
+      "reaction_one": "ప్రతిచర్య",
+      "reaction": "ప్రతిచర్యలు",
+      "reaction_other": "ప్రతిచర్యలు",
       "commentActions": "వ్యాఖ్య చర్యలు",
       "reportContent": "కంటెంట్ను నివేదించండి",
       "reportUser": "వినియోగదారుని నివేదించండి",
@@ -349,10 +387,28 @@
       "noDiscussionDescription": "ఈ పుల్ రిక్వెస్ట్పై సమీక్ష త్రెడ్లు లేదా సంభాషణ వ్యాఖ్యలు లేవు.",
       "reviewFiles": "ఫైల్లను సమీక్షించండి",
       "quotedDiffSnippet": "కోట్ చేసిన diff స్నిప్పెట్",
-      "moreLinesAbove": "… పైన మరో {{count}} లైన్లు",
+      "moreLinesAbove": "… పైన మరో {{displayCount}} లైన్లు",
       "termsAcceptRequired": "పోస్ట్ చేయడానికి మీరు సేవా నిబంధనలను అంగీకరించాలి.",
       "termsOutdatedCopy": "సేవా నిబంధనలు మారాయి. తాజా వెర్షన్ను అంగీకరించడానికి ఈ స్క్రీన్ను మళ్ళీ తెరవండి.",
-      "termsCheckRetryCopy": "సేవా నిబంధనలను తనిఖీ చేయలేకపోయింది. మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి."
+      "termsCheckRetryCopy": "సేవా నిబంధనలను తనిఖీ చేయలేకపోయింది. మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి.",
+      "reactions": {
+        "thumbsUp": "బొటనవేలు పైకి",
+        "thumbsDown": "బొటనవేలు క్రిందికి",
+        "laugh": "నవ్వు",
+        "hooray": "హుర్రే",
+        "confused": "అయోమయం",
+        "heart": "హృదయం",
+        "rocket": "రాకెట్",
+        "eyes": "కళ్ళు"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} లో ఫైల్ వ్యాఖ్య",
+        "fileComment": "ఫైల్ వ్యాఖ్య",
+        "outdatedOnPathLines": "{{path}} {{lines}} లో పాతది",
+        "outdatedOnLines": "{{lines}} లో పాతది",
+        "outdatedOnPath": "{{path}} లో పాతది"
+      },
+      "deletedUser": "తొలగించిన వినియోగదారు"
     },
     "couldNotOpenGitHubAppSettings": "GitHub యాప్ సెట్టింగ్లను తెరవలేకపోయింది",
     "installKiloGitHubApp": "Kilo GitHub యాప్ను ఇన్స్టాల్ చేయండి",
@@ -391,11 +447,11 @@
       "retryChecks": "చెక్లను మళ్ళీ ప్రయత్నించండి",
       "viewOnGitHub": "GitHubలో PRని చూడండి",
       "noChecksReported": "చెక్లు నివేదించబడలేదు",
-      "passed": "{{count}} ఉత్తీర్ణమయ్యాయి",
-      "failed": "{{count}} విఫలమయ్యాయి",
-      "pending": "{{count}} వేచి ఉన్నాయి",
-      "skipped": "{{count}} దాటవేయబడ్డాయి",
-      "checksCount": "{{count}} చెక్లు",
+      "passed": "{{displayCount}} ఉత్తీర్ణమయ్యాయి",
+      "failed": "{{displayCount}} విఫలమయ్యాయి",
+      "pending": "{{displayCount}} వేచి ఉన్నాయి",
+      "skipped": "{{displayCount}} దాటవేయబడ్డాయి",
+      "checksCount": "{{displayCount}} చెక్లు",
       "checkDetails": "చెక్ వివరాలు",
       "pullRequest": "పుల్ రిక్వెస్ట్"
     },
@@ -452,11 +508,14 @@
       "deletePendingMessage": "ఈ వ్యాఖ్య సమీక్ష క్యూలో నుండి తీసివేయబడుతుంది.",
       "delete": "తొలగించండి",
       "summaryOptional": "సారాంశం (ఐచ్ఛికం)",
-      "pendingCommentSingular": "పెండింగ్ వ్యాఖ్య",
-      "pendingCommentPlural": "పెండింగ్ వ్యాఖ్యలు",
-      "submitCountOfTotal": "మొత్తం {{totalCount}} వ్యాఖ్యలలో {{freshCount}} సమర్పించండి",
+      "pendingComment_one": "పెండింగ్ వ్యాఖ్య",
+      "pendingComment": "పెండింగ్ వ్యాఖ్యలు",
+      "pendingComment_other": "పెండింగ్ వ్యాఖ్యలు",
+      "submitCountOfTotal": "మొత్తం {{displayTotalCount}} వ్యాఖ్యలలో {{displayFreshCount}} సమర్పించండి",
       "submitReview": "సమీక్షను సమర్పించండి",
-      "partialPostedMessage": "{{freshCount}} వ్యాఖ్య(లు) పోస్ట్ చేయబడ్డాయి. {{staleCount}} వ్యాఖ్య(లు) పాత కమిట్కు సూచిస్తున్నాయి మరియు మీ క్యూలో ఉన్నాయి."
+      "partialPostedMessage": "{{displayFreshCount}} వ్యాఖ్య(లు) పోస్ట్ చేయబడ్డాయి. {{displayStaleCount}} వ్యాఖ్య(లు) పాత కమిట్కు సూచిస్తున్నాయి మరియు మీ క్యూలో ఉన్నాయి.",
+      "blockedRequestChanges": "మార్పులను అభ్యర్థించడానికి సారాంశం లేదా కనీసం ఒక వ్యాఖ్యను జోడించండి.",
+      "blockedComment": "వ్యాఖ్య సమీక్షను పోస్ట్ చేయడానికి సారాంశం లేదా కనీసం ఒక వ్యాఖ్యను జోడించండి."
     },
     "reconnectNotice": {
       "title": "GitHub కనెక్షన్ గడువు ముగిసింది",
@@ -478,10 +537,12 @@
       "stateOpenReviewRequired": "తెరిచింది · సమీక్ష అవసరం",
       "stateOpen": "తెరిచింది",
       "unknownAuthor": "తెలియని రచయిత",
-      "commitSingular": "కమిట్",
-      "commitPlural": "కమిట్లు",
-      "fileSingular": "ఫైల్",
-      "filePlural": "ఫైల్లు"
+      "commit_one": "కమిట్",
+      "commit": "కమిట్లు",
+      "commit_other": "కమిట్లు",
+      "file_one": "ఫైల్",
+      "file": "ఫైల్లు",
+      "file_other": "ఫైల్లు"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}పై పాత పెండింగ్ వ్యాఖ్యను సవరించండి",
@@ -512,10 +573,36 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} ఎంచుకోబడింది, ఎంపికను మార్చడానికి తాప్ చేయండి",
-      "tapToComment": "{{label}}, వ్యాఖ్య చేయడానికి తాప్ చేయండి"
+      "tapToComment": "{{label}}, వ్యాఖ్య చేయడానికి తాప్ చేయండి",
+      "truncationBanner": "మొదటి {{limit}} / {{total}} మార్చబడిన ఫైళ్లు చూపుతోంది — GitHub API పరిమితి",
+      "statusAdded": "జోడించబడింది",
+      "statusContext": "సందర్భం",
+      "statusDeleted": "తొలగించబడింది",
+      "lineLabel": "{{status}} లైన్ {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ఖాళీ)"
     },
     "linkPasteClipboardEmpty": "క్లిప్బోర్డ్ ఖాళీగా ఉంది",
-    "linkPasteNotAPullRequest": "GitHub పుల్ రిక్వెస్ట్ లింక్ కాదు"
+    "linkPasteNotAPullRequest": "GitHub పుల్ రిక్వెస్ట్ లింక్ కాదు",
+    "announce": {
+      "commentPosted": "వ్యాఖ్య పోస్ట్ చేయబడింది",
+      "reviewSubmitted": "సమీక్ష సమర్పించబడింది",
+      "autoMergeEnabled": "ఆటో-మెర్జ్ ప్రారంభించబడింది"
+    },
+    "mutationError": {
+      "commentNotPosted": "ఈ వ్యాఖ్యను పోస్ట్ చేయలేము. ఎంచుకున్న లైన్ మారి ఉండవచ్చు, లేదా PR నవీకరించబడి ఉండవచ్చు.",
+      "reviewNotSubmitted": "ఈ సమీక్షను ఇలాగే సమర్పించలేము. PR మారి ఉండవచ్చు, లేదా మీ స్వంత పుల్ రిక్వెస్ట్‌ను సమీక్షించలేకపోవచ్చు.",
+      "couldNotPostComment": "వ్యాఖ్యను పోస్ట్ చేయలేకపోయాము.",
+      "couldNotSubmitReview": "సమీక్షను సమర్పించలేకపోయాము. మీ కనెక్షన్ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి."
+    },
+    "operation": {
+      "couldNotReply": "ప్రత్యుత్తరం ఇవ్వలేకపోయింది.",
+      "couldNotCompleteAction": "ఈ చర్యను పూర్తి చేయలేకపోయాము.",
+      "mergeResultDefaultError": "GitHub మెర్జ్ను పూర్తి చేయలేదు.",
+      "ambiguous": "నిర్ధారించలేకపోయాము — మళ్లీ ప్రయత్నించే ముందు PRని తనిఖీ చేయండి.",
+      "persistenceFailed": "ఈ చర్యను రికార్డ్ చేయలేకపోయాము. దయచేసి తర్వాత మళ్లీ ప్రయత్నించండి.",
+      "forbidden": "నిషేధించబడింది"
+    }
   },
   "notifications": {
     "title": "నోటిఫికేషన్లు",
@@ -573,7 +660,8 @@
     "agents": "ఏజెంట్లు",
     "profile": "ప్రొఫైల్",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, ట్యాబ్, మొత్తం {{total}} లో {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -614,7 +702,7 @@
       "recent": "ఇటీవలి",
       "common": "సాధారణం",
       "reactWith": "{{reaction}}తో ప్రతిస్పందించండి",
-      "accessibility": "{{emoji}} ప్రతిచర్య, {{count}}"
+      "accessibility": "{{emoji}} ప్రతిచర్య, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "ప్రత్యుత్తరం ఇస్తున్నారు",
@@ -643,11 +731,21 @@
       "imageUnavailable": "చిత్రం అందుబాటులో లేదు",
       "openFailed": "అటాచ్మెంట్ను తెరవలేకపోయింది. మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి.",
       "attachFailed": "ఫైల్ను అటాచ్ చేయడంలో విఫలమైంది",
-      "limit": "మీరు గరిష్టంగా {{count}} ఫైల్లను అటాచ్ చేయవచ్చు.",
+      "limit": "మీరు గరిష్టంగా {{displayCount}} ఫైల్లను అటాచ్ చేయవచ్చు.",
       "sizeRejection": "{{filename}} {{limit}} అటాచ్మెంట్ పరిమితిని మించిపోయింది.",
       "unreadable": "{{filename}}ను చదవలేకపోయింది.",
       "pastedImage": "అతికించిన చిత్రం",
-      "defaultName": "అటాచ్మెంట్"
+      "defaultName": "అటాచ్మెంట్",
+      "classificationDenied": "ఎక్జిక్యూటబుల్ ఫైల్లను అటాచ్ చేయలేరు",
+      "classificationEmpty": "ఫైల్ ఖాళీగా ఉంది",
+      "classificationTooLarge": "ఫైల్లు 20 MB లేదా అంతకంటే చిన్నవిగా ఉండాలి",
+      "classificationUnreadable": "ఈ ఫైల్ను చదవలేకపోయింది",
+      "announceUploaded": "అటాచ్మెంట్ అప్లోడ్ చేయబడింది",
+      "cantUpload": "ఈ ఫైల్ను అప్‌లోడ్ చేయలేము.",
+      "networkError": "నెట్‌వర్క్ లోపం",
+      "uploadFailed": "అప్‌లోడ్ విఫలమైంది",
+      "failedToUploadFile": "ఫైల్ అప్‌లోడ్ చేయడంలో విఫలమైంది: {{reason}}",
+      "nothingToPaste": "పేస్ట్ చేయడానికి ఏమీ లేదు"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -661,7 +759,9 @@
       "moreActions": "మరిన్ని చర్యలు",
       "message": "సందేశం",
       "notDelivered": "పంపించబడలేదు",
-      "edited": "(సవరించబడింది)"
+      "edited": "(సవరించబడింది)",
+      "image": "చిత్రం",
+      "attachment": "అటాచ్మెంట్"
     },
     "messageActions": {
       "copied": "కాపీ చేయబడింది",
@@ -691,8 +791,9 @@
     },
     "typingIndicator": {
       "someone": "ఎవరో",
-      "oneTyping": "{{name}} టైప్ చేస్తున్నారు...",
-      "manyTyping": "{{names}} టైప్ చేస్తున్నారు..."
+      "typing_one": "{{name}} టైప్ చేస్తున్నారు...",
+      "typing": "{{names}} టైప్ చేస్తున్నారు...",
+      "typing_other": "{{names}} టైప్ చేస్తున్నారు..."
     },
     "botStatus": {
       "online": "ఆన్లైన్",
@@ -702,6 +803,12 @@
       "loadingUser": "వినియోగదారుని లోడ్ చేస్తోంది...",
       "waitingForStatus": "బాట్ స్థితి కోసం వేచి ఉంది...",
       "offlineMessage": "బాట్ ఆఫ్లైన్లో ఉంది. అది తిరిగి కనెక్ట్ అయినప్పుడు సందేశాలు పునఃప్రారంభమవుతాయి."
+    },
+    "errors": {
+      "notAllowed": "అనుమతి లేదు",
+      "messageTooLong": "సందేశం చాలా పొడవుగా ఉంది — దీన్ని {{limit}} అక్షరాల కంటే తక్కువగా ఉంచండి",
+      "titleTooLong": "శీర్షిక చాలా పొడవుగా ఉంది — దీన్ని {{limit}} అక్షరాల కంటే తక్కువగా ఉంచండి",
+      "messageEmpty": "సందేశం ఖాళీగా ఉండకూడదు"
     }
   },
   "kiloclaw": {
@@ -714,6 +821,7 @@
       "finalTermEnds": "చివరి టర్మ్ ముగుస్తుంది",
       "afterFinalTerm": "చివరి టర్మ్ తర్వాత",
       "remaining": "మిగిలినది",
+      "lessThanOneDay": "1 రోజు కంటే తక్కువ",
       "ends": "ముగుస్తుంది",
       "expires": "గడువు ముగుస్తుంది",
       "noActivePlan": "చురుకైన ప్లాన్ లేదు",
@@ -722,23 +830,25 @@
       "couldNotLoad": "బిల్లింగ్ సమాచారాన్ని లోడ్ చేయలేకపోయాము",
       "manageOnWeb": "వెబ్లో బిల్లింగ్ నిర్వహించండి",
       "commitPlan": "కమిట్",
-      "daysLeft": "{{count}} రోజులు మిగిలి ఉన్నాయి",
       "earlybird": "ఎర్లీబర్డ్",
       "finalCommitTermEndsOn": "మీ చివరి Commit టర్మ్ {{date}}న ముగుస్తుంది. {{price}} వద్ద Standardగా కొనసాగించండి, లేదా హోస్టింగ్ ముగుస్తుంది.",
       "freeTrial": "ఉచిత ట్రయల్",
       "hostingEnds": "హోస్టింగ్ ముగుస్తుంది",
-      "oneDayLeft": "1 రోజు మిగిలి ఉంది",
       "renews": "పునరుద్ధరిస్తుంది",
       "standardMonthToMonth": "స్టాండర్డ్ నెలవారీ",
       "standardStartsOn": "Standard {{date}}న {{price}} వద్ద ప్రారంభమవుతుంది.",
       "yourStandardMonthlyPrice": "మీ Standard నెలవారీ ధర",
       "perMonth": "/నెల",
       "earlybirdAccessUntil": "{{date}} వరకు ఎర్లీబర్డ్ యాక్సెస్",
-      "earlybirdEnding": "ఎర్లీబర్డ్ ముగుస్తోంది: {{days}} రోజులు మిగిలి ఉన్నాయి",
+      "earlybirdEnding": "ఎర్లీబర్డ్ ముగుస్తోంది: {{remaining}} రోజులు మిగిలి ఉన్నాయి",
       "paymentPastDue": "చెల్లింపు గడువు ముగిసింది. మీ చెల్లింపు పద్ధతిని నవీకరించండి.",
       "subscriptionCancels": "చందా {{date}}న రద్దవుతుంది",
-      "trialDaysRemaining": "ట్రయల్: {{days}} రోజులు మిగిలి ఉన్నాయి",
-      "trialEndingSoon": "ట్రయల్ త్వరలో ముగుస్తుంది: {{days}}"
+      "trialDaysRemaining": "ట్రయల్: {{remaining}} రోజులు మిగిలి ఉన్నాయి",
+      "trialEndingSoon": "ట్రయల్ త్వరలో ముగుస్తుంది: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "కొత్తగా ఏముంది",
@@ -990,7 +1100,7 @@
         "stalledTitle": "ఏదో నిలిచిపోయింది",
         "stalledBody": "మేము {{name}}ను సెటప్ చేయడం పూర్తి చేయలేకపోయాము. మళ్లీ ప్రయత్నించండి, లేదా ఇది పునరావృతమైతే hi@kilo.aiకు ఇమెయిల్ చేయండి.",
         "timeoutTitle": "అంచనా కంటే ఎక్కువ సమయం తీసుకుంటోంది",
-        "timeoutBody": "{{name}} కోసం సెటప్ సాధారణం కంటే ఎక్కువ సమయం తీసుకుంటోంది ({{minutes}} నిమిషాలకు పైగా).",
+        "timeoutBody": "{{name}} కోసం సెటప్ సాధారణం కంటే ఎక్కువ సమయం తీసుకుంటోంది ({{displayMinutes}} నిమిషాలకు పైగా).",
         "continueInBackground": "నేపథ్యంలో కొనసాగించండి",
         "settingUp": "{{name}}ను సెటప్ చేస్తోంది",
         "finishingSetup": "సెటప్ పూర్తి చేస్తోంది",
@@ -1020,7 +1130,8 @@
       "starting": "STARTING",
       "stopped": "STOPPED",
       "stopping": "STOPPING",
-      "unknown": "UNKNOWN"
+      "unknown": "UNKNOWN",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1060,8 +1171,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}}కు శ్రద్ధ అవసరం: {{label}}",
-      "openUnreadOne": "{{name}}ను తెరవండి, {{count}} చదవని సందేశం",
-      "openUnreadMany": "{{name}}ను తెరవండి, {{count}} చదవని సందేశాలు",
+      "openUnread_one": "{{name}}ను తెరవండి, {{displayCount}} చదవని సందేశం",
+      "openUnread": "{{name}}ను తెరవండి, {{displayCount}} చదవని సందేశాలు",
+      "openUnread_other": "{{name}}ను తెరవండి, {{displayCount}} చదవని సందేశాలు",
       "open": "{{name}}ను తెరవండి",
       "openSettings": "{{name}} కోసం సెట్టింగ్లను తెరవండి",
       "fixOnKiloAi": "kilo.aiలో పరిష్కరించండి: {{label}}"
@@ -1103,7 +1215,9 @@
       "sparkles": "మెరుపులు",
       "strongArm": "బలమైన చేయి",
       "talisman": "టాలిస్మాన్"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "ఈ ఇన్స్టాన్స్ ఫైల్లను స్వీకరించదు.",
+    "instanceSwitcherTitle": "KiloClaw ఇన్స్టాన్స్"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1280,7 +1394,7 @@
       "mergeGate": "మెర్జ్ గేట్",
       "repositories": "రిపోజిటరీలు",
       "allRepositories": "అన్ని రిపోజిటరీలు",
-      "nSelected": "{{count}} ఎంచుకున్నారు",
+      "nSelected": "{{displayCount}} ఎంచుకున్నారు",
       "reviewMemory": "సమీక్ష మెమరీ",
       "proposedReviewMdGuidance": "ప్రతిపాదించిన REVIEW.md మార్గదర్శకత్వం"
     },
@@ -1290,7 +1404,71 @@
       "noDecision": "నిర్ణయం లేదు",
       "noResult": "ఫలితం లేదు"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "రివ్యూయర్‌ను నవీకరించడంలో విఫలమైంది",
+    "configSaveFailed": "సమీక్ష కాన్ఫిగ్‌ను సేవ్ చేయడంలో విఫలమైంది",
+    "status": {
+      "pending": "వేచి ఉంది",
+      "queued": "క్యూలో ఉంది",
+      "running": "నడుస్తోంది",
+      "completed": "పూర్తయింది",
+      "failed": "విఫలమైంది",
+      "cancelled": "రద్దు చేయబడింది",
+      "interrupted": "అంతరాయం కలిగింది"
+    },
+    "reviewStyle": {
+      "strict": "కఠినమైనది",
+      "balanced": "సమతుల్యం",
+      "lenient": "సౌమ్యం",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "సెక్యూరిటీ",
+      "performance": "పనితీరు",
+      "bugs": "బగ్స్",
+      "style": "శైలి",
+      "testing": "టెస్టింగ్",
+      "documentation": "డాక్యుమెంటేషన్"
+    },
+    "gateThreshold": {
+      "off": "ఆఫ్",
+      "all": "అన్నీ",
+      "warning": "హెచ్చరిక",
+      "critical": "క్రిటికల్"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewerకు శ్రద్ధ అవసరం",
+        "description": "చురుకైన GitHub App ఇన్స్టాలేషన్తో Kilo ఈ రిపోజిటరీని యాక్సెస్ చేయలేకపోవడం వల్ల Code Reviewer నిలిపివేయబడింది. GitHub App ఇన్స్టాలేషన్ను అప్డేట్ చేసి, ఆపై Code Reviewerను మళ్ళీ ప్రారంభించండి.",
+        "recoveryLabel": "GitHub Appను అప్డేట్ చేయండి"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewerకు శ్రద్ధ అవసరం",
+        "description": "ఈ GitHub సంస్థ Kiloను బ్లాక్ చేసే IP అనుమతి జాబితాను ఉపయోగిస్తున్నందున Code Reviewer నిలిపివేయబడింది. సహాయం కోసం hi@kilocode.aiని సంప్రదించి, ఆపై Code Reviewerను మళ్ళీ ప్రారంభించండి.",
+        "recoveryLabel": "మద్దతును సంప్రదించండి"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewerకు శ్రద్ధ అవసరం",
+        "description": "ఈ ప్రాజెక్ట్ కోసం Kilo GitLab Project Access Tokenను సృష్టించలేకపోవడం వల్ల Code Reviewer నిలిపివేయబడింది. Maintainer యాక్సెస్ మంజూరు చేయండి లేదా Project Access Tokens ప్రారంభించండి, ఆపై Code Reviewerను మళ్ళీ ప్రారంభించండి.",
+        "recoveryLabel": "GitLab ఇంటిగ్రేషన్ను అప్డేట్ చేయండి"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewerకు శ్రద్ధ అవసరం",
+        "description": "ఎంచుకున్న BYOK API కీ చెల్లదు, రద్దు చేయబడింది లేదా అనుమతి లేకపోవడం వల్ల Code Reviewer నిలిపివేయబడింది. కీని అప్డేట్ చేయండి లేదా మరొక మోడల్ను ఎంచుకోండి, ఆపై Code Reviewerను మళ్ళీ ప్రారంభించండి.",
+        "recoveryLabel": "BYOK సెట్టింగ్లను అప్డేట్ చేయండి"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewerకు శ్రద్ధ అవసరం",
+        "description": "ఎంచుకున్న మోడల్ క్లౌడ్ ఏజెంట్ సెషన్లకు అందుబాటులో లేకపోవడం వల్ల Code Reviewer నిలిపివేయబడింది. అందుబాటులో ఉన్న మోడల్ను ఎంచుకుని, ఆపై Code Reviewerను మళ్ళీ ప్రారంభించండి.",
+        "recoveryLabel": "Code Reviewer సెట్టింగ్లను అప్డేట్ చేయండి"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewerకు శ్రద్ధ అవసరం",
+        "description": "ఈరోజు మూడు రిపోజిటరీ క్లోన్ టైమవుట్ల తర్వాత Code Reviewer నిలిపివేయబడింది. సహాయం కోసం hi@kilocode.aiని సంప్రదించి, ఆపై Code Reviewerను మళ్ళీ ప్రారంభించండి.",
+        "recoveryLabel": "మద్దతును సంప్రదించండి"
+      }
+    },
+    "unknownError": "తెలియని లోపం"
   },
   "securityAgent": {
     "filter": {
@@ -1351,8 +1529,9 @@
       "enableAutoRemediationConfirmTitle": "ఆటో-నివారణను ప్రారంభించాలా?",
       "enableAutoRemediationConfirmMessage": "Security Agent అర్హత కలిగిన దుర్వినియోగం చేయదగిన ఫైండింగ్ల కోసం నివారణ PRలను స్వయంచాలకంగా తెరుస్తుంది.",
       "enable": "ప్రారంభించండి",
-      "queuedOne": "{{count}} ఉన్న ఫలితం విశ్లేషణ కోసం క్యూలో ఉంది.",
-      "queuedMany": "{{count}} ఉన్న ఫలితాలు విశ్లేషణ కోసం క్యూలో ఉన్నాయి.",
+      "queued_one": "{{displayCount}} ఉన్న ఫలితం విశ్లేషణ కోసం క్యూలో ఉంది.",
+      "queued": "{{displayCount}} ఉన్న ఫలితాలు విశ్లేషణ కోసం క్యూలో ఉన్నాయి.",
+      "queued_other": "{{displayCount}} ఉన్న ఫలితాలు విశ్లేషణ కోసం క్యూలో ఉన్నాయి.",
       "severityCriticalOnly": "క్లిష్టమైనవి మాత్రమే",
       "severityHighAndAbove": "అధికం మరియు పైన",
       "severityMediumAndAbove": "మధ్యస్థం మరియు పైన",
@@ -1383,14 +1562,14 @@
       "analyzed": "విశ్లేషించబడింది",
       "exploitabilityReasoning": "దుర్వినియోగ సామర్థ్య హేతుబద్ధీకరణ",
       "suggestedFix": "సూచించిన పరిష్కారం",
-      "whereFound": "ఇది ఎక్కడ కనుగొనబడింది ({{count}})",
+      "whereFound": "ఇది ఎక్కడ కనుగొనబడింది ({{displayCount}})",
       "fullReport": "పూర్తి రూపొందించిన నివేదిక",
       "unknown": "తెలియదు",
       "yes": "అవును",
       "no": "లేదు"
     },
     "dashboard": {
-      "findingsCount": "{{count}} ఫలితాలు",
+      "findingsCount": "{{displayCount}} ఫలితాలు",
       "notMeasured": "కొలవలేదు",
       "actFirst": "ముందుగా చర్య తీసుకోండి",
       "slaPosture": "SLA భంగిమ",
@@ -1399,7 +1578,7 @@
       "repositoryActionPlan": "రిపోజిటరీ చర్య ప్రణాళిక",
       "noOpenFindings": "దృష్టి అవసరమయ్యే తెరిచిన ఫలితాలు లేవు",
       "deadlineToday": "గడువు ఈరోజే చేరుకుంది",
-      "daysOverdue": "{{count}} రోజులు గడువు దాటాయి",
+      "daysOverdue": "{{displayCount}} రోజులు గడువు దాటాయి",
       "withinDeadline": "గడువులోపు",
       "criticalOverdue": "క్లిష్టమైనవి గడువు దాటాయి",
       "highOverdue": "అధికమైనవి గడువు దాటాయి",
@@ -1426,6 +1605,27 @@
       "syncNow": "ఇప్పుడే సింక్ చేయండి",
       "syncQueued": "సింక్ క్యూలో ఉంది",
       "syncStatusUnavailable": "సింక్ స్థితి అందుబాటులో లేదు"
+    },
+    "dashboardMetrics": {
+      "openFindings": "తెరిచిన ఫలితాలు",
+      "openFindingsDetail": "{{critical}} క్లిష్టమైనవి, {{high}} అధికమైనవి",
+      "confirmedExploitable": "దుర్వినియోగం చేయదగినదిగా నిర్ధారించబడింది",
+      "confirmedExploitableDetail": "ప్రాజెక్ట్ ప్రమాదం విశ్లేషణ ద్వారా నిర్ధారించబడింది",
+      "needsReview": "మీ సమీక్ష అవసరం",
+      "needsReviewDetail": "మానవ నిర్ణయం అవసరం",
+      "analysisIncomplete": "విశ్లేషణ పూర్తి కాలేదు",
+      "analysisIncompleteDetail": "ప్రాజెక్ట్ ప్రమాదం ఇంకా తెలియదు",
+      "slaCompliance": "SLA సమ్మతి",
+      "notMeasured": "కొలవలేదు",
+      "withinDeadlineDetail": "{{total}} లో {{within}} గడువులోపు",
+      "noDeadlineData": "ఏ ఫలితాలకూ ఇంకా SLA గడువు లేదు",
+      "deadlinePassed": "గడువు దాటిపోయింది",
+      "deadlinePassedDetail": "{{critical}} క్లిష్టమైనవి, {{high}} అధికమైనవి",
+      "dueThisWeek": "ఈ వారం గడువు",
+      "dueThisWeekDetail": "{{exploitable}} దుర్వినియోగం చేయదగినవిగా నిర్ధారించబడ్డాయి",
+      "noDeadline": "గడువు లేదు",
+      "reviewSlaAssignment": "SLA కేటాయింపును సమీక్షించండి",
+      "allOpenFindingsTracked": "అన్ని తెరిచిన ఫలితాలు ట్రాక్ చేయబడతాయి"
     },
     "dismiss": {
       "title": "ఫలితాన్ని తీసివేయండి",
@@ -1469,7 +1669,17 @@
       "sourceRecord": "మూల రికార్డు",
       "source": "మూలం",
       "sourceId": "మూల ID",
-      "viewAdvisory": "GitHubలో సలహాను చూడండి"
+      "viewAdvisory": "GitHubలో సలహాను చూడండి",
+      "statusSuperseded": "భర్తీ చేయబడింది",
+      "statusFixed": "పరిష్కరించబడింది",
+      "statusOpen": "తెరిచి ఉంది",
+      "sourceDependabot": "GitHub Dependabot",
+      "reasonFixStarted": "పరిష్కారం ఇప్పటికే ప్రారంభమైంది",
+      "reasonNoBandwidth": "బ్యాండ్‌విడ్త్ అందుబాటులో లేదు",
+      "reasonTolerableRisk": "ప్రమాదం తట్టుకోదగినది",
+      "reasonInaccurate": "ఫలితం సరికాదు",
+      "reasonNotUsed": "హాని కలిగించే కోడ్ ఉపయోగించబడదు",
+      "reasonAfterReview": "సమీక్ష తర్వాత"
     },
     "settingsOverview": {
       "title": "సెట్టింగ్‌లు",
@@ -1482,8 +1692,9 @@
       "on": "ఆన్",
       "off": "ఆఫ్",
       "allRepositories": "అన్ని రిపోజిటరీలు",
-      "repositorySelected": "{{count}} రిపోజిటరీ ఎంచుకోబడింది",
-      "repositoriesSelected": "{{count}} రిపోజిటరీలు ఎంచుకోబడ్డాయి",
+      "repositoriesCount_one": "{{displayCount}} రిపోజిటరీ ఎంచుకోబడింది",
+      "repositoriesCount": "{{displayCount}} రిపోజిటరీలు ఎంచుకోబడ్డాయి",
+      "repositoriesCount_other": "{{displayCount}} రిపోజిటరీలు ఎంచుకోబడ్డాయి",
       "selectRepositories": "రిపోజిటరీలను ఎంచుకోండి",
       "selectRepositoriesSubtitle": "సెక్యూరిటీ ఏజెంట్ ఏ రిపోజిటరీలను పర్యవేక్షిస్తుందో ఎంచుకోండి",
       "repositories": "రిపోజిటరీలు",
@@ -1491,9 +1702,9 @@
       "analysisModeSubtitle": "{{mode}} విశ్లేషణ",
       "automation": "ఆటోమేషన్",
       "automationAllOff": "అన్నీ ఆఫ్",
-      "automationCount": "{{count}} / 3 ప్రారంభించబడింది",
+      "automationCount": "{{displayCount}} / 3 ప్రారంభించబడింది",
       "notifications": "నోటిఫికేషన్‌లు",
-      "notificationsCount": "{{count}} / 2 ప్రారంభించబడింది",
+      "notificationsCount": "{{displayCount}} / 2 ప్రారంభించబడింది",
       "slaPolicy": "SLA విధానం",
       "disabledNoManage": "సెక్యూరిటీ ఏజెంట్ నిలిపివేయబడింది. సంస్థ యజమానులు మరియు బిల్లింగ్ మేనేజర్లు మాత్రమే దీన్ని ఆన్ చేయగలరు.",
       "disabledNoRepo": "సెక్యూరిటీ ఏజెంట్‌ను ప్రారంభించే ముందు కనీసం ఒక రిపోజిటరీని ఎంచుకోండి.",
@@ -1515,7 +1726,7 @@
       "openPullRequest": "పుల్ రిక్వెస్ట్ తెరవండి{{number}}",
       "openDraftPullRequest": "డ్రాఫ్ట్ పుల్ రిక్వెస్ట్ తెరవండి{{number}}",
       "progress": "పురోగతి",
-      "attemptHistory": "ప్రయత్న చరిత్ర ({{count}})",
+      "attemptHistory": "ప్రయత్న చరిత్ర ({{displayCount}})",
       "attemptNumber": "ప్రయత్నం #{{number}}",
       "startedBy": "ప్రారంభించినవారు",
       "model": "మోడల్",
@@ -1681,7 +1892,140 @@
     },
     "queuedActionUntracked": "క్యూలో ఉన్న చర్యను ఇకపై ట్రాక్ చేయలేకపోయింది. తాజా స్థితిని చూడటానికి రిఫ్రెష్ చేయండి.",
     "initialSyncAdmissionFailed": "సెక్యూరిటీ ఏజెంట్ ప్రారంభించబడింది, కానీ ప్రారంభ సింక్ క్యూలో వేయలేకపోయింది. మళ్ళీ సింక్ చేయండి.",
-    "title": "సెక్యూరిటీ ఏజెంట్"
+    "title": "సెక్యూరిటీ ఏజెంట్",
+    "commands": {
+      "findingAlreadyDismissed": "ఫలితం ఇప్పటికే తీసివేయబడింది",
+      "findingDismissed": "ఫలితం తీసివేయబడింది",
+      "noRemediationsQueued": "క్యూలో ఉన్న ఫలితాలు లేవు",
+      "remediationsQueued": "ఇప్పటికే ఉన్న పరిష్కారాలు క్యూలో ఉన్నాయి",
+      "analysisComplete": "విశ్లేషణ పూర్తయింది",
+      "syncComplete": "సింక్ పూర్తయింది"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "సెక్యూరిటీ సేవ కాన్ఫిగర్ చేయబడలేదు. ఇది పరిష్కరించబడే వరకు మళ్లీ సమర్పించడం విజయవంతం కాదు.",
+      "syncMayNotHaveCompleted": "సింక్ పూర్తి కాకపోవచ్చు. దాన్ని సర్దుబాటు చేయడానికి మళ్లీ ప్రయత్నించండి, లేదా విస్మరించండి.",
+      "syncInProgress": "సెక్యూరిటీ సింక్ ఇప్పటికే జరుగుతోంది. దయచేసి మళ్లీ ప్రయత్నించండి.",
+      "dismissalInProgress": "ఈ తోసివేత ఇప్పటికే జరుగుతోంది. దయచేసి మళ్లీ ప్రయత్నించండి.",
+      "couldNotReadPendingSyncs": "పెండింగ్ సింక్‌లను చదవలేకపోయాము. మళ్లీ ప్రయత్నించండి."
+    },
+    "analysisState": {
+      "queued": "విశ్లేషణ క్యూలో ఉంది",
+      "queuedTitle": "విశ్లేషణ క్యూలో ఉంది",
+      "queuedDescription": "విశ్లేషణ సామర్థ్యం అందుబాటులోకి వచ్చే వరకు వేచి ఉంది.",
+      "analyzing": "విశ్లేషిస్తోంది",
+      "analyzingTitle": "విశ్లేషిస్తోంది",
+      "analyzingDescription": "యాప్ కోడ్ ప్రభావిత ఫీచర్‌ను చేరుకోగలదా అని తనిఖీ చేస్తోంది.",
+      "failed": "విశ్లేషణ విఫలమైంది",
+      "failedTitle": "విశ్లేషణ విఫలమైంది",
+      "failedDescription": "సెక్యూరిటీ ఏజెంట్ విశ్లేషణను పూర్తి చేయలేకపోయింది.",
+      "extractionFailed": "సమీక్ష అవసరం",
+      "extractionFailedTitle": "సమీక్ష అవసరం",
+      "extractionFailedDescription": "సాంకేతిక నివేదికను నిర్మాణాత్మక ఫలితంగా మార్చలేకపోయింది.",
+      "exploitable": "దుర్వినియోగం చేయదగినది",
+      "exploitableTitle": "దుర్వినియోగం చేయదగినది",
+      "exploitableDescription": "యాప్ కోడ్ ప్రభావిత ఫీచర్‌ను చేరుకోగలదు.",
+      "notExploitable": "చేరుకోలేనిది",
+      "notExploitableTitle": "చేరుకోలేనిది",
+      "notExploitableDescription": "ఈ రిపోజిటరీలో చేరుకోగలిగే మార్గం ఏదీ కనుగొనబడలేదు.",
+      "unknown": "సమీక్ష అవసరం",
+      "unknownTitle": "సమీక్ష అవసరం",
+      "unknownDescription": "హాని కలిగించే ఫీచర్ చేరుకోగలదా అని విశ్లేషణ నిర్ధారించలేకపోయింది.",
+      "safeToDismiss": "తోసివేయడం సురక్షితం",
+      "safeToDismissTitle": "తోసివేయడం సురక్షితం",
+      "safeToDismissDescription": "కోడ్‌బేస్ విశ్లేషణ లేకుండా దీన్ని సురక్షితంగా తోసివేయవచ్చని ట్రయాజ్ నిర్ధారించింది.",
+      "manualReview": "సమీక్ష అవసరం",
+      "manualReviewTitle": "మాన్యువల్ సమీక్ష అవసరం",
+      "manualReviewDescription": "మాన్యువల్ సమీక్ష కోసం ట్రయాజ్ ఈ ఫలితాన్ని ఫ్లాగ్ చేసింది.",
+      "analysisRequired": "విశ్లేషణ అవసరం",
+      "analysisRequiredTitle": "కోడ్‌బేస్ విశ్లేషణ అవసరం",
+      "analysisRequiredDescription": "ప్రతిస్పందనను నిర్ణయించే ముందు రిపోజిటరీని విశ్లేషించాలని ట్రయాజ్ సిఫార్సు చేస్తుంది.",
+      "completed": "విశ్లేషించబడింది",
+      "completedTitle": "విశ్లేషించబడింది",
+      "completedDescription": "నిర్దిష్ట ఫలితం నమోదు చేయకుండా విశ్లేషణ పూర్తయింది.",
+      "notAnalyzed": "విశ్లేషించబడలేదు",
+      "notAnalyzedTitle": "విశ్లేషించబడలేదు",
+      "notAnalyzedDescription": "ఈ ఫలితానికి కోడ్‌బేస్ విశ్లేషణ ఇంకా అమలు కాలేదు."
+    },
+    "deadline": {
+      "fixedBeforeDeadline": "గడువుకు ముందే పరిష్కరించబడింది",
+      "fixed": "పరిష్కరించబడింది",
+      "fixedOn": "{{date}} నాటికి పరిష్కరించబడింది",
+      "resolutionRecorded": "పరిష్కారం నమోదు చేయబడింది",
+      "superseded": "భర్తీ చేయబడింది",
+      "dismissed": "తీసివేయబడింది",
+      "closedOn": "{{status}} {{date}}",
+      "deadlineNotSet": "గడువు నిర్ణయించబడలేదు",
+      "noSlaDeadline": "SLA గడువు లేదు",
+      "dueOn": "{{date}} గడువు",
+      "overdueNow": "గడువు దాటింది",
+      "overdue_one": "{{count}} రోజు గడువు దాటింది",
+      "overdue_other": "{{count}} రోజులు గడువు దాటాయి",
+      "dueToday": "ఈరోజు గడువు",
+      "dueTomorrow": "రేపు గడువు",
+      "dueInDays_one": "{{count}} రోజులో గడువు",
+      "dueInDays_other": "{{count}} రోజుల్లో గడువు",
+      "overdue": "{{count}} రోజులు గడువు దాటాయి",
+      "dueInDays": "{{count}} రోజుల్లో గడువు"
+    },
+    "remediationStatus": {
+      "cancellationRequested": "రద్దు అభ్యర్థించబడింది",
+      "notStarted": "ప్రారంభించబడలేదు",
+      "queued": "క్యూలో ఉంది",
+      "starting": "ప్రారంభిస్తోంది",
+      "inProgress": "జరుగుతోంది",
+      "draftPrOpened": "డ్రాఫ్ట్ PR తెరవబడింది",
+      "prOpened": "PR తెరవబడింది",
+      "blocked": "నిరోధించబడింది",
+      "failed": "విఫలమైంది",
+      "noChangesNeeded": "మార్పులు అవసరం లేదు",
+      "cancelled": "రద్దు చేయబడింది",
+      "originAutomaticPolicy": "స్వయంచాలక విధానం",
+      "originIncludeExistingPolicy": "ఇప్పటికే ఉన్న విధానాన్ని చేర్చండి",
+      "originManual": "మాన్యువల్",
+      "validationCheck": "ధృవీకరణ తనిఖీ {{number}}"
+    },
+    "remediationUnavailable": {
+      "findingNotFound": "భద్రతా ఫలితం ఇకపై లేదు.",
+      "approvalRequired": "ఆటో నివారణకు ఆమోదం అవసరం. దాన్ని ఆమోదించడానికి పరిష్కారాన్ని మాన్యువల్‌గా ప్రారంభించండి.",
+      "findingNotOpen": "ఫలితం ఇకపై తెరిచి ఉండదు.",
+      "repoNotInScope": "సెక్యూరిటీ ఏజెంట్ కోసం రిపోజిటరీ ఎంచుకోబడలేదు.",
+      "analysisRequired": "పరిష్కారాన్ని ప్రారంభించే ముందు కోడ్‌బేస్ విశ్లేషణను అమలు చేయండి.",
+      "sandboxAnalysisRequired": "పరిష్కారాన్ని ప్రారంభించే ముందు కోడ్‌బేస్ విశ్లేషణను అమలు చేయండి.",
+      "staleAnalysis": "విశ్లేషణ తర్వాత ఫలితం మారింది. పరిష్కారాన్ని ప్రారంభించే ముందు విశ్లేషణను మళ్ళీ అమలు చేయండి.",
+      "notExploitable": "విశ్లేషణ చేరుకోగలిగే హాని కలిగించే మార్గాన్ని కనుగొనలేదు. ఆటో నివారణ అందుబాటులో లేదు.",
+      "exploitabilityUnknown": "విశ్లేషణ దుర్వినియోగ సామర్థ్యాన్ని నిర్ధారించలేకపోయింది. వన్-క్లిక్ పరిష్కారానికి ముందు మాన్యువల్ సమీక్ష అవసరం.",
+      "manualReviewRequired": "విశ్లేషణ మాన్యువల్ సమీక్షను సిఫార్సు చేస్తుంది, కాబట్టి వన్-క్లిక్ పరిష్కారం అందుబాటులో లేదు.",
+      "monitorRequired": "PR తెరవడానికి బదులుగా పర్యవేక్షణను విశ్లేషణ సిఫార్సు చేస్తుంది.",
+      "triageOnly": "ట్రయాజ్ మాత్రమే పూర్తయింది. పరిష్కారాన్ని ప్రారంభించే ముందు కోడ్‌బేస్ విశ్లేషణను అమలు చేయండి.",
+      "actionNotConcrete": "కాంక్రీట్ డిపెండెన్సీ ప్యాచ్ లేదా సూచించిన పరిష్కారం అందుబాటులో లేదు.",
+      "remediationActive": "పరిష్కార ప్రయత్నం ఇప్పటికే చురుకుగా ఉంది.",
+      "prAlreadyOpened": "పరిష్కార PR ఇప్పటికే తెరిచి ఉంది.",
+      "duplicateAnalysisResult": "ఈ విశ్లేషణ ఫలితం ఇప్పటికే పరిష్కార పనిని ఉత్పత్తి చేసింది.",
+      "retryNotAllowed": "ఈ ప్రయత్నానికి మళ్ళీ ప్రయత్నించడం అందుబాటులో లేదు.",
+      "securityAgentDisabled": "ఈ యజమానికి సెక్యూరిటీ ఏజెంట్ నిలిపివేయబడింది.",
+      "autoRemediationDisabled": "ఆటో నివారణ నిలిపివేయబడింది. భద్రతా గేట్లు దాటినప్పుడు మాన్యువల్ పరిష్కారం ఇప్పటికీ ప్రారంభమవుతుంది.",
+      "includeExistingDisabled": "ఇప్పటికే ఉన్న ఫలితాలు స్వయంచాలక పరిష్కారం నుండి మినహాయించబడ్డాయి.",
+      "belowThreshold": "ఫలితం స్వయంచాలక తీవ్రత థ్రెషోల్డ్ కంటే తక్కువగా ఉంది. భద్రతా గేట్లు దాటినప్పుడు మాన్యువల్ పరిష్కారం ఇప్పటికీ ప్రారంభమవుతుంది.",
+      "beforeEnablement": "ఆటో నివారణ ప్రారంభించబడటానికి ముందు విశ్లేషణ పూర్తయింది. భద్రతా గేట్లు దాటినప్పుడు మాన్యువల్ పరిష్కారం ఇప్పటికీ ప్రారంభమవుతుంది.",
+      "generic": "ఈ ఫలితానికి పరిష్కారం అందుబాటులో లేదు."
+    },
+    "commandFailure": {
+      "ownerCapReached": "విశ్లేషణ సామర్థ్యం నిండిపోయింది. చురుకైన విశ్లేషణ పూర్తయ్యే వరకు వేచి ఉండి, ఆపై మళ్ళీ ప్రయత్నించండి.",
+      "githubTokenUnavailable": "GitHub ఆథరైజేషన్కు శ్రద్ధ అవసరం. GitHub Appను మళ్ళీ అథరైజ్ చేసి, ఆపై మళ్ళీ ప్రయత్నించండి.",
+      "githubAuthInvalid": "GitHub ఆథరైజేషన్కు శ్రద్ధ అవసరం. GitHub Appను మళ్ళీ అథరైజ్ చేసి, ఆపై మళ్ళీ ప్రయత్నించండి.",
+      "findingUnavailable": "ఫలితం ఇక అందుబాటులో లేదు. ఫలితాలను రిఫ్రెష్ చేసి, అది ఇంకా తెరిచి ఉంటే మళ్ళీ ప్రయత్నించండి.",
+      "repositoryUnavailable": "రిపోజిటరీ ఇక GitHub Appకు అందుబాటులో లేదు. రిపోజిటరీ యాక్సెస్ను రిఫ్రెష్ చేసి, ఆపై మళ్ళీ ప్రయత్నించండి.",
+      "invalidDismissTarget": "ఫలితం యొక్క Dependabot లక్ష్యం చెల్లదు కాబట్టి దానిని తోసివేయలేరు.",
+      "commandStalled": "క్యూ చేసిన చర్య సమయానికి పూర్తి కాలేదు. చర్యను మళ్ళీ ప్రయత్నించండి.",
+      "queueRetriesExhausted": "అనేక ప్రయత్నాల తర్వాత చర్యను పూర్తి చేయలేకపోయాము. చర్యను మళ్ళీ ప్రయత్నించండి.",
+      "queueAdmissionFailed": "క్యూ చేసిన చర్యను అంగీకరించలేకపోయాము. చర్యను మళ్ళీ ప్రయత్నించండి.",
+      "generic": "క్యూ చేసిన చర్య విఫలమైంది. చర్యను మళ్ళీ ప్రయత్నించండి."
+    },
+    "analysisMode": {
+      "auto": "ఆటో",
+      "shallow": "ఉపరితల",
+      "deep": "లోతైన"
+    }
   },
   "agents": {
     "activeNow": "ఇప్పుడు చురుకుగా ఉంది",
@@ -1720,14 +2064,29 @@
       "sessionDeleted": "సెషన్ తొలగించబడింది",
       "needsInput": "ఇన్పుట్ అవసరం",
       "fromPlatform": "{{platform}} నుండి",
-      "centOne": "సెంట్",
-      "centOther": "సెంట్లు",
-      "dollarOne": "డాలర్",
-      "dollarOther": "డాలర్లు"
+      "cent_one": "సెంట్",
+      "cent": "సెంట్లు",
+      "cent_other": "సెంట్లు",
+      "dollar_one": "డాలర్",
+      "dollar": "డాలర్లు",
+      "dollar_other": "డాలర్లు",
+      "costSpoken": "ఖర్చు {{cost}}",
+      "costSpokenWithTime": "ఖర్చు {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubను తెరవలేకపోయింది",
-      "couldNotOpenMessage": "మేము GitHub App సెటప్‌ను ప్రారంభించలేకపోయాము. దయచేసి మళ్ళీ ప్రయత్నించండి."
+      "couldNotOpenMessage": "మేము GitHub App సెటప్‌ను ప్రారంభించలేకపోయాము. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+      "installedTitle": "GitHub App ఇన్స్టాల్ చేయబడింది",
+      "installedMessage": "మీ రిపోజిటరీలు ఇప్పుడు కనెక్ట్ చేయబడ్డాయి.",
+      "pendingTitle": "అడ్మిన్ ఆమోదం కోసం వేచి ఉంది",
+      "pendingMessage": "ఒక సంస్థ అడ్మిన్ ఇన్స్టాలేషన్ అభ్యర్థనను ఆమోదించాలి.",
+      "accountMismatchTitle": "ఖాతా సరిపోలడం లేదు",
+      "accountMismatchMessage": "ఈ కనెక్షన్ వేరే ఖాతాతో సైన్ ఇన్ అయిన Kilo App నుండి ప్రారంభించబడింది. ఆ ఖాతాతో వెబ్లో సైన్ ఇన్ చేయండి, లేదా యాప్ నుండి మళ్ళీ ప్రారంభించండి.",
+      "cannotCompleteTitle": "ఇన్స్టాలేషన్ను పూర్తి చేయలేము",
+      "notAdminMessage": "ఆ ఖాతా యొక్క GitHub అడ్మిన్ మాత్రమే దాన్ని కనెక్ట్ చేయగలరు. Kiloను ఇన్స్టాల్ చేయమని సంస్థ అడ్మిన్ను అడగండి.",
+      "alreadyClaimedMessage": "ఆ GitHub ఇన్స్టాలేషన్ ఇప్పటికే మరొక Kilo ఖాతాకు కనెక్ట్ అయి ఉంది. అక్కడ దాన్ని ముందుగా డిస్కనెక్ట్ చేయండి.",
+      "didNotCompleteTitle": "ఇన్స్టాలేషన్ పూర్తి కాలేదు",
+      "didNotCompleteMessage": "GitHub App ఇన్స్టాలేషన్ పూర్తి కాలేదు. యాప్ నుండి మళ్ళీ ప్రయత్నించండి."
     },
     "sessionExited": "సెషన్ నిష్క్రమించింది",
     "remoteSpawnRetryable": "ఇన్స్టాన్స్ను చేరుకోలేకపోయాం — అది డిస్కనెక్ట్ అయి ఉండవచ్చు.",
@@ -1770,7 +2129,10 @@
       "exitMessage": "ఇది నడుస్తున్న సెషన్‌ను ఆపుతుంది కానీ దాని చరిత్రను ఉంచుతుంది.",
       "keepSessionRunning": "సెషన్ నడుస్తూనే ఉంచండి",
       "exitSession": "సెషన్ నుండి నిష్క్రమించండి",
-      "restartExitFailed": "కొత్త సెషన్ ప్రారంభించబడింది. మునుపటి సెషన్ ఇప్పటికీ తెరిచి ఉంది."
+      "restartExitFailed": "కొత్త సెషన్ ప్రారంభించబడింది. మునుపటి సెషన్ ఇప్పటికీ తెరిచి ఉంది.",
+      "exitNotSupported": "రిమోట్ సెషన్ నుండి నిష్క్రమించడం ప్రస్తుత సెషన్‌కు మద్దతు ఇవ్వబడదు.",
+      "exitUnavailable": "రిమోట్ సెషన్ నుండి నిష్క్రమించడం ప్రస్తుత సెషన్‌కు అందుబాటులో లేదు.",
+      "exitNeedsNewerCli": "రిమోట్ స్లాష్ కమాండ్లకు కొత్త Kilo CLI అవసరం. Kilo CLIని నవీకరించి మళ్లీ కనెక్ట్ చేయండి."
     },
     "sessionConnection": {
       "connecting": "కనెక్ట్ అవుతోంది…",
@@ -1817,8 +2179,9 @@
       "discardFailed": "డ్రాఫ్ట్‌ను విస్మరించలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} ఫైల్ నవీకరించబడింది",
-      "updatedFiles": "{{count}} ఫైల్స్ నవీకరించబడ్డాయి"
+      "updatedFileCount_one": "{{displayCount}} ఫైల్ నవీకరించబడింది",
+      "updatedFileCount": "{{displayCount}} ఫైల్స్ నవీకరించబడ్డాయి",
+      "updatedFileCount_other": "{{displayCount}} ఫైల్స్ నవీకరించబడ్డాయి"
     },
     "toolPatch": {
       "operationAdded": "జోడించబడింది",
@@ -1843,9 +2206,9 @@
       "toolTask": "టాస్క్",
       "readTodos": "టోడోలను చదవండి",
       "updateTodos": "టోడోలను నవీకరించండి",
-      "linesBadge": "{{count}} పంక్తులు",
-      "filesBadge": "{{count}} ఫైల్స్",
-      "matchesBadge": "{{count}} సరిపోలికలు"
+      "linesBadge": "{{displayCount}} పంక్తులు",
+      "filesBadge": "{{displayCount}} ఫైల్స్",
+      "matchesBadge": "{{displayCount}} సరిపోలికలు"
     },
     "readToolMarkdown": {
       "linesTruncated": "పంక్తులు {{start}}–{{end}} (ట్రంకేట్ చేయబడింది)",
@@ -1929,6 +2292,10 @@
       "reportAiResponseFailedTerminal": "ఈ ప్రతిస్పందనను నివేదించలేము.",
       "reportAiResponseSubmitted": "నివేదిక సమర్పించబడింది. రసీదు {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "వివరాలు అందుబాటులో లేవు",
       "textDisplay": "టెక్స్ట్ ప్రదర్శన",
@@ -1987,7 +2354,7 @@
       "preparationComplete": "సిద్ధత పూర్తయింది",
       "preparationFailed": "సిద్ధత విఫలమైంది",
       "setupCommand": "సెటప్ కమాండ్ {{index}}",
-      "setupCommandOf": "సెటప్ కమాండ్ {{index}} / {{count}}"
+      "setupCommandOf": "సెటప్ కమాండ్ {{index}} / {{displayCount}}"
     },
     "permissionCard": {
       "title": "అనుమతి అవసరం",
@@ -2024,7 +2391,7 @@
       "submissionFailed": "సమర్పణ విఫలమైంది. దయచేసి మళ్లీ ప్రయత్నించండి.",
       "questionAnnouncement": "ఏజెంట్కు మీ ఇన్పుట్ అవసరం. మీరు సమాధానం ఇచ్చే వరకు కంపోజర్ పాజ్ చేయబడుతుంది.",
       "permissionAnnouncement": "కొనసాగడానికి ఏజెంట్కు అనుమతి అవసరం. మీరు నిర్ణయించే వరకు కంపోజర్ పాజ్ చేయబడుతుంది.",
-      "positionHint": "({{count}}లో 1)",
+      "positionHint": "({{displayCount}}లో 1)",
       "movedPastPrompt": "ఏజెంట్ ఈ ప్రాంప్ట్ దాటి కదిలింది. సెషన్ కొనసాగినప్పుడు ఈ కార్డ్ మూసివేయబడుతుంది.",
       "waitingForAnswer": "ఏజెంట్ మీ సమాధానం కోసం వేచి ఉంది. ఈ ప్రశ్న తెరిచి ఉన్నప్పుడు, ఏజెంట్కు మీ సందేశం పాజ్ చేయబడుతుంది.",
       "waitingForPermission": "ఏజెంట్ అనుమతి కోసం వేచి ఉంది. ఈ అభ్యర్థన తెరిచి ఉన్నప్పుడు, ఏజెంట్కు మీ సందేశం పాజ్ చేయబడుతుంది."
@@ -2059,8 +2426,9 @@
     "olderMessages": {
       "arrived": "మునుపటి సందేశాలు లోడ్ అయ్యాయి",
       "retryHint": "ఈ సెషన్ కోసం పాత సందేశాల లోడ్ను మళ్లీ ప్రయత్నిస్తుంది.",
-      "omittedOne": "ఈ సెషన్ నుండి కొన్ని మునుపటి అంశాలను ప్రదర్శించలేకపోయాము.",
-      "omittedMany": "ఈ సెషన్ నుండి {{count}} మునుపటి అంశాలను ప్రదర్శించలేకపోయాము.",
+      "omitted_one": "ఈ సెషన్ నుండి కొన్ని మునుపటి అంశాలను ప్రదర్శించలేకపోయాము.",
+      "omitted": "ఈ సెషన్ నుండి {{displayCount}} మునుపటి అంశాలను ప్రదర్శించలేకపోయాము.",
+      "omitted_other": "ఈ సెషన్ నుండి {{displayCount}} మునుపటి అంశాలను ప్రదర్శించలేకపోయాము.",
       "couldNotLoad": "మునుపటి సందేశాలను లోడ్ చేయలేకపోయాము.",
       "unavailable": "మునుపటి సందేశాలు అందుబాటులో లేవు.",
       "tooLarge": "మునుపటి సందేశాలు లోడ్ చేయడానికి చాలా పెద్దవి."
@@ -2069,10 +2437,12 @@
       "viewTable": "పట్టికను వీక్షించండి",
       "title": "పట్టిక",
       "close": "పట్టికను మూసివేయండి",
-      "column": "నిలువు వరుస",
-      "columns": "నిలువు వరుసలు",
-      "row": "వరుస",
-      "rows": "వరుసలు",
+      "columnCount_one": "నిలువు వరుస",
+      "columnCount": "నిలువు వరుసలు",
+      "columnCount_other": "నిలువు వరుసలు",
+      "rowCount_one": "వరుస",
+      "rowCount": "వరుసలు",
+      "rowCount_other": "వరుసలు",
       "opensFullScreen": "పూర్తి స్క్రీన్లో తెరుస్తుంది"
     },
     "sessionFilter": {
@@ -2103,7 +2473,10 @@
       "title": "మోడల్ను ఎంచుకోండి",
       "searchPlaceholder": "మోడల్లను శోధించండి...",
       "noModels": "ఏ మోడల్లు అందుబాటులో లేవు",
-      "noModelsDescription": "ఎంచుకోవడానికి ఏ మోడల్లు అందుబాటులో లేవు."
+      "noModelsDescription": "ఎంచుకోవడానికి ఏ మోడల్లు అందుబాటులో లేవు.",
+      "favorites": "ఇష్టమైనవి",
+      "recommended": "సిఫార్సు చేయబడినవి",
+      "allModels": "అన్ని మోడల్లు"
     },
     "modelSelector": {
       "model": "మోడల్",
@@ -2120,7 +2493,8 @@
       "addToFavorites": "{{name}} ఫేవరిట్లకు జోడించండి",
       "removeFromFavorites": "{{name}} ఫేవరిట్ల నుండి తీసివేయండి",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "సెషన్ మోడల్"
     },
     "attachmentPreview": {
       "openFailedRetry": "ఫైల్ను తెరవడం విఫలమైంది. దయచేసి మళ్లీ ప్రయత్నించండి.",
@@ -2142,7 +2516,7 @@
       "cameraAccessDisabled": "కెమెరా యాక్సెస్ నిలిపివేయబడింది",
       "cameraAccessMessage": "ఫోటో తీయడానికి సెట్టింగ్లలో కెమెరా యాక్సెస్ను అనుమతించండి.",
       "couldNotOpenPhotoPicker": "ఫోటో పికర్ను తెరవలేకపోయాము. Kiloని పునఃప్రారంభించి మళ్లీ ప్రయత్నించండి.",
-      "maxFilesAllowed": "గరిష్టంగా {{count}} ఫైల్లు అనుమతించబడతాయి",
+      "maxFilesAllowed": "గరిష్టంగా {{displayCount}} ఫైల్లు అనుమతించబడతాయి",
       "onlyAddingFiles": "{{total}} ఫైల్లలో {{accepted}} మాత్రమే జోడిస్తోంది (గరిష్టం {{max}})"
     },
     "composer": {
@@ -2188,7 +2562,8 @@
       "delegatingWork": "పనిని అప్పగిస్తోంది",
       "askingQuestion": "ప్రశ్న అడుగుతోంది",
       "consideringNextSteps": "తదుపరి దశలను పరిశీలిస్తోంది",
-      "writingResponse": "స్పందన రాస్తోంది"
+      "writingResponse": "స్పందన రాస్తోంది",
+      "initializingSnapshot": "స్నాప్షాట్‌ను ప్రారంభిస్తోంది…"
     },
     "slashCommands": {
       "startNewSession": "కొత్త సెషన్ను ప్రారంభించండి",
@@ -2207,7 +2582,7 @@
       "costPrefix": "ఖర్చు {{cost}}",
       "costSuffix": ", ఖర్చు {{cost}}",
       "tokensWindowUnavailable": "సందర్భం {{used}} టోకెన్లు, విండో అందుబాటులో లేదు",
-      "tokensUsage": "సందర్భం {{window}} టోకెన్లలో {{used}} ఉపయోగించబడింది, {{percentage}}% ఉపయోగించబడింది",
+      "tokensUsage": "సందర్భం {{window}} టోకెన్లలో {{used}} ఉపయోగించబడింది, {{percentage}} ఉపయోగించబడింది",
       "title": "సందర్భ వినియోగం",
       "used": "ఉపయోగించబడింది",
       "remaining": "మిగిలి ఉంది",
@@ -2216,7 +2591,7 @@
       "usageReflectsLatest": "వినియోగం తాజా పూర్తయిన సహాయక ప్రతిస్పందనను ప్రతిబింబిస్తుంది.",
       "tokenUsage": "టోకెన్ వినియోగం",
       "cacheRate": "క్యాష్ రేటు",
-      "modelsCount": "మోడల్లు ({{count}})",
+      "modelsCount": "మోడల్లు ({{displayCount}})",
       "tokenTotalsNote": "టోకెన్ మొత్తాలు ఈ సెషన్కు మాత్రమే వర్తిస్తాయి మరియు సబ్ఏజెంట్/చైల్డ్-సెషన్ టోకెన్లను మినహాయిస్తాయి.",
       "subagents": "సబ్ఏజెంట్లు",
       "subagentsDescription": "చైల్డ్ సెషన్ల నుండి అవశేష ఖర్చు",
@@ -2225,8 +2600,9 @@
       "ofWindowTokens": "{{window}} టోకెన్లలో",
       "tokens": "టోకెన్లు",
       "tokensWithPercentage": "టోకెన్లు ({{percentage}})",
-      "stepsCountOne": "{{steps}} దశ",
-      "stepsCountMany": "{{steps}} దశలు",
+      "stepsCount_one": "{{steps}} దశ",
+      "stepsCount": "{{steps}} దశలు",
+      "stepsCount_other": "{{steps}} దశలు",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2251,7 +2627,8 @@
   },
   "addCredits": {
     "cta": "క్రెడిట్లను జోడించండి",
-    "description": "వినియోగం కొనసాగడానికి క్రెడిట్లను జోడించండి."
+    "description": "వినియోగం కొనసాగడానికి క్రెడిట్లను జోడించండి.",
+    "billingPage": "బిల్లింగ్ పేజీ"
   },
   "deviceSessions": {
     "couldNotLoad": "సెషన్లను లోడ్ చేయలేకపోయాము",
@@ -2271,13 +2648,15 @@
     "signOutThisSessionTitle": "ఈ సెషన్ నుండి సైన్ అవుట్ చేయాలా?",
     "signOutThisSessionMessage": "{{device}} సైన్ అవుట్ చేయబడుతుంది. ఇది గంట వరకు API యాక్సెస్ను ఉంచుకోవచ్చు.",
     "signOutConfirm": "సైన్ అవుట్",
-    "signOutMessage": "మీ వర్క్స్పేస్ను యాక్సెస్ చేయడానికి మీరు మళ్లీ సైన్ ఇన్ చేయాలి."
+    "signOutMessage": "మీ వర్క్స్పేస్ను యాక్సెస్ చేయడానికి మీరు మళ్లీ సైన్ ఇన్ చేయాలి.",
+    "webBrowser": "వెబ్ బ్రౌజర్"
   },
   "forceUpdate": {
     "couldNotOpenStore": "యాప్ స్టోర్ను తెరవలేకపోయాము.",
     "description": "Kilo కొత్త వెర్షన్ అందుబాటులో ఉంది. కొనసాగించడానికి దయచేసి నవీకరించండి.",
     "title": "నవీకరణ అవసరం",
-    "updateNow": "ఇప్పుడే నవీకరించండి"
+    "updateNow": "ఇప్పుడే నవీకరించండి",
+    "appStorePage": "యాప్ స్టోర్ పేజీ"
   },
   "home": {
     "couldNotLoadSessions": "సెషన్లను లోడ్ చేయలేకపోయాము",
@@ -2291,10 +2670,7 @@
     "newCodingTask": "కొత్త కోడింగ్ పని",
     "explore": "అన్వేషించండి",
     "seeAll": "అన్నీ చూడండి",
-    "kiloAgents": "Kilo ఏజెంట్లు",
-    "greetingMorning": "శుభోదయం",
-    "greetingAfternoon": "శుభ మధ్యాహ్నం",
-    "greetingEvening": "శుభ సాయంత్రం"
+    "kiloAgents": "Kilo ఏజెంట్లు"
   },
   "imageViewer": {
     "close": "{{filename}} మూసివేయండి",
@@ -2348,7 +2724,17 @@
     "onlineMessage": "ఈ పరికరం ఆఫ్లైన్లో ట్రాన్స్క్రైబ్ చేయలేదు. మీ రికార్డింగ్ను వచనంగా మార్చడానికి {{provider}}కి పంపబడుతుంది. Kilo ఆడియోను నిల్వ చేయదు.",
     "allow": "అనుమతించండి",
     "start": "వాయిస్ ఇన్పుట్ను ప్రారంభించండి",
-    "stop": "వాయిస్ ఇన్పుట్ను ఆపండి"
+    "stop": "వాయిస్ ఇన్పుట్ను ఆపండి",
+    "restricted": "ఈ పరికరంలో వాయిస్ ఇన్పుట్ పరిమితం చేయబడింది.",
+    "micRequired": "వాయిస్ ఇన్పుట్ కోసం మైక్రోఫోన్ యాక్సెస్ అవసరం.",
+    "micOff": "మైక్రోఫోన్ యాక్సెస్ ఆఫ్లో ఉంది. వాయిస్ ఇన్పుట్ ఉపయోగించడానికి దీన్ని సెట్టింగ్స్లో ఆన్ చేయండి.",
+    "micOffTitle": "మైక్రోఫోన్ యాక్సెస్ ఆఫ్లో ఉంది",
+    "noSpeech": "మాట గుర్తించబడలేదు. మళ్లీ ప్రయత్నించడానికి మైక్రోఫోన్ను తాప్ చేయండి.",
+    "needsConnection": "వాయిస్ ఇన్పుట్కు ప్రస్తుతం కనెక్షన్ అవసరం. మళ్లీ ప్రయత్నించండి.",
+    "busy": "వాయిస్ ఇన్పుట్ బిజీగా ఉంది. మళ్లీ ప్రయత్నించండి.",
+    "stopped": "వాయిస్ ఇన్పుట్ ఆగిపోయింది. మళ్లీ ప్రయత్నించడానికి మైక్రోఫోన్ను తాప్ చేయండి.",
+    "unavailableDevice": "ఈ పరికరంలో వాయిస్ ఇన్పుట్ అందుబాటులో లేదు.",
+    "unavailableLanguage": "ఈ పరికర భాషకు వాయిస్ ఇన్పుట్ అందుబాటులో లేదు."
   },
   "share": {
     "title": "Kiloకి భాగస్వామ్యం చేయండి",
@@ -2360,7 +2746,7 @@
     "connectedCli": "కనెక్ట్ అయిన CLIలో",
     "newSessionOn": "{{name}}లో కొత్త సెషన్",
     "noMatchingSessions": "సరిపోలే సెషన్లు లేవు.",
-    "onlyFirstFilesAttached": "మొదటి {{count}} ఫైల్లు మాత్రమే అటాచ్ చేయబడతాయి.",
+    "onlyFirstFilesAttached": "మొదటి {{displayCount}} ఫైల్లు మాత్రమే అటాచ్ చేయబడతాయి.",
     "staleMessage": "ఈ భాగస్వామ్యం ఇక అందుబాటులో లేదు.",
     "retryableMessage": "మీ సెషన్లను లోడ్ చేయలేకపోయాము.",
     "emptyMessage": "ఇంకా సెషన్లు లేవు — దీన్ని పంపడానికి కొత్తదాన్ని ప్రారంభించండి.",
@@ -2393,7 +2779,7 @@
     "otherAccountCopy": "ఈ యాపిల్ ఖాతాలోని Kilo Pass వేరే Kilo ఖాతాకు చెందుతుంది. దాన్ని నిర్వహించడానికి ఆ Kilo ఖాతాతో సైన్ ఇన్ చేయండి.",
     "alreadySubscribed": "మీకు ఇప్పటికే Kilo Pass చందా ఉంది.",
     "purchaseUnavailable": "Kilo Pass కొనుగోలు ప్రస్తుతం అందుబాటులో లేదు.",
-    "tierCredits": "${{amount}} క్రెడిట్లు",
+    "tierCredits": "{{amount}} క్రెడిట్లు",
     "perMonth": "{{price}}/నెల",
     "verifyPurchaseFailed": "మీ కొనుగోలును ధృవీకరించలేకపోయాము. మీ కనెక్షన్ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
     "productsCouldNotLoad": "యాప్ స్టోర్ నుండి Kilo Pass ఉత్పత్తులను లోడ్ చేయలేకపోయాము.",
@@ -2404,7 +2790,7 @@
     "manageFailed": "యాప్ స్టోర్ చందా నిర్వహణను తెరవడంలో విఫలమైంది.",
     "kiloPassSetup": "Kilo Pass సెటప్",
     "subscriptionHeaderDescription": "Kilo యాప్లో AI కోడింగ్ సెషన్లను నడపడానికి — క్లౌడ్ ఏజెంట్లు, రిమోట్ సెషన్లు మరియు KiloClaw చాట్లు — మీ Kilo బ్యాలెన్స్కు క్రెడిట్లను జోడించే నెలవారీ చందా.",
-    "tierDescription": "Kilo యాప్ వినియోగం కోసం ${{price}} చెల్లించిన క్రెడిట్లు నెలవారీగా జోడించబడతాయి.",
+    "tierDescription": "Kilo యాప్ వినియోగం కోసం {{price}} చెల్లించిన క్రెడిట్లు నెలవారీగా జోడించబడతాయి.",
     "subscribe": "చందాదారుడిగా చేరండి",
     "subscribeDescription": "బోనస్ ప్రోగ్రెస్తో నెలవారీ క్రెడిట్లు",
     "manage": "నిర్వహించండి",
@@ -2412,7 +2798,7 @@
     "statusPending": "Kilo Pass పెండింగ్",
     "statusCanceling": "Kilo Pass రద్దు అవుతోంది",
     "statusPastDue": "Kilo Pass వాయిదా ఆలస్యం",
-    "monthlyCredits": "${{credits}} నెలవారీ క్రెడిట్లు",
+    "monthlyCredits": "{{credits}} నెలవారీ క్రెడిట్లు",
     "ends": "{{date}}న ముగుస్తుంది",
     "periodEnd": "కాల ముగింపు",
     "managedOnGooglePlay": "Google Playలో నిర్వహించబడుతుంది",
@@ -2426,7 +2812,15 @@
     "webManagementDescription": "ఈ Kilo Pass వెబ్లో నిర్వహించబడుతుంది.",
     "legalDisclosure": "Kilo Pass అనేది స్వయంచాలకంగా పునరుద్ధరించబడే నెలవారీ చందా. కొనుగోలు నిర్ధారణ సమయంలో చెల్లింపు మీ Apple IDకి వసూలు చేయబడుతుంది. ప్రస్తుత వ్యవధి ముగిసే 24 గంటల కంటే ముందు రద్దు చేయకపోతే చందాలు ప్రదర్శించిన ధరకు ప్రతి నెల స్వయంచాలకంగా పునరుద్ధరించబడతాయి. మీ App Store ఖాతా సెట్టింగులలో ఎప్పుడైనా నిర్వహించండి లేదా రద్దు చేయండి.",
     "legalPrivacyPolicy": "గోప్యతా విధానం",
-    "legalTermsOfUse": "వినియోగ నిబంధనలు (EULA)"
+    "legalTermsOfUse": "వినియోగ నిబంధనలు (EULA)",
+    "purchaseDifferentAccount": "ఈ యాప్ స్టోర్ కొనుగోలు మీ Kilo ఖాతాతో లింక్ చేయబడలేదు. కొనుగోలు కోసం ఉపయోగించిన Apple ఖాతాతో సైన్ ఇన్ చేసి, మళ్లీ ప్రయత్నించండి.",
+    "restoreFailed": "కొనుగోళ్లను పునరుద్ధరించడంలో విఫలమైంది. మళ్లీ ప్రయత్నించండి.",
+    "purchaseFailed": "కొనుగోలును పూర్తి చేయడంలో విఫలమైంది.",
+    "purchaseStartFailed": "యాప్ స్టోర్ కొనుగోలును ప్రారంభించడంలో విఫలమైంది.",
+    "purchaseOwnedByAnotherAccount": "ఈ యాపిల్ ఖాతాలోని Kilo Pass వేరే Kilo ఖాతాకు చెందుతుంది.",
+    "couldNotConnectToAppStore": "App Storeకు కనెక్ట్ చేయలేకపోయింది. మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి.",
+    "noMatchingProducts": "App Store సరిపోలే Kilo Pass ఉత్పత్తులను ఏవీ తిరిగి ఇవ్వలేదు.",
+    "purchaseMissingSignedTransaction": "App Store కొనుగోలులో సంతకం చేసిన లావాదేవీ JWS చేర్చబడలేదు."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2522,7 +2916,8 @@
     "needsWork": "మెరుగుదల అవసరం",
     "sorryTitle": "విని మేము విచారిస్తున్నాము!",
     "sorryMessage": "ఏమి మెరుగుపరచాలో దయచేసి మాకు తెలియజేయండి. యాప్ బాధ్యత వహించే ఇంజనీర్ ప్రతి రిపోర్ట్ను చదువుతారు!",
-    "emailUs": "మాకు ఇమెయిల్ చేయండి"
+    "emailUs": "మాకు ఇమెయిల్ చేయండి",
+    "emailSubject": "మొబైల్ యాప్ ఫీడ్బ్యాక్"
   },
   "organization": {
     "boundary": {
@@ -2539,7 +2934,17 @@
       "emptyTitle": "క్రెడిట్ కార్యాచరణ లేదు",
       "expires": "{{date}}న గడువు ముగుస్తుంది",
       "title": "క్రెడిట్ కార్యాచరణ",
-      "transactionFallback": "క్రెడిట్ లావాదేవీ"
+      "transactionFallback": "క్రెడిట్ లావాదేవీ",
+      "category": {
+        "organization_custom": "సంస్థ కస్టమ్",
+        "parent_to_child_transfer_in": "పేరెంట్ నుండి చైల్డ్కు బదిలీ (లోపలికి)",
+        "parent_to_child_transfer_out": "పేరెంట్ నుండి చైల్డ్కు బదిలీ (బయటకి)",
+        "oss-sponsorship": "OSS స్పాన్సర్షిప్",
+        "oss-monthly-reset": "OSS నెలవారీ రీసెట్",
+        "team-topup-bonus-2025": "టీమ్ టాప్-అప్ బోనస్ 2025",
+        "accounting_adjustment": "అకౌంటింగ్ సర్దుబాటు",
+        "credits_expired": "క్రెడిట్లు గడువు ముగిశాయి"
+      }
     },
     "inviteMember": {
       "emailError": "చెల్లుబాటు అయ్యే ఇమెయిల్ చిరునామాను నమోదు చేయండి",
@@ -2556,10 +2961,17 @@
       "emptyDescription": "ఇన్వాయిస్లు ప్రతి బిల్లింగ్ చక్రానికి స్వయంచాలకంగా ఉత్పత్తి చేయబడతాయి మరియు మీ ఆర్గనైజేషన్కు బిల్లు వేయబడిన తర్వాత ఇక్కడ కనిపిస్తాయి.",
       "emptyTitle": "ఇన్వాయిస్లు లేవు",
       "invoiceFallback": "ఇన్వాయిస్",
-      "statusOpen": "ఓపెన్",
-      "statusPaid": "చెల్లించినది",
-      "statusVoid": "రద్దు",
-      "title": "ఇన్వాయిస్లు"
+      "title": "ఇన్వాయిస్లు",
+      "downloadFailed": "ఇన్వాయిస్ డౌన్‌లోడ్ చేయలేకపోయాము. మీ కనెక్షన్ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
+      "sharingUnavailable": "ఈ పరికరంలో షేరింగ్ అందుబాటులో లేదు.",
+      "status": {
+        "paid": "చెల్లించినది",
+        "open": "ఓపెన్",
+        "void": "రద్దు",
+        "draft": "డ్రాఫ్ట్",
+        "uncollectible": "వసూలు చేయలేనిది",
+        "unknown": "తెలియనిది"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2645,8 +3057,9 @@
       "manageHint": "వెబ్లో Kilo Pass నిర్వహణను తెరుస్తుంది.",
       "notSubscribed": "చందాదారుడు కాదు",
       "overallocated": "పాస్ అపాయింట్మెంట్లు చెల్లించిన సీట్లను మించిపోతున్నాయి",
-      "paidSeatOne": "{{count}} చెల్లించిన సీటు",
-      "paidSeatOther": "{{count}} చెల్లించిన సీట్లు",
+      "paidSeat_one": "{{displayCount}} చెల్లించిన సీటు",
+      "paidSeat": "{{displayCount}} చెల్లించిన సీట్లు",
+      "paidSeat_other": "{{displayCount}} చెల్లించిన సీట్లు",
       "paymentNeedsAttention": "చెల్లింపుకు శ్రద్ధ అవసరం",
       "paymentPending": "చెల్లింపు పెండింగ్",
       "processingBlocked": "ప్రాసెసింగ్ నిరోధించబడింది",
@@ -2671,10 +3084,28 @@
     "emailDeliveryFailed": "ఇమెయిల్ డెలివరీ ప్రస్తుతం అందుబాటులో లేదు. దయచేసి తరువాత మళ్లీ ప్రయత్నించండి.",
     "admissionRequired": "మీ పరికరాన్ని ధృవీకరించలేము. మరొక పరికరంలో లేదా వెబ్ ద్వారా సైన్-ఇన్ చేయడానికి '$t(login.moreSignInOptions)' ఉపయోగించండి.",
     "default": "ఏదో తప్పు జరిగింది. దయచేసి మళ్లీ ప్రయత్నించండి.",
-    "retryableAdmission": "మేము ఈ పరికరాన్ని ధృవీకరించలేకపోయాము. మీ కనెక్షన్ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి."
+    "retryableAdmission": "మేము ఈ పరికరాన్ని ధృవీకరించలేకపోయాము. మీ కనెక్షన్ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
+    "startSignInFailed": "సైన్ ఇన్ ప్రారంభించడంలో విఫలమైంది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    "couldNotOpenBrowser": "బ్రౌజర్ను తెరవలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    "signInTimedOut": "సైన్ ఇన్ గడువు ముగిసింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    "signInFailed": "సైన్ ఇన్ విఫలమైంది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    "networkError": "నెట్వర్క్ లోపం. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    "accessDeniedByUser": "వినియోగదారు ద్వారా యాక్సెస్ నిరాకరించబడింది",
+    "codeExpired": "కోడ్ గడువు ముగిసింది",
+    "tooManySignInAttempts": "చాలా ఎక్కువ సైన్-ఇన్ ప్రయత్నాలు. దయచేసి వేచి ఉండి మళ్లీ ప్రయత్నించండి."
   },
   "models": {
     "dataCollected": "సేకరించిన డేటా",
-    "free": "ఉచితం"
+    "free": "ఉచితం",
+    "couldNotUpdateFavorites": "ఫేవరిట్లను నవీకరించలేకపోయింది",
+    "thinkingEffort": {
+      "none": "ఏదీ లేదు",
+      "minimal": "కనిష్టం",
+      "low": "తక్కువ",
+      "medium": "మధ్యస్థం",
+      "high": "అధికం",
+      "xhigh": "అత్యధికం",
+      "max": "గరిష్టం"
+    }
   }
 }

@@ -16,6 +16,7 @@ import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconn
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { formatList, formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useTRPC } from '@/lib/trpc';
@@ -136,6 +137,13 @@ function CheckRow({ run }: Readonly<{ run: CheckRun }>) {
   );
 }
 
+function rollupCountOptions(count: number) {
+  return {
+    count,
+    displayCount: formatNumber(count, i18n.language),
+  };
+}
+
 function buildRollupLine(rollup: {
   total: number;
   success: number;
@@ -148,20 +156,20 @@ function buildRollupLine(rollup: {
   }
   const parts: string[] = [];
   if (rollup.success > 0) {
-    parts.push(i18n.t('prReview.checks.passed', { count: rollup.success }));
+    parts.push(i18n.t('prReview.checks.passed', rollupCountOptions(rollup.success)));
   }
   if (rollup.failure > 0) {
-    parts.push(i18n.t('prReview.checks.failed', { count: rollup.failure }));
+    parts.push(i18n.t('prReview.checks.failed', rollupCountOptions(rollup.failure)));
   }
   if (rollup.pending > 0) {
-    parts.push(i18n.t('prReview.checks.pending', { count: rollup.pending }));
+    parts.push(i18n.t('prReview.checks.pending', rollupCountOptions(rollup.pending)));
   }
   if (rollup.skipped > 0) {
-    parts.push(i18n.t('prReview.checks.skipped', { count: rollup.skipped }));
+    parts.push(i18n.t('prReview.checks.skipped', rollupCountOptions(rollup.skipped)));
   }
   return parts.length > 0
-    ? parts.join(' · ')
-    : i18n.t('prReview.checks.checksCount', { count: rollup.total });
+    ? formatList(parts, i18n.language)
+    : i18n.t('prReview.checks.checksCount', rollupCountOptions(rollup.total));
 }
 
 export function PrReviewChecksSection({

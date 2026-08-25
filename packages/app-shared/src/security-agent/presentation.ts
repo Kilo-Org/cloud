@@ -33,7 +33,23 @@ type FindingStatusPresentation = {
   tooltip?: string | null;
 };
 
-type FindingDeadlinePresentation = FindingStatusPresentation & { detail: string };
+// Stable code describing which deadline branch produced the copy, so mobile
+// can map it to its own translated strings instead of parsing the English
+// label/detail. `fixedAt` is null when the fixed-at timestamp is missing
+// (the shared copy then reads "Resolution recorded").
+export type FindingDeadlineState =
+  | { kind: 'fixed'; beforeDeadline: boolean; fixedAt: Date | null }
+  | { kind: 'closed'; superseded: boolean; at: Date }
+  | { kind: 'no-deadline' }
+  | { kind: 'overdue'; days: number; deadline: Date }
+  | { kind: 'due-today'; deadline: Date }
+  | { kind: 'due-tomorrow'; deadline: Date }
+  | { kind: 'due-in'; days: number; deadline: Date };
+
+type FindingDeadlinePresentation = FindingStatusPresentation & {
+  detail: string;
+  state: FindingDeadlineState;
+};
 
 // Structural shape of a finding's `analysis` column — permissive so it's
 // satisfied by both web's SecurityFinding (from @kilocode/db/schema) and
@@ -289,6 +305,7 @@ export function getSecurityDeadlinePresentation(
       label: fixedBeforeDeadline ? 'Fixed before deadline' : 'Fixed',
       detail: fixedAt ? `Fixed ${formatFindingDate(fixedAt)}` : 'Resolution recorded',
       tone: fixedBeforeDeadline ? 'success' : 'neutral',
+      state: { kind: 'fixed', beforeDeadline: fixedBeforeDeadline, fixedAt },
     };
   }
 
@@ -300,6 +317,7 @@ export function getSecurityDeadlinePresentation(
       label,
       detail: `${label} ${formatFindingDate(updatedAt)}`,
       tone: 'neutral',
+      state: { kind: 'closed', superseded: isSupersededFinding(finding), at: updatedAt },
     };
   }
 
@@ -309,6 +327,7 @@ export function getSecurityDeadlinePresentation(
       label: 'Deadline not set',
       detail: 'No SLA deadline',
       tone: 'neutral',
+      state: { kind: 'no-deadline' },
     };
   }
 
@@ -325,19 +344,33 @@ export function getSecurityDeadlinePresentation(
           : `${overdueDays} ${overdueDays === 1 ? 'day' : 'days'} overdue`,
       detail,
       tone: 'danger',
+      state: { kind: 'overdue', days: overdueDays, deadline },
     };
   }
   if (calendarDays === 0) {
-    return { icon: 'clock', label: 'Due today', detail, tone: 'warning' };
+    return {
+      icon: 'clock',
+      label: 'Due today',
+      detail,
+      tone: 'warning',
+      state: { kind: 'due-today', deadline },
+    };
   }
   if (calendarDays === 1) {
-    return { icon: 'clock', label: 'Due tomorrow', detail, tone: 'warning' };
+    return {
+      icon: 'clock',
+      label: 'Due tomorrow',
+      detail,
+      tone: 'warning',
+      state: { kind: 'due-tomorrow', deadline },
+    };
   }
   return {
     icon: 'clock',
     label: `Due in ${calendarDays} days`,
     detail,
     tone: calendarDays <= 3 ? 'warning' : 'neutral',
+    state: { kind: 'due-in', days: calendarDays, deadline },
   };
 }
 

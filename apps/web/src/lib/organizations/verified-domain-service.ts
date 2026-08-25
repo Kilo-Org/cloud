@@ -160,6 +160,62 @@ async function ensureProviderDomain(
   return providerDomain;
 }
 
+async function synchronizeProviderStateInTransaction(
+  tx: DrizzleTransaction,
+  claim: OrganizationDomainClaim,
+  providerDomain: OrganizationDomain,
+  actor: Actor
+): Promise<OrganizationDomainClaim> {
+  if (
+    claim.domain !== providerDomain.domain.toLowerCase() ||
+    (claim.workos_organization_id && claim.workos_organization_id !== providerDomain.organizationId)
+  ) {
+    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: PROVIDER_ERROR_MESSAGE });
+  }
+
+  const nextStatus =
+    providerDomain.state === OrganizationDomainState.Verified ? 'verified' : 'pending';
+  if (nextStatus === 'verified') {
+    const otherOwner = await tx.query.organization_domain_claims.findFirst({
+      where: and(
+        eq(organization_domain_claims.domain, claim.domain),
+        eq(organization_domain_claims.status, 'verified'),
+        ne(organization_domain_claims.organization_id, claim.organization_id)
+      ),
+    });
+    if (otherOwner) throw conflictError();
+  }
+
+  const becameVerified = claim.status === 'pending' && nextStatus === 'verified';
+  const lostVerification = claim.status === 'verified' && nextStatus === 'pending';
+  const [updated] = await tx
+    .update(organization_domain_claims)
+    .set({
+      status: nextStatus,
+      verified_at: becameVerified ? sql`now()` : lostVerification ? null : claim.verified_at,
+      workos_organization_id: providerDomain.organizationId,
+      workos_domain_id: providerDomain.id,
+    })
+    .where(eq(organization_domain_claims.id, claim.id))
+    .returning();
+  if (!updated) throw new Error('Failed to synchronize domain claim');
+
+  if (becameVerified || lostVerification) {
+    await createAuditLog({
+      action: becameVerified
+        ? 'organization.domain_claim.verify'
+        : 'organization.domain_claim.lose_verification',
+      actor_email: actor.google_user_email,
+      actor_id: actor.id,
+      actor_name: actor.google_user_name,
+      message: becameVerified ? 'Verified domain claim' : 'Domain claim lost verification',
+      organization_id: claim.organization_id,
+      tx,
+    });
+  }
+  return updated;
+}
+
 async function synchronizeProviderState(
   claimId: string,
   providerDomain: OrganizationDomain,
@@ -175,56 +231,8 @@ async function synchronizeProviderState(
       if (!claim) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Domain claim not found' });
       }
-      if (
-        claim.domain !== providerDomain.domain.toLowerCase() ||
-        (claim.workos_organization_id &&
-          claim.workos_organization_id !== providerDomain.organizationId)
-      ) {
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: PROVIDER_ERROR_MESSAGE });
-      }
-
       await lockDomain(tx, claim.domain);
-      const nextStatus =
-        providerDomain.state === OrganizationDomainState.Verified ? 'verified' : 'pending';
-      if (nextStatus === 'verified') {
-        const otherOwner = await tx.query.organization_domain_claims.findFirst({
-          where: and(
-            eq(organization_domain_claims.domain, claim.domain),
-            eq(organization_domain_claims.status, 'verified'),
-            ne(organization_domain_claims.organization_id, claim.organization_id)
-          ),
-        });
-        if (otherOwner) throw conflictError();
-      }
-
-      const becameVerified = claim.status === 'pending' && nextStatus === 'verified';
-      const lostVerification = claim.status === 'verified' && nextStatus === 'pending';
-      const [updated] = await tx
-        .update(organization_domain_claims)
-        .set({
-          status: nextStatus,
-          verified_at: becameVerified ? sql`now()` : lostVerification ? null : claim.verified_at,
-          workos_organization_id: providerDomain.organizationId,
-          workos_domain_id: providerDomain.id,
-        })
-        .where(eq(organization_domain_claims.id, claim.id))
-        .returning();
-      if (!updated) throw new Error('Failed to synchronize domain claim');
-
-      if (becameVerified || lostVerification) {
-        await createAuditLog({
-          action: becameVerified
-            ? 'organization.domain_claim.verify'
-            : 'organization.domain_claim.lose_verification',
-          actor_email: actor.google_user_email,
-          actor_id: actor.id,
-          actor_name: actor.google_user_name,
-          message: becameVerified ? 'Verified domain claim' : 'Domain claim lost verification',
-          organization_id: claim.organization_id,
-          tx,
-        });
-      }
-      return updated;
+      return synchronizeProviderStateInTransaction(tx, claim, providerDomain, actor);
     });
   } catch (error) {
     if (error instanceof TRPCError) throw error;
@@ -236,6 +244,13 @@ async function synchronizeProviderState(
 export async function listVerifiedDomainClaims(
   organizationId: string
 ): Promise<VerifiedDomainClaimView[]> {
+  const organization = await db.query.organizations.findFirst({
+    columns: { id: true },
+    where: and(eq(organizations.id, organizationId), sql`${organizations.deleted_at} IS NULL`),
+  });
+  if (!organization) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
   const claims = await db
     .select()
     .from(organization_domain_claims)
@@ -323,33 +338,52 @@ export async function refreshVerifiedDomainClaim(
   actor: Actor,
   provider: VerifiedDomainProvider = workos
 ): Promise<VerifiedDomainClaimView> {
-  const claim = await db.query.organization_domain_claims.findFirst({
-    where: and(
-      eq(organization_domain_claims.id, claimId),
-      eq(organization_domain_claims.organization_id, organizationId)
-    ),
-  });
-  if (!claim) throw new TRPCError({ code: 'NOT_FOUND', message: 'Domain claim not found' });
+  try {
+    return await db.transaction(async tx => {
+      const [claim] = await tx
+        .select()
+        .from(organization_domain_claims)
+        .where(
+          and(
+            eq(organization_domain_claims.id, claimId),
+            eq(organization_domain_claims.organization_id, organizationId)
+          )
+        )
+        .for('update');
+      if (!claim) throw new TRPCError({ code: 'NOT_FOUND', message: 'Domain claim not found' });
 
-  const organization = await db.query.organizations.findFirst({
-    columns: { id: true, name: true },
-    where: and(eq(organizations.id, organizationId), sql`${organizations.deleted_at} IS NULL`),
-  });
-  if (!organization) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      await lockDomain(tx, claim.domain);
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended('workos-organization:' || ${organizationId}, 0))`
+      );
+      const organization = await tx.query.organizations.findFirst({
+        columns: { id: true, name: true },
+        where: and(eq(organizations.id, organizationId), sql`${organizations.deleted_at} IS NULL`),
+      });
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+
+      let refreshed: OrganizationDomain;
+      if (claim.workos_domain_id) {
+        try {
+          refreshed = await provider.organizationDomains.get(claim.workos_domain_id);
+        } catch (error) {
+          if (providerStatus(error) !== 404) throw providerError(error);
+          refreshed = await ensureProviderDomain(provider, claim, organization);
+        }
+      } else {
+        refreshed = await ensureProviderDomain(provider, claim, organization);
+      }
+      return serializeClaim(
+        await synchronizeProviderStateInTransaction(tx, claim, refreshed, actor)
+      );
+    });
+  } catch (error) {
+    if (error instanceof TRPCError) throw error;
+    if (isUniqueViolation(error)) throw conflictError();
+    throw error;
   }
-  let refreshed: OrganizationDomain;
-  if (claim.workos_domain_id) {
-    try {
-      refreshed = await provider.organizationDomains.get(claim.workos_domain_id);
-    } catch (error) {
-      if (providerStatus(error) !== 404) throw providerError(error);
-      refreshed = await ensureProviderDomain(provider, claim, organization);
-    }
-  } else {
-    refreshed = await ensureProviderDomain(provider, claim, organization);
-  }
-  return serializeClaim(await synchronizeProviderState(claim.id, refreshed, actor));
 }
 
 export async function removeVerifiedDomainClaim(
@@ -370,6 +404,14 @@ export async function removeVerifiedDomainClaim(
       )
       .for('update');
     if (!claim) throw new TRPCError({ code: 'NOT_FOUND', message: 'Domain claim not found' });
+
+    const organization = await tx.query.organizations.findFirst({
+      columns: { id: true },
+      where: and(eq(organizations.id, organizationId), sql`${organizations.deleted_at} IS NULL`),
+    });
+    if (!organization) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+    }
 
     await lockDomain(tx, claim.domain);
     await tx.execute(

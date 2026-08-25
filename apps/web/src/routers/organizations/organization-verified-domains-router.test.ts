@@ -114,7 +114,7 @@ describe('organization verified domains router', () => {
       .where(
         inArray(organization_audit_logs.organization_id, [organization.id, otherOrganization.id])
       );
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     mockWorkOSInstance.organizations.getOrganizationByExternalId.mockImplementation(
       async (organizationId: string) => providerOrganization(organizationId)
     );
@@ -199,6 +199,36 @@ describe('organization verified domains router', () => {
         })
       ).toBeUndefined();
       expect(await claimAuditActions()).toEqual([]);
+    } finally {
+      await db
+        .update(organizations)
+        .set({ deleted_at: null })
+        .where(eq(organizations.id, organization.id));
+    }
+  });
+
+  test('does not list or remove claims for a deleted organization', async () => {
+    const caller = await createCallerForUser(owner.id);
+    const created = await caller.organizations.verifiedDomains.create({
+      organizationId: organization.id,
+      domain: 'deleted-organization-existing.example.com',
+    });
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, organization.id));
+
+    try {
+      await expect(
+        caller.organizations.verifiedDomains.list({ organizationId: organization.id })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      await expect(
+        caller.organizations.verifiedDomains.remove({
+          organizationId: organization.id,
+          claimId: created.claim.id,
+        })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      expect(mockWorkOSInstance.organizationDomains.delete).not.toHaveBeenCalled();
     } finally {
       await db
         .update(organizations)
@@ -477,6 +507,61 @@ describe('organization verified domains router', () => {
 
     await expect(removal).resolves.toEqual({ success: true });
     await expect(refresh).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(
+      db.query.organization_domain_claims.findFirst({
+        where: eq(organization_domain_claims.id, created.claim.id),
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  test('serializes provider recreation with concurrent claim removal', async () => {
+    const caller = await createCallerForUser(owner.id);
+    const created = await caller.organizations.verifiedDomains.create({
+      organizationId: organization.id,
+      domain: 'recreate-remove-race.example.com',
+    });
+    const storedClaim = await db.query.organization_domain_claims.findFirst({
+      where: eq(organization_domain_claims.id, created.claim.id),
+    });
+    if (!storedClaim?.workos_organization_id) throw new Error('Expected provisioned claim');
+    mockWorkOSInstance.organizationDomains.get.mockRejectedValue({ status: 404 });
+
+    let finishProviderCreation: (domain: ReturnType<typeof providerDomain>) => void = () => {};
+    const providerCreation = new Promise<ReturnType<typeof providerDomain>>(resolve => {
+      finishProviderCreation = resolve;
+    });
+    let providerCreationStarted: () => void = () => {};
+    const providerCreationWasStarted = new Promise<void>(resolve => {
+      providerCreationStarted = resolve;
+    });
+    mockWorkOSInstance.organizationDomains.create.mockImplementationOnce(() => {
+      providerCreationStarted();
+      return providerCreation;
+    });
+
+    const refresh = caller.organizations.verifiedDomains.refresh({
+      organizationId: organization.id,
+      claimId: created.claim.id,
+    });
+    await providerCreationWasStarted;
+    expect(mockWorkOSInstance.organizationDomains.create).toHaveBeenCalledTimes(2);
+    const removal = caller.organizations.verifiedDomains.remove({
+      organizationId: organization.id,
+      claimId: created.claim.id,
+    });
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(mockWorkOSInstance.organizationDomains.delete).not.toHaveBeenCalled();
+
+    finishProviderCreation({
+      ...providerDomain('recreate-remove-race.example.com', OrganizationDomainState.Pending),
+      id: 'workos-domain-recreated',
+      organizationId: storedClaim.workos_organization_id,
+    });
+    await expect(refresh).resolves.toMatchObject({ status: 'pending' });
+    await expect(removal).resolves.toEqual({ success: true });
+    expect(mockWorkOSInstance.organizationDomains.delete).toHaveBeenCalledWith(
+      'workos-domain-recreated'
+    );
     await expect(
       db.query.organization_domain_claims.findFirst({
         where: eq(organization_domain_claims.id, created.claim.id),

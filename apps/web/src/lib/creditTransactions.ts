@@ -3,7 +3,7 @@ import { db, readDb, sql } from './drizzle';
 import type { Organization } from '@kilocode/db/schema';
 import { credit_transactions, kilo_pass_issuance_items, kilocode_users } from '@kilocode/db/schema';
 
-type CreditSummary = {
+export type CreditSummary = {
   total_promotional_musd: number;
   total_purchased_musd: number;
   credit_transaction_count: number;
@@ -20,6 +20,33 @@ export async function getCreditTransactionsSummaryByUserId(
       count(*) as credit_transaction_count
     from public.credit_transactions
     where kilo_user_id = ${kiloUserId}
+  `
+  );
+  const result = rows[0] as {
+    total_promotional_musd: bigint;
+    total_purchased_musd: bigint;
+    credit_transaction_count: bigint;
+  };
+
+  return {
+    total_promotional_musd: Number(result.total_promotional_musd),
+    total_purchased_musd: Number(result.total_purchased_musd),
+    credit_transaction_count: Number(result.credit_transaction_count),
+  };
+}
+
+export async function getCreditTransactionsSummaryForOrganization(
+  organizationId: Organization['id']
+): Promise<CreditSummary> {
+  const { rows } = await db.execute(
+    sql`
+    select
+      coalesce(sum(amount_microdollars) filter (where is_free),0) :: bigint  total_promotional_musd,
+      coalesce(sum(amount_microdollars) filter (where not is_free),0) :: bigint  total_purchased_musd,
+      count(*) as credit_transaction_count
+    from public.credit_transactions
+    where organization_id = ${organizationId}
+      and (credit_category is null or credit_category not like 'kpo:consumption:%')
   `
   );
   const result = rows[0] as {
@@ -66,6 +93,7 @@ export async function summarizeUserPayments(kiloUserId: string, fromDb: typeof d
   )[0];
 }
 
+// old form: array capped at 100, no cursor; remove when every client pages.
 export async function getCreditTransactionsForOrganization(organizationId: Organization['id']) {
   return db
     .select({
@@ -98,6 +126,71 @@ export async function getCreditTransactionsForOrganization(organizationId: Organ
     )
     .orderBy(desc(credit_transactions.created_at))
     .limit(100);
+}
+
+const CREDIT_TRANSACTIONS_PAGE_SIZE = 25;
+
+type OrganizationCreditTransaction = Awaited<
+  ReturnType<typeof getCreditTransactionsForOrganization>
+>[number];
+
+export type CreditTransactionsPage = {
+  entries: OrganizationCreditTransaction[];
+  nextCursor: number | null;
+  hasMore: boolean;
+  summary: CreditSummary;
+};
+
+export async function getCreditTransactionsForOrganizationPage(
+  organizationId: Organization['id'],
+  cursor: number = 0
+): Promise<CreditTransactionsPage> {
+  const [transactions, summary] = await Promise.all([
+    db
+      .select({
+        id: credit_transactions.id,
+        kilo_user_id: credit_transactions.kilo_user_id,
+        amount_microdollars: credit_transactions.amount_microdollars,
+        expiration_baseline_microdollars_used:
+          credit_transactions.expiration_baseline_microdollars_used,
+        original_baseline_microdollars_used:
+          credit_transactions.original_baseline_microdollars_used,
+        is_free: credit_transactions.is_free,
+        description: credit_transactions.description,
+        original_transaction_id: credit_transactions.original_transaction_id,
+        stripe_payment_id: credit_transactions.stripe_payment_id,
+        coinbase_credit_block_id: credit_transactions.coinbase_credit_block_id,
+        credit_category: credit_transactions.credit_category,
+        expiry_date: credit_transactions.expiry_date,
+        created_at: credit_transactions.created_at,
+        organization_id: credit_transactions.organization_id,
+        check_category_uniqueness: credit_transactions.check_category_uniqueness,
+      })
+      .from(credit_transactions)
+      .where(
+        and(
+          eq(credit_transactions.organization_id, organizationId),
+          or(
+            isNull(credit_transactions.credit_category),
+            notLike(credit_transactions.credit_category, 'kpo:consumption:%')
+          )
+        )
+      )
+      .orderBy(desc(credit_transactions.created_at), desc(credit_transactions.id))
+      .limit(CREDIT_TRANSACTIONS_PAGE_SIZE + 1)
+      .offset(cursor),
+    getCreditTransactionsSummaryForOrganization(organizationId),
+  ]);
+
+  const hasMore = transactions.length > CREDIT_TRANSACTIONS_PAGE_SIZE;
+  const entries = transactions.slice(0, CREDIT_TRANSACTIONS_PAGE_SIZE);
+
+  return {
+    entries,
+    nextCursor: hasMore ? cursor + CREDIT_TRANSACTIONS_PAGE_SIZE : null,
+    hasMore,
+    summary,
+  };
 }
 
 export async function getAdminCreditTransactionsForOrganization(

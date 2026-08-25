@@ -1800,6 +1800,18 @@
       "updating": "Mise à jour, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Charger",
+      "loadWithHost": "Charger {{host}}",
+      "httpsOnly": "Images HTTPS uniquement"
+    },
+    "markdownLink": {
+      "invalidLink": "Ce lien ne peut pas être ouvert.",
+      "hostConfirmTitle": "Ouvrir le lien externe ?",
+      "hostConfirmMessage": "Ce lien ouvre {{host}} dans votre navigateur.",
+      "open": "Ouvrir",
+      "trustThisHost": "Faire confiance à cet hôte"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Données collectées",
     "free": "Gratuit"
+  },
+  "trustedHosts": {
+    "title": "Hôtes de confiance",
+    "subtitle": "Les hôtes que vous autorisez à ouvrir sans confirmation",
+    "emptyTitle": "Aucun hôte de confiance",
+    "emptyDescription": "Lorsque vous faites confiance à l'hôte d'un lien, il s'ouvre sans redemander.",
+    "revoke": "Révoquer {{host}}",
+    "backToPreferences": "Retour aux préférences"
   }
 }

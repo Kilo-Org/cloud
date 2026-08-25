@@ -2237,6 +2237,18 @@
       "updating": "Шинэчилж байна, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Ачаалах",
+      "loadWithHost": "Ачаалах {{host}}",
+      "httpsOnly": "Зөвхөн HTTPS зургууд"
+    },
+    "markdownLink": {
+      "invalidLink": "Энэ холбоосыг нээх боломжгүй.",
+      "hostConfirmTitle": "Гадаад холбоос нээх үү?",
+      "hostConfirmMessage": "Энэ холбоос {{host}}-ыг таны хөтөч дээр нээнэ.",
+      "open": "Нээх",
+      "trustThisHost": "Энэ хостыг итгэмжлэх"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Цуглуулсан өгөгдөл",
     "free": "Үнэгүй"
+  },
+  "trustedHosts": {
+    "title": "Итгэмжлэгдсэн хостууд",
+    "subtitle": "Асуултгүй нээхэд итгэмжлэгдсэн хостууд",
+    "emptyTitle": "Итгэмжлэгдсэн хостууд байхгүй",
+    "emptyDescription": "Холбоосын хостыг итгэмжлэхэд дахин асуултгүй нээгдэнэ.",
+    "revoke": "{{host}} цуцлах",
+    "backToPreferences": "Тохиргоо руу буцах"
   }
 }

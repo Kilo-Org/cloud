@@ -1865,6 +1865,18 @@
       "updating": "Обновление, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Загрузить",
+      "loadWithHost": "Загрузить {{host}}",
+      "httpsOnly": "Только HTTPS-изображения"
+    },
+    "markdownLink": {
+      "invalidLink": "Эту ссылку нельзя открыть.",
+      "hostConfirmTitle": "Открыть внешнюю ссылку?",
+      "hostConfirmMessage": "Эта ссылка откроет {{host}} в вашем браузере.",
+      "open": "Открыть",
+      "trustThisHost": "Доверять этому хосту"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Собранные данные",
     "free": "Бесплатно"
+  },
+  "trustedHosts": {
+    "title": "Надёжные хосты",
+    "subtitle": "Хосты, которым вы доверяете открываться без запроса",
+    "emptyTitle": "Нет надёжных хостов",
+    "emptyDescription": "Когда вы доверяете хосту ссылки, он открывается без повторного запроса.",
+    "revoke": "Отозвать {{host}}",
+    "backToPreferences": "Назад к настройкам"
   }
 }

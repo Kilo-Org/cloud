@@ -2237,6 +2237,18 @@
       "updating": "Aktualizuje se, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Načíst",
+      "loadWithHost": "Načíst {{host}}",
+      "httpsOnly": "Pouze obrázky přes HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Tento odkaz nelze otevřít.",
+      "hostConfirmTitle": "Otevřít externí odkaz?",
+      "hostConfirmMessage": "Tento odkaz otevře {{host}} ve vašem prohlížeči.",
+      "open": "Otevřít",
+      "trustThisHost": "Důvěřovat tomuto hostiteli"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Shromažďovaná data",
     "free": "Zdarma"
+  },
+  "trustedHosts": {
+    "title": "Důvěryhodní hostitelé",
+    "subtitle": "Hostitelé, kterým důvěřujete, se otevřou bez dotázání",
+    "emptyTitle": "Žádní důvěryhodní hostitelé",
+    "emptyDescription": "Když důvěřujete hostiteli odkazu, otevře se bez dalšího dotázání.",
+    "revoke": "Odebrat {{host}}",
+    "backToPreferences": "Zpět na předvolby"
   }
 }

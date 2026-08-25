@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive renderer: text, code, table, and image/link accessibility wiring share one subclass */
 import {
   cloneElement,
   createElement,
@@ -242,12 +243,31 @@ export class MarkdownRenderer extends Renderer {
   ): ReactNode {
     const interactionProps = this.linkInteractionProps(children, href, title);
     if (Array.isArray(children) && children.length > 0 && containsMarkdownImage(children)) {
-      // The image owns the default action, so the Pressable keeps long-press,
-      // the link role, and the showLinkActions action but no onPress.
+      // The image owns the default action, so the wrapper must not be an
+      // accessible link (it would group the image controls into one link and
+      // hide Load / the viewer); it keeps only long-press. The link's
+      // showLinkActions action moves onto each image child, defaulting to host
+      // confirm when the renderer has no long-press handler (chat wires its own
+      // sheet through onLongPressLink).
       return createElement(
         Pressable,
-        { ...interactionProps, onPress: undefined, key: this.getKey() },
-        children
+        { accessible: false, onLongPress: interactionProps.onLongPress, key: this.getKey() },
+        children.map(
+          (child): ReactNode =>
+            isValidElement(child) && child.type === MarkdownImage
+              ? // eslint-disable-next-line react/no-clone-element -- move the link's showLinkActions action onto the image without dropping its key
+                cloneElement(child as ReactElement<{ onShowLinkActions?: () => void }>, {
+                  /* eslint-disable typescript-eslint/no-confusing-void-expression -- the link action runs the host confirm or the chat sheet; its void result is discarded by design */
+                  onShowLinkActions: () =>
+                    this.onLongPressLink
+                      ? this.onLongPressLink(href)
+                      : confirmAndOpenMarkdownLink(href, {
+                          label: interactionProps.accessibilityLabel,
+                        }),
+                  /* eslint-enable typescript-eslint/no-confusing-void-expression */
+                })
+              : child
+        )
       );
     }
     return createElement(
@@ -262,7 +282,10 @@ export class MarkdownRenderer extends Renderer {
     );
   }
 
-  /** Interaction wiring shared by the Pressable (image) and Text link branches. */
+  /**
+   * Interaction wiring for the Text link branch. The image branch consumes only
+   * `onLongPress` (sighted long-press) and `accessibilityLabel` from this set.
+   */
   private linkInteractionProps(children: string | ReactNode[], href: string, title?: string) {
     const accessibilityLabel = resolveLinkAccessibilityLabel(children, href, title);
     return {

@@ -2237,6 +2237,18 @@
       "updating": "Yn diweddaru, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "ceisiad tynnu"
+    },
+    "markdownImage": {
+      "load": "Llwytho",
+      "loadWithHost": "Llwytho {{host}}",
+      "httpsOnly": "Delweddau HTTPS yn unig"
+    },
+    "markdownLink": {
+      "invalidLink": "Ni ellir agor y ddolen hon.",
+      "hostConfirmTitle": "Agor dolen allanol?",
+      "hostConfirmMessage": "Mae'r ddolen hon yn agor {{host}} yn eich porwr.",
+      "open": "Agor",
+      "trustThisHost": "Ymddiried yn y gwesteiwr hwn"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Data a gasglwyd",
     "free": "Am ddim"
+  },
+  "trustedHosts": {
+    "title": "Gwesteiwyr dibynadwy",
+    "subtitle": "Gwesteiwyr rydych yn ymddiried ynddynt i agor heb ofyn",
+    "emptyTitle": "Dim gwesteiwyr dibynadwy",
+    "emptyDescription": "Pan fyddwch yn ymddiried yn nhost y ddolen, bydd yn agor heb ofyn eto.",
+    "revoke": "Diddymu {{host}}",
+    "backToPreferences": "Yn ôl i'r dewisiadau"
   }
 }

@@ -2237,6 +2237,18 @@
       "updating": "Yangilanmoqda, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Yuklash",
+      "loadWithHost": "Yuklash {{host}}",
+      "httpsOnly": "Faqat HTTPS rasmlari"
+    },
+    "markdownLink": {
+      "invalidLink": "Bu havolani ochib bo'lmaydi.",
+      "hostConfirmTitle": "Tashqi havolani ochish kerakmi?",
+      "hostConfirmMessage": "Bu havola {{host}} sahifasini brauzeringizda ochadi.",
+      "open": "Ochish",
+      "trustThisHost": "Bu xostga ishonish"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Yig‘ilgan ma’lumotlar",
     "free": "Bepul"
+  },
+  "trustedHosts": {
+    "title": "Ishonchli xostlar",
+    "subtitle": "Ishonchli xostlar so'rovsiz ochiladi",
+    "emptyTitle": "Ishonchli xostlar yo'q",
+    "emptyDescription": "Havolaning xostiga ishonsangiz, u yana so'rovsiz ochiladi.",
+    "revoke": "{{host}} ruxsatini bekor qilish",
+    "backToPreferences": "Sozlamalarga qaytish"
   }
 }

@@ -2237,6 +2237,18 @@
       "updating": "Uppfærir, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull-beiðni"
+    },
+    "markdownImage": {
+      "load": "Hlaða",
+      "loadWithHost": "Hlaða {{host}}",
+      "httpsOnly": "Aðeins HTTPS myndir"
+    },
+    "markdownLink": {
+      "invalidLink": "Ekki er hægt að opna þennan tengil.",
+      "hostConfirmTitle": "Opna ytri tengil?",
+      "hostConfirmMessage": "Þessi tengill opnar {{host}} í vafranum þínum.",
+      "open": "Opna",
+      "trustThisHost": "Treysta þessum gestgjafa"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Upplýsingar safnaðar",
     "free": "Ókeypis"
+  },
+  "trustedHosts": {
+    "title": "Treystir gestgjafar",
+    "subtitle": "Gestgjafar sem þú treystir til að opna án þess að spyrja",
+    "emptyTitle": "Engir treystir gestgjafar",
+    "emptyDescription": "Þegar þú treystir gestgjafa tengils opnast hann án þess að spyrja aftur.",
+    "revoke": "Draga til baka {{host}}",
+    "backToPreferences": "Til baka í stillingar"
   }
 }

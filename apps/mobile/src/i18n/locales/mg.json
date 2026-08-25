@@ -2237,6 +2237,18 @@
       "updating": "Manavao, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Ampidirina",
+      "loadWithHost": "Ampidirina {{host}}",
+      "httpsOnly": "Sary HTTPS ihany"
+    },
+    "markdownLink": {
+      "invalidLink": "Tsy azo sokafana ity rohy ity.",
+      "hostConfirmTitle": "Hanokatra rohy ivelany ve?",
+      "hostConfirmMessage": "Ity rohy ity dia manokatra ny {{host}} ao amin'ny navigateur-nao.",
+      "open": "Sokafy",
+      "trustThisHost": "Iokano ity mpisakafoana ity"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Angona voaangona",
     "free": "Maimaimpoana"
+  },
+  "trustedHosts": {
+    "title": "Mpisakafoana azo itokisana",
+    "subtitle": "Mpisakafoana itokisanao hosokafana tsy misy fanontaniana",
+    "emptyTitle": "Tsy misy mpisakafoana itokisana",
+    "emptyDescription": "Raha itokisanao ny mpisakafoana amin'ny rohy iray, dia sokafana izany tsy misy fanontaniana intsony.",
+    "revoke": "Esory {{host}}",
+    "backToPreferences": "Miverina any amin'ny safidinao"
   }
 }

@@ -2237,6 +2237,18 @@
       "updating": "Werk op, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "trekkingsversoek"
+    },
+    "markdownImage": {
+      "load": "Laai",
+      "loadWithHost": "Laai {{host}}",
+      "httpsOnly": "Slegs HTTPS-beelde"
+    },
+    "markdownLink": {
+      "invalidLink": "Hierdie skakel kan nie oopgemaak word nie.",
+      "hostConfirmTitle": "Eksterne skakel oopmaak?",
+      "hostConfirmMessage": "Hierdie skakel maak {{host}} in jou blaaier oop.",
+      "open": "Maak oop",
+      "trustThisHost": "Vertrou hierdie gasheer"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Data ingesamel",
     "free": "Gratis"
+  },
+  "trustedHosts": {
+    "title": "Vertroude gashere",
+    "subtitle": "Gashere wat jy vertrou om sonder om te vra oop te maak",
+    "emptyTitle": "Geen vertroude gashere nie",
+    "emptyDescription": "Wanneer jy 'n skakel se gasheer vertrou, maak dit oop sonder om weer te vra.",
+    "revoke": "Herroep {{host}}",
+    "backToPreferences": "Terug na voorkeure"
   }
 }

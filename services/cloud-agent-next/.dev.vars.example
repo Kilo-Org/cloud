@@ -23,11 +23,8 @@ INTERNAL_API_SECRET=your-internal-api-secret-here
 # localhost/127.0.0.1 to host.docker.internal automatically.
 # @url nextjs
 KILOCODE_BACKEND_BASE_URL=http://localhost:3000
-# KILO_OPENROUTER_BASE options:
-#   Real LLM path (dev):  http://localhost:3000/api
-#   Fake LLM (E2E harness, local dev only):
-#     http://localhost:8811/api   (add portOffset if set)
-#   Start the `fake-llm` dev service before pointing at the fake URL.
+# Always the local Next.js gateway. Selecting `fake-deterministic` routes
+# through Next.js to the fake-llm service; do not point this at fake-llm.
 # @url nextjs/api
 KILO_OPENROUTER_BASE=http://localhost:3000/api
 

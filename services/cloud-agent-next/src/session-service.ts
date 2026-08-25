@@ -11,7 +11,10 @@ import {
 } from './types.js';
 import { generateSandboxId, getOutboundContainerId } from './sandbox-id.js';
 import { mintWrapperDispatchTicket, resolveSecret } from './auth.js';
-import { normalizeKilocodeModel } from './persistence/model-utils.js';
+import {
+  isLocalFakeDeterministicModel,
+  normalizeKilocodeModel,
+} from './persistence/model-utils.js';
 import {
   isTemporaryManagedBitbucketTokenFailure,
   issueCloudAgentGitHubSessionCapability,
@@ -1505,6 +1508,11 @@ export class SessionService {
       configContent.model = normalizeKilocodeModel(kilocodeModel);
     }
     const agentConfig: Record<string, unknown> = {};
+    if (isLocalFakeDeterministicModel(kilocodeModel)) {
+      const fakeModel = normalizeKilocodeModel(kilocodeModel);
+      configContent.small_model = fakeModel;
+      agentConfig.title = { model: fakeModel };
+    }
     if (appendSystemPrompt && appendSystemPrompt.trim()) {
       agentConfig.custom = { prompt: appendSystemPrompt };
     }

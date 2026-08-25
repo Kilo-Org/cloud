@@ -1,12 +1,10 @@
 /**
- * Fake LLM gateway for cloud-agent E2E harness.
+ * Fake LLM for cloud-agent E2E harness.
  *
- * Masquerades as the OpenRouter-compatible endpoint used by model preflight
- * and real kilo through `@openrouter/ai-sdk-provider`. When `.dev.vars` sets
- * `KILO_OPENROUTER_BASE=http://localhost:<port>/api`, the Worker calls
- * `POST /api/openrouter/models/validate` and translates the URL for sandboxed
- * kilo requests to `GET /api/openrouter/models` and
- * `POST /api/openrouter/chat/completions`.
+ * Preferred path: local Next.js routes `fake-deterministic` here while
+ * `KILO_OPENROUTER_BASE` stays on the real gateway. Masquerade routes
+ * (`/api/openrouter/{models,models/validate,chat/completions}`) still work
+ * if something points at this service directly.
  *
  * Directives in the last user message's content drive scenarios:
  *   `__fake__:<scenario>[:<arg1>[:<arg2>...]]`

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { dispatchedKilocodeModelId, normalizeKilocodeModel } from './model-utils.js';
+import {
+  dispatchedKilocodeModelId,
+  isLocalFakeDeterministicModel,
+  normalizeKilocodeModel,
+} from './model-utils.js';
 
 describe('normalizeKilocodeModel', () => {
   it('returns undefined for empty input', () => {
@@ -38,5 +42,13 @@ describe('dispatchedKilocodeModelId', () => {
   it('returns undefined for empty input', () => {
     expect(dispatchedKilocodeModelId(undefined)).toBeUndefined();
     expect(dispatchedKilocodeModelId('   ')).toBeUndefined();
+  });
+});
+
+describe('isLocalFakeDeterministicModel', () => {
+  it('matches the catalog id and kilo session id', () => {
+    expect(isLocalFakeDeterministicModel('fake-deterministic')).toBe(true);
+    expect(isLocalFakeDeterministicModel('kilo/fake-deterministic')).toBe(true);
+    expect(isLocalFakeDeterministicModel('kilo-auto/efficient')).toBe(false);
   });
 });

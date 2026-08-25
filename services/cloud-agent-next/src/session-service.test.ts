@@ -2718,6 +2718,57 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(opencodeConfig).toEqual(kiloConfig);
   });
 
+  it.each(['fake-deterministic', 'kilo/fake-deterministic'])(
+    'pins small_model and title model when the session model is %s',
+    async model => {
+      const service = new SessionService();
+      const env = createEnv();
+      env.WORKER_URL = 'https://cloud-agent.example.com';
+      const result = await service.buildWrapperSessionReadyAndPromptRequests({
+        env,
+        plan: {
+          scope: { sessionId: 'agent_test', userId: 'user_test' },
+          turn: {
+            type: 'prompt',
+            messageId: 'msg_018f1e2d3c4bFakeModelAAAAAA',
+            prompt: 'Do the work',
+          },
+          agent: { mode: 'code', model },
+          workspace: { sandboxId: 'ses-abcdef', metadata: createMetadata() },
+          wrapper: {
+            fence: {
+              wrapperRunId: 'wr_fake_model',
+              wrapperGeneration: 1,
+              wrapperConnectionId: 'conn_fake_model',
+            },
+          },
+        } satisfies FencedWrapperDispatchRequest,
+      });
+      const config = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+        model?: string;
+        small_model?: string;
+        agent?: { title?: { model?: string } };
+      };
+
+      expect(config.model).toBe('kilo/fake-deterministic');
+      expect(config.small_model).toBe('kilo/fake-deterministic');
+      expect(config.agent?.title?.model).toBe('kilo/fake-deterministic');
+    }
+  );
+
+  it('does not pin small_model or title model for real session models', async () => {
+    const result = await buildPromptWrapperRequests(createMetadata());
+    const config = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+      model?: string;
+      small_model?: string;
+      agent?: { title?: { model?: string } };
+    };
+
+    expect(config.model).toBe('kilo/test-model');
+    expect(config.small_model).toBeUndefined();
+    expect(config.agent?.title).toBeUndefined();
+  });
+
   it('passes canonical document attachments through signed wrapper prompt construction', async () => {
     const service = new SessionService();
     const env = createEnv();

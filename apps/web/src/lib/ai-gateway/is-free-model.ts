@@ -1,6 +1,10 @@
 import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 import { isKiloExclusiveFreeModel, kiloExclusiveModels } from '@/lib/ai-gateway/models';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
+import {
+  isLocalFakeDeterministicModel,
+  isLocalFakeLlmEnabled,
+} from '@/lib/ai-gateway/local-fake-llm';
 
 /**
  * Returns true if `model` should be treated as free for the requesting user
@@ -14,6 +18,7 @@ import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership'
  */
 export async function isFreeModel(model: string): Promise<boolean> {
   return (
+    (isLocalFakeDeterministicModel(model) && isLocalFakeLlmEnabled()) ||
     isKiloExclusiveFreeModel(model) ||
     model === KILO_AUTO_FREE_MODEL.id ||
     (model ?? '').endsWith(':free') ||

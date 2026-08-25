@@ -233,18 +233,24 @@ export async function upstreamRequest({
   const path = CHAT_API_PATHS[chatApi];
   const targetUrl = `${apiUrl}${path}${search}`;
 
-  const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS);
+  const timeoutSignal = provider.disableRequestTimeout ? null : AbortSignal.timeout(TIMEOUT_MS);
   const onTimeoutAbort = () => {
     errorExceptInTest(
       `[upstreamRequest] gateway timeout after ${TIMEOUT_MS}ms waiting for upstream response headers`,
       { vercelRequestId: vercelRequestId ?? '<none>' }
     );
   };
-  timeoutSignal.addEventListener('abort', onTimeoutAbort);
-  after(() => {
-    timeoutSignal.removeEventListener('abort', onTimeoutAbort);
-  });
-  const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+  if (timeoutSignal) {
+    timeoutSignal.addEventListener('abort', onTimeoutAbort);
+    after(() => {
+      timeoutSignal.removeEventListener('abort', onTimeoutAbort);
+    });
+  }
+  const combinedSignal = timeoutSignal
+    ? signal
+      ? AbortSignal.any([signal, timeoutSignal])
+      : timeoutSignal
+    : signal;
 
   try {
     return {

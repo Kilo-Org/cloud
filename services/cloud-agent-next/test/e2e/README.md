@@ -2,9 +2,9 @@
 
 Drives the real `pnpm dev:start cloud-agent` stack end-to-end — Worker,
 Durable Object, Sandbox container, wrapper, and **real kilo** inside the
-sandbox. Only LLM inference is deterministic: kilo's OpenRouter-shaped
-calls are routed to a local fake gateway
-(`test/e2e/fake-llm-server.ts`) instead of a real model provider.
+sandbox. Only LLM inference is deterministic: selecting
+`kilo/fake-deterministic` makes the local Next.js gateway proxy kilo's
+OpenRouter-shaped calls to `test/e2e/fake-llm-server.ts`.
 
 Not wired into `pnpm test` / CI — this is for local confidence during the
 cloud-agent-next refactor.
@@ -12,34 +12,19 @@ cloud-agent-next refactor.
 ## One-time setup
 
 1. Copy `.dev.vars.example` → `.dev.vars` and fill in local values.
+   Leave `KILO_OPENROUTER_BASE` pointed at local Next.js (`@url nextjs/api`).
 2. Ensure local Postgres is up and root `.env.local` defines `POSTGRES_URL`
    (or export `DATABASE_URL`) — the driver inserts a test user row via
    `@kilocode/db`.
-3. Point kilo at the fake LLM gateway instead of a real provider. Edit
-   `services/cloud-agent-next/.dev.vars`:
+3. Start the stack. The `cloud-agent` group already includes `fake-llm`:
 
    ```bash
-   # Real LLM (default):
-   # KILO_OPENROUTER_BASE=http://localhost:3000/api
-
-   # Fake LLM (E2E harness):
-   KILO_OPENROUTER_BASE=http://localhost:<8811 + portOffset>/api
+   pnpm dev:start cloud-agent
    ```
 
-   `<portOffset>` is the dev-session port offset reported by
-   `pnpm dev:status --json` (usually `0` for the first session). The Worker
-   calls the fake's `POST /api/openrouter/models/validate` route through this
-   host-reachable URL and translates it to `host.docker.internal` when injecting
-   sandbox provider configuration.
-
-4. Start the stack including the `fake-llm` dev service:
-
-   ```bash
-   pnpm dev:start cloud-agent fake-llm
-   ```
-
-   Switching back to a real LLM later is just a `.dev.vars` edit plus a
-   `pnpm dev:restart cloud-agent-next` — no flag toggles.
+   Selecting `kilo/fake-deterministic` is enough to hit fake-llm through
+   Next.js. A real-model session (`kilo-auto/efficient`, etc.) uses the same
+   Worker URL and does not need a restart.
 
 ## Credential containment (opt-in)
 
@@ -164,12 +149,11 @@ and `.env`, then falls back to `@kilocode/db` `computeDatabaseUrl()`, which
 uses `POSTGRES_URL` for local development.
 
 `FAKE_LLM_URL` is how the **driver** reaches the fake server (for
-`/test/release`, `/test/gate-status`, `/test/waiters`, and `/test/requests` side channels). It is separate from
-`KILO_OPENROUTER_BASE` in `.dev.vars`, which is the Worker-reachable gateway
-base used for lightweight model validation; runtime setup translates local
-hostnames for **kilo inside the sandbox** when necessary. If you changed the
-fake's port (e.g. non-zero `portOffset`), set both values to the matching
-reachable views.
+`/test/release`, `/test/gate-status`, `/test/waiters`, and `/test/requests`
+side channels). `KILO_OPENROUTER_BASE` stays on Next.js; the gateway routes
+`fake-deterministic` to fake-llm. If you changed the fake's port (e.g.
+non-zero `portOffset`), set `FAKE_LLM_URL` to the matching host-reachable
+view. Next.js picks up the same offset from `apps/web/.env.development.local`.
 
 ## Gateway contract
 
@@ -266,18 +250,18 @@ the newer `start` / `send` procedures. `prepareSession` requires
   and fill in the local secret (same value used by `apps/web`).
 - **`POSTGRES_URL not configured`** — Set root `.env.local` `POSTGRES_URL`,
   or export `DATABASE_URL` to override the database URL for this harness.
-- **Sandbox calls out to a real provider** — check `.dev.vars`
-  `KILO_OPENROUTER_BASE` is pointing at
-  `http://localhost:<8811 + portOffset>/api` and that the `fake-llm` service is
-  running (`pnpm dev:status`). Runtime configuration translates this URL for
-  sandbox access. Tail the fake's log (`tail -f dev/logs/fake-llm.log`) to
-  confirm kilo is hitting it.
+- **Sandbox calls out to a real provider** — the session model must be
+  `kilo/fake-deterministic`, Next.js must have `FAKE_LLM_URL` set (from
+  `pnpm dev:env`), and the `fake-llm` service must be running
+  (`pnpm dev:status`). Tail the fake's log (`tail -f dev/logs/fake-llm.log`)
+  to confirm kilo is hitting it through the gateway.
 - **`waitForGateEngaged` timed out** — kilo never reached the fake LLM. Most
-  common cause: `KILO_OPENROUTER_BASE` still points at a real provider or the
-  fake service is not running. Confirm with `curl -s $FAKE_LLM_URL/test/requests`
-  (expect a rising `chatCompletions` count as kilo dials the fake) and
-  `tail -f dev/logs/fake-llm.log` — a stream that stays empty while a turn is
-  "preparing" means the wrapper never started, not a fake-LLM problem.
+  common cause: the session used a real model, `FAKE_LLM_URL` is missing from
+  Next.js, or the fake service is not running. Confirm with
+  `curl -s $FAKE_LLM_URL/test/requests` (expect a rising `chatCompletions`
+  count as kilo dials the fake) and `tail -f dev/logs/fake-llm.log` — a
+  stream that stays empty while a turn is "preparing" means the wrapper
+  never started, not a fake-LLM problem.
 - **`Worker "git-token-service-dev" not found` in `cloud-agent-next.log`** —
   the `GIT_TOKEN_SERVICE` service binding could not resolve. The Worker log
   shows the failure as `Failed to issue Kilo session capability` and the turn

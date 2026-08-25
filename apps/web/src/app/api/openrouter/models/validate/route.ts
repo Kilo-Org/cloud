@@ -7,6 +7,7 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
 import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
+import { appendLocalFakeDeterministicCatalogModels } from '@/lib/ai-gateway/local-fake-llm';
 
 const BodySchema = z.object({ modelId: z.string().trim().min(1) });
 
@@ -52,9 +53,9 @@ export async function POST(request: NextRequest) {
       auth?.user ? getDirectByokModelsForUser(auth.user.id) : [],
       listAvailableExperimentModels(),
     ]);
-    const available = models.data
-      .concat(byokModels, experimentModels)
-      .some(model => model.id === bodyResult.data.modelId);
+    const available = appendLocalFakeDeterministicCatalogModels(
+      models.data.concat(byokModels, experimentModels)
+    ).some(model => model.id === bodyResult.data.modelId);
     return NextResponse.json(available ? { valid: true } : { valid: false, reason: 'unavailable' });
   } catch (error) {
     captureException(error, {

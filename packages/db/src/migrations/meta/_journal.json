@@ -1569,6 +1569,13 @@
       "when": 1787579129083,
       "tag": "0223_right_makkari",
       "breakpoints": true
+    },
+    {
+      "idx": 224,
+      "version": "7",
+      "when": 1787673464661,
+      "tag": "0224_nice_black_widow",
+      "breakpoints": true
     }
   ]
 }

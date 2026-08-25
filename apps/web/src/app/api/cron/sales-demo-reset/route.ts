@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { captureException } from '@sentry/nextjs';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
@@ -54,8 +55,13 @@ export async function GET(request: Request) {
         });
       });
       reset++;
-    } catch {
+    } catch (error) {
       failed++;
+      console.error(`[sales-demo-reset] Failed to reset demo org ${org.id}:`, error);
+      captureException(error, {
+        tags: { endpoint: 'cron/sales-demo-reset' },
+        extra: { organizationId: org.id },
+      });
     }
   }
 

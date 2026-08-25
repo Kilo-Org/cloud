@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "UQ_organizations_live_sales_demo_per_owner" ON "organizations" USING btree ("created_by_kilo_user_id") WHERE ("organizations"."settings"->>'is_sales_demo')::boolean = true AND "organizations"."deleted_at" IS NULL;

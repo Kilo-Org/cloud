@@ -5,13 +5,15 @@ import {
   exa_usage_log,
   kilocode_users,
   microdollar_usage,
+  microdollar_usage_daily,
   organization_invitations,
   organization_memberships,
+  organization_user_usage,
   organizations,
   type Organization,
   type User,
 } from '@kilocode/db/schema';
-import { and, asc, eq, isNull, ne, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { addUserToOrganization } from '@/lib/organizations/organizations';
 import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
 
@@ -151,9 +153,19 @@ export async function createSalesDemoOrganization(args: {
       free_trial_end_at: oneYearFromNow.toISOString(),
       settings: demoOrganizationSettings(now),
     })
+    .onConflictDoNothing({
+      target: [organizations.created_by_kilo_user_id],
+      where: sql`(${organizations.settings}->>'is_sales_demo')::boolean = true AND ${organizations.deleted_at} IS NULL`,
+    })
     .returning();
 
   if (!organization) {
+    const winner = await findLiveSalesDemoOwnedBy(targetUser.id, txn);
+    if (winner) {
+      throw new Error(ALREADY_OWNS_DEMO, {
+        cause: { organizationId: winner.id, organizationName: winner.name },
+      });
+    }
     throw new Error('Failed to create sales demo organization');
   }
 
@@ -221,6 +233,12 @@ export async function restoreSalesDemoOrganization(args: {
   await txn
     .delete(organization_invitations)
     .where(eq(organization_invitations.organization_id, organizationId));
+  await txn
+    .delete(organization_user_usage)
+    .where(eq(organization_user_usage.organization_id, organizationId));
+  await txn
+    .delete(microdollar_usage_daily)
+    .where(eq(microdollar_usage_daily.organization_id, organizationId));
 
   const now = new Date();
   const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
@@ -243,37 +261,14 @@ export async function restoreSalesDemoOrganization(args: {
 
   await txn
     .delete(organization_memberships)
-    .where(
-      and(
-        eq(organization_memberships.organization_id, organizationId),
-        ne(organization_memberships.kilo_user_id, ownerId ?? ''),
-        notInArray(organization_memberships.kilo_user_id, demoIds)
-      )
-    );
+    .where(eq(organization_memberships.organization_id, organizationId));
+
+  if (ownerId) {
+    await addUserToOrganization(organizationId, ownerId, 'owner', txn);
+  }
 
   for (const demoId of demoIds) {
     await addUserToOrganization(organizationId, demoId, 'member', txn);
-  }
-
-  if (ownerId) {
-    const [ownerMembership] = await txn
-      .select({ kilo_user_id: organization_memberships.kilo_user_id })
-      .from(organization_memberships)
-      .where(
-        and(
-          eq(organization_memberships.organization_id, organizationId),
-          eq(organization_memberships.kilo_user_id, ownerId)
-        )
-      )
-      .limit(1);
-
-    if (!ownerMembership) {
-      await txn.insert(organization_memberships).values({
-        organization_id: organizationId,
-        kilo_user_id: ownerId,
-        role: 'owner',
-      });
-    }
   }
 
   const [reloadedOrg] = await txn

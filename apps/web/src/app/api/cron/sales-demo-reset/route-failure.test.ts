@@ -1,9 +1,20 @@
 import { NextRequest } from 'next/server';
+import { captureException } from '@sentry/nextjs';
+import {
+  createSalesDemoOrganization,
+  restoreSalesDemoOrganization,
+  salesDemoMemberId,
+} from '@/lib/organizations/sales-demo';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 jest.mock('@/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
+}));
+
+jest.mock('@/lib/organizations/sales-demo', () => ({
+  ...jest.requireActual('@/lib/organizations/sales-demo'),
+  restoreSalesDemoOrganization: jest.fn(),
 }));
 
 import { db } from '@/lib/drizzle';
@@ -16,11 +27,13 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createSalesDemoOrganization, salesDemoMemberId } from '@/lib/organizations/sales-demo';
 import type { User } from '@kilocode/db/schema';
 import { GET } from './route';
+
+const mockedCaptureException = jest.mocked(captureException);
+const mockedRestoreSalesDemoOrganization = jest.mocked(restoreSalesDemoOrganization);
 
 async function deleteAllSalesDemoOrgs() {
   const rows = await db
@@ -39,7 +52,7 @@ async function deleteAllSalesDemoOrgs() {
   await db.delete(organizations).where(inArray(organizations.id, ids));
 }
 
-describe('GET /api/cron/sales-demo-reset', () => {
+describe('GET /api/cron/sales-demo-reset failure handling', () => {
   let admin: User;
   let target: User;
 
@@ -47,15 +60,15 @@ describe('GET /api/cron/sales-demo-reset', () => {
     await deleteAllSalesDemoOrgs();
 
     admin = await insertTestUser({
-      google_user_email: 'sales-demo-cron-admin@kilocode.ai',
-      google_user_name: 'Sales Demo Cron Admin',
+      google_user_email: 'sales-demo-cron-failure-admin@kilocode.ai',
+      google_user_name: 'Sales Demo Cron Failure Admin',
       is_admin: true,
     });
 
     target = await insertTestUser({
-      google_user_email: 'sales-demo-cron-target@kilocode.ai',
-      google_user_name: 'Sales Demo Cron Target',
-      normalized_email: 'sales-demo-cron-target@kilocode.ai',
+      google_user_email: 'sales-demo-cron-failure-target@kilocode.ai',
+      google_user_name: 'Sales Demo Cron Failure Target',
+      normalized_email: 'sales-demo-cron-failure-target@kilocode.ai',
     });
   });
 
@@ -67,39 +80,12 @@ describe('GET /api/cron/sales-demo-reset', () => {
       .where(inArray(kilocode_users.id, [admin.id, target.id, ...demoIds]));
   });
 
-  it('rejects requests without cron authorization', async () => {
-    const response = await GET(
-      new NextRequest('http://localhost:3000/api/cron/sales-demo-reset', { method: 'GET' })
-    );
-    expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
-  });
+  it('logs, captures the exception, counts the failure, and still returns 200', async () => {
+    mockedRestoreSalesDemoOrganization.mockRejectedValueOnce(new Error('boom'));
 
-  it('rejects requests with invalid cron authorization', async () => {
-    const response = await GET(
-      new NextRequest('http://localhost:3000/api/cron/sales-demo-reset', {
-        method: 'GET',
-        headers: { authorization: 'Bearer wrong-secret' },
-      })
-    );
-    expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
-  });
-
-  it('resets one dirty live demo org to $50 and reports reset 1', async () => {
-    const org = await db.transaction(async tx =>
+    await db.transaction(async tx =>
       createSalesDemoOrganization({ targetUser: target, adminUser: admin, txn: tx })
     );
-
-    await db.insert(microdollar_usage).values({
-      kilo_user_id: target.id,
-      cost: 2_000_000,
-      input_tokens: 0,
-      output_tokens: 0,
-      cache_write_tokens: 0,
-      cache_hit_tokens: 0,
-      organization_id: org.id,
-    });
 
     const response = await GET(
       new NextRequest('http://localhost:3000/api/cron/sales-demo-reset', {
@@ -109,17 +95,8 @@ describe('GET /api/cron/sales-demo-reset', () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ reset: 1, failed: 0 });
-
-    const [reloaded] = await db
-      .select()
-      .from(organizations)
-      .where(eq(organizations.id, org.id))
-      .limit(1);
-
-    expect(Number(reloaded.microdollars_used)).toBe(0);
-    expect(Number(reloaded.total_microdollars_acquired) - Number(reloaded.microdollars_used)).toBe(
-      50_000_000
-    );
+    await expect(response.json()).resolves.toEqual({ reset: 0, failed: 1 });
+    expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockedRestoreSalesDemoOrganization).toHaveBeenCalledTimes(1);
   });
 });

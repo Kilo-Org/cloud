@@ -4,7 +4,9 @@ import {
   credit_transactions,
   kilocode_users,
   microdollar_usage,
+  microdollar_usage_daily,
   organization_memberships,
+  organization_user_usage,
   organizations,
 } from '@kilocode/db/schema';
 import { and, eq, inArray, sql } from 'drizzle-orm';
@@ -23,10 +25,12 @@ describe('sales demo router', () => {
   let nonAdmin: User;
   let target: User;
   let target2: User;
+  let target3: User;
 
   let firstOrgId: string;
   let firstOrgName: string;
   let secondOrgId: string;
+  let thirdOrgId: string;
   let normalOrgId: string;
 
   beforeAll(async () => {
@@ -53,15 +57,27 @@ describe('sales demo router', () => {
       google_user_name: 'Sales Demo Target Two',
       normalized_email: 'sales-demo-target-2@kilocode.ai',
     });
+
+    target3 = await insertTestUser({
+      google_user_email: 'sales-demo-target-3@kilocode.ai',
+      google_user_name: 'Sales Demo Target Three',
+      normalized_email: 'sales-demo-target-3@kilocode.ai',
+    });
   });
 
   afterAll(async () => {
-    const orgIds = [firstOrgId, secondOrgId, normalOrgId].filter(Boolean);
+    const orgIds = [firstOrgId, secondOrgId, thirdOrgId, normalOrgId].filter(Boolean);
     if (orgIds.length > 0) {
       await db
         .delete(credit_transactions)
         .where(inArray(credit_transactions.organization_id, orgIds));
       await db.delete(microdollar_usage).where(inArray(microdollar_usage.organization_id, orgIds));
+      await db
+        .delete(microdollar_usage_daily)
+        .where(inArray(microdollar_usage_daily.organization_id, orgIds));
+      await db
+        .delete(organization_user_usage)
+        .where(inArray(organization_user_usage.organization_id, orgIds));
       await db
         .delete(organization_memberships)
         .where(inArray(organization_memberships.organization_id, orgIds));
@@ -72,7 +88,14 @@ describe('sales demo router', () => {
     await db
       .delete(kilocode_users)
       .where(
-        inArray(kilocode_users.id, [admin.id, nonAdmin.id, target.id, target2.id, ...demoIds])
+        inArray(kilocode_users.id, [
+          admin.id,
+          nonAdmin.id,
+          target.id,
+          target2.id,
+          target3.id,
+          ...demoIds,
+        ])
       );
   });
 
@@ -196,6 +219,41 @@ describe('sales demo router', () => {
     expect(demoRows).toHaveLength(25);
   });
 
+  it('allows exactly one of two concurrent creates for the same target', async () => {
+    const caller = await createCallerForUser(admin.id);
+
+    const results = await Promise.allSettled([
+      caller.admin.salesDemo.create({ email: target3.google_user_email }),
+      caller.admin.salesDemo.create({ email: target3.google_user_email }),
+    ]);
+
+    const fulfilled = results.filter(r => r.status === 'fulfilled');
+    const rejected = results.filter(r => r.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+
+    const winner = fulfilled[0] as PromiseFulfilledResult<{
+      organizationId: string;
+      organizationName: string;
+    }>;
+    thirdOrgId = winner.value.organizationId;
+
+    const loser = rejected[0] as PromiseRejectedResult;
+    expect(loser.reason).toMatchObject({ code: 'CONFLICT' });
+
+    const liveDemos = await db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(
+        and(
+          eq(organizations.created_by_kilo_user_id, target3.id),
+          sql`${organizations.settings}->>'is_sales_demo' = 'true'`,
+          sql`${organizations.deleted_at} IS NULL`
+        )
+      );
+    expect(liveDemos).toHaveLength(1);
+  });
+
   it('resets a dirty demo org back to the same id and $50', async () => {
     const caller = await createCallerForUser(admin.id);
 
@@ -225,6 +283,40 @@ describe('sales demo router', () => {
       organization_id: firstOrgId,
       kilo_user_id: nonAdmin.id,
       role: 'member',
+    });
+
+    await db
+      .update(organization_memberships)
+      .set({ role: 'admin' })
+      .where(
+        and(
+          eq(organization_memberships.organization_id, firstOrgId),
+          eq(organization_memberships.kilo_user_id, salesDemoMemberId(1))
+        )
+      );
+
+    await db
+      .update(organization_memberships)
+      .set({ role: 'member' })
+      .where(
+        and(
+          eq(organization_memberships.organization_id, firstOrgId),
+          eq(organization_memberships.kilo_user_id, target.id)
+        )
+      );
+
+    await db.insert(microdollar_usage_daily).values({
+      kilo_user_id: target.id,
+      organization_id: firstOrgId,
+      usage_date: '2026-08-25',
+    });
+
+    await db.insert(organization_user_usage).values({
+      organization_id: firstOrgId,
+      kilo_user_id: target.id,
+      usage_date: sql`CURRENT_DATE`,
+      limit_type: 'daily',
+      microdollar_usage: 1_000_000,
     });
 
     const result = await caller.admin.salesDemo.reset({ organizationId: firstOrgId });
@@ -257,6 +349,42 @@ describe('sales demo router', () => {
         )
       );
     expect(strayMemberships).toHaveLength(0);
+
+    const [demoMember01] = await db
+      .select({ role: organization_memberships.role })
+      .from(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, firstOrgId),
+          eq(organization_memberships.kilo_user_id, salesDemoMemberId(1))
+        )
+      )
+      .limit(1);
+    expect(demoMember01?.role).toBe('member');
+
+    const [ownerMembership] = await db
+      .select({ role: organization_memberships.role })
+      .from(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, firstOrgId),
+          eq(organization_memberships.kilo_user_id, target.id)
+        )
+      )
+      .limit(1);
+    expect(ownerMembership?.role).toBe('owner');
+
+    const dailyProjections = await db
+      .select({ id: microdollar_usage_daily.id })
+      .from(microdollar_usage_daily)
+      .where(eq(microdollar_usage_daily.organization_id, firstOrgId));
+    expect(dailyProjections).toHaveLength(0);
+
+    const orgUsageProjections = await db
+      .select({ id: organization_user_usage.id })
+      .from(organization_user_usage)
+      .where(eq(organization_user_usage.organization_id, firstOrgId));
+    expect(orgUsageProjections).toHaveLength(0);
 
     const txns = await db
       .select({ amount_microdollars: credit_transactions.amount_microdollars })

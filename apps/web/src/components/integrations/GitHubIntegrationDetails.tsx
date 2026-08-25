@@ -24,6 +24,7 @@ import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombob
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { buildGitHubInstallState } from './github-install-state';
 import { useConfirm } from '@/components/ui/confirm';
+import { OrganizationGitHubInstallations } from './OrganizationGitHubInstallations';
 
 type GitHubIntegrationDetailsProps = {
   organizationId?: string;
@@ -116,7 +117,14 @@ export function buildAppReturnOutcomeView(input: {
   };
 }
 
-export function GitHubIntegrationDetails({
+export function GitHubIntegrationDetails(props: GitHubIntegrationDetailsProps) {
+  if (props.organizationId && !props.appReturnPath) {
+    return <OrganizationGitHubInstallations organizationId={props.organizationId} />;
+  }
+  return <GitHubIntegrationDetailsContent {...props} />;
+}
+
+function GitHubIntegrationDetailsContent({
   organizationId,
   installState,
   fromApp,
@@ -444,7 +452,7 @@ export function GitHubIntegrationDetails({
         destructive: true,
       })
     ) {
-      uninstallApp.mutate(managementInput, {
+      uninstallApp.mutate(input, {
         onSuccess: async () => {
           toast.success('GitHub App uninstalled');
           await refetch();
@@ -468,7 +476,7 @@ export function GitHubIntegrationDetails({
         destructive: true,
       })
     ) {
-      cancelPendingInstallation.mutate(managementInput, {
+      cancelPendingInstallation.mutate(input, {
         onSuccess: async () => {
           toast.success('Installation request cancelled');
           await refetch();
@@ -483,7 +491,7 @@ export function GitHubIntegrationDetails({
   };
 
   const handleRefresh = () => {
-    refreshInstallation.mutate(managementInput, {
+    refreshInstallation.mutate(input, {
       onSuccess: async () => {
         toast.success('Installation details refreshed', {
           description: 'Permissions and repositories have been updated from GitHub.',
@@ -518,9 +526,6 @@ export function GitHubIntegrationDetails({
   }
 
   const installation = installationData?.installation;
-  const managementInput = organizationId
-    ? { organizationId, integrationId: installation?.id }
-    : undefined;
   const status = installation?.status;
   const isPendingApproval = status === 'awaiting_installation';
 

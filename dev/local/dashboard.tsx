@@ -33,7 +33,6 @@ import {
   ensureDeadServiceLogPipes,
   snapshotCloudAgentPublicTunnelEnv,
   waitForCloudAgentPublicTunnelCapture,
-  cloudAgentDevVarsPath,
 } from './runner';
 import { isPortlessServiceHealthy, readCapturedTunnelUrl } from './tunnel-health';
 
@@ -321,7 +320,9 @@ function Dashboard({
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [stackIssues, setStackIssues] = useState<string[]>([]);
   const refreshInFlight = useRef(false);
-  const lastWorkerUrl = useRef<string | undefined>(undefined);
+  const lastPublicTunnelSnapshot = useRef<
+    ReturnType<typeof snapshotCloudAgentPublicTunnelEnv> | undefined
+  >(undefined);
   const reloadingWorker = useRef(false);
   const lastTunnelProbe = useRef(new Map<string, { at: number; up: boolean }>());
   const [, bumpViewedRevision] = useState(0);
@@ -440,21 +441,31 @@ function Dashboard({
         if (repairedPipes.length > 0) {
           issues.push(`reattached logs: ${repairedPipes.join(', ')}`);
         }
-        const workerUrl = readEnvValue(cloudAgentDevVarsPath(repoRoot), 'WORKER_URL');
+        const publicTunnelSnapshot = snapshotCloudAgentPublicTunnelEnv(repoRoot);
+        const previousPublicTunnelSnapshot = lastPublicTunnelSnapshot.current;
         if (
-          lastWorkerUrl.current !== undefined &&
-          workerUrl !== undefined &&
-          workerUrl !== lastWorkerUrl.current &&
+          previousPublicTunnelSnapshot?.values.WORKER_URL !== undefined &&
+          publicTunnelSnapshot.values.WORKER_URL !== undefined &&
+          publicTunnelSnapshot.values.WORKER_URL !==
+            previousPublicTunnelSnapshot.values.WORKER_URL &&
           runningServices.has('cloud-agent-next') &&
           !reloadingWorker.current
         ) {
           reloadingWorker.current = true;
           issues.push('reloading worker for new tunnel URL');
-          void restartServiceInTmux(sessionName, 'cloud-agent-next').finally(() => {
-            reloadingWorker.current = false;
-          });
+          void waitForCloudAgentPublicTunnelCapture(
+            repoRoot,
+            previousPublicTunnelSnapshot,
+            CAPTURE_TIMEOUT_MS
+          )
+            .then(captured =>
+              captured ? restartServiceInTmux(sessionName, 'cloud-agent-next') : undefined
+            )
+            .finally(() => {
+              reloadingWorker.current = false;
+            });
         }
-        lastWorkerUrl.current = workerUrl;
+        lastPublicTunnelSnapshot.current = publicTunnelSnapshot;
         setStackIssues(prev => {
           if (prev.length === issues.length && prev.every((item, i) => item === issues[i])) {
             return prev;
@@ -775,33 +786,36 @@ function Dashboard({
         void restartServiceInTmux(sessionName, item.name);
         return;
       }
+      if (reloadingWorker.current) return;
       const previous = snapshotCloudAgentPublicTunnelEnv(repoRoot);
+      reloadingWorker.current = true;
       void (async () => {
-        const outcome = await restartServiceInTmux(sessionName, item.name);
-        if (outcome === 'gave-up') {
-          setStackIssues(['tunnels: restart did not finish']);
-          return;
-        }
-        const captured = await waitForCloudAgentPublicTunnelCapture(
-          repoRoot,
-          previous,
-          CAPTURE_TIMEOUT_MS
-        );
-        if (!captured) {
-          setStackIssues(['tunnels: no new public URL captured']);
-          return;
-        }
-        if (
-          !runningServices.has('cloud-agent-next') &&
-          !findServicePane(sessionName, 'cloud-agent-next')
-        ) {
-          return;
-        }
-        reloadingWorker.current = true;
-        setStackIssues(['reloading worker for new tunnel URL']);
-        await restartServiceInTmux(sessionName, 'cloud-agent-next').finally(() => {
+        try {
+          const outcome = await restartServiceInTmux(sessionName, item.name);
+          if (outcome === 'gave-up') {
+            setStackIssues(['tunnels: restart did not finish']);
+            return;
+          }
+          const captured = await waitForCloudAgentPublicTunnelCapture(
+            repoRoot,
+            previous,
+            CAPTURE_TIMEOUT_MS
+          );
+          if (!captured) {
+            setStackIssues(['tunnels: no new public URL captured']);
+            return;
+          }
+          if (
+            !runningServices.has('cloud-agent-next') &&
+            !findServicePane(sessionName, 'cloud-agent-next')
+          ) {
+            return;
+          }
+          setStackIssues(['reloading worker for new tunnel URL']);
+          await restartServiceInTmux(sessionName, 'cloud-agent-next');
+        } finally {
           reloadingWorker.current = false;
-        });
+        }
       })();
       return;
     }

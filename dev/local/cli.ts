@@ -459,7 +459,16 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   let serviceNames = topologicalSort([...new Set([...coreServices, ...extraServices])]);
 
   const sessionName = getSessionName();
-  const sessionAlreadyRunning = sessionExists(sessionName);
+  let sessionAlreadyRunning = sessionExists(sessionName);
+  if (
+    sessionAlreadyRunning &&
+    !reuseRunning &&
+    serviceNames.every(name => findServicePane(sessionName, name) === undefined)
+  ) {
+    console.log(`Session ${sessionName} has no running services — recreating it.`);
+    killSession(sessionName);
+    sessionAlreadyRunning = false;
+  }
 
   // --- Pick a free port offset before anything derives URLs from ports ---
   // An explicit KILO_PORT_OFFSET is honored as-is. Otherwise, when the
@@ -559,19 +568,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   }
 
   // --- Check for existing session ---
-  // A session can outlive every service: panes interrupted by hand, the
-  // dashboard closing windows, a partial startup. Rejoining that session used
-  // to print "already running — attaching" over an empty session and required a
-  // manual dev:stop; recreate it instead. Nothing is lost — no service pane
-  // exists to keep.
-  const emptySession =
-    sessionAlreadyRunning &&
-    serviceNames.every(name => findServicePane(sessionName, name) === undefined);
-  if (emptySession) {
-    console.log(`Session ${sessionName} has no running services — recreating it.`);
-    killSession(sessionName);
-  }
-  if (sessionAlreadyRunning && !emptySession) {
+  if (sessionAlreadyRunning) {
     for (const name of serviceNames) {
       const service = getService(name);
       if (service.type !== 'worker' || !findServicePane(sessionName, name)) continue;
@@ -597,36 +594,14 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
       serviceNames.includes('cloud-agent-public-tunnels') &&
       !findServicePane(sessionName, 'cloud-agent-public-tunnels')
     ) {
-      const cloudAgentEnvPath = path.join(repoRoot, 'services/cloud-agent-next/.dev.vars');
-      const oldWorker = readEnvValue(cloudAgentEnvPath, 'WORKER_URL');
-      const oldBackend = readEnvValue(cloudAgentEnvPath, 'KILOCODE_BACKEND_BASE_URL');
-      const oldIngest = readEnvValue(cloudAgentEnvPath, 'KILO_SESSION_INGEST_URL');
-      const oldMtime = readEnvMtime(cloudAgentEnvPath);
+      const previous = snapshotCloudAgentPublicTunnelEnv(repoRoot);
       startServiceInTmux(sessionName, 'cloud-agent-public-tunnels');
-      const [workerReady, backendReady, ingestReady] = await Promise.all([
-        waitForEnvValueChange(
-          cloudAgentEnvPath,
-          'WORKER_URL',
-          oldWorker,
-          CAPTURE_TIMEOUT_MS,
-          oldMtime
-        ),
-        waitForEnvValueChange(
-          cloudAgentEnvPath,
-          'KILOCODE_BACKEND_BASE_URL',
-          oldBackend,
-          CAPTURE_TIMEOUT_MS,
-          oldMtime
-        ),
-        waitForEnvValueChange(
-          cloudAgentEnvPath,
-          'KILO_SESSION_INGEST_URL',
-          oldIngest,
-          CAPTURE_TIMEOUT_MS,
-          oldMtime
-        ),
-      ]);
-      if (!workerReady || !backendReady || !ingestReady) {
+      const captured = await waitForCloudAgentPublicTunnelCapture(
+        repoRoot,
+        previous,
+        CAPTURE_TIMEOUT_MS
+      );
+      if (!captured) {
         throw new Error(
           'Public sandbox tunnel URLs were not captured. Check the cloud-agent-public-tunnels window.'
         );
@@ -798,24 +773,9 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
       );
       oldMtimes.set('bitbucket-webhook-tunnel', readEnvMtime(appEnvPath));
     }
-    if (captureServices.includes('cloud-agent-public-tunnels')) {
-      const cloudAgentEnvPath = path.join(repoRoot, 'services/cloud-agent-next/.dev.vars');
-      oldValues.set(
-        'cloud-agent-public-tunnels-worker',
-        readEnvValue(cloudAgentEnvPath, 'WORKER_URL')
-      );
-      oldValues.set(
-        'cloud-agent-public-tunnels-backend',
-        readEnvValue(cloudAgentEnvPath, 'KILOCODE_BACKEND_BASE_URL')
-      );
-      oldValues.set(
-        'cloud-agent-public-tunnels-ingest',
-        readEnvValue(cloudAgentEnvPath, 'KILO_SESSION_INGEST_URL')
-      );
-      oldMtimes.set('cloud-agent-public-tunnels-worker', readEnvMtime(cloudAgentEnvPath));
-      oldMtimes.set('cloud-agent-public-tunnels-backend', readEnvMtime(cloudAgentEnvPath));
-      oldMtimes.set('cloud-agent-public-tunnels-ingest', readEnvMtime(cloudAgentEnvPath));
-    }
+    const previousPublicTunnelSnapshot = captureServices.includes('cloud-agent-public-tunnels')
+      ? snapshotCloudAgentPublicTunnelEnv(repoRoot)
+      : undefined;
 
     for (const name of captureServices) {
       startServiceInTmux(sessionName, name, sessionEnv);
@@ -934,49 +894,18 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
       );
     }
 
-    if (captureServices.includes('cloud-agent-public-tunnels')) {
-      const cloudAgentEnvPath = path.join(repoRoot, 'services/cloud-agent-next/.dev.vars');
+    if (previousPublicTunnelSnapshot) {
       waits.push(
-        Promise.all([
-          waitForEnvValueChange(
-            cloudAgentEnvPath,
-            'WORKER_URL',
-            oldValues.get('cloud-agent-public-tunnels-worker'),
-            CAPTURE_TIMEOUT_MS,
-            oldMtimes.get('cloud-agent-public-tunnels-worker')
-          ),
-          waitForEnvValueChange(
-            cloudAgentEnvPath,
-            'KILOCODE_BACKEND_BASE_URL',
-            oldValues.get('cloud-agent-public-tunnels-backend'),
-            CAPTURE_TIMEOUT_MS,
-            oldMtimes.get('cloud-agent-public-tunnels-backend')
-          ),
-          waitForEnvValueChange(
-            cloudAgentEnvPath,
-            'KILO_SESSION_INGEST_URL',
-            oldValues.get('cloud-agent-public-tunnels-ingest'),
-            CAPTURE_TIMEOUT_MS,
-            oldMtimes.get('cloud-agent-public-tunnels-ingest')
-          ),
-        ]).then(([workerReady, backendReady, ingestReady]) => {
-          if (workerReady && backendReady && ingestReady) {
+        waitForCloudAgentPublicTunnelCapture(
+          repoRoot,
+          previousPublicTunnelSnapshot,
+          CAPTURE_TIMEOUT_MS
+        ).then(captured => {
+          if (captured) {
             console.log('  Public sandbox tunnel URLs captured');
-            return;
-          }
-          if (!workerReady) {
+          } else {
             console.warn(
-              '  WORKER_URL not captured after 30s - check cloud-agent-public-tunnels window'
-            );
-          }
-          if (!backendReady) {
-            console.warn(
-              '  KILOCODE_BACKEND_BASE_URL not captured after 30s - check cloud-agent-public-tunnels window'
-            );
-          }
-          if (!ingestReady) {
-            console.warn(
-              '  KILO_SESSION_INGEST_URL not captured after 30s - check cloud-agent-public-tunnels window'
+              '  Public sandbox tunnel URLs not captured after 30s - check cloud-agent-public-tunnels window'
             );
           }
         })

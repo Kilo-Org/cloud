@@ -210,7 +210,7 @@ export async function waitForCloudAgentPublicTunnelCapture(
   const envPath = cloudAgentDevVarsPath(repoRoot);
   const results = await Promise.all(
     CLOUD_AGENT_PUBLIC_TUNNEL_KEYS.map(key =>
-      waitForEnvValueChange(envPath, key, previous.values[key], timeoutMs, previous.mtime)
+      waitForEnvValueChange(envPath, key, previous.values[key], timeoutMs)
     )
   );
   return results.every(Boolean);

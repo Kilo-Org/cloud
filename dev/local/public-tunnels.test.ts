@@ -68,6 +68,30 @@ test('waitForCloudAgentPublicTunnelCapture returns true when all three keys chan
   assert.equal(await waitForCloudAgentPublicTunnelCapture(repoRoot, previous, 1000), true);
 });
 
+test('waitForCloudAgentPublicTunnelCapture waits for all sequential URL writes', async () => {
+  const oldValues = [
+    'WORKER_URL=https://old-worker.trycloudflare.com',
+    'KILOCODE_BACKEND_BASE_URL=https://old-backend.trycloudflare.com',
+    'KILO_SESSION_INGEST_URL=https://old-ingest.trycloudflare.com',
+  ];
+  const repoRoot = withTempRepo(oldValues.join('\n'));
+  const envPath = path.join(repoRoot, 'services/cloud-agent-next/.dev.vars');
+  const previous = snapshotCloudAgentPublicTunnelEnv(repoRoot);
+
+  oldValues[0] = 'WORKER_URL=https://new-worker.trycloudflare.com';
+  fs.writeFileSync(envPath, oldValues.join('\n'));
+  fs.utimesSync(envPath, new Date(), new Date(Date.now() + 1000));
+  assert.equal(await waitForCloudAgentPublicTunnelCapture(repoRoot, previous, 200), false);
+
+  oldValues[1] = 'KILOCODE_BACKEND_BASE_URL=https://new-backend.trycloudflare.com';
+  fs.writeFileSync(envPath, oldValues.join('\n'));
+  assert.equal(await waitForCloudAgentPublicTunnelCapture(repoRoot, previous, 200), false);
+
+  oldValues[2] = 'KILO_SESSION_INGEST_URL=https://new-ingest.trycloudflare.com';
+  fs.writeFileSync(envPath, oldValues.join('\n'));
+  assert.equal(await waitForCloudAgentPublicTunnelCapture(repoRoot, previous, 1000), true);
+});
+
 test('waitForCloudAgentPublicTunnelCapture times out when URLs stay the same', async () => {
   const repoRoot = withTempRepo('WORKER_URL=https://worker.trycloudflare.com\n');
   const previous = snapshotCloudAgentPublicTunnelEnv(repoRoot);

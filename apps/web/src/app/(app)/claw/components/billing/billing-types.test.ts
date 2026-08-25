@@ -113,10 +113,6 @@ function createBillingStatus(overrides?: BillingStatusOverrides): ClawBillingSta
             renewalCostSource: null,
             showConversionPrompt: false,
             pendingConversion: false,
-            referralRewards: {
-              totalAppliedMonths: 0,
-              applications: [],
-            },
             ...subscriptionOverrides,
           },
     earlybird: null,

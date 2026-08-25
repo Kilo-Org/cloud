@@ -3,6 +3,9 @@
  * discriminant to narrow string/number leaves or generic prop values. */
 import { isValidElement, type ReactNode } from 'react';
 
+import { i18n } from '@/i18n';
+import { formatList } from '@/lib/format';
+
 /**
  * Spoken text for a rendered markdown node. Strings and numbers are returned
  * verbatim; arrays are joined with a single space; elements use their explicit
@@ -41,7 +44,7 @@ export function linearRowLabel(header: string[], cells: string[]): string {
       parts.push(headerText ? `${headerText}: ${cellText}` : cellText);
     }
   }
-  return parts.join(', ');
+  return formatList(parts, i18n.language);
 }
 
 /**

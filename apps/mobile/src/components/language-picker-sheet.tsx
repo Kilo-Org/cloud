@@ -6,6 +6,7 @@ import {
   FlatList,
   I18nManager,
   Modal,
+  Platform,
   Pressable,
   TextInput,
   View,
@@ -13,8 +14,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
+import { EmptyState } from '@/components/empty-state';
+import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { PickerSheet } from '@/components/picker-sheet';
 import { ChoiceRow } from '@/components/ui/choice-row';
+import { SearchX } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { applyLanguagePreference } from '@/i18n/apply-language';
 import { languageRows } from '@/i18n/language-rows';
@@ -225,9 +229,12 @@ export function LanguagePickerSheet({
             ) : null
           }
           ListEmptyComponent={
-            <Text variant="muted" className="py-8 text-center text-sm">
-              {t('language.noMatches')}
-            </Text>
+            <EmptyState
+              icon={SearchX}
+              placement="top"
+              title={t('language.noMatches')}
+              description={t('agents.sessionList.tryDifferentSearch')}
+            />
           }
           renderItem={({ item }) => (
             <ChoiceRow
@@ -267,7 +274,10 @@ export function LanguagePickerSheet({
         }
       }}
     >
-      <View className="flex-1 justify-end bg-black/40">
+      <AppAwareKeyboardPaddingView
+        className="flex-1 justify-end bg-black/40"
+        keyboardOffset={Platform.OS === 'android' ? insets.bottom : 0}
+      >
         <Pressable
           className="flex-1"
           accessibilityLabel={t('common.cancel')}
@@ -284,7 +294,7 @@ export function LanguagePickerSheet({
         >
           {renderSheetContent()}
         </View>
-      </View>
+      </AppAwareKeyboardPaddingView>
     </Modal>
   );
 }

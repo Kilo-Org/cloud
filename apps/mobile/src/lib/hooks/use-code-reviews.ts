@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { hasInFlightReview, isInFlightReviewStatus } from '@kilocode/app-shared/code-review';
 import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -138,7 +139,7 @@ export async function createManualReviewMutationFn(scope: string, vars: CreateMa
   // used by other code-reviews mutations, so a domain failure still routes
   // to onError without treating a real success payload as a failure.
   if ((result as { success?: boolean }).success === false) {
-    throw new Error((result as { error?: string }).error ?? 'Unknown error');
+    throw new Error((result as { error?: string }).error ?? i18n.t('codeReviewer.unknownError'));
   }
   return result;
 }

@@ -2,6 +2,9 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // app.config.ts imports src/i18n/languages.ts with its extension: the Expo
+    // config loader resolves require('./x.ts') but not the extensionless form.
+    "allowImportingTsExtensions": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
       "@/*": ["./src/*"],

@@ -111,7 +111,7 @@ describe('message attachment render state', () => {
     expect(deleted).toEqual(['file:///cache/kilo-chat-attachments/attachment.txt']);
   });
 
-  it('keeps materialized attachment files after successful Android shares', async () => {
+  it('deletes materialized attachment files after successful Android shares', async () => {
     reactNativeMock.Platform.OS = 'android';
     const deleted: string[] = [];
 
@@ -127,7 +127,7 @@ describe('message attachment render state', () => {
       }
     );
 
-    expect(deleted).toEqual([]);
+    expect(deleted).toEqual(['file:///cache/kilo-chat-attachments/attachment.txt']);
   });
 
   it('deletes materialized attachment files after share failures', async () => {

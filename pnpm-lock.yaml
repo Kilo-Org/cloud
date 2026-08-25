@@ -487,8 +487,8 @@ importers:
         specifier: ~57.0.10
         version: 57.0.10(95016413e10ac4b2f99a030c8fabf35b)
       expo-screen-capture:
-        specifier: ~57.0.1
-        version: 57.0.2(expo@57.0.10)(react@19.2.3)
+        specifier: 57.0.1
+        version: 57.0.1(expo@57.0.10)(react@19.2.3)
       expo-screen-corner-radius:
         specifier: 1.1.0
         version: 1.1.0(expo@57.0.10)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
@@ -12773,8 +12773,8 @@ packages:
       react-server-dom-webpack:
         optional: true
 
-  expo-screen-capture@57.0.2:
-    resolution: {integrity: sha512-Ww8LFdSXuW7YeHc6/DwZd5tOEUqHAsOy4hLrfBxu99pbv+14sD9Lh0ueZeutg4QVktI+u2XJqFjMqyJ0b/5yxA==}
+  expo-screen-capture@57.0.1:
+    resolution: {integrity: sha512-toam1doTc0auN0SzQA2ziamXaDhevvCBxhrGyYdVMpfbmj0+0brm+u/pAUkJJMe/f+l3LvWRwltV0dLaMdiY9A==}
     peerDependencies:
       expo: '*'
       react: '*'
@@ -30294,7 +30294,7 @@ snapshots:
       - supports-color
     optional: true
 
-  expo-screen-capture@57.0.2(expo@57.0.10)(react@19.2.3):
+  expo-screen-capture@57.0.1(expo@57.0.10)(react@19.2.3):
     dependencies:
       expo: 57.0.10(@babel/core@7.29.7)(@expo/metro-runtime@57.0.8)(bufferutil@4.1.0)(expo-router@57.0.10)(react-dom@19.2.6(react@19.2.3))(react-native-worklets@0.10.1(@babel/core@7.29.7)(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native@0.86.2(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(typescript@6.0.3)(utf-8-validate@6.0.6)
       react: 19.2.3

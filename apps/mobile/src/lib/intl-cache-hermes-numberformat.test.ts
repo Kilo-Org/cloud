@@ -6,13 +6,12 @@ describe('Hermes NumberFormat compatibility', () => {
     vi.resetModules();
   });
 
-  it('polyfills currency parts and unit formatting when NumberFormat is missing', async () => {
+  it('polyfills currency parts and unit formatting when NumberFormat and PluralRules are missing', async () => {
     const nativeIntl = Intl;
     vi.stubGlobal('Intl', {
       Collator: nativeIntl.Collator,
       DateTimeFormat: nativeIntl.DateTimeFormat,
       getCanonicalLocales: nativeIntl.getCanonicalLocales,
-      PluralRules: nativeIntl.PluralRules,
     });
 
     const { prewarmIntl } = await import('./intl-cache');

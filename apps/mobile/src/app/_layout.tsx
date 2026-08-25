@@ -69,6 +69,7 @@ import {
   useLanguagePreference,
 } from '@/lib/hooks/use-language-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
+import { prewarmIntl } from '@/lib/intl-cache';
 import {
   captureLaunchDeepLink,
   getPendingDeepLink,
@@ -369,8 +370,10 @@ function RootLayoutNav() {
       }
       try {
         await i18n.changeLanguage(resolved);
+        prewarmIntl(resolved);
       } catch {
         await i18n.changeLanguage('en');
+        prewarmIntl('en');
       }
       void renameAndroidNotificationChannels();
       if (!cancelled) {

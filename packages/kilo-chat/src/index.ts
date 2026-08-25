@@ -1,9 +1,16 @@
 export { KiloChatClient } from './client';
-export { KiloChatApiError, formatKiloChatError } from './errors';
+export {
+  KiloChatApiError,
+  classifyKiloChatError,
+  formatKiloChatError,
+  type KiloChatErrorKind,
+} from './errors';
 export {
   ulidToTimestamp,
   contentBlocksToText,
   contentBlocksPreviewText,
+  contentBlocksAttachmentPreviewLabels,
+  type AttachmentPreviewLabel,
   buildReplyToMessageSnapshot,
   formatFileSize,
   remainingEditableAttachments,

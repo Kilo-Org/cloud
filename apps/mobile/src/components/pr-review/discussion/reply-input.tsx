@@ -21,10 +21,7 @@ import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { type useReplyToCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
-import {
-  isPrOperationPersistenceFailed,
-  PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
-} from '@/lib/pr-review/merge/pr-operation-ledger';
+import { isPrOperationPersistenceFailed } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { trpcClient } from '@/lib/trpc';
 
 /**
@@ -182,7 +179,7 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
       // The ledger persistence-failure marker is retry-blocking: the row never
       // became `reconcile_pending`, so the same key must not be retried.
       if (isPrOperationPersistenceFailed(reply.error)) {
-        setInlineError(PR_OPERATION_PERSISTENCE_FAILED_MESSAGE);
+        setInlineError(i18n.t('prReview.operation.persistenceFailed'));
         setInlineErrorKind('bad-request');
         return;
       }

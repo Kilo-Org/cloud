@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 import {
   type AppStoreKiloPassProduct,
   type BackendStoreKiloPassProduct,
@@ -5,8 +7,7 @@ import {
   type StoreKiloPassProduct,
 } from './store-products';
 
-export const NO_MATCHING_KILO_PASS_PRODUCTS_MESSAGE =
-  'No matching Kilo Pass products were returned by App Store.';
+export const NO_MATCHING_KILO_PASS_PRODUCTS_KEY = 'kiloPass.noMatchingProducts';
 
 export async function loadAppStoreKiloPassProducts(params: {
   fetchStoreProducts: (productSkus: string[]) => Promise<readonly StoreKiloPassProduct[]>;
@@ -31,7 +32,7 @@ export async function loadAppStoreKiloPassProducts(params: {
   });
 
   if (products.length === 0) {
-    throw new Error(NO_MATCHING_KILO_PASS_PRODUCTS_MESSAGE);
+    throw new Error(i18n.t(NO_MATCHING_KILO_PASS_PRODUCTS_KEY));
   }
 
   return products;

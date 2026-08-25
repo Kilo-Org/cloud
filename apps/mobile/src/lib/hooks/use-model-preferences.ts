@@ -3,6 +3,7 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import {
   isLatestMutationGeneration,
   nextMutationGeneration,
@@ -13,7 +14,7 @@ import { trpcClient, useTRPC } from '@/lib/trpc';
 type ModelPreferences = inferRouterOutputs<MobileRouter>['modelPreferences']['get'];
 
 const onError = (error: { message: string }) => {
-  toast.error(error.message || 'Something went wrong');
+  toast.error(error.message || i18n.t('common.somethingWentWrong'));
 };
 
 // Favorites are stored per user (not per organization), so one chain key
@@ -64,7 +65,7 @@ export function useModelPreferences(organizationId: string | undefined) {
       if (context?.previous && isLatestMutationGeneration(hashKey(queryKey), context.generation)) {
         queryClient.setQueryData(queryKey, context.previous);
       }
-      setFavoritesError(error.message || 'Could not update favorites');
+      setFavoritesError(error.message || i18n.t('models.couldNotUpdateFavorites'));
     },
     [queryClient, trpc.modelPreferences.get, input]
   );

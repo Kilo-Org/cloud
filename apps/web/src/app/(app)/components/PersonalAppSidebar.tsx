@@ -27,7 +27,6 @@ import {
   CreditCard,
   MessageSquare,
   Sparkles,
-  Gift,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -124,13 +123,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       title: "What's New",
       icon: Sparkles,
       url: '/claw/changelog',
-    },
-    {
-      title: 'Refer & Earn',
-      subtitle: 'Get 1 Month Free',
-      badge: 'NEW',
-      icon: Gift,
-      url: '/claw/refer',
     },
   ];
 

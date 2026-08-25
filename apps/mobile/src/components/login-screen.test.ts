@@ -284,6 +284,24 @@ describe('login-screen language globe', () => {
     renderer.unmount();
   });
 
+  it('renders the globe after the screen without raising it above the toaster', async () => {
+    const renderer = await mountLoginScreen();
+    const globe = findGlobe(renderer.root);
+    const parent = globe.parent;
+    if (!parent) {
+      throw new Error('language globe parent not found');
+    }
+
+    const scrollViewIndex = parent.children.findIndex(
+      child => typeof child !== 'string' && (child.type as string) === 'ScrollView'
+    );
+    expect(scrollViewIndex).toBeGreaterThanOrEqual(0);
+    expect(parent.children.indexOf(globe)).toBeGreaterThan(scrollViewIndex);
+    expect(globe.props.className).not.toMatch(/\bz-/);
+
+    renderer.unmount();
+  });
+
   it('disables the globe during pending auth', async () => {
     deviceAuth.status = 'pending';
     deviceAuth.code = 'UC-1234';

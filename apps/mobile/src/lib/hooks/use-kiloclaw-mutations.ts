@@ -2,6 +2,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
+import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type ClawInstance } from '@/lib/hooks/use-instance-context';
 import { renameKiloClawInstance } from '@/lib/kiloclaw-display';
@@ -9,7 +10,7 @@ import { useTRPC } from '@/lib/trpc';
 import { asyncNoop } from '@/lib/utils';
 
 const onMutationError = (error: { message: string }) => {
-  announcingToast.error(error.message || 'Something went wrong');
+  announcingToast.error(error.message || i18n.t('common.somethingWentWrong'));
 };
 
 const TrpcHttpStatusErrorSchema = z.looseObject({

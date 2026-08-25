@@ -1,6 +1,7 @@
 import {
   getSecurityAnalysisPresentation,
   getSecurityDeadlinePresentation,
+  getSecurityFindingAnalysisState,
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { ExternalLink } from '@/components/ui/icons';
@@ -19,7 +20,15 @@ import { i18n } from '@/i18n';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
-import { capitalize, cn } from '@/lib/utils';
+import { getDeadlineCopy, getSecurityAnalysisLabel } from '@/lib/security-agent-copy';
+import { cn } from '@/lib/utils';
+
+const SEVERITY_KEYS = {
+  critical: 'securityAgent.sla.critical',
+  high: 'securityAgent.sla.high',
+  medium: 'securityAgent.sla.medium',
+  low: 'securityAgent.sla.low',
+} satisfies Record<string, string>;
 
 const SEVERITY_TEXT_CLASS = {
   critical: 'text-destructive',
@@ -169,8 +178,13 @@ export function FindingRow({
   const { t } = useTranslation();
 
   const analysis = getSecurityAnalysisPresentation(finding);
+  const analysisState = getSecurityFindingAnalysisState(finding.analysis_status, finding.analysis);
+  const analysisLabel = getSecurityAnalysisLabel(analysisState);
   const deadline = slaEnabled ? getSecurityDeadlinePresentation(finding) : null;
+  const deadlineLabel = deadline ? getDeadlineCopy(deadline.state).label : '';
   const nextAction = getNextActionLabel(finding);
+  const severityKey = lookup(SEVERITY_KEYS, finding.severity);
+  const severityLabel = severityKey ? t(severityKey) : finding.severity;
 
   const AnalysisIcon = FINDING_ICONS[analysis.icon];
   const DeadlineIcon = deadline ? FINDING_ICONS[deadline.icon] : null;
@@ -187,17 +201,17 @@ export function FindingRow({
 
   const accessibilityLabel = deadline
     ? t('securityAgent.findingRow.a11yWithDeadline', {
-        severity: capitalize(finding.severity),
+        severity: severityLabel,
         title: finding.title,
         repo: finding.repo_full_name,
-        analysis: analysis.label,
-        deadline: deadline.label,
+        analysis: analysisLabel,
+        deadline: deadlineLabel,
       })
     : t('securityAgent.findingRow.a11y', {
-        severity: capitalize(finding.severity),
+        severity: severityLabel,
         title: finding.title,
         repo: finding.repo_full_name,
-        analysis: analysis.label,
+        analysis: analysisLabel,
       });
 
   return (
@@ -216,7 +230,7 @@ export function FindingRow({
             lookup(SEVERITY_TEXT_CLASS, finding.severity) ?? 'text-muted-foreground'
           )}
         >
-          {capitalize(finding.severity)}
+          {severityLabel}
         </Text>
         <Text className="text-sm font-medium" numberOfLines={2}>
           {finding.title}
@@ -233,7 +247,7 @@ export function FindingRow({
               spinning={Boolean(analysis.spinning)}
             />
             <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[analysis.tone])}>
-              {analysis.label}
+              {analysisLabel}
             </Text>
           </View>
           {deadline && DeadlineIcon && (
@@ -245,7 +259,7 @@ export function FindingRow({
                 spinning={Boolean(deadline.spinning)}
               />
               <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[deadline.tone])}>
-                {deadline.label}
+                {deadlineLabel}
               </Text>
             </View>
           )}

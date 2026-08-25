@@ -96,13 +96,14 @@ import {
   discardUnstoredSharePayload,
   normalizeShareIntent,
   peekSharePayload,
+  persistSharePayloadsNow,
   putSharePayload,
   restoreSharePayloads,
   setSharePersistUserId,
   type ShareId,
   type SharePayload,
 } from '@/lib/share-payload';
-import { restoreShareNavigation } from '@/lib/share-navigation';
+import { persistShareNavigationNow, restoreShareNavigation } from '@/lib/share-navigation';
 import {
   flushDraft,
   isStringDraft,
@@ -427,6 +428,21 @@ function RootLayoutNav() {
   // Bumped by the ingest arm and the gate consume so the cold-start restore can
   // detect any live arm/consume during its async reads and skip the fill.
   const pendingShareIdEpochRef = useRef(0);
+
+  // Flush a share staged while the account id was still loading: the ingest
+  // effect persisted nothing (userId was falsy), so once userId resolves the
+  // staged payload map, navigation queue, and pending id are written to durable
+  // drafts. A signed-out share never reaches this branch (userId stays null),
+  // so it remains in-memory only. Declared after `pendingShareIdRef` so the
+  // closure references an already-declared const.
+  useEffect(() => {
+    if (userId && pendingShareIdRef.current !== null) {
+      void persistSharePayloadsNow();
+      void persistShareNavigationNow();
+      saveDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, pendingShareIdRef.current);
+      void flushDraft(userId, PENDING_SHARE_ID_DRAFT_KEY);
+    }
+  }, [userId]);
 
   // Cold-start share restore. Order matters: payloads first, then the
   // navigation queue (deliveries point at restored payloads), then the pending

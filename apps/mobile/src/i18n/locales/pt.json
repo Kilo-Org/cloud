@@ -1723,7 +1723,8 @@
       "centOne": "cêntimo",
       "centOther": "cêntimos",
       "dollarOne": "dólar",
-      "dollarOther": "dólares"
+      "dollarOther": "dólares",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Não foi possível abrir o GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Precisa de melhorias",
     "sorryTitle": "Lamentamos ouvir isso!",
     "sorryMessage": "Por favor, diga-nos o que precisa de ser melhor. O engenheiro responsável pela aplicação lê todos os relatórios!",
-    "emailUs": "Enviar email"
+    "emailUs": "Enviar email",
+    "neutralTitle": "Avalie o app Kilo",
+    "rateTheApp": "Avalie o app",
+    "sendFeedback": "Enviar feedback"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Organização indisponível",
       "selectDescription": "Escolha uma organização a partir do seu perfil para continuar.",
       "selectOrganization": "Selecionar uma organização",
-      "unavailableDescription": "Esta organização já não está disponível. Escolha uma a partir do seu perfil para continuar."
+      "unavailableDescription": "Esta organização já não está disponível. Escolha uma a partir do seu perfil para continuar.",
+      "accessDeniedTitle": "Acesso negado",
+      "accessDeniedDescription": "Você não tem acesso a esta organização."
     },
     "creditActivity": {
       "emptyDescription": "Compras, uso e ajustes de crédito desta organização aparecerão aqui conforme ocorrerem.",

@@ -1723,7 +1723,8 @@
       "centOne": "centas",
       "centOther": "centai",
       "dollarOne": "doleris",
-      "dollarOther": "doleriai"
+      "dollarOther": "doleriai",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nepavyko atidaryti GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Reikia patobulinti",
     "sorryTitle": "Mums gaila tai girdėti!",
     "sorryMessage": "Praneškite mums, ką reikia patobulinti. Už programą atsakingas inžinierius perskaito kiekvieną ataskaitą!",
-    "emailUs": "Parašykite mums"
+    "emailUs": "Parašykite mums",
+    "neutralTitle": "Įvertinkite Kilo programėlę",
+    "rateTheApp": "Įvertinkite programėlę",
+    "sendFeedback": "Siųsti atsiliepimą"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Organizacija neprieinama",
       "selectDescription": "Pasirinkite organizaciją iš savo profilio, kad tęstumėte.",
       "selectOrganization": "Pasirinkti organizaciją",
-      "unavailableDescription": "Ši organizacija nebėra prieinama. Pasirinkite iš savo profilio, kad tęstumėte."
+      "unavailableDescription": "Ši organizacija nebėra prieinama. Pasirinkite iš savo profilio, kad tęstumėte.",
+      "accessDeniedTitle": "Prieiga uždrausta",
+      "accessDeniedDescription": "Neturite prieigos prie šios organizacijos."
     },
     "creditActivity": {
       "emptyDescription": "Šios organizacijos pirkiniai, naudojimas ir kreditų koregavimai čia pasirodys, kai jie įvyks.",

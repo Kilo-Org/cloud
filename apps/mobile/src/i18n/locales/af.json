@@ -1723,7 +1723,8 @@
       "centOne": "sent",
       "centOther": "sent",
       "dollarOne": "dollar",
-      "dollarOther": "dollars"
+      "dollarOther": "dollars",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kon GitHub nie oopmaak nie",
@@ -2522,7 +2523,10 @@
     "needsWork": "Moet werk",
     "sorryTitle": "Ons is jammer om dit te hoor!",
     "sorryMessage": "Laat ons asseblief weet wat beter moet word. Die ingenieur in beheer van die app lees elke verslag!",
-    "emailUs": "E-pos ons"
+    "emailUs": "E-pos ons",
+    "neutralTitle": "Gradeer die Kilo-app",
+    "rateTheApp": "Gradeer die app",
+    "sendFeedback": "Stuur terugvoer"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Organisasie onbeskikbaar",
       "selectDescription": "Kies 'n organisasie uit jou profiel om voort te gaan.",
       "selectOrganization": "Kies 'n organisasie",
-      "unavailableDescription": "Hierdie organisasie is nie meer beskikbaar nie. Kies een uit jou profiel om voort te gaan."
+      "unavailableDescription": "Hierdie organisasie is nie meer beskikbaar nie. Kies een uit jou profiel om voort te gaan.",
+      "accessDeniedTitle": "Toegang geweier",
+      "accessDeniedDescription": "Jy het nie toegang tot hierdie organisasie nie."
     },
     "creditActivity": {
       "emptyDescription": "Aankope, gebruik en kredietaanpassings vir hierdie organisasie sal hier verskyn soos dit gebeur.",

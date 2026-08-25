@@ -1723,7 +1723,8 @@
       "centOne": "ცენტი",
       "centOther": "ცენტი",
       "dollarOne": "დოლარი",
-      "dollarOther": "დოლარი"
+      "dollarOther": "დოლარი",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ის გახსნა ვერ მოხერხდა",
@@ -2522,7 +2523,10 @@
     "needsWork": "გასაუმჯობესებელია",
     "sorryTitle": "ბოდიშს ვიხდით, რომ ეს გვესმის!",
     "sorryMessage": "გთხოვთ, გვითხრათ, რა უნდა გაუმჯობესდეს. აპზე პასუხისმგებელი ინჟინერი ყველა ანგარიშს კითხულობს!",
-    "emailUs": "მოგვწერეთ"
+    "emailUs": "მოგვწერეთ",
+    "neutralTitle": "შეაფასეთ Kilo აპი",
+    "rateTheApp": "აპის შეფასება",
+    "sendFeedback": "გამოხმაურების გაგზავნა"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "ორგანიზაცია მიუწვდომელია",
       "selectDescription": "გასაგრძელებლად აირჩიეთ ორგანიზაცია თქვენი პროფილიდან.",
       "selectOrganization": "აირჩიეთ ორგანიზაცია",
-      "unavailableDescription": "ეს ორგანიზაცია აღარ არის ხელმისაწვდომი. გასაგრძელებლად აირჩიეთ ერთი თქვენი პროფილიდან."
+      "unavailableDescription": "ეს ორგანიზაცია აღარ არის ხელმისაწვდომი. გასაგრძელებლად აირჩიეთ ერთი თქვენი პროფილიდან.",
+      "accessDeniedTitle": "წვდომა აკრძალულია",
+      "accessDeniedDescription": "თქვენ არ გაქვთ წვდომა ამ ორგანიზაციაზე."
     },
     "creditActivity": {
       "emptyDescription": "ამ ორგანიზაციის შესყიდვები, გამოყენება და კრედიტის კორექტირებები აქ გამოჩნდება მათი წარმოქმნისას.",

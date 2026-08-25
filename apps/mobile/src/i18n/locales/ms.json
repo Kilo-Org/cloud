@@ -1723,7 +1723,8 @@
       "centOne": "sen",
       "centOther": "sen",
       "dollarOne": "dolar",
-      "dollarOther": "dolar"
+      "dollarOther": "dolar",
+      "pullRequest": "permintaan tarik {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Tidak dapat membuka GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Perlu diperbaiki",
     "sorryTitle": "Kami minta maaf mendengarnya!",
     "sorryMessage": "Sila beritahu kami apa yang perlu diperbaiki. Jurutera yang bertanggungjawab ke atas apl membaca setiap laporan!",
-    "emailUs": "E-mel kami"
+    "emailUs": "E-mel kami",
+    "neutralTitle": "Nilaikan aplikasi Kilo",
+    "rateTheApp": "Nilaikan aplikasi",
+    "sendFeedback": "Hantar maklum balas"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Organisasi tidak tersedia",
       "selectDescription": "Pilih organisasi daripada profil anda untuk meneruskan.",
       "selectOrganization": "Pilih organisasi",
-      "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih satu daripada profil anda untuk meneruskan."
+      "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih satu daripada profil anda untuk meneruskan.",
+      "accessDeniedTitle": "Akses dinafikan",
+      "accessDeniedDescription": "Anda tidak mempunyai akses kepada organisasi ini."
     },
     "creditActivity": {
       "emptyDescription": "Pembelian, penggunaan, dan pelarasan kredit untuk organisasi ini akan muncul di sini apabila ia berlaku.",

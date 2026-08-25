@@ -1723,7 +1723,8 @@
       "centOne": "cent",
       "centOther": "cent",
       "dollarOne": "dolara",
-      "dollarOther": "dolara"
+      "dollarOther": "dolara",
+      "pullRequest": "Pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Tsy afaka nanokatra ny GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Mila fanatsarana",
     "sorryTitle": "Malahelo izahay mandre izany!",
     "sorryMessage": "Ampahafantaro anay azafady izay tokony ho tsara kokoa. Mamaky ny tatitra rehetra ny injenieran'ny app!",
-    "emailUs": "Alefaso email"
+    "emailUs": "Alefaso email",
+    "neutralTitle": "Laharam-pahaizana ny fampiharana Kilo",
+    "rateTheApp": "Laharam-pahaizana ny fampiharana",
+    "sendFeedback": "Alefaso ny hevitrao"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Tsy misy ny orinasa",
       "selectDescription": "Fidio orinasa avy amin'ny profily mba hanohy.",
       "selectOrganization": "Fidio orinasa",
-      "unavailableDescription": "Tsy misy intsony ity orinasa ity. Fidio iray avy amin'ny profily mba hanohy."
+      "unavailableDescription": "Tsy misy intsony ity orinasa ity. Fidio iray avy amin'ny profily mba hanohy.",
+      "accessDeniedTitle": "Tsy mahazo miditra",
+      "accessDeniedDescription": "Tsy manana alalana hiditra amin'ity fikambanana ity ianao."
     },
     "creditActivity": {
       "emptyDescription": "Ny fividianana, fampiasana, ary fanitsiana crédit ho an'ity orinasa ity dia hiseho eto rehefa mitranga.",

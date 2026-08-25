@@ -1723,7 +1723,8 @@
       "centOne": "sent",
       "centOther": "senti",
       "dollarOne": "dollar",
-      "dollarOther": "dollarit"
+      "dollarOther": "dollarit",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub'i avamine ebaõnnestus",
@@ -2522,7 +2523,10 @@
     "needsWork": "Vajab täiendamist",
     "sorryTitle": "Meil on kahju seda kuulda!",
     "sorryMessage": "Andke meile teada, mida tuleks parandada. Rakenduse eest vastutav insener loeb iga üksikut aruannet!",
-    "emailUs": "Kirjutage meile"
+    "emailUs": "Kirjutage meile",
+    "neutralTitle": "Hinda Kilo rakendust",
+    "rateTheApp": "Hinda rakendust",
+    "sendFeedback": "Saada tagasisidet"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Organisatsioon pole saadaval",
       "selectDescription": "Jätkamiseks valige organisatsioon oma profiilist.",
       "selectOrganization": "Valige organisatsioon",
-      "unavailableDescription": "See organisatsioon pole enam saadaval. Jätkamiseks valige üks oma profiilist."
+      "unavailableDescription": "See organisatsioon pole enam saadaval. Jätkamiseks valige üks oma profiilist.",
+      "accessDeniedTitle": "Juurdepääs keelatud",
+      "accessDeniedDescription": "Sul puudub juurdepääs sellele organisatsioonile."
     },
     "creditActivity": {
       "emptyDescription": "Ostud, kasutus ja krediidikohandused selle organisatsiooni jaoks ilmuvad siia, kui need toimuvad.",

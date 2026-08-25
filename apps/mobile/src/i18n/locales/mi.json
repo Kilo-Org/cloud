@@ -1723,7 +1723,8 @@
       "centOne": "heneti",
       "centOther": "ngā heneti",
       "dollarOne": "tāra",
-      "dollarOther": "ngā tāra"
+      "dollarOther": "ngā tāra",
+      "pullRequest": "tono kumea {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kāore i taea te whakatuwhera GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Me mahi anō",
     "sorryTitle": "E aroha ana mātou!",
     "sorryMessage": "Tēnā whakamōhio mai ki a mātou te mea hei whakapai. Ka pānui te pūkaha o te taupānga i ia pūrongo!",
-    "emailUs": "Īmēra mai"
+    "emailUs": "Īmēra mai",
+    "neutralTitle": "Whakatau i te taupānga Kilo",
+    "rateTheApp": "Whakatauria te taupānga",
+    "sendFeedback": "Tukuna whakahoki kōrero"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Kāore e wātea ana te whakahaere",
       "selectDescription": "Kōwhiri he whakahaere mai i tō kōtaha kia haere tonu.",
       "selectOrganization": "Kōwhiri he whakahaere",
-      "unavailableDescription": "Kāore tēnei whakahaere e wātea ana. Kōwhiri tētahi mai i tō kōtaha kia haere tonu."
+      "unavailableDescription": "Kāore tēnei whakahaere e wātea ana. Kōwhiri tētahi mai i tō kōtaha kia haere tonu.",
+      "accessDeniedTitle": "Kāore te uru",
+      "accessDeniedDescription": "Kāore ō whakaaetanga ki tēnei whakahaere."
     },
     "creditActivity": {
       "emptyDescription": "Ka puta ki konei ngā hokonga, te whakamahinga, me ngā whakarerekē whiwhinga mō tēnei whakahaere i a rātou e tupu ana.",

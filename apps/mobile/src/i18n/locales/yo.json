@@ -1723,7 +1723,8 @@
       "centOne": "centi",
       "centOther": "awọn centi",
       "dollarOne": "dọla",
-      "dollarOther": "awọn dọla"
+      "dollarOther": "awọn dọla",
+      "pullRequest": "ẹ̀bẹ̀ yíyọ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ko le ṣii GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Nilo iṣẹ",
     "sorryTitle": "A binu lati gbọ iyẹn!",
     "sorryMessage": "Jọwọ jẹ ki a mọ ohun ti o nilo lati dara. Ẹlẹrọ ti n ṣakoso app ka gbogbo ijabọ kan!",
-    "emailUs": "Fi imeeli ranṣẹ si wa"
+    "emailUs": "Fi imeeli ranṣẹ si wa",
+    "neutralTitle": "Ṣe ìdìwọ́n ohun èlò Kilo",
+    "rateTheApp": "Ṣe ìdìwọ́n ohun èlò náà",
+    "sendFeedback": "Fi èsì ránṣẹ́"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Ajọ ko si",
       "selectDescription": "Yan ajọ lati profaìlì rẹ lati tẹsiwaju.",
       "selectOrganization": "Yan ajọ",
-      "unavailableDescription": "Ajọ yii ko si mọ. Yan ọkan lati profaìlì rẹ lati tẹsiwaju."
+      "unavailableDescription": "Ajọ yii ko si mọ. Yan ọkan lati profaìlì rẹ lati tẹsiwaju.",
+      "accessDeniedTitle": "A kọ̀ sí wíwọlé",
+      "accessDeniedDescription": "O kò ní àǹfààní sí àjọ yìí."
     },
     "creditActivity": {
       "emptyDescription": "Awọn rira, lilo, ati awọn atunṣe kirẹditi fun ajọ yii yoo han nibi bi wọn ṣe n ṣẹlẹ.",

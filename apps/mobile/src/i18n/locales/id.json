@@ -1351,7 +1351,8 @@
       "centOne": "sen",
       "centOther": "sen",
       "dollarOne": "dolar",
-      "dollarOther": "dolar"
+      "dollarOther": "dolar",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Kami tidak dapat memulai penyiapan Aplikasi GitHub. Silakan coba lagi.",
@@ -2519,7 +2520,9 @@
       "organizationUnavailable": "Organisasi tidak tersedia",
       "selectDescription": "Pilih organisasi dari profil Anda untuk melanjutkan.",
       "selectOrganization": "Pilih organisasi",
-      "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih salah satu dari profil Anda untuk melanjutkan."
+      "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih salah satu dari profil Anda untuk melanjutkan.",
+      "accessDeniedTitle": "Akses ditolak",
+      "accessDeniedDescription": "Anda tidak memiliki akses ke organisasi ini."
     },
     "creditActivity": {
       "emptyDescription": "Pembelian, penggunaan, dan penyesuaian kredit untuk organisasi ini akan muncul di sini seiring terjadinya.",
@@ -2654,7 +2657,10 @@
     "promptTitle": "Bagaimana pendapat Anda tentang aplikasi Kilo?",
     "rateKilo": "Beri Nilai Kilo",
     "sorryMessage": "Beri tahu kami apa yang perlu diperbaiki. Insinyur yang menangani aplikasi membaca setiap laporan!",
-    "sorryTitle": "Kami menyesal mendengarnya!"
+    "sorryTitle": "Kami menyesal mendengarnya!",
+    "neutralTitle": "Nilai aplikasi Kilo",
+    "rateTheApp": "Nilai aplikasinya",
+    "sendFeedback": "Kirim masukan"
   },
   "authErrors": {
     "emailAlreadyUsed": "Akun dengan email ini sudah ada dengan metode masuk yang berbeda. Coba metode lain atau gunakan '$t(login.moreSignInOptions)'.",

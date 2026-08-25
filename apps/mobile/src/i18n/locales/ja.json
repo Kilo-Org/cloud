@@ -1351,7 +1351,8 @@
       "centOne": "セント",
       "centOther": "セント",
       "dollarOne": "ドル",
-      "dollarOther": "ドル"
+      "dollarOther": "ドル",
+      "pullRequest": "プルリクエスト {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub Appのセットアップを開始できませんでした。もう一度お試しください。",
@@ -2519,7 +2520,9 @@
       "organizationUnavailable": "組織を利用できません",
       "selectDescription": "続行するには、プロフィールから組織を選択してください。",
       "selectOrganization": "組織を選択",
-      "unavailableDescription": "この組織は利用できなくなりました。続行するには、プロフィールから組織を選択してください。"
+      "unavailableDescription": "この組織は利用できなくなりました。続行するには、プロフィールから組織を選択してください。",
+      "accessDeniedTitle": "アクセス拒否",
+      "accessDeniedDescription": "この組織にアクセスする権限がありません。"
     },
     "creditActivity": {
       "emptyDescription": "この組織の購入、使用、クレジット調整は、発生するとここに表示されます。",
@@ -2654,7 +2657,10 @@
     "promptTitle": "Kiloアプリはいかがですか？",
     "rateKilo": "Kiloを評価",
     "sorryMessage": "どこを改善すべきかお知らせください。アプリ担当のエンジニアがすべての報告を読んでいます！",
-    "sorryTitle": "それは残念です。"
+    "sorryTitle": "それは残念です。",
+    "neutralTitle": "Kiloアプリを評価",
+    "rateTheApp": "アプリを評価",
+    "sendFeedback": "フィードバックを送信"
   },
   "authErrors": {
     "emailAlreadyUsed": "このメールアドレスのアカウントは、別のサインイン方法ですでに存在します。別の方法を試すか、[$t(login.moreSignInOptions)] を使用してください。",

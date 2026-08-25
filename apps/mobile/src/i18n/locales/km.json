@@ -1723,7 +1723,8 @@
       "centOne": "សេន",
       "centOther": "សេន",
       "dollarOne": "ដុល្លារ",
-      "dollarOther": "ដុល្លារ"
+      "dollarOther": "ដុល្លារ",
+      "pullRequest": "សំណើទាញ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "មិនអាចបើក GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "ត្រូវការកែលម្អ",
     "sorryTitle": "យើងសុំទោសដែលបានឮដូច្នេះ!",
     "sorryMessage": "សូមប្រាប់យើងពីអ្វីដែលត្រូវកែលម្អ។ វិស្វករដែលទទួលបន្ទុកកម្មវិធីអានរាល់របាយការណ៍!",
-    "emailUs": "ផ្ញើអ៊ីមែលមកយើង"
+    "emailUs": "ផ្ញើអ៊ីមែលមកយើង",
+    "neutralTitle": "វាយតម្លៃកម្មវិធី Kilo",
+    "rateTheApp": "វាយតម្លៃកម្មវិធី",
+    "sendFeedback": "ផ្ញើមតិ"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "អង្គការមិនអាចប្រើបាន",
       "selectDescription": "ជ្រើសរើសអង្គការពីប្រវត្តិរូបរបស់អ្នកដើម្បីបន្ត។",
       "selectOrganization": "ជ្រើសរើសអង្គការ",
-      "unavailableDescription": "អង្គការនេះលែងមានទៀតហើយ។ ជ្រើសរើសមួយពីប្រវត្តិរូបរបស់អ្នកដើម្បីបន្ត។"
+      "unavailableDescription": "អង្គការនេះលែងមានទៀតហើយ។ ជ្រើសរើសមួយពីប្រវត្តិរូបរបស់អ្នកដើម្បីបន្ត។",
+      "accessDeniedTitle": "ការចូលប្រើត្រូវបានបដិសេធ",
+      "accessDeniedDescription": "អ្នកមិនមានសិទ្ធិចូលប្រើអង្គការនេះទេ។"
     },
     "creditActivity": {
       "emptyDescription": "ការទិញ ការប្រើប្រាស់ និងការកែតម្រូវឥណទានសម្រាប់អង្គការនេះនឹងបង្ហាញនៅទីនេះនៅពេលវាកើតឡើង។",

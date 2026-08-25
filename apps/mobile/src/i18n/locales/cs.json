@@ -1723,7 +1723,8 @@
       "centOne": "cent",
       "centOther": "centů",
       "dollarOne": "dolar",
-      "dollarOther": "dolarů"
+      "dollarOther": "dolarů",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub se nepodařilo otevřít",
@@ -2522,7 +2523,10 @@
     "needsWork": "Vyžaduje zlepšení",
     "sorryTitle": "Je nám líto, že to slyšíme!",
     "sorryMessage": "Dejte nám prosím vědět, co by mělo být lepší. Inženýr odpovědný za aplikaci čte každou jednotlivou zprávu!",
-    "emailUs": "Napište nám e-mail"
+    "emailUs": "Napište nám e-mail",
+    "neutralTitle": "Ohodnoťte aplikaci Kilo",
+    "rateTheApp": "Ohodnoťte aplikaci",
+    "sendFeedback": "Odeslat zpětnou vazbu"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Organizace není k dispozici",
       "selectDescription": "Pro pokračování vyberte organizaci ze svého profilu.",
       "selectOrganization": "Vyberte organizaci",
-      "unavailableDescription": "Tato organizace již není k dispozici. Pro pokračování vyberte jednu ze svého profilu."
+      "unavailableDescription": "Tato organizace již není k dispozici. Pro pokračování vyberte jednu ze svého profilu.",
+      "accessDeniedTitle": "Přístup odepřen",
+      "accessDeniedDescription": "Nemáte přístup do této organizace."
     },
     "creditActivity": {
       "emptyDescription": "Nákupy, využití a úpravy kreditů pro tuto organizaci se zde zobrazí, jakmile nastanou.",

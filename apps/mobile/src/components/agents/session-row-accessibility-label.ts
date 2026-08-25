@@ -93,6 +93,17 @@ type SessionRowAccessibilityLabelInputs = {
    */
   meta?: string | null;
   /**
+   * Branch provenance text visible below the title. Spoken after `title`
+   * (and `needs input` when set) and before the pull-request phrase.
+   */
+  subtitle?: string | null;
+  /**
+   * Associated pull-request number. When set, spoken as
+   * `pull request <number>` after the branch text. Callers omit it for
+   * rows that do not show the PR mark.
+   */
+  prNumber?: number | null;
+  /**
    * Backend `created_on_platform` string. When truthy, appended as the
    * FINAL spoken part (`from ${platformLabel(platform)}`). The caller
    * gates this: only pass when an icon is rendered, not needs-input, and
@@ -105,10 +116,11 @@ type SessionRowAccessibilityLabelInputs = {
 /**
  * Compose the screen-reader label for a `SessionRow`, mirroring its visible
  * content in the order the row renders parts: title, then `needs input`
- * (only when the needs-input eyebrow is shown), then the always-visible
- * left-eyebrow badge, then the meta text (only when the row visibly
- * renders meta), then an optional platform origin (`from <LABEL>`). Empty
- * parts are skipped; the order is fixed.
+ * (only when the needs-input eyebrow is shown), then the branch subtitle
+ * (when present), then the `pull request <number>` phrase (when `prNumber`
+ * is set), then the always-visible left-eyebrow badge, then the meta text
+ * (only when the row visibly renders meta), then an optional platform origin
+ * (`from <LABEL>`). Empty parts are skipped; the order is fixed.
  *
  * Three exclusive variants, aligned with `selectSessionRowEyebrowRight`:
  *   - **needs-input variant**  (`needs-input` eyebrow):
@@ -127,11 +139,19 @@ export function sessionRowAccessibilityLabel({
   needsInput,
   badge,
   meta,
+  subtitle,
+  prNumber,
   platform,
 }: SessionRowAccessibilityLabelInputs): string {
   const parts: string[] = [title];
   if (needsInput) {
     parts.push(i18n.t('agents.sessionRow.needsInput'));
+  }
+  if (subtitle) {
+    parts.push(subtitle);
+  }
+  if (prNumber != null) {
+    parts.push(i18n.t('agents.sessionRow.pullRequest', { number: prNumber }));
   }
   if (badge) {
     parts.push(badge);

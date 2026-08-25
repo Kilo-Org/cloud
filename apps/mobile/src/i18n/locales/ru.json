@@ -1351,7 +1351,8 @@
       "centOne": "цент",
       "centOther": "центов",
       "dollarOne": "доллар",
-      "dollarOther": "долларов"
+      "dollarOther": "долларов",
+      "pullRequest": "запрос на слияние {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Не удалось начать настройку GitHub App. Попробуйте снова.",
@@ -2519,7 +2520,9 @@
       "organizationUnavailable": "Организация недоступна",
       "selectDescription": "Выберите организацию из вашего профиля, чтобы продолжить.",
       "selectOrganization": "Выбрать организацию",
-      "unavailableDescription": "Эта организация больше недоступна. Выберите другую из вашего профиля, чтобы продолжить."
+      "unavailableDescription": "Эта организация больше недоступна. Выберите другую из вашего профиля, чтобы продолжить.",
+      "accessDeniedTitle": "Доступ запрещен",
+      "accessDeniedDescription": "У вас нет доступа к этой организации."
     },
     "creditActivity": {
       "emptyDescription": "Покупки, использование и изменения кредитов этой организации будут появляться здесь по мере возникновения.",
@@ -2654,7 +2657,10 @@
     "promptTitle": "Как вам приложение Kilo?",
     "rateKilo": "Оценить Kilo",
     "sorryMessage": "Пожалуйста, расскажите, что можно улучшить. Инженер, отвечающий за приложение, читает каждый отчет!",
-    "sorryTitle": "Нам жаль это слышать!"
+    "sorryTitle": "Нам жаль это слышать!",
+    "neutralTitle": "Оцените приложение Kilo",
+    "rateTheApp": "Оцените приложение",
+    "sendFeedback": "Отправить отзыв"
   },
   "authErrors": {
     "emailAlreadyUsed": "Аккаунт с этим email уже существует с другим способом входа. Попробуйте другой способ или используйте «$t(login.moreSignInOptions)».",

@@ -1723,7 +1723,8 @@
       "centOne": "cent",
       "centOther": "cents",
       "dollarOne": "dollar",
-      "dollarOther": "dollars"
+      "dollarOther": "dollars",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Could not open GitHub",
@@ -2522,10 +2523,15 @@
     "needsWork": "Needs work",
     "sorryTitle": "We're sorry to hear that!",
     "sorryMessage": "Please let us know what needs to be better. The engineer in charge of the app reads every single report!",
-    "emailUs": "Email us"
+    "emailUs": "Email us",
+    "neutralTitle": "Rate the Kilo app",
+    "rateTheApp": "Rate the app",
+    "sendFeedback": "Send feedback"
   },
   "organization": {
     "boundary": {
+      "accessDeniedTitle": "Access denied",
+      "accessDeniedDescription": "You do not have access to this organization.",
       "backToProfile": "Back to profile",
       "loadErrorMessage": "Check your connection and try again.",
       "loadErrorTitle": "Couldn't load your organizations",

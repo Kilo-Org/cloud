@@ -1723,7 +1723,8 @@
       "centOne": "цент",
       "centOther": "цент",
       "dollarOne": "доллар",
-      "dollarOther": "доллар"
+      "dollarOther": "доллар",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ыг нээх боломжгүй",
@@ -2522,7 +2523,10 @@
     "needsWork": "Сайжруулах шаардлагатай",
     "sorryTitle": "Сонсоход харамсалтай байна!",
     "sorryMessage": "Юуг сайжруулах шаардлагатайг бидэнд мэдэгдэнэ үү. Аппыг хариуцсан инженер тайлан бүрийг уншдаг!",
-    "emailUs": "Бидэнд имэйл илгээх"
+    "emailUs": "Бидэнд имэйл илгээх",
+    "neutralTitle": "Kilo апп-ыг үнэлэх",
+    "rateTheApp": "Апп-ыг үнэлэх",
+    "sendFeedback": "Санал хүсэлт илгээх"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Байгууллага боломжгүй",
       "selectDescription": "Үргэлжлүүлэхийн тулд профайлаасаа байгууллага сонгоно уу.",
       "selectOrganization": "Байгууллага сонгох",
-      "unavailableDescription": "Энэ байгууллага цаашид боломжгүй. Үргэлжлүүлэхийн тулд профайлаасаа нэгийг сонгоно уу."
+      "unavailableDescription": "Энэ байгууллага цаашид боломжгүй. Үргэлжлүүлэхийн тулд профайлаасаа нэгийг сонгоно уу.",
+      "accessDeniedTitle": "Хандалтыг хориглосон",
+      "accessDeniedDescription": "Танд энэ байгууллагад хандах эрх байхгүй."
     },
     "creditActivity": {
       "emptyDescription": "Энэ байгууллагын худалдан авалт, ашиглалт, кредитийн тохируулгууд гарсан үедээ энд харагдана.",

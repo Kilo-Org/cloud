@@ -1351,7 +1351,8 @@
       "centOne": "سنت",
       "centOther": "سنتات",
       "dollarOne": "دولار",
-      "dollarOther": "دولارات"
+      "dollarOther": "دولارات",
+      "pullRequest": "طلب سحب {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "تعذّر بدء إعداد تطبيق GitHub. يرجى المحاولة مرة أخرى.",
@@ -2519,7 +2520,9 @@
       "organizationUnavailable": "المؤسسة غير متاحة",
       "selectDescription": "اختر مؤسسة من ملفك الشخصي للمتابعة.",
       "selectOrganization": "اختيار مؤسسة",
-      "unavailableDescription": "لم تعد هذه المؤسسة متاحة. اختر واحدة من ملفك الشخصي للمتابعة."
+      "unavailableDescription": "لم تعد هذه المؤسسة متاحة. اختر واحدة من ملفك الشخصي للمتابعة.",
+      "accessDeniedTitle": "تم رفض الوصول",
+      "accessDeniedDescription": "ليس لديك حق الوصول إلى هذه المؤسسة."
     },
     "creditActivity": {
       "emptyDescription": "ستظهر هنا المشتريات والاستخدام وتعديلات الرصيد لهذه المؤسسة فور حدوثها.",
@@ -2654,7 +2657,10 @@
     "promptTitle": "ما رأيك في تطبيق Kilo؟",
     "rateKilo": "قيّم Kilo",
     "sorryMessage": "يرجى إخبارنا بما يحتاج إلى تحسين. المهندس المسؤول عن التطبيق يقرأ كل تقرير!",
-    "sorryTitle": "نأسف لسماع ذلك!"
+    "sorryTitle": "نأسف لسماع ذلك!",
+    "neutralTitle": "قيّم تطبيق Kilo",
+    "rateTheApp": "قيّم التطبيق",
+    "sendFeedback": "أرسل ملاحظات"
   },
   "authErrors": {
     "emailAlreadyUsed": "يوجد حساب بهذا البريد الإلكتروني مسجل بطريقة تسجيل دخول مختلفة. جرّب طريقة أخرى أو استخدم \"$t(login.moreSignInOptions)\".",

@@ -1723,7 +1723,8 @@
       "centOne": "σεντ",
       "centOther": "σεντς",
       "dollarOne": "δολάριο",
-      "dollarOther": "δολάρια"
+      "dollarOther": "δολάρια",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Δεν ήταν δυνατό το άνοιγμα του GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Χρειάζεται βελτίωση",
     "sorryTitle": "Λυπούμαστε που το ακούμε!",
     "sorryMessage": "Παρακαλούμε ενημερώστε μας τι πρέπει να βελτιωθεί. Ο μηχανικός που είναι υπεύθυνος για την εφαρμογή διαβάζει κάθε αναφορά!",
-    "emailUs": "Στείλτε μας email"
+    "emailUs": "Στείλτε μας email",
+    "neutralTitle": "Βαθμολογήστε την εφαρμογή Kilo",
+    "rateTheApp": "Βαθμολογήστε την εφαρμογή",
+    "sendFeedback": "Στείλτε σχόλια"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Ο οργανισμός δεν είναι διαθέσιμος",
       "selectDescription": "Επιλέξτε έναν οργανισμό από το προφίλ σας για να συνεχίσετε.",
       "selectOrganization": "Επιλογή οργανισμού",
-      "unavailableDescription": "Αυτός ο οργανισμός δεν είναι πλέον διαθέσιμος. Επιλέξτε έναν από το προφίλ σας για να συνεχίσετε."
+      "unavailableDescription": "Αυτός ο οργανισμός δεν είναι πλέον διαθέσιμος. Επιλέξτε έναν από το προφίλ σας για να συνεχίσετε.",
+      "accessDeniedTitle": "Η πρόσβαση απορρίφθηκε",
+      "accessDeniedDescription": "Δεν έχετε πρόσβαση σε αυτόν τον οργανισμό."
     },
     "creditActivity": {
       "emptyDescription": "Οι αγορές, η χρήση και οι προσαρμογές πιστώσεων για αυτόν τον οργανισμό θα εμφανίζονται εδώ καθώς πραγματοποιούνται.",

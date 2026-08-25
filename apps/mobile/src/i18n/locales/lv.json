@@ -1723,7 +1723,8 @@
       "centOne": "cents",
       "centOther": "centi",
       "dollarOne": "dolārs",
-      "dollarOther": "dolāri"
+      "dollarOther": "dolāri",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Neizdevās atvērt GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Vajag uzlabojumus",
     "sorryTitle": "Mums ir žēl to dzirdēt!",
     "sorryMessage": "Lūdzu, ļauj mums uzzināt, kas jāuzlabo. Inženieris, kurš atbild par lietotni, izlasa katru ziņojumu!",
-    "emailUs": "Raksti mums"
+    "emailUs": "Raksti mums",
+    "neutralTitle": "Novērtējiet Kilo lietotni",
+    "rateTheApp": "Novērtēt lietotni",
+    "sendFeedback": "Nosūtīt atsauksmi"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Organizācija nav pieejama",
       "selectDescription": "Izvēlies organizāciju no sava profila, lai turpinātu.",
       "selectOrganization": "Izvēlēties organizāciju",
-      "unavailableDescription": "Šī organizācija vairs nav pieejama. Izvēlies vienu no sava profila, lai turpinātu."
+      "unavailableDescription": "Šī organizācija vairs nav pieejama. Izvēlies vienu no sava profila, lai turpinātu.",
+      "accessDeniedTitle": "Pieeja liegta",
+      "accessDeniedDescription": "Jums nav piekļuves šai organizācijai."
     },
     "creditActivity": {
       "emptyDescription": "Pirkumi, lietojums un kredītu korekcijas šai organizācijai parādīsies šeit, kad tās notiks.",

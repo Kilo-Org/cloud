@@ -303,6 +303,42 @@ export function canExitSessionFromList(session: { connectionId: string }): boole
   return session.connectionId !== CLOUD_AGENT_CONNECTION_ID;
 }
 
+/**
+ * Compose the provenance subtitle for a session row.
+ *
+ *   - both branch and PR number → `"branch · #N"`
+ *   - branch only → the branch
+ *   - PR number only → `"#N"`
+ *   - neither → `null`
+ */
+export function composeSessionProvenanceSubtitle(params: {
+  branch: string | null | undefined;
+  prNumber: number | null | undefined;
+}): string | null {
+  const { branch, prNumber } = params;
+  const hasBranch = branch != null && branch !== '';
+  const hasPr = prNumber != null;
+  if (hasBranch && hasPr) {
+    return `${branch} · #${prNumber}`;
+  }
+  if (hasBranch) {
+    return branch;
+  }
+  if (hasPr) {
+    return `#${prNumber}`;
+  }
+  return null;
+}
+
+/**
+ * Normalize a search needle the same way the server does: trim, lowercase,
+ * then strip one leading `#` so `"#42"` and `"42"` are equivalent needles.
+ */
+export function normalizeSessionSearchNeedle(raw: string): string {
+  const trimmed = raw.trim().toLowerCase();
+  return trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
+}
+
 const KNOWN_PLATFORM_VALUES: readonly string[] = KNOWN_PLATFORMS;
 
 /**
@@ -310,10 +346,13 @@ const KNOWN_PLATFORM_VALUES: readonly string[] = KNOWN_PLATFORMS;
  *
  * `searchQuery` narrows the tray with the same semantics as the
  * server-side history search: a case-insensitive substring match on the
- * session's `title` OR `id` (`position()`/`includes` — LIKE wildcards
- * match literally). Empty or whitespace-only queries perform no narrowing.
- * The text query applies in conjunction with the platform/project filters,
- * which mirror the server-side narrowing used by the stored-session list.
+ * session's `title`, `id`, `gitUrl`, `gitBranch`, associated PR `title`, or
+ * associated PR `number` (`position()`/`includes` — LIKE wildcards match
+ * literally). A leading `#` in the query is stripped, so `#42` and `42`
+ * both match PR number 42. Empty or whitespace-only queries perform no
+ * narrowing. The text query applies in conjunction with the platform/project
+ * filters, which mirror the server-side narrowing used by the stored-session
+ * list.
  *
  * No dedup against stored pages is performed here — exclusivity is enforced
  * on the history side by Task 3, so this helper stays pure and symmetric.
@@ -327,7 +366,7 @@ export function selectPinnedActiveSessions(params: {
   const { activeSessions, projectFilter, platformFilter, searchQuery } = params;
   const projectActive = projectFilter.length > 0;
   const platformActive = platformFilter.length > 0;
-  const needle = searchQuery.trim().toLowerCase();
+  const needle = normalizeSessionSearchNeedle(searchQuery);
 
   const concretePlatforms = platformFilter.filter(p => p !== 'other');
   const includeOther = platformFilter.includes('other');
@@ -336,7 +375,19 @@ export function selectPinnedActiveSessions(params: {
     if (needle.length > 0) {
       const hayTitle = session.title.toLowerCase();
       const hayId = session.id.toLowerCase();
-      if (!hayTitle.includes(needle) && !hayId.includes(needle)) {
+      const hayGitUrl = (session.gitUrl ?? '').toLowerCase();
+      const hayBranch = (session.gitBranch ?? '').toLowerCase();
+      const pr = session.associatedPr;
+      const hayPrTitle = (pr?.title ?? '').toLowerCase();
+      const hayPrNumber = pr?.number != null ? String(pr.number) : '';
+      if (
+        !hayTitle.includes(needle) &&
+        !hayId.includes(needle) &&
+        !hayGitUrl.includes(needle) &&
+        !hayBranch.includes(needle) &&
+        !hayPrTitle.includes(needle) &&
+        !hayPrNumber.includes(needle)
+      ) {
         return false;
       }
     }

@@ -1723,7 +1723,8 @@
       "centOne": "santim",
       "centOther": "santim",
       "dollarOne": "dola",
-      "dollarOther": "dola"
+      "dollarOther": "dola",
+      "pullRequest": "demann pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Pa t 'kapab louvri GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Gen travay pou fè",
     "sorryTitle": "Nou regrèt tande sa!",
     "sorryMessage": "Tanpri fè nou konnen kisa ki bezwen pi byen. Enjenyè ki responsab aplikasyon an li chak rapò!",
-    "emailUs": "Imel nou"
+    "emailUs": "Imel nou",
+    "neutralTitle": "Evalye aplikasyon Kilo a",
+    "rateTheApp": "Evalye aplikasyon an",
+    "sendFeedback": "Voye fidbak"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Òganizasyon pa disponib",
       "selectDescription": "Chwazi yon òganizasyon nan pwofil ou pou kontinye.",
       "selectOrganization": "Chwazi yon òganizasyon",
-      "unavailableDescription": "Òganizasyon sa a pa disponib ankò. Chwazi yon youn nan pwofil ou pou kontinye."
+      "unavailableDescription": "Òganizasyon sa a pa disponib ankò. Chwazi yon youn nan pwofil ou pou kontinye.",
+      "accessDeniedTitle": "Aksè refize",
+      "accessDeniedDescription": "Ou pa gen aksè nan òganizasyon sa a."
     },
     "creditActivity": {
       "emptyDescription": "Acha, itilizasyon, ak ajisteman kredi pou òganizasyon sa a ap parèt isit la jan yo rive.",

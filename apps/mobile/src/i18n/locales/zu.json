@@ -1723,7 +1723,8 @@
       "centOne": "isenti",
       "centOther": "amasenti",
       "dollarOne": "idola",
-      "dollarOther": "amadola"
+      "dollarOther": "amadola",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Akukwazanga ukuvula i-GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Kudinga umsebenzi",
     "sorryTitle": "Siyaxolisa ukukuzwa lokho!",
     "sorryMessage": "Sicela usazise ukuthi yini edinga ukuthuthuka. Unjiniyela ophethe i-app ufunda yonke imibiko!",
-    "emailUs": "Sithumele i-imeyili"
+    "emailUs": "Sithumele i-imeyili",
+    "neutralTitle": "Linganisa uhlelo lokusebenza lwe-Kilo",
+    "rateTheApp": "Linganisa uhlelo lokusebenza",
+    "sendFeedback": "Thumela impendulo"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Inhlangano ayitholakali",
       "selectDescription": "Khetha inhlangano kusukela kuphrofayili yakho ukuze uqhubeke.",
       "selectOrganization": "Khetha inhlangano",
-      "unavailableDescription": "Le nhlangano ayisatholakali. Khetha enye kusukela kuphrofayili yakho ukuze uqhubeke."
+      "unavailableDescription": "Le nhlangano ayisatholakali. Khetha enye kusukela kuphrofayili yakho ukuze uqhubeke.",
+      "accessDeniedTitle": "Ukufinyelela kuvinjelwe",
+      "accessDeniedDescription": "Awunakho ukufinyelela kule nhlangano."
     },
     "creditActivity": {
       "emptyDescription": "Ukuthenga, ukusetshenziswa, nokulungiswa kwamakhredithi kwaleli nhlangano kuzovela lapha njengoba kwenzeka.",

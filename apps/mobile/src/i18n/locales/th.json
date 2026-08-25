@@ -1723,7 +1723,8 @@
       "centOne": "cent",
       "centOther": "cents",
       "dollarOne": "ดอลลาร์",
-      "dollarOther": "ดอลลาร์"
+      "dollarOther": "ดอลลาร์",
+      "pullRequest": "คำขอ pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "ไม่สามารถเปิด GitHub ได้",
@@ -2522,7 +2523,10 @@
     "needsWork": "ต้องปรับปรุง",
     "sorryTitle": "เราขอโทษที่ได้ยินแบบนั้น!",
     "sorryMessage": "กรุณาแจ้งให้เรารู้ว่าต้องปรับปรุงอะไรบ้าง วิศวกรที่รับผิดชอบแอปอ่านทุกรายงาน!",
-    "emailUs": "ส่งอีเมลถึงเรา"
+    "emailUs": "ส่งอีเมลถึงเรา",
+    "neutralTitle": "ให้คะแนนแอป Kilo",
+    "rateTheApp": "ให้คะแนนแอป",
+    "sendFeedback": "ส่งความคิดเห็น"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "องค์กรไม่พร้อมใช้งาน",
       "selectDescription": "เลือกองค์กรจากโปรไฟล์ของคุณเพื่อดำเนินการต่อ",
       "selectOrganization": "เลือกองค์กร",
-      "unavailableDescription": "องค์กรนี้ไม่พร้อมใช้งานอีกต่อไป เลือกหนึ่งรายการจากโปรไฟล์ของคุณเพื่อดำเนินการต่อ"
+      "unavailableDescription": "องค์กรนี้ไม่พร้อมใช้งานอีกต่อไป เลือกหนึ่งรายการจากโปรไฟล์ของคุณเพื่อดำเนินการต่อ",
+      "accessDeniedTitle": "ปฏิเสธการเข้าถึง",
+      "accessDeniedDescription": "คุณไม่มีสิทธิ์เข้าถึงองค์กรนี้"
     },
     "creditActivity": {
       "emptyDescription": "การซื้อ การใช้งาน และการปรับยอดเครดิตสำหรับองค์กรนี้จะปรากฏที่นี่เมื่อเกิดขึ้น",

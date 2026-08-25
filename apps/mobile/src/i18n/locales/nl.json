@@ -1351,7 +1351,8 @@
       "centOne": "cent",
       "centOther": "centen",
       "dollarOne": "dollar",
-      "dollarOther": "dollars"
+      "dollarOther": "dollars",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "We konden de installatie van de GitHub-app niet starten. Probeer het opnieuw.",
@@ -2519,7 +2520,9 @@
       "organizationUnavailable": "Organisatie niet beschikbaar",
       "selectDescription": "Kies een organisatie uit je profiel om door te gaan.",
       "selectOrganization": "Een organisatie selecteren",
-      "unavailableDescription": "Deze organisatie is niet meer beschikbaar. Kies er een uit je profiel om door te gaan."
+      "unavailableDescription": "Deze organisatie is niet meer beschikbaar. Kies er een uit je profiel om door te gaan.",
+      "accessDeniedTitle": "Toegang geweigerd",
+      "accessDeniedDescription": "U heeft geen toegang tot deze organisatie."
     },
     "creditActivity": {
       "emptyDescription": "Aankopen, gebruik en creditaanpassingen voor deze organisatie verschijnen hier zodra ze plaatsvinden.",
@@ -2654,7 +2657,10 @@
     "promptTitle": "Hoe bevalt de Kilo-app je?",
     "rateKilo": "Kilo beoordelen",
     "sorryMessage": "Laat ons weten wat er beter kan. De engineer die over de app gaat, leest elk rapport!",
-    "sorryTitle": "Wat jammer om te horen!"
+    "sorryTitle": "Wat jammer om te horen!",
+    "neutralTitle": "Beoordeel de Kilo-app",
+    "rateTheApp": "Beoordeel de app",
+    "sendFeedback": "Feedback sturen"
   },
   "authErrors": {
     "emailAlreadyUsed": "Er bestaat al een account met dit e-mailadres via een andere aanmeldmethode. Probeer een andere methode of gebruik '$t(login.moreSignInOptions)'.",

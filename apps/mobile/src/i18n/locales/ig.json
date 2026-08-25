@@ -1723,7 +1723,8 @@
       "centOne": "senti",
       "centOther": "senti",
       "dollarOne": "dollar",
-      "dollarOther": "dollar"
+      "dollarOther": "dollar",
+      "pullRequest": "arịọta pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Enweghị ike imeghe GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Ọ chọrọ ọrụ",
     "sorryTitle": "Ọ dị anyị mwute ịnụ nke a!",
     "sorryMessage": "Biko gwa anyị ihe kwesịrị ịka mma. Onye injinia na-elekọta ngwa na-agụ akụkọ ọ bụla!",
-    "emailUs": "Ziga anyị email"
+    "emailUs": "Ziga anyị email",
+    "neutralTitle": "Tụọ ngwa Kilo",
+    "rateTheApp": "Tụọ ngwa",
+    "sendFeedback": "Ziga nzaghachi"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Ụlọ ọrụ adịghị",
       "selectDescription": "Họrọ ụlọ ọrụ site na profaịlụ gị ka ị gaa n'ihu.",
       "selectOrganization": "Họrọ ụlọ ọrụ",
-      "unavailableDescription": "Ụlọ ọrụ a adịkwaghị. Họrọ otu site na profaịlụ gị ka ị gaa n'ihu."
+      "unavailableDescription": "Ụlọ ọrụ a adịkwaghị. Họrọ otu site na profaịlụ gị ka ị gaa n'ihu.",
+      "accessDeniedTitle": "Amachibidoro ohere",
+      "accessDeniedDescription": "Ị enweghị ohere na nzukọ a."
     },
     "creditActivity": {
       "emptyDescription": "Ịzụrụ ihe, ojiji, na mgbanwe kredit maka ụlọ ọrụ a ga-apụta ebe a ka ha na-eme.",

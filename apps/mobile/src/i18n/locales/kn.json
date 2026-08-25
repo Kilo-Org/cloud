@@ -1723,7 +1723,8 @@
       "centOne": "ಸೆಂಟ್",
       "centOther": "ಸೆಂಟ್ಗಳು",
       "dollarOne": "ಡಾಲರ್",
-      "dollarOther": "ಡಾಲರ್ಗಳು"
+      "dollarOther": "ಡಾಲರ್ಗಳು",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
@@ -2522,7 +2523,10 @@
     "needsWork": "ಸುಧಾರಣೆ ಬೇಕು",
     "sorryTitle": "ಅದನ್ನು ಕೇಳಿ ನಮಗೆ ವಿಷಾದವಾಗಿದೆ!",
     "sorryMessage": "ಏನನ್ನು ಸುಧಾರಿಸಬೇಕು ಎಂದು ದಯವಿಟ್ಟು ನಮಗೆ ತಿಳಿಸಿ. ಅಪ್‌ನ ಉಸ್ತುವಾರಿ ಎಂಜಿನಿಯರ್ ಪ್ರತಿ ವರದಿಯನ್ನು ಓದುತ್ತಾರೆ!",
-    "emailUs": "ನಮಗೆ ಇಮೇಲ್ ಮಾಡಿ"
+    "emailUs": "ನಮಗೆ ಇಮೇಲ್ ಮಾಡಿ",
+    "neutralTitle": "Kilo ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ರೇಟ್ ಮಾಡಿ",
+    "rateTheApp": "ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ರೇಟ್ ಮಾಡಿ",
+    "sendFeedback": "ಪ್ರತಿಕ್ರಿಯೆ ಕಳುಹಿಸಿ"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "ಸಂಸ್ಥೆ ಲಭ್ಯವಿಲ್ಲ",
       "selectDescription": "ಮುಂದುವರಿಯಲು ನಿಮ್ಮ ಪ್ರೊಫೈಲ್‌ನಿಂದ ಸಂಸ್ಥೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
       "selectOrganization": "ಸಂಸ್ಥೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
-      "unavailableDescription": "ಈ ಸಂಸ್ಥೆ ಇನ್ನು ಮುಂದೆ ಲಭ್ಯವಿಲ್ಲ. ಮುಂದುವರಿಯಲು ನಿಮ್ಮ ಪ್ರೊಫೈಲ್‌ನಿಂದ ಒಂದನ್ನು ಆಯ್ಕೆಮಾಡಿ."
+      "unavailableDescription": "ಈ ಸಂಸ್ಥೆ ಇನ್ನು ಮುಂದೆ ಲಭ್ಯವಿಲ್ಲ. ಮುಂದುವರಿಯಲು ನಿಮ್ಮ ಪ್ರೊಫೈಲ್‌ನಿಂದ ಒಂದನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+      "accessDeniedTitle": "ಪ್ರವೇಶ ನಿರಾಕರಿಸಲಾಗಿದೆ",
+      "accessDeniedDescription": "ಈ ಸಂಸ್ಥೆಗೆ ನಿಮಗೆ ಪ್ರವೇಶವಿಲ್ಲ."
     },
     "creditActivity": {
       "emptyDescription": "ಈ ಸಂಸ್ಥೆಯ ಖರೀದಿಗಳು, ಬಳಕೆ, ಮತ್ತು ಕ್ರೆಡಿಟ್ ಹೊಂದಾಣಿಕೆಗಳು ಸಂಭವಿಸಿದಂತೆ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",

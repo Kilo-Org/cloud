@@ -1351,7 +1351,8 @@
       "centOne": "sent",
       "centOther": "sent",
       "dollarOne": "dolar",
-      "dollarOther": "dolar"
+      "dollarOther": "dolar",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub Uygulaması kurulumu başlatılamadı. Lütfen tekrar deneyin.",
@@ -2519,7 +2520,9 @@
       "organizationUnavailable": "Kuruluş kullanılamıyor",
       "selectDescription": "Devam etmek için profilinizden bir kuruluş seçin.",
       "selectOrganization": "Bir kuruluş seçin",
-      "unavailableDescription": "Bu kuruluş artık kullanılamıyor. Devam etmek için profilinizden birini seçin."
+      "unavailableDescription": "Bu kuruluş artık kullanılamıyor. Devam etmek için profilinizden birini seçin.",
+      "accessDeniedTitle": "Erişim reddedildi",
+      "accessDeniedDescription": "Bu organizasyona erişiminiz yok."
     },
     "creditActivity": {
       "emptyDescription": "Bu kuruluş için satın alımlar, kullanım ve kredi düzenlemeleri gerçekleştikçe burada görünür.",
@@ -2654,7 +2657,10 @@
     "promptTitle": "Kilo uygulamasını nasıl buluyorsunuz?",
     "rateKilo": "Kilo'yu değerlendir",
     "sorryMessage": "Lütfen neyin daha iyi olması gerektiğini bize bildirin. Uygulamadan sorumlu mühendis her raporu tek tek okur!",
-    "sorryTitle": "Bunu duyduğumuza üzüldük!"
+    "sorryTitle": "Bunu duyduğumuza üzüldük!",
+    "neutralTitle": "Kilo uygulamasını değerlendirin",
+    "rateTheApp": "Uygulamayı değerlendirin",
+    "sendFeedback": "Geri bildirim gönder"
   },
   "authErrors": {
     "emailAlreadyUsed": "Bu e-posta ile farklı bir oturum açma yöntemine sahip bir hesap zaten mevcut. Başka bir yöntem deneyin veya '$t(login.moreSignInOptions)'ni kullanın.",

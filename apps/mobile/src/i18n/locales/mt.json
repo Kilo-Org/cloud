@@ -1723,7 +1723,8 @@
       "centOne": "ċenteżmu",
       "centOther": "ċenteżmi",
       "dollarOne": "dollaru",
-      "dollarOther": "dollari"
+      "dollarOther": "dollari",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ma setax jinfetaħ GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Għandu bżonn titjib",
     "sorryTitle": "Iddispjċina li nisimgħu dan!",
     "sorryMessage": "Jekk jogħġbok għidilna x'għandu jitjieb. L-inġinier responsabbli mill-app jaqra kull rapport!",
-    "emailUs": "Ibgħatilna email"
+    "emailUs": "Ibgħatilna email",
+    "neutralTitle": "Irrata l-app Kilo",
+    "rateTheApp": "Irrata l-app",
+    "sendFeedback": "Ibgħat feedback"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "L-organizzazzjoni mhux disponibbli",
       "selectDescription": "Agħżel organizzazzjoni mill-profil tiegħek biex tkompli.",
       "selectOrganization": "Agħżel organizzazzjoni",
-      "unavailableDescription": "Din l-organizzazzjoni m'għadhiex disponibbli. Agħżel waħda mill-profil tiegħek biex tkompli."
+      "unavailableDescription": "Din l-organizzazzjoni m'għadhiex disponibbli. Agħżel waħda mill-profil tiegħek biex tkompli.",
+      "accessDeniedTitle": "Aċċess miċħud",
+      "accessDeniedDescription": "M'għandekx aċċess għal din l-organizzazzjoni."
     },
     "creditActivity": {
       "emptyDescription": "Xirjiet, użu, u aġġustamenti tal-kreditu għal din l-organizzazzjoni se jidhru hawnhekk hekk kif iseħħu.",

@@ -1351,7 +1351,8 @@
       "centOne": "цент",
       "centOther": "центів",
       "dollarOne": "долар",
-      "dollarOther": "доларів"
+      "dollarOther": "доларів",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Не вдалося розпочати налаштування застосунку GitHub. Спробуйте ще раз.",
@@ -2519,7 +2520,9 @@
       "organizationUnavailable": "Організація недоступна",
       "selectDescription": "Виберіть організацію зі свого профілю, щоб продовжити.",
       "selectOrganization": "Вибрати організацію",
-      "unavailableDescription": "Ця організація більше недоступна. Виберіть іншу зі свого профілю, щоб продовжити."
+      "unavailableDescription": "Ця організація більше недоступна. Виберіть іншу зі свого профілю, щоб продовжити.",
+      "accessDeniedTitle": "Доступ заборонено",
+      "accessDeniedDescription": "У вас немає доступу до цієї організації."
     },
     "creditActivity": {
       "emptyDescription": "Покупки, використання та коригування кредитів для цієї організації з'являться тут у міру їх виникнення.",
@@ -2654,7 +2657,10 @@
     "promptTitle": "Як вам застосунок Kilo?",
     "rateKilo": "Оцінити Kilo",
     "sorryMessage": "Розкажіть, що варто покращити. Інженер, відповідальний за застосунок, читає кожен звіт!",
-    "sorryTitle": "Нам шкода це чути!"
+    "sorryTitle": "Нам шкода це чути!",
+    "neutralTitle": "Оцініть застосунок Kilo",
+    "rateTheApp": "Оцінити застосунок",
+    "sendFeedback": "Надіслати відгук"
   },
   "authErrors": {
     "emailAlreadyUsed": "Обліковий запис із цією електронною поштою вже існує з іншим способом входу. Спробуйте інший спосіб або скористайтеся пунктом «$t(login.moreSignInOptions)».",

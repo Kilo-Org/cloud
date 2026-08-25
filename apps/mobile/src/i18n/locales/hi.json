@@ -1351,7 +1351,8 @@
       "centOne": "सेंट",
       "centOther": "सेंट",
       "dollarOne": "डॉलर",
-      "dollarOther": "डॉलर"
+      "dollarOther": "डॉलर",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "हम GitHub ऐप सेटअप शुरू नहीं कर सके। कृपया फिर से कोशिश करें।",
@@ -2519,7 +2520,9 @@
       "organizationUnavailable": "संगठन अनुपलब्ध",
       "selectDescription": "जारी रखने के लिए अपनी प्रोफ़ाइल से एक संगठन चुनें।",
       "selectOrganization": "एक संगठन चुनें",
-      "unavailableDescription": "यह संगठन अब उपलब्ध नहीं है। जारी रखने के लिए अपनी प्रोफ़ाइल से एक चुनें।"
+      "unavailableDescription": "यह संगठन अब उपलब्ध नहीं है। जारी रखने के लिए अपनी प्रोफ़ाइल से एक चुनें।",
+      "accessDeniedTitle": "पहुँच अस्वीकृत",
+      "accessDeniedDescription": "आपके पास इस संगठन तक पहुँच नहीं है।"
     },
     "creditActivity": {
       "emptyDescription": "इस संगठन के लिए खरीदारी, उपयोग और क्रेडिट समायोजन होते ही यहाँ दिखाई देंगे।",
@@ -2654,7 +2657,10 @@
     "promptTitle": "आपको Kilo ऐप कैसा लग रहा है?",
     "rateKilo": "Kilo को रेट करें",
     "sorryMessage": "कृपया हमें बताएँ कि क्या बेहतर होना चाहिए। ऐप का प्रभारी इंजीनियर हर एक रिपोर्ट पढ़ता है!",
-    "sorryTitle": "यह सुनकर हमें खेद है!"
+    "sorryTitle": "यह सुनकर हमें खेद है!",
+    "neutralTitle": "Kilo ऐप को रेट करें",
+    "rateTheApp": "ऐप को रेट करें",
+    "sendFeedback": "फ़ीडबैक भेजें"
   },
   "authErrors": {
     "emailAlreadyUsed": "इस ईमेल वाला एक खाता पहले से मौजूद है, लेकिन एक अलग साइन-इन विधि के साथ। कोई दूसरी विधि आज़माएँ या '$t(login.moreSignInOptions)' का उपयोग करें।",

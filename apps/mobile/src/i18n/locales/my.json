@@ -1723,7 +1723,8 @@
       "centOne": "ဆင့်",
       "centOther": "ဆင့်များ",
       "dollarOne": "ဒေါ်လာ",
-      "dollarOther": "ဒေါ်လာများ"
+      "dollarOther": "ဒေါ်လာများ",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ကို မဖွင့်နိုင်ခဲ့ပါ",
@@ -2522,7 +2523,10 @@
     "needsWork": "တိုးတက်ရန် လိုသည်",
     "sorryTitle": "ထိုသတင်းကြားရသည့်အတွက် ဝမ်းနည်းပါသည်။",
     "sorryMessage": "ဘာတွေ ပိုကောင်းအောင် လုပ်ရန် လိုသည်ကို အသိပေးပါ။ အက်ပ်တာဝန်ခံ အင်ဂျင်နီယာသည် အစီရင်ခံချက်တိုင်းကို ဖတ်ပါသည်။",
-    "emailUs": "ကျွန်ုပ်တို့ထံ အီးမေးလ် ပို့ပါ"
+    "emailUs": "ကျွန်ုပ်တို့ထံ အီးမေးလ် ပို့ပါ",
+    "neutralTitle": "Kilo အက်ပ်ကို အဆင့်သတ်မှတ်ပါ",
+    "rateTheApp": "အက်ပ်ကို အဆင့်သတ်မှတ်ပါ",
+    "sendFeedback": "တုံ့ပြန်ချက် ပေးပို့ပါ"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "အဖွဲ့အစည်း မရနိုင်ပါ",
       "selectDescription": "ဆက်လုပ်ရန် သင့် profile မှ အဖွဲ့အစည်းတစ်ခု ရွေးပါ။",
       "selectOrganization": "အဖွဲ့အစည်း ရွေးရန်",
-      "unavailableDescription": "ဤ အဖွဲ့အစည်း မရနိုင်တော့ပါ။ ဆက်လုပ်ရန် သင့် profile မှ တစ်ခု ရွေးပါ။"
+      "unavailableDescription": "ဤ အဖွဲ့အစည်း မရနိုင်တော့ပါ။ ဆက်လုပ်ရန် သင့် profile မှ တစ်ခု ရွေးပါ။",
+      "accessDeniedTitle": "ဝင်ရောက်ခွင့်မရှိ",
+      "accessDeniedDescription": "ဤအဖွဲ့အစည်းသို့ ဝင်ရောက်ခွင့်မရှိပါ။"
     },
     "creditActivity": {
       "emptyDescription": "ဤ အဖွဲ့အစည်းအတွက် ဝယ်ယူမှုများ၊ အသုံးပြုမှုနှင့် credit ပြုပြင်မှုများသည် ဖြစ်ပျက်သည်နှင့် ဤနေရာတွင် ပေါ်လာပါမည်။",

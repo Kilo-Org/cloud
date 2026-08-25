@@ -1985,6 +1985,124 @@ describe('cli-sessions-v2-router', () => {
     });
   });
 
+  describe('search provenance', () => {
+    const sessionByUrl = 'ses_search_prov_url_0001';
+    const sessionByBranch = 'ses_search_prov_branch_0001';
+    const sessionByPr = 'ses_search_prov_pr_0001';
+    const sessionTitleOnly = 'ses_search_prov_title_0001';
+    const allProvIds = [sessionByUrl, sessionByBranch, sessionByPr, sessionTitleOnly];
+    const CACHE_GIT_URL = 'https://github.com/kilo/search-provenance-repo';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: sessionByUrl,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: 'url session',
+          git_url: 'https://github.com/kilo/alpha-repo',
+          git_branch: 'main',
+        },
+        {
+          session_id: sessionByBranch,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: 'branch session',
+          git_url: 'https://github.com/kilo/beta-repo',
+          git_branch: 'feature/awesome-work',
+        },
+        {
+          session_id: sessionByPr,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: 'pr session',
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/pr-x',
+        },
+        {
+          session_id: sessionTitleOnly,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: 'title only session',
+          git_url: 'https://github.com/kilo/gamma-repo',
+          git_branch: 'main',
+        },
+      ]);
+      await db.insert(github_branch_pull_requests).values({
+        git_url: CACHE_GIT_URL,
+        git_branch: 'feature/pr-x',
+        owned_by_user_id: regularUser.id,
+        pr_url: 'https://github.com/kilo/search-provenance-repo/pull/42',
+        pr_number: 42,
+        pr_state: 'open',
+        pr_title: 'Searchable PR title',
+        pr_head_sha: 'beef42',
+      });
+    });
+
+    afterEach(async () => {
+      await db
+        .delete(github_branch_pull_requests)
+        .where(
+          and(
+            eq(github_branch_pull_requests.git_url, CACHE_GIT_URL),
+            eq(github_branch_pull_requests.owned_by_user_id, regularUser.id)
+          )
+        );
+      await db.delete(cli_sessions_v2).where(inArray(cli_sessions_v2.session_id, allProvIds));
+    });
+
+    it('matches by git_url substring', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: 'alpha-repo' });
+      expect(result.results.map(s => s.session_id)).toEqual([sessionByUrl]);
+    });
+
+    it('matches by git_branch substring', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: 'awesome-work' });
+      expect(result.results.map(s => s.session_id)).toEqual([sessionByBranch]);
+    });
+
+    it('matches by pr_title substring', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: 'Searchable PR' });
+      expect(result.results.map(s => s.session_id)).toEqual([sessionByPr]);
+    });
+
+    it('matches by pr_number 42 as text', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: '42' });
+      expect(result.results.map(s => s.session_id)).toEqual([sessionByPr]);
+    });
+
+    it('matches by #42 after stripping one leading hash', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: '#42' });
+      expect(result.results.map(s => s.session_id)).toEqual([sessionByPr]);
+    });
+
+    it('does not match a title-only session with no provenance for 42', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: '42' });
+      expect(result.results.map(s => s.session_id)).not.toContain(sessionTitleOnly);
+    });
+
+    it('returns no matches for a hash-only needle', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: '#' });
+      expect(result.results).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
+    it('returns no matches for a whitespace-only needle', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: '  ' });
+      expect(result.results).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+  });
+
   describe('refreshAssociatedPullRequest', () => {
     const sessionId = 'ses_refresh_pr_1234';
     // Session git_url is stored in the canonical normalized shape that the

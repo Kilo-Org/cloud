@@ -1723,7 +1723,8 @@
       "centOne": "سینټ",
       "centOther": "سینټه",
       "dollarOne": "ډالر",
-      "dollarOther": "ډالره"
+      "dollarOther": "ډالره",
+      "pullRequest": "پل ریکویسټ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub پرانیستل نشو",
@@ -2522,7 +2523,10 @@
     "needsWork": "کار ته اړتیا لري",
     "sorryTitle": "موږ د دې اوریدو څخه بخښنه غواړو!",
     "sorryMessage": "مهرباني وکړئ موږ ته خبر راکړئ چې څه باید ښه شي. د ایپ مسؤل انجنیر هر راپور لولي!",
-    "emailUs": "موږ ته بریښنالیک واستوئ"
+    "emailUs": "موږ ته بریښنالیک واستوئ",
+    "neutralTitle": "د کیلو اپ ارزونه وکړئ",
+    "rateTheApp": "د اپ ارزونه وکړئ",
+    "sendFeedback": "نظر واستوئ"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "سازمان شتون نلري",
       "selectDescription": "د دوام لپاره له خپل پروفایل څخه یو سازمان وټاکئ.",
       "selectOrganization": "یو سازمان وټاکئ",
-      "unavailableDescription": "دا سازمان نور شتون نلري. د دوام لپاره له خپل پروفایل څخه یو وټاکئ."
+      "unavailableDescription": "دا سازمان نور شتون نلري. د دوام لپاره له خپل پروفایل څخه یو وټاکئ.",
+      "accessDeniedTitle": "لاسرسی رد شو",
+      "accessDeniedDescription": "تاسو دې سازمان ته لاسرسی نه لرئ."
     },
     "creditActivity": {
       "emptyDescription": "د دې سازمان پیرودونه، کارول، او کریډیټ سمونونه به دلته څرګند شي لکه څنګه چې پېښیږي.",

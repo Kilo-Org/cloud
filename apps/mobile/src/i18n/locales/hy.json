@@ -1723,7 +1723,8 @@
       "centOne": "ցենտ",
       "centOther": "ցենտ",
       "dollarOne": "դոլար",
-      "dollarOther": "դոլար"
+      "dollarOther": "դոլար",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Չհաջողվեց բացել GitHub-ը",
@@ -2522,7 +2523,10 @@
     "needsWork": "Բարելավման կարիք ունի",
     "sorryTitle": "Ցավում ենք դա լսել:",
     "sorryMessage": "Խնդրում ենք հայտնել մեզ, թե ինչն է պետք բարելավել: Հավելվածի պատասխանատու ինժեները կարդում է յուրաքանչյուր հաշվետվություն:",
-    "emailUs": "Էլփոստ ուղարկեք մեզ"
+    "emailUs": "Էլփոստ ուղարկեք մեզ",
+    "neutralTitle": "Գնահատեք Kilo հավելվածը",
+    "rateTheApp": "Գնահատեք հավելվածը",
+    "sendFeedback": "Ուղարկեք կարծիք"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Կազմակերպությունը հասանելի չէ",
       "selectDescription": "Ընտրեք կազմակերպություն ձեր պրոֆիլից՝ շարունակելու համար:",
       "selectOrganization": "Ընտրել կազմակերպություն",
-      "unavailableDescription": "Այս կազմակերպությունն այլևս հասանելի չէ: Ընտրեք մեկը ձեր պրոֆիլից՝ շարունակելու համար:"
+      "unavailableDescription": "Այս կազմակերպությունն այլևս հասանելի չէ: Ընտրեք մեկը ձեր պրոֆիլից՝ շարունակելու համար:",
+      "accessDeniedTitle": "Մուտքը մերժված է",
+      "accessDeniedDescription": "Դուք մուտք չունեք այս կազմակերպություն։"
     },
     "creditActivity": {
       "emptyDescription": "Այս կազմակերպության գնումները, օգտագործումը և կրեդիտների ճշգրտումները կհայտնվեն այստեղ՝ իրենց կատարման պահին:",

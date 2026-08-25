@@ -1723,7 +1723,8 @@
       "centOne": "সেন্ট",
       "centOther": "সেন্ট",
       "dollarOne": "ডলার",
-      "dollarOther": "ডলার"
+      "dollarOther": "ডলার",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub খোলা যায়নি",
@@ -2522,7 +2523,10 @@
     "needsWork": "উন্নতি প্রয়োজন",
     "sorryTitle": "এটা শুনে আমরা দুঃখিত!",
     "sorryMessage": "কী উন্নত করতে হবে তা আমাদের জানান। অ্যাপের দায়িত্বে থাকা ইঞ্জিনিয়ার প্রতিটি রিপোর্ট পড়েন!",
-    "emailUs": "আমাদের ইমেইল করুন"
+    "emailUs": "আমাদের ইমেইল করুন",
+    "neutralTitle": "Kilo অ্যাপ রেট করুন",
+    "rateTheApp": "অ্যাপ রেট করুন",
+    "sendFeedback": "মতামত পাঠান"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "সংস্থা অনুপলব্ধ",
       "selectDescription": "চালিয়ে যেতে আপনার প্রোফাইল থেকে একটি সংস্থা বেছে নিন।",
       "selectOrganization": "একটি সংস্থা নির্বাচন করুন",
-      "unavailableDescription": "এই সংস্থাটি আর উপলব্ধ নয়। চালিয়ে যেতে আপনার প্রোফাইল থেকে একটি বেছে নিন।"
+      "unavailableDescription": "এই সংস্থাটি আর উপলব্ধ নয়। চালিয়ে যেতে আপনার প্রোফাইল থেকে একটি বেছে নিন।",
+      "accessDeniedTitle": "অ্যাক্সেস অস্বীকার করা হয়েছে",
+      "accessDeniedDescription": "আপনার এই সংস্থায় অ্যাক্সেস নেই।"
     },
     "creditActivity": {
       "emptyDescription": "এই সংস্থার ক্রয়, ব্যবহার এবং ক্রেডিট সমন্বয় এখানে প্রদর্শিত হবে।",

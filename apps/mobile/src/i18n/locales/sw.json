@@ -1723,7 +1723,8 @@
       "centOne": "senti",
       "centOther": "senti",
       "dollarOne": "dola",
-      "dollarOther": "dola"
+      "dollarOther": "dola",
+      "pullRequest": "ombi la mabadiliko {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Haikuweza kufungua GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Inahitaji kazi",
     "sorryTitle": "Tunasikitika kusikia hivyo!",
     "sorryMessage": "Tafadhali tujulishe kile kinachohitaji kuboreshwa. Mhandisi anayesimamia app husoma kila ripoti!",
-    "emailUs": "Tuandikie barua pepe"
+    "emailUs": "Tuandikie barua pepe",
+    "neutralTitle": "Pima programu ya Kilo",
+    "rateTheApp": "Pima programu",
+    "sendFeedback": "Tuma maoni"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Shirika halipatikani",
       "selectDescription": "Chagua shirika kutoka kwenye wasifu wako ili uendelee.",
       "selectOrganization": "Chagua shirika",
-      "unavailableDescription": "Shirika hili halipatikani tena. Chagua moja kutoka kwenye wasifu wako ili uendelee."
+      "unavailableDescription": "Shirika hili halipatikani tena. Chagua moja kutoka kwenye wasifu wako ili uendelee.",
+      "accessDeniedTitle": "Ufikiaji umekataliwa",
+      "accessDeniedDescription": "Huna ufikiaji wa shirika hili."
     },
     "creditActivity": {
       "emptyDescription": "Ununuzi, matumizi, na marekebisho ya salio kwa shirika hili yataonekana hapa yanapotokea.",

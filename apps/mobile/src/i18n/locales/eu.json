@@ -1723,7 +1723,8 @@
       "centOne": "zentimo",
       "centOther": "zentimo",
       "dollarOne": "dolar",
-      "dollarOther": "dolar"
+      "dollarOther": "dolar",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ezin da GitHub ireki",
@@ -2522,7 +2523,10 @@
     "needsWork": "Hobetu behar du",
     "sorryTitle": "Sentitzen dugu entzuteagatik!",
     "sorryMessage": "Mesedez, esan iezaguzu zer hobetu behar den. Aplikazioaren arduradunak irakurtzen du txosten bakoitza!",
-    "emailUs": "Bidali iezaguzu posta"
+    "emailUs": "Bidali iezaguzu posta",
+    "neutralTitle": "Kalifikatu Kilo aplikazioa",
+    "rateTheApp": "Kalifikatu aplikazioa",
+    "sendFeedback": "Bidali iritzia"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Erakundea ez erabilgarri",
       "selectDescription": "Aukeratu erakunde bat zure profiletik jarraitzeko.",
       "selectOrganization": "Hautatu erakunde bat",
-      "unavailableDescription": "Erakunde hau jada ez daude erabilgarri. Aukeratu bat zure profiletik jarraitzeko."
+      "unavailableDescription": "Erakunde hau jada ez daude erabilgarri. Aukeratu bat zure profiletik jarraitzeko.",
+      "accessDeniedTitle": "Sarbidea ukatuta",
+      "accessDeniedDescription": "Ez duzu erakunde honetarako sarbiderik."
     },
     "creditActivity": {
       "emptyDescription": "Erakunde honen erosketak, erabilerak eta kreditu-doikuntzak hemen agertuko dira gertatzen diren heinean.",

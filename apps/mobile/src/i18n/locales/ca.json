@@ -1723,7 +1723,8 @@
       "centOne": "cèntim",
       "centOther": "cèntims",
       "dollarOne": "dòlar",
-      "dollarOther": "dòlars"
+      "dollarOther": "dòlars",
+      "pullRequest": "sol·licitud d'extracció {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "No s'ha pogut obrir GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Necessita millores",
     "sorryTitle": "Ens sap greu sentir-ho!",
     "sorryMessage": "Si us plau, feu-nos saber què cal millorar. L'enginyer responsable de l'aplicació llegeix tots i cadascun dels informes!",
-    "emailUs": "Escriu-nos"
+    "emailUs": "Escriu-nos",
+    "neutralTitle": "Valora l'aplicació Kilo",
+    "rateTheApp": "Valora l'aplicació",
+    "sendFeedback": "Envia comentaris"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Organització no disponible",
       "selectDescription": "Trieu una organització del vostre perfil per continuar.",
       "selectOrganization": "Selecciona una organització",
-      "unavailableDescription": "Aquesta organització ja no està disponible. Trieu una del vostre perfil per continuar."
+      "unavailableDescription": "Aquesta organització ja no està disponible. Trieu una del vostre perfil per continuar.",
+      "accessDeniedTitle": "Accés denegat",
+      "accessDeniedDescription": "No tens accés a aquesta organització."
     },
     "creditActivity": {
       "emptyDescription": "Les compres, l'ús i els ajustos de crèdit d'aquesta organització apareixeran aquí a mesura que es produeixin.",

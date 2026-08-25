@@ -1723,7 +1723,8 @@
       "centOne": "cent",
       "centOther": "centi",
       "dollarOne": "dolar",
-      "dollarOther": "dolara"
+      "dollarOther": "dolara",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nije moguće otvoriti GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Treba poboljšanja",
     "sorryTitle": "Žao nam je to čuti!",
     "sorryMessage": "Javite nam šta treba biti bolje. Inženjer zadužen za aplikaciju čita svaki pojedinačni izvještaj!",
-    "emailUs": "Pošaljite nam email"
+    "emailUs": "Pošaljite nam email",
+    "neutralTitle": "Ocijenite Kilo aplikaciju",
+    "rateTheApp": "Ocijenite aplikaciju",
+    "sendFeedback": "Pošaljite povratne informacije"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Organizacija nedostupna",
       "selectDescription": "Odaberite organizaciju iz svog profila za nastavak.",
       "selectOrganization": "Odaberi organizaciju",
-      "unavailableDescription": "Ova organizacija više nije dostupna. Odaberite jednu iz svog profila za nastavak."
+      "unavailableDescription": "Ova organizacija više nije dostupna. Odaberite jednu iz svog profila za nastavak.",
+      "accessDeniedTitle": "Pristup odbijen",
+      "accessDeniedDescription": "Nemate pristup ovoj organizaciji."
     },
     "creditActivity": {
       "emptyDescription": "Kupovine, upotreba i prilagodbe kredita za ovu organizaciju pojavit će se ovdje kako se budu dešavale.",

@@ -1723,7 +1723,8 @@
       "centOne": "سەنت",
       "centOther": "سەنت",
       "dollarOne": "دۆلار",
-      "dollarOther": "دۆلار"
+      "dollarOther": "دۆلار",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "نەتوانرا GitHub بکرێتەوە",
@@ -2522,7 +2523,10 @@
     "needsWork": "پێویستی بە کارە",
     "sorryTitle": "دڵگرانین بە بیستنی ئەوە!",
     "sorryMessage": "تکایە ڕای بگەیەنە کە چی پێویستە باشتر بێت. ئەندازیارێک کە بەرپرسە لە ئەپ هەر ڕاپۆرتێک دەخوێنێتەوە!",
-    "emailUs": "ئیمەیڵمان بۆ بنێرە"
+    "emailUs": "ئیمەیڵمان بۆ بنێرە",
+    "neutralTitle": "هەڵسەنگاندنی ئەپی Kilo",
+    "rateTheApp": "هەڵسەنگاندنی ئەپەکە",
+    "sendFeedback": "ناردنی تێبینی"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "ڕێکخراوە بەردەست نییە",
       "selectDescription": "لە پڕۆفایلەکەتەوە ڕێکخراوێک هەڵبژێرە بۆ بەردەوامبوون.",
       "selectOrganization": "هەڵبژاردنی ڕێکخراوێک",
-      "unavailableDescription": "ئەم ڕێکخراوە چیتر بەردەست نییە. لە پڕۆفایلەکەتەوە یەکێک هەڵبژێرە بۆ بەردەوامبوون."
+      "unavailableDescription": "ئەم ڕێکخراوە چیتر بەردەست نییە. لە پڕۆفایلەکەتەوە یەکێک هەڵبژێرە بۆ بەردەوامبوون.",
+      "accessDeniedTitle": "ڕێگەپێدان نەدراوە",
+      "accessDeniedDescription": "تۆ ڕێگەپێدراو نیت بۆ ئەم ڕێکخراوە."
     },
     "creditActivity": {
       "emptyDescription": "کڕینەکان، بەکارهێنان و ڕێکخستنەکانی کرێدت بۆ ئەم ڕێکخراوە لێرەدا دەردەکەون کاتێک ڕوودەدەن.",

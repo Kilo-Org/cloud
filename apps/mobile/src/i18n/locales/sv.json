@@ -1723,7 +1723,8 @@
       "centOne": "cent",
       "centOther": "cent",
       "dollarOne": "dollar",
-      "dollarOther": "dollar"
+      "dollarOther": "dollar",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunde inte öppna GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Behöver förbättras",
     "sorryTitle": "Vi är ledsna att höra det!",
     "sorryMessage": "Berätta gärna vad som behöver bli bättre. Ingenjören som ansvarar för appen läser varje enskild rapport!",
-    "emailUs": "E-posta oss"
+    "emailUs": "E-posta oss",
+    "neutralTitle": "Betygsätt Kilo-appen",
+    "rateTheApp": "Betygsätt appen",
+    "sendFeedback": "Skicka feedback"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Organisationen är inte tillgänglig",
       "selectDescription": "Välj en organisation från din profil för att fortsätta.",
       "selectOrganization": "Välj en organisation",
-      "unavailableDescription": "Denna organisation är inte längre tillgänglig. Välj en från din profil för att fortsätta."
+      "unavailableDescription": "Denna organisation är inte längre tillgänglig. Välj en från din profil för att fortsätta.",
+      "accessDeniedTitle": "Nekad åtkomst",
+      "accessDeniedDescription": "Du har inte åtkomst till denna organisation."
     },
     "creditActivity": {
       "emptyDescription": "Köp, användning och kreditjusteringar för denna organisation visas här allteftersom de sker.",

@@ -1351,7 +1351,8 @@
       "centOne": "美分",
       "centOther": "美分",
       "dollarOne": "美元",
-      "dollarOther": "美元"
+      "dollarOther": "美元",
+      "pullRequest": "拉取请求 {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "我们无法启动 GitHub App 设置。请重试。",
@@ -2519,7 +2520,9 @@
       "organizationUnavailable": "组织不可用",
       "selectDescription": "从您的个人资料中选择一个组织以继续。",
       "selectOrganization": "选择组织",
-      "unavailableDescription": "此组织不再可用。请从您的个人资料中选择一个以继续。"
+      "unavailableDescription": "此组织不再可用。请从您的个人资料中选择一个以继续。",
+      "accessDeniedTitle": "访问被拒绝",
+      "accessDeniedDescription": "您无权访问此组织。"
     },
     "creditActivity": {
       "emptyDescription": "此组织的购买、用量和积分调整将在这里实时显示。",
@@ -2654,7 +2657,10 @@
     "promptTitle": "您觉得 Kilo 应用怎么样？",
     "rateKilo": "给 Kilo 评分",
     "sorryMessage": "请告诉我们哪些地方需要改进。负责该应用的工程师会阅读每一份报告！",
-    "sorryTitle": "很抱歉听到您这么说！"
+    "sorryTitle": "很抱歉听到您这么说！",
+    "neutralTitle": "评价 Kilo 应用",
+    "rateTheApp": "评价应用",
+    "sendFeedback": "发送反馈"
   },
   "authErrors": {
     "emailAlreadyUsed": "使用此邮箱的账户已存在，但登录方式不同。请尝试其他方式或使用\"$t(login.moreSignInOptions)\"。",

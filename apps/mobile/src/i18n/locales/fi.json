@@ -1723,7 +1723,8 @@
       "centOne": "sentti",
       "centOther": "senttiä",
       "dollarOne": "dollari",
-      "dollarOther": "dollaria"
+      "dollarOther": "dollaria",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubia ei voitu avata",
@@ -2522,7 +2523,10 @@
     "needsWork": "Vaatii parannuksia",
     "sorryTitle": "Ikävä kuulla se!",
     "sorryMessage": "Kerro meille, mitä pitäisi parantaa. Sovelluksesta vastaava insinööri lukee jokaisen raportin!",
-    "emailUs": "Lähetä sähköpostia"
+    "emailUs": "Lähetä sähköpostia",
+    "neutralTitle": "Arvioi Kilo-sovellus",
+    "rateTheApp": "Arvioi sovellus",
+    "sendFeedback": "Lähetä palautetta"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Organisaatio ei käytettävissä",
       "selectDescription": "Valitse organisaatio profiilistasi jatkaaksesi.",
       "selectOrganization": "Valitse organisaatio",
-      "unavailableDescription": "Tämä organisaatio ei ole enää käytettävissä. Valitse yksi profiilistasi jatkaaksesi."
+      "unavailableDescription": "Tämä organisaatio ei ole enää käytettävissä. Valitse yksi profiilistasi jatkaaksesi.",
+      "accessDeniedTitle": "Pääsy evätty",
+      "accessDeniedDescription": "Sinulla ei ole pääsyä tähän organisaatioon."
     },
     "creditActivity": {
       "emptyDescription": "Tämän organisaation ostokset, käyttö ja krediittimuutokset näkyvät täällä niiden tapahtuessa.",

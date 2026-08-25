@@ -1723,7 +1723,8 @@
       "centOne": "ເຊັນ",
       "centOther": "ເຊັນ",
       "dollarOne": "ໂດລາ",
-      "dollarOther": "ໂດລາ"
+      "dollarOther": "ໂດລາ",
+      "pullRequest": "ຄຳຮ້ອງດຶງ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "ບໍ່ສາມາດເປີດ GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "ຕ້ອງປັບປຸງ",
     "sorryTitle": "ຂໍໂທດທີ່ໄດ້ຍິນ!",
     "sorryMessage": "ກະລຸນາແຈ້ງໃຫ້ເຮົາຮູ້ສິ່ງທີ່ຕ້ອງດີຂຶ້ນ. ວິສະວະກອນທີ່ຮັບຜິດຊອບແອັບອ່ານທຸກລາຍງານ!",
-    "emailUs": "ສົ່ງອີເມວຫາເຮົາ"
+    "emailUs": "ສົ່ງອີເມວຫາເຮົາ",
+    "neutralTitle": "ໃຫ້ຄະແນນແອັບ Kilo",
+    "rateTheApp": "ໃຫ້ຄະແນນແອັບ",
+    "sendFeedback": "ສົ່ງຄຳຕິຊົມ"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "ອົງກອນບໍ່ມີ",
       "selectDescription": "ເລືອກອົງກອນຈາກໂປຣໄຟລ໌ຂອງທ່ານເພື່ອສືບຕໍ່.",
       "selectOrganization": "ເລືອກອົງກອນ",
-      "unavailableDescription": "ອົງກອນນີ້ບໍ່ມີອີກແລ້ວ. ເລືອກໜຶ່ງຈາກໂປຣໄຟລ໌ຂອງທ່ານເພື່ອສືບຕໍ່."
+      "unavailableDescription": "ອົງກອນນີ້ບໍ່ມີອີກແລ້ວ. ເລືອກໜຶ່ງຈາກໂປຣໄຟລ໌ຂອງທ່ານເພື່ອສືບຕໍ່.",
+      "accessDeniedTitle": "ບໍ່ອະນຸຍາດໃຫ້ເຂົ້າ",
+      "accessDeniedDescription": "ທ່ານບໍ່ມີສິດເຂົ້າເຖິງອົງກອນນີ້."
     },
     "creditActivity": {
       "emptyDescription": "ການຊື້, ການໃຊ້ງານ, ແລະ ການປັບປຸງເຄຣດິດຂອງອົງກອນນີ້ຈະປະກົດຢູ່ທີ່ນີ້ເມື່ອເກີດຂຶ້ນ.",

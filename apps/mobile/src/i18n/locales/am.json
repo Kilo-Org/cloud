@@ -1723,7 +1723,8 @@
       "centOne": "ሳንቲም",
       "centOther": "ሳንቲሞች",
       "dollarOne": "ዶላር",
-      "dollarOther": "ዶላሮች"
+      "dollarOther": "ዶላሮች",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubን መክፈት አልተቻለም",
@@ -2522,7 +2523,10 @@
     "needsWork": "ማሻሻያ ይፈልጋል",
     "sorryTitle": "ይህን ስለሰማን አዝነናል!",
     "sorryMessage": "እባክዎ ምን ማሻሻል እንዳለበት ያሳውቁን። የመተግበሪያው ሃላፊ መሐንዲስ እያንዳንዱን ሪፖርት ያነባል!",
-    "emailUs": "ይፃፉልን"
+    "emailUs": "ይፃፉልን",
+    "neutralTitle": "የKilo መተግበሪያን ደረጃ ይስጡ",
+    "rateTheApp": "መተግበሪያውን ደረጃ ይስጡ",
+    "sendFeedback": "አስተያየት ይላኩ"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "ድርጅት አይገኝም",
       "selectDescription": "ለመቀጠል ከመገለጫዎ ድርጅት ይምረጡ።",
       "selectOrganization": "ድርጅት ይምረጡ",
-      "unavailableDescription": "ይህ ድርጅት ከአሁን በኋላ አይገኝም። ለመቀጠል ከመገለጫዎ ይምረጡ።"
+      "unavailableDescription": "ይህ ድርጅት ከአሁን በኋላ አይገኝም። ለመቀጠል ከመገለጫዎ ይምረጡ።",
+      "accessDeniedTitle": "መዳረሻ ተከልክሏል",
+      "accessDeniedDescription": "ለዚህ ድርጅት የመዳረሻ ፍቃድ የለዎትም።"
     },
     "creditActivity": {
       "emptyDescription": "ለዚህ ድርጅት ግዢዎች፣ አጠቃቀም እና የክሬዲት ማስተካከያዎች እንደሚከሰቱ እዚህ ይታያሉ።",

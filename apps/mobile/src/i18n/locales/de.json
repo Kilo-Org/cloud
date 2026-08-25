@@ -1351,7 +1351,8 @@
       "centOne": "Cent",
       "centOther": "Cent",
       "dollarOne": "Dollar",
-      "dollarOther": "Dollar"
+      "dollarOther": "Dollar",
+      "pullRequest": "Pull-Request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Das Setup der GitHub-App konnte nicht gestartet werden. Bitte versuche es erneut.",
@@ -2519,7 +2520,9 @@
       "organizationUnavailable": "Organisation nicht verfügbar",
       "selectDescription": "Wähle eine Organisation aus deinem Profil, um fortzufahren.",
       "selectOrganization": "Organisation auswählen",
-      "unavailableDescription": "Diese Organisation ist nicht mehr verfügbar. Wähle eine aus deinem Profil, um fortzufahren."
+      "unavailableDescription": "Diese Organisation ist nicht mehr verfügbar. Wähle eine aus deinem Profil, um fortzufahren.",
+      "accessDeniedTitle": "Zugriff verweigert",
+      "accessDeniedDescription": "Du hast keinen Zugriff auf diese Organisation."
     },
     "creditActivity": {
       "emptyDescription": "Käufe, Nutzung und Guthabenänderungen für diese Organisation erscheinen hier, sobald sie passieren.",
@@ -2654,7 +2657,10 @@
     "promptTitle": "Wie gefällt dir die Kilo-App?",
     "rateKilo": "Kilo bewerten",
     "sorryMessage": "Bitte sag uns, was besser werden muss. Der für die App zuständige Entwickler liest jeden einzelnen Bericht!",
-    "sorryTitle": "Das tut uns leid!"
+    "sorryTitle": "Das tut uns leid!",
+    "neutralTitle": "Kilo-App bewerten",
+    "rateTheApp": "App bewerten",
+    "sendFeedback": "Feedback senden"
   },
   "authErrors": {
     "emailAlreadyUsed": "Ein Konto mit dieser E-Mail existiert bereits mit einer anderen Anmeldemethode. Versuche eine andere Methode oder nutze „$t(login.moreSignInOptions)“.",

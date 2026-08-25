@@ -1723,7 +1723,8 @@
       "centOne": "સેન્ટ",
       "centOther": "સેન્ટ",
       "dollarOne": "ડૉલર",
-      "dollarOther": "ડૉલર"
+      "dollarOther": "ડૉલર",
+      "pullRequest": "પુલ રિક્વેસ્ટ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ખોલી શકાયું નથી",
@@ -2522,7 +2523,10 @@
     "needsWork": "સુધારણાની જરૂર છે",
     "sorryTitle": "આ સાંભળીને અમને દિલગીરી થઈ!",
     "sorryMessage": "શું સુધારવાની જરૂર છે તે અમને જણાવો. એપ માટે જવાબદાર એન્જિનિયર દરેક રિપોર્ટ વાંચે છે!",
-    "emailUs": "અમને ઇમેઇલ કરો"
+    "emailUs": "અમને ઇમેઇલ કરો",
+    "neutralTitle": "Kilo એપને રેટ કરો",
+    "rateTheApp": "એપને રેટ કરો",
+    "sendFeedback": "ફીડબેક મોકલો"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "સંગઠન અનુપલબ્ધ",
       "selectDescription": "ચાલુ રાખવા માટે તમારી પ્રોફાઇલમાંથી એક સંગઠન પસંદ કરો.",
       "selectOrganization": "એક સંગઠન પસંદ કરો",
-      "unavailableDescription": "આ સંગઠન હવે ઉપલબ્ધ નથી. ચાલુ રાખવા માટે તમારી પ્રોફાઇલમાંથી એક પસંદ કરો."
+      "unavailableDescription": "આ સંગઠન હવે ઉપલબ્ધ નથી. ચાલુ રાખવા માટે તમારી પ્રોફાઇલમાંથી એક પસંદ કરો.",
+      "accessDeniedTitle": "ઍક્સેસ નામંજૂર",
+      "accessDeniedDescription": "તમારી પાસે આ સંસ્થાનો ઍક્સેસ નથી."
     },
     "creditActivity": {
       "emptyDescription": "આ સંગઠન માટે ખરીદીઓ, વપરાશ અને ક્રેડિટ ગોઠવણો અહીં થતાં જ દેખાશે.",

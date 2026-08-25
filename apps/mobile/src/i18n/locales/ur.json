@@ -1723,7 +1723,8 @@
       "centOne": "سینٹ",
       "centOther": "سینٹ",
       "dollarOne": "ڈالر",
-      "dollarOther": "ڈالر"
+      "dollarOther": "ڈالر",
+      "pullRequest": "پل ریکویسٹ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub نہیں کھل سکا",
@@ -2522,7 +2523,10 @@
     "needsWork": "بہتری کی ضرورت ہے",
     "sorryTitle": "ہمیں سن کر افسوس ہوا!",
     "sorryMessage": "براہ کرم ہمیں بتائیں کہ کیا بہتر ہونے کی ضرورت ہے۔ ایپ کا ذمہ دار انجینئر ہر ایک رپورٹ پڑھتا ہے!",
-    "emailUs": "ہمیں ای میل کریں"
+    "emailUs": "ہمیں ای میل کریں",
+    "neutralTitle": "Kilo ایپ کی درجہ بندی کریں",
+    "rateTheApp": "ایپ کی درجہ بندی کریں",
+    "sendFeedback": "فیڈ بیک بھیجیں"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "تنظیم دستیاب نہیں",
       "selectDescription": "جاری رکھنے کے لیے اپنے پروفائل سے ایک تنظیم منتخب کریں۔",
       "selectOrganization": "ایک تنظیم منتخب کریں",
-      "unavailableDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ جاری رکھنے کے لیے اپنے پروفائل سے ایک منتخب کریں۔"
+      "unavailableDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ جاری رکھنے کے لیے اپنے پروفائل سے ایک منتخب کریں۔",
+      "accessDeniedTitle": "رسائی سے انکار",
+      "accessDeniedDescription": "آپ کو اس تنظیم تک رسائی حاصل نہیں ہے۔"
     },
     "creditActivity": {
       "emptyDescription": "اس تنظیم کی خریداریاں، استعمال، اور کریڈٹ ایڈجسٹمنٹ ہونے پر یہاں ظاہر ہوں گی۔",

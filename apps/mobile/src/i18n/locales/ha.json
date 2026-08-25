@@ -1723,7 +1723,8 @@
       "centOne": "senti",
       "centOther": "senti",
       "dollarOne": "dala",
-      "dollarOther": "daloli"
+      "dollarOther": "daloli",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "An kasa buɗe GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Yana buƙatar ingantawa",
     "sorryTitle": "Mun yi nadamar jin haka!",
     "sorryMessage": "Da fatan za a sanar da mu abin da ya kamata a inganta. Injiniyan da ke kula da app ɗin yana karanta kowane rahoto!",
-    "emailUs": "Aiko mana imel"
+    "emailUs": "Aiko mana imel",
+    "neutralTitle": "Yi ƙimar app na Kilo",
+    "rateTheApp": "Yi ƙimar app",
+    "sendFeedback": "Aika ra'ayi"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Ƙungiyar ba ta nan",
       "selectDescription": "Zaɓi ƙungiya daga bayanan martabarka don ci gaba.",
       "selectOrganization": "Zaɓi ƙungiya",
-      "unavailableDescription": "Wannan ƙungiyar ba ta nan. Zaɓi ɗaya daga bayanan martabarka don ci gaba."
+      "unavailableDescription": "Wannan ƙungiyar ba ta nan. Zaɓi ɗaya daga bayanan martabarka don ci gaba.",
+      "accessDeniedTitle": "An hana shiga",
+      "accessDeniedDescription": "Ba ku da izinin shiga wannan ƙungiya."
     },
     "creditActivity": {
       "emptyDescription": "Sayayya, amfani, da gyare-gyaren credits na wannan ƙungiyar za su bayyana a nan yayin da suke faruwa.",

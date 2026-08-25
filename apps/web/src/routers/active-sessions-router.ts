@@ -5,9 +5,14 @@ import { z } from 'zod';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
 import { generateInternalServiceToken } from '@/lib/tokens';
 import { db } from '@/lib/drizzle';
-import { cli_sessions_v2, cloud_agent_session_runs } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  cloud_agent_session_runs,
+  github_branch_pull_requests,
+} from '@kilocode/db/schema';
 import { and, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { associatedPrSchema, formatAssociatedPr } from './cli-sessions-v2-router';
 
 export const activeSessionSchema = z.object({
   id: z.string(),
@@ -42,6 +47,12 @@ export const activeSessionSchema = z.object({
    * zero; display still omits it via `formatSessionTotalCost`.
    */
   totalCostMicrodollars: z.number().optional(),
+  /**
+   * Associated pull request for this session's branch, merged from the
+   * per-tenant PR cache during enrichment. Old clients omit this key;
+   * remove optional when every client is past this release.
+   */
+  associatedPr: associatedPrSchema.optional(),
 });
 
 const activeSessionsResponseSchema = z.object({
@@ -134,6 +145,20 @@ type EnrichmentRow = {
   organization_id: string | null;
   last_activity_at: string | null;
   total_cost_microdollars: number | null;
+  // Session's own stored PR link, aliased so it never collides with the
+  // cache keys below.
+  session_pr_platform: string | null;
+  session_pr_url: string | null;
+  session_pr_number: number | null;
+  // Per-tenant PR cache columns from the LEFT JOIN.
+  pr_url: string | null;
+  pr_number: number | null;
+  pr_state: string | null;
+  pr_title: string | null;
+  pr_head_sha: string | null;
+  pr_last_synced_at: string | null;
+  pr_review_decision: string | null;
+  review_decision_pending: boolean | null;
 };
 
 type CloudCandidateRow = EnrichmentRow & {
@@ -141,6 +166,52 @@ type CloudCandidateRow = EnrichmentRow & {
   git_branch: string | null;
   cloud_agent_session_id: string | null;
 };
+
+/**
+ * LEFT JOIN predicate that links a session to its per-tenant PR cache row.
+ * Local copy of the v2 router's predicate; intentionally not shared so the
+ * two routers do not grow a dependency in this direction.
+ */
+const sessionPrJoinPredicate = and(
+  eq(github_branch_pull_requests.git_url, cli_sessions_v2.git_url),
+  eq(github_branch_pull_requests.git_branch, cli_sessions_v2.git_branch),
+  or(
+    and(
+      isNotNull(cli_sessions_v2.organization_id),
+      eq(github_branch_pull_requests.owned_by_organization_id, cli_sessions_v2.organization_id)
+    ),
+    and(
+      isNull(cli_sessions_v2.organization_id),
+      eq(github_branch_pull_requests.owned_by_user_id, cli_sessions_v2.kilo_user_id)
+    )
+  )
+);
+
+/**
+ * Fold an enriched row's flat PR columns into the `associatedPr` shape.
+ * Returns `null` when there is no cache PR and no stored session link, so
+ * callers can omit the key entirely instead of emitting `associatedPr: null`.
+ */
+function associatedPrFromRow(row: EnrichmentRow): z.infer<typeof associatedPrSchema> | null {
+  return formatAssociatedPr(
+    {
+      platform: row.session_pr_platform,
+      pr_url: row.session_pr_url,
+      pr_number: row.session_pr_number,
+      updated_at: row.updated_at,
+    },
+    {
+      pr_url: row.pr_url,
+      pr_number: row.pr_number,
+      pr_state: row.pr_state,
+      pr_title: row.pr_title,
+      pr_head_sha: row.pr_head_sha,
+      pr_last_synced_at: row.pr_last_synced_at,
+      pr_review_decision: row.pr_review_decision,
+      review_decision_pending: row.review_decision_pending,
+    }
+  );
+}
 
 /**
  * Overlay stored attention (question/permission) onto a live heartbeat
@@ -191,6 +262,10 @@ function mapEnrichedHeartbeatSession(
   if (row.total_cost_microdollars != null) {
     mapped.totalCostMicrodollars = row.total_cost_microdollars;
   }
+  const associatedPr = associatedPrFromRow(row);
+  if (associatedPr) {
+    mapped.associatedPr = associatedPr;
+  }
   return mapped;
 }
 
@@ -216,6 +291,10 @@ function mapCloudCandidateRow(row: CloudCandidateRow): ActiveSession {
   }
   if (row.total_cost_microdollars != null) {
     mapped.totalCostMicrodollars = row.total_cost_microdollars;
+  }
+  const associatedPr = associatedPrFromRow(row);
+  if (associatedPr) {
+    mapped.associatedPr = associatedPr;
   }
   return mapped;
 }
@@ -363,8 +442,20 @@ export const activeSessionsRouter = createTRPCRouter({
             organization_id: cli_sessions_v2.organization_id,
             last_activity_at: cli_sessions_v2.last_activity_at,
             total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
+            session_pr_platform: cli_sessions_v2.platform,
+            session_pr_url: cli_sessions_v2.pr_url,
+            session_pr_number: cli_sessions_v2.pr_number,
+            pr_url: github_branch_pull_requests.pr_url,
+            pr_number: github_branch_pull_requests.pr_number,
+            pr_state: github_branch_pull_requests.pr_state,
+            pr_title: github_branch_pull_requests.pr_title,
+            pr_head_sha: github_branch_pull_requests.pr_head_sha,
+            pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
+            pr_review_decision: github_branch_pull_requests.pr_review_decision,
+            review_decision_pending: github_branch_pull_requests.review_decision_pending,
           })
           .from(cli_sessions_v2)
+          .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
           .where(
             and(
               eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
@@ -450,8 +541,20 @@ export const activeSessionsRouter = createTRPCRouter({
             last_activity_at: cli_sessions_v2.last_activity_at,
             total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
             cloud_agent_session_id: cli_sessions_v2.cloud_agent_session_id,
+            session_pr_platform: cli_sessions_v2.platform,
+            session_pr_url: cli_sessions_v2.pr_url,
+            session_pr_number: cli_sessions_v2.pr_number,
+            pr_url: github_branch_pull_requests.pr_url,
+            pr_number: github_branch_pull_requests.pr_number,
+            pr_state: github_branch_pull_requests.pr_state,
+            pr_title: github_branch_pull_requests.pr_title,
+            pr_head_sha: github_branch_pull_requests.pr_head_sha,
+            pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
+            pr_review_decision: github_branch_pull_requests.pr_review_decision,
+            review_decision_pending: github_branch_pull_requests.review_decision_pending,
           })
           .from(cli_sessions_v2)
+          .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
           .where(
             and(
               eq(cli_sessions_v2.kilo_user_id, ctx.user.id),

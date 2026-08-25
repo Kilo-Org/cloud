@@ -1723,7 +1723,8 @@
       "centOne": "sent",
       "centOther": "sent",
       "dollarOne": "dollar",
-      "dollarOther": "dollar"
+      "dollarOther": "dollar",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub açıla bilmədi",
@@ -2522,7 +2523,10 @@
     "needsWork": "Təkmilləşdirmə lazımdır",
     "sorryTitle": "Bunu eşitdiyimizə təəssüflənirik!",
     "sorryMessage": "Zəhmət olmasa nəyin yaxşılaşdırılması lazım olduğunu bizə bildirin. Tətbiqə cavabdeh olan mühəndis hər hesabatı oxuyur!",
-    "emailUs": "Bizə e-poçt göndərin"
+    "emailUs": "Bizə e-poçt göndərin",
+    "neutralTitle": "Kilo tətbiqini qiymətləndirin",
+    "rateTheApp": "Tətbiqi qiymətləndirin",
+    "sendFeedback": "Rəy göndərin"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Təşkilat mövcud deyil",
       "selectDescription": "Davam etmək üçün profilinizdən bir təşkilat seçin.",
       "selectOrganization": "Təşkilat seçin",
-      "unavailableDescription": "Bu təşkilat artıq mövcud deyil. Davam etmək üçün profilinizdən birini seçin."
+      "unavailableDescription": "Bu təşkilat artıq mövcud deyil. Davam etmək üçün profilinizdən birini seçin.",
+      "accessDeniedTitle": "Giriş qadağandır",
+      "accessDeniedDescription": "Bu təşkilata girişiniz yoxdur."
     },
     "creditActivity": {
       "emptyDescription": "Bu təşkilat üçün alışlar, istifadə və kredit düzəlişləri baş verdikcə burada görünəcək.",

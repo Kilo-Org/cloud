@@ -1351,7 +1351,8 @@
       "centOne": "xu",
       "centOther": "xu",
       "dollarOne": "đô la",
-      "dollarOther": "đô la"
+      "dollarOther": "đô la",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Chúng tôi không thể bắt đầu thiết lập ứng dụng GitHub. Vui lòng thử lại.",
@@ -2519,7 +2520,9 @@
       "organizationUnavailable": "Tổ chức không khả dụng",
       "selectDescription": "Chọn một tổ chức từ hồ sơ của bạn để tiếp tục.",
       "selectOrganization": "Chọn một tổ chức",
-      "unavailableDescription": "Tổ chức này không còn khả dụng. Hãy chọn một tổ chức từ hồ sơ của bạn để tiếp tục."
+      "unavailableDescription": "Tổ chức này không còn khả dụng. Hãy chọn một tổ chức từ hồ sơ của bạn để tiếp tục.",
+      "accessDeniedTitle": "Từ chối truy cập",
+      "accessDeniedDescription": "Bạn không có quyền truy cập vào tổ chức này."
     },
     "creditActivity": {
       "emptyDescription": "Các giao dịch mua, mức sử dụng và điều chỉnh tín dụng của tổ chức này sẽ xuất hiện tại đây khi phát sinh.",
@@ -2654,7 +2657,10 @@
     "promptTitle": "Bạn thấy ứng dụng Kilo thế nào?",
     "rateKilo": "Đánh giá Kilo",
     "sorryMessage": "Vui lòng cho chúng tôi biết điều cần cải thiện. Kỹ sư phụ trách ứng dụng đọc từng báo cáo một!",
-    "sorryTitle": "Chúng tôi rất tiếc khi nghe điều đó!"
+    "sorryTitle": "Chúng tôi rất tiếc khi nghe điều đó!",
+    "neutralTitle": "Đánh giá ứng dụng Kilo",
+    "rateTheApp": "Đánh giá ứng dụng",
+    "sendFeedback": "Gửi phản hồi"
   },
   "authErrors": {
     "emailAlreadyUsed": "Đã có tài khoản với email này nhưng sử dụng phương thức đăng nhập khác. Hãy thử phương thức khác hoặc dùng '$t(login.moreSignInOptions)'.",

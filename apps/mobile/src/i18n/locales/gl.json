@@ -1723,7 +1723,8 @@
       "centOne": "céntimo",
       "centOther": "céntimos",
       "dollarOne": "dólar",
-      "dollarOther": "dólares"
+      "dollarOther": "dólares",
+      "pullRequest": "solicitude de extracción {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Non se puido abrir GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Necesita melloras",
     "sorryTitle": "Sentímolo!",
     "sorryMessage": "Por favor, dínos que precisa mellorar. A persoa enxeñeira responsable da app le cada un dos informes!",
-    "emailUs": "Escríbenos"
+    "emailUs": "Escríbenos",
+    "neutralTitle": "Valora a aplicación Kilo",
+    "rateTheApp": "Valora a aplicación",
+    "sendFeedback": "Envía comentarios"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Organización non dispoñible",
       "selectDescription": "Escolle unha organización desde o teu perfil para continuar.",
       "selectOrganization": "Seleccionar unha organización",
-      "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar."
+      "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar.",
+      "accessDeniedTitle": "Acceso denegado",
+      "accessDeniedDescription": "Non tes acceso a esta organización."
     },
     "creditActivity": {
       "emptyDescription": "As compras, o uso e os axustes de crédito desta organización aparecerán aquí segundo ocorran.",

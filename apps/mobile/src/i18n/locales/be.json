@@ -1723,7 +1723,8 @@
       "centOne": "цэнт",
       "centOther": "цэнты",
       "dollarOne": "долар",
-      "dollarOther": "долары"
+      "dollarOther": "долары",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не атрымалася адкрыць GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Трэба папрацаваць",
     "sorryTitle": "Шкада гэта чуць!",
     "sorryMessage": "Калі ласка, паведаміце нам, што трэба палепшыць. Інжынер, які адказвае за дадатак, чытае кожную справаздачу!",
-    "emailUs": "Напішыце нам"
+    "emailUs": "Напішыце нам",
+    "neutralTitle": "Ацаніце дадатак Kilo",
+    "rateTheApp": "Ацаніце дадатак",
+    "sendFeedback": "Адправіць водгук"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Арганізацыя недаступная",
       "selectDescription": "Выберыце арганізацыю з вашага профілю, каб працягнуць.",
       "selectOrganization": "Выбраць арганізацыю",
-      "unavailableDescription": "Гэтая арганізацыя больш недаступная. Выберыце адну з вашага профілю, каб працягнуць."
+      "unavailableDescription": "Гэтая арганізацыя больш недаступная. Выберыце адну з вашага профілю, каб працягнуць.",
+      "accessDeniedTitle": "Доступ забаронены",
+      "accessDeniedDescription": "Вы не маеце доступу да гэтай арганізацыі."
     },
     "creditActivity": {
       "emptyDescription": "Пакупкі, карыстанне і карэкціроўкі крэдытаў для гэтай арганізацыі будуць з'яўляцца тут па меры іх узнікнення.",

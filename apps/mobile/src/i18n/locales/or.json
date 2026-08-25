@@ -1723,7 +1723,8 @@
       "centOne": "ସେଣ୍ଟ",
       "centOther": "ସେଣ୍ଟ",
       "dollarOne": "ଡଲାର",
-      "dollarOther": "ଡଲାର"
+      "dollarOther": "ଡଲାର",
+      "pullRequest": "ପୁଲ ରିକ୍ୱେଷ୍ଟ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ଖୋଲାଯାଇପାରିଲା ନାହିଁ",
@@ -2522,7 +2523,10 @@
     "needsWork": "ଉନ୍ନତି ଦରକାର",
     "sorryTitle": "ଏହା ଶୁଣି ଆମେ ଦୁଃଖିତ!",
     "sorryMessage": "କ'ଣ ଉନ୍ନତ ହେବା ଦରକାର ଆମକୁ ଜଣାନ୍ତୁ। ଆପ୍ ର ଦାୟିତ୍ୱରେ ଥିବା ଇଞ୍ଜିନିୟର ପ୍ରତ୍ୟେକ ରିପୋର୍ଟ ପଢ଼ନ୍ତି!",
-    "emailUs": "ଆମକୁ ଇମେଲ୍ କରନ୍ତୁ"
+    "emailUs": "ଆମକୁ ଇମେଲ୍ କରନ୍ତୁ",
+    "neutralTitle": "Kilo ଆପ୍ କୁ ମୂଲ୍ୟାଙ୍କନ କରନ୍ତୁ",
+    "rateTheApp": "ଆପ୍ କୁ ମୂଲ୍ୟାଙ୍କନ କରନ୍ତୁ",
+    "sendFeedback": "ମତାମତ ପଠାନ୍ତୁ"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "ସଂଗଠନ ଅନୁପଲବ୍ଧ",
       "selectDescription": "ଜାରି ରଖିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଏକ ସଂଗଠନ ଚୟନ କରନ୍ତୁ।",
       "selectOrganization": "ଏକ ସଂଗଠନ ଚୟନ କରନ୍ତୁ",
-      "unavailableDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଜାରି ରଖିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଏକ ଚୟନ କରନ୍ତୁ।"
+      "unavailableDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଜାରି ରଖିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଏକ ଚୟନ କରନ୍ତୁ।",
+      "accessDeniedTitle": "ପ୍ରବେଶ ଅସ୍ୱୀକୃତ",
+      "accessDeniedDescription": "ଆପଣଙ୍କର ଏହି ସଂଗଠନରେ ପ୍ରବେଶ ଅଧିକାର ନାହିଁ।"
     },
     "creditActivity": {
       "emptyDescription": "ଏହି ସଂଗଠନ ପାଇଁ କ୍ରୟ, ବ୍ୟବହାର, ଏବଂ କ୍ରେଡିଟ୍ ସଂଶୋଧନ ଘଟିବା ସମୟରେ ଏଠାରେ ଦେଖାଯିବ।",

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive unit-test suite for session-row a11y label helpers */
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -248,6 +249,64 @@ describe('sessionRowAccessibilityLabel', () => {
           meta: '1 day ago',
         })
       ).toBe('Orphan, 1 day ago');
+    });
+  });
+
+  describe('subtitle and PR provenance (title → needs input → subtitle → pr → badge → meta)', () => {
+    it('speaks "pull request N" after the branch for a PR row, in one button', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          badge: 'CLI',
+          subtitle: 'feature/x',
+          prNumber: 42,
+        })
+      ).toBe('Fix login bug, feature/x, pull request 42, CLI');
+    });
+
+    it('keeps the fixed order with needs input, branch, PR, badge, and meta', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: true,
+          badge: 'CLI',
+          meta: '5 minutes ago',
+          subtitle: 'feature/x',
+          prNumber: 7,
+        })
+      ).toBe('Fix login bug, needs input, feature/x, pull request 7, CLI, 5 minutes ago');
+    });
+
+    it('omits the pull-request phrase when the row has no PR', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Plain session',
+          needsInput: false,
+          badge: 'CLI',
+          subtitle: 'feature/x',
+        })
+      ).toBe('Plain session, feature/x, CLI');
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Plain session',
+          needsInput: false,
+          badge: 'CLI',
+          subtitle: 'feature/x',
+          prNumber: null,
+        })
+      ).toBe('Plain session, feature/x, CLI');
+    });
+
+    it('omits the branch phrase when no subtitle is present', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Plain session',
+          needsInput: false,
+          badge: 'CLI',
+          prNumber: 42,
+        })
+      ).toBe('Plain session, pull request 42, CLI');
     });
   });
 

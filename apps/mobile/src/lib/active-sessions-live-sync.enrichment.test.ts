@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import * as sessionsLive from '@/lib/active-sessions-live';
 import {
   ActiveSessionsLiveSync,
   makeCached,
@@ -289,5 +290,32 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
     const cached = qc.__getCached();
     expect(cached?.sessions.map(s => s.id)).toEqual(['a']);
     expect(cached?.sessions[0]?.createdOnPlatform).toBe('cli');
+  });
+});
+
+describe('merge enrichment — associatedPr preservation', () => {
+  const associatedPr = {
+    url: 'https://github.com/org/repo/pull/42',
+    number: 42,
+    state: 'open',
+    title: 'Fix deploy',
+    headSha: null,
+    lastSyncedAt: '2026-01-01T00:00:00.000Z',
+    reviewDecision: null,
+    reviewDecisionPending: false,
+    platform: 'github',
+  };
+
+  it('keeps associatedPr through heartbeat and snapshot merges', () => {
+    const current = [makeCached({ id: 'a', createdOnPlatform: 'cli', associatedPr })];
+    const afterHeartbeat = sessionsLive.mergeHeartbeatForActiveSessions(current, {
+      connectionId: 'c1',
+      sessions: [{ id: 'a', status: 'running', title: 'A' }],
+    });
+    const afterSnapshot = sessionsLive.mergeSnapshotForActiveSessions(current, [
+      { id: 'a', status: 'running', title: 'A', connectionId: 'c1' },
+    ]);
+    expect(afterHeartbeat[0]?.associatedPr).toEqual(associatedPr);
+    expect(afterSnapshot[0]?.associatedPr).toEqual(associatedPr);
   });
 });

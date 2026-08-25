@@ -131,7 +131,7 @@ export function parseGitHubOwnerRepo(url: string): { owner: string; repo: string
   return { owner, repo };
 }
 
-const associatedPrSchema = z.object({
+export const associatedPrSchema = z.object({
   url: z.string(),
   number: z.number(),
   state: z.string(),
@@ -318,7 +318,7 @@ function samePullRequest(sessionUrl: string, cacheUrl: string): boolean {
  *   2. Session link present but cache missing/different → pending partial.
  *   3. No session link → branch fallback (cache-only).
  */
-function formatAssociatedPr(
+export function formatAssociatedPr(
   session: SessionPrFields,
   cache: AssociatedPrRow,
   opts?: { partialReviewDecisionPending?: boolean }
@@ -849,13 +849,26 @@ export const cliSessionsV2Router = createTRPCRouter({
     // Use position() for a case-insensitive substring match. This avoids LIKE
     // wildcard semantics entirely, so %, _, and \ in user input are matched
     // literally without any escaping dance.
-    const needle = search_string.toLowerCase();
-    whereConditions.push(
-      sql`(
-        position(${needle} in lower(COALESCE(${cli_sessions_v2.title}, ''))) > 0
-        OR position(${needle} in lower(${cli_sessions_v2.session_id}::text)) > 0
-      )`
-    );
+    const trimmed = search_string.trim().toLowerCase();
+    const needle = trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
+    // `SearchInputSchema` only enforces `min(1)`, so `'#'` and `'  '` reduce
+    // to an empty needle after the trim and leading-`#` strip. In PostgreSQL
+    // `position('' in …)` is always > 0, so an empty needle would match every
+    // stored session. Match zero rows instead.
+    if (needle.length === 0) {
+      whereConditions.push(sql`false`);
+    } else {
+      whereConditions.push(
+        sql`(
+          position(${needle} in lower(COALESCE(${cli_sessions_v2.title}, ''))) > 0
+          OR position(${needle} in lower(${cli_sessions_v2.session_id}::text)) > 0
+          OR position(${needle} in lower(COALESCE(${cli_sessions_v2.git_url}, ''))) > 0
+          OR position(${needle} in lower(COALESCE(${cli_sessions_v2.git_branch}, ''))) > 0
+          OR position(${needle} in lower(COALESCE(${github_branch_pull_requests.pr_title}, ''))) > 0
+          OR position(${needle} in lower(${github_branch_pull_requests.pr_number}::text)) > 0
+        )`
+      );
+    }
 
     const baseWhere = and(...whereConditions);
 
@@ -868,9 +881,14 @@ export const cliSessionsV2Router = createTRPCRouter({
         .orderBy(desc(orderColumn))
         .limit(limit)
         .offset(pageOffset),
+      // The COUNT mirrors the rows query LEFT JOIN so the provenance
+      // predicates can reference the cache table. The list join can already
+      // double-count a branch with two cache rows; this COUNT matches that
+      // form until the join is uniqued.
       db
         .select({ count: sql<string>`COUNT(*)` })
         .from(cli_sessions_v2)
+        .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
         .where(baseWhere),
     ]);
 

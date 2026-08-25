@@ -1723,7 +1723,8 @@
       "centOne": "cent",
       "centOther": "cent",
       "dollarOne": "dollar",
-      "dollarOther": "dollar"
+      "dollarOther": "dollar",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Hindi mabuksan ang GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Kailangan pang ayusin",
     "sorryTitle": "Nalulungkot kaming marinig iyan!",
     "sorryMessage": "Mangyaring ipaalam sa amin kung ano ang kailangang pagbutihin. Binabasa ng engineer na namamahala sa app ang bawat report!",
-    "emailUs": "I-email kami"
+    "emailUs": "I-email kami",
+    "neutralTitle": "I-rate ang Kilo app",
+    "rateTheApp": "I-rate ang app",
+    "sendFeedback": "Magpadala ng feedback"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Hindi available ang organization",
       "selectDescription": "Pumili ng organization mula sa iyong profile para magpatuloy.",
       "selectOrganization": "Pumili ng organization",
-      "unavailableDescription": "Hindi na available ang organization na ito. Pumili ng isa mula sa iyong profile para magpatuloy."
+      "unavailableDescription": "Hindi na available ang organization na ito. Pumili ng isa mula sa iyong profile para magpatuloy.",
+      "accessDeniedTitle": "Walang access",
+      "accessDeniedDescription": "Wala kang access sa organisasyong ito."
     },
     "creditActivity": {
       "emptyDescription": "Lalabas dito ang mga purchase, paggamit, at pagsasaayos ng credit para sa organization na ito habang nangyayari ang mga ito.",

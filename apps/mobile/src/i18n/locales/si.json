@@ -1723,7 +1723,8 @@
       "centOne": "ශත",
       "centOther": "ශත",
       "dollarOne": "ඩොලරය",
-      "dollarOther": "ඩොලර්"
+      "dollarOther": "ඩොලර්",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub විවෘත කළ නොහැක",
@@ -2522,7 +2523,10 @@
     "needsWork": "වැඩිදියුණු කිරීම අවශ්‍යයි",
     "sorryTitle": "එය ඇසීමට අපට කණගාටුයි!",
     "sorryMessage": "වැඩිදියුණු කළ යුතු දේ අපට දන්වන්න. යෙදුමේ වගකිව යුතු ඉංජිනේරුවා සෑම වාර්තාවක්ම කියවයි!",
-    "emailUs": "අපට ඊමේල් කරන්න"
+    "emailUs": "අපට ඊමේල් කරන්න",
+    "neutralTitle": "Kilo යෙදුම ඇගයීමට ලක් කරන්න",
+    "rateTheApp": "යෙදුම ඇගයීමට ලක් කරන්න",
+    "sendFeedback": "ප්‍රතිචාරය යවන්න"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "සංවිධානය ලබා ගත නොහැක",
       "selectDescription": "ඉදිරියට යාමට ඔබගේ පැතිකඩෙන් සංවිධානයක් තෝරන්න.",
       "selectOrganization": "සංවිධානයක් තෝරන්න",
-      "unavailableDescription": "මෙම සංවිධානය තවදුරටත් ලබා ගත නොහැක. ඉදිරියට යාමට ඔබගේ පැතිකඩෙන් එකක් තෝරන්න."
+      "unavailableDescription": "මෙම සංවිධානය තවදුරටත් ලබා ගත නොහැක. ඉදිරියට යාමට ඔබගේ පැතිකඩෙන් එකක් තෝරන්න.",
+      "accessDeniedTitle": "ප්‍රවේශය ප්‍රතික්ෂේප විය",
+      "accessDeniedDescription": "ඔබට මෙම ආයතනයට ප්‍රවේශයක් නොමැත."
     },
     "creditActivity": {
       "emptyDescription": "මෙම සංවිධානය සඳහා මිලදී ගැනීම්, භාවිතය සහ ණය ගැලපීම් සිදු වන විට මෙහි දිස්වනු ඇත.",

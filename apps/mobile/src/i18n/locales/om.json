@@ -1723,7 +1723,8 @@
       "centOne": "santiima",
       "centOther": "santiimaa",
       "dollarOne": "doolaara",
-      "dollarOther": "doolaara"
+      "dollarOther": "doolaara",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub banuu hin dandeenye",
@@ -2522,7 +2523,10 @@
     "needsWork": "Fooyyessuu barbaada",
     "sorryTitle": "Nuf gaabbii dha!",
     "sorryMessage": "Maaloo waan fooyyessuu qabu nutti himi. Injinariin app irratti itti gaafatamu gabaasa hundumaa ni dubbisa!",
-    "emailUs": "Email nuu ergi"
+    "emailUs": "Email nuu ergi",
+    "neutralTitle": "App Kilo galmeessi",
+    "rateTheApp": "App galmeessi",
+    "sendFeedback": "Yaada ergi"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Dhaabbiin hin argamu",
       "selectDescription": "Itti fufuuf profile kee irraa dhaabbii filadhu.",
       "selectOrganization": "Dhaabbii filadhu",
-      "unavailableDescription": "Dhaabbiin kuni si'a kana hin argamu. Itti fufuuf profile kee irraa tokko filadhu."
+      "unavailableDescription": "Dhaabbiin kuni si'a kana hin argamu. Itti fufuuf profile kee irraa tokko filadhu.",
+      "accessDeniedTitle": "Hammaachuun dhowwame",
+      "accessDeniedDescription": "Dhaabbata kanaaf mirga hin qabdu."
     },
     "creditActivity": {
       "emptyDescription": "Bittaan, fayyadamuun, fi jijjiiramni kiriiditii dhaabbiichaaf yeroo uumannutti asitti mul'ata.",

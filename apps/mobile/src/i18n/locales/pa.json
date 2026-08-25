@@ -1723,7 +1723,8 @@
       "centOne": "ਸੈਂਟ",
       "centOther": "ਸੈਂਟ",
       "dollarOne": "ਡਾਲਰ",
-      "dollarOther": "ਡਾਲਰ"
+      "dollarOther": "ਡਾਲਰ",
+      "pullRequest": "ਪੁੱਲ ਰਿਕਵਸਟ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ",
@@ -2522,7 +2523,10 @@
     "needsWork": "ਸੁਧਾਰ ਦੀ ਲੋੜ ਹੈ",
     "sorryTitle": "ਇਹ ਸੁਣ ਕੇ ਸਾਨੂੰ ਅਫਸੋਸ ਹੈ!",
     "sorryMessage": "ਕਿਰਪਾ ਕਰਕੇ ਸਾਨੂੰ ਦੱਸੋ ਕਿ ਕੀ ਸੁਧਾਰ ਕਰਨ ਦੀ ਲੋੜ ਹੈ। ਐਪ ਦੀ ਜ਼ਿੰਮੇਵਾਰ ਇੰਜੀਨੀਅਰ ਹਰ ਇੱਕ ਰਿਪੋਰਟ ਪੜ੍ਹਦਾ ਹੈ!",
-    "emailUs": "ਸਾਨੂੰ ਈਮੇਲ ਕਰੋ"
+    "emailUs": "ਸਾਨੂੰ ਈਮੇਲ ਕਰੋ",
+    "neutralTitle": "Kilo ਐਪ ਨੂੰ ਰੇਟ ਕਰੋ",
+    "rateTheApp": "ਐਪ ਨੂੰ ਰੇਟ ਕਰੋ",
+    "sendFeedback": "ਫੀਡਬੈਕ ਭੇਜੋ"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "ਸੰਸਥਾ ਅਨੁਪਲਬਧ",
       "selectDescription": "ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣੇ ਪ੍ਰੋਫਾਈਲ ਤੋਂ ਇੱਕ ਸੰਸਥਾ ਚੁਣੋ।",
       "selectOrganization": "ਇੱਕ ਸੰਸਥਾ ਚੁਣੋ",
-      "unavailableDescription": "ਇਹ ਸੰਸਥਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣੇ ਪ੍ਰੋਫਾਈਲ ਤੋਂ ਇੱਕ ਚੁਣੋ।"
+      "unavailableDescription": "ਇਹ ਸੰਸਥਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣੇ ਪ੍ਰੋਫਾਈਲ ਤੋਂ ਇੱਕ ਚੁਣੋ।",
+      "accessDeniedTitle": "ਪਹੁੰਚ ਤੋਂ ਇਨਕਾਰ",
+      "accessDeniedDescription": "ਤੁਹਾਡੀ ਇਸ ਸੰਸਥਾ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੈ।"
     },
     "creditActivity": {
       "emptyDescription": "ਇਸ ਸੰਸਥਾ ਲਈ ਖਰੀਦਾਂ, ਵਰਤੋਂ, ਅਤੇ ਕ੍ਰੈਡਿਟ ਸਮਾਯੋਜਨ ਇੱਥੇ ਹੋਣ 'ਤੇ ਦਿਖਾਈ ਦੇਣਗੇ।",

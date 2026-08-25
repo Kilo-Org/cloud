@@ -1723,7 +1723,8 @@
       "centOne": "цент",
       "centOther": "цент",
       "dollarOne": "доллар",
-      "dollarOther": "доллар"
+      "dollarOther": "доллар",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ашу мүмкін болмады",
@@ -2522,7 +2523,10 @@
     "needsWork": "Жақсарту қажет",
     "sorryTitle": "Мұны естігенімізге өкінеміз!",
     "sorryMessage": "Не жақсарту керектігін айтыңыз. Қосымшаға жауапты инженер әрбір есепті оқиды!",
-    "emailUs": "Бізге жазыңыз"
+    "emailUs": "Бізге жазыңыз",
+    "neutralTitle": "Kilo қосымшасын бағалаңыз",
+    "rateTheApp": "Қосымшаны бағалаңыз",
+    "sendFeedback": "Пікір жіберу"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Ұйым қолжетімсіз",
       "selectDescription": "Жалғастыру үшін профильден ұйымды таңдаңыз.",
       "selectOrganization": "Ұйымды таңдау",
-      "unavailableDescription": "Бұл ұйым енді қолжетімсіз. Жалғастыру үшін профильден біреуін таңдаңыз."
+      "unavailableDescription": "Бұл ұйым енді қолжетімсіз. Жалғастыру үшін профильден біреуін таңдаңыз.",
+      "accessDeniedTitle": "Қолжетімділікке тыйым салынды",
+      "accessDeniedDescription": "Сізде бұл ұйымға қолжетімділік жоқ."
     },
     "creditActivity": {
       "emptyDescription": "Осы ұйымның сатып алулары, пайдалануы және кредит түзетулері болған сайын осында көрсетіледі.",

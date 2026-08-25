@@ -1723,7 +1723,8 @@
       "centOne": "cent",
       "centOther": "cent",
       "dollarOne": "dalur",
-      "dollarOther": "dalir"
+      "dollarOther": "dalir",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ekki tókst að opna GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Þarfnast úrbóta",
     "sorryTitle": "Okkur þykir leitt að heyra það!",
     "sorryMessage": "Vinsamlega láttu okkur vita hvað þarf að bæta. Verkfræðingurinn sem sér um appið les hverja einustu skýrslu!",
-    "emailUs": "Sendu okkur tölvupóst"
+    "emailUs": "Sendu okkur tölvupóst",
+    "neutralTitle": "Metdu Kilo-forritið",
+    "rateTheApp": "Metdu forritið",
+    "sendFeedback": "Senda endurgjöf"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Félag ótiltækt",
       "selectDescription": "Veldu félag úr prófílnum þínum til að halda áfram.",
       "selectOrganization": "Veldu félag",
-      "unavailableDescription": "Þetta félag er ekki lengur tiltækt. Veldu eitt úr prófílnum þínum til að halda áfram."
+      "unavailableDescription": "Þetta félag er ekki lengur tiltækt. Veldu eitt úr prófílnum þínum til að halda áfram.",
+      "accessDeniedTitle": "Aðgangi neitað",
+      "accessDeniedDescription": "Þú hefur ekki aðgang að þessari stofnun."
     },
     "creditActivity": {
       "emptyDescription": "Kaup, notkun og kreditleiðréttingar fyrir þetta félag birtast hér þegar þær verða.",

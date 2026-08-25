@@ -1723,7 +1723,8 @@
       "centOne": "cent",
       "centOther": "cents",
       "dollarOne": "doler",
-      "dollarOther": "doleri"
+      "dollarOther": "doleri",
+      "pullRequest": "cais tynnu {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Methwyd agor GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Angen gwaith",
     "sorryTitle": "Mae'n ddrwg gennym glywed hynny!",
     "sorryMessage": "Rhowch wybod i ni beth sydd angen ei wella. Mae'r peiriannydd sy'n gyfrifol am yr ap yn darllen pob adroddiad!",
-    "emailUs": "E-bostiwch ni"
+    "emailUs": "E-bostiwch ni",
+    "neutralTitle": "Graduwch ap Kilo",
+    "rateTheApp": "Graduwch yr ap",
+    "sendFeedback": "Anfonwch adborth"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Sefydliad ar gael",
       "selectDescription": "Dewiswch sefydliad o'ch proffil i barhau.",
       "selectOrganization": "Dewis sefydliad",
-      "unavailableDescription": "Nid yw'r sefydliad hwn ar gael mwyach. Dewiswch un o'ch proffil i barhau."
+      "unavailableDescription": "Nid yw'r sefydliad hwn ar gael mwyach. Dewiswch un o'ch proffil i barhau.",
+      "accessDeniedTitle": "Mynediad wedi'i wrthod",
+      "accessDeniedDescription": "Nid oes gennych fynediad i'r sefydliad hwn."
     },
     "creditActivity": {
       "emptyDescription": "Bydd pryniannau, defnydd, ac addasiadau credyd ar gyfer y sefydliad hwn yn ymddangos yma wrth iddynt ddigwydd.",

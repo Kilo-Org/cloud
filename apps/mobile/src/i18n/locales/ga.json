@@ -1723,7 +1723,8 @@
       "centOne": "cent",
       "centOther": "cent",
       "dollarOne": "dollar",
-      "dollarOther": "dollar"
+      "dollarOther": "dollar",
+      "pullRequest": "iarraidh tarraingt {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Níorbh fhéidir GitHub a oscailt",
@@ -2522,7 +2523,10 @@
     "needsWork": "Teastaíonn obair",
     "sorryTitle": "Tá brón orainn é sin a chloisteáil!",
     "sorryMessage": "Inis dúinn cad a chaithfidh a bheith níos fearr. Léann an t-innealtóir atá i gceannas ar an aip gach tuarascáil!",
-    "emailUs": "Seol ríomhphost chugainn"
+    "emailUs": "Seol ríomhphost chugainn",
+    "neutralTitle": "Grádaigh an aip Kilo",
+    "rateTheApp": "Grádaigh an aip",
+    "sendFeedback": "Seol aiseolas"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Eagraíocht gan fáil",
       "selectDescription": "Roghnaigh eagraíocht ó do phróifíl le leanúint ar aghaidh.",
       "selectOrganization": "Roghnaigh eagraíocht",
-      "unavailableDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Roghnaigh ceann ó do phróifíl le leanúint ar aghaidh."
+      "unavailableDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Roghnaigh ceann ó do phróifíl le leanúint ar aghaidh.",
+      "accessDeniedTitle": "Rochtain diúltaithe",
+      "accessDeniedDescription": "Níl rochtain agat ar an eagraíocht seo."
     },
     "creditActivity": {
       "emptyDescription": "Beidh ceannacháin, úsáid, agus coigeartuithe creidmheasa don eagraíocht seo le feiceáil anseo de réir mar a tharlaíonn siad.",

@@ -1723,7 +1723,8 @@
       "centOne": "cent",
       "centOther": "cent",
       "dollarOne": "dollar",
-      "dollarOther": "dollarer"
+      "dollarOther": "dollarer",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunne ikke åpne GitHub",
@@ -2522,7 +2523,10 @@
     "needsWork": "Trenger forbedring",
     "sorryTitle": "Så leit å høre!",
     "sorryMessage": "Fortell oss hva som må bli bedre. Ingeniøren som har ansvaret for appen, leser hver eneste rapport!",
-    "emailUs": "Send oss e-post"
+    "emailUs": "Send oss e-post",
+    "neutralTitle": "Vurder Kilo-appen",
+    "rateTheApp": "Vurder appen",
+    "sendFeedback": "Send tilbakemelding"
   },
   "organization": {
     "boundary": {
@@ -2532,7 +2536,9 @@
       "organizationUnavailable": "Organisasjon utilgjengelig",
       "selectDescription": "Velg en organisasjon fra profilen din for å fortsette.",
       "selectOrganization": "Velg en organisasjon",
-      "unavailableDescription": "Denne organisasjonen er ikke lenger tilgjengelig. Velg en fra profilen din for å fortsette."
+      "unavailableDescription": "Denne organisasjonen er ikke lenger tilgjengelig. Velg en fra profilen din for å fortsette.",
+      "accessDeniedTitle": "Tilgang nektet",
+      "accessDeniedDescription": "Du har ikke tilgang til denne organisasjonen."
     },
     "creditActivity": {
       "emptyDescription": "Kjøp, bruk og kredittjusteringer for denne organisasjonen vil vises her etter hvert som de skjer.",

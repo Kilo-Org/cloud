@@ -38,7 +38,7 @@ const integrationDetailRegistry = {
     title: 'GitHub Integration',
     userSubtitle: 'Set up personal repository access and optional Cloud Agent attribution',
     organizationSubtitle: organizationName =>
-      `Manage repository access for ${organizationName} and link your personal identity.`,
+      `Connect the GitHub organizations whose repositories ${organizationName} can use.`,
     render: async ({ organizationId, search }) => {
       const { GitHubIntegrationDetails } =
         await import('@/components/integrations/GitHubIntegrationDetails');

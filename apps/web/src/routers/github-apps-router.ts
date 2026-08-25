@@ -47,6 +47,51 @@ export const githubAppsRouter = createTRPCRouter({
     return githubAppsService.listIntegrations(owner);
   }),
 
+  listOrganizationInstallations: baseProcedure
+    .input(z.object({ organizationId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const role = await ensureOrganizationAccess(ctx, input.organizationId);
+      const integrations = await githubAppsService.listIntegrations({
+        type: 'org',
+        id: input.organizationId,
+      });
+      const primaryId = integrations.find(isPlatformIntegrationHealthy)?.id ?? null;
+
+      return {
+        canAdd: integrations.length === 0,
+        installations: integrations.map(integration => {
+          const repositories = requireNumericPlatformRepositories(integration.repositories) ?? [];
+          const status: 'connected' | 'pending' | 'suspended' | 'needs_attention' =
+            isPlatformIntegrationHealthy(integration)
+              ? 'connected'
+              : integration.integration_status === 'pending'
+                ? 'pending'
+                : integration.suspended_at || integration.integration_status === 'suspended'
+                  ? 'suspended'
+                  : 'needs_attention';
+          const canCancel =
+            status === 'pending' &&
+            (ctx.user.is_admin ||
+              role === 'owner' ||
+              role === 'admin' ||
+              integration.kilo_requester_user_id === ctx.user.id);
+
+          return {
+            id: integration.id,
+            accountLogin: integration.platform_account_login,
+            installationId: integration.platform_installation_id,
+            status,
+            repositorySelection: integration.repository_access,
+            repositories,
+            isPrimary: integration.id === primaryId,
+            canRefresh: status !== 'pending',
+            canUninstall: ctx.user.is_admin || role === 'owner' || role === 'admin',
+            canCancel,
+          };
+        }),
+      };
+    }),
+
   getUserAuthorization: baseProcedure.query(async ({ ctx }) => {
     return getGitHubUserAuthorizationStatus(ctx.user.id);
   }),
@@ -104,6 +149,7 @@ export const githubAppsRouter = createTRPCRouter({
       // which called ensureOrganizationAccess with no role filter.
       const owner = await resolveAuthorizedOwner(ctx, input.organizationId, [
         'owner',
+        'admin',
         'billing_manager',
         'member',
       ]);

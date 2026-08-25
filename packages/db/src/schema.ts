@@ -10824,6 +10824,31 @@ export const compute_usage_charge = pgTable(
 export type ComputeUsageCharge = typeof compute_usage_charge.$inferSelect;
 export type NewComputeUsageCharge = typeof compute_usage_charge.$inferInsert;
 
+// Surviving record of the spend a sales-demo reset discards. The reset deletes
+// the org's usage and credit rows, so a row here is the only remaining proof
+// that a demo cost money. `microdollars_used` is the org counter at reset time,
+// which covers LLM, Exa, and compute spend. A reset with no spend writes nothing.
+export const sales_demo_spend_ledger = pgTable(
+  'sales_demo_spend_ledger',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'restrict' }),
+    // Null when the demo org has no creator, which `restoreSalesDemoOrganization` allows.
+    owner_kilo_user_id: text(),
+    period_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    period_end: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    microdollars_used: bigint({ mode: 'number' }).notNull(),
+  },
+  table => [check('sales_demo_spend_ledger_spend_positive', sql`${table.microdollars_used} > 0`)]
+);
+
+export type SalesDemoSpendLedgerEntry = typeof sales_demo_spend_ledger.$inferSelect;
+
 // Content moderation reports. `context_json` holds only minimized metadata
 // (surface, ids, model id, platform) — never a message or comment body.
 export const content_moderation_reports = pgTable(

@@ -5,12 +5,14 @@ import {
   kilocode_users,
   microdollar_usage,
   microdollar_usage_daily,
+  microdollar_usage_metadata,
   organization_memberships,
+  organization_user_limits,
   organization_user_usage,
   organizations,
   sales_demo_spend_ledger,
 } from '@kilocode/db/schema';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
 import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
@@ -69,6 +71,13 @@ describe('sales demo router', () => {
   afterAll(async () => {
     const orgIds = [firstOrgId, secondOrgId, thirdOrgId, normalOrgId].filter(Boolean);
     if (orgIds.length > 0) {
+      const usageIds = db
+        .select({ id: microdollar_usage.id })
+        .from(microdollar_usage)
+        .where(inArray(microdollar_usage.organization_id, orgIds));
+      await db
+        .delete(microdollar_usage_metadata)
+        .where(inArray(microdollar_usage_metadata.id, usageIds));
       await db
         .delete(credit_transactions)
         .where(inArray(credit_transactions.organization_id, orgIds));
@@ -79,6 +88,9 @@ describe('sales demo router', () => {
       await db
         .delete(organization_user_usage)
         .where(inArray(organization_user_usage.organization_id, orgIds));
+      await db
+        .delete(organization_user_limits)
+        .where(inArray(organization_user_limits.organization_id, orgIds));
       await db
         .delete(organization_memberships)
         .where(inArray(organization_memberships.organization_id, orgIds));
@@ -130,7 +142,7 @@ describe('sales demo router', () => {
     });
   });
 
-  it('creates an enterprise sales demo org with $50 and 26 members', async () => {
+  it('creates an enterprise sales demo org with $25.03 remaining and 26 members', async () => {
     const caller = await createCallerForUser(admin.id);
     const result = await caller.admin.salesDemo.create({ email: target.google_user_email });
 
@@ -148,10 +160,12 @@ describe('sales demo router', () => {
     expect(org.require_seats).toBe(false);
     expect(org.settings.is_sales_demo).toBe(true);
     expect(org.settings.suppress_trial_messaging).toBe(true);
+    expect(org.settings.enable_usage_limits).toBe(true);
     expect(org.created_by_kilo_user_id).toBe(target.id);
     expect(Number(org.total_microdollars_acquired) - Number(org.microdollars_used)).toBe(
-      50_000_000
+      25_030_000
     );
+    expect(org.settings.sales_demo_seeded_microdollars).toBe(Number(org.microdollars_used));
 
     const [ownerMembership] = await db
       .select()
@@ -184,6 +198,103 @@ describe('sales demo router', () => {
       expect(member).toBeDefined();
       expect(member?.google_user_email).toBe(salesDemoMemberEmail(n));
       expect(member?.google_user_name).toBe(salesDemoMemberName(n));
+      expect(member?.google_user_email).toMatch(/@harborline\.ai$/);
+    }
+  });
+
+  it('keeps seeded usage, rollups, and org counters in agreement after create', async () => {
+    const [rawSum] = await db
+      .select({ total: sql<number>`COALESCE(SUM(${microdollar_usage.cost}), 0)`.mapWith(Number) })
+      .from(microdollar_usage)
+      .where(eq(microdollar_usage.organization_id, firstOrgId));
+    const [dailySum] = await db
+      .select({
+        total:
+          sql<number>`COALESCE(SUM(${microdollar_usage_daily.total_cost_microdollars}), 0)`.mapWith(
+            Number
+          ),
+      })
+      .from(microdollar_usage_daily)
+      .where(eq(microdollar_usage_daily.organization_id, firstOrgId));
+    const [userUsageSum] = await db
+      .select({
+        total: sql<number>`COALESCE(SUM(${organization_user_usage.microdollar_usage}), 0)`.mapWith(
+          Number
+        ),
+      })
+      .from(organization_user_usage)
+      .where(eq(organization_user_usage.organization_id, firstOrgId));
+
+    const [org] = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, firstOrgId))
+      .limit(1);
+
+    expect(rawSum.total).toBeGreaterThan(0);
+    expect(rawSum.total).toBe(dailySum.total);
+    expect(dailySum.total).toBe(userUsageSum.total);
+    expect(userUsageSum.total).toBe(Number(org.microdollars_used));
+    expect(Number(org.microdollars_used)).toBe(org.settings.sales_demo_seeded_microdollars);
+  });
+
+  it('writes non-null project, feature, and mode attribution on seeded rows', async () => {
+    const [withProject] = await db
+      .select({ id: microdollar_usage.id })
+      .from(microdollar_usage)
+      .where(
+        and(
+          eq(microdollar_usage.organization_id, firstOrgId),
+          isNotNull(microdollar_usage.project_id)
+        )
+      )
+      .limit(1);
+    expect(withProject).toBeDefined();
+
+    const [withMeta] = await db
+      .select({
+        feature_id: microdollar_usage_metadata.feature_id,
+        mode_id: microdollar_usage_metadata.mode_id,
+      })
+      .from(microdollar_usage_metadata)
+      .innerJoin(microdollar_usage, eq(microdollar_usage_metadata.id, microdollar_usage.id))
+      .where(eq(microdollar_usage.organization_id, firstOrgId))
+      .limit(1);
+    expect(withMeta).toBeDefined();
+    expect(withMeta.feature_id).not.toBeNull();
+    expect(withMeta.mode_id).not.toBeNull();
+  });
+
+  it('gives members 01-03 daily limits and near-limit usage today', async () => {
+    for (const n of [1, 2, 3]) {
+      const memberId = salesDemoMemberId(n);
+
+      const limits = await db
+        .select()
+        .from(organization_user_limits)
+        .where(
+          and(
+            eq(organization_user_limits.organization_id, firstOrgId),
+            eq(organization_user_limits.kilo_user_id, memberId),
+            eq(organization_user_limits.limit_type, 'daily')
+          )
+        );
+      expect(limits).toHaveLength(1);
+
+      const usageRows = await db
+        .select({ microdollar_usage: organization_user_usage.microdollar_usage })
+        .from(organization_user_usage)
+        .where(
+          and(
+            eq(organization_user_usage.organization_id, firstOrgId),
+            eq(organization_user_usage.kilo_user_id, memberId),
+            eq(organization_user_usage.limit_type, 'daily'),
+            eq(organization_user_usage.usage_date, sql`CURRENT_DATE`)
+          )
+        );
+      const todayUsage = usageRows.reduce((acc, row) => acc + Number(row.microdollar_usage), 0);
+      expect(todayUsage).toBeGreaterThanOrEqual(20_000_000);
+      expect(todayUsage).toBeLessThanOrEqual(23_750_000);
     }
   });
 
@@ -258,7 +369,7 @@ describe('sales demo router', () => {
     expect(liveDemos).toHaveLength(1);
   });
 
-  it('resets a dirty demo org back to the same id and $50', async () => {
+  it('resets a dirty demo org, ledgering only the real spend above seeded', async () => {
     const caller = await createCallerForUser(admin.id);
 
     const [before] = await db
@@ -314,20 +425,6 @@ describe('sales demo router', () => {
         )
       );
 
-    await db.insert(microdollar_usage_daily).values({
-      kilo_user_id: target.id,
-      organization_id: firstOrgId,
-      usage_date: '2026-08-25',
-    });
-
-    await db.insert(organization_user_usage).values({
-      organization_id: firstOrgId,
-      kilo_user_id: target.id,
-      usage_date: sql`CURRENT_DATE`,
-      limit_type: 'daily',
-      microdollar_usage: 1_000_000,
-    });
-
     const result = await caller.admin.salesDemo.reset({ organizationId: firstOrgId });
     expect(result.organizationId).toBe(firstOrgId);
 
@@ -337,12 +434,12 @@ describe('sales demo router', () => {
       .where(eq(organizations.id, firstOrgId))
       .limit(1);
 
-    expect(Number(after.microdollars_used)).toBe(0);
+    expect(Number(after.microdollars_used)).toBe(after.settings.sales_demo_seeded_microdollars);
     expect(Number(after.total_microdollars_acquired) - Number(after.microdollars_used)).toBe(
-      50_000_000
+      25_030_000
     );
     expect(after.settings.is_sales_demo).toBe(true);
-    expect(after.settings.enable_usage_limits).toBe(false);
+    expect(after.settings.enable_usage_limits).toBe(true);
     expect(after.settings.code_indexing_enabled).toBe(true);
     expect(after.settings.suppress_trial_messaging).toBe(true);
     expect(after.settings.recommendations_digest_enabled).toBe(true);
@@ -387,20 +484,20 @@ describe('sales demo router', () => {
       .select({ id: microdollar_usage_daily.id })
       .from(microdollar_usage_daily)
       .where(eq(microdollar_usage_daily.organization_id, firstOrgId));
-    expect(dailyProjections).toHaveLength(0);
+    expect(dailyProjections.length).toBeGreaterThan(0);
 
     const orgUsageProjections = await db
       .select({ id: organization_user_usage.id })
       .from(organization_user_usage)
       .where(eq(organization_user_usage.organization_id, firstOrgId));
-    expect(orgUsageProjections).toHaveLength(0);
+    expect(orgUsageProjections.length).toBeGreaterThan(0);
 
     const txns = await db
       .select({ amount_microdollars: credit_transactions.amount_microdollars })
       .from(credit_transactions)
       .where(eq(credit_transactions.organization_id, firstOrgId));
     const total = txns.reduce((acc, tx) => acc + Number(tx.amount_microdollars), 0);
-    expect(total).toBe(50_000_000);
+    expect(total).toBe(after.settings.sales_demo_seeded_microdollars + 25_030_000);
 
     const ledger = await db
       .select()
@@ -414,7 +511,7 @@ describe('sales demo router', () => {
     );
   });
 
-  it('writes no ledger row when a demo org reset discards no spend', async () => {
+  it('writes no ledger row for a demo org with seeded usage and no real spend', async () => {
     const caller = await createCallerForUser(admin.id);
 
     await caller.admin.salesDemo.reset({ organizationId: secondOrgId });

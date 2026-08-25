@@ -6,6 +6,10 @@ jest.mock('@/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
 }));
 
+// Create + reset each run a full 30-day populate step, so a single test case
+// needs more than the default 5s budget.
+jest.setTimeout(30_000);
+
 import { db } from '@/lib/drizzle';
 import {
   compute_usage_charge,
@@ -13,8 +17,13 @@ import {
   exa_usage_log,
   kilocode_users,
   microdollar_usage,
+  microdollar_usage_daily,
+  microdollar_usage_metadata,
   organization_memberships,
+  organization_user_limits,
+  organization_user_usage,
   organizations,
+  sales_demo_spend_ledger,
 } from '@kilocode/db/schema';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -29,13 +38,32 @@ async function deleteAllSalesDemoOrgs() {
     .where(sql`${organizations.settings}->>'is_sales_demo' = 'true'`);
   const ids = rows.map(row => row.id);
   if (ids.length === 0) return;
+  const usageIds = db
+    .select({ id: microdollar_usage.id })
+    .from(microdollar_usage)
+    .where(inArray(microdollar_usage.organization_id, ids));
+  await db
+    .delete(microdollar_usage_metadata)
+    .where(inArray(microdollar_usage_metadata.id, usageIds));
   await db.delete(credit_transactions).where(inArray(credit_transactions.organization_id, ids));
   await db.delete(microdollar_usage).where(inArray(microdollar_usage.organization_id, ids));
+  await db
+    .delete(microdollar_usage_daily)
+    .where(inArray(microdollar_usage_daily.organization_id, ids));
+  await db
+    .delete(organization_user_usage)
+    .where(inArray(organization_user_usage.organization_id, ids));
+  await db
+    .delete(organization_user_limits)
+    .where(inArray(organization_user_limits.organization_id, ids));
   await db.delete(exa_usage_log).where(inArray(exa_usage_log.organization_id, ids));
   await db.delete(compute_usage_charge).where(inArray(compute_usage_charge.organization_id, ids));
   await db
     .delete(organization_memberships)
     .where(inArray(organization_memberships.organization_id, ids));
+  await db
+    .delete(sales_demo_spend_ledger)
+    .where(inArray(sales_demo_spend_ledger.organization_id, ids));
   await db.delete(organizations).where(inArray(organizations.id, ids));
 }
 
@@ -86,7 +114,7 @@ describe('GET /api/cron/sales-demo-reset', () => {
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
   });
 
-  it('resets one dirty live demo org to $50 and reports reset 1', async () => {
+  it('resets one dirty live demo org to $25.03 and reports reset 1', async () => {
     const org = await db.transaction(async tx =>
       createSalesDemoOrganization({ targetUser: target, adminUser: admin, txn: tx })
     );
@@ -117,9 +145,9 @@ describe('GET /api/cron/sales-demo-reset', () => {
       .where(eq(organizations.id, org.id))
       .limit(1);
 
-    expect(Number(reloaded.microdollars_used)).toBe(0);
+    expect(Number(reloaded.microdollars_used)).toBeGreaterThan(0);
     expect(Number(reloaded.total_microdollars_acquired) - Number(reloaded.microdollars_used)).toBe(
-      50_000_000
+      25_030_000
     );
   });
 });

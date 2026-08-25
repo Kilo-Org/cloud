@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   compute_usage_charge,
@@ -6,8 +7,10 @@ import {
   kilocode_users,
   microdollar_usage,
   microdollar_usage_daily,
+  microdollar_usage_metadata,
   organization_invitations,
   organization_memberships,
+  organization_user_limits,
   organization_user_usage,
   organizations,
   sales_demo_spend_ledger,
@@ -16,29 +19,76 @@ import {
 } from '@kilocode/db/schema';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { addUserToOrganization } from '@/lib/organizations/organizations';
-import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
+import { populateSalesDemoUsage } from './sales-demo-usage';
 
 export const SALES_DEMO_MEMBER_COUNT = 25;
-export const SALES_DEMO_CREDIT_USD = 50;
+export const SALES_DEMO_REMAINING_MICRODOLLARS = 25_030_000;
 
 export const ALREADY_OWNS_DEMO = 'ALREADY_OWNS_DEMO';
 export const NOT_LIVE_SALES_DEMO = 'NOT_LIVE_SALES_DEMO';
+
+/**
+ * Fixed 25 human names for the demo members. Index `n - 1` aligns with
+ * `salesDemoMemberId(n)` so member `01` uses the first entry.
+ */
+export const SALES_DEMO_MEMBER_PROFILES: ReadonlyArray<{ first: string; last: string }> = [
+  { first: 'Ava', last: 'Chen' },
+  { first: 'Liam', last: 'Rodriguez' },
+  { first: 'Sofia', last: 'Patel' },
+  { first: 'Noah', last: 'Kim' },
+  { first: 'Maya', last: 'Johnson' },
+  { first: 'Ethan', last: 'Nguyen' },
+  { first: 'Olivia', last: 'Martinez' },
+  { first: 'Lucas', last: 'Brown' },
+  { first: 'Emma', last: 'Wilson' },
+  { first: 'Mateo', last: 'Garcia' },
+  { first: 'Isabella', last: 'Lee' },
+  { first: 'Gabriel', last: 'Thompson' },
+  { first: 'Chloe', last: 'Anderson' },
+  { first: 'Daniel', last: 'White' },
+  { first: 'Zoe', last: 'Harris' },
+  { first: 'Henry', last: 'Clark' },
+  { first: 'Lily', last: 'Lewis' },
+  { first: 'Jack', last: 'Robinson' },
+  { first: 'Grace', last: 'Walker' },
+  { first: 'Owen', last: 'Hall' },
+  { first: 'Mia', last: 'Young' },
+  { first: 'Samuel', last: 'King' },
+  { first: 'Ella', last: 'Wright' },
+  { first: 'Benjamin', last: 'Scott' },
+  { first: 'Nora', last: 'Green' },
+];
+
+function memberProfile(n: number): { first: string; last: string } {
+  const profile = SALES_DEMO_MEMBER_PROFILES[n - 1];
+  if (!profile) {
+    throw new Error(`No sales demo member profile for index ${n}`);
+  }
+  return profile;
+}
 
 export function salesDemoMemberId(n: number): string {
   return `sales-demo-member-${String(n).padStart(2, '0')}`;
 }
 
 export function salesDemoMemberEmail(n: number): string {
-  return `${salesDemoMemberId(n)}@example.com`;
+  const { first, last } = memberProfile(n);
+  return `${first}.${last}@harborline.ai`.toLowerCase();
 }
 
 export function salesDemoMemberName(n: number): string {
-  return `Demo Member ${String(n).padStart(2, '0')}`;
+  const { first, last } = memberProfile(n);
+  return `${first} ${last}`;
+}
+
+export function salesDemoMemberAvatarUrl(email: string): string {
+  const hash = createHash('md5').update(email.toLowerCase().trim()).digest('hex');
+  return `https://www.gravatar.com/avatar/${hash}?s=80&d=identicon`;
 }
 
 export function demoOrganizationSettings(now: Date) {
   return {
-    enable_usage_limits: false,
+    enable_usage_limits: true,
     code_indexing_enabled: true,
     suppress_trial_messaging: true,
     recommendations_digest_enabled: true,
@@ -56,14 +106,16 @@ export async function ensureSalesDemoUsers(txn: DrizzleTransaction): Promise<str
   for (let n = 1; n <= SALES_DEMO_MEMBER_COUNT; n++) {
     const id = salesDemoMemberId(n);
     const email = salesDemoMemberEmail(n);
+    const name = salesDemoMemberName(n);
+    const imageUrl = salesDemoMemberAvatarUrl(email);
     const padded = String(n).padStart(2, '0');
     await txn
       .insert(kilocode_users)
       .values({
         id,
         google_user_email: email,
-        google_user_name: salesDemoMemberName(n),
-        google_user_image_url: `https://example.com/sales-demo-member-${padded}.png`,
+        google_user_name: name,
+        google_user_image_url: imageUrl,
         stripe_customer_id: `cus_sales_demo_${padded}`,
         normalized_email: email,
       })
@@ -71,8 +123,8 @@ export async function ensureSalesDemoUsers(txn: DrizzleTransaction): Promise<str
         target: kilocode_users.id,
         set: {
           google_user_email: email,
-          google_user_name: salesDemoMemberName(n),
-          google_user_image_url: `https://example.com/sales-demo-member-${padded}.png`,
+          google_user_name: name,
+          google_user_image_url: imageUrl,
           normalized_email: email,
         },
       });
@@ -182,19 +234,12 @@ export async function createSalesDemoOrganization(args: {
     await addUserToOrganization(organization.id, demoId, 'member', txn);
   }
 
-  const creditResult = await grantEntityCreditForCategory(
-    { user: adminUser, organization },
-    {
-      credit_category: 'sales-demo',
-      counts_as_selfservice: false,
-      amount_usd: SALES_DEMO_CREDIT_USD,
-      dbOrTx: txn,
-    }
-  );
-
-  if (!creditResult.success) {
-    throw new Error(`Failed to grant credits: ${creditResult.message}`);
-  }
+  await populateSalesDemoUsage(txn, {
+    organization,
+    actorUser: adminUser,
+    memberIds: [...demoIds, targetUser.id],
+    now,
+  });
 
   return organization;
 }
@@ -224,18 +269,29 @@ export async function restoreSalesDemoOrganization(args: {
   const ownerId = org.created_by_kilo_user_id;
 
   // The deletes below destroy the org's usage and credit rows, so record the
-  // discarded spend first. `microdollars_used` is the org counter that the LLM,
-  // Exa, and compute charge paths all increment.
-  const spentMicrodollars = Number(org.microdollars_used);
-  if (spentMicrodollars > 0) {
+  // discarded real spend first. `microdollars_used` includes seeded usage, so
+  // subtract the seeded baseline before writing the ledger row.
+  //
+  // Before the seeded baseline existed this wrote the full `microdollars_used`
+  // form (PR #5496). Remove the seeded subtraction once every live demo org
+  // carries `sales_demo_seeded_microdollars`.
+  const seeded = org.settings.sales_demo_seeded_microdollars ?? 0;
+  const realSpend = Number(org.microdollars_used) - seeded;
+  if (realSpend > 0) {
     await txn.insert(sales_demo_spend_ledger).values({
       organization_id: organizationId,
       owner_kilo_user_id: ownerId,
       period_start: org.settings.sales_demo_last_reset_at ?? org.created_at,
-      microdollars_used: spentMicrodollars,
+      microdollars_used: realSpend,
     });
   }
 
+  await txn.execute(sql`
+    DELETE FROM ${microdollar_usage_metadata}
+    WHERE id IN (
+      SELECT id FROM microdollar_usage WHERE organization_id = ${organizationId}
+    )
+  `);
   await txn.delete(microdollar_usage).where(eq(microdollar_usage.organization_id, organizationId));
   await txn.delete(exa_usage_log).where(eq(exa_usage_log.organization_id, organizationId));
   await txn
@@ -277,6 +333,10 @@ export async function restoreSalesDemoOrganization(args: {
     .delete(organization_memberships)
     .where(eq(organization_memberships.organization_id, organizationId));
 
+  await txn
+    .delete(organization_user_limits)
+    .where(eq(organization_user_limits.organization_id, organizationId));
+
   if (ownerId) {
     await addUserToOrganization(organizationId, ownerId, 'owner', txn);
   }
@@ -295,19 +355,12 @@ export async function restoreSalesDemoOrganization(args: {
     throw new Error(`Organization ${organizationId} not found after reset`);
   }
 
-  const creditResult = await grantEntityCreditForCategory(
-    { user: actorUser, organization: reloadedOrg },
-    {
-      credit_category: 'sales-demo',
-      counts_as_selfservice: false,
-      amount_usd: SALES_DEMO_CREDIT_USD,
-      dbOrTx: txn,
-    }
-  );
-
-  if (!creditResult.success) {
-    throw new Error(`Failed to grant credits: ${creditResult.message}`);
-  }
+  await populateSalesDemoUsage(txn, {
+    organization: reloadedOrg,
+    actorUser,
+    memberIds: [...demoIds, ownerId].filter((id): id is string => Boolean(id)),
+    now,
+  });
 
   return organizationId;
 }

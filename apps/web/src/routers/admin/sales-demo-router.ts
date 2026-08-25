@@ -8,10 +8,10 @@ import { findUserByNormalizedEmail } from '@/lib/user';
 import {
   ALREADY_OWNS_DEMO,
   createSalesDemoOrganization,
-  isAllowedSalesDemoEmail,
   NOT_LIVE_SALES_DEMO,
   restoreSalesDemoOrganization,
 } from '@/lib/organizations/sales-demo';
+import { isAllowedSalesDemoEmail } from '@/lib/organizations/sales-demo-email';
 
 export const salesDemoRouter = createTRPCRouter({
   create: adminProcedure

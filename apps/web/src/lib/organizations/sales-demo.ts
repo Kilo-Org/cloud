@@ -13,9 +13,6 @@ import {
 import { and, asc, eq, isNull, ne, notInArray, sql } from 'drizzle-orm';
 import { addUserToOrganization } from '@/lib/organizations/organizations';
 import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
-import { isAllowedSalesDemoEmail } from './sales-demo-email';
-
-export { isAllowedSalesDemoEmail };
 
 export const SALES_DEMO_MEMBER_COUNT = 25;
 export const SALES_DEMO_CREDIT_USD = 50;

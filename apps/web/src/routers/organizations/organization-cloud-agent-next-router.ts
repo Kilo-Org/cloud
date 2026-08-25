@@ -13,7 +13,7 @@ import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
 } from '@/routers/organizations/utils';
-import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
+import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import {
   BitbucketOrganizationRepositoryListResultSchema,
   fetchBitbucketRepositoriesForOrganization,
@@ -238,6 +238,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       const {
         gitlabProject,
         githubRepo,
+        githubIntegrationId,
         bitbucketRepo,
         organizationId,
         attachments,
@@ -250,6 +251,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       // envVars/setupCommands/mcpServers overrides unchanged.
       let gitParams: {
         githubRepo?: string;
+        githubIntegrationId?: string;
         gitUrl?: string;
         platform?: 'github' | 'gitlab' | 'bitbucket';
         bitbucketWorkspaceUuid?: string;
@@ -268,7 +270,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           bitbucketRepositoryUuid: bitbucketRepo.repositoryUuid,
         };
       } else {
-        gitParams = { githubRepo, platform: PLATFORM.GITHUB };
+        gitParams = { githubRepo, githubIntegrationId, platform: PLATFORM.GITHUB };
       }
 
       try {
@@ -640,6 +642,8 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
             fullName: z.string(),
             private: z.boolean(),
             defaultBranch: z.string().optional(),
+            platformIntegrationId: z.string().uuid().optional(),
+            platformAccountLogin: z.string().optional(),
           })
         ),
         integrationInstalled: z.boolean(),
@@ -648,7 +652,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      const result = await fetchGitHubRepositoriesForOrganization(
+      const result = await fetchAllGitHubRepositoriesForOrganization(
         input.organizationId,
         input.forceRefresh
       );

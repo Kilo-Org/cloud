@@ -11,7 +11,11 @@ const CLOUD_AGENT_NEXT_LOCAL_TEST_MODEL = {
 } satisfies ModelOption;
 const REPO_STORAGE_KEY_PREFIX = 'cloud-agent:last-used-repo';
 
-type LastUsedRepo = { fullName: string; platform: RepositoryPlatform };
+type LastUsedRepo = {
+  fullName: string;
+  platform: RepositoryPlatform;
+  platformIntegrationId?: string;
+};
 
 export function shouldExposeCloudAgentNextLocalTestModel() {
   return (
@@ -55,7 +59,14 @@ export function parseLastUsedRepo(rawValue: string | null): LastUsedRepo | null 
         parsed.platform === 'gitlab' ||
         parsed.platform === 'bitbucket')
     ) {
-      return { fullName: parsed.fullName, platform: parsed.platform };
+      return {
+        fullName: parsed.fullName,
+        platform: parsed.platform,
+        platformIntegrationId:
+          'platformIntegrationId' in parsed && typeof parsed.platformIntegrationId === 'string'
+            ? parsed.platformIntegrationId
+            : undefined,
+      };
     }
     return null;
   } catch {
@@ -70,11 +81,12 @@ export function getLastUsedRepo(organizationId?: string): LastUsedRepo | null {
 export function setLastUsedRepo(
   fullName: string,
   platform: RepositoryPlatform,
-  organizationId?: string
+  organizationId?: string,
+  platformIntegrationId?: string
 ) {
   safeLocalStorage.setItem(
     getLastUsedRepoStorageKey(organizationId),
-    JSON.stringify({ fullName, platform } satisfies LastUsedRepo)
+    JSON.stringify({ fullName, platform, platformIntegrationId } satisfies LastUsedRepo)
   );
 }
 
@@ -96,10 +108,14 @@ export function getPreferredInitialRepo({
   isLoadingBitbucketRepos: boolean;
 }): RepositoryOption | undefined {
   if (lastUsedRepo) {
-    const match = availableRepos.find(
-      repo => repo.fullName === lastUsedRepo.fullName && repo.platform === lastUsedRepo.platform
+    const matches = availableRepos.filter(
+      repo =>
+        repo.fullName === lastUsedRepo.fullName &&
+        repo.platform === lastUsedRepo.platform &&
+        (lastUsedRepo.platformIntegrationId === undefined ||
+          repo.platformIntegrationId === lastUsedRepo.platformIntegrationId)
     );
-    if (match) return match;
+    if (matches.length === 1) return matches[0];
 
     const isSavedRepoLoading =
       lastUsedRepo.platform === 'github'

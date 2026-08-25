@@ -42,6 +42,21 @@ export function SeatUsageCard({ organizationId }: Props) {
     return null;
   }
 
+  // Surface an org-query failure before bailing on a null org.
+  if (orgError) {
+    return (
+      <ErrorCard
+        title="Seat Usage"
+        description="Error loading seat usage information"
+        error={orgError}
+        onRetry={() => {
+          void refetch();
+          void orgRefetch();
+        }}
+      />
+    );
+  }
+
   if (!org) {
     return null;
   }
@@ -52,12 +67,12 @@ export function SeatUsageCard({ organizationId }: Props) {
     return null;
   }
 
-  if (error || orgError || status === 'error') {
+  if (error || status === 'error') {
     return (
       <ErrorCard
         title="Seat Usage"
         description="Error loading seat usage information"
-        error={error || orgError || 'Error loading trial status'}
+        error={error || 'Error loading trial status'}
         onRetry={() => {
           void refetch();
           void orgRefetch();

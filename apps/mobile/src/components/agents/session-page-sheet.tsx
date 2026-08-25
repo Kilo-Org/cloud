@@ -1,6 +1,8 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { Modal, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 
 type SessionPageSheetProps = {
   visible: boolean;
@@ -25,6 +27,9 @@ export function SessionPageSheet({
   children,
 }: Readonly<SessionPageSheetProps>) {
   const insets = useSafeAreaInsets();
+
+  // Close when the privacy cover fires (app backgrounds on a covered route).
+  useEffect(() => subscribePrivacyCover(onClose), [onClose]);
 
   if (Platform.OS === 'ios') {
     return (

@@ -10,7 +10,7 @@
 // trigger. Every close path here routes through `onClose` or `onPick`.
 
 import { X } from '@/components/ui/icons';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, type Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/text';
 import { moveA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 import { REACTION_EMOJI, REACTION_LABEL } from '@/lib/pr-review/discussion/reaction-pills';
 import {
   REVIEW_REACTION_CONTENTS,
@@ -46,6 +47,10 @@ export function ReactionPickerSheet({
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const titleRef = useRef<RNText | null>(null);
+
+  // Close when the privacy cover fires (app backgrounds on a covered route):
+  // a native Modal renders above the overlay, so it must close itself.
+  useEffect(() => subscribePrivacyCover(onClose), [onClose]);
 
   const reacted = new Set<string>();
   for (const r of reactions) {

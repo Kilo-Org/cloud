@@ -1,5 +1,5 @@
 import { Check, X } from '@/components/ui/icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -10,6 +10,7 @@ import { RadioGroup } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
 import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 import { cn } from '@/lib/utils';
 
 const PLATFORM_FILTERS = [
@@ -205,6 +206,9 @@ export function SessionFilterModal({
       prev.includes(gitUrl) ? prev.filter(value => value !== gitUrl) : [...prev, gitUrl]
     );
   };
+
+  // Close when the privacy cover fires (app backgrounds on a covered route).
+  useEffect(() => subscribePrivacyCover(onClose), [onClose]);
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>

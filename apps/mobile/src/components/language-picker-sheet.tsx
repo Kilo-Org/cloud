@@ -28,6 +28,7 @@ import {
   type LanguagePreference,
 } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 
 const ROW_LTR = { writingDirection: 'ltr' } as const;
 const ROW_RTL = { writingDirection: 'rtl' } as const;
@@ -63,6 +64,10 @@ export function LanguagePickerSheet({
       setQuery('');
     }
   }, [visible]);
+
+  // Close when the privacy cover fires (app backgrounds on a covered route):
+  // a native Modal renders above the overlay, so it must close itself.
+  useEffect(() => subscribePrivacyCover(onClose), [onClose]);
 
   if (!visible) {
     return null;

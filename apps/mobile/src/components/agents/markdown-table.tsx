@@ -33,6 +33,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { moveA11yFocus } from '@/lib/a11y/announce';
 import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 
 import { containsPressable, extractNodeText, linearRowLabel } from './markdown-a11y';
 import { type MarkdownPalette } from './markdown-palette';
@@ -130,6 +131,16 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
       savedScale.value = ZOOM_DEFAULT;
     }
   }, [open, savedScale, scale, session]);
+
+  // Close when the privacy cover fires (app backgrounds on a covered route):
+  // a native Modal renders above the overlay, so it must close itself.
+  useEffect(
+    () =>
+      subscribePrivacyCover(() => {
+        setOpen(false);
+      }),
+    []
+  );
 
   // Natural (unscaled) table size — a transform does not change layout, so this
   // measurement stays valid at every zoom level. Epsilon guard stops a re-render loop.

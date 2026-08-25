@@ -73,6 +73,7 @@
     "expo-location": "~57.0.7",
     "expo-notifications": "~57.0.8",
     "expo-router": "~57.0.10",
+    "expo-screen-capture": "~57.0.1",
     "expo-screen-corner-radius": "1.1.0",
     "expo-secure-store": "~57.0.1",
     "expo-share-intent": "8.0.1",

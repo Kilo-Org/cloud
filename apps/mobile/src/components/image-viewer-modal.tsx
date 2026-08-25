@@ -11,6 +11,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 
 type ImageViewerModalProps = {
   visible: boolean;
@@ -72,6 +73,10 @@ export function ImageViewerModal({
   useEffect(() => {
     setImageError(false);
   }, [visible, uri]);
+
+  // Close when the privacy cover fires (app backgrounds on a covered route):
+  // a native Modal renders above the overlay, so it must close itself.
+  useEffect(() => subscribePrivacyCover(onClose), [onClose]);
 
   // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pinch().
   const pinch = Gesture.Pinch()

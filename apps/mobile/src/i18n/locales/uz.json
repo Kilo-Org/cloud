@@ -759,7 +759,9 @@
       "moreActions": "Ko'proq amallar",
       "message": "Xabar",
       "notDelivered": "Yetkazilmagan",
-      "edited": "(tahrirlangan)"
+      "edited": "(tahrirlangan)",
+      "image": "Rasm",
+      "attachment": "Biriktirma"
     },
     "messageActions": {
       "copied": "Nusxalandi",
@@ -801,6 +803,12 @@
       "loadingUser": "Foydalanuvchi yuklanmoqda...",
       "waitingForStatus": "Bot holati kutilmoqda...",
       "offlineMessage": "Bot oflayn. Qayta ulanganda xabarlar davom etadi."
+    },
+    "errors": {
+      "notAllowed": "Ruxsat berilmagan",
+      "messageTooLong": "Xabar juda uzun — uni {{limit}} belgidan kamroq saqlang",
+      "titleTooLong": "Sarlavha juda uzun — uni {{limit}} belgidan kamroq saqlang",
+      "messageEmpty": "Xabar bo'sh bo'lishi mumkin emas"
     }
   },
   "kiloclaw": {

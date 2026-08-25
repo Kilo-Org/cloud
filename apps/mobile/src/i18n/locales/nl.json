@@ -305,7 +305,9 @@
       "moreActions": "Meer acties",
       "message": "Bericht",
       "notDelivered": "Niet bezorgd",
-      "edited": "(bewerkt)"
+      "edited": "(bewerkt)",
+      "image": "Afbeelding",
+      "attachment": "Bijlage"
     },
     "messageActions": {
       "copied": "Gekopieerd",
@@ -347,6 +349,12 @@
       "loadingUser": "Gebruiker laden...",
       "waitingForStatus": "Wachten op botstatus...",
       "offlineMessage": "De bot is offline. Berichten worden hervat zodra deze opnieuw verbinding maakt."
+    },
+    "errors": {
+      "notAllowed": "Niet toegestaan",
+      "messageTooLong": "Bericht is te lang — houd het onder de {{limit}} tekens",
+      "titleTooLong": "Titel is te lang — houd het onder de {{limit}} tekens",
+      "messageEmpty": "Bericht mag niet leeg zijn"
     }
   },
   "kiloclaw": {

@@ -759,7 +759,9 @@
       "moreActions": "Lagi tindakan",
       "message": "Mesej",
       "notDelivered": "Tidak dihantar",
-      "edited": "(diedit)"
+      "edited": "(diedit)",
+      "image": "Imej",
+      "attachment": "Lampiran"
     },
     "messageActions": {
       "copied": "Disalin",
@@ -801,6 +803,12 @@
       "loadingUser": "Memuatkan pengguna...",
       "waitingForStatus": "Menunggu status bot...",
       "offlineMessage": "Bot berada dalam talian. Mesej akan disambung semula apabila ia bersambung semula."
+    },
+    "errors": {
+      "notAllowed": "Tidak dibenarkan",
+      "messageTooLong": "Mesej terlalu panjang — simpan di bawah {{limit}} aksara",
+      "titleTooLong": "Tajuk terlalu panjang — simpan di bawah {{limit}} aksara",
+      "messageEmpty": "Mesej tidak boleh kosong"
     }
   },
   "kiloclaw": {

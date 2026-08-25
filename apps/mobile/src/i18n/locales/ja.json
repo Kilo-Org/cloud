@@ -305,7 +305,9 @@
       "moreActions": "その他のアクション",
       "message": "メッセージ",
       "notDelivered": "未配信",
-      "edited": "(編集済み)"
+      "edited": "(編集済み)",
+      "image": "画像",
+      "attachment": "添付ファイル"
     },
     "messageActions": {
       "copied": "コピーしました",
@@ -347,6 +349,12 @@
       "loadingUser": "ユーザーを読み込み中...",
       "waitingForStatus": "ボットのステータスを待機中...",
       "offlineMessage": "ボットはオフラインです。再接続するとメッセージが再開されます。"
+    },
+    "errors": {
+      "notAllowed": "許可されていません",
+      "messageTooLong": "メッセージが長すぎます — {{limit}}文字以内にしてください",
+      "titleTooLong": "タイトルが長すぎます — {{limit}}文字以内にしてください",
+      "messageEmpty": "メッセージは空にできません"
     }
   },
   "kiloclaw": {

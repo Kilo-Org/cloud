@@ -773,7 +773,9 @@
       "moreActions": "Več dejanj",
       "message": "Sporočilo",
       "notDelivered": "Ni dostavljeno",
-      "edited": "(urejeno)"
+      "edited": "(urejeno)",
+      "image": "Slika",
+      "attachment": "Priloga"
     },
     "messageActions": {
       "copied": "Kopirano",
@@ -817,6 +819,12 @@
       "loadingUser": "Nalaganje uporabnika...",
       "waitingForStatus": "Čakanje na status bota...",
       "offlineMessage": "Bot ni na spletu. Sporočila se bodo nadaljevala, ko se bo znova povezal."
+    },
+    "errors": {
+      "notAllowed": "Ni dovoljeno",
+      "messageTooLong": "Sporočilo je predolgo — naj ne bo daljše od {{limit}} znakov",
+      "titleTooLong": "Naslov je predolg — naj ne bo daljši od {{limit}} znakov",
+      "messageEmpty": "Sporočilo ne sme biti prazno"
     }
   },
   "kiloclaw": {

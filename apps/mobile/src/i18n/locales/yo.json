@@ -759,7 +759,9 @@
       "moreActions": "Awọn iṣe diẹ sii",
       "message": "Ifiranṣẹ",
       "notDelivered": "A ko fi ranṣẹ",
-      "edited": "(a ṣatunkọ)"
+      "edited": "(a ṣatunkọ)",
+      "image": "Aworan",
+      "attachment": "Asomọ"
     },
     "messageActions": {
       "copied": "Ti daakọ",
@@ -801,6 +803,12 @@
       "loadingUser": "Ǹjẹ́ olùlò...",
       "waitingForStatus": "Nduro fún ipò bọ́tì...",
       "offlineMessage": "Bọ́tì wà ní òfíline. Àwọn ifiranṣẹ yóò tẹ̀síwájú nígbà tí ó bá tún sopọ̀."
+    },
+    "errors": {
+      "notAllowed": "A kò yọ̀ǹda",
+      "messageTooLong": "Ifiranṣẹ gùn ju — pa á mọ́ lábẹ́ ohun kikọ {{limit}}",
+      "titleTooLong": "Akọle gùn ju — pa á mọ́ lábẹ́ ohun kikọ {{limit}}",
+      "messageEmpty": "Ifiranṣẹ ko le ṣofo"
     }
   },
   "kiloclaw": {

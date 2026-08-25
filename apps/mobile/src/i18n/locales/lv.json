@@ -766,7 +766,9 @@
       "moreActions": "Citas darbības",
       "message": "Ziņojums",
       "notDelivered": "Nav piegādāts",
-      "edited": "(rediģēts)"
+      "edited": "(rediģēts)",
+      "image": "Attēls",
+      "attachment": "Pielikums"
     },
     "messageActions": {
       "copied": "Kopēts",
@@ -809,6 +811,12 @@
       "loadingUser": "Ielādē lietotāju…",
       "waitingForStatus": "Gaida bota statusu…",
       "offlineMessage": "Bots ir bezsaistē. Ziņojumi tiks atsākti, kad tas atkal pieslēgsies."
+    },
+    "errors": {
+      "notAllowed": "Nav atļauts",
+      "messageTooLong": "Ziņojums ir pārāk garš — ne vairāk par {{limit}} rakstzīmēm",
+      "titleTooLong": "Virsraksts ir pārāk garš — ne vairāk par {{limit}} rakstzīmēm",
+      "messageEmpty": "Ziņojums nedrīkst būt tukšs"
     }
   },
   "kiloclaw": {

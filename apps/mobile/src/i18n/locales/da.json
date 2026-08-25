@@ -759,7 +759,9 @@
       "moreActions": "Flere handlinger",
       "message": "Besked",
       "notDelivered": "Ikke leveret",
-      "edited": "(redigeret)"
+      "edited": "(redigeret)",
+      "image": "Billede",
+      "attachment": "Vedhæftning"
     },
     "messageActions": {
       "copied": "Kopieret",
@@ -801,6 +803,12 @@
       "loadingUser": "Indlæser bruger...",
       "waitingForStatus": "Venter på botstatus...",
       "offlineMessage": "Bot er offline. Beskeder genoptages, når den genopretter forbindelsen."
+    },
+    "errors": {
+      "notAllowed": "Ikke tilladt",
+      "messageTooLong": "Beskeden er for lang — hold den under {{limit}} tegn",
+      "titleTooLong": "Titlen er for lang — hold den under {{limit}} tegn",
+      "messageEmpty": "Beskeden kan ikke være tom"
     }
   },
   "kiloclaw": {

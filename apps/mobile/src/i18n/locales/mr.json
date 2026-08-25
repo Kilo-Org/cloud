@@ -759,7 +759,9 @@
       "moreActions": "अधिक क्रिया",
       "message": "संदेश",
       "notDelivered": "वितरित नाही",
-      "edited": "(संपादित)"
+      "edited": "(संपादित)",
+      "image": "प्रतिमा",
+      "attachment": "संलग्नक"
     },
     "messageActions": {
       "copied": "कॉपी केले",
@@ -801,6 +803,12 @@
       "loadingUser": "वापरकर्ता लोड होत आहे...",
       "waitingForStatus": "बॉटची स्थिती येण्याची वाट पाहत आहे...",
       "offlineMessage": "बॉट ऑफलाइन आहे. तो पुन्हा कनेक्ट झाल्यावर संदेश पुन्हा सुरू होतील."
+    },
+    "errors": {
+      "notAllowed": "परवानगी नाही",
+      "messageTooLong": "संदेश खूप लांब आहे — तो {{limit}} अक्षरांपेक्षा कमी ठेवा",
+      "titleTooLong": "शीर्षक खूप लांब आहे — ते {{limit}} अक्षरांपेक्षा कमी ठेवा",
+      "messageEmpty": "संदेश रिकामा असू शकत नाही"
     }
   },
   "kiloclaw": {

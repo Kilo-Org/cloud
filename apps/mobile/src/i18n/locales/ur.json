@@ -759,7 +759,9 @@
       "moreActions": "مزید اعمال",
       "message": "پیغام",
       "notDelivered": "پہنچایا نہیں گیا",
-      "edited": "(ترمیم شدہ)"
+      "edited": "(ترمیم شدہ)",
+      "image": "تصویر",
+      "attachment": "منسلکہ"
     },
     "messageActions": {
       "copied": "کاپی ہو گیا",
@@ -801,6 +803,12 @@
       "loadingUser": "صارف لوڈ ہو رہا ہے...",
       "waitingForStatus": "بوٹ کی حالت کا انتظار...",
       "offlineMessage": "بوٹ آف لائن ہے۔ دوبارہ جڑنے پر پیغامات دوبارہ شروع ہوں گے۔"
+    },
+    "errors": {
+      "notAllowed": "اجازت نہیں",
+      "messageTooLong": "پیغام بہت طویل ہے — اسے {{limit}} حروف سے کم رکھیں",
+      "titleTooLong": "عنوان بہت طویل ہے — اسے {{limit}} حروف سے کم رکھیں",
+      "messageEmpty": "پیغام خالی نہیں ہو سکتا"
     }
   },
   "kiloclaw": {

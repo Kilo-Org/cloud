@@ -759,7 +759,9 @@
       "moreActions": "Ētahi atu mahi",
       "message": "Karere",
       "notDelivered": "Kāore i tukua",
-      "edited": "(kua whakatikahia)"
+      "edited": "(kua whakatikahia)",
+      "image": "Whakaahua",
+      "attachment": "Tāpiritanga"
     },
     "messageActions": {
       "copied": "Kua tāruatia",
@@ -801,6 +803,12 @@
       "loadingUser": "Kei te uta kaiwhakamahi...",
       "waitingForStatus": "Kei te tatari mō te tūnga pōtā...",
       "offlineMessage": "Kei waho ipurangi te pōtā. Ka hoki anō ngā karere ina hono anō ia."
+    },
+    "errors": {
+      "notAllowed": "Kāore e whakaaetia",
+      "messageTooLong": "Kua roa rawa te karere — kia iti iho i te {{limit}} pū",
+      "titleTooLong": "Kua roa rawa te taitara — kia iti iho i te {{limit}} pū",
+      "messageEmpty": "Kāore e taea te noho kau te karere"
     }
   },
   "kiloclaw": {

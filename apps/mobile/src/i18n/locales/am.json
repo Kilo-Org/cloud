@@ -759,7 +759,9 @@
       "moreActions": "ተጨማሪ ተግባራት",
       "message": "መልዕክት",
       "notDelivered": "አልተላከም",
-      "edited": "(ተስተካክሏል)"
+      "edited": "(ተስተካክሏል)",
+      "image": "ምስል",
+      "attachment": "ዓባሪ"
     },
     "messageActions": {
       "copied": "ተቀድቷል",
@@ -801,6 +803,12 @@
       "loadingUser": "ተጠቃሚን በመጫን ላይ...",
       "waitingForStatus": "የቦት ሁኔታ በመጠበቅ ላይ...",
       "offlineMessage": "ቦቱ ከመስመር ውጭ ነው። እንደገና ሲገናኝ መልእክቶች ይቀጥላሉ።"
+    },
+    "errors": {
+      "notAllowed": "አይፈቀድም",
+      "messageTooLong": "መልዕክቱ በጣም ረጅም ነው — ከ{{limit}} ቁምፊዎች በታች ያስቀምጡት",
+      "titleTooLong": "ርዕሱ በጣም ረጅም ነው — ከ{{limit}} ቁምፊዎች በታች ያስቀምጡት",
+      "messageEmpty": "መልዕክት ባዶ መሆን አይችልም"
     }
   },
   "kiloclaw": {

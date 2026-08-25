@@ -766,7 +766,9 @@
       "moreActions": "Mai multe acțiuni",
       "message": "Mesaj",
       "notDelivered": "Nelivrat",
-      "edited": "(editat)"
+      "edited": "(editat)",
+      "image": "Imagine",
+      "attachment": "Atașament"
     },
     "messageActions": {
       "copied": "Copiat",
@@ -809,6 +811,12 @@
       "loadingUser": "Se încarcă utilizatorul...",
       "waitingForStatus": "Se așteaptă starea botului...",
       "offlineMessage": "Botul este offline. Mesajele vor fi reluate când se reconectează."
+    },
+    "errors": {
+      "notAllowed": "Nepermis",
+      "messageTooLong": "Mesajul este prea lung — păstrează-l sub {{limit}} caractere",
+      "titleTooLong": "Titlul este prea lung — păstrează-l sub {{limit}} caractere",
+      "messageEmpty": "Mesajul nu poate fi gol"
     }
   },
   "kiloclaw": {

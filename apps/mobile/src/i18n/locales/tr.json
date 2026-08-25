@@ -305,7 +305,9 @@
       "moreActions": "Daha fazla eylem",
       "message": "Mesaj",
       "notDelivered": "Teslim edilmedi",
-      "edited": "(düzenlendi)"
+      "edited": "(düzenlendi)",
+      "image": "Görsel",
+      "attachment": "Ek"
     },
     "messageActions": {
       "copied": "Kopyalandı",
@@ -347,6 +349,12 @@
       "loadingUser": "Kullanıcı yükleniyor...",
       "waitingForStatus": "Bot durumu bekleniyor...",
       "offlineMessage": "Bot çevrimdışı. Yeniden bağlandığında mesajlar devam edecek."
+    },
+    "errors": {
+      "notAllowed": "İzin verilmiyor",
+      "messageTooLong": "Mesaj çok uzun — {{limit}} karakterin altında tutun",
+      "titleTooLong": "Başlık çok uzun — {{limit}} karakterin altında tutun",
+      "messageEmpty": "Mesaj boş olamaz"
     }
   },
   "kiloclaw": {

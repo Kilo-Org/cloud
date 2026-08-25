@@ -759,7 +759,9 @@
       "moreActions": "نورې کړنې",
       "message": "پیغام",
       "notDelivered": "سپارل شوی نه دی",
-      "edited": "(سم شوی)"
+      "edited": "(سم شوی)",
+      "image": "انځور",
+      "attachment": "نښلول شوی فایل"
     },
     "messageActions": {
       "copied": "کاپي شو",
@@ -801,6 +803,12 @@
       "loadingUser": "کارن بارول...",
       "waitingForStatus": "د بوټ حالت ته انتظار...",
       "offlineMessage": "بوټ آفلاین دی. کله چې بیا وصل شي پیغامونه به دوام وکړي."
+    },
+    "errors": {
+      "notAllowed": "اجازه نشته",
+      "messageTooLong": "پیغام ډیر اوږد دی — تر {{limit}} تورو لاندې یې وساتئ",
+      "titleTooLong": "سرلیک ډیر اوږد دی — تر {{limit}} تورو لاندې یې وساتئ",
+      "messageEmpty": "پیغام خالي نشي کیدی"
     }
   },
   "kiloclaw": {

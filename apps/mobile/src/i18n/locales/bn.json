@@ -759,7 +759,9 @@
       "moreActions": "আরও কর্ম",
       "message": "বার্তা",
       "notDelivered": "পৌঁছে দেওয়া হয়নি",
-      "edited": "(সম্পাদিত)"
+      "edited": "(সম্পাদিত)",
+      "image": "ছবি",
+      "attachment": "সংযুক্তি"
     },
     "messageActions": {
       "copied": "কপি হয়েছে",
@@ -801,6 +803,12 @@
       "loadingUser": "ব্যবহারকারী লোড হচ্ছে...",
       "waitingForStatus": "বটের অবস্থার অপেক্ষায়...",
       "offlineMessage": "বট অফলাইন আছে। এটি আবার সংযুক্ত হলে বার্তা চালু হবে।"
+    },
+    "errors": {
+      "notAllowed": "অনুমতি নেই",
+      "messageTooLong": "বার্তাটি অনেক দীর্ঘ — এটি {{limit}} অক্ষরের কম রাখুন",
+      "titleTooLong": "শিরোনামটি অনেক দীর্ঘ — এটি {{limit}} অক্ষরের কম রাখুন",
+      "messageEmpty": "বার্তাটি খালি হতে পারে না"
     }
   },
   "kiloclaw": {

@@ -759,7 +759,9 @@
       "moreActions": "Rohkem toiminguid",
       "message": "Sõnum",
       "notDelivered": "Pole edastatud",
-      "edited": "(muudetud)"
+      "edited": "(muudetud)",
+      "image": "Pilt",
+      "attachment": "Manus"
     },
     "messageActions": {
       "copied": "Kopeeritud",
@@ -801,6 +803,12 @@
       "loadingUser": "Kasutaja laadimine...",
       "waitingForStatus": "Oodatakse boti olekut...",
       "offlineMessage": "Bot on võrguühenduseta. Sõnumid jätkuvad, kui see uuesti ühendub."
+    },
+    "errors": {
+      "notAllowed": "Pole lubatud",
+      "messageTooLong": "Sõnum on liiga pikk — hoia see alla {{limit}} tähemärgi",
+      "titleTooLong": "Pealkiri on liiga pikk — hoia see alla {{limit}} tähemärgi",
+      "messageEmpty": "Sõnum ei tohi olla tühi"
     }
   },
   "kiloclaw": {

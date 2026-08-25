@@ -759,7 +759,9 @@
       "moreActions": "اقدامات بیشتر",
       "message": "پیام",
       "notDelivered": "تحویل نشده",
-      "edited": "(ویرایش شده)"
+      "edited": "(ویرایش شده)",
+      "image": "تصویر",
+      "attachment": "پیوست"
     },
     "messageActions": {
       "copied": "کپی شد",
@@ -801,6 +803,12 @@
       "loadingUser": "در حال بارگذاری کاربر...",
       "waitingForStatus": "در انتظار وضعیت ربات...",
       "offlineMessage": "ربات آفلاین است. پیام‌ها پس از اتصال مجدد از سر گرفته می‌شوند."
+    },
+    "errors": {
+      "notAllowed": "مجاز نیست",
+      "messageTooLong": "پیام بیش از حد طولانی است — آن را زیر {{limit}} کاراکتر نگه دارید",
+      "titleTooLong": "عنوان بیش از حد طولانی است — آن را زیر {{limit}} کاراکتر نگه دارید",
+      "messageEmpty": "پیام نمی‌تواند خالی باشد"
     }
   },
   "kiloclaw": {

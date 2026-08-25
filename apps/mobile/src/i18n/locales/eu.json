@@ -759,7 +759,9 @@
       "moreActions": "Ekintza gehiago",
       "message": "Mezua",
       "notDelivered": "Ez da bidali",
-      "edited": "(editatuta)"
+      "edited": "(editatuta)",
+      "image": "Irudia",
+      "attachment": "Eranskina"
     },
     "messageActions": {
       "copied": "Kopiatuta",
@@ -801,6 +803,12 @@
       "loadingUser": "Erabiltzailea kargatzen...",
       "waitingForStatus": "Botaren egoeraren zain...",
       "offlineMessage": "Bota deskonektatuta dago. Mezuak berriro hasiko dira berriro konektatzen denean."
+    },
+    "errors": {
+      "notAllowed": "Ez dago baimenduta",
+      "messageTooLong": "Mezua luzeegia da — mantendu {{limit}} karaktere baino gutxiago",
+      "titleTooLong": "Izenburua luzeegia da — mantendu {{limit}} karaktere baino gutxiago",
+      "messageEmpty": "Mezua ezin da hutsik egon"
     }
   },
   "kiloclaw": {

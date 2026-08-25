@@ -305,7 +305,9 @@
       "moreActions": "Więcej akcji",
       "message": "Wiadomość",
       "notDelivered": "Nie dostarczono",
-      "edited": "(edytowano)"
+      "edited": "(edytowano)",
+      "image": "Obraz",
+      "attachment": "Załącznik"
     },
     "messageActions": {
       "copied": "Skopiowano",
@@ -349,6 +351,12 @@
       "loadingUser": "Ładowanie użytkownika...",
       "waitingForStatus": "Oczekiwanie na status bota...",
       "offlineMessage": "Bot jest offline. Wiadomości zostaną wznowione po ponownym połączeniu."
+    },
+    "errors": {
+      "notAllowed": "Nie dozwolone",
+      "messageTooLong": "Wiadomość jest za długa — nie przekraczaj {{limit}} znaków",
+      "titleTooLong": "Tytuł jest za długi — nie przekraczaj {{limit}} znaków",
+      "messageEmpty": "Wiadomość nie może być pusta"
     }
   },
   "kiloclaw": {

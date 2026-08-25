@@ -759,7 +759,9 @@
       "moreActions": "การกระทำเพิ่มเติม",
       "message": "ข้อความ",
       "notDelivered": "ไม่ถูกส่ง",
-      "edited": "(แก้ไขแล้ว)"
+      "edited": "(แก้ไขแล้ว)",
+      "image": "รูปภาพ",
+      "attachment": "ไฟล์แนบ"
     },
     "messageActions": {
       "copied": "คัดลอกแล้ว",
@@ -801,6 +803,12 @@
       "loadingUser": "กำลังโหลดผู้ใช้...",
       "waitingForStatus": "กำลังรอสถานะบอท...",
       "offlineMessage": "บอทออฟไลน์ ข้อความจะส่งต่อเมื่อเชื่อมต่อใหม่"
+    },
+    "errors": {
+      "notAllowed": "ไม่อนุญาต",
+      "messageTooLong": "ข้อความยาวเกินไป — ให้เหลือไม่เกิน {{limit}} อักขระ",
+      "titleTooLong": "ชื่อเรื่องยาวเกินไป — ให้เหลือไม่เกิน {{limit}} อักขระ",
+      "messageEmpty": "ข้อความต้องไม่ว่างเปล่า"
     }
   },
   "kiloclaw": {

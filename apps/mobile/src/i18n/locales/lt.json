@@ -773,7 +773,9 @@
       "moreActions": "Daugiau veiksmų",
       "message": "Žinutė",
       "notDelivered": "Nepristatyta",
-      "edited": "(redaguota)"
+      "edited": "(redaguota)",
+      "image": "Vaizdas",
+      "attachment": "Priedas"
     },
     "messageActions": {
       "copied": "Nukopijuota",
@@ -817,6 +819,12 @@
       "loadingUser": "Įkeliamas vartotojas...",
       "waitingForStatus": "Laukiama boto būsenos...",
       "offlineMessage": "Botas yra atsijungęs. Žinutės bus atnaujintos jam prisijungus."
+    },
+    "errors": {
+      "notAllowed": "Neleidžiama",
+      "messageTooLong": "Žinutė per ilga — ne daugiau kaip {{limit}} simbolių",
+      "titleTooLong": "Pavadinimas per ilgas — ne daugiau kaip {{limit}} simbolių",
+      "messageEmpty": "Žinutė negali būti tuščia"
     }
   },
   "kiloclaw": {

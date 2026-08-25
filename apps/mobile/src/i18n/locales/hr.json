@@ -766,7 +766,9 @@
       "moreActions": "Više radnji",
       "message": "Poruka",
       "notDelivered": "Nije dostavljeno",
-      "edited": "(uređeno)"
+      "edited": "(uređeno)",
+      "image": "Slika",
+      "attachment": "Privitak"
     },
     "messageActions": {
       "copied": "Kopirano",
@@ -809,6 +811,12 @@
       "loadingUser": "Učitavanje korisnika...",
       "waitingForStatus": "Čekanje na status bota...",
       "offlineMessage": "Bot je izvan mreže. Poruke će se nastaviti kad se ponovno poveže."
+    },
+    "errors": {
+      "notAllowed": "Nije dopušteno",
+      "messageTooLong": "Poruka je preduga — držite je ispod {{limit}} znakova",
+      "titleTooLong": "Naslov je predugačak — držite ga ispod {{limit}} znakova",
+      "messageEmpty": "Poruka ne može biti prazna"
     }
   },
   "kiloclaw": {

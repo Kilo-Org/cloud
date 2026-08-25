@@ -305,7 +305,9 @@
       "moreActions": "مزيد من الإجراءات",
       "message": "رسالة",
       "notDelivered": "لم يتم التسليم",
-      "edited": "(مُعدَّل)"
+      "edited": "(مُعدَّل)",
+      "image": "الصورة",
+      "attachment": "مرفق"
     },
     "messageActions": {
       "copied": "تم النسخ",
@@ -351,6 +353,12 @@
       "loadingUser": "جارٍ تحميل المستخدم...",
       "waitingForStatus": "في انتظار حالة الروبوت...",
       "offlineMessage": "الروبوت غير متصل. ستُستأنف الرسائل عند إعادة اتصاله."
+    },
+    "errors": {
+      "notAllowed": "غير مسموح",
+      "messageTooLong": "الرسالة طويلة جدًا — اجعلها أقل من {{limit}} حرفًا",
+      "titleTooLong": "العنوان طويل جدًا — اجعله أقل من {{limit}} حرفًا",
+      "messageEmpty": "لا يمكن أن تكون الرسالة فارغة"
     }
   },
   "kiloclaw": {

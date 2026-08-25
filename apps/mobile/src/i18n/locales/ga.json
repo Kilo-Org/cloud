@@ -780,7 +780,9 @@
       "moreActions": "Tuilleadh gníomhartha",
       "message": "Teachtaireacht",
       "notDelivered": "Gan seachadadh",
-      "edited": "(curtha in eagar)"
+      "edited": "(curtha in eagar)",
+      "image": "Íomhá",
+      "attachment": "Ceangaltán"
     },
     "messageActions": {
       "copied": "Cóipeáladh",
@@ -825,6 +827,12 @@
       "loadingUser": "Ag lódáil úsáideora...",
       "waitingForStatus": "Ag fanacht le stádas an róbait...",
       "offlineMessage": "Tá an róbat as líne. Tosóidh teachtaireachtaí arís nuair a athcheanglaíonn sé."
+    },
+    "errors": {
+      "notAllowed": "Gan chead",
+      "messageTooLong": "Tá an teachtaireacht rófhada — coinnigh faoi {{limit}} charachtar í",
+      "titleTooLong": "Tá an teideal rófhada — coinnigh faoi {{limit}} charachtar é",
+      "messageEmpty": "Ní féidir an teachtaireacht a bheith folamh"
     }
   },
   "kiloclaw": {

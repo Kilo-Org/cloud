@@ -759,7 +759,9 @@
       "moreActions": "थप कार्यहरू",
       "message": "सन्देश",
       "notDelivered": "डेलिभर भएन",
-      "edited": "(सम्पादित)"
+      "edited": "(सम्पादित)",
+      "image": "छवि",
+      "attachment": "संलग्न"
     },
     "messageActions": {
       "copied": "प्रतिलिपि गरियो",
@@ -801,6 +803,12 @@
       "loadingUser": "प्रयोगकर्ता लोड गर्दै...",
       "waitingForStatus": "बटको स्थिति पर्खदै...",
       "offlineMessage": "बट अफलाइन छ। यो पुनः जडान भएपछि सन्देशहरू जारी हुनेछन्।"
+    },
+    "errors": {
+      "notAllowed": "अनुमति छैन",
+      "messageTooLong": "सन्देश धेरै लामो छ — यसलाई {{limit}} अक्षरभन्दा कम राख्नुहोस्",
+      "titleTooLong": "शीर्षक धेरै लामो छ — यसलाई {{limit}} अक्षरभन्दा कम राख्नुहोस्",
+      "messageEmpty": "सन्देश खाली हुन सक्दैन"
     }
   },
   "kiloclaw": {

@@ -759,7 +759,9 @@
       "moreActions": "Fleiri aðgerðir",
       "message": "Skilaboð",
       "notDelivered": "Ekki afhent",
-      "edited": "(breytt)"
+      "edited": "(breytt)",
+      "image": "Mynd",
+      "attachment": "Viðhengi"
     },
     "messageActions": {
       "copied": "Afritað",
@@ -801,6 +803,12 @@
       "loadingUser": "Hleð notanda...",
       "waitingForStatus": "Bíð eftir stöðu bottsins...",
       "offlineMessage": "Bottinn er ótengdur. Skilaboð halda áfram þegar hann tengist aftur."
+    },
+    "errors": {
+      "notAllowed": "Ekki leyfilegt",
+      "messageTooLong": "Skilaboðin eru of löng — hafðu þau undir {{limit}} stöfum",
+      "titleTooLong": "Titillinn er of langur — hafðu hann undir {{limit}} stöfum",
+      "messageEmpty": "Skilaboð geta ekki verið tóm"
     }
   },
   "kiloclaw": {

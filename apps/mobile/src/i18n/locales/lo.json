@@ -759,7 +759,9 @@
       "moreActions": "ການກະທຳເພີ່ມເຕີມ",
       "message": "ຂໍ້ຄວາມ",
       "notDelivered": "ບໍ່ຖືກສົ່ງ",
-      "edited": "(ແກ້ໄຂ)"
+      "edited": "(ແກ້ໄຂ)",
+      "image": "ຮູບພາບ",
+      "attachment": "ໄຟລ໌ແນບ"
     },
     "messageActions": {
       "copied": "ສຳເນົາແລ້ວ",
@@ -801,6 +803,12 @@
       "loadingUser": "ກຳລັງໂຫຼດຜູ້ໃຊ້...",
       "waitingForStatus": "ລໍຖ້າສະຖານະຂອງບັອດ...",
       "offlineMessage": "ບັອດອອບໄລນ໌. ຂໍ້ຄວາມຈະສືບຕໍ່ເມື່ອມັນເຊື່ອມຕໍ່ໃໝ່."
+    },
+    "errors": {
+      "notAllowed": "ບໍ່ອະນຸຍາດ",
+      "messageTooLong": "ຂໍ້ຄວາມຍາວເກີນໄປ — ກະລຸນາເກັບໄວ້ບໍ່ເກີນ {{limit}} ຕົວອັກສອນ",
+      "titleTooLong": "ຫົວຂໍ້ຍາວເກີນໄປ — ກະລຸນາເກັບໄວ້ບໍ່ເກີນ {{limit}} ຕົວອັກສອນ",
+      "messageEmpty": "ຂໍ້ຄວາມບໍ່ສາມາດຫວ່າງເປົ່າໄດ້"
     }
   },
   "kiloclaw": {

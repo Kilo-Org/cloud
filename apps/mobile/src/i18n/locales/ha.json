@@ -759,7 +759,9 @@
       "moreActions": "Ƙarin ayyuka",
       "message": "Saƙo",
       "notDelivered": "Ba a isar ba",
-      "edited": "(an gyara)"
+      "edited": "(an gyara)",
+      "image": "Hoto",
+      "attachment": "Haɗi"
     },
     "messageActions": {
       "copied": "An kwafi",
@@ -801,6 +803,12 @@
       "loadingUser": "Ana ɗora mai amfani...",
       "waitingForStatus": "Ana jiran halin bot...",
       "offlineMessage": "Bot ba kan layi ba. Saƙonni za su ci gaba idan ya sake haɗawa."
+    },
+    "errors": {
+      "notAllowed": "Ba a yarda ba",
+      "messageTooLong": "Saƙon ya yi tsayi da yawa — kiyaye shi a ƙasa da harafi {{limit}}",
+      "titleTooLong": "Sunan ya yi tsayi da yawa — kiyaye shi a ƙasa da harafi {{limit}}",
+      "messageEmpty": "Saƙo ba zai iya zama marar komai ba"
     }
   },
   "kiloclaw": {

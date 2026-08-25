@@ -759,7 +759,9 @@
       "moreActions": "Hetsika fanampiny",
       "message": "Hafatra",
       "notDelivered": "Tsy voateraka",
-      "edited": "(noavaina)"
+      "edited": "(noavaina)",
+      "image": "Sary",
+      "attachment": "Firaiketana"
     },
     "messageActions": {
       "copied": "Voadika",
@@ -801,6 +803,12 @@
       "loadingUser": "Mampiditra mpampiasa...",
       "waitingForStatus": "Miandry ny sata bot...",
       "offlineMessage": "Tsy an-tserasera ny bot. Hifohy ny hafatra rehefa mifandray indray izy."
+    },
+    "errors": {
+      "notAllowed": "Tsy avela",
+      "messageTooLong": "Lavare loatra ny hafatra — tazony ho latsaky ny {{limit}} soratra",
+      "titleTooLong": "Lavare loatra ny lohateny — tazony ho latsaky ny {{limit}} soratra",
+      "messageEmpty": "Tsy mety ho foana ny hafatra"
     }
   },
   "kiloclaw": {

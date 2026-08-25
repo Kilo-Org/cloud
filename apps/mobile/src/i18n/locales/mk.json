@@ -759,7 +759,9 @@
       "moreActions": "Повеќе дејства",
       "message": "Порака",
       "notDelivered": "Не испорачана",
-      "edited": "(уредено)"
+      "edited": "(уредено)",
+      "image": "Слика",
+      "attachment": "Прилог"
     },
     "messageActions": {
       "copied": "Копирано",
@@ -801,6 +803,12 @@
       "loadingUser": "Се вчитува корисникот...",
       "waitingForStatus": "Се чека статус на ботот...",
       "offlineMessage": "Ботот е офлајн. Пораките ќе продолжат кога ќе се поврзе повторно."
+    },
+    "errors": {
+      "notAllowed": "Не е дозволено",
+      "messageTooLong": "Пораката е предолга — задржете ја под {{limit}} знаци",
+      "titleTooLong": "Насловот е предолг — задржете го под {{limit}} знаци",
+      "messageEmpty": "Пораката не може да биде празна"
     }
   },
   "kiloclaw": {

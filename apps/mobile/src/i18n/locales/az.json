@@ -759,7 +759,9 @@
       "moreActions": "Daha çox hərəkət",
       "message": "Mesaj",
       "notDelivered": "Çatdırılmayıb",
-      "edited": "(redaktə edildi)"
+      "edited": "(redaktə edildi)",
+      "image": "Şəkil",
+      "attachment": "Əlavə"
     },
     "messageActions": {
       "copied": "Kopyalandı",
@@ -801,6 +803,12 @@
       "loadingUser": "İstifadəçi yüklənir...",
       "waitingForStatus": "Botun statusu gözlənilir...",
       "offlineMessage": "Bot oflayndır. Yenidən qoşulanda mesajlar davam edəcək."
+    },
+    "errors": {
+      "notAllowed": "İcazə verilmir",
+      "messageTooLong": "Mesaj çox uzundur — onu {{limit}} simvoldan aşağı saxlayın",
+      "titleTooLong": "Başlıq çox uzundur — onu {{limit}} simvoldan aşağı saxlayın",
+      "messageEmpty": "Mesaj boş ola bilməz"
     }
   },
   "kiloclaw": {

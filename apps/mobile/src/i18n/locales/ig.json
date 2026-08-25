@@ -759,7 +759,9 @@
       "moreActions": "Omume ndị ọzọ",
       "message": "Ozi",
       "notDelivered": "Eziteghị ya",
-      "edited": "(edeziri)"
+      "edited": "(edeziri)",
+      "image": "Onyonyo",
+      "attachment": "Ihe jikọtara"
     },
     "messageActions": {
       "copied": "Detuola",
@@ -801,6 +803,12 @@
       "loadingUser": "Na-ebunye onye ọrụ...",
       "waitingForStatus": "Na-eche ọnọdụ bot...",
       "offlineMessage": "Bot anọghị na ntanetị. Ozi ga-amaliteghachi mgbe ọ jikọtara ọzọ."
+    },
+    "errors": {
+      "notAllowed": "Enweghị ikike",
+      "messageTooLong": "Ozi ahụ ogologo karịrị akarị — debe ya n'okpuru mkpụrụedemede {{limit}}",
+      "titleTooLong": "Aha ahụ ogologo karịrị akarị — debe ya n'okpuru mkpụrụedemede {{limit}}",
+      "messageEmpty": "Ozi enweghị ike ịbụ efu"
     }
   },
   "kiloclaw": {

@@ -14,8 +14,6 @@ import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-revie
 import {
   isPrOperationAmbiguous,
   isPrOperationPersistenceFailed,
-  PR_OPERATION_AMBIGUOUS_MESSAGE,
-  PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
 
 type MutationErrorDisplaySurface = 'composer' | 'submit';
@@ -41,13 +39,13 @@ export function mutationErrorDisplay(
   // The ambiguous outcome is NOT the generic retryable copy: the effect may
   // have committed, so the user must verify the PR. Verbatim on both surfaces.
   if (isPrOperationAmbiguous(rawError)) {
-    return { kind: 'retryable', message: PR_OPERATION_AMBIGUOUS_MESSAGE };
+    return { kind: 'retryable', message: i18n.t('prReview.operation.ambiguous') };
   }
   // The persistence-failure marker is retry-BLOCKING: the row never became
   // `reconcile_pending`. Use the bad-request kind (no retry CTA) with the
   // honest server copy, not the surface-specific validation copy.
   if (isPrOperationPersistenceFailed(rawError)) {
-    return { kind: 'bad-request', message: PR_OPERATION_PERSISTENCE_FAILED_MESSAGE };
+    return { kind: 'bad-request', message: i18n.t('prReview.operation.persistenceFailed') };
   }
   if (classification.kind === 'forbidden') {
     return { kind: 'forbidden', message: classification.message };

@@ -759,7 +759,9 @@
       "moreActions": "Meer aksies",
       "message": "Boodskap",
       "notDelivered": "Nie afgelewer nie",
-      "edited": "(gewysig)"
+      "edited": "(gewysig)",
+      "image": "Beeld",
+      "attachment": "Aanhegsel"
     },
     "messageActions": {
       "copied": "Gekopieer",
@@ -801,6 +803,12 @@
       "loadingUser": "Laai gebruiker...",
       "waitingForStatus": "Wag vir botstatus...",
       "offlineMessage": "Bot is vanlyn. Boodskappe sal hervat wanneer dit weer verbind."
+    },
+    "errors": {
+      "notAllowed": "Nie toegelaat nie",
+      "messageTooLong": "Boodskap is te lank — hou dit onder {{limit}} karakters",
+      "titleTooLong": "Titel is te lank — hou dit onder {{limit}} karakters",
+      "messageEmpty": "Boodskap kan nie leeg wees nie"
     }
   },
   "kiloclaw": {

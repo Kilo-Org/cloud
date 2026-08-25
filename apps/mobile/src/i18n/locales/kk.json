@@ -759,7 +759,9 @@
       "moreActions": "Қосымша әрекеттер",
       "message": "Хабарлама",
       "notDelivered": "Жеткізілмеді",
-      "edited": "(өңделген)"
+      "edited": "(өңделген)",
+      "image": "Сурет",
+      "attachment": "Тіркеме"
     },
     "messageActions": {
       "copied": "Көшірілді",
@@ -801,6 +803,12 @@
       "loadingUser": "Пайдаланушы жүктелуде...",
       "waitingForStatus": "Бот күйі күтілуде...",
       "offlineMessage": "Бот желіде емес. Қайта қосылғанда хабарламалар жалғасады."
+    },
+    "errors": {
+      "notAllowed": "Рұқсат етілмеген",
+      "messageTooLong": "Хабарлама тым ұзын — {{limit}} таңбадан аспауы керек",
+      "titleTooLong": "Тақырып тым ұзын — {{limit}} таңбадан аспауы керек",
+      "messageEmpty": "Хабарлама бос болмауы керек"
     }
   },
   "kiloclaw": {

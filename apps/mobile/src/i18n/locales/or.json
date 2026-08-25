@@ -759,7 +759,9 @@
       "moreActions": "ଅଧିକ କାର୍ଯ୍ୟ",
       "message": "ସନ୍ଦେଶ",
       "notDelivered": "ବିତରଣ ହୋଇନାହିଁ",
-      "edited": "(ସମ୍ପାଦିତ)"
+      "edited": "(ସମ୍ପାଦିତ)",
+      "image": "ଚିତ୍ର",
+      "attachment": "ସଂଲଗ୍ନକାରୀ"
     },
     "messageActions": {
       "copied": "କପି ହେଲା",
@@ -801,6 +803,12 @@
       "loadingUser": "ବ୍ୟବହାରକାରୀ ଲୋଡ୍ ହେଉଛି...",
       "waitingForStatus": "ବଟ୍ ସ୍ଥିତି ଅପେକ୍ଷା କରୁଛି...",
       "offlineMessage": "ବଟ୍ ଅଫଲାଇନ ଅଛି। ଏହା ପୁଣି ସଂଯୋଗ ହେଲେ ବାର୍ତ୍ତା ଆରମ୍ଭ ହେବ।"
+    },
+    "errors": {
+      "notAllowed": "ଅନୁମତି ନାହିଁ",
+      "messageTooLong": "ସନ୍ଦେଶ ଅତ୍ୟଧିକ ଲମ୍ବା — ଏହାକୁ {{limit}} ଅକ୍ଷରରୁ କମ୍ ରଖନ୍ତୁ",
+      "titleTooLong": "ଶୀର୍ଷକ ଅତ୍ୟଧିକ ଲମ୍ବା — ଏହାକୁ {{limit}} ଅକ୍ଷରରୁ କମ୍ ରଖନ୍ତୁ",
+      "messageEmpty": "ସନ୍ଦେଶ ଖାଲି ହୋଇପାରିବ ନାହିଁ"
     }
   },
   "kiloclaw": {

@@ -305,7 +305,9 @@
       "moreActions": "更多操作",
       "message": "消息",
       "notDelivered": "未送达",
-      "edited": "（已编辑）"
+      "edited": "（已编辑）",
+      "image": "图片",
+      "attachment": "附件"
     },
     "messageActions": {
       "copied": "已复制",
@@ -347,6 +349,12 @@
       "loadingUser": "正在加载用户...",
       "waitingForStatus": "正在等待机器人状态...",
       "offlineMessage": "机器人已离线。重新连接后消息将继续。"
+    },
+    "errors": {
+      "notAllowed": "不允许",
+      "messageTooLong": "消息太长 — 请保持在 {{limit}} 个字符以内",
+      "titleTooLong": "标题太长 — 请保持在 {{limit}} 个字符以内",
+      "messageEmpty": "消息不能为空"
     }
   },
   "kiloclaw": {

@@ -759,7 +759,9 @@
       "moreActions": "Fler åtgärder",
       "message": "Meddelande",
       "notDelivered": "Inte levererat",
-      "edited": "(redigerat)"
+      "edited": "(redigerat)",
+      "image": "Bild",
+      "attachment": "Bifogad fil"
     },
     "messageActions": {
       "copied": "Kopierat",
@@ -801,6 +803,12 @@
       "loadingUser": "Läser in användare…",
       "waitingForStatus": "Väntar på botstatus…",
       "offlineMessage": "Boten är offline. Meddelanden återupptas när den återansluter."
+    },
+    "errors": {
+      "notAllowed": "Inte tillåtet",
+      "messageTooLong": "Meddelandet är för långt — håll det under {{limit}} tecken",
+      "titleTooLong": "Titeln är för lång — håll den under {{limit}} tecken",
+      "messageEmpty": "Meddelandet kan inte vara tomt"
     }
   },
   "kiloclaw": {

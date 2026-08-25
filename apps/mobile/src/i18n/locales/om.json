@@ -759,7 +759,9 @@
       "moreActions": "Gochaalee dabalataa",
       "message": "Ergaa",
       "notDelivered": "Hin kennamne",
-      "edited": "(gulaalame)"
+      "edited": "(gulaalame)",
+      "image": "Suuraa",
+      "attachment": "Attachment"
     },
     "messageActions": {
       "copied": "Budeessame",
@@ -801,6 +803,12 @@
       "loadingUser": "Fayyadamaa fe'achaa...",
       "waitingForStatus": "Haala bota eeggachaa...",
       "offlineMessage": "Bot offlinedha. Ergaawwan yeroo walitti qabuu jalatti itti fufu."
+    },
+    "errors": {
+      "notAllowed": "Hin hayyamamu",
+      "messageTooLong": "Ergaan baay'ee dheeraadha — {{limit}} qubeelaa gadii keessatti eegi",
+      "titleTooLong": "Matawaan baay'ee dheeraadha — {{limit}} qubeelaa gadii keessatti eegi",
+      "messageEmpty": "Ergaan duwwaa ta'uu hin danda'u"
     }
   },
   "kiloclaw": {

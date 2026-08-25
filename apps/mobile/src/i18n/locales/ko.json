@@ -305,7 +305,9 @@
       "moreActions": "더 많은 작업",
       "message": "메시지",
       "notDelivered": "전달되지 않음",
-      "edited": "(수정됨)"
+      "edited": "(수정됨)",
+      "image": "이미지",
+      "attachment": "첨부 파일"
     },
     "messageActions": {
       "copied": "복사됨",
@@ -347,6 +349,12 @@
       "loadingUser": "사용자 로드 중...",
       "waitingForStatus": "봇 상태 대기 중...",
       "offlineMessage": "봇이 오프라인입니다. 다시 연결되면 메시지가 재개됩니다."
+    },
+    "errors": {
+      "notAllowed": "허용되지 않음",
+      "messageTooLong": "메시지가 너무 깁니다 — {{limit}}자 미만으로 유지하세요",
+      "titleTooLong": "제목이 너무 깁니다 — {{limit}}자 미만으로 유지하세요",
+      "messageEmpty": "메시지는 비워둘 수 없습니다"
     }
   },
   "kiloclaw": {

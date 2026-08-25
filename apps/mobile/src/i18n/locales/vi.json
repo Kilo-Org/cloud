@@ -305,7 +305,9 @@
       "moreActions": "Thêm hành động",
       "message": "Tin nhắn",
       "notDelivered": "Chưa được gửi",
-      "edited": "(đã chỉnh sửa)"
+      "edited": "(đã chỉnh sửa)",
+      "image": "Hình ảnh",
+      "attachment": "Tệp đính kèm"
     },
     "messageActions": {
       "copied": "Đã sao chép",
@@ -347,6 +349,12 @@
       "loadingUser": "Đang tải người dùng...",
       "waitingForStatus": "Đang chờ trạng thái bot...",
       "offlineMessage": "Bot đang ngoại tuyến. Tin nhắn sẽ tiếp tục khi bot kết nối lại."
+    },
+    "errors": {
+      "notAllowed": "Không được phép",
+      "messageTooLong": "Tin nhắn quá dài — hãy giữ dưới {{limit}} ký tự",
+      "titleTooLong": "Tiêu đề quá dài — hãy giữ dưới {{limit}} ký tự",
+      "messageEmpty": "Tin nhắn không được để trống"
     }
   },
   "kiloclaw": {

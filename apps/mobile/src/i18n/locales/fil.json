@@ -759,7 +759,9 @@
       "moreActions": "Higit pang aksyon",
       "message": "Mensahe",
       "notDelivered": "Hindi naihatid",
-      "edited": "(na-edit)"
+      "edited": "(na-edit)",
+      "image": "Larawan",
+      "attachment": "Attachment"
     },
     "messageActions": {
       "copied": "Kinopya",
@@ -801,6 +803,12 @@
       "loadingUser": "Niloload ang user...",
       "waitingForStatus": "Naghihintay sa status ng bot...",
       "offlineMessage": "Offline ang bot. Magpapatuloy ang mga mensahe kapag nag-reconnect na ito."
+    },
+    "errors": {
+      "notAllowed": "Hindi pinapayagan",
+      "messageTooLong": "Masyadong mahaba ang mensahe — panatilihin itong mas mababa sa {{limit}} na character",
+      "titleTooLong": "Masyadong mahaba ang pamagat — panatilihin itong mas mababa sa {{limit}} na character",
+      "messageEmpty": "Hindi maaaring walang laman ang mensahe"
     }
   },
   "kiloclaw": {

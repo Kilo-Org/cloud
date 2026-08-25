@@ -305,7 +305,9 @@
       "moreActions": "עוד פעולות",
       "message": "הודעה",
       "notDelivered": "לא נמסר",
-      "edited": "(נערך)"
+      "edited": "(נערך)",
+      "image": "תמונה",
+      "attachment": "קובץ מצורף"
     },
     "messageActions": {
       "copied": "הועתק",
@@ -348,6 +350,12 @@
       "loadingUser": "טוען משתמש...",
       "waitingForStatus": "ממתין לסטטוס הבוט...",
       "offlineMessage": "הבוט לא מקוון. ההודעות יתחדשו כשיתחבר מחדש."
+    },
+    "errors": {
+      "notAllowed": "לא מורשה",
+      "messageTooLong": "ההודעה ארוכה מדי — שמור אותה מתחת ל-{{limit}} תווים",
+      "titleTooLong": "הכותרת ארוכה מדי — שמור אותה מתחת ל-{{limit}} תווים",
+      "messageEmpty": "ההודעה לא יכולה להיות ריקה"
     }
   },
   "kiloclaw": {

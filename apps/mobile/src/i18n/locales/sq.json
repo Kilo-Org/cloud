@@ -759,7 +759,9 @@
       "moreActions": "Më shumë veprime",
       "message": "Mesazh",
       "notDelivered": "I padorëzuar",
-      "edited": "(i redaktuar)"
+      "edited": "(i redaktuar)",
+      "image": "Imazhi",
+      "attachment": "Bashkangjitje"
     },
     "messageActions": {
       "copied": "U kopjua",
@@ -801,6 +803,12 @@
       "loadingUser": "Duke ngarkuar përdoruesin...",
       "waitingForStatus": "Duke pritur statusin e botit...",
       "offlineMessage": "Boti është jashtë linje. Mesazhet do të rifillojnë kur të rikthehet."
+    },
+    "errors": {
+      "notAllowed": "Nuk lejohet",
+      "messageTooLong": "Mesazhi është shumë i gjatë — mbaje nën {{limit}} karaktere",
+      "titleTooLong": "Titulli është shumë i gjatë — mbaje nën {{limit}} karaktere",
+      "messageEmpty": "Mesazhi nuk mund të jetë bosh"
     }
   },
   "kiloclaw": {

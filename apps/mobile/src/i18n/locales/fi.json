@@ -759,7 +759,9 @@
       "moreActions": "Lisää toimintoja",
       "message": "Viesti",
       "notDelivered": "Ei toimitettu",
-      "edited": "(muokattu)"
+      "edited": "(muokattu)",
+      "image": "Kuva",
+      "attachment": "Liite"
     },
     "messageActions": {
       "copied": "Kopioitu",
@@ -801,6 +803,12 @@
       "loadingUser": "Ladataan käyttäjää…",
       "waitingForStatus": "Odotetaan botin tilaa…",
       "offlineMessage": "Botti on offline. Viestit jatkuvat, kun se yhdistää uudelleen."
+    },
+    "errors": {
+      "notAllowed": "Ei sallittu",
+      "messageTooLong": "Viesti on liian pitkä — pidä se alle {{limit}} merkin",
+      "titleTooLong": "Otsikko on liian pitkä — pidä se alle {{limit}} merkin",
+      "messageEmpty": "Viesti ei voi olla tyhjä"
     }
   },
   "kiloclaw": {

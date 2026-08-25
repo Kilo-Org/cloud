@@ -305,7 +305,9 @@
       "moreActions": "Tindakan lainnya",
       "message": "Pesan",
       "notDelivered": "Tidak terkirim",
-      "edited": "(diedit)"
+      "edited": "(diedit)",
+      "image": "Gambar",
+      "attachment": "Lampiran"
     },
     "messageActions": {
       "copied": "Disalin",
@@ -347,6 +349,12 @@
       "loadingUser": "Memuat pengguna...",
       "waitingForStatus": "Menunggu status bot...",
       "offlineMessage": "Bot sedang offline. Pesan akan dilanjutkan saat bot terhubung kembali."
+    },
+    "errors": {
+      "notAllowed": "Tidak diizinkan",
+      "messageTooLong": "Pesan terlalu panjang — tetap di bawah {{limit}} karakter",
+      "titleTooLong": "Judul terlalu panjang — jaga agar tetap di bawah {{limit}} karakter",
+      "messageEmpty": "Pesan tidak boleh kosong"
     }
   },
   "kiloclaw": {

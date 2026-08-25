@@ -759,7 +759,9 @@
       "moreActions": "ਹੋਰ ਕਾਰਵਾਈਆਂ",
       "message": "ਸੁਨੇਹਾ",
       "notDelivered": "ਭੇਜਿਆ ਨਹੀਂ ਗਿਆ",
-      "edited": "(ਸੰਪਾਦਿਤ)"
+      "edited": "(ਸੰਪਾਦਿਤ)",
+      "image": "ਚਿੱਤਰ",
+      "attachment": "ਅਟੈਚਮੈਂਟ"
     },
     "messageActions": {
       "copied": "ਕਾਪੀ ਕੀਤਾ ਗਿਆ",
@@ -801,6 +803,12 @@
       "loadingUser": "ਵਰਤੋਂਕਾਰ ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ...",
       "waitingForStatus": "ਬੋਟ ਦੀ ਸਥਿਤੀ ਦੀ ਉਡੀਕ...",
       "offlineMessage": "ਬੋਟ ਔਫਲਾਈਨ ਹੈ। ਦੁਬਾਰਾ ਕਨੈਕਟ ਹੋਣ 'ਤੇ ਸੁਨੇਹੇ ਜਾਰੀ ਰਹਿਣਗੇ।"
+    },
+    "errors": {
+      "notAllowed": "ਆਗਿਆ ਨਹੀਂ",
+      "messageTooLong": "ਸੁਨੇਹਾ ਬਹੁਤ ਲੰਬਾ ਹੈ — ਇਸਨੂੰ {{limit}} ਅੱਖਰਾਂ ਤੋਂ ਘੱਟ ਰੱਖੋ",
+      "titleTooLong": "ਸਿਰਲੇਖ ਬਹੁਤ ਲੰਬਾ ਹੈ — ਇਸਨੂੰ {{limit}} ਅੱਖਰਾਂ ਤੋਂ ਘੱਟ ਰੱਖੋ",
+      "messageEmpty": "ਸੁਨੇਹਾ ਖਾਲੀ ਨਹੀਂ ਹੋ ਸਕਦਾ"
     }
   },
   "kiloclaw": {

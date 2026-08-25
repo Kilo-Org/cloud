@@ -759,7 +759,9 @@
       "moreActions": "Ezenzo ezengeziwe",
       "message": "Umlayezo",
       "notDelivered": "Akulethiwe",
-      "edited": "(kuhleliwe)"
+      "edited": "(kuhleliwe)",
+      "image": "Isithombe",
+      "attachment": "Okunamathiselwe"
     },
     "messageActions": {
       "copied": "Kukopishwe",
@@ -801,6 +803,12 @@
       "loadingUser": "Ilayisha umsebenzisi...",
       "waitingForStatus": "Ilindele isimo se-bot...",
       "offlineMessage": "I-bot ayikho kuyintanethi. Imilayezo izoqhubeka lapho iphinde ixhuma."
+    },
+    "errors": {
+      "notAllowed": "Akukuvunyelwe",
+      "messageTooLong": "Umlayezo mude kakhulu — yigcine ngaphansi kwezinhlamvu ezingama-{{limit}}",
+      "titleTooLong": "Isihloko side kakhulu — yigcine ngaphansi kwezinhlamvu ezingama-{{limit}}",
+      "messageEmpty": "Umlayezo awumele ube ungenalutho"
     }
   },
   "kiloclaw": {

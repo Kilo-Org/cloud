@@ -759,7 +759,9 @@
       "moreActions": "Plis aksyon",
       "message": "Mesaj",
       "notDelivered": "Pa delivre",
-      "edited": "(modifye)"
+      "edited": "(modifye)",
+      "image": "Imaj",
+      "attachment": "Atachman"
     },
     "messageActions": {
       "copied": "Kopiye",
@@ -801,6 +803,12 @@
       "loadingUser": "Ap chaje itilizatè a...",
       "waitingForStatus": "Ap tann estati bot la...",
       "offlineMessage": "Bot la deliy. Mesaj yo ap reprann lè li rekonekte."
+    },
+    "errors": {
+      "notAllowed": "Pa gen dwa",
+      "messageTooLong": "Mesaj la twò long — kenbe l anba {{limit}} karaktè",
+      "titleTooLong": "Tit la twò long — kenbe l anba {{limit}} karaktè",
+      "messageEmpty": "Mesaj la pa ka vid"
     }
   },
   "kiloclaw": {

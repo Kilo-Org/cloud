@@ -787,7 +787,9 @@
       "moreActions": "Mwy o weithredoedd",
       "message": "Neges",
       "notDelivered": "Heb ei danfon",
-      "edited": "(wedi'i olygu)"
+      "edited": "(wedi'i olygu)",
+      "image": "Delwedd",
+      "attachment": "Atodiad"
     },
     "messageActions": {
       "copied": "Wedi'i gopïo",
@@ -833,6 +835,12 @@
       "loadingUser": "Llwytho defnyddiwr...",
       "waitingForStatus": "Aros am statws y bot...",
       "offlineMessage": "Mae'r bot all-lein. Bydd negeseuon yn ailddechrau pan fydd yn ailgysylltu."
+    },
+    "errors": {
+      "notAllowed": "Heb ganiatâd",
+      "messageTooLong": "Mae'r neges yn rhy hir — cadwch hi dan {{limit}} nod",
+      "titleTooLong": "Mae'r teitl yn rhy hir — cadwch ef dan {{limit}} nod",
+      "messageEmpty": "Ni all y neges fod yn wag"
     }
   },
   "kiloclaw": {

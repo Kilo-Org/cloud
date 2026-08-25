@@ -766,7 +766,9 @@
       "moreActions": "Més accions",
       "message": "Missatge",
       "notDelivered": "No s'ha entregat",
-      "edited": "(editat)"
+      "edited": "(editat)",
+      "image": "Imatge",
+      "attachment": "Adjunt"
     },
     "messageActions": {
       "copied": "Copiat",
@@ -809,6 +811,12 @@
       "loadingUser": "Carregant l'usuari...",
       "waitingForStatus": "Esperant l'estat del bot...",
       "offlineMessage": "El bot està desconnectat. Els missatges es reprendran quan es torni a connectar."
+    },
+    "errors": {
+      "notAllowed": "No permès",
+      "messageTooLong": "El missatge és massa llarg — mantén-lo per sota de {{limit}} caràcters",
+      "titleTooLong": "El títol és massa llarg — mantén-lo per sota de {{limit}} caràcters",
+      "messageEmpty": "El missatge no pot estar buit"
     }
   },
   "kiloclaw": {

@@ -759,7 +759,9 @@
       "moreActions": "További műveletek",
       "message": "Üzenet",
       "notDelivered": "Nem kézbesítve",
-      "edited": "(szerkesztve)"
+      "edited": "(szerkesztve)",
+      "image": "Kép",
+      "attachment": "Csatolmány"
     },
     "messageActions": {
       "copied": "Másolva",
@@ -801,6 +803,12 @@
       "loadingUser": "Felhasználó betöltése...",
       "waitingForStatus": "Várakozás a bot állapotára...",
       "offlineMessage": "A bot offline. Az üzenetek folytatódnak, amikor újra csatlakozik."
+    },
+    "errors": {
+      "notAllowed": "Nem engedélyezett",
+      "messageTooLong": "Az üzenet túl hosszú — tartsa {{limit}} karakternél rövidebb",
+      "titleTooLong": "A cím túl hosszú — tartsa {{limit}} karakternél rövidebb",
+      "messageEmpty": "Az üzenet nem lehet üres"
     }
   },
   "kiloclaw": {

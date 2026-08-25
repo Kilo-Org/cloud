@@ -759,7 +759,9 @@
       "moreActions": "More actions",
       "message": "Message",
       "notDelivered": "Not delivered",
-      "edited": "(edited)"
+      "edited": "(edited)",
+      "image": "Image",
+      "attachment": "Attachment"
     },
     "messageActions": {
       "copied": "Copied",
@@ -801,6 +803,12 @@
       "loadingUser": "Loading user...",
       "waitingForStatus": "Waiting for bot status...",
       "offlineMessage": "Bot is offline. Messages will resume when it reconnects."
+    },
+    "errors": {
+      "notAllowed": "Not allowed",
+      "messageTooLong": "Message is too long — keep it under {{limit}} characters",
+      "titleTooLong": "Title is too long — keep it under {{limit}} characters",
+      "messageEmpty": "Message can't be empty"
     }
   },
   "kiloclaw": {

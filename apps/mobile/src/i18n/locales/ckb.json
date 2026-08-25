@@ -759,7 +759,9 @@
       "moreActions": "کردارە زیاتر",
       "message": "نامە",
       "notDelivered": "نەگەیشت",
-      "edited": "(دەستکاریکراو)"
+      "edited": "(دەستکاریکراو)",
+      "image": "وێنە",
+      "attachment": "هاوپێچ"
     },
     "messageActions": {
       "copied": "کۆپی کرا",
@@ -801,6 +803,12 @@
       "loadingUser": "بارکردنی بەکارهێنەر...",
       "waitingForStatus": "چاوەڕوانی دۆخی بۆت...",
       "offlineMessage": "بۆتەکە دەرهێڵە. نامەکان دووبارە دەست پێدەکەن کاتێک دووبارە پەیوەندی دەکاتەوە."
+    },
+    "errors": {
+      "notAllowed": "ڕێگە پێنەدراوە",
+      "messageTooLong": "نامە زۆر درێژە — با لە {{limit}} پیت کەمتر بێت",
+      "titleTooLong": "سەردێڕ زۆر درێژە — با لە {{limit}} پیت کەمتر بێت",
+      "messageEmpty": "نامە نابێت بەتاڵ بێت"
     }
   },
   "kiloclaw": {

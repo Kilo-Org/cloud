@@ -759,7 +759,9 @@
       "moreActions": "વધુ ક્રિયાઓ",
       "message": "સંદેશ",
       "notDelivered": "પહોંચાડાયો નહીં",
-      "edited": "(સંપાદિત)"
+      "edited": "(સંપાદિત)",
+      "image": "છબી",
+      "attachment": "જોડાણ"
     },
     "messageActions": {
       "copied": "કૉપિ થયું",
@@ -801,6 +803,12 @@
       "loadingUser": "વપરાશકર્તા લોડ થઈ રહ્યો છે...",
       "waitingForStatus": "બોટ સ્થિતિની રાહ જોઈ રહ્યા છીએ...",
       "offlineMessage": "બોટ ઑફલાઇન છે. તે ફરી જોડાય ત્યારે સંદેશા ફરી શરૂ થશે."
+    },
+    "errors": {
+      "notAllowed": "મંજૂર નથી",
+      "messageTooLong": "સંદેશ ખૂબ લાંબો છે — તેને {{limit}} અક્ષરોથી ઓછો રાખો",
+      "titleTooLong": "શીર્ષક ખૂબ લાંબું છે — તેને {{limit}} અક્ષરોથી ઓછું રાખો",
+      "messageEmpty": "સંદેશ ખાલી ન હોઈ શકે"
     }
   },
   "kiloclaw": {

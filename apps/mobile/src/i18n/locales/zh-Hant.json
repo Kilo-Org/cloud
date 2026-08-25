@@ -305,7 +305,9 @@
       "moreActions": "更多動作",
       "message": "訊息",
       "notDelivered": "未送達",
-      "edited": "（已編輯）"
+      "edited": "（已編輯）",
+      "image": "圖片",
+      "attachment": "附件"
     },
     "messageActions": {
       "copied": "已複製",
@@ -347,6 +349,12 @@
       "loadingUser": "正在載入使用者...",
       "waitingForStatus": "正在等待機器人狀態...",
       "offlineMessage": "機器人已離線。重新連線後訊息將繼續。"
+    },
+    "errors": {
+      "notAllowed": "不允許",
+      "messageTooLong": "訊息太長 — 請保持在 {{limit}} 個字元以內",
+      "titleTooLong": "標題太長 — 請保持在 {{limit}} 個字元以內",
+      "messageEmpty": "訊息不能為空"
     }
   },
   "kiloclaw": {

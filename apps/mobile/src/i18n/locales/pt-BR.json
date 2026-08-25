@@ -291,7 +291,9 @@
       "moreActions": "Mais ações",
       "message": "Mensagem",
       "notDelivered": "Não entregue",
-      "edited": "(editado)"
+      "edited": "(editado)",
+      "image": "Imagem",
+      "attachment": "Anexo"
     },
     "messageActions": {
       "copied": "Copiado",
@@ -334,6 +336,12 @@
       "loadingUser": "Carregando usuário...",
       "waitingForStatus": "Aguardando status do bot...",
       "offlineMessage": "O bot está offline. As mensagens serão retomadas quando ele se reconectar."
+    },
+    "errors": {
+      "notAllowed": "Não permitido",
+      "messageTooLong": "A mensagem é muito longa — mantenha-a com menos de {{limit}} caracteres",
+      "titleTooLong": "O título é muito longo — mantenha-o com menos de {{limit}} caracteres",
+      "messageEmpty": "A mensagem não pode estar vazia"
     }
   },
   "kiloclaw": {

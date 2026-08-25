@@ -297,7 +297,9 @@
       "moreActions": "और कार्रवाइयाँ",
       "message": "संदेश",
       "notDelivered": "वितरित नहीं हुआ",
-      "edited": "(संपादित)"
+      "edited": "(संपादित)",
+      "image": "छवि",
+      "attachment": "अनुलग्नक"
     },
     "reactions": {
       "accessibility": "{{emoji}} प्रतिक्रिया, {{displayCount}}",
@@ -347,6 +349,12 @@
       "loadingUser": "उपयोगकर्ता लोड हो रहा है...",
       "waitingForStatus": "बॉट स्थिति की प्रतीक्षा हो रही है...",
       "offlineMessage": "बॉट ऑफ़लाइन है। दोबारा कनेक्ट होने पर संदेश फिर से शुरू होंगे।"
+    },
+    "errors": {
+      "notAllowed": "अनुमति नहीं है",
+      "messageTooLong": "संदेश बहुत लंबा है — इसे {{limit}} अक्षरों से कम रखें",
+      "titleTooLong": "शीर्षक बहुत लंबा है — इसे {{limit}} अक्षरों से कम रखें",
+      "messageEmpty": "संदेश खाली नहीं हो सकता"
     }
   },
   "kiloclaw": {

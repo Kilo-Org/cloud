@@ -759,7 +759,9 @@
       "moreActions": "Vitendo zaidi",
       "message": "Ujumbe",
       "notDelivered": "Haukuwasilishwa",
-      "edited": "(imehaririwa)"
+      "edited": "(imehaririwa)",
+      "image": "Picha",
+      "attachment": "Kiambatisho"
     },
     "messageActions": {
       "copied": "Imenakiliwa",
@@ -801,6 +803,12 @@
       "loadingUser": "Inapakia mtumiaji...",
       "waitingForStatus": "Inasubiri hali ya bot...",
       "offlineMessage": "Bot iko nje ya mtandao. Ujumbe utaendelea inapounganishwa tena."
+    },
+    "errors": {
+      "notAllowed": "Hairuhusiwi",
+      "messageTooLong": "Ujumbe ni mrefu sana — weka chini ya herufi {{limit}}",
+      "titleTooLong": "Kichwa ni kirefu sana — kiweke chini ya herufi {{limit}}",
+      "messageEmpty": "Ujumbe hauwezi kuwa tupu"
     }
   },
   "kiloclaw": {

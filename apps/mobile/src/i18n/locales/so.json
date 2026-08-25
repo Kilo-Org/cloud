@@ -759,7 +759,9 @@
       "moreActions": "Falalko dheeri ah",
       "message": "Fariin",
       "notDelivered": "Lama gudbin",
-      "edited": "(waa la beddelay)"
+      "edited": "(waa la beddelay)",
+      "image": "Sawir",
+      "attachment": "Lifaaq"
     },
     "messageActions": {
       "copied": "Waa la nuqulay",
@@ -801,6 +803,12 @@
       "loadingUser": "Isticmaale lagu shubayaa...",
       "waitingForStatus": "Sugaya heerka botka...",
       "offlineMessage": "Botku wuu joogsaday. Farriimuhu way socon doonaan markuu mar kale ku xirmaado."
+    },
+    "errors": {
+      "notAllowed": "Lama ogola",
+      "messageTooLong": "Fariintu aad bay u dheer tahay — ku hay wax ka yar {{limit}} xarfood",
+      "titleTooLong": "Cinwaanku aad buu u dheer yahay — ku hay wax ka yar {{limit}} xarfood",
+      "messageEmpty": "Fariintu ma noqon karto mid madhan"
     }
   },
   "kiloclaw": {

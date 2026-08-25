@@ -780,7 +780,9 @@
       "moreActions": "Aktar azzjonijiet",
       "message": "Messaġġ",
       "notDelivered": "Mhux mwassal",
-      "edited": "(editjat)"
+      "edited": "(editjat)",
+      "image": "Stampa",
+      "attachment": "Anness"
     },
     "messageActions": {
       "copied": "Ikkupjat",
@@ -825,6 +827,12 @@
       "loadingUser": "Qed jittella' l-utent...",
       "waitingForStatus": "Qed nistennew l-istatus tal-bot...",
       "offlineMessage": "Il-bot huwa offlajn. Il-messaġġi jerġgħu jibdew meta jerġa' jikkonnettja."
+    },
+    "errors": {
+      "notAllowed": "Mhux permess",
+      "messageTooLong": "Il-messaġġ huwa twil wisq — żommu taħt {{limit}} karattru",
+      "titleTooLong": "It-titlu huwa twil wisq — żommu taħt {{limit}} karattru",
+      "messageEmpty": "Il-messaġġ ma jistax ikun vojt"
     }
   },
   "kiloclaw": {

@@ -759,7 +759,9 @@
       "moreActions": "Flere handlinger",
       "message": "Melding",
       "notDelivered": "Ikke levert",
-      "edited": "(redigert)"
+      "edited": "(redigert)",
+      "image": "Bilde",
+      "attachment": "Vedlegg"
     },
     "messageActions": {
       "copied": "Kopiert",
@@ -801,6 +803,12 @@
       "loadingUser": "Laster bruker...",
       "waitingForStatus": "Venter på botstatus...",
       "offlineMessage": "Bot er frakoblet. Meldinger gjenopptas når den kobler til igjen."
+    },
+    "errors": {
+      "notAllowed": "Ikke tillatt",
+      "messageTooLong": "Meldingen er for lang — hold den under {{limit}} tegn",
+      "titleTooLong": "Tittelen er for lang — hold den under {{limit}} tegn",
+      "messageEmpty": "Meldingen kan ikke være tom"
     }
   },
   "kiloclaw": {

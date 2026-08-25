@@ -773,7 +773,9 @@
       "moreActions": "Další akce",
       "message": "Zpráva",
       "notDelivered": "Nedoručeno",
-      "edited": "(upraveno)"
+      "edited": "(upraveno)",
+      "image": "Obrázek",
+      "attachment": "Příloha"
     },
     "messageActions": {
       "copied": "Zkopírováno",
@@ -817,6 +819,12 @@
       "loadingUser": "Načítání uživatele…",
       "waitingForStatus": "Čekání na stav bota…",
       "offlineMessage": "Bot je offline. Zprávy se obnoví, až se znovu připojí."
+    },
+    "errors": {
+      "notAllowed": "Nepovoleno",
+      "messageTooLong": "Zpráva je příliš dlouhá — zkraťte ji pod {{limit}} znaků",
+      "titleTooLong": "Název je příliš dlouhý — zkraťte jej pod {{limit}} znaků",
+      "messageEmpty": "Zpráva nemůže být prázdná"
     }
   },
   "kiloclaw": {

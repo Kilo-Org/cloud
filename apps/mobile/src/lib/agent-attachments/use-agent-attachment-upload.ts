@@ -36,6 +36,7 @@ import {
   normalizeFilename,
   uploadOne,
 } from '@/lib/agent-attachments/upload-task';
+import { registerTempFile } from '@/lib/temp-file-registry';
 
 // Re-export only the types consumers import from this module.
 export type { AgentAttachment, AgentAttachmentSubmissionPayload, AgentAttachmentWire };
@@ -364,6 +365,11 @@ export function useAgentAttachmentUpload(
               ext = newExt;
               localUri = strippedUri;
               localFileOwned = true;
+              // The stripped copy is a new app-owned cache file the picker did
+              // not register. Register it so logout's reapTempFiles({ all:
+              // true }) deletes it; the original candidate.uri stays registered
+              // separately and is also reaped (or left for the picker).
+              registerTempFile(strippedUri);
               // eslint-disable-next-line no-await-in-loop -- measure the stripped file before the next candidate
               const strippedSize = await measureLocalSize(strippedUri);
               finalSize = strippedSize !== null && strippedSize > 0 ? strippedSize : finalSize;

@@ -106,6 +106,21 @@ function readUserIdFromToken(token: string): string | null {
   }
 }
 
+/**
+ * Clear the session-scoped local state that must not leak across an account
+ * boundary: trusted hosts, confirmed markdown images, media caches, and
+ * app-owned temp copies. Every member is synchronous and best-effort; a throw
+ * falls through to the caller's own sign-in/sign-out state reset.
+ */
+function clearSessionScopedState(): void {
+  clearTrustedHosts();
+  clearMarkdownImageConfirmMemory();
+  clearToolCardImageCache();
+  clearFilePartCache();
+  clearClipboardImages();
+  reapTempFiles({ all: true });
+}
+
 type AuthContextValue = {
   token: string | undefined;
   isLoading: boolean;
@@ -233,14 +248,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         trackEvent('login');
         resetPurchaseErrorToastDedup();
         setToken(tokenValue);
-        // A prior account's confirmed image URIs must not auto-load for this
-        // new session.
-        clearMarkdownImageConfirmMemory();
-        // A direct account switch must not keep the prior account's files.
-        clearToolCardImageCache();
-        clearFilePartCache();
-        clearClipboardImages();
-        reapTempFiles({ all: true });
+        // A direct account switch must not keep the prior account's session
+        // state: trusted hosts, image confirms, media caches, temp copies.
+        clearSessionScopedState();
       });
     },
     []
@@ -345,20 +355,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             clearViewedFiles(),
             clearSessionAttentionForSignOut(),
           ]);
-          // Synchronous preference clears so they don't leak to the next
-          // signed-in account. A synchronous throw here still falls through
-          // to the state reset below.
+          // Synchronous preference clears (best-effort) so nothing leaks to
+          // the next signed-in account.
           clearAgentModelPreference();
           clearReasoningPreference();
-          clearTrustedHosts();
-          clearMarkdownImageConfirmMemory();
           clearKeepScreenOnPreference();
-          // Session media caches and app-owned temp copies must not leak to
-          // the next account. Best-effort sync deletes; never throws.
-          clearToolCardImageCache();
-          clearFilePartCache();
-          clearClipboardImages();
-          reapTempFiles({ all: true });
+          clearSessionScopedState();
         } finally {
           queryClient.clear();
           setSessionEnded(ended);

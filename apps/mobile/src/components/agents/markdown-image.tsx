@@ -187,7 +187,8 @@ export function MarkdownImage({
           setMeasuredAspectRatio(undefined);
           setAttempt(prev => prev + 1);
         }}
-        className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
+        onLongPress={onShowLinkActions}
+        className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
         accessibilityRole="button"
         accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
         accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
@@ -213,6 +214,7 @@ export function MarkdownImage({
         onPress={() => {
           setViewerVisible(true);
         }}
+        onLongPress={onShowLinkActions}
         className="my-1 w-full overflow-hidden rounded-md bg-neutral-100 active:opacity-80 dark:bg-neutral-900"
         accessibilityRole="button"
         accessibilityLabel={

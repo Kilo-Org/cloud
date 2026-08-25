@@ -26,7 +26,12 @@ import { useHoistedOperationKey } from '@/lib/operation-key';
 import { getPrReviewPath } from '@/lib/profile-agent-navigation';
 import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
 import { appendShareParams, setPendingShareNavigation } from '@/lib/share-navigation';
-import { clearSharePayload, peekSharePayload, type ShareId } from '@/lib/share-payload';
+import {
+  clearPendingShareIdDraft,
+  clearSharePayload,
+  peekSharePayload,
+  type ShareId,
+} from '@/lib/share-payload';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { useTRPC } from '@/lib/trpc';
 
@@ -242,6 +247,10 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       void Haptics.selectionAsync();
       committedShareIdRef.current = shareId;
       setPendingShareNavigation({ href, shareId });
+      // Clear only this id's durable pending hint (value-scoped). A kill after
+      // commit restores payload + navigation queue, but no pending id, so the
+      // gate never re-opens and the navigator delivers the destination once.
+      void clearPendingShareIdDraft(shareId);
       router.back();
     },
     [router, shareId]

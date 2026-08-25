@@ -129,8 +129,13 @@ export async function persistSharePayloadsNow(): Promise<void> {
  * serialized chain), so clearing/taking share A never drops share B's durable
  * pending id even when B is written concurrently and not yet flushed. No-op
  * while signed out.
+ *
+ * Called by the share gate's commit so a process kill between commit and
+ * navigation delivery never re-arms the gate (the pending id is the only
+ * thing the cold-start restore reads to re-open it). The payload itself is
+ * intentionally left staged: the navigator still needs it to deliver.
  */
-async function clearPendingShareIdDraft(id: ShareId): Promise<void> {
+export async function clearPendingShareIdDraft(id: ShareId): Promise<void> {
   const userId = sharePersistUserId;
   if (!userId) {
     return;

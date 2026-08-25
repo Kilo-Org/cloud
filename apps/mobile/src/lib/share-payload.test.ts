@@ -6,6 +6,7 @@ import {
   __resetSharePayloadStoreForTests,
   __setCheckFileExistsForTests,
   __setDeleteCachedFileForTests,
+  clearPendingShareIdDraft,
   clearSharePayload,
   composeShareText,
   discardUnstoredSharePayload,
@@ -513,6 +514,31 @@ describe('share payload durable persistence', () => {
     await vi.waitFor(async () => {
       expect(await loadDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, isStringDraft)).toBeNull();
     });
+  });
+
+  it('commit clears only the committed id pending hint and keeps the payload', async () => {
+    setSharePersistUserId('u1');
+    const committed = putSharePayload({ text: 'committed', files: [], failedFiles: [] });
+    const other = putSharePayload({ text: 'other', files: [], failedFiles: [] });
+    await persistSharePayloadsNow();
+
+    // The durable hint currently names the newer `other` share.
+    saveDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, other);
+    await flushDraft('u1', PENDING_SHARE_ID_DRAFT_KEY);
+
+    // Committing the committed id is value-scoped: it must not drop `other`.
+    await clearPendingShareIdDraft(committed);
+    expect(await loadDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, isStringDraft)).toBe(other);
+    // The committed payload stays staged for the navigator to deliver.
+    expect(peekSharePayload(committed)?.text).toBe('committed');
+
+    // Now the hint names the committed id: commit clears it, and the payload
+    // still survives for the navigator.
+    saveDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, committed);
+    await flushDraft('u1', PENDING_SHARE_ID_DRAFT_KEY);
+    await clearPendingShareIdDraft(committed);
+    expect(await loadDraft('u1', PENDING_SHARE_ID_DRAFT_KEY, isStringDraft)).toBeNull();
+    expect(peekSharePayload(committed)?.text).toBe('committed');
   });
 
   it('clearing a superseded id cannot delete a newer pending id that is not yet flushed', async () => {

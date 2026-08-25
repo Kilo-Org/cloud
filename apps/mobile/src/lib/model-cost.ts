@@ -1,5 +1,5 @@
 import { i18n } from '@/i18n';
-import { formatNumber } from '@/lib/format';
+import { formatNumber, formatUsd } from '@/lib/format';
 
 export type ModelPricing = { prompt?: string; completion?: string };
 
@@ -14,15 +14,12 @@ function formatSide(pricePerTokenStr: string | undefined): string | null {
   }
 
   if (pricePer1M < 0.01) {
-    return `<${formatNumber(0.01, i18n.language, {
-      style: 'currency',
-      currency: 'USD',
-    })}`;
+    return i18n.t('agentChat.modelCost.lessThan', {
+      amount: formatUsd(0.01, i18n.language),
+    });
   }
 
-  return formatNumber(pricePer1M, i18n.language, {
-    style: 'currency',
-    currency: 'USD',
+  return formatUsd(pricePer1M, i18n.language, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
@@ -41,9 +38,14 @@ export function formatModelCostPer1M(pricing: ModelPricing | undefined): string 
   }
 
   const million = formatNumber(1_000_000, i18n.language, { notation: 'compact' });
-  return `${i18n.t('agentChat.messageDetails.input')} ${input} · ${i18n.t(
-    'agentChat.messageDetails.output'
-  )} ${output} / ${million} ${i18n.t('agentChat.contextUsage.tokens')}`;
+  return i18n.t('agentChat.modelCost.perMillion', {
+    input,
+    inputLabel: i18n.t('agentChat.messageDetails.input'),
+    million,
+    output,
+    outputLabel: i18n.t('agentChat.messageDetails.output'),
+    tokens: i18n.t('agentChat.contextUsage.tokens'),
+  });
 }
 
 /** Row-level cost decision: free/BYOK badges suppress cost; otherwise format. */

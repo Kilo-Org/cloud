@@ -206,11 +206,11 @@
       "loadingLines": "Po ngarkohen {{loaded}} nga {{total}} rreshta…",
       "expandContext": "Zgjero kontekstin",
       "expandMoreContext": "Zgjero më shumë kontekst",
-      "expandLines": "Zgjero {{count}} rreshta ({{start}}–{{end}})",
-      "expandMoreLines": "Zgjero edhe {{count}} rreshta ({{start}}–{{end}})",
-      "expandLinesOfContext": "Zgjero {{count}} rreshta konteksti",
+      "expandLines": "Zgjero {{displayCount}} rreshta ({{start}}–{{end}})",
+      "expandMoreLines": "Zgjero edhe {{displayCount}} rreshta ({{start}}–{{end}})",
+      "expandLinesOfContext": "Zgjero {{displayCount}} rreshta konteksti",
       "expandAll": "Zgjero të gjitha",
-      "expandAllLines": "Zgjero të gjitha {{count}} rreshtat",
+      "expandAllLines": "Zgjero të gjitha {{displayCount}} rreshtat",
       "loadingMoreFiles": "Po ngarkohen më shumë skedarë…",
       "retryLoadingNextPage": "Riprovo ngarkimin e faqes tjetër",
       "failedToLoadMoreFiles": "Dështoi ngarkimi i më shumë skedarëve — prek për ta riprovuar",
@@ -301,7 +301,7 @@
       "closeReactions": "Mbyll reagimet",
       "reactionsTitle": "Reagimet",
       "addReaction": "Shto reagim",
-      "reactionPill": "{{emoji}} reagim, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} reagim, {{displayCount}} {{countLabel}}",
       "reaction_one": "reagim",
       "reaction": "reagime",
       "reaction_other": "reagime",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Nuk ka fije rishikimi ose komente bisede në këtë kërkesë tërheqjeje.",
       "reviewFiles": "Rishiko skedarët",
       "quotedDiffSnippet": "Copëz dallimi e cituar",
-      "moreLinesAbove": "… {{count}} rreshta të tjerë më sipër",
+      "moreLinesAbove": "… {{displayCount}} rreshta të tjerë më sipër",
       "termsAcceptRequired": "Duhet të pranosh Kushtet e Shërbimit për të postuar.",
       "termsOutdatedCopy": "Kushtet e Shërbimit ndryshuan. Hape sërish këtë ekran për të pranuar versionin më të fundit.",
       "termsCheckRetryCopy": "Nuk u arrit të kontrolloheshin Kushtet e Shërbimit. Kontrollo lidhjen dhe provo përsëri."
@@ -395,11 +395,11 @@
       "retryChecks": "Riprovo kontrollet",
       "viewOnGitHub": "Shiko PR në GitHub",
       "noChecksReported": "Asnjë kontroll i raportuar",
-      "passed": "{{count}} kaluan",
-      "failed": "{{count}} dështuan",
-      "pending": "{{count}} në pritje",
-      "skipped": "{{count}} u anashkaluan",
-      "checksCount": "{{count}} kontrolle",
+      "passed": "{{displayCount}} kaluan",
+      "failed": "{{displayCount}} dështuan",
+      "pending": "{{displayCount}} në pritje",
+      "skipped": "{{displayCount}} u anashkaluan",
+      "checksCount": "{{displayCount}} kontrolle",
       "checkDetails": "detajet e kontrollit",
       "pullRequest": "kërkesa e tërheqjes"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "koment në pritje",
       "pendingComment": "komente në pritje",
       "pendingComment_other": "komente në pritje",
-      "submitCountOfTotal": "Dërgo {{freshCount}} nga {{totalCount}} komente",
+      "submitCountOfTotal": "Dërgo {{displayFreshCount}} nga {{displayTotalCount}} komente",
       "submitReview": "Dërgo rishikimin",
-      "partialPostedMessage": "U postuan {{freshCount}} koment(e). {{staleCount}} koment(e) tregojnë te një commit më i vjetër dhe mbetën në radhën tënde."
+      "partialPostedMessage": "U postuan {{displayFreshCount}} koment(e). {{displayStaleCount}} koment(e) tregojnë te një commit më i vjetër dhe mbetën në radhën tënde."
     },
     "reconnectNotice": {
       "title": "Lidhja me GitHub skadoi",
@@ -580,7 +580,8 @@
     "agents": "Agjentët",
     "profile": "Profili",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, skedë, {{position}} nga {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Të fundit",
       "common": "Të zakonshme",
       "reactWith": "Reago me {{reaction}}",
-      "accessibility": "{{emoji}} reagim, {{count}}"
+      "accessibility": "{{emoji}} reagim, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Po i përgjigjesh",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Imazhi i padisponueshëm",
       "openFailed": "Nuk u arrit të hapej bashkangjitja. Kontrollo lidhjen dhe provo përsëri.",
       "attachFailed": "Dështoi bashkangjitja e skedarit",
-      "limit": "Mund të bashkangjitësh deri në {{count}} skedarë.",
+      "limit": "Mund të bashkangjitësh deri në {{displayCount}} skedarë.",
       "sizeRejection": "{{filename}} e kalon kufirin e bashkangjitjes prej {{limit}}.",
       "unreadable": "Nuk u arrit të lexohej {{filename}}.",
       "pastedImage": "imazhi i ngjitur",
@@ -722,6 +723,7 @@
       "finalTermEnds": "Afati përfundimtar përfundon",
       "afterFinalTerm": "Pas afatit përfundimtar",
       "remaining": "Mbetur",
+      "lessThanOneDay": "Më pak se 1 ditë",
       "ends": "Përfundon",
       "expires": "Skadon",
       "noActivePlan": "Asnjë plan aktiv",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "çmimi yt standard mujor",
       "perMonth": "/muaj",
       "earlybirdAccessUntil": "Qasja e hershme deri më {{date}}",
-      "earlybirdEnding": "Herët përfundimi: {{days}} ditë të mbetura",
+      "earlybirdEnding": "Herët përfundimi: {{remaining}} ditë të mbetura",
       "paymentPastDue": "Pagesa është vonuar. Përditëso metodën tënde të pagesës.",
       "subscriptionCancels": "Abonimi anulohet më {{date}}",
-      "trialDaysRemaining": "Prova: {{days}} ditë të mbetura",
-      "trialEndingSoon": "Prova po mbaron së shpejti: {{days}}"
+      "trialDaysRemaining": "Prova: {{remaining}} ditë të mbetura",
+      "trialEndingSoon": "Prova po mbaron së shpejti: {{remaining}}"
     },
     "changelog": {
       "title": "Çfarë ka të re",
@@ -996,7 +998,7 @@
         "stalledTitle": "Diçka u bllokua",
         "stalledBody": "Nuk arritëm të përfundonim konfigurimin e {{name}}. Provo përsëri, ose dërgo email te hi@kilo.ai nëse kjo vazhdon të ndodhë.",
         "timeoutTitle": "Duke zgjatur më shumë se sa pritej",
-        "timeoutBody": "Konfigurimi i {{name}} po zgjat më shumë se zakonisht (mbi {{minutes}} minuta).",
+        "timeoutBody": "Konfigurimi i {{name}} po zgjat më shumë se zakonisht (mbi {{displayMinutes}} minuta).",
         "continueInBackground": "Vazhdo në sfond",
         "settingUp": "Duke konfiguruar {{name}}",
         "finishingSetup": "Duke përfunduar konfigurimin",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Porta e bashkimit",
       "repositories": "Depot",
       "allRepositories": "Të gjitha depot",
-      "nSelected": "{{count}} të zgjedhura",
+      "nSelected": "{{displayCount}} të zgjedhura",
       "reviewMemory": "Kujtesa e shqyrtimit",
       "proposedReviewMdGuidance": "Udhëzimi i propozuar i REVIEW.md"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "I analizuar",
       "exploitabilityReasoning": "Arsyetimi i shfrytëzueshmërisë",
       "suggestedFix": "Zgjidhja e sugjeruar",
-      "whereFound": "Ku u gjet ({{count}})",
+      "whereFound": "Ku u gjet ({{displayCount}})",
       "fullReport": "Raporti i plotë i gjeneruar",
       "unknown": "E panjohur",
       "yes": "Po",
       "no": "Jo"
     },
     "dashboard": {
-      "findingsCount": "{{count}} gjetje",
+      "findingsCount": "{{displayCount}} gjetje",
       "notMeasured": "E pamatur",
       "actFirst": "Vepro së pari",
       "slaPosture": "Qëndrimi i SLA-së",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Plani i veprimit për depon",
       "noOpenFindings": "Asnjë gjetje e hapur nuk ka nevojë për vëmendje",
       "deadlineToday": "Afati u arrit sot",
-      "daysOverdue": "{{count}} ditë me vonesë",
+      "daysOverdue": "{{displayCount}} ditë me vonesë",
       "withinDeadline": "Brenda afatit",
       "criticalOverdue": "Kritike me vonesë",
       "highOverdue": "E lartë me vonesë",
@@ -1434,6 +1436,27 @@
       "syncNow": "Sinkronizo tani",
       "syncQueued": "Sinkronizimi në radhë",
       "syncStatusUnavailable": "Statusi i sinkronizimit i padisponueshëm"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Gjetje të hapura",
+      "openFindingsDetail": "{{critical}} kritike, {{high}} të larta",
+      "confirmedExploitable": "E konfirmuar e shfrytëzueshme",
+      "confirmedExploitableDetail": "Rreziku i projektit u konfirmua nga analiza",
+      "needsReview": "Ka nevojë për shqyrtimin tuaj",
+      "needsReviewDetail": "Kërkohet vendim njerëzor",
+      "analysisIncomplete": "Analiza e papërfunduar",
+      "analysisIncompleteDetail": "Rreziku i projektit është ende i panjohur",
+      "slaCompliance": "Përputhja me SLA",
+      "notMeasured": "E pamatur",
+      "withinDeadlineDetail": "{{within}} nga {{total}} brenda afatit",
+      "noDeadlineData": "Asnjë gjetje nuk ka ende afat SLA",
+      "deadlinePassed": "Afati kaloi",
+      "deadlinePassedDetail": "{{critical}} kritike, {{high}} të larta",
+      "dueThisWeek": "Afati këtë javë",
+      "dueThisWeekDetail": "{{exploitable}} të konfirmuara të shfrytëzueshme",
+      "noDeadline": "Pa afat",
+      "reviewSlaAssignment": "Shqyrto caktimin e SLA-së",
+      "allOpenFindingsTracked": "Të gjitha gjetjet e hapura gjurmohen"
     },
     "dismiss": {
       "title": "Hidhni poshtë gjetjen",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "Analiza {{mode}}",
       "automation": "Automatizimi",
       "automationAllOff": "Të gjitha të çaktivizuara",
-      "automationCount": "{{count}} nga 3 të aktivizuara",
+      "automationCount": "{{displayCount}} nga 3 të aktivizuara",
       "notifications": "Njoftimet",
-      "notificationsCount": "{{count}} nga 2 të aktivizuara",
+      "notificationsCount": "{{displayCount}} nga 2 të aktivizuara",
       "slaPolicy": "Politika e SLA-së",
       "disabledNoManage": "Security Agent është i çaktivizuar. Vetëm pronarët e organizatës dhe menaxherët e faturimit mund ta aktivizojnë.",
       "disabledNoRepo": "Zgjidhni të paktën një depo përpara se të aktivizoni Security Agent.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Hap kërkesën për tërheqje{{number}}",
       "openDraftPullRequest": "Hap draftin e kërkesës për tërheqje{{number}}",
       "progress": "Ecuria",
-      "attemptHistory": "Historia e përpjekjeve ({{count}})",
+      "attemptHistory": "Historia e përpjekjeve ({{displayCount}})",
       "attemptNumber": "Përpjekja #{{number}}",
       "startedBy": "Filluar nga",
       "model": "Modeli",
@@ -1855,9 +1878,9 @@
       "toolTask": "detyrë",
       "readTodos": "Lexo listat e detyrave",
       "updateTodos": "Përditëso listat e detyrave",
-      "linesBadge": "{{count}} rreshta",
-      "filesBadge": "{{count}} skedarë",
-      "matchesBadge": "{{count}} përputhje"
+      "linesBadge": "{{displayCount}} rreshta",
+      "filesBadge": "{{displayCount}} skedarë",
+      "matchesBadge": "{{displayCount}} përputhje"
     },
     "readToolMarkdown": {
       "linesTruncated": "rreshta {{start}}–{{end}} (të shkurtuar)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "Kjo përgjigje nuk mund të raportohet.",
       "reportAiResponseSubmitted": "Raporti u dërgua. Faturimi {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Detajet e padisponueshme",
       "textDisplay": "Shfaqja e tekstit",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Përgatitja e përfunduar",
       "preparationFailed": "Përgatitja dështoi",
       "setupCommand": "Komanda e konfigurimit {{index}}",
-      "setupCommandOf": "Komanda e konfigurimit {{index}} nga {{count}}"
+      "setupCommandOf": "Komanda e konfigurimit {{index}} nga {{displayCount}}"
     },
     "permissionCard": {
       "title": "Kërkohet leje",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Dërgimi dështoi. Ju lutemi provoni përsëri.",
       "questionAnnouncement": "Agjenti ka nevojë për informacionin tuaj. Redaktori është i ndërprerë ndërsa ju përgjigjeni.",
       "permissionAnnouncement": "Agjenti ka nevojë për leje për të vazhduar. Redaktori është i ndërprerë ndërsa ju vendosni.",
-      "positionHint": "(1 nga {{count}})",
+      "positionHint": "(1 nga {{displayCount}})",
       "movedPastPrompt": "Agjenti ka kaluar përtej kësaj kërkese. Kjo kartë do të mbyllet kur seanca të vazhdojë.",
       "waitingForAnswer": "Agjenti po pret përgjigjen tuaj. Ndërsa kjo pyetje është e hapur, mesazhi juaj te agjenti është i ndërprerë.",
       "waitingForPermission": "Agjenti po pret lejen. Ndërsa kjo kërkesë është e hapur, mesazhi juaj te agjenti është i ndërprerë."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Aksesi në kamerë i çaktivizuar",
       "cameraAccessMessage": "Lejoni aksesin në kamerë te Cilësimet për të bërë një foto.",
       "couldNotOpenPhotoPicker": "Zgjedhësi i fotove nuk mund të hapej. Rinisni Kilo dhe provoni përsëri.",
-      "maxFilesAllowed": "Maksimumi {{count}} skedarë të lejuar",
+      "maxFilesAllowed": "Maksimumi {{displayCount}} skedarë të lejuar",
       "onlyAddingFiles": "Duke shtuar vetëm {{accepted}} nga {{total}} skedarët (maksimumi {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "kostoja {{cost}}",
       "costSuffix": ", kostoja {{cost}}",
       "tokensWindowUnavailable": "Konteksti {{used}} tokenë, dritarja e padisponueshme",
-      "tokensUsage": "Konteksti {{used}} nga {{window}} tokenët, {{percentage}}% i përdorur",
+      "tokensUsage": "Konteksti {{used}} nga {{window}} tokenët, {{percentage}} i përdorur",
       "title": "Përdorimi i kontekstit",
       "used": "I përdorur",
       "remaining": "I mbetur",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "Përdorimi pasqyron përgjigjen më të fundit të përfunduar të asistentit.",
       "tokenUsage": "Përdorimi i tokenëve",
       "cacheRate": "Shkalla e cache",
-      "modelsCount": "Modelet ({{count}})",
+      "modelsCount": "Modelet ({{displayCount}})",
       "tokenTotalsNote": "Totalet e tokenëve mbulojnë vetëm këtë seancë dhe përjashtojnë tokenët e nënagjentëve/seancave fëmijë.",
       "subagents": "Nënagjentët",
       "subagentsDescription": "Kostoja e mbetur nga seancat fëmijë",
@@ -2373,7 +2400,7 @@
     "connectedCli": "Në një CLI të lidhur",
     "newSessionOn": "Seancë e re në {{name}}",
     "noMatchingSessions": "Nuk ka seanca përputhëse.",
-    "onlyFirstFilesAttached": "Vetëm {{count}} skedarët e parë do të bashkëngjiten.",
+    "onlyFirstFilesAttached": "Vetëm {{displayCount}} skedarët e parë do të bashkëngjiten.",
     "staleMessage": "Kjo ndarje nuk është më e disponueshme.",
     "retryableMessage": "Seancat tuaja nuk u ngarkuan.",
     "emptyMessage": "Ende nuk ka seanca — filloni një të re për ta dërguar këtë.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Kilo Pass në këtë Apple Account i përket një llogarie tjetër Kilo. Hyni në atë llogari Kilo për ta menaxhuar.",
     "alreadySubscribed": "Ju tashmë keni një abonim Kilo Pass.",
     "purchaseUnavailable": "Blerja e Kilo Pass nuk është e disponueshme tani.",
-    "tierCredits": "${{amount}} në kredite",
+    "tierCredits": "{{amount}} në kredite",
     "perMonth": "{{price}}/muaj",
     "verifyPurchaseFailed": "Blerja juaj nuk mund të verifikohej. Kontrolloni lidhjen tuaj dhe provoni përsëri.",
     "productsCouldNotLoad": "Produktet Kilo Pass nuk mund të ngarkoheshin nga App Store.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "Menaxhimi i abonimit në App Store nuk u hap.",
     "kiloPassSetup": "Konfigurimi i Kilo Pass",
     "subscriptionHeaderDescription": "Një abonim mujor që shton kredite në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App — Cloud Agents, seanca në distancë dhe biseda KiloClaw.",
-    "tierDescription": "Kredite të paguara prej ${{price}} të shtuara çdo muaj për përdorimin e Kilo App.",
+    "tierDescription": "Kredite të paguara prej {{price}} të shtuara çdo muaj për përdorimin e Kilo App.",
     "subscribe": "Abonohu",
     "subscribeDescription": "Kredite mujore me progres bonus",
     "manage": "Menaxho",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass në pritje",
     "statusCanceling": "Kilo Pass duke u anuluar",
     "statusPastDue": "Kilo Pass me afat të kaluar",
-    "monthlyCredits": "${{credits}} kredite mujore",
+    "monthlyCredits": "{{credits}} kredite mujore",
     "ends": "Përfundon {{date}}",
     "periodEnd": "fundi i periudhës",
     "managedOnGooglePlay": "I menaxhuar në Google Play",

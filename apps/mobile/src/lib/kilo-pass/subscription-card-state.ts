@@ -4,7 +4,7 @@ import {
   type PurchaseStatusClass,
 } from '@kilocode/app-shared/commerce';
 import { i18n } from '@/i18n';
-import { formatDate, formatNumber } from '@/lib/format';
+import { formatDate, formatUsd } from '@/lib/format';
 import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -216,7 +216,8 @@ function getActiveSubscriptionCardState(
   statusClass: PurchaseStatusClass
 ): KiloPassSubscriptionCardState {
   const credits = i18n.t('kiloPass.monthlyCredits', {
-    credits: formatNumber(subscription.currentPeriodBaseCreditsUsd, i18n.language, {
+    credits: formatUsd(subscription.currentPeriodBaseCreditsUsd, i18n.language, {
+      minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }),
   });

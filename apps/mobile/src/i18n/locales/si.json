@@ -206,11 +206,11 @@
       "loadingLines": "{{total}} න් {{loaded}} පේළි පූරණය වෙමින්…",
       "expandContext": "සන්දර්භය පුළුල් කරන්න",
       "expandMoreContext": "තව සන්දර්භය පුළුල් කරන්න",
-      "expandLines": "පේළි {{count}} පුළුල් කරන්න ({{start}}–{{end}})",
-      "expandMoreLines": "තව පේළි {{count}} පුළුල් කරන්න ({{start}}–{{end}})",
-      "expandLinesOfContext": "සන්දර්භ පේළි {{count}} පුළුල් කරන්න",
+      "expandLines": "පේළි {{displayCount}} පුළුල් කරන්න ({{start}}–{{end}})",
+      "expandMoreLines": "තව පේළි {{displayCount}} පුළුල් කරන්න ({{start}}–{{end}})",
+      "expandLinesOfContext": "සන්දර්භ පේළි {{displayCount}} පුළුල් කරන්න",
       "expandAll": "සියල්ල පුළුල් කරන්න",
-      "expandAllLines": "පේළි {{count}} සියල්ල පුළුල් කරන්න",
+      "expandAllLines": "පේළි {{displayCount}} සියල්ල පුළුල් කරන්න",
       "loadingMoreFiles": "තවත් ගොනු පූරණය වෙමින්…",
       "retryLoadingNextPage": "ඊළඟ පිටුව පූරණය නැවත උත්සාහ කරන්න",
       "failedToLoadMoreFiles": "තවත් ගොනු පූරණය කිරීමට අසමත් විය — නැවත උත්සාහ කිරීමට තට්ටු කරන්න",
@@ -301,7 +301,7 @@
       "closeReactions": "ප්‍රතික්‍රියා වසන්න",
       "reactionsTitle": "ප්‍රතික්‍රියා",
       "addReaction": "ප්‍රතික්‍රියාවක් එක් කරන්න",
-      "reactionPill": "{{emoji}} ප්‍රතික්‍රියාව, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} ප්‍රතික්‍රියාව, {{displayCount}} {{countLabel}}",
       "reaction_one": "ප්‍රතික්‍රියාව",
       "reaction": "ප්‍රතික්‍රියා",
       "reaction_other": "ප්‍රතික්‍රියා",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "මෙම pull request මත සමාලෝචන නූල් හෝ සංවාද අදහස් නොමැත.",
       "reviewFiles": "ගොනු සමාලෝචනය කරන්න",
       "quotedDiffSnippet": "උපුටා දක්වන ලද diff කොටස",
-      "moreLinesAbove": "… ඉහළ තව පේළි {{count}} ක්",
+      "moreLinesAbove": "… ඉහළ තව පේළි {{displayCount}} ක්",
       "termsAcceptRequired": "පළ කිරීමට ඔබ සේවා නියමයන් පිළිගත යුතුය.",
       "termsOutdatedCopy": "සේවා නියමයන් වෙනස් විය. නවතම අනුවාදය පිළිගැනීමට මෙම තිරය නැවත විවෘත කරන්න.",
       "termsCheckRetryCopy": "සේවා නියමයන් පරීක්ෂා කිරීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න."
@@ -395,11 +395,11 @@
       "retryChecks": "පරීක්ෂා නැවත උත්සාහ කරන්න",
       "viewOnGitHub": "GitHub හි PR බලන්න",
       "noChecksReported": "පරීක්ෂා වාර්තා වී නොමැත",
-      "passed": "{{count}} සමත් විය",
-      "failed": "{{count}} අසමත් විය",
-      "pending": "{{count}} බලා සිටී",
-      "skipped": "{{count}} මඟ හැරුණි",
-      "checksCount": "පරීක්ෂා {{count}} ක්",
+      "passed": "{{displayCount}} සමත් විය",
+      "failed": "{{displayCount}} අසමත් විය",
+      "pending": "{{displayCount}} බලා සිටී",
+      "skipped": "{{displayCount}} මඟ හැරුණි",
+      "checksCount": "පරීක්ෂා {{displayCount}} ක්",
       "checkDetails": "පරීක්ෂා විස්තර",
       "pullRequest": "pull request"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "අත්හිටුවන ලද අදහස",
       "pendingComment": "අත්හිටුවන ලද අදහස්",
       "pendingComment_other": "අත්හිටුවන ලද අදහස්",
-      "submitCountOfTotal": "අදහස් {{totalCount}} න් {{freshCount}} ඉදිරිපත් කරන්න",
+      "submitCountOfTotal": "අදහස් {{displayTotalCount}} න් {{displayFreshCount}} ඉදිරිපත් කරන්න",
       "submitReview": "සමාලෝචනය ඉදිරිපත් කරන්න",
-      "partialPostedMessage": "අදහස් {{freshCount}} ක් පළ කරන ලදී. අදහස් {{staleCount}} ක් පැරණි commit එකක් දෙස බලා ඔබේ පෝලිමේ රැඳී ඇත."
+      "partialPostedMessage": "අදහස් {{displayFreshCount}} ක් පළ කරන ලදී. අදහස් {{displayStaleCount}} ක් පැරණි commit එකක් දෙස බලා ඔබේ පෝලිමේ රැඳී ඇත."
     },
     "reconnectNotice": {
       "title": "GitHub සම්බන්ධතාවය කල් ඉකුත් විය",
@@ -580,7 +580,8 @@
     "agents": "නියෝජිතයන්",
     "profile": "පැතිකඩ",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, ටැබ්, මුළු {{total}} න් {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "මෑත",
       "common": "පොදු",
       "reactWith": "{{reaction}} සමඟ ප්‍රතික්‍රියා කරන්න",
-      "accessibility": "{{emoji}} ප්‍රතික්‍රියාව, {{count}}"
+      "accessibility": "{{emoji}} ප්‍රතික්‍රියාව, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "පිළිතුරු දෙන්නේ",
@@ -650,7 +651,7 @@
       "imageUnavailable": "රූපය නොමැත",
       "openFailed": "ඇමුණුම විවෘත කිරීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "attachFailed": "ගොනුව ඇමිණීමට අසමත් විය",
-      "limit": "ඔබට ගොනු {{count}} ක් දක්වා ඇමිණිය හැක.",
+      "limit": "ඔබට ගොනු {{displayCount}} ක් දක්වා ඇමිණිය හැක.",
       "sizeRejection": "{{filename}} {{limit}} ඇමුණුම් සීමාව ඉක්මවයි.",
       "unreadable": "{{filename}} කියවීමට නොහැකි විය.",
       "pastedImage": "අලවන ලද රූපය",
@@ -722,6 +723,7 @@
       "finalTermEnds": "අවසාන කාලය අවසන් වේ",
       "afterFinalTerm": "අවසාන කාලයෙන් පසු",
       "remaining": "ඉතිරි",
+      "lessThanOneDay": "දින 1 ට වඩා අඩුය",
       "ends": "අවසන් වේ",
       "expires": "කල් ඉකුත් වේ",
       "noActivePlan": "සක්රීය සැලැස්මක් නොමැත",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "ඔබේ Standard මාසික මිල",
       "perMonth": "/මස",
       "earlybirdAccessUntil": "{{date}} දක්වා Earlybird ප්රවේශය",
-      "earlybirdEnding": "Earlybird අවසන් වේ: {{days}} දින ඉතිරියි",
+      "earlybirdEnding": "Earlybird අවසන් වේ: {{remaining}} දින ඉතිරියි",
       "paymentPastDue": "ගෙවීම කල් ඉකුත් විය. කරුණාකර ඔබේ ගෙවීම් ක්රමය යාවත්කාලීන කරන්න.",
       "subscriptionCancels": "දායකත්වය {{date}} දින අවලංගු වේ",
-      "trialDaysRemaining": "අත්හදා බැලීම: {{days}} දින ඉතිරියි",
-      "trialEndingSoon": "අත්හදා බැලීම ඉක්මනින් අවසන් වේ: {{days}}"
+      "trialDaysRemaining": "අත්හදා බැලීම: {{remaining}} දින ඉතිරියි",
+      "trialEndingSoon": "අත්හදා බැලීම ඉක්මනින් අවසන් වේ: {{remaining}}"
     },
     "changelog": {
       "title": "අලුත් මොනවද",
@@ -996,7 +998,7 @@
         "stalledTitle": "යම් දෙයක් එල්ලී ඇත",
         "stalledBody": "අපට {{name}} සැකසීම අවසන් කළ නොහැකි විය. නැවත උත්සාහ කරන්න, නැතහොත් මෙය දිගටම සිදු වුවහොත් hi@kilo.ai වෙත විද්යුත් තැපෑලක් යවන්න.",
         "timeoutTitle": "බලාපොරොත්තු වූවාට වඩා වැඩි කාලයක් ගත වේ",
-        "timeoutBody": "{{name}} සඳහා සැකසුම සාමාන්යයෙන් වඩා වැඩි කාලයක් ගත වේ ({{minutes}} මිනිත්තුවකට වඩා).",
+        "timeoutBody": "{{name}} සඳහා සැකසුම සාමාන්යයෙන් වඩා වැඩි කාලයක් ගත වේ ({{displayMinutes}} මිනිත්තුවකට වඩා).",
         "continueInBackground": "පසුබිමේ දිගටම කරන්න",
         "settingUp": "{{name}} සැකසෙමින්",
         "finishingSetup": "සැකසුම අවසන් වෙමින්",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Merge gate",
       "repositories": "ගබඩා",
       "allRepositories": "සියලුම ගබඩා",
-      "nSelected": "{{count}} තේරුවා",
+      "nSelected": "{{displayCount}} තේරුවා",
       "reviewMemory": "සමාලෝචන මතකය",
       "proposedReviewMdGuidance": "යෝජිත REVIEW.md මාර්ගෝපදේශ"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "විශ්ලේෂණය කර ඇත",
       "exploitabilityReasoning": "සූරාකෑමේ හැකියාව පිළිබඳ හේතුව",
       "suggestedFix": "යෝජිත විසඳුම",
-      "whereFound": "මෙය සොයාගත් ස්ථානය ({{count}})",
+      "whereFound": "මෙය සොයාගත් ස්ථානය ({{displayCount}})",
       "fullReport": "සම්පූර්ණ උත්පාදිත වාර්තාව",
       "unknown": "නොදන්නා",
       "yes": "ඔව්",
       "no": "නැත"
     },
     "dashboard": {
-      "findingsCount": "{{count}} සොයාගැනීම්",
+      "findingsCount": "{{displayCount}} සොයාගැනීම්",
       "notMeasured": "මැන බලා නැත",
       "actFirst": "මුලින්ම ක්රියා කරන්න",
       "slaPosture": "SLA පිළිවෙළ",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "ගබඩා ක්රියා සැලැස්ම",
       "noOpenFindings": "අවධානය අවශ්ය විවෘත සොයාගැනීම් නැත",
       "deadlineToday": "අද දින නියමිත කාලය ළඟා විය",
-      "daysOverdue": "{{count}} දින ප්රමාද වී ඇත",
+      "daysOverdue": "{{displayCount}} දින ප්රමාද වී ඇත",
       "withinDeadline": "නියමිත කාලය තුළ",
       "criticalOverdue": "Critical ප්රමාදයි",
       "highOverdue": "High ප්රමාදයි",
@@ -1434,6 +1436,27 @@
       "syncNow": "දැන් සමමුහුර්ත කරන්න",
       "syncQueued": "සමමුහුර්තය පෝලිම් කර ඇත",
       "syncStatusUnavailable": "සමමුහුර්ත තත්වය ලබාගත නොහැක"
+    },
+    "dashboardMetrics": {
+      "openFindings": "විවෘත සොයාගැනීම්",
+      "openFindingsDetail": "{{critical}} Critical, {{high}} High",
+      "confirmedExploitable": "සූරාකෑමට හැකි බව තහවුරු කර ඇත",
+      "confirmedExploitableDetail": "විශ්ලේෂණයෙන් ව්යාපෘති අවදානම තහවුරු විය",
+      "needsReview": "ඔබගේ සමාලෝචනය අවශ්‍යයි",
+      "needsReviewDetail": "මානව තීරණයක් අවශ්‍යයි",
+      "analysisIncomplete": "විශ්ලේෂණය සම්පූර්ණ නැත",
+      "analysisIncompleteDetail": "ව්‍යාපෘති අවදානම තවමත් නොදනී",
+      "slaCompliance": "SLA අනුකූලතාව",
+      "notMeasured": "මැන බලා නැත",
+      "withinDeadlineDetail": "නියමිත කාලය තුළ {{total}} න් {{within}}",
+      "noDeadlineData": "කිසිදු සොයාගැනීමකට තවම SLA නියමිත කාලයක් නැත",
+      "deadlinePassed": "නියමිත කාලය ඉක්මවා ඇත",
+      "deadlinePassedDetail": "{{critical}} Critical, {{high}} High",
+      "dueThisWeek": "මෙම සතියේ නියමිතයි",
+      "dueThisWeekDetail": "{{exploitable}} සූරාකෑමට හැකි බව තහවුරුයි",
+      "noDeadline": "නියමිත කාලයක් නැත",
+      "reviewSlaAssignment": "SLA පැවරීම සමාලෝචනය කරන්න",
+      "allOpenFindingsTracked": "සියලුම විවෘත සොයාගැනීම් නිරීක්ෂණය වේ"
     },
     "dismiss": {
       "title": "සොයාගැනීම ඉවතලන්න",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}} විශ්ලේෂණය",
       "automation": "ස්වයංක්රීයකරණය",
       "automationAllOff": "සියල්ල අක්රීයයි",
-      "automationCount": "{{count}} න් 3 ක් සක්රීයයි",
+      "automationCount": "{{displayCount}} න් 3 ක් සක්රීයයි",
       "notifications": "දැනුම්දීම්",
-      "notificationsCount": "{{count}} න් 2 ක් සක්රීයයි",
+      "notificationsCount": "{{displayCount}} න් 2 ක් සක්රීයයි",
       "slaPolicy": "SLA ප්රතිපත්තිය",
       "disabledNoManage": "Security Agent අක්රීයයි. සංවිධාන හිමිකරුවන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණක් එය සක්රීය කළ හැක.",
       "disabledNoRepo": "Security Agent සක්රීය කිරීමට පෙර අවම වශයෙන් එක් ගබඩාවක් තෝරන්න.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Pull request{{number}} විවෘත කරන්න",
       "openDraftPullRequest": "කෙටුම්පත් pull request{{number}} විවෘත කරන්න",
       "progress": "ප්රගතිය",
-      "attemptHistory": "උත්සාහ ඉතිහාසය ({{count}})",
+      "attemptHistory": "උත්සාහ ඉතිහාසය ({{displayCount}})",
       "attemptNumber": "උත්සාහය #{{number}}",
       "startedBy": "ආරම්භ කළේ",
       "model": "ආකෘතිය",
@@ -1855,9 +1878,9 @@
       "toolTask": "කාර්යය",
       "readTodos": "කළ යුතු දේ කියවන්න",
       "updateTodos": "කළ යුතු දේ යාවත්කාලීන කරන්න",
-      "linesBadge": "{{count}} පේළි",
-      "filesBadge": "{{count}} ගොනු",
-      "matchesBadge": "{{count}} ගැළපීම්"
+      "linesBadge": "{{displayCount}} පේළි",
+      "filesBadge": "{{displayCount}} ගොනු",
+      "matchesBadge": "{{displayCount}} ගැළපීම්"
     },
     "readToolMarkdown": {
       "linesTruncated": "පේළි {{start}}–{{end}} (කෙටි කර ඇත)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "මෙම ප්රතිචාරය වාර්තා කළ නොහැක.",
       "reportAiResponseSubmitted": "වාර්තාව ඉදිරිපත් කර ඇත. රිසිට්පත {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "විස්තර ලබාගත නොහැක",
       "textDisplay": "පෙළ සංදර්ශකය",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "සූදානම සම්පූර්ණයි",
       "preparationFailed": "සූදානම අසාර්ථක විය",
       "setupCommand": "සැකසුම් විධානය {{index}}",
-      "setupCommandOf": "{{count}} න් සැකසුම් විධානය {{index}}"
+      "setupCommandOf": "{{displayCount}} න් සැකසුම් විධානය {{index}}"
     },
     "permissionCard": {
       "title": "අවසරය අවශ්ය වේ",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "ඉදිරිපත් කිරීම අසාර්ථකයි. කරුණාකර නැවත උත්සාහ කරන්න.",
       "questionAnnouncement": "ඒජන්තයාට ඔබගේ ඇතුළත් කිරීම අවශ්‍යයි. ඔබ පිළිතුරු දෙන අතරතුර සංයුක්තකය විරාම කර ඇත.",
       "permissionAnnouncement": "ඒජන්තයාට ඉදිරියට යාමට අවසර අවශ්‍යයි. ඔබ තීරණය කරන අතරතුර සංයුක්තකය විරාම කර ඇත.",
-      "positionHint": "({{count}} න් 1)",
+      "positionHint": "({{displayCount}} න් 1)",
       "movedPastPrompt": "ඒජන්තයා මෙම ඉල්ලීම පසු කර ඇත. සැසිය ඉදිරියට යන විට මෙම කාඩ්පත වැසෙනු ඇත.",
       "waitingForAnswer": "ඒජන්තයා ඔබගේ පිළිතුර එනතුරු බලා සිටී. මෙම ප්‍රශ්නය විවෘතව ඇති අතරතුර, ඒජන්තයාට ඔබගේ පණිවිඩය විරාම කර ඇත.",
       "waitingForPermission": "ඒජන්තයා අවසරය එනතුරු බලා සිටී. මෙම ඉල්ලීම විවෘතව ඇති අතරතුර, ඒජන්තයාට ඔබගේ පණිවිඩය විරාම කර ඇත."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "කැමරා ප්‍රවේශය අක්‍රීයයි",
       "cameraAccessMessage": "ඡායාරූපයක් ගැනීමට සැකසුම් තුළ කැමරා ප්‍රවේශයට ඉඩ දෙන්න.",
       "couldNotOpenPhotoPicker": "ඡායාරූප තේරීම්කාරකය විවෘත කළ නොහැකි විය. Kilo නැවත ආරම්භ කර නැවත උත්සාහ කරන්න.",
-      "maxFilesAllowed": "උපරිම ගොනු {{count}} කට ඉඩ දෙනු ලැබේ",
+      "maxFilesAllowed": "උපරිම ගොනු {{displayCount}} කට ඉඩ දෙනු ලැබේ",
       "onlyAddingFiles": "ගොනු {{total}} න් {{accepted}} ක් පමණක් එක් කරමින් (උපරිම {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "පිරිවැය {{cost}}",
       "costSuffix": ", පිරිවැය {{cost}}",
       "tokensWindowUnavailable": "සන්දර්භය {{used}} ටෝකන, කවුළුව ලබා ගත නොහැක",
-      "tokensUsage": "සන්දර්භය {{used}}/{{window}} ටෝකන, {{percentage}}% භාවිතා කර ඇත",
+      "tokensUsage": "සන්දර්භය {{used}}/{{window}} ටෝකන, {{percentage}} භාවිතා කර ඇත",
       "title": "සන්දර්භ භාවිතය",
       "used": "භාවිතා කරන ලද",
       "remaining": "ඉතිරි",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "භාවිතය අවසන් සම්පූර්ණ කළ සහායක ප්‍රතිචාරය පිළිබිඹු කරයි.",
       "tokenUsage": "ටෝකන භාවිතය",
       "cacheRate": "හැඹිලි අනුපාතය",
-      "modelsCount": "මාදිලි ({{count}})",
+      "modelsCount": "මාදිලි ({{displayCount}})",
       "tokenTotalsNote": "ටෝකන එකතු මෙම සැසියට පමණක් අදාළ වන අතර උපඒජන්ත/ළමා සැසි ටෝකන බැහැර කරයි.",
       "subagents": "උපඒජන්තයන්",
       "subagentsDescription": "ළමා සැසි වලින් ඉතිරි පිරිවැය",
@@ -2373,7 +2400,7 @@
     "connectedCli": "සම්බන්ධිත CLI එකක",
     "newSessionOn": "{{name}} මත නව සැසිය",
     "noMatchingSessions": "ගැළපෙන සැසි නොමැත.",
-    "onlyFirstFilesAttached": "පළමු ගොනු {{count}} පමණක් අමුණනු ඇත.",
+    "onlyFirstFilesAttached": "පළමු ගොනු {{displayCount}} පමණක් අමුණනු ඇත.",
     "staleMessage": "මෙම බෙදාගැනීම තවදුරටත් ලබා ගත නොහැක.",
     "retryableMessage": "ඔබගේ සැසි පූරණය කළ නොහැකි විය.",
     "emptyMessage": "තවම සැසි නොමැත — මෙය යැවීමට නව එකක් ආරම්භ කරන්න.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "මෙම Apple ගිණුමේ Kilo Pass වෙනත් Kilo ගිණුමකට අයත් වේ. එය කළමනාකරණය කිරීමට එම Kilo ගිණුමට පුරනය වන්න.",
     "alreadySubscribed": "ඔබට දැනටමත් Kilo Pass දායකත්වයක් ඇත.",
     "purchaseUnavailable": "Kilo Pass මිලදී ගැනීම දැන් ලබා ගත නොහැක.",
-    "tierCredits": "ණය වශයෙන් ${{amount}}",
+    "tierCredits": "ණය වශයෙන් {{amount}}",
     "perMonth": "{{price}}/mo",
     "verifyPurchaseFailed": "ඔබගේ මිලදී ගැනීම සත්‍යාපනය කළ නොහැකි විය. ඔබගේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
     "productsCouldNotLoad": "App Store වෙතින් Kilo Pass නිෂ්පාදන පූරණය කළ නොහැකි විය.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "App Store දායකත්ව කළමනාකරණය විවෘත කිරීම අසාර්ථකයි.",
     "kiloPassSetup": "Kilo Pass සැකසුම",
     "subscriptionHeaderDescription": "Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා — Cloud Agents, දුරස්ථ සැසි, සහ KiloClaw කතාබස් — ඔබගේ Kilo ශේෂයට ණය එක් කරන මාසික දායකත්වයක්.",
-    "tierDescription": "Kilo App භාවිතය සඳහා ${{price}} ගෙවූ ණය මාසිකව එක් වේ.",
+    "tierDescription": "Kilo App භාවිතය සඳහා {{price}} ගෙවූ ණය මාසිකව එක් වේ.",
     "subscribe": "දායක වන්න",
     "subscribeDescription": "ප්‍රසාද ප්‍රගතිය සමඟ මාසික ණය",
     "manage": "කළමනාකරණය",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass අපේක්ෂිතයි",
     "statusCanceling": "Kilo Pass අවලංගු වෙමින්",
     "statusPastDue": "Kilo Pass කල් ඉකුත් වී ඇත",
-    "monthlyCredits": "මාසික ණය ${{credits}}",
+    "monthlyCredits": "මාසික ණය {{credits}}",
     "ends": "අවසන් වන්නේ {{date}}",
     "periodEnd": "කාලසීමාව අවසානය",
     "managedOnGooglePlay": "Google Play මත කළමනාකරණය වේ",

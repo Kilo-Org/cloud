@@ -3,6 +3,8 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { canShowReactionPills } from './message-presentation';
 
@@ -43,6 +45,7 @@ export function MessageReactionPills({
             accessibilityLabel={t('chat.reactions.accessibility', {
               emoji: reaction.emoji,
               count: reaction.count,
+              displayCount: formatNumber(reaction.count, i18n.language),
             })}
             accessibilityState={{ selected: hasReacted }}
             className={cn(
@@ -57,7 +60,7 @@ export function MessageReactionPills({
                 hasReacted ? 'text-primary-foreground' : 'text-foreground'
               )}
             >
-              {reaction.count}
+              {formatNumber(reaction.count, i18n.language)}
             </Text>
           </Pressable>
         );

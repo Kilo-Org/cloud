@@ -206,11 +206,11 @@
       "loadingLines": "Memuatkan {{loaded}} daripada {{total}} baris…",
       "expandContext": "Kembangkan konteks",
       "expandMoreContext": "Kembangkan lebih banyak konteks",
-      "expandLines": "Kembangkan {{count}} baris ({{start}}–{{end}})",
-      "expandMoreLines": "Kembangkan lagi {{count}} baris ({{start}}–{{end}})",
-      "expandLinesOfContext": "Kembangkan {{count}} baris konteks",
+      "expandLines": "Kembangkan {{displayCount}} baris ({{start}}–{{end}})",
+      "expandMoreLines": "Kembangkan lagi {{displayCount}} baris ({{start}}–{{end}})",
+      "expandLinesOfContext": "Kembangkan {{displayCount}} baris konteks",
       "expandAll": "Kembangkan semua",
-      "expandAllLines": "Kembangkan semua {{count}} baris",
+      "expandAllLines": "Kembangkan semua {{displayCount}} baris",
       "loadingMoreFiles": "Memuatkan lebih banyak fail…",
       "retryLoadingNextPage": "Cuba memuatkan halaman seterusnya semula",
       "failedToLoadMoreFiles": "Gagal memuatkan lebih banyak fail — ketik untuk mencuba semula",
@@ -301,7 +301,7 @@
       "closeReactions": "Tutup tindak balas",
       "reactionsTitle": "Tindak balas",
       "addReaction": "Tambah tindak balas",
-      "reactionPill": "{{emoji}} tindak balas, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} tindak balas, {{displayCount}} {{countLabel}}",
       "reaction_one": "tindak balas",
       "reaction": "tindak balas",
       "reaction_other": "tindak balas",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Tiada benang semakan atau komen perbualan pada permintaan tarik ini.",
       "reviewFiles": "Semak fail",
       "quotedDiffSnippet": "Petikan diff terpilih",
-      "moreLinesAbove": "… {{count}} lagi baris di atas",
+      "moreLinesAbove": "… {{displayCount}} lagi baris di atas",
       "termsAcceptRequired": "Anda mesti menerima Terma Perkhidmatan untuk menyiarkan.",
       "termsOutdatedCopy": "Terma Perkhidmatan telah berubah. Buka semula skrin ini untuk menerima versi terkini.",
       "termsCheckRetryCopy": "Tidak dapat menyemak Terma Perkhidmatan. Semak sambungan anda dan cuba lagi."
@@ -395,11 +395,11 @@
       "retryChecks": "Cuba semakan semula",
       "viewOnGitHub": "Lihat PR di GitHub",
       "noChecksReported": "Tiada semakan dilaporkan",
-      "passed": "{{count}} lulus",
-      "failed": "{{count}} gagal",
-      "pending": "{{count}} belum selesai",
-      "skipped": "{{count}} dilangkau",
-      "checksCount": "{{count}} semakan",
+      "passed": "{{displayCount}} lulus",
+      "failed": "{{displayCount}} gagal",
+      "pending": "{{displayCount}} belum selesai",
+      "skipped": "{{displayCount}} dilangkau",
+      "checksCount": "{{displayCount}} semakan",
       "checkDetails": "butiran semakan",
       "pullRequest": "permintaan tarik"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "komen tertunda",
       "pendingComment": "komen tertunda",
       "pendingComment_other": "komen tertunda",
-      "submitCountOfTotal": "Hantar {{freshCount}} daripada {{totalCount}} komen",
+      "submitCountOfTotal": "Hantar {{displayFreshCount}} daripada {{displayTotalCount}} komen",
       "submitReview": "Hantar semakan",
-      "partialPostedMessage": "Menghantar {{freshCount}} komen. {{staleCount}} komen menunjuk kepada komit yang lebih lama dan kekal dalam giliran anda."
+      "partialPostedMessage": "Menghantar {{displayFreshCount}} komen. {{displayStaleCount}} komen menunjuk kepada komit yang lebih lama dan kekal dalam giliran anda."
     },
     "reconnectNotice": {
       "title": "Sambungan GitHub telah tamat tempoh",
@@ -580,7 +580,8 @@
     "agents": "Ejen",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, tab, {{position}} daripada {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Terkini",
       "common": "Biasa",
       "reactWith": "Balas dengan {{reaction}}",
-      "accessibility": "{{emoji}} tindak balas, {{count}}"
+      "accessibility": "{{emoji}} tindak balas, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Membalas kepada",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Imej tidak tersedia",
       "openFailed": "Tidak dapat membuka lampiran. Semak sambungan anda dan cuba lagi.",
       "attachFailed": "Gagal melampirkan fail",
-      "limit": "Anda boleh melampirkan sehingga {{count}} fail.",
+      "limit": "Anda boleh melampirkan sehingga {{displayCount}} fail.",
       "sizeRejection": "{{filename}} melebihi had lampiran {{limit}}.",
       "unreadable": "Tidak dapat membaca {{filename}}.",
       "pastedImage": "imej yang ditampal",
@@ -722,6 +723,7 @@
       "finalTermEnds": "Tempoh akhir tamat",
       "afterFinalTerm": "Selepas tempoh akhir",
       "remaining": "Baki",
+      "lessThanOneDay": "Kurang daripada 1 hari",
       "ends": "Tamat",
       "expires": "Luput",
       "noActivePlan": "Tiada pelan aktif",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "harga bulanan Standard anda",
       "perMonth": "/bulan",
       "earlybirdAccessUntil": "Akses pakar awal sehingga {{date}}",
-      "earlybirdEnding": "Pakar awal tamat: {{days}} hari lagi",
+      "earlybirdEnding": "Pakar awal tamat: {{remaining}}",
       "paymentPastDue": "Pembayaran tertunggak. Sila kemas kini kaedah pembayaran anda.",
       "subscriptionCancels": "Langganan dibatalkan {{date}}",
-      "trialDaysRemaining": "Percubaan: {{days}} hari lagi",
-      "trialEndingSoon": "Percubaan tamat tidak lama lagi: {{days}}"
+      "trialDaysRemaining": "Percubaan: {{remaining}}",
+      "trialEndingSoon": "Percubaan tamat tidak lama lagi: {{remaining}}"
     },
     "changelog": {
       "title": "Apakah Baharu",
@@ -996,7 +998,7 @@
         "stalledTitle": "Sesuatu tersekat",
         "stalledBody": "Kami tidak dapat menyelesaikan persediaan {{name}}. Cuba lagi, atau emel hi@kilo.ai jika ini berulang.",
         "timeoutTitle": "Mengambil masa lebih lama daripada jangkaan",
-        "timeoutBody": "Persediaan untuk {{name}} mengambil masa lebih lama daripada biasa (lebih {{minutes}} minit).",
+        "timeoutBody": "Persediaan untuk {{name}} mengambil masa lebih lama daripada biasa (lebih {{displayMinutes}} minit).",
         "continueInBackground": "Teruskan di latar belakang",
         "settingUp": "Menyediakan {{name}}",
         "finishingSetup": "Menyelesaikan persediaan",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Gerbang penggabungan",
       "repositories": "Repositori",
       "allRepositories": "Semua repositori",
-      "nSelected": "{{count}} dipilih",
+      "nSelected": "{{displayCount}} dipilih",
       "reviewMemory": "Memori semakan",
       "proposedReviewMdGuidance": "Cadangan panduan REVIEW.md"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Analisis selesai",
       "exploitabilityReasoning": "Penalaran kebolehkesploitasian",
       "suggestedFix": "Pembetulan yang dicadangkan",
-      "whereFound": "Di mana ini ditemui ({{count}})",
+      "whereFound": "Di mana ini ditemui ({{displayCount}})",
       "fullReport": "Laporan penuh yang dijana",
       "unknown": "Tidak diketahui",
       "yes": "Ya",
       "no": "Tidak"
     },
     "dashboard": {
-      "findingsCount": "{{count}} penemuan",
+      "findingsCount": "{{displayCount}} penemuan",
       "notMeasured": "Tidak diukur",
       "actFirst": "Tindakan dahulu",
       "slaPosture": "Postur SLA",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Pelan tindakan repositori",
       "noOpenFindings": "Tiada penemuan terbuka yang perlu perhatian",
       "deadlineToday": "Tarikh akhir dicapai hari ini",
-      "daysOverdue": "{{count}} hari tertunggak",
+      "daysOverdue": "{{displayCount}} hari tertunggak",
       "withinDeadline": "Dalam tempoh tarikh akhir",
       "criticalOverdue": "Kritikal tertunggak",
       "highOverdue": "Tinggi tertunggak",
@@ -1434,6 +1436,27 @@
       "syncNow": "Segerakkan sekarang",
       "syncQueued": "Penyegerakan dijadualkan",
       "syncStatusUnavailable": "Status penyegerakan tidak tersedia"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Penemuan terbuka",
+      "openFindingsDetail": "{{critical}} kritikal, {{high}} tinggi",
+      "confirmedExploitable": "Disahkan boleh dieksploitasi",
+      "confirmedExploitableDetail": "Risiko projek disahkan oleh analisis",
+      "needsReview": "Memerlukan semakan anda",
+      "needsReviewDetail": "Keputusan manusia diperlukan",
+      "analysisIncomplete": "Analisis belum selesai",
+      "analysisIncompleteDetail": "Risiko projek masih tidak diketahui",
+      "slaCompliance": "Pematuhan SLA",
+      "notMeasured": "Tidak diukur",
+      "withinDeadlineDetail": "{{within}} daripada {{total}} dalam had masa",
+      "noDeadlineData": "Tiada penemuan yang mempunyai had masa SLA lagi",
+      "deadlinePassed": "Had masa telah berlalu",
+      "deadlinePassedDetail": "{{critical}} kritikal, {{high}} tinggi",
+      "dueThisWeek": "Dijangka minggu ini",
+      "dueThisWeekDetail": "{{exploitable}} disahkan boleh dieksploitasi",
+      "noDeadline": "Tiada had masa",
+      "reviewSlaAssignment": "Semak penetapan SLA",
+      "allOpenFindingsTracked": "Semua penemuan terbuka dijejaki"
     },
     "dismiss": {
       "title": "Buang penemuan",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "Analisis {{mode}}",
       "automation": "Automasi",
       "automationAllOff": "Semua dimatikan",
-      "automationCount": "{{count}} daripada 3 didayakan",
+      "automationCount": "{{displayCount}} daripada 3 didayakan",
       "notifications": "Pemberitahuan",
-      "notificationsCount": "{{count}} daripada 2 didayakan",
+      "notificationsCount": "{{displayCount}} daripada 2 didayakan",
       "slaPolicy": "Dasar SLA",
       "disabledNoManage": "Security Agent dilumpuhkan. Hanya pemilik organisasi dan pengurus pengebilan boleh menghidupkannya.",
       "disabledNoRepo": "Pilih sekurang-kurangnya satu repositori sebelum mendayakan Security Agent.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Buka permintaan tarik{{number}}",
       "openDraftPullRequest": "Buka permintaan tarik draf{{number}}",
       "progress": "Kemajuan",
-      "attemptHistory": "Sejarah percubaan ({{count}})",
+      "attemptHistory": "Sejarah percubaan ({{displayCount}})",
       "attemptNumber": "Percubaan #{{number}}",
       "startedBy": "Dimulakan oleh",
       "model": "Model",
@@ -1855,9 +1878,9 @@
       "toolTask": "tugasan",
       "readTodos": "Baca tugasan",
       "updateTodos": "Kemas kini tugasan",
-      "linesBadge": "{{count}} baris",
-      "filesBadge": "{{count}} fail",
-      "matchesBadge": "{{count}} padanan"
+      "linesBadge": "{{displayCount}} baris",
+      "filesBadge": "{{displayCount}} fail",
+      "matchesBadge": "{{displayCount}} padanan"
     },
     "readToolMarkdown": {
       "linesTruncated": "baris {{start}}–{{end}} (dipotong)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "Respons ini tidak boleh dilaporkan.",
       "reportAiResponseSubmitted": "Laporan dihantar. Resit {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "kurang daripada {{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Butiran tidak tersedia",
       "textDisplay": "Paparan teks",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Penyediaan selesai",
       "preparationFailed": "Penyediaan gagal",
       "setupCommand": "Arahan persediaan {{index}}",
-      "setupCommandOf": "Arahan persediaan {{index}} daripada {{count}}"
+      "setupCommandOf": "Arahan persediaan {{index}} daripada {{displayCount}}"
     },
     "permissionCard": {
       "title": "Kebenaran diperlukan",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Penghantaran gagal. Sila cuba lagi.",
       "questionAnnouncement": "Ejen memerlukan input anda. Komposer dijeda semasa anda menjawab.",
       "permissionAnnouncement": "Ejen memerlukan kebenaran untuk meneruskan. Komposer dijeda semasa anda membuat keputusan.",
-      "positionHint": "(1 daripada {{count}})",
+      "positionHint": "(1 daripada {{displayCount}})",
       "movedPastPrompt": "Ejen telah melepasi gesaan ini. Kad ini akan ditutup apabila sesi diteruskan.",
       "waitingForAnswer": "Ejen sedang menunggu jawapan anda. Semasa soalan ini terbuka, mesej anda kepada ejen dijeda.",
       "waitingForPermission": "Ejen sedang menunggu kebenaran. Semasa permintaan ini terbuka, mesej anda kepada ejen dijeda."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Akses Kamera Dilumpuhkan",
       "cameraAccessMessage": "Benarkan akses kamera dalam Tetapan untuk mengambil foto.",
       "couldNotOpenPhotoPicker": "Tidak dapat membuka pemilih foto. Mulakan semula Kilo dan cuba lagi.",
-      "maxFilesAllowed": "Maksimum {{count}} fail dibenarkan",
+      "maxFilesAllowed": "Maksimum {{displayCount}} fail dibenarkan",
       "onlyAddingFiles": "Hanya menambah {{accepted}} daripada {{total}} fail (maks {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "kos {{cost}}",
       "costSuffix": ", kos {{cost}}",
       "tokensWindowUnavailable": "Konteks {{used}} token, tetingkap tidak tersedia",
-      "tokensUsage": "Konteks {{used}} daripada {{window}} token, {{percentage}}% digunakan",
+      "tokensUsage": "Konteks {{used}} daripada {{window}} token, {{percentage}} digunakan",
       "title": "Penggunaan konteks",
       "used": "Digunakan",
       "remaining": "Baki",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "Penggunaan mencerminkan respons pembantu lengkap terkini.",
       "tokenUsage": "Penggunaan token",
       "cacheRate": "Kadar cache",
-      "modelsCount": "Model ({{count}})",
+      "modelsCount": "Model ({{displayCount}})",
       "tokenTotalsNote": "Jumlah token meliputi sesi ini sahaja dan tidak termasuk token subejen/sesi anak.",
       "subagents": "Subejen",
       "subagentsDescription": "Kos baki daripada sesi anak",
@@ -2373,7 +2400,7 @@
     "connectedCli": "Pada CLI bersambung",
     "newSessionOn": "Sesi baharu pada {{name}}",
     "noMatchingSessions": "Tiada sesi sepadan.",
-    "onlyFirstFilesAttached": "Hanya {{count}} fail pertama akan dilampirkan.",
+    "onlyFirstFilesAttached": "Hanya {{displayCount}} fail pertama akan dilampirkan.",
     "staleMessage": "Perkongsian ini tidak lagi tersedia.",
     "retryableMessage": "Tidak dapat memuatkan sesi anda.",
     "emptyMessage": "Belum ada sesi — mulakan yang baharu untuk menghantar ini.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Kilo Pass pada Akaun Apple ini kepunyaan akaun Kilo yang berbeza. Log masuk ke akaun Kilo itu untuk menguruskannya.",
     "alreadySubscribed": "Anda sudah mempunyai langganan Kilo Pass.",
     "purchaseUnavailable": "Pembelian Kilo Pass tidak tersedia sekarang.",
-    "tierCredits": "${{amount}} dalam kredit",
+    "tierCredits": "{{amount}} dalam kredit",
     "perMonth": "{{price}}/bln",
     "verifyPurchaseFailed": "Tidak dapat mengesahkan pembelian anda. Periksa sambungan anda dan cuba lagi.",
     "productsCouldNotLoad": "Produk Kilo Pass tidak dapat dimuatkan daripada App Store.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "Gagal membuka pengurusan langganan App Store.",
     "kiloPassSetup": "Penyediaan Kilo Pass",
     "subscriptionHeaderDescription": "Langganan bulanan yang menambah kredit ke baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo — Ejen Awan, sesi jauh, dan sembang KiloClaw.",
-    "tierDescription": "${{price}} kredit berbayar ditambah setiap bulan untuk penggunaan Apl Kilo.",
+    "tierDescription": "{{price}} kredit berbayar ditambah setiap bulan untuk penggunaan Apl Kilo.",
     "subscribe": "Langgan",
     "subscribeDescription": "Kredit bulanan dengan kemajuan bonus",
     "manage": "Urus",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass belum selesai",
     "statusCanceling": "Kilo Pass membatalkan",
     "statusPastDue": "Kilo Pass tertunggak",
-    "monthlyCredits": "${{credits}} kredit bulanan",
+    "monthlyCredits": "{{credits}} kredit bulanan",
     "ends": "Berakhir {{date}}",
     "periodEnd": "tamat tempoh",
     "managedOnGooglePlay": "Diurus pada Google Play",

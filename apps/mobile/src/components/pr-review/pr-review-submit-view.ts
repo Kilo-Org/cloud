@@ -5,12 +5,15 @@
  */
 
 import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 
 export function selectSubmitCtaLabel(args: { freshCount: number; totalCount: number }): string {
   if (args.totalCount > args.freshCount) {
     return i18n.t('prReview.submit.submitCountOfTotal', {
       freshCount: args.freshCount,
       totalCount: args.totalCount,
+      displayFreshCount: formatNumber(args.freshCount, i18n.language),
+      displayTotalCount: formatNumber(args.totalCount, i18n.language),
     });
   }
   return i18n.t('prReview.submit.submitReview');
@@ -26,5 +29,7 @@ export function selectPartialSubmitMessage(args: {
   return i18n.t('prReview.submit.partialPostedMessage', {
     freshCount: args.freshCount,
     staleCount: args.staleCount,
+    displayFreshCount: formatNumber(args.freshCount, i18n.language),
+    displayStaleCount: formatNumber(args.staleCount, i18n.language),
   });
 }

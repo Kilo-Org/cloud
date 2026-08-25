@@ -206,11 +206,11 @@
       "loadingLines": "ກຳລັງໂຫຼດ {{loaded}} ຈາກ {{total}} ແຖວ...",
       "expandContext": "ຂະຫຍາຍບໍລິບົດ",
       "expandMoreContext": "ຂະຫຍາຍບໍລິບົດເພີ່ມຂຶ້ນ",
-      "expandLines": "ຂະຫຍາຍ {{count}} ແຖວ ({{start}}–{{end}})",
-      "expandMoreLines": "ຂະຫຍາຍ {{count}} ແຖວເພີ່ມຂຶ້ນ ({{start}}–{{end}})",
-      "expandLinesOfContext": "ຂະຫຍາຍ {{count}} ແຖວຂອງບໍລິບົດ",
+      "expandLines": "ຂະຫຍາຍ {{displayCount}} ແຖວ ({{start}}–{{end}})",
+      "expandMoreLines": "ຂະຫຍາຍ {{displayCount}} ແຖວເພີ່ມຂຶ້ນ ({{start}}–{{end}})",
+      "expandLinesOfContext": "ຂະຫຍາຍ {{displayCount}} ແຖວຂອງບໍລິບົດ",
       "expandAll": "ຂະຫຍາຍທັງໝົດ",
-      "expandAllLines": "ຂະຫຍາຍ {{count}} ແຖວທັງໝົດ",
+      "expandAllLines": "ຂະຫຍາຍ {{displayCount}} ແຖວທັງໝົດ",
       "loadingMoreFiles": "ກຳລັງໂຫຼດໄຟລ໌ເພີ່ມເຕີມ...",
       "retryLoadingNextPage": "ລອງໂຫຼດໜ້າຕໍ່ໄປອີກຄັ້ງ",
       "failedToLoadMoreFiles": "ການໂຫຼດໄຟລ໌ເພີ່ມເຕີມລົ້ມເຫຼວ — ແຕະເພື່ອລອງໃໝ່",
@@ -301,7 +301,7 @@
       "closeReactions": "ປິດຣີແອກຊັນ",
       "reactionsTitle": "ຣີແອກຊັນ",
       "addReaction": "ເພີ່ມຣີແອກຊັນ",
-      "reactionPill": "{{emoji}} ຣີແອກຊັນ, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} ຣີແອກຊັນ, {{displayCount}} {{countLabel}}",
       "reaction_one": "ຣີແອກຊັນ",
       "reaction": "ຣີແອກຊັນ",
       "reaction_other": "ຣີແອກຊັນ",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "ບໍ່ມີກະທູ້ກວດສອບ ຫຼື ຄຳເຫັນສົນທະນາໃນ pull request ນີ້.",
       "reviewFiles": "ກວດສອບໄຟລ໌",
       "quotedDiffSnippet": "ຊິ້ນ diff ທີ່ອ້າງອີງ",
-      "moreLinesAbove": "... {{count}} ແຖວເພີ່ມເຕີມຂ້າງເທິງ",
+      "moreLinesAbove": "... {{displayCount}} ແຖວເພີ່ມເຕີມຂ້າງເທິງ",
       "termsAcceptRequired": "ທ່ານຕ້ອງຍອມຮັບຂໍ້ກຳນົດການໃຊ້ງານເພື່ອຈະໂພສໄດ້.",
       "termsOutdatedCopy": "ຂໍ້ກຳນົດການໃຊ້ງານປ່ຽນແປງແລ້ວ. ເປີດໜ້າຈໍນີ້ຄືນເພື່ອຍອມຮັບສະບັບຫຼ້າສຸດ.",
       "termsCheckRetryCopy": "ບໍ່ສາມາດກວດສອບຂໍ້ກຳນົດການໃຊ້ງານໄດ້. ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ ແລະ ລອງອີກຄັ້ງ."
@@ -395,11 +395,11 @@
       "retryChecks": "ລອງການກວດສອບອີກຄັ້ງ",
       "viewOnGitHub": "ເບິ່ງ PR ໃນ GitHub",
       "noChecksReported": "ບໍ່ມີການກວດສອບລາຍງານ",
-      "passed": "{{count}} ຜ່ານ",
-      "failed": "{{count}} ລົ້ມເຫຼວ",
-      "pending": "{{count}} ລໍຖ້າ",
-      "skipped": "{{count}} ຂ້າມ",
-      "checksCount": "{{count}} ການກວດສອບ",
+      "passed": "{{displayCount}} ຜ່ານ",
+      "failed": "{{displayCount}} ລົ້ມເຫຼວ",
+      "pending": "{{displayCount}} ລໍຖ້າ",
+      "skipped": "{{displayCount}} ຂ້າມ",
+      "checksCount": "{{displayCount}} ການກວດສອບ",
       "checkDetails": "ລາຍລະອຽດການກວດສອບ",
       "pullRequest": "pull request"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "ຄຳເຫັນທີ່ລໍຖ້າ",
       "pendingComment": "ຄຳເຫັນທີ່ລໍຖ້າ",
       "pendingComment_other": "ຄຳເຫັນທີ່ລໍຖ້າ",
-      "submitCountOfTotal": "ສົ່ງ {{freshCount}} ຈາກ {{totalCount}} ຄຳເຫັນ",
+      "submitCountOfTotal": "ສົ່ງ {{displayFreshCount}} ຈາກ {{displayTotalCount}} ຄຳເຫັນ",
       "submitReview": "ສົ່ງການກວດສອບ",
-      "partialPostedMessage": "ໂພສ {{freshCount}} ຄຳເຫັນ. {{staleCount}} ຄຳເຫັນຊີ້ບອກໃສ່ commit ທີ່ເກົ່າກວ່າ ແລະ ຍັງຄົງຢູ່ໃນຄິວຂອງທ່ານ."
+      "partialPostedMessage": "ໂພສ {{displayFreshCount}} ຄຳເຫັນ. {{displayStaleCount}} ຄຳເຫັນຊີ້ບອກໃສ່ commit ທີ່ເກົ່າກວ່າ ແລະ ຍັງຄົງຢູ່ໃນຄິວຂອງທ່ານ."
     },
     "reconnectNotice": {
       "title": "ການເຊື່ອມຕໍ່ GitHub ໝົດອາຍຸແລ້ວ",
@@ -580,7 +580,8 @@
     "agents": "ເອເຈນ",
     "profile": "ໂປຣຟາຍ",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, ແຖບ, {{position}} ຈາກ {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "ລ່າສຸດ",
       "common": "ທົ່ວໄປ",
       "reactWith": "ຣີແອກດ້ວຍ {{reaction}}",
-      "accessibility": "{{emoji}} ຣີແອກຊັນ, {{count}}"
+      "accessibility": "{{emoji}} ຣີແອກຊັນ, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "ກຳລັງຕອບ",
@@ -650,7 +651,7 @@
       "imageUnavailable": "ຮູບພາບບໍ່ພ້ອມໃຊ້",
       "openFailed": "ບໍ່ສາມາດເປີດໄຟລ໌ແນບໄດ້. ກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານ ແລະ ລອງອີກຄັ້ງ.",
       "attachFailed": "ການແນບໄຟລ໌ລົ້ມເຫຼວ",
-      "limit": "ທ່ານສາມາດແນບໄດ້ສູງສຸດ {{count}} ໄຟລ໌.",
+      "limit": "ທ່ານສາມາດແນບໄດ້ສູງສຸດ {{displayCount}} ໄຟລ໌.",
       "sizeRejection": "{{filename}} ເກີນຂີດຈຳກັດການແນບ {{limit}}.",
       "unreadable": "ບໍ່ສາມາດອ່ານ {{filename}} ໄດ້.",
       "pastedImage": "ຮູບພາບທີ່ວາງ",
@@ -722,6 +723,7 @@
       "finalTermEnds": "ຮອບສຸດທ້າຍສິ້ນສຸດ",
       "afterFinalTerm": "ຫຼັງຮອບສຸດທ້າຍ",
       "remaining": "ເຫຼືອ",
+      "lessThanOneDay": "ໜ້ອຍກວ່າ 1 ມື້",
       "ends": "ສິ້ນສຸດ",
       "expires": "ໝົດອາຍຸ",
       "noActivePlan": "ບໍ່ມີແຜນທີ່ເຄື່ອນໄຫວ",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "ລາຄາລາຍເດືອນ Standard ຂອງທ່ານ",
       "perMonth": "/ເດືອນ",
       "earlybirdAccessUntil": "ການເຂົ້າເຖິງ Earlybird ຈົນເຖິງ {{date}}",
-      "earlybirdEnding": "Earlybird ສິ້ນສຸດ: {{days}} ມື້ເຫຼືອ",
+      "earlybirdEnding": "Earlybird ສິ້ນສຸດ: {{remaining}}",
       "paymentPastDue": "ການຈ່າຍເງິນເກີນກຳນົດ. ກະລຸນາອັບເດດວິທີການຈ່າຍເງິນຂອງທ່ານ.",
       "subscriptionCancels": "ສະມາຊິກຈະຖືກຍົກເລີກໃນ {{date}}",
-      "trialDaysRemaining": "ທົດລອງ: {{days}} ມື້ເຫຼືອ",
-      "trialEndingSoon": "ທົດລອງຈະສິ້ນສຸດອີກບໍ່ດົນ: {{days}}"
+      "trialDaysRemaining": "ທົດລອງ: {{remaining}} ເຫຼືອ",
+      "trialEndingSoon": "ທົດລອງຈະສິ້ນສຸດອີກບໍ່ດົນ: {{remaining}}"
     },
     "changelog": {
       "title": "ມີອັນໃໝ່ຫຍັງ",
@@ -996,7 +998,7 @@
         "stalledTitle": "ມີບາງຢ່າງຕິດຄ້າງ",
         "stalledBody": "ພວກເຮົາບໍ່ສາມາດສຳເລັດການຕັ້ງຄ່າ {{name}}. ລອງອີກ, ຫຼືອີເມວ hi@kilo.ai ຖ້າມັນເກີດຂຶ້ນຊ້ຳ.",
         "timeoutTitle": "ໃຊ້ເວລາດົນກວ່າທີ່ຄາດໄວ້",
-        "timeoutBody": "ການຕັ້ງຄ່າ {{name}} ໃຊ້ເວລາດົນກວ່າປົກກະຕິ (ເກີນ {{minutes}} ນາທີ).",
+        "timeoutBody": "ການຕັ້ງຄ່າ {{name}} ໃຊ້ເວລາດົນກວ່າປົກກະຕິ (ເກີນ {{displayMinutes}} ນາທີ).",
         "continueInBackground": "ສືບຕໍ່ໃນພື້ນຫຼັງ",
         "settingUp": "ກຳລັງຕັ້ງຄ່າ {{name}}",
         "finishingSetup": "ກຳລັງສຳເລັດການຕັ້ງຄ່າ",
@@ -1287,7 +1289,7 @@
       "mergeGate": "ປະຕູ merge",
       "repositories": "Repositories",
       "allRepositories": "Repositories ທັງໝົດ",
-      "nSelected": "{{count}} ລາຍການທີ່ເລືອກ",
+      "nSelected": "{{displayCount}} ລາຍການທີ່ເລືອກ",
       "reviewMemory": "ຄວາມຈຳການທົບທວນ",
       "proposedReviewMdGuidance": "ຂໍ້ແນະນຳ REVIEW.md ທີ່ສະເໜີ"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "ວິເຄາະແລ້ວ",
       "exploitabilityReasoning": "ເຫດຜົນການໂຈມຕີໄດ້",
       "suggestedFix": "ການແກ້ໄຂທີ່ແນະນຳ",
-      "whereFound": "ພົບບ່ອນໃດ ({{count}})",
+      "whereFound": "ພົບບ່ອນໃດ ({{displayCount}})",
       "fullReport": "ລາຍງານທີ່ສ້າງຂຶ້ນເຕັມ",
       "unknown": "ບໍ່ຮູ້",
       "yes": "ແມ່ນ",
       "no": "ບໍ່"
     },
     "dashboard": {
-      "findingsCount": "{{count}} ການກວດພົບ",
+      "findingsCount": "{{displayCount}} ການກວດພົບ",
       "notMeasured": "ບໍ່ຖືກວັດແທກ",
       "actFirst": "ລົງມືກ່ອນ",
       "slaPosture": "ທ່າທາງ SLA",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "ແຜນການກະທຳຂອງບ່ອນເກັບລະຫັດ",
       "noOpenFindings": "ບໍ່ມີການກວດພົບທີ່ເປີດຢູ່ທີ່ຕ້ອງການຄວາມສົນໃຈ",
       "deadlineToday": "ຮອດກຳນົດເສັ້ນຕາຍໃນມື້ນີ້",
-      "daysOverdue": "{{count}} ມື້ທີ່ເກີນກຳນົດ",
+      "daysOverdue": "{{displayCount}} ມື້ທີ່ເກີນກຳນົດ",
       "withinDeadline": "ພາຍໃນກຳນົດເສັ້ນຕາຍ",
       "criticalOverdue": "ຮ້າຍແຮງທີ່ເກີນກຳນົດ",
       "highOverdue": "ສູງທີ່ເກີນກຳນົດ",
@@ -1434,6 +1436,27 @@
       "syncNow": "ຊິ້ງຕອນນີ້",
       "syncQueued": "ການຊິ້ງເຂົ້າຄິວແລ້ວ",
       "syncStatusUnavailable": "ສະຖານະການຊິ້ງບໍ່ສາມາດໃຊ້ງານໄດ້"
+    },
+    "dashboardMetrics": {
+      "openFindings": "ການກວດພົບທີ່ເປີດ",
+      "openFindingsDetail": "ຮ້າຍແຮງ {{critical}} ສູງ {{high}}",
+      "confirmedExploitable": "ຢືນຢັນວ່າໂຈມຕີໄດ້",
+      "confirmedExploitableDetail": "ຄວາມສ່ຽງຂອງໂຄງການຢືນຢັນໂດຍການວິເຄາະ",
+      "needsReview": "ຕ້ອງການການທົບທວນຂອງທ່ານ",
+      "needsReviewDetail": "ຕ້ອງການການຕັດສິນໃຈຂອງມະນຸດ",
+      "analysisIncomplete": "ການວິເຄາະບໍ່ສຳເລັດ",
+      "analysisIncompleteDetail": "ຄວາມສ່ຽງຂອງໂຄງການຍັງບໍ່ຮູ້",
+      "slaCompliance": "ການປະຕິບັດຕາມ SLA",
+      "notMeasured": "ບໍ່ໄດ້ວັດແທກ",
+      "withinDeadlineDetail": "{{within}} ຈາກ {{total}} ພາຍໃນກຳນົດເສັ້ນຕາຍ",
+      "noDeadlineData": "ຍັງບໍ່ມີການກວດພົບທີ່ມີກຳນົດເສັ້ນຕາຍ SLA",
+      "deadlinePassed": "ຜ່ານກຳນົດເສັ້ນຕາຍ",
+      "deadlinePassedDetail": "ຮ້າຍແຮງ {{critical}} ສູງ {{high}}",
+      "dueThisWeek": "ກຳນົດອາທິດນີ້",
+      "dueThisWeekDetail": "{{exploitable}} ຢືນຢັນວ່າໂຈມຕີໄດ້",
+      "noDeadline": "ບໍ່ມີກຳນົດເສັ້ນຕາຍ",
+      "reviewSlaAssignment": "ທົບທວນການມອບໝາຍ SLA",
+      "allOpenFindingsTracked": "ການກວດພົບທີ່ເປີດທັງໝົດຖືກຕິດຕາມ"
     },
     "dismiss": {
       "title": "ປິດການກວດພົບ",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "ການວິເຄາະ {{mode}}",
       "automation": "ອັດຕະໂນມັດ",
       "automationAllOff": "ປິດທັງໝົດ",
-      "automationCount": "{{count}} ຈາກ 3 ທີ່ເປີດໃຊ້",
+      "automationCount": "{{displayCount}} ຈາກ 3 ທີ່ເປີດໃຊ້",
       "notifications": "ການແຈ້ງເຕືອນ",
-      "notificationsCount": "{{count}} ຈາກ 2 ທີ່ເປີດໃຊ້",
+      "notificationsCount": "{{displayCount}} ຈາກ 2 ທີ່ເປີດໃຊ້",
       "slaPolicy": "ນະໂຍບາຍ SLA",
       "disabledNoManage": "Security Agent ຖືກປິດໃຊ້ງານ. ພຽງແຕ່ເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ຈັດການການເກັບເງິນສາມາດເປີດມັນ.",
       "disabledNoRepo": "ເລືອກຢ່າງໜ້ອຍໜຶ່ງບ່ອນເກັບລະຫັດກ່ອນເປີດໃຊ້ Security Agent.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "ເປີດ pull request{{number}}",
       "openDraftPullRequest": "ເປີດ pull request ຮ່າງ{{number}}",
       "progress": "ຄວາມຄືບໜ້າ",
-      "attemptHistory": "ປະຫວັດຄວາມພະຍາຍາມ ({{count}})",
+      "attemptHistory": "ປະຫວັດຄວາມພະຍາຍາມ ({{displayCount}})",
       "attemptNumber": "ຄວາມພະຍາຍາມ #{{number}}",
       "startedBy": "ເລີ່ມໂດຍ",
       "model": "ຕົວແບບ",
@@ -1855,9 +1878,9 @@
       "toolTask": "task",
       "readTodos": "ອ່ານລາຍການວຽກ",
       "updateTodos": "ອັບເດດລາຍການວຽກ",
-      "linesBadge": "{{count}} ແຖວ",
-      "filesBadge": "{{count}} ໄຟລ໌",
-      "matchesBadge": "{{count}} ລາຍການທີ່ກົງ"
+      "linesBadge": "{{displayCount}} ແຖວ",
+      "filesBadge": "{{displayCount}} ໄຟລ໌",
+      "matchesBadge": "{{displayCount}} ລາຍການທີ່ກົງ"
     },
     "readToolMarkdown": {
       "linesTruncated": "ແຖວ {{start}}–{{end}} (ຖືກຕັດ)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "ການຕອບນີ້ບໍ່ສາມາດຖືກລາຍງານ.",
       "reportAiResponseSubmitted": "ສົ່ງລາຍງານແລ້ວ. ໃບຮັບ {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "ລາຍລະອຽດບໍ່ສາມາດໃຊ້ໄດ້",
       "textDisplay": "ການສະແດງຂໍ້ຄວາມ",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "ການກຽມສຳເລັດ",
       "preparationFailed": "ການກຽມລົ້ມເຫຼວ",
       "setupCommand": "ຄຳສັ່ງຕັ້ງຄ່າ {{index}}",
-      "setupCommandOf": "ຄຳສັ່ງຕັ້ງຄ່າ {{index}} ຈາກ {{count}}"
+      "setupCommandOf": "ຄຳສັ່ງຕັ້ງຄ່າ {{index}} ຈາກ {{displayCount}}"
     },
     "permissionCard": {
       "title": "ຕ້ອງການສິດ",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "ການສົ່ງລົ້ມເຫລວ. ກະລຸນາລອງອີກ.",
       "questionAnnouncement": "ຕົວແທນຕ້ອງການຂໍ້ມູນຈາກທ່ານ. ກ່ອງຂຽນຖືກຢຸດຊົ່ວຄາວໃນຂະນະທີ່ທ່ານຕອບ.",
       "permissionAnnouncement": "ຕົວແທນຕ້ອງການການອະນຸຍາດເພື່ອສືບຕໍ່. ກ່ອງຂຽນຖືກຢຸດຊົ່ວຄາວໃນຂະນະທີ່ທ່ານຕັດສິນໃຈ.",
-      "positionHint": "(1 ຈາກ {{count}})",
+      "positionHint": "(1 ຈາກ {{displayCount}})",
       "movedPastPrompt": "ຕົວແທນໄດ້ຜ່ານການກະຕຸ້ນນີ້ແລ້ວ. ບັດນີ້ຈະປິດເມື່ອເຊດຊັນດຳເນີນຕໍ່.",
       "waitingForAnswer": "ຕົວແທນກຳລັງລໍຖ້າຄຳຕອບຂອງທ່ານ. ໃນຂະນະທີ່ຄຳຖາມນີ້ເປີດຢູ່, ຂໍ້ຄວາມຂອງທ່ານໄປຫາຕົວແທນຖືກຢຸດ.",
       "waitingForPermission": "ຕົວແທນກຳລັງລໍຖ້າການອະນຸຍາດ. ໃນຂະນະທີ່ຄຳຂໍນີ້ເປີດຢູ່, ຂໍ້ຄວາມຂອງທ່ານໄປຫາຕົວແທນຖືກຢຸດ."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "ການເຂົ້າເຖິງກ້ອງຖືກປິດ",
       "cameraAccessMessage": "ອະນຸຍາດໃຫ້ເຂົ້າເຖິງກ້ອງໃນການຕັ້ງຄ່າເພື່ອຖ່າຍຮູບ.",
       "couldNotOpenPhotoPicker": "ບໍ່ສາມາດເປີດຕົວເລືອກຮູບໄດ້. ເລີ່ມ Kilo ໃໝ່ແລ້ວລອງອີກ.",
-      "maxFilesAllowed": "ອະນຸຍາດສູງສຸດ {{count}} ໄຟລ໌",
+      "maxFilesAllowed": "ອະນຸຍາດສູງສຸດ {{displayCount}} ໄຟລ໌",
       "onlyAddingFiles": "ພຽງແຕ່ເພີ່ມ {{accepted}} ຈາກ {{total}} ໄຟລ໌ (ສູງສຸດ {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "ຄ່າໃຊ້ຈ່າຍ {{cost}}",
       "costSuffix": ", ຄ່າໃຊ້ຈ່າຍ {{cost}}",
       "tokensWindowUnavailable": "ບໍລິບົດ {{used}} tokens, window ບໍ່ມີ",
-      "tokensUsage": "ບໍລິບົດ {{used}} ຈາກ {{window}} tokens, ໃຊ້ {{percentage}}%",
+      "tokensUsage": "ບໍລິບົດ {{used}} ຈາກ {{window}} tokens, ໃຊ້ {{percentage}}",
       "title": "ການໃຊ້ບໍລິບົດ",
       "used": "ໃຊ້ແລ້ວ",
       "remaining": "ຍັງເຫຼືອ",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "ການໃຊ້ງານສະທ້ອນການຕອບສະໜອງຂອງຜູ້ຊ່ວຍຫຼ້າສຸດ.",
       "tokenUsage": "ການໃຊ້ token",
       "cacheRate": "ອັດຕາ cache",
-      "modelsCount": "ຮູບແບບ ({{count}})",
+      "modelsCount": "ຮູບແບບ ({{displayCount}})",
       "tokenTotalsNote": "ຍອດ token ກວມເອົາພຽງເຊດຊັນນີ້ເທົ່ານັ້ນ ແລະ ບໍ່ລວມ token ຂອງຕົວແທນຍ່ອຍ/ເຊດຊັນຍ່ອຍ.",
       "subagents": "ຕົວແທນຍ່ອຍ",
       "subagentsDescription": "ຄ່າໃຊ້ຈ່າຍທີ່ເຫຼືອຈາກເຊດຊັນຍ່ອຍ",
@@ -2373,7 +2400,7 @@
     "connectedCli": "ຢູ່ໃນ CLI ທີ່ເຊື່ອມຕໍ່",
     "newSessionOn": "ເຊດຊັນໃໝ່ໃນ {{name}}",
     "noMatchingSessions": "ບໍ່ມີເຊດຊັນທີ່ກົງກັນ.",
-    "onlyFirstFilesAttached": "ພຽງແຕ່ {{count}} ໄຟລ໌ທຳອິດເທົ່ານັ້ນທີ່ຈະຖືກແນບ.",
+    "onlyFirstFilesAttached": "ພຽງແຕ່ {{displayCount}} ໄຟລ໌ທຳອິດເທົ່ານັ້ນທີ່ຈະຖືກແນບ.",
     "staleMessage": "ການແບ່ງປັນນີ້ບໍ່ມີອີກແລ້ວ.",
     "retryableMessage": "ບໍ່ສາມາດໂຫລດເຊດຊັນຂອງທ່ານ.",
     "emptyMessage": "ຍັງບໍ່ມີເຊດຊັນ — ເລີ່ມໃໝ່ເພື່ອສົ່ງສິ່ງນີ້.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Kilo Pass ໃນ Apple Account ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອຈັດການ.",
     "alreadySubscribed": "ທ່ານມີການສະໝັກສະມາຊິກ Kilo Pass ແລ້ວ.",
     "purchaseUnavailable": "ການຊື້ Kilo Pass ບໍ່ມີໃນຕອນນີ້.",
-    "tierCredits": "${{amount}} ໃນເຄຣດິດ",
+    "tierCredits": "{{amount}} ໃນເຄຣດິດ",
     "perMonth": "{{price}}/ເດືອນ",
     "verifyPurchaseFailed": "ບໍ່ສາມາດກວດສອບການຊື້ຂອງທ່ານ. ກວດເບິ່ງການເຊື່ອມຕໍ່ແລ້ວລອງອີກ.",
     "productsCouldNotLoad": "ບໍ່ສາມາດໂຫລດສິນຄ້າ Kilo Pass ຈາກ App Store.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "ບໍ່ສາມາດເປີດການຈັດການການສະໝັກ App Store.",
     "kiloPassSetup": "ການຕັ້ງຄ່າ Kilo Pass",
     "subscriptionHeaderDescription": "ການສະໝັກລາຍເດືອນທີ່ເພີ່ມເຄຣດິດໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App — Cloud Agents, ເຊດຊັນຫ່າງໄກ, ແລະ ການສົນທະນາ KiloClaw.",
-    "tierDescription": "ເຄຣດິດທີ່ຊຳລະ ${{price}} ເພີ່ມລາຍເດືອນສຳລັບການໃຊ້ Kilo App.",
+    "tierDescription": "ເຄຣດິດທີ່ຊຳລະ {{price}} ເພີ່ມລາຍເດືອນສຳລັບການໃຊ້ Kilo App.",
     "subscribe": "ສະໝັກ",
     "subscribeDescription": "ເຄຣດິດລາຍເດືອນພ້ອມຄວາມຄືບໜ້າໂບນັດ",
     "manage": "ຈັດການ",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass ກຳລັງລໍຖ້າ",
     "statusCanceling": "Kilo Pass ກຳລັງຍົກເລີກ",
     "statusPastDue": "Kilo Pass ຄ້າງຊຳລະ",
-    "monthlyCredits": "${{credits}} ເຄຣດິດລາຍເດືອນ",
+    "monthlyCredits": "{{credits}} ເຄຣດິດລາຍເດືອນ",
     "ends": "ສິ້ນສຸດ {{date}}",
     "periodEnd": "ສິ້ນສຸດຊ່ວງເວລາ",
     "managedOnGooglePlay": "ຈັດການຢູ່ Google Play",

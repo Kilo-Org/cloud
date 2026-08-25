@@ -44,7 +44,6 @@ describe('intl-cache', () => {
       Collator: nativeIntl.Collator,
       DateTimeFormat: nativeIntl.DateTimeFormat,
       getCanonicalLocales: nativeIntl.getCanonicalLocales,
-      Locale: nativeIntl.Locale,
       NumberFormat: nativeIntl.NumberFormat,
       PluralRules: nativeIntl.PluralRules,
     });
@@ -56,5 +55,6 @@ describe('intl-cache', () => {
     expect(listFormat('de', { type: 'conjunction' }).format(['A', 'B'])).toBe('A und B');
     expect(durationFormat('en', { style: 'short' }).format({ hours: 1 })).toContain('1');
     expect([...segmenter('en', { granularity: 'grapheme' }).segment('👨‍👩‍👧‍👦X')]).toHaveLength(2);
+    expect(Intl.Locale).toBeTypeOf('function');
   });
 });

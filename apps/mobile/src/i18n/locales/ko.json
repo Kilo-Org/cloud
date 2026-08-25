@@ -201,7 +201,8 @@
     "agents": "에이전트",
     "profile": "프로필",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, 탭, {{total}} 중 {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -242,7 +243,7 @@
       "recent": "최근",
       "common": "일반",
       "reactWith": "{{reaction}} 반응",
-      "accessibility": "{{emoji}} 반응, {{count}}"
+      "accessibility": "{{emoji}} 반응, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "답장 대상",
@@ -271,7 +272,7 @@
       "imageUnavailable": "이미지를 사용할 수 없습니다",
       "openFailed": "첨부 파일을 열 수 없습니다. 연결을 확인하고 다시 시도하세요.",
       "attachFailed": "파일을 첨부하지 못했습니다",
-      "limit": "최대 {{count}}개의 파일을 첨부할 수 있습니다.",
+      "limit": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
       "sizeRejection": "{{filename}}이(가) 첨부 한도 {{limit}}을(를) 초과합니다.",
       "unreadable": "{{filename}}을(를) 읽을 수 없습니다.",
       "pastedImage": "붙여넣은 이미지",
@@ -343,6 +344,7 @@
       "finalTermEnds": "최종 기간 종료",
       "afterFinalTerm": "최종 기간 이후",
       "remaining": "남음",
+      "lessThanOneDay": "1일 미만",
       "ends": "종료",
       "expires": "만료",
       "noActivePlan": "활성 플랜 없음",
@@ -361,11 +363,11 @@
       "yourStandardMonthlyPrice": "Standard 월간 가격",
       "perMonth": "/월",
       "earlybirdAccessUntil": "Earlybird 액세스 {{date}}까지",
-      "earlybirdEnding": "Earlybird 종료: {{days}}일 남음",
+      "earlybirdEnding": "Earlybird 종료: {{remaining}}",
       "paymentPastDue": "결제가 연체되었습니다. 결제 수단을 업데이트하세요.",
       "subscriptionCancels": "구독이 {{date}}에 취소됩니다",
-      "trialDaysRemaining": "체험: {{days}}일 남음",
-      "trialEndingSoon": "체험 종료 임박: {{days}}"
+      "trialDaysRemaining": "체험: {{remaining}} 남음",
+      "trialEndingSoon": "체험 종료 임박: {{remaining}}"
     },
     "changelog": {
       "title": "새로운 기능",
@@ -665,7 +667,7 @@
         "startingSandbox": "샌드박스 시작 중",
         "stoppedBody": "설정 중 {{name}}의 인스턴스가 예기치 않게 중지되었습니다.",
         "stoppedTitle": "설정 중지됨",
-        "timeoutBody": "{{name}} 설정이 평소보다 오래 걸리고 있습니다({{minutes}}분 초과).",
+        "timeoutBody": "{{name}} 설정이 평소보다 오래 걸리고 있습니다({{displayMinutes}}분 초과).",
         "timeoutTitle": "예상보다 오래 걸림"
       },
       "unavailableDescription": "인스턴스를 프로비저닝하려면 현재 KiloClaw 구독이 필요합니다. 기존 인스턴스와 구독은 정상적으로 계속됩니다.",
@@ -912,7 +914,7 @@
       "focusAreas": "중점 영역",
       "mergeGate": "병합 게이트",
       "model": "모델",
-      "nSelected": "{{count}}개 선택됨",
+      "nSelected": "{{displayCount}}개 선택됨",
       "proposedReviewMdGuidance": "제안된 REVIEW.md 지침",
       "repositories": "저장소",
       "reviewMemory": "리뷰 메모리",
@@ -981,7 +983,7 @@
       "triageReasoning": "분류 근거",
       "unknown": "알 수 없음",
       "watchInCloudAgent": "Cloud Agent에서 보기",
-      "whereFound": "발견 위치({{count}})",
+      "whereFound": "발견 위치({{displayCount}})",
       "yes": "예"
     },
     "analysisSettings": {
@@ -1061,11 +1063,11 @@
       "confirmedExploitable": "악용 가능 확인됨",
       "couldNotLoad": "대시보드 데이터를 불러올 수 없습니다",
       "criticalOverdue": "치명적 기한 초과",
-      "daysOverdue": "{{count}}일 기한 초과",
+      "daysOverdue": "{{displayCount}}일 기한 초과",
       "deadlineToday": "오늘 마감일 도달",
       "filterByRepository": "저장소별 필터",
       "findings": "발견 사항",
-      "findingsCount": "발견 사항 {{count}}개",
+      "findingsCount": "발견 사항 {{displayCount}}개",
       "highOverdue": "높음 기한 초과",
       "lastSynced": "마지막 동기화: {{time}}",
       "manageRepositories": "저장소 관리",
@@ -1090,6 +1092,27 @@
       "syncQueued": "동기화 대기 중",
       "syncStatusUnavailable": "동기화 상태를 사용할 수 없음",
       "withinDeadline": "마감일 내"
+    },
+    "dashboardMetrics": {
+      "openFindings": "열린 발견 사항",
+      "openFindingsDetail": "치명적 {{critical}}, 높음 {{high}}",
+      "confirmedExploitable": "악용 가능 확인됨",
+      "confirmedExploitableDetail": "분석을 통해 프로젝트 위험 확인됨",
+      "needsReview": "검토 필요",
+      "needsReviewDetail": "사람의 결정 필요",
+      "analysisIncomplete": "분석 미완료",
+      "analysisIncompleteDetail": "프로젝트 위험 아직 알 수 없음",
+      "slaCompliance": "SLA 준수",
+      "notMeasured": "측정되지 않음",
+      "withinDeadlineDetail": "{{total}}개 중 {{within}}개가 마감일 내",
+      "noDeadlineData": "SLA 마감일이 있는 발견 사항이 아직 없음",
+      "deadlinePassed": "마감일 지남",
+      "deadlinePassedDetail": "치명적 {{critical}}, 높음 {{high}}",
+      "dueThisWeek": "이번 주 마감",
+      "dueThisWeekDetail": "악용 가능 확인 {{exploitable}}건",
+      "noDeadline": "마감일 없음",
+      "reviewSlaAssignment": "SLA 할당 검토",
+      "allOpenFindingsTracked": "모든 열린 발견 사항 추적됨"
     },
     "dismiss": {
       "alreadyResolvedDescription": "이 발견 사항은 이미 해결되어 더 이상 해제할 수 없습니다.",
@@ -1188,7 +1211,7 @@
       "title": "알림"
     },
     "remediation": {
-      "attemptHistory": "시도 기록({{count}})",
+      "attemptHistory": "시도 기록({{displayCount}})",
       "attemptNumber": "시도 #{{number}}",
       "branch": "브랜치",
       "cancelMessage": "Security Agent가 진행 중인 수정 시도를 중지합니다.",
@@ -1256,7 +1279,7 @@
       "analysisModeSubtitle": "{{mode}} 분석",
       "automation": "자동화",
       "automationAllOff": "모두 꺼짐",
-      "automationCount": "3개 중 {{count}}개 활성화됨",
+      "automationCount": "3개 중 {{displayCount}}개 활성화됨",
       "couldNotLoadPermissions": "권한을 불러올 수 없습니다",
       "couldNotLoadRepositories": "저장소를 불러올 수 없습니다",
       "couldNotLoadSettings": "Security Agent 설정을 불러올 수 없습니다",
@@ -1267,7 +1290,7 @@
       "enabled": "활성화됨",
       "modelsAndAnalysis": "모델 및 분석",
       "notifications": "알림",
-      "notificationsCount": "2개 중 {{count}}개 활성화됨",
+      "notificationsCount": "2개 중 {{displayCount}}개 활성화됨",
       "off": "꺼짐",
       "on": "켜짐",
       "repositories": "저장소",
@@ -1476,9 +1499,9 @@
       "toolTask": "작업",
       "readTodos": "할 일 읽기",
       "updateTodos": "할 일 업데이트",
-      "linesBadge": "{{count}}줄",
-      "filesBadge": "{{count}}개 파일",
-      "matchesBadge": "{{count}}개 일치"
+      "linesBadge": "{{displayCount}}줄",
+      "filesBadge": "{{displayCount}}개 파일",
+      "matchesBadge": "{{displayCount}}개 일치"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}행 (잘림)",
@@ -1562,6 +1585,10 @@
       "reportAiResponseFailedTerminal": "이 응답은 신고할 수 없습니다.",
       "reportAiResponseSubmitted": "신고가 제출되었습니다. 접수 {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "세부 정보를 사용할 수 없습니다",
       "textDisplay": "텍스트 표시",
@@ -1620,7 +1647,7 @@
       "preparationComplete": "준비 완료",
       "preparationFailed": "준비 실패",
       "setupCommand": "설정 명령 {{index}}",
-      "setupCommandOf": "설정 명령 {{index}} / {{count}}"
+      "setupCommandOf": "설정 명령 {{index}} / {{displayCount}}"
     },
     "permissionCard": {
       "title": "권한 필요",
@@ -1657,7 +1684,7 @@
       "submissionFailed": "제출에 실패했습니다. 다시 시도하세요.",
       "questionAnnouncement": "에이전트가 입력을 필요로 합니다. 답변하는 동안 작성기가 일시 중지됩니다.",
       "permissionAnnouncement": "에이전트가 계속하려면 권한이 필요합니다. 결정하는 동안 작성기가 일시 중지됩니다.",
-      "positionHint": "({{count}}개 중 1개)",
+      "positionHint": "({{displayCount}}개 중 1개)",
       "movedPastPrompt": "에이전트가 이 프롬프트를 지나갔습니다. 세션이 계속되면 이 카드가 닫힙니다.",
       "waitingForAnswer": "에이전트가 답변을 기다리고 있습니다. 이 질문이 열려 있는 동안 에이전트에게 보내는 메시지가 일시 중지됩니다.",
       "waitingForPermission": "에이전트가 권한을 기다리고 있습니다. 이 요청이 열려 있는 동안 에이전트에게 보내는 메시지가 일시 중지됩니다."
@@ -1778,7 +1805,7 @@
       "cameraAccessDisabled": "카메라 액세스 비활성화됨",
       "cameraAccessMessage": "사진을 찍으려면 설정에서 카메라 액세스를 허용하세요.",
       "couldNotOpenPhotoPicker": "사진 선택기를 열 수 없습니다. Kilo를 다시 시작하고 다시 시도하세요.",
-      "maxFilesAllowed": "최대 {{count}}개의 파일을 첨부할 수 있습니다.",
+      "maxFilesAllowed": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
       "onlyAddingFiles": "{{accepted}}개의 파일만 추가합니다 ({{total}}개 중, 최대 {{max}}개)"
     },
     "composer": {
@@ -1843,7 +1870,7 @@
       "costPrefix": "비용 {{cost}}",
       "costSuffix": ", 비용 {{cost}}",
       "tokensWindowUnavailable": "컨텍스트 {{used}} 토큰, 창 사용 불가",
-      "tokensUsage": "컨텍스트 {{window}} 중 {{used}} 토큰, {{percentage}}% 사용됨",
+      "tokensUsage": "컨텍스트 {{window}} 중 {{used}} 토큰, {{percentage}} 사용됨",
       "title": "컨텍스트 사용량",
       "used": "사용됨",
       "remaining": "남음",
@@ -1852,7 +1879,7 @@
       "usageReflectsLatest": "사용량은 최근 완료된 어시스턴트 응답을 반영합니다.",
       "tokenUsage": "토큰 사용량",
       "cacheRate": "캐시 비율",
-      "modelsCount": "모델 ({{count}})",
+      "modelsCount": "모델 ({{displayCount}})",
       "tokenTotalsNote": "토큰 합계는 이 세션만 포함하며 하위 에이전트/하위 세션 토큰은 제외합니다.",
       "subagents": "하위 에이전트",
       "subagentsDescription": "하위 세션의 잔여 비용",
@@ -1994,7 +2021,7 @@
     "connectedCli": "연결된 CLI에서",
     "newSessionOn": "{{name}}에서 새 세션",
     "noMatchingSessions": "일치하는 세션이 없습니다.",
-    "onlyFirstFilesAttached": "처음 {{count}}개의 파일만 첨부됩니다.",
+    "onlyFirstFilesAttached": "처음 {{displayCount}}개의 파일만 첨부됩니다.",
     "staleMessage": "이 공유는 더 이상 사용할 수 없습니다.",
     "retryableMessage": "세션을 불러올 수 없습니다.",
     "emptyMessage": "아직 세션 없음 — 보내려면 새 세션을 시작하세요.",
@@ -2027,7 +2054,7 @@
     "otherAccountCopy": "이 Apple 계정의 Kilo Pass는 다른 Kilo 계정에 속합니다. 관리하려면 해당 Kilo 계정에 로그인하세요.",
     "alreadySubscribed": "이미 Kilo Pass 구독이 있습니다.",
     "purchaseUnavailable": "지금은 Kilo Pass를 구매할 수 없습니다.",
-    "tierCredits": "${{amount}} 크레딧",
+    "tierCredits": "{{amount}} 크레딧",
     "perMonth": "{{price}}/월",
     "verifyPurchaseFailed": "구매를 확인할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
     "productsCouldNotLoad": "App Store에서 Kilo Pass 상품을 불러올 수 없습니다.",
@@ -2038,7 +2065,7 @@
     "manageFailed": "App Store 구독 관리를 열지 못했습니다.",
     "kiloPassSetup": "Kilo Pass 설정",
     "subscriptionHeaderDescription": "Kilo 앱에서 AI 코딩 세션을 실행하기 위해 Kilo 잔액에 크레딧을 추가하는 월간 구독 — Cloud Agents, 원격 세션, KiloClaw 채팅.",
-    "tierDescription": "Kilo 앱 사용을 위해 매월 ${{price}} 유료 크레딧이 추가됩니다.",
+    "tierDescription": "Kilo 앱 사용을 위해 매월 {{price}} 유료 크레딧이 추가됩니다.",
     "subscribe": "구독",
     "subscribeDescription": "보너스 진행률이 포함된 월간 크레딧",
     "manage": "관리",
@@ -2046,7 +2073,7 @@
     "statusPending": "Kilo Pass 대기 중",
     "statusCanceling": "Kilo Pass 취소 중",
     "statusPastDue": "Kilo Pass 기한 초과",
-    "monthlyCredits": "월 ${{credits}} 크레딧",
+    "monthlyCredits": "월 {{credits}} 크레딧",
     "ends": "{{date}}에 종료",
     "periodEnd": "기간 종료",
     "managedOnGooglePlay": "Google Play에서 관리",
@@ -2150,17 +2177,17 @@
     "accessDeniedDescription": "이 풀 리퀘스트를 볼 권한이 없습니다.",
     "checkConnection": "연결 확인",
     "checks": {
-      "checksCount": "체크 {{count}}개",
+      "checksCount": "체크 {{displayCount}}개",
       "couldNotLoad": "체크를 불러올 수 없습니다.",
-      "failed": "{{count}}개 실패",
+      "failed": "{{displayCount}}개 실패",
       "noAccess": "이 저장소의 체크에 액세스할 수 없습니다.",
       "noChecksReported": "보고된 체크 없음",
       "notAvailable": "체크를 아직 사용할 수 없습니다. 헤드 커밋이 처리되지 않았거나 헤드 저장소에 Kilo GitHub 앱이 설치되지 않았을 수 있습니다.",
       "openDetails": "{{name}} 세부 정보 열기",
-      "passed": "{{count}}개 통과",
-      "pending": "{{count}}개 대기 중",
+      "passed": "{{displayCount}}개 통과",
+      "pending": "{{displayCount}}개 대기 중",
       "retryChecks": "체크 다시 시도",
-      "skipped": "{{count}}개 건너뜀",
+      "skipped": "{{displayCount}}개 건너뜀",
       "title": "체크",
       "viewOnGitHub": "GitHub에서 PR 보기",
       "checkDetails": "체크 세부 정보",
@@ -2238,7 +2265,7 @@
           "terminal": "이 사용자는 신고할 수 없습니다."
         }
       },
-      "moreLinesAbove": "… 위에 {{count}}줄 더",
+      "moreLinesAbove": "… 위에 {{displayCount}}줄 더",
       "mute": "음소거",
       "mutedUser": "{{login}} 음소거됨",
       "noDiscussion": "아직 토론 없음",
@@ -2246,7 +2273,7 @@
       "comment_one": "댓글 1개",
       "outdated": "오래됨",
       "quotedDiffSnippet": "인용된 diff 스니펫",
-      "reactionPill": "{{emoji}} 반응, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} 반응, {{displayCount}} {{countLabel}}",
       "reaction": "반응",
       "reaction_other": "반응",
       "reaction_one": "반응",
@@ -2350,12 +2377,12 @@
     "hunkRows": {
       "contextUnavailable": "이 ref에서 컨텍스트를 사용할 수 없음",
       "expandAll": "모두 펼치기",
-      "expandAllLines": "{{count}}줄 모두 펼치기",
+      "expandAllLines": "{{displayCount}}줄 모두 펼치기",
       "expandContext": "컨텍스트 펼치기",
-      "expandLines": "{{count}}줄 펼치기 ({{start}}–{{end}})",
-      "expandLinesOfContext": "컨텍스트 {{count}}줄 펼치기",
+      "expandLines": "{{displayCount}}줄 펼치기 ({{start}}–{{end}})",
+      "expandLinesOfContext": "컨텍스트 {{displayCount}}줄 펼치기",
       "expandMoreContext": "컨텍스트 더 펼치기",
-      "expandMoreLines": "{{count}}줄 더 펼치기 ({{start}}–{{end}})",
+      "expandMoreLines": "{{displayCount}}줄 더 펼치기 ({{start}}–{{end}})",
       "failedToLoadContext": "컨텍스트를 불러오지 못했습니다 — 탭하여 다시 시도",
       "failedToLoadMoreFiles": "더 많은 파일을 불러오지 못했습니다 — 탭하여 다시 시도",
       "fileLoadedCount_one": "파일 {{displayCount}}개 로드됨",
@@ -2500,8 +2527,8 @@
       "pendingComment_one": "보류 중인 댓글",
       "summaryOptional": "요약 (선택 사항)",
       "title": "리뷰 제출",
-      "partialPostedMessage": "댓글 {{freshCount}}개를 게시했습니다. 이전 커밋을 가리키는 댓글 {{staleCount}}개는 대기열에 남았습니다.",
-      "submitCountOfTotal": "댓글 {{totalCount}}개 중 {{freshCount}}개 제출",
+      "partialPostedMessage": "댓글 {{displayFreshCount}}개를 게시했습니다. 이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",
+      "submitCountOfTotal": "댓글 {{displayTotalCount}}개 중 {{displayFreshCount}}개 제출",
       "submitReview": "리뷰 제출"
     },
     "fileStatus": {

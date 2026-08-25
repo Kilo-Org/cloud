@@ -206,11 +206,11 @@
       "loadingLines": "Läser in {{loaded}} av {{total}} rader...",
       "expandContext": "Expandera kontext",
       "expandMoreContext": "Expandera mer kontext",
-      "expandLines": "Expandera {{count}} rader ({{start}}–{{end}})",
-      "expandMoreLines": "Expandera ytterligare {{count}} rader ({{start}}–{{end}})",
-      "expandLinesOfContext": "Expandera {{count}} rader med kontext",
+      "expandLines": "Expandera {{displayCount}} rader ({{start}}–{{end}})",
+      "expandMoreLines": "Expandera ytterligare {{displayCount}} rader ({{start}}–{{end}})",
+      "expandLinesOfContext": "Expandera {{displayCount}} rader med kontext",
       "expandAll": "Expandera allt",
-      "expandAllLines": "Expandera alla {{count}} rader",
+      "expandAllLines": "Expandera alla {{displayCount}} rader",
       "loadingMoreFiles": "Läser in fler filer...",
       "retryLoadingNextPage": "Försök läsa in nästa sida igen",
       "failedToLoadMoreFiles": "Kunde inte läsa in fler filer — tryck för att försöka igen",
@@ -301,7 +301,7 @@
       "closeReactions": "Stäng reaktioner",
       "reactionsTitle": "Reaktioner",
       "addReaction": "Lägg till reaktion",
-      "reactionPill": "{{emoji}}-reaktion, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}}-reaktion, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaktion",
       "reaction": "reaktioner",
       "reaction_other": "reaktioner",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Inga granskningstrådar eller konversationskommentarer på den här pull requesten.",
       "reviewFiles": "Granska filer",
       "quotedDiffSnippet": "Citerat diff-utdrag",
-      "moreLinesAbove": "… {{count}} fler rader ovanför",
+      "moreLinesAbove": "… {{displayCount}} fler rader ovanför",
       "termsAcceptRequired": "Du måste godkänna användarvillkoren för att posta.",
       "termsOutdatedCopy": "Användarvillkoren har ändrats. Öppna den här skärmen igen för att godkänna den senaste versionen.",
       "termsCheckRetryCopy": "Kunde inte kontrollera användarvillkoren. Kontrollera anslutningen och försök igen."
@@ -395,11 +395,11 @@
       "retryChecks": "Försök igen med kontroller",
       "viewOnGitHub": "Visa PR på GitHub",
       "noChecksReported": "Inga kontroller rapporterade",
-      "passed": "{{count}} godkända",
-      "failed": "{{count}} misslyckades",
-      "pending": "{{count}} väntande",
-      "skipped": "{{count}} hoppades över",
-      "checksCount": "{{count}} kontroller",
+      "passed": "{{displayCount}} godkända",
+      "failed": "{{displayCount}} misslyckades",
+      "pending": "{{displayCount}} väntande",
+      "skipped": "{{displayCount}} hoppades över",
+      "checksCount": "{{displayCount}} kontroller",
       "checkDetails": "kontrolldetaljer",
       "pullRequest": "pull request"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "väntande kommentar",
       "pendingComment": "väntande kommentarer",
       "pendingComment_other": "väntande kommentarer",
-      "submitCountOfTotal": "Skicka {{freshCount}} av {{totalCount}} kommentarer",
+      "submitCountOfTotal": "Skicka {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
       "submitReview": "Skicka granskning",
-      "partialPostedMessage": "Skickade {{freshCount}} kommentar(er). {{staleCount}} kommentar(er) pekar på en äldre commit och blev kvar i kön."
+      "partialPostedMessage": "Skickade {{displayFreshCount}} kommentar(er). {{displayStaleCount}} kommentar(er) pekar på en äldre commit och blev kvar i kön."
     },
     "reconnectNotice": {
       "title": "GitHub-anslutningen har upphört att gälla",
@@ -580,7 +580,8 @@
     "agents": "Agenter",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, flik, {{position}} av {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Senaste",
       "common": "Vanliga",
       "reactWith": "Reagera med {{reaction}}",
-      "accessibility": "{{emoji}}-reaktion, {{count}}"
+      "accessibility": "{{emoji}}-reaktion, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Svarar på",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Bilden är inte tillgänglig",
       "openFailed": "Kunde inte öppna bifogad fil. Kontrollera anslutningen och försök igen.",
       "attachFailed": "Kunde inte bifoga filen",
-      "limit": "Du kan bifoga upp till {{count}} filer.",
+      "limit": "Du kan bifoga upp till {{displayCount}} filer.",
       "sizeRejection": "{{filename}} överskrider bifogningsgränsen på {{limit}}.",
       "unreadable": "Kunde inte läsa {{filename}}.",
       "pastedImage": "den inklistrade bilden",
@@ -722,6 +723,7 @@
       "finalTermEnds": "Sista perioden slutar",
       "afterFinalTerm": "Efter sista perioden",
       "remaining": "Kvar",
+      "lessThanOneDay": "Mindre än 1 dag",
       "ends": "Slutar",
       "expires": "Upphör",
       "noActivePlan": "Ingen aktiv plan",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "ditt Standard-månadspris",
       "perMonth": "/månad",
       "earlybirdAccessUntil": "Earlybird-åtkomst till {{date}}",
-      "earlybirdEnding": "Earlybird avslutas: {{days}} dagar kvar",
+      "earlybirdEnding": "Earlybird avslutas: {{remaining}} dagar kvar",
       "paymentPastDue": "Betalning förfallen. Uppdatera din betalningsmetod.",
       "subscriptionCancels": "Abonnemanget avslutas {{date}}",
-      "trialDaysRemaining": "Provperiod: {{days}} dagar kvar",
-      "trialEndingSoon": "Provperioden avslutas snart: {{days}}"
+      "trialDaysRemaining": "Provperiod: {{remaining}} dagar kvar",
+      "trialEndingSoon": "Provperioden avslutas snart: {{remaining}}"
     },
     "changelog": {
       "title": "Vad är nytt",
@@ -996,7 +998,7 @@
         "stalledTitle": "Något fastnade",
         "stalledBody": "Vi kunde inte slutföra installationen av {{name}}. Försök igen, eller mejla hi@kilo.ai om detta fortsätter.",
         "timeoutTitle": "Tar längre tid än förväntat",
-        "timeoutBody": "Installationen av {{name}} tar längre tid än vanligt (över {{minutes}} minuter).",
+        "timeoutBody": "Installationen av {{name}} tar längre tid än vanligt (över {{displayMinutes}} minuter).",
         "continueInBackground": "Fortsätt i bakgrunden",
         "settingUp": "Konfigurerar {{name}}",
         "finishingSetup": "Slutför installation",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Sammanfogningsgrind",
       "repositories": "Arkiv",
       "allRepositories": "Alla arkiv",
-      "nSelected": "{{count}} valda",
+      "nSelected": "{{displayCount}} valda",
       "reviewMemory": "Granskningsminne",
       "proposedReviewMdGuidance": "Föreslagen REVIEW.md-vägledning"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Analyserad",
       "exploitabilityReasoning": "Motivering för utnyttjbarhet",
       "suggestedFix": "Föreslagen fix",
-      "whereFound": "Var detta hittades ({{count}})",
+      "whereFound": "Var detta hittades ({{displayCount}})",
       "fullReport": "Fullständig genererad rapport",
       "unknown": "Okänt",
       "yes": "Ja",
       "no": "Nej"
     },
     "dashboard": {
-      "findingsCount": "{{count}} findings",
+      "findingsCount": "{{displayCount}} findings",
       "notMeasured": "Inte mätt",
       "actFirst": "Agrera först",
       "slaPosture": "SLA-läge",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Åtgärdsplan för arkiv",
       "noOpenFindings": "Inga öppna findings kräver uppmärksamhet",
       "deadlineToday": "Deadline nådd idag",
-      "daysOverdue": "{{count}} dagar försenade",
+      "daysOverdue": "{{displayCount}} dagar försenade",
       "withinDeadline": "Inom deadline",
       "criticalOverdue": "Kritiskt försenat",
       "highOverdue": "Högt försenat",
@@ -1434,6 +1436,27 @@
       "syncNow": "Synka nu",
       "syncQueued": "Synkning köad",
       "syncStatusUnavailable": "Synkstatus otillgänglig"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Öppna findings",
+      "openFindingsDetail": "{{critical}} kritiska, {{high}} höga",
+      "confirmedExploitable": "Bekräftat utnyttjbar",
+      "confirmedExploitableDetail": "Projektrisk bekräftad av analys",
+      "needsReview": "Kräver din granskning",
+      "needsReviewDetail": "Mänskligt beslut krävs",
+      "analysisIncomplete": "Analysen inte klar",
+      "analysisIncompleteDetail": "Projektrisken är fortfarande okänd",
+      "slaCompliance": "SLA-efterlevnad",
+      "notMeasured": "Inte mätt",
+      "withinDeadlineDetail": "{{within}} av {{total}} inom deadline",
+      "noDeadlineData": "Inga findings har en SLA-deadline ännu",
+      "deadlinePassed": "Deadline passerad",
+      "deadlinePassedDetail": "{{critical}} kritiska, {{high}} höga",
+      "dueThisWeek": "Förfaller denna vecka",
+      "dueThisWeekDetail": "{{exploitable}} bekräftat utnyttjbara",
+      "noDeadline": "Ingen deadline",
+      "reviewSlaAssignment": "Granska SLA-tilldelning",
+      "allOpenFindingsTracked": "Alla öppna findings spåras"
     },
     "dismiss": {
       "title": "Avskriv finding",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}} analys",
       "automation": "Automatisering",
       "automationAllOff": "Allt av",
-      "automationCount": "{{count}} av 3 aktiverade",
+      "automationCount": "{{displayCount}} av 3 aktiverade",
       "notifications": "Meddelanden",
-      "notificationsCount": "{{count}} av 2 aktiverade",
+      "notificationsCount": "{{displayCount}} av 2 aktiverade",
       "slaPolicy": "SLA-policy",
       "disabledNoManage": "Security Agent är inaktiverad. Endast organisationsägare och faktureringsansvariga kan aktivera den.",
       "disabledNoRepo": "Välj minst ett arkiv innan du aktiverar Security Agent.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Öppna pull request{{number}}",
       "openDraftPullRequest": "Öppna utkast till pull request{{number}}",
       "progress": "Förlopp",
-      "attemptHistory": "Försökshistorik ({{count}})",
+      "attemptHistory": "Försökshistorik ({{displayCount}})",
       "attemptNumber": "Försök #{{number}}",
       "startedBy": "Startad av",
       "model": "Modell",
@@ -1855,9 +1878,9 @@
       "toolTask": "uppgift",
       "readTodos": "Läs todos",
       "updateTodos": "Uppdatera todos",
-      "linesBadge": "{{count}} rader",
-      "filesBadge": "{{count}} filer",
-      "matchesBadge": "{{count}} matchningar"
+      "linesBadge": "{{displayCount}} rader",
+      "filesBadge": "{{displayCount}} filer",
+      "matchesBadge": "{{displayCount}} matchningar"
     },
     "readToolMarkdown": {
       "linesTruncated": "rader {{start}}–{{end}} (trunkerade)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "Det här svaret kan inte rapporteras.",
       "reportAiResponseSubmitted": "Rapport skickad. Kvitto {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Detaljer otillgängliga",
       "textDisplay": "Textvisning",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Förberedelsen klar",
       "preparationFailed": "Förberedelsen misslyckades",
       "setupCommand": "Konfigurationskommando {{index}}",
-      "setupCommandOf": "Konfigurationskommando {{index}} av {{count}}"
+      "setupCommandOf": "Konfigurationskommando {{index}} av {{displayCount}}"
     },
     "permissionCard": {
       "title": "Behörighet krävs",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Inskickningen misslyckades. Försök igen.",
       "questionAnnouncement": "Agenten behöver ditt svar. Kompositören är pausad medan du svarar.",
       "permissionAnnouncement": "Agenten behöver behörighet för att fortsätta. Kompositören är pausad medan du beslutar.",
-      "positionHint": "(1 av {{count}})",
+      "positionHint": "(1 av {{displayCount}})",
       "movedPastPrompt": "Agenten har gått förbi denna fråga. Detta kort stängs när sessionen fortsätter.",
       "waitingForAnswer": "Agenten väntar på ditt svar. Medan denna fråga är öppen är ditt meddelande till agenten pausat.",
       "waitingForPermission": "Agenten väntar på behörighet. Medan denna förfrågan är öppen är ditt meddelande till agenten pausat."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Kameratillgång inaktiverad",
       "cameraAccessMessage": "Tillåt kameratillgång i Inställningar för att ta ett foto.",
       "couldNotOpenPhotoPicker": "Det gick inte att öppna fotovalaren. Starta om Kilo och försök igen.",
-      "maxFilesAllowed": "Högst {{count}} filer tillåtna",
+      "maxFilesAllowed": "Högst {{displayCount}} filer tillåtna",
       "onlyAddingFiles": "Lägger endast till {{accepted}} av {{total}} filer (max {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "kostnad {{cost}}",
       "costSuffix": ", kostnad {{cost}}",
       "tokensWindowUnavailable": "Kontext {{used}} token, fönster ej tillgängligt",
-      "tokensUsage": "Kontext {{used}} av {{window}} token, {{percentage}}% använt",
+      "tokensUsage": "Kontext {{used}} av {{window}} token, {{percentage}} använt",
       "title": "Kontextanvändning",
       "used": "Använt",
       "remaining": "Kvar",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "Användningen återspeglar det senaste slutförda assistentsvaret.",
       "tokenUsage": "Tokenanvändning",
       "cacheRate": "Cachehastighet",
-      "modelsCount": "Modeller ({{count}})",
+      "modelsCount": "Modeller ({{displayCount}})",
       "tokenTotalsNote": "Tokensummor omfattar endast denna session och exkluderar underagent-/undersessionstoken.",
       "subagents": "Underagenter",
       "subagentsDescription": "Residualkostnad från barnsessioner",
@@ -2373,7 +2400,7 @@
     "connectedCli": "På en ansluten CLI",
     "newSessionOn": "Ny session på {{name}}",
     "noMatchingSessions": "Inga matchande sessioner.",
-    "onlyFirstFilesAttached": "Endast de första {{count}} filerna bifogas.",
+    "onlyFirstFilesAttached": "Endast de första {{displayCount}} filerna bifogas.",
     "staleMessage": "Denna delning är inte längre tillgänglig.",
     "retryableMessage": "Det gick inte att läsa in dina sessioner.",
     "emptyMessage": "Inga sessioner ännu — starta en ny för att skicka detta.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Kilo Pass på detta Apple-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att hantera det.",
     "alreadySubscribed": "Du har redan en Kilo Pass-prenumeration.",
     "purchaseUnavailable": "Kilo Pass-köp är inte tillgängligt just nu.",
-    "tierCredits": "${{amount}} i krediter",
+    "tierCredits": "{{amount}} i krediter",
     "perMonth": "{{price}}/mån",
     "verifyPurchaseFailed": "Det gick inte att verifiera ditt köp. Kontrollera din anslutning och försök igen.",
     "productsCouldNotLoad": "Kilo Pass-produkter kunde inte läsas in från App Store.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "Det gick inte att öppna App Store-prenumerationshanteringen.",
     "kiloPassSetup": "Kilo Pass-installation",
     "subscriptionHeaderDescription": "En månadsprenumeration som lägger till krediter till ditt Kilo-saldo för att köra AI-kodningssessioner i Kilo-appen — Cloud-agenter, fjärrsessioner och KiloClaw-chattar.",
-    "tierDescription": "${{price}} betalda krediter läggs till månadsvis för Kilo-appanvändning.",
+    "tierDescription": "{{price}} betalda krediter läggs till månadsvis för Kilo-appanvändning.",
     "subscribe": "Prenumerera",
     "subscribeDescription": "Månatliga krediter med bonusframsteg",
     "manage": "Hantera",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass väntande",
     "statusCanceling": "Kilo Pass avbryter",
     "statusPastDue": "Kilo Pass förfallen",
-    "monthlyCredits": "${{credits}} månatliga krediter",
+    "monthlyCredits": "{{credits}} månatliga krediter",
     "ends": "Slutar {{date}}",
     "periodEnd": "periodslut",
     "managedOnGooglePlay": "Hanteras på Google Play",

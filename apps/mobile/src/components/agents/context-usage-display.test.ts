@@ -316,6 +316,7 @@ describe('getMetricsAccessibilityLabel', () => {
     expect(label).toContain('84,000');
     expect(label).toContain('200,000');
     expect(label).toContain('42%');
+    expect(label).not.toContain('%%');
     expect(label).toContain('8 cents');
     expect(label).not.toContain('$');
     expect(label.toLowerCase()).toContain('context details');

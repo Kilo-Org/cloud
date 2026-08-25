@@ -206,11 +206,11 @@
       "loadingLines": "{{total}} ਲਾਈਨਾਂ ਵਿੱਚੋਂ {{loaded}} ਲੋਡ ਹੋ ਰਹੀਆਂ ਹਨ…",
       "expandContext": "ਸੰਦਰਭ ਵਿਸਤਾਰ ਕਰੋ",
       "expandMoreContext": "ਹੋਰ ਸੰਦਰਭ ਵਿਸਤਾਰ ਕਰੋ",
-      "expandLines": "{{count}} ਲਾਈਨਾਂ ਵਿਸਤਾਰ ਕਰੋ ({{start}}–{{end}})",
-      "expandMoreLines": "ਹੋਰ {{count}} ਲਾਈਨਾਂ ਵਿਸਤਾਰ ਕਰੋ ({{start}}–{{end}})",
-      "expandLinesOfContext": "ਸੰਦਰਭ ਦੀਆਂ {{count}} ਲਾਈਨਾਂ ਵਿਸਤਾਰ ਕਰੋ",
+      "expandLines": "{{displayCount}} ਲਾਈਨਾਂ ਵਿਸਤਾਰ ਕਰੋ ({{start}}–{{end}})",
+      "expandMoreLines": "ਹੋਰ {{displayCount}} ਲਾਈਨਾਂ ਵਿਸਤਾਰ ਕਰੋ ({{start}}–{{end}})",
+      "expandLinesOfContext": "ਸੰਦਰਭ ਦੀਆਂ {{displayCount}} ਲਾਈਨਾਂ ਵਿਸਤਾਰ ਕਰੋ",
       "expandAll": "ਸਭ ਵਿਸਤਾਰ ਕਰੋ",
-      "expandAllLines": "ਸਾਰੀਆਂ {{count}} ਲਾਈਨਾਂ ਵਿਸਤਾਰ ਕਰੋ",
+      "expandAllLines": "ਸਾਰੀਆਂ {{displayCount}} ਲਾਈਨਾਂ ਵਿਸਤਾਰ ਕਰੋ",
       "loadingMoreFiles": "ਹੋਰ ਫਾਈਲਾਂ ਲੋਡ ਹੋ ਰਹੀਆਂ ਹਨ…",
       "retryLoadingNextPage": "ਅਗਲਾ ਪੰਨਾ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
       "failedToLoadMoreFiles": "ਹੋਰ ਫਾਈਲਾਂ ਲੋਡ ਕਰਨ ਵਿੱਚ ਅਸਫਲ — ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ",
@@ -301,7 +301,7 @@
       "closeReactions": "ਪ੍ਰਤੀਕਿਰਿਆਵਾਂ ਬੰਦ ਕਰੋ",
       "reactionsTitle": "ਪ੍ਰਤੀਕਿਰਿਆਵਾਂ",
       "addReaction": "ਪ੍ਰਤੀਕਿਰਿਆ ਜੋੜੋ",
-      "reactionPill": "{{emoji}} ਪ੍ਰਤੀਕਿਰਿਆ, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} ਪ੍ਰਤੀਕਿਰਿਆ, {{displayCount}} {{countLabel}}",
       "reaction_one": "ਪ੍ਰਤੀਕਿਰਿਆ",
       "reaction": "ਪ੍ਰਤੀਕਿਰਿਆਵਾਂ",
       "reaction_other": "ਪ੍ਰਤੀਕਿਰਿਆਵਾਂ",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਕੋਈ ਰਿਵਿਊ ਥ੍ਰੈਡ ਜਾਂ ਗੱਲਬਾਤ ਟਿੱਪਣੀਆਂ ਨਹੀਂ ਹਨ।",
       "reviewFiles": "ਫਾਈਲਾਂ ਦਾ ਰਿਵਿਊ ਕਰੋ",
       "quotedDiffSnippet": "ਹਵਾਲਾ ਦਿੱਤਾ diff ਟੁਕੜਾ",
-      "moreLinesAbove": "… ਉੱਪਰ {{count}} ਹੋਰ ਲਾਈਨਾਂ",
+      "moreLinesAbove": "… ਉੱਪਰ {{displayCount}} ਹੋਰ ਲਾਈਨਾਂ",
       "termsAcceptRequired": "ਪੋਸਟ ਕਰਨ ਲਈ ਤੁਹਾਨੂੰ ਸੇਵਾ ਦੇ ਨਿਯਮ ਸਵੀਕਾਰ ਕਰਨੇ ਚਾਹੀਦੇ ਹਨ।",
       "termsOutdatedCopy": "ਸੇਵਾ ਦੇ ਨਿਯਮ ਬਦਲ ਗਏ ਹਨ। ਨਵਾਂ ਸੰਸਕਰਣ ਸਵੀਕਾਰ ਕਰਨ ਲਈ ਇਹ ਸਕ੍ਰੀਨ ਦੁਬਾਰਾ ਖੋਲ੍ਹੋ।",
       "termsCheckRetryCopy": "ਸੇਵਾ ਦੇ ਨਿਯਮ ਚੈੱਕ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਚੈੱਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
@@ -395,11 +395,11 @@
       "retryChecks": "ਚੈੱਕ ਦੁਬਾਰਾ ਕਰੋ",
       "viewOnGitHub": "GitHub 'ਤੇ PR ਵੇਖੋ",
       "noChecksReported": "ਕੋਈ ਚੈੱਕ ਰਿਪੋਰਟ ਨਹੀਂ ਕੀਤੇ ਗਏ",
-      "passed": "{{count}} ਪਾਸ ਹੋਏ",
-      "failed": "{{count}} ਅਸਫਲ ਹੋਏ",
-      "pending": "{{count}} ਬਕਾਇਆ",
-      "skipped": "{{count}} ਛੱਡੇ ਗਏ",
-      "checksCount": "{{count}} ਚੈੱਕ",
+      "passed": "{{displayCount}} ਪਾਸ ਹੋਏ",
+      "failed": "{{displayCount}} ਅਸਫਲ ਹੋਏ",
+      "pending": "{{displayCount}} ਬਕਾਇਆ",
+      "skipped": "{{displayCount}} ਛੱਡੇ ਗਏ",
+      "checksCount": "{{displayCount}} ਚੈੱਕ",
       "checkDetails": "ਚੈੱਕ ਵੇਰਵੇ",
       "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "ਲੰਬਿਤ ਟਿੱਪਣੀ",
       "pendingComment": "ਲੰਬਿਤ ਟਿੱਪਣੀਆਂ",
       "pendingComment_other": "ਲੰਬਿਤ ਟਿੱਪਣੀਆਂ",
-      "submitCountOfTotal": "{{totalCount}} ਵਿੱਚੋਂ {{freshCount}} ਟਿੱਪਣੀਆਂ ਜਮ੍ਹਾਂ ਕਰੋ",
+      "submitCountOfTotal": "{{displayTotalCount}} ਵਿੱਚੋਂ {{displayFreshCount}} ਟਿੱਪਣੀਆਂ ਜਮ੍ਹਾਂ ਕਰੋ",
       "submitReview": "ਰਿਵਿਊ ਜਮ੍ਹਾਂ ਕਰੋ",
-      "partialPostedMessage": "{{freshCount}} ਟਿੱਪਣੀ(ਆਂ) ਪੋਸਟ ਕੀਤੀਆਂ। {{staleCount}} ਟਿੱਪਣੀ(ਆਂ) ਪੁਰਾਣੇ ਕਮਿਟ ਵੱਲ ਇਸ਼ਾਰਾ ਕਰਦੀਆਂ ਹਨ ਅਤੇ ਤੁਹਾਡੀ ਕਤਾਰ ਵਿੱਚ ਰਹੀਆਂ।"
+      "partialPostedMessage": "{{displayFreshCount}} ਟਿੱਪਣੀ(ਆਂ) ਪੋਸਟ ਕੀਤੀਆਂ। {{displayStaleCount}} ਟਿੱਪਣੀ(ਆਂ) ਪੁਰਾਣੇ ਕਮਿਟ ਵੱਲ ਇਸ਼ਾਰਾ ਕਰਦੀਆਂ ਹਨ ਅਤੇ ਤੁਹਾਡੀ ਕਤਾਰ ਵਿੱਚ ਰਹੀਆਂ।"
     },
     "reconnectNotice": {
       "title": "GitHub ਕਨੈਕਸ਼ਨ ਮਿਆਦ ਪੁੱਗ ਗਿਆ",
@@ -580,7 +580,8 @@
     "agents": "ਏਜੰਟ",
     "profile": "ਪ੍ਰੋਫਾਈਲ",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, ਟੈਬ, {{total}} ਵਿੱਚੋਂ {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "ਤਾਜ਼ਾ",
       "common": "ਆਮ",
       "reactWith": "{{reaction}} ਨਾਲ ਪ੍ਰਤੀਕਿਰਿਆ ਕਰੋ",
-      "accessibility": "{{emoji}} ਪ੍ਰਤੀਕਿਰਿਆ, {{count}}"
+      "accessibility": "{{emoji}} ਪ੍ਰਤੀਕਿਰਿਆ, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "ਨੂੰ ਜਵਾਬ ਦਿੱਤਾ ਜਾ ਰਿਹਾ ਹੈ",
@@ -650,7 +651,7 @@
       "imageUnavailable": "ਚਿੱਤਰ ਉਪਲਬਧ ਨਹੀਂ",
       "openFailed": "ਅਟੈਚਮੈਂਟ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਚੈੱਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "attachFailed": "ਫਾਈਲ ਅਟੈਚ ਕਰਨ ਵਿੱਚ ਅਸਫਲ",
-      "limit": "ਤੁਸੀਂ {{count}} ਤੱਕ ਫਾਈਲਾਂ ਅਟੈਚ ਕਰ ਸਕਦੇ ਹੋ।",
+      "limit": "ਤੁਸੀਂ {{displayCount}} ਤੱਕ ਫਾਈਲਾਂ ਅਟੈਚ ਕਰ ਸਕਦੇ ਹੋ।",
       "sizeRejection": "{{filename}} {{limit}} ਅਟੈਚਮੈਂਟ ਸੀਮਾ ਤੋਂ ਵੱਧ ਗਈ।",
       "unreadable": "{{filename}} ਪੜ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
       "pastedImage": "ਪੇਸਟ ਕੀਤਾ ਚਿੱਤਰ",
@@ -722,6 +723,7 @@
       "finalTermEnds": "ਅੰਤਿਮ ਮਿਆਦ ਸਮਾਪਤ ਹੁੰਦੀ ਹੈ",
       "afterFinalTerm": "ਅੰਤਿਮ ਮਿਆਦ ਤੋਂ ਬਾਅਦ",
       "remaining": "ਬਾਕੀ",
+      "lessThanOneDay": "੧ ਦਿਨ ਤੋਂ ਘੱਟ",
       "ends": "ਸਮਾਪਤ ਹੁੰਦਾ ਹੈ",
       "expires": "ਮਿਆਦ ਖਤਮ ਹੁੰਦੀ ਹੈ",
       "noActivePlan": "ਕੋਈ ਸਰਗਰਮ ਯੋਜਨਾ ਨਹੀਂ",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "ਤੁਹਾਡੀ Standard ਮਹੀਨਾਵਾਰ ਕੀਮਤ",
       "perMonth": "/ਮਹੀਨਾ",
       "earlybirdAccessUntil": "{{date}} ਤੱਕ ਅਰਲੀਬਰਡ ਪਹੁੰਚ",
-      "earlybirdEnding": "ਅਰਲੀਬਰਡ ਖਤਮ ਹੋ ਰਿਹਾ ਹੈ: {{days}} ਦਿਨ ਬਾਕੀ",
+      "earlybirdEnding": "ਅਰਲੀਬਰਡ ਖਤਮ ਹੋ ਰਿਹਾ ਹੈ: {{remaining}}",
       "paymentPastDue": "ਭੁਗਤਾਨ ਬਕਾਇਆ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਆਪਣਾ ਭੁਗਤਾਨ ਢੰਗ ਅੱਪਡੇਟ ਕਰੋ।",
       "subscriptionCancels": "ਗਾਹਕੀ {{date}} ਨੂੰ ਰੱਦ ਹੁੰਦੀ ਹੈ",
-      "trialDaysRemaining": "ਅਜ਼ਮਾਇਸ਼: {{days}} ਦਿਨ ਬਾਕੀ",
-      "trialEndingSoon": "ਅਜ਼ਮਾਇਸ਼ ਜਲਦੀ ਖਤਮ ਹੋ ਰਹੀ ਹੈ: {{days}}"
+      "trialDaysRemaining": "ਅਜ਼ਮਾਇਸ਼: {{remaining}} ਬਾਕੀ",
+      "trialEndingSoon": "ਅਜ਼ਮਾਇਸ਼ ਜਲਦੀ ਖਤਮ ਹੋ ਰਹੀ ਹੈ: {{remaining}}"
     },
     "changelog": {
       "title": "ਕੀ ਨਵਾਂ ਹੈ",
@@ -996,7 +998,7 @@
         "stalledTitle": "ਕੁਝ ਰੁਕ ਗਿਆ",
         "stalledBody": "ਅਸੀਂ {{name}} ਦਾ ਸੈੱਟਅੱਪ ਪੂਰਾ ਨਹੀਂ ਕਰ ਸਕੇ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ, ਜਾਂ ਇਹ ਜਾਰੀ ਰਹੇ ਤਾਂ hi@kilo.ai 'ਤੇ ਈਮੇਲ ਕਰੋ।",
         "timeoutTitle": "ਉਮੀਦ ਤੋਂ ਵੱਧ ਸਮਾਂ ਲੱਗ ਰਿਹਾ ਹੈ",
-        "timeoutBody": "{{name}} ਦਾ ਸੈੱਟਅੱਪ ਆਮ ਨਾਲੋਂ ਵੱਧ ਸਮਾਂ ਲੈ ਰਿਹਾ ਹੈ ({{minutes}} ਮਿੰਟ ਤੋਂ ਵੱਧ)।",
+        "timeoutBody": "{{name}} ਦਾ ਸੈੱਟਅੱਪ ਆਮ ਨਾਲੋਂ ਵੱਧ ਸਮਾਂ ਲੈ ਰਿਹਾ ਹੈ ({{displayMinutes}} ਮਿੰਟ ਤੋਂ ਵੱਧ)।",
         "continueInBackground": "ਪਿਛੋਕੜ ਵਿੱਚ ਜਾਰੀ ਰੱਖੋ",
         "settingUp": "{{name}} ਸੈੱਟਅੱਪ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
         "finishingSetup": "ਸੈੱਟਅੱਪ ਪੂਰਾ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
@@ -1287,7 +1289,7 @@
       "mergeGate": "ਮਰਜ ਗੇਟ",
       "repositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ",
       "allRepositories": "ਸਾਰੀਆਂ ਰਿਪੋਜ਼ਟਰੀਆਂ",
-      "nSelected": "{{count}} ਚੁਣੇ ਗਏ",
+      "nSelected": "{{displayCount}} ਚੁਣੇ ਗਏ",
       "reviewMemory": "ਸਮੀਖਿਆ ਮੈਮੋਰੀ",
       "proposedReviewMdGuidance": "ਪ੍ਰਸਤਾਵਿਤ REVIEW.md ਦਿਸ਼ਾ-ਨਿਰਦੇਸ਼"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "ਵਿਸ਼ਲੇਸ਼ਣ ਕੀਤਾ ਗਿਆ",
       "exploitabilityReasoning": "ਸ਼ੋਸ਼ਣਯੋਗਤਾ ਤਰਕ",
       "suggestedFix": "ਸੁਝਾਈ ਗਈ ਸੁਧਾਰ",
-      "whereFound": "ਇਹ ਕਿੱਥੇ ਮਿਲਿਆ ({{count}})",
+      "whereFound": "ਇਹ ਕਿੱਥੇ ਮਿਲਿਆ ({{displayCount}})",
       "fullReport": "ਪੂਰੀ ਤਿਆਰ ਕੀਤੀ ਰਿਪੋਰਟ",
       "unknown": "ਅਣਜਾਣ",
       "yes": "ਹਾਂ",
       "no": "ਨਹੀਂ"
     },
     "dashboard": {
-      "findingsCount": "{{count}} ਖੋਜਾਂ",
+      "findingsCount": "{{displayCount}} ਖੋਜਾਂ",
       "notMeasured": "ਮਾਪਿਆ ਨਹੀਂ ਗਿਆ",
       "actFirst": "ਪਹਿਲਾਂ ਕਾਰਵਾਈ ਕਰੋ",
       "slaPosture": "SLA ਸਥਿਤੀ",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "ਰਿਪੋਜ਼ਟਰੀ ਕਾਰਵਾਈ ਯੋਜਨਾ",
       "noOpenFindings": "ਕੋਈ ਖੁੱਲ੍ਹੀ ਖੋਜ ਧਿਆਨ ਦੀ ਲੋੜ ਨਹੀਂ ਹੈ",
       "deadlineToday": "ਅੱਜ ਸਮਾਂ ਸੀਮਾ ਪੂਰੀ ਹੋਈ",
-      "daysOverdue": "{{count}} ਦਿਨ ਦੇਰੀ ਨਾਲ",
+      "daysOverdue": "{{displayCount}} ਦਿਨ ਦੇਰੀ ਨਾਲ",
       "withinDeadline": "ਸਮਾਂ ਸੀਮਾ ਦੇ ਅੰਦਰ",
       "criticalOverdue": "ਗੰਭੀਰ ਦੇਰੀ",
       "highOverdue": "ਉੱਚ ਦੇਰੀ",
@@ -1434,6 +1436,27 @@
       "syncNow": "ਹੁਣੇ ਸਿੰਕ ਕਰੋ",
       "syncQueued": "ਸਿੰਕ ਕਤਾਰ ਵਿੱਚ ਹੈ",
       "syncStatusUnavailable": "ਸਿੰਕ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ"
+    },
+    "dashboardMetrics": {
+      "openFindings": "ਖੁੱਲ੍ਹੀਆਂ ਖੋਜਾਂ",
+      "openFindingsDetail": "{{critical}} ਗੰਭੀਰ, {{high}} ਉੱਚ",
+      "confirmedExploitable": "ਪੁਸ਼ਟੀ ਕੀਤਾ ਸ਼ੋਸ਼ਣਯੋਗ",
+      "confirmedExploitableDetail": "ਵਿਸ਼ਲੇਸ਼ਣ ਦੁਆਰਾ ਪ੍ਰੋਜੈਕਟ ਜੋਖਮ ਦੀ ਪੁਸ਼ਟੀ ਹੋਈ",
+      "needsReview": "ਤੁਹਾਡੀ ਸਮੀਖਿਆ ਦੀ ਲੋੜ ਹੈ",
+      "needsReviewDetail": "ਮਨੁੱਖੀ ਫੈਸਲੇ ਦੀ ਲੋੜ ਹੈ",
+      "analysisIncomplete": "ਵਿਸ਼ਲੇਸ਼ਣ ਪੂਰਾ ਨਹੀਂ",
+      "analysisIncompleteDetail": "ਪ੍ਰੋਜੈਕਟ ਜੋਖਮ ਅਜੇ ਅਣਜਾਣ ਹੈ",
+      "slaCompliance": "SLA ਪਾਲਣਾ",
+      "notMeasured": "ਮਾਪਿਆ ਨਹੀਂ ਗਿਆ",
+      "withinDeadlineDetail": "{{total}} ਵਿੱਚੋਂ {{within}} ਸਮਾਂ ਸੀਮਾ ਦੇ ਅੰਦਰ",
+      "noDeadlineData": "ਕਿਸੇ ਵੀ ਖੋਜ ਦੀ ਅਜੇ SLA ਸਮਾਂ ਸੀਮਾ ਨਹੀਂ ਹੈ",
+      "deadlinePassed": "ਸਮਾਂ ਸੀਮਾ ਖਤਮ ਹੋਈ",
+      "deadlinePassedDetail": "{{critical}} ਗੰਭੀਰ, {{high}} ਉੱਚ",
+      "dueThisWeek": "ਇਸ ਹਫ਼ਤੇ ਸਮਾਂ ਸੀਮਾ",
+      "dueThisWeekDetail": "{{exploitable}} ਪੁਸ਼ਟੀ ਕੀਤਾ ਸ਼ੋਸ਼ਣਯੋਗ",
+      "noDeadline": "ਕੋਈ ਸਮਾਂ ਸੀਮਾ ਨਹੀਂ",
+      "reviewSlaAssignment": "SLA ਨਿਰਧਾਰਨ ਦੀ ਸਮੀਖਿਆ ਕਰੋ",
+      "allOpenFindingsTracked": "ਸਾਰੀਆਂ ਖੁੱਲ੍ਹੀਆਂ ਖੋਜਾਂ ਟਰੈਕ ਕੀਤੀਆਂ ਗਈਆਂ"
     },
     "dismiss": {
       "title": "ਖੋਜ ਨੂੰ ਖਾਰਜ ਕਰੋ",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}} ਵਿਸ਼ਲੇਸ਼ਣ",
       "automation": "ਸਵੈਚਾਲਨ",
       "automationAllOff": "ਸਾਰੇ ਬੰਦ",
-      "automationCount": "3 ਵਿੱਚੋਂ {{count}} ਯੋਗ",
+      "automationCount": "3 ਵਿੱਚੋਂ {{displayCount}} ਯੋਗ",
       "notifications": "ਸੂਚਨਾਵਾਂ",
-      "notificationsCount": "2 ਵਿੱਚੋਂ {{count}} ਯੋਗ",
+      "notificationsCount": "2 ਵਿੱਚੋਂ {{displayCount}} ਯੋਗ",
       "slaPolicy": "SLA ਨੀਤੀ",
       "disabledNoManage": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਅਯੋਗ ਹੈ। ਸਿਰਫ਼ ਸੰਗਠਨ ਮਾਲਕ ਅਤੇ ਬਿਲਿੰਗ ਪ੍ਰਬੰਧਕ ਇਸਨੂੰ ਚਾਲੂ ਕਰ ਸਕਦੇ ਹਨ।",
       "disabledNoRepo": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਨੂੰ ਯੋਗ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਘੱਟੋ-ਘੱਟ ਇੱਕ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣੋ।",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "pull request ਖੋਲ੍ਹੋ {{number}}",
       "openDraftPullRequest": "ਡਰਾਫਟ pull request ਖੋਲ੍ਹੋ {{number}}",
       "progress": "ਤਰੱਕੀ",
-      "attemptHistory": "ਕੋਸ਼ਿਸ਼ ਇਤਿਹਾਸ ({{count}})",
+      "attemptHistory": "ਕੋਸ਼ਿਸ਼ ਇਤਿਹਾਸ ({{displayCount}})",
       "attemptNumber": "ਕੋਸ਼ਿਸ਼ #{{number}}",
       "startedBy": "ਦੁਆਰਾ ਸ਼ੁਰੂ ਕੀਤਾ ਗਿਆ",
       "model": "ਮਾਡਲ",
@@ -1855,9 +1878,9 @@
       "toolTask": "task",
       "readTodos": "ਕੰਮ ਪੜ੍ਹੋ",
       "updateTodos": "ਕੰਮ ਅੱਪਡੇਟ ਕਰੋ",
-      "linesBadge": "{{count}} ਲਾਈਨਾਂ",
-      "filesBadge": "{{count}} ਫਾਈਲਾਂ",
-      "matchesBadge": "{{count}} ਮੇਲ"
+      "linesBadge": "{{displayCount}} ਲਾਈਨਾਂ",
+      "filesBadge": "{{displayCount}} ਫਾਈਲਾਂ",
+      "matchesBadge": "{{displayCount}} ਮੇਲ"
     },
     "readToolMarkdown": {
       "linesTruncated": "ਲਾਈਨਾਂ {{start}}–{{end}} (ਛੋਟੀਆਂ ਕੀਤੀਆਂ ਗਈਆਂ)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "ਇਹ ਜਵਾਬ ਰਿਪੋਰਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",
       "reportAiResponseSubmitted": "ਰਿਪੋਰਟ ਭੇਜੀ ਗਈ। ਰਸੀਦ {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "ਵੇਰਵੇ ਉਪਲਬਧ ਨਹੀਂ",
       "textDisplay": "ਟੈਕਸਟ ਡਿਸਪਲੇ",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "ਤਿਆਰੀ ਪੂਰੀ ਹੋਈ",
       "preparationFailed": "ਤਿਆਰੀ ਅਸਫਲ",
       "setupCommand": "ਸੈੱਟਅੱਪ ਕਮਾਂਡ {{index}}",
-      "setupCommandOf": "ਸੈੱਟਅੱਪ ਕਮਾਂਡ {{index}} ਕੁੱਲ {{count}} ਵਿੱਚੋਂ"
+      "setupCommandOf": "ਸੈੱਟਅੱਪ ਕਮਾਂਡ {{index}} ਕੁੱਲ {{displayCount}} ਵਿੱਚੋਂ"
     },
     "permissionCard": {
       "title": "ਇਜਾਜ਼ਤ ਲੋੜੀਂਦੀ ਹੈ",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "ਭੇਜਣਾ ਅਸਫਲ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "questionAnnouncement": "ਏਜੰਟ ਨੂੰ ਤੁਹਾਡੀ ਇੰਪੁੱਟ ਚਾਹੀਦੀ ਹੈ। ਜਦੋਂ ਤੱਕ ਤੁਸੀਂ ਜਵਾਬ ਨਹੀਂ ਦਿੰਦੇ, ਕੰਪੋਜ਼ਰ ਰੁਕਿਆ ਰਹਿੰਦਾ ਹੈ।",
       "permissionAnnouncement": "ਏਜੰਟ ਨੂੰ ਜਾਰੀ ਰੱਖਣ ਲਈ ਇਜਾਜ਼ਤ ਚਾਹੀਦੀ ਹੈ। ਜਦੋਂ ਤੱਕ ਤੁਸੀਂ ਫੈਸਲਾ ਨਹੀਂ ਕਰਦੇ, ਕੰਪੋਜ਼ਰ ਰੁਕਿਆ ਰਹਿੰਦਾ ਹੈ।",
-      "positionHint": "({{count}} ਵਿੱਚੋਂ 1)",
+      "positionHint": "({{displayCount}} ਵਿੱਚੋਂ 1)",
       "movedPastPrompt": "ਏਜੰਟ ਇਸ ਪ੍ਰੰਪਟ ਤੋਂ ਅੱਗੇ ਵਧ ਚੁੱਕਾ ਹੈ। ਸੈਸ਼ਨ ਜਾਰੀ ਰਹਿਣ ਤੇ ਇਹ ਕਾਰਡ ਬੰਦ ਹੋ ਜਾਵੇਗਾ।",
       "waitingForAnswer": "ਏਜੰਟ ਤੁਹਾਡੇ ਜਵਾਬ ਦੀ ਉਡੀਕ ਕਰ ਰਿਹਾ ਹੈ। ਜਦੋਂ ਇਹ ਸਵਾਲ ਖੁੱਲ੍ਹਾ ਹੈ, ਏਜੰਟ ਨੂੰ ਤੁਹਾਡਾ ਸੁਨੇਹਾ ਰੁਕਿਆ ਰਹਿੰਦਾ ਹੈ।",
       "waitingForPermission": "ਏਜੰਟ ਇਜਾਜ਼ਤ ਦੀ ਉਡੀਕ ਕਰ ਰਿਹਾ ਹੈ। ਜਦੋਂ ਇਹ ਬੇਨਤੀ ਖੁੱਲ੍ਹੀ ਹੈ, ਏਜੰਟ ਨੂੰ ਤੁਹਾਡਾ ਸੁਨੇਹਾ ਰੁਕਿਆ ਰਹਿੰਦਾ ਹੈ।"
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "ਕੈਮਰਾ ਪਹੁੰਚ ਅਸਮਰੱਥ",
       "cameraAccessMessage": "ਫੋਟੋ ਖਿੱਚਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਕੈਮਰਾ ਪਹੁੰਚ ਦੀ ਇਜਾਜ਼ਤ ਦਿਓ।",
       "couldNotOpenPhotoPicker": "ਫੋਟੋ ਪਿਕਰ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। Kilo ਮੁੜ ਚਾਲੂ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "maxFilesAllowed": "ਵੱਧ ਤੋਂ ਵੱਧ {{count}} ਫਾਈਲਾਂ ਦੀ ਇਜਾਜ਼ਤ ਹੈ",
+      "maxFilesAllowed": "ਵੱਧ ਤੋਂ ਵੱਧ {{displayCount}} ਫਾਈਲਾਂ ਦੀ ਇਜਾਜ਼ਤ ਹੈ",
       "onlyAddingFiles": "{{total}} ਵਿੱਚੋਂ ਸਿਰਫ {{accepted}} ਫਾਈਲਾਂ ਜੋੜੀਆਂ ਜਾ ਰਹੀਆਂ ਹਨ (ਵੱਧ ਤੋਂ ਵੱਧ {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "ਲਾਗਤ {{cost}}",
       "costSuffix": ", ਲਾਗਤ {{cost}}",
       "tokensWindowUnavailable": "ਸੰਦਰਭ {{used}} ਟੋਕਨ, ਵਿੰਡੋ ਅਨੁਪਲਬਧ",
-      "tokensUsage": "ਸੰਦਰਭ {{window}} ਵਿੱਚੋਂ {{used}} ਟੋਕਨ, {{percentage}}% ਵਰਤੇ ਗਏ",
+      "tokensUsage": "ਸੰਦਰਭ {{window}} ਵਿੱਚੋਂ {{used}} ਟੋਕਨ, {{percentage}} ਵਰਤੇ ਗਏ",
       "title": "ਸੰਦਰਭ ਵਰਤੋਂ",
       "used": "ਵਰਤੇ ਗਏ",
       "remaining": "ਬਾਕੀ",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "ਵਰਤੋਂ ਨਵੀਨਤਮ ਮੁਕੰਮਲ ਸਹਾਇਕ ਜਵਾਬ ਨੂੰ ਦਰਸਾਉਂਦੀ ਹੈ।",
       "tokenUsage": "ਟੋਕਨ ਵਰਤੋਂ",
       "cacheRate": "ਕੈਸ਼ ਦਰ",
-      "modelsCount": "ਮਾਡਲ ({{count}})",
+      "modelsCount": "ਮਾਡਲ ({{displayCount}})",
       "tokenTotalsNote": "ਟੋਕਨ ਕੁੱਲ ਸਿਰਫ ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਕਵਰ ਕਰਦੇ ਹਨ ਅਤੇ ਸਬਏਜੰਟ/ਚਾਈਲਡ-ਸੈਸ਼ਨ ਟੋਕਨ ਨੂੰ ਸ਼ਾਮਲ ਨਹੀਂ ਕਰਦੇ।",
       "subagents": "ਸਬਏਜੰਟ",
       "subagentsDescription": "ਚਾਈਲਡ ਸੈਸ਼ਨਾਂ ਤੋਂ ਬਕਾਇਆ ਲਾਗਤ",
@@ -2373,7 +2400,7 @@
     "connectedCli": "ਕਨੈਕਟ ਕੀਤੇ CLI 'ਤੇ",
     "newSessionOn": "{{name}} 'ਤੇ ਨਵਾਂ ਸੈਸ਼ਨ",
     "noMatchingSessions": "ਕੋਈ ਮੇਲ ਖਾਂਦੇ ਸੈਸ਼ਨ ਨਹੀਂ।",
-    "onlyFirstFilesAttached": "ਸਿਰਫ ਪਹਿਲੀਆਂ {{count}} ਫਾਈਲਾਂ ਅਟੈਚ ਕੀਤੀਆਂ ਜਾਣਗੀਆਂ।",
+    "onlyFirstFilesAttached": "ਸਿਰਫ ਪਹਿਲੀਆਂ {{displayCount}} ਫਾਈਲਾਂ ਅਟੈਚ ਕੀਤੀਆਂ ਜਾਣਗੀਆਂ।",
     "staleMessage": "ਇਹ ਸਾਂਝਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
     "retryableMessage": "ਤੁਹਾਡੇ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
     "emptyMessage": "ਅਜੇ ਕੋਈ ਸੈਸ਼ਨ ਨਹੀਂ — ਇਸ ਨੂੰ ਭੇਜਣ ਲਈ ਨਵਾਂ ਸ਼ੁਰੂ ਕਰੋ।",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "ਇਸ Apple ਖਾਤੇ 'ਤੇ Kilo Pass ਵੱਖਰੇ Kilo ਖਾਤੇ ਨਾਲ ਸਬੰਧਤ ਹੈ। ਇਸ ਨੂੰ ਪ੍ਰਬੰਧਿਤ ਕਰਨ ਲਈ ਉਸ Kilo ਖਾਤੇ ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ।",
     "alreadySubscribed": "ਤੁਹਾਡੇ ਕੋਲ ਪਹਿਲਾਂ ਹੀ Kilo Pass ਗਾਹਕੀ ਹੈ।",
     "purchaseUnavailable": "Kilo Pass ਖਰੀਦ ਇਸ ਸਮੇਂ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
-    "tierCredits": "ਕ੍ਰੈਡਿਟਾਂ ਵਿੱਚ ${{amount}}",
+    "tierCredits": "ਕ੍ਰੈਡਿਟਾਂ ਵਿੱਚ {{amount}}",
     "perMonth": "{{price}}/ਮਹੀਨਾ",
     "verifyPurchaseFailed": "ਤੁਹਾਡੀ ਖਰੀਦ ਦੀ ਪੁਸ਼ਟੀ ਨਹੀਂ ਹੋ ਸਕੀ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "productsCouldNotLoad": "Kilo Pass ਉਤਪਾਦ ਐਪ ਸਟੋਰ ਤੋਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
@@ -2417,7 +2444,7 @@
     "manageFailed": "ਐਪ ਸਟੋਰ ਗਾਹਕੀ ਪ੍ਰਬੰਧਨ ਖੋਲ੍ਹਣ ਵਿੱਚ ਅਸਫਲ।",
     "kiloPassSetup": "Kilo Pass ਸੈੱਟਅੱਪ",
     "subscriptionHeaderDescription": "ਇੱਕ ਮਾਸਿਕ ਗਾਹਕੀ ਜੋ Kilo ਐਪ ਵਿੱਚ AI ਕੋਡਿੰਗ ਸੈਸ਼ਨ ਚਲਾਉਣ ਲਈ — ਕਲਾਉਡ ਏਜੰਟ, ਰਿਮੋਟ ਸੈਸ਼ਨ, ਅਤੇ KiloClaw ਚੈਟ — ਤੁਹਾਡੇ Kilo ਬੈਲੰਸ ਵਿੱਚ ਕ੍ਰੈਡਿਟ ਜੋੜਦੀ ਹੈ।",
-    "tierDescription": "Kilo ਐਪ ਵਰਤੋਂ ਲਈ ਮਾਸਿਕ ਤੌਰ 'ਤੇ ${{price}} ਅਦਾ ਕੀਤੇ ਕ੍ਰੈਡਿਟ ਜੋੜੇ ਜਾਂਦੇ ਹਨ।",
+    "tierDescription": "Kilo ਐਪ ਵਰਤੋਂ ਲਈ ਮਾਸਿਕ ਤੌਰ 'ਤੇ {{price}} ਅਦਾ ਕੀਤੇ ਕ੍ਰੈਡਿਟ ਜੋੜੇ ਜਾਂਦੇ ਹਨ।",
     "subscribe": "ਗਾਹਕੀ ਲਓ",
     "subscribeDescription": "ਬੋਨਸ ਪ੍ਰਗਤੀ ਨਾਲ ਮਾਸਿਕ ਕ੍ਰੈਡਿਟ",
     "manage": "ਪ੍ਰਬੰਧਿਤ ਕਰੋ",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass ਬਕਾਇਆ",
     "statusCanceling": "Kilo Pass ਰੱਦ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
     "statusPastDue": "Kilo Pass ਦੇਰੀ ਨਾਲ",
-    "monthlyCredits": "${{credits}} ਮਾਸਿਕ ਕ੍ਰੈਡਿਟ",
+    "monthlyCredits": "{{credits}} ਮਾਸਿਕ ਕ੍ਰੈਡਿਟ",
     "ends": "{{date}} ਨੂੰ ਖਤਮ ਹੁੰਦਾ ਹੈ",
     "periodEnd": "ਮਿਆਦ ਦਾ ਅੰਤ",
     "managedOnGooglePlay": "Google Play 'ਤੇ ਪ੍ਰਬੰਧਿਤ",

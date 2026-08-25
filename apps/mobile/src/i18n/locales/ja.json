@@ -201,7 +201,8 @@
     "agents": "エージェント",
     "profile": "プロフィール",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}、タブ、{{total}}中{{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -242,7 +243,7 @@
       "recent": "最近",
       "common": "共通",
       "reactWith": "{{reaction}}でリアクション",
-      "accessibility": "{{emoji}}のリアクション、{{count}}"
+      "accessibility": "{{emoji}}のリアクション、{{displayCount}}"
     },
     "composer": {
       "replyingTo": "返信先",
@@ -271,7 +272,7 @@
       "imageUnavailable": "画像を利用できません",
       "openFailed": "添付ファイルを開けませんでした。接続を確認して、もう一度お試しください。",
       "attachFailed": "ファイルを添付できませんでした",
-      "limit": "最大{{count}}個のファイルを添付できます。",
+      "limit": "最大{{displayCount}}個のファイルを添付できます。",
       "sizeRejection": "{{filename}}は添付上限の{{limit}}を超えています。",
       "unreadable": "{{filename}}を読み取れませんでした。",
       "pastedImage": "貼り付けた画像",
@@ -343,6 +344,7 @@
       "finalTermEnds": "最終期間の終了",
       "afterFinalTerm": "最終期間の後",
       "remaining": "残り",
+      "lessThanOneDay": "1日未満",
       "ends": "終了",
       "expires": "失効",
       "noActivePlan": "アクティブなプランがありません",
@@ -361,11 +363,11 @@
       "yourStandardMonthlyPrice": "Standardの月額料金",
       "perMonth": "/月",
       "earlybirdAccessUntil": "Earlybirdアクセスは{{date}}まで",
-      "earlybirdEnding": "Earlybird終了まであと{{days}}日",
+      "earlybirdEnding": "Earlybird終了まで: {{remaining}}",
       "paymentPastDue": "お支払いが期限を過ぎています。お支払い方法を更新してください。",
       "subscriptionCancels": "サブスクリプションは{{date}}に解約されます",
-      "trialDaysRemaining": "トライアル: 残り{{days}}日",
-      "trialEndingSoon": "トライアル終了間近: {{days}}"
+      "trialDaysRemaining": "トライアル: 残り{{remaining}}",
+      "trialEndingSoon": "トライアル終了間近: {{remaining}}"
     },
     "changelog": {
       "title": "新着情報",
@@ -665,7 +667,7 @@
         "startingSandbox": "サンドボックスを起動中",
         "stoppedBody": "セットアップ中に{{name}}のインスタンスが予期せず停止しました。",
         "stoppedTitle": "セットアップが停止しました",
-        "timeoutBody": "{{name}}のセットアップに通常より時間がかかっています（{{minutes}}分以上）。",
+        "timeoutBody": "{{name}}のセットアップに通常より時間がかかっています（{{displayMinutes}}分以上）。",
         "timeoutTitle": "予想より時間がかかっています"
       },
       "unavailableDescription": "インスタンスをプロビジョニングするには、現在のKiloClawサブスクリプションが必要です。既存のインスタンスとサブスクリプションは通常どおり継続されます。",
@@ -912,7 +914,7 @@
       "focusAreas": "重点領域",
       "mergeGate": "マージゲート",
       "model": "モデル",
-      "nSelected": "{{count}}件選択",
+      "nSelected": "{{displayCount}}件選択",
       "proposedReviewMdGuidance": "提案されたREVIEW.mdガイダンス",
       "repositories": "リポジトリ",
       "reviewMemory": "レビューメモリ",
@@ -981,7 +983,7 @@
       "triageReasoning": "トリアージの理由",
       "unknown": "不明",
       "watchInCloudAgent": "Cloud Agentで見る",
-      "whereFound": "検出場所（{{count}}）",
+      "whereFound": "検出場所（{{displayCount}}）",
       "yes": "はい"
     },
     "analysisSettings": {
@@ -1061,11 +1063,11 @@
       "confirmedExploitable": "悪用可能と確認",
       "couldNotLoad": "ダッシュボードデータを読み込めませんでした",
       "criticalOverdue": "重大・期限超過",
-      "daysOverdue": "{{count}}日超過",
+      "daysOverdue": "{{displayCount}}日超過",
       "deadlineToday": "期限は本日です",
       "filterByRepository": "リポジトリで絞り込み",
       "findings": "所見",
-      "findingsCount": "{{count}}件の所見",
+      "findingsCount": "{{displayCount}}件の所見",
       "highOverdue": "高・期限超過",
       "lastSynced": "最終同期: {{time}}",
       "manageRepositories": "リポジトリを管理",
@@ -1090,6 +1092,27 @@
       "syncQueued": "同期がキューに入りました",
       "syncStatusUnavailable": "同期ステータスを利用できません",
       "withinDeadline": "期限内"
+    },
+    "dashboardMetrics": {
+      "openFindings": "未解決の所見",
+      "openFindingsDetail": "重大 {{critical}}、高 {{high}}",
+      "confirmedExploitable": "悪用可能と確認",
+      "confirmedExploitableDetail": "分析によりプロジェクトのリスクが確認されました",
+      "needsReview": "確認が必要です",
+      "needsReviewDetail": "人間の判断が必要です",
+      "analysisIncomplete": "分析が完了していません",
+      "analysisIncompleteDetail": "プロジェクトのリスクはまだ不明です",
+      "slaCompliance": "SLA コンプライアンス",
+      "notMeasured": "未測定",
+      "withinDeadlineDetail": "{{total}} 件中 {{within}} 件が期限内",
+      "noDeadlineData": "SLA 期限のある所見はまだありません",
+      "deadlinePassed": "期限切れ",
+      "deadlinePassedDetail": "重大 {{critical}}、高 {{high}}",
+      "dueThisWeek": "今週期限",
+      "dueThisWeekDetail": "悪用可能 {{exploitable}} 件",
+      "noDeadline": "期限なし",
+      "reviewSlaAssignment": "SLA 割り当ての確認",
+      "allOpenFindingsTracked": "すべての未解決の所見を追跡しています"
     },
     "dismiss": {
       "alreadyResolvedDescription": "この所見はすでに解決されており、却下を受け付けません。",
@@ -1188,7 +1211,7 @@
       "title": "通知"
     },
     "remediation": {
-      "attemptHistory": "試行履歴（{{count}}）",
+      "attemptHistory": "試行履歴（{{displayCount}}）",
       "attemptNumber": "試行 #{{number}}",
       "branch": "ブランチ",
       "cancelMessage": "Security Agentは進行中の修復試行を停止します。",
@@ -1256,7 +1279,7 @@
       "analysisModeSubtitle": "{{mode}}分析",
       "automation": "自動化",
       "automationAllOff": "すべてオフ",
-      "automationCount": "3件中{{count}}件が有効",
+      "automationCount": "3件中{{displayCount}}件が有効",
       "couldNotLoadPermissions": "権限を読み込めませんでした",
       "couldNotLoadRepositories": "リポジトリを読み込めませんでした",
       "couldNotLoadSettings": "Security Agentの設定を読み込めませんでした",
@@ -1267,7 +1290,7 @@
       "enabled": "有効",
       "modelsAndAnalysis": "モデルと分析",
       "notifications": "通知",
-      "notificationsCount": "2件中{{count}}件が有効",
+      "notificationsCount": "2件中{{displayCount}}件が有効",
       "off": "オフ",
       "on": "オン",
       "repositories": "リポジトリ",
@@ -1476,9 +1499,9 @@
       "toolTask": "タスク",
       "readTodos": "タスクを読む",
       "updateTodos": "タスクを更新",
-      "linesBadge": "{{count}}行",
-      "filesBadge": "{{count}}ファイル",
-      "matchesBadge": "{{count}}件"
+      "linesBadge": "{{displayCount}}行",
+      "filesBadge": "{{displayCount}}ファイル",
+      "matchesBadge": "{{displayCount}}件"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}行目（切り詰め）",
@@ -1562,6 +1585,10 @@
       "reportAiResponseFailedTerminal": "この応答は報告できません。",
       "reportAiResponseSubmitted": "報告を送信しました。受領番号 {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "詳細を利用できません",
       "textDisplay": "テキスト表示",
@@ -1620,7 +1647,7 @@
       "preparationComplete": "準備が完了しました",
       "preparationFailed": "準備に失敗しました",
       "setupCommand": "セットアップコマンド {{index}}",
-      "setupCommandOf": "セットアップコマンド {{index}} / {{count}}"
+      "setupCommandOf": "セットアップコマンド {{index}} / {{displayCount}}"
     },
     "permissionCard": {
       "title": "権限が必要です",
@@ -1657,7 +1684,7 @@
       "submissionFailed": "送信に失敗しました。もう一度お試しください。",
       "questionAnnouncement": "エージェントが入力を必要としています。回答中はコンポーザーが一時停止しています。",
       "permissionAnnouncement": "続行するにはエージェントの権限が必要です。判断中はコンポーザーが一時停止しています。",
-      "positionHint": "({{count}}件中1件目)",
+      "positionHint": "({{displayCount}}件中1件目)",
       "movedPastPrompt": "エージェントはこのプロンプトを通過しました。セッションが続行するとこのカードは閉じます。",
       "waitingForAnswer": "エージェントが回答を待っています。この質問が開いている間、エージェントへのメッセージは一時停止されます。",
       "waitingForPermission": "エージェントが権限を待っています。このリクエストが開いている間、エージェントへのメッセージは一時停止されます。"
@@ -1778,7 +1805,7 @@
       "cameraAccessDisabled": "カメラアクセスが無効です",
       "cameraAccessMessage": "写真を撮るには設定でカメラアクセスを許可してください。",
       "couldNotOpenPhotoPicker": "写真ピッカーを開けませんでした。Kiloを再起動してもう一度お試しください。",
-      "maxFilesAllowed": "最大{{count}}個のファイルまで添付できます",
+      "maxFilesAllowed": "最大{{displayCount}}個のファイルまで添付できます",
       "onlyAddingFiles": "{{total}}個中{{accepted}}個のファイルのみ追加します（最大{{max}}個）"
     },
     "composer": {
@@ -1843,7 +1870,7 @@
       "costPrefix": "コスト {{cost}}",
       "costSuffix": "、コスト {{cost}}",
       "tokensWindowUnavailable": "コンテキスト {{used}}トークン、ウィンドウを利用できません",
-      "tokensUsage": "コンテキスト {{window}}トークン中{{used}}トークン、{{percentage}}%使用",
+      "tokensUsage": "コンテキスト {{window}}トークン中{{used}}トークン、{{percentage}}使用",
       "title": "コンテキスト使用量",
       "used": "使用済み",
       "remaining": "残り",
@@ -1852,7 +1879,7 @@
       "usageReflectsLatest": "使用量は直近に完了したアシスタントの応答を反映しています。",
       "tokenUsage": "トークン使用量",
       "cacheRate": "キャッシュ率",
-      "modelsCount": "モデル（{{count}}）",
+      "modelsCount": "モデル（{{displayCount}}）",
       "tokenTotalsNote": "トークン合計はこのセッションのみを対象とし、サブエージェント/子セッションのトークンは含みません。",
       "subagents": "サブエージェント",
       "subagentsDescription": "子セッションからの残余コスト",
@@ -1994,7 +2021,7 @@
     "connectedCli": "接続されたCLI上",
     "newSessionOn": "{{name}}で新しいセッション",
     "noMatchingSessions": "一致するセッションはありません。",
-    "onlyFirstFilesAttached": "最初の{{count}}個のファイルのみが添付されます。",
+    "onlyFirstFilesAttached": "最初の{{displayCount}}個のファイルのみが添付されます。",
     "staleMessage": "この共有は利用できなくなりました。",
     "retryableMessage": "セッションを読み込めませんでした。",
     "emptyMessage": "セッションがまだありません。送信するには新しいセッションを開始してください。",
@@ -2027,7 +2054,7 @@
     "otherAccountCopy": "このAppleアカウントのKilo Passは別のKiloアカウントに属しています。管理するにはそのKiloアカウントにサインインしてください。",
     "alreadySubscribed": "すでにKilo Passサブスクリプションに登録されています。",
     "purchaseUnavailable": "現在Kilo Passを購入できません。",
-    "tierCredits": "{{amount}}ドル分のクレジット",
+    "tierCredits": "{{amount}}分のクレジット",
     "perMonth": "{{price}}/月",
     "verifyPurchaseFailed": "購入を確認できませんでした。接続を確認して、もう一度お試しください。",
     "productsCouldNotLoad": "App StoreからKilo Pass製品を読み込めませんでした。",
@@ -2038,7 +2065,7 @@
     "manageFailed": "App Storeのサブスクリプション管理を開けませんでした。",
     "kiloPassSetup": "Kilo Passセットアップ",
     "subscriptionHeaderDescription": "毎月のサブスクリプションで、Kilo AppでのAIコーディングセッション（Cloud Agents、リモートセッション、KiloClawチャット）の実行に使えるクレジットをKilo残高に追加します。",
-    "tierDescription": "Kilo Appの利用に毎月${{price}}の有料クレジットが追加されます。",
+    "tierDescription": "Kilo Appの利用に毎月{{price}}の有料クレジットが追加されます。",
     "subscribe": "登録する",
     "subscribeDescription": "ボーナス進行付きの月間クレジット",
     "manage": "管理",
@@ -2046,7 +2073,7 @@
     "statusPending": "Kilo Pass 保留中",
     "statusCanceling": "Kilo Pass 解約中",
     "statusPastDue": "Kilo Pass 支払い期限超過",
-    "monthlyCredits": "毎月${{credits}}のクレジット",
+    "monthlyCredits": "毎月{{credits}}のクレジット",
     "ends": "{{date}}に終了",
     "periodEnd": "期間終了",
     "managedOnGooglePlay": "Google Playで管理",
@@ -2150,17 +2177,17 @@
     "accessDeniedDescription": "このプルリクエストを表示する権限がありません。",
     "checkConnection": "接続を確認",
     "checks": {
-      "checksCount": "{{count}}件のチェック",
+      "checksCount": "{{displayCount}}件のチェック",
       "couldNotLoad": "チェックを読み込めませんでした。",
-      "failed": "{{count}}件失敗",
+      "failed": "{{displayCount}}件失敗",
       "noAccess": "このリポジトリのチェックにアクセスできません。",
       "noChecksReported": "チェックは報告されていません",
       "notAvailable": "チェックはまだ利用できません。ヘッドコミットが処理されていないか、ヘッドリポジトリにKilo GitHub Appがインストールされていない可能性があります。",
       "openDetails": "{{name}}の詳細を開く",
-      "passed": "{{count}}件成功",
-      "pending": "{{count}}件保留中",
+      "passed": "{{displayCount}}件成功",
+      "pending": "{{displayCount}}件保留中",
       "retryChecks": "チェックを再試行",
-      "skipped": "{{count}}件スキップ",
+      "skipped": "{{displayCount}}件スキップ",
       "title": "チェック",
       "viewOnGitHub": "GitHubでPRを表示",
       "checkDetails": "チェックの詳細",
@@ -2238,7 +2265,7 @@
           "terminal": "このユーザーは報告できません。"
         }
       },
-      "moreLinesAbove": "… 上に{{count}}行あります",
+      "moreLinesAbove": "… 上に{{displayCount}}行あります",
       "mute": "ミュート",
       "mutedUser": "{{login}}をミュートしました",
       "noDiscussion": "まだディスカッションはありません",
@@ -2246,7 +2273,7 @@
       "comment_one": "1件のコメント",
       "outdated": "古い",
       "quotedDiffSnippet": "引用されたdiffスニペット",
-      "reactionPill": "{{emoji}}のリアクション、{{count}}{{countLabel}}",
+      "reactionPill": "{{emoji}}のリアクション、{{displayCount}}{{countLabel}}",
       "reaction": "件",
       "reaction_other": "件",
       "reaction_one": "件",
@@ -2350,12 +2377,12 @@
     "hunkRows": {
       "contextUnavailable": "このrefではコンテキストを利用できません",
       "expandAll": "すべて展開",
-      "expandAllLines": "{{count}}行すべて展開",
+      "expandAllLines": "{{displayCount}}行すべて展開",
       "expandContext": "コンテキストを展開",
-      "expandLines": "{{count}}行を展開（{{start}}–{{end}}）",
-      "expandLinesOfContext": "{{count}}行のコンテキストを展開",
+      "expandLines": "{{displayCount}}行を展開（{{start}}–{{end}}）",
+      "expandLinesOfContext": "{{displayCount}}行のコンテキストを展開",
       "expandMoreContext": "さらにコンテキストを展開",
-      "expandMoreLines": "さらに{{count}}行を展開（{{start}}–{{end}}）",
+      "expandMoreLines": "さらに{{displayCount}}行を展開（{{start}}–{{end}}）",
       "failedToLoadContext": "コンテキストを読み込めませんでした — タップして再試行",
       "failedToLoadMoreFiles": "さらにファイルを読み込めませんでした — タップして再試行",
       "fileLoadedCount_one": "{{displayCount}}件のファイルを読み込みました",
@@ -2500,8 +2527,8 @@
       "pendingComment_one": "保留中のコメント",
       "summaryOptional": "概要（任意）",
       "title": "レビューを送信",
-      "partialPostedMessage": "{{freshCount}}件のコメントを投稿しました。{{staleCount}}件のコメントは古いコミットを指しているため、キューに残りました。",
-      "submitCountOfTotal": "{{totalCount}}件中{{freshCount}}件のコメントを送信",
+      "partialPostedMessage": "{{displayFreshCount}}件のコメントを投稿しました。{{displayStaleCount}}件のコメントは古いコミットを指しているため、キューに残りました。",
+      "submitCountOfTotal": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
       "submitReview": "レビューを送信"
     },
     "fileStatus": {

@@ -331,6 +331,9 @@ importers:
       '@formatjs/intl-listformat':
         specifier: ^8.3.13
         version: 8.3.13
+      '@formatjs/intl-locale':
+        specifier: ^5.3.10
+        version: 5.3.10
       '@formatjs/intl-numberformat':
         specifier: ^9.4.0
         version: 9.4.0
@@ -5214,8 +5217,14 @@ packages:
   '@formatjs/intl-durationformat@0.10.18':
     resolution: {integrity: sha512-Wyn7TYW1c5EORLuh6IeAyEpaJf6GmvHPN7TXjJj3VT0bl9U2/zv/A518R+5lYtCmXLmmxX7DYz4iKSKzoKkR7g==}
 
+  '@formatjs/intl-getcanonicallocales@3.2.11':
+    resolution: {integrity: sha512-3FX+dgs+n7IZ6LGewqKV+JhAN7PeknS17j2QH0Qq4yQ64QJCmd8ST5FIRRvVgM93T6L2sARpcSH1gNiVMgVy6w==}
+
   '@formatjs/intl-listformat@8.3.13':
     resolution: {integrity: sha512-BTyqgBrZJdNM0CKIpsRXyuaSWAQ5Y+wP94cQTadTtT4XogvNh9YjnqLqgez6vQS4dTFgqOz5y/gP9rms4C1k1w==}
+
+  '@formatjs/intl-locale@5.3.10':
+    resolution: {integrity: sha512-JAlo479jZagR6Ze7EI4HGcV8Fi0PYVvEYmsis7c5i7I9Wa5d1Cbo+ThvDikhkQi6Gt86fpGriDOiOQP8CT2WZA==}
 
   '@formatjs/intl-localematcher@0.8.13':
     resolution: {integrity: sha512-kHEAFOkeJSPNi7c5PaKaRjxcBrJwzzt81ifUu+8uve1EDW/VJl83KsxmqgqNZLzcFEhSliZGvx3+pk/RH0IOmg==}
@@ -5228,6 +5237,9 @@ packages:
 
   '@formatjs/intl-segmenter@12.2.13':
     resolution: {integrity: sha512-jhxNn6FnvlIOYzn+VG4xRjcLRrLHlDGoRd723YuwdsNHZRvvcC4qvnh5xC5udSv0CiwbBKnPY3OzDNni2NxqIw==}
+
+  '@formatjs/intl-supportedvaluesof@2.3.9':
+    resolution: {integrity: sha512-RquyMkDVrJ5c0fYJSehVfzp7fWELH7vWY4nIvCoEchkDA32Mdm06ms6QvWdW+slECykCmoG4p8SLhwOKj2nCcg==}
 
   '@fregante/relaxed-json@2.0.0':
     resolution: {integrity: sha512-PyUXQWB42s4jBli435TDiYuVsadwRHnMc27YaLouINktvTWsL3FcKrRMGawTayFk46X+n5bE23RjUTWQwrukWw==}
@@ -21856,9 +21868,16 @@ snapshots:
       '@formatjs/bigdecimal': 0.2.7
       '@formatjs/intl-localematcher': 0.8.13
 
+  '@formatjs/intl-getcanonicallocales@3.2.11': {}
+
   '@formatjs/intl-listformat@8.3.13':
     dependencies:
       '@formatjs/intl-localematcher': 0.8.13
+
+  '@formatjs/intl-locale@5.3.10':
+    dependencies:
+      '@formatjs/intl-getcanonicallocales': 3.2.11
+      '@formatjs/intl-supportedvaluesof': 2.3.9
 
   '@formatjs/intl-localematcher@0.8.13':
     dependencies:
@@ -21876,6 +21895,10 @@ snapshots:
   '@formatjs/intl-segmenter@12.2.13':
     dependencies:
       '@formatjs/intl-localematcher': 0.8.13
+
+  '@formatjs/intl-supportedvaluesof@2.3.9':
+    dependencies:
+      '@formatjs/fast-memoize': 3.1.7
 
   '@fregante/relaxed-json@2.0.0': {}
 

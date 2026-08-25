@@ -206,11 +206,11 @@
       "loadingLines": "در حال بارگذاری {{loaded}} از {{total}} خط…",
       "expandContext": "باز کردن زمینه",
       "expandMoreContext": "باز کردن زمینهٔ بیشتر",
-      "expandLines": "باز کردن {{count}} خط ({{start}}–{{end}})",
-      "expandMoreLines": "باز کردن {{count}} خط بیشتر ({{start}}–{{end}})",
-      "expandLinesOfContext": "باز کردن {{count}} خط از زمینه",
+      "expandLines": "باز کردن {{displayCount}} خط ({{start}}–{{end}})",
+      "expandMoreLines": "باز کردن {{displayCount}} خط بیشتر ({{start}}–{{end}})",
+      "expandLinesOfContext": "باز کردن {{displayCount}} خط از زمینه",
       "expandAll": "باز کردن همه",
-      "expandAllLines": "باز کردن همهٔ {{count}} خط",
+      "expandAllLines": "باز کردن همهٔ {{displayCount}} خط",
       "loadingMoreFiles": "در حال بارگذاری فایل‌های بیشتر…",
       "retryLoadingNextPage": "تلاش مجدد برای بارگذاری صفحهٔ بعد",
       "failedToLoadMoreFiles": "بارگذاری فایل‌های بیشتر ممکن نشد — برای تلاش مجدد ضربه بزنید",
@@ -301,7 +301,7 @@
       "closeReactions": "بستن واکنش‌ها",
       "reactionsTitle": "واکنش‌ها",
       "addReaction": "افزودن واکنش",
-      "reactionPill": "واکنش {{emoji}}، {{count}} {{countLabel}}",
+      "reactionPill": "واکنش {{emoji}}، {{displayCount}} {{countLabel}}",
       "reaction_one": "واکنش",
       "reaction": "واکنش",
       "reaction_other": "واکنش",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "هیچ رشتهٔ بازبینی یا نظری در این درخواست pull نیست.",
       "reviewFiles": "بازبینی فایل‌ها",
       "quotedDiffSnippet": "بخش diff نقل‌قول‌شده",
-      "moreLinesAbove": "… {{count}} خط بیشتر در بالا",
+      "moreLinesAbove": "… {{displayCount}} خط بیشتر در بالا",
       "termsAcceptRequired": "برای ارسال باید شرایط استفاده را بپذیرید.",
       "termsOutdatedCopy": "شرایط استفاده تغییر کرده است. برای پذیرش آخرین نسخه این صفحه را دوباره باز کنید.",
       "termsCheckRetryCopy": "بررسی شرایط استفاده ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید."
@@ -395,11 +395,11 @@
       "retryChecks": "تلاش مجدد برای بررسی‌ها",
       "viewOnGitHub": "مشاهدهٔ PR در GitHub",
       "noChecksReported": "هیچ بررسی‌ای گزارش نشده است",
-      "passed": "{{count}} موفق",
-      "failed": "{{count}} ناموفق",
-      "pending": "{{count}} در انتظار",
-      "skipped": "{{count}} رد شده",
-      "checksCount": "{{count}} بررسی",
+      "passed": "{{displayCount}} موفق",
+      "failed": "{{displayCount}} ناموفق",
+      "pending": "{{displayCount}} در انتظار",
+      "skipped": "{{displayCount}} رد شده",
+      "checksCount": "{{displayCount}} بررسی",
       "checkDetails": "جزئیات بررسی",
       "pullRequest": "درخواست pull"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "نظر در انتظار",
       "pendingComment": "نظرات در انتظار",
       "pendingComment_other": "نظرات در انتظار",
-      "submitCountOfTotal": "ارسال {{freshCount}} از {{totalCount}} نظر",
+      "submitCountOfTotal": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
       "submitReview": "ارسال بازبینی",
-      "partialPostedMessage": "{{freshCount}} نظر ارسال شد. {{staleCount}} نظر به یک commit قدیمی‌تر اشاره دارد و در صف شما ماند."
+      "partialPostedMessage": "{{displayFreshCount}} نظر ارسال شد. {{displayStaleCount}} نظر به یک commit قدیمی‌تر اشاره دارد و در صف شما ماند."
     },
     "reconnectNotice": {
       "title": "اتصال GitHub منقضی شد",
@@ -580,7 +580,8 @@
     "agents": "عامل‌ها",
     "profile": "پروفایل",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}، تب، {{position}} از {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "اخیر",
       "common": "متداول",
       "reactWith": "واکنش با {{reaction}}",
-      "accessibility": "واکنش {{emoji}}، {{count}}"
+      "accessibility": "واکنش {{emoji}}، {{displayCount}}"
     },
     "composer": {
       "replyingTo": "در حال پاسخ به",
@@ -650,7 +651,7 @@
       "imageUnavailable": "تصویر در دسترس نیست",
       "openFailed": "باز کردن پیوست ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
       "attachFailed": "پیوست فایل ممکن نشد",
-      "limit": "می‌توانید حداکثر {{count}} فایل پیوست کنید.",
+      "limit": "می‌توانید حداکثر {{displayCount}} فایل پیوست کنید.",
       "sizeRejection": "{{filename}} از محدودیت پیوست {{limit}} فراتر می‌رود.",
       "unreadable": "خواندن {{filename}} ممکن نشد.",
       "pastedImage": "تصویر جای‌گذاری‌شده",
@@ -722,6 +723,7 @@
       "finalTermEnds": "پایان دوره نهایی",
       "afterFinalTerm": "پس از دوره نهایی",
       "remaining": "باقی‌مانده",
+      "lessThanOneDay": "کمتر از 1 روز",
       "ends": "پایان",
       "expires": "انقضا",
       "noActivePlan": "طرح فعالی وجود ندارد",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "قیمت ماهانه Standard شما",
       "perMonth": "/ماه",
       "earlybirdAccessUntil": "دسترسی Earlybird تا {{date}}",
-      "earlybirdEnding": "پایان Earlybird: {{days}} روز باقی‌مانده",
+      "earlybirdEnding": "پایان Earlybird: {{remaining}}",
       "paymentPastDue": "پرداخت معوق است. لطفاً روش پرداخت خود را به‌روزرسانی کنید.",
       "subscriptionCancels": "اشتراک در {{date}} لغو می‌شود",
-      "trialDaysRemaining": "آزمایشی: {{days}} روز باقی‌مانده",
-      "trialEndingSoon": "به زودی پایان آزمایشی: {{days}}"
+      "trialDaysRemaining": "آزمایشی: {{remaining}} باقی‌مانده",
+      "trialEndingSoon": "به زودی پایان آزمایشی: {{remaining}}"
     },
     "changelog": {
       "title": "چه خبر",
@@ -996,7 +998,7 @@
         "stalledTitle": "مشکلی پیش آمد",
         "stalledBody": "نتوانستیم راه‌اندازی {{name}} را تمام کنیم. دوباره تلاش کنید، یا اگر این مشکل ادامه یافت به hi@kilo.ai ایمیل بزنید.",
         "timeoutTitle": "بیش از حد انتظار طول می‌کشد",
-        "timeoutBody": "راه‌اندازی {{name}} بیش از حد معمول طول می‌کشد (بیش از {{minutes}} دقیقه).",
+        "timeoutBody": "راه‌اندازی {{name}} بیش از حد معمول طول می‌کشد (بیش از {{displayMinutes}} دقیقه).",
         "continueInBackground": "ادامه در پس‌زمینه",
         "settingUp": "در حال راه‌اندازی {{name}}",
         "finishingSetup": "پایان راه‌اندازی",
@@ -1287,7 +1289,7 @@
       "mergeGate": "دروازه ادغام",
       "repositories": "مخزن‌ها",
       "allRepositories": "همه مخزن‌ها",
-      "nSelected": "{{count}} انتخاب شد",
+      "nSelected": "{{displayCount}} انتخاب شد",
       "reviewMemory": "حافظه بررسی",
       "proposedReviewMdGuidance": "راهنمای پیشنهادی REVIEW.md"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "تحلیل شده",
       "exploitabilityReasoning": "استدلال قابلیت بهرهبرداری",
       "suggestedFix": "اصلاح پیشنهادی",
-      "whereFound": "محل شناسایی ({{count}})",
+      "whereFound": "محل شناسایی ({{displayCount}})",
       "fullReport": "گزارش کامل تولید شده",
       "unknown": "ناشناخته",
       "yes": "بله",
       "no": "خیر"
     },
     "dashboard": {
-      "findingsCount": "{{count}} یافته",
+      "findingsCount": "{{displayCount}} یافته",
       "notMeasured": "اندازهگیری نشده",
       "actFirst": "اول اقدام کنید",
       "slaPosture": "SLA posture",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "برنامه اقدام مخزن",
       "noOpenFindings": "هیچ یافته باز نیاز به توجه ندارد",
       "deadlineToday": "مهلت امروز به پایان میرسد",
-      "daysOverdue": "{{count}} روز عقبافتاده",
+      "daysOverdue": "{{displayCount}} روز عقبافتاده",
       "withinDeadline": "در محدوده مهلت",
       "criticalOverdue": "عقبافتاده بحرانی",
       "highOverdue": "عقبافتاده با شدت بالا",
@@ -1434,6 +1436,27 @@
       "syncNow": "همگامسازی اکنون",
       "syncQueued": "همگامسازی در صف قرار گرفت",
       "syncStatusUnavailable": "وضعیت همگامسازی در دسترس نیست"
+    },
+    "dashboardMetrics": {
+      "openFindings": "یافته‌های باز",
+      "openFindingsDetail": "{{critical}} بحرانی، {{high}} بالا",
+      "confirmedExploitable": "قابل بهره‌برداری تأیید شده",
+      "confirmedExploitableDetail": "ریسک پروژه توسط تحلیل تأیید شد",
+      "needsReview": "نیاز به بررسی شما",
+      "needsReviewDetail": "نیاز به تصمیم انسانی دارد",
+      "analysisIncomplete": "تحلیل کامل نشده",
+      "analysisIncompleteDetail": "ریسک پروژه هنوز ناشناخته است",
+      "slaCompliance": "رعایت SLA",
+      "notMeasured": "اندازه‌گیری نشده",
+      "withinDeadlineDetail": "{{within}} از {{total}} در محدوده مهلت",
+      "noDeadlineData": "هنوز هیچ یافته‌ای مهلت SLA ندارد",
+      "deadlinePassed": "مهلت گذشته است",
+      "deadlinePassedDetail": "{{critical}} بحرانی، {{high}} بالا",
+      "dueThisWeek": "سررسید این هفته",
+      "dueThisWeekDetail": "{{exploitable}} قابل بهره‌برداری تأیید شده",
+      "noDeadline": "بدون مهلت",
+      "reviewSlaAssignment": "بررسی اختصاص SLA",
+      "allOpenFindingsTracked": "همه یافته‌های باز ردیابی می‌شوند"
     },
     "dismiss": {
       "title": "رد یافته",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "تحلیل {{mode}}",
       "automation": "خودکارسازی",
       "automationAllOff": "همه خاموش",
-      "automationCount": "{{count}} از ۳ فعال است",
+      "automationCount": "{{displayCount}} از ۳ فعال است",
       "notifications": "اعلانها",
-      "notificationsCount": "{{count}} از ۲ فعال است",
+      "notificationsCount": "{{displayCount}} از ۲ فعال است",
       "slaPolicy": "خطمشی SLA",
       "disabledNoManage": "Security Agent غیرفعال است. فقط مالکان سازمان و مدیران صورتحساب میتوانند آن را روشن کنند.",
       "disabledNoRepo": "قبل از فعال کردن Security Agent حداقل یک مخزن انتخاب کنید.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "باز کردن pull request{{number}}",
       "openDraftPullRequest": "باز کردن pull request پیشنویس{{number}}",
       "progress": "پیشرفت",
-      "attemptHistory": "تاریخچه تلاشها ({{count}})",
+      "attemptHistory": "تاریخچه تلاشها ({{displayCount}})",
       "attemptNumber": "تلاش #{{number}}",
       "startedBy": "شروع شده توسط",
       "model": "مدل",
@@ -1855,9 +1878,9 @@
       "toolTask": "کار",
       "readTodos": "خواندن کارها",
       "updateTodos": "بهروزرسانی کارها",
-      "linesBadge": "{{count}} خط",
-      "filesBadge": "{{count}} فایل",
-      "matchesBadge": "{{count}} مورد مطابق"
+      "linesBadge": "{{displayCount}} خط",
+      "filesBadge": "{{displayCount}} فایل",
+      "matchesBadge": "{{displayCount}} مورد مطابق"
     },
     "readToolMarkdown": {
       "linesTruncated": "خطوط {{start}}–{{end}} (بریده شده)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "گزارش این پاسخ ممکن نیست.",
       "reportAiResponseSubmitted": "گزارش ارسال شد. رسید {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "جزئیات در دسترس نیست",
       "textDisplay": "نمایش متن",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "آمادهسازی کامل شد",
       "preparationFailed": "آمادهسازی شکست خورد",
       "setupCommand": "دستور راهاندازی {{index}}",
-      "setupCommandOf": "دستور راهاندازی {{index}} از {{count}}"
+      "setupCommandOf": "دستور راهاندازی {{index}} از {{displayCount}}"
     },
     "permissionCard": {
       "title": "مجوز لازم است",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "ارسال ناموفق بود. لطفاً دوباره تلاش کنید.",
       "questionAnnouncement": "عامل به ورودی شما نیاز دارد. تا پاسخ شما، ویرایشگر متوقف است.",
       "permissionAnnouncement": "عامل برای ادامه به مجوز نیاز دارد. تا تصمیم شما، ویرایشگر متوقف است.",
-      "positionHint": "({{count}} از ۱)",
+      "positionHint": "({{displayCount}} از ۱)",
       "movedPastPrompt": "عامل از این پرسش عبور کرده است. این کارت هنگام ادامه جلسه بسته می‌شود.",
       "waitingForAnswer": "عامل منتظر پاسخ شماست. تا باز بودن این پرسش، پیام شما به عامل متوقف است.",
       "waitingForPermission": "عامل منتظر مجوز است. تا باز بودن این درخواست، پیام شما به عامل متوقف است."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "دسترسی دوربین غیرفعال است",
       "cameraAccessMessage": "برای گرفتن عکس، دسترسی دوربین را در تنظیمات مجاز کنید.",
       "couldNotOpenPhotoPicker": "انتخاب‌گر عکس باز نشد. Kilo را راه‌اندازی مجدد کنید و دوباره تلاش کنید.",
-      "maxFilesAllowed": "حداکثر {{count}} فایل مجاز است",
+      "maxFilesAllowed": "حداکثر {{displayCount}} فایل مجاز است",
       "onlyAddingFiles": "فقط {{accepted}} از {{total}} فایل اضافه می‌شود (حداکثر {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "هزینه {{cost}}",
       "costSuffix": "، هزینه {{cost}}",
       "tokensWindowUnavailable": "{{used}} توکن زمینه، پنجره در دسترس نیست",
-      "tokensUsage": "{{used}} از {{window}} توکن زمینه، {{percentage}}٪ استفاده شده",
+      "tokensUsage": "{{used}} از {{window}} توکن زمینه، {{percentage}} استفاده شده",
       "title": "استفاده از زمینه",
       "used": "استفاده شده",
       "remaining": "باقی‌مانده",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "استفاده، آخرین پاسخ تکمیل‌شده دستیار را نشان می‌دهد.",
       "tokenUsage": "استفاده از توکن",
       "cacheRate": "نرخ کش",
-      "modelsCount": "مدل‌ها ({{count}})",
+      "modelsCount": "مدل‌ها ({{displayCount}})",
       "tokenTotalsNote": "مجموع توکن‌ها فقط این جلسه را پوشش می‌دهد و توکن‌های زیرعامل/جلسه فرزند را شامل نمی‌شود.",
       "subagents": "زیرعامل‌ها",
       "subagentsDescription": "هزینه باقی‌مانده از جلسات فرزند",
@@ -2373,7 +2400,7 @@
     "connectedCli": "روی CLI متصل",
     "newSessionOn": "جلسه جدید در {{name}}",
     "noMatchingSessions": "جلسه‌ای مطابقت ندارد.",
-    "onlyFirstFilesAttached": "فقط {{count}} فایل اول پیوست می‌شوند.",
+    "onlyFirstFilesAttached": "فقط {{displayCount}} فایل اول پیوست می‌شوند.",
     "staleMessage": "این اشتراک دیگر در دسترس نیست.",
     "retryableMessage": "جلسات شما بارگذاری نشدند.",
     "emptyMessage": "هنوز جلسه‌ای نیست — برای ارسال این، یک جلسه جدید شروع کنید.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Kilo Pass روی این Apple Account متعلق به یک حساب Kilo دیگر است. برای مدیریت آن وارد آن حساب Kilo شوید.",
     "alreadySubscribed": "شما قبلاً اشتراک Kilo Pass دارید.",
     "purchaseUnavailable": "خرید Kilo Pass در حال حاضر در دسترس نیست.",
-    "tierCredits": "${{amount}} اعتبار",
+    "tierCredits": "{{amount}} اعتبار",
     "perMonth": "{{price}}/ماه",
     "verifyPurchaseFailed": "خرید شما تأیید نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
     "productsCouldNotLoad": "محصولات Kilo Pass از App Store بارگذاری نشدند.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "باز کردن مدیریت اشتراک App Store ناموفق بود.",
     "kiloPassSetup": "راه‌اندازی Kilo Pass",
     "subscriptionHeaderDescription": "اشتراک ماهانه که برای اجرای جلسات کدنویسی هوش مصنوعی در Kilo App — Cloud Agents، جلسات از راه دور و گفتگوهای KiloClaw، به موجودی Kilo شما اعتبار اضافه می‌کند.",
-    "tierDescription": "${{price}} اعتبار پرداخت‌شده ماهانه برای استفاده از Kilo App اضافه می‌شود.",
+    "tierDescription": "{{price}} اعتبار پرداخت‌شده ماهانه برای استفاده از Kilo App اضافه می‌شود.",
     "subscribe": "اشتراک",
     "subscribeDescription": "اعتبار ماهانه با پیشرفت پاداش",
     "manage": "مدیریت",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass در انتظار است",
     "statusCanceling": "Kilo Pass در حال لغو",
     "statusPastDue": "Kilo Pass معوق است",
-    "monthlyCredits": "${{credits}} اعتبار ماهانه",
+    "monthlyCredits": "{{credits}} اعتبار ماهانه",
     "ends": "پایان در {{date}}",
     "periodEnd": "پایان دوره",
     "managedOnGooglePlay": "مدیریت در Google Play",

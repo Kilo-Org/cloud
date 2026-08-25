@@ -206,11 +206,11 @@
       "loadingLines": "{{loaded}} / {{total}} లైన్లను లోడ్ చేస్తోంది…",
       "expandContext": "సందర్భం విస్తరించండి",
       "expandMoreContext": "మరింత సందర్భం విస్తరించండి",
-      "expandLines": "{{count}} లైన్లను విస్తరించండి ({{start}}–{{end}})",
-      "expandMoreLines": "మరో {{count}} లైన్లను విస్తరించండి ({{start}}–{{end}})",
-      "expandLinesOfContext": "{{count}} సందర్భ లైన్లను విస్తరించండి",
+      "expandLines": "{{displayCount}} లైన్లను విస్తరించండి ({{start}}–{{end}})",
+      "expandMoreLines": "మరో {{displayCount}} లైన్లను విస్తరించండి ({{start}}–{{end}})",
+      "expandLinesOfContext": "{{displayCount}} సందర్భ లైన్లను విస్తరించండి",
       "expandAll": "అన్నీ విస్తరించండి",
-      "expandAllLines": "అన్ని {{count}} లైన్లను విస్తరించండి",
+      "expandAllLines": "అన్ని {{displayCount}} లైన్లను విస్తరించండి",
       "loadingMoreFiles": "మరిన్ని ఫైల్లను లోడ్ చేస్తోంది…",
       "retryLoadingNextPage": "తదుపరి పేజీని లోడ్ చేయడం మళ్ళీ ప్రయత్నించండి",
       "failedToLoadMoreFiles": "మరిన్ని ఫైల్లను లోడ్ చేయడంలో విఫలమైంది — మళ్ళీ ప్రయత్నించడానికి తాప్ చేయండి",
@@ -301,7 +301,7 @@
       "closeReactions": "ప్రతిచర్యలను మూసివేయండి",
       "reactionsTitle": "ప్రతిచర్యలు",
       "addReaction": "ప్రతిచర్య జోడించండి",
-      "reactionPill": "{{emoji}} ప్రతిచర్య, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} ప్రతిచర్య, {{displayCount}} {{countLabel}}",
       "reaction_one": "ప్రతిచర్య",
       "reaction": "ప్రతిచర్యలు",
       "reaction_other": "ప్రతిచర్యలు",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "ఈ పుల్ రిక్వెస్ట్పై సమీక్ష త్రెడ్లు లేదా సంభాషణ వ్యాఖ్యలు లేవు.",
       "reviewFiles": "ఫైల్లను సమీక్షించండి",
       "quotedDiffSnippet": "కోట్ చేసిన diff స్నిప్పెట్",
-      "moreLinesAbove": "… పైన మరో {{count}} లైన్లు",
+      "moreLinesAbove": "… పైన మరో {{displayCount}} లైన్లు",
       "termsAcceptRequired": "పోస్ట్ చేయడానికి మీరు సేవా నిబంధనలను అంగీకరించాలి.",
       "termsOutdatedCopy": "సేవా నిబంధనలు మారాయి. తాజా వెర్షన్ను అంగీకరించడానికి ఈ స్క్రీన్ను మళ్ళీ తెరవండి.",
       "termsCheckRetryCopy": "సేవా నిబంధనలను తనిఖీ చేయలేకపోయింది. మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి."
@@ -395,11 +395,11 @@
       "retryChecks": "చెక్లను మళ్ళీ ప్రయత్నించండి",
       "viewOnGitHub": "GitHubలో PRని చూడండి",
       "noChecksReported": "చెక్లు నివేదించబడలేదు",
-      "passed": "{{count}} ఉత్తీర్ణమయ్యాయి",
-      "failed": "{{count}} విఫలమయ్యాయి",
-      "pending": "{{count}} వేచి ఉన్నాయి",
-      "skipped": "{{count}} దాటవేయబడ్డాయి",
-      "checksCount": "{{count}} చెక్లు",
+      "passed": "{{displayCount}} ఉత్తీర్ణమయ్యాయి",
+      "failed": "{{displayCount}} విఫలమయ్యాయి",
+      "pending": "{{displayCount}} వేచి ఉన్నాయి",
+      "skipped": "{{displayCount}} దాటవేయబడ్డాయి",
+      "checksCount": "{{displayCount}} చెక్లు",
       "checkDetails": "చెక్ వివరాలు",
       "pullRequest": "పుల్ రిక్వెస్ట్"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "పెండింగ్ వ్యాఖ్య",
       "pendingComment": "పెండింగ్ వ్యాఖ్యలు",
       "pendingComment_other": "పెండింగ్ వ్యాఖ్యలు",
-      "submitCountOfTotal": "మొత్తం {{totalCount}} వ్యాఖ్యలలో {{freshCount}} సమర్పించండి",
+      "submitCountOfTotal": "మొత్తం {{displayTotalCount}} వ్యాఖ్యలలో {{displayFreshCount}} సమర్పించండి",
       "submitReview": "సమీక్షను సమర్పించండి",
-      "partialPostedMessage": "{{freshCount}} వ్యాఖ్య(లు) పోస్ట్ చేయబడ్డాయి. {{staleCount}} వ్యాఖ్య(లు) పాత కమిట్కు సూచిస్తున్నాయి మరియు మీ క్యూలో ఉన్నాయి."
+      "partialPostedMessage": "{{displayFreshCount}} వ్యాఖ్య(లు) పోస్ట్ చేయబడ్డాయి. {{displayStaleCount}} వ్యాఖ్య(లు) పాత కమిట్కు సూచిస్తున్నాయి మరియు మీ క్యూలో ఉన్నాయి."
     },
     "reconnectNotice": {
       "title": "GitHub కనెక్షన్ గడువు ముగిసింది",
@@ -580,7 +580,8 @@
     "agents": "ఏజెంట్లు",
     "profile": "ప్రొఫైల్",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, ట్యాబ్, మొత్తం {{total}} లో {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "ఇటీవలి",
       "common": "సాధారణం",
       "reactWith": "{{reaction}}తో ప్రతిస్పందించండి",
-      "accessibility": "{{emoji}} ప్రతిచర్య, {{count}}"
+      "accessibility": "{{emoji}} ప్రతిచర్య, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "ప్రత్యుత్తరం ఇస్తున్నారు",
@@ -650,7 +651,7 @@
       "imageUnavailable": "చిత్రం అందుబాటులో లేదు",
       "openFailed": "అటాచ్మెంట్ను తెరవలేకపోయింది. మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి.",
       "attachFailed": "ఫైల్ను అటాచ్ చేయడంలో విఫలమైంది",
-      "limit": "మీరు గరిష్టంగా {{count}} ఫైల్లను అటాచ్ చేయవచ్చు.",
+      "limit": "మీరు గరిష్టంగా {{displayCount}} ఫైల్లను అటాచ్ చేయవచ్చు.",
       "sizeRejection": "{{filename}} {{limit}} అటాచ్మెంట్ పరిమితిని మించిపోయింది.",
       "unreadable": "{{filename}}ను చదవలేకపోయింది.",
       "pastedImage": "అతికించిన చిత్రం",
@@ -722,6 +723,7 @@
       "finalTermEnds": "చివరి టర్మ్ ముగుస్తుంది",
       "afterFinalTerm": "చివరి టర్మ్ తర్వాత",
       "remaining": "మిగిలినది",
+      "lessThanOneDay": "1 రోజు కంటే తక్కువ",
       "ends": "ముగుస్తుంది",
       "expires": "గడువు ముగుస్తుంది",
       "noActivePlan": "చురుకైన ప్లాన్ లేదు",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "మీ Standard నెలవారీ ధర",
       "perMonth": "/నెల",
       "earlybirdAccessUntil": "{{date}} వరకు ఎర్లీబర్డ్ యాక్సెస్",
-      "earlybirdEnding": "ఎర్లీబర్డ్ ముగుస్తోంది: {{days}} రోజులు మిగిలి ఉన్నాయి",
+      "earlybirdEnding": "ఎర్లీబర్డ్ ముగుస్తోంది: {{remaining}} రోజులు మిగిలి ఉన్నాయి",
       "paymentPastDue": "చెల్లింపు గడువు ముగిసింది. మీ చెల్లింపు పద్ధతిని నవీకరించండి.",
       "subscriptionCancels": "చందా {{date}}న రద్దవుతుంది",
-      "trialDaysRemaining": "ట్రయల్: {{days}} రోజులు మిగిలి ఉన్నాయి",
-      "trialEndingSoon": "ట్రయల్ త్వరలో ముగుస్తుంది: {{days}}"
+      "trialDaysRemaining": "ట్రయల్: {{remaining}} రోజులు మిగిలి ఉన్నాయి",
+      "trialEndingSoon": "ట్రయల్ త్వరలో ముగుస్తుంది: {{remaining}}"
     },
     "changelog": {
       "title": "కొత్తగా ఏముంది",
@@ -996,7 +998,7 @@
         "stalledTitle": "ఏదో నిలిచిపోయింది",
         "stalledBody": "మేము {{name}}ను సెటప్ చేయడం పూర్తి చేయలేకపోయాము. మళ్లీ ప్రయత్నించండి, లేదా ఇది పునరావృతమైతే hi@kilo.aiకు ఇమెయిల్ చేయండి.",
         "timeoutTitle": "అంచనా కంటే ఎక్కువ సమయం తీసుకుంటోంది",
-        "timeoutBody": "{{name}} కోసం సెటప్ సాధారణం కంటే ఎక్కువ సమయం తీసుకుంటోంది ({{minutes}} నిమిషాలకు పైగా).",
+        "timeoutBody": "{{name}} కోసం సెటప్ సాధారణం కంటే ఎక్కువ సమయం తీసుకుంటోంది ({{displayMinutes}} నిమిషాలకు పైగా).",
         "continueInBackground": "నేపథ్యంలో కొనసాగించండి",
         "settingUp": "{{name}}ను సెటప్ చేస్తోంది",
         "finishingSetup": "సెటప్ పూర్తి చేస్తోంది",
@@ -1287,7 +1289,7 @@
       "mergeGate": "మెర్జ్ గేట్",
       "repositories": "రిపోజిటరీలు",
       "allRepositories": "అన్ని రిపోజిటరీలు",
-      "nSelected": "{{count}} ఎంచుకున్నారు",
+      "nSelected": "{{displayCount}} ఎంచుకున్నారు",
       "reviewMemory": "సమీక్ష మెమరీ",
       "proposedReviewMdGuidance": "ప్రతిపాదించిన REVIEW.md మార్గదర్శకత్వం"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "విశ్లేషించబడింది",
       "exploitabilityReasoning": "దుర్వినియోగ సామర్థ్య హేతుబద్ధీకరణ",
       "suggestedFix": "సూచించిన పరిష్కారం",
-      "whereFound": "ఇది ఎక్కడ కనుగొనబడింది ({{count}})",
+      "whereFound": "ఇది ఎక్కడ కనుగొనబడింది ({{displayCount}})",
       "fullReport": "పూర్తి రూపొందించిన నివేదిక",
       "unknown": "తెలియదు",
       "yes": "అవును",
       "no": "లేదు"
     },
     "dashboard": {
-      "findingsCount": "{{count}} ఫలితాలు",
+      "findingsCount": "{{displayCount}} ఫలితాలు",
       "notMeasured": "కొలవలేదు",
       "actFirst": "ముందుగా చర్య తీసుకోండి",
       "slaPosture": "SLA భంగిమ",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "రిపోజిటరీ చర్య ప్రణాళిక",
       "noOpenFindings": "దృష్టి అవసరమయ్యే తెరిచిన ఫలితాలు లేవు",
       "deadlineToday": "గడువు ఈరోజే చేరుకుంది",
-      "daysOverdue": "{{count}} రోజులు గడువు దాటాయి",
+      "daysOverdue": "{{displayCount}} రోజులు గడువు దాటాయి",
       "withinDeadline": "గడువులోపు",
       "criticalOverdue": "క్లిష్టమైనవి గడువు దాటాయి",
       "highOverdue": "అధికమైనవి గడువు దాటాయి",
@@ -1434,6 +1436,27 @@
       "syncNow": "ఇప్పుడే సింక్ చేయండి",
       "syncQueued": "సింక్ క్యూలో ఉంది",
       "syncStatusUnavailable": "సింక్ స్థితి అందుబాటులో లేదు"
+    },
+    "dashboardMetrics": {
+      "openFindings": "తెరిచిన ఫలితాలు",
+      "openFindingsDetail": "{{critical}} క్లిష్టమైనవి, {{high}} అధికమైనవి",
+      "confirmedExploitable": "దుర్వినియోగం చేయదగినదిగా నిర్ధారించబడింది",
+      "confirmedExploitableDetail": "ప్రాజెక్ట్ ప్రమాదం విశ్లేషణ ద్వారా నిర్ధారించబడింది",
+      "needsReview": "మీ సమీక్ష అవసరం",
+      "needsReviewDetail": "మానవ నిర్ణయం అవసరం",
+      "analysisIncomplete": "విశ్లేషణ పూర్తి కాలేదు",
+      "analysisIncompleteDetail": "ప్రాజెక్ట్ ప్రమాదం ఇంకా తెలియదు",
+      "slaCompliance": "SLA సమ్మతి",
+      "notMeasured": "కొలవలేదు",
+      "withinDeadlineDetail": "{{total}} లో {{within}} గడువులోపు",
+      "noDeadlineData": "ఏ ఫలితాలకూ ఇంకా SLA గడువు లేదు",
+      "deadlinePassed": "గడువు దాటిపోయింది",
+      "deadlinePassedDetail": "{{critical}} క్లిష్టమైనవి, {{high}} అధికమైనవి",
+      "dueThisWeek": "ఈ వారం గడువు",
+      "dueThisWeekDetail": "{{exploitable}} దుర్వినియోగం చేయదగినవిగా నిర్ధారించబడ్డాయి",
+      "noDeadline": "గడువు లేదు",
+      "reviewSlaAssignment": "SLA కేటాయింపును సమీక్షించండి",
+      "allOpenFindingsTracked": "అన్ని తెరిచిన ఫలితాలు ట్రాక్ చేయబడతాయి"
     },
     "dismiss": {
       "title": "ఫలితాన్ని తీసివేయండి",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}} విశ్లేషణ",
       "automation": "ఆటోమేషన్",
       "automationAllOff": "అన్నీ ఆఫ్",
-      "automationCount": "{{count}} / 3 ప్రారంభించబడింది",
+      "automationCount": "{{displayCount}} / 3 ప్రారంభించబడింది",
       "notifications": "నోటిఫికేషన్‌లు",
-      "notificationsCount": "{{count}} / 2 ప్రారంభించబడింది",
+      "notificationsCount": "{{displayCount}} / 2 ప్రారంభించబడింది",
       "slaPolicy": "SLA విధానం",
       "disabledNoManage": "సెక్యూరిటీ ఏజెంట్ నిలిపివేయబడింది. సంస్థ యజమానులు మరియు బిల్లింగ్ మేనేజర్లు మాత్రమే దీన్ని ఆన్ చేయగలరు.",
       "disabledNoRepo": "సెక్యూరిటీ ఏజెంట్‌ను ప్రారంభించే ముందు కనీసం ఒక రిపోజిటరీని ఎంచుకోండి.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "పుల్ రిక్వెస్ట్ తెరవండి{{number}}",
       "openDraftPullRequest": "డ్రాఫ్ట్ పుల్ రిక్వెస్ట్ తెరవండి{{number}}",
       "progress": "పురోగతి",
-      "attemptHistory": "ప్రయత్న చరిత్ర ({{count}})",
+      "attemptHistory": "ప్రయత్న చరిత్ర ({{displayCount}})",
       "attemptNumber": "ప్రయత్నం #{{number}}",
       "startedBy": "ప్రారంభించినవారు",
       "model": "మోడల్",
@@ -1855,9 +1878,9 @@
       "toolTask": "టాస్క్",
       "readTodos": "టోడోలను చదవండి",
       "updateTodos": "టోడోలను నవీకరించండి",
-      "linesBadge": "{{count}} పంక్తులు",
-      "filesBadge": "{{count}} ఫైల్స్",
-      "matchesBadge": "{{count}} సరిపోలికలు"
+      "linesBadge": "{{displayCount}} పంక్తులు",
+      "filesBadge": "{{displayCount}} ఫైల్స్",
+      "matchesBadge": "{{displayCount}} సరిపోలికలు"
     },
     "readToolMarkdown": {
       "linesTruncated": "పంక్తులు {{start}}–{{end}} (ట్రంకేట్ చేయబడింది)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "ఈ ప్రతిస్పందనను నివేదించలేము.",
       "reportAiResponseSubmitted": "నివేదిక సమర్పించబడింది. రసీదు {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "వివరాలు అందుబాటులో లేవు",
       "textDisplay": "టెక్స్ట్ ప్రదర్శన",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "సిద్ధత పూర్తయింది",
       "preparationFailed": "సిద్ధత విఫలమైంది",
       "setupCommand": "సెటప్ కమాండ్ {{index}}",
-      "setupCommandOf": "సెటప్ కమాండ్ {{index}} / {{count}}"
+      "setupCommandOf": "సెటప్ కమాండ్ {{index}} / {{displayCount}}"
     },
     "permissionCard": {
       "title": "అనుమతి అవసరం",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "సమర్పణ విఫలమైంది. దయచేసి మళ్లీ ప్రయత్నించండి.",
       "questionAnnouncement": "ఏజెంట్కు మీ ఇన్పుట్ అవసరం. మీరు సమాధానం ఇచ్చే వరకు కంపోజర్ పాజ్ చేయబడుతుంది.",
       "permissionAnnouncement": "కొనసాగడానికి ఏజెంట్కు అనుమతి అవసరం. మీరు నిర్ణయించే వరకు కంపోజర్ పాజ్ చేయబడుతుంది.",
-      "positionHint": "({{count}}లో 1)",
+      "positionHint": "({{displayCount}}లో 1)",
       "movedPastPrompt": "ఏజెంట్ ఈ ప్రాంప్ట్ దాటి కదిలింది. సెషన్ కొనసాగినప్పుడు ఈ కార్డ్ మూసివేయబడుతుంది.",
       "waitingForAnswer": "ఏజెంట్ మీ సమాధానం కోసం వేచి ఉంది. ఈ ప్రశ్న తెరిచి ఉన్నప్పుడు, ఏజెంట్కు మీ సందేశం పాజ్ చేయబడుతుంది.",
       "waitingForPermission": "ఏజెంట్ అనుమతి కోసం వేచి ఉంది. ఈ అభ్యర్థన తెరిచి ఉన్నప్పుడు, ఏజెంట్కు మీ సందేశం పాజ్ చేయబడుతుంది."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "కెమెరా యాక్సెస్ నిలిపివేయబడింది",
       "cameraAccessMessage": "ఫోటో తీయడానికి సెట్టింగ్లలో కెమెరా యాక్సెస్ను అనుమతించండి.",
       "couldNotOpenPhotoPicker": "ఫోటో పికర్ను తెరవలేకపోయాము. Kiloని పునఃప్రారంభించి మళ్లీ ప్రయత్నించండి.",
-      "maxFilesAllowed": "గరిష్టంగా {{count}} ఫైల్లు అనుమతించబడతాయి",
+      "maxFilesAllowed": "గరిష్టంగా {{displayCount}} ఫైల్లు అనుమతించబడతాయి",
       "onlyAddingFiles": "{{total}} ఫైల్లలో {{accepted}} మాత్రమే జోడిస్తోంది (గరిష్టం {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "ఖర్చు {{cost}}",
       "costSuffix": ", ఖర్చు {{cost}}",
       "tokensWindowUnavailable": "సందర్భం {{used}} టోకెన్లు, విండో అందుబాటులో లేదు",
-      "tokensUsage": "సందర్భం {{window}} టోకెన్లలో {{used}} ఉపయోగించబడింది, {{percentage}}% ఉపయోగించబడింది",
+      "tokensUsage": "సందర్భం {{window}} టోకెన్లలో {{used}} ఉపయోగించబడింది, {{percentage}} ఉపయోగించబడింది",
       "title": "సందర్భ వినియోగం",
       "used": "ఉపయోగించబడింది",
       "remaining": "మిగిలి ఉంది",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "వినియోగం తాజా పూర్తయిన సహాయక ప్రతిస్పందనను ప్రతిబింబిస్తుంది.",
       "tokenUsage": "టోకెన్ వినియోగం",
       "cacheRate": "క్యాష్ రేటు",
-      "modelsCount": "మోడల్లు ({{count}})",
+      "modelsCount": "మోడల్లు ({{displayCount}})",
       "tokenTotalsNote": "టోకెన్ మొత్తాలు ఈ సెషన్కు మాత్రమే వర్తిస్తాయి మరియు సబ్ఏజెంట్/చైల్డ్-సెషన్ టోకెన్లను మినహాయిస్తాయి.",
       "subagents": "సబ్ఏజెంట్లు",
       "subagentsDescription": "చైల్డ్ సెషన్ల నుండి అవశేష ఖర్చు",
@@ -2373,7 +2400,7 @@
     "connectedCli": "కనెక్ట్ అయిన CLIలో",
     "newSessionOn": "{{name}}లో కొత్త సెషన్",
     "noMatchingSessions": "సరిపోలే సెషన్లు లేవు.",
-    "onlyFirstFilesAttached": "మొదటి {{count}} ఫైల్లు మాత్రమే అటాచ్ చేయబడతాయి.",
+    "onlyFirstFilesAttached": "మొదటి {{displayCount}} ఫైల్లు మాత్రమే అటాచ్ చేయబడతాయి.",
     "staleMessage": "ఈ భాగస్వామ్యం ఇక అందుబాటులో లేదు.",
     "retryableMessage": "మీ సెషన్లను లోడ్ చేయలేకపోయాము.",
     "emptyMessage": "ఇంకా సెషన్లు లేవు — దీన్ని పంపడానికి కొత్తదాన్ని ప్రారంభించండి.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "ఈ యాపిల్ ఖాతాలోని Kilo Pass వేరే Kilo ఖాతాకు చెందుతుంది. దాన్ని నిర్వహించడానికి ఆ Kilo ఖాతాతో సైన్ ఇన్ చేయండి.",
     "alreadySubscribed": "మీకు ఇప్పటికే Kilo Pass చందా ఉంది.",
     "purchaseUnavailable": "Kilo Pass కొనుగోలు ప్రస్తుతం అందుబాటులో లేదు.",
-    "tierCredits": "${{amount}} క్రెడిట్లు",
+    "tierCredits": "{{amount}} క్రెడిట్లు",
     "perMonth": "{{price}}/నెల",
     "verifyPurchaseFailed": "మీ కొనుగోలును ధృవీకరించలేకపోయాము. మీ కనెక్షన్ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
     "productsCouldNotLoad": "యాప్ స్టోర్ నుండి Kilo Pass ఉత్పత్తులను లోడ్ చేయలేకపోయాము.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "యాప్ స్టోర్ చందా నిర్వహణను తెరవడంలో విఫలమైంది.",
     "kiloPassSetup": "Kilo Pass సెటప్",
     "subscriptionHeaderDescription": "Kilo యాప్లో AI కోడింగ్ సెషన్లను నడపడానికి — క్లౌడ్ ఏజెంట్లు, రిమోట్ సెషన్లు మరియు KiloClaw చాట్లు — మీ Kilo బ్యాలెన్స్కు క్రెడిట్లను జోడించే నెలవారీ చందా.",
-    "tierDescription": "Kilo యాప్ వినియోగం కోసం ${{price}} చెల్లించిన క్రెడిట్లు నెలవారీగా జోడించబడతాయి.",
+    "tierDescription": "Kilo యాప్ వినియోగం కోసం {{price}} చెల్లించిన క్రెడిట్లు నెలవారీగా జోడించబడతాయి.",
     "subscribe": "చందాదారుడిగా చేరండి",
     "subscribeDescription": "బోనస్ ప్రోగ్రెస్తో నెలవారీ క్రెడిట్లు",
     "manage": "నిర్వహించండి",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass పెండింగ్",
     "statusCanceling": "Kilo Pass రద్దు అవుతోంది",
     "statusPastDue": "Kilo Pass వాయిదా ఆలస్యం",
-    "monthlyCredits": "${{credits}} నెలవారీ క్రెడిట్లు",
+    "monthlyCredits": "{{credits}} నెలవారీ క్రెడిట్లు",
     "ends": "{{date}}న ముగుస్తుంది",
     "periodEnd": "కాల ముగింపు",
     "managedOnGooglePlay": "Google Playలో నిర్వహించబడుతుంది",

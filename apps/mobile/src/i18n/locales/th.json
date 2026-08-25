@@ -206,11 +206,11 @@
       "loadingLines": "กำลังโหลด {{loaded}} จาก {{total}} บรรทัด…",
       "expandContext": "ขยายบริบท",
       "expandMoreContext": "ขยายบริบทเพิ่มเติม",
-      "expandLines": "ขยาย {{count}} บรรทัด ({{start}}–{{end}})",
-      "expandMoreLines": "ขยายเพิ่มอีก {{count}} บรรทัด ({{start}}–{{end}})",
-      "expandLinesOfContext": "ขยายบริบท {{count}} บรรทัด",
+      "expandLines": "ขยาย {{displayCount}} บรรทัด ({{start}}–{{end}})",
+      "expandMoreLines": "ขยายเพิ่มอีก {{displayCount}} บรรทัด ({{start}}–{{end}})",
+      "expandLinesOfContext": "ขยายบริบท {{displayCount}} บรรทัด",
       "expandAll": "ขยายทั้งหมด",
-      "expandAllLines": "ขยายทั้งหมด {{count}} บรรทัด",
+      "expandAllLines": "ขยายทั้งหมด {{displayCount}} บรรทัด",
       "loadingMoreFiles": "กำลังโหลดไฟล์เพิ่ม…",
       "retryLoadingNextPage": "ลองโหลดหน้าถัดไปอีกครั้ง",
       "failedToLoadMoreFiles": "โหลดไฟล์เพิ่มไม่สำเร็จ — แตะเพื่อลองอีกครั้ง",
@@ -301,7 +301,7 @@
       "closeReactions": "ปิดปฏิกิริยา",
       "reactionsTitle": "ปฏิกิริยา",
       "addReaction": "เพิ่มปฏิกิริยา",
-      "reactionPill": "{{emoji}} ปฏิกิริยา, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} ปฏิกิริยา, {{displayCount}} {{countLabel}}",
       "reaction_one": "ปฏิกิริยา",
       "reaction": "ปฏิกิริยา",
       "reaction_other": "ปฏิกิริยา",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "ไม่มีเธรดรีวิวหรือความคิดเห็นการสนทนาใน pull request นี้",
       "reviewFiles": "รีวิวไฟล์",
       "quotedDiffSnippet": "ส่วนย่อย diff ที่อ้างอิง",
-      "moreLinesAbove": "… {{count}} บรรทัดเพิ่มเติมด้านบน",
+      "moreLinesAbove": "… {{displayCount}} บรรทัดเพิ่มเติมด้านบน",
       "termsAcceptRequired": "คุณต้องยอมรับข้อกำหนดในการให้บริการก่อนจึงจะโพสต์ได้",
       "termsOutdatedCopy": "ข้อกำหนดในการให้บริการมีการเปลี่ยนแปลง เปิดหน้าจอนี้อีกครั้งเพื่อยอมรับเวอร์ชันล่าสุด",
       "termsCheckRetryCopy": "ไม่สามารถตรวจสอบข้อกำหนดในการให้บริการได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง"
@@ -395,11 +395,11 @@
       "retryChecks": "ลองตรวจสอบอีกครั้ง",
       "viewOnGitHub": "ดู PR บน GitHub",
       "noChecksReported": "ไม่มีการรายงานการตรวจสอบ",
-      "passed": "{{count}} ผ่าน",
-      "failed": "{{count}} ล้มเหลว",
-      "pending": "{{count}} รอดำเนินการ",
-      "skipped": "{{count}} ข้าม",
-      "checksCount": "{{count}} การตรวจสอบ",
+      "passed": "{{displayCount}} ผ่าน",
+      "failed": "{{displayCount}} ล้มเหลว",
+      "pending": "{{displayCount}} รอดำเนินการ",
+      "skipped": "{{displayCount}} ข้าม",
+      "checksCount": "{{displayCount}} การตรวจสอบ",
       "checkDetails": "รายละเอียดการตรวจสอบ",
       "pullRequest": "pull request"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "ความคิดเห็นที่รอดำเนินการ",
       "pendingComment": "ความคิดเห็นที่รอดำเนินการ",
       "pendingComment_other": "ความคิดเห็นที่รอดำเนินการ",
-      "submitCountOfTotal": "ส่ง {{freshCount}} จาก {{totalCount}} ความคิดเห็น",
+      "submitCountOfTotal": "ส่ง {{displayFreshCount}} จาก {{displayTotalCount}} ความคิดเห็น",
       "submitReview": "ส่งรีวิว",
-      "partialPostedMessage": "โพสต์ {{freshCount}} ความคิดเห็นแล้ว {{staleCount}} ความคิดเห็นชี้ไปที่ commit ที่เก่ากว่าและยังอยู่ในคิวของคุณ"
+      "partialPostedMessage": "โพสต์ {{displayFreshCount}} ความคิดเห็นแล้ว {{displayStaleCount}} ความคิดเห็นชี้ไปที่ commit ที่เก่ากว่าและยังอยู่ในคิวของคุณ"
     },
     "reconnectNotice": {
       "title": "การเชื่อมต่อ GitHub หมดอายุแล้ว",
@@ -580,7 +580,8 @@
     "agents": "เอเจนต์",
     "profile": "โปรไฟล์",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, แท็บ, {{position}} จาก {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "ล่าสุด",
       "common": "ทั่วไป",
       "reactWith": "แสดงปฏิกิริยา {{reaction}}",
-      "accessibility": "{{emoji}} ปฏิกิริยา, {{count}}"
+      "accessibility": "{{emoji}} ปฏิกิริยา, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "กำลังตอบกลับ",
@@ -650,7 +651,7 @@
       "imageUnavailable": "ไม่สามารถแสดงรูปภาพได้",
       "openFailed": "ไม่สามารถเปิดไฟล์แนบได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
       "attachFailed": "แนบไฟล์ไม่สำเร็จ",
-      "limit": "คุณสามารถแนบได้สูงสุด {{count}} ไฟล์",
+      "limit": "คุณสามารถแนบได้สูงสุด {{displayCount}} ไฟล์",
       "sizeRejection": "{{filename}} เกินขีดจำกัดการแนบ {{limit}}",
       "unreadable": "ไม่สามารถอ่าน {{filename}} ได้",
       "pastedImage": "รูปภาพที่วาง",
@@ -722,6 +723,7 @@
       "finalTermEnds": "สิ้นสุดเทอมสุดท้าย",
       "afterFinalTerm": "หลังเทอมสุดท้าย",
       "remaining": "คงเหลือ",
+      "lessThanOneDay": "น้อยกว่า 1 วัน",
       "ends": "สิ้นสุด",
       "expires": "หมดอายุ",
       "noActivePlan": "ไม่มีแพ็กเกจที่ใช้งาน",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "ราคารายเดือน Standard ของคุณ",
       "perMonth": "/เดือน",
       "earlybirdAccessUntil": "การเข้าถึง Earlybird จนถึง {{date}}",
-      "earlybirdEnding": "Earlybird จะสิ้นสุด: เหลือ {{days}} วัน",
+      "earlybirdEnding": "Earlybird จะสิ้นสุด: เหลือ {{remaining}} วัน",
       "paymentPastDue": "การชำระเงินค้างชำระ โปรดอัปเดตวิธีชำระเงินของคุณ",
       "subscriptionCancels": "การสมัครสมาชิกจะยกเลิกใน {{date}}",
-      "trialDaysRemaining": "ทดลองใช้: เหลือ {{days}} วัน",
-      "trialEndingSoon": "ทดลองใช้จะสิ้นสุดเร็วๆ นี้: {{days}}"
+      "trialDaysRemaining": "ทดลองใช้: เหลือ {{remaining}} วัน",
+      "trialEndingSoon": "ทดลองใช้จะสิ้นสุดเร็วๆ นี้: {{remaining}}"
     },
     "changelog": {
       "title": "มีอะไรใหม่",
@@ -996,7 +998,7 @@
         "stalledTitle": "มีบางอย่างติดขัด",
         "stalledBody": "เราไม่สามารถติดตั้ง {{name}} ให้เสร็จสิ้นได้ ลองอีกครั้งหรืออีเมล hi@kilo.ai หากเกิดซ้ำ",
         "timeoutTitle": "ใช้เวลานานกว่าที่คาดไว้",
-        "timeoutBody": "การติดตั้งสำหรับ {{name}} ใช้เวลานานกว่าปกติ (มากกว่า {{minutes}} นาที)",
+        "timeoutBody": "การติดตั้งสำหรับ {{name}} ใช้เวลานานกว่าปกติ (มากกว่า {{displayMinutes}} นาที)",
         "continueInBackground": "ดำเนินการต่อในพื้นหลัง",
         "settingUp": "กำลังติดตั้ง {{name}}",
         "finishingSetup": "กำลังติดตั้งเสร็จสิ้น",
@@ -1287,7 +1289,7 @@
       "mergeGate": "เกตการผสาน",
       "repositories": "ที่เก็บ",
       "allRepositories": "ที่เก็บทั้งหมด",
-      "nSelected": "เลือก {{count}} รายการ",
+      "nSelected": "เลือก {{displayCount}} รายการ",
       "reviewMemory": "หน่วยความจำการตรวจสอบ",
       "proposedReviewMdGuidance": "แนวทาง REVIEW.md ที่เสนอ"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "วิเคราะห์แล้ว",
       "exploitabilityReasoning": "เหตุผลความสามารถในการโจมตี",
       "suggestedFix": "วิธีแก้ไขที่แนะนำ",
-      "whereFound": "ตำแหน่งที่พบนี้ ({{count}})",
+      "whereFound": "ตำแหน่งที่พบนี้ ({{displayCount}})",
       "fullReport": "รายงานที่สร้างอย่างครบถ้วน",
       "unknown": "ไม่ทราบ",
       "yes": "ใช่",
       "no": "ไม่"
     },
     "dashboard": {
-      "findingsCount": "{{count}} findings",
+      "findingsCount": "{{displayCount}} findings",
       "notMeasured": "ไม่ได้วัด",
       "actFirst": "ดำเนินการก่อน",
       "slaPosture": "ท่าที SLA",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "แผนการดำเนินการของ repository",
       "noOpenFindings": "ไม่มี findings ที่เปิดอยู่ต้องให้ความสนใจ",
       "deadlineToday": "ถึงกำหนดเวลาวันนี้",
-      "daysOverdue": "เลยกำหนด {{count}} วัน",
+      "daysOverdue": "เลยกำหนด {{displayCount}} วัน",
       "withinDeadline": "ภายในกำหนดเวลา",
       "criticalOverdue": "วิกฤตเกินกำหนด",
       "highOverdue": "สูงเกินกำหนด",
@@ -1434,6 +1436,27 @@
       "syncNow": "ซิงค์ตอนนี้",
       "syncQueued": "การซิงค์ถูกจัดคิว",
       "syncStatusUnavailable": "ไม่มีสถานะการซิงค์"
+    },
+    "dashboardMetrics": {
+      "openFindings": "findings ที่เปิดอยู่",
+      "openFindingsDetail": "วิกฤต {{critical}}, สูง {{high}}",
+      "confirmedExploitable": "ยืนยันว่าโจมตีได้",
+      "confirmedExploitableDetail": "ยืนยันความเสี่ยงของโปรเจกต์โดยการวิเคราะห์",
+      "needsReview": "ต้องให้คุณตรวจสอบ",
+      "needsReviewDetail": "ต้องใช้การตัดสินใจของมนุษย์",
+      "analysisIncomplete": "การวิเคราะห์ไม่สมบูรณ์",
+      "analysisIncompleteDetail": "ความเสี่ยงของโปรเจกต์ยังไม่ทราบ",
+      "slaCompliance": "การปฏิบัติตาม SLA",
+      "notMeasured": "ไม่ได้วัด",
+      "withinDeadlineDetail": "{{within}} จาก {{total}} ภายในกำหนดเวลา",
+      "noDeadlineData": "ยังไม่มี findings ใดมีกำหนดเวลา SLA",
+      "deadlinePassed": "เลยกำหนดเวลา",
+      "deadlinePassedDetail": "วิกฤต {{critical}}, สูง {{high}}",
+      "dueThisWeek": "ถึงกำหนดสัปดาห์นี้",
+      "dueThisWeekDetail": "{{exploitable}} ยืนยันว่าโจมตีได้",
+      "noDeadline": "ไม่มีกำหนดเวลา",
+      "reviewSlaAssignment": "ตรวจสอบการกำหนด SLA",
+      "allOpenFindingsTracked": "ติดตาม findings ที่เปิดอยู่ทั้งหมด"
     },
     "dismiss": {
       "title": "ละเว้น finding",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "การวิเคราะห์แบบ {{mode}}",
       "automation": "ระบบอัตโนมัติ",
       "automationAllOff": "ปิดทั้งหมด",
-      "automationCount": "เปิด {{count}} จาก 3",
+      "automationCount": "เปิด {{displayCount}} จาก 3",
       "notifications": "การแจ้งเตือน",
-      "notificationsCount": "เปิด {{count}} จาก 2",
+      "notificationsCount": "เปิด {{displayCount}} จาก 2",
       "slaPolicy": "นโยบาย SLA",
       "disabledNoManage": "Security Agent ถูกปิดใช้งาน เฉพาะเจ้าขององค์กรและผู้จัดการบิลลิ่งเท่านั้นที่สามารถเปิดได้",
       "disabledNoRepo": "เลือกอย่างน้อยหนึ่ง repository ก่อนเปิดใช้งาน Security Agent",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "เปิด pull request{{number}}",
       "openDraftPullRequest": "เปิด draft pull request{{number}}",
       "progress": "ความคืบหน้า",
-      "attemptHistory": "ประวัติการพยายาม ({{count}})",
+      "attemptHistory": "ประวัติการพยายาม ({{displayCount}})",
       "attemptNumber": "การพยายาม #{{number}}",
       "startedBy": "เริ่มโดย",
       "model": "โมเดล",
@@ -1855,9 +1878,9 @@
       "toolTask": "task",
       "readTodos": "อ่าน todos",
       "updateTodos": "อัปเดต todos",
-      "linesBadge": "{{count}} บรรทัด",
-      "filesBadge": "{{count}} ไฟล์",
-      "matchesBadge": "{{count}} รายการที่ตรงกัน"
+      "linesBadge": "{{displayCount}} บรรทัด",
+      "filesBadge": "{{displayCount}} ไฟล์",
+      "matchesBadge": "{{displayCount}} รายการที่ตรงกัน"
     },
     "readToolMarkdown": {
       "linesTruncated": "บรรทัด {{start}}–{{end}} (ถูกตัดทอน)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "การตอบสนองนี้ไม่สามารถรายงานได้",
       "reportAiResponseSubmitted": "ส่งรายงานแล้ว ใบเสร็จ {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "ไม่มีรายละเอียด",
       "textDisplay": "การแสดงข้อความ",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "เตรียมเสร็จสิ้น",
       "preparationFailed": "การเตรียมล้มเหลว",
       "setupCommand": "คำสั่งตั้งค่า {{index}}",
-      "setupCommandOf": "คำสั่งตั้งค่า {{index}} จาก {{count}}"
+      "setupCommandOf": "คำสั่งตั้งค่า {{index}} จาก {{displayCount}}"
     },
     "permissionCard": {
       "title": "ต้องมีสิทธิ์",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "การส่งล้มเหลว กรุณาลองอีกครั้ง",
       "questionAnnouncement": "เอเจนต์ต้องการข้อมูลจากคุณ ตัวแก้ไขถูกหยุดชั่วคราวในระหว่างที่คุณตอบ",
       "permissionAnnouncement": "เอเจนต์ต้องได้รับสิทธิ์เพื่อดำเนินการต่อ ตัวแก้ไขถูกหยุดชั่วคราวในระหว่างที่คุณตัดสินใจ",
-      "positionHint": "(1 จาก {{count}})",
+      "positionHint": "(1 จาก {{displayCount}})",
       "movedPastPrompt": "เอเจนต์ได้เลยผ่านข้อความนี้ไปแล้ว การ์ดนี้จะปิดเมื่อเซสชันดำเนินต่อไป",
       "waitingForAnswer": "เอเจนต์กำลังรอคำตอบของคุณ ในขณะที่คำถามนี้ยังเปิดอยู่ ข้อความของคุณถึงเอเจนต์จะถูกหยุดชั่วคราว",
       "waitingForPermission": "เอเจนต์กำลังรอสิทธิ์ ในขณะที่คำขอนี้ยังเปิดอยู่ ข้อความของคุณถึงเอเจนต์จะถูกหยุดชั่วคราว"
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "การเข้าถึงกล้องถูกปิดใช้งาน",
       "cameraAccessMessage": "อนุญาตการเข้าถึงกล้องในการตั้งค่าเพื่อถ่ายภาพ",
       "couldNotOpenPhotoPicker": "เปิดตัวเลือกรูปภาพไม่สำเร็จ รีสตาร์ท Kilo แล้วลองอีกครั้ง",
-      "maxFilesAllowed": "อนุญาตไฟล์สูงสุด {{count}} ไฟล์",
+      "maxFilesAllowed": "อนุญาตไฟล์สูงสุด {{displayCount}} ไฟล์",
       "onlyAddingFiles": "กำลังเพิ่ม {{accepted}} จาก {{total}} ไฟล์เท่านั้น (สูงสุด {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "ค่าใช้จ่าย {{cost}}",
       "costSuffix": ", ค่าใช้จ่าย {{cost}}",
       "tokensWindowUnavailable": "บริบท {{used}} โทเคน ไม่ทราบหน้าต่าง",
-      "tokensUsage": "บริบท {{used}} จาก {{window}} โทเคน ใช้ {{percentage}}%",
+      "tokensUsage": "บริบท {{used}} จาก {{window}} โทเคน ใช้ {{percentage}}",
       "title": "การใช้บริบท",
       "used": "ใช้แล้ว",
       "remaining": "คงเหลือ",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "การใช้งานสะท้อนถึงคำตอบผู้ช่วยที่เสร็จสมบูรณ์ล่าสุด",
       "tokenUsage": "การใช้โทเคน",
       "cacheRate": "อัตราแคช",
-      "modelsCount": "โมเดล ({{count}})",
+      "modelsCount": "โมเดล ({{displayCount}})",
       "tokenTotalsNote": "ยอดรวมโทเคนครอบคลุมเฉพาะเซสชันนี้เท่านั้น และไม่รวมโทเคนของเซสชันซับ/ย่อย",
       "subagents": "ซับเอเจนต์",
       "subagentsDescription": "ค่าใช้จ่ายคงเหลือจากเซสชันย่อย",
@@ -2373,7 +2400,7 @@
     "connectedCli": "บน CLI ที่เชื่อมต่ออยู่",
     "newSessionOn": "เซสชันใหม่บน {{name}}",
     "noMatchingSessions": "ไม่มีเซสชันที่ตรงกัน",
-    "onlyFirstFilesAttached": "เฉพาะ {{count}} ไฟล์แรกเท่านั้นที่จะถูกแนบ",
+    "onlyFirstFilesAttached": "เฉพาะ {{displayCount}} ไฟล์แรกเท่านั้นที่จะถูกแนบ",
     "staleMessage": "การแชร์นี้ไม่พร้อมใช้งานอีกต่อไป",
     "retryableMessage": "โหลดเซสชันของคุณไม่สำเร็จ",
     "emptyMessage": "ยังไม่มีเซสชัน — เริ่มเซสชันใหม่เพื่อส่งสิ่งนี้",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Kilo Pass ใน Apple Account นี้เป็นของบัญชี Kilo อื่น ลงชื่อเข้าใช้บัญชี Kilo นั้นเพื่อจัดการ",
     "alreadySubscribed": "คุณมีการสมัครสมาชิก Kilo Pass อยู่แล้ว",
     "purchaseUnavailable": "การซื้อ Kilo Pass ไม่พร้อมใช้งานในขณะนี้",
-    "tierCredits": "เครดิต ${{amount}}",
+    "tierCredits": "เครดิต {{amount}}",
     "perMonth": "{{price}}/เดือน",
     "verifyPurchaseFailed": "ยืนยันการซื้อของคุณไม่สำเร็จ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
     "productsCouldNotLoad": "โหลดผลิตภัณฑ์ Kilo Pass จาก App Store ไม่สำเร็จ",
@@ -2417,7 +2444,7 @@
     "manageFailed": "เปิดการจัดการการสมัครสมาชิก App Store ไม่สำเร็จ",
     "kiloPassSetup": "การตั้งค่า Kilo Pass",
     "subscriptionHeaderDescription": "การสมัครสมาชิกรายเดือนที่เพิ่มเครดิตให้กับยอดคงเหลือ Kilo ของคุณสำหรับการรันเซสชันการเขียนโค้ด AI ใน Kilo App — Cloud Agents, เซสชันระยะไกล และการแชท KiloClaw",
-    "tierDescription": "เครดิตที่ชำระแล้ว ${{price}} ถูกเพิ่มรายเดือนสำหรับการใช้งาน Kilo App",
+    "tierDescription": "เครดิตที่ชำระแล้ว {{price}} ถูกเพิ่มรายเดือนสำหรับการใช้งาน Kilo App",
     "subscribe": "สมัครสมาชิก",
     "subscribeDescription": "เครดิตรายเดือนพร้อมความคืบหน้าโบนัส",
     "manage": "จัดการ",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass รอดำเนินการ",
     "statusCanceling": "Kilo Pass กำลังยกเลิก",
     "statusPastDue": "Kilo Pass ค้างชำระ",
-    "monthlyCredits": "เครดิต ${{credits}} ต่อเดือน",
+    "monthlyCredits": "เครดิต {{credits}} ต่อเดือน",
     "ends": "สิ้นสุด {{date}}",
     "periodEnd": "สิ้นสุดงวด",
     "managedOnGooglePlay": "จัดการบน Google Play",

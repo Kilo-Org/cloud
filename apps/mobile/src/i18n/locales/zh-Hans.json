@@ -201,7 +201,8 @@
     "agents": "代理",
     "profile": "个人资料",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}，标签页，{{total}} 中的第 {{position}} 个"
   },
   "chat": {
     "instancePicker": {
@@ -242,7 +243,7 @@
       "recent": "最近",
       "common": "常用",
       "reactWith": "使用 {{reaction}} 回应",
-      "accessibility": "{{emoji}} 回应，{{count}}"
+      "accessibility": "{{emoji}} 回应，{{displayCount}}"
     },
     "composer": {
       "replyingTo": "回复",
@@ -271,7 +272,7 @@
       "imageUnavailable": "图片不可用",
       "openFailed": "无法打开附件。请检查网络连接后重试。",
       "attachFailed": "附加文件失败",
-      "limit": "最多可附加 {{count}} 个文件。",
+      "limit": "最多可附加 {{displayCount}} 个文件。",
       "sizeRejection": "{{filename}} 超出了 {{limit}} 的附件大小限制。",
       "unreadable": "无法读取 {{filename}}。",
       "pastedImage": "粘贴的图片",
@@ -343,6 +344,7 @@
       "finalTermEnds": "最终期限结束",
       "afterFinalTerm": "最终期限之后",
       "remaining": "剩余",
+      "lessThanOneDay": "不到 1 天",
       "ends": "结束",
       "expires": "到期",
       "noActivePlan": "没有生效的方案",
@@ -361,11 +363,11 @@
       "yourStandardMonthlyPrice": "您的 Standard 月费",
       "perMonth": "/月",
       "earlybirdAccessUntil": "Earlybird 访问至 {{date}}",
-      "earlybirdEnding": "Earlybird 即将结束：剩余 {{days}} 天",
+      "earlybirdEnding": "Earlybird 即将结束：剩余 {{remaining}} 天",
       "paymentPastDue": "付款已逾期。请更新您的付款方式。",
       "subscriptionCancels": "订阅将于 {{date}} 取消",
-      "trialDaysRemaining": "试用：剩余 {{days}} 天",
-      "trialEndingSoon": "试用即将结束：{{days}}"
+      "trialDaysRemaining": "试用：剩余 {{remaining}} 天",
+      "trialEndingSoon": "试用即将结束：{{remaining}}"
     },
     "changelog": {
       "title": "新功能",
@@ -665,7 +667,7 @@
         "startingSandbox": "正在启动沙盒",
         "stoppedBody": "{{name}} 的实例在设置过程中意外停止。",
         "stoppedTitle": "设置已停止",
-        "timeoutBody": "{{name}} 的设置耗时比平时更长（已超过 {{minutes}} 分钟）。",
+        "timeoutBody": "{{name}} 的设置耗时比平时更长（已超过 {{displayMinutes}} 分钟）。",
         "timeoutTitle": "耗时比预期更长"
       },
       "unavailableDescription": "配置实例需要有效的 KiloClaw 订阅。现有实例和订阅将照常运行。",
@@ -912,7 +914,7 @@
       "focusAreas": "关注领域",
       "mergeGate": "合并门禁",
       "model": "模型",
-      "nSelected": "已选 {{count}} 项",
+      "nSelected": "已选 {{displayCount}} 项",
       "proposedReviewMdGuidance": "建议的 REVIEW.md 指导",
       "repositories": "仓库",
       "reviewMemory": "审查记忆",
@@ -981,7 +983,7 @@
       "triageReasoning": "分类推理",
       "unknown": "未知",
       "watchInCloudAgent": "在 Cloud Agent 中查看",
-      "whereFound": "发现位置（{{count}}）",
+      "whereFound": "发现位置（{{displayCount}}）",
       "yes": "是"
     },
     "analysisSettings": {
@@ -1061,11 +1063,11 @@
       "confirmedExploitable": "已确认可利用",
       "couldNotLoad": "无法加载仪表盘数据",
       "criticalOverdue": "严重逾期",
-      "daysOverdue": "逾期 {{count}} 天",
+      "daysOverdue": "逾期 {{displayCount}} 天",
       "deadlineToday": "今天到期",
       "filterByRepository": "按仓库筛选",
       "findings": "发现",
-      "findingsCount": "{{count}} 个发现",
+      "findingsCount": "{{displayCount}} 个发现",
       "highOverdue": "高逾期",
       "lastSynced": "上次同步于 {{time}}",
       "manageRepositories": "管理仓库",
@@ -1090,6 +1092,27 @@
       "syncQueued": "同步已排队",
       "syncStatusUnavailable": "同步状态不可用",
       "withinDeadline": "在截止时间内"
+    },
+    "dashboardMetrics": {
+      "openFindings": "未解决的发现",
+      "openFindingsDetail": "{{critical}} 个严重，{{high}} 个高",
+      "confirmedExploitable": "已确认可利用",
+      "confirmedExploitableDetail": "项目风险已通过分析确认",
+      "needsReview": "需要您审核",
+      "needsReviewDetail": "需要人工决定",
+      "analysisIncomplete": "分析未完成",
+      "analysisIncompleteDetail": "项目风险仍未知",
+      "slaCompliance": "SLA 合规",
+      "notMeasured": "未测量",
+      "withinDeadlineDetail": "{{total}} 个中有 {{within}} 个在截止时间内",
+      "noDeadlineData": "尚无发现具有 SLA 截止时间",
+      "deadlinePassed": "截止时间已过",
+      "deadlinePassedDetail": "{{critical}} 个严重，{{high}} 个高",
+      "dueThisWeek": "本周到期",
+      "dueThisWeekDetail": "{{exploitable}} 个已确认可利用",
+      "noDeadline": "无截止时间",
+      "reviewSlaAssignment": "查看 SLA 分配",
+      "allOpenFindingsTracked": "所有未解决的发现均已跟踪"
     },
     "dismiss": {
       "alreadyResolvedDescription": "此发现已解决，不再接受忽略。",
@@ -1188,7 +1211,7 @@
       "title": "通知"
     },
     "remediation": {
-      "attemptHistory": "尝试历史（{{count}}）",
+      "attemptHistory": "尝试历史（{{displayCount}}）",
       "attemptNumber": "尝试 #{{number}}",
       "branch": "分支",
       "cancelMessage": "安全代理将停止正在进行的修复尝试。",
@@ -1256,7 +1279,7 @@
       "analysisModeSubtitle": "{{mode}} 分析",
       "automation": "自动化",
       "automationAllOff": "全部关闭",
-      "automationCount": "已启用 {{count}}/3 项",
+      "automationCount": "已启用 {{displayCount}}/3 项",
       "couldNotLoadPermissions": "无法加载权限",
       "couldNotLoadRepositories": "无法加载仓库",
       "couldNotLoadSettings": "无法加载安全代理设置",
@@ -1267,7 +1290,7 @@
       "enabled": "已启用",
       "modelsAndAnalysis": "模型与分析",
       "notifications": "通知",
-      "notificationsCount": "已启用 {{count}}/2 项",
+      "notificationsCount": "已启用 {{displayCount}}/2 项",
       "off": "关闭",
       "on": "开启",
       "repositories": "仓库",
@@ -1476,9 +1499,9 @@
       "toolTask": "任务",
       "readTodos": "读取待办事项",
       "updateTodos": "更新待办事项",
-      "linesBadge": "{{count}} 行",
-      "filesBadge": "{{count}} 个文件",
-      "matchesBadge": "{{count}} 个匹配"
+      "linesBadge": "{{displayCount}} 行",
+      "filesBadge": "{{displayCount}} 个文件",
+      "matchesBadge": "{{displayCount}} 个匹配"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截断）",
@@ -1562,6 +1585,10 @@
       "reportAiResponseFailedTerminal": "此回复无法举报。",
       "reportAiResponseSubmitted": "举报已提交。回执 {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "详情不可用",
       "textDisplay": "文本显示",
@@ -1620,7 +1647,7 @@
       "preparationComplete": "准备完成",
       "preparationFailed": "准备失败",
       "setupCommand": "设置命令 {{index}}",
-      "setupCommandOf": "设置命令 {{index}}/{{count}}"
+      "setupCommandOf": "设置命令 {{index}}/{{displayCount}}"
     },
     "permissionCard": {
       "title": "需要权限",
@@ -1657,7 +1684,7 @@
       "submissionFailed": "提交失败。请重试。",
       "questionAnnouncement": "代理需要您的输入。在您回答期间，编辑器已暂停。",
       "permissionAnnouncement": "代理需要权限才能继续。在您决定期间，编辑器已暂停。",
-      "positionHint": "（{{count}} 之 1）",
+      "positionHint": "（{{displayCount}} 之 1）",
       "movedPastPrompt": "代理已越过此提示。会话继续时此卡片将关闭。",
       "waitingForAnswer": "代理正在等待您的回答。此问题打开期间，您发给代理的消息已暂停。",
       "waitingForPermission": "代理正在等待权限。此请求打开期间，您发给代理的消息已暂停。"
@@ -1778,7 +1805,7 @@
       "cameraAccessDisabled": "相机访问已禁用",
       "cameraAccessMessage": "在设置中允许相机访问以拍照。",
       "couldNotOpenPhotoPicker": "无法打开照片选择器。请重启 Kilo 后重试。",
-      "maxFilesAllowed": "最多允许 {{count}} 个文件",
+      "maxFilesAllowed": "最多允许 {{displayCount}} 个文件",
       "onlyAddingFiles": "仅添加 {{accepted}} 个文件（共 {{total}} 个，最多 {{max}} 个）"
     },
     "composer": {
@@ -1843,7 +1870,7 @@
       "costPrefix": "费用 {{cost}}",
       "costSuffix": "，费用 {{cost}}",
       "tokensWindowUnavailable": "上下文 {{used}} 个令牌，窗口不可用",
-      "tokensUsage": "上下文 {{used}}/{{window}} 个令牌，已使用 {{percentage}}%",
+      "tokensUsage": "上下文 {{used}}/{{window}} 个令牌，已使用 {{percentage}}",
       "title": "上下文使用情况",
       "used": "已使用",
       "remaining": "剩余",
@@ -1852,7 +1879,7 @@
       "usageReflectsLatest": "使用情况反映最近一次完成的助手回复。",
       "tokenUsage": "令牌使用情况",
       "cacheRate": "缓存费率",
-      "modelsCount": "模型（{{count}}）",
+      "modelsCount": "模型（{{displayCount}}）",
       "tokenTotalsNote": "令牌总数仅涵盖此会话，不包括子代理/子会话的令牌。",
       "subagents": "子代理",
       "subagentsDescription": "子会话的剩余费用",
@@ -1994,7 +2021,7 @@
     "connectedCli": "在已连接的 CLI 上",
     "newSessionOn": "在 {{name}} 上的新会话",
     "noMatchingSessions": "没有匹配的会话。",
-    "onlyFirstFilesAttached": "仅会附加前 {{count}} 个文件。",
+    "onlyFirstFilesAttached": "仅会附加前 {{displayCount}} 个文件。",
     "staleMessage": "此分享已不再可用。",
     "retryableMessage": "无法加载您的会话。",
     "emptyMessage": "暂无会话 — 新建一个会话以发送此内容。",
@@ -2027,7 +2054,7 @@
     "otherAccountCopy": "此 Apple 账户上的 Kilo Pass 属于另一个 Kilo 账户。请登录该 Kilo 账户进行管理。",
     "alreadySubscribed": "您已拥有 Kilo Pass 订阅。",
     "purchaseUnavailable": "Kilo Pass 购买目前不可用。",
-    "tierCredits": "${{amount}} 积分",
+    "tierCredits": "{{amount}} 积分",
     "perMonth": "{{price}}/月",
     "verifyPurchaseFailed": "无法验证您的购买。请检查连接后重试。",
     "productsCouldNotLoad": "无法从 App Store 加载 Kilo Pass 产品。",
@@ -2038,7 +2065,7 @@
     "manageFailed": "无法打开 App Store 订阅管理。",
     "kiloPassSetup": "Kilo Pass 设置",
     "subscriptionHeaderDescription": "一项月度订阅，为你的 Kilo 余额添加积分，用于在 Kilo App 中运行 AI 编程会话 — Cloud Agents、远程会话和 KiloClaw 聊天。",
-    "tierDescription": "每月为 Kilo App 使用添加 ${{price}} 付费积分。",
+    "tierDescription": "每月为 Kilo App 使用添加 {{price}} 付费积分。",
     "subscribe": "订阅",
     "subscribeDescription": "月度积分及奖励进度",
     "manage": "管理",
@@ -2046,7 +2073,7 @@
     "statusPending": "Kilo Pass 待处理",
     "statusCanceling": "Kilo Pass 正在取消",
     "statusPastDue": "Kilo Pass 已逾期",
-    "monthlyCredits": "每月 ${{credits}} 积分",
+    "monthlyCredits": "每月 {{credits}} 积分",
     "ends": "{{date}} 结束",
     "periodEnd": "周期结束",
     "managedOnGooglePlay": "在 Google Play 管理",
@@ -2150,17 +2177,17 @@
     "accessDeniedDescription": "您没有权限查看此拉取请求。",
     "checkConnection": "检查连接",
     "checks": {
-      "checksCount": "{{count}} 项检查",
+      "checksCount": "{{displayCount}} 项检查",
       "couldNotLoad": "无法加载检查。",
-      "failed": "{{count}} 项失败",
+      "failed": "{{displayCount}} 项失败",
       "noAccess": "您没有此仓库检查的访问权限。",
       "noChecksReported": "未报告任何检查",
       "notAvailable": "检查尚不可用。头部提交可能尚未处理，或者 Kilo GitHub 应用未安装在头部仓库上。",
       "openDetails": "打开 {{name}} 详情",
-      "passed": "{{count}} 项通过",
-      "pending": "{{count}} 项待处理",
+      "passed": "{{displayCount}} 项通过",
+      "pending": "{{displayCount}} 项待处理",
       "retryChecks": "重试检查",
-      "skipped": "{{count}} 项已跳过",
+      "skipped": "{{displayCount}} 项已跳过",
       "title": "检查",
       "viewOnGitHub": "在 GitHub 上查看 PR",
       "checkDetails": "检查详情",
@@ -2238,7 +2265,7 @@
           "terminal": "无法举报此用户。"
         }
       },
-      "moreLinesAbove": "… 上方还有 {{count}} 行",
+      "moreLinesAbove": "… 上方还有 {{displayCount}} 行",
       "mute": "静音",
       "mutedUser": "已静音 {{login}}",
       "noDiscussion": "暂无讨论",
@@ -2246,7 +2273,7 @@
       "comment_one": "1 条评论",
       "outdated": "已过时",
       "quotedDiffSnippet": "引用的差异片段",
-      "reactionPill": "{{emoji}} 回应，{{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} 回应，{{displayCount}} {{countLabel}}",
       "reaction": "个回应",
       "reaction_other": "个回应",
       "reaction_one": "个回应",
@@ -2350,12 +2377,12 @@
     "hunkRows": {
       "contextUnavailable": "此引用处上下文不可用",
       "expandAll": "全部展开",
-      "expandAllLines": "展开全部 {{count}} 行",
+      "expandAllLines": "展开全部 {{displayCount}} 行",
       "expandContext": "展开上下文",
-      "expandLines": "展开 {{count}} 行（{{start}}–{{end}}）",
-      "expandLinesOfContext": "展开 {{count}} 行上下文",
+      "expandLines": "展开 {{displayCount}} 行（{{start}}–{{end}}）",
+      "expandLinesOfContext": "展开 {{displayCount}} 行上下文",
       "expandMoreContext": "展开更多上下文",
-      "expandMoreLines": "展开更多 {{count}} 行（{{start}}–{{end}}）",
+      "expandMoreLines": "展开更多 {{displayCount}} 行（{{start}}–{{end}}）",
       "failedToLoadContext": "无法加载上下文 — 点击重试",
       "failedToLoadMoreFiles": "无法加载更多文件 — 点击重试",
       "fileLoadedCount_one": "已加载 {{displayCount}} 个文件",
@@ -2500,8 +2527,8 @@
       "pendingComment_one": "条待处理评论",
       "summaryOptional": "摘要（可选）",
       "title": "提交审查",
-      "partialPostedMessage": "已发布 {{freshCount}} 条评论。{{staleCount}} 条评论指向较早的提交，仍保留在您的队列中。",
-      "submitCountOfTotal": "提交 {{totalCount}} 条评论中的 {{freshCount}} 条",
+      "partialPostedMessage": "已发布 {{displayFreshCount}} 条评论。{{displayStaleCount}} 条评论指向较早的提交，仍保留在您的队列中。",
+      "submitCountOfTotal": "提交 {{displayTotalCount}} 条评论中的 {{displayFreshCount}} 条",
       "submitReview": "提交审查"
     },
     "fileStatus": {

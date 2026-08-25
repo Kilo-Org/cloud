@@ -122,8 +122,8 @@ export async function resolveVoiceInputStartLanguageTag(appLanguage: string): Pr
     .filter((t): t is string => typeof t === 'string' && t.length > 0);
   const language = normalizeLocale(appLanguage).split('-')[0];
   const preferredTags = [
-    appLanguage,
     ...deviceTags.filter(tag => normalizeLocale(tag).split('-')[0] === language),
+    appLanguage,
   ];
 
   const supported = await fetchSupportedLanguageTags();

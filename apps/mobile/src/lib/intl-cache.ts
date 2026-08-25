@@ -1,5 +1,6 @@
 import { shouldPolyfill as shouldPolyfillDurationFormat } from '@formatjs/intl-durationformat/should-polyfill.js';
 import { shouldPolyfill as shouldPolyfillListFormat } from '@formatjs/intl-listformat/should-polyfill.js';
+import { shouldPolyfill as shouldPolyfillLocale } from '@formatjs/intl-locale/should-polyfill.js';
 import { shouldPolyfill as shouldPolyfillNumberFormat } from '@formatjs/intl-numberformat/should-polyfill.js';
 import { shouldPolyfill as shouldPolyfillRelativeTimeFormat } from '@formatjs/intl-relativetimeformat/should-polyfill.js';
 import { shouldPolyfill as shouldPolyfillSegmenter } from '@formatjs/intl-segmenter/should-polyfill.js';
@@ -29,6 +30,7 @@ let usesListFormatPolyfill = false;
 let usesRelativeTimePolyfill = false;
 let usesDurationFormatPolyfill = false;
 let usesSegmenterPolyfill = false;
+let usesLocalePolyfill = false;
 
 function localeOrEnglish(locale: string): string {
   return locale || 'en';
@@ -42,6 +44,13 @@ function localeDataLanguage(locale: string): SupportedLanguage {
   return isSupportedLanguage(base) ? base : 'en';
 }
 
+function ensureLocale(): void {
+  if (!usesLocalePolyfill && shouldPolyfillLocale()) {
+    require('@formatjs/intl-locale/polyfill-force.js');
+    usesLocalePolyfill = true;
+  }
+}
+
 function ensureNumberFormat(locale: string): void {
   const language = localeDataLanguage(locale);
   if (!usesNumberFormatPolyfill && shouldPolyfillNumberFormat(locale)) {
@@ -49,6 +58,7 @@ function ensureNumberFormat(locale: string): void {
     usesNumberFormatPolyfill = true;
   }
   if (usesNumberFormatPolyfill) {
+    ensureLocale();
     loadNumberFormatLocaleData(language);
   }
 }
@@ -60,12 +70,13 @@ function ensureListFormat(locale: string): void {
     usesListFormatPolyfill = true;
   }
   if (usesListFormatPolyfill) {
+    ensureLocale();
     loadListFormatLocaleData(language);
   }
 }
 
 function ensureRelativeTimeFormat(locale: string): void {
-  const language = isSupportedLanguage(locale) ? locale : 'en';
+  const language = localeDataLanguage(locale);
   if (!usesRelativeTimePolyfill && shouldPolyfillRelativeTimeFormat(language)) {
     require('@formatjs/intl-relativetimeformat/polyfill-force.js');
     usesRelativeTimePolyfill = true;
@@ -73,6 +84,7 @@ function ensureRelativeTimeFormat(locale: string): void {
   if (!usesRelativeTimePolyfill) {
     return;
   }
+  ensureLocale();
   RELATIVE_TIME_LOCALE_LOADERS[language]();
 }
 

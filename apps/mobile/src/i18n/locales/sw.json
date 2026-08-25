@@ -206,11 +206,11 @@
       "loadingLines": "Inapakia {{loaded}} kati ya {{total}} mistari…",
       "expandContext": "Panua muktadha",
       "expandMoreContext": "Panua muktadha zaidi",
-      "expandLines": "Panua {{count}} mistari ({{start}}–{{end}})",
-      "expandMoreLines": "Panua zaidi {{count}} mistari ({{start}}–{{end}})",
-      "expandLinesOfContext": "Panua {{count}} mistari ya muktadha",
+      "expandLines": "Panua {{displayCount}} mistari ({{start}}–{{end}})",
+      "expandMoreLines": "Panua zaidi {{displayCount}} mistari ({{start}}–{{end}})",
+      "expandLinesOfContext": "Panua {{displayCount}} mistari ya muktadha",
       "expandAll": "Panua zote",
-      "expandAllLines": "Panua mistari yote {{count}}",
+      "expandAllLines": "Panua mistari yote {{displayCount}}",
       "loadingMoreFiles": "Inapakia faili zaidi…",
       "retryLoadingNextPage": "Jaribu tena kupakia ukurasa unaofuata",
       "failedToLoadMoreFiles": "Imeshindwa kupakia faili zaidi — gusa kujaribu tena",
@@ -301,7 +301,7 @@
       "closeReactions": "Funga miitikio",
       "reactionsTitle": "Miitikio",
       "addReaction": "Ongeza mwitikio",
-      "reactionPill": "{{emoji}} mwitikio, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} mwitikio, {{displayCount}} {{countLabel}}",
       "reaction_one": "mwitikio",
       "reaction": "miitikio",
       "reaction_other": "miitikio",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Hakuna mada za ukaguzi au maoni ya mazungumzo kwenye pull request hii.",
       "reviewFiles": "Kagua faili",
       "quotedDiffSnippet": "Sehemu ya diff iliyonukuliwa",
-      "moreLinesAbove": "… {{count}} zaidi mistari hapo juu",
+      "moreLinesAbove": "… {{displayCount}} zaidi mistari hapo juu",
       "termsAcceptRequired": "Lazima ukubali Masharti ya Huduma ili kuchapisha.",
       "termsOutdatedCopy": "Masharti ya Huduma yamebadilika. Fungua upya skrini hii kukubali toleo la hivi karibuni.",
       "termsCheckRetryCopy": "Imeshindwa kuangalia Masharti ya Huduma. Angalia muunganisho wako na ujaribu tena."
@@ -395,11 +395,11 @@
       "retryChecks": "Jaribu tena ukaguzi",
       "viewOnGitHub": "Angalia PR kwenye GitHub",
       "noChecksReported": "Hakuna ukaguzi ulioripotiwa",
-      "passed": "{{count}} zimepita",
-      "failed": "{{count}} zimeshindwa",
-      "pending": "{{count}} zinasubiri",
-      "skipped": "{{count}} zimerukwa",
-      "checksCount": "Ukaguzi {{count}}",
+      "passed": "{{displayCount}} zimepita",
+      "failed": "{{displayCount}} zimeshindwa",
+      "pending": "{{displayCount}} zinasubiri",
+      "skipped": "{{displayCount}} zimerukwa",
+      "checksCount": "Ukaguzi {{displayCount}}",
       "checkDetails": "maelezo ya ukaguzi",
       "pullRequest": "pull request"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "maoni ya kusubiri",
       "pendingComment": "maoni ya kusubiri",
       "pendingComment_other": "maoni ya kusubiri",
-      "submitCountOfTotal": "Wasilisha {{freshCount}} kati ya {{totalCount}} maoni",
+      "submitCountOfTotal": "Wasilisha {{displayFreshCount}} kati ya {{displayTotalCount}} maoni",
       "submitReview": "Wasilisha ukaguzi",
-      "partialPostedMessage": "Umetuma maoni {{freshCount}}. Maoni {{staleCount}} yanaelekeza kwenye commit la zamani na yalibaki kwenye foleni yako."
+      "partialPostedMessage": "Umetuma maoni {{displayFreshCount}}. Maoni {{displayStaleCount}} yanaelekeza kwenye commit la zamani na yalibaki kwenye foleni yako."
     },
     "reconnectNotice": {
       "title": "Muunganisho wa GitHub umekwisha muda",
@@ -580,7 +580,8 @@
     "agents": "Mawakala",
     "profile": "Wasifu",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, kichupo, {{position}} kati ya {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "za karibu",
       "common": "Kawaida",
       "reactWith": "Itikia na {{reaction}}",
-      "accessibility": "{{emoji}} mwitikio, {{count}}"
+      "accessibility": "{{emoji}} mwitikio, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Inajibu",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Picha haipatikani",
       "openFailed": "Imeshindwa kufungua kiambatisho. Angalia muunganisho wako na ujaribu tena.",
       "attachFailed": "Imeshindwa kuambatisha faili",
-      "limit": "Unaweza kuambatisha hadi {{count}} faili.",
+      "limit": "Unaweza kuambatisha hadi {{displayCount}} faili.",
       "sizeRejection": "{{filename}} inazidi kikomo cha kiambatisho cha {{limit}}.",
       "unreadable": "Imeshindwa kusoma {{filename}}.",
       "pastedImage": "picha iliyobandikwa",
@@ -722,6 +723,7 @@
       "finalTermEnds": "Muda wa mwisho unaisha",
       "afterFinalTerm": "Baada ya muda wa mwisho",
       "remaining": "Kilichobaki",
+      "lessThanOneDay": "Chini ya siku 1",
       "ends": "Unaisha",
       "expires": "Inaisha",
       "noActivePlan": "Hakuna mpango ulioamilishwa",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "bei yako ya kila mwezi ya Standard",
       "perMonth": "/kwa mwezi",
       "earlybirdAccessUntil": "Ufikiaji wa Earlybird hadi {{date}}",
-      "earlybirdEnding": "Earlybird inaisha: siku {{days}} zimebaki",
+      "earlybirdEnding": "Earlybird inaisha: siku {{remaining}} zimebaki",
       "paymentPastDue": "Malipo yamechelewa. Tafadhali sasisha njia yako ya malipo.",
       "subscriptionCancels": "Usajili unafutwa {{date}}",
-      "trialDaysRemaining": "Jaribio: siku {{days}} zimesalia",
-      "trialEndingSoon": "Jaribio linaisha hivi karibuni: {{days}}"
+      "trialDaysRemaining": "Jaribio: siku {{remaining}} zimesalia",
+      "trialEndingSoon": "Jaribio linaisha hivi karibuni: {{remaining}}"
     },
     "changelog": {
       "title": "Ni Nini Kipya",
@@ -996,7 +998,7 @@
         "stalledTitle": "Kuna kitu kimekwama",
         "stalledBody": "Hatukuweza kukamilisha usanidi wa {{name}}. Jaribu tena, au tuma barua pepe hi@kilo.ai ikiwa hili linaendelea kutokea.",
         "timeoutTitle": "Inachukua muda mrefu kuliko ilivyotarajiwa",
-        "timeoutBody": "Usanidi wa {{name}} unachukua muda mrefu kuliko kawaida (zaidi ya dakika {{minutes}}).",
+        "timeoutBody": "Usanidi wa {{name}} unachukua muda mrefu kuliko kawaida (zaidi ya dakika {{displayMinutes}}).",
         "continueInBackground": "Endelea usuli",
         "settingUp": "Inaweka usanidi wa {{name}}",
         "finishingSetup": "Inakamilisha usanidi",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Lango la muunganisho",
       "repositories": "Hazina",
       "allRepositories": "Hazina zote",
-      "nSelected": "{{count}} zimechaguliwa",
+      "nSelected": "{{displayCount}} zimechaguliwa",
       "reviewMemory": "Kumbukumbu ya ukaguzi",
       "proposedReviewMdGuidance": "Mwongozo uliopendekezwa wa REVIEW.md"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Imechambuliwa",
       "exploitabilityReasoning": "Sababu za uwezekano wa kutumiwa vibaya",
       "suggestedFix": "Rekebisho linalopendekezwa",
-      "whereFound": "Mahali hili lilipopatikana ({{count}})",
+      "whereFound": "Mahali hili lilipopatikana ({{displayCount}})",
       "fullReport": "Ripoti kamili iliyotengenezwa",
       "unknown": "Haijulikani",
       "yes": "Ndiyo",
       "no": "Hapana"
     },
     "dashboard": {
-      "findingsCount": "Matokeo {{count}}",
+      "findingsCount": "Matokeo {{displayCount}}",
       "notMeasured": "Haijapimwa",
       "actFirst": "Tenda kwanza",
       "slaPosture": "Mkao wa SLA",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Mpango wa hatua wa hazina",
       "noOpenFindings": "Hakuna matokeo wazi yanayohitaji umakini",
       "deadlineToday": "Muda wa mwisho umefikiwa leo",
-      "daysOverdue": "Imechelewa kwa siku {{count}}",
+      "daysOverdue": "Imechelewa kwa siku {{displayCount}}",
       "withinDeadline": "Ndani ya muda wa mwisho",
       "criticalOverdue": "Kikubwa kimechelewa",
       "highOverdue": "Juu kimechelewa",
@@ -1434,6 +1436,27 @@
       "syncNow": "Sawazisha sasa",
       "syncQueued": "Usawazishaji umepangwa",
       "syncStatusUnavailable": "Hali ya usawazishaji haipatikani"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Matokeo wazi",
+      "openFindingsDetail": "{{critical}} kikubwa, {{high}} cha juu",
+      "confirmedExploitable": "Imethibitishwa inaweza kutumiwa vibaya",
+      "confirmedExploitableDetail": "Hatari ya mradi imethibitishwa na uchambuzi",
+      "needsReview": "Inahitaji mapitio yako",
+      "needsReviewDetail": "Uamuzi wa binadamu unahitajika",
+      "analysisIncomplete": "Uchambuzi haujakamilika",
+      "analysisIncompleteDetail": "Hatari ya mradi bado haijulikani",
+      "slaCompliance": "Kufuata SLA",
+      "notMeasured": "Haijapimwa",
+      "withinDeadlineDetail": "{{within}} kati ya {{total}} ndani ya muda wa mwisho",
+      "noDeadlineData": "Hakuna matokeo yenye muda wa mwisho wa SLA bado",
+      "deadlinePassed": "Muda wa mwisho umepita",
+      "deadlinePassedDetail": "{{critical}} kikubwa, {{high}} cha juu",
+      "dueThisWeek": "Inatakiwa wiki hii",
+      "dueThisWeekDetail": "{{exploitable}} imethibitishwa inaweza kutumiwa vibaya",
+      "noDeadline": "Hakuna muda wa mwisho",
+      "reviewSlaAssignment": "Pitia ugawaji wa SLA",
+      "allOpenFindingsTracked": "Matokeo yote wazi yanafuatiliwa"
     },
     "dismiss": {
       "title": "Futa matokeo",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "Uchambuzi wa {{mode}}",
       "automation": "Otomatiki",
       "automationAllOff": "Zote zimezimwa",
-      "automationCount": "{{count}} kati ya 3 zimewezeshwa",
+      "automationCount": "{{displayCount}} kati ya 3 zimewezeshwa",
       "notifications": "Arifa",
-      "notificationsCount": "{{count}} kati ya 2 zimewezeshwa",
+      "notificationsCount": "{{displayCount}} kati ya 2 zimewezeshwa",
       "slaPolicy": "Sera ya SLA",
       "disabledNoManage": "Security Agent imezimwa. Wamiliki wa shirika na wasimamizi wa bili pekee ndio wanaweza kuiwasha.",
       "disabledNoRepo": "Chagua angalau hazina moja kabla ya kuwasha Security Agent.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Fungua pull request{{number}}",
       "openDraftPullRequest": "Fungua rasimu ya pull request{{number}}",
       "progress": "Maendeleo",
-      "attemptHistory": "Historia ya majaribio ({{count}})",
+      "attemptHistory": "Historia ya majaribio ({{displayCount}})",
       "attemptNumber": "Jaribio #{{number}}",
       "startedBy": "Imeanzishwa na",
       "model": "Muundo",
@@ -1855,9 +1878,9 @@
       "toolTask": "kazi",
       "readTodos": "Soma kazi",
       "updateTodos": "Sasisha kazi",
-      "linesBadge": "Mistari {{count}}",
-      "filesBadge": "Faili {{count}}",
-      "matchesBadge": "Linganisho {{count}}"
+      "linesBadge": "Mistari {{displayCount}}",
+      "filesBadge": "Faili {{displayCount}}",
+      "matchesBadge": "Linganisho {{displayCount}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "mistari {{start}}–{{end}} (imepunguzwa)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "Jibu hili haliwezi kuripotiwa.",
       "reportAiResponseSubmitted": "Ripoti imewasilishwa. Stakabadhi {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Maelezo hayapatikani",
       "textDisplay": "Onyesho la maandishi",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Utayarishaji umekamilika",
       "preparationFailed": "Utayarishaji umeshindikana",
       "setupCommand": "Amri ya usanidi {{index}}",
-      "setupCommandOf": "Amri ya usanidi {{index}} kati ya {{count}}"
+      "setupCommandOf": "Amri ya usanidi {{index}} kati ya {{displayCount}}"
     },
     "permissionCard": {
       "title": "Ruhusa inahitajika",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Uwasilishaji umeshindwa. Tafadhali jaribu tena.",
       "questionAnnouncement": "Wakala anahitaji mchango wako. Kitanzi cha uandishi kimesimamishwa wakati unapojibu.",
       "permissionAnnouncement": "Wakala anahitaji ruhusa kuendelea. Kitanzi cha uandishi kimesimamishwa wakati unaamua.",
-      "positionHint": "(1 ya {{count}})",
+      "positionHint": "(1 ya {{displayCount}})",
       "movedPastPrompt": "Wakala amesogea zaidi ya kidokezo hiki. Kadi hii itafungwa wakati kikao kikiendelea.",
       "waitingForAnswer": "Wakala anasubiri jibu lako. Wakati swali hili liko wazi, ujumbe wako kwa wakala umesimamishwa.",
       "waitingForPermission": "Wakala anasubiri ruhusa. Wakati ombi hili liko wazi, ujumbe wako kwa wakala umesimamishwa."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Upatikanaji wa Kamera Umezimwa",
       "cameraAccessMessage": "Ruhusu upatikanaji wa kamera katika Mipangilio ili kupiga picha.",
       "couldNotOpenPhotoPicker": "Haikuweza kufungua kichagua picha. Anzisha tena Kilo na ujaribu tena.",
-      "maxFilesAllowed": "Upeo wa {{count}} faili unaruhusiwa",
+      "maxFilesAllowed": "Upeo wa {{displayCount}} faili unaruhusiwa",
       "onlyAddingFiles": "Inaongeza tu {{accepted}} ya {{total}} faili (upeo {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "gharama {{cost}}",
       "costSuffix": ", gharama {{cost}}",
       "tokensWindowUnavailable": "Muktadha {{used}} tokeni, dirisha haipatikani",
-      "tokensUsage": "Muktadha {{used}} wa {{window}} tokeni, {{percentage}}% imetumika",
+      "tokensUsage": "Muktadha {{used}} wa {{window}} tokeni, {{percentage}} imetumika",
       "title": "Matumizi ya muktadha",
       "used": "Iliyotumika",
       "remaining": "Iliyosalia",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "Matumizi yanaonyesha jibu la msaidizi la hivi karibuni lililokamilika.",
       "tokenUsage": "Matumizi ya tokeni",
       "cacheRate": "Kiwango cha akiba",
-      "modelsCount": "Mifano ({{count}})",
+      "modelsCount": "Mifano ({{displayCount}})",
       "tokenTotalsNote": "Jumla ya tokeni inajumuisha kikao hiki tu na haijumuishi tokeni za subagent/kikao cha mtoto.",
       "subagents": "Subagents",
       "subagentsDescription": "Gharama iliyobaki kutoka kwa vikao vya mtoto",
@@ -2373,7 +2400,7 @@
     "connectedCli": "Kwenye CLI iliyounganishwa",
     "newSessionOn": "Kikao kipya kwenye {{name}}",
     "noMatchingSessions": "Hakuna vikao vinavyolingana.",
-    "onlyFirstFilesAttached": "Faili {{count}} za kwanza pekee zitaambatishwa.",
+    "onlyFirstFilesAttached": "Faili {{displayCount}} za kwanza pekee zitaambatishwa.",
     "staleMessage": "Ushiriki huu haupatikani tena.",
     "retryableMessage": "Haikuweza kupakia vikao vyako.",
     "emptyMessage": "Bado hakuna vikao — anza kipya ili utume hili.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Kilo Pass kwenye Akaunti hii ya Apple ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili uisimamie.",
     "alreadySubscribed": "Tayari una usajili wa Kilo Pass.",
     "purchaseUnavailable": "Ununuzi wa Kilo Pass haupatikani sasa hivi.",
-    "tierCredits": "${{amount}} katika salio",
+    "tierCredits": "{{amount}} katika salio",
     "perMonth": "{{price}}/mo",
     "verifyPurchaseFailed": "Haikuweza kuhakiki ununuzi wako. Angalia muunganisho wako na ujaribu tena.",
     "productsCouldNotLoad": "Bidhaa za Kilo Pass hazikuweza kupakiwa kutoka App Store.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "Imeshindwa kufungua usimamizi wa usajili wa App Store.",
     "kiloPassSetup": "Usanidi wa Kilo Pass",
     "subscriptionHeaderDescription": "Usajili wa kila mwezi unaoongeza salio kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App — Cloud Agents, vikao vya mbali, na mazungumzo ya KiloClaw.",
-    "tierDescription": "${{price}} ya salio linalolipwa linaongezwa kila mwezi kwa matumizi ya Kilo App.",
+    "tierDescription": "{{price}} ya salio linalolipwa linaongezwa kila mwezi kwa matumizi ya Kilo App.",
     "subscribe": "Jisajili",
     "subscribeDescription": "Salio la kila mwezi na maendeleo ya ziada",
     "manage": "Simamia",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass inasubiri",
     "statusCanceling": "Kilo Pass inaghairi",
     "statusPastDue": "Kilo Pass imechelewa",
-    "monthlyCredits": "${{credits}} salio la kila mwezi",
+    "monthlyCredits": "{{credits}} salio la kila mwezi",
     "ends": "Inaisha {{date}}",
     "periodEnd": "mwisho wa kipindi",
     "managedOnGooglePlay": "Inasimamiwa kwenye Google Play",

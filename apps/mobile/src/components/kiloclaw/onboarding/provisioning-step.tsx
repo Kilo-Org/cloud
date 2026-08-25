@@ -28,6 +28,7 @@ import { agentColor, toneColor } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 
 import { DEFAULT_BOT_IDENTITY } from './state';
 
@@ -190,7 +191,10 @@ export function ProvisioningStep({
           </Text>
           <Text className="text-center text-2xl font-semibold">{t(content.titleKey)}</Text>
           <Text variant="muted" className="text-center text-base">
-            {t(content.bodyKey, { name: botName, minutes: OVERALL_TIMEOUT_MS / 60_000 })}
+            {t(content.bodyKey, {
+              name: botName,
+              displayMinutes: formatNumber(OVERALL_TIMEOUT_MS / 60_000, i18n.language),
+            })}
           </Text>
         </View>
         <View className="w-full gap-3">

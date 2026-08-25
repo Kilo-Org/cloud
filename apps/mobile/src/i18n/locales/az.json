@@ -206,11 +206,11 @@
       "loadingLines": "{{loaded}} / {{total}} sətir yüklənir…",
       "expandContext": "Konteksti genişləndir",
       "expandMoreContext": "Daha çox kontekst genişləndir",
-      "expandLines": "{{count}} sətir genişləndir ({{start}}–{{end}})",
-      "expandMoreLines": "Daha {{count}} sətir genişləndir ({{start}}–{{end}})",
-      "expandLinesOfContext": "{{count}} sətir kontekst genişləndir",
+      "expandLines": "{{displayCount}} sətir genişləndir ({{start}}–{{end}})",
+      "expandMoreLines": "Daha {{displayCount}} sətir genişləndir ({{start}}–{{end}})",
+      "expandLinesOfContext": "{{displayCount}} sətir kontekst genişləndir",
       "expandAll": "Hamısını genişləndir",
-      "expandAllLines": "Bütün {{count}} sətri genişləndir",
+      "expandAllLines": "Bütün {{displayCount}} sətri genişləndir",
       "loadingMoreFiles": "Daha çox fayl yüklənir…",
       "retryLoadingNextPage": "Növbəti səhifənin yüklənməsini yenidən cəhd edin",
       "failedToLoadMoreFiles": "Daha çox fayl yüklənə bilmədi — yenidən cəhd etmək üçün toxunun",
@@ -301,7 +301,7 @@
       "closeReactions": "Reaksiyaları bağla",
       "reactionsTitle": "Reaksiyalar",
       "addReaction": "Reaksiya əlavə et",
-      "reactionPill": "{{emoji}} reaksiyası, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} reaksiyası, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksiya",
       "reaction": "reaksiya",
       "reaction_other": "reaksiya",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Bu pull request-də icmal mövzusu və ya söhbət şərhi yoxdur.",
       "reviewFiles": "Faylları icmal et",
       "quotedDiffSnippet": "Sitat götürülmüş diff parçası",
-      "moreLinesAbove": "… yuxarıda {{count}} sətir daha",
+      "moreLinesAbove": "… yuxarıda {{displayCount}} sətir daha",
       "termsAcceptRequired": "Yazmaq üçün Xidmət Şərtlərini qəbul etməlisiniz.",
       "termsOutdatedCopy": "Xidmət Şərtləri dəyişdi. Ən son versiyanı qəbul etmək üçün bu ekranı yenidən açın.",
       "termsCheckRetryCopy": "Xidmət Şərtləri yoxlanıla bilmədi. Bağlantınızı yoxlayın və yenidən cəhd edin."
@@ -395,11 +395,11 @@
       "retryChecks": "Yoxlamaları yenidən cəhd edin",
       "viewOnGitHub": "PR'i GitHub'da bax",
       "noChecksReported": "Yoxlama bildirilməyib",
-      "passed": "{{count}} keçdi",
-      "failed": "{{count}} uğursuz",
-      "pending": "{{count}} gözləyir",
-      "skipped": "{{count}} keçildi",
-      "checksCount": "{{count}} yoxlama",
+      "passed": "{{displayCount}} keçdi",
+      "failed": "{{displayCount}} uğursuz",
+      "pending": "{{displayCount}} gözləyir",
+      "skipped": "{{displayCount}} keçildi",
+      "checksCount": "{{displayCount}} yoxlama",
       "checkDetails": "yoxlama təfərrüatları",
       "pullRequest": "pull request"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "gözləyən şərh",
       "pendingComment": "gözləyən şərhlər",
       "pendingComment_other": "gözləyən şərhlər",
-      "submitCountOfTotal": "{{totalCount}} şərhlərdən {{freshCount}} təqdim edin",
+      "submitCountOfTotal": "{{displayTotalCount}} şərhlərdən {{displayFreshCount}} təqdim edin",
       "submitReview": "İcmalı təqdim et",
-      "partialPostedMessage": "{{freshCount}} şərh yerləşdirildi. {{staleCount}} şərh köhnə commit-ə işarə edir və növbənizdə qaldı."
+      "partialPostedMessage": "{{displayFreshCount}} şərh yerləşdirildi. {{displayStaleCount}} şərh köhnə commit-ə işarə edir və növbənizdə qaldı."
     },
     "reconnectNotice": {
       "title": "GitHub bağlantısı bitdi",
@@ -580,7 +580,8 @@
     "agents": "Agentlər",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, nişan, {{total}}-dən {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Son",
       "common": "Ümumi",
       "reactWith": "{{reaction}} ilə reaksiya ver",
-      "accessibility": "{{emoji}} reaksiyası, {{count}}"
+      "accessibility": "{{emoji}} reaksiyası, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Cavab verilir",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Şəkil əlçatan deyil",
       "openFailed": "Əlavə açıla bilmədi. Bağlantınızı yoxlayın və yenidən cəhd edin.",
       "attachFailed": "Fayl əlavə edilə bilmədi",
-      "limit": "Ən çox {{count}} fayl əlavə edə bilərsiniz.",
+      "limit": "Ən çox {{displayCount}} fayl əlavə edə bilərsiniz.",
       "sizeRejection": "{{filename}} {{limit}} əlavə limitini keçir.",
       "unreadable": "{{filename}} oxuna bilmədi.",
       "pastedImage": "yapışdırılmış şəkil",
@@ -740,11 +741,12 @@
       "yourStandardMonthlyPrice": "Standard aylıq qiymətiniz",
       "perMonth": "/ay",
       "earlybirdAccessUntil": "Earlybird girişi {{date}} tarixinə qədər",
-      "earlybirdEnding": "Earlybird bitir: {{days}} gün qalıb",
+      "earlybirdEnding": "Earlybird bitir: {{remaining}}",
       "paymentPastDue": "Ödəniş gecikib. Zəhmət olmasa ödəniş metodunuzu yeniləyin.",
       "subscriptionCancels": "Abunəlik {{date}} tarixində ləğv olunur",
-      "trialDaysRemaining": "Sınaq: {{days}} gün qalıb",
-      "trialEndingSoon": "Sınaq tezliklə bitir: {{days}}"
+      "trialDaysRemaining": "Sınaq: {{remaining}} qalıb",
+      "trialEndingSoon": "Sınaq tezliklə bitir: {{remaining}}",
+      "lessThanOneDay": "1 gündən az"
     },
     "changelog": {
       "title": "Nə Yeni Var",
@@ -996,7 +998,7 @@
         "stalledTitle": "Bir şey ilişdi",
         "stalledBody": "{{name}} quraşdırmasını bitirə bilmədik. Yenidən cəhd edin və ya bu davam edərsə hi@kilo.ai ünvanına e-poçt göndərin.",
         "timeoutTitle": "Gözləniləndən çox çəkir",
-        "timeoutBody": "{{name}} üçün quraşdırma adi haldan çox çəkir ({{minutes}} dəqiqədən çox).",
+        "timeoutBody": "{{name}} üçün quraşdırma adi haldan çox çəkir ({{displayMinutes}} dəqiqədən çox).",
         "continueInBackground": "Fonda davam et",
         "settingUp": "{{name}} quraşdırılır",
         "finishingSetup": "Quraşdırma tamamlanır",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Birləşdirmə qapısı",
       "repositories": "Repozitoriyalar",
       "allRepositories": "Bütün repozitoriyalar",
-      "nSelected": "{{count}} seçildi",
+      "nSelected": "{{displayCount}} seçildi",
       "reviewMemory": "Nəzərdən keçirmə yaddaşı",
       "proposedReviewMdGuidance": "Təklif olunan REVIEW.md rəhbərliyi"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Analiz edilib",
       "exploitabilityReasoning": "İstismar oluna bilmə səbəbləndirməsi",
       "suggestedFix": "Təklif olunan düzəliş",
-      "whereFound": "Bunun tapıldığı yer ({{count}})",
+      "whereFound": "Bunun tapıldığı yer ({{displayCount}})",
       "fullReport": "Tam yaradılmış hesabat",
       "unknown": "Naməlum",
       "yes": "Bəli",
       "no": "Xeyr"
     },
     "dashboard": {
-      "findingsCount": "{{count}} tapıntı",
+      "findingsCount": "{{displayCount}} tapıntı",
       "notMeasured": "Ölçülməyib",
       "actFirst": "Əvvəlcə hərəkət edin",
       "slaPosture": "SLA mövqeyi",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Repozitoriya fəaliyyət planı",
       "noOpenFindings": "Açıq tapıntı diqqət tələb etmir",
       "deadlineToday": "Müddət bu gün başa çatıb",
-      "daysOverdue": "{{count}} gün gecikib",
+      "daysOverdue": "{{displayCount}} gün gecikib",
       "withinDeadline": "Müddət daxilində",
       "criticalOverdue": "Kritik gecikmə",
       "highOverdue": "Yüksək gecikmə",
@@ -1434,6 +1436,27 @@
       "syncNow": "İndi sinxronlaşdır",
       "syncQueued": "Sinxronlaşdırma növbəyə alındı",
       "syncStatusUnavailable": "Sinxronlaşdırma statusu mövcud deyil"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Açıq tapıntılar",
+      "openFindingsDetail": "{{critical}} kritik, {{high}} yüksək",
+      "confirmedExploitable": "Təsdiqlənmiş istismar oluna bilən",
+      "confirmedExploitableDetail": "Layihə riski analizlə təsdiqlənib",
+      "needsReview": "İcmalınız tələb olunur",
+      "needsReviewDetail": "İnsan qərarı tələb olunur",
+      "analysisIncomplete": "Analiz tamamlanmayıb",
+      "analysisIncompleteDetail": "Layihə riski hələ məlum deyil",
+      "slaCompliance": "SLA uyğunluğu",
+      "notMeasured": "Ölçülməyib",
+      "withinDeadlineDetail": "Müddət daxilində {{total}}-dan {{within}}",
+      "noDeadlineData": "Hələ heç bir tapıntının SLA müddəti yoxdur",
+      "deadlinePassed": "Müddət başa çatıb",
+      "deadlinePassedDetail": "{{critical}} kritik, {{high}} yüksək",
+      "dueThisWeek": "Bu həftə bitir",
+      "dueThisWeekDetail": "{{exploitable}} təsdiqlənmiş istismar oluna bilən",
+      "noDeadline": "Müddət yoxdur",
+      "reviewSlaAssignment": "SLA təyinatına baxın",
+      "allOpenFindingsTracked": "Bütün açıq tapıntılar izlənir"
     },
     "dismiss": {
       "title": "Tapıntını rədd et",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}} analiz",
       "automation": "Avtomatlaşdırma",
       "automationAllOff": "Hamısı sönük",
-      "automationCount": "3-dən {{count}} aktiv",
+      "automationCount": "3-dən {{displayCount}} aktiv",
       "notifications": "Bildirişlər",
-      "notificationsCount": "2-dən {{count}} aktiv",
+      "notificationsCount": "2-dən {{displayCount}} aktiv",
       "slaPolicy": "SLA siyasəti",
       "disabledNoManage": "Security Agent deaktivdir. Yalnız təşkilat sahibləri və hesab menecerləri onu aktivləşdirə bilər.",
       "disabledNoRepo": "Security Agent-i aktivləşdirməzdən əvvəl ən azı bir repozitoriya seçin.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Pull request{{number}} açın",
       "openDraftPullRequest": "Qaralama pull request{{number}} açın",
       "progress": "Gedişat",
-      "attemptHistory": "Cəhd tarixçəsi ({{count}})",
+      "attemptHistory": "Cəhd tarixçəsi ({{displayCount}})",
       "attemptNumber": "Cəhd #{{number}}",
       "startedBy": "Tərəfindən başladılıb",
       "model": "Model",
@@ -1855,9 +1878,9 @@
       "toolTask": "tapşırıq",
       "readTodos": "Tapşırıqları oxu",
       "updateTodos": "Tapşırıqları yenilə",
-      "linesBadge": "{{count}} sətir",
-      "filesBadge": "{{count}} fayl",
-      "matchesBadge": "{{count}} uyğunluq"
+      "linesBadge": "{{displayCount}} sətir",
+      "filesBadge": "{{displayCount}} fayl",
+      "matchesBadge": "{{displayCount}} uyğunluq"
     },
     "readToolMarkdown": {
       "linesTruncated": "sətirlər {{start}}–{{end}} (qısaldılıb)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "Bu cavab bildirilə bilməz.",
       "reportAiResponseSubmitted": "Hesabat göndərildi. Qəbz {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Detallar mövcud deyil",
       "textDisplay": "Mətn göstərilməsi",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Hazırlıq tamamlandı",
       "preparationFailed": "Hazırlıq uğursuz oldu",
       "setupCommand": "Quraşdırma əmri {{index}}",
-      "setupCommandOf": "{{count}}-dən {{index}} quraşdırma əmri"
+      "setupCommandOf": "{{displayCount}}-dən {{index}} quraşdırma əmri"
     },
     "permissionCard": {
       "title": "İcazə tələb olunur",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Təqdimat uğursuz oldu. Zəhmət olmasa yenidən cəhd edin.",
       "questionAnnouncement": "Agent sizin girişinizə ehtiyac duyur. Siz cavab verərkən kompozitor dayandırılıb.",
       "permissionAnnouncement": "Agent davam etmək üçün icazəyə ehtiyac duyur. Siz qərar verərkən kompozitor dayandırılıb.",
-      "positionHint": "({{count}}-dən 1-i)",
+      "positionHint": "({{displayCount}}-dən 1-i)",
       "movedPastPrompt": "Agent bu sorğudan irəliləyib. Sessiya davam edərkən bu kart bağlanacaq.",
       "waitingForAnswer": "Agent sizin cavabınızı gözləyir. Bu sual açıq olduğu müddətdə agentə mesajınız dayandırılıb.",
       "waitingForPermission": "Agent icazə gözləyir. Bu sorğu açıq olduğu müddətdə agentə mesajınız dayandırılıb."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Kamera Girişi Deaktiv Edilib",
       "cameraAccessMessage": "Şəkil çəkmək üçün Parametrlərdə kamera girişinə icazə verin.",
       "couldNotOpenPhotoPicker": "Foto seçici açıla bilmədi. Kilo-nu yenidən başladın və yenidən cəhd edin.",
-      "maxFilesAllowed": "Maksimum {{count}} fayla icazə verilir",
+      "maxFilesAllowed": "Maksimum {{displayCount}} fayla icazə verilir",
       "onlyAddingFiles": "{{total}} fayldan yalnız {{accepted}} əlavə edilir (maks {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "xərc {{cost}}",
       "costSuffix": ", xərc {{cost}}",
       "tokensWindowUnavailable": "Kontekst {{used}} token, pəncərə mövcud deyil",
-      "tokensUsage": "Kontekst {{used}} / {{window}} token, {{percentage}}% istifadə olunub",
+      "tokensUsage": "Kontekst {{used}} / {{window}} token, {{percentage}} istifadə olunub",
       "title": "Kontekst istifadəsi",
       "used": "İstifadə olunub",
       "remaining": "Qalan",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "İstifadə ən son tamamlanmış köməkçi cavabını əks etdirir.",
       "tokenUsage": "Token istifadəsi",
       "cacheRate": "Keş dərəcəsi",
-      "modelsCount": "Modellər ({{count}})",
+      "modelsCount": "Modellər ({{displayCount}})",
       "tokenTotalsNote": "Token cəmləri yalnız bu sessiyanı əhatə edir və subagent/uşaq sessiya tokenlərini istisna edir.",
       "subagents": "Subagentlər",
       "subagentsDescription": "Uşaq sessiyalarından qalan xərc",
@@ -2373,7 +2400,7 @@
     "connectedCli": "Bağlı CLI-də",
     "newSessionOn": "{{name}} üzərində yeni sessiya",
     "noMatchingSessions": "Uyğun sessiya yoxdur.",
-    "onlyFirstFilesAttached": "Yalnız ilk {{count}} fayl əlavə ediləcək.",
+    "onlyFirstFilesAttached": "Yalnız ilk {{displayCount}} fayl əlavə ediləcək.",
     "staleMessage": "Bu paylaşım artıq mövcud deyil.",
     "retryableMessage": "Sessiyalarınız yüklənə bilmədi.",
     "emptyMessage": "Hələ sessiya yoxdur — bunu göndərmək üçün yenisinə başlayın.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Bu Apple Hesabındakı Kilo Pass başqa Kilo hesabına aiddir. Onu idarə etmək üçün həmin Kilo hesabına daxil olun.",
     "alreadySubscribed": "Artıq Kilo Pass abunəliyiniz var.",
     "purchaseUnavailable": "Kilo Pass alışı hazırda mövcud deyil.",
-    "tierCredits": "Kreditlərdə ${{amount}}",
+    "tierCredits": "Kreditlərdə {{amount}}",
     "perMonth": "{{price}}/ay",
     "verifyPurchaseFailed": "Alışınız yoxlanıla bilmədi. Bağlantınızı yoxlayın və yenidən cəhd edin.",
     "productsCouldNotLoad": "Kilo Pass məhsulları App Store-dan yüklənə bilmədi.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "App Store abunəlik idarəetməsi açıla bilmədi.",
     "kiloPassSetup": "Kilo Pass quraşdırması",
     "subscriptionHeaderDescription": "Kilo App-də AI kodlaşdırma sessiyalarını — Cloud Agentlər, uzaq sessiyalar və KiloClaw söhbətlərini işlətmək üçün Kilo balansınıza kredit əlavə edən aylıq abunəlik.",
-    "tierDescription": "Kilo App istifadəsi üçün aylıq ${{price}} ödənilmiş kredit əlavə olunur.",
+    "tierDescription": "Kilo App istifadəsi üçün aylıq {{price}} ödənilmiş kredit əlavə olunur.",
     "subscribe": "Abunə ol",
     "subscribeDescription": "Bonus irəliləyişli aylıq kreditlər",
     "manage": "İdarə et",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass gözləyir",
     "statusCanceling": "Kilo Pass ləğv edilir",
     "statusPastDue": "Kilo Pass vaxtı keçib",
-    "monthlyCredits": "Aylıq ${{credits}} kredit",
+    "monthlyCredits": "Aylıq {{credits}} kredit",
     "ends": "{{date}} tarixində bitir",
     "periodEnd": "dövrün sonu",
     "managedOnGooglePlay": "Google Play-də idarə olunur",

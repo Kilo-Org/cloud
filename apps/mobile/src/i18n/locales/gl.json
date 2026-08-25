@@ -206,11 +206,11 @@
       "loadingLines": "Cargando {{loaded}} de {{total}} liñas…",
       "expandContext": "Expandir contexto",
       "expandMoreContext": "Expandir máis contexto",
-      "expandLines": "Expandir {{count}} liñas ({{start}}–{{end}})",
-      "expandMoreLines": "Expandir {{count}} liñas máis ({{start}}–{{end}})",
-      "expandLinesOfContext": "Expandir {{count}} liñas de contexto",
+      "expandLines": "Expandir {{displayCount}} liñas ({{start}}–{{end}})",
+      "expandMoreLines": "Expandir {{displayCount}} liñas máis ({{start}}–{{end}})",
+      "expandLinesOfContext": "Expandir {{displayCount}} liñas de contexto",
       "expandAll": "Expandir todo",
-      "expandAllLines": "Expandir todas as {{count}} liñas",
+      "expandAllLines": "Expandir todas as {{displayCount}} liñas",
       "loadingMoreFiles": "Cargando máis arquivos…",
       "retryLoadingNextPage": "Volver cargar a seguinte páxina",
       "failedToLoadMoreFiles": "Non se puideron cargar máis arquivos — toca para volver tentalo",
@@ -301,7 +301,7 @@
       "closeReactions": "Pechar reaccións",
       "reactionsTitle": "Reaccións",
       "addReaction": "Engadir reacción",
-      "reactionPill": "{{emoji}} reacción, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} reacción, {{displayCount}} {{countLabel}}",
       "reaction_one": "reacción",
       "reaction": "reaccións",
       "reaction_other": "reaccións",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Non hai fíos de revisión nin comentarios de conversa neste pull request.",
       "reviewFiles": "Revisar arquivos",
       "quotedDiffSnippet": "Fragmento de diff citado",
-      "moreLinesAbove": "… {{count}} liñas máis arriba",
+      "moreLinesAbove": "… {{displayCount}} liñas máis arriba",
       "termsAcceptRequired": "Debes aceptar os Termos do servizo para publicar.",
       "termsOutdatedCopy": "Os Termos do servizo cambiaron. Volve abrir esta pantalla para aceptar a última versión.",
       "termsCheckRetryCopy": "Non se puido comprobar os Termos do servizo. Comproba a túa conexión e proba de novo."
@@ -395,11 +395,11 @@
       "retryChecks": "Volver probar as comprobacións",
       "viewOnGitHub": "Ver o PR en GitHub",
       "noChecksReported": "Non se informou de comprobacións",
-      "passed": "{{count}} pasaron",
-      "failed": "{{count}} fallaron",
-      "pending": "{{count}} pendentes",
-      "skipped": "{{count}} omitidas",
-      "checksCount": "{{count}} comprobacións",
+      "passed": "{{displayCount}} pasaron",
+      "failed": "{{displayCount}} fallaron",
+      "pending": "{{displayCount}} pendentes",
+      "skipped": "{{displayCount}} omitidas",
+      "checksCount": "{{displayCount}} comprobacións",
       "checkDetails": "detalles da comprobación",
       "pullRequest": "pull request"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "comentario pendente",
       "pendingComment": "comentarios pendentes",
       "pendingComment_other": "comentarios pendentes",
-      "submitCountOfTotal": "Enviar {{freshCount}} de {{totalCount}} comentarios",
+      "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
       "submitReview": "Enviar revisión",
-      "partialPostedMessage": "Publicouse {{freshCount}} comentario(s). {{staleCount}} comentario(s) apuntan a un commit máis antigo e permaneceron na túa cola."
+      "partialPostedMessage": "Publicouse {{displayFreshCount}} comentario(s). {{displayStaleCount}} comentario(s) apuntan a un commit máis antigo e permaneceron na túa cola."
     },
     "reconnectNotice": {
       "title": "A conexión de GitHub caducou",
@@ -580,7 +580,8 @@
     "agents": "Axentes",
     "profile": "Perfil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, lapela, {{position}} de {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Recentes",
       "common": "Comúns",
       "reactWith": "Reaccionar con {{reaction}}",
-      "accessibility": "{{emoji}} reacción, {{count}}"
+      "accessibility": "{{emoji}} reacción, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Respondendo a",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Imaxe non dispoñible",
       "openFailed": "Non se puido abrir o anexo. Comproba a túa conexión e proba de novo.",
       "attachFailed": "Non se puido anexar o arquivo",
-      "limit": "Podes anexar ata {{count}} arquivos.",
+      "limit": "Podes anexar ata {{displayCount}} arquivos.",
       "sizeRejection": "{{filename}} supera o límite de {{limit}} anexo.",
       "unreadable": "Non se puido ler {{filename}}.",
       "pastedImage": "a imaxe pegada",
@@ -734,17 +735,18 @@
       "finalCommitTermEndsOn": "O teu prazo final de Commit remata o {{date}}. Continúa como Standard por {{price}}, ou a hospedaxe remata.",
       "freeTrial": "Probas gratuítas",
       "hostingEnds": "A hospedaxe remata",
+      "lessThanOneDay": "Menos de 1 día",
       "renews": "Renóvase",
       "standardMonthToMonth": "Standard mes a mes",
       "standardStartsOn": "Standard comeza o {{date}} por {{price}}.",
       "yourStandardMonthlyPrice": "o teu prezo mensual de Standard",
       "perMonth": "/mes",
       "earlybirdAccessUntil": "Acceso de madrugador ata o {{date}}",
-      "earlybirdEnding": "O acceso de madrugador remata: quedan {{days}} días",
+      "earlybirdEnding": "O acceso de madrugador remata: quedan {{remaining}}",
       "paymentPastDue": "O pago está vencido. Actualiza o teu método de pago.",
       "subscriptionCancels": "A subscrición cancelase o {{date}}",
-      "trialDaysRemaining": "Probas: quedan {{days}} días",
-      "trialEndingSoon": "As probas rematan pronto: {{days}}"
+      "trialDaysRemaining": "Probas: quedan {{remaining}}",
+      "trialEndingSoon": "As probas rematan pronto: {{remaining}}"
     },
     "changelog": {
       "title": "Novidades",
@@ -996,7 +998,7 @@
         "stalledTitle": "Algo quedou bloqueado",
         "stalledBody": "Non puidemos rematar a configuración de {{name}}. Téntao de novo, ou envía un correo a hi@kilo.ai se isto segue pasando.",
         "timeoutTitle": "Tardando máis do esperado",
-        "timeoutBody": "A configuración de {{name}} está tardando máis do normal (máis de {{minutes}} minutos).",
+        "timeoutBody": "A configuración de {{name}} está tardando máis do normal (máis de {{displayMinutes}} minutos).",
         "continueInBackground": "Continuar en segundo plano",
         "settingUp": "Configurando {{name}}",
         "finishingSetup": "Rematando a configuración",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Porta de fusión",
       "repositories": "Repositorios",
       "allRepositories": "Todos os repositorios",
-      "nSelected": "{{count}} seleccionados",
+      "nSelected": "{{displayCount}} seleccionados",
       "reviewMemory": "Memoria de revisión",
       "proposedReviewMdGuidance": "Pautas propostas en REVIEW.md"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Analizado",
       "exploitabilityReasoning": "Razoamento da explotabilidade",
       "suggestedFix": "Corrección suxerida",
-      "whereFound": "Onde se atopou isto ({{count}})",
+      "whereFound": "Onde se atopou isto ({{displayCount}})",
       "fullReport": "Informe xerado completo",
       "unknown": "Descoñecido",
       "yes": "Si",
       "no": "Non"
     },
     "dashboard": {
-      "findingsCount": "{{count}} achados",
+      "findingsCount": "{{displayCount}} achados",
       "notMeasured": "Non medido",
       "actFirst": "Actuar primeiro",
       "slaPosture": "Postura do SLA",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Plan de acción do repositorio",
       "noOpenFindings": "Non hai achados abertos que requiran atención",
       "deadlineToday": "Prazо alcanzado hoxe",
-      "daysOverdue": "{{count}} días de atraso",
+      "daysOverdue": "{{displayCount}} días de atraso",
       "withinDeadline": "Dentro da praza",
       "criticalOverdue": "Crítico atrasado",
       "highOverdue": "Alto atrasado",
@@ -1434,6 +1436,27 @@
       "syncNow": "Sincronizar agora",
       "syncQueued": "Sincronización na cola",
       "syncStatusUnavailable": "Estado de sincronización non dispoñible"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Achados abertos",
+      "openFindingsDetail": "{{critical}} críticos, {{high}} altos",
+      "confirmedExploitable": "Explotable confirmado",
+      "confirmedExploitableDetail": "Risco do proxecto confirmado pola análise",
+      "needsReview": "Require a túa revisión",
+      "needsReviewDetail": "Requírese decisión humana",
+      "analysisIncomplete": "Análise incompleta",
+      "analysisIncompleteDetail": "O risco do proxecto aínda é descoñecido",
+      "slaCompliance": "Cumprimento do SLA",
+      "notMeasured": "Non medido",
+      "withinDeadlineDetail": "{{within}} de {{total}} dentro da praza",
+      "noDeadlineData": "Aínda ningún achado ten praza de SLA",
+      "deadlinePassed": "Praza superada",
+      "deadlinePassedDetail": "{{critical}} críticos, {{high}} altos",
+      "dueThisWeek": "Vence esta semana",
+      "dueThisWeekDetail": "{{exploitable}} confirmados explotables",
+      "noDeadline": "Sen praza",
+      "reviewSlaAssignment": "Revisar asignación de SLA",
+      "allOpenFindingsTracked": "Todos os achados abertos rexistrados"
     },
     "dismiss": {
       "title": "Descartar achado",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "Análise {{mode}}",
       "automation": "Automatización",
       "automationAllOff": "Todos desactivados",
-      "automationCount": "{{count}} de 3 activados",
+      "automationCount": "{{displayCount}} de 3 activados",
       "notifications": "Notificacións",
-      "notificationsCount": "{{count}} de 2 activados",
+      "notificationsCount": "{{displayCount}} de 2 activados",
       "slaPolicy": "Política de SLA",
       "disabledNoManage": "Security Agent está desactivado. Só os propietarios da organización e os xestores de facturación poden activalo.",
       "disabledNoRepo": "Selecciona polo menos un repositorio antes de activar Security Agent.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Abrir solicitude de cambios{{number}}",
       "openDraftPullRequest": "Abrir borrador de solicitude de cambios{{number}}",
       "progress": "Progreso",
-      "attemptHistory": "Historial de intentos ({{count}})",
+      "attemptHistory": "Historial de intentos ({{displayCount}})",
       "attemptNumber": "Intento #{{number}}",
       "startedBy": "Iniciado por",
       "model": "Modelo",
@@ -1855,9 +1878,9 @@
       "toolTask": "tarefa",
       "readTodos": "Ler tarefas",
       "updateTodos": "Actualizar tarefas",
-      "linesBadge": "{{count}} liñas",
-      "filesBadge": "{{count}} ficheiros",
-      "matchesBadge": "{{count}} coincidencias"
+      "linesBadge": "{{displayCount}} liñas",
+      "filesBadge": "{{displayCount}} ficheiros",
+      "matchesBadge": "{{displayCount}} coincidencias"
     },
     "readToolMarkdown": {
       "linesTruncated": "liñas {{start}}–{{end}} (truncado)",
@@ -1892,6 +1915,10 @@
     },
     "modeSelector": {
       "accessibility": "Modo: {{label}}"
+    },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
     },
     "modeOptions": {
       "code": "Código",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Preparación completada",
       "preparationFailed": "Fallou a preparación",
       "setupCommand": "Comando de configuración {{index}}",
-      "setupCommandOf": "Comando de configuración {{index}} de {{count}}"
+      "setupCommandOf": "Comando de configuración {{index}} de {{displayCount}}"
     },
     "permissionCard": {
       "title": "Requírese permiso",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Fallou o envío. Téntao de novo.",
       "questionAnnouncement": "O axente necesita a túa resposta. O compositor está en pausa mentres respondes.",
       "permissionAnnouncement": "O axente precisa permiso para continuar. O compositor está en pausa mentres decides.",
-      "positionHint": "(1 de {{count}})",
+      "positionHint": "(1 de {{displayCount}})",
       "movedPastPrompt": "O axente superou esta pregunta. Esta tarxeta pecharase cando continúe a sesión.",
       "waitingForAnswer": "O axente está agardando a túa resposta. Mentres esta pregunta estea aberta, a túa mensaxe para o axente está en pausa.",
       "waitingForPermission": "O axente está agardando permiso. Mentres esta solicitude estea aberta, a túa mensaxe para o axente está en pausa."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Acceso á cámara desactivado",
       "cameraAccessMessage": "Permite o acceso á cámara en Configuración para tirar unha foto.",
       "couldNotOpenPhotoPicker": "Non se puido abrir o selector de fotos. Reinicia Kilo e téntao de novo.",
-      "maxFilesAllowed": "Máximo de {{count}} ficheiros permitidos",
+      "maxFilesAllowed": "Máximo de {{displayCount}} ficheiros permitidos",
       "onlyAddingFiles": "Engadíndose só {{accepted}} de {{total}} ficheiros (máx. {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "custo {{cost}}",
       "costSuffix": ", custo {{cost}}",
       "tokensWindowUnavailable": "Contexto de {{used}} tokens, xanela non dispoñible",
-      "tokensUsage": "Contexto de {{used}} de {{window}} tokens, {{percentage}}% usado",
+      "tokensUsage": "Contexto de {{used}} de {{window}} tokens, {{percentage}} usado",
       "title": "Uso do contexto",
       "used": "Usado",
       "remaining": "Restante",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "O uso reflicte a última resposta completada do asistente.",
       "tokenUsage": "Uso de tokens",
       "cacheRate": "Taxa de caché",
-      "modelsCount": "Modelos ({{count}})",
+      "modelsCount": "Modelos ({{displayCount}})",
       "tokenTotalsNote": "Os totais de tokens cobren só esta sesión e exclúen os tokens de subaxentes/sesións fillas.",
       "subagents": "Subaxentes",
       "subagentsDescription": "Custo residual das sesións fillas",
@@ -2373,7 +2400,7 @@
     "connectedCli": "Nun CLI conectado",
     "newSessionOn": "Nova sesión en {{name}}",
     "noMatchingSessions": "Non hai sesións que coincidan.",
-    "onlyFirstFilesAttached": "Só se anexarán os primeiros {{count}} ficheiros.",
+    "onlyFirstFilesAttached": "Só se anexarán os primeiros {{displayCount}} ficheiros.",
     "staleMessage": "Este compartido xa non está dispoñible.",
     "retryableMessage": "Non se puideron cargar as túas sesións.",
     "emptyMessage": "Aínda non hai sesións — inicia unha nova para enviar isto.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "O Kilo Pass desta conta de Apple pertence a outra conta de Kilo. Inicia sesión nesa conta de Kilo para xestionalo.",
     "alreadySubscribed": "Xa tes unha subscrición de Kilo Pass.",
     "purchaseUnavailable": "A compra de Kilo Pass non está dispoñible neste momento.",
-    "tierCredits": "${{amount}} en créditos",
+    "tierCredits": "{{amount}} en créditos",
     "perMonth": "{{price}}/mes",
     "verifyPurchaseFailed": "Non se puido verificar a túa compra. Comproba a túa conexión e téntao de novo.",
     "productsCouldNotLoad": "Non se puideron cargar os produtos de Kilo Pass desde a App Store.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "Non se puido abrir a xestión de subscricións da App Store.",
     "kiloPassSetup": "Configuración de Kilo Pass",
     "subscriptionHeaderDescription": "Unha subscrición mensual que engade créditos ao teu saldo de Kilo para executar sesións de codificación con IA na app de Kilo — Cloud Agents, sesións remotas e chats de KiloClaw.",
-    "tierDescription": "${{price}} de créditos pagados engadidos mensualmente para o uso da app de Kilo.",
+    "tierDescription": "{{price}} de créditos pagados engadidos mensualmente para o uso da app de Kilo.",
     "subscribe": "Subscribirse",
     "subscribeDescription": "Créditos mensuais con progreso de bonificación",
     "manage": "Xestionar",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass pendente",
     "statusCanceling": "Kilo Pass cancelándose",
     "statusPastDue": "Kilo Pass con vencemento superado",
-    "monthlyCredits": "${{credits}} de créditos mensuais",
+    "monthlyCredits": "{{credits}} de créditos mensuais",
     "ends": "Remata {{date}}",
     "periodEnd": "fin do período",
     "managedOnGooglePlay": "Xestionado en Google Play",

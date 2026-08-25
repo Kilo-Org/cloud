@@ -206,11 +206,11 @@
       "loadingLines": "Ag lódáil {{loaded}} de {{total}} líne…",
       "expandContext": "Leathnaigh comhthéacs",
       "expandMoreContext": "Leathnaigh níos mó comhthéacs",
-      "expandLines": "Leathnaigh {{count}} líne ({{start}}–{{end}})",
-      "expandMoreLines": "Leathnaigh níos mó {{count}} líne ({{start}}–{{end}})",
-      "expandLinesOfContext": "Leathnaigh {{count}} líne comhthéacs",
+      "expandLines": "Leathnaigh {{displayCount}} líne ({{start}}–{{end}})",
+      "expandMoreLines": "Leathnaigh níos mó {{displayCount}} líne ({{start}}–{{end}})",
+      "expandLinesOfContext": "Leathnaigh {{displayCount}} líne comhthéacs",
       "expandAll": "Leathnaigh go léir",
-      "expandAllLines": "Leathnaigh {{count}} líne go léir",
+      "expandAllLines": "Leathnaigh {{displayCount}} líne go léir",
       "loadingMoreFiles": "Ag lódáil tuilleadh comhad…",
       "retryLoadingNextPage": "Bain triail as an chéad leathanach eile a lódáil arís",
       "failedToLoadMoreFiles": "Theip ar thuilleadh comhad a lódáil — tapáil chun triail arís a bhaint",
@@ -227,7 +227,13 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} comhad lódáilte de {{total}}",
       "filesStillLoading": "Tá na comhaid fós ag lódáil. Tarraing chun athnuachan a dhéanamh.",
       "goToOverview": "Téigh go dtí an Forléargas",
-      "goToOverviewTab": "Téigh go dtí an táb Forléargais"
+      "goToOverviewTab": "Téigh go dtí an táb Forléargais",
+      "fileLoadedCount_two": "{{displayCount}} chomhad lódáilte",
+      "fileLoadedCount_few": "{{displayCount}} chomhad lódáilte",
+      "fileLoadedCount_many": "{{displayCount}} comhad lódáilte",
+      "fileLoadedOfTotalCount_two": "{{displayCount}} chomhad lódáilte de {{total}}",
+      "fileLoadedOfTotalCount_few": "{{displayCount}} chomhad lódáilte de {{total}}",
+      "fileLoadedOfTotalCount_many": "{{displayCount}} comhad lódáilte de {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ gan líne nua ag deireadh an chomhaid",
@@ -301,7 +307,7 @@
       "closeReactions": "Dún imoibriúcháin",
       "reactionsTitle": "Imoibriúcháin",
       "addReaction": "Cuir imoibriúchán leis",
-      "reactionPill": "{{emoji}} imoibriúchán, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} imoibriúchán, {{displayCount}} {{countLabel}}",
       "reaction_one": "imoibriúchán",
       "reaction": "imoibriúcháin",
       "reaction_other": "imoibriúcháin",
@@ -353,10 +359,16 @@
       "noDiscussionDescription": "Níl aon snáithe athbhreithnithe ná tráchtanna comhrá ar an iarratas tarraingthe seo.",
       "reviewFiles": "Athbhreithnigh comhaid",
       "quotedDiffSnippet": "Sliocht diff luadhite",
-      "moreLinesAbove": "… {{count}} líne eile thuas",
+      "moreLinesAbove": "… {{displayCount}} líne eile thuas",
       "termsAcceptRequired": "Caithfidh tú glacadh le Téarmaí na Seirbhíse chun postáil.",
       "termsOutdatedCopy": "Athraíodh Téarmaí na Seirbhíse. Athoscail an scáileán seo chun glacadh leis an leagan is déanaí.",
-      "termsCheckRetryCopy": "Níorbh fhéidir Téarmaí na Seirbhíse a sheiceáil. Seiceáil do nasc agus bain triail as arís."
+      "termsCheckRetryCopy": "Níorbh fhéidir Téarmaí na Seirbhíse a sheiceáil. Seiceáil do nasc agus bain triail as arís.",
+      "comment_two": "{{displayCount}} thrácht",
+      "comment_few": "{{displayCount}} thrácht",
+      "comment_many": "{{displayCount}} trácht",
+      "reaction_two": "imoibriúchán",
+      "reaction_few": "imoibriúchán",
+      "reaction_many": "imoibriúcháin"
     },
     "couldNotOpenGitHubAppSettings": "Níorbh fhéidir socruithe Aip GitHub a oscailt",
     "installKiloGitHubApp": "Suiteáil Aip GitHub Kilo",
@@ -395,11 +407,11 @@
       "retryChecks": "Bain triail as seiceálacha arís",
       "viewOnGitHub": "Féach ar an PR ar GitHub",
       "noChecksReported": "Níor tuairiscíodh aon seiceáil",
-      "passed": "{{count}} rith",
-      "failed": "{{count}} theip",
-      "pending": "{{count}} ar feitheamh",
-      "skipped": "{{count}} scipeáilte",
-      "checksCount": "{{count}} seiceáil",
+      "passed": "{{displayCount}} rith",
+      "failed": "{{displayCount}} theip",
+      "pending": "{{displayCount}} ar feitheamh",
+      "skipped": "{{displayCount}} scipeáilte",
+      "checksCount": "{{displayCount}} seiceáil",
       "checkDetails": "sonraí seiceála",
       "pullRequest": "iarratas tarraingthe"
     },
@@ -459,9 +471,12 @@
       "pendingComment_one": "trácht ar feitheamh",
       "pendingComment": "tráchtanna ar feitheamh",
       "pendingComment_other": "tráchtanna ar feitheamh",
-      "submitCountOfTotal": "Seol {{freshCount}} de {{totalCount}} trácht",
+      "submitCountOfTotal": "Seol {{displayFreshCount}} de {{displayTotalCount}} trácht",
       "submitReview": "Seol athbhreithniú",
-      "partialPostedMessage": "Postáladh {{freshCount}} trácht(anna). Díríonn {{staleCount}} trácht(anna) ar thiomantas níos sine agus d'fhan siad i do scuaine."
+      "partialPostedMessage": "Postáladh {{displayFreshCount}} trácht(anna). Díríonn {{displayStaleCount}} trácht(anna) ar thiomantas níos sine agus d'fhan siad i do scuaine.",
+      "pendingComment_two": "thrácht ar feitheamh",
+      "pendingComment_few": "thrácht ar feitheamh",
+      "pendingComment_many": "tráchtanna ar feitheamh"
     },
     "reconnectNotice": {
       "title": "Tá an nasc GitHub imithe in éag",
@@ -488,7 +503,13 @@
       "commit_other": "tiomantais",
       "file_one": "comhad",
       "file": "comhaid",
-      "file_other": "comhaid"
+      "file_other": "comhaid",
+      "commit_two": "thiomantas",
+      "commit_few": "thiomantas",
+      "commit_many": "tiomantais",
+      "file_two": "chomhad",
+      "file_few": "chomhad",
+      "file_many": "comhaid"
     },
     "pendingComment": {
       "editOutdatedA11y": "Cuir trácht seanchaithe ar feitheamh in eagar ar {{location}}",
@@ -580,7 +601,8 @@
     "agents": "Gníomhairí",
     "profile": "Próifíl",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, cluaisín, {{position}} as {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +643,7 @@
       "recent": "Le déanaí",
       "common": "Coitianta",
       "reactWith": "Imoibrigh le {{reaction}}",
-      "accessibility": "{{emoji}} imoibriúchán, {{count}}"
+      "accessibility": "{{emoji}} imoibriúchán, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Ag freagra ar",
@@ -650,7 +672,7 @@
       "imageUnavailable": "Íomhá ar fáil",
       "openFailed": "Níorbh fhéidir an ceangaltán a oscailt. Seiceáil do nasc agus bain triail as arís.",
       "attachFailed": "Theip ar an gcomhad a cheangal",
-      "limit": "Is féidir leat suas le {{count}} comhad a cheangal.",
+      "limit": "Is féidir leat suas le {{displayCount}} comhad a cheangal.",
       "sizeRejection": "Is mó {{filename}} ná an teorainn cheangail {{limit}}.",
       "unreadable": "Níorbh fhéidir {{filename}} a léamh.",
       "pastedImage": "an íomhá ghreamaithe",
@@ -700,7 +722,10 @@
       "someone": "Duine éigin",
       "typing_one": "Tá {{name}} ag clóscríobh...",
       "typing": "Tá {{names}} ag clóscríobh...",
-      "typing_other": "Tá {{names}} ag clóscríobh..."
+      "typing_other": "Tá {{names}} ag clóscríobh...",
+      "typing_two": "Tá {{names}} ag clóscríobh...",
+      "typing_few": "Tá {{names}} ag clóscríobh...",
+      "typing_many": "Tá {{names}} ag clóscríobh..."
     },
     "botStatus": {
       "online": "Ar líne",
@@ -734,17 +759,18 @@
       "finalCommitTermEndsOn": "Críochnaíonn do théarma Tiomantais dheiridh ar {{date}}. Lean ar aghaidh mar Chaighdeán ag {{price}}, nó críochnaíonn an t-óstáil.",
       "freeTrial": "Triail Saor in Aisce",
       "hostingEnds": "Críochnaíonn an t-óstáil",
+      "lessThanOneDay": "Níos lú ná 1 lá",
       "renews": "Athnuaitear",
       "standardMonthToMonth": "Caighdeánach mí ar mhí",
       "standardStartsOn": "Tosóidh an Caighdeán ar {{date}} ag {{price}}.",
       "yourStandardMonthlyPrice": "do phraghas míosúil Caighdeánach",
       "perMonth": "/mí",
       "earlybirdAccessUntil": "Rochtain Earlybird go dtí {{date}}",
-      "earlybirdEnding": "Earlybird ag críochnú: {{days}} lá fágtha",
+      "earlybirdEnding": "Earlybird ag críochnú: {{remaining}}",
       "paymentPastDue": "Íocaíocht thar téarma. Nuashonraigh do mhodh íocaíochta le do thoil.",
       "subscriptionCancels": "Cealaítear an síntiús {{date}}",
-      "trialDaysRemaining": "Triail: {{days}} lá fágtha",
-      "trialEndingSoon": "Triail ag críochnú go luath: {{days}}"
+      "trialDaysRemaining": "Triail: {{remaining}} fágtha",
+      "trialEndingSoon": "Triail ag críochnú go luath: {{remaining}}"
     },
     "changelog": {
       "title": "Cad atá Nua",
@@ -996,7 +1022,7 @@
         "stalledTitle": "Chuir rud éigin stad",
         "stalledBody": "Níorbh fhéidir linn {{name}} a shocrú. Bain triail as arís, nó seol ríomhphost chuig hi@kilo.ai má leanann sé seo.",
         "timeoutTitle": "Ag tógáil níos faide ná mar a bhíothas ag súil leis",
-        "timeoutBody": "Tá socrú {{name}} ag tógáil níos faide ná mar is gnách (breis agus {{minutes}} nóiméad).",
+        "timeoutBody": "Tá socrú {{name}} ag tógáil níos faide ná mar is gnách (breis agus {{displayMinutes}} nóiméad).",
         "continueInBackground": "Lean ar aghaidh sa chúlra",
         "settingUp": "Ag socrú {{name}}",
         "finishingSetup": "Ag críochnú socraithe",
@@ -1071,7 +1097,10 @@
       "openUnread_other": "Oscail {{name}}, {{displayCount}} teachtaireacht gan léamh",
       "open": "Oscail {{name}}",
       "openSettings": "Oscail socruithe do {{name}}",
-      "fixOnKiloAi": "Deisigh ar kilo.ai: {{label}}"
+      "fixOnKiloAi": "Deisigh ar kilo.ai: {{label}}",
+      "openUnread_two": "Oscail {{name}}, {{displayCount}} theachtaireacht gan léamh",
+      "openUnread_few": "Oscail {{name}}, {{displayCount}} theachtaireacht gan léamh",
+      "openUnread_many": "Oscail {{name}}, {{displayCount}} teachtaireacht gan léamh"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1287,7 +1316,7 @@
       "mergeGate": "Geata cumaisc",
       "repositories": "Stóir",
       "allRepositories": "Gach stór",
-      "nSelected": "{{count}} roghnaithe",
+      "nSelected": "{{displayCount}} roghnaithe",
       "reviewMemory": "Cuimhne athbhreithnithe",
       "proposedReviewMdGuidance": "Treoir REVIEW.md molta"
     },
@@ -1367,7 +1396,10 @@
       "severityAll": "Gach déine",
       "confidenceHighOnly": "Muinín ard amháin",
       "confidenceMediumOrHigher": "Meánach nó níos airde",
-      "confidenceAny": "Muinín ar bith"
+      "confidenceAny": "Muinín ar bith",
+      "queued_two": "{{displayCount}} fhionnachtain atá ann cheana i scuaine le haghaidh anailíse.",
+      "queued_few": "{{displayCount}} fhionnachtain atá ann cheana i scuaine le haghaidh anailíse.",
+      "queued_many": "{{displayCount}} fionnachtain atá ann cheana i scuaine le haghaidh anailíse."
     },
     "analysis": {
       "couldNotLoad": "Níorbh fhéidir an anailís a lódáil",
@@ -1391,14 +1423,14 @@
       "analyzed": "Anailísithe",
       "exploitabilityReasoning": "Réasúnaíocht inshaothraitheachta",
       "suggestedFix": "Deisiúchán molta",
-      "whereFound": "Cá bhfuarthas é seo ({{count}})",
+      "whereFound": "Cá bhfuarthas é seo ({{displayCount}})",
       "fullReport": "Tuairisc iomlán ginte",
       "unknown": "Anaithnid",
       "yes": "Tá",
       "no": "Níl"
     },
     "dashboard": {
-      "findingsCount": "{{count}} fionnachtain",
+      "findingsCount": "{{displayCount}} fionnachtain",
       "notMeasured": "Ní tomhaiste",
       "actFirst": "Gníomhaigh ar dtús",
       "slaPosture": "Staidiúir SLA",
@@ -1407,7 +1439,7 @@
       "repositoryActionPlan": "Plean gníomhaíochta stóir",
       "noOpenFindings": "Ní gá aird ar aon fhionnachtain oscailte",
       "deadlineToday": "Sroicheadh spriocdháta inniu",
-      "daysOverdue": "{{count}} lá thar am",
+      "daysOverdue": "{{displayCount}} lá thar am",
       "withinDeadline": "Laistigh den spriocdháta",
       "criticalOverdue": "An-chriticiúil thar am",
       "highOverdue": "Ard thar am",
@@ -1434,6 +1466,27 @@
       "syncNow": "Sioncrónaigh anois",
       "syncQueued": "Sioncrónú i scuaine",
       "syncStatusUnavailable": "Níl stádas sioncronaithe ar fáil"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Fionnachtana oscailte",
+      "openFindingsDetail": "{{critical}} criticiúil, {{high}} ard",
+      "confirmedExploitable": "Inshaothraithe deimhnithe",
+      "confirmedExploitableDetail": "Priacal an tionscadail deimhnithe ag an anailís",
+      "needsReview": "Teastaíonn d'athbhreithniú",
+      "needsReviewDetail": "Cinneadh daonna ag teastáil",
+      "analysisIncomplete": "Anailís nach bhfuil críochnaithe",
+      "analysisIncompleteDetail": "Priacal an tionscadail anaithnid fós",
+      "slaCompliance": "Comhlíonadh SLA",
+      "notMeasured": "Ní tomhaiste",
+      "withinDeadlineDetail": "{{within}} as {{total}} laistigh den spriocdháta",
+      "noDeadlineData": "Níl spriocdháta SLA ag aon fhionnachtain fós",
+      "deadlinePassed": "Spriocdháta rite",
+      "deadlinePassedDetail": "{{critical}} criticiúil, {{high}} ard",
+      "dueThisWeek": "Dlite an tseachtain seo",
+      "dueThisWeekDetail": "{{exploitable}} inshaothraithe deimhnithe",
+      "noDeadline": "Gan spriocdháta",
+      "reviewSlaAssignment": "Athbhreithnigh sannadh SLA",
+      "allOpenFindingsTracked": "Rianaitear gach fionnachtain oscailte"
     },
     "dismiss": {
       "title": "Díbhe fionnachtain",
@@ -1500,13 +1553,16 @@
       "analysisModeSubtitle": "anailís {{mode}}",
       "automation": "Uathoibriú",
       "automationAllOff": "Gach as",
-      "automationCount": "{{count}} de 3 cumasaithe",
+      "automationCount": "{{displayCount}} de 3 cumasaithe",
       "notifications": "Fógraí",
-      "notificationsCount": "{{count}} de 2 cumasaithe",
+      "notificationsCount": "{{displayCount}} de 2 cumasaithe",
       "slaPolicy": "Polasaí SLA",
       "disabledNoManage": "Tá Security Agent díchumasaithe. Ní féidir ach le húinéirí eagraíochta agus bainisteoirí billeála é a chasadh air.",
       "disabledNoRepo": "Roghnaigh stór amháin ar a laghad sula gcumasaítear Security Agent.",
-      "disabledPrompt": "Cuir Security Agent ar siúl chun foláirimh Dependabot a shioncrónú, stórtha a roghnú, agus uathoibriú a chumrú."
+      "disabledPrompt": "Cuir Security Agent ar siúl chun foláirimh Dependabot a shioncrónú, stórtha a roghnú, agus uathoibriú a chumrú.",
+      "repositoriesCount_two": "{{displayCount}} shór roghnaithe",
+      "repositoriesCount_few": "{{displayCount}} stór roghnaithe",
+      "repositoriesCount_many": "{{displayCount}} stór roghnaithe"
     },
     "remediation": {
       "cancellationRequested": "Iarradh cealú",
@@ -1524,7 +1580,7 @@
       "openPullRequest": "Oscail iarratas tarraingthe{{number}}",
       "openDraftPullRequest": "Oscail dréacht-iarratas tarraingthe{{number}}",
       "progress": "Dul chun cinn",
-      "attemptHistory": "Stair iarrachtaí ({{count}})",
+      "attemptHistory": "Stair iarrachtaí ({{displayCount}})",
       "attemptNumber": "Iarracht #{{number}}",
       "startedBy": "Tionscnaithe ag",
       "model": "Samhail",
@@ -1734,7 +1790,13 @@
       "cent_other": "cent",
       "dollar_one": "dollar",
       "dollar": "dollar",
-      "dollar_other": "dollar"
+      "dollar_other": "dollar",
+      "cent_two": "cent",
+      "cent_few": "cent",
+      "cent_many": "cent",
+      "dollar_two": "dollar",
+      "dollar_few": "dollar",
+      "dollar_many": "dollar"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Níorbh fhéidir GitHub a oscailt",
@@ -1830,7 +1892,10 @@
     "partRenderer": {
       "updatedFileCount_one": "Nuashonraíodh {{displayCount}} comhad",
       "updatedFileCount": "Nuashonraíodh {{displayCount}} comhad",
-      "updatedFileCount_other": "Nuashonraíodh {{displayCount}} comhad"
+      "updatedFileCount_other": "Nuashonraíodh {{displayCount}} comhad",
+      "updatedFileCount_two": "Nuashonraíodh {{displayCount}} chomhad",
+      "updatedFileCount_few": "Nuashonraíodh {{displayCount}} chomhad",
+      "updatedFileCount_many": "Nuashonraíodh {{displayCount}} gcomhad"
     },
     "toolPatch": {
       "operationAdded": "Curtha leis",
@@ -1855,9 +1920,9 @@
       "toolTask": "tasc",
       "readTodos": "Léigh tascanna",
       "updateTodos": "Nuashonraigh tascanna",
-      "linesBadge": "{{count}} líne",
-      "filesBadge": "{{count}} comhad",
-      "matchesBadge": "{{count}} meaitseáil"
+      "linesBadge": "{{displayCount}} líne",
+      "filesBadge": "{{displayCount}} comhad",
+      "matchesBadge": "{{displayCount}} meaitseáil"
     },
     "readToolMarkdown": {
       "linesTruncated": "línte {{start}}–{{end}} (gearrtha)",
@@ -1892,6 +1957,10 @@
     },
     "modeSelector": {
       "accessibility": "Mód: {{label}}"
+    },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
     },
     "modeOptions": {
       "code": "Cód",
@@ -1999,7 +2068,7 @@
       "preparationComplete": "Ullmhú críochnaithe",
       "preparationFailed": "Theip ar an ullmhú",
       "setupCommand": "Ordú socraithe {{index}}",
-      "setupCommandOf": "Ordú socraithe {{index}} de {{count}}"
+      "setupCommandOf": "Ordú socraithe {{index}} de {{displayCount}}"
     },
     "permissionCard": {
       "title": "Cead ag teastáil",
@@ -2036,7 +2105,7 @@
       "submissionFailed": "Theip ar an aighneacht. Bain triail as arís.",
       "questionAnnouncement": "Teastaíonn d'ionchur ón ngníomhaire. Tá an cumadóir ar sos agus tú ag freagairt.",
       "permissionAnnouncement": "Teastaíonn cead ón ngníomhaire chun leanúint ar aghaidh. Tá an cumadóir ar sos agus tú ag cinneadh.",
-      "positionHint": "(1 as {{count}})",
+      "positionHint": "(1 as {{displayCount}})",
       "movedPastPrompt": "Tá an gníomhaire tar éis bogadh thar an leid seo. Dúnfaidh an cárta seo nuair a leanfaidh an seisiún ar aghaidh.",
       "waitingForAnswer": "Tá an gníomhaire ag fanacht ar do fhreagra. Agus an cheist seo ar oscailt, tá do theachtaireacht chuig an ngníomhaire ar sos.",
       "waitingForPermission": "Tá an gníomhaire ag fanacht ar chead. Agus an t-iarratas seo ar oscailt, tá do theachtaireacht chuig an ngníomhaire ar sos."
@@ -2076,7 +2145,10 @@
       "omitted_other": "Níorbh fhéidir {{displayCount}} mír níos luaithe ón seisiún seo a thaispeáint.",
       "couldNotLoad": "Níorbh fhéidir teachtaireachtaí níos luaithe a lódáil.",
       "unavailable": "Níl teachtaireachtaí níos luaithe ar fáil.",
-      "tooLarge": "Tá teachtaireachtaí níos luaithe rómhór le lódáil."
+      "tooLarge": "Tá teachtaireachtaí níos luaithe rómhór le lódáil.",
+      "omitted_two": "Níorbh fhéidir {{displayCount}} mhír níos luaithe ón seisiún seo a thaispeáint.",
+      "omitted_few": "Níorbh fhéidir {{displayCount}} mhír níos luaithe ón seisiún seo a thaispeáint.",
+      "omitted_many": "Níorbh fhéidir {{displayCount}} mír níos luaithe ón seisiún seo a thaispeáint."
     },
     "markdownTable": {
       "viewTable": "Féach ar an tábla",
@@ -2088,7 +2160,13 @@
       "rowCount_one": "ró",
       "rowCount": "rónna",
       "rowCount_other": "rónna",
-      "opensFullScreen": "osclaíonn scáileán iomlán"
+      "opensFullScreen": "osclaíonn scáileán iomlán",
+      "columnCount_two": "cholún",
+      "columnCount_few": "cholún",
+      "columnCount_many": "gcolún",
+      "rowCount_two": "ró",
+      "rowCount_few": "ró",
+      "rowCount_many": "ró"
     },
     "sessionFilter": {
       "title": "Scag seisiúin",
@@ -2157,7 +2235,7 @@
       "cameraAccessDisabled": "Rochtain Ceamara Díchumasaithe",
       "cameraAccessMessage": "Ceadaigh rochtain ceamara i Socruithe le grianghraf a ghlacadh.",
       "couldNotOpenPhotoPicker": "Níorbh fhéidir roghnóir na ngrianghraf a oscailt. Atosaigh Kilo agus bain triail as arís.",
-      "maxFilesAllowed": "Uasmhéid {{count}} comhad ceadaithe",
+      "maxFilesAllowed": "Uasmhéid {{displayCount}} comhad ceadaithe",
       "onlyAddingFiles": "Ag cur {{accepted}} de {{total}} comhad amháin leis (uas {{max}})"
     },
     "composer": {
@@ -2222,7 +2300,7 @@
       "costPrefix": "costas {{cost}}",
       "costSuffix": ", costas {{cost}}",
       "tokensWindowUnavailable": "Comhthéacs {{used}} thocain, fuinneog gan fáil",
-      "tokensUsage": "Comhthéacs {{used}} de {{window}} thocain, {{percentage}}% in úsáid",
+      "tokensUsage": "Comhthéacs {{used}} de {{window}} thocain, {{percentage}} in úsáid",
       "title": "Úsáid comhthéacs",
       "used": "In úsáid",
       "remaining": "Fágtha",
@@ -2231,7 +2309,7 @@
       "usageReflectsLatest": "Léiríonn an úsáid an freagra cúntóra iomlánaithe is déanaí.",
       "tokenUsage": "Úsáid tocain",
       "cacheRate": "Ráta taisce",
-      "modelsCount": "Samhlacha ({{count}})",
+      "modelsCount": "Samhlacha ({{displayCount}})",
       "tokenTotalsNote": "Clúdaíonn iomláin tocain an seisiún seo amháin agus ní áirítear leo tocain foghníomhaire/seisiún linbh.",
       "subagents": "Foghníomhairí",
       "subagentsDescription": "Costas iarmharach ó sheisiúin linbh",
@@ -2243,7 +2321,10 @@
       "stepsCount_one": "{{steps}} chéim",
       "stepsCount": "{{steps}} céim",
       "stepsCount_other": "{{steps}} céim",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "stepsCount_two": "{{steps}} chéim",
+      "stepsCount_few": "{{steps}} chéim",
+      "stepsCount_many": "{{steps}} céim"
     },
     "prBadge": {
       "open": "iarratas tarraingthe ar oscailt",
@@ -2373,7 +2454,7 @@
     "connectedCli": "Ar CLI ceangailte",
     "newSessionOn": "Seisiún nua ar {{name}}",
     "noMatchingSessions": "Níl aon seisiúin mheaitseála.",
-    "onlyFirstFilesAttached": "Ní bheidh ceangailte ach na chéad {{count}} chomhad.",
+    "onlyFirstFilesAttached": "Ní bheidh ceangailte ach na chéad {{displayCount}} chomhad.",
     "staleMessage": "Níl an roinnt seo ar fáil a thuilleadh.",
     "retryableMessage": "Níorbh fhéidir do sheisiúin a lódáil.",
     "emptyMessage": "Níl aon seisiúin fós — tosaigh ceann nua le hé seo a sheoladh.",
@@ -2406,7 +2487,7 @@
     "otherAccountCopy": "Baineann an Kilo Pass ar an Apple Account seo le cuntas Kilo éagsúil. Sínigh isteach sa chuntas Kilo sin le bainistiú a dhéanamh air.",
     "alreadySubscribed": "Tá sintiús Kilo Pass agat cheana féin.",
     "purchaseUnavailable": "Níl ceannach Kilo Pass ar fáil faoi láthair.",
-    "tierCredits": "${{amount}} i gcreidmheasanna",
+    "tierCredits": "{{amount}} i gcreidmheasanna",
     "perMonth": "{{price}}/mí",
     "verifyPurchaseFailed": "Níorbh fhéidir do cheannach a fhíorú. Seiceáil do cheangal agus bain triail as arís.",
     "productsCouldNotLoad": "Níorbh fhéidir táirgí Kilo Pass a lódáil ó App Store.",
@@ -2417,7 +2498,7 @@
     "manageFailed": "Theip ar bhainistíocht sintiúis App Store a oscailt.",
     "kiloPassSetup": "Socrú Kilo Pass",
     "subscriptionHeaderDescription": "Sintiús míosúil a chuireann creidmheasanna le do chothromas Kilo le haghaidh seisiúin chódaithe AI a rith in Kilo App — Cloud Agents, seisiúin chianoibre, agus comhráite KiloClaw.",
-    "tierDescription": "${{price}} i gcreidmheasanna íoctha curtha leis gach mí le haghaidh úsáid Kilo App.",
+    "tierDescription": "{{price}} i gcreidmheasanna íoctha curtha leis gach mí le haghaidh úsáid Kilo App.",
     "subscribe": "Liostáil",
     "subscribeDescription": "Creidmheasanna míosúla le dul chun cinn bónais",
     "manage": "Bainistigh",
@@ -2425,7 +2506,7 @@
     "statusPending": "Kilo Pass ar feitheamh",
     "statusCanceling": "Kilo Pass ag cealú",
     "statusPastDue": "Kilo Pass thar téarma",
-    "monthlyCredits": "${{credits}} i gcreidmheasanna míosúla",
+    "monthlyCredits": "{{credits}} i gcreidmheasanna míosúla",
     "ends": "Críochnaíonn {{date}}",
     "periodEnd": "deireadh tréimhse",
     "managedOnGooglePlay": "Bainistithe ar Google Play",
@@ -2667,7 +2748,10 @@
       "processingNeedsReview": "Teastaíonn athbhreithniú ar phróiseáil",
       "retry": "Athiarracht",
       "retryHint": "Déanann sé athiarracht ar stádas Kilo Pass a lódáil.",
-      "setupHint": "Osclaíonn socrú Kilo Pass ar an ngréasán."
+      "setupHint": "Osclaíonn socrú Kilo Pass ar an ngréasán.",
+      "paidSeat_two": "{{displayCount}} shuíochán íoctha",
+      "paidSeat_few": "{{displayCount}} shuíochán íoctha",
+      "paidSeat_many": "{{displayCount}} suíochán íoctha"
     }
   },
   "authErrors": {

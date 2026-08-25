@@ -210,7 +210,10 @@ export function SessionContextSheet({
         {modelsSectionCount > 0 ? (
           <View className="mt-8 gap-3">
             <Text className="text-sm font-semibold text-foreground">
-              {t('agentChat.contextUsage.modelsCount', { count: modelsSectionCount })}
+              {t('agentChat.contextUsage.modelsCount', {
+                count: modelsSectionCount,
+                displayCount: formatNumber(modelsSectionCount, i18n.language),
+              })}
             </Text>
             <View className="gap-2">
               {visibleModels.map(model => (

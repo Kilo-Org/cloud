@@ -206,11 +206,11 @@
       "loadingLines": "{{total}} dan {{loaded}} qator yuklanmoqda…",
       "expandContext": "Kontekstni kengaytirish",
       "expandMoreContext": "Ko'proq kontekstni kengaytirish",
-      "expandLines": "{{count}} qatorni kengaytirish ({{start}}–{{end}})",
-      "expandMoreLines": "Yana {{count}} qatorni kengaytirish ({{start}}–{{end}})",
-      "expandLinesOfContext": "{{count}} qator kontekstni kengaytirish",
+      "expandLines": "{{displayCount}} qatorni kengaytirish ({{start}}–{{end}})",
+      "expandMoreLines": "Yana {{displayCount}} qatorni kengaytirish ({{start}}–{{end}})",
+      "expandLinesOfContext": "{{displayCount}} qator kontekstni kengaytirish",
       "expandAll": "Hammasini kengaytirish",
-      "expandAllLines": "Barcha {{count}} qatorni kengaytirish",
+      "expandAllLines": "Barcha {{displayCount}} qatorni kengaytirish",
       "loadingMoreFiles": "Ko'proq fayllar yuklanmoqda…",
       "retryLoadingNextPage": "Keyingi sahifani yuklashni qayta urinish",
       "failedToLoadMoreFiles": "Ko'proq fayllarni yuklab bo'lmadi — qayta urinish uchun bosing",
@@ -301,7 +301,7 @@
       "closeReactions": "Reaksiyalarni yopish",
       "reactionsTitle": "Reaksiyalar",
       "addReaction": "Reaksiya qo'shish",
-      "reactionPill": "{{emoji}} reaksiya, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} reaksiya, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksiya",
       "reaction": "reaksiya",
       "reaction_other": "reaksiya",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Bu pull requestda sharh mavzulari yoki suhbat izohlari yo'q.",
       "reviewFiles": "Fayllarni ko'rib chiqish",
       "quotedDiffSnippet": "Iqtibos qilingan diff parchasi",
-      "moreLinesAbove": "… yuqorida yana {{count}} qator",
+      "moreLinesAbove": "… yuqorida yana {{displayCount}} qator",
       "termsAcceptRequired": "Post qoldirish uchun Xizmat shartlarini qabul qilishingiz kerak.",
       "termsOutdatedCopy": "Xizmat shartlari o'zgardi. Eng so'nggi versiyani qabul qilish uchun bu ekranni qayta oching.",
       "termsCheckRetryCopy": "Xizmat shartlarini tekshirib bo'lmadi. Ulanishingizni tekshiring va qayta urinib ko'ring."
@@ -395,11 +395,11 @@
       "retryChecks": "Tekshiruvlarni qayta urinish",
       "viewOnGitHub": "PRni GitHubda ko'rish",
       "noChecksReported": "Tekshiruvlar hisobot qilinmagan",
-      "passed": "{{count}} o'tdi",
-      "failed": "{{count}} muvaffaqiyatsiz",
-      "pending": "{{count}} kutilmoqda",
-      "skipped": "{{count}} o'tkazib yuborildi",
-      "checksCount": "{{count}} tekshiruv",
+      "passed": "{{displayCount}} o'tdi",
+      "failed": "{{displayCount}} muvaffaqiyatsiz",
+      "pending": "{{displayCount}} kutilmoqda",
+      "skipped": "{{displayCount}} o'tkazib yuborildi",
+      "checksCount": "{{displayCount}} tekshiruv",
       "checkDetails": "tekshiruv tafsilotlari",
       "pullRequest": "pull request"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "kutilayotgan izoh",
       "pendingComment": "kutilayotgan izohlar",
       "pendingComment_other": "kutilayotgan izohlar",
-      "submitCountOfTotal": "{{totalCount}} izohdan {{freshCount}} tasini yuborish",
+      "submitCountOfTotal": "{{displayTotalCount}} izohdan {{displayFreshCount}} tasini yuborish",
       "submitReview": "Sharhni yuborish",
-      "partialPostedMessage": "{{freshCount}} izoh yuborildi. {{staleCount}} izoh eski commitga tegishli bo'lib, navbatingizda qoldi."
+      "partialPostedMessage": "{{displayFreshCount}} izoh yuborildi. {{displayStaleCount}} izoh eski commitga tegishli bo'lib, navbatingizda qoldi."
     },
     "reconnectNotice": {
       "title": "GitHub ulanishi muddati tugadi",
@@ -580,7 +580,8 @@
     "agents": "Agentlar",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, yorliq, {{total}} tadan {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Yaqin",
       "common": "Umumiy",
       "reactWith": "{{reaction}} bilan reaksiya qilish",
-      "accessibility": "{{emoji}} reaksiya, {{count}}"
+      "accessibility": "{{emoji}} reaksiya, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Javob berilmoqda",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Rasm mavjud emas",
       "openFailed": "Biriktirmani ochib bo'lmadi. Ulanishingizni tekshiring va qayta urinib ko'ring.",
       "attachFailed": "Faylni biriktirib bo'lmadi",
-      "limit": "Siz {{count}} tagacha fayl biriktira olasiz.",
+      "limit": "Siz {{displayCount}} tagacha fayl biriktira olasiz.",
       "sizeRejection": "{{filename}} {{limit}} biriktirma chegarasidan oshadi.",
       "unreadable": "{{filename}} ni o'qib bo'lmadi.",
       "pastedImage": "joylashtirilgan rasm",
@@ -722,6 +723,7 @@
       "finalTermEnds": "Yakuniy muddat tugaydi",
       "afterFinalTerm": "Yakuniy muddatdan keyin",
       "remaining": "Qolgani",
+      "lessThanOneDay": "1 kundan kam",
       "ends": "Tugaydi",
       "expires": "Muddati o'tadi",
       "noActivePlan": "Faol reja yo'q",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "Standard oylik narxingiz",
       "perMonth": "/oy",
       "earlybirdAccessUntil": "Erta qush kirishi {{date}} gacha",
-      "earlybirdEnding": "Erta qush tugamoqda: {{days}} kun qoldi",
+      "earlybirdEnding": "Erta qush tugamoqda: {{remaining}} kun qoldi",
       "paymentPastDue": "To'lov muddati o'tgan. Iltimos, to'lov usulini yangilang.",
       "subscriptionCancels": "Obuna {{date}} da bekor qilinadi",
-      "trialDaysRemaining": "Sinov: {{days}} kun qoldi",
-      "trialEndingSoon": "Sinov tugamoqda: {{days}}"
+      "trialDaysRemaining": "Sinov: {{remaining}} kun qoldi",
+      "trialEndingSoon": "Sinov tugamoqda: {{remaining}}"
     },
     "changelog": {
       "title": "Nima yangi",
@@ -996,7 +998,7 @@
         "stalledTitle": "Biror narsa to'xtab qoldi",
         "stalledBody": "{{name}}ni sozlashni yakunlay olmadik. Qayta urinib ko'ring yoki bu takrorlansa, hi@kilo.ai ga yozing.",
         "timeoutTitle": "Kutilganidan uzoq davom etyapti",
-        "timeoutBody": "{{name}} sozlovi odatdagidan uzoqroq davom etyapti ({{minutes}} daqiqadan ko'proq).",
+        "timeoutBody": "{{name}} sozlovi odatdagidan uzoqroq davom etyapti ({{displayMinutes}} daqiqadan ko'proq).",
         "continueInBackground": "Fonda davom ettirish",
         "settingUp": "{{name}} sozlanmoqda",
         "finishingSetup": "Sozlash yakunlanmoqda",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Merge shlyuzi",
       "repositories": "Repozitoriylar",
       "allRepositories": "Barcha repozitoriylar",
-      "nSelected": "{{count}} tanlandi",
+      "nSelected": "{{displayCount}} tanlandi",
       "reviewMemory": "Ko'rib chiqish xotirasi",
       "proposedReviewMdGuidance": "Taklif etilgan REVIEW.md yo'riqnomasi"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Tahlil qilingan",
       "exploitabilityReasoning": "Foydalanish imkoniyati asoslari",
       "suggestedFix": "Tavsiya etilgan tuzatish",
-      "whereFound": "Qayerda topilgan ({{count}})",
+      "whereFound": "Qayerda topilgan ({{displayCount}})",
       "fullReport": "To'liq yaratilgan hisobot",
       "unknown": "Noma'lum",
       "yes": "Ha",
       "no": "Yo'q"
     },
     "dashboard": {
-      "findingsCount": "{{count}} ta natija",
+      "findingsCount": "{{displayCount}} ta natija",
       "notMeasured": "O'lchanmagan",
       "actFirst": "Avval harakat qilish",
       "slaPosture": "SLA holati",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Repozitoriya harakat rejasi",
       "noOpenFindings": "E'tibor talab qiladigan ochiq natijalar yo'q",
       "deadlineToday": "Muddat bugun yetib bordi",
-      "daysOverdue": "{{count}} kun kechikdi",
+      "daysOverdue": "{{displayCount}} kun kechikdi",
       "withinDeadline": "Muddat ichida",
       "criticalOverdue": "Tanqidiy kechikdi",
       "highOverdue": "Yuqori kechikdi",
@@ -1434,6 +1436,27 @@
       "syncNow": "Hozir sinxronlash",
       "syncQueued": "Sinxronlash navbatga qo'yildi",
       "syncStatusUnavailable": "Sinxronlash holati mavjud emas"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Ochiq natijalar",
+      "openFindingsDetail": "{{critical}} tanqidiy, {{high}} yuqori",
+      "confirmedExploitable": "Tasdiqlangan foydalanish mumkin",
+      "confirmedExploitableDetail": "Loyiha xavfi tahlil bilan tasdiqlandi",
+      "needsReview": "Sizning ko'rib chiqishingiz kerak",
+      "needsReviewDetail": "Inson qarori talab qilinadi",
+      "analysisIncomplete": "Tahlil tugallanmagan",
+      "analysisIncompleteDetail": "Loyiha xavfi hali noma'lum",
+      "slaCompliance": "SLA muvofiqligi",
+      "notMeasured": "O'lchanmagan",
+      "withinDeadlineDetail": "{{total}} tadan {{within}} muddat ichida",
+      "noDeadlineData": "Hali SLA muddati bo'lgan natija yo'q",
+      "deadlinePassed": "Muddat o'tdi",
+      "deadlinePassedDetail": "{{critical}} tanqidiy, {{high}} yuqori",
+      "dueThisWeek": "Shu hafta muddat",
+      "dueThisWeekDetail": "{{exploitable}} tasdiqlangan foydalanish mumkin",
+      "noDeadline": "Muddat yo'q",
+      "reviewSlaAssignment": "SLA tayinlanishini ko'rib chiqish",
+      "allOpenFindingsTracked": "Barcha ochiq natijalar kuzatilmoqda"
     },
     "dismiss": {
       "title": "Natijani rad etish",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}} tahlil",
       "automation": "Avtomatlashtirish",
       "automationAllOff": "Hammasi o'chiq",
-      "automationCount": "{{count}} dan 3 tasi yoqilgan",
+      "automationCount": "{{displayCount}} dan 3 tasi yoqilgan",
       "notifications": "Bildirishnomalar",
-      "notificationsCount": "{{count}} dan 2 tasi yoqilgan",
+      "notificationsCount": "{{displayCount}} dan 2 tasi yoqilgan",
       "slaPolicy": "SLA siyosati",
       "disabledNoManage": "Security Agent o'chirilgan. Faqat tashkilot egalari va hisob-kitob menejerlari uni yoqishi mumkin.",
       "disabledNoRepo": "Security Agent'ni yoqishdan oldin kamida bitta repozitoriyani tanlang.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Pull request'ni ochish{{number}}",
       "openDraftPullRequest": "Qoralama pull request'ni ochish{{number}}",
       "progress": "Jarayon",
-      "attemptHistory": "Urinishlar tarixi ({{count}})",
+      "attemptHistory": "Urinishlar tarixi ({{displayCount}})",
       "attemptNumber": "Urinish #{{number}}",
       "startedBy": "Tomonidan boshlangan",
       "model": "Model",
@@ -1855,9 +1878,9 @@
       "toolTask": "vazifa",
       "readTodos": "Todolarni o'qish",
       "updateTodos": "Todolarni yangilash",
-      "linesBadge": "{{count}} qator",
-      "filesBadge": "{{count}} fayl",
-      "matchesBadge": "{{count}} moslik"
+      "linesBadge": "{{displayCount}} qator",
+      "filesBadge": "{{displayCount}} fayl",
+      "matchesBadge": "{{displayCount}} moslik"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} qatorlar (qisqartirilgan)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "Ushbu javobni xabar qilib bo'lmaydi.",
       "reportAiResponseSubmitted": "Xabar yuborildi. Tilxat {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Tafsilotlar mavjud emas",
       "textDisplay": "Matn ko'rinishi",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Tayyorlash tugallandi",
       "preparationFailed": "Tayyorlash muvaffaqiyatsiz tugadi",
       "setupCommand": "Sozlash buyrug'i {{index}}",
-      "setupCommandOf": "{{count}} dan {{index}} sozlash buyrug'i"
+      "setupCommandOf": "{{displayCount}} dan {{index}} sozlash buyrug'i"
     },
     "permissionCard": {
       "title": "Ruxsat talab qilinadi",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Yuborish amalga oshmadi. Iltimos, qayta urinib ko'ring.",
       "questionAnnouncement": "Agent sizning javobingizga muhtoj. Siz javob berayotganda komposer pauza qilinadi.",
       "permissionAnnouncement": "Agent davom etish uchun ruxsatga muhtoj. Siz qaror qilayotganda komposer pauza qilinadi.",
-      "positionHint": "({{count}} dan 1)",
+      "positionHint": "({{displayCount}} dan 1)",
       "movedPastPrompt": "Agent bu so'rovdan o'tib ketdi. Sessiya davom etganda bu karta yopiladi.",
       "waitingForAnswer": "Agent sizning javobingizni kutmoqda. Bu savol ochiq ekan, agentga xabaringiz pauza qilinadi.",
       "waitingForPermission": "Agent ruxsatni kutmoqda. Bu so'rov ochiq ekan, agentga xabaringiz pauza qilinadi."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Kamera kirishi o'chirilgan",
       "cameraAccessMessage": "Suratga olish uchun Sozlamalarda kamera kirishiga ruxsat bering.",
       "couldNotOpenPhotoPicker": "Foto tanlagichni ochib bo'lmadi. Kilo'ni qayta ishga tushiring va qayta urinib ko'ring.",
-      "maxFilesAllowed": "Maksimal {{count}} ta faylga ruxsat berilgan",
+      "maxFilesAllowed": "Maksimal {{displayCount}} ta faylga ruxsat berilgan",
       "onlyAddingFiles": "{{total}} faylning faqat {{accepted}} tasi qo'shilmoqda (maks {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "xarajat {{cost}}",
       "costSuffix": ", xarajat {{cost}}",
       "tokensWindowUnavailable": "Kontekst {{used}} token, oyna mavjud emas",
-      "tokensUsage": "Kontekst {{window}} tokendan {{used}} tasi, {{percentage}}% ishlatilgan",
+      "tokensUsage": "Kontekst {{window}} tokendan {{used}} tasi, {{percentage}} ishlatilgan",
       "title": "Kontekstdan foydalanish",
       "used": "Ishlatilgan",
       "remaining": "Qolgan",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "Foydalanish eng so'nggi yakunlangan yordamchi javobini aks ettiradi.",
       "tokenUsage": "Tokenlardan foydalanish",
       "cacheRate": "Kesh tezligi",
-      "modelsCount": "Modellar ({{count}})",
+      "modelsCount": "Modellar ({{displayCount}})",
       "tokenTotalsNote": "Token umumiy summalari faqat shu sessiyani qamrab oladi va subagent/bolalar sessiyasi tokenlarini hisobga olmaydi.",
       "subagents": "Subagentlar",
       "subagentsDescription": "Bola sessiyalaridan qolgan xarajat",
@@ -2373,7 +2400,7 @@
     "connectedCli": "Ulangan CLI'da",
     "newSessionOn": "{{name}} da yangi sessiya",
     "noMatchingSessions": "Mos keladigan sessiyalar yo'q.",
-    "onlyFirstFilesAttached": "Faqat birinchi {{count}} ta fayl biriktiriladi.",
+    "onlyFirstFilesAttached": "Faqat birinchi {{displayCount}} ta fayl biriktiriladi.",
     "staleMessage": "Bu ulashish endi mavjud emas.",
     "retryableMessage": "Sessiyalaringizni yuklab bo'lmadi.",
     "emptyMessage": "Hali sessiyalar yo'q — buni yuborish uchun yangisini boshlang.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Bu Apple hisobidagi Kilo Pass boshqa Kilo hisobiga tegishli. Uni boshqarish uchun o'sha Kilo hisobiga kiring.",
     "alreadySubscribed": "Sizda allaqachon Kilo Pass obunasi mavjud.",
     "purchaseUnavailable": "Kilo Pass sotib olish hozir mavjud emas.",
-    "tierCredits": "Kreditlarda ${{amount}}",
+    "tierCredits": "Kreditlarda {{amount}}",
     "perMonth": "{{price}}/oy",
     "verifyPurchaseFailed": "Sotib olishingizni tasdiqlab bo'lmadi. Ulanishni tekshiring va qayta urinib ko'ring.",
     "productsCouldNotLoad": "Kilo Pass mahsulotlarini App Store'dan yuklab bo'lmadi.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "App Store obuna boshqaruvini ochib bo'lmadi.",
     "kiloPassSetup": "Kilo Pass sozlamasi",
     "subscriptionHeaderDescription": "Kilo App'idagi AI kodlash sessiyalari — Cloud Agents, masofaviy sessiyalar va KiloClaw suhbatlari — uchun Kilo balansingizga kreditlar qo'shadigan oylik obuna.",
-    "tierDescription": "Kilo App'dan foydalanish uchun oyiga qo'shiladigan ${{price}} to'langan kredit.",
+    "tierDescription": "Kilo App'dan foydalanish uchun oyiga qo'shiladigan {{price}} to'langan kredit.",
     "subscribe": "Obuna bo'lish",
     "subscribeDescription": "Bonus progress bilan oylik kreditlar",
     "manage": "Boshqarish",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass kutilmoqda",
     "statusCanceling": "Kilo Pass bekor qilinmoqda",
     "statusPastDue": "Kilo Pass muddati o'tgan",
-    "monthlyCredits": "Oylik ${{credits}} kredit",
+    "monthlyCredits": "Oylik {{credits}} kredit",
     "ends": "{{date}} da tugaydi",
     "periodEnd": "davr oxiri",
     "managedOnGooglePlay": "Google Play'da boshqariladi",

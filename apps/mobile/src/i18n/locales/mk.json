@@ -206,11 +206,11 @@
       "loadingLines": "Се вчитуваат {{loaded}} од {{total}} линии…",
       "expandContext": "Прошири контекст",
       "expandMoreContext": "Прошири повеќе контекст",
-      "expandLines": "Прошири {{count}} линии ({{start}}–{{end}})",
-      "expandMoreLines": "Прошири повеќе {{count}} линии ({{start}}–{{end}})",
-      "expandLinesOfContext": "Прошири {{count}} линии на контекст",
+      "expandLines": "Прошири {{displayCount}} линии ({{start}}–{{end}})",
+      "expandMoreLines": "Прошири повеќе {{displayCount}} линии ({{start}}–{{end}})",
+      "expandLinesOfContext": "Прошири {{displayCount}} линии на контекст",
       "expandAll": "Прошири сè",
-      "expandAllLines": "Прошири ги сите {{count}} линии",
+      "expandAllLines": "Прошири ги сите {{displayCount}} линии",
       "loadingMoreFiles": "Се вчитуваат повеќе датотеки…",
       "retryLoadingNextPage": "Обиди се повторно со вчитувањето на следната страница",
       "failedToLoadMoreFiles": "Не успеа вчитувањето на повеќе датотеки — допрете за да се обидете повторно",
@@ -301,7 +301,7 @@
       "closeReactions": "Затвори реакции",
       "reactionsTitle": "Реакции",
       "addReaction": "Додај реакција",
-      "reactionPill": "{{emoji}} реакција, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} реакција, {{displayCount}} {{countLabel}}",
       "reaction_one": "реакција",
       "reaction": "реакции",
       "reaction_other": "реакции",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Нема нишки за преглед или разговорни коментари на ова барање за повлекување.",
       "reviewFiles": "Прегледај датотеки",
       "quotedDiffSnippet": "Цитиран diff сегмент",
-      "moreLinesAbove": "… {{count}} повеќе линии погоре",
+      "moreLinesAbove": "… {{displayCount}} повеќе линии погоре",
       "termsAcceptRequired": "Мора да ги прифатите Условите на користење за да објавувате.",
       "termsOutdatedCopy": "Условите на користење се променија. Отворете го овој екран повторно за да ја прифатите најновата верзија.",
       "termsCheckRetryCopy": "Не можеше да се проверат Условите на користење. Проверете ја вашата врска и обидете се повторно."
@@ -395,11 +395,11 @@
       "retryChecks": "Обиди се повторно со проверките",
       "viewOnGitHub": "Прикажи PR на GitHub",
       "noChecksReported": "Нема пријавени проверки",
-      "passed": "{{count}} поминати",
-      "failed": "{{count}} неуспешни",
-      "pending": "{{count}} во тек",
-      "skipped": "{{count}} прескокнати",
-      "checksCount": "{{count}} проверки",
+      "passed": "{{displayCount}} поминати",
+      "failed": "{{displayCount}} неуспешни",
+      "pending": "{{displayCount}} во тек",
+      "skipped": "{{displayCount}} прескокнати",
+      "checksCount": "{{displayCount}} проверки",
       "checkDetails": "детали на проверка",
       "pullRequest": "барање за повлекување"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "коментар што чека",
       "pendingComment": "коментари што чекаат",
       "pendingComment_other": "коментари што чекаат",
-      "submitCountOfTotal": "Испрати {{freshCount}} од {{totalCount}} коментари",
+      "submitCountOfTotal": "Испрати {{displayFreshCount}} од {{displayTotalCount}} коментари",
       "submitReview": "Испрати преглед",
-      "partialPostedMessage": "Објавени {{freshCount}} коментар(и). {{staleCount}} коментар(и) упатуваат на постар commit и останаа во вашиот ред."
+      "partialPostedMessage": "Објавени {{displayFreshCount}} коментар(и). {{displayStaleCount}} коментар(и) упатуваат на постар commit и останаа во вашиот ред."
     },
     "reconnectNotice": {
       "title": "GitHub врската истече",
@@ -580,7 +580,8 @@
     "agents": "Агенти",
     "profile": "Профил",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, таб, {{position}} од {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Неодамнешни",
       "common": "Вообичаени",
       "reactWith": "Реагирај со {{reaction}}",
-      "accessibility": "{{emoji}} реакција, {{count}}"
+      "accessibility": "{{emoji}} реакција, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Одговара на",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Сликата е недостапна",
       "openFailed": "Не можеше да се отвори прилогот. Проверете ја вашата врска и обидете се повторно.",
       "attachFailed": "Не успеа прикачувањето на датотеката",
-      "limit": "Можете да прикачите до {{count}} датотеки.",
+      "limit": "Можете да прикачите до {{displayCount}} датотеки.",
       "sizeRejection": "{{filename}} ја надминува границата на прилогот од {{limit}}.",
       "unreadable": "Не можеше да се прочита {{filename}}.",
       "pastedImage": "залепената слика",
@@ -722,6 +723,7 @@
       "finalTermEnds": "Последниот период завршува",
       "afterFinalTerm": "По последниот период",
       "remaining": "Останува",
+      "lessThanOneDay": "Помалку од 1 ден",
       "ends": "Завршува",
       "expires": "Истекува",
       "noActivePlan": "Нема активен план",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "твојата Standard месечна цена",
       "perMonth": "/месец",
       "earlybirdAccessUntil": "Earlybird пристап до {{date}}",
-      "earlybirdEnding": "Earlybird завршува: {{days}} дена остануваат",
+      "earlybirdEnding": "Earlybird завршува: {{remaining}}",
       "paymentPastDue": "Плаќањето е задоцнето. Ажурирај го начинот на плаќање.",
       "subscriptionCancels": "Претплатата се откажува {{date}}",
-      "trialDaysRemaining": "Проба: {{days}} дена остануваат",
-      "trialEndingSoon": "Пробата наскоро завршува: {{days}}"
+      "trialDaysRemaining": "Проба: {{remaining}}",
+      "trialEndingSoon": "Пробата наскоро завршува: {{remaining}}"
     },
     "changelog": {
       "title": "Што има ново",
@@ -996,7 +998,7 @@
         "stalledTitle": "Нешто заглави",
         "stalledBody": "Не можевме да го завршиме поставувањето на {{name}}. Обиди се повторно, или пиши на hi@kilo.ai ако ова продолжи.",
         "timeoutTitle": "Трае подолго од очекуваното",
-        "timeoutBody": "Поставувањето на {{name}} трае подолго од вообичаено (повеќе од {{minutes}} минути).",
+        "timeoutBody": "Поставувањето на {{name}} трае подолго од вообичаено (повеќе од {{displayMinutes}} минути).",
         "continueInBackground": "Продолжи во заднина",
         "settingUp": "Се поставува {{name}}",
         "finishingSetup": "Се завршува поставувањето",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Порта за спојување",
       "repositories": "Репозиториуми",
       "allRepositories": "Сите репозиториуми",
-      "nSelected": "{{count}} избрани",
+      "nSelected": "{{displayCount}} избрани",
       "reviewMemory": "Меморија на прегледи",
       "proposedReviewMdGuidance": "Предложени REVIEW.md насоки"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Анализирано",
       "exploitabilityReasoning": "Образложение за искористливоста",
       "suggestedFix": "Предложена поправка",
-      "whereFound": "Каде е пронајдено ова ({{count}})",
+      "whereFound": "Каде е пронајдено ова ({{displayCount}})",
       "fullReport": "Целосен генериран извештај",
       "unknown": "Непознато",
       "yes": "Да",
       "no": "Не"
     },
     "dashboard": {
-      "findingsCount": "{{count}} наоди",
+      "findingsCount": "{{displayCount}} наоди",
       "notMeasured": "Не е измерено",
       "actFirst": "Дејствувај прво",
       "slaPosture": "SLA положба",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "План за дејствување во складиштето",
       "noOpenFindings": "Нема отворени наоди што бараат внимание",
       "deadlineToday": "Рокот е достигнат денес",
-      "daysOverdue": "{{count}} дена просрочени",
+      "daysOverdue": "{{displayCount}} дена просрочени",
       "withinDeadline": "Во рамките на рокот",
       "criticalOverdue": "Критични просрочени",
       "highOverdue": "Високи просрочени",
@@ -1434,6 +1436,27 @@
       "syncNow": "Синхронизирај сега",
       "syncQueued": "Синхронизацијата е ставена во ред",
       "syncStatusUnavailable": "Статусот на синхронизација е недостапен"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Отворени наоди",
+      "openFindingsDetail": "{{critical}} критични, {{high}} високи",
+      "confirmedExploitable": "Потврдено дека е искористливо",
+      "confirmedExploitableDetail": "Ризикот за проектот е потврден со анализа",
+      "needsReview": "Потребен е вашиот преглед",
+      "needsReviewDetail": "Потребна е човечка одлука",
+      "analysisIncomplete": "Анализата не е завршена",
+      "analysisIncompleteDetail": "Ризикот за проектот е сè уште непознат",
+      "slaCompliance": "Усогласеност со SLA",
+      "notMeasured": "Не е измерено",
+      "withinDeadlineDetail": "{{within}} од {{total}} во рок",
+      "noDeadlineData": "Наодите сè уште немаат SLA рок",
+      "deadlinePassed": "Рокот помина",
+      "deadlinePassedDetail": "{{critical}} критични, {{high}} високи",
+      "dueThisWeek": "Доспева оваа недела",
+      "dueThisWeekDetail": "{{exploitable}} потврдени како искористливи",
+      "noDeadline": "Нема рок",
+      "reviewSlaAssignment": "Прегледај ја SLA доделката",
+      "allOpenFindingsTracked": "Сите отворени наоди се следени"
     },
     "dismiss": {
       "title": "Отфрли наод",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}} анализа",
       "automation": "Автоматизација",
       "automationAllOff": "Сите исклучени",
-      "automationCount": "{{count}} од 3 овозможени",
+      "automationCount": "{{displayCount}} од 3 овозможени",
       "notifications": "Известувања",
-      "notificationsCount": "{{count}} од 2 овозможени",
+      "notificationsCount": "{{displayCount}} од 2 овозможени",
       "slaPolicy": "SLA политика",
       "disabledNoManage": "Безбедносниот агент е оневозможен. Само сопствениците на организацијата и менаџерите за наплата можат да го вклучат.",
       "disabledNoRepo": "Избери најмалку едно складиште пред да го овозможиш Безбедносниот агент.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Отвори барање за влечење{{number}}",
       "openDraftPullRequest": "Отвори нацрт барање за влечење{{number}}",
       "progress": "Напредок",
-      "attemptHistory": "Историја на обиди ({{count}})",
+      "attemptHistory": "Историја на обиди ({{displayCount}})",
       "attemptNumber": "Обид #{{number}}",
       "startedBy": "Започнато од",
       "model": "Модел",
@@ -1855,9 +1878,9 @@
       "toolTask": "задача",
       "readTodos": "Прочитај ги задачите",
       "updateTodos": "Ажурирај ги задачите",
-      "linesBadge": "{{count}} редови",
-      "filesBadge": "{{count}} датотеки",
-      "matchesBadge": "{{count}} совпаѓања"
+      "linesBadge": "{{displayCount}} редови",
+      "filesBadge": "{{displayCount}} датотеки",
+      "matchesBadge": "{{displayCount}} совпаѓања"
     },
     "readToolMarkdown": {
       "linesTruncated": "редови {{start}}–{{end}} (скратено)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "Овој одговор не може да се пријави.",
       "reportAiResponseSubmitted": "Пријавата е испратена. Потврда {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "помалку од {{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Деталите се недостапни",
       "textDisplay": "Приказ на текст",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Подготовката е завршена",
       "preparationFailed": "Подготовката не успеа",
       "setupCommand": "Команда за поставување {{index}}",
-      "setupCommandOf": "Команда за поставување {{index}} од {{count}}"
+      "setupCommandOf": "Команда за поставување {{index}} од {{displayCount}}"
     },
     "permissionCard": {
       "title": "Потребна е дозвола",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Поднесувањето не успеа. Обидете се повторно.",
       "questionAnnouncement": "На агентот му треба вашиот одговор. Композиторот е паузиран додека одговарате.",
       "permissionAnnouncement": "На агентот му треба дозвола за да продолжи. Композиторот е паузиран додека одлучувате.",
-      "positionHint": "(1 од {{count}})",
+      "positionHint": "(1 од {{displayCount}})",
       "movedPastPrompt": "Агентот се придвижи подалеку од ова барање. Оваа картичка ќе се затвори кога сесијата ќе продолжи.",
       "waitingForAnswer": "Агентот го чека вашиот одговор. Додека ова прашање е отворено, вашата порака до агентот е паузирана.",
       "waitingForPermission": "Агентот чека дозвола. Додека ова барање е отворено, вашата порака до агентот е паузирана."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Пристапот до камера е оневозможен",
       "cameraAccessMessage": "Дозволете пристап до камерата во Поставки за да направите фотографија.",
       "couldNotOpenPhotoPicker": "Не можев да го отворам избирачот на фотографии. Рестартирајте го Kilo и обидете се повторно.",
-      "maxFilesAllowed": "Дозволени се максимум {{count}} датотеки",
+      "maxFilesAllowed": "Дозволени се максимум {{displayCount}} датотеки",
       "onlyAddingFiles": "Се додаваат само {{accepted}} од {{total}} датотеки (макс. {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "цена {{cost}}",
       "costSuffix": ", цена {{cost}}",
       "tokensWindowUnavailable": "Контекст {{used}} токени, прозорецот е недостапен",
-      "tokensUsage": "Контекст {{used}} од {{window}} токени, {{percentage}}% искористени",
+      "tokensUsage": "Контекст {{used}} од {{window}} токени, {{percentage}} искористени",
       "title": "Искористеност на контекст",
       "used": "Искористено",
       "remaining": "Преостанато",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "Искористеноста ја одразува најновата завршена одговор на асистентот.",
       "tokenUsage": "Искористеност на токени",
       "cacheRate": "Стапка на кеш",
-      "modelsCount": "Модели ({{count}})",
+      "modelsCount": "Модели ({{displayCount}})",
       "tokenTotalsNote": "Вкупните токени се однесуваат само на оваа сесија и не ги вклучуваат токените на субагентите/детските сесии.",
       "subagents": "Субагенти",
       "subagentsDescription": "Преостаната цена од детски сесии",
@@ -2373,7 +2400,7 @@
     "connectedCli": "На поврзан CLI",
     "newSessionOn": "Нова сесија на {{name}}",
     "noMatchingSessions": "Нема соодветни сесии.",
-    "onlyFirstFilesAttached": "Само првите {{count}} датотеки ќе бидат прикачени.",
+    "onlyFirstFilesAttached": "Само првите {{displayCount}} датотеки ќе бидат прикачени.",
     "staleMessage": "Ова споделување повеќе не е достапно.",
     "retryableMessage": "Не можев да ги вчитам вашите сесии.",
     "emptyMessage": "Сè уште нема сесии — започнете нова за да го испратите ова.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Kilo Pass-от на оваа Apple сметка припаѓа на друга Kilo сметка. Најавете се на таа Kilo сметка за да ја управувате.",
     "alreadySubscribed": "Веќе имате Kilo Pass претплата.",
     "purchaseUnavailable": "Купувањето на Kilo Pass во моментов не е достапно.",
-    "tierCredits": "${{amount}} во кредити",
+    "tierCredits": "{{amount}} во кредити",
     "perMonth": "{{price}}/мес",
     "verifyPurchaseFailed": "Не можев да го потврдам вашето купување. Проверете ја вашата врска и обидете се повторно.",
     "productsCouldNotLoad": "Kilo Pass производите не можеа да се вчитаат од App Store.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "Не успеав да отворам управување со претплатата во App Store.",
     "kiloPassSetup": "Поставување на Kilo Pass",
     "subscriptionHeaderDescription": "Месечна претплата што додава кредити на вашата Kilo состојба за извршување на AI сесии за кодирање во Kilo App — Cloud Agents, далечински сесии и KiloClaw разговори.",
-    "tierDescription": "${{price}} платени кредити се додаваат месечно за употреба на Kilo App.",
+    "tierDescription": "{{price}} платени кредити се додаваат месечно за употреба на Kilo App.",
     "subscribe": "Претплати се",
     "subscribeDescription": "Месечни кредити со бонус напредок",
     "manage": "Управувај",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass е во очекување",
     "statusCanceling": "Kilo Pass се откажува",
     "statusPastDue": "Kilo Pass е доцни плаќање",
-    "monthlyCredits": "${{credits}} месечни кредити",
+    "monthlyCredits": "{{credits}} месечни кредити",
     "ends": "Завршува {{date}}",
     "periodEnd": "крај на периодот",
     "managedOnGooglePlay": "Управувано на Google Play",

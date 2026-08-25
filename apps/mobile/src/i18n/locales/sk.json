@@ -206,11 +206,11 @@
       "loadingLines": "Načítava sa {{loaded}} z {{total}} riadkov…",
       "expandContext": "Rozbaliť kontext",
       "expandMoreContext": "Rozbaliť viac kontextu",
-      "expandLines": "Rozbaliť {{count}} riadkov ({{start}}–{{end}})",
-      "expandMoreLines": "Rozbaliť ďalších {{count}} riadkov ({{start}}–{{end}})",
-      "expandLinesOfContext": "Rozbaliť {{count}} riadkov kontextu",
+      "expandLines": "Rozbaliť {{displayCount}} riadkov ({{start}}–{{end}})",
+      "expandMoreLines": "Rozbaliť ďalších {{displayCount}} riadkov ({{start}}–{{end}})",
+      "expandLinesOfContext": "Rozbaliť {{displayCount}} riadkov kontextu",
       "expandAll": "Rozbaliť všetko",
-      "expandAllLines": "Rozbaliť všetkých {{count}} riadkov",
+      "expandAllLines": "Rozbaliť všetkých {{displayCount}} riadkov",
       "loadingMoreFiles": "Načítavajú sa ďalšie súbory…",
       "retryLoadingNextPage": "Skúsiť načítať ďalšiu stránku znova",
       "failedToLoadMoreFiles": "Načítať ďalšie súbory sa nepodarilo — klepnutím skúsite znova",
@@ -227,7 +227,11 @@
       "fileLoadedOfTotalCount_other": "Načítaných {{displayCount}} súborov z {{total}}",
       "filesStillLoading": "Súbory sa stále načítavajú. Potiahnutím obnovíte.",
       "goToOverview": "Prejsť na Prehľad",
-      "goToOverviewTab": "Prejsť na kartu Prehľad"
+      "goToOverviewTab": "Prejsť na kartu Prehľad",
+      "fileLoadedCount_few": "Načítané {{displayCount}} súbory",
+      "fileLoadedCount_many": "Načítaných {{displayCount}} súborov",
+      "fileLoadedOfTotalCount_few": "Načítané {{displayCount}} súbory z {{total}}",
+      "fileLoadedOfTotalCount_many": "Načítaných {{displayCount}} súborov z {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ na konci súboru nie je nový riadok",
@@ -301,7 +305,7 @@
       "closeReactions": "Zavrieť reakcie",
       "reactionsTitle": "Reakcie",
       "addReaction": "Pridať reakciu",
-      "reactionPill": "{{emoji}} reakcia, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} reakcia, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakcia",
       "reaction": "reakcie",
       "reaction_other": "reakcie",
@@ -353,10 +357,14 @@
       "noDiscussionDescription": "Na tomto pull requeste nie sú žiadne vlákna kontroly ani komentáre v konverzácii.",
       "reviewFiles": "Skontrolovať súbory",
       "quotedDiffSnippet": "Citovaný úryvok diffu",
-      "moreLinesAbove": "… {{count}} ďalších riadkov vyššie",
+      "moreLinesAbove": "… {{displayCount}} ďalších riadkov vyššie",
       "termsAcceptRequired": "Ak chcete prispievať, musíte prijať Podmienky používania.",
       "termsOutdatedCopy": "Podmienky používania sa zmenili. Znovu otvorte túto obrazovku a prijmite najnovšiu verziu.",
-      "termsCheckRetryCopy": "Podmienky používania sa nepodarilo skontrolovať. Skontrolujte pripojenie a skúste to znova."
+      "termsCheckRetryCopy": "Podmienky používania sa nepodarilo skontrolovať. Skontrolujte pripojenie a skúste to znova.",
+      "comment_few": "{{displayCount}} komentáre",
+      "comment_many": "{{displayCount}} komentárov",
+      "reaction_few": "reakcie",
+      "reaction_many": "reakcií"
     },
     "couldNotOpenGitHubAppSettings": "Nastavenia aplikácie GitHub App sa nepodarilo otvoriť",
     "installKiloGitHubApp": "Nainštalovať aplikáciu Kilo GitHub App",
@@ -395,11 +403,11 @@
       "retryChecks": "Skúsiť kontroly znova",
       "viewOnGitHub": "Zobraziť PR v GitHub",
       "noChecksReported": "Žiadne nahlásené kontroly",
-      "passed": "{{count}} prešlo",
-      "failed": "{{count}} zlyhalo",
-      "pending": "{{count}} čaká",
-      "skipped": "{{count}} vynechaných",
-      "checksCount": "{{count}} kontrol",
+      "passed": "{{displayCount}} prešlo",
+      "failed": "{{displayCount}} zlyhalo",
+      "pending": "{{displayCount}} čaká",
+      "skipped": "{{displayCount}} vynechaných",
+      "checksCount": "{{displayCount}} kontrol",
       "checkDetails": "podrobnosti kontroly",
       "pullRequest": "pull request"
     },
@@ -459,9 +467,11 @@
       "pendingComment_one": "čakajúci komentár",
       "pendingComment": "čakajúce komentáre",
       "pendingComment_other": "čakajúce komentáre",
-      "submitCountOfTotal": "Odoslať {{freshCount}} z {{totalCount}} komentárov",
+      "submitCountOfTotal": "Odoslať {{displayFreshCount}} z {{displayTotalCount}} komentárov",
       "submitReview": "Odoslať kontrolu",
-      "partialPostedMessage": "Odoslaných {{freshCount}} komentárov. {{staleCount}} komentárov smeruje na starší commit a zostalo vo vašom fronte."
+      "partialPostedMessage": "Odoslaných {{displayFreshCount}} komentárov. {{displayStaleCount}} komentárov smeruje na starší commit a zostalo vo vašom fronte.",
+      "pendingComment_few": "čakajúce komentáre",
+      "pendingComment_many": "čakajúcich komentárov"
     },
     "reconnectNotice": {
       "title": "Pripojenie GitHub vypršalo",
@@ -488,7 +498,11 @@
       "commit_other": "commity",
       "file_one": "súbor",
       "file": "súbory",
-      "file_other": "súbory"
+      "file_other": "súbory",
+      "commit_few": "commity",
+      "commit_many": "commitov",
+      "file_few": "súbory",
+      "file_many": "súborov"
     },
     "pendingComment": {
       "editOutdatedA11y": "Upraviť zastaraný čakajúci komentár na {{location}}",
@@ -580,7 +594,8 @@
     "agents": "Agenti",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, karta, {{position}} z {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +636,7 @@
       "recent": "Nedávne",
       "common": "Bežné",
       "reactWith": "Reagovať {{reaction}}",
-      "accessibility": "{{emoji}} reakcia, {{count}}"
+      "accessibility": "{{emoji}} reakcia, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Odpovedáte na",
@@ -650,7 +665,7 @@
       "imageUnavailable": "Obrázok nie je dostupný",
       "openFailed": "Prílohu sa nepodarilo otvoriť. Skontrolujte pripojenie a skúste to znova.",
       "attachFailed": "Priloženie súboru zlyhalo",
-      "limit": "Môžete priložiť až {{count}} súborov.",
+      "limit": "Môžete priložiť až {{displayCount}} súborov.",
       "sizeRejection": "{{filename}} prekračuje limit prílohy {{limit}}.",
       "unreadable": "{{filename}} sa nepodarilo prečítať.",
       "pastedImage": "vložený obrázok",
@@ -700,7 +715,9 @@
       "someone": "Niekto",
       "typing_one": "{{name}} píše…",
       "typing": "{{names}} píšu…",
-      "typing_other": "{{names}} píšu…"
+      "typing_other": "{{names}} píšu…",
+      "typing_few": "{{names}} píšu…",
+      "typing_many": "{{names}} píšu…"
     },
     "botStatus": {
       "online": "Online",
@@ -722,6 +739,7 @@
       "finalTermEnds": "Konečné obdobie končí",
       "afterFinalTerm": "Po konečnom období",
       "remaining": "Zostáva",
+      "lessThanOneDay": "Menej ako 1 deň",
       "ends": "Končí",
       "expires": "Platnosť končí",
       "noActivePlan": "Žiadny aktívny plán",
@@ -740,11 +758,11 @@
       "yourStandardMonthlyPrice": "vaša štandardná mesačná cena",
       "perMonth": "/mesiac",
       "earlybirdAccessUntil": "Earlybird prístup do {{date}}",
-      "earlybirdEnding": "Earlybird končí: zostáva {{days}} dní",
+      "earlybirdEnding": "Earlybird končí: zostáva {{remaining}} dní",
       "paymentPastDue": "Platba je po splatnosti. Aktualizujte svoj spôsob platby.",
       "subscriptionCancels": "Predplatné sa ruší {{date}}",
-      "trialDaysRemaining": "Skúšobné obdobie: zostáva {{days}} dní",
-      "trialEndingSoon": "Skúšobné obdobie sa čoskoro končí: {{days}}"
+      "trialDaysRemaining": "Skúšobné obdobie: zostáva {{remaining}} dní",
+      "trialEndingSoon": "Skúšobné obdobie sa čoskoro končí: {{remaining}}"
     },
     "changelog": {
       "title": "Čo je nové",
@@ -996,7 +1014,7 @@
         "stalledTitle": "Niečo sa zastavilo",
         "stalledBody": "Nepodarilo sa nám dokončiť nastavenie {{name}}. Skúste to znova alebo napíšte na hi@kilo.ai, ak sa to opakuje.",
         "timeoutTitle": "Trvá to dlhšie, než sa očakávalo",
-        "timeoutBody": "Nastavenie {{name}} trvá dlhšie ako zvyčajne (viac ako {{minutes}} minút).",
+        "timeoutBody": "Nastavenie {{name}} trvá dlhšie ako zvyčajne (viac ako {{displayMinutes}} minút).",
         "continueInBackground": "Pokračovať na pozadí",
         "settingUp": "Nastavuje sa {{name}}",
         "finishingSetup": "Dokončuje sa nastavenie",
@@ -1071,7 +1089,9 @@
       "openUnread_other": "Otvoriť {{name}}, {{displayCount}} neprečítané správy",
       "open": "Otvoriť {{name}}",
       "openSettings": "Otvoriť nastavenia pre {{name}}",
-      "fixOnKiloAi": "Opraviť na kilo.ai: {{label}}"
+      "fixOnKiloAi": "Opraviť na kilo.ai: {{label}}",
+      "openUnread_few": "Otvoriť {{name}}, {{displayCount}} neprečítané správy",
+      "openUnread_many": "Otvoriť {{name}}, {{displayCount}} neprečítaných správ"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1287,7 +1307,7 @@
       "mergeGate": "Zlučovacia brána",
       "repositories": "Repozitáre",
       "allRepositories": "Všetky repozitáre",
-      "nSelected": "Vybrané: {{count}}",
+      "nSelected": "Vybrané: {{displayCount}}",
       "reviewMemory": "Pamäť preskúmaní",
       "proposedReviewMdGuidance": "Navrhované pokyny REVIEW.md"
     },
@@ -1367,7 +1387,9 @@
       "severityAll": "Všetky závažnosti",
       "confidenceHighOnly": "Iba vysoká miera istoty",
       "confidenceMediumOrHigher": "Stredná alebo vyššia",
-      "confidenceAny": "Akákoľvek miera istoty"
+      "confidenceAny": "Akákoľvek miera istoty",
+      "queued_few": "{{displayCount}} existujúce nálezy sú zaradené do analýzy.",
+      "queued_many": "{{displayCount}} existujúcich nálezov je zaradených do analýzy."
     },
     "analysis": {
       "couldNotLoad": "Analýzu sa nepodarilo načítať",
@@ -1391,14 +1413,14 @@
       "analyzed": "Analyzované",
       "exploitabilityReasoning": "Odôvodnenie zneužívateľnosti",
       "suggestedFix": "Navrhovaná oprava",
-      "whereFound": "Kde to bolo nájdené ({{count}})",
+      "whereFound": "Kde to bolo nájdené ({{displayCount}})",
       "fullReport": "Úplná vygenerovaná správa",
       "unknown": "Neznáme",
       "yes": "Áno",
       "no": "Nie"
     },
     "dashboard": {
-      "findingsCount": "{{count}} nálezov",
+      "findingsCount": "{{displayCount}} nálezov",
       "notMeasured": "Nezmerané",
       "actFirst": "Najprv konať",
       "slaPosture": "Stav SLA",
@@ -1407,7 +1429,7 @@
       "repositoryActionPlan": "Akčný plán repozitára",
       "noOpenFindings": "Žiadne otvorené nálezy nevyžadujú pozornosť",
       "deadlineToday": "Termín dosiahnutý dnes",
-      "daysOverdue": "{{count}} dní po termíne",
+      "daysOverdue": "{{displayCount}} dní po termíne",
       "withinDeadline": "V rámci termínu",
       "criticalOverdue": "Kritické po termíne",
       "highOverdue": "Vysoké po termíne",
@@ -1434,6 +1456,27 @@
       "syncNow": "Synchronizovať teraz",
       "syncQueued": "Synchronizácia zaradená",
       "syncStatusUnavailable": "Stav synchronizácie nedostupný"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Otvorené nálezy",
+      "openFindingsDetail": "{{critical}} kritických, {{high}} vysokých",
+      "confirmedExploitable": "Potvrdené ako zneužívateľné",
+      "confirmedExploitableDetail": "Riziko projektu potvrdené analýzou",
+      "needsReview": "Vyžaduje vašu kontrolu",
+      "needsReviewDetail": "Vyžaduje rozhodnutie človeka",
+      "analysisIncomplete": "Analýza nedokončená",
+      "analysisIncompleteDetail": "Riziko projektu je stále neznáme",
+      "slaCompliance": "Dodržiavanie SLA",
+      "notMeasured": "Nezmerané",
+      "withinDeadlineDetail": "{{within}} z {{total}} v rámci termínu",
+      "noDeadlineData": "Žiadny nález zatiaľ nemá termín SLA",
+      "deadlinePassed": "Termín uplynul",
+      "deadlinePassedDetail": "{{critical}} kritických, {{high}} vysokých",
+      "dueThisWeek": "Splatné tento týždeň",
+      "dueThisWeekDetail": "{{exploitable}} potvrdených ako zneužívateľné",
+      "noDeadline": "Bez termínu",
+      "reviewSlaAssignment": "Skontrolovať priradenie SLA",
+      "allOpenFindingsTracked": "Sledujú sa všetky otvorené nálezy"
     },
     "dismiss": {
       "title": "Odmietnuť nález",
@@ -1500,13 +1543,15 @@
       "analysisModeSubtitle": "Analýza {{mode}}",
       "automation": "Automatizácia",
       "automationAllOff": "Všetko vypnuté",
-      "automationCount": "{{count}} z 3 povolených",
+      "automationCount": "{{displayCount}} z 3 povolených",
       "notifications": "Upozornenia",
-      "notificationsCount": "{{count}} z 2 povolených",
+      "notificationsCount": "{{displayCount}} z 2 povolených",
       "slaPolicy": "Politika SLA",
       "disabledNoManage": "Security Agent je zakázaný. Zapnúť ho môžu iba vlastníci organizácie a manažéri fakturácie.",
       "disabledNoRepo": "Pred povolením Security Agent vyberte aspoň jeden repozitár.",
-      "disabledPrompt": "Zapnite Security Agent, aby ste synchronizovali upozornenia Dependabot, vybrali repozitáre a nakonfigurovali automatizáciu."
+      "disabledPrompt": "Zapnite Security Agent, aby ste synchronizovali upozornenia Dependabot, vybrali repozitáre a nakonfigurovali automatizáciu.",
+      "repositoriesCount_few": "Vybraté {{displayCount}} repozitáre",
+      "repositoriesCount_many": "Vybratých {{displayCount}} repozitárov"
     },
     "remediation": {
       "cancellationRequested": "Vyžiadané zrušenie",
@@ -1524,7 +1569,7 @@
       "openPullRequest": "Otvoriť pull request{{number}}",
       "openDraftPullRequest": "Otvoriť koncept pull request{{number}}",
       "progress": "Priebeh",
-      "attemptHistory": "História pokusov ({{count}})",
+      "attemptHistory": "História pokusov ({{displayCount}})",
       "attemptNumber": "Pokus #{{number}}",
       "startedBy": "Spustil",
       "model": "Model",
@@ -1734,7 +1779,11 @@
       "cent_other": "centy",
       "dollar_one": "dolár",
       "dollar": "doláre",
-      "dollar_other": "doláre"
+      "dollar_other": "doláre",
+      "cent_few": "centy",
+      "cent_many": "centov",
+      "dollar_few": "doláre",
+      "dollar_many": "dolárov"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub sa nepodarilo otvoriť",
@@ -1830,7 +1879,9 @@
     "partRenderer": {
       "updatedFileCount_one": "Aktualizovaný {{displayCount}} súbor",
       "updatedFileCount": "Aktualizované {{displayCount}} súbory",
-      "updatedFileCount_other": "Aktualizované {{displayCount}} súbory"
+      "updatedFileCount_other": "Aktualizované {{displayCount}} súbory",
+      "updatedFileCount_few": "Aktualizované {{displayCount}} súbory",
+      "updatedFileCount_many": "Aktualizovaných {{displayCount}} súborov"
     },
     "toolPatch": {
       "operationAdded": "Pridané",
@@ -1855,9 +1906,9 @@
       "toolTask": "úloha",
       "readTodos": "Prečítať úlohy",
       "updateTodos": "Aktualizovať úlohy",
-      "linesBadge": "{{count}} riadkov",
-      "filesBadge": "{{count}} súborov",
-      "matchesBadge": "{{count}} zhôd"
+      "linesBadge": "{{displayCount}} riadkov",
+      "filesBadge": "{{displayCount}} súborov",
+      "matchesBadge": "{{displayCount}} zhôd"
     },
     "readToolMarkdown": {
       "linesTruncated": "riadky {{start}}–{{end}} (skrátené)",
@@ -1941,6 +1992,10 @@
       "reportAiResponseFailedTerminal": "Túto odpoveď nemožno nahlásiť.",
       "reportAiResponseSubmitted": "Odpoveď nahlásená. Potvrdenie {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Podrobnosti nedostupné",
       "textDisplay": "Zobrazenie textu",
@@ -1999,7 +2054,7 @@
       "preparationComplete": "Príprava dokončená",
       "preparationFailed": "Príprava zlyhala",
       "setupCommand": "Príkaz nastavenia {{index}}",
-      "setupCommandOf": "Príkaz nastavenia {{index}} z {{count}}"
+      "setupCommandOf": "Príkaz nastavenia {{index}} z {{displayCount}}"
     },
     "permissionCard": {
       "title": "Vyžaduje sa povolenie",
@@ -2036,7 +2091,7 @@
       "submissionFailed": "Odoslanie zlyhalo. Skúste to znova.",
       "questionAnnouncement": "Agent potrebuje váš vstup. Editor je pozastavený, kým odpovedáte.",
       "permissionAnnouncement": "Agent potrebuje povolenie na pokračovanie. Editor je pozastavený, kým sa rozhodnete.",
-      "positionHint": "(1 z {{count}})",
+      "positionHint": "(1 z {{displayCount}})",
       "movedPastPrompt": "Agent prešiel za túto výzvu. Táto karta sa zatvorí, keď bude relácia pokračovať.",
       "waitingForAnswer": "Agent čaká na vašu odpoveď. Kým je táto otázka otvorená, vaša správa agentovi je pozastavená.",
       "waitingForPermission": "Agent čaká na povolenie. Kým je táto požiadavka otvorená, vaša správa agentovi je pozastavená."
@@ -2076,7 +2131,9 @@
       "omitted_other": "{{displayCount}} starších položiek z tejto relácie sa nepodarilo zobraziť.",
       "couldNotLoad": "Staršie správy sa nepodarilo načítať.",
       "unavailable": "Staršie správy nie sú k dispozícii.",
-      "tooLarge": "Staršie správy sú príliš veľké na načítanie."
+      "tooLarge": "Staršie správy sú príliš veľké na načítanie.",
+      "omitted_few": "{{displayCount}} staršie položky z tejto relácie sa nepodarilo zobraziť.",
+      "omitted_many": "{{displayCount}} starších položiek z tejto relácie sa nepodarilo zobraziť."
     },
     "markdownTable": {
       "viewTable": "Zobraziť tabuľku",
@@ -2088,7 +2145,11 @@
       "rowCount_one": "riadok",
       "rowCount": "riadky",
       "rowCount_other": "riadky",
-      "opensFullScreen": "otvára na celú obrazovku"
+      "opensFullScreen": "otvára na celú obrazovku",
+      "columnCount_few": "stĺpce",
+      "columnCount_many": "stĺpcov",
+      "rowCount_few": "riadky",
+      "rowCount_many": "riadkov"
     },
     "sessionFilter": {
       "title": "Filtrovať relácie",
@@ -2157,7 +2218,7 @@
       "cameraAccessDisabled": "Prístup k fotoaparátu je zakázaný",
       "cameraAccessMessage": "Povoľte prístup k fotoaparátu v Nastaveniach, aby ste mohli odfotiť.",
       "couldNotOpenPhotoPicker": "Výber fotiek sa nepodarilo otvoriť. Reštartujte Kilo a skúste to znova.",
-      "maxFilesAllowed": "Maximálny počet {{count}} súborov",
+      "maxFilesAllowed": "Maximálny počet {{displayCount}} súborov",
       "onlyAddingFiles": "Pridávajú sa iba súbory {{accepted}} z {{total}} (max {{max}})"
     },
     "composer": {
@@ -2222,7 +2283,7 @@
       "costPrefix": "cena {{cost}}",
       "costSuffix": ", cena {{cost}}",
       "tokensWindowUnavailable": "Kontext {{used}} tokenov, okno nie je k dispozícii",
-      "tokensUsage": "Kontext {{used}} z {{window}} tokenov, {{percentage}}% použitých",
+      "tokensUsage": "Kontext {{used}} z {{window}} tokenov, {{percentage}} použitých",
       "title": "Využitie kontextu",
       "used": "Použité",
       "remaining": "Zostáva",
@@ -2231,7 +2292,7 @@
       "usageReflectsLatest": "Využitie odráža poslednú dokončenú odpoveď asistenta.",
       "tokenUsage": "Využitie tokenov",
       "cacheRate": "Miera medzipamäte",
-      "modelsCount": "Modely ({{count}})",
+      "modelsCount": "Modely ({{displayCount}})",
       "tokenTotalsNote": "Súčty tokenov sa týkajú iba tejto relácie a nezahŕňajú tokeny subagentov/čiastkových relácií.",
       "subagents": "Subagenti",
       "subagentsDescription": "Reziduálna cena z čiastkových relácií",
@@ -2243,7 +2304,9 @@
       "stepsCount_one": "{{steps}} krok",
       "stepsCount": "{{steps}} krokov",
       "stepsCount_other": "{{steps}} krokov",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "stepsCount_few": "{{steps}} kroky",
+      "stepsCount_many": "{{steps}} krokov"
     },
     "prBadge": {
       "open": "otvorený pull request",
@@ -2373,7 +2436,7 @@
     "connectedCli": "Na pripojenom CLI",
     "newSessionOn": "Nové relácie na {{name}}",
     "noMatchingSessions": "Žiadne zodpovedajúce relácie.",
-    "onlyFirstFilesAttached": "Pripojí sa iba prvých {{count}} súborov.",
+    "onlyFirstFilesAttached": "Pripojí sa iba prvých {{displayCount}} súborov.",
     "staleMessage": "Toto zdieľanie už nie je k dispozícii.",
     "retryableMessage": "Vaše relácie sa nepodarilo načítať.",
     "emptyMessage": "Zatiaľ žiadne relácie — spustite novú, aby ste to odoslali.",
@@ -2406,7 +2469,7 @@
     "otherAccountCopy": "Kilo Pass na tomto Apple Account patrí inému účtu Kilo. Prihláste sa do tohto účtu Kilo, aby ste ho spravovali.",
     "alreadySubscribed": "Už máte predplatné Kilo Pass.",
     "purchaseUnavailable": "Nákup Kilo Pass nie je práve teraz k dispozícii.",
-    "tierCredits": "${{amount}} v kreditoch",
+    "tierCredits": "{{amount}} v kreditoch",
     "perMonth": "{{price}}/mes",
     "verifyPurchaseFailed": "Váš nákup sa nepodarilo overiť. Skontrolujte pripojenie a skúste to znova.",
     "productsCouldNotLoad": "Produkty Kilo Pass sa nepodarilo načítať z App Store.",
@@ -2417,7 +2480,7 @@
     "manageFailed": "Otvorenie správy predplatného v App Store zlyhalo.",
     "kiloPassSetup": "Nastavenie Kilo Pass",
     "subscriptionHeaderDescription": "Mesačné predplatné, ktoré pridáva kredity do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo — Cloud Agents, vzdialené relácie a chaty KiloClaw.",
-    "tierDescription": "${{price}} platených kreditov sa pridáva mesačne na používanie aplikácie Kilo.",
+    "tierDescription": "{{price}} platených kreditov sa pridáva mesačne na používanie aplikácie Kilo.",
     "subscribe": "Predplatiť",
     "subscribeDescription": "Mesačné kredity s bonusovým progresom",
     "manage": "Spravovať",
@@ -2425,7 +2488,7 @@
     "statusPending": "Kilo Pass čaká",
     "statusCanceling": "Kilo Pass sa ruší",
     "statusPastDue": "Kilo Pass po splatnosti",
-    "monthlyCredits": "${{credits}} mesačných kreditov",
+    "monthlyCredits": "{{credits}} mesačných kreditov",
     "ends": "Končí {{date}}",
     "periodEnd": "koniec obdobia",
     "managedOnGooglePlay": "Spravované cez Google Play",
@@ -2667,7 +2730,9 @@
       "processingNeedsReview": "Spracovanie si vyžaduje kontrolu",
       "retry": "Opakovať",
       "retryHint": "Znova skúša načítať stav Kilo Pass.",
-      "setupHint": "Otvorí nastavenie Kilo Pass na webe."
+      "setupHint": "Otvorí nastavenie Kilo Pass na webe.",
+      "paidSeat_few": "{{displayCount}} platené miesta",
+      "paidSeat_many": "{{displayCount}} platených miest"
     }
   },
   "authErrors": {

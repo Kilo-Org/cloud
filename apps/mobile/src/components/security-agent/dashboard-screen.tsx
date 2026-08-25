@@ -2,6 +2,7 @@
 import {
   buildSecurityDashboardMetrics,
   type DashboardMetricTone,
+  getAnalysisIncompleteCount,
   getSecurityRepositoriesInScope,
 } from '@kilocode/app-shared/security-agent';
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -21,6 +22,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
+import { formatNumber, formatPercent } from '@/lib/format';
 import {
   useSecurityAgentCapability,
   useSecurityAgentConfig,
@@ -46,6 +49,100 @@ const METRIC_TONE_CLASS = {
   warning: 'text-warn',
   neutral: 'text-muted-foreground',
 } satisfies Record<DashboardMetricTone, string>;
+
+type DashboardStats = NonNullable<ReturnType<typeof useSecurityAgentDashboardStats>['data']>;
+
+function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean) {
+  const metrics = buildSecurityDashboardMetrics(data, slaEnabled);
+  const number = (value: number) => formatNumber(value, i18n.language);
+
+  return metrics.map(metric => {
+    switch (metric.id) {
+      case 'openFindings': {
+        return Object.assign(metric, {
+          label: i18n.t('securityAgent.dashboardMetrics.openFindings'),
+          value: number(data.analysis.total),
+          detail: i18n.t('securityAgent.dashboardMetrics.openFindingsDetail', {
+            critical: number(data.severity.critical),
+            high: number(data.severity.high),
+          }),
+        });
+      }
+      case 'exploitable': {
+        return Object.assign(metric, {
+          label: i18n.t('securityAgent.dashboardMetrics.confirmedExploitable'),
+          value: number(data.analysis.exploitable),
+          detail: i18n.t('securityAgent.dashboardMetrics.confirmedExploitableDetail'),
+        });
+      }
+      case 'needsReview': {
+        return Object.assign(metric, {
+          label: i18n.t('securityAgent.dashboardMetrics.needsReview'),
+          value: number(data.analysis.needsReview),
+          detail: i18n.t('securityAgent.dashboardMetrics.needsReviewDetail'),
+        });
+      }
+      case 'analysisIncomplete': {
+        return Object.assign(metric, {
+          label: i18n.t('securityAgent.dashboardMetrics.analysisIncomplete'),
+          value: number(getAnalysisIncompleteCount(data.analysis)),
+          detail: i18n.t('securityAgent.dashboardMetrics.analysisIncompleteDetail'),
+        });
+      }
+      case 'slaCompliance': {
+        const measured = data.sla.overall.total > 0;
+        const compliance = measured
+          ? Math.round((data.sla.overall.withinSla / data.sla.overall.total) * 100)
+          : null;
+        return Object.assign(metric, {
+          label: i18n.t('securityAgent.dashboardMetrics.slaCompliance'),
+          value:
+            compliance === null
+              ? i18n.t('securityAgent.dashboardMetrics.notMeasured')
+              : formatPercent(compliance, i18n.language),
+          detail: measured
+            ? i18n.t('securityAgent.dashboardMetrics.withinDeadlineDetail', {
+                within: number(data.sla.overall.withinSla),
+                total: number(data.sla.overall.total),
+              })
+            : i18n.t('securityAgent.dashboardMetrics.noDeadlineData'),
+        });
+      }
+      case 'deadlinePassed': {
+        return Object.assign(metric, {
+          label: i18n.t('securityAgent.dashboardMetrics.deadlinePassed'),
+          value: number(data.sla.overall.overdue),
+          detail: i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', {
+            critical: number(data.sla.bySeverity.critical.overdue),
+            high: number(data.sla.bySeverity.high.overdue),
+          }),
+        });
+      }
+      case 'dueSoon': {
+        return Object.assign(metric, {
+          label: i18n.t('securityAgent.dashboardMetrics.dueThisWeek'),
+          value: number(data.sla.dueSoon.total),
+          detail: i18n.t('securityAgent.dashboardMetrics.dueThisWeekDetail', {
+            exploitable: number(data.sla.dueSoon.exploitable),
+          }),
+        });
+      }
+      case 'noDeadline': {
+        return Object.assign(metric, {
+          label: i18n.t('securityAgent.dashboardMetrics.noDeadline'),
+          value: number(data.sla.untrackedCount),
+          detail:
+            data.sla.untrackedCount > 0
+              ? i18n.t('securityAgent.dashboardMetrics.reviewSlaAssignment')
+              : i18n.t('securityAgent.dashboardMetrics.allOpenFindingsTracked'),
+        });
+      }
+      default: {
+        return metric;
+      }
+    }
+  });
+}
 
 export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
@@ -83,7 +180,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
   const slaEnabled = config.data?.slaEnabled ?? true;
   const data = dashboardStats.data;
-  const metrics = data ? buildSecurityDashboardMetrics(data, slaEnabled) : [];
+  const metrics = data ? buildLocalizedMetrics(data, slaEnabled) : [];
 
   const lastSyncTime = lastSync.data?.lastSyncTime;
   let lastSyncLabel = t('securityAgent.dashboard.notYetSynced');

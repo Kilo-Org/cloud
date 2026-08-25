@@ -206,11 +206,11 @@
       "loadingLines": "Sirrootni {{loaded}} keessaa {{total}} fayyadama...",
       "expandContext": "Context bal'iisi",
       "expandMoreContext": "Context dabalataa bal'iisi",
-      "expandLines": "Sirrootni {{count}} bal'iisi ({{start}}–{{end}})",
-      "expandMoreLines": "Sirrootni {{count}} dabalataa bal'iisi ({{start}}–{{end}})",
-      "expandLinesOfContext": "Sirrootni context {{count}} bal'iisi",
+      "expandLines": "Sirrootni {{displayCount}} bal'iisi ({{start}}–{{end}})",
+      "expandMoreLines": "Sirrootni {{displayCount}} dabalataa bal'iisi ({{start}}–{{end}})",
+      "expandLinesOfContext": "Sirrootni context {{displayCount}} bal'iisi",
       "expandAll": "Hundumaa bal'iisi",
-      "expandAllLines": "Sirrootni {{count}} hunda bal'iisi",
+      "expandAllLines": "Sirrootni {{displayCount}} hunda bal'iisi",
       "loadingMoreFiles": "Faayiloota dabalataa fayyadama...",
       "retryLoadingNextPage": "Fuula itti aanu fayyadamu irra deebi'i",
       "failedToLoadMoreFiles": "Faayiloota dabalataa fayyadamuu dadhabe — irra deebi'uuf tuqi",
@@ -301,7 +301,7 @@
       "closeReactions": "Adda suutii cufi",
       "reactionsTitle": "Adda suutii",
       "addReaction": "Adda suutii dabali",
-      "reactionPill": "Adda suutii {{emoji}}, {{count}} {{countLabel}}",
+      "reactionPill": "Adda suutii {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "adda suutii",
       "reaction": "adda suutii",
       "reaction_other": "adda suutii",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Pull request kana irratti maxxansa ilalloo ykn yaada marii hin jiru.",
       "reviewFiles": "Faayiloota ilaali",
       "quotedDiffSnippet": "Cita diff eerame",
-      "moreLinesAbove": "... sirrootni {{count}} dabalataa olii",
+      "moreLinesAbove": "... sirrootni {{displayCount}} dabalataa olii",
       "termsAcceptRequired": "Post gochuuf Qajeelfamoota Tajaajilaa fudhachuu qabda.",
       "termsOutdatedCopy": "Qajeelfamootni Tajaajilaa jijiraman. Fuula kana itti deebi'ii baniitii sassaabbii haaraa fudhadhu.",
       "termsCheckRetryCopy": "Qajeelfamoota Tajaajilaa ilaaluu hin dandeenye. Walqabii kee ilaali fi irra deebi'ii yaali."
@@ -395,11 +395,11 @@
       "retryChecks": "Qorannoo irra deebi'i",
       "viewOnGitHub": "PR GitHub irratti ilaali",
       "noChecksReported": "Qorannoon hin gabaafamne",
-      "passed": "{{count}} darban",
-      "failed": "{{count}} dadhaban",
-      "pending": "{{count}} eeggachaa",
-      "skipped": "{{count}} darbatan",
-      "checksCount": "Qorannoo {{count}}",
+      "passed": "{{displayCount}} darban",
+      "failed": "{{displayCount}} dadhaban",
+      "pending": "{{displayCount}} eeggachaa",
+      "skipped": "{{displayCount}} darbatan",
+      "checksCount": "Qorannoo {{displayCount}}",
       "checkDetails": "ibsa qorannoo",
       "pullRequest": "pull request"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "yaada eeggate",
       "pendingComment": "yaadota eeggatani",
       "pendingComment_other": "yaadota eeggatani",
-      "submitCountOfTotal": "Yaadota {{freshCount}} keessaa {{totalCount}} dhiheessi",
+      "submitCountOfTotal": "Yaadota {{displayFreshCount}} keessaa {{displayTotalCount}} dhiheessi",
       "submitReview": "Ilalloo dhiheessi",
-      "partialPostedMessage": "Yaadota {{freshCount}} maxxanfame. Yaadotni {{staleCount}} commit dheeraa irratti mul'atu fi tarree kee keessa turan."
+      "partialPostedMessage": "Yaadota {{displayFreshCount}} maxxanfame. Yaadotni {{displayStaleCount}} commit dheeraa irratti mul'atu fi tarree kee keessa turan."
     },
     "reconnectNotice": {
       "title": "Walqabii GitHub xumurame",
@@ -580,7 +580,8 @@
     "agents": "Eejentoota",
     "profile": "Kaardii",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, taabii, {{total}} keessaa {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Dhihoo",
       "common": "Waliigalaa",
       "reactWith": "{{reaction}} waliin suuti",
-      "accessibility": "Adda suutii {{emoji}}, {{count}}"
+      "accessibility": "Adda suutii {{emoji}}, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Deebii kennuuf",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Suuraan hin jiraatu",
       "openFailed": "Attachment banuu hin dandeenye. Walqabii kee ilaali fi irra deebi'ii yaali.",
       "attachFailed": "Faayilii qindeessuu dadhabe",
-      "limit": "Faayiloota hanga {{count}} qindeessuu dandeessa.",
+      "limit": "Faayiloota hanga {{displayCount}} qindeessuu dandeessa.",
       "sizeRejection": "{{filename}} daangaa attachment {{limit}} dabree jira.",
       "unreadable": "{{filename}} dubbisuu hin dandeenye.",
       "pastedImage": "suuraan maxxanfame",
@@ -722,6 +723,7 @@
       "finalTermEnds": "Xumura yeroo dhumaa",
       "afterFinalTerm": "Xumura yeroo dhumaa booda",
       "remaining": "Hafee",
+      "lessThanOneDay": "Guyyaa 1 gaditti",
       "ends": "Dhumaa",
       "expires": "Eeyama dhumaa",
       "noActivePlan": "Karoora hojii irraa jiru hin jiru",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "gatiin Standard ji'aa keessan",
       "perMonth": "/ji'aa",
       "earlybirdAccessUntil": "Guyyaa jalqabaa hanga {{date}}",
-      "earlybirdEnding": "Guyyaa jalqabaa dhuma: {{days}} guyyaa hafe",
+      "earlybirdEnding": "Guyyaa jalqabaa dhuma: {{remaining}}",
       "paymentPastDue": "Kaffaltiin yeroo xumuraa darbeera. Mala kaffaltii keessan haaromsaa.",
       "subscriptionCancels": "Ragaahannaan {{date}} irratti dhuma",
-      "trialDaysRemaining": "Qoramaa: {{days}} guyyaa hafe",
-      "trialEndingSoon": "Qoramaan dhumuuf jira: {{days}}"
+      "trialDaysRemaining": "Qoramaa: {{remaining}} hafe",
+      "trialEndingSoon": "Qoramaan dhumuuf jira: {{remaining}}"
     },
     "changelog": {
       "title": "Waan Haarayaa",
@@ -996,7 +998,7 @@
         "stalledTitle": "Wanti tokko dhaabbate",
         "stalledBody": "{{name}} qopheessuu hin dandeenye. Irra deebi'ii yaali, ykn yoo kana itti fufee hi@kilo.ai irratti iimeelii godhi.",
         "timeoutTitle": "Fakkaataa isaanii ol fudhachaa",
-        "timeoutBody": "Qophiin {{name}} yeroo fayyaa irra ol fudhachaa jira ({{minutes}} daqiiqaa ol).",
+        "timeoutBody": "Qophiin {{name}} yeroo fayyaa irra ol fudhachaa jira ({{displayMinutes}} daqiiqaa ol).",
         "continueInBackground": "Duraa booda itti fufi",
         "settingUp": "{{name}} qopheessaa",
         "finishingSetup": "Qophii xumuraa",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Maddii walitti makuu",
       "repositories": "Repositorywwan",
       "allRepositories": "Repositorywwan hundumaa",
-      "nSelected": "{{count}} filaman",
+      "nSelected": "{{displayCount}} filaman",
       "reviewMemory": "Yaadannoo sakatta'aa",
       "proposedReviewMdGuidance": "Qajeelfannoo REVIEW.md dhiyeffame"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Anaalizii godhame",
       "exploitabilityReasoning": "Sababa faayidaa irra ooluu danda'uu",
       "suggestedFix": "Furmaanni akeekame",
-      "whereFound": "Eessa kun argame ({{count}})",
+      "whereFound": "Eessa kun argame ({{displayCount}})",
       "fullReport": "Gabaasa guutuu uumame",
       "unknown": "Hin beekamu",
       "yes": "Eeyyee",
       "no": "Lakki"
     },
     "dashboard": {
-      "findingsCount": "Raawwiilee {{count}}",
+      "findingsCount": "Raawwiilee {{displayCount}}",
       "notMeasured": "Hin safaramne",
       "actFirst": "Dura hojjedhu",
       "slaPosture": "Haalli SLA",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Karoorri gochaa repository",
       "noOpenFindings": "Raawwiin banamaa xiyyeeffannaa barbaadu hin jiru",
       "deadlineToday": "Yeroo dhumaa har'a ga'eera",
-      "daysOverdue": "Guyyaa {{count}} darbeera",
+      "daysOverdue": "Guyyaa {{displayCount}} darbeera",
       "withinDeadline": "Yeroo dhumaa keessatti",
       "criticalOverdue": "Cimaa darbeera",
       "highOverdue": "Ol'aanaa darbeera",
@@ -1434,6 +1436,27 @@
       "syncNow": "Amma walitti qabi",
       "syncQueued": "Walitti qabamni eeggachuu keessa jira",
       "syncStatusUnavailable": "Haalli walitti qabamni hin argamu"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Raawwiilee banaman",
+      "openFindingsDetail": "{{critical}} cimaa, {{high}} ol'aanaa",
+      "confirmedExploitable": "Faayidaa irra ooluu mirkanaa'eera",
+      "confirmedExploitableDetail": "Balaan pirojektiin anaaliziidhaan mirkanaa'eera",
+      "needsReview": "Ilaalcha kee barbaada",
+      "needsReviewDetail": "Murtee namaa barbaachisa",
+      "analysisIncomplete": "Anaalizii hin xumuramne",
+      "analysisIncompleteDetail": "Balaan pirojektii amma iyyuu hin beekamu",
+      "slaCompliance": "Eegamni SLA",
+      "notMeasured": "Hin safaramne",
+      "withinDeadlineDetail": "{{total}} keessaa {{within}} yeroo dhumaa keessatti",
+      "noDeadlineData": "Raawwiin yeroo dhumaa SLA qabu amma iyyuu hin jiru",
+      "deadlinePassed": "Yeroon dhumaa darbeera",
+      "deadlinePassedDetail": "{{critical}} cimaa, {{high}} ol'aanaa",
+      "dueThisWeek": "Torban kana yeroo dhumaa",
+      "dueThisWeekDetail": "{{exploitable}} faayidaa irra ooluu mirkanaa'eera",
+      "noDeadline": "Yeroon dhumaa hin jiru",
+      "reviewSlaAssignment": "Qooda fudhannaa SLA ilaali",
+      "allOpenFindingsTracked": "Raawwiin banaman hunda hordofameera"
     },
     "dismiss": {
       "title": "Raawwii dhiisi",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "Anaalizii {{mode}}",
       "automation": "Ofumaan hojjechuu",
       "automationAllOff": "Hunda cufame",
-      "automationCount": "{{count}} keessaa 3 banameera",
+      "automationCount": "{{displayCount}} keessaa 3 banameera",
       "notifications": "Beeksisota",
-      "notificationsCount": "{{count}} keessaa 2 banameera",
+      "notificationsCount": "{{displayCount}} keessaa 2 banameera",
       "slaPolicy": "Imaammata SLA",
       "disabledNoManage": "Security Agent dhaabbateera. Abbaan dhaabbataa fi bulchitoonni baasii qofa isa banuu danda'u.",
       "disabledNoRepo": "Security Agent banuun dura gadi aanaa taate repository tokko filadhu.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Pull request{{number}} bani",
       "openDraftPullRequest": "Pull request{{number}} daaftarii bani",
       "progress": "Tarkaanfii",
-      "attemptHistory": "Seenaan yaalii ({{count}})",
+      "attemptHistory": "Seenaan yaalii ({{displayCount}})",
       "attemptNumber": "Yaalii #{{number}}",
       "startedBy": "Kan jalqabe",
       "model": "Model",
@@ -1855,9 +1878,9 @@
       "toolTask": "hojii",
       "readTodos": "Hojiiwwan dubbisi",
       "updateTodos": "Hojiiwwan haaromsi",
-      "linesBadge": "Sarara {{count}}",
-      "filesBadge": "Faayiloota {{count}}",
-      "matchesBadge": "Walqixxee {{count}}"
+      "linesBadge": "Sarara {{displayCount}}",
+      "filesBadge": "Faayiloota {{displayCount}}",
+      "matchesBadge": "Walqixxee {{displayCount}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "sarara {{start}}–{{end}} (gabaabbee)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "Deebiin kun gabaasamuu hin danda'u.",
       "reportAiResponseSubmitted": "Gabaasni ergame. Ragaa {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Ibsa hin jiru",
       "textDisplay": "Barreeffama mul'isuu",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Qophiin xumurame",
       "preparationFailed": "Qophiin dadhabe",
       "setupCommand": "Ajaja qindeessaa {{index}}",
-      "setupCommandOf": "Ajaja qindeessaa {{index}} kan {{count}}"
+      "setupCommandOf": "Ajaja qindeessaa {{index}} kan {{displayCount}}"
     },
     "permissionCard": {
       "title": "Hayyamni barbaachisa",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Galchii hin milkoofne. Mee ammas yaali.",
       "questionAnnouncement": "Agent'ichi deebii kee barbaada. Deebii kee kennuu kee hiddi waraqaa dhaabameera.",
       "permissionAnnouncement": "Agent'ichi itti fufuuf hayyama barbaada. Murtoo kee kennuu kee hiddi waraqaa dhaabameera.",
-      "positionHint": "({{count}} irraa 1)",
+      "positionHint": "({{displayCount}} irraa 1)",
       "movedPastPrompt": "Agent'ichi gaaffii kanaa darbeera. Yeroo shumarri itti fufu kaardichi cufama.",
       "waitingForAnswer": "Agent'ichi deebii kee eegaa jira. Gaaffiin kun banaa yeroo jiru, ergaa kee agent'ichaf dhaabameera.",
       "waitingForPermission": "Agent'ichi hayyama eegaa jira. Waanti kun banaa yeroo jiru, ergaa kee agent'ichaf dhaabameera."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Hiramni Kaameraa Cufameera",
       "cameraAccessMessage": "Suuraa fudhachuuf hirama kaameraa Settings keessatti hayyamaa.",
       "couldNotOpenPhotoPicker": "Filattoo suuraa banuu hin danda'ine. Kilo deebi'ii jalqabiitii ammas yaali.",
-      "maxFilesAllowed": "Faayiloota {{count}} guddoo ni hayyamama",
+      "maxFilesAllowed": "Faayiloota {{displayCount}} guddoo ni hayyamama",
       "onlyAddingFiles": "Faayiloota {{accepted}} kan {{total}} qofa dabalaa jira (guddoo {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "gatii {{cost}}",
       "costSuffix": ", gatii {{cost}}",
       "tokensWindowUnavailable": "Context tokkanoota {{used}}, iddoon hin argamu",
-      "tokensUsage": "Context tokkanoota {{used}} kan {{window}}, hamma {{percentage}}% fayyadameera",
+      "tokensUsage": "Context tokkanoota {{used}} kan {{window}}, hamma {{percentage}} fayyadameera",
       "title": "Fayyadama context",
       "used": "Fayyadame",
       "remaining": "Hafeera",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "Fayyadamuun deebii gargaaraa dhumaa xumurame argisiisa.",
       "tokenUsage": "Fayyadama tokkanootaa",
       "cacheRate": "Safara cache",
-      "modelsCount": "Moodeloota ({{count}})",
+      "modelsCount": "Moodeloota ({{displayCount}})",
       "tokenTotalsNote": "Waliigalli tokkanootaa shumarra kana qofa haguuga, tokkanoota subagent/shumarra ijoollee hin haguugu.",
       "subagents": "Subagentoota",
       "subagentsDescription": "Gatii hafe shumarra ijoollee irraa",
@@ -2373,7 +2400,7 @@
     "connectedCli": "CLI qunnamame irratti",
     "newSessionOn": "Shumarra haaraa {{name}} irratti",
     "noMatchingSessions": "Shumarri walsimu hin jiru.",
-    "onlyFirstFilesAttached": "Faayiloota {{count}} jalqabaa qofa ni qabachiifamu.",
+    "onlyFirstFilesAttached": "Faayiloota {{displayCount}} jalqabaa qofa ni qabachiifamu.",
     "staleMessage": "Qoodni kuni si'a kana hin argamu.",
     "retryableMessage": "Shumarra kee fudhachuu hin danda'ine.",
     "emptyMessage": "Shumarri hin jiru — kana erguuf haaraa jalqabi.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Kilo Pass akkaawuntii Apple kana irratti jiru akkaawuntii Kilo adda biraa keessaa. Kilo akkaawuntii sani ittiin bulchuuf seeni.",
     "alreadySubscribed": "Yammee hubboo Kilo Pass qabda.",
     "purchaseUnavailable": "Bittaan Kilo Pass amma hin argamu.",
-    "tierCredits": "kiriiditii ${{amount}}",
+    "tierCredits": "kiriiditii {{amount}}",
     "perMonth": "{{price}}/ji'aa",
     "verifyPurchaseFailed": "Bittaa kee mirkaneessuu hin danda'ine. Qunnamtiilee kee ilaalii ammas yaali.",
     "productsCouldNotLoad": "Bu'aan Kilo Pass App Store irraa fudhachuu hin danda'ame.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "Bulchiinsa hubboo App Store banuu hin danda'ine.",
     "kiloPassSetup": "Qophii Kilo Pass",
     "subscriptionHeaderDescription": "Hubboo ji'aa kiriiditii baalansii Kilo kee itti dabaluuf, shumarra code AI Kilo App keessatti hojjechuuf — Cloud Agents, shumarra fagoo, fi walmaree KiloClaw.",
-    "tierDescription": "Kiriiditii ${{price}} maallaqaan ji'aa itti dabalamu fayyadama Kilo App.",
+    "tierDescription": "Kiriiditii {{price}} maallaqaan ji'aa itti dabalamu fayyadama Kilo App.",
     "subscribe": "Hubboo seeni",
     "subscribeDescription": "Kiriiditii ji'aa olaantummaa bonus wajjin",
     "manage": "Bulchi",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass eegaa jira",
     "statusCanceling": "Kilo Pass dhaabaa jira",
     "statusPastDue": "Kilo Pass yeroo darbeera",
-    "monthlyCredits": "kiriiditii ji'aa ${{credits}}",
+    "monthlyCredits": "kiriiditii ji'aa {{credits}}",
     "ends": "Dhuma {{date}}",
     "periodEnd": "dhumni yeroo",
     "managedOnGooglePlay": "Google Play irratti bulchama",

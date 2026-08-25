@@ -210,8 +210,19 @@ function scanSource() {
   return { called, referenced };
 }
 
+const PLURAL_SUFFIX_RE = /_(zero|one|two|few|many|other)$/;
+
 function pluralBaseKey(key) {
   return key.replace(/_(?:zero|one|two|few|many|other)$/, '');
+}
+
+/** Split a dotted key into its family base and plural category, if any. */
+function pluralParts(key) {
+  const match = PLURAL_SUFFIX_RE.exec(key);
+  if (!match) {
+    return null;
+  }
+  return { base: key.slice(0, -match[0].length), category: match[1] };
 }
 
 const tags = supportedLanguages();
@@ -233,6 +244,12 @@ for (const catalog of CATALOGS) {
   }
 
   const english = flatten(parseCatalog(join(catalog.dir, 'en.json'), `${catalog.name}/en`));
+  const englishFamilies = new Set(
+    [...english.keys()]
+      .map(pluralParts)
+      .filter(Boolean)
+      .map(parts => parts.base)
+  );
   const englishValues = new Set(english.values());
   for (const [key, value] of english) {
     if (value.trim() === '') {
@@ -266,8 +283,39 @@ for (const catalog of CATALOGS) {
       }
     }
     for (const key of translated.keys()) {
-      if (!english.has(key)) {
+      if (english.has(key)) {
+        continue;
+      }
+      const parts = pluralParts(key);
+      if (!(parts && englishFamilies.has(parts.base))) {
         fail(`${label}: extra key "${key}" is not in en.json`);
+      }
+    }
+    const requiredCategories = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
+    for (const family of englishFamilies) {
+      for (const category of requiredCategories) {
+        if (!translated.has(`${family}_${category}`)) {
+          fail(`${label}: plural family "${family}" lacks the ${category} category of ${tag}`);
+        }
+      }
+    }
+    for (const [key, value] of translated) {
+      if (english.has(key)) {
+        continue;
+      }
+      const parts = pluralParts(key);
+      if (!(parts && englishFamilies.has(parts.base))) {
+        continue;
+      }
+      const englishRef =
+        english.get(`${parts.base}_${parts.category}`) ??
+        english.get(`${parts.base}_other`) ??
+        english.get(parts.base);
+      const allowed = new Set(placeholders(englishRef).split(',').filter(Boolean));
+      for (const ph of placeholders(value).split(',').filter(Boolean)) {
+        if (!allowed.has(ph)) {
+          fail(`${label}: "${key}" uses placeholder {{${ph}}}, which the English family does not`);
+        }
       }
     }
     for (const [key, value] of translated) {

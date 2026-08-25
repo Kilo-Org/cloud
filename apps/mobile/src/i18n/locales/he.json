@@ -201,7 +201,8 @@
     "agents": "סוכנים",
     "profile": "פרופיל",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, טאב, {{position}} מתוך {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -242,7 +243,7 @@
       "recent": "אחרונות",
       "common": "נפוצות",
       "reactWith": "הגב עם {{reaction}}",
-      "accessibility": "{{emoji}} תגובה, {{count}}"
+      "accessibility": "{{emoji}} תגובה, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "משיב ל",
@@ -271,7 +272,7 @@
       "imageUnavailable": "התמונה אינה זמינה",
       "openFailed": "לא ניתן היה לפתוח את הקובץ המצורף. בדוק את החיבור ונסה שוב.",
       "attachFailed": "צירוף הקובץ נכשל",
-      "limit": "ניתן לצרף עד {{count}} קבצים.",
+      "limit": "ניתן לצרף עד {{displayCount}} קבצים.",
       "sizeRejection": "{{filename}} חורג ממגבלת הצירוף של {{limit}}.",
       "unreadable": "לא ניתן היה לקרוא את {{filename}}.",
       "pastedImage": "התמונה שהודבקה",
@@ -321,7 +322,8 @@
       "someone": "מישהו",
       "typing_one": "{{name}} מקליד...",
       "typing": "{{names}} מקלידים...",
-      "typing_other": "{{names}} מקלידים..."
+      "typing_other": "{{names}} מקלידים...",
+      "typing_two": "{{names}} מקלידים..."
     },
     "botStatus": {
       "online": "מקוון",
@@ -355,17 +357,18 @@
       "finalCommitTermEndsOn": "תקופת ה-Commit האחרונה שלך מסתיימת ב-{{date}}. המשך כ-Standard תמורת {{price}}, או שהאירוח יסתיים.",
       "freeTrial": "ניסיון חינם",
       "hostingEnds": "האירוח מסתיים",
+      "lessThanOneDay": "פחות מיום אחד",
       "renews": "מתחדש",
       "standardMonthToMonth": "Standard חודשי",
       "standardStartsOn": "Standard מתחיל ב-{{date}} תמורת {{price}}.",
       "yourStandardMonthlyPrice": "המחיר החודשי שלך ל-Standard",
       "perMonth": "/חודש",
       "earlybirdAccessUntil": "גישת Earlybird עד {{date}}",
-      "earlybirdEnding": "Earlybird מסתיים: נותרו {{days}} ימים",
+      "earlybirdEnding": "Earlybird מסתיים: {{remaining}}",
       "paymentPastDue": "התשלום באיחור. עדכן את אמצעי התשלום שלך.",
       "subscriptionCancels": "המינוי מתבטל ב-{{date}}",
-      "trialDaysRemaining": "ניסיון: נותרו {{days}} ימים",
-      "trialEndingSoon": "הניסיון מסתיים בקרוב: {{days}}"
+      "trialDaysRemaining": "ניסיון: נותרו {{remaining}}",
+      "trialEndingSoon": "הניסיון מסתיים בקרוב: {{remaining}}"
     },
     "changelog": {
       "title": "מה חדש",
@@ -567,7 +570,8 @@
       "openSettings": "פתח הגדרות עבור {{name}}",
       "openUnread": "פתח את {{name}}, {{displayCount}} הודעות שלא נקראו",
       "openUnread_other": "פתח את {{name}}, {{displayCount}} הודעות שלא נקראו",
-      "openUnread_one": "פתח את {{name}}, {{displayCount}} הודעה שלא נקראה"
+      "openUnread_one": "פתח את {{name}}, {{displayCount}} הודעה שלא נקראה",
+      "openUnread_two": "פתח את {{name}}, {{displayCount}} הודעות שלא נקראו"
     },
     "list": {
       "createInstance": "צור מופע",
@@ -665,7 +669,7 @@
         "startingSandbox": "מתחיל את ארגז החול",
         "stoppedBody": "המופע של {{name}} נעצר באופן בלתי צפוי במהלך ההגדרה.",
         "stoppedTitle": "ההגדרה נעצרה",
-        "timeoutBody": "ההגדרה של {{name}} אורכת יותר מהרגיל (מעל {{minutes}} דקות).",
+        "timeoutBody": "ההגדרה של {{name}} אורכת יותר מהרגיל (מעל {{displayMinutes}} דקות).",
         "timeoutTitle": "אורך יותר מהצפוי"
       },
       "unavailableDescription": "נדרש מינוי KiloClaw פעיל כדי להקצות מופע. מופעים ומינויים קיימים ממשיכים כרגיל.",
@@ -912,7 +916,7 @@
       "focusAreas": "תחומי מיקוד",
       "mergeGate": "שער מיזוג",
       "model": "דגם",
-      "nSelected": "{{count}} נבחרו",
+      "nSelected": "{{displayCount}} נבחרו",
       "proposedReviewMdGuidance": "הנחיות REVIEW.md מוצעות",
       "repositories": "מאגרים",
       "reviewMemory": "זיכרון סקירה",
@@ -981,7 +985,7 @@
       "triageReasoning": "נימוק המיון",
       "unknown": "לא ידוע",
       "watchInCloudAgent": "צפה בסוכן הענן",
-      "whereFound": "היכן זה נמצא ({{count}})",
+      "whereFound": "היכן זה נמצא ({{displayCount}})",
       "yes": "כן"
     },
     "analysisSettings": {
@@ -1048,7 +1052,8 @@
       "severityCriticalOnly": "קריטי בלבד",
       "severityHighAndAbove": "גבוהה ומעלה",
       "severityMediumAndAbove": "בינונית ומעלה",
-      "title": "אוטומציה"
+      "title": "אוטומציה",
+      "queued_two": "{{displayCount}} ממצאים קיימים הועמדו בתור לניתוח."
     },
     "commandRetry": {
       "discard": "מחק"
@@ -1061,11 +1066,11 @@
       "confirmedExploitable": "אושר כניתן לניצול",
       "couldNotLoad": "לא ניתן היה לטעון את נתוני לוח הבקרה",
       "criticalOverdue": "קריטי באיחור",
-      "daysOverdue": "{{count}} ימים באיחור",
+      "daysOverdue": "{{displayCount}} ימים באיחור",
       "deadlineToday": "המועד האחרון מגיע היום",
       "filterByRepository": "סנן לפי מאגר",
       "findings": "ממצאים",
-      "findingsCount": "{{count}} ממצאים",
+      "findingsCount": "{{displayCount}} ממצאים",
       "highOverdue": "גבוה באיחור",
       "lastSynced": "סונכרן לאחרונה {{time}}",
       "manageRepositories": "נהל מאגרים",
@@ -1090,6 +1095,27 @@
       "syncQueued": "הסינכרון הועמד בתור",
       "syncStatusUnavailable": "מצב הסינכרון אינו זמין",
       "withinDeadline": "בתוך המועד"
+    },
+    "dashboardMetrics": {
+      "openFindings": "ממצאים פתוחים",
+      "openFindingsDetail": "{{critical}} קריטיים, {{high}} גבוהים",
+      "confirmedExploitable": "אושר כניתן לניצול",
+      "confirmedExploitableDetail": "סיכון הפרויקט אושר על ידי הניתוח",
+      "needsReview": "דורש את סקירתך",
+      "needsReviewDetail": "נדרשת החלטה אנושית",
+      "analysisIncomplete": "הניתוח לא הושלם",
+      "analysisIncompleteDetail": "סיכון הפרויקט עדיין לא ידוע",
+      "slaCompliance": "עמידה ב-SLA",
+      "notMeasured": "לא נמדד",
+      "withinDeadlineDetail": "{{within}} מתוך {{total}} במועד",
+      "noDeadlineData": "עדיין אין לממצאים מועד אחרון ל-SLA",
+      "deadlinePassed": "המועד האחרון חלף",
+      "deadlinePassedDetail": "{{critical}} קריטיים, {{high}} גבוהים",
+      "dueThisWeek": "אמור להתבצע השבוע",
+      "dueThisWeekDetail": "{{exploitable}} אושרו כניתנים לניצול",
+      "noDeadline": "אין מועד אחרון",
+      "reviewSlaAssignment": "סקירת שיבוץ SLA",
+      "allOpenFindingsTracked": "כל הממצאים הפתוחים במעקב"
     },
     "dismiss": {
       "alreadyResolvedDescription": "ממצא זה כבר נפתר ואינו מקבל עוד דחייה.",
@@ -1188,7 +1214,7 @@
       "title": "התראות"
     },
     "remediation": {
-      "attemptHistory": "היסטוריית ניסיונות ({{count}})",
+      "attemptHistory": "היסטוריית ניסיונות ({{displayCount}})",
       "attemptNumber": "ניסיון מס׳ {{number}}",
       "branch": "ענף",
       "cancelMessage": "סוכן האבטחה יעצור את ניסיון התיקון המתבצע.",
@@ -1256,7 +1282,7 @@
       "analysisModeSubtitle": "ניתוח {{mode}}",
       "automation": "אוטומציה",
       "automationAllOff": "הכל כבוי",
-      "automationCount": "{{count}} מתוך 3 מופעלים",
+      "automationCount": "{{displayCount}} מתוך 3 מופעלים",
       "couldNotLoadPermissions": "לא ניתן היה לטעון הרשאות",
       "couldNotLoadRepositories": "לא ניתן היה לטעון מאגרים",
       "couldNotLoadSettings": "לא ניתן היה לטעון את הגדרות סוכן האבטחה",
@@ -1267,7 +1293,7 @@
       "enabled": "מופעל",
       "modelsAndAnalysis": "דגמים וניתוח",
       "notifications": "התראות",
-      "notificationsCount": "{{count}} מתוך 2 מופעלים",
+      "notificationsCount": "{{displayCount}} מתוך 2 מופעלים",
       "off": "כבוי",
       "on": "מופעל",
       "repositories": "מאגרים",
@@ -1278,7 +1304,8 @@
       "selectRepositories": "בחר מאגרים",
       "selectRepositoriesSubtitle": "בחר אילו מאגרים סוכן האבטחה עוקב אחריהם",
       "slaPolicy": "מדיניות SLA",
-      "title": "הגדרות"
+      "title": "הגדרות",
+      "repositoriesCount_two": "{{displayCount}} מאגרים נבחרו"
     },
     "settingsSave": {
       "discard": "מחק",
@@ -1355,7 +1382,9 @@
       "cent_other": "סנטים",
       "dollar_one": "דולר",
       "dollar": "דולרים",
-      "dollar_other": "דולרים"
+      "dollar_other": "דולרים",
+      "cent_two": "סנטים",
+      "dollar_two": "דולרים"
     },
     "githubInstall": {
       "couldNotOpenMessage": "לא ניתן היה להתחיל את הגדרת אפליקציית GitHub. נסה שוב.",
@@ -1451,7 +1480,8 @@
     "partRenderer": {
       "updatedFileCount_one": "עודכן {{displayCount}} קובץ",
       "updatedFileCount": "עודכנו {{displayCount}} קבצים",
-      "updatedFileCount_other": "עודכנו {{displayCount}} קבצים"
+      "updatedFileCount_other": "עודכנו {{displayCount}} קבצים",
+      "updatedFileCount_two": "עודכנו {{displayCount}} קבצים"
     },
     "toolPatch": {
       "operationAdded": "נוסף",
@@ -1476,9 +1506,9 @@
       "toolTask": "משימה",
       "readTodos": "קריאת משימות",
       "updateTodos": "עדכון משימות",
-      "linesBadge": "{{count}} שורות",
-      "filesBadge": "{{count}} קבצים",
-      "matchesBadge": "{{count}} התאמות"
+      "linesBadge": "{{displayCount}} שורות",
+      "filesBadge": "{{displayCount}} קבצים",
+      "matchesBadge": "{{displayCount}} התאמות"
     },
     "readToolMarkdown": {
       "linesTruncated": "שורות {{start}}–{{end}} (קטום)",
@@ -1513,6 +1543,10 @@
     },
     "modeSelector": {
       "accessibility": "מצב: {{label}}"
+    },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
     },
     "modeOptions": {
       "code": "קוד",
@@ -1620,7 +1654,7 @@
       "preparationComplete": "ההכנה הושלמה",
       "preparationFailed": "ההכנה נכשלה",
       "setupCommand": "פקודת הגדרה {{index}}",
-      "setupCommandOf": "פקודת הגדרה {{index}} מתוך {{count}}"
+      "setupCommandOf": "פקודת הגדרה {{index}} מתוך {{displayCount}}"
     },
     "permissionCard": {
       "title": "נדרשת הרשאה",
@@ -1657,7 +1691,7 @@
       "submissionFailed": "השליחה נכשלה. נסה שוב.",
       "questionAnnouncement": "הסוכן זקוק לקלט שלך. המחבר מושהה בזמן שאתה עונה.",
       "permissionAnnouncement": "הסוכן זקוק להרשאה כדי להמשיך. המחבר מושהה בזמן שאתה מחליט.",
-      "positionHint": "(1 מתוך {{count}})",
+      "positionHint": "(1 מתוך {{displayCount}})",
       "movedPastPrompt": "הסוכן עבר מעבר להנחיה הזו. הכרטיס הזה ייסגר כשההפעלה תמשיך.",
       "waitingForAnswer": "הסוכן ממתין לתשובתך. בזמן שהשאלה הזו פתוחה, ההודעה שלך לסוכן מושהה.",
       "waitingForPermission": "הסוכן ממתין להרשאה. בזמן שהבקשה הזו פתוחה, ההודעה שלך לסוכן מושהה."
@@ -1697,7 +1731,8 @@
       "omitted_other": "לא ניתן היה להציג {{displayCount}} פריטים מוקדמים יותר מהפעלה זו.",
       "couldNotLoad": "לא ניתן היה לטעון הודעות מוקדמות יותר.",
       "unavailable": "הודעות מוקדמות יותר אינן זמינות.",
-      "tooLarge": "ההודעות המוקדמות יותר גדולות מדי לטעינה."
+      "tooLarge": "ההודעות המוקדמות יותר גדולות מדי לטעינה.",
+      "omitted_two": "לא ניתן היה להציג {{displayCount}} פריטים מוקדמים יותר מהפעלה זו."
     },
     "markdownTable": {
       "viewTable": "צפה בטבלה",
@@ -1709,7 +1744,9 @@
       "rowCount_one": "שורה",
       "rowCount": "שורות",
       "rowCount_other": "שורות",
-      "opensFullScreen": "נפתח במסך מלא"
+      "opensFullScreen": "נפתח במסך מלא",
+      "columnCount_two": "עמודות",
+      "rowCount_two": "שורות"
     },
     "sessionFilter": {
       "title": "סנן הפעלות",
@@ -1778,7 +1815,7 @@
       "cameraAccessDisabled": "גישת מצלמה מושבתת",
       "cameraAccessMessage": "אפשר גישת מצלמה בהגדרות כדי לצלם תמונה.",
       "couldNotOpenPhotoPicker": "לא ניתן היה לפתוח את בורר התמונות. הפעל מחדש את Kilo ונסה שוב.",
-      "maxFilesAllowed": "מותר לצרף עד {{count}} קבצים",
+      "maxFilesAllowed": "מותר לצרף עד {{displayCount}} קבצים",
       "onlyAddingFiles": "מוסיף רק {{accepted}} מתוך {{total}} קבצים (מקסימום {{max}})"
     },
     "composer": {
@@ -1843,7 +1880,7 @@
       "costPrefix": "עלות {{cost}}",
       "costSuffix": ", עלות {{cost}}",
       "tokensWindowUnavailable": "הקשר {{used}} אסימונים, חלון אינו זמין",
-      "tokensUsage": "הקשר {{used}} מתוך {{window}} אסימונים, {{percentage}}% בשימוש",
+      "tokensUsage": "הקשר {{used}} מתוך {{window}} אסימונים, {{percentage}} בשימוש",
       "title": "שימוש בהקשר",
       "used": "בשימוש",
       "remaining": "נותר",
@@ -1852,7 +1889,7 @@
       "usageReflectsLatest": "השימוש משקף את תשובת העוזר האחרונה שהושלמה.",
       "tokenUsage": "שימוש באסימונים",
       "cacheRate": "שיעור מטמון",
-      "modelsCount": "דגמים ({{count}})",
+      "modelsCount": "דגמים ({{displayCount}})",
       "tokenTotalsNote": "סך האסימונים מכסה הפעלה זו בלבד ואינו כולל אסימוני תת-סוכן/הפעלת משנה.",
       "subagents": "תת-סוכנים",
       "subagentsDescription": "עלות שיורית מהפעלות משנה",
@@ -1864,7 +1901,8 @@
       "stepsCount_one": "{{steps}} צעד",
       "stepsCount": "{{steps}} צעדים",
       "stepsCount_other": "{{steps}} צעדים",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "stepsCount_two": "{{steps}} צעדים"
     },
     "prBadge": {
       "open": "בקשת משיכה פתוחה",
@@ -1994,7 +2032,7 @@
     "connectedCli": "ב-CLI מחובר",
     "newSessionOn": "הפעלה חדשה ב-{{name}}",
     "noMatchingSessions": "אין הפעלות תואמות.",
-    "onlyFirstFilesAttached": "רק {{count}} הקבצים הראשונים יצורפו.",
+    "onlyFirstFilesAttached": "רק {{displayCount}} הקבצים הראשונים יצורפו.",
     "staleMessage": "השיתוף הזה אינו זמין עוד.",
     "retryableMessage": "לא ניתן היה לטעון את ההפעלות שלך.",
     "emptyMessage": "אין עדיין הפעלות — התחל הפעלה חדשה כדי לשלוח זאת.",
@@ -2027,7 +2065,7 @@
     "otherAccountCopy": "ה-Kilo Pass בחשבון Apple הזה שייך לחשבון Kilo אחר. היכנס לחשבון ה-Kilo הזה כדי לנהל אותו.",
     "alreadySubscribed": "כבר יש לך מינוי Kilo Pass.",
     "purchaseUnavailable": "רכישת Kilo Pass אינה זמינה כרגע.",
-    "tierCredits": "{{amount}}$ בקרדיטים",
+    "tierCredits": "{{amount}} בקרדיטים",
     "perMonth": "{{price}}/חודש",
     "verifyPurchaseFailed": "לא ניתן היה לאמת את הרכישה שלך. בדוק את החיבור שלך ונסה שוב.",
     "productsCouldNotLoad": "לא ניתן היה לטעון את מוצרי Kilo Pass מ-App Store.",
@@ -2038,7 +2076,7 @@
     "manageFailed": "לא ניתן היה לפתוח את ניהול המנויים ב-App Store.",
     "kiloPassSetup": "הגדרת Kilo Pass",
     "subscriptionHeaderDescription": "מנוי חודשי שמוסיף קרדיטים ליתרת Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App — Cloud Agents, מפגשים מרחוק וצ'אטים של KiloClaw.",
-    "tierDescription": "קרדיטים בתשלום של ${{price}} נוספים לשימוש ב-Kilo App מדי חודש.",
+    "tierDescription": "קרדיטים בתשלום של {{price}} נוספים לשימוש ב-Kilo App מדי חודש.",
     "subscribe": "הירשם",
     "subscribeDescription": "קרדיטים חודשיים עם התקדמות לבונוס",
     "manage": "ניהול",
@@ -2046,7 +2084,7 @@
     "statusPending": "Kilo Pass בהמתנה",
     "statusCanceling": "Kilo Pass בביטול",
     "statusPastDue": "Kilo Pass בפיגור",
-    "monthlyCredits": "${{credits}} קרדיטים חודשיים",
+    "monthlyCredits": "{{credits}} קרדיטים חודשיים",
     "ends": "מסתיים ב-{{date}}",
     "periodEnd": "סוף תקופה",
     "managedOnGooglePlay": "מנוהל ב-Google Play",
@@ -2150,17 +2188,17 @@
     "accessDeniedDescription": "אין לך הרשאה לצפות בבקשת המשיכה הזו.",
     "checkConnection": "בדוק חיבור",
     "checks": {
-      "checksCount": "{{count}} בדיקות",
+      "checksCount": "{{displayCount}} בדיקות",
       "couldNotLoad": "לא ניתן היה לטעון בדיקות.",
-      "failed": "{{count}} נכשלו",
+      "failed": "{{displayCount}} נכשלו",
       "noAccess": "אין לך גישה לבדיקות של המאגר הזה.",
       "noChecksReported": "לא דווחו בדיקות",
       "notAvailable": "הבדיקות עדיין לא זמינות. ייתכן שה-commit הראשי טרם עובד, או שאפליקציית Kilo GitHub אינה מותקנת על מאגר ה-head.",
       "openDetails": "פתח פרטים של {{name}}",
-      "passed": "{{count}} עברו",
-      "pending": "{{count}} ממתינות",
+      "passed": "{{displayCount}} עברו",
+      "pending": "{{displayCount}} ממתינות",
       "retryChecks": "נסה שוב את הבדיקות",
-      "skipped": "{{count}} דולגו",
+      "skipped": "{{displayCount}} דולגו",
       "title": "בדיקות",
       "viewOnGitHub": "צפה ב-PR ב-GitHub",
       "checkDetails": "פרטי בדיקה",
@@ -2238,7 +2276,7 @@
           "terminal": "לא ניתן לדווח על משתמש זה."
         }
       },
-      "moreLinesAbove": "… {{count}} שורות נוספות למעלה",
+      "moreLinesAbove": "… {{displayCount}} שורות נוספות למעלה",
       "mute": "השתק",
       "mutedUser": "{{login}} הושתק",
       "noDiscussion": "אין עדיין דיון",
@@ -2246,7 +2284,7 @@
       "comment_one": "תגובה אחת",
       "outdated": "מיושן",
       "quotedDiffSnippet": "קטע diff מצוטט",
-      "reactionPill": "{{emoji}} תגובה, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} תגובה, {{displayCount}} {{countLabel}}",
       "reaction": "תגובות",
       "reaction_other": "תגובות",
       "reaction_one": "תגובה",
@@ -2276,7 +2314,9 @@
       "viewTerms": "צפה בתנאים",
       "termsAcceptRequired": "עליך לאשר את תנאי השירות כדי לפרסם.",
       "termsCheckRetryCopy": "לא ניתן היה לבדוק את תנאי השירות. בדוק את החיבור ונסה שוב.",
-      "termsOutdatedCopy": "תנאי השירות השתנו. פתח מחדש את המסך הזה כדי לאשר את הגרסה האחרונה."
+      "termsOutdatedCopy": "תנאי השירות השתנו. פתח מחדש את המסך הזה כדי לאשר את הגרסה האחרונה.",
+      "comment_two": "{{displayCount}} תגובות",
+      "reaction_two": "תגובות"
     },
     "entry": {
       "clearLink": "נקה קישור בקשת משיכה",
@@ -2350,12 +2390,12 @@
     "hunkRows": {
       "contextUnavailable": "ההקשר אינו זמין ב-ref הזה",
       "expandAll": "הרחב הכל",
-      "expandAllLines": "הרחב את כל {{count}} השורות",
+      "expandAllLines": "הרחב את כל {{displayCount}} השורות",
       "expandContext": "הרחב הקשר",
-      "expandLines": "הרחב {{count}} שורות ({{start}}–{{end}})",
-      "expandLinesOfContext": "הרחב {{count}} שורות הקשר",
+      "expandLines": "הרחב {{displayCount}} שורות ({{start}}–{{end}})",
+      "expandLinesOfContext": "הרחב {{displayCount}} שורות הקשר",
       "expandMoreContext": "הרחב עוד הקשר",
-      "expandMoreLines": "הרחב עוד {{count}} שורות ({{start}}–{{end}})",
+      "expandMoreLines": "הרחב עוד {{displayCount}} שורות ({{start}}–{{end}})",
       "failedToLoadContext": "לא ניתן היה לטעון את ההקשר — הקש כדי לנסות שוב",
       "failedToLoadMoreFiles": "לא ניתן היה לטעון עוד קבצים — הקש כדי לנסות שוב",
       "fileLoadedCount_one": "{{displayCount}} קובץ נטען",
@@ -2377,7 +2417,9 @@
       "loadingLines": "טוען {{loaded}} מתוך {{total}} שורות…",
       "loadingMoreFiles": "טוען עוד קבצים…",
       "retryLoadingContext": "נסה שוב לטעון את ההקשר",
-      "retryLoadingNextPage": "נסה שוב לטעון את העמוד הבא"
+      "retryLoadingNextPage": "נסה שוב לטעון את העמוד הבא",
+      "fileLoadedCount_two": "{{displayCount}} קבצים נטענו",
+      "fileLoadedOfTotalCount_two": "{{displayCount}} קבצים נטענו מתוך {{total}}"
     },
     "inbox": {
       "couldNotLoad": "לא ניתן היה לטעון את תיבת הדואר הנכנס",
@@ -2452,7 +2494,9 @@
       "stateOpenApproved": "פתוח · אושר",
       "stateOpenChangesRequested": "פתוח · התבקשו שינויים",
       "stateOpenReviewRequired": "פתוח · נדרשת סקירה",
-      "unknownAuthor": "מחבר לא ידוע"
+      "unknownAuthor": "מחבר לא ידוע",
+      "commit_two": "commits",
+      "file_two": "קבצים"
     },
     "pendingComment": {
       "allQueuedHint": "כל התגובות יישלחו בבקשה אצווה אחת.",
@@ -2500,9 +2544,10 @@
       "pendingComment_one": "תגובה ממתינה",
       "summaryOptional": "סיכום (אופציונלי)",
       "title": "שלח סקירה",
-      "partialPostedMessage": "פורסמו {{freshCount}} תגובות. {{staleCount}} תגובות מתייחסות ל-commit ישן יותר ונשארו בתור שלך.",
-      "submitCountOfTotal": "שלח {{freshCount}} מתוך {{totalCount}} תגובות",
-      "submitReview": "שלח סקירה"
+      "partialPostedMessage": "פורסמו {{displayFreshCount}} תגובות. {{displayStaleCount}} תגובות מתייחסות ל-commit ישן יותר ונשארו בתור שלך.",
+      "submitCountOfTotal": "שלח {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
+      "submitReview": "שלח סקירה",
+      "pendingComment_two": "תגובות ממתינות"
     },
     "fileStatus": {
       "added": "נוסף",
@@ -2654,7 +2699,8 @@
       "processingNeedsReview": "העיבוד דורש סקירה",
       "retry": "נסה שוב",
       "retryHint": "מנסה שוב לטעון את מצב Kilo Pass.",
-      "setupHint": "פותח את הגדרת Kilo Pass באינטרנט."
+      "setupHint": "פותח את הגדרת Kilo Pass באינטרנט.",
+      "paidSeat_two": "{{displayCount}} מושבים בתשלום"
     }
   },
   "feedback": {

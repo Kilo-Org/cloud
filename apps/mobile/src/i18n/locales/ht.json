@@ -206,11 +206,11 @@
       "loadingLines": "Ap chaje {{loaded}} sou {{total}} liy...",
       "expandContext": "Elaji kontèks",
       "expandMoreContext": "Elaji plis kontèks",
-      "expandLines": "Elaji {{count}} liy ({{start}}–{{end}})",
-      "expandMoreLines": "Elaji {{count}} plis liy ({{start}}–{{end}})",
-      "expandLinesOfContext": "Elaji {{count}} liy kontèks",
+      "expandLines": "Elaji {{displayCount}} liy ({{start}}–{{end}})",
+      "expandMoreLines": "Elaji {{displayCount}} plis liy ({{start}}–{{end}})",
+      "expandLinesOfContext": "Elaji {{displayCount}} liy kontèks",
       "expandAll": "Elaji tout",
-      "expandAllLines": "Elaji tout {{count}} liy yo",
+      "expandAllLines": "Elaji tout {{displayCount}} liy yo",
       "loadingMoreFiles": "Ap chaje plis fichye...",
       "retryLoadingNextPage": "Rekòmanse chaje paj kap vini an",
       "failedToLoadMoreFiles": "Echwe pou chaje plis fichye — tape pou eseye ankò",
@@ -301,7 +301,7 @@
       "closeReactions": "Fèmen reyaksyon yo",
       "reactionsTitle": "Reyaksyon",
       "addReaction": "Ajoute reyaksyon",
-      "reactionPill": "{{emoji}} reyaksyon, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} reyaksyon, {{displayCount}} {{countLabel}}",
       "reaction_one": "reyaksyon",
       "reaction": "reyaksyon",
       "reaction_other": "reyaksyon",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Pa gen fil revizyon oswa kòmantè konvèsasyon sou demand rale sa a.",
       "reviewFiles": "Revize fichye",
       "quotedDiffSnippet": "Ekstrè diff site",
-      "moreLinesAbove": "... {{count}} plis liy pi wo a",
+      "moreLinesAbove": "... {{displayCount}} plis liy pi wo a",
       "termsAcceptRequired": "Ou dwe aksepte Kondisyon Itilizasyon yo pou pòste.",
       "termsOutdatedCopy": "Kondisyon Itilizasyon yo chanje. Relouvri ekran sa a pou aksepte vèsyon ki dènye a.",
       "termsCheckRetryCopy": "Pa t ka tcheke Kondisyon Itilizasyon yo. Tcheke koneksyon ou e eseye ankò."
@@ -395,11 +395,11 @@
       "retryChecks": "Rekòmanse tchèk",
       "viewOnGitHub": "Gade PR sou GitHub",
       "noChecksReported": "Pa gen tchèk rapòte",
-      "passed": "{{count}} pase",
-      "failed": "{{count}} echwe",
-      "pending": "{{count}} an patant",
-      "skipped": "{{count}} sote",
-      "checksCount": "{{count}} tchèk",
+      "passed": "{{displayCount}} pase",
+      "failed": "{{displayCount}} echwe",
+      "pending": "{{displayCount}} an patant",
+      "skipped": "{{displayCount}} sote",
+      "checksCount": "{{displayCount}} tchèk",
       "checkDetails": "detay tchèk",
       "pullRequest": "demand rale"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "kòmantè an patant",
       "pendingComment": "kòmantè an patant",
       "pendingComment_other": "kòmantè an patant",
-      "submitCountOfTotal": "Soumèt {{freshCount}} sou {{totalCount}} kòmantè",
+      "submitCountOfTotal": "Soumèt {{displayFreshCount}} sou {{displayTotalCount}} kòmantè",
       "submitReview": "Soumèt revizyon",
-      "partialPostedMessage": "Pòste {{freshCount}} kòmantè. {{staleCount}} kòmantè deziyen yon komit pi ansyen e rete nan fil ou."
+      "partialPostedMessage": "Pòste {{displayFreshCount}} kòmantè. {{displayStaleCount}} kòmantè deziyen yon komit pi ansyen e rete nan fil ou."
     },
     "reconnectNotice": {
       "title": "Koneksyon GitHub ekspire",
@@ -580,7 +580,8 @@
     "agents": "Ajans",
     "profile": "Pwofil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, tab, {{position}} sou {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Resan",
       "common": "Komen",
       "reactWith": "Reyaji ak {{reaction}}",
-      "accessibility": "{{emoji}} reyaksyon, {{count}}"
+      "accessibility": "{{emoji}} reyaksyon, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Ap reponn a",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Imaj pa disponib",
       "openFailed": "Pa t ka louvri atachman an. Tcheke koneksyon ou e eseye ankò.",
       "attachFailed": "Echwe pou atache fichye a",
-      "limit": "Ou ka atache jiska {{count}} fichye.",
+      "limit": "Ou ka atache jiska {{displayCount}} fichye.",
       "sizeRejection": "{{filename}} depase limit atachman {{limit}} a.",
       "unreadable": "Pa t ka li {{filename}}.",
       "pastedImage": "imaj kole a",
@@ -734,17 +735,18 @@
       "finalCommitTermEndsOn": "Dènye tèm Commit ou a fini sou {{date}}. Kontinye kòm Standard nan {{price}}, oswa òganizasyon an fini.",
       "freeTrial": "Eseye Gratis",
       "hostingEnds": "Òganizasyon fini",
+      "lessThanOneDay": "Mwens pase 1 jou",
       "renews": "Renouvle",
       "standardMonthToMonth": "Standard mwa pa mwa",
       "standardStartsOn": "Standard kòmanse sou {{date}} nan {{price}}.",
       "yourStandardMonthlyPrice": "pri mwa Standard ou a",
       "perMonth": "/mwa",
       "earlybirdAccessUntil": "Aksè Earlybird jiskaske {{date}}",
-      "earlybirdEnding": "Earlybird ap fini: {{days}} jou rès",
+      "earlybirdEnding": "Earlybird ap fini: {{remaining}}",
       "paymentPastDue": "Peman an reta. Tanpri mete ajou metòd peman ou a.",
       "subscriptionCancels": "Abònman an anile {{date}}",
-      "trialDaysRemaining": "Eseye: {{days}} jou ki rete",
-      "trialEndingSoon": "Eseye ap fini pito: {{days}}"
+      "trialDaysRemaining": "Eseye: {{remaining}} rete",
+      "trialEndingSoon": "Eseye ap fini pito: {{remaining}}"
     },
     "changelog": {
       "title": "Kisa ki Nouvo",
@@ -996,7 +998,7 @@
         "stalledTitle": "Yon bagay bloke",
         "stalledBody": "Nou pa t ka fini enstalasyon {{name}}. Eseye ankò, oswa voye imèl hi@kilo.ai si sa kontinye rive.",
         "timeoutTitle": "Ap pran plis tan pase espere",
-        "timeoutBody": "Enstalasyon {{name}} ap pran plis tan pase nòmal (plis pase {{minutes}} minit).",
+        "timeoutBody": "Enstalasyon {{name}} ap pran plis tan pase nòmal (plis pase {{displayMinutes}} minit).",
         "continueInBackground": "Kontinye nan fon",
         "settingUp": "Ap enstale {{name}}",
         "finishingSetup": "Ap fini enstalasyon",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Pòt fuzion",
       "repositories": "Depo",
       "allRepositories": "Tout depo",
-      "nSelected": "{{count}} chwazi",
+      "nSelected": "{{displayCount}} chwazi",
       "reviewMemory": "Memwa revizyon",
       "proposedReviewMdGuidance": "Direktiv REVIEW.md pwopoze"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Analize",
       "exploitabilityReasoning": "Rezonman eksplwatabilite",
       "suggestedFix": "Koreksyon sijere",
-      "whereFound": "Kote yo te jwenn sa a ({{count}})",
+      "whereFound": "Kote yo te jwenn sa a ({{displayCount}})",
       "fullReport": "Rapò konplè ki te jenere",
       "unknown": "Enkoni",
       "yes": "Wi",
       "no": "Non"
     },
     "dashboard": {
-      "findingsCount": "{{count}} rezilta",
+      "findingsCount": "{{displayCount}} rezilta",
       "notMeasured": "Pa mezire",
       "actFirst": "Aji an premye",
       "slaPosture": "Anviwonman SLA",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Plan aksyon repo a",
       "noOpenFindings": "Pa gen rezilta ouvè ki bezwen atansyon",
       "deadlineToday": "Dat limit rive jodi a",
-      "daysOverdue": "{{count}} jou an reta",
+      "daysOverdue": "{{displayCount}} jou an reta",
       "withinDeadline": "Nan dat limit",
       "criticalOverdue": "Kritik an reta",
       "highOverdue": "Wo an reta",
@@ -1434,6 +1436,27 @@
       "syncNow": "Senkronize kounye a",
       "syncQueued": "Senkronizasyon an pwosesis",
       "syncStatusUnavailable": "Estati senkronizasyon disponib"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Rezilta ouvè",
+      "openFindingsDetail": "{{critical}} kritik, {{high}} wo",
+      "confirmedExploitable": "Eksplwatab konfime",
+      "confirmedExploitableDetail": "Ris pwojè a konfime pa analiz la",
+      "needsReview": "Bezwen revizyon ou",
+      "needsReviewDetail": "Desizyon imen nesesè",
+      "analysisIncomplete": "Analiz pa fini",
+      "analysisIncompleteDetail": "Ris pwojè a poko konnen",
+      "slaCompliance": "Konfòmite SLA",
+      "notMeasured": "Pa mezire",
+      "withinDeadlineDetail": "{{within}} sou {{total}} nan dat limit",
+      "noDeadlineData": "Poko gen rezilta ki gen dat limit SLA",
+      "deadlinePassed": "Dat limit pase",
+      "deadlinePassedDetail": "{{critical}} kritik, {{high}} wo",
+      "dueThisWeek": "Pou semèn sa a",
+      "dueThisWeekDetail": "{{exploitable}} eksplwatab konfime",
+      "noDeadline": "Pa gen dat limit",
+      "reviewSlaAssignment": "Revize atribisyon SLA",
+      "allOpenFindingsTracked": "Tout rezilta ouvè swiv"
     },
     "dismiss": {
       "title": "Rejte rezilta a",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "Analiz {{mode}}",
       "automation": "Otonatizasyon",
       "automationAllOff": "Tout koupe",
-      "automationCount": "{{count}} sou 3 aktive",
+      "automationCount": "{{displayCount}} sou 3 aktive",
       "notifications": "Notifikasyon",
-      "notificationsCount": "{{count}} sou 2 aktive",
+      "notificationsCount": "{{displayCount}} sou 2 aktive",
       "slaPolicy": "Politik SLA",
       "disabledNoManage": "Security Agent dezaktive. Se sèlman pwopriyetè òganizasyon ak direktè fiyans ki kapab limen li.",
       "disabledNoRepo": "Chwazi omwen yon repo anvan ou limen Security Agent.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Louvri demann tiraj{{number}}",
       "openDraftPullRequest": "Louvri demann tiraj bouyon{{number}}",
       "progress": "Pwogrè",
-      "attemptHistory": "Istwа tentativ ({{count}})",
+      "attemptHistory": "Istwа tentativ ({{displayCount}})",
       "attemptNumber": "Tentativ #{{number}}",
       "startedBy": "Kòmanse pa",
       "model": "Modèl",
@@ -1855,9 +1878,9 @@
       "toolTask": "travay",
       "readTodos": "Li travay yo",
       "updateTodos": "Miz ajou travay yo",
-      "linesBadge": "{{count}} liy",
-      "filesBadge": "{{count}} fichye",
-      "matchesBadge": "{{count}} matche"
+      "linesBadge": "{{displayCount}} liy",
+      "filesBadge": "{{displayCount}} fichye",
+      "matchesBadge": "{{displayCount}} matche"
     },
     "readToolMarkdown": {
       "linesTruncated": "liy {{start}}–{{end}} (koupe)",
@@ -1892,6 +1915,10 @@
     },
     "modeSelector": {
       "accessibility": "Mòd: {{label}}"
+    },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
     },
     "modeOptions": {
       "code": "Kod",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Preparasyon konplè",
       "preparationFailed": "Preparasyon echwe",
       "setupCommand": "Kòmandman konfigirasyon {{index}}",
-      "setupCommandOf": "Kòmandman konfigirasyon {{index}} sou {{count}}"
+      "setupCommandOf": "Kòmandman konfigirasyon {{index}} sou {{displayCount}}"
     },
     "permissionCard": {
       "title": "Pèmisyon nesesè",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Soumèt la echwe. Tanpri eseye ankò.",
       "questionAnnouncement": "Ajant lan bezwen opinyon ou. Konpozitè a make pandan w ap reponn.",
       "permissionAnnouncement": "Ajant lan bezwen pèmisyon pou kontinye. Konpozitè a make pandan w ap deside.",
-      "positionHint": "(1 nan {{count}})",
+      "positionHint": "(1 nan {{displayCount}})",
       "movedPastPrompt": "Ajant lan te depase pwompt sa a. Kat sa a ap fèmen lè sesyon an kontinye.",
       "waitingForAnswer": "Ajant lan ap tann repons ou. Pandan kesyon sa a ouvè, mesaj ou bay ajant lan ap sispann.",
       "waitingForPermission": "Ajant lan ap tann pèmisyon. Pandan demann sa a ouvè, mesaj ou bay ajant lan ap sispann."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Akse Kamèra Dezaktive",
       "cameraAccessMessage": "Pèmèt akse kamèra nan Paramèt pou pran yon foto.",
       "couldNotOpenPhotoPicker": "Pa t ka louvri selektè foto a. Relance Kilo epi eseye ankò.",
-      "maxFilesAllowed": "Maksimòm {{count}} fichye pèmèt",
+      "maxFilesAllowed": "Maksimòm {{displayCount}} fichye pèmèt",
       "onlyAddingFiles": "Ap ajoute sèlman {{accepted}} nan {{total}} fichye (maks {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "kout {{cost}}",
       "costSuffix": ", kout {{cost}}",
       "tokensWindowUnavailable": "Kontèks {{used}} token, fenèt pa disponib",
-      "tokensUsage": "Kontèks {{used}} nan {{window}} token, {{percentage}}% itilize",
+      "tokensUsage": "Kontèks {{used}} nan {{window}} token, {{percentage}} itilize",
       "title": "Itilizasyon kontèks",
       "used": "Itilize",
       "remaining": "Rete",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "Itilizasyon an reflete dènye repons asistan ki fini a.",
       "tokenUsage": "Itilizasyon token",
       "cacheRate": "Pousantaj kach",
-      "modelsCount": "Modèl ({{count}})",
+      "modelsCount": "Modèl ({{displayCount}})",
       "tokenTotalsNote": "Total token yo kouvri sesyon sa a sèlman epi pa genyen token sesyon subajant/pitit.",
       "subagents": "Subajant",
       "subagentsDescription": "Kout rezidyèl soti nan sesyon pitit",
@@ -2373,7 +2400,7 @@
     "connectedCli": "Sou yon CLI konekte",
     "newSessionOn": "Nouvo sesyon sou {{name}}",
     "noMatchingSessions": "Pa gen sesyon ki matche.",
-    "onlyFirstFilesAttached": "Se sèlman premye {{count}} fichye yo ap tache.",
+    "onlyFirstFilesAttached": "Se sèlman premye {{displayCount}} fichye yo ap tache.",
     "staleMessage": "Pataj sa a pa disponib ankò.",
     "retryableMessage": "Pa t ka chaje sesyon ou yo.",
     "emptyMessage": "Pa gen sesyon ankò — kòmanse yon nouvo pou voye sa a.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Kilo Pass la sou Kont Apple sa a fè pati yon lòt kont Kilo. Siyen nan kont Kilo sa a pou jere li.",
     "alreadySubscribed": "Ou deja gen yon abònman Kilo Pass.",
     "purchaseUnavailable": "Acha Kilo Pass pa disponib kounye a.",
-    "tierCredits": "${{amount}} nan kredi",
+    "tierCredits": "{{amount}} nan kredi",
     "perMonth": "{{price}}/mw",
     "verifyPurchaseFailed": "Pa t ka verifye acha ou. Tcheke koneksyon ou epi eseye ankò.",
     "productsCouldNotLoad": "Pwodwi Kilo Pass pa t ka chaje soti nan App Store.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "Echèk pou louvri jesyon abònman App Store.",
     "kiloPassSetup": "Konfigirasyon Kilo Pass",
     "subscriptionHeaderDescription": "Yon abònman chak mwa ki ajoute kredi nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App — Cloud Agents, sesyon aleka, ak chat KiloClaw.",
-    "tierDescription": "${{price}} kredi peye ajoute chak mwa pou itilizasyon Kilo App.",
+    "tierDescription": "{{price}} kredi peye ajoute chak mwa pou itilizasyon Kilo App.",
     "subscribe": "Abòne",
     "subscribeDescription": "Kredi chak mwa ak pwogrè bonis",
     "manage": "Jere",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass annatant",
     "statusCanceling": "Kilo Pass ap anile",
     "statusPastDue": "Kilo Pass an reta",
-    "monthlyCredits": "${{credits}} kredi chak mwa",
+    "monthlyCredits": "{{credits}} kredi chak mwa",
     "ends": "Fini {{date}}",
     "periodEnd": "fin peryòd",
     "managedOnGooglePlay": "Jere sou Google Play",

@@ -201,7 +201,8 @@
     "agents": "代理",
     "profile": "個人資料",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}，標籤頁，{{total}} 中的第 {{position}} 個"
   },
   "chat": {
     "instancePicker": {
@@ -242,7 +243,7 @@
       "recent": "最近",
       "common": "常用",
       "reactWith": "以 {{reaction}} 回應",
-      "accessibility": "{{emoji}} 反應，{{count}}"
+      "accessibility": "{{emoji}} 反應，{{displayCount}}"
     },
     "composer": {
       "replyingTo": "回覆",
@@ -271,7 +272,7 @@
       "imageUnavailable": "圖片無法使用",
       "openFailed": "無法開啟附件。請檢查連線後再試一次。",
       "attachFailed": "附加檔案失敗",
-      "limit": "最多可附加 {{count}} 個檔案。",
+      "limit": "最多可附加 {{displayCount}} 個檔案。",
       "sizeRejection": "{{filename}} 超出 {{limit}} 的附件大小限制。",
       "unreadable": "無法讀取 {{filename}}。",
       "pastedImage": "貼上的圖片",
@@ -343,6 +344,7 @@
       "finalTermEnds": "最終期限結束",
       "afterFinalTerm": "最終期限之後",
       "remaining": "剩餘",
+      "lessThanOneDay": "不到 1 天",
       "ends": "結束",
       "expires": "到期",
       "noActivePlan": "沒有生效的方案",
@@ -361,11 +363,11 @@
       "yourStandardMonthlyPrice": "您的 Standard 月費",
       "perMonth": "/月",
       "earlybirdAccessUntil": "Earlybird 存取至 {{date}}",
-      "earlybirdEnding": "Earlybird 即將結束：剩餘 {{days}} 天",
+      "earlybirdEnding": "Earlybird 即將結束：剩餘 {{remaining}} 天",
       "paymentPastDue": "付款已逾期。請更新您的付款方式。",
       "subscriptionCancels": "訂閱將於 {{date}} 取消",
-      "trialDaysRemaining": "試用：剩餘 {{days}} 天",
-      "trialEndingSoon": "試用即將結束：{{days}}"
+      "trialDaysRemaining": "試用：剩餘 {{remaining}} 天",
+      "trialEndingSoon": "試用即將結束：{{remaining}}"
     },
     "changelog": {
       "title": "新功能",
@@ -665,7 +667,7 @@
         "startingSandbox": "正在啟動沙箱",
         "stoppedBody": "{{name}} 的執行個體在設定過程中意外停止。",
         "stoppedTitle": "設定已停止",
-        "timeoutBody": "{{name}} 的設定耗時比平常更久（已超過 {{minutes}} 分鐘）。",
+        "timeoutBody": "{{name}} 的設定耗時比平常更久（已超過 {{displayMinutes}} 分鐘）。",
         "timeoutTitle": "耗時比預期更久"
       },
       "unavailableDescription": "佈建執行個體需要有效的 KiloClaw 訂閱。現有執行個體與訂閱將照常運作。",
@@ -912,7 +914,7 @@
       "focusAreas": "重點領域",
       "mergeGate": "合併門禁",
       "model": "模型",
-      "nSelected": "已選取 {{count}} 項",
+      "nSelected": "已選取 {{displayCount}} 項",
       "proposedReviewMdGuidance": "建議的 REVIEW.md 指引",
       "repositories": "存放庫",
       "reviewMemory": "審查記憶",
@@ -981,7 +983,7 @@
       "triageReasoning": "分類推理",
       "unknown": "未知",
       "watchInCloudAgent": "在 Cloud Agent 中檢視",
-      "whereFound": "發現位置（{{count}}）",
+      "whereFound": "發現位置（{{displayCount}}）",
       "yes": "是"
     },
     "analysisSettings": {
@@ -1061,11 +1063,11 @@
       "confirmedExploitable": "已確認可利用",
       "couldNotLoad": "無法載入儀表板資料",
       "criticalOverdue": "嚴重逾期",
-      "daysOverdue": "逾期 {{count}} 天",
+      "daysOverdue": "逾期 {{displayCount}} 天",
       "deadlineToday": "今天到期",
       "filterByRepository": "依存放庫篩選",
       "findings": "發現",
-      "findingsCount": "{{count}} 個發現",
+      "findingsCount": "{{displayCount}} 個發現",
       "highOverdue": "高逾期",
       "lastSynced": "上次同步於 {{time}}",
       "manageRepositories": "管理存放庫",
@@ -1090,6 +1092,27 @@
       "syncQueued": "已排入同步佇列",
       "syncStatusUnavailable": "同步狀態無法使用",
       "withinDeadline": "在截止時間內"
+    },
+    "dashboardMetrics": {
+      "openFindings": "未解決的發現",
+      "openFindingsDetail": "{{critical}} 個嚴重，{{high}} 個高",
+      "confirmedExploitable": "已確認可利用",
+      "confirmedExploitableDetail": "專案風險已透過分析確認",
+      "needsReview": "需要您審核",
+      "needsReviewDetail": "需要人工決定",
+      "analysisIncomplete": "分析未完成",
+      "analysisIncompleteDetail": "專案風險仍未知",
+      "slaCompliance": "SLA 合規",
+      "notMeasured": "未測量",
+      "withinDeadlineDetail": "{{total}} 個中有 {{within}} 個在截止時間內",
+      "noDeadlineData": "尚無發現具有 SLA 截止時間",
+      "deadlinePassed": "截止時間已過",
+      "deadlinePassedDetail": "{{critical}} 個嚴重，{{high}} 個高",
+      "dueThisWeek": "本週到期",
+      "dueThisWeekDetail": "{{exploitable}} 個已確認可利用",
+      "noDeadline": "無截止時間",
+      "reviewSlaAssignment": "檢視 SLA 指派",
+      "allOpenFindingsTracked": "所有未解決的發現均已追蹤"
     },
     "dismiss": {
       "alreadyResolvedDescription": "此發現已解決，不再接受忽略。",
@@ -1188,7 +1211,7 @@
       "title": "通知"
     },
     "remediation": {
-      "attemptHistory": "嘗試記錄（{{count}}）",
+      "attemptHistory": "嘗試記錄（{{displayCount}}）",
       "attemptNumber": "嘗試 #{{number}}",
       "branch": "分支",
       "cancelMessage": "安全性代理將停止進行中的修復嘗試。",
@@ -1256,7 +1279,7 @@
       "analysisModeSubtitle": "{{mode}} 分析",
       "automation": "自動化",
       "automationAllOff": "全部關閉",
-      "automationCount": "已啟用 {{count}}/3 項",
+      "automationCount": "已啟用 {{displayCount}}/3 項",
       "couldNotLoadPermissions": "無法載入權限",
       "couldNotLoadRepositories": "無法載入存放庫",
       "couldNotLoadSettings": "無法載入安全性代理設定",
@@ -1267,7 +1290,7 @@
       "enabled": "已啟用",
       "modelsAndAnalysis": "模型與分析",
       "notifications": "通知",
-      "notificationsCount": "已啟用 {{count}}/2 項",
+      "notificationsCount": "已啟用 {{displayCount}}/2 項",
       "off": "關閉",
       "on": "開啟",
       "repositories": "存放庫",
@@ -1476,9 +1499,9 @@
       "toolTask": "任務",
       "readTodos": "讀取待辦事項",
       "updateTodos": "更新待辦事項",
-      "linesBadge": "{{count}} 行",
-      "filesBadge": "{{count}} 個檔案",
-      "matchesBadge": "{{count}} 個相符"
+      "linesBadge": "{{displayCount}} 行",
+      "filesBadge": "{{displayCount}} 個檔案",
+      "matchesBadge": "{{displayCount}} 個相符"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截斷）",
@@ -1562,6 +1585,10 @@
       "reportAiResponseFailedTerminal": "此回覆無法檢舉。",
       "reportAiResponseSubmitted": "檢舉已提交。回執 {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "詳細資料無法使用",
       "textDisplay": "文字顯示",
@@ -1620,7 +1647,7 @@
       "preparationComplete": "準備完成",
       "preparationFailed": "準備失敗",
       "setupCommand": "設定命令 {{index}}",
-      "setupCommandOf": "設定命令 {{index}} / {{count}}"
+      "setupCommandOf": "設定命令 {{index}} / {{displayCount}}"
     },
     "permissionCard": {
       "title": "需要權限",
@@ -1657,7 +1684,7 @@
       "submissionFailed": "提交失敗。請再試一次。",
       "questionAnnouncement": "代理需要您的輸入。回答期間撰寫器已暫停。",
       "permissionAnnouncement": "代理需要權限才能繼續。決定期間撰寫器已暫停。",
-      "positionHint": "（第 1 個，共 {{count}} 個）",
+      "positionHint": "（第 1 個，共 {{displayCount}} 個）",
       "movedPastPrompt": "代理已越過此提示。工作階段繼續時，此卡片將關閉。",
       "waitingForAnswer": "代理正在等待您的答案。此問題開啟期間，您傳給代理的訊息已暫停。",
       "waitingForPermission": "代理正在等待權限。此要求開啟期間，您傳給代理的訊息已暫停。"
@@ -1778,7 +1805,7 @@
       "cameraAccessDisabled": "相機存取已停用",
       "cameraAccessMessage": "請在「設定」中允許相機存取以拍攝照片。",
       "couldNotOpenPhotoPicker": "無法開啟照片選擇器。請重新啟動 Kilo 並再試一次。",
-      "maxFilesAllowed": "最多允許 {{count}} 個檔案",
+      "maxFilesAllowed": "最多允許 {{displayCount}} 個檔案",
       "onlyAddingFiles": "僅附加 {{total}} 個檔案中的 {{accepted}} 個（最多 {{max}} 個）"
     },
     "composer": {
@@ -1843,7 +1870,7 @@
       "costPrefix": "成本 {{cost}}",
       "costSuffix": "，成本 {{cost}}",
       "tokensWindowUnavailable": "內容 {{used}} 個 token，視窗無法使用",
-      "tokensUsage": "內容 {{used}} / {{window}} 個 token，已使用 {{percentage}}%",
+      "tokensUsage": "內容 {{used}} / {{window}} 個 token，已使用 {{percentage}}",
       "title": "內容用量",
       "used": "已使用",
       "remaining": "剩餘",
@@ -1852,7 +1879,7 @@
       "usageReflectsLatest": "用量反映最近一次完成的助理回覆。",
       "tokenUsage": "Token 用量",
       "cacheRate": "快取費率",
-      "modelsCount": "模型（{{count}}）",
+      "modelsCount": "模型（{{displayCount}}）",
       "tokenTotalsNote": "Token 總計僅涵蓋此工作階段，不包含子代理/子工作階段的 token。",
       "subagents": "子代理",
       "subagentsDescription": "子工作階段的剩餘成本",
@@ -1994,7 +2021,7 @@
     "connectedCli": "在已連接的 CLI 上",
     "newSessionOn": "在 {{name}} 上建立新工作階段",
     "noMatchingSessions": "沒有相符的工作階段。",
-    "onlyFirstFilesAttached": "只會附加前 {{count}} 個檔案。",
+    "onlyFirstFilesAttached": "只會附加前 {{displayCount}} 個檔案。",
     "staleMessage": "此分享已不再可用。",
     "retryableMessage": "無法載入您的工作階段。",
     "emptyMessage": "尚無工作階段 — 建立新工作階段即可傳送此內容。",
@@ -2027,7 +2054,7 @@
     "otherAccountCopy": "此 Apple 帳戶上的 Kilo Pass 屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以進行管理。",
     "alreadySubscribed": "您已有 Kilo Pass 訂閱。",
     "purchaseUnavailable": "Kilo Pass 購買目前無法使用。",
-    "tierCredits": "${{amount}} 的點數",
+    "tierCredits": "{{amount}} 的點數",
     "perMonth": "{{price}}/月",
     "verifyPurchaseFailed": "無法驗證您的購買。請檢查連線後重試。",
     "productsCouldNotLoad": "無法從 App Store 載入 Kilo Pass 產品。",
@@ -2038,7 +2065,7 @@
     "manageFailed": "無法開啟 App Store 訂閱管理。",
     "kiloPassSetup": "Kilo Pass 設定",
     "subscriptionHeaderDescription": "每月訂閱，可將點數加入您的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段 — Cloud Agents、遠端工作階段和 KiloClaw 聊天。",
-    "tierDescription": "每月為 Kilo App 使用加入 ${{price}} 的付費點數。",
+    "tierDescription": "每月為 Kilo App 使用加入 {{price}} 的付費點數。",
     "subscribe": "訂閱",
     "subscribeDescription": "每月點數與獎勵進度",
     "manage": "管理",
@@ -2046,7 +2073,7 @@
     "statusPending": "Kilo Pass 待處理",
     "statusCanceling": "Kilo Pass 取消中",
     "statusPastDue": "Kilo Pass 已逾期",
-    "monthlyCredits": "每月 ${{credits}} 點數",
+    "monthlyCredits": "每月 {{credits}} 點數",
     "ends": "於 {{date}} 結束",
     "periodEnd": "計費週期結束",
     "managedOnGooglePlay": "由 Google Play 管理",
@@ -2150,17 +2177,17 @@
     "accessDeniedDescription": "您沒有權限檢視此拉取請求。",
     "checkConnection": "檢查連線",
     "checks": {
-      "checksCount": "{{count}} 項檢查",
+      "checksCount": "{{displayCount}} 項檢查",
       "couldNotLoad": "無法載入檢查。",
-      "failed": "{{count}} 項失敗",
+      "failed": "{{displayCount}} 項失敗",
       "noAccess": "您沒有此存放庫的檢查存取權限。",
       "noChecksReported": "沒有回報的檢查",
       "notAvailable": "檢查尚無法使用。head 提交可能尚未處理，或 Kilo GitHub App 未安裝在 head 存放庫上。",
       "openDetails": "開啟 {{name}} 詳細資料",
-      "passed": "{{count}} 項通過",
-      "pending": "{{count}} 項待處理",
+      "passed": "{{displayCount}} 項通過",
+      "pending": "{{displayCount}} 項待處理",
       "retryChecks": "重試檢查",
-      "skipped": "{{count}} 項略過",
+      "skipped": "{{displayCount}} 項略過",
       "title": "檢查",
       "viewOnGitHub": "在 GitHub 上檢視 PR",
       "checkDetails": "檢查詳細資料",
@@ -2238,7 +2265,7 @@
           "terminal": "無法檢舉此使用者。"
         }
       },
-      "moreLinesAbove": "…上方還有 {{count}} 行",
+      "moreLinesAbove": "…上方還有 {{displayCount}} 行",
       "mute": "靜音",
       "mutedUser": "已靜音 {{login}}",
       "noDiscussion": "尚無討論",
@@ -2246,7 +2273,7 @@
       "comment_one": "1 則留言",
       "outdated": "已過時",
       "quotedDiffSnippet": "引用的 diff 片段",
-      "reactionPill": "{{emoji}} 反應，{{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} 反應，{{displayCount}} {{countLabel}}",
       "reaction": "個反應",
       "reaction_other": "個反應",
       "reaction_one": "個反應",
@@ -2350,12 +2377,12 @@
     "hunkRows": {
       "contextUnavailable": "此 ref 的內容無法使用",
       "expandAll": "全部展開",
-      "expandAllLines": "展開全部 {{count}} 行",
+      "expandAllLines": "展開全部 {{displayCount}} 行",
       "expandContext": "展開內容",
-      "expandLines": "展開 {{count}} 行（{{start}}–{{end}}）",
-      "expandLinesOfContext": "展開 {{count}} 行內容",
+      "expandLines": "展開 {{displayCount}} 行（{{start}}–{{end}}）",
+      "expandLinesOfContext": "展開 {{displayCount}} 行內容",
       "expandMoreContext": "展開更多內容",
-      "expandMoreLines": "展開更多 {{count}} 行（{{start}}–{{end}}）",
+      "expandMoreLines": "展開更多 {{displayCount}} 行（{{start}}–{{end}}）",
       "failedToLoadContext": "無法載入內容 — 點按重試",
       "failedToLoadMoreFiles": "無法載入更多檔案 — 點按重試",
       "fileLoadedCount_one": "已載入 {{displayCount}} 個檔案",
@@ -2500,8 +2527,8 @@
       "pendingComment_one": "則待處理留言",
       "summaryOptional": "摘要（選用）",
       "title": "提交審查",
-      "partialPostedMessage": "已發佈 {{freshCount}} 則留言。{{staleCount}} 則留言指向較舊的提交，並保留在您的佇列中。",
-      "submitCountOfTotal": "提交 {{freshCount}} / {{totalCount}} 則留言",
+      "partialPostedMessage": "已發佈 {{displayFreshCount}} 則留言。{{displayStaleCount}} 則留言指向較舊的提交，並保留在您的佇列中。",
+      "submitCountOfTotal": "提交 {{displayFreshCount}} / {{displayTotalCount}} 則留言",
       "submitReview": "提交審查"
     },
     "fileStatus": {

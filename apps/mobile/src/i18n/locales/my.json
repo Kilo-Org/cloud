@@ -206,11 +206,11 @@
       "loadingLines": "စာကြောင်း {{total}} တွင် {{loaded}} တင်နေသည်…",
       "expandContext": "context ချဲ့ပါ",
       "expandMoreContext": "context ပိုချဲ့ပါ",
-      "expandLines": "စာကြောင်း {{count}} ချဲ့ပါ ({{start}}–{{end}})",
-      "expandMoreLines": "စာကြောင်း {{count}} ပိုချဲ့ပါ ({{start}}–{{end}})",
-      "expandLinesOfContext": "context စာကြောင်း {{count}} ချဲ့ပါ",
+      "expandLines": "စာကြောင်း {{displayCount}} ချဲ့ပါ ({{start}}–{{end}})",
+      "expandMoreLines": "စာကြောင်း {{displayCount}} ပိုချဲ့ပါ ({{start}}–{{end}})",
+      "expandLinesOfContext": "context စာကြောင်း {{displayCount}} ချဲ့ပါ",
       "expandAll": "အားလုံးချဲ့ပါ",
-      "expandAllLines": "စာကြောင်း {{count}} အားလုံးချဲ့ပါ",
+      "expandAllLines": "စာကြောင်း {{displayCount}} အားလုံးချဲ့ပါ",
       "loadingMoreFiles": "နောက်ထပ်ဖိုင်များ တင်နေသည်…",
       "retryLoadingNextPage": "နောက်စာမျက်နှာတင်ရန် ထပ်စမ်းကြည့်",
       "failedToLoadMoreFiles": "နောက်ထပ်ဖိုင်များတင်ရန် မအောင်မြင်ပါ — ထပ်စမ်းရန် နှိပ်ပါ",
@@ -301,7 +301,7 @@
       "closeReactions": "တုံ့ပြန်မှုများပိတ်ပါ",
       "reactionsTitle": "တုံ့ပြန်မှုများ",
       "addReaction": "တုံ့ပြန်မှုထည့်ပါ",
-      "reactionPill": "{{emoji}} တုံ့ပြန်မှု, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} တုံ့ပြန်မှု, {{displayCount}} {{countLabel}}",
       "reaction_one": "တုံ့ပြန်မှု",
       "reaction": "တုံ့ပြန်မှုများ",
       "reaction_other": "တုံ့ပြန်မှုများ",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "ဤ pull request တွင် သုံးသပ်ချက် thread သို့မဟုတ် စကားဝိုင်းမှတ်ချက်များ မရှိပါ။",
       "reviewFiles": "ဖိုင်များသုံးသပ်ပါ",
       "quotedDiffSnippet": "ကိုးကားထားသော diff အပိုင်း",
-      "moreLinesAbove": "အထက် နောက်ထပ်စာကြောင်း {{count}}",
+      "moreLinesAbove": "အထက် နောက်ထပ်စာကြောင်း {{displayCount}}",
       "termsAcceptRequired": "တင်ရန် ဝန်ဆောင်မှုစည်းမျဉ်းများကို လက်ခံရပါမည်။",
       "termsOutdatedCopy": "ဝန်ဆောင်မှုစည်းမျဉ်းများ ပြောင်းလဲသွားသည်။ နောက်ဆုံးဗားရှင်းကို လက်ခံရန် ဤစခရင်ကို ပြန်ဖွင့်ပါ။",
       "termsCheckRetryCopy": "ဝန်ဆောင်မှုစည်းမျဉ်းများကို စစ်ဆေးမရပါ။ သင့်ချိတ်ဆက်မှုကို စစ်ပြီး ထပ်စမ်းကြည့်ပါ။"
@@ -395,11 +395,11 @@
       "retryChecks": "စစ်ဆေးမှုများ ထပ်စမ်းကြည့်",
       "viewOnGitHub": "PR ကို GitHub တွင် ကြည့်ပါ",
       "noChecksReported": "စစ်ဆေးမှု မတင်ပြပါ",
-      "passed": "{{count}} အောင်မြင်",
-      "failed": "{{count}} မအောင်မြင်",
-      "pending": "{{count}} ဆိုင်းငံ့",
-      "skipped": "{{count}} ကျော်လိုက်",
-      "checksCount": "စစ်ဆေးမှု {{count}}",
+      "passed": "{{displayCount}} အောင်မြင်",
+      "failed": "{{displayCount}} မအောင်မြင်",
+      "pending": "{{displayCount}} ဆိုင်းငံ့",
+      "skipped": "{{displayCount}} ကျော်လိုက်",
+      "checksCount": "စစ်ဆေးမှု {{displayCount}}",
       "checkDetails": "စစ်ဆေးမှုအသေးစိတ်များ",
       "pullRequest": "pull request"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "ဆိုင်းငံ့မှတ်ချက်",
       "pendingComment": "ဆိုင်းငံ့မှတ်ချက်များ",
       "pendingComment_other": "ဆိုင်းငံ့မှတ်ချက်များ",
-      "submitCountOfTotal": "မှတ်ချက် {{totalCount}} တွင် {{freshCount}} တင်သွင်းပါ",
+      "submitCountOfTotal": "မှတ်ချက် {{displayTotalCount}} တွင် {{displayFreshCount}} တင်သွင်းပါ",
       "submitReview": "သုံးသပ်မှုတင်သွင်းပါ",
-      "partialPostedMessage": "မှတ်ချက် {{freshCount}} ခု တင်ပြီးပါပြီ။ မှတ်ချက် {{staleCount}} ခုသည် အဟောင်း commit ကို ညွှန်ပြပြီး သင့်တန်းစီတွင် ရှိနေပါသည်။"
+      "partialPostedMessage": "မှတ်ချက် {{displayFreshCount}} ခု တင်ပြီးပါပြီ။ မှတ်ချက် {{displayStaleCount}} ခုသည် အဟောင်း commit ကို ညွှန်ပြပြီး သင့်တန်းစီတွင် ရှိနေပါသည်။"
     },
     "reconnectNotice": {
       "title": "GitHub ချိတ်ဆက်မှု သက်တမ်းကုန်သွားသည်",
@@ -580,7 +580,8 @@
     "agents": "Agent များ",
     "profile": "ပရိုဖိုင်",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}၊ tab၊ {{total}} အနက် {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "မကြာသေးမီ",
       "common": "အသုံးများ",
       "reactWith": "{{reaction}} ဖြင့် တုံ့ပြန်ပါ",
-      "accessibility": "{{emoji}} တုံ့ပြန်မှု, {{count}}"
+      "accessibility": "{{emoji}} တုံ့ပြန်မှု, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "အကြောင်းပြန်နေသည်",
@@ -650,7 +651,7 @@
       "imageUnavailable": "ပုံ မရနိုင်ပါ",
       "openFailed": "တွဲထားသောဖိုင်ကို ဖွင့်မရပါ။ သင့်ချိတ်ဆက်မှုကို စစ်ပြီး ထပ်စမ်းကြည့်ပါ။",
       "attachFailed": "ဖိုင်တွဲရန် မအောင်မြင်ပါ",
-      "limit": "ဖိုင် {{count}} အထိ တွဲနိုင်ပါသည်။",
+      "limit": "ဖိုင် {{displayCount}} အထိ တွဲနိုင်ပါသည်။",
       "sizeRejection": "{{filename}} သည် {{limit}} တွဲနိုင်သော ကန့်သတ်ချက်ထက် ကျော်လွန်ပါသည်။",
       "unreadable": "{{filename}} ကို ဖတ်မရပါ။",
       "pastedImage": "ကူးထည့်ထားသော ပုံ",
@@ -722,6 +723,7 @@
       "finalTermEnds": "နောက်ဆုံးသက်တမ်း ကုန်ဆုံး",
       "afterFinalTerm": "နောက်ဆုံးသက်တမ်းနောက်ပိုင်း",
       "remaining": "ကျန်ရှိ",
+      "lessThanOneDay": "ရက် 1 အောက်",
       "ends": "ကုန်ဆုံး",
       "expires": "သက်တမ်းကုန်",
       "noActivePlan": "တက်ကြွသော အစီအစဉ် မရှိပါ",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "သင့် Standard လစဉ်စျေးနှုန်း",
       "perMonth": "/လ",
       "earlybirdAccessUntil": "Earlybird အသုံးပြုခွင့် {{date}} အထိ",
-      "earlybirdEnding": "Earlybird ကုန်ဆုံးတော့မည်- {{days}} ရက် ကျန်ပါသည်",
+      "earlybirdEnding": "Earlybird ကုန်ဆုံးတော့မည်- {{remaining}}",
       "paymentPastDue": "ပေးချေမှု နောက်ကျနေသည်။ သင့်ပေးချေနည်းကို မွမ်းမံပါ။",
       "subscriptionCancels": "စာရင်းသွင်းမှု {{date}} တွင် ပယ်ဖျက်မည်",
-      "trialDaysRemaining": "စမ်းသုံး- {{days}} ရက် ကျန်ပါသည်",
-      "trialEndingSoon": "စမ်းသုံး မကြာမီ ကုန်ဆုံး- {{days}}"
+      "trialDaysRemaining": "စမ်းသုံး- {{remaining}}",
+      "trialEndingSoon": "စမ်းသုံး မကြာမီ ကုန်ဆုံး- {{remaining}}"
     },
     "changelog": {
       "title": "အသစ်အဆန်း",
@@ -996,7 +998,7 @@
         "stalledTitle": "တစ်ခုခု ရပ်တန့်နေသည်",
         "stalledBody": "{{name}} ကို အပြီးသတ်၍ မရပါ။ ထပ်ကြိုးစားပါ၊ သို့မဟုတ် ဆက်ဖြစ်နေပါက hi@kilo.ai သို့ အီးမေးလ် ပို့ပါ။",
         "timeoutTitle": "မျှော်လင့်ထားသည်ထက် ကြာနေသည်",
-        "timeoutBody": "{{name}} အတွက် ပြင်ဆင်မှုက ပုံမှန်ထက် ကြာနေသည် ({{minutes}} မိနစ်ကျော်)။",
+        "timeoutBody": "{{name}} အတွက် ပြင်ဆင်မှုက ပုံမှန်ထက် ကြာနေသည် ({{displayMinutes}} မိနစ်ကျော်)။",
         "continueInBackground": "နောက်ခံတွင် ဆက်လုပ်ရန်",
         "settingUp": "{{name}} ပြင်ဆင်နေသည်",
         "finishingSetup": "ပြင်ဆင်မှု အပြီးသတ်နေသည်",
@@ -1287,7 +1289,7 @@
       "mergeGate": "ပေါင်းစည်းမှု တံခါး",
       "repositories": "စာအုပ်များ",
       "allRepositories": "စာအုပ်များအားလုံး",
-      "nSelected": "{{count}} ရွေးထား",
+      "nSelected": "{{displayCount}} ရွေးထား",
       "reviewMemory": "စစ်ဆေးမှု မှတ်ဉာဏ်",
       "proposedReviewMdGuidance": "အဆိုပြုထားသော REVIEW.md လမ်းညွှန်"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "ခွဲခြမ်းစိတ်ဖြာပြီး",
       "exploitabilityReasoning": "အသုံးချနိုင်မှု ဆင်ခြင်ချက်",
       "suggestedFix": "အကြံပြုထားသော ပြင်ဆင်ချက်",
-      "whereFound": "၎င်းကို တွေ့ရှိခဲ့သည့်နေရာ ({{count}})",
+      "whereFound": "၎င်းကို တွေ့ရှိခဲ့သည့်နေရာ ({{displayCount}})",
       "fullReport": "ထုတ်လုပ်ထားသော အပြည့်အစုံအစီရင်ခံစာ",
       "unknown": "အမည်မသိ",
       "yes": "ဟုတ်သည်",
       "no": "မဟုတ်"
     },
     "dashboard": {
-      "findingsCount": "တွေ့ရှိချက် {{count}} ခု",
+      "findingsCount": "တွေ့ရှိချက် {{displayCount}} ခု",
       "notMeasured": "တိုင်းတာမထား",
       "actFirst": "ဦးစွာလုပ်ဆောင်ပါ",
       "slaPosture": "SLA အနေအထား",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "သိုလှောင်မှု လုပ်ဆောင်ချက် အစီအစဉ်",
       "noOpenFindings": "အာရုံစိုက်ရန် လိုအပ်သော ဖွင့်ထားသည့်တွေ့ရှိချက် မရှိပါ",
       "deadlineToday": "ယနေ့ သတ်မှတ်ရက် ရောက်ပြီ",
-      "daysOverdue": "{{count}} ရက် ကျော်လွန်ခဲ့သည်",
+      "daysOverdue": "{{displayCount}} ရက် ကျော်လွန်ခဲ့သည်",
       "withinDeadline": "သတ်မှတ်ရက်အတွင်း",
       "criticalOverdue": "အရေးကြီး သတ်မှတ်ရက်ကျော်လွန်",
       "highOverdue": "မြင့်မား သတ်မှတ်ရက်ကျော်လွန်",
@@ -1434,6 +1436,27 @@
       "syncNow": "ယခု ထပ်တူပြုပါ",
       "syncQueued": "ထပ်တူပြုရန် တန်းစီထား",
       "syncStatusUnavailable": "ထပ်တူပြုမှု အခြေအနေ မရရှိနိုင်"
+    },
+    "dashboardMetrics": {
+      "openFindings": "ဖွင့်ထားသော တွေ့ရှိချက်များ",
+      "openFindingsDetail": "{{critical}} ဆိုးရွား၊ {{high}} မြင့်",
+      "confirmedExploitable": "အမြတ်ထုတ်နိုင်ကြောင်း အတည်ပြုပြီး",
+      "confirmedExploitableDetail": "ခွဲခြမ်းစိတ်ဖြာမှုဖြင့် ပရောဂျက်အန္တရာယ် အတည်ပြုပြီး",
+      "needsReview": "သင့်ပြန်လည်သုံးသပ်မှု လိုအပ်သည်",
+      "needsReviewDetail": "လူသားဆုံးဖြတ်ချက် လိုအပ်သည်",
+      "analysisIncomplete": "ခွဲခြမ်းစိတ်ဖြာမှု မပြီးပြာ",
+      "analysisIncompleteDetail": "ပရောဂျက်အန္တရာယ်ကို မသိရသေးပါ",
+      "slaCompliance": "SLA လိုက်နာမှု",
+      "notMeasured": "တိုင်းတာမထား",
+      "withinDeadlineDetail": "သတ်မှတ်ချိန်အတွင်း {{total}} အနက် {{within}}",
+      "noDeadlineData": "တွေ့ရှိချက်များတွင် SLA သတ်မှတ်ချိန် မရှိသေးပါ",
+      "deadlinePassed": "သတ်မှတ်ချိန် ကျော်လွန်ပြီး",
+      "deadlinePassedDetail": "{{critical}} ဆိုးရွား၊ {{high}} မြင့်",
+      "dueThisWeek": "ဤတစ်ပတ်အတွင်း ကုန်ဆုံးမည်",
+      "dueThisWeekDetail": "{{exploitable}} အမြတ်ထုတ်နိုင်ကြောင်း အတည်ပြုပြီး",
+      "noDeadline": "သတ်မှတ်ချိန် မရှိ",
+      "reviewSlaAssignment": "SLA တာဝန်ပေးမှုကို ပြန်လည်သုံးသပ်ပါ",
+      "allOpenFindingsTracked": "ဖွင့်ထားသော တွေ့ရှိချက်အားလုံး ခြေရာခံပြီး"
     },
     "dismiss": {
       "title": "တွေ့ရှိချက်ကို ဖယ်ရှားပါ",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}} ခွဲခြမ်းစိတ်ဖြာမှု",
       "automation": "အလိုအလျောက်လုပ်ဆောင်မှု",
       "automationAllOff": "အားလုံး ပိတ်",
-      "automationCount": "3 ခုတွင် {{count}} ခု ဖွင့်ထား",
+      "automationCount": "3 ခုတွင် {{displayCount}} ခု ဖွင့်ထား",
       "notifications": "အသိပေးချက်များ",
-      "notificationsCount": "2 ခုတွင် {{count}} ခု ဖွင့်ထား",
+      "notificationsCount": "2 ခုတွင် {{displayCount}} ခု ဖွင့်ထား",
       "slaPolicy": "SLA မူဝါဒ",
       "disabledNoManage": "Security Agent ကို ပိတ်ထားသည်။ အဖွဲ့အစည်းပိုင်ရှင်များနှင့် ငွေပေးချေမှုမန်နေဂျာများသာ ၎င်းကို ဖွင့်နိုင်သည်။",
       "disabledNoRepo": "Security Agent ကို ဖွင့်ရန် အနည်းဆုံး သိုလှောင်မှုတစ်ခု ရွေးချယ်ပါ။",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "pull request{{number}} ဖွင့်ပါ",
       "openDraftPullRequest": "draft pull request{{number}} ဖွင့်ပါ",
       "progress": "တိုးတက်မှု",
-      "attemptHistory": "ကြိုးစားမှုမှတ်တမ်း ({{count}})",
+      "attemptHistory": "ကြိုးစားမှုမှတ်တမ်း ({{displayCount}})",
       "attemptNumber": "ကြိုးစားမှု #{{number}}",
       "startedBy": "စတင်သူ",
       "model": "မော်ဒယ်",
@@ -1855,9 +1878,9 @@
       "toolTask": "task",
       "readTodos": "todo များ ဖတ်ပါ",
       "updateTodos": "todo များ မွမ်းမံပါ",
-      "linesBadge": "စာကြောင်း {{count}} ခု",
-      "filesBadge": "ဖိုင် {{count}} ခု",
-      "matchesBadge": "ကိုက်ညီမှု {{count}} ခု"
+      "linesBadge": "စာကြောင်း {{displayCount}} ခု",
+      "filesBadge": "ဖိုင် {{displayCount}} ခု",
+      "matchesBadge": "ကိုက်ညီမှု {{displayCount}} ခု"
     },
     "readToolMarkdown": {
       "linesTruncated": "စာကြောင်း {{start}}–{{end}} (အတိုချုံး)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "ဤတုံ့ပြန်ချက်ကို အစီရင်ခံ၍မရပါ။",
       "reportAiResponseSubmitted": "အစီရင်ခံစာ တင်သွင်းပြီး။ လက်ခံကြောင်း {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "{{amount}} အောက်",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "အသေးစိတ်များ မရရှိနိုင်",
       "textDisplay": "စာသားပြသမှု",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "ပြင်ဆင်မှု ပြီးဆုံး",
       "preparationFailed": "ပြင်ဆင်မှု မအောင်မြင်ခဲ့ပါ",
       "setupCommand": "setup command {{index}}",
-      "setupCommandOf": "setup command {{index}} / {{count}} ခုတွင်"
+      "setupCommandOf": "setup command {{index}} / {{displayCount}} ခုတွင်"
     },
     "permissionCard": {
       "title": "ခွင့်ပြုချက် လိုအပ်သည်",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "တင်သွင်းမှု မအောင်မြင်ပါ။ ထပ်ကြိုးစားပါ။",
       "questionAnnouncement": "Agent သည် သင့်ထည့်သွင်းမှု လိုအပ်နေသည်။ သင်ဖြေဆိုနေစဉ် composer ကို ရပ်ထားသည်။",
       "permissionAnnouncement": "Agent သည် ဆက်လက်လုပ်ဆောင်ရန် ခွင့်ပြုချက် လိုအပ်နေသည်။ သင်ဆုံးဖြတ်နေစဉ် composer ကို ရပ်ထားသည်။",
-      "positionHint": "({{count}} ခုအနက် 1)",
+      "positionHint": "({{displayCount}} ခုအနက် 1)",
       "movedPastPrompt": "Agent သည် ဤ prompt ကို ကျော်သွားပြီးဖြစ်သည်။ session ဆက်လုပ်သောအခါ ဤ card သည် ပိတ်သွားပါမည်။",
       "waitingForAnswer": "Agent သည် သင့်အဖြေကို စောင့်နေသည်။ ဤမေးခွန်း ဖွင့်ထားစဉ် agent သို့ သင့်စာသည် ရပ်နေသည်။",
       "waitingForPermission": "Agent သည် ခွင့်ပြုချက်ကို စောင့်နေသည်။ ဤတောင်းဆိုမှု ဖွင့်ထားစဉ် agent သို့ သင့်စာသည် ရပ်နေသည်။"
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "ကင်မရာ ဝင်ရောက်ခွင့် ပိတ်ထားသည်",
       "cameraAccessMessage": "ဓာတ်ပုံရိုက်ရန် ဆက်တင်များ တွင် ကင်မရာ ဝင်ရောက်ခွင့် ခွင့်ပြုပါ။",
       "couldNotOpenPhotoPicker": "photo picker ကို မဖွင့်နိုင်ပါ။ Kilo ကို ပြန်စပြီး ထပ်ကြိုးစားပါ။",
-      "maxFilesAllowed": "ဖိုင် အများဆုံး {{count}} ခု ခွင့်ပြုသည်",
+      "maxFilesAllowed": "ဖိုင် အများဆုံး {{displayCount}} ခု ခွင့်ပြုသည်",
       "onlyAddingFiles": "ဖိုင် {{total}} ခုမှ {{accepted}} ခုသာ ထည့်နေသည် (အများဆုံး {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "ကုန်ကျစရိတ် {{cost}}",
       "costSuffix": "၊ ကုန်ကျစရိတ် {{cost}}",
       "tokensWindowUnavailable": "Context token {{used}} ခု၊ window မရနိုင်ပါ",
-      "tokensUsage": "Context {{window}} token မှ {{used}} ခု သုံးထားသည်၊ {{percentage}}% သုံးပြီးပါပြီ",
+      "tokensUsage": "Context {{window}} token မှ {{used}} ခု သုံးထားသည်၊ {{percentage}} သုံးပြီးပါပြီ",
       "title": "context အသုံးပြုမှု",
       "used": "သုံးပြီးသား",
       "remaining": "ကျန်ရှိနေ",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "အသုံးပြုမှုသည် နောက်ဆုံး ပြီးဆုံးသော assistant တုံ့ပြန်ချက်ကို ထင်ဟပ်သည်။",
       "tokenUsage": "token အသုံးပြုမှု",
       "cacheRate": "cache နှုန်း",
-      "modelsCount": "မော်ဒယ်များ ({{count}})",
+      "modelsCount": "မော်ဒယ်များ ({{displayCount}})",
       "tokenTotalsNote": "token စုစုပေါင်းများသည် ဤ session အတွက်သာဖြစ်ပြီး subagent/child-session token များ မပါဝင်ပါ။",
       "subagents": "Subagent များ",
       "subagentsDescription": "child session များမှ ကျန်ရှိ ကုန်ကျစရိတ်",
@@ -2373,7 +2400,7 @@
     "connectedCli": "ချိတ်ဆက်ထားသော CLI တွင်",
     "newSessionOn": "{{name}} တွင် session အသစ်",
     "noMatchingSessions": "ကိုက်ညီသော session များ မရှိပါ။",
-    "onlyFirstFilesAttached": "ပထမ ဖိုင် {{count}} ခုသာ ပူးတွဲပါမည်။",
+    "onlyFirstFilesAttached": "ပထမ ဖိုင် {{displayCount}} ခုသာ ပူးတွဲပါမည်။",
     "staleMessage": "ဤ မျှဝေမှု မရနိုင်တော့ပါ။",
     "retryableMessage": "သင့် session များကို မတင်နိုင်ပါ။",
     "emptyMessage": "session များ မရှိသေးပါ — ဤအရာပို့ရန် အသစ်တစ်ခု စတင်ပါ။",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "ဤ Apple Account ရှိ Kilo Pass သည် အခြား Kilo အကောင့်တစ်ခုနှင့် သက်ဆိုင်သည်။ ၎င်းကို စီမံရန် ထို Kilo အကောင့်ဖြင့် ဝင်ပါ။",
     "alreadySubscribed": "သင့်တွင် Kilo Pass subscription ရှိပြီးသားဖြစ်သည်။",
     "purchaseUnavailable": "Kilo Pass ဝယ်ယူမှုသည် ယခု မရနိုင်ပါ။",
-    "tierCredits": "credit ${{amount}}",
+    "tierCredits": "credit {{amount}}",
     "perMonth": "{{price}}/လ",
     "verifyPurchaseFailed": "သင့်ဝယ်ယူမှုကို အတည်မပြုနိုင်ပါ။ သင့်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်ကြိုးစားပါ။",
     "productsCouldNotLoad": "App Store မှ Kilo Pass ထုတ်ကုန်များကို မဖွင့်နိုင်ပါ။",
@@ -2417,7 +2444,7 @@
     "manageFailed": "App Store subscription စီမံခန့်ခွဲမှုကို မဖွင့်နိုင်ပါ။",
     "kiloPassSetup": "Kilo Pass ပြင်ဆင်မှု",
     "subscriptionHeaderDescription": "Kilo App — Cloud Agents၊ remote session များ နှင့် KiloClaw ချတ်များတွင် AI coding session များ လည်ပတ်ရန် သင့် Kilo လက်ကျန်သို့ credit များ ထည့်ပေးသော လစဉ် subscription တစ်ခု။",
-    "tierDescription": "Kilo App အသုံးပြုမှုအတွက် လစဉ် ထည့်ပေးသော credit ${{price}} ။",
+    "tierDescription": "Kilo App အသုံးပြုမှုအတွက် လစဉ် ထည့်ပေးသော credit {{price}} ။",
     "subscribe": "Subscribe",
     "subscribeDescription": "bonus တိုးတက်မှုနှင့် လစဉ် credit များ",
     "manage": "စီမံရန်",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass ဆိုင်းငံ့နေသည်",
     "statusCanceling": "Kilo Pass ဖျက်သိမ်းနေသည်",
     "statusPastDue": "Kilo Pass ကျော်လွန်နေသည်",
-    "monthlyCredits": "လစဉ် credit ${{credits}}",
+    "monthlyCredits": "လစဉ် credit {{credits}}",
     "ends": "{{date}} တွင် အဆုံးသတ်သည်",
     "periodEnd": "ကာလအဆုံး",
     "managedOnGooglePlay": "Google Play တွင် စီမံသည်",

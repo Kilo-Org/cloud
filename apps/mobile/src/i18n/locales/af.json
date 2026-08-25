@@ -206,11 +206,11 @@
       "loadingLines": "Laai {{loaded}} van {{total}} lyne…",
       "expandContext": "Vou konteks uit",
       "expandMoreContext": "Vou meer konteks uit",
-      "expandLines": "Vou {{count}} lyne uit ({{start}}–{{end}})",
-      "expandMoreLines": "Vou nog {{count}} lyne uit ({{start}}–{{end}})",
-      "expandLinesOfContext": "Vou {{count}} lyne konteks uit",
+      "expandLines": "Vou {{displayCount}} lyne uit ({{start}}–{{end}})",
+      "expandMoreLines": "Vou nog {{displayCount}} lyne uit ({{start}}–{{end}})",
+      "expandLinesOfContext": "Vou {{displayCount}} lyne konteks uit",
       "expandAll": "Vou alles uit",
-      "expandAllLines": "Vou al {{count}} lyne uit",
+      "expandAllLines": "Vou al {{displayCount}} lyne uit",
       "loadingMoreFiles": "Laai meer lêers…",
       "retryLoadingNextPage": "Probeer weer volgende bladsy laai",
       "failedToLoadMoreFiles": "Kon nie meer lêers laai nie — tik om weer te probeer",
@@ -301,7 +301,7 @@
       "closeReactions": "Maak reaksies toe",
       "reactionsTitle": "Reaksies",
       "addReaction": "Voeg reaksie by",
-      "reactionPill": "{{emoji}}-reaksie, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}}-reaksie, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksie",
       "reaction": "reaksies",
       "reaction_other": "reaksies",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Geen resensiedrade of gesprekskommentare op hierdie trekversoek nie.",
       "reviewFiles": "Resenseer lêers",
       "quotedDiffSnippet": "Aangehaalde diff-fragment",
-      "moreLinesAbove": "… {{count}} meer lyne hierbo",
+      "moreLinesAbove": "… {{displayCount}} meer lyne hierbo",
       "termsAcceptRequired": "Jy moet die Diensbepalings aanvaar om te plaas.",
       "termsOutdatedCopy": "Die Diensbepalings het verander. Maak hierdie skerm weer oop om die nuutste weergawe te aanvaar.",
       "termsCheckRetryCopy": "Kon nie die Diensbepalings kontroleer nie. Kontroleer jou verbinding en probeer weer."
@@ -395,11 +395,11 @@
       "retryChecks": "Probeer weer kontroles",
       "viewOnGitHub": "Bekyk PR op GitHub",
       "noChecksReported": "Geen kontroles gerapporteer nie",
-      "passed": "{{count}} geslaag",
-      "failed": "{{count}} misluk",
-      "pending": "{{count}} hangend",
-      "skipped": "{{count}} oorgeslaan",
-      "checksCount": "{{count}} kontroles",
+      "passed": "{{displayCount}} geslaag",
+      "failed": "{{displayCount}} misluk",
+      "pending": "{{displayCount}} hangend",
+      "skipped": "{{displayCount}} oorgeslaan",
+      "checksCount": "{{displayCount}} kontroles",
       "checkDetails": "kontrolebesonderhede",
       "pullRequest": "trekversoek"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "hangende kommentaar",
       "pendingComment": "hangende kommentare",
       "pendingComment_other": "hangende kommentare",
-      "submitCountOfTotal": "Dien {{freshCount}} van {{totalCount}} kommentare in",
+      "submitCountOfTotal": "Dien {{displayFreshCount}} van {{displayTotalCount}} kommentare in",
       "submitReview": "Dien resensie in",
-      "partialPostedMessage": "{{freshCount}} kommentaar(s) geplaas. {{staleCount}} kommentaar(s) verwys na 'n ouer commit en het in jou tou gebly."
+      "partialPostedMessage": "{{displayFreshCount}} kommentaar(s) geplaas. {{displayStaleCount}} kommentaar(s) verwys na 'n ouer commit en het in jou tou gebly."
     },
     "reconnectNotice": {
       "title": "GitHub-verbinding verval",
@@ -580,7 +580,8 @@
     "agents": "Agente",
     "profile": "Profiel",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, oortjie, {{position}} van {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Onlangs",
       "common": "Algemeen",
       "reactWith": "Reageer met {{reaction}}",
-      "accessibility": "{{emoji}}-reaksie, {{count}}"
+      "accessibility": "{{emoji}}-reaksie, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Antwoord op",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Beeld onbeskikbaar",
       "openFailed": "Kon nie aanhegsel oopmaak nie. Kontroleer jou verbinding en probeer weer.",
       "attachFailed": "Kon nie lêer aanheg nie",
-      "limit": "Jy kan tot {{count}} lêers aanheg.",
+      "limit": "Jy kan tot {{displayCount}} lêers aanheg.",
       "sizeRejection": "{{filename}} oorskry die {{limit}}-aanhegselperk.",
       "unreadable": "Kon nie {{filename}} lees nie.",
       "pastedImage": "die geplakte beeld",
@@ -740,11 +741,12 @@
       "yourStandardMonthlyPrice": "jou Standard-maandelikse prys",
       "perMonth": "/maand",
       "earlybirdAccessUntil": "Vroeëvoël-toegang tot {{date}}",
-      "earlybirdEnding": "Vroeëvoël eindig: {{days}} dae oor",
+      "earlybirdEnding": "Vroeëvoël eindig: {{remaining}}",
       "paymentPastDue": "Betaling is agterstallig. Werk asseblief jou betaalmetode by.",
       "subscriptionCancels": "Intekening kanselleer {{date}}",
-      "trialDaysRemaining": "Proefperiode: {{days}} dae oor",
-      "trialEndingSoon": "Proefperiode eindig binnekort: {{days}}"
+      "trialDaysRemaining": "Proefperiode: {{remaining}} oor",
+      "trialEndingSoon": "Proefperiode eindig binnekort: {{remaining}}",
+      "lessThanOneDay": "Minder as 1 dag"
     },
     "changelog": {
       "title": "Wat's Nuut",
@@ -996,7 +998,7 @@
         "stalledTitle": "Iets het vasgesteek",
         "stalledBody": "Ons kon nie klaarmaak met die opstel van {{name}}. Probeer weer, of e-pos hi@kilo.ai as dit aanhou gebeur.",
         "timeoutTitle": "Neem langer as verwag",
-        "timeoutBody": "Opstel vir {{name}} neem langer as gewoonlik (meer as {{minutes}} minute).",
+        "timeoutBody": "Opstel vir {{name}} neem langer as gewoonlik (meer as {{displayMinutes}} minute).",
         "continueInBackground": "Gaan voort in die agtergrond",
         "settingUp": "Besig om {{name}} op te stel",
         "finishingSetup": "Voltooi opstel",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Samesmeltingspoort",
       "repositories": "Bewaarplekke",
       "allRepositories": "Alle bewaarplekke",
-      "nSelected": "{{count}} geselekteer",
+      "nSelected": "{{displayCount}} geselekteer",
       "reviewMemory": "Hersieningsgeheue",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-riglyne"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Ontleed",
       "exploitabilityReasoning": "Uitbuitbaarheidsredenering",
       "suggestedFix": "Voorgestelde regstelling",
-      "whereFound": "Waar dit gevind is ({{count}})",
+      "whereFound": "Waar dit gevind is ({{displayCount}})",
       "fullReport": "Volledige gegenereerde verslag",
       "unknown": "Onbekend",
       "yes": "Ja",
       "no": "Nee"
     },
     "dashboard": {
-      "findingsCount": "{{count}} bevindings",
+      "findingsCount": "{{displayCount}} bevindings",
       "notMeasured": "Nie gemeet nie",
       "actFirst": "Tree eers op",
       "slaPosture": "SLA-houding",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Bewaarplekaksieplan",
       "noOpenFindings": "Geen oop bevindings benodig aandag nie",
       "deadlineToday": "Sperdatum vandag bereik",
-      "daysOverdue": "{{count}} dae agterstallig",
+      "daysOverdue": "{{displayCount}} dae agterstallig",
       "withinDeadline": "Binne sperdatum",
       "criticalOverdue": "Kritiek agterstallig",
       "highOverdue": "Hoog agterstallig",
@@ -1434,6 +1436,27 @@
       "syncNow": "Sinkroniseer nou",
       "syncQueued": "Sinkronisasie in tou",
       "syncStatusUnavailable": "Sinkronisasiestatus onbeskikbaar"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Oop bevindings",
+      "openFindingsDetail": "{{critical}} kritiek, {{high}} hoog",
+      "confirmedExploitable": "Bevestig uitbuitbaar",
+      "confirmedExploitableDetail": "Projekrisiko deur ontleding bevestig",
+      "needsReview": "Benodig jou hersiening",
+      "needsReviewDetail": "Menslike besluit vereis",
+      "analysisIncomplete": "Ontleding nie volledig nie",
+      "analysisIncompleteDetail": "Projekrisiko nog onbekend",
+      "slaCompliance": "SLA-nakoming",
+      "notMeasured": "Nie gemeet nie",
+      "withinDeadlineDetail": "{{within}} van {{total}} binne sperdatum",
+      "noDeadlineData": "Geen bevindings het nog 'n SLA-sperdatum nie",
+      "deadlinePassed": "Sperdatum verby",
+      "deadlinePassedDetail": "{{critical}} kritiek, {{high}} hoog",
+      "dueThisWeek": "Hierdie week verskuldig",
+      "dueThisWeekDetail": "{{exploitable}} bevestig uitbuitbaar",
+      "noDeadline": "Geen sperdatum nie",
+      "reviewSlaAssignment": "Hersien SLA-toewysing",
+      "allOpenFindingsTracked": "Alle oop bevindings opgespoor"
     },
     "dismiss": {
       "title": "Maak bevinding van die hand",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}} ontleding",
       "automation": "Outomatisering",
       "automationAllOff": "Almal af",
-      "automationCount": "{{count}} van 3 geaktiveer",
+      "automationCount": "{{displayCount}} van 3 geaktiveer",
       "notifications": "Kennisgewings",
-      "notificationsCount": "{{count}} van 2 geaktiveer",
+      "notificationsCount": "{{displayCount}} van 2 geaktiveer",
       "slaPolicy": "SLA-beleid",
       "disabledNoManage": "Security Agent is gedeaktiveer. Slegs organisasie-eienaars en faktuurbestuurders kan dit aanskakel.",
       "disabledNoRepo": "Kies ten minste een bewaarplek voordat jy Security Agent aktiveer.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Maak pull request oop{{number}}",
       "openDraftPullRequest": "Maak konsep-pull request oop{{number}}",
       "progress": "Vordering",
-      "attemptHistory": "Pogingsgeskiedenis ({{count}})",
+      "attemptHistory": "Pogingsgeskiedenis ({{displayCount}})",
       "attemptNumber": "Poging #{{number}}",
       "startedBy": "Begin deur",
       "model": "Model",
@@ -1855,9 +1878,9 @@
       "toolTask": "taak",
       "readTodos": "Lees todo's",
       "updateTodos": "Werk todo's by",
-      "linesBadge": "{{count}} reëls",
-      "filesBadge": "{{count}} lêers",
-      "matchesBadge": "{{count}} passings"
+      "linesBadge": "{{displayCount}} reëls",
+      "filesBadge": "{{displayCount}} lêers",
+      "matchesBadge": "{{displayCount}} passings"
     },
     "readToolMarkdown": {
       "linesTruncated": "reëls {{start}}–{{end}} (afgekap)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "Hierdie antwoord kan nie gerapporteer word nie.",
       "reportAiResponseSubmitted": "Verslag ingedien. Kwitansie {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Besonderhede onbeskikbaar",
       "textDisplay": "Teksvertoning",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Voorbereiding voltooi",
       "preparationFailed": "Voorbereiding misluk",
       "setupCommand": "Opstelopdrag {{index}}",
-      "setupCommandOf": "Opstelopdrag {{index}} van {{count}}"
+      "setupCommandOf": "Opstelopdrag {{index}} van {{displayCount}}"
     },
     "permissionCard": {
       "title": "Toestemming vereis",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Voorlegging misluk. Probeer asseblief weer.",
       "questionAnnouncement": "Agent benodig jou insette. Die komponis is onderbreek terwyl jy antwoord.",
       "permissionAnnouncement": "Agent benodig toestemming om voort te gaan. Die komponis is onderbreek terwyl jy besluit.",
-      "positionHint": "(1 van {{count}})",
+      "positionHint": "(1 van {{displayCount}})",
       "movedPastPrompt": "Die agent het verby hierdie opdrag beweeg. Hierdie kaart sal sluit wanneer die sessie voortgaan.",
       "waitingForAnswer": "Die agent wag op jou antwoord. Terwyl hierdie vraag oop is, is jou boodskap aan die agent onderbreek.",
       "waitingForPermission": "Die agent wag op toestemming. Terwyl hierdie versoek oop is, is jou boodskap aan die agent onderbreek."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Kameratoegang gedeaktiveer",
       "cameraAccessMessage": "Laat kameratoegang toe in Instellings om 'n foto te neem.",
       "couldNotOpenPhotoPicker": "Kon nie die fotokeuseerder oopmaak nie. Begin Kilo oor en probeer weer.",
-      "maxFilesAllowed": "Maksimum {{count}} lêers toegelaat",
+      "maxFilesAllowed": "Maksimum {{displayCount}} lêers toegelaat",
       "onlyAddingFiles": "Slegs {{accepted}} van {{total}} lêers word bygevoeg (maks {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "koste {{cost}}",
       "costSuffix": ", koste {{cost}}",
       "tokensWindowUnavailable": "Konteks {{used}} tekens, venster onbeskikbaar",
-      "tokensUsage": "Konteks {{used}} van {{window}} tekens, {{percentage}}% gebruik",
+      "tokensUsage": "Konteks {{used}} van {{window}} tekens, {{percentage}} gebruik",
       "title": "Konteksgebruik",
       "used": "Gebruik",
       "remaining": "Oorblywend",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "Gebruik weerspieël die jongste voltooide assistent-antwoord.",
       "tokenUsage": "Tekengebruik",
       "cacheRate": "Kaskoers",
-      "modelsCount": "Modelle ({{count}})",
+      "modelsCount": "Modelle ({{displayCount}})",
       "tokenTotalsNote": "Tekentotale dek slegs hierdie sessie en sluit subagent/kindersessie-tekens uit.",
       "subagents": "Subagente",
       "subagentsDescription": "Residuale koste van kindersessies",
@@ -2373,7 +2400,7 @@
     "connectedCli": "Op 'n gekoppelde CLI",
     "newSessionOn": "Nuwe sessie op {{name}}",
     "noMatchingSessions": "Geen ooreenstemmende sessies nie.",
-    "onlyFirstFilesAttached": "Slegs die eerste {{count}} lêers sal aangeheg word.",
+    "onlyFirstFilesAttached": "Slegs die eerste {{displayCount}} lêers sal aangeheg word.",
     "staleMessage": "Hierdie deel is nie meer beskikbaar nie.",
     "retryableMessage": "Kon nie jou sessies laai nie.",
     "emptyMessage": "Nog geen sessies nie — begin 'n nuwe een om dit te stuur.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Die Kilo Pass op hierdie Apple-rekening behoort aan 'n ander Kilo-rekening. Teken in by daardie Kilo-rekening om dit te bestuur.",
     "alreadySubscribed": "Jy het reeds 'n Kilo Pass-intekening.",
     "purchaseUnavailable": "Kilo Pass-aankoop is tans nie beskikbaar nie.",
-    "tierCredits": "${{amount}} in krediete",
+    "tierCredits": "{{amount}} in krediete",
     "perMonth": "{{price}}/md",
     "verifyPurchaseFailed": "Kon nie jou aankoop verifieer nie. Kontroleer jou verbinding en probeer weer.",
     "productsCouldNotLoad": "Kilo Pass-produkte kon nie vanaf App Store gelaai word nie.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "Kon nie App Store-intekeningsbestuur oopmaak nie.",
     "kiloPassSetup": "Kilo Pass-opstelling",
     "subscriptionHeaderDescription": "'n Maandelikse intekening wat krediete by jou Kilo-saldo voeg vir die bestuur van AI-koderingsessies in Kilo App — Cloud Agents, afstandssessies en KiloClaw-gesprekke.",
-    "tierDescription": "${{price}} betaalde krediete maandeliks bygevoeg vir Kilo App-gebruik.",
+    "tierDescription": "{{price}} betaalde krediete maandeliks bygevoeg vir Kilo App-gebruik.",
     "subscribe": "Teken in",
     "subscribeDescription": "Maandelikse krediete met bonusvordering",
     "manage": "Bestuur",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass hangend",
     "statusCanceling": "Kilo Pass kanselleer",
     "statusPastDue": "Kilo Pass agterstallig",
-    "monthlyCredits": "${{credits}} maandelikse krediete",
+    "monthlyCredits": "{{credits}} maandelikse krediete",
     "ends": "Eindig {{date}}",
     "periodEnd": "periode-einde",
     "managedOnGooglePlay": "Bestuur op Google Play",

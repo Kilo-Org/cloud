@@ -28,6 +28,7 @@
     "@expo/react-native-action-sheet": "4.1.1",
     "@formatjs/intl-durationformat": "^0.10.18",
     "@formatjs/intl-listformat": "^8.3.13",
+    "@formatjs/intl-locale": "^5.3.10",
     "@formatjs/intl-numberformat": "^9.4.0",
     "@formatjs/intl-relativetimeformat": "^12.3.13",
     "@formatjs/intl-segmenter": "^12.2.13",

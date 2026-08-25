@@ -19,7 +19,9 @@ import { Pressable, View } from 'react-native';
 
 import { ReactionPickerSheet } from '@/components/pr-review/discussion/reaction-picker-sheet';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { moveA11yFocus } from '@/lib/a11y/announce';
+import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REACTION_EMOJI, selectReactionPills } from '@/lib/pr-review/discussion/reaction-pills';
 import { type ReviewReactionContent } from '@/lib/pr-review/discussion/review-discussion-types';
@@ -174,6 +176,7 @@ function ReactionPill({
       accessibilityLabel={t('prReview.discussion.reactionPill', {
         emoji,
         count,
+        displayCount: formatNumber(count, i18n.language),
         countLabel: t('prReview.discussion.reaction', { count }),
       })}
       accessibilityState={{ selected: viewerHasReacted, disabled }}
@@ -193,7 +196,7 @@ function ReactionPill({
           viewerHasReacted ? 'text-accent-soft-foreground' : 'text-muted-foreground'
         )}
       >
-        {count}
+        {formatNumber(count, i18n.language)}
       </Text>
     </Pressable>
   );

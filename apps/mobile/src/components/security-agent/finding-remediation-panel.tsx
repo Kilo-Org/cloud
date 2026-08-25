@@ -18,9 +18,11 @@ import { Button } from '@/components/ui/button';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { resolveCodeReviewerOpenPrDestination } from '@/lib/code-reviewer-open-pr-destination';
 import { openExternalUrl } from '@/lib/external-link';
+import { formatNumber } from '@/lib/format';
 import {
   useCancelSecurityRemediation,
   useRetrySecurityRemediation,
@@ -265,6 +267,7 @@ export function FindingRemediationPanel({
         <CollapsibleSection
           title={t('securityAgent.remediation.attemptHistory', {
             count: remediationAttempts.length,
+            displayCount: formatNumber(remediationAttempts.length, i18n.language),
           })}
           defaultExpanded={remediationAttempts.length <= 2}
           // Attempt rows below are already their own card surface — a second

@@ -206,11 +206,11 @@
       "loadingLines": "Betöltés: {{loaded}} / {{total}} sor…",
       "expandContext": "Kontextus kibontása",
       "expandMoreContext": "További kontextus kibontása",
-      "expandLines": "{{count}} sor kibontása ({{start}}–{{end}})",
-      "expandMoreLines": "További {{count}} sor kibontása ({{start}}–{{end}})",
-      "expandLinesOfContext": "{{count}} sor kontextus kibontása",
+      "expandLines": "{{displayCount}} sor kibontása ({{start}}–{{end}})",
+      "expandMoreLines": "További {{displayCount}} sor kibontása ({{start}}–{{end}})",
+      "expandLinesOfContext": "{{displayCount}} sor kontextus kibontása",
       "expandAll": "Összes kibontása",
-      "expandAllLines": "Mind a {{count}} sor kibontása",
+      "expandAllLines": "Mind a {{displayCount}} sor kibontása",
       "loadingMoreFiles": "További fájlok betöltése…",
       "retryLoadingNextPage": "Következő oldal betöltésének újrapróbálása",
       "failedToLoadMoreFiles": "Nem sikerült betölteni további fájlokat — koppintson az újrapróbálkozáshoz",
@@ -301,7 +301,7 @@
       "closeReactions": "Reakciók bezárása",
       "reactionsTitle": "Reakciók",
       "addReaction": "Reakció hozzáadása",
-      "reactionPill": "{{emoji}} reakció, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} reakció, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakció",
       "reaction": "reakció",
       "reaction_other": "reakció",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Ehhez a pull requesthez nincs ellenőrzési szál vagy beszélgetési megjegyzés.",
       "reviewFiles": "Fájlok ellenőrzése",
       "quotedDiffSnippet": "Idézett diff-részlet",
-      "moreLinesAbove": "… {{count}} további sor fent",
+      "moreLinesAbove": "… {{displayCount}} további sor fent",
       "termsAcceptRequired": "A hozzászóláshoz el kell fogadnia a Szolgáltatási feltételeket.",
       "termsOutdatedCopy": "A Szolgáltatási feltételek megváltoztak. Nyissa meg újra ezt a képernyőt a legújabb verzió elfogadásához.",
       "termsCheckRetryCopy": "Nem sikerült ellenőrizni a Szolgáltatási feltételeket. Ellenőrizze a kapcsolatot, és próbálja újra."
@@ -395,11 +395,11 @@
       "retryChecks": "Ellenőrzések újrapróbálása",
       "viewOnGitHub": "PR megtekintése a GitHubon",
       "noChecksReported": "Nincs jelentett ellenőrzés",
-      "passed": "{{count}} sikeres",
-      "failed": "{{count}} sikertelen",
-      "pending": "{{count}} függőben",
-      "skipped": "{{count}} kihagyva",
-      "checksCount": "{{count}} ellenőrzés",
+      "passed": "{{displayCount}} sikeres",
+      "failed": "{{displayCount}} sikertelen",
+      "pending": "{{displayCount}} függőben",
+      "skipped": "{{displayCount}} kihagyva",
+      "checksCount": "{{displayCount}} ellenőrzés",
       "checkDetails": "ellenőrzés részletei",
       "pullRequest": "pull request"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "függőben lévő megjegyzés",
       "pendingComment": "függőben lévő megjegyzés",
       "pendingComment_other": "függőben lévő megjegyzés",
-      "submitCountOfTotal": "{{freshCount}} / {{totalCount}} megjegyzés elküldése",
+      "submitCountOfTotal": "{{displayFreshCount}} / {{displayTotalCount}} megjegyzés elküldése",
       "submitReview": "Ellenőrzés elküldése",
-      "partialPostedMessage": "{{freshCount}} megjegyzés elküldve. {{staleCount}} megjegyzés régebbi commithoz kapcsolódik, és a sorban maradt."
+      "partialPostedMessage": "{{displayFreshCount}} megjegyzés elküldve. {{displayStaleCount}} megjegyzés régebbi commithoz kapcsolódik, és a sorban maradt."
     },
     "reconnectNotice": {
       "title": "A GitHub-kapcsolat lejárt",
@@ -580,7 +580,8 @@
     "agents": "Ügynökök",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, fül, {{position}} a {{total}} közül"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Közelmúlt",
       "common": "Gyakori",
       "reactWith": "Reagálás: {{reaction}}",
-      "accessibility": "{{emoji}} reakció, {{count}}"
+      "accessibility": "{{emoji}} reakció, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Válasz erre:",
@@ -650,7 +651,7 @@
       "imageUnavailable": "A kép nem érhető el",
       "openFailed": "Nem sikerült megnyitni a csatolmányt. Ellenőrizze a kapcsolatot, és próbálja újra.",
       "attachFailed": "Nem sikerült csatolni a fájlt",
-      "limit": "Legfeljebb {{count}} fájlt csatolhat.",
+      "limit": "Legfeljebb {{displayCount}} fájlt csatolhat.",
       "sizeRejection": "{{filename}} meghaladja a(z) {{limit}} csatolási korlátot.",
       "unreadable": "Nem sikerült beolvasni a(z) {{filename}} fájlt.",
       "pastedImage": "a beillesztett kép",
@@ -734,17 +735,18 @@
       "finalCommitTermEndsOn": "Az utolsó Commit-időszakod {{date}}-kor ér véget. Folytasd Standard csomaggal {{price}} áron, vagy a tárhely megszűnik.",
       "freeTrial": "Ingyenes próba",
       "hostingEnds": "A tárhely megszűnik",
+      "lessThanOneDay": "Kevesebb mint 1 nap",
       "renews": "Megújul",
       "standardMonthToMonth": "Standard havidíj",
       "standardStartsOn": "A Standard {{date}}-kor kezdődik {{price}} áron.",
       "yourStandardMonthlyPrice": "a Standard havidíj",
       "perMonth": "/hó",
       "earlybirdAccessUntil": "Korai madár hozzáférés {{date}}-ig",
-      "earlybirdEnding": "Korai madár vége: {{days}} nap van hátra",
+      "earlybirdEnding": "Korai madár vége: {{remaining}}",
       "paymentPastDue": "A fizetés lejárt. Kérjük, frissítsd a fizetési módodat.",
       "subscriptionCancels": "Az előfizetés {{date}}-kor törlődik",
-      "trialDaysRemaining": "Próba: {{days}} nap van hátra",
-      "trialEndingSoon": "Próba hamarosan vége: {{days}}"
+      "trialDaysRemaining": "Próba: {{remaining}} van hátra",
+      "trialEndingSoon": "Próba hamarosan vége: {{remaining}}"
     },
     "changelog": {
       "title": "Mi újság",
@@ -996,7 +998,7 @@
         "stalledTitle": "Valami elakadt",
         "stalledBody": "Nem sikerült befejeznünk a(z) {{name}} beállítását. Próbáld újra, vagy írj a hi@kilo.ai címre, ha ez ismétlődik.",
         "timeoutTitle": "Tovább tart a vártnál",
-        "timeoutBody": "A(z) {{name}} beállítása a szokásosnál tovább tart (több mint {{minutes}} perc).",
+        "timeoutBody": "A(z) {{name}} beállítása a szokásosnál tovább tart (több mint {{displayMinutes}} perc).",
         "continueInBackground": "Folytatás a háttérben",
         "settingUp": "{{name}} beállítása",
         "finishingSetup": "Beállítás befejezése",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Merge-átjáró",
       "repositories": "Tárhelyek",
       "allRepositories": "Összes tárhely",
-      "nSelected": "{{count}} kijelölve",
+      "nSelected": "{{displayCount}} kijelölve",
       "reviewMemory": "Áttekintési memória",
       "proposedReviewMdGuidance": "Javasolt REVIEW.md útmutató"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Elemezve",
       "exploitabilityReasoning": "Kihasználhatósági indoklás",
       "suggestedFix": "Javasolt javítás",
-      "whereFound": "Ahol ez megtalálható volt ({{count}})",
+      "whereFound": "Ahol ez megtalálható volt ({{displayCount}})",
       "fullReport": "Teljes generált jelentés",
       "unknown": "Ismeretlen",
       "yes": "Igen",
       "no": "Nem"
     },
     "dashboard": {
-      "findingsCount": "{{count}} észlelés",
+      "findingsCount": "{{displayCount}} észlelés",
       "notMeasured": "Nincs mérve",
       "actFirst": "Először lépjen",
       "slaPosture": "SLA hozzáállás",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Adattár műveleti terv",
       "noOpenFindings": "Nincs nyitott észlelés, amely figyelmet igényelne",
       "deadlineToday": "A határidő ma lejárt",
-      "daysOverdue": "{{count}} napja késésben",
+      "daysOverdue": "{{displayCount}} napja késésben",
       "withinDeadline": "Határidőn belül",
       "criticalOverdue": "Kritikus késés",
       "highOverdue": "Magas késés",
@@ -1434,6 +1436,27 @@
       "syncNow": "Szinkronizálás most",
       "syncQueued": "Szinkronizálás sorban",
       "syncStatusUnavailable": "A szinkronizálási állapot nem érhető el"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Nyitott észlelések",
+      "openFindingsDetail": "{{critical}} kritikus, {{high}} magas",
+      "confirmedExploitable": "Megerősítetten kihasználható",
+      "confirmedExploitableDetail": "A projekt kockázatát az elemzés megerősítette",
+      "needsReview": "Az Ön felülvizsgálatát igényli",
+      "needsReviewDetail": "Emberi döntés szükséges",
+      "analysisIncomplete": "Az elemzés nem teljes",
+      "analysisIncompleteDetail": "A projekt kockázata még ismeretlen",
+      "slaCompliance": "SLA-megfelelés",
+      "notMeasured": "Nincs mérve",
+      "withinDeadlineDetail": "{{total}} közül {{within}} határidőn belül",
+      "noDeadlineData": "Még egyetlen észlelésnek sincs SLA-határideje",
+      "deadlinePassed": "Határidő lejárt",
+      "deadlinePassedDetail": "{{critical}} kritikus, {{high}} magas",
+      "dueThisWeek": "Esedékes ezen a héten",
+      "dueThisWeekDetail": "{{exploitable}} megerősítetten kihasználható",
+      "noDeadline": "Nincs határidő",
+      "reviewSlaAssignment": "SLA-hozzárendelés felülvizsgálata",
+      "allOpenFindingsTracked": "Minden nyitott észlelés nyomon követve"
     },
     "dismiss": {
       "title": "Észlelés elutasítása",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}} elemzés",
       "automation": "Automatizálás",
       "automationAllOff": "Mind kikapcsolva",
-      "automationCount": "{{count}} a 3-ból engedélyezve",
+      "automationCount": "{{displayCount}} a 3-ból engedélyezve",
       "notifications": "Értesítések",
-      "notificationsCount": "{{count}} a 2-ből engedélyezve",
+      "notificationsCount": "{{displayCount}} a 2-ből engedélyezve",
       "slaPolicy": "SLA szabályzat",
       "disabledNoManage": "A Security Agent le van tiltva. Csak szervezeti tulajdonosok és számlázási vezetők kapcsolhatják be.",
       "disabledNoRepo": "A Security Agent engedélyezése előtt válasszon ki legalább egy adattárat.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Pull request megnyitása{{number}}",
       "openDraftPullRequest": "Piszkozat pull request megnyitása{{number}}",
       "progress": "Előrehaladás",
-      "attemptHistory": "Kísérletelőzmények ({{count}})",
+      "attemptHistory": "Kísérletelőzmények ({{displayCount}})",
       "attemptNumber": "{{number}}. kísérlet",
       "startedBy": "Indította",
       "model": "Modell",
@@ -1855,9 +1878,9 @@
       "toolTask": "feladat",
       "readTodos": "Teendők olvasása",
       "updateTodos": "Teendők frissítése",
-      "linesBadge": "{{count}} sor",
-      "filesBadge": "{{count}} fájl",
-      "matchesBadge": "{{count}} találat"
+      "linesBadge": "{{displayCount}} sor",
+      "filesBadge": "{{displayCount}} fájl",
+      "matchesBadge": "{{displayCount}} találat"
     },
     "readToolMarkdown": {
       "linesTruncated": "sorok {{start}}–{{end}} (csonkolva)",
@@ -1892,6 +1915,10 @@
     },
     "modeSelector": {
       "accessibility": "Mód: {{label}}"
+    },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
     },
     "modeOptions": {
       "code": "Kód",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Az előkészítés befejeződött",
       "preparationFailed": "Az előkészítés meghiúsult",
       "setupCommand": "Beállítási parancs {{index}}",
-      "setupCommandOf": "Beállítási parancs {{index}} / {{count}}"
+      "setupCommandOf": "Beállítási parancs {{index}} / {{displayCount}}"
     },
     "permissionCard": {
       "title": "Engedély szükséges",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Az elküldés nem sikerült. Próbáld újra.",
       "questionAnnouncement": "Az ügynöknek szüksége van a válaszodra. A szerkesztő szünetel, amíg válaszolsz.",
       "permissionAnnouncement": "Az ügynöknek engedélyre van szüksége a folytatáshoz. A szerkesztő szünetel, amíg döntesz.",
-      "positionHint": "(1 a(z) {{count}} közül)",
+      "positionHint": "(1 a(z) {{displayCount}} közül)",
       "movedPastPrompt": "Az ügynök túllépett ezen a kérésen. Ez a kártya bezárul, amikor a munkamenet folytatódik.",
       "waitingForAnswer": "Az ügynök a válaszodra vár. Amíg ez a kérdés nyitva van, az ügynöknek küldött üzeneted szünetel.",
       "waitingForPermission": "Az ügynök engedélyre vár. Amíg ez a kérés nyitva van, az ügynöknek küldött üzeneted szünetel."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Kamera-hozzáférés letiltva",
       "cameraAccessMessage": "A fénykép készítéséhez engedélyezd a kamera-hozzáférést a Beállításokban.",
       "couldNotOpenPhotoPicker": "A fotóválasztó nem nyitható meg. Indítsd újra a Kilo-t és próbáld újra.",
-      "maxFilesAllowed": "Legfeljebb {{count}} fájl engedélyezett",
+      "maxFilesAllowed": "Legfeljebb {{displayCount}} fájl engedélyezett",
       "onlyAddingFiles": "Csak {{accepted}} fájl hozzáadása a(z) {{total}} közül (max. {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "költség {{cost}}",
       "costSuffix": ", költség {{cost}}",
       "tokensWindowUnavailable": "Kontextus {{used}} token, ablak nem elérhető",
-      "tokensUsage": "Kontextus {{used}} a(z) {{window}} tokenből, {{percentage}}% felhasználva",
+      "tokensUsage": "Kontextus {{used}} a(z) {{window}} tokenből, {{percentage}} felhasználva",
       "title": "Kontextus használat",
       "used": "Felhasználva",
       "remaining": "Fennmaradó",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "A használat a legutóbbi befejezett asszisztens választ tükrözi.",
       "tokenUsage": "Tokenhasználat",
       "cacheRate": "Gyorsítótár-arány",
-      "modelsCount": "Modellek ({{count}})",
+      "modelsCount": "Modellek ({{displayCount}})",
       "tokenTotalsNote": "A tokenösszesítők csak erre a munkamenetre vonatkoznak, és nem tartalmazzák az alügynök/gyermekmunkamenet tokenjeit.",
       "subagents": "Alügynökök",
       "subagentsDescription": "A gyermekmunkamenetek maradékköltsége",
@@ -2373,7 +2400,7 @@
     "connectedCli": "Csatlakoztatott CLI-n",
     "newSessionOn": "Új munkamenet ezen: {{name}}",
     "noMatchingSessions": "Nincs egyező munkamenet.",
-    "onlyFirstFilesAttached": "Csak az első {{count}} fájl lesz csatolva.",
+    "onlyFirstFilesAttached": "Csak az első {{displayCount}} fájl lesz csatolva.",
     "staleMessage": "Ez a megosztás már nem érhető el.",
     "retryableMessage": "A munkameneteid nem tölthetők be.",
     "emptyMessage": "Még nincs munkamenet — indíts egy újat ennek elküldéséhez.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Az ezen Apple-fiókon lévő Kilo Pass egy másik Kilo-fiókhoz tartozik. Jelentkezz be abba a Kilo-fiókba a kezeléséhez.",
     "alreadySubscribed": "Már van Kilo Pass előfizetésed.",
     "purchaseUnavailable": "A Kilo Pass vásárlás jelenleg nem érhető el.",
-    "tierCredits": "${{amount}} kredit",
+    "tierCredits": "{{amount}} kredit",
     "perMonth": "{{price}}/hó",
     "verifyPurchaseFailed": "A vásárlásod ellenőrzése nem sikerült. Ellenőrizd a kapcsolatot, és próbáld újra.",
     "productsCouldNotLoad": "A Kilo Pass termékek nem tölthetők be az App Store-ból.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "Az App Store előfizetés-kezelés megnyitása nem sikerült.",
     "kiloPassSetup": "Kilo Pass beállítás",
     "subscriptionHeaderDescription": "Havi előfizetés, amely krediteket ad a Kilo egyenlegedhez AI kódolási munkamenetek futtatásához a Kilo alkalmazásban — Cloud Agents, távoli munkamenetek és KiloClaw csevegések.",
-    "tierDescription": "${{price}} fizetett kredit havonta a Kilo alkalmazás használatához.",
+    "tierDescription": "{{price}} fizetett kredit havonta a Kilo alkalmazás használatához.",
     "subscribe": "Feliratkozás",
     "subscribeDescription": "Havi kreditek bónusz haladással",
     "manage": "Kezelés",
@@ -2425,7 +2452,7 @@
     "statusPending": "A Kilo Pass függőben",
     "statusCanceling": "A Kilo Pass törlés alatt",
     "statusPastDue": "A Kilo Pass lejárt",
-    "monthlyCredits": "${{credits}} havi kredit",
+    "monthlyCredits": "{{credits}} havi kredit",
     "ends": "Vége: {{date}}",
     "periodEnd": "időszak vége",
     "managedOnGooglePlay": "A Google Play felügyeli",

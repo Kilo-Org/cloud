@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { announceForA11y } from '@/lib/a11y/announce';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { createFrameCoalescer } from '@/lib/coalesce-frame';
@@ -309,6 +310,7 @@ export function useAgentAttachmentUpload(
         toast.error(
           i18n.t('agentChat.attachmentPicker.maxFilesAllowed', {
             count: AGENT_ATTACHMENT_MAX_FILES,
+            displayCount: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),
           })
         );
         return;
@@ -317,9 +319,9 @@ export function useAgentAttachmentUpload(
       if (limit.truncated) {
         toast.warning(
           i18n.t('agentChat.attachmentPicker.onlyAddingFiles', {
-            accepted: limit.acceptedCount,
-            total: candidates.length,
-            max: AGENT_ATTACHMENT_MAX_FILES,
+            accepted: formatNumber(limit.acceptedCount, i18n.language),
+            total: formatNumber(candidates.length, i18n.language),
+            max: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),
           })
         );
       }

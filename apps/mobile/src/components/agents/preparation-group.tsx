@@ -7,6 +7,8 @@ import { type PreparationAttempt, type PreparationStepSnapshot } from '@kilocode
 
 import { Text } from '@/components/ui/text';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { MonoScrollBlock } from './mono-scroll-block';
@@ -81,11 +83,14 @@ function setupCommandLabel(step: PreparationStepSnapshot, t: TFunction): string 
   }
   if (step.commandCount) {
     return t('agentChat.preparation.setupCommandOf', {
-      index: step.commandIndex + 1,
+      index: formatNumber(step.commandIndex + 1, i18n.language),
       count: step.commandCount,
+      displayCount: formatNumber(step.commandCount, i18n.language),
     });
   }
-  return t('agentChat.preparation.setupCommand', { index: step.commandIndex + 1 });
+  return t('agentChat.preparation.setupCommand', {
+    index: formatNumber(step.commandIndex + 1, i18n.language),
+  });
 }
 
 function PreparationStepRow({ step }: { step: PreparationStepSnapshot }) {

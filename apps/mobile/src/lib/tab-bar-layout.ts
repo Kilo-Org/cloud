@@ -1,3 +1,6 @@
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
+
 const TAB_BAR_BASE_HEIGHT = 50;
 const ANDROID_TAB_BAR_EXTRA_PADDING = 4;
 export const TAB_LABEL_WRAP_FONT_SCALE = 1.8;
@@ -89,5 +92,9 @@ export function shouldHideTabBar(pathname: string): boolean {
  * the rendered tab count, which changes when the KiloClaw tab is hidden.
  */
 export function tabAccessibilityLabel(name: string, position: number, total: number): string {
-  return `${name}, tab, ${position} of ${total}`;
+  return i18n.t('tabs.position', {
+    name,
+    position: formatNumber(position, i18n.language),
+    total: formatNumber(total, i18n.language),
+  });
 }

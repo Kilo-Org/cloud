@@ -206,11 +206,11 @@
       "loadingLines": "{{total}}-ден {{loaded}} жол жүктелуде…",
       "expandContext": "Контекстті ашу",
       "expandMoreContext": "Контекстті көбірек ашу",
-      "expandLines": "{{count}} жолды ашу ({{start}}–{{end}})",
-      "expandMoreLines": "Тағы {{count}} жолды ашу ({{start}}–{{end}})",
-      "expandLinesOfContext": "{{count}} контекст жолын ашу",
+      "expandLines": "{{displayCount}} жолды ашу ({{start}}–{{end}})",
+      "expandMoreLines": "Тағы {{displayCount}} жолды ашу ({{start}}–{{end}})",
+      "expandLinesOfContext": "{{displayCount}} контекст жолын ашу",
       "expandAll": "Барлығын ашу",
-      "expandAllLines": "Барлық {{count}} жолды ашу",
+      "expandAllLines": "Барлық {{displayCount}} жолды ашу",
       "loadingMoreFiles": "Қосымша файлдар жүктелуде…",
       "retryLoadingNextPage": "Келесі бетті жүктеуді қайталау",
       "failedToLoadMoreFiles": "Қосымша файлдарды жүктеу сәтсіз аяқталды — қайта көру үшін түртіңіз",
@@ -301,7 +301,7 @@
       "closeReactions": "Реакцияларды жабу",
       "reactionsTitle": "Реакциялар",
       "addReaction": "Реакция қосу",
-      "reactionPill": "{{emoji}} реакция, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} реакция, {{displayCount}} {{countLabel}}",
       "reaction_one": "реакция",
       "reaction": "реакциялар",
       "reaction_other": "реакциялар",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Бұл pull request-те рецензия тізбектері немесе сөйлесу пікірлері жоқ.",
       "reviewFiles": "Файлдарды рецензиялау",
       "quotedDiffSnippet": "Дәйексөз алынған diff үзіндісі",
-      "moreLinesAbove": "… жоғарыда тағы {{count}} жол",
+      "moreLinesAbove": "… жоғарыда тағы {{displayCount}} жол",
       "termsAcceptRequired": "Жариялау үшін Қызмет көрсету шарттарын қабылдау керек.",
       "termsOutdatedCopy": "Қызмет көрсету шарттары өзгерді. Соңғы нұсқаны қабылдау үшін осы экранды қайта ашыңыз.",
       "termsCheckRetryCopy": "Қызмет көрсету шарттарын тексеру мүмкін болмады. Қосылымды тексеріп, қайта көріңіз."
@@ -395,11 +395,11 @@
       "retryChecks": "Тексерулерді қайталау",
       "viewOnGitHub": "PR-ді GitHub-та қарау",
       "noChecksReported": "Тексерулер туралы хабарланбады",
-      "passed": "{{count}} өтті",
-      "failed": "{{count}} сәтсіз",
-      "pending": "{{count}} күтілуде",
-      "skipped": "{{count}} өткізілді",
-      "checksCount": "{{count}} тексеру",
+      "passed": "{{displayCount}} өтті",
+      "failed": "{{displayCount}} сәтсіз",
+      "pending": "{{displayCount}} күтілуде",
+      "skipped": "{{displayCount}} өткізілді",
+      "checksCount": "{{displayCount}} тексеру",
       "checkDetails": "тексеру мәліметтері",
       "pullRequest": "pull request"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "күтілудегі пікір",
       "pendingComment": "күтілудегі пікірлер",
       "pendingComment_other": "күтілудегі пікірлер",
-      "submitCountOfTotal": "{{totalCount}} пікірдің {{freshCount}} жіберу",
+      "submitCountOfTotal": "{{displayTotalCount}} пікірдің {{displayFreshCount}} жіберу",
       "submitReview": "Рецензияны жіберу",
-      "partialPostedMessage": "{{freshCount}} пікір жарияланды. {{staleCount}} пікір ескі commit-ке қатысты және кезегіңізде қалды."
+      "partialPostedMessage": "{{displayFreshCount}} пікір жарияланды. {{displayStaleCount}} пікір ескі commit-ке қатысты және кезегіңізде қалды."
     },
     "reconnectNotice": {
       "title": "GitHub қосылымының мерзімі өтті",
@@ -580,7 +580,8 @@
     "agents": "Агенттер",
     "profile": "Профиль",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, қойынды, {{total}} ішінде {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Жақында",
       "common": "Жиі",
       "reactWith": "{{reaction}} реакциясымен жауап беру",
-      "accessibility": "{{emoji}} реакция, {{count}}"
+      "accessibility": "{{emoji}} реакция, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Жауап берілуде",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Сурет қолжетімсіз",
       "openFailed": "Тіркемені ашу мүмкін болмады. Қосылымды тексеріп, қайта көріңіз.",
       "attachFailed": "Файлды тіркеу сәтсіз аяқталды",
-      "limit": "{{count}} файлға дейін тіркеуге болады.",
+      "limit": "{{displayCount}} файлға дейін тіркеуге болады.",
       "sizeRejection": "{{filename}} {{limit}} тіркеу шегінен асады.",
       "unreadable": "{{filename}} оқу мүмкін болмады.",
       "pastedImage": "қойылған сурет",
@@ -722,6 +723,7 @@
       "finalTermEnds": "Соңғы мерзім аяқталады",
       "afterFinalTerm": "Соңғы мерзімнен кейін",
       "remaining": "Қалды",
+      "lessThanOneDay": "1 күннен аз",
       "ends": "Аяқталады",
       "expires": "Мерзімі аяқталады",
       "noActivePlan": "Белсенді жоспар жоқ",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "Standard айлық бағаңыз",
       "perMonth": "/ай",
       "earlybirdAccessUntil": "Earlybird қолжетімділігі {{date}} дейін",
-      "earlybirdEnding": "Earlybird аяқталуда: {{days}} күн қалды",
+      "earlybirdEnding": "Earlybird аяқталуда: {{remaining}}",
       "paymentPastDue": "Төлем мерзімі өтіп кетті. Төлем әдісін жаңартыңыз.",
       "subscriptionCancels": "Жазылым {{date}} күні жойылады",
-      "trialDaysRemaining": "Сынақ: {{days}} күн қалды",
-      "trialEndingSoon": "Сынақ жақында аяқталады: {{days}}"
+      "trialDaysRemaining": "Сынақ: {{remaining}} қалды",
+      "trialEndingSoon": "Сынақ жақында аяқталады: {{remaining}}"
     },
     "changelog": {
       "title": "Не жаңалық",
@@ -996,7 +998,7 @@
         "stalledTitle": "Бірдеңе тұрып қалды",
         "stalledBody": "{{name}} орнатуды аяқтай алмадық. Қайта көріңіз, немесе осы қайталанса hi@kilo.ai мекенжайына жазыңыз.",
         "timeoutTitle": "Күткеннен ұзағырақ",
-        "timeoutBody": "{{name}} орнатылуы әдеттегіден ұзаққа созылуда ({{minutes}} минуттан артық).",
+        "timeoutBody": "{{name}} орнатылуы әдеттегіден ұзаққа созылуда ({{displayMinutes}} минуттан артық).",
         "continueInBackground": "Фонда жалғастыру",
         "settingUp": "{{name}} орнатылуда",
         "finishingSetup": "Орнатуды аяқтау",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Біріктіру қақпасы",
       "repositories": "Репозиторийлер",
       "allRepositories": "Барлық репозиторийлер",
-      "nSelected": "{{count}} таңдалды",
+      "nSelected": "{{displayCount}} таңдалды",
       "reviewMemory": "Шолу жады",
       "proposedReviewMdGuidance": "Ұсынылған REVIEW.md нұсқаулығы"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Талданды",
       "exploitabilityReasoning": "Пайдалану мүмкіндігі дәйектемесі",
       "suggestedFix": "Ұсынылған түзету",
-      "whereFound": "Бұл қайдан табылды ({{count}})",
+      "whereFound": "Бұл қайдан табылды ({{displayCount}})",
       "fullReport": "Толық жасалған есеп",
       "unknown": "Белгісіз",
       "yes": "Иә",
       "no": "Жоқ"
     },
     "dashboard": {
-      "findingsCount": "{{count}} дерек",
+      "findingsCount": "{{displayCount}} дерек",
       "notMeasured": "Өлшенбеген",
       "actFirst": "Алдымен әрекет етіңіз",
       "slaPosture": "SLA жағдайы",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Репозиторий әрекет жоспары",
       "noOpenFindings": "Назар аударуды қажет ететін ашық деректер жоқ",
       "deadlineToday": "Мерзім бүгін аяқталады",
-      "daysOverdue": "{{count}} күн кешіктірілді",
+      "daysOverdue": "{{displayCount}} күн кешіктірілді",
       "withinDeadline": "Мерзім ішінде",
       "criticalOverdue": "Критикалық, мерзімі өткен",
       "highOverdue": "Жоғары, мерзімі өткен",
@@ -1434,6 +1436,27 @@
       "syncNow": "Қазір синхрондау",
       "syncQueued": "Синхрондау кезекке қойылды",
       "syncStatusUnavailable": "Синхрондау күйі қолжетімсіз"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Ашық деректер",
+      "openFindingsDetail": "{{critical}} критикалық, {{high}} жоғары",
+      "confirmedExploitable": "Пайдалануға болатыны расталды",
+      "confirmedExploitableDetail": "Жоба қаупі талдаумен расталды",
+      "needsReview": "Сіздің қарауыңыз қажет",
+      "needsReviewDetail": "Адамның шешімі қажет",
+      "analysisIncomplete": "Талдау аяқталмаған",
+      "analysisIncompleteDetail": "Жоба қаупі әлі белгісіз",
+      "slaCompliance": "SLA сәйкестігі",
+      "notMeasured": "Өлшенбеген",
+      "withinDeadlineDetail": "{{total}}-ның {{within}} мерзім ішінде",
+      "noDeadlineData": "Әзірге ешбір деректе SLA мерзімі жоқ",
+      "deadlinePassed": "Мерзім өтті",
+      "deadlinePassedDetail": "{{critical}} критикалық, {{high}} жоғары",
+      "dueThisWeek": "Мерзімі осы аптада",
+      "dueThisWeekDetail": "{{exploitable}} пайдалануға болатыны расталды",
+      "noDeadline": "Мерзім жоқ",
+      "reviewSlaAssignment": "SLA тағайындауды қарау",
+      "allOpenFindingsTracked": "Барлық ашық деректер қадағаланады"
     },
     "dismiss": {
       "title": "Деректі жою",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}} талдау",
       "automation": "Автоматтандыру",
       "automationAllOff": "Барлығы өшірулі",
-      "automationCount": "{{count}} ішінен 3 қосулы",
+      "automationCount": "{{displayCount}} ішінен 3 қосулы",
       "notifications": "Хабарландырулар",
-      "notificationsCount": "{{count}} ішінен 2 қосулы",
+      "notificationsCount": "{{displayCount}} ішінен 2 қосулы",
       "slaPolicy": "SLA саясаты",
       "disabledNoManage": "Security Agent өшірулі. Оны тек ұйым иелері мен биллинг менеджерлері қоса алады.",
       "disabledNoRepo": "Security Agent қоспас бұрын кемінде бір репозиторий таңдаңыз.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "{{number}} pull request ашу",
       "openDraftPullRequest": "{{number}} draft pull request ашу",
       "progress": "Барысы",
-      "attemptHistory": "Әрекет тарихы ({{count}})",
+      "attemptHistory": "Әрекет тарихы ({{displayCount}})",
       "attemptNumber": "№{{number}} әрекет",
       "startedBy": "Бастаған",
       "model": "Модель",
@@ -1855,9 +1878,9 @@
       "toolTask": "тапсырма",
       "readTodos": "Todo-ны оқу",
       "updateTodos": "Todo-ны жаңарту",
-      "linesBadge": "{{count}} жол",
-      "filesBadge": "{{count}} файл",
-      "matchesBadge": "{{count}} сәйкестік"
+      "linesBadge": "{{displayCount}} жол",
+      "filesBadge": "{{displayCount}} файл",
+      "matchesBadge": "{{displayCount}} сәйкестік"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} жолдар (қысқартылды)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "Бұл жауапты хабарлау мүмкін емес.",
       "reportAiResponseSubmitted": "Хабарланды жіберілді. Түбіртек {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Мәліметтер қолжетімсіз",
       "textDisplay": "Мәтінді көрсету",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Дайындық аяқталды",
       "preparationFailed": "Дайындық сәтсіз аяқталды",
       "setupCommand": "{{index}} орнату пәрмені",
-      "setupCommandOf": "{{count}} ішіндегі {{index}} орнату пәрмені"
+      "setupCommandOf": "{{displayCount}} ішіндегі {{index}} орнату пәрмені"
     },
     "permissionCard": {
       "title": "Рұқсат қажет",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Жіберу сәтсіз аяқталды. Қайталап көріңіз.",
       "questionAnnouncement": "Агент сіздің жауабыңызды қажет етеді. Сіз жауап бергенше редактор кідіртілген.",
       "permissionAnnouncement": "Агент жалғастыру үшін рұқсат қажет. Сіз шешім қабылдағанша редактор кідіртілген.",
-      "positionHint": "({{count}}-дің 1-і)",
+      "positionHint": "({{displayCount}}-дің 1-і)",
       "movedPastPrompt": "Агент бұл сұрақтан өтіп кетті. Сессия жалғасқанда бұл карта жабылады.",
       "waitingForAnswer": "Агент сіздің жауабыңызды күтуде. Сұрақ ашық тұрғанда, агентке жіберілетін хабарлама кідіртілген.",
       "waitingForPermission": "Агент рұқсатты күтуде. Сұраныс ашық тұрғанда, агентке жіберілетін хабарлама кідіртілген."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Камераға рұқсат өшірілген",
       "cameraAccessMessage": "Фото түсіру үшін Баптауларда камераға рұқсат беріңіз.",
       "couldNotOpenPhotoPicker": "Фото таңдау құралын ашу мүмкін болмады. Kilo қайта іске қосып, қайталап көріңіз.",
-      "maxFilesAllowed": "Ең көбі {{count}} файлға рұқсат",
+      "maxFilesAllowed": "Ең көбі {{displayCount}} файлға рұқсат",
       "onlyAddingFiles": "Тек {{total}} файлдың {{accepted}}-і қосылуда (ең көбі {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "құны {{cost}}",
       "costSuffix": ", құны {{cost}}",
       "tokensWindowUnavailable": "Контекст {{used}} токен, терезе қолжетімсіз",
-      "tokensUsage": "Контекст {{window}} токеннің {{used}}-і, {{percentage}}% қолданылған",
+      "tokensUsage": "Контекст {{window}} токеннің {{used}}-і, {{percentage}} қолданылған",
       "title": "Контекстті қолдану",
       "used": "Қолданылған",
       "remaining": "Қалған",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "Қолдану соңғы аяқталған көмекші жауабын көрсетеді.",
       "tokenUsage": "Токендерді қолдану",
       "cacheRate": "Кэш жылдамдығы",
-      "modelsCount": "Модельдер ({{count}})",
+      "modelsCount": "Модельдер ({{displayCount}})",
       "tokenTotalsNote": "Токен жиыны тек осы сессияны қамтиды және субаргент/қосымша сессия токендерін қоспайды.",
       "subagents": "Субаргенттер",
       "subagentsDescription": "Қосымша сессиялардан қалған құны",
@@ -2373,7 +2400,7 @@
     "connectedCli": "Қосылған CLI-де",
     "newSessionOn": "{{name}} үстіндегі жаңа сессия",
     "noMatchingSessions": "Сәйкес сессиялар жоқ.",
-    "onlyFirstFilesAttached": "Тек алғашқы {{count}} файл қосылады.",
+    "onlyFirstFilesAttached": "Тек алғашқы {{displayCount}} файл қосылады.",
     "staleMessage": "Бұл бөлісу енді қолжетімсіз.",
     "retryableMessage": "Сессияларыңызды жүктеу мүмкін болмады.",
     "emptyMessage": "Әзірге сессиялар жоқ — бұны жіберу үшін жаңасын бастаңыз.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Бұл Apple Аккаунтындағы Kilo Pass басқа Kilo аккаунтына тиесілі. Оны басқару үшін сол Kilo аккаунтына кіріңіз.",
     "alreadySubscribed": "Сізде Kilo Pass жазылымы бар.",
     "purchaseUnavailable": "Kilo Pass сатып алу қазір қолжетімсіз.",
-    "tierCredits": "${{amount}} кредит",
+    "tierCredits": "{{amount}} кредит",
     "perMonth": "{{price}}/ай",
     "verifyPurchaseFailed": "Сатып алуды растау мүмкін болмады. Қосылымды тексеріп, қайталап көріңіз.",
     "productsCouldNotLoad": "Kilo Pass өнімдерін App Store-дан жүктеу мүмкін болмады.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "App Store жазылым басқаруын ашу сәтсіз аяқталды.",
     "kiloPassSetup": "Kilo Pass баптау",
     "subscriptionHeaderDescription": "Kilo App-те AI бағдарламалау сессияларын жүргізу үшін Kilo балансына ай сайын кредит қосатын айлық жазылым — Cloud Agents, қашықтағы сессиялар және KiloClaw чаттары.",
-    "tierDescription": "Kilo App пайдалану үшін ай сайын ${{price}} төленген кредит қосылады.",
+    "tierDescription": "Kilo App пайдалану үшін ай сайын {{price}} төленген кредит қосылады.",
     "subscribe": "Жазылу",
     "subscribeDescription": "Бонус прогреспен ай сайынғы кредиттер",
     "manage": "Басқару",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass күтілуде",
     "statusCanceling": "Kilo Pass жойылуда",
     "statusPastDue": "Kilo Pass мерзімі өткен",
-    "monthlyCredits": "${{credits}} айлық кредит",
+    "monthlyCredits": "{{credits}} айлық кредит",
     "ends": "{{date}} аяқталады",
     "periodEnd": "кезең соңы",
     "managedOnGooglePlay": "Google Play-де басқарылады",

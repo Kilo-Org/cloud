@@ -206,11 +206,11 @@
       "loadingLines": "Nalagam {{loaded}} od {{total}} vrstic ...",
       "expandContext": "Razširi kontekst",
       "expandMoreContext": "Razširi več konteksta",
-      "expandLines": "Razširi {{count}} vrstic ({{start}}–{{end}})",
-      "expandMoreLines": "Razširi še {{count}} vrstic ({{start}}–{{end}})",
-      "expandLinesOfContext": "Razširi {{count}} vrstic konteksta",
+      "expandLines": "Razširi {{displayCount}} vrstic ({{start}}–{{end}})",
+      "expandMoreLines": "Razširi še {{displayCount}} vrstic ({{start}}–{{end}})",
+      "expandLinesOfContext": "Razširi {{displayCount}} vrstic konteksta",
       "expandAll": "Razširi vse",
-      "expandAllLines": "Razširi vseh {{count}} vrstic",
+      "expandAllLines": "Razširi vseh {{displayCount}} vrstic",
       "loadingMoreFiles": "Nalagam več datotek ...",
       "retryLoadingNextPage": "Poskusi znova naložiti naslednjo stran",
       "failedToLoadMoreFiles": "Več datotek ni bilo mogoče naložiti — tapnite za ponovni poskus",
@@ -227,7 +227,11 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} datotek naloženih od {{total}}",
       "filesStillLoading": "Datoteke se še nalagajo. Povlecite za osvežitev.",
       "goToOverview": "Pojdi na pregled",
-      "goToOverviewTab": "Pojdi na zavihek pregled"
+      "goToOverviewTab": "Pojdi na zavihek pregled",
+      "fileLoadedCount_two": "{{displayCount}} datoteki naloženi",
+      "fileLoadedCount_few": "{{displayCount}} datoteke naložene",
+      "fileLoadedOfTotalCount_two": "{{displayCount}} datoteki naloženi od {{total}}",
+      "fileLoadedOfTotalCount_few": "{{displayCount}} datoteke naložene od {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ na koncu datoteke ni nove vrstice",
@@ -301,7 +305,7 @@
       "closeReactions": "Zapri reakcije",
       "reactionsTitle": "Reakcije",
       "addReaction": "Dodaj reakcijo",
-      "reactionPill": "{{emoji}} reakcija, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} reakcija, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakcija",
       "reaction": "reakcij",
       "reaction_other": "reakcij",
@@ -353,10 +357,14 @@
       "noDiscussionDescription": "Na tem pull requestu ni niti pregledov niti komentarjev pogovora.",
       "reviewFiles": "Preglej datoteke",
       "quotedDiffSnippet": "Citiran izsek diffa",
-      "moreLinesAbove": "… še {{count}} vrstic zgoraj",
+      "moreLinesAbove": "… še {{displayCount}} vrstic zgoraj",
       "termsAcceptRequired": "Za objavljanje morate sprejeti pogoje uporabe.",
       "termsOutdatedCopy": "Pogoji uporabe so se spremenili. Znova odprite ta zaslon za sprejem najnovejše različice.",
-      "termsCheckRetryCopy": "Pogojev uporabe ni bilo mogoče preveriti. Preverite povezavo in poskusite znova."
+      "termsCheckRetryCopy": "Pogojev uporabe ni bilo mogoče preveriti. Preverite povezavo in poskusite znova.",
+      "comment_two": "{{displayCount}} komentarja",
+      "comment_few": "{{displayCount}} komentarji",
+      "reaction_two": "reakciji",
+      "reaction_few": "reakcije"
     },
     "couldNotOpenGitHubAppSettings": "Nastavitev aplikacije GitHub ni bilo mogoče odpreti",
     "installKiloGitHubApp": "Namesti aplikacijo Kilo GitHub",
@@ -395,11 +403,11 @@
       "retryChecks": "Poskusi znova s preverjanji",
       "viewOnGitHub": "Prikaži PR na GitHubu",
       "noChecksReported": "Ni poročanih preverjanj",
-      "passed": "{{count}} uspešnih",
-      "failed": "{{count}} neuspešnih",
-      "pending": "{{count}} čaka",
-      "skipped": "{{count}} preskočenih",
-      "checksCount": "{{count}} preverjanj",
+      "passed": "{{displayCount}} uspešnih",
+      "failed": "{{displayCount}} neuspešnih",
+      "pending": "{{displayCount}} čaka",
+      "skipped": "{{displayCount}} preskočenih",
+      "checksCount": "{{displayCount}} preverjanj",
       "checkDetails": "podrobnosti preverjanja",
       "pullRequest": "pull request"
     },
@@ -459,9 +467,11 @@
       "pendingComment_one": "čakajoči komentar",
       "pendingComment": "čakajoči komentarji",
       "pendingComment_other": "čakajoči komentarji",
-      "submitCountOfTotal": "Pošlji {{freshCount}} od {{totalCount}} komentarjev",
+      "submitCountOfTotal": "Pošlji {{displayFreshCount}} od {{displayTotalCount}} komentarjev",
       "submitReview": "Pošlji pregled",
-      "partialPostedMessage": "Objavljenih {{freshCount}} komentarjev. {{staleCount}} komentarjev se nanaša na starejši commit in je ostalo v vaši čakalni vrsti."
+      "partialPostedMessage": "Objavljenih {{displayFreshCount}} komentarjev. {{displayStaleCount}} komentarjev se nanaša na starejši commit in je ostalo v vaši čakalni vrsti.",
+      "pendingComment_two": "čakajoča komentarja",
+      "pendingComment_few": "čakajoči komentarji"
     },
     "reconnectNotice": {
       "title": "Povezava GitHub je potekla",
@@ -488,7 +498,11 @@
       "commit_other": "commit-i",
       "file_one": "datoteka",
       "file": "datoteke",
-      "file_other": "datoteke"
+      "file_other": "datoteke",
+      "commit_two": "commit-a",
+      "commit_few": "commit-i",
+      "file_two": "datoteki",
+      "file_few": "datoteke"
     },
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastareli čakajoči komentar na {{location}}",
@@ -580,7 +594,8 @@
     "agents": "Agenti",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, zavihek, {{position}} od {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +636,7 @@
       "recent": "Nedavno",
       "common": "Pogosto",
       "reactWith": "Reagiraj z {{reaction}}",
-      "accessibility": "{{emoji}} reakcija, {{count}}"
+      "accessibility": "{{emoji}} reakcija, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Odgovarjam na",
@@ -650,7 +665,7 @@
       "imageUnavailable": "Slika ni na voljo",
       "openFailed": "Priloge ni bilo mogoče odpreti. Preverite povezavo in poskusite znova.",
       "attachFailed": "Datoteke ni bilo mogoče pripeti",
-      "limit": "Pripeti lahko do {{count}} datotek.",
+      "limit": "Pripeti lahko do {{displayCount}} datotek.",
       "sizeRejection": "{{filename}} presega omejitev prilog {{limit}}.",
       "unreadable": "{{filename}} ni bilo mogoče prebrati.",
       "pastedImage": "prilepljena slika",
@@ -700,7 +715,9 @@
       "someone": "Nekdo",
       "typing_one": "{{name}} piše...",
       "typing": "{{names}} pišejo...",
-      "typing_other": "{{names}} pišejo..."
+      "typing_other": "{{names}} pišejo...",
+      "typing_two": "{{names}} pišeta...",
+      "typing_few": "{{names}} pišejo..."
     },
     "botStatus": {
       "online": "Na spletu",
@@ -722,6 +739,7 @@
       "finalTermEnds": "Zadnje obdobje se konča",
       "afterFinalTerm": "Po zadnjem obdobju",
       "remaining": "Preostalo",
+      "lessThanOneDay": "Manj kot 1 dan",
       "ends": "Se konča",
       "expires": "Poteče",
       "noActivePlan": "Ni aktivnega načrta",
@@ -740,11 +758,11 @@
       "yourStandardMonthlyPrice": "vaša mesečna cena Standard",
       "perMonth": "/mesec",
       "earlybirdAccessUntil": "Dostop Earlybird do {{date}}",
-      "earlybirdEnding": "Konec Earlybird: preostalih {{days}} dni",
+      "earlybirdEnding": "Konec Earlybird: preostalih {{remaining}} dni",
       "paymentPastDue": "Plačilo je zapadlo. Posodobite svoj način plačila.",
       "subscriptionCancels": "Naročnina se prekliče {{date}}",
-      "trialDaysRemaining": "Preizkus: preostalih {{days}} dni",
-      "trialEndingSoon": "Preizkus se kmalu konča: {{days}}"
+      "trialDaysRemaining": "Preizkus: preostalih {{remaining}} dni",
+      "trialEndingSoon": "Preizkus se kmalu konča: {{remaining}}"
     },
     "changelog": {
       "title": "Kaj je novega",
@@ -996,7 +1014,7 @@
         "stalledTitle": "Nekaj se je zataknilo",
         "stalledBody": "Namestitve {{name}} nam ni uspelo dokončati. Poskusite znova ali pišite na hi@kilo.ai, če se to še naprej dogaja.",
         "timeoutTitle": "Traja dlje, kot je bilo pričakovano",
-        "timeoutBody": "Namestitev {{name}} traja dlje kot običajno (več kot {{minutes}} minut).",
+        "timeoutBody": "Namestitev {{name}} traja dlje kot običajno (več kot {{displayMinutes}} minut).",
         "continueInBackground": "Nadaljuj v ozadju",
         "settingUp": "Nameščanje {{name}}",
         "finishingSetup": "Dokončevanje namestitve",
@@ -1071,7 +1089,9 @@
       "openUnread_other": "Odpri {{name}}, {{displayCount}} neprebranih sporočil",
       "open": "Odpri {{name}}",
       "openSettings": "Odpri nastavitve za {{name}}",
-      "fixOnKiloAi": "Popravi na kilo.ai: {{label}}"
+      "fixOnKiloAi": "Popravi na kilo.ai: {{label}}",
+      "openUnread_two": "Odpri {{name}}, {{displayCount}} neprebrani sporočili",
+      "openUnread_few": "Odpri {{name}}, {{displayCount}} neprebrana sporočila"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1287,7 +1307,7 @@
       "mergeGate": "Vrata združitve",
       "repositories": "Skladišča",
       "allRepositories": "Vsa skladišča",
-      "nSelected": "Izbrano {{count}}",
+      "nSelected": "Izbrano {{displayCount}}",
       "reviewMemory": "Pomnilnik pregleda",
       "proposedReviewMdGuidance": "Predlagane smernice REVIEW.md"
     },
@@ -1367,7 +1387,9 @@
       "severityAll": "Vse resnosti",
       "confidenceHighOnly": "Samo visoka zanesljivost",
       "confidenceMediumOrHigher": "Srednja ali višja",
-      "confidenceAny": "Kakršna koli zanesljivost"
+      "confidenceAny": "Kakršna koli zanesljivost",
+      "queued_two": "{{displayCount}} obstoječi najdbi čakata na analizo.",
+      "queued_few": "{{displayCount}} obstoječe najdbe čakajo na analizo."
     },
     "analysis": {
       "couldNotLoad": "Analize ni bilo mogoče naložiti",
@@ -1391,14 +1413,14 @@
       "analyzed": "Analizirano",
       "exploitabilityReasoning": "Obrazložitev izkoristljivosti",
       "suggestedFix": "Predlagana poprava",
-      "whereFound": "Kje je bilo ugotovljeno ({{count}})",
+      "whereFound": "Kje je bilo ugotovljeno ({{displayCount}})",
       "fullReport": "Celotno ustvarjeno poročilo",
       "unknown": "Neznano",
       "yes": "Da",
       "no": "Ne"
     },
     "dashboard": {
-      "findingsCount": "{{count}} najdb",
+      "findingsCount": "{{displayCount}} najdb",
       "notMeasured": "Ni izmerjeno",
       "actFirst": "Najprej ukrepaj",
       "slaPosture": "Stanje SLA",
@@ -1407,7 +1429,7 @@
       "repositoryActionPlan": "Načrt ukrepov za skladišče",
       "noOpenFindings": "Nobena odprta najdba ne potrebuje pozornosti",
       "deadlineToday": "Rok je dosežen danes",
-      "daysOverdue": "{{count}} dni po roku",
+      "daysOverdue": "{{displayCount}} dni po roku",
       "withinDeadline": "Znotraj roka",
       "criticalOverdue": "Kritično po roku",
       "highOverdue": "Visoko po roku",
@@ -1434,6 +1456,27 @@
       "syncNow": "Sinhroniziraj zdaj",
       "syncQueued": "Sinhronizacija v čakalni vrsti",
       "syncStatusUnavailable": "Stanje sinhronizacije ni na voljo"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Odprte najdbe",
+      "openFindingsDetail": "{{critical}} kritičnih, {{high}} visokih",
+      "confirmedExploitable": "Potrjeno izkoristljivo",
+      "confirmedExploitableDetail": "Tveganje projekta potrjeno z analizo",
+      "needsReview": "Potrebuje tvoj pregled",
+      "needsReviewDetail": "Zahtevana odločitev človeka",
+      "analysisIncomplete": "Analiza ni dokončana",
+      "analysisIncompleteDetail": "Tveganje projekta še ni znano",
+      "slaCompliance": "Skladnost s SLA",
+      "notMeasured": "Ni izmerjeno",
+      "withinDeadlineDetail": "{{within}} od {{total}} znotraj roka",
+      "noDeadlineData": "Nobena najdba še nima roka SLA",
+      "deadlinePassed": "Rok je potekel",
+      "deadlinePassedDetail": "{{critical}} kritičnih, {{high}} visokih",
+      "dueThisWeek": "Zapade ta teden",
+      "dueThisWeekDetail": "{{exploitable}} potrjeno izkoristljivih",
+      "noDeadline": "Brez roka",
+      "reviewSlaAssignment": "Preglej dodelitev SLA",
+      "allOpenFindingsTracked": "Sledi se vsem odprtim najdbam"
     },
     "dismiss": {
       "title": "Zavrzi najdbo",
@@ -1500,13 +1543,15 @@
       "analysisModeSubtitle": "{{mode}} analiza",
       "automation": "Avtomatizacija",
       "automationAllOff": "Vse izklopljeno",
-      "automationCount": "{{count}} od 3 omogočenih",
+      "automationCount": "{{displayCount}} od 3 omogočenih",
       "notifications": "Obvestila",
-      "notificationsCount": "{{count}} od 2 omogočenih",
+      "notificationsCount": "{{displayCount}} od 2 omogočenih",
       "slaPolicy": "Politika SLA",
       "disabledNoManage": "Varnostni agent je onemogočen. Omogočijo ga lahko samo lastniki organizacije in upravitelji obračunavanja.",
       "disabledNoRepo": "Pred omogočanjem varnostnega agenta izberi vsaj eno skladišče.",
-      "disabledPrompt": "Vklopi varnostnega agenta za sinhronizacijo opozoril Dependabot, izbiro skladišč in konfiguracijo avtomatizacije."
+      "disabledPrompt": "Vklopi varnostnega agenta za sinhronizacijo opozoril Dependabot, izbiro skladišč in konfiguracijo avtomatizacije.",
+      "repositoriesCount_two": "Izbrani {{displayCount}} skladišči",
+      "repositoriesCount_few": "Izbrana {{displayCount}} skladišča"
     },
     "remediation": {
       "cancellationRequested": "Preklic je bil zahtevan",
@@ -1524,7 +1569,7 @@
       "openPullRequest": "Odpri pull request{{number}}",
       "openDraftPullRequest": "Odpri osnutek pull request{{number}}",
       "progress": "Napredek",
-      "attemptHistory": "Zgodovina poskusov ({{count}})",
+      "attemptHistory": "Zgodovina poskusov ({{displayCount}})",
       "attemptNumber": "Poskus #{{number}}",
       "startedBy": "Začel",
       "model": "Model",
@@ -1734,7 +1779,11 @@
       "cent_other": "centov",
       "dollar_one": "dolar",
       "dollar": "dolarjev",
-      "dollar_other": "dolarjev"
+      "dollar_other": "dolarjev",
+      "cent_two": "centa",
+      "cent_few": "centi",
+      "dollar_two": "dolarja",
+      "dollar_few": "dolarji"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ni bilo mogoče odpreti",
@@ -1830,7 +1879,9 @@
     "partRenderer": {
       "updatedFileCount_one": "Posodobljena {{displayCount}} datoteka",
       "updatedFileCount": "Posodobljenih {{displayCount}} datotek",
-      "updatedFileCount_other": "Posodobljenih {{displayCount}} datotek"
+      "updatedFileCount_other": "Posodobljenih {{displayCount}} datotek",
+      "updatedFileCount_two": "Posodobljeni {{displayCount}} datoteki",
+      "updatedFileCount_few": "Posodobljene {{displayCount}} datoteke"
     },
     "toolPatch": {
       "operationAdded": "Dodano",
@@ -1855,9 +1906,9 @@
       "toolTask": "naloga",
       "readTodos": "Preberi naloge",
       "updateTodos": "Posodobi naloge",
-      "linesBadge": "{{count}} vrstic",
-      "filesBadge": "{{count}} datotek",
-      "matchesBadge": "{{count}} zadetkov"
+      "linesBadge": "{{displayCount}} vrstic",
+      "filesBadge": "{{displayCount}} datotek",
+      "matchesBadge": "{{displayCount}} zadetkov"
     },
     "readToolMarkdown": {
       "linesTruncated": "vrstice {{start}}–{{end}} (skrajšano)",
@@ -1941,6 +1992,10 @@
       "reportAiResponseFailedTerminal": "Tega odziva ni mogoče prijaviti.",
       "reportAiResponseSubmitted": "Prijava oddana. Potrdilo {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Podrobnosti niso na voljo",
       "textDisplay": "Prikaz besedila",
@@ -1999,7 +2054,7 @@
       "preparationComplete": "Priprava končana",
       "preparationFailed": "Priprava ni uspela",
       "setupCommand": "Namestitveni ukaz {{index}}",
-      "setupCommandOf": "Namestitveni ukaz {{index}} od {{count}}"
+      "setupCommandOf": "Namestitveni ukaz {{index}} od {{displayCount}}"
     },
     "permissionCard": {
       "title": "Zahtevano dovoljenje",
@@ -2036,7 +2091,7 @@
       "submissionFailed": "Oddaja ni uspela. Poskusi znova.",
       "questionAnnouncement": "Agent potrebuje tvoj vnos. Vnos je začasno ustavljen, dokler ne odgovoriš.",
       "permissionAnnouncement": "Agent potrebuje dovoljenje za nadaljevanje. Vnos je začasno ustavljen, dokler se ne odločiš.",
-      "positionHint": "(1 od {{count}})",
+      "positionHint": "(1 od {{displayCount}})",
       "movedPastPrompt": "Agent je presegel ta poziv. Ta kartica se bo zaprla, ko se seja nadaljuje.",
       "waitingForAnswer": "Agent čaka na tvoj odgovor. Dokler je to vprašanje odprto, je tvoje sporočilo agentu začasno ustavljeno.",
       "waitingForPermission": "Agent čaka na dovoljenje. Dokler je ta zahteva odprta, je tvoje sporočilo agentu začasno ustavljeno."
@@ -2076,7 +2131,9 @@
       "omitted_other": "{{displayCount}} prejšnjih elementov te seje ni bilo mogoče prikazati.",
       "couldNotLoad": "Prejšnjih sporočil ni bilo mogoče naložiti.",
       "unavailable": "Prejšnja sporočila niso na voljo.",
-      "tooLarge": "Prejšnja sporočila so prevelika za nalaganje."
+      "tooLarge": "Prejšnja sporočila so prevelika za nalaganje.",
+      "omitted_two": "{{displayCount}} prejšnja elementa te seje ni bilo mogoče prikazati.",
+      "omitted_few": "{{displayCount}} prejšnji elementi te seje ni bilo mogoče prikazati."
     },
     "markdownTable": {
       "viewTable": "Prikaži tabelo",
@@ -2088,7 +2145,11 @@
       "rowCount_one": "vrstica",
       "rowCount": "vrstice",
       "rowCount_other": "vrstice",
-      "opensFullScreen": "odpre celozaslonski prikaz"
+      "opensFullScreen": "odpre celozaslonski prikaz",
+      "columnCount_two": "stolpca",
+      "columnCount_few": "stolpci",
+      "rowCount_two": "vrstici",
+      "rowCount_few": "vrstice"
     },
     "sessionFilter": {
       "title": "Filtriraj seje",
@@ -2157,7 +2218,7 @@
       "cameraAccessDisabled": "Dostop do fotoaparata onemogočen",
       "cameraAccessMessage": "Omogoči dostop do fotoaparata v Nastavitvah za fotografiranje.",
       "couldNotOpenPhotoPicker": "Izbirnika fotografij ni bilo mogoče odpreti. Znova zaženi Kilo in poskusi znova.",
-      "maxFilesAllowed": "Dovoljenih je največ {{count}} datotek",
+      "maxFilesAllowed": "Dovoljenih je največ {{displayCount}} datotek",
       "onlyAddingFiles": "Dodaja se samo {{accepted}} od {{total}} datotek (največ {{max}})"
     },
     "composer": {
@@ -2222,7 +2283,7 @@
       "costPrefix": "strošek {{cost}}",
       "costSuffix": ", strošek {{cost}}",
       "tokensWindowUnavailable": "Kontekst {{used}} žetonov, okno ni na voljo",
-      "tokensUsage": "Kontekst {{used}} od {{window}} žetonov, {{percentage}}% uporabljenih",
+      "tokensUsage": "Kontekst {{used}} od {{window}} žetonov, {{percentage}} uporabljenih",
       "title": "Poraba konteksta",
       "used": "Uporabljeno",
       "remaining": "Preostalo",
@@ -2231,7 +2292,7 @@
       "usageReflectsLatest": "Poraba odraža zadnji dokončan odgovor asistenta.",
       "tokenUsage": "Poraba žetonov",
       "cacheRate": "Stopnja predpomnilnika",
-      "modelsCount": "Modeli ({{count}})",
+      "modelsCount": "Modeli ({{displayCount}})",
       "tokenTotalsNote": "Skupne vrednosti žetonov zajemajo samo to sejo in izključujejo žetone podagentov/nadrejenih sej.",
       "subagents": "Podagenti",
       "subagentsDescription": "Preostali strošek podrejenih sej",
@@ -2243,7 +2304,9 @@
       "stepsCount_one": "{{steps}} korak",
       "stepsCount": "{{steps}} korakov",
       "stepsCount_other": "{{steps}} korakov",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "stepsCount_two": "{{steps}} koraka",
+      "stepsCount_few": "{{steps}} koraki"
     },
     "prBadge": {
       "open": "odprt pull request",
@@ -2373,7 +2436,7 @@
     "connectedCli": "Na povezanem CLI",
     "newSessionOn": "Nova seja na {{name}}",
     "noMatchingSessions": "Ni ujemajočih sej.",
-    "onlyFirstFilesAttached": "Priloženih bo samo prvih {{count}} datotek.",
+    "onlyFirstFilesAttached": "Priloženih bo samo prvih {{displayCount}} datotek.",
     "staleMessage": "Ta deljeni vnos ni več na voljo.",
     "retryableMessage": "Tvojih sej ni bilo mogoče naložiti.",
     "emptyMessage": "Še ni sej — začni novo za pošiljanje tega.",
@@ -2406,7 +2469,7 @@
     "otherAccountCopy": "Kilo Pass na tem Apple računu pripada drugemu Kilo računu. Prijavi se v ta Kilo račun, da ga upravljaš.",
     "alreadySubscribed": "Že imaš naročnino Kilo Passa.",
     "purchaseUnavailable": "Nakup Kilo Passa trenutno ni na voljo.",
-    "tierCredits": "${{amount}} kreditov",
+    "tierCredits": "{{amount}} kreditov",
     "perMonth": "{{price}}/mes",
     "verifyPurchaseFailed": "Nakupa ni bilo mogoče potrditi. Preveri svojo povezavo in poskusi znova.",
     "productsCouldNotLoad": "Izdelkov Kilo Passa ni bilo mogoče naložiti iz App Store.",
@@ -2417,7 +2480,7 @@
     "manageFailed": "Upravljanja naročnin App Store ni bilo mogoče odpreti.",
     "kiloPassSetup": "Nastavitev Kilo Passa",
     "subscriptionHeaderDescription": "Mesečna naročnina, ki tvojemu Kilo stanju doda kredite za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo — oblačni agenti, oddaljene seje in KiloClaw klepeti.",
-    "tierDescription": "${{price}} plačanih kreditov, dodanih mesečno za uporabo aplikacije Kilo.",
+    "tierDescription": "{{price}} plačanih kreditov, dodanih mesečno za uporabo aplikacije Kilo.",
     "subscribe": "Naroči se",
     "subscribeDescription": "Mesečni krediti z bonus napredkom",
     "manage": "Upravljaj",
@@ -2425,7 +2488,7 @@
     "statusPending": "Kilo Pass čaka",
     "statusCanceling": "Kilo Pass se preklicuje",
     "statusPastDue": "Kilo Pass zamujen",
-    "monthlyCredits": "${{credits}} mesečnih kreditov",
+    "monthlyCredits": "{{credits}} mesečnih kreditov",
     "ends": "Konča se {{date}}",
     "periodEnd": "konec obdobja",
     "managedOnGooglePlay": "Upravlja se v Google Play",
@@ -2667,7 +2730,9 @@
       "processingNeedsReview": "Obdelava potrebuje pregled",
       "retry": "Ponovni poskus",
       "retryHint": "Ponovno poskusi naložiti stanje Kilo Passa.",
-      "setupHint": "Odpre nastavitev Kilo Passa na spletu."
+      "setupHint": "Odpre nastavitev Kilo Passa na spletu.",
+      "paidSeat_two": "{{displayCount}} plačana sedeža",
+      "paidSeat_few": "{{displayCount}} plačani sedeži"
     }
   },
   "authErrors": {

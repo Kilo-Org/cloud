@@ -63,7 +63,7 @@ function getBannerConfig(billing: ClawBillingStatus, state: string): BannerConfi
       return {
         icon: Info,
         message: i18n.t('kiloclaw.billing.trialDaysRemaining', {
-          days: billing.trial?.daysRemaining ?? 0,
+          remaining: formatRemainingDays(billing.trial?.daysRemaining ?? 0),
         }),
         severity: 'info',
       };
@@ -73,7 +73,7 @@ function getBannerConfig(billing: ClawBillingStatus, state: string): BannerConfi
       return {
         icon: Clock,
         message: i18n.t('kiloclaw.billing.trialEndingSoon', {
-          days: formatRemainingDays(billing.trial?.daysRemaining ?? 0),
+          remaining: formatRemainingDays(billing.trial?.daysRemaining ?? 0),
         }),
         severity: 'warn',
       };
@@ -93,7 +93,7 @@ function getBannerConfig(billing: ClawBillingStatus, state: string): BannerConfi
       return {
         icon: Clock,
         message: i18n.t('kiloclaw.billing.earlybirdEnding', {
-          days: billing.earlybird?.daysRemaining ?? 0,
+          remaining: formatRemainingDays(billing.earlybird?.daysRemaining ?? 0),
         }),
         severity: 'warn',
       };

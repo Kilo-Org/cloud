@@ -29,7 +29,7 @@ import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog'
 import { resolveCodeReviewerOpenPrDestination } from '@/lib/code-reviewer-open-pr-destination';
 import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatNumber } from '@/lib/format';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
 import { getPrReviewPath } from '@/lib/profile-agent-navigation';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -245,8 +245,8 @@ export function ReviewDetailScreen({
               <MetaRow
                 label={t('codeReviewer.reviewDetail.tokens')}
                 value={t('codeReviewer.reviewDetail.tokensInOut', {
-                  input: tokenUsage.input,
-                  output: tokenUsage.output,
+                  input: formatNumber(tokenUsage.input, i18n.language),
+                  output: formatNumber(tokenUsage.output, i18n.language),
                 })}
               />
             ) : null}

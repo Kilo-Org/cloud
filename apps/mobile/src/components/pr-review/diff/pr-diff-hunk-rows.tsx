@@ -85,8 +85,8 @@ export function ExpandSeparatorRow({
           {isUnknownEnd
             ? t('prReview.hunkRows.loadingContext')
             : t('prReview.hunkRows.loadingLines', {
-                loaded: Math.min(gapSize, DEFAULT_EXPAND_WINDOW),
-                total: gapSize,
+                loaded: formatNumber(Math.min(gapSize, DEFAULT_EXPAND_WINDOW), i18n.language),
+                total: formatNumber(gapSize, i18n.language),
               })}
         </Text>
       </View>
@@ -104,13 +104,15 @@ export function ExpandSeparatorRow({
     expandText = isPartial
       ? t('prReview.hunkRows.expandMoreLines', {
           count: windowSize,
-          start: startLine,
-          end: windowEnd,
+          displayCount: formatNumber(windowSize, i18n.language),
+          start: formatNumber(startLine, i18n.language),
+          end: formatNumber(windowEnd, i18n.language),
         })
       : t('prReview.hunkRows.expandLines', {
           count: windowSize,
-          start: startLine,
-          end: windowEnd,
+          displayCount: formatNumber(windowSize, i18n.language),
+          start: formatNumber(startLine, i18n.language),
+          end: formatNumber(windowEnd, i18n.language),
         });
   }
 
@@ -125,7 +127,10 @@ export function ExpandSeparatorRow({
         accessibilityLabel={
           isUnknownEnd
             ? t('prReview.hunkRows.expandContext')
-            : t('prReview.hunkRows.expandLinesOfContext', { count: DEFAULT_EXPAND_WINDOW })
+            : t('prReview.hunkRows.expandLinesOfContext', {
+                count: DEFAULT_EXPAND_WINDOW,
+                displayCount: formatNumber(DEFAULT_EXPAND_WINDOW, i18n.language),
+              })
         }
       >
         <ChevronDown size={12} color={colors.info} />
@@ -141,7 +146,10 @@ export function ExpandSeparatorRow({
           }}
           className="ml-3 flex-row items-center gap-1 active:opacity-70"
           accessibilityRole="button"
-          accessibilityLabel={t('prReview.hunkRows.expandAllLines', { count: gapSize })}
+          accessibilityLabel={t('prReview.hunkRows.expandAllLines', {
+            count: gapSize,
+            displayCount: formatNumber(gapSize, i18n.language),
+          })}
         >
           <ChevronDown size={12} color={colors.info} />
           {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme info color */}

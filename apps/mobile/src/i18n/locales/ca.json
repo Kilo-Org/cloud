@@ -206,11 +206,11 @@
       "loadingLines": "Carregant {{loaded}} de {{total}} línies…",
       "expandContext": "Expandeix el context",
       "expandMoreContext": "Expandeix més context",
-      "expandLines": "Expandeix {{count}} línies ({{start}}–{{end}})",
-      "expandMoreLines": "Expandeix {{count}} línies més ({{start}}–{{end}})",
-      "expandLinesOfContext": "Expandeix {{count}} línies de context",
+      "expandLines": "Expandeix {{displayCount}} línies ({{start}}–{{end}})",
+      "expandMoreLines": "Expandeix {{displayCount}} línies més ({{start}}–{{end}})",
+      "expandLinesOfContext": "Expandeix {{displayCount}} línies de context",
       "expandAll": "Expandeix-ho tot",
-      "expandAllLines": "Expandeix totes les {{count}} línies",
+      "expandAllLines": "Expandeix totes les {{displayCount}} línies",
       "loadingMoreFiles": "Carregant més fitxers…",
       "retryLoadingNextPage": "Torna a carregar la pàgina següent",
       "failedToLoadMoreFiles": "No s'han pogut carregar més fitxers — toca per tornar-ho a provar",
@@ -227,7 +227,9 @@
       "fileLoadedOfTotalCount_other": "S'han carregat {{displayCount}} fitxers de {{total}}",
       "filesStillLoading": "Els fitxers encara s'estan carregant. Estira per actualitzar.",
       "goToOverview": "Vés a la visió general",
-      "goToOverviewTab": "Vés a la pestanya de visió general"
+      "goToOverviewTab": "Vés a la pestanya de visió general",
+      "fileLoadedCount_many": "S'han carregat {{displayCount}} fitxers",
+      "fileLoadedOfTotalCount_many": "S'han carregat {{displayCount}} fitxers de {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ sense salt de línia al final del fitxer",
@@ -301,7 +303,7 @@
       "closeReactions": "Tanca les reaccions",
       "reactionsTitle": "Reaccions",
       "addReaction": "Afegeix una reacció",
-      "reactionPill": "{{emoji}} reacció, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} reacció, {{displayCount}} {{countLabel}}",
       "reaction_one": "reacció",
       "reaction": "reaccions",
       "reaction_other": "reaccions",
@@ -353,10 +355,12 @@
       "noDiscussionDescription": "No hi ha fils de revisió ni comentaris de conversa en aquesta pull request.",
       "reviewFiles": "Revisa els fitxers",
       "quotedDiffSnippet": "Fragment de diff citat",
-      "moreLinesAbove": "… {{count}} línies més a dalt",
+      "moreLinesAbove": "… {{displayCount}} línies més a dalt",
       "termsAcceptRequired": "Has d'acceptar els Termes del servei per publicar.",
       "termsOutdatedCopy": "Els Termes del servei han canviat. Torna a obrir aquesta pantalla per acceptar la versió més recent.",
-      "termsCheckRetryCopy": "No s'han pogut comprovar els Termes del servei. Comprova la connexió i torna-ho a provar."
+      "termsCheckRetryCopy": "No s'han pogut comprovar els Termes del servei. Comprova la connexió i torna-ho a provar.",
+      "comment_many": "{{displayCount}} comentaris",
+      "reaction_many": "reaccions"
     },
     "couldNotOpenGitHubAppSettings": "No s'ha pogut obrir la configuració de l'app de GitHub",
     "installKiloGitHubApp": "Instal·la l'app Kilo de GitHub",
@@ -395,11 +399,11 @@
       "retryChecks": "Torna a comprovar",
       "viewOnGitHub": "Veure la PR a GitHub",
       "noChecksReported": "No s'ha informat de cap comprovació",
-      "passed": "{{count}} superades",
-      "failed": "{{count}} fallides",
-      "pending": "{{count}} pendents",
-      "skipped": "{{count}} ometudes",
-      "checksCount": "{{count}} comprovacions",
+      "passed": "{{displayCount}} superades",
+      "failed": "{{displayCount}} fallides",
+      "pending": "{{displayCount}} pendents",
+      "skipped": "{{displayCount}} ometudes",
+      "checksCount": "{{displayCount}} comprovacions",
       "checkDetails": "detalls de la comprovació",
       "pullRequest": "pull request"
     },
@@ -459,9 +463,10 @@
       "pendingComment_one": "comentari pendent",
       "pendingComment": "comentaris pendents",
       "pendingComment_other": "comentaris pendents",
-      "submitCountOfTotal": "Envia {{freshCount}} de {{totalCount}} comentaris",
+      "submitCountOfTotal": "Envia {{displayFreshCount}} de {{displayTotalCount}} comentaris",
       "submitReview": "Envia la revisió",
-      "partialPostedMessage": "S'han publicat {{freshCount}} comentari(s). {{staleCount}} comentari(s) apunten a un commit més antic i han quedat a la teva cua."
+      "partialPostedMessage": "S'han publicat {{displayFreshCount}} comentari(s). {{displayStaleCount}} comentari(s) apunten a un commit més antic i han quedat a la teva cua.",
+      "pendingComment_many": "comentaris pendents"
     },
     "reconnectNotice": {
       "title": "La connexió de GitHub ha caducat",
@@ -488,7 +493,9 @@
       "commit_other": "commits",
       "file_one": "fitxer",
       "file": "fitxers",
-      "file_other": "fitxers"
+      "file_other": "fitxers",
+      "commit_many": "commits",
+      "file_many": "fitxers"
     },
     "pendingComment": {
       "editOutdatedA11y": "Edita el comentari pendent desactualitzat a {{location}}",
@@ -580,7 +587,8 @@
     "agents": "Agents",
     "profile": "Perfil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, pestanya, {{position}} de {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +629,7 @@
       "recent": "Recents",
       "common": "Habituals",
       "reactWith": "Reacciona amb {{reaction}}",
-      "accessibility": "{{emoji}} reacció, {{count}}"
+      "accessibility": "{{emoji}} reacció, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Responent a",
@@ -650,7 +658,7 @@
       "imageUnavailable": "Imatge no disponible",
       "openFailed": "No s'ha pogut obrir l'adjunt. Comprova la connexió i torna-ho a provar.",
       "attachFailed": "No s'ha pogut adjuntar el fitxer",
-      "limit": "Pots adjuntar fins a {{count}} fitxers.",
+      "limit": "Pots adjuntar fins a {{displayCount}} fitxers.",
       "sizeRejection": "{{filename}} supera el límit d'adjunts de {{limit}}.",
       "unreadable": "No s'ha pogut llegir {{filename}}.",
       "pastedImage": "la imatge enganxada",
@@ -700,7 +708,8 @@
       "someone": "Algú",
       "typing_one": "{{name}} està escrivint...",
       "typing": "{{names}} estan escrivint...",
-      "typing_other": "{{names}} estan escrivint..."
+      "typing_other": "{{names}} estan escrivint...",
+      "typing_many": "{{names}} estan escrivint..."
     },
     "botStatus": {
       "online": "En línia",
@@ -740,11 +749,12 @@
       "yourStandardMonthlyPrice": "el teu preu mensual Standard",
       "perMonth": "/mes",
       "earlybirdAccessUntil": "Accés Earlybird fins al {{date}}",
-      "earlybirdEnding": "Earlybird acaba: queden {{days}} dies",
+      "earlybirdEnding": "Earlybird acaba: {{remaining}}",
       "paymentPastDue": "Pagament vençut. Actualitza el teu mètode de pagament.",
       "subscriptionCancels": "La subscripció es cancel·la el {{date}}",
-      "trialDaysRemaining": "Prova: queden {{days}} dies",
-      "trialEndingSoon": "La prova acaba aviat: {{days}}"
+      "trialDaysRemaining": "Prova: queden {{remaining}}",
+      "trialEndingSoon": "La prova acaba aviat: {{remaining}}",
+      "lessThanOneDay": "Menys d'1 dia"
     },
     "changelog": {
       "title": "Novetats",
@@ -996,7 +1006,7 @@
         "stalledTitle": "Alguna cosa s'ha encallat",
         "stalledBody": "No hem pogut acabar de configurar {{name}}. Torna-ho a provar, o escriu a hi@kilo.ai si això continua passant.",
         "timeoutTitle": "Tarda més del previst",
-        "timeoutBody": "La configuració de {{name}} tarda més del normal (més de {{minutes}} minuts).",
+        "timeoutBody": "La configuració de {{name}} tarda més del normal (més de {{displayMinutes}} minuts).",
         "continueInBackground": "Continua en segon pla",
         "settingUp": "Configurant {{name}}",
         "finishingSetup": "Finalitzant la configuració",
@@ -1071,7 +1081,8 @@
       "openUnread_other": "Obre {{name}}, {{displayCount}} missatges no llegits",
       "open": "Obre {{name}}",
       "openSettings": "Obre la configuració de {{name}}",
-      "fixOnKiloAi": "Corregeix a kilo.ai: {{label}}"
+      "fixOnKiloAi": "Corregeix a kilo.ai: {{label}}",
+      "openUnread_many": "Obre {{name}}, {{displayCount}} missatges no llegits"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1287,7 +1298,7 @@
       "mergeGate": "Porta de fusió",
       "repositories": "Repositoris",
       "allRepositories": "Tots els repositoris",
-      "nSelected": "{{count}} seleccionats",
+      "nSelected": "{{displayCount}} seleccionats",
       "reviewMemory": "Memòria de revisió",
       "proposedReviewMdGuidance": "Pautes de REVIEW.md proposades"
     },
@@ -1367,7 +1378,8 @@
       "severityAll": "Totes les severitats",
       "confidenceHighOnly": "Només confiança alta",
       "confidenceMediumOrHigher": "Mitjana o superior",
-      "confidenceAny": "Qualsevol confiança"
+      "confidenceAny": "Qualsevol confiança",
+      "queued_many": "{{displayCount}} resultats existents en cua per analitzar."
     },
     "analysis": {
       "couldNotLoad": "No s'ha pogut carregar l'anàlisi",
@@ -1391,14 +1403,14 @@
       "analyzed": "Analitzat",
       "exploitabilityReasoning": "Raonament d'explotabilitat",
       "suggestedFix": "Correcció suggerida",
-      "whereFound": "On s'ha trobat ({{count}})",
+      "whereFound": "On s'ha trobat ({{displayCount}})",
       "fullReport": "Informe complet generat",
       "unknown": "Desconegut",
       "yes": "Sí",
       "no": "No"
     },
     "dashboard": {
-      "findingsCount": "{{count}} resultats",
+      "findingsCount": "{{displayCount}} resultats",
       "notMeasured": "No mesurat",
       "actFirst": "Actua primer",
       "slaPosture": "Postura SLA",
@@ -1407,7 +1419,7 @@
       "repositoryActionPlan": "Pla d'acció del repositori",
       "noOpenFindings": "Cap resultat obert no requereix atenció",
       "deadlineToday": "Termini assolit avui",
-      "daysOverdue": "{{count}} dies de retard",
+      "daysOverdue": "{{displayCount}} dies de retard",
       "withinDeadline": "Dins del termini",
       "criticalOverdue": "Crític amb retard",
       "highOverdue": "Alt amb retard",
@@ -1434,6 +1446,27 @@
       "syncNow": "Sincronitza ara",
       "syncQueued": "Sincronització en cua",
       "syncStatusUnavailable": "Estat de sincronització no disponible"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Resultats oberts",
+      "openFindingsDetail": "{{critical}} crítics, {{high}} alts",
+      "confirmedExploitable": "Confirmat com a explotable",
+      "confirmedExploitableDetail": "Risc del projecte confirmat per l'anàlisi",
+      "needsReview": "Requereix la teva revisió",
+      "needsReviewDetail": "Cal una decisió humana",
+      "analysisIncomplete": "Anàlisi no completada",
+      "analysisIncompleteDetail": "El risc del projecte encara és desconegut",
+      "slaCompliance": "Compliment de SLA",
+      "notMeasured": "No mesurat",
+      "withinDeadlineDetail": "{{within}} de {{total}} dins del termini",
+      "noDeadlineData": "Encara cap resultat no té termini SLA",
+      "deadlinePassed": "El termini ha passat",
+      "deadlinePassedDetail": "{{critical}} crítics, {{high}} alts",
+      "dueThisWeek": "Venç aquesta setmana",
+      "dueThisWeekDetail": "{{exploitable}} confirmats com a explotables",
+      "noDeadline": "Cap termini",
+      "reviewSlaAssignment": "Revisa l'assignació de SLA",
+      "allOpenFindingsTracked": "Tots els resultats oberts es fan seguiment"
     },
     "dismiss": {
       "title": "Descarta el resultat",
@@ -1500,13 +1533,14 @@
       "analysisModeSubtitle": "Anàlisi {{mode}}",
       "automation": "Automatització",
       "automationAllOff": "Tots desactivats",
-      "automationCount": "{{count}} de 3 activats",
+      "automationCount": "{{displayCount}} de 3 activats",
       "notifications": "Notificacions",
-      "notificationsCount": "{{count}} de 2 activats",
+      "notificationsCount": "{{displayCount}} de 2 activats",
       "slaPolicy": "Política SLA",
       "disabledNoManage": "Security Agent està desactivat. Només els propietaris de l'organització i els gestors de facturació poden activar-lo.",
       "disabledNoRepo": "Selecciona almenys un repositori abans d'activar Security Agent.",
-      "disabledPrompt": "Activa Security Agent per sincronitzar alertes de Dependabot, triar repositoris i configurar l'automatització."
+      "disabledPrompt": "Activa Security Agent per sincronitzar alertes de Dependabot, triar repositoris i configurar l'automatització.",
+      "repositoriesCount_many": "{{displayCount}} repositoris seleccionats"
     },
     "remediation": {
       "cancellationRequested": "Cancel·lació sol·licitada",
@@ -1524,7 +1558,7 @@
       "openPullRequest": "Obrir la sol·licitud d'extracció{{number}}",
       "openDraftPullRequest": "Obrir l'esborrany de sol·licitud d'extracció{{number}}",
       "progress": "Progrés",
-      "attemptHistory": "Historial d'intents ({{count}})",
+      "attemptHistory": "Historial d'intents ({{displayCount}})",
       "attemptNumber": "Intent #{{number}}",
       "startedBy": "Iniciat per",
       "model": "Model",
@@ -1734,7 +1768,9 @@
       "cent_other": "cèntims",
       "dollar_one": "dòlar",
       "dollar": "dòlars",
-      "dollar_other": "dòlars"
+      "dollar_other": "dòlars",
+      "cent_many": "cèntims",
+      "dollar_many": "dòlars"
     },
     "githubInstall": {
       "couldNotOpenTitle": "No s'ha pogut obrir GitHub",
@@ -1830,7 +1866,8 @@
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxer actualitzat",
       "updatedFileCount": "{{displayCount}} fitxers actualitzats",
-      "updatedFileCount_other": "{{displayCount}} fitxers actualitzats"
+      "updatedFileCount_other": "{{displayCount}} fitxers actualitzats",
+      "updatedFileCount_many": "{{displayCount}} fitxers actualitzats"
     },
     "toolPatch": {
       "operationAdded": "Afegit",
@@ -1855,9 +1892,9 @@
       "toolTask": "tasca",
       "readTodos": "Llegeix els todos",
       "updateTodos": "Actualitza els todos",
-      "linesBadge": "{{count}} línies",
-      "filesBadge": "{{count}} fitxers",
-      "matchesBadge": "{{count}} coincidències"
+      "linesBadge": "{{displayCount}} línies",
+      "filesBadge": "{{displayCount}} fitxers",
+      "matchesBadge": "{{displayCount}} coincidències"
     },
     "readToolMarkdown": {
       "linesTruncated": "línies {{start}}–{{end}} (truncades)",
@@ -1941,6 +1978,10 @@
       "reportAiResponseFailedTerminal": "Aquesta resposta no es pot reportar.",
       "reportAiResponseSubmitted": "Informe enviat. Rebut {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Detalls no disponibles",
       "textDisplay": "Mostra del text",
@@ -1999,7 +2040,7 @@
       "preparationComplete": "Preparació completada",
       "preparationFailed": "La preparació ha fallat",
       "setupCommand": "Ordre de configuració {{index}}",
-      "setupCommandOf": "Ordre de configuració {{index}} de {{count}}"
+      "setupCommandOf": "Ordre de configuració {{index}} de {{displayCount}}"
     },
     "permissionCard": {
       "title": "Permís necessari",
@@ -2036,7 +2077,7 @@
       "submissionFailed": "L'enviament ha fallat. Torna-ho a provar.",
       "questionAnnouncement": "L'agent necessita la teva aportació. El compositor està en pausa mentre respons.",
       "permissionAnnouncement": "L'agent necessita permís per continuar. El compositor està en pausa mentre decideixes.",
-      "positionHint": "(1 de {{count}})",
+      "positionHint": "(1 de {{displayCount}})",
       "movedPastPrompt": "L'agent ha superat aquesta sol·licitud. Aquesta targeta es tancarà quan la sessió continuï.",
       "waitingForAnswer": "L'agent espera la teva resposta. Mentre aquesta pregunta sigui oberta, el teu missatge a l'agent està en pausa.",
       "waitingForPermission": "L'agent espera un permís. Mentre aquesta petició sigui oberta, el teu missatge a l'agent està en pausa."
@@ -2076,7 +2117,8 @@
       "omitted_other": "{{displayCount}} elements anteriors d'aquesta sessió no s'han pogut mostrar.",
       "couldNotLoad": "No s'han pogut carregar els missatges anteriors.",
       "unavailable": "Els missatges anteriors no estan disponibles.",
-      "tooLarge": "Els missatges anteriors són massa grans per carregar-los."
+      "tooLarge": "Els missatges anteriors són massa grans per carregar-los.",
+      "omitted_many": "{{displayCount}} elements anteriors d'aquesta sessió no s'han pogut mostrar."
     },
     "markdownTable": {
       "viewTable": "Mostra la taula",
@@ -2088,7 +2130,9 @@
       "rowCount_one": "fila",
       "rowCount": "files",
       "rowCount_other": "files",
-      "opensFullScreen": "obre la pantalla completa"
+      "opensFullScreen": "obre la pantalla completa",
+      "columnCount_many": "columnes",
+      "rowCount_many": "files"
     },
     "sessionFilter": {
       "title": "Filtra les sessions",
@@ -2157,7 +2201,7 @@
       "cameraAccessDisabled": "Accés a la càmera desactivat",
       "cameraAccessMessage": "Permet l'accés a la càmera a Configuració per fer una foto.",
       "couldNotOpenPhotoPicker": "No s'ha pogut obrir el selector de fotos. Reinicia Kilo i torna-ho a provar.",
-      "maxFilesAllowed": "Màxim {{count}} fitxers permesos",
+      "maxFilesAllowed": "Màxim {{displayCount}} fitxers permesos",
       "onlyAddingFiles": "Només s'afegeixen {{accepted}} de {{total}} fitxers (màx. {{max}})"
     },
     "composer": {
@@ -2222,7 +2266,7 @@
       "costPrefix": "cost {{cost}}",
       "costSuffix": ", cost {{cost}}",
       "tokensWindowUnavailable": "Context {{used}} tokens, finestra no disponible",
-      "tokensUsage": "Context {{used}} de {{window}} tokens, {{percentage}}% utilitzat",
+      "tokensUsage": "Context {{used}} de {{window}} tokens, {{percentage}} utilitzat",
       "title": "Ús del context",
       "used": "Utilitzat",
       "remaining": "Restant",
@@ -2231,7 +2275,7 @@
       "usageReflectsLatest": "L'ús reflecteix l'última resposta de l'assistent completada.",
       "tokenUsage": "Ús de tokens",
       "cacheRate": "Taxa de memòria cau",
-      "modelsCount": "Models ({{count}})",
+      "modelsCount": "Models ({{displayCount}})",
       "tokenTotalsNote": "Els totals de tokens cobreixen només aquesta sessió i excloem els tokens de subagents/sessions filles.",
       "subagents": "Subagents",
       "subagentsDescription": "Cost residual de les sessions filles",
@@ -2243,7 +2287,8 @@
       "stepsCount_one": "{{steps}} pas",
       "stepsCount": "{{steps}} passos",
       "stepsCount_other": "{{steps}} passos",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "stepsCount_many": "{{steps}} passos"
     },
     "prBadge": {
       "open": "pull request oberta",
@@ -2373,7 +2418,7 @@
     "connectedCli": "En un CLI connectat",
     "newSessionOn": "Nova sessió a {{name}}",
     "noMatchingSessions": "No hi ha sessions coincidents.",
-    "onlyFirstFilesAttached": "Només s'adjuntaran els primers {{count}} fitxers.",
+    "onlyFirstFilesAttached": "Només s'adjuntaran els primers {{displayCount}} fitxers.",
     "staleMessage": "Aquest element compartit ja no està disponible.",
     "retryableMessage": "No s'han pogut carregar les teves sessions.",
     "emptyMessage": "Encara no hi ha sessions: inicia una de nova per enviar-ho.",
@@ -2406,7 +2451,7 @@
     "otherAccountCopy": "El Kilo Pass d'aquest Apple Account pertany a un compte de Kilo diferent. Inicieu la sessió en aquell compte de Kilo per gestionar-lo.",
     "alreadySubscribed": "Ja tens una subscripció de Kilo Pass.",
     "purchaseUnavailable": "La compra de Kilo Pass no està disponible ara mateix.",
-    "tierCredits": "${{amount}} en crèdits",
+    "tierCredits": "{{amount}} en crèdits",
     "perMonth": "{{price}}/mes",
     "verifyPurchaseFailed": "No s'ha pogut verificar la teva compra. Comprova la teva connexió i torna-ho a provar.",
     "productsCouldNotLoad": "No s'han pogut carregar els productes de Kilo Pass des de l'App Store.",
@@ -2417,7 +2462,7 @@
     "manageFailed": "No s'ha pogut obrir la gestió de la subscripció de l'App Store.",
     "kiloPassSetup": "Configuració de Kilo Pass",
     "subscriptionHeaderDescription": "Una subscripció mensual que afegeix crèdits al teu saldo de Kilo per executar sessions de programació d'IA a l'aplicació Kilo: Cloud Agents, sessions remotes i xats de KiloClaw.",
-    "tierDescription": "${{price}} en crèdits de pagament afegits mensualment per a l'ús de l'aplicació Kilo.",
+    "tierDescription": "{{price}} en crèdits de pagament afegits mensualment per a l'ús de l'aplicació Kilo.",
     "subscribe": "Subscriu-te",
     "subscribeDescription": "Crèdits mensuals amb progrés de bonificació",
     "manage": "Gestiona",
@@ -2425,7 +2470,7 @@
     "statusPending": "Kilo Pass pendent",
     "statusCanceling": "Kilo Pass cancel·lant",
     "statusPastDue": "Kilo Pass vençut",
-    "monthlyCredits": "${{credits}} crèdits mensuals",
+    "monthlyCredits": "{{credits}} crèdits mensuals",
     "ends": "Finalitza el {{date}}",
     "periodEnd": "fi del període",
     "managedOnGooglePlay": "Gestionat a Google Play",
@@ -2667,7 +2712,8 @@
       "processingNeedsReview": "El processament necessita revisió",
       "retry": "Torna-ho a provar",
       "retryHint": "Torna a provar la càrrega de l'estat de Kilo Pass.",
-      "setupHint": "Obre la configuració de Kilo Pass al web."
+      "setupHint": "Obre la configuració de Kilo Pass al web.",
+      "paidSeat_many": "{{displayCount}} seients de pagament"
     }
   },
   "authErrors": {

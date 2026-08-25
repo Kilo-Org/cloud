@@ -206,11 +206,11 @@
       "loadingLines": "Ladataan {{loaded}}/{{total}} riviä...",
       "expandContext": "Laajenna konteksti",
       "expandMoreContext": "Laajenna lisää kontekstia",
-      "expandLines": "Laajenna {{count}} riviä ({{start}}–{{end}})",
-      "expandMoreLines": "Laajenna vielä {{count}} riviä ({{start}}–{{end}})",
-      "expandLinesOfContext": "Laajenna {{count}} kontekstiriviä",
+      "expandLines": "Laajenna {{displayCount}} riviä ({{start}}–{{end}})",
+      "expandMoreLines": "Laajenna vielä {{displayCount}} riviä ({{start}}–{{end}})",
+      "expandLinesOfContext": "Laajenna {{displayCount}} kontekstiriviä",
       "expandAll": "Laajenna kaikki",
-      "expandAllLines": "Laajenna kaikki {{count}} riviä",
+      "expandAllLines": "Laajenna kaikki {{displayCount}} riviä",
       "loadingMoreFiles": "Ladataan lisää tiedostoja...",
       "retryLoadingNextPage": "Yritä ladata seuraava sivu uudelleen",
       "failedToLoadMoreFiles": "Lisätiedostojen lataus epäonnistui — napauta yrittääksesi uudelleen",
@@ -301,7 +301,7 @@
       "closeReactions": "Sulje reaktiot",
       "reactionsTitle": "Reaktiot",
       "addReaction": "Lisää reaktio",
-      "reactionPill": "{{emoji}} reaktio, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} reaktio, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaktio",
       "reaction": "reaktiota",
       "reaction_other": "reaktiota",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Tässä pull requestissa ei ole arviointiketjuja tai keskustelukommentteja.",
       "reviewFiles": "Arvioi tiedostot",
       "quotedDiffSnippet": "Lainattu diff-ote",
-      "moreLinesAbove": "… {{count}} lisää riviä yläpuolella",
+      "moreLinesAbove": "… {{displayCount}} lisää riviä yläpuolella",
       "termsAcceptRequired": "Sinun on hyväksyttävä palvelun ehdot julkaistaksesi.",
       "termsOutdatedCopy": "Palvelun ehdot muuttuivat. Avaa tämä näyttö uudelleen hyväksyäksesi uusimman version.",
       "termsCheckRetryCopy": "Palvelun ehtoja ei voitu tarkistaa. Tarkista yhteys ja yritä uudelleen."
@@ -395,11 +395,11 @@
       "retryChecks": "Yritä tarkistuksia uudelleen",
       "viewOnGitHub": "Katso PR GitHubissa",
       "noChecksReported": "Ei raportoituja tarkistuksia",
-      "passed": "{{count}} läpäissyt",
-      "failed": "{{count}} epäonnistui",
-      "pending": "{{count}} odottaa",
-      "skipped": "{{count}} ohitettu",
-      "checksCount": "{{count}} tarkistusta",
+      "passed": "{{displayCount}} läpäissyt",
+      "failed": "{{displayCount}} epäonnistui",
+      "pending": "{{displayCount}} odottaa",
+      "skipped": "{{displayCount}} ohitettu",
+      "checksCount": "{{displayCount}} tarkistusta",
       "checkDetails": "tarkistuksen tiedot",
       "pullRequest": "pull request"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "odottava kommentti",
       "pendingComment": "odottavaa kommenttia",
       "pendingComment_other": "odottavaa kommenttia",
-      "submitCountOfTotal": "Lähetä {{freshCount}}/{{totalCount}} kommenttia",
+      "submitCountOfTotal": "Lähetä {{displayFreshCount}}/{{displayTotalCount}} kommenttia",
       "submitReview": "Lähetä arviointi",
-      "partialPostedMessage": "Lähetettiin {{freshCount}} kommenttia. {{staleCount}} kommenttia viittaa vanhempaan committiin ja jäi jonoon."
+      "partialPostedMessage": "Lähetettiin {{displayFreshCount}} kommenttia. {{displayStaleCount}} kommenttia viittaa vanhempaan committiin ja jäi jonoon."
     },
     "reconnectNotice": {
       "title": "GitHub-yhteys vanhentui",
@@ -580,7 +580,8 @@
     "agents": "Agentit",
     "profile": "Profiili",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, välilehti, {{position}}/{{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Viimeaikaiset",
       "common": "Yleiset",
       "reactWith": "Reagoi {{reaction}}",
-      "accessibility": "{{emoji}} reaktio, {{count}}"
+      "accessibility": "{{emoji}} reaktio, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Vastaat käyttäjälle",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Kuva ei käytettävissä",
       "openFailed": "Liitettä ei voitu avata. Tarkista yhteys ja yritä uudelleen.",
       "attachFailed": "Tiedoston liittäminen epäonnistui",
-      "limit": "Voit liittää enintään {{count}} tiedostoa.",
+      "limit": "Voit liittää enintään {{displayCount}} tiedostoa.",
       "sizeRejection": "{{filename}} ylittää {{limit}} liiterajan.",
       "unreadable": "Tiedostoa {{filename}} ei voitu lukea.",
       "pastedImage": "liitetty kuva",
@@ -722,6 +723,7 @@
       "finalTermEnds": "Viimeinen jakso päättyy",
       "afterFinalTerm": "Viimeisen jakson jälkeen",
       "remaining": "Jäljellä",
+      "lessThanOneDay": "Alle 1 päivä",
       "ends": "Päättyy",
       "expires": "Vanhenee",
       "noActivePlan": "Ei aktiivista suunnitelmaa",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "Standard-kuukausihintasi",
       "perMonth": "/kk",
       "earlybirdAccessUntil": "Earlybird-käyttöoikeus {{date}} asti",
-      "earlybirdEnding": "Earlybird päättyy: {{days}} päivää jäljellä",
+      "earlybirdEnding": "Earlybird päättyy: {{remaining}}",
       "paymentPastDue": "Maksu on erääntynyt. Päivitä maksutapasi.",
       "subscriptionCancels": "Tilaus peruuntuu {{date}}",
-      "trialDaysRemaining": "Kokeilu: {{days}} päivää jäljellä",
-      "trialEndingSoon": "Kokeilu päättyy pian: {{days}}"
+      "trialDaysRemaining": "Kokeilu: {{remaining}} jäljellä",
+      "trialEndingSoon": "Kokeilu päättyy pian: {{remaining}}"
     },
     "changelog": {
       "title": "Mitä uutta",
@@ -996,7 +998,7 @@
         "stalledTitle": "Jotain jumittui",
         "stalledBody": "Emme pystyneet viimeistelemään {{name}}:n asennusta. Yritä uudelleen tai lähetä sähköpostia hi@kilo.ai, jos tämä jatkuu.",
         "timeoutTitle": "Kestää odotettua kauemmin",
-        "timeoutBody": "{{name}}:n asennus kestää tavallista kauemmin (yli {{minutes}} minuuttia).",
+        "timeoutBody": "{{name}}:n asennus kestää tavallista kauemmin (yli {{displayMinutes}} minuuttia).",
         "continueInBackground": "Jatka taustalla",
         "settingUp": "Asennetaan {{name}}",
         "finishingSetup": "Viimeistellään asennusta",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Yhdistämisportti",
       "repositories": "Repositoriot",
       "allRepositories": "Kaikki repositoriot",
-      "nSelected": "{{count}} valittu",
+      "nSelected": "{{displayCount}} valittu",
       "reviewMemory": "Arviointimuisti",
       "proposedReviewMdGuidance": "Ehdotettu REVIEW.md-ohjeistus"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Analysoitu",
       "exploitabilityReasoning": "Hyödynnettävyyden perustelu",
       "suggestedFix": "Ehdotettu korjaus",
-      "whereFound": "Mistä tämä löytyi ({{count}})",
+      "whereFound": "Mistä tämä löytyi ({{displayCount}})",
       "fullReport": "Täydellinen luotu raportti",
       "unknown": "Tuntematon",
       "yes": "Kyllä",
       "no": "Ei"
     },
     "dashboard": {
-      "findingsCount": "{{count}} havaintoa",
+      "findingsCount": "{{displayCount}} havaintoa",
       "notMeasured": "Ei mitattu",
       "actFirst": "Toimi ensin",
       "slaPosture": "SLA-valmius",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Arkiston toimintasuunnitelma",
       "noOpenFindings": "Ei avoimia havaintoja, jotka vaatisivat huomiota",
       "deadlineToday": "Määräaika saavutettu tänään",
-      "daysOverdue": "{{count}} päivää myöhässä",
+      "daysOverdue": "{{displayCount}} päivää myöhässä",
       "withinDeadline": "Määräajassa",
       "criticalOverdue": "Kriittiset myöhässä",
       "highOverdue": "Korkeat myöhässä",
@@ -1434,6 +1436,27 @@
       "syncNow": "Synkronoi nyt",
       "syncQueued": "Synkronointi jonossa",
       "syncStatusUnavailable": "Synkronoinnin tila ei käytettävissä"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Avoimet havainnot",
+      "openFindingsDetail": "{{critical}} kriittistä, {{high}} korkeaa",
+      "confirmedExploitable": "Vahvistettu hyödynnettäväksi",
+      "confirmedExploitableDetail": "Projektin riski vahvistettu analyysissä",
+      "needsReview": "Vaatii sinun tarkistuksesi",
+      "needsReviewDetail": "Vaaditaan ihmisen päätös",
+      "analysisIncomplete": "Analyysi ei valmis",
+      "analysisIncompleteDetail": "Projektin riski edelleen tuntematon",
+      "slaCompliance": "SLA-vaatimustenmukaisuus",
+      "notMeasured": "Ei mitattu",
+      "withinDeadlineDetail": "{{within}}/{{total}} määräajassa",
+      "noDeadlineData": "Millään havainnolla ei ole vielä SLA-määräaikaa",
+      "deadlinePassed": "Määräaika mennyt",
+      "deadlinePassedDetail": "{{critical}} kriittistä, {{high}} korkeaa",
+      "dueThisWeek": "Erääntyy tällä viikolla",
+      "dueThisWeekDetail": "{{exploitable}} vahvistettu hyödynnettäväksi",
+      "noDeadline": "Ei määräaikaa",
+      "reviewSlaAssignment": "Tarkista SLA-määritys",
+      "allOpenFindingsTracked": "Kaikki avoimet havainnot seurannassa"
     },
     "dismiss": {
       "title": "Hylkää havainto",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}}-analyysi",
       "automation": "Automatisointi",
       "automationAllOff": "Kaikki pois",
-      "automationCount": "{{count}}/3 käytössä",
+      "automationCount": "{{displayCount}}/3 käytössä",
       "notifications": "Ilmoitukset",
-      "notificationsCount": "{{count}}/2 käytössä",
+      "notificationsCount": "{{displayCount}}/2 käytössä",
       "slaPolicy": "SLA-käytäntö",
       "disabledNoManage": "Security Agent on poissa käytöstä. Vain organisaation omistajat ja laskutuksen ylläpitäjät voivat ottaa sen käyttöön.",
       "disabledNoRepo": "Valitse vähintään yksi arkisto ennen Security Agentin käyttöönottoa.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Avaa pull request{{number}}",
       "openDraftPullRequest": "Avaa luonnos-pull request{{number}}",
       "progress": "Edistyminen",
-      "attemptHistory": "Yrityshistoria ({{count}})",
+      "attemptHistory": "Yrityshistoria ({{displayCount}})",
       "attemptNumber": "Yritys #{{number}}",
       "startedBy": "Aloittanut",
       "model": "Malli",
@@ -1855,9 +1878,9 @@
       "toolTask": "task",
       "readTodos": "Lue tehtävät",
       "updateTodos": "Päivitä tehtävät",
-      "linesBadge": "{{count}} riviä",
-      "filesBadge": "{{count}} tiedostoa",
-      "matchesBadge": "{{count}} osumaa"
+      "linesBadge": "{{displayCount}} riviä",
+      "filesBadge": "{{displayCount}} tiedostoa",
+      "matchesBadge": "{{displayCount}} osumaa"
     },
     "readToolMarkdown": {
       "linesTruncated": "rivit {{start}}–{{end}} (katkaistu)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "Tästä vastauksesta ei voi ilmoittaa.",
       "reportAiResponseSubmitted": "Ilmoitus lähetetty. Kuitti {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Tiedot eivät käytettävissä",
       "textDisplay": "Tekstin näyttö",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Valmistelu valmis",
       "preparationFailed": "Valmistelu epäonnistui",
       "setupCommand": "Asennuskomento {{index}}",
-      "setupCommandOf": "Asennuskomento {{index}} / {{count}}"
+      "setupCommandOf": "Asennuskomento {{index}} / {{displayCount}}"
     },
     "permissionCard": {
       "title": "Käyttöoikeus vaaditaan",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Lähetys epäonnistui. Yritä uudelleen.",
       "questionAnnouncement": "Agentti tarvitsee sinun vastaustasi. Komentaja on keskeytetty, kunnes vastaat.",
       "permissionAnnouncement": "Agentti tarvitsee luvan jatkaakseen. Komentaja on keskeytetty, kunnes päätät.",
-      "positionHint": "(1/{{count}})",
+      "positionHint": "(1/{{displayCount}})",
       "movedPastPrompt": "Agentti on siirtynyt tämän kehotuksen ohi. Tämä kortti sulkeutuu, kun istunto jatkuu.",
       "waitingForAnswer": "Agentti odottaa vastaustasi. Kun kysymys on avoinna, viestisi agentille on keskeytetty.",
       "waitingForPermission": "Agentti odottaa lupaa. Kun pyyntö on avoinna, viestisi agentille on keskeytetty."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Kameran käyttö estetty",
       "cameraAccessMessage": "Salli kameran käyttö Asetuksissa ottaaksesi valokuvan.",
       "couldNotOpenPhotoPicker": "Kuvavalitsinta ei voitu avata. Käynnistä Kilo uudelleen ja yritä uudelleen.",
-      "maxFilesAllowed": "Enintään {{count}} tiedostoa sallittu",
+      "maxFilesAllowed": "Enintään {{displayCount}} tiedostoa sallittu",
       "onlyAddingFiles": "Lisätään vain {{accepted}}/{{total}} tiedostoa (enintään {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "hinta {{cost}}",
       "costSuffix": ", hinta {{cost}}",
       "tokensWindowUnavailable": "Konteksti {{used}} tokenia, ikkuna ei saatavilla",
-      "tokensUsage": "Konteksti {{used}}/{{window}} tokenia, {{percentage}}% käytetty",
+      "tokensUsage": "Konteksti {{used}}/{{window}} tokenia, {{percentage}} käytetty",
       "title": "Kontekstin käyttö",
       "used": "Käytetty",
       "remaining": "Jäljellä",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "Käyttö heijastaa viimeisintä valmistunutta avustajan vastausta.",
       "tokenUsage": "Tokenien käyttö",
       "cacheRate": "Välimuistin osuus",
-      "modelsCount": "Mallit ({{count}})",
+      "modelsCount": "Mallit ({{displayCount}})",
       "tokenTotalsNote": "Tokenien kokonaismäärät koskevat vain tätä istuntoa eivätkä sisällä alagentin/lapsi-istunnon tokeneita.",
       "subagents": "Alagentit",
       "subagentsDescription": "Lapsi-istuntojen jäännöskustannus",
@@ -2373,7 +2400,7 @@
     "connectedCli": "Yhdistetyssä CLI:ssä",
     "newSessionOn": "Uusi istunto laitteessa {{name}}",
     "noMatchingSessions": "Ei vastaavia istuntoja.",
-    "onlyFirstFilesAttached": "Vain ensimmäiset {{count}} tiedostoa liitetään.",
+    "onlyFirstFilesAttached": "Vain ensimmäiset {{displayCount}} tiedostoa liitetään.",
     "staleMessage": "Tämä jako ei ole enää käytettävissä.",
     "retryableMessage": "Istuntojasi ei voitu ladata.",
     "emptyMessage": "Ei istuntoja vielä — aloita uusi lähettääksesi tämän.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Tämän Apple-tilin Kilo Pass kuuluu eri Kilo-tilille. Kirjaudu sisään sille Kilo-tilille hallinnoidaksesi sitä.",
     "alreadySubscribed": "Sinulla on jo Kilo Pass -tilaus.",
     "purchaseUnavailable": "Kilo Pass -osto ei ole käytettävissä juuri nyt.",
-    "tierCredits": "${{amount}} krediittejä",
+    "tierCredits": "{{amount}} krediittejä",
     "perMonth": "{{price}}/kk",
     "verifyPurchaseFailed": "Ostostasi ei voitu vahvistaa. Tarkista yhteytesi ja yritä uudelleen.",
     "productsCouldNotLoad": "Kilo Pass -tuotteita ei voitu ladata App Storesta.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "App Store -tilauksen hallinnan avaaminen epäonnistui.",
     "kiloPassSetup": "Kilo Pass -asetukset",
     "subscriptionHeaderDescription": "Kuukausitilaus, joka lisää krediittejä Kilo-saldollesi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa — Cloud Agentit, etäistunnot ja KiloClaw-chatit.",
-    "tierDescription": "${{price}} maksettuja krediittejä lisätään kuukausittain Kilo-sovelluksen käyttöä varten.",
+    "tierDescription": "{{price}} maksettuja krediittejä lisätään kuukausittain Kilo-sovelluksen käyttöä varten.",
     "subscribe": "Tilaa",
     "subscribeDescription": "Kuukausikrediitit bonusedistymisen kanssa",
     "manage": "Hallinnoi",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass odottaa",
     "statusCanceling": "Kilo Pass peruuntumassa",
     "statusPastDue": "Kilo Pass erääntynyt",
-    "monthlyCredits": "${{credits}} kuukausikrediittejä",
+    "monthlyCredits": "{{credits}} kuukausikrediittejä",
     "ends": "Päättyy {{date}}",
     "periodEnd": "jakson loppu",
     "managedOnGooglePlay": "Hallinnoidaan Google Playssa",

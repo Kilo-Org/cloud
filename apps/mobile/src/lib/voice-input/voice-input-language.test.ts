@@ -172,4 +172,14 @@ describe('resolveVoiceInputStartLanguageTag', () => {
 
     expect(await resolveVoiceInputStartLanguageTag('fr')).toBe('fr-FR');
   });
+
+  it('uses the matching device region for the selected app language', async () => {
+    localizationMock.getLocales.mockReturnValue([{ languageTag: 'en-GB' }]);
+    getSupportedLocalesMock.mockResolvedValue({
+      locales: ['en-US', 'en-GB'],
+      installedLocales: [],
+    });
+
+    expect(await resolveVoiceInputStartLanguageTag('en')).toBe('en-GB');
+  });
 });

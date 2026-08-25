@@ -12,10 +12,10 @@ vi.mock('@/lib/hooks/use-language-preference', () => ({
 }));
 
 describe('KiloClaw billing trial display', () => {
-  it('formats active sub-day trials without saying zero days left', () => {
-    expect(formatRemainingDays(0)).toBe('today');
-    expect(formatRemainingDays(1)).toBe('tomorrow');
-    expect(formatRemainingDays(2)).toBe('in 2 days');
+  it('formats remaining time as a localized duration', () => {
+    expect(formatRemainingDays(0)).toBe('Less than 1 day');
+    expect(formatRemainingDays(1)).toBe('1 day');
+    expect(formatRemainingDays(2)).toBe('2 days');
   });
 
   it('treats active zero-day trials as ending soon rather than expired today', () => {

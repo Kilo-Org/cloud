@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/icons';
 
 import { i18n } from '@/i18n';
-import { formatList } from '@/lib/format';
+import { formatList, formatNumber } from '@/lib/format';
 import { type PLATFORM_CAPABILITIES, type ReviewConfigData } from '@/lib/code-reviewer-config';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { capitalize } from '@/lib/utils';
@@ -99,6 +99,7 @@ export function buildOverviewRows({
           ? i18n.t('codeReviewer.overview.allRepositories')
           : i18n.t('codeReviewer.overview.nSelected', {
               count: data.selectedRepositoryIds.length,
+              displayCount: formatNumber(data.selectedRepositoryIds.length, i18n.language),
             }),
     },
     // Review memory is GitHub-only and only offered when the caller wires the

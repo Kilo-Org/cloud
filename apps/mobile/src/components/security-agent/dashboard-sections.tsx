@@ -36,7 +36,10 @@ function repoTrailingLabel(
   slaEnabled: boolean
 ): string {
   if (!slaEnabled) {
-    return i18n.t('securityAgent.dashboard.findingsCount', { count: repo.needsAction });
+    return i18n.t('securityAgent.dashboard.findingsCount', {
+      count: repo.needsAction,
+      displayCount: formatNumber(repo.needsAction, i18n.language),
+    });
   }
   return repo.slaComplianceMeasured
     ? formatPercent(repo.slaCompliancePercent, i18n.language)
@@ -95,6 +98,7 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
   }
 
   const isOverdue = slaEnabled && finding.daysOverdue !== null;
+  const daysOverdue = finding.daysOverdue ?? 0;
 
   return (
     <SectionCard title={t('securityAgent.dashboard.actFirst')}>
@@ -111,9 +115,12 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
           {finding.repoFullName}
           {isOverdue &&
             ` · ${
-              finding.daysOverdue === 0
+              daysOverdue === 0
                 ? t('securityAgent.dashboard.deadlineToday')
-                : t('securityAgent.dashboard.daysOverdue', { count: finding.daysOverdue })
+                : t('securityAgent.dashboard.daysOverdue', {
+                    count: daysOverdue,
+                    displayCount: formatNumber(daysOverdue, i18n.language),
+                  })
             }`}
         </Text>
       </Pressable>
@@ -300,9 +307,9 @@ function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
             </Text>
             <Text variant="muted" className="mt-0.5 text-xs">
               {t('securityAgent.dashboard.repoSummary', {
-                open: repo.open,
-                critical: repo.critical,
-                high: repo.high,
+                open: formatNumber(repo.open, i18n.language),
+                critical: formatNumber(repo.critical, i18n.language),
+                high: formatNumber(repo.high, i18n.language),
               })}
             </Text>
           </View>

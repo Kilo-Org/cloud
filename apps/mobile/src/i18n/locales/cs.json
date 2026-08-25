@@ -206,11 +206,11 @@
       "loadingLines": "Načítám {{loaded}} z {{total}} řádků…",
       "expandContext": "Rozbalit kontext",
       "expandMoreContext": "Rozbalit více kontextu",
-      "expandLines": "Rozbalit {{count}} řádků ({{start}}–{{end}})",
-      "expandMoreLines": "Rozbalit dalších {{count}} řádků ({{start}}–{{end}})",
-      "expandLinesOfContext": "Rozbalit {{count}} řádků kontextu",
+      "expandLines": "Rozbalit {{displayCount}} řádků ({{start}}–{{end}})",
+      "expandMoreLines": "Rozbalit dalších {{displayCount}} řádků ({{start}}–{{end}})",
+      "expandLinesOfContext": "Rozbalit {{displayCount}} řádků kontextu",
       "expandAll": "Rozbalit vše",
-      "expandAllLines": "Rozbalit všech {{count}} řádků",
+      "expandAllLines": "Rozbalit všech {{displayCount}} řádků",
       "loadingMoreFiles": "Načítám další soubory…",
       "retryLoadingNextPage": "Zkusit znovu načíst další stránku",
       "failedToLoadMoreFiles": "Nepodařilo se načíst další soubory — klepnutím zkusíte znovu",
@@ -227,7 +227,11 @@
       "fileLoadedOfTotalCount_other": "Načteno {{displayCount}} souborů z {{total}}",
       "filesStillLoading": "Soubory se stále načítají. Potažením obnovíte.",
       "goToOverview": "Přejít na přehled",
-      "goToOverviewTab": "Přejít na kartu Přehled"
+      "goToOverviewTab": "Přejít na kartu Přehled",
+      "fileLoadedCount_few": "Načteny {{displayCount}} soubory",
+      "fileLoadedCount_many": "Načteno {{displayCount}} souborů",
+      "fileLoadedOfTotalCount_few": "Načteny {{displayCount}} soubory z {{total}}",
+      "fileLoadedOfTotalCount_many": "Načteno {{displayCount}} souborů z {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ na konci souboru chybí nový řádek",
@@ -301,7 +305,7 @@
       "closeReactions": "Zavřít reakce",
       "reactionsTitle": "Reakce",
       "addReaction": "Přidat reakci",
-      "reactionPill": "{{emoji}} reakce, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} reakce, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakce",
       "reaction": "reakce",
       "reaction_other": "reakce",
@@ -353,10 +357,14 @@
       "noDiscussionDescription": "Žádná vlákna recenzí ani konverzační komentáře na tomto pull requestu.",
       "reviewFiles": "Zkontrolovat soubory",
       "quotedDiffSnippet": "Citovaný úryvek diffu",
-      "moreLinesAbove": "… {{count}} dalších řádků výše",
+      "moreLinesAbove": "… {{displayCount}} dalších řádků výše",
       "termsAcceptRequired": "Pro přidávání příspěvků musíte přijmout Podmínky služby.",
       "termsOutdatedCopy": "Podmínky služby se změnily. Znovu otevřete tuto obrazovku a přijměte nejnovější verzi.",
-      "termsCheckRetryCopy": "Podmínky služby se nepodařilo zkontrolovat. Zkontrolujte připojení a zkuste to znovu."
+      "termsCheckRetryCopy": "Podmínky služby se nepodařilo zkontrolovat. Zkontrolujte připojení a zkuste to znovu.",
+      "comment_few": "{{displayCount}} komentáře",
+      "comment_many": "{{displayCount}} komentářů",
+      "reaction_few": "reakce",
+      "reaction_many": "reakcí"
     },
     "couldNotOpenGitHubAppSettings": "Nastavení GitHub App se nepodařilo otevřít",
     "installKiloGitHubApp": "Nainstalovat Kilo GitHub App",
@@ -395,11 +403,11 @@
       "retryChecks": "Zkusit kontroly znovu",
       "viewOnGitHub": "Zobrazit PR na GitHubu",
       "noChecksReported": "Žádné hlášené kontroly",
-      "passed": "{{count}} prošlo",
-      "failed": "{{count}} selhalo",
-      "pending": "{{count}} čeká",
-      "skipped": "{{count}} přeskočeno",
-      "checksCount": "{{count}} kontrol",
+      "passed": "{{displayCount}} prošlo",
+      "failed": "{{displayCount}} selhalo",
+      "pending": "{{displayCount}} čeká",
+      "skipped": "{{displayCount}} přeskočeno",
+      "checksCount": "{{displayCount}} kontrol",
       "checkDetails": "podrobnosti kontroly",
       "pullRequest": "pull request"
     },
@@ -459,9 +467,11 @@
       "pendingComment_one": "čekající komentář",
       "pendingComment": "čekající komentáře",
       "pendingComment_other": "čekající komentáře",
-      "submitCountOfTotal": "Odeslat {{freshCount}} z {{totalCount}} komentářů",
+      "submitCountOfTotal": "Odeslat {{displayFreshCount}} z {{displayTotalCount}} komentářů",
       "submitReview": "Odeslat recenzi",
-      "partialPostedMessage": "Odesláno {{freshCount}} komentářů. {{staleCount}} komentářů odkazuje na starší commit a zůstalo ve vaší frontě."
+      "partialPostedMessage": "Odesláno {{displayFreshCount}} komentářů. {{displayStaleCount}} komentářů odkazuje na starší commit a zůstalo ve vaší frontě.",
+      "pendingComment_few": "čekající komentáře",
+      "pendingComment_many": "čekajících komentářů"
     },
     "reconnectNotice": {
       "title": "Připojení ke GitHubu vypršelo",
@@ -488,7 +498,11 @@
       "commit_other": "commity",
       "file_one": "soubor",
       "file": "soubory",
-      "file_other": "soubory"
+      "file_other": "soubory",
+      "commit_few": "commity",
+      "commit_many": "commitů",
+      "file_few": "soubory",
+      "file_many": "souborů"
     },
     "pendingComment": {
       "editOutdatedA11y": "Upravit zastaralý čekající komentář na {{location}}",
@@ -580,7 +594,8 @@
     "agents": "Agenti",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, karta, {{position}} z {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +636,7 @@
       "recent": "Nedávné",
       "common": "Běžné",
       "reactWith": "Reagovat pomocí {{reaction}}",
-      "accessibility": "{{emoji}} reakce, {{count}}"
+      "accessibility": "{{emoji}} reakce, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Odpovídáte na",
@@ -650,7 +665,7 @@
       "imageUnavailable": "Obrázek není dostupný",
       "openFailed": "Přílohu se nepodařilo otevřít. Zkontrolujte připojení a zkuste to znovu.",
       "attachFailed": "Připojení souboru se nezdařilo",
-      "limit": "Můžete připojit až {{count}} souborů.",
+      "limit": "Můžete připojit až {{displayCount}} souborů.",
       "sizeRejection": "{{filename}} překračuje limit příloh {{limit}}.",
       "unreadable": "{{filename}} se nepodařilo přečíst.",
       "pastedImage": "vložený obrázek",
@@ -700,7 +715,9 @@
       "someone": "Někdo",
       "typing_one": "{{name}} píše…",
       "typing": "{{names}} píší…",
-      "typing_other": "{{names}} píší…"
+      "typing_other": "{{names}} píší…",
+      "typing_few": "{{names}} píší…",
+      "typing_many": "{{names}} píší…"
     },
     "botStatus": {
       "online": "Online",
@@ -740,11 +757,12 @@
       "yourStandardMonthlyPrice": "vaše standardní měsíční cena",
       "perMonth": "/měsíc",
       "earlybirdAccessUntil": "Přístup Earlybird do {{date}}",
-      "earlybirdEnding": "Earlybird končí: zbývá {{days}} dní",
+      "earlybirdEnding": "Earlybird končí: {{remaining}}",
       "paymentPastDue": "Platba po splatnosti. Aktualizujte prosím svůj způsob platby.",
       "subscriptionCancels": "Předplatné se ruší {{date}}",
-      "trialDaysRemaining": "Zkušební verze: zbývá {{days}} dní",
-      "trialEndingSoon": "Zkušební verze brzy skončí: {{days}}"
+      "trialDaysRemaining": "Zkušební verze: zbývá {{remaining}}",
+      "trialEndingSoon": "Zkušební verze brzy skončí: {{remaining}}",
+      "lessThanOneDay": "Méně než 1 den"
     },
     "changelog": {
       "title": "Co je nového",
@@ -996,7 +1014,7 @@
         "stalledTitle": "Něco se zaseklo",
         "stalledBody": "Nepodařilo se nám dokončit nastavení {{name}}. Zkuste to znovu, nebo napište na hi@kilo.ai, pokud se to opakuje.",
         "timeoutTitle": "Trvá to déle, než se očekávalo",
-        "timeoutBody": "Nastavení {{name}} trvá déle než obvykle (přes {{minutes}} minut).",
+        "timeoutBody": "Nastavení {{name}} trvá déle než obvykle (přes {{displayMinutes}} minut).",
         "continueInBackground": "Pokračovat na pozadí",
         "settingUp": "Nastavuje se {{name}}",
         "finishingSetup": "Dokončování nastavení",
@@ -1071,7 +1089,9 @@
       "openUnread_other": "Otevřít {{name}}, {{displayCount}} nepřečtených zpráv",
       "open": "Otevřít {{name}}",
       "openSettings": "Otevřít nastavení pro {{name}}",
-      "fixOnKiloAi": "Opravit na kilo.ai: {{label}}"
+      "fixOnKiloAi": "Opravit na kilo.ai: {{label}}",
+      "openUnread_few": "Otevřít {{name}}, {{displayCount}} nepřečtené zprávy",
+      "openUnread_many": "Otevřít {{name}}, {{displayCount}} nepřečtených zpráv"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1287,7 +1307,7 @@
       "mergeGate": "Sloučení brána",
       "repositories": "Úložiště",
       "allRepositories": "Všechna úložiště",
-      "nSelected": "{{count}} vybráno",
+      "nSelected": "{{displayCount}} vybráno",
       "reviewMemory": "Paměť kontroly",
       "proposedReviewMdGuidance": "Navrhované pokyny REVIEW.md"
     },
@@ -1367,7 +1387,9 @@
       "severityAll": "Všechny závažnosti",
       "confidenceHighOnly": "Pouze vysoká spolehlivost",
       "confidenceMediumOrHigher": "Střední nebo vyšší",
-      "confidenceAny": "Libovolná spolehlivost"
+      "confidenceAny": "Libovolná spolehlivost",
+      "queued_few": "{{displayCount}} stávající zjištění čekají na analýzu.",
+      "queued_many": "{{displayCount}} stávajících zjištění čeká na analýzu."
     },
     "analysis": {
       "couldNotLoad": "Analýzu se nepodařilo načíst",
@@ -1391,14 +1413,14 @@
       "analyzed": "Analyzováno",
       "exploitabilityReasoning": "Odůvodnění zneužitelnosti",
       "suggestedFix": "Doporučená oprava",
-      "whereFound": "Kde to bylo nalezeno ({{count}})",
+      "whereFound": "Kde to bylo nalezeno ({{displayCount}})",
       "fullReport": "Plný vygenerovaný přehled",
       "unknown": "Neznámé",
       "yes": "Ano",
       "no": "Ne"
     },
     "dashboard": {
-      "findingsCount": "{{count}} zjištění",
+      "findingsCount": "{{displayCount}} zjištění",
       "notMeasured": "Nezměřeno",
       "actFirst": "Nejdřív konejte",
       "slaPosture": "Postoj k SLA",
@@ -1407,7 +1429,7 @@
       "repositoryActionPlan": "Plán akcí repozitáře",
       "noOpenFindings": "Žádná otevřená zjištění nevyžadují pozornost",
       "deadlineToday": "Termín dosažen dnes",
-      "daysOverdue": "{{count}} dní po termínu",
+      "daysOverdue": "{{displayCount}} dní po termínu",
       "withinDeadline": "V termínu",
       "criticalOverdue": "Kritické po termínu",
       "highOverdue": "Vysoké po termínu",
@@ -1434,6 +1456,27 @@
       "syncNow": "Synchronizovat nyní",
       "syncQueued": "Synchronizace zařazena",
       "syncStatusUnavailable": "Stav synchronizace není k dispozici"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Otevřená zjištění",
+      "openFindingsDetail": "{{critical}} kritických, {{high}} vysokých",
+      "confirmedExploitable": "Potvrzeně zneužitelné",
+      "confirmedExploitableDetail": "Riziko projektu potvrzeno analýzou",
+      "needsReview": "Vyžaduje vaše přezkoumání",
+      "needsReviewDetail": "Je vyžadováno lidské rozhodnutí",
+      "analysisIncomplete": "Analýza není dokončena",
+      "analysisIncompleteDetail": "Riziko projektu je stále neznámé",
+      "slaCompliance": "Dodržování SLA",
+      "notMeasured": "Nezměřeno",
+      "withinDeadlineDetail": "{{within}} z {{total}} v termínu",
+      "noDeadlineData": "Zatím žádné zjištění nemá termín SLA",
+      "deadlinePassed": "Termín uplynul",
+      "deadlinePassedDetail": "{{critical}} kritických, {{high}} vysokých",
+      "dueThisWeek": "Splatné tento týden",
+      "dueThisWeekDetail": "{{exploitable}} potvrzeně zneužitelných",
+      "noDeadline": "Žádný termín",
+      "reviewSlaAssignment": "Zkontrolovat přiřazení SLA",
+      "allOpenFindingsTracked": "Všechna otevřená zjištění jsou sledována"
     },
     "dismiss": {
       "title": "Zamítnout zjištění",
@@ -1500,13 +1543,15 @@
       "analysisModeSubtitle": "Analýza {{mode}}",
       "automation": "Automatizace",
       "automationAllOff": "Vše vypnuto",
-      "automationCount": "{{count}} ze 3 povoleno",
+      "automationCount": "{{displayCount}} ze 3 povoleno",
       "notifications": "Oznámení",
-      "notificationsCount": "{{count}} ze 2 povoleno",
+      "notificationsCount": "{{displayCount}} ze 2 povoleno",
       "slaPolicy": "Zásady SLA",
       "disabledNoManage": "Security Agent je zakázán. Zapnout jej mohou pouze vlastníci organizace a správci fakturace.",
       "disabledNoRepo": "Před povolením Security Agent vyberte alespoň jeden repozitář.",
-      "disabledPrompt": "Zapněte Security Agent pro synchronizaci výstrah Dependabot, výběr repozitářů a konfiguraci automatizace."
+      "disabledPrompt": "Zapněte Security Agent pro synchronizaci výstrah Dependabot, výběr repozitářů a konfiguraci automatizace.",
+      "repositoriesCount_few": "{{displayCount}} vybrané repozitáře",
+      "repositoriesCount_many": "{{displayCount}} vybraných repozitářů"
     },
     "remediation": {
       "cancellationRequested": "Zrušení požadováno",
@@ -1524,7 +1569,7 @@
       "openPullRequest": "Otevřít pull request{{number}}",
       "openDraftPullRequest": "Otevřít návrh pull request{{number}}",
       "progress": "Průběh",
-      "attemptHistory": "Historie pokusů ({{count}})",
+      "attemptHistory": "Historie pokusů ({{displayCount}})",
       "attemptNumber": "Pokus #{{number}}",
       "startedBy": "Zahájil",
       "model": "Model",
@@ -1734,7 +1779,11 @@
       "cent_other": "centů",
       "dollar_one": "dolar",
       "dollar": "dolarů",
-      "dollar_other": "dolarů"
+      "dollar_other": "dolarů",
+      "cent_few": "centy",
+      "cent_many": "centů",
+      "dollar_few": "dolary",
+      "dollar_many": "dolarů"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub se nepodařilo otevřít",
@@ -1830,7 +1879,9 @@
     "partRenderer": {
       "updatedFileCount_one": "Aktualizován {{displayCount}} soubor",
       "updatedFileCount": "Aktualizováno {{displayCount}} souborů",
-      "updatedFileCount_other": "Aktualizováno {{displayCount}} souborů"
+      "updatedFileCount_other": "Aktualizováno {{displayCount}} souborů",
+      "updatedFileCount_few": "Aktualizovány {{displayCount}} soubory",
+      "updatedFileCount_many": "Aktualizováno {{displayCount}} souborů"
     },
     "toolPatch": {
       "operationAdded": "Přidáno",
@@ -1855,9 +1906,9 @@
       "toolTask": "úloha",
       "readTodos": "Přečíst úkoly",
       "updateTodos": "Aktualizovat úkoly",
-      "linesBadge": "{{count}} řádků",
-      "filesBadge": "{{count}} souborů",
-      "matchesBadge": "{{count}} shod"
+      "linesBadge": "{{displayCount}} řádků",
+      "filesBadge": "{{displayCount}} souborů",
+      "matchesBadge": "{{displayCount}} shod"
     },
     "readToolMarkdown": {
       "linesTruncated": "řádky {{start}}–{{end}} (zkráceno)",
@@ -1941,6 +1992,10 @@
       "reportAiResponseFailedTerminal": "Tuto odpověď nelze nahlásit.",
       "reportAiResponseSubmitted": "Hlášení odesláno. Účtenka {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Podrobnosti nejsou k dispozici",
       "textDisplay": "Zobrazení textu",
@@ -1999,7 +2054,7 @@
       "preparationComplete": "Příprava dokončena",
       "preparationFailed": "Příprava selhala",
       "setupCommand": "Příkaz nastavení {{index}}",
-      "setupCommandOf": "Příkaz nastavení {{index}} z {{count}}"
+      "setupCommandOf": "Příkaz nastavení {{index}} z {{displayCount}}"
     },
     "permissionCard": {
       "title": "Je vyžadováno oprávnění",
@@ -2036,7 +2091,7 @@
       "submissionFailed": "Odeslání se nezdařilo. Zkuste to prosím znovu.",
       "questionAnnouncement": "Agent potřebuje váš vstup. Skladatel je pozastaven, dokud neodpovíte.",
       "permissionAnnouncement": "Agent potřebuje oprávnění, aby mohl pokračovat. Skladatel je pozastaven, dokud se nerozhodnete.",
-      "positionHint": "(1 z {{count}})",
+      "positionHint": "(1 z {{displayCount}})",
       "movedPastPrompt": "Agent se posunul za tuto výzvu. Tato karta se zavře, až bude relace pokračovat.",
       "waitingForAnswer": "Agent čeká na vaši odpověď. Dokud je tato otázka otevřená, vaše zpráva agentovi je pozastavena.",
       "waitingForPermission": "Agent čeká na oprávnění. Dokud je tento požadavek otevřený, vaše zpráva agentovi je pozastavena."
@@ -2076,7 +2131,9 @@
       "omitted_other": "{{displayCount}} dřívějších položek z této relace nebylo možné zobrazit.",
       "couldNotLoad": "Dřívější zprávy se nepodařilo načíst.",
       "unavailable": "Dřívější zprávy nejsou k dispozici.",
-      "tooLarge": "Dřívější zprávy jsou příliš velké na načtení."
+      "tooLarge": "Dřívější zprávy jsou příliš velké na načtení.",
+      "omitted_few": "{{displayCount}} dřívější položky z této relace nebylo možné zobrazit.",
+      "omitted_many": "{{displayCount}} dřívějších položek z této relace nebylo možné zobrazit."
     },
     "markdownTable": {
       "viewTable": "Zobrazit tabulku",
@@ -2088,7 +2145,11 @@
       "rowCount_one": "řádek",
       "rowCount": "řádky",
       "rowCount_other": "řádky",
-      "opensFullScreen": "otevře celou obrazovku"
+      "opensFullScreen": "otevře celou obrazovku",
+      "columnCount_few": "sloupce",
+      "columnCount_many": "sloupců",
+      "rowCount_few": "řádky",
+      "rowCount_many": "řádků"
     },
     "sessionFilter": {
       "title": "Filtrovat relace",
@@ -2157,7 +2218,7 @@
       "cameraAccessDisabled": "Přístup k fotoaparátu zakázán",
       "cameraAccessMessage": "Povolte v Nastavení přístup k fotoaparátu pro pořízení fotky.",
       "couldNotOpenPhotoPicker": "Výběr fotek se nepodařilo otevřít. Restartujte Kilo a zkuste to znovu.",
-      "maxFilesAllowed": "Maximum je {{count}} souborů",
+      "maxFilesAllowed": "Maximum je {{displayCount}} souborů",
       "onlyAddingFiles": "Přidávají se pouze {{accepted}} z {{total}} souborů (maximálně {{max}})"
     },
     "composer": {
@@ -2222,7 +2283,7 @@
       "costPrefix": "cena {{cost}}",
       "costSuffix": ", cena {{cost}}",
       "tokensWindowUnavailable": "Kontext {{used}} tokenů, okno není k dispozici",
-      "tokensUsage": "Kontext {{used}} z {{window}} tokenů, použito {{percentage}}%",
+      "tokensUsage": "Kontext {{used}} z {{window}} tokenů, použito {{percentage}}",
       "title": "Využití kontextu",
       "used": "Použito",
       "remaining": "Zbývá",
@@ -2231,7 +2292,7 @@
       "usageReflectsLatest": "Využití odráží poslední dokončenou odpověď asistenta.",
       "tokenUsage": "Využití tokenů",
       "cacheRate": "Míra mezipaměti",
-      "modelsCount": "Modely ({{count}})",
+      "modelsCount": "Modely ({{displayCount}})",
       "tokenTotalsNote": "Součty tokenů se týkají pouze této relace a nezahrnují tokeny subagentů/dětských relací.",
       "subagents": "Subagenti",
       "subagentsDescription": "Zbytková cena z dětských relací",
@@ -2243,7 +2304,9 @@
       "stepsCount_one": "{{steps}} krok",
       "stepsCount": "{{steps}} kroků",
       "stepsCount_other": "{{steps}} kroků",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "stepsCount_few": "{{steps}} kroky",
+      "stepsCount_many": "{{steps}} kroků"
     },
     "prBadge": {
       "open": "otevřený pull request",
@@ -2373,7 +2436,7 @@
     "connectedCli": "Na připojeném CLI",
     "newSessionOn": "Nová relace na {{name}}",
     "noMatchingSessions": "Žádné odpovídající relace.",
-    "onlyFirstFilesAttached": "Bude připojeno pouze prvních {{count}} souborů.",
+    "onlyFirstFilesAttached": "Bude připojeno pouze prvních {{displayCount}} souborů.",
     "staleMessage": "Toto sdílení již není k dispozici.",
     "retryableMessage": "Vaše relace se nepodařilo načíst.",
     "emptyMessage": "Zatím žádné relace — zahajte novou pro odeslání tohoto.",
@@ -2406,7 +2469,7 @@
     "otherAccountCopy": "Kilo Pass na tomto Apple účtu patří k jinému účtu Kilo. Přihlaste se k tomuto účtu Kilo, abyste jej spravovali.",
     "alreadySubscribed": "Již máte předplatné Kilo Pass.",
     "purchaseUnavailable": "Nákup Kilo Pass není právě k dispozici.",
-    "tierCredits": "${{amount}} v kreditech",
+    "tierCredits": "{{amount}} v kreditech",
     "perMonth": "{{price}}/měs",
     "verifyPurchaseFailed": "Váš nákup se nepodařilo ověřit. Zkontrolujte připojení a zkuste to znovu.",
     "productsCouldNotLoad": "Produkty Kilo Pass se nepodařilo načíst z App Store.",
@@ -2417,7 +2480,7 @@
     "manageFailed": "Otevření správy předplatného v App Store se nezdařilo.",
     "kiloPassSetup": "Nastavení Kilo Pass",
     "subscriptionHeaderDescription": "Měsíční předplatné, které přidává kredity do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo — Cloud Agents, vzdálené relace a chaty KiloClaw.",
-    "tierDescription": "${{price}} placených kreditů přidáváno měsíčně pro použití v aplikaci Kilo.",
+    "tierDescription": "{{price}} placených kreditů přidáváno měsíčně pro použití v aplikaci Kilo.",
     "subscribe": "Předplatit",
     "subscribeDescription": "Měsíční kredity s bonusovým postupem",
     "manage": "Spravovat",
@@ -2425,7 +2488,7 @@
     "statusPending": "Kilo Pass čeká",
     "statusCanceling": "Kilo Pass se ruší",
     "statusPastDue": "Kilo Pass po splatnosti",
-    "monthlyCredits": "${{credits}} měsíčních kreditů",
+    "monthlyCredits": "{{credits}} měsíčních kreditů",
     "ends": "Končí {{date}}",
     "periodEnd": "konec období",
     "managedOnGooglePlay": "Spravováno na Google Play",
@@ -2667,7 +2730,9 @@
       "processingNeedsReview": "Zpracování vyžaduje kontrolu",
       "retry": "Opakovat",
       "retryHint": "Znovu načte stav Kilo Pass.",
-      "setupHint": "Otevře nastavení Kilo Pass na webu."
+      "setupHint": "Otevře nastavení Kilo Pass na webu.",
+      "paidSeat_few": "{{displayCount}} placená místa",
+      "paidSeat_many": "{{displayCount}} placených sedadel"
     }
   },
   "authErrors": {

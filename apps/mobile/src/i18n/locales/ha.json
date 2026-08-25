@@ -206,11 +206,11 @@
       "loadingLines": "Ana ɗaukar {{loaded}} daga {{total}} layuka…",
       "expandContext": "Fadada mahallin",
       "expandMoreContext": "Fadada ƙarin mahallin",
-      "expandLines": "Fadada {{count}} layuka ({{start}}–{{end}})",
-      "expandMoreLines": "Fadada ƙarin {{count}} layuka ({{start}}–{{end}})",
-      "expandLinesOfContext": "Fadada {{count}} layukan mahallin",
+      "expandLines": "Fadada {{displayCount}} layuka ({{start}}–{{end}})",
+      "expandMoreLines": "Fadada ƙarin {{displayCount}} layuka ({{start}}–{{end}})",
+      "expandLinesOfContext": "Fadada {{displayCount}} layukan mahallin",
       "expandAll": "Fadada duka",
-      "expandAllLines": "Fadada duk {{count}} layuka",
+      "expandAllLines": "Fadada duk {{displayCount}} layuka",
       "loadingMoreFiles": "Ana ɗaukar ƙarin fayiloli…",
       "retryLoadingNextPage": "Sake gwadawa ɗaukar shafi na gaba",
       "failedToLoadMoreFiles": "An kasa ɗaukar ƙarin fayiloli — danna don sake gwadawa",
@@ -301,7 +301,7 @@
       "closeReactions": "Rufe halayen",
       "reactionsTitle": "Halaye",
       "addReaction": "Ƙara hali",
-      "reactionPill": "{{emoji}} hali, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} hali, {{displayCount}} {{countLabel}}",
       "reaction_one": "hali",
       "reaction": "halaye",
       "reaction_other": "halaye",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Babu zaren bita ko tsokacin tattaunawa a kan wannan buƙatar jan.",
       "reviewFiles": "Bita fayiloli",
       "quotedDiffSnippet": "Faɗin bambanci da aka ambato",
-      "moreLinesAbove": "… {{count}} ƙarin layuka a sama",
+      "moreLinesAbove": "… {{displayCount}} ƙarin layuka a sama",
       "termsAcceptRequired": "Dole ka karɓi Sharuɗɗan Amfani don rubutu.",
       "termsOutdatedCopy": "Sharuɗɗan Amfani sun canza. Bude wannan allo don karɓar sabuwar sigar.",
       "termsCheckRetryCopy": "Ba a iya duba Sharuɗɗan Amfani ba. Duba haɗinka kuma sake gwadawa."
@@ -395,11 +395,11 @@
       "retryChecks": "Sake gwadawa duba",
       "viewOnGitHub": "Duba PR a GitHub",
       "noChecksReported": "Babu duba da aka ruwaito",
-      "passed": "{{count}} sun wuce",
-      "failed": "{{count}} sun kasa",
-      "pending": "{{count}} suna jira",
-      "skipped": "{{count}} an tsallake",
-      "checksCount": "{{count}} duba",
+      "passed": "{{displayCount}} sun wuce",
+      "failed": "{{displayCount}} sun kasa",
+      "pending": "{{displayCount}} suna jira",
+      "skipped": "{{displayCount}} an tsallake",
+      "checksCount": "{{displayCount}} duba",
       "checkDetails": "bayanan duba",
       "pullRequest": "buƙatar jan"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "tsokacin da ke jira",
       "pendingComment": "tsokacin da ke jira",
       "pendingComment_other": "tsokacin da ke jira",
-      "submitCountOfTotal": "Ƙaddamar da {{freshCount}} daga {{totalCount}} tsokaci",
+      "submitCountOfTotal": "Ƙaddamar da {{displayFreshCount}} daga {{displayTotalCount}} tsokaci",
       "submitReview": "Ƙaddamar da bita",
-      "partialPostedMessage": "An buga {{freshCount}} tsokaci. {{staleCount}} tsokaci suna nuna tsohon commit kuma sun kasance a jerinka."
+      "partialPostedMessage": "An buga {{displayFreshCount}} tsokaci. {{displayStaleCount}} tsokaci suna nuna tsohon commit kuma sun kasance a jerinka."
     },
     "reconnectNotice": {
       "title": "Haɗin GitHub ya ƙare",
@@ -580,7 +580,8 @@
     "agents": "Wakilai",
     "profile": "Bayanan",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, shafi, {{position}} na {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Kwanan nan",
       "common": "Gama gari",
       "reactWith": "Yi hali da {{reaction}}",
-      "accessibility": "{{emoji}} hali, {{count}}"
+      "accessibility": "{{emoji}} hali, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Ana amsawa ga",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Hoton ba ya samuwa",
       "openFailed": "Ba a iya buɗe haɗin ba. Duba haɗinka kuma sake gwadawa.",
       "attachFailed": "An kasa haɗa fayil",
-      "limit": "Za ka iya haɗa har {{count}} fayiloli.",
+      "limit": "Za ka iya haɗa har {{displayCount}} fayiloli.",
       "sizeRejection": "{{filename}} ya wuce iyakar haɗa {{limit}}.",
       "unreadable": "Ba a iya karanta {{filename}} ba.",
       "pastedImage": "hoton da aka manna",
@@ -734,17 +735,18 @@
       "finalCommitTermEndsOn": "Wa'adin Commit na ƙarshe na ka zai ƙare a {{date}}. Ci gaba a matsayin Standard a {{price}}, ko kuma masauki ya ƙare.",
       "freeTrial": "Gwaji Kyauta",
       "hostingEnds": "Masauki yana ƙarewa",
+      "lessThanOneDay": "Kasa da kwana 1",
       "renews": "Yana sabuntawa",
       "standardMonthToMonth": "Standard duk wata",
       "standardStartsOn": "Standard zai fara a {{date}} a {{price}}.",
       "yourStandardMonthlyPrice": "farashin Standard na ka na wata-wata",
       "perMonth": "/wata",
       "earlybirdAccessUntil": "Shiga Earlybird har zuwa {{date}}",
-      "earlybirdEnding": "Earlybird yana ƙarewa: {{days}} kwanaki suka rage",
+      "earlybirdEnding": "Earlybird yana ƙarewa: {{remaining}}",
       "paymentPastDue": "Biyan kuɗi ya wuce lokaci. Da fatan sabunta hanyar biyan ka.",
       "subscriptionCancels": "Biyan kuɗi zai soke {{date}}",
-      "trialDaysRemaining": "Gwaji: {{days}} kwanaki suka rage",
-      "trialEndingSoon": "Gwaji zai ƙare ba da jimawa: {{days}}"
+      "trialDaysRemaining": "Gwaji: {{remaining}} suka rage",
+      "trialEndingSoon": "Gwaji zai ƙare ba da jimawa: {{remaining}}"
     },
     "changelog": {
       "title": "Me Sabo",
@@ -996,7 +998,7 @@
         "stalledTitle": "Wani abu ya tsaya",
         "stalledBody": "Ba mu iya gama saitin {{name}} ba. Sake gwadawa, ko aika imel zuwa hi@kilo.ai idan wannan ya ci gaba da faruwa.",
         "timeoutTitle": "Yana ɗaukar lokaci fiye da yadda ake tsammani",
-        "timeoutBody": "Saitin {{name}} yana ɗaukar lokaci fiye da yadda aka saba (sama da mintuna {{minutes}}).",
+        "timeoutBody": "Saitin {{name}} yana ɗaukar lokaci fiye da yadda aka saba (sama da mintuna {{displayMinutes}}).",
         "continueInBackground": "Ci gaba a baya",
         "settingUp": "Ana saita {{name}}",
         "finishingSetup": "Ana gama saitin",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Ƙofar haɗawa",
       "repositories": "Ma'ajiyun",
       "allRepositories": "Duk ma'ajiyun",
-      "nSelected": "{{count}} da aka zaɓa",
+      "nSelected": "{{displayCount}} da aka zaɓa",
       "reviewMemory": "Ƙwaƙwalwar bita",
       "proposedReviewMdGuidance": "Shawarar jagorar REVIEW.md"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "An yi nazari",
       "exploitabilityReasoning": "Dalili na yiwuwar amfani",
       "suggestedFix": "Gyara da aka ba da shawara",
-      "whereFound": "Inda aka samu wannan ({{count}})",
+      "whereFound": "Inda aka samu wannan ({{displayCount}})",
       "fullReport": "Cikakken rahoton da aka samar",
       "unknown": "Ba a sani ba",
       "yes": "Ee",
       "no": "A'a"
     },
     "dashboard": {
-      "findingsCount": "{{count}} sakamako",
+      "findingsCount": "{{displayCount}} sakamako",
       "notMeasured": "Ba a auna ba",
       "actFirst": "Yi aiki da farko",
       "slaPosture": "Matsayin SLA",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Shirin aiki na ma'ajiya",
       "noOpenFindings": "Babu sakamako da ke buƙatar kulawa",
       "deadlineToday": "Ƙarshen lokaci ya kai yau",
-      "daysOverdue": "{{count}} kwanaki a wuce lokaci",
+      "daysOverdue": "{{displayCount}} kwanaki a wuce lokaci",
       "withinDeadline": "Cikin ƙarshen lokaci",
       "criticalOverdue": "Matsananci a wuce lokaci",
       "highOverdue": "Babba a wuce lokaci",
@@ -1434,6 +1436,27 @@
       "syncNow": "Daidaita yanzu",
       "syncQueued": "An shigar da daidaitawa",
       "syncStatusUnavailable": "Ba a samun matsayin daidaitawa"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Sakamako masu buɗewa",
+      "openFindingsDetail": "{{critical}} masu tsanani, {{high}} babba",
+      "confirmedExploitable": "An tabbatar ana iya amfani da shi",
+      "confirmedExploitableDetail": "Haɗarin aikin da nazari ya tabbatar",
+      "needsReview": "Yana buƙatar dubanka",
+      "needsReviewDetail": "Ana buƙatar yanke shawara na ɗan adam",
+      "analysisIncomplete": "Nazari bai cika ba",
+      "analysisIncompleteDetail": "Haɗarin aikin har yanzu ba a sani ba",
+      "slaCompliance": "Bin SLA",
+      "notMeasured": "Ba a auna ba",
+      "withinDeadlineDetail": "{{within}} na {{total}} a cikin ƙarshen lokaci",
+      "noDeadlineData": "Har yanzu babu sakamako mai ƙarshen lokacin SLA",
+      "deadlinePassed": "Ƙarshen lokaci ya wuce",
+      "deadlinePassedDetail": "{{critical}} masu tsanani, {{high}} babba",
+      "dueThisWeek": "Ana sa ran wannan makon",
+      "dueThisWeekDetail": "{{exploitable}} an tabbatar ana iya amfani da su",
+      "noDeadline": "Babu ƙarshen lokaci",
+      "reviewSlaAssignment": "Duba aikin SLA",
+      "allOpenFindingsTracked": "Ana bin duk sakamako masu buɗewa"
     },
     "dismiss": {
       "title": "Watsi da sakamako",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "Nazarin {{mode}}",
       "automation": "Aiki ta atomatik",
       "automationAllOff": "Duk a kashe",
-      "automationCount": "{{count}} daga cikin 3 an kunna",
+      "automationCount": "{{displayCount}} daga cikin 3 an kunna",
       "notifications": "Sanarwa",
-      "notificationsCount": "{{count}} daga cikin 2 an kunna",
+      "notificationsCount": "{{displayCount}} daga cikin 2 an kunna",
       "slaPolicy": "Manufar SLA",
       "disabledNoManage": "An kashe Security Agent. Masu mallakar kungiya da masu kula da kuɗi kawai za su iya kunnawa.",
       "disabledNoRepo": "Zaɓi aƙalla ma'ajiya ɗaya kafin kunna Security Agent.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Buɗe neman ciro{{number}}",
       "openDraftPullRequest": "Buɗe daftarin neman ciro{{number}}",
       "progress": "Ci gaba",
-      "attemptHistory": "Tarihin ƙoƙari ({{count}})",
+      "attemptHistory": "Tarihin ƙoƙari ({{displayCount}})",
       "attemptNumber": "Ƙoƙari #{{number}}",
       "startedBy": "Wanda ya fara",
       "model": "Samfuri",
@@ -1855,9 +1878,9 @@
       "toolTask": "aiki",
       "readTodos": "Karanta ayyukan",
       "updateTodos": "Sabunta ayyukan",
-      "linesBadge": "{{count}} layukan",
-      "filesBadge": "{{count}} fayiloli",
-      "matchesBadge": "{{count}} abubuwan da suka dace"
+      "linesBadge": "{{displayCount}} layukan",
+      "filesBadge": "{{displayCount}} fayiloli",
+      "matchesBadge": "{{displayCount}} abubuwan da suka dace"
     },
     "readToolMarkdown": {
       "linesTruncated": "layukan {{start}}–{{end}} (an yanke)",
@@ -1892,6 +1915,10 @@
     },
     "modeSelector": {
       "accessibility": "Yanayi: {{label}}"
+    },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
     },
     "modeOptions": {
       "code": "Lamba",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Shiri ya cika",
       "preparationFailed": "Shiri ya gaza",
       "setupCommand": "Umurnin saiti {{index}}",
-      "setupCommandOf": "Umurnin saiti {{index}} na {{count}}"
+      "setupCommandOf": "Umurnin saiti {{index}} na {{displayCount}}"
     },
     "permissionCard": {
       "title": "Ana buƙatar izini",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Aikar ya kasa. Da fatan za a sake gwadawa.",
       "questionAnnouncement": "Wakili yana buƙatar bayaninka. An dakatar da rubutu yayin da kake amsawa.",
       "permissionAnnouncement": "Wakili yana buƙatar izini don ci gaba. An dakatar da rubutu yayin da kake yanke shawara.",
-      "positionHint": "(1 na {{count}})",
+      "positionHint": "(1 na {{displayCount}})",
       "movedPastPrompt": "Wakilin ya wuce wannan tambaya. Wannan katin zai rufe idan zaman ya ci gaba.",
       "waitingForAnswer": "Wakili yana jiran amsarka. Yayin da wannan tambaya ke a buɗe, sakonka zuwa wakili yana dakatarwa.",
       "waitingForPermission": "Wakili yana jiran izini. Yayin da wannan buƙata ke a buɗe, sakonka zuwa wakili yana dakatarwa."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "An kashe damar Kyamara",
       "cameraAccessMessage": "Ba da izinin kyamara a cikin Settings don ɗaukar hoto.",
       "couldNotOpenPhotoPicker": "Ba a iya buɗe zaɓin hoto ba. Sake kunna Kilo sannan ka sake gwadawa.",
-      "maxFilesAllowed": "Matsakaicin fayiloli {{count}} da aka yarda",
+      "maxFilesAllowed": "Matsakaicin fayiloli {{displayCount}} da aka yarda",
       "onlyAddingFiles": "Ana ƙara {{accepted}} kawai daga {{total}} fayiloli (max {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "farashi {{cost}}",
       "costSuffix": ", farashi {{cost}}",
       "tokensWindowUnavailable": "Mahallin {{used}} tokens, taga ba ya nan",
-      "tokensUsage": "Mahallin {{used}} daga {{window}} tokens, an yi amfani da {{percentage}}%",
+      "tokensUsage": "Mahallin {{used}} daga {{window}} tokens, an yi amfani da {{percentage}}",
       "title": "Amfanin mahallin",
       "used": "An yi amfani",
       "remaining": "Ragowa",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "Amfani yana nuna sabuwar amsar mataimakin da ta gama.",
       "tokenUsage": "Amfanin token",
       "cacheRate": "Adadin cache",
-      "modelsCount": "Models ({{count}})",
+      "modelsCount": "Models ({{displayCount}})",
       "tokenTotalsNote": "Jimlar token ta rufe wannan zaman kawai kuma ta ware tokens na subagent/zaman yaro.",
       "subagents": "Subagents",
       "subagentsDescription": "Farashin ragowar daga zaman yara",
@@ -2373,7 +2400,7 @@
     "connectedCli": "A kan CLI da aka haɗa",
     "newSessionOn": "Sabon zama akan {{name}}",
     "noMatchingSessions": "Babu zaman da suka dace.",
-    "onlyFirstFilesAttached": "Fayilolin farko {{count}} kawai za a haɗa.",
+    "onlyFirstFilesAttached": "Fayilolin farko {{displayCount}} kawai za a haɗa.",
     "staleMessage": "Wannan rabon ba ya nan.",
     "retryableMessage": "An kasa ɗora zaman ka.",
     "emptyMessage": "Babu zaman tukuna — fara sabon don aika wannan.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Kilo Pass akan wannan Apple Account na wani asusun Kilo ne daban. Shiga wannan asusun Kilo don sarrafa shi.",
     "alreadySubscribed": "Kana da biyan kuɗin Kilo Pass tuni.",
     "purchaseUnavailable": "Sayayyar Kilo Pass ba ta nan a yanzu.",
-    "tierCredits": "${{amount}} a cikin credits",
+    "tierCredits": "{{amount}} a cikin credits",
     "perMonth": "{{price}}/wata",
     "verifyPurchaseFailed": "Ba a iya tabbatar da sayayyarka ba. Duba haɗinka sannan ka sake gwadawa.",
     "productsCouldNotLoad": "Ba a iya ɗora samfuran Kilo Pass daga App Store ba.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "An kasa buɗe sarrafa biyan kuɗi na App Store.",
     "kiloPassSetup": "Saitin Kilo Pass",
     "subscriptionHeaderDescription": "Biyan kuɗi na wata-wata wanda ke ƙara credits zuwa ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App — Cloud Agents, zaman nesa, da tattaunawar KiloClaw.",
-    "tierDescription": "${{price}} credits da aka biya ana ƙara su kowane wata don amfani da Kilo App.",
+    "tierDescription": "{{price}} credits da aka biya ana ƙara su kowane wata don amfani da Kilo App.",
     "subscribe": "Biyan kuɗi",
     "subscribeDescription": "Credits na wata-wata tare da ci gaban bonus",
     "manage": "Sarrafa",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass yana jiran",
     "statusCanceling": "Kilo Pass yana sokewa",
     "statusPastDue": "Kilo Pass ya ƙare kwanan",
-    "monthlyCredits": "${{credits}} credits na wata-wata",
+    "monthlyCredits": "{{credits}} credits na wata-wata",
     "ends": "Yana ƙare {{date}}",
     "periodEnd": "ƙarshen lokaci",
     "managedOnGooglePlay": "Ana sarrafa akan Google Play",

@@ -2,7 +2,7 @@ import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { z } from 'zod';
 
 import { i18n } from '@/i18n';
-import { formatList } from '@/lib/format';
+import { formatList, formatNumber } from '@/lib/format';
 import { getToolFileAttachments, getToolImageAttachments } from './tool-card-attachments';
 import {
   getDirectoryName,
@@ -73,7 +73,12 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
         badgeParts.push(`L${offset}`);
       }
       if (limit !== undefined) {
-        badgeParts.push(i18n.t('agentChat.toolCard.linesBadge', { count: limit }));
+        badgeParts.push(
+          i18n.t('agentChat.toolCard.linesBadge', {
+            count: limit,
+            displayCount: formatNumber(limit, i18n.language),
+          })
+        );
       }
       const badge = badgeParts.length > 0 ? formatList(badgeParts, i18n.language) : undefined;
 
@@ -111,7 +116,10 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       const matchCount = output ? countResultRows(output, 'glob') : undefined;
       const badge =
         matchCount !== undefined && matchCount > 0
-          ? i18n.t('agentChat.toolCard.filesBadge', { count: matchCount })
+          ? i18n.t('agentChat.toolCard.filesBadge', {
+              count: matchCount,
+              displayCount: formatNumber(matchCount, i18n.language),
+            })
           : undefined;
       return {
         title: i18n.t('agentChat.toolCard.toolGlob'),
@@ -130,7 +138,10 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       const matchCount = output ? countResultRows(output, 'grep') : undefined;
       const badge =
         matchCount !== undefined && matchCount > 0
-          ? i18n.t('agentChat.toolCard.matchesBadge', { count: matchCount })
+          ? i18n.t('agentChat.toolCard.matchesBadge', {
+              count: matchCount,
+              displayCount: formatNumber(matchCount, i18n.language),
+            })
           : undefined;
       return { title: i18n.t('agentChat.toolCard.toolGrep'), subtitle, badge };
     }
@@ -153,7 +164,10 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       if (files.length === 1) {
         subtitle = getFilename(files[0] ?? '');
       } else if (files.length > 1) {
-        subtitle = i18n.t('agentChat.toolCard.filesBadge', { count: files.length });
+        subtitle = i18n.t('agentChat.toolCard.filesBadge', {
+          count: files.length,
+          displayCount: formatNumber(files.length, i18n.language),
+        });
       }
       return { title: i18n.t('agentChat.toolCard.toolPatch'), subtitle };
     }

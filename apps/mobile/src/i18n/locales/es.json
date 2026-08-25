@@ -201,7 +201,8 @@
     "agents": "Agentes",
     "profile": "Perfil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, pestaña, {{position}} de {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -242,7 +243,7 @@
       "recent": "Recientes",
       "common": "Comunes",
       "reactWith": "Reaccionar con {{reaction}}",
-      "accessibility": "{{emoji}} reacción, {{count}}"
+      "accessibility": "{{emoji}} reacción, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Respondiendo a",
@@ -271,7 +272,7 @@
       "imageUnavailable": "Imagen no disponible",
       "openFailed": "No se pudo abrir el archivo adjunto. Comprueba tu conexión e inténtalo de nuevo.",
       "attachFailed": "No se pudo adjuntar el archivo",
-      "limit": "Puedes adjuntar hasta {{count}} archivos.",
+      "limit": "Puedes adjuntar hasta {{displayCount}} archivos.",
       "sizeRejection": "{{filename}} supera el límite de {{limit}} para archivos adjuntos.",
       "unreadable": "No se pudo leer {{filename}}.",
       "pastedImage": "la imagen pegada",
@@ -321,7 +322,8 @@
       "someone": "Alguien",
       "typing_one": "{{name}} está escribiendo...",
       "typing": "{{names}} están escribiendo...",
-      "typing_other": "{{names}} están escribiendo..."
+      "typing_other": "{{names}} están escribiendo...",
+      "typing_many": "{{names}} están escribiendo..."
     },
     "botStatus": {
       "online": "En línea",
@@ -343,6 +345,7 @@
       "finalTermEnds": "El plazo final termina",
       "afterFinalTerm": "Después del plazo final",
       "remaining": "Restante",
+      "lessThanOneDay": "Menos de 1 día",
       "ends": "Termina",
       "expires": "Caduca",
       "noActivePlan": "Sin plan activo",
@@ -361,11 +364,11 @@
       "yourStandardMonthlyPrice": "tu precio mensual de Standard",
       "perMonth": "/mes",
       "earlybirdAccessUntil": "Acceso Earlybird hasta el {{date}}",
-      "earlybirdEnding": "Earlybird termina: quedan {{days}} días",
+      "earlybirdEnding": "Earlybird termina: {{remaining}}",
       "paymentPastDue": "Pago vencido. Actualiza tu método de pago.",
       "subscriptionCancels": "La suscripción se cancela el {{date}}",
-      "trialDaysRemaining": "Prueba: quedan {{days}} días",
-      "trialEndingSoon": "La prueba termina pronto: {{days}}"
+      "trialDaysRemaining": "Prueba: {{remaining}} restantes",
+      "trialEndingSoon": "La prueba termina pronto: {{remaining}}"
     },
     "changelog": {
       "title": "Novedades",
@@ -567,7 +570,8 @@
       "openSettings": "Abrir los ajustes de {{name}}",
       "openUnread": "Abrir {{name}}, {{displayCount}} mensajes sin leer",
       "openUnread_other": "Abrir {{name}}, {{displayCount}} mensajes sin leer",
-      "openUnread_one": "Abrir {{name}}, {{displayCount}} mensaje sin leer"
+      "openUnread_one": "Abrir {{name}}, {{displayCount}} mensaje sin leer",
+      "openUnread_many": "Abrir {{name}}, {{displayCount}} mensajes sin leer"
     },
     "list": {
       "createInstance": "Crear instancia",
@@ -665,7 +669,7 @@
         "startingSandbox": "Iniciando el sandbox",
         "stoppedBody": "La instancia de {{name}} se detuvo de forma inesperada durante la configuración.",
         "stoppedTitle": "Configuración detenida",
-        "timeoutBody": "La configuración de {{name}} está tardando más de lo habitual (más de {{minutes}} minutos).",
+        "timeoutBody": "La configuración de {{name}} está tardando más de lo habitual (más de {{displayMinutes}} minutos).",
         "timeoutTitle": "Tarda más de lo esperado"
       },
       "unavailableDescription": "Se requiere una suscripción activa a KiloClaw para aprovisionar una instancia. Las instancias y suscripciones existentes continúan con normalidad.",
@@ -912,7 +916,7 @@
       "focusAreas": "Áreas de enfoque",
       "mergeGate": "Puerta de fusión",
       "model": "Modelo",
-      "nSelected": "{{count}} seleccionados",
+      "nSelected": "{{displayCount}} seleccionados",
       "proposedReviewMdGuidance": "Directrices propuestas de REVIEW.md",
       "repositories": "Repositorios",
       "reviewMemory": "Memoria de revisión",
@@ -981,7 +985,7 @@
       "triageReasoning": "Razonamiento del triaje",
       "unknown": "Desconocido",
       "watchInCloudAgent": "Ver en Cloud Agent",
-      "whereFound": "Dónde se encontró ({{count}})",
+      "whereFound": "Dónde se encontró ({{displayCount}})",
       "yes": "Sí"
     },
     "analysisSettings": {
@@ -1048,7 +1052,8 @@
       "severityCriticalOnly": "Solo crítica",
       "severityHighAndAbove": "Alta y superior",
       "severityMediumAndAbove": "Media y superior",
-      "title": "Automatización"
+      "title": "Automatización",
+      "queued_many": "{{displayCount}} hallazgos existentes en cola para el análisis."
     },
     "commandRetry": {
       "discard": "Descartar"
@@ -1061,11 +1066,11 @@
       "confirmedExploitable": "Explotable confirmado",
       "couldNotLoad": "No se pudieron cargar los datos del panel",
       "criticalOverdue": "Crítico vencido",
-      "daysOverdue": "{{count}} días de retraso",
+      "daysOverdue": "{{displayCount}} días de retraso",
       "deadlineToday": "El plazo vence hoy",
       "filterByRepository": "Filtrar por repositorio",
       "findings": "Hallazgos",
-      "findingsCount": "{{count}} hallazgos",
+      "findingsCount": "{{displayCount}} hallazgos",
       "highOverdue": "Alto vencido",
       "lastSynced": "Última sincronización {{time}}",
       "manageRepositories": "Gestionar repositorios",
@@ -1090,6 +1095,27 @@
       "syncQueued": "Sincronización en cola",
       "syncStatusUnavailable": "Estado de sincronización no disponible",
       "withinDeadline": "Dentro del plazo"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Hallazgos abiertos",
+      "openFindingsDetail": "{{critical}} críticos, {{high}} altos",
+      "confirmedExploitable": "Explotable confirmado",
+      "confirmedExploitableDetail": "Riesgo del proyecto confirmado por el análisis",
+      "needsReview": "Necesita tu revisión",
+      "needsReviewDetail": "Se requiere decisión humana",
+      "analysisIncomplete": "Análisis no completado",
+      "analysisIncompleteDetail": "Riesgo del proyecto aún desconocido",
+      "slaCompliance": "Cumplimiento de SLA",
+      "notMeasured": "No medido",
+      "withinDeadlineDetail": "{{within}} de {{total}} dentro del plazo",
+      "noDeadlineData": "Ningún hallazgo tiene plazo de SLA todavía",
+      "deadlinePassed": "Plazo vencido",
+      "deadlinePassedDetail": "{{critical}} críticos, {{high}} altos",
+      "dueThisWeek": "Vence esta semana",
+      "dueThisWeekDetail": "{{exploitable}} explotables confirmados",
+      "noDeadline": "Sin plazo",
+      "reviewSlaAssignment": "Revisar asignación de SLA",
+      "allOpenFindingsTracked": "Todos los hallazgos abiertos se rastrean"
     },
     "dismiss": {
       "alreadyResolvedDescription": "Este hallazgo ya se ha resuelto y ya no acepta un descarte.",
@@ -1188,7 +1214,7 @@
       "title": "Notificaciones"
     },
     "remediation": {
-      "attemptHistory": "Historial de intentos ({{count}})",
+      "attemptHistory": "Historial de intentos ({{displayCount}})",
       "attemptNumber": "Intento n.º {{number}}",
       "branch": "Rama",
       "cancelMessage": "Security Agent detendrá el intento de corrección en curso.",
@@ -1256,7 +1282,7 @@
       "analysisModeSubtitle": "Análisis {{mode}}",
       "automation": "Automatización",
       "automationAllOff": "Todo desactivado",
-      "automationCount": "{{count}} de 3 activados",
+      "automationCount": "{{displayCount}} de 3 activados",
       "couldNotLoadPermissions": "No se pudieron cargar los permisos",
       "couldNotLoadRepositories": "No se pudieron cargar los repositorios",
       "couldNotLoadSettings": "No se pudieron cargar los ajustes de Security Agent",
@@ -1267,7 +1293,7 @@
       "enabled": "Activado",
       "modelsAndAnalysis": "Modelos y análisis",
       "notifications": "Notificaciones",
-      "notificationsCount": "{{count}} de 2 activados",
+      "notificationsCount": "{{displayCount}} de 2 activados",
       "off": "Desactivado",
       "on": "Activado",
       "repositories": "Repositorios",
@@ -1278,7 +1304,8 @@
       "selectRepositories": "Seleccionar repositorios",
       "selectRepositoriesSubtitle": "Elige qué repositorios supervisa Security Agent",
       "slaPolicy": "Política de SLA",
-      "title": "Ajustes"
+      "title": "Ajustes",
+      "repositoriesCount_many": "{{displayCount}} repositorios seleccionados"
     },
     "settingsSave": {
       "discard": "Descartar",
@@ -1355,7 +1382,9 @@
       "cent_other": "céntimos",
       "dollar_one": "dólar",
       "dollar": "dólares",
-      "dollar_other": "dólares"
+      "dollar_other": "dólares",
+      "cent_many": "céntimos",
+      "dollar_many": "dólares"
     },
     "githubInstall": {
       "couldNotOpenMessage": "No pudimos iniciar la configuración de la GitHub App. Inténtalo de nuevo.",
@@ -1451,7 +1480,8 @@
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} archivo actualizado",
       "updatedFileCount": "{{displayCount}} archivos actualizados",
-      "updatedFileCount_other": "{{displayCount}} archivos actualizados"
+      "updatedFileCount_other": "{{displayCount}} archivos actualizados",
+      "updatedFileCount_many": "{{displayCount}} archivos actualizados"
     },
     "toolPatch": {
       "operationAdded": "Añadido",
@@ -1476,9 +1506,9 @@
       "toolTask": "tarea",
       "readTodos": "Leer tareas",
       "updateTodos": "Actualizar tareas",
-      "linesBadge": "{{count}} líneas",
-      "filesBadge": "{{count}} archivos",
-      "matchesBadge": "{{count}} coincidencias"
+      "linesBadge": "{{displayCount}} líneas",
+      "filesBadge": "{{displayCount}} archivos",
+      "matchesBadge": "{{displayCount}} coincidencias"
     },
     "readToolMarkdown": {
       "linesTruncated": "líneas {{start}}–{{end}} (truncadas)",
@@ -1562,6 +1592,10 @@
       "reportAiResponseFailedTerminal": "Esta respuesta no se puede reportar.",
       "reportAiResponseSubmitted": "Reporte enviado. Recibo {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Detalles no disponibles",
       "textDisplay": "Visualización de texto",
@@ -1620,7 +1654,7 @@
       "preparationComplete": "Preparación completada",
       "preparationFailed": "La preparación falló",
       "setupCommand": "Comando de configuración {{index}}",
-      "setupCommandOf": "Comando de configuración {{index}} de {{count}}"
+      "setupCommandOf": "Comando de configuración {{index}} de {{displayCount}}"
     },
     "permissionCard": {
       "title": "Permiso requerido",
@@ -1657,7 +1691,7 @@
       "submissionFailed": "El envío falló. Inténtalo de nuevo.",
       "questionAnnouncement": "El agente necesita tu aportación. El editor está en pausa mientras respondes.",
       "permissionAnnouncement": "El agente necesita permiso para continuar. El editor está en pausa mientras decides.",
-      "positionHint": "(1 de {{count}})",
+      "positionHint": "(1 de {{displayCount}})",
       "movedPastPrompt": "El agente ha superado este aviso. Esta tarjeta se cerrará cuando la sesión continúe.",
       "waitingForAnswer": "El agente está esperando tu respuesta. Mientras esta pregunta esté abierta, tu mensaje al agente está en pausa.",
       "waitingForPermission": "El agente está esperando permiso. Mientras esta solicitud esté abierta, tu mensaje al agente está en pausa."
@@ -1697,7 +1731,8 @@
       "omitted_other": "No se pudieron mostrar {{displayCount}} elementos anteriores de esta sesión.",
       "couldNotLoad": "No se pudieron cargar los mensajes anteriores.",
       "unavailable": "Los mensajes anteriores no están disponibles.",
-      "tooLarge": "Los mensajes anteriores son demasiado grandes para cargar."
+      "tooLarge": "Los mensajes anteriores son demasiado grandes para cargar.",
+      "omitted_many": "No se pudieron mostrar {{displayCount}} elementos anteriores de esta sesión."
     },
     "markdownTable": {
       "viewTable": "Ver tabla",
@@ -1709,7 +1744,9 @@
       "rowCount_one": "fila",
       "rowCount": "filas",
       "rowCount_other": "filas",
-      "opensFullScreen": "abre a pantalla completa"
+      "opensFullScreen": "abre a pantalla completa",
+      "columnCount_many": "columnas",
+      "rowCount_many": "filas"
     },
     "sessionFilter": {
       "title": "Filtrar sesiones",
@@ -1778,7 +1815,7 @@
       "cameraAccessDisabled": "Acceso a la cámara desactivado",
       "cameraAccessMessage": "Permite el acceso a la cámara en Ajustes para hacer una foto.",
       "couldNotOpenPhotoPicker": "No se pudo abrir el selector de fotos. Reinicia Kilo e inténtalo de nuevo.",
-      "maxFilesAllowed": "Máximo {{count}} archivos permitidos",
+      "maxFilesAllowed": "Máximo {{displayCount}} archivos permitidos",
       "onlyAddingFiles": "Solo se añaden {{accepted}} de {{total}} archivos (máx. {{max}})"
     },
     "composer": {
@@ -1843,7 +1880,7 @@
       "costPrefix": "coste {{cost}}",
       "costSuffix": ", coste {{cost}}",
       "tokensWindowUnavailable": "Contexto {{used}} tokens, ventana no disponible",
-      "tokensUsage": "Contexto {{used}} de {{window}} tokens, {{percentage}}% usado",
+      "tokensUsage": "Contexto {{used}} de {{window}} tokens, {{percentage}} usado",
       "title": "Uso de contexto",
       "used": "Usado",
       "remaining": "Restante",
@@ -1852,7 +1889,7 @@
       "usageReflectsLatest": "El uso refleja la última respuesta completada del asistente.",
       "tokenUsage": "Uso de tokens",
       "cacheRate": "Tasa de caché",
-      "modelsCount": "Modelos ({{count}})",
+      "modelsCount": "Modelos ({{displayCount}})",
       "tokenTotalsNote": "Los totales de tokens cubren solo esta sesión y excluyen los tokens de subagentes y sesiones secundarias.",
       "subagents": "Subagentes",
       "subagentsDescription": "Coste residual de las sesiones secundarias",
@@ -1864,7 +1901,8 @@
       "stepsCount_one": "{{steps}} paso",
       "stepsCount": "{{steps}} pasos",
       "stepsCount_other": "{{steps}} pasos",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "stepsCount_many": "{{steps}} pasos"
     },
     "prBadge": {
       "open": "solicitud de cambios abierta",
@@ -1994,7 +2032,7 @@
     "connectedCli": "En una CLI conectada",
     "newSessionOn": "Nueva sesión en {{name}}",
     "noMatchingSessions": "No hay sesiones coincidentes.",
-    "onlyFirstFilesAttached": "Solo se adjuntarán los primeros {{count}} archivos.",
+    "onlyFirstFilesAttached": "Solo se adjuntarán los primeros {{displayCount}} archivos.",
     "staleMessage": "Este contenido compartido ya no está disponible.",
     "retryableMessage": "No se pudieron cargar tus sesiones.",
     "emptyMessage": "Aún no hay sesiones: inicia una nueva para enviar esto.",
@@ -2027,7 +2065,7 @@
     "otherAccountCopy": "El Kilo Pass de esta cuenta de Apple pertenece a una cuenta de Kilo diferente. Inicia sesión en esa cuenta de Kilo para gestionarlo.",
     "alreadySubscribed": "Ya tienes una suscripción a Kilo Pass.",
     "purchaseUnavailable": "La compra de Kilo Pass no está disponible ahora mismo.",
-    "tierCredits": "${{amount}} en créditos",
+    "tierCredits": "{{amount}} en créditos",
     "perMonth": "{{price}}/mes",
     "verifyPurchaseFailed": "No se pudo verificar tu compra. Comprueba tu conexión e inténtalo de nuevo.",
     "productsCouldNotLoad": "No se pudieron cargar los productos de Kilo Pass desde la App Store.",
@@ -2038,7 +2076,7 @@
     "manageFailed": "No se pudo abrir la gestión de suscripciones del App Store.",
     "kiloPassSetup": "Configuración de Kilo Pass",
     "subscriptionHeaderDescription": "Una suscripción mensual que añade créditos a tu saldo de Kilo para ejecutar sesiones de codificación con IA en Kilo App: Cloud Agents, sesiones remotas y chats de KiloClaw.",
-    "tierDescription": "${{price}} en créditos pagados añadidos mensualmente para el uso de Kilo App.",
+    "tierDescription": "{{price}} en créditos pagados añadidos mensualmente para el uso de Kilo App.",
     "subscribe": "Suscribirse",
     "subscribeDescription": "Créditos mensuales con progreso de bonificación",
     "manage": "Gestionar",
@@ -2046,7 +2084,7 @@
     "statusPending": "Kilo Pass pendiente",
     "statusCanceling": "Cancelando Kilo Pass",
     "statusPastDue": "Kilo Pass vencido",
-    "monthlyCredits": "${{credits}} créditos mensuales",
+    "monthlyCredits": "{{credits}} créditos mensuales",
     "ends": "Finaliza el {{date}}",
     "periodEnd": "fin del periodo",
     "managedOnGooglePlay": "Gestionado en Google Play",
@@ -2150,17 +2188,17 @@
     "accessDeniedDescription": "No tienes permiso para ver esta pull request.",
     "checkConnection": "Comprobar conexión",
     "checks": {
-      "checksCount": "{{count}} verificaciones",
+      "checksCount": "{{displayCount}} verificaciones",
       "couldNotLoad": "No se pudieron cargar las verificaciones.",
-      "failed": "{{count}} fallidas",
+      "failed": "{{displayCount}} fallidas",
       "noAccess": "No tienes acceso a las verificaciones de este repositorio.",
       "noChecksReported": "No se han notificado verificaciones",
       "notAvailable": "Las verificaciones aún no están disponibles. Puede que el commit principal no se haya procesado o que la Kilo GitHub App no esté instalada en el repositorio principal.",
       "openDetails": "Abrir los detalles de {{name}}",
-      "passed": "{{count}} superadas",
-      "pending": "{{count}} pendientes",
+      "passed": "{{displayCount}} superadas",
+      "pending": "{{displayCount}} pendientes",
       "retryChecks": "Reintentar verificaciones",
-      "skipped": "{{count}} omitidas",
+      "skipped": "{{displayCount}} omitidas",
       "title": "Verificaciones",
       "viewOnGitHub": "Ver PR en GitHub",
       "checkDetails": "Detalles de la verificación",
@@ -2238,7 +2276,7 @@
           "terminal": "No se puede denunciar a este usuario."
         }
       },
-      "moreLinesAbove": "… {{count}} líneas más arriba",
+      "moreLinesAbove": "… {{displayCount}} líneas más arriba",
       "mute": "Silenciar",
       "mutedUser": "{{login}} silenciado",
       "noDiscussion": "Aún no hay conversación",
@@ -2246,7 +2284,7 @@
       "comment_one": "1 comentario",
       "outdated": "Desactualizado",
       "quotedDiffSnippet": "Fragmento de diff citado",
-      "reactionPill": "{{emoji}} reacción, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} reacción, {{displayCount}} {{countLabel}}",
       "reaction": "reacciones",
       "reaction_other": "reacciones",
       "reaction_one": "reacción",
@@ -2276,7 +2314,9 @@
       "viewTerms": "Ver términos",
       "termsAcceptRequired": "Debes aceptar los Términos del servicio para publicar.",
       "termsCheckRetryCopy": "No se pudieron comprobar los Términos del servicio. Comprueba tu conexión e inténtalo de nuevo.",
-      "termsOutdatedCopy": "Los Términos del servicio han cambiado. Vuelve a abrir esta pantalla para aceptar la versión más reciente."
+      "termsOutdatedCopy": "Los Términos del servicio han cambiado. Vuelve a abrir esta pantalla para aceptar la versión más reciente.",
+      "comment_many": "{{displayCount}} comentarios",
+      "reaction_many": "reacciones"
     },
     "entry": {
       "clearLink": "Borrar enlace de la pull request",
@@ -2350,12 +2390,12 @@
     "hunkRows": {
       "contextUnavailable": "Contexto no disponible en esta ref",
       "expandAll": "Expandir todo",
-      "expandAllLines": "Expandir las {{count}} líneas",
+      "expandAllLines": "Expandir las {{displayCount}} líneas",
       "expandContext": "Expandir contexto",
-      "expandLines": "Expandir {{count}} líneas ({{start}}–{{end}})",
-      "expandLinesOfContext": "Expandir {{count}} líneas de contexto",
+      "expandLines": "Expandir {{displayCount}} líneas ({{start}}–{{end}})",
+      "expandLinesOfContext": "Expandir {{displayCount}} líneas de contexto",
       "expandMoreContext": "Expandir más contexto",
-      "expandMoreLines": "Expandir {{count}} líneas más ({{start}}–{{end}})",
+      "expandMoreLines": "Expandir {{displayCount}} líneas más ({{start}}–{{end}})",
       "failedToLoadContext": "No se pudo cargar el contexto — toca para reintentar",
       "failedToLoadMoreFiles": "No se pudieron cargar más archivos — toca para reintentar",
       "fileLoadedCount_one": "{{displayCount}} archivo cargado",
@@ -2377,7 +2417,9 @@
       "loadingLines": "Cargando {{loaded}} de {{total}} líneas…",
       "loadingMoreFiles": "Cargando más archivos…",
       "retryLoadingContext": "Reintentar la carga del contexto",
-      "retryLoadingNextPage": "Reintentar la carga de la página siguiente"
+      "retryLoadingNextPage": "Reintentar la carga de la página siguiente",
+      "fileLoadedCount_many": "{{displayCount}} archivos cargados",
+      "fileLoadedOfTotalCount_many": "{{displayCount}} archivos cargados de {{total}}"
     },
     "inbox": {
       "couldNotLoad": "No se pudo cargar la bandeja de entrada",
@@ -2452,7 +2494,9 @@
       "stateOpenApproved": "Abierta · Aprobada",
       "stateOpenChangesRequested": "Abierta · Cambios solicitados",
       "stateOpenReviewRequired": "Abierta · Revisión necesaria",
-      "unknownAuthor": "Autor desconocido"
+      "unknownAuthor": "Autor desconocido",
+      "commit_many": "commits",
+      "file_many": "archivos"
     },
     "pendingComment": {
       "allQueuedHint": "Todos los comentarios se enviarán en una única solicitud por lotes.",
@@ -2500,9 +2544,10 @@
       "pendingComment_one": "comentario pendiente",
       "summaryOptional": "Resumen (opcional)",
       "title": "Enviar revisión",
-      "partialPostedMessage": "Se publicaron {{freshCount}} comentario(s). {{staleCount}} comentario(s) apuntan a un commit anterior y se quedaron en tu cola.",
-      "submitCountOfTotal": "Enviar {{freshCount}} de {{totalCount}} comentarios",
-      "submitReview": "Enviar revisión"
+      "partialPostedMessage": "Se publicaron {{displayFreshCount}} comentario(s). {{displayStaleCount}} comentario(s) apuntan a un commit anterior y se quedaron en tu cola.",
+      "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentarios",
+      "submitReview": "Enviar revisión",
+      "pendingComment_many": "comentarios pendientes"
     },
     "fileStatus": {
       "added": "Añadido",
@@ -2654,7 +2699,8 @@
       "processingNeedsReview": "El procesamiento necesita revisión",
       "retry": "Reintentar",
       "retryHint": "Reintenta la carga del estado de Kilo Pass.",
-      "setupHint": "Abre la configuración de Kilo Pass en la web."
+      "setupHint": "Abre la configuración de Kilo Pass en la web.",
+      "paidSeat_many": "{{displayCount}} asientos pagados"
     }
   },
   "feedback": {

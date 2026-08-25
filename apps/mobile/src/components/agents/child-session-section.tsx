@@ -71,7 +71,7 @@ export function ChildSessionSection({
   return (
     <Animated.View
       layout={LinearTransition.duration(200)}
-      className="overflow-hidden rounded-lg"
+      className="overflow-hidden rounded-e-lg"
       // eslint-disable-next-line react-native/no-inline-styles -- dynamic border color
       style={{ borderStartWidth: 2, borderStartColor: borderColor }}
     >

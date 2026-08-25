@@ -8,6 +8,7 @@
 import { type Component, type RefObject } from 'react';
 
 import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 import { type BlockingInteraction } from './agent-interaction-policy';
@@ -216,7 +217,10 @@ function buildAnnouncement(kind: BlockingCardKind, state: BlockingCardUiState): 
  */
 export function formatBlockingCardTitle(baseTitle: string, count: number): string {
   return count > 1
-    ? `${baseTitle} ${i18n.t('agentChat.blockingCard.positionHint', { count })}`
+    ? `${baseTitle} ${i18n.t('agentChat.blockingCard.positionHint', {
+        count,
+        displayCount: formatNumber(count, i18n.language),
+      })}`
     : baseTitle;
 }
 

@@ -206,11 +206,11 @@
       "loadingLines": "Բեռնվում է {{loaded}}-ը {{total}} տողերից…",
       "expandContext": "Ընդլայնել համատեքստը",
       "expandMoreContext": "Ընդլայնել ավելի շատ համատեքստ",
-      "expandLines": "Ընդլայնել {{count}} տող ({{start}}–{{end}})",
-      "expandMoreLines": "Ընդլայնել ևս {{count}} տող ({{start}}–{{end}})",
-      "expandLinesOfContext": "Ընդլայնել {{count}} տող համատեքստ",
+      "expandLines": "Ընդլայնել {{displayCount}} տող ({{start}}–{{end}})",
+      "expandMoreLines": "Ընդլայնել ևս {{displayCount}} տող ({{start}}–{{end}})",
+      "expandLinesOfContext": "Ընդլայնել {{displayCount}} տող համատեքստ",
       "expandAll": "Ընդլայնել բոլորը",
-      "expandAllLines": "Ընդլայնել բոլոր {{count}} տողերը",
+      "expandAllLines": "Ընդլայնել բոլոր {{displayCount}} տողերը",
       "loadingMoreFiles": "Բեռնվում են ավելի շատ ֆայլեր…",
       "retryLoadingNextPage": "Կրկին փորձել բեռնել հաջորդ էջը",
       "failedToLoadMoreFiles": "Չհաջողվեց բեռնել ավելի շատ ֆայլեր — հպեք՝ կրկին փորձելու համար",
@@ -301,7 +301,7 @@
       "closeReactions": "Փակել ռեակցիաները",
       "reactionsTitle": "Ռեակցիաներ",
       "addReaction": "Ավելացնել ռեակցիա",
-      "reactionPill": "{{emoji}} ռեակցիա, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} ռեակցիա, {{displayCount}} {{countLabel}}",
       "reaction_one": "ռեակցիա",
       "reaction": "ռեակցիա",
       "reaction_other": "ռեակցիա",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Այս pull request-ում վերանայման թեմաներ կամ զրույցի մեկնաբանություններ չկան:",
       "reviewFiles": "Վերանայել ֆայլերը",
       "quotedDiffSnippet": "Մեջբերված diff հատված",
-      "moreLinesAbove": "… {{count}} ավելի տող վերևում",
+      "moreLinesAbove": "… {{displayCount}} ավելի տող վերևում",
       "termsAcceptRequired": "Գրառելու համար դուք պետք է ընդունեք Ծառայության պայմանները:",
       "termsOutdatedCopy": "Ծառայության պայմանները փոխվել են: Վերաբացեք այս էկրանը՝ վերջին տարբերակն ընդունելու համար:",
       "termsCheckRetryCopy": "Չհաջողվեց ստուգել Ծառայության պայմանները: Ստուգեք ձեր կապը և կրկին փորձեք:"
@@ -395,11 +395,11 @@
       "retryChecks": "Կրկին փորձել ստուգումները",
       "viewOnGitHub": "Դիտել PR-ը GitHub-ում",
       "noChecksReported": "Ստուգումներ չեն հաղորդվել",
-      "passed": "{{count}} անցել է",
-      "failed": "{{count}} ձախողվել է",
-      "pending": "{{count}} սպասում է",
-      "skipped": "{{count}} բաց թողնված",
-      "checksCount": "{{count}} ստուգում",
+      "passed": "{{displayCount}} անցել է",
+      "failed": "{{displayCount}} ձախողվել է",
+      "pending": "{{displayCount}} սպասում է",
+      "skipped": "{{displayCount}} բաց թողնված",
+      "checksCount": "{{displayCount}} ստուգում",
       "checkDetails": "ստուգման մանրամասներ",
       "pullRequest": "pull request"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "սպասվող մեկնաբանություն",
       "pendingComment": "սպասվող մեկնաբանություններ",
       "pendingComment_other": "սպասվող մեկնաբանություններ",
-      "submitCountOfTotal": "Ուղարկել {{freshCount}}-ը {{totalCount}} մեկնաբանություններից",
+      "submitCountOfTotal": "Ուղարկել {{displayFreshCount}}-ը {{displayTotalCount}} մեկնաբանություններից",
       "submitReview": "Ուղարկել վերանայումը",
-      "partialPostedMessage": "Տեղադրված է {{freshCount}} մեկնաբանություն: {{staleCount}} մեկնաբանություն վերաբերում է ավելի հին commit-ին և մնացել է ձեր հերթում:"
+      "partialPostedMessage": "Տեղադրված է {{displayFreshCount}} մեկնաբանություն: {{displayStaleCount}} մեկնաբանություն վերաբերում է ավելի հին commit-ին և մնացել է ձեր հերթում:"
     },
     "reconnectNotice": {
       "title": "GitHub կապը ժամկետանց է",
@@ -580,7 +580,8 @@
     "agents": "Գործակալներ",
     "profile": "Պրոֆիլ",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, ներդիր, {{position}} / {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Վերջին",
       "common": "Հաճախակի",
       "reactWith": "Արձագանքել {{reaction}}-ով",
-      "accessibility": "{{emoji}} ռեակցիա, {{count}}"
+      "accessibility": "{{emoji}} ռեակցիա, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Պատասխանում եք",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Պատկերը հասանելի չէ",
       "openFailed": "Չհաջողվեց բացել կցորդը: Ստուգեք ձեր կապը և կրկին փորձեք:",
       "attachFailed": "Չհաջողվեց կցել ֆայլը",
-      "limit": "Կարող եք կցել մինչև {{count}} ֆայլ:",
+      "limit": "Կարող եք կցել մինչև {{displayCount}} ֆայլ:",
       "sizeRejection": "{{filename}}-ը գերազանցում է {{limit}} կցորդի սահմանը:",
       "unreadable": "Չհաջողվեց կարդալ {{filename}}-ը:",
       "pastedImage": "տեղադրված պատկերը",
@@ -734,17 +735,18 @@
       "finalCommitTermEndsOn": "Ձեր վերջնական Commit ժամկետն ավարտվում է {{date}}-ին: Շարունակեք Standard-ով {{price}}-ով, կամ հոսթինգն ավարտվում է:",
       "freeTrial": "Անվճար փորձարկում",
       "hostingEnds": "Հոսթինգն ավարտվում է",
+      "lessThanOneDay": "Ավելի քիչ, քան 1 օր",
       "renews": "Երկարաձգվում է",
       "standardMonthToMonth": "Ստանդարտ ամսական",
       "standardStartsOn": "Ստանդարտը սկսվում է {{date}}-ին {{price}}-ով:",
       "yourStandardMonthlyPrice": "ձեր ստանդարտ ամսական գինը",
       "perMonth": "/ամիս",
       "earlybirdAccessUntil": "Վաղ թռչնի հասանելիություն մինչև {{date}}",
-      "earlybirdEnding": "Վաղ թռչնի ավարտը՝ մնացել է {{days}} օր",
+      "earlybirdEnding": "Վաղ թռչնի ավարտը՝ {{remaining}}",
       "paymentPastDue": "Վճարումն ուշացած է: Խնդրում ենք թարմացնել վճարման եղանակը:",
       "subscriptionCancels": "Բաժանորդագրությունը չեղարկվում է {{date}}-ին",
-      "trialDaysRemaining": "Փորձարկում՝ մնացել է {{days}} օր",
-      "trialEndingSoon": "Փորձարկումը շուտով կավարտվի՝ {{days}}"
+      "trialDaysRemaining": "Փորձարկում՝ մնացել է {{remaining}}",
+      "trialEndingSoon": "Փորձարկումը շուտով կավարտվի՝ {{remaining}}"
     },
     "changelog": {
       "title": "Ի՞նչ նորություն կա",
@@ -996,7 +998,7 @@
         "stalledTitle": "Ինչ-որ բան կանգ առավ",
         "stalledBody": "Մենք չկարողացանք ավարտել {{name}}-ի կարգավորումը: Փորձեք կրկին, կամ գրեք hi@kilo.ai, եթե սա շարունակվում է:",
         "timeoutTitle": "Ավելի երկար է տևում, քան սպասվում էր",
-        "timeoutBody": "{{name}}-ի կարգավորումն ավելի երկար է տևում, քան սովորաբար (ավելի քան {{minutes}} րոպե):",
+        "timeoutBody": "{{name}}-ի կարգավորումն ավելի երկար է տևում, քան սովորաբար (ավելի քան {{displayMinutes}} րոպե):",
         "continueInBackground": "Շարունակել հետին պլանում",
         "settingUp": "Կարգավորվում է {{name}}",
         "finishingSetup": "Ավարտվում է կարգավորումը",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Միաձուլման դարպաս",
       "repositories": "Պահոցներ",
       "allRepositories": "Բոլոր պահոցները",
-      "nSelected": "Ընտրված է {{count}}",
+      "nSelected": "Ընտրված է {{displayCount}}",
       "reviewMemory": "Ստուգման հիշողություն",
       "proposedReviewMdGuidance": "Առաջարկվող REVIEW.md ուղեցույց"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Վերլուծված",
       "exploitabilityReasoning": "Շահագործելիության հիմնավորում",
       "suggestedFix": "Առաջարկվող ուղղում",
-      "whereFound": "Որտեղ է սա գտնվել ({{count}})",
+      "whereFound": "Որտեղ է սա գտնվել ({{displayCount}})",
       "fullReport": "Ամբողջական ստեղծված հաշվետվություն",
       "unknown": "Անհայտ",
       "yes": "Այո",
       "no": "Ոչ"
     },
     "dashboard": {
-      "findingsCount": "{{count}} գտածո",
+      "findingsCount": "{{displayCount}} գտածո",
       "notMeasured": "Չչափված",
       "actFirst": "Նախ գործել",
       "slaPosture": "SLA կարգավիճակ",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Պահոցի գործողությունների ծրագիր",
       "noOpenFindings": "Բաց գտածոներ չկան, որ ուշադրություն պահանջեն",
       "deadlineToday": "Ժամկետը լրացել է այսօր",
-      "daysOverdue": "{{count}} օր ուշացած",
+      "daysOverdue": "{{displayCount}} օր ուշացած",
       "withinDeadline": "Ժամկետի սահմանում",
       "criticalOverdue": "Կրիտիկական ուշացած",
       "highOverdue": "Բարձր ուշացած",
@@ -1434,6 +1436,27 @@
       "syncNow": "Համաժամեցնել հիմա",
       "syncQueued": "Համաժամեցումը հերթագրված է",
       "syncStatusUnavailable": "Համաժամեցման կարգավիճակն անհասանելի է"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Բաց գտածոներ",
+      "openFindingsDetail": "{{critical}} կրիտիկական, {{high}} բարձր",
+      "confirmedExploitable": "Հաստատված շահագործելի",
+      "confirmedExploitableDetail": "Ծրագրի ռիսկը հաստատվել է վերլուծությամբ",
+      "needsReview": "Ձեր վերանայման կարիք ունի",
+      "needsReviewDetail": "Պահանջվում է մարդկային որոշում",
+      "analysisIncomplete": "Վերլուծությունն ավարտված չէ",
+      "analysisIncompleteDetail": "Ծրագրի ռիսկը դեռ անհայտ է",
+      "slaCompliance": "SLA համապատասխանություն",
+      "notMeasured": "Չչափված",
+      "withinDeadlineDetail": "Ժամկետի սահմանում՝ {{within}} / {{total}}",
+      "noDeadlineData": "Ոչ մի գտածո դեռ SLA ժամկետ չունի",
+      "deadlinePassed": "Ժամկետը լրացել է",
+      "deadlinePassedDetail": "{{critical}} կրիտիկական, {{high}} բարձր",
+      "dueThisWeek": "Պետք է կատարվի այս շաբաթ",
+      "dueThisWeekDetail": "{{exploitable}} հաստատված շահագործելի",
+      "noDeadline": "Ժամկետ չկա",
+      "reviewSlaAssignment": "Վերանայել SLA նշանակումը",
+      "allOpenFindingsTracked": "Բոլոր բաց գտածոներն են հետևվում"
     },
     "dismiss": {
       "title": "Մերժել գտածոն",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}} վերլուծություն",
       "automation": "Ավտոմատացում",
       "automationAllOff": "Բոլորը անջատված",
-      "automationCount": "{{count}}-ը 3-ից միացված է",
+      "automationCount": "{{displayCount}}-ը 3-ից միացված է",
       "notifications": "Ծանուցումներ",
-      "notificationsCount": "{{count}}-ը 2-ից միացված է",
+      "notificationsCount": "{{displayCount}}-ը 2-ից միացված է",
       "slaPolicy": "SLA քաղաքականություն",
       "disabledNoManage": "Անվտանգության գործակալն անջատված է։ Միայն կազմակերպության սեփականատերերը և վճարման կառավարիչները կարող են այն միացնել։",
       "disabledNoRepo": "Անվտանգության գործակալը միացնելուց առաջ ընտրեք առնվազն մեկ պահոց։",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Բացել pull request{{number}}",
       "openDraftPullRequest": "Բացել սևագիր pull request{{number}}",
       "progress": "Ընթացք",
-      "attemptHistory": "Փորձերի պատմություն ({{count}})",
+      "attemptHistory": "Փորձերի պատմություն ({{displayCount}})",
       "attemptNumber": "Փորձ #{{number}}",
       "startedBy": "Սկսել է",
       "model": "Մոդել",
@@ -1855,9 +1878,9 @@
       "toolTask": "առաջադրանք",
       "readTodos": "Կարդալ անելիքները",
       "updateTodos": "Թարմացնել անելիքները",
-      "linesBadge": "{{count}} տող",
-      "filesBadge": "{{count}} ֆայլ",
-      "matchesBadge": "{{count}} համընկնում"
+      "linesBadge": "{{displayCount}} տող",
+      "filesBadge": "{{displayCount}} ֆայլ",
+      "matchesBadge": "{{displayCount}} համընկնում"
     },
     "readToolMarkdown": {
       "linesTruncated": "տող {{start}}–{{end}} (կրճատված)",
@@ -1892,6 +1915,10 @@
     },
     "modeSelector": {
       "accessibility": "Ռեժիմ՝ {{label}}"
+    },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
     },
     "modeOptions": {
       "code": "Կոդ",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Նախապատրաստումն ավարտված է",
       "preparationFailed": "Նախապատրաստումը ձախողվեց",
       "setupCommand": "Կարգավորման հրաման {{index}}",
-      "setupCommandOf": "Կարգավորման հրաման {{index}}՝ {{count}}-ից"
+      "setupCommandOf": "Կարգավորման հրաման {{index}}՝ {{displayCount}}-ից"
     },
     "permissionCard": {
       "title": "Թույլտվություն է պահանջվում",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Ներկայացումը ձախողվեց: Խնդրում ենք նորից փորձել:",
       "questionAnnouncement": "Գործակալին անհրաժեշտ է ձեր պատասխանը: Մուտքագրման դաշտը դադարեցված է, քանի դեռ պատասխանում եք:",
       "permissionAnnouncement": "Գործակալին անհրաժեշտ է թույլտվություն՝ շարունակելու համար: Մուտքագրման դաշտը դադարեցված է, քանի դեռ որոշում եք կայացնում:",
-      "positionHint": "(1-ը {{count}}-ից)",
+      "positionHint": "(1-ը {{displayCount}}-ից)",
       "movedPastPrompt": "Գործակալն անցել է այս հարցից: Այս քարտը կփակվի, երբ նիստը շարունակվի:",
       "waitingForAnswer": "Գործակալը սպասում է ձեր պատասխանին: Քանի դեռ այս հարցը բաց է, ձեր հաղորդագրությունը գործակալին դադարեցված է:",
       "waitingForPermission": "Գործակալը սպասում է թույլտվության: Քանի դեռ այս հարցումը բաց է, ձեր հաղորդագրությունը գործակալին դադարեցված է:"
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Տեսախցիկի հասանելիությունն անջատված է",
       "cameraAccessMessage": "Թույլատրեք տեսախցիկի հասանելիությունը Կարգավորումներում՝ լուսանկար անելու համար:",
       "couldNotOpenPhotoPicker": "Հնարավոր չեղավ բացել լուսանկարի ընտրիչը: Վերագործարկեք Kilo-ն և նորից փորձեք:",
-      "maxFilesAllowed": "Առավելագույնը {{count}} ֆայլ թույլատրված",
+      "maxFilesAllowed": "Առավելագույնը {{displayCount}} ֆայլ թույլատրված",
       "onlyAddingFiles": "Ավելացվում է միայն {{accepted}}-ը {{total}} ֆայլերից (առավելագույնը {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "արժեքը {{cost}}",
       "costSuffix": ", արժեքը {{cost}}",
       "tokensWindowUnavailable": "Կոնտեքստ {{used}} նշան, պատուհանը հասանելի չէ",
-      "tokensUsage": "Կոնտեքստ {{used}}-ը {{window}} նշաններից, {{percentage}}%-ն օգտագործված",
+      "tokensUsage": "Կոնտեքստ {{used}}-ը {{window}} նշաններից, {{percentage}}-ն օգտագործված",
       "title": "Կոնտեքստի օգտագործում",
       "used": "Օգտագործված",
       "remaining": "Մնացած",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "Օգտագործումն արտացոլում է օգնականի վերջին ավարտված պատասխանը:",
       "tokenUsage": "Նշանների օգտագործում",
       "cacheRate": "Քեշի դրույք",
-      "modelsCount": "Մոդելներ ({{count}})",
+      "modelsCount": "Մոդելներ ({{displayCount}})",
       "tokenTotalsNote": "Նշանների ընդհանուր քանակը վերաբերում է միայն այս նիստին և չի ներառում ենթագործակալի/ենթանիստի նշանները:",
       "subagents": "Ենթագործակալներ",
       "subagentsDescription": "Մնացորդային ծախս ենթանիստերից",
@@ -2373,7 +2400,7 @@
     "connectedCli": "Միացված CLI-ում",
     "newSessionOn": "Նոր նիստ {{name}}-ում",
     "noMatchingSessions": "Համապատասխան նիստեր չկան:",
-    "onlyFirstFilesAttached": "Միայն առաջին {{count}} ֆայլերը կցված կլինեն:",
+    "onlyFirstFilesAttached": "Միայն առաջին {{displayCount}} ֆայլերը կցված կլինեն:",
     "staleMessage": "Այս տարածումն այլևս հասանելի չէ:",
     "retryableMessage": "Հնարավոր չեղավ բեռնել ձեր նիստերը:",
     "emptyMessage": "Նիստեր դեռ չկան — սկսեք նորը՝ սա ուղարկելու համար:",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Այս Apple Account-ի Kilo Pass-ը պատկանում է մեկ այլ Kilo հաշվին: Մուտք գործեք այդ Kilo հաշիվ՝ այն կառավարելու համար:",
     "alreadySubscribed": "Դուք արդեն ունեք Kilo Pass բաժանորդագրություն:",
     "purchaseUnavailable": "Kilo Pass գնումը հասանելի չէ հենց հիմա:",
-    "tierCredits": "${{amount}} կրեդիտներ",
+    "tierCredits": "{{amount}} կրեդիտներ",
     "perMonth": "{{price}}/ամիս",
     "verifyPurchaseFailed": "Հնարավոր չեղավ հաստատել ձեր գնումը: Ստուգեք ձեր կապը և նորից փորձեք:",
     "productsCouldNotLoad": "Kilo Pass ապրանքները չհաջողվեց բեռնել App Store-ից:",
@@ -2417,7 +2444,7 @@
     "manageFailed": "Չհաջողվեց բացել App Store բաժանորդագրության կառավարումը:",
     "kiloPassSetup": "Kilo Pass կարգավորում",
     "subscriptionHeaderDescription": "Ամսական բաժանորդագրություն, որը կրեդիտներ է ավելացնում ձեր Kilo մնացորդին՝ Kilo App-ում AI ծրագրավորման նիստեր վարելու համար — Cloud Agents, հեռակառավարվող նիստեր և KiloClaw զրույցներ:",
-    "tierDescription": "${{price}} վճարված կրեդիտներ՝ ամսական ավելացված Kilo App օգտագործման համար:",
+    "tierDescription": "{{price}} վճարված կրեդիտներ՝ ամսական ավելացված Kilo App օգտագործման համար:",
     "subscribe": "Բաժանորդագրվել",
     "subscribeDescription": "Ամսական կրեդիտներ բոնուսային առաջընթացով",
     "manage": "Կառավարել",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass-ը սպասում է",
     "statusCanceling": "Kilo Pass-ը չեղարկվում է",
     "statusPastDue": "Kilo Pass-ի ժամկետն անցել է",
-    "monthlyCredits": "${{credits}} ամսական կրեդիտներ",
+    "monthlyCredits": "{{credits}} ամսական կրեդիտներ",
     "ends": "Ավարտվում է {{date}}-ին",
     "periodEnd": "ժամանակաշրջանի ավարտ",
     "managedOnGooglePlay": "Կառավարվում է Google Play-ում",

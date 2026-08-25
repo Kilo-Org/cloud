@@ -12,13 +12,26 @@ import {
  * app language drives the output. FormatJS fills the constructors Hermes omits.
  */
 
-export function formatMoney(amount: number, locale: string): string {
+export function formatUsd(
+  amount: number,
+  locale: string,
+  options: Intl.NumberFormatOptions = {}
+): string {
   return numberFormat(locale, {
+    ...options,
     style: 'currency',
     currency: 'USD',
+  })
+    .formatToParts(amount)
+    .map(part => (part.type === 'currency' ? '$' : part.value))
+    .join('');
+}
+
+export function formatMoney(amount: number, locale: string): string {
+  return formatUsd(amount, locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amount);
+  });
 }
 
 /**
@@ -27,21 +40,23 @@ export function formatMoney(amount: number, locale: string): string {
  * always pins two.
  */
 export function formatCurrency(amount: number, locale: string, fractionDigits: number): string {
-  return numberFormat(locale, {
-    style: 'currency',
-    currency: 'USD',
+  return formatUsd(amount, locale, {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
-  }).format(amount);
+  });
 }
 
 /** Amounts below this render as a zero currency value at four fraction digits (50 µ$). */
 export const CURRENCY_ZERO_THRESHOLD = 50 / 1_000_000;
 
 export function formatMoneyFromCents(amount: number, locale: string, currency = 'USD'): string {
+  const normalizedCurrency = currency.toUpperCase();
+  if (normalizedCurrency === 'USD') {
+    return formatUsd(amount / 100, locale);
+  }
   return numberFormat(locale, {
     style: 'currency',
-    currency: currency.toUpperCase(),
+    currency: normalizedCurrency,
   }).format(amount / 100);
 }
 
@@ -77,14 +92,19 @@ export function formatDuration(seconds: number, locale: string): string {
 }
 
 export function formatFileSize(bytes: number, locale: string): string {
-  const units = ['B', 'KB', 'MB', 'GB'] as const;
+  const units = ['byte', 'kilobyte', 'megabyte', 'gigabyte'] as const;
   let value = bytes;
   let unit = 0;
   while (value >= 1024 && unit < units.length - 1) {
     value /= 1024;
     unit += 1;
   }
-  return `${formatNumber(value, locale, { maximumFractionDigits: unit === 0 ? 0 : 2 })} ${units[unit]}`;
+  return formatNumber(value, locale, {
+    style: 'unit',
+    unit: units[unit],
+    unitDisplay: 'short',
+    maximumFractionDigits: unit === 0 ? 0 : 2,
+  });
 }
 
 export function firstGrapheme(value: string, locale: string): string {
@@ -110,6 +130,9 @@ export function parseLocalizedNumber(value: string, locale: string): number | nu
   let normalized = value.trim().replaceAll(/[\u061C\u200E\u200F]/g, '');
   for (const [local, ascii] of digits) {
     normalized = normalized.split(local).join(ascii);
+  }
+  if (/^[\s\u00A0\u202F]+$/u.test(group)) {
+    normalized = normalized.replaceAll(/[ \u00A0\u202F]/gu, group);
   }
   normalized = normalized.split(group).join('').split(decimal).join('.').split(minus).join('-');
   if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) {

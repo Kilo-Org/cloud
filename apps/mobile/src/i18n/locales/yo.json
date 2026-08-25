@@ -206,11 +206,11 @@
       "loadingLines": "Njẹ {{loaded}} ti {{total}} awọn laini…",
       "expandContext": "Fẹ̀ aaye-ọrọ",
       "expandMoreContext": "Fẹ̀ aaye-ọrọ diẹ sii",
-      "expandLines": "Fẹ̀ {{count}} awọn laini ({{start}}–{{end}})",
-      "expandMoreLines": "Fẹ̀ {{count}} awọn laini diẹ sii ({{start}}–{{end}})",
-      "expandLinesOfContext": "Fẹ̀ {{count}} awọn laini aaye-ọrọ",
+      "expandLines": "Fẹ̀ {{displayCount}} awọn laini ({{start}}–{{end}})",
+      "expandMoreLines": "Fẹ̀ {{displayCount}} awọn laini diẹ sii ({{start}}–{{end}})",
+      "expandLinesOfContext": "Fẹ̀ {{displayCount}} awọn laini aaye-ọrọ",
       "expandAll": "Fẹ̀ gbogbo",
-      "expandAllLines": "Fẹ̀ gbogbo {{count}} awọn laini",
+      "expandAllLines": "Fẹ̀ gbogbo {{displayCount}} awọn laini",
       "loadingMoreFiles": "Njẹ awọn faili diẹ sii…",
       "retryLoadingNextPage": "Gbìyànjú lati gbe oju-iwe atẹle lẹẹkansi",
       "failedToLoadMoreFiles": "Kuna lati gbe awọn faili diẹ sii — tẹ lati gbìyànjú lẹẹkansi",
@@ -301,7 +301,7 @@
       "closeReactions": "Pa awọn aati",
       "reactionsTitle": "Awọn aati",
       "addReaction": "Fi aati kun",
-      "reactionPill": "aati {{emoji}}, {{count}} {{countLabel}}",
+      "reactionPill": "aati {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "aati",
       "reaction": "awọn aati",
       "reaction_other": "awọn aati",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Ko si awọn okun atunyẹwo tabi awọn asọye ibaraẹnisọrọ lori ibeere fifa yii.",
       "reviewFiles": "Ṣe atunyẹwo awọn faili",
       "quotedDiffSnippet": "Apero diff ti a sọ",
-      "moreLinesAbove": "… {{count}} awọn laini diẹ sii loke",
+      "moreLinesAbove": "… {{displayCount}} awọn laini diẹ sii loke",
       "termsAcceptRequired": "O gbọdọ gba Awọn Ofin Iṣẹ lati fiweranṣẹ.",
       "termsOutdatedCopy": "Awọn Ofin Iṣẹ yipada. Tun ṣii iboju yii lati gba ẹya tuntun.",
       "termsCheckRetryCopy": "Ko le ṣayẹwo Awọn Ofin Iṣẹ. Ṣayẹwo asopọ rẹ ki o gbìyànjú lẹẹkansi."
@@ -395,11 +395,11 @@
       "retryChecks": "Gbìyànjú awọn ṣayẹwo lẹẹkansi",
       "viewOnGitHub": "Wo PR lori GitHub",
       "noChecksReported": "Ko si awọn ṣayẹwo ti a royin",
-      "passed": "{{count}} kọja",
-      "failed": "{{count}} kuna",
-      "pending": "{{count}} nduro",
-      "skipped": "{{count}} fo",
-      "checksCount": "{{count}} awọn ṣayẹwo",
+      "passed": "{{displayCount}} kọja",
+      "failed": "{{displayCount}} kuna",
+      "pending": "{{displayCount}} nduro",
+      "skipped": "{{displayCount}} fo",
+      "checksCount": "{{displayCount}} awọn ṣayẹwo",
       "checkDetails": "awọn alaye ṣayẹwo",
       "pullRequest": "ibeere fifa"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "asọye idaduro",
       "pendingComment": "awọn asọye idaduro",
       "pendingComment_other": "awọn asọye idaduro",
-      "submitCountOfTotal": "Fi {{freshCount}} ti {{totalCount}} awọn asọye silẹ",
+      "submitCountOfTotal": "Fi {{displayFreshCount}} ti {{displayTotalCount}} awọn asọye silẹ",
       "submitReview": "Fi atunyẹwo silẹ",
-      "partialPostedMessage": "Fi {{freshCount}} asọye silẹ. {{staleCount}} asọye tọka si iṣẹ atijọ ati pe o wa ninu iṣẹ́ rẹ."
+      "partialPostedMessage": "Fi {{displayFreshCount}} asọye silẹ. {{displayStaleCount}} asọye tọka si iṣẹ atijọ ati pe o wa ninu iṣẹ́ rẹ."
     },
     "reconnectNotice": {
       "title": "Asopọ GitHub ti pari",
@@ -580,7 +580,8 @@
     "agents": "Awọn aṣoju",
     "profile": "Àkójọpọ̀",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, taabu, {{position}} nínú {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Aipẹ",
       "common": "Wọpọ",
       "reactWith": "Fi aati si {{reaction}}",
-      "accessibility": "aati {{emoji}}, {{count}}"
+      "accessibility": "aati {{emoji}}, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Nfesi si",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Aworan ko si",
       "openFailed": "Ko le ṣii asomọ. Ṣayẹwo asopọ rẹ ki o gbìyànjú lẹẹkansi.",
       "attachFailed": "Kuna lati so faili mọ",
-      "limit": "O le so awọn faili {{count}} mọ.",
+      "limit": "O le so awọn faili {{displayCount}} mọ.",
       "sizeRejection": "{{filename}} kọja opin asomọ {{limit}}.",
       "unreadable": "Ko le ka {{filename}}.",
       "pastedImage": "aworan ti a lẹ pẹ",
@@ -722,6 +723,7 @@
       "finalTermEnds": "Àkókò ìkẹyìn parí",
       "afterFinalTerm": "Lẹ́yìn àkókò ìkẹyìn",
       "remaining": "Ìyókù",
+      "lessThanOneDay": "Kere ju ọjọ́ kan",
       "ends": "Parí",
       "expires": "Kógun",
       "noActivePlan": "Kò sí ètò tí ó ń ṣiṣẹ́",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "oṣù-ìsanwó Standard rẹ",
       "perMonth": "/oṣù",
       "earlybirdAccessUntil": "Ààyè Ẹyẹ òwúrọ̀ títí {{date}}",
-      "earlybirdEnding": "Ẹyẹ òwúrọ̀ ń parí: {{days}} ọjọ́ kù",
+      "earlybirdEnding": "Ẹyẹ òwúrọ̀ ń parí: {{remaining}} ọjọ́ kù",
       "paymentPastDue": "Ìsanwó ti pẹ́. Jọ̀wọ́ mẹ́nu kàn ọ̀nà ìsanwó rẹ.",
       "subscriptionCancels": "Ìfọwọ́sí fagilé {{date}}",
-      "trialDaysRemaining": "Ìgbìyànjú: {{days}} ọjọ́ ṣẹ́kù",
-      "trialEndingSoon": "Ìgbìyànjú ń parí láìpẹ́: {{days}}"
+      "trialDaysRemaining": "Ìgbìyànjú: {{remaining}} ọjọ́ ṣẹ́kù",
+      "trialEndingSoon": "Ìgbìyànjú ń parí láìpẹ́: {{remaining}}"
     },
     "changelog": {
       "title": "Kí ni Tuntun",
@@ -996,7 +998,7 @@
         "stalledTitle": "Nǹkan kan ṣe dúró",
         "stalledBody": "A kò lè parí ìtòlẹ́tò {{name}}. Gbìyànjú lẹ́ẹ̀kan síi, tàbí fi iméèlì ranṣẹ́ sí hi@kilo.ai bí èyí bá ń bá a lọ.",
         "timeoutTitle": "Ǹjẹ́ gba àkókò tó pẹ́ ju tí a rò lọ",
-        "timeoutBody": "Ìtòlẹ́tò fún {{name}} ń gba àkókò pẹ́ ju ti ìgbà dídì (ju {{minutes}} ìṣẹ́jú lọ).",
+        "timeoutBody": "Ìtòlẹ́tò fún {{name}} ń gba àkókò pẹ́ ju ti ìgbà dídì (ju {{displayMinutes}} ìṣẹ́jú lọ).",
         "continueInBackground": "Tẹ̀síwájú ní ẹ̀hìn",
         "settingUp": "Ǹjẹ́ títòlẹ́tò {{name}}",
         "finishingSetup": "Ǹjẹ́ típarí ìtòlẹ́tò",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Ẹ̀bùn ìsopọ̀",
       "repositories": "Àwọn ìpamọ́",
       "allRepositories": "Gbogbo àwọn ìpamọ́",
-      "nSelected": "{{count}} tí a yàn",
+      "nSelected": "{{displayCount}} tí a yàn",
       "reviewMemory": "Ìrántí àtúnyẹ̀wò",
       "proposedReviewMdGuidance": "Ìtọ́sọ́nà REVIEW.md tí a dábàá"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Ti itupalẹ",
       "exploitabilityReasoning": "Ìdíye nilokulo",
       "suggestedFix": "Atunṣe ti a daba",
-      "whereFound": "Nibo eyi ti a ri ({{count}})",
+      "whereFound": "Nibo eyi ti a ri ({{displayCount}})",
       "fullReport": "Ìjabọ ti a ṣe ni kikun",
       "unknown": "Àìmọ",
       "yes": "Bẹẹni",
       "no": "Rara"
     },
     "dashboard": {
-      "findingsCount": "{{count}} awọn abawọn",
+      "findingsCount": "{{displayCount}} awọn abawọn",
       "notMeasured": "Ko ṣe wiwọn",
       "actFirst": "Ṣe igbese akọkọ",
       "slaPosture": "Ipo SLA",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Eto igbese ibi ipamọ",
       "noOpenFindings": "Ko si awọn abawọn ṣiṣi ti o nilo akiyesi",
       "deadlineToday": "Ọjọ-ipari ti de oni",
-      "daysOverdue": "{{count}} ọjọ ti kọja",
+      "daysOverdue": "{{displayCount}} ọjọ ti kọja",
       "withinDeadline": "Laarin ọjọ-ipari",
       "criticalOverdue": "Pataki ti kọja",
       "highOverdue": "Ga ti kọja",
@@ -1434,6 +1436,27 @@
       "syncNow": "Mu pọ bayi",
       "syncQueued": "Ti wa ni ila fun mimu pọ",
       "syncStatusUnavailable": "Ipo mimu pọ ko wa"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Awọn abawọn ṣiṣi",
+      "openFindingsDetail": "{{critical}} pataki, {{high}} ga",
+      "confirmedExploitable": "Ti jẹrisi pe o le nilokulo",
+      "confirmedExploitableDetail": "Ewu iṣẹ́-ìdásílẹ̀ ti jẹrisi nipasẹ itupalẹ",
+      "needsReview": "Nilo atunyẹwo rẹ",
+      "needsReviewDetail": "Ipinnu eniyan nilo",
+      "analysisIncomplete": "Itupalẹ ko pari",
+      "analysisIncompleteDetail": "Ewu iṣẹ́-ìdásílẹ̀ ṣì jẹ́ àìmọ̀",
+      "slaCompliance": "Ìbáṣepọ̀ SLA",
+      "notMeasured": "Ko ṣe wiwọn",
+      "withinDeadlineDetail": "{{within}} nínú {{total}} laarin ọjọ-ipari",
+      "noDeadlineData": "Ko si awọn abawọn ti o ni ọjọ-ipari SLA sibẹsibẹ",
+      "deadlinePassed": "Ọjọ-ipari ti kọja",
+      "deadlinePassedDetail": "{{critical}} pataki, {{high}} ga",
+      "dueThisWeek": "Yẹ ni ọṣẹ yìí",
+      "dueThisWeekDetail": "{{exploitable}} ti jẹrisi pe o le nilokulo",
+      "noDeadline": "Ko si ọjọ-ipari",
+      "reviewSlaAssignment": "Ṣe atunyẹwo iyàn SLA",
+      "allOpenFindingsTracked": "Gbogbo awọn abawọn ṣiṣi ni a tọpínpin"
     },
     "dismiss": {
       "title": "Fi abawọn silẹ",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "Itupalẹ {{mode}}",
       "automation": "Adaṣe",
       "automationAllOff": "Gbogbo paa",
-      "automationCount": "{{count}} ninu 3 ti mu ṣiṣẹ",
+      "automationCount": "{{displayCount}} ninu 3 ti mu ṣiṣẹ",
       "notifications": "Awọn ifitonileti",
-      "notificationsCount": "{{count}} ninu 2 ti mu ṣiṣẹ",
+      "notificationsCount": "{{displayCount}} ninu 2 ti mu ṣiṣẹ",
       "slaPolicy": "Eto imulo SLA",
       "disabledNoManage": "Security Agent ti pa. Awọn oniwun àjọ ati awọn oluṣakoso owo nikan ni o le mu u ṣiṣẹ.",
       "disabledNoRepo": "Yan o kere ju ibi ipamọ kan ṣaaju ki o to mu Security Agent ṣiṣẹ.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Ṣii ibeere fifa{{number}}",
       "openDraftPullRequest": "Ṣii ibeere fifa osere{{number}}",
       "progress": "Ilọsiwaju",
-      "attemptHistory": "Itan igbiyanju ({{count}})",
+      "attemptHistory": "Itan igbiyanju ({{displayCount}})",
       "attemptNumber": "Igbiyanju #{{number}}",
       "startedBy": "Ti bẹrẹ nipasẹ",
       "model": "Awoṣe",
@@ -1855,9 +1878,9 @@
       "toolTask": "iṣẹ",
       "readTodos": "Ka awọn todos",
       "updateTodos": "Ṣe imudojuiwọn awọn todos",
-      "linesBadge": "{{count}} awọn ila",
-      "filesBadge": "{{count}} awọn faili",
-      "matchesBadge": "{{count}} awọn baramu"
+      "linesBadge": "{{displayCount}} awọn ila",
+      "filesBadge": "{{displayCount}} awọn faili",
+      "matchesBadge": "{{displayCount}} awọn baramu"
     },
     "readToolMarkdown": {
       "linesTruncated": "awọn ila {{start}}–{{end}} (ti ge kuru)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "A ko le jabo idahun yii.",
       "reportAiResponseSubmitted": "Ijabọ ti firanṣẹ. Iwe-ẹri {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Awọn alaye ko wa",
       "textDisplay": "Ìfihan ọrọ",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Imurasilẹ pari",
       "preparationFailed": "Imurasilẹ kuna",
       "setupCommand": "Aṣẹ eto {{index}}",
-      "setupCommandOf": "Aṣẹ eto {{index}} ninu {{count}}"
+      "setupCommandOf": "Aṣẹ eto {{index}} ninu {{displayCount}}"
     },
     "permissionCard": {
       "title": "Iraye to nilo",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Ifisilẹ kuna. Jọwọ gbiyanju lẹẹkansi.",
       "questionAnnouncement": "Aṣoju nilo idahun rẹ. Olupilẹṣẹ ti duro si bi o ṣe n dahun.",
       "permissionAnnouncement": "Aṣoju nilo igbanilaye lati tẹsiwaju. Olupilẹṣẹ ti duro si bi o ṣe n pinnu.",
-      "positionHint": "(1 ninu {{count}})",
+      "positionHint": "(1 ninu {{displayCount}})",
       "movedPastPrompt": "Aṣoju ti kọja ibi ireti yii. Kaadi yii yoo pa nigba ti igba-ijiroro ba tẹsiwaju.",
       "waitingForAnswer": "Aṣoju n duro fun esi rẹ. Nigba ti ibeere yii ba wa ni sisi, ifiranṣẹ rẹ si aṣoju ti duro si.",
       "waitingForPermission": "Aṣoju n duro fun igbanilaye. Nigba ti ibeere yii ba wa ni sisi, ifiranṣẹ rẹ si aṣoju ti duro si."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Kamẹra Irayeṣi Ti Pa",
       "cameraAccessMessage": "Gba irayeṣi kamẹra ni Awọn Eto lati ya aworan.",
       "couldNotOpenPhotoPicker": "Ko le ṣii oluyan aworan. Tun Kilo bẹrẹ ki o si gbiyanju lẹẹkansi.",
-      "maxFilesAllowed": "Iwon {{count}} faili ti gba",
+      "maxFilesAllowed": "Iwon {{displayCount}} faili ti gba",
       "onlyAddingFiles": "Nikan ṣafikun {{accepted}} ninu {{total}} faili (pupọ {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "idiyele {{cost}}",
       "costSuffix": ", idiyele {{cost}}",
       "tokensWindowUnavailable": "Ọrọ-àkóónú {{used}} tokens, windọọ ko si",
-      "tokensUsage": "Ọrọ-àkóónú {{used}} ninu {{window}} tokens, {{percentage}}% ti lo",
+      "tokensUsage": "Ọrọ-àkóónú {{used}} ninu {{window}} tokens, {{percentage}} ti lo",
       "title": "Lilo ọrọ-àkóónú",
       "used": "Ti lo",
       "remaining": "To ku",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "Lilo ṣe afihan esi oluranlowo ti o pari laipe.",
       "tokenUsage": "Lilo token",
       "cacheRate": "Oṣuwọn cache",
-      "modelsCount": "Awọn awoṣe ({{count}})",
+      "modelsCount": "Awọn awoṣe ({{displayCount}})",
       "tokenTotalsNote": "Lapapọ token bo igba-ijiroro yii nikan ati pe ko ka awọn token subagent/igba-ijiroro ọmọ.",
       "subagents": "Awọn subagent",
       "subagentsDescription": "Idiyele iyokù lati awọn igba-ijiroro ọmọ",
@@ -2373,7 +2400,7 @@
     "connectedCli": "Lori CLI ti o ti so",
     "newSessionOn": "Igba-ijiroro tuntun lori {{name}}",
     "noMatchingSessions": "Ko si igba-ijiroro to baamu.",
-    "onlyFirstFilesAttached": "Awọn faili {{count}} akọkọ nikan ni yoo so.",
+    "onlyFirstFilesAttached": "Awọn faili {{displayCount}} akọkọ nikan ni yoo so.",
     "staleMessage": "Pinpin yii ko si mọ.",
     "retryableMessage": "Ko le ṣagbewọ awọn igba-ijiroro rẹ.",
     "emptyMessage": "Ko si igba-ijiroro sibẹsibẹ — bẹrẹ tuntun lati fi eyi ranṣẹ.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Kilo Pass lori Apple Account yii jẹ ti Kilo akọọlẹ miiran. Wọle si Kilo akọọlẹ yẹn lati ṣakoso rẹ.",
     "alreadySubscribed": "O ti ni ìfọwọsowọpọ Kilo Pass tẹlẹ.",
     "purchaseUnavailable": "Rira Kilo Pass ko si ni bayi.",
-    "tierCredits": "${{amount}} ninu awọn kirẹditi",
+    "tierCredits": "{{amount}} ninu awọn kirẹditi",
     "perMonth": "{{price}}/osu",
     "verifyPurchaseFailed": "Ko le ṣe ijẹrisi rira rẹ. Ṣayẹwo asopọ rẹ ki o si gbiyanju lẹẹkansi.",
     "productsCouldNotLoad": "A ko le ṣagbewọ awọn ọja Kilo Pass lati App Store.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "Kuna lati ṣii iṣakoso ìfọwọsowọpọ App Store.",
     "kiloPassSetup": "Eto Kilo Pass",
     "subscriptionHeaderDescription": "Ìfọwọsowọpọ oṣooṣu ti n fi awọn kirẹditi kun si iwọntunwọnsi Kilo rẹ fun ṣiṣe awọn igba-ijiroro koodu AI ninu Kilo App — Cloud Agents, awọn igba-ijiroro jijin, ati awọn ijiroro KiloClaw.",
-    "tierDescription": "${{price}} awọn kirẹditi ti a san ti a fi kun ni oṣooṣu fun lilo Kilo App.",
+    "tierDescription": "{{price}} awọn kirẹditi ti a san ti a fi kun ni oṣooṣu fun lilo Kilo App.",
     "subscribe": "Fọwọsowọpọ",
     "subscribeDescription": "Awọn kirẹditi oṣooṣu pẹlu ilọsiwaju ẹbun",
     "manage": "Ṣakoso",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass n duro",
     "statusCanceling": "Kilo Pass n fagile",
     "statusPastDue": "Kilo Pass ti pẹ",
-    "monthlyCredits": "${{credits}} awọn kirẹditi oṣooṣu",
+    "monthlyCredits": "{{credits}} awọn kirẹditi oṣooṣu",
     "ends": "Pari {{date}}",
     "periodEnd": "ipari akoko",
     "managedOnGooglePlay": "Ti ṣakoso lori Google Play",

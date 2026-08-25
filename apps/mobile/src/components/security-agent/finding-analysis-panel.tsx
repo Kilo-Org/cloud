@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- this panel renders one analysis response. */
 import {
   getSecurityAnalysisDetailPresentation,
   getSecurityFindingAnalysisState,
@@ -21,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { formatNumber } from '@/lib/format';
 import { useSecurityAnalysisCapacity } from '@/lib/hooks/use-security-agent';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -36,9 +38,7 @@ type FindingAnalysisPanelProps = {
   onRetry: () => void;
 };
 
-// Ported from FindingDetailDialog.tsx:985 (getAnalysisPresentation) — triage
-// and sandbox evidence rendered as plain facts plus the raw technical
-// report, rather than the web's hero/summary/action/steps narrative.
+// Ported from FindingDetailDialog.tsx:985; this panel keeps the raw technical report.
 export function FindingAnalysisPanel({
   scope,
   findingId,
@@ -49,7 +49,7 @@ export function FindingAnalysisPanel({
 }: Readonly<FindingAnalysisPanelProps>) {
   const router = useRouter();
   const colors = useThemeColors();
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const capacity = useSecurityAnalysisCapacity(scope);
   const startAnalysis = useStartSecurityAnalysis(scope);
 
@@ -301,7 +301,10 @@ export function FindingAnalysisPanel({
           ) : null}
           {uniqueLocations.length > 0 ? (
             <CollapsibleSection
-              title={t('securityAgent.analysis.whereFound', { count: uniqueLocations.length })}
+              title={t('securityAgent.analysis.whereFound', {
+                count: uniqueLocations.length,
+                displayCount: formatNumber(uniqueLocations.length, i18n.language),
+              })}
               defaultExpanded={uniqueLocations.length <= 2}
             >
               {uniqueLocations.map(location => (

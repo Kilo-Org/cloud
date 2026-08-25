@@ -201,7 +201,8 @@
     "agents": "Tác nhân",
     "profile": "Hồ sơ",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, tab, {{position}} trên {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -242,7 +243,7 @@
       "recent": "Gần đây",
       "common": "Phổ biến",
       "reactWith": "Phản ứng bằng {{reaction}}",
-      "accessibility": "{{emoji}} phản ứng, {{count}}"
+      "accessibility": "{{emoji}} phản ứng, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Đang trả lời",
@@ -271,7 +272,7 @@
       "imageUnavailable": "Hình ảnh không khả dụng",
       "openFailed": "Không mở được tệp đính kèm. Kiểm tra kết nối và thử lại.",
       "attachFailed": "Không đính kèm được tệp",
-      "limit": "Bạn có thể đính kèm tối đa {{count}} tệp.",
+      "limit": "Bạn có thể đính kèm tối đa {{displayCount}} tệp.",
       "sizeRejection": "{{filename}} vượt quá giới hạn đính kèm {{limit}}.",
       "unreadable": "Không đọc được {{filename}}.",
       "pastedImage": "hình ảnh đã dán",
@@ -343,6 +344,7 @@
       "finalTermEnds": "Kỳ hạn cuối kết thúc",
       "afterFinalTerm": "Sau kỳ hạn cuối",
       "remaining": "Còn lại",
+      "lessThanOneDay": "Dưới 1 ngày",
       "ends": "Kết thúc",
       "expires": "Hết hạn",
       "noActivePlan": "Không có gói đang hoạt động",
@@ -361,11 +363,11 @@
       "yourStandardMonthlyPrice": "giá Standard hằng tháng của bạn",
       "perMonth": "/tháng",
       "earlybirdAccessUntil": "Quyền truy cập Earlybird đến {{date}}",
-      "earlybirdEnding": "Earlybird sắp kết thúc: còn {{days}} ngày",
+      "earlybirdEnding": "Earlybird sắp kết thúc: còn {{remaining}} ngày",
       "paymentPastDue": "Thanh toán quá hạn. Vui lòng cập nhật phương thức thanh toán.",
       "subscriptionCancels": "Gói đăng ký hủy vào {{date}}",
-      "trialDaysRemaining": "Dùng thử: còn {{days}} ngày",
-      "trialEndingSoon": "Dùng thử sắp kết thúc: {{days}}"
+      "trialDaysRemaining": "Dùng thử: còn {{remaining}} ngày",
+      "trialEndingSoon": "Dùng thử sắp kết thúc: {{remaining}}"
     },
     "changelog": {
       "title": "Có gì mới",
@@ -665,7 +667,7 @@
         "startingSandbox": "Đang khởi động hộp cát",
         "stoppedBody": "Phiên bản của {{name}} dừng bất ngờ trong quá trình thiết lập.",
         "stoppedTitle": "Thiết lập đã dừng",
-        "timeoutBody": "Thiết lập cho {{name}} mất nhiều thời gian hơn bình thường (hơn {{minutes}} phút).",
+        "timeoutBody": "Thiết lập cho {{name}} mất nhiều thời gian hơn bình thường (hơn {{displayMinutes}} phút).",
         "timeoutTitle": "Mất nhiều thời gian hơn dự kiến"
       },
       "unavailableDescription": "Cần có gói đăng ký KiloClaw hiện tại để cấp phát phiên bản. Các phiên bản và gói đăng ký hiện có vẫn tiếp tục bình thường.",
@@ -912,7 +914,7 @@
       "focusAreas": "Lĩnh vực trọng tâm",
       "mergeGate": "Cổng hợp nhất",
       "model": "Mô hình",
-      "nSelected": "{{count}} đã chọn",
+      "nSelected": "{{displayCount}} đã chọn",
       "proposedReviewMdGuidance": "Hướng dẫn REVIEW.md được đề xuất",
       "repositories": "Kho lưu trữ",
       "reviewMemory": "Bộ nhớ đánh giá",
@@ -981,7 +983,7 @@
       "triageReasoning": "Lập luận phân loại",
       "unknown": "Không xác định",
       "watchInCloudAgent": "Xem trong Cloud Agent",
-      "whereFound": "Nơi phát hiện ({{count}})",
+      "whereFound": "Nơi phát hiện ({{displayCount}})",
       "yes": "Có"
     },
     "analysisSettings": {
@@ -1061,11 +1063,11 @@
       "confirmedExploitable": "Đã xác nhận có thể khai thác",
       "couldNotLoad": "Không thể tải dữ liệu bảng điều khiển",
       "criticalOverdue": "Nghiêm trọng quá hạn",
-      "daysOverdue": "Quá hạn {{count}} ngày",
+      "daysOverdue": "Quá hạn {{displayCount}} ngày",
       "deadlineToday": "Đến hạn hôm nay",
       "filterByRepository": "Lọc theo kho lưu trữ",
       "findings": "Phát hiện",
-      "findingsCount": "{{count}} phát hiện",
+      "findingsCount": "{{displayCount}} phát hiện",
       "highOverdue": "Cao quá hạn",
       "lastSynced": "Đồng bộ lần cuối {{time}}",
       "manageRepositories": "Quản lý kho lưu trữ",
@@ -1090,6 +1092,27 @@
       "syncQueued": "Đã xếp hàng đồng bộ",
       "syncStatusUnavailable": "Trạng thái đồng bộ không khả dụng",
       "withinDeadline": "Trong hạn"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Phát hiện đang mở",
+      "openFindingsDetail": "{{critical}} nghiêm trọng, {{high}} cao",
+      "confirmedExploitable": "Đã xác nhận có thể khai thác",
+      "confirmedExploitableDetail": "Rủi ro dự án được xác nhận bằng phân tích",
+      "needsReview": "Cần bạn xem xét",
+      "needsReviewDetail": "Cần quyết định của con người",
+      "analysisIncomplete": "Phân tích chưa hoàn tất",
+      "analysisIncompleteDetail": "Rủi ro dự án vẫn chưa rõ",
+      "slaCompliance": "Tuân thủ SLA",
+      "notMeasured": "Chưa đo lường",
+      "withinDeadlineDetail": "{{within}} trong {{total}} trong hạn",
+      "noDeadlineData": "Chưa có phát hiện nào có hạn chót SLA",
+      "deadlinePassed": "Đã quá hạn",
+      "deadlinePassedDetail": "{{critical}} nghiêm trọng, {{high}} cao",
+      "dueThisWeek": "Đến hạn trong tuần này",
+      "dueThisWeekDetail": "{{exploitable}} đã xác nhận có thể khai thác",
+      "noDeadline": "Không có hạn chót",
+      "reviewSlaAssignment": "Xem xét phân bổ SLA",
+      "allOpenFindingsTracked": "Tất cả phát hiện đang mở đều được theo dõi"
     },
     "dismiss": {
       "alreadyResolvedDescription": "Phát hiện này đã được giải quyết và không còn chấp nhận việc bỏ qua.",
@@ -1188,7 +1211,7 @@
       "title": "Thông báo"
     },
     "remediation": {
-      "attemptHistory": "Lịch sử lần thử ({{count}})",
+      "attemptHistory": "Lịch sử lần thử ({{displayCount}})",
       "attemptNumber": "Lần thử #{{number}}",
       "branch": "Nhánh",
       "cancelMessage": "Security Agent sẽ dừng lần thử khắc phục đang diễn ra.",
@@ -1256,7 +1279,7 @@
       "analysisModeSubtitle": "Phân tích {{mode}}",
       "automation": "Tự động hóa",
       "automationAllOff": "Tất cả đều tắt",
-      "automationCount": "Đã bật {{count}}/3",
+      "automationCount": "Đã bật {{displayCount}}/3",
       "couldNotLoadPermissions": "Không thể tải quyền",
       "couldNotLoadRepositories": "Không thể tải các kho lưu trữ",
       "couldNotLoadSettings": "Không thể tải cài đặt Security Agent",
@@ -1267,7 +1290,7 @@
       "enabled": "Đã bật",
       "modelsAndAnalysis": "Mô hình & phân tích",
       "notifications": "Thông báo",
-      "notificationsCount": "Đã bật {{count}}/2",
+      "notificationsCount": "Đã bật {{displayCount}}/2",
       "off": "Tắt",
       "on": "Bật",
       "repositories": "Kho lưu trữ",
@@ -1476,9 +1499,9 @@
       "toolTask": "tác vụ",
       "readTodos": "Đọc việc cần làm",
       "updateTodos": "Cập nhật việc cần làm",
-      "linesBadge": "{{count}} dòng",
-      "filesBadge": "{{count}} tệp",
-      "matchesBadge": "{{count}} kết quả khớp"
+      "linesBadge": "{{displayCount}} dòng",
+      "filesBadge": "{{displayCount}} tệp",
+      "matchesBadge": "{{displayCount}} kết quả khớp"
     },
     "readToolMarkdown": {
       "linesTruncated": "các dòng {{start}}–{{end}} (đã cắt bớt)",
@@ -1562,6 +1585,10 @@
       "reportAiResponseFailedTerminal": "Không thể báo cáo phản hồi này.",
       "reportAiResponseSubmitted": "Đã gửi báo cáo. Biên nhận {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Chi tiết không khả dụng",
       "textDisplay": "Hiển thị văn bản",
@@ -1620,7 +1647,7 @@
       "preparationComplete": "Chuẩn bị hoàn tất",
       "preparationFailed": "Chuẩn bị thất bại",
       "setupCommand": "Lệnh thiết lập {{index}}",
-      "setupCommandOf": "Lệnh thiết lập {{index}} trên {{count}}"
+      "setupCommandOf": "Lệnh thiết lập {{index}} trên {{displayCount}}"
     },
     "permissionCard": {
       "title": "Cần quyền",
@@ -1657,7 +1684,7 @@
       "submissionFailed": "Gửi thất bại. Vui lòng thử lại.",
       "questionAnnouncement": "Tác nhân cần nhập liệu của bạn. Trình soạn đang tạm dừng trong khi bạn trả lời.",
       "permissionAnnouncement": "Tác nhân cần quyền để tiếp tục. Trình soạn đang tạm dừng trong khi bạn quyết định.",
-      "positionHint": "(1 trên {{count}})",
+      "positionHint": "(1 trên {{displayCount}})",
       "movedPastPrompt": "Tác nhân đã vượt qua lời nhắc này. Thẻ này sẽ đóng khi phiên tiếp tục.",
       "waitingForAnswer": "Tác nhân đang chờ câu trả lời của bạn. Trong khi câu hỏi này đang mở, tin nhắn của bạn đến tác nhân bị tạm dừng.",
       "waitingForPermission": "Tác nhân đang chờ quyền. Trong khi yêu cầu này đang mở, tin nhắn của bạn đến tác nhân bị tạm dừng."
@@ -1778,7 +1805,7 @@
       "cameraAccessDisabled": "Quyền truy cập máy ảnh bị tắt",
       "cameraAccessMessage": "Cho phép quyền truy cập máy ảnh trong Cài đặt để chụp ảnh.",
       "couldNotOpenPhotoPicker": "Không thể mở trình chọn ảnh. Khởi động lại Kilo và thử lại.",
-      "maxFilesAllowed": "Cho phép tối đa {{count}} tệp",
+      "maxFilesAllowed": "Cho phép tối đa {{displayCount}} tệp",
       "onlyAddingFiles": "Chỉ thêm {{accepted}} trong {{total}} tệp (tối đa {{max}})"
     },
     "composer": {
@@ -1843,7 +1870,7 @@
       "costPrefix": "chi phí {{cost}}",
       "costSuffix": ", chi phí {{cost}}",
       "tokensWindowUnavailable": "Ngữ cảnh {{used}} token, cửa sổ không khả dụng",
-      "tokensUsage": "Ngữ cảnh {{used}} trên {{window}} token, đã dùng {{percentage}}%",
+      "tokensUsage": "Ngữ cảnh {{used}} trên {{window}} token, đã dùng {{percentage}}",
       "title": "Mức sử dụng ngữ cảnh",
       "used": "Đã dùng",
       "remaining": "Còn lại",
@@ -1852,7 +1879,7 @@
       "usageReflectsLatest": "Mức sử dụng phản ánh phản hồi trợ lý hoàn tất gần nhất.",
       "tokenUsage": "Mức sử dụng token",
       "cacheRate": "Tỷ lệ bộ nhớ đệm",
-      "modelsCount": "Mô hình ({{count}})",
+      "modelsCount": "Mô hình ({{displayCount}})",
       "tokenTotalsNote": "Tổng token chỉ tính phiên này và không bao gồm token của tác nhân phụ/phiên con.",
       "subagents": "Tác nhân phụ",
       "subagentsDescription": "Chi phí còn lại từ các phiên con",
@@ -1994,7 +2021,7 @@
     "connectedCli": "Trên CLI đã kết nối",
     "newSessionOn": "Phiên mới trên {{name}}",
     "noMatchingSessions": "Không có phiên nào khớp.",
-    "onlyFirstFilesAttached": "Chỉ {{count}} tệp đầu tiên sẽ được đính kèm.",
+    "onlyFirstFilesAttached": "Chỉ {{displayCount}} tệp đầu tiên sẽ được đính kèm.",
     "staleMessage": "Chia sẻ này không còn khả dụng.",
     "retryableMessage": "Không thể tải các phiên của bạn.",
     "emptyMessage": "Chưa có phiên nào — hãy bắt đầu phiên mới để gửi nội dung này.",
@@ -2027,7 +2054,7 @@
     "otherAccountCopy": "Kilo Pass trên Tài khoản Apple này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để quản lý.",
     "alreadySubscribed": "Bạn đã có gói đăng ký Kilo Pass.",
     "purchaseUnavailable": "Giao dịch mua Kilo Pass hiện không khả dụng.",
-    "tierCredits": "${{amount}} tín dụng",
+    "tierCredits": "{{amount}} tín dụng",
     "perMonth": "{{price}}/tháng",
     "verifyPurchaseFailed": "Không thể xác minh giao dịch mua của bạn. Kiểm tra kết nối và thử lại.",
     "productsCouldNotLoad": "Không thể tải các sản phẩm Kilo Pass từ App Store.",
@@ -2038,7 +2065,7 @@
     "manageFailed": "Không thể mở quản lý đăng ký App Store.",
     "kiloPassSetup": "Thiết lập Kilo Pass",
     "subscriptionHeaderDescription": "Gói đăng ký hàng tháng giúp thêm tín dụng vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App — Cloud Agents, phiên từ xa và trò chuyện KiloClaw.",
-    "tierDescription": "${{price}} tín dụng trả phí được thêm hàng tháng cho việc sử dụng Kilo App.",
+    "tierDescription": "{{price}} tín dụng trả phí được thêm hàng tháng cho việc sử dụng Kilo App.",
     "subscribe": "Đăng ký",
     "subscribeDescription": "Tín dụng hàng tháng kèm tiến trình thưởng",
     "manage": "Quản lý",
@@ -2046,7 +2073,7 @@
     "statusPending": "Kilo Pass đang chờ",
     "statusCanceling": "Kilo Pass đang hủy",
     "statusPastDue": "Kilo Pass quá hạn",
-    "monthlyCredits": "${{credits}} tín dụng hàng tháng",
+    "monthlyCredits": "{{credits}} tín dụng hàng tháng",
     "ends": "Kết thúc {{date}}",
     "periodEnd": "cuối kỳ",
     "managedOnGooglePlay": "Được quản lý trên Google Play",
@@ -2150,17 +2177,17 @@
     "accessDeniedDescription": "Bạn không có quyền xem yêu cầu hợp nhất này.",
     "checkConnection": "Kiểm tra kết nối",
     "checks": {
-      "checksCount": "{{count}} lần kiểm tra",
+      "checksCount": "{{displayCount}} lần kiểm tra",
       "couldNotLoad": "Không thể tải các lần kiểm tra.",
-      "failed": "{{count}} thất bại",
+      "failed": "{{displayCount}} thất bại",
       "noAccess": "Bạn không có quyền truy cập vào các lần kiểm tra của kho lưu trữ này.",
       "noChecksReported": "Không có lần kiểm tra nào được báo cáo",
       "notAvailable": "Các lần kiểm tra chưa khả dụng. Commit đầu có thể chưa được xử lý, hoặc Ứng dụng Kilo GitHub chưa được cài đặt trên kho lưu trữ đầu.",
       "openDetails": "Mở chi tiết {{name}}",
-      "passed": "{{count}} đạt",
-      "pending": "{{count}} đang chờ",
+      "passed": "{{displayCount}} đạt",
+      "pending": "{{displayCount}} đang chờ",
       "retryChecks": "Thử lại các lần kiểm tra",
-      "skipped": "{{count}} bị bỏ qua",
+      "skipped": "{{displayCount}} bị bỏ qua",
       "title": "Kiểm tra",
       "viewOnGitHub": "Xem PR trên GitHub",
       "checkDetails": "chi tiết lần kiểm tra",
@@ -2238,7 +2265,7 @@
           "terminal": "Không thể báo cáo người dùng này."
         }
       },
-      "moreLinesAbove": "… {{count}} dòng nữa ở trên",
+      "moreLinesAbove": "… {{displayCount}} dòng nữa ở trên",
       "mute": "Tắt tiếng",
       "mutedUser": "Đã tắt tiếng {{login}}",
       "noDiscussion": "Chưa có thảo luận",
@@ -2246,7 +2273,7 @@
       "comment_one": "1 bình luận",
       "outdated": "Đã lỗi thời",
       "quotedDiffSnippet": "Đoạn diff được trích dẫn",
-      "reactionPill": "{{emoji}} phản ứng, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} phản ứng, {{displayCount}} {{countLabel}}",
       "reaction": "phản ứng",
       "reaction_other": "phản ứng",
       "reaction_one": "phản ứng",
@@ -2350,12 +2377,12 @@
     "hunkRows": {
       "contextUnavailable": "Ngữ cảnh không khả dụng tại ref này",
       "expandAll": "Mở rộng tất cả",
-      "expandAllLines": "Mở rộng tất cả {{count}} dòng",
+      "expandAllLines": "Mở rộng tất cả {{displayCount}} dòng",
       "expandContext": "Mở rộng ngữ cảnh",
-      "expandLines": "Mở rộng {{count}} dòng ({{start}}–{{end}})",
-      "expandLinesOfContext": "Mở rộng {{count}} dòng ngữ cảnh",
+      "expandLines": "Mở rộng {{displayCount}} dòng ({{start}}–{{end}})",
+      "expandLinesOfContext": "Mở rộng {{displayCount}} dòng ngữ cảnh",
       "expandMoreContext": "Mở rộng thêm ngữ cảnh",
-      "expandMoreLines": "Mở rộng thêm {{count}} dòng ({{start}}–{{end}})",
+      "expandMoreLines": "Mở rộng thêm {{displayCount}} dòng ({{start}}–{{end}})",
       "failedToLoadContext": "Không tải được ngữ cảnh — chạm để thử lại",
       "failedToLoadMoreFiles": "Không tải được thêm tệp — chạm để thử lại",
       "fileLoadedCount_one": "Đã tải {{displayCount}} tệp",
@@ -2500,8 +2527,8 @@
       "pendingComment_one": "bình luận đang chờ",
       "summaryOptional": "Tóm tắt (tùy chọn)",
       "title": "Gửi đánh giá",
-      "partialPostedMessage": "Đã đăng {{freshCount}} bình luận. {{staleCount}} bình luận trỏ đến commit cũ hơn và vẫn nằm trong hàng đợi của bạn.",
-      "submitCountOfTotal": "Gửi {{freshCount}} trong {{totalCount}} bình luận",
+      "partialPostedMessage": "Đã đăng {{displayFreshCount}} bình luận. {{displayStaleCount}} bình luận trỏ đến commit cũ hơn và vẫn nằm trong hàng đợi của bạn.",
+      "submitCountOfTotal": "Gửi {{displayFreshCount}} trong {{displayTotalCount}} bình luận",
       "submitReview": "Gửi đánh giá"
     },
     "fileStatus": {

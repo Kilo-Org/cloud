@@ -206,11 +206,11 @@
       "loadingLines": "{{total}} میں سے {{loaded}} لائنیں لوڈ ہو رہی ہیں...",
       "expandContext": "سیاق پھیلائیں",
       "expandMoreContext": "مزید سیاق پھیلائیں",
-      "expandLines": "{{count}} لائنیں پھیلائیں ({{start}}–{{end}})",
-      "expandMoreLines": "مزید {{count}} لائنیں پھیلائیں ({{start}}–{{end}})",
-      "expandLinesOfContext": "سیاق کی {{count}} لائنیں پھیلائیں",
+      "expandLines": "{{displayCount}} لائنیں پھیلائیں ({{start}}–{{end}})",
+      "expandMoreLines": "مزید {{displayCount}} لائنیں پھیلائیں ({{start}}–{{end}})",
+      "expandLinesOfContext": "سیاق کی {{displayCount}} لائنیں پھیلائیں",
       "expandAll": "سب پھیلائیں",
-      "expandAllLines": "تمام {{count}} لائنیں پھیلائیں",
+      "expandAllLines": "تمام {{displayCount}} لائنیں پھیلائیں",
       "loadingMoreFiles": "مزید فائلیں لوڈ ہو رہی ہیں...",
       "retryLoadingNextPage": "اگلا صفحہ لوڈ کرنے کی دوبارہ کوشش کریں",
       "failedToLoadMoreFiles": "مزید فائلیں لوڈ نہیں ہو سکیں — دوبارہ کوشش کے لیے تھپتھپائیں",
@@ -301,7 +301,7 @@
       "closeReactions": "ردعمل بند کریں",
       "reactionsTitle": "ردعمل",
       "addReaction": "ردعمل شامل کریں",
-      "reactionPill": "{{emoji}} ردعمل، {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} ردعمل، {{displayCount}} {{countLabel}}",
       "reaction_one": "ردعمل",
       "reaction": "ردعمل",
       "reaction_other": "ردعمل",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "اس پل ریکویسٹ پر کوئی جائزہ تھریڈ یا گفتگو تبصرہ نہیں۔",
       "reviewFiles": "فائلوں کا جائزہ لیں",
       "quotedDiffSnippet": "اقتباسی diff ٹکڑا",
-      "moreLinesAbove": "اوپر مزید {{count}} لائنیں...",
+      "moreLinesAbove": "اوپر مزید {{displayCount}} لائنیں...",
       "termsAcceptRequired": "پوسٹ کرنے کے لیے آپ کو خدمت کی شرائط قبول کرنی ہوں گی۔",
       "termsOutdatedCopy": "خدمت کی شرائط تبدیل ہو گئیں۔ تازہ ترین ورژن قبول کرنے کے لیے یہ اسکرین دوبارہ کھولیں۔",
       "termsCheckRetryCopy": "خدمت کی شرائط چیک نہیں ہو سکیں۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔"
@@ -395,11 +395,11 @@
       "retryChecks": "جانچوں کی دوبارہ کوشش کریں",
       "viewOnGitHub": "GitHub پر PR دیکھیں",
       "noChecksReported": "کوئی جانچ رپورٹ نہیں ہوئی",
-      "passed": "{{count}} پاس",
-      "failed": "{{count}} ناکام",
-      "pending": "{{count}} زیر التوا",
-      "skipped": "{{count}} چھوڑی گئیں",
-      "checksCount": "{{count}} جانچیں",
+      "passed": "{{displayCount}} پاس",
+      "failed": "{{displayCount}} ناکام",
+      "pending": "{{displayCount}} زیر التوا",
+      "skipped": "{{displayCount}} چھوڑی گئیں",
+      "checksCount": "{{displayCount}} جانچیں",
       "checkDetails": "جانچ کی تفصیلات",
       "pullRequest": "پل ریکویسٹ"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "زیر التوا تبصرہ",
       "pendingComment": "زیر التوا تبصرے",
       "pendingComment_other": "زیر التوا تبصرے",
-      "submitCountOfTotal": "{{totalCount}} میں سے {{freshCount}} تبصرے جمع کریں",
+      "submitCountOfTotal": "{{displayTotalCount}} میں سے {{displayFreshCount}} تبصرے جمع کریں",
       "submitReview": "جائزہ جمع کریں",
-      "partialPostedMessage": "{{freshCount}} تبصرہ(ے) پوسٹ ہوئے۔ {{staleCount}} تبصرہ(ے) پرانی کمیٹ کی طرف اشارہ کرتے ہیں اور آپ کی قطار میں رہے۔"
+      "partialPostedMessage": "{{displayFreshCount}} تبصرہ(ے) پوسٹ ہوئے۔ {{displayStaleCount}} تبصرہ(ے) پرانی کمیٹ کی طرف اشارہ کرتے ہیں اور آپ کی قطار میں رہے۔"
     },
     "reconnectNotice": {
       "title": "GitHub کنکشن ختم ہو گیا",
@@ -580,7 +580,8 @@
     "agents": "ایجینٹس",
     "profile": "پروفائل",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}، ٹیب، {{total}} میں سے {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "حالیہ",
       "common": "عام",
       "reactWith": "{{reaction}} سے ردعمل دیں",
-      "accessibility": "{{emoji}} ردعمل، {{count}}"
+      "accessibility": "{{emoji}} ردعمل، {{displayCount}}"
     },
     "composer": {
       "replyingTo": "کا جواب دے رہے ہیں",
@@ -650,7 +651,7 @@
       "imageUnavailable": "تصویر دستیاب نہیں",
       "openFailed": "منسلکہ نہیں کھلا سکے۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
       "attachFailed": "فائل منسلک کرنے میں ناکامی",
-      "limit": "آپ {{count}} تک فائلیں منسلک کر سکتے ہیں۔",
+      "limit": "آپ {{displayCount}} تک فائلیں منسلک کر سکتے ہیں۔",
       "sizeRejection": "{{filename}} {{limit}} منسلکہ حد سے بڑھ جاتی ہے۔",
       "unreadable": "{{filename}} پڑھی نہیں جا سکی۔",
       "pastedImage": "چسپاں کردہ تصویر",
@@ -722,6 +723,7 @@
       "finalTermEnds": "آخری مدت ختم",
       "afterFinalTerm": "آخری مدت کے بعد",
       "remaining": "باقی",
+      "lessThanOneDay": "1 دن سے کم",
       "ends": "ختم",
       "expires": "میعاد ختم",
       "noActivePlan": "کوئی فعال منصوبہ نہیں",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "آپ کی معیاری ماہانہ قیمت",
       "perMonth": "/ماہ",
       "earlybirdAccessUntil": "Earlybird تک رسائی {{date}} تک",
-      "earlybirdEnding": "Earlybird ختم: {{days}} دن باقی",
+      "earlybirdEnding": "Earlybird ختم: {{remaining}} دن باقی",
       "paymentPastDue": "ادائیگی زیر التوا ہے۔ براہ کرم اپنا ادائیگی کا طریقہ اپ ڈیٹ کریں۔",
       "subscriptionCancels": "سبسکرپشن {{date}} کو منسوخ ہوتی ہے",
-      "trialDaysRemaining": "آزمائش: {{days}} دن باقی",
-      "trialEndingSoon": "آزمائش جلد ختم: {{days}}"
+      "trialDaysRemaining": "آزمائش: {{remaining}} دن باقی",
+      "trialEndingSoon": "آزمائش جلد ختم: {{remaining}}"
     },
     "changelog": {
       "title": "نیا کیا ہے",
@@ -996,7 +998,7 @@
         "stalledTitle": "کچھ رک گیا",
         "stalledBody": "ہم {{name}} کا سیٹ اپ مکمل نہیں کر سکے۔ دوبارہ کوشش کریں، یا اگر ایسا بار بار ہو تو hi@kilo.ai پر ای میل کریں۔",
         "timeoutTitle": "توقع سے زیادہ وقت لگ رہا ہے",
-        "timeoutBody": "{{name}} کا سیٹ اپ معمول سے زیادہ وقت لے رہا ہے ({{minutes}} منٹ سے زیادہ)۔",
+        "timeoutBody": "{{name}} کا سیٹ اپ معمول سے زیادہ وقت لے رہا ہے ({{displayMinutes}} منٹ سے زیادہ)۔",
         "continueInBackground": "پس منظر میں جاری رکھیں",
         "settingUp": "{{name}} ترتیب دیا جا رہا ہے",
         "finishingSetup": "سیٹ اپ مکمل کیا جا رہا ہے",
@@ -1287,7 +1289,7 @@
       "mergeGate": "مرج گیٹ",
       "repositories": "ریپوزٹریز",
       "allRepositories": "تمام ریپوزٹریز",
-      "nSelected": "{{count}} منتخب",
+      "nSelected": "{{displayCount}} منتخب",
       "reviewMemory": "جائزہ میموری",
       "proposedReviewMdGuidance": "تجویز کردہ REVIEW.md رہنمائی"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "تجزیہ کیا گیا",
       "exploitabilityReasoning": "استحصالیت کی دلیل",
       "suggestedFix": "تجویز کردہ اصلاح",
-      "whereFound": "یہ کہاں ملا ({{count}})",
+      "whereFound": "یہ کہاں ملا ({{displayCount}})",
       "fullReport": "مکمل تیار کردہ رپورٹ",
       "unknown": "نامعلوم",
       "yes": "ہاں",
       "no": "نہیں"
     },
     "dashboard": {
-      "findingsCount": "{{count}} نتائج",
+      "findingsCount": "{{displayCount}} نتائج",
       "notMeasured": "پیمائش نہیں کی گئی",
       "actFirst": "پہلے اقدام کریں",
       "slaPosture": "SLA صورتحال",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "ریپوزٹری ایکشن پلان",
       "noOpenFindings": "کوئی کھلا نتیجہ توجہ نہیں مانگتا",
       "deadlineToday": "آج آخری تاریخ پہنچ گئی",
-      "daysOverdue": "{{count}} دن تاخیر شدہ",
+      "daysOverdue": "{{displayCount}} دن تاخیر شدہ",
       "withinDeadline": "آخری تاریخ کے اندر",
       "criticalOverdue": "نازک تاخیر شدہ",
       "highOverdue": "اعلیٰ تاخیر شدہ",
@@ -1434,6 +1436,27 @@
       "syncNow": "ابھی ہم آہنگ کریں",
       "syncQueued": "ہم آہنگی قطار میں ہے",
       "syncStatusUnavailable": "ہم آہنگی کی حالت دستیاب نہیں"
+    },
+    "dashboardMetrics": {
+      "openFindings": "کھلے نتائج",
+      "openFindingsDetail": "{{critical}} نازک، {{high}} اعلیٰ",
+      "confirmedExploitable": "تصدیق شدہ قابلِ استحصال",
+      "confirmedExploitableDetail": "پروجیکٹ کا خطرہ تجزیے سے تصدیق شدہ",
+      "needsReview": "آپ کے جائزے کی ضرورت ہے",
+      "needsReviewDetail": "انسانی فیصلہ درکار",
+      "analysisIncomplete": "تجزیہ مکمل نہیں",
+      "analysisIncompleteDetail": "پروجیکٹ کا خطرہ ابھی نامعلوم",
+      "slaCompliance": "SLA تعمیل",
+      "notMeasured": "پیمائش نہیں کی گئی",
+      "withinDeadlineDetail": "{{total}} میں سے {{within}} آخری تاریخ کے اندر",
+      "noDeadlineData": "ابھی کسی نتیجے کی SLA آخری تاریخ نہیں",
+      "deadlinePassed": "آخری تاریخ گزر گئی",
+      "deadlinePassedDetail": "{{critical}} نازک، {{high}} اعلیٰ",
+      "dueThisWeek": "اس ہفتے مقرر",
+      "dueThisWeekDetail": "{{exploitable}} تصدیق شدہ قابلِ استحصال",
+      "noDeadline": "کوئی آخری تاریخ نہیں",
+      "reviewSlaAssignment": "SLA تفویض کا جائزہ لیں",
+      "allOpenFindingsTracked": "تمام کھلے نتائج ٹریک کیے جاتے ہیں"
     },
     "dismiss": {
       "title": "نتیجہ خارج کریں",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}} تجزیہ",
       "automation": "خودکار کاری",
       "automationAllOff": "سب آف",
-      "automationCount": "{{count}} میں سے 3 فعال",
+      "automationCount": "{{displayCount}} میں سے 3 فعال",
       "notifications": "اطلاعات",
-      "notificationsCount": "{{count}} میں سے 2 فعال",
+      "notificationsCount": "{{displayCount}} میں سے 2 فعال",
       "slaPolicy": "SLA پالیسی",
       "disabledNoManage": "سکیورٹی ایجنٹ غیر فعال ہے۔ صرف تنظیم کے مالکان اور بلنگ مینیجر اسے آن کر سکتے ہیں۔",
       "disabledNoRepo": "سکیورٹی ایجنٹ فعال کرنے سے پہلے کم از کم ایک ریپوزٹری منتخب کریں۔",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Pull request کھولیں{{number}}",
       "openDraftPullRequest": "ڈرافٹ pull request کھولیں{{number}}",
       "progress": "پیش رفت",
-      "attemptHistory": "کوشش کی تاریخ ({{count}})",
+      "attemptHistory": "کوشش کی تاریخ ({{displayCount}})",
       "attemptNumber": "کوشش #{{number}}",
       "startedBy": "شروع کیا بذریعہ",
       "model": "ماڈل",
@@ -1855,9 +1878,9 @@
       "toolTask": "کام",
       "readTodos": "کام پڑھیں",
       "updateTodos": "کام اپ ڈیٹ کریں",
-      "linesBadge": "{{count}} لائنیں",
-      "filesBadge": "{{count}} فائلیں",
-      "matchesBadge": "{{count}} مماثلتیں"
+      "linesBadge": "{{displayCount}} لائنیں",
+      "filesBadge": "{{displayCount}} فائلیں",
+      "matchesBadge": "{{displayCount}} مماثلتیں"
     },
     "readToolMarkdown": {
       "linesTruncated": "لائنیں {{start}}–{{end}} (کٹی ہوئی)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "یہ جواب رپورٹ نہیں کیا جا سکتا۔",
       "reportAiResponseSubmitted": "رپورٹ جمع کرائی گئی۔ رسید {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "تفصیلات دستیاب نہیں",
       "textDisplay": "متن کی نمائش",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "تیاری مکمل",
       "preparationFailed": "تیاری ناکام",
       "setupCommand": "سیٹ اپ کمانڈ {{index}}",
-      "setupCommandOf": "سیٹ اپ کمانڈ {{index}} از {{count}}"
+      "setupCommandOf": "سیٹ اپ کمانڈ {{index}} از {{displayCount}}"
     },
     "permissionCard": {
       "title": "اجازت درکار ہے",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "جمع کرانے میں ناکامی۔ براہ کرم دوبارہ کوشش کریں۔",
       "questionAnnouncement": "ایجنٹ کو آپ کی معلومات درکار ہیں۔ جب تک آپ جواب دیتے ہیں کمپوزر روکا ہوا ہے۔",
       "permissionAnnouncement": "ایجنٹ کو جاری رکھنے کے لیے اجازت درکار ہے۔ جب تک آپ فیصلہ کرتے ہیں کمپوزر روکا ہوا ہے۔",
-      "positionHint": "({{count}} میں سے 1)",
+      "positionHint": "({{displayCount}} میں سے 1)",
       "movedPastPrompt": "ایجنٹ اس سوال سے آگے بڑھ چکا ہے۔ سیشن جاری رہنے پر یہ کارڈ بند ہو جائے گا۔",
       "waitingForAnswer": "ایجنٹ آپ کے جواب کا انتظار کر رہا ہے۔ جب تک یہ سوال کھلا ہے، ایجنٹ کو آپ کا پیغام روکا ہوا ہے۔",
       "waitingForPermission": "ایجنٹ اجازت کا انتظار کر رہا ہے۔ جب تک یہ درخواست کھلی ہے، ایجنٹ کو آپ کا پیغام روکا ہوا ہے۔"
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "کیمرہ رسائی غیر فعال",
       "cameraAccessMessage": "تصویر لینے کے لیے سیٹنگز میں کیمرہ رسائی کی اجازت دیں۔",
       "couldNotOpenPhotoPicker": "فوٹو پیکر نہیں کھل سکا۔ Kilo کو دوبارہ شروع کریں اور دوبارہ کوشش کریں۔",
-      "maxFilesAllowed": "زیادہ سے زیادہ {{count}} فائلیں مجاز ہیں",
+      "maxFilesAllowed": "زیادہ سے زیادہ {{displayCount}} فائلیں مجاز ہیں",
       "onlyAddingFiles": "صرف {{accepted}} میں سے {{total}} فائلیں شامل کر رہے ہیں (زیادہ سے زیادہ {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "لاگت {{cost}}",
       "costSuffix": ", لاگت {{cost}}",
       "tokensWindowUnavailable": "سیاق و سباق {{used}} ٹوکنز، ونڈو دستیاب نہیں",
-      "tokensUsage": "سیاق و سباق {{window}} میں سے {{used}} ٹوکنز، {{percentage}}% استعمال شدہ",
+      "tokensUsage": "سیاق و سباق {{window}} میں سے {{used}} ٹوکنز، {{percentage}} استعمال شدہ",
       "title": "سیاق و سباق کا استعمال",
       "used": "استعمال شدہ",
       "remaining": "باقی",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "استعمال تازہ ترین مکمل شدہ معاون جواب کی عکاسی کرتا ہے۔",
       "tokenUsage": "ٹوکن استعمال",
       "cacheRate": "کیش ریٹ",
-      "modelsCount": "ماڈلز ({{count}})",
+      "modelsCount": "ماڈلز ({{displayCount}})",
       "tokenTotalsNote": "ٹوکن کل صرف اس سیشن کا احاطہ کرتے ہیں اور ذیلی ایجنٹ/چائلڈ سیشن ٹوکنز کو خارج کرتے ہیں۔",
       "subagents": "ذیلی ایجنٹس",
       "subagentsDescription": "چائلڈ سیشنز سے بقایا لاگت",
@@ -2373,7 +2400,7 @@
     "connectedCli": "منسلک CLI پر",
     "newSessionOn": "{{name}} پر نیا سیشن",
     "noMatchingSessions": "کوئی مماثل سیشن نہیں۔",
-    "onlyFirstFilesAttached": "صرف پہلی {{count}} فائلیں منسلک ہوں گی۔",
+    "onlyFirstFilesAttached": "صرف پہلی {{displayCount}} فائلیں منسلک ہوں گی۔",
     "staleMessage": "یہ شیئر اب دستیاب نہیں ہے۔",
     "retryableMessage": "آپ کے سیشنز لوڈ نہیں ہو سکے۔",
     "emptyMessage": "ابھی کوئی سیشن نہیں — یہ بھیجنے کے لیے نیا شروع کریں۔",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "اس Apple اکاؤنٹ پر Kilo Pass کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتا ہے۔ اسے منظم کرنے کے لیے اس Kilo اکاؤنٹ میں سائن ان کریں۔",
     "alreadySubscribed": "آپ کے پاس پہلے سے Kilo Pass سبسکرپشن ہے۔",
     "purchaseUnavailable": "Kilo Pass خریداری فی الحال دستیاب نہیں ہے۔",
-    "tierCredits": "کریڈٹ میں ${{amount}}",
+    "tierCredits": "کریڈٹ میں {{amount}}",
     "perMonth": "{{price}}/ماہ",
     "verifyPurchaseFailed": "آپ کی خریداری کی تصدیق نہیں ہو سکی۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
     "productsCouldNotLoad": "Kilo Pass مصنوعات App Store سے لوڈ نہیں ہو سکیں۔",
@@ -2417,7 +2444,7 @@
     "manageFailed": "App Store سبسکرپشن انتظام کھولنے میں ناکامی۔",
     "kiloPassSetup": "Kilo Pass سیٹ اپ",
     "subscriptionHeaderDescription": "ایک ماہانہ سبسکرپشن جو Kilo App میں AI کوڈنگ سیشن چلانے کے لیے آپ کے Kilo بیلنس میں کریڈٹ شامل کرتی ہے — کلاؤڈ ایجنٹس، ریموٹ سیشنز، اور KiloClaw چیٹس۔",
-    "tierDescription": "Kilo App استعمال کے لیے ماہانہ ${{price}} ادا شدہ کریڈٹ شامل کیے جاتے ہیں۔",
+    "tierDescription": "Kilo App استعمال کے لیے ماہانہ {{price}} ادا شدہ کریڈٹ شامل کیے جاتے ہیں۔",
     "subscribe": "سبسکرائب کریں",
     "subscribeDescription": "بونس پیشرفت کے ساتھ ماہانہ کریڈٹ",
     "manage": "منظم کریں",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass زیر التوا",
     "statusCanceling": "Kilo Pass منسوخ ہو رہا ہے",
     "statusPastDue": "Kilo Pass تاریخ گزر چکی",
-    "monthlyCredits": "${{credits}} ماہانہ کریڈٹ",
+    "monthlyCredits": "{{credits}} ماہانہ کریڈٹ",
     "ends": "{{date}} کو ختم ہوتا ہے",
     "periodEnd": "مدت کا اختتام",
     "managedOnGooglePlay": "Google Play پر منظم",

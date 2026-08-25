@@ -15,6 +15,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
+import { formatUsd } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getKiloPassLegalLinks, kiloPassLegalDisclosure } from '@/lib/kilo-pass/legal-links';
 import { ensureProfileAfterKiloPassPurchase } from '@/lib/kilo-pass/navigation';
@@ -48,7 +49,12 @@ function getPreflightFailureMessage(reason: string | null): string {
 }
 
 function formatTier(product: AppStoreKiloPassProduct): string {
-  return i18n.t('kiloPass.tierCredits', { amount: product.webMonthlyPriceUsd });
+  return i18n.t('kiloPass.tierCredits', {
+    amount: formatUsd(product.webMonthlyPriceUsd, i18n.language, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }),
+  });
 }
 
 function formatStorePrice(product: AppStoreKiloPassProduct): string {
@@ -367,7 +373,12 @@ function KiloPassNativeIapContent() {
                   <View className="flex-1 gap-1.5">
                     <Text className="font-semibold text-foreground">{formatTier(product)}</Text>
                     <Text className="text-xs text-muted-foreground">
-                      {t('kiloPass.tierDescription', { price: product.webMonthlyPriceUsd })}
+                      {t('kiloPass.tierDescription', {
+                        price: formatUsd(product.webMonthlyPriceUsd, i18n.language, {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 2,
+                        }),
+                      })}
                     </Text>
                   </View>
                   <Text className="text-base font-semibold text-foreground tabular-nums">

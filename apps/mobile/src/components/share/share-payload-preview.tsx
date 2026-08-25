@@ -6,7 +6,7 @@ import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { formatFileSize } from '@/lib/format';
+import { formatFileSize, formatNumber } from '@/lib/format';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -125,7 +125,10 @@ export function SharePayloadPreview({ payload, validation }: Readonly<SharePaylo
       ) : null}
       {validation.truncated ? (
         <Text className="text-xs text-muted-foreground">
-          {t('share.onlyFirstFilesAttached', { count: AGENT_ATTACHMENT_MAX_FILES })}
+          {t('share.onlyFirstFilesAttached', {
+            count: AGENT_ATTACHMENT_MAX_FILES,
+            displayCount: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),
+          })}
         </Text>
       ) : null}
       <RejectionNotes notes={validation.rejectedNotes} />

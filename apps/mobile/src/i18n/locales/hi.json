@@ -201,7 +201,8 @@
     "agents": "एजेंट",
     "profile": "प्रोफ़ाइल",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, टैब, {{position}} में से {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -241,7 +242,7 @@
       "open": "{{filename}} खोलें",
       "openFailed": "अटैचमेंट खोल नहीं सका। अपना कनेक्शन जाँचें और फिर से प्रयास करें।",
       "attachFailed": "फ़ाइल संलग्न करने में विफल",
-      "limit": "आप अधिकतम {{count}} फ़ाइलें संलग्न कर सकते हैं।",
+      "limit": "आप अधिकतम {{displayCount}} फ़ाइलें संलग्न कर सकते हैं।",
       "sizeRejection": "{{filename}} {{limit}} की अटैचमेंट सीमा से अधिक है।",
       "unreadable": "{{filename}} पढ़ नहीं सका।",
       "pastedImage": "चिपकाई गई छवि",
@@ -284,7 +285,7 @@
       "edited": "(संपादित)"
     },
     "reactions": {
-      "accessibility": "{{emoji}} प्रतिक्रिया, {{count}}",
+      "accessibility": "{{emoji}} प्रतिक्रिया, {{displayCount}}",
       "close": "प्रतिक्रियाएँ बंद करें",
       "common": "सामान्य",
       "reactWith": "{{reaction}} से प्रतिक्रिया दें",
@@ -355,17 +356,18 @@
       "finalCommitTermEndsOn": "आपकी अंतिम Commit अवधि {{date}} को समाप्त हो रही है. {{price}} पर Standard के रूप में जारी रखें, अन्यथा होस्टिंग समाप्त हो जाएगी.",
       "freeTrial": "मुफ़्त परीक्षण",
       "hostingEnds": "होस्टिंग समाप्त हो रही है",
+      "lessThanOneDay": "1 दिन से कम",
       "renews": "नवीनीकृत होता है",
       "standardMonthToMonth": "Standard माह-दर-माह",
       "standardStartsOn": "Standard {{date}} को {{price}} पर शुरू होता है.",
       "yourStandardMonthlyPrice": "आपकी Standard मासिक कीमत",
       "perMonth": "/माह",
       "earlybirdAccessUntil": "Earlybird पहुँच {{date}} तक",
-      "earlybirdEnding": "Earlybird समाप्त हो रहा है: {{days}} दिन शेष",
+      "earlybirdEnding": "Earlybird समाप्त हो रहा है: {{remaining}}",
       "paymentPastDue": "भुगतान बकाया है। कृपया अपनी भुगतान विधि अपडेट करें।",
       "subscriptionCancels": "सदस्यता {{date}} को रद्द होती है",
-      "trialDaysRemaining": "परीक्षण: {{days}} दिन शेष",
-      "trialEndingSoon": "परीक्षण जल्द समाप्त हो रहा है: {{days}}"
+      "trialDaysRemaining": "परीक्षण: {{remaining}} शेष",
+      "trialEndingSoon": "परीक्षण जल्द समाप्त हो रहा है: {{remaining}}"
     },
     "changelog": {
       "title": "नया क्या है",
@@ -665,7 +667,7 @@
         "startingSandbox": "सैंडबॉक्स शुरू हो रहा है",
         "stoppedBody": "सेटअप के दौरान {{name}} का इंस्टेंस अप्रत्याशित रूप से रुक गया।",
         "stoppedTitle": "सेटअप रुक गया",
-        "timeoutBody": "{{name}} का सेटअप सामान्य से अधिक समय ले रहा है ({{minutes}} मिनट से अधिक)।",
+        "timeoutBody": "{{name}} का सेटअप सामान्य से अधिक समय ले रहा है ({{displayMinutes}} मिनट से अधिक)।",
         "timeoutTitle": "अपेक्षा से अधिक समय लग रहा है"
       },
       "unavailableDescription": "इंस्टेंस प्रोविज़न करने के लिए वर्तमान KiloClaw सदस्यता आवश्यक है। मौजूदा इंस्टेंस और सदस्यताएँ सामान्य रूप से जारी रहती हैं।",
@@ -912,7 +914,7 @@
       "focusAreas": "फ़ोकस क्षेत्र",
       "mergeGate": "मर्ज गेट",
       "model": "मॉडल",
-      "nSelected": "{{count}} चयनित",
+      "nSelected": "{{displayCount}} चयनित",
       "proposedReviewMdGuidance": "प्रस्तावित REVIEW.md मार्गदर्शन",
       "repositories": "रिपॉज़िटरी",
       "reviewMemory": "समीक्षा मेमोरी",
@@ -981,7 +983,7 @@
       "triageReasoning": "ट्राइएज तर्क",
       "unknown": "अज्ञात",
       "watchInCloudAgent": "Cloud Agent में देखें",
-      "whereFound": "यह कहाँ मिला ({{count}})",
+      "whereFound": "यह कहाँ मिला ({{displayCount}})",
       "yes": "हाँ"
     },
     "analysisSettings": {
@@ -1061,11 +1063,11 @@
       "confirmedExploitable": "पुष्ट शोषण-योग्य",
       "couldNotLoad": "डैशबोर्ड डेटा लोड नहीं हो सका",
       "criticalOverdue": "गंभीर विलंबित",
-      "daysOverdue": "{{count}} दिन विलंबित",
+      "daysOverdue": "{{displayCount}} दिन विलंबित",
       "deadlineToday": "समय सीमा आज पहुँची",
       "filterByRepository": "रिपॉज़िटरी से फ़िल्टर करें",
       "findings": "निष्कर्ष",
-      "findingsCount": "{{count}} निष्कर्ष",
+      "findingsCount": "{{displayCount}} निष्कर्ष",
       "highOverdue": "उच्च विलंबित",
       "lastSynced": "अंतिम सिंक {{time}}",
       "manageRepositories": "रिपॉज़िटरी प्रबंधित करें",
@@ -1090,6 +1092,27 @@
       "syncQueued": "सिंक कतार में लगाया गया",
       "syncStatusUnavailable": "सिंक स्थिति अनुपलब्ध",
       "withinDeadline": "समय सीमा के भीतर"
+    },
+    "dashboardMetrics": {
+      "openFindings": "खुले निष्कर्ष",
+      "openFindingsDetail": "{{critical}} गंभीर, {{high}} उच्च",
+      "confirmedExploitable": "पुष्ट शोषण-योग्य",
+      "confirmedExploitableDetail": "विश्लेषण द्वारा परियोजना जोखिम की पुष्टि हुई",
+      "needsReview": "आपकी समीक्षा आवश्यक",
+      "needsReviewDetail": "मानवीय निर्णय आवश्यक",
+      "analysisIncomplete": "विश्लेषण पूरा नहीं",
+      "analysisIncompleteDetail": "परियोजना जोखिम अभी भी अज्ञात है",
+      "slaCompliance": "SLA अनुपालन",
+      "notMeasured": "मापा नहीं गया",
+      "withinDeadlineDetail": "समय सीमा के भीतर {{total}} में से {{within}}",
+      "noDeadlineData": "अभी किसी निष्कर्ष की SLA समय सीमा नहीं है",
+      "deadlinePassed": "समय सीमा बीत गई",
+      "deadlinePassedDetail": "{{critical}} गंभीर, {{high}} उच्च",
+      "dueThisWeek": "इस सप्ताह देय",
+      "dueThisWeekDetail": "{{exploitable}} पुष्ट शोषण-योग्य",
+      "noDeadline": "कोई समय सीमा नहीं",
+      "reviewSlaAssignment": "SLA असाइनमेंट की समीक्षा करें",
+      "allOpenFindingsTracked": "सभी खुले निष्कर्ष ट्रैक किए गए"
     },
     "dismiss": {
       "alreadyResolvedDescription": "यह निष्कर्ष पहले ही हल हो चुका है और अब खारिज स्वीकार नहीं करता।",
@@ -1188,7 +1211,7 @@
       "title": "सूचनाएँ"
     },
     "remediation": {
-      "attemptHistory": "प्रयास इतिहास ({{count}})",
+      "attemptHistory": "प्रयास इतिहास ({{displayCount}})",
       "attemptNumber": "प्रयास #{{number}}",
       "branch": "शाखा",
       "cancelMessage": "Security Agent जारी सुधार प्रयास रोक देगा।",
@@ -1256,7 +1279,7 @@
       "analysisModeSubtitle": "{{mode}} विश्लेषण",
       "automation": "ऑटोमेशन",
       "automationAllOff": "सभी बंद",
-      "automationCount": "3 में से {{count}} सक्षम",
+      "automationCount": "3 में से {{displayCount}} सक्षम",
       "couldNotLoadPermissions": "अनुमतियाँ लोड नहीं हो सकीं",
       "couldNotLoadRepositories": "रिपॉज़िटरी लोड नहीं हो सकीं",
       "couldNotLoadSettings": "Security Agent सेटिंग लोड नहीं हो सकीं",
@@ -1267,7 +1290,7 @@
       "enabled": "सक्षम",
       "modelsAndAnalysis": "मॉडल और विश्लेषण",
       "notifications": "सूचनाएँ",
-      "notificationsCount": "2 में से {{count}} सक्षम",
+      "notificationsCount": "2 में से {{displayCount}} सक्षम",
       "off": "बंद",
       "on": "चालू",
       "repositories": "रिपॉज़िटरी",
@@ -1487,6 +1510,10 @@
     "modeSelector": {
       "accessibility": "मोड: {{label}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "modeOptions": {
       "code": "कोड",
       "plan": "प्लान",
@@ -1593,7 +1620,7 @@
       "preparationComplete": "तैयारी पूरी हुई",
       "preparationFailed": "तैयारी विफल रही",
       "setupCommand": "सेटअप कमांड {{index}}",
-      "setupCommandOf": "{{count}} में से सेटअप कमांड {{index}}"
+      "setupCommandOf": "{{displayCount}} में से सेटअप कमांड {{index}}"
     },
     "permissionCard": {
       "title": "अनुमति आवश्यक",
@@ -1630,7 +1657,7 @@
       "submissionFailed": "सबमिशन विफल रहा। कृपया फिर से कोशिश करें।",
       "questionAnnouncement": "एजेंट को आपके इनपुट की ज़रूरत है। जब तक आप उत्तर देते हैं, कंपोज़र रुका हुआ है।",
       "permissionAnnouncement": "एजेंट को जारी रखने के लिए अनुमति चाहिए। जब तक आप निर्णय लेते हैं, कंपोज़र रुका हुआ है।",
-      "positionHint": "({{count}} में से 1)",
+      "positionHint": "({{displayCount}} में से 1)",
       "movedPastPrompt": "एजेंट इस प्रॉम्प्ट से आगे बढ़ चुका है। सत्र जारी रहने पर यह कार्ड बंद हो जाएगा।",
       "waitingForAnswer": "एजेंट आपके उत्तर की प्रतीक्षा कर रहा है। जब तक यह प्रश्न खुला है, एजेंट को आपका संदेश रुका हुआ है।",
       "waitingForPermission": "एजेंट अनुमति की प्रतीक्षा कर रहा है। जब तक यह अनुरोध खुला है, एजेंट को आपका संदेश रुका हुआ है।"
@@ -1744,7 +1771,7 @@
       "cameraAccessDisabled": "कैमरा पहुँच अक्षम",
       "cameraAccessMessage": "फ़ोटो लेने के लिए सेटिंग में कैमरा पहुँच की अनुमति दें।",
       "couldNotOpenPhotoPicker": "फ़ोटो पिकर नहीं खुल सका। Kilo को पुनः आरंभ करें और फिर से कोशिश करें।",
-      "maxFilesAllowed": "अधिकतम {{count}} फ़ाइलें अनुमत हैं",
+      "maxFilesAllowed": "अधिकतम {{displayCount}} फ़ाइलें अनुमत हैं",
       "onlyAddingFiles": "केवल {{accepted}} फ़ाइलें जोड़ी जा रही हैं ({{total}} में से, अधिकतम {{max}})"
     },
     "composer": {
@@ -1809,10 +1836,10 @@
       "costPrefix": "लागत {{cost}}",
       "costSuffix": ", लागत {{cost}}",
       "tokensWindowUnavailable": "संदर्भ {{used}} टोकन, विंडो उपलब्ध नहीं",
-      "tokensUsage": "संदर्भ {{window}} में से {{used}} टोकन, {{percentage}}% उपयोग हुआ",
+      "tokensUsage": "संदर्भ {{window}} में से {{used}} टोकन, {{percentage}} उपयोग हुआ",
       "cacheRate": "कैश दर",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "modelsCount": "मॉडल ({{count}})",
+      "modelsCount": "मॉडल ({{displayCount}})",
       "ofWindowTokens": "{{window}} टोकन में से",
       "olderActivity": "पुरानी गतिविधि",
       "olderActivityDescription": "लोड किए गए इतिहास में शामिल नहीं की गई लागत",
@@ -1857,9 +1884,9 @@
       "toolTask": "कार्य",
       "readTodos": "कार्य पढ़ें",
       "updateTodos": "कार्य अपडेट करें",
-      "linesBadge": "{{count}} पंक्तियाँ",
-      "filesBadge": "{{count}} फ़ाइलें",
-      "matchesBadge": "{{count}} मिलान"
+      "linesBadge": "{{displayCount}} पंक्तियाँ",
+      "filesBadge": "{{displayCount}} फ़ाइलें",
+      "matchesBadge": "{{displayCount}} मिलान"
     },
     "toolPatch": {
       "operationAdded": "जोड़ा गया",
@@ -1994,7 +2021,7 @@
     "connectedCli": "कनेक्टेड CLI पर",
     "newSessionOn": "{{name}} पर नया सत्र",
     "noMatchingSessions": "कोई मेल खाता सत्र नहीं।",
-    "onlyFirstFilesAttached": "केवल पहली {{count}} फ़ाइलें संलग्न की जाएँगी।",
+    "onlyFirstFilesAttached": "केवल पहली {{displayCount}} फ़ाइलें संलग्न की जाएँगी।",
     "staleMessage": "यह साझा अब उपलब्ध नहीं है।",
     "retryableMessage": "आपके सत्र लोड नहीं हो सके।",
     "emptyMessage": "अभी कोई सत्र नहीं — इसे भेजने के लिए नया सत्र शुरू करें।",
@@ -2027,7 +2054,7 @@
     "otherAccountCopy": "इस Apple खाते का Kilo Pass किसी दूसरे Kilo खाते से संबंधित है। इसे प्रबंधित करने के लिए उस Kilo खाते में साइन इन करें।",
     "alreadySubscribed": "आपके पास पहले से Kilo Pass सदस्यता है।",
     "purchaseUnavailable": "Kilo Pass खरीदारी अभी उपलब्ध नहीं है।",
-    "tierCredits": "क्रेडिट में ${{amount}}",
+    "tierCredits": "क्रेडिट में {{amount}}",
     "perMonth": "{{price}}/माह",
     "verifyPurchaseFailed": "आपकी खरीदारी सत्यापित नहीं हो सकी। अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
     "productsCouldNotLoad": "Kilo Pass उत्पाद App Store से लोड नहीं हो सके।",
@@ -2038,7 +2065,7 @@
     "manageFailed": "App Store सदस्यता प्रबंधन खोलने में विफल।",
     "kiloPassSetup": "Kilo Pass सेटअप",
     "subscriptionHeaderDescription": "एक मासिक सदस्यता जो Kilo App में AI कोडिंग सत्र चलाने के लिए आपके Kilo बैलेंस में क्रेडिट जोड़ती है — Cloud Agents, रिमोट सत्र और KiloClaw चैट।",
-    "tierDescription": "${{price}} भुगतान क्रेडिट Kilo App उपयोग के लिए मासिक जोड़े गए।",
+    "tierDescription": "{{price}} भुगतान क्रेडिट Kilo App उपयोग के लिए मासिक जोड़े गए।",
     "subscribe": "सब्सक्राइब करें",
     "subscribeDescription": "बोनस प्रगति के साथ मासिक क्रेडिट",
     "manage": "प्रबंधित करें",
@@ -2046,7 +2073,7 @@
     "statusPending": "Kilo Pass लंबित",
     "statusCanceling": "Kilo Pass रद्द हो रहा है",
     "statusPastDue": "Kilo Pass विलंबित",
-    "monthlyCredits": "${{credits}} मासिक क्रेडिट",
+    "monthlyCredits": "{{credits}} मासिक क्रेडिट",
     "ends": "{{date}} को समाप्त होता है",
     "periodEnd": "अवधि समाप्ति",
     "managedOnGooglePlay": "Google Play पर प्रबंधित",
@@ -2150,17 +2177,17 @@
     "accessDeniedDescription": "आपके पास इस पुल रिक्वेस्ट को देखने की अनुमति नहीं है।",
     "checkConnection": "कनेक्शन जाँचें",
     "checks": {
-      "checksCount": "{{count}} जाँचें",
+      "checksCount": "{{displayCount}} जाँचें",
       "couldNotLoad": "जाँचें लोड नहीं हो सकीं।",
-      "failed": "{{count}} विफल",
+      "failed": "{{displayCount}} विफल",
       "noAccess": "आपके पास इस रिपॉज़िटरी की जाँचों तक पहुँच नहीं है।",
       "noChecksReported": "कोई जाँच रिपोर्ट नहीं",
       "notAvailable": "जाँचें अभी उपलब्ध नहीं हैं। हो सकता है कि हेड कमिट प्रोसेस न हुआ हो, या Kilo GitHub ऐप हेड रिपॉज़िटरी पर इंस्टॉल न हो।",
       "openDetails": "{{name}} विवरण खोलें",
-      "passed": "{{count}} पास",
-      "pending": "{{count}} लंबित",
+      "passed": "{{displayCount}} पास",
+      "pending": "{{displayCount}} लंबित",
       "retryChecks": "जाँचें फिर से करें",
-      "skipped": "{{count}} छोड़ी गईं",
+      "skipped": "{{displayCount}} छोड़ी गईं",
       "title": "जाँचें",
       "viewOnGitHub": "GitHub पर PR देखें",
       "checkDetails": "चेक विवरण",
@@ -2238,7 +2265,7 @@
           "terminal": "यह उपयोगकर्ता रिपोर्ट नहीं किया जा सकता।"
         }
       },
-      "moreLinesAbove": "… ऊपर {{count}} और पंक्तियाँ",
+      "moreLinesAbove": "… ऊपर {{displayCount}} और पंक्तियाँ",
       "mute": "म्यूट करें",
       "mutedUser": "{{login}} म्यूट किया गया",
       "noDiscussion": "अभी कोई चर्चा नहीं",
@@ -2246,7 +2273,7 @@
       "comment_one": "1 टिप्पणी",
       "outdated": "पुराना",
       "quotedDiffSnippet": "उद्धृत डिफ़ स्निपेट",
-      "reactionPill": "{{emoji}} प्रतिक्रिया, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} प्रतिक्रिया, {{displayCount}} {{countLabel}}",
       "reaction": "प्रतिक्रियाएँ",
       "reaction_other": "प्रतिक्रियाएँ",
       "reaction_one": "प्रतिक्रिया",
@@ -2350,12 +2377,12 @@
     "hunkRows": {
       "contextUnavailable": "इस ref पर संदर्भ अनुपलब्ध",
       "expandAll": "सभी विस्तारित करें",
-      "expandAllLines": "सभी {{count}} पंक्तियाँ विस्तारित करें",
+      "expandAllLines": "सभी {{displayCount}} पंक्तियाँ विस्तारित करें",
       "expandContext": "संदर्भ विस्तारित करें",
-      "expandLines": "{{count}} पंक्तियाँ विस्तारित करें ({{start}}–{{end}})",
-      "expandLinesOfContext": "संदर्भ की {{count}} पंक्तियाँ विस्तारित करें",
+      "expandLines": "{{displayCount}} पंक्तियाँ विस्तारित करें ({{start}}–{{end}})",
+      "expandLinesOfContext": "संदर्भ की {{displayCount}} पंक्तियाँ विस्तारित करें",
       "expandMoreContext": "और संदर्भ विस्तारित करें",
-      "expandMoreLines": "और {{count}} पंक्तियाँ विस्तारित करें ({{start}}–{{end}})",
+      "expandMoreLines": "और {{displayCount}} पंक्तियाँ विस्तारित करें ({{start}}–{{end}})",
       "failedToLoadContext": "संदर्भ लोड करने में विफल — फिर से कोशिश करने के लिए टैप करें",
       "failedToLoadMoreFiles": "और फ़ाइलें लोड करने में विफल — फिर से कोशिश करने के लिए टैप करें",
       "fileLoadedCount_one": "{{displayCount}} फ़ाइल लोड हुई",
@@ -2500,8 +2527,8 @@
       "pendingComment_one": "लंबित टिप्पणी",
       "summaryOptional": "सारांश (वैकल्पिक)",
       "title": "समीक्षा सबमिट करें",
-      "partialPostedMessage": "{{freshCount}} टिप्पणी पोस्ट की गईं। {{staleCount}} टिप्पणी पुराने कमिट की ओर इशारा करती हैं और आपकी कतार में रहीं।",
-      "submitCountOfTotal": "{{totalCount}} में से {{freshCount}} टिप्पणियाँ सबमिट करें",
+      "partialPostedMessage": "{{displayFreshCount}} टिप्पणी पोस्ट की गईं। {{displayStaleCount}} टिप्पणी पुराने कमिट की ओर इशारा करती हैं और आपकी कतार में रहीं।",
+      "submitCountOfTotal": "{{displayTotalCount}} में से {{displayFreshCount}} टिप्पणियाँ सबमिट करें",
       "submitReview": "समीक्षा सबमिट करें"
     },
     "fileStatus": {

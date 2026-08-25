@@ -201,7 +201,8 @@
     "agents": "الوكلاء",
     "profile": "الملف الشخصي",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}، تبويب، {{position}} من {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -242,7 +243,7 @@
       "recent": "الأخيرة",
       "common": "شائعة",
       "reactWith": "التفاعل بـ {{reaction}}",
-      "accessibility": "تفاعل {{emoji}}، {{count}}"
+      "accessibility": "تفاعل {{emoji}}، {{displayCount}}"
     },
     "composer": {
       "replyingTo": "الرد على",
@@ -271,7 +272,7 @@
       "imageUnavailable": "الصورة غير متاحة",
       "openFailed": "تعذر فتح المرفق. تحقق من اتصالك وحاول مرة أخرى.",
       "attachFailed": "فشل إرفاق الملف",
-      "limit": "يمكنك إرفاق ما يصل إلى {{count}} ملفات.",
+      "limit": "يمكنك إرفاق ما يصل إلى {{displayCount}} ملفات.",
       "sizeRejection": "{{filename}} يتجاوز حد المرفقات البالغ {{limit}}.",
       "unreadable": "تعذر قراءة {{filename}}.",
       "pastedImage": "الصورة الملصقة",
@@ -321,7 +322,11 @@
       "someone": "شخص ما",
       "typing_one": "{{name}} يكتب...",
       "typing": "{{names}} يكتبون...",
-      "typing_other": "{{names}} يكتبون..."
+      "typing_other": "{{names}} يكتبون...",
+      "typing_zero": "لا أحد يكتب...",
+      "typing_two": "{{names}} يكتبان...",
+      "typing_few": "{{names}} يكتبون...",
+      "typing_many": "{{names}} يكتبون..."
     },
     "botStatus": {
       "online": "متصل",
@@ -361,11 +366,12 @@
       "yourStandardMonthlyPrice": "سعر Standard الشهري الخاص بك",
       "perMonth": "/شهر",
       "earlybirdAccessUntil": "وصول Earlybird حتى {{date}}",
-      "earlybirdEnding": "ينتهي Earlybird: متبقٍ {{days}} يوم",
+      "earlybirdEnding": "ينتهي Earlybird: {{remaining}}",
       "paymentPastDue": "الدفع متأخر. يرجى تحديث طريقة الدفع الخاصة بك.",
       "subscriptionCancels": "يُلغى الاشتراك في {{date}}",
-      "trialDaysRemaining": "النسخة التجريبية: متبقٍ {{days}} يوم",
-      "trialEndingSoon": "تنتهي النسخة التجريبية قريبًا: {{days}}"
+      "trialDaysRemaining": "النسخة التجريبية: متبقٍ {{remaining}}",
+      "trialEndingSoon": "تنتهي النسخة التجريبية قريبًا: {{remaining}}",
+      "lessThanOneDay": "أقل من يوم واحد"
     },
     "changelog": {
       "title": "ما الجديد",
@@ -567,7 +573,11 @@
       "openSettings": "فتح إعدادات {{name}}",
       "openUnread": "فتح {{name}}، {{displayCount}} رسائل غير مقروءة",
       "openUnread_other": "فتح {{name}}، {{displayCount}} رسائل غير مقروءة",
-      "openUnread_one": "فتح {{name}}، {{displayCount}} رسالة غير مقروءة"
+      "openUnread_one": "فتح {{name}}، {{displayCount}} رسالة غير مقروءة",
+      "openUnread_zero": "فتح {{name}}، لا توجد رسائل غير مقروءة",
+      "openUnread_two": "فتح {{name}}، {{displayCount}} رسالتان غير مقروءتين",
+      "openUnread_few": "فتح {{name}}، {{displayCount}} رسائل غير مقروءة",
+      "openUnread_many": "فتح {{name}}، {{displayCount}} رسالة غير مقروءة"
     },
     "list": {
       "createInstance": "إنشاء مثيل",
@@ -665,7 +675,7 @@
         "startingSandbox": "جارٍ بدء بيئة الاختبار",
         "stoppedBody": "توقف مثيل {{name}} بشكل غير متوقع أثناء الإعداد.",
         "stoppedTitle": "توقف الإعداد",
-        "timeoutBody": "يستغرق إعداد {{name}} وقتًا أطول من المعتاد (أكثر من {{minutes}} دقيقة).",
+        "timeoutBody": "يستغرق إعداد {{name}} وقتًا أطول من المعتاد (أكثر من {{displayMinutes}} دقيقة).",
         "timeoutTitle": "يستغرق وقتًا أطول من المتوقع"
       },
       "unavailableDescription": "يلزم اشتراك KiloClaw حالي لتجهيز مثيل. تستمر المثيلات والاشتراكات الحالية كالمعتاد.",
@@ -912,7 +922,7 @@
       "focusAreas": "مجالات التركيز",
       "mergeGate": "بوابة الدمج",
       "model": "النموذج",
-      "nSelected": "{{count}} محدد",
+      "nSelected": "{{displayCount}} محدد",
       "proposedReviewMdGuidance": "إرشادات REVIEW.md المقترحة",
       "repositories": "المستودعات",
       "reviewMemory": "ذاكرة المراجعة",
@@ -981,7 +991,7 @@
       "triageReasoning": "استدلال الفرز",
       "unknown": "غير معروف",
       "watchInCloudAgent": "المشاهدة في Cloud Agent",
-      "whereFound": "مكان العثور على هذا ({{count}})",
+      "whereFound": "مكان العثور على هذا ({{displayCount}})",
       "yes": "نعم"
     },
     "analysisSettings": {
@@ -1048,7 +1058,11 @@
       "severityCriticalOnly": "حرجة فقط",
       "severityHighAndAbove": "عالية وأعلى",
       "severityMediumAndAbove": "متوسطة وأعلى",
-      "title": "الأتمتة"
+      "title": "الأتمتة",
+      "queued_zero": "لم يتم وضع أي نتيجة حالية في قائمة انتظار التحليل.",
+      "queued_two": "تم وضع {{displayCount}} نتيجتين حاليّتين في قائمة انتظار التحليل.",
+      "queued_few": "تم وضع {{displayCount}} نتائج حالية في قائمة انتظار التحليل.",
+      "queued_many": "تم وضع {{displayCount}} نتيجة حالية في قائمة انتظار التحليل."
     },
     "commandRetry": {
       "discard": "تجاهل"
@@ -1061,11 +1075,11 @@
       "confirmedExploitable": "مؤكد قابل للاستغلال",
       "couldNotLoad": "تعذّر تحميل بيانات لوحة المعلومات",
       "criticalOverdue": "متأخر حرج",
-      "daysOverdue": "متأخر منذ {{count}} يوم",
+      "daysOverdue": "متأخر منذ {{displayCount}} يوم",
       "deadlineToday": "تم بلوغ الموعد النهائي اليوم",
       "filterByRepository": "التصفية حسب المستودع",
       "findings": "النتائج",
-      "findingsCount": "{{count}} نتيجة",
+      "findingsCount": "{{displayCount}} نتيجة",
       "highOverdue": "متأخر عالٍ",
       "lastSynced": "آخر مزامنة {{time}}",
       "manageRepositories": "إدارة المستودعات",
@@ -1090,6 +1104,27 @@
       "syncQueued": "تمت جدولة المزامنة",
       "syncStatusUnavailable": "حالة المزامنة غير متاحة",
       "withinDeadline": "ضمن الموعد النهائي"
+    },
+    "dashboardMetrics": {
+      "openFindings": "نتائج مفتوحة",
+      "openFindingsDetail": "{{critical}} حرج، {{high}} عالٍ",
+      "confirmedExploitable": "مؤكد قابل للاستغلال",
+      "confirmedExploitableDetail": "تأكدت مخاطر المشروع عبر التحليل",
+      "needsReview": "يحتاج إلى مراجعتك",
+      "needsReviewDetail": "مطلوب قرار بشري",
+      "analysisIncomplete": "التحليل غير مكتمل",
+      "analysisIncompleteDetail": "مخاطر المشروع ما تزال غير معروفة",
+      "slaCompliance": "الالتزام بـ SLA",
+      "notMeasured": "غير مُقاس",
+      "withinDeadlineDetail": "{{within}} من أصل {{total}} ضمن الموعد النهائي",
+      "noDeadlineData": "لا توجد نتائج لها موعد نهائي لـ SLA بعد",
+      "deadlinePassed": "انتهى الموعد النهائي",
+      "deadlinePassedDetail": "{{critical}} حرج، {{high}} عالٍ",
+      "dueThisWeek": "مستحق هذا الأسبوع",
+      "dueThisWeekDetail": "{{exploitable}} مؤكد قابل للاستغلال",
+      "noDeadline": "لا يوجد موعد نهائي",
+      "reviewSlaAssignment": "مراجعة تعيين SLA",
+      "allOpenFindingsTracked": "جميع النتائج المفتوحة متتبعة"
     },
     "dismiss": {
       "alreadyResolvedDescription": "تمت معالجة هذه النتيجة بالفعل ولم تعد تقبل الرفض.",
@@ -1188,7 +1223,7 @@
       "title": "الإشعارات"
     },
     "remediation": {
-      "attemptHistory": "سجل المحاولات ({{count}})",
+      "attemptHistory": "سجل المحاولات ({{displayCount}})",
       "attemptNumber": "المحاولة رقم {{number}}",
       "branch": "الفرع",
       "cancelMessage": "سيوقف وكيل الأمان محاولة المعالجة الجارية.",
@@ -1256,7 +1291,7 @@
       "analysisModeSubtitle": "تحليل {{mode}}",
       "automation": "الأتمتة",
       "automationAllOff": "الكل متوقف",
-      "automationCount": "تم تفعيل {{count}} من 3",
+      "automationCount": "تم تفعيل {{displayCount}} من 3",
       "couldNotLoadPermissions": "تعذّر تحميل الصلاحيات",
       "couldNotLoadRepositories": "تعذّر تحميل المستودعات",
       "couldNotLoadSettings": "تعذّر تحميل إعدادات وكيل الأمان",
@@ -1267,7 +1302,7 @@
       "enabled": "مفعّل",
       "modelsAndAnalysis": "النماذج والتحليل",
       "notifications": "الإشعارات",
-      "notificationsCount": "تم تفعيل {{count}} من 2",
+      "notificationsCount": "تم تفعيل {{displayCount}} من 2",
       "off": "إيقاف",
       "on": "تشغيل",
       "repositories": "المستودعات",
@@ -1278,7 +1313,11 @@
       "selectRepositories": "اختيار المستودعات",
       "selectRepositoriesSubtitle": "اختر المستودعات التي يراقبها وكيل الأمان",
       "slaPolicy": "سياسة SLA",
-      "title": "الإعدادات"
+      "title": "الإعدادات",
+      "repositoriesCount_zero": "لم يتم تحديد أي مستودع",
+      "repositoriesCount_two": "تم تحديد {{displayCount}} مستودعين",
+      "repositoriesCount_few": "تم تحديد {{displayCount}} مستودعات",
+      "repositoriesCount_many": "تم تحديد {{displayCount}} مستودعًا"
     },
     "settingsSave": {
       "discard": "تجاهل",
@@ -1355,7 +1394,15 @@
       "cent_other": "سنتات",
       "dollar_one": "دولار",
       "dollar": "دولارات",
-      "dollar_other": "دولارات"
+      "dollar_other": "دولارات",
+      "cent_zero": "سنت",
+      "cent_two": "سنتان",
+      "cent_few": "سنتات",
+      "cent_many": "سنتًا",
+      "dollar_zero": "دولار",
+      "dollar_two": "دولاران",
+      "dollar_few": "دولارات",
+      "dollar_many": "دولارًا"
     },
     "githubInstall": {
       "couldNotOpenMessage": "تعذّر بدء إعداد تطبيق GitHub. يرجى المحاولة مرة أخرى.",
@@ -1451,7 +1498,11 @@
     "partRenderer": {
       "updatedFileCount_one": "تم تحديث {{displayCount}} ملف",
       "updatedFileCount": "تم تحديث {{displayCount}} ملفات",
-      "updatedFileCount_other": "تم تحديث {{displayCount}} ملفات"
+      "updatedFileCount_other": "تم تحديث {{displayCount}} ملفات",
+      "updatedFileCount_zero": "لم يتم تحديث أي ملف",
+      "updatedFileCount_two": "تم تحديث {{displayCount}} ملفّين",
+      "updatedFileCount_few": "تم تحديث {{displayCount}} ملفات",
+      "updatedFileCount_many": "تم تحديث {{displayCount}} ملفًا"
     },
     "toolPatch": {
       "operationAdded": "مضاف",
@@ -1476,9 +1527,9 @@
       "toolTask": "مهمة",
       "readTodos": "قراءة المهام",
       "updateTodos": "تحديث المهام",
-      "linesBadge": "{{count}} أسطر",
-      "filesBadge": "{{count}} ملفات",
-      "matchesBadge": "{{count}} تطابقات"
+      "linesBadge": "{{displayCount}} أسطر",
+      "filesBadge": "{{displayCount}} ملفات",
+      "matchesBadge": "{{displayCount}} تطابقات"
     },
     "readToolMarkdown": {
       "linesTruncated": "الأسطر {{start}}–{{end}} (مقتطعة)",
@@ -1562,6 +1613,10 @@
       "reportAiResponseFailedTerminal": "لا يمكن الإبلاغ عن هذا الرد.",
       "reportAiResponseSubmitted": "تم إرسال البلاغ. الإيصال {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "التفاصيل غير متاحة",
       "textDisplay": "عرض النص",
@@ -1620,7 +1675,7 @@
       "preparationComplete": "اكتمل التحضير",
       "preparationFailed": "فشل التحضير",
       "setupCommand": "أمر الإعداد {{index}}",
-      "setupCommandOf": "أمر الإعداد {{index}} من {{count}}"
+      "setupCommandOf": "أمر الإعداد {{index}} من {{displayCount}}"
     },
     "permissionCard": {
       "title": "الإذن مطلوب",
@@ -1657,7 +1712,7 @@
       "submissionFailed": "فشل الإرسال. يرجى المحاولة مرة أخرى.",
       "questionAnnouncement": "الوكيل بحاجة إلى إدخالك. المحرر متوقف مؤقتًا أثناء إجابتك.",
       "permissionAnnouncement": "الوكيل بحاجة إلى إذن للمتابعة. المحرر متوقف مؤقتًا أثناء اتخاذك القرار.",
-      "positionHint": "(1 من {{count}})",
+      "positionHint": "(1 من {{displayCount}})",
       "movedPastPrompt": "تجاوز الوكيل هذه المطالبة. ستُغلق هذه البطاقة عند استمرار الجلسة.",
       "waitingForAnswer": "الوكيل في انتظار إجابتك. أثناء فتح هذا السؤال، تتوقف رسالتك إلى الوكيل مؤقتًا.",
       "waitingForPermission": "الوكيل في انتظار الإذن. أثناء فتح هذا الطلب، تتوقف رسالتك إلى الوكيل مؤقتًا."
@@ -1697,7 +1752,11 @@
       "omitted_other": "تعذّر عرض {{displayCount}} من العناصر الأقدم من هذه الجلسة.",
       "couldNotLoad": "تعذّر تحميل الرسائل الأقدم.",
       "unavailable": "الرسائل الأقدم غير متاحة.",
-      "tooLarge": "الرسائل الأقدم أكبر من أن تُحمَّل."
+      "tooLarge": "الرسائل الأقدم أكبر من أن تُحمَّل.",
+      "omitted_zero": "تعذّر عرض أي عنصر أقدم من هذه الجلسة.",
+      "omitted_two": "تعذّر عرض عنصرين أقدمين من هذه الجلسة.",
+      "omitted_few": "تعذّر عرض {{displayCount}} من العناصر الأقدم من هذه الجلسة.",
+      "omitted_many": "تعذّر عرض {{displayCount}} عنصرًا أقدم من هذه الجلسة."
     },
     "markdownTable": {
       "viewTable": "عرض الجدول",
@@ -1709,7 +1768,15 @@
       "rowCount_one": "صف",
       "rowCount": "صفوف",
       "rowCount_other": "صفوف",
-      "opensFullScreen": "يفتح بملء الشاشة"
+      "opensFullScreen": "يفتح بملء الشاشة",
+      "columnCount_zero": "عمود",
+      "columnCount_two": "عمودان",
+      "columnCount_few": "أعمدة",
+      "columnCount_many": "عمودًا",
+      "rowCount_zero": "صف",
+      "rowCount_two": "صفّان",
+      "rowCount_few": "صفوف",
+      "rowCount_many": "صفًّا"
     },
     "sessionFilter": {
       "title": "تصفية الجلسات",
@@ -1778,7 +1845,7 @@
       "cameraAccessDisabled": "الوصول إلى الكاميرا معطّل",
       "cameraAccessMessage": "اسمح بالوصول إلى الكاميرا في الإعدادات لالتقاط صورة.",
       "couldNotOpenPhotoPicker": "تعذّر فتح منتقي الصور. أعد تشغيل Kilo وحاول مرة أخرى.",
-      "maxFilesAllowed": "الحد الأقصى {{count}} ملفات مسموح بها",
+      "maxFilesAllowed": "الحد الأقصى {{displayCount}} ملفات مسموح بها",
       "onlyAddingFiles": "ستتم إضافة {{accepted}} من {{total}} ملفات فقط (الحد الأقصى {{max}})"
     },
     "composer": {
@@ -1843,7 +1910,7 @@
       "costPrefix": "التكلفة {{cost}}",
       "costSuffix": "، التكلفة {{cost}}",
       "tokensWindowUnavailable": "السياق {{used}} رمز، النافذة غير متاحة",
-      "tokensUsage": "السياق {{used}} من {{window}} رمز، تم استخدام {{percentage}}%",
+      "tokensUsage": "السياق {{used}} من {{window}} رمز، تم استخدام {{percentage}}",
       "title": "استخدام السياق",
       "used": "المستخدم",
       "remaining": "المتبقي",
@@ -1852,7 +1919,7 @@
       "usageReflectsLatest": "يعكس الاستخدام أحدث رد مكتمل من المساعد.",
       "tokenUsage": "استخدام الرموز",
       "cacheRate": "معدل ذاكرة التخزين المؤقت",
-      "modelsCount": "النماذج ({{count}})",
+      "modelsCount": "النماذج ({{displayCount}})",
       "tokenTotalsNote": "تغطي إجماليات الرموز هذه الجلسة فقط وتستثني رموز الوكلاء الفرعيين/الجلسات الفرعية.",
       "subagents": "وكلاء فرعيون",
       "subagentsDescription": "التكلفة المتبقية من الجلسات الفرعية",
@@ -1864,7 +1931,11 @@
       "stepsCount_one": "{{steps}} خطوة",
       "stepsCount": "{{steps}} خطوات",
       "stepsCount_other": "{{steps}} خطوات",
-      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
+      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
+      "stepsCount_zero": "{{steps}} خطوات",
+      "stepsCount_two": "{{steps}} خطوتان",
+      "stepsCount_few": "{{steps}} خطوات",
+      "stepsCount_many": "{{steps}} خطوة"
     },
     "prBadge": {
       "open": "طلب سحب مفتوح",
@@ -1994,7 +2065,7 @@
     "connectedCli": "على CLI متصل",
     "newSessionOn": "جلسة جديدة على {{name}}",
     "noMatchingSessions": "لا توجد جلسات مطابقة.",
-    "onlyFirstFilesAttached": "سيتم إرفاق أول {{count}} ملف فقط.",
+    "onlyFirstFilesAttached": "سيتم إرفاق أول {{displayCount}} ملف فقط.",
     "staleMessage": "لم تعد هذه المشاركة متاحة.",
     "retryableMessage": "تعذّر تحميل جلساتك.",
     "emptyMessage": "لا توجد جلسات بعد — ابدأ جلسة جديدة لإرسال هذا.",
@@ -2027,7 +2098,7 @@
     "otherAccountCopy": "ينتمي Kilo Pass على حساب Apple هذا إلى حساب Kilo مختلف. سجّل الدخول إلى حساب Kilo ذلك لإدارته.",
     "alreadySubscribed": "لديك بالفعل اشتراك Kilo Pass.",
     "purchaseUnavailable": "شراء Kilo Pass غير متاح حاليًا.",
-    "tierCredits": "{{amount}} دولار من الأرصدة",
+    "tierCredits": "{{amount}} من الأرصدة",
     "perMonth": "{{price}}/شهر",
     "verifyPurchaseFailed": "تعذّر التحقق من شرائك. تحقق من اتصالك وحاول مرة أخرى.",
     "productsCouldNotLoad": "تعذّر تحميل منتجات Kilo Pass من App Store.",
@@ -2038,7 +2109,7 @@
     "manageFailed": "تعذّر فتح إدارة اشتراك App Store.",
     "kiloPassSetup": "إعداد Kilo Pass",
     "subscriptionHeaderDescription": "اشتراك شهري يضيف أرصدة إلى رصيدك في Kilo لتشغيل جلسات البرمجة بالذكاء الاصطناعي في تطبيق Kilo — وكلاء السحابة، والجلسات عن بُعد، ومحادثات KiloClaw.",
-    "tierDescription": "أرصدة مدفوعة بقيمة ${{price}} تُضاف شهريًا لاستخدام تطبيق Kilo.",
+    "tierDescription": "أرصدة مدفوعة بقيمة {{price}} تُضاف شهريًا لاستخدام تطبيق Kilo.",
     "subscribe": "اشترك",
     "subscribeDescription": "أرصدة شهرية مع تقدم إضافي",
     "manage": "إدارة",
@@ -2046,7 +2117,7 @@
     "statusPending": "Kilo Pass قيد الانتظار",
     "statusCanceling": "Kilo Pass قيد الإلغاء",
     "statusPastDue": "Kilo Pass متأخر السداد",
-    "monthlyCredits": "أرصدة شهرية بقيمة ${{credits}}",
+    "monthlyCredits": "أرصدة شهرية بقيمة {{credits}}",
     "ends": "ينتهي في {{date}}",
     "periodEnd": "نهاية الفترة",
     "managedOnGooglePlay": "تتم الإدارة عبر Google Play",
@@ -2150,17 +2221,17 @@
     "accessDeniedDescription": "ليست لديك صلاحية لعرض طلب السحب هذا.",
     "checkConnection": "التحقق من الاتصال",
     "checks": {
-      "checksCount": "{{count}} فحصًا",
+      "checksCount": "{{displayCount}} فحصًا",
       "couldNotLoad": "تعذّر تحميل الفحوصات.",
-      "failed": "{{count}} فاشلًا",
+      "failed": "{{displayCount}} فاشلًا",
       "noAccess": "ليست لديك صلاحية للوصول إلى فحوصات هذا المستودع.",
       "noChecksReported": "لم يتم الإبلاغ عن أي فحوصات",
       "notAvailable": "الفحوصات غير متاحة بعد. ربما لم تتم معالجة الالتزام الرئيسي، أو أن تطبيق Kilo GitHub غير مثبت على المستودع الرئيسي.",
       "openDetails": "فتح تفاصيل {{name}}",
-      "passed": "{{count}} ناجحًا",
-      "pending": "{{count}} معلّقًا",
+      "passed": "{{displayCount}} ناجحًا",
+      "pending": "{{displayCount}} معلّقًا",
       "retryChecks": "إعادة محاولة الفحوصات",
-      "skipped": "{{count}} متخطًى",
+      "skipped": "{{displayCount}} متخطًى",
       "title": "الفحوصات",
       "viewOnGitHub": "عرض طلب السحب على GitHub",
       "checkDetails": "تفاصيل الفحص",
@@ -2238,7 +2309,7 @@
           "terminal": "لا يمكن الإبلاغ عن هذا المستخدم."
         }
       },
-      "moreLinesAbove": "… {{count}} أسطر إضافية أعلاه",
+      "moreLinesAbove": "… {{displayCount}} أسطر إضافية أعلاه",
       "mute": "كتم",
       "mutedUser": "تم كتم {{login}}",
       "noDiscussion": "لا توجد مناقشة بعد",
@@ -2246,7 +2317,7 @@
       "comment_one": "تعليق واحد",
       "outdated": "قديم",
       "quotedDiffSnippet": "مقتطف فرق مقتبس",
-      "reactionPill": "تفاعل {{emoji}}، {{count}} {{countLabel}}",
+      "reactionPill": "تفاعل {{emoji}}، {{displayCount}} {{countLabel}}",
       "reaction": "تفاعلات",
       "reaction_other": "تفاعلات",
       "reaction_one": "تفاعل",
@@ -2276,7 +2347,15 @@
       "viewTerms": "عرض الشروط",
       "termsAcceptRequired": "يجب أن تقبل شروط الخدمة للنشر.",
       "termsCheckRetryCopy": "تعذّر التحقق من شروط الخدمة. تحقق من اتصالك وحاول مرة أخرى.",
-      "termsOutdatedCopy": "تغيّرت شروط الخدمة. أعد فتح هذه الشاشة لقبول أحدث إصدار."
+      "termsOutdatedCopy": "تغيّرت شروط الخدمة. أعد فتح هذه الشاشة لقبول أحدث إصدار.",
+      "comment_zero": "لا تعليقات",
+      "comment_two": "{{displayCount}} تعليقان",
+      "comment_few": "{{displayCount}} تعليقات",
+      "comment_many": "{{displayCount}} تعليقًا",
+      "reaction_zero": "لا تفاعلات",
+      "reaction_two": "تفاعلان",
+      "reaction_few": "تفاعلات",
+      "reaction_many": "تفاعلًا"
     },
     "entry": {
       "clearLink": "مسح رابط طلب السحب",
@@ -2350,12 +2429,12 @@
     "hunkRows": {
       "contextUnavailable": "السياق غير متاح عند هذا المرجع",
       "expandAll": "توسيع الكل",
-      "expandAllLines": "توسيع جميع الأسطر {{count}}",
+      "expandAllLines": "توسيع جميع الأسطر {{displayCount}}",
       "expandContext": "توسيع السياق",
-      "expandLines": "توسيع {{count}} أسطر ({{start}}–{{end}})",
-      "expandLinesOfContext": "توسيع {{count}} أسطر من السياق",
+      "expandLines": "توسيع {{displayCount}} أسطر ({{start}}–{{end}})",
+      "expandLinesOfContext": "توسيع {{displayCount}} أسطر من السياق",
       "expandMoreContext": "توسيع المزيد من السياق",
-      "expandMoreLines": "توسيع {{count}} أسطر إضافية ({{start}}–{{end}})",
+      "expandMoreLines": "توسيع {{displayCount}} أسطر إضافية ({{start}}–{{end}})",
       "failedToLoadContext": "فشل تحميل السياق — اضغط لإعادة المحاولة",
       "failedToLoadMoreFiles": "فشل تحميل المزيد من الملفات — اضغط لإعادة المحاولة",
       "fileLoadedCount_one": "تم تحميل {{displayCount}} ملف",
@@ -2377,7 +2456,15 @@
       "loadingLines": "جارٍ تحميل {{loaded}} من {{total}} سطرًا…",
       "loadingMoreFiles": "جارٍ تحميل المزيد من الملفات…",
       "retryLoadingContext": "إعادة محاولة تحميل السياق",
-      "retryLoadingNextPage": "إعادة محاولة تحميل الصفحة التالية"
+      "retryLoadingNextPage": "إعادة محاولة تحميل الصفحة التالية",
+      "fileLoadedCount_zero": "لم يتم تحميل أي ملف",
+      "fileLoadedCount_two": "تم تحميل {{displayCount}} ملفّين",
+      "fileLoadedCount_few": "تم تحميل {{displayCount}} ملفات",
+      "fileLoadedCount_many": "تم تحميل {{displayCount}} ملفًا",
+      "fileLoadedOfTotalCount_zero": "لم يتم تحميل أي ملف من {{total}}",
+      "fileLoadedOfTotalCount_two": "تم تحميل {{displayCount}} ملفّين من {{total}}",
+      "fileLoadedOfTotalCount_few": "تم تحميل {{displayCount}} ملفات من {{total}}",
+      "fileLoadedOfTotalCount_many": "تم تحميل {{displayCount}} ملفًا من {{total}}"
     },
     "inbox": {
       "couldNotLoad": "تعذّر تحميل صندوق الوارد",
@@ -2452,7 +2539,15 @@
       "stateOpenApproved": "مفتوح · تمت الموافقة",
       "stateOpenChangesRequested": "مفتوح · تم طلب تغييرات",
       "stateOpenReviewRequired": "مفتوح · المراجعة مطلوبة",
-      "unknownAuthor": "مؤلف غير معروف"
+      "unknownAuthor": "مؤلف غير معروف",
+      "commit_zero": "لا إيداعات",
+      "commit_two": "إيداعان",
+      "commit_few": "إيداعات",
+      "commit_many": "إيداعًا",
+      "file_zero": "لا ملفات",
+      "file_two": "ملفّان",
+      "file_few": "ملفات",
+      "file_many": "ملفًا"
     },
     "pendingComment": {
       "allQueuedHint": "ستُرسل جميع التعليقات في طلب مجمّع واحد.",
@@ -2500,9 +2595,13 @@
       "pendingComment_one": "تعليق معلّق",
       "summaryOptional": "الملخص (اختياري)",
       "title": "إرسال المراجعة",
-      "partialPostedMessage": "تم نشر {{freshCount}} تعليقًا. {{staleCount}} تعليقًا يشير إلى إيداع أقدم وبقي في قائمتك.",
-      "submitCountOfTotal": "إرسال {{freshCount}} من {{totalCount}} تعليقًا",
-      "submitReview": "إرسال المراجعة"
+      "partialPostedMessage": "تم نشر {{displayFreshCount}} تعليقًا. {{displayStaleCount}} تعليقًا يشير إلى إيداع أقدم وبقي في قائمتك.",
+      "submitCountOfTotal": "إرسال {{displayFreshCount}} من {{displayTotalCount}} تعليقًا",
+      "submitReview": "إرسال المراجعة",
+      "pendingComment_zero": "لا تعليقات معلّقة",
+      "pendingComment_two": "تعليقان معلّقان",
+      "pendingComment_few": "تعليقات معلّقة",
+      "pendingComment_many": "تعليقًا معلّقًا"
     },
     "fileStatus": {
       "added": "مضاف",
@@ -2654,7 +2753,11 @@
       "processingNeedsReview": "المعالجة تحتاج إلى مراجعة",
       "retry": "إعادة المحاولة",
       "retryHint": "يعيد محاولة تحميل حالة Kilo Pass.",
-      "setupHint": "يفتح إعداد Kilo Pass على الويب."
+      "setupHint": "يفتح إعداد Kilo Pass على الويب.",
+      "paidSeat_zero": "لا مقاعد مدفوعة",
+      "paidSeat_two": "{{displayCount}} مقعدان مدفوعان",
+      "paidSeat_few": "{{displayCount}} مقاعد مدفوعة",
+      "paidSeat_many": "{{displayCount}} مقعدًا مدفوعًا"
     }
   },
   "feedback": {

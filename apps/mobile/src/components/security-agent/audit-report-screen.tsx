@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatNumber } from '@/lib/format';
 import { useTRPC } from '@/lib/trpc';
 import { capitalize, parseTimestamp } from '@/lib/utils';
 
@@ -75,7 +75,9 @@ function ReportHeader({ report }: Readonly<{ report: SecurityAgentAuditReport }>
 function SummaryCount({ label, value }: Readonly<{ label: string; value: number }>) {
   return (
     <View className="min-w-16">
-      <Text className="text-lg font-semibold tabular-nums">{value}</Text>
+      <Text className="text-lg font-semibold tabular-nums">
+        {formatNumber(value, i18n.language)}
+      </Text>
       <Text variant="muted" className="text-xs">
         {label}
       </Text>

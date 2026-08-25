@@ -52,11 +52,11 @@ describe('label references', () => {
   });
 });
 
-describe('plural fallback', () => {
-  it('uses a translated singular and the generic Arabic fallback', async () => {
+describe('plural forms', () => {
+  it('uses the translated Arabic singular and dual forms', async () => {
     await i18n.changeLanguage('ar');
 
     expect(i18n.t('agents.sessionRow.cent', { count: 1 })).toBe(ar.agents.sessionRow.cent_one);
-    expect(i18n.t('agents.sessionRow.cent', { count: 2 })).toBe(ar.agents.sessionRow.cent);
+    expect(i18n.t('agents.sessionRow.cent', { count: 2 })).toBe(ar.agents.sessionRow.cent_two);
   });
 });

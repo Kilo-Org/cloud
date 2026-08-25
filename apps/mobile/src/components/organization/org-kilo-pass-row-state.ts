@@ -1,5 +1,5 @@
 import { i18n } from '@/i18n';
-import { formatDate, formatNumber } from '@/lib/format';
+import { formatDate, formatNumber, formatUsd } from '@/lib/format';
 import { parseTimestamp } from '@/lib/utils';
 
 /**
@@ -58,11 +58,7 @@ export type OrgKiloPassRowState = {
   loading: boolean;
 };
 
-const TIER_LABELS = {
-  tier_19: '$19',
-  tier_49: '$49',
-  tier_199: '$199',
-} satisfies Record<'tier_19' | 'tier_49' | 'tier_199', string>;
+const TIER_PRICES = { tier_19: 19, tier_49: 49, tier_199: 199 } as const;
 
 function paidSeatsLabel(count: number): string {
   return i18n.t('organization.kiloPass.paidSeat', {
@@ -72,7 +68,11 @@ function paidSeatsLabel(count: number): string {
 }
 
 function activeSubtitle(agreement: NonNullable<OrgKiloPassSummary['agreement']>): string {
-  return `${TIER_LABELS[agreement.tier]} · ${paidSeatsLabel(agreement.paidSeatCount)}`;
+  const tierPrice = formatUsd(TIER_PRICES[agreement.tier], i18n.language, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+  return `${tierPrice} · ${paidSeatsLabel(agreement.paidSeatCount)}`;
 }
 
 /** `paidThrough` arrives as a PostgreSQL timestamp; Hermes needs `parseTimestamp`. */

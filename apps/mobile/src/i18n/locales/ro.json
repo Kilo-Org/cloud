@@ -206,11 +206,11 @@
       "loadingLines": "Se încarcă {{loaded}} din {{total}} linii…",
       "expandContext": "Extinde contextul",
       "expandMoreContext": "Extinde mai mult context",
-      "expandLines": "Extinde {{count}} linii ({{start}}–{{end}})",
-      "expandMoreLines": "Extinde încă {{count}} linii ({{start}}–{{end}})",
-      "expandLinesOfContext": "Extinde {{count}} linii de context",
+      "expandLines": "Extinde {{displayCount}} linii ({{start}}–{{end}})",
+      "expandMoreLines": "Extinde încă {{displayCount}} linii ({{start}}–{{end}})",
+      "expandLinesOfContext": "Extinde {{displayCount}} linii de context",
       "expandAll": "Extinde tot",
-      "expandAllLines": "Extinde toate cele {{count}} linii",
+      "expandAllLines": "Extinde toate cele {{displayCount}} linii",
       "loadingMoreFiles": "Se încarcă mai multe fișiere…",
       "retryLoadingNextPage": "Reîncearcă încărcarea paginii următoare",
       "failedToLoadMoreFiles": "Încărcarea a mai multor fișiere a eșuat — atinge pentru a reîncerca",
@@ -227,7 +227,9 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} fișiere încărcate din {{total}}",
       "filesStillLoading": "Fișierele se mai încarcă. Trage pentru a reîmprospăta.",
       "goToOverview": "Mergi la Prezentare generală",
-      "goToOverviewTab": "Mergi la fila Prezentare generală"
+      "goToOverviewTab": "Mergi la fila Prezentare generală",
+      "fileLoadedCount_few": "{{displayCount}} fișiere încărcate",
+      "fileLoadedOfTotalCount_few": "{{displayCount}} fișiere încărcate din {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ fără linie nouă la sfârșitul fișierului",
@@ -301,7 +303,7 @@
       "closeReactions": "Închide reacțiile",
       "reactionsTitle": "Reacții",
       "addReaction": "Adaugă o reacție",
-      "reactionPill": "{{emoji}} reacție, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} reacție, {{displayCount}} {{countLabel}}",
       "reaction_one": "reacție",
       "reaction": "reacții",
       "reaction_other": "reacții",
@@ -353,10 +355,12 @@
       "noDiscussionDescription": "Nu există fire de revizuire sau comentarii de conversație pe acest pull request.",
       "reviewFiles": "Revizuiește fișierele",
       "quotedDiffSnippet": "Fragment de diff citat",
-      "moreLinesAbove": "… {{count}} linii mai multe mai sus",
+      "moreLinesAbove": "… {{displayCount}} linii mai multe mai sus",
       "termsAcceptRequired": "Trebuie să accepți Termenii de utilizare pentru a posta.",
       "termsOutdatedCopy": "Termenii de utilizare s-au schimbat. Redeschide acest ecran pentru a accepta versiunea cea mai recentă.",
-      "termsCheckRetryCopy": "Nu s-a putut verifica Termenii de utilizare. Verifică conexiunea și încearcă din nou."
+      "termsCheckRetryCopy": "Nu s-a putut verifica Termenii de utilizare. Verifică conexiunea și încearcă din nou.",
+      "comment_few": "{{displayCount}} comentarii",
+      "reaction_few": "reacții"
     },
     "couldNotOpenGitHubAppSettings": "Nu s-au putut deschide setările aplicației GitHub",
     "installKiloGitHubApp": "Instalează Kilo GitHub App",
@@ -395,11 +399,11 @@
       "retryChecks": "Reîncearcă verificările",
       "viewOnGitHub": "Vezi PR pe GitHub",
       "noChecksReported": "Nicio verificare raportată",
-      "passed": "{{count}} trecute",
-      "failed": "{{count}} eșuate",
-      "pending": "{{count}} în așteptare",
-      "skipped": "{{count}} sărite",
-      "checksCount": "{{count}} verificări",
+      "passed": "{{displayCount}} trecute",
+      "failed": "{{displayCount}} eșuate",
+      "pending": "{{displayCount}} în așteptare",
+      "skipped": "{{displayCount}} sărite",
+      "checksCount": "{{displayCount}} verificări",
       "checkDetails": "detaliile verificării",
       "pullRequest": "pull request"
     },
@@ -459,9 +463,10 @@
       "pendingComment_one": "comentariu în așteptare",
       "pendingComment": "comentarii în așteptare",
       "pendingComment_other": "comentarii în așteptare",
-      "submitCountOfTotal": "Trimite {{freshCount}} din {{totalCount}} comentarii",
+      "submitCountOfTotal": "Trimite {{displayFreshCount}} din {{displayTotalCount}} comentarii",
       "submitReview": "Trimite revizuirea",
-      "partialPostedMessage": "Publicate {{freshCount}} comentariu(i). {{staleCount}} comentariu(i) se referă la un commit mai vechi și au rămas în coada ta."
+      "partialPostedMessage": "Publicate {{displayFreshCount}} comentariu(i). {{displayStaleCount}} comentariu(i) se referă la un commit mai vechi și au rămas în coada ta.",
+      "pendingComment_few": "comentarii în așteptare"
     },
     "reconnectNotice": {
       "title": "Conexiunea GitHub a expirat",
@@ -488,7 +493,9 @@
       "commit_other": "commit-uri",
       "file_one": "fișier",
       "file": "fișiere",
-      "file_other": "fișiere"
+      "file_other": "fișiere",
+      "commit_few": "commit-uri",
+      "file_few": "fișiere"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editează comentariul învechit în așteptare pe {{location}}",
@@ -580,7 +587,8 @@
     "agents": "Agenți",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, filă, {{position}} din {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +629,7 @@
       "recent": "Recente",
       "common": "Comune",
       "reactWith": "Reacționează cu {{reaction}}",
-      "accessibility": "{{emoji}} reacție, {{count}}"
+      "accessibility": "{{emoji}} reacție, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Răspunzi la",
@@ -650,7 +658,7 @@
       "imageUnavailable": "Imagine indisponibilă",
       "openFailed": "Nu s-a putut deschide atașamentul. Verifică conexiunea și încearcă din nou.",
       "attachFailed": "Atașarea fișierului a eșuat",
-      "limit": "Poți atașa până la {{count}} fișiere.",
+      "limit": "Poți atașa până la {{displayCount}} fișiere.",
       "sizeRejection": "{{filename}} depășește limita de atașare de {{limit}}.",
       "unreadable": "Nu s-a putut citi {{filename}}.",
       "pastedImage": "imaginea lipită",
@@ -700,7 +708,8 @@
       "someone": "Cineva",
       "typing_one": "{{name}} scrie...",
       "typing": "{{names}} scriu...",
-      "typing_other": "{{names}} scriu..."
+      "typing_other": "{{names}} scriu...",
+      "typing_few": "{{names}} scriu..."
     },
     "botStatus": {
       "online": "Online",
@@ -722,6 +731,7 @@
       "finalTermEnds": "Termenul final se încheie",
       "afterFinalTerm": "După termenul final",
       "remaining": "Rămas",
+      "lessThanOneDay": "Mai puțin de 1 zi",
       "ends": "Se încheie",
       "expires": "Expiră",
       "noActivePlan": "Fără plan activ",
@@ -740,11 +750,11 @@
       "yourStandardMonthlyPrice": "prețul tău lunar Standard",
       "perMonth": "/lună",
       "earlybirdAccessUntil": "Acces Earlybird până pe {{date}}",
-      "earlybirdEnding": "Earlybird se încheie: {{days}} zile rămase",
+      "earlybirdEnding": "Earlybird se încheie: {{remaining}}",
       "paymentPastDue": "Plată întârziată. Te rugăm să actualizezi metoda de plată.",
       "subscriptionCancels": "Abonamentul se anulează pe {{date}}",
-      "trialDaysRemaining": "Perioadă de probă: {{days}} zile rămase",
-      "trialEndingSoon": "Perioada de probă se încheie curând: {{days}}"
+      "trialDaysRemaining": "Perioadă de probă: {{remaining}} rămase",
+      "trialEndingSoon": "Perioada de probă se încheie curând: {{remaining}}"
     },
     "changelog": {
       "title": "Ce e nou",
@@ -996,7 +1006,7 @@
         "stalledTitle": "Ceva s-a blocat",
         "stalledBody": "Nu am putut finaliza configurarea lui {{name}}. Încearcă din nou sau trimite un e-mail la hi@kilo.ai dacă acest lucru se întâmplă în continuare.",
         "timeoutTitle": "Durează mai mult decât era de așteptat",
-        "timeoutBody": "Configurarea pentru {{name}} durează mai mult decât de obicei (peste {{minutes}} minute).",
+        "timeoutBody": "Configurarea pentru {{name}} durează mai mult decât de obicei (peste {{displayMinutes}} minute).",
         "continueInBackground": "Continuă în fundal",
         "settingUp": "Se configurează {{name}}",
         "finishingSetup": "Se finalizează configurarea",
@@ -1071,7 +1081,8 @@
       "openUnread_other": "Deschide {{name}}, {{displayCount}} mesaje necitite",
       "open": "Deschide {{name}}",
       "openSettings": "Deschide setările pentru {{name}}",
-      "fixOnKiloAi": "Rezolvă pe kilo.ai: {{label}}"
+      "fixOnKiloAi": "Rezolvă pe kilo.ai: {{label}}",
+      "openUnread_few": "Deschide {{name}}, {{displayCount}} mesaje necitite"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1287,7 +1298,7 @@
       "mergeGate": "Poartă de fuziune",
       "repositories": "Depozite",
       "allRepositories": "Toate depozitele",
-      "nSelected": "{{count}} selectate",
+      "nSelected": "{{displayCount}} selectate",
       "reviewMemory": "Memorie de revizuire",
       "proposedReviewMdGuidance": "Îndrumări REVIEW.md propuse"
     },
@@ -1367,7 +1378,8 @@
       "severityAll": "Toate severitățile",
       "confidenceHighOnly": "Doar încredere ridicată",
       "confidenceMediumOrHigher": "Medie sau mai mare",
-      "confidenceAny": "Orice nivel de încredere"
+      "confidenceAny": "Orice nivel de încredere",
+      "queued_few": "{{displayCount}} constatări existente puse în coadă pentru analiză."
     },
     "analysis": {
       "couldNotLoad": "Nu s-a putut încărca analiza",
@@ -1391,14 +1403,14 @@
       "analyzed": "Analizat",
       "exploitabilityReasoning": "Raționamentul de exploatabilitate",
       "suggestedFix": "Remediere sugerată",
-      "whereFound": "Unde a fost găsit ({{count}})",
+      "whereFound": "Unde a fost găsit ({{displayCount}})",
       "fullReport": "Raport complet generat",
       "unknown": "Necunoscut",
       "yes": "Da",
       "no": "Nu"
     },
     "dashboard": {
-      "findingsCount": "{{count}} constatări",
+      "findingsCount": "{{displayCount}} constatări",
       "notMeasured": "Nedimensionat",
       "actFirst": "Acționează mai întâi",
       "slaPosture": "Postura SLA",
@@ -1407,7 +1419,7 @@
       "repositoryActionPlan": "Planul de acțiune al depozitului",
       "noOpenFindings": "Nicio constatare deschisă nu necesită atenție",
       "deadlineToday": "Termenul limită a fost atins astăzi",
-      "daysOverdue": "{{count}} zile întârziere",
+      "daysOverdue": "{{displayCount}} zile întârziere",
       "withinDeadline": "În termenul limită",
       "criticalOverdue": "Critice întârziate",
       "highOverdue": "Mari întârziate",
@@ -1434,6 +1446,27 @@
       "syncNow": "Sincronizează acum",
       "syncQueued": "Sincronizare în coadă",
       "syncStatusUnavailable": "Starea sincronizării nu este disponibilă"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Constatări deschise",
+      "openFindingsDetail": "{{critical}} critice, {{high}} mari",
+      "confirmedExploitable": "Confirmat exploatabil",
+      "confirmedExploitableDetail": "Riscul proiectului confirmat prin analiză",
+      "needsReview": "Necesită revizuirea ta",
+      "needsReviewDetail": "Este necesară o decizie umană",
+      "analysisIncomplete": "Analiză incompletă",
+      "analysisIncompleteDetail": "Riscul proiectului este încă necunoscut",
+      "slaCompliance": "Conformitate SLA",
+      "notMeasured": "Nedimensionat",
+      "withinDeadlineDetail": "{{within}} din {{total}} în termenul limită",
+      "noDeadlineData": "Nicio constatare nu are încă termen limită SLA",
+      "deadlinePassed": "Termenul limită a expirat",
+      "deadlinePassedDetail": "{{critical}} critice, {{high}} mari",
+      "dueThisWeek": "Termenul limită în această săptămână",
+      "dueThisWeekDetail": "{{exploitable}} confirmate exploatabile",
+      "noDeadline": "Fără termen limită",
+      "reviewSlaAssignment": "Revizuiește atribuirea SLA",
+      "allOpenFindingsTracked": "Toate constatările deschise sunt urmărite"
     },
     "dismiss": {
       "title": "Respinge constatarea",
@@ -1500,13 +1533,14 @@
       "analysisModeSubtitle": "Analiză {{mode}}",
       "automation": "Automatizare",
       "automationAllOff": "Toate oprite",
-      "automationCount": "{{count}} din 3 activate",
+      "automationCount": "{{displayCount}} din 3 activate",
       "notifications": "Notificări",
-      "notificationsCount": "{{count}} din 2 activate",
+      "notificationsCount": "{{displayCount}} din 2 activate",
       "slaPolicy": "Politica SLA",
       "disabledNoManage": "Security Agent este dezactivat. Doar proprietarii organizației și managerii de facturare îl pot activa.",
       "disabledNoRepo": "Selectează cel puțin un depozit înainte de a activa Security Agent.",
-      "disabledPrompt": "Activează Security Agent pentru a sincroniza alertele Dependabot, a alege depozite și a configura automatizarea."
+      "disabledPrompt": "Activează Security Agent pentru a sincroniza alertele Dependabot, a alege depozite și a configura automatizarea.",
+      "repositoriesCount_few": "{{displayCount}} depozite selectate"
     },
     "remediation": {
       "cancellationRequested": "Anulare solicitată",
@@ -1524,7 +1558,7 @@
       "openPullRequest": "Deschide pull request{{number}}",
       "openDraftPullRequest": "Deschide pull request draft{{number}}",
       "progress": "Progres",
-      "attemptHistory": "Istoricul tentativelor ({{count}})",
+      "attemptHistory": "Istoricul tentativelor ({{displayCount}})",
       "attemptNumber": "Tentativa #{{number}}",
       "startedBy": "Început de",
       "model": "Model",
@@ -1734,7 +1768,9 @@
       "cent_other": "cenți",
       "dollar_one": "dolar",
       "dollar": "dolari",
-      "dollar_other": "dolari"
+      "dollar_other": "dolari",
+      "cent_few": "cenți",
+      "dollar_few": "dolari"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nu s-a putut deschide GitHub",
@@ -1830,7 +1866,8 @@
     "partRenderer": {
       "updatedFileCount_one": "Actualizat {{displayCount}} fișier",
       "updatedFileCount": "Actualizate {{displayCount}} fișiere",
-      "updatedFileCount_other": "Actualizate {{displayCount}} fișiere"
+      "updatedFileCount_other": "Actualizate {{displayCount}} fișiere",
+      "updatedFileCount_few": "Actualizate {{displayCount}} fișiere"
     },
     "toolPatch": {
       "operationAdded": "Adăugat",
@@ -1855,9 +1892,9 @@
       "toolTask": "sarcină",
       "readTodos": "Citește sarcinile",
       "updateTodos": "Actualizează sarcinile",
-      "linesBadge": "{{count}} linii",
-      "filesBadge": "{{count}} fișiere",
-      "matchesBadge": "{{count}} potriviri"
+      "linesBadge": "{{displayCount}} linii",
+      "filesBadge": "{{displayCount}} fișiere",
+      "matchesBadge": "{{displayCount}} potriviri"
     },
     "readToolMarkdown": {
       "linesTruncated": "liniile {{start}}–{{end}} (trunchiate)",
@@ -1941,6 +1978,10 @@
       "reportAiResponseFailedTerminal": "Acest răspuns nu poate fi raportat.",
       "reportAiResponseSubmitted": "Raport trimis. Chitanță {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Detalii indisponibile",
       "textDisplay": "Afișare text",
@@ -1999,7 +2040,7 @@
       "preparationComplete": "Pregătire finalizată",
       "preparationFailed": "Pregătire eșuată",
       "setupCommand": "Comandă de configurare {{index}}",
-      "setupCommandOf": "Comandă de configurare {{index}} din {{count}}"
+      "setupCommandOf": "Comandă de configurare {{index}} din {{displayCount}}"
     },
     "permissionCard": {
       "title": "Este necesară permisiunea",
@@ -2036,7 +2077,7 @@
       "submissionFailed": "Trimiterea a eșuat. Încearcă din nou.",
       "questionAnnouncement": "Agentul are nevoie de inputul tău. Compozitorul este în pauză în timp ce răspunzi.",
       "permissionAnnouncement": "Agentul are nevoie de permisiune pentru a continua. Compozitorul este în pauză în timp ce decizi.",
-      "positionHint": "(1 din {{count}})",
+      "positionHint": "(1 din {{displayCount}})",
       "movedPastPrompt": "Agentul a trecut de acest prompt. Acest card se va închide când sesiunea continuă.",
       "waitingForAnswer": "Agentul așteaptă răspunsul tău. Cât timp această întrebare este deschisă, mesajul tău către agent este în pauză.",
       "waitingForPermission": "Agentul așteaptă permisiunea. Cât timp această cerere este deschisă, mesajul tău către agent este în pauză."
@@ -2076,7 +2117,8 @@
       "omitted_other": "{{displayCount}} elemente anterioare din această sesiune nu au putut fi afișate.",
       "couldNotLoad": "Mesajele anterioare nu au putut fi încărcate.",
       "unavailable": "Mesajele anterioare nu sunt disponibile.",
-      "tooLarge": "Mesajele anterioare sunt prea mari pentru a fi încărcate."
+      "tooLarge": "Mesajele anterioare sunt prea mari pentru a fi încărcate.",
+      "omitted_few": "{{displayCount}} elemente anterioare din această sesiune nu au putut fi afișate."
     },
     "markdownTable": {
       "viewTable": "Vezi tabelul",
@@ -2088,7 +2130,9 @@
       "rowCount_one": "rând",
       "rowCount": "rânduri",
       "rowCount_other": "rânduri",
-      "opensFullScreen": "deschide pe tot ecranul"
+      "opensFullScreen": "deschide pe tot ecranul",
+      "columnCount_few": "coloane",
+      "rowCount_few": "rânduri"
     },
     "sessionFilter": {
       "title": "Filtrează sesiunile",
@@ -2157,7 +2201,7 @@
       "cameraAccessDisabled": "Acces la cameră dezactivat",
       "cameraAccessMessage": "Permite accesul la cameră în Setări pentru a face o fotografie.",
       "couldNotOpenPhotoPicker": "Selectorul de fotografii nu a putut fi deschis. Repornește Kilo și încearcă din nou.",
-      "maxFilesAllowed": "Se permit maximum {{count}} fișiere",
+      "maxFilesAllowed": "Se permit maximum {{displayCount}} fișiere",
       "onlyAddingFiles": "Se adaugă doar {{accepted}} din {{total}} fișiere (max {{max}})"
     },
     "composer": {
@@ -2222,7 +2266,7 @@
       "costPrefix": "cost {{cost}}",
       "costSuffix": ", cost {{cost}}",
       "tokensWindowUnavailable": "Context {{used}} tokeni, fereastră indisponibilă",
-      "tokensUsage": "Context {{used}} din {{window}} tokeni, {{percentage}}% folosit",
+      "tokensUsage": "Context {{used}} din {{window}} tokeni, {{percentage}} folosit",
       "title": "Utilizarea contextului",
       "used": "Folosit",
       "remaining": "Rămas",
@@ -2231,7 +2275,7 @@
       "usageReflectsLatest": "Utilizarea reflectă cel mai recent răspuns completat al asistentului.",
       "tokenUsage": "Utilizare tokeni",
       "cacheRate": "Rată cache",
-      "modelsCount": "Modele ({{count}})",
+      "modelsCount": "Modele ({{displayCount}})",
       "tokenTotalsNote": "Totalurile de tokeni acoperă doar această sesiune și exclud tokenii de subagent/sesiune-copil.",
       "subagents": "Subagenți",
       "subagentsDescription": "Cost rezidual din sesiunile copil",
@@ -2243,7 +2287,8 @@
       "stepsCount_one": "{{steps}} pas",
       "stepsCount": "{{steps}} pași",
       "stepsCount_other": "{{steps}} pași",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "stepsCount_few": "{{steps}} pași"
     },
     "prBadge": {
       "open": "pull request deschisă",
@@ -2373,7 +2418,7 @@
     "connectedCli": "Pe un CLI conectat",
     "newSessionOn": "Sesiune nouă pe {{name}}",
     "noMatchingSessions": "Nicio sesiune potrivită.",
-    "onlyFirstFilesAttached": "Doar primele {{count}} fișiere vor fi atașate.",
+    "onlyFirstFilesAttached": "Doar primele {{displayCount}} fișiere vor fi atașate.",
     "staleMessage": "Acest element partajat nu mai este disponibil.",
     "retryableMessage": "Sesiunile tale nu au putut fi încărcate.",
     "emptyMessage": "Încă nicio sesiune — începe una nouă pentru a trimite acest conținut.",
@@ -2406,7 +2451,7 @@
     "otherAccountCopy": "Kilo Pass de pe acest Apple Account aparține unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a-l gestiona.",
     "alreadySubscribed": "Ai deja un abonament Kilo Pass.",
     "purchaseUnavailable": "Achiziția Kilo Pass nu este disponibilă chiar acum.",
-    "tierCredits": "${{amount}} în credite",
+    "tierCredits": "{{amount}} în credite",
     "perMonth": "{{price}}/lună",
     "verifyPurchaseFailed": "Achiziția ta nu a putut fi verificată. Verifică conexiunea și încearcă din nou.",
     "productsCouldNotLoad": "Produsele Kilo Pass nu au putut fi încărcate din App Store.",
@@ -2417,7 +2462,7 @@
     "manageFailed": "Gestionarea abonamentului din App Store nu a putut fi deschisă.",
     "kiloPassSetup": "Configurare Kilo Pass",
     "subscriptionHeaderDescription": "Un abonament lunar care adaugă credite la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App — Cloud Agents, sesiuni de la distanță și chat-uri KiloClaw.",
-    "tierDescription": "${{price}} credite plătite adăugate lunar pentru utilizarea Kilo App.",
+    "tierDescription": "{{price}} credite plătite adăugate lunar pentru utilizarea Kilo App.",
     "subscribe": "Abonează-te",
     "subscribeDescription": "Credite lunare cu progres bonus",
     "manage": "Gestionare",
@@ -2425,7 +2470,7 @@
     "statusPending": "Kilo Pass în așteptare",
     "statusCanceling": "Kilo Pass se anulează",
     "statusPastDue": "Kilo Pass restant",
-    "monthlyCredits": "${{credits}} credite lunare",
+    "monthlyCredits": "{{credits}} credite lunare",
     "ends": "Se încheie {{date}}",
     "periodEnd": "sfârșit de perioadă",
     "managedOnGooglePlay": "Gestionat pe Google Play",
@@ -2667,7 +2712,8 @@
       "processingNeedsReview": "Procesarea necesită revizuire",
       "retry": "Reîncearcă",
       "retryHint": "Reîncearcă încărcarea stării Kilo Pass.",
-      "setupHint": "Deschide configurarea Kilo Pass pe web."
+      "setupHint": "Deschide configurarea Kilo Pass pe web.",
+      "paidSeat_few": "{{displayCount}} locuri plătite"
     }
   },
   "authErrors": {

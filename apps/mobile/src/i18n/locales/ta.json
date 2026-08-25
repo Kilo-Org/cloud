@@ -206,11 +206,11 @@
       "loadingLines": "{{loaded}} / {{total}} வரிகள் ஏற்றப்படுகிறது…",
       "expandContext": "சூழலை விரிவாக்கு",
       "expandMoreContext": "மேலும் சூழலை விரிவாக்கு",
-      "expandLines": "{{count}} வரிகளை விரிவாக்கு ({{start}}–{{end}})",
-      "expandMoreLines": "மேலும் {{count}} வரிகளை விரிவாக்கு ({{start}}–{{end}})",
-      "expandLinesOfContext": "சூழலின் {{count}} வரிகளை விரிவாக்கு",
+      "expandLines": "{{displayCount}} வரிகளை விரிவாக்கு ({{start}}–{{end}})",
+      "expandMoreLines": "மேலும் {{displayCount}} வரிகளை விரிவாக்கு ({{start}}–{{end}})",
+      "expandLinesOfContext": "சூழலின் {{displayCount}} வரிகளை விரிவாக்கு",
       "expandAll": "அனைத்தையும் விரிவாக்கு",
-      "expandAllLines": "எல்லா {{count}} வரிகளையும் விரிவாக்கு",
+      "expandAllLines": "எல்லா {{displayCount}} வரிகளையும் விரிவாக்கு",
       "loadingMoreFiles": "மேலும் கோப்புகள் ஏற்றப்படுகின்றன…",
       "retryLoadingNextPage": "அடுத்த பக்கத்தை ஏற்றுவதை மீண்டும் முயற்சி",
       "failedToLoadMoreFiles": "மேலும் கோப்புகளை ஏற்ற முடியவில்லை — மீண்டும் முயற்சிக்க தட்டவும்",
@@ -301,7 +301,7 @@
       "closeReactions": "எதிர்வினைகளை மூடு",
       "reactionsTitle": "எதிர்வினைகள்",
       "addReaction": "எதிர்வினை சேர்",
-      "reactionPill": "{{emoji}} எதிர்வினை, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} எதிர்வினை, {{displayCount}} {{countLabel}}",
       "reaction_one": "எதிர்வினை",
       "reaction": "எதிர்வினைகள்",
       "reaction_other": "எதிர்வினைகள்",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "இந்த இழுப்பு கோரிக்கையில் மதிப்பாய்வு நூல்கள் அல்லது உரையாடல் கருத்துகள் இல்லை.",
       "reviewFiles": "கோப்புகளை மதிப்பாய்வு செய்",
       "quotedDiffSnippet": "மேற்கோள் காட்டிய diff பகுதி",
-      "moreLinesAbove": "… மேலே {{count}} கூடுதல் வரிகள்",
+      "moreLinesAbove": "… மேலே {{displayCount}} கூடுதல் வரிகள்",
       "termsAcceptRequired": "இடுகையிட நீங்கள் சேவை விதிமுறைகளை ஏற்க வேண்டும்.",
       "termsOutdatedCopy": "சேவை விதிமுறைகள் மாறியது. சமீபத்திய பதிப்பை ஏற்க இந்த திரையை மீண்டும் திறக்கவும்.",
       "termsCheckRetryCopy": "சேவை விதிமுறைகளைச் சரிபார்க்க முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்."
@@ -395,11 +395,11 @@
       "retryChecks": "சோதனைகளை மீண்டும் முயற்சி",
       "viewOnGitHub": "PR ஐ GitHub இல் பார்",
       "noChecksReported": "சோதனைகள் எதுவும் பதிவாகவில்லை",
-      "passed": "{{count}} தேர்ச்சி பெற்றது",
-      "failed": "{{count}} தோல்வியடைந்தது",
-      "pending": "{{count}} நிலுவையில் உள்ளது",
-      "skipped": "{{count}} தவிர்க்கப்பட்டது",
-      "checksCount": "{{count}} சோதனைகள்",
+      "passed": "{{displayCount}} தேர்ச்சி பெற்றது",
+      "failed": "{{displayCount}} தோல்வியடைந்தது",
+      "pending": "{{displayCount}} நிலுவையில் உள்ளது",
+      "skipped": "{{displayCount}} தவிர்க்கப்பட்டது",
+      "checksCount": "{{displayCount}} சோதனைகள்",
       "checkDetails": "சோதனை விவரங்கள்",
       "pullRequest": "இழுப்பு கோரிக்கை"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "நிலுவை கருத்து",
       "pendingComment": "நிலுவை கருத்துகள்",
       "pendingComment_other": "நிலுவை கருத்துகள்",
-      "submitCountOfTotal": "{{totalCount}} கருத்துகளில் {{freshCount}} ஐ சமர்ப்பி",
+      "submitCountOfTotal": "{{displayTotalCount}} கருத்துகளில் {{displayFreshCount}} ஐ சமர்ப்பி",
       "submitReview": "மதிப்பாய்வை சமர்ப்பி",
-      "partialPostedMessage": "{{freshCount}} கருத்து(களை) இடுகையிட்டது. {{staleCount}} கருத்து(கள்) பழைய commit ஐ சுட்டிக்காட்டி உங்கள் வரிசையில் இருந்தன."
+      "partialPostedMessage": "{{displayFreshCount}} கருத்து(களை) இடுகையிட்டது. {{displayStaleCount}} கருத்து(கள்) பழைய commit ஐ சுட்டிக்காட்டி உங்கள் வரிசையில் இருந்தன."
     },
     "reconnectNotice": {
       "title": "GitHub இணைப்பு காலாவதியானது",
@@ -580,7 +580,8 @@
     "agents": "முகவர்கள்",
     "profile": "சுயவிவரம்",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, தாவல், மொத்தம் {{total}} இல் {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "சமீபத்திய",
       "common": "பொதுவான",
       "reactWith": "{{reaction}} உடன் எதிர்வினை",
-      "accessibility": "{{emoji}} எதிர்வினை, {{count}}"
+      "accessibility": "{{emoji}} எதிர்வினை, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "பதிலளிக்கிறது",
@@ -650,7 +651,7 @@
       "imageUnavailable": "படம் கிடைக்கவில்லை",
       "openFailed": "இணைப்பைத் திறக்க முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
       "attachFailed": "கோப்பை இணைக்க முடியவில்லை",
-      "limit": "நீங்கள் {{count}} கோப்புகள் வரை இணைக்கலாம்.",
+      "limit": "நீங்கள் {{displayCount}} கோப்புகள் வரை இணைக்கலாம்.",
       "sizeRejection": "{{filename}} {{limit}} இணைப்பு வரம்பை மீறுகிறது.",
       "unreadable": "{{filename}} ஐ படிக்க முடியவில்லை.",
       "pastedImage": "ஒட்டிய படம்",
@@ -722,6 +723,7 @@
       "finalTermEnds": "இறுதி காலம் முடிவடைகிறது",
       "afterFinalTerm": "இறுதி காலத்திற்குப் பிறகு",
       "remaining": "மீதமுள்ளது",
+      "lessThanOneDay": "1 நாளுக்கும் குறைவு",
       "ends": "முடிவடைகிறது",
       "expires": "காலாவதியாகிறது",
       "noActivePlan": "செயலில் உள்ள திட்டம் இல்லை",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "உங்கள் Standard மாதாந்திர விலை",
       "perMonth": "/மாதம்",
       "earlybirdAccessUntil": "{{date}} வரை முன்கூட்டிய அணுகல்",
-      "earlybirdEnding": "முன்கூட்டிய சலுகை முடிவடைகிறது: {{days}} நாட்கள் மீதம்",
+      "earlybirdEnding": "முன்கூட்டிய சலுகை முடிவடைகிறது: {{remaining}} நாட்கள் மீதம்",
       "paymentPastDue": "கட்டணம் நிலுவையில் உள்ளது. உங்கள் கட்டண முறையைப் புதுப்பிக்கவும்.",
       "subscriptionCancels": "சந்தா {{date}} அன்று ரத்தாகிறது",
-      "trialDaysRemaining": "சோதனை: {{days}} நாட்கள் மீதம்",
-      "trialEndingSoon": "சோதனை விரைவில் முடிவடைகிறது: {{days}}"
+      "trialDaysRemaining": "சோதனை: {{remaining}} நாட்கள் மீதம்",
+      "trialEndingSoon": "சோதனை விரைவில் முடிவடைகிறது: {{remaining}}"
     },
     "changelog": {
       "title": "என்ன புதியது",
@@ -996,7 +998,7 @@
         "stalledTitle": "ஏதோ தேக்கமடைந்தது",
         "stalledBody": "{{name}} இன் அமைவை முடிக்க முடியவில்லை. இது தொடர்ந்து நடந்தால் மீண்டும் முயற்சிக்கவும், அல்லது hi@kilo.ai க்கு மின்னஞ்சல் அனுப்பவும்.",
         "timeoutTitle": "எதிர்பார்த்ததை விட அதிக நேரம் எடுக்கிறது",
-        "timeoutBody": "{{name}} இன் அமைவு வழக்கத்தை விட அதிக நேரம் எடுக்கிறது ({{minutes}} நிமிடங்களுக்கு மேல்).",
+        "timeoutBody": "{{name}} இன் அமைவு வழக்கத்தை விட அதிக நேரம் எடுக்கிறது ({{displayMinutes}} நிமிடங்களுக்கு மேல்).",
         "continueInBackground": "பின்னணியில் தொடரவும்",
         "settingUp": "{{name}} ஐ அமைக்கிறது",
         "finishingSetup": "அமைவை முடிக்கிறது",
@@ -1287,7 +1289,7 @@
       "mergeGate": "ஒருங்கிணைப்பு நுழைவாயில்",
       "repositories": "களஞ்சியங்கள்",
       "allRepositories": "அனைத்து களஞ்சியங்கள்",
-      "nSelected": "{{count}} தேர்ந்தெடுக்கப்பட்டது",
+      "nSelected": "{{displayCount}} தேர்ந்தெடுக்கப்பட்டது",
       "reviewMemory": "மதிப்பாய்வு நினைவகம்",
       "proposedReviewMdGuidance": "முன்மொழியப்பட்ட REVIEW.md வழிகாட்டுதல்"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "பகுப்பாய்வு செய்யப்பட்டது",
       "exploitabilityReasoning": "சுரண்டக்கூடிய தன்மை பகுத்தறிவு",
       "suggestedFix": "பரிந்துரைக்கப்பட்ட திருத்தம்",
-      "whereFound": "இது கண்டுபிடிக்கப்பட்ட இடம் ({{count}})",
+      "whereFound": "இது கண்டுபிடிக்கப்பட்ட இடம் ({{displayCount}})",
       "fullReport": "முழு உருவாக்கப்பட்ட அறிக்கை",
       "unknown": "தெரியவில்லை",
       "yes": "ஆம்",
       "no": "இல்லை"
     },
     "dashboard": {
-      "findingsCount": "{{count}} கண்டுபிடிப்புகள்",
+      "findingsCount": "{{displayCount}} கண்டுபிடிப்புகள்",
       "notMeasured": "அளவிடப்படவில்லை",
       "actFirst": "முதலில் செயல்படு",
       "slaPosture": "SLA நிலை",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "களஞ்சிய செயல் திட்டம்",
       "noOpenFindings": "கவனம் தேவைப்படும் திறந்த கண்டுபிடிப்புகள் இல்லை",
       "deadlineToday": "இன்று காலக்கெடு அடைந்தது",
-      "daysOverdue": "{{count}} நாட்கள் தாமதம்",
+      "daysOverdue": "{{displayCount}} நாட்கள் தாமதம்",
       "withinDeadline": "காலக்கெடுவிற்குள்",
       "criticalOverdue": "முக்கியமான தாமதம்",
       "highOverdue": "உயர் தாமதம்",
@@ -1434,6 +1436,27 @@
       "syncNow": "இப்போது ஒத்திசை",
       "syncQueued": "ஒத்திசைவு வரிசையில் உள்ளது",
       "syncStatusUnavailable": "ஒத்திசைவு நிலை கிடைக்கவில்லை"
+    },
+    "dashboardMetrics": {
+      "openFindings": "திறந்த கண்டுபிடிப்புகள்",
+      "openFindingsDetail": "{{critical}} முக்கியமான, {{high}} உயர்",
+      "confirmedExploitable": "சுரண்டக்கூடியதாக உறுதிப்படுத்தப்பட்டது",
+      "confirmedExploitableDetail": "திட்ட இடர் பகுப்பாய்வால் உறுதிப்படுத்தப்பட்டது",
+      "needsReview": "உங்கள் மதிப்பாய்வு தேவை",
+      "needsReviewDetail": "மனித முடிவு தேவை",
+      "analysisIncomplete": "பகுப்பாய்வு முடிவடையவில்லை",
+      "analysisIncompleteDetail": "திட்ட இடர் இன்னும் தெரியவில்லை",
+      "slaCompliance": "SLA இணக்கம்",
+      "notMeasured": "அளவிடப்படவில்லை",
+      "withinDeadlineDetail": "{{total}} இல் {{within}} காலக்கெடுவிற்குள்",
+      "noDeadlineData": "எந்த கண்டுபிடிப்புகளுக்கும் SLA காலக்கெடு இன்னும் இல்லை",
+      "deadlinePassed": "காலக்கெடு கடந்துவிட்டது",
+      "deadlinePassedDetail": "{{critical}} முக்கியமான, {{high}} உயர்",
+      "dueThisWeek": "இந்த வாரம் காலக்கெடு",
+      "dueThisWeekDetail": "{{exploitable}} சுரண்டக்கூடியதாக உறுதிப்படுத்தப்பட்டது",
+      "noDeadline": "காலக்கெடு இல்லை",
+      "reviewSlaAssignment": "SLA ஒதுக்கீட்டை மதிப்பாய்வு செய்யவும்",
+      "allOpenFindingsTracked": "அனைத்து திறந்த கண்டுபிடிப்புகளும் கண்காணிக்கப்படுகின்றன"
     },
     "dismiss": {
       "title": "கண்டுபிடிப்பை நிராகரி",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}} பகுப்பாய்வு",
       "automation": "ஆட்டோமேஷன்",
       "automationAllOff": "அனைத்தும் ஆஃப்",
-      "automationCount": "{{count}}/3 இயக்கப்பட்டது",
+      "automationCount": "{{displayCount}}/3 இயக்கப்பட்டது",
       "notifications": "அறிவிப்புகள்",
-      "notificationsCount": "{{count}}/2 இயக்கப்பட்டது",
+      "notificationsCount": "{{displayCount}}/2 இயக்கப்பட்டது",
       "slaPolicy": "SLA கொள்கை",
       "disabledNoManage": "Security Agent முடக்கப்பட்டுள்ளது. நிறுவன உரிமையாளர்கள் மற்றும் பில்லிங் மேலாளர்கள் மட்டுமே அதை இயக்க முடியும்.",
       "disabledNoRepo": "Security Agent ஐ இயக்கும் முன் குறைந்தது ஒரு களஞ்சியத்தையாவது தேர்ந்தெடுக்கவும்.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "புல் ரிக்வெஸ்டைத் திற{{number}}",
       "openDraftPullRequest": "வரைவு புல் ரிக்வெஸ்டைத் திற{{number}}",
       "progress": "முன்னேற்றம்",
-      "attemptHistory": "முயற்சி வரலாறு ({{count}})",
+      "attemptHistory": "முயற்சி வரலாறு ({{displayCount}})",
       "attemptNumber": "முயற்சி #{{number}}",
       "startedBy": "தொடங்கியவர்",
       "model": "மாதிரி",
@@ -1855,9 +1878,9 @@
       "toolTask": "பணி",
       "readTodos": "செய்ய வேண்டியவற்றை படி",
       "updateTodos": "செய்ய வேண்டியவற்றை புதுப்பி",
-      "linesBadge": "{{count}} வரிகள்",
-      "filesBadge": "{{count}} கோப்புகள்",
-      "matchesBadge": "{{count}} பொருத்தங்கள்"
+      "linesBadge": "{{displayCount}} வரிகள்",
+      "filesBadge": "{{displayCount}} கோப்புகள்",
+      "matchesBadge": "{{displayCount}} பொருத்தங்கள்"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} வரிகள் (துண்டிக்கப்பட்டது)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "இந்த பதிலை அறிக்கை செய்ய முடியாது.",
       "reportAiResponseSubmitted": "அறிக்கை சமர்ப்பிக்கப்பட்டது. ரசீது {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "விவரங்கள் கிடைக்கவில்லை",
       "textDisplay": "உரை காட்சி",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "தயாரிப்பு முடிந்தது",
       "preparationFailed": "தயாரிப்பு தோல்வியடைந்தது",
       "setupCommand": "அமைவு கட்டளை {{index}}",
-      "setupCommandOf": "{{count}} இல் அமைவு கட்டளை {{index}}"
+      "setupCommandOf": "{{displayCount}} இல் அமைவு கட்டளை {{index}}"
     },
     "permissionCard": {
       "title": "அனுமதி தேவை",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "சமர்ப்பிப்பு தோல்வியடைந்தது. மீண்டும் முயற்சிக்கவும்.",
       "questionAnnouncement": "முகவருக்கு உங்கள் உள்ளீடு தேவை. நீங்கள் பதிலளிக்கும் வரை கம்போசர் இடைநிறுத்தப்பட்டுள்ளது.",
       "permissionAnnouncement": "தொடர முகவருக்கு அனுமதி தேவை. நீங்கள் முடிவு செய்யும் வரை கம்போசர் இடைநிறுத்தப்பட்டுள்ளது.",
-      "positionHint": "({{count}} இல் 1)",
+      "positionHint": "({{displayCount}} இல் 1)",
       "movedPastPrompt": "முகவர் இந்த கேள்வியைக் கடந்து சென்றுவிட்டார். அமர்வு தொடரும்போது இந்த அட்டை மூடப்படும்.",
       "waitingForAnswer": "முகவர் உங்கள் பதிலுக்காக காத்திருக்கிறார். இந்த கேள்வி திறந்திருக்கும்போது, முகவருக்கான உங்கள் செய்தி இடைநிறுத்தப்பட்டுள்ளது.",
       "waitingForPermission": "முகவர் அனுமதிக்காக காத்திருக்கிறார். இந்த கோரிக்கை திறந்திருக்கும்போது, முகவருக்கான உங்கள் செய்தி இடைநிறுத்தப்பட்டுள்ளது."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "கேமரா அணுகல் முடக்கப்பட்டது",
       "cameraAccessMessage": "புகைப்படம் எடுக்க அமைப்புகளில் கேமரா அணுகலை அனுமதிக்கவும்.",
       "couldNotOpenPhotoPicker": "புகைப்பட தேர்வியைத் திறக்க முடியவில்லை. Kiloவை மறுதொடக்கம் செய்து மீண்டும் முயற்சிக்கவும்.",
-      "maxFilesAllowed": "அதிகபட்சம் {{count}} கோப்புகள் அனுமதிக்கப்படும்",
+      "maxFilesAllowed": "அதிகபட்சம் {{displayCount}} கோப்புகள் அனுமதிக்கப்படும்",
       "onlyAddingFiles": "{{total}} கோப்புகளில் {{accepted}} மட்டுமே சேர்க்கிறது (அதிகபட்சம் {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "செலவு {{cost}}",
       "costSuffix": ", செலவு {{cost}}",
       "tokensWindowUnavailable": "சூழல் {{used}} டோக்கன்கள், சாளரம் கிடைக்கவில்லை",
-      "tokensUsage": "சூழல் {{window}} டோக்கன்களில் {{used}}, {{percentage}}% பயன்படுத்தப்பட்டது",
+      "tokensUsage": "சூழல் {{window}} டோக்கன்களில் {{used}}, {{percentage}} பயன்படுத்தப்பட்டது",
       "title": "சூழல் பயன்பாடு",
       "used": "பயன்படுத்தப்பட்டது",
       "remaining": "மீதம்",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "பயன்பாடு சமீபத்திய முடிந்த உதவியாளர் பதிலை பிரதிபலிக்கிறது.",
       "tokenUsage": "டோக்கன் பயன்பாடு",
       "cacheRate": "தற்காலிக சேமிப்பு விகிதம்",
-      "modelsCount": "மாதிரிகள் ({{count}})",
+      "modelsCount": "மாதிரிகள் ({{displayCount}})",
       "tokenTotalsNote": "டோக்கன் மொத்தங்கள் இந்த அமர்வை மட்டுமே உள்ளடக்கும், துணை முகவர்/குழந்தை அமர்வு டோக்கன்களை விலக்கும்.",
       "subagents": "துணை முகவர்கள்",
       "subagentsDescription": "குழந்தை அமர்வுகளிலிருந்து எஞ்சிய செலவு",
@@ -2373,7 +2400,7 @@
     "connectedCli": "இணைக்கப்பட்ட CLI இல்",
     "newSessionOn": "{{name}} இல் புதிய அமர்வு",
     "noMatchingSessions": "பொருந்தும் அமர்வுகள் இல்லை.",
-    "onlyFirstFilesAttached": "முதல் {{count}} கோப்புகள் மட்டுமே இணைக்கப்படும்.",
+    "onlyFirstFilesAttached": "முதல் {{displayCount}} கோப்புகள் மட்டுமே இணைக்கப்படும்.",
     "staleMessage": "இந்தப் பகிர்வு இனி கிடைக்காது.",
     "retryableMessage": "உங்கள் அமர்வுகளை ஏற்ற முடியவில்லை.",
     "emptyMessage": "இன்னும் அமர்வுகள் இல்லை — இதை அனுப்ப ஒரு புதிய ஒன்றைத் தொடங்குங்கள்.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "இந்த Apple கணக்கில் உள்ள Kilo Pass வேறொரு Kilo கணக்கைச் சேர்ந்தது. அதை நிர்வகிக்க அந்த Kilo கணக்கில் உள்நுழையவும்.",
     "alreadySubscribed": "உங்களிடம் ஏற்கனவே Kilo Pass சந்தா உள்ளது.",
     "purchaseUnavailable": "Kilo Pass வாங்குதல் இப்போது கிடைக்கவில்லை.",
-    "tierCredits": "கிரெடிட்களில் ${{amount}}",
+    "tierCredits": "கிரெடிட்களில் {{amount}}",
     "perMonth": "{{price}}/மாதம்",
     "verifyPurchaseFailed": "உங்கள் வாங்குதலைச் சரிபார்க்க முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
     "productsCouldNotLoad": "App Storeஇலிருந்து Kilo Pass தயாரிப்புகளை ஏற்ற முடியவில்லை.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "App Store சந்தா நிர்வாகத்தைத் திறக்க முடியவில்லை.",
     "kiloPassSetup": "Kilo Pass அமைப்பு",
     "subscriptionHeaderDescription": "Kilo App இல் AI குறியீட்டு அமர்வுகளை இயக்க உங்கள் Kilo இருப்புக்கு கிரெடிட்களைச் சேர்க்கும் மாதாந்திர சந்தா — Cloud Agents, தொலைநிலை அமர்வுகள் மற்றும் KiloClaw அரட்டைகள்.",
-    "tierDescription": "Kilo App பயன்பாட்டிற்காக ${{price}} செலுத்திய கிரெடிட்கள் மாதந்தோறும் சேர்க்கப்படும்.",
+    "tierDescription": "Kilo App பயன்பாட்டிற்காக {{price}} செலுத்திய கிரெடிட்கள் மாதந்தோறும் சேர்க்கப்படும்.",
     "subscribe": "சந்தா எடு",
     "subscribeDescription": "போனஸ் முன்னேற்றத்துடன் மாதாந்திர கிரெடிட்கள்",
     "manage": "நிர்வகி",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass நிலுவையில் உள்ளது",
     "statusCanceling": "Kilo Pass ரத்து செய்யப்படுகிறது",
     "statusPastDue": "Kilo Pass காலக்கெடு கடந்தது",
-    "monthlyCredits": "${{credits}} மாதாந்திர கிரெடிட்கள்",
+    "monthlyCredits": "{{credits}} மாதாந்திர கிரெடிட்கள்",
     "ends": "{{date}} அன்று முடிகிறது",
     "periodEnd": "கால முடிவு",
     "managedOnGooglePlay": "Google Play இல் நிர்வகிக்கப்படுகிறது",

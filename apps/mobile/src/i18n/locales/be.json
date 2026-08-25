@@ -206,11 +206,11 @@
       "loadingLines": "Загрузка {{loaded}} з {{total}} радкоў…",
       "expandContext": "Разгарнуць кантэкст",
       "expandMoreContext": "Разгарнуць больш кантэксту",
-      "expandLines": "Разгарнуць {{count}} радкоў ({{start}}–{{end}})",
-      "expandMoreLines": "Разгарнуць яшчэ {{count}} радкоў ({{start}}–{{end}})",
-      "expandLinesOfContext": "Разгарнуць {{count}} радкоў кантэксту",
+      "expandLines": "Разгарнуць {{displayCount}} радкоў ({{start}}–{{end}})",
+      "expandMoreLines": "Разгарнуць яшчэ {{displayCount}} радкоў ({{start}}–{{end}})",
+      "expandLinesOfContext": "Разгарнуць {{displayCount}} радкоў кантэксту",
       "expandAll": "Разгарнуць усё",
-      "expandAllLines": "Разгарнуць усе {{count}} радкоў",
+      "expandAllLines": "Разгарнуць усе {{displayCount}} радкоў",
       "loadingMoreFiles": "Загрузка больш файлаў…",
       "retryLoadingNextPage": "Паўтарыць загрузку наступнай старонкі",
       "failedToLoadMoreFiles": "Не атрымалася загрузіць больш файлаў — дакраніцеся, каб паўтарыць",
@@ -227,7 +227,11 @@
       "fileLoadedOfTotalCount_other": "Загружана {{displayCount}} файлаў з {{total}}",
       "filesStillLoading": "Файлы яшчэ загружаюцца. Сцягніце ўніз, каб абнавіць.",
       "goToOverview": "Перайсці да агляду",
-      "goToOverviewTab": "Перайсці да ўкладкі «Агляд»"
+      "goToOverviewTab": "Перайсці да ўкладкі «Агляд»",
+      "fileLoadedCount_few": "Загружаны {{displayCount}} файлы",
+      "fileLoadedCount_many": "Загружана {{displayCount}} файлаў",
+      "fileLoadedOfTotalCount_few": "Загружаны {{displayCount}} файлы з {{total}}",
+      "fileLoadedOfTotalCount_many": "Загружана {{displayCount}} файлаў з {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ няма пераносу радка ў канцы файла",
@@ -301,7 +305,7 @@
       "closeReactions": "Закрыць рэакцыі",
       "reactionsTitle": "Рэакцыі",
       "addReaction": "Дадаць рэакцыю",
-      "reactionPill": "{{emoji}} рэакцыя, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} рэакцыя, {{displayCount}} {{countLabel}}",
       "reaction_one": "рэакцыя",
       "reaction": "рэакцыі",
       "reaction_other": "рэакцыі",
@@ -353,10 +357,14 @@
       "noDiscussionDescription": "На гэтым pull request няма галінак рэцэнзіі або каментароў размовы.",
       "reviewFiles": "Рэцэнзаваць файлы",
       "quotedDiffSnippet": "Цытаваны фрагмент diff",
-      "moreLinesAbove": "… яшчэ {{count}} радкоў вышэй",
+      "moreLinesAbove": "… яшчэ {{displayCount}} радкоў вышэй",
       "termsAcceptRequired": "Вам трэба прыняць Умовы выкарыстання, каб пакідаць паведамленні.",
       "termsOutdatedCopy": "Умовы выкарыстання змяніліся. Адкрыйце гэты экран зноў, каб прыняць апошнюю версію.",
-      "termsCheckRetryCopy": "Не атрымалася праверыць Умовы выкарыстання. Праверце падключэнне і паспрабуйце яшчэ раз."
+      "termsCheckRetryCopy": "Не атрымалася праверыць Умовы выкарыстання. Праверце падключэнне і паспрабуйце яшчэ раз.",
+      "comment_few": "{{displayCount}} каментары",
+      "comment_many": "{{displayCount}} каментароў",
+      "reaction_few": "рэакцыі",
+      "reaction_many": "рэакцый"
     },
     "couldNotOpenGitHubAppSettings": "Не атрымалася адкрыць налады GitHub App",
     "installKiloGitHubApp": "Усталяваць Kilo GitHub App",
@@ -395,11 +403,11 @@
       "retryChecks": "Паўтарыць праверкі",
       "viewOnGitHub": "Прагледзець PR на GitHub",
       "noChecksReported": "Праверкі не паведамлены",
-      "passed": "{{count}} прайшлі",
-      "failed": "{{count}} не прайшлі",
-      "pending": "{{count}} чакаюць",
-      "skipped": "{{count}} прапушчаны",
-      "checksCount": "{{count}} правак",
+      "passed": "{{displayCount}} прайшлі",
+      "failed": "{{displayCount}} не прайшлі",
+      "pending": "{{displayCount}} чакаюць",
+      "skipped": "{{displayCount}} прапушчаны",
+      "checksCount": "{{displayCount}} правак",
       "checkDetails": "падрабязнасці праверкі",
       "pullRequest": "pull request"
     },
@@ -459,9 +467,11 @@
       "pendingComment_one": "чакаючы каментар",
       "pendingComment": "чакаючыя каментары",
       "pendingComment_other": "чакаючыя каментары",
-      "submitCountOfTotal": "Адправіць {{freshCount}} з {{totalCount}} каментароў",
+      "submitCountOfTotal": "Адправіць {{displayFreshCount}} з {{displayTotalCount}} каментароў",
       "submitReview": "Адправіць рэцэнзію",
-      "partialPostedMessage": "Адпраўлена {{freshCount}} каментар(аў). {{staleCount}} каментар(аў) адносяцца да старэйшага каміта і засталіся ў вашай чарзе."
+      "partialPostedMessage": "Адпраўлена {{displayFreshCount}} каментар(аў). {{displayStaleCount}} каментар(аў) адносяцца да старэйшага каміта і засталіся ў вашай чарзе.",
+      "pendingComment_few": "чакаючых каментары",
+      "pendingComment_many": "чакаючых каментароў"
     },
     "reconnectNotice": {
       "title": "Тэрмін злучэння з GitHub скончыўся",
@@ -488,7 +498,11 @@
       "commit_other": "каміты",
       "file_one": "файл",
       "file": "файлы",
-      "file_other": "файлы"
+      "file_other": "файлы",
+      "commit_few": "каміты",
+      "commit_many": "камітаў",
+      "file_few": "файлы",
+      "file_many": "файлаў"
     },
     "pendingComment": {
       "editOutdatedA11y": "Рэдагаваць састарэлы чакаючы каментар на {{location}}",
@@ -580,7 +594,8 @@
     "agents": "Агенты",
     "profile": "Профіль",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, укладка, {{position}} з {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +636,7 @@
       "recent": "Нядаўнія",
       "common": "Звычайныя",
       "reactWith": "Рэагаваць з {{reaction}}",
-      "accessibility": "{{emoji}} рэакцыя, {{count}}"
+      "accessibility": "{{emoji}} рэакцыя, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Адказ на",
@@ -650,7 +665,7 @@
       "imageUnavailable": "Выява недаступная",
       "openFailed": "Не атрымалася адкрыць далучэнне. Праверце падключэнне і паспрабуйце яшчэ раз.",
       "attachFailed": "Не атрымалася далучыць файл",
-      "limit": "Вы можаце далучыць да {{count}} файлаў.",
+      "limit": "Вы можаце далучыць да {{displayCount}} файлаў.",
       "sizeRejection": "{{filename}} перавышае ліміт далучэння {{limit}}.",
       "unreadable": "Не атрымалася прачытаць {{filename}}.",
       "pastedImage": "устаўленая выява",
@@ -700,7 +715,9 @@
       "someone": "Нехта",
       "typing_one": "{{name}} друкуе...",
       "typing": "{{names}} друкуюць...",
-      "typing_other": "{{names}} друкуюць..."
+      "typing_other": "{{names}} друкуюць...",
+      "typing_few": "{{names}} друкуюць...",
+      "typing_many": "{{names}} друкуюць..."
     },
     "botStatus": {
       "online": "У сетцы",
@@ -740,11 +757,12 @@
       "yourStandardMonthlyPrice": "ваша штомесячная цана Standard",
       "perMonth": "/мес",
       "earlybirdAccessUntil": "Доступ Earlybird да {{date}}",
-      "earlybirdEnding": "Earlybird сканчаецца: засталося {{days}} дз.",
+      "earlybirdEnding": "Earlybird сканчаецца: {{remaining}}",
       "paymentPastDue": "Пратэрмінаваны плацёж. Абнавіце спосаб аплаты.",
       "subscriptionCancels": "Падпіска адмяняецца {{date}}",
-      "trialDaysRemaining": "Пробная версія: засталося {{days}} дз.",
-      "trialEndingSoon": "Пробная версія сканчаецца: {{days}}"
+      "trialDaysRemaining": "Пробная версія: засталося {{remaining}}",
+      "trialEndingSoon": "Пробная версія сканчаецца: {{remaining}}",
+      "lessThanOneDay": "Менш за 1 дзень"
     },
     "changelog": {
       "title": "Што новага",
@@ -996,7 +1014,7 @@
         "stalledTitle": "Нешта затрымалася",
         "stalledBody": "Нам не ўдалося завяршыць наладку {{name}}. Паспрабуйце яшчэ раз або напішыце на hi@kilo.ai, калі гэта паўтараецца.",
         "timeoutTitle": "Гэта займае больш часу, чым чакалася",
-        "timeoutBody": "Наладка {{name}} займае больш часу, чым звычайна (больш за {{minutes}} хвіл.).",
+        "timeoutBody": "Наладка {{name}} займае больш часу, чым звычайна (больш за {{displayMinutes}} хвіл.).",
         "continueInBackground": "Працягнуць у фонавым рэжыме",
         "settingUp": "Наладка {{name}}",
         "finishingSetup": "Завяршэнне наладкі",
@@ -1071,7 +1089,9 @@
       "openUnread_other": "Адкрыць {{name}}, {{displayCount}} непрачытаных паведамленняў",
       "open": "Адкрыць {{name}}",
       "openSettings": "Адкрыць налады для {{name}}",
-      "fixOnKiloAi": "Выправіць на kilo.ai: {{label}}"
+      "fixOnKiloAi": "Выправіць на kilo.ai: {{label}}",
+      "openUnread_few": "Адкрыць {{name}}, непрачытаных паведамленні: {{displayCount}}",
+      "openUnread_many": "Адкрыць {{name}}, непрачытаных паведамленняў: {{displayCount}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1287,7 +1307,7 @@
       "mergeGate": "Парог зліцця",
       "repositories": "Рэпазіторыі",
       "allRepositories": "Усе рэпазіторыі",
-      "nSelected": "{{count}} выбрана",
+      "nSelected": "{{displayCount}} выбрана",
       "reviewMemory": "Памяць праверкі",
       "proposedReviewMdGuidance": "Прапанаваная рэкамендацыя REVIEW.md"
     },
@@ -1367,7 +1387,9 @@
       "severityAll": "Усе ўзроўні",
       "confidenceHighOnly": "Толькі з высокай упэўненасцю",
       "confidenceMediumOrHigher": "Сярэдняя і вышэй",
-      "confidenceAny": "Любая ўпэўненасць"
+      "confidenceAny": "Любая ўпэўненасць",
+      "queued_few": "{{displayCount}} існыя знаходкі пастаўлены ў чаргу для аналізу.",
+      "queued_many": "{{displayCount}} існых знаходак пастаўлена ў чаргу для аналізу."
     },
     "analysis": {
       "couldNotLoad": "Не атрымалася загрузіць аналіз",
@@ -1391,14 +1413,14 @@
       "analyzed": "Прааналізавана",
       "exploitabilityReasoning": "Абгрунтаванне выкарыстоўвальнасці",
       "suggestedFix": "Прапанаванае выпраўленне",
-      "whereFound": "Дзе гэта было знойдзена ({{count}})",
+      "whereFound": "Дзе гэта было знойдзена ({{displayCount}})",
       "fullReport": "Поўны сфарміраваны справаздача",
       "unknown": "Невядома",
       "yes": "Так",
       "no": "Не"
     },
     "dashboard": {
-      "findingsCount": "{{count}} знаходак",
+      "findingsCount": "{{displayCount}} знаходак",
       "notMeasured": "Не вымерана",
       "actFirst": "Дзейнічаць перш",
       "slaPosture": "Пазіцыя SLA",
@@ -1407,7 +1429,7 @@
       "repositoryActionPlan": "План дзеянняў для рэпазіторыя",
       "noOpenFindings": "Няма адкрытых знаходак, якія патрабуюць увагі",
       "deadlineToday": "Тэрмін дасягнуты сёння",
-      "daysOverdue": "{{count}} дзён пратэрмінавана",
+      "daysOverdue": "{{displayCount}} дзён пратэрмінавана",
       "withinDeadline": "У межах тэрміну",
       "criticalOverdue": "Крытычна пратэрмінавана",
       "highOverdue": "Высока пратэрмінавана",
@@ -1434,6 +1456,27 @@
       "syncNow": "Сінхранізаваць зараз",
       "syncQueued": "Сінхранізацыя ў чарзе",
       "syncStatusUnavailable": "Статус сінхранізацыі недаступны"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Адкрытыя знаходкі",
+      "openFindingsDetail": "{{critical}} крытычных, {{high}} высокіх",
+      "confirmedExploitable": "Пацверджана выкарыстоўвальная",
+      "confirmedExploitableDetail": "Рызыка праекта пацверджана аналізам",
+      "needsReview": "Патрабуе вашай праверкі",
+      "needsReviewDetail": "Патрабуецца рашэнне чалавека",
+      "analysisIncomplete": "Аналіз не завершаны",
+      "analysisIncompleteDetail": "Рызыка праекта яшчэ невядомая",
+      "slaCompliance": "Адпаведнасць SLA",
+      "notMeasured": "Не вымерана",
+      "withinDeadlineDetail": "{{within}} з {{total}} у межах тэрміну",
+      "noDeadlineData": "Яшчэ ніводная знаходка не мае тэрміну SLA",
+      "deadlinePassed": "Тэрмін прайшоў",
+      "deadlinePassedDetail": "{{critical}} крытычных, {{high}} высокіх",
+      "dueThisWeek": "Да спынення гэты тыдзень",
+      "dueThisWeekDetail": "{{exploitable}} пацверджана выкарыстоўвальная",
+      "noDeadline": "Няма тэрміну",
+      "reviewSlaAssignment": "Праверце прызначэнне SLA",
+      "allOpenFindingsTracked": "Усе адкрытыя знаходкі адсочваюцца"
     },
     "dismiss": {
       "title": "Адхіліць знаходку",
@@ -1500,13 +1543,15 @@
       "analysisModeSubtitle": "аналіз {{mode}}",
       "automation": "Аўтаматызацыя",
       "automationAllOff": "Усё выключана",
-      "automationCount": "уключана {{count}} з 3",
+      "automationCount": "уключана {{displayCount}} з 3",
       "notifications": "Паведамленні",
-      "notificationsCount": "уключана {{count}} з 2",
+      "notificationsCount": "уключана {{displayCount}} з 2",
       "slaPolicy": "Палітыка SLA",
       "disabledNoManage": "Security Agent выключаны. Толькі ўладальнікі арганізацыі і менеджэры па аплаце могуць яго ўключыць.",
       "disabledNoRepo": "Выберыце хаця б адзін рэпазіторый, перш чым уключаць Security Agent.",
-      "disabledPrompt": "Уключыце Security Agent, каб сінхранізаваць апавяшчэнні Dependabot, выбіраць рэпазіторыі і наладжваць аўтаматызацыю."
+      "disabledPrompt": "Уключыце Security Agent, каб сінхранізаваць апавяшчэнні Dependabot, выбіраць рэпазіторыі і наладжваць аўтаматызацыю.",
+      "repositoriesCount_few": "выбрана {{displayCount}} рэпазіторыі",
+      "repositoriesCount_many": "выбрана {{displayCount}} рэпазіторыяў"
     },
     "remediation": {
       "cancellationRequested": "Запытана адмена",
@@ -1524,7 +1569,7 @@
       "openPullRequest": "Адкрыць pull request{{number}}",
       "openDraftPullRequest": "Адкрыць чарнавік pull request{{number}}",
       "progress": "Ход выканання",
-      "attemptHistory": "Гісторыя спроб ({{count}})",
+      "attemptHistory": "Гісторыя спроб ({{displayCount}})",
       "attemptNumber": "Спроба #{{number}}",
       "startedBy": "Пачата",
       "model": "Мадэль",
@@ -1734,7 +1779,11 @@
       "cent_other": "цэнты",
       "dollar_one": "долар",
       "dollar": "долары",
-      "dollar_other": "долары"
+      "dollar_other": "долары",
+      "cent_few": "цэнты",
+      "cent_many": "цэнтаў",
+      "dollar_few": "долары",
+      "dollar_many": "долараў"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не атрымалася адкрыць GitHub",
@@ -1830,7 +1879,9 @@
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл",
       "updatedFileCount": "Абноўлена {{displayCount}} файлаў",
-      "updatedFileCount_other": "Абноўлена {{displayCount}} файлаў"
+      "updatedFileCount_other": "Абноўлена {{displayCount}} файлаў",
+      "updatedFileCount_few": "Абноўлены {{displayCount}} файлы",
+      "updatedFileCount_many": "Абноўлена {{displayCount}} файлаў"
     },
     "toolPatch": {
       "operationAdded": "Дададзена",
@@ -1855,9 +1906,9 @@
       "toolTask": "задача",
       "readTodos": "Прачытаць задачы",
       "updateTodos": "Абнавіць задачы",
-      "linesBadge": "{{count}} радкоў",
-      "filesBadge": "{{count}} файлаў",
-      "matchesBadge": "{{count}} супадзенняў"
+      "linesBadge": "{{displayCount}} радкоў",
+      "filesBadge": "{{displayCount}} файлаў",
+      "matchesBadge": "{{displayCount}} супадзенняў"
     },
     "readToolMarkdown": {
       "linesTruncated": "радкі {{start}}–{{end}} (абрэзана)",
@@ -1941,6 +1992,10 @@
       "reportAiResponseFailedTerminal": "Пра гэты адказ нельга паведаміць.",
       "reportAiResponseSubmitted": "Паведамленне адпраўлена. Квітанцыя {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Падрабязнасці недаступныя",
       "textDisplay": "Адлюстраванне тэксту",
@@ -1999,7 +2054,7 @@
       "preparationComplete": "Падрыхтоўка завершана",
       "preparationFailed": "Падрыхтоўка не атрымалася",
       "setupCommand": "Каманда налады {{index}}",
-      "setupCommandOf": "Каманда налады {{index}} з {{count}}"
+      "setupCommandOf": "Каманда налады {{index}} з {{displayCount}}"
     },
     "permissionCard": {
       "title": "Патрабуецца дазвол",
@@ -2036,7 +2091,7 @@
       "submissionFailed": "Адпраўка не ўдалася. Паспрабуйце яшчэ раз.",
       "questionAnnouncement": "Агенту патрэбен ваш адказ. Кампазітар прыпынены, пакуль вы адказваеце.",
       "permissionAnnouncement": "Агенту патрэбен дазвол, каб працягнуць. Кампазітар прыпынены, пакуль вы вырашаеце.",
-      "positionHint": "(1 з {{count}})",
+      "positionHint": "(1 з {{displayCount}})",
       "movedPastPrompt": "Агент прасунуўся далей за гэты запыт. Гэтая картка закрыецца, калі сеанс працягнецца.",
       "waitingForAnswer": "Агент чакае вашага адказу. Пакуль пытанне адкрытае, ваша паведамленне агенту прыпыненае.",
       "waitingForPermission": "Агент чакае дазволу. Пакуль запыт адкрыты, ваша паведамленне агенту прыпыненае."
@@ -2076,7 +2131,9 @@
       "omitted_other": "{{displayCount}} больш ранніх элементаў гэтага сеанса не ўдалося паказаць.",
       "couldNotLoad": "Не ўдалося загрузіць больш раннія паведамленні.",
       "unavailable": "Больш раннія паведамленні недаступныя.",
-      "tooLarge": "Больш раннія паведамленні занадта вялікія для загрузкі."
+      "tooLarge": "Больш раннія паведамленні занадта вялікія для загрузкі.",
+      "omitted_few": "{{displayCount}} больш ранніх элементи гэтага сеанса не ўдалося паказаць.",
+      "omitted_many": "{{displayCount}} больш ранніх элементаў гэтага сеанса не ўдалося паказаць."
     },
     "markdownTable": {
       "viewTable": "Праглядзець табліцу",
@@ -2088,7 +2145,11 @@
       "rowCount_one": "радок",
       "rowCount": "радкі",
       "rowCount_other": "радкі",
-      "opensFullScreen": "адкрываецца на ўвесь экран"
+      "opensFullScreen": "адкрываецца на ўвесь экран",
+      "columnCount_few": "слупкі",
+      "columnCount_many": "слупкоў",
+      "rowCount_few": "радкі",
+      "rowCount_many": "радкоў"
     },
     "sessionFilter": {
       "title": "Фільтраваць сеансы",
@@ -2157,7 +2218,7 @@
       "cameraAccessDisabled": "Доступ да камеры адключаны",
       "cameraAccessMessage": "Дазвольце доступ да камеры ў наладах, каб зрабіць фота.",
       "couldNotOpenPhotoPicker": "Не ўдалося адкрыць выбар фота. Перазапусціце Kilo і паспрабуйце яшчэ раз.",
-      "maxFilesAllowed": "Дазволена максімум {{count}} файлаў",
+      "maxFilesAllowed": "Дазволена максімум {{displayCount}} файлаў",
       "onlyAddingFiles": "Дадаецца толькі {{accepted}} з {{total}} файлаў (макс. {{max}})"
     },
     "composer": {
@@ -2222,7 +2283,7 @@
       "costPrefix": "кошт {{cost}}",
       "costSuffix": ", кошт {{cost}}",
       "tokensWindowUnavailable": "Кантэкст {{used}} токенаў, акно недаступнае",
-      "tokensUsage": "Кантэкст {{used}} з {{window}} токенаў, выкарыстана {{percentage}}%",
+      "tokensUsage": "Кантэкст {{used}} з {{window}} токенаў, выкарыстана {{percentage}}",
       "title": "Выкарыстанне кантэксту",
       "used": "Выкарыстана",
       "remaining": "Засталося",
@@ -2231,7 +2292,7 @@
       "usageReflectsLatest": "Выкарыстанне адлюстроўвае апошні завершаны адказ памочніка.",
       "tokenUsage": "Выкарыстанне токенаў",
       "cacheRate": "Хуткасць кэшавання",
-      "modelsCount": "Мадэлі ({{count}})",
+      "modelsCount": "Мадэлі ({{displayCount}})",
       "tokenTotalsNote": "Падсумоўванні токенаў ахопліваюць толькі гэты сеанс і выключаюць токены падагентаў/даччыных сеансаў.",
       "subagents": "Падагенты",
       "subagentsDescription": "Рэшткавы кошт з даччыных сеансаў",
@@ -2243,7 +2304,9 @@
       "stepsCount_one": "{{steps}} крок",
       "stepsCount": "{{steps}} крокаў",
       "stepsCount_other": "{{steps}} крокаў",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "stepsCount_few": "{{steps}} крокі",
+      "stepsCount_many": "{{steps}} крокаў"
     },
     "prBadge": {
       "open": "адкрыты pull request",
@@ -2373,7 +2436,7 @@
     "connectedCli": "На падключаным CLI",
     "newSessionOn": "Новы сеанс на {{name}}",
     "noMatchingSessions": "Няма супадзенняў па сеансах.",
-    "onlyFirstFilesAttached": "Будуць прымацаваныя толькі першыя {{count}} файлаў.",
+    "onlyFirstFilesAttached": "Будуць прымацаваныя толькі першыя {{displayCount}} файлаў.",
     "staleMessage": "Гэтая публікацыя больш недаступная.",
     "retryableMessage": "Не ўдалося загрузіць вашы сеансы.",
     "emptyMessage": "Яшчэ няма сеансаў — пачніце новы, каб адправіць гэта.",
@@ -2406,7 +2469,7 @@
     "otherAccountCopy": "Kilo Pass на гэтым Apple Account належыць іншаму ўліковаму запісу Kilo. Увайдзіце ў той уліковы запіс Kilo, каб кіраваць ім.",
     "alreadySubscribed": "У вас ужо ёсць падпіска Kilo Pass.",
     "purchaseUnavailable": "Пакупка Kilo Pass зараз недаступная.",
-    "tierCredits": "${{amount}} у крэдытах",
+    "tierCredits": "{{amount}} у крэдытах",
     "perMonth": "{{price}}/мес",
     "verifyPurchaseFailed": "Не ўдалося праверыць вашу пакупку. Праверце падключэнне і паспрабуйце яшчэ раз.",
     "productsCouldNotLoad": "Прадукты Kilo Pass не ўдалося загрузіць з App Store.",
@@ -2417,7 +2480,7 @@
     "manageFailed": "Не ўдалося адкрыць кіраванне падпіскай у App Store.",
     "kiloPassSetup": "Настройка Kilo Pass",
     "subscriptionHeaderDescription": "Штомесячная падпіска, якая дадае крэдыты на ваш баланс Kilo для запуску AI-сеансаў праграмавання ў дадатку Kilo — Cloud Agents, аддаленыя сеансы і чаты KiloClaw.",
-    "tierDescription": "${{price}} аплачаных крэдытаў дадаецца штомесяц для карыстання дадаткам Kilo.",
+    "tierDescription": "{{price}} аплачаных крэдытаў дадаецца штомесяц для карыстання дадаткам Kilo.",
     "subscribe": "Падпісацца",
     "subscribeDescription": "Штомесячныя крэдыты з бонусным прагрэсам",
     "manage": "Кіраваць",
@@ -2425,7 +2488,7 @@
     "statusPending": "Kilo Pass чакае",
     "statusCanceling": "Kilo Pass адмяняецца",
     "statusPastDue": "Kilo Pass пратэрмінаваны",
-    "monthlyCredits": "${{credits}} штомесячных крэдытаў",
+    "monthlyCredits": "{{credits}} штомесячных крэдытаў",
     "ends": "Сканчваецца {{date}}",
     "periodEnd": "канец перыяду",
     "managedOnGooglePlay": "Кіруецца ў Google Play",
@@ -2667,7 +2730,9 @@
       "processingNeedsReview": "Апрацоўка патрабуе праверкі",
       "retry": "Паўтарыць",
       "retryHint": "Паўтарае загрузку статусу Kilo Pass.",
-      "setupHint": "Адкрывае настройку Kilo Pass у інтэрнэце."
+      "setupHint": "Адкрывае настройку Kilo Pass у інтэрнэце.",
+      "paidSeat_few": "{{displayCount}} аплачаных месцы",
+      "paidSeat_many": "{{displayCount}} аплачаных месцаў"
     }
   },
   "authErrors": {

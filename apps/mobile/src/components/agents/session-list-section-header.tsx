@@ -2,6 +2,8 @@ import { View } from 'react-native';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 
 type SessionListSectionHeaderProps = {
   title: string;
@@ -23,7 +25,7 @@ export function SessionListSectionHeader({
     <View className="flex-row items-center justify-between bg-background px-[22px] pb-2 pt-[18px]">
       <Eyebrow>{title}</Eyebrow>
       <Text variant="mono" className="text-[10px] uppercase tracking-[1.5px] text-muted-foreground">
-        {count}
+        {formatNumber(count, i18n.language)}
       </Text>
     </View>
   );

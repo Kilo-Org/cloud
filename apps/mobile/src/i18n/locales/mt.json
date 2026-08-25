@@ -206,11 +206,11 @@
       "loadingLines": "Qed jitgħabbew {{loaded}} minn {{total}} linji…",
       "expandContext": "Espandi l-kuntest",
       "expandMoreContext": "Espandi aktar kuntest",
-      "expandLines": "Espandi {{count}} linji ({{start}}–{{end}})",
-      "expandMoreLines": "Espandi aktar {{count}} linji ({{start}}–{{end}})",
-      "expandLinesOfContext": "Espandi {{count}} linji ta' kuntest",
+      "expandLines": "Espandi {{displayCount}} linji ({{start}}–{{end}})",
+      "expandMoreLines": "Espandi aktar {{displayCount}} linji ({{start}}–{{end}})",
+      "expandLinesOfContext": "Espandi {{displayCount}} linji ta' kuntest",
       "expandAll": "Espandi kollox",
-      "expandAllLines": "Espandi l-{{count}} linji kollha",
+      "expandAllLines": "Espandi l-{{displayCount}} linji kollha",
       "loadingMoreFiles": "Qed jitgħabbew aktar fajls…",
       "retryLoadingNextPage": "Erġa' pprova jitgħabba l-paġna li jmiss",
       "failedToLoadMoreFiles": "Ma setgħux jitgħabbew aktar fajls — mess biex terġa' tipprova",
@@ -227,7 +227,13 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} fajls mgħobbija minn {{total}}",
       "filesStillLoading": "Il-fajls għadhom qed jitgħabbew. Iġbed biex taġġorna.",
       "goToOverview": "Mur fil-Ħarsa Ġenerali",
-      "goToOverviewTab": "Mur fit-tab tal-Ħarsa Ġenerali"
+      "goToOverviewTab": "Mur fit-tab tal-Ħarsa Ġenerali",
+      "fileLoadedCount_two": "{{displayCount}} fajls mgħobbija",
+      "fileLoadedCount_few": "{{displayCount}} fajls mgħobbija",
+      "fileLoadedCount_many": "{{displayCount}} fajl mgħobbi",
+      "fileLoadedOfTotalCount_two": "{{displayCount}} fajls mgħobbija minn {{total}}",
+      "fileLoadedOfTotalCount_few": "{{displayCount}} fajls mgħobbija minn {{total}}",
+      "fileLoadedOfTotalCount_many": "{{displayCount}} fajl mgħobbi minn {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ l-ebda newline fit-tmiem tal-fajl",
@@ -301,7 +307,7 @@
       "closeReactions": "Agħlaq ir-reazzjonijiet",
       "reactionsTitle": "Reazzjonijiet",
       "addReaction": "Żid reazzjoni",
-      "reactionPill": "{{emoji}} reazzjoni, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} reazzjoni, {{displayCount}} {{countLabel}}",
       "reaction_one": "reazzjoni",
       "reaction": "reazzjonijiet",
       "reaction_other": "reazzjonijiet",
@@ -353,10 +359,16 @@
       "noDiscussionDescription": "L-ebda thread ta' reviżjoni jew kummenti ta' konversazzjoni fuq dan il-pull request.",
       "reviewFiles": "Irrevedi l-fajls",
       "quotedDiffSnippet": "Snippet ta' diff ikkwotat",
-      "moreLinesAbove": "… {{count}} aktar linji 'l fuq",
+      "moreLinesAbove": "… {{displayCount}} aktar linji 'l fuq",
       "termsAcceptRequired": "Trid taċċetta t-Termini tas-Servizz biex tippubblika.",
       "termsOutdatedCopy": "It-Termini tas-Servizz inbidlu. Erġa' iftaħ din l-iskrin biex taċċetta l-aħħar verżjoni.",
-      "termsCheckRetryCopy": "Ma setgħux jiġu ċċekkjati t-Termini tas-Servizz. Iċċekkja l-konnessjoni tiegħek u erġa' pprova."
+      "termsCheckRetryCopy": "Ma setgħux jiġu ċċekkjati t-Termini tas-Servizz. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+      "comment_two": "{{displayCount}} kummenti",
+      "comment_few": "{{displayCount}} kummenti",
+      "comment_many": "{{displayCount}} kumment",
+      "reaction_two": "reazzjonijiet",
+      "reaction_few": "reazzjonijiet",
+      "reaction_many": "reazzjoni"
     },
     "couldNotOpenGitHubAppSettings": "Ma setgħux jinfetħu s-settings tal-GitHub App",
     "installKiloGitHubApp": "Installa l-Kilo GitHub App",
@@ -395,11 +407,11 @@
       "retryChecks": "Erġa' pprova l-kontrolli",
       "viewOnGitHub": "Ara l-PR fuq GitHub",
       "noChecksReported": "L-ebda kontroll irrapportat",
-      "passed": "{{count}} għaddew",
-      "failed": "{{count}} fallew",
-      "pending": "{{count}} pendenti",
-      "skipped": "{{count}} maqbuża",
-      "checksCount": "{{count}} kontrolli",
+      "passed": "{{displayCount}} għaddew",
+      "failed": "{{displayCount}} fallew",
+      "pending": "{{displayCount}} pendenti",
+      "skipped": "{{displayCount}} maqbuża",
+      "checksCount": "{{displayCount}} kontrolli",
       "checkDetails": "dettalji tal-kontroll",
       "pullRequest": "pull request"
     },
@@ -459,9 +471,12 @@
       "pendingComment_one": "kument pendenti",
       "pendingComment": "kummenti pendenti",
       "pendingComment_other": "kummenti pendenti",
-      "submitCountOfTotal": "Ibgħat {{freshCount}} minn {{totalCount}} kummenti",
+      "submitCountOfTotal": "Ibgħat {{displayFreshCount}} minn {{displayTotalCount}} kummenti",
       "submitReview": "Ibgħat ir-reviżjoni",
-      "partialPostedMessage": "Tpoġġew {{freshCount}} kumment(i). {{staleCount}} kumment(i) jindikaw commit aktar antik u baqgħu fil-kju tiegħek."
+      "partialPostedMessage": "Tpoġġew {{displayFreshCount}} kumment(i). {{displayStaleCount}} kumment(i) jindikaw commit aktar antik u baqgħu fil-kju tiegħek.",
+      "pendingComment_two": "kummenti pendenti",
+      "pendingComment_few": "kummenti pendenti",
+      "pendingComment_many": "kumment pendenti"
     },
     "reconnectNotice": {
       "title": "Il-konnessjoni ta' GitHub skadiet",
@@ -488,7 +503,13 @@
       "commit_other": "commits",
       "file_one": "fajl",
       "file": "fajls",
-      "file_other": "fajls"
+      "file_other": "fajls",
+      "commit_two": "commits",
+      "commit_few": "commits",
+      "commit_many": "commit",
+      "file_two": "fajls",
+      "file_few": "fajls",
+      "file_many": "fajl"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editja l-kument pendenti skadut fuq {{location}}",
@@ -580,7 +601,8 @@
     "agents": "Aġenti",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, tab, {{position}} minn {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +643,7 @@
       "recent": "Riċenti",
       "common": "Komuni",
       "reactWith": "Irreaġixxi b'{{reaction}}",
-      "accessibility": "{{emoji}} reazzjoni, {{count}}"
+      "accessibility": "{{emoji}} reazzjoni, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Qed tirrispondi lil",
@@ -650,7 +672,7 @@
       "imageUnavailable": "Immaġni mhux disponibbli",
       "openFailed": "Ma setax jinfetaħ l-attachment. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
       "attachFailed": "Ma setax jitwaħħal il-fajl",
-      "limit": "Tista' twaħħal sa {{count}} fajls.",
+      "limit": "Tista' twaħħal sa {{displayCount}} fajls.",
       "sizeRejection": "{{filename}} jaqbeż il-limitu tal-attachment ta' {{limit}}.",
       "unreadable": "Ma setax jinqara {{filename}}.",
       "pastedImage": "l-immaġni mwaħħla",
@@ -700,7 +722,10 @@
       "someone": "Xi ħadd",
       "typing_one": "{{name}} qed jikteb...",
       "typing": "{{names}} qed jiktbu...",
-      "typing_other": "{{names}} qed jiktbu..."
+      "typing_other": "{{names}} qed jiktbu...",
+      "typing_two": "{{names}} qed jiktbu...",
+      "typing_few": "{{names}} qed jiktbu...",
+      "typing_many": "{{names}} qed jiktbu..."
     },
     "botStatus": {
       "online": "Onlajn",
@@ -722,6 +747,7 @@
       "finalTermEnds": "It-terminu finali jintemm",
       "afterFinalTerm": "Wara t-terminu finali",
       "remaining": "Jifdal",
+      "lessThanOneDay": "Inqas minn ġurnata 1",
       "ends": "Jintemm",
       "expires": "Jiskadi",
       "noActivePlan": "L-ebda pjan attiv",
@@ -740,11 +766,11 @@
       "yourStandardMonthlyPrice": "il-prezz standard fix-xahar tiegħek",
       "perMonth": "/xahar",
       "earlybirdAccessUntil": "Aċċess Earlybird sal-{{date}}",
-      "earlybirdEnding": "Earlybird jintemm: {{days}} jum jifdal",
+      "earlybirdEnding": "Earlybird jintemm: {{remaining}}",
       "paymentPastDue": "Ħlas tard. Jekk jogħġbok aġġorna l-metodu tal-ħlas tiegħek.",
       "subscriptionCancels": "L-abbonament jikkanċella fil-{{date}}",
-      "trialDaysRemaining": "Prova: jifdal {{days}} jum",
-      "trialEndingSoon": "Il-prova dalwaqt tintemm: {{days}}"
+      "trialDaysRemaining": "Prova: {{remaining}}",
+      "trialEndingSoon": "Il-prova dalwaqt tintemm: {{remaining}}"
     },
     "changelog": {
       "title": "X'Ġdid",
@@ -996,7 +1022,7 @@
         "stalledTitle": "Xi ħaġa staġnat",
         "stalledBody": "Ma stajniex inlestu s-setup ta' {{name}}. Erġa' pprova, jew ibgħat email lil hi@kilo.ai jekk dan ikompli jiġri.",
         "timeoutTitle": "Qed jieħu aktar milli mistenni",
-        "timeoutBody": "Is-setup ta' {{name}} qed jieħu aktar mis-soltu (aktar minn {{minutes}} minuta).",
+        "timeoutBody": "Is-setup ta' {{name}} qed jieħu aktar mis-soltu (aktar minn {{displayMinutes}} minuta).",
         "continueInBackground": "Kompli fl-isfond",
         "settingUp": "Qed issir is-setup ta' {{name}}",
         "finishingSetup": "Qed jintemm is-setup",
@@ -1071,7 +1097,10 @@
       "openUnread_other": "Iftaħ {{name}}, {{displayCount}} messaġġi mhux moqrija",
       "open": "Iftaħ {{name}}",
       "openSettings": "Iftaħ l-issettjar ta' {{name}}",
-      "fixOnKiloAi": "Isewwi fuq kilo.ai: {{label}}"
+      "fixOnKiloAi": "Isewwi fuq kilo.ai: {{label}}",
+      "openUnread_two": "Iftaħ {{name}}, {{displayCount}} messaġġi mhux moqrija",
+      "openUnread_few": "Iftaħ {{name}}, {{displayCount}} messaġġi mhux moqrija",
+      "openUnread_many": "Iftaħ {{name}}, {{displayCount}} messaġġ mhux moqri"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1287,7 +1316,7 @@
       "mergeGate": "Bieb tal-merge",
       "repositories": "Repożitorji",
       "allRepositories": "Ir-repożitorji kollha",
-      "nSelected": "{{count}} magħżula",
+      "nSelected": "{{displayCount}} magħżula",
       "reviewMemory": "Memorja tar-reviżjoni",
       "proposedReviewMdGuidance": "Gwida REVIEW.md proposta"
     },
@@ -1367,7 +1396,10 @@
       "severityAll": "Is-severitajiet kollha",
       "confidenceHighOnly": "Kunfidenza għolja biss",
       "confidenceMediumOrHigher": "Medju jew ogħla",
-      "confidenceAny": "Kwalunkwe kunfidenza"
+      "confidenceAny": "Kwalunkwe kunfidenza",
+      "queued_two": "{{displayCount}} sejbiet eżistenti fil-kju għall-analiżi.",
+      "queued_few": "{{displayCount}} sejbiet eżistenti fil-kju għall-analiżi.",
+      "queued_many": "{{displayCount}} sejba eżistenti fil-kju għall-analiżi."
     },
     "analysis": {
       "couldNotLoad": "Ma setgħetx titgħabba l-analiżi",
@@ -1391,14 +1423,14 @@
       "analyzed": "Analizzat",
       "exploitabilityReasoning": "Raġunament tal-żvantaġġabbiltà",
       "suggestedFix": "Soluzzjoni proposta",
-      "whereFound": "Fejn instab dan ({{count}})",
+      "whereFound": "Fejn instab dan ({{displayCount}})",
       "fullReport": "Rapport sħiħ iġġenerat",
       "unknown": "Mhux magħruf",
       "yes": "Iva",
       "no": "Le"
     },
     "dashboard": {
-      "findingsCount": "{{count}} sejbiet",
+      "findingsCount": "{{displayCount}} sejbiet",
       "notMeasured": "Mhux imkejjel",
       "actFirst": "Aġixxi l-ewwel",
       "slaPosture": "Pożizzjoni tal-SLA",
@@ -1407,7 +1439,7 @@
       "repositoryActionPlan": "Pjan ta' azzjoni tar-repożitorju",
       "noOpenFindings": "L-ebda sejba miftuħa ma teħtieġ attenzjoni",
       "deadlineToday": "L-iskadenza intlaħqet illum",
-      "daysOverdue": "{{count}} jiem tard",
+      "daysOverdue": "{{displayCount}} jiem tard",
       "withinDeadline": "Fi ħdan l-iskadenza",
       "criticalOverdue": "Kritiku tard",
       "highOverdue": "Għoli tard",
@@ -1434,6 +1466,27 @@
       "syncNow": "Sinkronizza issa",
       "syncQueued": "Is-sinkronizzazzjoni fil-kju",
       "syncStatusUnavailable": "L-istatus tas-sinkronizzazzjoni mhux disponibbli"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Sejbiet miftuħa",
+      "openFindingsDetail": "{{critical}} kritiċi, {{high}} għoljin",
+      "confirmedExploitable": "Konfermat li jista' jiġi sfruttat",
+      "confirmedExploitableDetail": "Ir-riskju tal-proġett ikkonfermat mill-analiżi",
+      "needsReview": "Jeħtieġ ir-reviżjoni tiegħek",
+      "needsReviewDetail": "Meħtieġa deċiżjoni umana",
+      "analysisIncomplete": "L-analiżi mhix kompluta",
+      "analysisIncompleteDetail": "Ir-riskju tal-proġett għadu mhux magħruf",
+      "slaCompliance": "Konformità mal-SLA",
+      "notMeasured": "Mhux imkejjel",
+      "withinDeadlineDetail": "{{within}} minn {{total}} fil-limitu ta' żmien",
+      "noDeadlineData": "Għad m'hemmx limitu ta' żmien SLA għas-sejbiet",
+      "deadlinePassed": "Il-limitu ta' żmien għadda",
+      "deadlinePassedDetail": "{{critical}} kritiċi, {{high}} għoljin",
+      "dueThisWeek": "Id-data mistennija din il-ġimgħa",
+      "dueThisWeekDetail": "{{exploitable}} ikkonfermati li jistgħu jiġu sfruttati",
+      "noDeadline": "L-ebda limitu ta' żmien",
+      "reviewSlaAssignment": "Irrevedi l-assenjazzjoni tal-SLA",
+      "allOpenFindingsTracked": "Is-sejbiet miftuħa kollha ssorveljati"
     },
     "dismiss": {
       "title": "Warrab is-sejba",
@@ -1500,13 +1553,16 @@
       "analysisModeSubtitle": "Analiżi {{mode}}",
       "automation": "Awtomazzjoni",
       "automationAllOff": "Kollha mitfija",
-      "automationCount": "{{count}} minn 3 attivati",
+      "automationCount": "{{displayCount}} minn 3 attivati",
       "notifications": "Notifiki",
-      "notificationsCount": "{{count}} minn 2 attivati",
+      "notificationsCount": "{{displayCount}} minn 2 attivati",
       "slaPolicy": "Politika tal-SLA",
       "disabledNoManage": "Is-Security Agent huwa diżattivat. Is-sidien tal-organizzazzjoni u l-maniġers tal-kontijiet biss jistgħu jattivawh.",
       "disabledNoRepo": "Agħżel mill-inqas repożitorju wieħed qabel ma tattiva s-Security Agent.",
-      "disabledPrompt": "Ixgħel is-Security Agent biex tissinkronizza l-allerti ta' Dependabot, tagħżel ir-repożitorji, u tikkonfigura l-awtomazzjoni."
+      "disabledPrompt": "Ixgħel is-Security Agent biex tissinkronizza l-allerti ta' Dependabot, tagħżel ir-repożitorji, u tikkonfigura l-awtomazzjoni.",
+      "repositoriesCount_two": "{{displayCount}} repożitorji magħżula",
+      "repositoriesCount_few": "{{displayCount}} repożitorji magħżula",
+      "repositoriesCount_many": "{{displayCount}} repożitorju magħżul"
     },
     "remediation": {
       "cancellationRequested": "Talba ta' kanċellazzjoni",
@@ -1524,7 +1580,7 @@
       "openPullRequest": "Iftaħ pull request{{number}}",
       "openDraftPullRequest": "Iftaħ abbozz ta' pull request{{number}}",
       "progress": "Progress",
-      "attemptHistory": "Storja tat-tentattivi ({{count}})",
+      "attemptHistory": "Storja tat-tentattivi ({{displayCount}})",
       "attemptNumber": "Tentattiv #{{number}}",
       "startedBy": "Mibdi minn",
       "model": "Mudell",
@@ -1734,7 +1790,13 @@
       "cent_other": "ċenteżmi",
       "dollar_one": "dollaru",
       "dollar": "dollari",
-      "dollar_other": "dollari"
+      "dollar_other": "dollari",
+      "cent_two": "ċenteżmi",
+      "cent_few": "ċenteżmi",
+      "cent_many": "ċenteżmu",
+      "dollar_two": "dollari",
+      "dollar_few": "dollari",
+      "dollar_many": "dollaru"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ma setax jinfetaħ GitHub",
@@ -1830,7 +1892,10 @@
     "partRenderer": {
       "updatedFileCount_one": "Aġġornat {{displayCount}} fajl",
       "updatedFileCount": "Aġġornati {{displayCount}} fajls",
-      "updatedFileCount_other": "Aġġornati {{displayCount}} fajls"
+      "updatedFileCount_other": "Aġġornati {{displayCount}} fajls",
+      "updatedFileCount_two": "Aġġornati {{displayCount}} fajls",
+      "updatedFileCount_few": "Aġġornati {{displayCount}} fajls",
+      "updatedFileCount_many": "Aġġornat {{displayCount}} fajl"
     },
     "toolPatch": {
       "operationAdded": "Miżjud",
@@ -1855,9 +1920,9 @@
       "toolTask": "ħidma",
       "readTodos": "Aqra t-todos",
       "updateTodos": "Aġġorna t-todos",
-      "linesBadge": "{{count}} linji",
-      "filesBadge": "{{count}} fajls",
-      "matchesBadge": "{{count}} qbil"
+      "linesBadge": "{{displayCount}} linji",
+      "filesBadge": "{{displayCount}} fajls",
+      "matchesBadge": "{{displayCount}} qbil"
     },
     "readToolMarkdown": {
       "linesTruncated": "linji {{start}}–{{end}} (maqtugħa)",
@@ -1941,6 +2006,10 @@
       "reportAiResponseFailedTerminal": "Dan ir-rispons ma jistax jiġi rrapportat.",
       "reportAiResponseSubmitted": "Ir-rapport ġie sottomess. Irċevuta {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "inqas minn {{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Dettalji mhux disponibbli",
       "textDisplay": "Wiri tat-test",
@@ -1999,7 +2068,7 @@
       "preparationComplete": "It-tħejjija kompluta",
       "preparationFailed": "It-tħejjija falliet",
       "setupCommand": "Kmand ta' settup {{index}}",
-      "setupCommandOf": "Kmand ta' settup {{index}} minn {{count}}"
+      "setupCommandOf": "Kmand ta' settup {{index}} minn {{displayCount}}"
     },
     "permissionCard": {
       "title": "Permess meħtieġ",
@@ -2036,7 +2105,7 @@
       "submissionFailed": "Is-sottomissjoni fallejt. Ipprova għal darb'oħra.",
       "questionAnnouncement": "L-Aġent għandu bżonn il-kontribut tiegħek. Il-kompożitur qed jieqaf waqt li inti twieġeb.",
       "permissionAnnouncement": "L-Aġent għandu bżonn il-permess biex ikompli. Il-kompożitur qed jieqaf waqt li inti tiddeċiedi.",
-      "positionHint": "(1 minn {{count}})",
+      "positionHint": "(1 minn {{displayCount}})",
       "movedPastPrompt": "L-aġent għadda minn dan il-pront. Din il-karta tagħlaq meta s-sessjoni tkompli.",
       "waitingForAnswer": "L-aġent qed jistenna t-tweġiba tiegħek. Waqt li din il-mistoqsija tkun miftuħa, il-messaġġ tiegħek lill-aġent ikun waqaf.",
       "waitingForPermission": "L-aġent qed jistenna l-permess. Waqt li din it-talba tkun miftuħa, il-messaġġ tiegħek lill-aġent ikun waqaf."
@@ -2076,7 +2145,10 @@
       "omitted_other": "{{displayCount}} oġġetti aktar bikrin minn din is-sessjoni ma setgħux jintwerew.",
       "couldNotLoad": "Ma setgħux jitgħabbew il-messaġġi aktar bikrin.",
       "unavailable": "Il-messaġġi aktar bikrin mhumiex disponibbli.",
-      "tooLarge": "Il-messaġġi aktar bikrin huma kbar wisq biex jitgħabbew."
+      "tooLarge": "Il-messaġġi aktar bikrin huma kbar wisq biex jitgħabbew.",
+      "omitted_two": "{{displayCount}} oġġetti aktar bikrin minn din is-sessjoni ma setgħux jintwerew.",
+      "omitted_few": "{{displayCount}} oġġetti aktar bikrin minn din is-sessjoni ma setgħux jintwerew.",
+      "omitted_many": "{{displayCount}} oġġett aktar bikri minn din is-sessjoni ma setax jintwera."
     },
     "markdownTable": {
       "viewTable": "Ara t-tabella",
@@ -2088,7 +2160,13 @@
       "rowCount_one": "ringiela",
       "rowCount": "ringieli",
       "rowCount_other": "ringieli",
-      "opensFullScreen": "jiftaħ b'mod sħiħ"
+      "opensFullScreen": "jiftaħ b'mod sħiħ",
+      "columnCount_two": "kolonni",
+      "columnCount_few": "kolonni",
+      "columnCount_many": "kolonna",
+      "rowCount_two": "ringieli",
+      "rowCount_few": "ringieli",
+      "rowCount_many": "ringiela"
     },
     "sessionFilter": {
       "title": "Iffiltra s-sessjonijiet",
@@ -2157,7 +2235,7 @@
       "cameraAccessDisabled": "Aċċess għall-Kamera Diżattivat",
       "cameraAccessMessage": "Ippermetti l-aċċess għall-kamera fis-Settings biex tieħu ritratt.",
       "couldNotOpenPhotoPicker": "Ma setgħux jinfetaħ il-picker tar-ritratti. Erġa' ibda Kilo u ipprova għal darb'oħra.",
-      "maxFilesAllowed": "Massimu ta' {{count}} fajls permessi",
+      "maxFilesAllowed": "Massimu ta' {{displayCount}} fajls permessi",
       "onlyAddingFiles": "Qed iżżid biss {{accepted}} minn {{total}} fajls (massimu {{max}})"
     },
     "composer": {
@@ -2222,7 +2300,7 @@
       "costPrefix": "spiża {{cost}}",
       "costSuffix": ", spiża {{cost}}",
       "tokensWindowUnavailable": "Kuntest {{used}} tokens, tieqa mhux disponibbli",
-      "tokensUsage": "Kuntest {{used}} minn {{window}} tokens, {{percentage}}% użat",
+      "tokensUsage": "Kuntest {{used}} minn {{window}} tokens, {{percentage}} użat",
       "title": "Użu tal-kuntest",
       "used": "Użat",
       "remaining": "Fadal",
@@ -2231,7 +2309,7 @@
       "usageReflectsLatest": "L-użu jirrifletti l-aħħar risposta tal-assistent li tlestiet.",
       "tokenUsage": "Użu tat-tokens",
       "cacheRate": "Rata tal-cache",
-      "modelsCount": "Mudelli ({{count}})",
+      "modelsCount": "Mudelli ({{displayCount}})",
       "tokenTotalsNote": "It-totali tat-tokens ikopru din is-sessjoni biss u jeskludu t-tokens tas-subaġenti/sessjonijiet ta' tfal.",
       "subagents": "Subaġenti",
       "subagentsDescription": "Spiża residwa mis-sessjonijiet ta' tfal",
@@ -2243,7 +2321,10 @@
       "stepsCount_one": "{{steps}} pass",
       "stepsCount": "{{steps}} passi",
       "stepsCount_other": "{{steps}} passi",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "stepsCount_two": "{{steps}} passi",
+      "stepsCount_few": "{{steps}} passi",
+      "stepsCount_many": "{{steps}} pass"
     },
     "prBadge": {
       "open": "pull request miftuħ",
@@ -2373,7 +2454,7 @@
     "connectedCli": "Fuq CLI konness",
     "newSessionOn": "Sessjoni ġdida fuq {{name}}",
     "noMatchingSessions": "L-ebda sessjoni li taqbel.",
-    "onlyFirstFilesAttached": "Biss l-ewwel {{count}} fajls se jitwaħħlu.",
+    "onlyFirstFilesAttached": "Biss l-ewwel {{displayCount}} fajls se jitwaħħlu.",
     "staleMessage": "Dan il-qsim m'għadux disponibbli.",
     "retryableMessage": "Ma setgħux jitgħabbew is-sessjonijiet tiegħek.",
     "emptyMessage": "Għad m'hemmx sessjonijiet — ibda waħda ġdida biex tibgħat dan.",
@@ -2406,7 +2487,7 @@
     "otherAccountCopy": "Il-Kilo Pass fuq dan l-Apple Account jappartjeni għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex timmaniġġjah.",
     "alreadySubscribed": "Diġà għandek sottoskrizzjoni ta' Kilo Pass.",
     "purchaseUnavailable": "Ix-xiri ta' Kilo Pass mhux disponibbli bħalissa.",
-    "tierCredits": "${{amount}} f'krediti",
+    "tierCredits": "{{amount}} f'krediti",
     "perMonth": "{{price}}/xahar",
     "verifyPurchaseFailed": "Ma setax jivverifika x-xiri tiegħek. Iċċekkja l-konnessjoni tiegħek u erġa' ipprova.",
     "productsCouldNotLoad": "Il-prodotti ta' Kilo Pass ma setgħux jitgħabbew mill-App Store.",
@@ -2417,7 +2498,7 @@
     "manageFailed": "Ma setgħetx tinfetaħ il-ġestjoni tas-sottoskrizzjoni fl-App Store.",
     "kiloPassSetup": "Twaqqif ta' Kilo Pass",
     "subscriptionHeaderDescription": "Sottoskrizzjoni mensili li żżid krediti mal-bilanċ ta' Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo — Cloud Agents, sessjonijiet mill-bogħod, u chats ta' KiloClaw.",
-    "tierDescription": "${{price}} krediti mħallsa miżjuda kull xahar għall-użu tal-App Kilo.",
+    "tierDescription": "{{price}} krediti mħallsa miżjuda kull xahar għall-użu tal-App Kilo.",
     "subscribe": "Issottoskrivi",
     "subscribeDescription": "Krediti mensili b'progress bonus",
     "manage": "Immaniġġja",
@@ -2425,7 +2506,7 @@
     "statusPending": "Kilo Pass pendenti",
     "statusCanceling": "Kilo Pass qed jikkanċella",
     "statusPastDue": "Kilo Pass skadut fil-ħlas",
-    "monthlyCredits": "${{credits}} krediti mensili",
+    "monthlyCredits": "{{credits}} krediti mensili",
     "ends": "Jispiċċa {{date}}",
     "periodEnd": "tmiem tal-perjodu",
     "managedOnGooglePlay": "Immaniġġjat fuq Google Play",
@@ -2667,7 +2748,10 @@
       "processingNeedsReview": "L-ipproċessar għandu bżonn reviżjoni",
       "retry": "Erġa' ipprova",
       "retryHint": "Jerġa' jipprova jgħabbi l-istatus ta' Kilo Pass.",
-      "setupHint": "Jiftaħ it-twaqqif ta' Kilo Pass fuq il-web."
+      "setupHint": "Jiftaħ it-twaqqif ta' Kilo Pass fuq il-web.",
+      "paidSeat_two": "{{displayCount}} postijiet imħallsa",
+      "paidSeat_few": "{{displayCount}} postijiet imħallsa",
+      "paidSeat_many": "{{displayCount}} post imħallas"
     }
   },
   "authErrors": {

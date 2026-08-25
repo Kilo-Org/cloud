@@ -5,8 +5,6 @@
 // `session-row.tsx` and `agent-sessions-section.tsx`; centralizing here
 // means the `kilo remote` label fix ("CLI" instead of a hardcoded "CLOUD
 // AGENT") can never drift between the two sites.
-import { i18n } from '@/i18n';
-
 export function platformLabel(platform: string): string {
   switch (platform) {
     case 'cloud-agent':
@@ -24,7 +22,7 @@ export function platformLabel(platform: string): string {
       return 'CLI';
     }
     default: {
-      return platform.toLocaleUpperCase(i18n.language);
+      return platform.toUpperCase();
     }
   }
 }

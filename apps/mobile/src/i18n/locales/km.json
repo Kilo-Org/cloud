@@ -206,11 +206,11 @@
       "loadingLines": "កំពុងផ្ទុក {{loaded}} ក្នុងចំណោម {{total}} បន្ទាត់…",
       "expandContext": "ពង្រីកបរិបទ",
       "expandMoreContext": "ពង្រីកបរិបទបន្ថែម",
-      "expandLines": "ពង្រីក {{count}} បន្ទាត់ ({{start}}–{{end}})",
-      "expandMoreLines": "ពង្រីក {{count}} បន្ទាត់បន្ថែម ({{start}}–{{end}})",
-      "expandLinesOfContext": "ពង្រីក {{count}} បន្ទាត់នៃបរិបទ",
+      "expandLines": "ពង្រីក {{displayCount}} បន្ទាត់ ({{start}}–{{end}})",
+      "expandMoreLines": "ពង្រីក {{displayCount}} បន្ទាត់បន្ថែម ({{start}}–{{end}})",
+      "expandLinesOfContext": "ពង្រីក {{displayCount}} បន្ទាត់នៃបរិបទ",
       "expandAll": "ពង្រីកទាំងអស់",
-      "expandAllLines": "ពង្រីក {{count}} បន្ទាត់ទាំងអស់",
+      "expandAllLines": "ពង្រីក {{displayCount}} បន្ទាត់ទាំងអស់",
       "loadingMoreFiles": "កំពុងផ្ទុកឯកសារបន្ថែម…",
       "retryLoadingNextPage": "ព្យាយាមផ្ទុកទំព័របន្ទាប់ម្តងទៀត",
       "failedToLoadMoreFiles": "បរាជ័យក្នុងការផ្ទុកឯកសារបន្ថែម — ប៉ះដើម្បីព្យាយាមម្តងទៀត",
@@ -301,7 +301,7 @@
       "closeReactions": "បិទប្រតិកម្ម",
       "reactionsTitle": "ប្រតិកម្ម",
       "addReaction": "បន្ថែមប្រតិកម្ម",
-      "reactionPill": "ប្រតិកម្ម {{emoji}} ចំនួន {{count}} {{countLabel}}",
+      "reactionPill": "ប្រតិកម្ម {{emoji}} ចំនួន {{displayCount}} {{countLabel}}",
       "reaction_one": "ប្រតិកម្ម",
       "reaction": "ប្រតិកម្ម",
       "reaction_other": "ប្រតិកម្ម",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "គ្មានខ្សែស្រឡាយពិនិត្យ ឬអត្ថាធិប្បាយសន្ទនានៅលើសំណើទាញនេះទេ។",
       "reviewFiles": "ពិនិត្យឯកសារ",
       "quotedDiffSnippet": "សម្រង់ diff ខ្លី",
-      "moreLinesAbove": "… {{count}} បន្ទាត់បន្ថែមខាងលើ",
+      "moreLinesAbove": "… {{displayCount}} បន្ទាត់បន្ថែមខាងលើ",
       "termsAcceptRequired": "អ្នកត្រូវតែទទួលយកលក្ខខណ្ឌនៃសេវាកម្ម ដើម្បីប្រកាស។",
       "termsOutdatedCopy": "លក្ខខណ្ឌនៃសេវាកម្មបានប្តូរ។ បើកអេក្រង់នេះម្តងទៀត ដើម្បីទទួលយកកំណែចុងក្រោយ។",
       "termsCheckRetryCopy": "មិនអាចពិនិត្យលក្ខខណ្ឌនៃសេវាកម្មបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។"
@@ -395,11 +395,11 @@
       "retryChecks": "ព្យាយាមការត្រួតពិនិត្យម្តងទៀត",
       "viewOnGitHub": "មើល PR នៅលើ GitHub",
       "noChecksReported": "គ្មានការត្រួតពិនិត្យដែលបានរាយការណ៍ទេ",
-      "passed": "{{count}} បានឆ្លងកាត់",
-      "failed": "{{count}} បានបរាជ័យ",
-      "pending": "{{count}} កំពុងរង់ចាំ",
-      "skipped": "{{count}} បានរំលង",
-      "checksCount": "{{count}} ការត្រួតពិនិត្យ",
+      "passed": "{{displayCount}} បានឆ្លងកាត់",
+      "failed": "{{displayCount}} បានបរាជ័យ",
+      "pending": "{{displayCount}} កំពុងរង់ចាំ",
+      "skipped": "{{displayCount}} បានរំលង",
+      "checksCount": "{{displayCount}} ការត្រួតពិនិត្យ",
       "checkDetails": "ព័ត៌មានលម្អិតការត្រួតពិនិត្យ",
       "pullRequest": "sំណើទាញ"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "អត្ថាធិប្បាយរង់ចាំ",
       "pendingComment": "អត្ថាធិប្បាយរង់ចាំ",
       "pendingComment_other": "អត្ថាធិប្បាយរង់ចាំ",
-      "submitCountOfTotal": "ដាក់ស្នើ {{freshCount}} ក្នុងចំណោម {{totalCount}} អត្ថាធិប្បាយ",
+      "submitCountOfTotal": "ដាក់ស្នើ {{displayFreshCount}} ក្នុងចំណោម {{displayTotalCount}} អត្ថាធិប្បាយ",
       "submitReview": "ដាក់ស្នើការពិនិត្យ",
-      "partialPostedMessage": "បានប្រកាស {{freshCount}} អត្ថាធិប្បាយ។ {{staleCount}} អត្ថាធិប្បាយចង្អុលទៅ commit ចាស់ ហើយនៅក្នុងជួររង់ចាំរបស់អ្នក។"
+      "partialPostedMessage": "បានប្រកាស {{displayFreshCount}} អត្ថាធិប្បាយ។ {{displayStaleCount}} អត្ថាធិប្បាយចង្អុលទៅ commit ចាស់ ហើយនៅក្នុងជួររង់ចាំរបស់អ្នក។"
     },
     "reconnectNotice": {
       "title": "ការតភ្ជាប់ GitHub ផុតកំណត់",
@@ -580,7 +580,8 @@
     "agents": "ភ្នាក់ងារ",
     "profile": "ប្រវត្តិរូប",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, ផ្ទាំង, {{position}} នៃ {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "ថ្មីៗ",
       "common": "ទូទៅ",
       "reactWith": "ប្រតិកម្មជាមួយ {{reaction}}",
-      "accessibility": "ប្រតិកម្ម {{emoji}} ចំនួន {{count}}"
+      "accessibility": "ប្រតិកម្ម {{emoji}} ចំនួន {{displayCount}}"
     },
     "composer": {
       "replyingTo": "កំពុងឆ្លើយតបទៅ",
@@ -650,7 +651,7 @@
       "imageUnavailable": "រូបភាពមិនអាចប្រើបានទេ",
       "openFailed": "មិនអាចបើកឯកសារភ្ជាប់បានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
       "attachFailed": "បរាជ័យក្នុងការភ្ជាប់ឯកសារ",
-      "limit": "អ្នកអាចភ្ជាប់រហូតដល់ {{count}} ឯកសារ។",
+      "limit": "អ្នកអាចភ្ជាប់រហូតដល់ {{displayCount}} ឯកសារ។",
       "sizeRejection": "{{filename}} លើសពីដែនកំណត់ភ្ជាប់ {{limit}}។",
       "unreadable": "មិនអាចអាន {{filename}} បានទេ។",
       "pastedImage": "រូបភាពដែលបានបិទភ្ជាប់",
@@ -722,6 +723,7 @@
       "finalTermEnds": "រយៈពេលចុងក្រោយបញ្ចប់",
       "afterFinalTerm": "បន្ទាប់ពីរយៈពេលចុងក្រោយ",
       "remaining": "នៅសល់",
+      "lessThanOneDay": "តិចជាង 1 ថ្ងៃ",
       "ends": "បញ្ចប់",
       "expires": "ផុតកំណត់",
       "noActivePlan": "គ្មានគម្រោងសកម្ម",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "តម្លៃប្រចាំខែ Standard របស់អ្នក",
       "perMonth": "/ខែ",
       "earlybirdAccessUntil": "ការចូលប្រើ Earlybird រហូតដល់ {{date}}",
-      "earlybirdEnding": "Earlybird នឹងបញ្ចប់៖ នៅសល់ {{days}} ថ្ងៃ",
+      "earlybirdEnding": "Earlybird នឹងបញ្ចប់៖ នៅសល់ {{remaining}}",
       "paymentPastDue": "ការទូទាត់ហួសកំណត់។ សូមធ្វើបច្ចុប្បន្នភាពវិធីសាស្ត្រទូទាត់របស់អ្នក។",
       "subscriptionCancels": "ការជាវនឹងត្រូវលុបចោល {{date}}",
-      "trialDaysRemaining": "សាកល្បង៖ នៅសល់ {{days}} ថ្ងៃ",
-      "trialEndingSoon": "ការសាកល្បងនឹងបញ្ចប់ឆាប់ៗ៖ {{days}}"
+      "trialDaysRemaining": "សាកល្បង៖ នៅសល់ {{remaining}}",
+      "trialEndingSoon": "ការសាកល្បងនឹងបញ្ចប់ឆាប់ៗ៖ {{remaining}}"
     },
     "changelog": {
       "title": "អ្វីដែលថ្មី",
@@ -996,7 +998,7 @@
         "stalledTitle": "អ្វីមួយបានជាប់គាំង",
         "stalledBody": "យើងមិនអាចបញ្ចប់ការរៀបចំ {{name}} បានទេ។ ព្យាយាមម្តងទៀត ឬផ្ញើអ៊ីមែលទៅ hi@kilo.ai ប្រសិនបើវានៅតែកើតឡើង។",
         "timeoutTitle": "ចំណាយពេលយូរជាងការរំពឹងទុក",
-        "timeoutBody": "ការរៀបចំសម្រាប់ {{name}} កំពុងចំណាយពេលយូរជាងធម្មតា (លើសពី {{minutes}} នាទី)។",
+        "timeoutBody": "ការរៀបចំសម្រាប់ {{name}} កំពុងចំណាយពេលយូរជាងធម្មតា (លើសពី {{displayMinutes}} នាទី)។",
         "continueInBackground": "បន្តនៅផ្ទៃខាងក្រោយ",
         "settingUp": "កំពុងរៀបចំ {{name}}",
         "finishingSetup": "កំពុងបញ្ចប់ការរៀបចំ",
@@ -1287,7 +1289,7 @@
       "mergeGate": "ច្រកទ្វារបញ្ចូលគ្នា",
       "repositories": "ឃ្លាំង",
       "allRepositories": "ឃ្លាំងទាំងអស់",
-      "nSelected": "{{count}} បានជ្រើសរើស",
+      "nSelected": "{{displayCount}} បានជ្រើសរើស",
       "reviewMemory": "អង្គចងចាំត្រួតពិនិត្យ",
       "proposedReviewMdGuidance": "ការណែនាំ REVIEW.md ដែលបានស្នើ"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "បានវិភាគ",
       "exploitabilityReasoning": "ហេតុផលនៃការទាញយកប្រយោជន៍",
       "suggestedFix": "ការជួសជុលដែលបានស្នើ",
-      "whereFound": "កន្លែងដែលរកឃើញនេះ ({{count}})",
+      "whereFound": "កន្លែងដែលរកឃើញនេះ ({{displayCount}})",
       "fullReport": "របាយការណ៍ដែលបានបង្កើតពេញលេញ",
       "unknown": "មិនស្គាល់",
       "yes": "បាទ",
       "no": "ទេ"
     },
     "dashboard": {
-      "findingsCount": "ការរកឃើញ {{count}}",
+      "findingsCount": "ការរកឃើញ {{displayCount}}",
       "notMeasured": "មិនត្រូវបានវាស់",
       "actFirst": "ធ្វើសកម្មភាពជាមុន",
       "slaPosture": "ស្ថានភាព SLA",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "ផែនការសកម្មភាពនៃឃ្លាំងកូដ",
       "noOpenFindings": "មិនមានការរកឃើញបើកចំហដែលត្រូវការការយកចិត្តទុកដាក់",
       "deadlineToday": "ឈានដល់ថ្ងៃកំណត់នៅថ្ងៃនេះ",
-      "daysOverdue": "ហួសកំណត់ {{count}} ថ្ងៃ",
+      "daysOverdue": "ហួសកំណត់ {{displayCount}} ថ្ងៃ",
       "withinDeadline": "ក្នុងរយៈពេលកំណត់",
       "criticalOverdue": "ធ្ងន់ធ្ងរហួសកំណត់",
       "highOverdue": "ខ្ពស់ហួសកំណត់",
@@ -1434,6 +1436,27 @@
       "syncNow": "ធ្វើសមកាលកម្មឥឡូវនេះ",
       "syncQueued": "ការធ្វើសមកាលកម្មត្រូវបានដាក់ក្នុងជួរ",
       "syncStatusUnavailable": "ស្ថានភាពសមកាលកម្មមិនមាន"
+    },
+    "dashboardMetrics": {
+      "openFindings": "ការរកឃើញដែលបើក",
+      "openFindingsDetail": "ធ្ងន់ធ្ងរ {{critical}} ខ្ពស់ {{high}}",
+      "confirmedExploitable": "បានបញ្ជាក់ថាអាចត្រូវបានគេទាញយកប្រយោជន៍",
+      "confirmedExploitableDetail": "ហានិភ័យគម្រោងបានបញ្ជាក់ដោយការវិភាគ",
+      "needsReview": "ត្រូវការការពិនិត្យរបស់អ្នក",
+      "needsReviewDetail": "ត្រូវការការសម្រេចរបស់មនុស្ស",
+      "analysisIncomplete": "ការវិភាគមិនទាន់ពេញលេញ",
+      "analysisIncompleteDetail": "ហានិភ័យគម្រោងនៅមិនទាន់ដឹងនៅឡើយ",
+      "slaCompliance": "ការអនុលោមតាម SLA",
+      "notMeasured": "មិនទាន់បានវាស់",
+      "withinDeadlineDetail": "{{within}} ក្នុងចំណោម {{total}} ក្នុងរយៈពេលកំណត់",
+      "noDeadlineData": "មិនទាន់មានការរកឃើញណាមួយមានថ្ងៃកំណត់ SLA ទេ",
+      "deadlinePassed": "បានហួសកាលកំណត់",
+      "deadlinePassedDetail": "ធ្ងន់ធ្ងរ {{critical}} ខ្ពស់ {{high}}",
+      "dueThisWeek": "កំណត់នៅសប្តាហ៍នេះ",
+      "dueThisWeekDetail": "{{exploitable}} បានបញ្ជាក់ថាអាចទាញយកប្រយោជន៍បាន",
+      "noDeadline": "គ្មានកាលកំណត់",
+      "reviewSlaAssignment": "ពិនិត្យការកំណត់ SLA",
+      "allOpenFindingsTracked": "ការរកឃើញដែលបើកទាំងអស់ត្រូវបានតាមដាន"
     },
     "dismiss": {
       "title": "បដិសេធការរកឃើញ",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "ការវិភាគ {{mode}}",
       "automation": "ស្វ័យប្រវត្តិកម្ម",
       "automationAllOff": "បិទទាំងអស់",
-      "automationCount": "បានបើក {{count}} ក្នុងចំណោម 3",
+      "automationCount": "បានបើក {{displayCount}} ក្នុងចំណោម 3",
       "notifications": "ការជូនដំណឹង",
-      "notificationsCount": "បានបើក {{count}} ក្នុងចំណោម 2",
+      "notificationsCount": "បានបើក {{displayCount}} ក្នុងចំណោម 2",
       "slaPolicy": "គោលការណ៍ SLA",
       "disabledNoManage": "Security Agent ត្រូវបានបិទ។ មានតែម្ចាស់អង្គការ និងអ្នកគ្រប់គ្រងការទូទាត់ប៉ុណ្ណោះដែលអាចបើកវា។",
       "disabledNoRepo": "ជ្រើសរើសឃ្លាំងកូដយ៉ាងហោចណាស់មួយ មុនពេលបើក Security Agent។",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "បើកសំណើទាញ{{number}}",
       "openDraftPullRequest": "បើកសំណើទាញព្រាង{{number}}",
       "progress": "វឌ្ឍនភាព",
-      "attemptHistory": "ប្រវត្តិនៃការព្យាយាម ({{count}})",
+      "attemptHistory": "ប្រវត្តិនៃការព្យាយាម ({{displayCount}})",
       "attemptNumber": "ការព្យាយាមលេខ #{{number}}",
       "startedBy": "ចាប់ផ្តើមដោយ",
       "model": "គំរូ",
@@ -1855,9 +1878,9 @@
       "toolTask": "កិច្ចការ",
       "readTodos": "អានបញ្ជីការងារ",
       "updateTodos": "ធ្វើបច្ចុប្បន្នភាពបញ្ជីការងារ",
-      "linesBadge": "{{count}} បន្ទាត់",
-      "filesBadge": "{{count}} ឯកសារ",
-      "matchesBadge": "{{count}} ការផ្គូផ្គង"
+      "linesBadge": "{{displayCount}} បន្ទាត់",
+      "filesBadge": "{{displayCount}} ឯកសារ",
+      "matchesBadge": "{{displayCount}} ការផ្គូផ្គង"
     },
     "readToolMarkdown": {
       "linesTruncated": "បន្ទាត់ {{start}}–{{end}} (បានកាត់ឱ្យខ្លី)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "ចម្លើយនេះមិនអាចត្រូវបានរាយការណ៍។",
       "reportAiResponseSubmitted": "បានដាក់របាយការណ៍។ វិក្កយបត្រ {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "ព័ត៌មានលម្អិតមិនមាន",
       "textDisplay": "ការបង្ហាញអត្ថបទ",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "ការរៀបចំបានបញ្ចប់",
       "preparationFailed": "ការរៀបចំបានបរាជ័យ",
       "setupCommand": "ពាក្យបញ្ជាដំឡើង {{index}}",
-      "setupCommandOf": "ពាក្យបញ្ជាដំឡើង {{index}} ក្នុងចំណោម {{count}}"
+      "setupCommandOf": "ពាក្យបញ្ជាដំឡើង {{index}} ក្នុងចំណោម {{displayCount}}"
     },
     "permissionCard": {
       "title": "តម្រូវឱ្យមានសិទ្ធិ",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "ការដាក់ស្នើបានបរាជ័យ។ សូមព្យាយាមម្តងទៀត។",
       "questionAnnouncement": "ភ្នាក់ងារត្រូវការការបញ្ចូលរបស់អ្នក។ អ្នកតែងត្រូវបានផ្អាកខណៈពេលអ្នកឆ្លើយ។",
       "permissionAnnouncement": "ភ្នាក់ងារត្រូវការការអនុញ្ញាតដើម្បីបន្ត។ អ្នកតែងត្រូវបានផ្អាកខណៈពេលអ្នកសម្រេច។",
-      "positionHint": "({{count}} ក្នុងចំណោម)",
+      "positionHint": "({{displayCount}} ក្នុងចំណោម)",
       "movedPastPrompt": "ភ្នាក់ងារបានរំលងការជំរុញនេះ។ កាតនេះនឹងបិទនៅពេលវគ្គបន្ត។",
       "waitingForAnswer": "ភ្នាក់ងារកំពុងរង់ចាំចម្លើយរបស់អ្នក។ ខណៈពេលសំណួរនេះបើក សាររបស់អ្នកទៅកាន់ភ្នាក់ងារត្រូវបានផ្អាក។",
       "waitingForPermission": "ភ្នាក់ងារកំពុងរង់ចាំការអនុញ្ញាត។ ខណៈពេលសំណើនេះបើក សាររបស់អ្នកទៅកាន់ភ្នាក់ងារត្រូវបានផ្អាក។"
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "ការចូលប្រើកាមេរ៉ាត្រូវបានបិទ",
       "cameraAccessMessage": "អនុញ្ញាតការចូលប្រើកាមេរ៉ានៅក្នុងការកំណត់ដើម្បីថតរូប។",
       "couldNotOpenPhotoPicker": "មិនអាចបើកអ្នកជ្រើសរូបថតបានទេ។ ចាប់ផ្តើម Kilo ឡើងវិញហើយព្យាយាមម្តងទៀត។",
-      "maxFilesAllowed": "អនុញ្ញាតឯកសារអតិបរមា {{count}}",
+      "maxFilesAllowed": "អនុញ្ញាតឯកសារអតិបរមា {{displayCount}}",
       "onlyAddingFiles": "កំពុងបន្ថែមតែ {{accepted}} ក្នុងចំណោម {{total}} ឯកសារ (អតិបរមា {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "តម្លៃ {{cost}}",
       "costSuffix": ", តម្លៃ {{cost}}",
       "tokensWindowUnavailable": "បរិបទ {{used}} tokens, បង្អួចមិនអាចប្រើបាន",
-      "tokensUsage": "បរិបទ {{used}} ក្នុងចំណោម {{window}} tokens, បានប្រើ {{percentage}}%",
+      "tokensUsage": "បរិបទ {{used}} ក្នុងចំណោម {{window}} tokens, បានប្រើ {{percentage}}",
       "title": "ការប្រើប្រាស់បរិបទ",
       "used": "បានប្រើ",
       "remaining": "នៅសល់",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "ការប្រើប្រាស់ឆ្លុះបញ្ចាំងពីការឆ្លើយតបជំនួយការចុងក្រោយដែលបានបញ្ចប់។",
       "tokenUsage": "ការប្រើប្រាស់ token",
       "cacheRate": "អត្រាឃ្លាំងសម្ងាត់",
-      "modelsCount": "ម៉ូដែល ({{count}})",
+      "modelsCount": "ម៉ូដែល ({{displayCount}})",
       "tokenTotalsNote": "សរុប token គ្របដណ្តប់តែវគ្គនេះ និងមិនរាប់បញ្ចូល token ភ្នាក់ងាររង/វគ្គកូន។",
       "subagents": "ភ្នាក់ងាររង",
       "subagentsDescription": "តម្លៃសំណល់ពីវគ្គកូន",
@@ -2373,7 +2400,7 @@
     "connectedCli": "នៅលើ CLI ដែលបានភ្ជាប់",
     "newSessionOn": "វគ្គថ្មីនៅលើ {{name}}",
     "noMatchingSessions": "គ្មានវគ្គដែលត្រូវគ្នាទេ។",
-    "onlyFirstFilesAttached": "នឹងភ្ជាប់តែ {{count}} ឯកសារដំបូងប៉ុណ្ណោះ។",
+    "onlyFirstFilesAttached": "នឹងភ្ជាប់តែ {{displayCount}} ឯកសារដំបូងប៉ុណ្ណោះ។",
     "staleMessage": "ការចែករំលែកនេះលែងមានទៀតហើយ។",
     "retryableMessage": "មិនអាចផ្ទុកវគ្គរបស់អ្នកបានទេ។",
     "emptyMessage": "មិនទាន់មានវគ្គទេ — ចាប់ផ្តើមវគ្គថ្មីដើម្បីផ្ញើរឿងនេះ។",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Kilo Pass នៅលើ Apple Account នេះជារបស់គណនី Kilo ផ្សេង។ ចូលគណនី Kilo នោះដើម្បីគ្រប់គ្រងវា។",
     "alreadySubscribed": "អ្នកមានការជាវ Kilo Pass រួចហើយ។",
     "purchaseUnavailable": "ការទិញ Kilo Pass មិនអាចប្រើបានឥឡូវនេះទេ។",
-    "tierCredits": "${{amount}} នៅក្នុងឥណទាន",
+    "tierCredits": "{{amount}} នៅក្នុងឥណទាន",
     "perMonth": "{{price}}/ខែ",
     "verifyPurchaseFailed": "មិនអាចផ្ទៀងផ្ទាត់ការទិញរបស់អ្នកបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នកហើយព្យាយាមម្តងទៀត។",
     "productsCouldNotLoad": "មិនអាចផ្ទុកផលិតផល Kilo Pass ពី App Store បានទេ។",
@@ -2417,7 +2444,7 @@
     "manageFailed": "មិនអាចបើកការគ្រប់គ្រងការជាវ App Store បានទេ។",
     "kiloPassSetup": "ការរៀបចំ Kilo Pass",
     "subscriptionHeaderDescription": "ការជាវប្រចាំខែដែលបន្ថែមឥណទានទៅសមតុល្យ Kilo របស់អ្នកសម្រាប់ដំណើរការវគ្គសរសេរកូដ AI នៅក្នុង Kilo App — Cloud Agents, វគ្គពីចម្ងាយ, និងការជជែក KiloClaw ។",
-    "tierDescription": "${{price}} ឥណទានដែលបានបង់បន្ថែមប្រចាំខែសម្រាប់ការប្រើប្រាស់ Kilo App ។",
+    "tierDescription": "{{price}} ឥណទានដែលបានបង់បន្ថែមប្រចាំខែសម្រាប់ការប្រើប្រាស់ Kilo App ។",
     "subscribe": "ជាវ",
     "subscribeDescription": "ឥណទានប្រចាំខែជាមួយវឌ្ឍនភាពប្រាក់រង្វាន់",
     "manage": "គ្រប់គ្រង",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass កំពុងរង់ចាំ",
     "statusCanceling": "Kilo Pass កំពុងលុបចោល",
     "statusPastDue": "Kilo Pass ហួសកំណត់",
-    "monthlyCredits": "${{credits}} ឥណទានប្រចាំខែ",
+    "monthlyCredits": "{{credits}} ឥណទានប្រចាំខែ",
     "ends": "បញ្ចប់ {{date}}",
     "periodEnd": "ចុងបញ្ចប់នៃកំឡុងពេល",
     "managedOnGooglePlay": "គ្រប់គ្រងនៅលើ Google Play",

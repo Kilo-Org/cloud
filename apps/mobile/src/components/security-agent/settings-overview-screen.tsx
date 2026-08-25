@@ -281,6 +281,7 @@ export function SettingsOverviewScreen({
                   ? t('securityAgent.settingsOverview.automationAllOff')
                   : t('securityAgent.settingsOverview.automationCount', {
                       count: automationEnabledCount,
+                      displayCount: formatNumber(automationEnabledCount, i18n.language),
                     })
               }
               onPress={() => {
@@ -295,6 +296,7 @@ export function SettingsOverviewScreen({
                   ? t('securityAgent.settingsOverview.off')
                   : t('securityAgent.settingsOverview.notificationsCount', {
                       count: notificationsEnabledCount,
+                      displayCount: formatNumber(notificationsEnabledCount, i18n.language),
                     })
               }
               onPress={() => {

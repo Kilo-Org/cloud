@@ -1,5 +1,5 @@
 import { i18n } from '@/i18n';
-import { formatFileSize } from '@/lib/format';
+import { formatFileSize, formatNumber } from '@/lib/format';
 
 const MESSAGE_ATTACHMENT_MAX_COUNT = 10;
 
@@ -84,7 +84,10 @@ export function normalizeAttachmentSelection(
 }
 
 export function buildAttachmentLimitToast(): string {
-  return i18n.t('chat.attachment.limit', { count: MESSAGE_ATTACHMENT_MAX_COUNT });
+  return i18n.t('chat.attachment.limit', {
+    count: MESSAGE_ATTACHMENT_MAX_COUNT,
+    displayCount: formatNumber(MESSAGE_ATTACHMENT_MAX_COUNT, i18n.language),
+  });
 }
 
 export function buildAttachmentSizeRejectionToast(filename: string): string {

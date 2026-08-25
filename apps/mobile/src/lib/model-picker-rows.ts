@@ -1,5 +1,4 @@
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
-import { i18n } from '@/i18n';
 
 export type ModelPickerRow =
   | { key: string; title: string; type: 'header' }
@@ -129,7 +128,7 @@ function groupForModel(model: SessionModelOption): Pick<ModelGroup, 'key' | 'tit
   if (model.provider) {
     return {
       key: `provider:${model.provider.id}`,
-      title: model.provider.name.toLocaleUpperCase(i18n.language),
+      title: model.provider.name.toUpperCase(),
     };
   }
   if (model.isPreferred) {

@@ -206,11 +206,11 @@
       "loadingLines": "Φόρτωση {{loaded}} από {{total}} γραμμές…",
       "expandContext": "Επέκταση περιεχομένου",
       "expandMoreContext": "Επέκταση περισσότερου περιεχομένου",
-      "expandLines": "Επέκταση {{count}} γραμμών ({{start}}–{{end}})",
-      "expandMoreLines": "Επέκταση ακόμα {{count}} γραμμών ({{start}}–{{end}})",
-      "expandLinesOfContext": "Επέκταση {{count}} γραμμών περιεχομένου",
+      "expandLines": "Επέκταση {{displayCount}} γραμμών ({{start}}–{{end}})",
+      "expandMoreLines": "Επέκταση ακόμα {{displayCount}} γραμμών ({{start}}–{{end}})",
+      "expandLinesOfContext": "Επέκταση {{displayCount}} γραμμών περιεχομένου",
       "expandAll": "Επέκταση όλων",
-      "expandAllLines": "Επέκταση όλων των {{count}} γραμμών",
+      "expandAllLines": "Επέκταση όλων των {{displayCount}} γραμμών",
       "loadingMoreFiles": "Φόρτωση περισσότερων αρχείων…",
       "retryLoadingNextPage": "Νέα προσπάθεια φόρτωσης επόμενης σελίδας",
       "failedToLoadMoreFiles": "Δεν ήταν δυνατή η φόρτωση περισσότερων αρχείων — πατήστε για νέα προσπάθεια",
@@ -301,7 +301,7 @@
       "closeReactions": "Κλείσιμο αντιδράσεων",
       "reactionsTitle": "Αντιδράσεις",
       "addReaction": "Προσθήκη αντίδρασης",
-      "reactionPill": "{{emoji}} αντίδραση, {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} αντίδραση, {{displayCount}} {{countLabel}}",
       "reaction_one": "αντίδραση",
       "reaction": "αντιδράσεις",
       "reaction_other": "αντιδράσεις",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "Δεν υπάρχουν νήματα αναθεώρησης ή σχόλια συνομιλίας σε αυτό το pull request.",
       "reviewFiles": "Αρχεία αναθεώρησης",
       "quotedDiffSnippet": "Απόσπασμα diff σε εισαγωγικά",
-      "moreLinesAbove": "… {{count}} επιπλέον γραμμές παραπάνω",
+      "moreLinesAbove": "… {{displayCount}} επιπλέον γραμμές παραπάνω",
       "termsAcceptRequired": "Πρέπει να αποδεχτείτε τους Όρους χρήσης για να δημοσιεύσετε.",
       "termsOutdatedCopy": "Οι Όροι χρήσης άλλαξαν. Ανοίξτε ξανά αυτή την οθόνη για να αποδεχτείτε την τελευταία έκδοση.",
       "termsCheckRetryCopy": "Δεν ήταν δυνατός ο έλεγχος των Όρων χρήσης. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά."
@@ -395,11 +395,11 @@
       "retryChecks": "Νέα προσπάθεια ελέγχων",
       "viewOnGitHub": "Προβολή PR στο GitHub",
       "noChecksReported": "Δεν αναφέρθηκαν έλεγχοι",
-      "passed": "{{count}} πέρασαν",
-      "failed": "{{count}} απέτυχαν",
-      "pending": "{{count}} σε εκκρεμότητα",
-      "skipped": "{{count}} παραλείφθηκαν",
-      "checksCount": "{{count}} έλεγχοι",
+      "passed": "{{displayCount}} πέρασαν",
+      "failed": "{{displayCount}} απέτυχαν",
+      "pending": "{{displayCount}} σε εκκρεμότητα",
+      "skipped": "{{displayCount}} παραλείφθηκαν",
+      "checksCount": "{{displayCount}} έλεγχοι",
       "checkDetails": "λεπτομέρειες ελέγχου",
       "pullRequest": "pull request"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "εκκρεμές σχόλιο",
       "pendingComment": "εκκρεμή σχόλια",
       "pendingComment_other": "εκκρεμή σχόλια",
-      "submitCountOfTotal": "Υποβολή {{freshCount}} από {{totalCount}} σχόλια",
+      "submitCountOfTotal": "Υποβολή {{displayFreshCount}} από {{displayTotalCount}} σχόλια",
       "submitReview": "Υποβολή αναθεώρησης",
-      "partialPostedMessage": "Δημοσιεύτηκαν {{freshCount}} σχόλιο(α). {{staleCount}} σχόλιο(α) αναφέρονται σε παλαιότερο commit και παρέμειναν στην ουρά σας."
+      "partialPostedMessage": "Δημοσιεύτηκαν {{displayFreshCount}} σχόλιο(α). {{displayStaleCount}} σχόλιο(α) αναφέρονται σε παλαιότερο commit και παρέμειναν στην ουρά σας."
     },
     "reconnectNotice": {
       "title": "Η σύνδεση GitHub έληξε",
@@ -580,7 +580,8 @@
     "agents": "Πράκτορες",
     "profile": "Προφίλ",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, καρτέλα, {{position}} από {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "Πρόσφατα",
       "common": "Κοινά",
       "reactWith": "Αντίδραση με {{reaction}}",
-      "accessibility": "{{emoji}} αντίδραση, {{count}}"
+      "accessibility": "{{emoji}} αντίδραση, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Απάντηση σε",
@@ -650,7 +651,7 @@
       "imageUnavailable": "Η εικόνα δεν είναι διαθέσιμη",
       "openFailed": "Δεν ήταν δυνατό το άνοιγμα του συνημμένου. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",
       "attachFailed": "Δεν ήταν δυνατή η επισύναψη του αρχείου",
-      "limit": "Μπορείτε να επισυνάψετε έως και {{count}} αρχεία.",
+      "limit": "Μπορείτε να επισυνάψετε έως και {{displayCount}} αρχεία.",
       "sizeRejection": "Το {{filename}} υπερβαίνει το όριο επισύναψης {{limit}}.",
       "unreadable": "Δεν ήταν δυνατή η ανάγνωση του {{filename}}.",
       "pastedImage": "η επικολλημένη εικόνα",
@@ -722,6 +723,7 @@
       "finalTermEnds": "Η τελική περίοδος λήγει",
       "afterFinalTerm": "Μετά την τελική περίοδο",
       "remaining": "Υπόλοιπο",
+      "lessThanOneDay": "Λιγότερο από 1 ημέρα",
       "ends": "Λήγει",
       "expires": "Λήγει",
       "noActivePlan": "Κανένα ενεργό πλάνο",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "η μηνιαία σας τιμή Standard",
       "perMonth": "/μήνα",
       "earlybirdAccessUntil": "Πρόσβαση Earlybird έως {{date}}",
-      "earlybirdEnding": "Η Earlybird λήγει: {{days}} ημέρες απομένουν",
+      "earlybirdEnding": "Η Earlybird λήγει: {{remaining}}",
       "paymentPastDue": "Εκπρόθεσμη πληρωμή. Ενημερώστε τη μέθοδο πληρωμής σας.",
       "subscriptionCancels": "Η συνδρομή ακυρώνεται στις {{date}}",
-      "trialDaysRemaining": "Δοκιμή: {{days}} ημέρες απομένουν",
-      "trialEndingSoon": "Η δοκιμή λήγει σύντομα: {{days}}"
+      "trialDaysRemaining": "Δοκιμή: {{remaining}} απομένουν",
+      "trialEndingSoon": "Η δοκιμή λήγει σύντομα: {{remaining}}"
     },
     "changelog": {
       "title": "Τι νέο υπάρχει",
@@ -996,7 +998,7 @@
         "stalledTitle": "Κάτι κόλλησε",
         "stalledBody": "Δεν μπορέσαμε να ολοκληρώσουμε τη ρύθμιση του/της {{name}}. Δοκιμάστε ξανά ή στείλτε email στο hi@kilo.ai αν αυτό συνεχίζεται.",
         "timeoutTitle": "Διαρκεί περισσότερο από το αναμενόμενο",
-        "timeoutBody": "Η ρύθμιση του/της {{name}} διαρκεί περισσότερο από το συνηθισμένο (πάνω από {{minutes}} λεπτά).",
+        "timeoutBody": "Η ρύθμιση του/της {{name}} διαρκεί περισσότερο από το συνηθισμένο (πάνω από {{displayMinutes}} λεπτά).",
         "continueInBackground": "Συνέχεια στο παρασκήνιο",
         "settingUp": "Ρύθμιση του/της {{name}}",
         "finishingSetup": "Ολοκλήρωση ρύθμισης",
@@ -1287,7 +1289,7 @@
       "mergeGate": "Πύλη συγχώνευσης",
       "repositories": "Repositories",
       "allRepositories": "Όλα τα repositories",
-      "nSelected": "{{count}} επιλεγμένα",
+      "nSelected": "{{displayCount}} επιλεγμένα",
       "reviewMemory": "Μνήμη αναθεώρησης",
       "proposedReviewMdGuidance": "Προτεινόμενη οδηγία REVIEW.md"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "Αναλύθηκε",
       "exploitabilityReasoning": "Σκεπτικό αξιοποίησης",
       "suggestedFix": "Προτεινόμενη διόρθωση",
-      "whereFound": "Πού βρέθηκε αυτό ({{count}})",
+      "whereFound": "Πού βρέθηκε αυτό ({{displayCount}})",
       "fullReport": "Πλήρης αναφορά που δημιουργήθηκε",
       "unknown": "Άγνωστο",
       "yes": "Ναι",
       "no": "Όχι"
     },
     "dashboard": {
-      "findingsCount": "{{count}} ευρήματα",
+      "findingsCount": "{{displayCount}} ευρήματα",
       "notMeasured": "Δεν μετρήθηκε",
       "actFirst": "Δράστε πρώτα",
       "slaPosture": "Στάση SLA",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "Σχέδιο δράσης αποθετηρίου",
       "noOpenFindings": "Κανένα ανοιχτό εύρημα δεν χρήζει προσοχής",
       "deadlineToday": "Η προθεσμία έφτασε σήμερα",
-      "daysOverdue": "{{count}} ημέρες εκπρόθεσμο",
+      "daysOverdue": "{{displayCount}} ημέρες εκπρόθεσμο",
       "withinDeadline": "Εντός προθεσμίας",
       "criticalOverdue": "Κρίσιμο εκπρόθεσμο",
       "highOverdue": "Υψηλό εκπρόθεσμο",
@@ -1434,6 +1436,27 @@
       "syncNow": "Συγχρονισμός τώρα",
       "syncQueued": "Συγχρονισμός σε αναμονή",
       "syncStatusUnavailable": "Η κατάσταση συγχρονισμού δεν είναι διαθέσιμη"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Ανοιχτά ευρήματα",
+      "openFindingsDetail": "{{critical}} κρίσιμα, {{high}} υψηλά",
+      "confirmedExploitable": "Επιβεβαιωμένα αξιοποιήσιμο",
+      "confirmedExploitableDetail": "Ο κίνδυνος του έργου επιβεβαιώθηκε μέσω ανάλυσης",
+      "needsReview": "Χρήζει της αναθεώρησής σας",
+      "needsReviewDetail": "Απαιτείται ανθρώπινη απόφαση",
+      "analysisIncomplete": "Ανάλυση μη ολοκληρωμένη",
+      "analysisIncompleteDetail": "Ο κίνδυνος του έργου είναι ακόμη άγνωστος",
+      "slaCompliance": "Συμμόρφωση SLA",
+      "notMeasured": "Δεν μετρήθηκε",
+      "withinDeadlineDetail": "{{within}} από {{total}} εντός προθεσμίας",
+      "noDeadlineData": "Κανένα εύρημα δεν έχει προθεσμία SLA ακόμη",
+      "deadlinePassed": "Η προθεσμία παρήλθε",
+      "deadlinePassedDetail": "{{critical}} κρίσιμα, {{high}} υψηλά",
+      "dueThisWeek": "Λήγει αυτή την εβδομάδα",
+      "dueThisWeekDetail": "{{exploitable}} επιβεβαιωμένα αξιοποιήσιμα",
+      "noDeadline": "Χωρίς προθεσμία",
+      "reviewSlaAssignment": "Αναθεώρηση ανάθεσης SLA",
+      "allOpenFindingsTracked": "Όλα τα ανοιχτά ευρήματα παρακολουθούνται"
     },
     "dismiss": {
       "title": "Απόρριψη ευρήματος",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "Ανάλυση {{mode}}",
       "automation": "Αυτοματοποίηση",
       "automationAllOff": "Όλα ανενεργά",
-      "automationCount": "{{count}} από 3 ενεργά",
+      "automationCount": "{{displayCount}} από 3 ενεργά",
       "notifications": "Ειδοποιήσεις",
-      "notificationsCount": "{{count}} από 2 ενεργά",
+      "notificationsCount": "{{displayCount}} από 2 ενεργά",
       "slaPolicy": "Πολιτική SLA",
       "disabledNoManage": "Ο Security Agent είναι ανενεργός. Μόνο οι ιδιοκτήτες οργανισμού και οι διαχειριστές χρέωσης μπορούν να τον ενεργοποιήσουν.",
       "disabledNoRepo": "Επιλέξτε τουλάχιστον ένα αποθετήριο πριν ενεργοποιήσετε τον Security Agent.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "Άνοιγμα pull request{{number}}",
       "openDraftPullRequest": "Άνοιγμα πρόχειρου pull request{{number}}",
       "progress": "Πρόοδος",
-      "attemptHistory": "Ιστορικό προσπαθειών ({{count}})",
+      "attemptHistory": "Ιστορικό προσπαθειών ({{displayCount}})",
       "attemptNumber": "Προσπάθεια #{{number}}",
       "startedBy": "Ξεκίνησε από",
       "model": "Μοντέλο",
@@ -1855,9 +1878,9 @@
       "toolTask": "εργασία",
       "readTodos": "Ανάγνωση εκκρεμοτήτων",
       "updateTodos": "Ενημέρωση εκκρεμοτήτων",
-      "linesBadge": "{{count}} γραμμές",
-      "filesBadge": "{{count}} αρχεία",
-      "matchesBadge": "{{count}} αντιστοιχίες"
+      "linesBadge": "{{displayCount}} γραμμές",
+      "filesBadge": "{{displayCount}} αρχεία",
+      "matchesBadge": "{{displayCount}} αντιστοιχίες"
     },
     "readToolMarkdown": {
       "linesTruncated": "γραμμές {{start}}–{{end}} (περικομμένες)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "Αυτή η απόκριση δεν μπορεί να αναφερθεί.",
       "reportAiResponseSubmitted": "Η αναφορά υποβλήθηκε. Απόδειξη {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Οι λεπτομέρειες δεν είναι διαθέσιμες",
       "textDisplay": "Εμφάνιση κειμένου",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "Η προετοιμασία ολοκληρώθηκε",
       "preparationFailed": "Η προετοιμασία απέτυχε",
       "setupCommand": "Εντολή ρύθμισης {{index}}",
-      "setupCommandOf": "Εντολή ρύθμισης {{index}} από {{count}}"
+      "setupCommandOf": "Εντολή ρύθμισης {{index}} από {{displayCount}}"
     },
     "permissionCard": {
       "title": "Απαιτείται άδεια",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "Η υποβολή απέτυχε. Δοκιμάστε ξανά.",
       "questionAnnouncement": "Ο πράκτορας χρειάζεται την απάντησή σας. Ο σύνθετος είναι σε παύση όσο απαντάτε.",
       "permissionAnnouncement": "Ο πράκτορας χρειάζεται άδεια για να συνεχίσει. Ο σύνθετος είναι σε παύση όσο αποφασίζετε.",
-      "positionHint": "(1 από {{count}})",
+      "positionHint": "(1 από {{displayCount}})",
       "movedPastPrompt": "Ο πράκτορας προχώρησε πέρα από αυτό το μήνυμα. Αυτή η κάρτα θα κλείσει όταν συνεχιστεί η συνεδρία.",
       "waitingForAnswer": "Ο πράκτορας περιμένει την απάντησή σας. Όσο αυτή η ερώτηση είναι ανοιχτή, το μήνυμά σας προς τον πράκτορα είναι σε παύση.",
       "waitingForPermission": "Ο πράκτορας περιμένει άδεια. Όσο αυτό το αίτημα είναι ανοιχτό, το μήνυμά σας προς τον πράκτορα είναι σε παύση."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "Η πρόσβαση στην κάμερα είναι απενεργοποιημένη",
       "cameraAccessMessage": "Επιτρέψτε την πρόσβαση στην κάμερα στις Ρυθμίσεις για να τραβήξετε φωτογραφία.",
       "couldNotOpenPhotoPicker": "Δεν ήταν δυνατό το άνοιγμα του επιλογέα φωτογραφιών. Επανεκκινήστε το Kilo και δοκιμάστε ξανά.",
-      "maxFilesAllowed": "Επιτρέπονται έως {{count}} αρχεία",
+      "maxFilesAllowed": "Επιτρέπονται έως {{displayCount}} αρχεία",
       "onlyAddingFiles": "Προστίθενται μόνο {{accepted}} από τα {{total}} αρχεία (μέγιστο {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "κόστος {{cost}}",
       "costSuffix": ", κόστος {{cost}}",
       "tokensWindowUnavailable": "Πλαίσιο {{used}} διακριτικών, παράθυρο μη διαθέσιμο",
-      "tokensUsage": "Πλαίσιο {{used}} από {{window}} διακριτικά, {{percentage}}% χρησιμοποιημένα",
+      "tokensUsage": "Πλαίσιο {{used}} από {{window}} διακριτικά, {{percentage}} χρησιμοποιημένα",
       "title": "Χρήση πλαισίου",
       "used": "Χρησιμοποιήθηκε",
       "remaining": "Υπόλοιπο",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "Η χρήση αντικατοπτρίζει την τελευταία ολοκληρωμένη απάντηση του βοηθού.",
       "tokenUsage": "Χρήση διακριτικών",
       "cacheRate": "Ρυθμός κρυφής μνήμης",
-      "modelsCount": "Μοντέλα ({{count}})",
+      "modelsCount": "Μοντέλα ({{displayCount}})",
       "tokenTotalsNote": "Τα σύνολα διακριτικών καλύπτουν μόνο αυτή τη συνεδρία και εξαιρούν τα διακριτικά υποπρακτόρων/παιδικών συνεδριών.",
       "subagents": "Υποπράκτορες",
       "subagentsDescription": "Υπολειπόμενο κόστος από παιδικές συνεδρίες",
@@ -2373,7 +2400,7 @@
     "connectedCli": "Σε συνδεδεμένο CLI",
     "newSessionOn": "Νέα συνεδρία στο {{name}}",
     "noMatchingSessions": "Δεν υπάρχουν αντίστοιχες συνεδρίες.",
-    "onlyFirstFilesAttached": "Θα προσαρτηθούν μόνο τα πρώτα {{count}} αρχεία.",
+    "onlyFirstFilesAttached": "Θα προσαρτηθούν μόνο τα πρώτα {{displayCount}} αρχεία.",
     "staleMessage": "Αυτή η κοινή χρήση δεν είναι πλέον διαθέσιμη.",
     "retryableMessage": "Δεν ήταν δυνατή η φόρτωση των συνεδριών σας.",
     "emptyMessage": "Δεν υπάρχουν ακόμη συνεδρίες — ξεκινήστε μια νέα για να στείλετε αυτό.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "Το Kilo Pass σε αυτόν τον Λογαριασμό Apple ανήκει σε διαφορετικό λογαριασμό Kilo. Συνδεθείτε σε αυτόν τον λογαριασμό Kilo για να τον διαχειριστείτε.",
     "alreadySubscribed": "Έχετε ήδη συνδρομή στο Kilo Pass.",
     "purchaseUnavailable": "Η αγορά του Kilo Pass δεν είναι διαθέσιμη αυτή τη στιγμή.",
-    "tierCredits": "${{amount}} σε πιστώσεις",
+    "tierCredits": "{{amount}} σε πιστώσεις",
     "perMonth": "{{price}}/μήνα",
     "verifyPurchaseFailed": "Δεν ήταν δυνατή η επαλήθευση της αγοράς σας. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",
     "productsCouldNotLoad": "Δεν ήταν δυνατή η φόρτωση των προϊόντων Kilo Pass από το App Store.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "Αποτυχία ανοίγματος της διαχείρισης συνδρομών του App Store.",
     "kiloPassSetup": "Ρύθμιση Kilo Pass",
     "subscriptionHeaderDescription": "Μια μηνιαία συνδρομή που προσθέτει πιστώσεις στο υπόλοιπό σας Kilo για την εκτέλεση συνεδριών προγραμματισμού με AI στην Εφαρμογή Kilo — Cloud Agents, απομακρυσμένες συνεδρίες και συνομιλίες KiloClaw.",
-    "tierDescription": "Πιστώσεις ${{price}} που προστίθενται μηνιαίως για χρήση της Εφαρμογής Kilo.",
+    "tierDescription": "Πιστώσεις {{price}} που προστίθενται μηνιαίως για χρήση της Εφαρμογής Kilo.",
     "subscribe": "Εγγραφή",
     "subscribeDescription": "Μηνιαίες πιστώσεις με πρόσθετη πρόοδο μπόνους",
     "manage": "Διαχείριση",
@@ -2425,7 +2452,7 @@
     "statusPending": "Το Kilo Pass εκκρεμεί",
     "statusCanceling": "Το Kilo Pass ακυρώνεται",
     "statusPastDue": "Το Kilo Pass είναι ληξιπρόθεσμο",
-    "monthlyCredits": "${{credits}} μηνιαίες πιστώσεις",
+    "monthlyCredits": "{{credits}} μηνιαίες πιστώσεις",
     "ends": "Λήγει {{date}}",
     "periodEnd": "τέλος περιόδου",
     "managedOnGooglePlay": "Διαχείριση στο Google Play",

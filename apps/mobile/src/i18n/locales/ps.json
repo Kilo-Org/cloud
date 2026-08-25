@@ -206,11 +206,11 @@
       "loadingLines": "{{total}} کرښو څخه {{loaded}} بار کیږي…",
       "expandContext": "شرایط پراخول",
       "expandMoreContext": "نور شرایط پراخول",
-      "expandLines": "{{count}} کرښې پراخول ({{start}}–{{end}})",
-      "expandMoreLines": "نور {{count}} کرښې پراخول ({{start}}–{{end}})",
-      "expandLinesOfContext": "د شرایطو {{count}} کرښې پراخول",
+      "expandLines": "{{displayCount}} کرښې پراخول ({{start}}–{{end}})",
+      "expandMoreLines": "نور {{displayCount}} کرښې پراخول ({{start}}–{{end}})",
+      "expandLinesOfContext": "د شرایطو {{displayCount}} کرښې پراخول",
       "expandAll": "ټول پراخول",
-      "expandAllLines": "ټول {{count}} کرښې پراخول",
+      "expandAllLines": "ټول {{displayCount}} کرښې پراخول",
       "loadingMoreFiles": "نور فایلونه بار کیږي…",
       "retryLoadingNextPage": "بله پاڼه بارول بیا هڅه وکړئ",
       "failedToLoadMoreFiles": "نور فایلونه بار کیدی نشول — د بیا هڅې لپاره ټک وکړئ",
@@ -301,7 +301,7 @@
       "closeReactions": "غبرګونونه وتړئ",
       "reactionsTitle": "غبرګونونه",
       "addReaction": "غبرګون اضافه کړئ",
-      "reactionPill": "{{emoji}} غبرګون، {{count}} {{countLabel}}",
+      "reactionPill": "{{emoji}} غبرګون، {{displayCount}} {{countLabel}}",
       "reaction_one": "غبرګون",
       "reaction": "غبرګونونه",
       "reaction_other": "غبرګونونه",
@@ -353,7 +353,7 @@
       "noDiscussionDescription": "په دې پل ریکویسټ کې کوم د بیاکتنې تار یا د خبرو تبصره نشته.",
       "reviewFiles": "فایلونه بیاکتنه کړئ",
       "quotedDiffSnippet": "نقل شوی diff برخه",
-      "moreLinesAbove": "… پورته {{count}} نور کرښې",
+      "moreLinesAbove": "… پورته {{displayCount}} نور کرښې",
       "termsAcceptRequired": "د خپرولو لپاره باید د خدمت شرایط ومنئ.",
       "termsOutdatedCopy": "د خدمت شرایط بدل شول. د وروستۍ نسخې منلو لپاره دا سکرین بیا پرانیزئ.",
       "termsCheckRetryCopy": "د خدمت شرایط معاینه کیدی نشول. خپل اړیکه وګورئ او بیا هڅه وکړئ."
@@ -395,11 +395,11 @@
       "retryChecks": "چیکونه بیا هڅه وکړئ",
       "viewOnGitHub": "PR په GitHub کې وګورئ",
       "noChecksReported": "کوم چیک راپور نه شوی",
-      "passed": "{{count}} تیر شول",
-      "failed": "{{count}} ناکام شول",
-      "pending": "{{count}} په انتظار",
-      "skipped": "{{count}} پریښودل شول",
-      "checksCount": "{{count}} چیکونه",
+      "passed": "{{displayCount}} تیر شول",
+      "failed": "{{displayCount}} ناکام شول",
+      "pending": "{{displayCount}} په انتظار",
+      "skipped": "{{displayCount}} پریښودل شول",
+      "checksCount": "{{displayCount}} چیکونه",
       "checkDetails": "د چیک جزئیات",
       "pullRequest": "پل ریکویسټ"
     },
@@ -459,9 +459,9 @@
       "pendingComment_one": "په انتظار تبصره",
       "pendingComment": "په انتظار تبصرې",
       "pendingComment_other": "په انتظار تبصرې",
-      "submitCountOfTotal": "د {{totalCount}} تبصرو څخه {{freshCount}} وسپارئ",
+      "submitCountOfTotal": "د {{displayTotalCount}} تبصرو څخه {{displayFreshCount}} وسپارئ",
       "submitReview": "بیاکتنه وسپارئ",
-      "partialPostedMessage": "{{freshCount}} تبصره خپره شوه. {{staleCount}} تبصرې په یو زوړ کمټ اشاره کوي او ستاسو په قطار کې پاتې شوې."
+      "partialPostedMessage": "{{displayFreshCount}} تبصره خپره شوه. {{displayStaleCount}} تبصرې په یو زوړ کمټ اشاره کوي او ستاسو په قطار کې پاتې شوې."
     },
     "reconnectNotice": {
       "title": "د GitHub اړیکه پای ته ورسیده",
@@ -580,7 +580,8 @@
     "agents": "اجنټان",
     "profile": "پروفایل",
     "kiloclaw": "کلیوکلاو",
-    "kiloclawWrapped": "کلیو\nکلاو"
+    "kiloclawWrapped": "کلیو\nکلاو",
+    "position": "{{name}}, ټب، {{total}} څخه {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -621,7 +622,7 @@
       "recent": "وروستي",
       "common": "عام",
       "reactWith": "په {{reaction}} غبرګون وکړئ",
-      "accessibility": "{{emoji}} غبرګون، {{count}}"
+      "accessibility": "{{emoji}} غبرګون، {{displayCount}}"
     },
     "composer": {
       "replyingTo": "ځواب ورکول",
@@ -650,7 +651,7 @@
       "imageUnavailable": "انځور شتون نلري",
       "openFailed": "نښلول شوی فایل پرانیستل کیدی نشو. خپل اړیکه وګورئ او بیا هڅه وکړئ.",
       "attachFailed": "فایل نښلول ناکام شول",
-      "limit": "تاسو کولی شئ تر {{count}} فایلونه ونښلئ.",
+      "limit": "تاسو کولی شئ تر {{displayCount}} فایلونه ونښلئ.",
       "sizeRejection": "{{filename}} د {{limit}} نښلولو حد څخه ډیر دی.",
       "unreadable": "{{filename}} لوستل کیدی نشو.",
       "pastedImage": "پیسټ شوی انځور",
@@ -722,6 +723,7 @@
       "finalTermEnds": "وروستۍ دوره پای ته رسېږي",
       "afterFinalTerm": "د وروستۍ دورې وروسته",
       "remaining": "پاتې",
+      "lessThanOneDay": "له ۱ ورځې کم",
       "ends": "پای ته رسېږي",
       "expires": "منقضی کېږي",
       "noActivePlan": "هېڅ فعال پلان نشته",
@@ -740,11 +742,11 @@
       "yourStandardMonthlyPrice": "ستاسو معیاري میاشتنی بیه",
       "perMonth": "/میاشت",
       "earlybirdAccessUntil": "د {{date}} پورې د لمړني مرغۍ لاسرسی",
-      "earlybirdEnding": "د لمړني مرغۍ پای: {{days}} ورځې پاتې دي",
+      "earlybirdEnding": "د لمړني مرغۍ پای: {{remaining}}",
       "paymentPastDue": "تادیه له نیټې تېره شوې. مهرباني وکړئ د تادیې طریقه نوي کړئ.",
       "subscriptionCancels": "ګډون په {{date}} لغوه کېږي",
-      "trialDaysRemaining": "تجربه: {{days}} ورځې پاتې دي",
-      "trialEndingSoon": "تجربه ډېر ژر پای ته رسېږي: {{days}}"
+      "trialDaysRemaining": "تجربه: {{remaining}} پاتې دي",
+      "trialEndingSoon": "تجربه ډېر ژر پای ته رسېږي: {{remaining}}"
     },
     "changelog": {
       "title": "نوی څه دی",
@@ -996,7 +998,7 @@
         "stalledTitle": "یو څه ودرېدل",
         "stalledBody": "موږ {{name}} پای ته نه شو رسولی. بیا هڅه وکړئ، یا که دا دوام وکړي hi@kilo.ai ته ایمیل واستوئ.",
         "timeoutTitle": "له اټکل ډېر وخت نیسي",
-        "timeoutBody": "د {{name}} جوړونه له معمول ډېر وخت نیسي (له {{minutes}} دقیقو ډېر).",
+        "timeoutBody": "د {{name}} جوړونه له معمول ډېر وخت نیسي (له {{displayMinutes}} دقیقو ډېر).",
         "continueInBackground": "په شالید کې دوام ورکړئ",
         "settingUp": "{{name}} جوړول",
         "finishingSetup": "د جوړونې بشپړول",
@@ -1287,7 +1289,7 @@
       "mergeGate": "د یوځای کولو دروازه",
       "repositories": "ریپوزیټورۍ",
       "allRepositories": "ټولې ریپوزیټورۍ",
-      "nSelected": "{{count}} غوره شوي",
+      "nSelected": "{{displayCount}} غوره شوي",
       "reviewMemory": "د بیاکتنې حافظه",
       "proposedReviewMdGuidance": "د REVIEW.md وړاندیز شوې لارښوونه"
     },
@@ -1391,14 +1393,14 @@
       "analyzed": "تحلیل شوی",
       "exploitabilityReasoning": "د استحصال وړتیا دلیل",
       "suggestedFix": "وړاندیز شوی حل",
-      "whereFound": "چیرته وموندل شوه ({{count}})",
+      "whereFound": "چیرته وموندل شوه ({{displayCount}})",
       "fullReport": "بشپړ جوړ شوی راپور",
       "unknown": "نامعلوم",
       "yes": "هو",
       "no": "نه"
     },
     "dashboard": {
-      "findingsCount": "{{count}} موندنې",
+      "findingsCount": "{{displayCount}} موندنې",
       "notMeasured": "نمی شوی",
       "actFirst": "لومړی عمل وکړئ",
       "slaPosture": "د SLA حالت",
@@ -1407,7 +1409,7 @@
       "repositoryActionPlan": "د ذخیرې د عمل پلان",
       "noOpenFindings": "هیڅ خلاصه موندنه پاملرنې ته اړتیا نلري",
       "deadlineToday": "نن مهالو وخت ورسېد",
-      "daysOverdue": "{{count}} ورځې ځنډ",
+      "daysOverdue": "{{displayCount}} ورځې ځنډ",
       "withinDeadline": "د مهالو وخت دننه",
       "criticalOverdue": "کریټیکل ځنډ",
       "highOverdue": "لوړ ځنډ",
@@ -1434,6 +1436,27 @@
       "syncNow": "اوس ترکیب کړئ",
       "syncQueued": "ترکیب په صف کې دی",
       "syncStatusUnavailable": "د ترکیب حالت شتون نلري"
+    },
+    "dashboardMetrics": {
+      "openFindings": "خلاصې موندنې",
+      "openFindingsDetail": "{{critical}} کریټیکل، {{high}} لوړ",
+      "confirmedExploitable": "استحصال وړ تایید شوی",
+      "confirmedExploitableDetail": "د تحلیل له مخې د پروژې خطر تایید شوی",
+      "needsReview": "ستاسو بیا کتنې ته اړتیا لري",
+      "needsReviewDetail": "انساني پریکړې ته اړتیا ده",
+      "analysisIncomplete": "تحلیل بشپړ نه دی",
+      "analysisIncompleteDetail": "د پروژې خطر لا تر اوسه نامعلوم دی",
+      "slaCompliance": "د SLA اطاعت",
+      "notMeasured": "نمی شوی",
+      "withinDeadlineDetail": "{{total}} څخه {{within}} د مهالو وخت دننه",
+      "noDeadlineData": "لا د کومې موندنې SLA مهالو وخت نشته",
+      "deadlinePassed": "مهالو وخت تېر شو",
+      "deadlinePassedDetail": "{{critical}} کریټیکل، {{high}} لوړ",
+      "dueThisWeek": "دا اوونۍ مهالو وخت",
+      "dueThisWeekDetail": "{{exploitable}} استحصال وړ تایید شوی",
+      "noDeadline": "مهالو وخت نشته",
+      "reviewSlaAssignment": "د SLA ګمارنه بیاکتنه کړئ",
+      "allOpenFindingsTracked": "ټولې خلاصې موندنې تعقیب شوې"
     },
     "dismiss": {
       "title": "موندنه له پامه وغورځوئ",
@@ -1500,9 +1523,9 @@
       "analysisModeSubtitle": "{{mode}} تحلیل",
       "automation": "اتوماتیک",
       "automationAllOff": "ټول غیرفعال",
-      "automationCount": "{{count}} له 3 څخه فعال",
+      "automationCount": "{{displayCount}} له 3 څخه فعال",
       "notifications": "خبرتیاوې",
-      "notificationsCount": "{{count}} له 2 څخه فعال",
+      "notificationsCount": "{{displayCount}} له 2 څخه فعال",
       "slaPolicy": "د SLA پالیسي",
       "disabledNoManage": "د امنیت استازی غیرفعال دی. یوازې د سازمان مالکان او د بیلینګ مدیران کولی شي دا فعال کړي.",
       "disabledNoRepo": "د امنیت استازی فعالولو دمخه لږ تر لږه یوه ذخیره غوره کړئ.",
@@ -1524,7 +1547,7 @@
       "openPullRequest": "د کشولو غوښتنه پرانیزئ{{number}}",
       "openDraftPullRequest": "د مسودې د کشولو غوښتنه پرانیزئ{{number}}",
       "progress": "پرمختګ",
-      "attemptHistory": "د هڅې تاریخچه ({{count}})",
+      "attemptHistory": "د هڅې تاریخچه ({{displayCount}})",
       "attemptNumber": "هڅه #{{number}}",
       "startedBy": "لخوا پیل شوی",
       "model": "ماډل",
@@ -1855,9 +1878,9 @@
       "toolTask": "task",
       "readTodos": "کړنې ولولئ",
       "updateTodos": "کړنې تازه کړئ",
-      "linesBadge": "{{count}} کرښې",
-      "filesBadge": "{{count}} فایلونه",
-      "matchesBadge": "{{count}} سمونونه"
+      "linesBadge": "{{displayCount}} کرښې",
+      "filesBadge": "{{displayCount}} فایلونه",
+      "matchesBadge": "{{displayCount}} سمونونه"
     },
     "readToolMarkdown": {
       "linesTruncated": "کرښې {{start}}–{{end}} (لنډې شوې)",
@@ -1941,6 +1964,10 @@
       "reportAiResponseFailedTerminal": "دا ځواب راپور کړی نشي.",
       "reportAiResponseSubmitted": "راپور وړاندې شو. رسید {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "تفصیلات شتون نلري",
       "textDisplay": "د متن ښودنه",
@@ -1999,7 +2026,7 @@
       "preparationComplete": "چمتوالی بشپړ شو",
       "preparationFailed": "چمتوالی ناکام شو",
       "setupCommand": "د ترتیب کمانډ {{index}}",
-      "setupCommandOf": "د ترتیب کمانډ {{index}} له {{count}} څخه"
+      "setupCommandOf": "د ترتیب کمانډ {{index}} له {{displayCount}} څخه"
     },
     "permissionCard": {
       "title": "اجازې ته اړتیا ده",
@@ -2036,7 +2063,7 @@
       "submissionFailed": "وړاندې کول ناکام شول. مهرباني وکړئ بیا هڅه وکړئ.",
       "questionAnnouncement": "اجنټ ستاسو معلوماتو ته اړتیا لري. تر هغه چې تاسو ځواب ووایاست لیکنه درول شوې ده.",
       "permissionAnnouncement": "اجنټ ته دوام لپاره اجازه اړینه ده. تر هغه چې تاسو پرېکړه وکړئ لیکنه درول شوې ده.",
-      "positionHint": "(۱ له {{count}})",
+      "positionHint": "(۱ له {{displayCount}})",
       "movedPastPrompt": "اجنټ دې لارښود ته تېر شوی دی. کله چې غونډه دوام وکړي دا کارت بندېږي.",
       "waitingForAnswer": "اجنټ ستاسو ځواب ته انتظار باسي. تر هغه چې دا پوښتنه خلاصه وي، اجنټ ته ستاسو پیغام درول شوی دی.",
       "waitingForPermission": "اجنټ د اجازې انتظار باسي. تر هغه چې دا غوښتنه خلاصه وي، اجنټ ته ستاسو پیغام درول شوی دی."
@@ -2157,7 +2184,7 @@
       "cameraAccessDisabled": "د کیمرې لاسرسی بند دی",
       "cameraAccessMessage": "د انځور اخیستلو لپاره په تنظیماتو کې کیمرې ته لاسرسی ورکړئ.",
       "couldNotOpenPhotoPicker": "د انځور ټاکنکی نه شو خلاصېدلای. Kilo بیا پیل کړئ او بیا هڅه وکړئ.",
-      "maxFilesAllowed": "اعظمي {{count}} فایلونه اجازه لري",
+      "maxFilesAllowed": "اعظمي {{displayCount}} فایلونه اجازه لري",
       "onlyAddingFiles": "یوازې د {{total}} فایلونو څخه {{accepted}} اضافه کېږي (اعظمي {{max}})"
     },
     "composer": {
@@ -2222,7 +2249,7 @@
       "costPrefix": "لګښت {{cost}}",
       "costSuffix": "، لګښت {{cost}}",
       "tokensWindowUnavailable": "شرایط {{used}} ټوکنونه، کړکۍ شتون نلري",
-      "tokensUsage": "شرایط د {{window}} ټوکنونو څخه {{used}}، {{percentage}}% کارول شوي",
+      "tokensUsage": "شرایط د {{window}} ټوکنونو څخه {{used}}، {{percentage}} کارول شوي",
       "title": "د شرایطو کارول",
       "used": "کارول شوی",
       "remaining": "پاتې",
@@ -2231,7 +2258,7 @@
       "usageReflectsLatest": "کارول د وروستي بشپړ شوي مرستیال ځواب منعکس کوي.",
       "tokenUsage": "د ټوکن کارول",
       "cacheRate": "د کش نرخ",
-      "modelsCount": "ماډلونه ({{count}})",
+      "modelsCount": "ماډلونه ({{displayCount}})",
       "tokenTotalsNote": "ټول ټوکنونه یوازې دا غونډه پوښي او د فرعي اجنټ/ماشوم غونډې ټوکنونه نه ورکوي.",
       "subagents": "فرعي اجنټان",
       "subagentsDescription": "د ماشوم غونډو پاتې لګښت",
@@ -2373,7 +2400,7 @@
     "connectedCli": "په یو نښل شوي CLI باندې",
     "newSessionOn": "په {{name}} باندې نوې غونډه",
     "noMatchingSessions": "هیڅ ورته غونډه نشته.",
-    "onlyFirstFilesAttached": "یوازې لومړني {{count}} فایلونه به ضمیمه شي.",
+    "onlyFirstFilesAttached": "یوازې لومړني {{displayCount}} فایلونه به ضمیمه شي.",
     "staleMessage": "دا شریکول نور شتون نلري.",
     "retryableMessage": "ستاسو غونډې نه شول پورته کېدلای.",
     "emptyMessage": "لا هیڅ غونډه نشته — د دې لیږلو لپاره نوې پیل کړئ.",
@@ -2406,7 +2433,7 @@
     "otherAccountCopy": "دا Apple Account باندې Kilo Pass د بل Kilo حساب پورې اړه لري. د مدیریت لپاره هغه Kilo حساب ته ننوځئ.",
     "alreadySubscribed": "تاسو مخکې له مخکې د Kilo Pass ګډون لرئ.",
     "purchaseUnavailable": "د Kilo Pass پیرود اوس مهال شتون نلري.",
-    "tierCredits": "په کریډیټونو کې ${{amount}}",
+    "tierCredits": "په کریډیټونو کې {{amount}}",
     "perMonth": "{{price}}/میاشت",
     "verifyPurchaseFailed": "ستاسو پیرود نه شو تصدیق کېدلای. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
     "productsCouldNotLoad": "د Kilo Pass محصولات له App Store څخه نه شول پورته کېدلای.",
@@ -2417,7 +2444,7 @@
     "manageFailed": "د App Store د ګډون مدیریت نه شو خلاصېدلای.",
     "kiloPassSetup": "د Kilo Pass جوړول",
     "subscriptionHeaderDescription": "یو میاشتنی ګډون چې ستاسو Kilo توازن ته کریډیټونه اضافه کوي د Kilo App کې د AI کوډ کولو غونډو چلولو لپاره — کلاوډ اجنټان، لرې غونډې، او د KiloClaw خبرې اترې.",
-    "tierDescription": "${{price}} ورکړل شوي کریډیټونه د Kilo App کارولو لپاره میاشتني اضافه کېږي.",
+    "tierDescription": "{{price}} ورکړل شوي کریډیټونه د Kilo App کارولو لپاره میاشتني اضافه کېږي.",
     "subscribe": "ګډون وکړئ",
     "subscribeDescription": "د بونس پرمختګ سره میاشتني کریډیټونه",
     "manage": "مدیریت",
@@ -2425,7 +2452,7 @@
     "statusPending": "Kilo Pass په انتظار کې",
     "statusCanceling": "Kilo Pass لغوه کېږي",
     "statusPastDue": "Kilo Pass تېر شوی",
-    "monthlyCredits": "${{credits}} میاشتني کریډیټونه",
+    "monthlyCredits": "{{credits}} میاشتني کریډیټونه",
     "ends": "{{date}} پای ته رسیږي",
     "periodEnd": "د دورې پای",
     "managedOnGooglePlay": "په Google Play باندې اداره کېږي",

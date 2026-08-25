@@ -147,13 +147,17 @@ vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
   clearAgentModelPreference: vi.fn(),
 }));
 
-const { clearKeepScreenOnPreference, clearReasoningPreference } = vi.hoisted(() => ({
-  clearKeepScreenOnPreference: vi.fn(),
-  clearReasoningPreference: vi.fn(),
-}));
+const { clearKeepScreenOnPreference, clearReasoningPreference, clearPrReviewFooterPreference } =
+  vi.hoisted(() => ({
+    clearKeepScreenOnPreference: vi.fn(),
+    clearReasoningPreference: vi.fn(),
+    clearPrReviewFooterPreference: vi.fn(),
+  }));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({ clearKeepScreenOnPreference }));
 
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference }));
+
+vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({ clearPrReviewFooterPreference }));
 
 vi.mock('@/lib/last-active-instance', () => ({
   clearLastActiveInstance: vi.fn().mockResolvedValue(undefined),
@@ -385,7 +389,7 @@ describe('sign-out teardown ordering', () => {
     unmount();
   });
 
-  it('clears both local preferences on sign-out', async () => {
+  it('clears the local preferences on sign-out', async () => {
     const { ctx } = await mountAndGetContext();
 
     await act(async () => {
@@ -394,6 +398,7 @@ describe('sign-out teardown ordering', () => {
 
     expect(clearKeepScreenOnPreference).toHaveBeenCalled();
     expect(clearReasoningPreference).toHaveBeenCalled();
+    expect(clearPrReviewFooterPreference).toHaveBeenCalled();
   });
 
   it('closes the ownership gate before any await and blocks a late persist', async () => {

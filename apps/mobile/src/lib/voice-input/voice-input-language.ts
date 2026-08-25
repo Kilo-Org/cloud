@@ -1,30 +1,48 @@
 import { getLocales } from 'expo-localization';
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 
-/**
- * Resolve the BCP-47 language tag for voice recognition from the device's
- * locale list. The helper is defensive because runtime behavior can diverge
- * from the package's static typing: `getLocales()` may return an empty
- * array, or the first locale may be missing a tag, so every path falls back
- * to `en-US`. The parameter shape is intentionally structural so the caller
- * can pass `expo-localization`'s `Locale[]` without a type assertion.
- */
-export function resolveVoiceInputLanguageTag(locales: readonly { languageTag?: string }[]): string {
-  const first = locales[0];
-  if (!first) {
-    return 'en-US';
-  }
-
-  const tag = first.languageTag;
-  if (!tag || tag.length === 0) {
-    return 'en-US';
-  }
-
-  return tag;
-}
-
 function normalizeLocale(tag: string): string {
   return tag.toLowerCase().replaceAll('_', '-');
+}
+
+function scriptSubtag(tag: string): string | undefined {
+  return normalizeLocale(tag)
+    .split('-')
+    .slice(1)
+    .find(part => part.length === 4);
+}
+
+// Region-implied script, keyed `<language>-<region>`. Chinese is handled by
+// its own rule below, which needs no region list.
+const REGION_SCRIPTS = new Map([
+  ['sr-rs', 'cyrl'],
+  ['sr-ba', 'cyrl'],
+  ['sr-me', 'cyrl'],
+  ['sr-xk', 'cyrl'],
+  ['pa-pk', 'arab'],
+  ['pa-in', 'guru'],
+  ['az-ir', 'arab'],
+  ['az-az', 'latn'],
+  ['uz-af', 'arab'],
+  ['uz-uz', 'latn'],
+]);
+
+/** Script of a tag. When the tag lacks a script subtag, a region implies one. */
+function scriptOf(tag: string): string | undefined {
+  const script = scriptSubtag(tag);
+  if (script) {
+    return script;
+  }
+  const parts = normalizeLocale(tag).split('-');
+  const [language] = parts;
+  if (language === 'zh') {
+    const traditional = parts
+      .slice(1)
+      .some(subtag => subtag === 'hant' || subtag === 'tw' || subtag === 'hk' || subtag === 'mo');
+    return traditional ? 'hant' : 'hans';
+  }
+  const region = parts.slice(1).find(part => part.length === 2);
+  return region ? REGION_SCRIPTS.get(`${language}-${region}`) : undefined;
 }
 
 /**
@@ -39,10 +57,11 @@ function normalizeLocale(tag: string): string {
  *   a. Exact normalized match in `supportedTags` → return it.
  *   b. Same-language fallback among `supportedTags` sharing the primary
  *      language subtag, with these tie-breaks in order:
- *        i.  Eponymous region: `<lang>-<LANG>` as a plain string rule
+ *        i.  The same script subtag, when the device tag has one.
+ *        ii. Eponymous region: `<lang>-<LANG>` as a plain string rule
  *            (e.g. `de`→`de-DE`, `fr`→`fr-FR`).
- *        ii. `<lang>-US` if present.
- *        iii. Otherwise the first candidate in `supportedTags` order.
+ *        iii. `<lang>-US` if present.
+ *        iv. Otherwise the first candidate in `supportedTags` order.
  *
  * No match for any device tag → `null`.
  */
@@ -66,19 +85,27 @@ export function pickSupportedVoiceInputLanguageTag(
       const [deviceLang] = deviceTag.split('-');
       const sameLang = normalized.filter(([n]) => n.split('-')[0] === deviceLang);
       if (sameLang.length > 0) {
-        // i. Eponymous region: <lang>-<LANG>
+        const deviceScript = scriptOf(deviceTag);
+        const sameScript = deviceScript
+          ? sameLang.find(([n]) => scriptOf(n) === deviceScript)
+          : undefined;
+        if (sameScript) {
+          return sameScript[1];
+        }
+
+        // ii. Eponymous region: <lang>-<LANG>
         const eponymous = sameLang.find(([n]) => n === `${deviceLang}-${deviceLang}`.toLowerCase());
         if (eponymous) {
           return eponymous[1];
         }
 
-        // ii. <lang>-US
+        // iii. <lang>-US
         const usVariant = sameLang.find(([n]) => n === `${deviceLang}-us`);
         if (usVariant) {
           return usVariant[1];
         }
 
-        // iii. First candidate in supportedTags order
+        // iv. First candidate in supportedTags order
         const first = sameLang[0];
         if (first) {
           return first[1];
@@ -106,13 +133,13 @@ async function fetchSupportedLanguageTags(): Promise<readonly string[] | null> {
 }
 
 /**
- * Resolve the best language tag for voice recognition, preferring a match
- * against the recognizer's supported locales. On first call, fetches and
+ * Resolve the best language tag for voice recognition from the active app
+ * language. On first call, fetches and
  * memoizes the supported list; failures are never cached so subsequent calls
- * retry. Falls back to the raw device preferred-language tag when the
- * supported list is empty, unavailable, or contains no same-language match.
+ * retry. A matching device region refines the selected language. The selected
+ * app language remains the fallback when the supported list is unavailable.
  */
-export async function resolveVoiceInputStartLanguageTag(): Promise<string> {
+export async function resolveVoiceInputStartLanguageTag(appLanguage: string): Promise<string> {
   const locales = getLocales();
   const deviceTags = locales
     .map(l => l.languageTag)
@@ -120,14 +147,20 @@ export async function resolveVoiceInputStartLanguageTag(): Promise<string> {
     // module can still hand back a missing/empty value at runtime.
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- environment probe: guards against a real-device value diverging from expo-localization's static type.
     .filter((t): t is string => typeof t === 'string' && t.length > 0);
-  const rawTag = resolveVoiceInputLanguageTag(locales);
+  const language = normalizeLocale(appLanguage).split('-')[0];
+  const matchingDeviceTags = deviceTags.filter(
+    tag => normalizeLocale(tag).split('-')[0] === language
+  );
+  const preferredTags = scriptOf(appLanguage)
+    ? [appLanguage, ...matchingDeviceTags]
+    : [...matchingDeviceTags, appLanguage];
 
   const supported = await fetchSupportedLanguageTags();
   if (!supported || supported.length === 0) {
-    return rawTag;
+    return appLanguage;
   }
 
-  return pickSupportedVoiceInputLanguageTag(deviceTags, supported) ?? rawTag;
+  return pickSupportedVoiceInputLanguageTag(preferredTags, supported) ?? appLanguage;
 }
 
 /** Clear the session-level supported-locale cache. For tests only. */

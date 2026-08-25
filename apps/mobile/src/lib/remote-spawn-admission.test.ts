@@ -4,7 +4,7 @@ import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { type SharePayload } from '@/lib/share-payload';
 
 import {
-  REMOTE_SPAWN_FILES_NOT_SUPPORTED_TOAST,
+  remoteSpawnFilesNotSupportedToast,
   resolveRemoteSpawnAdmission,
 } from './remote-spawn-admission';
 
@@ -29,13 +29,13 @@ describe('resolveRemoteSpawnAdmission', () => {
         instance: { ...instance, capabilities: { attachments: false } },
         payload: filesPayload,
       })
-    ).toEqual({ allowed: false, toast: REMOTE_SPAWN_FILES_NOT_SUPPORTED_TOAST });
+    ).toEqual({ allowed: false, toast: remoteSpawnFilesNotSupportedToast() });
   });
 
   it('rejects files when capability is absent', () => {
     expect(resolveRemoteSpawnAdmission({ instance, payload: filesPayload })).toEqual({
       allowed: false,
-      toast: REMOTE_SPAWN_FILES_NOT_SUPPORTED_TOAST,
+      toast: remoteSpawnFilesNotSupportedToast(),
     });
   });
 

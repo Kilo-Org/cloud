@@ -45,27 +45,23 @@ const SECURITY_LEDGER_PERSISTENCE_FAILED_MESSAGE =
 export const SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE = 'Security service is not configured';
 
 /** Surface copy for the missing-configuration state (dismiss sheet). */
-export const SECURITY_CONFIGURATION_COPY =
-  'Security service is not configured. Resubmitting cannot succeed until this is fixed.';
+export function securityConfigurationCopy(): string {
+  return i18n.t('securityAgent.mutations.serviceNotConfiguredResubmit');
+}
 
 /**
  * Card copy for a reconcile-first sync row: a crash mid-sync left the outcome
  * uncertain, so the card offers a same-key reconcile retry instead of a blind
  * re-POST.
  */
-export const SECURITY_SYNC_RECONCILE_COPY =
-  'A sync may not have completed. Retry to reconcile it, or discard.';
+export function securitySyncReconcileCopy(): string {
+  return i18n.t('securityAgent.mutations.syncMayNotHaveCompleted');
+}
 
 /** True when the error is the server's missing-Worker-configuration rejection. */
 export function isSecurityConfigurationError(error: unknown): boolean {
   return error instanceof Error && error.message === SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE;
 }
-
-/** In-progress surface copy: reads like the existing retryable toasts. */
-const SECURITY_SYNC_IN_PROGRESS_COPY = 'A security sync is already in progress. Please try again.';
-/** Same shape, right noun for the dismiss sheet. */
-const SECURITY_DISMISS_IN_PROGRESS_COPY =
-  'This dismissal is already in progress. Please try again.';
 
 /**
  * True when the mutation may be retried under the SAME operation key. Also
@@ -101,12 +97,12 @@ function mapOperationInProgress(error: unknown, copy: string) {
 
 /** Maps the raw in-progress marker onto retryable sync copy; others pass through. */
 export function mapSecuritySyncOperationError(error: unknown) {
-  return mapOperationInProgress(error, SECURITY_SYNC_IN_PROGRESS_COPY);
+  return mapOperationInProgress(error, i18n.t('securityAgent.mutations.syncInProgress'));
 }
 
 /** Same marker, dismissal copy: the dismiss sheet must not talk about a sync. */
 export function mapSecurityDismissOperationError(error: unknown) {
-  return mapOperationInProgress(error, SECURITY_DISMISS_IN_PROGRESS_COPY);
+  return mapOperationInProgress(error, i18n.t('securityAgent.mutations.dismissalInProgress'));
 }
 
 /** Intent fingerprint for a manual sync: a changed scope or repo is a new intent. */
@@ -297,7 +293,7 @@ export function useTriggerSecuritySync(scope: string) {
       // A failed outbox read reads as no stored rows, so refuse instead of
       // writing a fresh key over a crash row the server may already hold.
       if (!(await whenLoaded())) {
-        throw new Error('Could not read pending syncs. Try again.');
+        throw new Error(i18n.t('securityAgent.mutations.couldNotReadPendingSyncs'));
       }
       // Persist the reconcile-first row BEFORE the POST and resolve the row's
       // own operationKey: a stored row keeps its key, so the wire never POSTs

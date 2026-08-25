@@ -2,9 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   loadAppStoreKiloPassProducts,
-  NO_MATCHING_KILO_PASS_PRODUCTS_MESSAGE,
+  NO_MATCHING_KILO_PASS_PRODUCTS_KEY,
 } from './store-products-loader';
 import { type BackendStoreKiloPassProduct } from './store-products';
+import { i18n } from '@/i18n';
 
 const backendProducts: BackendStoreKiloPassProduct[] = [
   {
@@ -68,6 +69,6 @@ describe('loadAppStoreKiloPassProducts', () => {
           products: backendProducts,
         }),
       })
-    ).rejects.toThrow(NO_MATCHING_KILO_PASS_PRODUCTS_MESSAGE);
+    ).rejects.toThrow(i18n.t(NO_MATCHING_KILO_PASS_PRODUCTS_KEY));
   });
 });

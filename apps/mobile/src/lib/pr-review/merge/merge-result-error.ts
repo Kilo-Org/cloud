@@ -10,6 +10,8 @@
 // Routing it through the BAD_REQUEST branch would disable the submit
 // button and lock the user out of retrying.
 
+import { i18n } from '@/i18n';
+
 export class MergeNotCompletedError extends Error {
   /** The sha GitHub reported in the merge response, when available. */
   readonly sha?: string;
@@ -17,7 +19,7 @@ export class MergeNotCompletedError extends Error {
   readonly reason?: string;
 
   constructor(args: { message?: string; sha?: string; reason?: string } = {}) {
-    super(args.message ?? 'GitHub did not complete the merge.');
+    super(args.message ?? i18n.t('prReview.operation.mergeResultDefaultError'));
     this.name = 'MergeNotCompletedError';
     this.sha = args.sha;
     this.reason = args.reason;

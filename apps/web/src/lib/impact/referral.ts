@@ -59,13 +59,15 @@ function productForProgramKey(programKey: ImpactAdvocateProgramKey): ImpactRefer
     : ImpactReferralProduct.KiloClaw;
 }
 
+// Kilo Pass is the only live Advocate program, so it is the fallback when a
+// caller supplies neither a product nor a program key.
 function resolveReferralProgramKey(params: {
   product?: ImpactReferralProduct | null;
   programKey?: ImpactAdvocateProgramKey | null;
 }): ImpactAdvocateProgramKey {
   if (params.programKey) return params.programKey;
-  if (params.product === ImpactReferralProduct.KiloPass) return ImpactAdvocateProgramKey.KiloPass;
-  return ImpactAdvocateProgramKey.KiloClaw;
+  if (params.product === ImpactReferralProduct.KiloClaw) return ImpactAdvocateProgramKey.KiloClaw;
+  return ImpactAdvocateProgramKey.KiloPass;
 }
 
 function resolveReferralProduct(params: {
@@ -256,7 +258,7 @@ export async function ensureImpactAdvocateParticipantProfile(params: {
   opaqueReferralIdentifier?: string | null;
 }): Promise<{ id: string }> {
   const database = getDatabaseClient(params.database);
-  const programKey = params.programKey ?? ImpactAdvocateProgramKey.KiloClaw;
+  const programKey = params.programKey ?? ImpactAdvocateProgramKey.KiloPass;
 
   const isConfigured = isImpactAdvocateConfigured({ programKey });
 

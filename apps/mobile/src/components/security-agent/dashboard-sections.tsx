@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The dashboard sections share one data contract and navigation scope. */
 import { getAnalysisIncompleteCount } from '@kilocode/app-shared/security-agent';
 import { type Href, useRouter } from 'expo-router';
 import { FolderGit2, ShieldCheck } from '@/components/ui/icons';
@@ -10,6 +11,7 @@ import { EmptyState } from '@/components/empty-state';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { formatNumber, formatPercent } from '@/lib/format';
 import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath } from '@/lib/security-agent';
@@ -34,10 +36,13 @@ function repoTrailingLabel(
   slaEnabled: boolean
 ): string {
   if (!slaEnabled) {
-    return i18n.t('securityAgent.dashboard.findingsCount', { count: repo.needsAction });
+    return i18n.t('securityAgent.dashboard.findingsCount', {
+      count: repo.needsAction,
+      displayCount: formatNumber(repo.needsAction, i18n.language),
+    });
   }
   return repo.slaComplianceMeasured
-    ? `${repo.slaCompliancePercent}%`
+    ? formatPercent(repo.slaCompliancePercent, i18n.language)
     : i18n.t('securityAgent.dashboard.notMeasured');
 }
 
@@ -93,6 +98,7 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
   }
 
   const isOverdue = slaEnabled && finding.daysOverdue !== null;
+  const daysOverdue = finding.daysOverdue ?? 0;
 
   return (
     <SectionCard title={t('securityAgent.dashboard.actFirst')}>
@@ -109,9 +115,12 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
           {finding.repoFullName}
           {isOverdue &&
             ` · ${
-              finding.daysOverdue === 0
+              daysOverdue === 0
                 ? t('securityAgent.dashboard.deadlineToday')
-                : t('securityAgent.dashboard.daysOverdue', { count: finding.daysOverdue })
+                : t('securityAgent.dashboard.daysOverdue', {
+                    count: daysOverdue,
+                    displayCount: formatNumber(daysOverdue, i18n.language),
+                  })
             }`}
         </Text>
       </Pressable>
@@ -127,23 +136,26 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
       <SectionCard title={t('securityAgent.dashboard.slaPosture')}>
         <KvRow
           label={t('securityAgent.dashboard.withinDeadline')}
-          value={`${overall.withinSla} / ${overall.total}`}
+          value={`${formatNumber(overall.withinSla, i18n.language)} / ${formatNumber(
+            overall.total,
+            i18n.language
+          )}`}
         />
         <KvRow
           label={t('securityAgent.dashboard.criticalOverdue')}
-          value={String(bySeverity.critical.overdue)}
+          value={formatNumber(bySeverity.critical.overdue, i18n.language)}
           valueTone="muted"
           dotTone={bySeverity.critical.overdue > 0 ? 'danger' : 'muted'}
         />
         <KvRow
           label={t('securityAgent.dashboard.highOverdue')}
-          value={String(bySeverity.high.overdue)}
+          value={formatNumber(bySeverity.high.overdue, i18n.language)}
           valueTone="muted"
           dotTone={bySeverity.high.overdue > 0 ? 'danger' : 'muted'}
         />
         <KvRow
           label={t('securityAgent.dashboard.mediumLowOverdue')}
-          value={String(bySeverity.medium.overdue + bySeverity.low.overdue)}
+          value={formatNumber(bySeverity.medium.overdue + bySeverity.low.overdue, i18n.language)}
           valueTone="muted"
           dotTone={bySeverity.medium.overdue + bySeverity.low.overdue > 0 ? 'danger' : 'muted'}
           last
@@ -162,25 +174,25 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
     <SectionCard title={t('securityAgent.dashboard.actionPosture')}>
       <KvRow
         label={t('securityAgent.dashboard.confirmedExploitable')}
-        value={String(data.analysis.exploitable)}
+        value={formatNumber(data.analysis.exploitable, i18n.language)}
         valueTone="muted"
         dotTone="danger"
       />
       <KvRow
         label={t('securityAgent.dashboard.needsEvidenceReview')}
-        value={String(data.analysis.needsReview)}
+        value={formatNumber(data.analysis.needsReview, i18n.language)}
         valueTone="muted"
         dotTone="warn"
       />
       <KvRow
         label={t('securityAgent.dashboard.analysisNotComplete')}
-        value={String(analysisIncomplete)}
+        value={formatNumber(analysisIncomplete, i18n.language)}
         valueTone="muted"
         dotTone="muted"
       />
       <KvRow
         label={t('securityAgent.dashboard.noImmediateAction')}
-        value={String(noImmediateAction)}
+        value={formatNumber(noImmediateAction, i18n.language)}
         valueTone="muted"
         dotTone="good"
         last
@@ -246,7 +258,7 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
         >
           <KvRow
             label={row.label}
-            value={String(row.value)}
+            value={formatNumber(row.value, i18n.language)}
             valueTone="muted"
             dotTone={row.tone}
             last={index === rows.length - 1}
@@ -295,9 +307,9 @@ function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
             </Text>
             <Text variant="muted" className="mt-0.5 text-xs">
               {t('securityAgent.dashboard.repoSummary', {
-                open: repo.open,
-                critical: repo.critical,
-                high: repo.high,
+                open: formatNumber(repo.open, i18n.language),
+                critical: formatNumber(repo.critical, i18n.language),
+                high: formatNumber(repo.high, i18n.language),
               })}
             </Text>
           </View>

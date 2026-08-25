@@ -1,9 +1,8 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { i18n } from '@/i18n';
 
 /** One active device session as returned by `user.listDeviceSessions`. */
 export type DeviceSession = inferRouterOutputs<MobileRouter>['user']['listDeviceSessions'][number];
-
-const UNKNOWN_DEVICE_LABEL = 'Unknown device';
 
 /**
  * Derive a short, human-readable label from the raw `user_agent` HTTP header
@@ -17,13 +16,13 @@ const UNKNOWN_DEVICE_LABEL = 'Unknown device';
 export function deviceSessionLabel(userAgent: string | null | undefined): string {
   const trimmed = userAgent?.trim() ?? '';
   if (!trimmed) {
-    return UNKNOWN_DEVICE_LABEL;
+    return i18n.t('kiloclaw.devicePairing.unknownDevice');
   }
   if (trimmed.startsWith('Mozilla/')) {
-    return 'Web browser';
+    return i18n.t('deviceSessions.webBrowser');
   }
   // "Kilo-Code/1.2.3 (darwin; arm64)" → "Kilo-Code" (drop the version and the rest).
-  return trimmed.split(/[\s/]/)[0] ?? UNKNOWN_DEVICE_LABEL;
+  return trimmed.split(/[\s/]/)[0] ?? i18n.t('kiloclaw.devicePairing.unknownDevice');
 }
 
 /**

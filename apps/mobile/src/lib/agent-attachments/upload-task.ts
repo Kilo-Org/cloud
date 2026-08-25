@@ -1,5 +1,6 @@
 import { createUploadTask, FileSystemUploadType, getInfoAsync } from 'expo-file-system/legacy';
 
+import { i18n } from '@/i18n';
 import { trpcClient } from '@/lib/trpc';
 import {
   type AgentAttachmentExtension,
@@ -107,5 +108,5 @@ export async function uploadOne(args: {
 
 /** Chip/toast copy for terminal (non-retryable) upload failures. */
 export function describeTerminalReason(_reason: string): string {
-  return "This file can't be uploaded.";
+  return i18n.t('chat.attachment.cantUpload');
 }

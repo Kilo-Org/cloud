@@ -3577,7 +3577,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         { ...plan, preparation: { attemptId: recorder.attemptId } },
         {
           onProgress: (step, message) => {
-            recorder.onProgress(step, message);
+            if (!recorder.onProgress(step, message)) return;
             this.broadcastVolatileEvent({
               executionId: eventSourceId,
               sessionId,
@@ -3593,6 +3593,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             if (!readyResult.success) {
               throw new Error(readyResult.error ?? 'Failed to record session readiness');
             }
+            recorder.finalize({ status: 'completed' });
           },
           onAccepted: delivery => this.recordRuntimeAcceptedMessage(plan, delivery),
         }

@@ -19,7 +19,7 @@ import {
 export type PreparationProgressRecorder = {
   readonly attemptId: string;
   /** Translate a legacy (step, message) progress callback into v2 events. */
-  onProgress(step: string, message: string): void;
+  onProgress(step: string, message: string): boolean;
   /**
    * Drive the attempt to a terminal state if it is still running. A no-op
    * when no preparation happened or the wrapper already finished the attempt.
@@ -72,7 +72,7 @@ export function createPreparationProgressRecorder(options: {
     if (materializePreparationEvent(eventQueries, stored, data)) broadcast(stored);
   }
 
-  function onProgress(step: string, message: string): void {
+  function onProgress(step: string, message: string): boolean {
     const key = step as PreparingStep;
     if (!readPreparationAttempt(eventQueries, attemptId)) {
       emit('workspace_setup', 'Preparing environment', { action: 'attempt_started' });
@@ -91,10 +91,12 @@ export function createPreparationProgressRecorder(options: {
       activeStep = { id: stepId, key };
     }
     emit(key, message, { action: 'step_progress', stepId, detail: message });
+    return readPreparationAttempt(eventQueries, attemptId)?.status === 'running';
   }
 
   function finalize(outcome: PreparationOutcome): void {
     activeStep = undefined;
+    if (!readPreparationAttempt(eventQueries, attemptId)) return;
     for (const event of finalizePreparationAttempt(eventQueries, attemptId, {
       ...outcome,
       timestamp: now(),

@@ -181,15 +181,16 @@ source of directive truth is `test/e2e/fake-llm-server.ts`.
 
 | Directive | Behavior |
 |---|---|
-| `echo:<text>` | One SSE chunk with `delta.content = <text>`, then `finish_reason: stop`, then `[DONE]`. |
+| *(no `__fake__:` directive)* | Echo the last user message after stripping kilo `<environment_details>`. |
 | `slow:<n>:<ms>` | `n` content chunks `<ms>` apart, then stop + `[DONE]`. Used for pacing/timing probes. |
 | `idle` | One empty-delta chunk, then stop + `[DONE]`. |
 | `hang` | Opens the SSE stream but emits nothing and never closes. Drives abort/timeout paths. |
 | `error:<msg>` | HTTP 402 with OpenAI-shaped error body carrying `<msg>`. Exercises kilo's error propagation. |
 | `gate:<tag>` | Opens the SSE stream, emits no chunks, blocks until the driver calls `POST /test/release?tag=<tag>`. On release, emits `"done"` + stop + `[DONE]`. |
 
-Unknown or missing directives produce HTTP 402 with
+Unknown `__fake__:<name>` directives produce HTTP 402 with
 `unknown fake scenario: <name>` — easy to spot in fake-LLM logs.
+A prompt with no `__fake__:` prefix echoes instead.
 
 ### Side channels
 

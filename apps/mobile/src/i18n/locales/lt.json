@@ -415,7 +415,8 @@
         "outdatedOnPathLines": "Pasenęs {{path}} {{lines}}",
         "outdatedOnLines": "Pasenęs {{lines}}",
         "outdatedOnPath": "Pasenęs {{path}}"
-      }
+      },
+      "deletedUser": "ištrintas vartotojas"
     },
     "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programėlės nustatymų",
     "installKiloGitHubApp": "Įdiegti Kilo GitHub programėlę",
@@ -590,7 +591,10 @@
       "truncationBanner": "Rodoma pirmi {{limit}} iš {{total}} pakeistų failų — „GitHub“ API limitas",
       "statusAdded": "Pridėta",
       "statusContext": "Kontekstas",
-      "statusDeleted": "Ištrinta"
+      "statusDeleted": "Ištrinta",
+      "lineLabel": "{{status}} eilutė {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(tuščia)"
     },
     "linkPasteClipboardEmpty": "Iškarpinė tuščia",
     "linkPasteNotAPullRequest": "Tai ne „GitHub“ pull request nuoroda",
@@ -608,7 +612,10 @@
     "operation": {
       "couldNotReply": "Nepavyko atsakyti.",
       "couldNotCompleteAction": "Nepavyko užbaigti šio veiksmo.",
-      "mergeResultDefaultError": "„GitHub“ nebaigė sujungimo."
+      "mergeResultDefaultError": "„GitHub“ nebaigė sujungimo.",
+      "ambiguous": "Nepavyko patvirtinti — prieš bandydami dar kartą patikrinkite PR.",
+      "persistenceFailed": "Nepavyko užfiksuoti šio veiksmo. Bandykite dar kartą vėliau.",
+      "forbidden": "Draudžiama"
     }
   },
   "notifications": {
@@ -2084,7 +2091,9 @@
       "cent_few": "centai",
       "cent_many": "centų",
       "dollar_few": "doleriai",
-      "dollar_many": "dolerių"
+      "dollar_many": "dolerių",
+      "costSpoken": "kaina {{cost}}",
+      "costSpokenWithTime": "kaina {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nepavyko atidaryti GitHub",
@@ -2674,7 +2683,8 @@
     "couldNotOpenStore": "Nepavyko atidaryti programų parduotuvės.",
     "description": "Galima nauja Kilo versija. Atnaujinkite, kad tęstumėte.",
     "title": "Reikia atnaujinti",
-    "updateNow": "Atnaujinti dabar"
+    "updateNow": "Atnaujinti dabar",
+    "appStorePage": "programų parduotuvės puslapis"
   },
   "home": {
     "couldNotLoadSessions": "Nepavyko įkelti sesijų",

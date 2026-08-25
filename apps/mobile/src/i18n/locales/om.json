@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Gara duraa {{path}} {{lines}} irratti",
         "outdatedOnLines": "Gara duraa {{lines}} irratti",
         "outdatedOnPath": "Gara duraa {{path}} irratti"
-      }
+      },
+      "deletedUser": "fayyadamaa haqame"
     },
     "couldNotOpenGitHubAppSettings": "Ejjannoo App GitHub banuu hin dandeenye",
     "installKiloGitHubApp": "App Kilo GitHub dhaabbessi",
@@ -576,7 +577,10 @@
       "truncationBanner": "Faayiloota jijjiramaniin walii {{total}} keessaa isaan jalqabaa {{limit}} agarsiifamaa jira — GitHub API daangaa",
       "statusAdded": "Dabalamte",
       "statusContext": "Context",
-      "statusDeleted": "Balleessamte"
+      "statusDeleted": "Balleessamte",
+      "lineLabel": "{{status}} sarara {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(duwwaa)"
     },
     "linkPasteClipboardEmpty": "Kibirri duwwaa dha",
     "linkPasteNotAPullRequest": "Hidhaa pull request GitHub hin taane",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Deebii kennuu hin dandeenye.",
       "couldNotCompleteAction": "Gocha kana xumuruu hin dandeenye.",
-      "mergeResultDefaultError": "GitHub makxinsaa hin xumuurre."
+      "mergeResultDefaultError": "GitHub makxinsaa hin xumuurre.",
+      "ambiguous": "Mirkaneessuu hin dandeenye — deebi'ii yaaluu dura PR ilaali.",
+      "persistenceFailed": "Gocha kana galmeessuu hin dandeenye. Maaloo booda deebi'ii yaali.",
+      "forbidden": "Hayyama hin qabdu"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "santiimaa",
       "dollar_one": "doolaara",
       "dollar": "doolaara",
-      "dollar_other": "doolaara"
+      "dollar_other": "doolaara",
+      "costSpoken": "gatii {{cost}}",
+      "costSpokenWithTime": "gatii {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub banuu hin dandeenye",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Suuqa app banuu hin danda'ine.",
     "description": "Gara haaraa Kilo ni argama. Itti fufuuf maaloo fooyyessi.",
     "title": "Fooyyessuu barbaachisa",
-    "updateNow": "Amma fooyyessi"
+    "updateNow": "Amma fooyyessi",
+    "appStorePage": "fuula suuqa app"
   },
   "home": {
     "couldNotLoadSessions": "Shumarra fudhachuu hin danda'ine",

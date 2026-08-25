@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Imeisha muda kwenye {{path}} {{lines}}",
         "outdatedOnLines": "Imeisha muda kwenye {{lines}}",
         "outdatedOnPath": "Imeisha muda kwenye {{path}}"
-      }
+      },
+      "deletedUser": "mtumiaji aliyefutwa"
     },
     "couldNotOpenGitHubAppSettings": "Imeshindwa kufungua mipangilio ya GitHub App",
     "installKiloGitHubApp": "Sakinisha Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "Inaonyesha {{limit}} za kwanza kati ya {{total}} faili zilizobadilishwa — kikomo cha API ya GitHub",
       "statusAdded": "Imeongezwa",
       "statusContext": "Muktadha",
-      "statusDeleted": "Imefutwa"
+      "statusDeleted": "Imefutwa",
+      "lineLabel": "{{status}} mstari {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(tupu)"
     },
     "linkPasteClipboardEmpty": "Ubao wa kunakili ni tupu",
     "linkPasteNotAPullRequest": "Si kiungo cha ombi la kuvuta la GitHub",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Imeshindwa kujibu.",
       "couldNotCompleteAction": "Imeshindwa kukamilisha kitendo hiki.",
-      "mergeResultDefaultError": "GitHub haikukamilisha muunganisho."
+      "mergeResultDefaultError": "GitHub haikukamilisha muunganisho.",
+      "ambiguous": "Haikuweza kuthibitisha — angalia PR kabla ya kujaribu tena.",
+      "persistenceFailed": "Hatukuweza kurekodi kitendo hiki. Tafadhali jaribu tena baadaye.",
+      "forbidden": "Imekatazwa"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "senti",
       "dollar_one": "dola",
       "dollar": "dola",
-      "dollar_other": "dola"
+      "dollar_other": "dola",
+      "costSpoken": "gharama {{cost}}",
+      "costSpokenWithTime": "gharama {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Haikuweza kufungua GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Haikuweza kufungua duka la app.",
     "description": "Toleo jipya la Kilo linapatikana. Tafadhali sasisha ili uendelee.",
     "title": "Sasisho linahitajika",
-    "updateNow": "Sasisha sasa"
+    "updateNow": "Sasisha sasa",
+    "appStorePage": "ukurasa wa duka la app"
   },
   "home": {
     "couldNotLoadSessions": "Haikuweza kupakia vikao",

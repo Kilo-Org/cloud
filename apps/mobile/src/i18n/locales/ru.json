@@ -1623,7 +1623,9 @@
       "cent_few": "цента",
       "cent_many": "центов",
       "dollar_few": "доллара",
-      "dollar_many": "долларов"
+      "dollar_many": "долларов",
+      "costSpoken": "стоимость {{cost}}",
+      "costSpokenWithTime": "стоимость {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Не удалось начать настройку GitHub App. Попробуйте снова.",
@@ -2213,7 +2215,8 @@
     "couldNotOpenStore": "Не удалось открыть магазин приложений.",
     "description": "Доступна новая версия Kilo. Обновите приложение, чтобы продолжить.",
     "title": "Требуется обновление",
-    "updateNow": "Обновить сейчас"
+    "updateNow": "Обновить сейчас",
+    "appStorePage": "страница магазина приложений"
   },
   "home": {
     "couldNotLoadSessions": "Не удалось загрузить сеансы",
@@ -2614,7 +2617,8 @@
         "outdatedOnPathLines": "Устарело в {{path}} {{lines}}",
         "outdatedOnLines": "Устарело в {{lines}}",
         "outdatedOnPath": "Устарело в {{path}}"
-      }
+      },
+      "deletedUser": "удаленный пользователь"
     },
     "entry": {
       "clearLink": "Очистить ссылку на pull request",
@@ -2902,7 +2906,10 @@
       "truncationBanner": "Показаны первые {{limit}} из {{total}} изменённых файлов — лимит API GitHub",
       "statusAdded": "Добавлено",
       "statusContext": "Контекст",
-      "statusDeleted": "Удалено"
+      "statusDeleted": "Удалено",
+      "lineLabel": "{{status}} строка {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(пусто)"
     },
     "linkPasteClipboardEmpty": "Буфер обмена пуст",
     "linkPasteNotAPullRequest": "Это не ссылка на pull request GitHub",
@@ -2920,7 +2927,10 @@
     "operation": {
       "couldNotReply": "Не удалось ответить.",
       "couldNotCompleteAction": "Не удалось выполнить это действие.",
-      "mergeResultDefaultError": "GitHub не завершил слияние."
+      "mergeResultDefaultError": "GitHub не завершил слияние.",
+      "ambiguous": "Не удалось подтвердить — проверьте PR перед повторной попыткой.",
+      "persistenceFailed": "Не удалось записать это действие. Повторите попытку позже.",
+      "forbidden": "Запрещено"
     }
   },
   "organization": {

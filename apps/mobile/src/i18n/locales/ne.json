@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} मा पुरानो",
         "outdatedOnLines": "{{lines}} मा पुरानो",
         "outdatedOnPath": "{{path}} मा पुरानो"
-      }
+      },
+      "deletedUser": "मेटिएको प्रयोगकर्ता"
     },
     "couldNotOpenGitHubAppSettings": "GitHub App सेटिङ खोल्न सकिएन",
     "installKiloGitHubApp": "Kilo GitHub App स्थापना गर्नुहोस्",
@@ -576,7 +577,10 @@
       "truncationBanner": "कुल {{total}} परिवर्तन गरिएका फाइलहरूमध्ये पहिलो {{limit}} देखाइँदै — GitHub API सीमा",
       "statusAdded": "थपियो",
       "statusContext": "सन्दर्भ",
-      "statusDeleted": "मेटियो"
+      "statusDeleted": "मेटियो",
+      "lineLabel": "{{status}} पङ्क्ति {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(खाली)"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली छ",
     "linkPasteNotAPullRequest": "GitHub पुल रिक्वेस्ट लिंक होइन",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "जवाफ दिन सकिएन।",
       "couldNotCompleteAction": "यो कार्य पूरा गर्न सकिएन।",
-      "mergeResultDefaultError": "GitHub ले मर्ज पूरा गरेन।"
+      "mergeResultDefaultError": "GitHub ले मर्ज पूरा गरेन।",
+      "ambiguous": "पुष्टि गर्न सकिएन — पुनः प्रयास गर्नुअघि PR जाँच्नुहोस्।",
+      "persistenceFailed": "हामीले यो कार्य रेकर्ड गर्न सकेनौं। कृपया पछि फेरि प्रयास गर्नुहोस्।",
+      "forbidden": "निषेध गरिएको"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "सेन्टहरू",
       "dollar_one": "डलर",
       "dollar": "डलरहरू",
-      "dollar_other": "डलरहरू"
+      "dollar_other": "डलरहरू",
+      "costSpoken": "लागत {{cost}}",
+      "costSpokenWithTime": "लागत {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub खोल्न सकिएन",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "एप स्टोर खोल्न सकिएन।",
     "description": "Kilo को नयाँ संस्करण उपलब्ध छ। जारी राख्न कृपया अद्यावधिक गर्नुहोस्।",
     "title": "अद्यावधिक आवश्यक छ",
-    "updateNow": "अहिले अद्यावधिक गर्नुहोस्"
+    "updateNow": "अहिले अद्यावधिक गर्नुहोस्",
+    "appStorePage": "एप स्टोर पृष्ठ"
   },
   "home": {
     "couldNotLoadSessions": "सत्रहरू लोड गर्न सकिएन",

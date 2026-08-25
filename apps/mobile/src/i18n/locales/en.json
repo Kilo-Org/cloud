@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Outdated on {{path}} {{lines}}",
         "outdatedOnLines": "Outdated on {{lines}}",
         "outdatedOnPath": "Outdated on {{path}}"
-      }
+      },
+      "deletedUser": "deleted user"
     },
     "couldNotOpenGitHubAppSettings": "Could not open GitHub App settings",
     "installKiloGitHubApp": "Install the Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "Showing the first {{limit}} of {{total}} changed files — GitHub API limit",
       "statusAdded": "Added",
       "statusContext": "Context",
-      "statusDeleted": "Deleted"
+      "statusDeleted": "Deleted",
+      "lineLabel": "{{status}} line {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(empty)"
     },
     "linkPasteClipboardEmpty": "Clipboard is empty",
     "linkPasteNotAPullRequest": "Not a GitHub pull request link",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Could not reply.",
       "couldNotCompleteAction": "Could not complete this action.",
-      "mergeResultDefaultError": "GitHub did not complete the merge."
+      "mergeResultDefaultError": "GitHub did not complete the merge.",
+      "ambiguous": "Couldn't confirm — check the PR before retrying.",
+      "persistenceFailed": "We could not record this action. Please try again later.",
+      "forbidden": "Forbidden"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "cents",
       "dollar_one": "dollar",
       "dollar": "dollars",
-      "dollar_other": "dollars"
+      "dollar_other": "dollars",
+      "costSpoken": "cost {{cost}}",
+      "costSpokenWithTime": "cost {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Could not open GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Could not open the app store.",
     "description": "A new version of Kilo is available. Please update to continue.",
     "title": "Update required",
-    "updateNow": "Update now"
+    "updateNow": "Update now",
+    "appStorePage": "app store page"
   },
   "home": {
     "couldNotLoadSessions": "Couldn't load sessions",

@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "ហួសសម័យនៅលើ {{path}} {{lines}}",
         "outdatedOnLines": "ហួសសម័យនៅលើ {{lines}}",
         "outdatedOnPath": "ហួសសម័យនៅលើ {{path}}"
-      }
+      },
+      "deletedUser": "អ្នកប្រើដែលបានលុប"
     },
     "couldNotOpenGitHubAppSettings": "មិនអាចបើកការកំណត់ GitHub App បានទេ",
     "installKiloGitHubApp": "ដំឡើង Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "កំពុងបង្ហាញ {{limit}} ដំបូងក្នុងចំណោម {{total}} ឯកសារដែលបានផ្លាស់ប្តូរ — ដែនកំណត់ GitHub API",
       "statusAdded": "បានបន្ថែម",
       "statusContext": "បរិបទ",
-      "statusDeleted": "បានលុប"
+      "statusDeleted": "បានលុប",
+      "lineLabel": "{{status}} បន្ទាត់ {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ទទេ)"
     },
     "linkPasteClipboardEmpty": "ក្ដារតម្បៀតខ្ទាស់ទទេ",
     "linkPasteNotAPullRequest": "មិនមែនជាតំណ pull request របស់ GitHub ទេ",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "មិនអាចឆ្លើយតបបានទេ។",
       "couldNotCompleteAction": "មិនអាចបញ្ចប់សកម្មភាពនេះបានទេ។",
-      "mergeResultDefaultError": "GitHub មិនបានបញ្ចប់ការបញ្ចូលទេ។"
+      "mergeResultDefaultError": "GitHub មិនបានបញ្ចប់ការបញ្ចូលទេ។",
+      "ambiguous": "មិនអាចបញ្ជាក់បានទេ — សូមពិនិត្យ PR មុនពេលព្យាយាមម្តងទៀត។",
+      "persistenceFailed": "យើងមិនអាចកត់ត្រាសកម្មភាពនេះបានទេ។ សូមព្យាយាមម្តងទៀតនៅពេលក្រោយ។",
+      "forbidden": "ហាមឃាត់"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "សេន",
       "dollar_one": "ដុល្លារ",
       "dollar": "ដុល្លារ",
-      "dollar_other": "ដុល្លារ"
+      "dollar_other": "ដុល្លារ",
+      "costSpoken": "តម្លៃ {{cost}}",
+      "costSpokenWithTime": "តម្លៃ {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "មិនអាចបើក GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "មិនអាចបើកហាងកម្មវិធីបានទេ។",
     "description": "កំណែថ្មីរបស់ Kilo អាចប្រើបាន។ សូមធ្វើបច្ចុប្បន្នភាពដើម្បីបន្ត។",
     "title": "ទាមទារការធ្វើបច្ចុប្បន្នភាព",
-    "updateNow": "ធ្វើបច្ចុប្បន្នភាពឥឡូវនេះ"
+    "updateNow": "ធ្វើបច្ចុប្បន្នភាពឥឡូវនេះ",
+    "appStorePage": "ទំព័រហាងកម្មវិធី"
   },
   "home": {
     "couldNotLoadSessions": "មិនអាចផ្ទុកវគ្គបានទេ",

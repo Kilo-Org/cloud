@@ -1639,7 +1639,9 @@
       "dollar_zero": "دولار",
       "dollar_two": "دولاران",
       "dollar_few": "دولارات",
-      "dollar_many": "دولارًا"
+      "dollar_many": "دولارًا",
+      "costSpoken": "التكلفة {{cost}}",
+      "costSpokenWithTime": "التكلفة {{cost}}، {{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "تعذّر بدء إعداد تطبيق GitHub. يرجى المحاولة مرة أخرى.",
@@ -2239,7 +2241,8 @@
     "couldNotOpenStore": "تعذّر فتح متجر التطبيقات.",
     "description": "يتوفر إصدار جديد من Kilo. يرجى التحديث للمتابعة.",
     "title": "التحديث مطلوب",
-    "updateNow": "حدّث الآن"
+    "updateNow": "حدّث الآن",
+    "appStorePage": "صفحة متجر التطبيقات"
   },
   "home": {
     "couldNotLoadSessions": "تعذّر تحميل الجلسات",
@@ -2644,7 +2647,8 @@
         "outdatedOnPathLines": "قديم في {{path}} {{lines}}",
         "outdatedOnLines": "قديم في {{lines}}",
         "outdatedOnPath": "قديم في {{path}}"
-      }
+      },
+      "deletedUser": "مستخدم محذوف"
     },
     "entry": {
       "clearLink": "مسح رابط طلب السحب",
@@ -2942,7 +2946,10 @@
       "tapToComment": "{{label}}، اضغط للتعليق",
       "statusAdded": "تمت الإضافة",
       "statusContext": "السياق",
-      "statusDeleted": "تم الحذف"
+      "statusDeleted": "تم الحذف",
+      "lineLabel": "{{status}} سطر {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(فارغ)"
     },
     "linkPasteClipboardEmpty": "الحافظة فارغة",
     "linkPasteNotAPullRequest": "ليس رابط طلب سحب على GitHub",
@@ -2960,7 +2967,10 @@
     "operation": {
       "couldNotReply": "تعذّر الرد.",
       "couldNotCompleteAction": "تعذّر إكمال هذا الإجراء.",
-      "mergeResultDefaultError": "لم يكمل GitHub الدمج."
+      "mergeResultDefaultError": "لم يكمل GitHub الدمج.",
+      "ambiguous": "تعذّر التأكيد — تحقق من PR قبل إعادة المحاولة.",
+      "persistenceFailed": "لم نتمكن من تسجيل هذا الإجراء. يرجى المحاولة مرة أخرى لاحقًا.",
+      "forbidden": "ممنوع"
     }
   },
   "organization": {

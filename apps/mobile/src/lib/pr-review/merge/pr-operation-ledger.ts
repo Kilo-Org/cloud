@@ -27,11 +27,31 @@ const PR_SURFACE_RETRYABLE_COPY = {
   merge: 'prReview.merge.couldNotMerge',
 } satisfies Record<PrMutationSurface, string>;
 
+/**
+ * A ledger marker re-wrapped for display. The kind travels on the error, not in
+ * its text, so the sheets can still classify it after the message is
+ * translated. The server's own English marker is still matched below.
+ */
+class PrOperationMarkerError extends Error {
+  kind: 'ambiguous' | 'persistence-failed';
+
+  constructor(kind: 'ambiguous' | 'persistence-failed', message: string) {
+    super(message);
+    this.kind = kind;
+  }
+}
+
 export function isPrOperationAmbiguous(error: unknown): boolean {
+  if (error instanceof PrOperationMarkerError) {
+    return error.kind === 'ambiguous';
+  }
   return error instanceof Error && error.message === PR_OPERATION_AMBIGUOUS_MESSAGE;
 }
 
 export function isPrOperationPersistenceFailed(error: unknown): boolean {
+  if (error instanceof PrOperationMarkerError) {
+    return error.kind === 'persistence-failed';
+  }
   return error instanceof Error && error.message === PR_OPERATION_PERSISTENCE_FAILED_MESSAGE;
 }
 
@@ -59,10 +79,13 @@ export function mapPrOperationError<T>(error: T, surface: PrMutationSurface): T 
     return new Error(i18n.t(PR_SURFACE_RETRYABLE_COPY[surface]));
   }
   if (isPrOperationAmbiguous(error)) {
-    return new Error(PR_OPERATION_AMBIGUOUS_MESSAGE);
+    return new PrOperationMarkerError('ambiguous', i18n.t('prReview.operation.ambiguous'));
   }
   if (isPrOperationPersistenceFailed(error)) {
-    return new Error(PR_OPERATION_PERSISTENCE_FAILED_MESSAGE);
+    return new PrOperationMarkerError(
+      'persistence-failed',
+      i18n.t('prReview.operation.persistenceFailed')
+    );
   }
   return error;
 }

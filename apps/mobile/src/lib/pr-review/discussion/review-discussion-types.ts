@@ -143,7 +143,7 @@ export function selectThreadBadges(thread: ReviewThread) {
  * `author: null` in the GraphQL DTO).
  */
 export function selectCommentAuthorName(author: ReviewComment['author']): string {
-  return author?.login ?? 'deleted user';
+  return author?.login ?? i18n.t('prReview.discussion.deletedUser');
 }
 
 /**

@@ -411,7 +411,8 @@
         "outdatedOnPathLines": "Zastarjelo na {{path}} {{lines}}",
         "outdatedOnLines": "Zastarjelo na {{lines}}",
         "outdatedOnPath": "Zastarjelo na {{path}}"
-      }
+      },
+      "deletedUser": "obrisani korisnik"
     },
     "couldNotOpenGitHubAppSettings": "Postavke GitHub aplikacije se nisu mogle otvoriti",
     "installKiloGitHubApp": "Instaliraj Kilo GitHub aplikaciju",
@@ -583,7 +584,10 @@
       "tapToComment": "{{label}}, dodirnite za komentar",
       "statusAdded": "Dodano",
       "statusContext": "Kontekst",
-      "statusDeleted": "Obrisano"
+      "statusDeleted": "Obrisano",
+      "lineLabel": "{{status}} redak {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(prazno)"
     },
     "linkPasteClipboardEmpty": "Međuspremnik je prazan",
     "linkPasteNotAPullRequest": "Nije GitHub pull request link",
@@ -601,7 +605,10 @@
     "operation": {
       "couldNotReply": "Odgovor nije uspio.",
       "couldNotCompleteAction": "Nije moguće dovršiti ovu radnju.",
-      "mergeResultDefaultError": "GitHub nije dovršio spajanje."
+      "mergeResultDefaultError": "GitHub nije dovršio spajanje.",
+      "ambiguous": "Nije moguće potvrditi — provjerite PR prije ponovnog pokušaja.",
+      "persistenceFailed": "Nismo mogli zabilježiti ovu radnju. Pokušajte ponovo kasnije.",
+      "forbidden": "Zabranjeno"
     }
   },
   "notifications": {
@@ -2069,7 +2076,9 @@
       "dollar": "dolara",
       "dollar_other": "dolara",
       "cent_few": "centa",
-      "dollar_few": "dolara"
+      "dollar_few": "dolara",
+      "costSpoken": "trošak {{cost}}",
+      "costSpokenWithTime": "trošak {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nije moguće otvoriti GitHub",
@@ -2654,7 +2663,8 @@
     "couldNotOpenStore": "Trgovina aplikacija nije mogla biti otvorena.",
     "description": "Dostupna je nova verzija Kilo. Ažurirajte za nastavak.",
     "title": "Ažuriranje je obavezno",
-    "updateNow": "Ažuriraj sada"
+    "updateNow": "Ažuriraj sada",
+    "appStorePage": "stranica trgovine aplikacija"
   },
   "home": {
     "couldNotLoadSessions": "Sesije nisu mogle biti učitane",

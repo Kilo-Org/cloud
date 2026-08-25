@@ -1623,7 +1623,9 @@
       "cent_few": "centy",
       "cent_many": "centów",
       "dollar_few": "dolary",
-      "dollar_many": "dolarów"
+      "dollar_many": "dolarów",
+      "costSpoken": "koszt {{cost}}",
+      "costSpokenWithTime": "koszt {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Nie udało się rozpocząć konfiguracji aplikacji GitHub. Spróbuj ponownie.",
@@ -2213,7 +2215,8 @@
     "couldNotOpenStore": "Nie można otworzyć sklepu z aplikacjami.",
     "description": "Dostępna jest nowa wersja Kilo. Zaktualizuj, aby kontynuować.",
     "title": "Wymagana aktualizacja",
-    "updateNow": "Zaktualizuj teraz"
+    "updateNow": "Zaktualizuj teraz",
+    "appStorePage": "strona sklepu z aplikacjami"
   },
   "home": {
     "couldNotLoadSessions": "Nie można załadować sesji",
@@ -2614,7 +2617,8 @@
         "outdatedOnPathLines": "Nieaktualny na {{path}} {{lines}}",
         "outdatedOnLines": "Nieaktualny na {{lines}}",
         "outdatedOnPath": "Nieaktualny na {{path}}"
-      }
+      },
+      "deletedUser": "usunięty użytkownik"
     },
     "entry": {
       "clearLink": "Wyczyść link pull requesta",
@@ -2902,7 +2906,10 @@
       "truncationBanner": "Wyświetlanie pierwszych {{limit}} z {{total}} zmienionych plików — limit API GitHub",
       "statusAdded": "Dodano",
       "statusContext": "Kontekst",
-      "statusDeleted": "Usunięto"
+      "statusDeleted": "Usunięto",
+      "lineLabel": "{{status}} wiersz {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(pusty)"
     },
     "linkPasteClipboardEmpty": "Schowek jest pusty",
     "linkPasteNotAPullRequest": "To nie jest link do pull requesta na GitHub",
@@ -2920,7 +2927,10 @@
     "operation": {
       "couldNotReply": "Nie udało się odpowiedzieć.",
       "couldNotCompleteAction": "Nie udało się ukończyć tej akcji.",
-      "mergeResultDefaultError": "GitHub nie ukończył scalania."
+      "mergeResultDefaultError": "GitHub nie ukończył scalania.",
+      "ambiguous": "Nie udało się potwierdzić — sprawdź PR przed ponowną próbą.",
+      "persistenceFailed": "Nie mogliśmy zapisać tej akcji. Spróbuj ponownie później.",
+      "forbidden": "Zabronione"
     }
   },
   "organization": {

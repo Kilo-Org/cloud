@@ -96,10 +96,12 @@ export type ParsedDiffLine = {
 export function buildDiffLineAccessibilityLabel(line: ParsedDiffLine): string {
   const status = diffLineStatusWord(line.type);
   const lineNumber = line.newLine ?? line.oldLine;
-  const linePart = lineNumber !== undefined ? ` line ${lineNumber}` : '';
   const trimmed = line.text.trim();
-  const text = trimmed === '' ? '(empty)' : line.text;
-  return `${status}${linePart}: ${text}`;
+  const text = trimmed === '' ? i18n.t('prReview.diff.emptyLine') : line.text;
+  if (lineNumber === undefined) {
+    return i18n.t('prReview.diff.lineLabelNoNumber', { status, text });
+  }
+  return i18n.t('prReview.diff.lineLabel', { status, line: lineNumber, text });
 }
 
 export type ParsedHunk = {

@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Kwedlule isikhathi ku-{{path}} {{lines}}",
         "outdatedOnLines": "Kwedlule isikhathi ku-{{lines}}",
         "outdatedOnPath": "Kwedlule isikhathi ku-{{path}}"
-      }
+      },
+      "deletedUser": "umsebenzisi osusiwe"
     },
     "couldNotOpenGitHubAppSettings": "Asikwazanga ukuvula izilungiselelo ze-GitHub App",
     "installKiloGitHubApp": "Faka uhlelo lwe-Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "Kuboniswa amafayela okuqala angu-{{limit}} kwangu-{{total}} aguquliwe — umkhawulo we-GitHub API",
       "statusAdded": "Kwengeziwe",
       "statusContext": "Umongo",
-      "statusDeleted": "Kususiwe"
+      "statusDeleted": "Kususiwe",
+      "lineLabel": "{{status}} umugqa {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(okungenalutho)"
     },
     "linkPasteClipboardEmpty": "Ikliphuphodi ayinalutho",
     "linkPasteNotAPullRequest": "Akuyona isixhumanisi sokudonsa se-GitHub",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Asikwazanga ukuphendula.",
       "couldNotCompleteAction": "Asikwazanga ukuqeda lesi senzo.",
-      "mergeResultDefaultError": "I-GitHub ayizange iqede ukuhlanganisa."
+      "mergeResultDefaultError": "I-GitHub ayizange iqede ukuhlanganisa.",
+      "ambiguous": "Asikwazanga ukuqinisekisa — hlola i-PR ngaphambi kokuzama futhi.",
+      "persistenceFailed": "Asikwazanga ukurekhoda lesi senzo. Sicela uzame futhi kamuva.",
+      "forbidden": "Kunqatshelwe"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "amasenti",
       "dollar_one": "idola",
       "dollar": "amadola",
-      "dollar_other": "amadola"
+      "dollar_other": "amadola",
+      "costSpoken": "izindleko {{cost}}",
+      "costSpokenWithTime": "izindleko {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Akukwazanga ukuvula i-GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Ayikwazanga ukuvula i-app store.",
     "description": "Inguqulo entsha ye-Kilo iyatholakala. Sicela ubuyekeze ukuze uqhubeke.",
     "title": "Ukubuyekeza kuyadingeka",
-    "updateNow": "Buyekeza manje"
+    "updateNow": "Buyekeza manje",
+    "appStorePage": "ikhasi le-app store"
   },
   "home": {
     "couldNotLoadSessions": "Asikwazanga ukulayisha amaseshini",

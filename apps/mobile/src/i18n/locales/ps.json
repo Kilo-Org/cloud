@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "په {{path}} {{lines}} کې زوړ",
         "outdatedOnLines": "په {{lines}} کې زوړ",
         "outdatedOnPath": "په {{path}} کې زوړ"
-      }
+      },
+      "deletedUser": "ړنګ شوی کارن"
     },
     "couldNotOpenGitHubAppSettings": "د GitHub اپلیکیشن تنظیمات پرانیستل کیدی نشو",
     "installKiloGitHubApp": "د کلیو GitHub اپلیکیشن نصب کړئ",
@@ -576,7 +577,10 @@
       "truncationBanner": "د {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کیږي — د GitHub API حد",
       "statusAdded": "اضافه شوی",
       "statusContext": "شرایط",
-      "statusDeleted": "ړنګ شوی"
+      "statusDeleted": "ړنګ شوی",
+      "lineLabel": "{{status}} کرښه {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(خالي)"
     },
     "linkPasteClipboardEmpty": "کلیپبورډ خالي دی",
     "linkPasteNotAPullRequest": "دا د GitHub pull request لینک نه دی",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "ځواب ورکول کیدی نشو.",
       "couldNotCompleteAction": "دا کړنه بشپړول کیدی نشو.",
-      "mergeResultDefaultError": "GitHub یوځای کول بشپړ نه کړل."
+      "mergeResultDefaultError": "GitHub یوځای کول بشپړ نه کړل.",
+      "ambiguous": "تأیید کیدی نشو — د بیا هڅې څخه مخکې PR وګورئ.",
+      "persistenceFailed": "موږ دا کړنه ثبت نه شو کولی. مهرباني وکړئ وروسته بیا هڅه وکړئ.",
+      "forbidden": "منع شوی"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "سینټه",
       "dollar_one": "ډالر",
       "dollar": "ډالره",
-      "dollar_other": "ډالره"
+      "dollar_other": "ډالره",
+      "costSpoken": "لګښت {{cost}}",
+      "costSpokenWithTime": "لګښت {{cost}}، {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub پرانیستل نشو",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "د ایپ پلورنځی نه شو خلاصېدلای.",
     "description": "د Kilo نوې نسخه شتون لري. مهرباني وکړئ د دوام لپاره تازه یې کړئ.",
     "title": "تازه کول اړین دي",
-    "updateNow": "اوس تازه کړئ"
+    "updateNow": "اوس تازه کړئ",
+    "appStorePage": "د ایپ پلورنځی پاڼه"
   },
   "home": {
     "couldNotLoadSessions": "غونډې نه شول پورته کېدلای",

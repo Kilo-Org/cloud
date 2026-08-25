@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Vanhentunut: {{path}} {{lines}}",
         "outdatedOnLines": "Vanhentunut: {{lines}}",
         "outdatedOnPath": "Vanhentunut: {{path}}"
-      }
+      },
+      "deletedUser": "poistettu käyttäjä"
     },
     "couldNotOpenGitHubAppSettings": "GitHub-sovelluksen asetuksia ei voitu avata",
     "installKiloGitHubApp": "Asenna Kilo GitHub -sovellus",
@@ -576,7 +577,10 @@
       "truncationBanner": "Näytetään ensimmäiset {{limit}} muutetuista {{total}} tiedostosta — GitHub API:n raja",
       "statusAdded": "Lisätty",
       "statusContext": "Konteksti",
-      "statusDeleted": "Poistettu"
+      "statusDeleted": "Poistettu",
+      "lineLabel": "{{status}} rivi {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(tyhjä)"
     },
     "linkPasteClipboardEmpty": "Leikepöytä on tyhjä",
     "linkPasteNotAPullRequest": "Ei GitHub-pull request -linkki",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Vastaaminen epäonnistui.",
       "couldNotCompleteAction": "Tätä toimintoa ei voitu suorittaa loppuun.",
-      "mergeResultDefaultError": "GitHub ei saattanut yhdistämistä loppuun."
+      "mergeResultDefaultError": "GitHub ei saattanut yhdistämistä loppuun.",
+      "ambiguous": "Vahvistusta ei saatu — tarkista PR ennen uudelleen yrittämistä.",
+      "persistenceFailed": "Emme voineet tallentaa tätä toimintoa. Yritä myöhemmin uudelleen.",
+      "forbidden": "Kielletty"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "senttiä",
       "dollar_one": "dollari",
       "dollar": "dollaria",
-      "dollar_other": "dollaria"
+      "dollar_other": "dollaria",
+      "costSpoken": "hinta {{cost}}",
+      "costSpokenWithTime": "hinta {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubia ei voitu avata",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Sovelluskauppaa ei voitu avata.",
     "description": "Kilo-sovelluksesta on uusi versio saatavilla. Päivitä jatkaaksesi.",
     "title": "Päivitys vaaditaan",
-    "updateNow": "Päivitä nyt"
+    "updateNow": "Päivitä nyt",
+    "appStorePage": "sovelluskaupan sivu"
   },
   "home": {
     "couldNotLoadSessions": "Istuntoja ei voitu ladata",

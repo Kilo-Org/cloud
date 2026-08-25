@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Desactualizado en {{path}} {{lines}}",
         "outdatedOnLines": "Desactualizado en {{lines}}",
         "outdatedOnPath": "Desactualizado en {{path}}"
-      }
+      },
+      "deletedUser": "usuario eliminado"
     },
     "couldNotOpenGitHubAppSettings": "Non se puideron abrir os axustes da GitHub App",
     "installKiloGitHubApp": "Instalar a Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "Mostrando os primeiros {{limit}} de {{total}} ficheiros modificados — límite da API de GitHub",
       "statusAdded": "Engadido",
       "statusContext": "Contexto",
-      "statusDeleted": "Eliminado"
+      "statusDeleted": "Eliminado",
+      "lineLabel": "{{status}} liña {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(baleiro)"
     },
     "linkPasteClipboardEmpty": "O portapapeis está baleiro",
     "linkPasteNotAPullRequest": "Non é unha ligazón de solicitude de cambios de GitHub",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Non se puido responder.",
       "couldNotCompleteAction": "Non se puido completar esta acción.",
-      "mergeResultDefaultError": "GitHub non completou a fusión."
+      "mergeResultDefaultError": "GitHub non completou a fusión.",
+      "ambiguous": "Non se puido confirmar — comproba o PR antes de volver intentalo.",
+      "persistenceFailed": "Non puidemos rexistrar esta acción. Téntao de novo máis tarde.",
+      "forbidden": "Prohibido"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "céntimos",
       "dollar_one": "dólar",
       "dollar": "dólares",
-      "dollar_other": "dólares"
+      "dollar_other": "dólares",
+      "costSpoken": "custo {{cost}}",
+      "costSpokenWithTime": "custo {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Non se puido abrir GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Non se puido abrir a tenda de aplicacións.",
     "description": "Hai unha nova versión de Kilo dispoñible. Actualiza para continuar.",
     "title": "Actualización necesaria",
-    "updateNow": "Actualizar agora"
+    "updateNow": "Actualizar agora",
+    "appStorePage": "páxina da tenda de aplicacións"
   },
   "home": {
     "couldNotLoadSessions": "Non se puideron cargar as sesións",

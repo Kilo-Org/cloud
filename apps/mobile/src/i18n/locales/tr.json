@@ -1607,7 +1607,9 @@
       "cent_other": "sent",
       "dollar_one": "dolar",
       "dollar": "dolar",
-      "dollar_other": "dolar"
+      "dollar_other": "dolar",
+      "costSpoken": "maliyet {{cost}}",
+      "costSpokenWithTime": "maliyet {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub Uygulaması kurulumu başlatılamadı. Lütfen tekrar deneyin.",
@@ -2187,7 +2189,8 @@
     "couldNotOpenStore": "Uygulama mağazası açılamadı.",
     "description": "Kilo'nun yeni bir sürümü mevcut. Devam etmek için lütfen güncelleyin.",
     "title": "Güncelleme gerekli",
-    "updateNow": "Şimdi güncelle"
+    "updateNow": "Şimdi güncelle",
+    "appStorePage": "uygulama mağazası sayfası"
   },
   "home": {
     "couldNotLoadSessions": "Oturumlar yüklenemedi",
@@ -2584,7 +2587,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} konumunda güncel değil",
         "outdatedOnLines": "{{lines}} konumunda güncel değil",
         "outdatedOnPath": "{{path}} konumunda güncel değil"
-      }
+      },
+      "deletedUser": "silinen kullanıcı"
     },
     "entry": {
       "clearLink": "Çekme isteği bağlantısını temizle",
@@ -2862,7 +2866,10 @@
       "truncationBanner": "Değiştirilen dosyaların ilk {{limit}} tanesi gösteriliyor (toplam {{total}}) — GitHub API sınırı",
       "statusAdded": "Eklendi",
       "statusContext": "Bağlam",
-      "statusDeleted": "Silindi"
+      "statusDeleted": "Silindi",
+      "lineLabel": "{{status}} satırı {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(boş)"
     },
     "linkPasteClipboardEmpty": "Pano boş",
     "linkPasteNotAPullRequest": "GitHub çekme isteği bağlantısı değil",
@@ -2880,7 +2887,10 @@
     "operation": {
       "couldNotReply": "Yanıt verilemedi.",
       "couldNotCompleteAction": "Bu işlem tamamlanamadı.",
-      "mergeResultDefaultError": "GitHub birleştirmeyi tamamlamadı."
+      "mergeResultDefaultError": "GitHub birleştirmeyi tamamlamadı.",
+      "ambiguous": "Doğrulanamadı — yeniden denemeden önce PR'yi kontrol edin.",
+      "persistenceFailed": "Bu işlemi kaydedemedik. Lütfen daha sonra tekrar deneyin.",
+      "forbidden": "Yasak"
     }
   },
   "organization": {

@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Luma na sa {{path}} {{lines}}",
         "outdatedOnLines": "Luma na sa {{lines}}",
         "outdatedOnPath": "Luma na sa {{path}}"
-      }
+      },
+      "deletedUser": "na-delete na user"
     },
     "couldNotOpenGitHubAppSettings": "Hindi mabuksan ang mga setting ng GitHub App",
     "installKiloGitHubApp": "I-install ang Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "Ipinapakita ang unang {{limit}} sa {{total}} binagong file — limitasyon sa API ng GitHub",
       "statusAdded": "Idinagdag",
       "statusContext": "Konteksto",
-      "statusDeleted": "Na-delete"
+      "statusDeleted": "Na-delete",
+      "lineLabel": "{{status}} na linya {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(walang laman)"
     },
     "linkPasteClipboardEmpty": "Walang laman ang clipboard",
     "linkPasteNotAPullRequest": "Hindi link ng GitHub pull request",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Hindi makapag-reply.",
       "couldNotCompleteAction": "Hindi makumpleto ang aksyong ito.",
-      "mergeResultDefaultError": "Hindi kinumpleto ng GitHub ang merge."
+      "mergeResultDefaultError": "Hindi kinumpleto ng GitHub ang merge.",
+      "ambiguous": "Hindi makumpirma — suriin ang PR bago subukan muli.",
+      "persistenceFailed": "Hindi namin maitala ang aksyong ito. Pakisubukan muli mamaya.",
+      "forbidden": "Bawal"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "cent",
       "dollar_one": "dollar",
       "dollar": "dollar",
-      "dollar_other": "dollar"
+      "dollar_other": "dollar",
+      "costSpoken": "gastos {{cost}}",
+      "costSpokenWithTime": "gastos {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Hindi mabuksan ang GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Hindi mabuksan ang app store.",
     "description": "May available na bagong bersyon ng Kilo. Mangyaring mag-update para magpatuloy.",
     "title": "Kinakailangan ang update",
-    "updateNow": "Mag-update ngayon"
+    "updateNow": "Mag-update ngayon",
+    "appStorePage": "pahina ng app store"
   },
   "home": {
     "couldNotLoadSessions": "Hindi ma-load ang mga session",

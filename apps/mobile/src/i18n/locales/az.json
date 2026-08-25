@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} üzərində köhnəlmiş",
         "outdatedOnLines": "{{lines}} üzərində köhnəlmiş",
         "outdatedOnPath": "{{path}} üzərində köhnəlmiş"
-      }
+      },
+      "deletedUser": "silinmiş istifadəçi"
     },
     "couldNotOpenGitHubAppSettings": "GitHub App parametrləri açıla bilmədi",
     "installKiloGitHubApp": "Kilo GitHub App'ini quraşdırın",
@@ -576,7 +577,10 @@
       "tapToComment": "{{label}}, şərh üçün toxunun",
       "statusAdded": "Əlavə edildi",
       "statusContext": "Kontekst",
-      "statusDeleted": "Silindi"
+      "statusDeleted": "Silindi",
+      "lineLabel": "{{status}} sətir {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(boş)"
     },
     "linkPasteClipboardEmpty": "Panoda heç nə yoxdur",
     "linkPasteNotAPullRequest": "Bu, GitHub pull request linki deyil",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Cavab vermək mümkün olmadı.",
       "couldNotCompleteAction": "Bu əməliyyatı tamamlamaq mümkün olmadı.",
-      "mergeResultDefaultError": "GitHub birləşməni tamamlamadı."
+      "mergeResultDefaultError": "GitHub birləşməni tamamlamadı.",
+      "ambiguous": "Təsdiqləmək mümkün olmadı — yenidən cəhd etməzdən əvvəl PR-ə baxın.",
+      "persistenceFailed": "Bu əməliyyatı qeyd edə bilmədik. Zəhmət olmasa daha sonra yenidən cəhd edin.",
+      "forbidden": "Qadağandır"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "sent",
       "dollar_one": "dollar",
       "dollar": "dollar",
-      "dollar_other": "dollar"
+      "dollar_other": "dollar",
+      "costSpoken": "xərc {{cost}}",
+      "costSpokenWithTime": "xərc {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub açıla bilmədi",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Tətbiq mağazası açıla bilmədi.",
     "description": "Kilo-nun yeni versiyası mövcuddur. Davam etmək üçün yeniləyin.",
     "title": "Yeniləmə tələb olunur",
-    "updateNow": "İndi yenilə"
+    "updateNow": "İndi yenilə",
+    "appStorePage": "tətbiq mağazası səhifəsi"
   },
   "home": {
     "couldNotLoadSessions": "Sessiyalar yüklənə bilmədi",

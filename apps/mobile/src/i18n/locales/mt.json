@@ -419,7 +419,8 @@
         "outdatedOnPathLines": "Skadut fuq {{path}} {{lines}}",
         "outdatedOnLines": "Skadut fuq {{lines}}",
         "outdatedOnPath": "Skadut fuq {{path}}"
-      }
+      },
+      "deletedUser": "utent imħassar"
     },
     "couldNotOpenGitHubAppSettings": "Ma setgħux jinfetħu s-settings tal-GitHub App",
     "installKiloGitHubApp": "Installa l-Kilo GitHub App",
@@ -597,7 +598,10 @@
       "truncationBanner": "Qed juri l-ewwel {{limit}} minn {{total}} fajls mibdula — il-limitu tal-API ta' GitHub",
       "statusAdded": "Miżjud",
       "statusContext": "Kuntest",
-      "statusDeleted": "Imħassar"
+      "statusDeleted": "Imħassar",
+      "lineLabel": "{{status}} linja {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(vojta)"
     },
     "linkPasteClipboardEmpty": "L-appostru huwa vojt",
     "linkPasteNotAPullRequest": "Mhux link ta' pull request ta' GitHub",
@@ -615,7 +619,10 @@
     "operation": {
       "couldNotReply": "Ma setgħetx tingħata risposta.",
       "couldNotCompleteAction": "Ma setgħetx titlesta din l-azzjoni.",
-      "mergeResultDefaultError": "GitHub ma lestiex il-merge."
+      "mergeResultDefaultError": "GitHub ma lestiex il-merge.",
+      "ambiguous": "Ma setgħetx tiġi kkonfermata — iċċekkja l-PR qabel terġa' tipprova.",
+      "persistenceFailed": "Ma stajniex nirreġistraw din l-azzjoni. Jekk jogħġbok erġa' pprova aktar tard.",
+      "forbidden": "Ipprojbit"
     }
   },
   "notifications": {
@@ -2099,7 +2106,9 @@
       "cent_many": "ċenteżmu",
       "dollar_two": "dollari",
       "dollar_few": "dollari",
-      "dollar_many": "dollaru"
+      "dollar_many": "dollaru",
+      "costSpoken": "spiża {{cost}}",
+      "costSpokenWithTime": "spiża {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ma setax jinfetaħ GitHub",
@@ -2694,7 +2703,8 @@
     "couldNotOpenStore": "Ma setgħetx tinfetaħ l-app store.",
     "description": "Verżjoni ġdida ta' Kilo hija disponibbli. Jekk jogħġbok aġġorna biex tkompli.",
     "title": "Aġġornament meħtieġ",
-    "updateNow": "Aġġorna issa"
+    "updateNow": "Aġġorna issa",
+    "appStorePage": "paġna tal-app store"
   },
   "home": {
     "couldNotLoadSessions": "Ma setgħux jitgħabbew is-sessjonijiet",

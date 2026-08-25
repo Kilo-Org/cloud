@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} پر پرانا",
         "outdatedOnLines": "{{lines}} پر پرانا",
         "outdatedOnPath": "{{path}} پر پرانا"
-      }
+      },
+      "deletedUser": "حذف شدہ صارف"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ایپ کی سیٹنگز نہیں کھلی سکیں",
     "installKiloGitHubApp": "Kilo GitHub ایپ انسٹال کریں",
@@ -576,7 +577,10 @@
       "truncationBanner": "کل {{total}} تبدیل شدہ فائلوں میں سے پہلی {{limit}} دکھائی جا رہی ہیں — GitHub API حد",
       "statusAdded": "شامل شدہ",
       "statusContext": "سیاق",
-      "statusDeleted": "حذف شدہ"
+      "statusDeleted": "حذف شدہ",
+      "lineLabel": "{{status}} لائن {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(خالی)"
     },
     "linkPasteClipboardEmpty": "کلپ بورڈ خالی ہے",
     "linkPasteNotAPullRequest": "یہ GitHub پل ریکویسٹ لنک نہیں ہے",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "جواب نہیں ہو سکا۔",
       "couldNotCompleteAction": "یہ کارروائی مکمل نہیں ہو سکی۔",
-      "mergeResultDefaultError": "GitHub نے مرج مکمل نہیں کیا۔"
+      "mergeResultDefaultError": "GitHub نے مرج مکمل نہیں کیا۔",
+      "ambiguous": "تصدیق نہیں ہو سکی — دوبارہ کوشش کرنے سے پہلے PR چیک کریں۔",
+      "persistenceFailed": "ہم اس کارروائی کو ریکارڈ نہیں کر سکے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
+      "forbidden": "ممنوع"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "سینٹ",
       "dollar_one": "ڈالر",
       "dollar": "ڈالر",
-      "dollar_other": "ڈالر"
+      "dollar_other": "ڈالر",
+      "costSpoken": "لاگت {{cost}}",
+      "costSpokenWithTime": "لاگت {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub نہیں کھل سکا",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "ایپ اسٹور نہیں کھل سکا۔",
     "description": "Kilo کا نیا ورژن دستیاب ہے۔ براہ کرم جاری رکھنے کے لیے اپ ڈیٹ کریں۔",
     "title": "اپ ڈیٹ ضروری ہے",
-    "updateNow": "ابھی اپ ڈیٹ کریں"
+    "updateNow": "ابھی اپ ڈیٹ کریں",
+    "appStorePage": "ایپ اسٹور کا صفحہ"
   },
   "home": {
     "couldNotLoadSessions": "سیشنز لوڈ نہیں ہو سکے",

@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} ରେ ଅପ୍ରଚଳିତ",
         "outdatedOnLines": "{{lines}} ରେ ଅପ୍ରଚଳିତ",
         "outdatedOnPath": "{{path}} ରେ ଅପ୍ରଚଳିତ"
-      }
+      },
+      "deletedUser": "ବିଲୋପ ହୋଇଥିବା ବ୍ୟବହାରକାରୀ"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ଆପ୍ ସେଟିଂସ୍ ଖୋଲାଯାଇ ପାରିଲା ନାହିଁ",
     "installKiloGitHubApp": "Kilo GitHub ଆପ୍ ଇନଷ୍ଟଲ୍ କରନ୍ତୁ",
@@ -576,7 +577,10 @@
       "truncationBanner": "ମୋଟ {{total}} ମଧ୍ୟରୁ ପ୍ରଥମ {{limit}} ପରିବର୍ତ୍ତିତ ଫାଇଲ ଦେଖାଯାଉଛି — GitHub API ସୀମା",
       "statusAdded": "ଯୋଡ଼ାଗଲା",
       "statusContext": "ପ୍ରସଙ୍ଗ",
-      "statusDeleted": "ବିଲୋପ ହେଲା"
+      "statusDeleted": "ବିଲୋପ ହେଲା",
+      "lineLabel": "{{status}} ଧାଡ଼ି {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ଖାଲି)"
     },
     "linkPasteClipboardEmpty": "କ୍ଲିପ୍ବୋର୍ଡ ଖାଲି ଅଛି",
     "linkPasteNotAPullRequest": "ଏହା GitHub ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ନୁହେଁ",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "ଉତ୍ତର ଦେବା ଯାଇ ପାରିଲା ନାହିଁ।",
       "couldNotCompleteAction": "ଏହି କାର୍ଯ୍ୟ ସମ୍ପୂର୍ଣ୍ଣ କରାଯାଇ ପାରିଲା ନାହିଁ।",
-      "mergeResultDefaultError": "GitHub ମର୍ଜ୍ ସମ୍ପୂର୍ଣ୍ଣ କଲା ନାହିଁ।"
+      "mergeResultDefaultError": "GitHub ମର୍ଜ୍ ସମ୍ପୂର୍ଣ୍ଣ କଲା ନାହିଁ।",
+      "ambiguous": "ନିଶ୍ଚିତ କରାଯାଇ ପାରିଲା ନାହିଁ — ପୁଣି ଚେଷ୍ଟା କରିବା ପୂର୍ବରୁ PR ଯାଞ୍ଚ କରନ୍ତୁ।",
+      "persistenceFailed": "ଏହି କାର୍ଯ୍ୟ ରେକର୍ଡ୍ କରାଯାଇ ପାରିଲା ନାହିଁ। ଦୟାକରି ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "forbidden": "ନିଷେଧ"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "ସେଣ୍ଟ",
       "dollar_one": "ଡଲାର",
       "dollar": "ଡଲାର",
-      "dollar_other": "ଡଲାର"
+      "dollar_other": "ଡଲାର",
+      "costSpoken": "ଖର୍ଚ୍ଚ {{cost}}",
+      "costSpokenWithTime": "ଖର୍ଚ୍ଚ {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ଖୋଲାଯାଇପାରିଲା ନାହିଁ",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "ଆପ୍ ଷ୍ଟୋର ଖୋଲାଯାଇପାରିଲା ନାହିଁ।",
     "description": "Kilo ର ଏକ ନୂତନ ସଂସ୍କରଣ ଉପଲବ୍ଧ। ଜାରି ରଖିବାକୁ ଅପଡେଟ୍ କରନ୍ତୁ।",
     "title": "ଅପଡେଟ୍ ଆବଶ୍ୟକ",
-    "updateNow": "ଏବେ ଅପଡେଟ୍ କରନ୍ତୁ"
+    "updateNow": "ଏବେ ଅପଡେଟ୍ କରନ୍ତୁ",
+    "appStorePage": "ଆପ୍ ଷ୍ଟୋର ପୃଷ୍ଠା"
   },
   "home": {
     "couldNotLoadSessions": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",

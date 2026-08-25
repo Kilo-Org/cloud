@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Atijọ lori {{path}} {{lines}}",
         "outdatedOnLines": "Atijọ lori {{lines}}",
         "outdatedOnPath": "Atijọ lori {{path}}"
-      }
+      },
+      "deletedUser": "olumulo ti a pa"
     },
     "couldNotOpenGitHubAppSettings": "Ko le ṣii awọn eto GitHub App",
     "installKiloGitHubApp": "Fi Kilo GitHub App sori",
@@ -576,7 +577,10 @@
       "truncationBanner": "Ìfihàn àwọn fáìlì àkọ́kọ́ {{limit}} nínú {{total}} fáìlì tí a yí padà — ìpẹ̀kun API GitHub",
       "statusAdded": "Ti fi kun",
       "statusContext": "Àyíká",
-      "statusDeleted": "Ti pa"
+      "statusDeleted": "Ti pa",
+      "lineLabel": "{{status}} laini {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ofo)"
     },
     "linkPasteClipboardEmpty": "Àtẹ̀ àkójọpọ̀ ti ṣófo",
     "linkPasteNotAPullRequest": "Kì í ṣe ọ̀nà asopọ́ pull request GitHub",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Ko le fesi.",
       "couldNotCompleteAction": "Kò lè parí ìgbésẹ̀ yìí.",
-      "mergeResultDefaultError": "GitHub kò parí ìsopọ̀ náà."
+      "mergeResultDefaultError": "GitHub kò parí ìsopọ̀ náà.",
+      "ambiguous": "A ko le fi idi rẹ mulẹ — ṣayẹwo PR naa ki o to gbiyanju lẹẹkansi.",
+      "persistenceFailed": "A ko le gbasilẹ iṣe yii. Jọwọ gbiyanju lẹẹkansi nigbamii.",
+      "forbidden": "Eewọ"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "awọn centi",
       "dollar_one": "dọla",
       "dollar": "awọn dọla",
-      "dollar_other": "awọn dọla"
+      "dollar_other": "awọn dọla",
+      "costSpoken": "idiyele {{cost}}",
+      "costSpokenWithTime": "idiyele {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ko le ṣii GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Ko le ṣii ibi-itaja app.",
     "description": "Ẹya tuntun ti Kilo wa. Jọwọ ṣe igbesoke lati tẹsiwaju.",
     "title": "Igbesoke nilo",
-    "updateNow": "Ṣe igbesoke ni bayi"
+    "updateNow": "Ṣe igbesoke ni bayi",
+    "appStorePage": "oju-iwe ibi-itaja app"
   },
   "home": {
     "couldNotLoadSessions": "Ko le ṣagbewọ awọn igba-ijiroro",

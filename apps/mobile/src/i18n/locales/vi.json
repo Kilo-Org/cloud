@@ -1607,7 +1607,9 @@
       "cent_other": "xu",
       "dollar_one": "đô la",
       "dollar": "đô la",
-      "dollar_other": "đô la"
+      "dollar_other": "đô la",
+      "costSpoken": "chi phí {{cost}}",
+      "costSpokenWithTime": "chi phí {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Chúng tôi không thể bắt đầu thiết lập ứng dụng GitHub. Vui lòng thử lại.",
@@ -2187,7 +2189,8 @@
     "couldNotOpenStore": "Không thể mở cửa hàng ứng dụng.",
     "description": "Đã có phiên bản mới của Kilo. Vui lòng cập nhật để tiếp tục.",
     "title": "Cần cập nhật",
-    "updateNow": "Cập nhật ngay"
+    "updateNow": "Cập nhật ngay",
+    "appStorePage": "trang cửa hàng ứng dụng"
   },
   "home": {
     "couldNotLoadSessions": "Không thể tải các phiên",
@@ -2584,7 +2587,8 @@
         "outdatedOnPathLines": "Đã lỗi thời trên {{path}} {{lines}}",
         "outdatedOnLines": "Đã lỗi thời trên {{lines}}",
         "outdatedOnPath": "Đã lỗi thời trên {{path}}"
-      }
+      },
+      "deletedUser": "người dùng đã bị xóa"
     },
     "entry": {
       "clearLink": "Xóa liên kết yêu cầu hợp nhất",
@@ -2862,7 +2866,10 @@
       "truncationBanner": "Hiển thị {{limit}} tệp đã thay đổi đầu tiên trong tổng số {{total}} — giới hạn API của GitHub",
       "statusAdded": "Đã thêm",
       "statusContext": "Ngữ cảnh",
-      "statusDeleted": "Đã xóa"
+      "statusDeleted": "Đã xóa",
+      "lineLabel": "{{status}} dòng {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(trống)"
     },
     "linkPasteClipboardEmpty": "Bộ nhớ tạm trống",
     "linkPasteNotAPullRequest": "Không phải là liên kết yêu cầu kéo GitHub",
@@ -2880,7 +2887,10 @@
     "operation": {
       "couldNotReply": "Không thể trả lời.",
       "couldNotCompleteAction": "Không thể hoàn tất hành động này.",
-      "mergeResultDefaultError": "GitHub đã không hoàn tất việc hợp nhất."
+      "mergeResultDefaultError": "GitHub đã không hoàn tất việc hợp nhất.",
+      "ambiguous": "Không thể xác nhận — hãy kiểm tra PR trước khi thử lại.",
+      "persistenceFailed": "Chúng tôi không thể ghi lại hành động này. Vui lòng thử lại sau.",
+      "forbidden": "Bị cấm"
     }
   },
   "organization": {

@@ -411,7 +411,8 @@
         "outdatedOnPathLines": "Novecojis uz {{path}} {{lines}}",
         "outdatedOnLines": "Novecojis uz {{lines}}",
         "outdatedOnPath": "Novecojis uz {{path}}"
-      }
+      },
+      "deletedUser": "dzēsts lietotājs"
     },
     "couldNotOpenGitHubAppSettings": "Neizdevās atvērt GitHub lietotnes iestatījumus",
     "installKiloGitHubApp": "Instalēt Kilo GitHub lietotni",
@@ -583,7 +584,10 @@
       "truncationBanner": "Tiek rādīti pirmie {{limit}} no {{total}} mainītajiem failiem — GitHub API ierobežojums",
       "statusAdded": "Pievienots",
       "statusContext": "Konteksts",
-      "statusDeleted": "Dzēsts"
+      "statusDeleted": "Dzēsts",
+      "lineLabel": "{{status}} rinda {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(tukšs)"
     },
     "linkPasteClipboardEmpty": "Starpliktuve ir tukša",
     "linkPasteNotAPullRequest": "Nav GitHub pieprasījuma saite",
@@ -601,7 +605,10 @@
     "operation": {
       "couldNotReply": "Neizdevās atbildēt.",
       "couldNotCompleteAction": "Neizdevās pabeigt šo darbību.",
-      "mergeResultDefaultError": "GitHub nepabeidza apvienošanu."
+      "mergeResultDefaultError": "GitHub nepabeidza apvienošanu.",
+      "ambiguous": "Neizdevās apstiprināt — pirms mēģināšanas vēlreiz pārbaudiet PR.",
+      "persistenceFailed": "Mēs nevarējām reģistrēt šo darbību. Lūdzu, mēģini vēlreiz vēlāk.",
+      "forbidden": "Aizliegts"
     }
   },
   "notifications": {
@@ -2069,7 +2076,9 @@
       "dollar": "dolāri",
       "dollar_other": "dolāri",
       "cent_zero": "centu",
-      "dollar_zero": "dolāru"
+      "dollar_zero": "dolāru",
+      "costSpoken": "izmaksas {{cost}}",
+      "costSpokenWithTime": "izmaksas {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Neizdevās atvērt GitHub",
@@ -2654,7 +2663,8 @@
     "couldNotOpenStore": "Neizdevās atvērt lietotņu veikalu.",
     "description": "Pieejama jauna Kilo versija. Lūdzu, atjaunini, lai turpinātu.",
     "title": "Nepieciešams atjauninājums",
-    "updateNow": "Atjaunināt tagad"
+    "updateNow": "Atjaunināt tagad",
+    "appStorePage": "lietotņu veikala lapa"
   },
   "home": {
     "couldNotLoadSessions": "Neizdevās ielādēt sesijas",

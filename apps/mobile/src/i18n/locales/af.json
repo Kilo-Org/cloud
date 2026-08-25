@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Uitgediend op {{path}} {{lines}}",
         "outdatedOnLines": "Uitgediend op {{lines}}",
         "outdatedOnPath": "Uitgediend op {{path}}"
-      }
+      },
+      "deletedUser": "verwyderde gebruiker"
     },
     "couldNotOpenGitHubAppSettings": "Kon nie GitHub-toepinstellings oopmaak nie",
     "installKiloGitHubApp": "Installeer die Kilo GitHub-toep",
@@ -576,7 +577,10 @@
       "tapToComment": "{{label}}, tik om kommentaar te lewer",
       "statusAdded": "Bygevoeg",
       "statusContext": "Konteks",
-      "statusDeleted": "Verwyder"
+      "statusDeleted": "Verwyder",
+      "lineLabel": "{{status}} lyn {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(leeg)"
     },
     "linkPasteClipboardEmpty": "Knipbord is leeg",
     "linkPasteNotAPullRequest": "Nie 'n GitHub-pull-request-skakel nie",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Kon nie antwoord nie.",
       "couldNotCompleteAction": "Kon nie hierdie aksie voltooi nie.",
-      "mergeResultDefaultError": "GitHub het nie die samesmelting voltooi nie."
+      "mergeResultDefaultError": "GitHub het nie die samesmelting voltooi nie.",
+      "ambiguous": "Kon nie bevestig nie — kyk na die PR voordat jy weer probeer.",
+      "persistenceFailed": "Ons kon nie hierdie aksie aanteken nie. Probeer asseblief later weer.",
+      "forbidden": "Verbode"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "sent",
       "dollar_one": "dollar",
       "dollar": "dollars",
-      "dollar_other": "dollars"
+      "dollar_other": "dollars",
+      "costSpoken": "koste {{cost}}",
+      "costSpokenWithTime": "koste {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kon GitHub nie oopmaak nie",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Kon nie die appwinkel oopmaak nie.",
     "description": "'n Nuwe weergawe van Kilo is beskikbaar. Dateer asseblief op om voort te gaan.",
     "title": "Opdatering vereis",
-    "updateNow": "Dateer nou op"
+    "updateNow": "Dateer nou op",
+    "appStorePage": "appwinkel-bladsy"
   },
   "home": {
     "couldNotLoadSessions": "Kon nie sessies laai nie",

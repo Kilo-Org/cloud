@@ -1623,7 +1623,9 @@
       "cent_few": "центи",
       "cent_many": "центів",
       "dollar_few": "долари",
-      "dollar_many": "доларів"
+      "dollar_many": "доларів",
+      "costSpoken": "вартість {{cost}}",
+      "costSpokenWithTime": "вартість {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Не вдалося розпочати налаштування застосунку GitHub. Спробуйте ще раз.",
@@ -2213,7 +2215,8 @@
     "couldNotOpenStore": "Не вдалося відкрити магазин застосунків.",
     "description": "Доступна нова версія Kilo. Оновіться, щоб продовжити.",
     "title": "Потрібне оновлення",
-    "updateNow": "Оновити зараз"
+    "updateNow": "Оновити зараз",
+    "appStorePage": "сторінка магазину застосунків"
   },
   "home": {
     "couldNotLoadSessions": "Не вдалося завантажити сеанси",
@@ -2614,7 +2617,8 @@
         "outdatedOnPathLines": "Застаріле на {{path}} {{lines}}",
         "outdatedOnLines": "Застаріле на {{lines}}",
         "outdatedOnPath": "Застаріле на {{path}}"
-      }
+      },
+      "deletedUser": "видалений користувач"
     },
     "entry": {
       "clearLink": "Очистити посилання на pull request",
@@ -2902,7 +2906,10 @@
       "truncationBanner": "Показано перші {{limit}} зі {{total}} змінених файлів — обмеження GitHub API",
       "statusAdded": "Додано",
       "statusContext": "Контекст",
-      "statusDeleted": "Видалено"
+      "statusDeleted": "Видалено",
+      "lineLabel": "{{status}} рядок {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(порожньо)"
     },
     "linkPasteClipboardEmpty": "Буфер обміну порожній",
     "linkPasteNotAPullRequest": "Це не посилання на pull request GitHub",
@@ -2920,7 +2927,10 @@
     "operation": {
       "couldNotReply": "Не вдалося відповісти.",
       "couldNotCompleteAction": "Не вдалося завершити цю дію.",
-      "mergeResultDefaultError": "GitHub не завершив злиття."
+      "mergeResultDefaultError": "GitHub не завершив злиття.",
+      "ambiguous": "Не вдалося підтвердити — перевірте PR, перш ніж повторювати спробу.",
+      "persistenceFailed": "Не вдалося зберегти цю дію. Спробуйте ще раз пізніше.",
+      "forbidden": "Заборонено"
     }
   },
   "organization": {

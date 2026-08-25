@@ -1615,7 +1615,9 @@
       "dollar": "dólares",
       "dollar_other": "dólares",
       "cent_many": "céntimos",
-      "dollar_many": "dólares"
+      "dollar_many": "dólares",
+      "costSpoken": "coste {{cost}}",
+      "costSpokenWithTime": "coste {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "No pudimos iniciar la configuración de la GitHub App. Inténtalo de nuevo.",
@@ -2200,7 +2202,8 @@
     "couldNotOpenStore": "No se pudo abrir la tienda de aplicaciones.",
     "description": "Hay una nueva versión de Kilo disponible. Actualiza para continuar.",
     "title": "Actualización requerida",
-    "updateNow": "Actualizar ahora"
+    "updateNow": "Actualizar ahora",
+    "appStorePage": "página de la tienda de aplicaciones"
   },
   "home": {
     "couldNotLoadSessions": "No se pudieron cargar las sesiones",
@@ -2599,7 +2602,8 @@
         "outdatedOnPathLines": "Desactualizado en {{path}} {{lines}}",
         "outdatedOnLines": "Desactualizado en {{lines}}",
         "outdatedOnPath": "Desactualizado en {{path}}"
-      }
+      },
+      "deletedUser": "usuario eliminado"
     },
     "entry": {
       "clearLink": "Borrar enlace de la pull request",
@@ -2882,7 +2886,10 @@
       "truncationBanner": "Mostrando los primeros {{limit}} de {{total}} archivos modificados — límite de la API de GitHub",
       "statusAdded": "Añadido",
       "statusContext": "Contexto",
-      "statusDeleted": "Eliminado"
+      "statusDeleted": "Eliminado",
+      "lineLabel": "{{status}} línea {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(vacío)"
     },
     "linkPasteClipboardEmpty": "El portapapeles está vacío",
     "linkPasteNotAPullRequest": "No es un enlace de pull request de GitHub",
@@ -2900,7 +2907,10 @@
     "operation": {
       "couldNotReply": "No se pudo responder.",
       "couldNotCompleteAction": "No se pudo completar esta acción.",
-      "mergeResultDefaultError": "GitHub no completó la fusión."
+      "mergeResultDefaultError": "GitHub no completó la fusión.",
+      "ambiguous": "No se pudo confirmar — comprueba el PR antes de reintentar.",
+      "persistenceFailed": "No se pudo registrar esta acción. Inténtalo de nuevo más tarde.",
+      "forbidden": "Prohibido"
     }
   },
   "organization": {

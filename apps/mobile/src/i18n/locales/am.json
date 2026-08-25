@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "በ{{path}} {{lines}} ላይ ያረጀ",
         "outdatedOnLines": "በ{{lines}} ላይ ያረጀ",
         "outdatedOnPath": "በ{{path}} ላይ ያረጀ"
-      }
+      },
+      "deletedUser": "የተሰረዘ ተጠቃሚ"
     },
     "couldNotOpenGitHubAppSettings": "የGitHub መተግበሪያ ቅንብሮችን መክፈት አልተቻለም",
     "installKiloGitHubApp": "የKilo GitHub መተግበሪያን ጫን",
@@ -576,7 +577,10 @@
       "tapToComment": "{{label}}፣ አስተያየት ለመስጠት ይንኩ",
       "statusAdded": "ታክሏል",
       "statusContext": "አውድ",
-      "statusDeleted": "ተሰርዟል"
+      "statusDeleted": "ተሰርዟል",
+      "lineLabel": "{{status}} መስመር {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ባዶ)"
     },
     "linkPasteClipboardEmpty": "ቅንጥብ ሰሌዳው ባዶ ነው",
     "linkPasteNotAPullRequest": "የGitHub ፑል እንደጠየቀ አገናኝ አይደለም",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "መልስ መስጠት አልተቻለም።",
       "couldNotCompleteAction": "ይህን እርምጃ ማጠናቀቅ አልተቻለም።",
-      "mergeResultDefaultError": "GitHub ውህደቱን አላጠናቀቀም።"
+      "mergeResultDefaultError": "GitHub ውህደቱን አላጠናቀቀም።",
+      "ambiguous": "ማረጋገጥ አልተቻለም — እንደገና ከመሞከርዎ በፊት PRን ያረጋግጡ።",
+      "persistenceFailed": "ይህን እርምጃ መመዝገብ አልቻልን። እባክዎ በኋላ እንደገና ይሞክሩ።",
+      "forbidden": "የተከለከለ"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "ሳንቲሞች",
       "dollar_one": "ዶላር",
       "dollar": "ዶላሮች",
-      "dollar_other": "ዶላሮች"
+      "dollar_other": "ዶላሮች",
+      "costSpoken": "ዋጋ {{cost}}",
+      "costSpokenWithTime": "ዋጋ {{cost}}፣ {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubን መክፈት አልተቻለም",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "የመተግበሪያ መደብር መክፈት አልተቻለም።",
     "description": "አዲስ የKilo ስሪት ይገኛል። ለመቀጠል እባክዎ ያዘምኑ።",
     "title": "ማዘመን ያስፈልጋል",
-    "updateNow": "አሁን ያዘምኑ"
+    "updateNow": "አሁን ያዘምኑ",
+    "appStorePage": "የመተግበሪያ መደብር ገጽ"
   },
   "home": {
     "couldNotLoadSessions": "ክፍለ-ጊዜዎችን መጫን አልተቻለም",

@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}}-এ পুরানো",
         "outdatedOnLines": "{{lines}}-এ পুরানো",
         "outdatedOnPath": "{{path}}-এ পুরানো"
-      }
+      },
+      "deletedUser": "মুছে ফেলা ব্যবহারকারী"
     },
     "couldNotOpenGitHubAppSettings": "GitHub অ্যাপ সেটিংস খোলা যায়নি",
     "installKiloGitHubApp": "Kilo GitHub অ্যাপ ইনস্টল করুন",
@@ -576,7 +577,10 @@
       "tapToComment": "{{label}}, মন্তব্য করতে আলতো চাপুন",
       "statusAdded": "যোগ করা হয়েছে",
       "statusContext": "প্রসঙ্গ",
-      "statusDeleted": "মুছে ফেলা হয়েছে"
+      "statusDeleted": "মুছে ফেলা হয়েছে",
+      "lineLabel": "{{status}} লাইন {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(খালি)"
     },
     "linkPasteClipboardEmpty": "ক্লিপবোর্ড খালি",
     "linkPasteNotAPullRequest": "এটি একটি GitHub pull request লিংক নয়",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "উত্তর দেওয়া যায়নি।",
       "couldNotCompleteAction": "এই কাজটি সম্পূর্ণ করা যায়নি।",
-      "mergeResultDefaultError": "GitHub মার্জ সম্পূর্ণ করেনি।"
+      "mergeResultDefaultError": "GitHub মার্জ সম্পূর্ণ করেনি।",
+      "ambiguous": "নিশ্চিত করা যায়নি — আবার চেষ্টা করার আগে PR-টি পরীক্ষা করুন।",
+      "persistenceFailed": "এই কাজটি রেকর্ড করা যায়নি। অনুগ্রহ করে পরে আবার চেষ্টা করুন।",
+      "forbidden": "নিষিদ্ধ"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "সেন্ট",
       "dollar_one": "ডলার",
       "dollar": "ডলার",
-      "dollar_other": "ডলার"
+      "dollar_other": "ডলার",
+      "costSpoken": "খরচ {{cost}}",
+      "costSpokenWithTime": "খরচ {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub খোলা যায়নি",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "অ্যাপ স্টোর খোলা যায়নি।",
     "description": "Kilo-এর একটি নতুন সংস্করণ উপলব্ধ। চালিয়ে যেতে আপডেট করুন।",
     "title": "আপডেট প্রয়োজন",
-    "updateNow": "এখনই আপডেট করুন"
+    "updateNow": "এখনই আপডেট করুন",
+    "appStorePage": "অ্যাপ স্টোর পেজ"
   },
   "home": {
     "couldNotLoadSessions": "সেশন লোড করা যায়নি",

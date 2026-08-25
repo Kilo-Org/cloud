@@ -415,7 +415,8 @@
         "outdatedOnPathLines": "Zastarané v {{path}} {{lines}}",
         "outdatedOnLines": "Zastarané v {{lines}}",
         "outdatedOnPath": "Zastarané v {{path}}"
-      }
+      },
+      "deletedUser": "vymazaný používateľ"
     },
     "couldNotOpenGitHubAppSettings": "Nastavenia aplikácie GitHub App sa nepodarilo otvoriť",
     "installKiloGitHubApp": "Nainštalovať aplikáciu Kilo GitHub App",
@@ -590,7 +591,10 @@
       "truncationBanner": "Zobrazuje sa prvých {{limit}} z {{total}} zmenených súborov — limit GitHub API",
       "statusAdded": "Pridané",
       "statusContext": "Kontext",
-      "statusDeleted": "Vymazané"
+      "statusDeleted": "Vymazané",
+      "lineLabel": "{{status}} riadok {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(prázdne)"
     },
     "linkPasteClipboardEmpty": "Schránka je prázdna",
     "linkPasteNotAPullRequest": "Nie je to odkaz na GitHub pull request",
@@ -608,7 +612,10 @@
     "operation": {
       "couldNotReply": "Nepodarilo sa odpovedať.",
       "couldNotCompleteAction": "Túto akciu sa nepodarilo dokončiť.",
-      "mergeResultDefaultError": "GitHub nedokončil zlúčenie."
+      "mergeResultDefaultError": "GitHub nedokončil zlúčenie.",
+      "ambiguous": "Nepodarilo sa potvrdiť — skontrolujte PR pred opätovným pokusom.",
+      "persistenceFailed": "Túto akciu sa nepodarilo zaznamenať. Skúste to neskôr.",
+      "forbidden": "Zakázané"
     }
   },
   "notifications": {
@@ -2084,7 +2091,9 @@
       "cent_few": "centy",
       "cent_many": "centov",
       "dollar_few": "doláre",
-      "dollar_many": "dolárov"
+      "dollar_many": "dolárov",
+      "costSpoken": "cena {{cost}}",
+      "costSpokenWithTime": "cena {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub sa nepodarilo otvoriť",
@@ -2674,7 +2683,8 @@
     "couldNotOpenStore": "Obchod s aplikáciami sa nepodarilo otvoriť.",
     "description": "K dispozícii je nová verzia Kilo. Ak chcete pokračovať, aktualizujte.",
     "title": "Vyžaduje sa aktualizácia",
-    "updateNow": "Aktualizovať teraz"
+    "updateNow": "Aktualizovať teraz",
+    "appStorePage": "stránka obchodu s aplikáciami"
   },
   "home": {
     "couldNotLoadSessions": "Relácie sa nepodarilo načítať",

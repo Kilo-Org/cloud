@@ -2134,7 +2134,8 @@
     "couldNotOpenStore": "Impossible d'ouvrir l'App Store.",
     "description": "Une nouvelle version de Kilo est disponible. Veuillez mettre à jour pour continuer.",
     "title": "Mise à jour requise",
-    "updateNow": "Mettre à jour maintenant"
+    "updateNow": "Mettre à jour maintenant",
+    "appStorePage": "page de l'App Store"
   },
   "home": {
     "couldNotLoadSessions": "Impossible de charger les sessions",
@@ -2421,7 +2422,9 @@
       "dollar": "dollars",
       "dollar_other": "dollars",
       "cent_many": "centimes",
-      "dollar_many": "dollars"
+      "dollar_many": "dollars",
+      "costSpoken": "coût {{cost}}",
+      "costSpokenWithTime": "coût {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Impossible de démarrer la configuration de la GitHub App. Veuillez réessayer.",
@@ -2599,7 +2602,8 @@
         "outdatedOnPathLines": "Obsolète sur {{path}} {{lines}}",
         "outdatedOnLines": "Obsolète sur {{lines}}",
         "outdatedOnPath": "Obsolète sur {{path}}"
-      }
+      },
+      "deletedUser": "utilisateur supprimé"
     },
     "entry": {
       "clearLink": "Effacer le lien de la pull request",
@@ -2882,7 +2886,10 @@
       "truncationBanner": "Affichage des {{limit}} premiers fichiers modifiés sur {{total}} — limite de l'API GitHub",
       "statusAdded": "Ajouté",
       "statusContext": "Contexte",
-      "statusDeleted": "Supprimé"
+      "statusDeleted": "Supprimé",
+      "lineLabel": "{{status}} ligne {{line}} : {{text}}",
+      "lineLabelNoNumber": "{{status}} : {{text}}",
+      "emptyLine": "(vide)"
     },
     "linkPasteClipboardEmpty": "Le presse-papiers est vide",
     "linkPasteNotAPullRequest": "Ce n'est pas un lien de pull request GitHub",
@@ -2900,7 +2907,10 @@
     "operation": {
       "couldNotReply": "Impossible de répondre.",
       "couldNotCompleteAction": "Impossible de terminer cette action.",
-      "mergeResultDefaultError": "GitHub n'a pas terminé la fusion."
+      "mergeResultDefaultError": "GitHub n'a pas terminé la fusion.",
+      "ambiguous": "Impossible de confirmer — vérifiez la PR avant de réessayer.",
+      "persistenceFailed": "Nous n'avons pas pu enregistrer cette action. Veuillez réessayer plus tard.",
+      "forbidden": "Interdit"
     }
   },
   "organization": {

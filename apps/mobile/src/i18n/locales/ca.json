@@ -411,7 +411,8 @@
         "outdatedOnPathLines": "Desactualitzat a {{path}} {{lines}}",
         "outdatedOnLines": "Desactualitzat a {{lines}}",
         "outdatedOnPath": "Desactualitzat a {{path}}"
-      }
+      },
+      "deletedUser": "usuari eliminat"
     },
     "couldNotOpenGitHubAppSettings": "No s'ha pogut obrir la configuració de l'app de GitHub",
     "installKiloGitHubApp": "Instal·la l'app Kilo de GitHub",
@@ -583,7 +584,10 @@
       "tapToComment": "{{label}}, toca per comentar",
       "statusAdded": "Afegit",
       "statusContext": "Context",
-      "statusDeleted": "Eliminat"
+      "statusDeleted": "Eliminat",
+      "lineLabel": "{{status}} línia {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(buit)"
     },
     "linkPasteClipboardEmpty": "El porta-retalls és buit",
     "linkPasteNotAPullRequest": "No és un enllaç de pull request de GitHub",
@@ -601,7 +605,10 @@
     "operation": {
       "couldNotReply": "No s'ha pogut respondre.",
       "couldNotCompleteAction": "No s'ha pogut completar aquesta acció.",
-      "mergeResultDefaultError": "GitHub no ha completat la fusió."
+      "mergeResultDefaultError": "GitHub no ha completat la fusió.",
+      "ambiguous": "No s'ha pogut confirmar — comprova el PR abans de tornar-ho a provar.",
+      "persistenceFailed": "No s'ha pogut registrar aquesta acció. Torna-ho a provar més tard.",
+      "forbidden": "Prohibit"
     }
   },
   "notifications": {
@@ -2069,7 +2076,9 @@
       "dollar": "dòlars",
       "dollar_other": "dòlars",
       "cent_many": "cèntims",
-      "dollar_many": "dòlars"
+      "dollar_many": "dòlars",
+      "costSpoken": "cost {{cost}}",
+      "costSpokenWithTime": "cost {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "No s'ha pogut obrir GitHub",
@@ -2654,7 +2663,8 @@
     "couldNotOpenStore": "No s'ha pogut obrir l'App Store.",
     "description": "Hi ha disponible una versió nova de Kilo. Actualitzeu-la per continuar.",
     "title": "Cal actualitzar",
-    "updateNow": "Actualitza ara"
+    "updateNow": "Actualitza ara",
+    "appStorePage": "pàgina de l'App Store"
   },
   "home": {
     "couldNotLoadSessions": "No s'han pogut carregar les sessions",

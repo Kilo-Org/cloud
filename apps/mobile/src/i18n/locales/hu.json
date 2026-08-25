@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Elavult itt: {{path}} {{lines}}",
         "outdatedOnLines": "Elavult itt: {{lines}}",
         "outdatedOnPath": "Elavult itt: {{path}}"
-      }
+      },
+      "deletedUser": "törölt felhasználó"
     },
     "couldNotOpenGitHubAppSettings": "Nem sikerült megnyitni a GitHub App beállításait",
     "installKiloGitHubApp": "A Kilo GitHub App telepítése",
@@ -576,7 +577,10 @@
       "truncationBanner": "A módosított {{total}} fájl közül az első {{limit}} megjelenítése — GitHub API-korlát",
       "statusAdded": "Hozzáadva",
       "statusContext": "Kontextus",
-      "statusDeleted": "Törölve"
+      "statusDeleted": "Törölve",
+      "lineLabel": "{{status}} sor {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(üres)"
     },
     "linkPasteClipboardEmpty": "A vágólap üres",
     "linkPasteNotAPullRequest": "Nem GitHub pull request hivatkozás",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Nem sikerült válaszolni.",
       "couldNotCompleteAction": "Nem sikerült végrehajtani ezt a műveletet.",
-      "mergeResultDefaultError": "A GitHub nem fejezte be az összevonást."
+      "mergeResultDefaultError": "A GitHub nem fejezte be az összevonást.",
+      "ambiguous": "Nem sikerült megerősíteni — ellenőrizze a PR-t az újrapróbálás előtt.",
+      "persistenceFailed": "Nem sikerült rögzíteni ezt a műveletet. Kérjük, próbálja újra később.",
+      "forbidden": "Tiltott"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "cent",
       "dollar_one": "dollár",
       "dollar": "dollár",
-      "dollar_other": "dollár"
+      "dollar_other": "dollár",
+      "costSpoken": "költség {{cost}}",
+      "costSpokenWithTime": "költség {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "A GitHub megnyitása nem sikerült",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Az alkalmazásbolt nem nyitható meg.",
     "description": "Elérhető a Kilo új verziója. A folytatáshoz frissíts.",
     "title": "Frissítés szükséges",
-    "updateNow": "Frissítés most"
+    "updateNow": "Frissítés most",
+    "appStorePage": "alkalmazásbolt oldala"
   },
   "home": {
     "couldNotLoadSessions": "A munkameneteket nem sikerült betölteni",

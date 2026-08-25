@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Ochie na {{path}} {{lines}}",
         "outdatedOnLines": "Ochie na {{lines}}",
         "outdatedOnPath": "Ochie na {{path}}"
-      }
+      },
+      "deletedUser": "onye ọrụ e hichapụrụ"
     },
     "couldNotOpenGitHubAppSettings": "Enweghị ike imepe ntọala Ngwa GitHub",
     "installKiloGitHubApp": "Tinye Ngwa Kilo GitHub",
@@ -576,7 +577,10 @@
       "truncationBanner": "Na-egosi nke mbụ {{limit}} n'ime {{total}} faịlụ agbanwere — njedebe API GitHub",
       "statusAdded": "Agbakwunyere",
       "statusContext": "Ọdịnaya",
-      "statusDeleted": "Ehichapụla"
+      "statusDeleted": "Ehichapụla",
+      "lineLabel": "{{status}} ahịrị {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(efu)"
     },
     "linkPasteClipboardEmpty": "Mbadamba ederede tọgbọrọ chakachara",
     "linkPasteNotAPullRequest": "Ọ bụghị njikọ arịrịọ ndọta GitHub",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Enweghị ike ịzaghachi.",
       "couldNotCompleteAction": "Enweghị ike imecha omume a.",
-      "mergeResultDefaultError": "GitHub emechaghị njikọta ahụ."
+      "mergeResultDefaultError": "GitHub emechaghị njikọta ahụ.",
+      "ambiguous": "Enweghị ike ikwenye — lelee PR tupu ị nwaa ọzọ.",
+      "persistenceFailed": "Anyị enweghị ike ịdekọ omume a. Biko nwaa ọzọ ma emechaa.",
+      "forbidden": "Amachibidoro"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "senti",
       "dollar_one": "dollar",
       "dollar": "dollar",
-      "dollar_other": "dollar"
+      "dollar_other": "dollar",
+      "costSpoken": "ọnụ ahịa {{cost}}",
+      "costSpokenWithTime": "ọnụ ahịa {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Enweghị ike imeghe GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Enweghị ike imeghe ụlọ ahịa ngwa.",
     "description": "Ụdị ọhụrụ nke Kilo dị. Biko melite ka ị gaa n'ihu.",
     "title": "Ịmelite chọrọ",
-    "updateNow": "Melite ugbu a"
+    "updateNow": "Melite ugbu a",
+    "appStorePage": "ibe ụlọ ahịa ngwa"
   },
   "home": {
     "couldNotLoadSessions": "Enweghị ike ibutu nnọkọ",

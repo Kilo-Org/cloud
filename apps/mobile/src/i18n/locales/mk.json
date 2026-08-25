@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Застарено на {{path}} {{lines}}",
         "outdatedOnLines": "Застарено на {{lines}}",
         "outdatedOnPath": "Застарено на {{path}}"
-      }
+      },
+      "deletedUser": "избришан корисник"
     },
     "couldNotOpenGitHubAppSettings": "Не можеше да се отворат поставките на GitHub App",
     "installKiloGitHubApp": "Инсталирај го Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "Прикажува првите {{limit}} од {{total}} изменети датотеки — GitHub API лимит",
       "statusAdded": "Додадено",
       "statusContext": "Контекст",
-      "statusDeleted": "Избришано"
+      "statusDeleted": "Избришано",
+      "lineLabel": "{{status}} линија {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(празно)"
     },
     "linkPasteClipboardEmpty": "Таблата со клипборд е празна",
     "linkPasteNotAPullRequest": "Ова не е линк до GitHub pull request",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Не можеше да се одговори.",
       "couldNotCompleteAction": "Не можеше да се заврши оваа акција.",
-      "mergeResultDefaultError": "GitHub не го заврши спојувањето."
+      "mergeResultDefaultError": "GitHub не го заврши спојувањето.",
+      "ambiguous": "Не можеше да се потврди — проверете го PR-от пред да се обидете повторно.",
+      "persistenceFailed": "Не можевме да ја забележиме оваа акција. Обидете се повторно подоцна.",
+      "forbidden": "Забрането"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "центи",
       "dollar_one": "долар",
       "dollar": "долари",
-      "dollar_other": "долари"
+      "dollar_other": "долари",
+      "costSpoken": "цена {{cost}}",
+      "costSpokenWithTime": "цена {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не можеше да се отвори GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Не можев да ја отворам продавницата за апликации.",
     "description": "Достапна е нова верзија на Kilo. Ажурирајте за да продолжите.",
     "title": "Потребно е ажурирање",
-    "updateNow": "Ажурирај сега"
+    "updateNow": "Ажурирај сега",
+    "appStorePage": "страница на продавницата за апликации"
   },
   "home": {
     "couldNotLoadSessions": "Не можев да ги вчитам сесиите",

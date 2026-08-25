@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Tsoho akan {{path}} {{lines}}",
         "outdatedOnLines": "Tsoho akan {{lines}}",
         "outdatedOnPath": "Tsoho akan {{path}}"
-      }
+      },
+      "deletedUser": "mai amfani da aka share"
     },
     "couldNotOpenGitHubAppSettings": "Ba a iya buɗe saitunan GitHub App ba",
     "installKiloGitHubApp": "Shigar da Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "Ana nuna farkon {{limit}} na {{total}} fayilolin da aka canza — iyakar GitHub API",
       "statusAdded": "An ƙara",
       "statusContext": "Mahallin",
-      "statusDeleted": "An share"
+      "statusDeleted": "An share",
+      "lineLabel": "{{status}} layin {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(marar komai)"
     },
     "linkPasteClipboardEmpty": "Allon kwafi babu kome",
     "linkPasteNotAPullRequest": "Ba hanyar GitHub pull request ba",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Ba a iya amsawa ba.",
       "couldNotCompleteAction": "Ba a iya kammala wannan aikin ba.",
-      "mergeResultDefaultError": "GitHub bai kammala haɗawa ba."
+      "mergeResultDefaultError": "GitHub bai kammala haɗawa ba.",
+      "ambiguous": "Ba a iya tabbatarwa ba — duba PR kafin ka sake gwadawa.",
+      "persistenceFailed": "Ba mu iya rubuta wannan aikin ba. Da fatan za ka sake gwadawa daga baya.",
+      "forbidden": "An hana"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "senti",
       "dollar_one": "dala",
       "dollar": "daloli",
-      "dollar_other": "daloli"
+      "dollar_other": "daloli",
+      "costSpoken": "Farashi {{cost}}",
+      "costSpokenWithTime": "Farashi {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "An kasa buɗe GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Ba a iya buɗe kantin apps ba.",
     "description": "Akwai sabon sigar Kilo. Da fatan za a sabunta don ci gaba.",
     "title": "Ana buƙatar sabuntawa",
-    "updateNow": "Sabunta yanzu"
+    "updateNow": "Sabunta yanzu",
+    "appStorePage": "shafin kantin apps"
   },
   "home": {
     "couldNotLoadSessions": "An kasa ɗora zaman",

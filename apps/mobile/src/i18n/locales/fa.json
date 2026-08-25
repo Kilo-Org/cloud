@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "قدیمی: {{path}} {{lines}}",
         "outdatedOnLines": "قدیمی: {{lines}}",
         "outdatedOnPath": "قدیمی: {{path}}"
-      }
+      },
+      "deletedUser": "کاربر حذف‌شده"
     },
     "couldNotOpenGitHubAppSettings": "باز کردن تنظیمات GitHub App ممکن نشد",
     "installKiloGitHubApp": "نصب Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "نمایش {{limit}} فایل اول از {{total}} فایل تغییر یافته — سقف API گیتهاب",
       "statusAdded": "افزوده شده",
       "statusContext": "زمینه",
-      "statusDeleted": "حذف شده"
+      "statusDeleted": "حذف شده",
+      "lineLabel": "{{status}} خط {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(خالی)"
     },
     "linkPasteClipboardEmpty": "کلیپبورد خالی است",
     "linkPasteNotAPullRequest": "این پیوند درخواست کشش GitHub نیست",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "پاسخ ممکن نشد.",
       "couldNotCompleteAction": "تکمیل این عمل ممکن نشد.",
-      "mergeResultDefaultError": "GitHub ادغام را تکمیل نکرد."
+      "mergeResultDefaultError": "GitHub ادغام را تکمیل نکرد.",
+      "ambiguous": "نمی‌توان تأیید کرد — قبل از تلاش مجدد، PR را بررسی کنید.",
+      "persistenceFailed": "نتوانستیم این اقدام را ثبت کنیم. لطفاً بعداً دوباره تلاش کنید.",
+      "forbidden": "ممنوع"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "سنت",
       "dollar_one": "دلار",
       "dollar": "دلار",
-      "dollar_other": "دلار"
+      "dollar_other": "دلار",
+      "costSpoken": "هزینه {{cost}}",
+      "costSpokenWithTime": "هزینه {{cost}}، {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "باز کردن GitHub ممکن نشد",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "باز کردن فروشگاه برنامه ممکن نشد.",
     "description": "نسخه جدیدی از Kilo در دسترس است. برای ادامه، به‌روزرسانی کنید.",
     "title": "به‌روزرسانی لازم است",
-    "updateNow": "اکنون به‌روزرسانی کنید"
+    "updateNow": "اکنون به‌روزرسانی کنید",
+    "appStorePage": "صفحهٔ فروشگاه برنامه"
   },
   "home": {
     "couldNotLoadSessions": "جلسات بارگذاری نشدند",

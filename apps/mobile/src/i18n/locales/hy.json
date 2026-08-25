@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Հնացած է {{path}} {{lines}}-ում",
         "outdatedOnLines": "Հնացած է {{lines}}-ում",
         "outdatedOnPath": "Հնացած է {{path}}-ում"
-      }
+      },
+      "deletedUser": "ջնջված օգտատեր"
     },
     "couldNotOpenGitHubAppSettings": "Չհաջողվեց բացել GitHub հավելվածի կարգավորումները",
     "installKiloGitHubApp": "Տեղադրել Kilo GitHub հավելվածը",
@@ -576,7 +577,10 @@
       "truncationBanner": "Ցուցադրվում են փոփոխված {{total}} ֆայլերից առաջին {{limit}}-ը — GitHub API-ի սահմանաչափ",
       "statusAdded": "Ավելացված",
       "statusContext": "Համատեքստ",
-      "statusDeleted": "Ջնջված"
+      "statusDeleted": "Ջնջված",
+      "lineLabel": "{{status}} տող {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(դատարկ)"
     },
     "linkPasteClipboardEmpty": "Սեղմատախտակը դատարկ է",
     "linkPasteNotAPullRequest": "Սա GitHub-ի pull request հղում չէ",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Չհաջողվեց պատասխանել:",
       "couldNotCompleteAction": "Չհաջողվեց ավարտել այս գործողությունը:",
-      "mergeResultDefaultError": "GitHub-ը չավարտեց միավորումը:"
+      "mergeResultDefaultError": "GitHub-ը չավարտեց միավորումը:",
+      "ambiguous": "Չհաջողվեց հաստատել — նախքան նորից փորձելը ստուգեք PR-ը։",
+      "persistenceFailed": "Մենք չկարողացանք գրանցել այս գործողությունը: Խնդրում ենք կրկին փորձել ավելի ուշ:",
+      "forbidden": "Արգելված"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "ցենտ",
       "dollar_one": "դոլար",
       "dollar": "դոլար",
-      "dollar_other": "դոլար"
+      "dollar_other": "դոլար",
+      "costSpoken": "Արժեք {{cost}}",
+      "costSpokenWithTime": "Արժեք {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Չհաջողվեց բացել GitHub-ը",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Հնարավոր չեղավ բացել հավելվածների խանութը:",
     "description": "Kilo-ի նոր տարբերակը հասանելի է: Խնդրում ենք թարմացնել՝ շարունակելու համար:",
     "title": "Թարմացումը պարտադիր է",
-    "updateNow": "Թարմացնել հիմա"
+    "updateNow": "Թարմացնել հիմա",
+    "appStorePage": "հավելվածների խանութի էջ"
   },
   "home": {
     "couldNotLoadSessions": "Հնարավոր չեղավ բեռնել նիստերը",

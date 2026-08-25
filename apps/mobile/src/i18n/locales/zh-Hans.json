@@ -1607,7 +1607,9 @@
       "cent_other": "美分",
       "dollar_one": "美元",
       "dollar": "美元",
-      "dollar_other": "美元"
+      "dollar_other": "美元",
+      "costSpoken": "费用 {{cost}}",
+      "costSpokenWithTime": "费用 {{cost}}，{{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "我们无法启动 GitHub App 设置。请重试。",
@@ -2187,7 +2189,8 @@
     "couldNotOpenStore": "无法打开应用商店。",
     "description": "Kilo 有新版本可用。请更新以继续。",
     "title": "需要更新",
-    "updateNow": "立即更新"
+    "updateNow": "立即更新",
+    "appStorePage": "应用商店页面"
   },
   "home": {
     "couldNotLoadSessions": "无法加载会话",
@@ -2584,7 +2587,8 @@
         "outdatedOnPathLines": "在 {{path}} {{lines}} 上已过时",
         "outdatedOnLines": "在 {{lines}} 上已过时",
         "outdatedOnPath": "在 {{path}} 上已过时"
-      }
+      },
+      "deletedUser": "已删除的用户"
     },
     "entry": {
       "clearLink": "清除拉取请求链接",
@@ -2862,7 +2866,10 @@
       "truncationBanner": "正在显示前 {{limit}} 个（共 {{total}} 个）已更改文件 — GitHub API 限制",
       "statusAdded": "已添加",
       "statusContext": "上下文",
-      "statusDeleted": "已删除"
+      "statusDeleted": "已删除",
+      "lineLabel": "{{status}} 行 {{line}}：{{text}}",
+      "lineLabelNoNumber": "{{status}}：{{text}}",
+      "emptyLine": "(空)"
     },
     "linkPasteClipboardEmpty": "剪贴板为空",
     "linkPasteNotAPullRequest": "不是 GitHub 拉取请求链接",
@@ -2880,7 +2887,10 @@
     "operation": {
       "couldNotReply": "无法回复。",
       "couldNotCompleteAction": "无法完成此操作。",
-      "mergeResultDefaultError": "GitHub 未完成合并。"
+      "mergeResultDefaultError": "GitHub 未完成合并。",
+      "ambiguous": "无法确认 — 请先检查 PR 再重试。",
+      "persistenceFailed": "我们无法记录此操作。请稍后重试。",
+      "forbidden": "禁止"
     }
   },
   "organization": {

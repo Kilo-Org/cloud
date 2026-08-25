@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}}-ലെ കാലഹരണപ്പെട്ടത്",
         "outdatedOnLines": "{{lines}}-ലെ കാലഹരണപ്പെട്ടത്",
         "outdatedOnPath": "{{path}}-ലെ കാലഹരണപ്പെട്ടത്"
-      }
+      },
+      "deletedUser": "ഇല്ലാതാക്കിയ ഉപയോക്താവ്"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ആപ്പ് ക്രമീകരണങ്ങൾ തുറക്കാനായില്ല",
     "installKiloGitHubApp": "Kilo GitHub ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക",
@@ -576,7 +577,10 @@
       "truncationBanner": "{{total}} മാറ്റപ്പെട്ട ഫയലുകളിൽ ആദ്യത്തെ {{limit}} കാണിക്കുന്നു — GitHub API പരിധി",
       "statusAdded": "ചേർത്തു",
       "statusContext": "കോണ്ടെക്സ്റ്റ്",
-      "statusDeleted": "ഇല്ലാതാക്കി"
+      "statusDeleted": "ഇല്ലാതാക്കി",
+      "lineLabel": "{{status}} വരി {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ശൂന്യം)"
     },
     "linkPasteClipboardEmpty": "ക്ലിപ്പ്ബോർഡ് ശൂന്യമാണ്",
     "linkPasteNotAPullRequest": "ഇത് ഒരു GitHub പുൾ റിക്വസ്റ്റ് ലിങ്ക് അല്ല",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "മറുപടി നൽകാനായില്ല.",
       "couldNotCompleteAction": "ഈ പ്രവർത്തനം പൂർത്തിയാക്കാൻ കഴിഞ്ഞില്ല.",
-      "mergeResultDefaultError": "GitHub മെർജ് പൂർത്തിയാക്കിയില്ല."
+      "mergeResultDefaultError": "GitHub മെർജ് പൂർത്തിയാക്കിയില്ല.",
+      "ambiguous": "സ്ഥിരീകരിക്കാനായില്ല — വീണ്ടും ശ്രമിക്കുന്നതിന് മുമ്പ് PR പരിശോധിക്കുക.",
+      "persistenceFailed": "ഈ പ്രവർത്തനം രേഖപ്പെടുത്താൻ ഞങ്ങൾക്ക് കഴിഞ്ഞില്ല. പിന്നീട് വീണ്ടും ശ്രമിക്കുക.",
+      "forbidden": "നിരോധിച്ചിരിക്കുന്നു"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "സെന്റുകൾ",
       "dollar_one": "ഡോളർ",
       "dollar": "ഡോളറുകൾ",
-      "dollar_other": "ഡോളറുകൾ"
+      "dollar_other": "ഡോളറുകൾ",
+      "costSpoken": "ചെലവ് {{cost}}",
+      "costSpokenWithTime": "ചെലവ് {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub തുറക്കാൻ കഴിഞ്ഞില്ല",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "ആപ്പ് സ്റ്റോർ തുറക്കാൻ കഴിഞ്ഞില്ല.",
     "description": "Kilo-യുടെ ഒരു പുതിയ പതിപ്പ് ലഭ്യമാണ്. തുടരാൻ അപ്ഡേറ്റ് ചെയ്യുക.",
     "title": "അപ്ഡേറ്റ് ആവശ്യമാണ്",
-    "updateNow": "ഇപ്പോൾ അപ്ഡേറ്റ് ചെയ്യുക"
+    "updateNow": "ഇപ്പോൾ അപ്ഡേറ്റ് ചെയ്യുക",
+    "appStorePage": "ആപ്പ് സ്റ്റോർ പേജ്"
   },
   "home": {
     "couldNotLoadSessions": "സെഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",

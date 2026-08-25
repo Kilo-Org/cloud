@@ -415,7 +415,8 @@
         "outdatedOnPathLines": "Zastarelo na {{path}} {{lines}}",
         "outdatedOnLines": "Zastarelo na {{lines}}",
         "outdatedOnPath": "Zastarelo na {{path}}"
-      }
+      },
+      "deletedUser": "izbrisani uporabnik"
     },
     "couldNotOpenGitHubAppSettings": "Nastavitev aplikacije GitHub ni bilo mogoče odpreti",
     "installKiloGitHubApp": "Namesti aplikacijo Kilo GitHub",
@@ -590,7 +591,10 @@
       "truncationBanner": "Prikaz prvih {{limit}} od {{total}} spremenjenih datotek — omejitev API GitHub",
       "statusAdded": "Dodano",
       "statusContext": "Kontekst",
-      "statusDeleted": "Izbrisano"
+      "statusDeleted": "Izbrisano",
+      "lineLabel": "{{status}} vrstica {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(prazno)"
     },
     "linkPasteClipboardEmpty": "Odložišče je prazno",
     "linkPasteNotAPullRequest": "To ni povezava do pull requesta na GitHubu",
@@ -608,7 +612,10 @@
     "operation": {
       "couldNotReply": "Odgovora ni bilo mogoče poslati.",
       "couldNotCompleteAction": "Tega dejanja ni bilo mogoče dokončati.",
-      "mergeResultDefaultError": "GitHub ni dokončal združitve."
+      "mergeResultDefaultError": "GitHub ni dokončal združitve.",
+      "ambiguous": "Ni bilo mogoče potrditi — preverite PR, preden poskusite znova.",
+      "persistenceFailed": "Tega dejanja ni bilo mogoče zabeležiti. Poskusite znova pozneje.",
+      "forbidden": "Prepovedano"
     }
   },
   "notifications": {
@@ -2084,7 +2091,9 @@
       "cent_two": "centa",
       "cent_few": "centi",
       "dollar_two": "dolarja",
-      "dollar_few": "dolarji"
+      "dollar_few": "dolarji",
+      "costSpoken": "stroški {{cost}}",
+      "costSpokenWithTime": "stroški {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ni bilo mogoče odpreti",
@@ -2674,7 +2683,8 @@
     "couldNotOpenStore": "Trgovine z aplikacijami ni bilo mogoče odpreti.",
     "description": "Na voljo je nova različica Kilo. Prosimo, posodobi za nadaljevanje.",
     "title": "Posodobitev je obvezna",
-    "updateNow": "Posodobi zdaj"
+    "updateNow": "Posodobi zdaj",
+    "appStorePage": "stran trgovine z aplikacijami"
   },
   "home": {
     "couldNotLoadSessions": "Sej ni bilo mogoče naložiti",

@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "ລ້າສະໄໝໃນ {{path}} {{lines}}",
         "outdatedOnLines": "ລ້າສະໄໝໃນ {{lines}}",
         "outdatedOnPath": "ລ້າສະໄໝໃນ {{path}}"
-      }
+      },
+      "deletedUser": "ຜູ້ໃຊ້ທີ່ຖືກລຶບ"
     },
     "couldNotOpenGitHubAppSettings": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າ GitHub App ໄດ້",
     "installKiloGitHubApp": "ຕິດຕັ້ງ Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "ກຳລັງສະແດງ {{limit}} ທຳອິດຈາກ {{total}} ໄຟລ໌ທີ່ປ່ຽນແປງ — ຂີດຈຳກັດ GitHub API",
       "statusAdded": "ເພີ່ມແລ້ວ",
       "statusContext": "ບໍລິບົດ",
-      "statusDeleted": "ລຶບແລ້ວ"
+      "statusDeleted": "ລຶບແລ້ວ",
+      "lineLabel": "{{status}} ແຖວ {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ຫວ່າງ)"
     },
     "linkPasteClipboardEmpty": "ຄລິບບອດວ່າງເປົ່າ",
     "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງ pull request ຂອງ GitHub",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "ບໍ່ສາມາດຕອບໄດ້.",
       "couldNotCompleteAction": "ບໍ່ສາມາດເຮັດການກະທຳນີ້ໃຫ້ສຳເລັດໄດ້.",
-      "mergeResultDefaultError": "GitHub ບໍ່ໄດ້ເຮັດການ merge ໃຫ້ສຳເລັດ."
+      "mergeResultDefaultError": "GitHub ບໍ່ໄດ້ເຮັດການ merge ໃຫ້ສຳເລັດ.",
+      "ambiguous": "ບໍ່ສາມາດຢືນຢັນໄດ້ — ກວດເບິ່ງ PR ກ່ອນລອງໃໝ່.",
+      "persistenceFailed": "ພວກເຮົາບໍ່ສາມາດບັນທຶກການກະທຳນີ້ໄດ້. ກະລຸນາລອງໃໝ່ພາຍຫຼັງ.",
+      "forbidden": "ຖືກຫ້າມ"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "ເຊັນ",
       "dollar_one": "ໂດລາ",
       "dollar": "ໂດລາ",
-      "dollar_other": "ໂດລາ"
+      "dollar_other": "ໂດລາ",
+      "costSpoken": "ຄ່າໃຊ້ຈ່າຍ {{cost}}",
+      "costSpokenWithTime": "ຄ່າໃຊ້ຈ່າຍ {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "ບໍ່ສາມາດເປີດ GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "ບໍ່ສາມາດເປີດ app store.",
     "description": "Kilo ຮຸ່ນໃໝ່ມີແລ້ວ. ກະລຸນາອັບເດດເພື່ອສືບຕໍ່.",
     "title": "ຕ້ອງອັບເດດ",
-    "updateNow": "ອັບເດດດຽວນີ້"
+    "updateNow": "ອັບເດດດຽວນີ້",
+    "appStorePage": "ໜ້າ app store"
   },
   "home": {
     "couldNotLoadSessions": "ບໍ່ສາມາດໂຫລດເຊດຊັນ",

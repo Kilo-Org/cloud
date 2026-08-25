@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} дээрх хуучирсан",
         "outdatedOnLines": "{{lines}} дээрх хуучирсан",
         "outdatedOnPath": "{{path}} дээрх хуучирсан"
-      }
+      },
+      "deletedUser": "Устгагдсан хэрэглэгч"
     },
     "couldNotOpenGitHubAppSettings": "GitHub App тохиргоог нээх боломжгүй",
     "installKiloGitHubApp": "Kilo GitHub App суулгах",
@@ -576,7 +577,10 @@
       "truncationBanner": "Өөрчлөгдсөн {{total}} файлаас эхний {{limit}}-ыг харуулж байна — GitHub API хязгаар",
       "statusAdded": "Нэмсэн",
       "statusContext": "Контекст",
-      "statusDeleted": "Устгасан"
+      "statusDeleted": "Устгасан",
+      "lineLabel": "{{status}} мөр {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(хоосон)"
     },
     "linkPasteClipboardEmpty": "Хуулбар самбар хоосон байна",
     "linkPasteNotAPullRequest": "Энэ нь GitHub pull request холбоос биш",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Хариулах боломжгүй.",
       "couldNotCompleteAction": "Энэ үйлдлийг гүйцэтгэх боломжгүй.",
-      "mergeResultDefaultError": "GitHub нэгтгэлтийг гүйцээгүй."
+      "mergeResultDefaultError": "GitHub нэгтгэлтийг гүйцээгүй.",
+      "ambiguous": "Баталгаажуулж чадсангүй — дахин оролдохын өмнө PR-г шалгана уу.",
+      "persistenceFailed": "Бид энэ үйлдлийг бүртгэж чадсангүй. Дараа дахин оролдоно уу.",
+      "forbidden": "Хориглосон"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "цент",
       "dollar_one": "доллар",
       "dollar": "доллар",
-      "dollar_other": "доллар"
+      "dollar_other": "доллар",
+      "costSpoken": "зардал {{cost}}",
+      "costSpokenWithTime": "зардал {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ыг нээх боломжгүй",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Апп дэлгүүрийг нээж чадсангүй.",
     "description": "Kilo-ийн шинэ хувилбар гарлаа. Үргэлжлүүлэхийн тулд шинэчлэнэ үү.",
     "title": "Шинэчлэлт шаардлагатай",
-    "updateNow": "Одоо шинэчлэх"
+    "updateNow": "Одоо шинэчлэх",
+    "appStorePage": "Апп дэлгүүрийн хуудас"
   },
   "home": {
     "couldNotLoadSessions": "Сессийг ачаалж чадсангүй",

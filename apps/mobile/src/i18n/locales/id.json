@@ -1607,7 +1607,9 @@
       "cent_other": "sen",
       "dollar_one": "dolar",
       "dollar": "dolar",
-      "dollar_other": "dolar"
+      "dollar_other": "dolar",
+      "costSpoken": "biaya {{cost}}",
+      "costSpokenWithTime": "biaya {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Kami tidak dapat memulai penyiapan Aplikasi GitHub. Silakan coba lagi.",
@@ -2187,7 +2189,8 @@
     "couldNotOpenStore": "Tidak dapat membuka toko aplikasi.",
     "description": "Versi baru Kilo tersedia. Perbarui untuk melanjutkan.",
     "title": "Pembaruan diperlukan",
-    "updateNow": "Perbarui sekarang"
+    "updateNow": "Perbarui sekarang",
+    "appStorePage": "halaman toko aplikasi"
   },
   "home": {
     "couldNotLoadSessions": "Tidak dapat memuat sesi",
@@ -2584,7 +2587,8 @@
         "outdatedOnPathLines": "Kedaluwarsa di {{path}} {{lines}}",
         "outdatedOnLines": "Kedaluwarsa di {{lines}}",
         "outdatedOnPath": "Kedaluwarsa di {{path}}"
-      }
+      },
+      "deletedUser": "pengguna yang dihapus"
     },
     "entry": {
       "clearLink": "Hapus tautan pull request",
@@ -2862,7 +2866,10 @@
       "truncationBanner": "Menampilkan {{limit}} file pertama dari {{total}} file yang diubah — batas API GitHub",
       "statusAdded": "Ditambahkan",
       "statusContext": "Konteks",
-      "statusDeleted": "Dihapus"
+      "statusDeleted": "Dihapus",
+      "lineLabel": "{{status}} baris {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(kosong)"
     },
     "linkPasteClipboardEmpty": "Clipboard kosong",
     "linkPasteNotAPullRequest": "Bukan tautan pull request GitHub",
@@ -2880,7 +2887,10 @@
     "operation": {
       "couldNotReply": "Tidak dapat membalas.",
       "couldNotCompleteAction": "Tidak dapat menyelesaikan tindakan ini.",
-      "mergeResultDefaultError": "GitHub tidak menyelesaikan penggabungan."
+      "mergeResultDefaultError": "GitHub tidak menyelesaikan penggabungan.",
+      "ambiguous": "Tidak dapat mengonfirmasi — periksa PR sebelum mencoba lagi.",
+      "persistenceFailed": "Kami tidak dapat mencatat tindakan ini. Silakan coba lagi nanti.",
+      "forbidden": "Dilarang"
     }
   },
   "organization": {

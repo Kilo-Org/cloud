@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "بەسەرچوو لەسەر {{path}} {{lines}}",
         "outdatedOnLines": "بەسەرچوو لەسەر {{lines}}",
         "outdatedOnPath": "بەسەرچوو لەسەر {{path}}"
-      }
+      },
+      "deletedUser": "بەکارهێنەری سڕراو"
     },
     "couldNotOpenGitHubAppSettings": "نەتوانرا ڕێکخستنەکانی GitHub App بکرێنەوە",
     "installKiloGitHubApp": "دامەزراندنی Kilo GitHub App",
@@ -576,7 +577,10 @@
       "tapToComment": "{{label}}، بۆ بۆچوون لێی بدە",
       "statusAdded": "زیادکراو",
       "statusContext": "دەق",
-      "statusDeleted": "سڕراو"
+      "statusDeleted": "سڕراو",
+      "lineLabel": "{{status}} هێڵی {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(بەتاڵ)"
     },
     "linkPasteClipboardEmpty": "کلیپبۆردەکە بەتاڵە",
     "linkPasteNotAPullRequest": "لینکی پرسی ڕاکێشان (pull request)ی GitHub نییە",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "نەتوانرا وەڵام بدرێتەوە.",
       "couldNotCompleteAction": "نەتوانرا ئەم کردارە تەواو بکرێت.",
-      "mergeResultDefaultError": "GitHub نەیتوانی تێکەڵکردنەکە تەواو بکات."
+      "mergeResultDefaultError": "GitHub نەیتوانی تێکەڵکردنەکە تەواو بکات.",
+      "ambiguous": "نەتوانرا پشتڕاست بکرێتەوە — پێش هەوڵدانەوە، PR بپشکنە.",
+      "persistenceFailed": "نەتوانرا ئەم کردارە تۆمار بکرێت. تکایە دواتر هەوڵبدەوە.",
+      "forbidden": "قەدەغەکراو"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "سەنت",
       "dollar_one": "دۆلار",
       "dollar": "دۆلار",
-      "dollar_other": "دۆلار"
+      "dollar_other": "دۆلار",
+      "costSpoken": "تێچووی {{cost}}",
+      "costSpokenWithTime": "تێچووی {{cost}}، {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "نەتوانرا GitHub بکرێتەوە",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "نەتوانرا دوکانەکە بکرێتەوە.",
     "description": "وەشانی نوێی Kilo بەردەستە. تکایە نوێی بکەرەوە بۆ بەردەوامبوون.",
     "title": "نوێکردنەوە پێویستە",
-    "updateNow": "ئێستا نوێ بکەرەوە"
+    "updateNow": "ئێستا نوێ بکەرەوە",
+    "appStorePage": "پەڕەی دوکانی ئەپ"
   },
   "home": {
     "couldNotLoadSessions": "نەتوانرا دانیشتنەکان باربکرێن",

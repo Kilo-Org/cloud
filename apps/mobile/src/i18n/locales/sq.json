@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "E vjetëruar te {{path}} {{lines}}",
         "outdatedOnLines": "E vjetëruar te {{lines}}",
         "outdatedOnPath": "E vjetëruar te {{path}}"
-      }
+      },
+      "deletedUser": "përdorues i fshirë"
     },
     "couldNotOpenGitHubAppSettings": "Nuk u arrit të hapeshin cilësimet e Aplikacionit të GitHub",
     "installKiloGitHubApp": "Instalo Aplikacionin Kilo të GitHub",
@@ -576,7 +577,10 @@
       "truncationBanner": "Duke shfaqur {{limit}}-in e parë nga {{total}} skedarë të ndryshuar — kufiri i API-së së GitHub",
       "statusAdded": "I shtuar",
       "statusContext": "Kontekst",
-      "statusDeleted": "I fshirë"
+      "statusDeleted": "I fshirë",
+      "lineLabel": "{{status}} rreshti {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(bosh)"
     },
     "linkPasteClipboardEmpty": "Kujtesa është bosh",
     "linkPasteNotAPullRequest": "Nuk është një lidhje e pull request në GitHub",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Nuk u arrit të përgjigjeshej.",
       "couldNotCompleteAction": "Nuk u arrit të përfundohej ky veprim.",
-      "mergeResultDefaultError": "GitHub nuk e përfundoi shkrirjen."
+      "mergeResultDefaultError": "GitHub nuk e përfundoi shkrirjen.",
+      "ambiguous": "Nuk u konfirmua — kontrollo PR-në përpara se të provosh përsëri.",
+      "persistenceFailed": "Nuk arritëm ta regjistronim këtë veprim. Provo përsëri më vonë.",
+      "forbidden": "I ndaluar"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "centë",
       "dollar_one": "dollar",
       "dollar": "dollarë",
-      "dollar_other": "dollarë"
+      "dollar_other": "dollarë",
+      "costSpoken": "kostoja {{cost}}",
+      "costSpokenWithTime": "kostoja {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nuk u hap GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Dyqani i aplikacioneve nuk mund të hapej.",
     "description": "Është i disponueshëm një version i ri i Kilo. Ju lutemi përditësoni për të vazhduar.",
     "title": "Kërkohet përditësim",
-    "updateNow": "Përditëso tani"
+    "updateNow": "Përditëso tani",
+    "appStorePage": "faqja e dyqanit të aplikacioneve"
   },
   "home": {
     "couldNotLoadSessions": "Seancat nuk u ngarkuan",

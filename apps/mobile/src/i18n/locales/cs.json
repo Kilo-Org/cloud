@@ -415,7 +415,8 @@
         "outdatedOnPathLines": "Zastaralé na {{path}} {{lines}}",
         "outdatedOnLines": "Zastaralé na {{lines}}",
         "outdatedOnPath": "Zastaralé na {{path}}"
-      }
+      },
+      "deletedUser": "smazaný uživatel"
     },
     "couldNotOpenGitHubAppSettings": "Nastavení GitHub App se nepodařilo otevřít",
     "installKiloGitHubApp": "Nainstalovat Kilo GitHub App",
@@ -590,7 +591,10 @@
       "tapToComment": "{{label}}, klepnutím okomentujete",
       "statusAdded": "Přidáno",
       "statusContext": "Kontext",
-      "statusDeleted": "Smazáno"
+      "statusDeleted": "Smazáno",
+      "lineLabel": "{{status}} řádek {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(prázdné)"
     },
     "linkPasteClipboardEmpty": "Schránka je prázdná",
     "linkPasteNotAPullRequest": "Toto není odkaz na pull request v GitHubu",
@@ -608,7 +612,10 @@
     "operation": {
       "couldNotReply": "Odpověď se nepodařilo odeslat.",
       "couldNotCompleteAction": "Tuto akci se nepodařilo dokončit.",
-      "mergeResultDefaultError": "GitHub nedokončil sloučení."
+      "mergeResultDefaultError": "GitHub nedokončil sloučení.",
+      "ambiguous": "Nepodařilo se potvrdit — zkontrolujte PR a zkuste to znovu.",
+      "persistenceFailed": "Nepodařilo se zaznamenat tuto akci. Zkuste to prosím později.",
+      "forbidden": "Zakázáno"
     }
   },
   "notifications": {
@@ -2084,7 +2091,9 @@
       "cent_few": "centy",
       "cent_many": "centů",
       "dollar_few": "dolary",
-      "dollar_many": "dolarů"
+      "dollar_many": "dolarů",
+      "costSpoken": "náklady {{cost}}",
+      "costSpokenWithTime": "náklady {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub se nepodařilo otevřít",
@@ -2674,7 +2683,8 @@
     "couldNotOpenStore": "Obchod s aplikacemi se nepodařilo otevřít.",
     "description": "Je k dispozici nová verze Kilo. Pro pokračování aktualizujte.",
     "title": "Vyžaduje se aktualizace",
-    "updateNow": "Aktualizovat nyní"
+    "updateNow": "Aktualizovat nyní",
+    "appStorePage": "stránka obchodu s aplikacemi"
   },
   "home": {
     "couldNotLoadSessions": "Relace se nepodařilo načíst",

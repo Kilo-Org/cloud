@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} இல் காலாவதியானது",
         "outdatedOnLines": "{{lines}} இல் காலாவதியானது",
         "outdatedOnPath": "{{path}} இல் காலாவதியானது"
-      }
+      },
+      "deletedUser": "நீக்கப்பட்ட பயனர்"
     },
     "couldNotOpenGitHubAppSettings": "GitHub App அமைப்புகளைத் திறக்க முடியவில்லை",
     "installKiloGitHubApp": "Kilo GitHub App ஐ நிறுவு",
@@ -576,7 +577,10 @@
       "truncationBanner": "மாற்றப்பட்ட {{total}} கோப்புகளில் முதல் {{limit}} காட்டப்படுகின்றன — GitHub API வரம்பு",
       "statusAdded": "சேர்க்கப்பட்டது",
       "statusContext": "சூழல்",
-      "statusDeleted": "நீக்கப்பட்டது"
+      "statusDeleted": "நீக்கப்பட்டது",
+      "lineLabel": "{{status}} வரி {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(காலி)"
     },
     "linkPasteClipboardEmpty": "கிளிப்போர்டு காலியாக உள்ளது",
     "linkPasteNotAPullRequest": "GitHub புல் ரீக்வெஸ்ட் இணைப்பு இல்லை",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "பதிலளிக்க முடியவில்லை.",
       "couldNotCompleteAction": "இந்த செயலை முடிக்க முடியவில்லை.",
-      "mergeResultDefaultError": "GitHub ஒருங்கிணைப்பை முடிக்கவில்லை."
+      "mergeResultDefaultError": "GitHub ஒருங்கிணைப்பை முடிக்கவில்லை.",
+      "ambiguous": "உறுதிப்படுத்த முடியவில்லை — மீண்டும் முயற்சிக்கும் முன் PR-ஐச் சரிபார்க்கவும்.",
+      "persistenceFailed": "இந்த செயலைப் பதிவு செய்ய முடியவில்லை. தயவுசெய்து பிறகு முயற்சிக்கவும்.",
+      "forbidden": "தடைசெய்யப்பட்டது"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "சென்ட்கள்",
       "dollar_one": "டாலர்",
       "dollar": "டாலர்கள்",
-      "dollar_other": "டாலர்கள்"
+      "dollar_other": "டாலர்கள்",
+      "costSpoken": "செலவு {{cost}}",
+      "costSpokenWithTime": "செலவு {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ஐ திறக்க முடியவில்லை",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "ஆப் ஸ்டோரைத் திறக்க முடியவில்லை.",
     "description": "Kiloவின் புதிய பதிப்பு கிடைக்கிறது. தொடர புதுப்பிக்கவும்.",
     "title": "புதுப்பிப்பு தேவை",
-    "updateNow": "இப்போது புதுப்பி"
+    "updateNow": "இப்போது புதுப்பி",
+    "appStorePage": "ஆப் ஸ்டோர் பக்கம்"
   },
   "home": {
     "couldNotLoadSessions": "அமர்வுகளை ஏற்ற முடியவில்லை",

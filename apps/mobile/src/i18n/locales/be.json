@@ -415,7 +415,8 @@
         "outdatedOnPathLines": "Састарэла на {{path}} {{lines}}",
         "outdatedOnLines": "Састарэла на {{lines}}",
         "outdatedOnPath": "Састарэла на {{path}}"
-      }
+      },
+      "deletedUser": "выдалены карыстальнік"
     },
     "couldNotOpenGitHubAppSettings": "Не атрымалася адкрыць налады GitHub App",
     "installKiloGitHubApp": "Усталяваць Kilo GitHub App",
@@ -590,7 +591,10 @@
       "tapToComment": "{{label}}, дакраніцеся, каб пакінуць каментар",
       "statusAdded": "Дададзены",
       "statusContext": "Кантэкст",
-      "statusDeleted": "Выдалены"
+      "statusDeleted": "Выдалены",
+      "lineLabel": "{{status}} радок {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(пуста)"
     },
     "linkPasteClipboardEmpty": "Буфер абмену пусты",
     "linkPasteNotAPullRequest": "Гэта не спасылка на pull request GitHub",
@@ -608,7 +612,10 @@
     "operation": {
       "couldNotReply": "Не атрымалася адказаць.",
       "couldNotCompleteAction": "Не атрымалася завяршыць гэтае дзеянне.",
-      "mergeResultDefaultError": "GitHub не завяршыў зліццё."
+      "mergeResultDefaultError": "GitHub не завяршыў зліццё.",
+      "ambiguous": "Не атрымалася пацвердзіць — праверце PR перад паўторнай спробай.",
+      "persistenceFailed": "Не ўдалося запісаць гэтае дзеянне. Паспрабуйце яшчэ раз пазней.",
+      "forbidden": "Забаронена"
     }
   },
   "notifications": {
@@ -2084,7 +2091,9 @@
       "cent_few": "цэнты",
       "cent_many": "цэнтаў",
       "dollar_few": "долары",
-      "dollar_many": "долараў"
+      "dollar_many": "долараў",
+      "costSpoken": "кошт {{cost}}",
+      "costSpokenWithTime": "кошт {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не атрымалася адкрыць GitHub",
@@ -2674,7 +2683,8 @@
     "couldNotOpenStore": "Не ўдалося адкрыць краму дадаткаў.",
     "description": "Даступная новая версія Kilo. Абнавіцеся, каб працягнуць.",
     "title": "Патрабуецца абнаўленне",
-    "updateNow": "Абнавіць зараз"
+    "updateNow": "Абнавіць зараз",
+    "appStorePage": "старонка крамы дадаткаў"
   },
   "home": {
     "couldNotLoadSessions": "Не ўдалося загрузіць сеансы",

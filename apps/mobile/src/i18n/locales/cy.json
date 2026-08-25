@@ -423,7 +423,8 @@
         "outdatedOnPathLines": "Hen ffasiwn ar {{path}} {{lines}}",
         "outdatedOnLines": "Hen ffasiwn ar {{lines}}",
         "outdatedOnPath": "Hen ffasiwn ar {{path}}"
-      }
+      },
+      "deletedUser": "defnyddiwr wedi'i ddileu"
     },
     "couldNotOpenGitHubAppSettings": "Ni ellid agor gosodiadau Ap GitHub",
     "installKiloGitHubApp": "Gosod Ap GitHub Kilo",
@@ -604,7 +605,10 @@
       "truncationBanner": "Yn dangos y {{limit}} cyntaf o {{total}} ffeil a newidiwyd — terfyn API GitHub",
       "statusAdded": "Wedi'i ychwanegu",
       "statusContext": "Cyd-destun",
-      "statusDeleted": "Wedi'i ddileu"
+      "statusDeleted": "Wedi'i ddileu",
+      "lineLabel": "{{status}} llinell {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(gwag)"
     },
     "linkPasteClipboardEmpty": "Mae'r clipfwrdd yn wag",
     "linkPasteNotAPullRequest": "Nid dolen GitHub pull request yw hon",
@@ -622,7 +626,10 @@
     "operation": {
       "couldNotReply": "Ni ellid ateb.",
       "couldNotCompleteAction": "Ni ellid cwblhau'r weithred hon.",
-      "mergeResultDefaultError": "Ni chwblhaodd GitHub y cyfuniad."
+      "mergeResultDefaultError": "Ni chwblhaodd GitHub y cyfuniad.",
+      "ambiguous": "Ni ellid cadarnhau — gwiriwch y PR cyn rhoi cynnig arall arni.",
+      "persistenceFailed": "Ni ellid cofnodi'r weithred hon. Rhowch gynnig arall arni yn nes ymlaen.",
+      "forbidden": "Gwaharddedig"
     }
   },
   "notifications": {
@@ -2114,7 +2121,9 @@
       "dollar_zero": "doler",
       "dollar_two": "ddoler",
       "dollar_few": "ddoler",
-      "dollar_many": "doler"
+      "dollar_many": "doler",
+      "costSpoken": "cost {{cost}}",
+      "costSpokenWithTime": "cost {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Methwyd agor GitHub",
@@ -2714,7 +2723,8 @@
     "couldNotOpenStore": "Methwyd agor y siop apiau.",
     "description": "Mae fersiwn newydd o Kilo ar gael. Diweddarwch i barhau.",
     "title": "Angen diweddaru",
-    "updateNow": "Diweddaru nawr"
+    "updateNow": "Diweddaru nawr",
+    "appStorePage": "tudalen y siop apiau"
   },
   "home": {
     "couldNotLoadSessions": "Methwyd llwytho sesiynau",

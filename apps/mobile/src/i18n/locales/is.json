@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Úrelt á {{path}} {{lines}}",
         "outdatedOnLines": "Úrelt á {{lines}}",
         "outdatedOnPath": "Úrelt á {{path}}"
-      }
+      },
+      "deletedUser": "eyddur notandi"
     },
     "couldNotOpenGitHubAppSettings": "Gat ekki opnað stillingar GitHub App",
     "installKiloGitHubApp": "Settu upp Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "Sýni fyrstu {{limit}} af {{total}} breyttum skrám — GitHub API takmörk",
       "statusAdded": "Bætt",
       "statusContext": "Samhengi",
-      "statusDeleted": "Eytt"
+      "statusDeleted": "Eytt",
+      "lineLabel": "{{status}} lína {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(tómt)"
     },
     "linkPasteClipboardEmpty": "Klippiborð er tómt",
     "linkPasteNotAPullRequest": "Ekki GitHub pull request hlekkur",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Gat ekki svarað.",
       "couldNotCompleteAction": "Gat ekki lokið þessari aðgerð.",
-      "mergeResultDefaultError": "GitHub kláraði ekki sameininguna."
+      "mergeResultDefaultError": "GitHub kláraði ekki sameininguna.",
+      "ambiguous": "Gat ekki staðfest — athugaðu PR áður en þú reynir aftur.",
+      "persistenceFailed": "Við gátum ekki skráð þessa aðgerð. Reyndu aftur síðar.",
+      "forbidden": "Bannað"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "cent",
       "dollar_one": "dalur",
       "dollar": "dalir",
-      "dollar_other": "dalir"
+      "dollar_other": "dalir",
+      "costSpoken": "kostnaður {{cost}}",
+      "costSpokenWithTime": "kostnaður {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ekki tókst að opna GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Ekki tókst að opna app-verslunina.",
     "description": "Ný útgáfa af Kilo er tiltæk. Uppfærðu til að halda áfram.",
     "title": "Uppfærsla nauðsynleg",
-    "updateNow": "Uppfæra núna"
+    "updateNow": "Uppfæra núna",
+    "appStorePage": "app-verslunarsíða"
   },
   "home": {
     "couldNotLoadSessions": "Ekki tókst að hlaða lotur",

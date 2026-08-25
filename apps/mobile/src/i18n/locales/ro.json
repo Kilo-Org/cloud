@@ -411,7 +411,8 @@
         "outdatedOnPathLines": "Învechit pe {{path}} {{lines}}",
         "outdatedOnLines": "Învechit pe {{lines}}",
         "outdatedOnPath": "Învechit pe {{path}}"
-      }
+      },
+      "deletedUser": "utilizator șters"
     },
     "couldNotOpenGitHubAppSettings": "Nu s-au putut deschide setările aplicației GitHub",
     "installKiloGitHubApp": "Instalează Kilo GitHub App",
@@ -583,7 +584,10 @@
       "truncationBanner": "Se afișează primele {{limit}} din {{total}} fișiere modificate — limita API GitHub",
       "statusAdded": "Adăugat",
       "statusContext": "Context",
-      "statusDeleted": "Șters"
+      "statusDeleted": "Șters",
+      "lineLabel": "{{status}} linia {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(gol)"
     },
     "linkPasteClipboardEmpty": "Clipboard-ul este gol",
     "linkPasteNotAPullRequest": "Nu este un link de pull request GitHub",
@@ -601,7 +605,10 @@
     "operation": {
       "couldNotReply": "Nu s-a putut răspunde.",
       "couldNotCompleteAction": "Nu s-a putut finaliza această acțiune.",
-      "mergeResultDefaultError": "GitHub nu a finalizat fuzionarea."
+      "mergeResultDefaultError": "GitHub nu a finalizat fuzionarea.",
+      "ambiguous": "Nu s-a putut confirma — verifică PR-ul înainte de a reîncerca.",
+      "persistenceFailed": "Nu am putut înregistra această acțiune. Încearcă din nou mai târziu.",
+      "forbidden": "Interzis"
     }
   },
   "notifications": {
@@ -2069,7 +2076,9 @@
       "dollar": "dolari",
       "dollar_other": "dolari",
       "cent_few": "cenți",
-      "dollar_few": "dolari"
+      "dollar_few": "dolari",
+      "costSpoken": "cost {{cost}}",
+      "costSpokenWithTime": "cost {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nu s-a putut deschide GitHub",
@@ -2654,7 +2663,8 @@
     "couldNotOpenStore": "Magazinul de aplicații nu a putut fi deschis.",
     "description": "Este disponibilă o versiune nouă de Kilo. Actualizează pentru a continua.",
     "title": "Actualizare necesară",
-    "updateNow": "Actualizează acum"
+    "updateNow": "Actualizează acum",
+    "appStorePage": "pagina magazinului de aplicații"
   },
   "home": {
     "couldNotLoadSessions": "Sesiunile nu au putut fi încărcate",

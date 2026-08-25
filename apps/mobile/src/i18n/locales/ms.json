@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Usang pada {{path}} {{lines}}",
         "outdatedOnLines": "Usang pada {{lines}}",
         "outdatedOnPath": "Usang pada {{path}}"
-      }
+      },
+      "deletedUser": "pengguna dipadam"
     },
     "couldNotOpenGitHubAppSettings": "Tidak dapat membuka tetapan Apl GitHub",
     "installKiloGitHubApp": "Pasang Apl GitHub Kilo",
@@ -576,7 +577,10 @@
       "truncationBanner": "Menunjukkan {{limit}} fail pertama daripada {{total}} fail yang diubah — had API GitHub",
       "statusAdded": "Ditambah",
       "statusContext": "Konteks",
-      "statusDeleted": "Dipadam"
+      "statusDeleted": "Dipadam",
+      "lineLabel": "{{status}} baris {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(kosong)"
     },
     "linkPasteClipboardEmpty": "Papan keratan kosong",
     "linkPasteNotAPullRequest": "Bukan pautan permintaan tarik GitHub",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Tidak dapat membalas.",
       "couldNotCompleteAction": "Tidak dapat melengkapkan tindakan ini.",
-      "mergeResultDefaultError": "GitHub tidak melengkapkan gabungan."
+      "mergeResultDefaultError": "GitHub tidak melengkapkan gabungan.",
+      "ambiguous": "Tidak dapat mengesahkan — semak PR sebelum mencuba lagi.",
+      "persistenceFailed": "Kami tidak dapat merakam tindakan ini. Sila cuba lagi kemudian.",
+      "forbidden": "Dilarang"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "sen",
       "dollar_one": "dolar",
       "dollar": "dolar",
-      "dollar_other": "dolar"
+      "dollar_other": "dolar",
+      "costSpoken": "kos {{cost}}",
+      "costSpokenWithTime": "kos {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Tidak dapat membuka GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Tidak dapat membuka gedung apl.",
     "description": "Versi baharu Kilo tersedia. Sila kemas kini untuk meneruskan.",
     "title": "Kemas kini diperlukan",
-    "updateNow": "Kemas kini sekarang"
+    "updateNow": "Kemas kini sekarang",
+    "appStorePage": "halaman gedung apl"
   },
   "home": {
     "couldNotLoadSessions": "Tidak dapat memuatkan sesi",

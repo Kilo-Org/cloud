@@ -1607,7 +1607,9 @@
       "cent_other": "セント",
       "dollar_one": "ドル",
       "dollar": "ドル",
-      "dollar_other": "ドル"
+      "dollar_other": "ドル",
+      "costSpoken": "コスト {{cost}}",
+      "costSpokenWithTime": "コスト {{cost}}、{{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub Appのセットアップを開始できませんでした。もう一度お試しください。",
@@ -2187,7 +2189,8 @@
     "couldNotOpenStore": "アプリストアを開けませんでした。",
     "description": "Kiloの新しいバージョンが利用可能です。続行するには更新してください。",
     "title": "更新が必要です",
-    "updateNow": "今すぐ更新"
+    "updateNow": "今すぐ更新",
+    "appStorePage": "アプリストアのページ"
   },
   "home": {
     "couldNotLoadSessions": "セッションを読み込めませんでした",
@@ -2584,7 +2587,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}}の古いコメント",
         "outdatedOnLines": "{{lines}}の古いコメント",
         "outdatedOnPath": "{{path}}の古いコメント"
-      }
+      },
+      "deletedUser": "削除されたユーザー"
     },
     "entry": {
       "clearLink": "プルリクエストリンクをクリア",
@@ -2862,7 +2866,10 @@
       "truncationBanner": "変更されたファイル {{total}} 件中、最初の {{limit}} 件を表示中 — GitHub API の制限",
       "statusAdded": "追加",
       "statusContext": "コンテキスト",
-      "statusDeleted": "削除"
+      "statusDeleted": "削除",
+      "lineLabel": "{{status}} {{line}}行: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "（空）"
     },
     "linkPasteClipboardEmpty": "クリップボードが空です",
     "linkPasteNotAPullRequest": "GitHub のプルリクエストリンクではありません",
@@ -2880,7 +2887,10 @@
     "operation": {
       "couldNotReply": "返信できませんでした。",
       "couldNotCompleteAction": "この操作を完了できませんでした。",
-      "mergeResultDefaultError": "GitHubはマージを完了しませんでした。"
+      "mergeResultDefaultError": "GitHubはマージを完了しませんでした。",
+      "ambiguous": "確認できませんでした — 再試行する前にPRを確認してください。",
+      "persistenceFailed": "この操作を記録できませんでした。後でもう一度お試しください。",
+      "forbidden": "禁止"
     }
   },
   "organization": {

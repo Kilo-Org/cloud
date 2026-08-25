@@ -419,7 +419,8 @@
         "outdatedOnPathLines": "Seanchaithe ar {{path}} {{lines}}",
         "outdatedOnLines": "Seanchaithe ar {{lines}}",
         "outdatedOnPath": "Seanchaithe ar {{path}}"
-      }
+      },
+      "deletedUser": "úsáideoir scriosta"
     },
     "couldNotOpenGitHubAppSettings": "Níorbh fhéidir socruithe Aip GitHub a oscailt",
     "installKiloGitHubApp": "Suiteáil Aip GitHub Kilo",
@@ -597,7 +598,10 @@
       "truncationBanner": "Ag taispeáint an chéad {{limit}} de na {{total}} chomhad athraithe — teorainn API GitHub",
       "statusAdded": "Curtha leis",
       "statusContext": "Comhthéacs",
-      "statusDeleted": "Scriosta"
+      "statusDeleted": "Scriosta",
+      "lineLabel": "{{status}} líne {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(folamh)"
     },
     "linkPasteClipboardEmpty": "Tá an ghearrthaisce folamh",
     "linkPasteNotAPullRequest": "Ní nasc pull request GitHub é seo",
@@ -615,7 +619,10 @@
     "operation": {
       "couldNotReply": "Níorbh fhéidir freagra a thabhairt.",
       "couldNotCompleteAction": "Níorbh fhéidir an gníomh seo a chríochnú.",
-      "mergeResultDefaultError": "Níor chríochnaigh GitHub an cumaisc."
+      "mergeResultDefaultError": "Níor chríochnaigh GitHub an cumaisc.",
+      "ambiguous": "Níorbh fhéidir deimhniú — seiceáil an PR sula ndéanann tú iarracht arís.",
+      "persistenceFailed": "Níorbh fhéidir linn an gníomh seo a thaifeadadh. Bain triail as arís níos déanaí.",
+      "forbidden": "Toirmiscthe"
     }
   },
   "notifications": {
@@ -2099,7 +2106,9 @@
       "cent_many": "cent",
       "dollar_two": "dollar",
       "dollar_few": "dollar",
-      "dollar_many": "dollar"
+      "dollar_many": "dollar",
+      "costSpoken": "costas {{cost}}",
+      "costSpokenWithTime": "costas {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Níorbh fhéidir GitHub a oscailt",
@@ -2694,7 +2703,8 @@
     "couldNotOpenStore": "Níorbh fhéidir an siopa aip a oscailt.",
     "description": "Tá leagan nua de Kilo ar fáil. Nuashonraigh le leanúint ar aghaidh.",
     "title": "Nuashonrú riachtanach",
-    "updateNow": "Nuashonraigh anois"
+    "updateNow": "Nuashonraigh anois",
+    "appStorePage": "leathanach an tsiopa aip"
   },
   "home": {
     "couldNotLoadSessions": "Níorbh fhéidir seisiúin a lódáil",

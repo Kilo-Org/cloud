@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "ล้าสมัยบน {{path}} {{lines}}",
         "outdatedOnLines": "ล้าสมัยบน {{lines}}",
         "outdatedOnPath": "ล้าสมัยบน {{path}}"
-      }
+      },
+      "deletedUser": "ผู้ใช้ที่ถูกลบ"
     },
     "couldNotOpenGitHubAppSettings": "ไม่สามารถเปิดการตั้งค่า GitHub App ได้",
     "installKiloGitHubApp": "ติดตั้ง Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "กำลังแสดง {{limit}} ไฟล์แรกจากทั้งหมด {{total}} ไฟล์ที่เปลี่ยนแปลง — ขีดจำกัด API ของ GitHub",
       "statusAdded": "เพิ่มแล้ว",
       "statusContext": "บริบท",
-      "statusDeleted": "ลบแล้ว"
+      "statusDeleted": "ลบแล้ว",
+      "lineLabel": "{{status}} บรรทัด {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ว่างเปล่า)"
     },
     "linkPasteClipboardEmpty": "คลิปบอร์ดว่างเปล่า",
     "linkPasteNotAPullRequest": "ไม่ใช่ลิงก์คำขอดึงของ GitHub",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "ไม่สามารถตอบกลับได้",
       "couldNotCompleteAction": "ไม่สามารถดำเนินการนี้ให้เสร็จสมบูรณ์ได้",
-      "mergeResultDefaultError": "GitHub ไม่ได้รวมให้เสร็จสมบูรณ์"
+      "mergeResultDefaultError": "GitHub ไม่ได้รวมให้เสร็จสมบูรณ์",
+      "ambiguous": "ยืนยันไม่ได้ — โปรดตรวจสอบ PR ก่อนลองอีกครั้ง",
+      "persistenceFailed": "เราไม่สามารถบันทึกการดำเนินการนี้ได้ โปรดลองอีกครั้งในภายหลัง",
+      "forbidden": "ถูกห้าม"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "cents",
       "dollar_one": "ดอลลาร์",
       "dollar": "ดอลลาร์",
-      "dollar_other": "ดอลลาร์"
+      "dollar_other": "ดอลลาร์",
+      "costSpoken": "ค่าใช้จ่าย {{cost}}",
+      "costSpokenWithTime": "ค่าใช้จ่าย {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "ไม่สามารถเปิด GitHub ได้",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "เปิด App Store ไม่สำเร็จ",
     "description": "มี Kilo เวอร์ชันใหม่ กรุณาอัปเดตเพื่อดำเนินการต่อ",
     "title": "ต้องอัปเดต",
-    "updateNow": "อัปเดตตอนนี้"
+    "updateNow": "อัปเดตตอนนี้",
+    "appStorePage": "หน้า App Store"
   },
   "home": {
     "couldNotLoadSessions": "โหลดเซสชันไม่สำเร็จ",

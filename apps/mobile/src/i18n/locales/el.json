@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Ξεπερασμένο στο {{path}} {{lines}}",
         "outdatedOnLines": "Ξεπερασμένο στις {{lines}}",
         "outdatedOnPath": "Ξεπερασμένο στο {{path}}"
-      }
+      },
+      "deletedUser": "διαγραμμένος χρήστης"
     },
     "couldNotOpenGitHubAppSettings": "Δεν ήταν δυνατό το άνοιγμα των ρυθμίσεων GitHub App",
     "installKiloGitHubApp": "Εγκατάσταση του Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "Εμφάνιση των πρώτων {{limit}} από {{total}} αλλαγμένα αρχεία — όριο API του GitHub",
       "statusAdded": "Προστέθηκε",
       "statusContext": "Πλαίσιο",
-      "statusDeleted": "Διαγράφηκε"
+      "statusDeleted": "Διαγράφηκε",
+      "lineLabel": "{{status}} γραμμή {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(κενό)"
     },
     "linkPasteClipboardEmpty": "Το πρόχειρο είναι άδειο",
     "linkPasteNotAPullRequest": "Δεν είναι σύνδεσμος pull request του GitHub",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Δεν ήταν δυνατή η απάντηση.",
       "couldNotCompleteAction": "Δεν ήταν δυνατή η ολοκλήρωση αυτής της ενέργειας.",
-      "mergeResultDefaultError": "Το GitHub δεν ολοκλήρωσε τη συγχώνευση."
+      "mergeResultDefaultError": "Το GitHub δεν ολοκλήρωσε τη συγχώνευση.",
+      "ambiguous": "Δεν ήταν δυνατή η επιβεβαίωση — ελέγξτε το PR πριν δοκιμάσετε ξανά.",
+      "persistenceFailed": "Δεν ήταν δυνατή η καταγραφή αυτής της ενέργειας. Δοκιμάστε ξανά αργότερα.",
+      "forbidden": "Απαγορεύεται"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "σεντς",
       "dollar_one": "δολάριο",
       "dollar": "δολάρια",
-      "dollar_other": "δολάρια"
+      "dollar_other": "δολάρια",
+      "costSpoken": "κόστος {{cost}}",
+      "costSpokenWithTime": "κόστος {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Δεν ήταν δυνατό το άνοιγμα του GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Δεν ήταν δυνατό το άνοιγμα του καταστήματος εφαρμογών.",
     "description": "Μια νέα έκδοση του Kilo είναι διαθέσιμη. Ενημερώστε για να συνεχίσετε.",
     "title": "Απαιτείται ενημέρωση",
-    "updateNow": "Ενημέρωση τώρα"
+    "updateNow": "Ενημέρωση τώρα",
+    "appStorePage": "σελίδα καταστήματος εφαρμογών"
   },
   "home": {
     "couldNotLoadSessions": "Δεν ήταν δυνατή η φόρτωση συνεδριών",

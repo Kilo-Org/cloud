@@ -1607,7 +1607,9 @@
       "cent_other": "centen",
       "dollar_one": "dollar",
       "dollar": "dollars",
-      "dollar_other": "dollars"
+      "dollar_other": "dollars",
+      "costSpoken": "kosten {{cost}}",
+      "costSpokenWithTime": "kosten {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "We konden de installatie van de GitHub-app niet starten. Probeer het opnieuw.",
@@ -2187,7 +2189,8 @@
     "couldNotOpenStore": "De app store kon niet worden geopend.",
     "description": "Er is een nieuwe versie van Kilo beschikbaar. Werk bij om door te gaan.",
     "title": "Update vereist",
-    "updateNow": "Nu bijwerken"
+    "updateNow": "Nu bijwerken",
+    "appStorePage": "app store-pagina"
   },
   "home": {
     "couldNotLoadSessions": "Sessies konden niet worden geladen",
@@ -2584,7 +2587,8 @@
         "outdatedOnPathLines": "Verouderd op {{path}} {{lines}}",
         "outdatedOnLines": "Verouderd op {{lines}}",
         "outdatedOnPath": "Verouderd op {{path}}"
-      }
+      },
+      "deletedUser": "verwijderde gebruiker"
     },
     "entry": {
       "clearLink": "Pull-aanvraag-link wissen",
@@ -2862,7 +2866,10 @@
       "truncationBanner": "De eerste {{limit}} van {{total}} gewijzigde bestanden worden getoond — GitHub API-limiet",
       "statusAdded": "Toegevoegd",
       "statusContext": "Context",
-      "statusDeleted": "Verwijderd"
+      "statusDeleted": "Verwijderd",
+      "lineLabel": "{{status}} regel {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(leeg)"
     },
     "linkPasteClipboardEmpty": "Klembord is leeg",
     "linkPasteNotAPullRequest": "Geen GitHub pull-requestlink",
@@ -2880,7 +2887,10 @@
     "operation": {
       "couldNotReply": "Kon niet reageren.",
       "couldNotCompleteAction": "Deze actie kon niet worden voltooid.",
-      "mergeResultDefaultError": "GitHub heeft de merge niet voltooid."
+      "mergeResultDefaultError": "GitHub heeft de merge niet voltooid.",
+      "ambiguous": "Kon niet bevestigen — controleer de PR voordat je het opnieuw probeert.",
+      "persistenceFailed": "We konden deze actie niet vastleggen. Probeer het later opnieuw.",
+      "forbidden": "Verboden"
     }
   },
   "organization": {

@@ -411,7 +411,8 @@
         "outdatedOnPathLines": "Desatualizado em {{path}} {{lines}}",
         "outdatedOnLines": "Desatualizado em {{lines}}",
         "outdatedOnPath": "Desatualizado em {{path}}"
-      }
+      },
+      "deletedUser": "utilizador eliminado"
     },
     "couldNotOpenGitHubAppSettings": "Não foi possível abrir as definições da GitHub App",
     "installKiloGitHubApp": "Instalar a Kilo GitHub App",
@@ -583,7 +584,10 @@
       "truncationBanner": "A mostrar os primeiros {{limit}} de {{total}} ficheiros alterados — limite da API do GitHub",
       "statusAdded": "Adicionado",
       "statusContext": "Contexto",
-      "statusDeleted": "Eliminado"
+      "statusDeleted": "Eliminado",
+      "lineLabel": "{{status}} linha {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(vazio)"
     },
     "linkPasteClipboardEmpty": "A área de transferência está vazia",
     "linkPasteNotAPullRequest": "Não é uma ligação de pull request do GitHub",
@@ -601,7 +605,10 @@
     "operation": {
       "couldNotReply": "Não foi possível responder.",
       "couldNotCompleteAction": "Não foi possível concluir esta ação.",
-      "mergeResultDefaultError": "O GitHub não concluiu a fusão."
+      "mergeResultDefaultError": "O GitHub não concluiu a fusão.",
+      "ambiguous": "Não foi possível confirmar — verifique o PR antes de tentar novamente.",
+      "persistenceFailed": "Não foi possível registar esta ação. Tente novamente mais tarde.",
+      "forbidden": "Proibido"
     }
   },
   "notifications": {
@@ -2069,7 +2076,9 @@
       "dollar": "dólares",
       "dollar_other": "dólares",
       "cent_many": "cêntimos",
-      "dollar_many": "dólares"
+      "dollar_many": "dólares",
+      "costSpoken": "custo {{cost}}",
+      "costSpokenWithTime": "custo {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Não foi possível abrir o GitHub",
@@ -2654,7 +2663,8 @@
     "couldNotOpenStore": "Não foi possível abrir a loja de aplicações.",
     "description": "Está disponível uma nova versão do Kilo. Atualize para continuar.",
     "title": "Atualização necessária",
-    "updateNow": "Atualizar agora"
+    "updateNow": "Atualizar agora",
+    "appStorePage": "página da loja de aplicações"
   },
   "home": {
     "couldNotLoadSessions": "Não foi possível carregar as sessões",

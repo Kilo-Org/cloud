@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} da eskirgan",
         "outdatedOnLines": "{{lines}} da eskirgan",
         "outdatedOnPath": "{{path}} da eskirgan"
-      }
+      },
+      "deletedUser": "o'chirilgan foydalanuvchi"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ilovasi sozlamalarini ochib bo'lmadi",
     "installKiloGitHubApp": "Kilo GitHub ilovasini o'rnatish",
@@ -576,7 +577,10 @@
       "truncationBanner": "Jami {{total}} ta o'zgartirilgan fayldan dastlabki {{limit}} tasi ko'rsatilmoqda — GitHub API chegarasi",
       "statusAdded": "Qo'shildi",
       "statusContext": "Kontekst",
-      "statusDeleted": "O'chirildi"
+      "statusDeleted": "O'chirildi",
+      "lineLabel": "{{status}} qator {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(bo'sh)"
     },
     "linkPasteClipboardEmpty": "Vaqtinchalik xotira bo‘sh",
     "linkPasteNotAPullRequest": "Bu GitHub pull request havolasi emas",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Javob bera olmadi.",
       "couldNotCompleteAction": "Bu amalni yakunlab bo'lmadi.",
-      "mergeResultDefaultError": "GitHub birlashtirishni yakunlamadi."
+      "mergeResultDefaultError": "GitHub birlashtirishni yakunlamadi.",
+      "ambiguous": "Tasdiqlab bo'lmadi — qayta urinishdan oldin PR'ni tekshiring.",
+      "persistenceFailed": "Bu amalni yozib ololmadik. Iltimos, keyinroq qayta urinib ko'ring.",
+      "forbidden": "Taqiqlangan"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "sent",
       "dollar_one": "dollar",
       "dollar": "dollar",
-      "dollar_other": "dollar"
+      "dollar_other": "dollar",
+      "costSpoken": "xarajat {{cost}}",
+      "costSpokenWithTime": "xarajat {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub'ni ochib bo'lmadi",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Ilova do'konini ochib bo'lmadi.",
     "description": "Kilo'ning yangi versiyasi mavjud. Davom etish uchun yangilang.",
     "title": "Yangilash talab qilinadi",
-    "updateNow": "Hozir yangilash"
+    "updateNow": "Hozir yangilash",
+    "appStorePage": "ilova do'koni sahifasi"
   },
   "home": {
     "couldNotLoadSessions": "Sessiyalarni yuklab bo'lmadi",

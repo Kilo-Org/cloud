@@ -1607,7 +1607,9 @@
       "cent_other": "सेंट",
       "dollar_one": "डॉलर",
       "dollar": "डॉलर",
-      "dollar_other": "डॉलर"
+      "dollar_other": "डॉलर",
+      "costSpoken": "लागत {{cost}}",
+      "costSpokenWithTime": "लागत {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "हम GitHub ऐप सेटअप शुरू नहीं कर सके। कृपया फिर से कोशिश करें।",
@@ -2187,7 +2189,8 @@
     "couldNotOpenStore": "ऐप स्टोर नहीं खुल सका।",
     "description": "Kilo का नया संस्करण उपलब्ध है। जारी रखने के लिए कृपया अपडेट करें।",
     "title": "अपडेट आवश्यक",
-    "updateNow": "अभी अपडेट करें"
+    "updateNow": "अभी अपडेट करें",
+    "appStorePage": "ऐप स्टोर पेज"
   },
   "home": {
     "couldNotLoadSessions": "सत्र लोड नहीं हो सके",
@@ -2584,7 +2587,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} पर पुराना",
         "outdatedOnLines": "{{lines}} पर पुराना",
         "outdatedOnPath": "{{path}} पर पुराना"
-      }
+      },
+      "deletedUser": "हटाया गया उपयोगकर्ता"
     },
     "entry": {
       "clearLink": "पुल रिक्वेस्ट लिंक साफ़ करें",
@@ -2862,7 +2866,10 @@
       "truncationBanner": "बदली गई {{total}} फ़ाइलों में से पहली {{limit}} फ़ाइलें दिखाई जा रही हैं — GitHub API सीमा",
       "statusAdded": "जोड़ा गया",
       "statusContext": "संदर्भ",
-      "statusDeleted": "हटाया गया"
+      "statusDeleted": "हटाया गया",
+      "lineLabel": "{{status}} पंक्ति {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(खाली)"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली है",
     "linkPasteNotAPullRequest": "यह GitHub पुल रिक्वेस्ट लिंक नहीं है",
@@ -2880,7 +2887,10 @@
     "operation": {
       "couldNotReply": "उत्तर नहीं दे सका।",
       "couldNotCompleteAction": "यह कार्रवाई पूरी नहीं हो सकी।",
-      "mergeResultDefaultError": "GitHub ने मर्ज पूरा नहीं किया।"
+      "mergeResultDefaultError": "GitHub ने मर्ज पूरा नहीं किया।",
+      "ambiguous": "पुष्टि नहीं हो सकी — दोबारा कोशिश करने से पहले PR जाँचें।",
+      "persistenceFailed": "हम इस कार्रवाई को रिकॉर्ड नहीं कर सके। कृपया बाद में फिर से प्रयास करें।",
+      "forbidden": "निषिद्ध"
     }
   },
   "organization": {

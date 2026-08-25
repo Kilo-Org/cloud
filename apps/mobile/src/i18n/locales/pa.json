@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} 'ਤੇ ਪੁਰਾਣਾ",
         "outdatedOnLines": "{{lines}} 'ਤੇ ਪੁਰਾਣਾ",
         "outdatedOnPath": "{{path}} 'ਤੇ ਪੁਰਾਣਾ"
-      }
+      },
+      "deletedUser": "ਮਿਟਾਇਆ ਗਿਆ ਉਪਭੋਗਤਾ"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ਐਪ ਸੈਟਿੰਗਾਂ ਖੋਲ੍ਹੀਆਂ ਨਹੀਂ ਜਾ ਸਕੀਆਂ",
     "installKiloGitHubApp": "Kilo GitHub ਐਪ ਸਥਾਪਿਤ ਕਰੋ",
@@ -576,7 +577,10 @@
       "truncationBanner": "ਕੁੱਲ {{total}} ਬਦਲੀਆਂ ਫਾਈਲਾਂ ਵਿੱਚੋਂ ਪਹਿਲੇ {{limit}} ਦਿਖਾਏ ਜਾ ਰਹੇ ਹਨ — GitHub API ਸੀਮਾ",
       "statusAdded": "ਜੋੜਿਆ ਗਿਆ",
       "statusContext": "ਸੰਦਰਭ",
-      "statusDeleted": "ਮਿਟਾਇਆ ਗਿਆ"
+      "statusDeleted": "ਮਿਟਾਇਆ ਗਿਆ",
+      "lineLabel": "{{status}} ਲਾਈਨ {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ਖਾਲੀ)"
     },
     "linkPasteClipboardEmpty": "ਕਲਿੱਪਬੋਰਡ ਖਾਲੀ ਹੈ",
     "linkPasteNotAPullRequest": "ਇਹ GitHub ਪੁੱਲ ਰਿਕਸਟ ਲਿੰਕ ਨਹੀਂ ਹੈ",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ ਜਾ ਸਕਿਆ।",
       "couldNotCompleteAction": "ਇਹ ਕਾਰਵਾਈ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
-      "mergeResultDefaultError": "GitHub ਨੇ ਮਰਜ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ।"
+      "mergeResultDefaultError": "GitHub ਨੇ ਮਰਜ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ।",
+      "ambiguous": "ਪੁਸ਼ਟੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ — ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ PR ਚੈੱਕ ਕਰੋ।",
+      "persistenceFailed": "ਅਸੀਂ ਇਹ ਕਾਰਵਾਈ ਰਿਕਾਰਡ ਨਹੀਂ ਕਰ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "forbidden": "ਮਨਾਹੀ"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "ਸੈਂਟ",
       "dollar_one": "ਡਾਲਰ",
       "dollar": "ਡਾਲਰ",
-      "dollar_other": "ਡਾਲਰ"
+      "dollar_other": "ਡਾਲਰ",
+      "costSpoken": "ਲਾਗਤ {{cost}}",
+      "costSpokenWithTime": "ਲਾਗਤ {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "ਐਪ ਸਟੋਰ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
     "description": "Kilo ਦਾ ਨਵਾਂ ਵਰਜਨ ਉਪਲਬਧ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਜਾਰੀ ਰੱਖਣ ਲਈ ਅੱਪਡੇਟ ਕਰੋ।",
     "title": "ਅੱਪਡੇਟ ਲੋੜੀਂਦਾ ਹੈ",
-    "updateNow": "ਹੁਣ ਅੱਪਡੇਟ ਕਰੋ"
+    "updateNow": "ਹੁਣ ਅੱਪਡੇਟ ਕਰੋ",
+    "appStorePage": "ਐਪ ਸਟੋਰ ਪੰਨਾ"
   },
   "home": {
     "couldNotLoadSessions": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",

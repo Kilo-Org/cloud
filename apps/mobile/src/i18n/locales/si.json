@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} හි යල් පැන ගිය",
         "outdatedOnLines": "{{lines}} හි යල් පැන ගිය",
         "outdatedOnPath": "{{path}} හි යල් පැන ගිය"
-      }
+      },
+      "deletedUser": "මකා දැමූ පරිශීලකයා"
     },
     "couldNotOpenGitHubAppSettings": "GitHub App සැකසුම් විවෘත කිරීමට නොහැකි විය",
     "installKiloGitHubApp": "Kilo GitHub App ස්ථාපනය කරන්න",
@@ -576,7 +577,10 @@
       "truncationBanner": "වෙනස් කළ ගොනු {{total}} අතරින් පළමු {{limit}} පෙන්වයි — GitHub API සීමාව",
       "statusAdded": "එකතු කරන ලදී",
       "statusContext": "සන්දර්භය",
-      "statusDeleted": "මකා දමන ලදී"
+      "statusDeleted": "මකා දමන ලදී",
+      "lineLabel": "{{status}} පේළිය {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(හිස්)"
     },
     "linkPasteClipboardEmpty": "පසුරු පුවරුව හිස් ය",
     "linkPasteNotAPullRequest": "GitHub pull request සබැඳියක් නොවේ",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "පිළිතුරු දිය නොහැකි විය.",
       "couldNotCompleteAction": "මෙම ක්‍රියාව සම්පූර්ණ කිරීමට නොහැකි විය.",
-      "mergeResultDefaultError": "GitHub ඒකාබද්ධ කිරීම සම්පූර්ණ කළේ නැත."
+      "mergeResultDefaultError": "GitHub ඒකාබද්ධ කිරීම සම්පූර්ණ කළේ නැත.",
+      "ambiguous": "තහවුරු කිරීමට නොහැකි විය — නැවත උත්සාහ කිරීමට පෙර PR එක පරීක්ෂා කරන්න.",
+      "persistenceFailed": "මෙම ක්‍රියාව වාර්තා කිරීමට නොහැකි විය. කරුණාකර පසුව නැවත උත්සාහ කරන්න.",
+      "forbidden": "තහනම්"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "ශත",
       "dollar_one": "ඩොලරය",
       "dollar": "ඩොලර්",
-      "dollar_other": "ඩොලර්"
+      "dollar_other": "ඩොලර්",
+      "costSpoken": "පිරිවැය {{cost}}",
+      "costSpokenWithTime": "පිරිවැය {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub විවෘත කළ නොහැක",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "යෙදුම් වෙළඳසැල විවෘත කළ නොහැකි විය.",
     "description": "Kilo හි නව අනුවාදයක් ලබා ගත හැක. ඉදිරියට යාමට කරුණාකර යාවත්කාලීන කරන්න.",
     "title": "යාවත්කාලීනය අවශ්‍යයි",
-    "updateNow": "දැන් යාවත්කාලීන කරන්න"
+    "updateNow": "දැන් යාවත්කාලීන කරන්න",
+    "appStorePage": "යෙදුම් වෙළඳසැලේ පිටුව"
   },
   "home": {
     "couldNotLoadSessions": "සැසි පූරණය කළ නොහැකි විය",

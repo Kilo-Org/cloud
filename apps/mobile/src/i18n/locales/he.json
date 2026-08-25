@@ -1615,7 +1615,9 @@
       "dollar": "דולרים",
       "dollar_other": "דולרים",
       "cent_two": "סנטים",
-      "dollar_two": "דולרים"
+      "dollar_two": "דולרים",
+      "costSpoken": "עלות {{cost}}",
+      "costSpokenWithTime": "עלות {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "לא ניתן היה להתחיל את הגדרת אפליקציית GitHub. נסה שוב.",
@@ -2200,7 +2202,8 @@
     "couldNotOpenStore": "לא ניתן היה לפתוח את חנות האפליקציות.",
     "description": "גרסה חדשה של Kilo זמינה. עדכן כדי להמשיך.",
     "title": "נדרש עדכון",
-    "updateNow": "עדכן עכשיו"
+    "updateNow": "עדכן עכשיו",
+    "appStorePage": "דף חנות האפליקציות"
   },
   "home": {
     "couldNotLoadSessions": "לא ניתן לטעון הפעלות",
@@ -2599,7 +2602,8 @@
         "outdatedOnPathLines": "מיושן על {{path}} {{lines}}",
         "outdatedOnLines": "מיושן על {{lines}}",
         "outdatedOnPath": "מיושן על {{path}}"
-      }
+      },
+      "deletedUser": "משתמש שנמחק"
     },
     "entry": {
       "clearLink": "נקה קישור בקשת משיכה",
@@ -2882,7 +2886,10 @@
       "truncationBanner": "מציג את {{limit}} הראשונים מתוך {{total}} קבצים ששונו — מגבלת API של GitHub",
       "statusAdded": "נוסף",
       "statusContext": "הקשר",
-      "statusDeleted": "נמחק"
+      "statusDeleted": "נמחק",
+      "lineLabel": "{{status}} שורה {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ריק)"
     },
     "linkPasteClipboardEmpty": "הלוח ריק",
     "linkPasteNotAPullRequest": "לא קישור לבקשת משיכה ב-GitHub",
@@ -2900,7 +2907,10 @@
     "operation": {
       "couldNotReply": "לא ניתן היה להשיב.",
       "couldNotCompleteAction": "לא ניתן היה להשלים פעולה זו.",
-      "mergeResultDefaultError": "GitHub לא השלים את המיזוג."
+      "mergeResultDefaultError": "GitHub לא השלים את המיזוג.",
+      "ambiguous": "לא ניתן היה לאשר — בדוק את ה-PR לפני שתנסה שוב.",
+      "persistenceFailed": "לא הצלחנו לתעד פעולה זו. אנא נסה שוב מאוחר יותר.",
+      "forbidden": "אין הרשאה"
     }
   },
   "organization": {

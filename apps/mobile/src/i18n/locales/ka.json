@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "მოძველებულია {{path}} {{lines}}-ზე",
         "outdatedOnLines": "მოძველებულია {{lines}}-ზე",
         "outdatedOnPath": "მოძველებულია {{path}}-ზე"
-      }
+      },
+      "deletedUser": "წაშლილი მომხმარებელი"
     },
     "couldNotOpenGitHubAppSettings": "GitHub აპლიკაციის პარამეტრების გახსნა ვერ მოხერხდა",
     "installKiloGitHubApp": "დააინსტალირეთ Kilo GitHub აპლიკაცია",
@@ -576,7 +577,10 @@
       "truncationBanner": "ნაჩვენებია შეცვლილი ფაილების {{total}}-დან პირველი {{limit}} — GitHub API ლიმიტი",
       "statusAdded": "დამატებულია",
       "statusContext": "კონტექსტი",
-      "statusDeleted": "წაშლილია"
+      "statusDeleted": "წაშლილია",
+      "lineLabel": "{{status}} ხაზი {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ცარიელი)"
     },
     "linkPasteClipboardEmpty": "ბუფერი ცარიელია",
     "linkPasteNotAPullRequest": "არ არის GitHub pull request ბმული",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "პასუხი ვერ მოხერხდა.",
       "couldNotCompleteAction": "ამ მოქმედების დასრულება ვერ მოხერხდა.",
-      "mergeResultDefaultError": "GitHub-მა შერწყმა ვერ დაასრულა."
+      "mergeResultDefaultError": "GitHub-მა შერწყმა ვერ დაასრულა.",
+      "ambiguous": "დადასტურება ვერ მოხერხდა — PR-ის ხელახლა ცდამდე შეამოწმეთ იგი.",
+      "persistenceFailed": "ამ მოქმედების ჩაწერა ვერ მოხერხდა. გთხოვთ, სცადოთ მოგვიანებით.",
+      "forbidden": "აკრძალულია"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "ცენტი",
       "dollar_one": "დოლარი",
       "dollar": "დოლარი",
-      "dollar_other": "დოლარი"
+      "dollar_other": "დოლარი",
+      "costSpoken": "ღირებულება {{cost}}",
+      "costSpokenWithTime": "ღირებულება {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ის გახსნა ვერ მოხერხდა",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "აპლიკაციების მაღაზიის გახსნა ვერ მოხერხდა.",
     "description": "Kilo-ის ახალი ვერსია ხელმისაწვდომია. გასაგრძელებლად გთხოვთ, განაახლოთ.",
     "title": "საჭიროა განახლება",
-    "updateNow": "ახლავე განახლება"
+    "updateNow": "ახლავე განახლება",
+    "appStorePage": "აპლიკაციების მაღაზიის გვერდი"
   },
   "home": {
     "couldNotLoadSessions": "სესიების ჩატვირთვა ვერ მოხერხდა",

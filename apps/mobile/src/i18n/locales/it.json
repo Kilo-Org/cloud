@@ -1601,7 +1601,9 @@
       "dollar": "dollari",
       "dollar_other": "dollari",
       "cent_many": "centesimi",
-      "dollar_many": "dollari"
+      "dollar_many": "dollari",
+      "costSpoken": "costo {{cost}}",
+      "costSpokenWithTime": "costo {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Impossibile avviare la configurazione della GitHub App. Riprova.",
@@ -2200,7 +2202,8 @@
     "couldNotOpenStore": "Impossibile aprire l'app store.",
     "description": "È disponibile una nuova versione di Kilo. Aggiorna per continuare.",
     "title": "Aggiornamento richiesto",
-    "updateNow": "Aggiorna ora"
+    "updateNow": "Aggiorna ora",
+    "appStorePage": "pagina dell'app store"
   },
   "home": {
     "couldNotLoadSessions": "Impossibile caricare le sessioni",
@@ -2599,7 +2602,8 @@
         "outdatedOnPathLines": "Obsoleto su {{path}} {{lines}}",
         "outdatedOnLines": "Obsoleto su {{lines}}",
         "outdatedOnPath": "Obsoleto su {{path}}"
-      }
+      },
+      "deletedUser": "utente eliminato"
     },
     "entry": {
       "clearLink": "Cancella il link della pull request",
@@ -2882,7 +2886,10 @@
       "truncationBanner": "Mostra le prime {{limit}} di {{total}} modifiche ai file — limite API GitHub",
       "statusAdded": "Aggiunto",
       "statusContext": "Contesto",
-      "statusDeleted": "Eliminato"
+      "statusDeleted": "Eliminato",
+      "lineLabel": "{{status}} riga {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(vuoto)"
     },
     "linkPasteClipboardEmpty": "Appunti vuoti",
     "linkPasteNotAPullRequest": "Non è un link a una pull request di GitHub",
@@ -2900,7 +2907,10 @@
     "operation": {
       "couldNotReply": "Impossibile rispondere.",
       "couldNotCompleteAction": "Impossibile completare questa azione.",
-      "mergeResultDefaultError": "GitHub non ha completato il merge."
+      "mergeResultDefaultError": "GitHub non ha completato il merge.",
+      "ambiguous": "Impossibile confermare — controlla la PR prima di riprovare.",
+      "persistenceFailed": "Non abbiamo potuto registrare questa azione. Riprova più tardi.",
+      "forbidden": "Vietato"
     }
   },
   "organization": {

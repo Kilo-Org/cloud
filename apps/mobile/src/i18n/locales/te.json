@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} లో పాతది",
         "outdatedOnLines": "{{lines}} లో పాతది",
         "outdatedOnPath": "{{path}} లో పాతది"
-      }
+      },
+      "deletedUser": "తొలగించిన వినియోగదారు"
     },
     "couldNotOpenGitHubAppSettings": "GitHub యాప్ సెట్టింగ్లను తెరవలేకపోయింది",
     "installKiloGitHubApp": "Kilo GitHub యాప్ను ఇన్స్టాల్ చేయండి",
@@ -576,7 +577,10 @@
       "truncationBanner": "మొదటి {{limit}} / {{total}} మార్చబడిన ఫైళ్లు చూపుతోంది — GitHub API పరిమితి",
       "statusAdded": "జోడించబడింది",
       "statusContext": "సందర్భం",
-      "statusDeleted": "తొలగించబడింది"
+      "statusDeleted": "తొలగించబడింది",
+      "lineLabel": "{{status}} లైన్ {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ఖాళీ)"
     },
     "linkPasteClipboardEmpty": "క్లిప్బోర్డ్ ఖాళీగా ఉంది",
     "linkPasteNotAPullRequest": "GitHub పుల్ రిక్వెస్ట్ లింక్ కాదు",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "ప్రత్యుత్తరం ఇవ్వలేకపోయింది.",
       "couldNotCompleteAction": "ఈ చర్యను పూర్తి చేయలేకపోయాము.",
-      "mergeResultDefaultError": "GitHub మెర్జ్ను పూర్తి చేయలేదు."
+      "mergeResultDefaultError": "GitHub మెర్జ్ను పూర్తి చేయలేదు.",
+      "ambiguous": "నిర్ధారించలేకపోయాము — మళ్లీ ప్రయత్నించే ముందు PRని తనిఖీ చేయండి.",
+      "persistenceFailed": "ఈ చర్యను రికార్డ్ చేయలేకపోయాము. దయచేసి తర్వాత మళ్లీ ప్రయత్నించండి.",
+      "forbidden": "నిషేధించబడింది"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "సెంట్లు",
       "dollar_one": "డాలర్",
       "dollar": "డాలర్లు",
-      "dollar_other": "డాలర్లు"
+      "dollar_other": "డాలర్లు",
+      "costSpoken": "ఖర్చు {{cost}}",
+      "costSpokenWithTime": "ఖర్చు {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubను తెరవలేకపోయింది",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "యాప్ స్టోర్ను తెరవలేకపోయాము.",
     "description": "Kilo కొత్త వెర్షన్ అందుబాటులో ఉంది. కొనసాగించడానికి దయచేసి నవీకరించండి.",
     "title": "నవీకరణ అవసరం",
-    "updateNow": "ఇప్పుడే నవీకరించండి"
+    "updateNow": "ఇప్పుడే నవీకరించండి",
+    "appStorePage": "యాప్ స్టోర్ పేజీ"
   },
   "home": {
     "couldNotLoadSessions": "సెషన్లను లోడ్ చేయలేకపోయాము",

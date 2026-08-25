@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Waa duugoobay ee {{path}} {{lines}}",
         "outdatedOnLines": "Waa duugoobay ee {{lines}}",
         "outdatedOnPath": "Waa duugoobay ee {{path}}"
-      }
+      },
+      "deletedUser": "isticmaale la tirtiray"
     },
     "couldNotOpenGitHubAppSettings": "Dejinta GitHub App lama furi karin",
     "installKiloGitHubApp": "Rakib Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "Waxaa la muujinayaa {{limit}}-ka ugu horreeya ee {{total}} fayl oo la beddelay — xadka API-ga GitHub",
       "statusAdded": "Waa la daray",
       "statusContext": "Xaalad",
-      "statusDeleted": "Waa la tirtiray"
+      "statusDeleted": "Waa la tirtiray",
+      "lineLabel": "{{status}} xariiqda {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(far madhan)"
     },
     "linkPasteClipboardEmpty": "Qalabka koobigu waa madhan",
     "linkPasteNotAPullRequest": "Kuma aha xiriiriyaha codsiga jiidista GitHub",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Lama jawaabi karin.",
       "couldNotCompleteAction": "Falkan lama dhammayn karin.",
-      "mergeResultDefaultError": "GitHub kama dhammaystirin isku-darka."
+      "mergeResultDefaultError": "GitHub kama dhammaystirin isku-darka.",
+      "ambiguous": "Lama xaqiijin karin — hubi PR-ka ka hor intaadan mar kale isku dayin.",
+      "persistenceFailed": "Falkan lama diwaangelin karin. Fadlan mar kale isku day markii dambe.",
+      "forbidden": "Waa mamnuuc"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "senti",
       "dollar_one": "doolar",
       "dollar": "doolarro",
-      "dollar_other": "doolarro"
+      "dollar_other": "doolarro",
+      "costSpoken": "qiimaha {{cost}}",
+      "costSpokenWithTime": "qiimaha {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Lama furi karin GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Dukaanka app-ka lama furi karin.",
     "description": "Nooc cusub oo Kilo ah ayaa diyaar ah. Fadlan cusboonaysii si aad u sii socoto.",
     "title": "Cusboonaysiin loo baahan yahay",
-    "updateNow": "Hadda cusboonaysii"
+    "updateNow": "Hadda cusboonaysii",
+    "appStorePage": "bogga dukaanka app-ka"
   },
   "home": {
     "couldNotLoadSessions": "Kalfadhiyada lama soo dejin karin",

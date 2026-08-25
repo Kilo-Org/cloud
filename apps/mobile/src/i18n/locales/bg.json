@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Остаряло на {{path}} {{lines}}",
         "outdatedOnLines": "Остаряло на {{lines}}",
         "outdatedOnPath": "Остаряло на {{path}}"
-      }
+      },
+      "deletedUser": "изтрит потребител"
     },
     "couldNotOpenGitHubAppSettings": "Не можахме да отворим настройките на GitHub App",
     "installKiloGitHubApp": "Инсталирай Kilo GitHub App",
@@ -576,7 +577,10 @@
       "tapToComment": "{{label}}, докосни, за да коментираш",
       "statusAdded": "Добавен",
       "statusContext": "Контекст",
-      "statusDeleted": "Изтрит"
+      "statusDeleted": "Изтрит",
+      "lineLabel": "{{status}} ред {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(празно)"
     },
     "linkPasteClipboardEmpty": "Клипбордът е празен",
     "linkPasteNotAPullRequest": "Не е връзка към pull request в GitHub",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Не можахме да отговорим.",
       "couldNotCompleteAction": "Не можахме да завършим това действие.",
-      "mergeResultDefaultError": "GitHub не завърши обединяването."
+      "mergeResultDefaultError": "GitHub не завърши обединяването.",
+      "ambiguous": "Не можахме да потвърдим — проверете PR-а, преди да опитате отново.",
+      "persistenceFailed": "Не успяхме да запишем това действие. Моля, опитайте отново по-късно.",
+      "forbidden": "Забранено"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "цента",
       "dollar_one": "долар",
       "dollar": "долара",
-      "dollar_other": "долара"
+      "dollar_other": "долара",
+      "costSpoken": "разход {{cost}}",
+      "costSpokenWithTime": "разход {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не може да се отвори GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Не може да се отвори магазинът за приложения.",
     "description": "Налична е нова версия на Kilo. Моля, актуализирайте, за да продължите.",
     "title": "Изисква се актуализация",
-    "updateNow": "Актуализирайте сега"
+    "updateNow": "Актуализирайте сега",
+    "appStorePage": "страница на магазина за приложения"
   },
   "home": {
     "couldNotLoadSessions": "Не можаха да се заредят сесиите",

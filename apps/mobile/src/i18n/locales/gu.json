@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} પર જૂનું",
         "outdatedOnLines": "{{lines}} પર જૂનું",
         "outdatedOnPath": "{{path}} પર જૂનું"
-      }
+      },
+      "deletedUser": "કાઢી નાખેલ વપરાશકર્તા"
     },
     "couldNotOpenGitHubAppSettings": "GitHub એપ સેટિંગ્સ ખોલી શકાઈ નહીં",
     "installKiloGitHubApp": "Kilo GitHub એપ ઇન્સ્ટોલ કરો",
@@ -576,7 +577,10 @@
       "truncationBanner": "બદલાયેલી {{total}} ફાઇલોમાંથી પ્રથમ {{limit}} બતાવી રહ્યાં છીએ — GitHub API મર્યાદા",
       "statusAdded": "ઉમેરાયું",
       "statusContext": "સંદર્ભ",
-      "statusDeleted": "કાઢી નાખવામાં આવ્યું"
+      "statusDeleted": "કાઢી નાખવામાં આવ્યું",
+      "lineLabel": "{{status}} પંક્તિ {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ખાલી)"
     },
     "linkPasteClipboardEmpty": "ક્લિપબોર્ડ ખાલી છે",
     "linkPasteNotAPullRequest": "આ GitHub પુલ રિક્વેસ્ટ લિંક નથી",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "જવાબ આપી શકાયો નહીં.",
       "couldNotCompleteAction": "આ ક્રિયા પૂર્ણ કરી શકાઈ નહીં.",
-      "mergeResultDefaultError": "GitHub એ મર્જ પૂર્ણ કર્યું નથી."
+      "mergeResultDefaultError": "GitHub એ મર્જ પૂર્ણ કર્યું નથી.",
+      "ambiguous": "પુષ્ટિ કરી શકાઈ નહીં — ફરી પ્રયાસ કરતાં પહેલાં PR તપાસો.",
+      "persistenceFailed": "અમે આ ક્રિયા રેકોર્ડ કરી શક્યા નથી. કૃપા કરીને પછીથી ફરી પ્રયત્ન કરો.",
+      "forbidden": "પ્રતિબંધિત"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "સેન્ટ",
       "dollar_one": "ડૉલર",
       "dollar": "ડૉલર",
-      "dollar_other": "ડૉલર"
+      "dollar_other": "ડૉલર",
+      "costSpoken": "કિંમત {{cost}}",
+      "costSpokenWithTime": "કિંમત {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ખોલી શકાયું નથી",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "એપ સ્ટોર ખોલી શકાયું નહીં.",
     "description": "Kilo નો નવો વર્ઝન ઉપલબ્ધ છે. ચાલુ રાખવા માટે કૃપા કરીને અપડેટ કરો.",
     "title": "અપડેટ જરૂરી",
-    "updateNow": "હમણાં અપડેટ કરો"
+    "updateNow": "હમણાં અપડેટ કરો",
+    "appStorePage": "એપ સ્ટોર પેજ"
   },
   "home": {
     "couldNotLoadSessions": "સત્રો લોડ કરી શકાયા નહીં",

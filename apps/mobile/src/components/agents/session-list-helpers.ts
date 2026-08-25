@@ -186,10 +186,10 @@ export function composeActiveSessionSpokenMeta(
   timeSpoken: string | null
 ): string | null {
   if (cost && timeSpoken) {
-    return `cost ${cost}, ${timeSpoken}`;
+    return i18n.t('agents.sessionRow.costSpokenWithTime', { cost, time: timeSpoken });
   }
   if (cost) {
-    return `cost ${cost}`;
+    return i18n.t('agents.sessionRow.costSpoken', { cost });
   }
   if (timeSpoken) {
     return timeSpoken;

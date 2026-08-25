@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} တွင် ခေတ်နောက်ကျသော",
         "outdatedOnLines": "{{lines}} တွင် ခေတ်နောက်ကျသော",
         "outdatedOnPath": "{{path}} တွင် ခေတ်နောက်ကျသော"
-      }
+      },
+      "deletedUser": "ဖျက်လိုက်သော အသုံးပြုသူ"
     },
     "couldNotOpenGitHubAppSettings": "GitHub App ဆက်တင်များကို ဖွင့်မရပါ",
     "installKiloGitHubApp": "Kilo GitHub App ကို ထည့်သွင်းပါ",
@@ -576,7 +577,10 @@
       "truncationBanner": "ပြောင်းလဲထားသော ဖိုင် {{total}} ခုအနက် ပထမဆုံး {{limit}} ခုကို ပြသနေသည် — GitHub API ကန့်သတ်ချက်",
       "statusAdded": "ထည့်ပြီး",
       "statusContext": "Context",
-      "statusDeleted": "ဖျက်ပြီး"
+      "statusDeleted": "ဖျက်ပြီး",
+      "lineLabel": "{{status}} စာကြောင်း {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ဗလာ)"
     },
     "linkPasteClipboardEmpty": "ကလစ်ဘုတ် ဗလာဖြစ်သည်",
     "linkPasteNotAPullRequest": "GitHub pull request လင့်ခ် မဟုတ်ပါ",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "အကြောင်းပြန်မရပါ။",
       "couldNotCompleteAction": "ဤလုပ်ဆောင်ချက်ကို မပြီးမြောက်နိုင်ပါ။",
-      "mergeResultDefaultError": "GitHub သည် ပေါင်းစည်းမှုကို မပြီးမြောက်ခဲ့ပါ။"
+      "mergeResultDefaultError": "GitHub သည် ပေါင်းစည်းမှုကို မပြီးမြောက်ခဲ့ပါ။",
+      "ambiguous": "အတည်ပြု၍မရပါ — ပြန်မစမ်းမီ PR ကို စစ်ဆေးပါ။",
+      "persistenceFailed": "ဤလုပ်ဆောင်ချက်ကို မှတ်တမ်းတင်နိုင်ခြင်း မရှိပါ။ နောက်မှ ထပ်စမ်းကြည့်ပါ။",
+      "forbidden": "တားမြစ်ထားသည်"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "ဆင့်များ",
       "dollar_one": "ဒေါ်လာ",
       "dollar": "ဒေါ်လာများ",
-      "dollar_other": "ဒေါ်လာများ"
+      "dollar_other": "ဒေါ်လာများ",
+      "costSpoken": "ကုန်ကျစရိတ် {{cost}}",
+      "costSpokenWithTime": "ကုန်ကျစရိတ် {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ကို မဖွင့်နိုင်ခဲ့ပါ",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "အက်ပ် စတိုးကို မဖွင့်နိုင်ပါ။",
     "description": "Kilo ၏ ဗားရှင်းအသစ် ရနိုင်ပါသည်။ ဆက်သုံးရန် အဆင့်မြှင့်ပါ။",
     "title": "အဆင့်မြှင့်ရန် လိုအပ်သည်",
-    "updateNow": "ယခု အဆင့်မြှင့်ပါ"
+    "updateNow": "ယခု အဆင့်မြှင့်ပါ",
+    "appStorePage": "အက်ပ်စတိုး စာမျက်နှာ"
   },
   "home": {
     "couldNotLoadSessions": "session များကို မတင်နိုင်ပါ",

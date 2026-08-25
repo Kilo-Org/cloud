@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Forældet på {{path}} {{lines}}",
         "outdatedOnLines": "Forældet på {{lines}}",
         "outdatedOnPath": "Forældet på {{path}}"
-      }
+      },
+      "deletedUser": "slettet bruger"
     },
     "couldNotOpenGitHubAppSettings": "Kunne ikke åbne GitHub-appindstillinger",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
@@ -576,7 +577,10 @@
       "truncationBanner": "Viser de første {{limit}} af {{total}} ændrede filer — GitHub API-grænse",
       "statusAdded": "Tilføjet",
       "statusContext": "Kontekst",
-      "statusDeleted": "Slettet"
+      "statusDeleted": "Slettet",
+      "lineLabel": "{{status}} linje {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(tom)"
     },
     "linkPasteClipboardEmpty": "Udklipsholderen er tom",
     "linkPasteNotAPullRequest": "Ikke et GitHub pull request-link",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Kunne ikke svare.",
       "couldNotCompleteAction": "Kunne ikke fuldføre denne handling.",
-      "mergeResultDefaultError": "GitHub fuldførte ikke fletningen."
+      "mergeResultDefaultError": "GitHub fuldførte ikke fletningen.",
+      "ambiguous": "Kunne ikke bekræftes — tjek PR'en, før du prøver igen.",
+      "persistenceFailed": "Vi kunne ikke registrere denne handling. Prøv igen senere.",
+      "forbidden": "Forbudt"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "cent",
       "dollar_one": "dollar",
       "dollar": "dollars",
-      "dollar_other": "dollars"
+      "dollar_other": "dollars",
+      "costSpoken": "pris {{cost}}",
+      "costSpokenWithTime": "pris {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunne ikke åbne GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Kunne ikke åbne app-butikken.",
     "description": "En ny version af Kilo er tilgængelig. Opdater for at fortsætte.",
     "title": "Opdatering kræves",
-    "updateNow": "Opdater nu"
+    "updateNow": "Opdater nu",
+    "appStorePage": "side i app-butikken"
   },
   "home": {
     "couldNotLoadSessions": "Kunne ikke indlæse sessioner",

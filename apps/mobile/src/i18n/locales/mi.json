@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Kua tawhito ki {{path}} {{lines}}",
         "outdatedOnLines": "Kua tawhito ki {{lines}}",
         "outdatedOnPath": "Kua tawhito ki {{path}}"
-      }
+      },
+      "deletedUser": "kaimahi kua mukua"
     },
     "couldNotOpenGitHubAppSettings": "Kāore i taea te whakatuwhera i ngā tautuhinga Taupānga GitHub",
     "installKiloGitHubApp": "Tāuta i te Taupānga Kilo GitHub",
@@ -576,7 +577,10 @@
       "truncationBanner": "E whakaatu ana i ngā {{limit}} tuatahi o ngā {{total}} kōnae kua hurihia — te rohe API a GitHub",
       "statusAdded": "Kua tāpiritia",
       "statusContext": "Horopaki",
-      "statusDeleted": "Kua mukua"
+      "statusDeleted": "Kua mukua",
+      "lineLabel": "{{status}} rārangi {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(putanga kore)"
     },
     "linkPasteClipboardEmpty": "Kei te putua tonu te papapātuhi",
     "linkPasteNotAPullRequest": "Ehara tēnei i te hononga GitHub pull request",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Kāore i taea te whakahoki.",
       "couldNotCompleteAction": "Kāore i taea te whakaoti tēnei mahi.",
-      "mergeResultDefaultError": "Kāore i whakaotia e GitHub te whakakotahi."
+      "mergeResultDefaultError": "Kāore i whakaotia e GitHub te whakakotahi.",
+      "ambiguous": "Kāore i taea te whakaū — tirohia te PR i mua i te whakamātau anō.",
+      "persistenceFailed": "Kāore i taea e mātou te tuhia tēnei mahi. Tēnā whakamātau anō ā muri ake.",
+      "forbidden": "Kua rāhuitia"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "ngā heneti",
       "dollar_one": "tāra",
       "dollar": "ngā tāra",
-      "dollar_other": "ngā tāra"
+      "dollar_other": "ngā tāra",
+      "costSpoken": "utu {{cost}}",
+      "costSpokenWithTime": "utu {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kāore i taea te whakatuwhera GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Kāore i taea te whakatuwhera te toa taupānga.",
     "description": "E wātea ana he putanga hōu o Kilo. Tēnā whakamohoatia kia haere tonu.",
     "title": "Me whakamohoa",
-    "updateNow": "Whakamohoa ināianei"
+    "updateNow": "Whakamohoa ināianei",
+    "appStorePage": "te whārangi toa taupānga"
   },
   "home": {
     "couldNotLoadSessions": "Kāore i taea te uta ngā wātū",

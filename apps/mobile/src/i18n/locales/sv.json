@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Föråldrad på {{path}} {{lines}}",
         "outdatedOnLines": "Föråldrad på {{lines}}",
         "outdatedOnPath": "Föråldrad på {{path}}"
-      }
+      },
+      "deletedUser": "raderad användare"
     },
     "couldNotOpenGitHubAppSettings": "Kunde inte öppna GitHub Apps inställningar",
     "installKiloGitHubApp": "Installera Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "Visar de första {{limit}} av {{total}} ändrade filer — GitHub API-begränsning",
       "statusAdded": "Tillagd",
       "statusContext": "Kontext",
-      "statusDeleted": "Borttagen"
+      "statusDeleted": "Borttagen",
+      "lineLabel": "{{status}} rad {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(tom)"
     },
     "linkPasteClipboardEmpty": "Urklipp är tomt",
     "linkPasteNotAPullRequest": "Inte en GitHub-pull request-länk",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Kunde inte svara.",
       "couldNotCompleteAction": "Kunde inte slutföra den här åtgärden.",
-      "mergeResultDefaultError": "GitHub slutförde inte sammanslagningen."
+      "mergeResultDefaultError": "GitHub slutförde inte sammanslagningen.",
+      "ambiguous": "Kunde inte bekräfta — kontrollera PR:en innan du försöker igen.",
+      "persistenceFailed": "Vi kunde inte registrera den här åtgärden. Försök igen senare.",
+      "forbidden": "Förbjuden"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "cent",
       "dollar_one": "dollar",
       "dollar": "dollar",
-      "dollar_other": "dollar"
+      "dollar_other": "dollar",
+      "costSpoken": "kostnad {{cost}}",
+      "costSpokenWithTime": "kostnad {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunde inte öppna GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Det gick inte att öppna appbutiken.",
     "description": "En ny version av Kilo är tillgänglig. Uppdatera för att fortsätta.",
     "title": "Uppdatering krävs",
-    "updateNow": "Uppdatera nu"
+    "updateNow": "Uppdatera nu",
+    "appStorePage": "appbutikssidan"
   },
   "home": {
     "couldNotLoadSessions": "Det gick inte att läsa in sessioner",

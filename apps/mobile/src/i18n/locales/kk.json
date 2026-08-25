@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} бойынша ескірген",
         "outdatedOnLines": "{{lines}} бойынша ескірген",
         "outdatedOnPath": "{{path}} бойынша ескірген"
-      }
+      },
+      "deletedUser": "жойылған пайдаланушы"
     },
     "couldNotOpenGitHubAppSettings": "GitHub App параметрлерін ашу мүмкін болмады",
     "installKiloGitHubApp": "Kilo GitHub App орнату",
@@ -576,7 +577,10 @@
       "truncationBanner": "Өзгертілген {{total}} файлдың алғашқы {{limit}}-і көрсетілуде — GitHub API шегі",
       "statusAdded": "Қосылды",
       "statusContext": "Контекст",
-      "statusDeleted": "Жойылды"
+      "statusDeleted": "Жойылды",
+      "lineLabel": "{{status}} {{line}} жол: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(бос)"
     },
     "linkPasteClipboardEmpty": "Айырбастау буфері бос",
     "linkPasteNotAPullRequest": "GitHub pull request сілтемесі емес",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Жауап беру мүмкін болмады.",
       "couldNotCompleteAction": "Бұл әрекетті аяқтау мүмкін болмады.",
-      "mergeResultDefaultError": "GitHub біріктіруді аяқтамады."
+      "mergeResultDefaultError": "GitHub біріктіруді аяқтамады.",
+      "ambiguous": "Растау мүмкін болмады — қайталамас бұрын PR-ті тексеріңіз.",
+      "persistenceFailed": "Бұл әрекетті тіркей алмадық. Кейінірек қайталап көріңіз.",
+      "forbidden": "Тыйым салынған"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "цент",
       "dollar_one": "доллар",
       "dollar": "доллар",
-      "dollar_other": "доллар"
+      "dollar_other": "доллар",
+      "costSpoken": "құны {{cost}}",
+      "costSpokenWithTime": "құны {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ашу мүмкін болмады",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Қосымшалар дүкенін ашу мүмкін болмады.",
     "description": "Kilo-ның жаңа нұсқасы қолжетімді. Жалғастыру үшін жаңартыңыз.",
     "title": "Жаңарту қажет",
-    "updateNow": "Қазір жаңарту"
+    "updateNow": "Қазір жаңарту",
+    "appStorePage": "қосымшалар дүкенінің беті"
   },
   "home": {
     "couldNotLoadSessions": "Сессияларды жүктеу мүмкін болмады",

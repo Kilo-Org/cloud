@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Demode sou {{path}} {{lines}}",
         "outdatedOnLines": "Demode sou {{lines}}",
         "outdatedOnPath": "Demode sou {{path}}"
-      }
+      },
+      "deletedUser": "itilizatè efase"
     },
     "couldNotOpenGitHubAppSettings": "Pa t ka louvri paramèt GitHub App",
     "installKiloGitHubApp": "Enstale Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "Ap montre premye {{limit}} sou {{total}} fichye ki chanje — limit API GitHub",
       "statusAdded": "Ajoute",
       "statusContext": "Kontèks",
-      "statusDeleted": "Efase"
+      "statusDeleted": "Efase",
+      "lineLabel": "{{status}} liy {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(vid)"
     },
     "linkPasteClipboardEmpty": "Clipboard la vid",
     "linkPasteNotAPullRequest": "Se pa yon lyen pull request GitHub",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Pa t ka reponn.",
       "couldNotCompleteAction": "Pa t ka fini aksyon sa a.",
-      "mergeResultDefaultError": "GitHub pa t fini fizyon an."
+      "mergeResultDefaultError": "GitHub pa t fini fizyon an.",
+      "ambiguous": "Pa t ka konfime — tcheke PR a anvan ou eseye ankò.",
+      "persistenceFailed": "Nou pa t ka anrejistre aksyon sa a. Tanpri eseye ankò pita.",
+      "forbidden": "Entèdi"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "santim",
       "dollar_one": "dola",
       "dollar": "dola",
-      "dollar_other": "dola"
+      "dollar_other": "dola",
+      "costSpoken": "Pri {{cost}}",
+      "costSpokenWithTime": "Pri {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Pa t 'kapab louvri GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Pa t ka louvri magazen aplikasyon an.",
     "description": "Yon nouvo vèsyon Kilo disponib. Tanpri mete ajou pou kontinye.",
     "title": "Aktyalizasyon obligatwa",
-    "updateNow": "Mete ajou kounye a"
+    "updateNow": "Mete ajou kounye a",
+    "appStorePage": "paj magazen aplikasyon"
   },
   "home": {
     "couldNotLoadSessions": "Pa t ka chaje sesyon",

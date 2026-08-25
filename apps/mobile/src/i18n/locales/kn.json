@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "{{path}} {{lines}} ನಲ್ಲಿ ಹಳೆಯದಾಗಿದೆ",
         "outdatedOnLines": "{{lines}} ನಲ್ಲಿ ಹಳೆಯದಾಗಿದೆ",
         "outdatedOnPath": "{{path}} ನಲ್ಲಿ ಹಳೆಯದಾಗಿದೆ"
-      }
+      },
+      "deletedUser": "ಅಳಿಸಲಾದ ಬಳಕೆದಾರ"
     },
     "couldNotOpenGitHubAppSettings": "GitHub App ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "installKiloGitHubApp": "Kilo GitHub App ಅನ್ನು ಸ್ಥಾಪಿಸಿ",
@@ -576,7 +577,10 @@
       "truncationBanner": "ಬದಲಾದ {{total}} ಫೈಲ್ಗಳಲ್ಲಿ ಮೊದಲ {{limit}} ತೋರಿಸಲಾಗುತ್ತಿದೆ — GitHub API ಮಿತಿ",
       "statusAdded": "ಸೇರಿಸಲಾಗಿದೆ",
       "statusContext": "ಸಂದರ್ಭ",
-      "statusDeleted": "ಅಳಿಸಲಾಗಿದೆ"
+      "statusDeleted": "ಅಳಿಸಲಾಗಿದೆ",
+      "lineLabel": "{{status}} ಸಾಲು {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ಖಾಲಿ)"
     },
     "linkPasteClipboardEmpty": "ಕ್ಲಿಪ್ಬೋರ್ಡ್ ಖಾಲಿಯಾಗಿದೆ",
     "linkPasteNotAPullRequest": "GitHub ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅಲ್ಲ",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "ಉತ್ತರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotCompleteAction": "ಈ ಕ್ರಿಯೆಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "mergeResultDefaultError": "GitHub ವಿಲೀನವನ್ನು ಪೂರ್ಣಗೊಳಿಸಲಿಲ್ಲ."
+      "mergeResultDefaultError": "GitHub ವಿಲೀನವನ್ನು ಪೂರ್ಣಗೊಳಿಸಲಿಲ್ಲ.",
+      "ambiguous": "ದೃಢೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ — ಮತ್ತೆ ಪ್ರಯತ್ನಿಸುವ ಮೊದಲು PR ಪರಿಶೀಲಿಸಿ.",
+      "persistenceFailed": "ಈ ಕ್ರಿಯೆಯನ್ನು ದಾಖಲಿಸಲು ನಮಗೆ ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "forbidden": "ನಿಷೇಧಿಸಲಾಗಿದೆ"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "ಸೆಂಟ್ಗಳು",
       "dollar_one": "ಡಾಲರ್",
       "dollar": "ಡಾಲರ್ಗಳು",
-      "dollar_other": "ಡಾಲರ್ಗಳು"
+      "dollar_other": "ಡಾಲರ್ಗಳು",
+      "costSpoken": "ವೆಚ್ಚ {{cost}}",
+      "costSpokenWithTime": "ವೆಚ್ಚ {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "ಅಪ್ ಸ್ಟೋರ್ ಅನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "description": "Kilo ನ ಹೊಸ ಆವೃತ್ತಿ ಲಭ್ಯವಿದೆ. ಮುಂದುವರಿಯಲು ದಯವಿಟ್ಟು ನವೀಕರಿಸಿ.",
     "title": "ನವೀಕರಣ ಅಗತ್ಯವಿದೆ",
-    "updateNow": "ಈಗ ನವೀಕರಿಸಿ"
+    "updateNow": "ಈಗ ನವೀಕರಿಸಿ",
+    "appStorePage": "ಅಪ್ ಸ್ಟೋರ್ ಪುಟ"
   },
   "home": {
     "couldNotLoadSessions": "ಸೆಷನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",

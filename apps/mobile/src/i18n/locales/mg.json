@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Lany daty amin'ny {{path}} {{lines}}",
         "outdatedOnLines": "Lany daty amin'ny {{lines}}",
         "outdatedOnPath": "Lany daty amin'ny {{path}}"
-      }
+      },
+      "deletedUser": "mpampiasa voafafa"
     },
     "couldNotOpenGitHubAppSettings": "Tsy afaka nanokatra ny fika GitHub App",
     "installKiloGitHubApp": "Ampetraho ny Kilo GitHub App",
@@ -576,7 +577,10 @@
       "truncationBanner": "Mampiseho ny {{limit}} voalohany amin'ny {{total}} rakitra novaina — fetran'ny API GitHub",
       "statusAdded": "Nampiana",
       "statusContext": "Contexte",
-      "statusDeleted": "Voafafa"
+      "statusDeleted": "Voafafa",
+      "lineLabel": "{{status}} andalana {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(foana)"
     },
     "linkPasteClipboardEmpty": "Foana ny tahiry",
     "linkPasteNotAPullRequest": "Tsy rohy pull request amin'ny GitHub io",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Tsy afaka namaly.",
       "couldNotCompleteAction": "Tsy afaka nahavita ity hetsika ity.",
-      "mergeResultDefaultError": "Tsy nahavita nampirina ny GitHub."
+      "mergeResultDefaultError": "Tsy nahavita nampirina ny GitHub.",
+      "ambiguous": "Tsy afaka nanamafy — jereo ny PR alohan'ny andramana indray.",
+      "persistenceFailed": "Tsy vitanay ny nandrakitra ity hetsika ity. Andramo indray azafady any aoriana.",
+      "forbidden": "Voarara"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "cent",
       "dollar_one": "dolara",
       "dollar": "dolara",
-      "dollar_other": "dolara"
+      "dollar_other": "dolara",
+      "costSpoken": "vidy {{cost}}",
+      "costSpokenWithTime": "vidy {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Tsy afaka nanokatra ny GitHub",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Tsy afaka nanokatra ny app store.",
     "description": "Misy kinova vaovao amin'ny Kilo. Vaovao azafady raha hanohy.",
     "title": "Ilaina ny fanavaozana",
-    "updateNow": "Havaozina izao"
+    "updateNow": "Havaozina izao",
+    "appStorePage": "pejy app store"
   },
   "home": {
     "couldNotLoadSessions": "Tsy afaka nampidirina ny session",

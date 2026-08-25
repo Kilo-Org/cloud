@@ -1607,7 +1607,9 @@
       "cent_other": "Cent",
       "dollar_one": "Dollar",
       "dollar": "Dollar",
-      "dollar_other": "Dollar"
+      "dollar_other": "Dollar",
+      "costSpoken": "Kosten {{cost}}",
+      "costSpokenWithTime": "Kosten {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Das Setup der GitHub-App konnte nicht gestartet werden. Bitte versuche es erneut.",
@@ -2187,7 +2189,8 @@
     "couldNotOpenStore": "Der App Store konnte nicht geöffnet werden.",
     "description": "Eine neue Version von Kilo ist verfügbar. Bitte aktualisiere, um fortzufahren.",
     "title": "Update erforderlich",
-    "updateNow": "Jetzt aktualisieren"
+    "updateNow": "Jetzt aktualisieren",
+    "appStorePage": "App-Store-Seite"
   },
   "home": {
     "couldNotLoadSessions": "Sitzungen konnten nicht geladen werden",
@@ -2584,7 +2587,8 @@
         "outdatedOnPathLines": "Veraltet auf {{path}} {{lines}}",
         "outdatedOnLines": "Veraltet auf {{lines}}",
         "outdatedOnPath": "Veraltet auf {{path}}"
-      }
+      },
+      "deletedUser": "gelöschter Benutzer"
     },
     "entry": {
       "clearLink": "Pull-Request-Link löschen",
@@ -2862,7 +2866,10 @@
       "truncationBanner": "Zeigt die ersten {{limit}} von {{total}} geänderten Dateien — GitHub-API-Limit",
       "statusAdded": "Hinzugefügt",
       "statusContext": "Kontext",
-      "statusDeleted": "Gelöscht"
+      "statusDeleted": "Gelöscht",
+      "lineLabel": "{{status}} Zeile {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(leer)"
     },
     "linkPasteClipboardEmpty": "Zwischenablage ist leer",
     "linkPasteNotAPullRequest": "Kein GitHub-Pull-Request-Link",
@@ -2880,7 +2887,10 @@
     "operation": {
       "couldNotReply": "Antwort konnte nicht gesendet werden.",
       "couldNotCompleteAction": "Diese Aktion konnte nicht abgeschlossen werden.",
-      "mergeResultDefaultError": "GitHub hat die Zusammenführung nicht abgeschlossen."
+      "mergeResultDefaultError": "GitHub hat die Zusammenführung nicht abgeschlossen.",
+      "ambiguous": "Konnte nicht bestätigt werden — prüfe den PR, bevor du es erneut versuchst.",
+      "persistenceFailed": "Wir konnten diese Aktion nicht aufzeichnen. Bitte versuche es später erneut.",
+      "forbidden": "Verboten"
     }
   },
   "organization": {

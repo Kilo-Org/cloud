@@ -407,7 +407,8 @@
         "outdatedOnPathLines": "Aegunud: {{path}} {{lines}}",
         "outdatedOnLines": "Aegunud: {{lines}}",
         "outdatedOnPath": "Aegunud: {{path}}"
-      }
+      },
+      "deletedUser": "kustutatud kasutaja"
     },
     "couldNotOpenGitHubAppSettings": "GitHub'i rakenduse seadete avamine ebaõnnestus",
     "installKiloGitHubApp": "Installi Kilo GitHub'i rakendus",
@@ -576,7 +577,10 @@
       "truncationBanner": "Kuvatakse esimesed {{limit}} muudetud faili kokku {{total}}-st — GitHubi API piirang",
       "statusAdded": "Lisatud",
       "statusContext": "Kontekst",
-      "statusDeleted": "Kustutatud"
+      "statusDeleted": "Kustutatud",
+      "lineLabel": "{{status}} rida {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(tühi)"
     },
     "linkPasteClipboardEmpty": "Lõikelaud on tühi",
     "linkPasteNotAPullRequest": "Pole GitHub pull requesti link",
@@ -594,7 +598,10 @@
     "operation": {
       "couldNotReply": "Vastamine ebaõnnestus.",
       "couldNotCompleteAction": "Seda toimingut ei õnnestunud lõpule viia.",
-      "mergeResultDefaultError": "GitHub ei lõpetanud ühendamist."
+      "mergeResultDefaultError": "GitHub ei lõpetanud ühendamist.",
+      "ambiguous": "Ei õnnestunud kinnitada — kontrolli PR-i enne uuesti proovimist.",
+      "persistenceFailed": "Me ei saanud seda toimingut salvestada. Proovi hiljem uuesti.",
+      "forbidden": "Keelatud"
     }
   },
   "notifications": {
@@ -2054,7 +2061,9 @@
       "cent_other": "senti",
       "dollar_one": "dollar",
       "dollar": "dollarit",
-      "dollar_other": "dollarit"
+      "dollar_other": "dollarit",
+      "costSpoken": "kulu {{cost}}",
+      "costSpokenWithTime": "kulu {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub'i avamine ebaõnnestus",
@@ -2634,7 +2643,8 @@
     "couldNotOpenStore": "Rakendusepoodi ei õnnestunud avada.",
     "description": "Saadaval on Kilo uus versioon. Jätkamiseks uuendage.",
     "title": "Uuendus nõutud",
-    "updateNow": "Uuenda kohe"
+    "updateNow": "Uuenda kohe",
+    "appStorePage": "rakendusepoe leht"
   },
   "home": {
     "couldNotLoadSessions": "Seansse ei õnnestunud laadida",

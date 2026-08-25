@@ -2237,6 +2237,18 @@
       "updating": "Päivitetään, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Lataa",
+      "loadWithHost": "Lataa {{host}}",
+      "httpsOnly": "Vain HTTPS-kuvat"
+    },
+    "markdownLink": {
+      "invalidLink": "Tätä linkkiä ei voi avata.",
+      "hostConfirmTitle": "Avataanko ulkoinen linkki?",
+      "hostConfirmMessage": "Tämä linkki avaa {{host}} selaimessasi.",
+      "open": "Avaa",
+      "trustThisHost": "Luota tähän isäntään"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Kerätyt tiedot",
     "free": "Ilmainen"
+  },
+  "trustedHosts": {
+    "title": "Luotetut isännät",
+    "subtitle": "Isännät, jotka voit avata kysymättä",
+    "emptyTitle": "Ei luotettuja isäntiä",
+    "emptyDescription": "Kun luotat linkin isäntään, se avataan kysymättä uudelleen.",
+    "revoke": "Peruuta {{host}}",
+    "backToPreferences": "Takaisin asetuksiin"
   }
 }

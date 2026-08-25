@@ -2237,6 +2237,18 @@
       "updating": "ກຳລັງອັບເດດ, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "ໂຫຼດ",
+      "loadWithHost": "ໂຫຼດ {{host}}",
+      "httpsOnly": "ຮູບພາບ HTTPS ເທົ່ານັ້ນ"
+    },
+    "markdownLink": {
+      "invalidLink": "ບໍ່ສາມາດເປີດລິ້ງນີ້ໄດ້.",
+      "hostConfirmTitle": "ເປີດລິ້ງພາຍນອກບໍ?",
+      "hostConfirmMessage": "ລິ້ງນີ້ເປີດ {{host}} ໃນບຣາວເຊີຂອງທ່ານ.",
+      "open": "ເປີດ",
+      "trustThisHost": "ໄວ້ໃຈໂຮສນີ້"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "ຂໍ້ມູນທີ່ເກັບກຳ",
     "free": "ຟຣີ"
+  },
+  "trustedHosts": {
+    "title": "ໂຮສທີ່ໄວ້ໃຈ",
+    "subtitle": "ໂຮສທີ່ທ່ານໄວ້ໃຈໃຫ້ເປີດໂດຍບໍ່ຕ້ອງຖາມ",
+    "emptyTitle": "ບໍ່ມີໂຮສທີ່ໄວ້ໃຈ",
+    "emptyDescription": "ເມື່ອທ່ານໄວ້ໃຈໂຮສຂອງລິ້ງ, ມັນຈະເປີດໂດຍບໍ່ຖາມອີກ.",
+    "revoke": "ຖອນ {{host}}",
+    "backToPreferences": "ກັບໄປທີ່ການຕັ້ງຄ່າ"
   }
 }

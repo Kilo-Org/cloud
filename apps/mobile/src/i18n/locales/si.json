@@ -2237,6 +2237,18 @@
       "updating": "යාවත්කාලීන වෙමින්, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "ඉල්ලීම් ඇදීම"
+    },
+    "markdownImage": {
+      "load": "පූරණය කරන්න",
+      "loadWithHost": "පූරණය කරන්න {{host}}",
+      "httpsOnly": "HTTPS පින්තූර පමණයි"
+    },
+    "markdownLink": {
+      "invalidLink": "මෙම සබැඳිය විවෘත කළ නොහැක.",
+      "hostConfirmTitle": "බාහිර සබැඳිය විවෘත කරන්නද?",
+      "hostConfirmMessage": "මෙම සබැඳිය ඔබේ බ්‍රවුසරයේ {{host}} විවෘත කරයි.",
+      "open": "විවෘත කරන්න",
+      "trustThisHost": "මෙම ධාරකය විශ්වාස කරන්න"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "එකතු කළ දත්ත",
     "free": "නොමිලේ"
+  },
+  "trustedHosts": {
+    "title": "විශ්වාස කළ ධාරක",
+    "subtitle": "ඔබ අසා නොගෙන විවෘත කිරීමට විශ්වාස කරන ධාරක",
+    "emptyTitle": "විශ්වාස කළ ධාරක නැත",
+    "emptyDescription": "ඔබ සබැඳියක ධාරකය විශ්වාස කළ විට, එය නැවත අසා නොගෙන විවෘත වේ.",
+    "revoke": "{{host}} අවලංගු කරන්න",
+    "backToPreferences": "මනාප වෙත ආපසු"
   }
 }

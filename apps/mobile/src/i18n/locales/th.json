@@ -2237,6 +2237,18 @@
       "updating": "กำลังอัปเดต, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "โหลด",
+      "loadWithHost": "โหลด {{host}}",
+      "httpsOnly": "เฉพาะภาพ HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "ไม่สามารถเปิดลิงก์นี้ได้",
+      "hostConfirmTitle": "เปิดลิงก์ภายนอก?",
+      "hostConfirmMessage": "ลิงก์นี้จะเปิด {{host}} ในเบราว์เซอร์ของคุณ",
+      "open": "เปิด",
+      "trustThisHost": "เชื่อถือโฮสต์นี้"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "ข้อมูลที่รวบรวม",
     "free": "ฟรี"
+  },
+  "trustedHosts": {
+    "title": "โฮสต์ที่เชื่อถือ",
+    "subtitle": "โฮสต์ที่คุณเชื่อถือจะเปิดโดยไม่ถาม",
+    "emptyTitle": "ไม่มีโฮสต์ที่เชื่อถือ",
+    "emptyDescription": "เมื่อคุณเชื่อถือโฮสต์ของลิงก์ มันจะเปิดโดยไม่ถามอีก",
+    "revoke": "เพิกถอน {{host}}",
+    "backToPreferences": "กลับไปที่การตั้งค่า"
   }
 }

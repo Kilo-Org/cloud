@@ -2237,6 +2237,18 @@
       "updating": "Актуализиране, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "заявка за сливане"
+    },
+    "markdownImage": {
+      "load": "Зареждане",
+      "loadWithHost": "Зареждане {{host}}",
+      "httpsOnly": "Само HTTPS изображения"
+    },
+    "markdownLink": {
+      "invalidLink": "Тази връзка не може да бъде отворена.",
+      "hostConfirmTitle": "Да се отвори външна връзка?",
+      "hostConfirmMessage": "Тази връзка отваря {{host}} в браузъра ви.",
+      "open": "Отвори",
+      "trustThisHost": "Доверявай се на този хост"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Събрани данни",
     "free": "Безплатно"
+  },
+  "trustedHosts": {
+    "title": "Доверени хостове",
+    "subtitle": "Хостове, на които се доверявате да се отварят без запитване",
+    "emptyTitle": "Няма доверени хостове",
+    "emptyDescription": "Когато се доверите на хоста на връзка, тя се отваря без да пита отново.",
+    "revoke": "Отмени {{host}}",
+    "backToPreferences": "Обратно към предпочитанията"
   }
 }

@@ -1865,6 +1865,18 @@
       "updating": "מעדכן, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "בקשת משיכה"
+    },
+    "markdownImage": {
+      "load": "טען",
+      "loadWithHost": "טען {{host}}",
+      "httpsOnly": "תמונות HTTPS בלבד"
+    },
+    "markdownLink": {
+      "invalidLink": "לא ניתן לפתוח קישור זה.",
+      "hostConfirmTitle": "לפתוח קישור חיצוני?",
+      "hostConfirmMessage": "קישור זה פותח את {{host}} בדפדפן שלך.",
+      "open": "פתח",
+      "trustThisHost": "בטח במארח זה"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "נתונים שנאספו",
     "free": "חינם"
+  },
+  "trustedHosts": {
+    "title": "מארחים מהימנים",
+    "subtitle": "מארחים שבהם אתה בוטח לפתיחה ללא שאלה",
+    "emptyTitle": "אין מארחים מהימנים",
+    "emptyDescription": "כשאתה בוטח במארח של קישור, הוא נפתח ללא שאלה נוספת.",
+    "revoke": "בטל אמון ב{{host}}",
+    "backToPreferences": "חזור להעדפות"
   }
 }

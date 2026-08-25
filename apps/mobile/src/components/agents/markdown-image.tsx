@@ -11,6 +11,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { confirmMarkdownImage, isMarkdownImageConfirmed } from './markdown-image-confirm';
 import { resolveMarkdownImageSrc } from './markdown-image-src';
+import { getLinkAccessibilityActions } from './markdown-link';
 import {
   IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,
   resolveImagePreviewAspectRatio,
@@ -63,7 +64,11 @@ function BlockedImageChip({ kind, uri }: Readonly<{ kind: 'http' | 'data'; uri: 
 }
 
 /** HTTPS, not yet confirmed: source host plus a Load affordance. No Image mounts. */
-function UnconfirmedImageChip({ uri, onLoad }: Readonly<{ uri: string; onLoad: () => void }>) {
+function UnconfirmedImageChip({
+  uri,
+  onLoad,
+  onShowLinkActions,
+}: Readonly<{ uri: string; onLoad: () => void; onShowLinkActions?: () => void }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const host = imageHostDisplay(uri);
@@ -75,8 +80,18 @@ function UnconfirmedImageChip({ uri, onLoad }: Readonly<{ uri: string; onLoad: (
       <Pressable
         onPress={onLoad}
         accessibilityRole="button"
-        accessibilityLabel={t('agentChat.markdownImage.load')}
-        className="min-h-11 shrink-0 items-center justify-center active:opacity-70"
+        accessibilityLabel={
+          host
+            ? t('agentChat.markdownImage.loadWithHost', { host })
+            : t('agentChat.markdownImage.load')
+        }
+        accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
+        onAccessibilityAction={event => {
+          if (event.nativeEvent.actionName === 'showLinkActions') {
+            onShowLinkActions?.();
+          }
+        }}
+        className="min-h-11 min-w-11 shrink-0 items-center justify-center active:opacity-70"
       >
         <Download size={16} color={colors.mutedForeground} />
       </Pressable>
@@ -88,10 +103,12 @@ export function MarkdownImage({
   uri,
   alt,
   aspectRatio,
+  onShowLinkActions,
 }: Readonly<{
   uri: string;
   alt: string;
   aspectRatio?: number;
+  onShowLinkActions?: () => void;
 }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -103,6 +120,18 @@ export function MarkdownImage({
   const [failed, setFailed] = useState(false);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [attempt, setAttempt] = useState(0);
+
+  // A recycled FlashList cell must not carry the previous uri's fail or viewer
+  // state into the new uri. Reset synchronously during render (React's
+  // "adjust state when a prop changes" pattern) so no frame shows a stale chip.
+  const [prevUri, setPrevUri] = useState(uri);
+  if (prevUri !== uri) {
+    setPrevUri(uri);
+    setFailed(false);
+    setViewerVisible(false);
+    setAttempt(0);
+    setMeasuredAspectRatio(undefined);
+  }
 
   const filename =
     alt || (uri.startsWith('http') ? getFilename(uri.split('?')[0] ?? '') : '') || 'image';
@@ -118,6 +147,7 @@ export function MarkdownImage({
     return (
       <UnconfirmedImageChip
         uri={uri}
+        onShowLinkActions={onShowLinkActions}
         onLoad={() => {
           confirmMarkdownImage(uri);
           forceRender();
@@ -167,6 +197,12 @@ export function MarkdownImage({
             ? t('agentChat.filePart.viewImageWithAlt', { alt })
             : t('agentChat.filePart.viewImage')
         }
+        accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
+        onAccessibilityAction={event => {
+          if (event.nativeEvent.actionName === 'showLinkActions') {
+            onShowLinkActions?.();
+          }
+        }}
         // eslint-disable-next-line react-native/no-inline-styles -- measured aspect ratio cannot be a Tailwind class
         style={{
           aspectRatio: measuredAspectRatio ?? aspectRatio ?? IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,

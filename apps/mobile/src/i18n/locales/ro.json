@@ -2237,6 +2237,18 @@
       "updating": "Se actualizează, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Încarcă",
+      "loadWithHost": "Încarcă {{host}}",
+      "httpsOnly": "Doar imagini HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Acest link nu poate fi deschis.",
+      "hostConfirmTitle": "Deschideți link extern?",
+      "hostConfirmMessage": "Acest link deschide {{host}} în browser.",
+      "open": "Deschide",
+      "trustThisHost": "Încrede-te în această gazdă"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Date colectate",
     "free": "Gratuit"
+  },
+  "trustedHosts": {
+    "title": "Gazde de încredere",
+    "subtitle": "Gazde în care ai încredere să le deschizi fără a întreba",
+    "emptyTitle": "Nicio gazdă de încredere",
+    "emptyDescription": "Când ai încredere în gazda unui link, acesta se deschide fără a te mai întreba.",
+    "revoke": "Revocă {{host}}",
+    "backToPreferences": "Înapoi la preferințe"
   }
 }

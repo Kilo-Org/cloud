@@ -2237,6 +2237,18 @@
       "updating": "আপডেট হচ্ছে, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "পুল রিকোয়েস্ট"
+    },
+    "markdownImage": {
+      "load": "লোড",
+      "loadWithHost": "লোড {{host}}",
+      "httpsOnly": "শুধুমাত্র HTTPS ছবি"
+    },
+    "markdownLink": {
+      "invalidLink": "এই লিঙ্কটি খোলা যাবে না।",
+      "hostConfirmTitle": "বাহ্যিক লিঙ্ক খুলবেন?",
+      "hostConfirmMessage": "এই লিঙ্কটি আপনার ব্রাউজারে {{host}} খোলে।",
+      "open": "খুলুন",
+      "trustThisHost": "এই হোস্ট বিশ্বাস করুন"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "সংগৃহীত ডেটা",
     "free": "ফ্রি"
+  },
+  "trustedHosts": {
+    "title": "বিশ্বস্ত হোস্ট",
+    "subtitle": "যেসব হোস্ট জিজ্ঞেস না করেই খুলবেন",
+    "emptyTitle": "কোনো বিশ্বস্ত হোস্ট নেই",
+    "emptyDescription": "আপনি কোনো লিঙ্কের হোস্ট বিশ্বাস করলে তা আবার জিজ্ঞেস না করেই খোলে।",
+    "revoke": "{{host}} প্রত্যাহার করুন",
+    "backToPreferences": "পছন্দে ফিরুন"
   }
 }

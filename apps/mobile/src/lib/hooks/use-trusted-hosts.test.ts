@@ -132,4 +132,32 @@ describe('trusted host store', () => {
       JSON.stringify(['existing.com', 'new.com'])
     );
   });
+
+  it('preserves the persisted list when a host is trusted before the preload resolves', async () => {
+    let resolveRead: ((value: string | null) => void) | undefined = undefined;
+    getItemAsync.mockImplementation(
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- the read must stay pending until the test releases it
+      () =>
+        new Promise<string | null>(resolve => {
+          resolveRead = resolve;
+        })
+    );
+    const mod = await freshTrustedHosts();
+
+    // Trust before the module-scope preload has resolved its disk read.
+    mod.trustHost('new.com');
+
+    expect(mod.isTrustedHost('new.com')).toBe(true);
+
+    // The pending disk read resolves after the Trust write.
+    resolveRead?.('["existing.com"]');
+    await flushMicrotasks();
+
+    expect(mod.isTrustedHost('existing.com')).toBe(true);
+    expect(mod.isTrustedHost('new.com')).toBe(true);
+    expect(setItemAsync).toHaveBeenLastCalledWith(
+      'trusted-hosts',
+      JSON.stringify(['existing.com', 'new.com'])
+    );
+  });
 });

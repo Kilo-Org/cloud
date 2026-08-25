@@ -139,11 +139,7 @@ export function CreateDemoOrganizationDialog({
               />
             </div>
             {fieldError && (
-              <div
-                id="sales-demo-email-error"
-                className="text-sm text-destructive"
-                role="alert"
-              >
+              <div id="sales-demo-email-error" className="text-sm text-destructive" role="alert">
                 {fieldError}
               </div>
             )}

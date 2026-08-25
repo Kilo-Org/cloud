@@ -5,10 +5,7 @@ import { CreateDemoOrganizationButton } from '../components/CreateDemoOrganizati
 export default async function OrganizationsPage() {
   return (
     <Suspense fallback={<div>Loading organizations...</div>}>
-      <OrganizationsTable
-        defaultStripeStatus="active"
-        actions={<CreateDemoOrganizationButton />}
-      />
+      <OrganizationsTable defaultStripeStatus="active" actions={<CreateDemoOrganizationButton />} />
     </Suspense>
   );
 }

@@ -27,6 +27,38 @@ vi.mock('expo-file-system/legacy', () => ({
   }),
 }));
 
+const expoFileSystemMock = vi.hoisted(() => {
+  const files = new Map<string, string>();
+  const File = vi.fn(function FileMock(_base: unknown, ...rest: unknown[]) {
+    const uri =
+      rest.length > 0 ? `${(_base as { uri: string }).uri}/${String(rest[0])}` : String(_base);
+    return {
+      uri,
+      get exists() {
+        return files.has(uri);
+      },
+      write(content: string) {
+        files.set(uri, content);
+      },
+      textSync() {
+        return files.get(uri) ?? '';
+      },
+      delete() {
+        files.delete(uri);
+      },
+    };
+  });
+  return {
+    File,
+    Paths: { cache: { uri: 'file:///cache' } },
+  };
+});
+
+vi.mock('expo-file-system', () => ({
+  File: expoFileSystemMock.File,
+  Paths: expoFileSystemMock.Paths,
+}));
+
 // share-prefill also exports the React hook (expo-router). Keep the pure core
 // testable without a renderer by stubbing RN + router so vitest never parses
 // react-native's Flow sources.

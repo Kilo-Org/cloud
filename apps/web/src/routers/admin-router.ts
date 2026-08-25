@@ -53,6 +53,7 @@ import { ContainerMetricsAnalyticsError } from '@/lib/cloudflare/container-metri
 import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router';
 import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
 import { contributorChampionsRouter } from '@/routers/admin/contributor-champions-router';
+import { salesDemoRouter } from '@/routers/admin/sales-demo-router';
 import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
 import { creditCampaignsRouter } from '@/routers/admin/credit-campaigns-router';
 import { cloudBillingSkusRouter } from '@/routers/admin/cloud-billing-skus-router';
@@ -66,7 +67,7 @@ import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-r
 import { adminRequestLoggingOptInsRouter } from '@/routers/admin/request-logging-opt-ins-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
 import { adminKiloPassRouter } from '@/routers/admin/kilo-pass-router';
-import { adminKiloclawReferralsRouter } from '@/routers/admin/kiloclaw-referrals-router';
+import { adminImpactReferralsRouter } from '@/routers/admin/impact-referrals-router';
 import { adminStripeDisputesRouter } from '@/routers/admin/stripe-disputes-router';
 import { adminStripeEarlyFraudWarningsRouter } from '@/routers/admin/stripe-early-fraud-warnings-router';
 import { adminShellSecurityContentRouter } from '@/routers/admin/shell-security-content-router';
@@ -504,7 +505,7 @@ export const adminRouter = createTRPCRouter({
       canManageCredits: userCanManageCredits(currentUser),
     };
   }),
-  kiloclawReferrals: adminKiloclawReferralsRouter,
+  impactReferrals: adminImpactReferralsRouter,
   webhookTriggers: adminWebhookTriggersRouter,
   github: createTRPCRouter({
     getKilocodeOpenPullRequestCounts: adminProcedure.query(async () => {
@@ -2394,6 +2395,7 @@ export const adminRouter = createTRPCRouter({
   aiAttribution: adminAIAttributionRouter,
   ossSponsorship: ossSponsorshipRouter,
   contributorChampions: contributorChampionsRouter,
+  salesDemo: salesDemoRouter,
   bulkUserCredits: bulkUserCreditsRouter,
   creditCampaigns: creditCampaignsRouter,
   cloudBillingSkus: cloudBillingSkusRouter,

@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 type KiloClawDisplayInstance = {
   botName?: string | null;
   name?: string | null;
@@ -23,7 +25,7 @@ export function kiloclawConversationEyebrow(instance: KiloClawDisplayInstance | 
 export function kiloclawInstanceSwitcherTitle(instance: KiloClawDisplayInstance | undefined) {
   return (
     firstDisplayValue([instance?.botName, instance?.name, instance?.organizationName]) ??
-    'KiloClaw instance'
+    i18n.t('kiloclaw.instanceSwitcherTitle')
   );
 }
 

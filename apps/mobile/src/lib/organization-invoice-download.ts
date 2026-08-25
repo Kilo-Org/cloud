@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import {
   getShareRemoteFileReason,
   shareRemoteFile,
@@ -9,10 +10,10 @@ const INVOICE_CACHE_DIRECTORY = 'org-invoices';
 
 type InvoiceRowState = 'idle' | 'busy' | 'no-affordance';
 
-export const INVOICE_DOWNLOAD_FAILED_MESSAGE =
-  "Couldn't download invoice. Check your connection and try again.";
+export const invoiceDownloadFailedMessage = () => i18n.t('organization.invoices.downloadFailed');
 
-export const INVOICE_SHARING_UNAVAILABLE_MESSAGE = 'Sharing is not available on this device.';
+export const invoiceSharingUnavailableMessage = () =>
+  i18n.t('organization.invoices.sharingUnavailable');
 
 type InvoiceRowStateInput = {
   readonly invoicePdf: string | null;
@@ -45,9 +46,9 @@ export function selectInvoiceRowState(input: InvoiceRowStateInput): InvoiceRowSt
  */
 export function selectInvoiceDownloadErrorMessage(reason: ShareRemoteFileReason): string {
   if (reason === 'sharing-unavailable') {
-    return INVOICE_SHARING_UNAVAILABLE_MESSAGE;
+    return invoiceSharingUnavailableMessage();
   }
-  return INVOICE_DOWNLOAD_FAILED_MESSAGE;
+  return invoiceDownloadFailedMessage();
 }
 
 export function getInvoiceDownloadErrorMessage(error: unknown): string {

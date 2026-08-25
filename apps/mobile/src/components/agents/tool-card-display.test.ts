@@ -279,7 +279,7 @@ describe('getToolDisplay badge rules', () => {
     expect(
       getDisplay(makeToolPart('read', completed({ filePath: '/a/b.ts', offset: 10, limit: 25 })))
         .badge
-    ).toBe('L10, 25 lines');
+    ).toBe('L10 and 25 lines');
     expect(
       getDisplay(makeToolPart('read', completed({ filePath: '/a/b.ts', offset: 10 }))).badge
     ).toBe('L10');

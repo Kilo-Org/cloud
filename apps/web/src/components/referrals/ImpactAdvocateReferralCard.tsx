@@ -4,10 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
 import React, { createElement, useEffect, useState } from 'react';
 
-import {
-  buildImpactAdvocateTokenUrl,
-  type ImpactAdvocateReferralProduct,
-} from './ImpactAdvocateReferralCard.utils';
+import { IMPACT_ADVOCATE_TOKEN_URL } from './ImpactAdvocateReferralCard.utils';
 
 type WidgetToken = {
   token: string;
@@ -24,8 +21,8 @@ export const IMPACT_ADVOCATE_WIDGET_LOAD_TIMEOUT_MS = 10_000;
 export const IMPACT_ADVOCATE_WIDGET_LOAD_TIMEOUT_MESSAGE =
   'Ad blockers or network filters can block the referral widget from loading. Either allow the blocked domains or turn off the ad blocker or network filters to see the referral widget.';
 
-async function getWidgetToken(product: ImpactAdvocateReferralProduct): Promise<WidgetToken> {
-  const response = await fetch(buildImpactAdvocateTokenUrl(product), {
+async function getWidgetToken(): Promise<WidgetToken> {
+  const response = await fetch(IMPACT_ADVOCATE_TOKEN_URL, {
     method: 'GET',
     credentials: 'same-origin',
     headers: {
@@ -40,17 +37,13 @@ async function getWidgetToken(product: ImpactAdvocateReferralProduct): Promise<W
   } | null;
 
   if (!response.ok || !payload?.token || !payload.widgetId) {
-    const isKiloPassConfigurationUnavailable = product === 'kilo_pass' && response.status === 503;
-    const fallbackMessage = isKiloPassConfigurationUnavailable
-      ? 'Kilo Pass referral sharing is unavailable right now. Rewards already earned stay pending and apply automatically when eligible.'
-      : response.status === 503
-        ? 'Referral sharing is not configured in this environment.'
-        : 'Referral sharing is temporarily unavailable.';
-    const message = isKiloPassConfigurationUnavailable
-      ? fallbackMessage
-      : (payload?.error ?? fallbackMessage);
+    if (response.status === 503) {
+      throw new Error(
+        'Kilo Pass referral sharing is unavailable right now. Rewards already earned stay pending and apply automatically when eligible.'
+      );
+    }
 
-    throw new Error(message);
+    throw new Error(payload?.error ?? 'Referral sharing is temporarily unavailable.');
   }
 
   return { token: payload.token, widgetId: payload.widgetId };
@@ -117,14 +110,10 @@ export function WidgetContent({ state }: { state: WidgetState }) {
   }
 }
 
-export function ImpactAdvocateReferralWidget({
-  product = 'kiloclaw',
-}: {
-  product?: ImpactAdvocateReferralProduct;
-}) {
+export function ImpactAdvocateReferralWidget() {
   const tokenQuery = useQuery({
-    queryKey: ['impact-advocate-widget-token', product],
-    queryFn: () => getWidgetToken(product),
+    queryKey: ['impact-advocate-widget-token'],
+    queryFn: getWidgetToken,
     retry: false,
   });
 

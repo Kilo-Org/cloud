@@ -10,6 +10,7 @@
 // that keeps it testable in plain Node.
 
 import { readTrpcErrorField } from '@/lib/trpc-error';
+import { i18n } from '@/i18n';
 
 type PrReviewQueryState =
   | {
@@ -122,7 +123,7 @@ export function classifyPrReviewMutationError(error: unknown): PrReviewMutationE
   if (code === 'FORBIDDEN') {
     return {
       kind: 'forbidden',
-      message: error instanceof Error ? error.message : 'Forbidden',
+      message: error instanceof Error ? error.message : i18n.t('prReview.operation.forbidden'),
     };
   }
   if (code === 'PRECONDITION_FAILED' && readTrpcErrorField(error, 'message') === 'terms_required') {

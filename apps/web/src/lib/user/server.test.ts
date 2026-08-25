@@ -838,6 +838,23 @@ describe('getProfileRedirectPath', () => {
     );
   });
 
+  test('redirects to the sales demo org when the user also has an older non-demo org', async () => {
+    const user = await insertTestUser({
+      google_user_name: 'Sales Demo Redirect User',
+    });
+    const olderOrg = await createTestOrganization('Older Non-Demo Org', user.id, 100_000);
+    await db
+      .update(organizations)
+      .set({ created_at: '2020-01-01T00:00:00.000Z' })
+      .where(eq(organizations.id, olderOrg.id));
+
+    const demoOrg = await createTestOrganization('Sales Demo Redirect Org', user.id, 0, {
+      is_sales_demo: true,
+    });
+
+    await expect(getProfileRedirectPath(user)).resolves.toBe(`/organizations/${demoOrg.id}`);
+  });
+
   describe('users with personal account disabled', () => {
     test('redirects multi-organization users to one of their organizations', async () => {
       const invitedUser = await insertTestUser({

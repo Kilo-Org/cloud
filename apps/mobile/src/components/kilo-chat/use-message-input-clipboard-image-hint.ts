@@ -2,7 +2,7 @@ import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 import {
-  CLIPBOARD_PASTE_EMPTY_MESSAGE,
+  clipboardPasteEmptyMessage,
   useClipboardPaste,
 } from '@/lib/agent-attachments/use-clipboard-paste';
 import { buildAttachmentUnreadableToast } from './message-attachment-state';
@@ -29,7 +29,7 @@ export function useMessageInputClipboardImageHint({
     onFailure: reason => {
       toast.error(
         reason === 'empty'
-          ? CLIPBOARD_PASTE_EMPTY_MESSAGE
+          ? clipboardPasteEmptyMessage()
           : buildAttachmentUnreadableToast(i18n.t('chat.attachment.pastedImage'))
       );
     },

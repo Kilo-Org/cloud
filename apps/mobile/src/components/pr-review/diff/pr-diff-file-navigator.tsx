@@ -38,6 +38,8 @@ import { EmptyState } from '@/components/empty-state';
 import { NavigatorFileRow } from '@/components/pr-review/diff/pr-diff-navigator-file-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { requestScrollToFile } from '@/lib/pr-review/file-navigator-bridge';
 import {
   useFetchToCompletion,
@@ -346,12 +348,12 @@ export function PrDiffFileNavigator({
         <Text variant="muted" className="text-xs">
           {isTruncated
             ? t('prReview.fileNavigator.viewedOfListed', {
-                viewed: viewedCount.toLocaleString(),
-                total: files.length.toLocaleString(),
+                viewed: formatNumber(viewedCount, i18n.language),
+                total: formatNumber(files.length, i18n.language),
               })
             : t('prReview.fileNavigator.viewedCount', {
-                viewed: viewedCount.toLocaleString(),
-                total: files.length.toLocaleString(),
+                viewed: formatNumber(viewedCount, i18n.language),
+                total: formatNumber(files.length, i18n.language),
               })}
         </Text>
         {fetchAll.isRunning ? (
@@ -359,8 +361,8 @@ export function PrDiffFileNavigator({
             <ActivityIndicator size="small" color={colors.mutedForeground} />
             <Text variant="muted" className="text-xs">
               {t('prReview.fileNavigator.loadingFiles', {
-                loaded: fetchAll.loadedFiles.toLocaleString(),
-                total: changedFiles.toLocaleString(),
+                loaded: formatNumber(fetchAll.loadedFiles, i18n.language),
+                total: formatNumber(changedFiles, i18n.language),
               })}
             </Text>
           </View>

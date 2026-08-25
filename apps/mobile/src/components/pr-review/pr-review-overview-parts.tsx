@@ -11,6 +11,8 @@ import { View } from 'react-native';
 
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -170,26 +172,21 @@ export function PrCountsLine({
       <View className="flex-row items-center gap-1.5">
         <GitCommit size={14} color={colors.mutedForeground} />
         <Text variant="muted" className="text-sm">
-          {commits.toLocaleString()}{' '}
-          {commits === 1
-            ? t('prReview.overview.commitSingular')
-            : t('prReview.overview.commitPlural')}
+          {formatNumber(commits, i18n.language)} {t('prReview.overview.commit', { count: commits })}
         </Text>
       </View>
       <View className="flex-row items-center gap-1.5">
         <GitPullRequest size={14} color={colors.mutedForeground} />
         <Text variant="muted" className="text-sm">
-          {changedFiles.toLocaleString()}{' '}
-          {changedFiles === 1
-            ? t('prReview.overview.fileSingular')
-            : t('prReview.overview.filePlural')}
+          {formatNumber(changedFiles, i18n.language)}{' '}
+          {t('prReview.overview.file', { count: changedFiles })}
         </Text>
       </View>
       <View className="flex-row items-center gap-1.5">
         <Plus size={14} color={colors.good} />
-        <Text className="text-sm text-good">{additions.toLocaleString()}</Text>
+        <Text className="text-sm text-good">{formatNumber(additions, i18n.language)}</Text>
         <Text variant="muted" className="text-sm">
-          / −{deletions.toLocaleString()}
+          / −{formatNumber(deletions, i18n.language)}
         </Text>
       </View>
     </View>
@@ -197,7 +194,7 @@ export function PrCountsLine({
 }
 
 function localizeNumber(n: number): string {
-  return n.toLocaleString();
+  return formatNumber(n, i18n.language);
 }
 
 export function formatPrCounts(additions: number, deletions: number): string {

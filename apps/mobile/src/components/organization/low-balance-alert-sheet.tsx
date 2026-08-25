@@ -18,6 +18,8 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
@@ -40,7 +42,9 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
 
   const [enabled, setEnabled] = useState(settings.minimum_balance !== undefined);
   const thresholdRef = useRef(
-    settings.minimum_balance != null ? String(settings.minimum_balance) : ''
+    settings.minimum_balance == null
+      ? ''
+      : formatNumber(settings.minimum_balance, i18n.language, { useGrouping: false })
   );
   // Default to the signer's own email when no alert email is stored yet, so
   // the field starts pre-filled with a real, savable value rather than a

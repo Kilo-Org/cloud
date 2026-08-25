@@ -129,6 +129,25 @@ vi.mock('expo-file-system/legacy', () => ({
   copyAsync: vi.fn().mockResolvedValue('/tmp/copy'),
   deleteAsync: vi.fn().mockResolvedValue(undefined),
 }));
+// The real `share-payload.ts` pulls `registerTempFile` from
+// `@/lib/temp-file-registry`, which imports the new `expo-file-system` API.
+// Mock the main entry (not only `expo-file-system/legacy`) so the
+// `importOriginal()` chain in the `@/lib/share-payload` mock stays harmless.
+vi.mock('expo-file-system', () => {
+  const File = vi.fn(function FileMock(_base: unknown, ..._rest: unknown[]) {
+    return {
+      uri: 'file:///cache/temp-file-registry.json',
+      exists: false,
+      write: vi.fn(),
+      textSync: vi.fn(() => ''),
+      delete: vi.fn(),
+    };
+  });
+  return {
+    File,
+    Paths: { cache: { uri: 'file:///cache' } },
+  };
+});
 vi.mock('expo-share-intent', () => ({}));
 // Wrap only `peekSharePayload` so the tests can force a single settle-time
 // miss (a cleared payload) while the real store keeps staging. Everything

@@ -53,6 +53,20 @@ const NON_RETRYABLE_EXIT_MESSAGES: ReadonlySet<string> = new Set([
   REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE,
 ]);
 
+/** Catalog copy for a pinned SDK exit message, or null when it is not one. */
+function exitErrorCopy(message: string): string | null {
+  if (message === REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE) {
+    return i18n.t('agentChat.remoteSession.exitNotSupported');
+  }
+  if (message === REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE) {
+    return i18n.t('agentChat.remoteSession.exitUnavailable');
+  }
+  if (message.startsWith(REMOTE_SESSION_EXIT_UPGRADE_PREFIX)) {
+    return i18n.t('agentChat.remoteSession.exitNeedsNewerCli');
+  }
+  return null;
+}
+
 function isNonRetryableExitError(message: string): boolean {
   if (NON_RETRYABLE_EXIT_MESSAGES.has(message)) {
     return true;
@@ -76,16 +90,19 @@ export async function exitRemoteSessionWithFeedback({
     } catch (error) {
       const message =
         error instanceof Error ? error.message : i18n.t('agentChat.remoteSession.failedToExit');
+      // The three pinned SDK messages are a producer/consumer contract, matched
+      // above in English. Once matched, show the reader their own language.
+      const shown = exitErrorCopy(message) ?? message;
       if (isNonRetryableExitError(message)) {
         // Fail-closed: the SDK already signalled "do not send" by rejecting
         // before any wire command. Surface the message with no CTA so the
         // user sees the upgrade copy but cannot trigger another attempt.
-        toast.error(message);
+        toast.error(shown);
       } else {
         // Retryable: transport / ACK / heartbeat failure. The draft is
         // preserved by the submit-lock contract; the retry action re-runs
         // the exit mutation under the same SubmitLock the initial send held.
-        toast.error(message, {
+        toast.error(shown, {
           action: {
             label: i18n.t('common.tryAgain'),
             onClick: () => {

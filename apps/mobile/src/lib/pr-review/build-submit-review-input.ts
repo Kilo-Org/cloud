@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import {
   type SubmitReviewComment,
   type SubmitReviewInput,
@@ -23,9 +24,9 @@ export function reviewSubmitBlockReason(args: {
     return null;
   }
   if (args.event === 'REQUEST_CHANGES') {
-    return 'Add a summary or at least one comment to request changes.';
+    return i18n.t('prReview.submit.blockedRequestChanges');
   }
-  return 'Add a summary or at least one comment to post a comment review.';
+  return i18n.t('prReview.submit.blockedComment');
 }
 
 type BuildSubmitReviewInputArgs = {

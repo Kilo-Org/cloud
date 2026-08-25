@@ -1,8 +1,4 @@
-import {
-  getSettingsDirtyState,
-  isValidDayCount,
-  parseDayCount,
-} from '@kilocode/app-shared/security-agent';
+import { getSettingsDirtyState, isValidDayCount } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +10,8 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
+import { formatNumber, parseLocalizedNumber } from '@/lib/format';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -92,7 +90,7 @@ function SlaDayRow({
 }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const rawRef = useRef(String(initialValue));
+  const rawRef = useRef(formatNumber(initialValue, i18n.language, { useGrouping: false }));
   const [days, setDays] = useState(initialValue);
 
   return (
@@ -127,7 +125,8 @@ function SlaDayRow({
         placeholderTextColor={colors.mutedForeground}
         onChangeText={text => {
           rawRef.current = text;
-          const parsed = parseDayCount(text);
+          const value = parseLocalizedNumber(text, i18n.language);
+          const parsed = value !== null && Number.isInteger(value) ? value : Number.NaN;
           setDays(parsed);
           onChangeValue(parsed);
         }}

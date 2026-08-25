@@ -1,6 +1,6 @@
 import {
   type AttachmentBlock,
-  contentBlocksPreviewText,
+  contentBlocksAttachmentPreviewLabels,
   contentBlocksToText,
   type ConversationDetailResponse,
   type CreateMessageRequest,
@@ -67,7 +67,25 @@ export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string 
   if ('previewText' in replyToMessage) {
     return replyToMessage.previewText ?? i18n.t('chat.messageBubble.message');
   }
-  return contentBlocksPreviewText(replyToMessage.content) || i18n.t('chat.messageBubble.message');
+  const text = contentBlocksToText(replyToMessage.content).trim();
+  if (text) {
+    return text;
+  }
+  const labels = contentBlocksAttachmentPreviewLabels(replyToMessage.content);
+  if (labels.length === 0) {
+    return i18n.t('chat.messageBubble.message');
+  }
+  return labels
+    .map(label => {
+      if (label.kind === 'filename') {
+        return label.filename;
+      }
+      if (label.kind === 'image') {
+        return i18n.t('chat.messageBubble.image');
+      }
+      return i18n.t('chat.messageBubble.attachment');
+    })
+    .join(', ');
 }
 
 export function getDeliveryFailureLabel(message: Message): string | null {

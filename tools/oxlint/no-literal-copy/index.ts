@@ -165,6 +165,16 @@ function isCopyExpression(node: ESTree.Expression): boolean {
   if (node.type === 'BinaryExpression' && node.operator === '+') {
     return isCopyExpression(node.left) || isCopyExpression(node.right);
   }
+  // `error.message || 'Something went wrong'`: the fallback is the string the
+  // user reads whenever the server sends no message, so it is copy.
+  if (node.type === 'LogicalExpression' && (node.operator === '||' || node.operator === '??')) {
+    return isCopyExpression(node.left) || isCopyExpression(node.right);
+  }
+  // `error ? 'Something went wrong' : ''`: the user reads the branch when the
+  // condition holds, so either branch is copy.
+  if (node.type === 'ConditionalExpression') {
+    return isCopyExpression(node.consequent) || isCopyExpression(node.alternate);
+  }
   return false;
 }
 
@@ -330,8 +340,13 @@ const noLiteralCopyRule = defineRule({
             return;
           }
         }
-        // Bare toast('message')
-        if (node.callee.type === 'Identifier' && node.callee.name === 'toast') {
+        // Bare toast('message'), and announceForA11y('message') — a screen
+        // reader speaks the argument, so an English literal there ships
+        // English to every locale exactly like a visible label does.
+        if (
+          node.callee.type === 'Identifier' &&
+          (node.callee.name === 'toast' || node.callee.name === 'announceForA11y')
+        ) {
           const first = node.arguments[0];
           if (first && isStringArgument(first)) {
             context.report({ node, messageId: 'literalCopy' });

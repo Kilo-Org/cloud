@@ -14,8 +14,6 @@ const REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE =
 const REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE =
   'Remote session exit is unavailable for the current session';
 const REMOTE_SESSION_EXIT_UPGRADE_PREFIX = 'Remote slash commands require a newer Kilo CLI';
-const RETRY_TOAST_LABEL = 'Try again';
-const FALLBACK_ERROR_MESSAGE = 'Failed to exit session';
 
 const NON_RETRYABLE_EXIT_MESSAGES: ReadonlySet<string> = new Set([
   REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE,
@@ -62,7 +60,8 @@ export async function exitRemoteSessionFromList({
       try {
         await sendExit();
       } catch (error) {
-        const message = error instanceof Error ? error.message : FALLBACK_ERROR_MESSAGE;
+        const message =
+          error instanceof Error ? error.message : i18n.t('agentChat.remoteSession.failedToExit');
         if (isNonRetryableExitError(message)) {
           // Fail-closed: the SDK signalled "do not send". No CTA so the user
           // sees the copy but cannot trigger another attempt.
@@ -72,7 +71,7 @@ export async function exitRemoteSessionFromList({
           // send without a second confirm.
           announcingToast.error(message, {
             action: {
-              label: RETRY_TOAST_LABEL,
+              label: i18n.t('common.tryAgain'),
               onClick: () => {
                 void runSend();
               },

@@ -41,47 +41,44 @@ export function buildGitHubInstallOutcomeAlert(
   switch (result.kind) {
     case 'success': {
       return {
-        title: 'GitHub App installed',
-        message: 'Your repositories are now connected.',
-        buttons: [{ text: 'Continue' }],
+        title: i18n.t('agents.githubInstall.installedTitle'),
+        message: i18n.t('agents.githubInstall.installedMessage'),
+        buttons: [{ text: i18n.t('common.continue') }],
       };
     }
     case 'pending': {
       return {
-        title: 'Awaiting admin approval',
-        message: 'An organization admin must approve the installation request.',
-        buttons: [{ text: 'Done' }],
+        title: i18n.t('agents.githubInstall.pendingTitle'),
+        message: i18n.t('agents.githubInstall.pendingMessage'),
+        buttons: [{ text: i18n.t('common.done') }],
       };
     }
     case 'error': {
       if (result.code === 'install_state_user_mismatch') {
         return {
-          title: 'Account mismatch',
-          message:
-            'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.',
-          buttons: [{ text: 'Back' }],
+          title: i18n.t('agents.githubInstall.accountMismatchTitle'),
+          message: i18n.t('agents.githubInstall.accountMismatchMessage'),
+          buttons: [{ text: i18n.t('common.back') }],
         };
       }
       if (result.code === 'not_installation_admin') {
         return {
-          title: 'Cannot complete installation',
-          message:
-            'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.',
-          buttons: [{ text: 'Back' }],
+          title: i18n.t('agents.githubInstall.cannotCompleteTitle'),
+          message: i18n.t('agents.githubInstall.notAdminMessage'),
+          buttons: [{ text: i18n.t('common.back') }],
         };
       }
       if (result.code === 'installation_already_claimed') {
         return {
-          title: 'Cannot complete installation',
-          message:
-            'That GitHub installation is already connected to another Kilo account. Disconnect it there first.',
-          buttons: [{ text: 'Back' }],
+          title: i18n.t('agents.githubInstall.cannotCompleteTitle'),
+          message: i18n.t('agents.githubInstall.alreadyClaimedMessage'),
+          buttons: [{ text: i18n.t('common.back') }],
         };
       }
       return {
-        title: 'Installation did not complete',
-        message: 'The GitHub App installation was not completed. Try again from the app.',
-        buttons: [{ text: 'Try again', onPress: onRetry }],
+        title: i18n.t('agents.githubInstall.didNotCompleteTitle'),
+        message: i18n.t('agents.githubInstall.didNotCompleteMessage'),
+        buttons: [{ text: i18n.t('common.tryAgain'), onPress: onRetry }],
       };
     }
     default: {

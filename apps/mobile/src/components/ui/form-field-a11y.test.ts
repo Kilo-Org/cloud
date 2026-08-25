@@ -8,18 +8,18 @@ describe('formFieldA11y', () => {
   });
 
   it('appends "required" when the field is required', () => {
-    expect(formFieldA11y({ label: 'Email', required: true })).toBe('Email, required');
+    expect(formFieldA11y({ label: 'Email', required: true })).toBe('Email and required');
   });
 
   it('appends the error phrase when an error is set', () => {
     expect(formFieldA11y({ label: 'Email', error: 'Enter a valid email' })).toBe(
-      'Email, error: Enter a valid email'
+      'Email and error: Enter a valid email'
     );
   });
 
   it('appends required then the error phrase when both are set', () => {
     expect(formFieldA11y({ label: 'Email', required: true, error: 'Enter a valid email' })).toBe(
-      'Email, required, error: Enter a valid email'
+      'Email, required, and error: Enter a valid email'
     );
   });
 
@@ -27,6 +27,6 @@ describe('formFieldA11y', () => {
     expect(formFieldA11y({ label: 'Email', required: false })).toBe('Email');
     expect(formFieldA11y({ label: 'Email', error: null })).toBe('Email');
     expect(formFieldA11y({ label: 'Email', error: '' })).toBe('Email');
-    expect(formFieldA11y({ label: 'Email', required: true, error: '' })).toBe('Email, required');
+    expect(formFieldA11y({ label: 'Email', required: true, error: '' })).toBe('Email and required');
   });
 });

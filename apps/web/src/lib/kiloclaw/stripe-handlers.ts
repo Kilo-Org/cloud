@@ -11,10 +11,7 @@ import {
   type KiloClawSubscription,
 } from '@kilocode/db';
 import { kiloclaw_subscriptions, kiloclaw_instances, kilocode_users } from '@kilocode/db/schema';
-import {
-  ImpactReferralPaymentProvider,
-  type KiloClawSubscriptionStatus,
-} from '@kilocode/db/schema-types';
+import { type KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
 import {
   getClawPlanForStripePriceId,
   getStripePriceIdForClawPlan,
@@ -37,7 +34,6 @@ import {
   buildAffiliateEventDedupeKey,
   enqueueAffiliateEventForUser,
 } from '@/lib/impact/affiliate-events';
-import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
 import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
 import {
   CurrentPersonalSubscriptionResolutionError,
@@ -1859,35 +1855,22 @@ export async function handleKiloClawInvoicePaid(params: {
         invoice.status_transitions?.paid_at != null
           ? new Date(invoice.status_transitions.paid_at * 1000)
           : new Date();
-      const conversionDisposition = await processPersonalKiloClawPaidConversion({
+      await enqueueAffiliateEventForUser({
         userId: metadata.kiloUserId,
-        sourcePaymentId: invoice.id,
-        orderId: invoice.id,
-        paymentProvider: ImpactReferralPaymentProvider.Stripe,
-        amount: invoice.amount_paid / 100,
-        currencyCode: invoice.currency ?? 'usd',
-        convertedAt: eventDate,
-        ...reportingFields,
-      });
-
-      if (conversionDisposition.shouldEnqueueAffiliateSale) {
-        await enqueueAffiliateEventForUser({
-          userId: metadata.kiloUserId,
+        provider: 'impact',
+        eventType: 'sale',
+        dedupeKey: buildAffiliateEventDedupeKey({
           provider: 'impact',
           eventType: 'sale',
-          dedupeKey: buildAffiliateEventDedupeKey({
-            provider: 'impact',
-            eventType: 'sale',
-            entityId: invoice.id,
-          }),
-          orderId: invoice.id,
-          amount: invoice.amount_paid / 100,
-          currencyCode: invoice.currency ?? 'usd',
-          eventDate,
-          ...reportingFields,
-          stripeChargeId: chargeId ?? undefined,
-        });
-      }
+          entityId: invoice.id,
+        }),
+        orderId: invoice.id,
+        amount: invoice.amount_paid / 100,
+        currencyCode: invoice.currency ?? 'usd',
+        eventDate,
+        ...reportingFields,
+        stripeChargeId: chargeId ?? undefined,
+      });
     } catch (error) {
       logWarning('Affiliate sale enqueue failed', {
         stripe_event_id: eventId,

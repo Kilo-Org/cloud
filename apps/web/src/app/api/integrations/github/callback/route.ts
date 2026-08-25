@@ -528,53 +528,62 @@ async function handleCoreInstallFlow(params: {
     );
   }
 
-  // Admin proof — report mode. The GitHub App does not yet request OAuth
-  // authorization during installation. When `code` is present we verify
-  // administration and log the outcome; when absent we log and proceed.
-  // A follow-up commit will hard-require `code` after the App setting is
-  // enabled in the GitHub App dashboard.
+  // Require proof that the OAuth-authorized GitHub user administers the
+  // installation before using app credentials to fetch or persist it.
   if (setupAction === 'install' || setupAction === 'update') {
     const code = searchParams.get('code');
+    const rejectUnauthorizedInstallation = () =>
+      NextResponse.redirect(
+        new URL(
+          isAppInitiated
+            ? appFallbackPath('error=not_installation_admin')
+            : appendQueryParam(redirectPath, 'error=not_installation_admin'),
+          APP_URL
+        )
+      );
 
-    if (code) {
-      try {
-        const exchangeResult = await exchangeGitHubOAuthCode(code, githubAppType);
-        const isAdmin = await assertUserAdministersInstallation({
-          accessToken: exchangeResult.accessToken,
-          installationId,
-        });
-
-        if (isAdmin) {
-          console.log('[github_admin_proof:pass]', {
-            github_user_id: exchangeResult.id,
-            github_user_login: exchangeResult.login,
-            installation_id: installationId,
-          });
-        } else {
-          console.log('[github_admin_proof:fail_non_admin]', {
-            github_user_id: exchangeResult.id,
-            github_user_login: exchangeResult.login,
-            installation_id: installationId,
-          });
-        }
-      } catch (error) {
-        console.error('[github_admin_proof:error]', {
-          installation_id: installationId,
-          error: (error as Error).message,
-        });
-        captureException(error, {
-          tags: {
-            endpoint: 'github/callback',
-            source: 'github_admin_proof',
-          },
-          extra: { installationId },
-        });
-      }
-    } else {
+    if (!code) {
       console.log('[github_admin_proof:code_absent]', {
         installation_id: installationId,
         setup_action: setupAction,
       });
+      return rejectUnauthorizedInstallation();
+    }
+
+    try {
+      const exchangeResult = await exchangeGitHubOAuthCode(code, githubAppType);
+      const isAdmin = await assertUserAdministersInstallation({
+        accessToken: exchangeResult.accessToken,
+        installationId,
+      });
+
+      if (!isAdmin) {
+        console.log('[github_admin_proof:fail_non_admin]', {
+          github_user_id: exchangeResult.id,
+          github_user_login: exchangeResult.login,
+          installation_id: installationId,
+        });
+        return rejectUnauthorizedInstallation();
+      }
+
+      console.log('[github_admin_proof:pass]', {
+        github_user_id: exchangeResult.id,
+        github_user_login: exchangeResult.login,
+        installation_id: installationId,
+      });
+    } catch (error) {
+      console.error('[github_admin_proof:error]', {
+        installation_id: installationId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      captureException(error, {
+        tags: {
+          endpoint: 'github/callback',
+          source: 'github_admin_proof',
+        },
+        extra: { installationId },
+      });
+      return rejectUnauthorizedInstallation();
     }
   }
 

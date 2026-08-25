@@ -22,7 +22,12 @@
     "copiedToClipboard": "Copiat al porta-retalls",
     "couldNotCopyToClipboard": "No s'ha pogut copiar al porta-retalls",
     "required": "obligatori",
-    "error": "error: {{error}}"
+    "error": "error: {{error}}",
+    "back": "Enrere",
+    "somethingWentWrong": "Alguna cosa ha fallat",
+    "couldNotOpen": "No s'ha pogut obrir {{label}}",
+    "link": "enllaç",
+    "takingLonger": "Això triga més del que s'esperava. Pots tancar-ho i tornar-ho a comprovar."
   },
   "language": {
     "title": "Idioma",
@@ -206,11 +211,11 @@
       "loadingLines": "Carregant {{loaded}} de {{total}} línies…",
       "expandContext": "Expandeix el context",
       "expandMoreContext": "Expandeix més context",
-      "expandLines": "Expandeix {{count}} línies ({{start}}–{{end}})",
-      "expandMoreLines": "Expandeix {{count}} línies més ({{start}}–{{end}})",
-      "expandLinesOfContext": "Expandeix {{count}} línies de context",
+      "expandLines": "Expandeix {{displayCount}} línies ({{start}}–{{end}})",
+      "expandMoreLines": "Expandeix {{displayCount}} línies més ({{start}}–{{end}})",
+      "expandLinesOfContext": "Expandeix {{displayCount}} línies de context",
       "expandAll": "Expandeix-ho tot",
-      "expandAllLines": "Expandeix totes les {{count}} línies",
+      "expandAllLines": "Expandeix totes les {{displayCount}} línies",
       "loadingMoreFiles": "Carregant més fitxers…",
       "retryLoadingNextPage": "Torna a carregar la pàgina següent",
       "failedToLoadMoreFiles": "No s'han pogut carregar més fitxers — toca per tornar-ho a provar",
@@ -219,13 +224,17 @@
       "loadedOfTotalFiles": "S'han carregat {{loaded}} de {{total}} fitxers",
       "loadAllFiles": "Carrega tots els fitxers",
       "loadAll": "Carrega-ho tot",
-      "fileLoaded": "S'ha carregat {{count}} fitxer",
-      "filesLoaded": "S'han carregat {{count}} fitxers",
-      "fileLoadedOfTotal": "S'ha carregat {{count}} fitxer de {{total}}",
-      "filesLoadedOfTotal": "S'han carregat {{count}} fitxers de {{total}}",
+      "fileLoadedCount_one": "S'ha carregat {{displayCount}} fitxer",
+      "fileLoadedCount": "S'han carregat {{displayCount}} fitxers",
+      "fileLoadedCount_other": "S'han carregat {{displayCount}} fitxers",
+      "fileLoadedOfTotalCount_one": "S'ha carregat {{displayCount}} fitxer de {{total}}",
+      "fileLoadedOfTotalCount": "S'han carregat {{displayCount}} fitxers de {{total}}",
+      "fileLoadedOfTotalCount_other": "S'han carregat {{displayCount}} fitxers de {{total}}",
       "filesStillLoading": "Els fitxers encara s'estan carregant. Estira per actualitzar.",
       "goToOverview": "Vés a la visió general",
-      "goToOverviewTab": "Vés a la pestanya de visió general"
+      "goToOverviewTab": "Vés a la pestanya de visió general",
+      "fileLoadedCount_many": "S'han carregat {{displayCount}} fitxers",
+      "fileLoadedOfTotalCount_many": "S'han carregat {{displayCount}} fitxers de {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ sense salt de línia al final del fitxer",
@@ -278,7 +287,36 @@
         "body": "No s'ha pogut eliminar la branca: {{reason}}",
         "accessibility": "Fusionada. No s'ha pogut eliminar la branca: {{reason}}"
       },
-      "loadFailedTitle": "No s'han pogut carregar les opcions de fusió"
+      "loadFailedTitle": "No s'han pogut carregar les opcions de fusió",
+      "blocked": {
+        "unknownStateTitle": "GitHub no ha informat d'un estat de fusió",
+        "unknownStateDetail": "Torna a actualitzar la visió general d'aquí a una estona.",
+        "conflictsTitle": "Conflictes de fusió",
+        "conflictsDetail": "Resol els conflictes de fusió en aquesta branca abans de fusionar.",
+        "requiredReviewsTitle": "Falten revisions requerides",
+        "requiredReviewsDetail": "Falten o estan pendents les aprovacions dels revisors requerits.",
+        "failingChecksTitle": "Comprovacions requerides fallides",
+        "failingChecksDetail": "Les comprovacions d'estat requerides estan fallant.",
+        "unstableTitle": "Algunes comprovacions estan fallant",
+        "unstableDetail": "Les comprovacions no requerides estan fallant. No bloquejaran la fusió.",
+        "draftTitle": "Pull request esborrany",
+        "draftDetail": "Marca la pull request com a preparada per a la revisió abans de fusionar.",
+        "behindTitle": "La branca està desactualitzada",
+        "behindDetailUpdatable": "Actualitza la branca des de la base, o fes un rebase, abans de fusionar.",
+        "behindDetail": "La branca capçalera va per darrere de la base. Fes un rebase o actualitza la branca abans de fusionar.",
+        "notMergeableTitle": "Aquesta pull request encara no es pot fusionar",
+        "notMergeableDetail": "GitHub ha informat d'un estat de fusió {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Crea un commit de fusió",
+        "squash": "Comprimir i fusionar",
+        "rebase": "Rebase i fusionar"
+      },
+      "methodDescriptions": {
+        "merge": "Combina tots els commits d'aquesta branca a la branca base amb un commit de fusió.",
+        "squash": "Combina tots els commits d'aquesta branca en un únic commit a la branca base.",
+        "rebase": "Reprodueix tots els commits d'aquesta branca sobre la branca base sense un commit de fusió."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Fil de discussió {{anchorLabel}}",
@@ -288,8 +326,9 @@
       "resolved": "Resolt",
       "outdated": "Desactualitzat",
       "file": "Fitxer",
-      "oneComment": "1 comentari",
-      "commentCount": "{{count}} comentaris",
+      "comment_one": "1 comentari",
+      "comment": "{{displayCount}} comentaris",
+      "comment_other": "{{displayCount}} comentaris",
       "startedRelative": " · començat {{relative}}",
       "couldNotLoadMore": "No s'han pogut carregar més comentaris.",
       "retryLoadingMore": "Torna a carregar més comentaris",
@@ -298,9 +337,10 @@
       "closeReactions": "Tanca les reaccions",
       "reactionsTitle": "Reaccions",
       "addReaction": "Afegeix una reacció",
-      "reactionPill": "{{emoji}} reacció, {{count}} {{countLabel}}",
-      "reactionSingular": "reacció",
-      "reactionPlural": "reaccions",
+      "reactionPill": "{{emoji}} reacció, {{displayCount}} {{countLabel}}",
+      "reaction_one": "reacció",
+      "reaction": "reaccions",
+      "reaction_other": "reaccions",
       "commentActions": "Accions del comentari",
       "reportContent": "Denuncia el contingut",
       "reportUser": "Denuncia l'usuari",
@@ -349,10 +389,30 @@
       "noDiscussionDescription": "No hi ha fils de revisió ni comentaris de conversa en aquesta pull request.",
       "reviewFiles": "Revisa els fitxers",
       "quotedDiffSnippet": "Fragment de diff citat",
-      "moreLinesAbove": "… {{count}} línies més a dalt",
+      "moreLinesAbove": "… {{displayCount}} línies més a dalt",
       "termsAcceptRequired": "Has d'acceptar els Termes del servei per publicar.",
       "termsOutdatedCopy": "Els Termes del servei han canviat. Torna a obrir aquesta pantalla per acceptar la versió més recent.",
-      "termsCheckRetryCopy": "No s'han pogut comprovar els Termes del servei. Comprova la connexió i torna-ho a provar."
+      "termsCheckRetryCopy": "No s'han pogut comprovar els Termes del servei. Comprova la connexió i torna-ho a provar.",
+      "comment_many": "{{displayCount}} comentaris",
+      "reaction_many": "reaccions",
+      "reactions": {
+        "thumbsUp": "Polze amunt",
+        "thumbsDown": "Polze avall",
+        "laugh": "Rialla",
+        "hooray": "Hurra",
+        "confused": "Confós",
+        "heart": "Cor",
+        "rocket": "Coet",
+        "eyes": "Ulls"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Comentari de fitxer a {{path}}",
+        "fileComment": "Comentari de fitxer",
+        "outdatedOnPathLines": "Desactualitzat a {{path}} {{lines}}",
+        "outdatedOnLines": "Desactualitzat a {{lines}}",
+        "outdatedOnPath": "Desactualitzat a {{path}}"
+      },
+      "deletedUser": "usuari eliminat"
     },
     "couldNotOpenGitHubAppSettings": "No s'ha pogut obrir la configuració de l'app de GitHub",
     "installKiloGitHubApp": "Instal·la l'app Kilo de GitHub",
@@ -391,11 +451,11 @@
       "retryChecks": "Torna a comprovar",
       "viewOnGitHub": "Veure la PR a GitHub",
       "noChecksReported": "No s'ha informat de cap comprovació",
-      "passed": "{{count}} superades",
-      "failed": "{{count}} fallides",
-      "pending": "{{count}} pendents",
-      "skipped": "{{count}} ometudes",
-      "checksCount": "{{count}} comprovacions",
+      "passed": "{{displayCount}} superades",
+      "failed": "{{displayCount}} fallides",
+      "pending": "{{displayCount}} pendents",
+      "skipped": "{{displayCount}} ometudes",
+      "checksCount": "{{displayCount}} comprovacions",
       "checkDetails": "detalls de la comprovació",
       "pullRequest": "pull request"
     },
@@ -452,11 +512,15 @@
       "deletePendingMessage": "Aquest comentari s'eliminarà de la cua de revisió.",
       "delete": "Elimina",
       "summaryOptional": "Resum (opcional)",
-      "pendingCommentSingular": "comentari pendent",
-      "pendingCommentPlural": "comentaris pendents",
-      "submitCountOfTotal": "Envia {{freshCount}} de {{totalCount}} comentaris",
+      "pendingComment_one": "comentari pendent",
+      "pendingComment": "comentaris pendents",
+      "pendingComment_other": "comentaris pendents",
+      "submitCountOfTotal": "Envia {{displayFreshCount}} de {{displayTotalCount}} comentaris",
       "submitReview": "Envia la revisió",
-      "partialPostedMessage": "S'han publicat {{freshCount}} comentari(s). {{staleCount}} comentari(s) apunten a un commit més antic i han quedat a la teva cua."
+      "partialPostedMessage": "S'han publicat {{displayFreshCount}} comentari(s). {{displayStaleCount}} comentari(s) apunten a un commit més antic i han quedat a la teva cua.",
+      "pendingComment_many": "comentaris pendents",
+      "blockedRequestChanges": "Afegeix un resum o com a mínim un comentari per sol·licitar canvis.",
+      "blockedComment": "Afegeix un resum o com a mínim un comentari per publicar una revisió de comentaris."
     },
     "reconnectNotice": {
       "title": "La connexió de GitHub ha caducat",
@@ -478,10 +542,14 @@
       "stateOpenReviewRequired": "Oberta · Revisió requerida",
       "stateOpen": "Oberta",
       "unknownAuthor": "Autor desconegut",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "fitxer",
-      "filePlural": "fitxers"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "fitxer",
+      "file": "fitxers",
+      "file_other": "fitxers",
+      "commit_many": "commits",
+      "file_many": "fitxers"
     },
     "pendingComment": {
       "editOutdatedA11y": "Edita el comentari pendent desactualitzat a {{location}}",
@@ -512,10 +580,36 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} seleccionat, toca per canviar la selecció",
-      "tapToComment": "{{label}}, toca per comentar"
+      "truncationBanner": "Es mostren els primers {{limit}} de {{total}} fitxers modificats — límit de l'API de GitHub",
+      "tapToComment": "{{label}}, toca per comentar",
+      "statusAdded": "Afegit",
+      "statusContext": "Context",
+      "statusDeleted": "Eliminat",
+      "lineLabel": "{{status}} línia {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(buit)"
     },
     "linkPasteClipboardEmpty": "El porta-retalls és buit",
-    "linkPasteNotAPullRequest": "No és un enllaç de pull request de GitHub"
+    "linkPasteNotAPullRequest": "No és un enllaç de pull request de GitHub",
+    "announce": {
+      "commentPosted": "Comentari publicat",
+      "reviewSubmitted": "Revisió enviada",
+      "autoMergeEnabled": "Fusió automàtica activada"
+    },
+    "mutationError": {
+      "commentNotPosted": "Aquest comentari no es pot publicar. Pot ser que la línia seleccionada hagi canviat, o que la PR s'hagi actualitzat.",
+      "reviewNotSubmitted": "Aquesta revisió no es pot enviar tal com està. Pot ser que la PR hagi canviat, o no pots revisar la teva pròpia pull request.",
+      "couldNotPostComment": "No s'ha pogut publicar el comentari.",
+      "couldNotSubmitReview": "No s'ha pogut enviar la revisió. Comprova la connexió i torna-ho a provar."
+    },
+    "operation": {
+      "couldNotReply": "No s'ha pogut respondre.",
+      "couldNotCompleteAction": "No s'ha pogut completar aquesta acció.",
+      "mergeResultDefaultError": "GitHub no ha completat la fusió.",
+      "ambiguous": "No s'ha pogut confirmar — comprova el PR abans de tornar-ho a provar.",
+      "persistenceFailed": "No s'ha pogut registrar aquesta acció. Torna-ho a provar més tard.",
+      "forbidden": "Prohibit"
+    }
   },
   "notifications": {
     "title": "Notificacions",
@@ -573,7 +667,8 @@
     "agents": "Agents",
     "profile": "Perfil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, pestanya, {{position}} de {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -614,7 +709,7 @@
       "recent": "Recents",
       "common": "Habituals",
       "reactWith": "Reacciona amb {{reaction}}",
-      "accessibility": "{{emoji}} reacció, {{count}}"
+      "accessibility": "{{emoji}} reacció, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Responent a",
@@ -643,11 +738,21 @@
       "imageUnavailable": "Imatge no disponible",
       "openFailed": "No s'ha pogut obrir l'adjunt. Comprova la connexió i torna-ho a provar.",
       "attachFailed": "No s'ha pogut adjuntar el fitxer",
-      "limit": "Pots adjuntar fins a {{count}} fitxers.",
+      "limit": "Pots adjuntar fins a {{displayCount}} fitxers.",
       "sizeRejection": "{{filename}} supera el límit d'adjunts de {{limit}}.",
       "unreadable": "No s'ha pogut llegir {{filename}}.",
       "pastedImage": "la imatge enganxada",
-      "defaultName": "Adjunt"
+      "defaultName": "Adjunt",
+      "classificationDenied": "Els fitxers executables no es poden adjuntar",
+      "classificationEmpty": "El fitxer és buit",
+      "classificationTooLarge": "Els fitxers han de ser de 20 MB o menys",
+      "classificationUnreadable": "No s'ha pogut llegir aquest fitxer",
+      "announceUploaded": "Adjunt penjat",
+      "cantUpload": "Aquest fitxer no es pot pujar.",
+      "networkError": "Error de xarxa",
+      "uploadFailed": "La pujada ha fallat",
+      "failedToUploadFile": "No s'ha pogut pujar el fitxer: {{reason}}",
+      "nothingToPaste": "Res per enganxar"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -661,7 +766,9 @@
       "moreActions": "Més accions",
       "message": "Missatge",
       "notDelivered": "No s'ha entregat",
-      "edited": "(editat)"
+      "edited": "(editat)",
+      "image": "Imatge",
+      "attachment": "Adjunt"
     },
     "messageActions": {
       "copied": "Copiat",
@@ -691,8 +798,10 @@
     },
     "typingIndicator": {
       "someone": "Algú",
-      "oneTyping": "{{name}} està escrivint...",
-      "manyTyping": "{{names}} estan escrivint..."
+      "typing_one": "{{name}} està escrivint...",
+      "typing": "{{names}} estan escrivint...",
+      "typing_other": "{{names}} estan escrivint...",
+      "typing_many": "{{names}} estan escrivint..."
     },
     "botStatus": {
       "online": "En línia",
@@ -702,6 +811,12 @@
       "loadingUser": "Carregant l'usuari...",
       "waitingForStatus": "Esperant l'estat del bot...",
       "offlineMessage": "El bot està desconnectat. Els missatges es reprendran quan es torni a connectar."
+    },
+    "errors": {
+      "notAllowed": "No permès",
+      "messageTooLong": "El missatge és massa llarg — mantén-lo per sota de {{limit}} caràcters",
+      "titleTooLong": "El títol és massa llarg — mantén-lo per sota de {{limit}} caràcters",
+      "messageEmpty": "El missatge no pot estar buit"
     }
   },
   "kiloclaw": {
@@ -722,23 +837,26 @@
       "couldNotLoad": "No s'ha pogut carregar la informació de facturació",
       "manageOnWeb": "Gestiona la facturació al web",
       "commitPlan": "Commit",
-      "daysLeft": "Queden {{count}} dies",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "El teu període final de Commit acaba el {{date}}. Continua com a Standard per {{price}}, o l'allotjament s'acaba.",
       "freeTrial": "Prova gratuïta",
       "hostingEnds": "L'allotjament s'acaba",
-      "oneDayLeft": "Queda 1 dia",
       "renews": "Es renova",
       "standardMonthToMonth": "Standard mensual",
       "standardStartsOn": "Standard comença el {{date}} per {{price}}.",
       "yourStandardMonthlyPrice": "el teu preu mensual Standard",
       "perMonth": "/mes",
       "earlybirdAccessUntil": "Accés Earlybird fins al {{date}}",
-      "earlybirdEnding": "Earlybird acaba: queden {{days}} dies",
+      "earlybirdEnding": "Earlybird acaba: {{remaining}}",
       "paymentPastDue": "Pagament vençut. Actualitza el teu mètode de pagament.",
       "subscriptionCancels": "La subscripció es cancel·la el {{date}}",
-      "trialDaysRemaining": "Prova: queden {{days}} dies",
-      "trialEndingSoon": "La prova acaba aviat: {{days}}"
+      "trialDaysRemaining": "Prova: queden {{remaining}}",
+      "trialEndingSoon": "La prova acaba aviat: {{remaining}}",
+      "lessThanOneDay": "Menys d'1 dia",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Novetats",
@@ -990,7 +1108,7 @@
         "stalledTitle": "Alguna cosa s'ha encallat",
         "stalledBody": "No hem pogut acabar de configurar {{name}}. Torna-ho a provar, o escriu a hi@kilo.ai si això continua passant.",
         "timeoutTitle": "Tarda més del previst",
-        "timeoutBody": "La configuració de {{name}} tarda més del normal (més de {{minutes}} minuts).",
+        "timeoutBody": "La configuració de {{name}} tarda més del normal (més de {{displayMinutes}} minuts).",
         "continueInBackground": "Continua en segon pla",
         "settingUp": "Configurant {{name}}",
         "finishingSetup": "Finalitzant la configuració",
@@ -1020,7 +1138,8 @@
       "starting": "INICIANT",
       "stopped": "ATURAT",
       "stopping": "ATURANT",
-      "unknown": "DESCONEGUT"
+      "unknown": "DESCONEGUT",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1060,11 +1179,13 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} requereix atenció: {{label}}",
-      "openUnreadOne": "Obre {{name}}, {{count}} missatge no llegit",
-      "openUnreadMany": "Obre {{name}}, {{count}} missatges no llegits",
+      "openUnread_one": "Obre {{name}}, {{displayCount}} missatge no llegit",
+      "openUnread": "Obre {{name}}, {{displayCount}} missatges no llegits",
+      "openUnread_other": "Obre {{name}}, {{displayCount}} missatges no llegits",
       "open": "Obre {{name}}",
       "openSettings": "Obre la configuració de {{name}}",
-      "fixOnKiloAi": "Corregeix a kilo.ai: {{label}}"
+      "fixOnKiloAi": "Corregeix a kilo.ai: {{label}}",
+      "openUnread_many": "Obre {{name}}, {{displayCount}} missatges no llegits"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -1103,7 +1224,9 @@
       "sparkles": "Espurnes",
       "strongArm": "Braç fort",
       "talisman": "Talismà"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Aquesta instància no pot rebre fitxers.",
+    "instanceSwitcherTitle": "Instància de KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1280,7 +1403,7 @@
       "mergeGate": "Porta de fusió",
       "repositories": "Repositoris",
       "allRepositories": "Tots els repositoris",
-      "nSelected": "{{count}} seleccionats",
+      "nSelected": "{{displayCount}} seleccionats",
       "reviewMemory": "Memòria de revisió",
       "proposedReviewMdGuidance": "Pautes de REVIEW.md proposades"
     },
@@ -1290,7 +1413,71 @@
       "noDecision": "Cap decisió",
       "noResult": "Cap resultat"
     },
-    "eyebrow": "Revisor de codi"
+    "eyebrow": "Revisor de codi",
+    "updateFailed": "No s'ha pogut actualitzar el revisor",
+    "configSaveFailed": "No s'ha pogut desar la configuració de la revisió",
+    "status": {
+      "pending": "Pendent",
+      "queued": "En cua",
+      "running": "En execució",
+      "completed": "Completat",
+      "failed": "Fallit",
+      "cancelled": "Cancel·lat",
+      "interrupted": "Interromput"
+    },
+    "reviewStyle": {
+      "strict": "Estricte",
+      "balanced": "Equilibrat",
+      "lenient": "Flexible",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Seguretat",
+      "performance": "Rendiment",
+      "bugs": "Errors",
+      "style": "Estil",
+      "testing": "Proves",
+      "documentation": "Documentació"
+    },
+    "gateThreshold": {
+      "off": "Desactivat",
+      "all": "Tots",
+      "warning": "Avís",
+      "critical": "Crític"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "El Revisor de codi requereix atenció",
+        "description": "El Revisor de codi s'ha desactivat perquè Kilo no pot accedir a aquest repositori amb una instal·lació activa de l'aplicació de GitHub. Actualitza la instal·lació de l'aplicació de GitHub i torna a activar el Revisor de codi.",
+        "recoveryLabel": "Actualitza l'aplicació de GitHub"
+      },
+      "githubIpAllowList": {
+        "title": "El Revisor de codi requereix atenció",
+        "description": "El Revisor de codi s'ha desactivat perquè aquesta organització de GitHub utilitza una llista d'IP permeses que bloqueja Kilo. Contacta amb hi@kilocode.ai per demanar ajuda i torna a activar el Revisor de codi.",
+        "recoveryLabel": "Contacta amb el suport"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "El Revisor de codi requereix atenció",
+        "description": "El Revisor de codi s'ha desactivat perquè Kilo no pot crear un token d'accés de projecte de GitLab per a aquest projecte. Concedeix accés de Maintainer o activa els tokens d'accés de projecte i torna a activar el Revisor de codi.",
+        "recoveryLabel": "Actualitza la integració de GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "El Revisor de codi requereix atenció",
+        "description": "El Revisor de codi s'ha desactivat perquè la clau d'API BYOK seleccionada no és vàlida, s'ha revocat o no té permisos. Actualitza la clau o tria un altre model i torna a activar el Revisor de codi.",
+        "recoveryLabel": "Actualitza la configuració de BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "El Revisor de codi requereix atenció",
+        "description": "El Revisor de codi s'ha desactivat perquè el model seleccionat no està disponible per a les sessions de Cloud Agent. Tria un model disponible i torna a activar el Revisor de codi.",
+        "recoveryLabel": "Actualitza la configuració del Revisor de codi"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "El Revisor de codi requereix atenció",
+        "description": "El Revisor de codi s'ha desactivat després de tres temps d'espera de clonació de repositoris avui. Contacta amb hi@kilocode.ai per demanar ajuda i torna a activar el Revisor de codi.",
+        "recoveryLabel": "Contacta amb el suport"
+      }
+    },
+    "unknownError": "Error desconegut"
   },
   "securityAgent": {
     "filter": {
@@ -1351,15 +1538,17 @@
       "enableAutoRemediationConfirmTitle": "Activar la correcció automàtica?",
       "enableAutoRemediationConfirmMessage": "L'Agent de seguretat obrirà PR de correcció automàticament per a les troballes explotables elegibles.",
       "enable": "Activa",
-      "queuedOne": "{{count}} resultat existent en cua per analitzar.",
-      "queuedMany": "{{count}} resultats existents en cua per analitzar.",
+      "queued_one": "{{displayCount}} resultat existent en cua per analitzar.",
+      "queued": "{{displayCount}} resultats existents en cua per analitzar.",
+      "queued_other": "{{displayCount}} resultats existents en cua per analitzar.",
       "severityCriticalOnly": "Només crítics",
       "severityHighAndAbove": "Alts i superiors",
       "severityMediumAndAbove": "Mitjans i superiors",
       "severityAll": "Totes les severitats",
       "confidenceHighOnly": "Només confiança alta",
       "confidenceMediumOrHigher": "Mitjana o superior",
-      "confidenceAny": "Qualsevol confiança"
+      "confidenceAny": "Qualsevol confiança",
+      "queued_many": "{{displayCount}} resultats existents en cua per analitzar."
     },
     "analysis": {
       "couldNotLoad": "No s'ha pogut carregar l'anàlisi",
@@ -1383,14 +1572,14 @@
       "analyzed": "Analitzat",
       "exploitabilityReasoning": "Raonament d'explotabilitat",
       "suggestedFix": "Correcció suggerida",
-      "whereFound": "On s'ha trobat ({{count}})",
+      "whereFound": "On s'ha trobat ({{displayCount}})",
       "fullReport": "Informe complet generat",
       "unknown": "Desconegut",
       "yes": "Sí",
       "no": "No"
     },
     "dashboard": {
-      "findingsCount": "{{count}} resultats",
+      "findingsCount": "{{displayCount}} resultats",
       "notMeasured": "No mesurat",
       "actFirst": "Actua primer",
       "slaPosture": "Postura SLA",
@@ -1399,7 +1588,7 @@
       "repositoryActionPlan": "Pla d'acció del repositori",
       "noOpenFindings": "Cap resultat obert no requereix atenció",
       "deadlineToday": "Termini assolit avui",
-      "daysOverdue": "{{count}} dies de retard",
+      "daysOverdue": "{{displayCount}} dies de retard",
       "withinDeadline": "Dins del termini",
       "criticalOverdue": "Crític amb retard",
       "highOverdue": "Alt amb retard",
@@ -1426,6 +1615,27 @@
       "syncNow": "Sincronitza ara",
       "syncQueued": "Sincronització en cua",
       "syncStatusUnavailable": "Estat de sincronització no disponible"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Resultats oberts",
+      "openFindingsDetail": "{{critical}} crítics, {{high}} alts",
+      "confirmedExploitable": "Confirmat com a explotable",
+      "confirmedExploitableDetail": "Risc del projecte confirmat per l'anàlisi",
+      "needsReview": "Requereix la teva revisió",
+      "needsReviewDetail": "Cal una decisió humana",
+      "analysisIncomplete": "Anàlisi no completada",
+      "analysisIncompleteDetail": "El risc del projecte encara és desconegut",
+      "slaCompliance": "Compliment de SLA",
+      "notMeasured": "No mesurat",
+      "withinDeadlineDetail": "{{within}} de {{total}} dins del termini",
+      "noDeadlineData": "Encara cap resultat no té termini SLA",
+      "deadlinePassed": "El termini ha passat",
+      "deadlinePassedDetail": "{{critical}} crítics, {{high}} alts",
+      "dueThisWeek": "Venç aquesta setmana",
+      "dueThisWeekDetail": "{{exploitable}} confirmats com a explotables",
+      "noDeadline": "Cap termini",
+      "reviewSlaAssignment": "Revisa l'assignació de SLA",
+      "allOpenFindingsTracked": "Tots els resultats oberts es fan seguiment"
     },
     "dismiss": {
       "title": "Descarta el resultat",
@@ -1469,7 +1679,17 @@
       "sourceRecord": "Registre d'origen",
       "source": "Origen",
       "sourceId": "ID d'origen",
-      "viewAdvisory": "Veure l'avís a GitHub"
+      "viewAdvisory": "Veure l'avís a GitHub",
+      "statusSuperseded": "Substituït",
+      "statusFixed": "Corregit",
+      "statusOpen": "Obert",
+      "sourceDependabot": "GitHub Dependabot",
+      "reasonFixStarted": "ja ha començat una correcció",
+      "reasonNoBandwidth": "no hi ha capacitat disponible",
+      "reasonTolerableRisk": "el risc és tolerable",
+      "reasonInaccurate": "el resultat no és exacte",
+      "reasonNotUsed": "el codi vulnerable no s'utilitza",
+      "reasonAfterReview": "després de la revisió"
     },
     "settingsOverview": {
       "title": "Configuració",
@@ -1482,8 +1702,9 @@
       "on": "Activat",
       "off": "Desactivat",
       "allRepositories": "Tots els repositoris",
-      "repositorySelected": "{{count}} repositori seleccionat",
-      "repositoriesSelected": "{{count}} repositoris seleccionats",
+      "repositoriesCount_one": "{{displayCount}} repositori seleccionat",
+      "repositoriesCount": "{{displayCount}} repositoris seleccionats",
+      "repositoriesCount_other": "{{displayCount}} repositoris seleccionats",
       "selectRepositories": "Selecciona repositoris",
       "selectRepositoriesSubtitle": "Tria quins repositoris supervisa Security Agent",
       "repositories": "Repositoris",
@@ -1491,13 +1712,14 @@
       "analysisModeSubtitle": "Anàlisi {{mode}}",
       "automation": "Automatització",
       "automationAllOff": "Tots desactivats",
-      "automationCount": "{{count}} de 3 activats",
+      "automationCount": "{{displayCount}} de 3 activats",
       "notifications": "Notificacions",
-      "notificationsCount": "{{count}} de 2 activats",
+      "notificationsCount": "{{displayCount}} de 2 activats",
       "slaPolicy": "Política SLA",
       "disabledNoManage": "Security Agent està desactivat. Només els propietaris de l'organització i els gestors de facturació poden activar-lo.",
       "disabledNoRepo": "Selecciona almenys un repositori abans d'activar Security Agent.",
-      "disabledPrompt": "Activa Security Agent per sincronitzar alertes de Dependabot, triar repositoris i configurar l'automatització."
+      "disabledPrompt": "Activa Security Agent per sincronitzar alertes de Dependabot, triar repositoris i configurar l'automatització.",
+      "repositoriesCount_many": "{{displayCount}} repositoris seleccionats"
     },
     "remediation": {
       "cancellationRequested": "Cancel·lació sol·licitada",
@@ -1515,7 +1737,7 @@
       "openPullRequest": "Obrir la sol·licitud d'extracció{{number}}",
       "openDraftPullRequest": "Obrir l'esborrany de sol·licitud d'extracció{{number}}",
       "progress": "Progrés",
-      "attemptHistory": "Historial d'intents ({{count}})",
+      "attemptHistory": "Historial d'intents ({{displayCount}})",
       "attemptNumber": "Intent #{{number}}",
       "startedBy": "Iniciat per",
       "model": "Model",
@@ -1681,7 +1903,142 @@
     },
     "queuedActionUntracked": "Una acció en cua ja no es podia rastrejar. Actualitza per veure l'estat més recent.",
     "initialSyncAdmissionFailed": "Security Agent s'ha activat, però no s'ha pogut posar en cua la sincronització inicial. Torna a sincronitzar.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "La troballa ja s'ha descartat",
+      "findingDismissed": "Troballa descartada",
+      "noRemediationsQueued": "No hi ha cap troballa existent a la cua",
+      "remediationsQueued": "S'han posat les correccions existents a la cua",
+      "analysisComplete": "Anàlisi completada",
+      "syncComplete": "Sincronització completada"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "El servei de seguretat no està configurat. Tornar a enviar no pot tenir èxit fins que això es resolgui.",
+      "syncMayNotHaveCompleted": "Pot ser que una sincronització no s'hagi completat. Torna-ho a provar per reconciliar-la, o descarta-la.",
+      "syncInProgress": "Una sincronització de seguretat ja està en curs. Torna-ho a provar.",
+      "dismissalInProgress": "Aquest descartament ja està en curs. Torna-ho a provar.",
+      "couldNotReadPendingSyncs": "No s'han pogut llegir les sincronitzacions pendents. Torna-ho a provar."
+    },
+    "analysisState": {
+      "queued": "Anàlisi en cua",
+      "queuedTitle": "Anàlisi en cua",
+      "queuedDescription": "Esperant que hi hagi capacitat d'anàlisi disponible.",
+      "analyzing": "Analitzant",
+      "analyzingTitle": "Analitzant",
+      "analyzingDescription": "Comprovant si el codi de l'aplicació pot arribar a la funció afectada.",
+      "failed": "L'anàlisi ha fallat",
+      "failedTitle": "L'anàlisi ha fallat",
+      "failedDescription": "Security Agent no ha pogut completar l'anàlisi.",
+      "extractionFailed": "Requereix revisió",
+      "extractionFailedTitle": "Requereix revisió",
+      "extractionFailedDescription": "L'informe tècnic no s'ha pogut convertir en un resultat estructurat.",
+      "exploitable": "Explotable",
+      "exploitableTitle": "Explotable",
+      "exploitableDescription": "El codi de l'aplicació pot arribar a la funció afectada.",
+      "notExploitable": "Inabastable",
+      "notExploitableTitle": "Inabastable",
+      "notExploitableDescription": "No s'ha trobat cap via abastable en aquest repositori.",
+      "unknown": "Requereix revisió",
+      "unknownTitle": "Requereix revisió",
+      "unknownDescription": "L'anàlisi no ha pogut confirmar si la funció vulnerable és abastable.",
+      "safeToDismiss": "Segur d'ignorar",
+      "safeToDismissTitle": "Segur d'ignorar",
+      "safeToDismissDescription": "El triatge ha determinat que això es pot ignorar amb seguretat sense anàlisi del codi base.",
+      "manualReview": "Requereix revisió",
+      "manualReviewTitle": "Requereix revisió manual",
+      "manualReviewDescription": "El triatge ha marcat aquest resultat per a una revisió manual.",
+      "analysisRequired": "Cal anàlisi",
+      "analysisRequiredTitle": "Cal l'anàlisi del codi base",
+      "analysisRequiredDescription": "El triatge recomana analitzar el repositori abans de decidir una resposta.",
+      "completed": "Analitzat",
+      "completedTitle": "Analitzat",
+      "completedDescription": "L'anàlisi s'ha completat sense cap resultat específic registrat.",
+      "notAnalyzed": "No analitzat",
+      "notAnalyzedTitle": "No analitzat",
+      "notAnalyzedDescription": "L'anàlisi del codi base encara no s'ha executat per a aquest resultat."
+    },
+    "deadline": {
+      "fixedBeforeDeadline": "Corregit abans del termini",
+      "fixed": "Corregit",
+      "fixedOn": "Corregit el {{date}}",
+      "resolutionRecorded": "Resolució registrada",
+      "superseded": "Substituït",
+      "dismissed": "Descartat",
+      "closedOn": "{{status}} {{date}}",
+      "deadlineNotSet": "Termini no establert",
+      "noSlaDeadline": "Cap termini SLA",
+      "dueOn": "Venç el {{date}}",
+      "overdueNow": "Vençut",
+      "overdue_one": "{{count}} dia de retard",
+      "overdue_many": "{{count}} dies de retard",
+      "overdue_other": "{{count}} dies de retard",
+      "dueToday": "Venç avui",
+      "dueTomorrow": "Venç demà",
+      "dueInDays_one": "Venç en {{count}} dia",
+      "dueInDays_many": "Venç en {{count}} dies",
+      "dueInDays_other": "Venç en {{count}} dies",
+      "overdue": "{{count}} dies de retard",
+      "dueInDays": "Venç en {{count}} dies"
+    },
+    "remediationStatus": {
+      "cancellationRequested": "Cancel·lació sol·licitada",
+      "notStarted": "No començat",
+      "queued": "En cua",
+      "starting": "Iniciant",
+      "inProgress": "En curs",
+      "draftPrOpened": "Esborrany de PR obert",
+      "prOpened": "PR oberta",
+      "blocked": "Bloquejada",
+      "failed": "Fallida",
+      "noChangesNeeded": "No calen canvis",
+      "cancelled": "Cancel·lada",
+      "originAutomaticPolicy": "Política automàtica",
+      "originIncludeExistingPolicy": "Política d'incloure les existents",
+      "originManual": "Manual",
+      "validationCheck": "Comprovació de validació {{number}}"
+    },
+    "remediationUnavailable": {
+      "findingNotFound": "El resultat de seguretat ja no existeix.",
+      "approvalRequired": "La correcció automàtica requereix aprovació. Inicia la correcció manualment per aprovar-la.",
+      "findingNotOpen": "El resultat ja no està obert.",
+      "repoNotInScope": "El repositori no està seleccionat per a Security Agent.",
+      "analysisRequired": "Executa l'anàlisi del codi base abans de començar la correcció.",
+      "sandboxAnalysisRequired": "Executa l'anàlisi del codi base abans de començar la correcció.",
+      "staleAnalysis": "El resultat ha canviat després de l'anàlisi. Torna a executar l'anàlisi abans de començar la correcció.",
+      "notExploitable": "L'anàlisi no ha trobat cap via vulnerable abastable. La correcció automàtica no està disponible.",
+      "exploitabilityUnknown": "L'anàlisi no ha pogut confirmar l'explotabilitat. Cal una revisió manual abans de la correcció amb un sol clic.",
+      "manualReviewRequired": "L'anàlisi recomana una revisió manual, així que la correcció amb un sol clic no està disponible.",
+      "monitorRequired": "L'anàlisi recomana supervisar en lloc d'obrir una PR.",
+      "triageOnly": "Només s'ha completat el triatge. Executa l'anàlisi del codi base abans de començar la correcció.",
+      "actionNotConcrete": "No hi ha cap pedaç de dependència concret ni correcció suggerida disponible.",
+      "remediationActive": "Ja hi ha un intent de correcció actiu.",
+      "prAlreadyOpened": "Ja hi ha una PR de correcció oberta.",
+      "duplicateAnalysisResult": "Aquest resultat d'anàlisi ja ha produït feina de correcció.",
+      "retryNotAllowed": "La repetició no està disponible per a aquest intent.",
+      "securityAgentDisabled": "Security Agent està desactivat per a aquest propietari.",
+      "autoRemediationDisabled": "La correcció automàtica està desactivada. La correcció manual encara pot començar quan passin les comprovacions de seguretat.",
+      "includeExistingDisabled": "Els resultats existents s'exclouen de la correcció automàtica.",
+      "belowThreshold": "El resultat està per sota del llindar automàtic de gravetat. La correcció manual encara pot començar quan passin les comprovacions de seguretat.",
+      "beforeEnablement": "L'anàlisi es va completar abans d'activar la correcció automàtica. La correcció manual encara pot començar quan passin les comprovacions de seguretat.",
+      "generic": "La correcció no està disponible per a aquest resultat."
+    },
+    "commandFailure": {
+      "ownerCapReached": "La capacitat d'anàlisi està plena. Espera que acabi una anàlisi activa i torna-ho a provar.",
+      "githubTokenUnavailable": "L'autorització de GitHub requereix atenció. Torna a autoritzar l'aplicació de GitHub i torna-ho a provar.",
+      "githubAuthInvalid": "L'autorització de GitHub requereix atenció. Torna a autoritzar l'aplicació de GitHub i torna-ho a provar.",
+      "findingUnavailable": "El resultat ja no està disponible. Actualitza els resultats i torna-ho a provar si continua obert.",
+      "repositoryUnavailable": "El repositori ja no està disponible per a l'aplicació de GitHub. Actualitza l'accés al repositori i torna-ho a provar.",
+      "invalidDismissTarget": "El resultat no es pot descartar perquè el seu objectiu de Dependabot no és vàlid.",
+      "commandStalled": "L'acció en cua no ha acabat a temps. Torna a provar l'acció.",
+      "queueRetriesExhausted": "L'acció no s'ha pogut completar després de diversos intents. Torna a provar l'acció.",
+      "queueAdmissionFailed": "L'acció en cua no s'ha pogut admetre. Torna a provar l'acció.",
+      "generic": "L'acció en cua ha fallat. Torna a provar l'acció."
+    },
+    "analysisMode": {
+      "auto": "Automàtic",
+      "shallow": "Superficial",
+      "deep": "Profunda"
+    }
   },
   "agents": {
     "activeNow": "Actius ara",
@@ -1720,15 +2077,32 @@
       "sessionDeleted": "Sessió eliminada",
       "needsInput": "requereix entrada",
       "fromPlatform": "des de {{platform}}",
-      "centOne": "cèntim",
-      "centOther": "cèntims",
-      "dollarOne": "dòlar",
-      "dollarOther": "dòlars",
+      "cent_one": "cèntim",
+      "cent": "cèntims",
+      "cent_other": "cèntims",
+      "dollar_one": "dòlar",
+      "dollar": "dòlars",
+      "dollar_other": "dòlars",
+      "cent_many": "cèntims",
+      "dollar_many": "dòlars",
+      "costSpoken": "cost {{cost}}",
+      "costSpokenWithTime": "cost {{cost}}, {{time}}",
       "pullRequest": "sol·licitud d'extracció {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "No s'ha pogut obrir GitHub",
-      "couldNotOpenMessage": "No hem pogut iniciar la configuració de l'aplicació de GitHub. Torna-ho a provar."
+      "couldNotOpenMessage": "No hem pogut iniciar la configuració de l'aplicació de GitHub. Torna-ho a provar.",
+      "installedTitle": "GitHub App instal·lada",
+      "installedMessage": "Els teus repositoris ara estan connectats.",
+      "pendingTitle": "Esperant l'aprovació de l'administrador",
+      "pendingMessage": "Un administrador de l'organització ha d'aprovar la sol·licitud d'instal·lació.",
+      "accountMismatchTitle": "Els comptes no coincideixen",
+      "accountMismatchMessage": "Aquesta connexió es va iniciar des de l'app de Kilo amb la sessió iniciada amb un compte diferent. Inicia la sessió al web amb aquest compte, o torna a començar des de l'app.",
+      "cannotCompleteTitle": "No es pot completar la instal·lació",
+      "notAdminMessage": "Només un administrador de GitHub d'aquest compte pot connectar-lo. Demana a un administrador de l'organització que instal·li Kilo.",
+      "alreadyClaimedMessage": "Aquesta instal·lació de GitHub ja està connectada a un altre compte de Kilo. Primer desconnecta-la allà.",
+      "didNotCompleteTitle": "La instal·lació no es va completar",
+      "didNotCompleteMessage": "La instal·lació de la GitHub App no es va completar. Torna-ho a provar des de l'app."
     },
     "sessionExited": "La sessió ha finalitzat",
     "remoteSpawnRetryable": "No s'ha pogut arribar a la instància: potser s'ha desconnectat.",
@@ -1771,7 +2145,10 @@
       "exitMessage": "Això atura la sessió en execució però conserva el seu historial.",
       "keepSessionRunning": "Mantén la sessió en execució",
       "exitSession": "Finalitza la sessió",
-      "restartExitFailed": "S'ha iniciat una sessió nova. La sessió anterior encara està oberta."
+      "restartExitFailed": "S'ha iniciat una sessió nova. La sessió anterior encara està oberta.",
+      "exitNotSupported": "La sortida de la sessió remota no és compatible amb la sessió actual",
+      "exitUnavailable": "La sortida de la sessió remota no està disponible per a la sessió actual",
+      "exitNeedsNewerCli": "Les ordres de barra remotes requereixen una versió més nova del CLI de Kilo. Actualitzeu el CLI de Kilo i torneu-vos a connectar."
     },
     "sessionConnection": {
       "connecting": "Connectant…",
@@ -1818,8 +2195,10 @@
       "discardFailed": "No s'ha pogut descartar l'esborrany. Torna-ho a provar."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} fitxer actualitzat",
-      "updatedFiles": "{{count}} fitxers actualitzats"
+      "updatedFileCount_one": "{{displayCount}} fitxer actualitzat",
+      "updatedFileCount": "{{displayCount}} fitxers actualitzats",
+      "updatedFileCount_other": "{{displayCount}} fitxers actualitzats",
+      "updatedFileCount_many": "{{displayCount}} fitxers actualitzats"
     },
     "toolPatch": {
       "operationAdded": "Afegit",
@@ -1844,9 +2223,9 @@
       "toolTask": "tasca",
       "readTodos": "Llegeix els todos",
       "updateTodos": "Actualitza els todos",
-      "linesBadge": "{{count}} línies",
-      "filesBadge": "{{count}} fitxers",
-      "matchesBadge": "{{count}} coincidències"
+      "linesBadge": "{{displayCount}} línies",
+      "filesBadge": "{{displayCount}} fitxers",
+      "matchesBadge": "{{displayCount}} coincidències"
     },
     "readToolMarkdown": {
       "linesTruncated": "línies {{start}}–{{end}} (truncades)",
@@ -1930,6 +2309,10 @@
       "reportAiResponseFailedTerminal": "Aquesta resposta no es pot reportar.",
       "reportAiResponseSubmitted": "Informe enviat. Rebut {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Detalls no disponibles",
       "textDisplay": "Mostra del text",
@@ -1988,7 +2371,7 @@
       "preparationComplete": "Preparació completada",
       "preparationFailed": "La preparació ha fallat",
       "setupCommand": "Ordre de configuració {{index}}",
-      "setupCommandOf": "Ordre de configuració {{index}} de {{count}}"
+      "setupCommandOf": "Ordre de configuració {{index}} de {{displayCount}}"
     },
     "permissionCard": {
       "title": "Permís necessari",
@@ -2025,7 +2408,7 @@
       "submissionFailed": "L'enviament ha fallat. Torna-ho a provar.",
       "questionAnnouncement": "L'agent necessita la teva aportació. El compositor està en pausa mentre respons.",
       "permissionAnnouncement": "L'agent necessita permís per continuar. El compositor està en pausa mentre decideixes.",
-      "positionHint": "(1 de {{count}})",
+      "positionHint": "(1 de {{displayCount}})",
       "movedPastPrompt": "L'agent ha superat aquesta sol·licitud. Aquesta targeta es tancarà quan la sessió continuï.",
       "waitingForAnswer": "L'agent espera la teva resposta. Mentre aquesta pregunta sigui oberta, el teu missatge a l'agent està en pausa.",
       "waitingForPermission": "L'agent espera un permís. Mentre aquesta petició sigui oberta, el teu missatge a l'agent està en pausa."
@@ -2060,21 +2443,27 @@
     "olderMessages": {
       "arrived": "S'han carregat els missatges anteriors",
       "retryHint": "Torna a intentar la càrrega dels missatges anteriors d'aquesta sessió.",
-      "omittedOne": "Alguns elements anteriors d'aquesta sessió no s'han pogut mostrar.",
-      "omittedMany": "{{count}} elements anteriors d'aquesta sessió no s'han pogut mostrar.",
+      "omitted_one": "Alguns elements anteriors d'aquesta sessió no s'han pogut mostrar.",
+      "omitted": "{{displayCount}} elements anteriors d'aquesta sessió no s'han pogut mostrar.",
+      "omitted_other": "{{displayCount}} elements anteriors d'aquesta sessió no s'han pogut mostrar.",
       "couldNotLoad": "No s'han pogut carregar els missatges anteriors.",
       "unavailable": "Els missatges anteriors no estan disponibles.",
-      "tooLarge": "Els missatges anteriors són massa grans per carregar-los."
+      "tooLarge": "Els missatges anteriors són massa grans per carregar-los.",
+      "omitted_many": "{{displayCount}} elements anteriors d'aquesta sessió no s'han pogut mostrar."
     },
     "markdownTable": {
       "viewTable": "Mostra la taula",
       "title": "Taula",
       "close": "Tanca la taula",
-      "column": "columna",
-      "columns": "columnes",
-      "row": "fila",
-      "rows": "files",
-      "opensFullScreen": "obre la pantalla completa"
+      "columnCount_one": "columna",
+      "columnCount": "columnes",
+      "columnCount_other": "columnes",
+      "rowCount_one": "fila",
+      "rowCount": "files",
+      "rowCount_other": "files",
+      "opensFullScreen": "obre la pantalla completa",
+      "columnCount_many": "columnes",
+      "rowCount_many": "files"
     },
     "sessionFilter": {
       "title": "Filtra les sessions",
@@ -2103,7 +2492,10 @@
     "modelPicker": {
       "title": "Selecciona el model",
       "searchPlaceholder": "Cerca models...",
+      "allModels": "Tots els models",
+      "favorites": "Preferits",
       "noModels": "No hi ha models disponibles",
+      "recommended": "Recomanats",
       "noModelsDescription": "No hi ha cap model per seleccionar."
     },
     "modelSelector": {
@@ -2121,7 +2513,8 @@
       "addToFavorites": "Afegeix {{name}} als favorits",
       "removeFromFavorites": "Treu {{name}} dels favorits",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Model de sessió"
     },
     "attachmentPreview": {
       "openFailedRetry": "No s'ha pogut obrir el fitxer. Torna-ho a provar.",
@@ -2143,7 +2536,7 @@
       "cameraAccessDisabled": "Accés a la càmera desactivat",
       "cameraAccessMessage": "Permet l'accés a la càmera a Configuració per fer una foto.",
       "couldNotOpenPhotoPicker": "No s'ha pogut obrir el selector de fotos. Reinicia Kilo i torna-ho a provar.",
-      "maxFilesAllowed": "Màxim {{count}} fitxers permesos",
+      "maxFilesAllowed": "Màxim {{displayCount}} fitxers permesos",
       "onlyAddingFiles": "Només s'afegeixen {{accepted}} de {{total}} fitxers (màx. {{max}})"
     },
     "composer": {
@@ -2189,7 +2582,8 @@
       "delegatingWork": "Delegant feina",
       "askingQuestion": "Fent una pregunta",
       "consideringNextSteps": "Considerant els propers passos",
-      "writingResponse": "Escrivint la resposta"
+      "writingResponse": "Escrivint la resposta",
+      "initializingSnapshot": "Inicialitzant la instantània…"
     },
     "slashCommands": {
       "startNewSession": "Inicia una nova sessió",
@@ -2208,7 +2602,7 @@
       "costPrefix": "cost {{cost}}",
       "costSuffix": ", cost {{cost}}",
       "tokensWindowUnavailable": "Context {{used}} tokens, finestra no disponible",
-      "tokensUsage": "Context {{used}} de {{window}} tokens, {{percentage}}% utilitzat",
+      "tokensUsage": "Context {{used}} de {{window}} tokens, {{percentage}} utilitzat",
       "title": "Ús del context",
       "used": "Utilitzat",
       "remaining": "Restant",
@@ -2217,7 +2611,7 @@
       "usageReflectsLatest": "L'ús reflecteix l'última resposta de l'assistent completada.",
       "tokenUsage": "Ús de tokens",
       "cacheRate": "Taxa de memòria cau",
-      "modelsCount": "Models ({{count}})",
+      "modelsCount": "Models ({{displayCount}})",
       "tokenTotalsNote": "Els totals de tokens cobreixen només aquesta sessió i excloem els tokens de subagents/sessions filles.",
       "subagents": "Subagents",
       "subagentsDescription": "Cost residual de les sessions filles",
@@ -2226,9 +2620,11 @@
       "ofWindowTokens": "de {{window}} tokens",
       "tokens": "tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
-      "stepsCountOne": "{{steps}} pas",
-      "stepsCountMany": "{{steps}} passos",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "stepsCount_one": "{{steps}} pas",
+      "stepsCount": "{{steps}} passos",
+      "stepsCount_other": "{{steps}} passos",
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "stepsCount_many": "{{steps}} passos"
     },
     "prBadge": {
       "open": "pull request oberta",
@@ -2252,7 +2648,8 @@
   },
   "addCredits": {
     "cta": "Afegeix crèdits",
-    "description": "Afegeix crèdits per mantenir l'ús actiu."
+    "description": "Afegeix crèdits per mantenir l'ús actiu.",
+    "billingPage": "pàgina de facturació"
   },
   "deviceSessions": {
     "couldNotLoad": "No s'han pogut carregar les sessions",
@@ -2264,6 +2661,7 @@
     "signedIn": "Iniciat la sessió el {{signedIn}} · Vist per última vegada el {{lastSeen}}",
     "thisDevice": "Aquest dispositiu",
     "title": "Sessions de dispositiu",
+    "webBrowser": "Navegador web",
     "viewProfile": "Mostra el perfil",
     "signOutThisDevice": "Tanca la sessió d'aquest dispositiu",
     "signOutThisSession": "Tanca aquesta sessió",
@@ -2278,7 +2676,8 @@
     "couldNotOpenStore": "No s'ha pogut obrir l'App Store.",
     "description": "Hi ha disponible una versió nova de Kilo. Actualitzeu-la per continuar.",
     "title": "Cal actualitzar",
-    "updateNow": "Actualitza ara"
+    "updateNow": "Actualitza ara",
+    "appStorePage": "pàgina de l'App Store"
   },
   "home": {
     "couldNotLoadSessions": "No s'han pogut carregar les sessions",
@@ -2292,10 +2691,7 @@
     "newCodingTask": "Nova tasca de programació",
     "explore": "Explora",
     "seeAll": "Veure-ho tot",
-    "kiloAgents": "Agents de Kilo",
-    "greetingMorning": "Bon dia",
-    "greetingAfternoon": "Bona tarda",
-    "greetingEvening": "Bona nit"
+    "kiloAgents": "Agents de Kilo"
   },
   "imageViewer": {
     "close": "Tanca {{filename}}",
@@ -2349,7 +2745,17 @@
     "onlineMessage": "Aquest dispositiu no pot transcriure sense connexió. El teu enregistrament s'envia a {{provider}} per convertir-lo en text. Kilo no emmagatzema l'àudio.",
     "allow": "Permet",
     "start": "Inicia l'entrada de veu",
-    "stop": "Atura l'entrada de veu"
+    "stop": "Atura l'entrada de veu",
+    "restricted": "L'entrada de veu està restringida en aquest dispositiu.",
+    "micRequired": "Cal accés al micròfon per a l'entrada de veu.",
+    "micOff": "L'accés al micròfon està desactivat. Activa'l a la configuració per utilitzar l'entrada de veu.",
+    "micOffTitle": "L'accés al micròfon està desactivat",
+    "noSpeech": "No s'ha detectat cap veu. Toca el micròfon per tornar-ho a provar.",
+    "needsConnection": "L'entrada de veu necessita connexió ara mateix. Torna-ho a provar.",
+    "busy": "L'entrada de veu està ocupada. Torna-ho a provar.",
+    "stopped": "L'entrada de veu s'ha aturat. Toca el micròfon per tornar-ho a provar.",
+    "unavailableDevice": "L'entrada de veu no està disponible en aquest dispositiu.",
+    "unavailableLanguage": "L'entrada de veu no està disponible per a l'idioma d'aquest dispositiu."
   },
   "share": {
     "title": "Comparteix a Kilo",
@@ -2361,7 +2767,7 @@
     "connectedCli": "En un CLI connectat",
     "newSessionOn": "Nova sessió a {{name}}",
     "noMatchingSessions": "No hi ha sessions coincidents.",
-    "onlyFirstFilesAttached": "Només s'adjuntaran els primers {{count}} fitxers.",
+    "onlyFirstFilesAttached": "Només s'adjuntaran els primers {{displayCount}} fitxers.",
     "staleMessage": "Aquest element compartit ja no està disponible.",
     "retryableMessage": "No s'han pogut carregar les teves sessions.",
     "emptyMessage": "Encara no hi ha sessions: inicia una de nova per enviar-ho.",
@@ -2394,7 +2800,7 @@
     "otherAccountCopy": "El Kilo Pass d'aquest Apple Account pertany a un compte de Kilo diferent. Inicieu la sessió en aquell compte de Kilo per gestionar-lo.",
     "alreadySubscribed": "Ja tens una subscripció de Kilo Pass.",
     "purchaseUnavailable": "La compra de Kilo Pass no està disponible ara mateix.",
-    "tierCredits": "${{amount}} en crèdits",
+    "tierCredits": "{{amount}} en crèdits",
     "perMonth": "{{price}}/mes",
     "verifyPurchaseFailed": "No s'ha pogut verificar la teva compra. Comprova la teva connexió i torna-ho a provar.",
     "productsCouldNotLoad": "No s'han pogut carregar els productes de Kilo Pass des de l'App Store.",
@@ -2405,7 +2811,7 @@
     "manageFailed": "No s'ha pogut obrir la gestió de la subscripció de l'App Store.",
     "kiloPassSetup": "Configuració de Kilo Pass",
     "subscriptionHeaderDescription": "Una subscripció mensual que afegeix crèdits al teu saldo de Kilo per executar sessions de programació d'IA a l'aplicació Kilo: Cloud Agents, sessions remotes i xats de KiloClaw.",
-    "tierDescription": "${{price}} en crèdits de pagament afegits mensualment per a l'ús de l'aplicació Kilo.",
+    "tierDescription": "{{price}} en crèdits de pagament afegits mensualment per a l'ús de l'aplicació Kilo.",
     "subscribe": "Subscriu-te",
     "subscribeDescription": "Crèdits mensuals amb progrés de bonificació",
     "manage": "Gestiona",
@@ -2413,7 +2819,7 @@
     "statusPending": "Kilo Pass pendent",
     "statusCanceling": "Kilo Pass cancel·lant",
     "statusPastDue": "Kilo Pass vençut",
-    "monthlyCredits": "${{credits}} crèdits mensuals",
+    "monthlyCredits": "{{credits}} crèdits mensuals",
     "ends": "Finalitza el {{date}}",
     "periodEnd": "fi del període",
     "managedOnGooglePlay": "Gestionat a Google Play",
@@ -2427,7 +2833,15 @@
     "webManagementDescription": "Aquest Kilo Pass es gestiona al web.",
     "legalDisclosure": "Kilo Pass és una subscripció mensual de renovació automàtica. El pagament es carrega al vostre Apple ID en confirmar la compra. Les subscripcions es renoven automàticament cada mes al preu mostrat tret que es cancel·lin com a mínim 24 hores abans del final del període actual. Gestioneu-les o cancel·leu-les en qualsevol moment a la configuració del compte de l'App Store.",
     "legalPrivacyPolicy": "Política de privadesa",
-    "legalTermsOfUse": "Condicions d'ús (EULA)"
+    "legalTermsOfUse": "Condicions d'ús (EULA)",
+    "purchaseDifferentAccount": "Aquesta compra d'App Store no està vinculada al teu compte de Kilo. Inicia la sessió amb el compte d'Apple que es va utilitzar per a la compra, i torna-ho a provar.",
+    "restoreFailed": "No s'han pogut restaurar les compres. Torna-ho a provar.",
+    "purchaseFailed": "No s'ha pogut completar la compra.",
+    "purchaseStartFailed": "No s'ha pogut iniciar la compra a l'App Store.",
+    "purchaseOwnedByAnotherAccount": "El Kilo Pass d'aquest Apple Account pertany a un compte de Kilo diferent.",
+    "couldNotConnectToAppStore": "No s'ha pogut connectar amb l'App Store. Comprova la connexió i torna-ho a provar.",
+    "noMatchingProducts": "L'App Store no ha retornat cap producte de Kilo Pass que coincideixi.",
+    "purchaseMissingSignedTransaction": "La compra de l'App Store no incloïa una JWS de transacció signada."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2524,6 +2938,7 @@
     "sorryTitle": "Ens sap greu sentir-ho!",
     "sorryMessage": "Si us plau, feu-nos saber què cal millorar. L'enginyer responsable de l'aplicació llegeix tots i cadascun dels informes!",
     "emailUs": "Escriu-nos",
+    "emailSubject": "comentaris de l'aplicació mòbil",
     "neutralTitle": "Valora l'aplicació Kilo",
     "rateTheApp": "Valora l'aplicació",
     "sendFeedback": "Envia comentaris"
@@ -2545,7 +2960,17 @@
       "emptyTitle": "No hi ha activitat de crèdit",
       "expires": "Caduca el {{date}}",
       "title": "Activitat de crèdit",
-      "transactionFallback": "Transacció de crèdit"
+      "transactionFallback": "Transacció de crèdit",
+      "category": {
+        "organization_custom": "Personalitzat d'organització",
+        "parent_to_child_transfer_in": "Transferència entrant de l'organització principal a la filial",
+        "parent_to_child_transfer_out": "Transferència sortint de l'organització principal a la filial",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Ajust comptable",
+        "credits_expired": "Crèdits caducats"
+      }
     },
     "inviteMember": {
       "emailError": "Introduïu una adreça de correu vàlida",
@@ -2562,10 +2987,17 @@
       "emptyDescription": "Les factures es generen automàticament cada cicle de facturació i apareixeran aquí un cop l'organització sigui facturada.",
       "emptyTitle": "No hi ha factures",
       "invoiceFallback": "Factura",
-      "statusOpen": "Oberta",
-      "statusPaid": "Pagada",
-      "statusVoid": "Anul·lada",
-      "title": "Factures"
+      "title": "Factures",
+      "downloadFailed": "No s'ha pogut descarregar la factura. Comprova la connexió i torna-ho a provar.",
+      "sharingUnavailable": "La compartició no està disponible en aquest dispositiu.",
+      "status": {
+        "paid": "Pagada",
+        "open": "Oberta",
+        "void": "Anul·lada",
+        "draft": "Esborrany",
+        "uncollectible": "No cobrable",
+        "unknown": "Desconegut"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2651,15 +3083,17 @@
       "manageHint": "Obre la gestió de Kilo Pass al web.",
       "notSubscribed": "No subscrit",
       "overallocated": "Les assignacions de Pass superen els seients de pagament",
-      "paidSeatOne": "{{count}} seient de pagament",
-      "paidSeatOther": "{{count}} seients de pagament",
+      "paidSeat_one": "{{displayCount}} seient de pagament",
+      "paidSeat": "{{displayCount}} seients de pagament",
+      "paidSeat_other": "{{displayCount}} seients de pagament",
       "paymentNeedsAttention": "El pagament necessita atenció",
       "paymentPending": "Pagament pendent",
       "processingBlocked": "Processament bloquejat",
       "processingNeedsReview": "El processament necessita revisió",
       "retry": "Torna-ho a provar",
       "retryHint": "Torna a provar la càrrega de l'estat de Kilo Pass.",
-      "setupHint": "Obre la configuració de Kilo Pass al web."
+      "setupHint": "Obre la configuració de Kilo Pass al web.",
+      "paidSeat_many": "{{displayCount}} seients de pagament"
     }
   },
   "authErrors": {
@@ -2677,10 +3111,28 @@
     "emailDeliveryFailed": "El lliurament del correu electrònic no està disponible temporalment. Torneu-ho a provar més tard.",
     "admissionRequired": "No es pot verificar el vostre dispositiu. Feu servir \"$t(login.moreSignInOptions)\" per iniciar sessió en un altre dispositiu o mitjançant el web.",
     "default": "S'ha produït un error. Torneu-ho a provar.",
-    "retryableAdmission": "No s'ha pogut verificar aquest dispositiu. Comproveu la connexió i torneu-ho a provar."
+    "retryableAdmission": "No s'ha pogut verificar aquest dispositiu. Comproveu la connexió i torneu-ho a provar.",
+    "startSignInFailed": "No s'ha pogut iniciar la sessió. Torna-ho a provar.",
+    "couldNotOpenBrowser": "No s'ha pogut obrir el navegador. Torna-ho a provar.",
+    "signInTimedOut": "L'inici de sessió ha caducat. Torna-ho a provar.",
+    "signInFailed": "L'inici de sessió ha fallat. Torna-ho a provar.",
+    "networkError": "Error de xarxa. Torna-ho a provar.",
+    "accessDeniedByUser": "Accés denegat per l'usuari",
+    "codeExpired": "El codi ha caducat",
+    "tooManySignInAttempts": "Massa intents d'inici de sessió. Espera i torna-ho a provar."
   },
   "models": {
     "dataCollected": "Dades recollides",
-    "free": "Gratuït"
+    "free": "Gratuït",
+    "couldNotUpdateFavorites": "No s'han pogut actualitzar els favorits",
+    "thinkingEffort": {
+      "none": "Cap",
+      "minimal": "Mínim",
+      "low": "Baix",
+      "medium": "Mitjà",
+      "high": "Alt",
+      "xhigh": "Extra alt",
+      "max": "Màxim"
+    }
   }
 }

@@ -141,13 +141,6 @@ const kiloClawItems: SidebarStoryItem[] = [
     icon: Sparkles,
     url: '/claw/changelog',
   },
-  {
-    title: 'Refer & Earn',
-    subtitle: 'Get 1 Month Free',
-    badge: 'NEW',
-    icon: Gift,
-    url: '/claw/refer',
-  },
 ];
 
 const cloudItems: SidebarStoryItem[] = [

@@ -24,6 +24,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
 
+import { i18n } from '@/i18n';
 import { announceForA11y } from '@/lib/a11y/announce';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -92,7 +93,7 @@ export function useCreateReviewCommentMutation(ref: PrRef) {
       // Bare success announcement beside the composer's existing success
       // effect (haptic + dismiss). The inline composer error box owns the
       // persistent inline error; the toast owns the failure announcement.
-      announceForA11y('Comment posted');
+      announceForA11y(i18n.t('prReview.announce.commentPosted'));
     },
     onError: (error: { message: string }) => {
       announcingToast.error(prOperationToastMessage(error, 'create-comment'));
@@ -146,7 +147,7 @@ export function useSubmitReviewMutation(ref: PrRef) {
     onSuccess: () => {
       // Bare success announcement beside the submit sheet's existing
       // success effect (queue clear + haptic + dismiss).
-      announceForA11y('Review submitted');
+      announceForA11y(i18n.t('prReview.announce.reviewSubmitted'));
     },
     onError: (error: { message: string }) => {
       announcingToast.error(prOperationToastMessage(error, 'submit-review'));

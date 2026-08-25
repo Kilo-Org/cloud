@@ -22,7 +22,12 @@
     "required": "zorunlu",
     "error": "hata: {{error}}",
     "notNow": "Şimdi değil",
-    "continue": "Devam et"
+    "continue": "Devam et",
+    "back": "Geri",
+    "somethingWentWrong": "Bir şeyler ters gitti",
+    "couldNotOpen": "{{label}} açılamadı",
+    "link": "bağlantı",
+    "takingLonger": "Bu beklenenden uzun sürüyor. Bunu kapatıp tekrar kontrol edebilirsin."
   },
   "language": {
     "title": "Dil",
@@ -201,7 +206,8 @@
     "agents": "Ajanlar",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, sekme, {{position}} / {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -242,7 +248,7 @@
       "recent": "Son",
       "common": "Yaygın",
       "reactWith": "{{reaction}} ile tepki ver",
-      "accessibility": "{{emoji}} tepki, {{count}}"
+      "accessibility": "{{emoji}} tepki, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Yanıtlanıyor",
@@ -271,11 +277,21 @@
       "imageUnavailable": "Görüntü kullanılamıyor",
       "openFailed": "Ek açılamadı. Bağlantını kontrol et ve tekrar dene.",
       "attachFailed": "Dosya eklenemedi",
-      "limit": "En fazla {{count}} dosya ekleyebilirsin.",
+      "limit": "En fazla {{displayCount}} dosya ekleyebilirsin.",
       "sizeRejection": "{{filename}}, {{limit}} ek sınırını aşıyor.",
       "unreadable": "{{filename}} okunamadı.",
       "pastedImage": "yapıştırılan görsel",
-      "defaultName": "Ek"
+      "defaultName": "Ek",
+      "classificationDenied": "Yürütülebilir dosyalar eklenemez",
+      "classificationEmpty": "Dosya boş",
+      "classificationTooLarge": "Dosyalar 20 MB veya daha küçük olmalı",
+      "classificationUnreadable": "Bu dosya okunamadı",
+      "announceUploaded": "Ek yüklendi",
+      "cantUpload": "Bu dosya yüklenemiyor.",
+      "networkError": "Ağ hatası",
+      "uploadFailed": "Yükleme başarısız oldu",
+      "failedToUploadFile": "Dosya yüklenemedi: {{reason}}",
+      "nothingToPaste": "Yapıştırılacak bir şey yok"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -289,7 +305,9 @@
       "moreActions": "Daha fazla eylem",
       "message": "Mesaj",
       "notDelivered": "Teslim edilmedi",
-      "edited": "(düzenlendi)"
+      "edited": "(düzenlendi)",
+      "image": "Görsel",
+      "attachment": "Ek"
     },
     "messageActions": {
       "copied": "Kopyalandı",
@@ -319,8 +337,9 @@
     },
     "typingIndicator": {
       "someone": "Biri",
-      "oneTyping": "{{name}} yazıyor...",
-      "manyTyping": "{{names}} yazıyor..."
+      "typing_one": "{{name}} yazıyor...",
+      "typing": "{{names}} yazıyor...",
+      "typing_other": "{{names}} yazıyor..."
     },
     "botStatus": {
       "online": "Çevrimiçi",
@@ -330,6 +349,12 @@
       "loadingUser": "Kullanıcı yükleniyor...",
       "waitingForStatus": "Bot durumu bekleniyor...",
       "offlineMessage": "Bot çevrimdışı. Yeniden bağlandığında mesajlar devam edecek."
+    },
+    "errors": {
+      "notAllowed": "İzin verilmiyor",
+      "messageTooLong": "Mesaj çok uzun — {{limit}} karakterin altında tutun",
+      "titleTooLong": "Başlık çok uzun — {{limit}} karakterin altında tutun",
+      "messageEmpty": "Mesaj boş olamaz"
     }
   },
   "kiloclaw": {
@@ -342,6 +367,7 @@
       "finalTermEnds": "Son dönem sona eriyor",
       "afterFinalTerm": "Son dönemden sonra",
       "remaining": "Kalan",
+      "lessThanOneDay": "1 günden az",
       "ends": "Sona eriyor",
       "expires": "Süresi doluyor",
       "noActivePlan": "Etkin plan yok",
@@ -350,23 +376,25 @@
       "couldNotLoad": "Faturalandırma bilgileri yüklenemedi",
       "manageOnWeb": "Faturalandırmayı Web'de Yönet",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} gün kaldı",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Son Commit döneminiz {{date}} tarihinde sona eriyor. {{price}} karşılığında Standard olarak devam edin, aksi takdirde barındırma sona erer.",
       "freeTrial": "Ücretsiz Deneme",
       "hostingEnds": "Barındırma sona eriyor",
-      "oneDayLeft": "1 gün kaldı",
       "renews": "Yenilenir",
       "standardMonthToMonth": "Standard aylık",
       "standardStartsOn": "Standard {{date}} tarihinde {{price}} ile başlıyor.",
       "yourStandardMonthlyPrice": "aylık Standard fiyatınız",
       "perMonth": "/ay",
       "earlybirdAccessUntil": "Earlybird erişimi {{date}} tarihine kadar",
-      "earlybirdEnding": "Earlybird bitiyor: {{days}} gün kaldı",
+      "earlybirdEnding": "Earlybird bitiyor: {{remaining}} gün kaldı",
       "paymentPastDue": "Ödeme gecikti. Lütfen ödeme yönteminizi güncelleyin.",
       "subscriptionCancels": "Abonelik {{date}} tarihinde iptal ediliyor",
-      "trialDaysRemaining": "Deneme: {{days}} gün kaldı",
-      "trialEndingSoon": "Deneme yakında bitiyor: {{days}}"
+      "trialDaysRemaining": "Deneme: {{remaining}} gün kaldı",
+      "trialEndingSoon": "Deneme yakında bitiyor: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Yenilikler",
@@ -566,8 +594,9 @@
       "needsAttention": "{{name}} ilgi gerektiriyor: {{label}}",
       "open": "{{name}} aç",
       "openSettings": "{{name}} için ayarları aç",
-      "openUnreadMany": "{{name}} aç, {{count}} okunmamış mesaj",
-      "openUnreadOne": "{{name}} aç, {{count}} okunmamış mesaj"
+      "openUnread": "{{name}} aç, {{displayCount}} okunmamış mesaj",
+      "openUnread_other": "{{name}} aç, {{displayCount}} okunmamış mesaj",
+      "openUnread_one": "{{name}} aç, {{displayCount}} okunmamış mesaj"
     },
     "list": {
       "createInstance": "Örnek oluştur",
@@ -665,7 +694,7 @@
         "startingSandbox": "Korumalı alan başlatılıyor",
         "stoppedBody": "{{name}} örneği kurulum sırasında beklenmedik şekilde durdu.",
         "stoppedTitle": "Kurulum durdu",
-        "timeoutBody": "{{name}} kurulumu normalden uzun sürüyor ({{minutes}} dakikadan fazla).",
+        "timeoutBody": "{{name}} kurulumu normalden uzun sürüyor ({{displayMinutes}} dakikadan fazla).",
         "timeoutTitle": "Beklenenden uzun sürüyor"
       },
       "unavailableDescription": "Bir örnek sağlamak için geçerli bir KiloClaw aboneliği gerekir. Mevcut örnekler ve abonelikler normal şekilde devam eder.",
@@ -692,7 +721,8 @@
       "starting": "BAŞLATILIYOR",
       "stopped": "DURDURULDU",
       "stopping": "DURDURULUYOR",
-      "unknown": "BİLİNMİYOR"
+      "unknown": "BİLİNMİYOR",
+      "vcpuValue": "{{value}} vCPU"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
@@ -731,7 +761,9 @@
       "sparkles": "Parıltılar",
       "strongArm": "Güçlü kol",
       "talisman": "Tılsım"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Bu instance dosya alamıyor.",
+    "instanceSwitcherTitle": "KiloClaw örneği"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -912,13 +944,77 @@
       "focusAreas": "Odak alanları",
       "mergeGate": "Birleştirme kapısı",
       "model": "Model",
-      "nSelected": "{{count}} seçili",
+      "nSelected": "{{displayCount}} seçili",
       "proposedReviewMdGuidance": "Önerilen REVIEW.md yönergesi",
       "repositories": "Depolar",
       "reviewMemory": "İnceleme belleği",
       "reviewStyle": "İnceleme stili",
       "set": "Ayarlı"
-    }
+    },
+    "updateFailed": "İnceleyici güncellenemedi",
+    "configSaveFailed": "İnceleme yapılandırması kaydedilemedi",
+    "status": {
+      "pending": "Bekliyor",
+      "queued": "Kuyruğa alındı",
+      "running": "Çalışıyor",
+      "completed": "Tamamlandı",
+      "failed": "Başarısız oldu",
+      "cancelled": "İptal edildi",
+      "interrupted": "Kesintiye uğradı"
+    },
+    "reviewStyle": {
+      "strict": "Katı",
+      "balanced": "Dengeli",
+      "lenient": "Hoşgörülü",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Güvenlik",
+      "performance": "Performans",
+      "bugs": "Hatalar",
+      "style": "Stil",
+      "testing": "Test",
+      "documentation": "Belgeler"
+    },
+    "gateThreshold": {
+      "off": "Kapalı",
+      "all": "Tümü",
+      "warning": "Uyarı",
+      "critical": "Kritik"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Kod İnceleyici ilgi gerektiriyor",
+        "description": "Kod İnceleyici, Kilo'nun bu depoya etkin bir GitHub Uygulaması kurulumuyla erişememesi nedeniyle devre dışı bırakıldı. GitHub Uygulaması kurulumunu güncelleyin, ardından Kod İnceleyici'yi tekrar etkinleştirin.",
+        "recoveryLabel": "GitHub Uygulamasını güncelle"
+      },
+      "githubIpAllowList": {
+        "title": "Kod İnceleyici ilgi gerektiriyor",
+        "description": "Kod İnceleyici, bu GitHub kuruluşunun Kilo'yu engelleyen bir IP izin listesi kullanması nedeniyle devre dışı bırakıldı. Yardım için hi@kilocode.ai adresine ulaşın, ardından Kod İnceleyici'yi tekrar etkinleştirin.",
+        "recoveryLabel": "Destekle iletişime geç"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Kod İnceleyici ilgi gerektiriyor",
+        "description": "Kod İnceleyici, Kilo'nun bu proje için bir GitLab Proje Erişim Jetonu oluşturamaması nedeniyle devre dışı bırakıldı. Sahip erişimi verin veya Proje Erişim Jetonlarını etkinleştirin, ardından Kod İnceleyici'yi tekrar etkinleştirin.",
+        "recoveryLabel": "GitLab entegrasyonunu güncelle"
+      },
+      "byokInvalidKey": {
+        "title": "Kod İnceleyici ilgi gerektiriyor",
+        "description": "Kod İnceleyici, seçilen BYOK API anahtarının geçersiz, iptal edilmiş veya izinsiz olması nedeniyle devre dışı bırakıldı. Anahtarı güncelleyin veya başka bir model seçin, ardından Kod İnceleyici'yi tekrar etkinleştirin.",
+        "recoveryLabel": "BYOK ayarlarını güncelle"
+      },
+      "selectedModelUnavailable": {
+        "title": "Kod İnceleyici ilgi gerektiriyor",
+        "description": "Kod İnceleyici, seçilen modelin bulut ajan oturumları için kullanılamaması nedeniyle devre dışı bırakıldı. Kullanılabilir bir model seçin, ardından Kod İnceleyici'yi tekrar etkinleştirin.",
+        "recoveryLabel": "Kod İnceleyici ayarlarını güncelle"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Kod İnceleyici ilgi gerektiriyor",
+        "description": "Kod İnceleyici, bugün üç depo klonlama zaman aşımından sonra devre dışı bırakıldı. Yardım için hi@kilocode.ai adresine ulaşın, ardından Kod İnceleyici'yi tekrar etkinleştirin.",
+        "recoveryLabel": "Destekle iletişime geç"
+      }
+    },
+    "unknownError": "Bilinmeyen hata"
   },
   "securityAgent": {
     "filter": {
@@ -981,7 +1077,7 @@
       "triageReasoning": "Triyaj gerekçesi",
       "unknown": "Bilinmiyor",
       "watchInCloudAgent": "Bulut Ajanı'nda izle",
-      "whereFound": "Bunun bulunduğu yer ({{count}})",
+      "whereFound": "Bunun bulunduğu yer ({{displayCount}})",
       "yes": "Evet"
     },
     "analysisSettings": {
@@ -1039,8 +1135,9 @@
       "includeExistingFindingsRemediationSubtitle": "Zaten analiz edilmiş uygun bulguları da kuyruğa al. Yinelenen PR'lar bastırılmış kalır.",
       "minimumSeverity": "Minimum önem derecesi",
       "permissionNote": "Bu ayarları yalnızca kuruluş sahipleri ve faturalandırma yöneticileri değiştirebilir.",
-      "queuedMany": "{{count}} mevcut bulgu analiz için kuyruğa alındı.",
-      "queuedOne": "{{count}} mevcut bulgu analiz için kuyruğa alındı.",
+      "queued": "{{displayCount}} mevcut bulgu analiz için kuyruğa alındı.",
+      "queued_other": "{{displayCount}} mevcut bulgu analiz için kuyruğa alındı.",
+      "queued_one": "{{displayCount}} mevcut bulgu analiz için kuyruğa alındı.",
       "requireApproval": "Otomatik iyileştirmeden önce onay iste",
       "requireApprovalSubtitle": "Otomatik iyileştirme, PR açmadan önce onayınızı bekler.",
       "severityAll": "Tüm önem dereceleri",
@@ -1060,11 +1157,11 @@
       "confirmedExploitable": "Doğrulanmış istismar edilebilir",
       "couldNotLoad": "Panel verileri yüklenemedi",
       "criticalOverdue": "Kritik gecikmiş",
-      "daysOverdue": "{{count}} gün gecikmiş",
+      "daysOverdue": "{{displayCount}} gün gecikmiş",
       "deadlineToday": "Son tarih bugün doldu",
       "filterByRepository": "Depoya göre filtrele",
       "findings": "Bulgular",
-      "findingsCount": "{{count}} bulgu",
+      "findingsCount": "{{displayCount}} bulgu",
       "highOverdue": "Yüksek gecikmiş",
       "lastSynced": "Son eşitleme: {{time}}",
       "manageRepositories": "Depoları yönet",
@@ -1089,6 +1186,27 @@
       "syncQueued": "Eşitleme kuyruğa alındı",
       "syncStatusUnavailable": "Eşitleme durumu kullanılamıyor",
       "withinDeadline": "Son tarih içinde"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Açık bulgular",
+      "openFindingsDetail": "{{critical}} kritik, {{high}} yüksek",
+      "confirmedExploitable": "Doğrulanmış istismar edilebilir",
+      "confirmedExploitableDetail": "Proje riski analizle doğrulandı",
+      "needsReview": "İncelemeniz gerekiyor",
+      "needsReviewDetail": "İnsan kararı gerekli",
+      "analysisIncomplete": "Analiz tamamlanmadı",
+      "analysisIncompleteDetail": "Proje riski henüz bilinmiyor",
+      "slaCompliance": "SLA uyumu",
+      "notMeasured": "Ölçülmedi",
+      "withinDeadlineDetail": "{{total}} içinden {{within}} son tarih içinde",
+      "noDeadlineData": "Henüz SLA son tarihi olan bulgu yok",
+      "deadlinePassed": "Son tarih geçti",
+      "deadlinePassedDetail": "{{critical}} kritik, {{high}} yüksek",
+      "dueThisWeek": "Bu hafta son teslim",
+      "dueThisWeekDetail": "{{exploitable}} doğrulanmış istismar edilebilir",
+      "noDeadline": "Son tarih yok",
+      "reviewSlaAssignment": "SLA atamasını incele",
+      "allOpenFindingsTracked": "Tüm açık bulgular takip ediliyor"
     },
     "dismiss": {
       "alreadyResolvedDescription": "Bu bulgu zaten çözümlendi ve artık yok sayma kabul etmiyor.",
@@ -1142,7 +1260,17 @@
       "unknown": "Bilinmiyor",
       "updated": "Güncellendi",
       "viewAdvisory": "GitHub'da güvenlik bildirimini görüntüle",
-      "vulnerableVersions": "Savunmasız sürümler"
+      "vulnerableVersions": "Savunmasız sürümler",
+      "statusSuperseded": "Geçersiz kılındı",
+      "statusFixed": "Düzeltildi",
+      "statusOpen": "Açık",
+      "sourceDependabot": "GitHub Dependabot",
+      "reasonFixStarted": "bir düzeltme zaten başladı",
+      "reasonNoBandwidth": "kullanılabilir kapasite yok",
+      "reasonTolerableRisk": "risk tolere edilebilir",
+      "reasonInaccurate": "bulgu hatalı",
+      "reasonNotUsed": "savunmasız kod kullanılmıyor",
+      "reasonAfterReview": "incelemeden sonra"
     },
     "findingList": {
       "clearFilters": "Filtreleri temizle",
@@ -1187,7 +1315,7 @@
       "title": "Bildirimler"
     },
     "remediation": {
-      "attemptHistory": "Deneme geçmişi ({{count}})",
+      "attemptHistory": "Deneme geçmişi ({{displayCount}})",
       "attemptNumber": "Deneme #{{number}}",
       "branch": "Dal",
       "cancelMessage": "Security Agent, sürmekte olan iyileştirme denemesini durdurur.",
@@ -1255,7 +1383,7 @@
       "analysisModeSubtitle": "{{mode}} analiz",
       "automation": "Otomasyon",
       "automationAllOff": "Tümü kapalı",
-      "automationCount": "3 özellikten {{count}} etkin",
+      "automationCount": "3 özellikten {{displayCount}} etkin",
       "couldNotLoadPermissions": "İzinler yüklenemedi",
       "couldNotLoadRepositories": "Depolar yüklenemedi",
       "couldNotLoadSettings": "Security Agent ayarları yüklenemedi",
@@ -1266,12 +1394,13 @@
       "enabled": "Etkin",
       "modelsAndAnalysis": "Modeller ve analiz",
       "notifications": "Bildirimler",
-      "notificationsCount": "2 özellikten {{count}} etkin",
+      "notificationsCount": "2 özellikten {{displayCount}} etkin",
       "off": "Kapalı",
       "on": "Açık",
       "repositories": "Depolar",
-      "repositoriesSelected": "{{count}} depo seçildi",
-      "repositorySelected": "{{count}} depo seçildi",
+      "repositoriesCount": "{{displayCount}} depo seçildi",
+      "repositoriesCount_other": "{{displayCount}} depo seçildi",
+      "repositoriesCount_one": "{{displayCount}} depo seçildi",
       "securityAgent": "Security Agent",
       "selectRepositories": "Depoları seç",
       "selectRepositoriesSubtitle": "Security Agent'ın hangi depoları izleyeceğini seçin",
@@ -1309,7 +1438,140 @@
     },
     "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agent etkinleştirildi ancak ilk eşitleme kuyruğa alınamadı. Tekrar eşitleyin.",
-    "queuedActionUntracked": "Kuyruğa alınmış bir eylem artık izlenemiyor. En son durumu görmek için yenileyin."
+    "queuedActionUntracked": "Kuyruğa alınmış bir eylem artık izlenemiyor. En son durumu görmek için yenileyin.",
+    "commands": {
+      "findingAlreadyDismissed": "Bulgu zaten yok sayıldı",
+      "findingDismissed": "Bulgu yok sayıldı",
+      "noRemediationsQueued": "Sıraya alınmış mevcut bulgu yok",
+      "remediationsQueued": "Mevcut iyileştirmeler kuyruğa alındı",
+      "analysisComplete": "Analiz tamamlandı",
+      "syncComplete": "Senkronizasyon tamamlandı"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Güvenlik hizmeti yapılandırılmamış. Bu düzeltilene kadar yeniden gönderme başarılı olamaz.",
+      "syncMayNotHaveCompleted": "Bir eşitleme tamamlanmamış olabilir. Uzlaştırmak için tekrar deneyin ya da atın.",
+      "syncInProgress": "Bir güvenlik eşitlemesi zaten devam ediyor. Lütfen tekrar deneyin.",
+      "dismissalInProgress": "Bu yok sayma zaten devam ediyor. Lütfen tekrar deneyin.",
+      "couldNotReadPendingSyncs": "Bekleyen eşitlemeler okunamadı. Tekrar deneyin."
+    },
+    "analysisState": {
+      "queued": "Analiz kuyruğa alındı",
+      "queuedTitle": "Analiz kuyruğa alındı",
+      "queuedDescription": "Analiz kapasitesinin kullanılabilir olması bekleniyor.",
+      "analyzing": "Analiz ediliyor",
+      "analyzingTitle": "Analiz ediliyor",
+      "analyzingDescription": "Uygulama kodunun etkilenen özelliğe ulaşıp ulaşamadığı kontrol ediliyor.",
+      "failed": "Analiz başarısız oldu",
+      "failedTitle": "Analiz başarısız oldu",
+      "failedDescription": "Security Agent analizi tamamlayamadı.",
+      "extractionFailed": "İnceleme gerekiyor",
+      "extractionFailedTitle": "İnceleme gerekiyor",
+      "extractionFailedDescription": "Teknik rapor yapılandırılmış bir sonuca dönüştürülemedi.",
+      "exploitable": "İstismar edilebilir",
+      "exploitableTitle": "İstismar edilebilir",
+      "exploitableDescription": "Uygulama kodu etkilenen özelliğe ulaşabiliyor.",
+      "notExploitable": "Ulaşılamaz",
+      "notExploitableTitle": "Ulaşılamaz",
+      "notExploitableDescription": "Bu depoda ulaşılabilir bir yol bulunamadı.",
+      "unknown": "İnceleme gerekiyor",
+      "unknownTitle": "İnceleme gerekiyor",
+      "unknownDescription": "Analiz, güvenlik açığı olan özelliğin ulaşılabilir olup olmadığını doğrulayamadı.",
+      "safeToDismiss": "Yok sayılabilir",
+      "safeToDismissTitle": "Yok sayılabilir",
+      "safeToDismissDescription": "Triyaj, kod tabanı analizi olmadan bunun güvenle yok sayılabileceğini belirledi.",
+      "manualReview": "İnceleme gerekiyor",
+      "manualReviewTitle": "Manuel inceleme gerekiyor",
+      "manualReviewDescription": "Triyaj bu bulguyu manuel inceleme için işaretledi.",
+      "analysisRequired": "Analiz gerekli",
+      "analysisRequiredTitle": "Kod tabanı analizi gerekli",
+      "analysisRequiredDescription": "Triyaj, bir yanıta karar vermeden önce deponun analiz edilmesini önerir.",
+      "completed": "Analiz edildi",
+      "completedTitle": "Analiz edildi",
+      "completedDescription": "Analiz, belirli bir sonuç kaydedilmeden tamamlandı.",
+      "notAnalyzed": "Analiz edilmedi",
+      "notAnalyzedTitle": "Analiz edilmedi",
+      "notAnalyzedDescription": "Bu bulgu için kod tabanı analizi henüz çalıştırılmadı."
+    },
+    "deadline": {
+      "fixedBeforeDeadline": "Son tarihten önce düzeltildi",
+      "fixed": "Düzeltildi",
+      "fixedOn": "{{date}} tarihinde düzeltildi",
+      "resolutionRecorded": "Çözüm kaydedildi",
+      "superseded": "Geçersiz kılındı",
+      "dismissed": "Yok sayıldı",
+      "closedOn": "{{status}} {{date}}",
+      "deadlineNotSet": "Son tarih belirtilmedi",
+      "noSlaDeadline": "SLA son tarihi atanmadı",
+      "dueOn": "Son tarih: {{date}}",
+      "overdueNow": "Gecikmiş",
+      "overdue_one": "{{count}} gün gecikmiş",
+      "overdue_other": "{{count}} gün gecikmiş",
+      "dueToday": "Son tarih bugün",
+      "dueTomorrow": "Son tarih yarın",
+      "dueInDays_one": "{{count}} gün içinde",
+      "dueInDays_other": "{{count}} gün içinde",
+      "overdue": "{{count}} gün gecikmiş",
+      "dueInDays": "{{count}} gün içinde"
+    },
+    "remediationStatus": {
+      "cancellationRequested": "İptal istendi",
+      "notStarted": "Başlatılmadı",
+      "queued": "Kuyruğa alındı",
+      "starting": "Başlatılıyor",
+      "inProgress": "Devam ediyor",
+      "draftPrOpened": "Taslak PR açıldı",
+      "prOpened": "PR açıldı",
+      "blocked": "Engellendi",
+      "failed": "Başarısız oldu",
+      "noChangesNeeded": "Değişiklik gerekmiyor",
+      "cancelled": "İptal edildi",
+      "originAutomaticPolicy": "Otomatik ilke",
+      "originIncludeExistingPolicy": "Mevcut ilkeyi dahil et",
+      "originManual": "Manuel",
+      "validationCheck": "Doğrulama kontrolü {{number}}"
+    },
+    "remediationUnavailable": {
+      "findingNotFound": "Güvenlik bulgusu artık mevcut değil.",
+      "approvalRequired": "Otomatik İyileştirme onay gerektirir. Onaylamak için iyileştirmeyi manuel olarak başlatın.",
+      "findingNotOpen": "Bulgu artık açık değil.",
+      "repoNotInScope": "Depo, Security Agent için seçilmedi.",
+      "analysisRequired": "İyileştirmeyi başlatmadan önce kod tabanı analizini çalıştırın.",
+      "sandboxAnalysisRequired": "İyileştirmeyi başlatmadan önce kod tabanı analizini çalıştırın.",
+      "staleAnalysis": "Bulgu, analizden sonra değişti. İyileştirmeyi başlatmadan önce analizi yeniden çalıştırın.",
+      "notExploitable": "Analiz, ulaşılabilir bir güvenlik açığı yolu bulmadı. Otomatik İyileştirme kullanılamıyor.",
+      "exploitabilityUnknown": "Analiz, istismar edilebilirliği doğrulayamadı. Tek tıkla iyileştirmeden önce manuel inceleme gerekli.",
+      "manualReviewRequired": "Analiz manuel inceleme öneriyor, bu yüzden tek tıkla iyileştirme kullanılamıyor.",
+      "monitorRequired": "Analiz, PR açmak yerine izlemeyi öneriyor.",
+      "triageOnly": "Yalnızca triyaj tamamlandı. İyileştirmeyi başlatmadan önce kod tabanı analizini çalıştırın.",
+      "actionNotConcrete": "Somut bir bağımlılık yaması veya önerilen düzeltme mevcut değil.",
+      "remediationActive": "Zaten etkin bir iyileştirme denemesi var.",
+      "prAlreadyOpened": "Bir iyileştirme PR'ı zaten açık.",
+      "duplicateAnalysisResult": "Bu analiz sonucu zaten iyileştirme çalışması üretti.",
+      "retryNotAllowed": "Bu deneme için yeniden deneme mevcut değil.",
+      "securityAgentDisabled": "Security Agent bu sahip için devre dışı.",
+      "autoRemediationDisabled": "Otomatik İyileştirme devre dışı. Güvenlik kapıları geçtiğinde manuel iyileştirme yine de başlayabilir.",
+      "includeExistingDisabled": "Mevcut bulgular otomatik iyileştirmenin dışında tutulur.",
+      "belowThreshold": "Bulgu, otomatik önem derecesi eşiğinin altında. Güvenlik kapıları geçtiğinde manuel iyileştirme yine de başlayabilir.",
+      "beforeEnablement": "Analiz, Otomatik İyileştirme etkinleştirilmeden önce tamamlandı. Güvenlik kapıları geçtiğinde manuel iyileştirme yine de başlayabilir.",
+      "generic": "Bu bulgu için iyileştirme kullanılamıyor."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Analiz kapasitesi dolu. Etkin bir analizin bitmesini bekleyin, ardından tekrar deneyin.",
+      "githubTokenUnavailable": "GitHub yetkilendirmesi ilgi gerektiriyor. GitHub Uygulamasını yeniden yetkilendirin, ardından tekrar deneyin.",
+      "githubAuthInvalid": "GitHub yetkilendirmesi ilgi gerektiriyor. GitHub Uygulamasını yeniden yetkilendirin, ardından tekrar deneyin.",
+      "findingUnavailable": "Bu bulgu artık kullanılamıyor. Bulguları yenileyin ve açık kalırsa tekrar deneyin.",
+      "repositoryUnavailable": "Depo artık GitHub Uygulaması için kullanılamıyor. Depo erişimini yenileyin, ardından tekrar deneyin.",
+      "invalidDismissTarget": "Dependabot hedefi geçersiz olduğu için bulgu yok sayılamıyor.",
+      "commandStalled": "Kuyruğa alınan işlem zamanında tamamlanmadı. İşlemi tekrar dene.",
+      "queueRetriesExhausted": "İşlem birkaç denemeden sonra tamamlanamadı. İşlemi tekrar dene.",
+      "queueAdmissionFailed": "Kuyruğa alınan işlem kabul edilemedi. İşlemi tekrar dene.",
+      "generic": "Kuyruğa alınan işlem başarısız oldu. İşlemi tekrar dene."
+    },
+    "analysisMode": {
+      "auto": "Otomatik",
+      "shallow": "Yüzeysel",
+      "deep": "Derin"
+    }
   },
   "agents": {
     "activeNow": "Şu anda etkin",
@@ -1348,15 +1610,30 @@
       "sessionDeleted": "Oturum silindi",
       "needsInput": "girdi gerekli",
       "fromPlatform": "{{platform}} üzerinden",
-      "centOne": "sent",
-      "centOther": "sent",
-      "dollarOne": "dolar",
-      "dollarOther": "dolar",
+      "cent_one": "sent",
+      "cent": "sent",
+      "cent_other": "sent",
+      "dollar_one": "dolar",
+      "dollar": "dolar",
+      "dollar_other": "dolar",
+      "costSpoken": "maliyet {{cost}}",
+      "costSpokenWithTime": "maliyet {{cost}}, {{time}}",
       "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub Uygulaması kurulumu başlatılamadı. Lütfen tekrar deneyin.",
-      "couldNotOpenTitle": "GitHub açılamadı"
+      "couldNotOpenTitle": "GitHub açılamadı",
+      "installedTitle": "GitHub Uygulaması kuruldu",
+      "installedMessage": "Depolarınız artık bağlı.",
+      "pendingTitle": "Yönetici onayı bekleniyor",
+      "pendingMessage": "Bir kuruluş yöneticisinin kurulum isteğini onaylaması gerekir.",
+      "accountMismatchTitle": "Hesap uyuşmazlığı",
+      "accountMismatchMessage": "Bu bağlantı, farklı bir hesapla oturum açılmış Kilo Uygulaması'ndan başlatıldı. O hesapla web'de oturum açın veya uygulamadan yeniden başlatın.",
+      "cannotCompleteTitle": "Kurulum tamamlanamıyor",
+      "notAdminMessage": "Bu hesabı yalnızca hesabın GitHub yöneticisi bağlayabilir. Kilo'yu yüklemesi için kuruluş yöneticinizden isteyin.",
+      "alreadyClaimedMessage": "Bu GitHub kurulumu zaten başka bir Kilo hesabına bağlı. Önce orada bağlantısını kesin.",
+      "didNotCompleteTitle": "Kurulum tamamlanmadı",
+      "didNotCompleteMessage": "GitHub Uygulaması kurulumu tamamlanmadı. Uygulamadan tekrar deneyin."
     },
     "sessionExited": "Oturumdan çıkıldı",
     "remoteSpawnRetryable": "Örneğe ulaşılamadı — bağlantısı kesilmiş olabilir.",
@@ -1399,7 +1676,10 @@
       "exitMessage": "Bu, çalışan oturumu durdurur ancak geçmişini korur.",
       "keepSessionRunning": "Oturumu çalışır durumda tut",
       "exitSession": "Oturumdan çık",
-      "restartExitFailed": "Yeni oturum başlatıldı. Önceki oturum hâlâ açık."
+      "restartExitFailed": "Yeni oturum başlatıldı. Önceki oturum hâlâ açık.",
+      "exitNotSupported": "Uzak oturumdan çıkış, geçerli oturum için desteklenmiyor.",
+      "exitUnavailable": "Uzak oturumdan çıkış, geçerli oturum için kullanılamıyor.",
+      "exitNeedsNewerCli": "Uzak eğik çizgi komutları daha yeni bir Kilo CLI gerektirir. Kilo CLI'yı güncelleyin ve yeniden bağlanın."
     },
     "sessionConnection": {
       "connecting": "Bağlanıyor…",
@@ -1446,8 +1726,9 @@
       "keepEditing": "Düzenlemeye devam et"
     },
     "partRenderer": {
-      "updatedFile": "{{count}} dosya güncellendi",
-      "updatedFiles": "{{count}} dosya güncellendi"
+      "updatedFileCount_one": "{{displayCount}} dosya güncellendi",
+      "updatedFileCount": "{{displayCount}} dosya güncellendi",
+      "updatedFileCount_other": "{{displayCount}} dosya güncellendi"
     },
     "toolPatch": {
       "operationAdded": "Eklendi",
@@ -1472,9 +1753,9 @@
       "toolTask": "görev",
       "readTodos": "Görevleri oku",
       "updateTodos": "Görevleri güncelle",
-      "linesBadge": "{{count}} satır",
-      "filesBadge": "{{count}} dosya",
-      "matchesBadge": "{{count}} eşleşme"
+      "linesBadge": "{{displayCount}} satır",
+      "filesBadge": "{{displayCount}} dosya",
+      "matchesBadge": "{{displayCount}} eşleşme"
     },
     "readToolMarkdown": {
       "linesTruncated": "satırlar {{start}}–{{end}} (kısaltıldı)",
@@ -1558,6 +1839,10 @@
       "reportAiResponseFailedTerminal": "Bu yanıt bildirilemez.",
       "reportAiResponseSubmitted": "Bildirim gönderildi. Makbuz {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Ayrıntılar kullanılamıyor",
       "textDisplay": "Metin görüntüsü",
@@ -1616,7 +1901,7 @@
       "preparationComplete": "Hazırlık tamamlandı",
       "preparationFailed": "Hazırlık başarısız oldu",
       "setupCommand": "Kurulum komutu {{index}}",
-      "setupCommandOf": "Kurulum komutu {{index}} / {{count}}"
+      "setupCommandOf": "Kurulum komutu {{index}} / {{displayCount}}"
     },
     "permissionCard": {
       "title": "İzin gerekli",
@@ -1653,7 +1938,7 @@
       "submissionFailed": "Gönderim başarısız oldu. Lütfen tekrar deneyin.",
       "questionAnnouncement": "Ajanın girdinize ihtiyacı var. Siz yanıtlarken yazma alanı duraklatıldı.",
       "permissionAnnouncement": "Ajanın devam etmek için izne ihtiyacı var. Siz karar verirken yazma alanı duraklatıldı.",
-      "positionHint": "(1 / {{count}})",
+      "positionHint": "(1 / {{displayCount}})",
       "movedPastPrompt": "Ajan bu istemi geçti. Oturum devam ettiğinde bu kart kapanacak.",
       "waitingForAnswer": "Ajan yanıtınızı bekliyor. Bu soru açıkken ajana gönderdiğiniz mesaj duraklatılır.",
       "waitingForPermission": "Ajan izin bekliyor. Bu istek açıkken ajana gönderdiğiniz mesaj duraklatılır."
@@ -1688,8 +1973,9 @@
     "olderMessages": {
       "arrived": "Önceki mesajlar yüklendi",
       "retryHint": "Bu oturumun eski mesajlarının yüklenmesini yeniden dener.",
-      "omittedOne": "Bu oturumdaki daha eski bir öğe görüntülenemedi.",
-      "omittedMany": "Bu oturumdaki {{count}} eski öğe görüntülenemedi.",
+      "omitted_one": "Bu oturumdaki daha eski bir öğe görüntülenemedi.",
+      "omitted": "Bu oturumdaki {{displayCount}} eski öğe görüntülenemedi.",
+      "omitted_other": "Bu oturumdaki {{displayCount}} eski öğe görüntülenemedi.",
       "couldNotLoad": "Eski mesajlar yüklenemedi.",
       "unavailable": "Eski mesajlar kullanılamıyor.",
       "tooLarge": "Eski mesajlar yüklenemeyecek kadar büyük."
@@ -1698,10 +1984,12 @@
       "viewTable": "Tabloyu görüntüle",
       "title": "Tablo",
       "close": "Tabloyu kapat",
-      "column": "sütun",
-      "columns": "sütunlar",
-      "row": "satır",
-      "rows": "satırlar",
+      "columnCount_one": "sütun",
+      "columnCount": "sütunlar",
+      "columnCount_other": "sütunlar",
+      "rowCount_one": "satır",
+      "rowCount": "satırlar",
+      "rowCount_other": "satırlar",
       "opensFullScreen": "tam ekran açar"
     },
     "sessionFilter": {
@@ -1732,7 +2020,10 @@
       "title": "Model seç",
       "searchPlaceholder": "Model ara...",
       "noModels": "Kullanılabilir model yok",
-      "noModelsDescription": "Seçilebilecek model yok."
+      "noModelsDescription": "Seçilebilecek model yok.",
+      "allModels": "Tüm modeller",
+      "favorites": "Favoriler",
+      "recommended": "Önerilen"
     },
     "modelSelector": {
       "model": "Model",
@@ -1749,7 +2040,8 @@
       "addToFavorites": "{{name}} favorilere ekle",
       "removeFromFavorites": "{{name}} favorilerden kaldır",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Orta"
+      "thinkingEffortMedium": "Orta",
+      "sessionModel": "Oturum modeli"
     },
     "attachmentPreview": {
       "openFailedRetry": "Dosya açılamadı. Lütfen tekrar deneyin.",
@@ -1771,7 +2063,7 @@
       "cameraAccessDisabled": "Kamera Erişimi Devre Dışı",
       "cameraAccessMessage": "Fotoğraf çekmek için Ayarlar'da kamera erişimine izin verin.",
       "couldNotOpenPhotoPicker": "Fotoğraf seçici açılamadı. Kilo'yu yeniden başlatıp tekrar deneyin.",
-      "maxFilesAllowed": "En fazla {{count}} dosyaya izin verilir",
+      "maxFilesAllowed": "En fazla {{displayCount}} dosyaya izin verilir",
       "onlyAddingFiles": "Yalnızca {{total}} dosyanın {{accepted}} kadarı ekleniyor (en fazla {{max}})"
     },
     "composer": {
@@ -1817,7 +2109,8 @@
       "delegatingWork": "İş dağıtıyor",
       "askingQuestion": "Soru soruyor",
       "consideringNextSteps": "Sonraki adımları değerlendiriyor",
-      "writingResponse": "Yanıt yazıyor"
+      "writingResponse": "Yanıt yazıyor",
+      "initializingSnapshot": "Anlık görüntü başlatılıyor…"
     },
     "slashCommands": {
       "startNewSession": "Yeni bir oturum başlat",
@@ -1836,7 +2129,7 @@
       "costPrefix": "maliyet {{cost}}",
       "costSuffix": ", maliyet {{cost}}",
       "tokensWindowUnavailable": "Bağlam {{used}} jeton, pencere kullanılamıyor",
-      "tokensUsage": "Bağlam {{window}} jetonun {{used}} kadarı, %{{percentage}} kullanıldı",
+      "tokensUsage": "Bağlam {{window}} jetonun {{used}} kadarı, {{percentage}} kullanıldı",
       "title": "Bağlam kullanımı",
       "used": "Kullanılan",
       "remaining": "Kalan",
@@ -1845,7 +2138,7 @@
       "usageReflectsLatest": "Kullanım, tamamlanan en son asistan yanıtını yansıtır.",
       "tokenUsage": "Jeton kullanımı",
       "cacheRate": "Önbellek oranı",
-      "modelsCount": "Modeller ({{count}})",
+      "modelsCount": "Modeller ({{displayCount}})",
       "tokenTotalsNote": "Jeton toplamları yalnızca bu oturumu kapsar ve alt ajan/alt oturum jetonlarını hariç tutar.",
       "subagents": "Alt ajanlar",
       "subagentsDescription": "Alt oturumlardan kalan maliyet",
@@ -1854,8 +2147,9 @@
       "ofWindowTokens": "{{window}} jetonun",
       "tokens": "jeton",
       "tokensWithPercentage": "jeton (%{{percentage}})",
-      "stepsCountOne": "{{steps}} adım",
-      "stepsCountMany": "{{steps}} adım",
+      "stepsCount_one": "{{steps}} adım",
+      "stepsCount": "{{steps}} adım",
+      "stepsCount_other": "{{steps}} adım",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -1880,7 +2174,8 @@
   },
   "addCredits": {
     "cta": "Kredi ekle",
-    "description": "Kullanımın sürmesi için kredi ekleyin."
+    "description": "Kullanımın sürmesi için kredi ekleyin.",
+    "billingPage": "faturalandırma sayfası"
   },
   "deviceSessions": {
     "couldNotLoad": "Oturumlar yüklenemedi",
@@ -1891,6 +2186,7 @@
     "onlyKiloAppSignIns": "Burada yalnızca Kilo uygulaması oturumları görünür. Editör ve CLI oturumları listelenmez.",
     "signedIn": "{{signedIn}} tarihinde oturum açıldı · Son görülme {{lastSeen}}",
     "thisDevice": "Bu cihaz",
+    "webBrowser": "Web tarayıcısı",
     "title": "Cihaz oturumları",
     "viewProfile": "Profili görüntüle",
     "signOutThisDevice": "Bu cihazın oturumunu kapat",
@@ -1906,7 +2202,8 @@
     "couldNotOpenStore": "Uygulama mağazası açılamadı.",
     "description": "Kilo'nun yeni bir sürümü mevcut. Devam etmek için lütfen güncelleyin.",
     "title": "Güncelleme gerekli",
-    "updateNow": "Şimdi güncelle"
+    "updateNow": "Şimdi güncelle",
+    "appStorePage": "uygulama mağazası sayfası"
   },
   "home": {
     "couldNotLoadSessions": "Oturumlar yüklenemedi",
@@ -1920,10 +2217,7 @@
     "newCodingTask": "Yeni kodlama görevi",
     "explore": "Keşfet",
     "seeAll": "Tümünü gör",
-    "kiloAgents": "Kilo Ajanları",
-    "greetingMorning": "Günaydın",
-    "greetingAfternoon": "İyi günler",
-    "greetingEvening": "İyi akşamlar"
+    "kiloAgents": "Kilo Ajanları"
   },
   "imageViewer": {
     "close": "{{filename}} kapat",
@@ -1977,7 +2271,17 @@
     "onlineTitle": "Konuşma çevrimiçi işleniyor",
     "staysOff": "Çevrimiçi transkripsiyona izin verene kadar konuşma kapalı kalır.",
     "start": "Sesli girişi başlat",
-    "stop": "Sesli girişi durdur"
+    "stop": "Sesli girişi durdur",
+    "restricted": "Bu cihazda sesli giriş kısıtlıdır.",
+    "micRequired": "Sesli giriş için mikrofon erişimi gerekir.",
+    "micOff": "Mikrofon erişimi kapalı. Sesli girişi kullanmak için Ayarlar'dan etkinleştirin.",
+    "micOffTitle": "Mikrofon erişimi kapalı",
+    "noSpeech": "Konuşma algılanmadı. Tekrar denemek için mikrofona dokunun.",
+    "needsConnection": "Sesli giriş şu anda bir bağlantı gerektiriyor. Tekrar deneyin.",
+    "busy": "Sesli giriş meşgul. Tekrar deneyin.",
+    "stopped": "Sesli giriş durdu. Tekrar denemek için mikrofona dokunun.",
+    "unavailableDevice": "Sesli giriş bu cihazda kullanılamıyor.",
+    "unavailableLanguage": "Sesli giriş bu cihaz dili için kullanılamıyor."
   },
   "share": {
     "title": "Kilo'ya paylaş",
@@ -1989,7 +2293,7 @@
     "connectedCli": "Bağlı bir CLI üzerinde",
     "newSessionOn": "{{name}} üzerinde yeni oturum",
     "noMatchingSessions": "Eşleşen oturum yok.",
-    "onlyFirstFilesAttached": "Yalnızca ilk {{count}} dosya eklenecek.",
+    "onlyFirstFilesAttached": "Yalnızca ilk {{displayCount}} dosya eklenecek.",
     "staleMessage": "Bu paylaşım artık kullanılamıyor.",
     "retryableMessage": "Oturumlarınız yüklenemedi.",
     "emptyMessage": "Henüz oturum yok — bunu göndermek için yeni bir tane başlatın.",
@@ -2022,7 +2326,7 @@
     "otherAccountCopy": "Bu Apple Hesabındaki Kilo Pass farklı bir Kilo hesabına ait. Yönetmek için o Kilo hesabıyla oturum açın.",
     "alreadySubscribed": "Zaten bir Kilo Pass aboneliğiniz var.",
     "purchaseUnavailable": "Kilo Pass satın alımı şu anda kullanılamıyor.",
-    "tierCredits": "${{amount}} kredi",
+    "tierCredits": "{{amount}} kredi",
     "perMonth": "{{price}}/ay",
     "verifyPurchaseFailed": "Satın alımınız doğrulanamadı. Bağlantınızı kontrol edip tekrar deneyin.",
     "productsCouldNotLoad": "Kilo Pass ürünleri App Store'dan yüklenemedi.",
@@ -2033,7 +2337,7 @@
     "manageFailed": "App Store abonelik yönetimi açılamadı.",
     "kiloPassSetup": "Kilo Pass kurulumu",
     "subscriptionHeaderDescription": "Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize kredi ekleyen aylık bir abonelik — Cloud Agents, uzak oturumlar ve KiloClaw sohbetleri.",
-    "tierDescription": "Kilo App kullanımı için aylık ${{price}} ücretli kredi eklenir.",
+    "tierDescription": "Kilo App kullanımı için aylık {{price}} ücretli kredi eklenir.",
     "subscribe": "Abone ol",
     "subscribeDescription": "Bonus ilerlemeyle aylık krediler",
     "manage": "Yönet",
@@ -2041,7 +2345,7 @@
     "statusPending": "Kilo Pass bekleniyor",
     "statusCanceling": "Kilo Pass iptal ediliyor",
     "statusPastDue": "Kilo Pass vadesi geçmiş",
-    "monthlyCredits": "Aylık ${{credits}} kredi",
+    "monthlyCredits": "Aylık {{credits}} kredi",
     "ends": "Bitiş: {{date}}",
     "periodEnd": "dönem sonu",
     "managedOnGooglePlay": "Google Play'de yönetiliyor",
@@ -2055,7 +2359,15 @@
     "webManagementDescription": "Bu Kilo Pass web üzerinden yönetiliyor.",
     "legalDisclosure": "Kilo Pass, otomatik yenilenen aylık bir aboneliktir. Ödeme, satın alma onayında Apple Kimliğinize yansıtılır. Abonelikler, geçerli dönemin bitiminden en az 24 saat önce iptal edilmediği sürece her ay gösterilen fiyattan otomatik yenilenir. App Store hesap ayarlarınızdan istediğiniz zaman yönetin veya iptal edin.",
     "legalPrivacyPolicy": "Gizlilik Politikası",
-    "legalTermsOfUse": "Kullanım Koşulları (EULA)"
+    "legalTermsOfUse": "Kullanım Koşulları (EULA)",
+    "purchaseDifferentAccount": "Bu App Store satın alımı Kilo hesabınıza bağlı değil. Satın alımda kullanılan Apple hesabına giriş yapın, sonra tekrar deneyin.",
+    "restoreFailed": "Satın alımlar geri yüklenemedi. Tekrar deneyin.",
+    "purchaseFailed": "Satın alma tamamlanamadı.",
+    "purchaseStartFailed": "App Store satın alımı başlatılamadı.",
+    "purchaseOwnedByAnotherAccount": "Bu Apple Hesabındaki Kilo Pass farklı bir Kilo hesabına ait.",
+    "couldNotConnectToAppStore": "App Store'a bağlanılamadı. Bağlantınızı kontrol edin ve tekrar deneyin.",
+    "noMatchingProducts": "App Store eşleşen Kilo Pass ürünü döndürmedi.",
+    "purchaseMissingSignedTransaction": "App Store satın alımı imzalı bir işlem JWS'si içermiyor."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2145,17 +2457,17 @@
     "accessDeniedDescription": "Bu çekme isteğini görüntüleme izniniz yok.",
     "checkConnection": "Bağlantıyı kontrol et",
     "checks": {
-      "checksCount": "{{count}} kontrol",
+      "checksCount": "{{displayCount}} kontrol",
       "couldNotLoad": "Kontroller yüklenemedi.",
-      "failed": "{{count}} başarısız",
+      "failed": "{{displayCount}} başarısız",
       "noAccess": "Bu deponun kontrollerine erişiminiz yok.",
       "noChecksReported": "Kontrol bildirilmedi",
       "notAvailable": "Kontroller henüz kullanılamıyor. Head commit işlenmemiş olabilir veya Kilo GitHub Uygulaması head depoya kurulu olmayabilir.",
       "openDetails": "{{name}} ayrıntılarını aç",
-      "passed": "{{count}} geçti",
-      "pending": "{{count}} bekliyor",
+      "passed": "{{displayCount}} geçti",
+      "pending": "{{displayCount}} bekliyor",
       "retryChecks": "Kontrolleri tekrar dene",
-      "skipped": "{{count}} atlandı",
+      "skipped": "{{displayCount}} atlandı",
       "title": "Kontroller",
       "viewOnGitHub": "PR'ı GitHub'da görüntüle",
       "checkDetails": "kontrol ayrıntıları",
@@ -2206,7 +2518,8 @@
       "closeReactions": "Tepkileri kapat",
       "collapseThread": "Konuyu daralt",
       "commentActions": "Yorum eylemleri",
-      "commentCount": "{{count}} yorum",
+      "comment": "{{displayCount}} yorum",
+      "comment_other": "{{displayCount}} yorum",
       "couldNotLoad": "Tartışma yüklenemedi",
       "couldNotLoadMore": "Daha fazla yorum yüklenemedi.",
       "couldNotReply": "Yanıt verilemedi.",
@@ -2232,17 +2545,18 @@
           "terminal": "Bu kullanıcı bildirilemez."
         }
       },
-      "moreLinesAbove": "… yukarıda {{count}} satır daha",
+      "moreLinesAbove": "… yukarıda {{displayCount}} satır daha",
       "mute": "Sustur",
       "mutedUser": "{{login}} susturuldu",
       "noDiscussion": "Henüz tartışma yok",
       "noDiscussionDescription": "Bu çekme isteğinde inceleme konusu veya konuşma yorumu yok.",
-      "oneComment": "1 yorum",
+      "comment_one": "1 yorum",
       "outdated": "Güncel değil",
       "quotedDiffSnippet": "Alıntılanan diff parçası",
-      "reactionPill": "{{emoji}} tepki, {{count}} {{countLabel}}",
-      "reactionPlural": "tepki",
-      "reactionSingular": "tepki",
+      "reactionPill": "{{emoji}} tepki, {{displayCount}} {{countLabel}}",
+      "reaction": "tepki",
+      "reaction_other": "tepki",
+      "reaction_one": "tepki",
       "reactionsTitle": "Tepkiler",
       "reply": "Yanıtla",
       "replyBadRequest": "Bu yanıt gönderilemiyor. Konu değişmiş olabilir.",
@@ -2269,7 +2583,25 @@
       "viewTerms": "Koşulları görüntüle",
       "termsAcceptRequired": "Gönderi yapmak için Hizmet Koşullarını kabul etmelisiniz.",
       "termsCheckRetryCopy": "Hizmet Koşulları kontrol edilemedi. Bağlantınızı kontrol edin ve tekrar deneyin.",
-      "termsOutdatedCopy": "Hizmet Koşulları değişti. En son sürümü kabul etmek için bu ekranı yeniden açın."
+      "termsOutdatedCopy": "Hizmet Koşulları değişti. En son sürümü kabul etmek için bu ekranı yeniden açın.",
+      "reactions": {
+        "thumbsUp": "Başparmak yukarı",
+        "thumbsDown": "Başparmak aşağı",
+        "laugh": "Gülme",
+        "hooray": "Yaşasın",
+        "confused": "Kafası karışık",
+        "heart": "Kalp",
+        "rocket": "Roket",
+        "eyes": "Gözler"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} konumunda dosya yorumu",
+        "fileComment": "Dosya yorumu",
+        "outdatedOnPathLines": "{{path}} {{lines}} konumunda güncel değil",
+        "outdatedOnLines": "{{lines}} konumunda güncel değil",
+        "outdatedOnPath": "{{path}} konumunda güncel değil"
+      },
+      "deletedUser": "silinen kullanıcı"
     },
     "entry": {
       "clearLink": "Çekme isteği bağlantısını temizle",
@@ -2343,18 +2675,20 @@
     "hunkRows": {
       "contextUnavailable": "Bu ref'te bağlam kullanılamıyor",
       "expandAll": "Tümünü genişlet",
-      "expandAllLines": "{{count}} satırın tümünü genişlet",
+      "expandAllLines": "{{displayCount}} satırın tümünü genişlet",
       "expandContext": "Bağlamı genişlet",
-      "expandLines": "{{count}} satırı genişlet ({{start}}–{{end}})",
-      "expandLinesOfContext": "{{count}} satır bağlamı genişlet",
+      "expandLines": "{{displayCount}} satırı genişlet ({{start}}–{{end}})",
+      "expandLinesOfContext": "{{displayCount}} satır bağlamı genişlet",
       "expandMoreContext": "Daha fazla bağlam genişlet",
-      "expandMoreLines": "{{count}} satır daha genişlet ({{start}}–{{end}})",
+      "expandMoreLines": "{{displayCount}} satır daha genişlet ({{start}}–{{end}})",
       "failedToLoadContext": "Bağlam yüklenemedi — tekrar denemek için dokunun",
       "failedToLoadMoreFiles": "Daha fazla dosya yüklenemedi — tekrar denemek için dokunun",
-      "fileLoaded": "{{count}} dosya yüklendi",
-      "fileLoadedOfTotal": "{{total}} dosyanın {{count}} kadarı yüklendi",
-      "filesLoaded": "{{count}} dosya yüklendi",
-      "filesLoadedOfTotal": "{{total}} dosyanın {{count}} kadarı yüklendi",
+      "fileLoadedCount_one": "{{displayCount}} dosya yüklendi",
+      "fileLoadedOfTotalCount_one": "{{total}} dosyanın {{displayCount}} kadarı yüklendi",
+      "fileLoadedCount": "{{displayCount}} dosya yüklendi",
+      "fileLoadedCount_other": "{{displayCount}} dosya yüklendi",
+      "fileLoadedOfTotalCount": "{{total}} dosyanın {{displayCount}} kadarı yüklendi",
+      "fileLoadedOfTotalCount_other": "{{total}} dosyanın {{displayCount}} kadarı yüklendi",
       "filesStillLoading": "Dosyalar hâlâ yükleniyor. Yenilemek için aşağı çekin.",
       "goToOverview": "Genel Bakış'a git",
       "goToOverviewTab": "Genel Bakış sekmesine git",
@@ -2424,16 +2758,47 @@
         "closed": "Bu çekme isteği kapalı"
       },
       "updateBranch": "Dalı güncelle",
-      "updateBranchFromBase": "Dalı temel daldan güncelle"
+      "updateBranchFromBase": "Dalı temel daldan güncelle",
+      "blocked": {
+        "unknownStateTitle": "GitHub birleştirilebilirlik durumu bildirmedi",
+        "unknownStateDetail": "Kısa bir süre sonra genel bakışı yenilemeyi deneyin.",
+        "conflictsTitle": "Birleştirme çakışmaları",
+        "conflictsDetail": "Birleştirmeden önce bu daldaki birleştirme çakışmalarını çözün.",
+        "requiredReviewsTitle": "Gerekli incelemeler eksik",
+        "requiredReviewsDetail": "Gerekli inceleyenlerin onayları eksik veya bekliyor.",
+        "failingChecksTitle": "Başarısız gerekli kontroller",
+        "failingChecksDetail": "Gerekli durum kontrolleri başarısız oluyor.",
+        "unstableTitle": "Bazı kontroller başarısız",
+        "unstableDetail": "Gerekli olmayan kontroller başarısız oluyor. Birleştirmeyi engellemezler.",
+        "draftTitle": "Taslak çekme isteği",
+        "draftDetail": "Birleştirmeden önce çekme isteğini incelemeye hazır olarak işaretleyin.",
+        "behindTitle": "Dal güncel değil",
+        "behindDetailUpdatable": "Birleştirmeden önce dalı temel daldan güncelleyin veya rebase yapın.",
+        "behindDetail": "Baş dal, temel dalın gerisinde. Birleştirmeden önce dalı rebase edin veya güncelleyin.",
+        "notMergeableTitle": "Bu çekme isteği henüz birleştirilebilir değil",
+        "notMergeableDetail": "GitHub {{state}} birleştirilebilirlik durumu bildirdi."
+      },
+      "methodLabels": {
+        "merge": "Birleştirme commit'i oluştur",
+        "squash": "Squash ile birleştir",
+        "rebase": "Rebase ile birleştir"
+      },
+      "methodDescriptions": {
+        "merge": "Bu daldaki tüm commit'leri bir birleştirme commit'iyle temel dala birleştirir.",
+        "squash": "Bu daldaki tüm commit'leri temel dalda tek bir commit'te birleştirir.",
+        "rebase": "Bu daldaki tüm commit'leri bir birleştirme commit'i olmadan temel dalda yeniden uygular."
+      }
     },
     "noDescriptionProvided": "Açıklama sağlanmadı.",
     "noFilesChanged": "Değişen dosya yok",
     "noFilesChangedDescription": "Bu çekme isteğinde dosya değişikliği yok.",
     "overview": {
-      "commitPlural": "commit",
-      "commitSingular": "commit",
-      "filePlural": "dosya",
-      "fileSingular": "dosya",
+      "commit": "commit",
+      "commit_other": "commit",
+      "commit_one": "commit",
+      "file": "dosya",
+      "file_other": "dosya",
+      "file_one": "dosya",
       "stateClosed": "Kapalı",
       "stateDraft": "Taslak",
       "stateMerged": "Birleştirildi",
@@ -2484,13 +2849,16 @@
       "deletePendingMessage": "Bu yorum inceleme kuyruğundan kaldırılacak.",
       "deletePendingTitle": "Bekleyen yorum silinsin mi?",
       "loadFailedTitle": "İnceleme gönderimi yüklenemedi",
-      "pendingCommentPlural": "bekleyen yorum",
-      "pendingCommentSingular": "bekleyen yorum",
+      "pendingComment": "bekleyen yorum",
+      "pendingComment_other": "bekleyen yorum",
+      "pendingComment_one": "bekleyen yorum",
       "summaryOptional": "Özet (isteğe bağlı)",
       "title": "İncelemeyi gönder",
-      "partialPostedMessage": "{{freshCount}} yorum gönderildi. {{staleCount}} yorum daha eski bir commit'e işaret ediyor ve kuyruğunuzda kaldı.",
-      "submitCountOfTotal": "{{totalCount}} yorumun {{freshCount}} tanesini gönder",
-      "submitReview": "İncelemeyi gönder"
+      "partialPostedMessage": "{{displayFreshCount}} yorum gönderildi. {{displayStaleCount}} yorum daha eski bir commit'e işaret ediyor ve kuyruğunuzda kaldı.",
+      "submitCountOfTotal": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
+      "submitReview": "İncelemeyi gönder",
+      "blockedRequestChanges": "Değişiklik istemek için bir özet veya en az bir yorum ekleyin.",
+      "blockedComment": "Yorum incelemesi göndermek için bir özet veya en az bir yorum ekleyin."
     },
     "fileStatus": {
       "added": "Eklendi",
@@ -2507,10 +2875,36 @@
     },
     "diff": {
       "selectedTapToChange": "Seçilen {{label}}, seçimi değiştirmek için dokunun",
-      "tapToComment": "{{label}}, yorum yapmak için dokunun"
+      "tapToComment": "{{label}}, yorum yapmak için dokunun",
+      "truncationBanner": "Değiştirilen dosyaların ilk {{limit}} tanesi gösteriliyor (toplam {{total}}) — GitHub API sınırı",
+      "statusAdded": "Eklendi",
+      "statusContext": "Bağlam",
+      "statusDeleted": "Silindi",
+      "lineLabel": "{{status}} satırı {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(boş)"
     },
     "linkPasteClipboardEmpty": "Pano boş",
-    "linkPasteNotAPullRequest": "GitHub çekme isteği bağlantısı değil"
+    "linkPasteNotAPullRequest": "GitHub çekme isteği bağlantısı değil",
+    "announce": {
+      "commentPosted": "Yorum gönderildi",
+      "reviewSubmitted": "İnceleme gönderildi",
+      "autoMergeEnabled": "Otomatik birleştirme etkinleştirildi"
+    },
+    "mutationError": {
+      "commentNotPosted": "Bu yorum gönderilemiyor. Seçili satır değişmiş ya da PR güncellenmiş olabilir.",
+      "reviewNotSubmitted": "Bu inceleme bu şekilde gönderilemiyor. PR değişmiş olabilir ya da kendi pull request'inizi inceleyemezsiniz.",
+      "couldNotPostComment": "Yorum gönderilemedi.",
+      "couldNotSubmitReview": "İnceleme gönderilemedi. Bağlantını kontrol et ve tekrar dene."
+    },
+    "operation": {
+      "couldNotReply": "Yanıt verilemedi.",
+      "couldNotCompleteAction": "Bu işlem tamamlanamadı.",
+      "mergeResultDefaultError": "GitHub birleştirmeyi tamamlamadı.",
+      "ambiguous": "Doğrulanamadı — yeniden denemeden önce PR'yi kontrol edin.",
+      "persistenceFailed": "Bu işlemi kaydedemedik. Lütfen daha sonra tekrar deneyin.",
+      "forbidden": "Yasak"
+    }
   },
   "organization": {
     "boundary": {
@@ -2529,7 +2923,17 @@
       "emptyTitle": "Kredi etkinliği yok",
       "expires": "Son kullanma: {{date}}",
       "title": "Kredi etkinliği",
-      "transactionFallback": "Kredi işlemi"
+      "transactionFallback": "Kredi işlemi",
+      "category": {
+        "organization_custom": "Kuruluş özel",
+        "parent_to_child_transfer_in": "Üst kuruluştan alt kuruluşa giriş transferi",
+        "parent_to_child_transfer_out": "Üst kuruluştan alt kuruluşa çıkış transferi",
+        "oss-sponsorship": "OSS sponsorluğu",
+        "oss-monthly-reset": "OSS aylık sıfırlama",
+        "team-topup-bonus-2025": "Ekip bakiye yükleme bonusu 2025",
+        "accounting_adjustment": "Muhasebe düzeltmesi",
+        "credits_expired": "Kredilerin süresi doldu"
+      }
     },
     "hub": {
       "balance": "Bakiye",
@@ -2556,9 +2960,16 @@
       "emptyTitle": "Fatura yok",
       "invoiceFallback": "Fatura",
       "title": "Faturalar",
-      "statusPaid": "Ödendi",
-      "statusOpen": "Açık",
-      "statusVoid": "Geçersiz"
+      "downloadFailed": "Fatura indirilemedi. Bağlantını kontrol et ve tekrar dene.",
+      "sharingUnavailable": "Paylaşım bu cihazda kullanılamıyor.",
+      "status": {
+        "paid": "Ödendi",
+        "open": "Açık",
+        "void": "Geçersiz",
+        "draft": "Taslak",
+        "uncollectible": "Tahsil edilemez",
+        "unknown": "Bilinmiyor"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2635,8 +3046,9 @@
       "manageHint": "Web'de Kilo Pass yönetimini açar.",
       "notSubscribed": "Abone değil",
       "overallocated": "Pass atamaları ödenen koltuk sayısını aşıyor",
-      "paidSeatOne": "{{count}} ödenen koltuk",
-      "paidSeatOther": "{{count}} ödenen koltuk",
+      "paidSeat_one": "{{displayCount}} ödenen koltuk",
+      "paidSeat": "{{displayCount}} ödenen koltuk",
+      "paidSeat_other": "{{displayCount}} ödenen koltuk",
       "paymentNeedsAttention": "Ödeme ilgi gerektiriyor",
       "paymentPending": "Ödeme bekliyor",
       "processingBlocked": "İşleme engellendi",
@@ -2658,6 +3070,7 @@
     "rateKilo": "Kilo'yu değerlendir",
     "sorryMessage": "Lütfen neyin daha iyi olması gerektiğini bize bildirin. Uygulamadan sorumlu mühendis her raporu tek tek okur!",
     "sorryTitle": "Bunu duyduğumuza üzüldük!",
+    "emailSubject": "mobil uygulama geri bildirimi",
     "neutralTitle": "Kilo uygulamasını değerlendirin",
     "rateTheApp": "Uygulamayı değerlendirin",
     "sendFeedback": "Geri bildirim gönder"
@@ -2677,10 +3090,28 @@
     "emailDeliveryFailed": "E-posta teslimatı geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
     "admissionRequired": "Cihazınız doğrulanamıyor. Başka bir cihazda veya web üzerinden oturum açmak için '$t(login.moreSignInOptions)'ni kullanın.",
     "default": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
-    "retryableAdmission": "Bu cihaz doğrulanamadı. Bağlantınızı kontrol edin ve tekrar deneyin."
+    "retryableAdmission": "Bu cihaz doğrulanamadı. Bağlantınızı kontrol edin ve tekrar deneyin.",
+    "startSignInFailed": "Oturum açma başlatılamadı. Lütfen tekrar deneyin.",
+    "couldNotOpenBrowser": "Tarayıcı açılamadı. Lütfen tekrar deneyin.",
+    "signInTimedOut": "Oturum açma zaman aşımına uğradı. Lütfen tekrar deneyin.",
+    "signInFailed": "Oturum açma başarısız oldu. Lütfen tekrar deneyin.",
+    "networkError": "Ağ hatası. Lütfen tekrar deneyin.",
+    "accessDeniedByUser": "Kullanıcı erişimi reddetti",
+    "codeExpired": "Kodun süresi doldu",
+    "tooManySignInAttempts": "Çok fazla oturum açma denemesi yapıldı. Lütfen bekleyin ve tekrar deneyin."
   },
   "models": {
     "dataCollected": "Toplanan veriler",
-    "free": "Ücretsiz"
+    "free": "Ücretsiz",
+    "couldNotUpdateFavorites": "Sık kullanılanlar güncellenemedi",
+    "thinkingEffort": {
+      "none": "Yok",
+      "minimal": "Minimum",
+      "low": "Düşük",
+      "medium": "Orta",
+      "high": "Yüksek",
+      "xhigh": "Çok yüksek",
+      "max": "Maksimum"
+    }
   }
 }

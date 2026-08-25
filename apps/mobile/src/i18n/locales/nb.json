@@ -22,7 +22,12 @@
     "copiedToClipboard": "Kopiert til utklippstavlen",
     "couldNotCopyToClipboard": "Kunne ikke kopiere til utklippstavlen",
     "required": "påkrevd",
-    "error": "feil: {{error}}"
+    "error": "feil: {{error}}",
+    "back": "Tilbake",
+    "somethingWentWrong": "Noe gikk galt",
+    "couldNotOpen": "Kunne ikke åpne {{label}}",
+    "link": "lenke",
+    "takingLonger": "Dette tar lengre tid enn forventet. Du kan lukke dette og sjekke igjen."
   },
   "language": {
     "title": "Språk",
@@ -206,11 +211,11 @@
       "loadingLines": "Laster {{loaded}} av {{total}} linjer…",
       "expandContext": "Utvid kontekst",
       "expandMoreContext": "Utvid mer kontekst",
-      "expandLines": "Utvid {{count}} linjer ({{start}}–{{end}})",
-      "expandMoreLines": "Utvid {{count}} flere linjer ({{start}}–{{end}})",
-      "expandLinesOfContext": "Utvid {{count}} kontekstlinjer",
+      "expandLines": "Utvid {{displayCount}} linjer ({{start}}–{{end}})",
+      "expandMoreLines": "Utvid {{displayCount}} flere linjer ({{start}}–{{end}})",
+      "expandLinesOfContext": "Utvid {{displayCount}} kontekstlinjer",
       "expandAll": "Utvid alle",
-      "expandAllLines": "Utvid alle {{count}} linjene",
+      "expandAllLines": "Utvid alle {{displayCount}} linjene",
       "loadingMoreFiles": "Laster flere filer…",
       "retryLoadingNextPage": "Prøv å laste neste side igjen",
       "failedToLoadMoreFiles": "Kunne ikke laste flere filer — trykk for å prøve igjen",
@@ -219,10 +224,12 @@
       "loadedOfTotalFiles": "{{loaded}} av {{total}} filer lastet",
       "loadAllFiles": "Last alle filene",
       "loadAll": "Last alt",
-      "fileLoaded": "{{count}} fil lastet",
-      "filesLoaded": "{{count}} filer lastet",
-      "fileLoadedOfTotal": "{{count}} fil lastet av {{total}}",
-      "filesLoadedOfTotal": "{{count}} filer lastet av {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} fil lastet",
+      "fileLoadedCount": "{{displayCount}} filer lastet",
+      "fileLoadedCount_other": "{{displayCount}} filer lastet",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} fil lastet av {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} filer lastet av {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} filer lastet av {{total}}",
       "filesStillLoading": "Filer laster fortsatt. Dra ned for å oppdatere.",
       "goToOverview": "Gå til oversikt",
       "goToOverviewTab": "Gå til oversiktsfanen"
@@ -278,7 +285,36 @@
         "body": "Kunne ikke slette grenen: {{reason}}",
         "accessibility": "Flettet. Kunne ikke slette grenen: {{reason}}"
       },
-      "loadFailedTitle": "Kunne ikke laste flettingsalternativer"
+      "loadFailedTitle": "Kunne ikke laste flettingsalternativer",
+      "blocked": {
+        "unknownStateTitle": "GitHub har ikke rapportert en flettbar status",
+        "unknownStateDetail": "Prøv å oppdatere oversikten om et øyeblikk.",
+        "conflictsTitle": "Flettingskonflikter",
+        "conflictsDetail": "Løs flettingskonfliktene på denne grenen før du fletter.",
+        "requiredReviewsTitle": "Nødvendige anmeldelser mangler",
+        "requiredReviewsDetail": "Godkjenninger fra de nødvendige anmelderne mangler eller venter.",
+        "failingChecksTitle": "Nødvendige sjekker feiler",
+        "failingChecksDetail": "Nødvendige statussjekker feiler.",
+        "unstableTitle": "Noen sjekker feiler",
+        "unstableDetail": "Ikke-nødvendige sjekker feiler. De blokkerer ikke flettingen.",
+        "draftTitle": "Utkast til pull request",
+        "draftDetail": "Marker pull requesten som klar for anmeldelse før du fletter.",
+        "behindTitle": "Grenen er utdatert",
+        "behindDetailUpdatable": "Oppdater grenen fra basen, eller utfør rebase, før du fletter.",
+        "behindDetail": "Hodegrenen ligger bak basen. Utfør rebase eller oppdater grenen før du fletter.",
+        "notMergeableTitle": "Denne pull requesten kan ikke flettes ennå",
+        "notMergeableDetail": "GitHub rapporterte en {{state}} flettbar status."
+      },
+      "methodLabels": {
+        "merge": "Opprett en flettingscommit",
+        "squash": "Squash og flett",
+        "rebase": "Rebase og flett"
+      },
+      "methodDescriptions": {
+        "merge": "Kombiner alle commits fra denne grenen inn i basen med en flettingscommit.",
+        "squash": "Kombiner alle commits fra denne grenen til en enkelt commit på basen.",
+        "rebase": "Gjenta alle commits fra denne grenen på basen uten en flettingscommit."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Diskusjonstråd {{anchorLabel}}",
@@ -288,8 +324,9 @@
       "resolved": "Løst",
       "outdated": "Utdatert",
       "file": "Fil",
-      "oneComment": "1 kommentar",
-      "commentCount": "{{count}} kommentarer",
+      "comment_one": "1 kommentar",
+      "comment": "{{displayCount}} kommentarer",
+      "comment_other": "{{displayCount}} kommentarer",
       "startedRelative": " · startet {{relative}}",
       "couldNotLoadMore": "Kunne ikke laste flere kommentarer.",
       "retryLoadingMore": "Prøv å laste flere kommentarer igjen",
@@ -298,9 +335,10 @@
       "closeReactions": "Lukk reaksjoner",
       "reactionsTitle": "Reaksjoner",
       "addReaction": "Legg til reaksjon",
-      "reactionPill": "{{emoji}}-reaksjon, {{count}} {{countLabel}}",
-      "reactionSingular": "reaksjon",
-      "reactionPlural": "reaksjoner",
+      "reactionPill": "{{emoji}}-reaksjon, {{displayCount}} {{countLabel}}",
+      "reaction_one": "reaksjon",
+      "reaction": "reaksjoner",
+      "reaction_other": "reaksjoner",
       "commentActions": "Kommentarhandlinger",
       "reportContent": "Rapporter innhold",
       "reportUser": "Rapporter bruker",
@@ -349,10 +387,28 @@
       "noDiscussionDescription": "Ingen anmeldelsestråder eller samtalekommentarer på denne pull requesten.",
       "reviewFiles": "Anmeld filer",
       "quotedDiffSnippet": "Sitert diff-utdrag",
-      "moreLinesAbove": "… {{count}} flere linjer over",
+      "moreLinesAbove": "… {{displayCount}} flere linjer over",
       "termsAcceptRequired": "Du må godta vilkårene for bruk for å publisere.",
       "termsOutdatedCopy": "Vilkårene for bruk har endret seg. Åpne denne skjermen på nytt for å godta den nyeste versjonen.",
-      "termsCheckRetryCopy": "Kunne ikke sjekke vilkårene for bruk. Sjekk tilkoblingen og prøv igjen."
+      "termsCheckRetryCopy": "Kunne ikke sjekke vilkårene for bruk. Sjekk tilkoblingen og prøv igjen.",
+      "reactions": {
+        "thumbsUp": "Tommel opp",
+        "thumbsDown": "Tommel ned",
+        "laugh": "Latter",
+        "hooray": "Hurra",
+        "confused": "Forvirret",
+        "heart": "Hjerte",
+        "rocket": "Rakett",
+        "eyes": "Øyne"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Filkommentar på {{path}}",
+        "fileComment": "Filkommentar",
+        "outdatedOnPathLines": "Utdatert på {{path}} {{lines}}",
+        "outdatedOnLines": "Utdatert på {{lines}}",
+        "outdatedOnPath": "Utdatert på {{path}}"
+      },
+      "deletedUser": "slettet bruker"
     },
     "couldNotOpenGitHubAppSettings": "Kunne ikke åpne GitHub-appinnstillingene",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
@@ -391,11 +447,11 @@
       "retryChecks": "Prøv sjekkene igjen",
       "viewOnGitHub": "Vis PR på GitHub",
       "noChecksReported": "Ingen sjekker rapportert",
-      "passed": "{{count}} bestått",
-      "failed": "{{count}} mislyktes",
-      "pending": "{{count}} venter",
-      "skipped": "{{count}} hoppet over",
-      "checksCount": "{{count}} sjekker",
+      "passed": "{{displayCount}} bestått",
+      "failed": "{{displayCount}} mislyktes",
+      "pending": "{{displayCount}} venter",
+      "skipped": "{{displayCount}} hoppet over",
+      "checksCount": "{{displayCount}} sjekker",
       "checkDetails": "sjekkdetaljer",
       "pullRequest": "pull request"
     },
@@ -452,11 +508,14 @@
       "deletePendingMessage": "Denne kommentaren fjernes fra anmeldelseskøen.",
       "delete": "Slett",
       "summaryOptional": "Sammendrag (valgfritt)",
-      "pendingCommentSingular": "ventende kommentar",
-      "pendingCommentPlural": "ventende kommentarer",
-      "submitCountOfTotal": "Send {{freshCount}} av {{totalCount}} kommentarer",
+      "pendingComment_one": "ventende kommentar",
+      "pendingComment": "ventende kommentarer",
+      "pendingComment_other": "ventende kommentarer",
+      "submitCountOfTotal": "Send {{displayFreshCount}} av {{displayTotalCount}} kommentarer",
       "submitReview": "Send anmeldelse",
-      "partialPostedMessage": "Publiserte {{freshCount}} kommentar(er). {{staleCount}} kommentar(er) peker på en eldre commit og ble i køen din."
+      "partialPostedMessage": "Publiserte {{displayFreshCount}} kommentar(er). {{displayStaleCount}} kommentar(er) peker på en eldre commit og ble i køen din.",
+      "blockedRequestChanges": "Legg til et sammendrag eller minst én kommentar for å be om endringer.",
+      "blockedComment": "Legg til et sammendrag eller minst én kommentar for å sende en kommentaranmeldelse."
     },
     "reconnectNotice": {
       "title": "GitHub-tilkoblingen er utløpt",
@@ -478,10 +537,12 @@
       "stateOpenReviewRequired": "Åpen · Anmeldelse kreves",
       "stateOpen": "Åpen",
       "unknownAuthor": "Ukjent forfatter",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "fil",
-      "filePlural": "filer"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "fil",
+      "file": "filer",
+      "file_other": "filer"
     },
     "pendingComment": {
       "editOutdatedA11y": "Rediger utdatert ventende kommentar på {{location}}",
@@ -512,10 +573,36 @@
     },
     "diff": {
       "selectedTapToChange": "Valgte {{label}}, trykk for å endre markeringen",
-      "tapToComment": "{{label}}, trykk for å kommentere"
+      "tapToComment": "{{label}}, trykk for å kommentere",
+      "truncationBanner": "Viser de første {{limit}} av {{total}} endrede filene — GitHub API-grense",
+      "statusAdded": "Lagt til",
+      "statusContext": "Kontekst",
+      "statusDeleted": "Slettet",
+      "lineLabel": "{{status}} linje {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(tom)"
     },
     "linkPasteClipboardEmpty": "Utklippstavlen er tom",
-    "linkPasteNotAPullRequest": "Ikke en GitHub-pull request-lenke"
+    "linkPasteNotAPullRequest": "Ikke en GitHub-pull request-lenke",
+    "announce": {
+      "commentPosted": "Kommentar lagt ut",
+      "reviewSubmitted": "Anmeldelse sendt inn",
+      "autoMergeEnabled": "Automatisk fletting aktivert"
+    },
+    "mutationError": {
+      "commentNotPosted": "Denne kommentaren kan ikke publiseres. Den valgte linjen kan ha endret seg, eller PR-en kan ha blitt oppdatert.",
+      "reviewNotSubmitted": "Denne anmeldelsen kan ikke sendes inn som den er. PR-en kan ha endret seg, eller du kan ikke anmelde din egen pull request.",
+      "couldNotPostComment": "Kunne ikke publisere kommentaren.",
+      "couldNotSubmitReview": "Kunne ikke sende inn anmeldelsen. Sjekk tilkoblingen og prøv igjen."
+    },
+    "operation": {
+      "couldNotReply": "Kunne ikke svare.",
+      "couldNotCompleteAction": "Kunne ikke fullføre denne handlingen.",
+      "mergeResultDefaultError": "GitHub fullførte ikke flettingen.",
+      "ambiguous": "Kunne ikke bekrefte — sjekk PR-en før du prøver igjen.",
+      "persistenceFailed": "Vi kunne ikke registrere denne handlingen. Prøv igjen senere.",
+      "forbidden": "Forbudt"
+    }
   },
   "notifications": {
     "title": "Varsler",
@@ -573,7 +660,8 @@
     "agents": "Agenter",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, fane, {{position}} av {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -614,7 +702,7 @@
       "recent": "Nylig",
       "common": "Vanlig",
       "reactWith": "Reager med {{reaction}}",
-      "accessibility": "{{emoji}}-reaksjon, {{count}}"
+      "accessibility": "{{emoji}}-reaksjon, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Svarer på",
@@ -643,11 +731,21 @@
       "imageUnavailable": "Bilde utilgjengelig",
       "openFailed": "Kunne ikke åpne vedlegget. Sjekk tilkoblingen og prøv igjen.",
       "attachFailed": "Kunne ikke legge ved filen",
-      "limit": "Du kan legge ved opptil {{count}} filer.",
+      "limit": "Du kan legge ved opptil {{displayCount}} filer.",
       "sizeRejection": "{{filename}} overskrider {{limit}}-vedleggsgrensen.",
       "unreadable": "Kunne ikke lese {{filename}}.",
       "pastedImage": "det limte bildet",
-      "defaultName": "Vedlegg"
+      "defaultName": "Vedlegg",
+      "classificationDenied": "Eksekverbare filer kan ikke legges ved",
+      "classificationEmpty": "Filen er tom",
+      "classificationTooLarge": "Filer må være 20 MB eller mindre",
+      "classificationUnreadable": "Kunne ikke lese denne filen",
+      "announceUploaded": "Vedlegg lastet opp",
+      "cantUpload": "Denne filen kan ikke lastes opp.",
+      "networkError": "Nettverksfeil",
+      "uploadFailed": "Opplasting mislyktes",
+      "failedToUploadFile": "Kunne ikke laste opp filen: {{reason}}",
+      "nothingToPaste": "Ingenting å lime inn"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -661,7 +759,9 @@
       "moreActions": "Flere handlinger",
       "message": "Melding",
       "notDelivered": "Ikke levert",
-      "edited": "(redigert)"
+      "edited": "(redigert)",
+      "image": "Bilde",
+      "attachment": "Vedlegg"
     },
     "messageActions": {
       "copied": "Kopiert",
@@ -691,8 +791,9 @@
     },
     "typingIndicator": {
       "someone": "Noen",
-      "oneTyping": "{{name}} skriver...",
-      "manyTyping": "{{names}} skriver..."
+      "typing_one": "{{name}} skriver...",
+      "typing": "{{names}} skriver...",
+      "typing_other": "{{names}} skriver..."
     },
     "botStatus": {
       "online": "Pålogget",
@@ -702,6 +803,12 @@
       "loadingUser": "Laster bruker...",
       "waitingForStatus": "Venter på botstatus...",
       "offlineMessage": "Bot er frakoblet. Meldinger gjenopptas når den kobler til igjen."
+    },
+    "errors": {
+      "notAllowed": "Ikke tillatt",
+      "messageTooLong": "Meldingen er for lang — hold den under {{limit}} tegn",
+      "titleTooLong": "Tittelen er for lang — hold den under {{limit}} tegn",
+      "messageEmpty": "Meldingen kan ikke være tom"
     }
   },
   "kiloclaw": {
@@ -714,6 +821,7 @@
       "finalTermEnds": "Siste periode slutter",
       "afterFinalTerm": "Etter siste periode",
       "remaining": "Gjenstår",
+      "lessThanOneDay": "Mindre enn 1 dag",
       "ends": "Slutter",
       "expires": "Utløper",
       "noActivePlan": "Ingen aktiv plan",
@@ -722,23 +830,25 @@
       "couldNotLoad": "Kunne ikke laste faktureringsinformasjon",
       "manageOnWeb": "Administrer fakturering på nettet",
       "commitPlan": "Bindende plan",
-      "daysLeft": "{{count}} dager igjen",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Den siste bindende perioden din slutter {{date}}. Fortsett som Standard til {{price}}, eller slutten på hosting.",
       "freeTrial": "Gratis prøveperiode",
       "hostingEnds": "Hosting slutter",
-      "oneDayLeft": "1 dag igjen",
       "renews": "Fornyes",
       "standardMonthToMonth": "Standard månedlig",
       "standardStartsOn": "Standard starter {{date}} til {{price}}.",
       "yourStandardMonthlyPrice": "din Standard månedspris",
       "perMonth": "/måned",
       "earlybirdAccessUntil": "Earlybird-tilgang til {{date}}",
-      "earlybirdEnding": "Earlybird avsluttes: {{days}} dager igjen",
+      "earlybirdEnding": "Earlybird avsluttes: {{remaining}}",
       "paymentPastDue": "Betaling er forfalt. Oppdater betalingsmåten din.",
       "subscriptionCancels": "Abonnementet avsluttes {{date}}",
-      "trialDaysRemaining": "Prøveperiode: {{days}} dager igjen",
-      "trialEndingSoon": "Prøveperioden slutter snart: {{days}}"
+      "trialDaysRemaining": "Prøveperiode: {{remaining}}",
+      "trialEndingSoon": "Prøveperioden slutter snart: {{remaining}}",
+      "planName": {
+        "commit": "Bindende plan",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Hva er nytt",
@@ -990,7 +1100,7 @@
         "stalledTitle": "Noe stoppet opp",
         "stalledBody": "Vi kunne ikke fullføre oppsettet av {{name}}. Prøv igjen, eller send e-post til hi@kilo.ai hvis dette fortsetter.",
         "timeoutTitle": "Tar lengre tid enn forventet",
-        "timeoutBody": "Oppsettet av {{name}} tar lengre tid enn vanlig (over {{minutes}} minutter).",
+        "timeoutBody": "Oppsettet av {{name}} tar lengre tid enn vanlig (over {{displayMinutes}} minutter).",
         "continueInBackground": "Fortsett i bakgrunnen",
         "settingUp": "Setter opp {{name}}",
         "finishingSetup": "Fullfører oppsett",
@@ -1020,7 +1130,8 @@
       "starting": "STARTER",
       "stopped": "STOPPET",
       "stopping": "STOPPER",
-      "unknown": "UKJENT"
+      "unknown": "UKJENT",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1060,8 +1171,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} trenger oppmerksomhet: {{label}}",
-      "openUnreadOne": "Åpne {{name}}, {{count}} ulest melding",
-      "openUnreadMany": "Åpne {{name}}, {{count}} uleste meldinger",
+      "openUnread_one": "Åpne {{name}}, {{displayCount}} ulest melding",
+      "openUnread": "Åpne {{name}}, {{displayCount}} uleste meldinger",
+      "openUnread_other": "Åpne {{name}}, {{displayCount}} uleste meldinger",
       "open": "Åpne {{name}}",
       "openSettings": "Åpne innstillinger for {{name}}",
       "fixOnKiloAi": "Fiks på kilo.ai: {{label}}"
@@ -1103,7 +1215,9 @@
       "sparkles": "Gnister",
       "strongArm": "Sterk arm",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Denne forekomsten kan ikke motta filer.",
+    "instanceSwitcherTitle": "KiloClaw-forekomst"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1280,7 +1394,7 @@
       "mergeGate": "Fusjonsport",
       "repositories": "Repositorier",
       "allRepositories": "Alle repositorier",
-      "nSelected": "{{count}} valgt",
+      "nSelected": "{{displayCount}} valgt",
       "reviewMemory": "Gjennomgangsminne",
       "proposedReviewMdGuidance": "Foreslått REVIEW.md-veiledning"
     },
@@ -1290,7 +1404,71 @@
       "noDecision": "Ingen avgjørelse",
       "noResult": "Ingen resultat"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "Kunne ikke oppdatere anmelderen",
+    "configSaveFailed": "Kunne ikke lagre anmeldelseskonfigurasjonen",
+    "status": {
+      "pending": "Venter",
+      "queued": "I kø",
+      "running": "Kjører",
+      "completed": "Fullført",
+      "failed": "Mislyktes",
+      "cancelled": "Avbrutt",
+      "interrupted": "Avbrutt uventet"
+    },
+    "reviewStyle": {
+      "strict": "Streng",
+      "balanced": "Balansert",
+      "lenient": "Ettergivende",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Sikkerhet",
+      "performance": "Ytelse",
+      "bugs": "Feil",
+      "style": "Stil",
+      "testing": "Testing",
+      "documentation": "Dokumentasjon"
+    },
+    "gateThreshold": {
+      "off": "Av",
+      "all": "Alle",
+      "warning": "Advarsel",
+      "critical": "Kritisk"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer trenger oppmerksomhet",
+        "description": "Code Reviewer ble deaktivert fordi Kilo ikke kan få tilgang til dette depotet med en aktiv GitHub-appinstallasjon. Oppdater GitHub-appinstallasjonen, og aktiver deretter Code Reviewer igjen.",
+        "recoveryLabel": "Oppdater GitHub-appen"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer trenger oppmerksomhet",
+        "description": "Code Reviewer ble deaktivert fordi denne GitHub-organisasjonen bruker en IP-allowliste som blokkerer Kilo. Kontakt hi@kilocode.ai for hjelp, og aktiver deretter Code Reviewer igjen.",
+        "recoveryLabel": "Kontakt kundestøtte"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer trenger oppmerksomhet",
+        "description": "Code Reviewer ble deaktivert fordi Kilo ikke kan opprette en GitLab Project Access Token for dette prosjektet. Gi Maintainer-tilgang eller aktiver Project Access Tokens, og aktiver deretter Code Reviewer igjen.",
+        "recoveryLabel": "Oppdater GitLab-integrasjonen"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer trenger oppmerksomhet",
+        "description": "Code Reviewer ble deaktivert fordi den valgte BYOK API-nøkkelen er ugyldig, tilbakekalt eller mangler tillatelse. Oppdater nøkkelen eller velg en annen modell, og aktiver deretter Code Reviewer igjen.",
+        "recoveryLabel": "Oppdater BYOK-innstillinger"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer trenger oppmerksomhet",
+        "description": "Code Reviewer ble deaktivert fordi den valgte modellen ikke er tilgjengelig for cloud-agentøkter. Velg en tilgjengelig modell, og aktiver deretter Code Reviewer igjen.",
+        "recoveryLabel": "Oppdater Code Reviewer-innstillingene"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer trenger oppmerksomhet",
+        "description": "Code Reviewer ble deaktivert etter tre timeout for depotkloning i dag. Kontakt hi@kilocode.ai for hjelp, og aktiver deretter Code Reviewer igjen.",
+        "recoveryLabel": "Kontakt kundestøtte"
+      }
+    },
+    "unknownError": "Ukjent feil"
   },
   "securityAgent": {
     "filter": {
@@ -1351,8 +1529,9 @@
       "enableAutoRemediationConfirmTitle": "Aktivere automatisk utbedring?",
       "enableAutoRemediationConfirmMessage": "Security Agent åpner utbedrings-PR-er automatisk for kvalifiserte utnyttbare funn.",
       "enable": "Aktiver",
-      "queuedOne": "{{count}} eksisterende funn satt i kø for analyse.",
-      "queuedMany": "{{count}} eksisterende funn satt i kø for analyse.",
+      "queued_one": "{{displayCount}} eksisterende funn satt i kø for analyse.",
+      "queued": "{{displayCount}} eksisterende funn satt i kø for analyse.",
+      "queued_other": "{{displayCount}} eksisterende funn satt i kø for analyse.",
       "severityCriticalOnly": "Bare kritiske",
       "severityHighAndAbove": "Høy og over",
       "severityMediumAndAbove": "Middels og over",
@@ -1383,14 +1562,14 @@
       "analyzed": "Analysert",
       "exploitabilityReasoning": "Begrunnelse for utnyttbarhet",
       "suggestedFix": "Foreslått rettelse",
-      "whereFound": "Hvor dette ble funnet ({{count}})",
+      "whereFound": "Hvor dette ble funnet ({{displayCount}})",
       "fullReport": "Full generert rapport",
       "unknown": "Ukjent",
       "yes": "Ja",
       "no": "Nei"
     },
     "dashboard": {
-      "findingsCount": "{{count}} funn",
+      "findingsCount": "{{displayCount}} funn",
       "notMeasured": "Ikke målt",
       "actFirst": "Handle først",
       "slaPosture": "SLA-holdning",
@@ -1399,7 +1578,7 @@
       "repositoryActionPlan": "Handlingsplan for repository",
       "noOpenFindings": "Ingen åpne funn trenger oppmerksomhet",
       "deadlineToday": "Frist nådd i dag",
-      "daysOverdue": "{{count}} dager på overtid",
+      "daysOverdue": "{{displayCount}} dager på overtid",
       "withinDeadline": "Innenfor frist",
       "criticalOverdue": "Kritiske på overtid",
       "highOverdue": "Høye på overtid",
@@ -1426,6 +1605,27 @@
       "syncNow": "Synkroniser nå",
       "syncQueued": "Synkronisering i kø",
       "syncStatusUnavailable": "Synkroniseringsstatus utilgjengelig"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Åpne funn",
+      "openFindingsDetail": "{{critical}} kritiske, {{high}} høye",
+      "confirmedExploitable": "Bekreftet utnyttbar",
+      "confirmedExploitableDetail": "Prosjektrisiko bekreftet av analyse",
+      "needsReview": "Trenger din vurdering",
+      "needsReviewDetail": "Menneskelig avgjørelse kreves",
+      "analysisIncomplete": "Analysen er ikke fullført",
+      "analysisIncompleteDetail": "Prosjektrisikoen er fortsatt ukjent",
+      "slaCompliance": "SLA-overholdelse",
+      "notMeasured": "Ikke målt",
+      "withinDeadlineDetail": "{{within}} av {{total}} innen fristen",
+      "noDeadlineData": "Ingen funn har en SLA-frist ennå",
+      "deadlinePassed": "Fristen er passert",
+      "deadlinePassedDetail": "{{critical}} kritiske, {{high}} høye",
+      "dueThisWeek": "Forfaller denne uken",
+      "dueThisWeekDetail": "{{exploitable}} bekreftet utnyttbare",
+      "noDeadline": "Ingen frist",
+      "reviewSlaAssignment": "Gjennomgå SLA-tilordningen",
+      "allOpenFindingsTracked": "Alle åpne funn spores"
     },
     "dismiss": {
       "title": "Avvis funn",
@@ -1469,7 +1669,17 @@
       "sourceRecord": "Kildepost",
       "source": "Kilde",
       "sourceId": "Kilde-ID",
-      "viewAdvisory": "Vis rådgivning på GitHub"
+      "viewAdvisory": "Vis rådgivning på GitHub",
+      "statusSuperseded": "Erstattet",
+      "statusFixed": "Rettet",
+      "statusOpen": "Åpen",
+      "sourceDependabot": "GitHub Dependabot",
+      "reasonFixStarted": "en rettelse er allerede startet",
+      "reasonNoBandwidth": "ingen kapasitet er tilgjengelig",
+      "reasonTolerableRisk": "risikoen er akseptabel",
+      "reasonInaccurate": "funnet er unøyaktig",
+      "reasonNotUsed": "sårbar kode brukes ikke",
+      "reasonAfterReview": "etter gjennomgang"
     },
     "settingsOverview": {
       "title": "Innstillinger",
@@ -1482,8 +1692,9 @@
       "on": "På",
       "off": "Av",
       "allRepositories": "Alle repositories",
-      "repositorySelected": "{{count}} repository valgt",
-      "repositoriesSelected": "{{count}} repositories valgt",
+      "repositoriesCount_one": "{{displayCount}} repository valgt",
+      "repositoriesCount": "{{displayCount}} repositories valgt",
+      "repositoriesCount_other": "{{displayCount}} repositories valgt",
       "selectRepositories": "Velg repositories",
       "selectRepositoriesSubtitle": "Velg hvilke repositories Security Agent overvåker",
       "repositories": "Repositories",
@@ -1491,9 +1702,9 @@
       "analysisModeSubtitle": "{{mode}}-analyse",
       "automation": "Automatisering",
       "automationAllOff": "Alt av",
-      "automationCount": "{{count}} av 3 aktivert",
+      "automationCount": "{{displayCount}} av 3 aktivert",
       "notifications": "Varsler",
-      "notificationsCount": "{{count}} av 2 aktivert",
+      "notificationsCount": "{{displayCount}} av 2 aktivert",
       "slaPolicy": "SLA-policy",
       "disabledNoManage": "Security Agent er deaktivert. Bare organisasjonseiere og faktureringsansvarlige kan slå det på.",
       "disabledNoRepo": "Velg minst ett repository før du aktiverer Security Agent.",
@@ -1515,7 +1726,7 @@
       "openPullRequest": "Åpne pull request{{number}}",
       "openDraftPullRequest": "Åpne utkast til pull request{{number}}",
       "progress": "Fremdrift",
-      "attemptHistory": "Forsøkshistorikk ({{count}})",
+      "attemptHistory": "Forsøkshistorikk ({{displayCount}})",
       "attemptNumber": "Forsøk #{{number}}",
       "startedBy": "Startet av",
       "model": "Modell",
@@ -1681,7 +1892,140 @@
     },
     "queuedActionUntracked": "En handling i kø kunne ikke lenger spores. Oppdater for å se den nyeste tilstanden.",
     "initialSyncAdmissionFailed": "Security Agent ble aktivert, men den første synkroniseringen kunne ikke settes i kø. Synkroniser igjen.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Funnet er allerede avvist",
+      "findingDismissed": "Funnet er avvist",
+      "noRemediationsQueued": "Ingen eksisterende funn i kø",
+      "remediationsQueued": "Eksisterende utbedringer satt i kø",
+      "analysisComplete": "Analysen er fullført",
+      "syncComplete": "Synkroniseringen er fullført"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Sikkerhetstjenesten er ikke konfigurert. Ny innsending kan ikke lykkes før dette er fikset.",
+      "syncMayNotHaveCompleted": "En synkronisering er kanskje ikke fullført. Prøv igjen for å avstemme, eller forkast.",
+      "syncInProgress": "En sikkerhetssynkronisering pågår allerede. Prøv igjen.",
+      "dismissalInProgress": "Denne avvisningen pågår allerede. Prøv igjen.",
+      "couldNotReadPendingSyncs": "Kunne ikke lese ventende synkroniseringer. Prøv igjen."
+    },
+    "analysisState": {
+      "queued": "Analyse i kø",
+      "queuedTitle": "Analyse i kø",
+      "queuedDescription": "Venter på at analysekapasitet blir tilgjengelig.",
+      "analyzing": "Analyserer",
+      "analyzingTitle": "Analyserer",
+      "analyzingDescription": "Sjekker om programkoden kan nå den berørte funksjonen.",
+      "failed": "Analysen mislyktes",
+      "failedTitle": "Analysen mislyktes",
+      "failedDescription": "Security Agent kunne ikke fullføre analysen.",
+      "extractionFailed": "Trenger gjennomgang",
+      "extractionFailedTitle": "Trenger gjennomgang",
+      "extractionFailedDescription": "Den tekniske rapporten kunne ikke gjøres om til et strukturert resultat.",
+      "exploitable": "Utnyttbar",
+      "exploitableTitle": "Utnyttbar",
+      "exploitableDescription": "Programkoden kan nå den berørte funksjonen.",
+      "notExploitable": "Ikke utnyttbar",
+      "notExploitableTitle": "Ikke utnyttbar",
+      "notExploitableDescription": "Ingen nåbar sti ble funnet i dette repositoriet.",
+      "unknown": "Trenger gjennomgang",
+      "unknownTitle": "Trenger gjennomgang",
+      "unknownDescription": "Analysen kunne ikke bekrefte om den sårbare funksjonen er nåbar.",
+      "safeToDismiss": "Trygt å avvise",
+      "safeToDismissTitle": "Trygt å avvise",
+      "safeToDismissDescription": "Triagering bestemte at dette trygt kan avvises uten kodebasisanalyse.",
+      "manualReview": "Trenger gjennomgang",
+      "manualReviewTitle": "Trenger manuell gjennomgang",
+      "manualReviewDescription": "Triagering merket dette funnet for manuell gjennomgang.",
+      "analysisRequired": "Analyse kreves",
+      "analysisRequiredTitle": "Kodebasisanalyse kreves",
+      "analysisRequiredDescription": "Triagering anbefaler å analysere repositoriet før du bestemmer deg for en respons.",
+      "completed": "Analysert",
+      "completedTitle": "Analysert",
+      "completedDescription": "Analysen ble fullført uten et spesifikt registrert utfall.",
+      "notAnalyzed": "Ikke analysert",
+      "notAnalyzedTitle": "Ikke analysert",
+      "notAnalyzedDescription": "Kodebasisanalyse har ennå ikke kjørt for dette funnet."
+    },
+    "deadline": {
+      "fixedBeforeDeadline": "Rettet før fristen",
+      "fixed": "Rettet",
+      "fixedOn": "Rettet {{date}}",
+      "resolutionRecorded": "Løsning registrert",
+      "superseded": "Erstattet",
+      "dismissed": "Avvist",
+      "closedOn": "{{status}} {{date}}",
+      "deadlineNotSet": "Ingen frist angitt",
+      "noSlaDeadline": "Ingen SLA-frist",
+      "dueOn": "Forfaller {{date}}",
+      "overdueNow": "På overtid",
+      "overdue_one": "{{count}} dag på overtid",
+      "overdue_other": "{{count}} dager på overtid",
+      "dueToday": "Forfaller i dag",
+      "dueTomorrow": "Forfaller i morgen",
+      "dueInDays_one": "Forfaller om {{count}} dag",
+      "dueInDays_other": "Forfaller om {{count}} dager",
+      "overdue": "{{count}} dager på overtid",
+      "dueInDays": "Forfaller om {{count}} dager"
+    },
+    "remediationStatus": {
+      "cancellationRequested": "Avbestilling forespurt",
+      "notStarted": "Ikke startet",
+      "queued": "I kø",
+      "starting": "Starter",
+      "inProgress": "Pågår",
+      "draftPrOpened": "Utkast-PR åpnet",
+      "prOpened": "PR åpnet",
+      "blocked": "Blokkert",
+      "failed": "Mislyktes",
+      "noChangesNeeded": "Ingen endringer nødvendig",
+      "cancelled": "Avbrutt",
+      "originAutomaticPolicy": "Automatisk policy",
+      "originIncludeExistingPolicy": "Inkluder eksisterende policy",
+      "originManual": "Manuell",
+      "validationCheck": "Valideringssjekk {{number}}"
+    },
+    "remediationUnavailable": {
+      "findingNotFound": "Sikkerhetsfunnet finnes ikke lenger.",
+      "approvalRequired": "Automatisk utbedring krever godkjenning. Start utbedringen manuelt for å godkjenne den.",
+      "findingNotOpen": "Funnet er ikke lenger åpent.",
+      "repoNotInScope": "Repositoriet er ikke valgt for Security Agent.",
+      "analysisRequired": "Kjør kodebasisanalyse før du starter utbedringen.",
+      "sandboxAnalysisRequired": "Kjør kodebasisanalyse før du starter utbedringen.",
+      "staleAnalysis": "Funnet endret seg etter analysen. Kjør analysen på nytt før du starter utbedringen.",
+      "notExploitable": "Analysen fant ingen nåbar sårbar sti. Automatisk utbedring er utilgjengelig.",
+      "exploitabilityUnknown": "Analysen kunne ikke bekrefte utnyttbarhet. Manuell gjennomgang kreves før utbedring med ett klikk.",
+      "manualReviewRequired": "Analysen anbefaler manuell gjennomgang, så utbedring med ett klikk er utilgjengelig.",
+      "monitorRequired": "Analysen anbefaler overvåking i stedet for å åpne en PR.",
+      "triageOnly": "Kun triagering er fullført. Kjør kodebasisanalyse før du starter utbedringen.",
+      "actionNotConcrete": "Ingen konkret avhengighetslapp eller foreslått rettelse er tilgjengelig.",
+      "remediationActive": "Et utbedringsforsøk er allerede aktivt.",
+      "prAlreadyOpened": "En utbedrings-PR er allerede åpen.",
+      "duplicateAnalysisResult": "Dette analyseresultatet har allerede produsert utbedringsarbeid.",
+      "retryNotAllowed": "Prøving på nytt er ikke tilgjengelig for dette forsøket.",
+      "securityAgentDisabled": "Security Agent er deaktivert for denne eieren.",
+      "autoRemediationDisabled": "Automatisk utbedring er deaktivert. Manuell utbedring kan fortsatt starte når sikkerhetsportene er bestått.",
+      "includeExistingDisabled": "Eksisterende funn er ekskludert fra automatisk utbedring.",
+      "belowThreshold": "Funnet er under den automatiske alvorlighetsgradsterskelen. Manuell utbedring kan fortsatt starte når sikkerhetsportene er bestått.",
+      "beforeEnablement": "Analysen ble fullført før automatisk utbedring ble aktivert. Manuell utbedring kan fortsatt starte når sikkerhetsportene er bestått.",
+      "generic": "Utbedring er utilgjengelig for dette funnet."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Analysekapasiteten er full. Vent til en aktiv analyse er ferdig, og prøv igjen.",
+      "githubTokenUnavailable": "GitHub-autorisasjonen trenger oppmerksomhet. Autoriser GitHub-appen på nytt, og prøv igjen.",
+      "githubAuthInvalid": "GitHub-autorisasjonen trenger oppmerksomhet. Autoriser GitHub-appen på nytt, og prøv igjen.",
+      "findingUnavailable": "Funnet er ikke lenger tilgjengelig. Oppdater funnene og prøv igjen hvis det fortsatt er åpent.",
+      "repositoryUnavailable": "Depotet er ikke lenger tilgjengelig for GitHub-appen. Oppdater depottilgangen, og prøv igjen.",
+      "invalidDismissTarget": "Funnet kan ikke avvises fordi Dependabot-målet er ugyldig.",
+      "commandStalled": "Den køede handlingen ble ikke ferdig i tide. Prøv handlingen igjen.",
+      "queueRetriesExhausted": "Handlingen kunne ikke fullføres etter flere forsøk. Prøv handlingen igjen.",
+      "queueAdmissionFailed": "Den køede handlingen kunne ikke bli tatt opp. Prøv handlingen igjen.",
+      "generic": "Den køede handlingen mislyktes. Prøv handlingen igjen."
+    },
+    "analysisMode": {
+      "auto": "Auto",
+      "shallow": "Grunn",
+      "deep": "Dyp"
+    }
   },
   "agents": {
     "activeNow": "Aktiv nå",
@@ -1720,15 +2064,30 @@
       "sessionDeleted": "Økt slettet",
       "needsInput": "trenger innspill",
       "fromPlatform": "fra {{platform}}",
-      "centOne": "cent",
-      "centOther": "cent",
-      "dollarOne": "dollar",
-      "dollarOther": "dollarer",
+      "cent_one": "cent",
+      "cent": "cent",
+      "cent_other": "cent",
+      "dollar_one": "dollar",
+      "dollar": "dollarer",
+      "dollar_other": "dollarer",
+      "costSpoken": "kostnad {{cost}}",
+      "costSpokenWithTime": "kostnad {{cost}}, {{time}}",
       "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunne ikke åpne GitHub",
-      "couldNotOpenMessage": "Vi kunne ikke starte GitHub App-oppsettet. Prøv igjen."
+      "couldNotOpenMessage": "Vi kunne ikke starte GitHub App-oppsettet. Prøv igjen.",
+      "installedTitle": "GitHub-appen installert",
+      "installedMessage": "Repositoriene dine er nå tilkoblet.",
+      "pendingTitle": "Venter på administratorgodkjenning",
+      "pendingMessage": "En organisasjonsadministrator må godkjenne installasjonsforespørselen.",
+      "accountMismatchTitle": "Kontoen samsvarer ikke",
+      "accountMismatchMessage": "Denne tilkoblingen ble startet fra Kilo-appen med en annen konto. Logg på nettet med den kontoen, eller start på nytt fra appen.",
+      "cannotCompleteTitle": "Kan ikke fullføre installasjonen",
+      "notAdminMessage": "Bare en GitHub-administrator for den kontoen kan koble den til. Be en organisasjonsadministrator om å installere Kilo.",
+      "alreadyClaimedMessage": "Den GitHub-installasjonen er allerede tilkoblet en annen Kilo-konto. Koble den fra der først.",
+      "didNotCompleteTitle": "Installasjonen ble ikke fullført",
+      "didNotCompleteMessage": "GitHub-appinstallasjonen ble ikke fullført. Prøv igjen fra appen."
     },
     "sessionExited": "Økten ble avsluttet",
     "remoteSpawnRetryable": "Kunne ikke nå forekomsten — den kan ha mistet tilkoblingen.",
@@ -1771,7 +2130,10 @@
       "exitMessage": "Dette stopper den kjørende økten, men beholder historikken.",
       "keepSessionRunning": "La økten fortsette å kjøre",
       "exitSession": "Avslutt økt",
-      "restartExitFailed": "Startet en ny økt. Den forrige økten er fortsatt åpen."
+      "restartExitFailed": "Startet en ny økt. Den forrige økten er fortsatt åpen.",
+      "exitNotSupported": "Avslutning av ekstern økt støttes ikke for den gjeldende økten",
+      "exitUnavailable": "Avslutning av ekstern økt er utilgjengelig for den gjeldende økten",
+      "exitNeedsNewerCli": "Eksterne skråstrekskommandoer krever en nyere Kilo CLI. Oppdater Kilo CLI og koble til på nytt."
     },
     "sessionConnection": {
       "connecting": "Kobler til…",
@@ -1818,8 +2180,9 @@
       "discardFailed": "Kunne ikke forkaste utkastet. Prøv igjen."
     },
     "partRenderer": {
-      "updatedFile": "Oppdaterte {{count}} fil",
-      "updatedFiles": "Oppdaterte {{count}} filer"
+      "updatedFileCount_one": "Oppdaterte {{displayCount}} fil",
+      "updatedFileCount": "Oppdaterte {{displayCount}} filer",
+      "updatedFileCount_other": "Oppdaterte {{displayCount}} filer"
     },
     "toolPatch": {
       "operationAdded": "Lagt til",
@@ -1844,9 +2207,9 @@
       "toolTask": "oppgave",
       "readTodos": "Les gjøremål",
       "updateTodos": "Oppdater gjøremål",
-      "linesBadge": "{{count}} linjer",
-      "filesBadge": "{{count}} filer",
-      "matchesBadge": "{{count}} treff"
+      "linesBadge": "{{displayCount}} linjer",
+      "filesBadge": "{{displayCount}} filer",
+      "matchesBadge": "{{displayCount}} treff"
     },
     "readToolMarkdown": {
       "linesTruncated": "linjer {{start}}–{{end}} (avkortet)",
@@ -1930,6 +2293,10 @@
       "reportAiResponseFailedTerminal": "Dette svaret kan ikke rapporteres.",
       "reportAiResponseSubmitted": "Rapport sendt. Kvittering {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "mindre enn {{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Detaljer utilgjengelig",
       "textDisplay": "Tekstvisning",
@@ -1988,7 +2355,7 @@
       "preparationComplete": "Forberedelse fullført",
       "preparationFailed": "Forberedelse mislyktes",
       "setupCommand": "Oppsettkommando {{index}}",
-      "setupCommandOf": "Oppsettkommando {{index}} av {{count}}"
+      "setupCommandOf": "Oppsettkommando {{index}} av {{displayCount}}"
     },
     "permissionCard": {
       "title": "Tillatelse kreves",
@@ -2025,7 +2392,7 @@
       "submissionFailed": "Innsendingen mislyktes. Prøv igjen.",
       "questionAnnouncement": "Agenten trenger innspill fra deg. Komponisten er satt på pause mens du svarer.",
       "permissionAnnouncement": "Agenten trenger tillatelse for å fortsette. Komponisten er satt på pause mens du bestemmer deg.",
-      "positionHint": "(1 av {{count}})",
+      "positionHint": "(1 av {{displayCount}})",
       "movedPastPrompt": "Agenten har gått forbi denne meldingen. Dette kortet lukkes når økten fortsetter.",
       "waitingForAnswer": "Agenten venter på svaret ditt. Mens dette spørsmålet er åpent, er meldingen din til agenten satt på pause.",
       "waitingForPermission": "Agenten venter på tillatelse. Mens denne forespørselen er åpen, er meldingen din til agenten satt på pause."
@@ -2060,8 +2427,9 @@
     "olderMessages": {
       "arrived": "Tidligere meldinger lastet inn",
       "retryHint": "Forsøker igjen å laste de eldre meldingene for denne økten.",
-      "omittedOne": "Noen tidligere elementer fra denne økten kunne ikke vises.",
-      "omittedMany": "{{count}} tidligere elementer fra denne økten kunne ikke vises.",
+      "omitted_one": "Noen tidligere elementer fra denne økten kunne ikke vises.",
+      "omitted": "{{displayCount}} tidligere elementer fra denne økten kunne ikke vises.",
+      "omitted_other": "{{displayCount}} tidligere elementer fra denne økten kunne ikke vises.",
       "couldNotLoad": "Kunne ikke laste tidligere meldinger.",
       "unavailable": "Tidligere meldinger er ikke tilgjengelige.",
       "tooLarge": "Tidligere meldinger er for store til å lastes."
@@ -2070,10 +2438,12 @@
       "viewTable": "Vis tabell",
       "title": "Tabell",
       "close": "Lukk tabell",
-      "column": "kolonne",
-      "columns": "kolonner",
-      "row": "rad",
-      "rows": "rader",
+      "columnCount_one": "kolonne",
+      "columnCount": "kolonner",
+      "columnCount_other": "kolonner",
+      "rowCount_one": "rad",
+      "rowCount": "rader",
+      "rowCount_other": "rader",
       "opensFullScreen": "åpnes i fullskjerm"
     },
     "sessionFilter": {
@@ -2104,7 +2474,10 @@
       "title": "Velg modell",
       "searchPlaceholder": "Søk etter modeller...",
       "noModels": "Ingen modeller tilgjengelige",
-      "noModelsDescription": "Ingen modeller er tilgjengelige for valg."
+      "noModelsDescription": "Ingen modeller er tilgjengelige for valg.",
+      "favorites": "Favoritter",
+      "recommended": "Anbefalt",
+      "allModels": "Alle modeller"
     },
     "modelSelector": {
       "model": "Modell",
@@ -2121,7 +2494,8 @@
       "addToFavorites": "Legg {{name}} til favoritter",
       "removeFromFavorites": "Fjern {{name}} fra favoritter",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Sesjonsmodell"
     },
     "attachmentPreview": {
       "openFailedRetry": "Kunne ikke åpne filen. Prøv igjen.",
@@ -2143,7 +2517,7 @@
       "cameraAccessDisabled": "Kameratilgang deaktivert",
       "cameraAccessMessage": "Gi kameratilgang i Innstillinger for å ta et bilde.",
       "couldNotOpenPhotoPicker": "Kunne ikke åpne fotovelegeren. Start Kilo på nytt og prøv igjen.",
-      "maxFilesAllowed": "Maksimum {{count}} filer tillatt",
+      "maxFilesAllowed": "Maksimum {{displayCount}} filer tillatt",
       "onlyAddingFiles": "Legger bare til {{accepted}} av {{total}} filer (maks {{max}})"
     },
     "composer": {
@@ -2189,7 +2563,8 @@
       "delegatingWork": "Delegerer arbeid",
       "askingQuestion": "Stiller et spørsmål",
       "consideringNextSteps": "Vurderer neste steg",
-      "writingResponse": "Skriver svar"
+      "writingResponse": "Skriver svar",
+      "initializingSnapshot": "Initialiserer øyeblikksbilde…"
     },
     "slashCommands": {
       "startNewSession": "Start en ny økt",
@@ -2208,7 +2583,7 @@
       "costPrefix": "kostnad {{cost}}",
       "costSuffix": ", kostnad {{cost}}",
       "tokensWindowUnavailable": "Kontekst {{used}} tokens, vindu utilgjengelig",
-      "tokensUsage": "Kontekst {{used}} av {{window}} tokens, {{percentage}}% brukt",
+      "tokensUsage": "Kontekst {{used}} av {{window}} tokens, {{percentage}} brukt",
       "title": "Kontekstbruk",
       "used": "Brukt",
       "remaining": "Gjenstående",
@@ -2217,7 +2592,7 @@
       "usageReflectsLatest": "Bruken gjenspeiler det siste fullførte assistentsvaret.",
       "tokenUsage": "Tokenbruk",
       "cacheRate": "Cache-sats",
-      "modelsCount": "Modeller ({{count}})",
+      "modelsCount": "Modeller ({{displayCount}})",
       "tokenTotalsNote": "Tokentotaler dekker kun denne økten og ekskluderer underagent-/barneøkttokens.",
       "subagents": "Underagenter",
       "subagentsDescription": "Restkostnad fra barneøkter",
@@ -2226,8 +2601,9 @@
       "ofWindowTokens": "av {{window}} tokens",
       "tokens": "tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
-      "stepsCountOne": "{{steps}} steg",
-      "stepsCountMany": "{{steps}} steg",
+      "stepsCount_one": "{{steps}} steg",
+      "stepsCount": "{{steps}} steg",
+      "stepsCount_other": "{{steps}} steg",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2252,7 +2628,8 @@
   },
   "addCredits": {
     "cta": "Legg til kreditter",
-    "description": "Legg til kreditter for å holde bruken i gang."
+    "description": "Legg til kreditter for å holde bruken i gang.",
+    "billingPage": "faktureringsside"
   },
   "deviceSessions": {
     "couldNotLoad": "Kunne ikke laste økter",
@@ -2272,13 +2649,15 @@
     "signOutThisSessionTitle": "Logg ut denne økten?",
     "signOutThisSessionMessage": "{{device}} vil bli logget ut. Den kan beholde API-tilgang i opptil en time.",
     "signOutConfirm": "Logg ut",
-    "signOutMessage": "Du må logge inn igjen for å få tilgang til arbeidsområdet ditt."
+    "signOutMessage": "Du må logge inn igjen for å få tilgang til arbeidsområdet ditt.",
+    "webBrowser": "Nettleser"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Kunne ikke åpne app-butikken.",
     "description": "En ny versjon av Kilo er tilgjengelig. Oppdater for å fortsette.",
     "title": "Oppdatering nødvendig",
-    "updateNow": "Oppdater nå"
+    "updateNow": "Oppdater nå",
+    "appStorePage": "app-butikkside"
   },
   "home": {
     "couldNotLoadSessions": "Kunne ikke laste økter",
@@ -2292,10 +2671,7 @@
     "newCodingTask": "Ny kodeoppgave",
     "explore": "Utforsk",
     "seeAll": "Se alle",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "God morgen",
-    "greetingAfternoon": "God ettermiddag",
-    "greetingEvening": "God kveld"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Lukk {{filename}}",
@@ -2349,7 +2725,17 @@
     "onlineMessage": "Denne enheten kan ikke transkribere offline. Opptaket ditt sendes til {{provider}} for å gjøre det om til tekst. Kilo lagrer ikke lyden.",
     "allow": "Tillat",
     "start": "Start taleinntasting",
-    "stop": "Stopp taleinntasting"
+    "stop": "Stopp taleinntasting",
+    "restricted": "Taleinntasting er begrenset på denne enheten.",
+    "micRequired": "Mikrofontilgang kreves for taleinntasting.",
+    "micOff": "Mikrofontilgang er av. Aktiver den i Innstillinger for å bruke taleinntasting.",
+    "micOffTitle": "Mikrofontilgang er av",
+    "noSpeech": "Ingen tale oppdaget. Trykk på mikrofonen for å prøve igjen.",
+    "needsConnection": "Taleinntasting trenger en tilkobling akkurat nå. Prøv igjen.",
+    "busy": "Taleinntasting er opptatt. Prøv igjen.",
+    "stopped": "Taleinntasting stoppet. Trykk på mikrofonen for å prøve igjen.",
+    "unavailableDevice": "Taleinntasting er ikke tilgjengelig på denne enheten.",
+    "unavailableLanguage": "Taleinntasting er ikke tilgjengelig for dette enhetsspråket."
   },
   "share": {
     "title": "Del til Kilo",
@@ -2361,7 +2747,7 @@
     "connectedCli": "På en tilkoblet CLI",
     "newSessionOn": "Ny økt på {{name}}",
     "noMatchingSessions": "Ingen samsvarende økter.",
-    "onlyFirstFilesAttached": "Kun de første {{count}} filene vil bli lagt til.",
+    "onlyFirstFilesAttached": "Kun de første {{displayCount}} filene vil bli lagt til.",
     "staleMessage": "Denne delingen er ikke lenger tilgjengelig.",
     "retryableMessage": "Kunne ikke laste øktene dine.",
     "emptyMessage": "Ingen økter ennå — start en ny for å sende dette.",
@@ -2394,7 +2780,7 @@
     "otherAccountCopy": "Kilo Pass på denne Apple-kontoen tilhører en annen Kilo-konto. Logg inn på den Kilo-kontoen for å administrere den.",
     "alreadySubscribed": "Du har allerede et Kilo Pass-abonnement.",
     "purchaseUnavailable": "Kilo Pass-kjøp er ikke tilgjengelig akkurat nå.",
-    "tierCredits": "${{amount}} i kreditter",
+    "tierCredits": "{{amount}} i kreditter",
     "perMonth": "{{price}}/mnd",
     "verifyPurchaseFailed": "Kunne ikke verifisere kjøpet ditt. Sjekk tilkoblingen din og prøv igjen.",
     "productsCouldNotLoad": "Kilo Pass-produktene kunne ikke lastes fra App Store.",
@@ -2405,7 +2791,7 @@
     "manageFailed": "Kunne ikke åpne App Store-abonnementsadministrasjonen.",
     "kiloPassSetup": "Kilo Pass-oppsett",
     "subscriptionHeaderDescription": "Et månedlig abonnement som legger til kreditter på Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App — Cloud Agents, eksterne økter og KiloClaw-chatter.",
-    "tierDescription": "${{price}} betalte kreditter lagt til månedlig for bruk av Kilo App.",
+    "tierDescription": "{{price}} betalte kreditter lagt til månedlig for bruk av Kilo App.",
     "subscribe": "Abonner",
     "subscribeDescription": "Månedlige kreditter med bonusfremgang",
     "manage": "Administrer",
@@ -2413,7 +2799,7 @@
     "statusPending": "Kilo Pass venter",
     "statusCanceling": "Kilo Pass avbryter",
     "statusPastDue": "Kilo Pass forfalt",
-    "monthlyCredits": "${{credits}} månedlige kreditter",
+    "monthlyCredits": "{{credits}} månedlige kreditter",
     "ends": "Slutter {{date}}",
     "periodEnd": "periode slutt",
     "managedOnGooglePlay": "Administreres på Google Play",
@@ -2427,7 +2813,15 @@
     "webManagementDescription": "Denne Kilo Pass-en administreres på nettet.",
     "legalDisclosure": "Kilo Pass er et automatisk fornybart månedsabonnement. Betaling belastes Apple-ID-en din ved bekreftelse av kjøpet. Abonnementet fornyes automatisk hver måned til prisen som vises, med mindre det kanselleres minst 24 timer før slutten av gjeldende periode. Administrer eller kanseller når som helst i App Store-kontoinnstillingene.",
     "legalPrivacyPolicy": "Personvernpolicy",
-    "legalTermsOfUse": "Bruksvilkår (EULA)"
+    "legalTermsOfUse": "Bruksvilkår (EULA)",
+    "purchaseDifferentAccount": "Dette App Store-kjøpet er ikke koblet til Kilo-kontoen din. Logg på Apple-kontoen som ble brukt for kjøpet, og prøv igjen.",
+    "restoreFailed": "Kunne ikke gjenopprette kjøp. Prøv igjen.",
+    "purchaseFailed": "Kunne ikke fullføre kjøpet.",
+    "purchaseStartFailed": "Kunne ikke starte App Store-kjøpet.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass på denne Apple-kontoen tilhører en annen Kilo-konto.",
+    "couldNotConnectToAppStore": "Kunne ikke koble til App Store. Sjekk tilkoblingen og prøv igjen.",
+    "noMatchingProducts": "App Store returnerte ingen samsvarende Kilo Pass-produkter.",
+    "purchaseMissingSignedTransaction": "App Store-kjøpet inneholdt ikke en signert transaksjons-JWS."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2524,6 +2918,7 @@
     "sorryTitle": "Så leit å høre!",
     "sorryMessage": "Fortell oss hva som må bli bedre. Ingeniøren som har ansvaret for appen, leser hver eneste rapport!",
     "emailUs": "Send oss e-post",
+    "emailSubject": "tilbakemelding på mobilappen",
     "neutralTitle": "Vurder Kilo-appen",
     "rateTheApp": "Vurder appen",
     "sendFeedback": "Send tilbakemelding"
@@ -2545,7 +2940,17 @@
       "emptyTitle": "Ingen kredittaktivitet",
       "expires": "Utløper {{date}}",
       "title": "Kredittaktivitet",
-      "transactionFallback": "Kreditttransaksjon"
+      "transactionFallback": "Kreditttransaksjon",
+      "category": {
+        "organization_custom": "Organisasjonsspesifikk",
+        "parent_to_child_transfer_in": "Overføring inn fra overordnet til underordnet",
+        "parent_to_child_transfer_out": "Overføring ut fra underordnet til overordnet",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Regnskapsjustering",
+        "credits_expired": "Kreditter utløpt"
+      }
     },
     "inviteMember": {
       "emailError": "Angi en gyldig e-postadresse",
@@ -2562,10 +2967,17 @@
       "emptyDescription": "Fakturaer genereres automatisk hver faktureringssyklus og vil vises her når organisasjonen din faktureres.",
       "emptyTitle": "Ingen fakturaer",
       "invoiceFallback": "Faktura",
-      "statusOpen": "Åpen",
-      "statusPaid": "Betalt",
-      "statusVoid": "Ugyldig",
-      "title": "Fakturaer"
+      "title": "Fakturaer",
+      "downloadFailed": "Kunne ikke laste ned fakturaen. Sjekk tilkoblingen og prøv igjen.",
+      "sharingUnavailable": "Deling er ikke tilgjengelig på denne enheten.",
+      "status": {
+        "paid": "Betalt",
+        "open": "Åpen",
+        "void": "Ugyldig",
+        "draft": "Kladd",
+        "uncollectible": "Uinnkrevbar",
+        "unknown": "Ukjent"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2651,8 +3063,9 @@
       "manageHint": "Åpner Kilo Pass-administrasjon på nettet.",
       "notSubscribed": "Ikke abonnert",
       "overallocated": "Pass-tildelinger overstiger betalte plasser",
-      "paidSeatOne": "{{count}} betalt plass",
-      "paidSeatOther": "{{count}} betalte plasser",
+      "paidSeat_one": "{{displayCount}} betalt plass",
+      "paidSeat": "{{displayCount}} betalte plasser",
+      "paidSeat_other": "{{displayCount}} betalte plasser",
       "paymentNeedsAttention": "Betaling krever oppmerksomhet",
       "paymentPending": "Betaling venter",
       "processingBlocked": "Behandling blokkert",
@@ -2677,10 +3090,28 @@
     "emailDeliveryFailed": "E-postlevering er midlertidig utilgjengelig. Prøv igjen senere.",
     "admissionRequired": "Enheten din kan ikke verifiseres. Bruk «$t(login.moreSignInOptions)» for å logge på en annen enhet eller via nettet.",
     "default": "Noe gikk galt. Prøv igjen.",
-    "retryableAdmission": "Vi kunne ikke verifisere denne enheten. Kontroller tilkoblingen og prøv igjen."
+    "retryableAdmission": "Vi kunne ikke verifisere denne enheten. Kontroller tilkoblingen og prøv igjen.",
+    "startSignInFailed": "Kunne ikke starte påloggingen. Prøv igjen.",
+    "couldNotOpenBrowser": "Kunne ikke åpne nettleseren. Prøv igjen.",
+    "signInTimedOut": "Påloggingen ble tidsavbrutt. Prøv igjen.",
+    "signInFailed": "Påloggingen mislyktes. Prøv igjen.",
+    "networkError": "Nettverksfeil. Prøv igjen.",
+    "accessDeniedByUser": "Tilgang nektet av brukeren",
+    "codeExpired": "Koden er utløpt",
+    "tooManySignInAttempts": "For mange påloggingsforsøk. Vent og prøv igjen."
   },
   "models": {
     "dataCollected": "Data samlet inn",
-    "free": "Gratis"
+    "free": "Gratis",
+    "couldNotUpdateFavorites": "Kunne ikke oppdatere favoritter",
+    "thinkingEffort": {
+      "none": "Ingen",
+      "minimal": "Minimal",
+      "low": "Lav",
+      "medium": "Middels",
+      "high": "Høy",
+      "xhigh": "Ekstra høy",
+      "max": "Maks"
+    }
   }
 }

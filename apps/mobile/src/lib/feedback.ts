@@ -23,7 +23,7 @@ async function openSupportEmail(userId: string | undefined) {
     `OS: ${Platform.OS} ${Platform.Version}`,
   ].join('\n');
   const body = `\n\n---\n${envDetails}`;
-  const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('mobile app feedback')}&body=${encodeURIComponent(body)}`;
+  const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(i18n.t('feedback.emailSubject'))}&body=${encodeURIComponent(body)}`;
   try {
     await Linking.openURL(url);
   } catch {

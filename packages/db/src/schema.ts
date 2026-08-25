@@ -2524,6 +2524,9 @@ export const user_auth_provider = pgTable(
     primaryKey({ columns: [table.provider, table.provider_account_id] }),
     index('IDX_user_auth_provider_kilo_user_id').on(table.kilo_user_id),
     index('IDX_user_auth_provider_hosted_domain').on(table.hosted_domain),
+    index('IDX_user_auth_provider_lower_email')
+      .on(sql`lower(${table.email})`)
+      .concurrently(),
   ]
 );
 
@@ -3207,6 +3210,11 @@ export const organizations = pgTable(
     ),
     index('IDX_organizations_sso_domain').on(table.sso_domain),
     index('IDX_organizations_parent_organization_id').on(table.parent_organization_id),
+    uniqueIndex('UQ_organizations_live_sales_demo_per_owner')
+      .on(table.created_by_kilo_user_id)
+      .where(
+        sql`(${table.settings}->>'is_sales_demo')::boolean = true AND ${table.deleted_at} IS NULL`
+      ),
   ]
 );
 

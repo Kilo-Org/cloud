@@ -2,6 +2,7 @@ import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { z } from 'zod';
 
 import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 
 export type ReadFileDisplay = {
   path: string;
@@ -180,7 +181,7 @@ export function balanceCodeFences(text: string): string {
 }
 
 function formatGroupedNumber(n: number): string {
-  return String(n).replaceAll(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return formatNumber(n, i18n.language);
 }
 
 function buildFooter(display: ReadFileDisplay): string | undefined {

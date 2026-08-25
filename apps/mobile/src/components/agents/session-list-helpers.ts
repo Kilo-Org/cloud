@@ -66,7 +66,7 @@ export function formatGitUrlProject(gitUrl: string): string {
 }
 
 export function formatMeta(timestamp: string): string {
-  return timeAgo(parseTimestamp(timestamp)).toUpperCase();
+  return timeAgo(parseTimestamp(timestamp)).toLocaleUpperCase(i18n.language);
 }
 
 /**
@@ -186,10 +186,10 @@ export function composeActiveSessionSpokenMeta(
   timeSpoken: string | null
 ): string | null {
   if (cost && timeSpoken) {
-    return `cost ${cost}, ${timeSpoken}`;
+    return i18n.t('agents.sessionRow.costSpokenWithTime', { cost, time: timeSpoken });
   }
   if (cost) {
-    return `cost ${cost}`;
+    return i18n.t('agents.sessionRow.costSpoken', { cost });
   }
   if (timeSpoken) {
     return timeSpoken;

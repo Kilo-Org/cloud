@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { ChevronRight } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Pressable, View } from 'react-native';
 
 import { AgentBadge } from '@/components/ui/agent-badge';
@@ -73,6 +74,7 @@ export function SessionRow({
   className,
 }: Readonly<SessionRowProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const color = agentColor(agentLabel);
   const dimStrip = !live && !needsInput;
 
@@ -93,7 +95,7 @@ export function SessionRow({
       <View className="flex-row items-center gap-1.5">
         <StatusDot tone="warn" pulse />
         <Text variant="mono" className="shrink text-xs text-warn">
-          NEEDS INPUT
+          {t('sessionRow.needsInput')}
         </Text>
       </View>
     );
@@ -176,7 +178,7 @@ export function SessionRow({
           </Text>
         ) : null}
       </View>
-      <ChevronRight size={14} color={colors.mutedSoft} />
+      <DirectionalChevronRight size={14} color={colors.mutedSoft} />
     </View>
   );
   if (onPress) {

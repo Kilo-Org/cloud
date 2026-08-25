@@ -6,70 +6,20 @@ import { toast } from 'sonner-native';
 
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
+import { i18n } from '@/i18n';
 import { GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useAuth } from '@/lib/auth/auth-context';
+import { defaultErrorMessage, mapError } from '@/lib/auth/auth-error-messages';
 import { hasStringCode, postAuth } from '@/lib/auth/auth-fetch';
-import {
-  ADMISSION_CHALLENGE_FAILED,
-  type AdmissionPayload,
-  getAdmission,
-} from '@/lib/auth/admission';
 import {
   buildChallengeEntry,
   parseEmailCodeResponse,
   parseTokenPair,
   selectChallengeId,
 } from '@/lib/auth/native-auth-contract';
-
-export const AUTH_ERROR_MESSAGES = {
-  'EMAIL-ALREADY-USED':
-    "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-  'DIFFERENT-OAUTH':
-    "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
-  SSO_ERROR: "Your organization requires SSO. Use 'More sign-in options'.",
-  // Only surfaced by Apple/Google paths; the email-OTP request returns opaque 200 for blocked domains
-  BLOCKED: 'This account has been blocked. Please contact support.',
-  'SIGNUP-RATE-LIMITED': 'Too many attempts. Please try again later.',
-  INVALID_CODE: 'That code is incorrect. Please try again.',
-  CODE_IN_PROGRESS: 'Your code is being processed. Wait a moment and try again.',
-  TOO_MANY_ATTEMPTS: 'Too many attempts. Please request a new code.',
-  INVALID_TOKEN: 'Sign-in failed. Please try again.',
-  INVALID_EMAIL: 'Unable to deliver email to this address. Please use a different email.',
-  INVALID_REQUEST: 'Check your email address and try again.',
-  EMAIL_DELIVERY_FAILED: 'Email delivery is temporarily unavailable. Please try again later.',
-  // Admission: server refuses the device under enforce mode — non-retryable.
-  ADMISSION_REQUIRED:
-    "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.",
-} satisfies Record<string, string>;
-
-export const DEFAULT_ERROR_MESSAGE = 'Something went wrong. Please try again.';
-export const RETRYABLE_ADMISSION_ERROR =
-  'We could not verify this device. Check your connection and try again.';
-
-export function mapError(errorCode: string | undefined): string {
-  return (
-    (errorCode && AUTH_ERROR_MESSAGES[errorCode as keyof typeof AUTH_ERROR_MESSAGES]) ??
-    DEFAULT_ERROR_MESSAGE
-  );
-}
-
-export async function resolveAdmission(): Promise<
-  { admission: AdmissionPayload } | { admission: undefined }
-> {
-  try {
-    const admission = await getAdmission();
-    if (admission) {
-      return { admission };
-    }
-    return { admission: undefined };
-  } catch {
-    // Normalize every challenge/provider failure to the retryable message.
-    // Network errors, JSON parse failures, and !response.ok all abort sign-in;
-    // every path must show the retryable toast and throw a consistent sentinel.
-    toast.error(RETRYABLE_ADMISSION_ERROR);
-    throw new Error(ADMISSION_CHALLENGE_FAILED);
-  }
-}
+import { resolveAdmission } from '@/lib/auth/resolve-admission';
+import { type SsoRecovery, useSsoRecovery } from '@/lib/auth/use-sso-recovery';
 
 // Module-level guard — GoogleSignin.configure() is cheap but re-calling it
 // on every button press is pointless; upgrade to a re-configure path if client IDs
@@ -97,6 +47,9 @@ type NativeAuthResult = {
   signInWithGoogle: () => Promise<void>;
   requestEmailCode: (email: string) => Promise<boolean>;
   verifyEmailCode: (email: string, code: string) => Promise<boolean>;
+  ssoRecovery: SsoRecovery | null;
+  clearSsoRecovery: () => void;
+  handleSsoError: (email: string, ssoOrganizationId: string | undefined) => void;
 };
 
 export function useNativeAuth(): NativeAuthResult {
@@ -104,15 +57,20 @@ export function useNativeAuth(): NativeAuthResult {
   const [busy, setBusy] = useState<BusyAction>(undefined);
   const busyRef = useRef<BusyAction>(undefined);
   const challengeRef = useRef<{ email: string; challengeId: string } | null>(null);
+  const { ssoRecovery, clearSsoRecovery, handleSsoError } = useSsoRecovery();
 
-  const startAction = useCallback((action: Exclude<BusyAction, undefined>) => {
-    if (busyRef.current) {
-      return false;
-    }
-    busyRef.current = action;
-    setBusy(action);
-    return true;
-  }, []);
+  const startAction = useCallback(
+    (action: Exclude<BusyAction, undefined>) => {
+      if (busyRef.current) {
+        return false;
+      }
+      busyRef.current = action;
+      setBusy(action);
+      clearSsoRecovery();
+      return true;
+    },
+    [clearSsoRecovery]
+  );
 
   const finishAction = useCallback((action: Exclude<BusyAction, undefined>) => {
     if (busyRef.current === action) {
@@ -146,7 +104,7 @@ export function useNativeAuth(): NativeAuthResult {
       });
 
       if (!credential.identityToken) {
-        toast.error(DEFAULT_ERROR_MESSAGE);
+        toast.error(defaultErrorMessage());
         return;
       }
 
@@ -174,7 +132,7 @@ export function useNativeAuth(): NativeAuthResult {
       if (result.ok) {
         const parsed = parseTokenPair(result.data);
         if (!parsed) {
-          toast.error(DEFAULT_ERROR_MESSAGE);
+          toast.error(defaultErrorMessage());
           return;
         }
         await signIn(
@@ -182,6 +140,11 @@ export function useNativeAuth(): NativeAuthResult {
           'refreshToken' in parsed ? parsed.refreshToken : undefined,
           'expiresIn' in parsed ? parsed.expiresIn : undefined
         );
+        if (parsed.created === true) {
+          announcingToast.success(i18n.t('login.accountCreated'));
+        }
+      } else if (result.errorCode === 'SSO_ERROR') {
+        handleSsoError(credential.email ?? '', result.ssoOrganizationId);
       } else {
         toast.error(mapError(result.errorCode));
       }
@@ -189,11 +152,11 @@ export function useNativeAuth(): NativeAuthResult {
       if (hasStringCode(error) && error.code === 'ERR_REQUEST_CANCELED') {
         return;
       }
-      toast.error(DEFAULT_ERROR_MESSAGE);
+      toast.error(defaultErrorMessage());
     } finally {
       finishAction('apple');
     }
-  }, [finishAction, signIn, startAction]);
+  }, [finishAction, handleSsoError, signIn, startAction]);
 
   const signInWithGoogle = useCallback(async () => {
     if (!startAction('google')) {
@@ -213,7 +176,7 @@ export function useNativeAuth(): NativeAuthResult {
       const idToken = response.data.idToken;
 
       if (!serverAuthCode && !idToken) {
-        toast.error(DEFAULT_ERROR_MESSAGE);
+        toast.error(defaultErrorMessage());
         return;
       }
 
@@ -236,7 +199,7 @@ export function useNativeAuth(): NativeAuthResult {
       if (result.ok) {
         const parsed = parseTokenPair(result.data);
         if (!parsed) {
-          toast.error(DEFAULT_ERROR_MESSAGE);
+          toast.error(defaultErrorMessage());
           return;
         }
         await signIn(
@@ -244,21 +207,26 @@ export function useNativeAuth(): NativeAuthResult {
           'refreshToken' in parsed ? parsed.refreshToken : undefined,
           'expiresIn' in parsed ? parsed.expiresIn : undefined
         );
+        if (parsed.created === true) {
+          announcingToast.success(i18n.t('login.accountCreated'));
+        }
+      } else if (result.errorCode === 'SSO_ERROR') {
+        handleSsoError(response.data.user.email, result.ssoOrganizationId);
       } else {
         toast.error(mapError(result.errorCode));
       }
     } catch {
-      toast.error(DEFAULT_ERROR_MESSAGE);
+      toast.error(defaultErrorMessage());
     } finally {
       finishAction('google');
     }
-  }, [finishAction, signIn, startAction]);
+  }, [finishAction, handleSsoError, signIn, startAction]);
 
   const requestEmailCode = useCallback(
     async (rawEmail: string) => {
       const email = rawEmail.trim().toLowerCase();
       if (!email) {
-        toast.error('Please enter your email address.');
+        toast.error(i18n.t('login.pleaseEnterEmail'));
         return false;
       }
 
@@ -268,12 +236,16 @@ export function useNativeAuth(): NativeAuthResult {
       try {
         const result = await postAuth('/api/auth/native/otp', { email });
         if (!result.ok) {
-          toast.error(mapError(result.errorCode));
+          if (result.errorCode === 'SSO_ERROR') {
+            handleSsoError(email, result.ssoOrganizationId);
+          } else {
+            toast.error(mapError(result.errorCode));
+          }
           return false;
         }
         const parsed = parseEmailCodeResponse(result.data);
         if (!parsed) {
-          toast.error(DEFAULT_ERROR_MESSAGE);
+          toast.error(defaultErrorMessage());
           return false;
         }
         // Hold the challenge for the current email so verifyEmailCode can
@@ -286,7 +258,7 @@ export function useNativeAuth(): NativeAuthResult {
         finishAction('otp-send');
       }
     },
-    [finishAction, startAction]
+    [finishAction, handleSsoError, startAction]
   );
 
   const verifyEmailCode = useCallback(
@@ -316,12 +288,16 @@ export function useNativeAuth(): NativeAuthResult {
           ...(challengeId ? { challengeId } : {}),
         });
         if (!result.ok) {
-          toast.error(mapError(result.errorCode));
+          if (result.errorCode === 'SSO_ERROR') {
+            handleSsoError(email, result.ssoOrganizationId);
+          } else {
+            toast.error(mapError(result.errorCode));
+          }
           return false;
         }
         const parsed = parseTokenPair(result.data);
         if (!parsed) {
-          toast.error(DEFAULT_ERROR_MESSAGE);
+          toast.error(defaultErrorMessage());
           return false;
         }
         await signIn(
@@ -329,17 +305,20 @@ export function useNativeAuth(): NativeAuthResult {
           'refreshToken' in parsed ? parsed.refreshToken : undefined,
           'expiresIn' in parsed ? parsed.expiresIn : undefined
         );
+        if (parsed.created === true) {
+          announcingToast.success(i18n.t('login.accountCreated'));
+        }
         return true;
       } catch (error) {
         // eslint-disable-next-line no-console -- surface swallowed auth errors to Sentry
         console.error('[native-auth] verifyEmailCode signIn failed:', error);
-        toast.error(DEFAULT_ERROR_MESSAGE);
+        toast.error(defaultErrorMessage());
         return false;
       } finally {
         finishAction('otp-verify');
       }
     },
-    [finishAction, signIn, startAction]
+    [finishAction, handleSsoError, signIn, startAction]
   );
 
   return {
@@ -349,5 +328,8 @@ export function useNativeAuth(): NativeAuthResult {
     signInWithGoogle,
     requestEmailCode,
     verifyEmailCode,
+    ssoRecovery,
+    clearSsoRecovery,
+    handleSsoError,
   };
 }

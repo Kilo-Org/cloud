@@ -1,5 +1,6 @@
 import { type Message } from '@kilocode/kilo-chat';
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,7 @@ export function MessageReactionPills({
   isFromMe,
   onReactionPress,
 }: Readonly<MessageReactionPillsProps>) {
+  const { t } = useTranslation();
   if (!canShowReactionPills(message)) {
     return null;
   }
@@ -38,7 +40,10 @@ export function MessageReactionPills({
               onReactionPress(message, reaction.emoji);
             }}
             accessibilityRole="button"
-            accessibilityLabel={`${reaction.emoji} reaction, ${reaction.count}`}
+            accessibilityLabel={t('chat.reactions.accessibility', {
+              emoji: reaction.emoji,
+              count: reaction.count,
+            })}
             accessibilityState={{ selected: hasReacted }}
             className={cn(
               'min-h-11 flex-row items-center gap-1 rounded-full px-3 py-1 active:opacity-70',

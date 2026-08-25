@@ -1,18 +1,21 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, Share, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatDate } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type InvitedOrgMember } from '@/lib/hooks/use-organization-queries';
-import { cn, formatDate, parseTimestamp } from '@/lib/utils';
+import { cn, parseTimestamp } from '@/lib/utils';
 
 import {
   emailStatusLabel,
   invitedMemberActionOptions,
   useResendInvite,
 } from './invited-member-row-state';
-import { ROLE_LABEL } from './member-row';
+import { roleLabel } from './member-row';
 
 type InvitedMemberRowProps = {
   invite: InvitedOrgMember;
@@ -27,7 +30,9 @@ function inviteDateLabel(inviteDate: string | null): string | null {
   if (inviteDate == null) {
     return null;
   }
-  return `Invited ${formatDate(parseTimestamp(inviteDate))}`;
+  return i18n.t('organization.members.invitedDate', {
+    date: formatDate(parseTimestamp(inviteDate), i18n.language),
+  });
 }
 
 export function InvitedMemberRow({
@@ -37,6 +42,7 @@ export function InvitedMemberRow({
   last,
 }: Readonly<InvitedMemberRowProps>) {
   const { bottom } = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { showActionSheetWithOptions } = useActionSheet();
   const mutations = useOrganizationMutations(organizationId);
   const resendInvite = useResendInvite(organizationId);
@@ -44,20 +50,28 @@ export function InvitedMemberRow({
   const statusLabel = emailStatusLabel(invite.emailStatus);
 
   function confirmRevoke() {
-    Alert.alert('Revoke invitation', `Revoke the invitation sent to ${invite.email}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Revoke',
-        style: 'destructive',
-        onPress: () => {
-          mutations.deleteInvite.mutate({ inviteId: invite.inviteId });
+    Alert.alert(
+      t('organization.members.revokeInvitation'),
+      t('organization.members.revokeInvitationMessage', { email: invite.email }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('organization.members.revokeConfirm'),
+          style: 'destructive',
+          onPress: () => {
+            mutations.deleteInvite.mutate({ inviteId: invite.inviteId });
+          },
         },
-      },
-    ]);
+      ]
+    );
   }
 
   function openActions() {
-    const options = invitedMemberActionOptions(invite.emailStatus);
+    const hasInviteUrl = 'inviteUrl' in invite;
+    const shareLabel = t('organization.members.shareInviteLink');
+    const resendLabel = t('organization.members.resendInvite');
+    const revokeLabel = t('organization.members.revokeInvitation');
+    const options = invitedMemberActionOptions(invite.emailStatus, hasInviteUrl);
     showActionSheetWithOptions(
       {
         options,
@@ -67,11 +81,13 @@ export function InvitedMemberRow({
       },
       index => {
         const label = index !== undefined ? options[index] : undefined;
-        if (label === 'Share invite link') {
-          void Share.share({ message: invite.inviteUrl });
-        } else if (label === 'Resend invite') {
+        if (label === shareLabel) {
+          if ('inviteUrl' in invite) {
+            void Share.share({ message: invite.inviteUrl });
+          }
+        } else if (label === resendLabel) {
           resendInvite.mutate({ inviteId: invite.inviteId });
-        } else if (label === 'Revoke invitation') {
+        } else if (label === revokeLabel) {
           confirmRevoke();
         }
       }
@@ -108,7 +124,7 @@ export function InvitedMemberRow({
       </View>
       <View className="rounded-full bg-muted px-2 py-0.5">
         <Text className="text-[11px] font-medium text-muted-foreground">
-          {ROLE_LABEL[invite.role]}
+          {roleLabel(invite.role)}
         </Text>
       </View>
     </View>
@@ -122,7 +138,7 @@ export function InvitedMemberRow({
     <Pressable
       onPress={openActions}
       accessibilityRole="button"
-      accessibilityLabel={`Manage invitation for ${invite.email}`}
+      accessibilityLabel={t('organization.members.manageInvitationA11y', { email: invite.email })}
       className="px-3 active:opacity-70"
     >
       {inner}

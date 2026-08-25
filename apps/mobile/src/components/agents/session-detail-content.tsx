@@ -1,21 +1,18 @@
 /* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
-import {
-  type CloudStatus,
-  type KiloSessionId,
-  type StoredMessage,
-} from '@kilocode/cloud-agent-sdk';
+import { type KiloSessionId, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
 import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { getBlockingInteraction } from '@/components/agents/agent-interaction-policy';
-import { ChatComposer } from '@/components/agents/chat-composer';
+import { ChatComposer, type ChatComposerControl } from '@/components/agents/chat-composer';
 import {
   type AgentMode,
   customModeOptionsFromRuntimeAgents,
@@ -58,7 +55,16 @@ import {
   shouldShowFooterWorkingIndicator,
   shouldShowSessionFooterRow,
 } from '@/components/agents/session-working-state';
+import {
+  collectEmptyChildSessionIds,
+  countInFlightMessages,
+  hydrateEmptyChildSessions,
+  resolveRetryPrompt,
+  retryMessageAndClear,
+  runConnectRepository,
+} from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
+import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
 import { TranscriptTimeMarker } from '@/components/agents/transcript-time-marker';
 import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
@@ -120,6 +126,7 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
+import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
 import { useContinueSession } from '@/components/agents/use-continue-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
@@ -141,11 +148,6 @@ type SessionDetailContentProps = {
   spawnedMode?: string;
 };
 
-const COMPOSER_PLACEHOLDERS = {
-  preparing: 'Setting up environment...',
-  finalizing: 'Wrapping up...',
-} satisfies Partial<Record<CloudStatus['type'], string>>;
-
 const EMPTY_IDS: ReadonlySet<string> = new Set();
 
 export function SessionDetailContent({
@@ -156,12 +158,15 @@ export function SessionDetailContent({
   spawnedMode,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
+  const { t } = useTranslation();
   const router = useRouter();
   const [childSessionSheet, setChildSessionSheet] = useState<ChildSessionSheetMountState>({
     sheet: null,
     visible: false,
   });
   const childSheetReleaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const composerControlRef = useRef<ChatComposerControl | null>(null);
+  const childHydrateAttemptedRef = useRef<Set<string>>(new Set());
 
   const clearChildSheetReleaseTimeout = useCallback(() => {
     if (childSheetReleaseTimeoutRef.current !== null) {
@@ -194,6 +199,7 @@ export function SessionDetailContent({
   );
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const getChildSessionHydrationState = useAtomValue(manager.atoms.childSessionHydrationState);
+  const getChildSessionError = useAtomValue(manager.atoms.childSessionError);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
   const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
@@ -290,11 +296,20 @@ export function SessionDetailContent({
     organizationId,
   });
   const modelOptions = sessionModels.options;
-  const { continueSession, isContinuing } = useContinueSession({
+  const {
+    continueSession,
+    isContinuing,
+    guidance: continueGuidance,
+    clearGuidance,
+  } = useContinueSession({
+    sessionId,
     organizationId,
-    manager,
     models: modelOptions,
     modelsLoading: gatewayModelsLoading,
+  });
+  const { openGitHubIntegration } = useGitHubReposRefresh({
+    organizationId,
+    integrationInstalled: undefined,
   });
   const contextInfo = useMemo(
     () => resolveSessionContextInfo(contextUsage, sessionModels.options),
@@ -450,13 +465,56 @@ export function SessionDetailContent({
     void manager.switchSession(sessionId);
   }, [sessionId, manager]);
 
+  const store = useStore();
+
+  useEffect(() => {
+    childHydrateAttemptedRef.current = new Set();
+  }, [sessionId]);
+
+  // Hydrate child transcripts for task cards that have no messages yet, so a
+  // reopened parent shows each completed child's model on the card without
+  // opening the child sheet. An attempted id is never hydrated again for the
+  // same parent session; a hydrate error retries once.
+  useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+    if (fetchedData?.kiloSessionId !== sessionId) {
+      return;
+    }
+    const liveGetChildMessages = store.get(manager.atoms.childMessages);
+    const readHydrationStatus = (id: KiloSessionId) =>
+      store.get(manager.atoms.childSessionHydrationState)(id).status;
+    const emptyIds = collectEmptyChildSessionIds(messages, liveGetChildMessages).filter(
+      id => !childHydrateAttemptedRef.current.has(id)
+    );
+    if (emptyIds.length === 0) {
+      return;
+    }
+    for (const id of emptyIds) {
+      childHydrateAttemptedRef.current.add(id);
+    }
+    void hydrateEmptyChildSessions(
+      emptyIds,
+      async id => {
+        await manager.hydrateChildSession(id);
+      },
+      readHydrationStatus
+    );
+  }, [isLoading, fetchedData?.kiloSessionId, sessionId, messages, manager, store]);
+
   // Refetch the linked PR on every focus so a link, unlink, or mid-session
   // decision change surfaces without reopening the session. A pending review
   // decision gets one 4s follow-up refetch — no polling loop.
+  // The first focus on a session id is owned by `manager.switchSession`, which
+  // already fetches the session metadata (including `associatedPr`). Every
+  // later focus refetches; this ref tracks which id has been seeded.
+  const seededSessionIdRef = useRef<string | null>(null);
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
+      let unsubscribe: (() => void) | null = null;
 
       const refetch = async (scheduleFollowUp: boolean) => {
         try {
@@ -479,15 +537,54 @@ export function SessionDetailContent({
         }
       };
 
-      void refetch(true);
+      // Check the current `fetchedSessionData` and, when a review decision is
+      // pending, schedule the one-shot 4s follow-up. Runs once against the
+      // current value and again on every later write until the session's data
+      // has landed (or the effect is cancelled).
+      const checkAndSchedule = (): boolean => {
+        if (cancelled) {
+          return true;
+        }
+        const fetched = store.get(manager.atoms.fetchedSessionData);
+        if (fetched?.kiloSessionId !== sessionId) {
+          return false;
+        }
+        unsubscribe?.();
+        unsubscribe = null;
+        if (fetched.associatedPr?.reviewDecisionPending) {
+          pendingTimeout = setTimeout(() => {
+            pendingTimeout = null;
+            void refetch(false);
+          }, 4000);
+        }
+        return true;
+      };
+
+      if (!shouldRefetchOnFocus(seededSessionIdRef.current, sessionId)) {
+        // First focus: `switchSession` owns the metadata read, so issue no
+        // request. Seed the ref and keep the pending-decision follow-up. The
+        // manager's fetch can land before this effect runs (switchSession
+        // writes first), so check the current value once before subscribing.
+        // Subscribe only when the data has not landed yet; a match schedules
+        // at most one follow-up and stops listening.
+        seededSessionIdRef.current = sessionId;
+        if (!checkAndSchedule()) {
+          unsubscribe = store.sub(manager.atoms.fetchedSessionData, () => {
+            checkAndSchedule();
+          });
+        }
+      } else {
+        void refetch(true);
+      }
 
       return () => {
         cancelled = true;
+        unsubscribe?.();
         if (pendingTimeout !== null) {
           clearTimeout(pendingTimeout);
         }
       };
-    }, [manager, sessionId])
+    }, [manager, sessionId, store])
   );
 
   useEffect(() => {
@@ -589,212 +686,7 @@ export function SessionDetailContent({
     }
   }
 
-  const renderItem = useCallback(
-    ({ item }: { item: SessionTranscriptItem }) => {
-      if (item.type === 'preparation') {
-        return <PreparationGroup attempt={item.attempt} />;
-      }
-      if (item.type === 'time') {
-        return <TranscriptTimeMarker created={item.created} dayChanged={item.dayChanged} />;
-      }
-      // Look up delivery state by message id. The map is keyed by user-message
-      // id and may briefly contain an entry before the bubble has rendered
-      // (ServiceEvents can be applied while chat events are still buffered),
-      // so a plain lookup is enough — no render-order guard.
-      const deliveryState =
-        item.message.info.role === 'user' ? pendingMessages.get(item.message.info.id) : undefined;
-      return (
-        <MessageBubble
-          message={item.message}
-          isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
-          isSessionStreaming={isStreaming}
-          getChildMessages={getChildMessages}
-          defaultReasoningExpanded={reasoningDefaultExpanded}
-          onOpenChildSession={handleOpenChildSession}
-          deliveryState={deliveryState}
-          onLongPressDetails={setDetailsMessage}
-          holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
-        />
-      );
-    },
-    [
-      lastAssistantMessageId,
-      isStreaming,
-      getChildMessages,
-      reasoningDefaultExpanded,
-      handleOpenChildSession,
-      pendingMessages,
-      heldQueuedIds,
-    ]
-  );
-
-  const handleStop = useCallback(async () => {
-    try {
-      await manager.interrupt();
-    } catch {
-      toast.error('Failed to stop execution');
-    }
-  }, [manager]);
-
-  const handleBackToSessions = useCallback(() => {
-    router.replace('/(app)/(tabs)/(2_agents)' as Href);
-  }, [router]);
-
-  const handleModelSelect = useCallback(
-    (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
-      if (activeSessionType === 'remote') {
-        const selectedOption = pickerSelection?.option;
-        const selectedRef = selectedOption?.modelRef;
-        const option = selectedRef
-          ? modelOptions.find(
-              candidate =>
-                candidate.overrideSource === selectedOption.overrideSource &&
-                candidate.modelRef?.providerID === selectedRef.providerID &&
-                candidate.modelRef.modelID === selectedRef.modelID
-            )
-          : modelOptions.find(candidate => candidate.id === value);
-        if (option) {
-          manager.setRemoteModelOverride(createRemoteModelOverride(option, variant));
-        }
-        return;
-      }
-
-      manager.setCloudAgentModelOverride({
-        model: value,
-        ...(variant ? { variant } : {}),
-      });
-      setCurrentModel(value);
-      setCurrentVariant(variant);
-      savePersistedModel(organizationId, { model: value, variant });
-      persistServerLastSelected({ model: value, ...(variant ? { variant } : {}) });
-    },
-    [
-      activeSessionType,
-      manager,
-      modelOptions,
-      organizationId,
-      persistServerLastSelected,
-      savePersistedModel,
-      setCurrentModel,
-      setCurrentVariant,
-    ]
-  );
-
-  const shouldShowLoading =
-    isLoading ||
-    (fetchedData === null && !statusIndicator && !error) ||
-    (fetchedData !== null && fetchedData.kiloSessionId !== sessionId);
-  const shouldBlockMessages = shouldShowLoading;
-  const shouldShowWorkingIndicator = shouldShowAgentWorkingIndicator({
-    isStreaming,
-    pendingMessageCount: pendingMessages.size,
-  });
-  const hasFooterStatusIndicator =
-    statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready');
-  const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
-    isAgentWorking: shouldShowWorkingIndicator,
-    hasStatusIndicator: hasFooterStatusIndicator,
-  });
-  // Only a live PreparationGroup duplicates footer progress. Completed groups
-  // stay in the transcript after cold starts and must not suppress a later
-  // recycle re-prepare footer (Setting up environment…).
-  const hasInProgressTranscriptPreparation = useMemo(
-    () => transcript.some(item => item.type === 'preparation' && item.attempt.status === 'running'),
-    [transcript]
-  );
-  const showSessionFooterRow = shouldShowSessionFooterRow({
-    cloudStatusType: cloudStatus?.type,
-    hasInProgressTranscriptPreparation,
-    shouldShowFooterWorking,
-    hasStatusIndicator: statusIndicator !== null,
-    messageCount: messages.length,
-  });
-
-  const emptyStateText = statusIndicator ? null : 'No messages yet';
-
-  const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
-  const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
-  const rename = useSessionDetailRename({
-    sessionId,
-    isLoaded: isSessionLoaded,
-    serverTitle,
-    fallbackTitle: 'Session',
-  });
-  const handleRenameSave = rename.submit;
-  const handleRenameClose = rename.closeModal;
-  const headerRight = (
-    <View className="flex-row items-center gap-2">
-      <SessionPrBadge pr={fetchedData?.associatedPr ?? null} loading={shouldShowLoading} />
-      <SessionContextMetrics
-        info={contextInfo}
-        totalCostMicrodollars={totalMicrodollars}
-        hasMessages={messages.length > 0}
-        loading={shouldShowLoading}
-        onPress={
-          contextInfo
-            ? () => {
-                setOpenContextSheetIdentity({
-                  sessionId,
-                  providerID: contextInfo.providerID,
-                  modelID: contextInfo.modelID,
-                });
-              }
-            : undefined
-        }
-      />
-    </View>
-  );
   const requiresModel = Boolean(fetchedData?.cloudAgentSessionId);
-  const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
-  const hasBlockingInteraction = blockingInteraction !== 'none';
-  // One number for both kinds: the user must see every waiting request, not
-  // only the ones of the kind currently on screen.
-  const blockingRequestCount = pendingQuestions.length + pendingPermissions.length;
-
-  // When a blocking question/permission card dismisses, hand screen-reader
-  // focus back to the transcript so the user does not get stranded on a
-  // node that no longer exists. We track the previous blocking kind and
-  // only fire on the non-none → none transition (i.e. the user satisfied
-  // the card), not on the very first mount.
-  const transcriptRef = useRef<RNText | null>(null);
-  const previousBlockingInteractionRef = useRef<typeof blockingInteraction>('none');
-  useEffect(() => {
-    const wasBlocking = previousBlockingInteractionRef.current !== 'none';
-    const isBlocking = blockingInteraction !== 'none';
-    previousBlockingInteractionRef.current = blockingInteraction;
-    if (!wasBlocking || isBlocking) {
-      return undefined;
-    }
-    if (moveA11yFocus(transcriptRef)) {
-      return undefined;
-    }
-    const handle = setTimeout(() => {
-      moveA11yFocus(transcriptRef);
-    }, 50);
-    return () => {
-      clearTimeout(handle);
-    };
-  }, [blockingInteraction]);
-  // One condition for the composer and for the bottom BlurBar that reserves
-  // its space: if the bar claimed the space on a condition the composer does
-  // not share, the composer pops in and the layout jumps on every open.
-  const isComposerMounted = !isReadOnly || messages.length === 0;
-  const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
-  const isComposerDisabled = resolveSessionComposerDisabled({
-    isReadOnly,
-    canSend,
-    shouldShowLoading,
-    hasBlockingInteraction,
-    requiresModel,
-    // A pinned agent model satisfies the model requirement even before the
-    // catalog selection resolves.
-    hasModel: Boolean(pinned.model ?? currentModel),
-  });
-  const composerPlaceholder =
-    (cloudStatus &&
-      COMPOSER_PLACEHOLDERS[cloudStatus.type as keyof typeof COMPOSER_PLACEHOLDERS]) ??
-    'Message...';
-  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSend = useCallback(
     async (
@@ -803,7 +695,7 @@ export function SessionDetailContent({
       submission?: AgentAttachmentSubmissionPayload
     ) => {
       if (requiresModel && !(pinned.model ?? currentModel)) {
-        toast.error('Select a model before sending');
+        toast.error(t('agentChat.composer.selectModelBeforeSending'));
         return;
       }
       // Pick the wire shape via the same pure helper the unit test covers:
@@ -817,8 +709,7 @@ export function SessionDetailContent({
         attachments !== undefined
       );
       if (shouldRefuseSilentAttachmentDrop(kind, attachments !== undefined)) {
-        const message =
-          "This session can't receive files. Remove the attachments to send your message.";
+        const message = t('agentChat.composer.cannotReceiveFiles');
         toast.error(message);
         throw new Error(message);
       }
@@ -887,8 +778,267 @@ export function SessionDetailContent({
       activeSessionType,
       supportsAttachments,
       analyticsSurface,
+      t,
     ]
   );
+
+  const handleCopyToComposer = useCallback((text: string) => {
+    composerControlRef.current?.setText(text);
+  }, []);
+
+  const handleRetryMessage = useCallback(
+    (message: StoredMessage) => {
+      const prompt = resolveRetryPrompt(message, messages);
+      if (prompt === null) {
+        return;
+      }
+      // Same guard handleSend opens with: when no model resolves, run the send
+      // anyway (the user gets the existing toast) and keep the failed row.
+      if (requiresModel && !(pinned.model ?? currentModel)) {
+        void handleSend(prompt);
+        return;
+      }
+      void retryMessageAndClear(
+        async () => {
+          await handleSend(prompt);
+        },
+        () => {
+          manager.clearFailedMessage(message.info.id);
+        }
+      );
+    },
+    [messages, requiresModel, pinned.model, currentModel, handleSend, manager]
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: SessionTranscriptItem }) => {
+      if (item.type === 'preparation') {
+        return <PreparationGroup attempt={item.attempt} />;
+      }
+      if (item.type === 'time') {
+        return <TranscriptTimeMarker created={item.created} dayChanged={item.dayChanged} />;
+      }
+      // Look up delivery state by message id. The map is keyed by user-message
+      // id and may briefly contain an entry before the bubble has rendered
+      // (ServiceEvents can be applied while chat events are still buffered),
+      // so a plain lookup is enough — no render-order guard.
+      const deliveryState =
+        item.message.info.role === 'user' ? pendingMessages.get(item.message.info.id) : undefined;
+      // Suppress Retry on an assistant failure with no preceding user row.
+      const retryPrompt = resolveRetryPrompt(item.message, messages);
+      return (
+        <MessageBubble
+          message={item.message}
+          isLastAssistantMessage={item.message.info.id === lastAssistantMessageId}
+          isSessionStreaming={isStreaming}
+          getChildMessages={getChildMessages}
+          modelOptions={modelOptions}
+          defaultReasoningExpanded={reasoningDefaultExpanded}
+          onOpenChildSession={handleOpenChildSession}
+          deliveryState={deliveryState}
+          onLongPressDetails={setDetailsMessage}
+          holdQueuedSlot={isStreaming && heldQueuedIds.has(item.message.info.id)}
+          onRetryMessage={retryPrompt !== null ? handleRetryMessage : undefined}
+          onCopyToComposer={handleCopyToComposer}
+        />
+      );
+    },
+    [
+      lastAssistantMessageId,
+      isStreaming,
+      getChildMessages,
+      modelOptions,
+      reasoningDefaultExpanded,
+      handleOpenChildSession,
+      pendingMessages,
+      heldQueuedIds,
+      messages,
+      handleRetryMessage,
+      handleCopyToComposer,
+    ]
+  );
+
+  const handleStop = useCallback(async () => {
+    try {
+      await manager.interrupt();
+    } catch {
+      toast.error(t('agentChat.session.failedToStopExecution'));
+    }
+  }, [manager, t]);
+
+  const handleBackToSessions = useCallback(() => {
+    router.replace('/(app)/(tabs)/(2_agents)' as Href);
+  }, [router]);
+
+  const handleConnectRepository = useCallback(() => {
+    runConnectRepository(openGitHubIntegration, clearGuidance);
+  }, [openGitHubIntegration, clearGuidance]);
+
+  const handleModelSelect = useCallback(
+    (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
+      if (activeSessionType === 'remote') {
+        const selectedOption = pickerSelection?.option;
+        const selectedRef = selectedOption?.modelRef;
+        const option = selectedRef
+          ? modelOptions.find(
+              candidate =>
+                candidate.overrideSource === selectedOption.overrideSource &&
+                candidate.modelRef?.providerID === selectedRef.providerID &&
+                candidate.modelRef.modelID === selectedRef.modelID
+            )
+          : modelOptions.find(candidate => candidate.id === value);
+        if (option) {
+          manager.setRemoteModelOverride(createRemoteModelOverride(option, variant));
+        }
+        return;
+      }
+
+      manager.setCloudAgentModelOverride({
+        model: value,
+        ...(variant ? { variant } : {}),
+      });
+      setCurrentModel(value);
+      setCurrentVariant(variant);
+      savePersistedModel(organizationId, { model: value, variant });
+      persistServerLastSelected({ model: value, ...(variant ? { variant } : {}) });
+    },
+    [
+      activeSessionType,
+      manager,
+      modelOptions,
+      organizationId,
+      persistServerLastSelected,
+      savePersistedModel,
+      setCurrentModel,
+      setCurrentVariant,
+    ]
+  );
+
+  const shouldShowLoading =
+    isLoading ||
+    (fetchedData === null && !statusIndicator && !error) ||
+    (fetchedData !== null && fetchedData.kiloSessionId !== sessionId);
+  const shouldBlockMessages = shouldShowLoading;
+  // Failed delivery entries must not count as in-flight: after a terminal
+  // delivery failure the working spinner and wake lock would otherwise stay on.
+  const inFlightMessageCount = useMemo(
+    () => countInFlightMessages(pendingMessages),
+    [pendingMessages]
+  );
+  const shouldShowWorkingIndicator = shouldShowAgentWorkingIndicator({
+    isStreaming,
+    pendingMessageCount: inFlightMessageCount,
+  });
+  const hasFooterStatusIndicator =
+    statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready');
+  const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
+    isAgentWorking: shouldShowWorkingIndicator,
+    hasStatusIndicator: hasFooterStatusIndicator,
+  });
+  // Only a live PreparationGroup duplicates footer progress. Completed groups
+  // stay in the transcript after cold starts and must not suppress a later
+  // recycle re-prepare footer (Setting up environment…).
+  const hasInProgressTranscriptPreparation = useMemo(
+    () => transcript.some(item => item.type === 'preparation' && item.attempt.status === 'running'),
+    [transcript]
+  );
+  const showSessionFooterRow = shouldShowSessionFooterRow({
+    cloudStatusType: cloudStatus?.type,
+    hasInProgressTranscriptPreparation,
+    shouldShowFooterWorking,
+    hasStatusIndicator: statusIndicator !== null,
+    messageCount: messages.length,
+  });
+
+  const emptyStateText = statusIndicator ? null : t('agentChat.session.emptyTitle');
+
+  const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
+  const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
+  const rename = useSessionDetailRename({
+    sessionId,
+    isLoaded: isSessionLoaded,
+    serverTitle,
+    fallbackTitle: t('agentChat.session.title'),
+  });
+  const handleRenameSave = rename.submit;
+  const handleRenameClose = rename.closeModal;
+  const headerRight = (
+    <View className="flex-row items-center gap-2">
+      <SessionPrBadge pr={fetchedData?.associatedPr ?? null} loading={shouldShowLoading} />
+      <SessionContextMetrics
+        info={contextInfo}
+        totalCostMicrodollars={totalMicrodollars}
+        hasMessages={messages.length > 0}
+        loading={shouldShowLoading}
+        onPress={
+          contextInfo
+            ? () => {
+                setOpenContextSheetIdentity({
+                  sessionId,
+                  providerID: contextInfo.providerID,
+                  modelID: contextInfo.modelID,
+                });
+              }
+            : undefined
+        }
+      />
+    </View>
+  );
+  const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
+  const hasBlockingInteraction = blockingInteraction !== 'none';
+  // One number for both kinds: the user must see every waiting request, not
+  // only the ones of the kind currently on screen.
+  const blockingRequestCount = pendingQuestions.length + pendingPermissions.length;
+
+  // When a blocking question/permission card dismisses, hand screen-reader
+  // focus back to the transcript so the user does not get stranded on a
+  // node that no longer exists. We track the previous blocking kind and
+  // only fire on the non-none → none transition (i.e. the user satisfied
+  // the card), not on the very first mount.
+  const transcriptRef = useRef<RNText | null>(null);
+  const previousBlockingInteractionRef = useRef<typeof blockingInteraction>('none');
+  useEffect(() => {
+    const wasBlocking = previousBlockingInteractionRef.current !== 'none';
+    const isBlocking = blockingInteraction !== 'none';
+    previousBlockingInteractionRef.current = blockingInteraction;
+    if (!wasBlocking || isBlocking) {
+      return undefined;
+    }
+    if (moveA11yFocus(transcriptRef)) {
+      return undefined;
+    }
+    const handle = setTimeout(() => {
+      moveA11yFocus(transcriptRef);
+    }, 50);
+    return () => {
+      clearTimeout(handle);
+    };
+  }, [blockingInteraction]);
+  // One condition for the composer and for the bottom BlurBar that reserves
+  // its space: if the bar claimed the space on a condition the composer does
+  // not share, the composer pops in and the layout jumps on every open.
+  const isComposerMounted = !isReadOnly || messages.length === 0;
+  const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
+  const isComposerDisabled = resolveSessionComposerDisabled({
+    isReadOnly,
+    canSend,
+    shouldShowLoading,
+    hasBlockingInteraction,
+    requiresModel,
+    // A pinned agent model satisfies the model requirement even before the
+    // catalog selection resolves.
+    hasModel: Boolean(pinned.model ?? currentModel),
+  });
+  const composerPlaceholder = useMemo(() => {
+    if (cloudStatus?.type === 'preparing') {
+      return t('agentChat.composer.preparingPlaceholder');
+    }
+    if (cloudStatus?.type === 'finalizing') {
+      return t('agentChat.composer.finalizingPlaceholder');
+    }
+    return t('agentChat.composer.messagePlaceholder');
+  }, [cloudStatus, t]);
+  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSendCommand = useCallback(
     async (command: string, argumentsText: string) => {
@@ -976,8 +1126,23 @@ export function SessionDetailContent({
     isFocused,
     isDisconnected: agentStatus.type === 'disconnected',
     isStreaming,
-    pendingMessageCount: pendingMessages.size,
+    pendingMessageCount: inFlightMessageCount,
   });
+
+  // Child-sheet pagination fields live only on the `ready` hydration state.
+  // The sheet can render `content` before hydration reports ready (live child
+  // rows already exist), so default every non-ready state.
+  const openChildSessionId = childSessionSheet.sheet?.sessionId ?? null;
+  const openChildHydrationState =
+    openChildSessionId === null ? null : getChildSessionHydrationState(openChildSessionId);
+  const childHasOlderMessages =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.hasOlder : false;
+  const childIsLoadingOlderMessages =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.isLoadingOlder : false;
+  const childOlderMessagesError =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.olderError : null;
+  const childOlderMessagesOmittedItemCount =
+    openChildHydrationState?.status === 'ready' ? openChildHydrationState.omittedItemCount : 0;
 
   return (
     <PartDetailSheetHost messages={messages}>
@@ -988,7 +1153,9 @@ export function SessionDetailContent({
           {...(rename.isTitleInteractive
             ? {
                 onTitlePress: rename.openModal,
-                onTitlePressAccessibilityLabel: `Rename session: ${rename.title}`,
+                onTitlePressAccessibilityLabel: t('agentChat.session.renameAccessibility', {
+                  title: rename.title,
+                }),
               }
             : {})}
         />
@@ -1048,7 +1215,17 @@ export function SessionDetailContent({
             title={childSessionSheet.sheet.title}
             getChildMessages={getChildMessages}
             hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
+            sessionError={getChildSessionError(childSessionSheet.sheet.sessionId)}
             isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
+            hasOlderMessages={childHasOlderMessages}
+            isLoadingOlderMessages={childIsLoadingOlderMessages}
+            olderMessagesError={childOlderMessagesError}
+            olderMessagesOmittedItemCount={childOlderMessagesOmittedItemCount}
+            onLoadOlderMessages={() => {
+              if (openChildSessionId !== null) {
+                void manager.loadOlderChildMessages(openChildSessionId);
+              }
+            }}
             renderPart={props => <PartRenderer {...props} />}
             onOpenChildSession={handleOpenChildSession}
             onRetry={() => {
@@ -1060,13 +1237,14 @@ export function SessionDetailContent({
             }}
             onClose={handleCloseChildSession}
             onDismiss={handleChildSheetDismiss}
+            modelOptions={modelOptions}
           />
         ) : null}
 
         {rename.isTitleInteractive && rename.isModalOpen ? (
           <RenameModal
-            title="Rename session"
-            placeholder="Session name"
+            title={t('agentChat.session.renameSession')}
+            placeholder={t('agentChat.session.renamePlaceholder')}
             initialValue={rename.modalInitialValue}
             onSave={handleRenameSave}
             onClose={handleRenameClose}
@@ -1083,7 +1261,7 @@ export function SessionDetailContent({
           <Text
             ref={transcriptRef}
             accessible
-            accessibilityLabel="Session transcript"
+            accessibilityLabel={t('agentChat.session.transcriptAccessibility')}
             pointerEvents="none"
             className="absolute inset-0 opacity-0"
           />
@@ -1143,17 +1321,60 @@ export function SessionDetailContent({
         {isReadOnly && messages.length > 0 && !hasBlockingInteraction ? (
           <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
             <Text className="text-center text-sm text-muted-foreground">
-              This is a read-only session
+              {t('agentChat.session.readOnly')}
             </Text>
-            <Button
-              variant="outline"
-              size="sm"
-              accessibilityLabel="Continue in a new session"
-              disabled={isContinuing}
-              onPress={handleContinueInNewSession}
-            >
-              <Text>Continue in a new session</Text>
-            </Button>
+            {continueGuidance?.kind === 'terminal' ? (
+              <>
+                <Text className="text-center text-sm text-muted-foreground">
+                  {continueGuidance.message}
+                </Text>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  accessibilityLabel={
+                    continueGuidance.action === 'connect-repository'
+                      ? t('agentChat.session.connectRepository')
+                      : t('agentChat.session.backToSessions')
+                  }
+                  onPress={
+                    continueGuidance.action === 'connect-repository'
+                      ? handleConnectRepository
+                      : handleBackToSessions
+                  }
+                >
+                  <Text>
+                    {continueGuidance.action === 'connect-repository'
+                      ? t('agentChat.session.connectRepository')
+                      : t('agentChat.session.backToSessions')}
+                  </Text>
+                </Button>
+              </>
+            ) : (
+              <>
+                {continueGuidance?.kind === 'retry' ? (
+                  <Text className="text-center text-sm text-muted-foreground">
+                    {continueGuidance.message}
+                  </Text>
+                ) : null}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  accessibilityLabel={
+                    isContinuing
+                      ? t('agentChat.session.cloningSession')
+                      : t('agentChat.session.continue')
+                  }
+                  loading={isContinuing}
+                  onPress={handleContinueInNewSession}
+                >
+                  <Text>
+                    {isContinuing
+                      ? t('agentChat.session.cloningSession')
+                      : t('agentChat.session.continue')}
+                  </Text>
+                </Button>
+              </>
+            )}
           </View>
         ) : null}
 
@@ -1195,7 +1416,9 @@ export function SessionDetailContent({
                 shareId={shareId}
                 autoSend={autoSend}
                 draftKey={userId ? sessionComposerDraftKey : undefined}
-                initialDraft={composerDraft.settled ? (composerDraft.text ?? '') : undefined}
+                initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
+                sessionId={sessionId}
+                controlRef={composerControlRef}
               />
             </ModelPickerSelectionScopeProvider>
           </View>
@@ -1236,15 +1459,15 @@ export function SessionDetailContent({
           <View className="flex-row gap-3">
             <Button
               variant="ghost"
-              accessibilityLabel="Copy error details"
+              accessibilityLabel={t('agentChat.session.copyErrorDetails')}
               onPress={() => {
                 void performCopy(copyText);
               }}
             >
-              <Text>Copy</Text>
+              <Text>{t('common.copy')}</Text>
             </Button>
             <Button variant="ghost" onPress={handleBackToSessions}>
-              <Text>Back to sessions</Text>
+              <Text>{t('agentChat.session.backToSessions')}</Text>
             </Button>
           </View>
         </View>
@@ -1261,7 +1484,7 @@ export function SessionDetailContent({
             <EmptyState
               icon={MessageSquare}
               title={emptyStateText}
-              description="Send a message below to get started."
+              description={t('agentChat.session.emptyDescription')}
             />
           ) : null}
         </View>
@@ -1278,6 +1501,9 @@ export function SessionDetailContent({
         olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
         onLoadOlderMessages={() => {
           void manager.loadOlderMessages();
+        }}
+        onReachedBottom={() => {
+          manager.trimRetainedHistory();
         }}
         renderItem={renderItem}
       />

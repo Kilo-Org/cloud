@@ -3,6 +3,7 @@ import { type ReactNode, type RefObject } from 'react';
 import { type LayoutChangeEvent, Pressable, TextInput, View } from 'react-native';
 import { type Message, MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
 import { type QueuedAttachment } from '@kilocode/kilo-chat-hooks';
+import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -99,6 +100,7 @@ export function MessageInputView({
   onPasteImage,
 }: Props) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const inputDisabled = controlsDisabled || voiceInputActive;
 
   return (
@@ -106,7 +108,9 @@ export function MessageInputView({
       {replyingTo && (
         <View className="mb-2 flex-row items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
           <View className="min-w-0 flex-1">
-            <Text className="text-xs font-medium text-muted-foreground">Replying to</Text>
+            <Text className="text-xs font-medium text-muted-foreground">
+              {t('chat.composer.replyingTo')}
+            </Text>
             <Text numberOfLines={1} className="text-sm text-foreground">
               {getReplyPreviewText(replyingTo)}
             </Text>
@@ -119,7 +123,7 @@ export function MessageInputView({
               controlsDisabled && 'opacity-50'
             )}
             accessibilityRole="button"
-            accessibilityLabel="Cancel reply"
+            accessibilityLabel={t('chat.composer.cancelReply')}
             accessibilityState={{ disabled: controlsDisabled }}
           >
             <X size={16} color={colors.foreground} />
@@ -134,10 +138,12 @@ export function MessageInputView({
               onPress={onOpenInstance}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Open instance"
+              accessibilityLabel={t('chat.composer.openInstance')}
               className="active:opacity-70"
             >
-              <Text className="text-xs font-medium text-foreground">Open instance</Text>
+              <Text className="text-xs font-medium text-foreground">
+                {t('chat.composer.openInstance')}
+              </Text>
             </Pressable>
           ) : null}
         </View>
@@ -170,7 +176,7 @@ export function MessageInputView({
                 (controlsDisabled || voiceInputActive) && 'opacity-50'
               )}
               accessibilityRole="button"
-              accessibilityLabel="Attach file"
+              accessibilityLabel={t('chat.composer.attachFile')}
               accessibilityState={{ disabled: controlsDisabled || voiceInputActive }}
             >
               <Paperclip size={18} color={colors.foreground} />
@@ -185,7 +191,7 @@ export function MessageInputView({
                 inputDisabled && 'opacity-50'
               )}
               style={[messageInputTextStyle, { height: inputHeight }]}
-              placeholder="Message"
+              placeholder={t('chat.composer.messagePlaceholder')}
               placeholderTextColor={colors.mutedForeground}
               defaultValue={initialText}
               multiline
@@ -215,7 +221,7 @@ export function MessageInputView({
                 controlsDisabled && 'opacity-50'
               )}
               accessibilityRole="button"
-              accessibilityLabel="Cancel edit"
+              accessibilityLabel={t('chat.composer.cancelEdit')}
               accessibilityState={{ disabled: controlsDisabled }}
             >
               <X size={18} color={colors.foreground} />
@@ -229,7 +235,7 @@ export function MessageInputView({
               sendDisabled && 'opacity-50'
             )}
             accessibilityRole="button"
-            accessibilityLabel="Send message"
+            accessibilityLabel={t('chat.composer.sendMessage')}
             accessibilityState={{ disabled: sendDisabled }}
           >
             <Send size={18} color={colors.primaryForeground} />

@@ -1,16 +1,50 @@
 import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
+import { SUPPORTED_LANGUAGES } from './src/i18n/languages.ts';
 import { SENTRY_NATIVE_OPTIONS } from './src/lib/sentry-dsn';
 import { UNIVERSAL_LINK_PATH_PATTERNS } from './src/lib/universal-link-paths';
+import {
+  assertProductionHost,
+  assertUrlScheme,
+  PRODUCTION_HOSTS,
+  URL_SCHEMES,
+} from './src/lib/url-contract';
 
+const isProductionBuild = process.env.EAS_BUILD_PROFILE === 'production';
+
+// Required env is fatal by build intent: a production build must never ship
+// with a missing value, so throw under EAS_BUILD_PROFILE === 'production'.
+// Otherwise keep the old behavior: warn under GITHUB_ACTIONS, throw locally.
 const missing = Object.values(ENV_KEYS).filter(key => !process.env[key]);
 if (missing.length > 0) {
   const message = `Missing required environment variables: ${missing.join(', ')}`;
-  if (process.env.GITHUB_ACTIONS) {
+  if (isProductionBuild) {
+    throw new Error(message);
+  } else if (process.env.GITHUB_ACTIONS) {
     console.warn(`⚠️  ${message}`);
   } else {
     throw new Error(message);
   }
+}
+
+// URL contract: every URL value must use its allowed scheme. Non-production
+// builds additionally permit http:/ws: for local development; production
+// builds also assert the host against the production allowlist.
+for (const [key, schemes] of Object.entries(URL_SCHEMES)) {
+  const value = process.env[ENV_KEYS[key as keyof typeof ENV_KEYS]];
+  if (!value) continue;
+  assertUrlScheme(key, value, schemes, { allowInsecure: !isProductionBuild });
+  if (isProductionBuild) {
+    assertProductionHost(key, value, PRODUCTION_HOSTS);
+  }
+}
+
+// Source-map gate: an unauthenticated production artifact must never reach the
+// stores with silently missing symbolication.
+if (isProductionBuild && !process.env.SENTRY_AUTH_TOKEN) {
+  throw new Error(
+    'Missing SENTRY_AUTH_TOKEN: production builds require an authenticated Sentry source-map upload.'
+  );
 }
 
 // Google OAuth client IDs are public identifiers (committed .env, all EAS
@@ -28,7 +62,7 @@ const config: ExpoConfig = {
   name: 'Kilo',
   owner: 'kilocode',
   slug: 'kilo-app',
-  version: '1.0.4',
+  version: '1.0.5',
   // Portrait-only is an accepted, documented product deviation from WCAG 1.3.4
   // (Orientation). Landscape layouts and iPad split-view/multitasking are out
   // of scope; `ios.requireFullScreen` below enforces that. This is not claimed
@@ -62,6 +96,11 @@ const config: ExpoConfig = {
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      // iOS reads this list, not the JS catalog. Without it the system treats
+      // the app as English-only, so OS-drawn text we cannot translate — the
+      // native Sign in with Apple button above all — stays English on a
+      // localized device.
+      CFBundleLocalizations: [...SUPPORTED_LANGUAGES],
       NSAdvertisingAttributionReportEndpoint: 'https://appsflyer-skadnetwork.com/',
       // Apple's raw key for AdAttributionKit postback copies is the top-level
       // string `AttributionCopyEndpoint` (Xcode displays it as "AdAttributionKit -
@@ -84,7 +123,7 @@ const config: ExpoConfig = {
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-foreground.png',
     },
-    predictiveBackGestureEnabled: false,
+    predictiveBackGestureEnabled: true,
     blockedPermissions: [
       'android.permission.READ_MEDIA_IMAGES',
       'android.permission.READ_MEDIA_VIDEO',
@@ -222,6 +261,7 @@ const config: ExpoConfig = {
       Object.entries(OPTIONAL_ENV_KEYS).map(([key, env]) => [key, process.env[env]])
     ),
     router: {},
+    isProductionBuild,
     eas: {
       projectId: '2cf05e39-90b5-48a5-a8a5-e0b3423cf3f4',
     },

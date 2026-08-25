@@ -1,4 +1,5 @@
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,7 +28,7 @@ export function ConversationHistoryLoadingView({ subtitle, title }: Props) {
 }
 
 export function ConversationHistoryErrorView({
-  message = 'Could not load conversation history',
+  message,
   onRetry,
   subtitle,
   title,
@@ -35,11 +36,16 @@ export function ConversationHistoryErrorView({
   message?: string;
   onRetry: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View className="flex-1">
       <ConversationHeader title={title} subtitle={subtitle} />
       <AppAwareKeyboardPaddingView className="flex-1">
-        <QueryError className="flex-1" message={message} onRetry={onRetry} />
+        <QueryError
+          className="flex-1"
+          message={message ?? t('chat.conversation.couldNotLoadHistory')}
+          onRetry={onRetry}
+        />
       </AppAwareKeyboardPaddingView>
     </View>
   );
@@ -53,6 +59,7 @@ export function ConversationInlineRetryBanner({
   message: string;
   onRetry: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View className="flex-row items-center justify-between gap-2 border-b border-neutral-200 bg-neutral-100 px-4 py-2 dark:border-neutral-800 dark:bg-neutral-900">
       <Text variant="muted" className="flex-1 text-xs">
@@ -62,10 +69,10 @@ export function ConversationInlineRetryBanner({
         onPress={onRetry}
         hitSlop={8}
         accessibilityRole="button"
-        accessibilityLabel="Retry"
+        accessibilityLabel={t('common.retry')}
         className="active:opacity-70"
       >
-        <Text className="text-xs font-medium text-foreground">Retry</Text>
+        <Text className="text-xs font-medium text-foreground">{t('common.retry')}</Text>
       </Pressable>
     </View>
   );

@@ -5,6 +5,7 @@ import {
   MAX_TOOL_OUTPUT_LENGTH,
   MAX_RAW_INPUT_LENGTH,
   MAX_STDOUT_LENGTH,
+  MAX_INLINE_FILE_URL_LENGTH,
 } from './trim-payload.js';
 
 function createKilocodeEvent(event: string, properties: unknown) {
@@ -246,7 +247,7 @@ describe('trimPayload', () => {
   });
 
   describe('message.part.updated — file part', () => {
-    it('strips url and source.text.value', () => {
+    it('preserves a small data: url and strips source.text.value', () => {
       const data = createKilocodeEvent('message.part.updated', {
         part: {
           type: 'file',
@@ -274,14 +275,14 @@ describe('trimPayload', () => {
         };
       };
 
-      expect(result.properties.part.url).toBe('');
+      expect(result.properties.part.url).toBe('data:image/png;base64,abc123');
       expect(result.properties.part.source.text.value).toBe('');
       expect(result.properties.part.name).toBe('image.png');
       expect(result.properties.part.source.type).toBe('file');
       expect(result.properties.part.source.path).toBe('/foo');
     });
 
-    it('strips only url when source is absent', () => {
+    it('preserves a small data: url when source is absent', () => {
       const data = createKilocodeEvent('message.part.updated', {
         part: {
           type: 'file',
@@ -294,11 +295,101 @@ describe('trimPayload', () => {
         properties: { part: { url: string; name: string } };
       };
 
+      expect(result.properties.part.url).toBe('data:image/png;base64,abc123');
+      expect(result.properties.part.name).toBe('image.png');
+    });
+
+    it('strips a large data: url on a top-level file part', () => {
+      const largeDataUrl = `data:image/png;base64,${'A'.repeat(MAX_INLINE_FILE_URL_LENGTH + 1)}`;
+      const data = createKilocodeEvent('message.part.updated', {
+        part: {
+          type: 'file',
+          url: largeDataUrl,
+          name: 'image.png',
+          source: {
+            text: { value: 'file content here', start: 0, end: 50 },
+            type: 'file',
+            path: '/foo',
+          },
+        },
+      });
+
+      const result = trimPayload('kilocode', data) as {
+        properties: { part: { url: string; name: string } };
+      };
+
       expect(result.properties.part.url).toBe('');
       expect(result.properties.part.name).toBe('image.png');
     });
 
-    it('strips top-level url and source.text.value', () => {
+    it('preserves a file:// url and strips only source.text.value', () => {
+      const data = createKilocodeEvent('message.part.updated', {
+        part: {
+          type: 'file',
+          url: 'file:///tmp/attachments/agent_1/user_1/4ad3d9d2-b461-4a55-ac05-ae970f22ee2a/brief.md',
+          name: 'brief.md',
+          source: {
+            text: { value: 'file content here', start: 0, end: 50 },
+            type: 'file',
+            path: '/tmp/attachments/agent_1/user_1/4ad3d9d2-b461-4a55-ac05-ae970f22ee2a/brief.md',
+          },
+        },
+      });
+
+      const result = trimPayload('kilocode', data) as {
+        properties: {
+          part: {
+            url: string;
+            name: string;
+            source: {
+              text: { value: string; start: number; end: number };
+              type: string;
+              path: string;
+            };
+          };
+        };
+      };
+
+      expect(result.properties.part.url).toBe(
+        'file:///tmp/attachments/agent_1/user_1/4ad3d9d2-b461-4a55-ac05-ae970f22ee2a/brief.md'
+      );
+      expect(result.properties.part.source.text.value).toBe('');
+      expect(result.properties.part.name).toBe('brief.md');
+      expect(result.properties.part.source.type).toBe('file');
+      expect(result.properties.part.source.path).toBe(
+        '/tmp/attachments/agent_1/user_1/4ad3d9d2-b461-4a55-ac05-ae970f22ee2a/brief.md'
+      );
+    });
+
+    it('preserves an http(s) url and strips only source.text.value', () => {
+      const data = createKilocodeEvent('message.part.updated', {
+        part: {
+          type: 'file',
+          url: 'https://example.com/brief.md',
+          name: 'brief.md',
+          source: {
+            text: { value: 'file content here', start: 0, end: 50 },
+            type: 'file',
+            path: '/foo',
+          },
+        },
+      });
+
+      const result = trimPayload('kilocode', data) as {
+        properties: {
+          part: {
+            url: string;
+            name: string;
+            source: { text: { value: string }; type: string; path: string };
+          };
+        };
+      };
+
+      expect(result.properties.part.url).toBe('https://example.com/brief.md');
+      expect(result.properties.part.source.text.value).toBe('');
+    });
+
+    it('preserves a small top-level data: url and strips source.text.value', () => {
       const data = {
         event: 'message.part.updated',
         part: {
@@ -325,7 +416,7 @@ describe('trimPayload', () => {
         };
       };
 
-      expect(result.part.url).toBe('');
+      expect(result.part.url).toBe('data:image/png;base64,top-level');
       expect(result.part.source.text.value).toBe('');
       expect(result.part.name).toBe('image.png');
       expect(result.part.source.type).toBe('file');
@@ -334,7 +425,7 @@ describe('trimPayload', () => {
       expect(result.part.source.text.end).toBe(50);
     });
 
-    it('strips both top-level and properties file parts', () => {
+    it('preserves small data: urls on both top-level and properties file parts', () => {
       const data = {
         event: 'message.part.updated',
         part: {
@@ -356,9 +447,9 @@ describe('trimPayload', () => {
         properties: { part: { url: string; source: { text: { value: string } } } };
       };
 
-      expect(result.part.url).toBe('');
+      expect(result.part.url).toBe('data:image/png;base64,top-level');
       expect(result.part.source.text.value).toBe('');
-      expect(result.properties.part.url).toBe('');
+      expect(result.properties.part.url).toBe('data:image/png;base64,properties');
       expect(result.properties.part.source.text.value).toBe('');
     });
   });

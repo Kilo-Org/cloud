@@ -1,5 +1,6 @@
 import { type Href, useRouter } from 'expo-router';
 import { SearchX } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -13,13 +14,14 @@ import { Text } from '@/components/ui/text';
  */
 export function InvalidRouteState({ backTo }: Readonly<{ backTo: Href }>) {
   const router = useRouter();
+  const { t } = useTranslation();
 
   return (
     <View className="flex-1 items-center justify-center bg-background">
       <EmptyState
         icon={SearchX}
-        title="Page not found"
-        description="This link is no longer valid."
+        title={t('invalidRoute.title')}
+        description={t('invalidRoute.description')}
         action={
           <Button
             variant="outline"
@@ -27,7 +29,7 @@ export function InvalidRouteState({ backTo }: Readonly<{ backTo: Href }>) {
               router.replace(backTo);
             }}
           >
-            <Text>Go back</Text>
+            <Text>{t('invalidRoute.goBack')}</Text>
           </Button>
         }
       />

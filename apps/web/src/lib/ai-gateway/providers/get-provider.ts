@@ -1,4 +1,7 @@
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type {
+  GatewayRequest,
+  OpenRouterProviderConfig,
+} from '@/lib/ai-gateway/providers/openrouter/types';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
 import { findKiloExclusiveModel, isKiloExclusiveModel } from '@/lib/ai-gateway/models';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
@@ -13,7 +16,11 @@ import { eq } from 'drizzle-orm';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
 import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import {
+  OPENROUTER,
+  tryGetProviderById,
+  VERCEL_AI_GATEWAY,
+} from '@/lib/ai-gateway/providers/provider-definitions';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
 import { buildDirectProvider } from '@/lib/ai-gateway/experiments/build-direct-provider';
@@ -83,6 +90,7 @@ async function checkDirectBYOK(
       apiUrl: directByok.base_url,
       apiUrlOverrides: directByok.base_url_overrides,
       apiKey: userByok[0].decryptedAPIKey,
+      apiKeyHeader: null,
       supportedChatApis: directByok.supported_chat_apis,
       responseTransforms: null,
       async transformRequest(context) {
@@ -130,8 +138,10 @@ async function checkCustomLlm(
   }
 
   let apiKey: string;
-  if (parsedCredentials.data.type === 'api_key') {
+  let apiKeyHeader: 'x-api-key' | null = null;
+  if (parsedCredentials.data.type === 'api_key' || parsedCredentials.data.type === 'x-api-key') {
     apiKey = parsedCredentials.data.api_key;
+    apiKeyHeader = parsedCredentials.data.type === 'x-api-key' ? 'x-api-key' : null;
   } else {
     apiKey = await getGoogleServiceAccountAccessToken(parsedCredentials.data);
   }
@@ -151,7 +161,8 @@ async function checkCustomLlm(
             ? 'responses'
             : 'chat_completions',
       ],
-      resolvedCustomLlm
+      resolvedCustomLlm,
+      apiKeyHeader
     ),
     userByok: null,
     bypassAccessCheck: true,
@@ -191,10 +202,22 @@ export type GetProviderInput = {
   /** Machine identifier from `x-kilocode-machineid`. Used as the machine-
    *  cohort allocation subject for experiment routing. */
   machineId: string | null;
+  /** Resolves organization/group provider policy only when selecting a managed
+   * gateway. Direct BYOK and custom LLM routes remain exempt. */
+  getRoutingProviderConfig?: () => Promise<OpenRouterProviderConfig | undefined>;
 };
 
 export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
-  const { requestedModel, request, user, organizationId, taskId, clientIp, machineId } = input;
+  const {
+    requestedModel,
+    request,
+    user,
+    organizationId,
+    taskId,
+    clientIp,
+    machineId,
+    getRoutingProviderConfig,
+  } = input;
 
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
   if (directByokByok) {
@@ -205,7 +228,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   if (vercelByok) {
     return {
       kind: 'provider',
-      provider: PROVIDERS.VERCEL_AI_GATEWAY,
+      provider: VERCEL_AI_GATEWAY,
       userByok: vercelByok,
       bypassAccessCheck: false,
     };
@@ -239,7 +262,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     if (selection?.status === 'active') {
       return {
         kind: 'provider',
-        provider: buildDirectProvider('experiment', ['chat_completions'], selection.upstream),
+        provider: buildDirectProvider('experiment', ['chat_completions'], selection.upstream, null),
         userByok: null,
         bypassAccessCheck: false,
         experiment: {
@@ -263,14 +286,21 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   const eligibleForVercelRouting =
     !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');
+  const resolveRoutingProviderConfig = async () =>
+    (await getRoutingProviderConfig?.()) ?? request.body.provider;
 
   if (
     eligibleForVercelRouting &&
-    (await shouldRouteToVercel(requestedModel, request, taskId || user.id))
+    (await shouldRouteToVercel(
+      requestedModel,
+      request,
+      taskId || user.id,
+      resolveRoutingProviderConfig
+    ))
   ) {
     return {
       kind: 'provider',
-      provider: PROVIDERS.VERCEL_AI_GATEWAY,
+      provider: VERCEL_AI_GATEWAY,
       userByok: null,
       bypassAccessCheck: false,
     };
@@ -278,9 +308,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   return {
     kind: 'provider',
-    provider:
-      Object.values(PROVIDERS).find(p => p.id === kiloExclusiveModel?.gateway) ??
-      PROVIDERS.OPENROUTER,
+    provider: (kiloExclusiveModel && tryGetProviderById(kiloExclusiveModel.gateway)) ?? OPENROUTER,
     userByok: null,
     bypassAccessCheck: false,
   };
@@ -294,16 +322,16 @@ export async function getEmbeddingProvider(
   // 1. BYOK check — route through Vercel AI Gateway when user has their own key
   const userByok = await checkVercelBYOK(user, requestedModel, organizationId);
   if (userByok) {
-    return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok };
+    return { provider: VERCEL_AI_GATEWAY, userByok };
   }
 
   // 2. All non-BYOK embedding requests go through OpenRouter
-  return { provider: PROVIDERS.OPENROUTER, userByok: null };
+  return { provider: OPENROUTER, userByok: null };
 }
 
 export async function getTranscriptionProvider(): Promise<{
   provider: Provider;
   userByok: BYOKResult[] | null;
 }> {
-  return { provider: PROVIDERS.OPENROUTER, userByok: null };
+  return { provider: OPENROUTER, userByok: null };
 }

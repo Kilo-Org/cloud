@@ -7,8 +7,25 @@ import {
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+
 import { ChildSessionMessage, ChildSessionSection } from './child-session-section';
+import { ChildSessionModelLabel } from './child-session-model-label';
 import { MessageErrorBoundary } from './message-error-boundary';
+
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -80,6 +97,17 @@ function makeMessage(parts: Part[]): StoredMessage {
     parts,
   };
 }
+
+const modelOption: SessionModelOption = {
+  id: 'kilo/model',
+  name: 'Test Model',
+  displayId: 'model',
+  variants: [],
+  isPreferred: false,
+  showGatewayMetadata: false,
+  provider: { id: 'kilo', name: 'Kilo' },
+  modelRef: { providerID: 'kilo', modelID: 'model' },
+};
 
 function findAll(
   node: unknown,
@@ -208,5 +236,70 @@ describe('ChildSessionMessage routing seam', () => {
     );
     expect(limitTexts).toHaveLength(1);
     expect(renderPart).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChildSessionSection model label', () => {
+  it('renders the model label when child messages carry model data', () => {
+    const childMessages = [makeMessage([makeTextPart('child text')])];
+    const onOpenChildSession = vi.fn<(sessionId: string, title: string) => void>();
+    const part = makeToolPart('task', taskCompletedState);
+
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = ChildSessionSection({
+      part,
+      childMessages,
+      modelOptions: [modelOption],
+      onOpenChildSession,
+    });
+
+    const labels = findByType(root, ChildSessionModelLabel);
+    expect(labels).toHaveLength(1);
+    expect(labels[0]?.props).toMatchObject({ modelLabel: 'Test Model' });
+  });
+
+  it('hides the model label when child messages are empty and still renders the card', () => {
+    const onOpenChildSession = vi.fn<(sessionId: string, title: string) => void>();
+    const part = makeToolPart('task', taskCompletedState);
+
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = ChildSessionSection({
+      part,
+      childMessages: [],
+      modelOptions: [modelOption],
+      onOpenChildSession,
+    });
+
+    expect(findByType(root, ChildSessionModelLabel)).toHaveLength(0);
+    const taskNameTexts = findAll(
+      root,
+      el => el.type === 'Text' && textChildren(el) === 'child task'
+    );
+    expect(taskNameTexts).toHaveLength(1);
+  });
+
+  it('passes modelOptions through to the nested ChildSessionSection', () => {
+    const childMessages = [makeMessage([makeTextPart('child text')])];
+    const getChildMessages = vi.fn((id: string) => (id === 'child-1' ? childMessages : []));
+    const renderPart = vi.fn();
+    const onOpenChildSession = vi.fn<(sessionId: string, title: string) => void>();
+
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = ChildSessionMessage({
+      message: makeMessage([makeToolPart('task', taskCompletedState)]),
+      depth: 0,
+      getChildMessages,
+      renderPart,
+      onOpenChildSession,
+      modelOptions: [modelOption],
+    });
+
+    const sections = findByType(root, ChildSessionSection);
+    expect(sections).toHaveLength(1);
+    const section = sections[0];
+    if (!section) {
+      throw new Error('expected ChildSessionSection');
+    }
+    expect(section.props).toMatchObject({ modelOptions: [modelOption] });
   });
 });

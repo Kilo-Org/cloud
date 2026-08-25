@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { type LayoutChangeEvent, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
+import { useTranslation } from 'react-i18next';
 
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
@@ -87,6 +88,7 @@ export function MonoScrollBlock({
 }: Readonly<MonoScrollBlockProps>) {
   const textSelectable = useTranscriptTextSelectable();
   const sheet = useMonoScrollSheet();
+  const { t } = useTranslation();
   const textMode = sheet?.mode ?? 'scroll';
   const track = sheet?.track;
   const { displayText, isTruncated } = prepareMonoScrollContent(content, maxLength);
@@ -121,10 +123,10 @@ export function MonoScrollBlock({
         )}
         {isTruncated ? (
           <Text
-            accessibilityLabel="Content truncated"
+            accessibilityLabel={t('monoScrollBlock.contentTruncated')}
             className="mt-1 text-xs text-muted-foreground"
           >
-            Truncated
+            {t('monoScrollBlock.truncated')}
           </Text>
         ) : null}
       </View>
@@ -158,8 +160,11 @@ export function MonoScrollBlock({
         )}
       </ScrollView>
       {isTruncated ? (
-        <Text accessibilityLabel="Content truncated" className="mt-1 text-xs text-muted-foreground">
-          Truncated
+        <Text
+          accessibilityLabel={t('monoScrollBlock.contentTruncated')}
+          className="mt-1 text-xs text-muted-foreground"
+        >
+          {t('monoScrollBlock.truncated')}
         </Text>
       ) : null}
     </View>

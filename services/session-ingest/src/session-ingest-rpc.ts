@@ -14,6 +14,7 @@ import {
   type CloudAgentRootSessionSnapshot,
   type CloudAgentRootSessionSummary,
   type CreateSessionForCloudAgentParams,
+  type CreateSessionForCloudAgentResult,
   type DeleteSessionForCloudAgentParams,
   type GetCloudAgentRootSessionMessagesParams,
   type GetCloudAgentRootSessionMessagesResult,
@@ -28,17 +29,22 @@ import {
 } from '@kilocode/session-ingest-contracts';
 
 import type { Env } from './env';
-import { getSessionIngestDO } from './dos/SessionIngestDO';
+import { getSessionIngestDO, type InspectCloneStageResult } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
-import { withDORetry } from '@kilocode/worker-utils';
+import { normalizeGitUrl, withDORetry } from '@kilocode/worker-utils';
 import { app } from './app';
 import { mapSessionEventRow, notifyUserSessionEvent } from './session-events';
+import { cloneSessionIntoDestination } from './clone/session-clone';
 import {
   canCreateCliSessionForUser,
   USER_SESSION_ADMISSION_ERROR,
 } from './services/user-session-admission';
 
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
+const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
+  'Cloud Agent root session identity conflict';
+
+type CliSessionsV2Row = typeof cli_sessions_v2.$inferSelect;
 
 function databaseTimestampToMilliseconds(value: string): number {
   const timestamp = new Date(value).getTime();
@@ -59,6 +65,30 @@ function personalOrAccessibleOrganizationCondition() {
   return or(isNull(cli_sessions_v2.organization_id), isNotNull(organization_memberships.id));
 }
 
+/**
+ * True when an existing destination root row cannot be claimed by this Cloud
+ * Agent create. Mirrors the identity check inside the insert transaction so the
+ * pre-clone read and the transactional check agree on what "conflict" means.
+ */
+function destinationIdentityConflicts(
+  existing: Pick<
+    CliSessionsV2Row,
+    | 'parent_session_id'
+    | 'cloud_agent_session_id'
+    | 'cloud_agent_session_scope_id'
+    | 'organization_id'
+  >,
+  parsed: CreateSessionForCloudAgentParams
+): boolean {
+  return (
+    existing.parent_session_id !== null ||
+    existing.cloud_agent_session_id !== parsed.cloudAgentSessionId ||
+    (existing.cloud_agent_session_scope_id !== null &&
+      existing.cloud_agent_session_scope_id !== parsed.cloudAgentSessionId) ||
+    existing.organization_id !== (parsed.organizationId ?? null)
+  );
+}
+
 export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIngestRpcMethods {
   // Delegate HTTP requests to the Hono app so callers using the service
   // binding can `.fetch()` against this entrypoint (not just call RPC methods).
@@ -72,78 +102,91 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
    *
    * Concurrent retries are idempotent, but an existing session cannot be rebound
    * to another Cloud Agent session scope.
+   *
+   * When `cloneFromKiloSessionId` is absent the legacy empty-storage path runs
+   * unchanged and returns a zero-item clone acknowledgement. When present, the
+   * source transcript is cloned into the destination Durable Object before the
+   * PostgreSQL insert; the clone is finalized before the row is written.
    */
-  async createSessionForCloudAgent(params: CreateSessionForCloudAgentParams): Promise<void> {
+  async createSessionForCloudAgent(
+    params: CreateSessionForCloudAgentParams
+  ): Promise<CreateSessionForCloudAgentResult> {
     const parsed = createSessionForCloudAgentSchema.parse(params);
+    const inputGitUrl = parsed.gitUrl === undefined ? undefined : normalizeGitUrl(parsed.gitUrl);
 
-    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
-
-    const { existingRow, persistedRow } = await db.transaction(async tx => {
-      if (!(await canCreateCliSessionForUser(tx, parsed.kiloUserId))) {
-        throw new Error(USER_SESSION_ADMISSION_ERROR);
+    let copiedItemCount = 0;
+    if (parsed.cloneFromKiloSessionId !== undefined) {
+      // Destination claim pre-check: read the existing destination root row
+      // before any clone write. A conflicting identity rejects without touching
+      // the destination Durable Object or R2; a matching identity is an
+      // idempotent retry that returns ready without re-cloning.
+      const existingDestination = await this.findExistingDestinationRootRow(parsed);
+      if (existingDestination) {
+        if (destinationIdentityConflicts(existingDestination, parsed)) {
+          return { status: 'rejected', code: 'destination_conflict' };
+        }
+        return { status: 'ready', clone: { sessionId: parsed.sessionId, copiedItemCount: 0 } };
       }
 
-      const [created] = await tx
-        .insert(cli_sessions_v2)
-        .values({
-          session_id: parsed.sessionId,
-          kilo_user_id: parsed.kiloUserId,
-          cloud_agent_session_id: parsed.cloudAgentSessionId,
-          cloud_agent_session_scope_id: parsed.cloudAgentSessionId,
-          organization_id: parsed.organizationId ?? null,
-          created_on_platform: parsed.createdOnPlatform,
-          ...(parsed.title !== undefined ? { title: parsed.title } : {}),
-          version: 0,
-        })
-        .onConflictDoNothing({
-          target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
-        })
-        .returning();
-      if (created) return { existingRow: undefined, persistedRow: created };
+      const source = await this.findOwnedAccessibleSession({
+        kiloUserId: parsed.kiloUserId,
+        kiloSessionId: parsed.cloneFromKiloSessionId,
+      });
+      if (!source) {
+        return { status: 'rejected', code: 'source_access_denied' };
+      }
 
-      const [existing] = await tx
-        .select()
-        .from(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.session_id, parsed.sessionId),
-            eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
-          )
-        )
-        .limit(1)
-        .for('update');
+      const outcome = await cloneSessionIntoDestination({
+        env: this.env,
+        kiloUserId: parsed.kiloUserId,
+        sourceSessionId: parsed.cloneFromKiloSessionId,
+        destinationSessionId: parsed.sessionId,
+        sourceOrganizationId: source.organizationId,
+        destinationOrganizationId: parsed.organizationId ?? null,
+        destinationTitle: parsed.title,
+      });
+
+      if (outcome.status === 'rejected') return { status: 'rejected', code: outcome.code };
+      if (outcome.status === 'in_progress') return { status: 'in_progress' };
+      copiedItemCount = outcome.copiedItemCount;
+    }
+
+    let existingRow: CliSessionsV2Row | undefined;
+    let persistedRow: CliSessionsV2Row | undefined;
+    try {
+      const inserted = await this.insertCloudAgentRootSession(parsed, inputGitUrl);
+      existingRow = inserted.existingRow;
+      persistedRow = inserted.persistedRow;
+    } catch (error) {
+      if (parsed.cloneFromKiloSessionId === undefined) throw error;
       if (
-        !existing ||
-        existing.parent_session_id !== null ||
-        existing.cloud_agent_session_id !== parsed.cloudAgentSessionId ||
-        (existing.cloud_agent_session_scope_id !== null &&
-          existing.cloud_agent_session_scope_id !== parsed.cloudAgentSessionId)
+        error instanceof Error &&
+        error.message === CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR
       ) {
-        throw new Error('Cloud Agent root session identity conflict');
+        // The destination session ID is already claimed by another session.
+        // Never clear that other session's Durable Object data.
+        return { status: 'rejected', code: 'destination_conflict' };
       }
-
-      const [updated] = await tx
-        .update(cli_sessions_v2)
-        .set({
-          cloud_agent_session_scope_id: parsed.cloudAgentSessionId,
-          ...(parsed.organizationId !== undefined
-            ? { organization_id: parsed.organizationId }
-            : {}),
-        })
-        .where(
-          and(
-            eq(cli_sessions_v2.session_id, parsed.sessionId),
-            eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
-          )
-        )
-        .returning();
-      return { existingRow: existing, persistedRow: updated };
-    });
+      if (await this.findMatchingCommittedRootSession(parsed)) {
+        return { status: 'ready', clone: { sessionId: parsed.sessionId, copiedItemCount } };
+      }
+      // The insert did not commit: reset the unpublished destination clone and
+      // its R2 objects, then rethrow so the caller treats it as retryable.
+      await withDORetry(
+        () =>
+          getSessionIngestDO(this.env, {
+            kiloUserId: parsed.kiloUserId,
+            sessionId: parsed.sessionId,
+          }),
+        stub => stub.resetCloneStage(),
+        'SessionIngestDO.resetCloneStage'
+      );
+      throw error;
+    }
 
     const hasMeaningfulChange = existingRow
       ? existingRow.cloud_agent_session_scope_id !== parsed.cloudAgentSessionId ||
-        (parsed.organizationId !== undefined &&
-          existingRow.organization_id !== parsed.organizationId)
+        (inputGitUrl !== undefined && existingRow.git_url == null)
       : true;
 
     if (existingRow && hasMeaningfulChange && persistedRow) {
@@ -174,6 +217,133 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         this.ctx
       );
     }
+
+    return { status: 'ready', clone: { sessionId: parsed.sessionId, copiedItemCount } };
+  }
+
+  /**
+   * Read the existing destination root row for `(sessionId, kiloUserId)` without
+   * writing. Used by the clone pre-check so a claimed destination is detected
+   * before any Durable Object or R2 mutation.
+   */
+  private async findExistingDestinationRootRow(
+    parsed: CreateSessionForCloudAgentParams
+  ): Promise<CliSessionsV2Row | undefined> {
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const rows = await db
+      .select()
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.sessionId),
+          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
+        )
+      )
+      .limit(1);
+    return rows[0];
+  }
+
+  /**
+   * Insert (or idempotently claim) the cli_sessions_v2 root row for a Cloud
+   * Agent session. Runs the admission check and the identity-conflict check in
+   * one short transaction. No Durable Object or R2 work runs inside it.
+   */
+  private async insertCloudAgentRootSession(
+    parsed: CreateSessionForCloudAgentParams,
+    inputGitUrl: string | undefined
+  ): Promise<{
+    existingRow: CliSessionsV2Row | undefined;
+    persistedRow: CliSessionsV2Row | undefined;
+  }> {
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+
+    return db.transaction(async tx => {
+      if (!(await canCreateCliSessionForUser(tx, parsed.kiloUserId))) {
+        throw new Error(USER_SESSION_ADMISSION_ERROR);
+      }
+
+      const [created] = await tx
+        .insert(cli_sessions_v2)
+        .values({
+          session_id: parsed.sessionId,
+          kilo_user_id: parsed.kiloUserId,
+          cloud_agent_session_id: parsed.cloudAgentSessionId,
+          cloud_agent_session_scope_id: parsed.cloudAgentSessionId,
+          organization_id: parsed.organizationId ?? null,
+          created_on_platform: parsed.createdOnPlatform,
+          ...(parsed.title !== undefined ? { title: parsed.title } : {}),
+          ...(inputGitUrl !== undefined ? { git_url: inputGitUrl } : {}),
+          version: 0,
+        })
+        .onConflictDoNothing({
+          target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
+        })
+        .returning();
+      if (created) return { existingRow: undefined, persistedRow: created };
+
+      const [existing] = await tx
+        .select()
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, parsed.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
+          )
+        )
+        .limit(1)
+        .for('update');
+      if (!existing || destinationIdentityConflicts(existing, parsed)) {
+        throw new Error(CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR);
+      }
+
+      // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
+      const repositoryHealed = inputGitUrl !== undefined && existing.git_url == null;
+      if (
+        inputGitUrl !== undefined &&
+        existing.git_url != null &&
+        existing.git_url !== inputGitUrl
+      ) {
+        throw new Error(CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR);
+      }
+
+      const [updated] = await tx
+        .update(cli_sessions_v2)
+        .set({
+          cloud_agent_session_scope_id: parsed.cloudAgentSessionId,
+          ...(repositoryHealed ? { git_url: inputGitUrl } : {}),
+        })
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, parsed.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
+          )
+        )
+        .returning();
+      return { existingRow: existing, persistedRow: updated };
+    });
+  }
+
+  /**
+   * Confirm whether the destination root row was committed despite a failed
+   * insert (e.g. a transient error after the write). Used to keep same-source
+   * retries idempotent across clone finalization and row insertion.
+   */
+  private async findMatchingCommittedRootSession(
+    parsed: CreateSessionForCloudAgentParams
+  ): Promise<boolean> {
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const rows = await db
+      .select({ sessionId: cli_sessions_v2.session_id })
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parsed.sessionId),
+          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId),
+          eq(cli_sessions_v2.cloud_agent_session_id, parsed.cloudAgentSessionId)
+        )
+      )
+      .limit(1);
+    return rows.length > 0;
   }
 
   async resolveCloudAgentRootSessionForKiloSession(
@@ -364,10 +534,13 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
   private async findOwnedAccessibleSession(params: {
     kiloUserId: string;
     kiloSessionId: string;
-  }): Promise<{ kiloSessionId: string } | null> {
+  }): Promise<{ kiloSessionId: string; organizationId: string | null } | null> {
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     const rows = await db
-      .select({ sessionId: cli_sessions_v2.session_id })
+      .select({
+        sessionId: cli_sessions_v2.session_id,
+        organizationId: cli_sessions_v2.organization_id,
+      })
       .from(cli_sessions_v2)
       .leftJoin(organization_memberships, organizationMembershipJoinCondition(params.kiloUserId))
       .where(
@@ -378,7 +551,9 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         )
       )
       .limit(1);
-    return rows[0] ? { kiloSessionId: rows[0].sessionId } : null;
+    return rows[0]
+      ? { kiloSessionId: rows[0].sessionId, organizationId: rows[0].organizationId }
+      : null;
   }
 
   /**
@@ -386,9 +561,75 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
    * Called via service binding from cloud-agent-next for rollback when DO prepare() fails.
    *
    * Scoped to the user (composite PK: session_id + kilo_user_id).
+   *
+   * When `cloneSourceSessionId` is present this is a clone rollback: the row,
+   * clone DO stage, and its R2 bodies are cleared only when the destination
+   * clone matches that source. A session that belongs to another source is
+   * never cleared.
    */
   async deleteSessionForCloudAgent(params: DeleteSessionForCloudAgentParams): Promise<void> {
     const parsed = deleteSessionForCloudAgentSchema.parse(params);
+
+    if (parsed.cloneSourceSessionId !== undefined) {
+      const cloneSourceSessionId = parsed.cloneSourceSessionId;
+      const inspected = await withDORetry<
+        ReturnType<typeof getSessionIngestDO>,
+        InspectCloneStageResult
+      >(
+        () =>
+          getSessionIngestDO(this.env, {
+            kiloUserId: parsed.kiloUserId,
+            sessionId: parsed.sessionId,
+          }),
+        stub =>
+          stub.inspectCloneStage({
+            sourceSessionId: cloneSourceSessionId,
+            destinationSessionId: parsed.sessionId,
+          }),
+        'SessionIngestDO.inspectCloneStage'
+      );
+
+      const matches = inspected.status === 'complete' || inspected.status === 'in_progress';
+      if (!matches) return;
+
+      await this.deleteRootSessionRow(parsed);
+
+      const errors: string[] = [];
+      try {
+        await withDORetry(
+          () =>
+            getSessionIngestDO(this.env, {
+              kiloUserId: parsed.kiloUserId,
+              sessionId: parsed.sessionId,
+            }),
+          stub => stub.resetCloneStage(),
+          'SessionIngestDO.resetCloneStage'
+        );
+      } catch (error) {
+        errors.push(
+          `SessionIngestDO.resetCloneStage: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+      try {
+        await withDORetry(
+          () => getSessionAccessCacheDO(this.env, { kiloUserId: parsed.kiloUserId }),
+          sessionCache => sessionCache.remove(parsed.sessionId),
+          'SessionAccessCacheDO.remove'
+        );
+      } catch (error) {
+        errors.push(
+          `SessionAccessCacheDO.remove: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+      if (errors.length > 0) {
+        console.error('Failed to clear caches after clone rollback (non-fatal)', {
+          sessionId: parsed.sessionId,
+          kiloUserId: parsed.kiloUserId,
+          errors,
+        });
+      }
+      return;
+    }
 
     // When onlyIfEmpty is set, atomically check emptiness and clear within a
     // single DO request to prevent a TOCTOU race where ingest data arrives
@@ -408,6 +649,55 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       }
     }
 
+    await this.deleteRootSessionRow(parsed);
+
+    // Clear caches — best-effort; don't fail the delete if DOs are unavailable.
+    const cacheErrors: string[] = [];
+    try {
+      await withDORetry(
+        () => getSessionAccessCacheDO(this.env, { kiloUserId: parsed.kiloUserId }),
+        sessionCache => sessionCache.remove(parsed.sessionId),
+        'SessionAccessCacheDO.remove'
+      );
+    } catch (error) {
+      cacheErrors.push(
+        `SessionAccessCacheDO.remove: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    // When onlyIfEmpty was set, the DO was already cleared atomically above.
+    if (!parsed.onlyIfEmpty) {
+      try {
+        await withDORetry(
+          () =>
+            getSessionIngestDO(this.env, {
+              kiloUserId: parsed.kiloUserId,
+              sessionId: parsed.sessionId,
+            }),
+          stub => stub.clear(),
+          'SessionIngestDO.clear'
+        );
+      } catch (error) {
+        cacheErrors.push(
+          `SessionIngestDO.clear: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+
+    if (cacheErrors.length > 0) {
+      console.error('Failed to clear caches after delete (non-fatal)', {
+        sessionId: parsed.sessionId,
+        kiloUserId: parsed.kiloUserId,
+        errors: cacheErrors,
+      });
+    }
+  }
+
+  /**
+   * Delete the cli_sessions_v2 root row scoped to the user and emit the
+   * session.deleted event when a row existed.
+   */
+  private async deleteRootSessionRow(parsed: DeleteSessionForCloudAgentParams): Promise<void> {
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
     const deletedRows = await db
@@ -450,47 +740,6 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         },
         this.ctx
       );
-    }
-
-    // Clear caches — best-effort; don't fail the delete if DOs are unavailable.
-    const cacheErrors: string[] = [];
-    try {
-      await withDORetry(
-        () => getSessionAccessCacheDO(this.env, { kiloUserId: parsed.kiloUserId }),
-        sessionCache => sessionCache.remove(parsed.sessionId),
-        'SessionAccessCacheDO.remove'
-      );
-    } catch (error) {
-      cacheErrors.push(
-        `SessionAccessCacheDO.remove: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-
-    // When onlyIfEmpty was set, the DO was already cleared atomically above.
-    if (!parsed.onlyIfEmpty) {
-      try {
-        await withDORetry(
-          () =>
-            getSessionIngestDO(this.env, {
-              kiloUserId: parsed.kiloUserId,
-              sessionId: parsed.sessionId,
-            }),
-          stub => stub.clear(),
-          'SessionIngestDO.clear'
-        );
-      } catch (error) {
-        cacheErrors.push(
-          `SessionIngestDO.clear: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-    }
-
-    if (cacheErrors.length > 0) {
-      console.error('Failed to clear caches after delete (non-fatal)', {
-        sessionId: parsed.sessionId,
-        kiloUserId: parsed.kiloUserId,
-        errors: cacheErrors,
-      });
     }
   }
 }

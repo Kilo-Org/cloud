@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the panel composes the status card, remediation controls, summary PR button, timeline, and attempt history; each is a small rendered surface that mirrors the shared remediation pattern. Splitting would re-encode the same hooks. */
 import {
   formatRemediationOrigin,
   formatValidationEvidenceEntry,
@@ -5,7 +6,9 @@ import {
   getRemediationUnavailableCopy,
 } from '@kilocode/app-shared/security-agent';
 import { Wrench } from '@/components/ui/icons';
-import { ActivityIndicator, Alert, Linking, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ActivityIndicator, Alert, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
@@ -15,12 +18,16 @@ import { Button } from '@/components/ui/button';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
+import { resolveCodeReviewerOpenPrDestination } from '@/lib/code-reviewer-open-pr-destination';
+import { openExternalUrl } from '@/lib/external-link';
 import {
   useCancelSecurityRemediation,
   useRetrySecurityRemediation,
   useStartSecurityRemediation,
 } from '@/lib/hooks/use-security-remediation';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getPrReviewPath } from '@/lib/profile-agent-navigation';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -32,6 +39,22 @@ type FindingRemediationPanelProps = {
   isError: boolean;
   onRetry: () => void;
 };
+
+// Local label map for the remediation timeline events, keyed on the audit
+// action values (same labels as the web audit report ACTION_LABELS).
+const REMEDIATION_TIMELINE_LABELS = {
+  'security.remediation.queued': 'securityAgent.remediation.timeline.queued',
+  'security.remediation.pr_opened': 'securityAgent.remediation.timeline.prOpened',
+  'security.remediation.failed': 'securityAgent.remediation.timeline.failed',
+  'security.remediation.blocked': 'securityAgent.remediation.timeline.blocked',
+  'security.remediation.no_changes_needed': 'securityAgent.remediation.timeline.noChangesNeeded',
+  'security.remediation.cancelled': 'securityAgent.remediation.timeline.cancelled',
+} as const satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
 
 // Ported from FindingDetailDialog.tsx:1849 (getRemediationPresentation) and
 // remediation-unavailable-copy.ts — capability/blocker, current summary, and
@@ -47,9 +70,21 @@ export function FindingRemediationPanel({
   onRetry,
 }: Readonly<FindingRemediationPanelProps>) {
   const colors = useThemeColors();
+  const router = useRouter();
+  const { t } = useTranslation();
+  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const startRemediation = useStartSecurityRemediation(scope);
   const retryRemediation = useRetrySecurityRemediation(scope);
   const cancelRemediation = useCancelSecurityRemediation(scope);
+
+  const openPullRequest = (url: string) => {
+    const destination = resolveCodeReviewerOpenPrDestination(url, prReviewEnabled);
+    if (destination.kind === 'in-app') {
+      router.push(getPrReviewPath(destination.owner, destination.repo, destination.number));
+      return;
+    }
+    void openExternalUrl(url, { label: t('securityAgent.remediation.pullRequest') });
+  };
 
   if (isLoading && !analysis) {
     return (
@@ -63,7 +98,7 @@ export function FindingRemediationPanel({
   if (isError && !analysis) {
     return (
       <View className="items-center justify-center py-8">
-        <QueryError message="Could not load remediation status" onRetry={onRetry} />
+        <QueryError message={t('securityAgent.remediation.couldNotLoad')} onRetry={onRetry} />
       </View>
     );
   }
@@ -73,13 +108,17 @@ export function FindingRemediationPanel({
       <EmptyState
         icon={Wrench}
         placement="top"
-        title="No analysis yet"
-        description="Run one from the Details tab"
+        title={t('securityAgent.remediation.noAnalysisTitle')}
+        description={t('securityAgent.remediation.noAnalysisDescription')}
       />
     );
   }
 
   const { remediationCapability, remediationSummary, remediationAttempts } = analysis;
+  // A separately released client can talk to an old backend that omits the new
+  // `remediationTimeline` field, so the non-nullable type is not a runtime guarantee.
+  // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
+  const remediationTimeline = analysis.remediationTimeline ?? [];
   const latestAttempt = remediationAttempts[0] ?? null;
   const summaryPrUrl = remediationSummary?.prUrl;
   const presentation = getRemediationStatusPresentation(remediationSummary?.status ?? null, {
@@ -131,7 +170,7 @@ export function FindingRemediationPanel({
           {startRemediation.isPending ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : null}
-          <Text className="text-primary-foreground">Start remediation</Text>
+          <Text className="text-primary-foreground">{t('securityAgent.remediation.start')}</Text>
         </Button>
       ) : null}
 
@@ -146,7 +185,7 @@ export function FindingRemediationPanel({
           {retryRemediation.isPending ? (
             <ActivityIndicator size="small" color={colors.foreground} />
           ) : null}
-          <Text>Retry remediation</Text>
+          <Text>{t('securityAgent.remediation.retry')}</Text>
         </Button>
       ) : null}
 
@@ -160,12 +199,12 @@ export function FindingRemediationPanel({
               return;
             }
             Alert.alert(
-              'Cancel this remediation?',
-              'Security Agent will stop the in-progress remediation attempt.',
+              t('securityAgent.remediation.cancelTitle'),
+              t('securityAgent.remediation.cancelMessage'),
               [
-                { text: 'Keep running', style: 'cancel' },
+                { text: t('securityAgent.remediation.keepRunning'), style: 'cancel' },
                 {
-                  text: 'Cancel remediation',
+                  text: t('securityAgent.remediation.cancelRemediation'),
                   style: 'destructive',
                   onPress: () => {
                     cancelRemediation.mutate({ attemptId, findingId });
@@ -178,7 +217,7 @@ export function FindingRemediationPanel({
           {cancelRemediation.isPending ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
           ) : null}
-          <Text>Cancel remediation</Text>
+          <Text>{t('securityAgent.remediation.cancelRemediation')}</Text>
         </Button>
       ) : null}
 
@@ -186,19 +225,47 @@ export function FindingRemediationPanel({
         <Button
           variant="outline"
           onPress={() => {
-            void Linking.openURL(summaryPrUrl);
+            openPullRequest(summaryPrUrl);
           }}
         >
           <Text>
-            Open {remediationSummary.prDraft ? 'draft ' : ''}pull request
-            {remediationSummary.prNumber ? ` #${remediationSummary.prNumber}` : ''}
+            {t(
+              remediationSummary.prDraft
+                ? 'securityAgent.remediation.openDraftPullRequest'
+                : 'securityAgent.remediation.openPullRequest',
+              { number: remediationSummary.prNumber ? ` #${remediationSummary.prNumber}` : '' }
+            )}
           </Text>
         </Button>
       ) : null}
 
+      {remediationTimeline.length > 0 ? (
+        <View className="gap-1.5 rounded-lg bg-card p-3">
+          <Text className="text-xs font-medium">{t('securityAgent.remediation.progress')}</Text>
+          <View className="gap-1">
+            {remediationTimeline.map((event, index) => {
+              const labelKey = lookup(REMEDIATION_TIMELINE_LABELS, event.action);
+              return (
+                <View
+                  key={`${event.action}-${event.occurredAt}-${index}`}
+                  className="flex-row items-center justify-between"
+                >
+                  <Text className="text-xs">{labelKey ? t(labelKey) : event.action}</Text>
+                  <Text variant="muted" className="text-xs">
+                    {timeAgo(parseTimestamp(event.occurredAt))}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
+
       {remediationAttempts.length > 0 ? (
         <CollapsibleSection
-          title={`Attempt history (${remediationAttempts.length})`}
+          title={t('securityAgent.remediation.attemptHistory', {
+            count: remediationAttempts.length,
+          })}
           defaultExpanded={remediationAttempts.length <= 2}
           // Attempt rows below are already their own card surface — a second
           // bg-secondary card wrapping them read as a card nested in a card.
@@ -220,7 +287,11 @@ export function FindingRemediationPanel({
               return (
                 <View key={attempt.id} className="gap-1.5 rounded-lg bg-card p-3">
                   <View className="flex-row items-center justify-between">
-                    <Text className="text-xs font-medium">Attempt #{attempt.attemptNumber}</Text>
+                    <Text className="text-xs font-medium">
+                      {t('securityAgent.remediation.attemptNumber', {
+                        number: attempt.attemptNumber,
+                      })}
+                    </Text>
                     <Text variant="muted" className="text-xs">
                       {timeAgo(parseTimestamp(attempt.updatedAt))}
                     </Text>
@@ -231,9 +302,21 @@ export function FindingRemediationPanel({
                     tone={attemptPresentation.tone}
                     spinning={attemptPresentation.spinning}
                   />
-                  <KvRow label="Started by" value={formatRemediationOrigin(attempt.origin)} />
-                  <KvRow label="Model" value={attempt.remediationModelSlug} selectable />
-                  <KvRow label="Branch" value={attempt.branchName} last selectable />
+                  <KvRow
+                    label={t('securityAgent.remediation.startedBy')}
+                    value={formatRemediationOrigin(attempt.origin)}
+                  />
+                  <KvRow
+                    label={t('securityAgent.remediation.model')}
+                    value={attempt.remediationModelSlug}
+                    selectable
+                  />
+                  <KvRow
+                    label={t('securityAgent.remediation.branch')}
+                    value={attempt.branchName}
+                    last
+                    selectable
+                  />
                   {outcome ? (
                     <Text variant="muted" className="text-xs" selectable>
                       {outcome}
@@ -258,11 +341,13 @@ export function FindingRemediationPanel({
                       variant="ghost"
                       size="sm"
                       onPress={() => {
-                        void Linking.openURL(attemptUrl);
+                        openPullRequest(attemptUrl);
                       }}
                     >
                       <Text>
-                        Open pull request{attempt.prNumber ? ` #${attempt.prNumber}` : ''}
+                        {t('securityAgent.remediation.openPullRequest', {
+                          number: attempt.prNumber ? ` #${attempt.prNumber}` : '',
+                        })}
                       </Text>
                     </Button>
                   ) : null}

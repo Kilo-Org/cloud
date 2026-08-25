@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Building2, User } from '@/components/ui/icons';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -17,6 +18,7 @@ import { useTRPC } from '@/lib/trpc';
 export function ScopeListScreen() {
   const router = useRouter();
   const trpc = useTRPC();
+  const { t } = useTranslation();
   const {
     data: orgs,
     isLoading,
@@ -39,7 +41,7 @@ export function ScopeListScreen() {
         <QueryError
           placement="top"
           variant="server"
-          title="Could not load organizations"
+          title={t('securityAgent.scopeList.couldNotLoad')}
           onRetry={() => void refetch()}
           isRetrying={isFetching}
           className="mt-3"
@@ -64,12 +66,12 @@ export function ScopeListScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Security Agent" />
+      <ScreenHeader title={t('securityAgent.scopeList.title')} />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         <ConfigureRow
           icon={User}
-          title="Personal"
-          subtitle="Your own repositories"
+          title={t('securityAgent.scopeList.personal')}
+          subtitle={t('securityAgent.scopeList.personalSubtitle')}
           onPress={() => {
             openScope(PERSONAL_SECURITY_SCOPE);
           }}

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, TextInput, View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -8,6 +9,7 @@ import { useConnectBitbucket } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export function BitbucketConnectForm({ scope }: Readonly<{ scope: string }>) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const tokenRef = useRef('');
   const [canConnect, setCanConnect] = useState(false);
@@ -22,7 +24,7 @@ export function BitbucketConnectForm({ scope }: Readonly<{ scope: string }>) {
       { accessToken: token },
       {
         onSuccess: () => {
-          toast.success('Bitbucket connected');
+          toast.success(t('codeReviewer.bitbucketConnect.connected'));
         },
       }
     );
@@ -30,16 +32,18 @@ export function BitbucketConnectForm({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="gap-3 rounded-lg bg-secondary p-6">
-      <Text className="text-center text-sm font-medium">Connect Bitbucket</Text>
-      <Text className="text-center text-xs text-muted-foreground">
-        Create a Workspace Access Token with the required scopes and paste it below.
+      <Text className="text-center text-sm font-medium">
+        {t('codeReviewer.bitbucketConnect.title')}
       </Text>
       <Text className="text-center text-xs text-muted-foreground">
-        Account: read · Repositories: read/write · Pull requests: read · Webhooks: read/write
+        {t('codeReviewer.bitbucketConnect.description')}
+      </Text>
+      <Text className="text-center text-xs text-muted-foreground">
+        {t('codeReviewer.bitbucketConnect.scopes')}
       </Text>
       <TextInput
         className="h-12 rounded-md border border-input bg-background px-3 text-sm leading-[normal] text-foreground"
-        placeholder="Workspace access token"
+        placeholder={t('codeReviewer.bitbucketConnect.tokenPlaceholder')}
         placeholderTextColor={colors.mutedForeground}
         autoCapitalize="none"
         autoCorrect={false}
@@ -55,7 +59,7 @@ export function BitbucketConnectForm({ scope }: Readonly<{ scope: string }>) {
         onPress={onConnect}
       >
         {connect.isPending ? <ActivityIndicator size="small" /> : null}
-        <Text>Connect</Text>
+        <Text>{t('codeReviewer.bitbucketConnect.connect')}</Text>
       </Button>
     </View>
   );

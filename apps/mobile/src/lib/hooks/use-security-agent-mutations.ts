@@ -1,7 +1,12 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import {
+  isLatestMutationGeneration,
+  nextMutationGeneration,
+} from '@/lib/hooks/mutation-generations';
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
 import {
   isOperationInProgress,
@@ -10,6 +15,8 @@ import {
 } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import {
   type FlattenedSecurityAgentConfig,
   type SecurityAgentConfig,
@@ -122,6 +129,8 @@ export function useSaveSecurityAgentConfig(scope: string) {
   const queryClient = useQueryClient();
   const configQueryKey = useSecurityAgentConfigQueryKey(scope);
 
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (patch: Omit<SecurityAgentConfigPatch, 'expectedRevision'>) => {
@@ -139,14 +148,18 @@ export function useSaveSecurityAgentConfig(scope: string) {
     },
     onMutate: async patch => {
       await queryClient.cancelQueries({ queryKey: configQueryKey });
+      const generation = nextMutationGeneration(hashKey(configQueryKey));
       const previous = queryClient.getQueryData<FlattenedSecurityAgentConfig>(configQueryKey);
       queryClient.setQueryData<FlattenedSecurityAgentConfig>(configQueryKey, old =>
         old ? { ...old, ...patch } : old
       );
-      return { previous, patch };
+      return { previous, patch, generation };
     },
     onError: (error, _patch, context) => {
-      if (context?.previous) {
+      if (
+        context?.previous &&
+        isLatestMutationGeneration(hashKey(configQueryKey), context.generation)
+      ) {
         const keys = Object.keys(context.patch) as (keyof SecurityAgentConfig)[];
         const restoredFields = pick(context.previous, keys);
         queryClient.setQueryData<FlattenedSecurityAgentConfig>(configQueryKey, old =>
@@ -163,27 +176,29 @@ export function useSaveSecurityAgentConfig(scope: string) {
     onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: configQueryKey });
       if (isPersonalSecurityScope(scope)) {
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: trpc.securityAgent.getDashboardStats.queryKey(),
-          }),
-          queryClient.invalidateQueries({ queryKey: trpc.securityAgent.listFindings.queryKey() }),
-        ]);
+        await queryClient.invalidateQueries({
+          queryKey: trpc.securityAgent.getDashboardStats.queryKey(),
+        });
+        scheduleCacheMaintenance(() => {
+          reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
+        });
         return;
       }
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: trpc.organizations.securityAgent.getDashboardStats.queryKey({
-            organizationId: scope,
-          }),
+      await queryClient.invalidateQueries({
+        queryKey: trpc.organizations.securityAgent.getDashboardStats.queryKey({
+          organizationId: scope,
         }),
-        queryClient.invalidateQueries({
-          queryKey: trpc.organizations.securityAgent.listFindings.queryKey({
-            organizationId: scope,
-          }),
-        }),
-      ]);
+      });
+      scheduleCacheMaintenance(() => {
+        reconcileFirstPage(
+          queryClient,
+          trpc.organizations.securityAgent.listFindings.queryKey({ organizationId: scope })
+        );
+      });
     },
+    // Serialize a save against a toggle on the same config so the network
+    // calls land in order; the generation guard above orders the rollbacks.
+    scope: { id: `security-agent-config:${scope}` },
   });
 }
 
@@ -192,6 +207,8 @@ export function useSetSecurityAgentEnabled(scope: string) {
   const queryClient = useQueryClient();
   const configQueryKey = useSecurityAgentConfigQueryKey(scope);
 
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.setEnabled.mutate>[0]) =>
@@ -203,23 +220,28 @@ export function useSetSecurityAgentEnabled(scope: string) {
           }),
     onMutate: async vars => {
       await queryClient.cancelQueries({ queryKey: configQueryKey });
+      const generation = nextMutationGeneration(hashKey(configQueryKey));
       const previous = queryClient.getQueryData<SecurityAgentConfig>(configQueryKey);
       queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
         old ? { ...old, isEnabled: vars.isEnabled } : old
       );
-      return { previous };
+      return { previous, generation };
     },
     onError: (error, _vars, context) => {
-      queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
-        old && context?.previous ? { ...old, isEnabled: context.previous.isEnabled } : old
-      );
+      if (
+        context?.previous &&
+        isLatestMutationGeneration(hashKey(configQueryKey), context.generation)
+      ) {
+        const previous = context.previous;
+        queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
+          old ? { ...old, isEnabled: previous.isEnabled } : old
+        );
+      }
       announcingToast.error(error.message);
     },
     onSuccess: result => {
       if ('initialSyncAdmissionFailed' in result && result.initialSyncAdmissionFailed) {
-        announcingToast.error(
-          'Security Agent was enabled, but the initial sync could not be queued. Sync again.'
-        );
+        announcingToast.error(i18n.t('securityAgent.initialSyncAdmissionFailed'));
       } else if ('initialSync' in result && result.initialSync) {
         trackSecurityAgentCommand(queryClient, scope, result.initialSync.commandId);
       }
@@ -251,6 +273,9 @@ export function useSetSecurityAgentEnabled(scope: string) {
         }),
       ]);
     },
+    // Serialize a toggle against a save on the same config so the network
+    // calls land in order; the generation guard above orders the rollbacks.
+    scope: { id: `security-agent-config:${scope}` },
   });
 }
 

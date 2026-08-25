@@ -1927,3 +1927,71 @@ describe('createUserWebConnection connection-state API', () => {
     client.destroy();
   });
 });
+
+describe('createUserWebConnection reconnect-exhaustion API', () => {
+  it('reports false initially and subscribes/unsubscribes listeners', () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    const listener = jest.fn();
+    const unsubscribe = client.onReconnectExhaustionChange(listener);
+
+    expect(client.isReconnectExhausted()).toBe(false);
+    expect(listener).not.toHaveBeenCalled();
+
+    unsubscribe();
+    client.destroy();
+  });
+
+  it('fires the listener on both edges and retryConnection resets the snapshot', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const listener = jest.fn();
+      const client = createUserWebConnection({
+        websocketUrl: WS_URL,
+        getAuthToken: () => 'token',
+        maxReconnectAttempts: 2,
+      });
+      client.onReconnectExhaustionChange(listener);
+      const release = client.retain();
+
+      // Drive the base connection to exhaustion without ever opening a socket
+      // (no successful message), so `hasEverOpened` stays false and reconnects
+      // skip the auth refresh.
+      sockets[0].onclose?.({ code: 1006 } as CloseEvent);
+      jest.advanceTimersByTime(60_000);
+      sockets[1].onclose?.({ code: 1006 } as CloseEvent);
+      jest.advanceTimersByTime(60_000);
+      sockets[2].onclose?.({ code: 1006 } as CloseEvent);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(true);
+      expect(client.isReconnectExhausted()).toBe(true);
+
+      client.retryConnection();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(listener).toHaveBeenCalledTimes(2);
+      expect(listener).toHaveBeenLastCalledWith(false);
+      expect(client.isReconnectExhausted()).toBe(false);
+      expect(sockets).toHaveLength(4);
+
+      release();
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('ignores exhaustion listeners registered after destroy()', () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.destroy();
+    const listener = jest.fn();
+
+    const unsubscribe = client.onReconnectExhaustionChange(listener);
+    unsubscribe();
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(client.isReconnectExhausted()).toBe(false);
+  });
+});

@@ -1,5 +1,6 @@
 import { Check } from '@/components/ui/icons';
 import { TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,7 @@ export function VersionPinRow({
   onConfirm: () => void;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const publishedAgo = item.published_at ? timeAgo(parseTimestamp(item.published_at)) : undefined;
   const showVariant = item.variant && item.variant !== 'default';
 
@@ -51,7 +53,9 @@ export function VersionPinRow({
             <Text className="text-sm font-medium">{item.openclaw_version}</Text>
             {isLatest && (
               <View className="rounded-full bg-info px-1.5 py-0.5">
-                <Text className="text-[10px] font-semibold text-info-foreground">latest</Text>
+                <Text className="text-[10px] font-semibold text-info-foreground">
+                  {t('kiloclaw.versionPin.latest')}
+                </Text>
               </View>
             )}
           </View>
@@ -70,17 +74,19 @@ export function VersionPinRow({
             disabled={isPinMutating}
             onPress={onToggle}
           >
-            <Text>{isDraftOpen ? 'Cancel' : 'Pin'}</Text>
+            <Text>{isDraftOpen ? t('common.cancel') : t('kiloclaw.versionPin.pin')}</Text>
           </Button>
         )}
       </View>
       {isDraftOpen && (
         <Animated.View entering={FadeIn.duration(150)} className="border-t border-border">
           <View className="py-3 gap-3">
-            <Text className="text-xs font-medium text-muted-foreground">Reason (optional)</Text>
+            <Text className="text-xs font-medium text-muted-foreground">
+              {t('kiloclaw.versionPin.reasonOptional')}
+            </Text>
             <TextInput
               className="rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground"
-              placeholder="Why are you pinning this version?"
+              placeholder={t('kiloclaw.versionPin.reasonPlaceholder')}
               placeholderTextColor={colors.mutedForeground}
               onFocus={onFocusReason}
               onChangeText={val => {
@@ -97,7 +103,7 @@ export function VersionPinRow({
             />
             {isPinnedByAdmin && adminPinLabel && (
               <Text className="text-xs text-warn">
-                This replaces the admin-set pin (currently {adminPinLabel}).
+                {t('kiloclaw.versionPin.replacesAdminPin', { label: adminPinLabel })}
               </Text>
             )}
             <Button
@@ -108,7 +114,9 @@ export function VersionPinRow({
             >
               {!isConfirmingThis && <Check size={14} color={colors.primaryForeground} />}
               <Text className="text-xs text-primary-foreground">
-                {isPinnedByAdmin ? 'Replace Admin Pin' : 'Confirm Pin'}
+                {isPinnedByAdmin
+                  ? t('kiloclaw.versionPin.replaceAdminPin')
+                  : t('kiloclaw.versionPin.confirmPin')}
               </Text>
             </Button>
           </View>

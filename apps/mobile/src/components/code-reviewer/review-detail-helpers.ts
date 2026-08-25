@@ -1,6 +1,8 @@
 // Pure helpers for the review-detail screen. Kept dependency-free so they can be
 // unit-tested without mounting the screen or importing React Native / tRPC.
 
+import { i18n } from '@/i18n';
+
 // Flatten the persisted council result into a single finding list. The council
 // result stores findings per specialist; the detail screen renders them as one
 // flat, paginated list. A null/absent council result (standard review, or a
@@ -18,22 +20,22 @@ export function flattenCouncilFindings<F>(
 // in `advisory` mode and computed no verdict.
 export function councilDecisionLabel(decision: 'pass' | 'block' | null | undefined): string {
   if (decision === 'pass') {
-    return 'Pass';
+    return i18n.t('codeReviewer.decision.pass');
   }
   if (decision === 'block') {
-    return 'Block';
+    return i18n.t('codeReviewer.decision.block');
   }
-  return 'No decision';
+  return i18n.t('codeReviewer.decision.noDecision');
 }
 
 // Human label for one specialist's binary vote. Null means the specialist
 // returned no reliable result (not a `block`).
 export function councilVoteLabel(vote: 'pass' | 'block' | null | undefined): string {
   if (vote === 'pass') {
-    return 'Pass';
+    return i18n.t('codeReviewer.decision.pass');
   }
   if (vote === 'block') {
-    return 'Block';
+    return i18n.t('codeReviewer.decision.block');
   }
-  return 'No result';
+  return i18n.t('codeReviewer.decision.noResult');
 }

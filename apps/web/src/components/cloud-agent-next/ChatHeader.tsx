@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -15,6 +16,16 @@ import { SessionActionsDialog } from './SessionActionsDialog';
 import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
 import { FeedbackDialog } from './FeedbackDialog';
 import { buildRepoBrowseUrl, detectGitPlatform } from './utils/git-utils';
+import { useTRPC } from '@/lib/trpc/utils';
+
+export function computeBillingRefetchInterval(
+  sessionActive: boolean,
+  phase: 'idle' | 'active' | 'stopping' | 'settling' | 'unavailable' | undefined
+): number | false {
+  return sessionActive || phase === 'active' || phase === 'stopping' || phase === 'settling'
+    ? 5_000
+    : false;
+}
 
 type ChatHeaderProps = {
   cloudAgentSessionId: string;
@@ -25,10 +36,11 @@ type ChatHeaderProps = {
   gitUrl?: string | null;
   model?: string;
   modelDisplayName?: string;
-  totalCost?: number;
+  tokenUsage?: number;
   soundEnabled?: boolean;
   onToggleSound?: () => void;
   sessionTitle?: string;
+  sessionActive: boolean;
 };
 
 export function ChatHeader({
@@ -38,15 +50,35 @@ export function ChatHeader({
   gitUrl,
   model = 'Unknown',
   modelDisplayName,
-  totalCost = 0,
+  tokenUsage = 0,
   soundEnabled = true,
   onToggleSound,
   kiloSessionId,
   organizationId,
   sessionTitle,
+  sessionActive,
 }: ChatHeaderProps) {
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [showActionsDialog, setShowActionsDialog] = useState(false);
+  const trpc = useTRPC();
+  const computeQuery = useQuery({
+    ...(organizationId
+      ? trpc.organizations.cloudAgentNext.getComputeBillingStatus.queryOptions({
+          organizationId,
+          cloudAgentSessionId,
+        })
+      : trpc.cloudAgentNext.getComputeBillingStatus.queryOptions({ cloudAgentSessionId })),
+    enabled: cloudAgentSessionId.startsWith('agent_'),
+    refetchInterval: query => {
+      return computeBillingRefetchInterval(sessionActive, query.state.data?.phase);
+    },
+  });
+  const wasSessionActive = useRef(sessionActive);
+  useEffect(() => {
+    if (sessionActive && !wasSessionActive.current) void computeQuery.refetch();
+    wasSessionActive.current = sessionActive;
+  }, [computeQuery.refetch, sessionActive]);
+  const computeStatus = computeQuery.data;
 
   const browseUrl = buildRepoBrowseUrl(gitUrl);
   const repoUrl =
@@ -63,7 +95,8 @@ export function ChatHeader({
         kiloSessionId={kiloSessionId}
         model={model}
         modelDisplayName={modelDisplayName}
-        cost={totalCost * 1_000_000}
+        tokenUsageMicrodollars={tokenUsage * 1_000_000}
+        computeStatus={computeStatus}
       />
       <SessionActionsDialog
         open={showActionsDialog}
@@ -72,7 +105,7 @@ export function ChatHeader({
         sessionTitle={sessionTitle}
         repository={repository}
       />
-      <div className="flex items-center gap-1">
+      <div className="flex min-w-0 items-center gap-1">
         {onToggleSound && (
           <SoundToggleButton enabled={soundEnabled} onToggle={onToggleSound} size="sm" />
         )}

@@ -42,6 +42,12 @@ describe('CustomLlmCredentialsSchema and CustomLlmDefinitionSchema', () => {
     ).toBe(true);
   });
 
+  it('accepts x-api-key credentials', () => {
+    expect(
+      CustomLlmCredentialsSchema.safeParse({ type: 'x-api-key', api_key: 'partner-token' }).success
+    ).toBe(true);
+  });
+
   it('accepts Google Cloud service account authentication', () => {
     expect(CustomLlmCredentialsSchema.safeParse(serviceAccount('private-key')).success).toBe(true);
   });

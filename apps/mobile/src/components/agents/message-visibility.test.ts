@@ -44,6 +44,17 @@ function toolPart(tool: string): Part {
   };
 }
 
+function patchPart(files: string[]): Part {
+  return {
+    id: 'p4',
+    sessionID: 's1',
+    messageID: 'm1',
+    type: 'patch',
+    hash: 'abc',
+    files,
+  };
+}
+
 function assistantMessage(parts: Part[]): StoredMessage {
   return {
     info: {
@@ -118,6 +129,14 @@ describe('partRendersContent', () => {
       url: 'file:///a.txt',
     };
     expect(partRendersContent(part)).toBe(true);
+  });
+
+  it('returns true for a patch part with files', () => {
+    expect(partRendersContent(patchPart(['src/a.ts', 'src/b.ts']))).toBe(true);
+  });
+
+  it('returns false for a patch part with no files', () => {
+    expect(partRendersContent(patchPart([]))).toBe(false);
   });
 });
 

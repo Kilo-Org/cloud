@@ -28,6 +28,9 @@ vi.mock('@/components/home/greeting', () => ({
 vi.mock('@/components/home/new-task-button', () => ({
   NewTaskButton: () => null,
 }));
+vi.mock('@/components/home/product-choices', () => ({
+  ProductChoices: () => null,
+}));
 vi.mock('@/components/query-error', () => ({
   QueryError: () => null,
 }));

@@ -2,7 +2,7 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount RN trees under vitest (same pattern as code-block.test.ts) */
 // eslint-disable-next-line import/no-nodejs-modules -- patching the CJS loader is the only way to stub react-native for the externalized react-native-marked; the library under test stays real
 import Module from 'node:module';
-import { type ReactElement, type ReactNode } from 'react';
+import { createElement, type ReactElement, type ReactNode } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,7 +24,12 @@ const rnStub = {
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
     hairlineWidth: 1,
-    flatten: (style: unknown) => style,
+    // Real flatten semantics: merge arrays with later values winning, pass
+    // non-array values through unchanged.
+    flatten: (style: unknown) =>
+      Array.isArray(style)
+        ? Object.assign({}, ...(style.filter(Boolean) as Record<string, unknown>[]))
+        : style,
   },
   Dimensions: {
     get: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
@@ -83,8 +88,8 @@ vi.mock('./markdown-image', () => ({
 }));
 vi.mock('./markdown-link', () => ({
   getLinkAccessibilityActions: () => [],
+  getLinkAccessibilityHint: () => 'hint',
   getLinkLongPressHandler: () => undefined,
-  LINK_ACCESSIBILITY_HINT: 'hint',
   resolveLinkAccessibilityLabel: () => 'label',
 }));
 vi.mock('@/lib/external-link', () => ({
@@ -138,6 +143,13 @@ function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: strin
   /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
   return instance.props[key];
   /* eslint-enable typescript-eslint/no-unsafe-member-access */
+}
+
+function flattenStyle(style: unknown): Record<string, unknown> {
+  if (Array.isArray(style)) {
+    return Object.assign({}, ...(style.filter(Boolean) as Record<string, unknown>[]));
+  }
+  return (style ?? {}) as Record<string, unknown>;
 }
 
 describe('MarkdownRenderer key stability', () => {
@@ -556,5 +568,169 @@ describe('MarkdownRenderer empty fence mounting', () => {
     });
     // Restore the stubbed module graph for any dynamic import that follows.
     vi.resetModules();
+  });
+});
+
+describe('MarkdownRenderer list marker alignment', () => {
+  function viewChildren(node: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+    return node.children.filter(
+      (child): child is TestRenderer.ReactTestInstance =>
+        typeof child === 'object' && (child.type as unknown) === 'View'
+    );
+  }
+
+  async function mountMarkdown(value: string) {
+    const { useMarkdown } = await import('react-native-marked');
+    const { getMarkdownStyles } = await import('./markdown-palette');
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const { View: StubView } = await import('react-native');
+    const renderer = new RendererClass(palette, true, {});
+    const styles = getMarkdownStyles(palette);
+    function Host() {
+      const elements = useMarkdown(value, { styles, renderer, colorScheme: 'light' });
+      return createElement(StubView, null, elements);
+    }
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      await Promise.resolve();
+      rendererRef.current = TestRenderer.create(createElement(Host));
+    });
+    const mounted = rendererRef.current;
+    if (!mounted) {
+      throw new Error('renderer was not created');
+    }
+    return mounted;
+  }
+
+  async function unmountMarkdown(mounted: TestRenderer.ReactTestRenderer) {
+    await act(async () => {
+      await Promise.resolve();
+      mounted.unmount();
+    });
+  }
+
+  function assertAlignedList(mounted: TestRenderer.ReactTestRenderer, expectedItems: number) {
+    const rows = mounted.root.findAll(node => propOf(node, 'testID') === 'marked-list-item');
+    expect(rows).toHaveLength(expectedItems);
+    for (const row of rows) {
+      // Criterion 3 mechanism: the row lays the fixed-width marker box beside
+      // a shrinking content View, so wrapped text indents under the text and
+      // does not overlap the marker.
+      expect(flattenStyle(propOf(row, 'style')).flexDirection).toBe('row');
+      const contentViews = viewChildren(row);
+      expect(contentViews).toHaveLength(1);
+      const contentView = contentViews[0];
+      if (!contentView) {
+        throw new Error('list item content View missing');
+      }
+      expect(flattenStyle(propOf(contentView, 'style')).flexShrink).toBe(1);
+    }
+    const markers = mounted.root.findAll(node => propOf(node, 'testID') === 'marker-box');
+    expect(markers).toHaveLength(expectedItems);
+    for (const marker of markers) {
+      const box = marker.parent;
+      if (!box) {
+        throw new Error('marker box View missing');
+      }
+      // No top margin on the marker box: the marker shares the row top with
+      // the first text line.
+      expect(flattenStyle(propOf(box, 'style'))).toEqual({ marginBottom: 4 });
+      const markerStyle = flattenStyle(propOf(marker, 'style'));
+      expect(markerStyle.fontSize).toBe(16);
+      expect(markerStyle.lineHeight).toBe(24);
+    }
+  }
+
+  function assertItemTextMetrics(mounted: TestRenderer.ReactTestRenderer, words: string[]) {
+    const itemTexts = mounted.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as unknown) === 'Text' &&
+        Array.isArray(node.children) &&
+        node.children.some(
+          child => typeof child === 'string' && words.some(word => child.includes(word))
+        )
+    );
+    expect(itemTexts).toHaveLength(words.length);
+    for (const item of itemTexts) {
+      const style = flattenStyle(propOf(item, 'style'));
+      expect(style.fontSize).toBe(16);
+      expect(style.lineHeight).toBe(24);
+    }
+  }
+
+  function assertLooseParagraphMargins(mounted: TestRenderer.ReactTestRenderer) {
+    const rows = mounted.root.findAll(node => propOf(node, 'testID') === 'marked-list-item');
+    for (const row of rows) {
+      const contentViews = viewChildren(row);
+      const contentView = contentViews[0];
+      if (!contentView) {
+        throw new Error('list item content View missing');
+      }
+      const paragraphs = viewChildren(contentView);
+      expect(paragraphs).toHaveLength(1);
+      const paragraphStyle = flattenStyle(propOf(paragraphs[0], 'style'));
+      expect(paragraphStyle.marginTop).toBe(0);
+      expect(paragraphStyle.marginVertical).toBeUndefined();
+      expect(paragraphStyle.marginBottom).toBe(2);
+    }
+  }
+
+  it('aligns tight unordered list markers with the first line of item text', async () => {
+    const mounted = await mountMarkdown('- one\n- two');
+    assertAlignedList(mounted, 2);
+    assertItemTextMetrics(mounted, ['one', 'two']);
+    await unmountMarkdown(mounted);
+  });
+
+  it('aligns tight ordered list markers with the first line of item text', async () => {
+    const mounted = await mountMarkdown('1. one\n2. two');
+    assertAlignedList(mounted, 2);
+    assertItemTextMetrics(mounted, ['one', 'two']);
+    await unmountMarkdown(mounted);
+  });
+
+  it('aligns loose unordered list markers with the first line of item text', async () => {
+    const mounted = await mountMarkdown('- one\n\n- two');
+    assertAlignedList(mounted, 2);
+    assertLooseParagraphMargins(mounted);
+    assertItemTextMetrics(mounted, ['one', 'two']);
+    await unmountMarkdown(mounted);
+  });
+
+  it('aligns loose ordered list markers with the first line of item text', async () => {
+    const mounted = await mountMarkdown('1. one\n\n2. two');
+    assertAlignedList(mounted, 2);
+    assertLooseParagraphMargins(mounted);
+    assertItemTextMetrics(mounted, ['one', 'two']);
+    await unmountMarkdown(mounted);
+  });
+
+  it('keeps a leading blockquote margin in a list item', async () => {
+    const mounted = await mountMarkdown('- > quoted text');
+    const rows = mounted.root.findAll(node => propOf(node, 'testID') === 'marked-list-item');
+    expect(rows).toHaveLength(1);
+    const row = rows[0];
+    if (!row) {
+      throw new Error('list item row missing');
+    }
+    const contentViews = viewChildren(row);
+    expect(contentViews).toHaveLength(1);
+    const contentView = contentViews[0];
+    if (!contentView) {
+      throw new Error('list item content View missing');
+    }
+    const blockquotes = viewChildren(contentView);
+    expect(blockquotes).toHaveLength(1);
+    const blockquote = blockquotes[0];
+    if (!blockquote) {
+      throw new Error('blockquote View missing');
+    }
+    const blockquoteStyle = flattenStyle(propOf(blockquote, 'style'));
+    expect(blockquoteStyle.marginVertical).toBe(4);
+    expect(blockquoteStyle.marginTop).toBeUndefined();
+    await unmountMarkdown(mounted);
   });
 });

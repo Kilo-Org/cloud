@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Je agentsessie heeft een update",
+      "chatMessage": "Je hebt een nieuw bericht",
+      "instanceLifecycle": "Je instance heeft een update",
+      "scheduledAction": "Een geplande actie heeft een update",
+      "lowBalance": "Je saldo heeft aandacht nodig",
+      "securityFinding": "Een beveiligingsbevinding heeft aandacht nodig"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Taak voltooid"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Mislukt: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Onderbroken: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Zonder titel",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Waarschuwing laag saldo",
+      "body": "Het saldo van {{organizationName}} is gedaald onder ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Nieuwe beveiligingsbevinding ({{severity}})",
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA-waarschuwing",
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA-overschrijding",
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Een beveiligingsbevinding heeft aandacht nodig"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} is klaar",
+      "body": "Tik om te beginnen met chatten."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} kon niet worden gestart",
+      "body": "Starten mislukt."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} wordt binnenkort opnieuw opgestart",
+      "body": "Opnieuw opstarten gepland om {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Opnieuw opstarten van {{instanceName}} geannuleerd",
+      "body": "De eerder geplande herstart is geannuleerd."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} wordt binnenkort bijgewerkt",
+      "bodyWithTag": "Upgrade naar {{targetImageTag}} om {{when}}.",
+      "bodyWithoutTag": "Geplande upgrade om {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Upgrade van {{instanceName}} geannuleerd",
+      "body": "De eerder geplande upgrade is geannuleerd."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Je Kilo-sessie is klaar om vanaf je telefoon te bedienen"
+  }
+}

@@ -3,6 +3,7 @@ import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as ReadToolMarkdownModule from '../read-tool-markdown';
+import type * as ReactI18next from 'react-i18next';
 
 import { BashToolCardBody } from './bash-tool-card';
 import { GenericToolCardBody } from './generic-tool-card';
@@ -16,6 +17,13 @@ import { WebSearchToolCardBody } from './web-search-tool-card';
 import { prepareMonoScrollContent } from '../mono-scroll-block-model';
 
 vi.mock('react-native', () => ({ View: 'View', TextInput: 'TextInput' }));
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => ({ t: (key: string) => key }),
+  };
+});
 vi.mock('react', async importOriginal => {
   const actual = await importOriginal<typeof React>();
   return {
@@ -324,7 +332,9 @@ describe('tool-card output caps removed', () => {
     // `SelectableText` renders a read-only `TextInput` whose text flows
     // through the `value` prop, not a `Text` element with children.
     const inputs = findByType(root, 'TextInput');
-    expect(inputs.some(el => (el.props as { value?: unknown }).value === 'No tasks.')).toBe(true);
+    expect(
+      inputs.some(el => (el.props as { value?: unknown }).value === 'agentChat.toolCard.noTasks')
+    ).toBe(true);
     expect(findByType(root, 'TodoTaskRows')).toHaveLength(0);
     expect(findByType(root, 'MonoScrollBlock')).toHaveLength(0);
   });

@@ -43,12 +43,20 @@ export type BaseConnectionConfig<T = unknown> = {
    *  For browser usage, use `createBrowserLifecycleHooks()`.
    *  For CLI usage, omit this or provide custom hooks. */
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
+  /** Cap on automatic reconnect attempts before the connection is considered
+   *  exhausted. Defaults to `MAX_RECONNECT_ATTEMPTS`. */
+  maxReconnectAttempts?: number | undefined;
+  /** Fires on both edges of the reconnect-exhaustion state: `true` when the
+   *  automatic retry cap is reached (or a terminal auth failure stops retries),
+   *  and `false` when any recovery path resets the state. */
+  onReconnectExhaustionChange?: ((exhausted: boolean) => void) | undefined;
 };
 
 export type Connection = {
   connect: () => void;
   disconnect: () => void;
   reconnectWithRefreshedAuth?: () => void;
+  retryReconnect: () => void;
   destroy: () => void;
 };
 
@@ -72,6 +80,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   let authRefreshAttempted = false;
   let connected = false;
   let reconnectAttempt = 0;
+  let exhausted = false;
   let generation = 0;
   let hasConnectedOnce = false;
   let stalenessTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -79,6 +88,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   let hiddenAt = 0;
   let preconnectAuthRefreshAttempted = false;
   const stalenessTimeoutMs = config.stalenessTimeoutMs ?? DEFAULT_STALENESS_TIMEOUT_MS;
+  const maxReconnectAttempts = config.maxReconnectAttempts ?? MAX_RECONNECT_ATTEMPTS;
 
   // Cleanup functions returned by lifecycle hooks
   const cleanupFns: Array<() => void> = [];
@@ -95,6 +105,13 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     if (stalenessTimeoutId !== null) {
       clearTimeout(stalenessTimeoutId);
       stalenessTimeoutId = null;
+    }
+  }
+
+  function clearExhausted(): void {
+    if (exhausted) {
+      exhausted = false;
+      config.onReconnectExhaustionChange?.(false);
     }
   }
 
@@ -129,7 +146,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     }
   }
 
-  async function refreshAndConnect(expectedGeneration: number): Promise<void> {
+  async function refreshAndConnect(expectedGeneration: number, attempt = 0): Promise<void> {
     preconnectAuthRefreshAttempted = true;
 
     try {
@@ -140,8 +157,16 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
           // Continue with existing auth — the old ticket might still work
         }
         if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+        // The async refresh gap can let the in-flight socket finish its
+        // handshake and receive its first message. If it did, there is nothing
+        // to replace — reconnecting would close a healthy socket and open a
+        // duplicate (the two-socket `/stream` open). This is the NetInfo
+        // `unknown → online` race: handleOnline decides to reconnect while the
+        // socket is still CONNECTING, but the socket establishes before the
+        // refresh resolves.
+        if (connected && ws !== null && ws.readyState === WebSocket.OPEN) return;
       }
-      connectInternal(0, expectedGeneration, true);
+      connectInternal(attempt, expectedGeneration, true);
     } finally {
       if (expectedGeneration === generation) {
         preconnectAuthRefreshAttempted = false;
@@ -152,7 +177,11 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   function scheduleReconnect(attempt: number, expectedGeneration: number) {
     if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
 
-    if (attempt >= MAX_RECONNECT_ATTEMPTS) {
+    if (attempt >= maxReconnectAttempts) {
+      if (!exhausted) {
+        exhausted = true;
+        config.onReconnectExhaustionChange?.(true);
+      }
       return;
     }
 
@@ -176,7 +205,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       !skipAuthRefresh &&
       !preconnectAuthRefreshAttempted
     ) {
-      void refreshAndConnect(expectedGeneration);
+      void refreshAndConnect(expectedGeneration, attempt);
       return;
     }
 
@@ -209,6 +238,13 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     };
 
     newWs.onmessage = (messageEvent: MessageEvent) => {
+      // Ignore messages from replaced sockets: a late event from a socket we
+      // already closed must not re-anchor the staleness clock, clear
+      // exhaustion, or report the transport recovered.
+      if (ws !== newWs) {
+        return;
+      }
+
       // Any incoming message cancels an active staleness check
       clearStalenessTimeout();
       lastMessageTime = Date.now();
@@ -226,6 +262,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       // Reset auth refresh flag on successful message
       authRefreshAttempted = false;
       reconnectAttempt = 0;
+      clearExhausted();
 
       if (!connected) {
         connected = true;
@@ -277,6 +314,10 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       // The current physical route is gone even though no new socket follows.
       if (isAuthFailure && authRefreshAttempted) {
         notifyReplacingConnection(expectedGeneration);
+        if (!exhausted) {
+          exhausted = true;
+          config.onReconnectExhaustionChange?.(true);
+        }
         return;
       }
 
@@ -311,6 +352,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
 
     // Tab became visible
     reconnectAttempt = 0;
+    clearExhausted();
     const wasHiddenSince = hiddenAt;
     hiddenAt = 0;
 
@@ -357,6 +399,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
 
     // BFCache restore - WebSocket is guaranteed dead
     reconnectAttempt = 0;
+    clearExhausted();
     clearReconnectTimer();
     clearStalenessTimeout();
     if (!notifyReplacingConnection()) return;
@@ -380,6 +423,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     if (connected && ws !== null && ws.readyState === WebSocket.OPEN) return;
 
     reconnectAttempt = 0;
+    clearExhausted();
     clearReconnectTimer();
     void refreshAndConnect(generation);
   }
@@ -415,6 +459,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     preconnectAuthRefreshAttempted = false;
     connected = false;
     reconnectAttempt = 0;
+    clearExhausted();
     hasConnectedOnce = false;
     lastMessageTime = 0;
     generation += 1;
@@ -448,6 +493,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     if (destroyed || intentionalDisconnect) return;
 
     reconnectAttempt = 0;
+    clearExhausted();
     clearReconnectTimer();
     clearStalenessTimeout();
     if (!notifyReplacingConnection()) return;
@@ -461,6 +507,15 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       connected = false;
       config.onDisconnected();
     }
+    void refreshAndConnect(generation);
+  }
+
+  function retryReconnect() {
+    if (destroyed || intentionalDisconnect) return;
+
+    clearReconnectTimer();
+    reconnectAttempt = 0;
+    clearExhausted();
     void refreshAndConnect(generation);
   }
 
@@ -482,7 +537,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     connected = false;
   }
 
-  return { connect, disconnect, reconnectWithRefreshedAuth, destroy };
+  return { connect, disconnect, reconnectWithRefreshedAuth, retryReconnect, destroy };
 }
 
 export function createBrowserLifecycleHooks(): ConnectionLifecycleHooks {

@@ -33,6 +33,7 @@ vi.mock('@kilocode/db/client', () => ({
 }));
 
 import { SessionIngestDO, ingestOrderCursor } from './SessionIngestDO';
+import { ingestItems } from '../db/sqlite-schema';
 
 describe('SessionIngestDO ingest ordering', () => {
   it('uses ingested_at with id only as a tie-breaker for cursor progression', () => {
@@ -1328,5 +1329,691 @@ describe('SessionIngestDO live activity + cost persist', () => {
     expect(meta.get('lastCostPersistedMicrodollars')).toBe('350000');
     // activity value also max-merged
     expect(Number(meta.get('lastActivityPersistedValueMs'))).toBe(20_000);
+  });
+});
+
+describe('SessionIngestDO clone primitives', () => {
+  type ItemRow = {
+    id: number;
+    item_id: string;
+    item_type: string;
+    item_data: string;
+    item_data_r2_key: string | null;
+    ingested_at: number | null;
+  };
+
+  /**
+   * Recover the ingest-order cursor bound into an `afterIngestOrderCursor` SQL
+   * condition. The non-null branch binds [ingestedAt, ingestedAt, id]; the null
+   * branch binds [id]; no cursor binds no numbers.
+   */
+  function extractIngestCursor(
+    condition: unknown
+  ): { ingestedAt: number | null; id: number } | null {
+    const numbers = collectConditionParams(condition).filter(
+      (p): p is number => typeof p === 'number'
+    );
+    if (numbers.length === 0) return null;
+    if (numbers.length === 1) return { ingestedAt: null, id: numbers[0] };
+    return { ingestedAt: numbers[0], id: numbers[numbers.length - 1] };
+  }
+
+  /**
+   * Walk a drizzle SQL condition and collect every bound Param value (string or
+   * number), including Params nested inside the plain array that `inArray`
+   * inlines. `collectBoundParams` above stops at that array, so this walker is
+   * needed for the clone export condition.
+   */
+  function collectConditionParams(
+    condition: unknown,
+    out: Array<string | number> = []
+  ): Array<string | number> {
+    if (condition == null) return out;
+    if (Array.isArray(condition)) {
+      for (const item of condition) collectConditionParams(item, out);
+      return out;
+    }
+    if (typeof condition !== 'object') return out;
+    const value = (condition as { value?: unknown }).value;
+    if (typeof value === 'string' || typeof value === 'number') {
+      out.push(value);
+    }
+    const chunks = (condition as { queryChunks?: unknown[] }).queryChunks;
+    if (Array.isArray(chunks)) {
+      for (const chunk of chunks) collectConditionParams(chunk, out);
+    }
+    return out;
+  }
+
+  function compareIngestOrder(
+    a: { ingested_at: number | null; id: number },
+    b: { ingested_at: number | null; id: number }
+  ): number {
+    if (a.ingested_at === null && b.ingested_at !== null) return -1;
+    if (a.ingested_at !== null && b.ingested_at === null) return 1;
+    if (a.ingested_at !== null && b.ingested_at !== null && a.ingested_at !== b.ingested_at) {
+      return a.ingested_at - b.ingested_at;
+    }
+    return a.id - b.id;
+  }
+
+  function isAfterIngestOrder(
+    row: { ingested_at: number | null; id: number },
+    cursor: { ingestedAt: number | null; id: number }
+  ): boolean {
+    if (cursor.ingestedAt === null) {
+      if (row.ingested_at === null) return row.id > cursor.id;
+      return true;
+    }
+    if (row.ingested_at === null) return false;
+    if (row.ingested_at !== cursor.ingestedAt) return row.ingested_at > cursor.ingestedAt;
+    return row.id > cursor.id;
+  }
+
+  function makeCloneHarness(seedItems: ItemRow[] = []) {
+    const items: ItemRow[] = seedItems.map(row => ({ ...row }));
+    const meta = new Map<string, string | null>();
+    let nextId = items.reduce((max, row) => Math.max(max, row.id), 0) + 1;
+
+    type SelectKind = 'items_export' | 'items_r2' | 'meta_get' | 'other';
+    let selectKind: SelectKind = 'other';
+    let whereCondition: unknown;
+    let eqKey: string | undefined;
+    let limitValue: number | undefined;
+    let orderByArgs: unknown[] = [];
+
+    const selectQuery = {
+      from: vi.fn(() => selectQuery),
+      where: vi.fn((condition: unknown) => {
+        whereCondition = condition;
+        eqKey = collectBoundParams(condition).find((p): p is string => typeof p === 'string');
+        return selectQuery;
+      }),
+      orderBy: vi.fn((...args: unknown[]) => {
+        orderByArgs = args;
+        return selectQuery;
+      }),
+      limit: vi.fn((n: number) => {
+        limitValue = n;
+        return selectQuery;
+      }),
+      get: vi.fn(() => {
+        if (selectKind === 'meta_get' && eqKey !== undefined) {
+          const value = meta.get(eqKey);
+          return value === undefined ? undefined : { value };
+        }
+        return undefined;
+      }),
+      all: vi.fn(() => {
+        if (selectKind === 'items_export') {
+          const params = collectConditionParams(whereCondition);
+          const allowedTypes = params.filter((p): p is string => typeof p === 'string');
+          const cursor = extractIngestCursor(whereCondition);
+          return items
+            .filter(row => allowedTypes.includes(row.item_type))
+            .filter(row => cursor === null || isAfterIngestOrder(row, cursor))
+            .sort(compareIngestOrder)
+            .slice(0, limitValue ?? Number.POSITIVE_INFINITY)
+            .map(row => ({
+              id: row.id,
+              item_id: row.item_id,
+              item_type: row.item_type,
+              item_data: row.item_data,
+              item_data_r2_key: row.item_data_r2_key,
+              ingested_at: row.ingested_at,
+            }));
+        }
+        if (selectKind === 'items_r2') {
+          return items
+            .filter(row => row.item_data_r2_key !== null)
+            .map(row => ({ item_data_r2_key: row.item_data_r2_key }));
+        }
+        return [];
+      }),
+    };
+
+    const db = {
+      select: vi.fn((columns?: unknown) => {
+        const cols = columns as Record<string, unknown> | undefined;
+        if (cols && 'item_id' in cols) selectKind = 'items_export';
+        else if (cols && 'item_data_r2_key' in cols) selectKind = 'items_r2';
+        else if (cols && 'value' in cols) selectKind = 'meta_get';
+        else selectKind = 'other';
+        return selectQuery;
+      }),
+      insert: vi.fn(() => ({
+        values: vi.fn(
+          (values: {
+            key?: string;
+            value?: string | null;
+            item_id?: string;
+            item_type?: string;
+            item_data?: string;
+            item_data_r2_key?: string | null;
+            ingested_at?: number | null;
+          }) => ({
+            onConflictDoUpdate: vi.fn(() => ({
+              run: vi.fn(() => {
+                if (values.key !== undefined) {
+                  meta.set(values.key, values.value ?? null);
+                } else if (values.item_id !== undefined) {
+                  const existing = items.find(row => row.item_id === values.item_id);
+                  if (existing) {
+                    existing.item_type = values.item_type ?? existing.item_type;
+                    existing.item_data = values.item_data ?? existing.item_data;
+                    existing.item_data_r2_key = values.item_data_r2_key ?? null;
+                    existing.ingested_at = values.ingested_at ?? null;
+                  } else {
+                    items.push({
+                      id: nextId++,
+                      item_id: values.item_id,
+                      item_type: values.item_type ?? '',
+                      item_data: values.item_data ?? '',
+                      item_data_r2_key: values.item_data_r2_key ?? null,
+                      ingested_at: values.ingested_at ?? null,
+                    });
+                  }
+                }
+              }),
+            })),
+          })
+        ),
+      })),
+      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+    };
+    drizzleMocks.db = db;
+
+    const deleteObject = vi.fn(async () => {});
+    const deleteAlarm = vi.fn(async () => {});
+    const deleteAll = vi.fn(async () => {
+      items.length = 0;
+      meta.clear();
+    });
+    const state = {
+      storage: {
+        setAlarm: vi.fn(),
+        deleteAlarm,
+        deleteAll,
+      },
+      waitUntil: vi.fn(),
+      blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
+    } as unknown as DurableObjectState;
+    const env = { SESSION_INGEST_R2: { delete: deleteObject } } as never;
+
+    return {
+      durableObject: new SessionIngestDO(state, env),
+      items,
+      meta,
+      deleteObject,
+      deleteAlarm,
+      deleteAll,
+      get orderByArgs() {
+        return orderByArgs;
+      },
+    };
+  }
+
+  function itemRow(
+    id: number,
+    itemId: string,
+    itemType: string,
+    ingestedAt: number | null,
+    r2Key: string | null = null
+  ): ItemRow {
+    return {
+      id,
+      item_id: itemId,
+      item_type: itemType,
+      item_data: JSON.stringify({ id: itemId }),
+      item_data_r2_key: r2Key,
+      ingested_at: ingestedAt,
+    };
+  }
+
+  it('exports bounded batches in (ingested_at, id) order with only allowed item types', async () => {
+    const harness = makeCloneHarness([
+      itemRow(1, 'session/1', 'session', 100),
+      itemRow(2, 'message/2', 'message', 100),
+      itemRow(3, 'kilo_meta/3', 'kilo_meta', 100),
+      itemRow(4, 'part/4', 'part', 200),
+      itemRow(5, 'session_diff/5', 'session_diff', 300),
+      itemRow(6, 'message/6', 'message', 50),
+    ]);
+
+    const first = await harness.durableObject.exportCloneBatch(null, 2);
+    expect(harness.orderByArgs).toEqual([ingestItems.ingested_at, ingestItems.id]);
+    expect(first.rows.map(row => row.itemId)).toEqual(['message/6', 'session/1']);
+    expect(
+      first.rows.every(row => ['session', 'message', 'part', 'session_diff'].includes(row.itemType))
+    ).toBe(true);
+    expect(first.done).toBe(false);
+    expect(first.nextCursor).toEqual({ ingestedAt: 100, id: 1 });
+
+    const second = await harness.durableObject.exportCloneBatch(first.nextCursor, 2);
+    expect(second.rows.map(row => row.itemId)).toEqual(['message/2', 'part/4']);
+    expect(second.done).toBe(false);
+    expect(second.nextCursor).toEqual({ ingestedAt: 200, id: 4 });
+
+    const third = await harness.durableObject.exportCloneBatch(second.nextCursor, 2);
+    expect(third.rows.map(row => row.itemId)).toEqual(['session_diff/5']);
+    expect(third.done).toBe(true);
+    expect(third.nextCursor).toBeNull();
+  });
+
+  it('produces a deterministic, stable digest over identical rows', async () => {
+    const harness = makeCloneHarness([
+      itemRow(1, 'session/1', 'session', 100),
+      itemRow(2, 'message/2', 'message', 200, 'items/blob-2'),
+    ]);
+
+    const first = await harness.durableObject.exportCloneBatch(null, 10);
+    const second = await harness.durableObject.exportCloneBatch(null, 10);
+
+    expect(first.digest).toBe(second.digest);
+    expect(first.digest).toMatch(/^[0-9a-f]{64}$/);
+
+    // The digest covers the stored reference: an inline row contributes item_data,
+    // so changing inline data changes the digest.
+    harness.items[0].item_data = JSON.stringify({ id: 'session/1', changed: true });
+    const changed = await harness.durableObject.exportCloneBatch(null, 10);
+    expect(changed.digest).not.toBe(first.digest);
+  });
+
+  it('stages, inspects, and finalizes a clone round-trip', async () => {
+    const harness = makeCloneHarness();
+    const rows = [
+      {
+        itemId: 'session/dst',
+        itemType: 'session' as const,
+        itemData: '{}',
+        itemDataR2Key: null,
+        ingestedAt: 1,
+      },
+      {
+        itemId: 'message/dst',
+        itemType: 'message' as const,
+        itemData: '{}',
+        itemDataR2Key: null,
+        ingestedAt: 2,
+      },
+    ];
+
+    const staged = harness.durableObject.stageCloneBatch({
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      rows,
+      nextCursor: { ingestedAt: 2, id: 9 },
+      rollingDigest: 'digest-1',
+      copiedItemCount: 2,
+    });
+    expect(staged).toMatchObject({ status: 'staged', copiedItemCount: 2 });
+
+    const inspected = harness.durableObject.inspectCloneStage({
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+    });
+    expect(inspected).toMatchObject({
+      status: 'in_progress',
+      nextCursor: { ingestedAt: 2, id: 9 },
+      rollingDigest: 'digest-1',
+      copiedItemCount: 2,
+    });
+
+    const finalized = harness.durableObject.finalizeCloneStage({
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      finalDigest: 'digest-1',
+      finalItemCount: 2,
+    });
+    expect(finalized).toMatchObject({ status: 'complete', sourceSessionId: 'src' });
+
+    expect(
+      harness.durableObject.inspectCloneStage({
+        sourceSessionId: 'src',
+        destinationSessionId: 'dst',
+      })
+    ).toMatchObject({ status: 'complete' });
+    expect(harness.items).toHaveLength(2);
+  });
+
+  it('resumes an incomplete same-source stage with the persisted next cursor', async () => {
+    const harness = makeCloneHarness();
+
+    harness.durableObject.stageCloneBatch({
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      rows: [
+        {
+          itemId: 'message/a',
+          itemType: 'message' as const,
+          itemData: '{}',
+          itemDataR2Key: null,
+          ingestedAt: 1,
+        },
+        {
+          itemId: 'message/b',
+          itemType: 'message' as const,
+          itemData: '{}',
+          itemDataR2Key: null,
+          ingestedAt: 2,
+        },
+      ],
+      nextCursor: { ingestedAt: 2, id: 11 },
+      rollingDigest: 'digest-partial',
+      copiedItemCount: 2,
+    });
+
+    const inspected = harness.durableObject.inspectCloneStage({
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+    });
+    expect(inspected).toMatchObject({
+      status: 'in_progress',
+      nextCursor: { ingestedAt: 2, id: 11 },
+      copiedItemCount: 2,
+    });
+
+    harness.durableObject.stageCloneBatch({
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      rows: [
+        {
+          itemId: 'message/c',
+          itemType: 'message' as const,
+          itemData: '{}',
+          itemDataR2Key: null,
+          ingestedAt: 3,
+        },
+        {
+          itemId: 'message/d',
+          itemType: 'message' as const,
+          itemData: '{}',
+          itemDataR2Key: null,
+          ingestedAt: 4,
+        },
+      ],
+      nextCursor: null,
+      rollingDigest: 'digest-full',
+      copiedItemCount: 4,
+    });
+
+    expect(
+      harness.durableObject.inspectCloneStage({
+        sourceSessionId: 'src',
+        destinationSessionId: 'dst',
+      })
+    ).toMatchObject({
+      status: 'in_progress',
+      nextCursor: null,
+      rollingDigest: 'digest-full',
+      copiedItemCount: 4,
+    });
+    expect(harness.items).toHaveLength(4);
+  });
+
+  it('rejects a different source or destination across stage, inspect, and finalize', async () => {
+    const harness = makeCloneHarness();
+
+    harness.durableObject.stageCloneBatch({
+      sourceSessionId: 'src-a',
+      destinationSessionId: 'dst',
+      rows: [
+        {
+          itemId: 'message/a',
+          itemType: 'message' as const,
+          itemData: '{}',
+          itemDataR2Key: null,
+          ingestedAt: 1,
+        },
+      ],
+      nextCursor: null,
+      rollingDigest: 'digest-a',
+      copiedItemCount: 1,
+    });
+
+    const stagedB = harness.durableObject.stageCloneBatch({
+      sourceSessionId: 'src-b',
+      destinationSessionId: 'dst',
+      rows: [
+        {
+          itemId: 'message/b',
+          itemType: 'message' as const,
+          itemData: '{}',
+          itemDataR2Key: null,
+          ingestedAt: 1,
+        },
+      ],
+      nextCursor: null,
+      rollingDigest: 'digest-b',
+      copiedItemCount: 1,
+    });
+    expect(stagedB).toMatchObject({ status: 'mismatch', storedSourceSessionId: 'src-a' });
+
+    expect(
+      harness.durableObject.inspectCloneStage({
+        sourceSessionId: 'src-b',
+        destinationSessionId: 'dst',
+      })
+    ).toMatchObject({ status: 'mismatch', storedSourceSessionId: 'src-a' });
+
+    expect(
+      harness.durableObject.finalizeCloneStage({
+        sourceSessionId: 'src-b',
+        destinationSessionId: 'dst',
+        finalDigest: 'digest-a',
+        finalItemCount: 1,
+      })
+    ).toMatchObject({ status: 'mismatch', storedSourceSessionId: 'src-a' });
+
+    // A destination mismatch is rejected too.
+    expect(
+      harness.durableObject.inspectCloneStage({
+        sourceSessionId: 'src-a',
+        destinationSessionId: 'dst-other',
+      })
+    ).toMatchObject({ status: 'mismatch', storedDestinationSessionId: 'dst' });
+
+    // The rejected batch did not mutate the stage.
+    expect(harness.items).toHaveLength(1);
+    expect(harness.items[0].item_id).toBe('message/a');
+  });
+
+  it('reports whether a mismatched stage was complete or in_progress', () => {
+    const harness = makeCloneHarness();
+
+    harness.durableObject.stageCloneBatch({
+      sourceSessionId: 'src-a',
+      destinationSessionId: 'dst',
+      rows: [
+        {
+          itemId: 'message/a',
+          itemType: 'message' as const,
+          itemData: '{}',
+          itemDataR2Key: null,
+          ingestedAt: 1,
+        },
+      ],
+      nextCursor: null,
+      rollingDigest: 'digest-a',
+      copiedItemCount: 1,
+    });
+
+    expect(
+      harness.durableObject.inspectCloneStage({
+        sourceSessionId: 'src-b',
+        destinationSessionId: 'dst',
+      })
+    ).toMatchObject({ status: 'mismatch', storedStage: 'in_progress' });
+
+    harness.durableObject.finalizeCloneStage({
+      sourceSessionId: 'src-a',
+      destinationSessionId: 'dst',
+      finalDigest: 'digest-a',
+      finalItemCount: 1,
+    });
+
+    expect(
+      harness.durableObject.inspectCloneStage({
+        sourceSessionId: 'src-b',
+        destinationSessionId: 'dst',
+      })
+    ).toMatchObject({ status: 'mismatch', storedStage: 'complete' });
+  });
+
+  it('is idempotent when re-staging the same batch and re-finalizing the same source', async () => {
+    const harness = makeCloneHarness();
+    const params = {
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      rows: [
+        {
+          itemId: 'message/a',
+          itemType: 'message' as const,
+          itemData: '{}',
+          itemDataR2Key: null,
+          ingestedAt: 1,
+        },
+        {
+          itemId: 'message/b',
+          itemType: 'message' as const,
+          itemData: '{}',
+          itemDataR2Key: null,
+          ingestedAt: 2,
+        },
+      ],
+      nextCursor: null,
+      rollingDigest: 'digest-full',
+      copiedItemCount: 2,
+    };
+
+    expect(harness.durableObject.stageCloneBatch(params).status).toBe('staged');
+    expect(harness.durableObject.stageCloneBatch(params).status).toBe('staged');
+    expect(harness.items).toHaveLength(2);
+
+    const finalized = {
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      finalDigest: 'digest-full',
+      finalItemCount: 2,
+    };
+    expect(harness.durableObject.finalizeCloneStage(finalized).status).toBe('complete');
+    expect(harness.durableObject.finalizeCloneStage(finalized).status).toBe('complete');
+  });
+
+  it('rejects finalization when the digest or item count does not match', async () => {
+    const harness = makeCloneHarness();
+    harness.durableObject.stageCloneBatch({
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      rows: [
+        {
+          itemId: 'message/a',
+          itemType: 'message' as const,
+          itemData: '{}',
+          itemDataR2Key: null,
+          ingestedAt: 1,
+        },
+      ],
+      nextCursor: null,
+      rollingDigest: 'digest-real',
+      copiedItemCount: 1,
+    });
+
+    expect(
+      harness.durableObject.finalizeCloneStage({
+        sourceSessionId: 'src',
+        destinationSessionId: 'dst',
+        finalDigest: 'digest-wrong',
+        finalItemCount: 1,
+      })
+    ).toMatchObject({
+      status: 'digest_mismatch',
+      expectedDigest: 'digest-wrong',
+      actualDigest: 'digest-real',
+    });
+
+    expect(
+      harness.durableObject.finalizeCloneStage({
+        sourceSessionId: 'src',
+        destinationSessionId: 'dst',
+        finalDigest: 'digest-real',
+        finalItemCount: 5,
+      })
+    ).toMatchObject({ status: 'digest_mismatch', expectedItemCount: 5, actualItemCount: 1 });
+
+    // No complete marker was written.
+    expect(
+      harness.durableObject.inspectCloneStage({
+        sourceSessionId: 'src',
+        destinationSessionId: 'dst',
+      })
+    ).toMatchObject({ status: 'in_progress' });
+  });
+
+  it('resets staged rows, R2 objects, and clone markers', async () => {
+    const harness = makeCloneHarness();
+    harness.durableObject.stageCloneBatch({
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      rows: [
+        {
+          itemId: 'session/dst',
+          itemType: 'session' as const,
+          itemData: '{}',
+          itemDataR2Key: null,
+          ingestedAt: 1,
+        },
+        {
+          itemId: 'message/dst',
+          itemType: 'message' as const,
+          itemData: '{}',
+          itemDataR2Key: 'items/staged-blob',
+          ingestedAt: 2,
+        },
+      ],
+      nextCursor: null,
+      rollingDigest: 'digest',
+      copiedItemCount: 2,
+    });
+
+    await harness.durableObject.resetCloneStage();
+
+    // The SQLite wipe must complete before the R2 delete await opens the input gate.
+    expect(harness.deleteAll.mock.invocationCallOrder[0]).toBeLessThan(
+      harness.deleteObject.mock.invocationCallOrder[0]
+    );
+    expect(harness.deleteObject).toHaveBeenCalledWith(['items/staged-blob']);
+    expect(harness.items).toHaveLength(0);
+    expect(harness.meta.size).toBe(0);
+    expect(
+      harness.durableObject.inspectCloneStage({
+        sourceSessionId: 'src',
+        destinationSessionId: 'dst',
+      })
+    ).toEqual({ status: 'empty' });
+  });
+
+  it('swallows an R2 delete failure so resetCloneStage still returns a typed reject', async () => {
+    const harness = makeCloneHarness([itemRow(1, 'message/src', 'message', 1, 'items/blob')]);
+    harness.deleteObject.mockRejectedValueOnce(new Error('r2 unavailable'));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(harness.durableObject.resetCloneStage()).resolves.toBeUndefined();
+
+    expect(harness.deleteAll).toHaveBeenCalled();
+    expect(harness.items).toHaveLength(0);
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('marks the DO deleted even when the clear R2 delete fails', async () => {
+    const harness = makeCloneHarness([itemRow(1, 'message/src', 'message', 1, 'items/blob')]);
+    harness.deleteObject.mockRejectedValueOnce(new Error('r2 unavailable'));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(harness.durableObject.clear()).resolves.toBeUndefined();
+
+    expect(harness.meta.get('deleted')).toBe('true');
+    consoleError.mockRestore();
   });
 });

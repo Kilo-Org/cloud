@@ -1,5 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { type TFunction } from 'i18next';
 import { RefreshControl, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -12,6 +14,7 @@ import {
 import { AgentsPromoCard } from '@/components/home/agents-promo-card';
 import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
+import { ProductChoices } from '@/components/home/product-choices';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,6 +23,7 @@ import { useOrganization } from '@/lib/organization-context';
 
 export function HomeScreen() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [refreshing, setRefreshing] = useState(false);
 
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
@@ -84,6 +88,7 @@ export function HomeScreen() {
                 sessionsLoadedEmpty: storedIsSuccess && !hasAnySession,
                 activeIsError,
                 handleRetrySessions: () => void refetchSessions(),
+                t,
               })}
 
               {hasAnySession ? (
@@ -91,6 +96,8 @@ export function HomeScreen() {
                   <NewTaskButton organizationId={organizationId} />
                 </View>
               ) : null}
+
+              <ProductChoices organizationId={organizationId} />
             </Animated.View>
           )}
         </Animated.View>
@@ -106,6 +113,7 @@ function renderSessionsOrPromo(params: {
   sessionsLoadedEmpty: boolean;
   activeIsError: boolean;
   handleRetrySessions: () => void;
+  t: TFunction;
 }) {
   // Stale stored history always wins over an error (e.g. a live-poll blip
   // on the active-sessions query) — never blank out sessions we already
@@ -118,7 +126,7 @@ function renderSessionsOrPromo(params: {
     return (
       <QueryError
         placement="top"
-        title="Couldn't load sessions"
+        title={params.t('home.couldNotLoadSessions')}
         onRetry={params.handleRetrySessions}
       />
     );
@@ -129,7 +137,7 @@ function renderSessionsOrPromo(params: {
     return (
       <QueryError
         placement="top"
-        title="Couldn't load active sessions"
+        title={params.t('home.couldNotLoadActiveSessions')}
         onRetry={params.handleRetrySessions}
       />
     );

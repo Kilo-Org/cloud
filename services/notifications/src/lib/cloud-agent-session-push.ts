@@ -60,6 +60,8 @@ type SessionPushContent = {
   title: string;
   body: string;
   category: CloudAgentSessionCategory;
+  i18nKey?: string;
+  i18nParams?: Record<string, string>;
 };
 
 async function dispatchSessionPush(
@@ -113,6 +115,10 @@ async function dispatchSessionPush(
     push: {
       title: content.title,
       body: content.body,
+      ...(content.i18nKey !== undefined && {
+        i18nKey: content.i18nKey,
+        i18nParams: content.i18nParams,
+      }),
       // ponytail: `category` is always set on the emitted pushData so the
       // mobile deep-link handler can dispatch on attention vs. status
       // without a second round-trip. The default covers the rolling-deploy
@@ -142,15 +148,25 @@ export async function dispatchCloudAgentSessionPush(
   return dispatchSessionPush(
     parsed.userId,
     parsed.cliSessionId,
-    session => ({
-      presenceContext: parsed.suppressIfViewingSession
-        ? presenceContextForCliSession(parsed.cliSessionId)
-        : null,
-      idempotencyKey: `cloud-agent:${parsed.cliSessionId}:${parsed.executionId}`,
-      title: sanitizeTitle(session.title) ?? 'Agent session',
-      body: parsed.body,
-      category,
-    }),
+    session => {
+      const title = sanitizeTitle(session.title) ?? 'Agent session';
+      return {
+        presenceContext: parsed.suppressIfViewingSession
+          ? presenceContextForCliSession(parsed.cliSessionId)
+          : null,
+        idempotencyKey: `cloud-agent:${parsed.cliSessionId}:${parsed.executionId}`,
+        title,
+        body: parsed.body,
+        // The session title is user-authored; it passes through the catalog
+        // title template as a param. The body is the translated system copy.
+        i18nKey: parsed.i18nKey,
+        i18nParams:
+          parsed.i18nKey !== undefined
+            ? { ...(parsed.i18nParams ?? {}), sessionTitle: title }
+            : undefined,
+        category,
+      };
+    },
     prefs => (category === 'attention' ? prefs.agentAttentionEnabled : prefs.sessionStatusEnabled),
     deps
   );
@@ -176,14 +192,19 @@ export async function dispatchSessionReadyPush(
   return dispatchSessionPush(
     parsed.userId,
     parsed.cliSessionId,
-    session => ({
-      presenceContext: presenceContextForPlatform('app'),
-      idempotencyKey: `cloud-agent:${parsed.cliSessionId}:session-ready`,
-      title:
-        sanitizeTitle(parsed.title ?? null) ?? sanitizeTitle(session.title) ?? 'Kilo session ready',
-      body: 'Your Kilo session is ready to control from your phone',
-      category: 'status',
-    }),
+    session => {
+      const title =
+        sanitizeTitle(parsed.title ?? null) ?? sanitizeTitle(session.title) ?? 'Kilo session ready';
+      return {
+        presenceContext: presenceContextForPlatform('app'),
+        idempotencyKey: `cloud-agent:${parsed.cliSessionId}:session-ready`,
+        title,
+        body: 'Your Kilo session is ready to control from your phone',
+        i18nKey: 'sessionReady',
+        i18nParams: { sessionTitle: title },
+        category: 'status',
+      };
+    },
     prefs => prefs.sessionStatusEnabled,
     deps
   );

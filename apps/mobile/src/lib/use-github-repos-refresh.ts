@@ -3,6 +3,7 @@ import { AppState, type AppStateStatus, Platform } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
@@ -87,7 +88,7 @@ export function useGitHubReposRefresh({
           setConnectCheckFailed(false);
         }
       } catch {
-        toast.error('Could not refresh repositories. Please try again.');
+        toast.error(i18n.t('agentChat.newSession.couldNotRefreshRepositories'));
       } finally {
         setIsRefreshingRepos(false);
       }
@@ -147,7 +148,7 @@ export function useGitHubReposRefresh({
         // Browser failed to open — clear the sentinel so a later
         // unrelated foreground doesn't trigger a stray refetch.
         launchedAt.current = null;
-        toast.error('Could not open GitHub setup. Please try again.');
+        toast.error(i18n.t('codeReviewer.providerConnect.githubError'));
       }
     })();
   }, [organizationId, performForceFresh]);

@@ -5,6 +5,7 @@ import {
 import { useRouter } from 'expo-router';
 import { ExternalLink } from '@/components/ui/icons';
 import { ActivityIndicator, Linking, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import {
   FINDING_ICONS,
@@ -14,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
@@ -40,27 +42,29 @@ function getNextActionLabel(finding: SecurityFinding): string | null {
   const capability = finding.remediationCapability;
 
   if (remediation?.status === 'pr_opened' && remediation.prUrl) {
-    return 'Remediation PR open';
+    return i18n.t('securityAgent.findingRow.nextRemediationPrOpen');
   }
   if (capability.canCancel) {
-    return 'Remediation in progress';
+    return i18n.t('securityAgent.findingRow.nextRemediationInProgress');
   }
   if (capability.canRetry) {
-    return 'Retry remediation available';
+    return i18n.t('securityAgent.findingRow.nextRetryRemediation');
   }
   if (capability.canStart) {
-    return 'Remediation available';
+    return i18n.t('securityAgent.findingRow.nextRemediationAvailable');
   }
   const needsAnalysis =
     finding.status === 'open' && (!finding.analysis_status || finding.analysis_status === 'failed');
   if (needsAnalysis) {
-    return finding.analysis_status === 'failed' ? 'Retry analysis' : 'Run analysis';
+    return finding.analysis_status === 'failed'
+      ? i18n.t('securityAgent.findingRow.retryAnalysis')
+      : i18n.t('securityAgent.findingRow.runAnalysis');
   }
   if (finding.analysis?.triage?.suggestedAction === 'manual_review' && finding.status === 'open') {
-    return 'Needs manual review';
+    return i18n.t('securityAgent.findingRow.nextNeedsManualReview');
   }
   if (finding.status === 'fixed' || finding.status === 'ignored') {
-    return 'View details';
+    return i18n.t('securityAgent.findingRow.nextViewDetails');
   }
   return null;
 }
@@ -89,6 +93,7 @@ function FindingRowQuickAction({
   nextAction,
 }: Readonly<FindingRowQuickActionProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const startAnalysis = useStartSecurityAnalysis(scope);
   const analysisFailed = finding.analysis_status === 'failed';
 
@@ -103,7 +108,7 @@ function FindingRowQuickAction({
         }}
       >
         <ExternalLink size={13} color={colors.foreground} />
-        <Text className="text-xs font-medium">View PR</Text>
+        <Text className="text-xs font-medium">{t('securityAgent.findingRow.viewPr')}</Text>
       </Button>
     );
   }
@@ -125,7 +130,11 @@ function FindingRowQuickAction({
         {startAnalysis.isPending ? (
           <ActivityIndicator size="small" color={colors.foreground} />
         ) : null}
-        <Text className="text-xs font-medium">{analysisFailed ? 'Retry analysis' : 'Analyze'}</Text>
+        <Text className="text-xs font-medium">
+          {analysisFailed
+            ? t('securityAgent.findingRow.retryAnalysis')
+            : t('securityAgent.findingRow.analyze')}
+        </Text>
       </Button>
     );
   }
@@ -157,6 +166,7 @@ export function FindingRow({
 }: Readonly<FindingRowProps>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   const analysis = getSecurityAnalysisPresentation(finding);
   const deadline = slaEnabled ? getSecurityDeadlinePresentation(finding) : null;
@@ -175,12 +185,27 @@ export function FindingRow({
     finding.status === 'open' &&
     (!finding.analysis_status || finding.analysis_status === 'failed');
 
+  const accessibilityLabel = deadline
+    ? t('securityAgent.findingRow.a11yWithDeadline', {
+        severity: capitalize(finding.severity),
+        title: finding.title,
+        repo: finding.repo_full_name,
+        analysis: analysis.label,
+        deadline: deadline.label,
+      })
+    : t('securityAgent.findingRow.a11y', {
+        severity: capitalize(finding.severity),
+        title: finding.title,
+        repo: finding.repo_full_name,
+        analysis: analysis.label,
+      });
+
   return (
     <View className="gap-1.5 rounded-lg bg-secondary p-3">
       <Pressable
         className="gap-1.5 active:opacity-70"
         accessibilityRole="button"
-        accessibilityLabel={`${capitalize(finding.severity)} finding: ${finding.title}. ${finding.repo_full_name}. ${analysis.label}${deadline ? `. ${deadline.label}` : ''}`}
+        accessibilityLabel={accessibilityLabel}
         onPress={() => {
           router.push(getSecurityAgentPath(scope, `findings/${finding.id}`));
         }}

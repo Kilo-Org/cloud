@@ -5,6 +5,8 @@ import { useCallback } from 'react';
 import { ActionSheetIOS, Platform } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
+
 import { collectCopyableText } from './collect-copyable-text';
 
 export function useMessageCopy() {
@@ -16,7 +18,10 @@ export function useMessageCopy() {
 
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Copy Text', 'Cancel'], cancelButtonIndex: 1 },
+        {
+          options: [i18n.t('agentChat.messageDetails.copyText'), i18n.t('common.cancel')],
+          cancelButtonIndex: 1,
+        },
         buttonIndex => {
           if (buttonIndex === 0) {
             void performCopy(text);
@@ -41,8 +46,8 @@ export async function performCopy(text: string): Promise<void> {
   try {
     await Clipboard.setStringAsync(text);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    toast.success('Copied to clipboard');
+    toast.success(i18n.t('common.copiedToClipboard'));
   } catch {
-    toast.error('Could not copy to clipboard');
+    toast.error(i18n.t('common.couldNotCopyToClipboard'));
   }
 }

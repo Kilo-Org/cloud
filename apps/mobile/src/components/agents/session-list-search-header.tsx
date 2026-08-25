@@ -1,6 +1,7 @@
 import { Search, X } from '@/components/ui/icons';
 import { type RefObject } from 'react';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -25,6 +26,7 @@ export function SessionListSearchHeader({
   onClearSearch,
 }: Readonly<SessionListSearchHeaderProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View>
       <View className="mx-[22px] mb-[14px] mt-3 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5">
@@ -34,7 +36,7 @@ export function SessionListSearchHeader({
             <ActivityIndicator
               size="small"
               color={colors.mutedForeground}
-              accessibilityLabel="Searching"
+              accessibilityLabel={t('agents.search.searching')}
             />
           ) : (
             <Search size={18} color={colors.mutedForeground} />
@@ -42,9 +44,9 @@ export function SessionListSearchHeader({
         </View>
         <TextInput
           ref={inputRef}
-          accessibilityLabel="Search sessions"
+          accessibilityLabel={t('agents.search.searchSessions')}
           className="min-h-6 flex-1 py-1 text-[15px] leading-6 text-foreground"
-          placeholder="Search sessions..."
+          placeholder={t('agents.search.searchSessionsPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
           onChangeText={onChangeText}
           returnKeyType="search"
@@ -54,7 +56,7 @@ export function SessionListSearchHeader({
         {hasText ? (
           <Pressable
             onPress={onClearSearch}
-            accessibilityLabel="Clear search"
+            accessibilityLabel={t('agents.search.clearSearch')}
             accessibilityRole="button"
             hitSlop={12}
             className="active:opacity-70"
@@ -65,7 +67,7 @@ export function SessionListSearchHeader({
       </View>
       {showInlineError ? (
         <Text variant="muted" className="mx-[22px] mb-[14px] text-xs">
-          Couldn't refresh. Pull down to try again.
+          {t('common.couldNotRefresh')}
         </Text>
       ) : null}
     </View>

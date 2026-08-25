@@ -10,7 +10,7 @@ export default async function OrganizationCloudPage({
 }) {
   const { id } = await params;
   const organizationId = decodeURIComponent(id);
-  await getUserFromAuthOrRedirect(
+  const user = await getUserFromAuthOrRedirect(
     `/users/sign_in?callbackPath=${encodeURIComponent(`/organizations/${organizationId}/cloud`)}`
   );
   const isDevcontainerAvailable = await isFeatureFlagEnabledOrDevelopment(
@@ -21,9 +21,12 @@ export default async function OrganizationCloudPage({
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization }) => (
+      render={({ organization, role }) => (
         <NewSessionPanel
+          currentUserId={user.id}
           organizationId={organization.id}
+          organizationName={organization.name}
+          organizationRole={role}
           isDevcontainerAvailable={isDevcontainerAvailable}
         />
       )}

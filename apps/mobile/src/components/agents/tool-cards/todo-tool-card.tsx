@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { ListTodo } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { useTranslation } from 'react-i18next';
 
 import { SelectableText } from '@/components/ui/selectable-text';
 
@@ -19,6 +20,7 @@ import { TodoTaskRows } from './todo-task-rows';
  * attachments and the pending/running status line live in `ToolPartDetailBody`.
  */
 export function TodoToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
+  const { t } = useTranslation();
   const output = part.state.status === 'completed' ? part.state.output : undefined;
   const error = part.state.status === 'error' ? part.state.error : undefined;
   const todoModel = buildTodoListModel(part);
@@ -29,8 +31,9 @@ export function TodoToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
         <TodoTaskRows tasks={todoModel.tasks} truncated={todoModel.truncated} />
       ) : null}
       {todoModel && todoModel.tasks.length === 0 ? (
-        // eslint-disable-next-line react-native/no-raw-text -- static copy inlined in place of the removed NO_TASKS_TEXT
-        <SelectableText className="text-sm text-muted-foreground">No tasks.</SelectableText>
+        <SelectableText className="text-sm text-muted-foreground">
+          {t('agentChat.toolCard.noTasks')}
+        </SelectableText>
       ) : null}
       {!todoModel && output ? (
         <MonoScrollBlock content={output} textClassName="text-foreground" />
@@ -42,6 +45,7 @@ export function TodoToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 
 export function TodoToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
+  const { t } = useTranslation();
   const display = getToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
@@ -50,7 +54,10 @@ export function TodoToolCard({ part }: Readonly<{ part: ToolPart }>) {
       icon={ListTodo}
       label={display.subtitle ?? display.title}
       status={part.state.status}
-      accessibilityLabel={`${display.subtitle ?? display.title} tool, ${part.state.status}`}
+      accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
+        name: display.subtitle ?? display.title,
+        status: part.state.status,
+      })}
       onPress={
         hasDetails && openPartDetail
           ? () => {

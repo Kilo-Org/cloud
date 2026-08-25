@@ -1,4 +1,8 @@
 /* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, and Sentry init are kept together */
+// Must run before the first view mounts: allowRTL(true) makes the native
+// direction known before any layout pass (see src/i18n/rtl.ts).
+// eslint-disable-next-line import/no-duplicates -- the side effect must run here, before the named import below
+import '@/i18n/rtl';
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
 
@@ -11,7 +15,7 @@ import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
 import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Medium';
 import { JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono/600SemiBold';
 import * as Sentry from '@sentry/react-native';
-import { isRunningInExpoGo } from 'expo';
+import { isRunningInExpoGo, reloadAppAsync } from 'expo';
 import { loadAsync, useFonts } from 'expo-font';
 import {
   ErrorBoundary as ExpoRouterErrorBoundary,
@@ -27,14 +31,17 @@ import * as SplashScreen from 'expo-splash-screen';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
+import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useAuth } from '@/lib/auth/auth-context';
+import { resolveBootstrapDecision } from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { subscribeToConsentChanges } from '@/lib/consent';
@@ -53,10 +60,26 @@ import {
   preloadThemePreference,
   useThemePreference,
 } from '@/lib/hooks/use-theme-preference';
+import { i18n } from '@/i18n';
+import { syncRtl } from '@/i18n/rtl';
+import { type LanguageReturnTarget, readLanguageReturnTarget } from '@/i18n/return-target';
+import {
+  getResolvedLanguage,
+  preloadLanguagePreference,
+  useLanguagePreference,
+} from '@/lib/hooks/use-language-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
-import { captureLaunchDeepLink, getPendingDeepLink } from '@/lib/deep-link-launch';
+import {
+  captureLaunchDeepLink,
+  getPendingDeepLink,
+  getPendingDeepLinkSnapshot,
+  restorePersistedPendingDeepLink,
+  subscribeToPendingDeepLink,
+} from '@/lib/deep-link-launch';
 import {
   checkInitialNotification,
+  ensureAndroidNotificationChannels,
+  renameAndroidNotificationChannels,
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
@@ -79,6 +102,7 @@ import {
 import { SENTRY_ENVIRONMENT } from '@/lib/config';
 import { SENTRY_DSN } from '@/lib/sentry-dsn';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
+import { applySentryContext, setSentryContext } from '@/lib/sentry-context';
 import { scrubBreadcrumb, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 import { resolveSentryEnvironment } from '@/lib/sentry-environment';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
@@ -96,7 +120,8 @@ installE2EWebSocketLatency();
 // MASKED session replay and error screenshots (DEC-02 amendment, owner
 // decision 2026-08-17); the replay integration is only registered once
 // optional consent is accepted, so no replay code runs before the
-// decision. Account identity is cleared by step 7's `Sentry.setUser(null)`.
+// decision. The Sentry context module reapplies identity and global tags after
+// every init, and auth sign-out clears its canonical identity state.
 // `enableTombstone` is Android 12+ only; NDK stays on for older devices.
 // `enableMetricKit` is iOS 15+ only. App-hang tracking stays off so MetricKit
 // hangs are not reported twice. Native init in the Expo plugin captures
@@ -141,6 +166,7 @@ function initSentry(optionalConsented: boolean) {
 
     spotlight: __DEV__,
   });
+  applySentryContext();
 }
 
 initSentry(false);
@@ -160,15 +186,17 @@ function preloadStartupFonts(): void {
 }
 
 void SplashScreen.preventAutoHideAsync();
+void ensureAndroidNotificationChannels();
 setupNotificationHandler();
 checkInitialNotification();
 captureLaunchDeepLink();
 prefetchCurrentUser();
 preloadThemePreference();
+preloadLanguagePreference();
 preloadStartupFonts();
 
 function RootLayoutNav() {
-  const { token, isLoading: authLoading, signOut } = useAuth();
+  const { token, isLoading: authLoading, isSigningOut, signOut } = useAuth();
   const { updateRequired } = useForceUpdate();
   const [fontsLoaded, fontsError] = useFonts({
     JetBrainsMono_500Medium,
@@ -179,6 +207,14 @@ function RootLayoutNav() {
   const { mode } = useGlobalSearchParams<{ mode?: string }>();
   const router = useRouter();
   const { preference: themePreference, hasLoaded: themeHasLoaded } = useThemePreference();
+  const { hasLoaded: languageHasLoaded } = useLanguagePreference();
+  const { t } = useTranslation();
+  // True once the active catalog is loaded (or English after a catalog
+  // failure), so the splash never hides on an unlocalized tree.
+  const [languageReady, setLanguageReady] = useState(false);
+  // True when the cold-start RTL reload failed after syncRtl forced the native
+  // direction; the app then shows a Retry/Continue screen instead of painting LTR.
+  const [languageReloadFailed, setLanguageReloadFailed] = useState(false);
   const {
     userId,
     email,
@@ -200,15 +236,52 @@ function RootLayoutNav() {
 
   useEffect(() => {
     if (fontsError) {
-      Sentry.captureException(fontsError);
+      Sentry.captureException(fontsError, {
+        tags: { 'error.subsystem': 'startup', 'error.operation': 'load_fonts' },
+      });
     }
   }, [fontsError]);
+
+  useEffect(() => {
+    let authState: 'error' | 'loading' | 'signed_in' | 'signed_out' = 'signed_out';
+    if (isSigningOut) {
+      authState = 'signed_out';
+    } else if (authLoading || userIdLoading) {
+      authState = 'loading';
+    } else if (userIdError) {
+      authState = 'error';
+    } else if (token && userId) {
+      authState = 'signed_in';
+    }
+    setSentryContext({
+      userId: authState === 'signed_in' ? (userId ?? null) : null,
+      authState,
+      telemetryMode: consentChecked && !needsConsent && optionalConsent ? 'optional' : 'mandatory',
+    });
+  }, [
+    authLoading,
+    consentChecked,
+    isSigningOut,
+    needsConsent,
+    optionalConsent,
+    token,
+    userId,
+    userIdError,
+    userIdLoading,
+  ]);
 
   // Cold-start read-cache restore: best effort, never blocks startup. Starts
   // before the auth gate resolves so allowlisted queries can hydrate under
   // the splash; the authenticated mount abandons or rescopes it on identity.
   useEffect(() => {
     void restorePersistedCacheOnColdStart(queryClient);
+  }, []);
+
+  // Restore a deep-link destination persisted before process death. Runs before
+  // the gate effect so a restored destination is present when the shell
+  // settles; the observable slot re-triggers the consumer if it lands later.
+  useEffect(() => {
+    void restorePersistedPendingDeepLink();
   }, []);
 
   useSentryConsentSync(consentChecked && !needsConsent && optionalConsent, initSentry);
@@ -219,7 +292,8 @@ function RootLayoutNav() {
   // holding first paint for it only ever costs time. `updateRequired` starts
   // false, first paint happens, and the effect below routes to /force-update
   // if the check later says an update is required.
-  const isLoading = authLoading || !fontsReady || !themeHasLoaded;
+  const isLoading =
+    authLoading || !fontsReady || !themeHasLoaded || !languageHasLoaded || !languageReady;
 
   // Startup phase timings (lib/startup-timing). Idempotent per mark, so this
   // effect re-runs freely as gates settle. `userIdLoading` is false while the
@@ -247,6 +321,71 @@ function RootLayoutNav() {
       applyThemePreference(themePreference);
     }
   }, [themeHasLoaded, themePreference]);
+
+  // Resolve the active language once the stored preference has loaded, then
+  // prepare the direction and catalog before first paint. A direction change
+  // forces RTL and reloads the app; a catalog failure falls back to English so
+  // the splash still hides. Held in `isLoading` so the tree never paints
+  // English and then swaps.
+  useEffect(() => {
+    if (!languageHasLoaded) {
+      return undefined;
+    }
+    let cancelled = false;
+
+    const prepareLanguage = async () => {
+      const resolved = getResolvedLanguage();
+      let reloadFailed = false;
+      if (syncRtl(resolved)) {
+        try {
+          await reloadAppAsync();
+          // The native reload tears down this JS context; nothing below runs.
+          return;
+        } catch {
+          // Reload failed: keep going so the language still loads, then show
+          // the Retry/Continue screen instead of first-painting in the wrong
+          // direction.
+          reloadFailed = true;
+        }
+      }
+      // Reopen the screen the user was on before an RTL reload. Read once,
+      // after the reload path, so the helper's one-shot delete is the only read.
+      // On a failed reload the key stays in SecureStore, so Retry's successful
+      // reloadAppAsync() still reopens the right screen on the relaunch.
+      let returnTarget: LanguageReturnTarget | null = null;
+      if (!reloadFailed) {
+        try {
+          returnTarget = await readLanguageReturnTarget();
+        } catch {
+          // Failed read: fall through so the splash still hides.
+        }
+      }
+      if (returnTarget === 'login') {
+        router.replace('/(auth)/login');
+      } else if (returnTarget === 'profile') {
+        router.replace('/(app)/(tabs)/(3_profile)');
+      } else if (returnTarget === 'preferences') {
+        router.replace('/(app)/(tabs)/(3_profile)/preferences');
+      }
+      try {
+        await i18n.changeLanguage(resolved);
+      } catch {
+        await i18n.changeLanguage('en');
+      }
+      void renameAndroidNotificationChannels();
+      if (!cancelled) {
+        if (reloadFailed) {
+          setLanguageReloadFailed(true);
+        }
+        setLanguageReady(true);
+      }
+    };
+
+    void prepareLanguage();
+    return () => {
+      cancelled = true;
+    };
+  }, [languageHasLoaded, router]);
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
   const onConsentRoute = pathname === '/consent' || pathname === '/consent-details';
@@ -302,7 +441,9 @@ function RootLayoutNav() {
       }
 
       if (result.status === 'error') {
-        Sentry.captureException(result.error);
+        Sentry.captureException(result.error, {
+          tags: { 'error.subsystem': 'consent', 'error.operation': 'read_decision' },
+        });
         setNeedsConsent(false);
         setOptionalConsentState(false);
         setConsentChecked(false);
@@ -364,8 +505,14 @@ function RootLayoutNav() {
 
   useEffect(() => {
     if (shareIntentError) {
-      Sentry.captureException(new Error(shareIntentError));
-      toast.error("Couldn't read the shared content");
+      Sentry.captureException(new Error('Share intent provider error'), {
+        tags: {
+          'error.subsystem': 'share-intent',
+          'error.operation': 'read_native_payload',
+        },
+        fingerprint: ['share-intent-provider-error'],
+      });
+      toast.error(i18n.t('share.couldNotReadContent'));
       resetShareIntentRef.current();
     }
   }, [shareIntentError]);
@@ -402,8 +549,10 @@ function RootLayoutNav() {
         if (cancelled) {
           return;
         }
-        Sentry.captureException(error);
-        toast.error("Couldn't read the shared content");
+        Sentry.captureException(error, {
+          tags: { 'error.subsystem': 'share-intent', 'error.operation': 'normalize_payload' },
+        });
+        toast.error(i18n.t('share.couldNotReadContent'));
         resetShareIntentRef.current();
       }
     };
@@ -416,72 +565,89 @@ function RootLayoutNav() {
   }, [hasShareIntent, shareIntent]);
 
   useEffect(() => {
-    if (isLoading) {
-      return;
-    }
+    const decision = resolveBootstrapDecision({
+      isLoading,
+      updateRequired,
+      inForceUpdate,
+      inAuthGroup,
+      hasToken: token != null,
+      userIdLoading,
+      userIdError,
+      consentCheckError: consentCheckError != null,
+      consentChecked,
+      needsConsent,
+      onConsentRoute,
+      onConsentReviewRoute,
+      languageReloadFailed,
+    });
 
-    if (updateRequired) {
-      if (!inForceUpdate) {
+    // Replaces the old inline if-chain (resolveBootstrapTag in
+    // src/lib/bootstrap-decision.ts). Remove this switch when the decision
+    // module owns all bootstrap routing.
+    switch (decision.tag) {
+      case 'settle-language-error': {
+        markStartupComplete('language-error');
+        setStartupFinished(true);
+        return;
+      }
+      case 'wait-loading':
+      case 'wait-user-consent': {
+        return;
+      }
+      case 'redirect-force-update': {
         router.replace('/force-update');
-      } else {
+        return;
+      }
+      case 'settle-force-update': {
         markStartupComplete('force-update');
         setStartupFinished(true);
+        return;
       }
-      return;
-    }
-
-    if (inForceUpdate) {
-      router.replace('/(app)');
-      return;
-    }
-
-    if (!token) {
-      if (inAuthGroup) {
+      case 'exit-force-update': {
+        router.replace('/(app)');
+        return;
+      }
+      case 'settle-login': {
         markStartupComplete('login');
         setStartupFinished(true);
-      } else {
-        router.replace('/(auth)/login');
+        return;
       }
-    } else {
-      if (userIdError) {
+      case 'redirect-login': {
+        router.replace('/(auth)/login');
+        return;
+      }
+      case 'settle-user-error': {
         markStartupComplete('user-error');
         setStartupFinished(true);
         return;
       }
-
-      if (consentCheckError) {
+      case 'settle-consent-error': {
         markStartupComplete('consent-error');
         setStartupFinished(true);
         return;
       }
-
-      if (userIdLoading || !consentChecked) {
+      case 'settle-consent': {
+        markStartupComplete('consent');
+        setStartupFinished(true);
         return;
       }
-
-      if (needsConsent) {
-        if (onConsentRoute) {
-          markStartupComplete('consent');
-          setStartupFinished(true);
-        } else {
-          router.replace('/(app)/consent' as Href);
-        }
+      case 'redirect-consent': {
+        router.replace('/(app)/consent' as Href);
         return;
       }
-
-      if ((onConsentRoute && !onConsentReviewRoute) || inAuthGroup) {
+      case 'redirect-app': {
         router.replace('/(app)');
         return;
       }
-
-      markStartupComplete('app');
-      setStartupFinished(true);
-      // Navigate to pending deep link (cold start universal link / notification tap)
-      const pendingNavigation = resolvePendingNavigation(getPendingDeepLink());
-      if (pendingNavigation) {
-        router.navigate(pendingNavigation.href as Href);
+      case 'settle-app': {
+        markStartupComplete('app');
+        setStartupFinished(true);
+        // Deep-link navigation is owned by the pendingDeepLink effect below.
+        // Share-gate open is owned by the pendingShareId effect + isShellReadyForShare.
+        break;
       }
-      // Share-gate open is owned by the pendingShareId effect + isShellReadyForShare.
+      default:
+      // Unreachable: BootstrapDecisionTag is a closed union.
     }
   }, [
     token,
@@ -497,10 +663,30 @@ function RootLayoutNav() {
     needsConsent,
     onConsentRoute,
     onConsentReviewRoute,
+    languageReloadFailed,
   ]);
 
+  // Reactive snapshot of the pending deep-link slot so a destination stashed
+  // after the gate effect last ran (e.g. a notification tap while signed out,
+  // or a restored persisted record) is consumed without waiting for an
+  // unrelated dependency change.
+  const pendingDeepLink = useSyncExternalStore(
+    subscribeToPendingDeepLink,
+    getPendingDeepLinkSnapshot
+  );
+
   // Declared after the auth effect so that on the same flush a pending
-  // notification navigate runs first and the share gate opens on top.
+  // deep-link navigate runs first and the share gate opens on top.
+  useEffect(() => {
+    if (pendingDeepLink === null || !isShellReady) {
+      return;
+    }
+    const navigation = resolvePendingNavigation(getPendingDeepLink());
+    if (navigation) {
+      router.navigate(navigation.href as Href);
+    }
+  }, [pendingDeepLink, isShellReady, router]);
+
   useEffect(() => {
     if (pendingShareId === null || !isShellReady) {
       return;
@@ -543,30 +729,26 @@ function RootLayoutNav() {
     });
   }, [startupFinished, token, consentChecked, needsConsent, optionalConsent, postHogReady]);
 
-  const needsForceUpdate = updateRequired && !inForceUpdate;
-  const showingForceUpdate = updateRequired && inForceUpdate;
-  const needsAuth = !token && !inAuthGroup;
-  const needsAppRedirect = token != null && inAuthGroup;
-  const hasUserBootstrapError = token != null && userIdError;
-  const hasConsentBootstrapError = token != null && consentCheckError !== null;
-  const hasBootstrapError = hasUserBootstrapError || hasConsentBootstrapError;
-  const consentLoading =
-    token != null && !consentChecked && !inAuthGroup && !inForceUpdate && !onConsentRoute;
-  const needsConsentRedirect = consentChecked && needsConsent && !onConsentRoute;
-
-  const needsRedirect =
-    !isLoading &&
-    (needsForceUpdate ||
-      (!showingForceUpdate && (needsAuth || needsAppRedirect || needsConsentRedirect)));
-
   // Always keep Slot mounted so Expo Router's navigation tree stays
   // initialised — returning null unmounts it and breaks router.replace.
   // The native splash screen covers everything during initial load, and
   // opacity 0 hides the wrong screen during redirects.
-  const hidden =
-    !hasUserBootstrapError &&
-    !hasConsentBootstrapError &&
-    (isLoading || needsRedirect || consentLoading);
+  const { hasUserBootstrapError, hasConsentBootstrapError, hasBootstrapError, hidden } =
+    resolveBootstrapDecision({
+      isLoading,
+      updateRequired,
+      inForceUpdate,
+      inAuthGroup,
+      hasToken: token != null,
+      userIdLoading,
+      userIdError,
+      consentCheckError: consentCheckError != null,
+      consentChecked,
+      needsConsent,
+      onConsentRoute,
+      onConsentReviewRoute,
+      languageReloadFailed,
+    });
 
   // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
   // both accessibility trees. On the hidden → visible transition,
@@ -591,7 +773,7 @@ function RootLayoutNav() {
     if (!wasHidden || hidden || hasBootstrapError) {
       return undefined;
     }
-    announceForA11y('Content ready');
+    announceForA11y(i18n.t('bootstrap.contentReady'));
     const frame = requestAnimationFrame(() => {
       moveA11yFocus(wrapperRef);
     });
@@ -603,13 +785,13 @@ function RootLayoutNav() {
   if (hasUserBootstrapError) {
     return (
       <BootstrapErrorScreen
-        title="Could not load your account"
-        description="Check your connection and try again."
-        primaryLabel="Retry"
-        primaryAccessibilityLabel="Retry loading account"
+        title={t('bootstrap.couldNotLoadAccount')}
+        description={t('bootstrap.couldNotLoadAccountDescription')}
+        primaryLabel={t('common.retry')}
+        primaryAccessibilityLabel={t('bootstrap.retryLoadingAccount')}
         onPrimaryPress={refetchUserId}
-        secondaryLabel="Sign out"
-        secondaryAccessibilityLabel="Sign out"
+        secondaryLabel={t('bootstrap.signOut')}
+        secondaryAccessibilityLabel={t('bootstrap.signOut')}
         onSecondaryPress={() => {
           void signOut();
         }}
@@ -620,18 +802,37 @@ function RootLayoutNav() {
   if (hasConsentBootstrapError) {
     return (
       <BootstrapErrorScreen
-        title="Could not load privacy choices"
-        description="Check your device security settings and try again."
-        primaryLabel="Retry"
-        primaryAccessibilityLabel="Retry loading privacy choices"
+        title={t('bootstrap.couldNotLoadPrivacy')}
+        description={t('bootstrap.couldNotLoadPrivacyDescription')}
+        primaryLabel={t('common.retry')}
+        primaryAccessibilityLabel={t('bootstrap.retryLoadingPrivacy')}
         onPrimaryPress={() => {
           setConsentCheckError(null);
           setConsentCheckRetryKey(key => key + 1);
         }}
-        secondaryLabel="Sign out"
-        secondaryAccessibilityLabel="Sign out"
+        secondaryLabel={t('bootstrap.signOut')}
+        secondaryAccessibilityLabel={t('bootstrap.signOut')}
         onSecondaryPress={() => {
           void signOut();
+        }}
+      />
+    );
+  }
+
+  if (languageReloadFailed) {
+    return (
+      <LanguageReloadErrorScreen
+        onRetry={() => {
+          void (async () => {
+            try {
+              await reloadAppAsync();
+            } catch {
+              // Reload failed: the screen stays so the user can retry or continue.
+            }
+          })();
+        }}
+        onContinue={() => {
+          setLanguageReloadFailed(false);
         }}
       />
     );

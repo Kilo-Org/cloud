@@ -3,6 +3,7 @@ import { type AttachmentBlock, formatFileSize, type KiloChatClient } from '@kilo
 import { AlertCircle, File as FileIcon } from '@/components/ui/icons';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { ImageViewerModal } from '@/components/image-viewer-modal';
@@ -26,6 +27,7 @@ type Props = {
 };
 
 export function MessageAttachment({ client, conversationId, block, isFromMe }: Props) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const isImage = isImageMimeType(block.mimeType);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -104,7 +106,9 @@ export function MessageAttachment({ client, conversationId, block, isFromMe }: P
     return (
       <View className="aspect-[4/3] w-full items-center justify-center gap-2">
         <AlertCircle size={18} color={colors.mutedForeground} />
-        <Text className="text-xs text-muted-foreground">Image unavailable</Text>
+        <Text className="text-xs text-muted-foreground">
+          {t('chat.attachment.imageUnavailable')}
+        </Text>
       </View>
     );
   }
@@ -118,7 +122,7 @@ export function MessageAttachment({ client, conversationId, block, isFromMe }: P
           }}
           className="overflow-hidden rounded-lg bg-neutral-200 active:opacity-80 dark:bg-neutral-900"
           accessibilityRole="button"
-          accessibilityLabel={`Open ${block.filename}`}
+          accessibilityLabel={t('chat.attachment.open', { filename: block.filename })}
         >
           {renderImageThumbnail()}
         </Pressable>
@@ -152,7 +156,7 @@ export function MessageAttachment({ client, conversationId, block, isFromMe }: P
         isFromMe ? 'border-primary-foreground' : 'border-border bg-secondary'
       )}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${block.filename}`}
+      accessibilityLabel={t('chat.attachment.open', { filename: block.filename })}
     >
       {sharing ? (
         <ActivityIndicator

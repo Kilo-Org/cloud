@@ -13,6 +13,7 @@ import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-l
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { logExceptInTest } from '@/lib/utils.server';
+import { ReasoningDetailsTransform } from '@/lib/ai-gateway/providers/types';
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
@@ -297,10 +298,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
-        responseTransforms: {
-          mapGeminiThoughtContent: false,
-          mapReasoningContentToDetails: true,
-        },
+        responseTransforms: ReasoningDetailsTransform.ReasoningContent,
       });
       const json = await result.json();
 
@@ -335,10 +333,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
-        responseTransforms: {
-          mapGeminiThoughtContent: false,
-          mapReasoningContentToDetails: true,
-        },
+        responseTransforms: ReasoningDetailsTransform.ReasoningContent,
       });
       const json = await result.json();
 
@@ -467,9 +462,9 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(dataPayloads(sse)).toContain('[DONE]');
     });
 
-    test('moves marked delta content to reasoning content', async () => {
+    test('maps Gemini thought content and signatures to reasoning_details', async () => {
       const upstream = sseResponse(
-        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"first thought","extra_content":{"google":{"thought":true}}}},{"index":1,"delta":{"content":"answer","extra_content":{"google":{"thought":false}}}},{"index":2,"delta":{"content":"more answer"}}]}\n\n' +
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"first thought","extra_content":{"google":{"thought":true}}}},{"index":1,"delta":{"content":"answer","extra_content":{"google":{"thought":false}}}},{"index":2,"delta":{"tool_calls":[{"id":"call-1","type":"function","function":{"name":"lookup","arguments":"{}"},"extra_content":{"trace_id":"trace-1","google":{"thought_signature":"opaque-signature"}}}]}}]}\n\n' +
           'data: [DONE]\n\n'
       );
 
@@ -478,21 +473,72 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
-        responseTransforms: {
-          mapGeminiThoughtContent: true,
-          mapReasoningContentToDetails: false,
-        },
+        responseTransforms: ReasoningDetailsTransform.GeminiThought,
       });
       const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
         choices: Array<{ delta: Record<string, unknown> }>;
       }>;
 
       expect(chunk.choices[0].delta).toEqual({
-        reasoning_content: 'first thought',
-        extra_content: { google: { thought: true } },
+        reasoning_details: [
+          {
+            type: 'reasoning.text',
+            text: 'first thought',
+            index: 0,
+            format: 'google-gemini-v1',
+          },
+        ],
       });
       expect(chunk.choices[1].delta).toMatchObject({ content: 'answer' });
-      expect(chunk.choices[2].delta).toMatchObject({ content: 'more answer' });
+      expect(chunk.choices[2].delta).toEqual({
+        tool_calls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: { name: 'lookup', arguments: '{}' },
+            extra_content: { trace_id: 'trace-1' },
+          },
+        ],
+        reasoning_details: [
+          {
+            type: 'reasoning.encrypted',
+            data: 'opaque-signature',
+            id: 'call-1',
+            index: 0,
+            format: 'google-gemini-v1',
+          },
+        ],
+      });
+    });
+
+    test('maps a message-level Gemini signature to encrypted reasoning details', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"content":"answer","extra_content":{"google":{"thought_signature":"root-signature"}}}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        responseTransforms: ReasoningDetailsTransform.GeminiThought,
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: Record<string, unknown> }>;
+      }>;
+
+      expect(chunk.choices[0].delta).toEqual({
+        content: 'answer',
+        reasoning_details: [
+          {
+            type: 'reasoning.encrypted',
+            data: 'root-signature',
+            index: 0,
+            format: 'google-gemini-v1',
+          },
+        ],
+      });
     });
 
     test('maps delta reasoning_content to reasoning_details', async () => {
@@ -506,10 +552,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
         removeCost: true,
         capture: null,
         vercelRequestId: null,
-        responseTransforms: {
-          mapGeminiThoughtContent: false,
-          mapReasoningContentToDetails: true,
-        },
+        responseTransforms: ReasoningDetailsTransform.ReasoningContent,
       });
       const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
         choices: Array<{ delta: Record<string, unknown> }>;

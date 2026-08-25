@@ -138,6 +138,26 @@ describe('ContainerUsageMeter', () => {
     );
   });
 
+  it('returns detailed insufficient-credit rejections from recordStart', async () => {
+    vi.mocked(applyStart).mockResolvedValue({
+      kind: 'rejected',
+      code: 'insufficient_credits',
+      message: 'Container billing requires at least $5.00 in remaining credits',
+      remainingMicrodollars: 5_000_000,
+      minimumRequiredMicrodollars: 5_000_000,
+    });
+
+    await expect(createMeter().recordStart(validStart())).resolves.toEqual({
+      success: false,
+      error: {
+        code: 'insufficient_credits',
+        message: 'Container billing requires at least $5.00 in remaining credits',
+        remainingMicrodollars: 5_000_000,
+        minimumRequiredMicrodollars: 5_000_000,
+      },
+    });
+  });
+
   it('writes heartbeats directly and returns the shadow budget verdict', async () => {
     await expect(createMeter().recordHeartbeat(validHeartbeat())).resolves.toEqual({
       intervalId: 'cloud-agent-next:instance-1:123',

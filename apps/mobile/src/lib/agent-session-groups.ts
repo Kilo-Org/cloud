@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+import { dateTimeFormat } from '@/lib/intl-cache';
 import {
   type AgentSessionSortBy,
   getAgentSessionTimestamp,
@@ -27,7 +29,9 @@ function addDays(date: Date, days: number): Date {
 }
 
 function getWeekdayName(date: Date): string {
-  return new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(date);
+  // The active language, not en-US: a day heading in the session list must
+  // read in the language the rest of the list reads in.
+  return dateTimeFormat(i18n.language, { weekday: 'long' }).format(date);
 }
 
 function timestampMs(session: SessionTimestamps, sortBy: AgentSessionSortBy): number {

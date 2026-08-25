@@ -4,6 +4,7 @@ import {
   createSecurityAgentCommand,
   deleteRetainedSecurityAgentCommands,
   getSecurityAgentCommandForOwner,
+  getSecurityAgentCommandsForOwner,
   getSecurityAgentRepositorySyncState,
   listActiveSecurityAgentCommandsForOwner,
   markSecurityAgentCommandRetriesExhausted,
@@ -228,6 +229,30 @@ describe('Security Agent command ledger', () => {
     await expect(
       deleteRetainedSecurityAgentCommands(db, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
     ).resolves.toBeGreaterThanOrEqual(1);
+  });
+
+  it('fetches a batch of commands scoped to the owner and omits unknown ids', async () => {
+    const owner = await insertTestUser();
+    const otherOwner = await insertTestUser();
+    const owned = await createSecurityAgentCommand(db, {
+      commandType: 'sync',
+      origin: 'manual',
+      owner: { type: 'user', id: owner.id },
+    });
+    const foreign = await createSecurityAgentCommand(db, {
+      commandType: 'sync',
+      origin: 'manual',
+      owner: { type: 'user', id: otherOwner.id },
+    });
+
+    const unknownId = '00000000-0000-4000-8000-000000000000';
+    const result = await getSecurityAgentCommandsForOwner(db, { type: 'user', id: owner.id }, [
+      owned.id,
+      foreign.id,
+      unknownId,
+    ]);
+
+    expect(result.map(command => command.id)).toEqual([owned.id]);
   });
 
   it('lists active commands and clean-repository freshness for only requested owner', async () => {

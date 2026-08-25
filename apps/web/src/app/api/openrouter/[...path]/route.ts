@@ -64,7 +64,7 @@ import {
   rewriteModelResponse,
   logUnrewrittenResponse,
 } from '@/lib/ai-gateway/rewriteModelResponse';
-import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner-routing';
+import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner/routing';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -341,9 +341,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
           // Kilo-funded classification with no user to attribute it to.
           if (!user || authFailedResponse) return null;
           const { settings, plan } = await balanceAndSettingsPromise;
-          const deniedFromSettings =
-            plan === 'enterprise' ? (settings?.model_deny_list?.map(normalizeModelId) ?? []) : [];
           const groupPolicy = await organizationGroupPolicyPromise;
+          const deniedFromSettings =
+            !groupPolicy && plan === 'enterprise'
+              ? (settings?.model_deny_list?.map(normalizeModelId) ?? [])
+              : [];
           const deniedFromPolicy = groupPolicy
             ? await collectDeniedAutoRoutingModelIds(groupPolicy, {
                 userId: user.id,
@@ -602,6 +604,62 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
   }
 
+  async function resolveAccessCheck(modelId: string) {
+    const { balance, settings, plan } = await balanceAndSettingsPromise;
+    const groupPolicy = await organizationGroupPolicyPromise;
+    const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
+      modelId,
+      settings,
+      organizationPlan: groupPolicy ? undefined : plan,
+    });
+    if (modelRestrictionError) {
+      return {
+        balance,
+        effectiveProviderConfig: providerConfig,
+        groupModelAllowed: true,
+        groupProvidersAllowed: true,
+        modelRestrictionError,
+        settings,
+      };
+    }
+    let effectiveProviderConfig = providerConfig;
+    let groupModelAllowed = true;
+    let groupProvidersAllowed = true;
+    if (groupPolicy) {
+      const groupDecision = await getEffectiveModelDecision(groupPolicy, modelId);
+      groupModelAllowed = groupDecision.allowed;
+      if (groupDecision.eligibleProviderRoutes) {
+        const currentOnly = providerConfig?.only;
+        const only = currentOnly
+          ? currentOnly.filter(provider => groupDecision.eligibleProviderRoutes?.has(provider))
+          : [...groupDecision.eligibleProviderRoutes];
+        groupProvidersAllowed = only.length > 0;
+        effectiveProviderConfig = { ...providerConfig, only };
+      }
+    }
+    return {
+      balance,
+      effectiveProviderConfig,
+      groupModelAllowed,
+      groupProvidersAllowed,
+      modelRestrictionError,
+      settings,
+    };
+  }
+
+  function createAccessCheckResolver(modelId: string) {
+    let accessCheck: ReturnType<typeof resolveAccessCheck> | undefined;
+    const get = () => (accessCheck ??= resolveAccessCheck(modelId));
+    return {
+      get,
+      getRoutingProviderConfig: isAnonymousContext(user)
+        ? undefined
+        : async () => (await get()).effectiveProviderConfig,
+    };
+  }
+
+  let accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
+
   // Resolve the initial provider before abuse enforcement because abuse needs
   // provider/BYOK context, and quarantine-3 may later rewrite these values.
   const initialProviderResultForAbuseService = await getProvider({
@@ -612,6 +670,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     taskId,
     clientIp: ipAddress ?? null,
     machineId: machineIdHeader,
+    getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
   });
   if (initialProviderResultForAbuseService.kind === 'not-found') {
     // Paused experiment for this public id — return a local model-unavailable
@@ -727,6 +786,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     abuseDowngradedFrom = effectiveModelIdLowerCased;
     requestBodyParsed.body.model = rulesEngineDecision.modelOverride;
     effectiveModelIdLowerCased = rulesEngineDecision.modelOverride;
+    accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
     const quarantineProviderResult = await getProvider({
       requestedModel: effectiveModelIdLowerCased,
       request: requestBodyParsed,
@@ -735,6 +795,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       taskId,
       clientIp: ipAddress ?? null,
       machineId: machineIdHeader,
+      getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
     });
     if (quarantineProviderResult.kind === 'not-found') {
       if (rulesEngineDecision.delayMs > 0) {
@@ -780,7 +841,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Skip balance/org checks for anonymous users - they can only use free models
   if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
-    const { balance, settings, plan } = await balanceAndSettingsPromise;
+    const {
+      balance,
+      effectiveProviderConfig,
+      groupModelAllowed,
+      groupProvidersAllowed,
+      modelRestrictionError,
+      settings,
+    } = await accessCheckResolver.get();
 
     if (
       balance <= 0 &&
@@ -792,36 +860,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
     // Organization model/provider restrictions check
     // Provider/model access policy applies to Enterprise plans; data collection applies to all plans.
-    const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
-      modelId: effectiveModelIdLowerCased,
-      settings,
-      organizationPlan: plan,
-    });
     if (modelRestrictionError) {
       return isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelRestrictionError;
     }
 
-    let effectiveProviderConfig = providerConfig;
-    const groupPolicy = await organizationGroupPolicyPromise;
-    if (groupPolicy) {
-      // Started right after auth so the DB read overlapped the work above; the
-      // decision itself is in-memory against the cached provider index.
-      const groupDecision = await getEffectiveModelDecision(
-        groupPolicy,
-        effectiveModelIdLowerCased
-      );
-      if (!groupDecision.allowed) {
-        return isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
-      }
-      if (groupDecision.eligibleProviderRoutes) {
-        const currentOnly = providerConfig?.only;
-        const only = currentOnly
-          ? currentOnly.filter(provider => groupDecision.eligibleProviderRoutes?.has(provider))
-          : [...groupDecision.eligibleProviderRoutes];
-        if (only.length === 0) return modelNotAllowedResponse();
-        effectiveProviderConfig = { ...providerConfig, only };
-      }
+    if (!groupModelAllowed) {
+      return isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
     }
+    if (!groupProvidersAllowed) return modelNotAllowedResponse();
 
     // Experiment traffic captures prompts to R2 for partner evaluation, which
     // is a form of data collection that the gateway-pinned `data_collection`
@@ -832,11 +878,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       return dataCollectionRequiredResponse();
     }
 
-    // Enterprise `provider_allow_list` is enforced via OpenRouter's
-    // `body.provider.only` field, which doesn't reach a direct partner
-    // upstream. Refuse the experimented public id rather than routing
-    // around the org's allow-list.
-    if (effectiveProviderContext.experiment && plan === 'enterprise') {
+    // OpenRouter's `body.provider.only` does not reach a direct experiment
+    // partner, so enforce any effective provider routes locally instead.
+    if (
+      effectiveProviderContext.experiment &&
+      effectiveProviderConfig?.only &&
+      !effectiveProviderConfig.only.includes(effectiveProviderContext.provider.id)
+    ) {
       return modelNotAllowedResponse();
     }
 
@@ -1103,7 +1151,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestedModel: effectiveModelIdLowerCased,
       request: requestBodyParsed,
       response,
-      isUserByok: !!effectiveProviderContext.userByok,
+      userByokProviderIds:
+        effectiveProviderContext.userByok === null
+          ? null
+          : effectiveProviderContext.userByok.map(byok => byok.providerId),
     });
     if (errorResponse) {
       await logUnrewrittenResponse({

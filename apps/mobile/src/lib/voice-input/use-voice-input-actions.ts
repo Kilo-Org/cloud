@@ -1,6 +1,8 @@
-import { AccessibilityInfo, Alert, Linking } from 'react-native';
+import { AccessibilityInfo, Alert, Linking, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { toast } from 'sonner-native';
+
+import { i18n } from '@/i18n';
 
 import {
   type VoiceInputControllerSnapshot,
@@ -17,6 +19,8 @@ import {
   type VoiceInputLifecycleInput,
   type VoiceInputStatus,
 } from './voice-input-state';
+import { resolveVoiceInputRecognitionMode } from './voice-input-recognition-mode';
+import { readVoiceNetworkConsent, writeVoiceNetworkConsent } from './voice-network-consent';
 import { resolveOwnerVoiceInputView } from './voice-input-view-state';
 
 type VoiceInputControllerLike = {
@@ -25,6 +29,7 @@ type VoiceInputControllerLike = {
   start: (options: VoiceInputStartOptions) => Promise<boolean>;
   stop: (owner: string) => Promise<boolean>;
   subscribe: (listener: (snapshot: VoiceInputControllerSnapshot) => void) => () => void;
+  supportsOnDevice: () => boolean;
 };
 
 export type VoiceInputActions = {
@@ -39,6 +44,7 @@ type VoiceInputActionsConfig = {
   getDraft: () => string;
   getOnDraftChange: () => (draft: string) => void;
   getOwner: () => string;
+  getUserId: () => string | undefined;
 };
 
 async function fireHaptic(style: Haptics.ImpactFeedbackStyle): Promise<void> {
@@ -85,7 +91,7 @@ export function shouldAbortVoiceInputForOwner(
 }
 
 export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceInputActions {
-  const { controller, getDisabled, getDraft, getOnDraftChange, getOwner } = config;
+  const { controller, getDisabled, getDraft, getOnDraftChange, getOwner, getUserId } = config;
 
   const abort = async (): Promise<boolean> => {
     const result = await controller.abort(getOwner());
@@ -116,14 +122,65 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
       return;
     }
 
-    const startOptions: VoiceInputStartOptions = {
-      baseDraft: getDraft(),
-      languageTag: await resolveVoiceInputStartLanguageTag(),
-      onDraftChange: getOnDraftChange(),
-      onFeedback: showFeedback,
-      owner,
+    const supportsOnDevice = controller.supportsOnDevice();
+    const userId = getUserId();
+    const consent = userId ? await readVoiceNetworkConsent(userId) : 'unset';
+    const mode = resolveVoiceInputRecognitionMode(supportsOnDevice, consent);
+
+    const startWith = async (requiresOnDeviceRecognition: boolean): Promise<void> => {
+      const startOptions: VoiceInputStartOptions = {
+        baseDraft: getDraft(),
+        languageTag: await resolveVoiceInputStartLanguageTag(),
+        onDraftChange: getOnDraftChange(),
+        onFeedback: showFeedback,
+        owner,
+        requiresOnDeviceRecognition,
+      };
+      await controller.start(startOptions);
     };
-    await controller.start(startOptions);
+
+    if (mode === 'on-device') {
+      await startWith(true);
+      return;
+    }
+    if (mode === 'network') {
+      await startWith(false);
+      return;
+    }
+    // mode === 'blocked'
+    if (consent === 'declined') {
+      toast.error(i18n.t('voiceInput.staysOff'));
+      return;
+    }
+    // consent === 'unset' — raise the disclosure, do not start until answered.
+    Alert.alert(
+      i18n.t('voiceInput.onlineTitle'),
+      i18n.t('voiceInput.onlineMessage', {
+        provider: Platform.OS === 'ios' ? 'Apple' : 'Google',
+      }),
+      [
+        {
+          text: i18n.t('common.notNow'),
+          style: 'cancel',
+          onPress: () => {
+            if (userId) {
+              void writeVoiceNetworkConsent(userId, 'declined');
+            }
+          },
+        },
+        {
+          text: i18n.t('voiceInput.allow'),
+          onPress: () => {
+            void (async () => {
+              if (userId) {
+                await writeVoiceNetworkConsent(userId, 'granted');
+              }
+              await startWith(false);
+            })();
+          },
+        },
+      ]
+    );
   };
 
   return { abort, settleBeforeSubmit, toggle };

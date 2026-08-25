@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import {
   sessionIdSchema,
   githubRepoSchema,
@@ -420,187 +421,217 @@ export const CloseTerminalOutput = z.object({
  * Input schema for prepareSession endpoint.
  * Creates a session in "prepared" state for later initiation.
  * Used by backend-to-backend flows.
+ *
+ * Discriminated on `cloneFromKiloSessionId`: the non-clone variant keeps the
+ * required `prompt` and the current optional initial fields, while the
+ * clone-only variant requires the source session, `autoInitiate: true`, and a
+ * stable `operationKey`, and forbids any synthetic initial turn fields.
  */
+const PrepareSessionSharedFields = {
+  mode: ModeSlugSchema.describe(
+    'Kilo Code execution mode (built-in or custom slug from runtimeAgents)'
+  ),
+  model: modelIdSchema.describe('AI model to use'),
+  variant: z
+    .string()
+    .max(50)
+    .regex(/^[a-zA-Z]+$/)
+    .optional(),
+
+  // Repository - one of these pairs required
+  githubRepo: githubRepoSchema
+    .optional()
+    .describe('GitHub repository in format org/repo (mutually exclusive with gitUrl)'),
+  githubToken: z
+    .string()
+    .optional()
+    .describe(
+      'Deprecated compatibility field. Accepted for older clients but ignored; GitHub credentials are managed by the server.'
+    ),
+  gitUrl: gitUrlSchema
+    .optional()
+    .describe('Generic git repository HTTPS URL (mutually exclusive with githubRepo)'),
+  gitToken: z
+    .string()
+    .optional()
+    .describe(
+      'Git token for generic git repositories. Ignored when platform selects a managed provider.'
+    ),
+  platform: z
+    .enum(['github', 'gitlab', 'bitbucket'])
+    .optional()
+    .describe('Git platform type for correct token/env var handling'),
+  bitbucketWorkspaceUuid: z.string().uuid().optional(),
+  bitbucketWorkspaceSlug: z
+    .string()
+    .regex(/^[A-Za-z0-9_.-]+$/)
+    .optional(),
+  bitbucketRepositoryUuid: z.string().uuid().optional(),
+  bitbucketRepositorySlug: z
+    .string()
+    .regex(/^[A-Za-z0-9_.-]+$/)
+    .optional(),
+  bitbucketIntegrationId: z.string().uuid().optional(),
+  bitbucketPullRequestId: z.number().int().positive().safe().optional(),
+  bitbucketExpectedHeadSha: z
+    .string()
+    .regex(/^[0-9a-f]{40}$/)
+    .optional(),
+
+  // Optional configuration
+  envVars: envVarsSchema.optional().describe('Environment variables to inject into the session'),
+  encryptedSecrets: EncryptedSecretsSchema.optional().describe(
+    'Encrypted secret env vars (from agent environment profiles). These are stored encrypted in the DO and decrypted only at execution time.'
+  ),
+  setupCommands: z
+    .array(z.string().max(Limits.MAX_SETUP_COMMAND_LENGTH))
+    .max(Limits.MAX_SETUP_COMMANDS)
+    .optional()
+    .describe('Setup commands to run during session initialization'),
+  mcpServers: z
+    .record(z.string().max(100), MCPServerConfigSchema)
+    .refine(obj => Object.keys(obj).length <= Limits.MAX_MCP_SERVERS, {
+      message: `Maximum ${Limits.MAX_MCP_SERVERS} MCP servers allowed`,
+    })
+    .optional()
+    .describe('MCP server configurations'),
+  runtimeSkills: RuntimeSkillsSchema.optional().describe(
+    'Runtime skills to materialize as SKILL.md files inside the sandbox'
+  ),
+  runtimeAgents: RuntimeAgentsSchema.optional().describe(
+    'Custom kilo agents materialized into KILO_CONFIG_CONTENT.agent.<slug>'
+  ),
+  kiloCommands: RuntimeKiloCommandsSchema.optional().describe(
+    'Custom slash commands materialized into KILO_CONFIG_CONTENT.command.<name>'
+  ),
+  upstreamBranch: branchNameSchema
+    .optional()
+    .describe('Optional upstream branch to checkout during session initialization'),
+  autoCommit: z
+    .boolean()
+    .optional()
+    .describe('Automatically commit and push changes after execution'),
+  condenseOnComplete: z
+    .boolean()
+    .optional()
+    .describe('Automatically condense context after execution completes'),
+  appendSystemPrompt: z
+    .string()
+    .max(10000)
+    .optional()
+    .describe('Custom text to append to the system prompt'),
+
+  // Callback configuration
+  callbackTarget: CallbackTargetSchema.optional().describe(
+    'Optional callback target configuration for execution completion notifications'
+  ),
+
+  // Organization context
+  kilocodeOrganizationId: z.string().uuid().optional().describe('Organization ID (UUID, optional)'),
+
+  // Profile resolution — cloud-agent-next resolves the profile stack
+  // (repo binding + default + explicit override) server-side and stacks
+  // the inline fields above as one more layer on top. All six collections
+  // (envVars / setupCommands / encryptedSecrets / mcpServers /
+  // runtimeSkills / runtimeAgents) follow the same precedence: inline
+  // wins on collision with the profile-derived value.
+  profileId: z
+    .string()
+    .uuid()
+    .optional()
+    .describe('Profile ID to resolve (repo binding + default still apply on top)'),
+
+  ...AttachmentFieldsSchema,
+  createdOnPlatform: z
+    .string()
+    .max(100)
+    .optional()
+    .describe('Platform that created this session (e.g. slack, app-builder)'),
+  shallow: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe(
+      'Perform a shallow clone (depth: 1) for faster checkout and reduced disk usage. Useful when full git history is not needed.'
+    ),
+  gateThreshold: z
+    .enum(['off', 'all', 'warning', 'critical'])
+    .optional()
+    .describe(
+      'PR gate threshold — when not "off", the agent should evaluate findings and report gateResult in its callback'
+    ),
+  devcontainer: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe(
+      'When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes'
+    ),
+};
+
+const PrepareSessionNonCloneVariant = z.object({
+  prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH).describe('The task prompt for Kilo Code'),
+  initialMessageId: MessageIdSchema.optional().describe(
+    'Initial message ID for correlation with external systems'
+  ),
+  /**
+   * Old clients omit this field and keep the empty-session bootstrap; remove
+   * the fallback only after old clients and prepared sessions expire.
+   */
+  cloneFromKiloSessionId: z.undefined().optional(),
+  /**
+   * When `true`, `prepareSession` also enqueues the initial user message
+   * (mirroring the unified `start` endpoint) so callers that navigate
+   * straight to the session UI after prepare — apps/web NewSessionPanel,
+   * mobile session manager — don't need a separate
+   * `initiateFromKilocodeSessionV2` round-trip. When omitted or `false`,
+   * the caller is responsible for a follow-up
+   * `initiateFromKilocodeSessionV2` (legacy two-step flow preserved for
+   * services/code-review-infra and e2e tests that assert on the split).
+   */
+  autoInitiate: z
+    .boolean()
+    .optional()
+    .describe(
+      'When true, also queues the initial user message; preparation still runs lazily at first-message flush.'
+    ),
+  initialPayload: SendMessageV2Payload.optional().describe(
+    'Discriminated initial execution payload - command variant allows starting a session with a slash command instead of a free-text prompt'
+  ),
+  operationKey: z
+    .string()
+    .uuid()
+    .optional()
+    .describe(
+      'Client-generated UUID, stable across retries of one user intent. Admitted into the operation ledger only when autoInitiate is also true; otherwise ignored.'
+    ),
+  ...PrepareSessionSharedFields,
+});
+
+const PrepareSessionCloneVariant = z.object({
+  /**
+   * Clone-only prepare must not fabricate a synthetic initial turn: the copied
+   * transcript is the session state and the destination waits for the user's
+   * next prompt.
+   */
+  prompt: z.undefined().optional(),
+  initialMessageId: z.undefined().optional(),
+  initialPayload: z.undefined().optional(),
+  cloneFromKiloSessionId: kiloSessionIdSchema.describe(
+    'Source Kilo session ID to clone into this Cloud Agent session'
+  ),
+  autoInitiate: z.literal(true),
+  operationKey: z
+    .string()
+    .uuid()
+    .describe(
+      'Client-generated UUID, stable across retries of one user intent. Admitted into the operation ledger only when autoInitiate is also true; otherwise ignored.'
+    ),
+  ...PrepareSessionSharedFields,
+});
+
 export const PrepareSessionInput = z
-  .object({
-    prompt: z
-      .string()
-      .min(1)
-      .max(Limits.MAX_PROMPT_LENGTH)
-      .describe('The task prompt for Kilo Code'),
-    mode: ModeSlugSchema.describe(
-      'Kilo Code execution mode (built-in or custom slug from runtimeAgents)'
-    ),
-    model: modelIdSchema.describe('AI model to use'),
-    variant: z
-      .string()
-      .max(50)
-      .regex(/^[a-zA-Z]+$/)
-      .optional(),
-
-    // Repository - one of these pairs required
-    githubRepo: githubRepoSchema
-      .optional()
-      .describe('GitHub repository in format org/repo (mutually exclusive with gitUrl)'),
-    githubToken: z
-      .string()
-      .optional()
-      .describe(
-        'Deprecated compatibility field. Accepted for older clients but ignored; GitHub credentials are managed by the server.'
-      ),
-    gitUrl: gitUrlSchema
-      .optional()
-      .describe('Generic git repository HTTPS URL (mutually exclusive with githubRepo)'),
-    gitToken: z
-      .string()
-      .optional()
-      .describe(
-        'Git token for generic git repositories. Ignored when platform selects a managed provider.'
-      ),
-    platform: z
-      .enum(['github', 'gitlab', 'bitbucket'])
-      .optional()
-      .describe('Git platform type for correct token/env var handling'),
-    bitbucketWorkspaceUuid: z.string().uuid().optional(),
-    bitbucketWorkspaceSlug: z
-      .string()
-      .regex(/^[A-Za-z0-9_.-]+$/)
-      .optional(),
-    bitbucketRepositoryUuid: z.string().uuid().optional(),
-    bitbucketRepositorySlug: z
-      .string()
-      .regex(/^[A-Za-z0-9_.-]+$/)
-      .optional(),
-    bitbucketIntegrationId: z.string().uuid().optional(),
-    bitbucketPullRequestId: z.number().int().positive().safe().optional(),
-    bitbucketExpectedHeadSha: z
-      .string()
-      .regex(/^[0-9a-f]{40}$/)
-      .optional(),
-
-    // Optional configuration
-    envVars: envVarsSchema.optional().describe('Environment variables to inject into the session'),
-    encryptedSecrets: EncryptedSecretsSchema.optional().describe(
-      'Encrypted secret env vars (from agent environment profiles). These are stored encrypted in the DO and decrypted only at execution time.'
-    ),
-    setupCommands: z
-      .array(z.string().max(Limits.MAX_SETUP_COMMAND_LENGTH))
-      .max(Limits.MAX_SETUP_COMMANDS)
-      .optional()
-      .describe('Setup commands to run during session initialization'),
-    mcpServers: z
-      .record(z.string().max(100), MCPServerConfigSchema)
-      .refine(obj => Object.keys(obj).length <= Limits.MAX_MCP_SERVERS, {
-        message: `Maximum ${Limits.MAX_MCP_SERVERS} MCP servers allowed`,
-      })
-      .optional()
-      .describe('MCP server configurations'),
-    runtimeSkills: RuntimeSkillsSchema.optional().describe(
-      'Runtime skills to materialize as SKILL.md files inside the sandbox'
-    ),
-    runtimeAgents: RuntimeAgentsSchema.optional().describe(
-      'Custom kilo agents materialized into KILO_CONFIG_CONTENT.agent.<slug>'
-    ),
-    kiloCommands: RuntimeKiloCommandsSchema.optional().describe(
-      'Custom slash commands materialized into KILO_CONFIG_CONTENT.command.<name>'
-    ),
-    upstreamBranch: branchNameSchema
-      .optional()
-      .describe('Optional upstream branch to checkout during session initialization'),
-    autoCommit: z
-      .boolean()
-      .optional()
-      .describe('Automatically commit and push changes after execution'),
-    condenseOnComplete: z
-      .boolean()
-      .optional()
-      .describe('Automatically condense context after execution completes'),
-    appendSystemPrompt: z
-      .string()
-      .max(10000)
-      .optional()
-      .describe('Custom text to append to the system prompt'),
-
-    // Callback configuration
-    callbackTarget: CallbackTargetSchema.optional().describe(
-      'Optional callback target configuration for execution completion notifications'
-    ),
-
-    // Organization context
-    kilocodeOrganizationId: z
-      .string()
-      .uuid()
-      .optional()
-      .describe('Organization ID (UUID, optional)'),
-
-    // Profile resolution — cloud-agent-next resolves the profile stack
-    // (repo binding + default + explicit override) server-side and stacks
-    // the inline fields above as one more layer on top. All six collections
-    // (envVars / setupCommands / encryptedSecrets / mcpServers /
-    // runtimeSkills / runtimeAgents) follow the same precedence: inline
-    // wins on collision with the profile-derived value.
-    profileId: z
-      .string()
-      .uuid()
-      .optional()
-      .describe('Profile ID to resolve (repo binding + default still apply on top)'),
-
-    ...AttachmentFieldsSchema,
-    createdOnPlatform: z
-      .string()
-      .max(100)
-      .optional()
-      .describe('Platform that created this session (e.g. slack, app-builder)'),
-    shallow: z
-      .boolean()
-      .optional()
-      .default(false)
-      .describe(
-        'Perform a shallow clone (depth: 1) for faster checkout and reduced disk usage. Useful when full git history is not needed.'
-      ),
-    gateThreshold: z
-      .enum(['off', 'all', 'warning', 'critical'])
-      .optional()
-      .describe(
-        'PR gate threshold — when not "off", the agent should evaluate findings and report gateResult in its callback'
-      ),
-    initialMessageId: MessageIdSchema.optional().describe(
-      'Initial message ID for correlation with external systems'
-    ),
-    /**
-     * When `true`, `prepareSession` also enqueues the initial user message
-     * (mirroring the unified `start` endpoint) so callers that navigate
-     * straight to the session UI after prepare — apps/web NewSessionPanel,
-     * mobile session manager — don't need a separate
-     * `initiateFromKilocodeSessionV2` round-trip. When omitted or `false`,
-     * the caller is responsible for a follow-up
-     * `initiateFromKilocodeSessionV2` (legacy two-step flow preserved for
-     * services/code-review-infra and e2e tests that assert on the split).
-     */
-    autoInitiate: z
-      .boolean()
-      .optional()
-      .describe(
-        'When true, also queues the initial user message; preparation still runs lazily at first-message flush.'
-      ),
-    devcontainer: z
-      .boolean()
-      .optional()
-      .default(false)
-      .describe(
-        'When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes'
-      ),
-    initialPayload: SendMessageV2Payload.optional().describe(
-      'Discriminated initial execution payload - command variant allows starting a session with a slash command instead of a free-text prompt'
-    ),
-    operationKey: z
-      .string()
-      .uuid()
-      .optional()
-      .describe(
-        'Client-generated UUID, stable across retries of one user intent. Admitted into the operation ledger only when autoInitiate is also true; otherwise ignored.'
-      ),
-  })
+  .union([PrepareSessionNonCloneVariant, PrepareSessionCloneVariant])
   .refine(validateGitSource, {
     message: 'Must provide either githubRepo or gitUrl, but not both',
     path: ['githubRepo'],
@@ -922,6 +953,26 @@ export const UpdateSessionOutput = z.object({
  */
 export const GetSessionInput = z.object({
   cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to retrieve'),
+});
+
+/** Customer-safe, no-wake compute billing status for an existing session. */
+export const GetComputeBillingStatusOutput = z.object({
+  payer: z.object({ type: z.enum(['user', 'org']), id: z.string() }),
+  attribution: z.enum(['payer_shared', 'session']),
+  phase: z.enum(['idle', 'active', 'stopping', 'settling', 'unavailable']),
+  estimatedHourlyRateMicrodollars: z.number().int().nonnegative().nullable(),
+  estimatedIntervalAmountMicrodollars: z.number().int().nonnegative().nullable(),
+  billingMode: z.enum(['shadow', 'paid']).nullable(),
+  interval: z
+    .object({
+      id: z.string(),
+      startedAt: z.string().datetime(),
+      lastSeenAt: z.string().datetime(),
+      stoppedAt: z.string().datetime().nullable(),
+      confirmedSeconds: z.number().int().nonnegative(),
+      settledBillableSeconds: z.number().int().nonnegative(),
+    })
+    .nullable(),
 });
 
 export const SandboxStatusSchema = z

@@ -4,10 +4,7 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  KILO_PASS_OTHER_ACCOUNT_COPY,
-  KiloPassSubscriptionScreen,
-} from './kilo-pass-subscription-screen';
+import { KiloPassSubscriptionScreen } from './kilo-pass-subscription-screen';
 
 // ── Mutable state ────────────────────────────────────────────────────
 
@@ -34,6 +31,9 @@ const mocks = vi.hoisted(() => ({
     productsRefetch: vi.fn(),
     purchase: vi.fn(),
     ownedByAnotherAccount: false,
+    ownedAppleProductId: null as string | null,
+    ownedOriginalTransactionId: null as string | null,
+    ownershipChecked: true,
   },
   routerPush: vi.fn(),
 }));
@@ -65,6 +65,7 @@ vi.mock('@tanstack/react-query', () => ({
     isPending: mocks.preflightIsPending,
   }),
   useQuery: () => mocks.presentation,
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
 vi.mock('@/components/detail-screen', () => ({
@@ -108,7 +109,7 @@ vi.mock('@/lib/kilo-pass/legal-links', () => ({
     { url: 'https://example.com/privacy', label: 'Privacy Policy' },
     { url: 'https://example.com/terms', label: 'Terms of Use' },
   ],
-  KILO_PASS_LEGAL_DISCLOSURE: '',
+  kiloPassLegalDisclosure: () => '',
 }));
 
 vi.mock('@/lib/kilo-pass/navigation', () => ({
@@ -244,6 +245,9 @@ function setNativeIapPresentation(): void {
   mockedPlatform.OS = 'ios';
   mocks.presentation.data = { kind: 'native_iap', webUrl: null };
   mocks.nativeIap.productsIsLoading = false;
+  mocks.nativeIap.ownedAppleProductId = null;
+  mocks.nativeIap.ownedOriginalTransactionId = null;
+  mocks.nativeIap.ownershipChecked = true;
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -291,8 +295,47 @@ describe('KiloPassSubscriptionScreen', () => {
       storefront: 'app_store',
       product: 'kilo_pass',
       appleProductId: product.appleProductId,
+      appleOriginalTransactionId: null,
     });
     expect(mocks.nativeIap.purchase).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('blocked: tiles stay disabled until StoreKit reports what this device owns', async () => {
+    setNativeIapPresentation();
+    mocks.nativeIap.products = [product];
+    mocks.nativeIap.ownershipChecked = false;
+
+    const renderer = await renderScreen();
+    const tiles = productTiles(renderer);
+    expect((first(tiles).props as { disabled?: boolean }).disabled).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('sends the owned original transaction id to preflight', async () => {
+    setNativeIapPresentation();
+    mocks.nativeIap.products = [product];
+    mocks.nativeIap.ownedAppleProductId = product.appleProductId;
+    mocks.nativeIap.ownedOriginalTransactionId = 'orig-123';
+    mocks.preflightMutateAsync.mockResolvedValue({
+      allowed: false,
+      statusClass: 'terminal',
+      reason: 'owned_by_another_account',
+    });
+
+    const renderer = await renderScreen();
+    await press(first(productTiles(renderer)));
+
+    expect(mocks.preflightMutateAsync).toHaveBeenCalledWith({
+      platform: 'ios',
+      storefront: 'app_store',
+      product: 'kilo_pass',
+      appleProductId: product.appleProductId,
+      appleOriginalTransactionId: 'orig-123',
+    });
+    expect(mocks.nativeIap.purchase).not.toHaveBeenCalled();
 
     renderer.unmount();
   });
@@ -304,7 +347,9 @@ describe('KiloPassSubscriptionScreen', () => {
 
     const renderer = await renderScreen();
     const tiles = productTiles(renderer);
-    expect(allText(renderer)).toContain(KILO_PASS_OTHER_ACCOUNT_COPY);
+    expect(allText(renderer)).toContain(
+      'The Kilo Pass on this Apple Account belongs to a different Kilo account. Sign in to that Kilo account to manage it.'
+    );
     expect((first(tiles).props as { disabled?: boolean }).disabled).toBe(true);
     expect(
       (first(tiles).props as { accessibilityState?: { disabled?: boolean } }).accessibilityState

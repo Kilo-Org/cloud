@@ -5,6 +5,8 @@ import {
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
 
+import { i18n } from '@/i18n';
+
 import { computeStatus } from './compute-status';
 import { isToolPart } from './part-types';
 import { getFilename, truncateText } from './tool-card-utils';
@@ -82,15 +84,17 @@ export function getChildSessionCardState(
   childMessages: StoredMessage[]
 ): ChildSessionCardState {
   const input = part.state.input;
-  const agentName = getStringProperty(input, 'subagent_type') ?? 'Subagent';
+  const agentName =
+    getStringProperty(input, 'subagent_type') ?? i18n.t('agentChat.childSession.subagent');
   const description = getStringProperty(input, 'description');
   const prompt = getStringProperty(input, 'prompt');
-  const taskName = description ?? (prompt ? truncateText(prompt, 60) : 'Task');
+  const taskName =
+    description ?? (prompt ? truncateText(prompt, 60) : i18n.t('agentChat.childSession.task'));
 
   const latestPart = findLatestAssistantPart(childMessages);
   const latestActivity: ChildSessionActivity | string = (() => {
     if (!latestPart) {
-      return 'Waiting for activity';
+      return i18n.t('agentChat.childSession.waitingForActivity');
     }
     if (isToolPart(latestPart)) {
       return { tool: latestPart.tool, context: getToolContext(latestPart) };

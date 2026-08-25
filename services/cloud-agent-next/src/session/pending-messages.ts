@@ -96,9 +96,12 @@ const PendingFlushFailureCodeSchema = z.enum([
   'SANDBOX_CAPABILITY_UNAVAILABLE',
   'NOT_FOUND',
   'BAD_REQUEST',
+  'PAYMENT_REQUIRED',
   'INTERNAL',
   'PENDING_QUEUE_FULL',
   'MODEL_MISSING',
+  'COMPUTE_STOPPING',
+  'BILLING_UNAVAILABLE',
   'UNKNOWN',
 ]);
 export type PendingFlushFailureCode = z.infer<typeof PendingFlushFailureCodeSchema>;
@@ -535,9 +538,12 @@ export async function recordPendingFlushFailure(
       | 'WRAPPER_CLEANUP_EXHAUSTED'
       | 'NOT_FOUND'
       | 'BAD_REQUEST'
+      | 'PAYMENT_REQUIRED'
       | 'INTERNAL'
       | 'PENDING_QUEUE_FULL'
       | 'MODEL_MISSING'
+      | 'COMPUTE_STOPPING'
+      | 'BILLING_UNAVAILABLE'
       | 'UNKNOWN';
     subtype?: WorkspaceFailureSubtype;
     safeFailureMessage?: string;
@@ -630,9 +636,12 @@ function isRetryableFlushCode(
     | 'WRAPPER_CLEANUP_EXHAUSTED'
     | 'NOT_FOUND'
     | 'BAD_REQUEST'
+    | 'PAYMENT_REQUIRED'
     | 'INTERNAL'
     | 'PENDING_QUEUE_FULL'
     | 'MODEL_MISSING'
+    | 'COMPUTE_STOPPING'
+    | 'BILLING_UNAVAILABLE'
     | 'UNKNOWN'
     | undefined
 ): boolean {
@@ -643,6 +652,8 @@ function isRetryableFlushCode(
     code === 'WORKSPACE_SETUP_FAILED' ||
     code === 'KILO_SERVER_FAILED' ||
     code === 'WRAPPER_START_FAILED' ||
+    code === 'COMPUTE_STOPPING' ||
+    code === 'BILLING_UNAVAILABLE' ||
     code === 'WRAPPER_CLEANUP_EXHAUSTED'
   );
 }

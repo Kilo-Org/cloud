@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, type AppStateStatus, Platform, View } from 'react-native';
+import { type ReactNode, useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ActivityIndicator, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -11,6 +12,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useExternalAuthReturn } from '@/lib/external-auth/use-external-auth-return';
 import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
 import { selectPrReviewGateView } from './pr-review-connect-gate-view';
 import { useTRPC } from '@/lib/trpc';
@@ -43,6 +45,7 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
   const queryClient = useQueryClient();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const authorization = useQuery(trpc.githubApps.getUserAuthorization.queryOptions());
   const connect = useMutation(
     trpc.githubApps.connectUserAuthorization.mutationOptions({
@@ -54,44 +57,26 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
 
   // Track the in-flight launch so a stale AppState 'active' transition
   // (from the user backgrounding the app before tapping Connect) doesn't
-  // trigger a refetch on its own.
-  const launchedAt = useRef<number | null>(null);
-  const [connecting, setConnecting] = useState(false);
-
-  // iOS: openAuthSessionAsync already resolves on sheet close, so we await
-  // it and refetch right there. Android: openBrowserAsync is fire-and-
-  // forget, so we listen for AppState returning to 'active' and refetch
-  // then. Same split as use-device-auth.ts.
-  useEffect(() => {
-    if (Platform.OS !== 'android') {
-      return undefined;
-    }
-    const handleChange = (nextState: AppStateStatus) => {
-      if (nextState !== 'active') {
-        return;
-      }
-      if (launchedAt.current === null) {
-        return;
-      }
-      launchedAt.current = null;
-      void authorization.refetch();
-    };
-    const subscription = AppState.addEventListener('change', handleChange);
-    return () => {
-      subscription.remove();
-    };
+  // trigger a refetch on its own. iOS: openAuthSessionAsync already resolves
+  // on sheet close, so we await it and refetch right there. Android:
+  // openBrowserAsync is fire-and-forget, so the hook refetches on AppState
+  // returning to 'active'.
+  const refetchAuthorization = useCallback(() => {
+    void authorization.refetch();
   }, [authorization]);
+  const { markLaunched, clearLaunch } = useExternalAuthReturn(refetchAuthorization);
+  const [connecting, setConnecting] = useState(false);
 
   const handleConnect = async () => {
     setConnecting(true);
     try {
       const result = await connect.mutateAsync();
-      launchedAt.current = Date.now();
+      markLaunched();
       const trigger = await openAuthorizationAndWaitForReturn(Platform.OS, result.authorizationUrl);
       if (trigger === 'sheet-close') {
         // iOS: refetch immediately. Clear the launch sentinel so the
         // AppState handler (if it ever fires) doesn't double-refetch.
-        launchedAt.current = null;
+        clearLaunch();
         await authorization.refetch();
         await queryClient.invalidateQueries({
           queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
@@ -106,7 +91,7 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
       // rejection means the browser failed to open — clear the sentinel so
       // a later unrelated foreground doesn't trigger a stray refetch, and
       // keep the gate showing.
-      launchedAt.current = null;
+      clearLaunch();
     } finally {
       setConnecting(false);
     }
@@ -127,11 +112,11 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
   if (view === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="PR Review" />
+        <ScreenHeader title={t('prReview.screenTitle')} />
         <QueryError
           variant="server"
-          title="Could not check GitHub connection"
-          message="Sign-in status is unavailable until this loads."
+          title={t('prReview.connect.checkFailedTitle')}
+          message={t('prReview.connect.checkFailedMessage')}
           onRetry={() => {
             void authorization.refetch();
           }}
@@ -144,7 +129,7 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
   if (view === 'loading') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="PR Review" />
+        <ScreenHeader title={t('prReview.screenTitle')} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="small" color={colors.mutedForeground} />
         </View>
@@ -165,16 +150,16 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
     // the safe-region midpoint (±24pt).
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="PR Review" />
+        <ScreenHeader title={t('prReview.screenTitle')} />
         <View className="flex-1" style={{ paddingBottom: insets.bottom }}>
           <EmptyState
             className="pb-[72px]"
             icon={revoked ? ShieldAlert : PlugZap}
-            title={revoked ? 'Reconnect GitHub' : 'Connect GitHub'}
+            title={revoked ? t('prReview.connect.reconnectTitle') : t('prReview.connect.title')}
             description={
               revoked
-                ? 'Your GitHub connection was revoked. Reconnect to keep reviewing pull requests on mobile.'
-                : 'Connect your GitHub account to review pull requests on mobile.'
+                ? t('prReview.connect.reconnectDescription')
+                : t('prReview.connect.description')
             }
             action={
               <Button
@@ -189,7 +174,9 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
                 ) : (
                   <RefreshCcw size={16} color={colors.primaryForeground} />
                 )}
-                <Text>{revoked ? 'Reconnect GitHub' : 'Connect GitHub'}</Text>
+                <Text>
+                  {revoked ? t('prReview.connect.reconnectTitle') : t('prReview.connect.title')}
+                </Text>
               </Button>
             }
           />

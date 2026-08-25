@@ -9,52 +9,53 @@ import {
   selectSecurityFindingStatus,
 } from '@kilocode/app-shared/security-agent';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
 
-const STATUS_OPTIONS: { value: SecurityFindingStatusFilter; label: string }[] = [
-  { value: 'open', label: 'Open' },
-  { value: 'fixed', label: 'Fixed' },
-  { value: 'ignored', label: 'Ignored' },
-  { value: 'closed', label: 'Closed' },
-  { value: 'all', label: 'All' },
-];
+const STATUS_OPTIONS = [
+  { value: 'open', labelKey: 'securityAgent.filter.statusOpen' },
+  { value: 'fixed', labelKey: 'securityAgent.filter.fixed' },
+  { value: 'ignored', labelKey: 'securityAgent.filter.statusIgnored' },
+  { value: 'closed', labelKey: 'securityAgent.filter.statusClosed' },
+  { value: 'all', labelKey: 'securityAgent.filter.all' },
+] as const satisfies readonly { value: SecurityFindingStatusFilter; labelKey: string }[];
 
-const SEVERITY_OPTIONS: { value: SecuritySeverityFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'critical', label: 'Critical' },
-  { value: 'high', label: 'High' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'low', label: 'Low' },
-];
+const SEVERITY_OPTIONS = [
+  { value: 'all', labelKey: 'securityAgent.filter.all' },
+  { value: 'critical', labelKey: 'securityAgent.filter.severityCritical' },
+  { value: 'high', labelKey: 'securityAgent.filter.severityHigh' },
+  { value: 'medium', labelKey: 'securityAgent.filter.severityMedium' },
+  { value: 'low', labelKey: 'securityAgent.filter.severityLow' },
+] as const satisfies readonly { value: SecuritySeverityFilter; labelKey: string }[];
 
-const OUTCOME_OPTIONS: { value: SecurityOutcomeFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'not_analyzed', label: 'Not analyzed' },
-  { value: 'analyzing', label: 'Analyzing' },
-  { value: 'failed', label: 'Analysis failed' },
-  { value: 'exploitable', label: 'Exploitable' },
-  { value: 'not_exploitable', label: 'Not exploitable' },
-  { value: 'safe_to_dismiss', label: 'Safe to dismiss' },
-  { value: 'needs_review', label: 'Needs review' },
-  { value: 'triage_complete', label: 'Triage complete' },
-  { value: 'fixed', label: 'Fixed' },
-  { value: 'dismissed', label: 'Dismissed' },
-];
+const OUTCOME_OPTIONS = [
+  { value: 'all', labelKey: 'securityAgent.filter.all' },
+  { value: 'not_analyzed', labelKey: 'securityAgent.filter.outcomeNotAnalyzed' },
+  { value: 'analyzing', labelKey: 'securityAgent.filter.outcomeAnalyzing' },
+  { value: 'failed', labelKey: 'securityAgent.filter.outcomeFailed' },
+  { value: 'exploitable', labelKey: 'securityAgent.filter.outcomeExploitable' },
+  { value: 'not_exploitable', labelKey: 'securityAgent.filter.outcomeNotExploitable' },
+  { value: 'safe_to_dismiss', labelKey: 'securityAgent.filter.outcomeSafeToDismiss' },
+  { value: 'needs_review', labelKey: 'securityAgent.filter.outcomeNeedsReview' },
+  { value: 'triage_complete', labelKey: 'securityAgent.filter.outcomeTriageComplete' },
+  { value: 'fixed', labelKey: 'securityAgent.filter.fixed' },
+  { value: 'dismissed', labelKey: 'securityAgent.filter.outcomeDismissed' },
+] as const satisfies readonly { value: SecurityOutcomeFilter; labelKey: string }[];
 
-const SORT_OPTIONS: { value: SecurityFindingSortBy; label: string }[] = [
-  { value: 'severity_desc', label: 'Severity: high to low' },
-  { value: 'severity_asc', label: 'Severity: low to high' },
-  { value: 'sla_due_at_asc', label: 'SLA due date' },
-];
+const SORT_OPTIONS = [
+  { value: 'severity_desc', labelKey: 'securityAgent.filter.sortSeverityDesc' },
+  { value: 'severity_asc', labelKey: 'securityAgent.filter.sortSeverityAsc' },
+  { value: 'sla_due_at_asc', labelKey: 'securityAgent.filter.sortSlaDue' },
+] as const satisfies readonly { value: SecurityFindingSortBy; labelKey: string }[];
 
-const SLA_STATUS_OPTIONS: { value: boolean; label: string }[] = [
-  { value: false, label: 'All' },
-  { value: true, label: 'Overdue only' },
-];
+const SLA_STATUS_OPTIONS = [
+  { value: false, labelKey: 'securityAgent.filter.all' },
+  { value: true, labelKey: 'securityAgent.filter.overdueOnly' },
+] as const satisfies readonly { value: boolean; labelKey: string }[];
 
 type FindingRepositoryOption = {
   fullName: string;
@@ -119,8 +120,26 @@ export function FindingFilterModal({
   repositories,
   onChange,
 }: Readonly<FindingFilterModalProps>) {
+  const { t } = useTranslation();
+  const statusOptions = STATUS_OPTIONS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
+  const severityOptions = SEVERITY_OPTIONS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
+  const outcomeOptions = OUTCOME_OPTIONS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
+  const sortOptions = SORT_OPTIONS.map(({ value, labelKey }) => ({ value, label: t(labelKey) }));
+  const slaStatusOptions = SLA_STATUS_OPTIONS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
   const repoOptions: { value: string | null; label: string }[] = [
-    { value: null, label: 'All repositories' },
+    { value: null, label: t('securityAgent.filter.allRepositories') },
     ...repositories.map(repo => ({ value: repo.fullName, label: repo.fullName })),
   ];
 
@@ -133,11 +152,11 @@ export function FindingFilterModal({
           onChange(DEFAULT_SECURITY_FINDING_FILTERS);
         }}
       >
-        <Text>Reset</Text>
+        <Text>{t('securityAgent.filter.reset')}</Text>
       </Button>
       <View className="gap-4">
         <FilterSection
-          title="Repository"
+          title={t('securityAgent.filter.repository')}
           options={repoOptions}
           selected={filters.repoFullName}
           onSelect={repoFullName => {
@@ -145,40 +164,40 @@ export function FindingFilterModal({
           }}
         />
         <FilterSection
-          title="Status"
-          options={STATUS_OPTIONS}
+          title={t('securityAgent.filter.status')}
+          options={statusOptions}
           selected={filters.status}
           onSelect={status => {
             onChange(selectSecurityFindingStatus(filters, status));
           }}
         />
         <FilterSection
-          title="Severity"
-          options={SEVERITY_OPTIONS}
+          title={t('securityAgent.filter.severity')}
+          options={severityOptions}
           selected={filters.severity}
           onSelect={severity => {
             onChange({ ...filters, severity });
           }}
         />
         <FilterSection
-          title="Outcome"
-          options={OUTCOME_OPTIONS}
+          title={t('securityAgent.filter.outcome')}
+          options={outcomeOptions}
           selected={filters.outcome}
           onSelect={outcome => {
             onChange(selectSecurityFindingOutcome(filters, outcome));
           }}
         />
         <FilterSection
-          title="SLA status"
-          options={SLA_STATUS_OPTIONS}
+          title={t('securityAgent.filter.slaStatus')}
+          options={slaStatusOptions}
           selected={Boolean(filters.overdue)}
           onSelect={overdue => {
             onChange({ ...filters, overdue: overdue ? true : undefined });
           }}
         />
         <FilterSection
-          title="Sort by"
-          options={SORT_OPTIONS}
+          title={t('securityAgent.filter.sortBy')}
+          options={sortOptions}
           selected={filters.sortBy}
           onSelect={sortBy => {
             onChange({ ...filters, sortBy });

@@ -675,13 +675,16 @@ describe('database schema', () => {
         'substack',
         'anonymize',
         'pylon_reply',
+        'pylon_finalize',
         'pylon_contact',
+        'csa_support_db',
       ],
       UserDeletionCloudSubjectResolution: [
         'current_user',
         'authoritative_absence',
         'prior_queue_cleanup',
         'legacy_identity_unresolved',
+        'unresolved',
       ],
       UserDeletionAuditEventType: [
         'request_created',
@@ -705,6 +708,7 @@ describe('database schema', () => {
         'posthog',
         'substack',
         'pylon',
+        'csa',
       ],
       ImpactReferralProduct: ['kiloclaw', 'kilo_pass'],
       ImpactAdvocateProgramKey: ['kiloclaw', 'kilo_pass'],
@@ -1775,7 +1779,7 @@ describe('user deletion queue invariants', () => {
     });
   });
 
-  it('rejects unknown request status, completed without timestamp, and active without email', async () => {
+  it('rejects unknown request status, completed without timestamp, and in-progress without email', async () => {
     await withDeletionTestUser(async ({ userId, email }) => {
       await expect(
         schemaTestDb.db.execute(sql`
@@ -1809,12 +1813,27 @@ describe('user deletion queue invariants', () => {
             user_id, status, target_email, target_email_hmac,
             cloud_subject_resolution
           ) VALUES (
-            ${userId}, 'pending', NULL, ${`hmac-${crypto.randomUUID()}`}, 'current_user'
+            ${userId}, 'in_progress', NULL, ${`hmac-${crypto.randomUUID()}`}, 'current_user'
           )
         `)
       ).rejects.toMatchObject({
         cause: { constraint: 'user_deletion_requests_active_email_check' },
       });
+    });
+  });
+
+  it('allows a ticket-only pending request without email or HMAC', async () => {
+    await withDeletionTestUser(async ({ userId }) => {
+      await expect(
+        schemaTestDb.db.insert(schema.user_deletion_requests).values({
+          user_id: userId,
+          status: UserDeletionRequestStatus.Pending,
+          target_email: null,
+          target_email_hmac: null,
+          pylon_ticket_ref: `#iss-${crypto.randomUUID()}`,
+          cloud_subject_resolution: UserDeletionCloudSubjectResolution.Unresolved,
+        })
+      ).resolves.toBeDefined();
     });
   });
 

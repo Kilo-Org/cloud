@@ -1,6 +1,7 @@
 import { formatFileSize } from '@kilocode/kilo-chat';
 import { File as FileIcon } from '@/components/ui/icons';
 import { ScrollView, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -89,6 +90,7 @@ function RejectionNotes({ notes }: { notes: readonly RejectedNote[] }) {
  * Text → clamped to 3 lines. Skeleton while async measurement runs.
  */
 export function SharePayloadPreview({ payload, validation }: Readonly<SharePayloadPreviewProps>) {
+  const { t } = useTranslation();
   if (validation === null) {
     return (
       <View className="gap-2 px-4 pb-2">
@@ -120,7 +122,7 @@ export function SharePayloadPreview({ payload, validation }: Readonly<SharePaylo
       ) : null}
       {validation.truncated ? (
         <Text className="text-xs text-muted-foreground">
-          Only the first {AGENT_ATTACHMENT_MAX_FILES} files will be attached.
+          {t('share.onlyFirstFilesAttached', { count: AGENT_ATTACHMENT_MAX_FILES })}
         </Text>
       ) : null}
       <RejectionNotes notes={validation.rejectedNotes} />

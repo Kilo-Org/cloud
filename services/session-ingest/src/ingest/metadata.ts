@@ -83,6 +83,9 @@ export async function applyMetadataChanges(
   /** True only when an agent-generated title write was actually applied (placeholder was still unset). */
   let titleWriteApplied = false;
 
+  /** True only when a git_url write was actually applied (non-Cloud-Agent write or Cloud Agent null-to-value heal). */
+  let gitUrlWriteApplied = false;
+
   const notification = await db.transaction(async tx => {
     const selectCurrentRow = () =>
       tx
@@ -92,6 +95,7 @@ export async function applyMetadataChanges(
           parentSessionId: cli_sessions_v2.parent_session_id,
           cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
           cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
+          gitUrl: cli_sessions_v2.git_url,
         })
         .from(cli_sessions_v2)
         .where(
@@ -192,6 +196,20 @@ export async function applyMetadataChanges(
         }
       } else {
         organizationIdWriteApplied = true;
+      }
+    }
+
+    if (mergedChanges.has('gitUrl')) {
+      if (isCloudAgentManagedSession) {
+        // Compatibility: old Cloud Agent rows can start without git_url; remove this heal only after no old worker or null root row remains.
+        const inputGitUrl = updates.git_url;
+        if (inputGitUrl != null && currentRow.gitUrl == null) {
+          gitUrlWriteApplied = true;
+        } else {
+          delete updates.git_url;
+        }
+      } else {
+        gitUrlWriteApplied = true;
       }
     }
 
@@ -320,7 +338,7 @@ export async function applyMetadataChanges(
       titleWriteApplied ||
       mergedChanges.has('platform') ||
       organizationIdWriteApplied ||
-      mergedChanges.has('gitUrl') ||
+      gitUrlWriteApplied ||
       mergedChanges.has('gitBranch') ||
       mergedChanges.has('prPlatform') ||
       mergedChanges.has('prUrl') ||

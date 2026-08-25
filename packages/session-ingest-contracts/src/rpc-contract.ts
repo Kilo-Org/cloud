@@ -22,13 +22,57 @@ export const createSessionForCloudAgentSchema = z.object({
   organizationId: z.string().optional(),
   createdOnPlatform: z.string().min(1),
   title: z.string().optional(),
+  // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
+  gitUrl: z.string().optional(),
+  // Compatibility: old callers omit this field and create empty destination
+  // storage. Remove that path only when all deployed callers require cloning.
+  cloneFromKiloSessionId: sessionIdSchema.optional(),
 });
 export type CreateSessionForCloudAgentParams = z.input<typeof createSessionForCloudAgentSchema>;
+
+/**
+ * Stable clone rejection codes returned by `createSessionForCloudAgent` when
+ * the destination clone cannot be created. The codes are a contract: add new
+ * codes, never rename or remove an existing one.
+ */
+export type SessionCloneRejectionCode =
+  | 'source_access_denied'
+  | 'organization_mismatch'
+  | 'malformed_source_data'
+  | 'missing_source_body'
+  | 'source_digest_changed'
+  | 'destination_conflict'
+  | 'clone_setup_failed';
+
+/**
+ * Clone acknowledgement carried by the `ready` result. `sessionId` is the
+ * destination session that now owns the cloned transcript; `copiedItemCount`
+ * is the number of ingest rows copied (0 for an empty source).
+ */
+export type SessionCloneAcknowledgement = {
+  sessionId: string;
+  copiedItemCount: number;
+};
+
+/**
+ * Discriminated result of `createSessionForCloudAgent`. Old callers can ignore
+ * the returned value; new clone callers must require the `ready`
+ * acknowledgement and treat a missing acknowledgement (an old worker that
+ * still returns `undefined`) as service-unavailable.
+ */
+export type CreateSessionForCloudAgentResult =
+  | { status: 'ready'; clone: SessionCloneAcknowledgement }
+  | { status: 'in_progress' }
+  | { status: 'rejected'; code: SessionCloneRejectionCode };
 
 export const deleteSessionForCloudAgentSchema = z.object({
   sessionId: sessionIdSchema,
   kiloUserId: z.string().min(1),
   onlyIfEmpty: z.boolean().optional(),
+  // When set, the delete is a clone rollback: the destination row, clone DO
+  // stage, and its R2 bodies are cleared only when the destination clone
+  // matches this source. Never clears a session that belongs to another source.
+  cloneSourceSessionId: sessionIdSchema.optional(),
 });
 export type DeleteSessionForCloudAgentParams = z.input<typeof deleteSessionForCloudAgentSchema>;
 
@@ -689,7 +733,9 @@ export type AuthorizedSessionMessages = {
 export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
 
 export type SessionIngestRpcMethods = {
-  createSessionForCloudAgent: (params: CreateSessionForCloudAgentParams) => Promise<void>;
+  createSessionForCloudAgent: (
+    params: CreateSessionForCloudAgentParams
+  ) => Promise<CreateSessionForCloudAgentResult>;
   deleteSessionForCloudAgent: (params: DeleteSessionForCloudAgentParams) => Promise<void>;
   resolveCloudAgentRootSessionForKiloSession: (
     params: ResolveCloudAgentRootSessionForKiloSessionParams

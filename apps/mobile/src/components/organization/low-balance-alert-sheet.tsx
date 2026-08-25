@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScrollView, Switch, View } from 'react-native';
 
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
@@ -33,6 +34,7 @@ type LowBalanceAlertFormProps = Readonly<{
 
 function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const mutations = useOrganizationMutations(organizationId ?? '');
   const { email: myEmail } = useCurrentUserId();
 
@@ -83,9 +85,9 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
   return (
     <>
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <Text className="text-sm font-medium">Enabled</Text>
+        <Text className="text-sm font-medium">{t('organization.lowBalanceAlert.enabled')}</Text>
         <Switch
-          accessibilityLabel="Enable low balance alert"
+          accessibilityLabel={t('organization.lowBalanceAlert.enableA11y')}
           value={enabled}
           onValueChange={value => {
             void Haptics.selectionAsync();
@@ -98,7 +100,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
       {enabled && (
         <>
           <FormField
-            label="Alert below (USD)"
+            label={t('organization.lowBalanceAlert.thresholdLabel')}
             required
             placeholder="10.00"
             keyboardType="decimal-pad"
@@ -112,9 +114,9 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
 
           <View className="gap-1.5">
             <FormField
-              label="Notify emails"
+              label={t('organization.lowBalanceAlert.notifyEmailsLabel')}
               required
-              placeholder="name@company.com"
+              placeholder={t('organization.lowBalanceAlert.emailPlaceholder')}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -126,7 +128,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
               }}
             />
             <Text variant="muted" className="text-xs">
-              Separate multiple emails with commas.
+              {t('organization.lowBalanceAlert.separateEmailsHint')}
             </Text>
           </View>
         </>
@@ -149,13 +151,14 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
         loading={mutations.updateMinimumBalanceAlert.isPending}
         onPress={onSave}
       >
-        <Text className="text-primary-foreground">Save</Text>
+        <Text className="text-primary-foreground">{t('common.save')}</Text>
       </Button>
     </>
   );
 }
 
 export function LowBalanceAlertSheet() {
+  const { t } = useTranslation();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
 
@@ -184,7 +187,7 @@ export function LowBalanceAlertSheet() {
     return <OrganizationBoundary />;
   }
   if (!isMoneyRole(role)) {
-    return <PermissionDenied description="You don't have permission to manage billing alerts." />;
+    return <PermissionDenied description={t('organization.lowBalanceAlert.permissionDenied')} />;
   }
 
   let body: ReactNode = null;
@@ -212,7 +215,9 @@ export function LowBalanceAlertSheet() {
       automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
     >
-      <Text className="text-center text-lg font-semibold text-foreground">Low balance alert</Text>
+      <Text className="text-center text-lg font-semibold text-foreground">
+        {t('organization.lowBalanceAlert.title')}
+      </Text>
 
       {body}
     </ScrollView>

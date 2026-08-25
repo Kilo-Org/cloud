@@ -2,11 +2,13 @@ import { db } from '@/lib/drizzle';
 import {
   createSecurityAgentCommand,
   getSecurityAgentCommandForOwner,
+  getSecurityAgentCommandsForOwner,
   listActiveSecurityAgentCommandsForOwner,
   markSecurityAgentCommandQueueAdmissionFailed,
   type SecurityAgentCommandOwner,
 } from '@kilocode/db';
 import type { SecurityAgentCommand } from '@kilocode/db/schema';
+import type { SecurityCommandType } from '@kilocode/app-shared/security-agent';
 import type { SecurityReviewOwner } from '../core/types';
 
 function toCommandOwner(owner: SecurityReviewOwner): SecurityAgentCommandOwner {
@@ -51,6 +53,14 @@ export async function getSecurityAgentCommandStatus(
   return command ? serializeSecurityAgentCommand(command) : null;
 }
 
+export async function getSecurityAgentCommandStatuses(
+  owner: SecurityReviewOwner,
+  commandIds: string[]
+): Promise<SecurityAgentCommandStatusResponse[]> {
+  const commands = await getSecurityAgentCommandsForOwner(db, toCommandOwner(owner), commandIds);
+  return commands.map(serializeSecurityAgentCommand);
+}
+
 export async function listActiveSecurityAgentCommands(
   owner: SecurityReviewOwner
 ): Promise<SecurityAgentCommandStatusResponse[]> {
@@ -60,7 +70,7 @@ export async function listActiveSecurityAgentCommands(
 
 export async function createApplyAutoRemediationCommand(owner: SecurityReviewOwner) {
   const command = await createSecurityAgentCommand(db, {
-    commandType: 'apply_auto_remediation',
+    commandType: 'apply_auto_remediation' satisfies SecurityCommandType,
     origin: 'settings_include_existing',
     owner: toCommandOwner(owner),
   });

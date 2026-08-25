@@ -512,7 +512,9 @@ export const UserDeletionStepKey = {
   Substack: 'substack',
   Anonymize: 'anonymize',
   PylonReply: 'pylon_reply',
+  PylonFinalize: 'pylon_finalize',
   PylonContact: 'pylon_contact',
+  CsaSupportDb: 'csa_support_db',
 } as const;
 
 export type UserDeletionStepKey = (typeof UserDeletionStepKey)[keyof typeof UserDeletionStepKey];
@@ -522,6 +524,7 @@ export const UserDeletionCloudSubjectResolution = {
   AuthoritativeAbsence: 'authoritative_absence',
   PriorQueueCleanup: 'prior_queue_cleanup',
   LegacyIdentityUnresolved: 'legacy_identity_unresolved',
+  Unresolved: 'unresolved',
 } as const;
 
 export type UserDeletionCloudSubjectResolution =
@@ -553,6 +556,7 @@ export const UserDeletionProviderScope = {
   Posthog: 'posthog',
   Substack: 'substack',
   Pylon: 'pylon',
+  Csa: 'csa',
 } as const;
 
 export type UserDeletionProviderScope =
@@ -579,6 +583,7 @@ export type UserDeletionTaskProgress = {
   reply_state?: UserDeletionPylonReplyState;
   reply_message_id?: string;
   close_confirmed?: boolean;
+  verify_attempt_count?: number;
 };
 
 export type UserDeletionManualEvidence = {
@@ -2042,6 +2047,15 @@ export const CustomLlmMetadataSchema = z.object({
 
 export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
 
+export const ReasoningDetailsTransform = {
+  GeminiThought: 'gemini-thought',
+  ReasoningContent: 'reasoning-content',
+} as const;
+
+export const ReasoningDetailsTransformSchema = z.enum(ReasoningDetailsTransform);
+
+export type ReasoningDetailsTransform = z.infer<typeof ReasoningDetailsTransformSchema>;
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1),
   base_url: z.url(),
@@ -2050,7 +2064,7 @@ export const CustomLlmApiConfigSchema = z.object({
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(z.string()).optional(),
-  use_gemini_reasoning_transform: z.boolean().optional(),
+  reasoning_details_transform: ReasoningDetailsTransformSchema.optional(),
 });
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;
@@ -2078,8 +2092,16 @@ export const CustomLlmApiKeyCredentialsSchema = z.object({
 
 export type CustomLlmApiKeyCredentials = z.infer<typeof CustomLlmApiKeyCredentialsSchema>;
 
+export const CustomLlmXApiKeyCredentialsSchema = z.object({
+  type: z.literal('x-api-key'),
+  api_key: z.string().min(1),
+});
+
+export type CustomLlmXApiKeyCredentials = z.infer<typeof CustomLlmXApiKeyCredentialsSchema>;
+
 export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
   CustomLlmApiKeyCredentialsSchema,
+  CustomLlmXApiKeyCredentialsSchema,
   GoogleServiceAccountKeySchema,
 ]);
 

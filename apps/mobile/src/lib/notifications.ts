@@ -1,11 +1,17 @@
 import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
-import { type Href, router } from 'expo-router';
 import { Platform } from 'react-native';
 import { z } from 'zod';
 
-import { type PushData, pushDataSchema } from '@kilocode/notifications';
+import * as Sentry from '@sentry/react-native';
+import {
+  ANDROID_NOTIFICATION_CHANNELS,
+  type AndroidNotificationChannelId,
+  type PushData,
+  pushDataSchema,
+} from '@kilocode/notifications';
 
+import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
 import { notificationPathForData } from './notification-path';
 
@@ -81,15 +87,11 @@ export function setupNotificationResponseHandler() {
 
     const path = notificationPathForData(data);
     Notifications.clearLastNotificationResponse();
-    // If the router is ready, navigate immediately; otherwise store as pending.
-    // navigate (not replace) so the target screen keeps a back stack — replace
-    // on a stack root leaves canGoBack() false and strands the user — while
-    // still deduplicating if the route is already on top.
-    try {
-      router.navigate(path as Href);
-    } catch {
-      setPendingDeepLink(path, 'notification');
-    }
+    // Always stash: the gated consumer in `_layout.tsx` owns every navigation.
+    // `router.navigate` queues rather than throws when the router is unmounted,
+    // so a tap while at the consent/force-update/login gate would navigate past
+    // the gate and be dropped by the root redirect.
+    setPendingDeepLink(path, 'notification');
   });
 
   return subscription;
@@ -108,7 +110,91 @@ export function checkInitialNotification(): void {
   Notifications.clearLastNotificationResponse();
 }
 
+// Single-flight promise so concurrent callers share one channel-creation pass.
+// The promise never rejects: a per-channel failure is reported to Sentry and
+// the remaining channels still get created.
+let androidChannelsPromise: Promise<void> | null = null;
+
+async function createAndroidNotificationChannels(): Promise<void> {
+  for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- channels are created sequentially so a per-channel failure is isolated
+      await Notifications.setNotificationChannelAsync(channel.id, {
+        name: channel.name,
+        importance:
+          channel.importance === 'high'
+            ? Notifications.AndroidImportance.HIGH
+            : Notifications.AndroidImportance.DEFAULT,
+      });
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: {
+          'error.subsystem': 'notifications',
+          'error.operation': 'create_android_channel',
+          'notification.channel': channel.id,
+        },
+      });
+    }
+  }
+}
+
+/**
+ * Create the Android notification channels once. No-op on iOS. Idempotent and
+ * single-flight: every call returns the same module-level promise, and a
+ * per-channel failure never rejects it (reported to Sentry instead).
+ */
+// eslint-disable-next-line promise-function-async -- must return the same module-level promise for single-flight
+export function ensureAndroidNotificationChannels(): Promise<void> {
+  if (Platform.OS !== 'android') {
+    return Promise.resolve();
+  }
+  androidChannelsPromise ??= createAndroidNotificationChannels();
+  return androidChannelsPromise;
+}
+
+const CHANNEL_NAME_KEYS = {
+  agent: 'notifications.channel.agent',
+  chat: 'notifications.channel.chat',
+  kiloclaw: 'notifications.channel.kiloclaw',
+  balance: 'notifications.channel.balance',
+  security: 'notifications.channel.security',
+} as const satisfies Record<AndroidNotificationChannelId, string>;
+
+/**
+ * Re-set every Android channel name with the active catalog translation. Not
+ * single-flight and never cached: a language change must always re-write the
+ * names, even when `ensureAndroidNotificationChannels` already returned its
+ * cached promise. No-op on iOS.
+ */
+export async function renameAndroidNotificationChannels(): Promise<void> {
+  if (Platform.OS !== 'android') {
+    return;
+  }
+  for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- channels are renamed sequentially so a per-channel failure is isolated
+      await Notifications.setNotificationChannelAsync(channel.id, {
+        name: i18n.t(CHANNEL_NAME_KEYS[channel.id]),
+        importance:
+          channel.importance === 'high'
+            ? Notifications.AndroidImportance.HIGH
+            : Notifications.AndroidImportance.DEFAULT,
+      });
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: {
+          'error.subsystem': 'notifications',
+          'error.operation': 'rename_android_channel',
+          'notification.channel': channel.id,
+        },
+      });
+    }
+  }
+}
+
 export async function registerForPushNotifications(): Promise<string | null> {
+  await ensureAndroidNotificationChannels();
+
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
 
   let finalStatus = existingStatus;
@@ -135,6 +221,8 @@ export async function registerForPushNotifications(): Promise<string | null> {
  * treat a failed lookup.
  */
 export async function getDevicePushToken(): Promise<string | null> {
+  await ensureAndroidNotificationChannels();
+
   const { status } = await Notifications.getPermissionsAsync();
   if (status !== Notifications.PermissionStatus.GRANTED) {
     return null;

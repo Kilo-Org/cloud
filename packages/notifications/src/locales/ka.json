@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "თქვენს აგენტის სესიას განახლება აქვს",
+      "chatMessage": "თქვენ გაქვთ ახალი შეტყობინება",
+      "instanceLifecycle": "თქვენს ინსტანსს განახლება აქვს",
+      "scheduledAction": "დაგეგმილ მოქმედებას განახლება აქვს",
+      "lowBalance": "თქვენი ბალანსი ყურადღებას საჭიროებს",
+      "securityFinding": "უსაფრთხოების დასკვნა ყურადღებას საჭიროებს"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "ამოცანა დასრულდა"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "ჩავარდა: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "შეწყდა: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · უსათაურო",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "დაბალი ბალანსის შეტყობინება",
+      "body": "{{organizationName}} ბალანსი დაეცა ${{minimumBalanceUsd}}-ზე ქვემოთ"
+    },
+    "securityFindingNew": {
+      "title": "ახალი უსაფრთხოების დასკვნა ({{severity}})",
+      "body": "{{findingTitle}} {{repoFullName}}-ში"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA გაფრთხილება",
+      "body": "{{findingTitle}} {{repoFullName}}-ში"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA დარღვევა",
+      "body": "{{findingTitle}} {{repoFullName}}-ში"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "უსაფრთხოების დასკვნა ყურადღებას საჭიროებს"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} მზადაა",
+      "body": "შეეხეთ ჩატის დასაწყებად."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} გაშვება ვერ მოხერხდა",
+      "body": "გაშვება ვერ მოხერხდა."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} მალე გადაიტვირთება",
+      "body": "დაგეგმილია გადატვირთვა {{when}}."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} გადატვირთვა გაუქმდა",
+      "body": "ადრე დაგეგმილი გადატვირთვა გაუქმდა."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} მალე განახლდება",
+      "bodyWithTag": "განახლება {{targetImageTag}}-ზე {{when}}.",
+      "bodyWithoutTag": "დაგეგმილი განახლება {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} განახლება გაუქმდა",
+      "body": "ადრე დაგეგმილი განახლება გაუქმდა."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "თქვენი Kilo სესია მზადაა ტელეფონიდან სამართავად"
+  }
+}

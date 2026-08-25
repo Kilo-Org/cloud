@@ -638,6 +638,32 @@ describe('createIngestHandler', () => {
       expect(state.acceptWebSocket).not.toHaveBeenCalled();
     });
 
+    it('rejects wrapper reconnect while container billing is blocked', async () => {
+      const state = createFakeState();
+      const doContext = createFakeDOContext();
+      doContext.isBillingBlocked = vi.fn().mockResolvedValue(true);
+      const handler = createIngestHandler(
+        state,
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+
+      const response = await handler.handleIngestRequest(
+        makeIngestRequest({
+          wrapperRunId: WRAPPER_RUN_ID,
+          wrapperGeneration: '2',
+          wrapperConnectionId: 'conn_current',
+          sessionId: SESSION_ID,
+        })
+      );
+
+      expect(response.status).toBe(409);
+      expect(doContext.wrapperSupervisor.checkReconnect).not.toHaveBeenCalled();
+      expect(state.acceptWebSocket).not.toHaveBeenCalled();
+    });
+
     itWithWebSocketPair(
       'accepts current fenced connection and cancels matching grace',
       async () => {

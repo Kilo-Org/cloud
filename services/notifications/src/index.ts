@@ -220,6 +220,10 @@ export async function sendPushForConversationCore(
         push: {
           title: input.title,
           body: input.bodyPreview,
+          ...(input.i18nKey !== undefined && {
+            i18nKey: input.i18nKey,
+            i18nParams: input.i18nParams,
+          }),
           data: {
             type: 'chat.message',
             sandboxId: input.sandboxId,
@@ -302,10 +306,10 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
       },
       getTokens: async userId => {
         const rows = await db
-          .select({ token: user_push_tokens.token })
+          .select({ token: user_push_tokens.token, locale: user_push_tokens.locale })
           .from(user_push_tokens)
           .where(eq(user_push_tokens.user_id, userId));
-        return rows.map(r => r.token);
+        return rows.map(r => ({ token: r.token, locale: r.locale }));
       },
       deleteStaleTokens: async tokens => {
         await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, tokens));
@@ -466,10 +470,10 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
       },
       getTokens: async userId => {
         const rows = await db
-          .select({ token: user_push_tokens.token })
+          .select({ token: user_push_tokens.token, locale: user_push_tokens.locale })
           .from(user_push_tokens)
           .where(eq(user_push_tokens.user_id, userId));
-        return rows.map(r => r.token);
+        return rows.map(r => ({ token: r.token, locale: r.locale }));
       },
       deleteStaleTokens: async tokens => {
         await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, tokens));

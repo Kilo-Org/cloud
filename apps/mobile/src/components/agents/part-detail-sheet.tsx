@@ -1,8 +1,10 @@
 import { type Part } from '@kilocode/cloud-agent-sdk';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
+import { i18n } from '@/i18n';
 import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
@@ -10,6 +12,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 
 import { MONO_SCROLL_TEXT_MODE_OPTIONS, type MonoScrollTextMode } from './mono-scroll-block-model';
 import { MonoScrollSheetProvider } from './mono-scroll-block';
+import { SessionPageSheet } from './session-page-sheet';
 import { getPartDetailTitle, shouldAutoFollowPartDetail } from './part-detail-model';
 import { isPartStreaming, isReasoningPart, isToolPart } from './part-types';
 import { ToolPartDetailBody } from './tool-part-detail-body';
@@ -23,7 +26,11 @@ type PartDetailSheetProps = {
 
 function renderPartContent(part: Part | null): ReactNode {
   if (part === null) {
-    return <Text className="text-sm text-muted-foreground">Details unavailable</Text>;
+    return (
+      <Text className="text-sm text-muted-foreground">
+        {i18n.t('agentChat.partDetail.detailsUnavailable')}
+      </Text>
+    );
   }
   if (isToolPart(part)) {
     return <ToolPartDetailBody part={part} />;
@@ -67,6 +74,7 @@ function renderPartContent(part: Part | null): ReactNode {
  */
 export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailSheetProps>) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [textMode, setTextMode] = useState<MonoScrollTextMode>('wrap');
   const [monoCount, setMonoCount] = useState(0);
   const trackMonoBlock = useCallback(() => {
@@ -90,49 +98,46 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
   });
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
-      <View className="flex-1 bg-background">
-        <SheetHeader
-          title={part ? getPartDetailTitle(part) : 'Details'}
-          onDone={onClose}
-          doneLabel="Done"
-        />
+    <SessionPageSheet visible={visible} onClose={onClose}>
+      <SheetHeader
+        title={part ? getPartDetailTitle(part) : t('agentChat.partDetail.title')}
+        onDone={onClose}
+        doneLabel={t('common.done')}
+      />
 
-        {monoCount > 0 ? (
-          <View className="px-4 pb-2 pt-3">
-            <SegmentedControl<MonoScrollTextMode>
-              accessibilityLabel="Text display"
-              options={MONO_SCROLL_TEXT_MODE_OPTIONS}
-              value={textMode}
-              onChange={setTextMode}
-            />
-          </View>
-        ) : null}
+      {monoCount > 0 ? (
+        <View className="px-4 pb-2 pt-3">
+          <SegmentedControl<MonoScrollTextMode>
+            accessibilityLabel={t('agentChat.partDetail.textDisplay')}
+            options={MONO_SCROLL_TEXT_MODE_OPTIONS.map(o => ({
+              value: o.value,
+              label: t(o.labelKey),
+            }))}
+            value={textMode}
+            onChange={setTextMode}
+          />
+        </View>
+      ) : null}
 
-        <ScrollView
-          ref={autoFollow.scrollRef}
-          contentContainerClassName="gap-2 px-4 pb-6 pt-3"
-          onScroll={autoFollow.handleScroll}
-          onScrollBeginDrag={autoFollow.handleScrollBeginDrag}
-          onScrollEndDrag={autoFollow.handleScrollEndDrag}
-          onMomentumScrollBegin={autoFollow.handleMomentumScrollBegin}
-          onMomentumScrollEnd={autoFollow.handleMomentumScrollEnd}
-          onContentSizeChange={autoFollow.handleContentSizeChange}
-          onLayout={autoFollow.handleLayout}
-          scrollEventThrottle={16}
-        >
-          <MonoScrollSheetProvider value={sheetContext}>
-            {renderPartContent(part)}
-          </MonoScrollSheetProvider>
-        </ScrollView>
+      <ScrollView
+        ref={autoFollow.scrollRef}
+        className="flex-1"
+        contentContainerClassName="gap-2 px-4 pb-6 pt-3"
+        onScroll={autoFollow.handleScroll}
+        onScrollBeginDrag={autoFollow.handleScrollBeginDrag}
+        onScrollEndDrag={autoFollow.handleScrollEndDrag}
+        onMomentumScrollBegin={autoFollow.handleMomentumScrollBegin}
+        onMomentumScrollEnd={autoFollow.handleMomentumScrollEnd}
+        onContentSizeChange={autoFollow.handleContentSizeChange}
+        onLayout={autoFollow.handleLayout}
+        scrollEventThrottle={16}
+      >
+        <MonoScrollSheetProvider value={sheetContext}>
+          {renderPartContent(part)}
+        </MonoScrollSheetProvider>
+      </ScrollView>
 
-        <View style={{ height: insets.bottom }} className="bg-background" />
-      </View>
-    </Modal>
+      <View style={{ height: insets.bottom }} className="bg-background" />
+    </SessionPageSheet>
   );
 }

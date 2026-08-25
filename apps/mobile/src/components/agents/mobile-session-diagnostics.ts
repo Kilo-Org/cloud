@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 const maxUserDiagnosticLength = 220;
 
 type SafeCloudAgentErrorInfo = {
@@ -92,8 +94,8 @@ export function formatSafeCloudAgentFailureDiagnostic(
     return undefined;
   }
   const prefix = status
-    ? `Cloud Agent ${action} failed (${status})`
-    : `Cloud Agent ${action} failed`;
+    ? i18n.t('agentChat.mobileSessionDiagnostics.failedWithStatus', { action, status })
+    : i18n.t('agentChat.mobileSessionDiagnostics.failed', { action });
   return message ? `${prefix}: ${message}` : prefix;
 }
 

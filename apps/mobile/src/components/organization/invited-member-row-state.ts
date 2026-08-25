@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type InvitedOrgMember } from '@/lib/hooks/use-organization-queries';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -9,7 +10,9 @@ import { trpcClient, useTRPC } from '@/lib/trpc';
  * sent asynchronously through the outbox, so the copy must say "created", not
  * "sent".
  */
-export const INVITE_SUCCESS_MESSAGE = 'Invite created';
+export function getInviteSuccessMessage(): string {
+  return i18n.t('organization.members.inviteCreated');
+}
 
 /**
  * Maps an invited member's outbox email status to the label shown in the row.
@@ -19,13 +22,13 @@ export const INVITE_SUCCESS_MESSAGE = 'Invite created';
 export function emailStatusLabel(emailStatus: InvitedOrgMember['emailStatus']): string | null {
   switch (emailStatus) {
     case 'pending': {
-      return 'Pending';
+      return i18n.t('organization.members.emailStatusPending');
     }
     case 'sending': {
-      return 'Pending';
+      return i18n.t('organization.members.emailStatusPending');
     }
     case 'failed': {
-      return 'Email failed';
+      return i18n.t('organization.members.emailStatusFailed');
     }
     case 'delivered': {
       return null;
@@ -49,14 +52,20 @@ export function canResendInvite(emailStatus: InvitedOrgMember['emailStatus']): b
 
 /**
  * Action-sheet options for an invited member row, in display order. The
- * `Resend invite` option appears only for a failed invite.
+ * `Resend invite` option appears only for a failed invite. The `Share invite
+ * link` option appears only when the caller has the invite URL: a member
+ * caller's `withMembers` response omits `inviteUrl`, so the row must not offer
+ * a share action it cannot perform.
  */
-export function invitedMemberActionOptions(emailStatus: InvitedOrgMember['emailStatus']): string[] {
+export function invitedMemberActionOptions(
+  emailStatus: InvitedOrgMember['emailStatus'],
+  hasInviteUrl: boolean
+): string[] {
   return [
-    'Share invite link',
-    ...(canResendInvite(emailStatus) ? ['Resend invite'] : []),
-    'Revoke invitation',
-    'Cancel',
+    ...(hasInviteUrl ? [i18n.t('organization.members.shareInviteLink')] : []),
+    ...(canResendInvite(emailStatus) ? [i18n.t('organization.members.resendInvite')] : []),
+    i18n.t('organization.members.revokeInvitation'),
+    i18n.t('common.cancel'),
   ];
 }
 

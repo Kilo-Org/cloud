@@ -11,6 +11,7 @@
 
 import { X } from '@/components/ui/icons';
 import { useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, type Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -43,6 +44,7 @@ export function ReactionPickerSheet({
 }: Readonly<ReactionPickerSheetProps>) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const titleRef = useRef<RNText | null>(null);
 
   const reacted = new Set<string>();
@@ -65,7 +67,11 @@ export function ReactionPickerSheet({
       onRequestClose={onClose}
     >
       <View className="flex-1 justify-end bg-black/40">
-        <Pressable className="flex-1" accessibilityLabel="Close reactions" onPress={onClose} />
+        <Pressable
+          className="flex-1"
+          accessibilityLabel={t('prReview.discussion.closeReactions')}
+          onPress={onClose}
+        />
         <View
           accessibilityViewIsModal
           className="gap-4 rounded-t-3xl bg-card px-5 pt-4"
@@ -77,11 +83,11 @@ export function ReactionPickerSheet({
               accessibilityRole="header"
               className="text-base font-semibold text-foreground"
             >
-              Reactions
+              {t('prReview.discussion.reactionsTitle')}
             </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Close reactions"
+              accessibilityLabel={t('prReview.discussion.closeReactions')}
               className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
               onPress={onClose}
             >

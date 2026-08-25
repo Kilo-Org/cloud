@@ -25,6 +25,7 @@ export const kiloTokenPayload = z.object({
   createdOnPlatform: z.string().optional(),
   tokenSource: z.string().optional(),
   deviceAuthRequestCode: z.string().optional(),
+  deviceSessionId: z.string().optional(),
   // Org memberships (baked into gastown tokens to avoid DB lookups)
   orgMemberships: z
     .array(z.object({ orgId: z.string(), role: z.enum(['owner', 'member', 'billing_manager']) }))
@@ -52,6 +53,7 @@ export type SignKiloTokenExtra = Pick<
   | 'createdOnPlatform'
   | 'tokenSource'
   | 'deviceAuthRequestCode'
+  | 'deviceSessionId'
   | 'orgMemberships'
 >;
 

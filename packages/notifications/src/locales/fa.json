@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "جلسه عامل شما به‌روزرسانی دارد",
+      "chatMessage": "پیام جدیدی دارید",
+      "instanceLifecycle": "نمونه شما به‌روزرسانی دارد",
+      "scheduledAction": "یک اقدام زمان‌بندی‌شده به‌روزرسانی دارد",
+      "lowBalance": "موجودی شما نیاز به توجه دارد",
+      "securityFinding": "یک یافته امنیتی نیاز به توجه دارد"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "وظیفه کامل شد"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "ناموفق: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "قطع شد: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · بدون عنوان",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "هشدار موجودی کم",
+      "body": "موجودی {{organizationName}} به زیر ${{minimumBalanceUsd}} رسید"
+    },
+    "securityFindingNew": {
+      "title": "یافته امنیتی جدید ({{severity}})",
+      "body": "{{findingTitle}} در {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "هشدار SLA",
+      "body": "{{findingTitle}} در {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "نقض SLA",
+      "body": "{{findingTitle}} در {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "یک یافته امنیتی نیاز به توجه دارد"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} آماده است",
+      "body": "برای شروع گفتگو لمس کنید."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} شروع نشد",
+      "body": "شروع ناموفق بود."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} به‌زودی راه‌اندازی مجدد می‌شود",
+      "body": "زمان‌بندی راه‌اندازی مجدد در {{when}}."
+    },
+    "restartCancelled": {
+      "title": "راه‌اندازی مجدد {{instanceName}} لغو شد",
+      "body": "راه‌اندازی مجدد زمان‌بندی‌شده قبلی لغو شده است."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} به‌زودی ارتقا می‌یابد",
+      "bodyWithTag": "ارتقا به {{targetImageTag}} در {{when}}.",
+      "bodyWithoutTag": "ارتقای زمان‌بندی‌شده در {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "ارتقای {{instanceName}} لغو شد",
+      "body": "ارتقای زمان‌بندی‌شده قبلی لغو شده است."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "جلسه Kilo شما آماده است تا از تلفن خود کنترل کنید"
+  }
+}

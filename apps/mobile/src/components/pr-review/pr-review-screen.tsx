@@ -1,9 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { Check, Share as ShareIcon } from '@/components/ui/icons';
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Share, View } from 'react-native';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Pressable, RefreshControl, Share, View } from 'react-native';
 
+import { DetailScreenScrollView } from '@/components/detail-screen';
 import { PrMergePartialSuccessBanner } from '@/components/pr-review/merge/pr-merge-partial-success-banner';
 import { PrReviewDiscussionTab } from '@/components/pr-review/pr-review-discussion-tab';
 import { PrReviewFilesTab } from '@/components/pr-review/pr-review-files-tab';
@@ -17,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { consumeMergePartialSuccess } from '@/lib/pr-review/merge/merge-result-banner-store';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { upsertRecentPr } from '@/lib/pr-review/recent-prs';
+import { markRecentPrFailed, upsertRecentPr } from '@/lib/pr-review/recent-prs';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -49,6 +51,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const [tab, setTab] = useState<PrReviewTabId>('overview');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -84,9 +87,10 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   // a single network round-trip even though both components subscribe.
   const pr = useQuery(trpc.githubPrReview.getPullRequest.queryOptions({ owner, repo, number }));
 
-  // Recents title backfill. S4b left the title empty so the recents row
-  // can be written before the PR loads. Once we have the real title,
-  // upsert it so the recents list shows it next time.
+  // Recents backfill. This is the ONLY writer that creates an entry: a
+  // successful load upserts the real title with `lastResult: 'ok'`, which
+  // also clears any previous `'failed'` marker. A never-authorized PR
+  // (no successful load) never gets an entry.
   useEffect(() => {
     const data = pr.data;
     if (!data?.title) {
@@ -98,8 +102,27 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
       number,
       title: data.title,
       lastOpenedAt: Date.now(),
+      lastResult: 'ok',
     });
   }, [pr.data, owner, repo, number]);
+
+  // Mark an existing recents entry as failed exactly once per error. The
+  // ref guards against re-writing on re-render; `markRecentPrFailed` is a
+  // no-op when no entry exists, so a never-authorized PR stays out of
+  // recents. A success (isError false) or a PR identity change resets the
+  // guard so a later error marks the entry failed again.
+  const markedFailedRef = useRef(false);
+  useEffect(() => {
+    if (!pr.isError) {
+      markedFailedRef.current = false;
+      return;
+    }
+    if (markedFailedRef.current) {
+      return;
+    }
+    markedFailedRef.current = true;
+    void markRecentPrFailed({ owner, repo, number });
+  }, [pr.isError, owner, repo, number]);
 
   // Share the PR's public GitHub URL via the native share sheet. The URL comes
   // from the route params, so this works before the PR query resolves; the title
@@ -141,21 +164,21 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
     })();
   }, [queryClient, trpc, owner, repo, number, pr.data?.headSha]);
 
-  // Each tab owns its own scroll: Overview is a ScrollView with
+  // Each tab owns its own scroll: Overview is a DetailScreenScrollView with
   // pull-to-refresh; the Files tab hosts a virtualized FlashList and must
   // NOT be nested inside a ScrollView.
   let body: ReactNode = null;
   if (tab === 'overview') {
     body = (
-      <ScrollView
+      <DetailScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-5 px-4 pb-12"
+        contentContainerClassName="gap-5 px-4"
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         {partialMergeReason ? <PrMergePartialSuccessBanner reason={partialMergeReason} /> : null}
         <PrReviewOverview owner={owner} repo={repo} number={number} isActive />
-      </ScrollView>
+      </DetailScreenScrollView>
     );
   } else if (tab === 'files') {
     body = (
@@ -186,14 +209,14 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={`#${number}`}
+        title={t('prReview.screen.title', { number })}
         eyebrow={`${owner}/${repo}`}
         headerRight={
           <View className="flex-row items-center gap-1">
             <Pressable
               onPress={sharePullRequest}
               accessibilityRole="button"
-              accessibilityLabel="Share pull request"
+              accessibilityLabel={t('prReview.screen.shareA11y')}
               className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
             >
               <ShareIcon size={18} color={colors.foreground} />
@@ -206,11 +229,11 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
               <Button
                 size="sm"
                 onPress={openReviewSubmit}
-                accessibilityLabel="Submit review"
+                accessibilityLabel={t('prReview.submit.title')}
                 className={cn('px-3')}
               >
                 <Check size={14} color={colors.primaryForeground} />
-                <Text>Submit review</Text>
+                <Text>{t('prReview.submit.title')}</Text>
               </Button>
             ) : null}
           </View>

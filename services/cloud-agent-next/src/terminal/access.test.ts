@@ -99,6 +99,9 @@ function sandboxWithTerminalResult(
   getRunningTerminalClient: AgentSandbox['getRunningTerminalClient']
 ): AgentSandbox {
   return {
+    ensureBillingAdmission: vi.fn().mockResolvedValue({ success: true }),
+    isBillingBlocked: vi.fn().mockResolvedValue(false),
+    getBillingRuntimeStatus: vi.fn().mockResolvedValue(undefined),
     ensureWrapper: vi.fn(),
     discoverSessionWrappers: vi.fn(),
     observeWrappersWithoutWaking: vi.fn(),

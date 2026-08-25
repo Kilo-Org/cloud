@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { formatDate, parseTimestamp } from '@/lib/utils';
 import {
@@ -9,6 +9,10 @@ import {
 } from '@kilocode/app-shared/commerce';
 
 import { getKiloPassSubscriptionCardContentState } from './subscription-card-state';
+
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => 'en',
+}));
 
 const activeAppStoreSubscription = {
   cancelAtPeriodEnd: false,

@@ -1,4 +1,5 @@
 import { Fragment, memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { type LayoutChangeEvent, Text as RNText, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 
@@ -61,6 +62,7 @@ function CodeBlockImpl({
   const textSelectable = useTranscriptTextSelectable();
   const effectiveSelectable = selectable ?? textSelectable;
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const isDark = colors.background === '#0E0E10';
   const { displayText, isTruncated } = prepareMonoScrollContent(code, maxLength);
   const tokenLines = useMemo(
@@ -100,8 +102,11 @@ function CodeBlockImpl({
   ));
 
   const truncatedMarker = isTruncated ? (
-    <Text accessibilityLabel="Content truncated" className="mt-1 text-xs text-muted-foreground">
-      Truncated
+    <Text
+      accessibilityLabel={t('monoScrollBlock.contentTruncated')}
+      className="mt-1 text-xs text-muted-foreground"
+    >
+      {t('monoScrollBlock.truncated')}
     </Text>
   ) : null;
 

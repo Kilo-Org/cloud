@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { type RefObject } from 'react';
 import { ActivityIndicator } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -33,6 +34,7 @@ export function SettingsSaveButton({
 }>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   return (
     <Button
@@ -51,7 +53,7 @@ export function SettingsSaveButton({
       }}
     >
       {pending ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
-      <Text>Save changes</Text>
+      <Text>{t('securityAgent.settingsSave.saveChanges')}</Text>
     </Button>
   );
 }

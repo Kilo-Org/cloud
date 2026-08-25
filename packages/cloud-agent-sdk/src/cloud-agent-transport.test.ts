@@ -1646,3 +1646,92 @@ describe('CloudAgentTransport event delivery and replay cursor', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Duplicate WebSocket connect investigation (W10.2)
+// ---------------------------------------------------------------------------
+
+describe('CloudAgentTransport single-connect guarantee', () => {
+  it('opens exactly one connection per connect() call (no duplicate)', async () => {
+    const getTicket = jest.fn(() => 'test-ticket');
+    const fetchSnapshotPage = jest.fn().mockResolvedValue({
+      kind: 'success' as const,
+      info: { id: 'ses-1' },
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    });
+
+    const factory = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket,
+      fetchSnapshot: () => Promise.reject(new Error('legacy fetchSnapshot should not be called')),
+      fetchSnapshotPage,
+      websocketBaseUrl: 'ws://localhost:9999',
+    });
+
+    const transport = factory({
+      onChatEvent: () => {},
+      onServiceEvent: () => {},
+    });
+
+    transport.connect();
+    await flushPromises();
+
+    // One connect() must produce exactly one createConnection call. Each
+    // createConnection maps 1:1 to a WebSocket construction (the transport
+    // calls connect() once per createConnection, and connectInternal opens
+    // exactly one socket), so the WebSocket constructor count is the direct
+    // observable of createConnection calls. A duplicate driven from inside the
+    // transport would show up here as a second construction.
+    expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+    expect(getTicket).toHaveBeenCalledTimes(1);
+
+    transport.destroy();
+  });
+
+  it('opens exactly one connection when the ticket is expiring (refresh does not double-connect)', async () => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const getTicket = jest
+      .fn()
+      .mockResolvedValueOnce({ ticket: 'expiring-ticket', expiresAt: nowSeconds + 5 })
+      .mockResolvedValueOnce({ ticket: 'fresh-ticket', expiresAt: nowSeconds + 60 });
+    const fetchSnapshotPage = jest.fn().mockResolvedValue({
+      kind: 'success' as const,
+      info: { id: 'ses-1' },
+      messages: [],
+      nextCursor: null,
+      omittedItemCount: 0,
+    });
+
+    const factory = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket,
+      fetchSnapshot: () => Promise.reject(new Error('legacy fetchSnapshot should not be called')),
+      fetchSnapshotPage,
+      websocketBaseUrl: 'ws://localhost:9999',
+    });
+
+    const transport = factory({
+      onChatEvent: () => {},
+      onServiceEvent: () => {},
+    });
+
+    transport.connect();
+    await flushPromises();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // The pre-connect ticket refresh is a legitimate trigger: it refreshes the
+    // ticket (second getTicket) but still opens exactly one WebSocket.
+    expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+    expect(getTicket).toHaveBeenCalledTimes(2);
+    expect(webSocketConstructor.mock.calls[0]?.[0]).toContain('ticket=fresh-ticket');
+
+    transport.destroy();
+  });
+});

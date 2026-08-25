@@ -4,6 +4,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { computeStatus } from './compute-status';
 
@@ -43,7 +44,7 @@ export function WorkingIndicator({ messages, isStreaming }: Readonly<WorkingIndi
   }
 
   // Find the last assistant message and its last part for status
-  let statusText = 'Considering next steps';
+  let statusText = i18n.t('agentChat.computeStatus.consideringNextSteps');
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const msg = messages[i];
     if (msg?.info.role === 'assistant' && msg.parts.length > 0) {

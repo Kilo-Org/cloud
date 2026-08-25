@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import { type SharePayload } from '@/lib/share-payload';
 
 import { type SharePayloadValidation } from './share-payload-validation';
@@ -58,10 +59,6 @@ export type ShareGateStateInput = {
   isLoading: boolean;
 };
 
-const STALE_MESSAGE = 'This share is no longer available.';
-const RETRYABLE_MESSAGE = "Couldn't load your sessions.";
-const EMPTY_MESSAGE = 'No sessions yet — start a new one to send this.';
-
 /**
  * New session is only committable once org is loaded and validation settled
  * to `ok`. Pending validation (`null`) and `all-rejected` both disable commit
@@ -90,7 +87,7 @@ export function selectShareGateState(input: ShareGateStateInput): ShareGateState
   if (shareId === '' || input.payload === null) {
     return {
       kind: 'stale-share',
-      message: STALE_MESSAGE,
+      message: i18n.t('share.staleMessage'),
       showNewSession: false,
       showRetry: false,
       showList: false,
@@ -125,7 +122,7 @@ export function selectShareGateState(input: ShareGateStateInput): ShareGateState
   if (input.storedIsError && input.storedRowCount === 0) {
     return {
       kind: 'retryable',
-      message: RETRYABLE_MESSAGE,
+      message: i18n.t('share.retryableMessage'),
       showNewSession: true,
       showRetry: true,
       showList: false,
@@ -135,7 +132,7 @@ export function selectShareGateState(input: ShareGateStateInput): ShareGateState
   if (input.storedRowCount === 0) {
     return {
       kind: 'empty',
-      message: EMPTY_MESSAGE,
+      message: i18n.t('share.emptyMessage'),
       showNewSession: true,
       showRetry: false,
       showList: false,

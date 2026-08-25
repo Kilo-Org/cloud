@@ -50,7 +50,7 @@ vi.mock('@/lib/analytics/posthog', () => ({
 }));
 
 vi.mock('@/lib/appsflyer', () => ({ resetAppsFlyerState: vi.fn(), trackEvent: vi.fn() }));
-vi.mock('@sentry/react-native', () => ({ setUser: vi.fn() }));
+vi.mock('@sentry/react-native', () => ({ setUser: vi.fn(), setTag: vi.fn() }));
 vi.mock('@/lib/telemetry/controller', () => ({ clearTelemetryDecision: vi.fn() }));
 vi.mock('@/lib/telemetry/posthog-storage', () => ({ purgePostHogPersistence: vi.fn() }));
 // sonner-native pulls in react-native at runtime, whose Flow-only `import

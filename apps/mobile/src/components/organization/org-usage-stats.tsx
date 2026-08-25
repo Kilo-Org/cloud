@@ -1,10 +1,13 @@
-import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatMoney } from '@/lib/format';
 import { useOrgUsageStats } from '@/lib/hooks/use-organization-queries';
 
 function StatTile({ label, value }: Readonly<{ label: string; value: string }>) {
@@ -31,6 +34,7 @@ type OrgUsageStatsProps = {
 
 /** "Last 30 days" eyebrow + 2x2 usage stat tile grid. Visible to all org roles. */
 export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) {
+  const { t } = useTranslation();
   const { data, isLoading, isError } = useOrgUsageStats(organizationId);
 
   // An embedded stat block has no room for a retry affordance — hide the
@@ -58,12 +62,24 @@ export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) 
     body = (
       <Animated.View entering={FadeIn.duration(200)} className="gap-3">
         <View className="flex-row gap-3">
-          <StatTile label="Cost" value={formatDollars(fromMicrodollars(data.totalCost))} />
-          <StatTile label="Requests" value={data.totalRequestCount.toLocaleString()} />
+          <StatTile
+            label={t('organization.usageStats.cost')}
+            value={formatMoney(fromMicrodollars(data.totalCost), i18n.language)}
+          />
+          <StatTile
+            label={t('organization.usageStats.requests')}
+            value={data.totalRequestCount.toLocaleString()}
+          />
         </View>
         <View className="flex-row gap-3">
-          <StatTile label="Input Tokens" value={data.totalInputTokens.toLocaleString()} />
-          <StatTile label="Output Tokens" value={data.totalOutputTokens.toLocaleString()} />
+          <StatTile
+            label={t('organization.usageStats.inputTokens')}
+            value={data.totalInputTokens.toLocaleString()}
+          />
+          <StatTile
+            label={t('organization.usageStats.outputTokens')}
+            value={data.totalOutputTokens.toLocaleString()}
+          />
         </View>
       </Animated.View>
     );
@@ -72,7 +88,7 @@ export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) 
   return (
     <Animated.View layout={LinearTransition} className="gap-3">
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        Last 30 days
+        {t('organization.usageStats.last30Days')}
       </Text>
       {body}
     </Animated.View>

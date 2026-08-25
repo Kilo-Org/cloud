@@ -10,6 +10,20 @@ import {
   userMessage,
 } from './message-bubble-test-utils';
 
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
+
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
@@ -53,6 +67,7 @@ vi.mock('./part-renderer', () => ({
 vi.mock('./part-types', () => ({
   isFilePart: () => false,
   isTextPart: () => false,
+  firstHumanText: () => '',
 }));
 vi.mock('./use-message-copy', () => ({
   useMessageCopy: () => ({ copyMessage: vi.fn() }),
@@ -153,8 +168,9 @@ describe('MessageBubble long-press details', () => {
     });
     const { MessageBubble } = await import('./message-bubble');
     const message = userMessage('m-long');
+    // MessageBubble is wrapped in React.memo; invoke its inner component.
     // eslint-disable-next-line new-cap
-    const tree = MessageBubble({ message, onLongPressDetails });
+    const tree = MessageBubble.type({ message, onLongPressDetails });
     const props = pressableProps(tree);
     expect(props).not.toBeNull();
     const handler = props === null ? undefined : props.onLongPress;

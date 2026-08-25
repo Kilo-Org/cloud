@@ -1,14 +1,20 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
 import {
+  agent_configs,
   credit_transactions,
   device_sessions,
+  kiloclaw_instances,
   kilocode_users,
   magic_link_tokens,
+  organization_memberships,
+  organizations,
   user_notification_preferences,
+  user_push_tokens,
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import type { User } from '@kilocode/db/schema';
 import { sendSignInCodeEmail } from '@/lib/email';
 import {
@@ -45,6 +51,31 @@ const mockSendDeletionConfirmation = jest.mocked(sendAccountDeletionConfirmation
 const mockSendDeletionSupportNotification = jest.mocked(sendAccountDeletionSupportNotification);
 const mockPerformGdprRemoval = jest.mocked(performGdprRemoval);
 const mockAssertUserCanBeSoftDeleted = jest.mocked(assertUserCanBeSoftDeleted);
+
+const AVAILABLE_CAPABILITY = { available: true, unavailableReason: null };
+const UNAVAILABLE_BALANCE_ALERTS = {
+  available: false,
+  unavailableReason: 'Join an organization to get balance alerts.',
+};
+const UNAVAILABLE_SECURITY_FINDINGS = {
+  available: false,
+  unavailableReason: 'Enable Kilo Security Agent on a scope to get security findings.',
+};
+const UNAVAILABLE_KILOCLAW_ACTIVITY = {
+  available: false,
+  unavailableReason: 'Start a KiloClaw instance to get KiloClaw activity.',
+};
+
+/** Capabilities for a user with no org, no Security config, and no KiloClaw instance. */
+const NO_GATES_CAPABILITIES = {
+  chatMessages: AVAILABLE_CAPABILITY,
+  agentAttention: AVAILABLE_CAPABILITY,
+  agentUpdates: AVAILABLE_CAPABILITY,
+  sessionStatus: AVAILABLE_CAPABILITY,
+  kiloclawActivity: UNAVAILABLE_KILOCLAW_ACTIVITY,
+  balanceAlerts: UNAVAILABLE_BALANCE_ALERTS,
+  securityFindings: UNAVAILABLE_SECURITY_FINDINGS,
+};
 
 let testUser: User;
 let surveyTestUser: User;
@@ -610,7 +641,9 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
+      capabilities: NO_GATES_CAPABILITIES,
     });
     // Legacy compat: agentUpdates and agentPushEnabled always share the same value.
     expect(result.agentUpdates).toBe(result.agentPushEnabled);
@@ -639,7 +672,9 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: false,
       balanceAlerts: false,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: false,
+      capabilities: NO_GATES_CAPABILITIES,
     });
     expect(result.agentUpdates).toBe(result.agentPushEnabled);
   });
@@ -656,6 +691,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: false,
     });
 
@@ -698,7 +734,9 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
+      capabilities: NO_GATES_CAPABILITIES,
     });
 
     const firstPrefs = await firstCaller.user.getNotificationPreferences();
@@ -710,7 +748,9 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: false,
+      capabilities: NO_GATES_CAPABILITIES,
     });
 
     // Setting second user's preference must not affect first user's row.
@@ -746,6 +786,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: true,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -765,6 +806,39 @@ describe('user router - notification preferences', () => {
     expect(row?.security_findings_enabled).toBe(true);
   });
 
+  it('writes only notificationPreviews and leaves the category columns untouched', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    const result = await caller.user.setNotificationPreferences({
+      notificationPreviews: 'full',
+    });
+
+    expect(result.notificationPreviews).toBe('full');
+    // All category columns stay at their DB default (true) because only the
+    // notificationPreviews key was supplied.
+    expect(result.chatMessages).toBe(true);
+    expect(result.agentAttention).toBe(true);
+    expect(result.agentUpdates).toBe(true);
+    expect(result.sessionStatus).toBe(true);
+    expect(result.kiloclawActivity).toBe(true);
+    expect(result.balanceAlerts).toBe(true);
+    expect(result.securityFindings).toBe(true);
+    expect(result.agentPushEnabled).toBe(true);
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+    expect(row?.notification_previews).toBe('full');
+    expect(row?.chat_messages_enabled).toBe(true);
+    expect(row?.agent_attention_enabled).toBe(true);
+    expect(row?.session_status_enabled).toBe(true);
+    expect(row?.kiloclaw_activity_enabled).toBe(true);
+    expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.security_findings_enabled).toBe(true);
+    expect(row?.agent_push_enabled).toBe(true);
+  });
+
   it('persists balanceAlerts and securityFindings independently via provided-only upsert', async () => {
     const caller = await createCallerForUser(firstUser.id);
 
@@ -777,6 +851,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: false,
       securityFindings: true,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -798,6 +873,7 @@ describe('user router - notification preferences', () => {
       kiloclawActivity: true,
       balanceAlerts: false,
       securityFindings: false,
+      notificationPreviews: 'generic',
       agentPushEnabled: true,
     });
 
@@ -839,6 +915,348 @@ describe('user router - notification preferences', () => {
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
+  });
+
+  it('one category toggle cannot delete unrelated subscriptions (six other categories + agent_push_enabled preserved)', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    // Seed every category OFF and the master gate OFF. A full-row overwrite
+    // would flip an unrelated subscription back ON, so this pins the
+    // provided-only partial upsert contract.
+    await db.insert(user_notification_preferences).values({
+      user_id: firstUser.id,
+      agent_push_enabled: false,
+      chat_messages_enabled: false,
+      agent_attention_enabled: false,
+      session_status_enabled: false,
+      kiloclaw_activity_enabled: false,
+      balance_alerts_enabled: false,
+      security_findings_enabled: false,
+    });
+
+    // Flip exactly one category ON.
+    const result = await caller.user.setNotificationPreferences({ balanceAlerts: true });
+    expect(result.balanceAlerts).toBe(true);
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+
+    // The single flipped column changed; every other column is untouched.
+    expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.agent_push_enabled).toBe(false);
+    expect(row?.chat_messages_enabled).toBe(false);
+    expect(row?.agent_attention_enabled).toBe(false);
+    expect(row?.session_status_enabled).toBe(false);
+    expect(row?.kiloclaw_activity_enabled).toBe(false);
+    expect(row?.security_findings_enabled).toBe(false);
+  });
+});
+
+describe('user router - notification capabilities', () => {
+  let capUser: User;
+
+  beforeAll(async () => {
+    capUser = await insertTestUser({
+      google_user_email: 'notif-caps@example.com',
+      google_user_name: 'Notif Caps',
+    });
+  });
+
+  afterEach(async () => {
+    // Remove every gate fixture so each test starts from the no-gates baseline.
+    await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.user_id, capUser.id));
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, capUser.id));
+    await db.delete(organizations).where(eq(organizations.created_by_kilo_user_id, capUser.id));
+    await db.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, capUser.id));
+    await db
+      .delete(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, capUser.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, capUser.id));
+  });
+
+  it('reports balanceAlerts unavailable with a reason when the user has no organization', async () => {
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities.balanceAlerts).toEqual(UNAVAILABLE_BALANCE_ALERTS);
+    expect(result.capabilities.kiloclawActivity).toEqual(UNAVAILABLE_KILOCLAW_ACTIVITY);
+    expect(result.capabilities.securityFindings).toEqual(UNAVAILABLE_SECURITY_FINDINGS);
+    // The four always-on categories stay available for a signed-in user.
+    expect(result.capabilities.chatMessages).toEqual(AVAILABLE_CAPABILITY);
+    expect(result.capabilities.agentAttention).toEqual(AVAILABLE_CAPABILITY);
+    expect(result.capabilities.agentUpdates).toEqual(AVAILABLE_CAPABILITY);
+    expect(result.capabilities.sessionStatus).toEqual(AVAILABLE_CAPABILITY);
+  });
+
+  it('reports securityFindings unavailable when Security is disabled everywhere', async () => {
+    // The user has an org (so balanceAlerts is available) but no Security config.
+    await createTestOrganization('cap-org', capUser.id, 0);
+
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities.balanceAlerts).toEqual(AVAILABLE_CAPABILITY);
+    expect(result.capabilities.securityFindings).toEqual(UNAVAILABLE_SECURITY_FINDINGS);
+  });
+
+  it('reports securityFindings available when the personal scope has Security enabled', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: capUser.id,
+      agent_type: 'security_scan',
+      platform: 'github',
+      config: {},
+      is_enabled: true,
+      created_by: capUser.id,
+    });
+
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities.securityFindings).toEqual(AVAILABLE_CAPABILITY);
+  });
+
+  it('reports securityFindings unavailable when the personal scope has Security disabled', async () => {
+    await db.insert(agent_configs).values({
+      owned_by_user_id: capUser.id,
+      agent_type: 'security_scan',
+      platform: 'github',
+      config: {},
+      is_enabled: false,
+      created_by: capUser.id,
+    });
+
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities.securityFindings).toEqual(UNAVAILABLE_SECURITY_FINDINGS);
+  });
+
+  it('reports kiloclawActivity unavailable when the only instance is destroyed', async () => {
+    await db.insert(kiloclaw_instances).values({
+      user_id: capUser.id,
+      sandbox_id: 'cap-sandbox-destroyed',
+      destroyed_at: '2026-01-01T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities.kiloclawActivity).toEqual(UNAVAILABLE_KILOCLAW_ACTIVITY);
+  });
+
+  it('reports every capability available when all gates are satisfied', async () => {
+    const org = await createTestOrganization('cap-org', capUser.id, 0);
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: org.id,
+      agent_type: 'security_scan',
+      platform: 'github',
+      config: {},
+      is_enabled: true,
+      created_by: capUser.id,
+    });
+    await db.insert(kiloclaw_instances).values({
+      user_id: capUser.id,
+      sandbox_id: 'cap-sandbox',
+    });
+
+    const caller = await createCallerForUser(capUser.id);
+    const result = await caller.user.getNotificationPreferences();
+
+    expect(result.capabilities).toEqual({
+      chatMessages: AVAILABLE_CAPABILITY,
+      agentAttention: AVAILABLE_CAPABILITY,
+      agentUpdates: AVAILABLE_CAPABILITY,
+      sessionStatus: AVAILABLE_CAPABILITY,
+      kiloclawActivity: AVAILABLE_CAPABILITY,
+      balanceAlerts: AVAILABLE_CAPABILITY,
+      securityFindings: AVAILABLE_CAPABILITY,
+    });
+  });
+});
+
+describe('user router - register push token', () => {
+  let tokenUser: User;
+
+  beforeAll(async () => {
+    tokenUser = await insertTestUser({
+      google_user_email: 'push-token-register@example.com',
+      google_user_name: 'Push Token Register',
+    });
+  });
+
+  afterEach(async () => {
+    await db.delete(user_push_tokens).where(eq(user_push_tokens.user_id, tokenUser.id));
+    await db
+      .delete(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, tokenUser.id));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, tokenUser.id));
+  });
+
+  it('stores the app version when provided', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-with-version]',
+      platform: 'android',
+      appVersion: '1.0.4',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.app_version).toBe('1.0.4');
+    expect(row?.platform).toBe('android');
+  });
+
+  it('stores a null app version when omitted (old client)', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-without-version]',
+      platform: 'android',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.app_version).toBeNull();
+  });
+
+  it('updates the app version on re-registration of the same token', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'ExponentPushToken[token-re-register]';
+
+    await caller.user.registerPushToken({ token, platform: 'android' });
+    await caller.user.registerPushToken({ token, platform: 'android', appVersion: '1.0.4' });
+
+    const rows = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.app_version).toBe('1.0.4');
+  });
+
+  it('stores a null locale when omitted (old client)', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-locale-omitted]',
+      platform: 'ios',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.locale).toBeNull();
+  });
+
+  it('stores the locale when provided', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerPushToken({
+      token: 'ExponentPushToken[token-locale-es]',
+      platform: 'ios',
+      locale: 'es',
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(row?.locale).toBe('es');
+  });
+
+  it('clears the locale to null on re-registration without locale', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'ExponentPushToken[token-locale-reregister]';
+
+    await caller.user.registerPushToken({ token, platform: 'ios', locale: 'es' });
+    await caller.user.registerPushToken({ token, platform: 'ios' });
+
+    const rows = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.locale).toBeNull();
+  });
+
+  it('registerPushToken and unregisterPushToken never read or write user_notification_preferences', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    // Seed a distinctive preferences row so any accidental write is visible.
+    await db.insert(user_notification_preferences).values({
+      user_id: tokenUser.id,
+      agent_push_enabled: false,
+      chat_messages_enabled: false,
+      agent_attention_enabled: false,
+      session_status_enabled: false,
+      kiloclaw_activity_enabled: false,
+      balance_alerts_enabled: false,
+      security_findings_enabled: false,
+      notification_previews: 'full',
+    });
+
+    const token = 'ExponentPushToken[token-prefs-untouched]';
+    await caller.user.registerPushToken({ token, platform: 'android' });
+
+    // Token registration must not mutate any preference column.
+    const [afterRegister] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, tokenUser.id));
+    expect(afterRegister?.agent_push_enabled).toBe(false);
+    expect(afterRegister?.chat_messages_enabled).toBe(false);
+    expect(afterRegister?.agent_attention_enabled).toBe(false);
+    expect(afterRegister?.session_status_enabled).toBe(false);
+    expect(afterRegister?.kiloclaw_activity_enabled).toBe(false);
+    expect(afterRegister?.balance_alerts_enabled).toBe(false);
+    expect(afterRegister?.security_findings_enabled).toBe(false);
+    expect(afterRegister?.notification_previews).toBe('full');
+
+    // The token row now exists, proving register ran.
+    const tokensAfterRegister = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(tokensAfterRegister).toHaveLength(1);
+
+    await caller.user.unregisterPushToken({ token });
+
+    // Token removal must not mutate any preference column either.
+    const [afterUnregister] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, tokenUser.id));
+    expect(afterUnregister?.agent_push_enabled).toBe(false);
+    expect(afterUnregister?.chat_messages_enabled).toBe(false);
+    expect(afterUnregister?.agent_attention_enabled).toBe(false);
+    expect(afterUnregister?.session_status_enabled).toBe(false);
+    expect(afterUnregister?.kiloclaw_activity_enabled).toBe(false);
+    expect(afterUnregister?.balance_alerts_enabled).toBe(false);
+    expect(afterUnregister?.security_findings_enabled).toBe(false);
+    expect(afterUnregister?.notification_previews).toBe('full');
+
+    // The token row is gone, proving unregister ran.
+    const tokensAfterUnregister = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, tokenUser.id));
+    expect(tokensAfterUnregister).toHaveLength(0);
   });
 });
 

@@ -375,6 +375,9 @@ describe('remote session transport state', () => {
       destroy: jest.fn(),
       isConnected: jest.fn(() => false),
       onConnectionChange: jest.fn(() => jest.fn()),
+      isReconnectExhausted: jest.fn(() => false),
+      onReconnectExhaustionChange: jest.fn(() => jest.fn()),
+      retryConnection: jest.fn(),
       subscribeToCliSession: jest.fn(() => jest.fn()),
       sendCommand: jest.fn(() =>
         Promise.resolve({
@@ -448,6 +451,9 @@ describe('remote session create and retry commands', () => {
       destroy: jest.fn(),
       isConnected: jest.fn(() => false),
       onConnectionChange: jest.fn(() => jest.fn()),
+      isReconnectExhausted: jest.fn(() => false),
+      onReconnectExhaustionChange: jest.fn(() => jest.fn()),
+      retryConnection: jest.fn(),
       subscribeToCliSession: jest.fn(() => jest.fn()),
       sendCommand: jest.fn<Promise<unknown>, [string, string, unknown, string?]>(() =>
         Promise.resolve({

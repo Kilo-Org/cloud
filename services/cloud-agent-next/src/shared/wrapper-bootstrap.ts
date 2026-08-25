@@ -35,6 +35,7 @@ export type WrapperBootstrapWorkspace = {
   upstreamBranch?: string;
   strictBranch?: boolean;
   preferSnapshot?: boolean;
+  requireSnapshot?: boolean;
   restoredFromBackup?: boolean;
 };
 
@@ -276,6 +277,9 @@ export function isWrapperSessionReadyRequest(value: unknown): value is WrapperSe
     workspace.restoredFromBackup !== undefined &&
     typeof workspace.restoredFromBackup !== 'boolean'
   ) {
+    return false;
+  }
+  if (workspace.requireSnapshot !== undefined && typeof workspace.requireSnapshot !== 'boolean') {
     return false;
   }
 

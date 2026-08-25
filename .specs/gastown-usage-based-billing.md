@@ -2,9 +2,8 @@
 
 ## Role of This Document
 
-This is retained design history for the Gastown producer. The authoritative rollout and
-settlement design is `fd-plans/research/container-billing-charge-and-enforce.md`; where this
-document differs from that plan, the plan wins.
+This is retained design history for the Gastown producer. It is superseded for rollout and
+settlement decisions.
 
 ## Status
 

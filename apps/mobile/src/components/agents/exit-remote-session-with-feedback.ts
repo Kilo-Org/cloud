@@ -1,12 +1,18 @@
 import { toast } from 'sonner-native';
 
-import { type AgentSessionRouterLike } from '@/components/agents/session-router-like';
+import { type Href } from 'expo-router';
+import { i18n } from '@/i18n';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
+
+/** Structural subset of Expo Router's router used for post-exit navigation. */
+type ExitRemoteSessionRouter = {
+  dismissTo: (href: Href) => void;
+};
 
 type ExitRemoteSessionWithFeedbackInput = {
   exit: () => Promise<void>;
   onAccepted: () => void;
-  router: AgentSessionRouterLike;
+  router: ExitRemoteSessionRouter;
   /**
    * The composer SubmitLock, exposed as a `{ current: boolean }` ref so the
    * retry action can re-acquire the same admission gate the initial send
@@ -23,7 +29,6 @@ type ExitRemoteSessionWithFeedbackInput = {
 };
 
 const SESSIONS_ROUTE = '/(app)/(tabs)/(2_agents)' as const;
-const SESSION_EXITED_MESSAGE = 'Session exited';
 /**
  * Pinned to the SDK's exported `REMOTE_SESSION_EXIT_NOT_SUPPORTED` constant
  * (see `apps/web/src/lib/cloud-agent-sdk/session.ts`). The barrel import is
@@ -42,8 +47,6 @@ const REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE =
 const REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE =
   'Remote session exit is unavailable for the current session';
 const REMOTE_SESSION_EXIT_UPGRADE_PREFIX = 'Remote slash commands require a newer Kilo CLI';
-const RETRY_TOAST_LABEL = 'Try again';
-const FALLBACK_ERROR_MESSAGE = 'Failed to exit session';
 
 const NON_RETRYABLE_EXIT_MESSAGES: ReadonlySet<string> = new Set([
   REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE,
@@ -71,7 +74,8 @@ export async function exitRemoteSessionWithFeedback({
     try {
       await exit();
     } catch (error) {
-      const message = error instanceof Error ? error.message : FALLBACK_ERROR_MESSAGE;
+      const message =
+        error instanceof Error ? error.message : i18n.t('agentChat.remoteSession.failedToExit');
       if (isNonRetryableExitError(message)) {
         // Fail-closed: the SDK already signalled "do not send" by rejecting
         // before any wire command. Surface the message with no CTA so the
@@ -83,7 +87,7 @@ export async function exitRemoteSessionWithFeedback({
         // the exit mutation under the same SubmitLock the initial send held.
         toast.error(message, {
           action: {
-            label: RETRY_TOAST_LABEL,
+            label: i18n.t('common.tryAgain'),
             onClick: () => {
               void (async () => {
                 try {
@@ -105,9 +109,12 @@ export async function exitRemoteSessionWithFeedback({
       throw error;
     }
 
-    toast.success(SESSION_EXITED_MESSAGE);
+    toast.success(i18n.t('agentChat.remoteSession.exited'));
     onAccepted();
-    router.replace(SESSIONS_ROUTE);
+    // `dismissTo` dispatches POP_TO, which finds the existing `(tabs)` route
+    // at the stack root and truncates the stack so a back gesture cannot
+    // return to the exited `agent-chat` route.
+    router.dismissTo(SESSIONS_ROUTE);
   };
 
   await runExit();

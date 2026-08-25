@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -8,7 +9,7 @@ import {
   isCancellableReviewStatus,
   isRetriggerableReviewStatus,
 } from '@kilocode/app-shared/code-review';
-import { formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { statusMeta } from '@/components/code-reviewer/review-list-screen';
 import { flattenCouncilFindings } from '@/components/code-reviewer/review-detail-helpers';
 import {
@@ -23,10 +24,12 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { resolveCodeReviewerOpenPrDestination } from '@/lib/code-reviewer-open-pr-destination';
 import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
+import { formatMoney } from '@/lib/format';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
 import { getPrReviewPath } from '@/lib/profile-agent-navigation';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -34,17 +37,29 @@ import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 const FINDINGS_PAGE_SIZE = 20;
 
 function confirmCancel(onConfirm: () => void) {
-  Alert.alert('Cancel review?', 'This will stop the in-progress code review.', [
-    { text: 'Keep running', style: 'cancel' },
-    { text: 'Cancel review', style: 'destructive', onPress: onConfirm },
-  ]);
+  Alert.alert(
+    i18n.t('codeReviewer.reviewDetail.cancelTitle'),
+    i18n.t('codeReviewer.reviewDetail.cancelMessage'),
+    [
+      { text: i18n.t('codeReviewer.reviewDetail.keepRunning'), style: 'cancel' },
+      {
+        text: i18n.t('codeReviewer.reviewDetail.cancelReview'),
+        style: 'destructive',
+        onPress: onConfirm,
+      },
+    ]
+  );
 }
 
 function confirmRetry(onConfirm: () => void) {
-  Alert.alert('Retry review?', 'This will re-run the code review.', [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Retry', onPress: onConfirm },
-  ]);
+  Alert.alert(
+    i18n.t('codeReviewer.reviewDetail.retryTitle'),
+    i18n.t('codeReviewer.reviewDetail.retryMessage'),
+    [
+      { text: i18n.t('common.cancel'), style: 'cancel' },
+      { text: i18n.t('common.retry'), onPress: onConfirm },
+    ]
+  );
 }
 
 export function ReviewDetailScreen({
@@ -52,6 +67,7 @@ export function ReviewDetailScreen({
   reviewId,
 }: Readonly<{ scope: string; reviewId: string }>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const { data, isLoading, isError, isFetching, error, refetch } = useReviewDetail(reviewId);
   const cancelReview = useCancelReview(scope);
@@ -61,7 +77,7 @@ export function ReviewDetailScreen({
   if (isLoading) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Review" />
+        <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
         <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
           <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
             <Skeleton className="h-14 w-full rounded-lg" />
@@ -82,7 +98,7 @@ export function ReviewDetailScreen({
     if (errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED') {
       return (
         <View className="flex-1 bg-background">
-          <ScreenHeader title="Review" />
+          <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
           <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="flex-1 pt-4">
             <QueryError variant={errorCode === 'NOT_FOUND' ? 'not-found' : 'permission'} />
           </TabScreenScrollView>
@@ -91,11 +107,11 @@ export function ReviewDetailScreen({
     }
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Review" />
+        <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
         <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="flex-1 pt-4">
           <QueryError
             variant="server"
-            title="Could not load review"
+            title={t('codeReviewer.reviewDetail.couldNotLoad')}
             onRetry={() => void refetch()}
             isRetrying={isFetching}
           />
@@ -121,19 +137,23 @@ export function ReviewDetailScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Review" eyebrow={review.repo_full_name} />
+      <ScreenHeader title={t('codeReviewer.reviewDetail.title')} eyebrow={review.repo_full_name} />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-4 pt-4">
         {/* A background poll failure must not blank out an already-loaded review. */}
         {isError && (
           <Text variant="muted" className="text-center text-xs">
-            Couldn't get the latest.
+            {t('codeReviewer.reviewDetail.couldNotGetLatest')}
           </Text>
         )}
 
         <Animated.View entering={FadeIn.duration(200)} className="gap-1">
           <Text className="text-base font-medium">{review.pr_title}</Text>
           <Text variant="muted" className="text-xs">
-            {review.repo_full_name} #{review.pr_number} by {review.pr_author}
+            {t('codeReviewer.reviewDetail.byline', {
+              repo: review.repo_full_name,
+              number: review.pr_number,
+              author: review.pr_author,
+            })}
           </Text>
         </Animated.View>
 
@@ -149,10 +169,10 @@ export function ReviewDetailScreen({
 
         {/* Findings: flattened from the council result, paginated in memory. */}
         <View className="gap-2">
-          <Text className="text-sm font-medium">Findings</Text>
+          <Text className="text-sm font-medium">{t('codeReviewer.reviewDetail.findings')}</Text>
           {visibleFindings.length === 0 ? (
             <Text variant="muted" className="text-xs">
-              No findings
+              {t('codeReviewer.reviewDetail.noFindings')}
             </Text>
           ) : (
             <View className="gap-2">
@@ -166,7 +186,7 @@ export function ReviewDetailScreen({
                     setVisibleCount(count => count + FINDINGS_PAGE_SIZE);
                   }}
                 >
-                  <Text>Show more</Text>
+                  <Text>{t('codeReviewer.reviewDetail.showMore')}</Text>
                 </Button>
               ) : null}
             </View>
@@ -179,32 +199,56 @@ export function ReviewDetailScreen({
         {/* Gate: check-run presence, review status, and threshold when set. */}
         <GateSection
           checkRunId={review.check_run_id}
+          checkRunRedacted={review.rawIdsRedacted}
           statusLabel={meta.label}
           gateThreshold={gateThreshold}
         />
 
         {/* Metadata: technical details after the outcome. */}
         <View className="gap-2">
-          <Text className="text-sm font-medium">Details</Text>
+          <Text className="text-sm font-medium">{t('codeReviewer.reviewDetail.details')}</Text>
           <View className="gap-1 rounded-lg bg-secondary p-4">
-            <MetaRow label="Branch" value={`${review.head_ref} → ${review.base_ref}`} />
-            <MetaRow label="Platform" value={reviewerPlatformLabel(review.platform)} />
-            {review.model ? <MetaRow label="Model" value={review.model} /> : null}
-            <MetaRow label="Created" value={timeAgo(parseTimestamp(review.created_at))} />
+            <MetaRow
+              label={t('codeReviewer.reviewDetail.branch')}
+              value={`${review.head_ref} → ${review.base_ref}`}
+            />
+            <MetaRow
+              label={t('codeReviewer.reviewDetail.platform')}
+              value={reviewerPlatformLabel(review.platform)}
+            />
+            {review.model ? (
+              <MetaRow label={t('codeReviewer.reviewDetail.model')} value={review.model} />
+            ) : null}
+            <MetaRow
+              label={t('codeReviewer.reviewDetail.created')}
+              value={timeAgo(parseTimestamp(review.created_at))}
+            />
             {review.started_at ? (
-              <MetaRow label="Started" value={timeAgo(parseTimestamp(review.started_at))} />
+              <MetaRow
+                label={t('codeReviewer.reviewDetail.started')}
+                value={timeAgo(parseTimestamp(review.started_at))}
+              />
             ) : null}
             {review.completed_at ? (
-              <MetaRow label="Completed" value={timeAgo(parseTimestamp(review.completed_at))} />
+              <MetaRow
+                label={t('codeReviewer.reviewDetail.completed')}
+                value={timeAgo(parseTimestamp(review.completed_at))}
+              />
             ) : null}
             {review.total_cost_musd != null && review.total_cost_musd > 0 ? (
               <MetaRow
-                label="Cost"
-                value={formatDollars(fromMicrodollars(review.total_cost_musd))}
+                label={t('codeReviewer.reviewDetail.cost')}
+                value={formatMoney(fromMicrodollars(review.total_cost_musd), i18n.language)}
               />
             ) : null}
             {tokenUsage.input > 0 || tokenUsage.output > 0 ? (
-              <MetaRow label="Tokens" value={`${tokenUsage.input} in / ${tokenUsage.output} out`} />
+              <MetaRow
+                label={t('codeReviewer.reviewDetail.tokens')}
+                value={t('codeReviewer.reviewDetail.tokensInOut', {
+                  input: tokenUsage.input,
+                  output: tokenUsage.output,
+                })}
+              />
             ) : null}
           </View>
         </View>
@@ -224,10 +268,12 @@ export function ReviewDetailScreen({
                 );
                 return;
               }
-              void openExternalUrl(review.pr_url, { label: 'pull request' });
+              void openExternalUrl(review.pr_url, {
+                label: t('codeReviewer.reviewDetail.pullRequest'),
+              });
             }}
           >
-            <Text>Open pull request</Text>
+            <Text>{t('codeReviewer.reviewDetail.openPullRequest')}</Text>
           </Button>
 
           {canCancel ? (
@@ -247,7 +293,7 @@ export function ReviewDetailScreen({
                 });
               }}
             >
-              <Text>Cancel review</Text>
+              <Text>{t('codeReviewer.reviewDetail.cancelReview')}</Text>
             </Button>
           ) : null}
 
@@ -268,7 +314,7 @@ export function ReviewDetailScreen({
                 });
               }}
             >
-              <Text>Retry review</Text>
+              <Text>{t('codeReviewer.reviewDetail.retryReview')}</Text>
             </Button>
           ) : null}
         </View>

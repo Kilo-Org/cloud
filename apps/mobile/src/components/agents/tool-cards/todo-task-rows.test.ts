@@ -1,10 +1,18 @@
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import type * as ReactI18next from 'react-i18next';
 
 import { type TodoTask } from '../tool-list-model';
 import { TodoTaskRows } from './todo-task-rows';
 
 vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => ({ t: (key: string) => key }),
+  };
+});
 vi.mock('@/components/ui/icons', () => ({
   Circle: 'Circle',
   CircleCheck: 'CircleCheck',
@@ -145,7 +153,9 @@ describe('TodoTaskRows', () => {
   it('shows the Truncated marker when truncated', () => {
     const root = render([makeTask({})], true);
     const labels = findByType(root, 'Text').filter(
-      el => (el.props as { accessibilityLabel?: string }).accessibilityLabel === 'Content truncated'
+      el =>
+        (el.props as { accessibilityLabel?: string }).accessibilityLabel ===
+        'agentChat.toolCard.contentTruncated'
     );
     expect(labels).toHaveLength(1);
   });
@@ -153,7 +163,9 @@ describe('TodoTaskRows', () => {
   it('omits the Truncated marker when not truncated', () => {
     const root = render([makeTask({})], false);
     const labels = findByType(root, 'Text').filter(
-      el => (el.props as { accessibilityLabel?: string }).accessibilityLabel === 'Content truncated'
+      el =>
+        (el.props as { accessibilityLabel?: string }).accessibilityLabel ===
+        'agentChat.toolCard.contentTruncated'
     );
     expect(labels).toHaveLength(0);
   });

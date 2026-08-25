@@ -1,7 +1,11 @@
+/* eslint-disable max-lines -- cohesive suite for merge draft save, restore, clear, and settle-gate contracts */
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as Haptics from 'expo-haptics';
+
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
 import { PrMergeSheet } from './pr-merge-sheet';
 import {
   __resetMergePartialSuccessStoreForTests,
@@ -9,6 +13,18 @@ import {
 } from '@/lib/pr-review/merge/merge-result-banner-store';
 import { type PrOverviewRepoSettings } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import { MergeNotCompletedError } from '@/lib/pr-review/merge/merge-result-error';
+import { clearDraft } from '@/lib/persist/drafts';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
 const mergeMutationMocks = vi.hoisted(() => ({
   mutateAsync: vi.fn<() => Promise<unknown>>(),
@@ -121,6 +137,33 @@ vi.mock('@/lib/pr-review/merge/merge-commit-defaults', () => ({
   defaultCommitTitle: (title: string, number: number) =>
     `Merge pull request #${number} from ${title}`,
   defaultCommitMessage: () => '',
+}));
+
+// The sheet imports the durable-draft chain, which pulls in the native
+// encrypted-kv → expo-secure-store → expo-modules-core chain that the node
+// test environment cannot resolve. Mock the persist chain and the identity
+// hook so this suite stays node-only.
+vi.mock('@/lib/persist/drafts', () => ({
+  saveDraft: vi.fn(),
+  clearDraft: vi.fn(),
+  isMergeDraft: vi.fn(),
+  prMergeDraftKey: vi.fn(
+    (owner: string, repo: string, number: number) => `pr-merge:${owner}/${repo}#${number}`
+  ),
+  prReplyDraftKey: vi.fn(),
+  prCommentDraftKey: vi.fn(),
+}));
+
+vi.mock('@/lib/persist/use-draft-load', () => ({
+  useFencedDraftLoad: () => ({ settled: true, value: null }),
+}));
+
+vi.mock('@/lib/persist/use-draft-flush', () => ({
+  useDraftFlushOnBackground: () => undefined,
+}));
+
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'u1', isLoading: false }),
 }));
 
 const REF = { owner: 'octocat', repo: 'hello', number: 1 };
@@ -256,6 +299,7 @@ describe('PrMergeSheet performSubmit wiring (P0-B-08)', () => {
     );
     expect(onRefetch).toHaveBeenCalledTimes(1);
     expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(clearDraft).toHaveBeenCalledWith('u1', 'pr-merge:octocat/hello#1');
   });
 
   it('clean success (merged:true + branchDeleted:true) fires haptic and dismisses without writing a banner', async () => {
@@ -278,6 +322,7 @@ describe('PrMergeSheet performSubmit wiring (P0-B-08)', () => {
     );
     expect(onRefetch).toHaveBeenCalledTimes(1);
     expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(clearDraft).toHaveBeenCalledWith('u1', 'pr-merge:octocat/hello#1');
   });
 
   it('rejected mutation (merged:false) does not fire haptic, refetch, dismiss, or write a banner', async () => {
@@ -294,5 +339,52 @@ describe('PrMergeSheet performSubmit wiring (P0-B-08)', () => {
     expect(Haptics.notificationAsync).not.toHaveBeenCalled();
     expect(onRefetch).not.toHaveBeenCalled();
     expect(onDismiss).not.toHaveBeenCalled();
+    expect(clearDraft).not.toHaveBeenCalled();
+  });
+
+  it('confirmed cancel clears the draft and dismisses', () => {
+    const onDismiss = vi.fn();
+    const props = { ...baseProps, onDismiss };
+    // eslint-disable-next-line new-cap
+    const element = PrMergeSheet(props);
+    const formBody = findElement({
+      node: element,
+      type: 'MergeSheetFormBody',
+      prop: 'submitLabel',
+      value: 'Merge',
+    });
+    if (!formBody) {
+      throw new Error('MergeSheetFormBody not found in rendered tree');
+    }
+    const onDismissProp = (formBody.props as { onDismiss?: () => void }).onDismiss;
+    onDismissProp?.();
+    expect(clearDraft).toHaveBeenCalledWith('u1', 'pr-merge:octocat/hello#1');
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('auto-merge enable success clears the draft and dismisses', async () => {
+    const onDismiss = vi.fn();
+    const onRefetch = vi.fn().mockResolvedValue(undefined);
+    const props = { ...baseProps, mode: 'enable-auto-merge' as const, onDismiss, onRefetch };
+
+    autoMergeMutationMocks.mutateAsync.mockResolvedValueOnce({});
+
+    // eslint-disable-next-line new-cap
+    const element = PrMergeSheet(props);
+    const formBody = findElement({
+      node: element,
+      type: 'MergeSheetFormBody',
+      prop: 'submitLabel',
+      value: 'Enable auto-merge',
+    });
+    if (!formBody) {
+      throw new Error('MergeSheetFormBody not found in rendered tree');
+    }
+    const onConfirm = (formBody.props as { onConfirm?: () => void }).onConfirm;
+    onConfirm?.();
+    await flushMicrotasks();
+
+    expect(clearDraft).toHaveBeenCalledWith('u1', 'pr-merge:octocat/hello#1');
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,6 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   cloudBillingSkuRateSchema,
+  cloudBillingAmountMicrodollars,
+  formatMicrodollars,
   multiplyCloudBillingRate,
   normalizeCloudBillingSkuRate,
 } from '@/lib/cloud-billing-sku';
@@ -64,5 +66,12 @@ describe('multiplyCloudBillingRate', () => {
 
   it('validates the rate before multiplying', () => {
     expect(() => multiplyCloudBillingRate('0.0000000000001', 60)).toThrow();
+  });
+});
+
+describe('cloud billing amount formatting', () => {
+  it('floors exact fractional cents to the ledger microdollar amount', () => {
+    expect(cloudBillingAmountMicrodollars('0.123456789012', 3)).toBe(3_703);
+    expect(formatMicrodollars(3_703)).toBe('$0.003703');
   });
 });

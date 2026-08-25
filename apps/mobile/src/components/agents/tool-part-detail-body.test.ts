@@ -1,6 +1,7 @@
 import { type FilePart, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as ReactI18next from 'react-i18next';
 
 import { ToolPartDetailBody } from './tool-part-detail-body';
 import {
@@ -20,6 +21,13 @@ import {
 import { BashToolCardBody as RealBashToolCardBody } from './tool-cards/bash-tool-card';
 
 vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => ({ t: (key: string) => key }),
+  };
+});
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/selectable-text', () => ({ SelectableText: 'SelectableText' }));
 vi.mock('@/components/ui/icons', () => ({ Terminal: 'Terminal' }));
@@ -255,20 +263,20 @@ describe('ToolPartDetailBody status line', () => {
   it('renders the Running… status line for a running part', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = ToolPartDetailBody({ part: makeToolPart('bash', runningState) });
-    expect(findAll(root, el => el.type === 'Text' && textChildren(el) === 'Running…')).toHaveLength(
-      1
-    );
-    expect(findAll(root, el => el.type === 'Text' && textChildren(el) === 'Pending…')).toHaveLength(
-      0
-    );
+    expect(
+      findAll(root, el => el.type === 'Text' && textChildren(el) === 'agentChat.partDetail.running')
+    ).toHaveLength(1);
+    expect(
+      findAll(root, el => el.type === 'Text' && textChildren(el) === 'agentChat.partDetail.pending')
+    ).toHaveLength(0);
   });
 
   it('renders the Pending… status line for a pending part', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = ToolPartDetailBody({ part: makeToolPart('bash', pendingState) });
-    expect(findAll(root, el => el.type === 'Text' && textChildren(el) === 'Pending…')).toHaveLength(
-      1
-    );
+    expect(
+      findAll(root, el => el.type === 'Text' && textChildren(el) === 'agentChat.partDetail.pending')
+    ).toHaveLength(1);
   });
 
   it('renders no status line for a completed part', () => {
@@ -277,7 +285,9 @@ describe('ToolPartDetailBody status line', () => {
     const statusLines = findAll(
       root,
       el =>
-        el.type === 'Text' && (textChildren(el) === 'Pending…' || textChildren(el) === 'Running…')
+        el.type === 'Text' &&
+        (textChildren(el) === 'agentChat.partDetail.pending' ||
+          textChildren(el) === 'agentChat.partDetail.running')
     );
     expect(statusLines).toHaveLength(0);
   });
@@ -288,7 +298,9 @@ describe('ToolPartDetailBody status line', () => {
     const statusLines = findAll(
       root,
       el =>
-        el.type === 'Text' && (textChildren(el) === 'Pending…' || textChildren(el) === 'Running…')
+        el.type === 'Text' &&
+        (textChildren(el) === 'agentChat.partDetail.pending' ||
+          textChildren(el) === 'agentChat.partDetail.running')
     );
     expect(statusLines).toHaveLength(0);
   });

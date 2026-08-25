@@ -5,10 +5,10 @@ import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-comman
 
 import {
   createMobileSlashCommandList,
+  getLocalClearSlashCommand,
+  getLocalNewSlashCommand,
   getSlashCommandCandidate,
   getSlashCommandSuggestions,
-  LOCAL_CLEAR_SLASH_COMMAND,
-  LOCAL_NEW_SLASH_COMMAND,
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 
@@ -28,18 +28,18 @@ function remoteState(overrides: Partial<RemoteCommandState> = {}): RemoteCommand
 describe('createMobileSlashCommandList', () => {
   it('returns the live CLI catalog with reserved /new injected', () => {
     const list = createMobileSlashCommandList('remote', SAMPLE_COMMANDS, remoteState());
-    expect(list).toEqual([...SAMPLE_COMMANDS, LOCAL_NEW_SLASH_COMMAND]);
+    expect(list).toEqual([...SAMPLE_COMMANDS, getLocalNewSlashCommand()]);
   });
 
   it('strips any CLI-reported /new and /clear before injecting the local reserved ones', () => {
     const list = createMobileSlashCommandList(
       'remote',
-      [COMPACT, LOCAL_NEW_SLASH_COMMAND, LOCAL_CLEAR_SLASH_COMMAND],
+      [COMPACT, getLocalNewSlashCommand(), getLocalClearSlashCommand()],
       remoteState({
-        commands: [COMPACT, LOCAL_NEW_SLASH_COMMAND, LOCAL_CLEAR_SLASH_COMMAND],
+        commands: [COMPACT, getLocalNewSlashCommand(), getLocalClearSlashCommand()],
       })
     );
-    expect(list.filter(command => command.name === 'new')).toEqual([LOCAL_NEW_SLASH_COMMAND]);
+    expect(list.filter(command => command.name === 'new')).toEqual([getLocalNewSlashCommand()]);
     expect(list.filter(command => command.name === 'clear')).toEqual([]);
     expect(list[0]).toBe(COMPACT);
   });
@@ -50,7 +50,7 @@ describe('createMobileSlashCommandList', () => {
       [],
       remoteState({ commands: [], refresh: 'idle' })
     );
-    expect(list).toEqual([LOCAL_NEW_SLASH_COMMAND]);
+    expect(list).toEqual([getLocalNewSlashCommand()]);
   });
 
   it('exposes reserved /new when the remote catalog is empty and upgrade-required', () => {
@@ -59,7 +59,7 @@ describe('createMobileSlashCommandList', () => {
       [],
       remoteState({ commands: [], refresh: 'upgrade-required', message: 'Please upgrade your CLI' })
     );
-    expect(list).toEqual([LOCAL_NEW_SLASH_COMMAND]);
+    expect(list).toEqual([getLocalNewSlashCommand()]);
     expect(list.some(command => command.name === 'compact')).toBe(false);
   });
 
@@ -151,7 +151,7 @@ describe('parseChatComposerSubmission — happy path', () => {
 
   it('routes /new with no arguments to create-session', () => {
     expect(
-      parseChatComposerSubmission('/new', [...SAMPLE_COMMANDS, LOCAL_NEW_SLASH_COMMAND], {
+      parseChatComposerSubmission('/new', [...SAMPLE_COMMANDS, getLocalNewSlashCommand()], {
         hasAttachments: false,
         sessionType: 'remote',
         remoteCommandState: remoteState(),
@@ -183,7 +183,7 @@ describe('parseChatComposerSubmission — attachment errors', () => {
 
   it('rejects attachments for /new create-session', () => {
     expect(
-      parseChatComposerSubmission('/new', [...SAMPLE_COMMANDS, LOCAL_NEW_SLASH_COMMAND], {
+      parseChatComposerSubmission('/new', [...SAMPLE_COMMANDS, getLocalNewSlashCommand()], {
         hasAttachments: true,
         sessionType: 'remote',
         remoteCommandState: remoteState(),
@@ -205,7 +205,7 @@ describe('parseChatComposerSubmission — attachment errors', () => {
 describe('parseChatComposerSubmission — argument errors', () => {
   it('rejects /new with any argument text', () => {
     expect(
-      parseChatComposerSubmission('/new extra', [...SAMPLE_COMMANDS, LOCAL_NEW_SLASH_COMMAND], {
+      parseChatComposerSubmission('/new extra', [...SAMPLE_COMMANDS, getLocalNewSlashCommand()], {
         hasAttachments: false,
         sessionType: 'remote',
         remoteCommandState: remoteState(),
@@ -230,7 +230,7 @@ describe('parseChatComposerSubmission — upgrade-required', () => {
 
   it('returns upgrade-required for the reserved /new command when the CLI must upgrade', () => {
     expect(
-      parseChatComposerSubmission('/new', [...SAMPLE_COMMANDS, LOCAL_NEW_SLASH_COMMAND], {
+      parseChatComposerSubmission('/new', [...SAMPLE_COMMANDS, getLocalNewSlashCommand()], {
         hasAttachments: false,
         sessionType: 'remote',
         remoteCommandState: remoteState({

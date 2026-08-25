@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Submit-review, share, and inset reachability tests share the direct-invocation screen harness. */
 // P1-F-46b: the "Submit review" affordance must be reachable from the
 // Overview tab (header right) and the Files tab (floating action bar,
 // see `pr-diff-floating-actions.test.tsx`). The Discussion tab is
@@ -13,8 +14,21 @@
 import * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
 import { PrReviewScreen } from './pr-review-screen';
 import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
 const routerPush = vi.fn();
 const routerBack = vi.fn();
@@ -128,6 +142,9 @@ vi.mock('@/components/pr-review/pr-review-overview', () => ({
 }));
 vi.mock('@/components/pr-review/pr-review-tab-selector', () => ({
   PrReviewTabSelector: 'PrReviewTabSelector',
+}));
+vi.mock('@/components/detail-screen', () => ({
+  DetailScreenScrollView: 'DetailScreenScrollView',
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -310,5 +327,49 @@ describe('PrReviewScreen share action', () => {
     expect(shareMock).toHaveBeenCalledWith({
       message: 'Fix the thing\nhttps://github.com/octocat/hello/pull/7',
     });
+  });
+});
+
+describe('PrReviewScreen Overview bottom inset (plan §6)', () => {
+  beforeEach(() => {
+    prQueryResult = {
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      isFetching: false,
+    };
+  });
+
+  function findOverviewScroll(): React.ReactElement | null {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    return findElement({
+      node: element,
+      type: 'DetailScreenScrollView',
+      prop: 'contentContainerClassName',
+      value: 'gap-5 px-4',
+    });
+  }
+
+  it('renders the Overview body inside DetailScreenScrollView', () => {
+    expect(findOverviewScroll()).not.toBeNull();
+  });
+
+  it('drops the fixed pb-12 clearance from the Overview scroll container', () => {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const scroll = findElement({
+      node: element,
+      type: 'DetailScreenScrollView',
+      prop: 'contentContainerClassName',
+      value: 'gap-5 px-4',
+    });
+    expect(scroll).not.toBeNull();
+    if (!scroll) {
+      throw new Error('Overview scroll not found');
+    }
+    const className = (scroll.props as { contentContainerClassName?: string })
+      .contentContainerClassName;
+    expect(className).not.toContain('pb-12');
   });
 });

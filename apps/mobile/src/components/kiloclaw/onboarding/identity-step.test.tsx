@@ -1,7 +1,20 @@
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
 import { IdentityStep } from './identity-step';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
 const locationMocks = vi.hoisted(() => ({
   requestForegroundPermissionsAsync: vi.fn<() => Promise<{ status: string }>>(),
@@ -135,7 +148,13 @@ describe('IdentityStep GPS error reporting', () => {
     await vi.waitFor(() => {
       expect(Sentry.captureException).toHaveBeenCalledTimes(1);
     });
-    expect(vi.mocked(Sentry.captureException).mock.calls[0]?.[0]).toBe(validateError);
+    expect(Sentry.captureException).toHaveBeenCalledWith(validateError, {
+      tags: {
+        'error.subsystem': 'kiloclaw-onboarding',
+        'error.operation': 'validate-gps-location',
+      },
+      extra: { coordinatePrecision: 2 },
+    });
   });
 
   it.each(['timeout', 'Location request failed due to unsatisfied device settings'])(

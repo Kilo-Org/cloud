@@ -1,4 +1,5 @@
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
@@ -38,13 +39,15 @@ export function ActiveNowSection({
   organizationIdBySessionId,
   onSessionPress,
 }: Readonly<ActiveNowSectionProps>) {
+  const { t } = useTranslation();
+
   if (pinned.length === 0) {
     return null;
   }
 
   return (
     <View testID="agents-active-now-section" className="bg-background">
-      <SessionListSectionHeader title="Active now" count={pinned.length} />
+      <SessionListSectionHeader title={t('agents.activeNow')} count={pinned.length} />
       {pinned.map(session => (
         <RemoteSessionRow
           key={session.id}

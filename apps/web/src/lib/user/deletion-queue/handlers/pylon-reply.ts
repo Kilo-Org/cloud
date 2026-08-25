@@ -7,9 +7,10 @@ import {
 } from '@kilocode/db/schema-types';
 import { db } from '@/lib/drizzle';
 import { getEnvVariable } from '@/lib/dotenvx';
-import { USER_DELETION_PYLON_REPLY_TEXT } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_PYLON_REPLY_HTML } from '@/lib/user/deletion-queue/deletion-constants';
 import {
   deletionEmailsEqual,
+  isInternalOrRelayEmail,
   normalizeDeletionEmail,
 } from '@/lib/user/deletion-queue/deletion-intake';
 import type {
@@ -36,8 +37,6 @@ import {
 type PylonIssue = {
   id: string;
   requesterEmail: string | null;
-  source: string | null;
-  state: string | null;
 };
 
 type PylonMessage = {
@@ -47,6 +46,7 @@ type PylonMessage = {
   timestamp: string | null;
   threadId: string | null;
   authorUserId: string | null;
+  authorUserEmail: string | null;
   toEmails: string[];
   ccEmails: string[];
   bccEmails: string[];
@@ -63,8 +63,6 @@ function parseIssue(payload: unknown): PylonIssue | null {
   return {
     id,
     requesterEmail: requester ? asNonEmptyString(requester.email) : null,
-    source: asNonEmptyString(data.source),
-    state: asNonEmptyString(data.state),
   };
 }
 
@@ -93,6 +91,7 @@ function parseMessage(entry: unknown): PylonMessage | null {
     timestamp: asNonEmptyString(entry.timestamp),
     threadId: asNonEmptyString(entry.thread_id),
     authorUserId: authorUser ? asNonEmptyString(authorUser.id) : null,
+    authorUserEmail: authorUser ? asNonEmptyString(authorUser.email) : null,
     toEmails: emailInfo ? emailList(emailInfo.to_emails) : [],
     ccEmails: emailInfo ? emailList(emailInfo.cc_emails) : [],
     bccEmails: emailInfo ? emailList(emailInfo.bcc_emails) : [],
@@ -125,7 +124,46 @@ function normalizeMessageHtml(html: string): string {
 }
 
 function expectedReplyHtml(): string {
-  return normalizeMessageHtml(`<p>${USER_DELETION_PYLON_REPLY_TEXT}</p>`);
+  return normalizeMessageHtml(USER_DELETION_PYLON_REPLY_HTML);
+}
+
+function externalEmailFromMessage(message: PylonMessage): string | null {
+  const fromEmail = message.fromEmail ? normalizeDeletionEmail(message.fromEmail) : null;
+  if (fromEmail && isInternalOrRelayEmail(fromEmail)) {
+    for (const value of message.toEmails) {
+      if (!isInternalOrRelayEmail(value)) return normalizeDeletionEmail(value);
+    }
+  }
+
+  for (const value of [message.contactEmail, message.fromEmail, message.authorUserEmail]) {
+    if (value && !isInternalOrRelayEmail(value)) return normalizeDeletionEmail(value);
+  }
+  return null;
+}
+
+function messageTouchesEmail(message: PylonMessage, email: string): boolean {
+  return (
+    (message.contactEmail !== null && deletionEmailsEqual(message.contactEmail, email)) ||
+    (message.fromEmail !== null && deletionEmailsEqual(message.fromEmail, email)) ||
+    messageAddressedToEmail(message, email)
+  );
+}
+
+function latestPublicCustomerMessage(messages: PylonMessage[]): PylonMessage | undefined {
+  return messages
+    .filter(message => !message.isPrivate && externalEmailFromMessage(message) !== null)
+    .at(-1);
+}
+
+function sortMessagesByTimestamp(messages: PylonMessage[]): PylonMessage[] {
+  return [...messages].sort((a, b) => {
+    const aTime = a.timestamp ? Date.parse(a.timestamp) : Number.NaN;
+    const bTime = b.timestamp ? Date.parse(b.timestamp) : Number.NaN;
+    if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0;
+    if (Number.isNaN(aTime)) return 1;
+    if (Number.isNaN(bTime)) return -1;
+    return aTime - bTime;
+  });
 }
 
 function messageThreadKey(message: PylonMessage): string | undefined {
@@ -144,9 +182,9 @@ function customerThreadKeysForEmail(messages: PylonMessage[], email: string): Se
     messages
       .filter(message => {
         if (message.isPrivate) return false;
-        const contact = message.contactEmail ? normalizeDeletionEmail(message.contactEmail) : null;
-        const from = message.fromEmail ? normalizeDeletionEmail(message.fromEmail) : null;
-        return contact === target || from === target || messageAddressedToEmail(message, email);
+        return (
+          externalEmailFromMessage(message) === target || messageAddressedToEmail(message, email)
+        );
       })
       .map(messageThreadKey)
       .filter((threadKey): threadKey is string => Boolean(threadKey))
@@ -248,7 +286,7 @@ async function fetchAllMessages(
     messages.push(...page.messages);
     cursor = page.nextCursor;
   } while (cursor);
-  return { messages };
+  return { messages: sortMessagesByTimestamp(messages) };
 }
 
 function requestNotBefore(createdAt: string): Date {
@@ -287,16 +325,6 @@ export const handlePylonReply: DeletionHandler = async ({ request, step, context
   if (!issue) {
     return { kind: 'needs_attention', errorCode: 'pylon_issue_unparsed' };
   }
-  if (!issue.requesterEmail) {
-    return { kind: 'needs_attention', errorCode: 'pylon_issue_requester_missing' };
-  }
-  if (!deletionEmailsEqual(issue.requesterEmail, emailOrOutcome)) {
-    return {
-      kind: 'needs_attention',
-      errorCode: 'pylon_issue_identity_mismatch',
-      resourceHmac: resourceHmac(issue.id),
-    };
-  }
 
   let progress = step.progress_json;
   const notBefore = requestNotBefore(request.created_at);
@@ -307,6 +335,22 @@ export const handlePylonReply: DeletionHandler = async ({ request, step, context
   if (progress.reply_state !== UserDeletionPylonReplyState.Posted || !progress.reply_message_id) {
     const listed = await fetchAllMessages(context, config.apiKey, issue.id);
     if ('outcome' in listed) return listed.outcome;
+
+    const replyTarget = latestPublicCustomerMessage(listed.messages);
+    const requesterIsTarget =
+      issue.requesterEmail !== null && deletionEmailsEqual(issue.requesterEmail, emailOrOutcome);
+    const targetOnLatestCustomer =
+      replyTarget !== undefined && messageTouchesEmail(replyTarget, emailOrOutcome);
+    if (!requesterIsTarget && !targetOnLatestCustomer) {
+      return {
+        kind: 'needs_attention',
+        errorCode: issue.requesterEmail
+          ? 'pylon_issue_identity_mismatch'
+          : 'pylon_issue_requester_missing',
+        resourceHmac: resourceHmac(issue.id),
+      };
+    }
+
     const existing = findMatchingDeletionReply(listed.messages, emailOrOutcome, notBefore);
     if (existing) {
       progress = postedProgress(progress, existing.id);
@@ -315,8 +359,7 @@ export const handlePylonReply: DeletionHandler = async ({ request, step, context
     } else if (mustReconcile) {
       return { kind: 'needs_attention', errorCode: 'pylon_reply_inconclusive' };
     } else {
-      const thread = listed.messages.find(message => !message.isPrivate);
-      if (!thread) {
+      if (!replyTarget) {
         return { kind: 'needs_attention', errorCode: 'pylon_reply_thread_missing' };
       }
 
@@ -328,12 +371,10 @@ export const handlePylonReply: DeletionHandler = async ({ request, step, context
       if (lostBeforePost) return lostBeforePost;
 
       const body: Record<string, unknown> = {
-        body_html: `<p>${USER_DELETION_PYLON_REPLY_TEXT}</p>`,
-        message_id: thread.threadId ?? thread.id,
+        body_html: USER_DELETION_PYLON_REPLY_HTML,
+        message_id: replyTarget.threadId ?? replyTarget.id,
+        email_info: { to_emails: [emailOrOutcome] },
       };
-      if (issue.source === 'email') {
-        body.email_info = { to_emails: [emailOrOutcome] };
-      }
 
       const post = await pylonRequest(
         context,
@@ -378,27 +419,8 @@ export const handlePylonReply: DeletionHandler = async ({ request, step, context
     }
   }
 
-  if (!progress.close_confirmed && issue.state !== 'closed') {
-    const reserve = continueIfLowTime(context, progress);
-    if (reserve) return reserve;
-
-    const close = await pylonRequest(
-      context,
-      config.apiKey,
-      `/issues/${encodeURIComponent(issue.id)}`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ state: 'closed' }),
-      }
-    );
-    if ('outcome' in close) return close.outcome;
-    if (!close.response.ok && close.response.status !== 404) {
-      return classifyResponse(close.response);
-    }
-  }
-
   return {
     kind: 'succeeded',
-    progress: { ...progress, close_confirmed: true },
+    progress,
   };
 };

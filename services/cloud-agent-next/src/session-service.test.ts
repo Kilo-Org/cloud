@@ -85,6 +85,7 @@ import {
   writeGlobalRules,
 } from './session-service.js';
 import type { CloudAgentSessionState, PersistenceEnv } from './persistence/types.js';
+import type { CreateSessionForCloudAgentResult } from '@kilocode/session-ingest-contracts';
 import {
   parseSessionMetadata,
   type CredentialContainment,
@@ -124,6 +125,53 @@ describe('SessionService.buildRuntimeEnv', () => {
     expect(runtimeEnv.HOME).toBe('/home/agent_test');
     expect(runtimeEnv.SESSION_HOME).toBe('/home/agent_test');
     expect(runtimeEnv[PNPM_STORE_ENV_VAR]).toBe(PNPM_STORE_DIR);
+    expect(runtimeEnv.GIT_CONFIG_COUNT).toBe('2');
+    expect(runtimeEnv.GIT_CONFIG_KEY_0).toBe('credential.helper');
+    expect(runtimeEnv.GIT_CONFIG_VALUE_0).toBe('/opt/kilo-cloud/kilo-git-credential');
+    expect(runtimeEnv.GIT_CONFIG_KEY_1).toBe('credential.useHttpPath');
+    expect(runtimeEnv.GIT_CONFIG_VALUE_1).toBe('false');
+    expect(runtimeEnv.GIT_TERMINAL_PROMPT).toBe('0');
+    expect(runtimeEnv.GIT_CONFIG_NOSYSTEM).toBeUndefined();
+    expect(runtimeEnv.GIT_CONFIG_GLOBAL).toBeUndefined();
+    expect(runtimeEnv.GIT_OPTIONAL_LOCKS).toBeUndefined();
+  });
+
+  it('wins over a profile that tries to override the git credential helper', () => {
+    const service = new SessionService();
+    const context = service.buildContext({
+      sandboxId: 'usr-test',
+      userId: 'user_test',
+      sessionId: 'agent_test',
+      envVars: {
+        GIT_CONFIG_COUNT: '99',
+        GIT_CONFIG_KEY_0: 'user.email',
+        GIT_CONFIG_VALUE_0: 'attacker@example.com',
+        GIT_CONFIG_KEY_1: 'credential.helper',
+        GIT_CONFIG_VALUE_1: '/tmp/evil-helper',
+        GIT_CONFIG_KEY_2: 'credential.helper',
+        GIT_CONFIG_VALUE_2: '/tmp/second-evil-helper',
+        GIT_CONFIG_GLOBAL: '/tmp/evil.gitconfig',
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_TERMINAL_PROMPT: '1',
+      },
+    });
+
+    const runtimeEnv = service.buildRuntimeEnv({
+      context,
+      env: createEnv(),
+      kiloCapability: 'kilo-token',
+    });
+
+    expect(runtimeEnv.GIT_CONFIG_COUNT).toBe('2');
+    expect(runtimeEnv.GIT_CONFIG_KEY_0).toBe('credential.helper');
+    expect(runtimeEnv.GIT_CONFIG_VALUE_0).toBe('/opt/kilo-cloud/kilo-git-credential');
+    expect(runtimeEnv.GIT_CONFIG_KEY_1).toBe('credential.useHttpPath');
+    expect(runtimeEnv.GIT_CONFIG_VALUE_1).toBe('false');
+    expect(runtimeEnv.GIT_TERMINAL_PROMPT).toBe('0');
+    expect(runtimeEnv.GIT_CONFIG_KEY_2).toBeUndefined();
+    expect(runtimeEnv.GIT_CONFIG_VALUE_2).toBeUndefined();
+    expect(runtimeEnv.GIT_CONFIG_GLOBAL).toBeUndefined();
+    expect(runtimeEnv.GIT_CONFIG_NOSYSTEM).toBeUndefined();
   });
 });
 
@@ -504,6 +552,31 @@ function createBitbucketMetadata(
 
 const BITBUCKET_SANDBOX_ID = 'ses-bitbucket' as SandboxId;
 
+function createCloneMetadata(): CloudAgentSessionState {
+  return parseSessionMetadata({
+    metadataSchemaVersion: 2,
+    identity: {
+      sessionId: 'agent_test',
+      userId: 'user_test',
+      createdOnPlatform: 'cloud-agent-web',
+    },
+    auth: {
+      kilocodeToken: 'kilo-token',
+      kiloSessionId: 'kilo-session',
+    },
+    repository: {
+      type: 'gitlab',
+      url: 'https://gitlab.com/acme/repo.git',
+      platform: 'gitlab',
+    },
+    clone: {
+      cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+    },
+    agent: { mode: 'code', model: 'kilo/test-model' },
+    lifecycle: { version: 1, timestamp: 1 },
+  });
+}
+
 describe('SessionService.resolveWorkspaceTokens', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -719,6 +792,184 @@ describe('SessionService.prepareWorkspace', () => {
       gitToken: 'resolved-gitlab-token',
       gitlabTokenManaged: true,
     });
+  });
+
+  it('restores the destination snapshot for clone metadata on first preparation', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    const progress = vi.fn();
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'ses-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata: createCloneMetadata(),
+      kilocodeModel: 'test-model',
+      onProgress: progress,
+    });
+
+    expect(progress).toHaveBeenCalledWith('kilo_session', 'Restoring session…');
+    const restoreCall = session.exec.mock.calls.find(
+      ([command]) =>
+        typeof command === 'string' &&
+        command.includes('kilo-restore-session.js') &&
+        !command.includes('--file')
+    );
+    expect(restoreCall).toBeDefined();
+    const bootstrapCall = session.exec.mock.calls.find(
+      ([command]) =>
+        typeof command === 'string' &&
+        command.includes('kilo-restore-session.js') &&
+        command.includes('--file')
+    );
+    expect(bootstrapCall).toBeUndefined();
+  });
+
+  it('attempts snapshot restore for a first preparation with preparedAt and no clone', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    const progress = vi.fn();
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'ses-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata: createMetadata({ preparedAt: 1 }),
+      kilocodeModel: 'test-model',
+      onProgress: progress,
+    });
+
+    expect(progress).toHaveBeenCalledWith('kilo_session', 'Restoring session…');
+    const restoreCall = session.exec.mock.calls.find(
+      ([command]) =>
+        typeof command === 'string' &&
+        command.includes('kilo-restore-session.js') &&
+        !command.includes('--file')
+    );
+    expect(restoreCall).toBeDefined();
+    const bootstrapCall = session.exec.mock.calls.find(
+      ([command]) =>
+        typeof command === 'string' &&
+        command.includes('kilo-restore-session.js') &&
+        command.includes('--file')
+    );
+    expect(bootstrapCall).toBeUndefined();
+  });
+
+  it('fails instead of bootstrapping when the clone snapshot is missing', async () => {
+    const session = createSession(false);
+    session.exec.mockImplementation(async (command: string) => {
+      if (command.includes('kilo-restore-session.js')) {
+        if (command.includes('--file')) {
+          return { exitCode: 0, stdout: JSON.stringify({ ok: true }), stderr: '' };
+        }
+        return {
+          exitCode: 1,
+          stdout: JSON.stringify({
+            ok: false,
+            code: 404,
+            step: 'download',
+            error: 'snapshot not found (404)',
+          }),
+          stderr: '',
+        };
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    const sandbox = createSandbox(session);
+
+    await expect(
+      new SessionService().prepareWorkspace({
+        sandbox,
+        sandboxId: 'ses-abcdef',
+        userId: 'user_test',
+        sessionId: 'agent_test' as SessionId,
+        env: createEnv(),
+        metadata: createCloneMetadata(),
+        kilocodeModel: 'test-model',
+      })
+    ).rejects.toThrow('Session snapshot required but not found');
+
+    const bootstrapCall = session.exec.mock.calls.find(
+      ([command]) =>
+        typeof command === 'string' &&
+        command.includes('kilo-restore-session.js') &&
+        command.includes('--file')
+    );
+    expect(bootstrapCall).toBeUndefined();
+  });
+
+  it('bootstraps an empty session for a first preparation without clone or preparedAt', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    const progress = vi.fn();
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'ses-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata: createMetadata(),
+      kilocodeModel: 'test-model',
+      onProgress: progress,
+    });
+
+    expect(progress).toHaveBeenCalledWith('kilo_session', 'Importing session…');
+    const bootstrapCall = session.exec.mock.calls.find(
+      ([command]) =>
+        typeof command === 'string' &&
+        command.includes('kilo-restore-session.js') &&
+        command.includes('--file')
+    );
+    expect(bootstrapCall).toBeDefined();
+    expect(bootstrapCall?.[0]).toContain('/tmp/kilo-empty-session-kilo-session.json');
+  });
+
+  it('keeps the empty-import fallback for a non-clone prepared restore with a 404', async () => {
+    const session = createSession(false);
+    session.exec.mockImplementation(async (command: string) => {
+      if (command.includes('kilo-restore-session.js')) {
+        if (command.includes('--file')) {
+          return { exitCode: 0, stdout: JSON.stringify({ ok: true }), stderr: '' };
+        }
+        return {
+          exitCode: 1,
+          stdout: JSON.stringify({
+            ok: false,
+            code: 404,
+            step: 'download',
+            error: 'snapshot not found (404)',
+          }),
+          stderr: '',
+        };
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    const sandbox = createSandbox(session);
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'ses-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata: createMetadata({ preparedAt: 1 }),
+      kilocodeModel: 'test-model',
+    });
+
+    const bootstrapCall = session.exec.mock.calls.find(
+      ([command]) =>
+        typeof command === 'string' &&
+        command.includes('kilo-restore-session.js') &&
+        command.includes('--file')
+    );
+    expect(bootstrapCall).toBeDefined();
+    expect(bootstrapCall?.[0]).toContain('/tmp/kilo-empty-session-kilo-session.json');
   });
 
   it('removes the managed Bitbucket token from origin after cold review branch setup', async () => {
@@ -1773,6 +2024,20 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       } satisfies FencedWrapperDispatchRequest,
     });
   }
+
+  it('prefers and requires snapshot restore in wrapper readiness for clone metadata', async () => {
+    const result = await buildPromptWrapperRequests(createCloneMetadata());
+
+    expect(result.readyRequest.workspace.preferSnapshot).toBe(true);
+    expect(result.readyRequest.workspace.requireSnapshot).toBe(true);
+  });
+
+  it('prefers but does not require snapshot restore in wrapper readiness for preparedAt-only metadata', async () => {
+    const result = await buildPromptWrapperRequests(createMetadata({ preparedAt: 1 }));
+
+    expect(result.readyRequest.workspace.preferSnapshot).toBe(true);
+    expect(result.readyRequest.workspace.requireSnapshot).toBe(false);
+  });
 
   it('uses a containment sandbox with a Kilo capability and raw GitLab token for Kilo-only containment', async () => {
     const issueKiloSessionCapability = vi.fn().mockResolvedValue({
@@ -3052,14 +3317,17 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         `bb comments create 42 --input - < ${inputPath}`
       )
     ).toBe('allow');
+    expect(result.readyRequest.materialized.env).toMatchObject({
+      GIT_CONFIG_COUNT: '2',
+      GIT_CONFIG_KEY_0: 'credential.helper',
+      GIT_CONFIG_VALUE_0: '/opt/kilo-cloud/kilo-git-credential',
+      GIT_CONFIG_KEY_1: 'credential.useHttpPath',
+      GIT_CONFIG_VALUE_1: 'false',
+      GIT_TERMINAL_PROMPT: '0',
+    });
     for (const key of [
       'GIT_CONFIG_NOSYSTEM',
       'GIT_CONFIG_GLOBAL',
-      'GIT_CONFIG_COUNT',
-      'GIT_CONFIG_KEY_0',
-      'GIT_CONFIG_VALUE_0',
-      'GIT_CONFIG_KEY_1',
-      'GIT_CONFIG_VALUE_1',
       'GIT_CONFIG_KEY_2',
       'GIT_CONFIG_VALUE_2',
       'GIT_OPTIONAL_LOCKS',
@@ -3284,6 +3552,79 @@ describe('SessionService session-ingest compatibility', () => {
     expect(env.SESSION_INGEST.createSessionForCloudAgent).toHaveBeenCalledWith(
       expect.not.objectContaining({ requireFullSessionReport: expect.anything() })
     );
+  });
+
+  it('forwards cloneFromKiloSessionId and returns the typed RPC result', async () => {
+    const env = createEnv();
+    const service = new SessionService();
+    const readyResult: CreateSessionForCloudAgentResult = {
+      status: 'ready',
+      clone: { sessionId: 'ses_12345678901234567890123456', copiedItemCount: 3 },
+    };
+    vi.mocked(env.SESSION_INGEST.createSessionForCloudAgent).mockResolvedValue(readyResult);
+
+    const result = await service.createCliSessionViaSessionIngest(
+      'ses_12345678901234567890123456',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      'user_test',
+      env,
+      undefined,
+      'cloud-agent',
+      undefined,
+      undefined,
+      'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa'
+    );
+
+    expect(result).toEqual(readyResult);
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(env.SESSION_INGEST.createSessionForCloudAgent).toHaveBeenCalledWith({
+      sessionId: 'ses_12345678901234567890123456',
+      kiloUserId: 'user_test',
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      organizationId: undefined,
+      createdOnPlatform: 'cloud-agent',
+      title: undefined,
+      gitUrl: undefined,
+      cloneFromKiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+    });
+  });
+
+  it('returns undefined when the old worker sends no clone acknowledgement', async () => {
+    const env = createEnv();
+    const service = new SessionService();
+
+    const result = await service.createCliSessionViaSessionIngest(
+      'ses_12345678901234567890123456',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      'user_test',
+      env,
+      undefined,
+      'cloud-agent',
+      undefined,
+      'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa'
+    );
+
+    expect(result).toBeUndefined();
+  });
+
+  it('forwards cloneSourceSessionId on the matching-source delete', async () => {
+    const env = createEnv();
+    const service = new SessionService();
+
+    await service.deleteCliSessionViaSessionIngest(
+      'ses_12345678901234567890123456',
+      'user_test',
+      env,
+      { cloneSourceSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa' }
+    );
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(env.SESSION_INGEST.deleteSessionForCloudAgent).toHaveBeenCalledWith({
+      sessionId: 'ses_12345678901234567890123456',
+      kiloUserId: 'user_test',
+      onlyIfEmpty: undefined,
+      cloneSourceSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+    });
   });
 });
 

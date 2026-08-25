@@ -1,18 +1,23 @@
+import { memo } from 'react';
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { Clock } from '@/components/ui/icons';
 import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Bubble } from '@/components/ui/bubble';
+import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { InMessageBubbleContext } from './bubble-text-selection-context';
 import { ChatMarkdownText } from './chat-markdown-text';
 import { CompactionSeparator } from './compaction-separator';
 import { FilePartRenderer } from './file-part-renderer';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
+import { selectMessageFailure } from './message-failure-state';
 import { PartRenderer } from './part-renderer';
-import { isFilePart, isTextPart } from './part-types';
+import { firstHumanText, isFilePart, isTextPart } from './part-types';
 import { useMessageCopy } from './use-message-copy';
 import { type OpenChildSession } from './child-session-section';
 
@@ -21,6 +26,7 @@ type MessageBubbleProps = {
   isLastAssistantMessage?: boolean;
   isSessionStreaming?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
+  modelOptions?: SessionModelOption[];
   defaultReasoningExpanded?: boolean;
   onOpenChildSession?: OpenChildSession;
   /** Per-user-message delivery state. v1 surfaces only a "Queued" badge. */
@@ -33,22 +39,30 @@ type MessageBubbleProps = {
    * deliveryState !== 'queued'; the hidden slot retains the same height.
    */
   holdQueuedSlot?: boolean;
+  /** Retries a failed message. The failure footer renders only when supplied. */
+  onRetryMessage?: (message: StoredMessage) => void;
+  /** Copies a failed user message's text back into the composer. */
+  onCopyToComposer?: (text: string) => void;
 };
 
-export function MessageBubble({
+function MessageBubbleImpl({
   message,
   isLastAssistantMessage,
   isSessionStreaming,
   getChildMessages,
+  modelOptions,
   defaultReasoningExpanded,
   onOpenChildSession,
   deliveryState,
   onLongPressDetails,
   holdQueuedSlot,
+  onRetryMessage,
+  onCopyToComposer,
 }: Readonly<MessageBubbleProps>) {
   const isUser = message.info.role === 'user';
   const { copyMessage } = useMessageCopy();
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   const handleLongPress = () => {
     onLongPressDetails?.(message);
@@ -78,53 +92,160 @@ export function MessageBubble({
     );
   }
 
+  // Failed-row footer. Renders only when the relevant handler is wired
+  // (mobile-w2b wires onRetryMessage/onCopyToComposer); a delivery row needs
+  // Retry or Copy, an assistant row needs Retry only.
+  const failure = selectMessageFailure({ deliveryState, info: message.info });
+  const relevantHandlerWired =
+    failure?.kind === 'delivery'
+      ? onRetryMessage !== undefined || onCopyToComposer !== undefined
+      : onRetryMessage !== undefined;
+  const userTextContent = isUser
+    ? message.parts
+        .filter(isTextPart)
+        .map(p => p.text)
+        .join('\n\n')
+    : '';
+  // Copy-to-composer re-sends only the first human-authored text part, so a
+  // synthesized attachment notice is not copied and a file-only row hides the
+  // button entirely.
+  const copyText = isUser ? firstHumanText(message.parts) : '';
+  const failureFooter =
+    failure !== null && relevantHandlerWired ? (
+      <View className="gap-1 px-4 py-1">
+        <Text
+          className="text-sm text-destructive"
+          accessibilityLabel={
+            failure.canRetry
+              ? t('agentChat.messageBubble.failureRetryAvailable', { title: failure.title })
+              : t('agentChat.messageBubble.failure', { title: failure.title })
+          }
+        >
+          {failure.title}
+        </Text>
+        <Text className="text-xs text-muted-foreground">{failure.detail}</Text>
+        <View className="flex-row gap-2">
+          {failure.canRetry && onRetryMessage ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onPress={() => {
+                onRetryMessage(message);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.retry')}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          ) : null}
+          {failure.canCopy && onCopyToComposer && copyText !== '' ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onPress={() => {
+                onCopyToComposer(copyText);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('agentChat.messageBubble.copyToComposer')}
+            >
+              <Text>{t('agentChat.messageBubble.copyToComposer')}</Text>
+            </Button>
+          ) : null}
+        </View>
+      </View>
+    ) : null;
+
   if (isUser) {
     // Composer, queued-message synthesis, and slash commands emit exactly one
     // human-authored text part, so the separator separates it from synthesized
     // attachment notices.
-    const textContent = message.parts
-      .filter(isTextPart)
-      .map(p => p.text)
-      .join('\n\n');
     const fileParts = message.parts.filter(isFilePart);
     const isQueued = deliveryState?.status === 'queued';
     const hasBadgeSlot = isQueued || holdQueuedSlot;
     const a11y = buildAgentMessageBubbleAccessibilityProps({ isUser: true, canCopy: true });
 
     return (
-      <Pressable onLongPress={handleLongPress} accessible={a11y.accessible} className="px-4 py-1">
-        <View className="items-end gap-1">
-          <Bubble side="user">
-            <InMessageBubbleContext.Provider value>
-              {textContent ? (
-                <ChatMarkdownText value={textContent} variant="user" selectable={false} />
-              ) : null}
-              {fileParts.map(part => (
-                <FilePartRenderer key={part.id} part={part} />
-              ))}
-            </InMessageBubbleContext.Provider>
-          </Bubble>
-          {hasBadgeSlot ? (
-            <View className="flex-row items-center gap-2 self-end pr-1">
-              <View
-                accessibilityRole={isQueued ? 'text' : undefined}
-                accessibilityLabel={isQueued ? 'Message queued' : undefined}
-                accessible={isQueued}
-                {...(!isQueued
-                  ? {
-                      accessibilityElementsHidden: true as const,
-                      importantForAccessibility: 'no-hide-descendants' as const,
-                    }
-                  : {})}
-                pointerEvents={isQueued ? 'auto' : 'none'}
-                className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
-              >
-                <Clock size={12} color={colors.mutedForeground} />
-                <Text className="text-xs text-muted-foreground">Queued</Text>
+      <>
+        <Pressable onLongPress={handleLongPress} accessible={a11y.accessible} className="px-4 py-1">
+          <View className="items-end gap-1">
+            <Bubble side="user">
+              <InMessageBubbleContext.Provider value>
+                {userTextContent ? (
+                  <ChatMarkdownText value={userTextContent} variant="user" selectable={false} />
+                ) : null}
+                {fileParts.map(part => (
+                  <FilePartRenderer key={part.id} part={part} />
+                ))}
+              </InMessageBubbleContext.Provider>
+            </Bubble>
+            {hasBadgeSlot ? (
+              <View className="flex-row items-center gap-2 self-end pr-1">
+                <View
+                  accessibilityRole={isQueued ? 'text' : undefined}
+                  accessibilityLabel={
+                    isQueued ? t('agentChat.messageBubble.queuedAccessibility') : undefined
+                  }
+                  accessible={isQueued}
+                  {...(!isQueued
+                    ? {
+                        accessibilityElementsHidden: true as const,
+                        importantForAccessibility: 'no-hide-descendants' as const,
+                      }
+                    : {})}
+                  pointerEvents={isQueued ? 'auto' : 'none'}
+                  className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
+                >
+                  <Clock size={12} color={colors.mutedForeground} />
+                  <Text className="text-xs text-muted-foreground">
+                    {t('agentChat.messageBubble.queued')}
+                  </Text>
+                </View>
               </View>
-            </View>
+            ) : null}
+          </View>
+          {a11y.accessibilityActions.length > 0 ? (
+            <View
+              accessible
+              accessibilityRole={a11y.accessibilityRole}
+              accessibilityLabel={a11y.accessibilityLabel}
+              accessibilityHint={a11y.accessibilityHint}
+              accessibilityActions={a11y.accessibilityActions}
+              onAccessibilityAction={handleAccessibilityAction}
+              className="absolute inset-0 opacity-0"
+              pointerEvents="none"
+            />
           ) : null}
-        </View>
+        </Pressable>
+        {failureFooter}
+      </>
+    );
+  }
+
+  // Assistant messages: render parts sequentially without a bubble.
+  // Row-rhythm contract: py-1 on each of two adjacent wrappers sums to the
+  // same value as the gap-2 between parts of one message and the user
+  // wrapper's py-1 — every adjacent transcript row pair sits one gap apart.
+  const isStreaming = isLastAssistantMessage && isSessionStreaming;
+  const a11y = buildAgentMessageBubbleAccessibilityProps({ isUser: false, canCopy: true });
+
+  return (
+    <>
+      <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
+        <InMessageBubbleContext.Provider value>
+          <View className="gap-2">
+            {message.parts.map(part => (
+              <PartRenderer
+                key={part.id}
+                part={part}
+                isStreaming={isStreaming}
+                getChildMessages={getChildMessages}
+                defaultReasoningExpanded={defaultReasoningExpanded}
+                onOpenChildSession={onOpenChildSession}
+                modelOptions={modelOptions}
+              />
+            ))}
+          </View>
+        </InMessageBubbleContext.Provider>
         {a11y.accessibilityActions.length > 0 ? (
           <View
             accessible
@@ -138,44 +259,9 @@ export function MessageBubble({
           />
         ) : null}
       </Pressable>
-    );
-  }
-
-  // Assistant messages: render parts sequentially without a bubble.
-  // Row-rhythm contract: py-1 on each of two adjacent wrappers sums to the
-  // same value as the gap-2 between parts of one message and the user
-  // wrapper's py-1 — every adjacent transcript row pair sits one gap apart.
-  const isStreaming = isLastAssistantMessage && isSessionStreaming;
-  const a11y = buildAgentMessageBubbleAccessibilityProps({ isUser: false, canCopy: true });
-
-  return (
-    <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
-      <InMessageBubbleContext.Provider value>
-        <View className="gap-2">
-          {message.parts.map(part => (
-            <PartRenderer
-              key={part.id}
-              part={part}
-              isStreaming={isStreaming}
-              getChildMessages={getChildMessages}
-              defaultReasoningExpanded={defaultReasoningExpanded}
-              onOpenChildSession={onOpenChildSession}
-            />
-          ))}
-        </View>
-      </InMessageBubbleContext.Provider>
-      {a11y.accessibilityActions.length > 0 ? (
-        <View
-          accessible
-          accessibilityRole={a11y.accessibilityRole}
-          accessibilityLabel={a11y.accessibilityLabel}
-          accessibilityHint={a11y.accessibilityHint}
-          accessibilityActions={a11y.accessibilityActions}
-          onAccessibilityAction={handleAccessibilityAction}
-          className="absolute inset-0 opacity-0"
-          pointerEvents="none"
-        />
-      ) : null}
-    </Pressable>
+      {failureFooter}
+    </>
   );
 }
+
+export const MessageBubble = memo(MessageBubbleImpl);

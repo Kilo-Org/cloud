@@ -3,6 +3,7 @@
 // under the line cap.
 
 import { type ReactNode, type RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
 import { TextInput, View } from 'react-native';
 
 import {
@@ -14,8 +15,6 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { cn } from '@/lib/utils';
-
-const BODY_PLACEHOLDER = 'Leave a comment';
 
 export function CommentBodyField({
   inputRef,
@@ -30,14 +29,15 @@ export function CommentBodyField({
 }) {
   const colors = useThemeColors();
   const keyboardVisible = useFormSheetKeyboardVisible();
+  const { t } = useTranslation();
   return (
     <TextInput
       ref={inputRef}
       defaultValue={defaultValue}
       editable={!isDisabled}
-      placeholder={BODY_PLACEHOLDER}
+      placeholder={t('prReview.composer.commentBodyPlaceholder')}
       placeholderTextColor={colors.mutedForeground}
-      accessibilityLabel="Comment body"
+      accessibilityLabel={t('prReview.composer.commentBody')}
       onChangeText={onChangeText}
       multiline
       textAlignVertical="top"
@@ -70,47 +70,45 @@ export function ComposerFooter({
   onAddToReview: () => void;
   onCancel: () => void;
 }): ReactNode {
+  const { t } = useTranslation();
   return (
     // Lives inside the formSheet ScrollView (not a sticky sibling).
-    // size=sm + tight footer: half-detent + empty-body error must keep Cancel
-    // above the closed-sheet limit (~874) without scrolling.
-    <PrFormSheetFooter className="pb-1 pt-1">
+    // Half detent stays a drag-down; keep Cancel above the closed-sheet
+    // limit (~874) without scrolling.
+    <PrFormSheetFooter>
       {isEdit ? (
-        <Button size="sm" onPress={onSave} disabled={primaryDisabled} accessibilityLabel="Save">
-          <Text>Save</Text>
+        <Button onPress={onSave} disabled={primaryDisabled} accessibilityLabel={t('common.save')}>
+          <Text>{t('common.save')}</Text>
         </Button>
       ) : (
         <>
           <Button
-            size="sm"
             onPress={onCommentNow}
             loading={isSubmitting}
             disabled={primaryDisabled}
-            accessibilityLabel="Comment now"
+            accessibilityLabel={t('prReview.composer.commentNow')}
           >
-            <Text>Comment now</Text>
+            <Text>{t('prReview.composer.commentNow')}</Text>
           </Button>
           <Button
-            size="sm"
             variant="secondary"
             onPress={onAddToReview}
             disabled={isSubmitting}
-            className="mt-0.5"
-            accessibilityLabel="Add to review"
+            className="mt-2"
+            accessibilityLabel={t('prReview.composer.addToReview')}
           >
-            <Text>Add to review</Text>
+            <Text>{t('prReview.composer.addToReview')}</Text>
           </Button>
         </>
       )}
       <Button
-        size="sm"
         variant="ghost"
         onPress={onCancel}
         disabled={isSubmitting}
-        className="mt-0.5"
-        accessibilityLabel="Cancel"
+        className="mt-2"
+        accessibilityLabel={t('common.cancel')}
       >
-        <Text>Cancel</Text>
+        <Text>{t('common.cancel')}</Text>
       </Button>
     </PrFormSheetFooter>
   );
@@ -139,7 +137,7 @@ export function ContextPreview({
   const previewText = preferFallback ? '' : (selection?.selectedText ?? '');
   // Single-line context keeps half-detent + keyboard-open room for CTAs.
   return (
-    <View className="gap-0.5 rounded-lg border border-hair-soft bg-secondary px-3 py-1.5">
+    <View className="gap-0.5 rounded-lg border border-hair-soft bg-secondary px-4 py-2">
       <Text className="font-mono-medium text-[11px] text-muted-foreground" numberOfLines={1}>
         {path} {side} {lineLabel}
       </Text>

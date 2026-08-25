@@ -1,8 +1,7 @@
+import type { SecurityCommandType } from '@kilocode/app-shared/security-agent';
+
 export type SecurityAgentAdmissionAction =
-  | 'sync'
-  | 'dismiss_finding'
-  | 'start_analysis'
-  | 'apply_auto_remediation'
+  | SecurityCommandType
   | 'enable_initial_sync'
   | 'existing_findings_backlog';
 

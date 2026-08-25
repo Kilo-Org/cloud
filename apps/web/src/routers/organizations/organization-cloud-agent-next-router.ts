@@ -23,6 +23,7 @@ import {
   buildGitLabCloneUrl,
   fetchGitLabRepositoriesForOrganization,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { orderRepositoriesByUsage } from '@/lib/cloud-agent/order-repositories';
 import {
   basePrepareSessionNextSchema,
   basePrepareSessionNextOutputSchema,
@@ -605,6 +606,19 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       return await client.getSession(input.cloudAgentSessionId);
     }),
 
+  getComputeBillingStatus: organizationMemberProcedure
+    .input(GetSessionInput)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      return await createCloudAgentNextClient(
+        generateCloudAgentToken(ctx.user)
+      ).getComputeBillingStatus(input.cloudAgentSessionId);
+    }),
+
   checkEligibility: organizationMemberProcedure
     .input(z.object({ organizationId: z.uuid() }))
     .query(async ({ ctx, input }) => {
@@ -633,13 +647,18 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         errorMessage: z.string().optional(),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const result = await fetchGitHubRepositoriesForOrganization(
         input.organizationId,
         input.forceRefresh
       );
       return {
-        repositories: result.repositories,
+        repositories: await orderRepositoriesByUsage({
+          userId: ctx.user.id,
+          organizationId: input.organizationId,
+          platform: 'github',
+          repositories: result.repositories,
+        }),
         integrationInstalled: result.integrationInstalled,
         syncedAt: result.syncedAt,
         errorMessage: result.errorMessage,
@@ -673,7 +692,13 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         input.forceRefresh
       );
       return {
-        repositories: result.repositories,
+        repositories: await orderRepositoriesByUsage({
+          userId: ctx.user.id,
+          organizationId: input.organizationId,
+          platform: 'gitlab',
+          repositories: result.repositories,
+          gitlabInstanceUrl: result.instanceUrl,
+        }),
         integrationInstalled: result.integrationInstalled,
         syncedAt: result.syncedAt,
         errorMessage: result.errorMessage,
@@ -684,10 +709,22 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(ListBitbucketRepositoriesInput)
     .output(BitbucketOrganizationRepositoryListResultSchema)
     .query(async ({ ctx, input }) => {
-      return fetchBitbucketRepositoriesForOrganization(
+      const result = await fetchBitbucketRepositoriesForOrganization(
         input.organizationId,
         ctx.user.id,
         input.forceRefresh
       );
+      if (result.status !== 'available') {
+        return result;
+      }
+      return {
+        ...result,
+        repositories: await orderRepositoriesByUsage({
+          userId: ctx.user.id,
+          organizationId: input.organizationId,
+          platform: 'bitbucket',
+          repositories: result.repositories,
+        }),
+      };
     }),
 });

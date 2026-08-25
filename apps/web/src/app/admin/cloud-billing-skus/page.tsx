@@ -36,6 +36,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CloudBillingSkuForm from './CloudBillingSkuForm';
 import UsageRecordsContent from './UsageRecordsContent';
 import BillingHealthContent from './BillingHealthContent';
+import ChargesContent from './ChargesContent';
 
 const breadcrumbs = (
   <BreadcrumbItem>
@@ -60,7 +61,10 @@ export default function CloudBillingSkusPage() {
   const createButtonRef = useRef<HTMLButtonElement>(null);
   const listOptions = trpc.admin.cloudBillingSkus.list.queryOptions();
   const tabParam = searchParams.get('tab');
-  const activeTab = tabParam === 'usage-records' || tabParam === 'health' ? tabParam : 'catalog';
+  const activeTab =
+    tabParam === 'usage-records' || tabParam === 'charges' || tabParam === 'health'
+      ? tabParam
+      : 'catalog';
   const catalog = useQuery({ ...listOptions, enabled: activeTab === 'catalog' });
   const { data: skus, isLoading } = catalog;
   const loadedSkus = skus ?? [];
@@ -148,6 +152,9 @@ export default function CloudBillingSkusPage() {
             </TabsTrigger>
             <TabsTrigger value="usage-records" className={tabTriggerClass}>
               Usage records
+            </TabsTrigger>
+            <TabsTrigger value="charges" className={tabTriggerClass}>
+              Charges
             </TabsTrigger>
             <TabsTrigger value="health" className={tabTriggerClass}>
               Health
@@ -308,6 +315,9 @@ export default function CloudBillingSkusPage() {
           </TabsContent>
           <TabsContent value="usage-records" className="mt-6">
             <UsageRecordsContent />
+          </TabsContent>
+          <TabsContent value="charges" className="mt-6">
+            <ChargesContent />
           </TabsContent>
           <TabsContent value="health" className="mt-6">
             <BillingHealthContent />

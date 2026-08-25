@@ -1,6 +1,8 @@
+import * as Application from 'expo-application';
 import * as SecureStore from 'expo-secure-store';
-import { ChevronRight } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Linking, ScrollView, View } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 
@@ -8,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { BotAvatar } from '@/components/kiloclaw/bot-avatar';
 import { Text } from '@/components/ui/text';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
+import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   getNotificationPermissionStatus,
@@ -19,8 +22,6 @@ import { useTRPC } from '@/lib/trpc';
 
 import { type BotIdentity, DEFAULT_BOT_IDENTITY } from './state';
 
-const MOCK_MESSAGE = 'All done! I put together that summary you asked for. Ready when you are.';
-
 type NotificationsStepProps = {
   onComplete: () => void;
   botIdentity: BotIdentity | null;
@@ -29,6 +30,7 @@ type NotificationsStepProps = {
 export function NotificationsStep({ onComplete, botIdentity }: Readonly<NotificationsStepProps>) {
   const colors = useThemeColors();
   const trpc = useTRPC();
+  const { t } = useTranslation();
   const { isActive } = useAppLifecycle();
   const [permission, setPermission] = useState<'checking' | 'undetermined' | 'denied'>('checking');
   const [isRegistering, setIsRegistering] = useState(false);
@@ -60,7 +62,16 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
           return;
         }
         if (token) {
-          await registerTokenMutateAsync({ token, platform: getPlatform() });
+          await registerTokenMutateAsync({
+            token,
+            platform: getPlatform(),
+            // Both fields are read per token when a push is sent: a null
+            // locale sends English copy, and a null app_version drops the
+            // Android channel id. Omitting them here writes nulls over the
+            // values an earlier registration stored.
+            appVersion: Application.nativeApplicationVersion ?? undefined,
+            locale: getResolvedLanguage(),
+          });
           if (isCancelled()) {
             return;
           }
@@ -75,7 +86,9 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
           return;
         }
         setRegisterError(
-          error instanceof Error ? error.message : 'Could not enable notifications.'
+          error instanceof Error
+            ? error.message
+            : t('kiloclaw.onboarding.notifications.couldNotEnable')
         );
       } finally {
         if (!isCancelled()) {
@@ -83,7 +96,7 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
         }
       }
     },
-    [onComplete, registerTokenMutateAsync]
+    [onComplete, registerTokenMutateAsync, t]
   );
 
   // Re-check permission on mount and whenever the app returns to foreground.
@@ -116,19 +129,15 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
     const currentStatus = await getNotificationPermissionStatus();
 
     if (currentStatus === 'denied') {
-      Alert.alert(
-        'Notifications disabled',
-        'To enable notifications, turn them on in your device settings.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => void Linking.openSettings() },
-        ]
-      );
+      Alert.alert(t('notifications.disabledTitle'), t('notifications.disabledMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
+      ]);
       return;
     }
 
     await completeRegistration();
-  }, [completeRegistration]);
+  }, [completeRegistration, t]);
 
   const handleSkip = useCallback(async () => {
     try {
@@ -146,7 +155,7 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
       <View className="flex-1 items-center justify-center gap-3 px-6">
         <ActivityIndicator size="small" color={colors.mutedForeground} />
         <Text variant="muted" className="text-center text-sm">
-          Setting up notifications…
+          {t('kiloclaw.onboarding.notifications.settingUp')}
         </Text>
       </View>
     );
@@ -160,11 +169,13 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
     >
       <View className="gap-2">
         <Text variant="eyebrow" className="text-xs">
-          Notifications
+          {t('notifications.title')}
         </Text>
-        <Text className="text-2xl font-semibold">Stay in the loop</Text>
+        <Text className="text-2xl font-semibold">
+          {t('kiloclaw.onboarding.notifications.stayInTheLoop')}
+        </Text>
         <Text variant="muted" className="text-base">
-          Get notified when {botName} finishes a task so you never miss a response.
+          {t('kiloclaw.onboarding.notifications.getNotified', { name: botName })}
         </Text>
       </View>
 
@@ -176,10 +187,12 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
           <View className="flex-1 gap-1">
             <View className="flex-row items-center justify-between">
               <Text className="text-sm font-semibold">{botName}</Text>
-              <Text className="text-xs text-muted-foreground">now</Text>
+              <Text className="text-xs text-muted-foreground">
+                {t('kiloclaw.onboarding.notifications.now')}
+              </Text>
             </View>
             <Text className="text-sm text-muted-foreground" numberOfLines={2}>
-              {MOCK_MESSAGE}
+              {t('kiloclaw.onboarding.notifications.mockMessage')}
             </Text>
           </View>
         </View>
@@ -189,11 +202,13 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
 
       <View className="gap-3">
         <Button size="lg" onPress={() => void handleEnable()}>
-          <Text className="text-base">{registerError ? 'Try again' : 'Enable notifications'}</Text>
-          <ChevronRight size={16} color={colors.primaryForeground} />
+          <Text className="text-base">
+            {registerError ? t('common.tryAgain') : t('notifications.enable')}
+          </Text>
+          <DirectionalChevronRight size={16} color={colors.primaryForeground} />
         </Button>
         <Button variant="ghost" size="lg" onPress={() => void handleSkip()}>
-          <Text className="text-base">Skip for now</Text>
+          <Text className="text-base">{t('kiloclaw.onboarding.notifications.skipForNow')}</Text>
         </Button>
       </View>
     </ScrollView>

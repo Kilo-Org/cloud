@@ -75,10 +75,10 @@ describe('height pin — content growth must remeasure', () => {
 });
 
 describe('MONO_SCROLL_TEXT_MODE_OPTIONS — segmented-control order matches the sheet default', () => {
-  it('is exactly wrap then scroll, with stable labels', () => {
+  it('is exactly wrap then scroll, with stable label keys', () => {
     expect(MONO_SCROLL_TEXT_MODE_OPTIONS).toEqual([
-      { value: 'wrap', label: 'Wrap' },
-      { value: 'scroll', label: 'Scroll' },
+      { value: 'wrap', labelKey: 'monoScrollBlock.wrap' },
+      { value: 'scroll', labelKey: 'monoScrollBlock.scroll' },
     ]);
   });
 });

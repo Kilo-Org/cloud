@@ -12,8 +12,8 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  REMOTE_SPAWN_NON_RETRYABLE_TOAST,
-  REMOTE_SPAWN_RETRYABLE_TOAST,
+  remoteSpawnNonRetryableToast,
+  remoteSpawnRetryableToast,
 } from '@/lib/remote-submit-outcome';
 import { __resetPendingShareNavigationForTests } from '@/lib/share-navigation';
 import {
@@ -293,7 +293,7 @@ describe('ShareGateSheet spawn operationKey wiring', () => {
     const keys = usedOperationKeys();
     expect(keys[0]).toBeDefined();
     expect(keys[1]).toBe(keys[0]);
-    expect(toastError).toHaveBeenCalledWith(REMOTE_SPAWN_RETRYABLE_TOAST);
+    expect(toastError).toHaveBeenCalledWith(remoteSpawnRetryableToast());
     expect(refetchInstancesMock).toHaveBeenCalled();
 
     act(() => {
@@ -369,7 +369,7 @@ describe('ShareGateSheet spawn operationKey wiring', () => {
     const keys = usedOperationKeys();
     expect(keys[0]).toBeDefined();
     expect(keys[1]).not.toBe(keys[0]);
-    expect(toastError).toHaveBeenCalledWith(REMOTE_SPAWN_NON_RETRYABLE_TOAST);
+    expect(toastError).toHaveBeenCalledWith(remoteSpawnNonRetryableToast());
     // A non-retryable rejection must not refetch or navigate.
     expect(refetchInstancesMock).not.toHaveBeenCalled();
     expect(routerBack).not.toHaveBeenCalled();

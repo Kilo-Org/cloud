@@ -19,11 +19,12 @@ export type ConnectivitySource = {
 export type OfflineBannerStore = {
   subscribe: (listener: () => void) => () => void;
   isOffline: () => boolean;
+  state: () => BannerState;
   destroy: () => void;
 };
 
 /** The banner's committed connectivity state. */
-type BannerState = 'online' | 'offline' | 'unknown';
+export type BannerState = 'online' | 'offline' | 'unknown';
 
 export function createOfflineBannerStore(options: {
   source: ConnectivitySource;
@@ -45,14 +46,15 @@ export function createOfflineBannerStore(options: {
   }
 
   function commit(next: BannerState): void {
-    const wasOffline = state === 'offline';
+    if (state === next) {
+      return;
+    }
     state = next;
-    // Notify only when the observable `isOffline` value changes; an
-    // unknown → online transition leaves it false and must not re-render.
-    if (wasOffline !== (next === 'offline')) {
-      for (const listener of listeners) {
-        listener();
-      }
+    // Notify on every committed state change. The banner's `getSnapshot`
+    // (`isOffline`) is unchanged on an unknown → online edge, so it does not
+    // re-render there; the tri-state hook's `getSnapshot` (`state`) does.
+    for (const listener of listeners) {
+      listener();
     }
   }
 
@@ -87,11 +89,13 @@ export function createOfflineBannerStore(options: {
 
   const isOffline = (): boolean => state === 'offline';
 
+  const getState = (): BannerState => state;
+
   const destroy = (): void => {
     cancelPending();
     unsubscribeSource();
     listeners.clear();
   };
 
-  return { subscribe, isOffline, destroy };
+  return { subscribe, isOffline, state: getState, destroy };
 }

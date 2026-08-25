@@ -33,7 +33,7 @@ import {
   selectAutoFreeCandidate,
 } from '@/lib/ai-gateway/models';
 import { getOpenRouterModelsFromRedis } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import { tryGetProviderById } from '@/lib/ai-gateway/providers/provider-definitions';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import {
   getOrganizationAutoRoute,
@@ -98,7 +98,7 @@ function gatewaySupportsApiKind(
   apiKind: GatewayRequest['kind'] | null
 ): boolean {
   if (apiKind === null) return true;
-  const provider = Object.values(PROVIDERS).find(p => p.id === gateway);
+  const provider = tryGetProviderById(gateway);
   return provider?.supportedChatApis.some(k => k === apiKind) ?? false;
 }
 

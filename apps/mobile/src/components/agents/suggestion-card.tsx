@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Sparkles } from '@/components/ui/icons';
 import { type StandaloneSuggestion, type SuggestionAction } from '@kilocode/cloud-agent-sdk';
@@ -28,6 +29,7 @@ export function SuggestionCard({
   onDismiss,
 }: Readonly<SuggestionCardProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const lockRef = useRef(createSuggestionActionLock());
   const [pending, setPending] = useState<PendingState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +72,7 @@ export function SuggestionCard({
     <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
       <View className="flex-row items-center gap-2 border-b border-border bg-secondary px-4 py-3">
         <Sparkles size={16} color={colors.mutedForeground} />
-        <Text className="text-sm font-medium">Suggestion</Text>
+        <Text className="text-sm font-medium">{t('agentChat.suggestion.title')}</Text>
       </View>
 
       <View className="gap-3 p-4">
@@ -117,10 +119,10 @@ export function SuggestionCard({
           disabled={isPending}
           loading={pending?.kind === 'dismiss'}
           accessibilityRole="button"
-          accessibilityLabel="Dismiss suggestion"
+          accessibilityLabel={t('agentChat.suggestion.dismiss')}
           className={cn(actions.length > 0 && 'self-start')}
         >
-          <Text className="text-sm">Dismiss suggestion</Text>
+          <Text className="text-sm">{t('agentChat.suggestion.dismiss')}</Text>
         </Button>
       </View>
     </View>

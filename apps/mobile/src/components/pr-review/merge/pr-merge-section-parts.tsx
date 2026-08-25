@@ -4,6 +4,7 @@
 
 import { type LucideIcon, RefreshCw } from '@/components/ui/icons';
 import { ActivityIndicator, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -15,11 +16,15 @@ import {
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
 
 export function TerminalChip({ state }: Readonly<{ state: PrOverviewDto['state'] }>) {
-  const label = state === 'merged' ? 'Already merged' : 'This pull request is closed';
+  const { t } = useTranslation();
+  const label =
+    state === 'merged'
+      ? t('prReview.merge.terminal.alreadyMerged')
+      : t('prReview.merge.terminal.closed');
   return (
     <View className="gap-2">
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        Merge
+        {t('prReview.merge.merge')}
       </Text>
       <View className="rounded-lg bg-secondary p-4">
         <Text className="text-sm text-muted-foreground">{label}</Text>
@@ -29,10 +34,11 @@ export function TerminalChip({ state }: Readonly<{ state: PrOverviewDto['state']
 }
 
 export function MergeabilityCheckingRow() {
+  const { t } = useTranslation();
   return (
     <View className="flex-row items-center gap-2 rounded-lg bg-secondary p-4">
       <ActivityIndicator size="small" />
-      <Text className="text-sm text-muted-foreground">Checking mergeability…</Text>
+      <Text className="text-sm text-muted-foreground">{t('prReview.merge.checking')}</Text>
     </View>
   );
 }
@@ -42,9 +48,10 @@ export function MergeabilityTimedOutRow({
   isRefreshing,
 }: Readonly<{ onRefresh: () => void; isRefreshing: boolean }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View className="gap-2 rounded-lg bg-secondary p-4">
-      <Text className="text-sm text-muted-foreground">Couldn&apos;t determine mergeability.</Text>
+      <Text className="text-sm text-muted-foreground">{t('prReview.merge.couldNotDetermine')}</Text>
       <Button
         variant="outline"
         size="sm"
@@ -52,11 +59,11 @@ export function MergeabilityTimedOutRow({
           onRefresh();
         }}
         loading={isRefreshing}
-        accessibilityLabel="Refresh mergeability"
+        accessibilityLabel={t('prReview.merge.refreshMergeability')}
       >
         <View className="flex-row items-center gap-2">
           <RefreshCw size={14} color={colors.foreground} />
-          <Text>Refresh</Text>
+          <Text>{t('common.refresh')}</Text>
         </View>
       </Button>
     </View>
@@ -100,10 +107,11 @@ export function BlockedPanel({
   onUpdateBranch: () => void;
 }>) {
   const hasBehindReason = reasons.some(r => r.id === 'behind');
+  const { t } = useTranslation();
   return (
     <View className="gap-2">
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        Why this can&apos;t be merged yet
+        {t('prReview.merge.blockedTitle')}
       </Text>
       <View className="overflow-hidden rounded-lg bg-secondary">
         {reasons.map(reason => (
@@ -115,9 +123,9 @@ export function BlockedPanel({
           variant="outline"
           onPress={onUpdateBranch}
           loading={isUpdatePending}
-          accessibilityLabel="Update branch from base"
+          accessibilityLabel={t('prReview.merge.updateBranchFromBase')}
         >
-          <Text>Update branch</Text>
+          <Text>{t('prReview.merge.updateBranch')}</Text>
         </Button>
       ) : null}
     </View>
@@ -129,22 +137,24 @@ export function AutoMergeEnabledBanner({
   onDisable,
   isDisabling,
 }: Readonly<{ method: string; onDisable: () => void; isDisabling: boolean }>) {
+  const { t } = useTranslation();
   return (
     <View className="gap-3 rounded-lg bg-accent-soft p-4">
       <View className="gap-1">
-        <Text className="text-sm font-medium text-accent-soft-foreground">Auto-merge is on</Text>
+        <Text className="text-sm font-medium text-accent-soft-foreground">
+          {t('prReview.merge.autoMergeOn')}
+        </Text>
         <Text className="text-xs text-accent-soft-foreground">
-          GitHub will merge this pull request automatically when all required checks pass (method:{' '}
-          {method.toLowerCase()}).
+          {t('prReview.merge.autoMergeDescription', { method: method.toLowerCase() })}
         </Text>
       </View>
       <Button
         variant="outline"
         onPress={onDisable}
         loading={isDisabling}
-        accessibilityLabel="Disable auto-merge"
+        accessibilityLabel={t('prReview.merge.disableAutoMerge')}
       >
-        <Text>Disable auto-merge</Text>
+        <Text>{t('prReview.merge.disableAutoMerge')}</Text>
       </Button>
     </View>
   );

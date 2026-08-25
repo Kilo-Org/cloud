@@ -14,6 +14,7 @@ import type { Env, SandboxInstance } from '../../types.js';
 import type { CredentialContainment, SessionMetadata } from '../../persistence/session-metadata.js';
 import { WrapperClient, WrapperError } from '../../kilo/wrapper-client.js';
 import { WRAPPER_VERSION } from '../../shared/wrapper-version.js';
+import { SYSTEM_GIT_CONFIG_ENV } from '../../shared/runtime-environment.js';
 import type { EnsureWrapperRequest } from '../protocol.js';
 import { CloudflareAgentSandbox, deriveSetupEnvironment } from './cloudflare-agent-sandbox.js';
 import { buildWorkspaceBackupCandidate } from '../../workspace-backup-cache.js';
@@ -251,6 +252,33 @@ describe('deriveSetupEnvironment', () => {
       )
     ).toBeNull();
   });
+
+  it('ignores git config keys the runtime strips before the sandbox starts', () => {
+    expect(
+      deriveSetupEnvironment(
+        {
+          envVars: {
+            CACHE_VARIANT: 'profile-value',
+            GIT_CONFIG_GLOBAL: '/tmp/evil.gitconfig',
+            GIT_CONFIG_KEY_2: 'credential.helper',
+          },
+        },
+        { CACHE_VARIANT: 'resolved-profile-value', ...SYSTEM_GIT_CONFIG_ENV }
+      )
+    ).toEqual({
+      variables: { CACHE_VARIANT: 'resolved-profile-value' },
+      secretIdentities: {},
+    });
+  });
+
+  it('keeps the pinned git config in the cache key when a profile declares it', () => {
+    expect(
+      deriveSetupEnvironment({ envVars: { GIT_CONFIG_COUNT: '99' } }, { ...SYSTEM_GIT_CONFIG_ENV })
+    ).toEqual({
+      variables: { GIT_CONFIG_COUNT: '2' },
+      secretIdentities: {},
+    });
+  });
 });
 
 describe('CloudflareAgentSandbox', () => {
@@ -435,6 +463,48 @@ describe('CloudflareAgentSandbox', () => {
       exec.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     );
     ensureBootstrapWrapper.mockRestore();
+  });
+
+  it('requests paid admission for an organization canary before sandbox work', async () => {
+    const ensureBillingAdmission = vi.fn().mockResolvedValue({
+      success: false,
+      code: 'insufficient_credits',
+      message: 'Low balance',
+    });
+    const sandbox = new CloudflareAgentSandbox(
+      {
+        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
+        CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: '',
+        CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org_cloudflare',
+      } as Env,
+      metadata({ sandboxId: 'usr-shared' }),
+      {
+        resolveSandbox: () => ({}) as SandboxInstance,
+        ensureBillingAdmission,
+        isBillingBlocked: vi.fn().mockResolvedValue(false),
+      }
+    );
+
+    await expect(sandbox.ensureBillingAdmission()).resolves.toMatchObject({
+      success: false,
+      code: 'insufficient_credits',
+    });
+    expect(ensureBillingAdmission).toHaveBeenCalledWith(expect.anything(), {
+      sandboxId: 'usr-shared',
+      subject: { type: 'org', id: 'org_cloudflare' },
+      actor: { type: 'user', id: 'user_cloudflare' },
+      enforcementRequested: true,
+    });
+  });
+
+  it('fails closed for a rejected billing block RPC when enforcement is requested', async () => {
+    const isBillingBlocked = vi.fn().mockRejectedValue(new Error('RPC unavailable'));
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata({ sandboxId: 'usr-shared' }), {
+      resolveSandbox: () => ({ isBillingBlocked }) as unknown as SandboxInstance,
+    });
+
+    await expect(sandbox.isBillingBlocked(true)).resolves.toBe(true);
+    await expect(sandbox.isBillingBlocked()).resolves.toBe(false);
   });
 
   it('reports malformed worker URLs before degrading to a cold bootstrap', async () => {
@@ -1720,7 +1790,7 @@ describe('CloudflareAgentSandbox', () => {
     expect(listProcesses).toHaveBeenCalled();
   });
 
-  it('inspects a stopped container for stop reasons other than idle-timeout', async () => {
+  it('does not wake a confirmed stopped container for session deletion cleanup', async () => {
     const listProcesses = vi.fn().mockResolvedValue([]);
     const isContainerRunning = vi.fn().mockResolvedValue(false);
     const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
@@ -1734,8 +1804,8 @@ describe('CloudflareAgentSandbox', () => {
         reason: 'session-delete',
       })
     ).resolves.toEqual({ status: 'absent' });
-    expect(listProcesses).toHaveBeenCalled();
-    expect(isContainerRunning).not.toHaveBeenCalled();
+    expect(isContainerRunning).toHaveBeenCalledOnce();
+    expect(listProcesses).not.toHaveBeenCalled();
   });
 
   it('falls back to inspection when the sandbox cannot report container state', async () => {

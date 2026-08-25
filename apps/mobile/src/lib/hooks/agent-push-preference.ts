@@ -1,4 +1,6 @@
-import { type QueryClient } from '@tanstack/react-query';
+import { hashKey, type QueryClient } from '@tanstack/react-query';
+
+import { nextMutationGeneration } from '@/lib/hooks/mutation-generations';
 
 /**
  * Pure logic for the per-user notification-preference settings (S3 — the
@@ -35,6 +37,7 @@ export type NotificationPreferences = Readonly<{
   balanceAlerts: boolean;
   securityFindings: boolean;
   agentPushEnabled: boolean;
+  notificationPreviews?: 'generic' | 'full';
 }>;
 
 /** What the cache may hold — either the typed full row or the legacy `agentPushEnabled` snapshot. */
@@ -150,6 +153,9 @@ type OptimisticArgs = Readonly<{
 
 type OptimisticContext = Readonly<{
   previous: NotificationPreferencesSnapshot;
+  // Generation stamped atomically with the optimistic write, so a later
+  // rollback only fires when this write is still the latest one.
+  generation: number;
   // When the legacy single-key snapshot was the cache value, also remember
   // whether we materialized it into the full per-category shape so the
   // rollback can restore the original shape.
@@ -164,6 +170,10 @@ type OptimisticContext = Readonly<{
  */
 export async function applyAgentPushOptimistic(args: OptimisticArgs): Promise<OptimisticContext> {
   await args.queryClient.cancelQueries({ queryKey: args.queryKey });
+  // Stamp after the last await, in the same synchronous block as the cache
+  // write below. Stamping before the await lets a second mutation take the
+  // newer generation while this one still owns the newer cache write.
+  const generation = nextMutationGeneration(hashKey(args.queryKey));
   const rawPrevious = args.queryClient.getQueryData(
     args.queryKey
   ) as NotificationPreferencesSnapshot;
@@ -174,7 +184,7 @@ export async function applyAgentPushOptimistic(args: OptimisticArgs): Promise<Op
       ...defaultPreferences(),
       [args.category]: args.next,
     });
-    return { previous: undefined, previousWasLegacy: false };
+    return { previous: undefined, previousWasLegacy: false, generation };
   }
   if (isLegacySnapshot(rawPrevious)) {
     // Promote the legacy snapshot into the new per-category shape (sharing the
@@ -184,14 +194,14 @@ export async function applyAgentPushOptimistic(args: OptimisticArgs): Promise<Op
       ...promoted,
       [args.category]: args.next,
     });
-    return { previous: rawPrevious, previousWasLegacy: true };
+    return { previous: rawPrevious, previousWasLegacy: true, generation };
   }
   const previous = rawPrevious as NotificationPreferences;
   args.queryClient.setQueryData(args.queryKey, {
     ...previous,
     [args.category]: args.next,
   });
-  return { previous: rawPrevious, previousWasLegacy: false };
+  return { previous: rawPrevious, previousWasLegacy: false, generation };
 }
 
 type RollbackArgs = Readonly<{

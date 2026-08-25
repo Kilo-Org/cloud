@@ -1,12 +1,15 @@
 import { getAnalysisIncompleteCount } from '@kilocode/app-shared/security-agent';
 import { type Href, useRouter } from 'expo-router';
-import { ArrowRight, FolderGit2, ShieldCheck } from '@/components/ui/icons';
+import { FolderGit2, ShieldCheck } from '@/components/ui/icons';
+import { DirectionalArrowRight } from '@/components/ui/directional-icons';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath } from '@/lib/security-agent';
@@ -31,9 +34,11 @@ function repoTrailingLabel(
   slaEnabled: boolean
 ): string {
   if (!slaEnabled) {
-    return `${repo.needsAction} findings`;
+    return i18n.t('securityAgent.dashboard.findingsCount', { count: repo.needsAction });
   }
-  return repo.slaComplianceMeasured ? `${repo.slaCompliancePercent}%` : 'Not measured';
+  return repo.slaComplianceMeasured
+    ? `${repo.slaCompliancePercent}%`
+    : i18n.t('securityAgent.dashboard.notMeasured');
 }
 
 function findingsHref(
@@ -65,11 +70,12 @@ function SectionCard({ title, children }: Readonly<{ title: string; children: Re
 function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const finding = data.priorityFinding;
 
   if (!finding) {
     return (
-      <SectionCard title="Act first">
+      <SectionCard title={t('securityAgent.dashboard.actFirst')}>
         <Pressable
           className="flex-row items-center justify-between gap-2 py-3 active:opacity-70"
           onPress={() => {
@@ -78,9 +84,9 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
         >
           <View className="flex-row items-center gap-2">
             <ShieldCheck size={16} color={colors.good} />
-            <Text className="text-sm">No open findings need attention</Text>
+            <Text className="text-sm">{t('securityAgent.dashboard.noOpenFindings')}</Text>
           </View>
-          <ArrowRight size={14} color={colors.mutedForeground} />
+          <DirectionalArrowRight size={14} color={colors.mutedForeground} />
         </Pressable>
       </SectionCard>
     );
@@ -89,7 +95,7 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
   const isOverdue = slaEnabled && finding.daysOverdue !== null;
 
   return (
-    <SectionCard title="Act first">
+    <SectionCard title={t('securityAgent.dashboard.actFirst')}>
       <Pressable
         className="gap-1 py-3 active:opacity-70"
         onPress={() => {
@@ -102,7 +108,11 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
         <Text variant="muted" className="text-xs" numberOfLines={1}>
           {finding.repoFullName}
           {isOverdue &&
-            ` · ${finding.daysOverdue === 0 ? 'Deadline reached today' : `${finding.daysOverdue} days overdue`}`}
+            ` · ${
+              finding.daysOverdue === 0
+                ? t('securityAgent.dashboard.deadlineToday')
+                : t('securityAgent.dashboard.daysOverdue', { count: finding.daysOverdue })
+            }`}
         </Text>
       </Pressable>
     </SectionCard>
@@ -110,25 +120,29 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
 }
 
 function PostureSection({ data, slaEnabled }: SectionProps) {
+  const { t } = useTranslation();
   if (slaEnabled) {
     const { overall, bySeverity } = data.sla;
     return (
-      <SectionCard title="SLA posture">
-        <KvRow label="Within deadline" value={`${overall.withinSla} / ${overall.total}`} />
+      <SectionCard title={t('securityAgent.dashboard.slaPosture')}>
         <KvRow
-          label="Critical overdue"
+          label={t('securityAgent.dashboard.withinDeadline')}
+          value={`${overall.withinSla} / ${overall.total}`}
+        />
+        <KvRow
+          label={t('securityAgent.dashboard.criticalOverdue')}
           value={String(bySeverity.critical.overdue)}
           valueTone="muted"
           dotTone={bySeverity.critical.overdue > 0 ? 'danger' : 'muted'}
         />
         <KvRow
-          label="High overdue"
+          label={t('securityAgent.dashboard.highOverdue')}
           value={String(bySeverity.high.overdue)}
           valueTone="muted"
           dotTone={bySeverity.high.overdue > 0 ? 'danger' : 'muted'}
         />
         <KvRow
-          label="Medium & low overdue"
+          label={t('securityAgent.dashboard.mediumLowOverdue')}
           value={String(bySeverity.medium.overdue + bySeverity.low.overdue)}
           valueTone="muted"
           dotTone={bySeverity.medium.overdue + bySeverity.low.overdue > 0 ? 'danger' : 'muted'}
@@ -145,27 +159,27 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
   );
 
   return (
-    <SectionCard title="Action posture">
+    <SectionCard title={t('securityAgent.dashboard.actionPosture')}>
       <KvRow
-        label="Confirmed exploitable"
+        label={t('securityAgent.dashboard.confirmedExploitable')}
         value={String(data.analysis.exploitable)}
         valueTone="muted"
         dotTone="danger"
       />
       <KvRow
-        label="Needs evidence review"
+        label={t('securityAgent.dashboard.needsEvidenceReview')}
         value={String(data.analysis.needsReview)}
         valueTone="muted"
         dotTone="warn"
       />
       <KvRow
-        label="Analysis not complete"
+        label={t('securityAgent.dashboard.analysisNotComplete')}
         value={String(analysisIncomplete)}
         valueTone="muted"
         dotTone="muted"
       />
       <KvRow
-        label="No immediate action"
+        label={t('securityAgent.dashboard.noImmediateAction')}
         value={String(noImmediateAction)}
         valueTone="muted"
         dotTone="good"
@@ -177,6 +191,7 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
 
 function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const analysisIncomplete = getAnalysisIncompleteCount(data.analysis);
 
   const rows: {
@@ -186,25 +201,25 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
     href: Href;
   }[] = [
     {
-      label: 'Confirmed exploitable',
+      label: t('securityAgent.dashboard.confirmedExploitable'),
       value: data.analysis.exploitable,
       tone: 'danger',
       href: findingsHref(scope, { outcomeFilter: 'exploitable', repoFullName }),
     },
     {
-      label: 'Not exploitable',
+      label: t('securityAgent.dashboard.notExploitable'),
       value: data.analysis.notExploitable,
       tone: 'good',
       href: findingsHref(scope, { outcomeFilter: 'not_exploitable', repoFullName }),
     },
     {
-      label: 'Needs your review',
+      label: t('securityAgent.dashboard.needsYourReview'),
       value: data.analysis.needsReview,
       tone: 'warn',
       href: findingsHref(scope, { outcomeFilter: 'needs_review', repoFullName }),
     },
     {
-      label: 'Analysis not complete',
+      label: t('securityAgent.dashboard.analysisNotComplete'),
       value: analysisIncomplete,
       tone: 'muted',
       href: findingsHref(scope, { status: 'open', repoFullName }),
@@ -212,7 +227,7 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
   ];
   if (slaEnabled) {
     rows.push({
-      label: 'No SLA deadline assigned',
+      label: t('securityAgent.dashboard.noSlaDeadline'),
       value: data.sla.untrackedCount,
       tone: 'muted',
       href: findingsHref(scope, { status: 'open', repoFullName }),
@@ -220,7 +235,7 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
   }
 
   return (
-    <SectionCard title="Codebase risk">
+    <SectionCard title={t('securityAgent.dashboard.codebaseRisk')}>
       {rows.map((row, index) => (
         <Pressable
           key={row.label}
@@ -245,23 +260,24 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
 function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   if (data.repoHealth.length === 0) {
     return (
-      <SectionCard title="Repository action plan">
+      <SectionCard title={t('securityAgent.dashboard.repositoryActionPlan')}>
         <EmptyState
           icon={FolderGit2}
           placement="top"
           className="py-3"
-          title="No repository data yet"
-          description="Repository priorities will appear after findings are synced."
+          title={t('securityAgent.dashboard.noRepositoryData')}
+          description={t('securityAgent.dashboard.noRepositoryDataDescription')}
         />
       </SectionCard>
     );
   }
 
   return (
-    <SectionCard title="Repository action plan">
+    <SectionCard title={t('securityAgent.dashboard.repositoryActionPlan')}>
       {data.repoHealth.map((repo, index) => (
         <Pressable
           key={repo.repoFullName}
@@ -278,13 +294,17 @@ function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
               {repo.repoFullName}
             </Text>
             <Text variant="muted" className="mt-0.5 text-xs">
-              {repo.open} open · {repo.critical} critical · {repo.high} high
+              {t('securityAgent.dashboard.repoSummary', {
+                open: repo.open,
+                critical: repo.critical,
+                high: repo.high,
+              })}
             </Text>
           </View>
           <Text variant="mono" className="text-xs text-muted-foreground">
             {repoTrailingLabel(repo, slaEnabled)}
           </Text>
-          <ArrowRight size={14} color={colors.mutedForeground} />
+          <DirectionalArrowRight size={14} color={colors.mutedForeground} />
         </Pressable>
       ))}
     </SectionCard>

@@ -1,6 +1,7 @@
 import { AlertCircle } from '@/components/ui/icons';
 import { useState } from 'react';
 import { Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ImageViewerModal } from '@/components/image-viewer-modal';
 import { Image } from '@/components/ui/image';
@@ -24,6 +25,7 @@ export function MarkdownImage({
   aspectRatio?: number;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const [measuredAspectRatio, setMeasuredAspectRatio] = useState<number | undefined>(undefined);
   const [failed, setFailed] = useState(false);
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -42,11 +44,13 @@ export function MarkdownImage({
         }}
         className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
         accessibilityRole="button"
-        accessibilityLabel="Image unavailable, retry loading"
+        accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
       >
         <AlertCircle size={14} color={colors.mutedForeground} />
         <Text className="text-xs text-muted-foreground">
-          {alt ? `Image unavailable ${alt}` : 'Image unavailable'}
+          {alt
+            ? t('agentChat.filePart.imageUnavailableWithAlt', { alt })
+            : t('agentChat.filePart.imageUnavailable')}
         </Text>
       </Pressable>
     );
@@ -60,7 +64,11 @@ export function MarkdownImage({
         }}
         className="my-1 w-full overflow-hidden rounded-md bg-neutral-100 active:opacity-80 dark:bg-neutral-900"
         accessibilityRole="button"
-        accessibilityLabel={alt ? `View image ${alt}` : 'View image'}
+        accessibilityLabel={
+          alt
+            ? t('agentChat.filePart.viewImageWithAlt', { alt })
+            : t('agentChat.filePart.viewImage')
+        }
         // eslint-disable-next-line react-native/no-inline-styles -- measured aspect ratio cannot be a Tailwind class
         style={{
           aspectRatio: measuredAspectRatio ?? aspectRatio ?? IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,

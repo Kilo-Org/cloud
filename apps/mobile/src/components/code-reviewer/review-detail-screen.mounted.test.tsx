@@ -49,7 +49,6 @@ vi.mock('@kilocode/app-shared/code-review', () => ({
   isRetriggerableReviewStatus: () => false,
 }));
 vi.mock('@kilocode/app-shared/utils', () => ({
-  formatDollars: String,
   fromMicrodollars: (value: unknown) => value,
 }));
 vi.mock('@/components/code-reviewer/review-list-screen', () => ({
@@ -133,6 +132,7 @@ function makeReview(over: Record<string, unknown> = {}) {
     completed_at: null,
     total_cost_musd: null,
     check_run_id: 123,
+    rawIdsRedacted: false,
     manual_config: { agentConfig: { gate_threshold: 'critical' } },
     council_result: null,
     ...over,
@@ -169,6 +169,7 @@ describe('ReviewDetailScreen outcome-first order', () => {
     detail.data = {
       success: true,
       review: makeReview({
+        total_cost_musd: 123,
         council_result: {
           decision: 'block',
           aggregationStrategy: 'unanimous',
@@ -193,6 +194,7 @@ describe('ReviewDetailScreen outcome-first order', () => {
     expect(idx('Council')).toBeGreaterThan(idx('Findings'));
     expect(idx('Gate')).toBeGreaterThan(idx('Council'));
     expect(idx('Details')).toBeGreaterThan(idx('Gate'));
+    expect(texts).toContain('$123.00');
   });
 
   it('shows the error message inside the conclusion', () => {
@@ -235,6 +237,21 @@ describe('ReviewDetailScreen empty council', () => {
     const texts = renderScreen();
 
     expect(texts).toContain('No findings');
+  });
+});
+
+describe('ReviewDetailScreen redacted check run', () => {
+  it('renders "Hidden" (not "None") when the check run is redacted', () => {
+    detail.data = {
+      success: true,
+      review: makeReview({ check_run_id: null, rawIdsRedacted: true }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    expect(texts).toContain('Hidden');
+    expect(texts).not.toContain('None');
   });
 });
 

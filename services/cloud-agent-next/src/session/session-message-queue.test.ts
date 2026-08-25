@@ -12,6 +12,7 @@ import { buildCloudMessageFailedPayload } from './message-settlement-outbox.js';
 import {
   createSessionMessageQueue,
   flushNextPendingSessionMessage,
+  type SessionMessageQueueDependencies,
   type SessionMessageQueueStorage,
 } from './session-message-queue.js';
 import {
@@ -130,6 +131,7 @@ function createQueueHarness(options?: {
   ensureAcceptedMessageEffects?: (messageId: string) => Promise<void>;
   getDeliveryBlock?: () => Promise<WrapperCleanupBlock | null>;
   recoverExhaustedDeliveryBlock?: () => Promise<void>;
+  checkBillingAdmission?: SessionMessageQueueDependencies['checkBillingAdmission'];
 }) {
   const storage = options?.storage ?? createMemoryStorage();
   const events: QueueEvent[] = [];
@@ -167,6 +169,7 @@ function createQueueHarness(options?: {
       getDeliveryContext: async () => (metadata ? createContext(metadata) : null),
       getDeliveryBlock: options?.getDeliveryBlock ?? (async () => null),
       recoverExhaustedDeliveryBlock: options?.recoverExhaustedDeliveryBlock,
+      checkBillingAdmission: options?.checkBillingAdmission,
       deliver,
       ensureQueuedMessageEvent: event => {
         if (failQueuedEvent) {
@@ -415,6 +418,116 @@ describe('flushNextPendingSessionMessage', () => {
     expect((await storage.list({ prefix: 'pending_message:' })).size).toBe(0);
   });
 
+  it.each(['COMPUTE_STOPPING', 'BILLING_UNAVAILABLE'] as const)(
+    'retries %s billing admission and preserves the durable message identity',
+    async code => {
+      const storage = createMemoryStorage();
+      await storePendingSessionMessage(
+        storage,
+        createPendingSessionMessage({
+          messageId: FIRST_MESSAGE_ID,
+          role: 'user',
+          content: 'retry after compute state settles',
+          createdAt: 1,
+        })
+      );
+      const deliver = vi
+        .fn<(_plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>>()
+        .mockResolvedValueOnce({ success: false, code, error: 'temporary billing state' })
+        .mockResolvedValueOnce({
+          success: true,
+          outcome: 'accepted',
+          messageId: FIRST_MESSAGE_ID,
+          wrapperRunId: 'wr_test',
+        });
+
+      const first = await flushNextPendingSessionMessage({
+        storage,
+        now: 10,
+        getDeliveryContext: async () => createContext(),
+        validateModeAgainstRuntimeAgents: () => null,
+        deliver,
+      });
+      expect(first).toMatchObject({ type: 'failure', exhausted: false, attempts: 1 });
+      if (first.type !== 'failure') return;
+      expect(first.message.lastFlushFailureCode).toBe(code);
+
+      await expect(
+        flushNextPendingSessionMessage({
+          storage,
+          now: first.nextFlushAttemptAt ?? 20,
+          getDeliveryContext: async () => createContext(),
+          validateModeAgainstRuntimeAgents: () => null,
+          deliver,
+        })
+      ).resolves.toEqual({ type: 'delivered', remainingCount: 0 });
+      expect(deliver.mock.calls.map(([plan]) => plan.turn.messageId)).toEqual([
+        FIRST_MESSAGE_ID,
+        FIRST_MESSAGE_ID,
+      ]);
+    }
+  );
+
+  it('fails closed after the retry budget for unavailable billing', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'eventually terminal',
+        createdAt: 1,
+      })
+    );
+    const deliver = async (): Promise<MessageDeliveryResult> => ({
+      success: false,
+      code: 'BILLING_UNAVAILABLE',
+      error: 'temporary billing state',
+    });
+    const first = await flushNextPendingSessionMessage({
+      storage,
+      now: 10,
+      getDeliveryContext: async () => createContext(),
+      validateModeAgainstRuntimeAgents: () => null,
+      deliver,
+    });
+    if (first.type !== 'failure') throw new Error('Expected failure');
+    const exhausted = await flushNextPendingSessionMessage({
+      storage,
+      now: first.nextFlushAttemptAt ?? 20,
+      getDeliveryContext: async () => createContext(),
+      validateModeAgainstRuntimeAgents: () => null,
+      deliver,
+    });
+    expect(exhausted).toMatchObject({ type: 'failure', exhausted: true, attempts: 2 });
+  });
+
+  it('terminalizes insufficient credits immediately without a retry', async () => {
+    const storage = createMemoryStorage();
+    await storePendingSessionMessage(
+      storage,
+      createPendingSessionMessage({
+        messageId: FIRST_MESSAGE_ID,
+        role: 'user',
+        content: 'needs funds',
+        createdAt: 1,
+      })
+    );
+    await expect(
+      flushNextPendingSessionMessage({
+        storage,
+        now: 10,
+        getDeliveryContext: async () => createContext(),
+        validateModeAgainstRuntimeAgents: () => null,
+        deliver: async () => ({
+          success: false,
+          code: 'PAYMENT_REQUIRED',
+          error: 'Insufficient credits',
+        }),
+      })
+    ).resolves.toMatchObject({ type: 'failure', exhausted: true, attempts: 1 });
+  });
+
   it('schedules a retry from the time a delivery failure is observed', async () => {
     const storage = createMemoryStorage();
     await storePendingSessionMessage(
@@ -620,6 +733,27 @@ describe('flushNextPendingSessionMessage', () => {
 });
 
 describe('SessionMessageQueue', () => {
+  it('rejects new work before persisting it when container billing is blocked', async () => {
+    const harness = createQueueHarness({
+      checkBillingAdmission: async () => ({
+        success: false,
+        code: 'PAYMENT_REQUIRED',
+        error: 'Container billing balance is too low',
+        failureBoundary: 'admission',
+      }),
+    });
+
+    await expect(
+      harness.queue.admitSubmittedMessage({
+        userId: 'user_test' as UserId,
+        turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'do not enqueue this prompt' },
+      })
+    ).resolves.toMatchObject({ success: false, code: 'PAYMENT_REQUIRED' });
+    expect(await listPendingSessionMessages(harness.storage)).toHaveLength(0);
+    expect(harness.events).toHaveLength(0);
+    expect(harness.alarmDeadlines).toHaveLength(0);
+  });
+
   it('reports whether a message identity already has durable admission state', async () => {
     const harness = createQueueHarness();
 

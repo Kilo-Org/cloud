@@ -1,15 +1,22 @@
 import { type Href, useRouter } from 'expo-router';
-import { Bell, Brain, type LucideIcon, Smartphone } from '@/components/ui/icons';
+import { Bell, Brain, Globe, type LucideIcon, Smartphone } from '@/components/ui/icons';
+import { useState } from 'react';
 import { Switch, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
+import { LanguagePickerSheet } from '@/components/language-picker-sheet';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
+import { attemptPushRegistrationReconciliation } from '@/lib/auth/push-registration-reconciliation';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { getResolvedLanguage, useLanguagePreference } from '@/lib/hooks/use-language-preference';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { cn } from '@/lib/utils';
+import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   setThemePreference,
@@ -73,10 +80,19 @@ export function PreferencesScreen() {
     hasLoaded: keepScreenOnLoaded,
     setKeepScreenOn,
   } = useKeepScreenOnPreference();
+  const { t } = useTranslation();
+  const { userId } = useCurrentUserId();
+  const { preference: languagePreference } = useLanguagePreference();
+  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
+  const languageEndonym = LANGUAGE_ENDONYMS[getResolvedLanguage()];
+  const languageSubtitle =
+    languagePreference === 'device'
+      ? `${t('common.device')} · ${languageEndonym}`
+      : languageEndonym;
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Preferences" />
+      <ScreenHeader title={t('preferences.title')} />
       <TabScreenScrollView
         className="flex-1 px-6"
         contentContainerClassName="gap-3 pt-4"
@@ -84,16 +100,16 @@ export function PreferencesScreen() {
       >
         <PreferenceRow
           icon={Brain}
-          title="Auto expand thinking"
-          subtitle="Show the agent's thinking expanded when it finishes."
+          title={t('preferences.autoExpandThinking')}
+          subtitle={t('preferences.autoExpandThinkingSubtitle')}
           value={defaultExpanded}
           disabled={!reasoningLoaded}
           onValueChange={setDefaultExpanded}
         />
         <PreferenceRow
           icon={Smartphone}
-          title="Keep screen on while on session page"
-          subtitle="Hold the screen awake while the session is working."
+          title={t('preferences.keepScreenOn')}
+          subtitle={t('preferences.keepScreenOnSubtitle')}
           value={keepScreenOn}
           disabled={!keepScreenOnLoaded}
           onValueChange={setKeepScreenOn}
@@ -102,29 +118,55 @@ export function PreferencesScreen() {
         {/* Appearance */}
         <View className="mt-3 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Appearance
+            {t('preferences.appearance')}
           </Text>
           <SegmentedControl<ThemePreference>
-            accessibilityLabel="Appearance"
+            accessibilityLabel={t('preferences.appearance')}
             options={[
-              { value: 'system', label: 'System' },
-              { value: 'light', label: 'Light' },
-              { value: 'dark', label: 'Dark' },
+              { value: 'system', label: t('preferences.appearanceSystem') },
+              { value: 'light', label: t('preferences.appearanceLight') },
+              { value: 'dark', label: t('preferences.appearanceDark') },
             ]}
             value={themePreference}
             onChange={setThemePreference}
           />
         </View>
 
+        {/* Account */}
+        <View className="mt-3 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {t('preferences.account')}
+          </Text>
+          <ConfigureRow
+            icon={Globe}
+            title={t('common.language')}
+            subtitle={languageSubtitle}
+            className="rounded-lg bg-secondary px-3"
+            onPress={() => {
+              setLanguagePickerOpen(true);
+            }}
+          />
+          <ConfigureRow
+            icon={Smartphone}
+            title={t('profile.deviceSessions')}
+            subtitle={t('profile.deviceSessionsSubtitle')}
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/device-sessions' as Href);
+            }}
+          />
+        </View>
+
         {/* Notifications */}
         <View className="mt-3 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Notifications
+            {t('preferences.notifications')}
           </Text>
           <ConfigureRow
             icon={Bell}
-            title="Notifications"
-            subtitle="Push preferences"
+            title={t('preferences.notifications')}
+            subtitle={t('preferences.notificationsSubtitle')}
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {
@@ -133,6 +175,18 @@ export function PreferencesScreen() {
           />
         </View>
       </TabScreenScrollView>
+      <LanguagePickerSheet
+        visible={languagePickerOpen}
+        onClose={() => {
+          setLanguagePickerOpen(false);
+        }}
+        onApplied={() => {
+          if (userId) {
+            void attemptPushRegistrationReconciliation(userId);
+          }
+        }}
+        returnTarget="preferences"
+      />
     </View>
   );
 }

@@ -1,6 +1,7 @@
 import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
@@ -28,23 +29,24 @@ type ConfidenceThreshold = SecurityAgentConfig['autoDismissConfidenceThreshold']
 
 // Labels mirror apps/web/src/components/security-agent/SecurityConfigSections.tsx
 // so the mobile and web copy for these enums stay in sync.
-const MIN_SEVERITY_OPTIONS: { value: MinSeverity; label: string }[] = [
-  { value: 'critical', label: 'Critical only' },
-  { value: 'high', label: 'High and above' },
-  { value: 'medium', label: 'Medium and above' },
-  { value: 'all', label: 'All severities' },
-];
+const MIN_SEVERITY_OPTIONS = [
+  { value: 'critical', labelKey: 'securityAgent.automation.severityCriticalOnly' },
+  { value: 'high', labelKey: 'securityAgent.automation.severityHighAndAbove' },
+  { value: 'medium', labelKey: 'securityAgent.automation.severityMediumAndAbove' },
+  { value: 'all', labelKey: 'securityAgent.automation.severityAll' },
+] as const satisfies readonly { value: MinSeverity; labelKey: string }[];
 
-const CONFIDENCE_OPTIONS: { value: ConfidenceThreshold; label: string }[] = [
-  { value: 'high', label: 'High confidence only' },
-  { value: 'medium', label: 'Medium or higher' },
-  { value: 'low', label: 'Any confidence' },
-];
+const CONFIDENCE_OPTIONS = [
+  { value: 'high', labelKey: 'securityAgent.automation.confidenceHighOnly' },
+  { value: 'medium', labelKey: 'securityAgent.automation.confidenceMediumOrHigher' },
+  { value: 'low', labelKey: 'securityAgent.automation.confidenceAny' },
+] as const satisfies readonly { value: ConfidenceThreshold; labelKey: string }[];
 
 function AutomationSettingsSkeleton() {
+  const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Automation" />
+      <ScreenHeader title={t('securityAgent.automation.title')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-16 w-full rounded-lg" />
@@ -55,6 +57,15 @@ function AutomationSettingsSkeleton() {
 }
 
 export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>) {
+  const { t } = useTranslation();
+  const minSeverityOptions = MIN_SEVERITY_OPTIONS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
+  const confidenceOptions = CONFIDENCE_OPTIONS.map(({ value, labelKey }) => ({
+    value,
+    label: t(labelKey),
+  }));
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope);
@@ -66,6 +77,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   const [autoRemediationEnabled, setAutoRemediationEnabled] = useState(false);
   const [autoRemediationMinSeverity, setAutoRemediationMinSeverity] = useState<MinSeverity>('all');
   const [autoRemediationIncludeExisting, setAutoRemediationIncludeExisting] = useState(false);
+  const [autoRemediationRequireApproval, setAutoRemediationRequireApproval] = useState(true);
   const [autoDismissEnabled, setAutoDismissEnabled] = useState(false);
   const [autoDismissConfidenceThreshold, setAutoDismissConfidenceThreshold] =
     useState<ConfidenceThreshold>('high');
@@ -87,6 +99,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     setAutoRemediationEnabled(config.data.autoRemediationEnabled);
     setAutoRemediationMinSeverity(config.data.autoRemediationMinSeverity);
     setAutoRemediationIncludeExisting(config.data.autoRemediationIncludeExisting);
+    setAutoRemediationRequireApproval(config.data.autoRemediationRequireApproval);
     setAutoDismissEnabled(config.data.autoDismissEnabled);
     setAutoDismissConfidenceThreshold(config.data.autoDismissConfidenceThreshold);
   }, [config.data]);
@@ -117,6 +130,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     autoRemediationEnabled,
     autoRemediationMinSeverity,
     autoRemediationIncludeExisting,
+    autoRemediationRequireApproval,
     autoDismissEnabled,
     autoDismissConfidenceThreshold,
   };
@@ -128,10 +142,35 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     const result = await save.mutateAsync(patch);
     initialConfigRef.current = { ...initialConfigRef.current, ...patch };
     if (result.existingFindingsQueuedCount) {
+      const count = result.existingFindingsQueuedCount;
       toast.success(
-        `${result.existingFindingsQueuedCount} existing finding${result.existingFindingsQueuedCount === 1 ? '' : 's'} queued for analysis.`
+        count === 1
+          ? t('securityAgent.automation.queuedOne', { count })
+          : t('securityAgent.automation.queuedMany', { count })
       );
     }
+  };
+
+  // Enabling auto-remediation is destructive: it opens PRs without a human in
+  // the loop, so confirm before committing (apps/mobile/AGENTS.md rule).
+  const handleAutoRemediationToggle = (next: boolean) => {
+    if (!next) {
+      setAutoRemediationEnabled(false);
+      return;
+    }
+    Alert.alert(
+      t('securityAgent.automation.enableAutoRemediationConfirmTitle'),
+      t('securityAgent.automation.enableAutoRemediationConfirmMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('securityAgent.automation.enable'),
+          onPress: () => {
+            setAutoRemediationEnabled(true);
+          },
+        },
+      ]
+    );
   };
 
   const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
@@ -139,9 +178,9 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   if (config.isError && !config.data) {
     return (
       <PlatformErrorScreen
-        title="Automation"
+        title={t('securityAgent.automation.title')}
         variant="offline"
-        message="Could not load automation settings"
+        message={t('securityAgent.automation.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );
@@ -156,7 +195,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Automation"
+        title={t('securityAgent.automation.title')}
         onBack={onBack}
         headerRight={
           canManage ? (
@@ -173,11 +212,11 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Auto analysis
+            {t('securityAgent.automation.autoAnalysis')}
           </Text>
           <ToggleRow
-            title="Enable auto-analysis"
-            subtitle="Automatically analyze findings as they are synced."
+            title={t('securityAgent.automation.enableAutoAnalysis')}
+            subtitle={t('securityAgent.automation.enableAutoAnalysisSubtitle')}
             value={autoAnalysisEnabled}
             disabled={!canManage}
             onValueChange={setAutoAnalysisEnabled}
@@ -185,15 +224,15 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           {autoAnalysisEnabled && (
             <>
               <PillGroup
-                label="Minimum severity"
-                options={MIN_SEVERITY_OPTIONS}
+                label={t('securityAgent.automation.minimumSeverity')}
+                options={minSeverityOptions}
                 value={autoAnalysisMinSeverity}
                 disabled={!canManage}
                 onChange={setAutoAnalysisMinSeverity}
               />
               <ToggleRow
-                title="Include existing findings"
-                subtitle="Also analyze previously synced findings. This may use additional credits."
+                title={t('securityAgent.automation.includeExistingFindings')}
+                subtitle={t('securityAgent.automation.includeExistingFindingsAnalysisSubtitle')}
                 value={autoAnalysisIncludeExisting}
                 disabled={!canManage}
                 onValueChange={setAutoAnalysisIncludeExisting}
@@ -204,30 +243,37 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Auto remediation
+            {t('securityAgent.automation.autoRemediation')}
           </Text>
           <ToggleRow
-            title="Enable auto-remediation"
-            subtitle="Automatically open PRs for eligible exploitable findings."
+            title={t('securityAgent.automation.enableAutoRemediation')}
+            subtitle={t('securityAgent.automation.enableAutoRemediationSubtitle')}
             value={autoRemediationEnabled}
             disabled={!canManage}
-            onValueChange={setAutoRemediationEnabled}
+            onValueChange={handleAutoRemediationToggle}
           />
           {autoRemediationEnabled && (
             <>
               <PillGroup
-                label="Minimum severity"
-                options={MIN_SEVERITY_OPTIONS}
+                label={t('securityAgent.automation.minimumSeverity')}
+                options={minSeverityOptions}
                 value={autoRemediationMinSeverity}
                 disabled={!canManage}
                 onChange={setAutoRemediationMinSeverity}
               />
               <ToggleRow
-                title="Include existing findings"
-                subtitle="Also queue already-analyzed eligible findings. Duplicate PRs stay suppressed."
+                title={t('securityAgent.automation.includeExistingFindings')}
+                subtitle={t('securityAgent.automation.includeExistingFindingsRemediationSubtitle')}
                 value={autoRemediationIncludeExisting}
                 disabled={!canManage}
                 onValueChange={setAutoRemediationIncludeExisting}
+              />
+              <ToggleRow
+                title={t('securityAgent.automation.requireApproval')}
+                subtitle={t('securityAgent.automation.requireApprovalSubtitle')}
+                value={autoRemediationRequireApproval}
+                disabled={!canManage}
+                onValueChange={setAutoRemediationRequireApproval}
               />
             </>
           )}
@@ -235,19 +281,19 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Auto dismiss
+            {t('securityAgent.automation.autoDismiss')}
           </Text>
           <ToggleRow
-            title="Enable auto-dismiss"
-            subtitle="Automatically dismiss findings AI determines are not exploitable."
+            title={t('securityAgent.automation.enableAutoDismiss')}
+            subtitle={t('securityAgent.automation.enableAutoDismissSubtitle')}
             value={autoDismissEnabled}
             disabled={!canManage}
             onValueChange={setAutoDismissEnabled}
           />
           {autoDismissEnabled && (
             <PillGroup
-              label="Confidence threshold"
-              options={CONFIDENCE_OPTIONS}
+              label={t('securityAgent.automation.confidenceThreshold')}
+              options={confidenceOptions}
               value={autoDismissConfidenceThreshold}
               disabled={!canManage}
               onChange={setAutoDismissConfidenceThreshold}
@@ -257,7 +303,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
+            {t('securityAgent.automation.permissionNote')}
           </Text>
         )}
       </TabScreenScrollView>

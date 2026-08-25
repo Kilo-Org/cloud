@@ -1,5 +1,11 @@
 import expoConstants from 'expo-constants';
 import { type ENV_KEYS, type OPTIONAL_ENV_KEYS } from './env-keys';
+import {
+  assertProductionHost,
+  assertUrlScheme,
+  PRODUCTION_HOSTS,
+  URL_SCHEMES,
+} from '@/lib/url-contract';
 
 const extra = expoConstants.expoConfig?.extra;
 
@@ -17,6 +23,8 @@ function optional(key: keyof typeof OPTIONAL_ENV_KEYS): string | undefined {
 
 export const API_BASE_URL: string = required('apiBaseUrl');
 export const WEB_BASE_URL: string = required('webBaseUrl');
+export const TERMS_URL = `${WEB_BASE_URL}/terms-app`;
+export const PRIVACY_URL = `${WEB_BASE_URL}/privacy-app`;
 export const APPSFLYER_DEV_KEY: string = required('appsFlyerDevKey');
 export const APPSFLYER_APP_ID: string = required('appsFlyerAppId');
 
@@ -34,6 +42,21 @@ export const PLAY_INTEGRITY_PROJECT_NUMBER: string | undefined = optional(
   'playIntegrityProjectNumber'
 );
 export const SENTRY_ENVIRONMENT: string | undefined = optional('sentryEnvironment');
+
+// URL contract at module evaluation. The production host check keys off the
+// baked `extra.isProductionBuild` flag, not the Sentry environment, so a
+// preview release build never crashes on preview hosts. The `required`
+// presence check above is the old presence-only check; remove it when every
+// build passes through the config boundary in app.config.ts, which already
+// throws on missing values.
+const runProductionHostCheck = !__DEV__ && extra?.isProductionBuild === true;
+for (const [key, schemes] of Object.entries(URL_SCHEMES)) {
+  const value = required(key as keyof typeof ENV_KEYS);
+  assertUrlScheme(key, value, schemes, { allowInsecure: __DEV__ });
+  if (runProductionHostCheck) {
+    assertProductionHost(key, value, PRODUCTION_HOSTS);
+  }
+}
 
 function optionalLatencyMs(key: keyof typeof OPTIONAL_ENV_KEYS): number {
   const parsed = Number.parseInt(optional(key) ?? '', 10);

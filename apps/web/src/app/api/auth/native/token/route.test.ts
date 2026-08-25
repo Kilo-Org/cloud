@@ -164,7 +164,7 @@ describe('POST /api/auth/native/token', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual({ token: 'minted-jwt' });
+      expect(data).toEqual({ token: 'minted-jwt', created: false });
       expect(mockVerifyNativeAppleIdToken).toHaveBeenCalledWith('apple-id-token', undefined);
       expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -314,7 +314,7 @@ describe('POST /api/auth/native/token', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual({ token: 'minted-jwt' });
+      expect(data).toEqual({ token: 'minted-jwt', created: false });
       expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
         expect.objectContaining({
           google_user_email: 'googleuser@example.com',
@@ -428,7 +428,7 @@ describe('POST /api/auth/native/token', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual({ token: 'minted-jwt' });
+      expect(data).toEqual({ token: 'minted-jwt', created: false });
       expect(mockCreateOrUpdateUser).toHaveBeenCalled();
     });
 
@@ -536,7 +536,7 @@ describe('POST /api/auth/native/token', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual({ token: 'minted-jwt' });
+      expect(data).toEqual({ token: 'minted-jwt', created: false });
       expect(mockReserveSignInCode).toHaveBeenCalledWith(
         'emailuser@example.com',
         '123456',
@@ -580,7 +580,7 @@ describe('POST /api/auth/native/token', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual({ token: 'minted-jwt' });
+      expect(data).toEqual({ token: 'minted-jwt', created: false });
       expect(mockReserveSignInCode).toHaveBeenCalledWith(
         'emailuser@example.com',
         '123456',
@@ -755,7 +755,7 @@ describe('POST /api/auth/native/token', () => {
       // Second attempt: code was released, re-reserve succeeds, settle works.
       const second = await POST(createRequest({ provider: 'email', email, code }));
       expect(second.status).toBe(200);
-      expect(await second.json()).toEqual({ token: 'minted-jwt' });
+      expect(await second.json()).toEqual({ token: 'minted-jwt', created: false });
 
       // One account minted across both attempts.
       expect(mockCreateOrUpdateUser).toHaveBeenCalledTimes(2);
@@ -831,6 +831,7 @@ describe('POST /api/auth/native/token', () => {
         token: 'short-jwt',
         refreshToken: 'refresh-xyz',
         expiresIn: 3600,
+        created: false,
       });
 
       // One account, one session, no legacy token.
@@ -1122,7 +1123,7 @@ describe('POST /api/auth/native/token', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ token: 'minted-jwt' });
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
       // Ownership mismatch is logged before code commit.
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_ownership_mismatch');
       // Code is committed and credentials are issued.
@@ -1270,7 +1271,7 @@ describe('POST /api/auth/native/token', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ token: 'minted-jwt' });
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_ownership_mismatch');
       // Key persistence is skipped.
       expect(mockPersistAttestedKey).not.toHaveBeenCalled();
@@ -1306,7 +1307,7 @@ describe('POST /api/auth/native/token', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ token: 'minted-jwt' });
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
     });
 
@@ -1423,6 +1424,7 @@ describe('POST /api/auth/native/token', () => {
         token: 'short-jwt',
         refreshToken: 'refresh-abc',
         expiresIn: 3600,
+        created: false,
       });
       // Must use the transactional combined function, not separate calls.
       expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledWith({
@@ -1467,6 +1469,7 @@ describe('POST /api/auth/native/token', () => {
         token: 'short-jwt',
         refreshToken: 'refresh-abc',
         expiresIn: 3600,
+        created: false,
       });
       expect(mockCreateDeviceSession).toHaveBeenCalledWith({
         userId: fakeUser.id,
@@ -1489,7 +1492,7 @@ describe('POST /api/auth/native/token', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ token: 'minted-jwt' });
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
       expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser);
       expect(mockCreateDeviceSession).not.toHaveBeenCalled();
       expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
@@ -1511,7 +1514,7 @@ describe('POST /api/auth/native/token', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ token: 'minted-jwt' });
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
       expect(mockCreateDeviceSession).not.toHaveBeenCalled();
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_legacy_long_lived_count: 1');
     });
@@ -1620,6 +1623,68 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(200);
       expect(mockPosthogCapture).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('created field', () => {
+    it('returns created: true for a new account on the email path', async () => {
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: true,
+        user: fakeUser,
+        isNew: true,
+      } as never);
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'new@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: true });
+    });
+
+    it('returns created: true for a new account on the apple path', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: true,
+        user: fakeUser,
+        isNew: true,
+      } as never);
+
+      const response = await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: true });
+    });
+
+    it('returns created: true for a new account on the google path', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+      mockCreateOrUpdateUser.mockResolvedValue({
+        success: true,
+        user: fakeUser,
+        isNew: true,
+      } as never);
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: true });
+    });
+
+    it('returns created: false for an existing account on the email path', async () => {
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'existing@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
     });
   });
 });

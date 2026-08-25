@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- the route coordinates the new-session draft, model selection, and submit lifecycle. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
@@ -21,6 +22,7 @@ import { useNewSessionPrefillTargets } from '@/components/agents/use-new-session
 import { ScreenHeader } from '@/components/screen-header';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import { useAgentAttachmentUpload } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useInstanceModelCatalog } from '@/lib/hooks/use-instance-model-catalog';
@@ -58,6 +60,7 @@ export default function NewSessionScreen() {
 }
 function NewSessionScreenBody() {
   const { mode, setMode, model, setModel, variant, setVariant } = useNewSessionModelState();
+  const { t } = useTranslation();
   const { showActionSheetWithOptions } = useActionSheet();
   const { organizationId, shareId: shareIdParam } = useLocalSearchParams<{
     organizationId?: string;
@@ -106,7 +109,7 @@ function NewSessionScreenBody() {
   // settles.
   const initialPrompt = resolvePrefillOverDraft(
     sharePrefillText,
-    draftState.settled ? draftState.text : null
+    draftState.settled ? draftState.value : null
   );
 
   // Save the new-session draft debounced on every text change, and flush the
@@ -378,9 +381,22 @@ function NewSessionScreenBody() {
   }, []);
 
   const { addCandidates, removeAttachment, retryAttachment } = attachments;
+
+  useAndroidPendingPickerRecovery({
+    surface: 'agent-new',
+    sessionId: null,
+    addCandidates,
+  });
+
   const handleAddAttachment = useCallback(async () => {
-    void addCandidates(await pickAgentAttachments(showActionSheetWithOptions));
-  }, [addCandidates, showActionSheetWithOptions]);
+    void addCandidates(
+      await pickAgentAttachments(showActionSheetWithOptions, {
+        userId,
+        surface: 'agent-new',
+        sessionId: null,
+      })
+    );
+  }, [addCandidates, showActionSheetWithOptions, userId]);
 
   const handleRemoveAttachment = useCallback(
     (id: string) => {
@@ -401,6 +417,7 @@ function NewSessionScreenBody() {
     ? remoteSpawn.isSpawningRemote ||
       isSubmitting ||
       attachments.hasFailedAttachments ||
+      attachments.isUploading ||
       modelView.isSelectionUnavailable ||
       instanceCatalog.isLoading
     : resolveNewSessionStartDisabled({
@@ -428,7 +445,7 @@ function NewSessionScreenBody() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="New session" />
+      <ScreenHeader title={t('agentChat.newSession.title')} />
       <NewSessionConfigureForm
         key={promptSeed === 'restore' ? 'draft' : 'empty'}
         attachments={attachments.attachments}

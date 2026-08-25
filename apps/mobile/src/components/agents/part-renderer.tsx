@@ -1,4 +1,10 @@
 import { type Part, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+
+import { Text } from '@/components/ui/text';
+
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { CompactionSeparator } from './compaction-separator';
 import { FilePartRenderer } from './file-part-renderer';
@@ -8,6 +14,7 @@ import {
   isCompactionPart,
   isFilePart,
   isPartStreaming,
+  isPatchPart,
   isReasoningPart,
   isTextPart,
   isToolPart,
@@ -23,6 +30,7 @@ type PartRendererProps = {
   getChildMessages?: (sessionId: string) => StoredMessage[];
   defaultReasoningExpanded?: boolean;
   onOpenChildSession?: OpenChildSession;
+  modelOptions?: SessionModelOption[];
 };
 
 export function PartRenderer({
@@ -31,7 +39,9 @@ export function PartRenderer({
   getChildMessages,
   defaultReasoningExpanded,
   onOpenChildSession,
+  modelOptions,
 }: Readonly<PartRendererProps>) {
+  const { t } = useTranslation();
   if (!partRendersContent(part)) {
     return null;
   }
@@ -50,6 +60,7 @@ export function PartRenderer({
           getChildMessages={getChildMessages}
           renderPart={props => <PartRenderer {...props} />}
           onOpenChildSession={onOpenChildSession}
+          modelOptions={modelOptions}
         />
       </MessageErrorBoundary>
     );
@@ -76,6 +87,29 @@ export function PartRenderer({
   if (isCompactionPart(part)) {
     return <CompactionSeparator />;
   }
-  // step-start, step-finish, patch, snapshot, agent, retry, subtask — not rendered
+  // Standalone PatchPart (`type: 'patch'`) carries only file paths — no diff
+  // text — so the diff engine cannot apply. The web renderer renders null for
+  // it (apps/web/src/components/cloud-agent-next/PartRenderer.tsx:398-404).
+  // If OpenCode ever ships diff text on the part, render it through `DiffLine`.
+  if (isPatchPart(part)) {
+    const fileCount = part.files.length;
+    const summary =
+      fileCount === 1
+        ? t('agentChat.partRenderer.updatedFile', { count: fileCount })
+        : t('agentChat.partRenderer.updatedFiles', { count: fileCount });
+    return (
+      <MessageErrorBoundary>
+        <View className="my-1 gap-1">
+          <Text className="text-xs text-muted-foreground">{summary}</Text>
+          {part.files.map(file => (
+            <Text key={file} className="font-mono text-xs text-muted-foreground" numberOfLines={1}>
+              {file}
+            </Text>
+          ))}
+        </View>
+      </MessageErrorBoundary>
+    );
+  }
+  // step-start, step-finish, snapshot, agent, retry, subtask — not rendered
   return null;
 }

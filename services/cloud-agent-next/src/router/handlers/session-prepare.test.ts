@@ -334,4 +334,52 @@ describe('prepareSession operation-ledger admission gate', () => {
     });
     expect(result).not.toHaveProperty('replayed');
   });
+
+  it('propagates the clone source through createSessionWithLedger and replays on a same-key retry', async () => {
+    const caller = router.createCaller(createContext());
+    const sourceKiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
+
+    await caller.prepareSession({
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      operationKey: OPERATION_KEY,
+      cloneFromKiloSessionId: sourceKiloSessionId,
+    });
+
+    expect(createSessionWithLedgerMock).toHaveBeenCalledTimes(1);
+    expect(createSessionWithLedgerMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialTurn: undefined,
+        clone: { cloneFromKiloSessionId: sourceKiloSessionId },
+      }),
+      expect.objectContaining({ userId: 'test-user-123' }),
+      expect.objectContaining({ operationKey: OPERATION_KEY })
+    );
+    expect(startNewSessionMock).not.toHaveBeenCalled();
+    expect(registerNewSessionMock).not.toHaveBeenCalled();
+
+    // Same-key retry resumes: the ledger replays the settled clone create.
+    createSessionWithLedgerMock.mockResolvedValueOnce({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      kiloSessionId: 'cli-session-abc123',
+      replayed: true,
+    });
+    const retry = await caller.prepareSession({
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      operationKey: OPERATION_KEY,
+      cloneFromKiloSessionId: sourceKiloSessionId,
+    });
+
+    expect(createSessionWithLedgerMock).toHaveBeenCalledTimes(2);
+    expect(retry).toEqual({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      kiloSessionId: 'cli-session-abc123',
+      replayed: true,
+    });
+  });
 });

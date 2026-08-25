@@ -253,6 +253,8 @@ describe('CloudAgentSession push notification producer', () => {
           status: 'failed',
           category: 'status',
           body: 'Failed: The message failed',
+          i18nKey: 'cloudAgentSession.failed',
+          i18nParams: { detail: 'The message failed' },
           suppressIfViewingSession: true,
         },
       ]);
@@ -285,6 +287,8 @@ describe('CloudAgentSession push notification producer', () => {
           status: 'interrupted',
           category: 'status',
           body: 'Interrupted: Task interrupted',
+          i18nKey: 'cloudAgentSession.interrupted',
+          i18nParams: { detail: 'Task interrupted' },
           suppressIfViewingSession: true,
         },
       ]);
@@ -324,6 +328,8 @@ describe('CloudAgentSession push notification producer', () => {
           status: 'failed',
           category: 'status',
           body: 'Failed: The message failed',
+          i18nKey: 'cloudAgentSession.failed',
+          i18nParams: { detail: 'The message failed' },
           suppressIfViewingSession: true,
         },
         {
@@ -333,6 +339,8 @@ describe('CloudAgentSession push notification producer', () => {
           status: 'failed',
           category: 'status',
           body: 'Failed: The message failed',
+          i18nKey: 'cloudAgentSession.failed',
+          i18nParams: { detail: 'The message failed' },
           suppressIfViewingSession: true,
         },
       ]);

@@ -109,10 +109,6 @@ export const kiloExtras = {
     notebook_execute: { $ref: '#/$defs/PermissionRuleConfig' },
   },
   experimental: {
-    codebase_search: {
-      description: 'Enable AI-powered codebase search',
-      type: 'boolean',
-    },
     agent_requirements: {
       description:
         'Require declared agent skills, MCPs, and VS Code extensions before VS Code prompts can run',

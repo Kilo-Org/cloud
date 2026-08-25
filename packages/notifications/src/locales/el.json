@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Η συνεδρία του πράκτορά σας έχει μια ενημέρωση",
+      "chatMessage": "Έχετε ένα νέο μήνυμα",
+      "instanceLifecycle": "Η παρουσία σας έχει μια ενημέρωση",
+      "scheduledAction": "Μια προγραμματισμένη ενέργεια έχει μια ενημέρωση",
+      "lowBalance": "Το υπόλοιπό σας χρειάζεται προσοχή",
+      "securityFinding": "Ένα εύρημα ασφαλείας χρειάζεται προσοχή"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Η εργασία ολοκληρώθηκε"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Απέτυχε: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Διακόπηκε: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Χωρίς τίτλο",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Ειδοποίηση χαμηλού υπολοίπου",
+      "body": "Το υπόλοιπο του {{organizationName}} έπεσε κάτω από ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Νέο εύρημα ασφαλείας ({{severity}})",
+      "body": "{{findingTitle}} στο {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Προειδοποίηση SLA",
+      "body": "{{findingTitle}} στο {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Παραβίαση SLA",
+      "body": "{{findingTitle}} στο {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Ένα εύρημα ασφαλείας χρειάζεται προσοχή"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "Το {{instanceName}} είναι έτοιμο",
+      "body": "Πατήστε για να ξεκινήσετε τη συνομιλία."
+    },
+    "startFailed": {
+      "title": "Το {{instanceName}} απέτυχε να ξεκινήσει",
+      "body": "Η εκκίνηση απέτυχε."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "Το {{instanceName}} θα επανεκκινηθεί σύντομα",
+      "body": "Προγραμματίστηκε επανεκκίνηση στις {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Η επανεκκίνηση του {{instanceName}} ακυρώθηκε",
+      "body": "Η προηγουμένως προγραμματισμένη επανεκκίνηση ακυρώθηκε."
+    },
+    "versionChangeNotice": {
+      "title": "Το {{instanceName}} θα αναβαθμιστεί σύντομα",
+      "bodyWithTag": "Αναβάθμιση σε {{targetImageTag}} στις {{when}}.",
+      "bodyWithoutTag": "Προγραμματισμένη αναβάθμιση στις {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Η αναβάθμιση του {{instanceName}} ακυρώθηκε",
+      "body": "Η προηγουμένως προγραμματισμένη αναβάθμιση ακυρώθηκε."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Η συνεδρία Kilo σας είναι έτοιμη να ελεγχθεί από το τηλέφωνό σας"
+  }
+}

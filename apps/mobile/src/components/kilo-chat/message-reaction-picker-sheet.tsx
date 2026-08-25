@@ -2,6 +2,7 @@ import { Portal } from '@rn-primitives/portal';
 import { X } from '@/components/ui/icons';
 import { useEffect } from 'react';
 import { BackHandler, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -36,6 +37,7 @@ export function MessageReactionPickerSheet({
   onSelect,
 }: Readonly<MessageReactionPickerSheetProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -64,7 +66,11 @@ export function MessageReactionPickerSheet({
         exiting={FadeOut.duration(150)}
         className="absolute inset-0 justify-end bg-black/40"
       >
-        <Pressable className="flex-1" accessibilityLabel="Close reactions" onPress={onClose} />
+        <Pressable
+          className="flex-1"
+          accessibilityLabel={t('chat.reactions.close')}
+          onPress={onClose}
+        />
         <Animated.View
           entering={SlideInDown.duration(220)}
           exiting={SlideOutDown.duration(180)}
@@ -73,10 +79,12 @@ export function MessageReactionPickerSheet({
           style={{ paddingBottom: insets.bottom + 24 }}
         >
           <View className="flex-row items-center justify-between">
-            <Text className="text-base font-semibold text-foreground">Reactions</Text>
+            <Text className="text-base font-semibold text-foreground">
+              {t('chat.reactions.title')}
+            </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Close reactions"
+              accessibilityLabel={t('chat.reactions.close')}
               className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
               onPress={onClose}
             >
@@ -84,9 +92,17 @@ export function MessageReactionPickerSheet({
             </Pressable>
           </View>
           {recent.length > 0 ? (
-            <ReactionGrid title="Recent" reactions={recent} onSelect={onSelect} />
+            <ReactionGrid
+              title={t('chat.reactions.recent')}
+              reactions={recent}
+              onSelect={onSelect}
+            />
           ) : null}
-          <ReactionGrid title="Common" reactions={COMMON_REACTIONS} onSelect={onSelect} />
+          <ReactionGrid
+            title={t('chat.reactions.common')}
+            reactions={COMMON_REACTIONS}
+            onSelect={onSelect}
+          />
         </Animated.View>
       </Animated.View>
     </Portal>
@@ -102,6 +118,7 @@ function ReactionGrid({
   reactions: string[];
   onSelect: (emoji: string) => void;
 }>) {
+  const { t } = useTranslation();
   return (
     <View className="gap-2">
       <Text variant="eyebrow">{title}</Text>
@@ -110,7 +127,7 @@ function ReactionGrid({
           <Pressable
             key={reaction}
             accessibilityRole="button"
-            accessibilityLabel={`React with ${reaction}`}
+            accessibilityLabel={t('chat.reactions.reactWith', { reaction })}
             className="h-11 w-11 items-center justify-center rounded-full bg-muted active:opacity-75"
             onPress={() => {
               onSelect(reaction);

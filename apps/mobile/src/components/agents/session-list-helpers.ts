@@ -1,6 +1,9 @@
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 
+import { i18n } from '@/i18n';
+import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { type AgentSessionDateGroup } from '@/lib/agent-session-groups';
+import { CURRENCY_ZERO_THRESHOLD, formatCurrency } from '@/lib/format';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
@@ -77,7 +80,8 @@ export function formatMeta(timestamp: string): string {
  * Conversion: microdollars → USD. At or above half a cent (`>= 5000` µ$),
  * two-decimal dollars (e.g. `$0.01`, `$1.23`). Below half a cent, four
  * decimals (e.g. `$0.0031`); values that would render `$0.0000` (1..49 µ$)
- * are omitted instead of a false zero.
+ * are omitted instead of a false zero. Formatted with the active language so
+ * the currency follows the applied locale.
  */
 export function formatSessionTotalCost(microdollars: number | null | undefined): string | null {
   if (microdollars == null || !Number.isFinite(microdollars) || microdollars <= 0) {
@@ -85,10 +89,12 @@ export function formatSessionTotalCost(microdollars: number | null | undefined):
   }
   const usd = microdollars / 1_000_000;
   if (usd >= 0.005) {
-    return `$${usd.toFixed(2)}`;
+    return formatCurrency(usd, i18n.language, 2);
   }
-  const fine = `$${usd.toFixed(4)}`;
-  return fine === '$0.0000' ? null : fine;
+  if (usd < CURRENCY_ZERO_THRESHOLD) {
+    return null;
+  }
+  return formatCurrency(usd, i18n.language, 4);
 }
 
 /**
@@ -216,7 +222,7 @@ export function selectRemoteRowSpokenMeta(params: {
  */
 export function remoteAgentLabel(createdOnPlatform: string | undefined): string {
   if (!createdOnPlatform || createdOnPlatform === 'unknown') {
-    return 'LIVE';
+    return i18n.t('agents.sessionList.live');
   }
   return platformLabel(createdOnPlatform);
 }
@@ -286,6 +292,15 @@ export function remoteSessionEyebrowLabel(session: {
 }): string {
   const repo = repoNameFromGitUrl(session.gitUrl);
   return repo ? repo.toUpperCase() : remoteAgentLabel(session.createdOnPlatform);
+}
+
+/**
+ * Whether the Active now row's long-press menu may offer Exit session.
+ * Cloud-agent rows carry the sentinel `connectionId` and have no CLI
+ * connection to receive `exit_cli`; only real CLI rows can be exited.
+ */
+export function canExitSessionFromList(session: { connectionId: string }): boolean {
+  return session.connectionId !== CLOUD_AGENT_CONNECTION_ID;
 }
 
 const KNOWN_PLATFORM_VALUES: readonly string[] = KNOWN_PLATFORMS;

@@ -1,4 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
@@ -102,6 +103,7 @@ type AgentSessionsSectionProps = {
 
 export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsSectionProps>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const { activeSessions, storedSessions, activeSessionIds, activeIsError } = useAgentSessions({
     organizationId,
   });
@@ -116,15 +118,15 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
   return (
     <View>
       <SectionHeader
-        label="Agent sessions"
-        actionLabel="See all"
+        label={t('home.agentSessions')}
+        actionLabel={t('home.seeAll')}
         onActionPress={() => {
           router.push('/(app)/(tabs)/(2_agents)' as Href);
         }}
       />
       {activeIsError ? (
         <Text variant="muted" className="mx-4 mb-2 text-xs">
-          Showing saved sessions — live status may be out of date
+          {t('home.showingSavedSessions')}
         </Text>
       ) : null}
       <View className="mx-4 gap-2">

@@ -1,8 +1,9 @@
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
-import { CREATE_REMOTE_SESSION_FALLBACK_MESSAGE } from '@/components/agents/create-remote-session-with-feedback';
 
 const SESSION_ID = 'ses_12345678901234567890123456' as KiloSessionId;
 const ORG_ID = 'org_abc123';
@@ -85,7 +86,7 @@ describe('createAndNavigateAgentSession', () => {
 
     expect(result).toEqual({ success: false });
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(CREATE_REMOTE_SESSION_FALLBACK_MESSAGE);
+    expect(onError).toHaveBeenCalledWith(i18n.t('agentChat.remoteSession.failedToCreate'));
     expect(router.replace).not.toHaveBeenCalled();
   });
 });

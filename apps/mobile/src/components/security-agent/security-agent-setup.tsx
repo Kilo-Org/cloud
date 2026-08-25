@@ -1,13 +1,15 @@
-import * as WebBrowser from 'expo-web-browser';
 import { ShieldCheck } from '@/components/ui/icons';
-import { useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Platform, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { useExternalAuthReturn } from '@/lib/external-auth/use-external-auth-return';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
 
 type SecurityAgentSetupProps<T> = {
   title: string;
@@ -28,14 +30,28 @@ export function SecurityAgentSetup<T>({
   const colors = useThemeColors();
   const tabBarPadding = useTabBarBottomPadding();
   const [connecting, setConnecting] = useState(false);
+  const { t } = useTranslation();
+
+  const handleConnected = useCallback(() => {
+    void onConnected();
+  }, [onConnected]);
+  const { markLaunched, clearLaunch } = useExternalAuthReturn(handleConnected);
 
   const connect = async () => {
     setConnecting(true);
     try {
-      await WebBrowser.openAuthSessionAsync(url);
-      await onConnected();
+      markLaunched();
+      const trigger = await openAuthorizationAndWaitForReturn(Platform.OS, url);
+      if (trigger === 'sheet-close') {
+        // iOS: the auth session resolves on sheet close — refresh right here.
+        clearLaunch();
+        await onConnected();
+      }
+      // Android: onConnected runs from the foreground handler once the app
+      // returns from the plain browser.
     } catch {
-      toast.error('Could not open GitHub. Please try again.');
+      clearLaunch();
+      toast.error(t('securityAgent.setup.couldNotOpenGithub'));
     } finally {
       setConnecting(false);
     }

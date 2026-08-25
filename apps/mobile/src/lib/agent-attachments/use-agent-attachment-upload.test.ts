@@ -3,6 +3,7 @@
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 import { AGENT_ATTACHMENT_MAX_BYTES } from './constants';
 import {
@@ -32,10 +33,20 @@ const hoisted = vi.hoisted(() => {
     announceForA11y: vi.fn(),
     announcingToastError: vi.fn(),
     measureLocalSize: vi.fn(),
+    cancelAsync: vi.fn(),
+    fileDelete: vi.fn(),
+    captureException: vi.fn(),
+    deletedUris: new Set<string>(),
   };
 });
 
 vi.mock('expo-crypto', () => ({ randomUUID: hoisted.randomUUID }));
+vi.mock('@sentry/react-native', () => ({ captureException: hoisted.captureException }));
+vi.mock('expo-file-system/legacy', () => ({ deleteAsync: vi.fn() }));
+vi.mock('expo-image-manipulator', () => ({
+  SaveFormat: { PNG: 'png', WEBP: 'webp', JPEG: 'jpeg' },
+  manipulateAsync: vi.fn(),
+}));
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
@@ -49,6 +60,29 @@ vi.mock('@/lib/agent-attachments/upload-task', () => ({
   describeTerminalReason: () => "This file can't be uploaded.",
   uploadOne: hoisted.uploadOne,
 }));
+vi.mock('expo-file-system', () => {
+  class FileMock {
+    uri: string;
+    constructor(uri: string) {
+      this.uri = uri;
+    }
+    get exists() {
+      return !hoisted.deletedUris.has(this.uri);
+    }
+    delete() {
+      if (hoisted.deletedUris.has(this.uri)) {
+        // already deleted — idempotent, matching production
+        return;
+      }
+      hoisted.deletedUris.add(this.uri);
+      hoisted.fileDelete(this.uri);
+    }
+  }
+  return {
+    File: FileMock,
+    Paths: { cache: { uri: 'file:///cache' } },
+  };
+});
 
 function makeAttachment(overrides: Partial<AgentAttachment>): AgentAttachment {
   return {
@@ -250,9 +284,9 @@ describe('isAnyAttachmentUploading / hasAnyFailedAttachment (send-admission sign
     expect(hasAnyFailedAttachment(list)).toBe(false);
   });
 
-  it('reports uploading=true for a pending chip (not yet started)', () => {
+  it('reports uploading=false for a pending chip (not yet started)', () => {
     const list = [makeAttachment({ status: 'pending', progress: 0 })];
-    expect(isAnyAttachmentUploading(list)).toBe(true);
+    expect(isAnyAttachmentUploading(list)).toBe(false);
   });
 
   it('reports hasFailed=true after a chip errors (retryable OR terminal)', () => {
@@ -280,7 +314,7 @@ describe('feature-state matrix — send-admission behavior', () => {
       { list: [], shouldBlock: false },
       { list: [makeAttachment({ status: 'uploaded', progress: 1 })], shouldBlock: false },
       { list: [makeAttachment({ status: 'uploading', progress: 0.5 })], shouldBlock: true },
-      { list: [makeAttachment({ status: 'pending', progress: 0 })], shouldBlock: true },
+      { list: [makeAttachment({ status: 'pending', progress: 0 })], shouldBlock: false },
       {
         list: [makeAttachment({ status: 'error', terminal: false, progress: null })],
         shouldBlock: true,
@@ -374,12 +408,185 @@ async function settle(): Promise<void> {
   await Promise.resolve();
 }
 
+describe('addCandidates defers document uploads', () => {
+  beforeEach(() => {
+    hoisted.uploadOne.mockReset();
+    hoisted.measureLocalSize.mockReset();
+    hoisted.measureLocalSize.mockResolvedValue(1024);
+  });
+
+  it('adds a pending chip without starting an upload', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    expect(hookApi().attachments[0]?.status).toBe('pending');
+    expect(hoisted.uploadOne).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+});
+
+describe('uploadPending', () => {
+  beforeEach(() => {
+    hoisted.uploadOne.mockReset();
+    hoisted.announceForA11y.mockReset();
+    hoisted.announcingToastError.mockReset();
+    hoisted.measureLocalSize.mockReset();
+    hoisted.measureLocalSize.mockResolvedValue(1024);
+    resolveUpload = undefined;
+    rejectUpload = undefined;
+    const controlled = new Promise<{ key: string }>((resolve, reject) => {
+      resolveUpload = resolve;
+      rejectUpload = reject;
+    });
+    hoisted.uploadOne.mockReturnValue(controlled);
+  });
+
+  it('resolves { ok: false } on a terminal upload failure and short-circuits a later call', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+
+    await act(async () => {
+      const pending = hookApi().uploadPending();
+      rejectUpload?.({ data: { code: 'BAD_REQUEST', message: 'extension not allowed' } });
+      const result = await pending;
+      expect(result).toEqual({ ok: false });
+    });
+    expect(hookApi().attachments[0]?.terminal).toBe(true);
+
+    // The terminal chip now short-circuits a second uploadPending.
+    await act(async () => {
+      const result = await hookApi().uploadPending();
+      expect(result).toEqual({ ok: false });
+    });
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
+    renderer.unmount();
+  });
+
+  it('resolves { ok: true, wire, submission } on full success', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+
+    let result: Awaited<ReturnType<HookApi['uploadPending']>> | undefined = undefined;
+    await act(async () => {
+      const pending = hookApi().uploadPending();
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      result = await pending;
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      wire: { path: expect.any(String), files: ['doc.pdf'] },
+      submission: {
+        wire: { path: expect.any(String), files: ['doc.pdf'] },
+        messageUuid: expect.any(String),
+        files: [{ remoteName: 'doc.pdf', originalName: 'doc.pdf', size: 1024 }],
+      },
+    });
+    renderer.unmount();
+  });
+});
+
+describe('selection-time image upload (Step 2)', () => {
+  beforeEach(() => {
+    hoisted.uploadOne.mockReset();
+    hoisted.announceForA11y.mockReset();
+    hoisted.announcingToastError.mockReset();
+    hoisted.measureLocalSize.mockReset();
+    hoisted.measureLocalSize.mockResolvedValue(1024);
+    vi.mocked(ImageManipulator.manipulateAsync).mockReset();
+    vi.mocked(ImageManipulator.manipulateAsync).mockResolvedValue({
+      uri: 'file:///cache/stripped.jpg',
+      width: 100,
+      height: 100,
+    });
+    resolveUpload = undefined;
+    rejectUpload = undefined;
+    const controlled = new Promise<{ key: string }>((resolve, reject) => {
+      resolveUpload = resolve;
+      rejectUpload = reject;
+    });
+    hoisted.uploadOne.mockReturnValue(controlled);
+  });
+
+  it('starts the upload for an image at selection time and flips the chip to uploaded', async () => {
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: 'IMG_0001.HEIC', uri: 'file:///cache/IMG_0001.HEIC' },
+      ]);
+    });
+
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('uploading');
+    // The strip mock re-encodes HEIC to JPEG, proving the Step 1 pipeline.
+    expect(chip?.extension).toBe('jpg');
+    expect(chip?.mimeType).toBe('image/jpeg');
+
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/img.jpg' });
+      await settle();
+    });
+
+    const uploaded = hookApi().attachments[0];
+    expect(uploaded?.status).toBe('uploaded');
+    expect(uploaded?.progress).toBe(1);
+    expect(uploaded?.remoteFilename).toBe('img.jpg');
+    renderer.unmount();
+  });
+
+  it('marks a selection-time upload rejection as a retryable error', async () => {
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: 'IMG_0001.HEIC', uri: 'file:///cache/IMG_0001.HEIC' },
+      ]);
+    });
+
+    await act(async () => {
+      rejectUpload?.(new TypeError('Network request failed'));
+      await settle();
+    });
+
+    const chip = hookApi().attachments[0];
+    expect(chip?.status).toBe('error');
+    expect(chip?.terminal).toBe(false);
+    renderer.unmount();
+  });
+
+  it('returns ok from uploadPending after the image pre-uploaded without a second uploadOne call', async () => {
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: 'IMG_0001.HEIC', uri: 'file:///cache/IMG_0001.HEIC' },
+      ]);
+    });
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/img.jpg' });
+      await settle();
+    });
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
+
+    let result: Awaited<ReturnType<HookApi['uploadPending']>> | undefined = undefined;
+    await act(async () => {
+      result = await hookApi().uploadPending();
+    });
+
+    expect(result).toEqual(expect.objectContaining({ ok: true }));
+    expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
+    renderer.unmount();
+  });
+});
+
 describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => {
   beforeEach(() => {
     hoisted.uploadOne.mockReset();
     hoisted.announceForA11y.mockReset();
     hoisted.announcingToastError.mockReset();
     hoisted.measureLocalSize.mockReset();
+    hoisted.cancelAsync.mockReset();
+    hoisted.fileDelete.mockReset();
+    hoisted.captureException.mockReset();
+    hoisted.deletedUris.clear();
     hoisted.measureLocalSize.mockResolvedValue(1024);
     resolveUpload = undefined;
     rejectUpload = undefined;
@@ -389,16 +596,27 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
       resolveUpload = resolve;
       rejectUpload = reject;
     });
-    hoisted.uploadOne.mockReturnValue(controlled);
+    // The mock mirrors `uploadOne`'s real contract: it hands the created
+    // task's `cancelAsync` back through `onTask` before the upload settles.
+    hoisted.uploadOne.mockImplementation(
+      async (args: { onTask?: (task: { cancelAsync: () => Promise<void> }) => void }) => {
+        args.onTask?.({ cancelAsync: hoisted.cancelAsync });
+        const result = await controlled;
+        return result;
+      }
+    );
   });
 
   it('announces success exactly once when the upload resolves', async () => {
     const renderer = await mountHook();
     await addDocument();
-    expect(hookApi().attachments[0]?.status).toBe('uploading');
+    expect(hookApi().attachments[0]?.status).toBe('pending');
 
     await act(async () => {
+      const pending = hookApi().uploadPending();
+      await Promise.resolve();
       resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await pending;
       await settle();
     });
 
@@ -415,7 +633,9 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     await addDocument();
 
     await act(async () => {
+      const pending = hookApi().uploadPending();
       rejectUpload?.(new TypeError('Network request failed'));
+      await pending;
       await settle();
     });
 
@@ -436,7 +656,9 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     await addDocument();
 
     await act(async () => {
+      const pending = hookApi().uploadPending();
       rejectUpload?.({ data: { code: 'BAD_REQUEST', message: 'extension not allowed' } });
+      await pending;
       await settle();
     });
 
@@ -453,7 +675,9 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     const renderer = await mountHook();
     await addDocument();
     await act(async () => {
+      const pending = hookApi().uploadPending();
       rejectUpload?.(new TypeError('Network request failed'));
+      await pending;
       await settle();
     });
     expect(hoisted.uploadOne).toHaveBeenCalledTimes(1);
@@ -491,6 +715,12 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
       throw new Error('attachment id missing');
     }
 
+    // Start the upload, then remove the chip while it is in flight.
+    let pending: Promise<unknown> | undefined = undefined;
+    await act(async () => {
+      pending = hookApi().uploadPending();
+      await Promise.resolve();
+    });
     await act(async () => {
       hookApi().removeAttachment(id);
       await settle();
@@ -499,6 +729,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
 
     await act(async () => {
       resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await pending;
       await settle();
     });
 
@@ -507,10 +738,42 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     renderer.unmount();
   });
 
+  it('reports a cache file delete failure with safe context', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+    hoisted.fileDelete.mockImplementationOnce(() => {
+      throw new Error('delete failed');
+    });
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+
+    expect(hoisted.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'delete-cache-file',
+      },
+      extra: { cacheOwned: true },
+      fingerprint: ['agent-attachments-delete-cache-file'],
+    });
+    renderer.unmount();
+  });
+
   it('never announces or updates state when the composer is reset before the outcome', async () => {
     const renderer = await mountHook();
     await addDocument();
 
+    let pending: Promise<unknown> | undefined = undefined;
+    await act(async () => {
+      pending = hookApi().uploadPending();
+      await Promise.resolve();
+    });
     await act(async () => {
       hookApi().reset();
       await settle();
@@ -519,6 +782,7 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
 
     await act(async () => {
       resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await pending;
       await settle();
     });
 
@@ -562,6 +826,256 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     expect(hoisted.uploadOne).not.toHaveBeenCalled();
     expect(hoisted.announceForA11y).not.toHaveBeenCalled();
     expect(hoisted.announcingToastError).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('cancels the in-flight upload and deletes a cache-owned file on remove', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+
+    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/doc.pdf');
+    renderer.unmount();
+  });
+
+  it('deletes the cache-owned file when removed during the presign window (onTask not yet called)', async () => {
+    // Simulate the presign window: `uploadOne` captures `onTask` but does not
+    // hand the task back before the upload settles, so `task` stays undefined.
+    let capturedOnTask: ((task: { cancelAsync: () => Promise<void> }) => void) | undefined =
+      undefined;
+    hoisted.uploadOne.mockImplementation(
+      async (args: { onTask?: (task: { cancelAsync: () => Promise<void> }) => void }) => {
+        capturedOnTask = args.onTask;
+        // Never resolves: the upload stays in the presign window, so the task
+        // is never handed back through `onTask`.
+        const result = await new Promise<{ key: string }>(resolve => {
+          resolveUpload = resolve;
+        });
+        return result;
+      }
+    );
+    const renderer = await mountHook();
+    await addDocument();
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+
+    // The task was never handed back, so no cancelAsync; the finally cleanup
+    // must still delete the cache-owned file.
+    expect(capturedOnTask).toBeDefined();
+    expect(hoisted.cancelAsync).not.toHaveBeenCalled();
+    expect(hoisted.fileDelete).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/doc.pdf');
+    renderer.unmount();
+  });
+
+  it('does not start an upload task when removed during the presign window', async () => {
+    let createTaskAfterPresign = 0;
+    let cancelledAfterPresign = false;
+    hoisted.uploadOne.mockImplementation(
+      async (args: {
+        onTask?: (task: { cancelAsync: () => Promise<void> }) => void;
+        isCancelled?: () => boolean;
+      }) => {
+        const result = await new Promise<{ key: string }>(resolve => {
+          resolveUpload = resolve;
+        });
+        if (args.isCancelled?.()) {
+          cancelledAfterPresign = true;
+          throw new Error('Upload cancelled');
+        }
+        createTaskAfterPresign += 1;
+        args.onTask?.({ cancelAsync: hoisted.cancelAsync });
+        return result;
+      }
+    );
+    const renderer = await mountHook();
+    await addDocument();
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+
+    await act(async () => {
+      resolveUpload?.({ key: 'org/2026/08/uuid/doc.pdf' });
+      await settle();
+    });
+
+    expect(cancelledAfterPresign).toBe(true);
+    expect(createTaskAfterPresign).toBe(0);
+    expect(hoisted.cancelAsync).not.toHaveBeenCalled();
+    expect(hookApi().attachments).toHaveLength(0);
+    renderer.unmount();
+  });
+
+  it('deletes the cache-owned file even when cancelAsync rejects', async () => {
+    hoisted.cancelAsync.mockRejectedValue(new Error('cancel failed'));
+    const renderer = await mountHook();
+    await addDocument();
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+
+    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).toHaveBeenCalledWith('file:///cache/doc.pdf');
+    renderer.unmount();
+  });
+
+  it('does not delete a picker-provided URI on remove', async () => {
+    const renderer = await mountHook();
+    await act(async () => {
+      await hookApi().addCandidates([{ name: 'doc.pdf', uri: 'file:///documents/picked.pdf' }]);
+    });
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+
+    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('cancels every in-flight upload and deletes cache-owned files on reset', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+
+    await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      hookApi().reset();
+      await settle();
+    });
+
+    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).toHaveBeenCalledTimes(1);
+    renderer.unmount();
+  });
+
+  it('cancels every in-flight upload on unmount with no toast and no state flip', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+
+    await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      renderer.unmount();
+      await settle();
+    });
+
+    expect(hoisted.cancelAsync).toHaveBeenCalledTimes(1);
+    expect(hoisted.fileDelete).toHaveBeenCalledTimes(1);
+
+    // The cancelled upload later rejects: unmount invalidated the live id, so
+    // the catch emits no toast and flips no state.
+    await act(async () => {
+      rejectUpload?.(new TypeError('Network request failed'));
+      await settle();
+    });
+
+    expect(hoisted.announcingToastError).not.toHaveBeenCalled();
+    expect(hoisted.announceForA11y).not.toHaveBeenCalled();
+  });
+
+  it('a cancelled upload emits no toast and no state flip when it later rejects', async () => {
+    const renderer = await mountHook();
+    await addDocument();
+    const id = hookApi().attachments[0]?.id;
+    if (!id) {
+      throw new Error('attachment id missing');
+    }
+
+    await act(async () => {
+      void hookApi().uploadPending();
+      // let the upload start and the cancel handle register
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      hookApi().removeAttachment(id);
+      await settle();
+    });
+    expect(hookApi().attachments).toHaveLength(0);
+
+    await act(async () => {
+      rejectUpload?.(new TypeError('Network request failed'));
+      await settle();
+    });
+
+    expect(hoisted.announcingToastError).not.toHaveBeenCalled();
+    expect(hoisted.announceForA11y).not.toHaveBeenCalled();
+    expect(hookApi().attachments).toHaveLength(0);
     renderer.unmount();
   });
 });

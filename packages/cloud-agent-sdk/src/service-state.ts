@@ -26,6 +26,7 @@ type ServiceStateConfig = {
   /** The root session ID we're tracking (to detect child sessions). */
   rootSessionId: string;
   onError?: ((message: string) => void) | undefined;
+  onChildSessionError?: ((sessionId: string, message: string) => void) | undefined;
   onQuestionAsked?: ((requestId: string, questions?: QuestionInfo[]) => void) | undefined;
   onQuestionResolved?: ((requestId: string) => void) | undefined;
   onPermissionAsked?:
@@ -74,6 +75,8 @@ type ServiceState = {
   getSuggestion(): SuggestionState | null;
   getSessionInfo(): SessionInfo | null;
   getPendingMessages(): ReadonlyMap<string, MessageDeliveryState>;
+  /** Remove one failed delivery entry (called after a successful retry). */
+  clearFailedMessage(messageId: string): void;
   snapshot(): ServiceStateSnapshot;
   /** Set activity directly (for transport lifecycle events like connecting/disconnected). */
   setActivity(activity: SessionActivity): void;
@@ -106,6 +109,7 @@ function upsertByRequestId<T extends { requestId: string }>(
 }
 
 function createServiceState(config: ServiceStateConfig): ServiceState {
+  let rootSessionId = config.rootSessionId;
   let activity: SessionActivity = INITIAL_ACTIVITY;
   let status: AgentStatus = IDLE_STATUS;
   let cloudStatus: CloudStatus | null = null;
@@ -132,7 +136,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   }
 
   function isRootSession(sessionId: string): boolean {
-    return sessionId === config.rootSessionId;
+    return sessionId === rootSessionId;
   }
 
   function processSessionStatus(event: Extract<ServiceEvent, { type: 'session.status' }>): void {
@@ -228,6 +232,14 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function processSessionError(event: Extract<ServiceEvent, { type: 'session.error' }>): void {
     if (terminated) return;
 
+    // Child session errors are scoped to the child. They must not touch the
+    // shared root status or onError, which drive the parent status indicator.
+    // Events without a sessionId keep the legacy root behavior.
+    if (event.sessionId !== undefined && !isRootSession(event.sessionId)) {
+      config.onChildSessionError?.(event.sessionId, event.error);
+      return;
+    }
+
     config.onError?.(event.error);
     status = { type: 'error', message: event.error };
 
@@ -235,6 +247,9 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   }
 
   function processSessionCreated(event: Extract<ServiceEvent, { type: 'session.created' }>): void {
+    if (event.info.parentID == null) {
+      rootSessionId = event.info.id;
+    }
     // Only track root session info
     if (isRootSession(event.info.id)) {
       sessionInfo = event.info;
@@ -575,7 +590,15 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       reason: event.reason,
       ...(event.attempts !== undefined ? { attempts: event.attempts } : {}),
     };
-    pendingMessages.delete(event.messageId);
+    pendingMessages.set(event.messageId, deliveryState);
+    // A preparation failure can arrive as a terminal message-delivery event
+    // without a separate preparing event. Do not leave the composer showing
+    // "Setting up environment" forever in that case. An interrupt is the user
+    // cancelling, not a failure, so it clears the stale status instead of
+    // raising an error banner.
+    if (cloudStatus?.type === 'preparing') {
+      cloudStatus = event.reason === 'interrupted' ? null : { type: 'error', message: event.error };
+    }
     if (event.reason === 'interrupted') {
       activity = { type: 'idle' };
       status = { type: 'interrupted' };
@@ -603,7 +626,15 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     if (!isRootSession(event.sessionId)) return;
     if (event.queued.length === 0) {
       if (pendingMessages.size === 0) return;
+      // Preserve failed entries — a failed delivery row must survive a
+      // reconciliation so its recovery affordance stays visible.
+      const failed = [...pendingMessages.entries()].filter(
+        ([messageId, state]) => state.status === 'failed' && !event.queued.includes(messageId)
+      );
       pendingMessages.clear();
+      for (const [messageId, state] of failed) {
+        pendingMessages.set(messageId, state);
+      }
       notify();
       return;
     }
@@ -611,10 +642,19 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     for (const messageId of event.queued) {
       next.set(messageId, { status: 'queued' });
     }
+    // Preserve failed entries before the wholesale replace, then re-insert
+    // them after the queued entries are written. Skip any failed id that is
+    // also in this snapshot: the queue is authoritative for those ids.
+    const failed = [...pendingMessages.entries()].filter(
+      ([messageId, state]) => state.status === 'failed' && !event.queued.includes(messageId)
+    );
     // Reuse the same Map identity where possible to avoid invalidating
     // existing subscribers that hold onto the previous reference.
     pendingMessages.clear();
     for (const [messageId, state] of next) {
+      pendingMessages.set(messageId, state);
+    }
+    for (const [messageId, state] of failed) {
       pendingMessages.set(messageId, state);
     }
     notify();
@@ -679,7 +719,14 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
 
     // Clear pending-message delivery state — replayed cloud.message.queued
     // events following the snapshot will repopulate it with the current truth.
+    // Failed entries survive the reconnect: replayed cloud.message.queued events
+    // repopulate the queued half, and the failed half must survive a reconnect
+    // so the row keeps its recovery affordance.
+    const failed = [...pendingMessages.entries()].filter(([, state]) => state.status === 'failed');
     pendingMessages.clear();
+    for (const [messageId, state] of failed) {
+      pendingMessages.set(messageId, state);
+    }
 
     notify();
   }
@@ -780,6 +827,11 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     getSuggestion: () => suggestion,
     getSessionInfo: () => sessionInfo,
     getPendingMessages: () => pendingMessages,
+
+    clearFailedMessage(messageId: string): void {
+      pendingMessages.delete(messageId);
+      notify();
+    },
 
     snapshot: () => ({
       activity,

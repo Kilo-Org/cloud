@@ -1,6 +1,7 @@
 import { PackageSearch } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { Alert, FlatList, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
 
@@ -36,6 +37,7 @@ export default function VersionPinScreen() {
   const availableVersionsQuery = useKiloClawAvailableVersions(organizationId, 0, limit);
   const mutations = useKiloClawMutations(organizationId);
   const paddingBottom = useDetailScreenBottomPadding();
+  const { t } = useTranslation();
   const pendingReasonRef = useRef('');
   const [pendingItem, setPendingItem] = useState<VersionItem>();
   const flatListRef = useRef<FlatList<VersionItem>>(null);
@@ -46,13 +48,15 @@ export default function VersionPinScreen() {
   const isPinMutating = mutations.setMyPin.isPending || mutations.removeMyPin.isPending;
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title="Version pinning" context={instanceContext} />;
+    return (
+      <InstanceContextBoundary title={t('kiloclaw.versionPin.title')} context={instanceContext} />
+    );
   }
 
   if (isLoading) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Version pinning" />
+        <ScreenHeader title={t('kiloclaw.versionPin.title')} />
         <Animated.View layout={LinearTransition} className="flex-1 px-4 pt-4 gap-3">
           <Animated.View exiting={FadeOut.duration(150)}>
             <Skeleton className="h-16 w-full rounded-lg" />
@@ -76,10 +80,10 @@ export default function VersionPinScreen() {
   ) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Version pinning" />
+        <ScreenHeader title={t('kiloclaw.versionPin.title')} />
         <View className="flex-1 items-center justify-center">
           <QueryError
-            message="Could not load version information"
+            message={t('kiloclaw.versionPin.couldNotLoad')}
             onRetry={() => {
               void myPinQuery.refetch();
               void latestVersionQuery.refetch();
@@ -104,10 +108,10 @@ export default function VersionPinScreen() {
   const isPinnedByAdmin = myPin != null && !myPin.pinnedBySelf;
 
   function handleUnpin() {
-    Alert.alert('Unpin version', 'Switch back to the latest available version?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('kiloclaw.versionPin.unpinTitle'), t('kiloclaw.versionPin.unpinMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Unpin',
+        text: t('kiloclaw.versionPin.unpin'),
         style: 'destructive',
         onPress: () => {
           mutations.removeMyPin.mutate(undefined);
@@ -191,7 +195,7 @@ export default function VersionPinScreen() {
       return (
         <View className="items-center gap-2 pt-3">
           <Text variant="muted" className="text-xs">
-            Could not load more versions
+            {t('kiloclaw.versionPin.couldNotLoadMore')}
           </Text>
           <Button
             variant="outline"
@@ -201,7 +205,7 @@ export default function VersionPinScreen() {
               void availableVersionsQuery.refetch();
             }}
           >
-            <Text>Retry</Text>
+            <Text>{t('common.retry')}</Text>
           </Button>
         </View>
       );
@@ -217,7 +221,7 @@ export default function VersionPinScreen() {
               setLimit(l => Math.min(l + PAGE_SIZE, MAX_LIMIT));
             }}
           >
-            <Text>Load more versions</Text>
+            <Text>{t('kiloclaw.versionPin.loadMore')}</Text>
           </Button>
         </View>
       );
@@ -226,7 +230,7 @@ export default function VersionPinScreen() {
       return (
         <View className="items-center pt-3">
           <Text variant="muted" className="text-xs">
-            Showing latest 100 versions
+            {t('kiloclaw.versionPin.showingLatest')}
           </Text>
         </View>
       );
@@ -236,7 +240,7 @@ export default function VersionPinScreen() {
 
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
-      <ScreenHeader title="Version pinning" />
+      <ScreenHeader title={t('kiloclaw.versionPin.title')} />
       <FlatList
         ref={flatListRef}
         data={versions}
@@ -260,7 +264,7 @@ export default function VersionPinScreen() {
 
             {versions.length > 0 && (
               <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Available versions
+                {t('kiloclaw.versionPin.availableVersions')}
               </Text>
             )}
           </Animated.View>
@@ -272,8 +276,8 @@ export default function VersionPinScreen() {
           ) : (
             <EmptyState
               icon={PackageSearch}
-              title="No versions available"
-              description="Available OpenClaw versions will appear here."
+              title={t('kiloclaw.versionPin.noVersions')}
+              description={t('kiloclaw.versionPin.noVersionsDescription')}
               className="px-0 pt-4"
               placement="top"
             />

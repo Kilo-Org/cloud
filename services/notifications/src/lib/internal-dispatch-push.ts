@@ -1,6 +1,7 @@
 /**
- * Pure core for internal dispatch of low-balance and security-finding pushes.
- * IO is injected via deps so unit tests can substitute in-memory fakes.
+ * Pure core for internal dispatch of low-balance, security-finding, and
+ * security-lifecycle pushes. IO is injected via deps so unit tests can
+ * substitute in-memory fakes.
  */
 
 import type {
@@ -50,57 +51,113 @@ function securityFindingTitle(
   }
 }
 
-function buildDispatchInput(userId: string, input: InternalDispatchRequest): DispatchPushInput {
-  if (input.kind === 'low_balance') {
-    return {
-      userId,
-      presenceContext: null,
-      idempotencyKey: `low-balance:${input.organizationId}`,
-      badge: null,
-      push: {
-        title: 'Low balance alert',
-        body: `${input.organizationName} balance fell below $${input.minimumBalanceUsd}`,
-        data: {
-          type: 'low_balance',
-          organizationId: input.organizationId,
-        },
-        sound: 'default',
-        priority: 'high',
-      },
-    } satisfies DispatchPushInput;
+function securityFindingI18nKey(
+  notificationKind: 'new_finding' | 'sla_warning' | 'sla_breach'
+): string {
+  switch (notificationKind) {
+    case 'new_finding':
+      return 'internal.securityFindingNew';
+    case 'sla_warning':
+      return 'internal.securityFindingSlaWarning';
+    case 'sla_breach':
+      return 'internal.securityFindingSlaBreach';
   }
+}
 
-  const title = securityFindingTitle(input.notificationKind, input.severity);
-  return {
-    userId,
-    presenceContext: null,
-    // Sibling finding rows for one advisory (per manifest, per scope) must
-    // collapse to one push per recipient; the DO instance is already per
-    // recipient. `notificationKind` stays in the key so `new_finding` and SLA
-    // pushes stay distinct.
-    idempotencyKey: input.ghsaId
-      ? `security-finding:${input.repoFullName}:${input.ghsaId}:${input.notificationKind}`
-      : `security-finding:${input.notificationId}`,
-    badge: null,
-    push: {
-      title,
-      body: `${input.title} in ${input.repoFullName}`,
-      data: {
-        type: 'security_finding',
-        findingId: input.findingId,
-        scope: input.scope,
-      },
-      sound: 'default',
-      priority: 'high',
-    },
-  } satisfies DispatchPushInput;
+function buildDispatchInput(userId: string, input: InternalDispatchRequest): DispatchPushInput {
+  switch (input.kind) {
+    case 'low_balance':
+      return {
+        userId,
+        presenceContext: null,
+        idempotencyKey: `low-balance:${input.organizationId}`,
+        badge: null,
+        push: {
+          title: 'Low balance alert',
+          body: `${input.organizationName} balance fell below $${input.minimumBalanceUsd}`,
+          i18nKey: 'internal.lowBalance',
+          i18nParams: {
+            organizationName: input.organizationName,
+            minimumBalanceUsd: String(input.minimumBalanceUsd),
+          },
+          data: {
+            type: 'low_balance',
+            organizationId: input.organizationId,
+          },
+          sound: 'default',
+          priority: 'high',
+        },
+      } satisfies DispatchPushInput;
+    case 'security_finding': {
+      const title = securityFindingTitle(input.notificationKind, input.severity);
+      return {
+        userId,
+        presenceContext: null,
+        // Sibling finding rows for one advisory (per manifest, per scope) must
+        // collapse to one push per recipient; the DO instance is already per
+        // recipient. `notificationKind` stays in the key so `new_finding` and SLA
+        // pushes stay distinct.
+        idempotencyKey: input.ghsaId
+          ? `security-finding:${input.repoFullName}:${input.ghsaId}:${input.notificationKind}`
+          : `security-finding:${input.notificationId}`,
+        badge: null,
+        push: {
+          title,
+          body: `${input.title} in ${input.repoFullName}`,
+          i18nKey: securityFindingI18nKey(input.notificationKind),
+          i18nParams: {
+            severity: input.severity,
+            findingTitle: input.title,
+            repoFullName: input.repoFullName,
+          },
+          data: {
+            type: 'security_finding',
+            findingId: input.findingId,
+            scope: input.scope,
+          },
+          sound: 'default',
+          priority: 'high',
+        },
+      } satisfies DispatchPushInput;
+    }
+    case 'security_lifecycle':
+      // Lifecycle events carry no finding title/severity, so the full-preview
+      // copy matches the generic preview copy in `push-presentation.ts`.
+      return {
+        userId,
+        presenceContext: null,
+        idempotencyKey: `security-lifecycle:${input.findingId}:${input.event}:${input.remediationId ?? 'none'}`,
+        badge: null,
+        push: {
+          title: 'Kilo',
+          body: 'A security finding needs attention',
+          i18nKey: 'internal.securityLifecycle',
+          data: {
+            type: 'security_lifecycle',
+            event: input.event,
+            findingId: input.findingId,
+            scope: input.scope,
+            ...(input.remediationId !== undefined ? { remediationId: input.remediationId } : {}),
+            ...(input.prUrl !== undefined ? { prUrl: input.prUrl } : {}),
+          },
+          sound: 'default',
+          priority: 'high',
+        },
+      } satisfies DispatchPushInput;
+  }
 }
 
 function categoryEnabled(
   prefs: UserNotificationPreferences,
   kind: InternalDispatchRequest['kind']
 ): boolean {
-  return kind === 'low_balance' ? prefs.balanceAlertsEnabled : prefs.securityFindingsEnabled;
+  switch (kind) {
+    case 'low_balance':
+      return prefs.balanceAlertsEnabled;
+    case 'security_finding':
+    case 'security_lifecycle':
+      return prefs.securityFindingsEnabled;
+  }
 }
 
 /** Narrow DO outcomes that cannot occur with null presence / no rate limit. */
@@ -123,7 +180,7 @@ export async function dispatchInternalPushCore(
   const recipients: string[] = [];
   const seen = new Set<string>();
 
-  if (input.kind === 'low_balance') {
+  if (input.kind === 'low_balance' || input.kind === 'security_lifecycle') {
     for (const id of input.recipientUserIds) {
       if (seen.has(id)) continue;
       seen.add(id);

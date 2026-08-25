@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/react-native';
 import * as SecureStore from 'expo-secure-store';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { deleteAccountMetadata, setAccountMetadata } from '@/lib/auth/account-metadata-write';
 
 /**
@@ -40,7 +41,9 @@ export function createSecureStorePreference<T>(options: {
       // Keep the default on read failure — this runs on mount, before the
       // user has done anything, so there's nothing actionable to tell them.
       // Just log so we can see failure rates.
-      Sentry.captureException(error);
+      Sentry.captureException(error, {
+        tags: { 'error.subsystem': 'preferences', 'error.operation': 'load_secure_store' },
+      });
     } finally {
       hasLoaded = true;
       emit();
@@ -54,7 +57,7 @@ export function createSecureStorePreference<T>(options: {
       // Keep the in-memory preference so the session still works, but the
       // change won't survive relaunch — tell the user so it's not a silent
       // surprise later.
-      toast.error('Could not save setting');
+      toast.error(i18n.t('common.couldNotSaveSetting'));
     }
   };
 
@@ -92,6 +95,26 @@ export function createSecureStorePreference<T>(options: {
       hasLoaded = true;
       emit();
       void persist(next);
+    },
+    /**
+     * Persist-then-apply write for callers that must not change memory on a
+     * failed disk write (e.g. language apply). Writes disk first; on success
+     * updates memory and emits, returning true. On failure shows the existing
+     * toast, leaves memory unchanged, and returns false. `toastLng` pins the
+     * toast language when the caller already switched the active language.
+     */
+    setAsync: async (next: T, toastLng?: string): Promise<boolean> => {
+      try {
+        await setAccountMetadata(key, serialize(next));
+      } catch {
+        toast.error(i18n.t('common.couldNotSaveSetting', toastLng ? { lng: toastLng } : undefined));
+        return false;
+      }
+      value = next;
+      dirty = true;
+      hasLoaded = true;
+      emit();
+      return true;
     },
     /** Reset memory and disk (e.g. on sign-out). */
     clear: () => {

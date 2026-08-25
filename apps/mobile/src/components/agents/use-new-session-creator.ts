@@ -5,6 +5,7 @@ import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import * as Haptics from 'expo-haptics';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { resolveNewSessionPromptForCreate } from '@/components/agents/new-session-prompt-state';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
@@ -102,15 +103,30 @@ export function useNewSessionCreator({
       return;
     }
     if (prompt.startsWith('/') && attachments.attachments.length > 0) {
-      toast.error('Attachments cannot be sent with slash commands.');
+      toast.error(i18n.t('agentChat.composer.attachmentsWithSlashCommands'));
       return;
     }
 
     setIsCreating(true);
 
+    // Warn (never block) when a chip kept its original image because
+    // metadata stripping failed: the photo may still carry EXIF/GPS.
+    if (attachments.attachments.some(attachment => attachment.metadataStripFailed === true)) {
+      toast.warning(i18n.t('agentChat.composer.photoMetadataNotRemoved'));
+    }
+
+    // Upload pending attachments now so the create body carries the real
+    // payload. `uploaded` is a plain object; `{ ok: false }` is truthy, so
+    // test `ok`.
+    const uploaded = await attachments.uploadPending();
+    if (!uploaded.ok) {
+      setIsCreating(false);
+      return;
+    }
+
     // Computed once and reused for both the fingerprint and the create body, so
     // the two cannot disagree and a swapped attachment set is a fresh intent.
-    const attachmentWire = attachments.toWirePayload();
+    const attachmentWire = uploaded.wire;
     const intentFingerprint = JSON.stringify({
       prompt,
       mode,
@@ -129,7 +145,7 @@ export function useNewSessionCreator({
     // A failed outbox read reads as no stored rows, so refuse instead of
     // minting a fresh key over a row whose POST the server may have accepted.
     if (!(await whenLoaded())) {
-      toast.error('Could not read pending sessions. Try again.');
+      toast.error(i18n.t('agentChat.newSession.couldNotReadPendingSessions'));
       setIsCreating(false);
       return;
     }
@@ -211,7 +227,8 @@ export function useNewSessionCreator({
       }
     } catch (error) {
       // Only `prepareSession` errors reach here; UI failures are swallowed.
-      const message = error instanceof Error ? error.message : 'Failed to create session';
+      const message =
+        error instanceof Error ? error.message : i18n.t('agentChat.newSession.failedToCreate');
       toast.error(message);
       // A typed terminal rejection ends the intent; a retryable one keeps the key.
       if (!isCloudPrepareRetryableError(error)) {

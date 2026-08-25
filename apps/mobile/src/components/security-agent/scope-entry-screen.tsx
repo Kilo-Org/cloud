@@ -1,6 +1,7 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
@@ -22,9 +23,10 @@ import {
 } from '@/lib/hooks/use-security-agent';
 
 function ScopeEntrySkeleton() {
+  const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Security Agent" />
+      <ScreenHeader title={t('securityAgent.title')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-10 w-full rounded-lg" />
         <View className="flex-row flex-wrap gap-3">
@@ -41,6 +43,7 @@ function ScopeEntrySkeleton() {
 }
 
 export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
+  const { t } = useTranslation();
   const permission = useSecurityAgentPermissionStatus(scope);
   const config = useSecurityAgentConfig(scope);
   const repositories = useSecurityAgentRepositories(scope);
@@ -127,8 +130,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   if (view === 'error') {
     return (
       <PlatformErrorScreen
-        title="Security Agent"
-        errorTitle="Could not load Security Agent"
+        title={t('securityAgent.title')}
+        errorTitle={t('securityAgent.scopeEntry.couldNotLoad')}
         onRetry={() => {
           void permission.refetch();
           void config.refetch();
@@ -150,11 +153,11 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       if (mintFailed) {
         return (
           <View className="flex-1 bg-background">
-            <ScreenHeader title="Security Agent" headerRight={auditAction} />
+            <ScreenHeader title={t('securityAgent.title')} headerRight={auditAction} />
             <PlatformErrorScreen
-              title="Security Agent"
+              title={t('securityAgent.title')}
               variant="offline"
-              message="Could not start GitHub setup. Please try again."
+              message={t('securityAgent.scopeEntry.setupFailed')}
               onRetry={() => void performMint()}
             />
           </View>
@@ -163,7 +166,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       if (!connectUrl) {
         return (
           <View className="flex-1 bg-background">
-            <ScreenHeader title="Security Agent" headerRight={auditAction} />
+            <ScreenHeader title={t('securityAgent.title')} headerRight={auditAction} />
             <View className="gap-3 px-6 pt-4">
               <Skeleton className="h-10 w-full rounded-lg" />
               <Skeleton className="h-32 w-full rounded-lg" />
@@ -173,11 +176,11 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       }
       return (
         <View className="flex-1 bg-background">
-          <ScreenHeader title="Security Agent" headerRight={auditAction} />
+          <ScreenHeader title={t('securityAgent.title')} headerRight={auditAction} />
           <SecurityAgentSetup
-            title="Connect GitHub to get started"
-            description="Install the Kilo GitHub App to automatically sync Dependabot alerts and manage security findings across your repositories."
-            buttonLabel="Install GitHub App"
+            title={t('securityAgent.scopeEntry.connectTitle')}
+            description={t('securityAgent.scopeEntry.connectDescription')}
+            buttonLabel={t('securityAgent.scopeEntry.installApp')}
             url={connectUrl}
             onConnected={refetchAll}
           />
@@ -188,11 +191,11 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       if (!reauthUrl && mintFailed) {
         return (
           <View className="flex-1 bg-background">
-            <ScreenHeader title="Security Agent" headerRight={auditAction} />
+            <ScreenHeader title={t('securityAgent.title')} headerRight={auditAction} />
             <PlatformErrorScreen
-              title="Security Agent"
+              title={t('securityAgent.title')}
               variant="offline"
-              message="Could not start re-authorization. Please try again."
+              message={t('securityAgent.scopeEntry.reauthorizeFailed')}
               onRetry={() => void performMint()}
             />
           </View>
@@ -201,7 +204,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       if (!reauthUrl && !connectUrl) {
         return (
           <View className="flex-1 bg-background">
-            <ScreenHeader title="Security Agent" headerRight={auditAction} />
+            <ScreenHeader title={t('securityAgent.title')} headerRight={auditAction} />
             <View className="gap-3 px-6 pt-4">
               <Skeleton className="h-10 w-full rounded-lg" />
               <Skeleton className="h-32 w-full rounded-lg" />
@@ -215,11 +218,11 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       }
       return (
         <View className="flex-1 bg-background">
-          <ScreenHeader title="Security Agent" headerRight={auditAction} />
+          <ScreenHeader title={t('securityAgent.title')} headerRight={auditAction} />
           <SecurityAgentSetup
-            title="Additional permissions required"
-            description="Security Agent requires the vulnerability_alerts permission to access Dependabot alerts. Re-authorize the GitHub App to grant this permission."
-            buttonLabel="Re-authorize GitHub App"
+            title={t('securityAgent.scopeEntry.reauthorizeTitle')}
+            description={t('securityAgent.scopeEntry.reauthorizeDescription')}
+            buttonLabel={t('securityAgent.scopeEntry.reauthorizeButton')}
             url={url}
             onConnected={refetchAll}
           />

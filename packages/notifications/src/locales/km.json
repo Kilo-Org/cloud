@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "វគ្គភ្នាក់ងាររបស់អ្នកមានការធ្វើបច្ចុប្បន្នភាព",
+      "chatMessage": "អ្នកមានសារថ្មី",
+      "instanceLifecycle": "ឧទាហរណ៍របស់អ្នកមានការធ្វើបច្ចុប្បន្នភាព",
+      "scheduledAction": "សកម្មភាពដែលបានកំណត់ពេលមានការធ្វើបច្ចុប្បន្នភាព",
+      "lowBalance": "សមតុល្យរបស់អ្នកត្រូវការការយកចិត្តទុកដាក់",
+      "securityFinding": "ការរកឃើញសុវត្ថិភាពត្រូវការការយកចិត្តទុកដាក់"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "បានបញ្ចប់ភារកិច្ច"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "បានបរាជ័យ: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "ត្រូវបានរំខាន: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · គ្មានចំណងជើង",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "ការជូនដំណឹងសមតុល្យទាប",
+      "body": "សមតុល្យ {{organizationName}} បានធ្លាក់ក្រោម ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "ការរកឃើញសុវត្ថិភាពថ្មី ({{severity}})",
+      "body": "{{findingTitle}} នៅក្នុង {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "ការព្រមាន SLA",
+      "body": "{{findingTitle}} នៅក្នុង {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "ការរំលោភ SLA",
+      "body": "{{findingTitle}} នៅក្នុង {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "ការរកឃើញសុវត្ថិភាពត្រូវការការយកចិត្តទុកដាក់"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} បានត្រៀមរួចរាល់",
+      "body": "ប៉ះដើម្បីចាប់ផ្តើមជជែក។"
+    },
+    "startFailed": {
+      "title": "{{instanceName}} មិនអាចចាប់ផ្តើមបានទេ",
+      "body": "ការចាប់ផ្តើមបានបរាជ័យ។"
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} នឹងចាប់ផ្តើមម្តងទៀតក្នុងពេលឆាប់ៗ",
+      "body": "កំណត់ពេលចាប់ផ្តើមម្តងទៀតនៅ {{when}} ។"
+    },
+    "restartCancelled": {
+      "title": "ការចាប់ផ្តើមម្តងទៀតរបស់ {{instanceName}} ត្រូវបានលុបចោល",
+      "body": "ការចាប់ផ្តើមម្តងទៀតដែលបានកំណត់ពេលពីមុនត្រូវបានលុបចោល។"
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} នឹងធ្វើបច្ចុប្បន្នភាពក្នុងពេលឆាប់ៗ",
+      "bodyWithTag": "ធ្វើបច្ចុប្បន្នភាពទៅ {{targetImageTag}} នៅ {{when}} ។",
+      "bodyWithoutTag": "ការធ្វើបច្ចុប្បន្នភាពដែលបានកំណត់ពេលនៅ {{when}} ។"
+    },
+    "versionChangeCancelled": {
+      "title": "ការធ្វើបច្ចុប្បន្នភាពរបស់ {{instanceName}} ត្រូវបានលុបចោល",
+      "body": "ការធ្វើបច្ចុប្បន្នភាពដែលបានកំណត់ពេលពីមុនត្រូវបានលុបចោល។"
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "វគ្គ Kilo របស់អ្នកបានត្រៀមរួចរាល់ដើម្បីគ្រប់គ្រងពីទូរសព្ទរបស់អ្នក"
+  }
+}

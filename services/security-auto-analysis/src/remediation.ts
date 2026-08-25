@@ -3,6 +3,10 @@ import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { transitionSecurityAgentCommand } from '@kilocode/db';
 import {
   agent_configs,
+  kilocode_users,
+  operation_ledgers,
+  organization_memberships,
+  organizations,
   platform_integrations,
   security_audit_log,
   security_findings,
@@ -11,6 +15,12 @@ import {
   type NewSecurityRemediationAttempt,
   type SecurityRemediationAttempt,
 } from '@kilocode/db/schema';
+import {
+  admitOperation,
+  recordOperationAcceptance,
+  settleOperation,
+  type TerminalOperationStatus,
+} from '@kilocode/db/operation-ledger';
 import {
   SecurityAuditLogAction,
   SecurityFindingAuditSourceContext,
@@ -907,7 +917,7 @@ async function transitionAttemptLaunchFailure(params: {
   failureCode: string;
   errorMessage: string;
   retryable: boolean;
-}): Promise<void> {
+}): Promise<boolean> {
   const terminal =
     !params.retryable || params.attempt.launch_attempt_count >= REMEDIATION_LAUNCH_MAX_ATTEMPTS;
   await params.db.transaction(async tx => {
@@ -955,6 +965,15 @@ async function transitionAttemptLaunchFailure(params: {
       }
     }
   });
+  if (terminal && params.finding) {
+    await settleSecurityRemediationLedgerRow({
+      db: params.db,
+      finding: params.finding,
+      attempt: params.attempt,
+      terminalStatus: 'failed',
+    });
+  }
+  return terminal;
 }
 
 async function blockAttempt(params: {
@@ -997,6 +1016,12 @@ async function blockAttempt(params: {
         metadata: { blocked_reason_code: params.reason },
       });
     }
+  });
+  await settleSecurityRemediationLedgerRow({
+    db: params.db,
+    finding: params.finding ?? null,
+    attempt: params.attempt,
+    terminalStatus: 'blocked',
   });
 }
 
@@ -1094,6 +1119,12 @@ async function finalizeAttemptCancellation(params: {
     result: { status: 'cancelled', summary: params.summary, validation: [] },
     finalAssistantMessage: undefined,
     actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+  });
+  await settleSecurityRemediationLedgerRow({
+    db: params.db,
+    finding: params.finding,
+    attempt: params.attempt,
+    terminalStatus: 'cancelled',
   });
 }
 
@@ -1299,6 +1330,12 @@ export async function processRemediationAttempt(params: {
       reason: decision.reason.toUpperCase(),
       summary: `Remediation no longer eligible: ${decision.reason}`,
     });
+    await emitRemediationTerminalLifecycleEvent({
+      env: params.env,
+      db,
+      attempt,
+      status: 'blocked',
+    });
     return 'skipped';
   }
   if (
@@ -1311,6 +1348,12 @@ export async function processRemediationAttempt(params: {
       finding,
       reason: 'COVERED_BY_EXISTING_REMEDIATION_PR',
       summary: 'Another open remediation PR covers same package and manifest',
+    });
+    await emitRemediationTerminalLifecycleEvent({
+      env: params.env,
+      db,
+      attempt,
+      status: 'blocked',
     });
     return 'skipped';
   }
@@ -1325,9 +1368,9 @@ export async function processRemediationAttempt(params: {
       errorMessage: 'Remediation actor unavailable',
       retryable: false,
     });
+    await emitRemediationTerminalLifecycleEvent({ env: params.env, db, attempt, status: 'failed' });
     return 'failed';
   }
-
   try {
     await launchAttempt({ db, env: params.env, attempt, finding, owner, actor });
     try {
@@ -1352,7 +1395,7 @@ export async function processRemediationAttempt(params: {
     }
     return 'launched';
   } catch (error) {
-    await transitionAttemptLaunchFailure({
+    const terminal = await transitionAttemptLaunchFailure({
       db,
       attempt,
       finding,
@@ -1361,6 +1404,14 @@ export async function processRemediationAttempt(params: {
       errorMessage: error instanceof Error ? error.message : String(error),
       retryable: !(error instanceof InsufficientCreditsError),
     });
+    if (terminal) {
+      await emitRemediationTerminalLifecycleEvent({
+        env: params.env,
+        db,
+        attempt,
+        status: 'failed',
+      });
+    }
     return 'failed';
   }
 }
@@ -1629,6 +1680,372 @@ async function finalizeAttemptAsFailed(params: {
   });
 }
 
+// ----- security remediation operation ledger (P1-A-07c) ---------------------
+
+const SECURITY_REMEDIATION_LEDGER_LEASE_SECONDS = 120;
+
+/**
+ * The ledger user id for a remediation attempt. Personal scope uses the
+ * finding's owner user. Org scope has no single acting user, so it
+ * approximates with the organization's `created_by_kilo_user_id` (a nullable
+ * column). Returns null when the org has no
+ * creator, in which case the admit is skipped and the terminal settle later
+ * skips on the missing row.
+ */
+async function resolveRemediationLedgerUserId(
+  db: WorkerDb,
+  finding: SecurityFindingRecord
+): Promise<string | null> {
+  if (finding.owned_by_user_id) return finding.owned_by_user_id;
+  if (!finding.owned_by_organization_id) return null;
+  const [org] = await db
+    .select({ createdBy: organizations.created_by_kilo_user_id })
+    .from(organizations)
+    .where(eq(organizations.id, finding.owned_by_organization_id))
+    .limit(1);
+  return org?.createdBy ?? null;
+}
+
+/**
+ * The ledger user id for a remediation attempt whose finding is gone
+ * (account deletion hard-deletes `security_findings` but not the attempt).
+ * Personal scope uses the attempt's owner user; org scope approximates with
+ * the organization's `created_by_kilo_user_id`.
+ */
+async function resolveRemediationLedgerUserIdFromAttempt(
+  db: WorkerDb,
+  attempt: Pick<SecurityRemediationAttempt, 'owned_by_user_id' | 'owned_by_organization_id'>
+): Promise<string | null> {
+  if (attempt.owned_by_user_id) return attempt.owned_by_user_id;
+  if (!attempt.owned_by_organization_id) return null;
+  const [org] = await db
+    .select({ createdBy: organizations.created_by_kilo_user_id })
+    .from(organizations)
+    .where(eq(organizations.id, attempt.owned_by_organization_id))
+    .limit(1);
+  return org?.createdBy ?? null;
+}
+
+async function resolveRemediationLedgerDistinctId(db: WorkerDb, userId: string): Promise<string> {
+  const [user] = await db
+    .select({ email: kilocode_users.google_user_email })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, userId))
+    .limit(1);
+  return user?.email ?? userId;
+}
+
+function remediationLedgerResourceKey(finding: SecurityFindingRecord): string {
+  const scope = finding.owned_by_organization_id
+    ? `org:${finding.owned_by_organization_id}`
+    : `user:${finding.owned_by_user_id}`;
+  return `security:apply_auto_remediation:${scope}:${finding.id}`;
+}
+
+/**
+ * Admits a `security`-domain ledger row for an already-committed remediation
+ * attempt and records the attempt id as the provider reference. Best-effort:
+ * the attempt already committed, so a ledger write failure must not fail the
+ * remediation admission; the terminal settle then skips on the missing row.
+ */
+export async function admitSecurityRemediationLedgerRow(params: {
+  db: WorkerDb;
+  finding: SecurityFindingRecord;
+  attemptId: string;
+  remediationId: string;
+  attemptNumber: number;
+}): Promise<void> {
+  try {
+    const userId = await resolveRemediationLedgerUserId(params.db, params.finding);
+    if (!userId) {
+      logger.info('Skipping security remediation ledger admission: no ledger user id', {
+        attempt_id: params.attemptId,
+      });
+      return;
+    }
+    const admission = await admitOperation(params.db, {
+      userId,
+      orgId: params.finding.owned_by_organization_id ?? null,
+      domain: 'security',
+      intent: 'apply_auto_remediation',
+      operationKey: `remediation:${params.attemptId}`,
+      resourceKey: remediationLedgerResourceKey(params.finding),
+      taxonomy: 'reconcile-first',
+      leaseSeconds: SECURITY_REMEDIATION_LEDGER_LEASE_SECONDS,
+    });
+    if (admission.admission !== 'admitted') return;
+    await recordOperationAcceptance(params.db, {
+      rowId: admission.row.id,
+      providerRef: params.attemptId,
+      canonicalResult: {
+        attemptId: params.attemptId,
+        remediationId: params.remediationId,
+        attemptNumber: params.attemptNumber,
+      },
+    });
+  } catch (error) {
+    logger.error('Failed to admit the security remediation ledger row', {
+      attempt_id: params.attemptId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/** Maps a terminal attempt status to a terminal operation outcome. */
+function remediationTerminalOutcome(status: string): TerminalOperationStatus | null {
+  switch (status) {
+    case 'pr_opened':
+      return 'completed';
+    case 'failed':
+      return 'failed';
+    case 'no_changes_needed':
+      return 'no_op';
+    case 'cancelled':
+      return 'interrupted';
+    case 'blocked':
+      return 'superseded';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Settles the remediation ledger row from the terminal callback. The row is
+ * joined by `provider_ref = attemptId` (the two-step pattern), then settled by
+ * row id. A missing admit row skips with a log and never throws. Best-effort:
+ * the attempt is already terminal, so a settle failure must not fail the
+ * callback (a retry would hit the already-terminal guard and never settle).
+ */
+export async function settleSecurityRemediationLedgerRow(params: {
+  db: WorkerDb;
+  finding: SecurityFindingRecord | null;
+  attempt: Pick<
+    SecurityRemediationAttempt,
+    'id' | 'queued_at' | 'owned_by_user_id' | 'owned_by_organization_id'
+  >;
+  terminalStatus: string;
+}): Promise<void> {
+  const outcome = remediationTerminalOutcome(params.terminalStatus);
+  if (!outcome) return;
+  try {
+    const userId = params.finding
+      ? await resolveRemediationLedgerUserId(params.db, params.finding)
+      : await resolveRemediationLedgerUserIdFromAttempt(params.db, params.attempt);
+    if (!userId) {
+      logger.info('Skipping security remediation ledger settle: no ledger user id', {
+        attempt_id: params.attempt.id,
+      });
+      return;
+    }
+    const [row] = await params.db
+      .select({ id: operation_ledgers.id })
+      .from(operation_ledgers)
+      .where(
+        and(
+          eq(operation_ledgers.domain, 'security'),
+          eq(operation_ledgers.kilo_user_id, userId),
+          eq(operation_ledgers.intent, 'apply_auto_remediation'),
+          eq(operation_ledgers.provider_ref, params.attempt.id)
+        )
+      )
+      .limit(1);
+    if (!row) {
+      logger.info('Skipping security remediation ledger settle: missing admit row', {
+        attempt_id: params.attempt.id,
+      });
+      return;
+    }
+    const distinctId = await resolveRemediationLedgerDistinctId(params.db, userId);
+    await settleOperation(params.db, {
+      rowId: row.id,
+      status: outcome,
+      outboxEvent: {
+        eventName: 'security_command_settled',
+        distinctId,
+        properties: {
+          source: 'server',
+          surface: 'security',
+          phase: 'terminal',
+          intent: 'apply_auto_remediation',
+          outcome,
+          duration_ms: Math.max(0, Date.now() - new Date(params.attempt.queued_at).getTime()),
+        },
+      },
+    });
+  } catch (error) {
+    logger.error('Failed to settle the security remediation ledger row', {
+      attempt_id: params.attempt.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/**
+ * Settles an admitted ledger row after a terminal transition that happens
+ * outside the callback. Fetches the attempt's queued_at for the duration
+ * metric, then settles by row id. Best-effort: never throws, so it cannot
+ * mask the original terminal-transition error.
+ */
+async function settleAdmittedLedgerRowBestEffort(params: {
+  db: WorkerDb;
+  finding: SecurityFindingRecord;
+  attemptId: string;
+  terminalStatus: string;
+}): Promise<void> {
+  try {
+    const [attempt] = await params.db
+      .select({
+        id: security_remediation_attempts.id,
+        queued_at: security_remediation_attempts.queued_at,
+        owned_by_user_id: security_remediation_attempts.owned_by_user_id,
+        owned_by_organization_id: security_remediation_attempts.owned_by_organization_id,
+      })
+      .from(security_remediation_attempts)
+      .where(eq(security_remediation_attempts.id, params.attemptId))
+      .limit(1);
+    if (!attempt) return;
+    await settleSecurityRemediationLedgerRow({
+      db: params.db,
+      finding: params.finding,
+      attempt,
+      terminalStatus: params.terminalStatus,
+    });
+  } catch (error) {
+    logger.error('Failed to settle the security remediation ledger row after terminal transition', {
+      attempt_id: params.attemptId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+// ----- security lifecycle push producers (P2-GH-48b) ---------------------
+//
+// These emit the `security_lifecycle` push after a terminal persist commits.
+// They run post-commit and best-effort: a push failure must never roll back
+// or fail the persist, so every path below catches and logs.
+
+// 1:1 map to the `security_lifecycle` event enum in
+// `packages/notifications/src/push-data.ts`. The service cannot import that
+// package, so the union is declared here.
+export type SecurityLifecycleEvent =
+  | 'analysis_completed'
+  | 'analysis_failed'
+  | 'remediation_queued'
+  | 'remediation_pr_opened'
+  | 'remediation_failed'
+  | 'remediation_blocked'
+  | 'remediation_no_changes_needed'
+  | 'remediation_cancelled';
+
+/** Maps a terminal remediation attempt status to its lifecycle push event. */
+export function remediationTerminalLifecycleEvent(status: string): SecurityLifecycleEvent | null {
+  switch (status) {
+    case 'pr_opened':
+      return 'remediation_pr_opened';
+    case 'failed':
+      return 'remediation_failed';
+    case 'blocked':
+      return 'remediation_blocked';
+    case 'no_changes_needed':
+      return 'remediation_no_changes_needed';
+    case 'cancelled':
+      return 'remediation_cancelled';
+    default:
+      return null;
+  }
+}
+
+async function resolveSecurityLifecycleRecipientUserIds(
+  db: WorkerDb,
+  finding: SecurityFindingRecord
+): Promise<string[]> {
+  if (finding.owned_by_user_id) return [finding.owned_by_user_id];
+  if (!finding.owned_by_organization_id) return [];
+  const rows = await db
+    .select({ userId: organization_memberships.kilo_user_id })
+    .from(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.organization_id, finding.owned_by_organization_id),
+        eq(organization_memberships.role, 'owner')
+      )
+    );
+  return [...new Set(rows.map(row => row.userId))];
+}
+
+/**
+ * Best-effort, post-commit security lifecycle push. Resolves recipients
+ * (personal scope → the owner user; org scope → org owners, mirroring the
+ * finding push), then POSTs the web internal notifications route. Never
+ * throws: a push failure must not roll back or fail the terminal persist.
+ */
+export async function dispatchSecurityLifecycleEventForFinding(params: {
+  env: CloudflareEnv;
+  db: WorkerDb;
+  findingId: string;
+  event: SecurityLifecycleEvent;
+  remediationId?: string;
+  prUrl?: string;
+}): Promise<void> {
+  try {
+    const finding = await getSecurityFindingById(params.db, params.findingId);
+    if (!finding) return;
+    const recipientUserIds = await resolveSecurityLifecycleRecipientUserIds(params.db, finding);
+    if (recipientUserIds.length === 0) return;
+    const backendUrl = params.env.KILOCODE_BACKEND_BASE_URL;
+    const internalSecret = await params.env.INTERNAL_API_SECRET.get();
+    if (!backendUrl || !internalSecret) return;
+    const response = await fetch(`${backendUrl}/api/internal/security-agent/notifications`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(10_000),
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Internal-Secret': internalSecret,
+      },
+      body: JSON.stringify({
+        event: params.event,
+        findingId: params.findingId,
+        scope: finding.owned_by_organization_id ?? 'personal',
+        ...(params.remediationId !== undefined ? { remediationId: params.remediationId } : {}),
+        ...(params.prUrl !== undefined ? { prUrl: params.prUrl } : {}),
+        recipientUserIds,
+      }),
+    });
+    if (!response.ok) {
+      logger.warn('Security lifecycle push dispatch returned non-OK status', {
+        finding_id: params.findingId,
+        event: params.event,
+        status: response.status,
+      });
+    }
+  } catch (error) {
+    logger.warn('Security lifecycle push dispatch failed', {
+      finding_id: params.findingId,
+      event: params.event,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function emitRemediationTerminalLifecycleEvent(params: {
+  env: CloudflareEnv;
+  db: WorkerDb;
+  attempt: SecurityRemediationAttempt;
+  status: string;
+  prUrl?: string | null;
+}): Promise<void> {
+  const event = remediationTerminalLifecycleEvent(params.status);
+  if (!event) return;
+  await dispatchSecurityLifecycleEventForFinding({
+    env: params.env,
+    db: params.db,
+    findingId: params.attempt.finding_id,
+    event,
+    remediationId: params.attempt.remediation_id,
+    prUrl: params.prUrl ?? undefined,
+  });
+}
+
 export async function finalizeRemediationCallbackFromEnv(params: {
   env: CloudflareEnv;
   attemptId: string;
@@ -1676,6 +2093,18 @@ export async function finalizeRemediationCallbackFromEnv(params: {
         finalAssistantMessage: params.payload.lastAssistantMessageText,
         actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
       });
+      await settleSecurityRemediationLedgerRow({
+        db,
+        finding,
+        attempt,
+        terminalStatus: 'cancelled',
+      });
+      await emitRemediationTerminalLifecycleEvent({
+        env: params.env,
+        db,
+        attempt,
+        status: 'cancelled',
+      });
       return { status: 'cancelled-finalized' };
     }
     await finalizeAttemptAsFailed({
@@ -1685,6 +2114,8 @@ export async function finalizeRemediationCallbackFromEnv(params: {
       failureCode: 'CLOUD_AGENT_INTERRUPTED',
       message: params.payload.errorMessage ?? 'Cloud Agent interrupted',
     });
+    await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: 'failed' });
+    await emitRemediationTerminalLifecycleEvent({ env: params.env, db, attempt, status: 'failed' });
     return { status: 'failed-finalized' };
   }
 
@@ -1696,6 +2127,8 @@ export async function finalizeRemediationCallbackFromEnv(params: {
       failureCode: 'CLOUD_AGENT_FAILED',
       message: params.payload.errorMessage ?? 'Cloud Agent failed',
     });
+    await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: 'failed' });
+    await emitRemediationTerminalLifecycleEvent({ env: params.env, db, attempt, status: 'failed' });
     return { status: 'failed-finalized' };
   }
 
@@ -1717,6 +2150,8 @@ export async function finalizeRemediationCallbackFromEnv(params: {
         ? 'Remediation result PR could not be verified'
         : 'Remediation result block missing or malformed',
     });
+    await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: 'failed' });
+    await emitRemediationTerminalLifecycleEvent({ env: params.env, db, attempt, status: 'failed' });
     return { status: 'failed-finalized' };
   }
   await finalizeAttemptOutcome({
@@ -1726,6 +2161,14 @@ export async function finalizeRemediationCallbackFromEnv(params: {
     result,
     finalAssistantMessage: params.payload.lastAssistantMessageText,
     actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+  });
+  await settleSecurityRemediationLedgerRow({ db, finding, attempt, terminalStatus: result.status });
+  await emitRemediationTerminalLifecycleEvent({
+    env: params.env,
+    db,
+    attempt,
+    status: result.status,
+    prUrl: result.prUrl,
   });
   return { status: `${result.status}-finalized` };
 }
@@ -1754,14 +2197,42 @@ export async function startManualRemediation(params: {
     allowManualRetry: params.request.retry,
   });
   if (!result.admitted) return result;
+  // Admit the ledger row BEFORE the queue hand-off. The consumer can reach a
+  // terminal state (blocked, launch failure) within milliseconds, and the
+  // terminal settle joins on `provider_ref = attemptId`, so an admit that
+  // lands after it would leave the row permanently unsettled.
+  const finding = await getSecurityFindingById(db, params.request.findingId);
+  if (finding) {
+    await admitSecurityRemediationLedgerRow({
+      db,
+      finding,
+      attemptId: result.attemptId,
+      remediationId: result.remediationId,
+      attemptNumber: result.attemptNumber,
+    });
+  }
   try {
     await enqueueRemediationAttempt(params.env, result.attemptId);
   } catch (error) {
     await markAttemptQueueAdmissionFailed(db, result.attemptId);
+    if (finding) {
+      await settleAdmittedLedgerRowBestEffort({
+        db,
+        finding,
+        attemptId: result.attemptId,
+        terminalStatus: 'failed',
+      });
+    }
     throw error;
   }
+  await dispatchSecurityLifecycleEventForFinding({
+    env: params.env,
+    db,
+    findingId: params.request.findingId,
+    event: 'remediation_queued',
+    remediationId: result.remediationId,
+  });
   if (params.request.retry) {
-    const finding = await getSecurityFindingById(db, params.request.findingId);
     if (finding) {
       try {
         await recordRemediationAudit({
@@ -1832,6 +2303,7 @@ export async function applyAutoRemediationCommand(params: {
     scanLimit: APPLY_AUTO_REMEDIATION_SCAN_LIMIT,
     truncated,
   };
+  const lifecycleDispatchPromises: Promise<void>[] = [];
   for (const row of findings) {
     counts.scanned += 1;
     try {
@@ -1847,6 +2319,17 @@ export async function applyAutoRemediationCommand(params: {
       if (result.admitted) {
         counts.admitted += 1;
         await enqueueRemediationAttempt(params.env, result.attemptId, params.command.commandId);
+        // Fire the push concurrently: the dispatcher is bounded by its own 10s
+        // abort, so a hanging backend must not serialize to scan-limit × 10s.
+        lifecycleDispatchPromises.push(
+          dispatchSecurityLifecycleEventForFinding({
+            env: params.env,
+            db,
+            findingId: row.id,
+            event: 'remediation_queued',
+            remediationId: result.remediationId,
+          })
+        );
       } else {
         counts.skipped += 1;
       }
@@ -1859,6 +2342,7 @@ export async function applyAutoRemediationCommand(params: {
       });
     }
   }
+  await Promise.all(lifecycleDispatchPromises);
   await transitionSecurityAgentCommand(db, {
     commandId: params.command.commandId,
     fromStatuses: ['accepted', 'running'],
@@ -1880,12 +2364,37 @@ export async function maybeAdmitAutoRemediationForCompletedAnalysis(params: {
     origin: 'auto_policy',
   });
   if (!result.admitted) return result;
+  const finding = await getSecurityFindingById(params.db, params.findingId);
+  if (finding) {
+    await admitSecurityRemediationLedgerRow({
+      db: params.db,
+      finding,
+      attemptId: result.attemptId,
+      remediationId: result.remediationId,
+      attemptNumber: result.attemptNumber,
+    });
+  }
   try {
     await enqueueRemediationAttempt(params.env, result.attemptId);
   } catch (error) {
     await markAttemptQueueAdmissionFailed(params.db, result.attemptId);
+    if (finding) {
+      await settleAdmittedLedgerRowBestEffort({
+        db: params.db,
+        finding,
+        attemptId: result.attemptId,
+        terminalStatus: 'failed',
+      });
+    }
     throw error;
   }
+  await dispatchSecurityLifecycleEventForFinding({
+    env: params.env,
+    db: params.db,
+    findingId: params.findingId,
+    event: 'remediation_queued',
+    remediationId: result.remediationId,
+  });
   return result;
 }
 
@@ -1919,6 +2428,18 @@ export async function cancelRemediation(params: {
         finalAssistantMessage: undefined,
         actor: auditActor,
       });
+      await settleSecurityRemediationLedgerRow({
+        db,
+        finding,
+        attempt,
+        terminalStatus: 'cancelled',
+      });
+      await emitRemediationTerminalLifecycleEvent({
+        env: params.env,
+        db,
+        attempt,
+        status: 'cancelled',
+      });
     } else {
       await db.transaction(async tx => {
         await tx
@@ -1940,6 +2461,12 @@ export async function cancelRemediation(params: {
             updated_at: sql`now()`,
           })
           .where(eq(security_remediations.id, attempt.remediation_id));
+      });
+      await settleSecurityRemediationLedgerRow({
+        db,
+        finding: null,
+        attempt,
+        terminalStatus: 'cancelled',
       });
     }
     return { success: true, status: 'cancelled' };

@@ -28,6 +28,7 @@ const CopyCustomLlmSchema = z.object({
   source_public_id: publicIdSchema,
   public_id: publicIdSchema,
   display_name: z.string().trim().min(1, 'display_name is required'),
+  internal_id: z.string().trim().min(1, 'internal_id is required'),
 });
 
 const DeleteCustomLlmSchema = z.object({
@@ -120,6 +121,7 @@ export const adminCustomLlmRouter = createTRPCRouter({
         definition: {
           ...source.definition,
           display_name: input.display_name,
+          internal_id: input.internal_id,
         },
         encrypted_api_key: source.encrypted_api_key,
       })

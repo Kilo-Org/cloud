@@ -17,6 +17,10 @@
     {
       "name": "zod-utils",
       "specifier": "../../tools/oxlint/zod-utils.mjs"
+    },
+    {
+      "name": "no-literal-copy",
+      "specifier": "../../tools/oxlint/no-literal-copy/index.ts"
     }
   ],
   "options": {
@@ -199,7 +203,8 @@
     "anti-slop/no-reflect-get": "error",
     "anti-slop/no-runtime-typeof": "error",
     "anti-slop/no-unknown-returns": "error",
-    "zod-utils/no-inline-zod-schema": "error"
+    "zod-utils/no-inline-zod-schema": "error",
+    "no-literal-copy/no-literal-copy": "error"
   },
   "overrides": [
     {
@@ -249,6 +254,26 @@
         "anti-slop/no-runtime-typeof": "off",
         "anti-slop/no-unknown-returns": "off",
         "zod-utils/no-inline-zod-schema": "off"
+      }
+    },
+    {
+      "files": ["src/i18n/catalogs.ts"],
+      "rules": {
+        "@typescript-eslint/no-require-imports": "off",
+        "@typescript-eslint/no-var-requires": "off",
+        "unicorn/prefer-module": "off"
+      }
+    },
+    {
+      "files": ["src/i18n/index.ts"],
+      "rules": {
+        "promise/prefer-await-to-callbacks": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**"],
+      "rules": {
+        "no-literal-copy/no-literal-copy": "off"
       }
     }
   ]

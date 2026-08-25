@@ -25,6 +25,9 @@ export const sendPushForConversationInputSchema = z.object({
   title: z.string().max(200),
   bodyPreview: z.string().max(200),
   messageId: z.string().min(1),
+  // Old producers omit these; remove the optionals when every producer sends keys.
+  i18nKey: z.string().min(1).optional(),
+  i18nParams: z.record(z.string(), z.string()).optional(),
 });
 export type SendPushForConversationInput = z.infer<typeof sendPushForConversationInputSchema>;
 
@@ -149,6 +152,9 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   suppressIfViewingSession: z.boolean().optional(),
   // Absent category is treated as 'status' at the enforcement read site.
   category: cloudAgentSessionCategorySchema.optional(),
+  // Old producers omit these; remove the optionals when every producer sends keys.
+  i18nKey: z.string().min(1).optional(),
+  i18nParams: z.record(z.string(), z.string()).optional(),
 });
 export type SendCloudAgentSessionNotificationParams = z.infer<
   typeof sendCloudAgentSessionNotificationInputSchema
@@ -235,6 +241,9 @@ export const dispatchPushInputSchema = z.object({
     data: pushDataSchema,
     sound: z.union([z.literal('default'), z.null()]).optional(),
     priority: z.enum(['default', 'high']).optional(),
+    // Old producers omit these; remove the optionals when every producer sends keys.
+    i18nKey: z.string().min(1).optional(),
+    i18nParams: z.record(z.string(), z.string()).optional(),
   }),
   // Optional per-call rate limit (sliding window). When set, the DO checks
   // the sliding window after idempotency/presence and before the Expo send;
@@ -289,8 +298,38 @@ export type InternalDispatchSecurityFindingRequest = z.infer<
   typeof internalDispatchSecurityFindingRequestSchema
 >;
 
+// 1:1 map to the `security_lifecycle` event enum in `push-data.ts` (which in
+// turn maps to SecurityAuditLogAction). Kept as a standalone enum here because
+// the push-data variant declares the enum inline and this package must not
+// import it back.
+export const securityLifecycleEventSchema = z.enum([
+  'analysis_completed',
+  'analysis_failed',
+  'remediation_queued',
+  'remediation_pr_opened',
+  'remediation_failed',
+  'remediation_blocked',
+  'remediation_no_changes_needed',
+  'remediation_cancelled',
+]);
+export type SecurityLifecycleEvent = z.infer<typeof securityLifecycleEventSchema>;
+
+export const internalDispatchSecurityLifecycleRequestSchema = z.object({
+  kind: z.literal('security_lifecycle'),
+  event: securityLifecycleEventSchema,
+  findingId: z.string().min(1),
+  scope: z.string().min(1),
+  remediationId: z.string().min(1).optional(),
+  prUrl: z.string().min(1).optional(),
+  recipientUserIds: z.array(z.string().min(1)).min(1),
+});
+export type InternalDispatchSecurityLifecycleRequest = z.infer<
+  typeof internalDispatchSecurityLifecycleRequestSchema
+>;
+
 export const internalDispatchRequestSchema = z.discriminatedUnion('kind', [
   internalDispatchLowBalanceRequestSchema,
   internalDispatchSecurityFindingRequestSchema,
+  internalDispatchSecurityLifecycleRequestSchema,
 ]);
 export type InternalDispatchRequest = z.infer<typeof internalDispatchRequestSchema>;

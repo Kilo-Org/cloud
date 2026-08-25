@@ -30,6 +30,7 @@
 //     nominal 44pt vertical target on contiguous rows.
 
 import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -49,7 +50,6 @@ import {
 
 const GUTTER_WIDTH = 56;
 const VERTICAL_PADDING = 2;
-const NO_NEWLINE_INDICATOR = '\u26A0\uFE0F no newline at end of file';
 
 type DiffLineProps = {
   line: ParsedDiffLine;
@@ -96,6 +96,7 @@ function markerColorFor(
 
 function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLineProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const isDark = colors.background === '#0E0E10';
   const metrics = useDiffFontMetrics();
 
@@ -108,7 +109,7 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
   const rowBackground = rowBackgroundFor(line.type);
   const gutterColor = isDark ? MUTED_COLOR.dark : MUTED_COLOR.light;
   const noNewlineColor = isDark ? MUTED_COLOR.dark : MUTED_COLOR.light;
-  const noNewlineLabel = ` ${NO_NEWLINE_INDICATOR}`;
+  const noNewlineLabel = ` ${t('prReview.sideBySide.noNewlineAtEndOfFile')}`;
   const marker = diffLineMarker(line.type);
   const markerColor = markerColorFor(line.type, colors);
   const accessibilityLabel = buildDiffLineAccessibilityLabel(line);
@@ -207,8 +208,8 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
       accessibilityRole="button"
       accessibilityLabel={
         isSelected
-          ? `Selected ${accessibilityLabel}, tap to change selection`
-          : `${accessibilityLabel}, tap to comment`
+          ? t('prReview.diff.selectedTapToChange', { label: accessibilityLabel })
+          : t('prReview.diff.tapToComment', { label: accessibilityLabel })
       }
       accessibilityState={{ selected: Boolean(isSelected) }}
       hitSlop={hitSlop}

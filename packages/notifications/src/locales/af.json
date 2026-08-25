@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Jou agentsessie het 'n opdatering",
+      "chatMessage": "Jy het 'n nuwe boodskap",
+      "instanceLifecycle": "Jou instansie het 'n opdatering",
+      "scheduledAction": "'n Geskeduleerde aksie het 'n opdatering",
+      "lowBalance": "Jou saldo benodig aandag",
+      "securityFinding": "'n Sekuriteitsbevinding benodig aandag"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Taak voltooi"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Misluk: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Onderbreek: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Sonder titel",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Lae saldo-waarskuwing",
+      "body": "{{organizationName}} saldo het onder ${{minimumBalanceUsd}} gedaal"
+    },
+    "securityFindingNew": {
+      "title": "Nuwe sekuriteitsbevinding ({{severity}})",
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA-waarskuwing",
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA-oortreding",
+      "body": "{{findingTitle}} in {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "'n Sekuriteitsbevinding benodig aandag"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} is gereed",
+      "body": "Tik om te begin klets."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} kon nie begin nie",
+      "body": "Begin het misluk."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} sal binnekort herbegin",
+      "body": "Geskeduleer om te herbegin by {{when}}."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} herbegin gekanselleer",
+      "body": "Die voorheen geskeduleerde herbegin is gekanselleer."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} sal binnekort opgradeer",
+      "bodyWithTag": "Opgradeer na {{targetImageTag}} by {{when}}.",
+      "bodyWithoutTag": "Geskeduleerde opgradering by {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} opgradering gekanselleer",
+      "body": "Die voorheen geskeduleerde opgradering is gekanselleer."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Jou Kilo-sessie is gereed om vanaf jou foon beheer te word"
+  }
+}

@@ -1,5 +1,6 @@
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import {
   CLIPBOARD_PASTE_EMPTY_MESSAGE,
   useClipboardPaste,
@@ -29,7 +30,7 @@ export function useMessageInputClipboardImageHint({
       toast.error(
         reason === 'empty'
           ? CLIPBOARD_PASTE_EMPTY_MESSAGE
-          : buildAttachmentUnreadableToast('the pasted image')
+          : buildAttachmentUnreadableToast(i18n.t('chat.attachment.pastedImage'))
       );
     },
   });

@@ -2,8 +2,10 @@ import { type ReactNode } from 'react';
 import { View } from 'react-native';
 import { Eye } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
+import { i18n } from '@/i18n';
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
 import { languageForPath } from '@/lib/pr-review/diff/highlight';
@@ -40,7 +42,11 @@ function renderReadCodeBody(
 ): ReactNode | null {
   if (codeBody) {
     if (codeBody.text === '') {
-      return <Text className="text-xs text-muted-foreground">This file is empty.</Text>;
+      return (
+        <Text className="text-xs text-muted-foreground">
+          {i18n.t('agentChat.toolCard.fileEmpty')}
+        </Text>
+      );
     }
     return (
       <View className="gap-2">
@@ -99,6 +105,7 @@ export function ReadToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 
 export function ReadToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
+  const { t } = useTranslation();
   const display = getToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
@@ -108,7 +115,10 @@ export function ReadToolCard({ part }: Readonly<{ part: ToolPart }>) {
       label={display.subtitle ?? display.title}
       {...(display.badge ? { badge: display.badge } : {})}
       status={part.state.status}
-      accessibilityLabel={`${display.subtitle ?? display.title} tool, ${part.state.status}`}
+      accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
+        name: display.subtitle ?? display.title,
+        status: part.state.status,
+      })}
       onPress={
         hasDetails && openPartDetail
           ? () => {

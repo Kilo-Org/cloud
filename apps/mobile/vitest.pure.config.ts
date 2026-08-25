@@ -18,6 +18,7 @@ export default defineProject({
     name: 'mobile-pure',
     environment: 'node',
     include: [
+      'src/i18n/**/*.test.ts',
       'src/lib/*.test.ts',
       'src/lib/a11y/**/*.test.ts',
       'src/lib/agent-attachments/**/*.test.ts',
@@ -29,14 +30,17 @@ export default defineProject({
       'src/lib/hooks/**/*.test.ts',
       'src/lib/kilo-pass/**/*.test.ts',
       'src/lib/kilo-pass/**/*.test.tsx',
+      'src/lib/navigation/**/*.test.ts',
       'src/lib/onboarding/**/*.test.ts',
       'src/lib/persist/**/*.test.ts',
       'src/lib/pr-review/**/*.test.ts',
+      'src/lib/query/**/*.test.ts',
       'src/lib/voice-input/**/*.test.ts',
       'src/components/**/*.test.ts',
       'src/components/pr-review/**/*.test.tsx',
-      'src/components/kiloclaw/**/*.test.tsx',
-      'src/components/login/**/*.test.tsx',
+      // `!(*.mounted)` keeps `*.mounted.test.tsx` in the mounted project only:
+      // this directory holds both kinds, and a file in both projects runs twice.
+      'src/components/kiloclaw/**/!(*.mounted).test.tsx',
       'src/lib/telemetry/**/*.test.ts',
     ],
   },

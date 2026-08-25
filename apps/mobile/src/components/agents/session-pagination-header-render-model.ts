@@ -1,16 +1,14 @@
+import { i18n } from '@/i18n';
 import {
   selectSessionMessageListHeaderState,
   type SessionMessageListHeaderStateInputs,
 } from '@/components/agents/session-message-list-state';
 
-const RETRY_LABEL = 'Retry';
-const RETRY_HINT = 'Reattempts the older-messages load for this session.';
-
 function omittedMessage(count: number): string {
   if (count === 1) {
-    return 'Some earlier items from this session could not be displayed.';
+    return i18n.t('agentChat.olderMessages.omittedOne');
   }
-  return `${count} earlier items from this session could not be displayed.`;
+  return i18n.t('agentChat.olderMessages.omittedMany', { count });
 }
 
 export type SessionPaginationHeaderRenderModel =
@@ -59,8 +57,11 @@ export function selectSessionPaginationHeaderRenderModel(
     return {
       kind: 'retryable',
       testID: 'session-pagination-header-retryable',
-      text: "Couldn't load earlier messages.",
-      retry: { label: RETRY_LABEL, accessibilityHint: RETRY_HINT },
+      text: i18n.t('agentChat.olderMessages.couldNotLoad'),
+      retry: {
+        label: i18n.t('common.retry'),
+        accessibilityHint: i18n.t('agentChat.olderMessages.retryHint'),
+      },
     };
   }
 
@@ -68,7 +69,7 @@ export function selectSessionPaginationHeaderRenderModel(
     return {
       kind: 'invalid_data',
       testID: 'session-pagination-header-invalid-data',
-      text: "Earlier messages aren't available.",
+      text: i18n.t('agentChat.olderMessages.unavailable'),
     };
   }
 
@@ -76,7 +77,7 @@ export function selectSessionPaginationHeaderRenderModel(
     return {
       kind: 'too_large',
       testID: 'session-pagination-header-too-large',
-      text: 'Earlier messages are too large to load.',
+      text: i18n.t('agentChat.olderMessages.tooLarge'),
     };
   }
 

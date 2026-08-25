@@ -2,8 +2,10 @@
 import * as Sentry from '@sentry/react-native';
 import { useMutation } from '@tanstack/react-query';
 import * as Location from 'expo-location';
-import { ChevronDown, ChevronRight, ChevronUp, MapPin } from '@/components/ui/icons';
+import { ChevronDown, ChevronUp, MapPin } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
@@ -21,38 +23,52 @@ import { type BotIdentity, DEFAULT_BOT_IDENTITY } from './state';
 type NaturePreset = {
   id: string;
   emoji: string;
+  /** Persisted English value stored as botNature; never rendered directly. */
   label: string;
+  /** i18n key rendered in the UI. */
+  labelKey: string;
+  /** Persisted English value stored as botVibe; never rendered directly. */
   vibe: string;
+  /** i18n key rendered in the UI. */
+  vibeKey: string;
 };
 
 const DEFAULT_NATURE = {
   id: 'ai-assistant',
   emoji: '🤖',
   label: 'AI assistant',
+  labelKey: 'kiloclaw.onboarding.identity.nature.aiAssistantLabel',
   vibe: 'Helpful, capable, professional',
-} satisfies NaturePreset;
+  vibeKey: 'kiloclaw.onboarding.identity.nature.aiAssistantVibe',
+} as const satisfies NaturePreset;
 
-const NATURE_PRESETS: readonly NaturePreset[] = [
+const NATURE_PRESETS = [
   DEFAULT_NATURE,
   {
     id: 'digital-creature',
     emoji: '🐙',
     label: 'Digital creature',
+    labelKey: 'kiloclaw.onboarding.identity.nature.digitalCreatureLabel',
     vibe: 'Quirky, alive, a bit unpredictable',
+    vibeKey: 'kiloclaw.onboarding.identity.nature.digitalCreatureVibe',
   },
   {
     id: 'virtual-companion',
     emoji: '🌙',
     label: 'Virtual companion',
+    labelKey: 'kiloclaw.onboarding.identity.nature.virtualCompanionLabel',
     vibe: 'Warm, present, genuinely cares',
+    vibeKey: 'kiloclaw.onboarding.identity.nature.virtualCompanionVibe',
   },
   {
     id: 'something-weirder',
     emoji: '🌀',
     label: 'Something weirder…',
+    labelKey: 'kiloclaw.onboarding.identity.nature.somethingWeirderLabel',
     vibe: 'Define it yourself',
+    vibeKey: 'kiloclaw.onboarding.identity.nature.somethingWeirderVibe',
   },
-];
+] as const satisfies readonly NaturePreset[];
 
 const EMOJI_OPTIONS = ['🤖', '👾', '🧠', '⚡', '🔮', '🔥', '🐉', '✨', '🌙'];
 
@@ -102,6 +118,7 @@ export function IdentityStep({
 }: Readonly<IdentityStepProps>) {
   const colors = useThemeColors();
   const trpc = useTRPC();
+  const { t } = useTranslation();
   const initialName = initialIdentity?.botName ?? '';
   const initialEmoji = initialIdentity?.botEmoji ?? DEFAULT_BOT_IDENTITY.botEmoji;
   const initialNatureId = initialIdentity
@@ -165,7 +182,10 @@ export function IdentityStep({
         return;
       }
       setValidatedLocation(null);
-      const message = error instanceof Error ? error.message : 'Location could not be validated.';
+      const message =
+        error instanceof Error
+          ? error.message
+          : t('kiloclaw.onboarding.identity.locationValidationFailed');
       setLocationFeedback({ message, status: 'error' });
     }
   }, [
@@ -174,6 +194,7 @@ export function IdentityStep({
     validateLocation.isPending,
     validateLocationAsync,
     validatedLocation,
+    t,
   ]);
 
   const handleGpsPress = useCallback(async () => {
@@ -182,8 +203,8 @@ export function IdentityStep({
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== Location.PermissionStatus.GRANTED) {
         Alert.alert(
-          'Location access denied',
-          'Enable location access in Settings to use your current location.'
+          t('kiloclaw.onboarding.identity.locationDeniedTitle'),
+          t('kiloclaw.onboarding.identity.locationDeniedMessage')
         );
         return;
       }
@@ -198,11 +219,17 @@ export function IdentityStep({
         setLocationFeedback({ message: result.currentWeatherText, status: result.status });
         setValidatedLocation(result.location);
       } catch (validateError) {
-        Sentry.captureException(validateError);
+        Sentry.captureException(validateError, {
+          tags: {
+            'error.subsystem': 'kiloclaw-onboarding',
+            'error.operation': 'validate-gps-location',
+          },
+          extra: { coordinatePrecision: GPS_COORDINATE_PRECISION },
+        });
         applyLocationText(coords);
         setValidatedLocation(null);
         setLocationFeedback({
-          message: 'Could not resolve your location. You can edit it manually.',
+          message: t('kiloclaw.onboarding.identity.locationResolveFailed'),
           status: 'error',
         });
       }
@@ -211,13 +238,13 @@ export function IdentityStep({
       // permission failure). The user is told via locationFeedback below, and
       // there is nothing a developer could act on, so nothing is reported.
       setLocationFeedback({
-        message: 'Could not get your location. Enter it manually.',
+        message: t('kiloclaw.onboarding.identity.locationGetFailed'),
         status: 'error',
       });
     } finally {
       setIsGpsLoading(false);
     }
-  }, [applyLocationText, validateLocationAsync]);
+  }, [applyLocationText, validateLocationAsync, t]);
 
   const handleContinue = useCallback(() => {
     const trimmedName = nameRef.current.trim();
@@ -268,7 +295,7 @@ export function IdentityStep({
       <Animated.View layout={LinearTransition} className="gap-3">
         <View className="flex-row items-center gap-3">
           <Pressable
-            accessibilityLabel="Choose avatar"
+            accessibilityLabel={t('kiloclaw.onboarding.identity.chooseAvatar')}
             accessibilityRole="button"
             onPress={() => {
               setAvatarExpanded(v => !v);
@@ -283,7 +310,7 @@ export function IdentityStep({
           </Pressable>
           <TextInput
             className="h-14 flex-1 rounded-xl border border-input bg-background px-3 text-base leading-[normal] text-foreground"
-            placeholder="Name your bot"
+            placeholder={t('kiloclaw.onboarding.identity.namePlaceholder')}
             placeholderTextColor={colors.mutedForeground}
             defaultValue={initialName}
             onChangeText={value => {
@@ -305,7 +332,9 @@ export function IdentityStep({
               return (
                 <Pressable
                   key={emoji}
-                  accessibilityLabel={`Select ${botAvatarName(emoji)} as avatar`}
+                  accessibilityLabel={t('kiloclaw.onboarding.identity.selectAvatar', {
+                    name: botAvatarName(emoji),
+                  })}
                   accessibilityRole="button"
                   onPress={() => {
                     setSelectedEmoji(emoji);
@@ -327,7 +356,7 @@ export function IdentityStep({
 
       <Animated.View layout={LinearTransition} className="gap-2">
         <Text variant="eyebrow" className="text-xs">
-          Personality
+          {t('kiloclaw.onboarding.identity.personality')}
         </Text>
         {personalityExpanded ? (
           <View className="gap-2">
@@ -349,8 +378,8 @@ export function IdentityStep({
               >
                 <BotAvatar emoji={preset.emoji} size={24} color={colors.foreground} />
                 <View className="flex-1 gap-0.5">
-                  <Text className="text-base font-medium">{preset.label}</Text>
-                  <Text className="text-sm text-muted-foreground">{preset.vibe}</Text>
+                  <Text className="text-base font-medium">{t(preset.labelKey)}</Text>
+                  <Text className="text-sm text-muted-foreground">{t(preset.vibeKey)}</Text>
                 </View>
               </Pressable>
             ))}
@@ -367,7 +396,7 @@ export function IdentityStep({
         ) : (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Change personality"
+            accessibilityLabel={t('kiloclaw.onboarding.identity.changePersonality')}
             onPress={() => {
               setPersonalityExpanded(true);
             }}
@@ -375,8 +404,8 @@ export function IdentityStep({
           >
             <BotAvatar emoji={nature.emoji} size={24} color={colors.foreground} />
             <View className="flex-1 gap-0.5">
-              <Text className="text-base font-medium">{nature.label}</Text>
-              <Text className="text-sm text-muted-foreground">{nature.vibe}</Text>
+              <Text className="text-base font-medium">{t(nature.labelKey)}</Text>
+              <Text className="text-sm text-muted-foreground">{t(nature.vibeKey)}</Text>
             </View>
             <ChevronDown size={16} color={colors.mutedForeground} />
           </Pressable>
@@ -385,13 +414,13 @@ export function IdentityStep({
 
       <Animated.View layout={LinearTransition} className="gap-2">
         <Text variant="eyebrow" className="text-xs">
-          Location
+          {t('kiloclaw.onboarding.identity.location')}
         </Text>
         <View className="flex-row items-center gap-2">
           <TextInput
             key={locationInputKey}
             className="h-11 flex-1 rounded-xl border border-input bg-background px-3 text-base leading-[normal] text-foreground"
-            placeholder="City or region (optional)"
+            placeholder={t('kiloclaw.onboarding.identity.locationPlaceholder')}
             placeholderTextColor={colors.mutedForeground}
             defaultValue={locationDefaultValue}
             onChangeText={value => {
@@ -412,7 +441,7 @@ export function IdentityStep({
             returnKeyType="done"
           />
           <Pressable
-            accessibilityLabel="Use current location"
+            accessibilityLabel={t('kiloclaw.onboarding.identity.useCurrentLocation')}
             accessibilityRole="button"
             onPress={() => {
               void handleGpsPress();
@@ -443,8 +472,8 @@ export function IdentityStep({
           <ActivityIndicator size="small" color={colors.primaryForeground} />
         ) : (
           <>
-            <Text className="text-base">Continue</Text>
-            <ChevronRight size={16} color={colors.primaryForeground} />
+            <Text className="text-base">{t('kiloclaw.onboarding.identity.continue')}</Text>
+            <DirectionalChevronRight size={16} color={colors.primaryForeground} />
           </>
         )}
       </Button>

@@ -1,5 +1,6 @@
 import { type Href, useRouter } from 'expo-router';
 import { Platform, useWindowDimensions, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -24,6 +25,7 @@ import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 export default function KiloClawTab() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   const instancesQuery = useAllKiloClawInstances();
@@ -51,7 +53,7 @@ export default function KiloClawTab() {
 
   const [manualRefreshing, handleRefresh] = useManualRefresh(
     refetchInstances,
-    "Couldn't refresh. Pull down to try again."
+    t('common.couldNotRefresh')
   );
 
   // A background billing-check failure while the list is already showing
@@ -63,7 +65,12 @@ export default function KiloClawTab() {
   if (hasQueryError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="KiloClaw" size="large" showBackButton={false} className="px-[22px]" />
+        <ScreenHeader
+          title={t('kiloclaw.title')}
+          size="large"
+          showBackButton={false}
+          className="px-[22px]"
+        />
         <Animated.View
           entering={FadeIn.duration(200)}
           className="flex-1"
@@ -71,7 +78,7 @@ export default function KiloClawTab() {
         >
           <QueryError
             className="flex-1"
-            message="Could not load KiloClaw instances"
+            message={t('kiloclaw.couldNotLoadInstances')}
             onRetry={() => {
               if (instancesQuery.isError) {
                 void instancesQuery.refetch();
@@ -109,7 +116,12 @@ export default function KiloClawTab() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="KiloClaw" size="large" showBackButton={false} className="px-[22px]" />
+      <ScreenHeader
+        title={t('kiloclaw.title')}
+        size="large"
+        showBackButton={false}
+        className="px-[22px]"
+      />
       <Animated.View layout={LinearTransition} className="flex-1 px-4">
         {showInstanceSkeleton || onboardingQuery.data === undefined ? (
           <Animated.View exiting={FadeOut.duration(150)} className="w-full gap-3 pt-5">

@@ -1,5 +1,14 @@
+import { eq, or, sql } from 'drizzle-orm';
+import { kilocode_users } from '@kilocode/db/schema';
+import { isSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
+import { db } from '@/lib/drizzle';
 import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@/lib/user/deletion-queue/deletion-constants';
-import { deletionEmailsEqual } from '@/lib/user/deletion-queue/deletion-intake';
+import { writeDeletionActivity } from '@/lib/user/deletion-queue/deletion-audit';
+import { hmacDeletionEmail } from '@/lib/user/deletion-queue/deletion-hmac';
+import {
+  deletionEmailsEqual,
+  normalizeDeletionEmail,
+} from '@/lib/user/deletion-queue/deletion-intake';
 import {
   asNonEmptyString,
   classifyResponse,
@@ -11,7 +20,6 @@ import {
 } from '@/lib/user/deletion-queue/handlers/common';
 import {
   pylonConfig,
-  pylonData,
   pylonJson,
   pylonRequest,
 } from '@/lib/user/deletion-queue/handlers/pylon-client';
@@ -37,15 +45,20 @@ function collectContactEmails(contact: Record<string, unknown>): string[] {
   return [...emails];
 }
 
+function contactEntries(payload: unknown): unknown[] | null {
+  if (Array.isArray(payload)) return payload;
+  if (!isRecord(payload)) return null;
+  if (!('data' in payload) || payload.data == null) return [];
+  const data = payload.data;
+  if (Array.isArray(data)) return data;
+  if (isRecord(data) && Array.isArray(data.contacts)) return data.contacts;
+  return null;
+}
+
 function parseContacts(
   payload: unknown
 ): { contacts: PylonContact[]; cursor: string | null } | null {
-  const data = pylonData(payload);
-  const list = Array.isArray(data)
-    ? data
-    : isRecord(data) && Array.isArray(data.contacts)
-      ? data.contacts
-      : null;
+  const list = contactEntries(payload);
   if (!list) return null;
 
   const contacts: PylonContact[] = [];
@@ -67,9 +80,24 @@ function parseContacts(
   return { contacts, cursor: hasNext ? cursor : null };
 }
 
-function contactIsAmbiguous(contact: PylonContact, targetEmail: string): boolean {
-  if (contact.emails.length === 0) return true;
-  return contact.emails.some(email => !deletionEmailsEqual(email, targetEmail));
+async function kiloUsersForEmails(emails: string[]): Promise<Array<{ id: string; email: string }>> {
+  const normalized = [...new Set(emails.map(normalizeDeletionEmail))];
+  if (normalized.length === 0) return [];
+  const match = or(
+    ...normalized.map(email => eq(sql`lower(${kilocode_users.google_user_email})`, email))
+  );
+  if (!match) return [];
+  const users = await db
+    .select({
+      id: kilocode_users.id,
+      google_user_email: kilocode_users.google_user_email,
+      blocked_reason: kilocode_users.blocked_reason,
+    })
+    .from(kilocode_users)
+    .where(match);
+  return users
+    .filter(user => !isSoftDeletedBlockedReason(user.blocked_reason))
+    .map(user => ({ id: user.id, email: normalizeDeletionEmail(user.google_user_email) }));
 }
 
 export const handlePylonContact: DeletionHandler = async ({ request, step, context }) => {
@@ -114,8 +142,22 @@ export const handlePylonContact: DeletionHandler = async ({ request, step, conte
   }
 
   for (const contact of parsed.contacts) {
-    if (contactIsAmbiguous(contact, emailOrOutcome)) {
-      return { kind: 'needs_attention', errorCode: 'pylon_contact_ambiguous' };
+    const extras = contact.emails.filter(email => !deletionEmailsEqual(email, emailOrOutcome));
+    const kiloUsers = await kiloUsersForEmails(extras);
+    if (kiloUsers.some(user => user.id !== request.user_id)) {
+      return { kind: 'needs_attention', errorCode: 'pylon_contact_shared_identity' };
+    }
+    const known = new Set(kiloUsers.map(user => user.email));
+    for (const extra of extras) {
+      if (known.has(normalizeDeletionEmail(extra))) continue;
+      await db.transaction(async tx => {
+        await writeDeletionActivity(tx, {
+          requestId: request.id,
+          stepKey: context.stepKey,
+          eventType: 'pylon_contact_extra_email',
+          details: { resource_hmac: hmacDeletionEmail(normalizeDeletionEmail(extra)) },
+        });
+      });
     }
   }
 

@@ -150,6 +150,10 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => 'en',
+}));
+
 type ReactInternals = {
   __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE: {
     H: unknown;
@@ -468,7 +472,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 
     expect(showError).toHaveBeenCalledTimes(1);
     expect(showError).toHaveBeenCalledWith(
-      'This App Store subscription is linked to another Kilo account.'
+      'The Kilo Pass on this Apple Account belongs to a different Kilo account.'
     );
   });
 
@@ -805,7 +809,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 
     expect(result).toBe('failed');
     expect(showError).toHaveBeenCalledWith(
-      'This App Store subscription is linked to another Kilo account.'
+      'The Kilo Pass on this Apple Account belongs to a different Kilo account.'
     );
   });
 
@@ -836,7 +840,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 
     expect(restoreResult).toBe('failed');
     expect(showError).toHaveBeenCalledWith(
-      'This App Store subscription is linked to another Kilo account.'
+      'The Kilo Pass on this Apple Account belongs to a different Kilo account.'
     );
   });
 

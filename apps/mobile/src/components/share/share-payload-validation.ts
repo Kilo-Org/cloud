@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 import {
   canAddAttachments,
   classifyAttachment,
@@ -37,8 +39,6 @@ export type SharePayloadValidation =
       /** True when the payload has usable text and/or at least one accepted file. */
       usable: boolean;
     };
-
-const CONTENTLESS_MESSAGE = 'Nothing to share — no text or files were included.';
 
 type MeasuredFileInput = {
   name: string;
@@ -99,7 +99,7 @@ export function validateMeasuredShareFiles(input: {
     return {
       kind: 'all-rejected',
       reason: null,
-      message: CONTENTLESS_MESSAGE,
+      message: i18n.t('share.contentlessMessage'),
     };
   }
 

@@ -1,82 +1,99 @@
 import * as Application from 'expo-application';
-import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
+import { onlineManager } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Platform } from 'react-native';
 
 import { API_BASE_URL } from '@/lib/config';
+import { resolveForceUpdateState } from '@/lib/force-update-policy';
+import { subscribeToForceUpdateRecheck } from '@/lib/force-update-signal';
 
-type MinVersionResponse = {
-  ios: string;
-  android: string;
-};
-
-function isVersionBelow(current: string, minimum: string): boolean {
-  const currentParts = current.split('.').map(Number);
-  const minimumParts = minimum.split('.').map(Number);
-
-  for (let i = 0; i < 3; i += 1) {
-    const cur = currentParts[i] ?? 0;
-    const min = minimumParts[i] ?? 0;
-    if (cur < min) {
-      return true;
-    }
-    if (cur > min) {
-      return false;
-    }
-  }
-  return false;
-}
+const CHECK_SPACING_MS = 30_000;
+const CHECK_TIMEOUT_MS = 5000;
 
 export function useForceUpdate() {
-  const [state, setState] = useState({
-    updateRequired: false,
-    isChecking: true,
-  });
+  const [pollRequired, setPollRequired] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
+  const lastCheckAtRef = useRef(0);
+  const inFlightRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function check() {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/app/min-version`, {
-          signal: controller.signal,
-          headers: { Accept: 'application/json' },
-        });
-
-        if (!response.ok) {
-          setState({ updateRequired: false, isChecking: false });
-          return;
-        }
-
-        const data = (await response.json()) as MinVersionResponse;
-        const nativeVersion = Application.nativeApplicationVersion;
-
-        if (!nativeVersion) {
-          setState({ updateRequired: false, isChecking: false });
-          return;
-        }
-
-        const minVersion = Platform.OS === 'ios' ? data.ios : data.android;
-        const updateRequired = isVersionBelow(nativeVersion, minVersion);
-
-        setState({ updateRequired, isChecking: false });
-      } catch {
-        // Fail open — network errors should not block the user
-        setState({ updateRequired: false, isChecking: false });
-      }
+  const check = useCallback(async (force = false) => {
+    if (!force && Date.now() - lastCheckAtRef.current < CHECK_SPACING_MS) {
+      return;
     }
+    // Single-flight: abort any in-flight check before starting a new one.
+    inFlightRef.current?.abort();
 
-    void check();
+    const controller = new AbortController();
+    inFlightRef.current = controller;
+    lastCheckAtRef.current = Date.now();
 
-    // 5 second timeout — fail open
     const timeout = setTimeout(() => {
       controller.abort();
-    }, 5000);
+    }, CHECK_TIMEOUT_MS);
 
-    return () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/app/min-version`, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' },
+      });
+      const data = await response.json().catch(() => undefined);
+      const state = resolveForceUpdateState(
+        { ok: response.ok, data },
+        Application.nativeApplicationVersion,
+        Platform.OS === 'ios' ? 'ios' : 'android'
+      );
+
+      if (state.kind === 'update-required') {
+        setPollRequired(true);
+      } else if (state.kind === 'up-to-date') {
+        setPollRequired(false);
+      }
+      // 'unknown' → fail-open: leave pollRequired unchanged.
+      setIsChecking(false);
+    } catch {
+      // Fail open — the client fails open on its own network error; the server
+      // middleware (G1) is the fail-closed half.
+      setIsChecking(false);
+    } finally {
       clearTimeout(timeout);
-      controller.abort();
-    };
+      if (inFlightRef.current === controller) {
+        inFlightRef.current = null;
+      }
+    }
   }, []);
 
-  return state;
+  useEffect(() => {
+    void check();
+  }, [check]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') {
+        void check();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [check]);
+
+  useEffect(
+    () =>
+      onlineManager.subscribe(online => {
+        if (online) {
+          void check();
+        }
+      }),
+    [check]
+  );
+
+  useEffect(
+    () =>
+      subscribeToForceUpdateRecheck(() => {
+        void check(true);
+      }),
+    [check]
+  );
+
+  return { updateRequired: pollRequired, isChecking };
 }

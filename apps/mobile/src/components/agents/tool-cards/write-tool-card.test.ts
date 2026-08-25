@@ -1,10 +1,19 @@
+// oxlint-disable max-lines
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { WriteToolCard, WriteToolCardBody } from './write-tool-card';
 import * as React from 'react';
+import type * as ReactI18next from 'react-i18next';
 
 vi.mock('react-native', () => ({ View: 'View', TextInput: 'TextInput' }));
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => ({ t: (key: string) => key }),
+  };
+});
 vi.mock('@/components/ui/icons', () => ({ FilePlus: 'FilePlus' }));
 // Real context so the shared `SelectableText` can call `useContext(TextClassContext)`.
 vi.mock('@/components/ui/text', async () => {
@@ -168,7 +177,7 @@ describe('WriteToolCard — fixed row', () => {
       icon: 'FilePlus',
       label: 'new.ts',
       status: 'completed',
-      accessibilityLabel: 'new.ts tool, completed',
+      accessibilityLabel: 'agentChat.toolCard.accessibilityLabel',
     });
     expect(rowProps.badge).toBeUndefined();
   });
@@ -290,7 +299,7 @@ describe('WriteToolCardBody — smart render routing', () => {
     if (!text) {
       throw new Error('text not found');
     }
-    expect((text.props as { children?: unknown }).children).toBe('This file is empty.');
+    expect((text.props as { children?: unknown }).children).toBe('agentChat.toolCard.fileEmpty');
     expect(findByType(root, 'CodeBlock')).toHaveLength(0);
     expect(findByType(root, 'ReadMarkdownBody')).toHaveLength(0);
   });

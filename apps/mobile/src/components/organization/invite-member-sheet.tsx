@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
 import { Check } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 
-import { ROLE_LABEL } from '@/components/organization/member-row';
-import { INVITE_SUCCESS_MESSAGE } from '@/components/organization/invited-member-row-state';
+import { roleLabel } from '@/components/organization/member-row';
+import { getInviteSuccessMessage } from '@/components/organization/invited-member-row-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -21,10 +22,10 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, EMAIL_PATTERN } from '@/lib/utils';
 
 const INVITABLE_ROLES: OrgRole[] = ['member', 'billing_manager', 'owner'];
-const EMAIL_ERROR = 'Enter a valid email address';
 
 export function InviteMemberSheet() {
   const router = useRouter();
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const { organizationId, role: myRole, org, isResolving } = useOrgBoundary();
   const mutations = useOrganizationMutations(organizationId ?? '');
@@ -45,7 +46,7 @@ export function InviteMemberSheet() {
     return <OrganizationBoundary />;
   }
   if (!isMoneyRole(myRole)) {
-    return <PermissionDenied description="You don't have permission to invite members." />;
+    return <PermissionDenied description={t('organization.inviteMember.permissionDenied')} />;
   }
 
   const onSubmit = () => {
@@ -57,7 +58,7 @@ export function InviteMemberSheet() {
           captureEvent(ORGANIZATION_MEMBER_INVITED_EVENT, {
             role: isBillingManager ? 'member' : role,
           });
-          announcingToast.success(INVITE_SUCCESS_MESSAGE);
+          announcingToast.success(getInviteSuccessMessage());
           router.back();
         },
       }
@@ -71,19 +72,23 @@ export function InviteMemberSheet() {
       automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
     >
-      <Text className="text-center text-lg font-semibold text-foreground">Invite member</Text>
+      <Text className="text-center text-lg font-semibold text-foreground">
+        {t('organization.inviteMember.title')}
+      </Text>
 
       <FormField
-        label="Email"
+        label={t('organization.inviteMember.emailLabel')}
         required
-        placeholder="name@company.com"
+        placeholder={t('organization.inviteMember.emailPlaceholder')}
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
         autoComplete="email"
         textContentType="emailAddress"
         autoFocus
-        validate={value => (EMAIL_PATTERN.test(value.trim()) ? null : EMAIL_ERROR)}
+        validate={value =>
+          EMAIL_PATTERN.test(value.trim()) ? null : t('organization.inviteMember.emailError')
+        }
         onChangeText={value => {
           emailRef.current = value;
           setCanSubmit(EMAIL_PATTERN.test(value.trim()));
@@ -91,13 +96,16 @@ export function InviteMemberSheet() {
       />
 
       {isBillingManager ? (
-        <Text variant="muted">Role: Member</Text>
+        <Text variant="muted">{t('organization.inviteMember.roleMember')}</Text>
       ) : (
         <View className="gap-2">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Role
+            {t('organization.inviteMember.roleLabel')}
           </Text>
-          <RadioGroup label="Role" className="overflow-hidden rounded-lg bg-secondary">
+          <RadioGroup
+            label={t('organization.inviteMember.roleLabel')}
+            className="overflow-hidden rounded-lg bg-secondary"
+          >
             {INVITABLE_ROLES.map((value, index) => {
               const selected = role === value;
               return (
@@ -110,9 +118,9 @@ export function InviteMemberSheet() {
                   onPress={() => {
                     setRole(value);
                   }}
-                  {...radioItemA11y({ label: ROLE_LABEL[value], checked: selected })}
+                  {...radioItemA11y({ label: roleLabel(value), checked: selected })}
                 >
-                  <Text className="flex-1 text-sm">{ROLE_LABEL[value]}</Text>
+                  <Text className="flex-1 text-sm">{roleLabel(value)}</Text>
                   {selected && <Check size={16} color={colors.primary} />}
                 </Pressable>
               );
@@ -130,7 +138,7 @@ export function InviteMemberSheet() {
       />
 
       <Button disabled={!canSubmit} loading={mutations.invite.isPending} onPress={onSubmit}>
-        <Text className="text-primary-foreground">Send invite</Text>
+        <Text className="text-primary-foreground">{t('organization.inviteMember.sendInvite')}</Text>
       </Button>
     </ScrollView>
   );

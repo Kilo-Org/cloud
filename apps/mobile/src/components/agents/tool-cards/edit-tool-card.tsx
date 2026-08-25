@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { View } from 'react-native';
 import { Pencil } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
 import { SelectableText } from '@/components/ui/selectable-text';
@@ -71,6 +72,7 @@ export function EditToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 
 export function EditToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
+  const { t } = useTranslation();
   const display = getToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
@@ -79,7 +81,10 @@ export function EditToolCard({ part }: Readonly<{ part: ToolPart }>) {
       icon={Pencil}
       label={display.subtitle ?? display.title}
       status={part.state.status}
-      accessibilityLabel={`${display.subtitle ?? display.title} tool, ${part.state.status}`}
+      accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
+        name: display.subtitle ?? display.title,
+        status: part.state.status,
+      })}
       onPress={
         hasDetails && openPartDetail
           ? () => {

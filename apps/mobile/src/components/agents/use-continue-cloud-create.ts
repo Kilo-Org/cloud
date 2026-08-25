@@ -1,17 +1,17 @@
 // The cloud-agent leg of `useContinueSession`: one `prepareSession` call, its
 // hoisted operation key, and the contained post-success UI work. Split out of
-// `use-continue-session.ts` (which keeps the paging drain, destination
-// resolution, and the remote spawn leg) so each file stays under the
-// max-lines limit.
+// `use-continue-session.ts` (which keeps destination resolution) so each file
+// stays under the max-lines limit.
 import { useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import * as Haptics from 'expo-haptics';
 
 import { normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
+import { i18n } from '@/i18n';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
@@ -21,7 +21,7 @@ import { trpcClient, useTRPC } from '@/lib/trpc';
 export function useContinueCloudCreate(
   organizationId: string | undefined
 ): (
-  seed: string,
+  sessionId: KiloSessionId,
   dest: { repo: string; model: string; variant: string },
   mode: string
 ) => Promise<void> {
@@ -41,9 +41,13 @@ export function useContinueCloudCreate(
   } = useMutationOutbox();
 
   return useCallback(
-    async (seed: string, dest: { repo: string; model: string; variant: string }, mode: string) => {
+    async (
+      sessionId: KiloSessionId,
+      dest: { repo: string; model: string; variant: string },
+      mode: string
+    ) => {
       const intentFingerprint = JSON.stringify({
-        seed,
+        cloneFromKiloSessionId: sessionId,
         repo: dest.repo,
         model: dest.model,
         variant: dest.variant || undefined,
@@ -58,21 +62,21 @@ export function useContinueCloudCreate(
       // A failed outbox read reads as no stored rows, so refuse instead of
       // minting a fresh key over a row whose POST the server may have accepted.
       if (!(await whenLoaded())) {
-        throw new Error('Could not read pending sessions. Try again.');
+        throw new Error(i18n.t('agentChat.newSession.couldNotReadPendingSessions'));
       }
       const operationKey =
         getStoredOperationKey(intentFingerprint) ?? cloudOperationKey.getKey(intentFingerprint);
-      const initialMessageId = generateMessageId();
+      // The clone-only prepare schema forbids `prompt` and `initialMessageId`;
+      // the clone carries no synthetic turn.
       const baseInput = {
-        prompt: seed,
-        initialMessageId,
         mode: normalizeAgentMode(mode),
         model: dest.model,
         variant: dest.variant || undefined,
         githubRepo: dest.repo,
         autoCommit: false,
-        autoInitiate: true,
+        autoInitiate: true as const,
         operationKey,
+        cloneFromKiloSessionId: sessionId,
       };
       try {
         // Persist the safe-retry row BEFORE the mutate so a crash mid-flight

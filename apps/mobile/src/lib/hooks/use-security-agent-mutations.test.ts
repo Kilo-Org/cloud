@@ -1,16 +1,25 @@
-// P1-A-08e wiring tests for `useTriggerSecuritySync`.
+// Tests for the security-agent mutation hooks and their helpers.
 //
-// The dashboard owns the sync button and its toasts; these tests assert the
-// HOOK WIRING: the `mutationFn` delegates to the matching
+// The dashboard owns the sync button and its toasts; the sync suite asserts
+// the HOOK WIRING: the `mutationFn` delegates to the matching
 // `trpcClient.(organizations.)securityAgent.triggerSync.mutate`, the hoisted
 // operation key is merged into the input, and the key rotation policy (real
 // `isSecuritySyncRetryable` + `mapSecuritySyncOperationError`) runs inside
 // `mutationFn`. Only `useHoistedOperationKey` is mocked (it holds React ref
 // state that needs a mounted renderer).
-/* eslint-disable max-lines -- cohesive suite for sync wiring, retryability matrix, and the reconcile-first outbox path */
+//
+// Suites: `useTriggerSecuritySync` wiring, retryability, and reconcile-first
+// outbox; `useSaveSecurityAgentConfig` expectedRevision and generation
+// guard+scope; `useSetSecurityAgentEnabled` generation guard+scope; `scope.id`
+// network serialization (real MutationCache); `securitySyncIntentFingerprint`;
+// `isSecuritySyncRetryable`; in-progress copy per surface; and
+// `isSecurityConfigurationError`.
+/* eslint-disable max-lines -- one file for the useTriggerSecuritySync wiring/retryability/outbox, useSaveSecurityAgentConfig expectedRevision + generation-guard/scope, useSetSecurityAgentEnabled generation-guard/scope, scope.id serialization (real MutationCache), securitySyncIntentFingerprint, isSecuritySyncRetryable, in-progress copy per surface, and isSecurityConfigurationError suites */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake outbox factories settle without await because they resolve immediately */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type * as ReactQuery from '@tanstack/react-query';
 
 import type * as OperationKeyModule from '@/lib/operation-key';
 import {
@@ -21,6 +30,7 @@ import {
   SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
   securitySyncIntentFingerprint,
   useSaveSecurityAgentConfig,
+  useSetSecurityAgentEnabled,
   useTriggerSecuritySync,
 } from './use-security-agent-mutations';
 
@@ -31,6 +41,10 @@ const hoistedKeys = vi.hoisted(() => ({
 
 vi.mock('expo-crypto', () => ({
   randomUUID: () => 'not-used',
+}));
+
+vi.mock('react-native', () => ({
+  InteractionManager: { runAfterInteractions: vi.fn() },
 }));
 
 vi.mock('@/lib/operation-key', async importOriginal => {
@@ -58,9 +72,11 @@ vi.mock('@/lib/hooks/use-security-agent-commands', () => ({
 
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
-  onError?: (error: unknown) => void;
+  onMutate?: (vars: unknown) => Promise<unknown> | unknown;
+  onError?: (error: unknown, vars?: unknown, context?: unknown) => void;
   onSuccess?: (result: unknown, vars: unknown) => void;
   onSettled?: (data?: unknown, error?: unknown, vars?: unknown) => Promise<void> | void;
+  scope?: { id: string };
 };
 
 let lastCapturedOptions: MutationOptions | null = null;
@@ -88,6 +104,7 @@ vi.mock('@tanstack/react-query', () => ({
     setQueryData: (...args: unknown[]) => setQueryDataMock(...args),
     cancelQueries: (...args: unknown[]) => cancelQueriesMock(...args),
   }),
+  hashKey: (key: unknown) => JSON.stringify(key),
 }));
 
 vi.mock('@/lib/trpc', () => ({
@@ -339,6 +356,127 @@ describe('useSaveSecurityAgentConfig (expectedRevision)', () => {
     expect(personalSaveConfigMutateMock).toHaveBeenCalledWith(
       expect.objectContaining({ expectedRevision: null })
     );
+  });
+});
+
+describe('useSaveSecurityAgentConfig (generation guard + scope)', () => {
+  beforeEach(() => {
+    lastCapturedOptions = null;
+    getQueryDataMock.mockReset();
+    setQueryDataMock.mockReset();
+    cancelQueriesMock.mockReset();
+    toastErrorMock.mockReset();
+  });
+
+  it('scopes the mutation to serialize against a toggle on the same config', () => {
+    useSaveSecurityAgentConfig('personal');
+    expect(lastCapturedOptions?.scope).toEqual({ id: 'security-agent-config:personal' });
+  });
+
+  it('a failing older save does not roll back while a newer save owns the config', async () => {
+    getQueryDataMock.mockReturnValue({ isEnabled: false, slaEnabled: false });
+    useSaveSecurityAgentConfig('personal');
+    const older = await lastCapturedOptions?.onMutate?.({ slaEnabled: true });
+    const newer = await lastCapturedOptions?.onMutate?.({ slaEnabled: false });
+
+    setQueryDataMock.mockClear();
+    lastCapturedOptions?.onError?.(new Error('boom'), { slaEnabled: true }, older);
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+
+    lastCapturedOptions?.onError?.(new Error('boom'), { slaEnabled: false }, newer);
+    expect(setQueryDataMock).toHaveBeenCalledTimes(1);
+    // The toast fires regardless of which generation failed.
+    expect(toastErrorMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('a failing latest save rolls back its snapshot', async () => {
+    getQueryDataMock.mockReturnValue({ isEnabled: false, slaEnabled: false });
+    useSaveSecurityAgentConfig('personal');
+    const context = await lastCapturedOptions?.onMutate?.({ slaEnabled: true });
+
+    setQueryDataMock.mockClear();
+    lastCapturedOptions?.onError?.(new Error('boom'), { slaEnabled: true }, context);
+    expect(setQueryDataMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).toHaveBeenCalledWith('boom');
+  });
+});
+
+describe('useSetSecurityAgentEnabled (generation guard + scope)', () => {
+  beforeEach(() => {
+    lastCapturedOptions = null;
+    getQueryDataMock.mockReset();
+    setQueryDataMock.mockReset();
+    cancelQueriesMock.mockReset();
+    toastErrorMock.mockReset();
+  });
+
+  it('scopes the mutation to serialize against a save on the same config', () => {
+    useSetSecurityAgentEnabled('personal');
+    expect(lastCapturedOptions?.scope).toEqual({ id: 'security-agent-config:personal' });
+  });
+
+  it('a failing older toggle does not roll back while a newer toggle owns the config', async () => {
+    getQueryDataMock.mockReturnValue({ isEnabled: false, configRevision: 1 });
+    useSetSecurityAgentEnabled('personal');
+    const older = await lastCapturedOptions?.onMutate?.({ isEnabled: true });
+    const newer = await lastCapturedOptions?.onMutate?.({ isEnabled: false });
+
+    setQueryDataMock.mockClear();
+    lastCapturedOptions?.onError?.(new Error('boom'), { isEnabled: true }, older);
+    expect(setQueryDataMock).not.toHaveBeenCalled();
+
+    lastCapturedOptions?.onError?.(new Error('boom'), { isEnabled: false }, newer);
+    expect(setQueryDataMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('a failing latest toggle rolls back its snapshot', async () => {
+    getQueryDataMock.mockReturnValue({ isEnabled: false, configRevision: 1 });
+    useSetSecurityAgentEnabled('personal');
+    const context = await lastCapturedOptions?.onMutate?.({ isEnabled: true });
+
+    setQueryDataMock.mockClear();
+    lastCapturedOptions?.onError?.(new Error('boom'), { isEnabled: true }, context);
+    expect(setQueryDataMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).toHaveBeenCalledWith('boom');
+  });
+});
+
+describe('scope.id network serialization (real MutationCache)', () => {
+  it('starts the second same-scope mutationFn only after the first settles', async () => {
+    const { MutationCache, QueryClient } =
+      await vi.importActual<typeof ReactQuery>('@tanstack/react-query');
+    const cache = new MutationCache();
+    const client = new QueryClient({ mutationCache: cache });
+    const order: string[] = [];
+    const gate = Promise.withResolvers<null>();
+
+    const first = cache.build(client, {
+      mutationFn: async () => {
+        order.push('first-start');
+        await gate.promise;
+        order.push('first-end');
+        return 'first';
+      },
+      scope: { id: 'security-agent-config:personal' },
+    });
+    const second = cache.build(client, {
+      mutationFn: async () => {
+        order.push('second-start');
+        return 'second';
+      },
+      scope: { id: 'security-agent-config:personal' },
+    });
+
+    const p1 = first.execute({});
+    const p2 = second.execute({});
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(order).toEqual(['first-start']);
+
+    gate.resolve(null);
+    await Promise.all([p1, p2]);
+    expect(order).toEqual(['first-start', 'first-end', 'second-start']);
   });
 });
 

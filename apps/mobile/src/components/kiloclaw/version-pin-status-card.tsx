@@ -1,4 +1,5 @@
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -25,6 +26,7 @@ export function VersionPinStatusCard({
   isRemovingPin: boolean;
   onUnpin: () => void;
 }>) {
+  const { t } = useTranslation();
   return (
     <View className="rounded-lg bg-secondary p-4 min-h-[60px] justify-center gap-2">
       {myPin ? (
@@ -32,7 +34,9 @@ export function VersionPinStatusCard({
           <View className="flex-row items-center justify-between">
             <View className="flex-1 gap-1">
               <Text className="text-sm font-medium">
-                Pinned to {myPin.openclaw_version ?? myPin.image_tag}
+                {t('kiloclaw.versionPin.pinnedTo', {
+                  version: myPin.openclaw_version ?? myPin.image_tag,
+                })}
               </Text>
               {myPin.reason && (
                 <Text variant="muted" className="text-xs">
@@ -48,20 +52,20 @@ export function VersionPinStatusCard({
                 disabled={isPinMutating}
                 onPress={onUnpin}
               >
-                <Text>Unpin</Text>
+                <Text>{t('kiloclaw.versionPin.unpin')}</Text>
               </Button>
             )}
           </View>
           {isPinnedByAdmin && (
-            <Text className="text-xs text-warn">
-              Pinned by admin — contact your admin to change.
-            </Text>
+            <Text className="text-xs text-warn">{t('kiloclaw.versionPin.pinnedByAdmin')}</Text>
           )}
         </>
       ) : (
         <View className="flex-row items-center gap-2">
           <View className="rounded-full bg-good-tile-bg px-2 py-0.5">
-            <Text className="text-xs font-medium text-good">Following latest</Text>
+            <Text className="text-xs font-medium text-good">
+              {t('kiloclaw.versionPin.followingLatest')}
+            </Text>
           </View>
           {latestVersion && (
             <Text variant="muted" className="text-xs">

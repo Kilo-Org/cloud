@@ -122,4 +122,31 @@ describe('installQueryClientNativeLifecycle', () => {
     expect(setOnline).toHaveBeenNthCalledWith(3, false);
     expect(setOnline).toHaveBeenNthCalledWith(4, true);
   });
+
+  it('flapping unknown → offline → online → offline is online only on the confirmed online state', () => {
+    const native = createSources();
+    const setFocused = createBooleanSetterMock();
+    const setOnline = createBooleanSetterMock();
+
+    const cleanup = installQueryClientNativeLifecycle({
+      sources: native.sources,
+      managers: {
+        focus: { setFocused },
+        online: { setOnline },
+      },
+    });
+
+    native.setConnectivity({ isConnected: null, isInternetReachable: null });
+    native.setConnectivity({ isConnected: false, isInternetReachable: false });
+    native.setConnectivity({ isConnected: true, isInternetReachable: true });
+    native.setConnectivity({ isConnected: false, isInternetReachable: false });
+    cleanup();
+
+    // Only the confirmed online state resumes React Query; unknown and every
+    // offline state pause it, so a paused query never surfaces an error state.
+    expect(setOnline).toHaveBeenNthCalledWith(1, false);
+    expect(setOnline).toHaveBeenNthCalledWith(2, false);
+    expect(setOnline).toHaveBeenNthCalledWith(3, true);
+    expect(setOnline).toHaveBeenNthCalledWith(4, false);
+  });
 });

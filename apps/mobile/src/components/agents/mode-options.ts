@@ -11,16 +11,41 @@ import {
 import {
   type BuiltinAgentMode,
   isBuiltinAgentMode,
-  type ModeOption,
   normalizeAgentMode,
 } from '@/components/agents/mode-normalize';
 
-export const MODE_OPTIONS: ModeOption[] = [
-  { value: 'code', label: 'Code', description: 'Write and modify code' },
-  { value: 'plan', label: 'Plan', description: 'Plan and design solutions' },
-  { value: 'debug', label: 'Debug', description: 'Find and fix issues' },
-  { value: 'orchestrator', label: 'Orchestrator', description: 'Coordinate complex tasks' },
-  { value: 'ask', label: 'Ask', description: 'Get answers and explanations' },
+export type BuiltinModeOption = {
+  value: BuiltinAgentMode;
+  labelKey: string;
+  descriptionKey: string;
+};
+
+export const MODE_OPTIONS: readonly BuiltinModeOption[] = [
+  {
+    value: 'code',
+    labelKey: 'agentChat.modeOptions.code',
+    descriptionKey: 'agentChat.modeOptions.codeDescription',
+  },
+  {
+    value: 'plan',
+    labelKey: 'agentChat.modeOptions.plan',
+    descriptionKey: 'agentChat.modeOptions.planDescription',
+  },
+  {
+    value: 'debug',
+    labelKey: 'agentChat.modeOptions.debug',
+    descriptionKey: 'agentChat.modeOptions.debugDescription',
+  },
+  {
+    value: 'orchestrator',
+    labelKey: 'agentChat.modeOptions.orchestrator',
+    descriptionKey: 'agentChat.modeOptions.orchestratorDescription',
+  },
+  {
+    value: 'ask',
+    labelKey: 'agentChat.modeOptions.ask',
+    descriptionKey: 'agentChat.modeOptions.askDescription',
+  },
 ];
 
 const MODE_ICONS = {
@@ -34,4 +59,20 @@ const MODE_ICONS = {
 export function getModeIcon(mode: string | null | undefined): LucideIcon {
   const normalized = normalizeAgentMode(mode);
   return isBuiltinAgentMode(normalized) ? MODE_ICONS[normalized] : Bot;
+}
+
+export function getBuiltinModeLabelKey(mode: string): string | null {
+  const normalized = normalizeAgentMode(mode);
+  if (!isBuiltinAgentMode(normalized)) {
+    return null;
+  }
+  return MODE_OPTIONS.find(option => option.value === normalized)?.labelKey ?? null;
+}
+
+export function getBuiltinModeDescriptionKey(mode: string): string | null {
+  const normalized = normalizeAgentMode(mode);
+  if (!isBuiltinAgentMode(normalized)) {
+    return null;
+  }
+  return MODE_OPTIONS.find(option => option.value === normalized)?.descriptionKey ?? null;
 }

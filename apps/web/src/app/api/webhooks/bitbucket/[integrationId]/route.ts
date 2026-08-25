@@ -8,6 +8,7 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { getUnblockedBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import {
+  admitCodeReviewLedgerRow,
   bitbucketCodeReviewerLifecycleLockKey,
   cancelActiveReviewsForPRInTransaction,
   cancelSupersededReviewsForPRInTransaction,
@@ -17,6 +18,7 @@ import {
   type ReviewScope,
 } from '@/lib/code-reviews/db/code-reviews';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
+import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { fetchBitbucketPullRequestFromTokenService } from '@/lib/integrations/platforms/bitbucket/token-service-client';
@@ -248,6 +250,17 @@ async function interruptCancelledReviews(cancelledReviews: CancelledReviewRow[])
         )
       )
   );
+}
+
+async function settleCancelledReviews(cancelledReviews: CancelledReviewRow[]): Promise<void> {
+  for (const review of cancelledReviews) {
+    await settleCodeReviewLedgerRow({
+      reviewId: review.id,
+      status: 'cancelled',
+      terminalReason: 'superseded',
+      triggerSource: review.triggerSource,
+    });
+  }
 }
 
 function isOlderObservation(observed: string, greatestProcessed: string | null): boolean {
@@ -545,7 +558,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   await interruptCancelledReviews(transactionResult.cancelledReviews);
+  await settleCancelledReviews(transactionResult.cancelledReviews);
   if (transactionResult.created) {
+    if (transactionResult.reviewId) {
+      // Best-effort ledger admission (P1-A-07c): the review row already
+      // committed, so a ledger write failure must not fail the webhook.
+      await admitCodeReviewLedgerRow({
+        reviewId: transactionResult.reviewId,
+        userId: ownerWithBot.userId,
+        orgId: ownerWithBot.type === 'org' ? ownerWithBot.id : null,
+        triggerSource: 'webhook',
+      });
+    }
     try {
       await tryDispatchPendingReviews(ownerWithBot);
     } catch {

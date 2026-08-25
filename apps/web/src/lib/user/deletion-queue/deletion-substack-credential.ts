@@ -3,6 +3,7 @@ import { user_deletion_provider_credentials } from '@kilocode/db/schema';
 import { UserDeletionProviderScope } from '@kilocode/db/schema-types';
 import { getEnvVariable } from '@/lib/dotenvx';
 import { db } from '@/lib/drizzle';
+import { USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL } from '@/lib/user/deletion-queue/deletion-constants';
 import {
   decryptDeletionCredential,
   DeletionCryptoError,
@@ -24,7 +25,7 @@ export function cookieFromCredential(material: string): string | null {
     try {
       const parsed: unknown = JSON.parse(trimmed);
       if (isRecord(parsed) && typeof parsed.sid === 'string' && parsed.sid) {
-        return `substack.sid=${parsed.sid}`;
+        return `connect.sid=${parsed.sid}`;
       }
       if (isRecord(parsed) && typeof parsed.cookie === 'string' && parsed.cookie) {
         return parsed.cookie;
@@ -34,16 +35,20 @@ export function cookieFromCredential(material: string): string | null {
     }
     return null;
   }
-  return trimmed.includes('=') ? trimmed : `substack.sid=${trimmed}`;
+  return trimmed.includes('=') ? trimmed : `connect.sid=${trimmed}`;
+}
+
+export function getSubstackPublicationUrl(): string {
+  return (
+    getEnvVariable('SUBSTACK_PUBLICATION_URL').trim().replace(/\/$/, '') ||
+    USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL
+  );
 }
 
 export async function testSubstackCredentialMaterial(
   material: string
 ): Promise<SubstackCredentialTestResult> {
-  const publication = getEnvVariable('SUBSTACK_PUBLICATION_URL').trim().replace(/\/$/, '');
-  if (!publication) {
-    return { status: 'error', errorCode: 'configuration_missing' };
-  }
+  const publication = getSubstackPublicationUrl();
 
   const cookie = cookieFromCredential(material);
   if (!cookie) {

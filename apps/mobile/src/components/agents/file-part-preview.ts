@@ -1,4 +1,29 @@
+import { i18n } from '@/i18n';
+
 import { isMarkdownPath } from './read-tool-markdown';
+
+/** A cloud-agent attachment reference parsed from the wrapper's sandbox URL. */
+export type CloudAgentAttachmentRef = { messageUuid: string; filename: string };
+
+// Persisted history and live events carry the wrapper's sandbox URL
+// `file:///tmp/attachments/<sessionId>/<userId>/<messageUuid>/<filename>`
+// (`services/cloud-agent-next/src/utils/attachment-download.ts`).
+// Removal condition: none — stored messages keep this form permanently.
+const CLOUD_AGENT_ATTACHMENT_URL =
+  /^file:\/\/\/tmp\/attachments\/[^/]+\/[^/]+\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\/([^/]+)$/;
+
+export function parseCloudAgentAttachmentUrl(url: string): CloudAgentAttachmentRef | undefined {
+  const match = CLOUD_AGENT_ATTACHMENT_URL.exec(url);
+  if (!match) {
+    return undefined;
+  }
+  const messageUuid = match[1];
+  const filename = match[2];
+  if (messageUuid === undefined || filename === undefined) {
+    return undefined;
+  }
+  return { messageUuid, filename };
+}
 
 export type FilePartKind = 'image' | 'markdown' | 'other';
 
@@ -17,16 +42,16 @@ export function getFilePartKind(input: { mime: string; filename?: string }): Fil
 }
 
 function resolveName(filename: string | undefined): string {
-  return filename && filename.trim() !== '' ? filename : 'File';
+  return filename && filename.trim() !== '' ? filename : i18n.t('agentChat.filePart.defaultName');
 }
 
 export function getFilePartAccessibilityLabel(kind: FilePartKind, filename?: string): string {
   const name = resolveName(filename);
   if (kind === 'image') {
-    return `Open ${name} full screen`;
+    return i18n.t('agentChat.filePart.openFullScreen', { name });
   }
   if (kind === 'markdown') {
-    return `Preview ${name}`;
+    return i18n.t('agentChat.filePart.preview', { name });
   }
-  return `Open ${name}`;
+  return i18n.t('agentChat.filePart.openFile', { name });
 }

@@ -132,19 +132,27 @@ export const recordStartFailureCodeSchema = z.enum([
 ]);
 export type RecordStartFailureCode = z.infer<typeof recordStartFailureCodeSchema>;
 
-export const recordStartResultSchema = z.discriminatedUnion('success', [
-  z.object({ success: z.literal(true), ack: recordAckSchema }).strict(),
+/** Customer-safe billing admission failure carried across Worker and client boundaries. */
+const recordStartFailureSchema = z.discriminatedUnion('code', [
   z
     .object({
-      success: z.literal(false),
-      error: z
-        .object({
-          code: recordStartFailureCodeSchema,
-          message: z.string().min(1),
-        })
-        .strict(),
+      code: z.literal('insufficient_credits'),
+      message: z.string().min(1),
+      remainingMicrodollars: z.number().int().nonnegative().optional(),
+      minimumRequiredMicrodollars: z.number().int().nonnegative().optional(),
     })
     .strict(),
+  z
+    .object({
+      code: z.enum(['sku_not_found', 'sku_unit_mismatch', 'sku_not_accepting_new_usage']),
+      message: z.string().min(1),
+    })
+    .strict(),
+]);
+
+export const recordStartResultSchema = z.discriminatedUnion('success', [
+  z.object({ success: z.literal(true), ack: recordAckSchema }).strict(),
+  z.object({ success: z.literal(false), error: recordStartFailureSchema }).strict(),
 ]);
 export type RecordStartResult = z.infer<typeof recordStartResultSchema>;
 
@@ -153,8 +161,8 @@ export const budgetVerdictSchema = z.discriminatedUnion('verdict', [
   z
     .object({
       verdict: z.literal('warn'),
-      remainingMicrodollars: z.number().int().optional(),
-      minimumRequiredMicrodollars: z.number().int().positive().optional(),
+      remainingMicrodollars: z.number().int().nonnegative().optional(),
+      minimumRequiredMicrodollars: z.number().int().nonnegative().optional(),
       // Retained while already-deployed producers complete their protocol rollout.
       remaining: z.number().int().optional(),
     })
@@ -162,8 +170,8 @@ export const budgetVerdictSchema = z.discriminatedUnion('verdict', [
   z
     .object({
       verdict: z.literal('stop'),
-      remainingMicrodollars: z.number().int().optional(),
-      minimumRequiredMicrodollars: z.number().int().positive().optional(),
+      remainingMicrodollars: z.number().int().nonnegative().optional(),
+      minimumRequiredMicrodollars: z.number().int().nonnegative().optional(),
       remaining: z.number().int().optional(),
     })
     .strict(),

@@ -23,6 +23,7 @@ import type { OpenChildSession, RenderPartFn } from './ChildSessionSection';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
+import { toSafeHttpUrl, toSafeImageSrc } from '@/lib/safe-http-url';
 import type { Part, StoredMessage } from './types';
 import {
   isTextPart,
@@ -56,8 +57,12 @@ export type PartRendererProps = {
 // ============================================================================
 
 function LinkRenderer({ href, children }: { href?: string; children?: ReactNode }) {
+  const safeHref = toSafeHttpUrl(href);
+  if (!safeHref) {
+    return <>{children}</>;
+  }
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer">
+    <a href={safeHref} target="_blank" rel="noopener noreferrer">
       {children}
     </a>
   );
@@ -268,7 +273,9 @@ function ToolPartRenderer({
  */
 function FilePartRenderer({ part }: { part: Extract<Part, { type: 'file' }> }) {
   const isImage = part.mime.startsWith('image/');
-  const hasUrl = part.url && part.url.length > 0;
+  const imageSrc = isImage ? toSafeImageSrc(part.url) : undefined;
+  const fileHref = isImage ? undefined : toSafeHttpUrl(part.url);
+  const hasUrl = Boolean(imageSrc ?? fileHref);
 
   // Handle stripped file parts (content not stored in memory/IndexedDB)
   if (!hasUrl) {
@@ -281,11 +288,11 @@ function FilePartRenderer({ part }: { part: Extract<Part, { type: 'file' }> }) {
     );
   }
 
-  if (isImage) {
+  if (isImage && imageSrc) {
     return (
       <div className="my-2">
         <img
-          src={part.url}
+          src={imageSrc}
           alt={part.filename || 'Image attachment'}
           className="max-h-96 max-w-full rounded-md object-contain"
         />
@@ -298,14 +305,16 @@ function FilePartRenderer({ part }: { part: Extract<Part, { type: 'file' }> }) {
   return (
     <div className="bg-muted/30 border-muted my-2 flex items-center gap-2 rounded-md border px-3 py-2">
       <span className="text-sm">{part.filename || 'File attachment'}</span>
-      <a
-        href={part.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-primary text-xs hover:underline"
-      >
-        Download
-      </a>
+      {fileHref && (
+        <a
+          href={fileHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary text-xs hover:underline"
+        >
+          Download
+        </a>
+      )}
       <span className="text-muted-foreground text-xs">({part.mime})</span>
     </div>
   );

@@ -1,4 +1,5 @@
 import type { TRPCDefaultErrorShape, TRPCErrorFormatter } from '@trpc/server';
+import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import * as z from 'zod';
 
 type JsonSchema = Record<string, unknown>;
@@ -86,15 +87,22 @@ export type KiloTrpcErrorShape = Omit<TRPCDefaultErrorShape, 'data'> & {
   data: KiloTrpcErrorData;
 };
 
-export const trpcErrorFormatter = (({ shape, error }) => ({
-  ...shape,
-  data: {
-    ...shape.data,
-    zodError:
-      error.code === 'BAD_REQUEST' && error.cause instanceof z.ZodError
-        ? z.flattenError(error.cause)
-        : null,
-    upstreamCode: error.cause instanceof UpstreamApiError ? error.cause.upstreamCode : undefined,
-    authRequired: error.cause instanceof AuthContextError ? true : undefined,
-  },
-})) satisfies TRPCErrorFormatter<unknown, KiloTrpcErrorShape>;
+export const trpcErrorFormatter = (({ shape, error }) => {
+  // Cloud Agent's worker tRPC error is rethrown with a structured cause. Parse
+  // it through the SDK contract before exposing it at the browser boundary.
+  const billingFailure = parseCustomerBillingFailure({ data: error.cause });
+
+  return {
+    ...shape,
+    data: {
+      ...shape.data,
+      zodError:
+        error.code === 'BAD_REQUEST' && error.cause instanceof z.ZodError
+          ? z.flattenError(error.cause)
+          : null,
+      upstreamCode: error.cause instanceof UpstreamApiError ? error.cause.upstreamCode : undefined,
+      authRequired: error.cause instanceof AuthContextError ? true : undefined,
+      ...(billingFailure ? { billingFailure } : {}),
+    },
+  };
+}) satisfies TRPCErrorFormatter<unknown, KiloTrpcErrorShape>;

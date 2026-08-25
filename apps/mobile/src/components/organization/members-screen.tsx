@@ -1,8 +1,9 @@
+import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
 import { UserPlus, Users } from '@/components/ui/icons';
-import { type ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Pressable, View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { InvitedMemberRow } from '@/components/organization/invited-member-row';
@@ -13,17 +14,22 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { TabScreenScrollView } from '@/components/tab-screen';
+import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
   type ActiveOrgMember,
   type InvitedOrgMember,
+  isActiveOrgMember,
+  isInvitedOrgMember,
   isMoneyRole,
   useOrgBoundary,
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { firstNonEmpty, parseTimestamp } from '@/lib/utils';
+import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
+
+import { buildMembersListItems, type MembersListItem } from './members-list-items';
+import { selectOrgListErrorView } from './org-list-error-view';
 
 function sortActiveMembers(members: ActiveOrgMember[]): ActiveOrgMember[] {
   // eslint-disable-next-line unicorn/no-array-sort -- toSorted() is not available in Hermes
@@ -56,15 +62,29 @@ function MemberRowSkeleton({ last }: Readonly<{ last?: boolean }>) {
   );
 }
 
+const listStyle = { flex: 1 } satisfies ViewStyle;
+const listContentContainerStyle = { paddingTop: 16, flexGrow: 1 } satisfies ViewStyle;
+
 export function OrganizationMembersScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const { organizationId, role, org, isResolving } = useOrgBoundary();
   const orgWithMembers = useOrgWithMembers(organizationId);
   const { userId: currentUserId } = useCurrentUserId();
+  const paddingBottom = useTabBarBottomPadding();
+
+  const members = orgWithMembers.data?.members ?? [];
+  const activeMembers = sortActiveMembers(members.filter(m => isActiveOrgMember(m)));
+  const invitedMembers = sortInvitedMembers(members.filter(m => isInvitedOrgMember(m)));
+
+  const items = useMemo(
+    () => buildMembersListItems({ activeMembers, invitedMembers }),
+    [activeMembers, invitedMembers]
+  );
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title="Members" />;
+    return <OrganizationBoundary title={t('organization.members.title')} />;
   }
 
   const isLoading = orgWithMembers.isLoading;
@@ -73,75 +93,122 @@ export function OrganizationMembersScreen() {
   const canInvite = isMoneyRole(role);
   const isOwner = role === 'owner';
 
-  const activeMembers = sortActiveMembers(
-    orgWithMembers.data?.members.filter(m => m.status === 'active') ?? []
-  );
-  const invitedMembers = sortInvitedMembers(
-    orgWithMembers.data?.members.filter(m => m.status === 'invited') ?? []
+  const errorView = isError ? selectOrgListErrorView(orgWithMembers.error) : null;
+
+  const emptyState = (
+    <EmptyState
+      icon={Users}
+      placement="top"
+      title={t('organization.members.emptyTitle')}
+      description={
+        canInvite
+          ? t('organization.members.emptyDescriptionCanInvite')
+          : t('organization.members.emptyDescriptionCannotInvite')
+      }
+      action={
+        canInvite ? (
+          <Button
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/organization/invite-member' as Href);
+            }}
+          >
+            <Text className="text-primary-foreground">
+              {t('organization.members.inviteMember')}
+            </Text>
+          </Button>
+        ) : undefined
+      }
+    />
   );
 
-  let membersBody: ReactNode = null;
-  if (isLoading) {
-    membersBody = (
-      <Animated.View exiting={FadeOut.duration(150)} className="rounded-lg bg-secondary">
-        <MemberRowSkeleton />
-        <MemberRowSkeleton />
-        <MemberRowSkeleton last />
-      </Animated.View>
-    );
-  } else if (isError) {
-    membersBody = (
-      <QueryError
-        onRetry={() => void orgWithMembers.refetch()}
-        isRetrying={orgWithMembers.isFetching}
-        placement="top"
-      />
-    );
-  } else if (activeMembers.length === 0) {
-    membersBody = (
-      <EmptyState
-        icon={Users}
-        placement="top"
-        title="No members yet"
-        description={
-          canInvite
-            ? 'Invite teammates to start collaborating in this organization.'
-            : 'Ask an owner or billing manager to invite teammates.'
-        }
-        action={
-          canInvite ? (
-            <Button
-              onPress={() => {
-                router.push('/(app)/(tabs)/(3_profile)/organization/invite-member' as Href);
-              }}
-            >
-              <Text className="text-primary-foreground">Invite member</Text>
-            </Button>
-          ) : undefined
-        }
-      />
-    );
-  } else {
-    membersBody = (
-      <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary">
-        {activeMembers.map((member, index) => (
-          <MemberRow
-            key={member.id}
-            member={member}
-            canManage={isOwner && member.id !== currentUserId}
-            enableUsageLimits={enableUsageLimits}
-            organizationId={organizationId}
-            last={index === activeMembers.length - 1}
-          />
-        ))}
-      </Animated.View>
-    );
-  }
+  // Loading, error, and empty are mutually exclusive and evaluated in this
+  // order. An error leaves both member arrays empty, so it must be checked
+  // before the empty branch — otherwise a 500 renders "No members yet".
+  const renderListEmpty = () => {
+    if (isLoading) {
+      return (
+        <View className="mx-6 rounded-lg bg-secondary">
+          <MemberRowSkeleton />
+          <MemberRowSkeleton />
+          <MemberRowSkeleton last />
+        </View>
+      );
+    }
+    if (errorView) {
+      return (
+        <QueryError
+          variant={errorView.variant}
+          onRetry={errorView.showRetry ? () => void orgWithMembers.refetch() : undefined}
+          isRetrying={orgWithMembers.isFetching}
+          placement="top"
+        />
+      );
+    }
+    return emptyState;
+  };
+
+  const renderItem = ({ item, index }: { item: MembersListItem; index: number }) => {
+    switch (item.kind) {
+      case 'section': {
+        return (
+          <View className="bg-background px-6 pb-2 pt-4">
+            <Text variant="eyebrow">{item.title}</Text>
+          </View>
+        );
+      }
+      case 'members-empty': {
+        return emptyState;
+      }
+      case 'member': {
+        const isFirst = index === 0 || items[index - 1]?.kind === 'section';
+        return (
+          <View
+            className={cn(
+              'mx-6 bg-secondary',
+              isFirst && 'rounded-t-lg',
+              item.last && 'rounded-b-lg'
+            )}
+          >
+            <MemberRow
+              member={item.member}
+              canManage={isOwner && item.member.id !== currentUserId}
+              enableUsageLimits={enableUsageLimits}
+              organizationId={organizationId}
+              last={item.last}
+            />
+          </View>
+        );
+      }
+      case 'invite': {
+        const isFirst = index === 0 || items[index - 1]?.kind === 'section';
+        return (
+          <View
+            className={cn(
+              'mx-6 bg-secondary',
+              isFirst && 'rounded-t-lg',
+              item.last && 'rounded-b-lg'
+            )}
+          >
+            <InvitedMemberRow
+              invite={item.invite}
+              canManage={isOwner}
+              organizationId={organizationId}
+              last={item.last}
+            />
+          </View>
+        );
+      }
+      default: {
+        const _exhaustive: never = item;
+        return _exhaustive;
+      }
+    }
+  };
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Members"
+        title={t('organization.members.title')}
         headerRight={
           canInvite ? (
             <Pressable
@@ -150,7 +217,7 @@ export function OrganizationMembersScreen() {
               }}
               hitSlop={12}
               accessibilityRole="button"
-              accessibilityLabel="Invite member"
+              accessibilityLabel={t('organization.members.inviteMember')}
               className="active:opacity-70"
             >
               <UserPlus size={22} color={colors.foreground} />
@@ -158,37 +225,36 @@ export function OrganizationMembersScreen() {
           ) : undefined
         }
       />
-      <TabScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4"
+      <FlashList
+        style={listStyle}
+        data={items}
+        renderItem={renderItem}
+        keyExtractor={item => {
+          switch (item.kind) {
+            case 'section': {
+              return `section:${item.title}`;
+            }
+            case 'members-empty': {
+              return 'members-empty';
+            }
+            case 'member': {
+              return item.member.id;
+            }
+            case 'invite': {
+              return item.invite.inviteId;
+            }
+            default: {
+              const _exhaustive: never = item;
+              return _exhaustive;
+            }
+          }
+        }}
+        getItemType={item => item.kind}
+        ListEmptyComponent={renderListEmpty}
+        ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
         showsVerticalScrollIndicator={false}
-      >
-        <Animated.View layout={LinearTransition} className="gap-2">
-          <Text variant="eyebrow">Members</Text>
-          {membersBody}
-        </Animated.View>
-
-        {!isLoading && !isError && invitedMembers.length > 0 && (
-          <Animated.View
-            entering={FadeIn.duration(200)}
-            layout={LinearTransition}
-            className="gap-2"
-          >
-            <Text variant="eyebrow">Pending invitations</Text>
-            <View className="rounded-lg bg-secondary">
-              {invitedMembers.map((invite, index) => (
-                <InvitedMemberRow
-                  key={invite.inviteId}
-                  invite={invite}
-                  canManage={isOwner}
-                  organizationId={organizationId}
-                  last={index === invitedMembers.length - 1}
-                />
-              ))}
-            </View>
-          </Animated.View>
-        )}
-      </TabScreenScrollView>
+        contentContainerStyle={listContentContainerStyle}
+      />
     </View>
   );
 }

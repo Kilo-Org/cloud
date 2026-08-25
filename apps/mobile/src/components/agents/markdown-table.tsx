@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   type LayoutChangeEvent,
   Modal,
@@ -30,6 +31,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { moveA11yFocus } from '@/lib/a11y/announce';
+import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { containsPressable, extractNodeText, linearRowLabel } from './markdown-a11y';
@@ -58,16 +60,16 @@ function getColumnCount(header: ReactNode[][], rows: ReactNode[][][]): number {
   return columnCount;
 }
 
-function pluralizeCount(count: number, singular: string): string {
-  return `${count} ${singular}${count === 1 ? '' : 's'}`;
+function formatCount(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
 }
 
 function formatTableSummary(columnCount: number, rowCount: number): string {
-  return `${pluralizeCount(columnCount, 'column')} · ${pluralizeCount(rowCount, 'row')}`;
+  return `${formatCount(columnCount, i18n.t('agentChat.markdownTable.column'), i18n.t('agentChat.markdownTable.columns'))} · ${formatCount(rowCount, i18n.t('agentChat.markdownTable.row'), i18n.t('agentChat.markdownTable.rows'))}`;
 }
 
 function formatChipAccessibilityLabel(columnCount: number, rowCount: number): string {
-  return `Table, ${pluralizeCount(columnCount, 'column')}, ${pluralizeCount(rowCount, 'row')}, opens full screen`;
+  return `${i18n.t('agentChat.markdownTable.title')}, ${formatCount(columnCount, i18n.t('agentChat.markdownTable.column'), i18n.t('agentChat.markdownTable.columns'))}, ${formatCount(rowCount, i18n.t('agentChat.markdownTable.row'), i18n.t('agentChat.markdownTable.rows'))}, ${i18n.t('agentChat.markdownTable.opensFullScreen')}`;
 }
 
 // Markdown tables never fit inside a chat bubble: a horizontal ScrollView in a
@@ -79,6 +81,7 @@ function formatChipAccessibilityLabel(columnCount: number, rowCount: number): st
 export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableProps>) {
   const [open, setOpen] = useState(false);
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
 
@@ -211,7 +214,7 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
         <View>
           {/* eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant text color */}
           <Text className="text-sm font-medium" style={{ color: palette.textColor }}>
-            View table
+            {t('agentChat.markdownTable.viewTable')}
           </Text>
           {/* eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant text color */}
           <Text className="text-xs" style={{ color: palette.mutedTextColor }}>
@@ -243,7 +246,7 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
               accessibilityRole="header"
               className="text-lg font-semibold text-foreground"
             >
-              Table
+              {t('agentChat.markdownTable.title')}
             </Text>
             <Pressable
               onPress={() => {
@@ -251,7 +254,7 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
                 setOpen(false);
               }}
               className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70"
-              accessibilityLabel="Close table"
+              accessibilityLabel={t('agentChat.markdownTable.close')}
               accessibilityRole="button"
               hitSlop={8}
             >

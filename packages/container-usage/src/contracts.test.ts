@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   intervalId,
   recordHeartbeatInputSchema,
+  recordStartResultSchema,
   recordStopInputSchema,
   usageContextSchema,
 } from './contracts';
@@ -120,5 +121,24 @@ describe('container usage contracts', () => {
     expect(intervalId('cloud-agent-next', 'shared-instance', 123)).not.toBe(
       intervalId('gastown', 'shared-instance', 123)
     );
+  });
+
+  it('keeps successful starts minimal and preserves insufficient-credit details', () => {
+    const v1 = {
+      success: true,
+      ack: { intervalId: 'interval-1', durable: 'pg', dedup: false },
+    };
+    expect(recordStartResultSchema.parse(v1)).toEqual(v1);
+    expect(
+      recordStartResultSchema.parse({
+        success: false,
+        error: {
+          code: 'insufficient_credits',
+          message: 'Insufficient credits',
+          remainingMicrodollars: 5_000_000,
+          minimumRequiredMicrodollars: 5_000_000,
+        },
+      })
+    ).toMatchObject({ success: false, error: { code: 'insufficient_credits' } });
   });
 });

@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Seanca juaj e agjentit ka një përditësim",
+      "chatMessage": "Keni një mesazh të ri",
+      "instanceLifecycle": "Instanca juaj ka një përditësim",
+      "scheduledAction": "Një veprim i planifikuar ka një përditësim",
+      "lowBalance": "Bilanci juaj ka nevojë për vëmendje",
+      "securityFinding": "Një gjetje sigurie ka nevojë për vëmendje"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Detyra u përfundua"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Dështoi: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "U ndërpre: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Pa titull",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Alarmi i bilancit të ulët",
+      "body": "Bilanci i {{organizationName}} ra nën ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Gjetje e re sigurie ({{severity}})",
+      "body": "{{findingTitle}} në {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Paralajmërim SLA",
+      "body": "{{findingTitle}} në {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Shkelje SLA",
+      "body": "{{findingTitle}} në {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Një gjetje sigurie ka nevojë për vëmendje"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} është gati",
+      "body": "Prekni për të filluar bisedën."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} dështoi të niset",
+      "body": "Nisja dështoi."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} do të riniset së shpejti",
+      "body": "Planifikuar të riniset në {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Rinisja e {{instanceName}} u anulua",
+      "body": "Rinisja e planifikuar më parë është anuluar."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} do të përmirësohet së shpejti",
+      "bodyWithTag": "Përmirësim në {{targetImageTag}} në {{when}}.",
+      "bodyWithoutTag": "Përmirësim i planifikuar në {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Përmirësimi i {{instanceName}} u anulua",
+      "body": "Përmirësimi i planifikuar më parë është anuluar."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Seanca juaj Kilo është gati për ta kontrolluar nga telefoni juaj"
+  }
+}

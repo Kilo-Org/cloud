@@ -3,6 +3,7 @@ import { type Href, Tabs, usePathname, useRouter } from 'expo-router';
 import { Bot, House, MessageSquare, UserRound } from '@/components/ui/icons';
 import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
@@ -65,6 +66,7 @@ export default function TabsLayout() {
   const tabIconSize = getTabBarIconSize(fontScale);
   const showKiloClawTab = useKiloClawTabVisible();
   const tabCount = showKiloClawTab ? 4 : 3;
+  const { t } = useTranslation();
 
   return (
     <Tabs
@@ -91,9 +93,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="(0_home)"
         options={{
-          title: 'Home',
-          tabBarAccessibilityLabel: tabAccessibilityLabel('Home', 1, tabCount),
-          tabBarLabel: ({ focused }) => <TabLabel label="Home" focused={focused} />,
+          title: t('tabs.home'),
+          tabBarAccessibilityLabel: tabAccessibilityLabel(t('tabs.home'), 1, tabCount),
+          tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.home')} focused={focused} />,
           tabBarIcon: ({ color, focused }) => (
             <House size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
@@ -108,11 +110,15 @@ export default function TabsLayout() {
         name="(1_kiloclaw)"
         options={{
           href: showKiloClawTab ? undefined : null,
-          title: 'KiloClaw',
-          tabBarAccessibilityLabel: tabAccessibilityLabel('KiloClaw', 2, tabCount),
+          title: t('tabs.kiloclaw'),
+          tabBarAccessibilityLabel: tabAccessibilityLabel(t('tabs.kiloclaw'), 2, tabCount),
           tabBarLabel: ({ focused }) => (
             <TabLabel
-              label={fontScale > TAB_LABEL_WRAP_FONT_SCALE ? 'Kilo\nClaw' : 'KiloClaw'}
+              label={
+                fontScale > TAB_LABEL_WRAP_FONT_SCALE
+                  ? t('tabs.kiloclawWrapped')
+                  : t('tabs.kiloclaw')
+              }
               focused={focused}
             />
           ),
@@ -131,13 +137,13 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="(2_agents)"
         options={{
-          title: 'Agents',
+          title: t('tabs.agents'),
           tabBarAccessibilityLabel: tabAccessibilityLabel(
-            'Agents',
+            t('tabs.agents'),
             showKiloClawTab ? 3 : 2,
             tabCount
           ),
-          tabBarLabel: ({ focused }) => <TabLabel label="Agents" focused={focused} />,
+          tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.agents')} focused={focused} />,
           tabBarIcon: ({ color, focused }) => (
             <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
@@ -151,13 +157,13 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="(3_profile)"
         options={{
-          title: 'Profile',
+          title: t('tabs.profile'),
           tabBarAccessibilityLabel: tabAccessibilityLabel(
-            'Profile',
+            t('tabs.profile'),
             showKiloClawTab ? 4 : 3,
             tabCount
           ),
-          tabBarLabel: ({ focused }) => <TabLabel label="Profile" focused={focused} />,
+          tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.profile')} focused={focused} />,
           tabBarIcon: ({ color, focused }) => (
             <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),

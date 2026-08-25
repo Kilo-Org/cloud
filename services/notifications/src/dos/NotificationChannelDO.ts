@@ -1,7 +1,14 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
-import { user_push_tokens } from '@kilocode/db/schema';
-import { type DispatchPushInput, type DispatchPushOutcome } from '@kilocode/notifications';
+import { user_notification_preferences, user_push_tokens } from '@kilocode/db/schema';
+import {
+  androidChannelIdForPushData,
+  genericPushContentForPushData,
+  resolvePushLocale,
+  translatePush,
+  type DispatchPushInput,
+  type DispatchPushOutcome,
+} from '@kilocode/notifications';
 import { eq, inArray } from 'drizzle-orm';
 
 import { isPushSinkEnabled } from '../lib/push-sink';
@@ -164,9 +171,28 @@ export class NotificationChannelDO extends DurableObject<Env> {
     // 5. Tokens. Missing Expo tokens only means no OS push can be sent; the
     //    in-app badge state above is still authoritative for client hydration.
     const tokens = await db
-      .select({ token: user_push_tokens.token })
+      .select({
+        token: user_push_tokens.token,
+        app_version: user_push_tokens.app_version,
+        locale: user_push_tokens.locale,
+      })
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, input.userId));
+
+    // Preview mode + Android channel. Resolved before the sink branch so the
+    // sink log can record them (both are non-content). Fail closed: a read
+    // that throws, or an absent row, is treated as 'generic'.
+    const channelId = androidChannelIdForPushData(input.push.data);
+    let previews: 'generic' | 'full' = 'generic';
+    try {
+      const [prefRow] = await db
+        .select({ notification_previews: user_notification_preferences.notification_previews })
+        .from(user_notification_preferences)
+        .where(eq(user_notification_preferences.user_id, input.userId));
+      previews = prefRow?.notification_previews ?? 'generic';
+    } catch {
+      previews = 'generic';
+    }
 
     if (tokens.length === 0) {
       const ts = Date.now();
@@ -200,6 +226,8 @@ export class NotificationChannelDO extends DurableObject<Env> {
               : undefined,
           sound: input.push.sound ?? null,
           priority: input.push.priority ?? 'default',
+          channelId,
+          previews,
         },
         to: '<redacted>',
       });
@@ -208,19 +236,54 @@ export class NotificationChannelDO extends DurableObject<Env> {
       return { kind: 'delivered', tokenCount: tokens.length };
     }
 
-    // 7. Send via Expo
-    const messages: ExpoPushMessage[] = tokens.map(
-      ({ token }) =>
-        ({
-          to: token,
-          title: input.push.title,
-          body: input.push.body,
-          data: input.push.data,
-          ...(badgeTotal !== undefined && { badge: badgeTotal }),
-          sound: input.push.sound ?? undefined,
-          priority: input.push.priority ?? 'default',
-        }) satisfies ExpoPushMessage
-    );
+    // 7. Send via Expo. Each token resolves its own locale and gets its own
+    //    title/body pair; a user with two tokens can receive two locales in
+    //    one dispatch.
+    const messages: ExpoPushMessage[] = tokens.map(({ token, app_version, locale }) => {
+      // Null and unsupported tags fall back to English.
+      const resolvedLocale = resolvePushLocale(locale);
+
+      let title: string;
+      let body: string;
+      if (previews === 'generic') {
+        ({ title, body } = genericPushContentForPushData(input.push.data, resolvedLocale));
+      } else if (input.push.i18nKey !== undefined) {
+        // Per-token translation of the system copy. User-authored fields
+        // (session title, conversation title, finding title, instance name)
+        // arrive as i18nParams and pass through the catalog templates.
+        title = translatePush(
+          resolvedLocale,
+          `${input.push.i18nKey}.title`,
+          input.push.i18nParams,
+          input.push.title
+        );
+        body = translatePush(
+          resolvedLocale,
+          `${input.push.i18nKey}.body`,
+          input.push.i18nParams,
+          input.push.body
+        );
+      } else {
+        // Old form is raw English title/body; remove when every producer sends i18nKey.
+        title = input.push.title;
+        body = input.push.body;
+      }
+
+      return {
+        to: token,
+        title,
+        body,
+        data: input.push.data,
+        // Android 8+ drops a notification addressed to a channel that does
+        // not exist. Only clients that create channels (a non-null app
+        // version at registration) get a channelId; older clients fall back
+        // to the default channel. iOS ignores channelId either way.
+        ...(app_version != null && { channelId }),
+        ...(badgeTotal !== undefined && { badge: badgeTotal }),
+        sound: input.push.sound ?? undefined,
+        priority: input.push.priority ?? 'default',
+      } satisfies ExpoPushMessage;
+    });
 
     const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();
     let result: SendResult;

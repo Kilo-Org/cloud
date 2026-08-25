@@ -1,12 +1,17 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN hooks under vitest (node env, no jsdom) */
+/* eslint-disable max-lines -- the SSO recovery and created-account announcement suites share one hook harness */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import * as React from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
 
 import { ADMISSION_CHALLENGE_FAILED, getAdmission } from '@/lib/auth/admission';
 import type * as AdmissionTypes from '@/lib/auth/admission';
+import type * as AuthFetchTypes from '@/lib/auth/auth-fetch';
 
 import {
   buildChallengeEntry,
   type ChallengeEntry,
-  parseAuthErrorCode,
   parseEmailCodeResponse,
   parseTokenPair,
   parseTokenResponse,
@@ -23,6 +28,10 @@ vi.mock('@/lib/config', () => ({
 // Mock react-native Platform for admission module import.
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+}));
+
+vi.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.0.4',
 }));
 
 // The admission module is imported for real (importOriginal), and these native
@@ -57,6 +66,10 @@ vi.mock('sonner-native', () => ({
   toast: { error: vi.fn() },
 }));
 
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
+
 vi.mock('expo-crypto', () => ({
   CryptoDigestAlgorithm: { SHA256: 1 },
   digestStringAsync: vi.fn(),
@@ -77,20 +90,35 @@ vi.mock('@/lib/auth/admission', async importOriginal => {
   };
 });
 
+const sentryMock = vi.hoisted(() => ({ addBreadcrumb: vi.fn() }));
+vi.mock('@sentry/react-native', () => sentryMock);
+
+// postAuth is the single fetch boundary for native auth; stub it so the SSO
+// recovery path can be driven without a network.
+vi.mock('@/lib/auth/auth-fetch', async importOriginal => {
+  const mod = await importOriginal<typeof AuthFetchTypes>();
+  return {
+    ...mod,
+    postAuth: vi.fn(),
+  };
+});
+
 // ── Imports (all after vi.mock hoisting) ───────────────────────────────
 
-const {
-  AUTH_ERROR_MESSAGES,
-  DEFAULT_ERROR_MESSAGE,
-  mapError,
-  RETRYABLE_ADMISSION_ERROR,
-  resolveAdmission,
-} = await import('@/lib/auth/use-native-auth');
+const { defaultErrorMessage, mapError, retryableAdmissionError } =
+  await import('@/lib/auth/auth-error-messages');
+
+const { resolveAdmission } = await import('@/lib/auth/resolve-admission');
 
 const { GOOGLE_WEB_CLIENT_ID } = await import('@/lib/config');
 const { toast } = await import('sonner-native');
+const { announcingToast } = await import('@/lib/a11y/announcing-toast');
 
 const mockGetAdmission = vi.mocked(getAdmission);
+
+const { useNativeAuth } = await import('@/lib/auth/use-native-auth');
+const { postAuth } = await import('@/lib/auth/auth-fetch');
+const mockPostAuth = vi.mocked(postAuth);
 
 // ── C12: Config invariant ────────────────────────────────────────────────
 
@@ -168,21 +196,6 @@ describe('native-auth-contract (used by use-native-auth)', () => {
       expect(parseTokenPair(undefined)).toBeNull();
     });
   });
-
-  describe('parseAuthErrorCode', () => {
-    it('extracts error code', () => {
-      expect(parseAuthErrorCode({ error: 'BLOCKED' })).toBe('BLOCKED');
-    });
-
-    it('returns undefined for non-error objects', () => {
-      expect(parseAuthErrorCode({ success: true })).toBeUndefined();
-    });
-
-    it('returns undefined for non-objects', () => {
-      expect(parseAuthErrorCode(null)).toBeUndefined();
-      expect(parseAuthErrorCode(undefined)).toBeUndefined();
-    });
-  });
 });
 
 // ── Production error mapping ────────────────────────────────────────────
@@ -199,7 +212,7 @@ describe('use-native-auth error mapping', () => {
     ['INVALID_EMAIL', 'Unable to deliver email to this address. Please use a different email.'],
     ['EMAIL_DELIVERY_FAILED', 'Email delivery is temporarily unavailable. Please try again later.'],
   ] as const)('maps %s to a user-facing message', (code, message) => {
-    // Exercise production mapError against the production AUTH_ERROR_MESSAGES map.
+    // Exercise production mapError against the production AUTH_ERROR_KEYS map.
     const result = mapError(code);
     expect(result).toBe(message);
 
@@ -208,22 +221,22 @@ describe('use-native-auth error mapping', () => {
   });
 
   it('returns the default error message for an undefined code', () => {
-    expect(mapError(undefined)).toBe(DEFAULT_ERROR_MESSAGE);
+    expect(mapError(undefined)).toBe(defaultErrorMessage());
   });
 
   it('returns the default error message for an unknown code', () => {
-    expect(mapError('NONEXISTENT_CODE')).toBe(DEFAULT_ERROR_MESSAGE);
+    expect(mapError('NONEXISTENT_CODE')).toBe(defaultErrorMessage());
   });
 
   it('has a retryable admission error constant', () => {
-    expect(RETRYABLE_ADMISSION_ERROR).toBe(
+    expect(retryableAdmissionError()).toBe(
       'We could not verify this device. Check your connection and try again.'
     );
-    expect(RETRYABLE_ADMISSION_ERROR).toMatch(/try again/i);
+    expect(retryableAdmissionError()).toMatch(/try again/i);
   });
 
   it('ADMISSION_REQUIRED message includes the More sign-in options CTA', () => {
-    const message = AUTH_ERROR_MESSAGES.ADMISSION_REQUIRED;
+    const message = mapError('ADMISSION_REQUIRED');
     expect(message).toContain('More sign-in options');
     // Non-retryable: must not suggest trying again.
     expect(message).not.toMatch(/try again|retry/i);
@@ -265,14 +278,14 @@ describe('resolveAdmission', () => {
     mockGetAdmission.mockRejectedValue(new Error('Network error'));
 
     await expect(resolveAdmission()).rejects.toThrow('admission_challenge_failed');
-    expect(toast.error).toHaveBeenCalledWith(RETRYABLE_ADMISSION_ERROR);
+    expect(toast.error).toHaveBeenCalledWith(retryableAdmissionError());
   });
 
   it('shows retryable toast and throws on JSON parse failure', async () => {
     mockGetAdmission.mockRejectedValue(new SyntaxError('Unexpected token'));
 
     await expect(resolveAdmission()).rejects.toThrow('admission_challenge_failed');
-    expect(toast.error).toHaveBeenCalledWith(RETRYABLE_ADMISSION_ERROR);
+    expect(toast.error).toHaveBeenCalledWith(retryableAdmissionError());
   });
 });
 
@@ -308,5 +321,134 @@ describe('challenge binding', () => {
     it('returns undefined when the entry is null (no server challenge)', () => {
       expect(selectChallengeId(null, email)).toBeUndefined();
     });
+  });
+});
+
+// ── SSO recovery (hook) ────────────────────────────────────────────────
+
+type NativeAuthResult = ReturnType<typeof useNativeAuth>;
+
+function NativeAuthHarness({ resultRef }: { resultRef: { current: NativeAuthResult | null } }) {
+  const result = useNativeAuth();
+  resultRef.current = result;
+  return null;
+}
+
+async function mountNativeAuth(): Promise<{ current: NativeAuthResult | null }> {
+  const resultRef: { current: NativeAuthResult | null } = { current: null };
+  await act(async () => {
+    TestRenderer.create(React.createElement(NativeAuthHarness, { resultRef }));
+    await Promise.resolve();
+  });
+  return resultRef;
+}
+
+describe('useNativeAuth SSO recovery', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('exposes ssoRecovery (initially null) and clearSsoRecovery', async () => {
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+
+    expect(result).not.toBeNull();
+    expect(result?.ssoRecovery).toBeNull();
+    expect(typeof result?.clearSsoRecovery).toBe('function');
+  });
+
+  it('sets ssoRecovery on an SSO_ERROR and clears it on a new attempt', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'SSO_ERROR',
+      ssoOrganizationId: 'org_1',
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    await act(async () => {
+      await result?.requestEmailCode('user@example.com');
+    });
+
+    expect(resultRef.current?.ssoRecovery).toEqual({
+      email: 'user@example.com',
+      ssoOrganizationId: 'org_1',
+    });
+    expect(sentryMock.addBreadcrumb).not.toHaveBeenCalled();
+
+    // A new attempt clears the recovery state before posting.
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    await act(async () => {
+      await result?.requestEmailCode('user@example.com');
+    });
+
+    expect(resultRef.current?.ssoRecovery).toBeNull();
+  });
+});
+
+// ── Created-account announcement ────────────────────────────────────────
+
+describe('useNativeAuth created-account announcement', () => {
+  beforeEach(() => {
+    // A prior resolveAdmission test sets a rejection that only clearAllMocks
+    // (not resetAllMocks) runs; reset it so admission resolves to undefined.
+    mockGetAdmission.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('announces account creation when the token response has created: true', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', refreshToken: 'rt', expiresIn: 3600, created: true },
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    await act(async () => {
+      await result?.verifyEmailCode('user@example.com', '123456');
+    });
+
+    expect(announcingToast.success).toHaveBeenCalledWith('Account created. Welcome to Kilo.');
+  });
+
+  it('stays silent when created is absent', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', refreshToken: 'rt', expiresIn: 3600 },
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    await act(async () => {
+      await result?.verifyEmailCode('user@example.com', '123456');
+    });
+
+    expect(announcingToast.success).not.toHaveBeenCalled();
+  });
+
+  it('stays silent when created is false', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { token: 'at', refreshToken: 'rt', expiresIn: 3600, created: false },
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    await act(async () => {
+      await result?.verifyEmailCode('user@example.com', '123456');
+    });
+
+    expect(announcingToast.success).not.toHaveBeenCalled();
   });
 });

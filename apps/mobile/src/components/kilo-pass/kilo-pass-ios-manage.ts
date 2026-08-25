@@ -1,6 +1,7 @@
 import { beginRefundRequestIOS, showManageSubscriptionsIOS } from 'expo-iap';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { requestDevStoreKitRefund } from '@/lib/kilo-pass/dev-storekit-refund';
 
 /**
@@ -19,9 +20,7 @@ export async function openAppStoreManagement(params: {
       void params.invalidateAfter();
     }, 2000);
   } catch (error) {
-    toast.error(
-      error instanceof Error ? error.message : 'Failed to open App Store subscription management.'
-    );
+    toast.error(error instanceof Error ? error.message : i18n.t('kiloPass.manageFailed'));
   }
 }
 

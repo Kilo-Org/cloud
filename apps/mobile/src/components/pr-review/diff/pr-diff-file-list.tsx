@@ -25,6 +25,7 @@
 
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
 import { QueryError } from '@/components/query-error';
@@ -54,6 +55,7 @@ import {
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { usePrDiffListScroll } from '@/lib/pr-review/diff/use-pr-diff-list-scroll';
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 
 type PrReviewFileListProps = {
@@ -75,6 +77,7 @@ export function PrReviewFileList({
   onRequestOverview,
 }: PrReviewFileListProps) {
   const listRef = useRef<FlashListRef<ListItem>>(null);
+  const { t } = useTranslation();
   // Bounded font-scale metrics for diff rows. We pass the scale into
   // `extraData` so FlashList re-measures every row when the user changes
   // a11y text size. The metrics are also provided via context so memoized
@@ -98,6 +101,9 @@ export function PrReviewFileList({
   });
   const { viewMode, setViewMode } = useDiffViewMode();
   const isTablet = useIsTablet();
+  // Bottom clearance for the reconnect and retryable first-page chrome, which
+  // render without the floating bar (so no list reserve applies).
+  const bottomPadding = useDetailScreenBottomPadding();
   const { selection, selectionView, handleLineTap, clearSelection } = useDiffSelection({
     owner,
     repo,
@@ -255,29 +261,32 @@ export function PrReviewFileList({
     if (firstPageErrorState?.kind === 'not-found') {
       return (
         <TabStateMessage
-          title="Pull request unavailable"
-          message="This PR can't be opened. It may have been deleted, the repository is private, or the Kilo GitHub App isn't installed on it."
+          title={t('prReview.pullRequestUnavailable')}
+          message={t('prReview.pullRequestUnavailableDescription')}
         />
       );
     }
     if (firstPageErrorState?.kind === 'permission') {
       return (
         <TabStateMessage
-          title="Access denied"
-          message="You don't have permission to view this pull request."
+          title={t('prReview.accessDenied')}
+          message={t('prReview.accessDeniedDescription')}
         />
       );
     }
     if (firstPageErrorState?.kind === 'reconnect') {
       return (
-        <View className="flex-1 items-center justify-center px-6 py-12">
+        <View
+          className="flex-1 items-center justify-center px-6 py-12"
+          style={{ paddingBottom: bottomPadding }}
+        >
           <PrReviewReconnectNotice />
         </View>
       );
     }
     if (firstPageErrorState?.kind === 'retryable') {
       return (
-        <View className="flex-1">
+        <View className="flex-1" style={{ paddingBottom: bottomPadding }}>
           <QueryError
             variant="server"
             onRetry={() => {
@@ -302,7 +311,7 @@ export function PrReviewFileList({
 
   return (
     <DiffFontMetricsContext.Provider value={diffFontMetrics}>
-      <View className="flex-1" accessibilityLabel="Files list">
+      <View className="flex-1" accessibilityLabel={t('prReview.fileList.filesList')}>
         <PrDiffFileListHeader
           owner={owner}
           repo={repo}

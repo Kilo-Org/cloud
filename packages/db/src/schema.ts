@@ -778,8 +778,9 @@ export const user_deletion_requests = pgTable(
       .default(UserDeletionRequestStatus.Pending),
     catalog_version: integer().notNull().default(1),
     requested_by_kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    requested_by_email: text(),
     target_email: text(),
-    target_email_hmac: text().notNull(),
+    target_email_hmac: text(),
     pylon_ticket_ref: text(),
     cloud_subject_resolution: text().$type<UserDeletionCloudSubjectResolution>().notNull(),
     cloud_subject_proof_ref: text(),
@@ -793,7 +794,9 @@ export const user_deletion_requests = pgTable(
   table => [
     uniqueIndex('UQ_user_deletion_requests_active_email_hmac')
       .on(table.target_email_hmac)
-      .where(sql`${table.status} IN ('pending', 'in_progress', 'finalizing')`),
+      .where(
+        sql`${table.target_email_hmac} IS NOT NULL AND ${table.status} IN ('pending', 'in_progress', 'finalizing')`
+      ),
     uniqueIndex('UQ_user_deletion_requests_active_user_id')
       .on(table.user_id)
       .where(
@@ -826,7 +829,7 @@ export const user_deletion_requests = pgTable(
     ),
     check(
       'user_deletion_requests_active_email_check',
-      sql`(${table.status} IN ('pending', 'in_progress', 'finalizing')) = (${table.target_email} IS NOT NULL)`
+      sql`(${table.status} NOT IN ('in_progress', 'finalizing') OR ${table.target_email} IS NOT NULL) AND (${table.status} NOT IN ('completed', 'cancelled') OR ${table.target_email} IS NULL)`
     ),
   ]
 );
@@ -9269,6 +9272,11 @@ export const user_push_tokens = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     token: text().notNull(),
     platform: text().$type<'ios' | 'android'>().notNull(),
+    // App version at token registration. Null for tokens registered by clients
+    // that predate channel creation; the push DO gates Android channelId on it.
+    app_version: text(),
+    // Locale tag (e.g. "es") captured at token registration. Null means English.
+    locale: text('locale'),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -9300,6 +9308,8 @@ export const user_notification_preferences = pgTable('user_notification_preferen
   kiloclaw_activity_enabled: boolean().default(true).notNull(),
   balance_alerts_enabled: boolean().default(true).notNull(),
   security_findings_enabled: boolean().default(true).notNull(),
+  // 'generic' hides lock-screen content; 'full' shows the message text.
+  notification_previews: text().$type<'generic' | 'full'>().default('generic').notNull(),
   created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   updated_at: timestamp({ withTimezone: true, mode: 'string' })
     .defaultNow()

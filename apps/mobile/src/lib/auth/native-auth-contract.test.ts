@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  parseAuthErrorCode,
+  parseAuthError,
   parseDeviceAuthCodeResponse,
   parseDeviceAuthTokenResponse,
   parseEmailCodeResponse,
@@ -103,6 +103,23 @@ describe('parseTokenPair', () => {
   it('returns null when expiresIn is zero', () => {
     // expiresIn must be positive; zero is rejected by the schema
     expect(parseTokenPair({ token: 'abc', refreshToken: 'ref', expiresIn: 0 })).toBeNull();
+  });
+
+  it('returns created on a complete token pair', () => {
+    expect(
+      parseTokenPair({ token: 'abc', refreshToken: 'ref', expiresIn: 3600, created: true })
+    ).toEqual({ token: 'abc', refreshToken: 'ref', expiresIn: 3600, created: true });
+  });
+
+  it('returns created on a token-only response', () => {
+    expect(parseTokenPair({ token: 'abc', created: false })).toEqual({
+      token: 'abc',
+      created: false,
+    });
+  });
+
+  it('omits created when the server does not send it', () => {
+    expect(parseTokenPair({ token: 'abc' })).toEqual({ token: 'abc' });
   });
 });
 
@@ -209,14 +226,23 @@ describe('parseEmailCodeResponse', () => {
   });
 });
 
-// --- parseAuthErrorCode ---
+// --- parseAuthError ---
 
-describe('parseAuthErrorCode', () => {
-  it('parses an error', () => {
-    expect(parseAuthErrorCode({ error: 'BLOCKED' })).toBe('BLOCKED');
+describe('parseAuthError', () => {
+  it('returns the code and ssoOrganizationId for an SSO error', () => {
+    expect(parseAuthError({ error: 'SSO_ERROR', ssoOrganizationId: 'org_1' })).toEqual({
+      code: 'SSO_ERROR',
+      ssoOrganizationId: 'org_1',
+    });
   });
 
-  it('returns undefined for non-object', () => {
-    expect(parseAuthErrorCode(null)).toBeUndefined();
+  it('tolerates the absence of ssoOrganizationId', () => {
+    expect(parseAuthError({ error: 'BLOCKED' })).toEqual({ code: 'BLOCKED' });
+  });
+
+  it('returns undefined for null, undefined, and non-error objects', () => {
+    expect(parseAuthError(null)).toBeUndefined();
+    expect(parseAuthError(undefined)).toBeUndefined();
+    expect(parseAuthError({ success: true })).toBeUndefined();
   });
 });

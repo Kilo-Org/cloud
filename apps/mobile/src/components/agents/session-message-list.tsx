@@ -3,6 +3,7 @@ import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { ChevronDown } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AccessibilityInfo, Pressable, View, type ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { useSessionListAutoScroll } from '@/components/agents/use-session-list-auto-scroll';
@@ -10,7 +11,7 @@ import { SessionPaginationHeader } from '@/components/agents/session-pagination-
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
-  OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT,
+  getOlderMessagesArrivedAnnouncement,
   shouldAnnounceOlderMessagesArrival,
 } from '@/components/agents/older-messages-a11y';
 
@@ -43,6 +44,13 @@ type SessionMessageListProps<T> = {
    * indicators.
    */
   contentBottomInset?: number;
+  /**
+   * Optional callback fired when the list returns to the bottom after the
+   * user scrolled away. Fires only on the false→true transition of
+   * `isAtBottom`, never on mount. The host uses this to trim retained
+   * history exactly when the user returns to the live tail.
+   */
+  onReachedBottom?: () => void;
 };
 
 export function SessionMessageList<T>({
@@ -57,6 +65,7 @@ export function SessionMessageList<T>({
   renderItem,
   ListFooterComponent,
   contentBottomInset,
+  onReachedBottom,
 }: Readonly<SessionMessageListProps<T>>) {
   // FlashList v2 renders the list in chronological order (oldest → newest).
   // `startRenderingFromBottom` keeps the viewport anchored at the newest
@@ -78,6 +87,7 @@ export function SessionMessageList<T>({
     resetKey: sessionId,
   });
   const colors = useThemeColors();
+  const { t } = useTranslation();
 
   // Coalesce the trigger: only fire `onLoadOlderMessages` while there is
   // actually a cursor, we are not already loading, and we are not in a
@@ -113,6 +123,22 @@ export function SessionMessageList<T>({
     inFlightRef.current = false;
   }, [sessionId]);
 
+  // Fire `onReachedBottom` only on the false→true transition of
+  // `isAtBottom`. The previous-value ref prevents a fire on mount (the list
+  // starts at the bottom) and on repeat renders while already at the bottom.
+  // The handler is held in a ref so a new inline callback identity from the
+  // host never re-runs this effect.
+  const onReachedBottomRef = useRef(onReachedBottom);
+  onReachedBottomRef.current = onReachedBottom;
+  const prevIsAtBottomRef = useRef(isAtBottom);
+  useEffect(() => {
+    const prev = prevIsAtBottomRef.current;
+    prevIsAtBottomRef.current = isAtBottom;
+    if (isAtBottom && !prev) {
+      onReachedBottomRef.current?.();
+    }
+  }, [isAtBottom]);
+
   // Non-visual a11y signal for older-page arrival (visual loading skeleton
   // was removed). Announce only when items were actually prepended.
   const olderArrivalInitializedRef = useRef(false);
@@ -136,7 +162,7 @@ export function SessionMessageList<T>({
         nextNewestKey,
       })
     ) {
-      AccessibilityInfo.announceForAccessibility(OLDER_MESSAGES_ARRIVED_ANNOUNCEMENT);
+      AccessibilityInfo.announceForAccessibility(getOlderMessagesArrivedAnnouncement());
     }
     olderArrivalInitializedRef.current = true;
     olderArrivalCountRef.current = nextCount;
@@ -165,6 +191,8 @@ export function SessionMessageList<T>({
         data={items}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
+        // Android Fabric can race clipped-view reattachment with rapid transcript updates.
+        removeClippedSubviews={false}
         onScroll={handleScroll}
         onScrollBeginDrag={handleScrollBeginDrag}
         onScrollEndDrag={handleScrollEndDrag}
@@ -209,7 +237,7 @@ export function SessionMessageList<T>({
         >
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Scroll to bottom"
+            accessibilityLabel={t('agentChat.session.scrollToBottom')}
             onPress={scrollToLatestAnimated}
             hitSlop={2}
             className="h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-black/25 active:opacity-70"

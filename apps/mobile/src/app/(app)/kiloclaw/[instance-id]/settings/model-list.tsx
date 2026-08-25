@@ -9,6 +9,7 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { EmptyState } from '@/components/empty-state';
@@ -40,6 +41,7 @@ export default function ModelListScreen() {
   const colors = useThemeColors();
   const paddingBottom = useDetailScreenBottomPadding();
   const trpc = useTRPC();
+  const { t } = useTranslation();
   const [searchFilter, setSearchFilter] = useState('');
   const searchInputRef = useRef<TextInput>(null);
 
@@ -143,30 +145,32 @@ export default function ModelListScreen() {
   const sections = [
     ...(preferred.length > 0
       ? [
-          { type: 'header' as const, title: 'Recommended' },
+          { type: 'header' as const, title: t('kiloclaw.modelList.recommended') },
           ...preferred.map(m => ({ type: 'model' as const, model: m })),
         ]
       : []),
     ...(rest.length > 0
       ? [
-          { type: 'header' as const, title: 'All models' },
+          { type: 'header' as const, title: t('kiloclaw.modelList.title') },
           ...rest.map(m => ({ type: 'model' as const, model: m })),
         ]
       : []),
   ];
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title="All models" context={instanceContext} />;
+    return (
+      <InstanceContextBoundary title={t('kiloclaw.modelList.title')} context={instanceContext} />
+    );
   }
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="All models" />
+      <ScreenHeader title={t('kiloclaw.modelList.title')} />
       <View className="px-4 pb-2 pt-2">
         <TextInput
           ref={searchInputRef}
           className="rounded-lg bg-secondary px-4 py-3 text-sm text-foreground"
-          placeholder="Search models..."
+          placeholder={t('kiloclaw.modelList.searchPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
           autoCapitalize="none"
           autoCorrect={false}
@@ -184,7 +188,7 @@ export default function ModelListScreen() {
       {isError && (
         <View className="flex-1 items-center justify-center">
           <QueryError
-            message="Could not load models"
+            message={t('kiloclaw.modelList.couldNotLoad')}
             onRetry={() => {
               void refetch();
               void configQuery.refetch();
@@ -202,17 +206,19 @@ export default function ModelListScreen() {
           ListEmptyComponent={
             <EmptyState
               icon={Search}
-              title={searchFilter ? 'No models match your search' : 'No models available'}
+              title={
+                searchFilter ? t('kiloclaw.modelList.noMatches') : t('kiloclaw.modelList.noModels')
+              }
               description={
                 searchFilter
-                  ? `No results for "${searchFilter}"`
-                  : 'Models will appear here once available.'
+                  ? t('kiloclaw.modelList.noResultsFor', { query: searchFilter })
+                  : t('kiloclaw.modelList.noModelsDescription')
               }
               placement="top"
               action={
                 searchFilter ? (
                   <Button variant="outline" size="sm" onPress={handleClearSearch}>
-                    <Text>Clear search</Text>
+                    <Text>{t('kiloclaw.modelList.clearSearch')}</Text>
                   </Button>
                 ) : undefined
               }

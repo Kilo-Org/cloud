@@ -43,7 +43,10 @@ function fakeDeps(overrides: Partial<ScheduledActionDispatchDeps> = {}): {
     readPreference: async () => true,
     getTokens: async userId => {
       calls.getTokenQueries.push(userId);
-      return ['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]'];
+      return [
+        { token: 'ExponentPushToken[aaa]', locale: null },
+        { token: 'ExponentPushToken[bbb]', locale: null },
+      ];
     },
     deleteStaleTokens: async tokens => {
       calls.deletedTokens.push([...tokens]);
@@ -71,7 +74,10 @@ function fakeDeps(overrides: Partial<ScheduledActionDispatchDeps> = {}): {
 describe('buildScheduledActionMessages', () => {
   it('builds restart-notice message with instance name and event metadata', () => {
     const params = baseParams({ event: 'scheduled_restart_notice' });
-    const messages = buildScheduledActionMessages(['ExponentPushToken[aaa]'], params);
+    const messages = buildScheduledActionMessages(
+      [{ token: 'ExponentPushToken[aaa]', locale: null }],
+      params
+    );
 
     expect(messages).toHaveLength(1);
     const m = messages[0];
@@ -89,7 +95,7 @@ describe('buildScheduledActionMessages', () => {
 
   it('falls back to "KiloClaw" when instanceName is null', () => {
     const messages = buildScheduledActionMessages(
-      ['ExponentPushToken[aaa]'],
+      [{ token: 'ExponentPushToken[aaa]', locale: null }],
       baseParams({ instanceName: null })
     );
     expect(messages[0].title).toBe('KiloClaw will restart soon');
@@ -97,7 +103,7 @@ describe('buildScheduledActionMessages', () => {
 
   it('builds version-change-notice with the target tag in body when set', () => {
     const messages = buildScheduledActionMessages(
-      ['ExponentPushToken[aaa]'],
+      [{ token: 'ExponentPushToken[aaa]', locale: null }],
       baseParams({
         event: 'scheduled_version_change_notice',
         targetImageTag: 'dev-1234567',
@@ -109,7 +115,7 @@ describe('buildScheduledActionMessages', () => {
 
   it('builds version-change-notice without tag falls back to generic phrasing', () => {
     const messages = buildScheduledActionMessages(
-      ['ExponentPushToken[aaa]'],
+      [{ token: 'ExponentPushToken[aaa]', locale: null }],
       baseParams({
         event: 'scheduled_version_change_notice',
         targetImageTag: null,
@@ -121,7 +127,7 @@ describe('buildScheduledActionMessages', () => {
 
   it('builds restart-cancelled message', () => {
     const messages = buildScheduledActionMessages(
-      ['ExponentPushToken[aaa]'],
+      [{ token: 'ExponentPushToken[aaa]', locale: null }],
       baseParams({ event: 'scheduled_restart_cancelled' })
     );
     expect(messages[0].title).toBe('My Bot restart cancelled');
@@ -130,7 +136,7 @@ describe('buildScheduledActionMessages', () => {
 
   it('builds version-change-cancelled message', () => {
     const messages = buildScheduledActionMessages(
-      ['ExponentPushToken[aaa]'],
+      [{ token: 'ExponentPushToken[aaa]', locale: null }],
       baseParams({ event: 'scheduled_version_change_cancelled' })
     );
     expect(messages[0].title).toBe('My Bot upgrade cancelled');
@@ -139,7 +145,11 @@ describe('buildScheduledActionMessages', () => {
 
   it('emits one message per token', () => {
     const messages = buildScheduledActionMessages(
-      ['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]', 'ExponentPushToken[ccc]'],
+      [
+        { token: 'ExponentPushToken[aaa]', locale: null },
+        { token: 'ExponentPushToken[bbb]', locale: null },
+        { token: 'ExponentPushToken[ccc]', locale: null },
+      ],
       baseParams()
     );
     expect(messages).toHaveLength(3);

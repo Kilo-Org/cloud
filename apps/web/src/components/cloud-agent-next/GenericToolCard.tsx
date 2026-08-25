@@ -1,4 +1,5 @@
 import { Plug, Paperclip } from 'lucide-react';
+import { toSafeHttpUrl } from '@/lib/safe-http-url';
 import { ToolCardShell } from './ToolCardShell';
 import { formatDuration } from './toolCardUtils';
 import type { ToolPart } from './types';
@@ -98,11 +99,12 @@ export function GenericToolCard({ toolPart }: GenericToolCardProps) {
         <div>
           <div className="text-muted-foreground mb-1 text-xs">Attachments:</div>
           <div className="flex flex-wrap gap-2">
-            {attachments.map((file, index) =>
-              file.url ? (
+            {attachments.map((file, index) => {
+              const safeHref = toSafeHttpUrl(file.url);
+              return safeHref ? (
                 <a
                   key={file.id || index}
-                  href={file.url}
+                  href={safeHref}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="bg-background hover:bg-muted flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors"
@@ -118,8 +120,8 @@ export function GenericToolCard({ toolPart }: GenericToolCardProps) {
                   <Paperclip className="h-3 w-3" />
                   <span>{file.filename || `File ${index + 1}`}</span>
                 </div>
-              )
-            )}
+              );
+            })}
           </div>
         </div>
       )}

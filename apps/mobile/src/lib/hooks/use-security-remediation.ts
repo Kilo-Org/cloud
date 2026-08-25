@@ -5,9 +5,16 @@ import {
   getRemediationUnavailableCopy,
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
+import {
+  isLatestMutationGeneration,
+  nextMutationGeneration,
+} from '@/lib/hooks/mutation-generations';
+import { i18n } from '@/i18n';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -26,9 +33,11 @@ async function invalidateRemediationQueries(
         queryKey: trpc.securityAgent.getAnalysis.queryKey({ findingId }),
       }),
       queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getFinding.queryKey() }),
-      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.listFindings.queryKey() }),
       queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getDashboardStats.queryKey() }),
     ]);
+    scheduleCacheMaintenance(() => {
+      reconcileFirstPage(queryClient, trpc.securityAgent.listFindings.queryKey());
+    });
     return;
   }
   const ownerInput = { organizationId: scope };
@@ -43,12 +52,15 @@ async function invalidateRemediationQueries(
       queryKey: trpc.organizations.securityAgent.getFinding.queryKey(ownerInput),
     }),
     queryClient.invalidateQueries({
-      queryKey: trpc.organizations.securityAgent.listFindings.queryKey(ownerInput),
-    }),
-    queryClient.invalidateQueries({
       queryKey: trpc.organizations.securityAgent.getDashboardStats.queryKey(ownerInput),
     }),
   ]);
+  scheduleCacheMaintenance(() => {
+    reconcileFirstPage(
+      queryClient,
+      trpc.organizations.securityAgent.listFindings.queryKey(ownerInput)
+    );
+  });
 }
 
 export function useStartSecurityRemediation(scope: string) {
@@ -70,10 +82,10 @@ export function useStartSecurityRemediation(scope: string) {
       if (!result.queued) {
         toast.error(
           getRemediationUnavailableCopy(result.reason) ??
-            'Remediation is unavailable for this finding.'
+            i18n.t('securityAgent.remediation.unavailable')
         );
       } else {
-        toast.success('Remediation queued');
+        toast.success(i18n.t('securityAgent.remediation.queued'));
       }
       await invalidateRemediationQueries(
         { trpc, queryClient },
@@ -102,10 +114,10 @@ export function useRetrySecurityRemediation(scope: string) {
       if (!result.queued) {
         toast.error(
           getRemediationUnavailableCopy(result.reason) ??
-            'Remediation is unavailable for this finding.'
+            i18n.t('securityAgent.remediation.unavailable')
         );
       } else {
-        toast.success('Remediation retry queued');
+        toast.success(i18n.t('securityAgent.remediation.retryQueued'));
       }
       await invalidateRemediationQueries(
         { trpc, queryClient },
@@ -134,6 +146,8 @@ function getSecurityAnalysisQueryKey(
 export function useCancelSecurityRemediation(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: { attemptId: string; findingId: string }) =>
@@ -146,6 +160,7 @@ export function useCancelSecurityRemediation(scope: string) {
     onMutate: async vars => {
       const analysisQueryKey = getSecurityAnalysisQueryKey(trpc, scope, vars.findingId);
       await queryClient.cancelQueries({ queryKey: analysisQueryKey });
+      const generation = nextMutationGeneration(hashKey(analysisQueryKey));
       const previous = queryClient.getQueryData<SecurityAnalysis>(analysisQueryKey);
       queryClient.setQueryData<SecurityAnalysis>(analysisQueryKey, old =>
         old
@@ -159,10 +174,13 @@ export function useCancelSecurityRemediation(scope: string) {
             }
           : old
       );
-      return { previous, analysisQueryKey };
+      return { previous, analysisQueryKey, generation };
     },
     onError: (error, _vars, context) => {
-      if (context?.previous) {
+      if (
+        context?.previous &&
+        isLatestMutationGeneration(hashKey(context.analysisQueryKey), context.generation)
+      ) {
         queryClient.setQueryData(context.analysisQueryKey, context.previous);
       }
       toast.error(error.message);
@@ -172,8 +190,8 @@ export function useCancelSecurityRemediation(scope: string) {
       // was only asked to stop — it may still finish and produce a PR.
       toast.success(
         result.status === 'cancellation_requested'
-          ? 'Cancellation requested'
-          : 'Remediation cancelled'
+          ? i18n.t('securityAgent.remediation.cancellationRequested')
+          : i18n.t('securityAgent.remediation.cancelled')
       );
     },
     onSettled: async (_result, _error, vars) => {

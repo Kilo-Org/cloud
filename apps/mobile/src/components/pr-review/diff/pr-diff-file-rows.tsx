@@ -2,6 +2,7 @@
 
 import * as Haptics from 'expo-haptics';
 import { ChevronDown, ChevronRight, Eye, EyeOff, File, Link2 } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { fileStatusIcon, fileStatusLabel } from '@/components/pr-review/diff/pr-diff-file-status';
@@ -35,6 +36,7 @@ export function MarkViewedToggle({
   onToggle: () => void;
 }) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <Pressable
       onPress={() => {
@@ -44,7 +46,11 @@ export function MarkViewedToggle({
       hitSlop={MARK_VIEWED_HIT_SLOP}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: viewed }}
-      accessibilityLabel={viewed ? `Unmark ${path} as viewed` : `Mark ${path} as viewed`}
+      accessibilityLabel={
+        viewed
+          ? t('prReview.fileRows.unmarkViewed', { path })
+          : t('prReview.fileRows.markViewed', { path })
+      }
       className="h-9 w-9 items-center justify-center active:opacity-70"
     >
       {viewed ? (
@@ -80,6 +86,7 @@ export function FileHeaderRow({
   onToggleViewed: () => void;
 }) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const StatusIcon = fileStatusIcon(file.status);
   const isRename = Boolean(file.previousPath) && file.previousPath !== file.path;
   const pathLine = isRename ? `${file.previousPath} → ${file.path}` : file.path;
@@ -91,7 +98,9 @@ export function FileHeaderRow({
           onPress={hasDiff ? onToggleExpand : undefined}
           disabled={!hasDiff}
           accessibilityRole="button"
-          accessibilityLabel={expanded ? 'Collapse file' : 'Expand file'}
+          accessibilityLabel={
+            expanded ? t('prReview.fileRows.collapseFile') : t('prReview.fileRows.expandFile')
+          }
           accessibilityState={{ expanded, disabled: !hasDiff }}
           className="min-h-9 flex-1 flex-row items-center gap-2 active:opacity-70"
         >
@@ -134,12 +143,13 @@ export function PatchMissingRow({
   onToggleViewed: () => void;
 }) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
     <View className="border-b border-hair-soft bg-secondary px-4 py-3">
       <View className="flex-row items-center gap-2">
         <File size={14} color={colors.mutedForeground} />
         <View className="flex-1">
-          <Text className="text-sm text-foreground">Diff too large to display</Text>
+          <Text className="text-sm text-foreground">{t('prReview.fileRows.diffTooLarge')}</Text>
           <Text variant="muted" className="text-xs">
             {file.path}
           </Text>
@@ -149,17 +159,17 @@ export function PatchMissingRow({
       <Pressable
         onPress={() => {
           if (githubUrl) {
-            void openExternalUrl(githubUrl, { label: 'GitHub diff' });
+            void openExternalUrl(githubUrl, { label: t('prReview.fileRows.githubDiff') });
           }
         }}
         accessibilityRole="link"
-        accessibilityLabel="Open this file's diff on GitHub"
+        accessibilityLabel={t('prReview.fileRows.openDiffOnGitHub')}
         className="mt-2 flex-row items-center gap-1.5 self-start"
       >
         <Link2 size={14} color={colors.info} />
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme info color */}
         <Text className="text-sm" style={{ color: colors.info }}>
-          Open on GitHub
+          {t('prReview.fileRows.openOnGitHub')}
         </Text>
       </Pressable>
     </View>

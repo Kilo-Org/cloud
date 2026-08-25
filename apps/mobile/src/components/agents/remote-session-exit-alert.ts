@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/promise-function-async, require-await -- Native Alert callbacks settle this Promise asynchronously. */
 import { Alert } from 'react-native';
 
+import { i18n } from '@/i18n';
+
 export function showRemoteSessionExitConfirmation(): Promise<boolean> {
   return new Promise(resolve => {
     let settled = false;
@@ -13,18 +15,18 @@ export function showRemoteSessionExitConfirmation(): Promise<boolean> {
     };
 
     Alert.alert(
-      'Exit session?',
-      'This stops the running session but keeps its history.',
+      i18n.t('agentChat.remoteSession.exitTitle'),
+      i18n.t('agentChat.remoteSession.exitMessage'),
       [
         {
-          text: 'Keep session running',
+          text: i18n.t('agentChat.remoteSession.keepSessionRunning'),
           style: 'cancel',
           onPress: () => {
             settle(false);
           },
         },
         {
-          text: 'Exit session',
+          text: i18n.t('agentChat.remoteSession.exitSession'),
           style: 'destructive',
           onPress: () => {
             settle(true);

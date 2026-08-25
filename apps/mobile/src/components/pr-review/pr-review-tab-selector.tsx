@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
@@ -6,16 +7,11 @@ import { cn } from '@/lib/utils';
 
 export type PrReviewTabId = 'overview' | 'files' | 'discussion';
 
-type PrReviewTab = {
-  id: PrReviewTabId;
-  label: string;
-};
-
-const TABS: readonly PrReviewTab[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'files', label: 'Files' },
-  { id: 'discussion', label: 'Discussion' },
-];
+const TABS = [
+  { id: 'overview', labelKey: 'prReview.tabs.overview' },
+  { id: 'files', labelKey: 'prReview.tabs.files' },
+  { id: 'discussion', labelKey: 'prReview.tabs.discussion' },
+] as const satisfies readonly { id: PrReviewTabId; labelKey: string }[];
 
 type PrReviewTabSelectorProps = {
   activeTab: PrReviewTabId;
@@ -29,6 +25,7 @@ type PrReviewTabSelectorProps = {
  * respective tab bodies — the parent screen owns the tab state.
  */
 export function PrReviewTabSelector({ activeTab, onChange }: PrReviewTabSelectorProps) {
+  const { t } = useTranslation();
   return (
     <View accessibilityRole="tablist" className="flex-row gap-1 rounded-lg bg-secondary p-1">
       {TABS.map(tab => {
@@ -56,7 +53,7 @@ export function PrReviewTabSelector({ activeTab, onChange }: PrReviewTabSelector
                 active ? 'font-semibold text-foreground' : 'text-muted-foreground'
               )}
             >
-              {tab.label}
+              {t(tab.labelKey)}
             </Text>
           </Pressable>
         );

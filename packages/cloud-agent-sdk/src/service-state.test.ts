@@ -284,6 +284,73 @@ describe('createServiceState', () => {
       expect(state.getStatus()).toEqual({ type: 'error', message: 'Something went wrong' });
     });
 
+    it('scopes child errors to onChildSessionError without touching root state', () => {
+      const onError = jest.fn();
+      const onChildSessionError = jest.fn();
+      const state = createServiceState(makeConfig({ onError, onChildSessionError }));
+
+      state.process({
+        type: 'session.error',
+        error: 'Requests ending with a model turn are not supported.',
+        sessionId: 'child-1',
+      });
+
+      expect(onError).not.toHaveBeenCalled();
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+      expect(onChildSessionError).toHaveBeenCalledWith(
+        'child-1',
+        'Requests ending with a model turn are not supported.'
+      );
+    });
+
+    it('keeps root session errors on onError and root status', () => {
+      const onError = jest.fn();
+      const onChildSessionError = jest.fn();
+      const state = createServiceState(makeConfig({ onError, onChildSessionError }));
+
+      state.process({
+        type: 'session.error',
+        error: 'Requests ending with a model turn are not supported.',
+        sessionId: 'root-1',
+      });
+
+      expect(onError).toHaveBeenCalledWith('Requests ending with a model turn are not supported.');
+      expect(onChildSessionError).not.toHaveBeenCalled();
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'Requests ending with a model turn are not supported.',
+      });
+    });
+
+    it('adopts the server-reported root session ID for errors', () => {
+      const onError = jest.fn();
+      const onChildSessionError = jest.fn();
+      const state = createServiceState(makeConfig({ onError, onChildSessionError }));
+
+      state.process({ type: 'session.created', info: makeSession('server-root') });
+      state.process({
+        type: 'session.error',
+        error: 'Root session failed.',
+        sessionId: 'server-root',
+      });
+
+      expect(onError).toHaveBeenCalledWith('Root session failed.');
+      expect(onChildSessionError).not.toHaveBeenCalled();
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'Root session failed.' });
+    });
+
+    it('keeps events without a sessionId on the legacy root path', () => {
+      const onError = jest.fn();
+      const onChildSessionError = jest.fn();
+      const state = createServiceState(makeConfig({ onError, onChildSessionError }));
+
+      state.process({ type: 'session.error', error: 'Something went wrong' });
+
+      expect(onError).toHaveBeenCalledWith('Something went wrong');
+      expect(onChildSessionError).not.toHaveBeenCalled();
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'Something went wrong' });
+    });
+
     it('is suppressed after stopped(error) — aftershock absorption', () => {
       const onError = jest.fn();
       const state = createServiceState(makeConfig({ onError }));
@@ -1651,7 +1718,7 @@ describe('createServiceState', () => {
       expect(cb).toHaveBeenCalledTimes(2);
     });
 
-    it('cloud.message.failed with reason=exhausted clears pending entry', () => {
+    it('cloud.message.failed with reason=exhausted keeps a failed pending entry', () => {
       const state = createServiceState(makeConfig());
 
       state.process({ type: 'cloud.message.queued', messageId: 'm1' });
@@ -1663,7 +1730,50 @@ describe('createServiceState', () => {
         attempts: 5,
       });
 
-      expect(state.getPendingMessages().has('m1')).toBe(false);
+      expect(state.getPendingMessages().get('m1')).toEqual({
+        status: 'failed',
+        error: 'flush failed',
+        reason: 'exhausted',
+        attempts: 5,
+      });
+    });
+
+    it('terminal delivery failure resolves a stale preparing status', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'cloud.status',
+        cloudStatus: { type: 'preparing', message: 'Setting up environment...' },
+      });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'Environment preparation failed',
+        reason: 'exhausted',
+      });
+
+      expect(state.getCloudStatus()).toEqual({
+        type: 'error',
+        message: 'Environment preparation failed',
+      });
+    });
+
+    it('an interrupt during preparation clears the preparing status', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'cloud.status',
+        cloudStatus: { type: 'preparing', message: 'Setting up environment...' },
+      });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The message was interrupted',
+        reason: 'interrupted',
+      });
+
+      expect(state.getCloudStatus()).toBeNull();
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
     });
 
     it('cloud.message.failed with reason=interrupted settles the session', () => {
@@ -1678,12 +1788,16 @@ describe('createServiceState', () => {
         reason: 'interrupted',
       });
 
-      expect(state.getPendingMessages().has('m1')).toBe(false);
+      expect(state.getPendingMessages().get('m1')).toEqual({
+        status: 'failed',
+        error: 'Pending queued message interrupted by user',
+        reason: 'interrupted',
+      });
       expect(state.getActivity()).toEqual({ type: 'idle' });
       expect(state.getStatus()).toEqual({ type: 'interrupted' });
     });
 
-    it('cloud.message.failed with reason=execution clears pending entry', () => {
+    it('cloud.message.failed with reason=execution keeps a failed pending entry', () => {
       const state = createServiceState(makeConfig());
 
       state.process({ type: 'cloud.message.queued', messageId: 'm1' });
@@ -1694,7 +1808,11 @@ describe('createServiceState', () => {
         reason: 'execution',
       });
 
-      expect(state.getPendingMessages().has('m1')).toBe(false);
+      expect(state.getPendingMessages().get('m1')).toEqual({
+        status: 'failed',
+        error: 'boom',
+        reason: 'execution',
+      });
     });
 
     it('cloud.message.queued can repopulate an entry after a failed event', () => {
@@ -1744,6 +1862,152 @@ describe('createServiceState', () => {
       state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
 
       expect(state.getPendingMessages().size).toBe(0);
+    });
+
+    describe('failed-entry survival', () => {
+      const failed = (state: ReturnType<typeof createServiceState>, id: string) =>
+        state.getPendingMessages().get(id);
+
+      it('a later queue.changed snapshot for the same id wins over a stale failed entry', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+        state.process({
+          type: 'cloud.message.failed',
+          messageId: 'm1',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+        state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m1'] });
+
+        expect(state.getPendingMessages().get('m1')).toEqual({ status: 'queued' });
+      });
+
+      it('a failed entry survives a non-empty queue.changed snapshot', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+        state.process({
+          type: 'cloud.message.failed',
+          messageId: 'm1',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+        state.process({ type: 'queue.changed', sessionId: 'root-1', queued: ['m2'] });
+
+        expect(failed(state, 'm1')).toEqual({
+          status: 'failed',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+        expect(state.getPendingMessages().get('m2')).toEqual({ status: 'queued' });
+      });
+
+      it('a failed entry survives an empty queue.changed snapshot', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+        state.process({
+          type: 'cloud.message.failed',
+          messageId: 'm1',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+        state.process({ type: 'queue.changed', sessionId: 'root-1', queued: [] });
+
+        expect(failed(state, 'm1')).toEqual({
+          status: 'failed',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+      });
+
+      it('a failed entry survives connected', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+        state.process({
+          type: 'cloud.message.failed',
+          messageId: 'm1',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+        state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+
+        expect(failed(state, 'm1')).toEqual({
+          status: 'failed',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+      });
+
+      it('reset clears a failed entry', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+        state.process({
+          type: 'cloud.message.failed',
+          messageId: 'm1',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+        state.reset();
+
+        expect(state.getPendingMessages().size).toBe(0);
+      });
+
+      it('a later queued for the same id replaces the failed entry', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+        state.process({
+          type: 'cloud.message.failed',
+          messageId: 'm1',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+        state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+
+        expect(state.getPendingMessages().get('m1')).toEqual({ status: 'queued' });
+      });
+
+      it('clearFailedMessage removes exactly one failed entry', () => {
+        const state = createServiceState(makeConfig());
+
+        state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+        state.process({
+          type: 'cloud.message.failed',
+          messageId: 'm1',
+          error: 'flush failed',
+          reason: 'exhausted',
+          attempts: 5,
+        });
+        state.process({ type: 'cloud.message.queued', messageId: 'm2' });
+        state.process({
+          type: 'cloud.message.failed',
+          messageId: 'm2',
+          error: 'boom',
+          reason: 'execution',
+        });
+
+        state.clearFailedMessage('m1');
+
+        expect(state.getPendingMessages().has('m1')).toBe(false);
+        expect(state.getPendingMessages().get('m2')).toEqual({
+          status: 'failed',
+          error: 'boom',
+          reason: 'execution',
+        });
+      });
     });
 
     it('fires onMessageQueued callback with messageId', () => {

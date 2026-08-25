@@ -7,6 +7,8 @@ import {
 import { useEffect } from 'react';
 import { Alert, Platform } from 'react-native';
 
+import { i18n } from '@/i18n';
+
 export function useTrackingPermissionPrompt(enabled: boolean): void {
   useEffect(() => {
     let cancelled = false;
@@ -26,7 +28,12 @@ export function useTrackingPermissionPrompt(enabled: boolean): void {
           if (cancelled) {
             return;
           }
-          Sentry.captureException(error);
+          Sentry.captureException(error, {
+            tags: {
+              'error.subsystem': 'tracking_permission',
+              'error.operation': 'get_permission',
+            },
+          });
           return;
         }
 
@@ -35,18 +42,23 @@ export function useTrackingPermissionPrompt(enabled: boolean): void {
         }
 
         Alert.alert(
-          'Allow install attribution?',
-          "Kilo uses Apple's tracking permission only to learn which channel brought you here. Your prompts and conversations are never used.",
+          i18n.t('consent.installAttributionPromptTitle'),
+          i18n.t('consent.installAttributionPromptMessage'),
           [
-            { text: 'Not now', style: 'cancel' },
+            { text: i18n.t('common.notNow'), style: 'cancel' },
             {
-              text: 'Continue',
+              text: i18n.t('consent.continue'),
               onPress: () => {
                 void (async () => {
                   try {
                     await requestTrackingPermissionsAsync();
                   } catch (error) {
-                    Sentry.captureException(error);
+                    Sentry.captureException(error, {
+                      tags: {
+                        'error.subsystem': 'tracking_permission',
+                        'error.operation': 'request_permission',
+                      },
+                    });
                   }
                 })();
               },

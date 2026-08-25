@@ -1,4 +1,5 @@
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import {
   councilDecisionLabel,
@@ -62,11 +63,15 @@ export function FindingCard({ finding }: Readonly<{ finding: CouncilFinding }>) 
 }
 
 export function CouncilSection({ councilResult }: Readonly<{ councilResult: CouncilResult }>) {
+  const { t } = useTranslation();
   return (
     <View className="gap-2">
-      <Text className="text-sm font-medium">Council</Text>
+      <Text className="text-sm font-medium">{t('codeReviewer.reviewDetail.council')}</Text>
       <View className="gap-1 rounded-lg bg-secondary p-4">
-        <MetaRow label="Decision" value={councilDecisionLabel(councilResult.decision)} />
+        <MetaRow
+          label={t('codeReviewer.reviewDetail.decision')}
+          value={councilDecisionLabel(councilResult.decision)}
+        />
         {councilResult.specialists.map(specialist => (
           <MetaRow
             key={specialist.id}
@@ -81,16 +86,31 @@ export function CouncilSection({ councilResult }: Readonly<{ councilResult: Coun
 
 export function GateSection({
   checkRunId,
+  checkRunRedacted,
   statusLabel,
   gateThreshold,
-}: Readonly<{ checkRunId: number | null; statusLabel: string; gateThreshold?: string }>) {
+}: Readonly<{
+  checkRunId: number | null;
+  checkRunRedacted?: boolean;
+  statusLabel: string;
+  gateThreshold?: string;
+}>) {
+  const { t } = useTranslation();
+  let checkRunLabel = t('codeReviewer.reviewDetail.gateNone');
+  if (checkRunId != null) {
+    checkRunLabel = `#${checkRunId}`;
+  } else if (checkRunRedacted) {
+    checkRunLabel = t('codeReviewer.reviewDetail.gateHidden');
+  }
   return (
     <View className="gap-2">
-      <Text className="text-sm font-medium">Gate</Text>
+      <Text className="text-sm font-medium">{t('codeReviewer.reviewDetail.gate')}</Text>
       <View className="gap-1 rounded-lg bg-secondary p-4">
-        <MetaRow label="Check run" value={checkRunId != null ? `#${checkRunId}` : 'None'} />
-        <MetaRow label="Status" value={statusLabel} />
-        {gateThreshold ? <MetaRow label="Threshold" value={gateThreshold} /> : null}
+        <MetaRow label={t('codeReviewer.reviewDetail.checkRun')} value={checkRunLabel} />
+        <MetaRow label={t('codeReviewer.reviewDetail.status')} value={statusLabel} />
+        {gateThreshold ? (
+          <MetaRow label={t('codeReviewer.reviewDetail.threshold')} value={gateThreshold} />
+        ) : null}
       </View>
     </View>
   );

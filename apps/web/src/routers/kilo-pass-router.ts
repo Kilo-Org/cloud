@@ -78,6 +78,7 @@ import type Stripe from 'stripe';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { computeChurnkeyAuthHash } from '@/lib/churnkey/auth';
 import { closePauseEvent } from '@/lib/kilo-pass/pause-events';
+import { abandonCollectibleInvoicesForStripeSubscription } from '@/lib/kilo-pass/abandon-collectible-invoices';
 import {
   getAllMobileStoreKiloPassProducts,
   getMobileStoreKiloPassProductByAppleProductId,
@@ -1038,6 +1039,11 @@ const PreflightPurchaseInputSchema = z.object({
   product: PurchaseProductSchema,
   program: z.string().max(64).nullable().optional(),
   appleProductId: z.string().min(1),
+  /**
+   * Original transaction ID of a Kilo Pass this device already owns, when StoreKit
+   * reports one. Untrusted: it can only deny a purchase, never grant one.
+   */
+  appleOriginalTransactionId: z.string().min(1).max(64).nullable().optional(),
 });
 
 const PurchasePresentationCtaOutputSchema = z.object({
@@ -1070,6 +1076,7 @@ const PreflightPurchaseOutputSchema = z.object({
       'unsupported_combination',
       'unknown_product',
       'already_subscribed',
+      'owned_by_another_account',
     ])
     .nullable(),
 });
@@ -1237,6 +1244,22 @@ export const kiloPassRouter = createTRPCRouter({
 
       if (!getMobileStoreKiloPassProductByAppleProductId(input.appleProductId)) {
         return { allowed: false, statusClass: 'terminal', reason: 'unknown_product' };
+      }
+
+      // Refuse before StoreKit is invoked when this device's subscription belongs to
+      // another Kilo account. The client-side check races the StoreKit purchase list,
+      // and losing that race charges the user for a purchase the server then rejects.
+      if (input.appleOriginalTransactionId) {
+        const devicePurchase = await readDb.query.kilo_pass_store_purchases.findFirst({
+          columns: { kilo_user_id: true },
+          where: and(
+            eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.AppStore),
+            eq(kilo_pass_store_purchases.provider_subscription_id, input.appleOriginalTransactionId)
+          ),
+        });
+        if (devicePurchase && devicePurchase.kilo_user_id !== ctx.user.id) {
+          return { allowed: false, statusClass: 'terminal', reason: 'owned_by_another_account' };
+        }
       }
 
       const hasLiveOtherProviderSub =
@@ -2044,6 +2067,11 @@ export const kiloPassRouter = createTRPCRouter({
           reason: 'cancel_subscription',
         });
       }
+
+      await abandonCollectibleInvoicesForStripeSubscription({
+        stripe,
+        stripeSubscriptionId: subscription.stripeSubscriptionId,
+      });
 
       await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
         cancel_at_period_end: true,

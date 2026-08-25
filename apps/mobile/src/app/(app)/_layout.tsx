@@ -8,10 +8,17 @@ import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
 import { attemptLogoutReconciliation } from '@/lib/auth/logout-reconciliation';
+import {
+  attemptPushRegistrationReconciliation,
+  subscribeToPushTokenRotation,
+} from '@/lib/auth/push-registration-reconciliation';
 import { useFormSheetDetents } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
+import { useTRPC } from '@/lib/trpc';
 
 /**
  * Attempts failed logout cleanup on every "next authenticated opportunity":
@@ -44,15 +51,70 @@ function LogoutReconciliationMount() {
   return null;
 }
 
+/**
+ * Ensures the signed-in user owns the device's Expo push token on every
+ * authenticated opportunity: once `user.getMe` has resolved on the
+ * authenticated mount, on each AppState return to `active`, and on each push
+ * token rotation. The attempt itself is single-flight with 60 s spacing, so
+ * foreground flaps do not hammer the server and a transient failure retries
+ * on the next foreground.
+ */
+function PushRegistrationMount() {
+  const { userId, isLoading, isError } = useCurrentUserId();
+
+  useEffect(() => {
+    if (!userId || isLoading || isError) {
+      return undefined;
+    }
+
+    void attemptPushRegistrationReconciliation(userId);
+
+    const appState = AppState.addEventListener('change', next => {
+      if (next === 'active') {
+        void attemptPushRegistrationReconciliation(userId);
+      }
+    });
+    const unsubscribeRotation = subscribeToPushTokenRotation(userId);
+
+    return () => {
+      appState.remove();
+      unsubscribeRotation();
+    };
+  }, [userId, isLoading, isError]);
+
+  return null;
+}
+
+/**
+ * Refreshes app-wide freshness on foreground regain: the signed-in user,
+ * their organizations, and kilo-chat conversations. The root `(app)` layout
+ * is always focused, so the hook's focus gate never blocks this mount.
+ */
+function AppWideFreshnessMount() {
+  const trpc = useTRPC();
+  useRouteForegroundRefresh([
+    trpc.user.getMe.queryKey(),
+    trpc.organizations.list.queryKey(),
+    // Kilo-chat keys are FLAT (['kilo-chat', 'conversations', …]), so the
+    // partial key is the flat ['kilo-chat']; the nested tRPC form
+    // [['kilo-chat']] does not prefix-match flat keys.
+    ['kilo-chat'],
+  ]);
+  return null;
+}
+
 export default function AppLayout() {
   const colors = useThemeColors();
   const { fullSheetDetent } = useFormSheetDetents();
+  useSecurityLifecycleInvalidation();
 
   return (
     <UserWebConnectionProvider>
       <ActiveSessionsLiveSyncMount />
       <CachePersistenceMount />
       <LogoutReconciliationMount />
+      <PushRegistrationMount />
+      <AppWideFreshnessMount />
       <SharePayloadNavigator />
       <KiloChatProvider>
         <KiloChatPresenceMount>
@@ -101,15 +163,6 @@ export default function AppLayout() {
             />
             <Stack.Screen
               name="agent-chat/instance-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="agent-chat/continue-picker"
               options={{
                 presentation: 'formSheet',
                 sheetAllowedDetents: [0.5, fullSheetDetent],

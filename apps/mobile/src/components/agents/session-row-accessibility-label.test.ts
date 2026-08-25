@@ -1,9 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   formatSpokenTimeAgo,
   sessionRowAccessibilityLabel,
 } from './session-row-accessibility-label';
+
+import '@/i18n';
+import type * as ReactI18next from 'react-i18next';
+
+vi.mock('react-i18next', async importOriginal => {
+  const actual = await importOriginal<typeof ReactI18next>();
+  return {
+    ...actual,
+    useTranslation: () => {
+      const i18n = actual.getI18n();
+      return { t: i18n.t.bind(i18n), i18n };
+    },
+  };
+});
 
 /**
  * Feature C — a11y labels mirroring visible content.
@@ -40,9 +54,9 @@ describe('formatSpokenTimeAgo', () => {
     expect(formatSpokenTimeAgo(t)).toBe('3 hours ago');
   });
 
-  it('expands "1d ago" to "1 day ago" (singular days)', () => {
+  it('passes "yesterday" through unchanged', () => {
     const t = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    expect(formatSpokenTimeAgo(t)).toBe('1 day ago');
+    expect(formatSpokenTimeAgo(t)).toBe('yesterday');
   });
 
   it('expands "3d ago" to "3 days ago" (plural days)', () => {
@@ -50,10 +64,10 @@ describe('formatSpokenTimeAgo', () => {
     expect(formatSpokenTimeAgo(t)).toBe('3 days ago');
   });
 
-  it('expands "1mo ago" to "1 month ago" (singular months)', () => {
+  it('passes "last month" through unchanged', () => {
     // 35 days pushes past the 30-day boundary into the months branch
     const t = new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString();
-    expect(formatSpokenTimeAgo(t)).toBe('1 month ago');
+    expect(formatSpokenTimeAgo(t)).toBe('last month');
   });
 
   it('expands "2mo ago" to "2 months ago" (plural months)', () => {
@@ -61,10 +75,10 @@ describe('formatSpokenTimeAgo', () => {
     expect(formatSpokenTimeAgo(t)).toBe('2 months ago');
   });
 
-  it('expands "1y ago" to "1 year ago" (singular years)', () => {
+  it('passes "last year" through unchanged', () => {
     // 370 days pushes past the 12-month boundary into the years branch
     const t = new Date(Date.now() - 370 * 24 * 60 * 60 * 1000).toISOString();
-    expect(formatSpokenTimeAgo(t)).toBe('1 year ago');
+    expect(formatSpokenTimeAgo(t)).toBe('last year');
   });
 
   it('expands "2y ago" to "2 years ago" (plural years)', () => {
@@ -74,7 +88,7 @@ describe('formatSpokenTimeAgo', () => {
 
   it('leaves "just now" unchanged', () => {
     const t = new Date().toISOString();
-    expect(formatSpokenTimeAgo(t)).toBe('just now');
+    expect(formatSpokenTimeAgo(t)).toBe('Just now');
   });
 });
 

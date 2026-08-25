@@ -1,5 +1,6 @@
 import { type RemoteAttachmentPart, type ResolvedSession } from '@kilocode/cloud-agent-sdk';
 
+import { i18n } from '@/i18n';
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
 
 type BuildRemoteAttachmentPartsResult =
@@ -75,7 +76,7 @@ export async function buildRemoteAttachmentPartsWithRetryableFeedback(
   } catch {
     return {
       ok: false,
-      message: "Couldn't attach files. Tap send to try again.",
+      message: i18n.t('agentChat.composer.couldNotAttachFiles'),
     };
   }
 }

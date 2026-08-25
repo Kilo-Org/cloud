@@ -61,6 +61,10 @@
     "TOOL_CGROUP_MODE": "enforce",
     "TOOL_CGROUP_RESERVE_MB": "2048",
     "TOOL_CGROUP_CPU_WEIGHT": "50",
+    "CLOUD_AGENT_CONTAINER_BILLING_ENABLED": "true",
+    "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "f1a848ca-bade-48d8-a5ad-1042d08651e6",
+    "CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
+    "CONTAINER_BILLING_HEARTBEAT_SECONDS": "300",
   },
   "placement": { "mode": "smart" },
   /**
@@ -429,6 +433,7 @@
         "KILOCODE_TOKEN_CONTAINMENT_ORG_IDS": "",
         "REPO_SNAPSHOT_ORG_IDS": "",
         "TOOL_CGROUP_ORG_IDS": "",
+        "CONTAINER_BILLING_HEARTBEAT_SECONDS": "60",
       },
       "services": [
         {

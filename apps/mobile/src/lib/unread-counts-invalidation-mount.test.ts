@@ -103,6 +103,10 @@ vi.mock('react-native', () => ({
   },
 }));
 
+vi.mock('@sentry/react-native', () => ({
+  captureException: vi.fn(),
+}));
+
 beforeEach(() => {
   testState.appStateListeners = [];
   testState.cleanups = [];

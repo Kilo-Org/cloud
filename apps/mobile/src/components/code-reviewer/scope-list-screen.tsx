@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { Building2, User } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { QueryError } from '@/components/query-error';
@@ -13,6 +14,7 @@ import { useTRPC } from '@/lib/trpc';
 
 export function ScopeListScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const trpc = useTRPC();
   const {
     data: orgs,
@@ -28,13 +30,13 @@ export function ScopeListScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Code Reviewer" />
+      <ScreenHeader title={t('codeReviewer.title')} />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         {isError && (
           <QueryError
             variant="server"
-            title="Could not load organizations"
-            message="Personal repositories are still available below."
+            title={t('codeReviewer.scopeList.couldNotLoad')}
+            message={t('codeReviewer.scopeList.personalStillAvailable')}
             placement="top"
             className="pb-6 pt-0"
             onRetry={() => void refetch()}
@@ -43,8 +45,8 @@ export function ScopeListScreen() {
         )}
         <ConfigureRow
           icon={User}
-          title="Personal"
-          subtitle="Your own repositories"
+          title={t('codeReviewer.scopeList.personal')}
+          subtitle={t('codeReviewer.scopeList.personalSubtitle')}
           onPress={() => {
             openScope(PERSONAL_SCOPE);
           }}
@@ -58,7 +60,7 @@ export function ScopeListScreen() {
               key={org.organizationId}
               icon={Building2}
               title={org.organizationName}
-              subtitle={org.role === 'member' ? 'View only' : undefined}
+              subtitle={org.role === 'member' ? t('codeReviewer.scopeList.viewOnly') : undefined}
               onPress={() => {
                 openScope(org.organizationId);
               }}

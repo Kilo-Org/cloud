@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { OrganizationMember } from '@/lib/organizations/organization-types';
+import type { OrganizationMemberResponse } from '@/lib/organizations/organization-types';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUpdateDailyUsageLimitUsd } from '@/app/api/organizations/hooks';
@@ -24,7 +24,7 @@ type EditDailyUsageLimitUsdDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   organizationId: string;
-  member: OrganizationMember;
+  member: OrganizationMemberResponse;
   onLimitUpdated: () => void;
 };
 

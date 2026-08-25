@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "جلسة الوكيل لديك بها تحديث",
+      "chatMessage": "لديك رسالة جديدة",
+      "instanceLifecycle": "المثيل لديك به تحديث",
+      "scheduledAction": "إجراء مجدول به تحديث",
+      "lowBalance": "رصيدك يحتاج إلى انتباه",
+      "securityFinding": "نتيجة أمان تحتاج إلى انتباه"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "اكتملت المهمة"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "فشل: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "تمت المقاطعة: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · بدون عنوان",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "تنبيه انخفاض الرصيد",
+      "body": "انخفض رصيد {{organizationName}} إلى أقل من ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "نتيجة أمان جديدة ({{severity}})",
+      "body": "{{findingTitle}} في {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "تحذير SLA",
+      "body": "{{findingTitle}} في {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "خرق SLA",
+      "body": "{{findingTitle}} في {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "نتيجة أمان تحتاج إلى انتباه"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} جاهز",
+      "body": "اضغط لبدء الدردشة."
+    },
+    "startFailed": {
+      "title": "فشل بدء {{instanceName}}",
+      "body": "فشل البدء."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "سيُعاد تشغيل {{instanceName}} قريبًا",
+      "body": "إعادة التشغيل مجدولة في {{when}}."
+    },
+    "restartCancelled": {
+      "title": "تم إلغاء إعادة تشغيل {{instanceName}}",
+      "body": "تم إلغاء إعادة التشغيل المجدولة سابقًا."
+    },
+    "versionChangeNotice": {
+      "title": "ستتم ترقية {{instanceName}} قريبًا",
+      "bodyWithTag": "الترقية إلى {{targetImageTag}} في {{when}}.",
+      "bodyWithoutTag": "ترقية مجدولة في {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "تم إلغاء ترقية {{instanceName}}",
+      "body": "تم إلغاء الترقية المجدولة سابقًا."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "جلسة Kilo الخاصة بك جاهزة للتحكم بها من هاتفك"
+  }
+}

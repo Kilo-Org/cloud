@@ -3,32 +3,52 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { type ActionSheetProps } from '@expo/react-native-action-sheet';
 import { Alert, Linking } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 
+import { i18n } from '@/i18n';
+import { AGENT_ATTACHMENT_EXTENSION_REGEX } from '@/lib/agent-attachments/constants';
 import { mimeForExtension, normalizeAttachmentExtension } from '@/lib/agent-attachments/validate';
 import { IMAGE_PICKER_OPTIONS, launchImagePicker } from '@/lib/agent-attachments/image-picker';
+import { writePickerLaunchContext } from '@/lib/agent-attachments/picker-launch-context';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
 
 function showPermissionSettingsAlert({ message, title }: { message: string; title: string }) {
   Alert.alert(title, message, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+    { text: i18n.t('common.cancel'), style: 'cancel' },
+    { text: i18n.t('common.openSettings'), onPress: () => void Linking.openSettings() },
   ]);
 }
 
-function normalizeImageAsset(asset: {
+export function normalizeImageAsset(asset: {
   uri: string;
   fileName?: string | null;
   mimeType?: string | null;
   fileSize?: number | null;
 }): AgentAttachmentCandidate {
-  // Image picker cannot return a filename with an arbitrary extension;
-  // synthesize one from the picker's MIME so `normalizeAttachmentExtension`
-  // can resolve a known key. The actual byte size is re-measured by the
-  // upload hook via `getInfoAsync`; `size` here is informational.
-  const fallbackName = `image.${(asset.mimeType ?? 'image/png').split('/')[1] ?? 'png'}`;
-  const name = asset.fileName ?? fallbackName;
+  // Keep the picker's filename when it is non-empty after trimming.
+  const fileName = asset.fileName?.trim();
+  if (fileName) {
+    return {
+      name: fileName,
+      uri: asset.uri,
+      mimeType: asset.mimeType ?? undefined,
+      size: asset.fileSize ?? undefined,
+    };
+  }
+
+  // The image picker can omit the filename — camera HEIC assets report
+  // `application/octet-stream` with no name. Synthesize `image.<ext>` from
+  // the URI extension, then the MIME subtype, then fall back to `image.png`.
+  // The upload hook re-measures size via `getInfoAsync`; `size` here is
+  // informational.
+  const uriExtension = asset.uri.split('.').pop()?.toLowerCase();
+  const mimeSubtype = asset.mimeType?.split('/')[1]?.toLowerCase();
+  const extension =
+    (uriExtension && AGENT_ATTACHMENT_EXTENSION_REGEX.test(uriExtension) ? uriExtension : null) ??
+    (mimeSubtype && AGENT_ATTACHMENT_EXTENSION_REGEX.test(mimeSubtype) ? mimeSubtype : null) ??
+    'png';
   return {
-    name,
+    name: `image.${extension}`,
     uri: asset.uri,
     mimeType: asset.mimeType ?? undefined,
     size: asset.fileSize ?? undefined,
@@ -64,8 +84,8 @@ async function pickAgentCameraImage(): Promise<AgentAttachmentCandidate[]> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) {
     showPermissionSettingsAlert({
-      title: 'Camera Access Disabled',
-      message: 'Allow camera access in Settings to take a photo.',
+      title: i18n.t('agentChat.attachmentPicker.cameraAccessDisabled'),
+      message: i18n.t('agentChat.attachmentPicker.cameraAccessMessage'),
     });
     return [];
   }
@@ -97,8 +117,14 @@ async function pickAgentDocuments(): Promise<AgentAttachmentCandidate[]> {
 
 type AttachmentSource = 'camera' | 'library' | 'files';
 
-const ATTACHMENT_SOURCE_OPTIONS = ['Camera', 'Photo Library', 'Files', 'Cancel'];
-const ATTACHMENT_SOURCE_CANCEL_INDEX = ATTACHMENT_SOURCE_OPTIONS.length - 1;
+function buildAttachmentSourceOptions(): string[] {
+  return [
+    i18n.t('agentChat.attachmentPicker.camera'),
+    i18n.t('agentChat.attachmentPicker.photoLibrary'),
+    i18n.t('agentChat.attachmentPicker.files'),
+    i18n.t('common.cancel'),
+  ];
+}
 
 async function pickFromSource(source: AttachmentSource): Promise<AgentAttachmentCandidate[]> {
   if (source === 'camera') {
@@ -111,7 +137,12 @@ async function pickFromSource(source: AttachmentSource): Promise<AgentAttachment
 }
 
 export function pickAgentAttachments(
-  showActionSheetWithOptions: ActionSheetProps['showActionSheetWithOptions']
+  showActionSheetWithOptions: ActionSheetProps['showActionSheetWithOptions'],
+  context: {
+    userId: string | undefined;
+    surface: 'agent-new' | 'agent-chat';
+    sessionId: string | null;
+  }
 ): Promise<AgentAttachmentCandidate[]> {
   return new Promise(resolve => {
     let settled = false;
@@ -122,13 +153,44 @@ export function pickAgentAttachments(
       }
     };
     const handle = async (source: AttachmentSource) => {
+      // Record the launching composer + account before the camera/library
+      // launch so the recovery hook can match a pending result after an
+      // Activity recreation. NOT before the Files branch, which uses
+      // `startActivityForResult` and is unaffected by that bug.
+      // Record the launching composer + account before the camera/library
+      // launch so the recovery hook can match a pending result after an
+      // Activity recreation. NOT before the Files branch, which uses
+      // `startActivityForResult` and is unaffected by that bug. Only record
+      // the launch when a real user id is present; an empty id would store a
+      // context the recovery hook can never match.
+      if ((source === 'camera' || source === 'library') && context.userId) {
+        try {
+          await writePickerLaunchContext({
+            userId: context.userId,
+            surface: context.surface,
+            sessionId: context.sessionId,
+            launchedAt: Date.now(),
+          });
+        } catch (error) {
+          // A store write failure must not block the picker launch; the
+          // recovery hook simply finds no context and nothing is attached.
+          Sentry.captureException(error, {
+            tags: {
+              'error.subsystem': 'agent-attachments',
+              'error.operation': 'write-picker-launch-context',
+            },
+            extra: { source, surface: context.surface, hasSession: context.sessionId !== null },
+          });
+        }
+      }
       const result = await pickFromSource(source);
       settle(result);
     };
+    const options = buildAttachmentSourceOptions();
     showActionSheetWithOptions(
       {
-        options: ATTACHMENT_SOURCE_OPTIONS,
-        cancelButtonIndex: ATTACHMENT_SOURCE_CANCEL_INDEX,
+        options,
+        cancelButtonIndex: options.length - 1,
       },
       index => {
         if (index === 0) {

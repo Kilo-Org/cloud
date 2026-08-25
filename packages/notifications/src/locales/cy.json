@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Mae gan eich sesiwn asiant ddiweddariad",
+      "chatMessage": "Mae gennych neges newydd",
+      "instanceLifecycle": "Mae gan eich achos ddiweddariad",
+      "scheduledAction": "Mae gan weithred wedi'i hamserlennu ddiweddariad",
+      "lowBalance": "Mae angen sylw ar eich balans",
+      "securityFinding": "Mae angen sylw ar ganfyddiad diogelwch"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Cwblhawyd y dasg"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Methodd: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Wedi'i ymyrryd: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Heb deitl",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Rhybudd balans isel",
+      "body": "Syrthiodd balans {{organizationName}} o dan ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Canfyddiad diogelwch newydd ({{severity}})",
+      "body": "{{findingTitle}} yn {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Rhybudd SLA",
+      "body": "{{findingTitle}} yn {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Torri SLA",
+      "body": "{{findingTitle}} yn {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Mae angen sylw ar ganfyddiad diogelwch"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "Mae {{instanceName}} yn barod",
+      "body": "Tapiwch i ddechrau sgwrsio."
+    },
+    "startFailed": {
+      "title": "Methodd {{instanceName}} â chychwyn",
+      "body": "Methodd y cychwyn."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "Bydd {{instanceName}} yn ailgychwyn yn fuan",
+      "body": "Wedi'i drefnu i ailgychwyn am {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Canslwyd ailgychwyn {{instanceName}}",
+      "body": "Canslwyd yr ailgychwyn a drefnwyd yn flaenorol."
+    },
+    "versionChangeNotice": {
+      "title": "Bydd {{instanceName}} yn uwchraddio'n fuan",
+      "bodyWithTag": "Uwchraddio i {{targetImageTag}} am {{when}}.",
+      "bodyWithoutTag": "Uwchraddio wedi'i drefnu am {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Canslwyd uwchraddiad {{instanceName}}",
+      "body": "Canslwyd yr uwchraddiad a drefnwyd yn flaenorol."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Mae eich sesiwn Kilo yn barod i'w rheoli o'ch ffôn"
+  }
+}

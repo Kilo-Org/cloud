@@ -1,9 +1,13 @@
+/* eslint-disable max-lines -- cohesive chip: thumbnail, status overlays, retry/remove controls, viewer, and text preview share one strip component */
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { File } from 'expo-file-system';
 import { toast } from 'sonner-native';
 import { useActionSheet } from '@expo/react-native-action-sheet';
+import { useTranslation } from 'react-i18next';
 
+import { i18n } from '@/i18n';
 import { AlertCircle, File as FileIcon, RotateCcw, X } from '@/components/ui/icons';
 
 import { Image } from '@/components/ui/image';
@@ -22,6 +26,7 @@ import {
 } from '@/lib/share-remote-file';
 import { isMarkdownPath } from '@/components/agents/read-tool-markdown';
 import { MarkdownText } from '@/components/agents/markdown-text';
+import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 
 type Props = {
   attachments: AgentAttachment[];
@@ -32,12 +37,13 @@ type Props = {
 /** 28pt visible button + 8pt slop on every side = 44pt effective target. */
 const REMOVE_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
 
-const UNKNOWN_OPEN_OPTIONS = ['Open as text', 'Open in external app', 'Cancel'] as const;
-const UNKNOWN_OPEN_CANCEL_INDEX = UNKNOWN_OPEN_OPTIONS.length - 1;
-
 function renderPreviewBody(preview: { mode: 'markdown' | 'text'; text: string }) {
   if (preview.text === '') {
-    return <Text className="text-xs text-muted-foreground">This file is empty.</Text>;
+    return (
+      <Text className="text-xs text-muted-foreground">
+        {i18n.t('agentChat.filePart.fileEmpty')}
+      </Text>
+    );
   }
   if (preview.mode === 'markdown') {
     return <MarkdownText value={preview.text} />;
@@ -57,8 +63,11 @@ function AttachmentChip({
   onRetry: () => void;
 }) {
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
+  const { t } = useTranslation();
   const [viewerVisible, setViewerVisible] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const [textPreview, setTextPreview] = useState<{
     mode: 'markdown' | 'text';
     text: string;
@@ -79,7 +88,7 @@ function AttachmentChip({
       const text = await new File(attachment.localUri).text();
       setTextPreview({ mode, text });
     } catch {
-      toast.error('Failed to open file. Please try again.');
+      toast.error(t('agentChat.attachmentPreview.openFailedRetry'));
     }
   }
 
@@ -89,14 +98,14 @@ function AttachmentChip({
     } catch (error: unknown) {
       const reason = getShareRemoteFileReason(error);
       if (reason === 'sharing-unavailable') {
-        toast.error('File sharing is not available on this device.');
+        toast.error(t('agentChat.filePart.sharingUnavailable'));
         return;
       }
       if (error instanceof ShareRemoteFileError) {
-        toast.error('Failed to share file. Please try again.');
+        toast.error(t('agentChat.filePart.shareFailedRetry'));
         return;
       }
-      toast.error('Share failed');
+      toast.error(t('agentChat.filePart.shareFailed'));
     }
   }
 
@@ -111,8 +120,12 @@ function AttachmentChip({
     }
     showActionSheetWithOptions(
       {
-        options: [...UNKNOWN_OPEN_OPTIONS],
-        cancelButtonIndex: UNKNOWN_OPEN_CANCEL_INDEX,
+        options: [
+          t('agentChat.filePart.openAsText'),
+          t('agentChat.filePart.openInExternalApp'),
+          t('common.cancel'),
+        ],
+        cancelButtonIndex: 2,
       },
       index => {
         if (index === 0) {
@@ -131,6 +144,25 @@ function AttachmentChip({
   const accessibilityState =
     isUploading && attachment.progress === null ? { busy: true } : undefined;
 
+  const imageThumbnail = imageFailed ? (
+    <View className="h-full w-full items-center justify-center">
+      <AlertCircle size={20} color={colors.mutedForeground} />
+    </View>
+  ) : (
+    <Image
+      source={{ uri: attachment.localUri }}
+      className="h-full w-full"
+      contentFit="cover"
+      transition={0}
+      allowDownscaling
+      recyclingKey={attachment.id}
+      cachePolicy="memory"
+      onError={() => {
+        setImageFailed(true);
+      }}
+    />
+  );
+
   const bodyContent = (
     // Visual descendants are excluded from the accessibility tree so
     // the body stays the single announced element: the nested Texts,
@@ -142,12 +174,7 @@ function AttachmentChip({
       importantForAccessibility="no-hide-descendants"
     >
       {isImage ? (
-        <Image
-          source={{ uri: attachment.localUri }}
-          className="h-full w-full"
-          contentFit="cover"
-          transition={0}
-        />
+        imageThumbnail
       ) : (
         <View
           className={cn(
@@ -247,7 +274,9 @@ function AttachmentChip({
             onPress={onRetry}
             className="absolute inset-0 items-start justify-end p-1 active:opacity-70"
             accessibilityRole="button"
-            accessibilityLabel={`Retry uploading ${attachment.filename}`}
+            accessibilityLabel={t('agentChat.attachmentPreview.retryUploading', {
+              filename: attachment.filename,
+            })}
           >
             <View className="h-7 w-7 items-center justify-center rounded-full bg-background">
               <RotateCcw size={14} color={colors.foreground} />
@@ -261,7 +290,9 @@ function AttachmentChip({
             hitSlop={REMOVE_HIT_SLOP}
             className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-background active:opacity-70"
             accessibilityRole="button"
-            accessibilityLabel={`Remove attachment ${attachment.filename}`}
+            accessibilityLabel={t('agentChat.attachmentPreview.removeAttachment', {
+              filename: attachment.filename,
+            })}
           >
             <X size={14} color={colors.foreground} />
           </Pressable>
@@ -280,27 +311,24 @@ function AttachmentChip({
       ) : null}
 
       {textPreview !== null ? (
-        <Modal
+        <SessionPageSheet
           visible
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => {
+          onClose={() => {
             setTextPreview(null);
           }}
         >
-          <View className="flex-1 bg-background">
-            <SheetHeader
-              title={attachment.filename}
-              onDone={() => {
-                setTextPreview(null);
-              }}
-              doneLabel="Done"
-            />
-            <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
-              {renderPreviewBody(textPreview)}
-            </ScrollView>
-          </View>
-        </Modal>
+          <SheetHeader
+            title={attachment.filename}
+            onDone={() => {
+              setTextPreview(null);
+            }}
+            doneLabel={t('common.done')}
+          />
+          <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
+            {renderPreviewBody(textPreview)}
+          </ScrollView>
+          <View style={{ height: insets.bottom }} className="bg-background" />
+        </SessionPageSheet>
       ) : null}
     </>
   );

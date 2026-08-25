@@ -1,5 +1,6 @@
 import { Newspaper } from '@/components/ui/icons';
 import { Alert, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -22,12 +23,13 @@ export default function ChangelogScreen() {
   const mutations = useKiloClawMutations(organizationId);
   const router = useRouter();
   const entries = changelogQuery.data;
+  const { t } = useTranslation();
 
   function handleRedeploy() {
-    Alert.alert('Redeploy instance', 'Are you sure you want to redeploy this instance?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('kiloclaw.redeployTitle'), t('kiloclaw.redeployMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Redeploy',
+        text: t('kiloclaw.redeploy'),
         onPress: () => {
           mutations.restartMachine.mutate(undefined);
         },
@@ -40,7 +42,9 @@ export default function ChangelogScreen() {
   }
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title="What's New" context={instanceContext} />;
+    return (
+      <InstanceContextBoundary title={t('kiloclaw.changelog.title')} context={instanceContext} />
+    );
   }
 
   function renderBody() {
@@ -58,7 +62,7 @@ export default function ChangelogScreen() {
       return (
         <View className="flex-1 items-center justify-center">
           <QueryError
-            message="Could not load changelog"
+            message={t('kiloclaw.changelog.couldNotLoad')}
             onRetry={() => {
               void changelogQuery.refetch();
             }}
@@ -72,8 +76,8 @@ export default function ChangelogScreen() {
         <View className="flex-1 items-center justify-center">
           <EmptyState
             icon={Newspaper}
-            title="No updates yet"
-            description="Changelog entries will appear here."
+            title={t('kiloclaw.changelog.noUpdates')}
+            description={t('kiloclaw.changelog.noUpdatesDescription')}
           />
         </View>
       );
@@ -86,7 +90,7 @@ export default function ChangelogScreen() {
       >
         <View className="gap-3">
           <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Recent updates
+            {t('kiloclaw.changelog.recentUpdates')}
           </Text>
           <Animated.View entering={FadeIn.duration(200)}>
             <ChangelogList
@@ -103,7 +107,7 @@ export default function ChangelogScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="What's New" />
+      <ScreenHeader title={t('kiloclaw.changelog.title')} />
       {renderBody()}
     </View>
   );

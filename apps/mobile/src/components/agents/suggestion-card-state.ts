@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 type ToolStatus = 'pending' | 'running' | 'completed' | 'error';
 type ActiveSuggestionIdentity = { requestId: string; callId?: string } | null;
 
@@ -30,6 +32,6 @@ export function createSuggestionActionLock() {
 
 export function suggestionActionError(kind: 'accept' | 'dismiss'): string {
   return kind === 'accept'
-    ? "Couldn't apply this suggestion. Try again."
-    : "Couldn't dismiss this suggestion. Try again.";
+    ? i18n.t('agentChat.suggestion.applyFailed')
+    : i18n.t('agentChat.suggestion.dismissFailed');
 }

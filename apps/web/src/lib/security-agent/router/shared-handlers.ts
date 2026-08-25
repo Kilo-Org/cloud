@@ -28,6 +28,7 @@ import {
 import { getDashboardStats } from '@/lib/security-agent/db/dashboard-stats';
 import {
   getSecurityAgentCommandStatus,
+  getSecurityAgentCommandStatuses,
   listActiveSecurityAgentCommands,
   markApplyAutoRemediationCommandAdmissionFailed,
   type SecurityAgentCommandStatusResponse,
@@ -37,6 +38,7 @@ import {
   decorateFindingWithRemediation,
   decorateFindingsWithRemediation,
   getRemediationAttemptHistory,
+  type SecurityFindingWithRemediation,
 } from '@/lib/security-agent/db/security-remediation';
 import {
   SecurityAgentAuditReportInputSchema,
@@ -66,12 +68,16 @@ import type { SecurityReviewOwner } from '@/lib/security-agent/core/types';
 import {
   operation_ledgers,
   organizations,
+  security_audit_log,
   type OperationLedgerRow,
   type SecurityFinding,
 } from '@kilocode/db/schema';
-import { buildSecurityFindingAuditHumanActor } from '@kilocode/worker-utils/security-finding-audit';
+import {
+  buildSecurityFindingAuditHumanActor,
+  REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS,
+} from '@kilocode/worker-utils/security-finding-audit';
 import { db } from '@/lib/drizzle';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import {
   SaveSecurityConfigInputSchema,
   ListFindingsInputSchema,
@@ -85,6 +91,7 @@ import {
   CancelRemediationInputSchema,
   GetAnalysisInputSchema,
   GetCommandStatusInputSchema,
+  GetCommandStatusesInputSchema,
   DeleteFindingsByRepoInputSchema,
   GetDashboardStatsInputSchema,
   TrackSecurityAgentUiInteractionInputSchema,
@@ -100,6 +107,7 @@ import {
   type CancelRemediationInput,
   type GetAnalysisInput,
   type GetCommandStatusInput,
+  type GetCommandStatusesInput,
   type DeleteFindingsByRepoInput,
   type GetDashboardStatsInput,
   type TrackSecurityAgentUiInteractionInput,
@@ -290,14 +298,30 @@ async function assembleAuditReportResponse<TExtra>(params: {
 // (network/5xx/lost correlation ids) marks the row `reconcile_pending` so a
 // same-key retry re-submits instead of re-executing blind.
 
-type SecurityLedgerIntent = 'manual_sync' | 'dismiss_finding';
+type SecurityLedgerIntent =
+  | 'manual_sync'
+  | 'dismiss_finding'
+  | 'start_analysis'
+  | 'apply_auto_remediation';
+
+const SECURITY_LEDGER_INTENTS: readonly SecurityLedgerIntent[] = [
+  'manual_sync',
+  'dismiss_finding',
+  'start_analysis',
+  'apply_auto_remediation',
+];
+
+function isSecurityLedgerIntent(value: string): value is SecurityLedgerIntent {
+  return (SECURITY_LEDGER_INTENTS as readonly string[]).includes(value);
+}
 
 /** The Worker's acceptance receipt and correlation ids. */
 type AcceptedCommandIds = {
   accepted: true;
   commandId: string;
-  runId: string;
-  messageId: string;
+  /** Correlation ids are absent for intents without a queue run (analysis). */
+  runId?: string;
+  messageId?: string;
 };
 
 type SecurityCommandResult =
@@ -349,6 +373,11 @@ function securityDismissLedgerResourceKey(
   comment?: string
 ): string {
   return `security:dismiss_finding:${securityOwnerScopeKey(owner)}:${findingId}:${reason}:${normalizeDismissComment(comment)}`;
+}
+
+/** Security ledger resource identity for a manual analysis start. */
+function securityAnalysisLedgerResourceKey(owner: SecurityReviewOwner, findingId: string): string {
+  return `security:start_analysis:${securityOwnerScopeKey(owner)}:${findingId}`;
 }
 
 /**
@@ -465,8 +494,8 @@ async function executeSecurityCommandSubmit(args: {
         providerRef: accepted.commandId,
         canonicalResult: {
           commandId: accepted.commandId,
-          runId: accepted.runId,
-          messageId: accepted.messageId,
+          ...(accepted.runId !== undefined ? { runId: accepted.runId } : {}),
+          ...(accepted.messageId !== undefined ? { messageId: accepted.messageId } : {}),
         },
       })) !== null
   );
@@ -575,7 +604,7 @@ async function settleSecurityLedgerForTerminalCommand(params: {
       )
       .limit(1);
     if (!row || isTerminalOperationStatus(row.status)) return;
-    if (row.intent !== 'manual_sync' && row.intent !== 'dismiss_finding') return;
+    if (!isSecurityLedgerIntent(row.intent)) return;
 
     await settleOperation(db, {
       rowId: row.id,
@@ -594,6 +623,68 @@ async function settleSecurityLedgerForTerminalCommand(params: {
       error: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Findings list DTO
+// ---------------------------------------------------------------------------
+//
+// The list response nulls `raw_data`, the raw Dependabot alert JSON. It is the
+// only heavy field no list UI reads. The detail procedure `getFinding` still
+// returns it. The web detail dialog is fed from the list
+// and reads `analysis` and `remediationSummary` (including `latestAttempt`),
+// so both stay fully intact. The decorator needs the full row, so the SQL
+// select stays untouched and the response nulls `raw_data` after decoration.
+
+function toFindingListItem(
+  finding: SecurityFindingWithRemediation
+): SecurityFindingWithRemediation {
+  return { ...finding, raw_data: null };
+}
+
+// ---------------------------------------------------------------------------
+// Remediation progress timeline (detail-only)
+// ---------------------------------------------------------------------------
+//
+// The remediation panel renders the ordered remediation audit events for one
+// finding. The list decorator stays lean (P2-GH-45a); this detail-only query
+// reads the audit log directly. Only the remediation members of
+// REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS are timeline events — finding
+// lifecycle events are not.
+
+// The remediation members of REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS are the
+// timeline events. Filtered from the worker-utils constant (not the
+// audit-log-service enum, which tests mock with a partial object) so the six
+// remediation action strings stay real.
+const REMEDIATION_TIMELINE_ACTIONS = REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS.filter(action =>
+  action.startsWith('security.remediation.')
+);
+
+type RemediationTimelineEvent = {
+  action: string;
+  occurredAt: string;
+};
+
+async function getRemediationTimeline(findingId: string): Promise<RemediationTimelineEvent[]> {
+  const effectiveAt = sql<string>`COALESCE(${security_audit_log.occurred_at}, ${security_audit_log.created_at})`;
+  const rows = await db
+    .select({
+      action: security_audit_log.action,
+      occurredAt: effectiveAt,
+    })
+    .from(security_audit_log)
+    .where(
+      and(
+        eq(security_audit_log.finding_id, findingId),
+        inArray(security_audit_log.action, [...REMEDIATION_TIMELINE_ACTIONS])
+      )
+    )
+    .orderBy(asc(effectiveAt));
+
+  return rows.map(row => ({
+    action: row.action,
+    occurredAt: new Date(row.occurredAt).toISOString(),
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -698,6 +789,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           autoRemediationEnabled: false,
           autoRemediationMinSeverity: 'high' as const,
           autoRemediationIncludeExisting: false,
+          autoRemediationRequireApproval: true,
           autoRemediationEnabledAt: null,
           remediationModelSlug: DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
           slaNotificationsEnabled: DEFAULT_SECURITY_AGENT_CONFIG.sla_notifications_enabled,
@@ -750,6 +842,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         autoRemediationEnabled: result.config.auto_remediation_enabled ?? false,
         autoRemediationMinSeverity: result.config.auto_remediation_min_severity ?? 'high',
         autoRemediationIncludeExisting: result.config.auto_remediation_include_existing ?? false,
+        autoRemediationRequireApproval: result.config.auto_remediation_require_approval ?? true,
         autoRemediationEnabledAt: result.config.auto_remediation_enabled_at ?? null,
         remediationModelSlug,
         slaNotificationsEnabled: result.config.sla_notifications_enabled,
@@ -876,12 +969,17 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           isNowRemediationIncludeExisting &&
           !!input.autoRemediationMinSeverity &&
           input.autoRemediationMinSeverity !== existingConfig?.config.auto_remediation_min_severity;
+        const wasApprovalRequired =
+          existingConfig?.config.auto_remediation_require_approval ?? false;
+        const isNowApprovalRequired = input.autoRemediationRequireApproval ?? wasApprovalRequired;
+        const approvalJustTurnedOff = !isNowApprovalRequired && wasApprovalRequired;
 
         const shouldEnqueueRemediation =
           isAutoRemediationOn &&
           (remediationIncludeExistingJustTurnedOn ||
             autoRemediationReEnabled ||
-            remediationThresholdChanged);
+            remediationThresholdChanged ||
+            approvalJustTurnedOff);
 
         // Compare-and-set save: the config write, the include-existing analysis
         // enqueue, and the include-existing remediation command all commit in one
@@ -909,6 +1007,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             auto_remediation_enabled: input.autoRemediationEnabled,
             auto_remediation_min_severity: input.autoRemediationMinSeverity,
             auto_remediation_include_existing: input.autoRemediationIncludeExisting,
+            auto_remediation_require_approval: input.autoRemediationRequireApproval,
             remediation_model_slug: remediationModelSlug,
             sla_notifications_enabled: input.slaNotificationsEnabled,
             sla_notification_min_severity: input.slaNotificationMinSeverity,
@@ -1293,7 +1392,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         });
 
         return {
-          findings: decoratedFindings,
+          findings: decoratedFindings.map(toFindingListItem),
           totalCount,
           runningCount: concurrencyCheck.currentCount,
           concurrencyLimit: concurrencyCheck.limit,
@@ -1670,21 +1769,41 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           }
         }
 
-        const queued = await submitManualAnalysisStart({
-          findingId: input.findingId,
+        // Analysis has no client `operationKey`, so each start attempt gets a
+        // fresh UUID key. The ledger row is admitted before submission and the
+        // Worker `commandId` is recorded as the provider reference, which the
+        // web observation settle later joins on to emit
+        // `security_command_settled` with the `start_analysis` intent.
+        const result: SecurityCommandResult = await runSecurityLedgerSubmit({
+          ctx,
           owner: securityOwner,
-          actorUserId: ctx.user.id,
-          requestedModels: {
-            model: input.model,
-            triageModel: input.triageModel,
-            analysisModel: input.analysisModel,
+          intent: 'start_analysis',
+          operationKey: crypto.randomUUID(),
+          resourceKey: securityAnalysisLedgerResourceKey(securityOwner, input.findingId),
+          submit: async () => {
+            const { commandId } = await submitManualAnalysisStart({
+              findingId: input.findingId,
+              owner: securityOwner,
+              actorUserId: ctx.user.id,
+              requestedModels: {
+                model: input.model,
+                triageModel: input.triageModel,
+                analysisModel: input.analysisModel,
+              },
+              forceSandbox: input.forceSandbox,
+              retrySandboxOnly: input.retrySandboxOnly,
+              restartActive: input.restartActive,
+            });
+            return { accepted: true, commandId };
           },
-          forceSandbox: input.forceSandbox,
-          retrySandboxOnly: input.retrySandboxOnly,
-          restartActive: input.restartActive,
         });
 
-        return { success: true, ...queued };
+        if (result.kind === 'replayed') {
+          const commandId =
+            typeof result.canonical.commandId === 'string' ? result.canonical.commandId : undefined;
+          return { success: true, queued: true, commandId };
+        }
+        return { success: true, queued: true, commandId: result.accepted.commandId };
       },
     },
 
@@ -1724,6 +1843,9 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           actorUserId: ctx.user.id,
         });
         if (!queued.queued) return { success: false, ...queued };
+
+        // The Worker admits the remediation ledger row before the queue
+        // hand-off, so the terminal settle can never precede the admit.
 
         trackSecurityAgentRemediationAction({
           distinctId: ctx.user.id,
@@ -1773,6 +1895,9 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           retry: true,
         });
         if (!queued.queued) return { success: false, ...queued };
+
+        // The Worker admits the remediation ledger row before the queue
+        // hand-off, so the terminal settle can never precede the admit.
 
         trackSecurityAgentRemediationAction({
           distinctId: ctx.user.id,
@@ -1847,11 +1972,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         }
 
         const owner = deps.resolveOwner(ctx, input);
-        const [configWithStatus, integration, remediationAttempts] = await Promise.all([
-          getSecurityAgentConfigWithStatus(owner),
-          deps.getIntegration(ctx, input),
-          getRemediationAttemptHistory(input.findingId),
-        ]);
+        const [configWithStatus, integration, remediationAttempts, remediationTimeline] =
+          await Promise.all([
+            getSecurityAgentConfigWithStatus(owner),
+            deps.getIntegration(ctx, input),
+            getRemediationAttemptHistory(input.findingId),
+            getRemediationTimeline(input.findingId),
+          ]);
         const config = configWithStatus?.config ?? DEFAULT_SECURITY_AGENT_CONFIG;
         const decoratedFinding = await decorateFindingWithRemediation({
           finding,
@@ -1878,6 +2005,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           remediationSummary: decoratedFinding.remediationSummary ?? null,
           remediationCapability: decoratedFinding.remediationCapability,
           remediationAttempts,
+          remediationTimeline,
         };
       },
     },
@@ -1902,6 +2030,29 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         }
         await settleSecurityLedgerForTerminalCommand({ ctx, command });
         return command;
+      },
+    },
+
+    // -----------------------------------------------------------------------
+    // getCommandStatuses (batch)
+    // -----------------------------------------------------------------------
+    // Compatibility: getCommandStatus (single) kept for older mobile clients; remove when all shipped clients call getCommandStatuses.
+    getCommandStatuses: {
+      inputSchema: GetCommandStatusesInputSchema,
+      handler: async ({
+        ctx,
+        input: rawInput,
+      }: {
+        ctx: TRPCContext;
+        input: GetCommandStatusesInput & TExtra;
+      }) => {
+        const input = rawInput;
+        const securityOwner = deps.resolveSecurityOwner(ctx, input);
+        const commands = await getSecurityAgentCommandStatuses(securityOwner, input.commandIds);
+        for (const command of commands) {
+          await settleSecurityLedgerForTerminalCommand({ ctx, command });
+        }
+        return commands;
       },
     },
 

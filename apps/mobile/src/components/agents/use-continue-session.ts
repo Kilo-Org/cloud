@@ -1,165 +1,58 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
-import { useCallback, useRef, useState } from 'react';
-import { type Href, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { useQueryClient } from '@tanstack/react-query';
-import { useStore } from 'jotai';
-import { toast } from 'sonner-native';
-import { listInstanceModels } from '@kilocode/cloud-agent-sdk/instance-model-catalog';
 
-import {
-  buildContinuationSeed,
-  buildContinueRemoteSpawnInput,
-  type ContinuationDestination,
-  resolveContinuationDestinations,
-} from '@/components/agents/continuation-seed';
-import { setContinuePickerBridge } from '@/components/agents/continue-picker-bridge';
-import { getSpawnedAgentSessionPath } from '@/components/agents/session-detail-routes';
+import { resolveContinuationResolution } from '@/components/agents/continuation-seed';
+import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-create';
-import {
-  appendNewSessionPrefill,
-  buildContinuePrefillParams,
-} from '@/components/agents/new-session-prefill';
-import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
-import { type useSessionManager } from '@/components/agents/session-provider';
-import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
-import { putSharePayload } from '@/lib/share-payload';
-import { appendShareParams } from '@/lib/share-navigation';
-import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
-import { useHoistedOperationKey } from '@/lib/operation-key';
-import {
-  REMOTE_SPAWN_NON_RETRYABLE_TOAST,
-  REMOTE_SPAWN_RETRYABLE_TOAST,
-} from '@/lib/remote-submit-outcome';
 import { useTRPC } from '@/lib/trpc';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 type RepositoriesResult =
   | RouterOutputs['organizations']['cloudAgentNext']['listGitHubRepositories']
   | RouterOutputs['cloudAgentNext']['listGitHubRepositories'];
-type InstancesResult = RouterOutputs['activeSessions']['listInstances'];
+
+// Six clone attempts with the five gaps between them. The sixth retryable
+// failure ends the intent with persistent retry guidance.
+const CONTINUE_RETRY_DELAYS_MS: number[] = [500, 1000, 2000, 4000, 5000];
+
+export type ContinueSessionGuidance =
+  | {
+      kind: 'terminal';
+      action: 'back-to-sessions' | 'connect-repository';
+      message: string;
+    }
+  | { kind: 'retry'; message: string }
+  | null;
+
+const defaultContinueSleep = async (ms: number): Promise<void> => {
+  await new Promise<void>(resolve => {
+    setTimeout(resolve, ms);
+  });
+};
 
 export function useContinueSession(args: {
+  sessionId: KiloSessionId;
   organizationId: string | undefined;
-  manager: ReturnType<typeof useSessionManager>;
   models: SessionModelOption[];
   modelsLoading: boolean;
+  sleep?: (ms: number) => Promise<void>;
 }) {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
-  const store = useStore();
-  const connection = useUserWebConnection();
-  const { spawn } = useRemoteInstanceSpawn(args.organizationId ?? null);
   const [isContinuing, setIsContinuing] = useState(false);
+  const [guidance, setGuidance] = useState<ContinueSessionGuidance>(null);
   const busyRef = useRef(false);
-  // P1-A-08b: cloud prepares and remote spawns are different intents, so each
-  // destination family holds its own hoisted `operationKey`. The cloud key
-  // lives inside `useContinueCloudCreate`.
-  const remoteOperationKey = useHoistedOperationKey();
   const runCloudCreate = useContinueCloudCreate(args.organizationId);
+  const sleep = args.sleep ?? defaultContinueSleep;
 
-  const execute = useCallback(
-    async (
-      dest: ContinuationDestination,
-      seed: string,
-      fields: { mode: string; model: string; variant: string }
-    ) => {
-      setIsContinuing(true);
-      busyRef.current = true;
-      try {
-        if (dest.kind === 'cloud-agent') {
-          try {
-            await runCloudCreate(seed, dest, fields.mode);
-          } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to create session');
-          }
-          return;
-        }
-        const remoteOperationKeyValue = remoteOperationKey.getKey(
-          JSON.stringify({
-            connectionId: dest.instance.connectionId,
-            seed,
-            model: fields.model,
-            variant: fields.variant,
-            mode: fields.mode,
-            organizationId: args.organizationId ?? null,
-          })
-        );
-        const catalogResult = await listInstanceModels(connection, dest.instance.connectionId);
-        const outcome = await spawn(
-          dest.instance.connectionId,
-          buildContinueRemoteSpawnInput({
-            mode: fields.mode,
-            model: fields.model,
-            variant: fields.variant,
-            options: args.models,
-            catalogResult,
-            organizationId: args.organizationId,
-          }),
-          { operationKey: remoteOperationKeyValue }
-        );
-        if (outcome.status === 'ready') {
-          // The spawn settled; the next submit is a fresh intent.
-          remoteOperationKey.rotateKey();
-          const shareId = putSharePayload({ text: seed, files: [], failedFiles: [] });
-          router.push(
-            appendShareParams(
-              getSpawnedAgentSessionPath(outcome.sessionID, args.organizationId) as string,
-              shareId,
-              { autoSend: true, mode: fields.mode }
-            ) as Href
-          );
-          return;
-        }
-        toast.error(
-          outcome.status === 'retryable'
-            ? REMOTE_SPAWN_RETRYABLE_TOAST
-            : REMOTE_SPAWN_NON_RETRYABLE_TOAST
-        );
-        // A non-retryable rejection ends the intent; a retryable outcome keeps
-        // the key so a same-key retry dedupes on the relay.
-        if (outcome.status === 'nonRetryable') {
-          remoteOperationKey.rotateKey();
-        }
-      } finally {
-        busyRef.current = false;
-        setIsContinuing(false);
-      }
-    },
-    [
-      args.organizationId,
-      args.models,
-      connection,
-      router,
-      runCloudCreate,
-      spawn,
-      remoteOperationKey,
-    ]
-  );
-
-  const fallback = useCallback(
-    (
-      fields: { gitUrl: string | null | undefined; mode: string; model: string; variant: string },
-      seed: string | null
-    ) => {
-      let path = appendNewSessionPrefill(
-        getNewAgentSessionPath(args.organizationId ?? null),
-        buildContinuePrefillParams({
-          gitUrl: fields.gitUrl,
-          mode: fields.mode,
-          model: fields.model,
-          variant: fields.variant,
-        })
-      );
-      if (seed !== null) {
-        const shareId = putSharePayload({ text: seed, files: [], failedFiles: [] });
-        path = appendShareParams(path, shareId);
-      }
-      router.push(path as Href);
-    },
-    [args.organizationId, router]
-  );
+  // A source-session change ends the previous intent's guidance.
+  useEffect(() => {
+    setGuidance(null);
+  }, [args.sessionId]);
 
   const continueSession = useCallback(
     async (fields: {
@@ -173,111 +66,107 @@ export function useContinueSession(args: {
       }
       setIsContinuing(true);
       busyRef.current = true;
-      let handedOff = false;
+      setGuidance(null);
       try {
-        for (
-          let pages = 0;
-          pages < 10 && store.get(args.manager.atoms.hasOlderMessages);
-          pages += 1
-        ) {
-          const before = store.get(args.manager.atoms.messagesList).length;
-          // eslint-disable-next-line no-await-in-loop -- draining pages sequentially is the intended behavior
-          await args.manager.loadOlderMessages();
-          if (store.get(args.manager.atoms.messagesList).length === before) {
-            break;
-          }
-        }
-        const messages = store.get(args.manager.atoms.messagesList);
-        const seed = buildContinuationSeed(messages);
-
-        if (seed === null) {
-          fallback(fields, null);
+        if (args.modelsLoading) {
+          // The destination model cannot resolve until the catalog loads.
+          // Return retry guidance so Continue stays enabled; never resolve a
+          // destination against an empty model list.
+          setGuidance({ kind: 'retry', message: i18n.t('agentChat.session.cloneFailedRetry') });
           return;
         }
-
         let repoData: RepositoriesResult | undefined = undefined;
-        let instancesData: InstancesResult | undefined = undefined;
         try {
-          [repoData, instancesData] = await Promise.all([
-            queryClient.fetchQuery({
-              ...(args.organizationId
-                ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
-                    organizationId: args.organizationId,
-                    forceRefresh: false,
-                  })
-                : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({
-                    forceRefresh: false,
-                  })),
-              staleTime: 0,
-            }),
-            queryClient.fetchQuery({
-              ...trpc.activeSessions.listInstances.queryOptions(undefined),
-              staleTime: 5000,
-            }),
-          ]);
+          repoData = await queryClient.fetchQuery({
+            ...(args.organizationId
+              ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
+                  organizationId: args.organizationId,
+                  forceRefresh: false,
+                })
+              : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({
+                  forceRefresh: false,
+                })),
+            staleTime: 0,
+          });
         } catch {
-          fallback(fields, seed);
+          setGuidance({ kind: 'retry', message: i18n.t('agentChat.session.cloneFailedRetry') });
           return;
         }
 
-        const destinations = resolveContinuationDestinations({
+        const resolution = resolveContinuationResolution({
           gitUrl: fields.gitUrl,
           mode: fields.mode,
           model: fields.model,
           variant: fields.variant,
           repositories: repoData.repositories,
-          models: args.modelsLoading ? [] : args.models,
-          instances: instancesData.instances,
+          models: args.models,
         });
 
-        if (destinations.length === 0) {
-          fallback(fields, seed);
+        if (resolution.kind === 'unmatched-repository') {
+          setGuidance({
+            kind: 'terminal',
+            action: 'connect-repository',
+            message: i18n.t('agentChat.session.connectRepositoryToContinue'),
+          });
           return;
         }
 
-        if (destinations.length === 1) {
-          const dest = destinations[0];
-          if (!dest) {
-            fallback(fields, seed);
+        if (resolution.kind === 'unresolved-model') {
+          setGuidance({
+            kind: 'terminal',
+            action: 'back-to-sessions',
+            message: i18n.t('agentChat.session.cloneFailed'),
+          });
+          return;
+        }
+
+        const dest = resolution;
+
+        for (let attempt = 0; ; attempt += 1) {
+          try {
+            // eslint-disable-next-line no-await-in-loop -- clone retry backoff cadence
+            await runCloudCreate(args.sessionId, dest, fields.mode);
             return;
+          } catch (error) {
+            if (!isCloudPrepareRetryableError(error)) {
+              setGuidance({
+                kind: 'terminal',
+                action: 'back-to-sessions',
+                message: i18n.t('agentChat.session.cloneFailed'),
+              });
+              return;
+            }
+            const delay = CONTINUE_RETRY_DELAYS_MS[attempt];
+            if (delay === undefined) {
+              // The sixth retryable failure ends the intent; Continue stays
+              // enabled so the user can retry the same operation key.
+              setGuidance({ kind: 'retry', message: i18n.t('agentChat.session.cloneFailedRetry') });
+              return;
+            }
+            // eslint-disable-next-line no-await-in-loop -- clone retry backoff cadence
+            await sleep(delay);
           }
-          await execute(dest, seed, fields);
-          return;
         }
-
-        handedOff = true;
-        const release = () => {
-          busyRef.current = false;
-          setIsContinuing(false);
-        };
-        setContinuePickerBridge({
-          destinations,
-          onSelect: dest => {
-            void execute(dest, seed, fields);
-          },
-          onCancel: release,
-        });
-        router.push('/(app)/agent-chat/continue-picker' as Href);
       } finally {
-        if (!handedOff) {
-          busyRef.current = false;
-          setIsContinuing(false);
-        }
+        busyRef.current = false;
+        setIsContinuing(false);
       }
     },
     [
-      args.manager,
+      args.organizationId,
       args.models,
       args.modelsLoading,
-      args.organizationId,
-      store,
-      fallback,
+      args.sessionId,
       queryClient,
       trpc,
-      execute,
-      router,
+      runCloudCreate,
+      sleep,
     ]
   );
 
-  return { continueSession, isContinuing };
+  const clearGuidance = useCallback(() => {
+    setGuidance(null);
+  }, []);
+
+  return { continueSession, isContinuing, guidance, clearGuidance };
 }

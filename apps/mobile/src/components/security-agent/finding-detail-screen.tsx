@@ -2,6 +2,7 @@ import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import { Ban, ShieldOff } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -26,11 +27,11 @@ import { cn } from '@/lib/utils';
 
 type FindingTab = 'details' | 'analysis' | 'remediation';
 
-const TABS: { key: FindingTab; label: string }[] = [
-  { key: 'details', label: 'Details' },
-  { key: 'analysis', label: 'Analysis' },
-  { key: 'remediation', label: 'Remediation' },
-];
+const TABS = [
+  { key: 'details', labelKey: 'securityAgent.findingDetail.tabDetails' },
+  { key: 'analysis', labelKey: 'securityAgent.findingDetail.tabAnalysis' },
+  { key: 'remediation', labelKey: 'securityAgent.findingDetail.tabRemediation' },
+] as const satisfies readonly { key: FindingTab; labelKey: string }[];
 
 // Server-verified security_agent_ui_interaction enum values (schemas.ts:28-31)
 // — one per tab, matching web's handleTabChange in FindingDetailDialog.tsx.
@@ -53,6 +54,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const navigation = useNavigation();
   const colors = useThemeColors();
   const paddingBottom = useTabBarBottomPadding();
+  const { t } = useTranslation();
   const [tab, setTab] = useState<FindingTab>('details');
   const findingQuery = useSecurityFinding(scope, findingId);
   const analysisQuery = useSecurityAnalysis(scope, findingId);
@@ -115,13 +117,17 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (notFound) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Finding" showBackButton onBack={handleBack} />
+        <ScreenHeader
+          title={t('securityAgent.findingDetail.title')}
+          showBackButton
+          onBack={handleBack}
+        />
         <View className="flex-1" style={{ paddingBottom }}>
           <EmptyState
             icon={ShieldOff}
             className="flex-1"
-            title="Finding not found"
-            description="This finding may have been removed, or you no longer have access to it."
+            title={t('securityAgent.findingDetail.notFound')}
+            description={t('securityAgent.findingDetail.notFoundDescription')}
           />
         </View>
       </View>
@@ -131,10 +137,14 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (findingQuery.isError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Finding" showBackButton onBack={handleBack} />
+        <ScreenHeader
+          title={t('securityAgent.findingDetail.title')}
+          showBackButton
+          onBack={handleBack}
+        />
         <View className="flex-1 items-center justify-center" style={{ paddingBottom }}>
           <QueryError
-            message="Could not load this finding"
+            message={t('securityAgent.findingDetail.couldNotLoad')}
             onRetry={() => void findingQuery.refetch()}
           />
         </View>
@@ -145,7 +155,11 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   if (findingQuery.isLoading || !findingQuery.data) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title="Finding" showBackButton onBack={handleBack} />
+        <ScreenHeader
+          title={t('securityAgent.findingDetail.title')}
+          showBackButton
+          onBack={handleBack}
+        />
         <View className="flex-1 gap-3 px-6 pt-4">
           <Skeleton className="h-6 w-2/3 rounded" />
           <Skeleton className="h-4 w-1/3 rounded" />
@@ -166,7 +180,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Finding"
+        title={t('securityAgent.findingDetail.title')}
         eyebrow={finding.repo_full_name}
         showBackButton
         onBack={handleBack}
@@ -177,7 +191,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
                 router.push(getSecurityAgentPath(scope, `dismiss/${findingId}`));
               }}
               accessibilityRole="button"
-              accessibilityLabel="Dismiss finding"
+              accessibilityLabel={t('securityAgent.findingDetail.dismissA11y')}
               className="size-11 items-center justify-center active:opacity-70"
             >
               <Ban size={20} color={colors.mutedForeground} />
@@ -200,7 +214,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         </View>
       ) : null}
       <View className="flex-row gap-2 px-6 pb-2 pt-1">
-        {TABS.map(({ key, label }) => {
+        {TABS.map(({ key, labelKey }) => {
           const selected = tab === key;
           return (
             <Pressable
@@ -221,7 +235,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
                   selected ? 'text-primary-foreground' : 'text-foreground'
                 )}
               >
-                {label}
+                {t(labelKey)}
               </Text>
             </Pressable>
           );

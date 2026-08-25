@@ -17,6 +17,7 @@
 
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MarkdownText } from '@/components/agents/markdown-text';
@@ -24,6 +25,7 @@ import { MoreHorizontal } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { ReactionsRow } from '@/components/pr-review/discussion/reactions-row';
+import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -53,27 +55,27 @@ type ModerationFailure =
   | { kind: 'terminal'; message: string }
   | { kind: 'retryable'; message: string };
 
-const TERMINAL_MESSAGES = {
-  'report-content': "This comment can't be reported.",
-  'report-user': "This user can't be reported.",
-  mute: "This user can't be muted.",
-  block: "This user can't be blocked.",
-} satisfies Record<ModerationAction, string>;
+const TERMINAL_KEYS = {
+  'report-content': 'prReview.discussion.moderation.reportContent.terminal',
+  'report-user': 'prReview.discussion.moderation.reportUser.terminal',
+  mute: 'prReview.discussion.moderation.mute.terminal',
+  block: 'prReview.discussion.moderation.block.terminal',
+} as const satisfies Record<ModerationAction, string>;
 
-const RETRYABLE_MESSAGES = {
-  'report-content': "Couldn't report this comment. Check your connection and try again.",
-  'report-user': "Couldn't report this user. Check your connection and try again.",
-  mute: "Couldn't mute this user. Check your connection and try again.",
-  block: "Couldn't block this user. Check your connection and try again.",
-} satisfies Record<ModerationAction, string>;
+const RETRYABLE_KEYS = {
+  'report-content': 'prReview.discussion.moderation.reportContent.retryable',
+  'report-user': 'prReview.discussion.moderation.reportUser.retryable',
+  mute: 'prReview.discussion.moderation.mute.retryable',
+  block: 'prReview.discussion.moderation.block.retryable',
+} as const satisfies Record<ModerationAction, string>;
 
 /** Terminal moderation failures must not be retried; everything else is retryable. */
 export function moderationFailure(action: ModerationAction, error: unknown): ModerationFailure {
   const code = readTrpcErrorField(error, 'code');
   if (isTerminalTrpcCode(code)) {
-    return { kind: 'terminal', message: TERMINAL_MESSAGES[action] };
+    return { kind: 'terminal', message: i18n.t(TERMINAL_KEYS[action]) };
   }
-  return { kind: 'retryable', message: RETRYABLE_MESSAGES[action] };
+  return { kind: 'retryable', message: i18n.t(RETRYABLE_KEYS[action]) };
 }
 
 /** Terminal failures toast once; retryable failures offer a Retry CTA. */
@@ -83,9 +85,9 @@ function showModerationFailure(action: ModerationAction, error: unknown, retry: 
     announcingToast.error(failure.message);
     return;
   }
-  Alert.alert('Something went wrong', failure.message, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Retry', onPress: retry },
+  Alert.alert(i18n.t('prReview.discussion.somethingWentWrong'), failure.message, [
+    { text: i18n.t('common.cancel'), style: 'cancel' },
+    { text: i18n.t('common.retry'), onPress: retry },
   ]);
 }
 
@@ -100,6 +102,7 @@ export function CommentRow({
   const timestamp = parseTimestamp(comment.createdAt);
   const relative = timeAgo(timestamp);
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
   const trpc = useTRPC();
@@ -111,7 +114,10 @@ export function CommentRow({
 
   const reportContent = useMutation(
     trpc.moderation.reportContent.mutationOptions({
-      onSuccess: result => announcingToast.success(`Report submitted. Receipt ${result.receiptId}`),
+      onSuccess: result =>
+        announcingToast.success(
+          t('prReview.discussion.reportSubmitted', { receiptId: result.receiptId })
+        ),
       onError: (error, variables) => {
         showModerationFailure('report-content', error, () => {
           reportContent.mutate(variables);
@@ -121,7 +127,10 @@ export function CommentRow({
   );
   const reportUser = useMutation(
     trpc.moderation.reportUser.mutationOptions({
-      onSuccess: result => announcingToast.success(`Report submitted. Receipt ${result.receiptId}`),
+      onSuccess: result =>
+        announcingToast.success(
+          t('prReview.discussion.reportSubmitted', { receiptId: result.receiptId })
+        ),
       onError: (error, variables) => {
         showModerationFailure('report-user', error, () => {
           reportUser.mutate(variables);
@@ -133,7 +142,7 @@ export function CommentRow({
     trpc.moderation.blockUser.mutationOptions({
       onSuccess: (_result, input) => {
         invalidateHiddenUsers();
-        announcingToast.success(`Blocked ${input.githubLogin}`);
+        announcingToast.success(t('prReview.discussion.blockedUser', { login: input.githubLogin }));
       },
       onError: (error, variables) => {
         showModerationFailure('block', error, () => {
@@ -146,7 +155,7 @@ export function CommentRow({
     trpc.moderation.muteUser.mutationOptions({
       onSuccess: (_result, input) => {
         invalidateHiddenUsers();
-        announcingToast.success(`Muted ${input.githubLogin}`);
+        announcingToast.success(t('prReview.discussion.mutedUser', { login: input.githubLogin }));
       },
       onError: (error, variables) => {
         showModerationFailure('mute', error, () => {
@@ -167,25 +176,29 @@ export function CommentRow({
     const userActions: { label: string; run: () => void }[] = [];
     if (author !== null) {
       userActions.push({
-        label: 'Report user',
+        label: t('prReview.discussion.reportUser'),
         run: () => {
           reportUser.mutate({ targetId: author.login, reason: 'other' });
         },
       });
       userActions.push({
-        label: 'Mute',
+        label: t('prReview.discussion.mute'),
         run: () => {
           muteUser.mutate({ githubLogin: author.login });
         },
       });
       userActions.push({
-        label: 'Block',
+        label: t('prReview.discussion.block'),
         run: () => {
           blockUser.mutate({ githubLogin: author.login });
         },
       });
     }
-    const options = ['Report content', ...userActions.map(action => action.label), 'Cancel'];
+    const options = [
+      t('prReview.discussion.reportContent'),
+      ...userActions.map(action => action.label),
+      t('common.cancel'),
+    ];
     const disabledButtonIndices = isSelf ? userActions.map((_, index) => 1 + index) : [];
     showActionSheetWithOptions(
       {
@@ -235,7 +248,7 @@ export function CommentRow({
         <Pressable
           onPress={openOverflow}
           accessibilityRole="button"
-          accessibilityLabel="Comment actions"
+          accessibilityLabel={t('prReview.discussion.commentActions')}
           hitSlop={8}
           className="ml-auto h-7 w-7 items-center justify-center rounded-full active:bg-muted"
         >

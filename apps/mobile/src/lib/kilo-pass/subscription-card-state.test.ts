@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { getKiloPassSubscriptionCardAccessibility } from './subscription-card-state';
+
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  getResolvedLanguage: () => 'en',
+}));
 
 describe('getKiloPassSubscriptionCardAccessibility', () => {
   it('describes the subscribe action', () => {

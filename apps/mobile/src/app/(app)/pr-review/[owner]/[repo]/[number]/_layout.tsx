@@ -3,6 +3,7 @@ import { type Href, Stack, useLocalSearchParams } from 'expo-router';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { PrReviewConnectGate } from '@/components/pr-review/pr-review-connect-gate';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import {
   pendingReviewDraftKey,
   PendingReviewProvider,
@@ -39,6 +40,7 @@ export default function PrReviewNumberLayout() {
   const number = rawNumber ? Number.parseInt(rawNumber, 10) : Number.NaN;
   const { fullSheetDetent } = useFormSheetDetents();
   const { userId } = useCurrentUserId();
+  useRouteForegroundRefresh([[['githubPrReview']]]);
 
   if (!owner || !repo || !Number.isInteger(number) || number <= 0) {
     return <InvalidRouteState backTo={'/(app)/pr-review' as Href} />;
@@ -51,6 +53,7 @@ export default function PrReviewNumberLayout() {
   const sheetOptions = {
     presentation: 'formSheet' as const,
     sheetAllowedDetents: [0.5, fullSheetDetent] as [number, number],
+    sheetInitialDetentIndex: 'last' as const,
     sheetGrabberVisible: true,
     headerShown: false,
   };

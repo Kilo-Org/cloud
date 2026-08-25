@@ -6,6 +6,8 @@ import {
 } from '@kilocode/kilo-chat-hooks';
 import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
+
 export { useMessages, useMessageCacheUpdater };
 
 export function useSendMessage(
@@ -15,7 +17,7 @@ export function useSendMessage(
 ) {
   return useSharedSendMessage(client, conversationId, currentUserId, {
     onError: err => {
-      toast.error(formatKiloChatError(err, 'Failed to send message'));
+      toast.error(formatKiloChatError(err, i18n.t('chat.messageActions.sendFailed')));
     },
   });
 }

@@ -1,7 +1,8 @@
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -14,6 +15,7 @@ import { formatExactTokens } from './context-usage-display';
 import { handleMessageDetailsCopy } from './message-details-copy';
 import { getMessageDetailsContent } from './message-details-content';
 import { MessageTextSelectSheet } from './message-text-select-sheet';
+import { SessionPageSheet } from './session-page-sheet';
 import {
   buildReportAiResponseErrorToast,
   buildReportAiResponseInput,
@@ -37,6 +39,7 @@ export function MessageDetailsSheet({
 }: Readonly<MessageDetailsSheetProps>) {
   const insets = useSafeAreaInsets();
   const trpc = useTRPC();
+  const { t } = useTranslation();
   const [reportedMessageId, setReportedMessageId] = useState<string | null>(null);
   const [selectVisible, setSelectVisible] = useState(false);
   const content = useMemo(
@@ -86,24 +89,26 @@ export function MessageDetailsSheet({
     if (!input) {
       return;
     }
-    Alert.alert('Report AI response', 'Report this response for review?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Report',
-        style: 'destructive',
-        onPress: () => {
-          reportMutation.mutate(input);
+    Alert.alert(
+      t('agentChat.messageDetails.reportAiResponse'),
+      t('agentChat.messageDetails.reportAiResponseConfirm'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('agentChat.messageDetails.report'),
+          style: 'destructive',
+          onPress: () => {
+            reportMutation.mutate(input);
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   return (
-    <Modal
+    <SessionPageSheet
       visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={
+      onClose={
         selectVisible
           ? () => {
               setSelectVisible(false);
@@ -119,22 +124,26 @@ export function MessageDetailsSheet({
           }}
         />
       ) : (
-        <View className="flex-1 bg-background">
-          <SheetHeader title="Message details" onDone={onClose} doneLabel="Done" />
+        <>
+          <SheetHeader
+            title={t('agentChat.messageDetails.title')}
+            onDone={onClose}
+            doneLabel={t('common.done')}
+          />
 
           {content ? (
-            <ScrollView contentContainerClassName="px-6 pb-6 pt-2">
+            <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
               {content.copyableText ? (
                 <View className="mb-6 gap-2">
                   <Pressable
                     onPress={handleCopy}
                     accessibilityRole="button"
-                    accessibilityLabel="Copy message"
+                    accessibilityLabel={t('agentChat.messageDetails.copyMessage')}
                     className="rounded-md border border-border px-4 py-3 active:opacity-70"
                     testID="message-details-copy"
                   >
                     <Text className="text-center text-base font-medium text-foreground">
-                      Copy message
+                      {t('agentChat.messageDetails.copyMessage')}
                     </Text>
                   </Pressable>
 
@@ -144,12 +153,12 @@ export function MessageDetailsSheet({
                         setSelectVisible(true);
                       }}
                       accessibilityRole="button"
-                      accessibilityLabel="Select text"
+                      accessibilityLabel={t('agentChat.messageDetails.selectText')}
                       className="rounded-md border border-border px-4 py-3 active:opacity-70"
                       testID="message-details-select-text"
                     >
                       <Text className="text-center text-base font-medium text-foreground">
-                        Select text
+                        {t('agentChat.messageDetails.selectText')}
                       </Text>
                     </Pressable>
                   ) : null}
@@ -160,23 +169,23 @@ export function MessageDetailsSheet({
                 <Pressable
                   onPress={handleReport}
                   accessibilityRole="button"
-                  accessibilityLabel="Report AI response"
+                  accessibilityLabel={t('agentChat.messageDetails.reportAiResponse')}
                   className="mb-6 rounded-md border border-border px-4 py-3 active:opacity-70"
                   testID="message-details-report"
                 >
                   <Text className="text-center text-base font-medium text-foreground">
-                    Report AI response
+                    {t('agentChat.messageDetails.reportAiResponse')}
                   </Text>
                 </Pressable>
               ) : null}
 
               <View className="gap-4">
-                <Row label="Role">
+                <Row label={t('agentChat.messageDetails.role')}>
                   <Text className="text-base font-medium text-foreground">{content.roleLabel}</Text>
                 </Row>
 
                 {content.sentTimeLabel ? (
-                  <Row label="Sent">
+                  <Row label={t('agentChat.messageDetails.sent')}>
                     <Text className="text-base font-medium text-foreground tabular-nums">
                       {content.sentTimeLabel}
                     </Text>
@@ -184,7 +193,7 @@ export function MessageDetailsSheet({
                 ) : null}
 
                 {content.modelLabel ? (
-                  <Row label="Model">
+                  <Row label={t('agentChat.messageDetails.model')}>
                     <Text className="text-base font-medium text-foreground">
                       {content.modelLabel}
                     </Text>
@@ -194,8 +203,10 @@ export function MessageDetailsSheet({
 
               {content.costLabel && content.tokenRows ? (
                 <View className="mt-8 gap-4">
-                  <Text className="text-sm font-semibold text-foreground">Cost & tokens</Text>
-                  <Row label="Cost">
+                  <Text className="text-sm font-semibold text-foreground">
+                    {t('agentChat.messageDetails.costAndTokens')}
+                  </Text>
+                  <Row label={t('agentChat.messageDetails.cost')}>
                     <Text className="text-base font-medium text-foreground tabular-nums">
                       {content.costLabel}
                     </Text>
@@ -211,9 +222,9 @@ export function MessageDetailsSheet({
           ) : null}
 
           <View style={{ height: insets.bottom }} className="bg-background" />
-        </View>
+        </>
       )}
-    </Modal>
+    </SessionPageSheet>
   );
 }
 

@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import {
   getSafeCacheFilename,
   getShareRemoteFileReason,
@@ -10,8 +11,6 @@ import {
 type AttachmentImageRenderState = 'loading' | 'ready' | 'error';
 
 const ATTACHMENT_CACHE_DIRECTORY = 'kilo-chat-attachments';
-const ATTACHMENT_OPEN_ERROR_MESSAGE =
-  "Couldn't open attachment. Check your connection and try again.";
 
 type MaterializedAttachment = MaterializedRemoteFile;
 
@@ -36,7 +35,7 @@ export function getAttachmentImageRenderState({
 }
 
 export function getAttachmentOpenErrorMessage(): string {
-  return ATTACHMENT_OPEN_ERROR_MESSAGE;
+  return i18n.t('chat.attachment.openFailed');
 }
 
 export function getFreshAttachmentPreviewUrl(

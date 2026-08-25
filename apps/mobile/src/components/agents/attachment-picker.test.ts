@@ -1,9 +1,11 @@
 import { type ActionSheetProps } from '@expo/react-native-action-sheet';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import * as SecureStore from 'expo-secure-store';
+import * as Sentry from '@sentry/react-native';
 import { describe, expect, it, vi } from 'vitest';
 
-import { pickAgentAttachments } from './attachment-picker';
+import { normalizeImageAsset, pickAgentAttachments } from './attachment-picker';
 
 const reactNativeMock = vi.hoisted(() => ({
   alert: vi.fn(),
@@ -31,6 +33,16 @@ vi.mock('expo-image-picker', () => ({
   requestCameraPermissionsAsync: vi.fn(),
 }));
 
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: vi.fn(),
+  setItemAsync: vi.fn(),
+  deleteItemAsync: vi.fn(),
+}));
+
+vi.mock('@sentry/react-native', () => ({
+  captureException: vi.fn(),
+}));
+
 const getDocumentAsyncMock = vi.mocked(DocumentPicker.getDocumentAsync);
 
 type ShowActionSheet = ActionSheetProps['showActionSheetWithOptions'];
@@ -47,12 +59,64 @@ async function pickWithSheetSelection(
   const showActionSheet = vi.fn() as unknown as ShowActionSheet & {
     mock: { calls: [unknown, SheetButtonHandler][] };
   };
-  const resultPromise = pickAgentAttachments(showActionSheet);
+  const resultPromise = pickAgentAttachments(showActionSheet, {
+    userId: 'user-1',
+    surface: 'agent-chat',
+    sessionId: 'sess-1',
+  });
   const registered = showActionSheet.mock.calls[0]?.[1];
   expect(registered).toEqual(expect.any(Function));
   await Promise.resolve(registered?.(buttonIndex));
   return resultPromise;
 }
+
+describe('normalizeImageAsset', () => {
+  it('keeps the picker fileName when present', () => {
+    expect(
+      normalizeImageAsset({
+        uri: 'file:///tmp/IMG_0001.HEIC',
+        fileName: 'IMG_0001.HEIC',
+        mimeType: 'application/octet-stream',
+      }).name
+    ).toBe('IMG_0001.HEIC');
+  });
+
+  it('treats a whitespace-only fileName as missing and synthesizes from the URI', () => {
+    expect(
+      normalizeImageAsset({
+        uri: 'file:///tmp/IMG_0001.HEIC',
+        fileName: '   ',
+        mimeType: 'application/octet-stream',
+      }).name
+    ).toBe('image.heic');
+  });
+
+  it('synthesizes image.heic from the URI extension when fileName is missing', () => {
+    expect(
+      normalizeImageAsset({
+        uri: 'file:///tmp/IMG_0001.HEIC',
+        mimeType: 'application/octet-stream',
+      }).name
+    ).toBe('image.heic');
+  });
+
+  it('synthesizes image.jpeg from the MIME subtype for an extension-less URI', () => {
+    expect(
+      normalizeImageAsset({
+        uri: 'file:///tmp/Camera/uuid',
+        mimeType: 'image/jpeg',
+      }).name
+    ).toBe('image.jpeg');
+  });
+
+  it('falls back to image.png when no signal carries the extension', () => {
+    expect(
+      normalizeImageAsset({
+        uri: 'file:///tmp/Camera/uuid',
+      }).name
+    ).toBe('image.png');
+  });
+});
 
 describe('agent attachment picker', () => {
   it('opens a native action sheet that keeps all sources and the cancel action', () => {
@@ -60,7 +124,11 @@ describe('agent attachment picker', () => {
       mock: { calls: unknown[][] };
     };
 
-    void pickAgentAttachments(showActionSheet);
+    void pickAgentAttachments(showActionSheet, {
+      userId: 'user-1',
+      surface: 'agent-chat',
+      sessionId: null,
+    });
 
     expect(showActionSheet).toHaveBeenCalledWith(
       {
@@ -85,6 +153,26 @@ describe('agent attachment picker', () => {
     expect(announcingToastMock.error).toHaveBeenCalledWith(
       'Could not open the photo picker. Restart Kilo and try again.'
     );
+  });
+
+  it('launches the picker when the launch context write fails', async () => {
+    vi.mocked(SecureStore.setItemAsync).mockRejectedValueOnce(new Error('store write failed'));
+    const result: Awaited<ReturnType<typeof ImagePicker.launchImageLibraryAsync>> = {
+      canceled: false,
+      assets: [{ uri: 'file:///cache/photo.jpg', width: 100, height: 100 }],
+    };
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValueOnce(result);
+
+    const candidates = await pickWithSheetSelection(1);
+
+    expect(candidates).toHaveLength(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'write-picker-launch-context',
+      },
+      extra: { source: 'library', surface: 'agent-chat', hasSession: true },
+    });
   });
 });
 

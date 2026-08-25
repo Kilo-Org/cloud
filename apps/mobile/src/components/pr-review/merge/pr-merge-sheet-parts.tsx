@@ -1,7 +1,9 @@
+/* eslint-disable max-lines -- Merge-sheet form sub-components share the sheet's keyboard-visibility and footer contracts. */
 // Form sub-components for the S8 merge sheet. Extracted out of
 // `pr-merge-sheet.tsx` to keep that file under the repo's 300-line limit.
 
 import { type ReactNode, type RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, Switch, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
@@ -22,14 +24,11 @@ import {
 import { type MergeMethodOption } from '@/components/pr-review/merge/pr-merge-icons';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 
-const NO_ENABLED_METHODS_MESSAGE =
-  'This repository has no enabled merge methods. Ask a repository admin to enable merge, squash, or rebase merging.';
-
-const SHORT_METHOD_LABELS = {
-  merge: 'Merge',
-  squash: 'Squash',
-  rebase: 'Rebase',
-} satisfies Record<AllowedMergeMethod, string>;
+const METHOD_LABEL_KEYS = {
+  merge: 'prReview.merge.methods.merge',
+  squash: 'prReview.merge.methods.squash',
+  rebase: 'prReview.merge.methods.rebase',
+} as const satisfies Record<AllowedMergeMethod, string>;
 
 function MethodPicker({
   methodOptions,
@@ -42,12 +41,13 @@ function MethodPicker({
   isDisabled: boolean;
   onChange: (next: AllowedMergeMethod) => void;
 }>) {
+  const { t } = useTranslation();
   return (
-    <View className="gap-0.5">
-      <Text className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Method
+    <View className="gap-1.5">
+      <Text className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+        {t('prReview.merge.methodLabel')}
       </Text>
-      <RadioGroup label="Method" className="flex-row flex-wrap gap-1">
+      <RadioGroup label={t('prReview.merge.methodLabel')} className="flex-row flex-wrap gap-2">
         {methodOptions.map(option => {
           const active = method === option.value;
           // Long labels stay readable via accessibilityLabel; chip shows short text.
@@ -62,7 +62,7 @@ function MethodPicker({
               {...radioItemA11y({ label: option.label, checked: active, disabled: isDisabled })}
               accessibilityHint={PR_MERGE_DESCRIPTIONS[option.value]}
               className={cn(
-                'min-h-8 items-center justify-center rounded-full border px-2.5 py-1 active:opacity-70',
+                'min-h-11 items-center justify-center rounded-full border px-4 py-2 active:opacity-70',
                 active && 'border-primary bg-primary',
                 !active && isDisabled && 'border-hair-soft bg-secondary',
                 !active && !isDisabled && 'border-border bg-secondary'
@@ -70,13 +70,13 @@ function MethodPicker({
             >
               <Text
                 className={cn(
-                  'text-xs font-medium',
+                  'text-sm font-medium',
                   active && 'text-primary-foreground',
                   !active && isDisabled && 'text-muted-foreground',
                   !active && !isDisabled && 'text-foreground'
                 )}
               >
-                {SHORT_METHOD_LABELS[option.value]}
+                {t(METHOD_LABEL_KEYS[option.value])}
               </Text>
             </Pressable>
           );
@@ -98,21 +98,22 @@ function CommitTitleField({
   isDisabled: boolean;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   return (
-    <View className="gap-0.5">
-      <Text className="text-xs font-medium text-foreground">Commit title</Text>
+    <View className="gap-1.5">
+      <Text className="text-sm font-medium text-foreground">{t('prReview.merge.commitTitle')}</Text>
       <TextInput
         ref={inputRef}
         defaultValue={titleRef.current}
         editable={!isDisabled}
         placeholder={placeholder}
         placeholderTextColor={colors.mutedForeground}
-        accessibilityLabel="Commit title"
+        accessibilityLabel={t('prReview.merge.commitTitle')}
         onChangeText={value => {
           titleRef.current = value;
         }}
         className={cn(
-          'min-h-9 max-h-12 rounded-md border border-input bg-background px-3 py-1 text-sm leading-5 text-foreground',
+          'min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground',
           'focus:border-ring'
         )}
         multiline
@@ -134,25 +135,28 @@ function CommitMessageField({
   compact?: boolean;
 }>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const keyboardVisible = useFormSheetKeyboardVisible();
   const tight = compact || keyboardVisible;
   return (
-    <View className="gap-0.5">
-      <Text className="text-xs font-medium text-foreground">Commit message</Text>
+    <View className="gap-1.5">
+      <Text className="text-sm font-medium text-foreground">
+        {t('prReview.merge.commitMessage')}
+      </Text>
       <TextInput
         ref={inputRef}
         defaultValue={messageRef.current}
         editable={!isDisabled}
-        placeholder="Optional description for the merge commit"
+        placeholder={t('prReview.merge.commitMessagePlaceholder')}
         placeholderTextColor={colors.mutedForeground}
-        accessibilityLabel="Commit message"
+        accessibilityLabel={t('prReview.merge.commitMessage')}
         onChangeText={value => {
           messageRef.current = value;
         }}
         className={cn(
-          'rounded-md border border-input bg-background px-3 py-1 text-sm leading-5 text-foreground',
+          'rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground',
           'focus:border-ring',
-          tight ? 'max-h-12 min-h-9' : 'min-h-11 max-h-16'
+          tight ? 'max-h-16 min-h-11' : 'min-h-24 max-h-40'
         )}
         multiline
         textAlignVertical="top"
@@ -174,14 +178,15 @@ function DeleteBranchToggle({
   hidden?: boolean;
 }>) {
   const keyboardVisible = useFormSheetKeyboardVisible();
+  const { t } = useTranslation();
   if (hidden || keyboardVisible) {
     return null;
   }
   return (
-    <View className="flex-row items-center justify-between rounded-lg bg-secondary px-3 py-1.5">
-      <Text className="flex-1 pr-3 text-sm font-medium">Delete branch</Text>
+    <View className="flex-row items-center justify-between rounded-lg bg-secondary px-4 py-3">
+      <Text className="flex-1 pr-3 text-sm font-medium">{t('prReview.merge.deleteBranch')}</Text>
       <Switch
-        accessibilityLabel="Delete branch after merge"
+        accessibilityLabel={t('prReview.merge.deleteBranchAfterMerge')}
         value={value}
         disabled={isDisabled}
         onValueChange={onChange}
@@ -234,13 +239,15 @@ export function MergeSheetFormBody(props: {
     onDismiss,
   } = props;
 
+  const { t } = useTranslation();
+
   return (
     <>
-      <View className="gap-1.5 px-6 pt-1.5">
+      <View className="gap-4 px-6 pt-4">
         {noMethodsAllowed ? (
           <View className="rounded-md border border-border bg-secondary p-3">
             <AccessibleStatus
-              message={NO_ENABLED_METHODS_MESSAGE}
+              message={t('prReview.merge.noEnabledMethods')}
               tone="status"
               className="text-sm"
             />
@@ -286,9 +293,8 @@ export function MergeSheetFormBody(props: {
         ) : null}
       </View>
 
-      <PrFormSheetFooter className="pb-1 pt-1">
+      <PrFormSheetFooter>
         <Button
-          size="sm"
           onPress={onConfirm}
           loading={isMutating}
           disabled={
@@ -301,14 +307,13 @@ export function MergeSheetFormBody(props: {
           <Text>{submitLabel}</Text>
         </Button>
         <Button
-          size="sm"
           variant="ghost"
           onPress={onDismiss}
           disabled={isMutating}
-          className="mt-0.5"
-          accessibilityLabel="Cancel"
+          className="mt-2"
+          accessibilityLabel={t('common.cancel')}
         >
-          <Text>Cancel</Text>
+          <Text>{t('common.cancel')}</Text>
         </Button>
       </PrFormSheetFooter>
     </>

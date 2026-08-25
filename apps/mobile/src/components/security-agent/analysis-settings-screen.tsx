@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { Brain, Search, Wrench } from '@/components/ui/icons';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { openModelPicker } from '@/components/agents/model-selector';
@@ -32,16 +33,17 @@ import { cn } from '@/lib/utils';
 
 type AnalysisMode = SecurityAgentConfig['analysisMode'];
 
-const ANALYSIS_MODES: { value: AnalysisMode; label: string }[] = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'shallow', label: 'Shallow' },
-  { value: 'deep', label: 'Deep' },
-];
+const ANALYSIS_MODES = [
+  { value: 'auto', labelKey: 'securityAgent.analysisSettings.modeAuto' },
+  { value: 'shallow', labelKey: 'securityAgent.analysisSettings.modeShallow' },
+  { value: 'deep', labelKey: 'securityAgent.analysisSettings.modeDeep' },
+] as const satisfies readonly { value: AnalysisMode; labelKey: string }[];
 
 function AnalysisSettingsSkeleton() {
+  const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Models & analysis" />
+      <ScreenHeader title={t('securityAgent.analysisSettings.title')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-11 w-full rounded-lg" />
         <Skeleton className="h-12 w-full rounded-lg" />
@@ -54,6 +56,7 @@ function AnalysisSettingsSkeleton() {
 
 export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
   const save = useSaveSecurityAgentConfig(scope);
@@ -111,9 +114,9 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   if (config.isError && !config.data) {
     return (
       <PlatformErrorScreen
-        title="Models & analysis"
+        title={t('securityAgent.analysisSettings.title')}
         variant="offline"
-        message="Could not load analysis settings"
+        message={t('securityAgent.analysisSettings.couldNotLoad')}
         onRetry={() => void config.refetch()}
       />
     );
@@ -136,7 +139,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Models & analysis"
+        title={t('securityAgent.analysisSettings.title')}
         onBack={onBack}
         headerRight={
           canManage ? (
@@ -153,19 +156,20 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
-            Only organization owners and billing managers can change these settings.
+            {t('securityAgent.analysisSettings.permissionNote')}
           </Text>
         )}
         <View className="gap-2">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Analysis depth
+            {t('securityAgent.analysisSettings.depth')}
           </Text>
           <RadioGroup
-            label="Analysis depth"
+            label={t('securityAgent.analysisSettings.depth')}
             className="flex-row gap-2 rounded-full bg-secondary p-1"
           >
             {ANALYSIS_MODES.map(option => {
               const active = analysisMode === option.value;
+              const label = t(option.labelKey);
               return (
                 <Pressable
                   key={option.value}
@@ -178,7 +182,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
                   onPress={() => {
                     setAnalysisMode(option.value);
                   }}
-                  {...radioItemA11y({ label: option.label, checked: active, disabled: !canManage })}
+                  {...radioItemA11y({ label, checked: active, disabled: !canManage })}
                 >
                   <Text
                     className={cn(
@@ -186,7 +190,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
                       active ? 'text-background' : 'text-foreground'
                     )}
                   >
-                    {option.label}
+                    {label}
                   </Text>
                 </Pressable>
               );
@@ -205,7 +209,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           <QueryError
             variant="server"
             placement="top"
-            title="Could not load models"
+            title={t('securityAgent.analysisSettings.couldNotLoadModels')}
             onRetry={() => void refetchModels()}
             isRetrying={modelsLoading}
           />
@@ -214,21 +218,21 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           <View>
             <ConfigureRow
               icon={Search}
-              title="Triage model"
+              title={t('securityAgent.analysisSettings.triageModel')}
               subtitle={modelName(triageModelSlug)}
               disabled={!canManage}
               onPress={modelRowOnPress(triageModelSlug, setTriageModelSlug)}
             />
             <ConfigureRow
               icon={Brain}
-              title="Analysis model"
+              title={t('securityAgent.analysisSettings.analysisModel')}
               subtitle={modelName(analysisModelSlug)}
               disabled={!canManage}
               onPress={modelRowOnPress(analysisModelSlug, setAnalysisModelSlug)}
             />
             <ConfigureRow
               icon={Wrench}
-              title="Remediation model"
+              title={t('securityAgent.analysisSettings.remediationModel')}
               subtitle={modelName(remediationModelSlug)}
               last
               disabled={!canManage}

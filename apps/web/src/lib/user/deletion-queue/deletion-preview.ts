@@ -4,11 +4,9 @@ import { isSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
 import { db } from '@/lib/drizzle';
 import { assertNoLiveSubscriptionsForSoftDelete, SoftDeletePreconditionError } from '@/lib/user';
 import { hmacDeletionEmail } from '@/lib/user/deletion-queue/deletion-hmac';
-import { lookupPylonRequesterEmail } from '@/lib/user/deletion-queue/handlers/pylon-client';
 import {
   classifyProtectedIdentity,
   DeletionRefusalCode,
-  normalizeDeletionEmail,
   type DeletionActorIdentity,
   previewDeletionTargets,
   type DeletionPreviewAccepted,
@@ -21,6 +19,7 @@ import { ACTIVE_REQUEST_STATUSES } from '@/lib/user/deletion-queue/deletion-type
 export const DeletionInspectWarning = {
   KiloPassActive: 'kilo_pass_active',
   KiloclawSubscriptionActive: 'kiloclaw_subscription_active',
+  ResolvesAtPreflight: 'resolves_at_preflight',
 } as const;
 
 export type DeletionInspectAccepted = {
@@ -50,17 +49,21 @@ export async function inspectDeletionTargets(
   const seenEmails = new Set<string>();
 
   for (const target of local.accepted) {
-    const resolved = await resolvePreviewTarget(target);
-    if (!resolved.ok) {
-      rejected.push(resolved);
+    if (!target.email) {
+      const inspected = await inspectTicketOnlyTarget(target);
+      if (inspected.ok) {
+        accepted.push(inspected);
+      } else {
+        rejected.push(inspected);
+      }
       continue;
     }
-    if (seenEmails.has(resolved.email)) {
-      rejected.push(rejectTarget(resolved, DeletionRefusalCode.DuplicateEntry));
+    if (seenEmails.has(target.email)) {
+      rejected.push(rejectTarget(target, DeletionRefusalCode.DuplicateEntry));
       continue;
     }
-    seenEmails.add(resolved.email);
-    const inspected = await inspectOneTarget(resolved, actor);
+    seenEmails.add(target.email);
+    const inspected = await inspectOneTarget(target, actor);
     if (inspected.ok) {
       accepted.push(inspected);
     } else {
@@ -71,18 +74,23 @@ export async function inspectDeletionTargets(
   return { accepted, rejected };
 }
 
-async function resolvePreviewTarget(
+async function inspectTicketOnlyTarget(
   target: DeletionPreviewAccepted
-): Promise<DeletionPreviewAccepted | DeletionPreviewRejected> {
-  if (target.email) return target;
+): Promise<DeletionInspectAccepted | DeletionPreviewRejected> {
   if (!target.pylonTicket) {
     return rejectTarget(target, DeletionRefusalCode.MalformedEmail);
   }
-  const email = await lookupPylonRequesterEmail(target.pylonTicket);
-  if (!email) {
-    return rejectTarget(target, DeletionRefusalCode.TicketUnresolved);
+  const byTicket = await findActiveRequestByPylonTicket(target.pylonTicket);
+  if (byTicket) {
+    return rejectTarget(target, DeletionRefusalCode.TicketAlreadyActive);
   }
-  return { ok: true, email: normalizeDeletionEmail(email), pylonTicket: target.pylonTicket };
+  return {
+    ok: true,
+    email: '',
+    pylonTicket: target.pylonTicket,
+    warnings: [DeletionInspectWarning.ResolvesAtPreflight],
+    userId: null,
+  };
 }
 
 async function inspectOneTarget(
@@ -111,22 +119,20 @@ async function inspectOneTarget(
     }
   }
 
-  if (!user) {
-    return rejectTarget(target, DeletionRefusalCode.NoCloudUser);
-  }
-
   const warnings: string[] = [];
-  try {
-    await assertNoLiveSubscriptionsForSoftDelete(user.id, db);
-  } catch (error) {
-    if (error instanceof SoftDeletePreconditionError) {
-      warnings.push(
-        error.message.includes('Kilo Pass')
-          ? DeletionInspectWarning.KiloPassActive
-          : DeletionInspectWarning.KiloclawSubscriptionActive
-      );
-    } else {
-      throw error;
+  if (user) {
+    try {
+      await assertNoLiveSubscriptionsForSoftDelete(user.id, db);
+    } catch (error) {
+      if (error instanceof SoftDeletePreconditionError) {
+        warnings.push(
+          error.message.includes('Kilo Pass')
+            ? DeletionInspectWarning.KiloPassActive
+            : DeletionInspectWarning.KiloclawSubscriptionActive
+        );
+      } else {
+        throw error;
+      }
     }
   }
 
@@ -135,7 +141,7 @@ async function inspectOneTarget(
     email: target.email,
     pylonTicket: target.pylonTicket,
     warnings,
-    userId: user.id,
+    userId: user?.id ?? null,
   };
 }
 

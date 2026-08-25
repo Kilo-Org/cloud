@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Misy fanavaozana ny session agent anao",
+      "chatMessage": "Manana hafatra vaovao ianao",
+      "instanceLifecycle": "Misy fanavaozana ny instance anao",
+      "scheduledAction": "Misy fanavaozana ny hetsika voalahatra",
+      "lowBalance": "Mila jerena ny balan-nao",
+      "securityFinding": "Misy hitan'ny fiarovana mila jerena"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Vita ny asa"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Tsy nahomby: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Voasakana: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Tsy misy anarana",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Fampandrenesana balan ambany",
+      "body": "Ny balan’ny {{organizationName}} dia latsaka ambany ny ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Hitan'ny fiarovana vaovao ({{severity}})",
+      "body": "{{findingTitle}} ao amin'ny {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Fampitandremana SLA",
+      "body": "{{findingTitle}} ao amin'ny {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Fanitsakitsahana SLA",
+      "body": "{{findingTitle}} ao amin'ny {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Misy hitan'ny fiarovana mila jerena"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "Vonona ny {{instanceName}}",
+      "body": "Tsindrio raha hanomboka resaka."
+    },
+    "startFailed": {
+      "title": "Tsy nahomby ny fanombohana ny {{instanceName}}",
+      "body": "Tsy nahomby ny fanombohana."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "Hoverina tsy ho ela ny {{instanceName}}",
+      "body": "Voalahatra hoverina amin'ny {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Nofoanana ny hoverina ny {{instanceName}}",
+      "body": "Nofoanana ny hoverina voalahatra taloha."
+    },
+    "versionChangeNotice": {
+      "title": "Havoavaina tsy ho ela ny {{instanceName}}",
+      "bodyWithTag": "Havaozina ho {{targetImageTag}} amin'ny {{when}}.",
+      "bodyWithoutTag": "Fanavaozana voalahatra amin'ny {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Nofoanana ny fanavaozana ny {{instanceName}}",
+      "body": "Nofoanana ny fanavaozana voalahatra taloha."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Vonona fehezina avy amin'ny findainao ny session Kilo anao"
+  }
+}

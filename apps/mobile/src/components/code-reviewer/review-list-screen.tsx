@@ -1,5 +1,6 @@
 import { type Href, useRouter } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -47,6 +48,7 @@ function reviewTime(review: Review): Date {
 
 export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const { data, isLoading, isError, isFetching, error, refetch } = useReviewList(scope);
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
@@ -66,7 +68,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Recent reviews" eyebrow="Code Reviewer" />
+      <ScreenHeader title={t('codeReviewer.reviewList.title')} eyebrow={t('codeReviewer.title')} />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         <Animated.View layout={LinearTransition}>
           {isLoading && (
@@ -84,7 +86,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
             <QueryError
               variant={errorVariant}
               placement="top"
-              title={isPermanentError ? undefined : 'Could not load reviews'}
+              title={isPermanentError ? undefined : t('codeReviewer.reviewList.couldNotLoad')}
               onRetry={isPermanentError ? undefined : () => void refetch()}
               isRetrying={isFetching}
             />
@@ -94,7 +96,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
             <QueryError
               variant="server"
               placement="top"
-              title="Could not load reviews"
+              title={t('codeReviewer.reviewList.couldNotLoad')}
               onRetry={() => void refetch()}
               isRetrying={isFetching}
             />
@@ -104,8 +106,8 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
             <EmptyState
               icon={GitPullRequest}
               placement="top"
-              title="No reviews yet"
-              description="Reviews appear here once the Code Reviewer runs on a pull request."
+              title={t('codeReviewer.reviewList.noReviews')}
+              description={t('codeReviewer.reviewList.noReviewsDescription')}
               className="pt-12"
               action={
                 <Button
@@ -118,7 +120,9 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
                   }}
                 >
                   <Text>
-                    {hasConnectedProvider ? 'Start a manual review' : 'Configure provider'}
+                    {hasConnectedProvider
+                      ? t('codeReviewer.reviewList.startManualReview')
+                      : t('codeReviewer.reviewList.configureProvider')}
                   </Text>
                 </Button>
               }

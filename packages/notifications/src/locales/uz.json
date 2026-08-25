@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Agent sessiyangizda yangilanish bor",
+      "chatMessage": "Sizda yangi xabar bor",
+      "instanceLifecycle": "Instansiyangizda yangilanish bor",
+      "scheduledAction": "Rejalashtirilgan harakatda yangilanish bor",
+      "lowBalance": "Balansingiz e'tibor talab qiladi",
+      "securityFinding": "Xavfsizlik xulosasi e'tibor talab qiladi"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Vazifa yakunlandi"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Amalga oshmadi: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Uzildi: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Nomsiz",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Past balans ogohlantirishi",
+      "body": "{{organizationName}} balansi ${{minimumBalanceUsd}} dan pastga tushdi"
+    },
+    "securityFindingNew": {
+      "title": "Yangi xavfsizlik xulosasi ({{severity}})",
+      "body": "{{repoFullName}} ichida {{findingTitle}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA ogohlantirishi",
+      "body": "{{repoFullName}} ichida {{findingTitle}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA buzilishi",
+      "body": "{{repoFullName}} ichida {{findingTitle}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Xavfsizlik xulosasi e'tibor talab qiladi"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} tayyor",
+      "body": "Suhbatni boshlash uchun bosing."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} ishga tushmadi",
+      "body": "Ishga tushirish amalga oshmadi."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} tez orada qayta ishga tushadi",
+      "body": "{{when}} da qayta ishga tushirish rejalashtirilgan."
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} qayta ishga tushirish bekor qilindi",
+      "body": "Avval rejalashtirilgan qayta ishga tushirish bekor qilindi."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} tez orada yangilanadi",
+      "bodyWithTag": "{{when}} da {{targetImageTag}} ga yangilash.",
+      "bodyWithoutTag": "{{when}} da rejalashtirilgan yangilash."
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} yangilash bekor qilindi",
+      "body": "Avval rejalashtirilgan yangilash bekor qilindi."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Kilo sessiyangiz telefoningizdan boshqarishga tayyor"
+  }
+}

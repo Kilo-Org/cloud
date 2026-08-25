@@ -161,6 +161,9 @@ describe('session share tokens', () => {
         kiloUserId: 'usr_123',
         title: 'Shared title',
         ownerName: 'Shared owner',
+        gitUrl: 'https://github.com/owner/repo',
+        gitBranch: 'main',
+        createdAt: '2026-08-19T10:00:00.000Z',
       },
     ]);
     const select = {
@@ -182,6 +185,9 @@ describe('session share tokens', () => {
       kiloUserId: 'usr_123',
       title: 'Shared title',
       ownerName: 'Shared owner',
+      gitUrl: 'https://github.com/owner/repo',
+      gitBranch: 'main',
+      createdAt: '2026-08-19T10:00:00.000Z',
     });
     expect(selectResult).toHaveBeenCalledTimes(1);
   });

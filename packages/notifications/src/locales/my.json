@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "သင့် agent session တွင် အသစ်အဆန်း ရှိသည်",
+      "chatMessage": "သင့်တွင် စာအသစ် တစ်စောင် ရှိသည်",
+      "instanceLifecycle": "သင့် instance တွင် အသစ်အဆန်း ရှိသည်",
+      "scheduledAction": "စီစဉ်ထားသော လုပ်ဆောင်ချက်တွင် အသစ်အဆန်း ရှိသည်",
+      "lowBalance": "သင့်လက်ကျန် အာရုံစိုက်ရန် လိုအပ်သည်",
+      "securityFinding": "လုံခြုံရေး တွေ့ရှိချက်တစ်ခု အာရုံစိုက်ရန် လိုအပ်သည်"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "လုပ်ငန်းစဉ် ပြီးစီးပါပြီ"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "မအောင်မြင်ပါ: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "ကြားဖြတ်ခံရသည်: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · ခေါင်းစဉ်မရှိ",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "လက်ကျန်နည်း သတိပေးချက်",
+      "body": "{{organizationName}} လက်ကျန်သည် ${{minimumBalanceUsd}} အောက်သို့ ကျဆင်းသွားသည်"
+    },
+    "securityFindingNew": {
+      "title": "လုံခြုံရေး တွေ့ရှိချက် အသစ် ({{severity}})",
+      "body": "{{repoFullName}} ရှိ {{findingTitle}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "SLA သတိပေးချက်",
+      "body": "{{repoFullName}} ရှိ {{findingTitle}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "SLA ချိုးဖောက်မှု",
+      "body": "{{repoFullName}} ရှိ {{findingTitle}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "လုံခြုံရေး တွေ့ရှိချက်တစ်ခု အာရုံစိုက်ရန် လိုအပ်သည်"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} အသင့်ဖြစ်ပါပြီ",
+      "body": "ချတ်စတင်ရန် နှိပ်ပါ။"
+    },
+    "startFailed": {
+      "title": "{{instanceName}} စတင်ရန် မအောင်မြင်ပါ",
+      "body": "စတင်မှု မအောင်မြင်ပါ။"
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} မကြာမီ ပြန်စပါမည်",
+      "body": "{{when}} တွင် ပြန်စရန် စီစဉ်ထားသည်။"
+    },
+    "restartCancelled": {
+      "title": "{{instanceName}} ပြန်စမှု ပယ်ဖျက်လိုက်ပါပြီ",
+      "body": "ယခင်က စီစဉ်ထားသော ပြန်စမှုကို ပယ်ဖျက်လိုက်ပါပြီ။"
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} မကြာမီ အဆင့်မြှင့်ပါမည်",
+      "bodyWithTag": "{{when}} တွင် {{targetImageTag}} သို့ အဆင့်မြှင့်ပါ။",
+      "bodyWithoutTag": "{{when}} တွင် စီစဉ်ထားသော အဆင့်မြှင့်မှု။"
+    },
+    "versionChangeCancelled": {
+      "title": "{{instanceName}} အဆင့်မြှင့်မှု ပယ်ဖျက်လိုက်ပါပြီ",
+      "body": "ယခင်က စီစဉ်ထားသော အဆင့်မြှင့်မှုကို ပယ်ဖျက်လိုက်ပါပြီ။"
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "သင့် Kilo session ကို သင့်ဖုန်းမှ ထိန်းချုပ်ရန် အသင့်ဖြစ်ပါပြီ"
+  }
+}

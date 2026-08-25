@@ -1,6 +1,8 @@
+/* eslint-disable max-lines -- the submit sheet composes the event radio, summary, pending-comments list, and the stale/fresh partition in one cohesive surface. */
 // Review-submit content: event radio, optional summary, pending-comments
-// list (view/edit/delete), and one batched submitReview call. Queue is
-// cleared on success and retained on failure.
+// list (view/edit/delete), and one batched submitReview call. On success the
+// fresh comments are removed and stale comments stay queued; on failure the
+// whole queue is retained.
 //
 // Disable lifetime: bad-request clears on event/summary change; forbidden
 // stays for the rest of the sheet session. Toasts paint behind formSheets
@@ -9,6 +11,7 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Keyboard, ScrollView, type TextInput, View } from 'react-native';
 
 import {
@@ -32,15 +35,17 @@ import {
   reviewSubmitBlockReason,
 } from '@/lib/pr-review/build-submit-review-input';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
-import {
-  ensureTermsAcceptedOutcome,
-  TERMS_CHECK_RETRY_COPY,
-  TERMS_OUTDATED_COPY,
-} from '@/components/pr-review/discussion/reply-input';
+import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
+import { i18n } from '@/i18n';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 import { type PendingReviewItem, usePendingReview } from '@/lib/pr-review/pending-review-provider';
+import { partitionPendingItems } from '@/lib/pr-review/partition-pending-items';
 import { useSubmitReviewMutation } from '@/lib/pr-review/use-pr-review-mutations';
+import {
+  selectPartialSubmitMessage,
+  selectSubmitCtaLabel,
+} from '@/components/pr-review/pr-review-submit-view';
 
 const COMMENT_COMPOSER_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/comment-composer' as const;
 
@@ -58,6 +63,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const { owner, repo, number, headSha, title, eyebrow, onDismiss } = props;
   const router = useRouter();
   const pending = usePendingReview();
+  const { t } = useTranslation();
   const submitReview = useSubmitReviewMutation({ owner, repo, number });
 
   const [event, setEvent] = useState<ReviewEvent>('COMMENT');
@@ -66,6 +72,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const [inlineErrorKind, setInlineErrorKind] = useState<
     'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
   >(null);
+  const [partialResult, setPartialResult] = useState<string | null>(null);
 
   const bodyRef = useRef<string>('');
   const bodyInputRef = useRef<TextInput | null>(null);
@@ -73,11 +80,16 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
   const isSubmitting = submitReview.isPending;
   const queuedCount = pending.items.length;
-  const hasStaleItems = pending.items.some(item => item.commitSha !== headSha);
+  const { fresh, stale } = partitionPendingItems(pending.items, headSha);
+  const staleIds = new Set(stale.map(item => item.id));
   const blockReason = reviewSubmitBlockReason({
     event,
     hasSummary,
-    commentCount: queuedCount,
+    commentCount: fresh.length,
+  });
+  const submitLabel = selectSubmitCtaLabel({
+    freshCount: fresh.length,
+    totalCount: pending.items.length,
   });
 
   useEffect(() => {
@@ -90,13 +102,13 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             setInlineError(null);
             setInlineErrorKind(null);
           } else if (outcome.kind === 'outdated') {
-            setInlineError(TERMS_OUTDATED_COPY);
+            setInlineError(i18n.t('prReview.discussion.termsOutdatedCopy'));
             setInlineErrorKind('bad-request');
           } else if (outcome.kind === 'unknown') {
-            setInlineError(TERMS_CHECK_RETRY_COPY);
+            setInlineError(i18n.t('prReview.discussion.termsCheckRetryCopy'));
             setInlineErrorKind('retryable');
           } else {
-            setInlineError('You must accept the Terms of Service to post.');
+            setInlineError(i18n.t('prReview.discussion.termsAcceptRequired'));
             setInlineErrorKind(null);
           }
         })();
@@ -130,9 +142,10 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   async function handleSubmit() {
     setInlineError(null);
     setInlineErrorKind(null);
+    setPartialResult(null);
     const outcome = await ensureTermsAcceptedOutcome();
     if (outcome.kind === 'outdated') {
-      setInlineError(TERMS_OUTDATED_COPY);
+      setInlineError(i18n.t('prReview.discussion.termsOutdatedCopy'));
       setInlineErrorKind('bad-request');
       return;
     }
@@ -149,12 +162,20 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
           event,
           ...(body.length > 0 ? { body } : {}),
           commitSha: headSha,
-          items: pending.items,
+          items: fresh,
         })
       );
-      pending.clear();
+      pending.removeComments(fresh.map(item => item.id));
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onDismiss();
+      if (stale.length > 0) {
+        // Stale items stay queued: keep the sheet open and report the partial
+        // result instead of dismissing, so the user can edit or delete them.
+        setPartialResult(
+          selectPartialSubmitMessage({ freshCount: fresh.length, staleCount: stale.length })
+        );
+      } else {
+        onDismiss();
+      }
     } catch {
       // Classified into inlineError by the effect above.
     }
@@ -178,21 +199,25 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   }
 
   function confirmDelete(item: PendingReviewItem) {
-    Alert.alert('Delete pending comment?', 'This comment will be removed from the review queue.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          // Announce/focus only when the remove is confirmed synchronous:
-          // the provider's removeComment filters by id and returns nothing,
-          // so the item must still be queued at delete-confirm time.
-          const removed = pending.items.some(queued => queued.id === item.id);
-          pending.removeComment(item.id);
-          focusAfterPendingCommentRemoval(bodyInputRef, removed);
+    Alert.alert(
+      t('prReview.submit.deletePendingTitle'),
+      t('prReview.submit.deletePendingMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('prReview.submit.delete'),
+          style: 'destructive',
+          onPress: () => {
+            // Announce/focus only when the remove is confirmed synchronous:
+            // the provider's removeComment filters by id and returns nothing,
+            // so the item must still be queued at delete-confirm time.
+            const removed = pending.items.some(queued => queued.id === item.id);
+            pending.removeComment(item.id);
+            focusAfterPendingCommentRemoval(bodyInputRef, removed);
+          },
         },
-      },
-    ]);
+      ]
+    );
   }
 
   const submitDisabled =
@@ -212,8 +237,8 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   let queueHint: ReactNode = null;
   if (blockReason !== null) {
     queueHint = <AccessibleStatus message={blockReason} tone="status" className="text-xs" />;
-  } else if (!keyboardVisible && (queuedCount === 0 || hasStaleItems)) {
-    queueHint = <PendingQueueHint queuedCount={queuedCount} hasStaleItems={hasStaleItems} />;
+  } else if (!keyboardVisible && (queuedCount === 0 || stale.length > 0)) {
+    queueHint = <PendingQueueHint queuedCount={queuedCount} staleCount={stale.length} />;
   }
 
   // PickerSheet invariant: [header, ScrollView]; footer is trailing content.
@@ -228,7 +253,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <View className="gap-2 px-6 pt-2">
+        <View className="gap-4 px-6 pt-4">
           <ReviewEventChips
             value={event}
             disabled={isSubmitting}
@@ -238,7 +263,9 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             }}
           />
           <View className="gap-1.5">
-            <Text className="text-sm font-medium text-foreground">Summary (optional)</Text>
+            <Text className="text-sm font-medium text-foreground">
+              {t('prReview.submit.summaryOptional')}
+            </Text>
             <ReviewSummaryField
               bodyRef={bodyRef}
               inputRef={bodyInputRef}
@@ -252,7 +279,10 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
           <View className="gap-1 rounded-lg border border-hair-soft bg-secondary px-3 py-1.5">
             <Text className="text-sm font-medium text-foreground">
-              {queuedCount} pending {queuedCount === 1 ? 'comment' : 'comments'}
+              {queuedCount}{' '}
+              {queuedCount === 1
+                ? t('prReview.submit.pendingCommentSingular')
+                : t('prReview.submit.pendingCommentPlural')}
             </Text>
             {queueHint}
             {/* Keyboard-open viewport is tight; keep the count, hide per-item
@@ -262,6 +292,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
                   <PrReviewPendingCommentRow
                     key={item.id}
                     item={item}
+                    stale={staleIds.has(item.id)}
                     disabled={isSubmitting}
                     onPress={() => {
                       openEditComposer(item);
@@ -273,6 +304,10 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
                 ))
               : null}
           </View>
+
+          {partialResult ? (
+            <AccessibleStatus message={partialResult} tone="status" className="text-xs" />
+          ) : null}
 
           {inlineError && inlineErrorKind !== 'reconnect' ? (
             <View className="rounded-md border border-destructive bg-red-50 dark:bg-red-950 px-2.5 py-2">
@@ -300,9 +335,9 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             }}
             loading={isSubmitting}
             disabled={submitDisabled}
-            accessibilityLabel="Submit review"
+            accessibilityLabel={submitLabel}
           >
-            <Text>Submit review</Text>
+            <Text>{submitLabel}</Text>
           </Button>
           <Button
             variant="ghost"
@@ -312,10 +347,10 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
               }
             }}
             disabled={isSubmitting}
-            className="mt-1"
-            accessibilityLabel="Cancel"
+            className="mt-2"
+            accessibilityLabel={t('common.cancel')}
           >
-            <Text>Cancel</Text>
+            <Text>{t('common.cancel')}</Text>
           </Button>
         </PrFormSheetFooter>
       </ScrollView>

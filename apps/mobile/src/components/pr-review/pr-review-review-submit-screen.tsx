@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 
 import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
@@ -19,12 +20,13 @@ type Params = {
 export function PrReviewReviewSubmitScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<Params>();
   const owner = parseParam(params.owner) ?? '';
   const repo = parseParam(params.repo) ?? '';
   const rawNumber = parseParam(params.number) ?? '';
   const number = Number.parseInt(rawNumber, 10);
-  const title = 'Submit review';
+  const title = t('prReview.submit.title');
   const eyebrow = `${owner}/${repo}#${rawNumber}`;
   const dismiss = () => {
     router.back();
@@ -59,7 +61,7 @@ export function PrReviewReviewSubmitScreen() {
   ) : (
     <QueryError
       variant="server"
-      title="Couldn't load review submission"
+      title={t('prReview.submit.loadFailedTitle')}
       onRetry={() => {
         void pr.refetch();
       }}

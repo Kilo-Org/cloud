@@ -1,4 +1,39 @@
-import { activeSessionSchema } from './schemas';
+import { activeSessionSchema, parseCustomerBillingFailure } from './schemas';
+
+describe('parseCustomerBillingFailure', () => {
+  const failure = {
+    code: 'COMPUTE_STOPPING',
+    payer: { type: 'org', id: 'org-1' },
+    retryable: true,
+  } as const;
+  it.each([
+    { data: { billingFailure: failure } },
+    { shape: { data: { billingFailure: failure } } },
+  ])('parses an explicit billing failure from either tRPC location', error =>
+    expect(parseCustomerBillingFailure(error)).toEqual(failure)
+  );
+  it.each([
+    { data: { billingFailure: { ...failure, payer: { type: 'org' } } } },
+    { data: { billingFailure: { ...failure, remainingMicrodollars: -1 } } },
+    { data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 } },
+  ])('omits malformed or legacy generic errors', error =>
+    expect(parseCustomerBillingFailure(error)).toBeNull()
+  );
+
+  it('preserves zero-valued customer billing balances from the Worker', () => {
+    expect(
+      parseCustomerBillingFailure({
+        data: {
+          billingFailure: {
+            ...failure,
+            remainingMicrodollars: 0,
+            minimumRequiredMicrodollars: 0,
+          },
+        },
+      })
+    ).toMatchObject({ remainingMicrodollars: 0, minimumRequiredMicrodollars: 0 });
+  });
+});
 
 describe('activeSessionSchema capabilities', () => {
   it('parses a session whose `capabilities` is absent', () => {

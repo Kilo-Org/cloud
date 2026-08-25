@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import { useTRPC } from '@/lib/trpc';
 export function PrReviewReconnectNotice() {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
+  const { t } = useTranslation();
 
   const handleReconnect = () => {
     void queryClient.invalidateQueries({
@@ -26,13 +28,16 @@ export function PrReviewReconnectNotice() {
 
   return (
     <View className="gap-3 rounded-lg bg-secondary p-4">
-      <Text className="text-sm font-medium text-foreground">GitHub connection expired</Text>
-      <Text className="text-sm text-muted-foreground">
-        Your GitHub connection is no longer valid. Re-check your connection — you&apos;ll be
-        prompted to reconnect if needed.
+      <Text className="text-sm font-medium text-foreground">
+        {t('prReview.reconnectNotice.title')}
       </Text>
-      <Button variant="outline" onPress={handleReconnect} accessibilityLabel="Check connection">
-        <Text>Check connection</Text>
+      <Text className="text-sm text-muted-foreground">{t('prReview.reconnectNotice.message')}</Text>
+      <Button
+        variant="outline"
+        onPress={handleReconnect}
+        accessibilityLabel={t('prReview.reconnectNotice.checkConnection')}
+      >
+        <Text>{t('prReview.reconnectNotice.checkConnection')}</Text>
       </Button>
     </View>
   );

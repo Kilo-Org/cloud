@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { CirclePlus, GitBranch, GitMerge, GitPullRequest, History } from '@/components/ui/icons';
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import {
   PERSONAL_SCOPE,
@@ -33,19 +35,22 @@ function connectionSubtitle(status: {
   // omitting it — otherwise the row grows by a line once the real status
   // arrives, popping the layout.
   if (status.isLoading) {
-    return 'Checking…';
+    return i18n.t('codeReviewer.platformList.checking');
   }
   // A failed status query must not read as "Not connected" — that's a false
   // disconnected signal. Say the state is unavailable; tapping in shows the
   // full error + retry.
   if (status.isError) {
-    return 'Status unavailable';
+    return i18n.t('codeReviewer.platformList.statusUnavailable');
   }
-  return status.data?.connected ? 'Connected' : 'Not connected';
+  return status.data?.connected
+    ? i18n.t('codeReviewer.platformList.connected')
+    : i18n.t('codeReviewer.platformList.notConnected');
 }
 
 export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const trpc = useTRPC();
   const isPersonal = scope === PERSONAL_SCOPE;
 
@@ -54,8 +59,9 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
     enabled: !isPersonal,
   });
   const scopeTitle = isPersonal
-    ? 'Personal'
-    : (orgs?.find(org => org.organizationId === scope)?.organizationName ?? 'Organization');
+    ? t('codeReviewer.scopeList.personal')
+    : (orgs?.find(org => org.organizationId === scope)?.organizationName ??
+      t('codeReviewer.platformList.organization'));
 
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
@@ -77,11 +83,11 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={scopeTitle} eyebrow="Code Reviewer" />
+      <ScreenHeader title={scopeTitle} eyebrow={t('codeReviewer.title')} />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Platforms
+            {t('codeReviewer.platformList.platforms')}
           </Text>
           <View>
             {platforms.map((platform, index) => {
@@ -106,19 +112,19 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
 
         <View className="mt-6 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Activity
+            {t('codeReviewer.platformList.activity')}
           </Text>
           <View>
             <ConfigureRow
               icon={History}
-              title="Recent reviews"
+              title={t('codeReviewer.reviewList.title')}
               onPress={() => {
                 router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/reviews` as Href);
               }}
             />
             <ConfigureRow
               icon={CirclePlus}
-              title="Manual review"
+              title={t('codeReviewer.manualReview.title')}
               last
               onPress={() => {
                 router.push(

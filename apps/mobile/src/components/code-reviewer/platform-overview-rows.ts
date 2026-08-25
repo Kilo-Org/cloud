@@ -1,4 +1,5 @@
 import {
+  Brain,
   FileSliders,
   FolderGit2,
   Gauge,
@@ -8,6 +9,7 @@ import {
   ShieldCheck,
 } from '@/components/ui/icons';
 
+import { i18n } from '@/i18n';
 import { type PLATFORM_CAPABILITIES, type ReviewConfigData } from '@/lib/code-reviewer-config';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { capitalize } from '@/lib/utils';
@@ -18,6 +20,8 @@ type OverviewRow = {
   title: string;
   subtitle: string;
   onPress?: () => void;
+  // A row members may open read-only even when they cannot edit config.
+  readOnlyAccessible?: boolean;
 };
 
 /**
@@ -31,26 +35,30 @@ export function buildOverviewRows({
   models,
   modelsLoading,
   onOpenModelPicker,
+  onOpenReviewMemory,
 }: {
   data: ReviewConfigData;
   capabilities: (typeof PLATFORM_CAPABILITIES)[keyof typeof PLATFORM_CAPABILITIES];
   models: ModelOption[];
   modelsLoading: boolean;
   onOpenModelPicker: () => void;
+  onOpenReviewMemory?: () => void;
 }): OverviewRow[] {
   return [
     {
       field: 'style',
       icon: MessageSquareText,
-      title: 'Review Style',
+      title: i18n.t('codeReviewer.overview.reviewStyle'),
       subtitle: capitalize(data.reviewStyle),
     },
     {
       field: 'focus-areas',
       icon: ShieldCheck,
-      title: 'Focus Areas',
+      title: i18n.t('codeReviewer.overview.focusAreas'),
       subtitle:
-        data.focusAreas.length > 0 ? data.focusAreas.map(capitalize).join(', ') : 'All areas',
+        data.focusAreas.length > 0
+          ? data.focusAreas.map(capitalize).join(', ')
+          : i18n.t('codeReviewer.overview.allAreas'),
     },
     // Custom Instructions is deprecated in favour of REVIEW.md, so the row is
     // only offered to configs that already have something stored in it.
@@ -59,15 +67,15 @@ export function buildOverviewRows({
           {
             field: 'instructions',
             icon: ScrollText,
-            title: 'Custom Instructions',
-            subtitle: 'Set',
+            title: i18n.t('codeReviewer.overview.customInstructions'),
+            subtitle: i18n.t('codeReviewer.overview.set'),
           },
         ]
       : []),
     {
       field: 'model',
       icon: FileSliders,
-      title: 'Model',
+      title: i18n.t('codeReviewer.overview.model'),
       subtitle: models.find(model => model.id === data.modelSlug)?.name ?? data.modelSlug,
       onPress: modelsLoading || models.length === 0 ? undefined : onOpenModelPicker,
     },
@@ -76,7 +84,7 @@ export function buildOverviewRows({
           {
             field: 'gate',
             icon: Gauge,
-            title: 'Merge gate',
+            title: i18n.t('codeReviewer.overview.mergeGate'),
             subtitle: capitalize(data.gateThreshold),
           },
         ]
@@ -84,24 +92,43 @@ export function buildOverviewRows({
     {
       field: 'repos',
       icon: FolderGit2,
-      title: 'Repositories',
+      title: i18n.t('codeReviewer.overview.repositories'),
       subtitle:
         capabilities.selectionModePicker && data.repositorySelectionMode === 'all'
-          ? 'All repositories'
-          : `${data.selectedRepositoryIds.length} selected`,
+          ? i18n.t('codeReviewer.overview.allRepositories')
+          : i18n.t('codeReviewer.overview.nSelected', {
+              count: data.selectedRepositoryIds.length,
+            }),
     },
+    // Review memory is GitHub-only and only offered when the caller wires the
+    // navigation callback (the overview screen pushes the scope-level route,
+    // not a per-platform settings field). Members may open it read-only: the
+    // server allows member reads and the screen ships a member off-state.
+    ...(onOpenReviewMemory
+      ? [
+          {
+            field: 'review-memory',
+            icon: Brain,
+            title: i18n.t('codeReviewer.overview.reviewMemory'),
+            subtitle: i18n.t('codeReviewer.overview.proposedReviewMdGuidance'),
+            onPress: onOpenReviewMemory,
+            readOnlyAccessible: true,
+          },
+        ]
+      : []),
   ];
 }
 
-/** Shared onPress resolution for an overview row: no-op when read-only, the
- * row's own handler (e.g. the model picker) when it has one, otherwise a
- * push to its settings field. */
+/** Shared onPress resolution for an overview row: no-op when read-only unless
+ * the row is marked read-only-accessible, the row's own handler (e.g. the
+ * model picker or review memory) when it has one, otherwise a push to its
+ * settings field. */
 export function resolveRowOnPress(
   row: OverviewRow,
   canEdit: boolean,
   pushField: (field: string) => void
 ): (() => void) | undefined {
-  if (!canEdit) {
+  if (!canEdit && !row.readOnlyAccessible) {
     return undefined;
   }
   if ('onPress' in row) {

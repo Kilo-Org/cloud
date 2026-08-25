@@ -1,11 +1,9 @@
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
+import { i18n } from '@/i18n';
 import { createRemoteSessionWithFeedback } from '@/components/agents/create-remote-session-with-feedback';
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
 import { type AgentSessionRouterLike } from '@/components/agents/session-router-like';
-
-export const RESTART_EXIT_FAILED_MESSAGE =
-  'Started a new session. The previous session is still open.';
 
 type RestartAgentSessionInput = {
   create: () => Promise<KiloSessionId>;
@@ -54,7 +52,7 @@ export async function restartAgentSession({
   try {
     await exit();
   } catch {
-    onError(RESTART_EXIT_FAILED_MESSAGE);
+    onError(i18n.t('agentChat.remoteSession.restartExitFailed'));
   }
   replaceWithAgentSession(router, created.sessionId, organizationId);
   return { success: true, sessionId: created.sessionId };

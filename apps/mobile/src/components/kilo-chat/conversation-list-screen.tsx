@@ -14,6 +14,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QueryError } from '@/components/query-error';
@@ -100,6 +101,7 @@ function flattenConversationGroups(
 }
 
 export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
+  const { t } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
@@ -176,7 +178,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
 
   const [manualRefreshing, handleRefresh] = useManualRefresh(
     refetchConversations,
-    "Couldn't refresh. Pull down to try again."
+    t('common.couldNotRefresh')
   );
 
   const contentState = getConversationListContentState({
@@ -207,7 +209,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
         >
           <QueryError
             className="flex-1"
-            message="Could not load conversations"
+            message={t('chat.conversationList.couldNotLoad')}
             onRetry={() => {
               void listQuery.refetch();
             }}
@@ -230,7 +232,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
           <View className="flex-row items-center gap-2">
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Open instance settings"
+              accessibilityLabel={t('chat.conversationList.openInstanceSettings')}
               className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
               onPress={handleOpenSettings}
             >
@@ -293,7 +295,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
       {entries.length > 0 && (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="New conversation"
+          accessibilityLabel={t('chat.conversationList.newConversation')}
           disabled={createConversation.isPending}
           onPress={handleCreateAndNavigate}
           className="absolute h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg shadow-black/25 active:opacity-80 disabled:opacity-60"

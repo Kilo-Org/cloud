@@ -1,9 +1,15 @@
-import { type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
+import { hashKey, type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { i18n } from '@/i18n';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { applyActiveSessionTitle, type CachedActiveSessionsData } from '@/lib/active-sessions-live';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import {
+  isLatestMutationGeneration,
+  nextMutationGeneration,
+} from '@/lib/hooks/mutation-generations';
 import { chainSave } from '@/lib/hooks/save-chain';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import {
   mapStoredSessions,
   removeStoredSession,
@@ -23,19 +29,22 @@ export function useSessionMutations() {
   const listKey = trpc.cliSessionsV2.list.infiniteQueryKey();
   const activeListFilter = trpc.activeSessions.list.pathFilter();
 
-  const invalidateSessions = async () => {
-    await invalidateAgentSessionQueries(queryClient, trpc);
+  const invalidateSessions = () => {
+    scheduleCacheMaintenance(() => {
+      void invalidateAgentSessionQueries(queryClient, trpc);
+    });
   };
 
   const snapshotAndUpdate = async (
     update: (data: SessionsListData) => SessionsListData
-  ): Promise<{ previous: SessionsListSnapshot }> => {
+  ): Promise<{ previous: SessionsListSnapshot; generation: number }> => {
     await queryClient.cancelQueries({ queryKey: listKey });
+    const generation = nextMutationGeneration(hashKey(listKey));
     const previous = queryClient.getQueriesData<SessionsListData>({ queryKey: listKey });
     queryClient.setQueriesData<SessionsListData>({ queryKey: listKey }, old =>
       old ? update(old) : old
     );
-    return { previous };
+    return { previous, generation };
   };
 
   /**
@@ -58,31 +67,42 @@ export function useSessionMutations() {
     }
   };
 
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   const deleteSessionMutation = useMutation(
     trpc.cliSessionsV2.delete.mutationOptions({
-      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-      onMutate: ({ session_id }) =>
-        snapshotAndUpdate(data => removeStoredSession(data, session_id)),
+      onMutate: async ({ session_id }) => {
+        const { previous, generation } = await snapshotAndUpdate(data =>
+          removeStoredSession(data, session_id)
+        );
+        return { previous, generation };
+      },
       onError: (error, _input, context) => {
-        rollback(context?.previous);
+        if (context && isLatestMutationGeneration(hashKey(listKey), context.generation)) {
+          rollback(context.previous);
+        }
         onError(error);
       },
       onSettled: invalidateSessions,
     })
   );
 
+  // onError policy: roll back the onMutate snapshot (latest generation only)
+  // and toast error.message.
   const renameSessionMutation = useMutation(
     trpc.cliSessionsV2.rename.mutationOptions({
       onMutate: async ({ session_id, title }) => {
-        const { previous } = await snapshotAndUpdate(data =>
+        const { previous, generation } = await snapshotAndUpdate(data =>
           mapStoredSessions(data, session_id, session => ({ ...session, title }))
         );
         const previousActive = await snapshotAndUpdateActive(session_id, title);
-        return { previous, previousActive };
+        return { previous, previousActive, generation };
       },
       onError: (error, _input, context) => {
-        rollback(context?.previous);
-        rollback(context?.previousActive);
+        if (context && isLatestMutationGeneration(hashKey(listKey), context.generation)) {
+          rollback(context.previous);
+          rollback(context.previousActive);
+        }
         onError(error);
       },
       onSettled: invalidateSessions,
@@ -116,7 +136,7 @@ export function useSessionMutations() {
           await chainSave(sessionId, () =>
             deleteSessionMutation.mutateAsync({ session_id: sessionId })
           );
-          announcingToast.success('Session deleted');
+          announcingToast.success(i18n.t('agents.sessionRow.sessionDeleted'));
           onDeleted?.();
         } catch {
           // Already surfaced via the mutation's own onError (toast + rollback).

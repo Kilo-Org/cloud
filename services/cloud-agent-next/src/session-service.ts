@@ -39,6 +39,7 @@ import {
   updateGitRemoteUrl,
 } from './workspace.js';
 import { logger, WithLogTags } from './logger.js';
+import type { CreateSessionForCloudAgentResult } from '@kilocode/session-ingest-contracts';
 import { timedExec } from './sandbox-timeout-logging.js';
 import type {
   PersistenceEnv,
@@ -81,7 +82,12 @@ import {
   type WrapperWorkspaceReady,
 } from './shared/wrapper-bootstrap.js';
 import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
-import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from './shared/runtime-environment.js';
+import {
+  isStrippedGitConfigEnvVar,
+  PNPM_STORE_DIR,
+  PNPM_STORE_ENV_VAR,
+  SYSTEM_GIT_CONFIG_ENV,
+} from './shared/runtime-environment.js';
 import type {
   FencedLegacyExecutionRequest,
   FencedWrapperDispatchRequest,
@@ -1362,6 +1368,8 @@ export class SessionService {
       SESSION_ID: sessionId,
       SESSION_HOME: sessionHome,
       [PNPM_STORE_ENV_VAR]: PNPM_STORE_DIR,
+      ...SYSTEM_GIT_CONFIG_ENV,
+      GIT_TERMINAL_PROMPT: '0',
       // Opaque Kilo capability — redeemed for the real credential at the outbound interceptor
       KILOCODE_TOKEN: kiloCapability,
       // Backend auth surface (session restore/import).
@@ -1372,6 +1380,12 @@ export class SessionService {
       // Feature attribution for microdollar usage tracking
       KILOCODE_FEATURE: createdOnPlatform ?? 'cloud-agent',
     };
+
+    for (const key of Object.keys(envVars)) {
+      if (isStrippedGitConfigEnvVar(key)) {
+        delete envVars[key];
+      }
+    }
 
     const providerOptions: Record<string, string> = {
       apiKey: kiloCapability,
@@ -2120,7 +2134,8 @@ export class SessionService {
         : [];
 
     const promptAgent = normalizeAgentMode(agent.mode);
-    const preferSnapshot = metadata.lifecycle.preparedAt !== undefined;
+    const preferSnapshot =
+      metadata.clone !== undefined || metadata.lifecycle.preparedAt !== undefined;
     const readyRequest: WrapperSessionReadyRequest = {
       agentSessionId: sessionId,
       userId,
@@ -2138,6 +2153,7 @@ export class SessionService {
           metadata.repository?.upstreamBranch && !metadata.lifecycle.preparedAt
         ),
         preferSnapshot,
+        requireSnapshot: metadata.clone !== undefined,
       },
       ...(repo ? { repo } : {}),
       ...(devcontainerRequested
@@ -2489,7 +2505,8 @@ export class SessionService {
         };
       }
 
-      const preferSnapshot = metadata.lifecycle.preparedAt !== undefined;
+      const preferSnapshot =
+        metadata.clone !== undefined || metadata.lifecycle.preparedAt !== undefined;
       onProgress?.('kilo_session', preferSnapshot ? 'Restoring session…' : 'Importing session…');
       await this.restoreOrBootstrapKiloSession(
         sandbox,
@@ -2497,6 +2514,7 @@ export class SessionService {
         metadata.auth.kiloSessionId,
         workspacePath,
         preferSnapshot,
+        metadata.clone !== undefined,
         {
           devcontainer,
           dockerEnv,
@@ -2695,9 +2713,14 @@ export class SessionService {
    *
    * GitHub App installation tokens expire after ~1h, and server-resolved GitLab
    * credentials can rotate independently of a warm workspace. The URL-embedded
-   * credentials from the original clone go stale quickly. `GH_TOKEN` /
-   * `GITLAB_TOKEN` env vars don't rescue `git` itself (they only affect the
-   * provider CLIs / GitLab HTTP integrations), so we rewrite `origin` whenever
+   * credentials from the original clone go stale quickly.
+   *
+   * The pinned `credential.helper` (`SYSTEM_GIT_CONFIG_ENV`) does serve `git`
+   * itself from `GH_TOKEN` / `GITLAB_TOKEN`, but it only rescues a remote whose
+   * URL lacks a password: when the URL carries both a username and a password,
+   * git sends that pair and never issues a `get` to the helper (verified against
+   * git 2.50 — on the 401 it only calls `erase`). A stale embedded pair
+   * therefore fails the fetch outright, so we still rewrite `origin` whenever
    * the token is resolved by us.
    */
   private async refreshGitRemoteToken(
@@ -2744,6 +2767,7 @@ export class SessionService {
     kiloSessionId: string,
     workspacePath: string,
     preferSnapshot: boolean,
+    requireSnapshot: boolean,
     options: RestoreRuntimeOptions
   ): Promise<void> {
     if (preferSnapshot) {
@@ -2755,8 +2779,16 @@ export class SessionService {
         options
       );
       if (restored) return;
+      if (requireSnapshot) {
+        throw new SessionSnapshotRestoreError('Session snapshot required but not found');
+      }
     }
 
+    // Non-clone sessions keep the empty-import fallback on a 404. This mirrors
+    // the old empty-first-preparation behavior, where a first preparation
+    // without a clone bootstrapped an empty session instead of attempting
+    // snapshot restore. Remove this fallback only after old prepared sessions
+    // age out.
     await this.bootstrapKiloSession(sandbox, session, kiloSessionId, workspacePath, options);
   }
 
@@ -2913,16 +2945,20 @@ export class SessionService {
     env: PersistenceEnv,
     organizationId: string | undefined,
     createdOnPlatform: string,
-    title?: string
-  ): Promise<void> {
+    title?: string,
+    gitUrl?: string,
+    cloneFromKiloSessionId?: string
+  ): Promise<CreateSessionForCloudAgentResult | undefined> {
     try {
-      await env.SESSION_INGEST.createSessionForCloudAgent({
+      return await env.SESSION_INGEST.createSessionForCloudAgent({
         sessionId: kiloSessionId,
         kiloUserId,
         cloudAgentSessionId,
         organizationId,
         createdOnPlatform,
         title,
+        gitUrl,
+        cloneFromKiloSessionId,
       });
     } catch (error) {
       logger
@@ -2945,13 +2981,14 @@ export class SessionService {
     kiloSessionId: string,
     kiloUserId: string,
     env: PersistenceEnv,
-    opts?: { onlyIfEmpty?: boolean }
+    opts?: { onlyIfEmpty?: boolean; cloneSourceSessionId?: string }
   ): Promise<void> {
     try {
       await env.SESSION_INGEST.deleteSessionForCloudAgent({
         sessionId: kiloSessionId,
         kiloUserId,
         onlyIfEmpty: opts?.onlyIfEmpty,
+        cloneSourceSessionId: opts?.cloneSourceSessionId,
       });
     } catch (error) {
       logger

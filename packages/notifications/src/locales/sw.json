@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Kikao chako cha wakala kimepokea sasisho",
+      "chatMessage": "Una ujumbe mpya",
+      "instanceLifecycle": "Mfano wako umepokea sasisho",
+      "scheduledAction": "Kitendo kilichopangwa kimepokea sasisho",
+      "lowBalance": "Usawa wako unahitaji umakini",
+      "securityFinding": "Tokeo la usalama linahitaji umakini"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Kazi imekamilika"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Imeshindwa: {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Imekatizwa: {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Isiyo na jina",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Arifa ya salio la chini",
+      "body": "Usawa wa {{organizationName}} ulishuka chini ya ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Tokeo jipya la usalama ({{severity}})",
+      "body": "{{findingTitle}} katika {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Onyo la SLA",
+      "body": "{{findingTitle}} katika {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Ukiukaji wa SLA",
+      "body": "{{findingTitle}} katika {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Tokeo la usalama linahitaji umakini"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} iko tayari",
+      "body": "Gusa ili uanze kuzungumza."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} imeshindwa kuanza",
+      "body": "Kuanza kumeshindwa."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} itaanzishwa upya hivi karibuni",
+      "body": "Imepangwa kuanzishwa upya saa {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Kuanzishwa upya kwa {{instanceName}} kumegairiwa",
+      "body": "Kuanzishwa upya kuliopangwa hapo awali kumegairiwa."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} itasasishwa hivi karibuni",
+      "bodyWithTag": "Sasisha hadi {{targetImageTag}} saa {{when}}.",
+      "bodyWithoutTag": "Sasisho lililopangwa saa {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Sasisho la {{instanceName}} limeghairiwa",
+      "body": "Sasisho liliopangwa hapo awali limeghairiwa."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Kikao chako cha Kilo kiko tayari kudhibitiwa kutoka kwenye simu yako"
+  }
+}

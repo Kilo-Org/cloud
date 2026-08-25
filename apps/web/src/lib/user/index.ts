@@ -1442,6 +1442,7 @@ export async function anonymizeCloudUserData(
           .where(eq(kiloclaw_instances.user_id, userId))
       )
     );
+  // Locale is account-adjacent and is removed with the token row.
   await tx.delete(user_push_tokens).where(eq(user_push_tokens.user_id, userId));
   await tx
     .delete(user_notification_preferences)

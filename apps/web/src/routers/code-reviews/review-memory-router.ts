@@ -6,6 +6,7 @@ import { runReviewMemoryAnalysis } from '@/lib/code-reviews/review-memory/aggreg
 import {
   countActiveProposals,
   listProposals,
+  listProposalsPage,
   listRepositoriesWithRecentFeedback,
   rejectProposal,
   updateProposal,
@@ -81,6 +82,29 @@ export const reviewMemoryRouter = createTRPCRouter({
         repoFullName: input.repoFullName,
         statuses: input.statuses,
         limit: input.limit,
+      });
+    }),
+
+  // Compatibility: `listProposals` above keeps the deployed array shape for
+  // the web panel and stale client bundles. The paginated shape is additive.
+  listProposalsPage: baseProcedure
+    .input(
+      PlatformOwnerInputSchema.extend({
+        repoFullName: z.string().min(1).optional(),
+        statuses: z.array(ProposalStatusSchema).optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+        cursor: z.string().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const owner = await ownerFromInput(ctx, input);
+      return await listProposalsPage({
+        owner,
+        platform: input.platform,
+        repoFullName: input.repoFullName,
+        statuses: input.statuses,
+        limit: input.limit,
+        cursor: input.cursor,
       });
     }),
 

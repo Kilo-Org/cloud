@@ -2,6 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Bell, Clock, Cpu, FolderGit2, Zap } from '@/components/ui/icons';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Switch, View } from 'react-native';
 
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
@@ -11,6 +12,7 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
 import {
   useSecurityAgentCapability,
   useSecurityAgentConfig,
@@ -18,13 +20,15 @@ import {
   useSetSecurityAgentEnabled,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { capitalize } from '@/lib/utils';
 
 function SettingsOverviewSkeleton() {
+  const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Settings" />
+      <ScreenHeader title={t('securityAgent.settingsOverview.title')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-12 w-full rounded-lg" />
@@ -38,12 +42,12 @@ type SettingsOverviewPresentation = 'inline' | 'route';
 
 function getDisabledCopy(canManage: boolean, hasEffectiveRepo: boolean): string {
   if (!canManage) {
-    return 'Security Agent is disabled. Only organization owners and billing managers can turn it on.';
+    return i18n.t('securityAgent.settingsOverview.disabledNoManage');
   }
   if (!hasEffectiveRepo) {
-    return 'Select at least one repository before enabling Security Agent.';
+    return i18n.t('securityAgent.settingsOverview.disabledNoRepo');
   }
-  return 'Turn on Security Agent to sync Dependabot alerts, choose repositories, and configure automation.';
+  return i18n.t('securityAgent.settingsOverview.disabledPrompt');
 }
 
 export function SettingsOverviewScreen({
@@ -51,8 +55,10 @@ export function SettingsOverviewScreen({
   presentation = 'inline',
 }: Readonly<{ scope: string; presentation?: SettingsOverviewPresentation }>) {
   const router = useRouter();
+  const { t } = useTranslation();
   const config = useSecurityAgentConfig(scope);
-  const canManage = useSecurityAgentCapability(scope).canManage;
+  const capability = useSecurityAgentCapability(scope);
+  const committedConnectivity = useCommittedConnectivityStatus();
   const setEnabled = useSetSecurityAgentEnabled(scope);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
   const repositories = useSecurityAgentRepositories(scope);
@@ -72,17 +78,29 @@ export function SettingsOverviewScreen({
     trackRef.current({ interaction: 'settings_config_viewed' });
   }, []);
 
-  if (config.isError && !config.data) {
+  if (
+    !config.data &&
+    (config.isError || (config.fetchStatus === 'paused' && committedConnectivity === 'offline'))
+  ) {
     return (
       <PlatformErrorScreen
-        title="Settings"
+        title={t('securityAgent.settingsOverview.title')}
         variant="offline"
-        message="Could not load Security Agent settings"
+        message={t('securityAgent.settingsOverview.couldNotLoadSettings')}
         onRetry={() => void config.refetch()}
       />
     );
   }
-  if (config.isLoading || !config.data) {
+  if (capability.status === 'error') {
+    return (
+      <PlatformErrorScreen
+        title={t('securityAgent.settingsOverview.title')}
+        message={t('securityAgent.settingsOverview.couldNotLoadPermissions')}
+        onRetry={() => void capability.refetch()}
+      />
+    );
+  }
+  if (config.isLoading || !config.data || capability.status === 'loading') {
     return <SettingsOverviewSkeleton />;
   }
 
@@ -105,11 +123,18 @@ export function SettingsOverviewScreen({
   // offer a direct path to the repo picker. Hide the CTA only when the repo set
   // is settled and empty (nothing to select); a loading or failed repo query
   // keeps the CTA reachable.
-  const showRepoCta = !data.isEnabled && canManage && !hasEffectiveRepo && !repositoriesEmpty;
-  const repoCountLabel =
-    data.repositorySelectionMode === 'all'
-      ? 'All repositories'
-      : `${data.selectedRepositoryIds.length} ${data.selectedRepositoryIds.length === 1 ? 'repository' : 'repositories'} selected`;
+  const showRepoCta =
+    !data.isEnabled && capability.canManage && !hasEffectiveRepo && !repositoriesEmpty;
+  let repoCountLabel = t('securityAgent.settingsOverview.repositoriesSelected', {
+    count: data.selectedRepositoryIds.length,
+  });
+  if (data.repositorySelectionMode === 'all') {
+    repoCountLabel = t('securityAgent.settingsOverview.allRepositories');
+  } else if (data.selectedRepositoryIds.length === 1) {
+    repoCountLabel = t('securityAgent.settingsOverview.repositorySelected', {
+      count: data.selectedRepositoryIds.length,
+    });
+  }
   const automationEnabledCount = [
     data.autoAnalysisEnabled,
     data.autoRemediationEnabled,
@@ -155,7 +180,7 @@ export function SettingsOverviewScreen({
   // connected-but-disabled counterpart: settings-overview-screen is where
   // scope-entry redirects once the agent is disabled, so the same action
   // needs to be reachable here too.
-  const auditAction = canManage ? <AuditReportButton scope={scope} /> : null;
+  const auditAction = capability.canManage ? <AuditReportButton scope={scope} /> : null;
 
   // Render the disabled-agent copy in three states: a still-loading repo set
   // (skeleton), a failed repo set (error + Retry), or a settled set (copy).
@@ -167,45 +192,49 @@ export function SettingsOverviewScreen({
       return (
         <View className="flex-row items-center gap-2">
           <Text variant="muted" className="text-xs">
-            Could not load repositories
+            {t('securityAgent.settingsOverview.couldNotLoadRepositories')}
           </Text>
           <Text
             className="text-xs font-medium text-primary"
             onPress={() => void repositories.refetch()}
           >
-            Retry
+            {t('common.retry')}
           </Text>
         </View>
       );
     }
     return (
       <Text variant="muted" className="text-xs">
-        {getDisabledCopy(canManage, hasEffectiveRepo)}
+        {getDisabledCopy(capability.canManage, hasEffectiveRepo)}
       </Text>
     );
   };
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Settings" headerRight={auditAction} />
+      <ScreenHeader title={t('securityAgent.settingsOverview.title')} headerRight={auditAction} />
       <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
         <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
           <View className="flex-1 pr-3">
-            <Text className="text-sm font-medium">Security Agent</Text>
+            <Text className="text-sm font-medium">
+              {t('securityAgent.settingsOverview.securityAgent')}
+            </Text>
             <Text variant="muted" className="text-xs">
-              {data.isEnabled ? repoCountLabel : 'Disabled'}
+              {data.isEnabled ? repoCountLabel : t('securityAgent.settingsOverview.disabled')}
             </Text>
           </View>
-          {canManage ? (
+          {capability.canManage ? (
             <Switch
-              accessibilityLabel="Security Agent"
+              accessibilityLabel={t('securityAgent.settingsOverview.securityAgent')}
               value={data.isEnabled}
               disabled={setEnabled.isPending || (!data.isEnabled && !hasEffectiveRepo)}
               onValueChange={handleToggle}
             />
           ) : (
             <Text variant="muted" className="text-xs">
-              {data.isEnabled ? 'Enabled' : 'Disabled'}
+              {data.isEnabled
+                ? t('securityAgent.settingsOverview.enabled')
+                : t('securityAgent.settingsOverview.disabled')}
             </Text>
           )}
         </View>
@@ -216,8 +245,8 @@ export function SettingsOverviewScreen({
             {showRepoCta ? (
               <ConfigureRow
                 icon={FolderGit2}
-                title="Select repositories"
-                subtitle="Choose which repositories Security Agent monitors"
+                title={t('securityAgent.settingsOverview.selectRepositories')}
+                subtitle={t('securityAgent.settingsOverview.selectRepositoriesSubtitle')}
                 onPress={() => {
                   router.push(getSecurityAgentPath(scope, 'settings/repositories'));
                 }}
@@ -230,7 +259,7 @@ export function SettingsOverviewScreen({
           <View>
             <ConfigureRow
               icon={FolderGit2}
-              title="Repositories"
+              title={t('securityAgent.settingsOverview.repositories')}
               subtitle={repoCountLabel}
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'settings/repositories'));
@@ -238,17 +267,23 @@ export function SettingsOverviewScreen({
             />
             <ConfigureRow
               icon={Cpu}
-              title="Models & analysis"
-              subtitle={`${capitalize(data.analysisMode)} analysis`}
+              title={t('securityAgent.settingsOverview.modelsAndAnalysis')}
+              subtitle={t('securityAgent.settingsOverview.analysisModeSubtitle', {
+                mode: capitalize(data.analysisMode),
+              })}
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'settings/analysis'));
               }}
             />
             <ConfigureRow
               icon={Zap}
-              title="Automation"
+              title={t('securityAgent.settingsOverview.automation')}
               subtitle={
-                automationEnabledCount === 0 ? 'All off' : `${automationEnabledCount} of 3 enabled`
+                automationEnabledCount === 0
+                  ? t('securityAgent.settingsOverview.automationAllOff')
+                  : t('securityAgent.settingsOverview.automationCount', {
+                      count: automationEnabledCount,
+                    })
               }
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'settings/automation'));
@@ -256,11 +291,13 @@ export function SettingsOverviewScreen({
             />
             <ConfigureRow
               icon={Bell}
-              title="Notifications"
+              title={t('securityAgent.settingsOverview.notifications')}
               subtitle={
                 notificationsEnabledCount === 0
-                  ? 'Off'
-                  : `${notificationsEnabledCount} of 2 enabled`
+                  ? t('securityAgent.settingsOverview.off')
+                  : t('securityAgent.settingsOverview.notificationsCount', {
+                      count: notificationsEnabledCount,
+                    })
               }
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'settings/notifications'));
@@ -268,8 +305,12 @@ export function SettingsOverviewScreen({
             />
             <ConfigureRow
               icon={Clock}
-              title="SLA policy"
-              subtitle={data.slaEnabled ? 'On' : 'Off'}
+              title={t('securityAgent.settingsOverview.slaPolicy')}
+              subtitle={
+                data.slaEnabled
+                  ? t('securityAgent.settingsOverview.on')
+                  : t('securityAgent.settingsOverview.off')
+              }
               last
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'settings/sla'));

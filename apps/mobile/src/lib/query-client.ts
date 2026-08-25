@@ -2,6 +2,7 @@ import { MutationCache, type Query, QueryCache, QueryClient } from '@tanstack/re
 import { z } from 'zod';
 
 import { handleTrpcQueryError } from '@/lib/auth/trpc-unauthorized';
+import { reportTrpcError } from '@/lib/force-update-signal';
 
 // tRPC error codes that retrying can never fix — surface these immediately
 // instead of sitting on a skeleton through the default retry backoff.
@@ -97,6 +98,8 @@ export function createKiloAppQueryClient(): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
+        // Foreground freshness is owned per route by useRouteForegroundRefresh mounts; the blanket focusManager refetch also woke frozen background tabs.
+        refetchOnWindowFocus: false,
         retry: (failureCount, error) => {
           const code = (error as { data?: { code?: string } } | null)?.data?.code;
           if (code !== undefined && PERMANENT_CODES.has(code)) {
@@ -110,6 +113,7 @@ export function createKiloAppQueryClient(): QueryClient {
     queryCache: new QueryCache({
       onError: (error, query) => {
         void handleTrpcQueryError(error);
+        reportTrpcError(error);
         // Removing a still-observed query rebuilds it on the next render and
         // refetches, which fails FORBIDDEN again and loops for as long as the
         // error screen stays mounted. Only drop queries nothing is observing.
@@ -121,6 +125,7 @@ export function createKiloAppQueryClient(): QueryClient {
     mutationCache: new MutationCache({
       onError: error => {
         void handleTrpcQueryError(error);
+        reportTrpcError(error);
       },
     }),
   });

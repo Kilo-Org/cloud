@@ -3,6 +3,7 @@ import { CONVERSATION_TITLE_MAX_CHARS, type ConversationListItem } from '@kiloco
 import * as Haptics from 'expo-haptics';
 import { MessageSquare, MoreVertical } from '@/components/ui/icons';
 import { Alert, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RenameModal } from '@/components/rename-modal';
@@ -19,10 +20,6 @@ type ConversationRowProps = {
   onPress: (conversationId: string) => void;
   onLeave: (conversationId: string) => void;
 };
-
-function conversationTitle(conversation: ConversationListItem): string {
-  return conversation.title ?? 'Untitled conversation';
-}
 
 function conversationTimestamp(conversation: ConversationListItem): number {
   return conversation.lastActivityAt ?? conversation.joinedAt;
@@ -42,6 +39,7 @@ export function ConversationRow({
   onLeave,
 }: Readonly<ConversationRowProps>) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
   const client = useKiloChatClient();
@@ -50,14 +48,14 @@ export function ConversationRow({
     conversation.conversationId,
     sandboxId
   );
-  const title = conversationTitle(conversation);
+  const title = conversation.title ?? t('chat.conversation.untitledConversation');
 
   function confirmLeave() {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert('Leave conversation?', 'This removes it from your list.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('chat.conversation.leaveTitle'), t('chat.conversation.leaveMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Leave',
+        text: t('chat.conversation.leave'),
         style: 'destructive',
         onPress: () => {
           onLeave(conversation.conversationId);
@@ -71,7 +69,7 @@ export function ConversationRow({
     showActionSheetWithOptions(
       {
         title: title,
-        options: ['Rename', 'Leave', 'Cancel'],
+        options: [t('chat.conversation.rename'), t('chat.conversation.leave'), t('common.cancel')],
         cancelButtonIndex: 2,
         destructiveButtonIndex: 1,
         containerStyle: { paddingBottom: bottom },
@@ -91,7 +89,7 @@ export function ConversationRow({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={title}
-        accessibilityHint="Opens the conversation. Long press for rename and leave options."
+        accessibilityHint={t('chat.conversation.openHint')}
         className="min-h-16 flex-row items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 active:opacity-80"
         onPress={() => {
           onPress(conversation.conversationId);
@@ -112,7 +110,10 @@ export function ConversationRow({
           </View>
           <View className="flex-row items-center gap-2">
             {hasUnread(conversation) ? (
-              <View className="h-2.5 w-2.5 rounded-full bg-primary" accessibilityLabel="Unread" />
+              <View
+                className="h-2.5 w-2.5 rounded-full bg-primary"
+                accessibilityLabel={t('chat.conversation.unread')}
+              />
             ) : null}
             <Text variant="muted" numberOfLines={1}>
               {timeAgo(new Date(conversationTimestamp(conversation)))}
@@ -121,7 +122,7 @@ export function ConversationRow({
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Conversation options for ${title}`}
+          accessibilityLabel={t('chat.conversation.optionsFor', { title })}
           hitSlop={8}
           className="h-11 w-11 items-center justify-center rounded-full active:bg-muted"
           onPress={openActions}
@@ -131,8 +132,8 @@ export function ConversationRow({
       </Pressable>
       {renaming && (
         <RenameModal
-          title="Rename conversation"
-          placeholder="Enter a new name"
+          title={t('chat.conversation.renameTitle')}
+          placeholder={t('chat.conversation.renamePlaceholder')}
           initialValue={conversation.title ?? ''}
           maxLength={CONVERSATION_TITLE_MAX_CHARS}
           onSave={saveRename}

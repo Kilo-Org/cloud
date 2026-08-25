@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "Votre session d'agent a une mise à jour",
+      "chatMessage": "Vous avez un nouveau message",
+      "instanceLifecycle": "Votre instance a une mise à jour",
+      "scheduledAction": "Une action planifiée a une mise à jour",
+      "lowBalance": "Votre solde nécessite une attention",
+      "securityFinding": "Un résultat de sécurité nécessite une attention"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "Tâche terminée"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "Échec : {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "Interrompu : {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · Sans titre",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "Alerte de solde faible",
+      "body": "Le solde de {{organizationName}} est passé sous ${{minimumBalanceUsd}}"
+    },
+    "securityFindingNew": {
+      "title": "Nouveau résultat de sécurité ({{severity}})",
+      "body": "{{findingTitle}} dans {{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "Avertissement SLA",
+      "body": "{{findingTitle}} dans {{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "Violation SLA",
+      "body": "{{findingTitle}} dans {{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "Un résultat de sécurité nécessite une attention"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} est prête",
+      "body": "Appuyez pour commencer à discuter."
+    },
+    "startFailed": {
+      "title": "{{instanceName}} n'a pas pu démarrer",
+      "body": "Échec du démarrage."
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} va bientôt redémarrer",
+      "body": "Redémarrage prévu à {{when}}."
+    },
+    "restartCancelled": {
+      "title": "Redémarrage de {{instanceName}} annulé",
+      "body": "Le redémarrage précédemment prévu a été annulé."
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} va bientôt être mise à niveau",
+      "bodyWithTag": "Mise à niveau vers {{targetImageTag}} à {{when}}.",
+      "bodyWithoutTag": "Mise à niveau prévue à {{when}}."
+    },
+    "versionChangeCancelled": {
+      "title": "Mise à niveau de {{instanceName}} annulée",
+      "body": "La mise à niveau précédemment prévue a été annulée."
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "Votre session Kilo est prête à être contrôlée depuis votre téléphone"
+  }
+}

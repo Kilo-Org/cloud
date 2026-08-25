@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { z } from 'zod';
 
+import { SECURITY_COMMAND_TYPES } from '@kilocode/app-shared/security-agent';
+
 import {
   ACCESS_REQUIRED_SHOWN_EVENT,
   ANALYTICS_EVENT_SCHEMAS,
   APP_STARTUP_EVENT,
   CLAW_WEATHER_LOCATION_SELECTED_EVENT,
   CLAW_WEATHER_LOCATION_SKIPPED_EVENT,
+  CODE_REVIEW_SETTLED_EVENT,
   COMPLETION_REACHED_EVENT,
   CONVERSATION_CREATED_EVENT,
   FEEDBACK_SUBMITTED_EVENT,
@@ -27,6 +30,8 @@ import {
   PURCHASE_SETTLED_EVENT,
   QUESTION_ANSWERED_EVENT,
   SECURITY_COMMAND_SETTLED_EVENT,
+  SECURITY_INTENT_FOR_COMMAND_TYPE,
+  SECURITY_INTENTS,
   SESSION_CREATED_EVENT,
   SESSION_CREATE_SETTLED_EVENT,
   SESSION_VIEWED_EVENT,
@@ -62,6 +67,7 @@ const ALL_EVENT_CONSTANTS = [
   SESSION_CREATE_SETTLED_EVENT,
   PR_OPERATION_SETTLED_EVENT,
   SECURITY_COMMAND_SETTLED_EVENT,
+  CODE_REVIEW_SETTLED_EVENT,
   PURCHASE_SETTLED_EVENT,
 ];
 
@@ -173,7 +179,7 @@ describe('phase classification', () => {
       KILO_PASS_PURCHASE_COMPLETED_EVENT,
       APP_STARTUP_EVENT,
     ];
-    expect(terminal).toHaveLength(4);
+    expect(terminal).toHaveLength(5);
     for (const name of TERMINAL_PHASE_EVENTS) {
       expect(ANALYTICS_EVENT_SCHEMAS).toHaveProperty(name);
     }
@@ -191,6 +197,41 @@ describe('phase classification', () => {
       );
       expect(schema.safeParse({ phase: 'accepted' }).success).toBe(false);
     }
+  });
+});
+
+describe('security intent map', () => {
+  it('keys the map by the shared command-type authority', () => {
+    expect(new Set(Object.keys(SECURITY_INTENT_FOR_COMMAND_TYPE))).toEqual(
+      new Set(SECURITY_COMMAND_TYPES)
+    );
+  });
+
+  it('maps every command type to exactly one intent and covers every intent', () => {
+    const commandTypes = Object.keys(SECURITY_INTENT_FOR_COMMAND_TYPE);
+    const intents = Object.values(SECURITY_INTENT_FOR_COMMAND_TYPE);
+
+    // The map is a bijection: every command type has exactly one intent and no
+    // two command types share an intent.
+    expect(commandTypes).toHaveLength(4);
+    expect(new Set(intents).size).toBe(commandTypes.length);
+
+    // The intents cover every SECURITY_INTENTS member. `sync` maps to
+    // `manual_sync`, so an array-equality assertion between the command types
+    // and the intents can never pass.
+    expect(new Set(intents)).toEqual(new Set(SECURITY_INTENTS));
+  });
+
+  it('pins the exact command-to-intent pairing', () => {
+    // A value swap (e.g. `sync: 'dismiss_finding'`) would pass the key-set and
+    // value-set assertions above, so pin the whole map. `sync` must map to the
+    // legacy ledger intent `manual_sync` that deployed producers emit.
+    expect(SECURITY_INTENT_FOR_COMMAND_TYPE).toEqual({
+      sync: 'manual_sync',
+      dismiss_finding: 'dismiss_finding',
+      start_analysis: 'start_analysis',
+      apply_auto_remediation: 'apply_auto_remediation',
+    });
   });
 });
 
@@ -230,6 +271,9 @@ describe('app_startup validation', () => {
         splash_hidden: 85,
       }).success
     ).toBe(true);
+    expect(startupSchema.safeParse({ outcome: 'language-error', splash_hidden: 90 }).success).toBe(
+      true
+    );
   });
 
   it('rejects an invalid startup outcome', () => {

@@ -1,0 +1,94 @@
+{
+  "generic": {
+    "title": "Kilo",
+    "body": {
+      "cloudAgentSession": "የወኪል ክፍለ-ጊዜዎ ማዘመኛ አለው",
+      "chatMessage": "አዲስ መልእክት አለዎት",
+      "instanceLifecycle": "ምሳሌዎ ማዘመኛ አለው",
+      "scheduledAction": "የተያዘ ተግባር ማዘመኛ አለው",
+      "lowBalance": "ቀሪ ሂሳብዎ ትኩረት ይፈልጋል",
+      "securityFinding": "የደህንነት ግኝት ትኩረት ይፈልጋል"
+    }
+  },
+  "cloudAgentSession": {
+    "completed": {
+      "title": "{{sessionTitle}}",
+      "body": "ተግባር ተጠናቋል"
+    },
+    "failed": {
+      "title": "{{sessionTitle}}",
+      "body": "አልተሳካም፦ {{detail}}"
+    },
+    "interrupted": {
+      "title": "{{sessionTitle}}",
+      "body": "ተቋርጧል፦ {{detail}}"
+    }
+  },
+  "agentSession": {
+    "notification": {
+      "title": "{{sessionTitle}}",
+      "body": "{{message}}"
+    }
+  },
+  "chat": {
+    "untitled": {
+      "title": "{{sandboxLabel}} · ያለርዕስ",
+      "body": "{{bodyPreview}}"
+    }
+  },
+  "internal": {
+    "lowBalance": {
+      "title": "ዝቅተኛ ቀሪ-ሂሳብ ማንቂያ",
+      "body": "የ{{organizationName}} ቀሪ ሂሳብ ከ${{minimumBalanceUsd}} በታች ወርዷል"
+    },
+    "securityFindingNew": {
+      "title": "አዲስ የደህንነት ግኝት ({{severity}})",
+      "body": "{{findingTitle}} በ{{repoFullName}}"
+    },
+    "securityFindingSlaWarning": {
+      "title": "የSLA ማስጠንቀቂያ",
+      "body": "{{findingTitle}} በ{{repoFullName}}"
+    },
+    "securityFindingSlaBreach": {
+      "title": "የSLA ጥሰት",
+      "body": "{{findingTitle}} በ{{repoFullName}}"
+    },
+    "securityLifecycle": {
+      "title": "Kilo",
+      "body": "የደህንነት ግኝት ትኩረት ይፈልጋል"
+    }
+  },
+  "instanceLifecycle": {
+    "ready": {
+      "title": "{{instanceName}} ዝግጁ ነው",
+      "body": "ውይይት ለመጀመር ይንኩ።"
+    },
+    "startFailed": {
+      "title": "{{instanceName}} ማስጀመር አልተሳካም",
+      "body": "ማስጀመር አልተሳካም።"
+    }
+  },
+  "scheduledAction": {
+    "restartNotice": {
+      "title": "{{instanceName}} በቅርቡ እንደገና ይጀመራል",
+      "body": "በ{{when}} እንደገና ለመጀመር የተያዘ።"
+    },
+    "restartCancelled": {
+      "title": "የ{{instanceName}} እንደገና መጀመር ተሰርዟል",
+      "body": "ከዚህ ቀደም የተያዘው እንደገና መጀመር ተሰርዟል።"
+    },
+    "versionChangeNotice": {
+      "title": "{{instanceName}} በቅርቡ ያሻሽላል",
+      "bodyWithTag": "በ{{when}} ወደ {{targetImageTag}} ያሻሽሉ።",
+      "bodyWithoutTag": "በ{{when}} የተያዘ ማሻሻያ።"
+    },
+    "versionChangeCancelled": {
+      "title": "የ{{instanceName}} ማሻሻያ ተሰርዟል",
+      "body": "ከዚህ ቀደም የተያዘው ማሻሻያ ተሰርዟል።"
+    }
+  },
+  "sessionReady": {
+    "title": "{{sessionTitle}}",
+    "body": "የKilo ክፍለ-ጊዜዎ ከስልክዎ ለመቆጣጠር ዝግጁ ነው"
+  }
+}

@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router';
-import { ChevronDown, ChevronLeft } from '@/components/ui/icons';
-import { Platform, Pressable, View } from 'react-native';
+import { ChevronDown } from '@/components/ui/icons';
+import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
+import { I18nManager, Platform, Pressable, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
@@ -48,6 +50,7 @@ export function ScreenHeader({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const canGoBack = showBackButton ?? router.canGoBack();
 
   // iOS modals are presented as cards already inset from the status bar
@@ -75,10 +78,11 @@ export function ScreenHeader({
     titleNode = onTitlePress ? (
       <Pressable
         onPress={onTitlePress}
-        hitSlop={13}
+        hitSlop={{ top: 13, right: 13, bottom: 13, left: 0 }}
         accessibilityRole="button"
         accessibilityLabel={
-          onTitlePressAccessibilityLabel ?? (title ? `Open menu for ${title}` : 'Open menu')
+          onTitlePressAccessibilityLabel ??
+          (title ? t('screenHeader.openMenuFor', { title }) : t('screenHeader.openMenu'))
         }
         className="active:opacity-70"
       >
@@ -102,15 +106,16 @@ export function ScreenHeader({
                   router.back();
                 }
               }}
-              hitSlop={12}
               accessibilityRole="button"
-              accessibilityLabel={resolvedBackIcon === 'close' ? 'Close' : 'Go back'}
-              className="-ml-1 mr-1 shrink-0 active:opacity-70"
+              accessibilityLabel={
+                resolvedBackIcon === 'close' ? t('screenHeader.close') : t('screenHeader.goBack')
+              }
+              className={`${I18nManager.isRTL ? '-mr-4' : '-ml-4'} h-11 w-11 shrink-0 items-center justify-center active:opacity-70`}
             >
               {resolvedBackIcon === 'close' ? (
                 <ChevronDown size={24} color={colors.foreground} />
               ) : (
-                <ChevronLeft size={24} color={colors.foreground} />
+                <DirectionalChevronLeft size={24} color={colors.foreground} />
               )}
             </Pressable>
           )}
@@ -119,7 +124,9 @@ export function ScreenHeader({
             {titleNode}
           </View>
         </View>
-        {headerRight ? <View className="ml-3 shrink-0">{headerRight}</View> : null}
+        {headerRight ? (
+          <View className={`${I18nManager.isRTL ? 'mr-3' : 'ml-3'} shrink-0`}>{headerRight}</View>
+        ) : null}
       </View>
     </View>
   );

@@ -1,7 +1,17 @@
-import { type ReasoningPart, type TextPart } from '@kilocode/cloud-agent-sdk';
+import {
+  type FilePart,
+  type PatchPart,
+  type ReasoningPart,
+  type TextPart,
+} from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
-import { isPartStreaming, isSnapshotProgressPart, shouldRenderReasoningPart } from './part-types';
+import {
+  isPartStreaming,
+  isPatchPart,
+  isSnapshotProgressPart,
+  shouldRenderReasoningPart,
+} from './part-types';
 
 function makeReasoningPart(text: string, ended = true): ReasoningPart {
   return {
@@ -48,6 +58,32 @@ describe('isSnapshotProgressPart', () => {
   it('is false for non-text parts', () => {
     const part = makeReasoningPart('thinking');
     expect(isSnapshotProgressPart(part)).toBe(false);
+  });
+});
+
+describe('isPatchPart', () => {
+  it('is true for a patch part', () => {
+    const part: PatchPart = {
+      id: 'p1',
+      sessionID: 's1',
+      messageID: 'm1',
+      type: 'patch',
+      hash: 'abc',
+      files: ['src/a.ts'],
+    };
+    expect(isPatchPart(part)).toBe(true);
+  });
+
+  it('is false for a file part', () => {
+    const part: FilePart = {
+      id: 'p1',
+      sessionID: 's1',
+      messageID: 'm1',
+      type: 'file',
+      mime: 'text/plain',
+      url: 'file:///a.txt',
+    };
+    expect(isPatchPart(part)).toBe(false);
   });
 });
 

@@ -15,6 +15,7 @@ import {
   buildGitLabCloneUrl,
   fetchGitLabRepositoriesForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { orderRepositoriesByUsage } from '@/lib/cloud-agent/order-repositories';
 import {
   personalPrepareSessionNextSchema,
   basePrepareSessionNextOutputSchema,
@@ -444,6 +445,15 @@ export const cloudAgentNextRouter = createTRPCRouter({
       return await client.getSession(input.cloudAgentSessionId);
     }),
 
+  getComputeBillingStatus: baseProcedure
+    .input(baseGetSessionNextSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      return await createCloudAgentNextClient(
+        generateCloudAgentToken(ctx.user)
+      ).getComputeBillingStatus(input.cloudAgentSessionId);
+    }),
+
   checkEligibility: baseProcedure.query(async ({ ctx }) => {
     const { balance } = await getBalanceForUser(ctx.user);
     return buildCloudAgentNextEligibility(balance);
@@ -477,7 +487,12 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const result = await fetchGitHubRepositoriesForUser(ctx.user.id, input.forceRefresh);
       return {
-        repositories: result.repositories,
+        repositories: await orderRepositoriesByUsage({
+          userId: ctx.user.id,
+          organizationId: null,
+          platform: 'github',
+          repositories: result.repositories,
+        }),
         integrationInstalled: result.integrationInstalled,
         syncedAt: result.syncedAt,
         errorMessage: result.errorMessage,
@@ -511,7 +526,13 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const result = await fetchGitLabRepositoriesForUser(ctx.user.id, input.forceRefresh);
       return {
-        repositories: result.repositories,
+        repositories: await orderRepositoriesByUsage({
+          userId: ctx.user.id,
+          organizationId: null,
+          platform: 'gitlab',
+          repositories: result.repositories,
+          gitlabInstanceUrl: result.instanceUrl,
+        }),
         integrationInstalled: result.integrationInstalled,
         syncedAt: result.syncedAt,
         errorMessage: result.errorMessage,

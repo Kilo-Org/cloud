@@ -1,3 +1,5 @@
+import { i18n } from '@/i18n';
+
 export type ConsentMode = 'onboarding' | 'review';
 
 type ConsentActions = {
@@ -14,17 +16,17 @@ export function consentModeForSearchParam(mode: string | string[] | undefined): 
 export function getConsentActions(mode: ConsentMode): ConsentActions {
   if (mode === 'review') {
     return {
-      primaryLabel: 'Back',
-      secondaryLabel: 'Revoke consent',
-      destructiveLabel: 'Revoke consent',
-      destructiveTitle: 'Revoke data sharing consent?',
+      primaryLabel: i18n.t('consent.back'),
+      secondaryLabel: i18n.t('consent.revokeConsent'),
+      destructiveLabel: i18n.t('consent.revokeConsent'),
+      destructiveTitle: i18n.t('consent.revokeConsentTitle'),
     };
   }
 
   return {
-    primaryLabel: 'Accept and continue',
-    secondaryLabel: 'Decline',
-    destructiveLabel: 'Decline and sign out',
-    destructiveTitle: 'Decline data sharing?',
+    primaryLabel: i18n.t('consent.acceptAndContinue'),
+    secondaryLabel: i18n.t('consent.decline'),
+    destructiveLabel: i18n.t('consent.declineAndSignOut'),
+    destructiveTitle: i18n.t('consent.declineTitle'),
   };
 }

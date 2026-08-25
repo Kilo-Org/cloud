@@ -7,6 +7,10 @@ import type {
   WorkspaceReady,
 } from '../execution/types.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
+import type { SandboxBillingAdmissionResult } from '../container-usage-context.js';
+import type { SandboxClassName } from '../container-usage-context.js';
+import type { BillingContext } from '@kilocode/container-usage';
+import type { SandboxId } from '../types.js';
 
 export type SandboxDeleteReason = 'explicit' | 'retention-expired' | 'recovery';
 
@@ -24,6 +28,7 @@ export type AgentSandboxFailure =
   | 'runtime_deleted_during_active_work'
   | 'runtime_max_duration_reached'
   | 'runtime_infrastructure_failed'
+  | 'billing_blocked'
   | 'capability_unavailable';
 
 export class AgentSandboxUnavailableError extends Error {
@@ -129,6 +134,18 @@ export type EnsuredWrapper =
  * Provider process, filesystem, and raw sandbox APIs remain private to adapters.
  */
 export type AgentSandbox = {
+  ensureBillingAdmission(): Promise<SandboxBillingAdmissionResult>;
+  isBillingBlocked(enforcementRequested?: boolean): Promise<boolean>;
+  getBillingRuntimeStatus(): Promise<
+    | {
+        sandboxId: SandboxId;
+        sandboxClassName: SandboxClassName;
+        running: boolean;
+        blocked: boolean;
+        context?: BillingContext;
+      }
+    | undefined
+  >;
   ensureWrapper(request: EnsureWrapperRequest): Promise<EnsuredWrapper>;
   discoverSessionWrappers(): Promise<WrapperObservation>;
   /**

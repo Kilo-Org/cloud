@@ -1,12 +1,14 @@
 import { Pressable } from 'react-native';
 import { type Href, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
 
-import { getModeIcon, MODE_OPTIONS } from '@/components/agents/mode-options';
+import { getBuiltinModeLabelKey, getModeIcon } from '@/components/agents/mode-options';
 import {
   type AgentMode,
   dedupeCustomModeOptions,
   ensureSelectedCustomOption,
+  isBuiltinAgentMode,
   type ModeOption,
   normalizeAgentMode,
 } from '@/components/agents/mode-normalize';
@@ -32,12 +34,15 @@ export function ModeSelector({
 }: Readonly<ModeSelectorProps>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const selectedValue = normalizeAgentMode(value);
-  const allOptions = [...MODE_OPTIONS, ...dedupeCustomModeOptions(customOptions)];
-  const selectedOption = ensureSelectedCustomOption(allOptions, selectedValue).find(
+  const customOptionsDeduped = dedupeCustomModeOptions(customOptions);
+  const selectedCustomOption = ensureSelectedCustomOption(customOptionsDeduped, selectedValue).find(
     m => m.value === selectedValue
   );
-  const selectedLabel = selectedOption?.label ?? selectedValue;
+  const selectedLabel = isBuiltinAgentMode(selectedValue)
+    ? t(getBuiltinModeLabelKey(selectedValue) ?? '')
+    : (selectedCustomOption?.label ?? selectedValue);
   const ModeIcon = getModeIcon(selectedValue);
 
   function handlePress() {
@@ -57,7 +62,7 @@ export function ModeSelector({
       onPress={handlePress}
       disabled={disabled}
       accessibilityRole="button"
-      accessibilityLabel={`Mode: ${selectedLabel}`}
+      accessibilityLabel={t('agentChat.modeSelector.accessibility', { label: selectedLabel })}
       accessibilityState={{ disabled }}
       className={cn(
         'flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70',

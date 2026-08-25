@@ -5,7 +5,10 @@ import {
   buildAgentSessionListInput,
   buildAgentSessionSearchInput,
 } from '@/lib/agent-session-input';
-import { buildStoredSessionsQueryOptions } from '@/lib/hooks/use-agent-sessions';
+import {
+  buildAgentSessionSearchQueryOptions,
+  buildStoredSessionsQueryOptions,
+} from '@/lib/hooks/use-agent-sessions';
 
 // The hook module transitively imports react-native (via the user-web-
 // connection lifecycle) and the real tRPC client (via `@/lib/trpc`), which the
@@ -23,8 +26,17 @@ vi.mock('@/lib/active-sessions-live-sync', () => ({
   refreshActiveSessionsNow: vi.fn().mockResolvedValue(false),
 }));
 
+vi.mock('react-native', () => ({
+  InteractionManager: { runAfterInteractions: vi.fn() },
+}));
+
 function createTrpcStub(infiniteQueryOptions: unknown) {
   const stub = { cliSessionsV2: { list: { infiniteQueryOptions } } };
+  return stub as never;
+}
+
+function createSearchTrpcStub(infiniteQueryOptions: unknown) {
+  const stub = { cliSessionsV2: { search: { infiniteQueryOptions } } };
   return stub as never;
 }
 
@@ -197,5 +209,32 @@ describe('buildStoredSessionsQueryOptions', () => {
     });
 
     expect(result.enabled).toBe(false);
+  });
+
+  it('carries a numeric maxPages retention bound', () => {
+    const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
+    const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
+
+    expect(result.maxPages).toBeTypeOf('number');
+  });
+});
+
+describe('buildAgentSessionSearchQueryOptions', () => {
+  it('carries a numeric maxPages retention bound', () => {
+    const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
+    const result = buildAgentSessionSearchQueryOptions(createSearchTrpcStub(infiniteQueryOptions), {
+      searchQuery: 'hello',
+    });
+
+    expect(result.maxPages).toBeTypeOf('number');
+  });
+
+  it('keeps the search-text gating (enabled passthrough)', () => {
+    const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
+    const result = buildAgentSessionSearchQueryOptions(createSearchTrpcStub(infiniteQueryOptions), {
+      searchQuery: 'hello',
+    });
+
+    expect(result.enabled).toBe(true);
   });
 });

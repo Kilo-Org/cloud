@@ -1,4 +1,5 @@
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 
@@ -13,9 +14,12 @@ import { type MarkdownBody } from './read-tool-markdown';
  */
 export function ReadMarkdownBody({ body }: Readonly<{ body: MarkdownBody }>) {
   const textSelectable = useTranscriptTextSelectable();
+  const { t } = useTranslation();
 
   if (body.text === '') {
-    return <Text className="text-xs text-muted-foreground">This file is empty.</Text>;
+    return (
+      <Text className="text-xs text-muted-foreground">{t('agentChat.filePart.fileEmpty')}</Text>
+    );
   }
 
   return (

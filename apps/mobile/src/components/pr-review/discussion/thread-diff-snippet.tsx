@@ -2,6 +2,7 @@
 // discussion thread. Reuses DiffLine (no onTap — static quote only).
 // When truncated, hidden lines are at the TOP (cap keeps the tail).
 
+import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { DiffLine } from '@/components/pr-review/diff/diff-line';
@@ -13,15 +14,18 @@ type ThreadDiffSnippetProps = {
 };
 
 export function ThreadDiffSnippet({ snippet }: Readonly<ThreadDiffSnippetProps>) {
+  const { t } = useTranslation();
   const truncatedCount = snippet.totalLineCount - snippet.lines.length;
   return (
     <View
-      accessibilityLabel="Quoted diff snippet"
+      accessibilityLabel={t('prReview.discussion.quotedDiffSnippet')}
       className="overflow-hidden rounded-lg border border-border"
     >
       {truncatedCount > 0 ? (
         <View className="border-b border-hair-soft px-3 py-1">
-          <Text className="text-xs text-muted-foreground">… {truncatedCount} more lines above</Text>
+          <Text className="text-xs text-muted-foreground">
+            {t('prReview.discussion.moreLinesAbove', { count: truncatedCount })}
+          </Text>
         </View>
       ) : null}
       {snippet.lines.map((line, index) => (

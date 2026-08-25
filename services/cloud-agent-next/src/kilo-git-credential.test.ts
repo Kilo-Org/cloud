@@ -108,7 +108,7 @@ describe('kilo-git-credential', () => {
     expect(defaultHost.stdout).toBe('');
   });
 
-  it('matches GITLAB_HOST and requested host when either includes a port', () => {
+  it('matches GITLAB_HOST and requested host including their port', () => {
     const token = 'kgl2.port';
     const env = { GITLAB_TOKEN: token, GITLAB_HOST: 'gitlab.example.com:8443' };
     const requestedWithPort = runHelper(
@@ -127,9 +127,15 @@ describe('kilo-git-credential', () => {
       env
     );
     expect(requestedWithoutPort.status).toBe(0);
-    const parsedBare = parseCredential(requestedWithoutPort.stdout);
-    expect(parsedBare.username).toBe('oauth2');
-    expectPassword(parsedBare.password, token);
+    expect(requestedWithoutPort.stdout).toBe('');
+  });
+
+  it('does not return a GitHub token for a different port', () => {
+    const result = runHelper('get', credentialInput('https', 'github.com:8443'), {
+      GH_TOKEN: 'kgh2.unused',
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe('');
   });
 
   it('accepts GITLAB_HOST with a scheme and path', () => {

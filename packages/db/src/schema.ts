@@ -2524,6 +2524,9 @@ export const user_auth_provider = pgTable(
     primaryKey({ columns: [table.provider, table.provider_account_id] }),
     index('IDX_user_auth_provider_kilo_user_id').on(table.kilo_user_id),
     index('IDX_user_auth_provider_hosted_domain').on(table.hosted_domain),
+    index('IDX_user_auth_provider_lower_email')
+      .on(sql`lower(${table.email})`)
+      .concurrently(),
   ]
 );
 

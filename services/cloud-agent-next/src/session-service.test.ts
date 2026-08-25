@@ -125,6 +125,53 @@ describe('SessionService.buildRuntimeEnv', () => {
     expect(runtimeEnv.HOME).toBe('/home/agent_test');
     expect(runtimeEnv.SESSION_HOME).toBe('/home/agent_test');
     expect(runtimeEnv[PNPM_STORE_ENV_VAR]).toBe(PNPM_STORE_DIR);
+    expect(runtimeEnv.GIT_CONFIG_COUNT).toBe('2');
+    expect(runtimeEnv.GIT_CONFIG_KEY_0).toBe('credential.helper');
+    expect(runtimeEnv.GIT_CONFIG_VALUE_0).toBe('/opt/kilo-cloud/kilo-git-credential');
+    expect(runtimeEnv.GIT_CONFIG_KEY_1).toBe('credential.useHttpPath');
+    expect(runtimeEnv.GIT_CONFIG_VALUE_1).toBe('false');
+    expect(runtimeEnv.GIT_TERMINAL_PROMPT).toBe('0');
+    expect(runtimeEnv.GIT_CONFIG_NOSYSTEM).toBeUndefined();
+    expect(runtimeEnv.GIT_CONFIG_GLOBAL).toBeUndefined();
+    expect(runtimeEnv.GIT_OPTIONAL_LOCKS).toBeUndefined();
+  });
+
+  it('wins over a profile that tries to override the git credential helper', () => {
+    const service = new SessionService();
+    const context = service.buildContext({
+      sandboxId: 'usr-test',
+      userId: 'user_test',
+      sessionId: 'agent_test',
+      envVars: {
+        GIT_CONFIG_COUNT: '99',
+        GIT_CONFIG_KEY_0: 'user.email',
+        GIT_CONFIG_VALUE_0: 'attacker@example.com',
+        GIT_CONFIG_KEY_1: 'credential.helper',
+        GIT_CONFIG_VALUE_1: '/tmp/evil-helper',
+        GIT_CONFIG_KEY_2: 'credential.helper',
+        GIT_CONFIG_VALUE_2: '/tmp/second-evil-helper',
+        GIT_CONFIG_GLOBAL: '/tmp/evil.gitconfig',
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_TERMINAL_PROMPT: '1',
+      },
+    });
+
+    const runtimeEnv = service.buildRuntimeEnv({
+      context,
+      env: createEnv(),
+      kiloCapability: 'kilo-token',
+    });
+
+    expect(runtimeEnv.GIT_CONFIG_COUNT).toBe('2');
+    expect(runtimeEnv.GIT_CONFIG_KEY_0).toBe('credential.helper');
+    expect(runtimeEnv.GIT_CONFIG_VALUE_0).toBe('/opt/kilo-cloud/kilo-git-credential');
+    expect(runtimeEnv.GIT_CONFIG_KEY_1).toBe('credential.useHttpPath');
+    expect(runtimeEnv.GIT_CONFIG_VALUE_1).toBe('false');
+    expect(runtimeEnv.GIT_TERMINAL_PROMPT).toBe('0');
+    expect(runtimeEnv.GIT_CONFIG_KEY_2).toBeUndefined();
+    expect(runtimeEnv.GIT_CONFIG_VALUE_2).toBeUndefined();
+    expect(runtimeEnv.GIT_CONFIG_GLOBAL).toBeUndefined();
+    expect(runtimeEnv.GIT_CONFIG_NOSYSTEM).toBeUndefined();
   });
 });
 
@@ -3270,14 +3317,17 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         `bb comments create 42 --input - < ${inputPath}`
       )
     ).toBe('allow');
+    expect(result.readyRequest.materialized.env).toMatchObject({
+      GIT_CONFIG_COUNT: '2',
+      GIT_CONFIG_KEY_0: 'credential.helper',
+      GIT_CONFIG_VALUE_0: '/opt/kilo-cloud/kilo-git-credential',
+      GIT_CONFIG_KEY_1: 'credential.useHttpPath',
+      GIT_CONFIG_VALUE_1: 'false',
+      GIT_TERMINAL_PROMPT: '0',
+    });
     for (const key of [
       'GIT_CONFIG_NOSYSTEM',
       'GIT_CONFIG_GLOBAL',
-      'GIT_CONFIG_COUNT',
-      'GIT_CONFIG_KEY_0',
-      'GIT_CONFIG_VALUE_0',
-      'GIT_CONFIG_KEY_1',
-      'GIT_CONFIG_VALUE_1',
       'GIT_CONFIG_KEY_2',
       'GIT_CONFIG_VALUE_2',
       'GIT_OPTIONAL_LOCKS',

@@ -17,6 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
 const ANDROID_PACKAGE = 'com.kilocode.kiloapp';
@@ -25,6 +26,7 @@ const INTENT_FILTER_HOST = 'app.kilo.ai';
 const BUNDLETOOL_URL =
   'https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar';
 const DEBUGSYMBOLS_PREFIX = 'BUNDLE-METADATA/com.android.tools.build.debugsymbols/';
+const SHRINK_SENTINEL = 'kilo_shrink_sentinel_unused';
 const REQUIRED_USAGE_DESCRIPTIONS = [
   'NSMicrophoneUsageDescription',
   'NSSpeechRecognitionUsageDescription',
@@ -262,6 +264,17 @@ function checkSymbols(aabPath) {
   check(aabHasDebugSymbols, `no debug symbols: the AAB has no ${DEBUGSYMBOLS_PREFIX} entries`);
 }
 
+/**
+ * Returns true when the AAB zip has no kilo_shrink_sentinel_unused entry
+ * (resource shrinking stripped the unused raw resource) and false when it does.
+ * Kept side-effect free so tests can import it without touching `failures`.
+ */
+export function checkResourceShrinking(aabPath) {
+  const entries = listZipEntries(aabPath);
+  const sentinelPresent = entries.some(entry => entry.includes(SHRINK_SENTINEL));
+  return !sentinelPresent;
+}
+
 function main() {
   const args = process.argv.slice(2);
   if (args[0] === '--select') {
@@ -283,7 +296,10 @@ function main() {
   inspectIos(ipaPath);
   inspectAndroid(aabPath);
   checkSymbols(aabPath);
+  check(checkResourceShrinking(aabPath), 'unused shrink sentinel still in the AAB');
   reportAndExit();
 }
 
-main();
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}

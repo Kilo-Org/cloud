@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Auto Backup configuration for Android 11 (API 30) and lower.
+
+  Union of the exclusions that expo-secure-store and the AppsFlyer SDK would
+  otherwise each try to declare on <application>:
+    - shared preferences are included wholesale,
+    - the SecureStore shared-preference file is excluded,
+    - the AppsFlyer capture files (appsflyer-data, appsflyer-purchase-data,
+      afpurchases.db) are excluded.
+-->
+<full-backup-content>
+  <include domain="sharedpref" path="."/>
+  <exclude domain="sharedpref" path="SecureStore"/>
+  <exclude domain="sharedpref" path="appsflyer-data"/>
+  <exclude domain="sharedpref" path="appsflyer-purchase-data"/>
+  <exclude domain="database" path="afpurchases.db"/>
+</full-backup-content>

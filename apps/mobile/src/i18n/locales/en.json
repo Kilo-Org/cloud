@@ -2946,7 +2946,7 @@
       "loadMoreFailed": "Couldn't load more.",
       "title": "Credit activity",
       "transactionFallback": "Credit transaction",
-"truncated": "Older credit activity is available.",
+      "truncated": "Older credit activity is available.",
       "category": {
         "organization_custom": "Organization custom",
         "parent_to_child_transfer_in": "Parent to child transfer in",
@@ -2973,7 +2973,7 @@
       "emptyDescription": "Invoices are generated automatically each billing cycle and will appear here once your organization is billed.",
       "emptyTitle": "No invoices",
       "invoiceFallback": "Invoice",
-"loadMore": "Load more",
+      "loadMore": "Load more",
       "loadMoreFailed": "Couldn't load more.",
       "truncated": "Older invoices are available.",
       "title": "Invoices",

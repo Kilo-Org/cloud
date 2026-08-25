@@ -354,7 +354,7 @@ export async function getIntegrationsByOrganization(organizationId: string, plat
         eq(platform_integrations.platform, platform)
       )
     )
-    .orderBy(desc(platform_integrations.created_at));
+    .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id));
 }
 
 /**
@@ -367,12 +367,14 @@ export async function createPendingIntegration({
   userId,
   requester,
   githubRequester,
+  githubRequest,
   githubAppType,
 }: {
   organizationId?: string;
   userId?: string;
   requester: KiloRequester;
   githubRequester?: GitHubRequester;
+  githubRequest?: { id: string; accountId: string; accountLogin: string };
   githubAppType?: 'standard' | 'lite';
 }) {
   // Ensure exactly one of organizationId or userId is provided
@@ -387,6 +389,7 @@ export async function createPendingIntegration({
     pending_approval: {
       requester,
       github_requester: githubRequester,
+      github_request_id: githubRequest?.id,
       status: PENDING_APPROVAL_STATUS.AWAITING_INSTALLATION,
     },
   };
@@ -402,6 +405,8 @@ export async function createPendingIntegration({
       repository_access: null, // Will be set to GitHub's value when approved
       integration_status: INTEGRATION_STATUS.PENDING, // Use integration_status instead of repository_access
       github_app_type: githubAppType ?? 'standard',
+      platform_account_id: githubRequest?.accountId ?? null,
+      platform_account_login: githubRequest?.accountLogin ?? null,
       metadata,
       // Denormalized requester columns for fast indexed queries
       kilo_requester_user_id: requester.kilo_user_id,

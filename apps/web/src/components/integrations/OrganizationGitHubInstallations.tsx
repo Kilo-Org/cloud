@@ -114,7 +114,11 @@ export function OrganizationGitHubInstallations({
         {query.data?.canAdd && (
           <Button onClick={startInstall} disabled={starting} className="shrink-0">
             <Github className="size-4" />
-            {starting ? 'Opening GitHub...' : 'Connect GitHub'}
+            {starting
+              ? 'Opening GitHub...'
+              : installations.length
+                ? 'Add organization'
+                : 'Connect GitHub'}
           </Button>
         )}
       </CardHeader>

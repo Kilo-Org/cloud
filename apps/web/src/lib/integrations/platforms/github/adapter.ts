@@ -9,6 +9,37 @@ import { type GitHubAppType, getGitHubAppCredentials } from './app-selector';
 
 export type { GitHubAppType } from './app-selector';
 
+export type GitHubInstallationRequest = {
+  id: string;
+  accountId: string;
+  accountLogin: string;
+  requesterId: string | null;
+  requesterLogin: string | null;
+};
+
+export async function fetchGitHubInstallationRequests(
+  appType: GitHubAppType = 'standard'
+): Promise<GitHubInstallationRequest[]> {
+  const credentials = getGitHubAppCredentials(appType);
+  const auth = createAppAuth({ appId: credentials.appId, privateKey: credentials.privateKey });
+  const { token } = await auth({ type: 'app' });
+  const octokit = new Octokit({ auth: token });
+  const requests = await octokit.paginate(
+    octokit.apps.listInstallationRequestsForAuthenticatedApp,
+    {
+      per_page: 100,
+    }
+  );
+
+  return requests.map(request => ({
+    id: request.id.toString(),
+    accountId: request.account.id.toString(),
+    accountLogin: 'login' in request.account ? request.account.login : request.account.slug,
+    requesterId: request.requester?.id?.toString() ?? null,
+    requesterLogin: request.requester?.login ?? null,
+  }));
+}
+
 /**
  * Verifies GitHub webhook signature
  * @param appType - The type of GitHub App to verify against (defaults to 'standard')

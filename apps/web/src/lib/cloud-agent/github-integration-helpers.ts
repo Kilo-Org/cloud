@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import {
+  getIntegrationsByOrganization,
   getIntegrationForOrganization,
   getIntegrationForOwner,
   updateRepositoriesForIntegration,
@@ -11,7 +12,10 @@ import {
 } from '@/lib/integrations/platforms/github/adapter';
 import { DEMO_SOURCE_OWNER, DEMO_SOURCE_REPO_NAME } from '@/components/cloud-agent/demo-config';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { isPlatformIntegrationSuspended } from '@/lib/integrations/core/health';
+import {
+  isPlatformIntegrationHealthy,
+  isPlatformIntegrationSuspended,
+} from '@/lib/integrations/core/health';
 import {
   requireNumericPlatformRepositories,
   type PlatformRepository,
@@ -24,19 +28,28 @@ type GitHubRepositoriesResult = {
     name: string;
     fullName: string;
     private: boolean;
+    platformIntegrationId?: string;
+    platformAccountLogin?: string;
   }[];
   syncedAt?: string | null;
   errorMessage?: string;
 };
 
 const mapRepositories = (
-  repositories: PlatformRepository[]
+  repositories: PlatformRepository[],
+  integration?: { id: string; platform_account_login: string | null }
 ): GitHubRepositoriesResult['repositories'] => {
   return repositories.map(repo => ({
     id: repo.id,
     name: repo.name,
     fullName: repo.full_name,
     private: repo.private,
+    ...(integration
+      ? {
+          platformIntegrationId: integration.id,
+          platformAccountLogin: integration.platform_account_login ?? undefined,
+        }
+      : {}),
   }));
 };
 
@@ -124,41 +137,60 @@ export async function fetchGitHubRepositoriesForOrganization(
   forceRefresh: boolean = false
 ): Promise<GitHubRepositoriesResult> {
   const integration = await getIntegrationForOrganization(organizationId, PLATFORM.GITHUB);
+  return fetchRepositoriesForIntegrations(
+    integration && isPlatformIntegrationHealthy(integration) ? [integration] : [],
+    forceRefresh
+  );
+}
 
-  if (!integration) {
+export async function fetchAllGitHubRepositoriesForOrganization(
+  organizationId: string,
+  forceRefresh: boolean = false
+): Promise<GitHubRepositoriesResult> {
+  const integrations = (
+    await getIntegrationsByOrganization(organizationId, PLATFORM.GITHUB)
+  ).filter(isPlatformIntegrationHealthy);
+  return fetchRepositoriesForIntegrations(integrations, forceRefresh);
+}
+
+async function fetchRepositoriesForIntegrations(
+  integrations: Awaited<ReturnType<typeof getIntegrationsByOrganization>>,
+  forceRefresh: boolean
+): Promise<GitHubRepositoriesResult> {
+  if (integrations.length === 0) {
     return missingIntegrationResponse('No GitHub integration found for this organization');
   }
 
-  if (isPlatformIntegrationSuspended(integration)) {
-    return missingIntegrationResponse('GitHub integration is suspended');
-  }
-
-  if (!integration.platform_installation_id) {
-    return missingIntegrationResponse('GitHub integration is not properly configured');
-  }
-
   try {
-    const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-    // If forceRefresh or no cached repos, fetch from GitHub and update cache
-    if (forceRefresh || !cachedRepositories?.length) {
-      const appType = integration.github_app_type || 'standard';
-      const repositories = await fetchGitHubRepositories(
-        integration.platform_installation_id,
-        appType
-      );
-      await updateRepositoriesForIntegration(integration.id, repositories);
-      return {
-        integrationInstalled: true,
-        repositories: mapRepositories(repositories),
-        syncedAt: new Date().toISOString(),
-      };
-    }
-
-    // Return cached repos
+    const results = await Promise.all(
+      integrations.map(async integration => {
+        if (!integration.platform_installation_id) return { repositories: [], syncedAt: null };
+        const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
+        if (forceRefresh || !cachedRepositories?.length) {
+          const repositories = await fetchGitHubRepositories(
+            integration.platform_installation_id,
+            integration.github_app_type || 'standard'
+          );
+          await updateRepositoriesForIntegration(integration.id, repositories);
+          return {
+            repositories: mapRepositories(repositories, integration),
+            syncedAt: new Date().toISOString(),
+          };
+        }
+        return {
+          repositories: mapRepositories(cachedRepositories, integration),
+          syncedAt: integration.repositories_synced_at,
+        };
+      })
+    );
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(cachedRepositories),
-      syncedAt: integration.repositories_synced_at,
+      repositories: results.flatMap(result => result.repositories),
+      syncedAt: results
+        .map(result => result.syncedAt)
+        .filter((value): value is string => value !== null)
+        .sort()
+        .at(0),
     };
   } catch (_error) {
     throw new TRPCError({

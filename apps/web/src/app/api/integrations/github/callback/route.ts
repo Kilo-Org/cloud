@@ -1,10 +1,13 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
-import type { User } from '@kilocode/db/schema';
+import { platform_integrations, type User } from '@kilocode/db/schema';
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
-import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/adapter';
+import {
+  exchangeGitHubOAuthCode,
+  fetchGitHubInstallationRequests,
+} from '@/lib/integrations/platforms/github/adapter';
 import {
   getGitHubAppTypeForOrganization,
   getGitHubAppCredentials,
@@ -15,7 +18,6 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
   createPendingIntegration,
   findIntegrationByInstallationId,
-  findPendingInstallationByRequesterId,
   upsertPlatformIntegrationForOwner,
 } from '@/lib/integrations/db/platform-integrations';
 import type {
@@ -23,6 +25,8 @@ import type {
   IntegrationPermissions,
   Owner,
 } from '@/lib/integrations/core/types';
+import { db } from '@/lib/drizzle';
+import { and, eq, isNull } from 'drizzle-orm';
 import { parseStateReturn } from '@/lib/integrations/validate-return-path';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
@@ -435,47 +439,86 @@ async function handleCoreInstallFlow(params: {
         }
       }
 
+      let githubRequest: { id: string; accountId: string; accountLogin: string } | undefined;
       if (githubRequester) {
-        const existingPending = await findPendingInstallationByRequesterId(githubRequester.id);
-
-        if (existingPending) {
-          const existingOwnerId =
-            existingPending.owned_by_organization_id || existingPending.owned_by_user_id;
-
-          console.log('User already has a pending installation', {
-            existingPendingId: existingPending.id,
-            existingOwnerId,
-            githubRequesterId: githubRequester.id,
-          });
-
-          const queryParam =
-            owner.type === 'org'
-              ? `error=pending_installation_exists&org=${existingOwnerId}`
-              : 'error=pending_installation_exists';
-
-          return NextResponse.redirect(
-            new URL(
-              isAppInitiated
-                ? appFallbackPath(queryParam)
-                : appendQueryParam(redirectPath, queryParam),
-              APP_URL
+        const requests = await fetchGitHubInstallationRequests(githubAppType);
+        const requesterRequests = requests.filter(
+          request => request.requesterId === githubRequester.id
+        );
+        const recorded = await db
+          .select({ platformAccountId: platform_integrations.platform_account_id })
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.platform, 'github'),
+              eq(platform_integrations.github_app_type, githubAppType),
+              eq(platform_integrations.integration_status, 'pending'),
+              isNull(platform_integrations.platform_installation_id)
             )
           );
+        const recordedAccountIds = new Set(recorded.map(row => row.platformAccountId));
+        const unrecorded = requesterRequests.filter(
+          request => !recordedAccountIds.has(request.accountId)
+        );
+        if (unrecorded.length === 1) {
+          githubRequest = unrecorded[0];
+        } else if (requesterRequests.length === 1) {
+          const existing = requesterRequests[0];
+          const [existingPending] = await db
+            .select({ id: platform_integrations.id })
+            .from(platform_integrations)
+            .where(
+              and(
+                owner.type === 'org'
+                  ? eq(platform_integrations.owned_by_organization_id, owner.id)
+                  : eq(platform_integrations.owned_by_user_id, owner.id),
+                eq(platform_integrations.platform, 'github'),
+                eq(platform_integrations.github_app_type, githubAppType),
+                eq(platform_integrations.platform_account_id, existing.accountId),
+                eq(platform_integrations.integration_status, 'pending'),
+                isNull(platform_integrations.platform_installation_id)
+              )
+            )
+            .limit(1);
+          if (existingPending) {
+            githubRequest = existing;
+          }
         }
       }
 
-      await createPendingIntegration({
-        organizationId: owner.type === 'org' ? owner.id : undefined,
-        userId: owner.type === 'user' ? owner.id : undefined,
-        requester: {
-          kilo_user_id: user.id,
-          kilo_user_email: user.google_user_email,
-          kilo_user_name: user.google_user_name,
-          requested_at: new Date().toISOString(),
-        },
-        githubRequester,
-        githubAppType,
-      });
+      if (githubRequest) {
+        const [existingPending] = await db
+          .select({ id: platform_integrations.id })
+          .from(platform_integrations)
+          .where(
+            and(
+              owner.type === 'org'
+                ? eq(platform_integrations.owned_by_organization_id, owner.id)
+                : eq(platform_integrations.owned_by_user_id, owner.id),
+              eq(platform_integrations.platform, 'github'),
+              eq(platform_integrations.github_app_type, githubAppType),
+              eq(platform_integrations.platform_account_id, githubRequest.accountId),
+              eq(platform_integrations.integration_status, 'pending'),
+              isNull(platform_integrations.platform_installation_id)
+            )
+          )
+          .limit(1);
+        if (!existingPending) {
+          await createPendingIntegration({
+            organizationId: owner.type === 'org' ? owner.id : undefined,
+            userId: owner.type === 'user' ? owner.id : undefined,
+            requester: {
+              kilo_user_id: user.id,
+              kilo_user_email: user.google_user_email,
+              kilo_user_name: user.google_user_name,
+              requested_at: new Date().toISOString(),
+            },
+            githubRequester,
+            githubRequest,
+            githubAppType,
+          });
+        }
+      }
 
       const orgParam =
         isAppInitiated && owner.type === 'org'

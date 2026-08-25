@@ -4,6 +4,7 @@ const mockVerifyGitHubWebhookSignature = jest.fn(
   (_payload: string, _signature: string, _appType: string) => true
 );
 const mockFindIntegrationByInstallationId = jest.fn();
+const mockGetIntegrationForOrganization = jest.fn();
 const mockLogWebhookEvent = jest.fn();
 const mockUpdateWebhookEvent = jest.fn();
 const mockHandlePullRequest = jest.fn();
@@ -27,6 +28,8 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     installationId: string | undefined,
     githubAppType?: string
   ) => mockFindIntegrationByInstallationId(platform, installationId, githubAppType),
+  getIntegrationForOrganization: (organizationId: string, platform: string) =>
+    mockGetIntegrationForOrganization(organizationId, platform),
 }));
 
 jest.mock('@/lib/integrations/db/webhook-events', () => ({
@@ -188,6 +191,7 @@ async function waitForAfterTask() {
 describe('handleGitHubWebhook', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetIntegrationForOrganization.mockResolvedValue(integration);
     mockVerifyGitHubWebhookSignature.mockReturnValue(true);
     mockFindIntegrationByInstallationId.mockResolvedValue(integration);
     mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: false });

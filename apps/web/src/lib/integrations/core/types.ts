@@ -80,4 +80,5 @@ export type PendingApprovalMetadata = {
   status: string;
   requester?: KiloRequester;
   github_requester?: GitHubRequester;
+  github_request_id?: string;
 };

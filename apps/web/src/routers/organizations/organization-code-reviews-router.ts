@@ -24,7 +24,7 @@ import {
   type CodeReviewAgentConfig,
   type RepositoryModelOverride,
 } from '@/lib/agent-config/core/types';
-import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
+import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
@@ -474,7 +474,10 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       })
     )
     .query(async ({ input }) => {
-      return await fetchGitHubRepositoriesForOrganization(input.organizationId, input.forceRefresh);
+      return await fetchAllGitHubRepositoriesForOrganization(
+        input.organizationId,
+        input.forceRefresh
+      );
     }),
 
   /**

@@ -29,6 +29,7 @@ export const PendingApprovalMetadataSchema = z.object({
   status: z.enum([PENDING_APPROVAL_STATUS.AWAITING_INSTALLATION]),
   requester: KiloRequesterSchema.optional(),
   github_requester: GitHubRequesterSchema.optional(),
+  github_request_id: z.string().optional(),
 });
 
 /**

@@ -26,6 +26,15 @@ jest.mock('@/lib/user/server');
 jest.mock('@/lib/bot/github-link-state');
 jest.mock('@/lib/bot-identity');
 jest.mock('@/lib/integrations/platforms/github/adapter');
+jest.mock('@/lib/drizzle', () => ({
+  db: {
+    select: jest.fn(() => ({
+      from: jest.fn(() => ({
+        where: jest.fn(async () => []),
+      })),
+    })),
+  },
+}));
 jest.mock('@/lib/bot', () => ({
   bot: {
     initialize: jest.fn(async () => undefined),
@@ -732,7 +741,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
   });
 
-  test('app-initiated pending_setup_failed redirects to /github-app fallback', async () => {
+  test('ambiguous app-initiated pending request returns successful pending no-op', async () => {
     mockedConsumeInstallState.mockResolvedValue({
       token: DB_TOKEN,
       kilo_user_id: USER_ID,
@@ -745,11 +754,6 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       created_at: new Date().toISOString(),
     });
 
-    const { createPendingIntegration } =
-      await import('@/lib/integrations/db/platform-integrations');
-    const mockedCreatePending = jest.mocked(createPendingIntegration);
-    mockedCreatePending.mockRejectedValue(new Error('DB error') as never);
-
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest(
@@ -758,7 +762,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     );
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/github-app?fromApp=1&error=pending_setup_failed');
+    expectRedirectLocation(response, '/github-app?fromApp=1&github_pending_approval=true');
   });
 
   test('app-initiated org success preserves organizationId on redirect', async () => {

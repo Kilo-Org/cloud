@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub waa la xidhay",
       "noRepositoriesVisible": "Ma jiraan kayd la arki karo. Hubi helitaanka kaydka ee App-ka Kilo GitHub, ka dib cusboonaysii.",
       "runOnWithTarget": "Ku socodsii: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Deegaanka",
       "couldNotLoadEnvironment": "Deegaankaaga lama shubay",
       "retryLoadingEnvironment": "Mar kale isku day inaad shubto deegaanka",

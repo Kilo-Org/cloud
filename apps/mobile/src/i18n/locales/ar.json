@@ -1422,7 +1422,7 @@
       "githubConnected": "تم ربط GitHub",
       "noRepositoriesVisible": "لا توجد مستودعات مرئية. تحقق من وصول المستودع لتطبيق Kilo GitHub، ثم حدّث.",
       "runOnWithTarget": "التشغيل على: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "البيئة",
       "couldNotLoadEnvironment": "تعذّر تحميل بيئتك",
       "retryLoadingEnvironment": "إعادة محاولة تحميل البيئة",

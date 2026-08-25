@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub je povezan",
       "noRepositoriesVisible": "Nema vidljivih repozitorijuma. Proveri pristup repozitorijumu za Kilo GitHub aplikaciju, a zatim osveži.",
       "runOnWithTarget": "Pokreni na: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Okruženje",
       "couldNotLoadEnvironment": "Tvoje okruženje se ne može učitati",
       "retryLoadingEnvironment": "Pokušaj ponovo učitavanje okruženja",

@@ -1422,7 +1422,7 @@
       "githubConnected": "GitHub 已連接",
       "noRepositoriesVisible": "看不到任何存放庫。請檢查 Kilo GitHub App 的存放庫存取權限，然後重新整理。",
       "runOnWithTarget": "執行於：{{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "環境",
       "couldNotLoadEnvironment": "無法載入您的環境",
       "retryLoadingEnvironment": "重試載入環境",

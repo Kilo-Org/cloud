@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub қосылды",
       "noRepositoriesVisible": "Көрінетін репозиторийлер жоқ. Kilo GitHub App үшін репозиторий қолжетімділігін тексеріп, содан кейін жаңартыңыз.",
       "runOnWithTarget": "Іске қосу орны: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Орта",
       "couldNotLoadEnvironment": "Ортаңызды жүктеу мүмкін болмады",
       "retryLoadingEnvironment": "Ортаны жүктеуді қайталау",

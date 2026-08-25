@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub இணைக்கப்பட்டது",
       "noRepositoriesVisible": "களஞ்சியங்கள் தெரியவில்லை. Kilo GitHub App க்கான களஞ்சிய அணுகலைச் சரிபார்த்து, பின்னர் புதுப்பிக்கவும்.",
       "runOnWithTarget": "இதில் இயக்கு: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "சூழல்",
       "couldNotLoadEnvironment": "உங்கள் சூழலை ஏற்ற முடியவில்லை",
       "retryLoadingEnvironment": "சூழலை ஏற்றுவதை மீண்டும் முயற்சி செய்",

@@ -1794,7 +1794,7 @@
       "githubConnected": "Σύνδεση GitHub επιτυχής",
       "noRepositoriesVisible": "Κανένα ορατό αποθετήριο. Ελέγξτε την πρόσβαση αποθετηρίων για την εφαρμογή Kilo GitHub και ανανεώστε.",
       "runOnWithTarget": "Εκτέλεση σε: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Περιβάλλον",
       "couldNotLoadEnvironment": "Δεν ήταν δυνατή η φόρτωση του περιβάλλοντός σας",
       "retryLoadingEnvironment": "Επανάληψη φόρτωσης περιβάλλοντος",

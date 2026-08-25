@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub connectat",
       "noRepositoriesVisible": "No es veu cap repositori. Comprova l'accés als repositoris de l'aplicació de GitHub de Kilo i actualitza.",
       "runOnWithTarget": "Executa a: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Entorn",
       "couldNotLoadEnvironment": "No s'ha pogut carregar el teu entorn",
       "retryLoadingEnvironment": "Torna a provar de carregar l'entorn",

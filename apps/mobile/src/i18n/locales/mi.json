@@ -1794,7 +1794,7 @@
       "githubConnected": "Kua hono a GitHub",
       "noRepositoriesVisible": "Kāore he pūranga e kitea ana. Tirohia te wāhi atu pūranga mō te Kilo GitHub App, kātahi whakahou.",
       "runOnWithTarget": "Oma i runga i: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Te taiao",
       "couldNotLoadEnvironment": "Kāore i taea te uta tō taiao",
       "retryLoadingEnvironment": "Whakamātau anō te uta taiao",

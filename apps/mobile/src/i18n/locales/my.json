@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub ချိတ်ဆက်ပြီး",
       "noRepositoriesVisible": "မြင်နိုင်သော သိုလှောင်မှုများ မရှိပါ။ Kilo GitHub App အတွက် သိုလှောင်မှုဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး ပြန်လည်စတင်ပါ။",
       "runOnWithTarget": "လုပ်ဆောင်မည့်နေရာ- {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "ပတ်ဝန်းကျင်",
       "couldNotLoadEnvironment": "သင့်ပတ်ဝန်းကျင်ကို မဖွင့်နိုင်ခဲ့ပါ",
       "retryLoadingEnvironment": "ပတ်ဝန်းကျင် ဖွင့်ရန် ထပ်ကြိုးစားပါ",

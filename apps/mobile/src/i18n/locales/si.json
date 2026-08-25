@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub සම්බන්ධ විය",
       "noRepositoriesVisible": "දෘශ්යමාන ගබඩා නැත. Kilo GitHub App සඳහා ගබඩා ප්රවේශය පරීක්ෂා කරන්න, පසුව නැවුම් කරන්න.",
       "runOnWithTarget": "ධාවනය කරන්න: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "පරිසරය",
       "couldNotLoadEnvironment": "ඔබේ පරිසරය පූරණය කළ නොහැකි විය",
       "retryLoadingEnvironment": "පරිසරය පූරණය කිරීම නැවත උත්සාහ කරන්න",

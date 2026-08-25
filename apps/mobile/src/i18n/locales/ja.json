@@ -1422,7 +1422,7 @@
       "githubConnected": "GitHub接続済み",
       "noRepositoriesVisible": "リポジトリが表示されません。Kilo GitHub Appのリポジトリアクセスを確認してから更新してください。",
       "runOnWithTarget": "実行先: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "環境",
       "couldNotLoadEnvironment": "環境を読み込めませんでした",
       "retryLoadingEnvironment": "環境の読み込みを再試行",

@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub সংযুক্ত",
       "noRepositoriesVisible": "কোনো রিপোজিটরি দৃশ্যমান নেই। কিলো GitHub অ্যাপের জন্য রিপোজিটরি অ্যাক্সেস পরীক্ষা করুন, তারপর রিফ্রেশ করুন।",
       "runOnWithTarget": "চলবে: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "পরিবেশ",
       "couldNotLoadEnvironment": "আপনার পরিবেশ লোড করা যায়নি",
       "retryLoadingEnvironment": "পরিবেশ লোড আবার চেষ্টা করুন",

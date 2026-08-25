@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub కనెక్ట్ అయింది",
       "noRepositoriesVisible": "రిపోజిటరీలు కనిపించడం లేదు. Kilo GitHub App కోసం రిపోజిటరీ యాక్సెస్‌ను తనిఖీ చేయండి, ఆపై రిఫ్రెష్ చేయండి.",
       "runOnWithTarget": "అమలు చేయండి: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "ఎన్విరాన్మెంట్",
       "couldNotLoadEnvironment": "మీ ఎన్విరాన్మెంట్‌ను లోడ్ చేయలేకపోయింది",
       "retryLoadingEnvironment": "ఎన్విరాన్మెంట్ లోడింగ్ మళ్ళీ ప్రయత్నించండి",

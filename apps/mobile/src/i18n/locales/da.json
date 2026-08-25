@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub forbundet",
       "noRepositoriesVisible": "Ingen repositories synlige. Tjek repository-adgang for Kilo GitHub App, og opdatér derefter.",
       "runOnWithTarget": "Kør på: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Miljø",
       "couldNotLoadEnvironment": "Kunne ikke indlæse dit miljø",
       "retryLoadingEnvironment": "Prøv at indlæse miljøet igen",

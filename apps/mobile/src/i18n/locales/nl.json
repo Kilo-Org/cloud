@@ -1422,7 +1422,7 @@
       "githubConnected": "GitHub verbonden",
       "noRepositoriesVisible": "Geen repositories zichtbaar. Controleer de repositorytoegang voor de Kilo GitHub-app en vernieuw daarna.",
       "runOnWithTarget": "Uitvoeren op: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Omgeving",
       "couldNotLoadEnvironment": "Kon je omgeving niet laden",
       "retryLoadingEnvironment": "Opnieuw omgeving laden",

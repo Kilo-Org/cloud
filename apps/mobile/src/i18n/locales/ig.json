@@ -1794,7 +1794,7 @@
       "githubConnected": "Ejikọrọ GitHub",
       "noRepositoriesVisible": "Enweghị ebe nchekwa a na-ahụ anya. Lelee ohere ebe nchekwa maka Kilo GitHub App, wee megharịa.",
       "runOnWithTarget": "Gbaa na: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Gburugburu",
       "couldNotLoadEnvironment": "Enweghị ike ibudata gburugburu gị",
       "retryLoadingEnvironment": "Nwaa ibudata gburugburu ọzọ",

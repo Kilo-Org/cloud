@@ -1422,7 +1422,7 @@
       "githubConnected": "Đã kết nối GitHub",
       "noRepositoriesVisible": "Không thấy kho lưu trữ nào. Kiểm tra quyền truy cập kho lưu trữ cho ứng dụng Kilo GitHub, sau đó làm mới.",
       "runOnWithTarget": "Chạy trên: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Môi trường",
       "couldNotLoadEnvironment": "Không thể tải môi trường của bạn",
       "retryLoadingEnvironment": "Thử tải lại môi trường",

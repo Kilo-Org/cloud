@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub ត្រូវបានភ្ជាប់",
       "noRepositoriesVisible": "គ្មានឃ្លាំងកូដដែលអាចមើលឃើញទេ។ ពិនិត្យសិទ្ធិចូលប្រើឃ្លាំងកូដសម្រាប់ Kilo GitHub App បន្ទាប់មកធ្វើឱ្យថ្មី។",
       "runOnWithTarget": "ដំណើរការលើ: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "បរិស្ថាន",
       "couldNotLoadEnvironment": "មិនអាចផ្ទុកបរិស្ថានរបស់អ្នក",
       "retryLoadingEnvironment": "ព្យាយាមផ្ទុកបរិស្ថានម្តងទៀត",

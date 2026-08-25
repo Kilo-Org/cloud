@@ -1422,7 +1422,7 @@
       "githubConnected": "GitHub bağlandı",
       "noRepositoriesVisible": "Görünür depo yok. Kilo GitHub Uygulaması için depo erişimini kontrol edin, ardından yenileyin.",
       "runOnWithTarget": "Çalıştırma yeri: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Ortam",
       "couldNotLoadEnvironment": "Ortamınız yüklenemedi",
       "retryLoadingEnvironment": "Ortamı yüklemeyi tekrar dene",

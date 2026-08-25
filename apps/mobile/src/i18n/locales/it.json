@@ -1406,7 +1406,7 @@
       "githubConnected": "GitHub collegato",
       "noRepositoriesVisible": "Nessun repository visibile. Controlla l'accesso ai repository per la Kilo GitHub App, poi aggiorna.",
       "runOnWithTarget": "Esegui su: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Ambiente",
       "couldNotLoadEnvironment": "Impossibile caricare il tuo ambiente",
       "retryLoadingEnvironment": "Riprova a caricare l'ambiente",

@@ -1422,7 +1422,7 @@
       "githubConnected": "GitHub מחובר",
       "noRepositoriesVisible": "לא נראים מאגרים. בדוק את גישת המאגרים של אפליקציית Kilo GitHub, ואז רענן.",
       "runOnWithTarget": "הרץ על: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "סביבה",
       "couldNotLoadEnvironment": "לא ניתן היה לטעון את הסביבה שלך",
       "retryLoadingEnvironment": "נסה שוב לטעון את הסביבה",

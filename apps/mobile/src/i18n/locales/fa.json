@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub وصل شد",
       "noRepositoriesVisible": "هیچ مخزنی قابل مشاهده نیست. دسترسی مخزن GitHub App کیلا را بررسی کنید، سپس تازهسازی کنید.",
       "runOnWithTarget": "اجرا بر روی: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "محیط",
       "couldNotLoadEnvironment": "بارگذاری محیط شما ممکن نشد",
       "retryLoadingEnvironment": "تلاش دوباره برای بارگذاری محیط",

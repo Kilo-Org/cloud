@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub جڑ گیا",
       "noRepositoriesVisible": "کوئی ریپوزٹری نظر نہیں آتی۔ Kilo GitHub App کے لیے ریپوزٹری رسائی چیک کریں، پھر تازہ کریں۔",
       "runOnWithTarget": "چلائیں: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "ماحول",
       "couldNotLoadEnvironment": "آپ کا ماحول لوڈ نہیں ہو سکا",
       "retryLoadingEnvironment": "ماحول لوڈ کرنا دوبارہ آزمائیں",

@@ -1422,7 +1422,7 @@
       "githubConnected": "GitHub подключен",
       "noRepositoriesVisible": "Репозитории не видны. Проверьте доступ к репозиториям для приложения Kilo GitHub, затем обновите.",
       "runOnWithTarget": "Запустить на: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Окружение",
       "couldNotLoadEnvironment": "Не удалось загрузить ваше окружение",
       "retryLoadingEnvironment": "Повторить загрузку окружения",

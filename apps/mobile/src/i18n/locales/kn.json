@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub ಸಂಪರ್ಕಗೊಂಡಿದೆ",
       "noRepositoriesVisible": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಗೋಚರಿಸುವುದಿಲ್ಲ. Kilo GitHub App ಗಾಗಿ ರೆಪೊಸಿಟರಿ ಪ್ರವೇಶವನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ರಿಫ್ರೆಶ್ ಮಾಡಿ.",
       "runOnWithTarget": "ಇದರ ಮೇಲೆ ಚಲಾಯಿಸಿ: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "ಪರಿಸರ",
       "couldNotLoadEnvironment": "ನಿಮ್ಮ ಪರಿಸರವನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "retryLoadingEnvironment": "ಪರಿಸರ ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",

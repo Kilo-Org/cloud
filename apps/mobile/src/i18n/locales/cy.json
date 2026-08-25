@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub wedi'i gysylltu",
       "noRepositoriesVisible": "Dim ystorfeydd i'w gweld. Gwiriwch fynediad ystorfa ar gyfer Ap GitHub Kilo, yna adnewyddwch.",
       "runOnWithTarget": "Rhedeg ar: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Amgylchedd",
       "couldNotLoadEnvironment": "Methwyd llwytho'ch amgylchedd",
       "retryLoadingEnvironment": "Ailgeisio llwytho'r amgylchedd",

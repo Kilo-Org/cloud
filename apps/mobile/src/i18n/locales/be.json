@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub падключаны",
       "noRepositoriesVisible": "Няма бачных рэпазіторыяў. Праверце доступ да рэпазіторыяў для Kilo GitHub App, затым абнавіце.",
       "runOnWithTarget": "Запуск на: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Асяроддзе",
       "couldNotLoadEnvironment": "Не атрымалася загрузіць ваша асяроддзе",
       "retryLoadingEnvironment": "Паўтарыць загрузку асяроддзя",

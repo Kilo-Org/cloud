@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub qoşuldu",
       "noRepositoriesVisible": "Görünən repozitoriya yoxdur. Kilo GitHub App üçün repozitoriya girişini yoxlayın, sonra yeniləyin.",
       "runOnWithTarget": "İşə salın: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Mühit",
       "couldNotLoadEnvironment": "Mühitiniz yüklənə bilmədi",
       "retryLoadingEnvironment": "Mühiti yükləməyi yenidən cəhd et",

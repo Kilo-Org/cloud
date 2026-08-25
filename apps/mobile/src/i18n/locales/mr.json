@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub कनेक्ट केले",
       "noRepositoriesVisible": "कोणतीही भांडारे दिसत नाहीत. Kilo GitHub App साठी भांडार प्रवेश तपासा, नंतर रिफ्रेश करा.",
       "runOnWithTarget": "यावर चालवा: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "वातावरण",
       "couldNotLoadEnvironment": "तुमचे वातावरण लोड करता आले नाही",
       "retryLoadingEnvironment": "वातावरण लोड करणे पुन्हा प्रयत्न करा",

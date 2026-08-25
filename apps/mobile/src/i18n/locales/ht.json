@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub konekte",
       "noRepositoriesVisible": "Pa gen repo ki vizib. Tcheke aksè repo pou GitHub App Kilo a, epi rafrechi.",
       "runOnWithTarget": "Kouri sou: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Anviwònman",
       "couldNotLoadEnvironment": "Pa t 'kapab chaje anviwònman ou",
       "retryLoadingEnvironment": "Rekòmanse chaje anviwònman an",

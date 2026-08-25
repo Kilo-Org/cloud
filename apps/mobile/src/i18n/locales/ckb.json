@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub بەسترایەوە",
       "noRepositoriesVisible": "هیچ کۆگایەک نەبینراوە. دەستپێگەیشتنی کۆگای GitHub Appی Kilo بپشکنە، پاشان نوێ بکەرەوە.",
       "runOnWithTarget": "جێبەجێ بکە لەسەر: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "ژینگە",
       "couldNotLoadEnvironment": "نەتوانرا ژینگەکەت بار بکرێت",
       "retryLoadingEnvironment": "هەوڵدانەوەی بارکردنی ژینگە",

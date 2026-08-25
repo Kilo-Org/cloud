@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub-ը միացված է",
       "noRepositoriesVisible": "Պահոցներ չեն երևում։ Ստուգեք Kilo GitHub App-ի պահոցի հասանելիությունը, ապա թարմացրեք։",
       "runOnWithTarget": "Գործարկել՝ {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Միջավայր",
       "couldNotLoadEnvironment": "Չհաջողվեց բեռնել ձեր միջավայրը",
       "retryLoadingEnvironment": "Կրկին փորձել միջավայրը բեռնել",

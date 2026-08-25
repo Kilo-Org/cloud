@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub prijungtas",
       "noRepositoriesVisible": "Saugyklų nematoma. Patikrinkite Kilo GitHub App saugyklų prieigą, tada atnaujinkite.",
       "runOnWithTarget": "Vykdyti: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Aplinka",
       "couldNotLoadEnvironment": "Nepavyko įkelti jūsų aplinkos",
       "retryLoadingEnvironment": "Bandyti įkelti aplinką iš naujo",

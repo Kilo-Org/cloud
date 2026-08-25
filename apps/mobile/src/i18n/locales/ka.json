@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub დაკავშირებულია",
       "noRepositoriesVisible": "რეპოზიტორები არ ჩანს. შეამოწმეთ რეპოზიტორის წვდომა Kilo GitHub App-ისთვის, შემდეგ განაახლეთ.",
       "runOnWithTarget": "გაშვება: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "გარემო",
       "couldNotLoadEnvironment": "თქვენი გარემო ვერ ჩაირთო",
       "retryLoadingEnvironment": "გარემოს ჩატვირთვის ხელახლა ცდა",

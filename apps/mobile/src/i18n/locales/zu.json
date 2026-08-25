@@ -1794,7 +1794,7 @@
       "githubConnected": "I-GitHub ixhunyiwe",
       "noRepositoriesVisible": "Akukho ma-repository abonakalayo. Bheka ukufinyelela kwe-repository ye-Kilo GitHub App, bese uvuselela.",
       "runOnWithTarget": "Sebenza ku: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Imvelo",
       "couldNotLoadEnvironment": "Akukwazanga ukulayisha imvelo yakho",
       "retryLoadingEnvironment": "Zama ukulayisha imvelo futhi",

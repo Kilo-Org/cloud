@@ -1422,7 +1422,7 @@
       "githubConnected": "GitHub कनेक्ट हो गया",
       "noRepositoriesVisible": "कोई रिपॉज़िटरी दिखाई नहीं दे रही। Kilo GitHub ऐप के लिए रिपॉज़िटरी पहुँच जाँचें, फिर रीफ़्रेश करें।",
       "runOnWithTarget": "इस पर चलाएँ: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "एनवायरनमेंट",
       "couldNotLoadEnvironment": "आपका एनवायरनमेंट लोड नहीं हो सका",
       "retryLoadingEnvironment": "एनवायरनमेंट फिर से लोड करें",

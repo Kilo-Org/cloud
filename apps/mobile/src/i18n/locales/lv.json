@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub savienots",
       "noRepositoriesVisible": "Nav redzamu repozitoriju. Pārbaudi repozitorija piekļuvi Kilo GitHub App, tad atsvaidzini.",
       "runOnWithTarget": "Palaist uz: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Vide",
       "couldNotLoadEnvironment": "Neizdevās ielādēt tavu vidi",
       "retryLoadingEnvironment": "Mēģināt ielādēt vidi vēlreiz",

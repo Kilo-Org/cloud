@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub കണക്റ്റ് ചെയ്തു",
       "noRepositoriesVisible": "റിപ്പോസിറ്ററികളൊന്നും ദൃശ്യമല്ല. Kilo GitHub App-നുള്ള റിപ്പോസിറ്ററി ആക്സസ് പരിശോധിച്ച് പുതുക്കുക.",
       "runOnWithTarget": "ഇതിൽ പ്രവർത്തിപ്പിക്കുക: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "എൻവയോൺമെന്റ്",
       "couldNotLoadEnvironment": "നിങ്ങളുടെ എൻവയോൺമെന്റ് ലോഡ് ചെയ്യാനായില്ല",
       "retryLoadingEnvironment": "എൻവയോൺമെന്റ് ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",

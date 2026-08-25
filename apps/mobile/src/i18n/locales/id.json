@@ -1422,7 +1422,7 @@
       "githubConnected": "GitHub terhubung",
       "noRepositoriesVisible": "Tidak ada repositori terlihat. Periksa akses repositori untuk Aplikasi Kilo GitHub, lalu muat ulang.",
       "runOnWithTarget": "Jalankan di: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Lingkungan",
       "couldNotLoadEnvironment": "Tidak dapat memuat lingkungan Anda",
       "retryLoadingEnvironment": "Coba lagi memuat lingkungan",

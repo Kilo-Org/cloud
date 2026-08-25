@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub yhdistetty",
       "noRepositoriesVisible": "Ei näkyviä arkistoja. Tarkista Kilo GitHub Appin arkistopääsy ja päivitä sitten.",
       "runOnWithTarget": "Aja kohteessa: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Ympäristö",
       "couldNotLoadEnvironment": "Ympäristöäsi ei voitu ladata",
       "retryLoadingEnvironment": "Yritä ladata ympäristö uudelleen",

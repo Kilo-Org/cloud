@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub připojen",
       "noRepositoriesVisible": "Žádné repozitáře nejsou viditelné. Zkontrolujte přístup k repozitářům pro aplikaci Kilo GitHub a pak obnovte.",
       "runOnWithTarget": "Spustit na: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Prostředí",
       "couldNotLoadEnvironment": "Vaše prostředí se nepodařilo načíst",
       "retryLoadingEnvironment": "Opakovat načtení prostředí",

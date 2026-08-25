@@ -1422,7 +1422,7 @@
       "githubConnected": "GitHub 연결됨",
       "noRepositoriesVisible": "표시되는 리포지토리가 없습니다. Kilo GitHub 앱의 리포지토리 액세스를 확인한 다음 새로고침하세요.",
       "runOnWithTarget": "실행 위치: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "환경",
       "couldNotLoadEnvironment": "환경을 불러올 수 없습니다",
       "retryLoadingEnvironment": "환경 로드 다시 시도",

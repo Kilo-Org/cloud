@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub ਕਨੈਕਟ ਹੋਇਆ",
       "noRepositoriesVisible": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦੇ ਰਹੀ। Kilo GitHub ਐਪ ਲਈ ਰਿਪੋਜ਼ਟਰੀ ਪਹੁੰਚ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
       "runOnWithTarget": "ਇਸ 'ਤੇ ਚਲਾਓ: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "ਵਾਤਾਵਰਣ",
       "couldNotLoadEnvironment": "ਤੁਹਾਡਾ ਵਾਤਾਵਰਣ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
       "retryLoadingEnvironment": "ਵਾਤਾਵਰਣ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",

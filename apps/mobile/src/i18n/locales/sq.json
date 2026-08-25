@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub u lidh",
       "noRepositoriesVisible": "Asnjë depo e dukshme. Kontrolloni aksesin në depo për Kilo GitHub App, pastaj rifreskoni.",
       "runOnWithTarget": "Ekzekuto në: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Mjedisi",
       "couldNotLoadEnvironment": "Nuk u ngarkua mjedisi juaj",
       "retryLoadingEnvironment": "Provo përsëri ngarkimin e mjedisit",

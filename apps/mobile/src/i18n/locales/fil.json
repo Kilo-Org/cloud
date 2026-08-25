@@ -1794,7 +1794,7 @@
       "githubConnected": "Konektado ang GitHub",
       "noRepositoriesVisible": "Walang nakikitang repository. I-check ang access sa repository para sa Kilo GitHub App, pagkatapos ay i-refresh.",
       "runOnWithTarget": "Patakbuhin sa: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Environment",
       "couldNotLoadEnvironment": "Hindi ma-load ang iyong environment",
       "retryLoadingEnvironment": "Subukan ulit i-load ang environment",

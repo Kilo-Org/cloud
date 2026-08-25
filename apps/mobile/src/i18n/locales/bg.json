@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub е свързан",
       "noRepositoriesVisible": "Няма видими хранилища. Провери достъпа до хранилищата за Kilo GitHub App, след което опресни.",
       "runOnWithTarget": "Изпълни в: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Среда",
       "couldNotLoadEnvironment": "Не можа да се зареди твоята среда",
       "retryLoadingEnvironment": "Опитай отново да заредиш средата",

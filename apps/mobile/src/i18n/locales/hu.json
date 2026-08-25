@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub csatlakoztatva",
       "noRepositoriesVisible": "Nincs látható adattár. Ellenőrizze a Kilo GitHub App adattár-hozzáférését, majd frissítsen.",
       "runOnWithTarget": "Futtatás a következőn: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Környezet",
       "couldNotLoadEnvironment": "A környezet betöltése nem sikerült",
       "retryLoadingEnvironment": "Környezet betöltésének újrapróbálása",

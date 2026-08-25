@@ -1794,7 +1794,7 @@
       "githubConnected": "GitHub wal qabame",
       "noRepositoriesVisible": "Repository mul'atu hin jiru. Kilo GitHub App'tti argama repository ilaaliitii haaromsi.",
       "runOnWithTarget": "Irratti hojjedhu: {{target}}",
-      "remoteHint": "Run `kilo remote` on your computer to control a local kilo process.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "environment": "Naannoo",
       "couldNotLoadEnvironment": "Naannoo kee dhiisuu hin dandeenyne",
       "retryLoadingEnvironment": "Naannoo dhiisuu irra deebi'i",

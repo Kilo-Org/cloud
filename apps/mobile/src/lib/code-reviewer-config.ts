@@ -3,6 +3,7 @@ import {
   type CodeReviewPlatform,
   type RepositoryModelOverrideInput,
 } from '@kilocode/app-shared/code-review';
+import { type CodeReviewActionRequiredState } from '@kilocode/app-shared/code-reviews';
 
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
@@ -137,8 +138,10 @@ type ReviewConfigIdFields = {
 };
 
 export type ReviewConfigData =
-  | (Omit<PersonalReviewConfig, keyof ReviewConfigIdFields> & ReviewConfigIdFields)
-  | (Omit<OrgReviewConfig, keyof ReviewConfigIdFields> & ReviewConfigIdFields);
+  | (Omit<PersonalReviewConfig, keyof ReviewConfigIdFields | 'actionRequired'> &
+      ReviewConfigIdFields & { actionRequired: CodeReviewActionRequiredState | null })
+  | (Omit<OrgReviewConfig, keyof ReviewConfigIdFields | 'actionRequired'> &
+      ReviewConfigIdFields & { actionRequired: CodeReviewActionRequiredState | null });
 
 // The save/optimistic-cache patch. Kept as the shared app-shared contract so
 // the personal and org save paths cannot drift apart.

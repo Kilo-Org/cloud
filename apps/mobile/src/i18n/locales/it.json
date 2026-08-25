@@ -1851,6 +1851,18 @@
       "updating": "Aggiornamento, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Carica",
+      "loadWithHost": "Carica {{host}}",
+      "httpsOnly": "Solo immagini HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Questo link non può essere aperto.",
+      "hostConfirmTitle": "Aprire link esterno?",
+      "hostConfirmMessage": "Questo link apre {{host}} nel tuo browser.",
+      "open": "Apri",
+      "trustThisHost": "Considera attendibile questo host"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Dati raccolti",
     "free": "Gratuito"
+  },
+  "trustedHosts": {
+    "title": "Host attendibili",
+    "subtitle": "Host che ritieni attendibili da aprire senza chiedere",
+    "emptyTitle": "Nessun host attendibile",
+    "emptyDescription": "Quando consideri attendibile l'host di un link, esso si apre senza chiedere di nuovo.",
+    "revoke": "Revoca {{host}}",
+    "backToPreferences": "Torna alle preferenze"
   }
 }

@@ -2237,6 +2237,18 @@
       "updating": "Ažuriranje, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Učitaj",
+      "loadWithHost": "Učitaj {{host}}",
+      "httpsOnly": "Samo HTTPS slike"
+    },
+    "markdownLink": {
+      "invalidLink": "Ova se veza ne može otvoriti.",
+      "hostConfirmTitle": "Otvori vanjsku vezu?",
+      "hostConfirmMessage": "Ova veza otvara {{host}} u vašem pregledniku.",
+      "open": "Otvori",
+      "trustThisHost": "Vjeruj ovom poslužitelju"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Prikupljeni podaci",
     "free": "Besplatno"
+  },
+  "trustedHosts": {
+    "title": "Pouzdani poslužitelji",
+    "subtitle": "Poslužitelji kojima vjerujete da se otvore bez pitanja",
+    "emptyTitle": "Nema pouzdanih poslužitelja",
+    "emptyDescription": "Kada vjerujete poslužitelju veze, otvara se bez ponovnog pitanja.",
+    "revoke": "Opozovi {{host}}",
+    "backToPreferences": "Natrag na postavke"
   }
 }

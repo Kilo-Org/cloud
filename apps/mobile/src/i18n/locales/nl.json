@@ -1865,6 +1865,18 @@
       "updating": "Bijwerken, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull-aanvraag"
+    },
+    "markdownImage": {
+      "load": "Laden",
+      "loadWithHost": "Laden {{host}}",
+      "httpsOnly": "Alleen HTTPS-afbeeldingen"
+    },
+    "markdownLink": {
+      "invalidLink": "Deze link kan niet worden geopend.",
+      "hostConfirmTitle": "Externe link openen?",
+      "hostConfirmMessage": "Deze link opent {{host}} in uw browser.",
+      "open": "Openen",
+      "trustThisHost": "Deze host vertrouwen"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Verzamelde gegevens",
     "free": "Gratis"
+  },
+  "trustedHosts": {
+    "title": "Vertrouwde hosts",
+    "subtitle": "Hosts die u vertrouwt om zonder te vragen te openen",
+    "emptyTitle": "Geen vertrouwde hosts",
+    "emptyDescription": "Wanneer u de host van een link vertrouwt, wordt deze zonder opnieuw te vragen geopend.",
+    "revoke": "{{host}} intrekken",
+    "backToPreferences": "Terug naar voorkeuren"
   }
 }

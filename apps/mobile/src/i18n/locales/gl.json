@@ -2237,6 +2237,18 @@
       "updating": "Actualizando, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "solicitude de pull"
+    },
+    "markdownImage": {
+      "load": "Cargar",
+      "loadWithHost": "Cargar {{host}}",
+      "httpsOnly": "Só imaxes HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Non se pode abrir esta ligazón.",
+      "hostConfirmTitle": "Abrir a ligazón externa?",
+      "hostConfirmMessage": "Esta ligazón abre {{host}} no teu navegador.",
+      "open": "Abrir",
+      "trustThisHost": "Confiar neste servidor"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Datos recollidos",
     "free": "Grátis"
+  },
+  "trustedHosts": {
+    "title": "Servidores de confianza",
+    "subtitle": "Servidores nos que confías para abrir sen preguntar",
+    "emptyTitle": "Sen servidores de confianza",
+    "emptyDescription": "Cando confías nun servidor de ligazón, ábrese sen volver preguntar.",
+    "revoke": "Revogar {{host}}",
+    "backToPreferences": "Volver ás preferencias"
   }
 }

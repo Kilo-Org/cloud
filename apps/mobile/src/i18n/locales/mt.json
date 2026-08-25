@@ -2237,6 +2237,18 @@
       "updating": "Qed jaġġorna, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Ittajja",
+      "loadWithHost": "Ittajja {{host}}",
+      "httpsOnly": "Stamp' HTTPS biss"
+    },
+    "markdownLink": {
+      "invalidLink": "Dan il-link ma jistax jinfetaħ.",
+      "hostConfirmTitle": "Niftaħ link estern?",
+      "hostConfirmMessage": "Dan il-link jiftaħ {{host}} fil-browser tiegħek.",
+      "open": "Iftaħ",
+      "trustThisHost": "Afda f'dan il-host"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Dejta miġbura",
     "free": "B'xejn"
+  },
+  "trustedHosts": {
+    "title": "Hosts fdati",
+    "subtitle": "Hosts li tafdahom jinfetħu mingħajr ma jistaqsu",
+    "emptyTitle": "Ebda hosts fdati",
+    "emptyDescription": "Meta tafda l-host ta' link, jinfetaħ mingħajr ma jistaqsi għal darb'oħra.",
+    "revoke": "Irrevoka {{host}}",
+    "backToPreferences": "Lura għall-preferenzi"
   }
 }

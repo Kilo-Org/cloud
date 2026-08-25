@@ -2237,6 +2237,18 @@
       "updating": "Ag nuashonrú, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "iarratas tarraingthe"
+    },
+    "markdownImage": {
+      "load": "Luchdaigh",
+      "loadWithHost": "Luchdaigh {{host}}",
+      "httpsOnly": "Íomhánna HTTPS amháin"
+    },
+    "markdownLink": {
+      "invalidLink": "Ní féidir an nasc seo a oscailt.",
+      "hostConfirmTitle": "An nasc seachtrach a oscailt?",
+      "hostConfirmMessage": "Osclaíonn an nasc seo {{host}} i do bhrabhsálaí.",
+      "open": "Oscail",
+      "trustThisHost": "Muinín as an óstaigh seo"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Sonraí bailithe",
     "free": "Saor in aisce"
+  },
+  "trustedHosts": {
+    "title": "Óstaigh iontaofa",
+    "subtitle": "Óstaigh a bhfuil muinín agat astu a oscailt gan ceist a chur",
+    "emptyTitle": "Níl aon óstaigh iontaofa",
+    "emptyDescription": "Nuair a bhíonn muinín agat as óstach an naisc, osclaíonn sé gan ceist a chur arís.",
+    "revoke": "Cúlghair {{host}}",
+    "backToPreferences": "Ar ais go dtí na roghanna"
   }
 }

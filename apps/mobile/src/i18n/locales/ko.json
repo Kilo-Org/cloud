@@ -1865,6 +1865,18 @@
       "updating": "업데이트 중, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "풀 리퀘스트"
+    },
+    "markdownImage": {
+      "load": "불러오기",
+      "loadWithHost": "불러오기 {{host}}",
+      "httpsOnly": "HTTPS 이미지만"
+    },
+    "markdownLink": {
+      "invalidLink": "이 링크를 열 수 없습니다.",
+      "hostConfirmTitle": "외부 링크를 여시겠습니까?",
+      "hostConfirmMessage": "이 링크는 브라우저에서 {{host}}를 엽니다.",
+      "open": "열기",
+      "trustThisHost": "이 호스트 신뢰"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "수집된 데이터",
     "free": "무료"
+  },
+  "trustedHosts": {
+    "title": "신뢰하는 호스트",
+    "subtitle": "묻지 않고 열도록 신뢰하는 호스트",
+    "emptyTitle": "신뢰하는 호스트 없음",
+    "emptyDescription": "링크의 호스트를 신뢰하면 다시 묻지 않고 열립니다.",
+    "revoke": "{{host}} 신뢰 해제",
+    "backToPreferences": "기본 설정으로 돌아가기"
   }
 }

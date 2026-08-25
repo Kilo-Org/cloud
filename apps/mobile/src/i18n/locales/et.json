@@ -2237,6 +2237,18 @@
       "updating": "Uuendamine, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Laadi",
+      "loadWithHost": "Laadi {{host}}",
+      "httpsOnly": "Ainult HTTPS-pildid"
+    },
+    "markdownLink": {
+      "invalidLink": "Seda linki ei saa avada.",
+      "hostConfirmTitle": "Avada väline link?",
+      "hostConfirmMessage": "See link avab {{host}} sinu brauseris.",
+      "open": "Ava",
+      "trustThisHost": "Usalda seda hosti"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Kogutud andmed",
     "free": "Tasuta"
+  },
+  "trustedHosts": {
+    "title": "Usaldatud hostid",
+    "subtitle": "Hostid, mida usaldad ilma küsimata avada",
+    "emptyTitle": "Usaldatud hoste pole",
+    "emptyDescription": "Kui usaldad lingi hosti, avaneb see ilma uuesti küsimata.",
+    "revoke": "Tühista {{host}}",
+    "backToPreferences": "Tagasi eelistuste juurde"
   }
 }

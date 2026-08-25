@@ -2237,6 +2237,18 @@
       "updating": "Nṣe igbesoke, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "ibeere-fa"
+    },
+    "markdownImage": {
+      "load": "Gbé",
+      "loadWithHost": "Gbé {{host}}",
+      "httpsOnly": "Aworan HTTPS nikan"
+    },
+    "markdownLink": {
+      "invalidLink": "A ko le ṣii ọna asopọ yii.",
+      "hostConfirmTitle": "Ṣii ọna asopọ ita?",
+      "hostConfirmMessage": "Ọna asopọ yii yoo ṣii {{host}} ninu aṣawakiri rẹ.",
+      "open": "Ṣii",
+      "trustThisHost": "Gbẹkẹle agbalejo yii"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Ìsọfúnni tí a kó",
     "free": "Ọ̀fẹ́"
+  },
+  "trustedHosts": {
+    "title": "Awọn agbalejo ti a gbẹkẹle",
+    "subtitle": "Awọn agbalejo ti o gbẹkẹle lati ṣii laisi béèrè",
+    "emptyTitle": "Ko si awọn agbalejo ti a gbẹkẹle",
+    "emptyDescription": "Nigbati o ba gbẹkẹle agbalejo ti ọna asopọ kan, yoo ṣii laisi béèrè lẹẹkansi.",
+    "revoke": "Fagilee {{host}}",
+    "backToPreferences": "Pada si awọn ayanfẹ"
   }
 }

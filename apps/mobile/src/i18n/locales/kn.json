@@ -2237,6 +2237,18 @@
       "updating": "ನವೀಕರಿಸುತ್ತಿದೆ, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್"
+    },
+    "markdownImage": {
+      "load": "ಲೋಡ್",
+      "loadWithHost": "ಲೋಡ್ {{host}}",
+      "httpsOnly": "HTTPS ಚಿತ್ರಗಳು ಮಾತ್ರ"
+    },
+    "markdownLink": {
+      "invalidLink": "ಈ ಲಿಂಕ್ ತೆರೆಯಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+      "hostConfirmTitle": "ಬಾಹ್ಯ ಲಿಂಕ್ ತೆರೆಯುವುದೇ?",
+      "hostConfirmMessage": "ಈ ಲಿಂಕ್ ನಿಮ್ಮ ಬ್ರೌಸರ್ನಲ್ಲಿ {{host}} ತೆರೆಯುತ್ತದೆ.",
+      "open": "ತೆರೆಯಿರಿ",
+      "trustThisHost": "ಈ ಹೋಸ್ಟ್ ಅನ್ನು ವಿಶ್ವಾಸಿಸಿ"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "ಸಂಗ್ರಹಿಸಿದ ಡೇಟಾ",
     "free": "ಉಚಿತ"
+  },
+  "trustedHosts": {
+    "title": "ವಿಶ್ವಾಸಿಸಿದ ಹೋಸ್ಟ್ಗಳು",
+    "subtitle": "ಕೇಳದೆ ತೆರೆಯಲು ನೀವು ವಿಶ್ವಾಸಿಸುವ ಹೋಸ್ಟ್ಗಳು",
+    "emptyTitle": "ವಿಶ್ವಾಸಿಸಿದ ಹೋಸ್ಟ್ಗಳಿಲ್ಲ",
+    "emptyDescription": "ನೀವು ಲಿಂಕ್ನ ಹೋಸ್ಟ್ ಅನ್ನು ವಿಶ್ವಾಸಿಸಿದಾಗ, ಅದು ಮತ್ತೆ ಕೇಳದೆ ತೆರೆಯುತ್ತದೆ.",
+    "revoke": "{{host}} ರದ್ದುಗೊಳಿಸಿ",
+    "backToPreferences": "ಆದ್ಯತೆಗಳಿಗೆ ಹಿಂತಿರುಗಿ"
   }
 }

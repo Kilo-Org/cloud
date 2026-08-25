@@ -2237,6 +2237,18 @@
       "updating": "E whakahou ana, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "tono hiki"
+    },
+    "markdownImage": {
+      "load": "Utaina",
+      "loadWithHost": "Utaina {{host}}",
+      "httpsOnly": "He whakaahua HTTPS anake"
+    },
+    "markdownLink": {
+      "invalidLink": "Kāore e taea te whakatuwhera tēnei hono.",
+      "hostConfirmTitle": "Tuwhera i te hono o waho?",
+      "hostConfirmMessage": "Ka tuwhera tēnei hono i a {{host}} i tō pūtirotiro.",
+      "open": "Tuwhera",
+      "trustThisHost": "Whakawhirinaki ki tēnei kaihautū"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Kua kohia ngā raraunga",
     "free": "Koreutu"
+  },
+  "trustedHosts": {
+    "title": "Ngā kaihautū kua whakawhirinakihia",
+    "subtitle": "Ngā kaihautū e whakawhirinaki ana koe ki te tuwhera me te kore pātai",
+    "emptyTitle": "Kāore he kaihautū kua whakawhirinakihia",
+    "emptyDescription": "Inā whakawhirinaki koe ki te kaihautū o tētahi hono, ka tuwhera me te kore anō e pātai.",
+    "revoke": "Whakakore i a {{host}}",
+    "backToPreferences": "Hoki ki ngā manakohanga"
   }
 }

@@ -2237,6 +2237,18 @@
       "updating": "Iyabuyekezwa, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "i-pull request"
+    },
+    "markdownImage": {
+      "load": "Layisha",
+      "loadWithHost": "Layisha {{host}}",
+      "httpsOnly": "Izithombe ze-HTTPS kuphela"
+    },
+    "markdownLink": {
+      "invalidLink": "Leli isixhumanisi alikwazi ukuvulwa.",
+      "hostConfirmTitle": "Vula isixhumanisi sangaphandle?",
+      "hostConfirmMessage": "Leli isixhumanisi livula {{host}} kubrawuza yakho.",
+      "open": "Vula",
+      "trustThisHost": "Themba leli host"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Idatha eqoqiwe",
     "free": "Mahhala"
+  },
+  "trustedHosts": {
+    "title": "Ama-host athenjwayo",
+    "subtitle": "Ama-host owathembayo ukuvula ngaphandle kokubuza",
+    "emptyTitle": "Awekho ama-host athenjwayo",
+    "emptyDescription": "Uma uthemba i-host yesixhumanisi, ivula ngaphandle kokubuza futhi.",
+    "revoke": "Hlehlisa {{host}}",
+    "backToPreferences": "Buyela kokuthandwayo"
   }
 }

@@ -2237,6 +2237,18 @@
       "updating": "నవీకరిస్తోంది, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "పుల్ రిక్వెస్ట్"
+    },
+    "markdownImage": {
+      "load": "లోడ్",
+      "loadWithHost": "లోడ్ {{host}}",
+      "httpsOnly": "HTTPS చిత్రాలు మాత్రమే"
+    },
+    "markdownLink": {
+      "invalidLink": "ఈ లింక్ను తెరవలేము.",
+      "hostConfirmTitle": "బాహ్య లింక్ను తెరవాలా?",
+      "hostConfirmMessage": "ఈ లింక్ మీ బ్రౌజర్లో {{host}}ని తెరుస్తుంది.",
+      "open": "తెరువు",
+      "trustThisHost": "ఈ హోస్ట్ను విశ్వసించండి"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "సేకరించిన డేటా",
     "free": "ఉచితం"
+  },
+  "trustedHosts": {
+    "title": "విశ్వసించిన హోస్ట్లు",
+    "subtitle": "అడగకుండా తెరవడానికి మీరు విశ్వసించే హోస్ట్లు",
+    "emptyTitle": "విశ్వసించిన హోస్ట్లు లేవు",
+    "emptyDescription": "మీరు లింక్ యొక్క హోస్ట్ను విశ్వసించినప్పుడు, అది మళ్లీ అడగకుండా తెరుచుకుంటుంది.",
+    "revoke": "{{host}}ను రద్దు చేయండి",
+    "backToPreferences": "ప్రాధాన్యతలకు తిరిగి వెళ్లండి"
   }
 }

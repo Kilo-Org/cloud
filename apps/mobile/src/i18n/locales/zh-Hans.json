@@ -1865,6 +1865,18 @@
       "updating": "正在更新，{{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "拉取请求"
+    },
+    "markdownImage": {
+      "load": "加载",
+      "loadWithHost": "加载 {{host}}",
+      "httpsOnly": "仅 HTTPS 图片"
+    },
+    "markdownLink": {
+      "invalidLink": "此链接无法打开。",
+      "hostConfirmTitle": "打开外部链接？",
+      "hostConfirmMessage": "此链接将在你的浏览器中打开 {{host}}。",
+      "open": "打开",
+      "trustThisHost": "信任此主机"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "收集的数据",
     "free": "免费"
+  },
+  "trustedHosts": {
+    "title": "受信任的主机",
+    "subtitle": "你信任无需询问即可打开的主机",
+    "emptyTitle": "没有受信任的主机",
+    "emptyDescription": "当你信任某个链接的主机后，它将无需再次询问即可打开。",
+    "revoke": "撤销 {{host}}",
+    "backToPreferences": "返回偏好设置"
   }
 }

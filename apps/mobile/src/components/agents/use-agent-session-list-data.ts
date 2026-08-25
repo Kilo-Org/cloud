@@ -225,6 +225,8 @@ export function useAgentSessionListData(options: {
     activeSessions,
     activeIsError,
     isLoading,
+    storedIsFetching,
+    storedLoadedPageCount,
     paging,
     refetch,
     handleRetry,

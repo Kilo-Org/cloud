@@ -1,3 +1,4 @@
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
@@ -45,7 +46,7 @@ const PROMPT_INPUT_LINE_HEIGHT = 24;
 const PROMPT_INPUT_VERTICAL_PADDING = 16;
 const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
-const PROMPT_INPUT_MAX_CHARS = 4000;
+const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
 const PROMPT_INPUT_MIN_HEIGHT =
   PROMPT_INPUT_LINE_HEIGHT * PROMPT_INPUT_DEFAULT_LINES + PROMPT_INPUT_VERTICAL_PADDING;
 const PROMPT_INPUT_MAX_HEIGHT =

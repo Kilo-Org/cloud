@@ -1,3 +1,4 @@
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -73,8 +74,8 @@ describe('constants', () => {
     expect(PROMPT_MIN_LENGTH).toBe(3);
   });
 
-  it('promptMaxLength is 4000', () => {
-    expect(PROMPT_MAX_LENGTH).toBe(4000);
+  it('promptMaxLength is the shared cloud agent prompt cap', () => {
+    expect(PROMPT_MAX_LENGTH).toBe(CLOUD_AGENT_PROMPT_MAX_LENGTH);
   });
 
   it('mode is "code"', () => {

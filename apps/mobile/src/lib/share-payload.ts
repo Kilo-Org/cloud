@@ -1,3 +1,4 @@
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import * as Crypto from 'expo-crypto';
 import { cacheDirectory, copyAsync, deleteAsync } from 'expo-file-system/legacy';
 import { type ShareIntent } from 'expo-share-intent';
@@ -13,8 +14,8 @@ export type SharePayload = {
   failedFiles: string[];
 };
 
-/** Mirrors PROMPT_INPUT_MAX_CHARS in new-session-prompt.tsx (module-local; composer clamps again). */
-export const SHARE_TEXT_MAX_CHARS = 4000;
+/** The cloud agent prompt cap; the composer clamps again on delivery. */
+export const SHARE_TEXT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
 
 export const SHARE_PAYLOAD_MAX_ENTRIES = 5;
 

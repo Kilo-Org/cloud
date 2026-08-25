@@ -1,4 +1,5 @@
 import { ArrowUp, Paperclip, Square } from '@/components/ui/icons';
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -119,7 +120,7 @@ export function ChatComposerInputRow({
           placeholder={placeholder}
           placeholderTextColor={colors.mutedForeground}
           multiline
-          maxLength={4000}
+          maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
           onChangeText={onChangeText}
           onFocus={onInputFocus}
           onBlur={onInputBlur}

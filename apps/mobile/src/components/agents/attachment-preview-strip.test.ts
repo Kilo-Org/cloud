@@ -32,7 +32,7 @@ describe('describeAttachmentChip — happy / in-flight', () => {
   it('shows filename and human-readable size for a fully uploaded chip', () => {
     const desc = describeAttachmentChip(baseState);
     expect(desc.filename).toBe('doc.pdf');
-    expect(desc.sizeText).toBe('1 KB');
+    expect(desc.sizeText).toBe('1 kB');
     expect(desc.progressText).toBe('Uploaded');
     expect(desc.message).toBeNull();
     expect(desc.accessibilityLabel).toBe('doc.pdf, Uploaded');
@@ -52,7 +52,7 @@ describe('describeAttachmentChip — happy / in-flight', () => {
     expect(desc.showRetry).toBe(false);
     expect(desc.showRemove).toBe(true);
     // Size and filename are still surfaced so the user knows what is uploading.
-    expect(desc.sizeText).toBe('1 KB');
+    expect(desc.sizeText).toBe('1 kB');
     expect(desc.filename).toBe('doc.pdf');
   });
 
@@ -75,7 +75,7 @@ describe('describeAttachmentChip — happy / in-flight', () => {
       progress: 0,
     });
     expect(desc.filename).toBe('doc.pdf');
-    expect(desc.sizeText).toBe('1 KB');
+    expect(desc.sizeText).toBe('1 kB');
     expect(desc.progressText).toBe('0%');
     expect(desc.message).toBeNull();
     expect(desc.accessibilityLabel).toBe('doc.pdf, 0%');
@@ -95,7 +95,7 @@ describe('describeAttachmentChip — unhappy, retryable (network/timeout/408/429
     expect(desc.showRetry).toBe(true);
     expect(desc.showRemove).toBe(true);
     // Size + filename are still surfaced so the user knows which file failed.
-    expect(desc.sizeText).toBe('1 KB');
+    expect(desc.sizeText).toBe('1 kB');
     expect(desc.filename).toBe('doc.pdf');
   });
 
@@ -130,7 +130,7 @@ describe('describeAttachmentChip — unhappy, non-retryable (presign BAD_REQUEST
     // Filename + size are still surfaced so the user knows which file is
     // permanently rejected.
     expect(desc.filename).toBe('doc.pdf');
-    expect(desc.sizeText).toBe('1 KB');
+    expect(desc.sizeText).toBe('1 kB');
   });
 
   it('keeps progressText empty for terminal failures (no percent leaked into the message)', () => {

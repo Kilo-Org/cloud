@@ -6,7 +6,6 @@ import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
 import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/adapter';
 import {
-  getGitHubAppTypeForOrganization,
   getGitHubAppCredentials,
   assertUserAdministersInstallation,
   type GitHubAppType,
@@ -23,7 +22,6 @@ import type {
   IntegrationPermissions,
   Owner,
 } from '@/lib/integrations/core/types';
-import { parseStateReturn } from '@/lib/integrations/validate-return-path';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { linkKiloUser } from '@/lib/bot-identity';
@@ -33,18 +31,11 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { APP_URL } from '@/lib/constants';
 import { consumeInstallState } from '@/lib/integrations/github/install-state';
 import type { GitHubInstallState } from '@kilocode/db/schema';
-import { getEnvVariable } from '@/lib/dotenvx';
 
 const appendQueryParam = (path: string, queryParam: string): string =>
   `${path}${path.includes('?') ? '&' : '?'}${queryParam}`;
 
-type InstallStateClass =
-  | 'none'
-  | 'legacy_org'
-  | 'legacy_user'
-  | 'bot_link'
-  | 'install_token'
-  | 'unknown';
+type InstallStateClass = 'none' | 'bot_link' | 'install_token' | 'unknown';
 
 /**
  * Classifies a GitHub callback state value without revealing its contents.
@@ -53,8 +44,6 @@ type InstallStateClass =
  */
 function classifyInstallState(rawState: string | null): InstallStateClass {
   if (!rawState) return 'none';
-  if (rawState.startsWith('org_')) return 'legacy_org';
-  if (rawState.startsWith('user_')) return 'legacy_user';
   if (rawState.includes('.')) return 'bot_link';
   // Database install tokens are 32 random bytes, base64url-encoded (no dots).
   if (/^[A-Za-z0-9_-]{16,}$/.test(rawState)) return 'install_token';
@@ -157,59 +146,24 @@ export async function GET(request: NextRequest) {
     const setupAction = searchParams.get('setup_action');
     const rawState = searchParams.get('state');
 
-    // 3. New database-backed install state — atomically consume the token.
-    // Consumed before any other dispatch so a minted token is unambiguous:
-    // even if a random base64url token's shape began with a legacy org_/user_
-    // prefix, the DB row wins and the state is never misrouted to legacy or
-    // bot-link parsing.
+    // 3. Atomically consume a database-backed install state before attempting
+    // bot-link parsing. Database tokens are opaque and unambiguous once found.
     if (rawState) {
       const installRow = await consumeInstallState(rawState);
       if (installRow) {
         return await handleNewInstallFlow(request, user, installRow, installationId, setupAction);
       }
 
-      // 4. Legacy plaintext branch — starts with org_ or user_ prefix.
-      // Legacy states are never bot-link or database-minted tokens.
-      // They are accepted only when the GITHUB_LEGACY_INSTALL_STATE flag is enabled.
-      if (rawState.startsWith('org_') || rawState.startsWith('user_')) {
-        const legacyEnabled = (getEnvVariable('GITHUB_LEGACY_INSTALL_STATE') ?? 'true') !== 'false';
-
-        if (legacyEnabled) {
-          // ponytail: the legacy branch is deleted once the legacy-state counter
-          // reports zero for 30 consecutive days.
-          captureMessage('GitHub callback using legacy plaintext install state', {
-            level: 'info',
-            tags: { endpoint: 'github/callback', source: 'legacy_install_state' },
-            extra: { installationId, stateClass: classifyInstallState(rawState) },
-          });
-          return await handleLegacyInstallFlow(
-            request,
-            user,
-            rawState,
-            installationId,
-            setupAction
-          );
-        }
-
-        // Legacy flag disabled: refuse the legacy state.
-        captureMessage('GitHub callback with legacy state refused (flag disabled)', {
-          level: 'warning',
-          tags: { endpoint: 'github/callback', source: 'legacy_install_state_disabled' },
-          extra: { installationId, stateClass: classifyInstallState(rawState) },
-        });
-        return NextResponse.redirect(new URL('/', APP_URL));
-      }
-
-      // 5. Bot-link callback hand-off. Bot-link state tokens use a signed
+      // 4. Bot-link callback hand-off. Bot-link state tokens use a signed
       // dot-separated format and never collide with database tokens, which are
-      // base64url (no dots). Tried last, after DB and legacy dispatch.
+      // base64url (no dots).
       const botLinkState = verifyGitHubBotLinkState(rawState);
       if (botLinkState) {
         return await handleGitHubBotLinkCallback(request, user);
       }
     }
 
-    // 6. Both bot-link and database consume returned null.
+    // 5. Both bot-link verification and database consumption returned null.
     captureMessage('GitHub callback with unrecognized state', {
       level: 'warning',
       tags: { endpoint: 'github/callback', source: 'github_app_installation' },
@@ -240,20 +194,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const { ownerToken: errorOwnerToken, returnTo } = parseStateReturn(rawState);
-
-    let redirectPath = returnTo || '/';
-
-    if (!returnTo && errorOwnerToken.startsWith('org_')) {
-      const orgId = errorOwnerToken.slice(4);
-      redirectPath = `/organizations/${orgId}/integrations/github`;
-    } else if (!returnTo && errorOwnerToken.startsWith('user_')) {
-      redirectPath = `/integrations/github`;
-    }
-
-    return NextResponse.redirect(
-      new URL(appendQueryParam(redirectPath, 'error=installation_failed'), APP_URL)
-    );
+    return NextResponse.redirect(new URL('/?error=installation_failed', APP_URL));
   }
 }
 
@@ -311,56 +252,6 @@ async function handleNewInstallFlow(
 }
 
 /**
- * Legacy plaintext install flow. Parses owner from the org_/user_ prefix.
- * Gated by GITHUB_LEGACY_INSTALL_STATE flag.
- */
-async function handleLegacyInstallFlow(
-  request: NextRequest,
-  user: { id: string; google_user_email: string; google_user_name: string },
-  rawState: string,
-  installationId: string,
-  setupAction: string | null
-): Promise<Response> {
-  // Parse owner from state (with optional |return=<path> suffix)
-  const { ownerToken, returnTo } = parseStateReturn(rawState);
-  let owner: Owner;
-  let ownerId: string;
-
-  if (ownerToken.startsWith('org_')) {
-    ownerId = ownerToken.slice(4);
-    owner = { type: 'org', id: ownerId };
-  } else if (ownerToken.startsWith('user_')) {
-    ownerId = ownerToken.slice(5);
-    owner = { type: 'user', id: ownerId };
-  } else {
-    captureMessage('GitHub callback missing or invalid owner in state', {
-      level: 'warning',
-      tags: { endpoint: 'github/callback', source: 'github_app_installation' },
-      extra: {
-        installationId,
-        stateClass: classifyInstallState(rawState),
-        reason: 'owner_not_org_or_user_prefix',
-      },
-    });
-    return NextResponse.redirect(new URL('/', APP_URL));
-  }
-
-  const appType = await getGitHubAppTypeForOrganization(owner.type === 'org' ? owner.id : null);
-
-  return handleCoreInstallFlow({
-    request,
-    user,
-    owner,
-    ownerId,
-    returnTo,
-    installationId,
-    setupAction,
-    githubAppType: appType,
-  });
-}
-
-/**
- * Core install flow shared by both legacy and new branches.
  * Handles access checks, pending approval, and installation storage.
  */
 async function handleCoreInstallFlow(params: {
@@ -528,53 +419,62 @@ async function handleCoreInstallFlow(params: {
     );
   }
 
-  // Admin proof — report mode. The GitHub App does not yet request OAuth
-  // authorization during installation. When `code` is present we verify
-  // administration and log the outcome; when absent we log and proceed.
-  // A follow-up commit will hard-require `code` after the App setting is
-  // enabled in the GitHub App dashboard.
+  // Require proof that the OAuth-authorized GitHub user administers the
+  // installation before using app credentials to fetch or persist it.
   if (setupAction === 'install' || setupAction === 'update') {
     const code = searchParams.get('code');
+    const rejectUnauthorizedInstallation = () =>
+      NextResponse.redirect(
+        new URL(
+          isAppInitiated
+            ? appFallbackPath('error=not_installation_admin')
+            : appendQueryParam(redirectPath, 'error=not_installation_admin'),
+          APP_URL
+        )
+      );
 
-    if (code) {
-      try {
-        const exchangeResult = await exchangeGitHubOAuthCode(code, githubAppType);
-        const isAdmin = await assertUserAdministersInstallation({
-          accessToken: exchangeResult.accessToken,
-          installationId,
-        });
-
-        if (isAdmin) {
-          console.log('[github_admin_proof:pass]', {
-            github_user_id: exchangeResult.id,
-            github_user_login: exchangeResult.login,
-            installation_id: installationId,
-          });
-        } else {
-          console.log('[github_admin_proof:fail_non_admin]', {
-            github_user_id: exchangeResult.id,
-            github_user_login: exchangeResult.login,
-            installation_id: installationId,
-          });
-        }
-      } catch (error) {
-        console.error('[github_admin_proof:error]', {
-          installation_id: installationId,
-          error: (error as Error).message,
-        });
-        captureException(error, {
-          tags: {
-            endpoint: 'github/callback',
-            source: 'github_admin_proof',
-          },
-          extra: { installationId },
-        });
-      }
-    } else {
+    if (!code) {
       console.log('[github_admin_proof:code_absent]', {
         installation_id: installationId,
         setup_action: setupAction,
       });
+      return rejectUnauthorizedInstallation();
+    }
+
+    try {
+      const exchangeResult = await exchangeGitHubOAuthCode(code, githubAppType);
+      const isAdmin = await assertUserAdministersInstallation({
+        accessToken: exchangeResult.accessToken,
+        installationId,
+      });
+
+      if (!isAdmin) {
+        console.log('[github_admin_proof:fail_non_admin]', {
+          github_user_id: exchangeResult.id,
+          github_user_login: exchangeResult.login,
+          installation_id: installationId,
+        });
+        return rejectUnauthorizedInstallation();
+      }
+
+      console.log('[github_admin_proof:pass]', {
+        github_user_id: exchangeResult.id,
+        github_user_login: exchangeResult.login,
+        installation_id: installationId,
+      });
+    } catch (error) {
+      console.error('[github_admin_proof:error]', {
+        installation_id: installationId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      captureException(error, {
+        tags: {
+          endpoint: 'github/callback',
+          source: 'github_admin_proof',
+        },
+        extra: { installationId },
+      });
+      return rejectUnauthorizedInstallation();
     }
   }
 

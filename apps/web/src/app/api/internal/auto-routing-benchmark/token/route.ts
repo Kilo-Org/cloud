@@ -24,6 +24,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from '@kilocode/encryption';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
@@ -37,16 +38,6 @@ const RequestSchema = z.object({
 });
 
 const SIX_HOURS_IN_SECONDS = 6 * 60 * 60;
-
-// Inline bearer extraction (case-insensitive prefix, RFC 6750 §2.1). Kept local
-// to avoid importing @kilocode/worker-utils, whose transitive `jose` ESM import
-// breaks under jest's CJS transform.
-function extractBearerToken(authHeader: string | null): string | null {
-  if (!authHeader) return null;
-  const trimmed = authHeader.trim();
-  if (trimmed.slice(0, 7).toLowerCase() !== 'bearer ') return null;
-  return trimmed.slice(7).trim() || null;
-}
 
 export async function POST(req: NextRequest) {
   const token = extractBearerToken(req.headers.get('authorization'));

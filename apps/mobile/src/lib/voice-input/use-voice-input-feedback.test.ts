@@ -76,6 +76,6 @@ describe('voice input feedback side effects', () => {
     expect(hapticsMock.impactAsync).toHaveBeenCalledTimes(1);
     expect(hapticsMock.impactAsync).toHaveBeenCalledWith('light');
     expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledOnce();
-    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledWith('Listening');
+    expect(accessibilityMock.announceForAccessibility).toHaveBeenCalledWith('Listening...');
   });
 });

@@ -1,17 +1,14 @@
 import type { Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { timingSafeEqual } from '@kilocode/encryption';
+import { extractBearerToken as extractBearerTokenFromHeader } from '@kilocode/worker-utils/extract-bearer-token';
 import type { Env, ErrorCode } from '../types';
 
 /**
  * Extract bearer token from Authorization header
  */
 export function extractBearerToken(c: Context<{ Bindings: Env }>): string | null {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return null;
-  }
-  return authHeader.slice(7);
+  return extractBearerTokenFromHeader(c.req.header('Authorization'));
 }
 
 /**

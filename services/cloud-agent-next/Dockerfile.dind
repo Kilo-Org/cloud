@@ -52,6 +52,10 @@ RUN GLAB_VERSION="1.93.0" \
     && chmod +x /usr/local/bin/glab \
     && rm -rf /tmp/glab.tar.gz /tmp/bin
 
+COPY scripts/kilo-git-credential /opt/kilo-cloud/kilo-git-credential
+RUN chmod +x /opt/kilo-cloud/kilo-git-credential \
+    && ln -sf /opt/kilo-cloud/kilo-git-credential /usr/local/bin/kilo-git-credential
+
 # Tools used by the outer sandbox. Kilo itself is still installed globally for
 # the existing wrapper path; the platform package bundle under /opt/kilo-agent
 # is intended for mounting or copying into inner dev containers.

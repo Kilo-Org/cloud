@@ -1,4 +1,3 @@
-import { formatFileSize } from '@kilocode/kilo-chat';
 import { File as FileIcon } from '@/components/ui/icons';
 import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -6,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatFileSize, formatNumber } from '@/lib/format';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -63,7 +64,9 @@ function PreviewDocuments({ files }: { files: readonly AcceptedShareFile[] }) {
           <Text numberOfLines={1} className="min-w-0 flex-1 text-sm text-foreground">
             {file.name}
           </Text>
-          <Text className="text-xs text-muted-foreground">{formatFileSize(file.measuredSize)}</Text>
+          <Text className="text-xs text-muted-foreground">
+            {formatFileSize(file.measuredSize, i18n.language)}
+          </Text>
         </View>
       ))}
     </View>
@@ -123,7 +126,10 @@ export function SharePayloadPreview({ payload, validation }: Readonly<SharePaylo
       ) : null}
       {validation.truncated ? (
         <Text className="text-xs text-muted-foreground">
-          {t('share.onlyFirstFilesAttached', { count: AGENT_ATTACHMENT_MAX_FILES })}
+          {t('share.onlyFirstFilesAttached', {
+            count: AGENT_ATTACHMENT_MAX_FILES,
+            displayCount: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),
+          })}
         </Text>
       ) : null}
       <RejectionNotes notes={validation.rejectedNotes} />

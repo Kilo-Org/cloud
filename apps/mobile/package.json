@@ -26,6 +26,7 @@
     "@expo-google-fonts/jetbrains-mono": "0.4.1",
     "@expo/app-integrity": "57.0.1",
     "@expo/react-native-action-sheet": "4.1.1",
+    "@formatjs/intl-relativetimeformat": "^12.3.13",
     "@kilocode/app-shared": "workspace:*",
     "@kilocode/cloud-agent-sdk": "workspace:*",
     "@kilocode/event-service": "workspace:*",

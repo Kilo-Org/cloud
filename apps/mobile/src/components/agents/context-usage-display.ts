@@ -1,5 +1,6 @@
 import { i18n } from '@/i18n';
 import { formatCurrency } from '@/lib/format';
+import { numberFormat } from '@/lib/intl-cache';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
 import { formatSessionTotalCost } from './session-list-helpers';
@@ -7,7 +8,7 @@ import { formatSpokenCost } from './session-row-accessibility-label';
 
 export type ContextTone = 'primary' | 'warning' | 'destructive' | 'neutral';
 
-const NUMBER_FORMAT = new Intl.NumberFormat('en-US');
+const NUMBER_FORMAT = numberFormat('en-US', {});
 
 const WARNING_TONE_THRESHOLD = 75;
 const DESTRUCTIVE_TONE_THRESHOLD = 90;

@@ -24,7 +24,8 @@ const RELATIVE_TIME_UNITS: readonly { unit: Intl.RelativeTimeFormatUnit; seconds
 /**
  * Returns a human-readable relative time string like "3 days ago". Uses
  * `Intl.RelativeTimeFormat` with the active i18n language (or the passed
- * locale) so the unit words and direction are localized. Sub-minute ages use
+ * locale) so the unit words and direction are localized. The shared formatter
+ * loads the Hermes polyfill and active locale on demand. Sub-minute ages use
  * the catalog's `common.justNow` because RelativeTimeFormat has no sub-minute
  * bucket.
  */

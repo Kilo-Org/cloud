@@ -2,6 +2,7 @@ import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { dateTimeFormat } from '@/lib/intl-cache';
 
 import { collectCopyableText } from './collect-copyable-text';
 import { formatCost } from './context-usage-display';
@@ -24,7 +25,7 @@ type MessageDetailsContent = {
   canSelectText: boolean;
 };
 
-const SENT_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
+const SENT_TIME_FORMATTER = dateTimeFormat(undefined, {
   dateStyle: 'medium',
   timeStyle: 'short',
 });

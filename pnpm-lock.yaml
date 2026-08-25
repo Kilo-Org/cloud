@@ -325,6 +325,9 @@ importers:
       '@expo/react-native-action-sheet':
         specifier: 4.1.1
         version: 4.1.1(@types/react@19.2.14)(react@19.2.3)
+      '@formatjs/intl-relativetimeformat':
+        specifier: ^12.3.13
+        version: 12.3.13
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../../packages/app-shared
@@ -5189,6 +5192,15 @@ packages:
 
   '@fontsource-variable/roboto-mono@5.3.0':
     resolution: {integrity: sha512-h5r+KY/6qy8JEOj33JgcrFO81YAnvrc1EAwMpl/EPJLb2OIvOy0/jmB5M7qs7x/uXk5JUP5Ux4LrkeOK7faHkQ==}
+
+  '@formatjs/fast-memoize@3.1.7':
+    resolution: {integrity: sha512-zXfhLpvA6T7+efdt9JLbBwZ00tT7NsBMDVnDu8rpHeNNv8KfRZAMo2gkG0k9lK/Nzc//3kJ9pImsfuJxk3KhUA==}
+
+  '@formatjs/intl-localematcher@0.8.13':
+    resolution: {integrity: sha512-kHEAFOkeJSPNi7c5PaKaRjxcBrJwzzt81ifUu+8uve1EDW/VJl83KsxmqgqNZLzcFEhSliZGvx3+pk/RH0IOmg==}
+
+  '@formatjs/intl-relativetimeformat@12.3.13':
+    resolution: {integrity: sha512-qgH6XQugzCrFyZIMvhi5xlk6JcJxyF87kcWzH8XT6X8oJQpdljt4xQSsF55TjaRHhi+iK1Nu7YAI9QkNGF7L2g==}
 
   '@fregante/relaxed-json@2.0.0':
     resolution: {integrity: sha512-PyUXQWB42s4jBli435TDiYuVsadwRHnMc27YaLouINktvTWsL3FcKrRMGawTayFk46X+n5bE23RjUTWQwrukWw==}
@@ -21807,6 +21819,16 @@ snapshots:
   '@fontsource-variable/inter@5.3.0': {}
 
   '@fontsource-variable/roboto-mono@5.3.0': {}
+
+  '@formatjs/fast-memoize@3.1.7': {}
+
+  '@formatjs/intl-localematcher@0.8.13':
+    dependencies:
+      '@formatjs/fast-memoize': 3.1.7
+
+  '@formatjs/intl-relativetimeformat@12.3.13':
+    dependencies:
+      '@formatjs/intl-localematcher': 0.8.13
 
   '@fregante/relaxed-json@2.0.0': {}
 

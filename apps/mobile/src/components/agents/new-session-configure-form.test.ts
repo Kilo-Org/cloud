@@ -559,7 +559,9 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: null,
       showRunOnSelector: true,
     }) as Node;
-    expect(findTextContent(cloud, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(true);
+    expect(findTextContent(cloud, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
+      true
+    );
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const remote = NewSessionConfigureForm({
@@ -567,6 +569,8 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: INSTANCE,
       showRunOnSelector: false,
     }) as Node;
-    expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(true);
+    expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
+      true
+    );
   });
 });

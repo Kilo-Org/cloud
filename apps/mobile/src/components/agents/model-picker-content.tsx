@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Info, Search, SearchX } from '@/components/ui/icons';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, TextInput, View } from 'react-native';
@@ -18,12 +18,9 @@ import {
   favoriteToggleAction,
   type ModelPickerRow,
 } from '@/lib/model-picker-rows';
-import {
-  clearModelPickerBridge,
-  commitModelPickerSelection,
-  getModelPickerBridge,
-  resolveModelPickerSelection,
-} from '@/lib/picker-bridge';
+import { commitModelPickerSelection, resolveModelPickerSelection } from '@/lib/picker-bridge';
+import { parseParam } from '@/lib/route-params';
+import { modelPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 
 export function ModelPickerContent() {
   const router = useRouter();
@@ -32,8 +29,11 @@ export function ModelPickerContent() {
   const { bottom } = useSafeAreaInsets();
   const { favorites, favoritesError, addFavorite, removeFavorite } = useModelPreferences(undefined);
   const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
+  const { routeKey: rawRouteKey } = useLocalSearchParams<{ routeKey?: string }>();
+  const routeKey = parseParam(rawRouteKey) ?? UNFENCED_ROUTE_KEY;
+  useRouteRegistry(routeKey);
   const [search, setSearch] = useState('');
-  const [bridge, setBridge] = useState(() => getModelPickerBridge());
+  const [bridge, setBridge] = useState(() => modelPickerSlot.get(routeKey));
   const [selectedModel, setSelectedModel] = useState(bridge?.currentValue ?? '');
   const [selectedVariant, setSelectedVariant] = useState(bridge?.currentVariant ?? '');
   const bridgeRef = useRef(bridge);
@@ -48,7 +48,7 @@ export function ModelPickerContent() {
 
   useFocusEffect(
     useCallback(() => {
-      const nextBridge = getModelPickerBridge();
+      const nextBridge = modelPickerSlot.get(routeKey);
       const nextModel = nextBridge?.currentValue ?? '';
       const nextVariant = nextBridge?.currentVariant ?? '';
 
@@ -75,10 +75,10 @@ export function ModelPickerContent() {
             selectedVariantRef.current
           );
         }
-        clearModelPickerBridge();
-        bridgeRef.current = null;
+        modelPickerSlot.clear(routeKey);
+        bridgeRef.current = undefined;
       };
-    }, [])
+    }, [routeKey])
   );
 
   const rows = useMemo<ModelPickerRow[]>(

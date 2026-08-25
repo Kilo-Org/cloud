@@ -6,7 +6,8 @@ import { Pressable } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type InstancePickerInstance, setInstancePickerBridge } from '@/lib/picker-bridge';
+import { type InstancePickerInstance } from '@/lib/picker-bridge';
+import { instancePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { cn } from '@/lib/utils';
 
 type InstanceSelectorProps = {
@@ -63,7 +64,7 @@ export function InstanceSelector({
     if (!canOpenPicker) {
       return;
     }
-    setInstancePickerBridge({
+    instancePickerSlot.set(UNFENCED_ROUTE_KEY, {
       instances,
       currentValue: value,
       onSelect: onChange,

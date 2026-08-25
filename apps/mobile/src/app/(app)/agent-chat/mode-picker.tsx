@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Check } from '@/components/ui/icons';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { FlatList, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -21,27 +21,24 @@ import {
 import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { clearModePickerBridge, getModePickerBridge } from '@/lib/picker-bridge';
+import { parseParam } from '@/lib/route-params';
+import { modePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 
 export default function ModePickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  // Lazy init reads the bridge synchronously on first render — no effect, no
+  const { routeKey: rawRouteKey } = useLocalSearchParams<{ routeKey?: string }>();
+  const routeKey = parseParam(rawRouteKey) ?? UNFENCED_ROUTE_KEY;
+  useRouteRegistry(routeKey);
+  // Lazy init reads the slot synchronously on first render — no effect, no
   // "No options available" flash before a later effect populates state.
-  const [bridge] = useState(() => getModePickerBridge());
-
-  useEffect(
-    () => () => {
-      clearModePickerBridge();
-    },
-    []
-  );
+  const [bridge] = useState(() => modePickerSlot.get(routeKey));
 
   function handleSelect(mode: AgentMode) {
     void Haptics.selectionAsync();
     bridge?.onSelect(mode);
-    clearModePickerBridge();
+    modePickerSlot.clear(routeKey);
     router.back();
   }
 

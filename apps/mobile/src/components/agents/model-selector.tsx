@@ -19,11 +19,8 @@ import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { modelPickerCostLabel } from '@/lib/model-cost';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import {
-  type ModelPickerSelection,
-  type ModelPickerSelectionScope,
-  setModelPickerBridge,
-} from '@/lib/picker-bridge';
+import { type ModelPickerSelection, type ModelPickerSelectionScope } from '@/lib/picker-bridge';
+import { modelPickerSlot } from '@/lib/route-registry';
 import { cn } from '@/lib/utils';
 
 import { modelSelectorBadges } from './model-selector-badges';
@@ -106,7 +103,8 @@ export function openModelPicker(
   }
 ) {
   const { options, value, variant, onSelect, selectionScope = UNFENCED_SELECTION_CONTEXT } = params;
-  setModelPickerBridge({
+  const routeKey = selectionScope.selectionScope.sessionId;
+  modelPickerSlot.set(routeKey, {
     options: options.map(option => toSessionModelOption(option)),
     currentValue: value,
     currentVariant: variant,
@@ -116,7 +114,7 @@ export function openModelPicker(
       onSelect(selection.option.id, selection.variant, selection);
     },
   });
-  router.push('/(app)/agent-chat/model-picker' as Href);
+  router.push(`/(app)/agent-chat/model-picker?routeKey=${encodeURIComponent(routeKey)}` as Href);
 }
 
 export function ModelSelector({

@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { clearRepoPickerBridge, getRepoPickerBridge } from '@/lib/picker-bridge';
+import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
 
 export default function RepoPickerScreen() {
@@ -19,9 +19,10 @@ export default function RepoPickerScreen() {
   const { bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
-  const [bridge, setBridge] = useState(() => getRepoPickerBridge());
+  const [bridge, setBridge] = useState(() => repoPickerSlot.get(UNFENCED_ROUTE_KEY));
 
   const bridgeRef = useRef(bridge);
+  useRouteRegistry(UNFENCED_ROUTE_KEY);
 
   const closePicker = useCallback(() => {
     router.back();
@@ -29,14 +30,14 @@ export default function RepoPickerScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const nextBridge = getRepoPickerBridge();
+      const nextBridge = repoPickerSlot.get(UNFENCED_ROUTE_KEY);
       bridgeRef.current = nextBridge;
       setBridge(nextBridge);
       setSearch('');
 
       return () => {
-        clearRepoPickerBridge();
-        bridgeRef.current = null;
+        repoPickerSlot.clear(UNFENCED_ROUTE_KEY);
+        bridgeRef.current = undefined;
       };
     }, [])
   );
@@ -50,8 +51,8 @@ export default function RepoPickerScreen() {
     (repo: string) => {
       void Haptics.selectionAsync();
       bridgeRef.current?.onSelect(repo);
-      clearRepoPickerBridge();
-      bridgeRef.current = null;
+      repoPickerSlot.clear(UNFENCED_ROUTE_KEY);
+      bridgeRef.current = undefined;
       closePicker();
     },
     [closePicker]
@@ -73,7 +74,7 @@ export default function RepoPickerScreen() {
       <FlatList
         className="flex-1 bg-background"
         data={filtered}
-        keyExtractor={repo => repo.fullName}
+        keyExtractor={repo => `${repo.platform}:${repo.fullName}`}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         contentContainerStyle={{ paddingBottom: bottom }}

@@ -5,12 +5,17 @@ import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { setRepoPickerBridge } from '@/lib/picker-bridge';
+import { type RepoOption as BridgeRepoOption, type RepoPlatform } from '@/lib/picker-bridge';
+import { repoPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { cn } from '@/lib/utils';
 
 type RepoOption = {
   fullName: string;
   isPrivate: boolean;
+  /** Provider platform; omitted rows are treated as GitHub until d1 fills it. */
+  platform?: RepoPlatform;
+  workspaceUuid?: string;
+  repositoryUuid?: string;
 };
 
 type RepoSelectorProps = {
@@ -40,8 +45,15 @@ export function RepoSelector({
     if (effectivelyDisabled) {
       return;
     }
-    setRepoPickerBridge({
-      repositories,
+    const bridgeRepositories: BridgeRepoOption[] = repositories.map(repo => ({
+      platform: repo.platform ?? 'github',
+      fullName: repo.fullName,
+      isPrivate: repo.isPrivate,
+      ...(repo.workspaceUuid !== undefined ? { workspaceUuid: repo.workspaceUuid } : {}),
+      ...(repo.repositoryUuid !== undefined ? { repositoryUuid: repo.repositoryUuid } : {}),
+    }));
+    repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
+      repositories: bridgeRepositories,
       currentValue: value,
       onSelect: onChange,
     });

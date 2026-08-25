@@ -12,17 +12,20 @@ import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { FindingFilterModal } from '@/components/security-agent/finding-filter-modal';
 import {
-  clearSecurityFindingFilterBridge,
-  getSecurityFindingFilterBridge,
-} from '@/lib/security-finding-filter-bridge';
+  SECURITY_FILTER_ROUTE_KEY,
+  securityFilterSlot,
+  useRouteRegistry,
+} from '@/lib/route-registry';
 
 export default function SecurityAgentFilterFindingsRoute() {
   const router = useRouter();
-  const [bridge, setBridge] = useState(() => getSecurityFindingFilterBridge());
+  const [bridge, setBridge] = useState(() => securityFilterSlot.get(SECURITY_FILTER_ROUTE_KEY));
   const { t } = useTranslation();
   const [draft, setDraft] = useState<SecurityFindingFilters>(
-    () => getSecurityFindingFilterBridge()?.filters ?? DEFAULT_SECURITY_FINDING_FILTERS
+    () =>
+      securityFilterSlot.get(SECURITY_FILTER_ROUTE_KEY)?.filters ?? DEFAULT_SECURITY_FINDING_FILTERS
   );
+  useRouteRegistry(SECURITY_FILTER_ROUTE_KEY);
 
   const handleClose = useCallback(() => {
     router.back();
@@ -35,11 +38,11 @@ export default function SecurityAgentFilterFindingsRoute() {
 
   useFocusEffect(
     useCallback(() => {
-      const nextBridge = getSecurityFindingFilterBridge();
+      const nextBridge = securityFilterSlot.get(SECURITY_FILTER_ROUTE_KEY);
       setBridge(nextBridge);
       setDraft(nextBridge?.filters ?? DEFAULT_SECURITY_FINDING_FILTERS);
       return () => {
-        clearSecurityFindingFilterBridge();
+        securityFilterSlot.clear(SECURITY_FILTER_ROUTE_KEY);
       };
     }, [])
   );

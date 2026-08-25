@@ -2237,6 +2237,18 @@
       "updating": "Се ажурира, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "барање за повлекување"
+    },
+    "markdownImage": {
+      "load": "Вчитај",
+      "loadWithHost": "Вчитај {{host}}",
+      "httpsOnly": "Само HTTPS слики"
+    },
+    "markdownLink": {
+      "invalidLink": "Оваа врска не може да се отвори.",
+      "hostConfirmTitle": "Да се отвори надворешна врска?",
+      "hostConfirmMessage": "Оваа врска го отвора {{host}} во вашиот прелистувач.",
+      "open": "Отвори",
+      "trustThisHost": "Верувај на овој домаќин"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Собрани податоци",
     "free": "Бесплатно"
+  },
+  "trustedHosts": {
+    "title": "Доверливи домаќини",
+    "subtitle": "Домаќини на кои им верувате да се отвораат без да праша",
+    "emptyTitle": "Нема доверливи домаќини",
+    "emptyDescription": "Кога ќе му верувате на домаќинот на врската, таа се отвора без да праша повторно.",
+    "revoke": "Одземете {{host}}",
+    "backToPreferences": "Назад до поставки"
   }
 }

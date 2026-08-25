@@ -2237,6 +2237,18 @@
       "updating": "Ana sabuntawa, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Ɗauka",
+      "loadWithHost": "Ɗauka {{host}}",
+      "httpsOnly": "Hotunan HTTPS kawai"
+    },
+    "markdownLink": {
+      "invalidLink": "Ba za a iya buɗe wannan hanyar ba.",
+      "hostConfirmTitle": "Buɗe hanyar waje?",
+      "hostConfirmMessage": "Wannan hanyar tana buɗe {{host}} a cikin burauzar ka.",
+      "open": "Buɗe",
+      "trustThisHost": "Amince da wannan mazaba"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Bayanan da aka tattara",
     "free": "Kyauta"
+  },
+  "trustedHosts": {
+    "title": "Mazabun da aka amince",
+    "subtitle": "Mazabun da ka amince su buɗe ba tare da tambaya ba",
+    "emptyTitle": "Babu mazabun da aka amince",
+    "emptyDescription": "Idan ka amince da mazabar hanyar, za ta buɗe ba tare da sake tambaya ba.",
+    "revoke": "Soke {{host}}",
+    "backToPreferences": "Koma ga zaɓuɓɓuka"
   }
 }

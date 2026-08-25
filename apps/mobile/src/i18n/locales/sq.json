@@ -2237,6 +2237,18 @@
       "updating": "Duke u përditësuar, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Ngarko",
+      "loadWithHost": "Ngarko {{host}}",
+      "httpsOnly": "Vetëm imazhe HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Kjo lidhje nuk mund të hapet.",
+      "hostConfirmTitle": "Të hapet lidhja e jashtme?",
+      "hostConfirmMessage": "Kjo lidhje hap {{host}} në shfletuesin tuaj.",
+      "open": "Hap",
+      "trustThisHost": "Beso këtë host"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Të dhënat e mbledhura",
     "free": "Falas"
+  },
+  "trustedHosts": {
+    "title": "Hostet e besuar",
+    "subtitle": "Hostet që i beson për t'i hapur pa pyetur",
+    "emptyTitle": "Asnjë host i besuar",
+    "emptyDescription": "Kur i beson hostit të një lidhjeje, ajo hapet pa pyetur përsëri.",
+    "revoke": "Heq besimin për {{host}}",
+    "backToPreferences": "Kthehu te preferencat"
   }
 }

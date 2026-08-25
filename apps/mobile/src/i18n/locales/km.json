@@ -2237,6 +2237,18 @@
       "updating": "កំពុងធ្វើបច្ចុប្បន្នភាព, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "សំណើទាញ"
+    },
+    "markdownImage": {
+      "load": "ផ្ទុក",
+      "loadWithHost": "ផ្ទុក {{host}}",
+      "httpsOnly": "រូបភាព HTTPS តែប៉ុណ្ណោះ"
+    },
+    "markdownLink": {
+      "invalidLink": "តំណនេះមិនអាចបើកបានទេ។",
+      "hostConfirmTitle": "បើកតំណខាងក្រៅ?",
+      "hostConfirmMessage": "តំណនេះបើក {{host}} នៅក្នុងកម្មវិធីរុករករបស់អ្នក។",
+      "open": "បើក",
+      "trustThisHost": "ជឿទុកចិត្តម៉ាស៊ីននេះ"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "ទិន្នន័យដែលប្រមូលបាន",
     "free": "ឥតគិតថ្លៃ"
+  },
+  "trustedHosts": {
+    "title": "ម៉ាស៊ីនដែលអ្នកជឿទុកចិត្ត",
+    "subtitle": "ម៉ាស៊ីនដែលអ្នកជឿទុកចិត្តឱ្យបើកដោយមិនសួរ",
+    "emptyTitle": "គ្មានម៉ាស៊ីនដែលជឿទុកចិត្តទេ",
+    "emptyDescription": "នៅពេលអ្នកជឿទុកចិត្តម៉ាស៊ីនរបស់តំណ វានឹងបើកដោយមិនសួរម្តងទៀត។",
+    "revoke": "ដកហូត {{host}}",
+    "backToPreferences": "ត្រឡប់ទៅការកំណត់"
   }
 }

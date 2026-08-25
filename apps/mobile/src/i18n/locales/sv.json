@@ -2237,6 +2237,18 @@
       "updating": "Uppdaterar, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Ladda",
+      "loadWithHost": "Ladda {{host}}",
+      "httpsOnly": "Endast HTTPS-bilder"
+    },
+    "markdownLink": {
+      "invalidLink": "Den här länken kan inte öppnas.",
+      "hostConfirmTitle": "Öppna extern länk?",
+      "hostConfirmMessage": "Den här länken öppnar {{host}} i din webbläsare.",
+      "open": "Öppna",
+      "trustThisHost": "Lita på den här värden"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Data samlas in",
     "free": "Gratis"
+  },
+  "trustedHosts": {
+    "title": "Betrodda värdar",
+    "subtitle": "Värdar du litar på att öppna utan att fråga",
+    "emptyTitle": "Inga betrodda värdar",
+    "emptyDescription": "När du litar på en länks värd öppnas den utan att fråga igen.",
+    "revoke": "Återkalla {{host}}",
+    "backToPreferences": "Tillbaka till inställningar"
   }
 }

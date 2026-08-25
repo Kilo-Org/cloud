@@ -2237,6 +2237,18 @@
       "updating": "Frissítés, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "lekérési kérelem"
+    },
+    "markdownImage": {
+      "load": "Betöltés",
+      "loadWithHost": "Betöltés {{host}}",
+      "httpsOnly": "Csak HTTPS-képek"
+    },
+    "markdownLink": {
+      "invalidLink": "Ezt a linket nem lehet megnyitni.",
+      "hostConfirmTitle": "Megnyitja a külső linket?",
+      "hostConfirmMessage": "Ez a link a(z) {{host}} oldalt nyitja meg a böngészőjében.",
+      "open": "Megnyitás",
+      "trustThisHost": "Megbízás ebben a hostban"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Gyűjtött adatok",
     "free": "Ingyenes"
+  },
+  "trustedHosts": {
+    "title": "Megbízható hostok",
+    "subtitle": "Hostok, amelyeket kérdezés nélkül nyithat meg",
+    "emptyTitle": "Nincs megbízható host",
+    "emptyDescription": "Ha megbízik egy link hostjában, az a továbbiakban kérdezés nélkül megnyílik.",
+    "revoke": "Visszavonás ({{host}})",
+    "backToPreferences": "Vissza a beállításokhoz"
   }
 }

@@ -234,7 +234,22 @@ describe('POST /api/sso/organizations', () => {
     expect(mockGetAllUserProviders).not.toHaveBeenCalled();
   });
 
-  it('fails closed when a rate-limit policy is unavailable', async () => {
+  it('continues discovery when rate-limit policies are not configured', async () => {
+    mockCheckRateLimit
+      .mockResolvedValueOnce({ rateLimited: false, error: 'not-found' })
+      .mockResolvedValueOnce({ rateLimited: false, error: 'not-found' });
+
+    const response = await POST(request({ email: 'user@example.com' }));
+
+    expect(response.status).toBe(200);
+    expect(mockGetAllUserProviders).toHaveBeenCalledWith('user@example.com');
+    expect(mockCaptureMessage).not.toHaveBeenCalledWith(
+      'Sign-in discovery rate limit unavailable',
+      expect.anything()
+    );
+  });
+
+  it('still rejects when a configured rate-limit policy has an operational error', async () => {
     mockCheckRateLimit
       .mockResolvedValueOnce({ rateLimited: false, error: 'not-found' })
       .mockResolvedValueOnce({
@@ -248,7 +263,7 @@ describe('POST /api/sso/organizations', () => {
       level: 'error',
       tags: { source: 'sso-organizations-rate-limit' },
       extra: {
-        ipLimiterUnavailable: true,
+        ipLimiterUnavailable: false,
         emailLimiterUnavailable: true,
       },
     });

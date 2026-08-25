@@ -20,6 +20,12 @@ const warnInSentry = sentryLogger('sso-organizations', 'warning');
 const DISCOVERY_IP_RATE_LIMIT_ID = 'sign-in-discovery-ip';
 const DISCOVERY_EMAIL_RATE_LIMIT_ID = 'sign-in-discovery-email';
 
+type RateLimitResult = Awaited<ReturnType<typeof checkRateLimit>>;
+
+function hasOperationalRateLimitError(result: RateLimitResult): boolean {
+  return Boolean(result.error && result.error !== 'not-found');
+}
+
 export function discoveryEmailRateLimitKey(email: string): string {
   return createHmac('sha256', NEXTAUTH_SECRET).update(normalizeEmail(email)).digest('base64url');
 }
@@ -68,13 +74,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (ipLimit.rateLimited || emailLimit.rateLimited) {
       return NextResponse.json({ error: 'Please try again later.' }, { status: 429 });
     }
-    if (ipLimit.error || emailLimit.error) {
+    if (hasOperationalRateLimitError(ipLimit) || hasOperationalRateLimitError(emailLimit)) {
       captureMessage('Sign-in discovery rate limit unavailable', {
         level: 'error',
         tags: { source: 'sso-organizations-rate-limit' },
         extra: {
-          ipLimiterUnavailable: Boolean(ipLimit.error),
-          emailLimiterUnavailable: Boolean(emailLimit.error),
+          ipLimiterUnavailable: hasOperationalRateLimitError(ipLimit),
+          emailLimiterUnavailable: hasOperationalRateLimitError(emailLimit),
         },
       });
       return NextResponse.json({ error: 'Please try again later.' }, { status: 503 });

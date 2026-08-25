@@ -732,6 +732,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         return {
           hasIntegration: false,
           hasPermissions: false,
+          integrationId: null,
           reauthorizeUrl: null,
           authInvalidAt: integration?.auth_invalid_at ?? null,
           authInvalidReason: integration?.auth_invalid_reason ?? null,
@@ -745,6 +746,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
       return {
         hasIntegration: true,
+        integrationId: integration.id,
         hasPermissions: hasEffectivePermissions,
         reauthorizeUrl: hasEffectivePermissions
           ? null

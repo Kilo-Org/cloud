@@ -40,6 +40,7 @@ type SecurityAgentContextValue = {
   // Permission & config state
   hasIntegration: boolean;
   hasPermission: boolean;
+  integrationId: string | null;
   isLoadingPermission: boolean;
   isLoadingConfig: boolean;
   reauthorizeUrl: string | undefined;
@@ -1382,6 +1383,7 @@ function useSecurityAgentProviderValue(
 
   const hasIntegration = permissionData?.hasIntegration ?? false;
   const hasPermission = permissionData?.hasPermissions ?? false;
+  const integrationId = permissionData?.integrationId ?? null;
   const reauthorizeUrl = permissionData?.reauthorizeUrl ?? undefined;
   const isEnabled = configData ? configData.isEnabled : undefined;
   const hasConfig = configData?.hasConfig ?? false;
@@ -1407,6 +1409,7 @@ function useSecurityAgentProviderValue(
       isOrg,
       hasIntegration,
       hasPermission,
+      integrationId,
       isLoadingPermission,
       isLoadingConfig,
       reauthorizeUrl,
@@ -1470,6 +1473,7 @@ function useSecurityAgentProviderValue(
       isOrg,
       hasIntegration,
       hasPermission,
+      integrationId,
       isLoadingPermission,
       isLoadingConfig,
       reauthorizeUrl,

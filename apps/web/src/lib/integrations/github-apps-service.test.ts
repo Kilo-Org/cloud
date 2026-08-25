@@ -44,6 +44,45 @@ describe('getInstallation', () => {
       await db.delete(organizations).where(eq(organizations.id, organization.id));
     }
   });
+
+  it('keeps the oldest healthy organization installation primary', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `GitHub primary ${crypto.randomUUID()}` })
+      .returning();
+    const oldestCreatedAt = '2026-01-01T00:00:00.000Z';
+    const newestCreatedAt = '2026-02-01T00:00:00.000Z';
+    const rows = await db
+      .insert(platform_integrations)
+      .values([
+        {
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: crypto.randomUUID(),
+          integration_status: 'active',
+          repository_access: 'all',
+          created_at: oldestCreatedAt,
+        },
+        {
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: crypto.randomUUID(),
+          integration_status: 'active',
+          repository_access: 'all',
+          created_at: newestCreatedAt,
+        },
+      ])
+      .returning();
+
+    try {
+      const integration = await getInstallation({ type: 'org', id: organization.id });
+      expect(integration?.id).toBe(rows[0].id);
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
 });
 
 describe('isInstallationGoneError', () => {

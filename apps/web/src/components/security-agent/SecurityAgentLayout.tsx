@@ -301,6 +301,7 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
     isOrg,
     hasIntegration,
     hasPermission,
+    integrationId,
     isLoadingPermission,
     isLoadingConfig,
     isEnabled,
@@ -352,8 +353,8 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
   );
 
   const handleRefreshPermissions = () => {
-    if (isOrg && organizationId) {
-      refreshMutate({ organizationId });
+    if (isOrg && organizationId && integrationId) {
+      refreshMutate({ organizationId, integrationId });
     } else {
       refreshMutate(undefined);
     }

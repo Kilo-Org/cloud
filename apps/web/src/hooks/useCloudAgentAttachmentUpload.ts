@@ -201,6 +201,12 @@ export function useCloudAgentAttachmentUpload(
   const { mutateAsync: orgLinkMutateAsync } = useMutation(
     trpc.organizations.cloudAgentNext.linkPendingUploads.mutationOptions()
   );
+  const { mutateAsync: personalReleaseMutateAsync } = useMutation(
+    trpc.cloudAgentNext.releasePendingUploads.mutationOptions()
+  );
+  const { mutateAsync: orgReleaseMutateAsync } = useMutation(
+    trpc.organizations.cloudAgentNext.releasePendingUploads.mutationOptions()
+  );
 
   const getPresignedUrl = useCallback(
     async (input: UploadUrlInput): Promise<UploadUrlResult> => {
@@ -260,6 +266,13 @@ export function useCloudAgentAttachmentUpload(
           contentLength: attachment.file.size,
         });
         if (!canContinue()) return;
+
+        // Store the admitted object key as soon as the presign succeeds, so a
+        // later remove/clear still releases the pending-ledger row even when
+        // the PUT below fails or is cancelled. finalizeAttachments still
+        // requires status === 'complete', so a pre-PUT key never leaks a
+        // non-uploaded file into the wire.
+        updateAttachment({ r2Key: result.key });
 
         await new Promise<void>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
@@ -394,22 +407,50 @@ export function useCloudAgentAttachmentUpload(
     });
   }, []);
 
-  const removeAttachment = useCallback((attachmentId: string) => {
-    const attachment = attachmentsRef.current.find(item => item.id === attachmentId);
-    if (!attachment) return;
-    if (shouldCancelCloudAgentAttachmentUpload(attachment.status)) {
-      cancelledAttachmentIdsRef.current.add(attachmentId);
-    }
-    const xhr = activeUploadsRef.current.get(attachmentId);
-    if (xhr) {
-      xhr.abort();
-      activeUploadsRef.current.delete(attachmentId);
-    }
-    if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
-    setAttachments(current => current.filter(item => item.id !== attachmentId));
-  }, []);
+  /**
+   * Fire-and-forget release of abandoned files' pending-ledger rows. Never
+   * blocks removal: a failed release just leaves the row for the 24-hour
+   * reaper.
+   */
+  const releasePendingUploadKeys = useCallback(
+    (objectKeys: string[]) => {
+      if (objectKeys.length === 0) return;
+      void (
+        organizationId
+          ? orgReleaseMutateAsync({ objectKeys, organizationId })
+          : personalReleaseMutateAsync({ objectKeys })
+      ).catch(() => {});
+    },
+    [organizationId, orgReleaseMutateAsync, personalReleaseMutateAsync]
+  );
+
+  const removeAttachment = useCallback(
+    (attachmentId: string) => {
+      const attachment = attachmentsRef.current.find(item => item.id === attachmentId);
+      if (!attachment) return;
+      if (shouldCancelCloudAgentAttachmentUpload(attachment.status)) {
+        cancelledAttachmentIdsRef.current.add(attachmentId);
+      }
+      const xhr = activeUploadsRef.current.get(attachmentId);
+      if (xhr) {
+        xhr.abort();
+        activeUploadsRef.current.delete(attachmentId);
+      }
+      if (attachment.r2Key) {
+        releasePendingUploadKeys([attachment.r2Key]);
+      }
+      if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
+      setAttachments(current => current.filter(item => item.id !== attachmentId));
+    },
+    [releasePendingUploadKeys]
+  );
 
   const clearAttachments = useCallback(() => {
+    releasePendingUploadKeys(
+      attachmentsRef.current
+        .map(attachment => attachment.r2Key)
+        .filter((key): key is string => Boolean(key))
+    );
     attachmentsRef.current.forEach(attachment => {
       if (shouldCancelCloudAgentAttachmentUpload(attachment.status)) {
         cancelledAttachmentIdsRef.current.add(attachment.id);
@@ -422,7 +463,7 @@ export function useCloudAgentAttachmentUpload(
       if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
     });
     setAttachments([]);
-  }, []);
+  }, [releasePendingUploadKeys]);
 
   const getAttachmentsData = useCallback(
     () => buildCloudAgentAttachments(messageUuid, attachmentsRef.current),
@@ -452,7 +493,13 @@ export function useCloudAgentAttachmentUpload(
     }
 
     return getAttachmentsData();
-  }, [getAttachmentsData, messageUuid, orgLinkMutateAsync, organizationId, personalLinkMutateAsync]);
+  }, [
+    getAttachmentsData,
+    messageUuid,
+    orgLinkMutateAsync,
+    organizationId,
+    personalLinkMutateAsync,
+  ]);
 
   const handleDragEnter = useCallback((event: React.DragEvent) => {
     event.preventDefault();

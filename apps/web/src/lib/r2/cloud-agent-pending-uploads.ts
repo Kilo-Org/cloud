@@ -102,23 +102,53 @@ export type ReapAbandonedUploadsSummary = {
 };
 
 /**
+ * Release a set of pending rows back out of the per-message quota when the
+ * caller abandons the files before sending (e.g. removes them from the
+ * composer). Only the caller's own 'pending' rows are deleted; 'linked' rows
+ * (already sent) and other users' rows stay untouched.
+ */
+export async function releasePendingUploads(
+  kiloUserId: string,
+  objectKeys: string[]
+): Promise<void> {
+  if (objectKeys.length === 0) return;
+
+  await db
+    .delete(cloud_agent_pending_uploads)
+    .where(
+      and(
+        eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+        eq(cloud_agent_pending_uploads.status, 'pending'),
+        inArray(cloud_agent_pending_uploads.object_key, objectKeys)
+      )
+    );
+}
+
+/**
  * Delete the private R2 objects behind abandoned pending uploads whose
- * 24-hour lease has lapsed, then record those rows as 'reaped'. Single-key
- * deletes are enough here because the ledger already knows each object key;
- * a delete of an already-absent key is a no-op, so re-runs are safe.
+ * 24-hour lease has lapsed. The claim is atomic: a single UPDATE flips the
+ * expired 'pending' rows to 'reaped' and returns their keys, so a link landing
+ * between the select and the delete (or after) can never have its sent object
+ * deleted — the claim only ever matches 'pending'. Single-key deletes are
+ * enough here because the ledger already knows each object key; a delete of an
+ * already-absent key is a no-op, so re-runs are safe.
  */
 export async function reapAbandonedUploads(): Promise<ReapAbandonedUploadsSummary> {
-  const expired = await db
-    .select()
-    .from(cloud_agent_pending_uploads)
+  const claimed = await db
+    .update(cloud_agent_pending_uploads)
+    .set({ status: 'reaped' })
     .where(
       and(
         eq(cloud_agent_pending_uploads.status, 'pending'),
         sql`${cloud_agent_pending_uploads.expires_at} < now()`
       )
-    );
+    )
+    .returning({
+      id: cloud_agent_pending_uploads.id,
+      object_key: cloud_agent_pending_uploads.object_key,
+    });
 
-  for (const row of expired) {
+  for (const row of claimed) {
     await r2Client.send(
       new DeleteObjectCommand({
         Bucket: r2CloudAgentAttachmentsBucketName,
@@ -127,13 +157,5 @@ export async function reapAbandonedUploads(): Promise<ReapAbandonedUploadsSummar
     );
   }
 
-  const expiredIds = expired.map(row => row.id);
-  if (expiredIds.length > 0) {
-    await db
-      .update(cloud_agent_pending_uploads)
-      .set({ status: 'reaped' })
-      .where(inArray(cloud_agent_pending_uploads.id, expiredIds));
-  }
-
-  return { reaped: expiredIds.length };
+  return { reaped: claimed.length };
 }

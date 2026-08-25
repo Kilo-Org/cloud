@@ -159,6 +159,16 @@ export const cloudAgentLinkPendingUploadsSchema = z.object({
   objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
 });
 
+/**
+ * Release-time input for the pending-upload ledger. A removed composer file
+ * releases its admitted row so it stops consuming the per-message quota. The
+ * keys are full R2 keys scoped to the caller; only 'pending' rows are released,
+ * so a row already linked (or reaped) is never disturbed.
+ */
+export const cloudAgentReleasePendingUploadsSchema = z.object({
+  objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
+});
+
 function hasOnlyOneAttachmentField(data: { images?: unknown; attachments?: unknown }): boolean {
   return data.images === undefined || data.attachments === undefined;
 }

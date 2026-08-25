@@ -1,7 +1,7 @@
 'use client';
 
 import type { KeyboardEvent } from 'react';
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Button as UIButton } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover';
@@ -183,13 +183,10 @@ export function ChatInput({
       if (attachmentSubmissionPendingRef.current) return false;
       if (attachmentsEnabled && attachmentUpload.hasUploadingAttachments) return false;
 
-      const attachmentsData = attachmentsEnabled
-        ? await attachmentUpload.finalizeAttachments()
-        : undefined;
-      const submittedAttachments = attachmentsEnabled ? attachmentUpload.attachments : [];
-      const submitsAttachments = hasSubmissionAttachmentPayload(attachmentsData);
-
-      // Re-match against the trimmed value at submit time
+      // Re-match against the trimmed value at submit time, and reject a slash
+      // command carrying files BEFORE finalizing the attachment ledger: a
+      // client-rejected send must leave its rows pending so the reaper can
+      // delete the orphaned objects.
       let accepted = false;
       const slashMatch = onSendCommand
         ? /^\s*\/([\w.-]+)(?:\s+([\s\S]*))?\s*$/.exec(trimmed)
@@ -211,6 +208,20 @@ export function ChatInput({
         });
         return false;
       }
+
+      let attachmentsData: CloudAgentAttachments | undefined;
+      if (attachmentsEnabled) {
+        try {
+          attachmentsData = await attachmentUpload.finalizeAttachments();
+        } catch (error) {
+          toast.error('Failed to attach files. Please try again.', {
+            description: String(error instanceof Error ? error.message : ''),
+          });
+          return false;
+        }
+      }
+      const submittedAttachments = attachmentsEnabled ? attachmentUpload.attachments : [];
+      const submitsAttachments = hasSubmissionAttachmentPayload(attachmentsData);
 
       if (submitsAttachments) {
         attachmentSubmissionPendingRef.current = true;

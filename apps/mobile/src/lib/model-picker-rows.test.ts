@@ -76,14 +76,14 @@ describe('buildModelPickerRows', () => {
     expect(
       buildModelPickerRows({ models: gatewayModels, search: '', favoriteIds: noFavorites })
     ).toEqual([
-      { key: 'recommended', title: 'RECOMMENDED', type: 'header' },
+      { key: 'recommended', title: 'Recommended', type: 'header' },
       {
         key: 'model:anthropic/claude-sonnet-4',
         model: gatewayModels[0],
         isFavorite: false,
         type: 'model',
       },
-      { key: 'all', title: 'ALL MODELS', type: 'header' },
+      { key: 'all', title: 'All models', type: 'header' },
       { key: 'model:openai/gpt-5', model: gatewayModels[1], isFavorite: false, type: 'model' },
     ]);
   });
@@ -92,7 +92,7 @@ describe('buildModelPickerRows', () => {
     expect(
       buildModelPickerRows({ models: gatewayModels, search: 'Sonnet 4', favoriteIds: noFavorites })
     ).toEqual([
-      { key: 'recommended', title: 'RECOMMENDED', type: 'header' },
+      { key: 'recommended', title: 'Recommended', type: 'header' },
       {
         key: 'model:anthropic/claude-sonnet-4',
         model: gatewayModels[0],
@@ -103,7 +103,7 @@ describe('buildModelPickerRows', () => {
     expect(
       buildModelPickerRows({ models: gatewayModels, search: 'openai/', favoriteIds: noFavorites })
     ).toEqual([
-      { key: 'all', title: 'ALL MODELS', type: 'header' },
+      { key: 'all', title: 'All models', type: 'header' },
       { key: 'model:openai/gpt-5', model: gatewayModels[1], isFavorite: false, type: 'model' },
     ]);
   });
@@ -111,9 +111,9 @@ describe('buildModelPickerRows', () => {
   it('pulls a favorited model into its own FAVORITES group ahead of everything else', () => {
     const favoriteIds = new Set(['openai/gpt-5']);
     expect(buildModelPickerRows({ models: gatewayModels, search: '', favoriteIds })).toEqual([
-      { key: 'favorites', title: 'FAVORITES', type: 'header' },
+      { key: 'favorites', title: 'Favorites', type: 'header' },
       { key: 'model:openai/gpt-5', model: gatewayModels[1], isFavorite: true, type: 'model' },
-      { key: 'recommended', title: 'RECOMMENDED', type: 'header' },
+      { key: 'recommended', title: 'Recommended', type: 'header' },
       {
         key: 'model:anthropic/claude-sonnet-4',
         model: gatewayModels[0],
@@ -161,7 +161,7 @@ describe('buildModelPickerRows', () => {
   it('keeps a favorited remote model out of its provider group', () => {
     const favoriteIds = new Set(['remote:custom-openai:shared/model.id']);
     expect(buildModelPickerRows({ models: remoteModels, search: '', favoriteIds })).toEqual([
-      { key: 'favorites', title: 'FAVORITES', type: 'header' },
+      { key: 'favorites', title: 'Favorites', type: 'header' },
       { key: 'model:remote-model-1', model: remoteModels[1], isFavorite: true, type: 'model' },
       { key: 'provider:anthropic-local', title: 'ANTHROPIC LOCAL', type: 'header' },
       { key: 'model:remote-model-0', model: remoteModels[0], isFavorite: false, type: 'model' },
@@ -177,7 +177,7 @@ describe('buildModelPickerRows', () => {
       { ...remoteWorkspaceClaude, id: 'remote-model-1' },
     ];
     expect(buildModelPickerRows({ models: reordered, search: '', favoriteIds })).toEqual([
-      { key: 'favorites', title: 'FAVORITES', type: 'header' },
+      { key: 'favorites', title: 'Favorites', type: 'header' },
       { key: 'model:remote-model-0', model: reordered[0], isFavorite: true, type: 'model' },
       { key: 'provider:anthropic-local', title: 'ANTHROPIC LOCAL', type: 'header' },
       { key: 'model:remote-model-1', model: reordered[1], isFavorite: false, type: 'model' },

@@ -143,6 +143,19 @@ describe('createPreparationProgressRecorder', () => {
     expect(eventQueries.findByEntityPrefix('preparation/attempt/')).toEqual([]);
   });
 
+  it('ignores progress received after the attempt was finalized', () => {
+    const eventQueries = createMemoryEventQueries();
+    const broadcasts: StoredEvent[] = [];
+    const recorder = createRecorder(eventQueries, broadcasts);
+
+    recorder.onProgress('sandbox_provision', 'Provisioning sandbox…');
+    recorder.finalize({ status: 'failed', safeError: 'Environment preparation failed' });
+    broadcasts.length = 0;
+
+    expect(recorder.onProgress('cloning', 'Cloning repository…')).toBe(false);
+    expect(broadcasts).toEqual([]);
+  });
+
   it('finalize settles an attempt the wrapper continued but never terminated', () => {
     const eventQueries = createMemoryEventQueries();
     const broadcasts: StoredEvent[] = [];

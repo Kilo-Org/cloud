@@ -49,10 +49,6 @@ import {
   kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
   kiloclaw_instances,
-  impact_referrals,
-  impact_referral_conversions,
-  impact_referral_reward_applications,
-  impact_referral_rewards,
   kiloclaw_email_log,
   kiloclaw_cli_runs,
   kiloclaw_scheduled_actions,
@@ -65,7 +61,6 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { and, asc, eq, ne, desc, isNull, inArray, sql, like, or } from 'drizzle-orm';
-import { ImpactReferralProduct, ImpactReferralRewardKind } from '@kilocode/db/schema-types';
 import { alias } from 'drizzle-orm/pg-core';
 import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
@@ -1453,29 +1448,6 @@ const KiloclawCommitRetirementStateSchema = z
   .enum(['pending_final_term', 'final_term', 'standard_scheduled', 'manual_review'])
   .nullable();
 const KiloclawActivationStateSchema = z.enum(['pending_settlement', 'activated']);
-const KiloclawReferralRewardRoleSchema = z.enum(['referrer', 'referee']);
-const KiloclawReferralRewardStatusSchema = z.enum([
-  'pending',
-  'earned',
-  'applied',
-  'expired',
-  'canceled',
-  'reversed',
-  'review_required',
-]);
-const KiloclawSubscriptionReferralRewardsSchema = z.object({
-  totalAppliedMonths: z.number(),
-  applications: z.array(
-    z.object({
-      role: KiloclawReferralRewardRoleSchema,
-      appliedAt: z.string(),
-      monthsGranted: z.number(),
-      previousRenewalBoundary: z.string(),
-      newRenewalBoundary: z.string(),
-    })
-  ),
-});
-
 const KiloclawPersonalSubscriptionSchema = z.object({
   instanceId: z.string().uuid(),
   sandboxId: z.string(),
@@ -1511,51 +1483,11 @@ const KiloclawPersonalSubscriptionSchema = z.object({
   currentFundingSource: z.enum(['stripe', 'credits']).nullable(),
   futureFundingSource: z.enum(['stripe', 'credits']).nullable(),
   needsSupportReview: z.boolean(),
-  referralRewards: KiloclawSubscriptionReferralRewardsSchema,
 });
 const KiloclawPersonalSubscriptionsOutputSchema = z.object({
   commitPlanAvailable: z.boolean(),
   subscriptions: z.array(KiloclawPersonalSubscriptionSchema),
 });
-const KiloclawReferredPersonStateSchema = z.enum(['reward_granted', 'waiting_for_paid_conversion']);
-const KiloclawReferralRewardSummarySchema = z.object({
-  totals: z.object({
-    totalRewards: z.number(),
-    pendingRewards: z.number(),
-    totalAppliedMonths: z.number(),
-  }),
-  pendingRewardAction: z.object({
-    showStartReactivateCta: z.boolean(),
-    pendingRewardCount: z.number(),
-  }),
-  referredPeople: z.array(
-    z.object({
-      maskedEmail: z.string().nullable(),
-      state: KiloclawReferredPersonStateSchema,
-      rewardGranted: z.boolean(),
-    })
-  ),
-  rewards: z.array(
-    z.object({
-      role: KiloclawReferralRewardRoleSchema,
-      status: KiloclawReferralRewardStatusSchema,
-      monthsGranted: z.number(),
-      earnedAt: z.string(),
-      appliedAt: z.string().nullable(),
-      expiresAt: z.string().nullable(),
-      reviewReason: z.string().nullable(),
-      application: z
-        .object({
-          appliedAt: z.string(),
-          subscriptionId: z.string().uuid().nullable(),
-          previousRenewalBoundary: z.string(),
-          newRenewalBoundary: z.string(),
-        })
-        .nullable(),
-    })
-  ),
-});
-
 const KiloclawBillingHistoryInputSchema = KiloclawInstanceInputSchema.extend({
   cursor: z.string().optional(),
 });
@@ -1570,11 +1502,6 @@ const KiloclawReprovisionCreditEnrollmentResultSchema = z.object({
   instanceId: z.string().uuid().nullable(),
   message: z.string().optional(),
 });
-
-type KiloclawSubscriptionReferralRewards = z.infer<
-  typeof KiloclawSubscriptionReferralRewardsSchema
->;
-type KiloclawReferralRewardSummary = z.infer<typeof KiloclawReferralRewardSummarySchema>;
 
 type KiloclawPersonalSubscriptionRow = {
   subscription: typeof kiloclaw_subscriptions.$inferSelect;
@@ -1887,13 +1814,6 @@ async function getPersonalBillingStatus(user: {
   const renewalCostSource: KiloclawRenewalCostSource | null = hasPaidSubscription
     ? getKiloclawRenewalCostSource(hasStripeFunding)
     : null;
-  const referralRewards = hasPaidSubscription
-    ? await getAppliedReferralRewardsForSubscription({
-        userId: user.id,
-        subscriptionId: sub.id,
-      })
-    : null;
-
   const subscriptionCommitRetirementState = sub ? await getCommitRetirementDisplayState(sub) : null;
   const subscriptionIsFinalCommitTerm = sub
     ? classifyKiloClawCommitTerm(await getCommitRetirementEvidence(sub)) === 'final_term'
@@ -1932,10 +1852,6 @@ async function getPersonalBillingStatus(user: {
             ? 'credits'
             : (sub.payment_source ?? null),
         needsSupportReview: subscriptionCommitRetirementState === 'manual_review',
-        referralRewards: referralRewards ?? {
-          totalAppliedMonths: 0,
-          applications: [],
-        },
       }
     : null;
 
@@ -2143,19 +2059,6 @@ function throwCreditReprovisionRecoveryUnavailable(): never {
   });
 }
 
-function maskCustomerEmail(email: string | null): string | null {
-  if (!email) return null;
-  const [localPart, domain] = email.toLowerCase().split('@');
-  if (!localPart || !domain) return null;
-  return `${localPart.slice(0, 1)}***@${domain}`;
-}
-
-function referredPersonState(
-  qualified: boolean | null
-): 'reward_granted' | 'waiting_for_paid_conversion' {
-  return qualified === true ? 'reward_granted' : 'waiting_for_paid_conversion';
-}
-
 function summarizePersonalBillingStatus(billing: ClawBillingStatus) {
   const hasActiveInstance = billing.instance?.exists ?? false;
   const activeInstanceId = hasActiveInstance ? (billing.instance?.id ?? null) : null;
@@ -2175,188 +2078,12 @@ function summarizePersonalBillingStatus(billing: ClawBillingStatus) {
   };
 }
 
-async function hasEligiblePersonalSubscriptionForReferralReward(userId: string): Promise<boolean> {
-  let currentRow: Awaited<ReturnType<typeof resolveCurrentPersonalSubscriptionRow>>;
-  try {
-    currentRow = await resolveCurrentPersonalSubscriptionRow({
-      userId,
-      dbOrTx: db,
-    });
-  } catch (error) {
-    mapCurrentSubscriptionResolutionError(error);
-  }
-  const subscription = currentRow?.subscription;
-  if (!subscription) return false;
-
-  return (
-    subscription.plan !== 'trial' &&
-    subscription.status === 'active' &&
-    !subscription.cancel_at_period_end &&
-    subscription.suspended_at === null &&
-    subscription.past_due_since === null
-  );
-}
-
-async function getCustomerReferralRewardSummary(
-  userId: string
-): Promise<KiloclawReferralRewardSummary> {
-  const rows = await db
-    .select({
-      role: impact_referral_rewards.beneficiary_role,
-      status: impact_referral_rewards.status,
-      monthsGranted: impact_referral_rewards.months_granted,
-      earnedAt: impact_referral_rewards.earned_at,
-      appliedAt: impact_referral_rewards.applied_at,
-      expiresAt: impact_referral_rewards.expires_at,
-      reviewReason: impact_referral_rewards.review_reason,
-      applicationAppliedAt: impact_referral_reward_applications.applied_at,
-      applicationSubscriptionId: impact_referral_reward_applications.subscription_id,
-      previousRenewalBoundary: impact_referral_reward_applications.previous_renewal_boundary,
-      newRenewalBoundary: impact_referral_reward_applications.new_renewal_boundary,
-    })
-    .from(impact_referral_rewards)
-    .leftJoin(
-      impact_referral_reward_applications,
-      eq(impact_referral_reward_applications.reward_id, impact_referral_rewards.id)
-    )
-    .where(
-      and(
-        eq(impact_referral_rewards.product, ImpactReferralProduct.KiloClaw),
-        eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloClawFreeMonth),
-        eq(impact_referral_rewards.beneficiary_user_id, userId)
-      )
-    )
-    .orderBy(desc(impact_referral_rewards.earned_at), desc(impact_referral_rewards.created_at));
-
-  const rewards = rows.map(row => ({
-    role: row.role,
-    status: row.status,
-    monthsGranted: row.monthsGranted,
-    earnedAt: normalizeTimestamp(row.earnedAt) ?? row.earnedAt,
-    appliedAt: normalizeTimestamp(row.appliedAt),
-    expiresAt: normalizeTimestamp(row.expiresAt),
-    reviewReason: row.reviewReason,
-    application:
-      row.applicationAppliedAt && row.previousRenewalBoundary && row.newRenewalBoundary
-        ? {
-            appliedAt: normalizeTimestamp(row.applicationAppliedAt) ?? row.applicationAppliedAt,
-            subscriptionId: row.applicationSubscriptionId,
-            previousRenewalBoundary:
-              normalizeTimestamp(row.previousRenewalBoundary) ?? row.previousRenewalBoundary,
-            newRenewalBoundary:
-              normalizeTimestamp(row.newRenewalBoundary) ?? row.newRenewalBoundary,
-          }
-        : null,
-  }));
-
-  const referredRows = await db
-    .select({
-      refereeEmail: kilocode_users.google_user_email,
-      qualified: impact_referral_conversions.qualified,
-    })
-    .from(impact_referrals)
-    .innerJoin(kilocode_users, eq(kilocode_users.id, impact_referrals.referee_user_id))
-    .leftJoin(
-      impact_referral_conversions,
-      and(
-        eq(impact_referral_conversions.product, ImpactReferralProduct.KiloClaw),
-        eq(impact_referral_conversions.referee_user_id, impact_referrals.referee_user_id),
-        eq(impact_referral_conversions.referrer_user_id, userId)
-      )
-    )
-    .where(
-      and(
-        eq(impact_referrals.product, ImpactReferralProduct.KiloClaw),
-        eq(impact_referrals.referrer_user_id, userId)
-      )
-    )
-    .orderBy(desc(impact_referrals.created_at));
-  const referredPeople = referredRows
-    .filter(row => row.qualified !== false)
-    .map(row => ({
-      maskedEmail: maskCustomerEmail(row.refereeEmail),
-      state: referredPersonState(row.qualified),
-      rewardGranted: row.qualified === true,
-    }));
-  const pendingRewardCount = rewards.filter(
-    reward => reward.role === 'referrer' && reward.status === 'pending'
-  ).length;
-  const hasEligibleSubscription = await hasEligiblePersonalSubscriptionForReferralReward(userId);
-
-  return {
-    totals: {
-      totalRewards: rewards.length,
-      pendingRewards: rewards.filter(reward => reward.status === 'pending').length,
-      totalAppliedMonths: rewards
-        .filter(reward => reward.status === 'applied')
-        .reduce((total, reward) => total + reward.monthsGranted, 0),
-    },
-    pendingRewardAction: {
-      showStartReactivateCta: pendingRewardCount > 0 && !hasEligibleSubscription,
-      pendingRewardCount,
-    },
-    referredPeople,
-    rewards,
-  };
-}
-
-async function getAppliedReferralRewardsForSubscription(params: {
-  userId: string;
-  subscriptionId: string;
-}): Promise<KiloclawSubscriptionReferralRewards> {
-  const rows = await db
-    .select({
-      role: impact_referral_rewards.beneficiary_role,
-      appliedAt: impact_referral_reward_applications.applied_at,
-      monthsGranted: impact_referral_rewards.months_granted,
-      previousRenewalBoundary: impact_referral_reward_applications.previous_renewal_boundary,
-      newRenewalBoundary: impact_referral_reward_applications.new_renewal_boundary,
-    })
-    .from(impact_referral_reward_applications)
-    .innerJoin(
-      impact_referral_rewards,
-      eq(impact_referral_rewards.id, impact_referral_reward_applications.reward_id)
-    )
-    .where(
-      and(
-        eq(impact_referral_reward_applications.product, ImpactReferralProduct.KiloClaw),
-        eq(impact_referral_reward_applications.subscription_id, params.subscriptionId),
-        eq(impact_referral_reward_applications.beneficiary_user_id, params.userId),
-        eq(impact_referral_rewards.product, ImpactReferralProduct.KiloClaw),
-        eq(impact_referral_rewards.reward_kind, ImpactReferralRewardKind.KiloClawFreeMonth),
-        eq(impact_referral_rewards.applies_to_subscription_id, params.subscriptionId),
-        eq(impact_referral_rewards.beneficiary_user_id, params.userId),
-        eq(impact_referral_rewards.status, 'applied')
-      )
-    )
-    .orderBy(
-      asc(impact_referral_reward_applications.applied_at),
-      asc(impact_referral_reward_applications.created_at)
-    );
-
-  return {
-    totalAppliedMonths: rows.reduce((total, row) => total + row.monthsGranted, 0),
-    applications: rows.map(row => ({
-      role: row.role,
-      appliedAt: normalizeTimestamp(row.appliedAt) ?? row.appliedAt,
-      monthsGranted: row.monthsGranted,
-      previousRenewalBoundary:
-        normalizeTimestamp(row.previousRenewalBoundary) ?? row.previousRenewalBoundary,
-      newRenewalBoundary: normalizeTimestamp(row.newRenewalBoundary) ?? row.newRenewalBoundary,
-    })),
-  };
-}
-
 async function serializeKiloclawPersonalSubscription(
   row: KiloclawPersonalSubscriptionRow,
   hasActiveKiloPass: boolean
 ) {
   const hasStripeFunding = Boolean(row.subscription.stripe_subscription_id);
   const activationState = getKiloClawSubscriptionActivationState(row.subscription);
-  const referralRewards = await getAppliedReferralRewardsForSubscription({
-    userId: row.subscription.user_id,
-    subscriptionId: row.subscription.id,
-  });
   const commitRetirementState = await getCommitRetirementDisplayState(row.subscription);
   const isFinalCommitTerm =
     classifyKiloClawCommitTerm(await getCommitRetirementEvidence(row.subscription)) ===
@@ -2408,7 +2135,6 @@ async function serializeKiloclawPersonalSubscription(
         ? 'credits'
         : (row.subscription.payment_source ?? null),
     needsSupportReview: commitRetirementState === 'manual_review',
-    referralRewards,
   };
 }
 
@@ -4928,12 +4654,6 @@ export const kiloclawRouter = createTRPCRouter({
     const billing = await getPersonalBillingStatus(ctx.user);
     return summarizePersonalBillingStatus(billing);
   }),
-
-  getReferralRewardSummary: baseProcedure
-    .output(KiloclawReferralRewardSummarySchema)
-    .query(async ({ ctx }) => {
-      return await getCustomerReferralRewardSummary(ctx.user.id);
-    }),
 
   // ── Personal subscription management ─────────────────────────────────
 

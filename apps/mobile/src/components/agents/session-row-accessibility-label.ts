@@ -1,4 +1,5 @@
 import { i18n } from '@/i18n';
+import { formatList, formatNumber } from '@/lib/format';
 import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -50,18 +51,22 @@ export function formatSpokenCost(microdollars: number | null | undefined): strin
       return null;
     }
     if (cents < 100) {
-      return `${cents} ${i18n.t(cents === 1 ? 'agents.sessionRow.centOne' : 'agents.sessionRow.centOther')}`;
+      return `${formatNumber(cents, i18n.language)} ${i18n.t('agents.sessionRow.cent', {
+        count: cents,
+      })}`;
     }
     const dollars = Math.floor(cents / 100);
     const remainder = cents % 100;
-    const dollarPart = `${dollars} ${i18n.t(
-      dollars === 1 ? 'agents.sessionRow.dollarOne' : 'agents.sessionRow.dollarOther'
+    const dollarPart = `${formatNumber(dollars, i18n.language)} ${i18n.t(
+      'agents.sessionRow.dollar',
+      { count: dollars }
     )}`;
     if (remainder === 0) {
       return dollarPart;
     }
-    return `${dollarPart} ${remainder} ${i18n.t(
-      remainder === 1 ? 'agents.sessionRow.centOne' : 'agents.sessionRow.centOther'
+    return `${dollarPart} ${formatNumber(remainder, i18n.language)} ${i18n.t(
+      'agents.sessionRow.cent',
+      { count: remainder }
     )}`;
   }
   // Sub-half-cent: fractional cents, 2 dp, trim trailing zeros.
@@ -70,8 +75,10 @@ export function formatSpokenCost(microdollars: number | null | undefined): strin
   if (rounded <= 0) {
     return null;
   }
-  const trimmed = String(rounded);
-  return `${trimmed} ${i18n.t('agents.sessionRow.centOther')}`;
+  return `${formatNumber(rounded, i18n.language, { maximumFractionDigits: 2 })} ${i18n.t(
+    'agents.sessionRow.cent',
+    { count: rounded }
+  )}`;
 }
 
 type SessionRowAccessibilityLabelInputs = {
@@ -142,5 +149,5 @@ export function sessionRowAccessibilityLabel({
   if (platform) {
     parts.push(i18n.t('agents.sessionRow.fromPlatform', { platform: platformLabel(platform) }));
   }
-  return parts.join(', ');
+  return formatList(parts, i18n.language);
 }

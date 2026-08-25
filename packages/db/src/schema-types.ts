@@ -993,6 +993,10 @@ const OrganizationSettingsSchema = z.object({
   oss_credits_last_reset_at: z.string().nullable().optional(),
   // Full GitHub URL for OSS sponsored repos (e.g., https://github.com/org/repo)
   oss_github_url: z.string().url().nullable().optional(),
+  // Marks an organization as a sales demo org
+  is_sales_demo: z.boolean().optional(),
+  // When sales demo credits were last reset (ISO timestamp string)
+  sales_demo_last_reset_at: z.string().nullable().optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;

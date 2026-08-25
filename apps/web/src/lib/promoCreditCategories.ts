@@ -126,6 +126,12 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
     description: 'OSS Sponsorship Program monthly credit reset',
     is_idempotent: false,
   },
+  // Sales demo organization credits
+  {
+    credit_category: 'sales-demo',
+    description: 'Sales demo organization credits',
+    is_idempotent: false,
+  },
   {
     credit_category: 'kilo-pass-first-month-50pct',
     description: 'Kilo Pass first month 50% promo credits',

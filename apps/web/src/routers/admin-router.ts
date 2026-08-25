@@ -53,6 +53,7 @@ import { ContainerMetricsAnalyticsError } from '@/lib/cloudflare/container-metri
 import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router';
 import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
 import { contributorChampionsRouter } from '@/routers/admin/contributor-champions-router';
+import { salesDemoRouter } from '@/routers/admin/sales-demo-router';
 import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
 import { creditCampaignsRouter } from '@/routers/admin/credit-campaigns-router';
 import { cloudBillingSkusRouter } from '@/routers/admin/cloud-billing-skus-router';
@@ -2394,6 +2395,7 @@ export const adminRouter = createTRPCRouter({
   aiAttribution: adminAIAttributionRouter,
   ossSponsorship: ossSponsorshipRouter,
   contributorChampions: contributorChampionsRouter,
+  salesDemo: salesDemoRouter,
   bulkUserCredits: bulkUserCreditsRouter,
   creditCampaigns: creditCampaignsRouter,
   cloudBillingSkus: cloudBillingSkusRouter,

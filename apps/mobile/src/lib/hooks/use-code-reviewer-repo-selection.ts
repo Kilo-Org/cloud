@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type ReviewConfigData, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { chainSave } from '@/lib/hooks/save-chain';
@@ -125,7 +126,7 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
               ...gitlabAutoConfigure,
             });
         if (!result.success) {
-          throw new Error('Failed to save review config');
+          throw new Error(i18n.t('codeReviewer.configSaveFailed'));
         }
         if (platform === 'gitlab') {
           queryClient.setQueryData<boolean>(

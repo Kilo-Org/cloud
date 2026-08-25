@@ -2,7 +2,6 @@ import {
   getSettingsDirtyState,
   isPersonalSecurityScope,
   isValidDayCount,
-  parseDayCount,
 } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +15,8 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
+import { formatNumber, parseLocalizedNumber } from '@/lib/format';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -96,7 +97,9 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
     setNewFindingNotificationMinSeverity(config.data.newFindingNotificationMinSeverity);
     setSlaNotificationsEnabled(config.data.slaNotificationsEnabled);
     setSlaNotificationMinSeverity(config.data.slaNotificationMinSeverity);
-    warningDaysRef.current = String(config.data.slaNotificationWarningDays);
+    warningDaysRef.current = formatNumber(config.data.slaNotificationWarningDays, i18n.language, {
+      useGrouping: false,
+    });
     setSlaNotificationWarningDays(config.data.slaNotificationWarningDays);
   }, [config.data]);
 
@@ -259,11 +262,13 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                   editable={canManage}
                   keyboardType="number-pad"
                   defaultValue={warningDaysRef.current}
-                  placeholder="1-365"
                   placeholderTextColor={colors.mutedForeground}
                   onChangeText={text => {
                     warningDaysRef.current = text;
-                    setSlaNotificationWarningDays(parseDayCount(text));
+                    const value = parseLocalizedNumber(text, i18n.language);
+                    setSlaNotificationWarningDays(
+                      value !== null && Number.isInteger(value) ? value : Number.NaN
+                    );
                   }}
                 />
                 {!isValidDayCount(slaNotificationWarningDays) && (

@@ -6,6 +6,7 @@ import ProfileExpiringCredits from '@/components/profile/ProfileExpiringCredits'
 import { getCustomerInfo } from '@/lib/customerInfo';
 import { DevNukeAccountButton } from '@/components/dev/DevNukeAccountButton';
 import { DevConsumeCreditsButton } from '@/components/dev/DevConsumeCreditsButton';
+import { DevAddCreditsButton } from '@/components/dev/DevAddCreditsButton';
 import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { getOAuthDisplayNames } from '@/lib/user';
 import { getExtensionUrl } from '@/components/auth/getExtensionUrl';
@@ -159,6 +160,11 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <p className="text-muted-foreground text-sm font-medium">Add Credits</p>
+                <DevAddCreditsButton />
+              </div>
+              <Separator />
               <div className="flex flex-col gap-2">
                 <p className="text-muted-foreground text-sm font-medium">Consume Credits</p>
                 <DevConsumeCreditsButton />

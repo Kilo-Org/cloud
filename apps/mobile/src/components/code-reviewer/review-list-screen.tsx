@@ -4,11 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
-import {
-  CODE_REVIEW_STATUS_LABELS,
-  type CodeReviewStatus,
-  isCodeReviewStatus,
-} from '@kilocode/app-shared/code-review';
+import { type CodeReviewStatus, isCodeReviewStatus } from '@kilocode/app-shared/code-review';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -16,12 +12,13 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
 import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
-// Tone classes stay mobile-local; labels come from the shared
-// CODE_REVIEW_STATUS_LABELS map so they can't drift from web's copy.
+// Tone classes stay mobile-local; the label is the translated catalog key
+// for the same stable status code web reads, so it can't drift from web.
 const STATUS_CLASSNAME = {
   pending: 'text-muted-foreground',
   queued: 'text-muted-foreground',
@@ -32,6 +29,16 @@ const STATUS_CLASSNAME = {
   interrupted: 'text-warn',
 } satisfies Record<CodeReviewStatus, string>;
 
+const STATUS_KEY = {
+  pending: 'codeReviewer.status.pending',
+  queued: 'codeReviewer.status.queued',
+  running: 'codeReviewer.status.running',
+  completed: 'codeReviewer.status.completed',
+  failed: 'codeReviewer.status.failed',
+  cancelled: 'codeReviewer.status.cancelled',
+  interrupted: 'codeReviewer.status.interrupted',
+} satisfies Record<CodeReviewStatus, string>;
+
 type ReviewListData = NonNullable<ReturnType<typeof useReviewList>['data']>;
 type Review = Extract<ReviewListData, { success: true }>['reviews'][number];
 
@@ -39,7 +46,10 @@ export function statusMeta(status: string) {
   if (!isCodeReviewStatus(status)) {
     return { label: status, className: 'text-muted-foreground' };
   }
-  return { label: CODE_REVIEW_STATUS_LABELS[status], className: STATUS_CLASSNAME[status] };
+  return {
+    label: i18n.t(STATUS_KEY[status]),
+    className: STATUS_CLASSNAME[status],
+  };
 }
 
 function reviewTime(review: Review): Date {

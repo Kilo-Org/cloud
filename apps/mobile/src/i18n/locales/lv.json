@@ -2237,6 +2237,18 @@
       "updating": "Atjaunina, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Ielādēt",
+      "loadWithHost": "Ielādēt {{host}}",
+      "httpsOnly": "Tikai HTTPS attēli"
+    },
+    "markdownLink": {
+      "invalidLink": "Šo saiti nevar atvērt.",
+      "hostConfirmTitle": "Atvērt ārēju saiti?",
+      "hostConfirmMessage": "Šī saite atver {{host}} pārlūkā.",
+      "open": "Atvērt",
+      "trustThisHost": "Uzticēties šim resursdatoram"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Apkopotie dati",
     "free": "Bezmaksas"
+  },
+  "trustedHosts": {
+    "title": "Uzticami resursdatori",
+    "subtitle": "Resursdatori, kuriem uzticaties atvērt bez jautāšanas",
+    "emptyTitle": "Nav uzticamu resursdatoru",
+    "emptyDescription": "Kad uzticaties saites resursdatoram, tā tiek atvērta bez atkārtotas jautāšanas.",
+    "revoke": "Atsaukt {{host}}",
+    "backToPreferences": "Atpakaļ uz iestatījumiem"
   }
 }

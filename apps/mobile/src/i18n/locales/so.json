@@ -2237,6 +2237,18 @@
       "updating": "Cusboonaysiinaya, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Sco deji",
+      "loadWithHost": "Sco deji {{host}}",
+      "httpsOnly": "Sawirrada HTTPS kaliya"
+    },
+    "markdownLink": {
+      "invalidLink": "Linkkan lama furi karo.",
+      "hostConfirmTitle": "Ma la furaa link-ka dibadda?",
+      "hostConfirmMessage": "Linkkani wuxuu ku furaa {{host}} browser-kaaga.",
+      "open": "Fur",
+      "trustThisHost": "Amin ku qaado host-kan"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Xog la ururiyay",
     "free": "Bilaash"
+  },
+  "trustedHosts": {
+    "title": "Hosts-ka la amini karo",
+    "subtitle": "Hosts-ka aad u aaminto inay isku furan si aan la weydiin",
+    "emptyTitle": "Ma jiraan hosts la amini karo",
+    "emptyDescription": "Markaad amini host-ka link, wuxuu isku furaa isagoon mar kale weydiinin.",
+    "revoke": "Jooji {{host}}",
+    "backToPreferences": "Ku noqo doorashooyinka"
   }
 }

@@ -1865,6 +1865,18 @@
       "updating": "Wird aktualisiert, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "Pull-Request"
+    },
+    "markdownImage": {
+      "load": "Laden",
+      "loadWithHost": "Laden {{host}}",
+      "httpsOnly": "Nur HTTPS-Bilder"
+    },
+    "markdownLink": {
+      "invalidLink": "Dieser Link kann nicht geöffnet werden.",
+      "hostConfirmTitle": "Externen Link öffnen?",
+      "hostConfirmMessage": "Dieser Link öffnet {{host}} in Ihrem Browser.",
+      "open": "Öffnen",
+      "trustThisHost": "Diesem Host vertrauen"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Erfasste Daten",
     "free": "Kostenlos"
+  },
+  "trustedHosts": {
+    "title": "Vertrauenswürdige Hosts",
+    "subtitle": "Hosts, die Sie ohne Nachfrage öffnen möchten",
+    "emptyTitle": "Keine vertrauenswürdigen Hosts",
+    "emptyDescription": "Wenn Sie dem Host eines Links vertrauen, wird er ohne erneute Nachfrage geöffnet.",
+    "revoke": "Zugriff auf {{host}} widerrufen",
+    "backToPreferences": "Zurück zu den Einstellungen"
   }
 }

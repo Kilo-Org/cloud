@@ -1865,6 +1865,18 @@
       "updating": "更新中、{{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "プルリクエスト"
+    },
+    "markdownImage": {
+      "load": "読み込む",
+      "loadWithHost": "読み込む {{host}}",
+      "httpsOnly": "HTTPS 画像のみ"
+    },
+    "markdownLink": {
+      "invalidLink": "このリンクを開けません。",
+      "hostConfirmTitle": "外部リンクを開きますか？",
+      "hostConfirmMessage": "このリンクはブラウザで {{host}} を開きます。",
+      "open": "開く",
+      "trustThisHost": "このホストを信頼する"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "収集されるデータ",
     "free": "無料"
+  },
+  "trustedHosts": {
+    "title": "信頼済みホスト",
+    "subtitle": "確認なしで開くことを信頼したホスト",
+    "emptyTitle": "信頼済みホストはありません",
+    "emptyDescription": "リンクのホストを信頼すると、再度確認せずに開きます。",
+    "revoke": "{{host}} を失効",
+    "backToPreferences": "設定に戻る"
   }
 }

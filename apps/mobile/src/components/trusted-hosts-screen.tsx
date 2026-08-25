@@ -73,7 +73,7 @@ export function TrustedHostsScreen() {
                   hitSlop={8}
                   accessibilityRole="button"
                   accessibilityLabel={t('trustedHosts.revoke', { host })}
-                  className="min-h-11 shrink-0 items-center justify-center active:opacity-70"
+                  className="min-h-11 min-w-11 shrink-0 items-center justify-center active:opacity-70"
                 >
                   <X size={16} color={colors.destructive} />
                 </Pressable>

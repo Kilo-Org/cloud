@@ -2237,6 +2237,18 @@
       "updating": "Mengemas kini, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "permintaan tarik"
+    },
+    "markdownImage": {
+      "load": "Muat",
+      "loadWithHost": "Muat {{host}}",
+      "httpsOnly": "Imej HTTPS sahaja"
+    },
+    "markdownLink": {
+      "invalidLink": "Pautan ini tidak boleh dibuka.",
+      "hostConfirmTitle": "Buka pautan luaran?",
+      "hostConfirmMessage": "Pautan ini membuka {{host}} dalam pelayar anda.",
+      "open": "Buka",
+      "trustThisHost": "Percayai hos ini"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "Data dikumpul",
     "free": "Percuma"
+  },
+  "trustedHosts": {
+    "title": "Hos yang dipercayai",
+    "subtitle": "Hos yang anda percayai untuk dibuka tanpa bertanya",
+    "emptyTitle": "Tiada hos yang dipercayai",
+    "emptyDescription": "Apabila anda mempercayai hos pautan, ia dibuka tanpa bertanya lagi.",
+    "revoke": "Tarik balik {{host}}",
+    "backToPreferences": "Kembali ke keutamaan"
   }
 }

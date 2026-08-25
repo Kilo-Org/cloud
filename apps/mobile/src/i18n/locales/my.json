@@ -2237,6 +2237,18 @@
       "updating": "ပြုပြင်နေသည်၊ {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "တင်မည်",
+      "loadWithHost": "တင်မည် {{host}}",
+      "httpsOnly": "HTTPS ရုပ်ပုံများသာ"
+    },
+    "markdownLink": {
+      "invalidLink": "ဤလင့်ကို မဖွင့်နိုင်ပါ။",
+      "hostConfirmTitle": "ပြင်ပလင့်ကို ဖွင့်မလား။",
+      "hostConfirmMessage": "ဤလင့်သည် သင့်ဘရောက်ဆာတွင် {{host}} ကို ဖွင့်ပါသည်။",
+      "open": "ဖွင့်မည်",
+      "trustThisHost": "ဤ host ကို ယုံကြည်မည်"
     }
   },
   "bootstrap": {
@@ -2676,5 +2688,13 @@
   "models": {
     "dataCollected": "စုဆောင်းထားသော အချက်အလက်",
     "free": "အခမဲ့"
+  },
+  "trustedHosts": {
+    "title": "ယုံကြည်ထားသော host များ",
+    "subtitle": "မေးစရာမလိုဘဲ ဖွင့်ရန် သင်ယုံကြည်သော host များ",
+    "emptyTitle": "ယုံကြည်ထားသော host မရှိပါ",
+    "emptyDescription": "လင့်တစ်ခု၏ host ကို သင်ယုံကြည်သောအခါ ၎င်းကို ထပ်မံမေးစရာမလိုဘဲ ဖွင့်ပါသည်။",
+    "revoke": "{{host}} ကို ပယ်ဖျက်မည်",
+    "backToPreferences": "နှစ်သက်မှုများသို့ ပြန်သွားမည်"
   }
 }

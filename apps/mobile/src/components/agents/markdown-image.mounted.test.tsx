@@ -55,7 +55,7 @@ describe('MarkdownImage viewer mounting', () => {
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'Pressable' &&
-        node.props.accessibilityLabel === 'Load'
+        node.props.accessibilityLabel === 'Load x'
     );
     await act(async () => {
       await Promise.resolve();

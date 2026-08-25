@@ -89,6 +89,7 @@ export type UserOrganizationWithSeats = {
   requireSeats: boolean;
   plan: OrganizationPlan;
   created_at: Organization['created_at'];
+  isSalesDemo?: boolean;
   seatCount: {
     used: number;
     total: number;

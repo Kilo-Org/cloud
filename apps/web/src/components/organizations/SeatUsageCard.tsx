@@ -35,14 +35,11 @@ export function SeatUsageCard({ organizationId }: Props) {
   const { data: seatUsage, isLoading, error, refetch } = useOrganizationSeatUsage(organizationId);
   const status = useOrganizationTrialStatus(organizationId);
 
-  if (isLoading || orgLoading || status === 'loading') {
-    return (
-      <LoadingCard
-        title="Seat Usage"
-        description="Loading seat usage information..."
-        rowCount={1}
-      />
-    );
+  // Old form showed a Seat Usage loading card before settings were known. This
+  // also removes that placeholder for ordinary orgs while the org query is in
+  // flight.
+  if (orgLoading) {
+    return null;
   }
 
   if (error || orgError || status === 'error') {
@@ -63,17 +60,28 @@ export function SeatUsageCard({ organizationId }: Props) {
     return null;
   }
 
+  // Once the org is loaded, hide Seat Usage for demo orgs and
+  // suppressed-trial orgs before any Seat Usage loading UI.
+  if (org.settings.suppress_trial_messaging || org.settings.is_sales_demo) {
+    return null;
+  }
+
+  if (isLoading || status === 'loading') {
+    return (
+      <LoadingCard
+        title="Seat Usage"
+        description="Loading seat usage information..."
+        rowCount={1}
+      />
+    );
+  }
+
   if (!seatUsage) {
     return null;
   }
 
   const { usedSeats, totalSeats } = seatUsage;
   const isTrial = status !== 'subscribed';
-
-  // Hide seat usage card when trial messaging is suppressed (e.g., OSS program participants)
-  if (org.settings.suppress_trial_messaging) {
-    return null;
-  }
 
   // Show seat usage card for subscribed orgs or orgs with require_seats
   if (status !== 'subscribed' && !org.require_seats) {

@@ -49,6 +49,10 @@ type OrganizationsTableProps = {
   // which sets `stripe_status=any` in the URL so the default no longer kicks
   // in on refresh.
   defaultStripeStatus?: string;
+  // Extra action controls rendered beside the create button (e.g. the
+  // demo-organization dialog trigger). Kept as a node so callers own their
+  // dialog/trigger pair without the table needing to know about them.
+  actions?: React.ReactNode;
 };
 
 const ANY_STRIPE_STATUS_TOKEN = 'any';
@@ -63,6 +67,7 @@ export function OrganizationsTable({
   showTrialEndDate = false,
   showTrialFilters = false,
   defaultStripeStatus,
+  actions,
 }: OrganizationsTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -322,12 +327,18 @@ export function OrganizationsTable({
     [sharedParams, updateUrl]
   );
 
-  const buttons = create ? (
-    <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)}>
-      <Plus className="h-4 w-4" />
-      {create.label}
-    </Button>
-  ) : null;
+  const buttons =
+    create || actions ? (
+      <>
+        {create ? (
+          <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4" />
+            {create.label}
+          </Button>
+        ) : null}
+        {actions}
+      </>
+    ) : null;
 
   const breadcrumbs = (
     <BreadcrumbItem>

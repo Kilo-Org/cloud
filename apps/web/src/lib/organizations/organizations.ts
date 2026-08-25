@@ -25,7 +25,7 @@ import {
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@/lib/drizzle';
-import { and, asc, eq, isNull, gt } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, gt } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@/lib/constants';
 import { randomUUID } from 'crypto';
 import { fromMicrodollars, getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
@@ -94,6 +94,7 @@ export async function getUserOrganizationsWithSeats(
             AND oi.role != 'billing_manager'
         ) combined_count
       )`,
+      isSalesDemo: sql<boolean>`COALESCE((${organizations.settings}->>'is_sales_demo')::boolean, false)`,
     })
     .from(organizations)
     .innerJoin(
@@ -113,6 +114,7 @@ export async function getUserOrganizationsWithSeats(
     requireSeats: result.requireSeats,
     plan: result.plan,
     created_at: result.createdAt,
+    isSalesDemo: result.isSalesDemo,
     seatCount: {
       used: result.total_member_count,
       total: result.seatCountTotal,
@@ -214,8 +216,14 @@ export async function getProfileOrganizations(
     )
     .where(and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at)))
     // Deterministic order so callers can treat the first element as a stable
-    // default selection (e.g. profile `selectedOrganizationId`).
-    .orderBy(asc(organizations.created_at), asc(organizations.id));
+    // default selection (e.g. profile `selectedOrganizationId`). Old form was
+    // created_at, id; sales-demo orgs win so profile selectedOrganizationId is
+    // the demo org.
+    .orderBy(
+      desc(sql`COALESCE((${organizations.settings}->>'is_sales_demo')::boolean, false)`),
+      asc(organizations.created_at),
+      asc(organizations.id)
+    );
 
   const parentOrganizationIdsWithMembershipInAChild = new Set(
     results.flatMap(result =>

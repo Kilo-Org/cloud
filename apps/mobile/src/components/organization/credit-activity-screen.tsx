@@ -11,6 +11,7 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -18,8 +19,9 @@ import { formatDate, formatMoney } from '@/lib/format';
 import {
   type CreditTransaction,
   useOrgBoundary,
-  useOrgCreditTransactions,
+  useOrgCreditTransactionsPage,
 } from '@/lib/hooks/use-organization-queries';
+import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useOrganization } from '@/lib/organization-context';
 import { reconcileOrgDeepLink } from '@/lib/org-deep-link';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
@@ -118,8 +120,13 @@ export function OrganizationCreditActivityScreen() {
 
   // Key transactions only on the reconcile query id — never the pre-tap context
   // org while a deep-link param is present and unvalidated/invalid.
-  const query = useOrgCreditTransactions(reconcile.queryOrganizationId);
+  const {
+    query,
+    entries: transactions,
+    hasMore,
+  } = useOrgCreditTransactionsPage(reconcile.queryOrganizationId);
   const paddingBottom = useTabBarBottomPadding();
+  useRouteForegroundRefresh([[['organizations']]]);
 
   const showBoundary =
     isResolving ||
@@ -137,9 +144,28 @@ export function OrganizationCreditActivityScreen() {
     );
   }
 
-  const isLoading = query.isLoading;
-  const isQueryError = query.isError && !query.data;
-  const transactions = query.data ?? [];
+  const isLoading = query.isPending;
+  const hasLoadedPages = (query.data?.pages.length ?? 0) > 0;
+  const isFirstPageError = query.isError && !hasLoadedPages;
+
+  // A thrown NOT_FOUND/FORBIDDEN/UNAUTHORIZED can't be fixed by retrying — show
+  // a permanent state with no Retry. Any other first-page error stays retryable.
+  const errorCode = query.error?.data?.code;
+  const isPermanentError =
+    errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED';
+
+  // NOT_FOUND maps to the not-found state; FORBIDDEN/UNAUTHORIZED map to the
+  // permission state. Any other error stays the retryable neutral state.
+  let errorVariant: 'neutral' | 'server' | 'not-found' | 'permission' = 'neutral';
+  if (errorCode === 'NOT_FOUND') {
+    errorVariant = 'not-found';
+  } else if (errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED') {
+    errorVariant = 'permission';
+  }
+
+  // A later-page failure must keep the already-loaded rows and offer an inline
+  // retry instead of replacing the list.
+  const isLaterPageError = query.isError && hasLoadedPages;
 
   let body: ReactNode = null;
   if (isLoading) {
@@ -150,13 +176,54 @@ export function OrganizationCreditActivityScreen() {
         <CreditRowSkeleton />
       </Animated.View>
     );
-  } else if (isQueryError) {
+  } else if (isFirstPageError) {
     body = (
       <Animated.View entering={FadeIn.duration(200)} className="flex-1" style={{ paddingBottom }}>
-        <QueryError onRetry={() => void query.refetch()} isRetrying={query.isFetching} />
+        <QueryError
+          variant={errorVariant}
+          onRetry={isPermanentError ? undefined : () => void query.refetch()}
+          isRetrying={query.isFetching}
+        />
       </Animated.View>
     );
   } else {
+    const footer = (
+      <View>
+        {hasMore && !isLaterPageError && (
+          <View className="items-center gap-3 px-6 py-4">
+            <Text variant="muted" className="text-center text-xs">
+              {t('organization.creditActivity.truncated')}
+            </Text>
+            <Button
+              variant="outline"
+              size="sm"
+              onPress={() => void query.fetchNextPage()}
+              loading={query.isFetchingNextPage}
+              accessibilityLabel={t('organization.creditActivity.loadMore')}
+            >
+              <Text>{t('organization.creditActivity.loadMore')}</Text>
+            </Button>
+          </View>
+        )}
+        {isLaterPageError && (
+          <View className="items-center gap-3 px-6 py-4">
+            <Text variant="muted" className="text-center text-xs">
+              {t('organization.creditActivity.loadMoreFailed')}
+            </Text>
+            <Button
+              variant="outline"
+              size="sm"
+              onPress={() => void query.fetchNextPage()}
+              accessibilityLabel={t('common.retry')}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          </View>
+        )}
+        <View style={{ height: paddingBottom }} pointerEvents="none" />
+      </View>
+    );
+
     body = (
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <FlatList
@@ -171,7 +238,7 @@ export function OrganizationCreditActivityScreen() {
               description={t('organization.creditActivity.emptyDescription')}
             />
           }
-          ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
+          ListFooterComponent={footer}
         />
       </Animated.View>
     );

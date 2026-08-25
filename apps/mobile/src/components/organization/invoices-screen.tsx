@@ -10,6 +10,7 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -17,8 +18,9 @@ import { formatDate, formatMoneyFromCents } from '@/lib/format';
 import {
   type OrgInvoice,
   useOrgBoundary,
-  useOrgInvoices,
+  useOrgInvoicesPage,
 } from '@/lib/hooks/use-organization-queries';
+import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   getInvoiceDownloadErrorMessage,
@@ -179,16 +181,36 @@ function InvoiceRow({ invoice }: Readonly<{ invoice: OrgInvoice }>) {
 export function OrganizationInvoicesScreen() {
   const { t } = useTranslation();
   const { organizationId, org, isResolving } = useOrgBoundary();
-  const query = useOrgInvoices(organizationId);
+  const { query, entries: invoices, hasMore } = useOrgInvoicesPage(organizationId);
   const paddingBottom = useTabBarBottomPadding();
+  useRouteForegroundRefresh([[['organizations']]]);
 
   if (isResolving || organizationId == null || org == null) {
     return <OrganizationBoundary title={t('organization.invoices.title')} />;
   }
 
-  const isLoading = query.isLoading;
-  const isError = query.isError && !query.data;
-  const invoices = query.data ?? [];
+  const isLoading = query.isPending;
+  const hasLoadedPages = (query.data?.pages.length ?? 0) > 0;
+  const isFirstPageError = query.isError && !hasLoadedPages;
+
+  // A thrown NOT_FOUND/FORBIDDEN/UNAUTHORIZED can't be fixed by retrying — show
+  // a permanent state with no Retry. Any other first-page error stays retryable.
+  const errorCode = query.error?.data?.code;
+  const isPermanentError =
+    errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED';
+
+  // NOT_FOUND maps to the not-found state; FORBIDDEN/UNAUTHORIZED map to the
+  // permission state. Any other error stays the retryable neutral state.
+  let errorVariant: 'neutral' | 'server' | 'not-found' | 'permission' = 'neutral';
+  if (errorCode === 'NOT_FOUND') {
+    errorVariant = 'not-found';
+  } else if (errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED') {
+    errorVariant = 'permission';
+  }
+
+  // A later-page failure must keep the already-loaded rows and offer an inline
+  // retry instead of replacing the list.
+  const isLaterPageError = query.isError && hasLoadedPages;
 
   let body: ReactNode = null;
   if (isLoading) {
@@ -199,13 +221,54 @@ export function OrganizationInvoicesScreen() {
         <InvoiceRowSkeleton />
       </Animated.View>
     );
-  } else if (isError) {
+  } else if (isFirstPageError) {
     body = (
       <Animated.View entering={FadeIn.duration(200)} className="flex-1" style={{ paddingBottom }}>
-        <QueryError onRetry={() => void query.refetch()} isRetrying={query.isFetching} />
+        <QueryError
+          variant={errorVariant}
+          onRetry={isPermanentError ? undefined : () => void query.refetch()}
+          isRetrying={query.isFetching}
+        />
       </Animated.View>
     );
   } else {
+    const footer = (
+      <View>
+        {hasMore && !isLaterPageError && (
+          <View className="items-center gap-3 px-6 py-4">
+            <Text variant="muted" className="text-center text-xs">
+              {t('organization.invoices.truncated')}
+            </Text>
+            <Button
+              variant="outline"
+              size="sm"
+              onPress={() => void query.fetchNextPage()}
+              loading={query.isFetchingNextPage}
+              accessibilityLabel={t('organization.invoices.loadMore')}
+            >
+              <Text>{t('organization.invoices.loadMore')}</Text>
+            </Button>
+          </View>
+        )}
+        {isLaterPageError && (
+          <View className="items-center gap-3 px-6 py-4">
+            <Text variant="muted" className="text-center text-xs">
+              {t('organization.invoices.loadMoreFailed')}
+            </Text>
+            <Button
+              variant="outline"
+              size="sm"
+              onPress={() => void query.fetchNextPage()}
+              accessibilityLabel={t('common.retry')}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          </View>
+        )}
+        <View style={{ height: paddingBottom }} pointerEvents="none" />
+      </View>
+    );
+
     body = (
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <FlatList
@@ -220,7 +283,7 @@ export function OrganizationInvoicesScreen() {
               description={t('organization.invoices.emptyDescription')}
             />
           }
-          ListFooterComponent={<View style={{ height: paddingBottom }} pointerEvents="none" />}
+          ListFooterComponent={footer}
         />
       </Animated.View>
     );

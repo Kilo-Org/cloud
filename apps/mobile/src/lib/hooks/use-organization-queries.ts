@@ -1,5 +1,6 @@
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import { useAuth } from '@/lib/auth/auth-context';
 import { useOrganization } from '@/lib/organization-context';
@@ -153,6 +154,33 @@ export type CreditTransaction = NonNullable<
   ReturnType<typeof useOrgCreditTransactions>['data']
 >[number];
 
+/**
+ * Cursor-paginated credit transactions for an organization. Mirrors the legacy
+ * `useOrgCreditTransactions` surface (flat `entries`) but pages through
+ * `organizations.creditTransactionsPage` with `useInfiniteQuery` so the screen
+ * can offer "Load more" instead of scanning every row at once.
+ */
+export function useOrgCreditTransactionsPage(organizationId: string | null) {
+  const trpc = useTRPC();
+  const query = useInfiniteQuery(
+    trpc.organizations.creditTransactionsPage.infiniteQueryOptions(
+      { organizationId: organizationId ?? '' },
+      {
+        enabled: organizationId != null,
+        getNextPageParam: lastPage =>
+          lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,
+      }
+    )
+  );
+
+  const pages = query.data?.pages;
+  const entries = useMemo(() => (pages ?? []).flatMap(page => page.entries), [pages]);
+  const lastPage = pages != null && pages.length > 0 ? pages.at(-1) : undefined;
+  const hasMore = lastPage?.hasMore ?? false;
+
+  return { query, entries, hasMore };
+}
+
 export function useOrgInvoices(organizationId: string | null) {
   const trpc = useTRPC();
   return useQuery(
@@ -164,3 +192,30 @@ export function useOrgInvoices(organizationId: string | null) {
 }
 
 export type OrgInvoice = NonNullable<ReturnType<typeof useOrgInvoices>['data']>[number];
+
+/**
+ * Cursor-paginated invoices for an organization. Mirrors the legacy
+ * `useOrgInvoices` surface (flat `entries`) but pages through
+ * `organizations.invoicesPage` with `useInfiniteQuery` so the screen can offer
+ * "Load more" instead of loading every invoice at once.
+ */
+export function useOrgInvoicesPage(organizationId: string | null) {
+  const trpc = useTRPC();
+  const query = useInfiniteQuery(
+    trpc.organizations.invoicesPage.infiniteQueryOptions(
+      { organizationId: organizationId ?? '', period: 'year' },
+      {
+        enabled: organizationId != null,
+        getNextPageParam: lastPage =>
+          lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,
+      }
+    )
+  );
+
+  const pages = query.data?.pages;
+  const entries = useMemo(() => (pages ?? []).flatMap(page => page.entries), [pages]);
+  const lastPage = pages != null && pages.length > 0 ? pages.at(-1) : undefined;
+  const hasMore = lastPage?.hasMore ?? false;
+
+  return { query, entries, hasMore };
+}

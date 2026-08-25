@@ -1781,15 +1781,24 @@
     "newSession": {
       "title": "New session",
       "repository": "Repository",
+      "recentlyUsed": "Recently used",
       "couldNotLoadRepositories": "Couldn't load repositories",
       "connectGithub": "Connect GitHub",
       "connectGithubDescription": "Connect GitHub in your browser, then return here to pick a repository.",
+      "connectGitlab": "Connect GitLab",
+      "connectGitlabDescription": "Connect GitLab in your browser, then return here to pick a repository.",
+      "connectBitbucket": "Connect Bitbucket",
+      "connectBitbucketDescription": "Connect Bitbucket in your browser, then return here to pick a repository.",
       "openGithub": "Open GitHub",
+      "openGitlab": "Open GitLab",
+      "openBitbucket": "Open Bitbucket",
       "refreshRepositories": "Refresh repositories",
       "githubConnectionNotVisible": "We can't see your GitHub connection yet",
       "githubConnectionNotVisibleDescription": "If you installed or configured the Kilo GitHub App, check again — or make sure it was installed for this account/organization.",
       "checkAgain": "Check again",
       "githubConnected": "GitHub connected",
+      "gitlabConnected": "GitLab connected",
+      "bitbucketConnected": "Bitbucket connected",
       "noRepositoriesVisible": "No repositories visible. Check repository access for the Kilo GitHub App, then refresh.",
       "runOnWithTarget": "Run on: {{target}}",
       "environment": "Environment",
@@ -2538,8 +2547,11 @@
       "emptyDescription": "Purchases, usage, and credit adjustments for this organization will appear here as they happen.",
       "emptyTitle": "No credit activity",
       "expires": "Expires {{date}}",
+      "loadMore": "Load more",
+      "loadMoreFailed": "Couldn't load more.",
       "title": "Credit activity",
-      "transactionFallback": "Credit transaction"
+      "transactionFallback": "Credit transaction",
+      "truncated": "Older credit activity is available."
     },
     "inviteMember": {
       "emailError": "Enter a valid email address",
@@ -2556,10 +2568,13 @@
       "emptyDescription": "Invoices are generated automatically each billing cycle and will appear here once your organization is billed.",
       "emptyTitle": "No invoices",
       "invoiceFallback": "Invoice",
+      "loadMore": "Load more",
+      "loadMoreFailed": "Couldn't load more.",
       "statusOpen": "Open",
       "statusPaid": "Paid",
       "statusVoid": "Void",
-      "title": "Invoices"
+      "title": "Invoices",
+      "truncated": "Older invoices are available."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

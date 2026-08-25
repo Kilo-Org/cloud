@@ -1,6 +1,7 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { type TRPCQueryKey } from '@trpc/tanstack-react-query';
 import { ChevronDown } from '@/components/ui/icons';
 import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
 import { formatDate, formatMoney } from '@/lib/format';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useOrganization } from '@/lib/organization-context';
@@ -24,6 +26,11 @@ type CreditsCardProps = {
   orgs: OrgListEntry[] | undefined;
 };
 
+function ownerScopedKey(key: TRPCQueryKey, userId: string | undefined): TRPCQueryKey {
+  const scoped: readonly unknown[] = [...key, userId ?? 'unsigned'];
+  return scoped as TRPCQueryKey;
+}
+
 export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
@@ -33,28 +40,55 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const { organizationId, setOrganizationId } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;
 
+  const { userId, isError: userIdError, refetch: refetchUserId } = useCurrentUserId({ enabled });
+  const hasUserId = userId !== undefined;
+
+  const balanceOptions = trpc.user.getContextBalance.queryOptions({
+    organizationId: selectedOrgId,
+  });
+  const personalCreditOptions = trpc.user.getCreditBlocks.queryOptions({});
+  const orgCreditOptions = trpc.organizations.getCreditBlocks.queryOptions({
+    organizationId: selectedOrgId ?? '',
+  });
+
+  // Key every financial query by the signed-in owner. The last key element is
+  // the userId; the placeholder gate below compares against it so a user switch
+  // never reuses another owner's cached balance as the current amount.
+  const balanceQueryKey = ownerScopedKey(balanceOptions.queryKey, userId);
+  const personalQueryKey = ownerScopedKey(personalCreditOptions.queryKey, userId);
+  const orgQueryKey = ownerScopedKey(orgCreditOptions.queryKey, userId);
+
   const {
     data: balance,
     isLoading: balanceLoading,
     isFetching: balanceFetching,
-    isError: balanceError,
+    isError: balanceQueryError,
     refetch: refetchBalance,
   } = useQuery({
-    ...trpc.user.getContextBalance.queryOptions({ organizationId: selectedOrgId }),
-    enabled,
-    placeholderData: keepPreviousData,
+    ...balanceOptions,
+    queryKey: balanceQueryKey,
+    enabled: enabled && hasUserId,
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey.at(-1) === userId ? previousData : undefined,
   });
 
   const { data: personalCreditData, isLoading: personalCreditsLoading } = useQuery({
-    ...trpc.user.getCreditBlocks.queryOptions({}),
-    enabled: enabled && !selectedOrgId,
+    ...personalCreditOptions,
+    queryKey: personalQueryKey,
+    enabled: enabled && hasUserId && !selectedOrgId,
   });
 
   const { data: orgCreditData, isLoading: orgCreditsLoading } = useQuery({
-    ...trpc.organizations.getCreditBlocks.queryOptions({ organizationId: selectedOrgId ?? '' }),
-    enabled: enabled && Boolean(selectedOrgId),
-    placeholderData: keepPreviousData,
+    ...orgCreditOptions,
+    queryKey: orgQueryKey,
+    enabled: enabled && hasUserId && Boolean(selectedOrgId),
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey.at(-1) === userId ? previousData : undefined,
   });
+
+  // A failed getMe (no userId) can never render a trusted balance, so it shares
+  // the balance error surface. Retry re-resolves the owner and re-fetches.
+  const balanceFailed = balanceQueryError || userIdError;
 
   const creditData = selectedOrgId ? orgCreditData : personalCreditData;
   const creditsLoading = selectedOrgId ? orgCreditsLoading : personalCreditsLoading;
@@ -64,7 +98,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // not fetching, so `balanceLoading` (isLoading) is false while `balance`
   // is still undefined. Treat "no data yet" as loading so the card shows a
   // skeleton instead of `$0` on a cold launch before NetInfo settles.
-  const balancePending = balance === undefined && !balanceError;
+  const balancePending = balance === undefined && !balanceFailed;
   const expiringBlocks = creditData?.creditBlocks.filter(b => b.expiry_date !== null) ?? [];
   const expiringTotal = fromMicrodollars(
     expiringBlocks.reduce((sum, b) => sum + b.balance_mUsd, 0)
@@ -146,15 +180,18 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       </View>
 
       {(balanceLoading || balancePending) && <Skeleton className="min-h-16 w-full rounded-lg" />}
-      {balanceError && (
+      {balanceFailed && (
         <Pressable
           className="min-h-16 justify-center rounded-lg bg-secondary px-3 py-3 active:opacity-70"
-          onPress={() => void refetchBalance()}
+          onPress={() => {
+            refetchUserId();
+            void refetchBalance();
+          }}
         >
           <Text className="text-sm text-destructive">{t('profile.failedToLoadBalance')}</Text>
         </Pressable>
       )}
-      {!balanceLoading && !balancePending && !balanceError && (
+      {!balanceLoading && !balancePending && !balanceFailed && (
         <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
           <Animated.View className="flex-1 justify-center" layout={LinearTransition.duration(200)}>
             <Text className="text-2xl font-bold">{formatMoney(balanceDollars, i18n.language)}</Text>
@@ -181,7 +218,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       )}
       {!balanceLoading &&
         !balancePending &&
-        !balanceError &&
+        !balanceFailed &&
         balanceDollars === 0 &&
         canShowZeroBalanceCta && (
           <AddCreditsRow url={zeroBalanceUrl} className="rounded-lg bg-secondary px-3 py-3" />
@@ -191,7 +228,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           IAP, and a non-money-role member just lacks access). */}
       {!balanceLoading &&
         !balancePending &&
-        !balanceError &&
+        !balanceFailed &&
         balanceDollars === 0 &&
         !canShowZeroBalanceCta &&
         selectedOrgId == null && (

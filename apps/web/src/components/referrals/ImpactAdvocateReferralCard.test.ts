@@ -7,17 +7,11 @@ import {
   IMPACT_ADVOCATE_WIDGET_LOAD_TIMEOUT_MS,
   WidgetFallbackContent,
 } from './ImpactAdvocateReferralCard';
-import { buildImpactAdvocateTokenUrl } from './ImpactAdvocateReferralCard.utils';
+import { IMPACT_ADVOCATE_TOKEN_URL } from './ImpactAdvocateReferralCard.utils';
 
-describe('buildImpactAdvocateTokenUrl', () => {
-  it('defaults to the KiloClaw Advocate token endpoint for existing callers', () => {
-    expect(buildImpactAdvocateTokenUrl()).toBe('/api/impact-advocate/token');
-  });
-
-  it('requests the Kilo Pass Advocate token without falling back to KiloClaw config', () => {
-    expect(buildImpactAdvocateTokenUrl('kilo_pass')).toBe(
-      '/api/impact-advocate/token?product=kilo_pass'
-    );
+describe('IMPACT_ADVOCATE_TOKEN_URL', () => {
+  it('always requests the Kilo Pass Advocate token', () => {
+    expect(IMPACT_ADVOCATE_TOKEN_URL).toBe('/api/impact-advocate/token?product=kilo_pass');
   });
 });
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from '@jest/globals';
 
-import { KiloclawReferralsInvestigationResults } from './KiloclawReferralsInvestigation';
+import { ImpactReferralsInvestigationResults } from './ImpactReferralsInvestigation';
 
 function referralRow(params: {
   referralId: string;
@@ -149,10 +149,10 @@ const result = {
   ],
 };
 
-describe('KiloclawReferralsInvestigationResults', () => {
+describe('ImpactReferralsInvestigationResults', () => {
   it('renders qualified and disqualified referee diagnostics with reward and Impact state', () => {
     const html = renderToStaticMarkup(
-      React.createElement(KiloclawReferralsInvestigationResults, { result })
+      React.createElement(ImpactReferralsInvestigationResults, { result })
     );
 
     expect(html).toContain('referrer@example.com');

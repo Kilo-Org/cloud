@@ -304,9 +304,10 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `IMPACT_AUTH_TOKEN` - Impact.com API auth token for affiliate/click events. `[SECRET]`
 - `IMPACT_ADVOCATE_ACCOUNT_SID` - Impact.com account SID for Advocate (referral) API. `[SECRET]`
 - `IMPACT_ADVOCATE_AUTH_TOKEN` - Impact.com Advocate API auth token. `[SECRET]`
-- `IMPACT_ADVOCATE_PROGRAM_ID` - Impact.com Advocate program ID. [SERVER]
+- `IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID` - Impact.com Advocate program ID for the Kilo Pass referral program. [SERVER]
+- `IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID` - Impact.com Advocate widget ID for the Kilo Pass referral program. [SERVER]
 - `IMPACT_ADVOCATE_TENANT_ALIAS` - Impact.com Advocate tenant alias. [SERVER]
-- `IMPACT_ADVOCATE_WIDGET_ID` - Impact.com Advocate widget ID. [SERVER]
+- `IMPACT_ADVOCATE_API_BASE_URL` - Impact.com Advocate API base URL. Defaults to `https://app.referralsaasquatch.com`. [SERVER]
 - `IMPACT_CAMPAIGN_ID` - Impact.com campaign ID for event tracking. [SERVER]
 ### Cloudflare Analytics
 

@@ -366,20 +366,6 @@ type SideEffectRequest =
       };
     }
   | {
-      action: 'process_paid_conversion';
-      input: {
-        userId: string;
-        dedupeKey: string;
-        eventDateIso: string;
-        orderId: string;
-        amount: number;
-        currencyCode: string;
-        itemCategory: string;
-        itemName: string;
-        itemSku?: string;
-      };
-    }
-  | {
       action: 'issue_kilo_pass_bonus_from_usage_threshold';
       input: { userId: string; nowIso: string };
     };
@@ -396,14 +382,7 @@ type SideEffectResponse<T extends SideEffectRequest> = T['action'] extends 'send
           ? { guarded: boolean }
           : T['action'] extends 'report_commit_retirement_anomaly'
             ? { ok: true }
-            : T['action'] extends 'process_paid_conversion'
-              ? {
-                  affiliateSaleEnqueued: boolean;
-                  winningTouchType: 'referral' | 'affiliate' | 'none';
-                  conversionId: string | null;
-                  disqualificationReason: string | null;
-                }
-              : { ok: true };
+            : { ok: true };
 
 export class KiloClawApiError extends Error {
   readonly statusCode: number;
@@ -1514,7 +1493,7 @@ async function enqueueAffiliateEvent(
   );
 }
 
-type PaidConversionParams = {
+type CreditRenewalSaleParams = {
   userId: string;
   dedupeKey: string;
   eventDateIso: string;
@@ -1526,31 +1505,23 @@ type PaidConversionParams = {
   itemSku?: string;
 };
 
-async function processPaidConversion(
+/**
+ * Affiliate SALE reporting for a settled credit renewal. Reporting must never
+ * fail a renewal, so delivery problems are logged and swallowed.
+ */
+async function enqueueCreditRenewalSaleBestEffort(
   env: BillingWorkerEnv,
   context: SweepExecutionContext,
-  params: PaidConversionParams
-): Promise<void> {
-  await callBillingSideEffect(
-    env,
-    context,
-    {
-      action: 'process_paid_conversion',
-      input: params,
-    },
-    { userId: params.userId }
-  );
-}
-
-async function processPaidConversionBestEffort(
-  env: BillingWorkerEnv,
-  context: SweepExecutionContext,
-  params: PaidConversionParams
+  params: CreditRenewalSaleParams
 ): Promise<void> {
   try {
-    await processPaidConversion(env, context, params);
+    await enqueueAffiliateEvent(env, context, {
+      ...params,
+      provider: 'impact',
+      eventType: 'sale',
+    });
   } catch (error) {
-    log('error', 'Paid conversion side effect failed after credit renewal', {
+    log('error', 'Affiliate sale side effect failed after credit renewal', {
       userId: params.userId,
       dedupeKey: params.dedupeKey,
       error: error instanceof Error ? error.message : String(error),
@@ -2203,7 +2174,7 @@ async function processCreditRenewalRow(
       outcome.wasPastDue
     );
 
-    await processPaidConversionBestEffort(env, context, {
+    await enqueueCreditRenewalSaleBestEffort(env, context, {
       userId: outcome.userId,
       dedupeKey: `affiliate:impact:sale:${outcome.deductionCategory}`,
       eventDateIso: serializeBillingTimestamp(outcome.renewalAt),
@@ -2256,7 +2227,7 @@ async function processCreditRenewalRow(
       outcome.wasPastDue
     );
 
-    await processPaidConversionBestEffort(env, context, {
+    await enqueueCreditRenewalSaleBestEffort(env, context, {
       userId: outcome.userId,
       dedupeKey: `affiliate:impact:sale:${outcome.deductionCategory}`,
       eventDateIso: serializeBillingTimestamp(outcome.renewalAt),

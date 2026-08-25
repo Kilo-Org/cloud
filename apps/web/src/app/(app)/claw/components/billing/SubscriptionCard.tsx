@@ -37,7 +37,6 @@ import {
   planLabel,
   type ClawBillingStatus,
 } from './billing-types';
-import { ReferralRewardsSummary } from './ReferralRewardsSummary';
 
 type SubscriptionCardProps = {
   billing: ClawBillingStatus;
@@ -345,8 +344,6 @@ function ActiveSubscriptionCard({
         </Alert>
       ) : null}
 
-      <ReferralRewardsSummary rewards={sub.referralRewards} variant="section" />
-
       <div className="flex flex-wrap gap-2 pt-1">
         {retirement.needsSupportReview ? null : retirement.isFinalCommitTerm ? (
           retirement.standardContinuationScheduled ? (
@@ -473,8 +470,6 @@ function ConvertingSubscriptionCard({
         </AlertDescription>
       </Alert>
 
-      <ReferralRewardsSummary rewards={sub.referralRewards} variant="section" />
-
       <div className="flex flex-wrap gap-2 pt-1">
         <Button onClick={onReactivateClick} disabled={isReactivating} aria-busy={isReactivating}>
           {isReactivating ? (
@@ -527,8 +522,6 @@ function CancelingSubscriptionCard({
         </AlertDescription>
       </Alert>
 
-      <ReferralRewardsSummary rewards={sub.referralRewards} variant="section" />
-
       <div className="flex flex-wrap gap-2 pt-1">
         <Button onClick={onReactivateClick} disabled={isReactivating} aria-busy={isReactivating}>
           {isReactivating ? (
@@ -579,8 +572,6 @@ function PastDueSubscriptionCard({
             : 'Your last payment failed. Update your payment method to avoid service interruption.'}
         </AlertDescription>
       </Alert>
-
-      <ReferralRewardsSummary rewards={sub.referralRewards} variant="section" />
 
       <div className="flex flex-wrap gap-2 pt-1">
         {isCreditFunded ? (

@@ -4,19 +4,15 @@ import { addMonths } from 'date-fns';
 import { and, asc, count, eq, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import {
-  IMPACT_ACTION_TRACKER_IDS,
-  buildSalePayload,
-  hashEmailForImpact,
-  isImpactConfigured,
-} from '@/lib/impact';
-import { isImpactAdvocateConfigured } from '@/lib/impact/advocate';
+import { IMPACT_ACTION_TRACKER_IDS, buildSalePayload, hashEmailForImpact } from '@/lib/impact';
+import { resolveWinningAttributionTouch } from '@/lib/impact/referral-attribution';
 import {
   dispatchImpactConversionReportById,
+  getRewardBearingReferralConfigurationState,
+  logRewardBearingReferralConfigurationFailure,
   queueImpactAdvocateRewardRedemption,
-  resolveWinningAttributionTouch,
   type AdverseReferralPaymentReason,
-} from '@/lib/impact/kiloclaw-referrals';
+} from '@/lib/impact/referral-delivery';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
 import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
@@ -80,32 +76,6 @@ function referralDisqualificationReason(reason: string): string {
 
 function getAdversePaymentReason(reason: AdverseReferralPaymentReason): string {
   return `referral_payment_${reason}`;
-}
-
-function getKiloPassReferralConfigurationState() {
-  const impactPerformanceConfigured = isImpactConfigured();
-  const impactAdvocateConfigured = isImpactAdvocateConfigured({
-    product: ImpactReferralProduct.KiloPass,
-  });
-
-  return {
-    impactPerformanceConfigured,
-    impactAdvocateConfigured,
-    isConfigured: impactPerformanceConfigured && impactAdvocateConfigured,
-  };
-}
-
-function logKiloPassReferralConfigurationFailure(params: {
-  sourcePaymentId?: string;
-  conversionId?: string;
-  userId?: string;
-}): void {
-  const configurationState = getKiloPassReferralConfigurationState();
-  console.error('[kilo-pass-referrals] reward-bearing referral configuration is incomplete', {
-    ...params,
-    impactPerformanceConfigured: configurationState.impactPerformanceConfigured,
-    impactAdvocateConfigured: configurationState.impactAdvocateConfigured,
-  });
 }
 
 function buildImpactReferralId(touch: ImpactAttributionTouch): string | null {
@@ -717,9 +687,9 @@ export async function processPersonalKiloPassStripePaidConversion(params: {
       throw new Error('Kilo Pass referral referrer unexpectedly missing after eligibility checks');
     }
 
-    if (!getKiloPassReferralConfigurationState().isConfigured) {
+    if (!getRewardBearingReferralConfigurationState().isConfigured) {
       const missingConfigReason = referralDisqualificationReason('missing_configuration');
-      logKiloPassReferralConfigurationFailure({
+      logRewardBearingReferralConfigurationFailure({
         sourcePaymentId: params.sourcePaymentId,
         userId: params.userId,
       });

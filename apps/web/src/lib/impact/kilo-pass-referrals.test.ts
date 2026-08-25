@@ -57,7 +57,7 @@ import {
   markPersonalKiloPassReferralPaymentAdverse,
   processPersonalKiloPassStripePaidConversion,
 } from '@/lib/impact/kilo-pass-referrals';
-import { dispatchQueuedImpactAdvocateRewardRedemptions } from '@/lib/impact/kiloclaw-referrals';
+import { dispatchQueuedImpactAdvocateRewardRedemptions } from '@/lib/impact/referral-delivery';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   deleted_user_email_tombstones,

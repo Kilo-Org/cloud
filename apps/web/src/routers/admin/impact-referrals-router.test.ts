@@ -198,16 +198,16 @@ async function insertReferralInvestigationRow(params: {
   return referee;
 }
 
-describe('admin kiloclaw referrals investigation', () => {
+describe('admin impact referrals investigation', () => {
   it('rejects non-admin users', async () => {
     const caller = await createCallerForUser(nonAdmin.id);
 
     await expect(
-      caller.admin.kiloclawReferrals.investigateReferrer({ search: referrer.id })
+      caller.admin.impactReferrals.investigateReferrer({ search: referrer.id })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  it('searches by referrer email and returns qualified and disqualified referee diagnostics', async () => {
+  it('searches retired KiloClaw referrals by referrer email and returns referee diagnostics', async () => {
     const qualifiedReferee = await insertReferralInvestigationRow({
       refereeEmail: `qualified-referee-${Math.random()}@example.com`,
       sourcePaymentId: 'qualified-payment',
@@ -224,8 +224,9 @@ describe('admin kiloclaw referrals investigation', () => {
     });
 
     const caller = await createCallerForUser(admin.id);
-    const result = await caller.admin.kiloclawReferrals.investigateReferrer({
+    const result = await caller.admin.impactReferrals.investigateReferrer({
       search: referrer.google_user_email,
+      product: 'kiloclaw',
     });
 
     expect(result.product).toBe('kiloclaw');
@@ -324,7 +325,7 @@ describe('admin kiloclaw referrals investigation', () => {
     });
 
     const caller = await createCallerForUser(admin.id);
-    const result = await caller.admin.kiloclawReferrals.investigateReferrer({
+    const result = await caller.admin.impactReferrals.investigateReferrer({
       search: referrer.id,
       product: 'kilo_pass',
     });

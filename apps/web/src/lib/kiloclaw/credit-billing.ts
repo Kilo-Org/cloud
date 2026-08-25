@@ -33,8 +33,6 @@ import {
   buildAffiliateEventDedupeKey,
   enqueueAffiliateEventForUser,
 } from '@/lib/impact/affiliate-events';
-import { processPersonalKiloClawPaidConversion } from '@/lib/impact/kiloclaw-referrals';
-import { ImpactReferralPaymentProvider } from '@kilocode/db/schema-types';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
 import {
@@ -341,23 +339,6 @@ async function enqueueCreditEnrollmentAffiliateEvents(params: {
     plan: params.plan,
     priceVersion: params.priceVersion,
   });
-
-  const conversionDisposition = await processPersonalKiloClawPaidConversion({
-    userId: params.userId,
-    sourcePaymentId: params.saleOrderId,
-    orderId: params.saleOrderId,
-    paymentProvider: ImpactReferralPaymentProvider.Credits,
-    amount: params.saleAmountMicrodollars / 1_000_000,
-    currencyCode: 'usd',
-    itemCategory,
-    itemName: getKiloClawAffiliateItemName(params.plan),
-    itemSku: params.saleItemSku,
-    convertedAt: params.eventDate,
-  });
-
-  if (!conversionDisposition.shouldEnqueueAffiliateSale) {
-    return;
-  }
 
   await enqueueAffiliateEventForUser({
     userId: params.userId,

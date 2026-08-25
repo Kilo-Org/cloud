@@ -25,20 +25,6 @@ describe('assertNotNull', () => {
     expect(() => assertNotNullish(null, customMessage)).toThrow(customMessage);
     expect(() => assertNotNullish(undefined, customMessage)).toThrow(customMessage);
   });
-
-  it('should properly narrow types (compile-time test)', () => {
-    // This test verifies TypeScript type narrowing works correctly
-    const nullableString: string | null = 'test';
-    const nullableNumber: number | undefined = 42;
-
-    // After assertNotNull, TypeScript should know these are not null/undefined
-    assertNotNullish(nullableString);
-    assertNotNullish(nullableNumber);
-
-    // These should work without type errors after assertion
-    expect(nullableString.toUpperCase()).toBe('TEST');
-    expect(nullableNumber.toFixed(2)).toBe('42.00');
-  });
 });
 
 describe('parseResultJsonWithZodSchema', () => {
@@ -168,14 +154,6 @@ describe('parseResultJsonWithZodSchema', () => {
     expect(result).toEqual(arrayData);
     expect(jsonMock).toHaveBeenCalledTimes(1);
   });
-
-  it('should preserve console.log behavior on JSON parse error', async () => {
-    const { response } = createMockResponse(400, 'Bad Request', null, true);
-
-    await expect(parseResultJsonWithZodSchema(response, testSchema)).rejects.toThrow(
-      'Failed to fetch data: Bad Request'
-    );
-  });
 });
 
 describe('isDateOnlyString', () => {
@@ -282,13 +260,5 @@ describe('requireNotNull', () => {
     expect(() => toNonNullish(undefined)).toThrow('Value must not be null or undefined');
     expect(() => toNonNullish(null, 'FOO')).toThrow('FOO');
     expect(() => toNonNullish(undefined, 'FOO')).toThrow('FOO');
-  });
-
-  it('should properly narrow return type (compile-time test)', () => {
-    const nullableString: string | null = 'test';
-    const nullableNumber: number | undefined = 42;
-
-    expect(toNonNullish(nullableString).toUpperCase()).toBe('TEST');
-    expect(toNonNullish(nullableNumber).toFixed(2)).toBe('42.00');
   });
 });

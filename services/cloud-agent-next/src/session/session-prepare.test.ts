@@ -1550,6 +1550,25 @@ describe('createSessionWithLedger changed-intent rejection', () => {
       }),
     },
     {
+      name: 'the GitHub integration',
+      original: makeRequest({
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
+      retry: makeRequest({
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId: '123e4567-e89b-12d3-a456-426614174099',
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
+    },
+    {
       name: 'the model',
       retry: makeRequest({ agent: { mode: 'code', model: 'gpt-4' }, options: ORIGINAL_OPTIONS }),
     },

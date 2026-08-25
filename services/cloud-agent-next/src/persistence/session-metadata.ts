@@ -100,6 +100,7 @@ const MetadataRepositorySchema = z.preprocess(
           type: z.literal('github'),
           repo: z.string(),
           platform: z.literal('github').optional(),
+          githubIntegrationId: z.string().uuid().optional(),
           githubInstallationId: z.string().optional(),
           githubAppType: z.enum(['standard', 'lite']).optional(),
           ...RepositoryCommonSchema,

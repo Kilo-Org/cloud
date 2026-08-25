@@ -263,6 +263,35 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
     });
   });
 
+  it('forwards the expected integration id through capability issuance', async () => {
+    const issueGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      capability: 'kgh2.opaque',
+      installationId: '123',
+      accountLogin: 'acme',
+      appType: 'standard',
+      source: 'installation',
+      gitAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
+    });
+    const expectedIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+
+    await issueCloudAgentGitHubSessionCapability(createEnv({ issueGitHubSessionCapability }), {
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId: 'container-test',
+      expectedIntegrationId,
+      allowUserAuthorization: false,
+    });
+
+    expect(issueGitHubSessionCapability).toHaveBeenCalledWith({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId: 'container-test',
+      expectedIntegrationId,
+      allowUserAuthorization: false,
+    });
+  });
+
   it('reports issuance failure without resolving raw authentication', async () => {
     const issueGitHubSessionCapability = vi.fn().mockResolvedValue({
       success: false,
@@ -533,6 +562,42 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
         appType: 'standard',
         source: 'installation',
       },
+    });
+  });
+
+  it('preserves the expected integration id through direct and legacy fallbacks', async () => {
+    const getCloudAgentAuthForRepo = vi
+      .fn()
+      .mockRejectedValue(new Error('RPC method getCloudAgentAuthForRepo is not available'));
+    const getTokenForRepo = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'installation-token',
+      installationId: '123',
+      accountLogin: 'acme',
+      appType: 'standard',
+    });
+    const expectedIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+
+    await resolveCloudAgentGitHubAuthForRepo(
+      createEnv({ getCloudAgentAuthForRepo, getTokenForRepo }),
+      {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        expectedIntegrationId,
+        allowUserAuthorization: false,
+      }
+    );
+
+    expect(getCloudAgentAuthForRepo).toHaveBeenCalledWith({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      expectedIntegrationId,
+      allowUserAuthorization: false,
+    });
+    expect(getTokenForRepo).toHaveBeenCalledWith({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      expectedIntegrationId,
     });
   });
 });

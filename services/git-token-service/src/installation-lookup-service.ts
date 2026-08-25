@@ -11,6 +11,7 @@ export type FindInstallationParams = {
   githubRepo: string;
   userId: string;
   orgId?: string;
+  expectedIntegrationId?: string;
 };
 
 const InstallationLookupResultSchema = z.object({
@@ -36,6 +37,12 @@ const ManagedInstallationLookupResultSchema = InstallationLookupResultSchema.ext
   permissions: z.record(z.string(), z.unknown()).nullable(),
 });
 
+const ExactManagedInstallationLookupResultSchema = ManagedInstallationLookupResultSchema.extend({
+  id: z.string().uuid(),
+  integration_status: z.string(),
+  owned_by_user_id: z.string().nullable(),
+});
+
 const MAX_INSTALLATION_LOGIN_REFRESH_CANDIDATES = 10;
 
 export type InstallationLookupSuccess = {
@@ -52,7 +59,8 @@ export type InstallationLookupFailure = {
     | 'invalid_repo_format'
     | 'no_installation_found'
     | 'ambiguous_installation'
-    | 'invalid_org_id';
+    | 'invalid_org_id'
+    | 'integration_mismatch';
 };
 
 export type InstallationLookupResult = InstallationLookupSuccess | InstallationLookupFailure;
@@ -101,6 +109,31 @@ function buildAuthorizedInstallationsQuery(
               )
             )
         );
+  const exactIntegrationOwner =
+    params.expectedIntegrationId === undefined
+      ? undefined
+      : params.orgId === undefined
+        ? sql`false`
+        : and(
+            eq(platform_integrations.id, params.expectedIntegrationId),
+            eq(platform_integrations.owned_by_organization_id, params.orgId),
+            isNull(platform_integrations.owned_by_user_id),
+            isNotNull(organization_memberships.id)
+          );
+  const legacyAuthorizedOwner =
+    params.expectedIntegrationId === undefined
+      ? or(
+          and(
+            isNotNull(platform_integrations.owned_by_organization_id),
+            eq(platform_integrations.owned_by_organization_id, sql`${params.orgId ?? null}::uuid`),
+            isNotNull(organization_memberships.id)
+          ),
+          and(
+            isNotNull(platform_integrations.owned_by_user_id),
+            eq(platform_integrations.owned_by_user_id, params.userId)
+          )
+        )
+      : undefined;
 
   return db
     .select({
@@ -108,7 +141,9 @@ function buildAuthorizedInstallationsQuery(
       platform_installation_id: platform_integrations.platform_installation_id,
       platform_account_login: platform_integrations.platform_account_login,
       github_app_type: platform_integrations.github_app_type,
+      integration_status: platform_integrations.integration_status,
       owned_by_organization_id: platform_integrations.owned_by_organization_id,
+      owned_by_user_id: platform_integrations.owned_by_user_id,
       repository_access: platform_integrations.repository_access,
       repositories: platform_integrations.repositories,
       permissions: platform_integrations.permissions,
@@ -136,17 +171,8 @@ function buildAuthorizedInstallationsQuery(
         accountLoginFilter,
         isNotNull(platform_integrations.platform_installation_id),
         requestedOrganizationMembership,
-        or(
-          and(
-            isNotNull(platform_integrations.owned_by_organization_id),
-            eq(platform_integrations.owned_by_organization_id, sql`${params.orgId ?? null}::uuid`),
-            isNotNull(organization_memberships.id)
-          ),
-          and(
-            isNotNull(platform_integrations.owned_by_user_id),
-            eq(platform_integrations.owned_by_user_id, params.userId)
-          )
-        )
+        exactIntegrationOwner,
+        legacyAuthorizedOwner
       )
     )
     .orderBy(
@@ -156,7 +182,9 @@ function buildAuthorizedInstallationsQuery(
 
 export function buildInstallationLookupQuery(db: WorkerDb, params: FindInstallationParams) {
   const [repoOwner = ''] = params.githubRepo.split('/');
-  return buildAuthorizedInstallationsQuery(db, params, repoOwner).limit(2);
+  return buildAuthorizedInstallationsQuery(db, params, repoOwner).limit(
+    params.expectedIntegrationId === undefined ? 2 : 1
+  );
 }
 
 export function buildInstallationRefreshCandidatesQuery(
@@ -170,7 +198,9 @@ export function buildInstallationRefreshCandidatesQuery(
 
 export function buildManagedInstallationLookupQuery(db: WorkerDb, params: FindInstallationParams) {
   const [repoOwner = ''] = params.githubRepo.split('/');
-  return buildAuthorizedInstallationsQuery(db, params, repoOwner).limit(2);
+  return buildAuthorizedInstallationsQuery(db, params, repoOwner).limit(
+    params.expectedIntegrationId === undefined ? 2 : 1
+  );
 }
 
 export class InstallationLookupService {
@@ -196,6 +226,14 @@ export class InstallationLookupService {
       return { success: false, reason: 'invalid_org_id' };
     }
 
+    if (
+      params.expectedIntegrationId !== undefined &&
+      (params.orgId === undefined ||
+        !z.string().uuid().safeParse(params.expectedIntegrationId).success)
+    ) {
+      return { success: false, reason: 'integration_mismatch' };
+    }
+
     const repoParts = params.githubRepo.split('/');
     if (repoParts.length !== 2 || repoParts.some(part => part.length === 0)) {
       return { success: false, reason: 'invalid_repo_format' };
@@ -211,6 +249,20 @@ export class InstallationLookupService {
     }
 
     const rows = await buildInstallationLookupQuery(this.getDb(), params);
+
+    if (params.expectedIntegrationId !== undefined) {
+      const selected = ExactManagedInstallationLookupResultSchema.safeParse(rows[0]);
+      if (!selected.success || !this.matchesExpectedIntegration(selected.data, params)) {
+        return { success: false, reason: 'integration_mismatch' };
+      }
+
+      return {
+        success: true,
+        installationId: selected.data.platform_installation_id,
+        accountLogin: selected.data.platform_account_login ?? '',
+        githubAppType: selected.data.github_app_type ?? 'standard',
+      };
+    }
 
     if (rows.length === 0) {
       return { success: false, reason: 'no_installation_found' };
@@ -288,6 +340,22 @@ export class InstallationLookupService {
     }
 
     const rows = await buildManagedInstallationLookupQuery(this.getDb(), params);
+    if (params.expectedIntegrationId !== undefined) {
+      const selected = ExactManagedInstallationLookupResultSchema.safeParse(rows[0]);
+      if (!selected.success || !this.matchesExpectedIntegration(selected.data, params)) {
+        return { success: false, reason: 'integration_mismatch' };
+      }
+
+      return {
+        success: true,
+        installationId: selected.data.platform_installation_id,
+        accountLogin: selected.data.platform_account_login ?? '',
+        githubAppType: selected.data.github_app_type ?? 'standard',
+        repoName,
+        permissions: selected.data.permissions,
+      };
+    }
+
     if (rows.length === 0) {
       return { success: false, reason: 'no_installation_found' };
     }
@@ -323,5 +391,29 @@ export class InstallationLookupService {
       repoName,
       permissions: selected.permissions,
     };
+  }
+
+  private matchesExpectedIntegration(
+    selected: z.infer<typeof ExactManagedInstallationLookupResultSchema>,
+    params: FindInstallationParams
+  ): boolean {
+    if (
+      selected.id !== params.expectedIntegrationId ||
+      selected.integration_status !== 'active' ||
+      selected.owned_by_organization_id !== params.orgId ||
+      selected.owned_by_user_id !== null ||
+      selected.platform_account_login?.toLowerCase() !==
+        params.githubRepo.split('/')[0]?.toLowerCase()
+    ) {
+      return false;
+    }
+
+    if (selected.repository_access === 'all') return true;
+    if (selected.repository_access !== 'selected') return false;
+    return Boolean(
+      selected.repositories?.some(
+        repository => repository.full_name.toLowerCase() === params.githubRepo.toLowerCase()
+      )
+    );
   }
 }

@@ -75,7 +75,7 @@ vi.mock('../../model-validation.js', () => ({
 }));
 
 vi.mock('../../session/validate-repository-access.js', () => ({
-  assertBitbucketRepositoryAccessBeforeSessionCreation: assertBitbucketRepositoryAccessMock,
+  assertRepositoryAccessBeforeSessionCreation: assertBitbucketRepositoryAccessMock,
 }));
 
 vi.mock('./organization-membership.js', () => ({
@@ -186,6 +186,28 @@ describe('prepareSession operation-ledger admission gate', () => {
     );
     expect(startNewSessionMock).not.toHaveBeenCalled();
     expect(registerNewSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('adapts the legacy GitHub integration id into grouped repository identity', async () => {
+    const caller = router.createCaller(createContext());
+    const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+
+    await caller.prepareSession({
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      githubIntegrationId,
+      autoInitiate: true,
+    });
+
+    expect(startNewSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repository: { type: 'github', repo: 'acme/repo', githubIntegrationId },
+      }),
+      expect.any(Object),
+      expect.any(Object)
+    );
   });
 
   it('ignores operationKey when autoInitiate is false and retains legacy registration', async () => {

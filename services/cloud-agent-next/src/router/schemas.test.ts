@@ -190,9 +190,52 @@ describe('grouped unified session input contracts', () => {
       }).success
     ).toBe(true);
   });
+
+  it('accepts a GitHub integration id only on GitHub repository inputs', () => {
+    const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+    expect(
+      StartSessionInput.safeParse({
+        ...baseStartInput,
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId,
+        },
+      }).success
+    ).toBe(true);
+    expect(
+      StartSessionInput.safeParse({
+        ...baseStartInput,
+        repository: {
+          type: 'gitlab',
+          url: 'https://gitlab.com/acme/repo.git',
+          githubIntegrationId,
+        },
+      }).success
+    ).toBe(false);
+  });
 });
 
 describe('legacy live attachment input compatibility', () => {
+  it('accepts a GitHub integration id only with a legacy GitHub repository', () => {
+    const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+    const input = {
+      prompt: 'Update the repository',
+      mode: 'code',
+      model: 'claude-sonnet-4-5-20250929',
+      githubIntegrationId,
+    };
+
+    expect(PrepareSessionInput.safeParse({ ...input, githubRepo: 'acme/repo' }).success).toBe(true);
+    expect(
+      PrepareSessionInput.safeParse({
+        ...input,
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        platform: 'gitlab',
+      }).success
+    ).toBe(false);
+  });
+
   it('accepts shell-safe Git branch punctuation used by current-branch reviews', () => {
     const branch = 'feature/alex+metadata@v2,fix=1#manual';
 

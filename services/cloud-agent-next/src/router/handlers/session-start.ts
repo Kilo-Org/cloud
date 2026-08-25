@@ -24,7 +24,7 @@ import {
 } from './session-prepare.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
-import { assertBitbucketRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
+import { assertRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
 import { assertOrganizationMembership } from './organization-membership.js';
 
 type SessionStartHandlers = {
@@ -44,7 +44,12 @@ function startInputToSessionCreateRequest(
   let repository: SessionCreateRequest['repository'];
   switch (repo.type) {
     case 'github':
-      repository = { type: 'github', repo: repo.repo, branch: repo.branch };
+      repository = {
+        type: 'github',
+        repo: repo.repo,
+        ...(repo.githubIntegrationId ? { githubIntegrationId: repo.githubIntegrationId } : {}),
+        branch: repo.branch,
+      };
       break;
     case 'gitlab':
       repository = { type: 'gitlab', url: repo.url, branch: repo.branch };
@@ -101,7 +106,7 @@ const startSessionHandler = protectedProcedure
         db = getPgDb(ctx.env);
         await assertOrganizationMembership(db, ctx.userId, organizationId);
       }
-      await assertBitbucketRepositoryAccessBeforeSessionCreation({
+      await assertRepositoryAccessBeforeSessionCreation({
         env: ctx.env,
         userId: ctx.userId,
         orgId: organizationId,

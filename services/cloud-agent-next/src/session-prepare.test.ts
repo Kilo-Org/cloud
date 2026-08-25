@@ -166,6 +166,7 @@ function createInternalApiContext(options: {
   requestInternalApiKey?: string | null;
   skipBalanceCheck?: boolean;
   doStub?: ReturnType<typeof createMockDOStub>;
+  getTokenForRepo?: ReturnType<typeof vi.fn>;
   getBitbucketToken?: ReturnType<typeof vi.fn>;
   githubTokenContainmentOrgIds?: string;
   gitlabTokenContainmentOrgIds?: string;
@@ -224,6 +225,15 @@ function createInternalApiContext(options: {
       R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
       CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
       GIT_TOKEN_SERVICE: {
+        getTokenForRepo:
+          options.getTokenForRepo ??
+          vi.fn().mockResolvedValue({
+            success: true,
+            token: 'managed-github-token',
+            installationId: '123',
+            accountLogin: 'acme',
+            appType: 'standard',
+          }),
         getBitbucketToken:
           options.getBitbucketToken ??
           vi.fn().mockResolvedValue({ success: true, token: 'managed-bitbucket-token' }),
@@ -1391,6 +1401,36 @@ describe('start endpoint', () => {
         workspace: expect.objectContaining({
           credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
         }),
+      })
+    );
+  });
+
+  it('preflights and registers grouped starts with exact GitHub integration identity', async () => {
+    const doStub = createMockDOStub();
+    const getTokenForRepo = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'managed-github-token',
+      installationId: '123',
+      accountLogin: 'acme',
+      appType: 'standard',
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub, getTokenForRepo }));
+    const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+
+    await caller.start({
+      message: { prompt: 'Use the selected GitHub installation' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo', githubIntegrationId },
+    });
+
+    expect(getTokenForRepo).toHaveBeenCalledWith({
+      githubRepo: 'acme/repo',
+      userId: 'test-user-123',
+      expectedIntegrationId: githubIntegrationId,
+    });
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repository: { type: 'github', repo: 'acme/repo', githubIntegrationId },
       })
     );
   });

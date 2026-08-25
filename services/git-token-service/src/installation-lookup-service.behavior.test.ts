@@ -12,6 +12,8 @@ type InstallationRow = {
   platform_account_login: string | null;
   github_app_type: 'standard' | 'lite' | null;
   owned_by_organization_id: string | null;
+  owned_by_user_id?: string | null;
+  integration_status?: string;
   repository_access?: string | null;
   repositories?: { full_name: string }[] | null;
   permissions?: Record<string, unknown> | null;
@@ -229,6 +231,105 @@ describe('InstallationLookupService', () => {
     });
 
     expect(result).toEqual({ success: false, reason: 'ambiguous_installation' });
+  });
+
+  it('resolves the exact active organization integration with repository access', async () => {
+    const integrationId = '00000000-0000-4000-8000-000000000002';
+    const orgId = '00000000-0000-4000-8000-000000000001';
+    const service = createService([
+      {
+        id: integrationId,
+        platform_installation_id: '100',
+        platform_account_login: 'renamed-owner',
+        github_app_type: 'standard',
+        integration_status: 'active',
+        owned_by_organization_id: orgId,
+        owned_by_user_id: null,
+        repository_access: 'selected',
+        repositories: [{ full_name: 'renamed-owner/repository' }],
+        permissions: { contents: 'write', pull_requests: 'write' },
+      },
+    ]);
+
+    await expect(
+      service.findManagedInstallationForRepo({
+        githubRepo: 'renamed-owner/repository',
+        userId: 'user-1',
+        orgId,
+        expectedIntegrationId: integrationId,
+      })
+    ).resolves.toEqual({
+      success: true,
+      installationId: '100',
+      accountLogin: 'renamed-owner',
+      githubAppType: 'standard',
+      repoName: 'repository',
+      permissions: { contents: 'write', pull_requests: 'write' },
+    });
+  });
+
+  it.each<[string, Partial<InstallationRow>]>([
+    ['wrong organization', { owned_by_organization_id: '00000000-0000-4000-8000-000000000099' }],
+    ['personal row', { owned_by_organization_id: null, owned_by_user_id: 'user-1' }],
+    ['suspended row', { integration_status: 'suspended' }],
+    ['repository owner mismatch', { platform_account_login: 'other-owner' }],
+    [
+      'selected repository mismatch',
+      { repositories: [{ full_name: 'renamed-owner/other-repository' }] },
+    ],
+  ])('rejects an expected integration with %s', async (_reason, override) => {
+    const integrationId = '00000000-0000-4000-8000-000000000002';
+    const orgId = '00000000-0000-4000-8000-000000000001';
+    const service = createService([
+      {
+        id: integrationId,
+        platform_installation_id: '100',
+        platform_account_login: 'renamed-owner',
+        github_app_type: 'standard',
+        integration_status: 'active',
+        owned_by_organization_id: orgId,
+        owned_by_user_id: null,
+        repository_access: 'selected',
+        repositories: [{ full_name: 'renamed-owner/repository' }],
+        permissions: null,
+        ...override,
+      },
+    ]);
+
+    await expect(
+      service.findManagedInstallationForRepo({
+        githubRepo: 'renamed-owner/repository',
+        userId: 'user-1',
+        orgId,
+        expectedIntegrationId: integrationId,
+      })
+    ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+  });
+
+  it('does not accept an expected integration without an organization', async () => {
+    const service = createService([]);
+
+    await expect(
+      service.findManagedInstallationForRepo({
+        githubRepo: 'renamed-owner/repository',
+        userId: 'user-1',
+        expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
+      })
+    ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+    expect(getWorkerDb).not.toHaveBeenCalled();
+  });
+
+  it('returns integration_mismatch when the expected row is not visible to the fenced query', async () => {
+    const service = createService([]);
+
+    await expect(
+      service.findManagedInstallationForRepo({
+        githubRepo: 'renamed-owner/repository',
+        userId: 'user-1',
+        orgId: '00000000-0000-4000-8000-000000000001',
+        expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
+      })
+    ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
   });
 
   it.each(['owner/repository/extra', 'owner/', '/repository', 'owner//repository', 'owner'])(

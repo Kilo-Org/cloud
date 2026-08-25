@@ -326,15 +326,21 @@ function canonicalGitUrl(repo: NonNullable<WrapperSessionReadyRequest['repo']>):
   }
 }
 
-function isHelperBackedRemote(repo: NonNullable<WrapperSessionReadyRequest['repo']>): boolean {
+function isHelperBackedRemote(
+  repo: NonNullable<WrapperSessionReadyRequest['repo']>,
+  env: WrapperSessionReadyRequest['materialized']['env']
+): boolean {
   if (repo.kind === 'github') return true;
   if (repo.platform === 'gitlab' || repo.platform === 'bitbucket') return true;
-  return repo.platform === 'github' && Boolean(process.env.GH_TOKEN);
+  return repo.platform === 'github' && Boolean(env.GH_TOKEN);
 }
 
-function cloneGitUrl(repo: NonNullable<WrapperSessionReadyRequest['repo']>): string {
+function cloneGitUrl(
+  repo: NonNullable<WrapperSessionReadyRequest['repo']>,
+  env: WrapperSessionReadyRequest['materialized']['env']
+): string {
   const canonical = canonicalGitUrl(repo);
-  if (isHelperBackedRemote(repo) || !repo.token) return canonical;
+  if (isHelperBackedRemote(repo, env) || !repo.token) return canonical;
   try {
     const url = new URL(canonical);
     url.username = 'x-access-token';
@@ -443,7 +449,7 @@ async function cloneRepository(
     throw new Error('Session metadata is missing a repository source');
   }
 
-  const repoUrl = cloneGitUrl(repo);
+  const repoUrl = cloneGitUrl(repo, request.materialized.env);
   const platform = repo.kind === 'git' ? repo.platform : 'github';
   // Code review reads changed files from the working tree and gets the PR diff
   // from the provider API or a local `git diff <prev>..HEAD`. It needs the full
@@ -654,7 +660,7 @@ async function sanitizeOriginRemote(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner
 ): Promise<void> {
-  if (!request.repo || !isHelperBackedRemote(request.repo)) return;
+  if (!request.repo || !isHelperBackedRemote(request.repo, request.materialized.env)) return;
   await setOriginUrl(request, runGit, canonicalGitUrl(request.repo));
 }
 

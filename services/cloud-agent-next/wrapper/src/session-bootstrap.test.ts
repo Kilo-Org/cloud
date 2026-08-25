@@ -508,6 +508,57 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     ]);
   });
 
+  it('uses the current request credential after an earlier request sets GH_TOKEN', async () => {
+    const initialRequest = makeRequest(path.join(tmpDir, 'initial'));
+    initialRequest.workspace.preferSnapshot = true;
+    initialRequest.materialized.setupCommands = [];
+    initialRequest.materialized.env.GH_TOKEN = 'previous-github-token';
+    await createCompleteGitWorkspace(initialRequest.workspace.workspacePath);
+
+    const fallbackRequest = makeRequest(path.join(tmpDir, 'fallback'));
+    fallbackRequest.materialized.setupCommands = [];
+    fallbackRequest.repo = {
+      kind: 'git',
+      url: 'https://github.com/Kilo-Org/cloud.git',
+      token: 'current-github-pat',
+      platform: 'github',
+    };
+
+    const gitCalls: string[][] = [];
+    const deps: WrapperBootstrapDeps = {
+      git: async args => {
+        gitCalls.push(args);
+        if (args[0] === 'clone') {
+          await fsp.mkdir(path.join(fallbackRequest.workspace.workspacePath, '.git'), {
+            recursive: true,
+          });
+        }
+        if (args[0] === 'rev-parse') {
+          return { stdout: '', stderr: '', exitCode: 1 };
+        }
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => ({
+        ok: true,
+        downloaded: false,
+        imported: true,
+        diffs: { applied: 0, skipped: 0, total: 0 },
+      }),
+    };
+
+    await prepareWrapperBootstrapWorkspace(initialRequest, undefined, deps);
+    expect(process.env.GH_TOKEN).toBe('previous-github-token');
+
+    gitCalls.length = 0;
+    await prepareWrapperBootstrapWorkspace(fallbackRequest, undefined, deps);
+
+    const expected = new URL('https://github.com/Kilo-Org/cloud.git');
+    expected.username = 'x-access-token';
+    expected.password = 'current-github-pat';
+    expect(gitCalls.find(args => args[0] === 'clone')).toContain(expected.toString());
+    expect(gitCalls.some(args => args[0] === 'remote' && args[1] === 'set-url')).toBe(false);
+  });
+
   it('retries a full clone when the server rejects the blobless filter', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.env.KILO_PLATFORM = 'code-review';

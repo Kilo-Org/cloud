@@ -19,6 +19,9 @@ import {
 import {
   CODE_REVIEW_PERMISSION_REJECTION_MESSAGE,
   createConnectionManager,
+  INGEST_INITIAL_CONNECT_TIMEOUT_MS,
+  INGEST_RECONNECT_CONNECT_TIMEOUT_MS,
+  RECONNECT_TOTAL_BUDGET_MS,
   openIngestProgressChannel,
   type ConnectionCallbacks,
 } from '../../../wrapper/src/connection.js';
@@ -575,33 +578,137 @@ describe('ingest WS reconnection', () => {
   // Test: reconnection fails after all attempts
   // -------------------------------------------------------------------------
 
-  it('calls onDisconnect after all reconnection attempts fail', async () => {
+  it('keeps retrying reconnect handshakes until one opens', async () => {
     const manager = createManager();
     const ws = await openConnection(manager);
 
     ws.simulateClose(1006);
     expect(manager.isReconnecting()).toBe(true);
 
-    // Backoff delays: 1s, 2s, 4s (3 attempts)
-    const delays = [1_000, 2_000, 4_000];
-
-    for (let i = 0; i < delays.length; i++) {
-      expect(callbacks.onReconnecting).toHaveBeenCalledWith(i + 1);
-      await vi.advanceTimersByTimeAsync(delays[i]);
-
-      // New WS created — simulate error so openIngestWs rejects
-      const attemptWs = MockWebSocket.latest!;
-      attemptWs.simulateError();
-
-      // Let the rejection propagate and next attempt to schedule
+    const delays = [1_000, 2_000, 4_000, 8_000];
+    for (const delay of delays) {
+      await vi.advanceTimersByTimeAsync(delay);
+      MockWebSocket.latest!.simulateError();
       await vi.advanceTimersByTimeAsync(0);
     }
 
-    // After 3 failures, onDisconnect should fire
+    expect(callbacks.onDisconnect).not.toHaveBeenCalled();
+    expect(manager.isReconnecting()).toBe(true);
+    expect(callbacks.onReconnecting).toHaveBeenCalledWith(5);
+
+    await vi.advanceTimersByTimeAsync(8_000);
+    const laterWs = MockWebSocket.latest!;
+    laterWs.simulateOpen();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onReconnected).toHaveBeenCalled();
+    expect(manager.isReconnecting()).toBe(false);
+  });
+
+  it('gives up and reports a disconnect once the reconnect budget is exhausted', async () => {
+    const manager = createManager();
+    const ws = await openConnection(manager);
+
+    ws.simulateClose(1006);
+
+    // The DO rejects a stale run/connection fence forever, so every handshake
+    // fails immediately. Burn past the wall-clock budget. The iteration cap is
+    // only there so an unbounded retry loop fails the test instead of hanging
+    // it: the budget divided by the capped delay is the real bound.
+    const maxAttempts = Math.ceil(RECONNECT_TOTAL_BUDGET_MS / 8_000) + 10;
+    let delay = 1_000;
+    let attempts = 0;
+    while (manager.isReconnecting() && attempts < maxAttempts) {
+      await vi.advanceTimersByTimeAsync(delay);
+      MockWebSocket.latest!.simulateError();
+      await vi.advanceTimersByTimeAsync(0);
+      delay = Math.min(delay * 2, 8_000);
+      attempts++;
+    }
+
     expect(callbacks.onDisconnect).toHaveBeenCalledWith(
       'ingest websocket closed (reconnection failed)'
     );
     expect(manager.isReconnecting()).toBe(false);
+
+    // A give-up before the budget elapsed would reintroduce the bug this
+    // ceiling replaces: a single hung handshake alone costs 90s.
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('is still reconnecting well before the budget elapses', async () => {
+    const manager = createManager();
+    const ws = await openConnection(manager);
+
+    ws.simulateClose(1006);
+
+    let elapsed = 0;
+    let delay = 1_000;
+    while (elapsed + delay < RECONNECT_TOTAL_BUDGET_MS / 2) {
+      await vi.advanceTimersByTimeAsync(delay);
+      MockWebSocket.latest!.simulateError();
+      await vi.advanceTimersByTimeAsync(0);
+      elapsed += delay;
+      delay = Math.min(delay * 2, 8_000);
+    }
+
+    expect(callbacks.onDisconnect).not.toHaveBeenCalled();
+    expect(manager.isReconnecting()).toBe(true);
+  });
+
+  it('keeps a reconnect handshake open past the initial-connect timeout', async () => {
+    const manager = createManager();
+    const ws = await openConnection(manager);
+
+    ws.simulateClose(1006);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const reconnectWs = MockWebSocket.latest!;
+    expect(reconnectWs).not.toBe(ws);
+
+    await vi.advanceTimersByTimeAsync(INGEST_INITIAL_CONNECT_TIMEOUT_MS);
+    expect(callbacks.onDisconnect).not.toHaveBeenCalled();
+    expect(manager.isReconnecting()).toBe(true);
+    expect(MockWebSocket.latest).toBe(reconnectWs);
+
+    reconnectWs.simulateOpen();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(callbacks.onReconnected).toHaveBeenCalled();
+    expect(manager.isReconnecting()).toBe(false);
+  });
+
+  it('times out a hung reconnect handshake and starts the next attempt', async () => {
+    const manager = createManager();
+    const ws = await openConnection(manager);
+
+    ws.simulateClose(1006);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const firstReconnectWs = MockWebSocket.latest!;
+
+    await vi.advanceTimersByTimeAsync(INGEST_RECONNECT_CONNECT_TIMEOUT_MS - 1);
+    expect(MockWebSocket.latest).toBe(firstReconnectWs);
+    expect(callbacks.onDisconnect).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(firstReconnectWs.readyState).toBe(MockWebSocket.CLOSED);
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    const secondReconnectWs = MockWebSocket.latest!;
+    expect(secondReconnectWs).not.toBe(firstReconnectWs);
+    expect(manager.isReconnecting()).toBe(true);
+    expect(callbacks.onDisconnect).not.toHaveBeenCalled();
+  });
+
+  it('still fail-fasts the initial ingest handshake', async () => {
+    const manager = createManager();
+    const openPromise = manager.open();
+    const initialWs = MockWebSocket.latest!;
+    const rejected = expect(openPromise).rejects.toThrow('Timed out before open');
+
+    await vi.advanceTimersByTimeAsync(INGEST_INITIAL_CONNECT_TIMEOUT_MS);
+    await rejected;
+    expect(initialWs.readyState).toBe(MockWebSocket.CLOSED);
   });
 
   // -------------------------------------------------------------------------
@@ -811,8 +918,8 @@ describe('ingest WS reconnection', () => {
     ws.simulateClose(1006);
 
     // Track when each new WS instance is created by checking instance count
-    // Backoff: attempt 1 = 1s, attempt 2 = 2s, attempt 3 = 4s
-    const delays = [1_000, 2_000, 4_000];
+    // Backoff: 1s, 2s, 4s, then capped at 8s
+    const delays = [1_000, 2_000, 4_000, 8_000, 8_000];
 
     for (let i = 0; i < delays.length; i++) {
       const countBefore = MockWebSocket.instances.length;

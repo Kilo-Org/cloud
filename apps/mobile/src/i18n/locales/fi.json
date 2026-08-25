@@ -22,7 +22,12 @@
     "copiedToClipboard": "Kopioitu leikepöydälle",
     "couldNotCopyToClipboard": "Kopioiminen leikepöydälle epäonnistui",
     "required": "pakollinen",
-    "error": "virhe: {{error}}"
+    "error": "virhe: {{error}}",
+    "back": "Takaisin",
+    "somethingWentWrong": "Jokin meni pieleen",
+    "couldNotOpen": "Ei voitu avata {{label}}",
+    "link": "linkki",
+    "takingLonger": "Tämä kestää odotettua kauemmin. Voit sulkea tämän ja tarkistaa myöhemmin."
   },
   "language": {
     "title": "Kieli",
@@ -206,11 +211,11 @@
       "loadingLines": "Ladataan {{loaded}}/{{total}} riviä...",
       "expandContext": "Laajenna konteksti",
       "expandMoreContext": "Laajenna lisää kontekstia",
-      "expandLines": "Laajenna {{count}} riviä ({{start}}–{{end}})",
-      "expandMoreLines": "Laajenna vielä {{count}} riviä ({{start}}–{{end}})",
-      "expandLinesOfContext": "Laajenna {{count}} kontekstiriviä",
+      "expandLines": "Laajenna {{displayCount}} riviä ({{start}}–{{end}})",
+      "expandMoreLines": "Laajenna vielä {{displayCount}} riviä ({{start}}–{{end}})",
+      "expandLinesOfContext": "Laajenna {{displayCount}} kontekstiriviä",
       "expandAll": "Laajenna kaikki",
-      "expandAllLines": "Laajenna kaikki {{count}} riviä",
+      "expandAllLines": "Laajenna kaikki {{displayCount}} riviä",
       "loadingMoreFiles": "Ladataan lisää tiedostoja...",
       "retryLoadingNextPage": "Yritä ladata seuraava sivu uudelleen",
       "failedToLoadMoreFiles": "Lisätiedostojen lataus epäonnistui — napauta yrittääksesi uudelleen",
@@ -219,10 +224,12 @@
       "loadedOfTotalFiles": "{{loaded}}/{{total}} tiedostoa ladattu",
       "loadAllFiles": "Lataa kaikki tiedostot",
       "loadAll": "Lataa kaikki",
-      "fileLoaded": "{{count}} tiedosto ladattu",
-      "filesLoaded": "{{count}} tiedostoa ladattu",
-      "fileLoadedOfTotal": "{{count}}/{{total}} tiedosto ladattu",
-      "filesLoadedOfTotal": "{{count}}/{{total}} tiedostoa ladattu",
+      "fileLoadedCount_one": "{{displayCount}} tiedosto ladattu",
+      "fileLoadedCount": "{{displayCount}} tiedostoa ladattu",
+      "fileLoadedCount_other": "{{displayCount}} tiedostoa ladattu",
+      "fileLoadedOfTotalCount_one": "{{displayCount}}/{{total}} tiedosto ladattu",
+      "fileLoadedOfTotalCount": "{{displayCount}}/{{total}} tiedostoa ladattu",
+      "fileLoadedOfTotalCount_other": "{{displayCount}}/{{total}} tiedostoa ladattu",
       "filesStillLoading": "Tiedostoja latautuu vielä. Pyyhkäise päivittääksesi.",
       "goToOverview": "Siirry yleiskatsaukseen",
       "goToOverviewTab": "Siirry yleiskatsaus-välilehteen"
@@ -278,7 +285,36 @@
         "body": "Haaraa ei voitu poistaa: {{reason}}",
         "accessibility": "Yhdistetty. Haaraa ei voitu poistaa: {{reason}}"
       },
-      "loadFailedTitle": "Yhdistämisasetuksia ei voitu ladata"
+      "loadFailedTitle": "Yhdistämisasetuksia ei voitu ladata",
+      "blocked": {
+        "unknownStateTitle": "GitHub ei ole raportoinut yhdistettävyystilaa",
+        "unknownStateDetail": "Yritä päivittää yleiskatsausta hetken kuluttua.",
+        "conflictsTitle": "Yhdistämisristiriidat",
+        "conflictsDetail": "Ratkaise yhdistämisristiriidat tässä haarassa ennen yhdistämistä.",
+        "requiredReviewsTitle": "Vaaditut arvioinnit puuttuvat",
+        "requiredReviewsDetail": "Vaadittujen arvioijien hyväksynnät puuttuvat tai odottavat.",
+        "failingChecksTitle": "Vaaditut tarkistukset epäonnistuvat",
+        "failingChecksDetail": "Vaaditut tilatarkistukset epäonnistuvat.",
+        "unstableTitle": "Jotkin tarkistukset epäonnistuvat",
+        "unstableDetail": "Ei-vaaditut tarkistukset epäonnistuvat. Ne eivät estä yhdistämistä.",
+        "draftTitle": "Luonnos-pull request",
+        "draftDetail": "Merkitse pull request arviointiin valmiiksi ennen yhdistämistä.",
+        "behindTitle": "Haara on vanhentunut",
+        "behindDetailUpdatable": "Päivitä haara pohjahaarasta tai tee rebase ennen yhdistämistä.",
+        "behindDetail": "Head-haara on jäljessä pohjahaarasta. Tee rebase tai päivitä haara ennen yhdistämistä.",
+        "notMergeableTitle": "Tätä pull requestia ei voi vielä yhdistää",
+        "notMergeableDetail": "GitHub raportoi yhdistettävyystilan {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Luo yhdistämiscommit",
+        "squash": "Squash ja yhdistä",
+        "rebase": "Rebase ja yhdistä"
+      },
+      "methodDescriptions": {
+        "merge": "Yhdistä kaikki tämän haaran commitit pohjahaaraan yhdistämiscommitilla.",
+        "squash": "Yhdistä kaikki tämän haaran commitit yhdeksi commitiksi pohjahaarassa.",
+        "rebase": "Toista kaikki tämän haaran commitit pohjahaarassa ilman yhdistämiscommittia."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Keskusteluketju {{anchorLabel}}",
@@ -288,8 +324,9 @@
       "resolved": "Ratkaistu",
       "outdated": "Vanhentunut",
       "file": "Tiedosto",
-      "oneComment": "1 kommentti",
-      "commentCount": "{{count}} kommenttia",
+      "comment_one": "1 kommentti",
+      "comment": "{{displayCount}} kommenttia",
+      "comment_other": "{{displayCount}} kommenttia",
       "startedRelative": " · aloitettu {{relative}}",
       "couldNotLoadMore": "Lisää kommentteja ei voitu ladata.",
       "retryLoadingMore": "Yritä ladata lisää kommentteja uudelleen",
@@ -298,9 +335,10 @@
       "closeReactions": "Sulje reaktiot",
       "reactionsTitle": "Reaktiot",
       "addReaction": "Lisää reaktio",
-      "reactionPill": "{{emoji}} reaktio, {{count}} {{countLabel}}",
-      "reactionSingular": "reaktio",
-      "reactionPlural": "reaktiota",
+      "reactionPill": "{{emoji}} reaktio, {{displayCount}} {{countLabel}}",
+      "reaction_one": "reaktio",
+      "reaction": "reaktiota",
+      "reaction_other": "reaktiota",
       "commentActions": "Kommentin toiminnot",
       "reportContent": "Ilmianna sisältö",
       "reportUser": "Ilmianna käyttäjä",
@@ -349,10 +387,28 @@
       "noDiscussionDescription": "Tässä pull requestissa ei ole arviointiketjuja tai keskustelukommentteja.",
       "reviewFiles": "Arvioi tiedostot",
       "quotedDiffSnippet": "Lainattu diff-ote",
-      "moreLinesAbove": "… {{count}} lisää riviä yläpuolella",
+      "moreLinesAbove": "… {{displayCount}} lisää riviä yläpuolella",
       "termsAcceptRequired": "Sinun on hyväksyttävä palvelun ehdot julkaistaksesi.",
       "termsOutdatedCopy": "Palvelun ehdot muuttuivat. Avaa tämä näyttö uudelleen hyväksyäksesi uusimman version.",
-      "termsCheckRetryCopy": "Palvelun ehtoja ei voitu tarkistaa. Tarkista yhteys ja yritä uudelleen."
+      "termsCheckRetryCopy": "Palvelun ehtoja ei voitu tarkistaa. Tarkista yhteys ja yritä uudelleen.",
+      "reactions": {
+        "thumbsUp": "Peukku ylös",
+        "thumbsDown": "Peukku alas",
+        "laugh": "Nauru",
+        "hooray": "Hurraa",
+        "confused": "Hämmentynyt",
+        "heart": "Sydän",
+        "rocket": "Raketti",
+        "eyes": "Silmät"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Tiedostokommentti: {{path}}",
+        "fileComment": "Tiedostokommentti",
+        "outdatedOnPathLines": "Vanhentunut: {{path}} {{lines}}",
+        "outdatedOnLines": "Vanhentunut: {{lines}}",
+        "outdatedOnPath": "Vanhentunut: {{path}}"
+      },
+      "deletedUser": "poistettu käyttäjä"
     },
     "couldNotOpenGitHubAppSettings": "GitHub-sovelluksen asetuksia ei voitu avata",
     "installKiloGitHubApp": "Asenna Kilo GitHub -sovellus",
@@ -391,11 +447,11 @@
       "retryChecks": "Yritä tarkistuksia uudelleen",
       "viewOnGitHub": "Katso PR GitHubissa",
       "noChecksReported": "Ei raportoituja tarkistuksia",
-      "passed": "{{count}} läpäissyt",
-      "failed": "{{count}} epäonnistui",
-      "pending": "{{count}} odottaa",
-      "skipped": "{{count}} ohitettu",
-      "checksCount": "{{count}} tarkistusta",
+      "passed": "{{displayCount}} läpäissyt",
+      "failed": "{{displayCount}} epäonnistui",
+      "pending": "{{displayCount}} odottaa",
+      "skipped": "{{displayCount}} ohitettu",
+      "checksCount": "{{displayCount}} tarkistusta",
       "checkDetails": "tarkistuksen tiedot",
       "pullRequest": "pull request"
     },
@@ -452,11 +508,14 @@
       "deletePendingMessage": "Tämä kommentti poistetaan arviointijonosta.",
       "delete": "Poista",
       "summaryOptional": "Yhteenveto (valinnainen)",
-      "pendingCommentSingular": "odottava kommentti",
-      "pendingCommentPlural": "odottavaa kommenttia",
-      "submitCountOfTotal": "Lähetä {{freshCount}}/{{totalCount}} kommenttia",
+      "pendingComment_one": "odottava kommentti",
+      "pendingComment": "odottavaa kommenttia",
+      "pendingComment_other": "odottavaa kommenttia",
+      "submitCountOfTotal": "Lähetä {{displayFreshCount}}/{{displayTotalCount}} kommenttia",
       "submitReview": "Lähetä arviointi",
-      "partialPostedMessage": "Lähetettiin {{freshCount}} kommenttia. {{staleCount}} kommenttia viittaa vanhempaan committiin ja jäi jonoon."
+      "partialPostedMessage": "Lähetettiin {{displayFreshCount}} kommenttia. {{displayStaleCount}} kommenttia viittaa vanhempaan committiin ja jäi jonoon.",
+      "blockedRequestChanges": "Lisää yhteenveto tai vähintään yksi kommentti muutosten pyytämiseksi.",
+      "blockedComment": "Lisää yhteenveto tai vähintään yksi kommentti kommenttiarvioinnin lähettämiseksi."
     },
     "reconnectNotice": {
       "title": "GitHub-yhteys vanhentui",
@@ -478,10 +537,12 @@
       "stateOpenReviewRequired": "Avoin · Arviointi vaaditaan",
       "stateOpen": "Avoin",
       "unknownAuthor": "Tuntematon tekijä",
-      "commitSingular": "commit",
-      "commitPlural": "commitia",
-      "fileSingular": "tiedosto",
-      "filePlural": "tiedostoa"
+      "commit_one": "commit",
+      "commit": "commitia",
+      "commit_other": "commitia",
+      "file_one": "tiedosto",
+      "file": "tiedostoa",
+      "file_other": "tiedostoa"
     },
     "pendingComment": {
       "editOutdatedA11y": "Muokkaa vanhentunutta odottavaa kommenttia kohteessa {{location}}",
@@ -512,10 +573,36 @@
     },
     "diff": {
       "selectedTapToChange": "Valittu {{label}}, napauta vaihtaaksesi valinnan",
-      "tapToComment": "{{label}}, napauta kommentoidaksesi"
+      "tapToComment": "{{label}}, napauta kommentoidaksesi",
+      "truncationBanner": "Näytetään ensimmäiset {{limit}} muutetuista {{total}} tiedostosta — GitHub API:n raja",
+      "statusAdded": "Lisätty",
+      "statusContext": "Konteksti",
+      "statusDeleted": "Poistettu",
+      "lineLabel": "{{status}} rivi {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(tyhjä)"
     },
     "linkPasteClipboardEmpty": "Leikepöytä on tyhjä",
-    "linkPasteNotAPullRequest": "Ei GitHub-pull request -linkki"
+    "linkPasteNotAPullRequest": "Ei GitHub-pull request -linkki",
+    "announce": {
+      "commentPosted": "Kommentti lähetetty",
+      "reviewSubmitted": "Arviointi lähetetty",
+      "autoMergeEnabled": "Automaattinen yhdistäminen käytössä"
+    },
+    "mutationError": {
+      "commentNotPosted": "Tätä kommenttia ei voi julkaista. Valittu rivi on saattanut muuttua tai PR on saatettu päivittää.",
+      "reviewNotSubmitted": "Tätä arviointia ei voi lähettää sellaisenaan. PR on saatettu muuttaa, tai et voi arvioida omaa pull requestiasi.",
+      "couldNotPostComment": "Kommenttia ei voitu lähettää.",
+      "couldNotSubmitReview": "Arviointia ei voitu lähettää. Tarkista yhteys ja yritä uudelleen."
+    },
+    "operation": {
+      "couldNotReply": "Vastaaminen epäonnistui.",
+      "couldNotCompleteAction": "Tätä toimintoa ei voitu suorittaa loppuun.",
+      "mergeResultDefaultError": "GitHub ei saattanut yhdistämistä loppuun.",
+      "ambiguous": "Vahvistusta ei saatu — tarkista PR ennen uudelleen yrittämistä.",
+      "persistenceFailed": "Emme voineet tallentaa tätä toimintoa. Yritä myöhemmin uudelleen.",
+      "forbidden": "Kielletty"
+    }
   },
   "notifications": {
     "title": "Ilmoitukset",
@@ -573,7 +660,8 @@
     "agents": "Agentit",
     "profile": "Profiili",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, välilehti, {{position}}/{{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -614,7 +702,7 @@
       "recent": "Viimeaikaiset",
       "common": "Yleiset",
       "reactWith": "Reagoi {{reaction}}",
-      "accessibility": "{{emoji}} reaktio, {{count}}"
+      "accessibility": "{{emoji}} reaktio, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Vastaat käyttäjälle",
@@ -643,11 +731,21 @@
       "imageUnavailable": "Kuva ei käytettävissä",
       "openFailed": "Liitettä ei voitu avata. Tarkista yhteys ja yritä uudelleen.",
       "attachFailed": "Tiedoston liittäminen epäonnistui",
-      "limit": "Voit liittää enintään {{count}} tiedostoa.",
+      "limit": "Voit liittää enintään {{displayCount}} tiedostoa.",
       "sizeRejection": "{{filename}} ylittää {{limit}} liiterajan.",
       "unreadable": "Tiedostoa {{filename}} ei voitu lukea.",
       "pastedImage": "liitetty kuva",
-      "defaultName": "Liite"
+      "defaultName": "Liite",
+      "classificationDenied": "Suoritettavia tiedostoja ei voi liittää",
+      "classificationEmpty": "Tiedosto on tyhjä",
+      "classificationTooLarge": "Tiedostojen on oltava enintään 20 MB",
+      "classificationUnreadable": "Tätä tiedostoa ei voitu lukea",
+      "announceUploaded": "Liite lähetetty",
+      "cantUpload": "Tätä tiedostoa ei voi ladata.",
+      "networkError": "Verkkovirhe",
+      "uploadFailed": "Lataus epäonnistui",
+      "failedToUploadFile": "Tiedoston lataaminen epäonnistui: {{reason}}",
+      "nothingToPaste": "Ei mitään liitettävää"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -661,7 +759,9 @@
       "moreActions": "Lisää toimintoja",
       "message": "Viesti",
       "notDelivered": "Ei toimitettu",
-      "edited": "(muokattu)"
+      "edited": "(muokattu)",
+      "image": "Kuva",
+      "attachment": "Liite"
     },
     "messageActions": {
       "copied": "Kopioitu",
@@ -691,8 +791,9 @@
     },
     "typingIndicator": {
       "someone": "Joku",
-      "oneTyping": "{{name}} kirjoittaa…",
-      "manyTyping": "{{names}} kirjoittavat…"
+      "typing_one": "{{name}} kirjoittaa…",
+      "typing": "{{names}} kirjoittavat…",
+      "typing_other": "{{names}} kirjoittavat…"
     },
     "botStatus": {
       "online": "Online",
@@ -702,6 +803,12 @@
       "loadingUser": "Ladataan käyttäjää…",
       "waitingForStatus": "Odotetaan botin tilaa…",
       "offlineMessage": "Botti on offline. Viestit jatkuvat, kun se yhdistää uudelleen."
+    },
+    "errors": {
+      "notAllowed": "Ei sallittu",
+      "messageTooLong": "Viesti on liian pitkä — pidä se alle {{limit}} merkin",
+      "titleTooLong": "Otsikko on liian pitkä — pidä se alle {{limit}} merkin",
+      "messageEmpty": "Viesti ei voi olla tyhjä"
     }
   },
   "kiloclaw": {
@@ -714,6 +821,7 @@
       "finalTermEnds": "Viimeinen jakso päättyy",
       "afterFinalTerm": "Viimeisen jakson jälkeen",
       "remaining": "Jäljellä",
+      "lessThanOneDay": "Alle 1 päivä",
       "ends": "Päättyy",
       "expires": "Vanhenee",
       "noActivePlan": "Ei aktiivista suunnitelmaa",
@@ -722,23 +830,25 @@
       "couldNotLoad": "Laskutustietoja ei voitu ladata",
       "manageOnWeb": "Hallinnoi laskutusta verkossa",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} päivää jäljellä",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Viimeinen Commit-jakson päättyy {{date}}. Jatka Standard-sopimuksella hintaan {{price}}, tai isännöinti päättyy.",
       "freeTrial": "Ilmainen kokeilu",
       "hostingEnds": "Isännöinti päättyy",
-      "oneDayLeft": "1 päivä jäljellä",
       "renews": "Uusiutuu",
       "standardMonthToMonth": "Standard kuukausittain",
       "standardStartsOn": "Standard alkaa {{date}} hintaan {{price}}.",
       "yourStandardMonthlyPrice": "Standard-kuukausihintasi",
       "perMonth": "/kk",
       "earlybirdAccessUntil": "Earlybird-käyttöoikeus {{date}} asti",
-      "earlybirdEnding": "Earlybird päättyy: {{days}} päivää jäljellä",
+      "earlybirdEnding": "Earlybird päättyy: {{remaining}}",
       "paymentPastDue": "Maksu on erääntynyt. Päivitä maksutapasi.",
       "subscriptionCancels": "Tilaus peruuntuu {{date}}",
-      "trialDaysRemaining": "Kokeilu: {{days}} päivää jäljellä",
-      "trialEndingSoon": "Kokeilu päättyy pian: {{days}}"
+      "trialDaysRemaining": "Kokeilu: {{remaining}} jäljellä",
+      "trialEndingSoon": "Kokeilu päättyy pian: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Mitä uutta",
@@ -990,7 +1100,7 @@
         "stalledTitle": "Jotain jumittui",
         "stalledBody": "Emme pystyneet viimeistelemään {{name}}:n asennusta. Yritä uudelleen tai lähetä sähköpostia hi@kilo.ai, jos tämä jatkuu.",
         "timeoutTitle": "Kestää odotettua kauemmin",
-        "timeoutBody": "{{name}}:n asennus kestää tavallista kauemmin (yli {{minutes}} minuuttia).",
+        "timeoutBody": "{{name}}:n asennus kestää tavallista kauemmin (yli {{displayMinutes}} minuuttia).",
         "continueInBackground": "Jatka taustalla",
         "settingUp": "Asennetaan {{name}}",
         "finishingSetup": "Viimeistellään asennusta",
@@ -1020,7 +1130,8 @@
       "starting": "KÄYNNISTETÄÄN",
       "stopped": "PYSÄYTETTY",
       "stopping": "PYSÄYTETÄÄN",
-      "unknown": "TUNTEMATON"
+      "unknown": "TUNTEMATON",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1060,8 +1171,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} vaatii huomiota: {{label}}",
-      "openUnreadOne": "Avaa {{name}}, {{count}} lukematon viesti",
-      "openUnreadMany": "Avaa {{name}}, {{count}} lukematonta viestiä",
+      "openUnread_one": "Avaa {{name}}, {{displayCount}} lukematon viesti",
+      "openUnread": "Avaa {{name}}, {{displayCount}} lukematonta viestiä",
+      "openUnread_other": "Avaa {{name}}, {{displayCount}} lukematonta viestiä",
       "open": "Avaa {{name}}",
       "openSettings": "Avaa {{name}}:n asetukset",
       "fixOnKiloAi": "Korjaa osoitteessa kilo.ai: {{label}}"
@@ -1103,7 +1215,9 @@
       "sparkles": "Kipinät",
       "strongArm": "Vahva käsivarsi",
       "talisman": "Talismaani"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Tämä instanssi ei voi vastaanottaa tiedostoja.",
+    "instanceSwitcherTitle": "KiloClaw-instanssi"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1280,7 +1394,7 @@
       "mergeGate": "Yhdistämisportti",
       "repositories": "Repositoriot",
       "allRepositories": "Kaikki repositoriot",
-      "nSelected": "{{count}} valittu",
+      "nSelected": "{{displayCount}} valittu",
       "reviewMemory": "Arviointimuisti",
       "proposedReviewMdGuidance": "Ehdotettu REVIEW.md-ohjeistus"
     },
@@ -1290,7 +1404,71 @@
       "noDecision": "Ei päätöstä",
       "noResult": "Ei tulosta"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Code Reviewer",
+    "updateFailed": "Arvioijan päivittäminen epäonnistui",
+    "configSaveFailed": "Arvioinnin konfiguraation tallentaminen epäonnistui",
+    "status": {
+      "pending": "Odottaa",
+      "queued": "Jonossa",
+      "running": "Käynnissä",
+      "completed": "Valmis",
+      "failed": "Epäonnistui",
+      "cancelled": "Peruttu",
+      "interrupted": "Keskeytetty"
+    },
+    "reviewStyle": {
+      "strict": "Tiukka",
+      "balanced": "Tasapainoinen",
+      "lenient": "Lempeä",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Turvallisuus",
+      "performance": "Suorituskyky",
+      "bugs": "Bugit",
+      "style": "Tyyli",
+      "testing": "Testaus",
+      "documentation": "Dokumentaatio"
+    },
+    "gateThreshold": {
+      "off": "Pois",
+      "all": "Kaikki",
+      "warning": "Varoitus",
+      "critical": "Kriittinen"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer vaatii huomiota",
+        "description": "Code Reviewer poistettiin käytöstä, koska Kilo ei pääse tähän repositorioon aktiivisella GitHub App -asennuksella. Päivitä GitHub App -asennus ja ota Code Reviewer uudelleen käyttöön.",
+        "recoveryLabel": "Päivitä GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer vaatii huomiota",
+        "description": "Code Reviewer poistettiin käytöstä, koska tämä GitHub-organisaatio käyttää IP-sallittujen luetteloa, joka estää Kilo. Ota yhteyttä hi@kilocode.ai -osoitteeseen saadaksesi apua ja ota Code Reviewer uudelleen käyttöön.",
+        "recoveryLabel": "Ota yhteyttä tukeen"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer vaatii huomiota",
+        "description": "Code Reviewer poistettiin käytöstä, koska Kilo ei voi luoda GitLab-projektin käyttöoikeustunnusta tälle projektille. Myönnä Maintainer-käyttöoikeus tai ota projektin käyttöoikeustunnukset käyttöön ja ota Code Reviewer uudelleen käyttöön.",
+        "recoveryLabel": "Päivitä GitLab-integraatio"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer vaatii huomiota",
+        "description": "Code Reviewer poistettiin käytöstä, koska valittu BYOK API -avain on virheellinen, peruutettu tai siitä puuttuu oikeus. Päivitä avain tai valitse toinen malli ja ota Code Reviewer uudelleen käyttöön.",
+        "recoveryLabel": "Päivitä BYOK-asetukset"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer vaatii huomiota",
+        "description": "Code Reviewer poistettiin käytöstä, koska valittu malli ei ole käytettävissä cloud agent -istunnoissa. Valitse käytettävissä oleva malli ja ota Code Reviewer uudelleen käyttöön.",
+        "recoveryLabel": "Päivitä Code Reviewer -asetukset"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer vaatii huomiota",
+        "description": "Code Reviewer poistettiin käytöstä kolmen repositorion kloonauksen aikakatkaisun jälkeen tänään. Ota yhteyttä hi@kilocode.ai -osoitteeseen saadaksesi apua ja ota Code Reviewer uudelleen käyttöön.",
+        "recoveryLabel": "Ota yhteyttä tukeen"
+      }
+    },
+    "unknownError": "Tuntematon virhe"
   },
   "securityAgent": {
     "filter": {
@@ -1351,8 +1529,9 @@
       "enableAutoRemediationConfirmTitle": "Otetaanko automaattinen korjaus käyttöön?",
       "enableAutoRemediationConfirmMessage": "Security Agent avaa korjaus-PR:t automaattisesti kelpoisille hyväksikäytettäville havainnoille.",
       "enable": "Ota käyttöön",
-      "queuedOne": "{{count}} olemassa oleva havainto jonossa analyysia varten.",
-      "queuedMany": "{{count}} olemassa olevaa havaintoa jonossa analyysia varten.",
+      "queued_one": "{{displayCount}} olemassa oleva havainto jonossa analyysia varten.",
+      "queued": "{{displayCount}} olemassa olevaa havaintoa jonossa analyysia varten.",
+      "queued_other": "{{displayCount}} olemassa olevaa havaintoa jonossa analyysia varten.",
       "severityCriticalOnly": "Vain kriittiset",
       "severityHighAndAbove": "Korkeat ja sitä korkeammat",
       "severityMediumAndAbove": "Keskitasoiset ja sitä korkeammat",
@@ -1383,14 +1562,14 @@
       "analyzed": "Analysoitu",
       "exploitabilityReasoning": "Hyödynnettävyyden perustelu",
       "suggestedFix": "Ehdotettu korjaus",
-      "whereFound": "Mistä tämä löytyi ({{count}})",
+      "whereFound": "Mistä tämä löytyi ({{displayCount}})",
       "fullReport": "Täydellinen luotu raportti",
       "unknown": "Tuntematon",
       "yes": "Kyllä",
       "no": "Ei"
     },
     "dashboard": {
-      "findingsCount": "{{count}} havaintoa",
+      "findingsCount": "{{displayCount}} havaintoa",
       "notMeasured": "Ei mitattu",
       "actFirst": "Toimi ensin",
       "slaPosture": "SLA-valmius",
@@ -1399,7 +1578,7 @@
       "repositoryActionPlan": "Arkiston toimintasuunnitelma",
       "noOpenFindings": "Ei avoimia havaintoja, jotka vaatisivat huomiota",
       "deadlineToday": "Määräaika saavutettu tänään",
-      "daysOverdue": "{{count}} päivää myöhässä",
+      "daysOverdue": "{{displayCount}} päivää myöhässä",
       "withinDeadline": "Määräajassa",
       "criticalOverdue": "Kriittiset myöhässä",
       "highOverdue": "Korkeat myöhässä",
@@ -1426,6 +1605,27 @@
       "syncNow": "Synkronoi nyt",
       "syncQueued": "Synkronointi jonossa",
       "syncStatusUnavailable": "Synkronoinnin tila ei käytettävissä"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Avoimet havainnot",
+      "openFindingsDetail": "{{critical}} kriittistä, {{high}} korkeaa",
+      "confirmedExploitable": "Vahvistettu hyödynnettäväksi",
+      "confirmedExploitableDetail": "Projektin riski vahvistettu analyysissä",
+      "needsReview": "Vaatii sinun tarkistuksesi",
+      "needsReviewDetail": "Vaaditaan ihmisen päätös",
+      "analysisIncomplete": "Analyysi ei valmis",
+      "analysisIncompleteDetail": "Projektin riski edelleen tuntematon",
+      "slaCompliance": "SLA-vaatimustenmukaisuus",
+      "notMeasured": "Ei mitattu",
+      "withinDeadlineDetail": "{{within}}/{{total}} määräajassa",
+      "noDeadlineData": "Millään havainnolla ei ole vielä SLA-määräaikaa",
+      "deadlinePassed": "Määräaika mennyt",
+      "deadlinePassedDetail": "{{critical}} kriittistä, {{high}} korkeaa",
+      "dueThisWeek": "Erääntyy tällä viikolla",
+      "dueThisWeekDetail": "{{exploitable}} vahvistettu hyödynnettäväksi",
+      "noDeadline": "Ei määräaikaa",
+      "reviewSlaAssignment": "Tarkista SLA-määritys",
+      "allOpenFindingsTracked": "Kaikki avoimet havainnot seurannassa"
     },
     "dismiss": {
       "title": "Hylkää havainto",
@@ -1469,7 +1669,17 @@
       "sourceRecord": "Lähdetietue",
       "source": "Lähde",
       "sourceId": "Lähteen tunnus",
-      "viewAdvisory": "Näytä tietoturvatiedote GitHubissa"
+      "viewAdvisory": "Näytä tietoturvatiedote GitHubissa",
+      "statusSuperseded": "Korvattu",
+      "statusFixed": "Korjattu",
+      "statusOpen": "Avoin",
+      "sourceDependabot": "GitHub Dependabot",
+      "reasonFixStarted": "korjaus on jo aloitettu",
+      "reasonNoBandwidth": "resursseja ei ole käytettävissä",
+      "reasonTolerableRisk": "riski on siedettävä",
+      "reasonInaccurate": "havainto on virheellinen",
+      "reasonNotUsed": "haavoittuvaa koodia ei käytetä",
+      "reasonAfterReview": "tarkistuksen jälkeen"
     },
     "settingsOverview": {
       "title": "Asetukset",
@@ -1482,8 +1692,9 @@
       "on": "Päällä",
       "off": "Pois",
       "allRepositories": "Kaikki arkistot",
-      "repositorySelected": "{{count}} arkisto valittu",
-      "repositoriesSelected": "{{count}} arkistoa valittu",
+      "repositoriesCount_one": "{{displayCount}} arkisto valittu",
+      "repositoriesCount": "{{displayCount}} arkistoa valittu",
+      "repositoriesCount_other": "{{displayCount}} arkistoa valittu",
       "selectRepositories": "Valitse arkistot",
       "selectRepositoriesSubtitle": "Valitse, mitä arkistoja Security Agent valvoo",
       "repositories": "Arkistot",
@@ -1491,9 +1702,9 @@
       "analysisModeSubtitle": "{{mode}}-analyysi",
       "automation": "Automatisointi",
       "automationAllOff": "Kaikki pois",
-      "automationCount": "{{count}}/3 käytössä",
+      "automationCount": "{{displayCount}}/3 käytössä",
       "notifications": "Ilmoitukset",
-      "notificationsCount": "{{count}}/2 käytössä",
+      "notificationsCount": "{{displayCount}}/2 käytössä",
       "slaPolicy": "SLA-käytäntö",
       "disabledNoManage": "Security Agent on poissa käytöstä. Vain organisaation omistajat ja laskutuksen ylläpitäjät voivat ottaa sen käyttöön.",
       "disabledNoRepo": "Valitse vähintään yksi arkisto ennen Security Agentin käyttöönottoa.",
@@ -1515,7 +1726,7 @@
       "openPullRequest": "Avaa pull request{{number}}",
       "openDraftPullRequest": "Avaa luonnos-pull request{{number}}",
       "progress": "Edistyminen",
-      "attemptHistory": "Yrityshistoria ({{count}})",
+      "attemptHistory": "Yrityshistoria ({{displayCount}})",
       "attemptNumber": "Yritys #{{number}}",
       "startedBy": "Aloittanut",
       "model": "Malli",
@@ -1681,7 +1892,140 @@
     },
     "queuedActionUntracked": "Jonossa olevaa toimenpidettä ei voitu enää seurata. Päivitä nähdäksesi uusimman tilan.",
     "initialSyncAdmissionFailed": "Security Agent otettiin käyttöön, mutta alkusynkronointia ei voitu asettaa jonoon. Synkronoi uudelleen.",
-    "title": "Security Agent"
+    "title": "Security Agent",
+    "commands": {
+      "findingAlreadyDismissed": "Havainto on jo hylätty",
+      "findingDismissed": "Havainto hylätty",
+      "noRemediationsQueued": "Ei olemassa olevia havaintoja jonossa",
+      "remediationsQueued": "Olemassa olevat korjaustoimenpiteet jonossa",
+      "analysisComplete": "Analyysi valmis",
+      "syncComplete": "Synkronointi valmis"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Tietoturvapalvelua ei ole määritetty. Uudelleenlähetys ei voi onnistua ennen kuin tämä on korjattu.",
+      "syncMayNotHaveCompleted": "Synkronointi ei välttämättä ole valmistunut. Yritä uudelleen yhtenäistääksesi se tai hylkää se.",
+      "syncInProgress": "Tietoturvasynkronointi on jo käynnissä. Yritä uudelleen.",
+      "dismissalInProgress": "Tämä hylkäys on jo käynnissä. Yritä uudelleen.",
+      "couldNotReadPendingSyncs": "Odottavia synkronointeja ei voitu lukea. Yritä uudelleen."
+    },
+    "analysisState": {
+      "queued": "Analyysi jonossa",
+      "queuedTitle": "Analyysi jonossa",
+      "queuedDescription": "Odotetaan analyysikapasiteetin vapautumista.",
+      "analyzing": "Analysoidaan",
+      "analyzingTitle": "Analysoidaan",
+      "analyzingDescription": "Tarkistetaan, pääseekö sovelluskoodi vaikutuksenalaiseen ominaisuuteen.",
+      "failed": "Analyysi epäonnistui",
+      "failedTitle": "Analyysi epäonnistui",
+      "failedDescription": "Security Agent ei voinut suorittaa analyysia loppuun.",
+      "extractionFailed": "Vaatii tarkistuksen",
+      "extractionFailedTitle": "Vaatii tarkistuksen",
+      "extractionFailedDescription": "Teknistä raporttia ei voitu muuttaa jäsennellyksi tulokseksi.",
+      "exploitable": "Hyödynnettävissä",
+      "exploitableTitle": "Hyödynnettävissä",
+      "exploitableDescription": "Sovelluskoodi pääsee vaikutuksenalaiseen ominaisuuteen.",
+      "notExploitable": "Ei hyödynnettävissä",
+      "notExploitableTitle": "Ei hyödynnettävissä",
+      "notExploitableDescription": "Tästä repositoriosta ei löytynyt tavoitettavissa olevaa polkua.",
+      "unknown": "Vaatii tarkistuksen",
+      "unknownTitle": "Vaatii tarkistuksen",
+      "unknownDescription": "Analyysi ei voinut vahvistaa, onko haavoittuva ominaisuus tavoitettavissa.",
+      "safeToDismiss": "Turvallista hylätä",
+      "safeToDismissTitle": "Turvallista hylätä",
+      "safeToDismissDescription": "Luokittelu päätti, että tämän voi hylätä turvallisesti ilman koodipohjan analyysia.",
+      "manualReview": "Vaatii tarkistuksen",
+      "manualReviewTitle": "Vaatii manuaalisen tarkistuksen",
+      "manualReviewDescription": "Luokittelu merkitsi tämän havainnon manuaaliseen tarkistukseen.",
+      "analysisRequired": "Analyysi vaaditaan",
+      "analysisRequiredTitle": "Koodipohjan analyysi vaaditaan",
+      "analysisRequiredDescription": "Luokittelu suosittelee repositorion analysointia ennen vastauksen päättämistä.",
+      "completed": "Analysoitu",
+      "completedTitle": "Analysoitu",
+      "completedDescription": "Analyysi valmistui ilman erityistä kirjattua tulosta.",
+      "notAnalyzed": "Ei analysoitu",
+      "notAnalyzedTitle": "Ei analysoitu",
+      "notAnalyzedDescription": "Koodipohjan analyysia ei ole vielä suoritettu tälle havainnolle."
+    },
+    "deadline": {
+      "fixedBeforeDeadline": "Korjattu ennen määräaikaa",
+      "fixed": "Korjattu",
+      "fixedOn": "Korjattu {{date}}",
+      "resolutionRecorded": "Ratkaisu kirjattu",
+      "superseded": "Korvattu",
+      "dismissed": "Hylätty",
+      "closedOn": "{{status}} {{date}}",
+      "deadlineNotSet": "Määräaikaa ei ole asetettu",
+      "noSlaDeadline": "Ei määritettyä SLA-määräaikaa",
+      "dueOn": "Erääntyy {{date}}",
+      "overdueNow": "Erääntynyt",
+      "overdue_one": "{{count}} päivä myöhässä",
+      "overdue_other": "{{count}} päivää myöhässä",
+      "dueToday": "Erääntyy tänään",
+      "dueTomorrow": "Erääntyy huomenna",
+      "dueInDays_one": "Erääntyy {{count}} päivän kuluttua",
+      "dueInDays_other": "Erääntyy {{count}} päivän kuluttua",
+      "overdue": "{{count}} päivää myöhässä",
+      "dueInDays": "Erääntyy {{count}} päivän kuluttua"
+    },
+    "remediationStatus": {
+      "cancellationRequested": "Peruutusta pyydetty",
+      "notStarted": "Ei aloitettu",
+      "queued": "Jonossa",
+      "starting": "Käynnistetään",
+      "inProgress": "Käynnissä",
+      "draftPrOpened": "Luonnos-PR avattu",
+      "prOpened": "PR avattu",
+      "blocked": "Estetty",
+      "failed": "Epäonnistui",
+      "noChangesNeeded": "Muutoksia ei tarvita",
+      "cancelled": "Peruttu",
+      "originAutomaticPolicy": "Automaattinen käytäntö",
+      "originIncludeExistingPolicy": "Aiempien sisällyttämisen käytäntö",
+      "originManual": "Manuaalinen",
+      "validationCheck": "Validointitarkistus {{number}}"
+    },
+    "remediationUnavailable": {
+      "findingNotFound": "Tietoturvahavaintoa ei ole enää olemassa.",
+      "approvalRequired": "Automaattinen korjaus vaatii hyväksynnän. Aloita korjaus manuaalisesti hyväksyäksesi sen.",
+      "findingNotOpen": "Havainto ei ole enää avoin.",
+      "repoNotInScope": "Repositoriota ei ole valittu Security Agentille.",
+      "analysisRequired": "Suorita koodipohjan analyysi ennen korjauksen aloittamista.",
+      "sandboxAnalysisRequired": "Suorita koodipohjan analyysi ennen korjauksen aloittamista.",
+      "staleAnalysis": "Havainto muuttui analyysin jälkeen. Suorita analyysi uudelleen ennen korjauksen aloittamista.",
+      "notExploitable": "Analyysi ei löytänyt tavoitettavissa olevaa haavoittuvaa polkua. Automaattinen korjaus ei ole käytettävissä.",
+      "exploitabilityUnknown": "Analyysi ei voinut vahvistaa hyödynnettävyyttä. Manuaalinen tarkistus vaaditaan ennen yhden napsautuksen korjausta.",
+      "manualReviewRequired": "Analyysi suosittelee manuaalista tarkistusta, joten yhden napsautuksen korjaus ei ole käytettävissä.",
+      "monitorRequired": "Analyysi suosittelee seurantaa PR:n avaamisen sijaan.",
+      "triageOnly": "Vain luokittelu on valmis. Suorita koodipohjan analyysi ennen korjauksen aloittamista.",
+      "actionNotConcrete": "Konkreettista riippuvuuskorjausta tai ehdotettua korjausta ei ole saatavilla.",
+      "remediationActive": "Korjausyritys on jo käynnissä.",
+      "prAlreadyOpened": "Korjaus-PR on jo avoinna.",
+      "duplicateAnalysisResult": "Tämä analyysitulos on jo tuottanut korjaustoimenpiteen.",
+      "retryNotAllowed": "Uusi yritys ei ole käytettävissä tälle yritykselle.",
+      "securityAgentDisabled": "Security Agent on poistettu käytöstä tälle omistajalle.",
+      "autoRemediationDisabled": "Automaattinen korjaus on poistettu käytöstä. Manuaalinen korjaus voi silti alkaa, kun turvaportit läpäistään.",
+      "includeExistingDisabled": "Olemassa olevat havainnot on suljettu automaattisen korjauksen ulkopuolelle.",
+      "belowThreshold": "Havainto on automaattisen vakavuuskynnyksen alapuolella. Manuaalinen korjaus voi silti alkaa, kun turvaportit läpäistään.",
+      "beforeEnablement": "Analyysi valmistui ennen automaattisen korjauksen käyttöönottoa. Manuaalinen korjaus voi silti alkaa, kun turvaportit läpäistään.",
+      "generic": "Korjaus ei ole käytettävissä tälle havainnolle."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Analyysikapasiteetti on täynnä. Odota, että käynnissä oleva analyysi päättyy, ja yritä sitten uudelleen.",
+      "githubTokenUnavailable": "GitHub-valtuutus vaatii huomiota. Valtuuta GitHub App uudelleen ja yritä sitten uudelleen.",
+      "githubAuthInvalid": "GitHub-valtuutus vaatii huomiota. Valtuuta GitHub App uudelleen ja yritä sitten uudelleen.",
+      "findingUnavailable": "Havainto ei ole enää käytettävissä. Päivitä havainnot ja yritä uudelleen, jos se on edelleen auki.",
+      "repositoryUnavailable": "Repositorio ei ole enää GitHub Appin käytettävissä. Päivitä repositorion käyttöoikeus ja yritä sitten uudelleen.",
+      "invalidDismissTarget": "Havaintoa ei voi hylätä, koska sen Dependabot-kohde on virheellinen.",
+      "commandStalled": "Jonossa oleva toiminto ei valmistunut ajoissa. Yritä toimintoa uudelleen.",
+      "queueRetriesExhausted": "Toimintoa ei voitu suorittaa loppuun useiden yritysten jälkeen. Yritä toimintoa uudelleen.",
+      "queueAdmissionFailed": "Jonossa olevaa toimintoa ei voitu hyväksyä. Yritä toimintoa uudelleen.",
+      "generic": "Jonossa oleva toiminto epäonnistui. Yritä toimintoa uudelleen."
+    },
+    "analysisMode": {
+      "auto": "Automaattinen",
+      "shallow": "Pinnallinen",
+      "deep": "Syvä"
+    }
   },
   "agents": {
     "activeNow": "Aktiivinen nyt",
@@ -1720,14 +2064,29 @@
       "sessionDeleted": "Istunto poistettu",
       "needsInput": "vaatii syötettä",
       "fromPlatform": "alustalta {{platform}}",
-      "centOne": "sentti",
-      "centOther": "senttiä",
-      "dollarOne": "dollari",
-      "dollarOther": "dollaria"
+      "cent_one": "sentti",
+      "cent": "senttiä",
+      "cent_other": "senttiä",
+      "dollar_one": "dollari",
+      "dollar": "dollaria",
+      "dollar_other": "dollaria",
+      "costSpoken": "hinta {{cost}}",
+      "costSpokenWithTime": "hinta {{cost}}, {{time}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubia ei voitu avata",
-      "couldNotOpenMessage": "GitHub App -asennusta ei voitu aloittaa. Yritä uudelleen."
+      "couldNotOpenMessage": "GitHub App -asennusta ei voitu aloittaa. Yritä uudelleen.",
+      "installedTitle": "GitHub App asennettu",
+      "installedMessage": "Arkistosi on nyt yhdistetty.",
+      "pendingTitle": "Odotetaan ylläpitäjän hyväksyntää",
+      "pendingMessage": "Organisaation ylläpitäjän on hyväksyttävä asennuspyyntö.",
+      "accountMismatchTitle": "Tilit eivät täsmää",
+      "accountMismatchMessage": "Tämä yhteys aloitettiin Kilo Appista, joka on kirjautunut eri tilillä. Kirjaudu sisään sillä tilillä verkossa tai aloita uudelleen sovelluksesta.",
+      "cannotCompleteTitle": "Asennusta ei voi suorittaa loppuun",
+      "notAdminMessage": "Vain GitHub-ylläpitäjä voi yhdistää kyseisen tilin. Pyydä organisaation ylläpitäjää asentamaan Kilo.",
+      "alreadyClaimedMessage": "Kyseinen GitHub-asennus on jo yhdistetty toiseen Kilo-tiliin. Katkaise yhteys sieltä ensin.",
+      "didNotCompleteTitle": "Asennus ei valmistunut",
+      "didNotCompleteMessage": "GitHub App -asennusta ei suoritettu loppuun. Yritä uudelleen sovelluksesta."
     },
     "sessionExited": "Istunto päättyi",
     "remoteSpawnRetryable": "Yhteyttä instanssiin ei saatu — se on voinut katketa.",
@@ -1770,7 +2129,10 @@
       "exitMessage": "Tämä pysäyttää käynnissä olevan istunnon mutta säilyttää sen historian.",
       "keepSessionRunning": "Pidä istunto käynnissä",
       "exitSession": "Poistu istunnosta",
-      "restartExitFailed": "Aloitettiin uusi istunto. Edellinen istunto on edelleen avoinna."
+      "restartExitFailed": "Aloitettiin uusi istunto. Edellinen istunto on edelleen avoinna.",
+      "exitNotSupported": "Etäistunnosta poistuminen ei ole tuettu nykyiselle istunnolle",
+      "exitUnavailable": "Etäistunnosta poistuminen ei ole käytettävissä nykyiselle istunnolle",
+      "exitNeedsNewerCli": "Etä-slash-komennot edellyttävät uudempaa Kilo CLI:tä. Päivitä Kilo CLI ja yhdistä uudelleen."
     },
     "sessionConnection": {
       "connecting": "Yhdistetään…",
@@ -1817,8 +2179,9 @@
       "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen."
     },
     "partRenderer": {
-      "updatedFile": "Päivitetty {{count}} tiedosto",
-      "updatedFiles": "Päivitetty {{count}} tiedostoa"
+      "updatedFileCount_one": "Päivitetty {{displayCount}} tiedosto",
+      "updatedFileCount": "Päivitetty {{displayCount}} tiedostoa",
+      "updatedFileCount_other": "Päivitetty {{displayCount}} tiedostoa"
     },
     "toolPatch": {
       "operationAdded": "Lisätty",
@@ -1843,9 +2206,9 @@
       "toolTask": "task",
       "readTodos": "Lue tehtävät",
       "updateTodos": "Päivitä tehtävät",
-      "linesBadge": "{{count}} riviä",
-      "filesBadge": "{{count}} tiedostoa",
-      "matchesBadge": "{{count}} osumaa"
+      "linesBadge": "{{displayCount}} riviä",
+      "filesBadge": "{{displayCount}} tiedostoa",
+      "matchesBadge": "{{displayCount}} osumaa"
     },
     "readToolMarkdown": {
       "linesTruncated": "rivit {{start}}–{{end}} (katkaistu)",
@@ -1929,6 +2292,10 @@
       "reportAiResponseFailedTerminal": "Tästä vastauksesta ei voi ilmoittaa.",
       "reportAiResponseSubmitted": "Ilmoitus lähetetty. Kuitti {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Tiedot eivät käytettävissä",
       "textDisplay": "Tekstin näyttö",
@@ -1987,7 +2354,7 @@
       "preparationComplete": "Valmistelu valmis",
       "preparationFailed": "Valmistelu epäonnistui",
       "setupCommand": "Asennuskomento {{index}}",
-      "setupCommandOf": "Asennuskomento {{index}} / {{count}}"
+      "setupCommandOf": "Asennuskomento {{index}} / {{displayCount}}"
     },
     "permissionCard": {
       "title": "Käyttöoikeus vaaditaan",
@@ -2024,7 +2391,7 @@
       "submissionFailed": "Lähetys epäonnistui. Yritä uudelleen.",
       "questionAnnouncement": "Agentti tarvitsee sinun vastaustasi. Komentaja on keskeytetty, kunnes vastaat.",
       "permissionAnnouncement": "Agentti tarvitsee luvan jatkaakseen. Komentaja on keskeytetty, kunnes päätät.",
-      "positionHint": "(1/{{count}})",
+      "positionHint": "(1/{{displayCount}})",
       "movedPastPrompt": "Agentti on siirtynyt tämän kehotuksen ohi. Tämä kortti sulkeutuu, kun istunto jatkuu.",
       "waitingForAnswer": "Agentti odottaa vastaustasi. Kun kysymys on avoinna, viestisi agentille on keskeytetty.",
       "waitingForPermission": "Agentti odottaa lupaa. Kun pyyntö on avoinna, viestisi agentille on keskeytetty."
@@ -2059,8 +2426,9 @@
     "olderMessages": {
       "arrived": "Aiemmat viestit ladattu",
       "retryHint": "Yrittää vanhempien viestien lataamista uudelleen tähän istuntoon.",
-      "omittedOne": "Joitakin tämän istunnon aiempia kohteita ei voitu näyttää.",
-      "omittedMany": "{{count}} tämän istunnon aiempaa kohdetta ei voitu näyttää.",
+      "omitted_one": "Joitakin tämän istunnon aiempia kohteita ei voitu näyttää.",
+      "omitted": "{{displayCount}} tämän istunnon aiempaa kohdetta ei voitu näyttää.",
+      "omitted_other": "{{displayCount}} tämän istunnon aiempaa kohdetta ei voitu näyttää.",
       "couldNotLoad": "Vanhempia viestejä ei voitu ladata.",
       "unavailable": "Vanhemmat viestit eivät ole saatavilla.",
       "tooLarge": "Vanhemmat viestit ovat liian suuria ladattaviksi."
@@ -2069,10 +2437,12 @@
       "viewTable": "Näytä taulukko",
       "title": "Taulukko",
       "close": "Sulje taulukko",
-      "column": "sarake",
-      "columns": "sarakkeet",
-      "row": "rivi",
-      "rows": "rivit",
+      "columnCount_one": "sarake",
+      "columnCount": "sarakkeet",
+      "columnCount_other": "sarakkeet",
+      "rowCount_one": "rivi",
+      "rowCount": "rivit",
+      "rowCount_other": "rivit",
       "opensFullScreen": "avautuu koko näytöllä"
     },
     "sessionFilter": {
@@ -2103,7 +2473,10 @@
       "title": "Valitse malli",
       "searchPlaceholder": "Hae malleja...",
       "noModels": "Ei malleja saatavilla",
-      "noModelsDescription": "Ei ole malleja valittavaksi."
+      "noModelsDescription": "Ei ole malleja valittavaksi.",
+      "favorites": "Suosikit",
+      "recommended": "Suositellut",
+      "allModels": "Kaikki mallit"
     },
     "modelSelector": {
       "model": "Malli",
@@ -2120,7 +2493,8 @@
       "addToFavorites": "Lisää {{name}} suosikkeihin",
       "removeFromFavorites": "Poista {{name}} suosikeista",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Istunnon malli"
     },
     "attachmentPreview": {
       "openFailedRetry": "Tiedoston avaaminen epäonnistui. Yritä uudelleen.",
@@ -2142,7 +2516,7 @@
       "cameraAccessDisabled": "Kameran käyttö estetty",
       "cameraAccessMessage": "Salli kameran käyttö Asetuksissa ottaaksesi valokuvan.",
       "couldNotOpenPhotoPicker": "Kuvavalitsinta ei voitu avata. Käynnistä Kilo uudelleen ja yritä uudelleen.",
-      "maxFilesAllowed": "Enintään {{count}} tiedostoa sallittu",
+      "maxFilesAllowed": "Enintään {{displayCount}} tiedostoa sallittu",
       "onlyAddingFiles": "Lisätään vain {{accepted}}/{{total}} tiedostoa (enintään {{max}})"
     },
     "composer": {
@@ -2188,7 +2562,8 @@
       "delegatingWork": "Delegoimassa työtä",
       "askingQuestion": "Esitetään kysymys",
       "consideringNextSteps": "Harkitaan seuraavia vaiheita",
-      "writingResponse": "Kirjoitetaan vastausta"
+      "writingResponse": "Kirjoitetaan vastausta",
+      "initializingSnapshot": "Alustetaan tilannekuvaa…"
     },
     "slashCommands": {
       "startNewSession": "Aloita uusi istunto",
@@ -2207,7 +2582,7 @@
       "costPrefix": "hinta {{cost}}",
       "costSuffix": ", hinta {{cost}}",
       "tokensWindowUnavailable": "Konteksti {{used}} tokenia, ikkuna ei saatavilla",
-      "tokensUsage": "Konteksti {{used}}/{{window}} tokenia, {{percentage}}% käytetty",
+      "tokensUsage": "Konteksti {{used}}/{{window}} tokenia, {{percentage}} käytetty",
       "title": "Kontekstin käyttö",
       "used": "Käytetty",
       "remaining": "Jäljellä",
@@ -2216,7 +2591,7 @@
       "usageReflectsLatest": "Käyttö heijastaa viimeisintä valmistunutta avustajan vastausta.",
       "tokenUsage": "Tokenien käyttö",
       "cacheRate": "Välimuistin osuus",
-      "modelsCount": "Mallit ({{count}})",
+      "modelsCount": "Mallit ({{displayCount}})",
       "tokenTotalsNote": "Tokenien kokonaismäärät koskevat vain tätä istuntoa eivätkä sisällä alagentin/lapsi-istunnon tokeneita.",
       "subagents": "Alagentit",
       "subagentsDescription": "Lapsi-istuntojen jäännöskustannus",
@@ -2225,8 +2600,9 @@
       "ofWindowTokens": "yhteensä {{window}} tokenia",
       "tokens": "tokenia",
       "tokensWithPercentage": "tokenia ({{percentage}})",
-      "stepsCountOne": "{{steps}} vaihe",
-      "stepsCountMany": "{{steps}} vaihetta",
+      "stepsCount_one": "{{steps}} vaihe",
+      "stepsCount": "{{steps}} vaihetta",
+      "stepsCount_other": "{{steps}} vaihetta",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2251,7 +2627,8 @@
   },
   "addCredits": {
     "cta": "Lisää krediittejä",
-    "description": "Lisää krediittejä pitääksesi käytön käynnissä."
+    "description": "Lisää krediittejä pitääksesi käytön käynnissä.",
+    "billingPage": "laskutussivu"
   },
   "deviceSessions": {
     "couldNotLoad": "Istuntoja ei voitu ladata",
@@ -2271,13 +2648,15 @@
     "signOutThisSessionTitle": "Kirjaudu ulos tästä istunnosta?",
     "signOutThisSessionMessage": "{{device}} kirjataan ulos. Se voi säilyttää API-käytön enintään tunnin ajan.",
     "signOutConfirm": "Kirjaudu ulos",
-    "signOutMessage": "Sinun on kirjauduttava sisään uudelleen päästäksesi työtilaan."
+    "signOutMessage": "Sinun on kirjauduttava sisään uudelleen päästäksesi työtilaan.",
+    "webBrowser": "Verkkoselain"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Sovelluskauppaa ei voitu avata.",
     "description": "Kilo-sovelluksesta on uusi versio saatavilla. Päivitä jatkaaksesi.",
     "title": "Päivitys vaaditaan",
-    "updateNow": "Päivitä nyt"
+    "updateNow": "Päivitä nyt",
+    "appStorePage": "sovelluskaupan sivu"
   },
   "home": {
     "couldNotLoadSessions": "Istuntoja ei voitu ladata",
@@ -2291,10 +2670,7 @@
     "newCodingTask": "Uusi koodaustehtävä",
     "explore": "Tutustu",
     "seeAll": "Näytä kaikki",
-    "kiloAgents": "Kilo Agentit",
-    "greetingMorning": "Hyvää huomenta",
-    "greetingAfternoon": "Hyvää päivää",
-    "greetingEvening": "Hyvää iltaa"
+    "kiloAgents": "Kilo Agentit"
   },
   "imageViewer": {
     "close": "Sulje {{filename}}",
@@ -2348,7 +2724,17 @@
     "onlineMessage": "Tämä laite ei voi transkriboida offline-tilassa. Tallenteesi lähetetään palveluun {{provider}} tekstiksi muuttamista varten. Kilo ei tallenna ääntä.",
     "allow": "Salli",
     "start": "Aloita puheentunnistus",
-    "stop": "Lopeta puheentunnistus"
+    "stop": "Lopeta puheentunnistus",
+    "restricted": "Puheentunnistus on rajoitettu tässä laitteessa.",
+    "micRequired": "Mikrofonin käyttöoikeus vaaditaan puheentunnistusta varten.",
+    "micOff": "Mikrofonin käyttöoikeus on pois päältä. Ota se käyttöön Asetuksista käyttääksesi puheentunnistusta.",
+    "micOffTitle": "Mikrofonin käyttöoikeus on pois päältä",
+    "noSpeech": "Puhetta ei tunnistettu. Napauta mikrofonia yrittääksesi uudelleen.",
+    "needsConnection": "Puheentunnistus tarvitsee yhteyden juuri nyt. Yritä uudelleen.",
+    "busy": "Puheentunnistus on varattu. Yritä uudelleen.",
+    "stopped": "Puheentunnistus pysähtyi. Napauta mikrofonia yrittääksesi uudelleen.",
+    "unavailableDevice": "Puheentunnistus ei ole käytettävissä tässä laitteessa.",
+    "unavailableLanguage": "Puheentunnistus ei ole käytettävissä tälle laitekielelle."
   },
   "share": {
     "title": "Jaa Kiloon",
@@ -2360,7 +2746,7 @@
     "connectedCli": "Yhdistetyssä CLI:ssä",
     "newSessionOn": "Uusi istunto laitteessa {{name}}",
     "noMatchingSessions": "Ei vastaavia istuntoja.",
-    "onlyFirstFilesAttached": "Vain ensimmäiset {{count}} tiedostoa liitetään.",
+    "onlyFirstFilesAttached": "Vain ensimmäiset {{displayCount}} tiedostoa liitetään.",
     "staleMessage": "Tämä jako ei ole enää käytettävissä.",
     "retryableMessage": "Istuntojasi ei voitu ladata.",
     "emptyMessage": "Ei istuntoja vielä — aloita uusi lähettääksesi tämän.",
@@ -2393,7 +2779,7 @@
     "otherAccountCopy": "Tämän Apple-tilin Kilo Pass kuuluu eri Kilo-tilille. Kirjaudu sisään sille Kilo-tilille hallinnoidaksesi sitä.",
     "alreadySubscribed": "Sinulla on jo Kilo Pass -tilaus.",
     "purchaseUnavailable": "Kilo Pass -osto ei ole käytettävissä juuri nyt.",
-    "tierCredits": "${{amount}} krediittejä",
+    "tierCredits": "{{amount}} krediittejä",
     "perMonth": "{{price}}/kk",
     "verifyPurchaseFailed": "Ostostasi ei voitu vahvistaa. Tarkista yhteytesi ja yritä uudelleen.",
     "productsCouldNotLoad": "Kilo Pass -tuotteita ei voitu ladata App Storesta.",
@@ -2404,7 +2790,7 @@
     "manageFailed": "App Store -tilauksen hallinnan avaaminen epäonnistui.",
     "kiloPassSetup": "Kilo Pass -asetukset",
     "subscriptionHeaderDescription": "Kuukausitilaus, joka lisää krediittejä Kilo-saldollesi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa — Cloud Agentit, etäistunnot ja KiloClaw-chatit.",
-    "tierDescription": "${{price}} maksettuja krediittejä lisätään kuukausittain Kilo-sovelluksen käyttöä varten.",
+    "tierDescription": "{{price}} maksettuja krediittejä lisätään kuukausittain Kilo-sovelluksen käyttöä varten.",
     "subscribe": "Tilaa",
     "subscribeDescription": "Kuukausikrediitit bonusedistymisen kanssa",
     "manage": "Hallinnoi",
@@ -2412,7 +2798,7 @@
     "statusPending": "Kilo Pass odottaa",
     "statusCanceling": "Kilo Pass peruuntumassa",
     "statusPastDue": "Kilo Pass erääntynyt",
-    "monthlyCredits": "${{credits}} kuukausikrediittejä",
+    "monthlyCredits": "{{credits}} kuukausikrediittejä",
     "ends": "Päättyy {{date}}",
     "periodEnd": "jakson loppu",
     "managedOnGooglePlay": "Hallinnoidaan Google Playssa",
@@ -2426,7 +2812,15 @@
     "webManagementDescription": "Tätä Kilo Pass -tilausta hallinnoidaan verkossa.",
     "legalDisclosure": "Kilo Pass on automaattisesti uusiutuva kuukausitilaus. Maksu veloitetaan Apple ID:stäsi oston vahvistuksen yhteydessä. Tilaus uusiutuu automaattisesti joka kuukausi näytettyyn hintaan, ellei sitä peruuteta vähintään 24 tuntia ennen nykyisen jakson päättymistä. Hallinnoi tai peruuta milloin tahansa App Store -tilin asetuksissa.",
     "legalPrivacyPolicy": "Tietosuojakäytäntö",
-    "legalTermsOfUse": "Käyttöehdot (EULA)"
+    "legalTermsOfUse": "Käyttöehdot (EULA)",
+    "purchaseDifferentAccount": "Tämä App Store -osto ei ole liitetty Kilo-tiliisi. Kirjaudu ostokseen käytetyllä Apple-tilillä ja yritä uudelleen.",
+    "restoreFailed": "Ostosten palauttaminen epäonnistui. Yritä uudelleen.",
+    "purchaseFailed": "Oston viimeistely epäonnistui.",
+    "purchaseStartFailed": "App Store -oston aloittaminen epäonnistui.",
+    "purchaseOwnedByAnotherAccount": "Tämän Apple-tilin Kilo Pass kuuluu eri Kilo-tilille.",
+    "couldNotConnectToAppStore": "Yhteyden muodostaminen App Storeen epäonnistui. Tarkista yhteys ja yritä uudelleen.",
+    "noMatchingProducts": "App Store ei palauttanut yhtään sopivaa Kilo Pass -tuotetta.",
+    "purchaseMissingSignedTransaction": "App Store -osto ei sisältänyt allekirjoitettua tapahtuman JWS:ää."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2522,7 +2916,8 @@
     "needsWork": "Vaatii parannuksia",
     "sorryTitle": "Ikävä kuulla se!",
     "sorryMessage": "Kerro meille, mitä pitäisi parantaa. Sovelluksesta vastaava insinööri lukee jokaisen raportin!",
-    "emailUs": "Lähetä sähköpostia"
+    "emailUs": "Lähetä sähköpostia",
+    "emailSubject": "mobiilisovelluksen palaute"
   },
   "organization": {
     "boundary": {
@@ -2539,7 +2934,17 @@
       "emptyTitle": "Ei krediittitoimintaa",
       "expires": "Vanhenee {{date}}",
       "title": "Krediittitoiminta",
-      "transactionFallback": "Krediittitapahtuma"
+      "transactionFallback": "Krediittitapahtuma",
+      "category": {
+        "organization_custom": "Organisaation mukautettu",
+        "parent_to_child_transfer_in": "Siirto vanhemmalta lapselle (sisään)",
+        "parent_to_child_transfer_out": "Siirto vanhemmalta lapselle (ulos)",
+        "oss-sponsorship": "OSS-sponsorointi",
+        "oss-monthly-reset": "OSS-kuukausittainen nollaus",
+        "team-topup-bonus-2025": "Tiimin topup-bonus 2025",
+        "accounting_adjustment": "Kirjanpidon oikaisu",
+        "credits_expired": "Krediitit vanhentuivat"
+      }
     },
     "inviteMember": {
       "emailError": "Syötä kelvollinen sähköpostiosoite",
@@ -2556,10 +2961,17 @@
       "emptyDescription": "Laskut luodaan automaattisesti jokaisessa laskutusjaksossa ja ne näkyvät täällä, kun organisaatiosi on laskutettu.",
       "emptyTitle": "Ei laskuja",
       "invoiceFallback": "Lasku",
-      "statusOpen": "Avoin",
-      "statusPaid": "Maksettu",
-      "statusVoid": "Mitätöity",
-      "title": "Laskut"
+      "title": "Laskut",
+      "downloadFailed": "Laskua ei voitu ladata. Tarkista yhteys ja yritä uudelleen.",
+      "sharingUnavailable": "Jakaminen ei ole käytettävissä tässä laitteessa.",
+      "status": {
+        "paid": "Maksettu",
+        "open": "Avoin",
+        "void": "Mitätöity",
+        "draft": "Luonnos",
+        "uncollectible": "Perimiskelvoton",
+        "unknown": "Tuntematon"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2645,8 +3057,9 @@
       "manageHint": "Avaa Kilo Pass -hallinnan verkossa.",
       "notSubscribed": "Ei tilattu",
       "overallocated": "Pass-varaukset ylittävät maksetut paikat",
-      "paidSeatOne": "{{count}} maksettu paikka",
-      "paidSeatOther": "{{count}} maksettua paikkaa",
+      "paidSeat_one": "{{displayCount}} maksettu paikka",
+      "paidSeat": "{{displayCount}} maksettua paikkaa",
+      "paidSeat_other": "{{displayCount}} maksettua paikkaa",
       "paymentNeedsAttention": "Maksu vaatii huomiota",
       "paymentPending": "Maksu odottaa",
       "processingBlocked": "Käsittely estetty",
@@ -2671,10 +3084,28 @@
     "emailDeliveryFailed": "Sähköpostin toimitus ei ole tilapäisesti käytettävissä. Yritä myöhemmin uudelleen.",
     "admissionRequired": "Laitettasi ei voida vahvistaa. Kirjaudu sisään toisella laitteella tai verkossa kohdan '$t(login.moreSignInOptions)' avulla.",
     "default": "Jokin meni pieleen. Yritä uudelleen.",
-    "retryableAdmission": "Laitetta ei voitu vahvistaa. Tarkista yhteys ja yritä uudelleen."
+    "retryableAdmission": "Laitetta ei voitu vahvistaa. Tarkista yhteys ja yritä uudelleen.",
+    "startSignInFailed": "Kirjautumisen aloittaminen epäonnistui. Yritä uudelleen.",
+    "couldNotOpenBrowser": "Selaimen avaaminen epäonnistui. Yritä uudelleen.",
+    "signInTimedOut": "Kirjautuminen aikakatkaistiin. Yritä uudelleen.",
+    "signInFailed": "Kirjautuminen epäonnistui. Yritä uudelleen.",
+    "networkError": "Verkkovirhe. Yritä uudelleen.",
+    "accessDeniedByUser": "Käyttäjä eväsi pääsyn",
+    "codeExpired": "Koodi vanhentui",
+    "tooManySignInAttempts": "Liian monta kirjautumisyritystä. Odota hetki ja yritä uudelleen."
   },
   "models": {
     "dataCollected": "Kerätyt tiedot",
-    "free": "Ilmainen"
+    "free": "Ilmainen",
+    "couldNotUpdateFavorites": "Suosikkeja ei voitu päivittää",
+    "thinkingEffort": {
+      "none": "Ei mitään",
+      "minimal": "Minimaalinen",
+      "low": "Matala",
+      "medium": "Keskitaso",
+      "high": "Korkea",
+      "xhigh": "Erittäin korkea",
+      "max": "Maksimi"
+    }
   }
 }

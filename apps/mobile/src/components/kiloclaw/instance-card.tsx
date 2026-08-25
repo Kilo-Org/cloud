@@ -9,6 +9,7 @@ import { BotAvatar } from '@/components/kiloclaw/bot-avatar';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Text } from '@/components/ui/text';
 import { agentColor } from '@/lib/agent-color';
+import { firstGrapheme, formatNumber } from '@/lib/format';
 import { useKiloClawStatus, useKiloClawStatusQueryKey } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
@@ -39,12 +40,14 @@ type KiloClawCardProps = {
 type CachedStatus = NonNullable<ReturnType<typeof useKiloClawStatus>['data']>;
 
 function formatUnreadCount(count: number): string {
-  return count > 99 ? '99+' : String(count);
+  return count > 99 ? `${formatNumber(99, i18n.language)}+` : formatNumber(count, i18n.language);
 }
 
 function firstLetter(name: string): string {
   const trimmed = name.trim();
-  return trimmed.length > 0 ? (trimmed[0]?.toUpperCase() ?? 'K') : 'K';
+  return trimmed.length > 0
+    ? firstGrapheme(trimmed, i18n.language).toLocaleUpperCase(i18n.language)
+    : 'K';
 }
 
 function resolveAccessibilityLabel(
@@ -59,9 +62,11 @@ function resolveAccessibilityLabel(
     });
   }
   if (unreadCount > 0) {
-    return unreadCount === 1
-      ? i18n.t('kiloclaw.instanceCard.openUnreadOne', { name: displayName, count: unreadCount })
-      : i18n.t('kiloclaw.instanceCard.openUnreadMany', { name: displayName, count: unreadCount });
+    return i18n.t('kiloclaw.instanceCard.openUnread', {
+      name: displayName,
+      count: unreadCount,
+      displayCount: formatNumber(unreadCount, i18n.language),
+    });
   }
   return i18n.t('kiloclaw.instanceCard.open', { name: displayName });
 }

@@ -29,23 +29,29 @@ import {
 } from '@/lib/organization-invoice-download';
 import { cn, firstNonEmpty } from '@/lib/utils';
 
+const STATUS_LABEL_KEYS = {
+  paid: 'organization.invoices.status.paid',
+  open: 'organization.invoices.status.open',
+  void: 'organization.invoices.status.void',
+  draft: 'organization.invoices.status.draft',
+  uncollectible: 'organization.invoices.status.uncollectible',
+  unknown: 'organization.invoices.status.unknown',
+} satisfies Record<string, string>;
+
 const STATUS_META = {
   paid: {
-    labelKey: 'organization.invoices.statusPaid',
     pillClass: 'bg-good',
     textClass: 'text-good-foreground',
   },
   open: {
-    labelKey: 'organization.invoices.statusOpen',
     pillClass: 'bg-warn',
     textClass: 'text-warn-foreground',
   },
   void: {
-    labelKey: 'organization.invoices.statusVoid',
     pillClass: 'bg-muted',
     textClass: 'text-muted-foreground',
   },
-} as const satisfies Record<string, { labelKey: string; pillClass: string; textClass: string }>;
+} as const satisfies Record<string, { pillClass: string; textClass: string }>;
 
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
 function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
@@ -54,13 +60,11 @@ function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | un
 
 function statusMeta(status: string) {
   const meta = lookup(STATUS_META, status);
-  if (meta) {
-    return { label: i18n.t(meta.labelKey), pillClass: meta.pillClass, textClass: meta.textClass };
-  }
+  const labelKey = lookup(STATUS_LABEL_KEYS, status);
   return {
-    label: status.charAt(0).toUpperCase() + status.slice(1),
-    pillClass: 'bg-muted',
-    textClass: 'text-muted-foreground',
+    label: labelKey ? i18n.t(labelKey) : status,
+    pillClass: meta?.pillClass ?? 'bg-muted',
+    textClass: meta?.textClass ?? 'text-muted-foreground',
   };
 }
 

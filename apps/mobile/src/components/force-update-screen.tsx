@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { i18n } from '@/i18n';
 
 const STORE_URL =
   Platform.OS === 'ios'
@@ -72,7 +73,7 @@ export function ForceUpdateScreen() {
             variant="outline"
             className="w-full"
             onPress={() => {
-              void openExternalUrl(STORE_URL, { label: 'app store page' });
+              void openExternalUrl(STORE_URL, { label: i18n.t('forceUpdate.appStorePage') });
             }}
           >
             <Text>{t('common.openInBrowser')}</Text>

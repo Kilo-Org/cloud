@@ -26,9 +26,25 @@ import { useOrganization } from '@/lib/organization-context';
 import { reconcileOrgDeepLink } from '@/lib/org-deep-link';
 import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
-function humanizeCategory(category: string): string {
-  const spaced = category.replaceAll('_', ' ');
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+const CREDIT_CATEGORY_KEYS = {
+  organization_custom: 'organization.creditActivity.category.organization_custom',
+  parent_to_child_transfer_in: 'organization.creditActivity.category.parent_to_child_transfer_in',
+  parent_to_child_transfer_out: 'organization.creditActivity.category.parent_to_child_transfer_out',
+  'oss-sponsorship': 'organization.creditActivity.category.oss-sponsorship',
+  'oss-monthly-reset': 'organization.creditActivity.category.oss-monthly-reset',
+  'team-topup-bonus-2025': 'organization.creditActivity.category.team-topup-bonus-2025',
+  accounting_adjustment: 'organization.creditActivity.category.accounting_adjustment',
+  credits_expired: 'organization.creditActivity.category.credits_expired',
+} satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
+
+function categoryLabel(category: string): string {
+  const key = lookup(CREDIT_CATEGORY_KEYS, category);
+  return key ? i18n.t(key) : category;
 }
 
 function CreditRowSkeleton() {
@@ -46,7 +62,7 @@ function CreditRow({ transaction }: Readonly<{ transaction: CreditTransaction }>
   const isPositive = amount >= 0;
   const title = firstNonEmpty(
     transaction.description,
-    transaction.credit_category ? humanizeCategory(transaction.credit_category) : undefined,
+    transaction.credit_category ? categoryLabel(transaction.credit_category) : undefined,
     t('organization.creditActivity.transactionFallback')
   );
 

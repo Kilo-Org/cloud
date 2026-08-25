@@ -1,5 +1,4 @@
 import {
-  getSecurityCommandFailureMessage,
   getSecurityCommandInvalidationScopes,
   isActiveSecurityCommand,
   isPersonalSecurityScope,
@@ -11,6 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { type QueryClient, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
+import { getSecurityCommandFailureMessage } from '@/lib/hooks/security-command-failure-copy';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
@@ -157,17 +157,19 @@ export function invalidateSecurityQueryScopes(
 
 function successMessageForCommand(command: SecurityCommand): string {
   if (command.commandType === 'dismiss_finding') {
-    return command.status === 'no_op' ? 'Finding already dismissed' : 'Finding dismissed';
+    return command.status === 'no_op'
+      ? i18n.t('securityAgent.commands.findingAlreadyDismissed')
+      : i18n.t('securityAgent.commands.findingDismissed');
   }
   if (command.commandType === 'apply_auto_remediation') {
     return command.status === 'no_op'
-      ? 'No existing findings queued'
-      : 'Existing remediations queued';
+      ? i18n.t('securityAgent.commands.noRemediationsQueued')
+      : i18n.t('securityAgent.commands.remediationsQueued');
   }
   if (command.commandType === 'start_analysis') {
-    return 'Analysis complete';
+    return i18n.t('securityAgent.commands.analysisComplete');
   }
-  return 'Sync complete';
+  return i18n.t('securityAgent.commands.syncComplete');
 }
 
 // Polls for and reconciles background Security Agent commands (sync,

@@ -89,7 +89,11 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          ENV_OUTPUT=$(pnpx eas-cli@21.8.0 env:list --environment production --format long)
+          if ! ENV_OUTPUT=$(pnpx eas-cli@21.8.0 env:list --environment production --format long 2>&1); then
+            echo "$ENV_OUTPUT"
+            echo "::error::eas env:list failed"
+            exit 1
+          fi
           MISSING=""
           for NAME in API_BASE_URL WEB_BASE_URL CLOUD_AGENT_WS_URL SESSION_INGEST_WS_URL APPSFLYER_DEV_KEY APPSFLYER_APP_ID KILO_CHAT_URL EVENT_SERVICE_URL NOTIFICATIONS_URL POSTHOG_API_KEY SENTRY_AUTH_TOKEN EXPO_PUBLIC_SENTRY_ENVIRONMENT; do
             if ! printf '%s\n' "$ENV_OUTPUT" | grep -qE "^Name[[:space:]]+${NAME}[[:space:]]*$"; then
@@ -106,7 +110,12 @@ jobs:
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: EAS_BUILD_PROFILE=production pnpx eas-cli@21.8.0 env:exec production --non-interactive 'pnpm assert:config'
+        # EAS_BUILD_PROFILE belongs inside the quoted command: eas-cli evaluates
+        # app.config.ts itself to resolve the project, and the production profile
+        # makes that evaluation throw on env the CLI never injects. SENTRY_AUTH_TOKEN
+        # is a SECRET variable that only EAS builders can read, so the assertion run
+        # gets a placeholder. The step above proves the real secret exists.
+        run: pnpx eas-cli@21.8.0 env:exec production --non-interactive 'EAS_BUILD_PROFILE=production SENTRY_AUTH_TOKEN=preflight-placeholder pnpm assert:config'
 
   build-and-submit:
     needs: [check-changes, validate, preflight]

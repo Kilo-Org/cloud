@@ -1738,6 +1738,44 @@ describe('createServiceState', () => {
       });
     });
 
+    it('terminal delivery failure resolves a stale preparing status', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'cloud.status',
+        cloudStatus: { type: 'preparing', message: 'Setting up environment...' },
+      });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'Environment preparation failed',
+        reason: 'exhausted',
+      });
+
+      expect(state.getCloudStatus()).toEqual({
+        type: 'error',
+        message: 'Environment preparation failed',
+      });
+    });
+
+    it('an interrupt during preparation clears the preparing status', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({
+        type: 'cloud.status',
+        cloudStatus: { type: 'preparing', message: 'Setting up environment...' },
+      });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The message was interrupted',
+        reason: 'interrupted',
+      });
+
+      expect(state.getCloudStatus()).toBeNull();
+      expect(state.getStatus()).toEqual({ type: 'interrupted' });
+    });
+
     it('cloud.message.failed with reason=interrupted settles the session', () => {
       const state = createServiceState(makeConfig());
 

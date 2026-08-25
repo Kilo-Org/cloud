@@ -4,6 +4,7 @@ import {
   SUPPORTED_LANGUAGES,
   type SupportedLanguage,
 } from './languages';
+import { collator } from '@/lib/intl-cache';
 
 export type LanguageRow = {
   tag: SupportedLanguage;
@@ -28,9 +29,7 @@ const ALL_ROWS: readonly LanguageRow[] = SUPPORTED_LANGUAGES.map(tag => ({
   tag,
   endonym: LANGUAGE_ENDONYMS[tag],
   englishName: LANGUAGE_ENGLISH_NAMES[tag],
-}))
-  // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; map already copies so nothing shared is mutated
-  .sort((a, b) => a.endonym.localeCompare(b.endonym));
+}));
 
 /**
  * The picker's rows: the active language first so it is visible without a
@@ -39,15 +38,21 @@ const ALL_ROWS: readonly LanguageRow[] = SUPPORTED_LANGUAGES.map(tag => ({
  * whether or not they read the interface's current language.
  */
 export function languageRows(query: string, active?: SupportedLanguage): readonly LanguageRow[] {
+  const locale = active ?? 'en';
+  const comparer = collator(locale, { sensitivity: 'base' });
   const needle = foldForSearch(query.trim());
-  const matches = needle
-    ? ALL_ROWS.filter(
-        row =>
-          foldForSearch(row.endonym).includes(needle) ||
-          foldForSearch(row.englishName).includes(needle) ||
-          row.tag.toLocaleLowerCase().startsWith(needle)
-      )
-    : ALL_ROWS;
+  const matches = (
+    needle
+      ? ALL_ROWS.filter(
+          row =>
+            foldForSearch(row.endonym).includes(needle) ||
+            foldForSearch(row.englishName).includes(needle) ||
+            row.tag.toLocaleLowerCase().startsWith(needle)
+        )
+      : [...ALL_ROWS]
+  )
+    // eslint-disable-next-line unicorn/no-array-sort -- Hermes lacks toSorted(); each branch creates a new array.
+    .sort((a, b) => comparer.compare(a.endonym, b.endonym));
   const pinned = matches.find(row => row.tag === active);
   return pinned ? [pinned, ...matches.filter(row => row.tag !== active)] : matches;
 }

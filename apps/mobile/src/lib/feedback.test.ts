@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 const secureStoreMock = vi.hoisted(() => ({
   getItemAsync: vi.fn(),
   setItemAsync: vi.fn(),
@@ -12,6 +14,7 @@ const storeReviewMock = vi.hoisted(() => ({
 const alertMock = vi.hoisted(() => ({ alert: vi.fn() }));
 const linkingMock = vi.hoisted(() => ({ openURL: vi.fn() }));
 const posthogMock = vi.hoisted(() => ({ captureEvent: vi.fn() }));
+const toastMock = vi.hoisted(() => ({ error: vi.fn() }));
 
 vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',
@@ -24,7 +27,7 @@ vi.mock('react-native', () => ({
   Linking: linkingMock,
   Platform: { OS: 'ios', select: (variants: Record<string, unknown>) => variants.ios },
 }));
-vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+vi.mock('sonner-native', () => ({ toast: toastMock }));
 vi.mock('@/lib/analytics/posthog', () => ({
   captureEvent: posthogMock.captureEvent,
   FEEDBACK_SUBMITTED_EVENT: 'feedback_submitted',
@@ -32,12 +35,32 @@ vi.mock('@/lib/analytics/posthog', () => ({
 
 type AlertButton = { text: string; onPress?: () => void };
 
-function pressRateKilo() {
-  const firstAlert = alertMock.alert.mock.calls[0] as [string, string | undefined, AlertButton[]];
-  firstAlert[2].find(button => button.text === 'I like it')?.onPress?.();
+function alertTitle(index: number): string {
+  const call = alertMock.alert.mock.calls[index] as [string, string | undefined, AlertButton[]];
+  return call[0];
+}
 
-  const secondAlert = alertMock.alert.mock.calls[1] as [string, string | undefined, AlertButton[]];
-  secondAlert[2].find(button => button.text === 'Rate Kilo')?.onPress?.();
+function alertButtons(index: number): AlertButton[] {
+  const call = alertMock.alert.mock.calls[index] as [string, string | undefined, AlertButton[]];
+  return call[2];
+}
+
+function pressButton(index: number, label: string) {
+  alertButtons(index)
+    .find(button => button.text === label)
+    ?.onPress?.();
+}
+
+function pressRateKilo(index = 0) {
+  pressButton(index, 'Rate the app');
+}
+
+function pressSendFeedback(index = 0) {
+  pressButton(index, 'Send feedback');
+}
+
+function pressNotNow(index = 0) {
+  pressButton(index, 'Not now');
 }
 
 async function flushMicrotasks(): Promise<void> {
@@ -48,7 +71,31 @@ async function flushMicrotasks(): Promise<void> {
 
 describe('feedback store-review write', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+  });
+
+  it('shows the neutral prompt with the expected title and button order', async () => {
+    const { showFeedbackPrompt } = await import('./feedback');
+
+    showFeedbackPrompt('user-1');
+
+    expect(alertTitle(0)).toBe('Rate the Kilo app');
+    expect(alertButtons(0).map(button => button.text)).toEqual([
+      'Not now',
+      'Rate the app',
+      'Send feedback',
+    ]);
+  });
+
+  it('logs nothing when Not now is pressed', async () => {
+    const { showFeedbackPrompt } = await import('./feedback');
+
+    showFeedbackPrompt('user-1');
+    pressNotNow();
+
+    expect(posthogMock.captureEvent).not.toHaveBeenCalled();
+    expect(storeReviewMock.requestReview).not.toHaveBeenCalled();
+    expect(linkingMock.openURL).not.toHaveBeenCalled();
   });
 
   it('persists the review-requested timestamp through the shared metadata write', async () => {
@@ -103,6 +150,108 @@ describe('feedback store-review write', () => {
     expect(storeReviewMock.requestReview).not.toHaveBeenCalled();
   });
 
+  it('shows the could-not-open-store toast when the store page cannot open', async () => {
+    const { showFeedbackPrompt } = await import('./feedback');
+    secureStoreMock.getItemAsync.mockResolvedValue('2024-01-01T00:00:00.000Z');
+    linkingMock.openURL.mockRejectedValue(new Error('no handler'));
+
+    showFeedbackPrompt('user-1');
+    pressRateKilo();
+
+    await vi.waitFor(() => {
+      expect(toastMock.error).toHaveBeenCalledWith(i18n.t('feedback.couldNotOpenStore'));
+    });
+  });
+
+  it('logs negative sentiment and opens the mail app when Send feedback is pressed', async () => {
+    const { showFeedbackPrompt } = await import('./feedback');
+    linkingMock.openURL.mockResolvedValue(undefined);
+
+    showFeedbackPrompt('user-1');
+    pressSendFeedback();
+
+    await flushMicrotasks();
+    expect(posthogMock.captureEvent).toHaveBeenCalledWith('feedback_submitted', {
+      sentiment: 'negative',
+    });
+    expect(linkingMock.openURL).toHaveBeenCalledWith(expect.stringContaining('mailto:'));
+  });
+
+  it('shows the no-email toast when the mail app cannot open', async () => {
+    const { showFeedbackPrompt } = await import('./feedback');
+    linkingMock.openURL.mockRejectedValue(new Error('no handler'));
+
+    showFeedbackPrompt('user-1');
+    pressSendFeedback();
+
+    await vi.waitFor(() => {
+      expect(posthogMock.captureEvent).toHaveBeenCalledWith('feedback_submitted', {
+        sentiment: 'negative',
+      });
+      expect(toastMock.error).toHaveBeenCalledWith(
+        i18n.t('feedback.noEmailApp', { email: 'hi@kilo.ai' })
+      );
+    });
+  });
+
+  it('writes the last-asked marker and defers the store review until Rate is pressed', async () => {
+    const { maybeAskAfterSuccessfulOutcome } = await import('./feedback');
+    secureStoreMock.getItemAsync.mockResolvedValue(null);
+    storeReviewMock.isAvailableAsync.mockResolvedValue(true);
+    storeReviewMock.requestReview.mockResolvedValue(undefined);
+
+    await maybeAskAfterSuccessfulOutcome('user-1');
+
+    expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(
+      'feedback-last-asked-at',
+      expect.any(String)
+    );
+    expect(secureStoreMock.setItemAsync).not.toHaveBeenCalledWith(
+      'store-review-requested-at',
+      expect.any(String)
+    );
+
+    pressRateKilo();
+    await vi.waitFor(() => {
+      expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(
+        'store-review-requested-at',
+        expect.any(String)
+      );
+    });
+  });
+
+  it('skips the prompt when it was already asked', async () => {
+    const { maybeAskAfterSuccessfulOutcome } = await import('./feedback');
+    let lastAskedAt: string | null = null;
+    secureStoreMock.getItemAsync.mockImplementation((key: string) => {
+      if (key === 'feedback-last-asked-at') {
+        return lastAskedAt;
+      }
+      return null;
+    });
+    secureStoreMock.setItemAsync.mockImplementation((key: string, value: string) => {
+      if (key === 'feedback-last-asked-at') {
+        lastAskedAt = value;
+      }
+    });
+
+    await maybeAskAfterSuccessfulOutcome('user-1');
+    expect(alertMock.alert).toHaveBeenCalledOnce();
+
+    await maybeAskAfterSuccessfulOutcome('user-1');
+    expect(alertMock.alert).toHaveBeenCalledOnce();
+  });
+
+  it('showFeedbackPrompt still alerts when the last-asked marker is set', async () => {
+    const { showFeedbackPrompt } = await import('./feedback');
+    secureStoreMock.getItemAsync.mockResolvedValue('2024-01-01T00:00:00.000Z');
+
+    showFeedbackPrompt('user-1');
+
+    expect(alertMock.alert).toHaveBeenCalledOnce();
+    expect(alertTitle(0)).toBe('Rate the Kilo app');
+  });
+
   it('triggers at most one native review when rateApp runs concurrently', async () => {
     const { showFeedbackPrompt } = await import('./feedback');
     const { chainSave } = await import('@/lib/hooks/save-chain');
@@ -134,33 +283,8 @@ describe('feedback store-review write', () => {
     });
     showFeedbackPrompt('user-1');
     showFeedbackPrompt('user-1');
-    // Alert calls: [0] and [1] are the two first-level prompts; pressing
-    // "I like it" on each appends its second-level prompt at [2] and [3].
-    const firstPromptOne = alertMock.alert.mock.calls[0] as [
-      string,
-      string | undefined,
-      AlertButton[],
-    ];
-    const firstPromptTwo = alertMock.alert.mock.calls[1] as [
-      string,
-      string | undefined,
-      AlertButton[],
-    ];
-    firstPromptOne[2].find(button => button.text === 'I like it')?.onPress?.();
-    firstPromptTwo[2].find(button => button.text === 'I like it')?.onPress?.();
-
-    const secondPromptOne = alertMock.alert.mock.calls[2] as [
-      string,
-      string | undefined,
-      AlertButton[],
-    ];
-    const secondPromptTwo = alertMock.alert.mock.calls[3] as [
-      string,
-      string | undefined,
-      AlertButton[],
-    ];
-    secondPromptOne[2].find(button => button.text === 'Rate Kilo')?.onPress?.();
-    secondPromptTwo[2].find(button => button.text === 'Rate Kilo')?.onPress?.();
+    pressRateKilo(0);
+    pressRateKilo(1);
 
     await flushMicrotasks();
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- resolver assigned synchronously

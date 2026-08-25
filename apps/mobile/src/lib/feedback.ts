@@ -7,7 +7,7 @@ import { toast } from 'sonner-native';
 import { i18n } from '@/i18n';
 import { captureEvent, FEEDBACK_SUBMITTED_EVENT } from '@/lib/analytics/posthog';
 import { writeAccountMetadata } from '@/lib/auth/account-metadata-write';
-import { REVIEW_REQUESTED_AT_KEY } from '@/lib/storage-keys';
+import { FEEDBACK_LAST_ASKED_AT_KEY, REVIEW_REQUESTED_AT_KEY } from '@/lib/storage-keys';
 
 const SUPPORT_EMAIL = 'hi@kilo.ai';
 
@@ -70,37 +70,36 @@ async function rateApp() {
 }
 
 export function showFeedbackPrompt(userId: string | undefined) {
-  Alert.alert(i18n.t('feedback.promptTitle'), undefined, [
-    { text: i18n.t('common.cancel'), style: 'cancel' },
+  Alert.alert(i18n.t('feedback.neutralTitle'), undefined, [
+    { text: i18n.t('common.notNow'), style: 'cancel' },
     {
-      text: i18n.t('feedback.iLikeIt'),
+      text: i18n.t('feedback.rateTheApp'),
       onPress: () => {
         captureEvent(FEEDBACK_SUBMITTED_EVENT, { sentiment: 'positive' });
-        Alert.alert(i18n.t('feedback.gladTitle'), i18n.t('feedback.gladMessage'), [
-          { text: i18n.t('common.notNow'), style: 'cancel' },
-          {
-            text: i18n.t('feedback.rateKilo'),
-            onPress: () => {
-              void rateApp();
-            },
-          },
-        ]);
+        void rateApp();
       },
     },
     {
-      text: i18n.t('feedback.needsWork'),
+      text: i18n.t('feedback.sendFeedback'),
       onPress: () => {
         captureEvent(FEEDBACK_SUBMITTED_EVENT, { sentiment: 'negative' });
-        Alert.alert(i18n.t('feedback.sorryTitle'), i18n.t('feedback.sorryMessage'), [
-          { text: i18n.t('common.notNow'), style: 'cancel' },
-          {
-            text: i18n.t('feedback.emailUs'),
-            onPress: () => {
-              void openSupportEmail(userId);
-            },
-          },
-        ]);
+        void openSupportEmail(userId);
       },
     },
   ]);
+}
+
+// One-time neutral prompt after an authoritative success (for example, a full
+// PR review submit). The last-asked marker absent-check and write run inside
+// one per-key chain, so concurrent calls observe the marker atomically: only
+// the first call shows the prompt and later calls skip it.
+export async function maybeAskAfterSuccessfulOutcome(userId: string | undefined): Promise<void> {
+  await writeAccountMetadata(FEEDBACK_LAST_ASKED_AT_KEY, async () => {
+    const alreadyAsked = await SecureStore.getItemAsync(FEEDBACK_LAST_ASKED_AT_KEY);
+    if (alreadyAsked != null) {
+      return;
+    }
+    await SecureStore.setItemAsync(FEEDBACK_LAST_ASKED_AT_KEY, new Date().toISOString());
+    showFeedbackPrompt(userId);
+  });
 }

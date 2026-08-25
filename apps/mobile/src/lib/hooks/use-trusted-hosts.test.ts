@@ -134,13 +134,10 @@ describe('trusted host store', () => {
   });
 
   it('preserves the persisted list when a host is trusted before the preload resolves', async () => {
-    let resolveRead: ((value: string | null) => void) | undefined = undefined;
+    const read = Promise.withResolvers<string | null>();
     getItemAsync.mockImplementation(
       // eslint-disable-next-line typescript-eslint/promise-function-async -- the read must stay pending until the test releases it
-      () =>
-        new Promise<string | null>(resolve => {
-          resolveRead = resolve;
-        })
+      () => read.promise
     );
     const mod = await freshTrustedHosts();
 
@@ -150,7 +147,7 @@ describe('trusted host store', () => {
     expect(mod.isTrustedHost('new.com')).toBe(true);
 
     // The pending disk read resolves after the Trust write.
-    resolveRead?.('["existing.com"]');
+    read.resolve('["existing.com"]');
     await flushMicrotasks();
 
     expect(mod.isTrustedHost('existing.com')).toBe(true);

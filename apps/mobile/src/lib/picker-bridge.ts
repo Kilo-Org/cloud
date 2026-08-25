@@ -14,7 +14,7 @@ export type ModelPickerSelectionScope = {
   catalogGenerationIdentity: object | null;
 };
 
-type ModelPickerBridge = {
+export type ModelPickerBridge = {
   options: SessionModelOption[];
   currentValue: string;
   currentVariant: string;
@@ -35,18 +35,23 @@ export function areModelPickerSelectionScopesEqual(
   );
 }
 
-type ModePickerBridge = {
+export type ModePickerBridge = {
   currentValue: AgentMode;
   onSelect: (mode: AgentMode) => void;
   customOptions?: ModeOption[];
 };
 
+export type RepoPlatform = 'github' | 'gitlab' | 'bitbucket';
+
 export type RepoOption = {
+  platform: RepoPlatform;
   fullName: string;
   isPrivate: boolean;
+  workspaceUuid?: string;
+  repositoryUuid?: string;
 };
 
-type RepoPickerBridge = {
+export type RepoPickerBridge = {
   repositories: RepoOption[];
   currentValue: string;
   onSelect: (repo: string) => void;
@@ -66,16 +71,11 @@ export type InstancePickerInstance = {
   capabilities?: { attachments?: boolean };
 };
 
-type InstancePickerBridge = {
+export type InstancePickerBridge = {
   instances: InstancePickerInstance[];
   currentValue: InstancePickerInstance | null;
   onSelect: (instance: InstancePickerInstance | null) => void;
 };
-
-let modelBridge: ModelPickerBridge | null = null;
-let modeBridge: ModePickerBridge | null = null;
-let repoBridge: RepoPickerBridge | null = null;
-let instanceBridge: InstancePickerBridge | null = null;
 
 export function resolveModelPickerSelection(
   bridge: ModelPickerBridge,
@@ -109,44 +109,4 @@ export function commitModelPickerSelection(
 
   bridge.onSelect(selection);
   return true;
-}
-
-export function setModelPickerBridge(bridge: ModelPickerBridge) {
-  modelBridge = bridge;
-}
-export function getModelPickerBridge() {
-  return modelBridge;
-}
-export function clearModelPickerBridge() {
-  modelBridge = null;
-}
-
-export function setModePickerBridge(bridge: ModePickerBridge) {
-  modeBridge = bridge;
-}
-export function getModePickerBridge() {
-  return modeBridge;
-}
-export function clearModePickerBridge() {
-  modeBridge = null;
-}
-
-export function setRepoPickerBridge(bridge: RepoPickerBridge) {
-  repoBridge = bridge;
-}
-export function getRepoPickerBridge() {
-  return repoBridge;
-}
-export function clearRepoPickerBridge() {
-  repoBridge = null;
-}
-
-export function setInstancePickerBridge(bridge: InstancePickerBridge) {
-  instanceBridge = bridge;
-}
-export function getInstancePickerBridge() {
-  return instanceBridge;
-}
-export function clearInstancePickerBridge() {
-  instanceBridge = null;
 }

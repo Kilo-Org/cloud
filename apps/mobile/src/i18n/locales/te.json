@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} / {{total}} ఫైల్లు లోడ్ అయ్యాయి",
       "loadAllFiles": "అన్ని ఫైల్లను లోడ్ చేయండి",
       "loadAll": "అన్నీ లోడ్ చేయండి",
-      "fileLoaded": "{{count}} ఫైల్ లోడ్ అయింది",
-      "filesLoaded": "{{count}} ఫైల్లు లోడ్ అయ్యాయి",
-      "fileLoadedOfTotal": "మొత్తం {{total}}లో {{count}} ఫైల్ లోడ్ అయింది",
-      "filesLoadedOfTotal": "మొత్తం {{total}}లో {{count}} ఫైల్లు లోడ్ అయ్యాయి",
+      "fileLoadedCount_one": "{{displayCount}} ఫైల్ లోడ్ అయింది",
+      "fileLoadedCount": "{{displayCount}} ఫైల్లు లోడ్ అయ్యాయి",
+      "fileLoadedCount_other": "{{displayCount}} ఫైల్లు లోడ్ అయ్యాయి",
+      "fileLoadedOfTotalCount_one": "మొత్తం {{total}}లో {{displayCount}} ఫైల్ లోడ్ అయింది",
+      "fileLoadedOfTotalCount": "మొత్తం {{total}}లో {{displayCount}} ఫైల్లు లోడ్ అయ్యాయి",
+      "fileLoadedOfTotalCount_other": "మొత్తం {{total}}లో {{displayCount}} ఫైల్లు లోడ్ అయ్యాయి",
       "filesStillLoading": "ఫైల్లు ఇంకా లోడ్ అవుతున్నాయి. రిఫ్రెష్ చేయడానికి లాగండి.",
       "goToOverview": "అవలోకనానికి వెళ్లండి",
       "goToOverviewTab": "అవలోకన ట్యాబ్కు వెళ్లండి"
@@ -288,8 +290,9 @@
       "resolved": "పరిష్కరించబడింది",
       "outdated": "పాతది",
       "file": "ఫైల్",
-      "oneComment": "1 వ్యాఖ్య",
-      "commentCount": "{{count}} వ్యాఖ్యలు",
+      "comment_one": "1 వ్యాఖ్య",
+      "comment": "{{displayCount}} వ్యాఖ్యలు",
+      "comment_other": "{{displayCount}} వ్యాఖ్యలు",
       "startedRelative": " · {{relative}}కి ప్రారంభమైంది",
       "couldNotLoadMore": "మరిన్ని వ్యాఖ్యలను లోడ్ చేయలేకపోయింది.",
       "retryLoadingMore": "మరిన్ని వ్యాఖ్యలను లోడ్ చేయడం మళ్ళీ ప్రయత్నించండి",
@@ -299,8 +302,9 @@
       "reactionsTitle": "ప్రతిచర్యలు",
       "addReaction": "ప్రతిచర్య జోడించండి",
       "reactionPill": "{{emoji}} ప్రతిచర్య, {{count}} {{countLabel}}",
-      "reactionSingular": "ప్రతిచర్య",
-      "reactionPlural": "ప్రతిచర్యలు",
+      "reaction_one": "ప్రతిచర్య",
+      "reaction": "ప్రతిచర్యలు",
+      "reaction_other": "ప్రతిచర్యలు",
       "commentActions": "వ్యాఖ్య చర్యలు",
       "reportContent": "కంటెంట్ను నివేదించండి",
       "reportUser": "వినియోగదారుని నివేదించండి",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "ఈ వ్యాఖ్య సమీక్ష క్యూలో నుండి తీసివేయబడుతుంది.",
       "delete": "తొలగించండి",
       "summaryOptional": "సారాంశం (ఐచ్ఛికం)",
-      "pendingCommentSingular": "పెండింగ్ వ్యాఖ్య",
-      "pendingCommentPlural": "పెండింగ్ వ్యాఖ్యలు",
+      "pendingComment_one": "పెండింగ్ వ్యాఖ్య",
+      "pendingComment": "పెండింగ్ వ్యాఖ్యలు",
+      "pendingComment_other": "పెండింగ్ వ్యాఖ్యలు",
       "submitCountOfTotal": "మొత్తం {{totalCount}} వ్యాఖ్యలలో {{freshCount}} సమర్పించండి",
       "submitReview": "సమీక్షను సమర్పించండి",
       "partialPostedMessage": "{{freshCount}} వ్యాఖ్య(లు) పోస్ట్ చేయబడ్డాయి. {{staleCount}} వ్యాఖ్య(లు) పాత కమిట్కు సూచిస్తున్నాయి మరియు మీ క్యూలో ఉన్నాయి."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "తెరిచింది · సమీక్ష అవసరం",
       "stateOpen": "తెరిచింది",
       "unknownAuthor": "తెలియని రచయిత",
-      "commitSingular": "కమిట్",
-      "commitPlural": "కమిట్లు",
-      "fileSingular": "ఫైల్",
-      "filePlural": "ఫైల్లు"
+      "commit_one": "కమిట్",
+      "commit": "కమిట్లు",
+      "commit_other": "కమిట్లు",
+      "file_one": "ఫైల్",
+      "file": "ఫైల్లు",
+      "file_other": "ఫైల్లు"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}పై పాత పెండింగ్ వ్యాఖ్యను సవరించండి",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "ఎవరో",
-      "oneTyping": "{{name}} టైప్ చేస్తున్నారు...",
-      "manyTyping": "{{names}} టైప్ చేస్తున్నారు..."
+      "typing_one": "{{name}} టైప్ చేస్తున్నారు...",
+      "typing": "{{names}} టైప్ చేస్తున్నారు...",
+      "typing_other": "{{names}} టైప్ చేస్తున్నారు..."
     },
     "botStatus": {
       "online": "ఆన్లైన్",
@@ -722,12 +730,10 @@
       "couldNotLoad": "బిల్లింగ్ సమాచారాన్ని లోడ్ చేయలేకపోయాము",
       "manageOnWeb": "వెబ్లో బిల్లింగ్ నిర్వహించండి",
       "commitPlan": "కమిట్",
-      "daysLeft": "{{count}} రోజులు మిగిలి ఉన్నాయి",
       "earlybird": "ఎర్లీబర్డ్",
       "finalCommitTermEndsOn": "మీ చివరి Commit టర్మ్ {{date}}న ముగుస్తుంది. {{price}} వద్ద Standardగా కొనసాగించండి, లేదా హోస్టింగ్ ముగుస్తుంది.",
       "freeTrial": "ఉచిత ట్రయల్",
       "hostingEnds": "హోస్టింగ్ ముగుస్తుంది",
-      "oneDayLeft": "1 రోజు మిగిలి ఉంది",
       "renews": "పునరుద్ధరిస్తుంది",
       "standardMonthToMonth": "స్టాండర్డ్ నెలవారీ",
       "standardStartsOn": "Standard {{date}}న {{price}} వద్ద ప్రారంభమవుతుంది.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}}కు శ్రద్ధ అవసరం: {{label}}",
-      "openUnreadOne": "{{name}}ను తెరవండి, {{count}} చదవని సందేశం",
-      "openUnreadMany": "{{name}}ను తెరవండి, {{count}} చదవని సందేశాలు",
+      "openUnread_one": "{{name}}ను తెరవండి, {{displayCount}} చదవని సందేశం",
+      "openUnread": "{{name}}ను తెరవండి, {{displayCount}} చదవని సందేశాలు",
+      "openUnread_other": "{{name}}ను తెరవండి, {{displayCount}} చదవని సందేశాలు",
       "open": "{{name}}ను తెరవండి",
       "openSettings": "{{name}} కోసం సెట్టింగ్లను తెరవండి",
       "fixOnKiloAi": "kilo.aiలో పరిష్కరించండి: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "ఆటో-నివారణను ప్రారంభించాలా?",
       "enableAutoRemediationConfirmMessage": "Security Agent అర్హత కలిగిన దుర్వినియోగం చేయదగిన ఫైండింగ్ల కోసం నివారణ PRలను స్వయంచాలకంగా తెరుస్తుంది.",
       "enable": "ప్రారంభించండి",
-      "queuedOne": "{{count}} ఉన్న ఫలితం విశ్లేషణ కోసం క్యూలో ఉంది.",
-      "queuedMany": "{{count}} ఉన్న ఫలితాలు విశ్లేషణ కోసం క్యూలో ఉన్నాయి.",
+      "queued_one": "{{displayCount}} ఉన్న ఫలితం విశ్లేషణ కోసం క్యూలో ఉంది.",
+      "queued": "{{displayCount}} ఉన్న ఫలితాలు విశ్లేషణ కోసం క్యూలో ఉన్నాయి.",
+      "queued_other": "{{displayCount}} ఉన్న ఫలితాలు విశ్లేషణ కోసం క్యూలో ఉన్నాయి.",
       "severityCriticalOnly": "క్లిష్టమైనవి మాత్రమే",
       "severityHighAndAbove": "అధికం మరియు పైన",
       "severityMediumAndAbove": "మధ్యస్థం మరియు పైన",
@@ -1482,8 +1490,9 @@
       "on": "ఆన్",
       "off": "ఆఫ్",
       "allRepositories": "అన్ని రిపోజిటరీలు",
-      "repositorySelected": "{{count}} రిపోజిటరీ ఎంచుకోబడింది",
-      "repositoriesSelected": "{{count}} రిపోజిటరీలు ఎంచుకోబడ్డాయి",
+      "repositoriesCount_one": "{{displayCount}} రిపోజిటరీ ఎంచుకోబడింది",
+      "repositoriesCount": "{{displayCount}} రిపోజిటరీలు ఎంచుకోబడ్డాయి",
+      "repositoriesCount_other": "{{displayCount}} రిపోజిటరీలు ఎంచుకోబడ్డాయి",
       "selectRepositories": "రిపోజిటరీలను ఎంచుకోండి",
       "selectRepositoriesSubtitle": "సెక్యూరిటీ ఏజెంట్ ఏ రిపోజిటరీలను పర్యవేక్షిస్తుందో ఎంచుకోండి",
       "repositories": "రిపోజిటరీలు",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "సెషన్ తొలగించబడింది",
       "needsInput": "ఇన్పుట్ అవసరం",
       "fromPlatform": "{{platform}} నుండి",
-      "centOne": "సెంట్",
-      "centOther": "సెంట్లు",
-      "dollarOne": "డాలర్",
-      "dollarOther": "డాలర్లు"
+      "cent_one": "సెంట్",
+      "cent": "సెంట్లు",
+      "cent_other": "సెంట్లు",
+      "dollar_one": "డాలర్",
+      "dollar": "డాలర్లు",
+      "dollar_other": "డాలర్లు"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubను తెరవలేకపోయింది",
@@ -1817,8 +1828,9 @@
       "discardFailed": "డ్రాఫ్ట్‌ను విస్మరించలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} ఫైల్ నవీకరించబడింది",
-      "updatedFiles": "{{count}} ఫైల్స్ నవీకరించబడ్డాయి"
+      "updatedFileCount_one": "{{displayCount}} ఫైల్ నవీకరించబడింది",
+      "updatedFileCount": "{{displayCount}} ఫైల్స్ నవీకరించబడ్డాయి",
+      "updatedFileCount_other": "{{displayCount}} ఫైల్స్ నవీకరించబడ్డాయి"
     },
     "toolPatch": {
       "operationAdded": "జోడించబడింది",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "మునుపటి సందేశాలు లోడ్ అయ్యాయి",
       "retryHint": "ఈ సెషన్ కోసం పాత సందేశాల లోడ్ను మళ్లీ ప్రయత్నిస్తుంది.",
-      "omittedOne": "ఈ సెషన్ నుండి కొన్ని మునుపటి అంశాలను ప్రదర్శించలేకపోయాము.",
-      "omittedMany": "ఈ సెషన్ నుండి {{count}} మునుపటి అంశాలను ప్రదర్శించలేకపోయాము.",
+      "omitted_one": "ఈ సెషన్ నుండి కొన్ని మునుపటి అంశాలను ప్రదర్శించలేకపోయాము.",
+      "omitted": "ఈ సెషన్ నుండి {{displayCount}} మునుపటి అంశాలను ప్రదర్శించలేకపోయాము.",
+      "omitted_other": "ఈ సెషన్ నుండి {{displayCount}} మునుపటి అంశాలను ప్రదర్శించలేకపోయాము.",
       "couldNotLoad": "మునుపటి సందేశాలను లోడ్ చేయలేకపోయాము.",
       "unavailable": "మునుపటి సందేశాలు అందుబాటులో లేవు.",
       "tooLarge": "మునుపటి సందేశాలు లోడ్ చేయడానికి చాలా పెద్దవి."
@@ -2069,10 +2082,12 @@
       "viewTable": "పట్టికను వీక్షించండి",
       "title": "పట్టిక",
       "close": "పట్టికను మూసివేయండి",
-      "column": "నిలువు వరుస",
-      "columns": "నిలువు వరుసలు",
-      "row": "వరుస",
-      "rows": "వరుసలు",
+      "columnCount_one": "నిలువు వరుస",
+      "columnCount": "నిలువు వరుసలు",
+      "columnCount_other": "నిలువు వరుసలు",
+      "rowCount_one": "వరుస",
+      "rowCount": "వరుసలు",
+      "rowCount_other": "వరుసలు",
       "opensFullScreen": "పూర్తి స్క్రీన్లో తెరుస్తుంది"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} టోకెన్లలో",
       "tokens": "టోకెన్లు",
       "tokensWithPercentage": "టోకెన్లు ({{percentage}})",
-      "stepsCountOne": "{{steps}} దశ",
-      "stepsCountMany": "{{steps}} దశలు",
+      "stepsCount_one": "{{steps}} దశ",
+      "stepsCount": "{{steps}} దశలు",
+      "stepsCount_other": "{{steps}} దశలు",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "కొత్త కోడింగ్ పని",
     "explore": "అన్వేషించండి",
     "seeAll": "అన్నీ చూడండి",
-    "kiloAgents": "Kilo ఏజెంట్లు",
-    "greetingMorning": "శుభోదయం",
-    "greetingAfternoon": "శుభ మధ్యాహ్నం",
-    "greetingEvening": "శుభ సాయంత్రం"
+    "kiloAgents": "Kilo ఏజెంట్లు"
   },
   "imageViewer": {
     "close": "{{filename}} మూసివేయండి",
@@ -2645,8 +2658,9 @@
       "manageHint": "వెబ్లో Kilo Pass నిర్వహణను తెరుస్తుంది.",
       "notSubscribed": "చందాదారుడు కాదు",
       "overallocated": "పాస్ అపాయింట్మెంట్లు చెల్లించిన సీట్లను మించిపోతున్నాయి",
-      "paidSeatOne": "{{count}} చెల్లించిన సీటు",
-      "paidSeatOther": "{{count}} చెల్లించిన సీట్లు",
+      "paidSeat_one": "{{displayCount}} చెల్లించిన సీటు",
+      "paidSeat": "{{displayCount}} చెల్లించిన సీట్లు",
+      "paidSeat_other": "{{displayCount}} చెల్లించిన సీట్లు",
       "paymentNeedsAttention": "చెల్లింపుకు శ్రద్ధ అవసరం",
       "paymentPending": "చెల్లింపు పెండింగ్",
       "processingBlocked": "ప్రాసెసింగ్ నిరోధించబడింది",

@@ -130,7 +130,7 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     const startWith = async (requiresOnDeviceRecognition: boolean): Promise<void> => {
       const startOptions: VoiceInputStartOptions = {
         baseDraft: getDraft(),
-        languageTag: await resolveVoiceInputStartLanguageTag(),
+        languageTag: await resolveVoiceInputStartLanguageTag(i18n.language),
         onDraftChange: getOnDraftChange(),
         onFeedback: showFeedback,
         owner,

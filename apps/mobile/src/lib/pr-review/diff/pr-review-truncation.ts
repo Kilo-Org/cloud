@@ -7,6 +7,9 @@
 // that exactly so the user never sees a "Showing 2,500 of 3,000"
 // banner when GitHub would have returned 2,500 anyway.
 
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
+
 export const PR_REVIEW_TRUNCATION_BANNER_THRESHOLD = 3000;
 
 export function shouldShowTruncationBanner(changedFiles: number): boolean {
@@ -14,5 +17,5 @@ export function shouldShowTruncationBanner(changedFiles: number): boolean {
 }
 
 export function truncationBannerCopy(changedFiles: number): string {
-  return `Showing the first ${PR_REVIEW_TRUNCATION_BANNER_THRESHOLD.toLocaleString()} of ${changedFiles.toLocaleString()} changed files — GitHub API limit`;
+  return `Showing the first ${formatNumber(PR_REVIEW_TRUNCATION_BANNER_THRESHOLD, i18n.language)} of ${formatNumber(changedFiles, i18n.language)} changed files — GitHub API limit`;
 }

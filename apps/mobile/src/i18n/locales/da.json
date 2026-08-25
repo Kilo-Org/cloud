@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} af {{total}} filer indlæst",
       "loadAllFiles": "Indlæs alle filer",
       "loadAll": "Indlæs alle",
-      "fileLoaded": "{{count}} fil indlæst",
-      "filesLoaded": "{{count}} filer indlæst",
-      "fileLoadedOfTotal": "{{count}} fil indlæst af {{total}}",
-      "filesLoadedOfTotal": "{{count}} filer indlæst af {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} fil indlæst",
+      "fileLoadedCount": "{{displayCount}} filer indlæst",
+      "fileLoadedCount_other": "{{displayCount}} filer indlæst",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} fil indlæst af {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} filer indlæst af {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} filer indlæst af {{total}}",
       "filesStillLoading": "Filer indlæses stadig. Træk ned for at opdatere.",
       "goToOverview": "Gå til oversigt",
       "goToOverviewTab": "Gå til fanen Oversigt"
@@ -288,8 +290,9 @@
       "resolved": "Løst",
       "outdated": "Forældet",
       "file": "Fil",
-      "oneComment": "1 kommentar",
-      "commentCount": "{{count}} kommentarer",
+      "comment_one": "1 kommentar",
+      "comment": "{{displayCount}} kommentarer",
+      "comment_other": "{{displayCount}} kommentarer",
       "startedRelative": " · startet {{relative}}",
       "couldNotLoadMore": "Kunne ikke indlæse flere kommentarer.",
       "retryLoadingMore": "Prøv at indlæse flere kommentarer igen",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reaktioner",
       "addReaction": "Tilføj reaktion",
       "reactionPill": "{{emoji}} reaktion, {{count}} {{countLabel}}",
-      "reactionSingular": "reaktion",
-      "reactionPlural": "reaktioner",
+      "reaction_one": "reaktion",
+      "reaction": "reaktioner",
+      "reaction_other": "reaktioner",
       "commentActions": "Kommentarhandlinger",
       "reportContent": "Rapportér indhold",
       "reportUser": "Rapportér bruger",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Denne kommentar fjernes fra anmeldelseskøen.",
       "delete": "Slet",
       "summaryOptional": "Resumé (valgfrit)",
-      "pendingCommentSingular": "ventende kommentar",
-      "pendingCommentPlural": "ventende kommentarer",
+      "pendingComment_one": "ventende kommentar",
+      "pendingComment": "ventende kommentarer",
+      "pendingComment_other": "ventende kommentarer",
       "submitCountOfTotal": "Send {{freshCount}} af {{totalCount}} kommentarer",
       "submitReview": "Send anmeldelse",
       "partialPostedMessage": "Sendte {{freshCount}} kommentar(er). {{staleCount}} kommentar(er) peger på en ældre commit og blev i din kø."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Åben · Anmeldelse påkrævet",
       "stateOpen": "Åben",
       "unknownAuthor": "Ukendt forfatter",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "fil",
-      "filePlural": "filer"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "fil",
+      "file": "filer",
+      "file_other": "filer"
     },
     "pendingComment": {
       "editOutdatedA11y": "Rediger forældet ventende kommentar på {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Nogen",
-      "oneTyping": "{{name}} skriver...",
-      "manyTyping": "{{names}} skriver..."
+      "typing_one": "{{name}} skriver...",
+      "typing": "{{names}} skriver...",
+      "typing_other": "{{names}} skriver..."
     },
     "botStatus": {
       "online": "Online",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Kunne ikke indlæse faktureringsoplysninger",
       "manageOnWeb": "Administrer fakturering på nettet",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} dage tilbage",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Din endelige Commit-periode slutter den {{date}}. Fortsæt som Standard til {{price}}, eller hosting slutter.",
       "freeTrial": "Gratis prøveperiode",
       "hostingEnds": "Hosting slutter",
-      "oneDayLeft": "1 dag tilbage",
       "renews": "Fornyes",
       "standardMonthToMonth": "Standard måned til måned",
       "standardStartsOn": "Standard starter den {{date}} til {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} kræver opmærksomhed: {{label}}",
-      "openUnreadOne": "Åbn {{name}}, {{count}} ulæst besked",
-      "openUnreadMany": "Åbn {{name}}, {{count}} ulæste beskeder",
+      "openUnread_one": "Åbn {{name}}, {{displayCount}} ulæst besked",
+      "openUnread": "Åbn {{name}}, {{displayCount}} ulæste beskeder",
+      "openUnread_other": "Åbn {{name}}, {{displayCount}} ulæste beskeder",
       "open": "Åbn {{name}}",
       "openSettings": "Åbn indstillinger for {{name}}",
       "fixOnKiloAi": "Ret på kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Aktivér autoudbedring?",
       "enableAutoRemediationConfirmMessage": "Security Agent åbner automatisk udbedrings-PR'er for berettigede udnyttelige fund.",
       "enable": "Aktivér",
-      "queuedOne": "{{count}} eksisterende fund kø i analyse.",
-      "queuedMany": "{{count}} eksisterende fund i kø til analyse.",
+      "queued_one": "{{displayCount}} eksisterende fund kø i analyse.",
+      "queued": "{{displayCount}} eksisterende fund i kø til analyse.",
+      "queued_other": "{{displayCount}} eksisterende fund i kø til analyse.",
       "severityCriticalOnly": "Kun kritisk",
       "severityHighAndAbove": "Høj og derover",
       "severityMediumAndAbove": "Middel og derover",
@@ -1482,8 +1490,9 @@
       "on": "Til",
       "off": "Fra",
       "allRepositories": "Alle repositories",
-      "repositorySelected": "{{count}} repository valgt",
-      "repositoriesSelected": "{{count}} repositories valgt",
+      "repositoriesCount_one": "{{displayCount}} repository valgt",
+      "repositoriesCount": "{{displayCount}} repositories valgt",
+      "repositoriesCount_other": "{{displayCount}} repositories valgt",
       "selectRepositories": "Vælg repositories",
       "selectRepositoriesSubtitle": "Vælg, hvilke repositories Security Agent overvåger",
       "repositories": "Repositories",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Session slettet",
       "needsInput": "kræver input",
       "fromPlatform": "fra {{platform}}",
-      "centOne": "cent",
-      "centOther": "cent",
-      "dollarOne": "dollar",
-      "dollarOther": "dollars"
+      "cent_one": "cent",
+      "cent": "cent",
+      "cent_other": "cent",
+      "dollar_one": "dollar",
+      "dollar": "dollars",
+      "dollar_other": "dollars"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunne ikke åbne GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Kunne ikke kassere kladden. Prøv igen."
     },
     "partRenderer": {
-      "updatedFile": "Opdaterede {{count}} fil",
-      "updatedFiles": "Opdaterede {{count}} filer"
+      "updatedFileCount_one": "Opdaterede {{displayCount}} fil",
+      "updatedFileCount": "Opdaterede {{displayCount}} filer",
+      "updatedFileCount_other": "Opdaterede {{displayCount}} filer"
     },
     "toolPatch": {
       "operationAdded": "Tilføjet",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Tidligere beskeder indlæst",
       "retryHint": "Forsøger igen at indlæse de ældre beskeder for denne session.",
-      "omittedOne": "Nogle tidligere elementer fra denne session kunne ikke vises.",
-      "omittedMany": "{{count}} tidligere elementer fra denne session kunne ikke vises.",
+      "omitted_one": "Nogle tidligere elementer fra denne session kunne ikke vises.",
+      "omitted": "{{displayCount}} tidligere elementer fra denne session kunne ikke vises.",
+      "omitted_other": "{{displayCount}} tidligere elementer fra denne session kunne ikke vises.",
       "couldNotLoad": "Kunne ikke indlæse tidligere beskeder.",
       "unavailable": "Tidligere beskeder er ikke tilgængelige.",
       "tooLarge": "Tidligere beskeder er for store til at indlæse."
@@ -2069,10 +2082,12 @@
       "viewTable": "Vis tabel",
       "title": "Tabel",
       "close": "Luk tabel",
-      "column": "kolonne",
-      "columns": "kolonner",
-      "row": "række",
-      "rows": "rækker",
+      "columnCount_one": "kolonne",
+      "columnCount": "kolonner",
+      "columnCount_other": "kolonner",
+      "rowCount_one": "række",
+      "rowCount": "rækker",
+      "rowCount_other": "rækker",
       "opensFullScreen": "åbner i fuld skærm"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "af {{window}} tokens",
       "tokens": "tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
-      "stepsCountOne": "{{steps}} trin",
-      "stepsCountMany": "{{steps}} trin",
+      "stepsCount_one": "{{steps}} trin",
+      "stepsCount": "{{steps}} trin",
+      "stepsCount_other": "{{steps}} trin",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Ny kodningsopgave",
     "explore": "Udforsk",
     "seeAll": "Se alle",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "God morgen",
-    "greetingAfternoon": "God eftermiddag",
-    "greetingEvening": "God aften"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Luk {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Åbner Kilo Pass-administration på nettet.",
       "notSubscribed": "Ikke abonneret",
       "overallocated": "Pass-tildelinger overstiger betalte pladser",
-      "paidSeatOne": "{{count}} betalt plads",
-      "paidSeatOther": "{{count}} betalte pladser",
+      "paidSeat_one": "{{displayCount}} betalt plads",
+      "paidSeat": "{{displayCount}} betalte pladser",
+      "paidSeat_other": "{{displayCount}} betalte pladser",
       "paymentNeedsAttention": "Betaling kræver opmærksomhed",
       "paymentPending": "Betaling afventer",
       "processingBlocked": "Behandling blokeret",

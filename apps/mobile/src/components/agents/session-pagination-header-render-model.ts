@@ -1,14 +1,15 @@
 import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import {
   selectSessionMessageListHeaderState,
   type SessionMessageListHeaderStateInputs,
 } from '@/components/agents/session-message-list-state';
 
 function omittedMessage(count: number): string {
-  if (count === 1) {
-    return i18n.t('agentChat.olderMessages.omittedOne');
-  }
-  return i18n.t('agentChat.olderMessages.omittedMany', { count });
+  return i18n.t('agentChat.olderMessages.omitted', {
+    count,
+    displayCount: formatNumber(count, i18n.language),
+  });
 }
 
 export type SessionPaginationHeaderRenderModel =

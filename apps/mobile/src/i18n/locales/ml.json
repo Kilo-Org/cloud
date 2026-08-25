@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{total}}-ൽ {{loaded}} ഫയലുകൾ ലോഡ് ചെയ്തു",
       "loadAllFiles": "എല്ലാ ഫയലുകളും ലോഡ് ചെയ്യുക",
       "loadAll": "എല്ലാം ലോഡ് ചെയ്യുക",
-      "fileLoaded": "{{count}} ഫയൽ ലോഡ് ചെയ്തു",
-      "filesLoaded": "{{count}} ഫയലുകൾ ലോഡ് ചെയ്തു",
-      "fileLoadedOfTotal": "{{total}}-ൽ {{count}} ഫയൽ ലോഡ് ചെയ്തു",
-      "filesLoadedOfTotal": "{{total}}-ൽ {{count}} ഫയലുകൾ ലോഡ് ചെയ്തു",
+      "fileLoadedCount_one": "{{displayCount}} ഫയൽ ലോഡ് ചെയ്തു",
+      "fileLoadedCount": "{{displayCount}} ഫയലുകൾ ലോഡ് ചെയ്തു",
+      "fileLoadedCount_other": "{{displayCount}} ഫയലുകൾ ലോഡ് ചെയ്തു",
+      "fileLoadedOfTotalCount_one": "{{total}}-ൽ {{displayCount}} ഫയൽ ലോഡ് ചെയ്തു",
+      "fileLoadedOfTotalCount": "{{total}}-ൽ {{displayCount}} ഫയലുകൾ ലോഡ് ചെയ്തു",
+      "fileLoadedOfTotalCount_other": "{{total}}-ൽ {{displayCount}} ഫയലുകൾ ലോഡ് ചെയ്തു",
       "filesStillLoading": "ഫയലുകൾ ഇപ്പോഴും ലോഡ് ചെയ്യുന്നു. പുതുക്കാൻ വലിക്കുക.",
       "goToOverview": "ഓവർവ്യൂവിലേക്ക് പോകുക",
       "goToOverviewTab": "ഓവർവ്യൂ ടാബിലേക്ക് പോകുക"
@@ -288,8 +290,9 @@
       "resolved": "പരിഹരിച്ചു",
       "outdated": "കാലഹരണപ്പെട്ടത്",
       "file": "ഫയൽ",
-      "oneComment": "1 അഭിപ്രായം",
-      "commentCount": "{{count}} അഭിപ്രായങ്ങൾ",
+      "comment_one": "1 അഭിപ്രായം",
+      "comment": "{{displayCount}} അഭിപ്രായങ്ങൾ",
+      "comment_other": "{{displayCount}} അഭിപ്രായങ്ങൾ",
       "startedRelative": " · {{relative}}-ൽ ആരംഭിച്ചു",
       "couldNotLoadMore": "കൂടുതൽ അഭിപ്രായങ്ങൾ ലോഡ് ചെയ്യാനായില്ല.",
       "retryLoadingMore": "കൂടുതൽ അഭിപ്രായങ്ങൾ ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
@@ -299,8 +302,9 @@
       "reactionsTitle": "റിയാക്ഷനുകൾ",
       "addReaction": "റിയാക്ഷൻ ചേർക്കുക",
       "reactionPill": "{{emoji}} റിയാക്ഷൻ, {{count}} {{countLabel}}",
-      "reactionSingular": "റിയാക്ഷൻ",
-      "reactionPlural": "റിയാക്ഷനുകൾ",
+      "reaction_one": "റിയാക്ഷൻ",
+      "reaction": "റിയാക്ഷനുകൾ",
+      "reaction_other": "റിയാക്ഷനുകൾ",
       "commentActions": "അഭിപ്രായ പ്രവർത്തനങ്ങൾ",
       "reportContent": "ഉള്ളടക്കം റിപ്പോർട്ട് ചെയ്യുക",
       "reportUser": "ഉപയോക്താവിനെ റിപ്പോർട്ട് ചെയ്യുക",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "ഈ അഭിപ്രായം റിവ്യൂ ക്യൂവിൽ നിന്ന് നീക്കം ചെയ്യും.",
       "delete": "ഇല്ലാതാക്കുക",
       "summaryOptional": "സംഗ്രഹം (ഓപ്ഷണൽ)",
-      "pendingCommentSingular": "തീർച്ചയാകാത്ത അഭിപ്രായം",
-      "pendingCommentPlural": "തീർച്ചയാകാത്ത അഭിപ്രായങ്ങൾ",
+      "pendingComment_one": "തീർച്ചയാകാത്ത അഭിപ്രായം",
+      "pendingComment": "തീർച്ചയാകാത്ത അഭിപ്രായങ്ങൾ",
+      "pendingComment_other": "തീർച്ചയാകാത്ത അഭിപ്രായങ്ങൾ",
       "submitCountOfTotal": "{{totalCount}}-ൽ {{freshCount}} അഭിപ്രായങ്ങൾ സമർപ്പിക്കുക",
       "submitReview": "അവലോകനം സമർപ്പിക്കുക",
       "partialPostedMessage": "{{freshCount}} അഭിപ്രായ(ങ്ങൾ) പോസ്റ്റ് ചെയ്തു. {{staleCount}} അഭിപ്രായ(ങ്ങൾ) ഒരു പഴയ കമ്മിറ്റിലേക്ക് ചൂണ്ടിക്കാണിക്കുകയും നിങ്ങളുടെ ക്യൂവിൽ തുടരുകയും ചെയ്തു."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "തുറന്നത് · അവലോകനം ആവശ്യമാണ്",
       "stateOpen": "തുറന്നത്",
       "unknownAuthor": "അജ്ഞാത രചയിതാവ്",
-      "commitSingular": "കമ്മിറ്റ്",
-      "commitPlural": "കമ്മിറ്റുകൾ",
-      "fileSingular": "ഫയൽ",
-      "filePlural": "ഫയലുകൾ"
+      "commit_one": "കമ്മിറ്റ്",
+      "commit": "കമ്മിറ്റുകൾ",
+      "commit_other": "കമ്മിറ്റുകൾ",
+      "file_one": "ഫയൽ",
+      "file": "ഫയലുകൾ",
+      "file_other": "ഫയലുകൾ"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}-ലെ കാലഹരണപ്പെട്ട തീർച്ചയാകാത്ത അഭിപ്രായം എഡിറ്റ് ചെയ്യുക",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "ആരോ",
-      "oneTyping": "{{name}} ടൈപ്പ് ചെയ്യുന്നു...",
-      "manyTyping": "{{names}} ടൈപ്പ് ചെയ്യുന്നു..."
+      "typing_one": "{{name}} ടൈപ്പ് ചെയ്യുന്നു...",
+      "typing": "{{names}} ടൈപ്പ് ചെയ്യുന്നു...",
+      "typing_other": "{{names}} ടൈപ്പ് ചെയ്യുന്നു..."
     },
     "botStatus": {
       "online": "ഓൺലൈൻ",
@@ -722,12 +730,10 @@
       "couldNotLoad": "ബില്ലിംഗ് വിവരങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "manageOnWeb": "വെബിൽ ബില്ലിംഗ് കൈകാര്യം ചെയ്യുക",
       "commitPlan": "കമ്മിറ്റ്",
-      "daysLeft": "{{count}} ദിവസം അവശേഷിക്കുന്നു",
       "earlybird": "ആദ്യകാല പക്ഷി",
       "finalCommitTermEndsOn": "നിങ്ങളുടെ അവസാന Commit കാലാവധി {{date}} ന് അവസാനിക്കുന്നു. {{price}} നിരക്കിൽ Standard ആയി തുടരുക, അല്ലെങ്കിൽ ഹോസ്റ്റിംഗ് അവസാനിക്കും.",
       "freeTrial": "സൗജന്യ ട്രയൽ",
       "hostingEnds": "ഹോസ്റ്റിംഗ് അവസാനിക്കുന്നു",
-      "oneDayLeft": "1 ദിവസം അവശേഷിക്കുന്നു",
       "renews": "പുതുക്കുന്നു",
       "standardMonthToMonth": "സ്റ്റാൻഡേർഡ് മാസം തോറും",
       "standardStartsOn": "Standard {{date}} ന് {{price}} നിരക്കിൽ ആരംഭിക്കുന്നു.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} ശ്രദ്ധ ആവശ്യമാണ്: {{label}}",
-      "openUnreadOne": "{{name}} തുറക്കുക, {{count}} വായിക്കാത്ത സന്ദേശം",
-      "openUnreadMany": "{{name}} തുറക്കുക, {{count}} വായിക്കാത്ത സന്ദേശങ്ങൾ",
+      "openUnread_one": "{{name}} തുറക്കുക, {{displayCount}} വായിക്കാത്ത സന്ദേശം",
+      "openUnread": "{{name}} തുറക്കുക, {{displayCount}} വായിക്കാത്ത സന്ദേശങ്ങൾ",
+      "openUnread_other": "{{name}} തുറക്കുക, {{displayCount}} വായിക്കാത്ത സന്ദേശങ്ങൾ",
       "open": "{{name}} തുറക്കുക",
       "openSettings": "{{name}} ന്റെ ക്രമീകരണങ്ങൾ തുറക്കുക",
       "fixOnKiloAi": "kilo.ai-യിൽ പരിഹരിക്കുക: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "ഓട്ടോ പരിഹാരം പ്രവർത്തനക്ഷമമാക്കണോ?",
       "enableAutoRemediationConfirmMessage": "യോഗ്യതയുള്ള ചൂഷണം ചെയ്യാവുന്ന കണ്ടെത്തലുകൾക്ക് Security Agent പരിഹാര PR-കൾ സ്വയമേവ തുറക്കും.",
       "enable": "പ്രവർത്തനക്ഷമമാക്കുക",
-      "queuedOne": "{{count}} നിലവിലുള്ള കണ്ടെത്തൽ വിശകലനത്തിനായി ക്യൂവിലാക്കി.",
-      "queuedMany": "{{count}} നിലവിലുള്ള കണ്ടെത്തലുകൾ വിശകലനത്തിനായി ക്യൂവിലാക്കി.",
+      "queued_one": "{{displayCount}} നിലവിലുള്ള കണ്ടെത്തൽ വിശകലനത്തിനായി ക്യൂവിലാക്കി.",
+      "queued": "{{displayCount}} നിലവിലുള്ള കണ്ടെത്തലുകൾ വിശകലനത്തിനായി ക്യൂവിലാക്കി.",
+      "queued_other": "{{displayCount}} നിലവിലുള്ള കണ്ടെത്തലുകൾ വിശകലനത്തിനായി ക്യൂവിലാക്കി.",
       "severityCriticalOnly": "ക്രിട്ടിക്കൽ മാത്രം",
       "severityHighAndAbove": "ഉയർന്നതും അതിനു മുകളിലും",
       "severityMediumAndAbove": "ഇടത്തരവും അതിനു മുകളിലും",
@@ -1482,8 +1490,9 @@
       "on": "ഓൺ",
       "off": "ഓഫ്",
       "allRepositories": "എല്ലാ റിപ്പോസിറ്ററികളും",
-      "repositorySelected": "{{count}} റിപ്പോസിറ്ററി തിരഞ്ഞെടുത്തു",
-      "repositoriesSelected": "{{count}} റിപ്പോസിറ്ററികൾ തിരഞ്ഞെടുത്തു",
+      "repositoriesCount_one": "{{displayCount}} റിപ്പോസിറ്ററി തിരഞ്ഞെടുത്തു",
+      "repositoriesCount": "{{displayCount}} റിപ്പോസിറ്ററികൾ തിരഞ്ഞെടുത്തു",
+      "repositoriesCount_other": "{{displayCount}} റിപ്പോസിറ്ററികൾ തിരഞ്ഞെടുത്തു",
       "selectRepositories": "റിപ്പോസിറ്ററികൾ തിരഞ്ഞെടുക്കുക",
       "selectRepositoriesSubtitle": "Security Agent ഏതൊക്കെ റിപ്പോസിറ്ററികൾ നിരീക്ഷിക്കണമെന്ന് തിരഞ്ഞെടുക്കുക",
       "repositories": "റിപ്പോസിറ്ററികൾ",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "സെഷൻ ഇല്ലാതാക്കി",
       "needsInput": "ഇൻപുട്ട് ആവശ്യമാണ്",
       "fromPlatform": "{{platform}}-ൽ നിന്ന്",
-      "centOne": "സെന്റ്",
-      "centOther": "സെന്റുകൾ",
-      "dollarOne": "ഡോളർ",
-      "dollarOther": "ഡോളറുകൾ"
+      "cent_one": "സെന്റ്",
+      "cent": "സെന്റുകൾ",
+      "cent_other": "സെന്റുകൾ",
+      "dollar_one": "ഡോളർ",
+      "dollar": "ഡോളറുകൾ",
+      "dollar_other": "ഡോളറുകൾ"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub തുറക്കാൻ കഴിഞ്ഞില്ല",
@@ -1817,8 +1828,9 @@
       "discardFailed": "ഡ്രാഫ്റ്റ് ഉപേക്ഷിക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} ഫയൽ അപ്ഡേറ്റ് ചെയ്തു",
-      "updatedFiles": "{{count}} ഫയലുകൾ അപ്ഡേറ്റ് ചെയ്തു"
+      "updatedFileCount_one": "{{displayCount}} ഫയൽ അപ്ഡേറ്റ് ചെയ്തു",
+      "updatedFileCount": "{{displayCount}} ഫയലുകൾ അപ്ഡേറ്റ് ചെയ്തു",
+      "updatedFileCount_other": "{{displayCount}} ഫയലുകൾ അപ്ഡേറ്റ് ചെയ്തു"
     },
     "toolPatch": {
       "operationAdded": "ചേർത്തു",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "മുൻപത്തെ സന്ദേശങ്ങൾ ലോഡ് ചെയ്തു",
       "retryHint": "ഈ സെഷനുള്ള മുൻപത്തെ സന്ദേശ ലോഡ് വീണ്ടും ശ്രമിക്കുന്നു.",
-      "omittedOne": "ഈ സെഷനിൽ നിന്നുള്ള ചില മുൻ ഇനങ്ങൾ പ്രദർശിപ്പിക്കാൻ കഴിഞ്ഞില്ല.",
-      "omittedMany": "ഈ സെഷനിൽ നിന്നുള്ള {{count}} മുൻ ഇനങ്ങൾ പ്രദർശിപ്പിക്കാൻ കഴിഞ്ഞില്ല.",
+      "omitted_one": "ഈ സെഷനിൽ നിന്നുള്ള ചില മുൻ ഇനങ്ങൾ പ്രദർശിപ്പിക്കാൻ കഴിഞ്ഞില്ല.",
+      "omitted": "ഈ സെഷനിൽ നിന്നുള്ള {{displayCount}} മുൻ ഇനങ്ങൾ പ്രദർശിപ്പിക്കാൻ കഴിഞ്ഞില്ല.",
+      "omitted_other": "ഈ സെഷനിൽ നിന്നുള്ള {{displayCount}} മുൻ ഇനങ്ങൾ പ്രദർശിപ്പിക്കാൻ കഴിഞ്ഞില്ല.",
       "couldNotLoad": "മുൻപത്തെ സന്ദേശങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "unavailable": "മുൻപത്തെ സന്ദേശങ്ങൾ ലഭ്യമല്ല.",
       "tooLarge": "മുൻപത്തെ സന്ദേശങ്ങൾ ലോഡ് ചെയ്യാൻ വളരെ വലുതാണ്."
@@ -2069,10 +2082,12 @@
       "viewTable": "പട്ടിക കാണുക",
       "title": "പട്ടിക",
       "close": "പട്ടിക അടയ്ക്കുക",
-      "column": "നിര",
-      "columns": "നിരകൾ",
-      "row": "വരി",
-      "rows": "വരികൾ",
+      "columnCount_one": "നിര",
+      "columnCount": "നിരകൾ",
+      "columnCount_other": "നിരകൾ",
+      "rowCount_one": "വരി",
+      "rowCount": "വരികൾ",
+      "rowCount_other": "വരികൾ",
       "opensFullScreen": "പൂർണ്ണ സ്ക്രീനിൽ തുറക്കുന്നു"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} ടോക്കണുകളിൽ",
       "tokens": "ടോക്കണുകൾ",
       "tokensWithPercentage": "ടോക്കണുകൾ ({{percentage}})",
-      "stepsCountOne": "{{steps}} ഘട്ടം",
-      "stepsCountMany": "{{steps}} ഘട്ടങ്ങൾ",
+      "stepsCount_one": "{{steps}} ഘട്ടം",
+      "stepsCount": "{{steps}} ഘട്ടങ്ങൾ",
+      "stepsCount_other": "{{steps}} ഘട്ടങ്ങൾ",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "പുതിയ കോഡിംഗ് ടാസ്ക്",
     "explore": "പര്യവേക്ഷണം ചെയ്യുക",
     "seeAll": "എല്ലാം കാണുക",
-    "kiloAgents": "Kilo ഏജന്റുകൾ",
-    "greetingMorning": "സുപ്രഭാതം",
-    "greetingAfternoon": "ശുഭ ഉച്ച",
-    "greetingEvening": "ശുഭ സായാഹ്നം"
+    "kiloAgents": "Kilo ഏജന്റുകൾ"
   },
   "imageViewer": {
     "close": "{{filename}} അടയ്ക്കുക",
@@ -2645,8 +2658,9 @@
       "manageHint": "വെബിൽ Kilo Pass മാനേജ്മെന്റ് തുറക്കുന്നു.",
       "notSubscribed": "സബ്സ്ക്രൈബ് ചെയ്തിട്ടില്ല",
       "overallocated": "പാസ് അസൈൻമെന്റുകൾ പണമടച്ച സീറ്റുകളെ കവിയുന്നു",
-      "paidSeatOne": "{{count}} പണമടച്ച സീറ്റ്",
-      "paidSeatOther": "{{count}} പണമടച്ച സീറ്റുകൾ",
+      "paidSeat_one": "{{displayCount}} പണമടച്ച സീറ്റ്",
+      "paidSeat": "{{displayCount}} പണമടച്ച സീറ്റുകൾ",
+      "paidSeat_other": "{{displayCount}} പണമടച്ച സീറ്റുകൾ",
       "paymentNeedsAttention": "പേയ്മെന്റിന് ശ്രദ്ധ ആവശ്യമാണ്",
       "paymentPending": "പേയ്മെന്റ് തീർപ്പാകാത്തത്",
       "processingBlocked": "പ്രോസസ്സിംഗ് തടഞ്ഞു",

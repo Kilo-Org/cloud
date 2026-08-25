@@ -3,11 +3,14 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight } from '@/components/ui/icons';
+import { ChevronDown } from '@/components/ui/icons';
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { SheetHeader } from '@/components/sheet-header';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber, formatPercent } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SessionContextInfo } from '@/lib/session-context-info';
@@ -198,7 +201,7 @@ export function SessionContextSheet({
               <Text className="text-base font-medium text-foreground tabular-nums">
                 {breakdown.totals.cacheRatePct === null
                   ? '-'
-                  : `${breakdown.totals.cacheRatePct.toFixed(1)}%`}
+                  : formatPercent(breakdown.totals.cacheRatePct, i18n.language)}
               </Text>
             </Row>
           </View>
@@ -268,10 +271,10 @@ function ModelRow({
   const { t } = useTranslation();
   const name = friendlyModelName(model.providerID, model.modelID, modelOptions);
   const provider = resolveModelProviderName(model.providerID, model.modelID, modelOptions);
-  const stepsLabel =
-    model.steps === 1
-      ? t('agentChat.contextUsage.stepsCountOne', { steps: model.steps })
-      : t('agentChat.contextUsage.stepsCountMany', { steps: model.steps });
+  const stepsLabel = t('agentChat.contextUsage.stepsCount', {
+    count: model.steps,
+    steps: formatNumber(model.steps, i18n.language),
+  });
   return (
     <View className="overflow-hidden rounded-md border border-border">
       <Pressable
@@ -291,7 +294,7 @@ function ModelRow({
         {expanded ? (
           <ChevronDown size={16} color={colors.mutedForeground} />
         ) : (
-          <ChevronRight size={16} color={colors.mutedForeground} />
+          <DirectionalChevronRight size={16} color={colors.mutedForeground} />
         )}
         <View className="min-w-0 flex-1 gap-0.5">
           <Text className="text-sm font-medium text-foreground" numberOfLines={1}>

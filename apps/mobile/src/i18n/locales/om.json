@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "Faayilootni {{loaded}} keessaa {{total}} fayyadaman",
       "loadAllFiles": "Faayiloota hunda fayyadami",
       "loadAll": "Hundumaa fayyadami",
-      "fileLoaded": "Faayiliin {{count}} fayyadame",
-      "filesLoaded": "Faayilootni {{count}} fayyadaman",
-      "fileLoadedOfTotal": "Faayiliin {{count}} keessaa {{total}} fayyadame",
-      "filesLoadedOfTotal": "Faayilootni {{count}} keessaa {{total}} fayyadaman",
+      "fileLoadedCount_one": "Faayiliin {{displayCount}} fayyadame",
+      "fileLoadedCount": "Faayilootni {{displayCount}} fayyadaman",
+      "fileLoadedCount_other": "Faayilootni {{displayCount}} fayyadaman",
+      "fileLoadedOfTotalCount_one": "Faayiliin {{displayCount}} keessaa {{total}} fayyadame",
+      "fileLoadedOfTotalCount": "Faayilootni {{displayCount}} keessaa {{total}} fayyadaman",
+      "fileLoadedOfTotalCount_other": "Faayilootni {{displayCount}} keessaa {{total}} fayyadaman",
       "filesStillLoading": "Faayilootni amma iyyuu fayyadamaa jiru. Haaromsuuf harkisi.",
       "goToOverview": "Gara Overview deemi",
       "goToOverviewTab": "Gara tab Overview deemi"
@@ -288,8 +290,9 @@
       "resolved": "Furate",
       "outdated": "Gara duraa",
       "file": "Faayilii",
-      "oneComment": "Yaada 1",
-      "commentCount": "Yaadota {{count}}",
+      "comment_one": "Yaada 1",
+      "comment": "Yaadota {{displayCount}}",
+      "comment_other": "Yaadota {{displayCount}}",
       "startedRelative": " · kan jalqabe {{relative}}",
       "couldNotLoadMore": "Yaadota dabalataa fayyadamuu hin dandeenye.",
       "retryLoadingMore": "Yaadota dabalataa fayyadamu irra deebi'i",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Adda suutii",
       "addReaction": "Adda suutii dabali",
       "reactionPill": "Adda suutii {{emoji}}, {{count}} {{countLabel}}",
-      "reactionSingular": "adda suutii",
-      "reactionPlural": "adda suutii",
+      "reaction_one": "adda suutii",
+      "reaction": "adda suutii",
+      "reaction_other": "adda suutii",
       "commentActions": "Gochaalee yaadaa",
       "reportContent": "Sagantaa gabaasi",
       "reportUser": "Fayyadamaa gabaasi",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Yaadni kun tarree ilalloo irraa baafama.",
       "delete": "Balleessi",
       "summaryOptional": "Guduunfaa (filannoo)",
-      "pendingCommentSingular": "yaada eeggate",
-      "pendingCommentPlural": "yaadota eeggatani",
+      "pendingComment_one": "yaada eeggate",
+      "pendingComment": "yaadota eeggatani",
+      "pendingComment_other": "yaadota eeggatani",
       "submitCountOfTotal": "Yaadota {{freshCount}} keessaa {{totalCount}} dhiheessi",
       "submitReview": "Ilalloo dhiheessi",
       "partialPostedMessage": "Yaadota {{freshCount}} maxxanfame. Yaadotni {{staleCount}} commit dheeraa irratti mul'atu fi tarree kee keessa turan."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Banama · Ilalloon barbaachisaa",
       "stateOpen": "Banama",
       "unknownAuthor": "Barreessaan hin beekamne",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "faayilii",
-      "filePlural": "faayiloota"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "faayilii",
+      "file": "faayiloota",
+      "file_other": "faayiloota"
     },
     "pendingComment": {
       "editOutdatedA11y": "Yaada eeggate dheeraa {{location}} irratti gulaali",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Namni tokko",
-      "oneTyping": "{{name}} barreessaa jira...",
-      "manyTyping": "{{names}} barreessaa jiru..."
+      "typing_one": "{{name}} barreessaa jira...",
+      "typing": "{{names}} barreessaa jiru...",
+      "typing_other": "{{names}} barreessaa jiru..."
     },
     "botStatus": {
       "online": "Online",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Odeeffannoo kaffaltii fe'achuu hin dandeenye",
       "manageOnWeb": "Kaffaltii Weebii irratti Bulcha",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} guyyaa hafe",
       "earlybird": "Guyyaa jalqaba",
       "finalCommitTermEndsOn": "Yeroo Commit kee dhumaa gaafa {{date}} xumurama. Itti fufi akka Standard taate gatii {{price}} tiin, ykn hosting ni dhaabbata.",
       "freeTrial": "Qoramaa Bilisaa",
       "hostingEnds": "Hosting dhuma",
-      "oneDayLeft": "1 guyyaa hafe",
       "renews": "Irra deebi'ee",
       "standardMonthToMonth": "Standard ji'aa tokkootti",
       "standardStartsOn": "Standard {{date}} irratti {{price}}n jalqaba.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} hubannoo barbaada: {{label}}",
-      "openUnreadOne": "{{name}} bani, {{count}} ergaa hin dubbifamne",
-      "openUnreadMany": "{{name}} bani, {{count}} ergaa hin dubbifamne",
+      "openUnread_one": "{{name}} bani, {{displayCount}} ergaa hin dubbifamne",
+      "openUnread": "{{name}} bani, {{displayCount}} ergaa hin dubbifamne",
+      "openUnread_other": "{{name}} bani, {{displayCount}} ergaa hin dubbifamne",
       "open": "{{name}} bani",
       "openSettings": "{{name}} tajaajila bani",
       "fixOnKiloAi": "kilo.ai irratti fayyisi: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Qulqullina of-rakkoo banaa?",
       "enableAutoRemediationConfirmMessage": "Security Agent argamoota itti fayyadamuu danda'an danda'anirratti of-rakkoo PR qulqullina banaa.",
       "enable": "Bani",
-      "queuedOne": "Raawwii {{count}} kan jirutti anaalizii eeggachuu keessa jira.",
-      "queuedMany": "Raawwiilee {{count}} kan jiranii anaalizii eeggachuu keessa jiran.",
+      "queued_one": "Raawwii {{displayCount}} kan jirutti anaalizii eeggachuu keessa jira.",
+      "queued": "Raawwiilee {{displayCount}} kan jiranii anaalizii eeggachuu keessa jiran.",
+      "queued_other": "Raawwiilee {{displayCount}} kan jiranii anaalizii eeggachuu keessa jiran.",
       "severityCriticalOnly": "Cimaa qofa",
       "severityHighAndAbove": "Ol'aanaa fi isaa ol",
       "severityMediumAndAbove": "Giddu-galeessaa fi isaa ol",
@@ -1482,8 +1490,9 @@
       "on": "Baname",
       "off": "Cufame",
       "allRepositories": "Repositorylee hunda",
-      "repositorySelected": "Repository {{count}} filatame",
-      "repositoriesSelected": "Repositorylee {{count}} filataman",
+      "repositoriesCount_one": "Repository {{displayCount}} filatame",
+      "repositoriesCount": "Repositorylee {{displayCount}} filataman",
+      "repositoriesCount_other": "Repositorylee {{displayCount}} filataman",
       "selectRepositories": "Repositorylee filadhu",
       "selectRepositoriesSubtitle": "Repositorylee Security Agent hordofu filadhu",
       "repositories": "Repositorylee",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Xalayyiin haqe",
       "needsInput": "seensa barbaada",
       "fromPlatform": "irraa {{platform}}",
-      "centOne": "santiima",
-      "centOther": "santiimaa",
-      "dollarOne": "doolaara",
-      "dollarOther": "doolaara"
+      "cent_one": "santiima",
+      "cent": "santiimaa",
+      "cent_other": "santiimaa",
+      "dollar_one": "doolaara",
+      "dollar": "doolaara",
+      "dollar_other": "doolaara"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub banuu hin dandeenye",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Daaftarii haquu hin dandeenye. Mee deebi'ee yaali."
     },
     "partRenderer": {
-      "updatedFile": "Faayilii {{count}} haaromfame",
-      "updatedFiles": "Faayiloota {{count}} haaromfaman"
+      "updatedFileCount_one": "Faayilii {{displayCount}} haaromfame",
+      "updatedFileCount": "Faayiloota {{displayCount}} haaromfaman",
+      "updatedFileCount_other": "Faayiloota {{displayCount}} haaromfaman"
     },
     "toolPatch": {
       "operationAdded": "Dabale",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Ergaawwan duraanii baay'amanii jiru",
       "retryHint": "Shumarrichaaf baay'achuu ergaawwan duraanii deebi'ee yaala.",
-      "omittedOne": "Wanta duraanii tokko shumarricha keessaa agarsisuu hin danda'amne.",
-      "omittedMany": "Wanta duraanii {{count}} shumarricha keessaa agarsisuu hin danda'amne.",
+      "omitted_one": "Wanta duraanii tokko shumarricha keessaa agarsisuu hin danda'amne.",
+      "omitted": "Wanta duraanii {{displayCount}} shumarricha keessaa agarsisuu hin danda'amne.",
+      "omitted_other": "Wanta duraanii {{displayCount}} shumarricha keessaa agarsisuu hin danda'amne.",
       "couldNotLoad": "Ergaawwan duraanii baay'achuu hin danda'ine.",
       "unavailable": "Ergaawwan duraanii hin argamani.",
       "tooLarge": "Ergaawwan duraanii baay'achuuf gurguddoo dha."
@@ -2069,10 +2082,12 @@
       "viewTable": "Taabala ilaali",
       "title": "Taabala",
       "close": "Taabala cufi",
-      "column": "haatara",
-      "columns": "haataraawwan",
-      "row": "tartiba",
-      "rows": "tartiboota",
+      "columnCount_one": "haatara",
+      "columnCount": "haataraawwan",
+      "columnCount_other": "haataraawwan",
+      "rowCount_one": "tartiba",
+      "rowCount": "tartiboota",
+      "rowCount_other": "tartiboota",
       "opensFullScreen": "fulla guutuu bana"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "tokkanoota {{window}} keessaa",
       "tokens": "tokkanoota",
       "tokensWithPercentage": "tokkanoota ({{percentage}})",
-      "stepsCountOne": "tarkaanfii {{steps}}",
-      "stepsCountMany": "tarkaanfiiwwan {{steps}}",
+      "stepsCount_one": "tarkaanfii {{steps}}",
+      "stepsCount": "tarkaanfiiwwan {{steps}}",
+      "stepsCount_other": "tarkaanfiiwwan {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Hojii code haaraa",
     "explore": "Qoradhu",
     "seeAll": "Hunda ilaali",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Bulchaan gaarii",
-    "greetingAfternoon": "Guyyaa gaarii",
-    "greetingEvening": "Gal-galtee gaarii"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "{{filename}} cufi",
@@ -2645,8 +2658,9 @@
       "manageHint": "Bulchiinsa Kilo Pass weeb irratti bana.",
       "notSubscribed": "Hubboo hin galne",
       "overallocated": "Ramaddiin Pass teessuma kaffalamee irraa darba",
-      "paidSeatOne": "teessuma kaffalame {{count}}",
-      "paidSeatOther": "teessuma kaffalame {{count}}",
+      "paidSeat_one": "teessuma kaffalame {{displayCount}}",
+      "paidSeat": "teessuma kaffalame {{displayCount}}",
+      "paidSeat_other": "teessuma kaffalame {{displayCount}}",
       "paymentNeedsAttention": "Kaffaltiin xiyyeeffannaa barbaada",
       "paymentPending": "Kaffaltiin eegaa jira",
       "processingBlocked": "Hordoffiin dhowwameera",

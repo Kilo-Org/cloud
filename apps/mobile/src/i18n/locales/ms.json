@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} daripada {{total}} fail dimuatkan",
       "loadAllFiles": "Muatkan semua fail",
       "loadAll": "Muatkan semua",
-      "fileLoaded": "{{count}} fail dimuatkan",
-      "filesLoaded": "{{count}} fail dimuatkan",
-      "fileLoadedOfTotal": "{{count}} fail dimuatkan daripada {{total}}",
-      "filesLoadedOfTotal": "{{count}} fail dimuatkan daripada {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} fail dimuatkan",
+      "fileLoadedCount": "{{displayCount}} fail dimuatkan",
+      "fileLoadedCount_other": "{{displayCount}} fail dimuatkan",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} fail dimuatkan daripada {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} fail dimuatkan daripada {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} fail dimuatkan daripada {{total}}",
       "filesStillLoading": "Fail masih dimuatkan. Tarik untuk memuat semula.",
       "goToOverview": "Pergi ke Gambaran Keseluruhan",
       "goToOverviewTab": "Pergi ke tab Gambaran Keseluruhan"
@@ -288,8 +290,9 @@
       "resolved": "Diselesaikan",
       "outdated": "Usang",
       "file": "Fail",
-      "oneComment": "1 komen",
-      "commentCount": "{{count}} komen",
+      "comment_one": "1 komen",
+      "comment": "{{displayCount}} komen",
+      "comment_other": "{{displayCount}} komen",
       "startedRelative": " · bermula {{relative}}",
       "couldNotLoadMore": "Tidak dapat memuatkan lebih banyak komen.",
       "retryLoadingMore": "Cuba memuatkan lebih banyak komen semula",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Tindak balas",
       "addReaction": "Tambah tindak balas",
       "reactionPill": "{{emoji}} tindak balas, {{count}} {{countLabel}}",
-      "reactionSingular": "tindak balas",
-      "reactionPlural": "tindak balas",
+      "reaction_one": "tindak balas",
+      "reaction": "tindak balas",
+      "reaction_other": "tindak balas",
       "commentActions": "Tindakan komen",
       "reportContent": "Laporkan kandungan",
       "reportUser": "Laporkan pengguna",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Komen ini akan dialih keluar daripada giliran semakan.",
       "delete": "Padam",
       "summaryOptional": "Ringkasan (pilihan)",
-      "pendingCommentSingular": "komen tertunda",
-      "pendingCommentPlural": "komen tertunda",
+      "pendingComment_one": "komen tertunda",
+      "pendingComment": "komen tertunda",
+      "pendingComment_other": "komen tertunda",
       "submitCountOfTotal": "Hantar {{freshCount}} daripada {{totalCount}} komen",
       "submitReview": "Hantar semakan",
       "partialPostedMessage": "Menghantar {{freshCount}} komen. {{staleCount}} komen menunjuk kepada komit yang lebih lama dan kekal dalam giliran anda."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Buka · Semakan diperlukan",
       "stateOpen": "Buka",
       "unknownAuthor": "Pengarang tidak diketahui",
-      "commitSingular": "komit",
-      "commitPlural": "komit",
-      "fileSingular": "fail",
-      "filePlural": "fail"
+      "commit_one": "komit",
+      "commit": "komit",
+      "commit_other": "komit",
+      "file_one": "fail",
+      "file": "fail",
+      "file_other": "fail"
     },
     "pendingComment": {
       "editOutdatedA11y": "Edit komen tertunda yang usang pada {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Seseorang",
-      "oneTyping": "{{name}} sedang menaip...",
-      "manyTyping": "{{names}} sedang menaip..."
+      "typing_one": "{{name}} sedang menaip...",
+      "typing": "{{names}} sedang menaip...",
+      "typing_other": "{{names}} sedang menaip..."
     },
     "botStatus": {
       "online": "Dalam talian",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Tidak dapat memuatkan maklumat bil",
       "manageOnWeb": "Urus Bil di Web",
       "commitPlan": "Komit",
-      "daysLeft": "{{count}} hari lagi",
       "earlybird": "Pakar awal",
       "finalCommitTermEndsOn": "Tempoh Komit akhir anda tamat pada {{date}}. Teruskan sebagai Standard pada {{price}}, atau pengehosan berakhir.",
       "freeTrial": "Percubaan Percuma",
       "hostingEnds": "Pengehosan berakhir",
-      "oneDayLeft": "1 hari lagi",
       "renews": "Memperbaharui",
       "standardMonthToMonth": "Standard bulan ke bulan",
       "standardStartsOn": "Standard bermula pada {{date}} pada {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} memerlukan perhatian: {{label}}",
-      "openUnreadOne": "Buka {{name}}, {{count}} mesej belum dibaca",
-      "openUnreadMany": "Buka {{name}}, {{count}} mesej belum dibaca",
+      "openUnread_one": "Buka {{name}}, {{displayCount}} mesej belum dibaca",
+      "openUnread": "Buka {{name}}, {{displayCount}} mesej belum dibaca",
+      "openUnread_other": "Buka {{name}}, {{displayCount}} mesej belum dibaca",
       "open": "Buka {{name}}",
       "openSettings": "Buka tetapan untuk {{name}}",
       "fixOnKiloAi": "Baiki di kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Dayakan pemulihan-auto?",
       "enableAutoRemediationConfirmMessage": "Ejen Keselamatan akan membuka PR pemulihan secara automatik untuk penemuan boleh dieksploitasi yang layak.",
       "enable": "Dayakan",
-      "queuedOne": "{{count}} penemuan sedia ada dijadualkan untuk analisis.",
-      "queuedMany": "{{count}} penemuan sedia ada dijadualkan untuk analisis.",
+      "queued_one": "{{displayCount}} penemuan sedia ada dijadualkan untuk analisis.",
+      "queued": "{{displayCount}} penemuan sedia ada dijadualkan untuk analisis.",
+      "queued_other": "{{displayCount}} penemuan sedia ada dijadualkan untuk analisis.",
       "severityCriticalOnly": "Kritikal sahaja",
       "severityHighAndAbove": "Tinggi dan ke atas",
       "severityMediumAndAbove": "Sederhana dan ke atas",
@@ -1482,8 +1490,9 @@
       "on": "Hidup",
       "off": "Mati",
       "allRepositories": "Semua repositori",
-      "repositorySelected": "{{count}} repositori dipilih",
-      "repositoriesSelected": "{{count}} repositori dipilih",
+      "repositoriesCount_one": "{{displayCount}} repositori dipilih",
+      "repositoriesCount": "{{displayCount}} repositori dipilih",
+      "repositoriesCount_other": "{{displayCount}} repositori dipilih",
       "selectRepositories": "Pilih repositori",
       "selectRepositoriesSubtitle": "Pilih repositori yang dipantau oleh Security Agent",
       "repositories": "Repositori",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Sesi dipadam",
       "needsInput": "perlu input",
       "fromPlatform": "dari {{platform}}",
-      "centOne": "sen",
-      "centOther": "sen",
-      "dollarOne": "dolar",
-      "dollarOther": "dolar"
+      "cent_one": "sen",
+      "cent": "sen",
+      "cent_other": "sen",
+      "dollar_one": "dolar",
+      "dollar": "dolar",
+      "dollar_other": "dolar"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Tidak dapat membuka GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Tidak dapat membuang draf. Sila cuba lagi."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} fail dikemas kini",
-      "updatedFiles": "{{count}} fail dikemas kini"
+      "updatedFileCount_one": "{{displayCount}} fail dikemas kini",
+      "updatedFileCount": "{{displayCount}} fail dikemas kini",
+      "updatedFileCount_other": "{{displayCount}} fail dikemas kini"
     },
     "toolPatch": {
       "operationAdded": "Ditambah",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Mesej awal dimuatkan",
       "retryHint": "Mencuba semula muatan mesej awal untuk sesi ini.",
-      "omittedOne": "Sebahagian item awal daripada sesi ini tidak dapat dipaparkan.",
-      "omittedMany": "{{count}} item awal daripada sesi ini tidak dapat dipaparkan.",
+      "omitted_one": "Sebahagian item awal daripada sesi ini tidak dapat dipaparkan.",
+      "omitted": "{{displayCount}} item awal daripada sesi ini tidak dapat dipaparkan.",
+      "omitted_other": "{{displayCount}} item awal daripada sesi ini tidak dapat dipaparkan.",
       "couldNotLoad": "Tidak dapat memuatkan mesej awal.",
       "unavailable": "Mesej awal tidak tersedia.",
       "tooLarge": "Mesej awal terlalu besar untuk dimuatkan."
@@ -2069,10 +2082,12 @@
       "viewTable": "Lihat jadual",
       "title": "Jadual",
       "close": "Tutup jadual",
-      "column": "lajur",
-      "columns": "lajur",
-      "row": "baris",
-      "rows": "baris",
+      "columnCount_one": "lajur",
+      "columnCount": "lajur",
+      "columnCount_other": "lajur",
+      "rowCount_one": "baris",
+      "rowCount": "baris",
+      "rowCount_other": "baris",
       "opensFullScreen": "membuka skrin penuh"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "daripada {{window}} token",
       "tokens": "token",
       "tokensWithPercentage": "token ({{percentage}})",
-      "stepsCountOne": "{{steps}} langkah",
-      "stepsCountMany": "{{steps}} langkah",
+      "stepsCount_one": "{{steps}} langkah",
+      "stepsCount": "{{steps}} langkah",
+      "stepsCount_other": "{{steps}} langkah",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Tugas pengekodan baharu",
     "explore": "Teroka",
     "seeAll": "Lihat semua",
-    "kiloAgents": "Ejen Kilo",
-    "greetingMorning": "Selamat pagi",
-    "greetingAfternoon": "Selamat tengah hari",
-    "greetingEvening": "Selamat petang"
+    "kiloAgents": "Ejen Kilo"
   },
   "imageViewer": {
     "close": "Tutup {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Membuka pengurusan Kilo Pass pada web.",
       "notSubscribed": "Tidak melanggan",
       "overallocated": "Peruntukan pas melebihi kerusi berbayar",
-      "paidSeatOne": "{{count}} kerusi berbayar",
-      "paidSeatOther": "{{count}} kerusi berbayar",
+      "paidSeat_one": "{{displayCount}} kerusi berbayar",
+      "paidSeat": "{{displayCount}} kerusi berbayar",
+      "paidSeat_other": "{{displayCount}} kerusi berbayar",
       "paymentNeedsAttention": "Pembayaran memerlukan perhatian",
       "paymentPending": "Pembayaran belum selesai",
       "processingBlocked": "Pemprosesan disekat",

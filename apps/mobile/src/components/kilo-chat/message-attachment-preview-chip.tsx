@@ -2,10 +2,11 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { AlertCircle, File as FileIcon, RotateCcw, X } from '@/components/ui/icons';
 import { type QueuedAttachment } from '@kilocode/kilo-chat-hooks';
-import { formatFileSize } from '@kilocode/kilo-chat';
 
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatFileSize, formatPercent } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { isImageMimeType } from './message-attachment-state';
@@ -60,7 +61,9 @@ export function MessageAttachmentPreviewChip({ row, localUri, onRemove, onRetry 
               {row.filename}
             </Text>
             <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
-              {uploading ? `${Math.round(row.progress * 100)}%` : formatFileSize(row.size)}
+              {uploading
+                ? formatPercent(row.progress * 100, i18n.language)
+                : formatFileSize(row.size, i18n.language)}
             </Text>
           </View>
         </View>
@@ -70,7 +73,7 @@ export function MessageAttachmentPreviewChip({ row, localUri, onRemove, onRetry 
         <View className="absolute inset-0 items-center justify-center bg-black/20">
           <ActivityIndicator size="small" color={colors.foreground} />
           <Text className="mt-1 text-[10px] text-foreground">
-            {Math.round(row.progress * 100)}%
+            {formatPercent(row.progress * 100, i18n.language)}
           </Text>
         </View>
       ) : null}

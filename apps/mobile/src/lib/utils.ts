@@ -4,6 +4,7 @@ import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 import { i18n } from '@/i18n';
+import { firstGrapheme } from '@/lib/format';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -59,7 +60,8 @@ function pick<T extends object, K extends keyof T>(obj: T, keys: readonly K[]): 
 
 /** Uppercases the first letter, e.g. for enum-like values used as labels. */
 function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
+  const first = firstGrapheme(value, i18n.language);
+  return first.toLocaleUpperCase(i18n.language) + value.slice(first.length);
 }
 
 export {

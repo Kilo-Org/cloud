@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} nga {{total}} skedarë të ngarkuar",
       "loadAllFiles": "Ngarko të gjithë skedarët",
       "loadAll": "Ngarko të gjitha",
-      "fileLoaded": "{{count}} skedar i ngarkuar",
-      "filesLoaded": "{{count}} skedarë të ngarkuar",
-      "fileLoadedOfTotal": "{{count}} skedar i ngarkuar nga {{total}}",
-      "filesLoadedOfTotal": "{{count}} skedarë të ngarkuar nga {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} skedar i ngarkuar",
+      "fileLoadedCount": "{{displayCount}} skedarë të ngarkuar",
+      "fileLoadedCount_other": "{{displayCount}} skedarë të ngarkuar",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} skedar i ngarkuar nga {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} skedarë të ngarkuar nga {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} skedarë të ngarkuar nga {{total}}",
       "filesStillLoading": "Skedarët po ngarkohen ende. Tërhiqe për të rifreskuar.",
       "goToOverview": "Shko te Përmbledhja",
       "goToOverviewTab": "Shko te skeda Përmbledhja"
@@ -288,8 +290,9 @@
       "resolved": "E zgjidhur",
       "outdated": "E vjetëruar",
       "file": "Skedari",
-      "oneComment": "1 koment",
-      "commentCount": "{{count}} komente",
+      "comment_one": "1 koment",
+      "comment": "{{displayCount}} komente",
+      "comment_other": "{{displayCount}} komente",
       "startedRelative": " · nisur {{relative}}",
       "couldNotLoadMore": "Nuk u arrit të ngarkoheshin më shumë komente.",
       "retryLoadingMore": "Riprovo ngarkimin e më shumë komenteve",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reagimet",
       "addReaction": "Shto reagim",
       "reactionPill": "{{emoji}} reagim, {{count}} {{countLabel}}",
-      "reactionSingular": "reagim",
-      "reactionPlural": "reagime",
+      "reaction_one": "reagim",
+      "reaction": "reagime",
+      "reaction_other": "reagime",
       "commentActions": "Veprimet e komentit",
       "reportContent": "Raporto përmbajtjen",
       "reportUser": "Raporto përdoruesin",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Ky koment do të hiqet nga radha e rishikimit.",
       "delete": "Fshi",
       "summaryOptional": "Përmbledhja (opsionale)",
-      "pendingCommentSingular": "koment në pritje",
-      "pendingCommentPlural": "komente në pritje",
+      "pendingComment_one": "koment në pritje",
+      "pendingComment": "komente në pritje",
+      "pendingComment_other": "komente në pritje",
       "submitCountOfTotal": "Dërgo {{freshCount}} nga {{totalCount}} komente",
       "submitReview": "Dërgo rishikimin",
       "partialPostedMessage": "U postuan {{freshCount}} koment(e). {{staleCount}} koment(e) tregojnë te një commit më i vjetër dhe mbetën në radhën tënde."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "E hapur · Kërkohet rishikim",
       "stateOpen": "E hapur",
       "unknownAuthor": "Autor i panjohur",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "skedar",
-      "filePlural": "skedarë"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "skedar",
+      "file": "skedarë",
+      "file_other": "skedarë"
     },
     "pendingComment": {
       "editOutdatedA11y": "Redakto komentin në pritje të vjetëruar te {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Dikush",
-      "oneTyping": "{{name}} po shkruan...",
-      "manyTyping": "{{names}} po shkruajnë..."
+      "typing_one": "{{name}} po shkruan...",
+      "typing": "{{names}} po shkruajnë...",
+      "typing_other": "{{names}} po shkruajnë..."
     },
     "botStatus": {
       "online": "Në linjë",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Nuk u arrit të ngarkoheshin informacionet e faturimit",
       "manageOnWeb": "Menaxho Faturimin në Web",
       "commitPlan": "Angazhohu",
-      "daysLeft": "{{count}} ditë të mbetura",
       "earlybird": "Herët",
       "finalCommitTermEndsOn": "Afati yt përfundimtar i angazhimit përfundon më {{date}}. Vazhdo si Standard me {{price}}, ose hosting-u përfundon.",
       "freeTrial": "Provë Falas",
       "hostingEnds": "Hosting-u përfundon",
-      "oneDayLeft": "1 ditë e mbetur",
       "renews": "Rinovon",
       "standardMonthToMonth": "Standard muaj pas muaji",
       "standardStartsOn": "Standard fillon më {{date}} me {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} kërkon vëmendje: {{label}}",
-      "openUnreadOne": "Hap {{name}}, {{count}} mesazh i palexuar",
-      "openUnreadMany": "Hap {{name}}, {{count}} mesazhe të palexuara",
+      "openUnread_one": "Hap {{name}}, {{displayCount}} mesazh i palexuar",
+      "openUnread": "Hap {{name}}, {{displayCount}} mesazhe të palexuara",
+      "openUnread_other": "Hap {{name}}, {{displayCount}} mesazhe të palexuara",
       "open": "Hap {{name}}",
       "openSettings": "Hap cilësimet për {{name}}",
       "fixOnKiloAi": "Rregullo te kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Të aktivizohet korrigjimi automatik?",
       "enableAutoRemediationConfirmMessage": "Agjenti i Sigurisë do të hapë automatikisht PR korrigjimi për gjetjet e shfrytëzueshme që kualifikohen.",
       "enable": "Aktivizo",
-      "queuedOne": "{{count}} gjetje ekzistuese në radhë për analizë.",
-      "queuedMany": "{{count}} gjetje ekzistuese në radhë për analizë.",
+      "queued_one": "{{displayCount}} gjetje ekzistuese në radhë për analizë.",
+      "queued": "{{displayCount}} gjetje ekzistuese në radhë për analizë.",
+      "queued_other": "{{displayCount}} gjetje ekzistuese në radhë për analizë.",
       "severityCriticalOnly": "Vetëm kritike",
       "severityHighAndAbove": "E lartë dhe më lart",
       "severityMediumAndAbove": "E mesme dhe më lart",
@@ -1482,8 +1490,9 @@
       "on": "Aktiv",
       "off": "Çaktiv",
       "allRepositories": "Të gjitha depot",
-      "repositorySelected": "{{count}} depo e zgjedhur",
-      "repositoriesSelected": "{{count}} depo të zgjedhura",
+      "repositoriesCount_one": "{{displayCount}} depo e zgjedhur",
+      "repositoriesCount": "{{displayCount}} depo të zgjedhura",
+      "repositoriesCount_other": "{{displayCount}} depo të zgjedhura",
       "selectRepositories": "Zgjidhni depot",
       "selectRepositoriesSubtitle": "Zgjidhni cilat depo monitoron Security Agent",
       "repositories": "Depot",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Seanca u fshi",
       "needsInput": "ka nevojë për të dhëna",
       "fromPlatform": "nga {{platform}}",
-      "centOne": "cent",
-      "centOther": "centë",
-      "dollarOne": "dollar",
-      "dollarOther": "dollarë"
+      "cent_one": "cent",
+      "cent": "centë",
+      "cent_other": "centë",
+      "dollar_one": "dollar",
+      "dollar": "dollarë",
+      "dollar_other": "dollarë"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nuk u hap GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Nuk u hoq drafti. Ju lutemi provoni përsëri."
     },
     "partRenderer": {
-      "updatedFile": "U përditësua {{count}} skedar",
-      "updatedFiles": "U përditësuan {{count}} skedarë"
+      "updatedFileCount_one": "U përditësua {{displayCount}} skedar",
+      "updatedFileCount": "U përditësuan {{displayCount}} skedarë",
+      "updatedFileCount_other": "U përditësuan {{displayCount}} skedarë"
     },
     "toolPatch": {
       "operationAdded": "U shtua",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "U ngarkuan mesazhet e mëparshme",
       "retryHint": "Riprovon ngarkimin e mesazheve të mëparshme për këtë seancë.",
-      "omittedOne": "Disa artikuj të mëparshëm nga kjo seancë nuk mund të shfaqeshin.",
-      "omittedMany": "{{count}} artikuj të mëparshëm nga kjo seancë nuk mund të shfaqeshin.",
+      "omitted_one": "Disa artikuj të mëparshëm nga kjo seancë nuk mund të shfaqeshin.",
+      "omitted": "{{displayCount}} artikuj të mëparshëm nga kjo seancë nuk mund të shfaqeshin.",
+      "omitted_other": "{{displayCount}} artikuj të mëparshëm nga kjo seancë nuk mund të shfaqeshin.",
       "couldNotLoad": "Mesazhet e mëparshme nuk u ngarkuan.",
       "unavailable": "Mesazhet e mëparshme nuk janë të disponueshme.",
       "tooLarge": "Mesazhet e mëparshme janë shumë të mëdha për t'u ngarkuar."
@@ -2069,10 +2082,12 @@
       "viewTable": "Shiko tabelën",
       "title": "Tabela",
       "close": "Mbyll tabelën",
-      "column": "kolona",
-      "columns": "kolonat",
-      "row": "rreshti",
-      "rows": "rreshtat",
+      "columnCount_one": "kolona",
+      "columnCount": "kolonat",
+      "columnCount_other": "kolonat",
+      "rowCount_one": "rreshti",
+      "rowCount": "rreshtat",
+      "rowCount_other": "rreshtat",
       "opensFullScreen": "hap në ekran të plotë"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "nga {{window}} tokenët",
       "tokens": "tokenë",
       "tokensWithPercentage": "tokenë ({{percentage}})",
-      "stepsCountOne": "{{steps}} hap",
-      "stepsCountMany": "{{steps}} hapa",
+      "stepsCount_one": "{{steps}} hap",
+      "stepsCount": "{{steps}} hapa",
+      "stepsCount_other": "{{steps}} hapa",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Detyrë e re kodimi",
     "explore": "Eksploro",
     "seeAll": "Shiko të gjitha",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Mirëmëngjes",
-    "greetingAfternoon": "Mirëdita",
-    "greetingEvening": "Mirëmbrëma"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Mbyll {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Hap menaxhimin e Kilo Pass në ueb.",
       "notSubscribed": "I paabonuar",
       "overallocated": "Caktimet e Pass tejkalojnë vendet e paguara",
-      "paidSeatOne": "{{count}} vend i paguar",
-      "paidSeatOther": "{{count}} vende të paguara",
+      "paidSeat_one": "{{displayCount}} vend i paguar",
+      "paidSeat": "{{displayCount}} vende të paguara",
+      "paidSeat_other": "{{displayCount}} vende të paguara",
       "paymentNeedsAttention": "Pagesa ka nevojë për vëmendje",
       "paymentPending": "Pagesa në pritje",
       "processingBlocked": "Përpunimi i bllokuar",

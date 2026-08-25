@@ -1,5 +1,6 @@
 import { formatDate } from '@/lib/format';
 import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
+import { relativeTimeFormat } from '@/lib/intl-cache';
 import { parseTimestamp } from '@/lib/utils';
 
 import { type useKiloClawBillingStatus } from './use-kiloclaw-queries';
@@ -86,9 +87,8 @@ export function formatBillingDate(iso: string): string {
 }
 
 export function formatRemainingDays(daysRemaining: number): string {
-  if (daysRemaining <= 0) {
-    return 'Less than 1 day left';
-  }
-
-  return `${String(daysRemaining)} day${daysRemaining === 1 ? '' : 's'} left`;
+  return relativeTimeFormat(getResolvedLanguage(), { numeric: 'auto' }).format(
+    Math.max(0, daysRemaining),
+    'day'
+  );
 }

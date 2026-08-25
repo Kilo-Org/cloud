@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} από {{total}} αρχεία φορτώθηκαν",
       "loadAllFiles": "Φόρτωση όλων των αρχείων",
       "loadAll": "Φόρτωση όλων",
-      "fileLoaded": "{{count}} αρχείο φορτώθηκε",
-      "filesLoaded": "{{count}} αρχεία φορτώθηκαν",
-      "fileLoadedOfTotal": "{{count}} αρχείο φορτώθηκε από {{total}}",
-      "filesLoadedOfTotal": "{{count}} αρχεία φορτώθηκαν από {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} αρχείο φορτώθηκε",
+      "fileLoadedCount": "{{displayCount}} αρχεία φορτώθηκαν",
+      "fileLoadedCount_other": "{{displayCount}} αρχεία φορτώθηκαν",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} αρχείο φορτώθηκε από {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} αρχεία φορτώθηκαν από {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} αρχεία φορτώθηκαν από {{total}}",
       "filesStillLoading": "Τα αρχεία φορτώνονται ακόμα. Σύρετε για ανανέωση.",
       "goToOverview": "Μετάβαση στην επισκόπηση",
       "goToOverviewTab": "Μετάβαση στην καρτέλα επισκόπησης"
@@ -288,8 +290,9 @@
       "resolved": "Επιλύθηκε",
       "outdated": "Ξεπερασμένο",
       "file": "Αρχείο",
-      "oneComment": "1 σχόλιο",
-      "commentCount": "{{count}} σχόλια",
+      "comment_one": "1 σχόλιο",
+      "comment": "{{displayCount}} σχόλια",
+      "comment_other": "{{displayCount}} σχόλια",
       "startedRelative": " · ξεκίνησε {{relative}}",
       "couldNotLoadMore": "Δεν ήταν δυνατή η φόρτωση περισσότερων σχολίων.",
       "retryLoadingMore": "Νέα προσπάθεια φόρτωσης περισσότερων σχολίων",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Αντιδράσεις",
       "addReaction": "Προσθήκη αντίδρασης",
       "reactionPill": "{{emoji}} αντίδραση, {{count}} {{countLabel}}",
-      "reactionSingular": "αντίδραση",
-      "reactionPlural": "αντιδράσεις",
+      "reaction_one": "αντίδραση",
+      "reaction": "αντιδράσεις",
+      "reaction_other": "αντιδράσεις",
       "commentActions": "Ενέργειες σχολίου",
       "reportContent": "Αναφορά περιεχομένου",
       "reportUser": "Αναφορά χρήστη",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Αυτό το σχόλιο θα αφαιρεθεί από την ουρά αναθεώρησης.",
       "delete": "Διαγραφή",
       "summaryOptional": "Σύνοψη (προαιρετική)",
-      "pendingCommentSingular": "εκκρεμές σχόλιο",
-      "pendingCommentPlural": "εκκρεμή σχόλια",
+      "pendingComment_one": "εκκρεμές σχόλιο",
+      "pendingComment": "εκκρεμή σχόλια",
+      "pendingComment_other": "εκκρεμή σχόλια",
       "submitCountOfTotal": "Υποβολή {{freshCount}} από {{totalCount}} σχόλια",
       "submitReview": "Υποβολή αναθεώρησης",
       "partialPostedMessage": "Δημοσιεύτηκαν {{freshCount}} σχόλιο(α). {{staleCount}} σχόλιο(α) αναφέρονται σε παλαιότερο commit και παρέμειναν στην ουρά σας."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Ανοιχτό · Απαιτείται αναθεώρηση",
       "stateOpen": "Ανοιχτό",
       "unknownAuthor": "Άγνωστος συγγραφέας",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "αρχείο",
-      "filePlural": "αρχεία"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "αρχείο",
+      "file": "αρχεία",
+      "file_other": "αρχεία"
     },
     "pendingComment": {
       "editOutdatedA11y": "Επεξεργασία ξεπερασμένου εκκρεμούς σχολίου στο {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Κάποιος",
-      "oneTyping": "Ο/Η {{name}} πληκτρολογεί...",
-      "manyTyping": "Οι {{names}} πληκτρολογούν..."
+      "typing_one": "Ο/Η {{name}} πληκτρολογεί...",
+      "typing": "Οι {{names}} πληκτρολογούν...",
+      "typing_other": "Οι {{names}} πληκτρολογούν..."
     },
     "botStatus": {
       "online": "Σε σύνδεση",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των πληροφοριών χρέωσης",
       "manageOnWeb": "Διαχείριση χρέωσης στον ιστό",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} ημέρες απομένουν",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Η τελική σας περίοδος Commit λήγει στις {{date}}. Συνεχίστε ως Standard στα {{price}}, διαφορετικά λήγει η φιλοξενία.",
       "freeTrial": "Δωρεάν δοκιμή",
       "hostingEnds": "Η φιλοξενία λήγει",
-      "oneDayLeft": "1 ημέρα απομένει",
       "renews": "Ανανεώνεται",
       "standardMonthToMonth": "Standard μήνα με μήνα",
       "standardStartsOn": "Το Standard ξεκινά στις {{date}} στα {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "Ο/Η {{name}} χρειάζεται προσοχή: {{label}}",
-      "openUnreadOne": "Άνοιγμα {{name}}, {{count}} μη αναγνωσμένο μήνυμα",
-      "openUnreadMany": "Άνοιγμα {{name}}, {{count}} μη αναγνωσμένα μηνύματα",
+      "openUnread_one": "Άνοιγμα {{name}}, {{displayCount}} μη αναγνωσμένο μήνυμα",
+      "openUnread": "Άνοιγμα {{name}}, {{displayCount}} μη αναγνωσμένα μηνύματα",
+      "openUnread_other": "Άνοιγμα {{name}}, {{displayCount}} μη αναγνωσμένα μηνύματα",
       "open": "Άνοιγμα {{name}}",
       "openSettings": "Άνοιγμα ρυθμίσεων για {{name}}",
       "fixOnKiloAi": "Διόρθωση στο kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Ενεργοποίηση αυτόματης αποκατάστασης;",
       "enableAutoRemediationConfirmMessage": "Ο Security Agent θα ανοίγει αυτόματα PR αποκατάστασης για επιλέξιμα εκμεταλλεύσιμα ευρήματα.",
       "enable": "Ενεργοποίηση",
-      "queuedOne": "{{count}} υπάρχον εύρημα σε αναμονή για ανάλυση.",
-      "queuedMany": "{{count}} υπάρχοντα ευρήματα σε αναμονή για ανάλυση.",
+      "queued_one": "{{displayCount}} υπάρχον εύρημα σε αναμονή για ανάλυση.",
+      "queued": "{{displayCount}} υπάρχοντα ευρήματα σε αναμονή για ανάλυση.",
+      "queued_other": "{{displayCount}} υπάρχοντα ευρήματα σε αναμονή για ανάλυση.",
       "severityCriticalOnly": "Μόνο κρίσιμα",
       "severityHighAndAbove": "Υψηλά και άνω",
       "severityMediumAndAbove": "Μεσαία και άνω",
@@ -1482,8 +1490,9 @@
       "on": "Ενεργό",
       "off": "Ανενεργό",
       "allRepositories": "Όλα τα αποθετήρια",
-      "repositorySelected": "{{count}} επιλεγμένο αποθετήριο",
-      "repositoriesSelected": "{{count}} επιλεγμένα αποθετήρια",
+      "repositoriesCount_one": "{{displayCount}} επιλεγμένο αποθετήριο",
+      "repositoriesCount": "{{displayCount}} επιλεγμένα αποθετήρια",
+      "repositoriesCount_other": "{{displayCount}} επιλεγμένα αποθετήρια",
       "selectRepositories": "Επιλογή αποθετηρίων",
       "selectRepositoriesSubtitle": "Επιλέξτε ποια αποθετήρια παρακολουθεί ο Security Agent",
       "repositories": "Αποθετήρια",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Η συνεδρία διαγράφηκε",
       "needsInput": "χρειάζεται είσοδο",
       "fromPlatform": "από {{platform}}",
-      "centOne": "σεντ",
-      "centOther": "σεντς",
-      "dollarOne": "δολάριο",
-      "dollarOther": "δολάρια"
+      "cent_one": "σεντ",
+      "cent": "σεντς",
+      "cent_other": "σεντς",
+      "dollar_one": "δολάριο",
+      "dollar": "δολάρια",
+      "dollar_other": "δολάρια"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Δεν ήταν δυνατό το άνοιγμα του GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Δεν ήταν δυνατή η απόρριψη του πρόχειρου. Δοκιμάστε ξανά."
     },
     "partRenderer": {
-      "updatedFile": "Ενημερώθηκε {{count}} αρχείο",
-      "updatedFiles": "Ενημερώθηκαν {{count}} αρχεία"
+      "updatedFileCount_one": "Ενημερώθηκε {{displayCount}} αρχείο",
+      "updatedFileCount": "Ενημερώθηκαν {{displayCount}} αρχεία",
+      "updatedFileCount_other": "Ενημερώθηκαν {{displayCount}} αρχεία"
     },
     "toolPatch": {
       "operationAdded": "Προστέθηκε",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Φορτώθηκαν προηγούμενα μηνύματα",
       "retryHint": "Επαναπροσπαθεί τη φόρτωση των προηγούμενων μηνυμάτων για αυτή τη συνεδρία.",
-      "omittedOne": "Ορισμένα προηγούμενα στοιχεία από αυτή τη συνεδρία δεν ήταν δυνατό να εμφανιστούν.",
-      "omittedMany": "{{count}} προηγούμενα στοιχεία από αυτή τη συνεδρία δεν ήταν δυνατό να εμφανιστούν.",
+      "omitted_one": "Ορισμένα προηγούμενα στοιχεία από αυτή τη συνεδρία δεν ήταν δυνατό να εμφανιστούν.",
+      "omitted": "{{displayCount}} προηγούμενα στοιχεία από αυτή τη συνεδρία δεν ήταν δυνατό να εμφανιστούν.",
+      "omitted_other": "{{displayCount}} προηγούμενα στοιχεία από αυτή τη συνεδρία δεν ήταν δυνατό να εμφανιστούν.",
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των προηγούμενων μηνυμάτων.",
       "unavailable": "Τα προηγούμενα μηνύματα δεν είναι διαθέσιμα.",
       "tooLarge": "Τα προηγούμενα μηνύματα είναι πολύ μεγάλα για φόρτωση."
@@ -2069,10 +2082,12 @@
       "viewTable": "Προβολή πίνακα",
       "title": "Πίνακας",
       "close": "Κλείσιμο πίνακα",
-      "column": "στήλη",
-      "columns": "στήλες",
-      "row": "γραμμή",
-      "rows": "γραμμές",
+      "columnCount_one": "στήλη",
+      "columnCount": "στήλες",
+      "columnCount_other": "στήλες",
+      "rowCount_one": "γραμμή",
+      "rowCount": "γραμμές",
+      "rowCount_other": "γραμμές",
       "opensFullScreen": "ανοίγει σε πλήρη οθόνη"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "από {{window}} διακριτικά",
       "tokens": "διακριτικά",
       "tokensWithPercentage": "διακριτικά ({{percentage}})",
-      "stepsCountOne": "{{steps}} βήμα",
-      "stepsCountMany": "{{steps}} βήματα",
+      "stepsCount_one": "{{steps}} βήμα",
+      "stepsCount": "{{steps}} βήματα",
+      "stepsCount_other": "{{steps}} βήματα",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Νέα εργασία προγραμματισμού",
     "explore": "Εξερεύνηση",
     "seeAll": "Προβολή όλων",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Καλημέρα",
-    "greetingAfternoon": "Καλησπέρα",
-    "greetingEvening": "Καλό βράδυ"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Κλείσιμο {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Ανοίγει τη διαχείριση Kilo Pass στο διαδίκτυο.",
       "notSubscribed": "Χωρίς συνδρομή",
       "overallocated": "Οι αναθέσεις Pass υπερβαίνουν τις πληρωμένες θέσεις",
-      "paidSeatOne": "{{count}} πληρωμένη θέση",
-      "paidSeatOther": "{{count}} πληρωμένες θέσεις",
+      "paidSeat_one": "{{displayCount}} πληρωμένη θέση",
+      "paidSeat": "{{displayCount}} πληρωμένες θέσεις",
+      "paidSeat_other": "{{displayCount}} πληρωμένες θέσεις",
       "paymentNeedsAttention": "Η πληρωμή χρειάζεται προσοχή",
       "paymentPending": "Η πληρωμή εκκρεμεί",
       "processingBlocked": "Η επεξεργασία αποκλείστηκε",

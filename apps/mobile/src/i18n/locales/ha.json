@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} daga {{total}} fayiloli an ɗauka",
       "loadAllFiles": "Ɗauki duk fayilolin",
       "loadAll": "Ɗauki duka",
-      "fileLoaded": "{{count}} fayil an ɗauka",
-      "filesLoaded": "{{count}} fayiloli an ɗauka",
-      "fileLoadedOfTotal": "{{count}} fayil an ɗauka daga {{total}}",
-      "filesLoadedOfTotal": "{{count}} fayiloli an ɗauka daga {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} fayil an ɗauka",
+      "fileLoadedCount": "{{displayCount}} fayiloli an ɗauka",
+      "fileLoadedCount_other": "{{displayCount}} fayiloli an ɗauka",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} fayil an ɗauka daga {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} fayiloli an ɗauka daga {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} fayiloli an ɗauka daga {{total}}",
       "filesStillLoading": "Fayiloli har yanzu suna ɗauka. Ja don sabuntawa.",
       "goToOverview": "Je zuwa Overview",
       "goToOverviewTab": "Je zuwa shafin Overview"
@@ -288,8 +290,9 @@
       "resolved": "An warware",
       "outdated": "Tsoho",
       "file": "Fayil",
-      "oneComment": "1 tsokaci",
-      "commentCount": "{{count}} tsokaci",
+      "comment_one": "1 tsokaci",
+      "comment": "{{displayCount}} tsokaci",
+      "comment_other": "{{displayCount}} tsokaci",
       "startedRelative": " · ya fara {{relative}}",
       "couldNotLoadMore": "Ba a iya ɗaukar ƙarin tsokaci ba.",
       "retryLoadingMore": "Sake gwadawa ɗaukar ƙarin tsokaci",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Halaye",
       "addReaction": "Ƙara hali",
       "reactionPill": "{{emoji}} hali, {{count}} {{countLabel}}",
-      "reactionSingular": "hali",
-      "reactionPlural": "halaye",
+      "reaction_one": "hali",
+      "reaction": "halaye",
+      "reaction_other": "halaye",
       "commentActions": "Ayyukan tsokaci",
       "reportContent": "Rahoton abun ciki",
       "reportUser": "Rahoton mai amfani",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Za a cire wannan tsokaci daga jerin bita.",
       "delete": "Share",
       "summaryOptional": "Takaitawa (na zaɓi)",
-      "pendingCommentSingular": "tsokacin da ke jira",
-      "pendingCommentPlural": "tsokacin da ke jira",
+      "pendingComment_one": "tsokacin da ke jira",
+      "pendingComment": "tsokacin da ke jira",
+      "pendingComment_other": "tsokacin da ke jira",
       "submitCountOfTotal": "Ƙaddamar da {{freshCount}} daga {{totalCount}} tsokaci",
       "submitReview": "Ƙaddamar da bita",
       "partialPostedMessage": "An buga {{freshCount}} tsokaci. {{staleCount}} tsokaci suna nuna tsohon commit kuma sun kasance a jerinka."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Bude · Ana buƙatar bita",
       "stateOpen": "Bude",
       "unknownAuthor": "Marubucin da ba a sani ba",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "fayil",
-      "filePlural": "fayiloli"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "fayil",
+      "file": "fayiloli",
+      "file_other": "fayiloli"
     },
     "pendingComment": {
       "editOutdatedA11y": "Gyara tsokacin da ke jira na tsoho a {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Wani",
-      "oneTyping": "{{name}} yana rubutu...",
-      "manyTyping": "{{names}} suna rubutu..."
+      "typing_one": "{{name}} yana rubutu...",
+      "typing": "{{names}} suna rubutu...",
+      "typing_other": "{{names}} suna rubutu..."
     },
     "botStatus": {
       "online": "Kan layi",
@@ -722,12 +730,10 @@
       "couldNotLoad": "An kasa ɗora bayanan biyan kuɗi",
       "manageOnWeb": "Sarrafa Biyan Kuɗi akan Yanar Gizo",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} kwanaki suka rage",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Wa'adin Commit na ƙarshe na ka zai ƙare a {{date}}. Ci gaba a matsayin Standard a {{price}}, ko kuma masauki ya ƙare.",
       "freeTrial": "Gwaji Kyauta",
       "hostingEnds": "Masauki yana ƙarewa",
-      "oneDayLeft": "Kwana 1 ya rage",
       "renews": "Yana sabuntawa",
       "standardMonthToMonth": "Standard duk wata",
       "standardStartsOn": "Standard zai fara a {{date}} a {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} yana buƙatar kulawa: {{label}}",
-      "openUnreadOne": "Buɗe {{name}}, saƙo {{count}} da ba a karanta ba",
-      "openUnreadMany": "Buɗe {{name}}, saƙonni {{count}} da ba a karanta ba",
+      "openUnread_one": "Buɗe {{name}}, saƙo {{displayCount}} da ba a karanta ba",
+      "openUnread": "Buɗe {{name}}, saƙonni {{displayCount}} da ba a karanta ba",
+      "openUnread_other": "Buɗe {{name}}, saƙonni {{displayCount}} da ba a karanta ba",
       "open": "Buɗe {{name}}",
       "openSettings": "Buɗe saituna don {{name}}",
       "fixOnKiloAi": "Gyara akan kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Kunna gyara ta atomatik?",
       "enableAutoRemediationConfirmMessage": "Security Agent zai buɗe PRs na gyara ta atomatik don binciken da ake iya amfani da su.",
       "enable": "Kunna",
-      "queuedOne": "{{count}} sakamako da ke akwai an shigar da shi domin nazari.",
-      "queuedMany": "{{count}} sakamako da ke akwai an shigar da su domin nazari.",
+      "queued_one": "{{displayCount}} sakamako da ke akwai an shigar da shi domin nazari.",
+      "queued": "{{displayCount}} sakamako da ke akwai an shigar da su domin nazari.",
+      "queued_other": "{{displayCount}} sakamako da ke akwai an shigar da su domin nazari.",
       "severityCriticalOnly": "Matsananci kawai",
       "severityHighAndAbove": "Babba da sama",
       "severityMediumAndAbove": "Matsakaici da sama",
@@ -1482,8 +1490,9 @@
       "on": "Kunna",
       "off": "Kashe",
       "allRepositories": "Duk ma'ajiyoyi",
-      "repositorySelected": "{{count}} ma'ajiya da aka zaɓa",
-      "repositoriesSelected": "{{count}} ma'ajiyoyi da aka zaɓa",
+      "repositoriesCount_one": "{{displayCount}} ma'ajiya da aka zaɓa",
+      "repositoriesCount": "{{displayCount}} ma'ajiyoyi da aka zaɓa",
+      "repositoriesCount_other": "{{displayCount}} ma'ajiyoyi da aka zaɓa",
       "selectRepositories": "Zaɓi ma'ajiyoyi",
       "selectRepositoriesSubtitle": "Zaɓi ma'ajiyoyin da Security Agent ke sa ido a kansu",
       "repositories": "Ma'ajiyoyi",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "An share zaman",
       "needsInput": "yana buƙatar bayani",
       "fromPlatform": "daga {{platform}}",
-      "centOne": "senti",
-      "centOther": "senti",
-      "dollarOne": "dala",
-      "dollarOther": "daloli"
+      "cent_one": "senti",
+      "cent": "senti",
+      "cent_other": "senti",
+      "dollar_one": "dala",
+      "dollar": "daloli",
+      "dollar_other": "daloli"
     },
     "githubInstall": {
       "couldNotOpenTitle": "An kasa buɗe GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "An kasa watsi da daftarin. Da fatan za a sake gwadawa."
     },
     "partRenderer": {
-      "updatedFile": "An sabunta {{count}} fayil",
-      "updatedFiles": "An sabunta {{count}} fayiloli"
+      "updatedFileCount_one": "An sabunta {{displayCount}} fayil",
+      "updatedFileCount": "An sabunta {{displayCount}} fayiloli",
+      "updatedFileCount_other": "An sabunta {{displayCount}} fayiloli"
     },
     "toolPatch": {
       "operationAdded": "An ƙara",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "An ɗora saƙonnin farko",
       "retryHint": "Yana sake gwada ɗora tsofaffin saƙonnin wannan zaman.",
-      "omittedOne": "Ba a iya nuna wasu abubuwan farko daga wannan zaman ba.",
-      "omittedMany": "Ba a iya nuna {{count}} abubuwan farko daga wannan zaman ba.",
+      "omitted_one": "Ba a iya nuna wasu abubuwan farko daga wannan zaman ba.",
+      "omitted": "Ba a iya nuna {{displayCount}} abubuwan farko daga wannan zaman ba.",
+      "omitted_other": "Ba a iya nuna {{displayCount}} abubuwan farko daga wannan zaman ba.",
       "couldNotLoad": "An kasa ɗora tsofaffin saƙonnin.",
       "unavailable": "Tsofaffin saƙonnin ba su nan.",
       "tooLarge": "Tsofaffin saƙonnin sun yi girma da yawa don ɗorawa."
@@ -2069,10 +2082,12 @@
       "viewTable": "Duba tebur",
       "title": "Tebur",
       "close": "Rufe tebur",
-      "column": "shafi",
-      "columns": "shafuka",
-      "row": "jere",
-      "rows": "jeruka",
+      "columnCount_one": "shafi",
+      "columnCount": "shafuka",
+      "columnCount_other": "shafuka",
+      "rowCount_one": "jere",
+      "rowCount": "jeruka",
+      "rowCount_other": "jeruka",
       "opensFullScreen": "yana buɗe cikakken allo"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "daga {{window}} tokens",
       "tokens": "tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
-      "stepsCountOne": "{{steps}} mataki",
-      "stepsCountMany": "{{steps}} matakai",
+      "stepsCount_one": "{{steps}} mataki",
+      "stepsCount": "{{steps}} matakai",
+      "stepsCount_other": "{{steps}} matakai",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Sabon aikin shirye-shirye",
     "explore": "Bincika",
     "seeAll": "Duba duka",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Barka da safiya",
-    "greetingAfternoon": "Barka da rana",
-    "greetingEvening": "Barka da yamma"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Rufe {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Yana buɗe sarrafa Kilo Pass akan gidan yanar gizo.",
       "notSubscribed": "Ba a biyan kuɗi ba",
       "overallocated": "Ayyukan Pass sun wuce wuraren da aka biya",
-      "paidSeatOne": "{{count}} wuri da aka biya",
-      "paidSeatOther": "{{count}} wuraren da aka biya",
+      "paidSeat_one": "{{displayCount}} wuri da aka biya",
+      "paidSeat": "{{displayCount}} wuraren da aka biya",
+      "paidSeat_other": "{{displayCount}} wuraren da aka biya",
       "paymentNeedsAttention": "Biyan kuɗi yana buƙatar kulawa",
       "paymentPending": "Biyan kuɗi yana jiran",
       "processingBlocked": "An toshe sarrafawa",

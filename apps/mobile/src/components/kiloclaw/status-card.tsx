@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { formatDuration, formatNumber } from '@/lib/format';
 import { type GatewayState } from '@/lib/hooks/use-kiloclaw-queries';
 
 type StatusCardProps = {
@@ -27,18 +28,6 @@ type StatusCardProps = {
   lastExitSignal: string | null | undefined;
   activeModel?: string;
 };
-
-function formatUptime(seconds: number): string {
-  if (seconds < 60) {
-    return `${String(seconds)}s`;
-  }
-  if (seconds < 3600) {
-    return `${String(Math.floor(seconds / 60))}m`;
-  }
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  return `${String(h)}h ${String(m)}m`;
-}
 
 function formatLastExit(
   exitCode: number | null | undefined,
@@ -63,12 +52,14 @@ export function StatusCard({
   activeModel,
 }: Readonly<StatusCardProps>) {
   const { t } = useTranslation();
-  const memoryLabel = memoryMb ? `${(memoryMb / 1024).toFixed(0)} GB` : '—';
-  const cpuLabel = cpus ? `${String(cpus)} vCPU` : '—';
+  const memoryLabel = memoryMb
+    ? `${formatNumber(memoryMb / 1024, i18n.language, { maximumFractionDigits: 0 })} GB`
+    : '—';
+  const cpuLabel = cpus ? `${formatNumber(cpus, i18n.language)} vCPU` : '—';
   const lastExitLabel = formatLastExit(lastExitCode, lastExitSignal);
   const gatewayLabel = gatewayState ?? '—';
-  const uptimeLabel = uptime == null ? '—' : formatUptime(uptime);
-  const restartsLabel = restarts == null ? '—' : String(restarts);
+  const uptimeLabel = uptime == null ? '—' : formatDuration(uptime, i18n.language);
+  const restartsLabel = restarts == null ? '—' : formatNumber(restarts, i18n.language);
   const modelLabel = activeModel ?? '—';
 
   return (

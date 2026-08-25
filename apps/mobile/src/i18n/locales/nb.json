@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} av {{total}} filer lastet",
       "loadAllFiles": "Last alle filene",
       "loadAll": "Last alt",
-      "fileLoaded": "{{count}} fil lastet",
-      "filesLoaded": "{{count}} filer lastet",
-      "fileLoadedOfTotal": "{{count}} fil lastet av {{total}}",
-      "filesLoadedOfTotal": "{{count}} filer lastet av {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} fil lastet",
+      "fileLoadedCount": "{{displayCount}} filer lastet",
+      "fileLoadedCount_other": "{{displayCount}} filer lastet",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} fil lastet av {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} filer lastet av {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} filer lastet av {{total}}",
       "filesStillLoading": "Filer laster fortsatt. Dra ned for å oppdatere.",
       "goToOverview": "Gå til oversikt",
       "goToOverviewTab": "Gå til oversiktsfanen"
@@ -288,8 +290,9 @@
       "resolved": "Løst",
       "outdated": "Utdatert",
       "file": "Fil",
-      "oneComment": "1 kommentar",
-      "commentCount": "{{count}} kommentarer",
+      "comment_one": "1 kommentar",
+      "comment": "{{displayCount}} kommentarer",
+      "comment_other": "{{displayCount}} kommentarer",
       "startedRelative": " · startet {{relative}}",
       "couldNotLoadMore": "Kunne ikke laste flere kommentarer.",
       "retryLoadingMore": "Prøv å laste flere kommentarer igjen",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reaksjoner",
       "addReaction": "Legg til reaksjon",
       "reactionPill": "{{emoji}}-reaksjon, {{count}} {{countLabel}}",
-      "reactionSingular": "reaksjon",
-      "reactionPlural": "reaksjoner",
+      "reaction_one": "reaksjon",
+      "reaction": "reaksjoner",
+      "reaction_other": "reaksjoner",
       "commentActions": "Kommentarhandlinger",
       "reportContent": "Rapporter innhold",
       "reportUser": "Rapporter bruker",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Denne kommentaren fjernes fra anmeldelseskøen.",
       "delete": "Slett",
       "summaryOptional": "Sammendrag (valgfritt)",
-      "pendingCommentSingular": "ventende kommentar",
-      "pendingCommentPlural": "ventende kommentarer",
+      "pendingComment_one": "ventende kommentar",
+      "pendingComment": "ventende kommentarer",
+      "pendingComment_other": "ventende kommentarer",
       "submitCountOfTotal": "Send {{freshCount}} av {{totalCount}} kommentarer",
       "submitReview": "Send anmeldelse",
       "partialPostedMessage": "Publiserte {{freshCount}} kommentar(er). {{staleCount}} kommentar(er) peker på en eldre commit og ble i køen din."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Åpen · Anmeldelse kreves",
       "stateOpen": "Åpen",
       "unknownAuthor": "Ukjent forfatter",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "fil",
-      "filePlural": "filer"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "fil",
+      "file": "filer",
+      "file_other": "filer"
     },
     "pendingComment": {
       "editOutdatedA11y": "Rediger utdatert ventende kommentar på {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Noen",
-      "oneTyping": "{{name}} skriver...",
-      "manyTyping": "{{names}} skriver..."
+      "typing_one": "{{name}} skriver...",
+      "typing": "{{names}} skriver...",
+      "typing_other": "{{names}} skriver..."
     },
     "botStatus": {
       "online": "Pålogget",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Kunne ikke laste faktureringsinformasjon",
       "manageOnWeb": "Administrer fakturering på nettet",
       "commitPlan": "Bindende plan",
-      "daysLeft": "{{count}} dager igjen",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Den siste bindende perioden din slutter {{date}}. Fortsett som Standard til {{price}}, eller slutten på hosting.",
       "freeTrial": "Gratis prøveperiode",
       "hostingEnds": "Hosting slutter",
-      "oneDayLeft": "1 dag igjen",
       "renews": "Fornyes",
       "standardMonthToMonth": "Standard månedlig",
       "standardStartsOn": "Standard starter {{date}} til {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} trenger oppmerksomhet: {{label}}",
-      "openUnreadOne": "Åpne {{name}}, {{count}} ulest melding",
-      "openUnreadMany": "Åpne {{name}}, {{count}} uleste meldinger",
+      "openUnread_one": "Åpne {{name}}, {{displayCount}} ulest melding",
+      "openUnread": "Åpne {{name}}, {{displayCount}} uleste meldinger",
+      "openUnread_other": "Åpne {{name}}, {{displayCount}} uleste meldinger",
       "open": "Åpne {{name}}",
       "openSettings": "Åpne innstillinger for {{name}}",
       "fixOnKiloAi": "Fiks på kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Aktivere automatisk utbedring?",
       "enableAutoRemediationConfirmMessage": "Security Agent åpner utbedrings-PR-er automatisk for kvalifiserte utnyttbare funn.",
       "enable": "Aktiver",
-      "queuedOne": "{{count}} eksisterende funn satt i kø for analyse.",
-      "queuedMany": "{{count}} eksisterende funn satt i kø for analyse.",
+      "queued_one": "{{displayCount}} eksisterende funn satt i kø for analyse.",
+      "queued": "{{displayCount}} eksisterende funn satt i kø for analyse.",
+      "queued_other": "{{displayCount}} eksisterende funn satt i kø for analyse.",
       "severityCriticalOnly": "Bare kritiske",
       "severityHighAndAbove": "Høy og over",
       "severityMediumAndAbove": "Middels og over",
@@ -1482,8 +1490,9 @@
       "on": "På",
       "off": "Av",
       "allRepositories": "Alle repositories",
-      "repositorySelected": "{{count}} repository valgt",
-      "repositoriesSelected": "{{count}} repositories valgt",
+      "repositoriesCount_one": "{{displayCount}} repository valgt",
+      "repositoriesCount": "{{displayCount}} repositories valgt",
+      "repositoriesCount_other": "{{displayCount}} repositories valgt",
       "selectRepositories": "Velg repositories",
       "selectRepositoriesSubtitle": "Velg hvilke repositories Security Agent overvåker",
       "repositories": "Repositories",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Økt slettet",
       "needsInput": "trenger innspill",
       "fromPlatform": "fra {{platform}}",
-      "centOne": "cent",
-      "centOther": "cent",
-      "dollarOne": "dollar",
-      "dollarOther": "dollarer"
+      "cent_one": "cent",
+      "cent": "cent",
+      "cent_other": "cent",
+      "dollar_one": "dollar",
+      "dollar": "dollarer",
+      "dollar_other": "dollarer"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunne ikke åpne GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Kunne ikke forkaste utkastet. Prøv igjen."
     },
     "partRenderer": {
-      "updatedFile": "Oppdaterte {{count}} fil",
-      "updatedFiles": "Oppdaterte {{count}} filer"
+      "updatedFileCount_one": "Oppdaterte {{displayCount}} fil",
+      "updatedFileCount": "Oppdaterte {{displayCount}} filer",
+      "updatedFileCount_other": "Oppdaterte {{displayCount}} filer"
     },
     "toolPatch": {
       "operationAdded": "Lagt til",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Tidligere meldinger lastet inn",
       "retryHint": "Forsøker igjen å laste de eldre meldingene for denne økten.",
-      "omittedOne": "Noen tidligere elementer fra denne økten kunne ikke vises.",
-      "omittedMany": "{{count}} tidligere elementer fra denne økten kunne ikke vises.",
+      "omitted_one": "Noen tidligere elementer fra denne økten kunne ikke vises.",
+      "omitted": "{{displayCount}} tidligere elementer fra denne økten kunne ikke vises.",
+      "omitted_other": "{{displayCount}} tidligere elementer fra denne økten kunne ikke vises.",
       "couldNotLoad": "Kunne ikke laste tidligere meldinger.",
       "unavailable": "Tidligere meldinger er ikke tilgjengelige.",
       "tooLarge": "Tidligere meldinger er for store til å lastes."
@@ -2069,10 +2082,12 @@
       "viewTable": "Vis tabell",
       "title": "Tabell",
       "close": "Lukk tabell",
-      "column": "kolonne",
-      "columns": "kolonner",
-      "row": "rad",
-      "rows": "rader",
+      "columnCount_one": "kolonne",
+      "columnCount": "kolonner",
+      "columnCount_other": "kolonner",
+      "rowCount_one": "rad",
+      "rowCount": "rader",
+      "rowCount_other": "rader",
       "opensFullScreen": "åpnes i fullskjerm"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "av {{window}} tokens",
       "tokens": "tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
-      "stepsCountOne": "{{steps}} steg",
-      "stepsCountMany": "{{steps}} steg",
+      "stepsCount_one": "{{steps}} steg",
+      "stepsCount": "{{steps}} steg",
+      "stepsCount_other": "{{steps}} steg",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Ny kodeoppgave",
     "explore": "Utforsk",
     "seeAll": "Se alle",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "God morgen",
-    "greetingAfternoon": "God ettermiddag",
-    "greetingEvening": "God kveld"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Lukk {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Åpner Kilo Pass-administrasjon på nettet.",
       "notSubscribed": "Ikke abonnert",
       "overallocated": "Pass-tildelinger overstiger betalte plasser",
-      "paidSeatOne": "{{count}} betalt plass",
-      "paidSeatOther": "{{count}} betalte plasser",
+      "paidSeat_one": "{{displayCount}} betalt plass",
+      "paidSeat": "{{displayCount}} betalte plasser",
+      "paidSeat_other": "{{displayCount}} betalte plasser",
       "paymentNeedsAttention": "Betaling krever oppmerksomhet",
       "paymentPending": "Betaling venter",
       "processingBlocked": "Behandling blokkert",

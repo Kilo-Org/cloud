@@ -22,11 +22,11 @@ import {
 } from '@/lib/hooks/use-organization-queries';
 import { useOrganization } from '@/lib/organization-context';
 import { reconcileOrgDeepLink } from '@/lib/org-deep-link';
-import { cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
+import { capitalize, cn, firstNonEmpty, parseTimestamp } from '@/lib/utils';
 
 function humanizeCategory(category: string): string {
   const spaced = category.replaceAll('_', ' ');
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+  return capitalize(spaced);
 }
 
 function CreditRowSkeleton() {

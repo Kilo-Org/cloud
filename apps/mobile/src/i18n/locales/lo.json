@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "ໂຫຼດ {{loaded}} ຈາກ {{total}} ໄຟລ໌ແລ້ວ",
       "loadAllFiles": "ໂຫຼດໄຟລ໌ທັງໝົດ",
       "loadAll": "ໂຫຼດທັງໝົດ",
-      "fileLoaded": "ໂຫຼດ {{count}} ໄຟລ໌ແລ້ວ",
-      "filesLoaded": "ໂຫຼດ {{count}} ໄຟລ໌ແລ້ວ",
-      "fileLoadedOfTotal": "ໂຫຼດ {{count}} ໄຟລ໌ ຈາກ {{total}} ແລ້ວ",
-      "filesLoadedOfTotal": "ໂຫຼດ {{count}} ໄຟລ໌ ຈາກ {{total}} ແລ້ວ",
+      "fileLoadedCount_one": "ໂຫຼດ {{displayCount}} ໄຟລ໌ແລ້ວ",
+      "fileLoadedCount": "ໂຫຼດ {{displayCount}} ໄຟລ໌ແລ້ວ",
+      "fileLoadedCount_other": "ໂຫຼດ {{displayCount}} ໄຟລ໌ແລ້ວ",
+      "fileLoadedOfTotalCount_one": "ໂຫຼດ {{displayCount}} ໄຟລ໌ ຈາກ {{total}} ແລ້ວ",
+      "fileLoadedOfTotalCount": "ໂຫຼດ {{displayCount}} ໄຟລ໌ ຈາກ {{total}} ແລ້ວ",
+      "fileLoadedOfTotalCount_other": "ໂຫຼດ {{displayCount}} ໄຟລ໌ ຈາກ {{total}} ແລ້ວ",
       "filesStillLoading": "ໄຟລ໌ຍັງກຳລັງໂຫຼດ. ດຶງເພື່ອໂຫຼດໃໝ່.",
       "goToOverview": "ໄປທີ່ພາບລວມ",
       "goToOverviewTab": "ໄປທີ່ແຖບພາບລວມ"
@@ -288,8 +290,9 @@
       "resolved": "ແກ້ໄຂແລ້ວ",
       "outdated": "ລ້າສະໄໝ",
       "file": "ໄຟລ໌",
-      "oneComment": "1 ຄຳເຫັນ",
-      "commentCount": "{{count}} ຄຳເຫັນ",
+      "comment_one": "1 ຄຳເຫັນ",
+      "comment": "{{displayCount}} ຄຳເຫັນ",
+      "comment_other": "{{displayCount}} ຄຳເຫັນ",
       "startedRelative": " · ເລີ່ມ {{relative}}",
       "couldNotLoadMore": "ບໍ່ສາມາດໂຫຼດຄຳເຫັນເພີ່ມເຕີມໄດ້.",
       "retryLoadingMore": "ລອງໂຫຼດຄຳເຫັນເພີ່ມເຕີມອີກຄັ້ງ",
@@ -299,8 +302,9 @@
       "reactionsTitle": "ຣີແອກຊັນ",
       "addReaction": "ເພີ່ມຣີແອກຊັນ",
       "reactionPill": "{{emoji}} ຣີແອກຊັນ, {{count}} {{countLabel}}",
-      "reactionSingular": "ຣີແອກຊັນ",
-      "reactionPlural": "ຣີແອກຊັນ",
+      "reaction_one": "ຣີແອກຊັນ",
+      "reaction": "ຣີແອກຊັນ",
+      "reaction_other": "ຣີແອກຊັນ",
       "commentActions": "ການກະທຳຄຳເຫັນ",
       "reportContent": "ລາຍງານເນື້ອຫາ",
       "reportUser": "ລາຍງານຜູ້ໃຊ້",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "ຄຳເຫັນນີ້ຈະຖືກລຶບອອກຈາກຄິວການກວດສອບ.",
       "delete": "ລຶບ",
       "summaryOptional": "ສະຫຼຸບ (ທາງເລືອກ)",
-      "pendingCommentSingular": "ຄຳເຫັນທີ່ລໍຖ້າ",
-      "pendingCommentPlural": "ຄຳເຫັນທີ່ລໍຖ້າ",
+      "pendingComment_one": "ຄຳເຫັນທີ່ລໍຖ້າ",
+      "pendingComment": "ຄຳເຫັນທີ່ລໍຖ້າ",
+      "pendingComment_other": "ຄຳເຫັນທີ່ລໍຖ້າ",
       "submitCountOfTotal": "ສົ່ງ {{freshCount}} ຈາກ {{totalCount}} ຄຳເຫັນ",
       "submitReview": "ສົ່ງການກວດສອບ",
       "partialPostedMessage": "ໂພສ {{freshCount}} ຄຳເຫັນ. {{staleCount}} ຄຳເຫັນຊີ້ບອກໃສ່ commit ທີ່ເກົ່າກວ່າ ແລະ ຍັງຄົງຢູ່ໃນຄິວຂອງທ່ານ."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "ເປີດ · ຕ້ອງການການກວດສອບ",
       "stateOpen": "ເປີດ",
       "unknownAuthor": "ຜູ້ຂຽນບໍ່ຮູ້ຈັກ",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "ໄຟລ໌",
-      "filePlural": "ໄຟລ໌"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "ໄຟລ໌",
+      "file": "ໄຟລ໌",
+      "file_other": "ໄຟລ໌"
     },
     "pendingComment": {
       "editOutdatedA11y": "ແກ້ໄຂຄຳເຫັນທີ່ລໍຖ້າທີ່ລ້າສະໄໝໃສ່ {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "ບາງຄົນ",
-      "oneTyping": "{{name}} ກຳລັງພິມ...",
-      "manyTyping": "{{names}} ກຳລັງພິມ..."
+      "typing_one": "{{name}} ກຳລັງພິມ...",
+      "typing": "{{names}} ກຳລັງພິມ...",
+      "typing_other": "{{names}} ກຳລັງພິມ..."
     },
     "botStatus": {
       "online": "ອອນໄລນ໌",
@@ -722,12 +730,10 @@
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດຂໍ້ມູນການອອກບິນ",
       "manageOnWeb": "ຈັດການການອອກບິນເທິງເວັບ",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} ມື້ເຫຼືອ",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "ຮອບ Commit ສຸດທ້າຍຂອງທ່ານສິ້ນສຸດໃນ {{date}}. ສືບຕໍ່ເປັນ Standard ໃນລາຄາ {{price}}, ຫຼືການໂຮສຕິ້ງຈະສິ້ນສຸດ.",
       "freeTrial": "ທົດລອງໃຊ້ຟຣີ",
       "hostingEnds": "ການໂຮສຕິ້ງສິ້ນສຸດ",
-      "oneDayLeft": "1 ມື້ເຫຼືອ",
       "renews": "ຕໍ່ອາຍຸ",
       "standardMonthToMonth": "Standard ລາຍເດືອນ",
       "standardStartsOn": "Standard ເລີ່ມໃນ {{date}} ໃນລາຄາ {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} ຕ້ອງການຄວາມເອົາໃຈໃສ່: {{label}}",
-      "openUnreadOne": "ເປີດ {{name}}, {{count}} ຂໍ້ຄວາມທີ່ຍັງບໍ່ໄດ້ອ່ານ",
-      "openUnreadMany": "ເປີດ {{name}}, {{count}} ຂໍ້ຄວາມທີ່ຍັງບໍ່ໄດ້ອ່ານ",
+      "openUnread_one": "ເປີດ {{name}}, {{displayCount}} ຂໍ້ຄວາມທີ່ຍັງບໍ່ໄດ້ອ່ານ",
+      "openUnread": "ເປີດ {{name}}, {{displayCount}} ຂໍ້ຄວາມທີ່ຍັງບໍ່ໄດ້ອ່ານ",
+      "openUnread_other": "ເປີດ {{name}}, {{displayCount}} ຂໍ້ຄວາມທີ່ຍັງບໍ່ໄດ້ອ່ານ",
       "open": "ເປີດ {{name}}",
       "openSettings": "ເປີດການຕັ້ງຄ່າສຳລັບ {{name}}",
       "fixOnKiloAi": "ແກ້ໄຂເທິງ kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "ເປີດການແກ້ໄຂອັດຕະໂນມັດ?",
       "enableAutoRemediationConfirmMessage": "Security Agent ຈະເປີດ PRs ການແກ້ໄຂອັດຕະໂນມັດສຳລັບການພົບທີ່ສາມາດໃຊ້ປະໂຫຍດໄດ້ທີ່ເໝາະສົມ.",
       "enable": "ເປີດ",
-      "queuedOne": "{{count}} ການກວດພົບທີ່ມີຢູ່ແລ້ວຖືກເຂົ້າຄິວເພື່ອວິເຄາະ.",
-      "queuedMany": "{{count}} ການກວດພົບທີ່ມີຢູ່ແລ້ວຖືກເຂົ້າຄິວເພື່ອວິເຄາະ.",
+      "queued_one": "{{displayCount}} ການກວດພົບທີ່ມີຢູ່ແລ້ວຖືກເຂົ້າຄິວເພື່ອວິເຄາະ.",
+      "queued": "{{displayCount}} ການກວດພົບທີ່ມີຢູ່ແລ້ວຖືກເຂົ້າຄິວເພື່ອວິເຄາະ.",
+      "queued_other": "{{displayCount}} ການກວດພົບທີ່ມີຢູ່ແລ້ວຖືກເຂົ້າຄິວເພື່ອວິເຄາະ.",
       "severityCriticalOnly": "ຮ້າຍແຮງພຽງຢ່າງດຽວ",
       "severityHighAndAbove": "ສູງຂຶ້ນໄປ",
       "severityMediumAndAbove": "ປານກາງຂຶ້ນໄປ",
@@ -1482,8 +1490,9 @@
       "on": "ເປີດ",
       "off": "ປິດ",
       "allRepositories": "ທຸກບ່ອນເກັບລະຫັດ",
-      "repositorySelected": "{{count}} ບ່ອນເກັບລະຫັດທີ່ເລືອກ",
-      "repositoriesSelected": "{{count}} ບ່ອນເກັບລະຫັດທີ່ເລືອກ",
+      "repositoriesCount_one": "{{displayCount}} ບ່ອນເກັບລະຫັດທີ່ເລືອກ",
+      "repositoriesCount": "{{displayCount}} ບ່ອນເກັບລະຫັດທີ່ເລືອກ",
+      "repositoriesCount_other": "{{displayCount}} ບ່ອນເກັບລະຫັດທີ່ເລືອກ",
       "selectRepositories": "ເລືອກບ່ອນເກັບລະຫັດ",
       "selectRepositoriesSubtitle": "ເລືອກວ່າບ່ອນເກັບລະຫັດໃດທີ່ Security Agent ຕິດຕາມ",
       "repositories": "ບ່ອນເກັບລະຫັດ",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "ລຶບເຊດຊັນແລ້ວ",
       "needsInput": "ຕ້ອງການຂໍ້ມູນເຂົ້າ",
       "fromPlatform": "ຈາກ {{platform}}",
-      "centOne": "ເຊັນ",
-      "centOther": "ເຊັນ",
-      "dollarOne": "ໂດລາ",
-      "dollarOther": "ໂດລາ"
+      "cent_one": "ເຊັນ",
+      "cent": "ເຊັນ",
+      "cent_other": "ເຊັນ",
+      "dollar_one": "ໂດລາ",
+      "dollar": "ໂດລາ",
+      "dollar_other": "ໂດລາ"
     },
     "githubInstall": {
       "couldNotOpenTitle": "ບໍ່ສາມາດເປີດ GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "ບໍ່ສາມາດລະເລີຍຮ່າງ. ກະລຸນາລອງໃໝ່."
     },
     "partRenderer": {
-      "updatedFile": "ອັບເດດ {{count}} ໄຟລ໌",
-      "updatedFiles": "ອັບເດດ {{count}} ໄຟລ໌"
+      "updatedFileCount_one": "ອັບເດດ {{displayCount}} ໄຟລ໌",
+      "updatedFileCount": "ອັບເດດ {{displayCount}} ໄຟລ໌",
+      "updatedFileCount_other": "ອັບເດດ {{displayCount}} ໄຟລ໌"
     },
     "toolPatch": {
       "operationAdded": "ເພີ່ມ",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "ຂໍ້ຄວາມກ່ອນໜ້າໂຫລດແລ້ວ",
       "retryHint": "ພະຍາຍາມໂຫລດຂໍ້ຄວາມເກົ່າອີກສຳລັບເຊດຊັນນີ້.",
-      "omittedOne": "ບາງລາຍການກ່ອນໜ້າຈາກເຊດຊັນນີ້ບໍ່ສາມາດສະແດງໄດ້.",
-      "omittedMany": "{{count}} ລາຍການກ່ອນໜ້າຈາກເຊດຊັນນີ້ບໍ່ສາມາດສະແດງໄດ້.",
+      "omitted_one": "ບາງລາຍການກ່ອນໜ້າຈາກເຊດຊັນນີ້ບໍ່ສາມາດສະແດງໄດ້.",
+      "omitted": "{{displayCount}} ລາຍການກ່ອນໜ້າຈາກເຊດຊັນນີ້ບໍ່ສາມາດສະແດງໄດ້.",
+      "omitted_other": "{{displayCount}} ລາຍການກ່ອນໜ້າຈາກເຊດຊັນນີ້ບໍ່ສາມາດສະແດງໄດ້.",
       "couldNotLoad": "ບໍ່ສາມາດໂຫລດຂໍ້ຄວາມກ່ອນໜ້າ.",
       "unavailable": "ຂໍ້ຄວາມກ່ອນໜ້າບໍ່ມີ.",
       "tooLarge": "ຂໍ້ຄວາມກ່ອນໜ້າໃຫຍ່ເກີນໄປທີ່ຈະໂຫລດ."
@@ -2069,10 +2082,12 @@
       "viewTable": "ເບິ່ງຕາຕະລາງ",
       "title": "ຕາຕະລາງ",
       "close": "ປິດຕາຕະລາງ",
-      "column": "ຖັນ",
-      "columns": "ຖັນ",
-      "row": "ແຖວ",
-      "rows": "ແຖວ",
+      "columnCount_one": "ຖັນ",
+      "columnCount": "ຖັນ",
+      "columnCount_other": "ຖັນ",
+      "rowCount_one": "ແຖວ",
+      "rowCount": "ແຖວ",
+      "rowCount_other": "ແຖວ",
       "opensFullScreen": "ເປີດແບບເຕັມຈໍ"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "ຈາກ {{window}} tokens",
       "tokens": "tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
-      "stepsCountOne": "{{steps}} ຂັ້ນຕອນ",
-      "stepsCountMany": "{{steps}} ຂັ້ນຕອນ",
+      "stepsCount_one": "{{steps}} ຂັ້ນຕອນ",
+      "stepsCount": "{{steps}} ຂັ້ນຕອນ",
+      "stepsCount_other": "{{steps}} ຂັ້ນຕອນ",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "ວຽກການຂຽນໂຄ້ດໃໝ່",
     "explore": "ສຳຫຼວດ",
     "seeAll": "ເບິ່ງທັງໝົດ",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "ສະບາຍດີຕອນເຊົ້າ",
-    "greetingAfternoon": "ສະບາຍດີຕອນບ່າຍ",
-    "greetingEvening": "ສະບາຍດີຕອນແລງ"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "ປິດ {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "ເປີດການຈັດການ Kilo Pass ເທິງເວັບ.",
       "notSubscribed": "ບໍ່ໄດ້ສະໝັກ",
       "overallocated": "ການມອບໝາຍ Pass ເກີນບ່ອນນັ່ງທີ່ຊຳລະ",
-      "paidSeatOne": "{{count}} ບ່ອນນັ່ງທີ່ຊຳລະ",
-      "paidSeatOther": "{{count}} ບ່ອນນັ່ງທີ່ຊຳລະ",
+      "paidSeat_one": "{{displayCount}} ບ່ອນນັ່ງທີ່ຊຳລະ",
+      "paidSeat": "{{displayCount}} ບ່ອນນັ່ງທີ່ຊຳລະ",
+      "paidSeat_other": "{{displayCount}} ບ່ອນນັ່ງທີ່ຊຳລະ",
       "paymentNeedsAttention": "ການຊຳລະຕ້ອງການຄວາມສົນໃຈ",
       "paymentPending": "ການຊຳລະກຳລັງລໍຖ້າ",
       "processingBlocked": "ການປະມວນຜົນຖືກບລັອກ",

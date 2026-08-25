@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{total}}-оос {{loaded}} файл ачаалагдсан",
       "loadAllFiles": "Бүх файлыг ачаалах",
       "loadAll": "Бүгдийг ачаалах",
-      "fileLoaded": "{{count}} файл ачаалагдсан",
-      "filesLoaded": "{{count}} файл ачаалагдсан",
-      "fileLoadedOfTotal": "{{total}}-оос {{count}} файл ачаалагдсан",
-      "filesLoadedOfTotal": "{{total}}-оос {{count}} файл ачаалагдсан",
+      "fileLoadedCount_one": "{{displayCount}} файл ачаалагдсан",
+      "fileLoadedCount": "{{displayCount}} файл ачаалагдсан",
+      "fileLoadedCount_other": "{{displayCount}} файл ачаалагдсан",
+      "fileLoadedOfTotalCount_one": "{{total}}-оос {{displayCount}} файл ачаалагдсан",
+      "fileLoadedOfTotalCount": "{{total}}-оос {{displayCount}} файл ачаалагдсан",
+      "fileLoadedOfTotalCount_other": "{{total}}-оос {{displayCount}} файл ачаалагдсан",
       "filesStillLoading": "Файлууд ачаалж байсаар байна. Сэргээхийн тулд доош татна уу.",
       "goToOverview": "Тойм руу орох",
       "goToOverviewTab": "Тойм таб руу орох"
@@ -288,8 +290,9 @@
       "resolved": "Шийдвэрлэсэн",
       "outdated": "Хуучирсан",
       "file": "Файл",
-      "oneComment": "1 сэтгэгдэл",
-      "commentCount": "{{count}} сэтгэгдэл",
+      "comment_one": "1 сэтгэгдэл",
+      "comment": "{{displayCount}} сэтгэгдэл",
+      "comment_other": "{{displayCount}} сэтгэгдэл",
       "startedRelative": " · эхэлсэн {{relative}}",
       "couldNotLoadMore": "Нэмэлт сэтгэгдлүүдийг ачаалах боломжгүй.",
       "retryLoadingMore": "Нэмэлт сэтгэгдлүүдийг ачаалахыг дахин оролдох",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Реакцууд",
       "addReaction": "Реакц нэмэх",
       "reactionPill": "{{emoji}} реакц, {{count}} {{countLabel}}",
-      "reactionSingular": "реакц",
-      "reactionPlural": "реакцууд",
+      "reaction_one": "реакц",
+      "reaction": "реакцууд",
+      "reaction_other": "реакцууд",
       "commentActions": "Сэтгэгдлийн үйлдлүүд",
       "reportContent": "Агуулгыг мэдээлэх",
       "reportUser": "Хэрэглэгчийг мэдээлэх",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Энэ сэтгэгдэл тоймын жагсаалтаас устах болно.",
       "delete": "Устгах",
       "summaryOptional": "Хураангуй (сонголтот)",
-      "pendingCommentSingular": "хүлээгдэж буй сэтгэгдэл",
-      "pendingCommentPlural": "хүлээгдэж буй сэтгэгдлүүд",
+      "pendingComment_one": "хүлээгдэж буй сэтгэгдэл",
+      "pendingComment": "хүлээгдэж буй сэтгэгдлүүд",
+      "pendingComment_other": "хүлээгдэж буй сэтгэгдлүүд",
       "submitCountOfTotal": "{{totalCount}} сэтгэгдлээс {{freshCount}} илгээх",
       "submitReview": "Тойм илгээх",
       "partialPostedMessage": "{{freshCount}} сэтгэгдэл илгээгдсэн. {{staleCount}} сэтгэгдэл хуучин commit-ыг зааж, таны жагсаалтад үлдсэн."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Нээлттэй · Тойм шаардлагатай",
       "stateOpen": "Нээлттэй",
       "unknownAuthor": "Тодорхойгүй зохиолч",
-      "commitSingular": "commit",
-      "commitPlural": "commit",
-      "fileSingular": "файл",
-      "filePlural": "файл"
+      "commit_one": "commit",
+      "commit": "commit",
+      "commit_other": "commit",
+      "file_one": "файл",
+      "file": "файл",
+      "file_other": "файл"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} дээрх хуучирсан хүлээгдэж буй сэтгэгдлийг засах",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Хэн нэгэн",
-      "oneTyping": "{{name}} бичиж байна...",
-      "manyTyping": "{{names}} бичиж байна..."
+      "typing_one": "{{name}} бичиж байна...",
+      "typing": "{{names}} бичиж байна...",
+      "typing_other": "{{names}} бичиж байна..."
     },
     "botStatus": {
       "online": "Онлайн",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Төлбөрийн мэдээллийг ачаалж чадсангүй",
       "manageOnWeb": "Вэб дээр төлбөрийг удирдах",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} хоног үлдсэн",
       "earlybird": "Эрт шувуу",
       "finalCommitTermEndsOn": "Таны эцсийн Commit хугацаа {{date}} өдөр дуусна. Standard үнэ {{price}}-аар үргэлжлүүлэх, эсвэл хостинг дуусна.",
       "freeTrial": "Үнэгүй туршилт",
       "hostingEnds": "Хостинг дуусна",
-      "oneDayLeft": "1 хоног үлдсэн",
       "renews": "Сэргээгдэнэ",
       "standardMonthToMonth": "Стандарт сарын төлөв",
       "standardStartsOn": "Стандарт {{date}} өдөр {{price}} үнээр эхэлнэ.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} анхаарал шаардаж байна: {{label}}",
-      "openUnreadOne": "{{name}}-г нээх, {{count}} уншаагүй зурвас",
-      "openUnreadMany": "{{name}}-г нээх, {{count}} уншаагүй зурвас",
+      "openUnread_one": "{{name}}-г нээх, {{displayCount}} уншаагүй зурвас",
+      "openUnread": "{{name}}-г нээх, {{displayCount}} уншаагүй зурвас",
+      "openUnread_other": "{{name}}-г нээх, {{displayCount}} уншаагүй зурвас",
       "open": "{{name}}-г нээх",
       "openSettings": "{{name}}-ийн тохиргоог нээх",
       "fixOnKiloAi": "kilo.ai дээр засах: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Автомат засварыг идэвхжүүлэх үү?",
       "enableAutoRemediationConfirmMessage": "Аюулгүй байдлын агент тохиромжтой, ашиглах боломжтой олдворуудад засварын PR-уудыг автоматаар нээнэ.",
       "enable": "Идэвхжүүлэх",
-      "queuedOne": "Дүн шинжилгээнд дараалалд орсон {{count}} одоогийн олдвор.",
-      "queuedMany": "Дүн шинжилгээнд дараалалд орсон {{count}} одоогийн олдвор.",
+      "queued_one": "Дүн шинжилгээнд дараалалд орсон {{displayCount}} одоогийн олдвор.",
+      "queued": "Дүн шинжилгээнд дараалалд орсон {{displayCount}} одоогийн олдвор.",
+      "queued_other": "Дүн шинжилгээнд дараалалд орсон {{displayCount}} одоогийн олдвор.",
       "severityCriticalOnly": "Зөвхөн чухал",
       "severityHighAndAbove": "Өндөр ба түүнээс дээш",
       "severityMediumAndAbove": "Дунд ба түүнээс дээш",
@@ -1482,8 +1490,9 @@
       "on": "Асаалттай",
       "off": "Унтарсан",
       "allRepositories": "Бүх репозиториуд",
-      "repositorySelected": "{{count}} репозитори сонгогдсон",
-      "repositoriesSelected": "{{count}} репозитори сонгогдсон",
+      "repositoriesCount_one": "{{displayCount}} репозитори сонгогдсон",
+      "repositoriesCount": "{{displayCount}} репозитори сонгогдсон",
+      "repositoriesCount_other": "{{displayCount}} репозитори сонгогдсон",
       "selectRepositories": "Репозиториудыг сонгох",
       "selectRepositoriesSubtitle": "Security Agent аль репозиториудыг хянахыг сонгоно уу",
       "repositories": "Репозиториуд",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Сесс устгагдсан",
       "needsInput": "оролт шаардлагатай",
       "fromPlatform": "{{platform}}-аас",
-      "centOne": "цент",
-      "centOther": "цент",
-      "dollarOne": "доллар",
-      "dollarOther": "доллар"
+      "cent_one": "цент",
+      "cent": "цент",
+      "cent_other": "цент",
+      "dollar_one": "доллар",
+      "dollar": "доллар",
+      "dollar_other": "доллар"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ыг нээх боломжгүй",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Нооргийг хаях боломжгүй. Дахин оролдоно уу."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} файл шинэчлэгдсэн",
-      "updatedFiles": "{{count}} файл шинэчлэгдсэн"
+      "updatedFileCount_one": "{{displayCount}} файл шинэчлэгдсэн",
+      "updatedFileCount": "{{displayCount}} файл шинэчлэгдсэн",
+      "updatedFileCount_other": "{{displayCount}} файл шинэчлэгдсэн"
     },
     "toolPatch": {
       "operationAdded": "Нэмэгдсэн",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Өмнөх мэдээллүүд ачаалагдлаа",
       "retryHint": "Энэ сессийн хувьд өмнөх мэдээллийг ачааллыг дахин оролдоно.",
-      "omittedOne": "Энэ сессийн зарим өмнөх зүйлийг харуулах боломжгүй байлаа.",
-      "omittedMany": "Энэ сессийн {{count}} өмнөх зүйлийг харуулах боломжгүй байлаа.",
+      "omitted_one": "Энэ сессийн зарим өмнөх зүйлийг харуулах боломжгүй байлаа.",
+      "omitted": "Энэ сессийн {{displayCount}} өмнөх зүйлийг харуулах боломжгүй байлаа.",
+      "omitted_other": "Энэ сессийн {{displayCount}} өмнөх зүйлийг харуулах боломжгүй байлаа.",
       "couldNotLoad": "Өмнөх мэдээллийг ачаалж чадсангүй.",
       "unavailable": "Өмнөх мэдээллүүд боломжгүй.",
       "tooLarge": "Өмнөх мэдээллүүд ачаалахад хэт том байна."
@@ -2069,10 +2082,12 @@
       "viewTable": "Хүснэгт үзэх",
       "title": "Хүснэгт",
       "close": "Хүснэгтийг хаах",
-      "column": "багана",
-      "columns": "баганууд",
-      "row": "мөр",
-      "rows": "мөрүүд",
+      "columnCount_one": "багана",
+      "columnCount": "баганууд",
+      "columnCount_other": "баганууд",
+      "rowCount_one": "мөр",
+      "rowCount": "мөрүүд",
+      "rowCount_other": "мөрүүд",
       "opensFullScreen": "бүтэн дэлгэцээр нээгдэнэ"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} токеноос",
       "tokens": "токен",
       "tokensWithPercentage": "токен ({{percentage}})",
-      "stepsCountOne": "{{steps}} алхам",
-      "stepsCountMany": "{{steps}} алхам",
+      "stepsCount_one": "{{steps}} алхам",
+      "stepsCount": "{{steps}} алхам",
+      "stepsCount_other": "{{steps}} алхам",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Шинэ кодчилолын даалгавар",
     "explore": "Судлах",
     "seeAll": "Бүгдийг үзэх",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Өглөөний мэнд",
-    "greetingAfternoon": "Өдрийн мэнд",
-    "greetingEvening": "Оройн мэнд"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "{{filename}} хаах",
@@ -2645,8 +2658,9 @@
       "manageHint": "Вэб дээр Kilo Pass удирдлагыг нээнэ.",
       "notSubscribed": "Захиалгагүй",
       "overallocated": "Pass даалгаварууд төлсөн суудлаас хэтэрлээ",
-      "paidSeatOne": "{{count}} төлсөн суудал",
-      "paidSeatOther": "{{count}} төлсөн суудал",
+      "paidSeat_one": "{{displayCount}} төлсөн суудал",
+      "paidSeat": "{{displayCount}} төлсөн суудал",
+      "paidSeat_other": "{{displayCount}} төлсөн суудал",
       "paymentNeedsAttention": "Төлбөр анхаарал шаарддаг",
       "paymentPending": "Төлбөр хүлээгдэж байна",
       "processingBlocked": "Боловсруулалт хаагдсан",

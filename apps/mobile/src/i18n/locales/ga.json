@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} de {{total}} comhad lódáilte",
       "loadAllFiles": "Lódáil na comhaid go léir",
       "loadAll": "Lódáil go léir",
-      "fileLoaded": "{{count}} comhad lódáilte",
-      "filesLoaded": "{{count}} comhad lódáilte",
-      "fileLoadedOfTotal": "{{count}} comhad lódáilte de {{total}}",
-      "filesLoadedOfTotal": "{{count}} comhad lódáilte de {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} comhad lódáilte",
+      "fileLoadedCount": "{{displayCount}} comhad lódáilte",
+      "fileLoadedCount_other": "{{displayCount}} comhad lódáilte",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} comhad lódáilte de {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} comhad lódáilte de {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} comhad lódáilte de {{total}}",
       "filesStillLoading": "Tá na comhaid fós ag lódáil. Tarraing chun athnuachan a dhéanamh.",
       "goToOverview": "Téigh go dtí an Forléargas",
       "goToOverviewTab": "Téigh go dtí an táb Forléargais"
@@ -288,8 +290,9 @@
       "resolved": "Réitithe",
       "outdated": "Seanchaithe",
       "file": "Comhad",
-      "oneComment": "1 trácht",
-      "commentCount": "{{count}} trácht",
+      "comment_one": "1 trácht",
+      "comment": "{{displayCount}} trácht",
+      "comment_other": "{{displayCount}} trácht",
       "startedRelative": " · thosaigh {{relative}}",
       "couldNotLoadMore": "Níorbh fhéidir tuilleadh tráchtanna a lódáil.",
       "retryLoadingMore": "Bain triail as tuilleadh tráchtanna a lódáil arís",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Imoibriúcháin",
       "addReaction": "Cuir imoibriúchán leis",
       "reactionPill": "{{emoji}} imoibriúchán, {{count}} {{countLabel}}",
-      "reactionSingular": "imoibriúchán",
-      "reactionPlural": "imoibriúcháin",
+      "reaction_one": "imoibriúchán",
+      "reaction": "imoibriúcháin",
+      "reaction_other": "imoibriúcháin",
       "commentActions": "Gníomhartha tráchta",
       "reportContent": "Tuairiscigh ábhar",
       "reportUser": "Tuairiscigh úsáideoir",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Bainfear an trácht seo ón scuaine athbhreithnithe.",
       "delete": "Scrios",
       "summaryOptional": "Achoimre (roghnach)",
-      "pendingCommentSingular": "trácht ar feitheamh",
-      "pendingCommentPlural": "tráchtanna ar feitheamh",
+      "pendingComment_one": "trácht ar feitheamh",
+      "pendingComment": "tráchtanna ar feitheamh",
+      "pendingComment_other": "tráchtanna ar feitheamh",
       "submitCountOfTotal": "Seol {{freshCount}} de {{totalCount}} trácht",
       "submitReview": "Seol athbhreithniú",
       "partialPostedMessage": "Postáladh {{freshCount}} trácht(anna). Díríonn {{staleCount}} trácht(anna) ar thiomantas níos sine agus d'fhan siad i do scuaine."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Oscailte · Athbhreithniú riachtanach",
       "stateOpen": "Oscailte",
       "unknownAuthor": "Údar anaithnid",
-      "commitSingular": "tiomantas",
-      "commitPlural": "tiomantais",
-      "fileSingular": "comhad",
-      "filePlural": "comhaid"
+      "commit_one": "tiomantas",
+      "commit": "tiomantais",
+      "commit_other": "tiomantais",
+      "file_one": "comhad",
+      "file": "comhaid",
+      "file_other": "comhaid"
     },
     "pendingComment": {
       "editOutdatedA11y": "Cuir trácht seanchaithe ar feitheamh in eagar ar {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Duine éigin",
-      "oneTyping": "Tá {{name}} ag clóscríobh...",
-      "manyTyping": "Tá {{names}} ag clóscríobh..."
+      "typing_one": "Tá {{name}} ag clóscríobh...",
+      "typing": "Tá {{names}} ag clóscríobh...",
+      "typing_other": "Tá {{names}} ag clóscríobh..."
     },
     "botStatus": {
       "online": "Ar líne",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Níorbh fhéidir faisnéis bhilleála a lódáil",
       "manageOnWeb": "Bainistigh Billeáil ar an nGréasán",
       "commitPlan": "Tiomantas",
-      "daysLeft": "{{count}} lá fágtha",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Críochnaíonn do théarma Tiomantais dheiridh ar {{date}}. Lean ar aghaidh mar Chaighdeán ag {{price}}, nó críochnaíonn an t-óstáil.",
       "freeTrial": "Triail Saor in Aisce",
       "hostingEnds": "Críochnaíonn an t-óstáil",
-      "oneDayLeft": "1 lá fágtha",
       "renews": "Athnuaitear",
       "standardMonthToMonth": "Caighdeánach mí ar mhí",
       "standardStartsOn": "Tosóidh an Caighdeán ar {{date}} ag {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "Teastaíonn aird ar {{name}}: {{label}}",
-      "openUnreadOne": "Oscail {{name}}, {{count}} teachtaireacht gan léamh",
-      "openUnreadMany": "Oscail {{name}}, {{count}} teachtaireacht gan léamh",
+      "openUnread_one": "Oscail {{name}}, {{displayCount}} teachtaireacht gan léamh",
+      "openUnread": "Oscail {{name}}, {{displayCount}} teachtaireacht gan léamh",
+      "openUnread_other": "Oscail {{name}}, {{displayCount}} teachtaireacht gan léamh",
       "open": "Oscail {{name}}",
       "openSettings": "Oscail socruithe do {{name}}",
       "fixOnKiloAi": "Deisigh ar kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Cumasaigh uath-fheabhsú?",
       "enableAutoRemediationConfirmMessage": "Osclóidh Gníomhaire Slándála PRanna feabhais go huathoibríoch do thorthaí inshaothraithe cáilitheacha.",
       "enable": "Cumasaigh",
-      "queuedOne": "{{count}} fionnachtain atá ann cheana i scuaine le haghaidh anailíse.",
-      "queuedMany": "{{count}} fionnachtain atá ann cheana i scuaine le haghaidh anailíse.",
+      "queued_one": "{{displayCount}} fionnachtain atá ann cheana i scuaine le haghaidh anailíse.",
+      "queued": "{{displayCount}} fionnachtain atá ann cheana i scuaine le haghaidh anailíse.",
+      "queued_other": "{{displayCount}} fionnachtain atá ann cheana i scuaine le haghaidh anailíse.",
       "severityCriticalOnly": "Criticiúil amháin",
       "severityHighAndAbove": "Ard agus os a chionn",
       "severityMediumAndAbove": "Meánach agus os a chionn",
@@ -1482,8 +1490,9 @@
       "on": "Ar siúl",
       "off": "As",
       "allRepositories": "Gach stór",
-      "repositorySelected": "{{count}} stór roghnaithe",
-      "repositoriesSelected": "{{count}} stór roghnaithe",
+      "repositoriesCount_one": "{{displayCount}} stór roghnaithe",
+      "repositoriesCount": "{{displayCount}} stór roghnaithe",
+      "repositoriesCount_other": "{{displayCount}} stór roghnaithe",
       "selectRepositories": "Roghnaigh stórtha",
       "selectRepositoriesSubtitle": "Roghnaigh cé na stórtha a ndéanann Security Agent monatóireacht orthu",
       "repositories": "Stórtha",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Scriosadh an seisiún",
       "needsInput": "teastaíonn ionchur",
       "fromPlatform": "ó {{platform}}",
-      "centOne": "cent",
-      "centOther": "cent",
-      "dollarOne": "dollar",
-      "dollarOther": "dollar"
+      "cent_one": "cent",
+      "cent": "cent",
+      "cent_other": "cent",
+      "dollar_one": "dollar",
+      "dollar": "dollar",
+      "dollar_other": "dollar"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Níorbh fhéidir GitHub a oscailt",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Níorbh fhéidir an dréacht a chaitheamh ar lár. Bain triail as arís le do thoil."
     },
     "partRenderer": {
-      "updatedFile": "Nuashonraíodh {{count}} comhad",
-      "updatedFiles": "Nuashonraíodh {{count}} comhad"
+      "updatedFileCount_one": "Nuashonraíodh {{displayCount}} comhad",
+      "updatedFileCount": "Nuashonraíodh {{displayCount}} comhad",
+      "updatedFileCount_other": "Nuashonraíodh {{displayCount}} comhad"
     },
     "toolPatch": {
       "operationAdded": "Curtha leis",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Lódáladh teachtaireachtaí níos luaithe",
       "retryHint": "Déanann sé athiarracht ar lódáil na dteachtaireachtaí níos sine don seisiún seo.",
-      "omittedOne": "Níorbh fhéidir roinnt míreanna níos luaithe ón seisiún seo a thaispeáint.",
-      "omittedMany": "Níorbh fhéidir {{count}} mír níos luaithe ón seisiún seo a thaispeáint.",
+      "omitted_one": "Níorbh fhéidir roinnt míreanna níos luaithe ón seisiún seo a thaispeáint.",
+      "omitted": "Níorbh fhéidir {{displayCount}} mír níos luaithe ón seisiún seo a thaispeáint.",
+      "omitted_other": "Níorbh fhéidir {{displayCount}} mír níos luaithe ón seisiún seo a thaispeáint.",
       "couldNotLoad": "Níorbh fhéidir teachtaireachtaí níos luaithe a lódáil.",
       "unavailable": "Níl teachtaireachtaí níos luaithe ar fáil.",
       "tooLarge": "Tá teachtaireachtaí níos luaithe rómhór le lódáil."
@@ -2069,10 +2082,12 @@
       "viewTable": "Féach ar an tábla",
       "title": "Tábla",
       "close": "Dún an tábla",
-      "column": "colún",
-      "columns": "colúin",
-      "row": "ró",
-      "rows": "rónna",
+      "columnCount_one": "colún",
+      "columnCount": "colúin",
+      "columnCount_other": "colúin",
+      "rowCount_one": "ró",
+      "rowCount": "rónna",
+      "rowCount_other": "rónna",
       "opensFullScreen": "osclaíonn scáileán iomlán"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "de {{window}} thocain",
       "tokens": "tocain",
       "tokensWithPercentage": "tocain ({{percentage}})",
-      "stepsCountOne": "{{steps}} chéim",
-      "stepsCountMany": "{{steps}} céim",
+      "stepsCount_one": "{{steps}} chéim",
+      "stepsCount": "{{steps}} céim",
+      "stepsCount_other": "{{steps}} céim",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Tasc códaithe nua",
     "explore": "Taiscéal",
     "seeAll": "Féach ar gach ceann",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Maidin mhaith",
-    "greetingAfternoon": "Tráthnóna maith",
-    "greetingEvening": "Oíche mhaith"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Dún {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Osclaíonn bainistíocht Kilo Pass ar an ngréasán.",
       "notSubscribed": "Gan liostáil",
       "overallocated": "Sáraíonn sannacháin Pas suíocháin íoctha",
-      "paidSeatOne": "{{count}} shuíochán íoctha",
-      "paidSeatOther": "{{count}} suíochán íoctha",
+      "paidSeat_one": "{{displayCount}} shuíochán íoctha",
+      "paidSeat": "{{displayCount}} suíochán íoctha",
+      "paidSeat_other": "{{displayCount}} suíochán íoctha",
       "paymentNeedsAttention": "Teastaíonn aird ar an íocaíocht",
       "paymentPending": "Íocaíocht ar feitheamh",
       "processingBlocked": "Próiseáil blocáilte",

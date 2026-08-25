@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{loaded}} ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
       "loadAllFiles": "ಎಲ್ಲಾ ಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಿ",
       "loadAll": "ಎಲ್ಲವನ್ನೂ ಲೋಡ್ ಮಾಡಿ",
-      "fileLoaded": "{{count}} ಫೈಲ್ ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
-      "filesLoaded": "{{count}} ಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
-      "fileLoadedOfTotal": "{{total}} ರಲ್ಲಿ {{count}} ಫೈಲ್ ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
-      "filesLoadedOfTotal": "{{total}} ರಲ್ಲಿ {{count}} ಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
+      "fileLoadedCount_one": "{{displayCount}} ಫೈಲ್ ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
+      "fileLoadedCount": "{{displayCount}} ಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
+      "fileLoadedCount_other": "{{displayCount}} ಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
+      "fileLoadedOfTotalCount_one": "{{total}} ರಲ್ಲಿ {{displayCount}} ಫೈಲ್ ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
+      "fileLoadedOfTotalCount": "{{total}} ರಲ್ಲಿ {{displayCount}} ಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
+      "fileLoadedOfTotalCount_other": "{{total}} ರಲ್ಲಿ {{displayCount}} ಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
       "filesStillLoading": "ಫೈಲ್‌ಗಳು ಇನ್ನೂ ಲೋಡ್ ಆಗುತ್ತಿವೆ. ರಿಫ್ರೆಶ್ ಮಾಡಲು ಎಳೆಯಿರಿ.",
       "goToOverview": "ಅವಲೋಕನಕ್ಕೆ ಹೋಗಿ",
       "goToOverviewTab": "ಅವಲೋಕನ ಟ್ಯಾಬ್‌ಗೆ ಹೋಗಿ"
@@ -288,8 +290,9 @@
       "resolved": "ಪರಿಹರಿಸಲಾಗಿದೆ",
       "outdated": "ಹಳೆಯದಾಗಿದೆ",
       "file": "ಫೈಲ್",
-      "oneComment": "1 ಕಾಮೆಂಟ್",
-      "commentCount": "{{count}} ಕಾಮೆಂಟ್‌ಗಳು",
+      "comment_one": "1 ಕಾಮೆಂಟ್",
+      "comment": "{{displayCount}} ಕಾಮೆಂಟ್‌ಗಳು",
+      "comment_other": "{{displayCount}} ಕಾಮೆಂಟ್‌ಗಳು",
       "startedRelative": " · {{relative}} ರಂದು ಪ್ರಾರಂಭಿಸಲಾಗಿದೆ",
       "couldNotLoadMore": "ಹೆಚ್ಚಿನ ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "retryLoadingMore": "ಹೆಚ್ಚಿನ ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
@@ -299,8 +302,9 @@
       "reactionsTitle": "ಪ್ರತಿಕ್ರಿಯೆಗಳು",
       "addReaction": "ಪ್ರತಿಕ್ರಿಯೆ ಸೇರಿಸಿ",
       "reactionPill": "{{emoji}} ಪ್ರತಿಕ್ರಿಯೆ, {{count}} {{countLabel}}",
-      "reactionSingular": "ಪ್ರತಿಕ್ರಿಯೆ",
-      "reactionPlural": "ಪ್ರತಿಕ್ರಿಯೆಗಳು",
+      "reaction_one": "ಪ್ರತಿಕ್ರಿಯೆ",
+      "reaction": "ಪ್ರತಿಕ್ರಿಯೆಗಳು",
+      "reaction_other": "ಪ್ರತಿಕ್ರಿಯೆಗಳು",
       "commentActions": "ಕಾಮೆಂಟ್ ಕ್ರಿಯೆಗಳು",
       "reportContent": "ವಿಷಯ ವರದಿ ಮಾಡಿ",
       "reportUser": "ಬಳಕೆದಾರರನ್ನು ವರದಿ ಮಾಡಿ",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "ಈ ಕಾಮೆಂಟ್ ಅನ್ನು ವಿಮರ್ಶಾ ಕ್ಯೂನಿಂದ ತೆಗೆದುಹಾಕಲಾಗುತ್ತದೆ.",
       "delete": "ಅಳಿಸಿ",
       "summaryOptional": "ಸಾರಾಂಶ (ಐಚ್ಛಿಕ)",
-      "pendingCommentSingular": "ಬಾಕಿ ಕಾಮೆಂಟ್",
-      "pendingCommentPlural": "ಬಾಕಿ ಕಾಮೆಂಟ್‌ಗಳು",
+      "pendingComment_one": "ಬಾಕಿ ಕಾಮೆಂಟ್",
+      "pendingComment": "ಬಾಕಿ ಕಾಮೆಂಟ್‌ಗಳು",
+      "pendingComment_other": "ಬಾಕಿ ಕಾಮೆಂಟ್‌ಗಳು",
       "submitCountOfTotal": "{{totalCount}} ರಲ್ಲಿ {{freshCount}} ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಸಲ್ಲಿಸಿ",
       "submitReview": "ವಿಮರ್ಶೆ ಸಲ್ಲಿಸಿ",
       "partialPostedMessage": "{{freshCount}} ಕಾಮೆಂಟ್(ಗಳನ್ನು) ಪೋಸ್ಟ್ ಮಾಡಲಾಗಿದೆ. {{staleCount}} ಕಾಮೆಂಟ್(ಗಳು) ಹಳೆಯ ಕಮಿಟ್‌ನತ್ತ ತೋರಿಸುತ್ತವೆ ಮತ್ತು ನಿಮ್ಮ ಕ್ಯೂನಲ್ಲಿ ಉಳಿದಿವೆ."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "ಮುಕ್ತ · ವಿಮರ್ಶೆ ಅಗತ್ಯವಿದೆ",
       "stateOpen": "ಮುಕ್ತ",
       "unknownAuthor": "ಅಜ್ಞಾತ ಲೇಖಕ",
-      "commitSingular": "ಕಮಿಟ್",
-      "commitPlural": "ಕಮಿಟ್‌ಗಳು",
-      "fileSingular": "ಫೈಲ್",
-      "filePlural": "ಫೈಲ್‌ಗಳು"
+      "commit_one": "ಕಮಿಟ್",
+      "commit": "ಕಮಿಟ್‌ಗಳು",
+      "commit_other": "ಕಮಿಟ್‌ಗಳು",
+      "file_one": "ಫೈಲ್",
+      "file": "ಫೈಲ್‌ಗಳು",
+      "file_other": "ಫೈಲ್‌ಗಳು"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} ನಲ್ಲಿ ಹಳೆಯ ಬಾಕಿ ಕಾಮೆಂಟ್ ಸಂಪಾದಿಸಿ",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "ಯಾರೋ",
-      "oneTyping": "{{name}} ಟೈಪ್ ಮಾಡುತ್ತಿದ್ದಾರೆ...",
-      "manyTyping": "{{names}} ಟೈಪ್ ಮಾಡುತ್ತಿದ್ದಾರೆ..."
+      "typing_one": "{{name}} ಟೈಪ್ ಮಾಡುತ್ತಿದ್ದಾರೆ...",
+      "typing": "{{names}} ಟೈಪ್ ಮಾಡುತ್ತಿದ್ದಾರೆ...",
+      "typing_other": "{{names}} ಟೈಪ್ ಮಾಡುತ್ತಿದ್ದಾರೆ..."
     },
     "botStatus": {
       "online": "ಆನ್ಲೈನ್",
@@ -722,12 +730,10 @@
       "couldNotLoad": "ಬಿಲ್ಲಿಂಗ್ ಮಾಹಿತಿಯನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "manageOnWeb": "ವೆಬ್ನಲ್ಲಿ ಬಿಲ್ಲಿಂಗ್ ನಿರ್ವಹಿಸಿ",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} ದಿನಗಳು ಉಳಿದಿವೆ",
       "earlybird": "ಆರಂಭಿಕ",
       "finalCommitTermEndsOn": "ನಿಮ್ಮ ಅಂತಿಮ Commit ಅವಧಿ {{date}} ಕ್ಕೆ ಮುಗಿಯುತ್ತದೆ. {{price}} ಗೆ Standard ಆಗಿ ಮುಂದುವರಿಸಿ, ಇಲ್ಲವೇ ಹೋಸ್ಟಿಂಗ್ ಕೊನೆಗೊಳ್ಳುತ್ತದೆ.",
       "freeTrial": "ಉಚಿತ ಪ್ರಯೋಗ",
       "hostingEnds": "ಹೋಸ್ಟಿಂಗ್ ಮುಗಿಯುತ್ತದೆ",
-      "oneDayLeft": "1 ದಿನ ಉಳಿದಿದೆ",
       "renews": "ನವೀಕರಿಸುತ್ತದೆ",
       "standardMonthToMonth": "Standard ತಿಂಗಳಿಗೊಮ್ಮೆ",
       "standardStartsOn": "Standard {{date}} ರಂದು {{price}} ಗೆ ಪ್ರಾರಂಭವಾಗುತ್ತದೆ.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} ಗಮನ ಬೇಕು: {{label}}",
-      "openUnreadOne": "{{name}} ತೆರೆಯಿರಿ, {{count}} ಓದದ ಸಂದೇಶ",
-      "openUnreadMany": "{{name}} ತೆರೆಯಿರಿ, {{count}} ಓದದ ಸಂದೇಶಗಳು",
+      "openUnread_one": "{{name}} ತೆರೆಯಿರಿ, {{displayCount}} ಓದದ ಸಂದೇಶ",
+      "openUnread": "{{name}} ತೆರೆಯಿರಿ, {{displayCount}} ಓದದ ಸಂದೇಶಗಳು",
+      "openUnread_other": "{{name}} ತೆರೆಯಿರಿ, {{displayCount}} ಓದದ ಸಂದೇಶಗಳು",
       "open": "{{name}} ತೆರೆಯಿರಿ",
       "openSettings": "{{name}} ಗಾಗಿ ಸೆಟ್ಟಿಂಗ್ಗಳನ್ನು ತೆರೆಯಿರಿ",
       "fixOnKiloAi": "kilo.ai ನಲ್ಲಿ ಸರಿಪಡಿಸಿ: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "ಸ್ವಯಂ-ಪರಿಹಾರ ಸಕ್ರಿಯಗೊಳಿಸುವುದೇ?",
       "enableAutoRemediationConfirmMessage": "ಅರ್ಹವಾದ ದುರ್ಬಳಕೆ ಸಾಧ್ಯ ಸಂಶೋಧನೆಗಳಿಗೆ Security Agent ಪರಿಹಾರ PR ಗಳನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ತೆರೆಯುತ್ತದೆ.",
       "enable": "ಸಕ್ರಿಯಗೊಳಿಸಿ",
-      "queuedOne": "{{count}} ಅಸ್ತಿತ್ವದಲ್ಲಿರುವ ಸಂಶೋಧನೆಯನ್ನು ವಿಶ್ಲೇಷಣೆಗೆ ಸೇರಿಸಲಾಗಿದೆ.",
-      "queuedMany": "{{count}} ಅಸ್ತಿತ್ವದಲ್ಲಿರುವ ಸಂಶೋಧನೆಗಳನ್ನು ವಿಶ್ಲೇಷಣೆಗೆ ಸೇರಿಸಲಾಗಿದೆ.",
+      "queued_one": "{{displayCount}} ಅಸ್ತಿತ್ವದಲ್ಲಿರುವ ಸಂಶೋಧನೆಯನ್ನು ವಿಶ್ಲೇಷಣೆಗೆ ಸೇರಿಸಲಾಗಿದೆ.",
+      "queued": "{{displayCount}} ಅಸ್ತಿತ್ವದಲ್ಲಿರುವ ಸಂಶೋಧನೆಗಳನ್ನು ವಿಶ್ಲೇಷಣೆಗೆ ಸೇರಿಸಲಾಗಿದೆ.",
+      "queued_other": "{{displayCount}} ಅಸ್ತಿತ್ವದಲ್ಲಿರುವ ಸಂಶೋಧನೆಗಳನ್ನು ವಿಶ್ಲೇಷಣೆಗೆ ಸೇರಿಸಲಾಗಿದೆ.",
       "severityCriticalOnly": "ಗಂಭೀರವಾದವು ಮಾತ್ರ",
       "severityHighAndAbove": "ಹೆಚ್ಚಿನ ಮತ್ತು ಅದಕ್ಕಿಂತ ಹೆಚ್ಚು",
       "severityMediumAndAbove": "ಮಧ್ಯಮ ಮತ್ತು ಅದಕ್ಕಿಂತ ಹೆಚ್ಚು",
@@ -1482,8 +1490,9 @@
       "on": "ಆನ್",
       "off": "ಆಫ್",
       "allRepositories": "ಎಲ್ಲಾ ರೆಪೊಸಿಟರಿಗಳು",
-      "repositorySelected": "{{count}} ರೆಪೊಸಿಟರಿ ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
-      "repositoriesSelected": "{{count}} ರೆಪೊಸಿಟರಿಗಳು ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
+      "repositoriesCount_one": "{{displayCount}} ರೆಪೊಸಿಟರಿ ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
+      "repositoriesCount": "{{displayCount}} ರೆಪೊಸಿಟರಿಗಳು ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
+      "repositoriesCount_other": "{{displayCount}} ರೆಪೊಸಿಟರಿಗಳು ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
       "selectRepositories": "ರೆಪೊಸಿಟರಿಗಳನ್ನು ಆಯ್ಕೆ ಮಾಡಿ",
       "selectRepositoriesSubtitle": "Security Agent ಯಾವ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಮೇಲ್ವಿಚಾರಣೆ ಮಾಡುತ್ತದೆ ಎಂಬುದನ್ನು ಆಯ್ಕೆ ಮಾಡಿ",
       "repositories": "ರೆಪೊಸಿಟರಿಗಳು",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "ಸೆಶನ್ ಅಳಿಸಲಾಗಿದೆ",
       "needsInput": "ಇನ್ಪುಟ್ ಅಗತ್ಯವಿದೆ",
       "fromPlatform": "{{platform}} ನಿಂದ",
-      "centOne": "ಸೆಂಟ್",
-      "centOther": "ಸೆಂಟ್ಗಳು",
-      "dollarOne": "ಡಾಲರ್",
-      "dollarOther": "ಡಾಲರ್ಗಳು"
+      "cent_one": "ಸೆಂಟ್",
+      "cent": "ಸೆಂಟ್ಗಳು",
+      "cent_other": "ಸೆಂಟ್ಗಳು",
+      "dollar_one": "ಡಾಲರ್",
+      "dollar": "ಡಾಲರ್ಗಳು",
+      "dollar_other": "ಡಾಲರ್ಗಳು"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
@@ -1817,8 +1828,9 @@
       "discardFailed": "ಡ್ರಾಫ್ಟ್ ತೆಗೆದುಹಾಕಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} ಫೈಲ್ ನವೀಕರಿಸಲಾಗಿದೆ",
-      "updatedFiles": "{{count}} ಫೈಲ್ಗಳು ನವೀಕರಿಸಲಾಗಿದೆ"
+      "updatedFileCount_one": "{{displayCount}} ಫೈಲ್ ನವೀಕರಿಸಲಾಗಿದೆ",
+      "updatedFileCount": "{{displayCount}} ಫೈಲ್ಗಳು ನವೀಕರಿಸಲಾಗಿದೆ",
+      "updatedFileCount_other": "{{displayCount}} ಫೈಲ್ಗಳು ನವೀಕರಿಸಲಾಗಿದೆ"
     },
     "toolPatch": {
       "operationAdded": "ಸೇರಿಸಲಾಗಿದೆ",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "ಹಿಂದಿನ ಸಂದೇಶಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
       "retryHint": "ಈ ಸೆಷನ್ಗಾಗಿ ಹಳೆಯ ಸಂದೇಶಗಳ ಲೋಡ್ ಅನ್ನು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸುತ್ತದೆ.",
-      "omittedOne": "ಈ ಸೆಷನ್ನ ಕೆಲವು ಹಿಂದಿನ ಐಟಂಗಳನ್ನು ಪ್ರದರ್ಶಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "omittedMany": "ಈ ಸೆಷನ್ನ {{count}} ಹಿಂದಿನ ಐಟಂಗಳನ್ನು ಪ್ರದರ್ಶಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "omitted_one": "ಈ ಸೆಷನ್ನ ಕೆಲವು ಹಿಂದಿನ ಐಟಂಗಳನ್ನು ಪ್ರದರ್ಶಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "omitted": "ಈ ಸೆಷನ್ನ {{displayCount}} ಹಿಂದಿನ ಐಟಂಗಳನ್ನು ಪ್ರದರ್ಶಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "omitted_other": "ಈ ಸೆಷನ್ನ {{displayCount}} ಹಿಂದಿನ ಐಟಂಗಳನ್ನು ಪ್ರದರ್ಶಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotLoad": "ಹಿಂದಿನ ಸಂದೇಶಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "unavailable": "ಹಿಂದಿನ ಸಂದೇಶಗಳು ಲಭ್ಯವಿಲ್ಲ.",
       "tooLarge": "ಹಿಂದಿನ ಸಂದೇಶಗಳು ಲೋಡ್ ಮಾಡಲು ತುಂಬಾ ದೊಡ್ಡದಾಗಿವೆ."
@@ -2069,10 +2082,12 @@
       "viewTable": "ಟೇಬಲ್ ವೀಕ್ಷಿಸಿ",
       "title": "ಟೇಬಲ್",
       "close": "ಟೇಬಲ್ ಮುಚ್ಚಿ",
-      "column": "ಕಾಲಮ್",
-      "columns": "ಕಾಲಮ್ಗಳು",
-      "row": "ಸಾಲು",
-      "rows": "ಸಾಲುಗಳು",
+      "columnCount_one": "ಕಾಲಮ್",
+      "columnCount": "ಕಾಲಮ್ಗಳು",
+      "columnCount_other": "ಕಾಲಮ್ಗಳು",
+      "rowCount_one": "ಸಾಲು",
+      "rowCount": "ಸಾಲುಗಳು",
+      "rowCount_other": "ಸಾಲುಗಳು",
       "opensFullScreen": "ಪೂರ್ಣ ಸ್ಕ್ರೀನ್ ತೆರೆಯುತ್ತದೆ"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} ಟೋಕನ್‌ಗಳಲ್ಲಿ",
       "tokens": "ಟೋಕನ್‌ಗಳು",
       "tokensWithPercentage": "ಟೋಕನ್‌ಗಳು ({{percentage}})",
-      "stepsCountOne": "{{steps}} ಹಂತ",
-      "stepsCountMany": "{{steps}} ಹಂತಗಳು",
+      "stepsCount_one": "{{steps}} ಹಂತ",
+      "stepsCount": "{{steps}} ಹಂತಗಳು",
+      "stepsCount_other": "{{steps}} ಹಂತಗಳು",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "ಹೊಸ ಕೋಡಿಂಗ್ ಕಾರ್ಯ",
     "explore": "ಅನ್ವೇಷಿಸಿ",
     "seeAll": "ಎಲ್ಲವನ್ನೂ ನೋಡಿ",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "ಶುಭೋದಯ",
-    "greetingAfternoon": "ಶುಭ ಮಧ್ಯಾಹ್ನ",
-    "greetingEvening": "ಶುಭ ಸಂಜೆ"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "{{filename}} ಮುಚ್ಚಿ",
@@ -2645,8 +2658,9 @@
       "manageHint": "ವೆಬ್‌ನಲ್ಲಿ Kilo Pass ನಿರ್ವಹಣೆಯನ್ನು ತೆರೆಯುತ್ತದೆ.",
       "notSubscribed": "ಚಂದಾದಾರರಾಗಿಲ್ಲ",
       "overallocated": "ಪಾಸ್ ನಿಯೋಜನೆಗಳು ಪಾವತಿಸಿದ ಸೀಟ್‌ಗಳನ್ನು ಮೀರಿದೆ",
-      "paidSeatOne": "{{count}} ಪಾವತಿಸಿದ ಸೀಟ್",
-      "paidSeatOther": "{{count}} ಪಾವತಿಸಿದ ಸೀಟ್‌ಗಳು",
+      "paidSeat_one": "{{displayCount}} ಪಾವತಿಸಿದ ಸೀಟ್",
+      "paidSeat": "{{displayCount}} ಪಾವತಿಸಿದ ಸೀಟ್‌ಗಳು",
+      "paidSeat_other": "{{displayCount}} ಪಾವತಿಸಿದ ಸೀಟ್‌ಗಳು",
       "paymentNeedsAttention": "ಪಾವತಿಗೆ ಗಮನ ಬೇಕು",
       "paymentPending": "ಪಾವತಿ ಬಾಕಿ ಇದೆ",
       "processingBlocked": "ಸಂಸ್ಕರಣೆ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ",

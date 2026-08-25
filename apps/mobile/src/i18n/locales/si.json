@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "ගොනු {{total}} න් {{loaded}} පූරණය විය",
       "loadAllFiles": "සියලුම ගොනු පූරණය කරන්න",
       "loadAll": "සියල්ල පූරණය කරන්න",
-      "fileLoaded": "ගොනුව {{count}} පූරණය විය",
-      "filesLoaded": "ගොනු {{count}} පූරණය විය",
-      "fileLoadedOfTotal": "{{total}} න් ගොනුව {{count}} පූරණය විය",
-      "filesLoadedOfTotal": "{{total}} න් ගොනු {{count}} පූරණය විය",
+      "fileLoadedCount_one": "ගොනුව {{displayCount}} පූරණය විය",
+      "fileLoadedCount": "ගොනු {{displayCount}} පූරණය විය",
+      "fileLoadedCount_other": "ගොනු {{displayCount}} පූරණය විය",
+      "fileLoadedOfTotalCount_one": "{{total}} න් ගොනුව {{displayCount}} පූරණය විය",
+      "fileLoadedOfTotalCount": "{{total}} න් ගොනු {{displayCount}} පූරණය විය",
+      "fileLoadedOfTotalCount_other": "{{total}} න් ගොනු {{displayCount}} පූරණය විය",
       "filesStillLoading": "ගොනු තවමත් පූරණය වෙමින් පවතී. නැවුම් කිරීමට අදින්න.",
       "goToOverview": "දළ විශ්ලේෂණයට යන්න",
       "goToOverviewTab": "දළ විශ්ලේෂණ පටිත්තට යන්න"
@@ -288,8 +290,9 @@
       "resolved": "විසඳන ලදී",
       "outdated": "යල් පැන ගිය",
       "file": "ගොනුව",
-      "oneComment": "අදහස් 1 ක්",
-      "commentCount": "අදහස් {{count}} ක්",
+      "comment_one": "අදහස් 1 ක්",
+      "comment": "අදහස් {{displayCount}} ක්",
+      "comment_other": "අදහස් {{displayCount}} ක්",
       "startedRelative": " · {{relative}} සිට ආරම්භ විය",
       "couldNotLoadMore": "තවත් අදහස් පූරණය කිරීමට නොහැකි විය.",
       "retryLoadingMore": "තවත් අදහස් පූරණය නැවත උත්සාහ කරන්න",
@@ -299,8 +302,9 @@
       "reactionsTitle": "ප්‍රතික්‍රියා",
       "addReaction": "ප්‍රතික්‍රියාවක් එක් කරන්න",
       "reactionPill": "{{emoji}} ප්‍රතික්‍රියාව, {{count}} {{countLabel}}",
-      "reactionSingular": "ප්‍රතික්‍රියාව",
-      "reactionPlural": "ප්‍රතික්‍රියා",
+      "reaction_one": "ප්‍රතික්‍රියාව",
+      "reaction": "ප්‍රතික්‍රියා",
+      "reaction_other": "ප්‍රතික්‍රියා",
       "commentActions": "අදහස් ක්‍රියා",
       "reportContent": "අන්තර්ගතය වාර්තා කරන්න",
       "reportUser": "පරිශීලකයා වාර්තා කරන්න",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "මෙම අදහස සමාලෝචන පෝලිමෙන් ඉවත් කරනු ඇත.",
       "delete": "මකන්න",
       "summaryOptional": "සාරාංශය (විකල්ප)",
-      "pendingCommentSingular": "අත්හිටුවන ලද අදහස",
-      "pendingCommentPlural": "අත්හිටුවන ලද අදහස්",
+      "pendingComment_one": "අත්හිටුවන ලද අදහස",
+      "pendingComment": "අත්හිටුවන ලද අදහස්",
+      "pendingComment_other": "අත්හිටුවන ලද අදහස්",
       "submitCountOfTotal": "අදහස් {{totalCount}} න් {{freshCount}} ඉදිරිපත් කරන්න",
       "submitReview": "සමාලෝචනය ඉදිරිපත් කරන්න",
       "partialPostedMessage": "අදහස් {{freshCount}} ක් පළ කරන ලදී. අදහස් {{staleCount}} ක් පැරණි commit එකක් දෙස බලා ඔබේ පෝලිමේ රැඳී ඇත."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "විවෘත · සමාලෝචනය අවශ්‍යයි",
       "stateOpen": "විවෘත",
       "unknownAuthor": "නොදන්නා කතෘ",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "ගොනුව",
-      "filePlural": "ගොනු"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "ගොනුව",
+      "file": "ගොනු",
+      "file_other": "ගොනු"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} මත යල් පැන ගිය අත්හිටුවන ලද අදහස සංස්කරණය කරන්න",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "කෙනෙක්",
-      "oneTyping": "{{name}} ටයිප් කරමින්...",
-      "manyTyping": "{{names}} ටයිප් කරමින්..."
+      "typing_one": "{{name}} ටයිප් කරමින්...",
+      "typing": "{{names}} ටයිප් කරමින්...",
+      "typing_other": "{{names}} ටයිප් කරමින්..."
     },
     "botStatus": {
       "online": "මාර්ගගත",
@@ -722,12 +730,10 @@
       "couldNotLoad": "බිල්පත් තොරතුරු පූරණය කිරීමට නොහැකි විය",
       "manageOnWeb": "වෙබ් අඩවියේ බිල්පත් කළමනාකරණය කරන්න",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} දින ඉතිරියි",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "ඔබේ අවසන් Commit කාලය {{date}} දින අවසන් වේ. {{price}} මිලට Standard ලෙස දිගටම කරන්න, නැතහොත් hosting අවසන් වේ.",
       "freeTrial": "නොමිලේ අත්හදා බැලීම",
       "hostingEnds": "Hosting අවසන් වේ",
-      "oneDayLeft": "දින 1ක් ඉතිරියි",
       "renews": "අලුත් වේ",
       "standardMonthToMonth": "Standard මාසික",
       "standardStartsOn": "Standard {{date}} දින {{price}} මිලට ආරම්භ වේ.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} අවධානය අවශ්යයි: {{label}}",
-      "openUnreadOne": "{{name}} විවෘත කරන්න, {{count}} නොකියවූ පණිවිඩය",
-      "openUnreadMany": "{{name}} විවෘත කරන්න, {{count}} නොකියවූ පණිවිඩ",
+      "openUnread_one": "{{name}} විවෘත කරන්න, {{displayCount}} නොකියවූ පණිවිඩය",
+      "openUnread": "{{name}} විවෘත කරන්න, {{displayCount}} නොකියවූ පණිවිඩ",
+      "openUnread_other": "{{name}} විවෘත කරන්න, {{displayCount}} නොකියවූ පණිවිඩ",
       "open": "{{name}} විවෘත කරන්න",
       "openSettings": "{{name}} සඳහා සැකසුම් විවෘත කරන්න",
       "fixOnKiloAi": "kilo.ai හි විසඳන්න: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "ස්වයං-ප්රතිකර්මය සක්රීය කරන්නද?",
       "enableAutoRemediationConfirmMessage": "Security Agent සුදුසුකම් ලත් සූරාකෑමට හැකි සොයා ගැනීම් සඳහා ප්රතිකර්ම PR ස්වයංක්රීයව විවෘත කරයි.",
       "enable": "සක්රීය කරන්න",
-      "queuedOne": "{{count}} පවතින සොයාගැනීමක් විශ්ලේෂණය සඳහා පෝලිම් කර ඇත.",
-      "queuedMany": "{{count}} පවතින සොයාගැනීම් විශ්ලේෂණය සඳහා පෝලිම් කර ඇත.",
+      "queued_one": "{{displayCount}} පවතින සොයාගැනීමක් විශ්ලේෂණය සඳහා පෝලිම් කර ඇත.",
+      "queued": "{{displayCount}} පවතින සොයාගැනීම් විශ්ලේෂණය සඳහා පෝලිම් කර ඇත.",
+      "queued_other": "{{displayCount}} පවතින සොයාගැනීම් විශ්ලේෂණය සඳහා පෝලිම් කර ඇත.",
       "severityCriticalOnly": "Critical පමණයි",
       "severityHighAndAbove": "High සහ ඊට ඉහළ",
       "severityMediumAndAbove": "Medium සහ ඊට ඉහළ",
@@ -1482,8 +1490,9 @@
       "on": "ක්රියාත්මකයි",
       "off": "ක්රියා විරහිතයි",
       "allRepositories": "සියලු ගබඩා",
-      "repositorySelected": "{{count}} ගබඩාවක් තේරුවා",
-      "repositoriesSelected": "{{count}} ගබඩා තේරුවා",
+      "repositoriesCount_one": "{{displayCount}} ගබඩාවක් තේරුවා",
+      "repositoriesCount": "{{displayCount}} ගබඩා තේරුවා",
+      "repositoriesCount_other": "{{displayCount}} ගබඩා තේරුවා",
       "selectRepositories": "ගබඩා තෝරන්න",
       "selectRepositoriesSubtitle": "Security Agent නිරීක්ෂණය කරන ගබඩා මොනවාද යන්න තෝරන්න",
       "repositories": "ගබඩා",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "සැසිය මකා ඇත",
       "needsInput": "ආදානය අවශ්යයි",
       "fromPlatform": "{{platform}} වෙතින්",
-      "centOne": "ශත",
-      "centOther": "ශත",
-      "dollarOne": "ඩොලරය",
-      "dollarOther": "ඩොලර්"
+      "cent_one": "ශත",
+      "cent": "ශත",
+      "cent_other": "ශත",
+      "dollar_one": "ඩොලරය",
+      "dollar": "ඩොලර්",
+      "dollar_other": "ඩොලර්"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub විවෘත කළ නොහැක",
@@ -1817,8 +1828,9 @@
       "discardFailed": "කටු සටහන ඉවතලිය නොහැක. කරුණාකර නැවත උත්සාහ කරන්න."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} ගොනුවක් යාවත්කාලීන කර ඇත",
-      "updatedFiles": "{{count}} ගොනු යාවත්කාලීන කර ඇත"
+      "updatedFileCount_one": "{{displayCount}} ගොනුවක් යාවත්කාලීන කර ඇත",
+      "updatedFileCount": "{{displayCount}} ගොනු යාවත්කාලීන කර ඇත",
+      "updatedFileCount_other": "{{displayCount}} ගොනු යාවත්කාලීන කර ඇත"
     },
     "toolPatch": {
       "operationAdded": "එකතු කර ඇත",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "පෙර පණිවිඩ පූරණය විය",
       "retryHint": "මෙම සැසිය සඳහා පැරණි පණිවිඩ පූරණය නැවත උත්සාහ කරයි.",
-      "omittedOne": "මෙම සැසියෙන් සමහර පෙර අයිතම ප්‍රදර්ශනය කළ නොහැකි විය.",
-      "omittedMany": "මෙම සැසියෙන් පෙර අයිතම {{count}} ක් ප්‍රදර්ශනය කළ නොහැකි විය.",
+      "omitted_one": "මෙම සැසියෙන් සමහර පෙර අයිතම ප්‍රදර්ශනය කළ නොහැකි විය.",
+      "omitted": "මෙම සැසියෙන් පෙර අයිතම {{displayCount}} ක් ප්‍රදර්ශනය කළ නොහැකි විය.",
+      "omitted_other": "මෙම සැසියෙන් පෙර අයිතම {{displayCount}} ක් ප්‍රදර්ශනය කළ නොහැකි විය.",
       "couldNotLoad": "පෙර පණිවිඩ පූරණය කළ නොහැකි විය.",
       "unavailable": "පෙර පණිවිඩ ලබා ගත නොහැක.",
       "tooLarge": "පූරණය කිරීමට පෙර පණිවිඩ ඉතා විශාලය."
@@ -2069,10 +2082,12 @@
       "viewTable": "වගුව බලන්න",
       "title": "වගුව",
       "close": "වගුව වසන්න",
-      "column": "තීරුව",
-      "columns": "තීරු",
-      "row": "පේළිය",
-      "rows": "පේළි",
+      "columnCount_one": "තීරුව",
+      "columnCount": "තීරු",
+      "columnCount_other": "තීරු",
+      "rowCount_one": "පේළිය",
+      "rowCount": "පේළි",
+      "rowCount_other": "පේළි",
       "opensFullScreen": "සම්පූර්ණ තිරය විවෘත කරයි"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "ටෝකන {{window}} න්",
       "tokens": "ටෝකන",
       "tokensWithPercentage": "ටෝකන ({{percentage}})",
-      "stepsCountOne": "පියවර {{steps}} ක්",
-      "stepsCountMany": "පියවර {{steps}} ක්",
+      "stepsCount_one": "පියවර {{steps}} ක්",
+      "stepsCount": "පියවර {{steps}} ක්",
+      "stepsCount_other": "පියවර {{steps}} ක්",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "නව කේතීකරණ කාර්යය",
     "explore": "ගවේෂණය",
     "seeAll": "සියල්ල බලන්න",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "සුබ උදෑසනක්",
-    "greetingAfternoon": "සුබ දවාලක්",
-    "greetingEvening": "සුබ සැන්දෑවක්"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "{{filename}} වසන්න",
@@ -2645,8 +2658,9 @@
       "manageHint": "ජාලයේ Kilo Pass කළමනාකරණය විවෘත කරයි.",
       "notSubscribed": "දායක වී නොමැත",
       "overallocated": "Pass පැවරුම් ගෙවූ ආසන ඉක්මවයි",
-      "paidSeatOne": "ගෙවූ ආසනය {{count}} ක්",
-      "paidSeatOther": "ගෙවූ ආසන {{count}} ක්",
+      "paidSeat_one": "ගෙවූ ආසනය {{displayCount}} ක්",
+      "paidSeat": "ගෙවූ ආසන {{displayCount}} ක්",
+      "paidSeat_other": "ගෙවූ ආසන {{displayCount}} ක්",
       "paymentNeedsAttention": "ගෙවීමට අවධානය අවශ්‍යයි",
       "paymentPending": "ගෙවීම අපේක්ෂිතයි",
       "processingBlocked": "සැකසීම අවහිර විය",

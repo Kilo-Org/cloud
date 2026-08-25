@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} {{total}}-დან ფაილი ჩატვირთულია",
       "loadAllFiles": "ყველა ფაილის ჩატვირთვა",
       "loadAll": "ყველაფრის ჩატვირთვა",
-      "fileLoaded": "{{count}} ფაილი ჩატვირთულია",
-      "filesLoaded": "{{count}} ფაილი ჩატვირთულია",
-      "fileLoadedOfTotal": "{{count}} {{total}}-დან ფაილი ჩატვირთულია",
-      "filesLoadedOfTotal": "{{count}} {{total}}-დან ფაილი ჩატვირთულია",
+      "fileLoadedCount_one": "{{displayCount}} ფაილი ჩატვირთულია",
+      "fileLoadedCount": "{{displayCount}} ფაილი ჩატვირთულია",
+      "fileLoadedCount_other": "{{displayCount}} ფაილი ჩატვირთულია",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} {{total}}-დან ფაილი ჩატვირთულია",
+      "fileLoadedOfTotalCount": "{{displayCount}} {{total}}-დან ფაილი ჩატვირთულია",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} {{total}}-დან ფაილი ჩატვირთულია",
       "filesStillLoading": "ფაილები ჯერ კიდევ იტვირთება. ჩამოწიეთ გასანახლებლად.",
       "goToOverview": "გადადით მიმოხილვაზე",
       "goToOverviewTab": "გადადით მიმოხილვის ჩანართზე"
@@ -288,8 +290,9 @@
       "resolved": "გადაწყვეტილია",
       "outdated": "მოძველებულია",
       "file": "ფაილი",
-      "oneComment": "1 კომენტარი",
-      "commentCount": "{{count}} კომენტარი",
+      "comment_one": "1 კომენტარი",
+      "comment": "{{displayCount}} კომენტარი",
+      "comment_other": "{{displayCount}} კომენტარი",
       "startedRelative": " · დაიწყო {{relative}}",
       "couldNotLoadMore": "მეტი კომენტარის ჩატვირთვა ვერ მოხერხდა.",
       "retryLoadingMore": "მეტი კომენტარის ჩატვირთვის ხელახლა ცდა",
@@ -299,8 +302,9 @@
       "reactionsTitle": "რეაქციები",
       "addReaction": "რეაქციის დამატება",
       "reactionPill": "{{emoji}} რეაქცია, {{count}} {{countLabel}}",
-      "reactionSingular": "რეაქცია",
-      "reactionPlural": "რეაქცია",
+      "reaction_one": "რეაქცია",
+      "reaction": "რეაქცია",
+      "reaction_other": "რეაქცია",
       "commentActions": "კომენტარის მოქმედებები",
       "reportContent": "კონტენტის შეტყობინება",
       "reportUser": "მომხმარებლის შეტყობინება",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "ეს კომენტარი წაიშლება რეცენზიის რიგიდან.",
       "delete": "წაშლა",
       "summaryOptional": "შეჯამება (არჩევითი)",
-      "pendingCommentSingular": "მოლოდინის კომენტარი",
-      "pendingCommentPlural": "მოლოდინის კომენტარი",
+      "pendingComment_one": "მოლოდინის კომენტარი",
+      "pendingComment": "მოლოდინის კომენტარი",
+      "pendingComment_other": "მოლოდინის კომენტარი",
       "submitCountOfTotal": "{{freshCount}} {{totalCount}}-დან კომენტარის გაგზავნა",
       "submitReview": "რეცენზიის გაგზავნა",
       "partialPostedMessage": "გამოქვეყნდა {{freshCount}} კომენტარი. {{staleCount}} კომენტარი მიუთითებს ძველ commit-ზე და დარჩა თქვენს რიგში."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "ღია · რეცენზია საჭიროა",
       "stateOpen": "ღია",
       "unknownAuthor": "უცნობი ავტორი",
-      "commitSingular": "commit",
-      "commitPlural": "commit",
-      "fileSingular": "ფაილი",
-      "filePlural": "ფაილი"
+      "commit_one": "commit",
+      "commit": "commit",
+      "commit_other": "commit",
+      "file_one": "ფაილი",
+      "file": "ფაილი",
+      "file_other": "ფაილი"
     },
     "pendingComment": {
       "editOutdatedA11y": "მოძველებული მოლოდინის კომენტარის რედაქტირება {{location}}-ზე",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "ვიღაც",
-      "oneTyping": "{{name}} წერს...",
-      "manyTyping": "{{names}} წერენ..."
+      "typing_one": "{{name}} წერს...",
+      "typing": "{{names}} წერენ...",
+      "typing_other": "{{names}} წერენ..."
     },
     "botStatus": {
       "online": "ონლაინი",
@@ -722,12 +730,10 @@
       "couldNotLoad": "გადახდის ინფორმაციის ჩატვირთვა ვერ მოხერხდა",
       "manageOnWeb": "გადახდის მართვა ვებზე",
       "commitPlan": "ვალდებულება",
-      "daysLeft": "{{count}} დღე დარჩა",
       "earlybird": "ადრეული ფრინველი",
       "finalCommitTermEndsOn": "თქვენი საბოლოო ვალდებულების ვადა მთავრდება {{date}}. გაგრძელდება სტანდარტულად {{price}} ფასად, ან ჰოსტინგი დასრულდება.",
       "freeTrial": "უფასო საცდელი პერიოდი",
       "hostingEnds": "ჰოსტინგი მთავრდება",
-      "oneDayLeft": "1 დღე დარჩა",
       "renews": "განახლდება",
       "standardMonthToMonth": "სტანდარტული თვე-თვეზე",
       "standardStartsOn": "სტანდარტული იწყება {{date}} {{price}} ფასად.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}}-ს სჭირდება ყურადღება: {{label}}",
-      "openUnreadOne": "{{name}}-ის გახსნა, {{count}} წაუკითხავი შეტყობინება",
-      "openUnreadMany": "{{name}}-ის გახსნა, {{count}} წაუკითხავი შეტყობინება",
+      "openUnread_one": "{{name}}-ის გახსნა, {{displayCount}} წაუკითხავი შეტყობინება",
+      "openUnread": "{{name}}-ის გახსნა, {{displayCount}} წაუკითხავი შეტყობინება",
+      "openUnread_other": "{{name}}-ის გახსნა, {{displayCount}} წაუკითხავი შეტყობინება",
       "open": "{{name}}-ის გახსნა",
       "openSettings": "{{name}}-ის პარამეტრების გახსნა",
       "fixOnKiloAi": "შესწორება kilo.ai-ზე: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "ავტო-შესწორება ჩავრთოთ?",
       "enableAutoRemediationConfirmMessage": "უსაფრთხოების აგენტი ავტომატურად გახსნის შესწორების PR-ებს კვალიფიციური ექსპლუატირებადი დასკვნებისთვის.",
       "enable": "ჩართვა",
-      "queuedOne": "{{count}} არსებული მონაპოვარი შედგა ანალიზის რიგში.",
-      "queuedMany": "{{count}} არსებული მონაპოვარი შედგა ანალიზის რიგში.",
+      "queued_one": "{{displayCount}} არსებული მონაპოვარი შედგა ანალიზის რიგში.",
+      "queued": "{{displayCount}} არსებული მონაპოვარი შედგა ანალიზის რიგში.",
+      "queued_other": "{{displayCount}} არსებული მონაპოვარი შედგა ანალიზის რიგში.",
       "severityCriticalOnly": "მხოლოდ კრიტიკული",
       "severityHighAndAbove": "მაღალი და ზემოთ",
       "severityMediumAndAbove": "საშუალო და ზემოთ",
@@ -1482,8 +1490,9 @@
       "on": "ჩართულია",
       "off": "გამორთულია",
       "allRepositories": "ყველა რეპოზიტორი",
-      "repositorySelected": "არჩეულია {{count}} რეპოზიტორი",
-      "repositoriesSelected": "არჩეულია {{count}} რეპოზიტორი",
+      "repositoriesCount_one": "არჩეულია {{displayCount}} რეპოზიტორი",
+      "repositoriesCount": "არჩეულია {{displayCount}} რეპოზიტორი",
+      "repositoriesCount_other": "არჩეულია {{displayCount}} რეპოზიტორი",
       "selectRepositories": "რეპოზიტორების არჩევა",
       "selectRepositoriesSubtitle": "აირჩიეთ რომელ რეპოზიტორებს აკონტროლებს Security Agent",
       "repositories": "რეპოზიტორები",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "სესია წაიშალა",
       "needsInput": "მოითხოვს შეყვანას",
       "fromPlatform": "{{platform}}-დან",
-      "centOne": "ცენტი",
-      "centOther": "ცენტი",
-      "dollarOne": "დოლარი",
-      "dollarOther": "დოლარი"
+      "cent_one": "ცენტი",
+      "cent": "ცენტი",
+      "cent_other": "ცენტი",
+      "dollar_one": "დოლარი",
+      "dollar": "დოლარი",
+      "dollar_other": "დოლარი"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ის გახსნა ვერ მოხერხდა",
@@ -1817,8 +1828,9 @@
       "discardFailed": "დრაფტის გაუქმება ვერ მოხერხდა. გთხოვთ, სცადეთ ხელახლა."
     },
     "partRenderer": {
-      "updatedFile": "განახლდა {{count}} ფაილი",
-      "updatedFiles": "განახლდა {{count}} ფაილი"
+      "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი",
+      "updatedFileCount": "განახლდა {{displayCount}} ფაილი",
+      "updatedFileCount_other": "განახლდა {{displayCount}} ფაილი"
     },
     "toolPatch": {
       "operationAdded": "დამატებულია",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "ადრინდელი შეტყობინებები ჩაიტვირთა",
       "retryHint": "ხელახლა ცდის ადრინდელი შეტყობინებების ჩატვირთვას ამ სესიისთვის.",
-      "omittedOne": "ამ სესიის ზოგიერთი ადრინდელი ელემენტის ჩვენება ვერ მოხერხდა.",
-      "omittedMany": "ამ სესიის {{count}} ადრინდელი ელემენტის ჩვენება ვერ მოხერხდა.",
+      "omitted_one": "ამ სესიის ზოგიერთი ადრინდელი ელემენტის ჩვენება ვერ მოხერხდა.",
+      "omitted": "ამ სესიის {{displayCount}} ადრინდელი ელემენტის ჩვენება ვერ მოხერხდა.",
+      "omitted_other": "ამ სესიის {{displayCount}} ადრინდელი ელემენტის ჩვენება ვერ მოხერხდა.",
       "couldNotLoad": "ადრინდელი შეტყობინებების ჩატვირთვა ვერ მოხერხდა.",
       "unavailable": "ადრინდელი შეტყობინებები ხელმისაწვდომი არ არის.",
       "tooLarge": "ადრინდელი შეტყობინებები ძალიან დიდია ჩასატვირთად."
@@ -2069,10 +2082,12 @@
       "viewTable": "ცხრილის ნახვა",
       "title": "ცხრილი",
       "close": "ცხრილის დახურვა",
-      "column": "სვეტი",
-      "columns": "სვეტი",
-      "row": "სტრიქონი",
-      "rows": "სტრიქონი",
+      "columnCount_one": "სვეტი",
+      "columnCount": "სვეტი",
+      "columnCount_other": "სვეტი",
+      "rowCount_one": "სტრიქონი",
+      "rowCount": "სტრიქონი",
+      "rowCount_other": "სტრიქონი",
       "opensFullScreen": "იხსნება სრულ ეკრანზე"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} ტოკენიდან",
       "tokens": "ტოკენი",
       "tokensWithPercentage": "ტოკენი ({{percentage}})",
-      "stepsCountOne": "{{steps}} ნაბიჯი",
-      "stepsCountMany": "{{steps}} ნაბიჯი",
+      "stepsCount_one": "{{steps}} ნაბიჯი",
+      "stepsCount": "{{steps}} ნაბიჯი",
+      "stepsCount_other": "{{steps}} ნაბიჯი",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "ახალი კოდირების ამოცანა",
     "explore": "გამოკვლევა",
     "seeAll": "ყველას ნახვა",
-    "kiloAgents": "Kilo აგენტები",
-    "greetingMorning": "დილა მშვიდობისა",
-    "greetingAfternoon": "შუადღე მშვიდობისა",
-    "greetingEvening": "საღამო მშვიდობისა"
+    "kiloAgents": "Kilo აგენტები"
   },
   "imageViewer": {
     "close": "{{filename}} დახურვა",
@@ -2645,8 +2658,9 @@
       "manageHint": "ინტერნეტში Kilo Pass მართვას ხსნის.",
       "notSubscribed": "გამოწერილი არ არის",
       "overallocated": "Pass დავალებები აჭარბებს გადახდილ ადგილებს",
-      "paidSeatOne": "{{count}} გადახდილი ადგილი",
-      "paidSeatOther": "{{count}} გადახდილი ადგილი",
+      "paidSeat_one": "{{displayCount}} გადახდილი ადგილი",
+      "paidSeat": "{{displayCount}} გადახდილი ადგილი",
+      "paidSeat_other": "{{displayCount}} გადახდილი ადგილი",
       "paymentNeedsAttention": "გადახდას ყურადღება სჭირდება",
       "paymentPending": "გადახდა მოლოდინშია",
       "processingBlocked": "დამუშავება დაბლოკილია",

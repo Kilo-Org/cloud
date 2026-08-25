@@ -100,9 +100,9 @@ export function getMarkdownStyles(palette: MarkdownPalette): MarkedStyles {
       marginVertical: 4,
     },
     blockquote: {
-      borderLeftWidth: 3,
-      borderLeftColor: borderColor,
-      paddingLeft: 12,
+      borderStartWidth: 3,
+      borderStartColor: borderColor,
+      paddingStart: 12,
       marginVertical: 4,
     },
     // react-native-marked maps `list` onto each item's marker box, not a list

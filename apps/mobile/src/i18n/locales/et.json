@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}}/{{total}} faili laaditud",
       "loadAllFiles": "Laadi kõik failid",
       "loadAll": "Laadi kõik",
-      "fileLoaded": "{{count}} fail laaditud",
-      "filesLoaded": "{{count}} faili laaditud",
-      "fileLoadedOfTotal": "{{count}} fail laaditud / {{total}}",
-      "filesLoadedOfTotal": "{{count}} faili laaditud / {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} fail laaditud",
+      "fileLoadedCount": "{{displayCount}} faili laaditud",
+      "fileLoadedCount_other": "{{displayCount}} faili laaditud",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} fail laaditud / {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} faili laaditud / {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} faili laaditud / {{total}}",
       "filesStillLoading": "Failid laadivad veel. Värskendamiseks tõmba alla.",
       "goToOverview": "Mine ülevaatesse",
       "goToOverviewTab": "Mine ülevaate vahekaardile"
@@ -288,8 +290,9 @@
       "resolved": "Lahendatud",
       "outdated": "Aegunud",
       "file": "Fail",
-      "oneComment": "1 kommentaar",
-      "commentCount": "{{count}} kommentaari",
+      "comment_one": "1 kommentaar",
+      "comment": "{{displayCount}} kommentaari",
+      "comment_other": "{{displayCount}} kommentaari",
       "startedRelative": " · alustatud {{relative}}",
       "couldNotLoadMore": "Rohkemate kommentaaride laadimine ebaõnnestus.",
       "retryLoadingMore": "Proovi rohkemate kommentaaride laadimist uuesti",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reaktsioonid",
       "addReaction": "Lisa reaktsioon",
       "reactionPill": "{{emoji}} reaktsioon, {{count}} {{countLabel}}",
-      "reactionSingular": "reaktsioon",
-      "reactionPlural": "reaktsiooni",
+      "reaction_one": "reaktsioon",
+      "reaction": "reaktsiooni",
+      "reaction_other": "reaktsiooni",
       "commentActions": "Kommentaari toimingud",
       "reportContent": "Teata sisust",
       "reportUser": "Teata kasutajast",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "See kommentaar eemaldatakse ülevaate järjekorrast.",
       "delete": "Kustuta",
       "summaryOptional": "Kokkuvõte (valikuline)",
-      "pendingCommentSingular": "ootel kommentaar",
-      "pendingCommentPlural": "ootel kommentaari",
+      "pendingComment_one": "ootel kommentaar",
+      "pendingComment": "ootel kommentaari",
+      "pendingComment_other": "ootel kommentaari",
       "submitCountOfTotal": "Esita {{freshCount}}/{{totalCount}} kommentaari",
       "submitReview": "Esita ülevaade",
       "partialPostedMessage": "Esitati {{freshCount}} kommentaari. {{staleCount}} kommentaari viitavad vanemale commit'ile ja jäid sinu järjekorda."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Avatud · Ülevaade nõutud",
       "stateOpen": "Avatud",
       "unknownAuthor": "Tundmatu autor",
-      "commitSingular": "commit",
-      "commitPlural": "commit'i",
-      "fileSingular": "fail",
-      "filePlural": "faili"
+      "commit_one": "commit",
+      "commit": "commit'i",
+      "commit_other": "commit'i",
+      "file_one": "fail",
+      "file": "faili",
+      "file_other": "faili"
     },
     "pendingComment": {
       "editOutdatedA11y": "Muuda aegunud ootel kommentaari asukohas {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Keegi",
-      "oneTyping": "{{name}} kirjutab...",
-      "manyTyping": "{{names}} kirjutavad..."
+      "typing_one": "{{name}} kirjutab...",
+      "typing": "{{names}} kirjutavad...",
+      "typing_other": "{{names}} kirjutavad..."
     },
     "botStatus": {
       "online": "Veebis",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Arveldusteabe laadimine ebaõnnestus",
       "manageOnWeb": "Halda arveldust veebis",
       "commitPlan": "Commit",
-      "daysLeft": "Jäänud {{count}} päeva",
       "earlybird": "Varajane registreerumine",
       "finalCommitTermEndsOn": "Teie viimane Commit-periood lõpeb {{date}}. Jätkake Standard-režiimis hinnaga {{price}} või majutus lõpeb.",
       "freeTrial": "Tasuta prooviperiood",
       "hostingEnds": "Majutus lõpeb",
-      "oneDayLeft": "Jäänud 1 päev",
       "renews": "Pikendatakse",
       "standardMonthToMonth": "Standard kuutellimus",
       "standardStartsOn": "Standard algab {{date}} hinnaga {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} vajab tähelepanu: {{label}}",
-      "openUnreadOne": "Ava {{name}}, {{count}} lugemata sõnum",
-      "openUnreadMany": "Ava {{name}}, {{count}} lugemata sõnumit",
+      "openUnread_one": "Ava {{name}}, {{displayCount}} lugemata sõnum",
+      "openUnread": "Ava {{name}}, {{displayCount}} lugemata sõnumit",
+      "openUnread_other": "Ava {{name}}, {{displayCount}} lugemata sõnumit",
       "open": "Ava {{name}}",
       "openSettings": "Ava {{name}} seaded",
       "fixOnKiloAi": "Paranda saidil kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Luba automaatne parandamine?",
       "enableAutoRemediationConfirmMessage": "Turvaagent avab sobivate kasutatavate leidude jaoks parandus-PR-id automaatselt.",
       "enable": "Luba",
-      "queuedOne": "{{count}} olemasolev leid on analüüsiks järjekorras.",
-      "queuedMany": "{{count}} olemasolevat leidu on analüüsiks järjekorras.",
+      "queued_one": "{{displayCount}} olemasolev leid on analüüsiks järjekorras.",
+      "queued": "{{displayCount}} olemasolevat leidu on analüüsiks järjekorras.",
+      "queued_other": "{{displayCount}} olemasolevat leidu on analüüsiks järjekorras.",
       "severityCriticalOnly": "Ainult kriitilised",
       "severityHighAndAbove": "Kõrge ja kõrgem",
       "severityMediumAndAbove": "Keskmine ja kõrgem",
@@ -1482,8 +1490,9 @@
       "on": "Sees",
       "off": "Väljas",
       "allRepositories": "Kõik hoidlad",
-      "repositorySelected": "Valitud on {{count}} hoidla",
-      "repositoriesSelected": "Valitud on {{count}} hoidlat",
+      "repositoriesCount_one": "Valitud on {{displayCount}} hoidla",
+      "repositoriesCount": "Valitud on {{displayCount}} hoidlat",
+      "repositoriesCount_other": "Valitud on {{displayCount}} hoidlat",
       "selectRepositories": "Vali hoidlad",
       "selectRepositoriesSubtitle": "Vali, milliseid hoidlaid Security Agent jälgib",
       "repositories": "Hoidlad",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Seanss on kustutatud",
       "needsInput": "vajab sisendit",
       "fromPlatform": "{{platform}} kaudu",
-      "centOne": "sent",
-      "centOther": "senti",
-      "dollarOne": "dollar",
-      "dollarOther": "dollarit"
+      "cent_one": "sent",
+      "cent": "senti",
+      "cent_other": "senti",
+      "dollar_one": "dollar",
+      "dollar": "dollarit",
+      "dollar_other": "dollarit"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub'i avamine ebaõnnestus",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Mustandist loobumine ebaõnnestus. Proovi uuesti."
     },
     "partRenderer": {
-      "updatedFile": "Uuendatud {{count}} fail",
-      "updatedFiles": "Uuendatud {{count}} faili"
+      "updatedFileCount_one": "Uuendatud {{displayCount}} fail",
+      "updatedFileCount": "Uuendatud {{displayCount}} faili",
+      "updatedFileCount_other": "Uuendatud {{displayCount}} faili"
     },
     "toolPatch": {
       "operationAdded": "Lisatud",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Varasemad sõnumid laaditud",
       "retryHint": "Proovib selle seansi vanemate sõnumite laadimist uuesti.",
-      "omittedOne": "Mõnda selle seansi varasemat üksust ei õnnestunud kuvada.",
-      "omittedMany": "{{count}} selle seansi varasemat üksust ei õnnestunud kuvada.",
+      "omitted_one": "Mõnda selle seansi varasemat üksust ei õnnestunud kuvada.",
+      "omitted": "{{displayCount}} selle seansi varasemat üksust ei õnnestunud kuvada.",
+      "omitted_other": "{{displayCount}} selle seansi varasemat üksust ei õnnestunud kuvada.",
       "couldNotLoad": "Varasemaid sõnumeid ei õnnestunud laadida.",
       "unavailable": "Varasemad sõnumid pole saadaval.",
       "tooLarge": "Varasemad sõnumid on liiga suured, et neid laadida."
@@ -2069,10 +2082,12 @@
       "viewTable": "Vaata tabelit",
       "title": "Tabel",
       "close": "Sulge tabel",
-      "column": "veerg",
-      "columns": "veerud",
-      "row": "rida",
-      "rows": "read",
+      "columnCount_one": "veerg",
+      "columnCount": "veerud",
+      "columnCount_other": "veerud",
+      "rowCount_one": "rida",
+      "rowCount": "read",
+      "rowCount_other": "read",
       "opensFullScreen": "avatakse täisekraanil"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "kokku {{window}} tokenit",
       "tokens": "tokenit",
       "tokensWithPercentage": "tokenit ({{percentage}})",
-      "stepsCountOne": "{{steps}} samm",
-      "stepsCountMany": "{{steps}} sammu",
+      "stepsCount_one": "{{steps}} samm",
+      "stepsCount": "{{steps}} sammu",
+      "stepsCount_other": "{{steps}} sammu",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Uus kodeerimisülesanne",
     "explore": "Avasta",
     "seeAll": "Vaata kõiki",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Tere hommikust",
-    "greetingAfternoon": "Tere päevast",
-    "greetingEvening": "Tere õhtust"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Sulge {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Avaneb Kilo Passi haldus veebis.",
       "notSubscribed": "Pole tellitud",
       "overallocated": "Passi määramised ületavad tasulisi kohti",
-      "paidSeatOne": "{{count}} tasuline koht",
-      "paidSeatOther": "{{count}} tasulist kohta",
+      "paidSeat_one": "{{displayCount}} tasuline koht",
+      "paidSeat": "{{displayCount}} tasulist kohta",
+      "paidSeat_other": "{{displayCount}} tasulist kohta",
       "paymentNeedsAttention": "Makse vajab tähelepanu",
       "paymentPending": "Makse ootel",
       "processingBlocked": "Töötlemine blokeeritud",

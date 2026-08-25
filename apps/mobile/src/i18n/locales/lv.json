@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "Ielādēti {{loaded}} no {{total}} failiem",
       "loadAllFiles": "Ielādēt visus failus",
       "loadAll": "Ielādēt visu",
-      "fileLoaded": "Ielādēts {{count}} fails",
-      "filesLoaded": "Ielādēti {{count}} faili",
-      "fileLoadedOfTotal": "Ielādēts {{count}} fails no {{total}}",
-      "filesLoadedOfTotal": "Ielādēti {{count}} faili no {{total}}",
+      "fileLoadedCount_one": "Ielādēts {{displayCount}} fails",
+      "fileLoadedCount": "Ielādēti {{displayCount}} faili",
+      "fileLoadedCount_other": "Ielādēti {{displayCount}} faili",
+      "fileLoadedOfTotalCount_one": "Ielādēts {{displayCount}} fails no {{total}}",
+      "fileLoadedOfTotalCount": "Ielādēti {{displayCount}} faili no {{total}}",
+      "fileLoadedOfTotalCount_other": "Ielādēti {{displayCount}} faili no {{total}}",
       "filesStillLoading": "Faili joprojām tiek ielādēti. Velciet, lai atjauninātu.",
       "goToOverview": "Doties uz pārskatu",
       "goToOverviewTab": "Doties uz pārskata cilni"
@@ -288,8 +290,9 @@
       "resolved": "Atrisināts",
       "outdated": "Novecojis",
       "file": "Fails",
-      "oneComment": "1 komentārs",
-      "commentCount": "{{count}} komentāri",
+      "comment_one": "1 komentārs",
+      "comment": "{{displayCount}} komentāri",
+      "comment_other": "{{displayCount}} komentāri",
       "startedRelative": " · sākts {{relative}}",
       "couldNotLoadMore": "Neizdevās ielādēt vairāk komentāru.",
       "retryLoadingMore": "Mēģināt ielādēt vairāk komentāru vēlreiz",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reakcijas",
       "addReaction": "Pievienot reakciju",
       "reactionPill": "{{emoji}} reakcija, {{count}} {{countLabel}}",
-      "reactionSingular": "reakcija",
-      "reactionPlural": "reakcijas",
+      "reaction_one": "reakcija",
+      "reaction": "reakcijas",
+      "reaction_other": "reakcijas",
       "commentActions": "Komentāru darbības",
       "reportContent": "Ziņot par saturu",
       "reportUser": "Ziņot par lietotāju",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Šis komentārs tiks noņemts no pārskata rindas.",
       "delete": "Dzēst",
       "summaryOptional": "Kopsavilkums (neobligāts)",
-      "pendingCommentSingular": "gaidītais komentārs",
-      "pendingCommentPlural": "gaidītie komentāri",
+      "pendingComment_one": "gaidītais komentārs",
+      "pendingComment": "gaidītie komentāri",
+      "pendingComment_other": "gaidītie komentāri",
       "submitCountOfTotal": "Iesniegt {{freshCount}} no {{totalCount}} komentāriem",
       "submitReview": "Iesniegt pārskatu",
       "partialPostedMessage": "Publicēti {{freshCount}} komentāri. {{staleCount}} komentāri norāda uz vecāku commit un palika jūsu rindā."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Atvērts · Nepieciešams pārskats",
       "stateOpen": "Atvērts",
       "unknownAuthor": "Nezināms autors",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "fails",
-      "filePlural": "faili"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "fails",
+      "file": "faili",
+      "file_other": "faili"
     },
     "pendingComment": {
       "editOutdatedA11y": "Rediģēt novecojušo gaidīto komentāru uz {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Kāds",
-      "oneTyping": "{{name}} raksta…",
-      "manyTyping": "{{names}} raksta…"
+      "typing_one": "{{name}} raksta…",
+      "typing": "{{names}} raksta…",
+      "typing_other": "{{names}} raksta…"
     },
     "botStatus": {
       "online": "Tiešsaistē",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Neizdevās ielādēt norēķinu informāciju",
       "manageOnWeb": "Pārvaldīt norēķinus tīmeklī",
       "commitPlan": "Commit",
-      "daysLeft": "Atlikušas {{count}} dienas",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Jūsu pēdējais Commit termiņš beidzas {{date}}. Turpiniet kā Standard par {{price}}, vai mitināšana beigsies.",
       "freeTrial": "Bezmaksas izmēģinājums",
       "hostingEnds": "Mitināšana beidzas",
-      "oneDayLeft": "Atlikusi 1 diena",
       "renews": "Atjaunojas",
       "standardMonthToMonth": "Standard katru mēnesi",
       "standardStartsOn": "Standard sākas {{date}} par {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} ir nepieciešama uzmanība: {{label}}",
-      "openUnreadOne": "Atvērt {{name}}, {{count}} nelasīts ziņojums",
-      "openUnreadMany": "Atvērt {{name}}, {{count}} nelasīti ziņojumi",
+      "openUnread_one": "Atvērt {{name}}, {{displayCount}} nelasīts ziņojums",
+      "openUnread": "Atvērt {{name}}, {{displayCount}} nelasīti ziņojumi",
+      "openUnread_other": "Atvērt {{name}}, {{displayCount}} nelasīti ziņojumi",
       "open": "Atvērt {{name}}",
       "openSettings": "Atvērt iestatījumus {{name}}",
       "fixOnKiloAi": "Novērst vietnē kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Iespējot automātisko novēršanu?",
       "enableAutoRemediationConfirmMessage": "Drošības aģents automātiski atvērs novēršanas PR atbilstošiem izmantojamiem atradumiem.",
       "enable": "Iespējot",
-      "queuedOne": "{{count}} esošs atradums ievietots analīzes rindā.",
-      "queuedMany": "{{count}} esošie atradumi ievietoti analīzes rindā.",
+      "queued_one": "{{displayCount}} esošs atradums ievietots analīzes rindā.",
+      "queued": "{{displayCount}} esošie atradumi ievietoti analīzes rindā.",
+      "queued_other": "{{displayCount}} esošie atradumi ievietoti analīzes rindā.",
       "severityCriticalOnly": "Tikai kritiski",
       "severityHighAndAbove": "Augsts un augstāk",
       "severityMediumAndAbove": "Vidējs un augstāk",
@@ -1482,8 +1490,9 @@
       "on": "Ieslēgts",
       "off": "Izslēgts",
       "allRepositories": "Visi repozitoriji",
-      "repositorySelected": "Izvēlēts {{count}} repozitorijs",
-      "repositoriesSelected": "Izvēlēti {{count}} repozitoriji",
+      "repositoriesCount_one": "Izvēlēts {{displayCount}} repozitorijs",
+      "repositoriesCount": "Izvēlēti {{displayCount}} repozitoriji",
+      "repositoriesCount_other": "Izvēlēti {{displayCount}} repozitoriji",
       "selectRepositories": "Izvēlēties repozitorijus",
       "selectRepositoriesSubtitle": "Izvēlies, kurus repozitorijus Security Agent uzrauga",
       "repositories": "Repozitoriji",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Sesija dzēsta",
       "needsInput": "nepieciešama ievade",
       "fromPlatform": "no {{platform}}",
-      "centOne": "cents",
-      "centOther": "centi",
-      "dollarOne": "dolārs",
-      "dollarOther": "dolāri"
+      "cent_one": "cents",
+      "cent": "centi",
+      "cent_other": "centi",
+      "dollar_one": "dolārs",
+      "dollar": "dolāri",
+      "dollar_other": "dolāri"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Neizdevās atvērt GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Neizdevās atmest melnrakstu. Lūdzu, mēģini vēlreiz."
     },
     "partRenderer": {
-      "updatedFile": "Atjaunināts {{count}} fails",
-      "updatedFiles": "Atjaunināti {{count}} faili"
+      "updatedFileCount_one": "Atjaunināts {{displayCount}} fails",
+      "updatedFileCount": "Atjaunināti {{displayCount}} faili",
+      "updatedFileCount_other": "Atjaunināti {{displayCount}} faili"
     },
     "toolPatch": {
       "operationAdded": "Pievienots",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Ielādēti agrāki ziņojumi",
       "retryHint": "Atkārto vecāko ziņojumu ielādi šai sesijai.",
-      "omittedOne": "Dažus agrākus vienumus no šīs sesijas nevarēja parādīt.",
-      "omittedMany": "{{count}} agrākus vienumus no šīs sesijas nevarēja parādīt.",
+      "omitted_one": "Dažus agrākus vienumus no šīs sesijas nevarēja parādīt.",
+      "omitted": "{{displayCount}} agrākus vienumus no šīs sesijas nevarēja parādīt.",
+      "omitted_other": "{{displayCount}} agrākus vienumus no šīs sesijas nevarēja parādīt.",
       "couldNotLoad": "Neizdevās ielādēt agrākus ziņojumus.",
       "unavailable": "Agrāki ziņojumi nav pieejami.",
       "tooLarge": "Agrāki ziņojumi ir pārāk lieli, lai tos ielādētu."
@@ -2069,10 +2082,12 @@
       "viewTable": "Skatīt tabulu",
       "title": "Tabula",
       "close": "Aizvērt tabulu",
-      "column": "kolonna",
-      "columns": "kolonnas",
-      "row": "rinda",
-      "rows": "rindas",
+      "columnCount_one": "kolonna",
+      "columnCount": "kolonnas",
+      "columnCount_other": "kolonnas",
+      "rowCount_one": "rinda",
+      "rowCount": "rindas",
+      "rowCount_other": "rindas",
       "opensFullScreen": "atver pilnekrāna režīmā"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "no {{window}} tokeniem",
       "tokens": "tokeni",
       "tokensWithPercentage": "tokeni ({{percentage}})",
-      "stepsCountOne": "{{steps}} solis",
-      "stepsCountMany": "{{steps}} soļi",
+      "stepsCount_one": "{{steps}} solis",
+      "stepsCount": "{{steps}} soļi",
+      "stepsCount_other": "{{steps}} soļi",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Jauns kodēšanas uzdevums",
     "explore": "Izpētīt",
     "seeAll": "Skatīt visus",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Labrīt",
-    "greetingAfternoon": "Labdien",
-    "greetingEvening": "Labvakar"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Aizvērt {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Atver Kilo Pass pārvaldību tīmeklī.",
       "notSubscribed": "Nav abonēts",
       "overallocated": "Pass piešķīrumi pārsniedz apmaksātās vietas",
-      "paidSeatOne": "{{count}} apmaksāta vieta",
-      "paidSeatOther": "{{count}} apmaksātas vietas",
+      "paidSeat_one": "{{displayCount}} apmaksāta vieta",
+      "paidSeat": "{{displayCount}} apmaksātas vietas",
+      "paidSeat_other": "{{displayCount}} apmaksātas vietas",
       "paymentNeedsAttention": "Maksājumam nepieciešama uzmanība",
       "paymentPending": "Maksājums gaida apstiprinājumu",
       "processingBlocked": "Apstrāde bloķēta",

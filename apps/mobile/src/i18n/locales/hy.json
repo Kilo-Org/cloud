@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "Բեռնված {{loaded}}-ը {{total}} ֆայլերից",
       "loadAllFiles": "Բեռնել բոլոր ֆայլերը",
       "loadAll": "Բեռնել բոլորը",
-      "fileLoaded": "Բեռնված է {{count}} ֆայլ",
-      "filesLoaded": "Բեռնված է {{count}} ֆայլ",
-      "fileLoadedOfTotal": "Բեռնված է {{count}} ֆայլ {{total}}-ից",
-      "filesLoadedOfTotal": "Բեռնված է {{count}} ֆայլ {{total}}-ից",
+      "fileLoadedCount_one": "Բեռնված է {{displayCount}} ֆայլ",
+      "fileLoadedCount": "Բեռնված է {{displayCount}} ֆայլ",
+      "fileLoadedCount_other": "Բեռնված է {{displayCount}} ֆայլ",
+      "fileLoadedOfTotalCount_one": "Բեռնված է {{displayCount}} ֆայլ {{total}}-ից",
+      "fileLoadedOfTotalCount": "Բեռնված է {{displayCount}} ֆայլ {{total}}-ից",
+      "fileLoadedOfTotalCount_other": "Բեռնված է {{displayCount}} ֆայլ {{total}}-ից",
       "filesStillLoading": "Ֆայլերը դեռ բեռնվում են: Քաշեք՝ թարմացնելու համար:",
       "goToOverview": "Գնալ ակնարկ",
       "goToOverviewTab": "Գնալ ակնարկի ներդիր"
@@ -288,8 +290,9 @@
       "resolved": "Լուծված",
       "outdated": "Հնացած",
       "file": "Ֆայլ",
-      "oneComment": "1 մեկնաբանություն",
-      "commentCount": "{{count}} մեկնաբանություն",
+      "comment_one": "1 մեկնաբանություն",
+      "comment": "{{displayCount}} մեկնաբանություն",
+      "comment_other": "{{displayCount}} մեկնաբանություն",
       "startedRelative": " · սկսվել է {{relative}}",
       "couldNotLoadMore": "Չհաջողվեց բեռնել ավելի շատ մեկնաբանություններ:",
       "retryLoadingMore": "Կրկին փորձել բեռնել ավելի շատ մեկնաբանություններ",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Ռեակցիաներ",
       "addReaction": "Ավելացնել ռեակցիա",
       "reactionPill": "{{emoji}} ռեակցիա, {{count}} {{countLabel}}",
-      "reactionSingular": "ռեակցիա",
-      "reactionPlural": "ռեակցիա",
+      "reaction_one": "ռեակցիա",
+      "reaction": "ռեակցիա",
+      "reaction_other": "ռեակցիա",
       "commentActions": "Մեկնաբանության գործողություններ",
       "reportContent": "Զեկուցել բովանդակությունը",
       "reportUser": "Զեկուցել օգտատիրոջ մասին",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Այս մեկնաբանությունը կհեռացվի վերանայման հերթից:",
       "delete": "Ջնջել",
       "summaryOptional": "Ամփոփում (պարտադիր չէ)",
-      "pendingCommentSingular": "սպասվող մեկնաբանություն",
-      "pendingCommentPlural": "սպասվող մեկնաբանություններ",
+      "pendingComment_one": "սպասվող մեկնաբանություն",
+      "pendingComment": "սպասվող մեկնաբանություններ",
+      "pendingComment_other": "սպասվող մեկնաբանություններ",
       "submitCountOfTotal": "Ուղարկել {{freshCount}}-ը {{totalCount}} մեկնաբանություններից",
       "submitReview": "Ուղարկել վերանայումը",
       "partialPostedMessage": "Տեղադրված է {{freshCount}} մեկնաբանություն: {{staleCount}} մեկնաբանություն վերաբերում է ավելի հին commit-ին և մնացել է ձեր հերթում:"
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Բաց · Վերանայում է պահանջվում",
       "stateOpen": "Բաց",
       "unknownAuthor": "Անհայտ հեղինակ",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "ֆայլ",
-      "filePlural": "ֆայլեր"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "ֆայլ",
+      "file": "ֆայլեր",
+      "file_other": "ֆայլեր"
     },
     "pendingComment": {
       "editOutdatedA11y": "Խմբագրել հնացած սպասվող մեկնաբանությունը {{location}} վայրում",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Ինչ-որ մեկը",
-      "oneTyping": "{{name}}-ը մուտքագրում է...",
-      "manyTyping": "{{names}}-ը մուտքագրում են..."
+      "typing_one": "{{name}}-ը մուտքագրում է...",
+      "typing": "{{names}}-ը մուտքագրում են...",
+      "typing_other": "{{names}}-ը մուտքագրում են..."
     },
     "botStatus": {
       "online": "Առցանց",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Հնարավոր չեղավ բեռնել վճարման տվյալները",
       "manageOnWeb": "Կառավարել վճարումները կայքում",
       "commitPlan": "Հաստատել",
-      "daysLeft": "Մնացել է {{count}} օր",
       "earlybird": "Վաղ թռչուն",
       "finalCommitTermEndsOn": "Ձեր վերջնական Commit ժամկետն ավարտվում է {{date}}-ին: Շարունակեք Standard-ով {{price}}-ով, կամ հոսթինգն ավարտվում է:",
       "freeTrial": "Անվճար փորձարկում",
       "hostingEnds": "Հոսթինգն ավարտվում է",
-      "oneDayLeft": "Մնացել է 1 օր",
       "renews": "Երկարաձգվում է",
       "standardMonthToMonth": "Ստանդարտ ամսական",
       "standardStartsOn": "Ստանդարտը սկսվում է {{date}}-ին {{price}}-ով:",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}}-ը ուշադրության կարիք ունի՝ {{label}}",
-      "openUnreadOne": "Բացել {{name}}-ը, {{count}} չկարդացված հաղորդագրություն",
-      "openUnreadMany": "Բացել {{name}}-ը, {{count}} չկարդացված հաղորդագրություն",
+      "openUnread_one": "Բացել {{name}}-ը, {{displayCount}} չկարդացված հաղորդագրություն",
+      "openUnread": "Բացել {{name}}-ը, {{displayCount}} չկարդացված հաղորդագրություն",
+      "openUnread_other": "Բացել {{name}}-ը, {{displayCount}} չկարդացված հաղորդագրություն",
       "open": "Բացել {{name}}-ը",
       "openSettings": "Բացել {{name}}-ի կարգավորումները",
       "fixOnKiloAi": "Շտկել kilo.ai-ում՝ {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Միացնե՞լ ավտոմատ շտկումը:",
       "enableAutoRemediationConfirmMessage": "Անվտանգության գործակալը կբացի շտկման PR-եր ավտոմատ՝ իրավասու շահագործելի հայտնաբերումների համար:",
       "enable": "Միացնել",
-      "queuedOne": "{{count}} առկա գտածո հերթագրված է վերլուծության համար։",
-      "queuedMany": "{{count}} առկա գտածո հերթագրված են վերլուծության համար։",
+      "queued_one": "{{displayCount}} առկա գտածո հերթագրված է վերլուծության համար։",
+      "queued": "{{displayCount}} առկա գտածո հերթագրված են վերլուծության համար։",
+      "queued_other": "{{displayCount}} առկա գտածո հերթագրված են վերլուծության համար։",
       "severityCriticalOnly": "Միայն կրիտիկական",
       "severityHighAndAbove": "Բարձր և բարձրից",
       "severityMediumAndAbove": "Միջին և բարձրից",
@@ -1482,8 +1490,9 @@
       "on": "Միացված",
       "off": "Անջատված",
       "allRepositories": "Բոլոր պահոցները",
-      "repositorySelected": "Ընտրվել է {{count}} պահոց",
-      "repositoriesSelected": "Ընտրվել են {{count}} պահոց",
+      "repositoriesCount_one": "Ընտրվել է {{displayCount}} պահոց",
+      "repositoriesCount": "Ընտրվել են {{displayCount}} պահոց",
+      "repositoriesCount_other": "Ընտրվել են {{displayCount}} պահոց",
       "selectRepositories": "Ընտրել պահոցները",
       "selectRepositoriesSubtitle": "Ընտրեք, թե որ պահոցներն է վերահսկում Անվտանգության գործակալը",
       "repositories": "Պահոցներ",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Նիստը ջնջված է",
       "needsInput": "մուտքագրման կարիք ունի",
       "fromPlatform": "{{platform}}-ից",
-      "centOne": "ցենտ",
-      "centOther": "ցենտ",
-      "dollarOne": "դոլար",
-      "dollarOther": "դոլար"
+      "cent_one": "ցենտ",
+      "cent": "ցենտ",
+      "cent_other": "ցենտ",
+      "dollar_one": "դոլար",
+      "dollar": "դոլար",
+      "dollar_other": "դոլար"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Չհաջողվեց բացել GitHub-ը",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Չհաջողվեց մերժել սևագիրը։ Խնդրում ենք կրկին փորձել։"
     },
     "partRenderer": {
-      "updatedFile": "Թարմացվել է {{count}} ֆայլ",
-      "updatedFiles": "Թարմացվել են {{count}} ֆայլ"
+      "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ",
+      "updatedFileCount": "Թարմացվել են {{displayCount}} ֆայլ",
+      "updatedFileCount_other": "Թարմացվել են {{displayCount}} ֆայլ"
     },
     "toolPatch": {
       "operationAdded": "Ավելացված",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Ավելի վաղ հաղորդագրությունները բեռնված են",
       "retryHint": "Կրկին փորձում է բեռնել ավելի վաղ հաղորդագրությունները այս նիստի համար:",
-      "omittedOne": "Այս նիստի որոշ ավելի վաղ տարրեր հնարավոր չեղավ ցուցադրել:",
-      "omittedMany": "Այս նիստի {{count}} ավելի վաղ տարրեր հնարավոր չեղավ ցուցադրել:",
+      "omitted_one": "Այս նիստի որոշ ավելի վաղ տարրեր հնարավոր չեղավ ցուցադրել:",
+      "omitted": "Այս նիստի {{displayCount}} ավելի վաղ տարրեր հնարավոր չեղավ ցուցադրել:",
+      "omitted_other": "Այս նիստի {{displayCount}} ավելի վաղ տարրեր հնարավոր չեղավ ցուցադրել:",
       "couldNotLoad": "Հնարավոր չեղավ բեռնել ավելի վաղ հաղորդագրությունները:",
       "unavailable": "Ավելի վաղ հաղորդագրությունները հասանելի չեն:",
       "tooLarge": "Ավելի վաղ հաղորդագրությունները չափազանց մեծ են՝ բեռնելու համար:"
@@ -2069,10 +2082,12 @@
       "viewTable": "Դիտել աղյուսակը",
       "title": "Աղյուսակ",
       "close": "Փակել աղյուսակը",
-      "column": "սյունակ",
-      "columns": "սյունակներ",
-      "row": "տող",
-      "rows": "տողեր",
+      "columnCount_one": "սյունակ",
+      "columnCount": "սյունակներ",
+      "columnCount_other": "սյունակներ",
+      "rowCount_one": "տող",
+      "rowCount": "տողեր",
+      "rowCount_other": "տողեր",
       "opensFullScreen": "բացվում է ամբողջ էկրանով"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} նշաններից",
       "tokens": "նշան",
       "tokensWithPercentage": "նշան ({{percentage}})",
-      "stepsCountOne": "{{steps}} քայլ",
-      "stepsCountMany": "{{steps}} քայլ",
+      "stepsCount_one": "{{steps}} քայլ",
+      "stepsCount": "{{steps}} քայլ",
+      "stepsCount_other": "{{steps}} քայլ",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Նոր ծրագրավորման առաջադրանք",
     "explore": "Ուսումնասիրել",
     "seeAll": "Տեսնել բոլորը",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Բարի առավոտ",
-    "greetingAfternoon": "Բարի օր",
-    "greetingEvening": "Բարի երեկո"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Փակել {{filename}}-ը",
@@ -2645,8 +2658,9 @@
       "manageHint": "Բացում է Kilo Pass կառավարումը վեբում:",
       "notSubscribed": "Բաժանորդագրված չէ",
       "overallocated": "Pass նշանակումները գերազանցում են վճարված տեղերը",
-      "paidSeatOne": "{{count}} վճարված տեղ",
-      "paidSeatOther": "{{count}} վճարված տեղեր",
+      "paidSeat_one": "{{displayCount}} վճարված տեղ",
+      "paidSeat": "{{displayCount}} վճարված տեղեր",
+      "paidSeat_other": "{{displayCount}} վճարված տեղեր",
       "paymentNeedsAttention": "Վճարումը ուշադրության կարիք ունի",
       "paymentPending": "Վճարումը սպասվում է",
       "processingBlocked": "Մշակումն արգելափակված է",

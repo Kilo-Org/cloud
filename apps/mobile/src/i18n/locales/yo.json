@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} ti {{total}} awọn faili ti kojọ",
       "loadAllFiles": "Kojọ gbogbo awọn faili",
       "loadAll": "Kojọ gbogbo",
-      "fileLoaded": "{{count}} faili kojọ",
-      "filesLoaded": "{{count}} awọn faili kojọ",
-      "fileLoadedOfTotal": "{{count}} faili kojọ ti {{total}}",
-      "filesLoadedOfTotal": "{{count}} awọn faili kojọ ti {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} faili kojọ",
+      "fileLoadedCount": "{{displayCount}} awọn faili kojọ",
+      "fileLoadedCount_other": "{{displayCount}} awọn faili kojọ",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} faili kojọ ti {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} awọn faili kojọ ti {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} awọn faili kojọ ti {{total}}",
       "filesStillLoading": "Awọn faili tun njẹ. Fa si isalẹ lati tunse.",
       "goToOverview": "Lọ si Ọpọlọpọ",
       "goToOverviewTab": "Lọ si taabu Ọpọlọpọ"
@@ -288,8 +290,9 @@
       "resolved": "Ti yanju",
       "outdated": "Atijọ",
       "file": "Faili",
-      "oneComment": "asọye 1",
-      "commentCount": "{{count}} awọn asọye",
+      "comment_one": "asọye 1",
+      "comment": "{{displayCount}} awọn asọye",
+      "comment_other": "{{displayCount}} awọn asọye",
       "startedRelative": " · bẹrẹ {{relative}}",
       "couldNotLoadMore": "Ko le gbe awọn asọye diẹ sii.",
       "retryLoadingMore": "Gbìyànjú lati gbe awọn asọye diẹ sii lẹẹkansi",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Awọn aati",
       "addReaction": "Fi aati kun",
       "reactionPill": "aati {{emoji}}, {{count}} {{countLabel}}",
-      "reactionSingular": "aati",
-      "reactionPlural": "awọn aati",
+      "reaction_one": "aati",
+      "reaction": "awọn aati",
+      "reaction_other": "awọn aati",
       "commentActions": "Awọn iṣe asọye",
       "reportContent": "Jabo akoonu",
       "reportUser": "Jabo olumulo",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "A yoo yọ asọye yii kuro ninu iṣẹ́ atunyẹwo.",
       "delete": "Pa",
       "summaryOptional": "Akojopo (yiyan)",
-      "pendingCommentSingular": "asọye idaduro",
-      "pendingCommentPlural": "awọn asọye idaduro",
+      "pendingComment_one": "asọye idaduro",
+      "pendingComment": "awọn asọye idaduro",
+      "pendingComment_other": "awọn asọye idaduro",
       "submitCountOfTotal": "Fi {{freshCount}} ti {{totalCount}} awọn asọye silẹ",
       "submitReview": "Fi atunyẹwo silẹ",
       "partialPostedMessage": "Fi {{freshCount}} asọye silẹ. {{staleCount}} asọye tọka si iṣẹ atijọ ati pe o wa ninu iṣẹ́ rẹ."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Ṣii · Atunyẹwo nilo",
       "stateOpen": "Ṣii",
       "unknownAuthor": "Onkọwe aimọ",
-      "commitSingular": "iṣẹ",
-      "commitPlural": "awọn iṣẹ",
-      "fileSingular": "faili",
-      "filePlural": "awọn faili"
+      "commit_one": "iṣẹ",
+      "commit": "awọn iṣẹ",
+      "commit_other": "awọn iṣẹ",
+      "file_one": "faili",
+      "file": "awọn faili",
+      "file_other": "awọn faili"
     },
     "pendingComment": {
       "editOutdatedA11y": "Ṣatunkọ asọye idaduro atijọ lori {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Ẹnìkan",
-      "oneTyping": "{{name}} ń tẹ̀...",
-      "manyTyping": "{{names}} ń tẹ̀..."
+      "typing_one": "{{name}} ń tẹ̀...",
+      "typing": "{{names}} ń tẹ̀...",
+      "typing_other": "{{names}} ń tẹ̀..."
     },
     "botStatus": {
       "online": "Ònlíne",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Kò lè gbé àlàyé ìsanwó",
       "manageOnWeb": "Ṣàkóso Ìsanwó lórí Wẹ́ẹ̀bù",
       "commitPlan": "Fọwọ́ sí",
-      "daysLeft": "{{count}} ọjọ́ kù",
       "earlybird": "Ẹyẹ òwúrọ̀",
       "finalCommitTermEndsOn": "Àkókò Commit ìkẹyìn rẹ parí ní {{date}}. Tẹ̀síwájú gẹ́gẹ́ bí Standard ni {{price}}, tàbí hosting parí.",
       "freeTrial": "Ìgbìyànjú Ọ̀fẹ́",
       "hostingEnds": "Hosting parí",
-      "oneDayLeft": "1 ọjọ́ kù",
       "renews": "Òún tún ìmúdọ̀tun",
       "standardMonthToMonth": "Standard oṣù sí oṣù",
       "standardStartsOn": "Standard bẹ̀rẹ̀ ní {{date}} ni {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} nílò àfiyèsí: {{label}}",
-      "openUnreadOne": "Ṣí {{name}}, {{count}} ifiranṣẹ tí a kò tíì kà",
-      "openUnreadMany": "Ṣí {{name}}, {{count}} àwọn ifiranṣẹ tí a kò tíì kà",
+      "openUnread_one": "Ṣí {{name}}, {{displayCount}} ifiranṣẹ tí a kò tíì kà",
+      "openUnread": "Ṣí {{name}}, {{displayCount}} àwọn ifiranṣẹ tí a kò tíì kà",
+      "openUnread_other": "Ṣí {{name}}, {{displayCount}} àwọn ifiranṣẹ tí a kò tíì kà",
       "open": "Ṣí {{name}}",
       "openSettings": "Ṣí àwọn ètò fún {{name}}",
       "fixOnKiloAi": "Tún lórí kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Ṣe ìtùn ládàá?",
       "enableAutoRemediationConfirmMessage": "Security Agent yóò ṣí àwọn PR ìtùn ládàá fún àwọn àwírí tí a lè lo tó yẹ.",
       "enable": "Ṣe",
-      "queuedOne": "{{count}} abawọn ti o wa tẹlẹ ti wa ni ila fun itupalẹ.",
-      "queuedMany": "{{count}} awọn abawọn ti o wa tẹlẹ ti wa ni ila fun itupalẹ.",
+      "queued_one": "{{displayCount}} abawọn ti o wa tẹlẹ ti wa ni ila fun itupalẹ.",
+      "queued": "{{displayCount}} awọn abawọn ti o wa tẹlẹ ti wa ni ila fun itupalẹ.",
+      "queued_other": "{{displayCount}} awọn abawọn ti o wa tẹlẹ ti wa ni ila fun itupalẹ.",
       "severityCriticalOnly": "Pataki nikan",
       "severityHighAndAbove": "Ga ati loke",
       "severityMediumAndAbove": "Alabọde ati loke",
@@ -1482,8 +1490,9 @@
       "on": "Nínú",
       "off": "Paa",
       "allRepositories": "Gbogbo awọn ibi ipamọ",
-      "repositorySelected": "{{count}} ibi ipamọ ti yàn",
-      "repositoriesSelected": "{{count}} awọn ibi ipamọ ti yàn",
+      "repositoriesCount_one": "{{displayCount}} ibi ipamọ ti yàn",
+      "repositoriesCount": "{{displayCount}} awọn ibi ipamọ ti yàn",
+      "repositoriesCount_other": "{{displayCount}} awọn ibi ipamọ ti yàn",
       "selectRepositories": "Yan awọn ibi ipamọ",
       "selectRepositoriesSubtitle": "Yan iru awọn ibi ipamọ ti Security Agent n ṣe abojuto",
       "repositories": "Awọn ibi ipamọ",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Ti pa akoko rẹ",
       "needsInput": "nilo igbewọle",
       "fromPlatform": "lati {{platform}}",
-      "centOne": "centi",
-      "centOther": "awọn centi",
-      "dollarOne": "dọla",
-      "dollarOther": "awọn dọla"
+      "cent_one": "centi",
+      "cent": "awọn centi",
+      "cent_other": "awọn centi",
+      "dollar_one": "dọla",
+      "dollar": "awọn dọla",
+      "dollar_other": "awọn dọla"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ko le ṣii GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Ko le fi osere silẹ. Jọwọ gbiyanju lẹẹkansi."
     },
     "partRenderer": {
-      "updatedFile": "Ti ṣe imudojuiwọn {{count}} faili",
-      "updatedFiles": "Ti ṣe imudojuiwọn {{count}} awọn faili"
+      "updatedFileCount_one": "Ti ṣe imudojuiwọn {{displayCount}} faili",
+      "updatedFileCount": "Ti ṣe imudojuiwọn {{displayCount}} awọn faili",
+      "updatedFileCount_other": "Ti ṣe imudojuiwọn {{displayCount}} awọn faili"
     },
     "toolPatch": {
       "operationAdded": "Ti ṣafikun",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Awọn ifiranṣẹ tẹlẹ ti ṣagbewọ",
       "retryHint": "Tun gbiyanju ṣiṣagbewọ awọn ifiranṣẹ atijọ fun igba-ijiroro yii.",
-      "omittedOne": "Diẹ ninu awọn nkan tẹlẹ lati igba-ijiroro yii ko le han.",
-      "omittedMany": "{{count}} nkan tẹlẹ lati igba-ijiroro yii ko le han.",
+      "omitted_one": "Diẹ ninu awọn nkan tẹlẹ lati igba-ijiroro yii ko le han.",
+      "omitted": "{{displayCount}} nkan tẹlẹ lati igba-ijiroro yii ko le han.",
+      "omitted_other": "{{displayCount}} nkan tẹlẹ lati igba-ijiroro yii ko le han.",
       "couldNotLoad": "Ko le ṣagbewọ awọn ifiranṣẹ tẹlẹ.",
       "unavailable": "Awọn ifiranṣẹ tẹlẹ ko si.",
       "tooLarge": "Awọn ifiranṣẹ tẹlẹ tobi ju lati ṣagbewọ."
@@ -2069,10 +2082,12 @@
       "viewTable": "Wo tabili",
       "title": "Tabili",
       "close": "Pa tabili",
-      "column": "iwe-ẹsẹ",
-      "columns": "awọn iwe-ẹsẹ",
-      "row": "ila",
-      "rows": "awọn ila",
+      "columnCount_one": "iwe-ẹsẹ",
+      "columnCount": "awọn iwe-ẹsẹ",
+      "columnCount_other": "awọn iwe-ẹsẹ",
+      "rowCount_one": "ila",
+      "rowCount": "awọn ila",
+      "rowCount_other": "awọn ila",
       "opensFullScreen": "ṣii iboju kikun"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "ninu {{window}} tokens",
       "tokens": "tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
-      "stepsCountOne": "{{steps}} igbese",
-      "stepsCountMany": "{{steps}} awọn igbese",
+      "stepsCount_one": "{{steps}} igbese",
+      "stepsCount": "{{steps}} awọn igbese",
+      "stepsCount_other": "{{steps}} awọn igbese",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Iṣẹ-ṣiṣe koodu tuntun",
     "explore": "Ṣàwárí",
     "seeAll": "Wo gbogbo",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Ẹ káàárọ̀",
-    "greetingAfternoon": "Ẹ káàsán",
-    "greetingEvening": "Ẹ káalẹ́"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Pa {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Ṣii iṣakoso Kilo Pass lori ayelujara.",
       "notSubscribed": "Ko ti fọwọsowọpọ",
       "overallocated": "Awọn iyanjade Pass ju awọn ijoko ti a san lọ",
-      "paidSeatOne": "{{count}} ijoko ti a san",
-      "paidSeatOther": "{{count}} awọn ijoko ti a san",
+      "paidSeat_one": "{{displayCount}} ijoko ti a san",
+      "paidSeat": "{{displayCount}} awọn ijoko ti a san",
+      "paidSeat_other": "{{displayCount}} awọn ijoko ti a san",
       "paymentNeedsAttention": "Sanwo nilo akiyesi",
       "paymentPending": "Sanwo n duro",
       "processingBlocked": "Iṣe ilana ti dina",

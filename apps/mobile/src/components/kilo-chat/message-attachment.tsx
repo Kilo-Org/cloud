@@ -1,5 +1,5 @@
 import { useAttachmentUrl } from '@kilocode/kilo-chat-hooks';
-import { type AttachmentBlock, formatFileSize, type KiloChatClient } from '@kilocode/kilo-chat';
+import { type AttachmentBlock, type KiloChatClient } from '@kilocode/kilo-chat';
 import { AlertCircle, File as FileIcon } from '@/components/ui/icons';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
@@ -9,6 +9,8 @@ import { toast } from 'sonner-native';
 import { ImageViewerModal } from '@/components/image-viewer-modal';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatFileSize } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import {
@@ -181,7 +183,7 @@ export function MessageAttachment({ client, conversationId, block, isFromMe }: P
               isFromMe ? 'text-primary-foreground opacity-70' : 'text-muted-foreground'
             )}
           >
-            {formatFileSize(block.size)}
+            {formatFileSize(block.size, i18n.language)}
           </Text>
         ) : null}
       </View>

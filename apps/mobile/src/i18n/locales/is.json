@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} af {{total}} skrám hlaðnar",
       "loadAllFiles": "Hlaða allar skrár",
       "loadAll": "Hlaða allt",
-      "fileLoaded": "{{count}} skrá hlaðin",
-      "filesLoaded": "{{count}} skrár hlaðnar",
-      "fileLoadedOfTotal": "{{count}} skrá hlaðin af {{total}}",
-      "filesLoadedOfTotal": "{{count}} skrár hlaðnar af {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} skrá hlaðin",
+      "fileLoadedCount": "{{displayCount}} skrár hlaðnar",
+      "fileLoadedCount_other": "{{displayCount}} skrár hlaðnar",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} skrá hlaðin af {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} skrár hlaðnar af {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} skrár hlaðnar af {{total}}",
       "filesStillLoading": "Skrár hlaða enn. Dragðu niður til að endurnýja.",
       "goToOverview": "Fara í yfirlit",
       "goToOverviewTab": "Fara í yfirlitsflipa"
@@ -288,8 +290,9 @@
       "resolved": "Leyst",
       "outdated": "Úrelt",
       "file": "Skrá",
-      "oneComment": "1 athugasemd",
-      "commentCount": "{{count}} athugasemdir",
+      "comment_one": "1 athugasemd",
+      "comment": "{{displayCount}} athugasemdir",
+      "comment_other": "{{displayCount}} athugasemdir",
       "startedRelative": " · byrjað {{relative}}",
       "couldNotLoadMore": "Gat ekki hlaðið fleiri athugasemdir.",
       "retryLoadingMore": "Reyna að hlaða fleiri athugasemdir aftur",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Viðbrögð",
       "addReaction": "Bæta við viðbrögðum",
       "reactionPill": "{{emoji}} viðbrögð, {{count}} {{countLabel}}",
-      "reactionSingular": "viðbrögð",
-      "reactionPlural": "viðbrögð",
+      "reaction_one": "viðbrögð",
+      "reaction": "viðbrögð",
+      "reaction_other": "viðbrögð",
       "commentActions": "Athugasemdaaðgerðir",
       "reportContent": "Tilkynna efni",
       "reportUser": "Tilkynna notanda",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Þessi athugasemd verður fjarlægð úr úttektarhópnum.",
       "delete": "Eyða",
       "summaryOptional": "Samantekt (valfrjáls)",
-      "pendingCommentSingular": "biðandi athugasemd",
-      "pendingCommentPlural": "biðandi athugasemdir",
+      "pendingComment_one": "biðandi athugasemd",
+      "pendingComment": "biðandi athugasemdir",
+      "pendingComment_other": "biðandi athugasemdir",
       "submitCountOfTotal": "Senda {{freshCount}} af {{totalCount}} athugasemdum",
       "submitReview": "Senda úttekt",
       "partialPostedMessage": "Sendi {{freshCount}} athugasemd(ir). {{staleCount}} athugasemd(ir) vísa í eldra commit og voru áfram í hópnum þínum."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Opið · Úttekt nauðsynleg",
       "stateOpen": "Opið",
       "unknownAuthor": "Óþekktur höfundur",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "skrá",
-      "filePlural": "skrár"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "skrá",
+      "file": "skrár",
+      "file_other": "skrár"
     },
     "pendingComment": {
       "editOutdatedA11y": "Breyta úreltri biðandi athugasemd á {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Einhver",
-      "oneTyping": "{{name}} er að skrifa...",
-      "manyTyping": "{{names}} eru að skrifa..."
+      "typing_one": "{{name}} er að skrifa...",
+      "typing": "{{names}} eru að skrifa...",
+      "typing_other": "{{names}} eru að skrifa..."
     },
     "botStatus": {
       "online": "Á netinu",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Tókst ekki að hlaða reikningsupplýsingum",
       "manageOnWeb": "Sýsla reikninga á vefnum",
       "commitPlan": "Skuldbinda",
-      "daysLeft": "{{count}} dagar eftir",
       "earlybird": "Snemmbúinn",
       "finalCommitTermEndsOn": "Lokaskildi skuldbindingar þinnar endar {{date}}. Haltu áfram sem Standard á {{price}}, annars lýkur hýsingu.",
       "freeTrial": "Ókeypis reynslutímabil",
       "hostingEnds": "Hýsingu lýkur",
-      "oneDayLeft": "1 dagur eftir",
       "renews": "Endurnýjast",
       "standardMonthToMonth": "Standard mánaðarlega",
       "standardStartsOn": "Standard hefst {{date}} á {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} þarfnast athygli: {{label}}",
-      "openUnreadOne": "Opna {{name}}, {{count}} ólesin skilaboð",
-      "openUnreadMany": "Opna {{name}}, {{count}} ólesin skilaboð",
+      "openUnread_one": "Opna {{name}}, {{displayCount}} ólesin skilaboð",
+      "openUnread": "Opna {{name}}, {{displayCount}} ólesin skilaboð",
+      "openUnread_other": "Opna {{name}}, {{displayCount}} ólesin skilaboð",
       "open": "Opna {{name}}",
       "openSettings": "Opna stillingar fyrir {{name}}",
       "fixOnKiloAi": "Laga á kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Virkja sjálfvirk úrbót?",
       "enableAutoRemediationConfirmMessage": "Security Agent opnar úrbóta-PR sjálfkrafa fyrir gjaldgeng nýtanlegar niðurstöður.",
       "enable": "Virkja",
-      "queuedOne": "{{count}} núverandi atvik sett í biðröð fyrir greiningu.",
-      "queuedMany": "{{count}} núverandi atvik sett í biðröð fyrir greiningu.",
+      "queued_one": "{{displayCount}} núverandi atvik sett í biðröð fyrir greiningu.",
+      "queued": "{{displayCount}} núverandi atvik sett í biðröð fyrir greiningu.",
+      "queued_other": "{{displayCount}} núverandi atvik sett í biðröð fyrir greiningu.",
       "severityCriticalOnly": "Bara mikilvæg",
       "severityHighAndAbove": "Há og hærra",
       "severityMediumAndAbove": "Miðlungs og hærra",
@@ -1482,8 +1490,9 @@
       "on": "On",
       "off": "Af",
       "allRepositories": "Allar geymslur",
-      "repositorySelected": "{{count}} geymsla valin",
-      "repositoriesSelected": "{{count}} geymslur valdar",
+      "repositoriesCount_one": "{{displayCount}} geymsla valin",
+      "repositoriesCount": "{{displayCount}} geymslur valdar",
+      "repositoriesCount_other": "{{displayCount}} geymslur valdar",
       "selectRepositories": "Velja geymslur",
       "selectRepositoriesSubtitle": "Veldu hvaða geymslur Security Agent fylgist með",
       "repositories": "Geymslur",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Lotu eytt",
       "needsInput": "þarfnast inntaks",
       "fromPlatform": "frá {{platform}}",
-      "centOne": "cent",
-      "centOther": "cent",
-      "dollarOne": "dalur",
-      "dollarOther": "dalir"
+      "cent_one": "cent",
+      "cent": "cent",
+      "cent_other": "cent",
+      "dollar_one": "dalur",
+      "dollar": "dalir",
+      "dollar_other": "dalir"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ekki tókst að opna GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Ekki tókst að farga drögunum. Reyndu aftur."
     },
     "partRenderer": {
-      "updatedFile": "Uppfærði {{count}} skrá",
-      "updatedFiles": "Uppfærði {{count}} skrár"
+      "updatedFileCount_one": "Uppfærði {{displayCount}} skrá",
+      "updatedFileCount": "Uppfærði {{displayCount}} skrár",
+      "updatedFileCount_other": "Uppfærði {{displayCount}} skrár"
     },
     "toolPatch": {
       "operationAdded": "Bætt við",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Eldri skilaboð hlaðin",
       "retryHint": "Reynir aftur að hlaða eldri skilaboð fyrir þessa lotu.",
-      "omittedOne": "Sumum eldri atriðum úr þessari lotu var ekki hægt að birta.",
-      "omittedMany": "{{count}} eldri atriði úr þessari lotu var ekki hægt að birta.",
+      "omitted_one": "Sumum eldri atriðum úr þessari lotu var ekki hægt að birta.",
+      "omitted": "{{displayCount}} eldri atriði úr þessari lotu var ekki hægt að birta.",
+      "omitted_other": "{{displayCount}} eldri atriði úr þessari lotu var ekki hægt að birta.",
       "couldNotLoad": "Ekki tókst að hlaða eldri skilaboð.",
       "unavailable": "Eldri skilaboð eru ekki tiltæk.",
       "tooLarge": "Eldri skilaboð eru of stór til að hlaða."
@@ -2069,10 +2082,12 @@
       "viewTable": "Skoða töflu",
       "title": "Tafla",
       "close": "Loka töflu",
-      "column": "dálkur",
-      "columns": "dálkar",
-      "row": "lína",
-      "rows": "línur",
+      "columnCount_one": "dálkur",
+      "columnCount": "dálkar",
+      "columnCount_other": "dálkar",
+      "rowCount_one": "lína",
+      "rowCount": "línur",
+      "rowCount_other": "línur",
       "opensFullScreen": "opnar allan skjáinn"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "af {{window}} tákn",
       "tokens": "tákn",
       "tokensWithPercentage": "tákn ({{percentage}})",
-      "stepsCountOne": "{{steps}} skref",
-      "stepsCountMany": "{{steps}} skref",
+      "stepsCount_one": "{{steps}} skref",
+      "stepsCount": "{{steps}} skref",
+      "stepsCount_other": "{{steps}} skref",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Nýtt forritunarverkefni",
     "explore": "Kanna",
     "seeAll": "Sjá allt",
-    "kiloAgents": "Kilo-umboð",
-    "greetingMorning": "Góðan daginn",
-    "greetingAfternoon": "Góðan eftirmiðdag",
-    "greetingEvening": "Gott kvöld"
+    "kiloAgents": "Kilo-umboð"
   },
   "imageViewer": {
     "close": "Loka {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Opnar Kilo Pass-stjórnun á vefnum.",
       "notSubscribed": "Ekki áskrifandi",
       "overallocated": "Passúthlutanir fara yfir greidd sæti",
-      "paidSeatOne": "{{count}} greitt sæti",
-      "paidSeatOther": "{{count}} greidd sæti",
+      "paidSeat_one": "{{displayCount}} greitt sæti",
+      "paidSeat": "{{displayCount}} greidd sæti",
+      "paidSeat_other": "{{displayCount}} greidd sæti",
       "paymentNeedsAttention": "Greiðslan þarfnast athygli",
       "paymentPending": "Greiðsla í bið",
       "processingBlocked": "Vinnsla lokuð",

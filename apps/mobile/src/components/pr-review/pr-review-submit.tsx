@@ -37,6 +37,7 @@ import {
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 import { type PendingReviewItem, usePendingReview } from '@/lib/pr-review/pending-review-provider';
@@ -279,10 +280,8 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
           <View className="gap-1 rounded-lg border border-hair-soft bg-secondary px-3 py-1.5">
             <Text className="text-sm font-medium text-foreground">
-              {queuedCount}{' '}
-              {queuedCount === 1
-                ? t('prReview.submit.pendingCommentSingular')
-                : t('prReview.submit.pendingCommentPlural')}
+              {formatNumber(queuedCount, i18n.language)}{' '}
+              {t('prReview.submit.pendingComment', { count: queuedCount })}
             </Text>
             {queueHint}
             {/* Keyboard-open viewport is tight; keep the count, hide per-item

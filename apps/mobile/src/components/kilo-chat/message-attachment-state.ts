@@ -1,6 +1,5 @@
-import { formatFileSize } from '@kilocode/kilo-chat';
-
 import { i18n } from '@/i18n';
+import { formatFileSize } from '@/lib/format';
 
 const MESSAGE_ATTACHMENT_MAX_COUNT = 10;
 
@@ -91,7 +90,7 @@ export function buildAttachmentLimitToast(): string {
 export function buildAttachmentSizeRejectionToast(filename: string): string {
   return i18n.t('chat.attachment.sizeRejection', {
     filename,
-    limit: formatFileSize(MOBILE_ATTACHMENT_MAX_BYTES),
+    limit: formatFileSize(MOBILE_ATTACHMENT_MAX_BYTES, i18n.language),
   });
 }
 

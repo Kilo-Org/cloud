@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} sa {{total}} na file ang na-load",
       "loadAllFiles": "I-load ang lahat ng file",
       "loadAll": "I-load lahat",
-      "fileLoaded": "{{count}} na file ang na-load",
-      "filesLoaded": "{{count}} na file ang na-load",
-      "fileLoadedOfTotal": "{{count}} na file sa {{total}} ang na-load",
-      "filesLoadedOfTotal": "{{count}} na file sa {{total}} ang na-load",
+      "fileLoadedCount_one": "{{displayCount}} na file ang na-load",
+      "fileLoadedCount": "{{displayCount}} na file ang na-load",
+      "fileLoadedCount_other": "{{displayCount}} na file ang na-load",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} na file sa {{total}} ang na-load",
+      "fileLoadedOfTotalCount": "{{displayCount}} na file sa {{total}} ang na-load",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} na file sa {{total}} ang na-load",
       "filesStillLoading": "Naglo-load pa rin ang mga file. Hilain para i-refresh.",
       "goToOverview": "Pumunta sa Overview",
       "goToOverviewTab": "Pumunta sa Overview tab"
@@ -288,8 +290,9 @@
       "resolved": "Na-resolve",
       "outdated": "Luma na",
       "file": "File",
-      "oneComment": "1 komento",
-      "commentCount": "{{count}} na komento",
+      "comment_one": "1 komento",
+      "comment": "{{displayCount}} na komento",
+      "comment_other": "{{displayCount}} na komento",
       "startedRelative": " · nagsimula {{relative}}",
       "couldNotLoadMore": "Hindi ma-load ang iba pang komento.",
       "retryLoadingMore": "Subukang i-load muli ang iba pang komento",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Mga Reaksyon",
       "addReaction": "Magdagdag ng reaksyon",
       "reactionPill": "{{emoji}} reaksyon, {{count}} {{countLabel}}",
-      "reactionSingular": "reaksyon",
-      "reactionPlural": "mga reaksyon",
+      "reaction_one": "reaksyon",
+      "reaction": "mga reaksyon",
+      "reaction_other": "mga reaksyon",
       "commentActions": "Mga aksyon sa komento",
       "reportContent": "I-report ang nilalaman",
       "reportUser": "I-report ang user",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Aalisin ang komentong ito sa review queue.",
       "delete": "I-delete",
       "summaryOptional": "Buod (opsyonal)",
-      "pendingCommentSingular": "nakabinbing komento",
-      "pendingCommentPlural": "mga nakabinbing komento",
+      "pendingComment_one": "nakabinbing komento",
+      "pendingComment": "mga nakabinbing komento",
+      "pendingComment_other": "mga nakabinbing komento",
       "submitCountOfTotal": "Isumite ang {{freshCount}} sa {{totalCount}} na komento",
       "submitReview": "Isumite ang review",
       "partialPostedMessage": "Na-post ang {{freshCount}} na komento. Ang {{staleCount}} na komento ay tumutukoy sa mas lumang commit at nanatili sa iyong queue."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Bukas · Kinakailangan ang review",
       "stateOpen": "Bukas",
       "unknownAuthor": "Hindi kilalang author",
-      "commitSingular": "commit",
-      "commitPlural": "mga commit",
-      "fileSingular": "file",
-      "filePlural": "mga file"
+      "commit_one": "commit",
+      "commit": "mga commit",
+      "commit_other": "mga commit",
+      "file_one": "file",
+      "file": "mga file",
+      "file_other": "mga file"
     },
     "pendingComment": {
       "editOutdatedA11y": "I-edit ang lumang nakabinbing komento sa {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "May isang tao",
-      "oneTyping": "{{name}} ay nagta-type...",
-      "manyTyping": "{{names}} ay nagta-type..."
+      "typing_one": "{{name}} ay nagta-type...",
+      "typing": "{{names}} ay nagta-type...",
+      "typing_other": "{{names}} ay nagta-type..."
     },
     "botStatus": {
       "online": "Online",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Hindi maload ang impormasyon ng billing",
       "manageOnWeb": "Pamahalaan ang Billing sa Web",
       "commitPlan": "Mag-commit",
-      "daysLeft": "{{count}} araw ang natitira",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Magtatapos ang iyong huling termino sa Commit sa {{date}}. Magpatuloy bilang Standard sa {{price}}, o magtatapos ang hosting.",
       "freeTrial": "Libreng Subok",
       "hostingEnds": "Magtatapos ang hosting",
-      "oneDayLeft": "1 araw ang natitira",
       "renews": "Nire-renew",
       "standardMonthToMonth": "Standard buwan-buwan",
       "standardStartsOn": "Magsisimula ang Standard sa {{date}} sa {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "Kailangan ng {{name}} ng pansin: {{label}}",
-      "openUnreadOne": "Buksan ang {{name}}, {{count}} na hindi pa nababasang mensahe",
-      "openUnreadMany": "Buksan ang {{name}}, {{count}} na hindi pa nababasang mensahe",
+      "openUnread_one": "Buksan ang {{name}}, {{displayCount}} na hindi pa nababasang mensahe",
+      "openUnread": "Buksan ang {{name}}, {{displayCount}} na hindi pa nababasang mensahe",
+      "openUnread_other": "Buksan ang {{name}}, {{displayCount}} na hindi pa nababasang mensahe",
       "open": "Buksan ang {{name}}",
       "openSettings": "Buksan ang mga setting para kay {{name}}",
       "fixOnKiloAi": "Ayusin sa kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "I-enable ang auto-remediation?",
       "enableAutoRemediationConfirmMessage": "Awtomatikong magbubukas ang Security Agent ng mga remediation PR para sa mga kwalipikadong magagamit na finding.",
       "enable": "I-enable",
-      "queuedOne": "{{count}} umiiral na finding ang nakapila para sa pagsusuri.",
-      "queuedMany": "{{count}} umiiral na findings ang nakapila para sa pagsusuri.",
+      "queued_one": "{{displayCount}} umiiral na finding ang nakapila para sa pagsusuri.",
+      "queued": "{{displayCount}} umiiral na findings ang nakapila para sa pagsusuri.",
+      "queued_other": "{{displayCount}} umiiral na findings ang nakapila para sa pagsusuri.",
       "severityCriticalOnly": "Critical lang",
       "severityHighAndAbove": "High pataas",
       "severityMediumAndAbove": "Medium pataas",
@@ -1482,8 +1490,9 @@
       "on": "Bukas",
       "off": "Sarado",
       "allRepositories": "Lahat ng repository",
-      "repositorySelected": "{{count}} repository ang napili",
-      "repositoriesSelected": "{{count}} repository ang napili",
+      "repositoriesCount_one": "{{displayCount}} repository ang napili",
+      "repositoriesCount": "{{displayCount}} repository ang napili",
+      "repositoriesCount_other": "{{displayCount}} repository ang napili",
       "selectRepositories": "Pumili ng mga repository",
       "selectRepositoriesSubtitle": "Piliin kung aling mga repository ang mina-monitor ng Security Agent",
       "repositories": "Mga repository",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Na-bura ang session",
       "needsInput": "kailangan ng input",
       "fromPlatform": "mula sa {{platform}}",
-      "centOne": "cent",
-      "centOther": "cent",
-      "dollarOne": "dollar",
-      "dollarOther": "dollar"
+      "cent_one": "cent",
+      "cent": "cent",
+      "cent_other": "cent",
+      "dollar_one": "dollar",
+      "dollar": "dollar",
+      "dollar_other": "dollar"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Hindi mabuksan ang GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Hindi ma-discard ang draft. Pakisubukang muli."
     },
     "partRenderer": {
-      "updatedFile": "Na-update ang {{count}} file",
-      "updatedFiles": "Na-update ang {{count}} files"
+      "updatedFileCount_one": "Na-update ang {{displayCount}} file",
+      "updatedFileCount": "Na-update ang {{displayCount}} files",
+      "updatedFileCount_other": "Na-update ang {{displayCount}} files"
     },
     "toolPatch": {
       "operationAdded": "Idinagdag",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Ni-load ang mga naunang mensahe",
       "retryHint": "Muling susubukang i-load ang mga naunang mensahe para sa session na ito.",
-      "omittedOne": "Hindi maipakita ang ilang naunang item mula sa session na ito.",
-      "omittedMany": "Hindi maipakita ang {{count}} na naunang item mula sa session na ito.",
+      "omitted_one": "Hindi maipakita ang ilang naunang item mula sa session na ito.",
+      "omitted": "Hindi maipakita ang {{displayCount}} na naunang item mula sa session na ito.",
+      "omitted_other": "Hindi maipakita ang {{displayCount}} na naunang item mula sa session na ito.",
       "couldNotLoad": "Hindi ma-load ang mga naunang mensahe.",
       "unavailable": "Hindi available ang mga naunang mensahe.",
       "tooLarge": "Masyadong malaki para i-load ang mga naunang mensahe."
@@ -2069,10 +2082,12 @@
       "viewTable": "Tingnan ang table",
       "title": "Table",
       "close": "Isara ang table",
-      "column": "column",
-      "columns": "mga column",
-      "row": "row",
-      "rows": "mga row",
+      "columnCount_one": "column",
+      "columnCount": "mga column",
+      "columnCount_other": "mga column",
+      "rowCount_one": "row",
+      "rowCount": "mga row",
+      "rowCount_other": "mga row",
       "opensFullScreen": "bubuksan sa full screen"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "ng {{window}} na tokens",
       "tokens": "mga token",
       "tokensWithPercentage": "mga token ({{percentage}})",
-      "stepsCountOne": "{{steps}} hakbang",
-      "stepsCountMany": "{{steps}} na hakbang",
+      "stepsCount_one": "{{steps}} hakbang",
+      "stepsCount": "{{steps}} na hakbang",
+      "stepsCount_other": "{{steps}} na hakbang",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Bagong coding task",
     "explore": "Mag-explore",
     "seeAll": "Tingnan lahat",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Magandang umaga",
-    "greetingAfternoon": "Magandang hapon",
-    "greetingEvening": "Magandang gabi"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Isara ang {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Bubuksan ang pamamahala ng Kilo Pass sa web.",
       "notSubscribed": "Hindi naka-subscribe",
       "overallocated": "Lumampas sa bayad na upuan ang mga pagtatalaga ng Pass",
-      "paidSeatOne": "{{count}} bayad na upuan",
-      "paidSeatOther": "{{count}} na bayad na upuan",
+      "paidSeat_one": "{{displayCount}} bayad na upuan",
+      "paidSeat": "{{displayCount}} na bayad na upuan",
+      "paidSeat_other": "{{displayCount}} na bayad na upuan",
       "paymentNeedsAttention": "Kailangan ng atensyon ang pagbabayad",
       "paymentPending": "Nakabinbin ang pagbabayad",
       "processingBlocked": "Naharang ang pagproseso",

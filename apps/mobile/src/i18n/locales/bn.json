@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{total}}-এর মধ্যে {{loaded}} ফাইল লোড হয়েছে",
       "loadAllFiles": "সব ফাইল লোড করুন",
       "loadAll": "সব লোড করুন",
-      "fileLoaded": "{{count}} ফাইল লোড হয়েছে",
-      "filesLoaded": "{{count}} ফাইল লোড হয়েছে",
-      "fileLoadedOfTotal": "{{total}}-এর মধ্যে {{count}} ফাইল লোড হয়েছে",
-      "filesLoadedOfTotal": "{{total}}-এর মধ্যে {{count}} ফাইল লোড হয়েছে",
+      "fileLoadedCount_one": "{{displayCount}} ফাইল লোড হয়েছে",
+      "fileLoadedCount": "{{displayCount}} ফাইল লোড হয়েছে",
+      "fileLoadedCount_other": "{{displayCount}} ফাইল লোড হয়েছে",
+      "fileLoadedOfTotalCount_one": "{{total}}-এর মধ্যে {{displayCount}} ফাইল লোড হয়েছে",
+      "fileLoadedOfTotalCount": "{{total}}-এর মধ্যে {{displayCount}} ফাইল লোড হয়েছে",
+      "fileLoadedOfTotalCount_other": "{{total}}-এর মধ্যে {{displayCount}} ফাইল লোড হয়েছে",
       "filesStillLoading": "ফাইল এখনও লোড হচ্ছে। রিফ্রেশ করতে টানুন।",
       "goToOverview": "ওভারভিউতে যান",
       "goToOverviewTab": "ওভারভিউ ট্যাবে যান"
@@ -288,8 +290,9 @@
       "resolved": "সমাধান হয়েছে",
       "outdated": "পুরাতন",
       "file": "ফাইল",
-      "oneComment": "১টি মন্তব্য",
-      "commentCount": "{{count}}টি মন্তব্য",
+      "comment_one": "১টি মন্তব্য",
+      "comment": "{{displayCount}}টি মন্তব্য",
+      "comment_other": "{{displayCount}}টি মন্তব্য",
       "startedRelative": " · {{relative}}-তে শুরু হয়েছে",
       "couldNotLoadMore": "আরও মন্তব্য লোড করা যায়নি।",
       "retryLoadingMore": "আরও মন্তব্য লোড আবার চেষ্টা করুন",
@@ -299,8 +302,9 @@
       "reactionsTitle": "প্রতিক্রিয়া",
       "addReaction": "প্রতিক্রিয়া যোগ করুন",
       "reactionPill": "{{emoji}} প্রতিক্রিয়া, {{count}} {{countLabel}}",
-      "reactionSingular": "প্রতিক্রিয়া",
-      "reactionPlural": "প্রতিক্রিয়া",
+      "reaction_one": "প্রতিক্রিয়া",
+      "reaction": "প্রতিক্রিয়া",
+      "reaction_other": "প্রতিক্রিয়া",
       "commentActions": "মন্তব্য কর্ম",
       "reportContent": "কনটেন্ট রিপোর্ট করুন",
       "reportUser": "ব্যবহারকারী রিপোর্ট করুন",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "এই মন্তব্যটি রিভিউ সারি থেকে সরানো হবে।",
       "delete": "মুছুন",
       "summaryOptional": "সারাংশ (ঐচ্ছিক)",
-      "pendingCommentSingular": "মুলতুবি মন্তব্য",
-      "pendingCommentPlural": "মুলতুবি মন্তব্য",
+      "pendingComment_one": "মুলতুবি মন্তব্য",
+      "pendingComment": "মুলতুবি মন্তব্য",
+      "pendingComment_other": "মুলতুবি মন্তব্য",
       "submitCountOfTotal": "{{totalCount}}-এর মধ্যে {{freshCount}} মন্তব্য জমা দিন",
       "submitReview": "রিভিউ জমা দিন",
       "partialPostedMessage": "{{freshCount}} মন্তব্য পোস্ট হয়েছে। {{staleCount}} মন্তব্য পুরাতন কমিটে নির্দেশ করে এবং আপনার সারিতে রয়ে গেছে।"
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "খোলা · রিভিউ প্রয়োজন",
       "stateOpen": "খোলা",
       "unknownAuthor": "অজানা লেখক",
-      "commitSingular": "কমিট",
-      "commitPlural": "কমিট",
-      "fileSingular": "ফাইল",
-      "filePlural": "ফাইল"
+      "commit_one": "কমিট",
+      "commit": "কমিট",
+      "commit_other": "কমিট",
+      "file_one": "ফাইল",
+      "file": "ফাইল",
+      "file_other": "ফাইল"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}-এ পুরাতন মুলতুবি মন্তব্য সম্পাদনা করুন",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "কেউ একজন",
-      "oneTyping": "{{name}} লিখছেন...",
-      "manyTyping": "{{names}} লিখছেন..."
+      "typing_one": "{{name}} লিখছেন...",
+      "typing": "{{names}} লিখছেন...",
+      "typing_other": "{{names}} লিখছেন..."
     },
     "botStatus": {
       "online": "অনলাইন",
@@ -722,12 +730,10 @@
       "couldNotLoad": "বিলিং তথ্য লোড করা যায়নি",
       "manageOnWeb": "ওয়েবে বিলিং পরিচালনা করুন",
       "commitPlan": "কমিট",
-      "daysLeft": "{{count}} দিন বাকি",
       "earlybird": "আর্লিবার্ড",
       "finalCommitTermEndsOn": "আপনার চূড়ান্ত Commit মেয়াদ {{date}} তারিখে শেষ হয়। {{price}} মূল্যে স্ট্যান্ডার্ড হিসেবে চালিয়ে যান, নইলে হোস্টিং শেষ হয়ে যাবে।",
       "freeTrial": "ফ্রি ট্রায়াল",
       "hostingEnds": "হোস্টিং শেষ হয়",
-      "oneDayLeft": "১ দিন বাকি",
       "renews": "নবায়ন হয়",
       "standardMonthToMonth": "স্ট্যান্ডার্ড মাসিক",
       "standardStartsOn": "স্ট্যান্ডার্ড {{date}} তারিখে {{price}} মূল্যে শুরু হয়।",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} এর মনোযোগ প্রয়োজন: {{label}}",
-      "openUnreadOne": "{{name}} খুলুন, {{count}}টি অপঠিত বার্তা",
-      "openUnreadMany": "{{name}} খুলুন, {{count}}টি অপঠিত বার্তা",
+      "openUnread_one": "{{name}} খুলুন, {{displayCount}}টি অপঠিত বার্তা",
+      "openUnread": "{{name}} খুলুন, {{displayCount}}টি অপঠিত বার্তা",
+      "openUnread_other": "{{name}} খুলুন, {{displayCount}}টি অপঠিত বার্তা",
       "open": "{{name}} খুলুন",
       "openSettings": "{{name}} এর জন্য সেটিংস খুলুন",
       "fixOnKiloAi": "kilo.ai এ ঠিক করুন: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "অটো-প্রতিকার সক্ষম করবেন?",
       "enableAutoRemediationConfirmMessage": "সিকিউরিটি এজেন্ট যোগ্য শোষণযোগ্য খুঁতের জন্য স্বয়ংক্রিয়ভাবে প্রতিকারের PR খুলবে।",
       "enable": "সক্ষম করুন",
-      "queuedOne": "{{count}}টি বিদ্যমান ফাইন্ডিং বিশ্লেষণের জন্য সারিতে রাখা হয়েছে।",
-      "queuedMany": "{{count}}টি বিদ্যমান ফাইন্ডিং বিশ্লেষণের জন্য সারিতে রাখা হয়েছে।",
+      "queued_one": "{{displayCount}}টি বিদ্যমান ফাইন্ডিং বিশ্লেষণের জন্য সারিতে রাখা হয়েছে।",
+      "queued": "{{displayCount}}টি বিদ্যমান ফাইন্ডিং বিশ্লেষণের জন্য সারিতে রাখা হয়েছে।",
+      "queued_other": "{{displayCount}}টি বিদ্যমান ফাইন্ডিং বিশ্লেষণের জন্য সারিতে রাখা হয়েছে।",
       "severityCriticalOnly": "শুধু ক্রিটিক্যাল",
       "severityHighAndAbove": "উচ্চ এবং তার উপরে",
       "severityMediumAndAbove": "মাঝারি এবং তার উপরে",
@@ -1482,8 +1490,9 @@
       "on": "চালু",
       "off": "বন্ধ",
       "allRepositories": "সব রিপোজিটরি",
-      "repositorySelected": "{{count}}টি রিপোজিটরি নির্বাচিত",
-      "repositoriesSelected": "{{count}}টি রিপোজিটরি নির্বাচিত",
+      "repositoriesCount_one": "{{displayCount}}টি রিপোজিটরি নির্বাচিত",
+      "repositoriesCount": "{{displayCount}}টি রিপোজিটরি নির্বাচিত",
+      "repositoriesCount_other": "{{displayCount}}টি রিপোজিটরি নির্বাচিত",
       "selectRepositories": "রিপোজিটরি নির্বাচন করুন",
       "selectRepositoriesSubtitle": "সিকিউরিটি এজেন্ট কোন রিপোজিটরি পর্যবেক্ষণ করবে তা চয়ন করুন",
       "repositories": "রিপোজিটরি",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "সেশন মুছে ফেলা হয়েছে",
       "needsInput": "ইনপুট প্রয়োজন",
       "fromPlatform": "{{platform}} থেকে",
-      "centOne": "সেন্ট",
-      "centOther": "সেন্ট",
-      "dollarOne": "ডলার",
-      "dollarOther": "ডলার"
+      "cent_one": "সেন্ট",
+      "cent": "সেন্ট",
+      "cent_other": "সেন্ট",
+      "dollar_one": "ডলার",
+      "dollar": "ডলার",
+      "dollar_other": "ডলার"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub খোলা যায়নি",
@@ -1817,8 +1828,9 @@
       "discardFailed": "ড্রাফ্টটি বাতিল করা যায়নি। আবার চেষ্টা করুন।"
     },
     "partRenderer": {
-      "updatedFile": "{{count}}টি ফাইল আপডেট হয়েছে",
-      "updatedFiles": "{{count}}টি ফাইল আপডেট হয়েছে"
+      "updatedFileCount_one": "{{displayCount}}টি ফাইল আপডেট হয়েছে",
+      "updatedFileCount": "{{displayCount}}টি ফাইল আপডেট হয়েছে",
+      "updatedFileCount_other": "{{displayCount}}টি ফাইল আপডেট হয়েছে"
     },
     "toolPatch": {
       "operationAdded": "যোগ করা হয়েছে",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "আগের বার্তাগুলি লোড হয়েছে",
       "retryHint": "এই সেশনের জন্য আগের বার্তা লোড আবার চেষ্টা করে।",
-      "omittedOne": "এই সেশনের কিছু আগের আইটেম প্রদর্শিত করা যায়নি।",
-      "omittedMany": "এই সেশনের {{count}}টি আগের আইটেম প্রদর্শিত করা যায়নি।",
+      "omitted_one": "এই সেশনের কিছু আগের আইটেম প্রদর্শিত করা যায়নি।",
+      "omitted": "এই সেশনের {{displayCount}}টি আগের আইটেম প্রদর্শিত করা যায়নি।",
+      "omitted_other": "এই সেশনের {{displayCount}}টি আগের আইটেম প্রদর্শিত করা যায়নি।",
       "couldNotLoad": "আগের বার্তাগুলি লোড করা যায়নি।",
       "unavailable": "আগের বার্তাগুলি উপলব্ধ নয়।",
       "tooLarge": "আগের বার্তাগুলি লোড করার জন্য খুব বড়।"
@@ -2069,10 +2082,12 @@
       "viewTable": "টেবিল দেখুন",
       "title": "টেবিল",
       "close": "টেবিল বন্ধ করুন",
-      "column": "কলাম",
-      "columns": "কলাম",
-      "row": "সারি",
-      "rows": "সারি",
+      "columnCount_one": "কলাম",
+      "columnCount": "কলাম",
+      "columnCount_other": "কলাম",
+      "rowCount_one": "সারি",
+      "rowCount": "সারি",
+      "rowCount_other": "সারি",
       "opensFullScreen": "ফুল স্ক্রিনে খোলে"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} টোকেনের মধ্যে",
       "tokens": "টোকেন",
       "tokensWithPercentage": "টোকেন ({{percentage}})",
-      "stepsCountOne": "{{steps}}টি ধাপ",
-      "stepsCountMany": "{{steps}}টি ধাপ",
+      "stepsCount_one": "{{steps}}টি ধাপ",
+      "stepsCount": "{{steps}}টি ধাপ",
+      "stepsCount_other": "{{steps}}টি ধাপ",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "নতুন কোডিং কাজ",
     "explore": "অন্বেষণ",
     "seeAll": "সব দেখুন",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "শুভ সকাল",
-    "greetingAfternoon": "শুভ বিকাল",
-    "greetingEvening": "শুভ সন্ধ্যা"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "{{filename}} বন্ধ করুন",
@@ -2645,8 +2658,9 @@
       "manageHint": "ওয়েবে Kilo Pass ব্যবস্থাপনা খোলে।",
       "notSubscribed": "সাবস্ক্রাইব করা হয়নি",
       "overallocated": "পাস বরাদ্দ প্রদত্ত সিট ছাড়িয়ে যায়",
-      "paidSeatOne": "{{count}}টি প্রদত্ত সিট",
-      "paidSeatOther": "{{count}}টি প্রদত্ত সিট",
+      "paidSeat_one": "{{displayCount}}টি প্রদত্ত সিট",
+      "paidSeat": "{{displayCount}}টি প্রদত্ত সিট",
+      "paidSeat_other": "{{displayCount}}টি প্রদত্ত সিট",
       "paymentNeedsAttention": "পেমেন্টে মনোযোগ প্রয়োজন",
       "paymentPending": "পেমেন্ট অপেক্ষমাণ",
       "processingBlocked": "প্রক্রিয়াকরণ অবরুদ্ধ",

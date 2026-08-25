@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import {
   useSecurityAgentCapability,
   useSecurityAgentConfig,
@@ -125,15 +126,12 @@ export function SettingsOverviewScreen({
   // keeps the CTA reachable.
   const showRepoCta =
     !data.isEnabled && capability.canManage && !hasEffectiveRepo && !repositoriesEmpty;
-  let repoCountLabel = t('securityAgent.settingsOverview.repositoriesSelected', {
+  let repoCountLabel = t('securityAgent.settingsOverview.repositoriesCount', {
     count: data.selectedRepositoryIds.length,
+    displayCount: formatNumber(data.selectedRepositoryIds.length, i18n.language),
   });
   if (data.repositorySelectionMode === 'all') {
     repoCountLabel = t('securityAgent.settingsOverview.allRepositories');
-  } else if (data.selectedRepositoryIds.length === 1) {
-    repoCountLabel = t('securityAgent.settingsOverview.repositorySelected', {
-      count: data.selectedRepositoryIds.length,
-    });
   }
   const automationEnabledCount = [
     data.autoAnalysisEnabled,

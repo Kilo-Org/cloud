@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} minn {{total}} fajls mgħobbija",
       "loadAllFiles": "Għabbi l-fajls kollha",
       "loadAll": "Għabbi kollox",
-      "fileLoaded": "{{count}} fajl mgħobbi",
-      "filesLoaded": "{{count}} fajls mgħobbija",
-      "fileLoadedOfTotal": "{{count}} fajl mgħobbi minn {{total}}",
-      "filesLoadedOfTotal": "{{count}} fajls mgħobbija minn {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} fajl mgħobbi",
+      "fileLoadedCount": "{{displayCount}} fajls mgħobbija",
+      "fileLoadedCount_other": "{{displayCount}} fajls mgħobbija",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} fajl mgħobbi minn {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} fajls mgħobbija minn {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} fajls mgħobbija minn {{total}}",
       "filesStillLoading": "Il-fajls għadhom qed jitgħabbew. Iġbed biex taġġorna.",
       "goToOverview": "Mur fil-Ħarsa Ġenerali",
       "goToOverviewTab": "Mur fit-tab tal-Ħarsa Ġenerali"
@@ -288,8 +290,9 @@
       "resolved": "Solvut",
       "outdated": "Skadut",
       "file": "Fajl",
-      "oneComment": "kumment 1",
-      "commentCount": "{{count}} kummenti",
+      "comment_one": "kumment 1",
+      "comment": "{{displayCount}} kummenti",
+      "comment_other": "{{displayCount}} kummenti",
       "startedRelative": " · beda {{relative}}",
       "couldNotLoadMore": "Ma setgħux jitgħabbew aktar kummenti.",
       "retryLoadingMore": "Erġa' pprova jitgħabbew aktar kummenti",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reazzjonijiet",
       "addReaction": "Żid reazzjoni",
       "reactionPill": "{{emoji}} reazzjoni, {{count}} {{countLabel}}",
-      "reactionSingular": "reazzjoni",
-      "reactionPlural": "reazzjonijiet",
+      "reaction_one": "reazzjoni",
+      "reaction": "reazzjonijiet",
+      "reaction_other": "reazzjonijiet",
       "commentActions": "Azzjonijiet tal-kument",
       "reportContent": "Irrapporta l-kontenut",
       "reportUser": "Irrapporta l-utent",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Dan il-kument se jitneħħa mill-kju tar-reviżjoni.",
       "delete": "Ħassar",
       "summaryOptional": "Sommarju (fakultattiv)",
-      "pendingCommentSingular": "kument pendenti",
-      "pendingCommentPlural": "kummenti pendenti",
+      "pendingComment_one": "kument pendenti",
+      "pendingComment": "kummenti pendenti",
+      "pendingComment_other": "kummenti pendenti",
       "submitCountOfTotal": "Ibgħat {{freshCount}} minn {{totalCount}} kummenti",
       "submitReview": "Ibgħat ir-reviżjoni",
       "partialPostedMessage": "Tpoġġew {{freshCount}} kumment(i). {{staleCount}} kumment(i) jindikaw commit aktar antik u baqgħu fil-kju tiegħek."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Miftuħ · Reviżjoni meħtieġa",
       "stateOpen": "Miftuħ",
       "unknownAuthor": "Awtur mhux magħruf",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "fajl",
-      "filePlural": "fajls"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "fajl",
+      "file": "fajls",
+      "file_other": "fajls"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editja l-kument pendenti skadut fuq {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Xi ħadd",
-      "oneTyping": "{{name}} qed jikteb...",
-      "manyTyping": "{{names}} qed jiktbu..."
+      "typing_one": "{{name}} qed jikteb...",
+      "typing": "{{names}} qed jiktbu...",
+      "typing_other": "{{names}} qed jiktbu..."
     },
     "botStatus": {
       "online": "Onlajn",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Ma setgħetx tintella' l-informazzjoni tal-ħlas",
       "manageOnWeb": "Immaniġġja l-Ħlas fuq il-Web",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} jum jifdal",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "It-terminu finali tal-Commits jintemm fil-{{date}}. Kompli bħala Standard bi {{price}}, jew l-ospitar jintemm.",
       "freeTrial": "Prova b'xejn",
       "hostingEnds": "L-ospitar jintemm",
-      "oneDayLeft": "Jifdal jum wieħed",
       "renews": "Jiġġedded",
       "standardMonthToMonth": "Standard xahar b'xahar",
       "standardStartsOn": "Standard jibda fil-{{date}} bi {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} jeħtieġ attenzjoni: {{label}}",
-      "openUnreadOne": "Iftaħ {{name}}, messaġġ mhux moqri {{count}}",
-      "openUnreadMany": "Iftaħ {{name}}, {{count}} messaġġi mhux moqrija",
+      "openUnread_one": "Iftaħ {{name}}, messaġġ mhux moqri {{displayCount}}",
+      "openUnread": "Iftaħ {{name}}, {{displayCount}} messaġġi mhux moqrija",
+      "openUnread_other": "Iftaħ {{name}}, {{displayCount}} messaġġi mhux moqrija",
       "open": "Iftaħ {{name}}",
       "openSettings": "Iftaħ l-issettjar ta' {{name}}",
       "fixOnKiloAi": "Isewwi fuq kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Tattiva r-rimedju awto?",
       "enableAutoRemediationConfirmMessage": "Is-Security Agent se jiftaħ PRs ta' rimedju b'mod awtomatiku għal sejbiet sfruttabbli eliġibbli.",
       "enable": "Attiva",
-      "queuedOne": "{{count}} sejba eżistenti fil-kju għall-analiżi.",
-      "queuedMany": "{{count}} sejbiet eżistenti fil-kju għall-analiżi.",
+      "queued_one": "{{displayCount}} sejba eżistenti fil-kju għall-analiżi.",
+      "queued": "{{displayCount}} sejbiet eżistenti fil-kju għall-analiżi.",
+      "queued_other": "{{displayCount}} sejbiet eżistenti fil-kju għall-analiżi.",
       "severityCriticalOnly": "Kritiku biss",
       "severityHighAndAbove": "Għoli u 'l fuq",
       "severityMediumAndAbove": "Medju u 'l fuq",
@@ -1482,8 +1490,9 @@
       "on": "Iva",
       "off": "Le",
       "allRepositories": "Ir-repożitorji kollha",
-      "repositorySelected": "{{count}} repożitorju magħżul",
-      "repositoriesSelected": "{{count}} repożitorji magħżula",
+      "repositoriesCount_one": "{{displayCount}} repożitorju magħżul",
+      "repositoriesCount": "{{displayCount}} repożitorji magħżula",
+      "repositoriesCount_other": "{{displayCount}} repożitorji magħżula",
       "selectRepositories": "Agħżel ir-repożitorji",
       "selectRepositoriesSubtitle": "Agħżel liema repożitorji jissorvelja s-Security Agent",
       "repositories": "Repożitorji",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Is-sessjoni tħassret",
       "needsInput": "jeħtieġ input",
       "fromPlatform": "minn {{platform}}",
-      "centOne": "ċenteżmu",
-      "centOther": "ċenteżmi",
-      "dollarOne": "dollaru",
-      "dollarOther": "dollari"
+      "cent_one": "ċenteżmu",
+      "cent": "ċenteżmi",
+      "cent_other": "ċenteżmi",
+      "dollar_one": "dollaru",
+      "dollar": "dollari",
+      "dollar_other": "dollari"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ma setax jinfetaħ GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Ma setax jintrema l-abbozz. Jekk jogħġbok erġa' pprova."
     },
     "partRenderer": {
-      "updatedFile": "Aġġornat {{count}} fajl",
-      "updatedFiles": "Aġġornati {{count}} fajls"
+      "updatedFileCount_one": "Aġġornat {{displayCount}} fajl",
+      "updatedFileCount": "Aġġornati {{displayCount}} fajls",
+      "updatedFileCount_other": "Aġġornati {{displayCount}} fajls"
     },
     "toolPatch": {
       "operationAdded": "Miżjud",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Messaġġi aktar bikrin mibgħuta",
       "retryHint": "Jerġa' jipprova jgħabbi l-messaġġi aktar bikrin għal din is-sessjoni.",
-      "omittedOne": "Xi oġġetti aktar bikrin minn din is-sessjoni ma setgħux jintwerew.",
-      "omittedMany": "{{count}} oġġetti aktar bikrin minn din is-sessjoni ma setgħux jintwerew.",
+      "omitted_one": "Xi oġġetti aktar bikrin minn din is-sessjoni ma setgħux jintwerew.",
+      "omitted": "{{displayCount}} oġġetti aktar bikrin minn din is-sessjoni ma setgħux jintwerew.",
+      "omitted_other": "{{displayCount}} oġġetti aktar bikrin minn din is-sessjoni ma setgħux jintwerew.",
       "couldNotLoad": "Ma setgħux jitgħabbew il-messaġġi aktar bikrin.",
       "unavailable": "Il-messaġġi aktar bikrin mhumiex disponibbli.",
       "tooLarge": "Il-messaġġi aktar bikrin huma kbar wisq biex jitgħabbew."
@@ -2069,10 +2082,12 @@
       "viewTable": "Ara t-tabella",
       "title": "Tabella",
       "close": "Agħlaq it-tabella",
-      "column": "kolonna",
-      "columns": "kolonni",
-      "row": "ringiela",
-      "rows": "ringieli",
+      "columnCount_one": "kolonna",
+      "columnCount": "kolonni",
+      "columnCount_other": "kolonni",
+      "rowCount_one": "ringiela",
+      "rowCount": "ringieli",
+      "rowCount_other": "ringieli",
       "opensFullScreen": "jiftaħ b'mod sħiħ"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "minn {{window}} tokens",
       "tokens": "tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
-      "stepsCountOne": "{{steps}} pass",
-      "stepsCountMany": "{{steps}} passi",
+      "stepsCount_one": "{{steps}} pass",
+      "stepsCount": "{{steps}} passi",
+      "stepsCount_other": "{{steps}} passi",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Kompitu ġdid ta' kodifikazzjoni",
     "explore": "Esplora",
     "seeAll": "Ara kollha",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Il-ġurnata t-tajba",
-    "greetingAfternoon": "Il-wara nofsinhar it-tajjeb",
-    "greetingEvening": "Il-lejla t-tajba"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Agħlaq {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Jiftaħ il-ġestjoni ta' Kilo Pass fuq il-web.",
       "notSubscribed": "Mhux sottoskritt",
       "overallocated": "L-assenjazzjonijiet tal-Pass jaqbżu l-postijiet imħallsa",
-      "paidSeatOne": "{{count}} post imħallas",
-      "paidSeatOther": "{{count}} postijiet imħallsa",
+      "paidSeat_one": "{{displayCount}} post imħallas",
+      "paidSeat": "{{displayCount}} postijiet imħallsa",
+      "paidSeat_other": "{{displayCount}} postijiet imħallsa",
       "paymentNeedsAttention": "Il-ħlas għandu bżonn attenzjoni",
       "paymentPending": "Ħlas pendenti",
       "processingBlocked": "L-ipproċessar imblukkat",

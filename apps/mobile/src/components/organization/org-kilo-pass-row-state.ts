@@ -1,5 +1,5 @@
 import { i18n } from '@/i18n';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatNumber } from '@/lib/format';
 import { parseTimestamp } from '@/lib/utils';
 
 /**
@@ -65,10 +65,10 @@ const TIER_LABELS = {
 } satisfies Record<'tier_19' | 'tier_49' | 'tier_199', string>;
 
 function paidSeatsLabel(count: number): string {
-  return i18n.t(
-    count === 1 ? 'organization.kiloPass.paidSeatOne' : 'organization.kiloPass.paidSeatOther',
-    { count }
-  );
+  return i18n.t('organization.kiloPass.paidSeat', {
+    count,
+    displayCount: formatNumber(count, i18n.language),
+  });
 }
 
 function activeSubtitle(agreement: NonNullable<OrgKiloPassSummary['agreement']>): string {

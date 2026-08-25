@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "ဖိုင်များ {{total}} တွင် {{loaded}} တင်ပြီး",
       "loadAllFiles": "ဖိုင်အားလုံးတင်ပါ",
       "loadAll": "အားလုံးတင်ပါ",
-      "fileLoaded": "ဖိုင် {{count}} တင်ပြီး",
-      "filesLoaded": "ဖိုင်များ {{count}} တင်ပြီး",
-      "fileLoadedOfTotal": "{{total}} တွင် ဖိုင် {{count}} တင်ပြီး",
-      "filesLoadedOfTotal": "{{total}} တွင် ဖိုင်များ {{count}} တင်ပြီး",
+      "fileLoadedCount_one": "ဖိုင် {{displayCount}} တင်ပြီး",
+      "fileLoadedCount": "ဖိုင်များ {{displayCount}} တင်ပြီး",
+      "fileLoadedCount_other": "ဖိုင်များ {{displayCount}} တင်ပြီး",
+      "fileLoadedOfTotalCount_one": "{{total}} တွင် ဖိုင် {{displayCount}} တင်ပြီး",
+      "fileLoadedOfTotalCount": "{{total}} တွင် ဖိုင်များ {{displayCount}} တင်ပြီး",
+      "fileLoadedOfTotalCount_other": "{{total}} တွင် ဖိုင်များ {{displayCount}} တင်ပြီး",
       "filesStillLoading": "ဖိုင်များ ဆက်တင်နေသည်။ ပြန်ဆန်းရန် ဆွဲပါ။",
       "goToOverview": "Overview သို့ သွားပါ",
       "goToOverviewTab": "Overview တဘ်သို့ သွားပါ"
@@ -288,8 +290,9 @@
       "resolved": "ဖြေရှင်းပြီး",
       "outdated": "ခေတ်နောက်ကျသော",
       "file": "ဖိုင်",
-      "oneComment": "မှတ်ချက် ၁ ခု",
-      "commentCount": "မှတ်ချက် {{count}} ခု",
+      "comment_one": "မှတ်ချက် ၁ ခု",
+      "comment": "မှတ်ချက် {{displayCount}} ခု",
+      "comment_other": "မှတ်ချက် {{displayCount}} ခု",
       "startedRelative": " · {{relative}} တွင် စတင်ခဲ့သည်",
       "couldNotLoadMore": "နောက်ထပ်မှတ်ချက်များကို တင်မရပါ။",
       "retryLoadingMore": "နောက်ထပ်မှတ်ချက်များတင်ရန် ထပ်စမ်းကြည့်",
@@ -299,8 +302,9 @@
       "reactionsTitle": "တုံ့ပြန်မှုများ",
       "addReaction": "တုံ့ပြန်မှုထည့်ပါ",
       "reactionPill": "{{emoji}} တုံ့ပြန်မှု, {{count}} {{countLabel}}",
-      "reactionSingular": "တုံ့ပြန်မှု",
-      "reactionPlural": "တုံ့ပြန်မှုများ",
+      "reaction_one": "တုံ့ပြန်မှု",
+      "reaction": "တုံ့ပြန်မှုများ",
+      "reaction_other": "တုံ့ပြန်မှုများ",
       "commentActions": "မှတ်ချက်လုပ်ဆောင်ချက်များ",
       "reportContent": "အကြောင်းအရာ သတင်းပို့ပါ",
       "reportUser": "အသုံးပြုသူ သတင်းပို့ပါ",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "ဤမှတ်ချက်ကို သုံးသပ်မှုတန်းစီမှ ဖယ်ရှားပါမည်။",
       "delete": "ဖျက်ပါ",
       "summaryOptional": "အကျဉ်းချုပ် (ရွေးချယ်နိုင်သည်)",
-      "pendingCommentSingular": "ဆိုင်းငံ့မှတ်ချက်",
-      "pendingCommentPlural": "ဆိုင်းငံ့မှတ်ချက်များ",
+      "pendingComment_one": "ဆိုင်းငံ့မှတ်ချက်",
+      "pendingComment": "ဆိုင်းငံ့မှတ်ချက်များ",
+      "pendingComment_other": "ဆိုင်းငံ့မှတ်ချက်များ",
       "submitCountOfTotal": "မှတ်ချက် {{totalCount}} တွင် {{freshCount}} တင်သွင်းပါ",
       "submitReview": "သုံးသပ်မှုတင်သွင်းပါ",
       "partialPostedMessage": "မှတ်ချက် {{freshCount}} ခု တင်ပြီးပါပြီ။ မှတ်ချက် {{staleCount}} ခုသည် အဟောင်း commit ကို ညွှန်ပြပြီး သင့်တန်းစီတွင် ရှိနေပါသည်။"
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "ဖွင့်ထား · သုံးသပ်မှု လိုအပ်",
       "stateOpen": "ဖွင့်ထား",
       "unknownAuthor": "အမည်မသိ ရေးသားသူ",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "ဖိုင်",
-      "filePlural": "ဖိုင်များ"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "ဖိုင်",
+      "file": "ဖိုင်များ",
+      "file_other": "ဖိုင်များ"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} တွင် ခေတ်နောက်ကျသော ဆိုင်းငံ့မှတ်ချက် တည်းဖြတ်ပါ",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "တစ်စုံတစ်ယောက်",
-      "oneTyping": "{{name}} စာရိုက်နေသည်...",
-      "manyTyping": "{{names}} စာရိုက်နေကြသည်..."
+      "typing_one": "{{name}} စာရိုက်နေသည်...",
+      "typing": "{{names}} စာရိုက်နေကြသည်...",
+      "typing_other": "{{names}} စာရိုက်နေကြသည်..."
     },
     "botStatus": {
       "online": "အွန်လိုင်း",
@@ -722,12 +730,10 @@
       "couldNotLoad": "ဘေလ်ပေးချေ အချက်အလက် ဖွင့်၍ မရပါ",
       "manageOnWeb": "ဝက်ဘ်ပေါ်တွင် ဘေလ်စီမံရန်",
       "commitPlan": "ကတိပြု",
-      "daysLeft": "{{count}} ရက် ကျန်ပါသည်",
       "earlybird": "အစောပိုင်းငှက်",
       "finalCommitTermEndsOn": "သင့် Commit နောက်ဆုံးသက်တမ်းသည် {{date}} တွင် ကုန်ဆုံးပါသည်။ {{price}} ဖြင့် Standard အဖြစ် ဆက်လုပ်ပါ၊ သို့မဟုတ် ဟော့စ်တင် ရပ်ဆိုင်းမည်။",
       "freeTrial": "အခမဲ့စမ်းသုံး",
       "hostingEnds": "ဟော့စ်တင် ကုန်ဆုံး",
-      "oneDayLeft": "1 ရက် ကျန်ပါသည်",
       "renews": "သက်တမ်းတိုး",
       "standardMonthToMonth": "Standard လစဉ်ပေးချေ",
       "standardStartsOn": "Standard သည် {{date}} တွင် {{price}} ဖြင့် စတင်ပါသည်။",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} အာရုံစိုက်ရန် လိုသည်- {{label}}",
-      "openUnreadOne": "{{name}} ဖွင့်ရန်၊ {{count}} မဖတ်ရသေးသော မက်ဆေ့ချ်",
-      "openUnreadMany": "{{name}} ဖွင့်ရန်၊ {{count}} မဖတ်ရသေးသော မက်ဆေ့ချ်များ",
+      "openUnread_one": "{{name}} ဖွင့်ရန်၊ {{displayCount}} မဖတ်ရသေးသော မက်ဆေ့ချ်",
+      "openUnread": "{{name}} ဖွင့်ရန်၊ {{displayCount}} မဖတ်ရသေးသော မက်ဆေ့ချ်များ",
+      "openUnread_other": "{{name}} ဖွင့်ရန်၊ {{displayCount}} မဖတ်ရသေးသော မက်ဆေ့ချ်များ",
       "open": "{{name}} ဖွင့်ရန်",
       "openSettings": "{{name}} အတွက် ဆက်တင်များ ဖွင့်ရန်",
       "fixOnKiloAi": "kilo.ai တွင် ဖြေရှင်းရန်- {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "အလိုအလျောက် ပြုပြင်မှု ဖွင့်မလား။",
       "enableAutoRemediationConfirmMessage": "Security Agent က သင့်လျော်သော အသုံးချနိုင်သော တွေ့ရှိချက်များအတွက် ပြုပြင်မှု PR များကို အလိုအလျောက် ဖွင့်ပါမည်။",
       "enable": "ဖွင့်ရန်",
-      "queuedOne": "ရှိပြီးသားတွေ့ရှိချက် {{count}} ခုကို ခွဲခြမ်းစိတ်ဖြာရန် တန်းစီထားသည်။",
-      "queuedMany": "ရှိပြီးသားတွေ့ရှိချက်များ {{count}} ခုကို ခွဲခြမ်းစိတ်ဖြာရန် တန်းစီထားသည်။",
+      "queued_one": "ရှိပြီးသားတွေ့ရှိချက် {{displayCount}} ခုကို ခွဲခြမ်းစိတ်ဖြာရန် တန်းစီထားသည်။",
+      "queued": "ရှိပြီးသားတွေ့ရှိချက်များ {{displayCount}} ခုကို ခွဲခြမ်းစိတ်ဖြာရန် တန်းစီထားသည်။",
+      "queued_other": "ရှိပြီးသားတွေ့ရှိချက်များ {{displayCount}} ခုကို ခွဲခြမ်းစိတ်ဖြာရန် တန်းစီထားသည်။",
       "severityCriticalOnly": "အရေးကြီးသောအဆင့်သာ",
       "severityHighAndAbove": "မြင့်မားခြင်းနှင့်အထက်",
       "severityMediumAndAbove": "အလယ်အလတ်နှင့်အထက်",
@@ -1482,8 +1490,9 @@
       "on": "ဖွင့်",
       "off": "ပိတ်",
       "allRepositories": "သိုလှောင်မှုအားလုံး",
-      "repositorySelected": "သိုလှောင်မှု {{count}} ခု ရွေးချယ်ထား",
-      "repositoriesSelected": "သိုလှောင်မှု {{count}} ခု ရွေးချယ်ထား",
+      "repositoriesCount_one": "သိုလှောင်မှု {{displayCount}} ခု ရွေးချယ်ထား",
+      "repositoriesCount": "သိုလှောင်မှု {{displayCount}} ခု ရွေးချယ်ထား",
+      "repositoriesCount_other": "သိုလှောင်မှု {{displayCount}} ခု ရွေးချယ်ထား",
       "selectRepositories": "သိုလှောင်မှုများ ရွေးချယ်ပါ",
       "selectRepositoriesSubtitle": "Security Agent စောင့်ကြည့်မည့် သိုလှောင်မှုများကို ရွေးချယ်ပါ",
       "repositories": "သိုလှောင်မှုများ",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "စက်ရှင် ဖျက်ပြီး",
       "needsInput": "ထည့်သွင်းမှု လိုအပ်",
       "fromPlatform": "{{platform}} မှ",
-      "centOne": "ဆင့်",
-      "centOther": "ဆင့်များ",
-      "dollarOne": "ဒေါ်လာ",
-      "dollarOther": "ဒေါ်လာများ"
+      "cent_one": "ဆင့်",
+      "cent": "ဆင့်များ",
+      "cent_other": "ဆင့်များ",
+      "dollar_one": "ဒေါ်လာ",
+      "dollar": "ဒေါ်လာများ",
+      "dollar_other": "ဒေါ်လာများ"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ကို မဖွင့်နိုင်ခဲ့ပါ",
@@ -1817,8 +1828,9 @@
       "discardFailed": "မူကြမ်းကို ပယ်ဖျက်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။"
     },
     "partRenderer": {
-      "updatedFile": "ဖိုင် {{count}} ခု မွမ်းမံပြီး",
-      "updatedFiles": "ဖိုင် {{count}} ခု မွမ်းမံပြီး"
+      "updatedFileCount_one": "ဖိုင် {{displayCount}} ခု မွမ်းမံပြီး",
+      "updatedFileCount": "ဖိုင် {{displayCount}} ခု မွမ်းမံပြီး",
+      "updatedFileCount_other": "ဖိုင် {{displayCount}} ခု မွမ်းမံပြီး"
     },
     "toolPatch": {
       "operationAdded": "ထည့်ပြီး",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "အစောပိုင်း စာများ တင်ပြီးပါပြီ",
       "retryHint": "ဤ session အတွက် အစောပိုင်း စာများ တင်ခြင်းကို ထပ်ကြိုးစားသည်။",
-      "omittedOne": "ဤ session မှ အစောပိုင်း အချို့ အရာများကို ပြသနိုင်ခဲ့ခြင်း မရှိပါ။",
-      "omittedMany": "ဤ session မှ အစောပိုင်း အရာ {{count}} ခုကို ပြသနိုင်ခဲ့ခြင်း မရှိပါ။",
+      "omitted_one": "ဤ session မှ အစောပိုင်း အချို့ အရာများကို ပြသနိုင်ခဲ့ခြင်း မရှိပါ။",
+      "omitted": "ဤ session မှ အစောပိုင်း အရာ {{displayCount}} ခုကို ပြသနိုင်ခဲ့ခြင်း မရှိပါ။",
+      "omitted_other": "ဤ session မှ အစောပိုင်း အရာ {{displayCount}} ခုကို ပြသနိုင်ခဲ့ခြင်း မရှိပါ။",
       "couldNotLoad": "အစောပိုင်း စာများကို မတင်နိုင်ပါ။",
       "unavailable": "အစောပိုင်း စာများ မရနိုင်ပါ။",
       "tooLarge": "အစောပိုင်း စာများသည် တင်ရန် ကြီးလွန်းသည်။"
@@ -2069,10 +2082,12 @@
       "viewTable": "ဇယားကြည့်ရန်",
       "title": "ဇယား",
       "close": "ဇယားပိတ်ရန်",
-      "column": "ကော်လံ",
-      "columns": "ကော်လံများ",
-      "row": "အတန်း",
-      "rows": "အတန်းများ",
+      "columnCount_one": "ကော်လံ",
+      "columnCount": "ကော်လံများ",
+      "columnCount_other": "ကော်လံများ",
+      "rowCount_one": "အတန်း",
+      "rowCount": "အတန်းများ",
+      "rowCount_other": "အတန်းများ",
       "opensFullScreen": "မျက်နှာပြင်အပြည့် ဖွင့်သည်"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} token မှ",
       "tokens": "token များ",
       "tokensWithPercentage": "token များ ({{percentage}})",
-      "stepsCountOne": "{{steps}} လုပ်ဆောင်ချက်",
-      "stepsCountMany": "{{steps}} လုပ်ဆောင်ချက်များ",
+      "stepsCount_one": "{{steps}} လုပ်ဆောင်ချက်",
+      "stepsCount": "{{steps}} လုပ်ဆောင်ချက်များ",
+      "stepsCount_other": "{{steps}} လုပ်ဆောင်ချက်များ",
       "modelAccessibilityLabel": "{{name}}၊ {{provider}}၊ {{steps}}၊ {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "coding အလုပ်အသစ်",
     "explore": "ရှာဖွေပါ",
     "seeAll": "အားလုံး ကြည့်ရန်",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "မင်္ဂလာနံနက်ခင်း",
-    "greetingAfternoon": "မင်္ဂလာနေ့လည်ခင်း",
-    "greetingEvening": "မင်္ဂလာညနေခင်း"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "{{filename}} ပိတ်ရန်",
@@ -2645,8 +2658,9 @@
       "manageHint": "ဝဘ်တွင် Kilo Pass စီမံခန့်ခွဲမှုကို ဖွင့်သည်။",
       "notSubscribed": "subscription မရှိပါ",
       "overallocated": "Pass သတ်မှတ်မှုများသည် ပေးထားသော နေရာများထက် ကျော်လွန်နေသည်",
-      "paidSeatOne": "ပေးထားသော နေရာ {{count}} ခု",
-      "paidSeatOther": "ပေးထားသော နေရာ {{count}} ခု",
+      "paidSeat_one": "ပေးထားသော နေရာ {{displayCount}} ခု",
+      "paidSeat": "ပေးထားသော နေရာ {{displayCount}} ခု",
+      "paidSeat_other": "ပေးထားသော နေရာ {{displayCount}} ခု",
       "paymentNeedsAttention": "ငွေပေးချေမှု အာရုံစိုက်ရန် လိုအပ်သည်",
       "paymentPending": "ငွေပေးချေမှု ဆိုင်းငံ့နေသည်",
       "processingBlocked": "လုပ်ဆောင်မှု ပိတ်ထားသည်",

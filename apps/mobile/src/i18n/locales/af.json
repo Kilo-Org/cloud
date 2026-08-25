@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} van {{total}} lêers gelaai",
       "loadAllFiles": "Laai alle lêers",
       "loadAll": "Laai alles",
-      "fileLoaded": "{{count}} lêer gelaai",
-      "filesLoaded": "{{count}} lêers gelaai",
-      "fileLoadedOfTotal": "{{count}} lêer gelaai van {{total}}",
-      "filesLoadedOfTotal": "{{count}} lêers gelaai van {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} lêer gelaai",
+      "fileLoadedCount": "{{displayCount}} lêers gelaai",
+      "fileLoadedCount_other": "{{displayCount}} lêers gelaai",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} lêer gelaai van {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} lêers gelaai van {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} lêers gelaai van {{total}}",
       "filesStillLoading": "Lêers laai nog. Trek af om te verfris.",
       "goToOverview": "Gaan na Oorsig",
       "goToOverviewTab": "Gaan na Oorsig-oortjie"
@@ -288,8 +290,9 @@
       "resolved": "Opgelos",
       "outdated": "Uitgediend",
       "file": "Lêer",
-      "oneComment": "1 kommentaar",
-      "commentCount": "{{count}} kommentare",
+      "comment_one": "1 kommentaar",
+      "comment": "{{displayCount}} kommentare",
+      "comment_other": "{{displayCount}} kommentare",
       "startedRelative": " · begin {{relative}}",
       "couldNotLoadMore": "Kon nie meer kommentare laai nie.",
       "retryLoadingMore": "Probeer weer meer kommentare laai",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reaksies",
       "addReaction": "Voeg reaksie by",
       "reactionPill": "{{emoji}}-reaksie, {{count}} {{countLabel}}",
-      "reactionSingular": "reaksie",
-      "reactionPlural": "reaksies",
+      "reaction_one": "reaksie",
+      "reaction": "reaksies",
+      "reaction_other": "reaksies",
       "commentActions": "Kommentaarakies",
       "reportContent": "Rapporteer inhoud",
       "reportUser": "Rapporteer gebruiker",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Hierdie kommentaar sal uit die resensietou verwyder word.",
       "delete": "Skrap",
       "summaryOptional": "Opsomming (opsioneel)",
-      "pendingCommentSingular": "hangende kommentaar",
-      "pendingCommentPlural": "hangende kommentare",
+      "pendingComment_one": "hangende kommentaar",
+      "pendingComment": "hangende kommentare",
+      "pendingComment_other": "hangende kommentare",
       "submitCountOfTotal": "Dien {{freshCount}} van {{totalCount}} kommentare in",
       "submitReview": "Dien resensie in",
       "partialPostedMessage": "{{freshCount}} kommentaar(s) geplaas. {{staleCount}} kommentaar(s) verwys na 'n ouer commit en het in jou tou gebly."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Oop · Resensie vereis",
       "stateOpen": "Oop",
       "unknownAuthor": "Onbekende outeur",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "lêer",
-      "filePlural": "lêers"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "lêer",
+      "file": "lêers",
+      "file_other": "lêers"
     },
     "pendingComment": {
       "editOutdatedA11y": "Wysig uitgediende hangende kommentaar op {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Iemand",
-      "oneTyping": "{{name}} is besig om te tik...",
-      "manyTyping": "{{names}} is besig om te tik..."
+      "typing_one": "{{name}} is besig om te tik...",
+      "typing": "{{names}} is besig om te tik...",
+      "typing_other": "{{names}} is besig om te tik..."
     },
     "botStatus": {
       "online": "Aanlyn",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Kon nie faktureringsinligting laai nie",
       "manageOnWeb": "Bestuur Fakturering op die Web",
       "commitPlan": "Vastelê",
-      "daysLeft": "{{count}} dae oor",
       "earlybird": "Vroeëvoël",
       "finalCommitTermEndsOn": "Jou finale Commit-termyn eindig op {{date}}. Gaan voort as Standard teen {{price}}, of die gasheer eindig.",
       "freeTrial": "Gratis Proefperiode",
       "hostingEnds": "Gasheer eindig",
-      "oneDayLeft": "1 dag oor",
       "renews": "Hernu",
       "standardMonthToMonth": "Standard maand-tot-maand",
       "standardStartsOn": "Standard begin op {{date}} teen {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} benodig aandag: {{label}}",
-      "openUnreadOne": "Maak {{name}} oop, {{count}} ongeleesde boodskap",
-      "openUnreadMany": "Maak {{name}} oop, {{count}} ongeleesde boodskappe",
+      "openUnread_one": "Maak {{name}} oop, {{displayCount}} ongeleesde boodskap",
+      "openUnread": "Maak {{name}} oop, {{displayCount}} ongeleesde boodskappe",
+      "openUnread_other": "Maak {{name}} oop, {{displayCount}} ongeleesde boodskappe",
       "open": "Maak {{name}} oop",
       "openSettings": "Maak instellings oop vir {{name}}",
       "fixOnKiloAi": "Los op op kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Aktiveer auto-regstelling?",
       "enableAutoRemediationConfirmMessage": "Security Agent sal outomaties regstellings-PRs oopmaak vir geskikte uitbuitbare bevindings.",
       "enable": "Aktiveer",
-      "queuedOne": "{{count}} bestaande bevinding in die tou vir ontleding.",
-      "queuedMany": "{{count}} bestaande bevindings in die tou vir ontleding.",
+      "queued_one": "{{displayCount}} bestaande bevinding in die tou vir ontleding.",
+      "queued": "{{displayCount}} bestaande bevindings in die tou vir ontleding.",
+      "queued_other": "{{displayCount}} bestaande bevindings in die tou vir ontleding.",
       "severityCriticalOnly": "Slegs kritiek",
       "severityHighAndAbove": "Hoog en hoër",
       "severityMediumAndAbove": "Medium en hoër",
@@ -1482,8 +1490,9 @@
       "on": "Aan",
       "off": "Af",
       "allRepositories": "Alle bewaarplekke",
-      "repositorySelected": "{{count}} bewaarplek gekies",
-      "repositoriesSelected": "{{count}} bewaarplekke gekies",
+      "repositoriesCount_one": "{{displayCount}} bewaarplek gekies",
+      "repositoriesCount": "{{displayCount}} bewaarplekke gekies",
+      "repositoriesCount_other": "{{displayCount}} bewaarplekke gekies",
       "selectRepositories": "Kies bewaarplekke",
       "selectRepositoriesSubtitle": "Kies watter bewaarplekke Security Agent monitor",
       "repositories": "Bewaarplekke",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Sessie verwyder",
       "needsInput": "benodig invoer",
       "fromPlatform": "vanaf {{platform}}",
-      "centOne": "sent",
-      "centOther": "sent",
-      "dollarOne": "dollar",
-      "dollarOther": "dollars"
+      "cent_one": "sent",
+      "cent": "sent",
+      "cent_other": "sent",
+      "dollar_one": "dollar",
+      "dollar": "dollars",
+      "dollar_other": "dollars"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kon GitHub nie oopmaak nie",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Kon die konsep nie weggooi nie. Probeer asseblief weer."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} lêer bygewerk",
-      "updatedFiles": "{{count}} lêers bygewerk"
+      "updatedFileCount_one": "{{displayCount}} lêer bygewerk",
+      "updatedFileCount": "{{displayCount}} lêers bygewerk",
+      "updatedFileCount_other": "{{displayCount}} lêers bygewerk"
     },
     "toolPatch": {
       "operationAdded": "Bygevoeg",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Vroeër boodskappe gelaai",
       "retryHint": "Poging weer die laai van vroeër boodskappe vir hierdie sessie.",
-      "omittedOne": "Sommige vroeër items van hierdie sessie kon nie vertoon word nie.",
-      "omittedMany": "{{count}} vroeër items van hierdie sessie kon nie vertoon word nie.",
+      "omitted_one": "Sommige vroeër items van hierdie sessie kon nie vertoon word nie.",
+      "omitted": "{{displayCount}} vroeër items van hierdie sessie kon nie vertoon word nie.",
+      "omitted_other": "{{displayCount}} vroeër items van hierdie sessie kon nie vertoon word nie.",
       "couldNotLoad": "Kon nie vroeër boodskappe laai nie.",
       "unavailable": "Vroeër boodskappe is nie beskikbaar nie.",
       "tooLarge": "Vroeër boodskappe is te groot om te laai."
@@ -2069,10 +2082,12 @@
       "viewTable": "Bekyk tabel",
       "title": "Tabel",
       "close": "Maak tabel toe",
-      "column": "kolom",
-      "columns": "kolomme",
-      "row": "ry",
-      "rows": "rye",
+      "columnCount_one": "kolom",
+      "columnCount": "kolomme",
+      "columnCount_other": "kolomme",
+      "rowCount_one": "ry",
+      "rowCount": "rye",
+      "rowCount_other": "rye",
       "opensFullScreen": "maak volskerm oop"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "van {{window}} tekens",
       "tokens": "tekens",
       "tokensWithPercentage": "tekens ({{percentage}})",
-      "stepsCountOne": "{{steps}} stap",
-      "stepsCountMany": "{{steps}} stappe",
+      "stepsCount_one": "{{steps}} stap",
+      "stepsCount": "{{steps}} stappe",
+      "stepsCount_other": "{{steps}} stappe",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Nuwe koderingstaak",
     "explore": "Verken",
     "seeAll": "Sien alles",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Goeie more",
-    "greetingAfternoon": "Goeie middag",
-    "greetingEvening": "Goeienaand"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Maak {{filename}} toe",
@@ -2645,8 +2658,9 @@
       "manageHint": "Maak Kilo Pass-bestuur op die web oop.",
       "notSubscribed": "Nie ingeteken nie",
       "overallocated": "Pass-toewysings oorskry betaalde sitplekke",
-      "paidSeatOne": "{{count}} betaalde sitplek",
-      "paidSeatOther": "{{count}} betaalde sitplekke",
+      "paidSeat_one": "{{displayCount}} betaalde sitplek",
+      "paidSeat": "{{displayCount}} betaalde sitplekke",
+      "paidSeat_other": "{{displayCount}} betaalde sitplekke",
       "paymentNeedsAttention": "Betaling benodig aandag",
       "paymentPending": "Betaling hangend",
       "processingBlocked": "Verwerking geblokkeer",

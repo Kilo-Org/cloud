@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} / {{total}} fayl yükləndi",
       "loadAllFiles": "Bütün faylları yüklə",
       "loadAll": "Hamısını yüklə",
-      "fileLoaded": "{{count}} fayl yükləndi",
-      "filesLoaded": "{{count}} fayl yükləndi",
-      "fileLoadedOfTotal": "{{total}} içindən {{count}} fayl yükləndi",
-      "filesLoadedOfTotal": "{{total}} içindən {{count}} fayl yükləndi",
+      "fileLoadedCount_one": "{{displayCount}} fayl yükləndi",
+      "fileLoadedCount": "{{displayCount}} fayl yükləndi",
+      "fileLoadedCount_other": "{{displayCount}} fayl yükləndi",
+      "fileLoadedOfTotalCount_one": "{{total}} içindən {{displayCount}} fayl yükləndi",
+      "fileLoadedOfTotalCount": "{{total}} içindən {{displayCount}} fayl yükləndi",
+      "fileLoadedOfTotalCount_other": "{{total}} içindən {{displayCount}} fayl yükləndi",
       "filesStillLoading": "Fayllar hələ də yüklənir. Yeniləmək üçün aşağı çəkin.",
       "goToOverview": "Xülasəyə get",
       "goToOverviewTab": "Xülasə sekmesine get"
@@ -288,8 +290,9 @@
       "resolved": "Həll olundu",
       "outdated": "Köhnəlmiş",
       "file": "Fayl",
-      "oneComment": "1 şərh",
-      "commentCount": "{{count}} şərh",
+      "comment_one": "1 şərh",
+      "comment": "{{displayCount}} şərh",
+      "comment_other": "{{displayCount}} şərh",
       "startedRelative": " · {{relative}} başladı",
       "couldNotLoadMore": "Daha çox şərh yüklənə bilmədi.",
       "retryLoadingMore": "Daha çox şərhin yüklənməsini yenidən cəhd edin",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reaksiyalar",
       "addReaction": "Reaksiya əlavə et",
       "reactionPill": "{{emoji}} reaksiyası, {{count}} {{countLabel}}",
-      "reactionSingular": "reaksiya",
-      "reactionPlural": "reaksiya",
+      "reaction_one": "reaksiya",
+      "reaction": "reaksiya",
+      "reaction_other": "reaksiya",
       "commentActions": "Şərh hərəkətləri",
       "reportContent": "Məzmunu bildir",
       "reportUser": "İstifadəçini bildir",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Bu şərh icmal növbəsindən silinəcək.",
       "delete": "Sil",
       "summaryOptional": "Xülasə (isteğe bağlı)",
-      "pendingCommentSingular": "gözləyən şərh",
-      "pendingCommentPlural": "gözləyən şərhlər",
+      "pendingComment_one": "gözləyən şərh",
+      "pendingComment": "gözləyən şərhlər",
+      "pendingComment_other": "gözləyən şərhlər",
       "submitCountOfTotal": "{{totalCount}} şərhlərdən {{freshCount}} təqdim edin",
       "submitReview": "İcmalı təqdim et",
       "partialPostedMessage": "{{freshCount}} şərh yerləşdirildi. {{staleCount}} şərh köhnə commit-ə işarə edir və növbənizdə qaldı."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Açıq · İcmal tələb olunur",
       "stateOpen": "Açıq",
       "unknownAuthor": "Naməlum müəllif",
-      "commitSingular": "commit",
-      "commitPlural": "commit",
-      "fileSingular": "fayl",
-      "filePlural": "fayl"
+      "commit_one": "commit",
+      "commit": "commit",
+      "commit_other": "commit",
+      "file_one": "fayl",
+      "file": "fayl",
+      "file_other": "fayl"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} üzərində köhnəlmiş gözləyən şərhi redaktə et",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Kimsə",
-      "oneTyping": "{{name}} yazır...",
-      "manyTyping": "{{names}} yazırlar..."
+      "typing_one": "{{name}} yazır...",
+      "typing": "{{names}} yazırlar...",
+      "typing_other": "{{names}} yazırlar..."
     },
     "botStatus": {
       "online": "Onlayn",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Faktura məlumatı yüklənə bilmədi",
       "manageOnWeb": "Vebdə Fakturanı idarə et",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} gün qalıb",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Son Commit müddətiniz {{date}} tarixində bitir. {{price}} qiymətinə Standart olaraq davam edin, yoxsa hostinq sona çatır.",
       "freeTrial": "Pulsuz Sınaq",
       "hostingEnds": "Hostinq bitir",
-      "oneDayLeft": "1 gün qalıb",
       "renews": "Yenilənir",
       "standardMonthToMonth": "Standard aylıq",
       "standardStartsOn": "Standard {{date}} tarixində {{price}} qiyməti ilə başlayır.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} diqqət tələb edir: {{label}}",
-      "openUnreadOne": "{{name}} açın, {{count}} oxunmamış mesaj",
-      "openUnreadMany": "{{name}} açın, {{count}} oxunmamış mesaj",
+      "openUnread_one": "{{name}} açın, {{displayCount}} oxunmamış mesaj",
+      "openUnread": "{{name}} açın, {{displayCount}} oxunmamış mesaj",
+      "openUnread_other": "{{name}} açın, {{displayCount}} oxunmamış mesaj",
       "open": "{{name}} açın",
       "openSettings": "{{name}} üçün parametrləri aç",
       "fixOnKiloAi": "kilo.ai üzərində düzəlt: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Avtomatik düzəltmə aktiv edilsin?",
       "enableAutoRemediationConfirmMessage": "Security Agent uyğun istismar edilə bilən tapıntılar üçün avtomatik düzəltmə PR-ləri açacaq.",
       "enable": "Aktiv et",
-      "queuedOne": "{{count}} mövcud tapıntı analiz üçün növbəyə alındı.",
-      "queuedMany": "{{count}} mövcud tapıntı analiz üçün növbəyə alındı.",
+      "queued_one": "{{displayCount}} mövcud tapıntı analiz üçün növbəyə alındı.",
+      "queued": "{{displayCount}} mövcud tapıntı analiz üçün növbəyə alındı.",
+      "queued_other": "{{displayCount}} mövcud tapıntı analiz üçün növbəyə alındı.",
       "severityCriticalOnly": "Yalnız kritik",
       "severityHighAndAbove": "Yüksək və yuxarı",
       "severityMediumAndAbove": "Orta və yuxarı",
@@ -1482,8 +1490,9 @@
       "on": "Aktiv",
       "off": "Deaktiv",
       "allRepositories": "Bütün repozitoriyalar",
-      "repositorySelected": "{{count}} repozitoriya seçilib",
-      "repositoriesSelected": "{{count}} repozitoriya seçilib",
+      "repositoriesCount_one": "{{displayCount}} repozitoriya seçilib",
+      "repositoriesCount": "{{displayCount}} repozitoriya seçilib",
+      "repositoriesCount_other": "{{displayCount}} repozitoriya seçilib",
       "selectRepositories": "Repozitoriyaları seçin",
       "selectRepositoriesSubtitle": "Security Agent-in izlədiyi repozitoriyaları seçin",
       "repositories": "Repozitoriyalar",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Sessiya silindi",
       "needsInput": "giriş tələb olunur",
       "fromPlatform": "{{platform}} platformasından",
-      "centOne": "sent",
-      "centOther": "sent",
-      "dollarOne": "dollar",
-      "dollarOther": "dollar"
+      "cent_one": "sent",
+      "cent": "sent",
+      "cent_other": "sent",
+      "dollar_one": "dollar",
+      "dollar": "dollar",
+      "dollar_other": "dollar"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub açıla bilmədi",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Qaralama ləğv edilə bilmədi. Zəhmət olmasa yenidən cəhd edin."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} fayl yeniləndi",
-      "updatedFiles": "{{count}} fayl yeniləndi"
+      "updatedFileCount_one": "{{displayCount}} fayl yeniləndi",
+      "updatedFileCount": "{{displayCount}} fayl yeniləndi",
+      "updatedFileCount_other": "{{displayCount}} fayl yeniləndi"
     },
     "toolPatch": {
       "operationAdded": "Əlavə edildi",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Əvvəlki mesajlar yükləndi",
       "retryHint": "Bu sessiya üçün əvvəlki mesajların yüklənməsini yenidən cəhd edir.",
-      "omittedOne": "Bu sessiyadan bəzi əvvəlki maddələr göstərilə bilmədi.",
-      "omittedMany": "Bu sessiyadan {{count}} əvvəlki maddə göstərilə bilmədi.",
+      "omitted_one": "Bu sessiyadan bəzi əvvəlki maddələr göstərilə bilmədi.",
+      "omitted": "Bu sessiyadan {{displayCount}} əvvəlki maddə göstərilə bilmədi.",
+      "omitted_other": "Bu sessiyadan {{displayCount}} əvvəlki maddə göstərilə bilmədi.",
       "couldNotLoad": "Əvvəlki mesajlar yüklənə bilmədi.",
       "unavailable": "Əvvəlki mesajlar mövcud deyil.",
       "tooLarge": "Əvvəlki mesajlar yükləmək üçün çox böyükdür."
@@ -2069,10 +2082,12 @@
       "viewTable": "Cədvələ bax",
       "title": "Cədvəl",
       "close": "Cədvəli bağla",
-      "column": "sütun",
-      "columns": "sütun",
-      "row": "sətir",
-      "rows": "sətir",
+      "columnCount_one": "sütun",
+      "columnCount": "sütun",
+      "columnCount_other": "sütun",
+      "rowCount_one": "sətir",
+      "rowCount": "sətir",
+      "rowCount_other": "sətir",
       "opensFullScreen": "tam ekranı açır"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} tokendən",
       "tokens": "token",
       "tokensWithPercentage": "token ({{percentage}})",
-      "stepsCountOne": "{{steps}} addım",
-      "stepsCountMany": "{{steps}} addım",
+      "stepsCount_one": "{{steps}} addım",
+      "stepsCount": "{{steps}} addım",
+      "stepsCount_other": "{{steps}} addım",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Yeni kodlaşdırma tapşırığı",
     "explore": "Kəşf et",
     "seeAll": "Hamısına bax",
-    "kiloAgents": "Kilo Agentlər",
-    "greetingMorning": "Sabahınız xeyir",
-    "greetingAfternoon": "Günortanız xeyir",
-    "greetingEvening": "Axşamınız xeyir"
+    "kiloAgents": "Kilo Agentlər"
   },
   "imageViewer": {
     "close": "{{filename}} bağla",
@@ -2645,8 +2658,9 @@
       "manageHint": "Kilo Pass idarəetməsini internetdə açır.",
       "notSubscribed": "Abunə deyil",
       "overallocated": "Pass təyinatları ödənilmiş yerləri aşır",
-      "paidSeatOne": "{{count}} ödənilmiş yer",
-      "paidSeatOther": "{{count}} ödənilmiş yer",
+      "paidSeat_one": "{{displayCount}} ödənilmiş yer",
+      "paidSeat": "{{displayCount}} ödənilmiş yer",
+      "paidSeat_other": "{{displayCount}} ödənilmiş yer",
       "paymentNeedsAttention": "Ödəniş diqqət tələb edir",
       "paymentPending": "Ödəniş gözləyir",
       "processingBlocked": "Emal bloklanıb",

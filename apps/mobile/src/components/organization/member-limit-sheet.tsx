@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   type ActiveOrgMember,
@@ -37,7 +39,9 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
   });
   const currentLimit = member.dailyUsageLimitUsd;
 
-  const limitRef = useRef(currentLimit != null ? String(currentLimit) : '');
+  const initialValue =
+    currentLimit == null ? '' : formatNumber(currentLimit, i18n.language, { useGrouping: false });
+  const limitRef = useRef(initialValue);
   const [canSave, setCanSave] = useState(limitError(limitRef.current) == null);
 
   const onSaved = () => {
@@ -64,7 +68,7 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
         required
         placeholder={t('organization.memberLimit.noLimitPlaceholder')}
         keyboardType="decimal-pad"
-        defaultValue={currentLimit != null ? String(currentLimit) : undefined}
+        defaultValue={initialValue || undefined}
         validate={limitError}
         onChangeText={value => {
           limitRef.current = value;

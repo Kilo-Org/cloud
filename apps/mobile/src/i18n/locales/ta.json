@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} / {{total}} கோப்புகள் ஏற்றப்பட்டது",
       "loadAllFiles": "எல்லா கோப்புகளையும் ஏற்று",
       "loadAll": "எல்லாவற்றையும் ஏற்று",
-      "fileLoaded": "{{count}} கோப்பு ஏற்றப்பட்டது",
-      "filesLoaded": "{{count}} கோப்புகள் ஏற்றப்பட்டது",
-      "fileLoadedOfTotal": "{{total}} இல் {{count}} கோப்பு ஏற்றப்பட்டது",
-      "filesLoadedOfTotal": "{{total}} இல் {{count}} கோப்புகள் ஏற்றப்பட்டது",
+      "fileLoadedCount_one": "{{displayCount}} கோப்பு ஏற்றப்பட்டது",
+      "fileLoadedCount": "{{displayCount}} கோப்புகள் ஏற்றப்பட்டது",
+      "fileLoadedCount_other": "{{displayCount}} கோப்புகள் ஏற்றப்பட்டது",
+      "fileLoadedOfTotalCount_one": "{{total}} இல் {{displayCount}} கோப்பு ஏற்றப்பட்டது",
+      "fileLoadedOfTotalCount": "{{total}} இல் {{displayCount}} கோப்புகள் ஏற்றப்பட்டது",
+      "fileLoadedOfTotalCount_other": "{{total}} இல் {{displayCount}} கோப்புகள் ஏற்றப்பட்டது",
       "filesStillLoading": "கோப்புகள் இன்னும் ஏற்றப்படுகின்றன. புதுப்பிக்க இழுக்கவும்.",
       "goToOverview": "மேலோட்டத்திற்குச் செல்",
       "goToOverviewTab": "மேலோட்ட தாவலுக்குச் செல்"
@@ -288,8 +290,9 @@
       "resolved": "தீர்க்கப்பட்டது",
       "outdated": "காலாவதியானது",
       "file": "கோப்பு",
-      "oneComment": "1 கருத்து",
-      "commentCount": "{{count}} கருத்துகள்",
+      "comment_one": "1 கருத்து",
+      "comment": "{{displayCount}} கருத்துகள்",
+      "comment_other": "{{displayCount}} கருத்துகள்",
       "startedRelative": " · {{relative}} இல் தொடங்கியது",
       "couldNotLoadMore": "மேலும் கருத்துகளை ஏற்ற முடியவில்லை.",
       "retryLoadingMore": "மேலும் கருத்துகளை ஏற்றுவதை மீண்டும் முயற்சி",
@@ -299,8 +302,9 @@
       "reactionsTitle": "எதிர்வினைகள்",
       "addReaction": "எதிர்வினை சேர்",
       "reactionPill": "{{emoji}} எதிர்வினை, {{count}} {{countLabel}}",
-      "reactionSingular": "எதிர்வினை",
-      "reactionPlural": "எதிர்வினைகள்",
+      "reaction_one": "எதிர்வினை",
+      "reaction": "எதிர்வினைகள்",
+      "reaction_other": "எதிர்வினைகள்",
       "commentActions": "கருத்து செயல்கள்",
       "reportContent": "உள்ளடக்கத்தைப் புகார் செய்",
       "reportUser": "பயனரைப் புகார் செய்",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "இந்த கருத்து மதிப்பாய்வு வரிசையிலிருந்து அகற்றப்படும்.",
       "delete": "நீக்கு",
       "summaryOptional": "சுருக்கம் (விருப்பம்)",
-      "pendingCommentSingular": "நிலுவை கருத்து",
-      "pendingCommentPlural": "நிலுவை கருத்துகள்",
+      "pendingComment_one": "நிலுவை கருத்து",
+      "pendingComment": "நிலுவை கருத்துகள்",
+      "pendingComment_other": "நிலுவை கருத்துகள்",
       "submitCountOfTotal": "{{totalCount}} கருத்துகளில் {{freshCount}} ஐ சமர்ப்பி",
       "submitReview": "மதிப்பாய்வை சமர்ப்பி",
       "partialPostedMessage": "{{freshCount}} கருத்து(களை) இடுகையிட்டது. {{staleCount}} கருத்து(கள்) பழைய commit ஐ சுட்டிக்காட்டி உங்கள் வரிசையில் இருந்தன."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "திற · மதிப்பாய்வு தேவை",
       "stateOpen": "திற",
       "unknownAuthor": "தெரியாத ஆசிரியர்",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "கோப்பு",
-      "filePlural": "கோப்புகள்"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "கோப்பு",
+      "file": "கோப்புகள்",
+      "file_other": "கோப்புகள்"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} இல் காலாவதியான நிலுவை கருத்தைத் திருத்து",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "யாரோ",
-      "oneTyping": "{{name}} தட்டச்சு செய்கிறார்...",
-      "manyTyping": "{{names}} தட்டச்சு செய்கின்றனர்..."
+      "typing_one": "{{name}} தட்டச்சு செய்கிறார்...",
+      "typing": "{{names}} தட்டச்சு செய்கின்றனர்...",
+      "typing_other": "{{names}} தட்டச்சு செய்கின்றனர்..."
     },
     "botStatus": {
       "online": "ஆன்லைன்",
@@ -722,12 +730,10 @@
       "couldNotLoad": "பில்லிங் தகவலை ஏற்ற முடியவில்லை",
       "manageOnWeb": "வலைத்தளத்தில் பில்லிங் நிர்வகி",
       "commitPlan": "உறுதி",
-      "daysLeft": "{{count}} நாட்கள் மீதம்",
       "earlybird": "முன்கூட்டிய சலுகை",
       "finalCommitTermEndsOn": "உங்கள் இறுதி உறுதி காலம் {{date}} அன்று முடிவடைகிறது. {{price}} விலையில் Standard ஆக தொடரவும், இல்லையெனில் ஹோஸ்டிங் முடிவடையும்.",
       "freeTrial": "இலவச சோதனை",
       "hostingEnds": "ஹோஸ்டிங் முடிவடைகிறது",
-      "oneDayLeft": "1 நாள் மீதம்",
       "renews": "புதுப்பிக்கப்படுகிறது",
       "standardMonthToMonth": "நிலையான மாதந்தோறும்",
       "standardStartsOn": "Standard {{date}} அன்று {{price}} விலையில் தொடங்குகிறது.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} கவனம் தேவை: {{label}}",
-      "openUnreadOne": "{{name}} திற, {{count}} படிக்காத செய்தி",
-      "openUnreadMany": "{{name}} திற, {{count}} படிக்காத செய்திகள்",
+      "openUnread_one": "{{name}} திற, {{displayCount}} படிக்காத செய்தி",
+      "openUnread": "{{name}} திற, {{displayCount}} படிக்காத செய்திகள்",
+      "openUnread_other": "{{name}} திற, {{displayCount}} படிக்காத செய்திகள்",
       "open": "{{name}} திற",
       "openSettings": "{{name}} க்கான அமைப்புகளை திற",
       "fixOnKiloAi": "kilo.ai இல் சரிசெய்: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "தானியங்கி திருத்தத்தை இயக்கவா?",
       "enableAutoRemediationConfirmMessage": "பாதுகாப்பு ஏஜெண்ட் தகுதியுள்ள சுரண்டக்கூடிய கண்டுபிடிப்புகளுக்கு தானாக திருத்த PR களை திறக்கும்.",
       "enable": "இயக்கு",
-      "queuedOne": "{{count}} ஏற்கனவே உள்ள கண்டுபிடிப்பு பகுப்பாய்விற்காக வரிசையில் உள்ளது.",
-      "queuedMany": "{{count}} ஏற்கனவே உள்ள கண்டுபிடிப்புகள் பகுப்பாய்விற்காக வரிசையில் உள்ளன.",
+      "queued_one": "{{displayCount}} ஏற்கனவே உள்ள கண்டுபிடிப்பு பகுப்பாய்விற்காக வரிசையில் உள்ளது.",
+      "queued": "{{displayCount}} ஏற்கனவே உள்ள கண்டுபிடிப்புகள் பகுப்பாய்விற்காக வரிசையில் உள்ளன.",
+      "queued_other": "{{displayCount}} ஏற்கனவே உள்ள கண்டுபிடிப்புகள் பகுப்பாய்விற்காக வரிசையில் உள்ளன.",
       "severityCriticalOnly": "முக்கியமானவை மட்டும்",
       "severityHighAndAbove": "உயர் மற்றும் அதற்கு மேல்",
       "severityMediumAndAbove": "நடுத்தரம் மற்றும் அதற்கு மேல்",
@@ -1482,8 +1490,9 @@
       "on": "ஆன்",
       "off": "ஆஃப்",
       "allRepositories": "அனைத்து களஞ்சியங்கள்",
-      "repositorySelected": "{{count}} களஞ்சியம் தேர்ந்தெடுக்கப்பட்டது",
-      "repositoriesSelected": "{{count}} களஞ்சியங்கள் தேர்ந்தெடுக்கப்பட்டன",
+      "repositoriesCount_one": "{{displayCount}} களஞ்சியம் தேர்ந்தெடுக்கப்பட்டது",
+      "repositoriesCount": "{{displayCount}} களஞ்சியங்கள் தேர்ந்தெடுக்கப்பட்டன",
+      "repositoriesCount_other": "{{displayCount}} களஞ்சியங்கள் தேர்ந்தெடுக்கப்பட்டன",
       "selectRepositories": "களஞ்சியங்களைத் தேர்ந்தெடு",
       "selectRepositoriesSubtitle": "Security Agent எந்த களஞ்சியங்களைக் கண்காணிக்கிறது என்பதைத் தேர்ந்தெடுக்கவும்",
       "repositories": "களஞ்சியங்கள்",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "அமர்வு நீக்கப்பட்டது",
       "needsInput": "உள்ளீடு தேவை",
       "fromPlatform": "{{platform}} இலிருந்து",
-      "centOne": "சென்ட்",
-      "centOther": "சென்ட்கள்",
-      "dollarOne": "டாலர்",
-      "dollarOther": "டாலர்கள்"
+      "cent_one": "சென்ட்",
+      "cent": "சென்ட்கள்",
+      "cent_other": "சென்ட்கள்",
+      "dollar_one": "டாலர்",
+      "dollar": "டாலர்கள்",
+      "dollar_other": "டாலர்கள்"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ஐ திறக்க முடியவில்லை",
@@ -1817,8 +1828,9 @@
       "discardFailed": "வரைவை நிராகரிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} கோப்பு புதுப்பிக்கப்பட்டது",
-      "updatedFiles": "{{count}} கோப்புகள் புதுப்பிக்கப்பட்டன"
+      "updatedFileCount_one": "{{displayCount}} கோப்பு புதுப்பிக்கப்பட்டது",
+      "updatedFileCount": "{{displayCount}} கோப்புகள் புதுப்பிக்கப்பட்டன",
+      "updatedFileCount_other": "{{displayCount}} கோப்புகள் புதுப்பிக்கப்பட்டன"
     },
     "toolPatch": {
       "operationAdded": "சேர்க்கப்பட்டது",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "முந்தைய செய்திகள் ஏற்றப்பட்டன",
       "retryHint": "இந்த அமர்விற்கான முந்தைய செய்தி ஏற்றத்தை மீண்டும் முயற்சிக்கிறது.",
-      "omittedOne": "இந்த அமர்வின் சில முந்தைய உருப்படிகளைக் காட்ட முடியவில்லை.",
-      "omittedMany": "இந்த அமர்வின் {{count}} முந்தைய உருப்படிகளைக் காட்ட முடியவில்லை.",
+      "omitted_one": "இந்த அமர்வின் சில முந்தைய உருப்படிகளைக் காட்ட முடியவில்லை.",
+      "omitted": "இந்த அமர்வின் {{displayCount}} முந்தைய உருப்படிகளைக் காட்ட முடியவில்லை.",
+      "omitted_other": "இந்த அமர்வின் {{displayCount}} முந்தைய உருப்படிகளைக் காட்ட முடியவில்லை.",
       "couldNotLoad": "முந்தைய செய்திகளை ஏற்ற முடியவில்லை.",
       "unavailable": "முந்தைய செய்திகள் கிடைக்கவில்லை.",
       "tooLarge": "முந்தைய செய்திகள் ஏற்றுவதற்கு மிகப் பெரியவை."
@@ -2069,10 +2082,12 @@
       "viewTable": "அட்டவணையைப் பார்க்கவும்",
       "title": "அட்டவணை",
       "close": "அட்டவணையை மூடு",
-      "column": "நெடுவரிசை",
-      "columns": "நெடுவரிசைகள்",
-      "row": "வரிசை",
-      "rows": "வரிசைகள்",
+      "columnCount_one": "நெடுவரிசை",
+      "columnCount": "நெடுவரிசைகள்",
+      "columnCount_other": "நெடுவரிசைகள்",
+      "rowCount_one": "வரிசை",
+      "rowCount": "வரிசைகள்",
+      "rowCount_other": "வரிசைகள்",
       "opensFullScreen": "முழுத் திரையில் திறக்கிறது"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} டோக்கன்களில்",
       "tokens": "டோக்கன்கள்",
       "tokensWithPercentage": "டோக்கன்கள் ({{percentage}})",
-      "stepsCountOne": "{{steps}} படி",
-      "stepsCountMany": "{{steps}} படிகள்",
+      "stepsCount_one": "{{steps}} படி",
+      "stepsCount": "{{steps}} படிகள்",
+      "stepsCount_other": "{{steps}} படிகள்",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "புதிய குறியீட்டு பணி",
     "explore": "ஆராய்க",
     "seeAll": "அனைத்தையும் காண்க",
-    "kiloAgents": "Kilo முகவர்கள்",
-    "greetingMorning": "காலை வணக்கம்",
-    "greetingAfternoon": "மதிய வணக்கம்",
-    "greetingEvening": "மாலை வணக்கம்"
+    "kiloAgents": "Kilo முகவர்கள்"
   },
   "imageViewer": {
     "close": "{{filename}} மூடு",
@@ -2645,8 +2658,9 @@
       "manageHint": "Kilo Pass நிர்வாகத்தை வலையில் திறக்கிறது.",
       "notSubscribed": "சந்தா எடுக்கப்படவில்லை",
       "overallocated": "Pass ஒதுக்கீடுகள் செலுத்திய இருக்கைகளை விட அதிகம்",
-      "paidSeatOne": "{{count}} செலுத்திய இருக்கை",
-      "paidSeatOther": "{{count}} செலுத்திய இருக்கைகள்",
+      "paidSeat_one": "{{displayCount}} செலுத்திய இருக்கை",
+      "paidSeat": "{{displayCount}} செலுத்திய இருக்கைகள்",
+      "paidSeat_other": "{{displayCount}} செலுத்திய இருக்கைகள்",
       "paymentNeedsAttention": "கட்டணத்திற்கு கவனம் தேவை",
       "paymentPending": "கட்டணம் நிலுவையில் உள்ளது",
       "processingBlocked": "செயலாக்கம் தடுக்கப்பட்டது",

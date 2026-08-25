@@ -107,7 +107,7 @@ describe('resolveVoiceInputStartLanguageTag', () => {
       installedLocales: [],
     });
 
-    const tag = await resolveVoiceInputStartLanguageTag();
+    const tag = await resolveVoiceInputStartLanguageTag('nl');
     expect(tag).toBe('nl-NL');
   });
 
@@ -118,7 +118,7 @@ describe('resolveVoiceInputStartLanguageTag', () => {
       installedLocales: [],
     });
 
-    const tag = await resolveVoiceInputStartLanguageTag();
+    const tag = await resolveVoiceInputStartLanguageTag('en');
     expect(tag).toBe('en-US');
   });
 
@@ -126,8 +126,8 @@ describe('resolveVoiceInputStartLanguageTag', () => {
     localizationMock.getLocales.mockReturnValue([{ languageTag: 'en-DE' }]);
     getSupportedLocalesMock.mockResolvedValue({ locales: [], installedLocales: [] });
 
-    const tag = await resolveVoiceInputStartLanguageTag();
-    expect(tag).toBe('en-DE');
+    const tag = await resolveVoiceInputStartLanguageTag('en');
+    expect(tag).toBe('en');
   });
 
   it('returns the raw tag when getSupportedLocales rejects, and retries on a later call', async () => {
@@ -138,10 +138,10 @@ describe('resolveVoiceInputStartLanguageTag', () => {
       installedLocales: [],
     });
 
-    const first = await resolveVoiceInputStartLanguageTag();
-    expect(first).toBe('en-DE');
+    const first = await resolveVoiceInputStartLanguageTag('en');
+    expect(first).toBe('en');
 
-    const second = await resolveVoiceInputStartLanguageTag();
+    const second = await resolveVoiceInputStartLanguageTag('en');
     expect(second).toBe('en-US');
   });
 
@@ -151,15 +151,25 @@ describe('resolveVoiceInputStartLanguageTag', () => {
       throw new Error('package not found');
     });
 
-    const tag = await resolveVoiceInputStartLanguageTag();
-    expect(tag).toBe('en-DE');
+    const tag = await resolveVoiceInputStartLanguageTag('en');
+    expect(tag).toBe('en');
   });
 
   it('returns the raw tag as pass-through when no match in a non-empty list', async () => {
     localizationMock.getLocales.mockReturnValue([{ languageTag: 'fil-PH' }]);
     getSupportedLocalesMock.mockResolvedValue({ locales: ['en-US'], installedLocales: [] });
 
-    const tag = await resolveVoiceInputStartLanguageTag();
-    expect(tag).toBe('fil-PH');
+    const tag = await resolveVoiceInputStartLanguageTag('fil');
+    expect(tag).toBe('fil');
+  });
+
+  it('uses the selected app language before a different device language', async () => {
+    localizationMock.getLocales.mockReturnValue([{ languageTag: 'nl-NL' }]);
+    getSupportedLocalesMock.mockResolvedValue({
+      locales: ['nl-NL', 'fr-FR'],
+      installedLocales: [],
+    });
+
+    expect(await resolveVoiceInputStartLanguageTag('fr')).toBe('fr-FR');
   });
 });

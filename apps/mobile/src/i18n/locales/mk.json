@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} од {{total}} датотеки вчитани",
       "loadAllFiles": "Вчитај ги сите датотеки",
       "loadAll": "Вчитај сè",
-      "fileLoaded": "{{count}} датотека вчитана",
-      "filesLoaded": "{{count}} датотеки вчитани",
-      "fileLoadedOfTotal": "{{count}} датотека вчитана од {{total}}",
-      "filesLoadedOfTotal": "{{count}} датотеки вчитани од {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} датотека вчитана",
+      "fileLoadedCount": "{{displayCount}} датотеки вчитани",
+      "fileLoadedCount_other": "{{displayCount}} датотеки вчитани",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} датотека вчитана од {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} датотеки вчитани од {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} датотеки вчитани од {{total}}",
       "filesStillLoading": "Датотеките сè уште се вчитуваат. Повлечете за да освежите.",
       "goToOverview": "Оди на Преглед",
       "goToOverviewTab": "Оди на јазичето Преглед"
@@ -288,8 +290,9 @@
       "resolved": "Решено",
       "outdated": "Застарено",
       "file": "Датотека",
-      "oneComment": "1 коментар",
-      "commentCount": "{{count}} коментари",
+      "comment_one": "1 коментар",
+      "comment": "{{displayCount}} коментари",
+      "comment_other": "{{displayCount}} коментари",
       "startedRelative": " · започнато {{relative}}",
       "couldNotLoadMore": "Не можеше да се вчитаат повеќе коментари.",
       "retryLoadingMore": "Обиди се повторно со вчитувањето на повеќе коментари",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Реакции",
       "addReaction": "Додај реакција",
       "reactionPill": "{{emoji}} реакција, {{count}} {{countLabel}}",
-      "reactionSingular": "реакција",
-      "reactionPlural": "реакции",
+      "reaction_one": "реакција",
+      "reaction": "реакции",
+      "reaction_other": "реакции",
       "commentActions": "Дејства на коментар",
       "reportContent": "Пријави содржина",
       "reportUser": "Пријави корисник",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Овој коментар ќе биде отстранет од редот за преглед.",
       "delete": "Избриши",
       "summaryOptional": "Резиме (опционално)",
-      "pendingCommentSingular": "коментар што чека",
-      "pendingCommentPlural": "коментари што чекаат",
+      "pendingComment_one": "коментар што чека",
+      "pendingComment": "коментари што чекаат",
+      "pendingComment_other": "коментари што чекаат",
       "submitCountOfTotal": "Испрати {{freshCount}} од {{totalCount}} коментари",
       "submitReview": "Испрати преглед",
       "partialPostedMessage": "Објавени {{freshCount}} коментар(и). {{staleCount}} коментар(и) упатуваат на постар commit и останаа во вашиот ред."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Отворено · Потребен преглед",
       "stateOpen": "Отворено",
       "unknownAuthor": "Непознат автор",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "датотека",
-      "filePlural": "датотеки"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "датотека",
+      "file": "датотеки",
+      "file_other": "датотеки"
     },
     "pendingComment": {
       "editOutdatedA11y": "Уреди застарен коментар што чека на {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Некој",
-      "oneTyping": "{{name}} пишува...",
-      "manyTyping": "{{names}} пишуваат..."
+      "typing_one": "{{name}} пишува...",
+      "typing": "{{names}} пишуваат...",
+      "typing_other": "{{names}} пишуваат..."
     },
     "botStatus": {
       "online": "На интернет",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Не можев да ги вчитам информациите за наплата",
       "manageOnWeb": "Управувај со наплатата на Web",
       "commitPlan": "Посвети",
-      "daysLeft": "{{count}} дена остануваат",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Твојот последен Commit период завршува на {{date}}. Продолжи како Standard на {{price}}, или хостингот престанува.",
       "freeTrial": "Бесплатна проба",
       "hostingEnds": "Хостингот завршува",
-      "oneDayLeft": "Останува 1 ден",
       "renews": "Обновува",
       "standardMonthToMonth": "Standard месечно",
       "standardStartsOn": "Standard започнува на {{date}} на {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} бара внимание: {{label}}",
-      "openUnreadOne": "Отвори {{name}}, {{count}} непрочитана порака",
-      "openUnreadMany": "Отвори {{name}}, {{count}} непрочитани пораки",
+      "openUnread_one": "Отвори {{name}}, {{displayCount}} непрочитана порака",
+      "openUnread": "Отвори {{name}}, {{displayCount}} непрочитани пораки",
+      "openUnread_other": "Отвори {{name}}, {{displayCount}} непрочитани пораки",
       "open": "Отвори {{name}}",
       "openSettings": "Отвори поставки за {{name}}",
       "fixOnKiloAi": "Поправи на kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Да се овозможи автоматска санација?",
       "enableAutoRemediationConfirmMessage": "Security Agent автоматски ќе отвора PR-ови за санација за квалификувани искористливи наоѓања.",
       "enable": "Овозможи",
-      "queuedOne": "{{count}} постоечки наод е ставен во ред за анализа.",
-      "queuedMany": "{{count}} постоечки наоди се ставени во ред за анализа.",
+      "queued_one": "{{displayCount}} постоечки наод е ставен во ред за анализа.",
+      "queued": "{{displayCount}} постоечки наоди се ставени во ред за анализа.",
+      "queued_other": "{{displayCount}} постоечки наоди се ставени во ред за анализа.",
       "severityCriticalOnly": "Само критични",
       "severityHighAndAbove": "Високи и повисоки",
       "severityMediumAndAbove": "Средни и повисоки",
@@ -1482,8 +1490,9 @@
       "on": "Вклучено",
       "off": "Исклучено",
       "allRepositories": "Сите складишта",
-      "repositorySelected": "{{count}} избрано складиште",
-      "repositoriesSelected": "{{count}} избрани складишта",
+      "repositoriesCount_one": "{{displayCount}} избрано складиште",
+      "repositoriesCount": "{{displayCount}} избрани складишта",
+      "repositoriesCount_other": "{{displayCount}} избрани складишта",
       "selectRepositories": "Избери складишта",
       "selectRepositoriesSubtitle": "Избери кои складишта ги следи Безбедносниот агент",
       "repositories": "Складишта",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Сесијата е избришана",
       "needsInput": "бара внес",
       "fromPlatform": "од {{platform}}",
-      "centOne": "цент",
-      "centOther": "центи",
-      "dollarOne": "долар",
-      "dollarOther": "долари"
+      "cent_one": "цент",
+      "cent": "центи",
+      "cent_other": "центи",
+      "dollar_one": "долар",
+      "dollar": "долари",
+      "dollar_other": "долари"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не можеше да се отвори GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Не можеше да се отфрли нацртот. Обиди се повторно."
     },
     "partRenderer": {
-      "updatedFile": "Ажурирана {{count}} датотека",
-      "updatedFiles": "Ажурирани {{count}} датотеки"
+      "updatedFileCount_one": "Ажурирана {{displayCount}} датотека",
+      "updatedFileCount": "Ажурирани {{displayCount}} датотеки",
+      "updatedFileCount_other": "Ажурирани {{displayCount}} датотеки"
     },
     "toolPatch": {
       "operationAdded": "Додадено",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Пораните пораки се вчитани",
       "retryHint": "Повторува обид за вчитување на постарите пораки за оваа сесија.",
-      "omittedOne": "Некои порани ставки од оваа сесија не можеа да се прикажат.",
-      "omittedMany": "{{count}} порани ставки од оваа сесија не можеа да се прикажат.",
+      "omitted_one": "Некои порани ставки од оваа сесија не можеа да се прикажат.",
+      "omitted": "{{displayCount}} порани ставки од оваа сесија не можеа да се прикажат.",
+      "omitted_other": "{{displayCount}} порани ставки од оваа сесија не можеа да се прикажат.",
       "couldNotLoad": "Не можев да ги вчитам пораните пораки.",
       "unavailable": "Пораните пораки не се достапни.",
       "tooLarge": "Пораните пораки се преголеми за вчитување."
@@ -2069,10 +2082,12 @@
       "viewTable": "Прикажи табела",
       "title": "Табела",
       "close": "Затвори табела",
-      "column": "колона",
-      "columns": "колони",
-      "row": "ред",
-      "rows": "редови",
+      "columnCount_one": "колона",
+      "columnCount": "колони",
+      "columnCount_other": "колони",
+      "rowCount_one": "ред",
+      "rowCount": "редови",
+      "rowCount_other": "редови",
       "opensFullScreen": "отвора цел екран"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "од {{window}} токени",
       "tokens": "токени",
       "tokensWithPercentage": "токени ({{percentage}})",
-      "stepsCountOne": "{{steps}} чекор",
-      "stepsCountMany": "{{steps}} чекори",
+      "stepsCount_one": "{{steps}} чекор",
+      "stepsCount": "{{steps}} чекори",
+      "stepsCount_other": "{{steps}} чекори",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Нова задача за кодирање",
     "explore": "Истражувај",
     "seeAll": "Види ги сите",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Добро утро",
-    "greetingAfternoon": "Добар ден",
-    "greetingEvening": "Добро вечер"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Затвори {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Отвора управување со Kilo Pass на веб.",
       "notSubscribed": "Не е претплатено",
       "overallocated": "Доделувањата на Pass надминуваат платени места",
-      "paidSeatOne": "{{count}} платено место",
-      "paidSeatOther": "{{count}} платени места",
+      "paidSeat_one": "{{displayCount}} платено место",
+      "paidSeat": "{{displayCount}} платени места",
+      "paidSeat_other": "{{displayCount}} платени места",
       "paymentNeedsAttention": "Плаќањето бара внимание",
       "paymentPending": "Плаќањето е во очекување",
       "processingBlocked": "Обработката е блокирана",

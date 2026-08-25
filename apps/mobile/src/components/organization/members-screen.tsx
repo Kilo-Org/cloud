@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
+import { collator } from '@/lib/intl-cache';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
   type ActiveOrgMember,
@@ -34,7 +36,10 @@ import { selectOrgListErrorView } from './org-list-error-view';
 function sortActiveMembers(members: ActiveOrgMember[]): ActiveOrgMember[] {
   // eslint-disable-next-line unicorn/no-array-sort -- toSorted() is not available in Hermes
   return [...members].sort((a, b) =>
-    firstNonEmpty(a.name, a.email).localeCompare(firstNonEmpty(b.name, b.email))
+    collator(i18n.language, { sensitivity: 'base' }).compare(
+      firstNonEmpty(a.name, a.email),
+      firstNonEmpty(b.name, b.email)
+    )
   );
 }
 

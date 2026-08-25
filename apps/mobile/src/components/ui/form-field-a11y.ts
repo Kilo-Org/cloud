@@ -8,6 +8,7 @@
  */
 
 import { i18n } from '@/i18n';
+import { formatList } from '@/lib/format';
 
 export function formFieldA11y({
   label,
@@ -25,5 +26,5 @@ export function formFieldA11y({
   if (error) {
     parts.push(i18n.t('common.error', { error }));
   }
-  return parts.join(', ');
+  return formatList(parts, i18n.language);
 }

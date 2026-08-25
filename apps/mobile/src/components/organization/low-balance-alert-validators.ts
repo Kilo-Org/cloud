@@ -1,10 +1,11 @@
 import { i18n } from '@/i18n';
+import { parseLocalizedNumber } from '@/lib/format';
 import { EMAIL_PATTERN } from '@/lib/utils';
 
 export function parseThreshold(value: string): number | null {
   const trimmed = value.trim();
-  const parsed = Number(trimmed);
-  if (trimmed === '' || !Number.isFinite(parsed) || parsed <= 0) {
+  const parsed = parseLocalizedNumber(trimmed, i18n.language);
+  if (trimmed === '' || parsed === null || parsed <= 0) {
     return null;
   }
   return parsed;

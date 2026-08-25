@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} ee {{total}} faylal waa la soo qaaday",
       "loadAllFiles": "Soo qaad faylasha oo dhan",
       "loadAll": "Wax walba soo qaad",
-      "fileLoaded": "{{count}} fayl waa la soo qaaday",
-      "filesLoaded": "{{count}} faylal waa la soo qaaday",
-      "fileLoadedOfTotal": "{{count}} fayl oo {{total}} ah waa la soo qaaday",
-      "filesLoadedOfTotal": "{{count}} faylal oo {{total}} ah waa la soo qaaday",
+      "fileLoadedCount_one": "{{displayCount}} fayl waa la soo qaaday",
+      "fileLoadedCount": "{{displayCount}} faylal waa la soo qaaday",
+      "fileLoadedCount_other": "{{displayCount}} faylal waa la soo qaaday",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} fayl oo {{total}} ah waa la soo qaaday",
+      "fileLoadedOfTotalCount": "{{displayCount}} faylal oo {{total}} ah waa la soo qaaday",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} faylal oo {{total}} ah waa la soo qaaday",
       "filesStillLoading": "Faylasha wali way soo qaadanayaan. Hoos u jiid si aad u cusbooneysiiso.",
       "goToOverview": "Tag Dulmarka",
       "goToOverviewTab": "Tag tab-ka Dulmarka"
@@ -288,8 +290,9 @@
       "resolved": "Waa la xalliyay",
       "outdated": "Waa duugoobay",
       "file": "Fayl",
-      "oneComment": "1 faallo",
-      "commentCount": "{{count}} faallooyin",
+      "comment_one": "1 faallo",
+      "comment": "{{displayCount}} faallooyin",
+      "comment_other": "{{displayCount}} faallooyin",
       "startedRelative": " · bilaabay {{relative}}",
       "couldNotLoadMore": "Faallooyin dheeri ah lama soo qaadin karin.",
       "retryLoadingMore": "Mar kale day soo qaadista faallooyin dheeri ah",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Falcelinta",
       "addReaction": "Ku dar falcelin",
       "reactionPill": "{{emoji}} falcelin, {{count}} {{countLabel}}",
-      "reactionSingular": "falcelin",
-      "reactionPlural": "falcelino",
+      "reaction_one": "falcelin",
+      "reaction": "falcelino",
+      "reaction_other": "falcelino",
       "commentActions": "Falalka faallada",
       "reportContent": "Soo sheeg waxa ku qoran",
       "reportUser": "Soo sheeg isticmaalaha",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Faalladan waxaa laga saari doonaa safka dib-u-eegista.",
       "delete": "Tirtir",
       "summaryOptional": "Soo koobid (ikhtiyaari)",
-      "pendingCommentSingular": "faallo sugaysa",
-      "pendingCommentPlural": "faallooyin sugaya",
+      "pendingComment_one": "faallo sugaysa",
+      "pendingComment": "faallooyin sugaya",
+      "pendingComment_other": "faallooyin sugaya",
       "submitCountOfTotal": "Dir {{freshCount}} ee {{totalCount}} faallooyinka",
       "submitReview": "Dir dib-u-eegista",
       "partialPostedMessage": "Waxaa la diray {{freshCount}} faallo(yin). {{staleCount}} faallo(yin) ayaa tilmaamaya commit duug ah oo ku sii hadhay safkaaga."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Furan · Dib-u-eegis ayaa loo baahan yahay",
       "stateOpen": "Furan",
       "unknownAuthor": "Qoraa aan la aqoon",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "fayl",
-      "filePlural": "faylal"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "fayl",
+      "file": "faylal",
+      "file_other": "faylal"
     },
     "pendingComment": {
       "editOutdatedA11y": "Faallada sugaysa ee duugga ah wax ka beddel {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Qof",
-      "oneTyping": "{{name}} wuu qorayaa...",
-      "manyTyping": "{{names}} way qorayaan..."
+      "typing_one": "{{name}} wuu qorayaa...",
+      "typing": "{{names}} way qorayaan...",
+      "typing_other": "{{names}} way qorayaan..."
     },
     "botStatus": {
       "online": "Online",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Macluumaadka billing lama soo dejin karin",
       "manageOnWeb": "Ku maaree Billing-ka on Web",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} maalmood ayaa harsan",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Muddadaada Commit-ka ugu dambaysa waxay ku dhammaanaysaa {{date}}. Ku sii soco Standard-ka {{price}}, ama hosting-ku wuu joogsanayaa.",
       "freeTrial": "Tijaabo bilaash",
       "hostingEnds": "Hosting wuu dhammaanayaa",
-      "oneDayLeft": "1 maalin ayaa harsan",
       "renews": "Way soo cusboonaataa",
       "standardMonthToMonth": "Standard bil-bil",
       "standardStartsOn": "Standard wuxuu bilaabmaa {{date}} qiimaha {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} wuxuu u baahan yahay fiiro: {{label}}",
-      "openUnreadOne": "Fur {{name}}, {{count}} farriin aan la aqrin",
-      "openUnreadMany": "Fur {{name}}, {{count}} farriimood oo aan la aqrin",
+      "openUnread_one": "Fur {{name}}, {{displayCount}} farriin aan la aqrin",
+      "openUnread": "Fur {{name}}, {{displayCount}} farriimood oo aan la aqrin",
+      "openUnread_other": "Fur {{name}}, {{displayCount}} farriimood oo aan la aqrin",
       "open": "Fur {{name}}",
       "openSettings": "Fur goobaha {{name}}",
       "fixOnKiloAi": "Ku xali kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Fur dayactirka otomaatigga ah?",
       "enableAutoRemediationConfirmMessage": "Security Agent wuxuu si otomaatig ah u furi doonaa PRs-ka dayactirka ee waxyaalaha halista ah ee la isticmaali karo.",
       "enable": "Fur",
-      "queuedOne": "{{count}} natiijo jirta ayaa safan falanqaynta.",
-      "queuedMany": "{{count}} natiijooyin jira ayaa safan falanqaynta.",
+      "queued_one": "{{displayCount}} natiijo jirta ayaa safan falanqaynta.",
+      "queued": "{{displayCount}} natiijooyin jira ayaa safan falanqaynta.",
+      "queued_other": "{{displayCount}} natiijooyin jira ayaa safan falanqaynta.",
       "severityCriticalOnly": "Kaliya muhiim",
       "severityHighAndAbove": "Sare iyo wixii ka sareeya",
       "severityMediumAndAbove": "Dhexdhexaad iyo wixii ka sareeya",
@@ -1482,8 +1490,9 @@
       "on": "Shidan",
       "off": "Dan",
       "allRepositories": "Dhammaan kaydka",
-      "repositorySelected": "{{count}} kayd oo la doortay",
-      "repositoriesSelected": "{{count}} kayd oo la doortay",
+      "repositoriesCount_one": "{{displayCount}} kayd oo la doortay",
+      "repositoriesCount": "{{displayCount}} kayd oo la doortay",
+      "repositoriesCount_other": "{{displayCount}} kayd oo la doortay",
       "selectRepositories": "Doorto kaydka",
       "selectRepositoriesSubtitle": "Doorto kaydka Security Agent la socdo",
       "repositories": "Kaydka",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Kalfadhiga waa la tirtiray",
       "needsInput": "u baahan wax-soo-gal",
       "fromPlatform": "ka {{platform}}",
-      "centOne": "senti",
-      "centOther": "senti",
-      "dollarOne": "doolar",
-      "dollarOther": "doolarro"
+      "cent_one": "senti",
+      "cent": "senti",
+      "cent_other": "senti",
+      "dollar_one": "doolar",
+      "dollar": "doolarro",
+      "dollar_other": "doolarro"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Lama furi karin GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Qabyada lama tuuri karin. Fadlan mar kale isku day."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} fayl ayaa la cusboonaysiiyay",
-      "updatedFiles": "{{count}} fayl ayaa la cusboonaysiiyay"
+      "updatedFileCount_one": "{{displayCount}} fayl ayaa la cusboonaysiiyay",
+      "updatedFileCount": "{{displayCount}} fayl ayaa la cusboonaysiiyay",
+      "updatedFileCount_other": "{{displayCount}} fayl ayaa la cusboonaysiiyay"
     },
     "toolPatch": {
       "operationAdded": "La daray",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Fariimihii hore waa la soo dejiyay",
       "retryHint": "Mar kale isku dayda inay soo gudbiso fariimihii hore ee kalfadhigan.",
-      "omittedOne": "Qaar ka mid ah qaybihii hore ee kalfadhigan lama soo bandhigi karin.",
-      "omittedMany": "{{count}} qaybood oo hore oo kalfadhigan ah lama soo bandhigi karin.",
+      "omitted_one": "Qaar ka mid ah qaybihii hore ee kalfadhigan lama soo bandhigi karin.",
+      "omitted": "{{displayCount}} qaybood oo hore oo kalfadhigan ah lama soo bandhigi karin.",
+      "omitted_other": "{{displayCount}} qaybood oo hore oo kalfadhigan ah lama soo bandhigi karin.",
       "couldNotLoad": "Fariimihii hore lama soo dejin karin.",
       "unavailable": "Fariimihii hore ma heli karaan.",
       "tooLarge": "Fariimihii hore aad bay u waynaayeen in la soo dejiyo."
@@ -2069,10 +2082,12 @@
       "viewTable": "Fiiri shaxda",
       "title": "Shax",
       "close": "Xidh shaxda",
-      "column": "tiir",
-      "columns": "tiirar",
-      "row": "saf",
-      "rows": "safaf",
+      "columnCount_one": "tiir",
+      "columnCount": "tiirar",
+      "columnCount_other": "tiirar",
+      "rowCount_one": "saf",
+      "rowCount": "safaf",
+      "rowCount_other": "safaf",
       "opensFullScreen": "wuxuu furaa shaashad buuxda"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "ka mid ah {{window}} tokens",
       "tokens": "tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
-      "stepsCountOne": "{{steps}} tillaabo",
-      "stepsCountMany": "{{steps}} tillaabo",
+      "stepsCount_one": "{{steps}} tillaabo",
+      "stepsCount": "{{steps}} tillaabo",
+      "stepsCount_other": "{{steps}} tillaabo",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Hawshooda cusub ee codeynta",
     "explore": "Sahan",
     "seeAll": "Fiiri dhammaan",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Subax wanaagsan",
-    "greetingAfternoon": "Galab wanaagsan",
-    "greetingEvening": "Habeen wanaagsan"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Xidh {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Wuxuu furaa maareynta Kilo Pass web-ka.",
       "notSubscribed": "Ma isdiiwaangelin",
       "overallocated": "Qoondaynta Pass waxay ka badan tahay kuraasta la bixiyay",
-      "paidSeatOne": "{{count}} kursi la bixiyay",
-      "paidSeatOther": "{{count}} kuraas oo la bixiyay",
+      "paidSeat_one": "{{displayCount}} kursi la bixiyay",
+      "paidSeat": "{{displayCount}} kuraas oo la bixiyay",
+      "paidSeat_other": "{{displayCount}} kuraas oo la bixiyay",
       "paymentNeedsAttention": "Bixintu waxay u baahan tahay feejignaan",
       "paymentPending": "Bixinta waa la sugayaa",
       "processingBlocked": "Habayntu waa la xannibay",

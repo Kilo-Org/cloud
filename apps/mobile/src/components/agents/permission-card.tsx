@@ -13,7 +13,7 @@ import {
 } from '@/components/agents/blocking-card-state';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
+import { capitalize, cn } from '@/lib/utils';
 
 type PermissionCardProps = {
   permission: string;
@@ -87,7 +87,7 @@ export function PermissionCard({
   // Format permission name for display
   const permissionDisplay = permission
     .split('_')
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .map(word => capitalize(word))
     .join(' ');
 
   const title = formatBlockingCardTitle(t('agentChat.permissionCard.title'), pendingCount);

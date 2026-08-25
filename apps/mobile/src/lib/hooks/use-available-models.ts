@@ -3,6 +3,9 @@ import { useMemo } from 'react';
 
 import { API_BASE_URL } from '@/lib/config';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
+import { i18n } from '@/i18n';
+import { collator } from '@/lib/intl-cache';
+import { capitalize } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -74,7 +77,7 @@ export function toModelOptions(data: ModelResponse | undefined): ModelOption[] {
     if (bHas) {
       return 1;
     }
-    return a.name.localeCompare(b.name);
+    return collator(i18n.language, { sensitivity: 'base' }).compare(a.name, b.name);
   });
 
   return items.map(item => ({
@@ -94,7 +97,7 @@ export function thinkingEffortLabel(variant: string): string {
   if (variant === 'xhigh') {
     return 'Extra High';
   }
-  return variant.charAt(0).toUpperCase() + variant.slice(1);
+  return capitalize(variant);
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────

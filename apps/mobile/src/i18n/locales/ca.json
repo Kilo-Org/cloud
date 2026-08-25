@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "S'han carregat {{loaded}} de {{total}} fitxers",
       "loadAllFiles": "Carrega tots els fitxers",
       "loadAll": "Carrega-ho tot",
-      "fileLoaded": "S'ha carregat {{count}} fitxer",
-      "filesLoaded": "S'han carregat {{count}} fitxers",
-      "fileLoadedOfTotal": "S'ha carregat {{count}} fitxer de {{total}}",
-      "filesLoadedOfTotal": "S'han carregat {{count}} fitxers de {{total}}",
+      "fileLoadedCount_one": "S'ha carregat {{displayCount}} fitxer",
+      "fileLoadedCount": "S'han carregat {{displayCount}} fitxers",
+      "fileLoadedCount_other": "S'han carregat {{displayCount}} fitxers",
+      "fileLoadedOfTotalCount_one": "S'ha carregat {{displayCount}} fitxer de {{total}}",
+      "fileLoadedOfTotalCount": "S'han carregat {{displayCount}} fitxers de {{total}}",
+      "fileLoadedOfTotalCount_other": "S'han carregat {{displayCount}} fitxers de {{total}}",
       "filesStillLoading": "Els fitxers encara s'estan carregant. Estira per actualitzar.",
       "goToOverview": "Vés a la visió general",
       "goToOverviewTab": "Vés a la pestanya de visió general"
@@ -288,8 +290,9 @@
       "resolved": "Resolt",
       "outdated": "Desactualitzat",
       "file": "Fitxer",
-      "oneComment": "1 comentari",
-      "commentCount": "{{count}} comentaris",
+      "comment_one": "1 comentari",
+      "comment": "{{displayCount}} comentaris",
+      "comment_other": "{{displayCount}} comentaris",
       "startedRelative": " · començat {{relative}}",
       "couldNotLoadMore": "No s'han pogut carregar més comentaris.",
       "retryLoadingMore": "Torna a carregar més comentaris",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reaccions",
       "addReaction": "Afegeix una reacció",
       "reactionPill": "{{emoji}} reacció, {{count}} {{countLabel}}",
-      "reactionSingular": "reacció",
-      "reactionPlural": "reaccions",
+      "reaction_one": "reacció",
+      "reaction": "reaccions",
+      "reaction_other": "reaccions",
       "commentActions": "Accions del comentari",
       "reportContent": "Denuncia el contingut",
       "reportUser": "Denuncia l'usuari",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Aquest comentari s'eliminarà de la cua de revisió.",
       "delete": "Elimina",
       "summaryOptional": "Resum (opcional)",
-      "pendingCommentSingular": "comentari pendent",
-      "pendingCommentPlural": "comentaris pendents",
+      "pendingComment_one": "comentari pendent",
+      "pendingComment": "comentaris pendents",
+      "pendingComment_other": "comentaris pendents",
       "submitCountOfTotal": "Envia {{freshCount}} de {{totalCount}} comentaris",
       "submitReview": "Envia la revisió",
       "partialPostedMessage": "S'han publicat {{freshCount}} comentari(s). {{staleCount}} comentari(s) apunten a un commit més antic i han quedat a la teva cua."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Oberta · Revisió requerida",
       "stateOpen": "Oberta",
       "unknownAuthor": "Autor desconegut",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "fitxer",
-      "filePlural": "fitxers"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "fitxer",
+      "file": "fitxers",
+      "file_other": "fitxers"
     },
     "pendingComment": {
       "editOutdatedA11y": "Edita el comentari pendent desactualitzat a {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Algú",
-      "oneTyping": "{{name}} està escrivint...",
-      "manyTyping": "{{names}} estan escrivint..."
+      "typing_one": "{{name}} està escrivint...",
+      "typing": "{{names}} estan escrivint...",
+      "typing_other": "{{names}} estan escrivint..."
     },
     "botStatus": {
       "online": "En línia",
@@ -722,12 +730,10 @@
       "couldNotLoad": "No s'ha pogut carregar la informació de facturació",
       "manageOnWeb": "Gestiona la facturació al web",
       "commitPlan": "Commit",
-      "daysLeft": "Queden {{count}} dies",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "El teu període final de Commit acaba el {{date}}. Continua com a Standard per {{price}}, o l'allotjament s'acaba.",
       "freeTrial": "Prova gratuïta",
       "hostingEnds": "L'allotjament s'acaba",
-      "oneDayLeft": "Queda 1 dia",
       "renews": "Es renova",
       "standardMonthToMonth": "Standard mensual",
       "standardStartsOn": "Standard comença el {{date}} per {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} requereix atenció: {{label}}",
-      "openUnreadOne": "Obre {{name}}, {{count}} missatge no llegit",
-      "openUnreadMany": "Obre {{name}}, {{count}} missatges no llegits",
+      "openUnread_one": "Obre {{name}}, {{displayCount}} missatge no llegit",
+      "openUnread": "Obre {{name}}, {{displayCount}} missatges no llegits",
+      "openUnread_other": "Obre {{name}}, {{displayCount}} missatges no llegits",
       "open": "Obre {{name}}",
       "openSettings": "Obre la configuració de {{name}}",
       "fixOnKiloAi": "Corregeix a kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Activar la correcció automàtica?",
       "enableAutoRemediationConfirmMessage": "L'Agent de seguretat obrirà PR de correcció automàticament per a les troballes explotables elegibles.",
       "enable": "Activa",
-      "queuedOne": "{{count}} resultat existent en cua per analitzar.",
-      "queuedMany": "{{count}} resultats existents en cua per analitzar.",
+      "queued_one": "{{displayCount}} resultat existent en cua per analitzar.",
+      "queued": "{{displayCount}} resultats existents en cua per analitzar.",
+      "queued_other": "{{displayCount}} resultats existents en cua per analitzar.",
       "severityCriticalOnly": "Només crítics",
       "severityHighAndAbove": "Alts i superiors",
       "severityMediumAndAbove": "Mitjans i superiors",
@@ -1482,8 +1490,9 @@
       "on": "Activat",
       "off": "Desactivat",
       "allRepositories": "Tots els repositoris",
-      "repositorySelected": "{{count}} repositori seleccionat",
-      "repositoriesSelected": "{{count}} repositoris seleccionats",
+      "repositoriesCount_one": "{{displayCount}} repositori seleccionat",
+      "repositoriesCount": "{{displayCount}} repositoris seleccionats",
+      "repositoriesCount_other": "{{displayCount}} repositoris seleccionats",
       "selectRepositories": "Selecciona repositoris",
       "selectRepositoriesSubtitle": "Tria quins repositoris supervisa Security Agent",
       "repositories": "Repositoris",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Sessió eliminada",
       "needsInput": "requereix entrada",
       "fromPlatform": "des de {{platform}}",
-      "centOne": "cèntim",
-      "centOther": "cèntims",
-      "dollarOne": "dòlar",
-      "dollarOther": "dòlars"
+      "cent_one": "cèntim",
+      "cent": "cèntims",
+      "cent_other": "cèntims",
+      "dollar_one": "dòlar",
+      "dollar": "dòlars",
+      "dollar_other": "dòlars"
     },
     "githubInstall": {
       "couldNotOpenTitle": "No s'ha pogut obrir GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "No s'ha pogut descartar l'esborrany. Torna-ho a provar."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} fitxer actualitzat",
-      "updatedFiles": "{{count}} fitxers actualitzats"
+      "updatedFileCount_one": "{{displayCount}} fitxer actualitzat",
+      "updatedFileCount": "{{displayCount}} fitxers actualitzats",
+      "updatedFileCount_other": "{{displayCount}} fitxers actualitzats"
     },
     "toolPatch": {
       "operationAdded": "Afegit",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "S'han carregat els missatges anteriors",
       "retryHint": "Torna a intentar la càrrega dels missatges anteriors d'aquesta sessió.",
-      "omittedOne": "Alguns elements anteriors d'aquesta sessió no s'han pogut mostrar.",
-      "omittedMany": "{{count}} elements anteriors d'aquesta sessió no s'han pogut mostrar.",
+      "omitted_one": "Alguns elements anteriors d'aquesta sessió no s'han pogut mostrar.",
+      "omitted": "{{displayCount}} elements anteriors d'aquesta sessió no s'han pogut mostrar.",
+      "omitted_other": "{{displayCount}} elements anteriors d'aquesta sessió no s'han pogut mostrar.",
       "couldNotLoad": "No s'han pogut carregar els missatges anteriors.",
       "unavailable": "Els missatges anteriors no estan disponibles.",
       "tooLarge": "Els missatges anteriors són massa grans per carregar-los."
@@ -2069,10 +2082,12 @@
       "viewTable": "Mostra la taula",
       "title": "Taula",
       "close": "Tanca la taula",
-      "column": "columna",
-      "columns": "columnes",
-      "row": "fila",
-      "rows": "files",
+      "columnCount_one": "columna",
+      "columnCount": "columnes",
+      "columnCount_other": "columnes",
+      "rowCount_one": "fila",
+      "rowCount": "files",
+      "rowCount_other": "files",
       "opensFullScreen": "obre la pantalla completa"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "de {{window}} tokens",
       "tokens": "tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
-      "stepsCountOne": "{{steps}} pas",
-      "stepsCountMany": "{{steps}} passos",
+      "stepsCount_one": "{{steps}} pas",
+      "stepsCount": "{{steps}} passos",
+      "stepsCount_other": "{{steps}} passos",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Nova tasca de programació",
     "explore": "Explora",
     "seeAll": "Veure-ho tot",
-    "kiloAgents": "Agents de Kilo",
-    "greetingMorning": "Bon dia",
-    "greetingAfternoon": "Bona tarda",
-    "greetingEvening": "Bona nit"
+    "kiloAgents": "Agents de Kilo"
   },
   "imageViewer": {
     "close": "Tanca {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Obre la gestió de Kilo Pass al web.",
       "notSubscribed": "No subscrit",
       "overallocated": "Les assignacions de Pass superen els seients de pagament",
-      "paidSeatOne": "{{count}} seient de pagament",
-      "paidSeatOther": "{{count}} seients de pagament",
+      "paidSeat_one": "{{displayCount}} seient de pagament",
+      "paidSeat": "{{displayCount}} seients de pagament",
+      "paidSeat_other": "{{displayCount}} seients de pagament",
       "paymentNeedsAttention": "El pagament necessita atenció",
       "paymentPending": "Pagament pendent",
       "processingBlocked": "Processament bloquejat",

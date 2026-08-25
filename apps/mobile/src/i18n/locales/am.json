@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} ከ {{total}} ፋይሎች ተጭነዋል",
       "loadAllFiles": "ሁሉንም ፋይሎች ጫን",
       "loadAll": "ሁሉንም ጫን",
-      "fileLoaded": "{{count}} ፋይል ተጭኗል",
-      "filesLoaded": "{{count}} ፋይሎች ተጭነዋል",
-      "fileLoadedOfTotal": "{{count}} ፋይል ከ {{total}} ተጭኗል",
-      "filesLoadedOfTotal": "{{count}} ፋይሎች ከ {{total}} ተጭነዋል",
+      "fileLoadedCount_one": "{{displayCount}} ፋይል ተጭኗል",
+      "fileLoadedCount": "{{displayCount}} ፋይሎች ተጭነዋል",
+      "fileLoadedCount_other": "{{displayCount}} ፋይሎች ተጭነዋል",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} ፋይል ከ {{total}} ተጭኗል",
+      "fileLoadedOfTotalCount": "{{displayCount}} ፋይሎች ከ {{total}} ተጭነዋል",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} ፋይሎች ከ {{total}} ተጭነዋል",
       "filesStillLoading": "ፋይሎች አሁንም በመጫን ላይ ናቸው። ለማደስ ጎትት።",
       "goToOverview": "ወደ አጠቃላይ እይታ ሂድ",
       "goToOverviewTab": "ወደ አጠቃላይ እይታ ትር ሂድ"
@@ -288,8 +290,9 @@
       "resolved": "ተፍቷል",
       "outdated": "ያረጀ",
       "file": "ፋይል",
-      "oneComment": "1 አስተያየት",
-      "commentCount": "{{count}} አስተያየቶች",
+      "comment_one": "1 አስተያየት",
+      "comment": "{{displayCount}} አስተያየቶች",
+      "comment_other": "{{displayCount}} አስተያየቶች",
       "startedRelative": " · የተጀመረ {{relative}}",
       "couldNotLoadMore": "ተጨማሪ አስተያየቶችን መጫን አልተቻለም።",
       "retryLoadingMore": "ተጨማሪ አስተያየቶችን መጫን ደግሞ ሞክር",
@@ -299,8 +302,9 @@
       "reactionsTitle": "ምላሾች",
       "addReaction": "ምላሽ ጨምር",
       "reactionPill": "{{emoji}} ምላሽ፣ {{count}} {{countLabel}}",
-      "reactionSingular": "ምላሽ",
-      "reactionPlural": "ምላሾች",
+      "reaction_one": "ምላሽ",
+      "reaction": "ምላሾች",
+      "reaction_other": "ምላሾች",
       "commentActions": "የአስተያየት ተግባራት",
       "reportContent": "ይዘት ሪፖርት አድርግ",
       "reportUser": "ተጠቃሚ ሪፖርት አድርግ",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "ይህ አስተያየት ከግምገማ ወረፋው ይወገዳል።",
       "delete": "ሰርዝ",
       "summaryOptional": "ማጠቃለያ (አማራጭ)",
-      "pendingCommentSingular": "በመጠባበቅ ላይ ያለ አስተያየት",
-      "pendingCommentPlural": "በመጠባበቅ ላይ ያሉ አስተያየቶች",
+      "pendingComment_one": "በመጠባበቅ ላይ ያለ አስተያየት",
+      "pendingComment": "በመጠባበቅ ላይ ያሉ አስተያየቶች",
+      "pendingComment_other": "በመጠባበቅ ላይ ያሉ አስተያየቶች",
       "submitCountOfTotal": "{{freshCount}} ከ {{totalCount}} አስተያየቶች አስገባ",
       "submitReview": "ግምገማ አስገባ",
       "partialPostedMessage": "{{freshCount}} አስተያየት(ዎች) ተለጥፈዋል። {{staleCount}} አስተያየት(ዎች) ወደ አሮጌ መግባት ይጠቁማሉ እና በወረፋዎ ውስጥ ቀሩ።"
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "ክፍት · ግምገማ ያስፈልጋል",
       "stateOpen": "ክፍት",
       "unknownAuthor": "ያልታወቀ ደራሲ",
-      "commitSingular": "መግባት",
-      "commitPlural": "መግባቶች",
-      "fileSingular": "ፋይል",
-      "filePlural": "ፋይሎች"
+      "commit_one": "መግባት",
+      "commit": "መግባቶች",
+      "commit_other": "መግባቶች",
+      "file_one": "ፋይል",
+      "file": "ፋይሎች",
+      "file_other": "ፋይሎች"
     },
     "pendingComment": {
       "editOutdatedA11y": "በ{{location}} ላይ ያለ ያረጀ በመጠባበቅ ላይ ያለ አስተያየት አስተካክል",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "አንድ ሰው",
-      "oneTyping": "{{name}} እየተየበ ነው...",
-      "manyTyping": "{{names}} እየተየቡ ነው..."
+      "typing_one": "{{name}} እየተየበ ነው...",
+      "typing": "{{names}} እየተየቡ ነው...",
+      "typing_other": "{{names}} እየተየቡ ነው..."
     },
     "botStatus": {
       "online": "በመስመር ላይ",
@@ -722,12 +730,10 @@
       "couldNotLoad": "የክፍያ መረጃ መጫን አልተቻለም",
       "manageOnWeb": "ክፍያን በድረ-ገጽ ያስተዳድሩ",
       "commitPlan": "አስተያይ",
-      "daysLeft": "{{count}} ቀናት ቀርተዋል",
       "earlybird": "የጥንታዊ ወፍ",
       "finalCommitTermEndsOn": "የመጨረሻው የCommit ጊዜዎ {{date}} ያበቃል። በ{{price}} እንደ መደበኛ ይቀጥሉ፣ ወይም ማስተናገጃው ያበቃል።",
       "freeTrial": "ነፃ ሙከራ",
       "hostingEnds": "ማስተናገጃው ያበቃል",
-      "oneDayLeft": "1 ቀን ቀርቷል",
       "renews": "ይታደሳል",
       "standardMonthToMonth": "መደበኛ በወር-ወር",
       "standardStartsOn": "መደበኛ {{date}} በ{{price}} ይጀምራል።",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} ትኩረት ይፈልጋል፡ {{label}}",
-      "openUnreadOne": "{{name}}ን ይክፈቱ፣ {{count}} ያልተነበበ መልእክት",
-      "openUnreadMany": "{{name}}ን ይክፈቱ፣ {{count}} ያልተነበቡ መልእክቶች",
+      "openUnread_one": "{{name}}ን ይክፈቱ፣ {{displayCount}} ያልተነበበ መልእክት",
+      "openUnread": "{{name}}ን ይክፈቱ፣ {{displayCount}} ያልተነበቡ መልእክቶች",
+      "openUnread_other": "{{name}}ን ይክፈቱ፣ {{displayCount}} ያልተነበቡ መልእክቶች",
       "open": "{{name}}ን ይክፈቱ",
       "openSettings": "ለ{{name}} ቅንብሮችን ይክፈቱ",
       "fixOnKiloAi": "በkilo.ai ላይ ያስተካክሉ፡ {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "ራስ-ሰር ማስተካከልን ያንቁ?",
       "enableAutoRemediationConfirmMessage": "የደህንነት ወኪል ለብቁ ሊበዘበዙ የሚችሉ ግኝቶች የማስተካከያ PRዎችን በራስ-ሰር ይከፍታል።",
       "enable": "አንቃ",
-      "queuedOne": "{{count}} የነበረ ግኝት ለመተንተን ተሰልፏል።",
-      "queuedMany": "{{count}} የነበሩ ግኝቶች ለመተንተን ተሰልፈዋል።",
+      "queued_one": "{{displayCount}} የነበረ ግኝት ለመተንተን ተሰልፏል።",
+      "queued": "{{displayCount}} የነበሩ ግኝቶች ለመተንተን ተሰልፈዋል።",
+      "queued_other": "{{displayCount}} የነበሩ ግኝቶች ለመተንተን ተሰልፈዋል።",
       "severityCriticalOnly": "ወሳኝ ብቻ",
       "severityHighAndAbove": "ከፍተኛ እና ከዚያ በላይ",
       "severityMediumAndAbove": "መካከለኛ እና ከዚያ በላይ",
@@ -1482,8 +1490,9 @@
       "on": "በርቷል",
       "off": "ጠፍቷል",
       "allRepositories": "ሁሉም ማከማቻዎች",
-      "repositorySelected": "{{count}} ማከማቻ ተመርጧል",
-      "repositoriesSelected": "{{count}} ማከማቻዎች ተመርጠዋል",
+      "repositoriesCount_one": "{{displayCount}} ማከማቻ ተመርጧል",
+      "repositoriesCount": "{{displayCount}} ማከማቻዎች ተመርጠዋል",
+      "repositoriesCount_other": "{{displayCount}} ማከማቻዎች ተመርጠዋል",
       "selectRepositories": "ማከማቻዎችን ይምረጡ",
       "selectRepositoriesSubtitle": "የደህንነት ወኪል የሚከታተላቸውን ማከማቻዎች ይምረጡ",
       "repositories": "ማከማቻዎች",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "ክፍለ ጊዜው ተሰርዟል",
       "needsInput": "ግብዓት ይፈልጋል",
       "fromPlatform": "ከ{{platform}}",
-      "centOne": "ሳንቲም",
-      "centOther": "ሳንቲሞች",
-      "dollarOne": "ዶላር",
-      "dollarOther": "ዶላሮች"
+      "cent_one": "ሳንቲም",
+      "cent": "ሳንቲሞች",
+      "cent_other": "ሳንቲሞች",
+      "dollar_one": "ዶላር",
+      "dollar": "ዶላሮች",
+      "dollar_other": "ዶላሮች"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubን መክፈት አልተቻለም",
@@ -1817,8 +1828,9 @@
       "discardFailed": "ረቂቁን ማስወገድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
     },
     "partRenderer": {
-      "updatedFile": "{{count}} ፋይል ተዘምኗል",
-      "updatedFiles": "{{count}} ፋይሎች ተዘምነዋል"
+      "updatedFileCount_one": "{{displayCount}} ፋይል ተዘምኗል",
+      "updatedFileCount": "{{displayCount}} ፋይሎች ተዘምነዋል",
+      "updatedFileCount_other": "{{displayCount}} ፋይሎች ተዘምነዋል"
     },
     "toolPatch": {
       "operationAdded": "ታክሏል",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "የቀደሙ መልእክቶች ተጭነዋል",
       "retryHint": "ለዚህ ክፍለ-ጊዜ የቀደሙ መልእክቶችን መጫንን እንደገና ይሞክራል።",
-      "omittedOne": "ከዚህ ክፍለ-ጊዜ የተወሰኑ ቀደምት ነገሮች ሊታዩ አልቻሉም።",
-      "omittedMany": "ከዚህ ክፍለ-ጊዜ {{count}} ቀደምት ነገሮች ሊታዩ አልቻሉም።",
+      "omitted_one": "ከዚህ ክፍለ-ጊዜ የተወሰኑ ቀደምት ነገሮች ሊታዩ አልቻሉም።",
+      "omitted": "ከዚህ ክፍለ-ጊዜ {{displayCount}} ቀደምት ነገሮች ሊታዩ አልቻሉም።",
+      "omitted_other": "ከዚህ ክፍለ-ጊዜ {{displayCount}} ቀደምት ነገሮች ሊታዩ አልቻሉም።",
       "couldNotLoad": "የቀደሙ መልእክቶችን መጫን አልተቻለም።",
       "unavailable": "የቀደሙ መልእክቶች አይገኙም።",
       "tooLarge": "የቀደሙ መልእክቶች ለመጫን በጣም ትልቅ ናቸው።"
@@ -2069,10 +2082,12 @@
       "viewTable": "ሰንጠረዥ ይመልከቱ",
       "title": "ሰንጠረዥ",
       "close": "ሰንጠረዥ ይዝጉ",
-      "column": "ዓምድ",
-      "columns": "ዓምዶች",
-      "row": "ረድፍ",
-      "rows": "ረድፎች",
+      "columnCount_one": "ዓምድ",
+      "columnCount": "ዓምዶች",
+      "columnCount_other": "ዓምዶች",
+      "rowCount_one": "ረድፍ",
+      "rowCount": "ረድፎች",
+      "rowCount_other": "ረድፎች",
       "opensFullScreen": "ሙሉ ስክሪን ይከፍታል"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "ከ{{window}} ቶከኖች",
       "tokens": "ቶከኖች",
       "tokensWithPercentage": "ቶከኖች ({{percentage}})",
-      "stepsCountOne": "{{steps}} እርምጃ",
-      "stepsCountMany": "{{steps}} እርምጃዎች",
+      "stepsCount_one": "{{steps}} እርምጃ",
+      "stepsCount": "{{steps}} እርምጃዎች",
+      "stepsCount_other": "{{steps}} እርምጃዎች",
       "modelAccessibilityLabel": "{{name}}፣ {{provider}}፣ {{steps}}፣ {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "አዲስ የኮዲንግ ተግባር",
     "explore": "ይቃኙ",
     "seeAll": "ሁሉንም ይመልከቱ",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "እንደምን አደሩ",
-    "greetingAfternoon": "እንደምን ዋሉ",
-    "greetingEvening": "እንደምን አመሹ"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "{{filename}}ን ይዝጉ",
@@ -2645,8 +2658,9 @@
       "manageHint": "የKilo Pass አስተዳደርን በድር ላይ ይከፍታል።",
       "notSubscribed": "አልተመዘገበም",
       "overallocated": "የፓስ ምደባዎች ከተከፈሉ መቀመጫዎች ይበልጣሉ",
-      "paidSeatOne": "{{count}} የተከፈለ መቀመጫ",
-      "paidSeatOther": "{{count}} የተከፈሉ መቀመጫዎች",
+      "paidSeat_one": "{{displayCount}} የተከፈለ መቀመጫ",
+      "paidSeat": "{{displayCount}} የተከፈሉ መቀመጫዎች",
+      "paidSeat_other": "{{displayCount}} የተከፈሉ መቀመጫዎች",
       "paymentNeedsAttention": "ክፍያ ትኩረት ይፈልጋል",
       "paymentPending": "ክፍያ በመጠባበቅ ላይ",
       "processingBlocked": "ሂደት ተከልክሏል",

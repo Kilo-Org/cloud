@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "učitano {{loaded}} od {{total}} datoteka",
       "loadAllFiles": "Učitaj sve datoteke",
       "loadAll": "Učitaj sve",
-      "fileLoaded": "učitana {{count}} datoteka",
-      "filesLoaded": "učitano {{count}} datoteka",
-      "fileLoadedOfTotal": "učitana {{count}} datoteka od {{total}}",
-      "filesLoadedOfTotal": "učitano {{count}} datoteka od {{total}}",
+      "fileLoadedCount_one": "učitana {{displayCount}} datoteka",
+      "fileLoadedCount": "učitano {{displayCount}} datoteka",
+      "fileLoadedCount_other": "učitano {{displayCount}} datoteka",
+      "fileLoadedOfTotalCount_one": "učitana {{displayCount}} datoteka od {{total}}",
+      "fileLoadedOfTotalCount": "učitano {{displayCount}} datoteka od {{total}}",
+      "fileLoadedOfTotalCount_other": "učitano {{displayCount}} datoteka od {{total}}",
       "filesStillLoading": "Datoteke se još učitavaju. Povucite za osvježavanje.",
       "goToOverview": "Idi na pregled",
       "goToOverviewTab": "Idi na karticu pregleda"
@@ -288,8 +290,9 @@
       "resolved": "Riješeno",
       "outdated": "Zastarjelo",
       "file": "Datoteka",
-      "oneComment": "1 komentar",
-      "commentCount": "{{count}} komentara",
+      "comment_one": "1 komentar",
+      "comment": "{{displayCount}} komentara",
+      "comment_other": "{{displayCount}} komentara",
       "startedRelative": " · započeto {{relative}}",
       "couldNotLoadMore": "Nije moguće učitati više komentara.",
       "retryLoadingMore": "Pokušaj ponovno učitati više komentara",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reakcije",
       "addReaction": "Dodaj reakciju",
       "reactionPill": "{{emoji}} reakcija, {{count}} {{countLabel}}",
-      "reactionSingular": "reakcija",
-      "reactionPlural": "reakcija",
+      "reaction_one": "reakcija",
+      "reaction": "reakcija",
+      "reaction_other": "reakcija",
       "commentActions": "Radnje komentara",
       "reportContent": "Prijavi sadržaj",
       "reportUser": "Prijavi korisnika",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Ovaj komentar bit će uklonjen iz reda recenzije.",
       "delete": "Obriši",
       "summaryOptional": "Sažetak (opcionalno)",
-      "pendingCommentSingular": "čekajući komentar",
-      "pendingCommentPlural": "čekajući komentari",
+      "pendingComment_one": "čekajući komentar",
+      "pendingComment": "čekajući komentari",
+      "pendingComment_other": "čekajući komentari",
       "submitCountOfTotal": "Pošalji {{freshCount}} od {{totalCount}} komentara",
       "submitReview": "Pošalji recenziju",
       "partialPostedMessage": "Poslano {{freshCount}} komentar(a). {{staleCount}} komentar(a) odnose se na stariji commit i ostalo je u vašem redu."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Otvoreno · Potrebna recenzija",
       "stateOpen": "Otvoreno",
       "unknownAuthor": "Nepoznati autor",
-      "commitSingular": "commit",
-      "commitPlural": "commita",
-      "fileSingular": "datoteka",
-      "filePlural": "datoteka"
+      "commit_one": "commit",
+      "commit": "commita",
+      "commit_other": "commita",
+      "file_one": "datoteka",
+      "file": "datoteka",
+      "file_other": "datoteka"
     },
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastarjeli čekajući komentar na {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Netko",
-      "oneTyping": "{{name}} tipka...",
-      "manyTyping": "{{names}} tipkaju..."
+      "typing_one": "{{name}} tipka...",
+      "typing": "{{names}} tipkaju...",
+      "typing_other": "{{names}} tipkaju..."
     },
     "botStatus": {
       "online": "Na mreži",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Učitavanje podataka o naplati nije uspjelo",
       "manageOnWeb": "Upravljaj naplatom na webu",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} dana preostalo",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Vaš konačni Commit rok završava {{date}}. Nastavite kao Standard po cijeni od {{price}}, ili hosting završava.",
       "freeTrial": "Besplatna proba",
       "hostingEnds": "Hosting završava",
-      "oneDayLeft": "1 dan preostalo",
       "renews": "Obnavlja se",
       "standardMonthToMonth": "Standardno mjesečno",
       "standardStartsOn": "Standard počinje {{date}} po cijeni od {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} zahtijeva pozornost: {{label}}",
-      "openUnreadOne": "Otvori {{name}}, {{count}} nepročitana poruka",
-      "openUnreadMany": "Otvori {{name}}, {{count}} nepročitanih poruka",
+      "openUnread_one": "Otvori {{name}}, {{displayCount}} nepročitana poruka",
+      "openUnread": "Otvori {{name}}, {{displayCount}} nepročitanih poruka",
+      "openUnread_other": "Otvori {{name}}, {{displayCount}} nepročitanih poruka",
       "open": "Otvori {{name}}",
       "openSettings": "Otvori postavke za {{name}}",
       "fixOnKiloAi": "Riješi na kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Omogućiti automatsku sanaciju?",
       "enableAutoRemediationConfirmMessage": "Security Agent će automatski otvarati PR-ove za sanaciju za prihvatljive iskoristive nalaze.",
       "enable": "Omogući",
-      "queuedOne": "{{count}} postojeći nalaz čeka na analizu.",
-      "queuedMany": "{{count}} postojećih nalaza čeka na analizu.",
+      "queued_one": "{{displayCount}} postojeći nalaz čeka na analizu.",
+      "queued": "{{displayCount}} postojećih nalaza čeka na analizu.",
+      "queued_other": "{{displayCount}} postojećih nalaza čeka na analizu.",
       "severityCriticalOnly": "Samo kritični",
       "severityHighAndAbove": "Visoki i viši",
       "severityMediumAndAbove": "Srednji i viši",
@@ -1482,8 +1490,9 @@
       "on": "Uključeno",
       "off": "Isključeno",
       "allRepositories": "Svi repozitoriji",
-      "repositorySelected": "{{count}} repozitorij odabran",
-      "repositoriesSelected": "{{count}} repozitorija odabrano",
+      "repositoriesCount_one": "{{displayCount}} repozitorij odabran",
+      "repositoriesCount": "{{displayCount}} repozitorija odabrano",
+      "repositoriesCount_other": "{{displayCount}} repozitorija odabrano",
       "selectRepositories": "Odaberi repozitorije",
       "selectRepositoriesSubtitle": "Odaberite koje repozitorije Security Agent prati",
       "repositories": "Repozitoriji",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Sesija izbrisana",
       "needsInput": "treba unos",
       "fromPlatform": "s {{platform}}",
-      "centOne": "cent",
-      "centOther": "centi",
-      "dollarOne": "dolar",
-      "dollarOther": "dolara"
+      "cent_one": "cent",
+      "cent": "centi",
+      "cent_other": "centi",
+      "dollar_one": "dolar",
+      "dollar": "dolara",
+      "dollar_other": "dolara"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nije moguće otvoriti GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Nije moguće odbaciti nacrt. Pokušajte ponovno."
     },
     "partRenderer": {
-      "updatedFile": "Ažurirana {{count}} datoteka",
-      "updatedFiles": "Ažurirane {{count}} datoteke"
+      "updatedFileCount_one": "Ažurirana {{displayCount}} datoteka",
+      "updatedFileCount": "Ažurirane {{displayCount}} datoteke",
+      "updatedFileCount_other": "Ažurirane {{displayCount}} datoteke"
     },
     "toolPatch": {
       "operationAdded": "Dodano",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Ranije poruke učitane",
       "retryHint": "Ponovno pokušava učitavanje ranijih poruka za ovu sesiju.",
-      "omittedOne": "Neke ranije stavke iz ove sesije nije moguće prikazati.",
-      "omittedMany": "{{count}} ranijih stavki iz ove sesije nije moguće prikazati.",
+      "omitted_one": "Neke ranije stavke iz ove sesije nije moguće prikazati.",
+      "omitted": "{{displayCount}} ranijih stavki iz ove sesije nije moguće prikazati.",
+      "omitted_other": "{{displayCount}} ranijih stavki iz ove sesije nije moguće prikazati.",
       "couldNotLoad": "Nije moguće učitati ranije poruke.",
       "unavailable": "Ranije poruke nisu dostupne.",
       "tooLarge": "Ranije poruke prevelike su za učitavanje."
@@ -2069,10 +2082,12 @@
       "viewTable": "Prikaži tablicu",
       "title": "Tablica",
       "close": "Zatvori tablicu",
-      "column": "stupac",
-      "columns": "stupci",
-      "row": "redak",
-      "rows": "redci",
+      "columnCount_one": "stupac",
+      "columnCount": "stupci",
+      "columnCount_other": "stupci",
+      "rowCount_one": "redak",
+      "rowCount": "redci",
+      "rowCount_other": "redci",
       "opensFullScreen": "otvara preko cijelog zaslona"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "od {{window}} tokena",
       "tokens": "tokena",
       "tokensWithPercentage": "tokena ({{percentage}})",
-      "stepsCountOne": "{{steps}} korak",
-      "stepsCountMany": "{{steps}} koraka",
+      "stepsCount_one": "{{steps}} korak",
+      "stepsCount": "{{steps}} koraka",
+      "stepsCount_other": "{{steps}} koraka",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Novi zadatak kodiranja",
     "explore": "Istraži",
     "seeAll": "Prikaži sve",
-    "kiloAgents": "Kilo Agenti",
-    "greetingMorning": "Dobro jutro",
-    "greetingAfternoon": "Dobar dan",
-    "greetingEvening": "Dobra večer"
+    "kiloAgents": "Kilo Agenti"
   },
   "imageViewer": {
     "close": "Zatvori {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Otvara upravljanje Kilo Passom na webu.",
       "notSubscribed": "Nema pretplate",
       "overallocated": "Dodjele Passa premašuju plaćena mjesta",
-      "paidSeatOne": "{{count}} plaćeno mjesto",
-      "paidSeatOther": "{{count}} plaćenih mjesta",
+      "paidSeat_one": "{{displayCount}} plaćeno mjesto",
+      "paidSeat": "{{displayCount}} plaćenih mjesta",
+      "paidSeat_other": "{{displayCount}} plaćenih mjesta",
       "paymentNeedsAttention": "Plaćanje zahtijeva pozornost",
       "paymentPending": "Plaćanje na čekanju",
       "processingBlocked": "Obrada blokirana",

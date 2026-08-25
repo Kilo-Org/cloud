@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} / {{total}} fitxategi kargatuta",
       "loadAllFiles": "Kargatu fitxategi guztiak",
       "loadAll": "Kargatu guztiak",
-      "fileLoaded": "{{count}} fitxategi kargatuta",
-      "filesLoaded": "{{count}} fitxategi kargatuta",
-      "fileLoadedOfTotal": "{{count}} / {{total}} fitxategi kargatuta",
-      "filesLoadedOfTotal": "{{count}} / {{total}} fitxategi kargatuta",
+      "fileLoadedCount_one": "{{displayCount}} fitxategi kargatuta",
+      "fileLoadedCount": "{{displayCount}} fitxategi kargatuta",
+      "fileLoadedCount_other": "{{displayCount}} fitxategi kargatuta",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} / {{total}} fitxategi kargatuta",
+      "fileLoadedOfTotalCount": "{{displayCount}} / {{total}} fitxategi kargatuta",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} / {{total}} fitxategi kargatuta",
       "filesStillLoading": "Fitxategiak oraindik kargatzen ari dira. Tira ezazu behera freskatzeko.",
       "goToOverview": "Joan ikuspegi orokorrera",
       "goToOverviewTab": "Joan ikuspegi orokorreko fitxara"
@@ -288,8 +290,9 @@
       "resolved": "Konponduta",
       "outdated": "Zaharkitua",
       "file": "Fitxategia",
-      "oneComment": "1 iruzkin",
-      "commentCount": "{{count}} iruzkin",
+      "comment_one": "1 iruzkin",
+      "comment": "{{displayCount}} iruzkin",
+      "comment_other": "{{displayCount}} iruzkin",
       "startedRelative": " · hasita {{relative}}",
       "couldNotLoadMore": "Ezin izan dira iruzkin gehiago kargatu.",
       "retryLoadingMore": "Saiatu iruzkin gehiago berriro kargatzen",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Erreakzioak",
       "addReaction": "Gehitu erreakzioa",
       "reactionPill": "{{emoji}} erreakzioa, {{count}} {{countLabel}}",
-      "reactionSingular": "erreakzio",
-      "reactionPlural": "erreakzio",
+      "reaction_one": "erreakzio",
+      "reaction": "erreakzio",
+      "reaction_other": "erreakzio",
       "commentActions": "Iruzkinaren ekintzak",
       "reportContent": "Salatu edukia",
       "reportUser": "Salatu erabiltzailea",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Iruzkin hau berrikuspen-ilaratik kenduko da.",
       "delete": "Ezabatu",
       "summaryOptional": "Laburpena (hautazkoa)",
-      "pendingCommentSingular": "zain dagoen iruzkin",
-      "pendingCommentPlural": "zain dauden iruzkin",
+      "pendingComment_one": "zain dagoen iruzkin",
+      "pendingComment": "zain dauden iruzkin",
+      "pendingComment_other": "zain dauden iruzkin",
       "submitCountOfTotal": "Bidali {{freshCount}} / {{totalCount}} iruzkin",
       "submitReview": "Bidali berrikuspena",
       "partialPostedMessage": "{{freshCount}} iruzkin argitaratu dira. {{staleCount}} iruzkinek commit zaharrago bat adierazten dute eta zure ilaran geratu dira."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Irekia · Berrikuspena beharrezkoa",
       "stateOpen": "Irekia",
       "unknownAuthor": "Egile ezezaguna",
-      "commitSingular": "commit",
-      "commitPlural": "commit",
-      "fileSingular": "fitxategi",
-      "filePlural": "fitxategi"
+      "commit_one": "commit",
+      "commit": "commit",
+      "commit_other": "commit",
+      "file_one": "fitxategi",
+      "file": "fitxategi",
+      "file_other": "fitxategi"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editatu {{location}}-ko iruzkin zaharkitua",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Norbait",
-      "oneTyping": "{{name}} idazten ari da...",
-      "manyTyping": "{{names}} idazten ari dira..."
+      "typing_one": "{{name}} idazten ari da...",
+      "typing": "{{names}} idazten ari dira...",
+      "typing_other": "{{names}} idazten ari dira..."
     },
     "botStatus": {
       "online": "Konektatuta",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Fakturazio-informazioa ezin izan da kargatu",
       "manageOnWeb": "Kudeatu fakturazioa webgunean",
       "commitPlan": "Konpromisoa",
-      "daysLeft": "{{count}} egun geratzen dira",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Zure azken Commit epea {{date}}n amaitzen da. Jarraitu Standard gisa {{price}}rekin, edo hostinga amaitzen da.",
       "freeTrial": "Doako proba",
       "hostingEnds": "Hostinga amaitzen da",
-      "oneDayLeft": "Egun 1 geratzen da",
       "renews": "Berritzen da",
       "standardMonthToMonth": "Standard hilabetez hilabete",
       "standardStartsOn": "Standard {{date}}n hasten da {{price}}rekin.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}}k arreta behar du: {{label}}",
-      "openUnreadOne": "Ireki {{name}}, {{count}} irakurri gabeko mezu",
-      "openUnreadMany": "Ireki {{name}}, {{count}} irakurri gabeko mezu",
+      "openUnread_one": "Ireki {{name}}, {{displayCount}} irakurri gabeko mezu",
+      "openUnread": "Ireki {{name}}, {{displayCount}} irakurri gabeko mezu",
+      "openUnread_other": "Ireki {{name}}, {{displayCount}} irakurri gabeko mezu",
       "open": "Ireki {{name}}",
       "openSettings": "Ireki {{name}}ren ezarpenak",
       "fixOnKiloAi": "Konpondu kilo.ai-n: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Gaitu konponketa automatikoa?",
       "enableAutoRemediationConfirmMessage": "Segurtasun-agenteak konponketa PR-ak irekiko ditu automatikoki ustiaezinak diren aurkikuntza baliagarrietarako.",
       "enable": "Gaitu",
-      "queuedOne": "{{count}} emaitza existente jarri da ilaran aztertzeko.",
-      "queuedMany": "{{count}} emaitza existente jarri dira ilaran aztertzeko.",
+      "queued_one": "{{displayCount}} emaitza existente jarri da ilaran aztertzeko.",
+      "queued": "{{displayCount}} emaitza existente jarri dira ilaran aztertzeko.",
+      "queued_other": "{{displayCount}} emaitza existente jarri dira ilaran aztertzeko.",
       "severityCriticalOnly": "Kritikoa soilik",
       "severityHighAndAbove": "Handia eta goragokoa",
       "severityMediumAndAbove": "Ertaina eta goragokoa",
@@ -1482,8 +1490,9 @@
       "on": "Aktibo",
       "off": "Desaktibo",
       "allRepositories": "Biltegi guztiak",
-      "repositorySelected": "{{count}} biltegi hautatu da",
-      "repositoriesSelected": "{{count}} biltegi hautatu dira",
+      "repositoriesCount_one": "{{displayCount}} biltegi hautatu da",
+      "repositoriesCount": "{{displayCount}} biltegi hautatu dira",
+      "repositoriesCount_other": "{{displayCount}} biltegi hautatu dira",
       "selectRepositories": "Hautatu biltegiak",
       "selectRepositoriesSubtitle": "Aukeratu zein biltegitan kontrolatzen duen Security Agent-ek",
       "repositories": "Biltegiak",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Saioa ezabatuta",
       "needsInput": "sarreraren zain",
       "fromPlatform": "{{platform}}tik",
-      "centOne": "zentimo",
-      "centOther": "zentimo",
-      "dollarOne": "dolar",
-      "dollarOther": "dolar"
+      "cent_one": "zentimo",
+      "cent": "zentimo",
+      "cent_other": "zentimo",
+      "dollar_one": "dolar",
+      "dollar": "dolar",
+      "dollar_other": "dolar"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ezin da GitHub ireki",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Ezin da zirriborroa baztertu. Saiatu berriro."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} fitxategi eguneratu da",
-      "updatedFiles": "{{count}} fitxategi eguneratu dira"
+      "updatedFileCount_one": "{{displayCount}} fitxategi eguneratu da",
+      "updatedFileCount": "{{displayCount}} fitxategi eguneratu dira",
+      "updatedFileCount_other": "{{displayCount}} fitxategi eguneratu dira"
     },
     "toolPatch": {
       "operationAdded": "Gehituta",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Aurreko mezuak kargatu dira",
       "retryHint": "Saio honetarako aurreko mezuak kargatzen berriro saiatzen da.",
-      "omittedOne": "Saio honetako aurreko elementu batzuk ezin izan dira erakutsi.",
-      "omittedMany": "Saio honetako {{count}} aurreko elementu ezin izan dira erakutsi.",
+      "omitted_one": "Saio honetako aurreko elementu batzuk ezin izan dira erakutsi.",
+      "omitted": "Saio honetako {{displayCount}} aurreko elementu ezin izan dira erakutsi.",
+      "omitted_other": "Saio honetako {{displayCount}} aurreko elementu ezin izan dira erakutsi.",
       "couldNotLoad": "Ezin izan dira aurreko mezuak kargatu.",
       "unavailable": "Aurreko mezuak ez daude erabilgarri.",
       "tooLarge": "Aurreko mezuak handiegiak dira kargatzeko."
@@ -2069,10 +2082,12 @@
       "viewTable": "Ikusi taula",
       "title": "Taula",
       "close": "Itxi taula",
-      "column": "zutabea",
-      "columns": "zutabeak",
-      "row": "ilara",
-      "rows": "ilarak",
+      "columnCount_one": "zutabea",
+      "columnCount": "zutabeak",
+      "columnCount_other": "zutabeak",
+      "rowCount_one": "ilara",
+      "rowCount": "ilarak",
+      "rowCount_other": "ilarak",
       "opensFullScreen": "pantaila osoan irekitzen du"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} tokenetik",
       "tokens": "token",
       "tokensWithPercentage": "token ({{percentage}})",
-      "stepsCountOne": "{{steps}} urrats",
-      "stepsCountMany": "{{steps}} urrats",
+      "stepsCount_one": "{{steps}} urrats",
+      "stepsCount": "{{steps}} urrats",
+      "stepsCount_other": "{{steps}} urrats",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Kodetze-lan berria",
     "explore": "Arakatu",
     "seeAll": "Ikusi guztiak",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Egun on",
-    "greetingAfternoon": "Arratsalde on",
-    "greetingEvening": "Gabon"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Itxi {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Kilo Pass kudeaketa webean irekitzen du.",
       "notSubscribed": "Ez harpidetuta",
       "overallocated": "Pasabideen esleipenak ordaindutako eserlekuak gainditzen ditu",
-      "paidSeatOne": "{{count}} ordaindutako eserleku",
-      "paidSeatOther": "{{count}} ordaindutako eserleku",
+      "paidSeat_one": "{{displayCount}} ordaindutako eserleku",
+      "paidSeat": "{{displayCount}} ordaindutako eserleku",
+      "paidSeat_other": "{{displayCount}} ordaindutako eserleku",
       "paymentNeedsAttention": "Ordainketak arreta behar du",
       "paymentPending": "Ordainketa zain",
       "processingBlocked": "Prozesamendua blokeatuta",

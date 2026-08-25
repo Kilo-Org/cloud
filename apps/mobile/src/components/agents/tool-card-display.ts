@@ -2,6 +2,7 @@ import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { z } from 'zod';
 
 import { i18n } from '@/i18n';
+import { formatList } from '@/lib/format';
 import { getToolFileAttachments, getToolImageAttachments } from './tool-card-attachments';
 import {
   getDirectoryName,
@@ -74,7 +75,7 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       if (limit !== undefined) {
         badgeParts.push(i18n.t('agentChat.toolCard.linesBadge', { count: limit }));
       }
-      const badge = badgeParts.length > 0 ? badgeParts.join(', ') : undefined;
+      const badge = badgeParts.length > 0 ? formatList(badgeParts, i18n.language) : undefined;
 
       return {
         title: i18n.t('agentChat.toolCard.toolRead'),

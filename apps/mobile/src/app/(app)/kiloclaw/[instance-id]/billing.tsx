@@ -23,7 +23,7 @@ import { useKiloClawBillingStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { formatBillingDate, formatRemainingDays } from '@/lib/hooks/use-kiloclaw-billing';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
-import { cn } from '@/lib/utils';
+import { capitalize, cn } from '@/lib/utils';
 
 function DetailRow({
   label,
@@ -132,8 +132,7 @@ function PlanDetails({
     return <FinalCommitTermDetails billing={billing} />;
   }
   if (billing.subscription) {
-    const planName =
-      billing.subscription.plan.charAt(0).toUpperCase() + billing.subscription.plan.slice(1);
+    const planName = capitalize(billing.subscription.plan);
     const cancelling = billing.subscription.cancelAtPeriodEnd;
     return (
       <View>
@@ -163,10 +162,7 @@ function PlanDetails({
     );
   }
   if (billing.earlybird) {
-    const daysText =
-      billing.earlybird.daysRemaining === 1
-        ? t('kiloclaw.billing.oneDayLeft')
-        : t('kiloclaw.billing.daysLeft', { count: billing.earlybird.daysRemaining });
+    const daysText = formatRemainingDays(billing.earlybird.daysRemaining);
     return (
       <View>
         <DetailRow label={t('kiloclaw.billing.plan')} value={t('kiloclaw.billing.earlybird')} />

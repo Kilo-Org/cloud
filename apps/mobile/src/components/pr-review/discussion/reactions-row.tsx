@@ -174,10 +174,7 @@ function ReactionPill({
       accessibilityLabel={t('prReview.discussion.reactionPill', {
         emoji,
         count,
-        countLabel:
-          count === 1
-            ? t('prReview.discussion.reactionSingular')
-            : t('prReview.discussion.reactionPlural'),
+        countLabel: t('prReview.discussion.reaction', { count }),
       })}
       accessibilityState={{ selected: viewerHasReacted, disabled }}
       onPress={onPress}

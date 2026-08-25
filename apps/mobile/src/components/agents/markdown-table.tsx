@@ -32,6 +32,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { moveA11yFocus } from '@/lib/a11y/announce';
 import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { containsPressable, extractNodeText, linearRowLabel } from './markdown-a11y';
@@ -60,16 +61,20 @@ function getColumnCount(header: ReactNode[][], rows: ReactNode[][][]): number {
   return columnCount;
 }
 
-function formatCount(count: number, singular: string, plural: string): string {
-  return `${count} ${count === 1 ? singular : plural}`;
+function formatCount(count: number, key: 'columnCount' | 'rowCount'): string {
+  const unit =
+    key === 'columnCount'
+      ? i18n.t('agentChat.markdownTable.columnCount', { count })
+      : i18n.t('agentChat.markdownTable.rowCount', { count });
+  return `${formatNumber(count, i18n.language)} ${unit}`;
 }
 
 function formatTableSummary(columnCount: number, rowCount: number): string {
-  return `${formatCount(columnCount, i18n.t('agentChat.markdownTable.column'), i18n.t('agentChat.markdownTable.columns'))} · ${formatCount(rowCount, i18n.t('agentChat.markdownTable.row'), i18n.t('agentChat.markdownTable.rows'))}`;
+  return `${formatCount(columnCount, 'columnCount')} · ${formatCount(rowCount, 'rowCount')}`;
 }
 
 function formatChipAccessibilityLabel(columnCount: number, rowCount: number): string {
-  return `${i18n.t('agentChat.markdownTable.title')}, ${formatCount(columnCount, i18n.t('agentChat.markdownTable.column'), i18n.t('agentChat.markdownTable.columns'))}, ${formatCount(rowCount, i18n.t('agentChat.markdownTable.row'), i18n.t('agentChat.markdownTable.rows'))}, ${i18n.t('agentChat.markdownTable.opensFullScreen')}`;
+  return `${i18n.t('agentChat.markdownTable.title')}, ${formatCount(columnCount, 'columnCount')}, ${formatCount(rowCount, 'rowCount')}, ${i18n.t('agentChat.markdownTable.opensFullScreen')}`;
 }
 
 // Markdown tables never fit inside a chat bubble: a horizontal ScrollView in a

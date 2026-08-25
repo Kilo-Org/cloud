@@ -106,13 +106,13 @@ async function fetchSupportedLanguageTags(): Promise<readonly string[] | null> {
 }
 
 /**
- * Resolve the best language tag for voice recognition, preferring a match
- * against the recognizer's supported locales. On first call, fetches and
+ * Resolve the best language tag for voice recognition from the active app
+ * language. On first call, fetches and
  * memoizes the supported list; failures are never cached so subsequent calls
- * retry. Falls back to the raw device preferred-language tag when the
- * supported list is empty, unavailable, or contains no same-language match.
+ * retry. A matching device region refines the selected language. The selected
+ * app language remains the fallback when the supported list is unavailable.
  */
-export async function resolveVoiceInputStartLanguageTag(): Promise<string> {
+export async function resolveVoiceInputStartLanguageTag(appLanguage: string): Promise<string> {
   const locales = getLocales();
   const deviceTags = locales
     .map(l => l.languageTag)
@@ -120,14 +120,18 @@ export async function resolveVoiceInputStartLanguageTag(): Promise<string> {
     // module can still hand back a missing/empty value at runtime.
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- environment probe: guards against a real-device value diverging from expo-localization's static type.
     .filter((t): t is string => typeof t === 'string' && t.length > 0);
-  const rawTag = resolveVoiceInputLanguageTag(locales);
+  const language = normalizeLocale(appLanguage).split('-')[0];
+  const preferredTags = [
+    appLanguage,
+    ...deviceTags.filter(tag => normalizeLocale(tag).split('-')[0] === language),
+  ];
 
   const supported = await fetchSupportedLanguageTags();
   if (!supported || supported.length === 0) {
-    return rawTag;
+    return appLanguage;
   }
 
-  return pickSupportedVoiceInputLanguageTag(deviceTags, supported) ?? rawTag;
+  return pickSupportedVoiceInputLanguageTag(preferredTags, supported) ?? appLanguage;
 }
 
 /** Clear the session-level supported-locale cache. For tests only. */

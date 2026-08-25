@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { i18n } from '@/i18n';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { formatList } from '@/lib/format';
 import {
   BYOK_MODEL_LABEL,
   freeModelDataLabel,
@@ -238,19 +239,20 @@ export function ModelPickerOptionRow({
   const { t } = useTranslation();
   const { free, byok, collectsData } = modelSelectorBadges(option);
   const costLabel = modelPickerCostLabel(option);
-  const accessibilityLabel = [
-    option.provider?.name,
-    option.name,
-    option.displayId,
-    byok ? BYOK_MODEL_LABEL : undefined,
-    free && !byok ? freeModelFreeLabel() : undefined,
-    collectsData ? freeModelDataLabel() : undefined,
-    costLabel ?? undefined,
-    option.unavailable ? t('agentChat.modelSelector.unavailableState') : undefined,
-    selected ? t('agentChat.modelSelector.selectedState') : undefined,
-  ]
-    .filter(Boolean)
-    .join(', ');
+  const accessibilityLabel = formatList(
+    [
+      option.provider?.name,
+      option.name,
+      option.displayId,
+      byok ? BYOK_MODEL_LABEL : undefined,
+      free && !byok ? freeModelFreeLabel() : undefined,
+      collectsData ? freeModelDataLabel() : undefined,
+      costLabel ?? undefined,
+      option.unavailable ? t('agentChat.modelSelector.unavailableState') : undefined,
+      selected ? t('agentChat.modelSelector.selectedState') : undefined,
+    ].filter(value => value !== undefined),
+    i18n.language
+  );
 
   // The row is a NON-accessible container with two sibling controls: the
   // main select (row content) and the favorite star. A pressable nested

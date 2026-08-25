@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{total}}-ден {{loaded}} файл жүктелді",
       "loadAllFiles": "Барлық файлдарды жүктеу",
       "loadAll": "Барлығын жүктеу",
-      "fileLoaded": "{{count}} файл жүктелді",
-      "filesLoaded": "{{count}} файл жүктелді",
-      "fileLoadedOfTotal": "{{total}}-ден {{count}} файл жүктелді",
-      "filesLoadedOfTotal": "{{total}}-ден {{count}} файл жүктелді",
+      "fileLoadedCount_one": "{{displayCount}} файл жүктелді",
+      "fileLoadedCount": "{{displayCount}} файл жүктелді",
+      "fileLoadedCount_other": "{{displayCount}} файл жүктелді",
+      "fileLoadedOfTotalCount_one": "{{total}}-ден {{displayCount}} файл жүктелді",
+      "fileLoadedOfTotalCount": "{{total}}-ден {{displayCount}} файл жүктелді",
+      "fileLoadedOfTotalCount_other": "{{total}}-ден {{displayCount}} файл жүктелді",
       "filesStillLoading": "Файлдар әлі жүктелуде. Жаңарту үшін тартыңыз.",
       "goToOverview": "Шолуға өту",
       "goToOverviewTab": "Шолу қойындысына өту"
@@ -288,8 +290,9 @@
       "resolved": "Шешілді",
       "outdated": "Ескірген",
       "file": "Файл",
-      "oneComment": "1 пікір",
-      "commentCount": "{{count}} пікір",
+      "comment_one": "1 пікір",
+      "comment": "{{displayCount}} пікір",
+      "comment_other": "{{displayCount}} пікір",
       "startedRelative": " · {{relative}} басталды",
       "couldNotLoadMore": "Қосымша пікірлерді жүктеу мүмкін болмады.",
       "retryLoadingMore": "Қосымша пікірлерді жүктеуді қайталау",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Реакциялар",
       "addReaction": "Реакция қосу",
       "reactionPill": "{{emoji}} реакция, {{count}} {{countLabel}}",
-      "reactionSingular": "реакция",
-      "reactionPlural": "реакциялар",
+      "reaction_one": "реакция",
+      "reaction": "реакциялар",
+      "reaction_other": "реакциялар",
       "commentActions": "Пікір әрекеттері",
       "reportContent": "Мазмұнды шағымдау",
       "reportUser": "Пайдаланушыны шағымдау",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Бұл пікір рецензия кезегінен жойылады.",
       "delete": "Жою",
       "summaryOptional": "Қорытынды (міндетті емес)",
-      "pendingCommentSingular": "күтілудегі пікір",
-      "pendingCommentPlural": "күтілудегі пікірлер",
+      "pendingComment_one": "күтілудегі пікір",
+      "pendingComment": "күтілудегі пікірлер",
+      "pendingComment_other": "күтілудегі пікірлер",
       "submitCountOfTotal": "{{totalCount}} пікірдің {{freshCount}} жіберу",
       "submitReview": "Рецензияны жіберу",
       "partialPostedMessage": "{{freshCount}} пікір жарияланды. {{staleCount}} пікір ескі commit-ке қатысты және кезегіңізде қалды."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Ашық · Рецензия қажет",
       "stateOpen": "Ашық",
       "unknownAuthor": "Белгісіз автор",
-      "commitSingular": "commit",
-      "commitPlural": "commitтер",
-      "fileSingular": "файл",
-      "filePlural": "файлдар"
+      "commit_one": "commit",
+      "commit": "commitтер",
+      "commit_other": "commitтер",
+      "file_one": "файл",
+      "file": "файлдар",
+      "file_other": "файлдар"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} бойынша ескірген күтілудегі пікірді өңдеу",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Біреу",
-      "oneTyping": "{{name}} теріп жатыр...",
-      "manyTyping": "{{names}} теріп жатыр..."
+      "typing_one": "{{name}} теріп жатыр...",
+      "typing": "{{names}} теріп жатыр...",
+      "typing_other": "{{names}} теріп жатыр..."
     },
     "botStatus": {
       "online": "Желіде",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Төлем ақпаратын жүктеу мүмкін болмады",
       "manageOnWeb": "Вебте төлемді басқару",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} күн қалды",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Соңғы Commit мерзімі {{date}} аяқталады. {{price}} бағасымен Standard жоспарына ауысыңыз, әйтпесе хостинг аяқталады.",
       "freeTrial": "Тегін сынақ",
       "hostingEnds": "Хостинг аяқталады",
-      "oneDayLeft": "1 күн қалды",
       "renews": "Жаңарады",
       "standardMonthToMonth": "Standard ай сайын",
       "standardStartsOn": "Standard {{date}} күні {{price}} бағасымен басталады.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} назар қажет: {{label}}",
-      "openUnreadOne": "{{name}} ашу, {{count}} оқылмаған хабарлама",
-      "openUnreadMany": "{{name}} ашу, {{count}} оқылмаған хабарлама",
+      "openUnread_one": "{{name}} ашу, {{displayCount}} оқылмаған хабарлама",
+      "openUnread": "{{name}} ашу, {{displayCount}} оқылмаған хабарлама",
+      "openUnread_other": "{{name}} ашу, {{displayCount}} оқылмаған хабарлама",
       "open": "{{name}} ашу",
       "openSettings": "{{name}} баптауларын ашу",
       "fixOnKiloAi": "kilo.ai сайтында түзету: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Автотүзетуді қосу керек пе?",
       "enableAutoRemediationConfirmMessage": "Security Agent тиісті пайдалануға болатын табылымдар үшін түзету PR-терін автоматты ашады.",
       "enable": "Қосу",
-      "queuedOne": "{{count}} бар табылған дерек талдауға кезекке қойылды.",
-      "queuedMany": "{{count}} бар табылған дерек талдауға кезекке қойылды.",
+      "queued_one": "{{displayCount}} бар табылған дерек талдауға кезекке қойылды.",
+      "queued": "{{displayCount}} бар табылған дерек талдауға кезекке қойылды.",
+      "queued_other": "{{displayCount}} бар табылған дерек талдауға кезекке қойылды.",
       "severityCriticalOnly": "Тек критикалық",
       "severityHighAndAbove": "Жоғары және одан жоғары",
       "severityMediumAndAbove": "Орташа және одан жоғары",
@@ -1482,8 +1490,9 @@
       "on": "Қосулы",
       "off": "Өшірулі",
       "allRepositories": "Барлық репозиторийлер",
-      "repositorySelected": "{{count}} репозиторий таңдалды",
-      "repositoriesSelected": "{{count}} репозиторий таңдалды",
+      "repositoriesCount_one": "{{displayCount}} репозиторий таңдалды",
+      "repositoriesCount": "{{displayCount}} репозиторий таңдалды",
+      "repositoriesCount_other": "{{displayCount}} репозиторий таңдалды",
       "selectRepositories": "Репозиторийлерді таңдау",
       "selectRepositoriesSubtitle": "Security Agent қай репозиторийлерді бақылайтынын таңдаңыз",
       "repositories": "Репозиторийлер",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Сессия жойылды",
       "needsInput": "енгізу қажет",
       "fromPlatform": "{{platform}} платформасынан",
-      "centOne": "цент",
-      "centOther": "цент",
-      "dollarOne": "доллар",
-      "dollarOther": "доллар"
+      "cent_one": "цент",
+      "cent": "цент",
+      "cent_other": "цент",
+      "dollar_one": "доллар",
+      "dollar": "доллар",
+      "dollar_other": "доллар"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ашу мүмкін болмады",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Жобаны жою мүмкін болмады. Қайталап көріңіз."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} файл жаңартылды",
-      "updatedFiles": "{{count}} файл жаңартылды"
+      "updatedFileCount_one": "{{displayCount}} файл жаңартылды",
+      "updatedFileCount": "{{displayCount}} файл жаңартылды",
+      "updatedFileCount_other": "{{displayCount}} файл жаңартылды"
     },
     "toolPatch": {
       "operationAdded": "Қосылды",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Алдыңғы хабарламалар жүктелді",
       "retryHint": "Осы сессияның алдыңғы хабарламаларын қайта жүктейді.",
-      "omittedOne": "Осы сессиядағы кейбір алдыңғы элементтерді көрсету мүмкін болмады.",
-      "omittedMany": "Осы сессиядағы {{count}} алдыңғы элементті көрсету мүмкін болмады.",
+      "omitted_one": "Осы сессиядағы кейбір алдыңғы элементтерді көрсету мүмкін болмады.",
+      "omitted": "Осы сессиядағы {{displayCount}} алдыңғы элементті көрсету мүмкін болмады.",
+      "omitted_other": "Осы сессиядағы {{displayCount}} алдыңғы элементті көрсету мүмкін болмады.",
       "couldNotLoad": "Алдыңғы хабарламаларды жүктеу мүмкін болмады.",
       "unavailable": "Алдыңғы хабарламалар қолжетімсіз.",
       "tooLarge": "Алдыңғы хабарламалар жүктеу үшін тым үлкен."
@@ -2069,10 +2082,12 @@
       "viewTable": "Кестені қарау",
       "title": "Кесте",
       "close": "Кестені жабу",
-      "column": "баған",
-      "columns": "баған",
-      "row": "жол",
-      "rows": "жол",
+      "columnCount_one": "баған",
+      "columnCount": "баған",
+      "columnCount_other": "баған",
+      "rowCount_one": "жол",
+      "rowCount": "жол",
+      "rowCount_other": "жол",
       "opensFullScreen": "толық экранда ашылады"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} токеннің",
       "tokens": "токен",
       "tokensWithPercentage": "токен ({{percentage}})",
-      "stepsCountOne": "{{steps}} қадам",
-      "stepsCountMany": "{{steps}} қадам",
+      "stepsCount_one": "{{steps}} қадам",
+      "stepsCount": "{{steps}} қадам",
+      "stepsCount_other": "{{steps}} қадам",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Жаңа бағдарламалау тапсырмасы",
     "explore": "Зерттеу",
     "seeAll": "Барлығын қарау",
-    "kiloAgents": "Kilo Agent",
-    "greetingMorning": "Қайырлы таң",
-    "greetingAfternoon": "Қайырлы күн",
-    "greetingEvening": "Қайырлы кеш"
+    "kiloAgents": "Kilo Agent"
   },
   "imageViewer": {
     "close": "{{filename}} жабу",
@@ -2645,8 +2658,9 @@
       "manageHint": "Kilo Pass басқаруды вебте ашады.",
       "notSubscribed": "Жазылмаған",
       "overallocated": "Pass тағайындаулары төленген орындардан асып кетті",
-      "paidSeatOne": "{{count}} төленген орын",
-      "paidSeatOther": "{{count}} төленген орын",
+      "paidSeat_one": "{{displayCount}} төленген орын",
+      "paidSeat": "{{displayCount}} төленген орын",
+      "paidSeat_other": "{{displayCount}} төленген орын",
       "paymentNeedsAttention": "Төлем назар қажет етеді",
       "paymentPending": "Төлем күтілуде",
       "processingBlocked": "Өңдеу бұғатталған",

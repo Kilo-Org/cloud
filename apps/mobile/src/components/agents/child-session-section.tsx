@@ -71,9 +71,9 @@ export function ChildSessionSection({
   return (
     <Animated.View
       layout={LinearTransition.duration(200)}
-      className="overflow-hidden rounded-r-lg"
+      className="overflow-hidden rounded-lg"
       // eslint-disable-next-line react-native/no-inline-styles -- dynamic border color
-      style={{ borderLeftWidth: 2, borderLeftColor: borderColor }}
+      style={{ borderStartWidth: 2, borderStartColor: borderColor }}
     >
       <Pressable
         className="flex-row items-center gap-2 px-3 py-2 active:bg-secondary"

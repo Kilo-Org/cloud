@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} de {{total}} arquivos cargados",
       "loadAllFiles": "Cargar todos os arquivos",
       "loadAll": "Cargar todo",
-      "fileLoaded": "{{count}} arquivo cargado",
-      "filesLoaded": "{{count}} arquivos cargados",
-      "fileLoadedOfTotal": "{{count}} arquivo cargado de {{total}}",
-      "filesLoadedOfTotal": "{{count}} arquivos cargados de {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} arquivo cargado",
+      "fileLoadedCount": "{{displayCount}} arquivos cargados",
+      "fileLoadedCount_other": "{{displayCount}} arquivos cargados",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} arquivo cargado de {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} arquivos cargados de {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} arquivos cargados de {{total}}",
       "filesStillLoading": "Os arquivos aínda se están cargando. Tira para actualizar.",
       "goToOverview": "Ir á vista xeral",
       "goToOverviewTab": "Ir á pestana de vista xeral"
@@ -288,8 +290,9 @@
       "resolved": "Resolto",
       "outdated": "Desactualizado",
       "file": "Arquivo",
-      "oneComment": "1 comentario",
-      "commentCount": "{{count}} comentarios",
+      "comment_one": "1 comentario",
+      "comment": "{{displayCount}} comentarios",
+      "comment_other": "{{displayCount}} comentarios",
       "startedRelative": " · comezou {{relative}}",
       "couldNotLoadMore": "Non se puideron cargar máis comentarios.",
       "retryLoadingMore": "Volver cargar máis comentarios",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reaccións",
       "addReaction": "Engadir reacción",
       "reactionPill": "{{emoji}} reacción, {{count}} {{countLabel}}",
-      "reactionSingular": "reacción",
-      "reactionPlural": "reaccións",
+      "reaction_one": "reacción",
+      "reaction": "reaccións",
+      "reaction_other": "reaccións",
       "commentActions": "Accións do comentario",
       "reportContent": "Denunciar contido",
       "reportUser": "Denunciar usuario",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Este comentario eliminarase da cola de revisión.",
       "delete": "Eliminar",
       "summaryOptional": "Resumo (opcional)",
-      "pendingCommentSingular": "comentario pendente",
-      "pendingCommentPlural": "comentarios pendentes",
+      "pendingComment_one": "comentario pendente",
+      "pendingComment": "comentarios pendentes",
+      "pendingComment_other": "comentarios pendentes",
       "submitCountOfTotal": "Enviar {{freshCount}} de {{totalCount}} comentarios",
       "submitReview": "Enviar revisión",
       "partialPostedMessage": "Publicouse {{freshCount}} comentario(s). {{staleCount}} comentario(s) apuntan a un commit máis antigo e permaneceron na túa cola."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Aberto · Revisión requirida",
       "stateOpen": "Aberto",
       "unknownAuthor": "Autor descoñecido",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "arquivo",
-      "filePlural": "arquivos"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "arquivo",
+      "file": "arquivos",
+      "file_other": "arquivos"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editar comentario pendente desactualizado en {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Alguén",
-      "oneTyping": "{{name}} está escribindo...",
-      "manyTyping": "{{names}} están escribindo..."
+      "typing_one": "{{name}} está escribindo...",
+      "typing": "{{names}} están escribindo...",
+      "typing_other": "{{names}} están escribindo..."
     },
     "botStatus": {
       "online": "En liña",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Non se puido cargar a información de facturación",
       "manageOnWeb": "Xestionar a facturación na web",
       "commitPlan": "Comprometer",
-      "daysLeft": "Quedan {{count}} días",
       "earlybird": "Madrugador",
       "finalCommitTermEndsOn": "O teu prazo final de Commit remata o {{date}}. Continúa como Standard por {{price}}, ou a hospedaxe remata.",
       "freeTrial": "Probas gratuítas",
       "hostingEnds": "A hospedaxe remata",
-      "oneDayLeft": "Queda 1 día",
       "renews": "Renóvase",
       "standardMonthToMonth": "Standard mes a mes",
       "standardStartsOn": "Standard comeza o {{date}} por {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} necesita atención: {{label}}",
-      "openUnreadOne": "Abrir {{name}}, {{count}} mensaxe sen ler",
-      "openUnreadMany": "Abrir {{name}}, {{count}} mensaxes sen ler",
+      "openUnread_one": "Abrir {{name}}, {{displayCount}} mensaxe sen ler",
+      "openUnread": "Abrir {{name}}, {{displayCount}} mensaxes sen ler",
+      "openUnread_other": "Abrir {{name}}, {{displayCount}} mensaxes sen ler",
       "open": "Abrir {{name}}",
       "openSettings": "Abrir axustes de {{name}}",
       "fixOnKiloAi": "Corrixir en kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Activar a autoremediación?",
       "enableAutoRemediationConfirmMessage": "O Axente de seguridade abrirá automaticamente PRs de remediación para os achados explotables elixibles.",
       "enable": "Activar",
-      "queuedOne": "{{count}} achado existente na cola para análise.",
-      "queuedMany": "{{count}} achados existentes na cola para análise.",
+      "queued_one": "{{displayCount}} achado existente na cola para análise.",
+      "queued": "{{displayCount}} achados existentes na cola para análise.",
+      "queued_other": "{{displayCount}} achados existentes na cola para análise.",
       "severityCriticalOnly": "Só crítico",
       "severityHighAndAbove": "Alto e superior",
       "severityMediumAndAbove": "Medio e superior",
@@ -1482,8 +1490,9 @@
       "on": "Activado",
       "off": "Desactivado",
       "allRepositories": "Todos os repositorios",
-      "repositorySelected": "{{count}} repositorio seleccionado",
-      "repositoriesSelected": "{{count}} repositorios seleccionados",
+      "repositoriesCount_one": "{{displayCount}} repositorio seleccionado",
+      "repositoriesCount": "{{displayCount}} repositorios seleccionados",
+      "repositoriesCount_other": "{{displayCount}} repositorios seleccionados",
       "selectRepositories": "Seleccionar repositorios",
       "selectRepositoriesSubtitle": "Escolle que repositorios supervisa Security Agent",
       "repositories": "Repositorios",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Sesión eliminada",
       "needsInput": "require entrada",
       "fromPlatform": "desde {{platform}}",
-      "centOne": "céntimo",
-      "centOther": "céntimos",
-      "dollarOne": "dólar",
-      "dollarOther": "dólares"
+      "cent_one": "céntimo",
+      "cent": "céntimos",
+      "cent_other": "céntimos",
+      "dollar_one": "dólar",
+      "dollar": "dólares",
+      "dollar_other": "dólares"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Non se puido abrir GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Non se puido descartar o borrador. Téntao de novo."
     },
     "partRenderer": {
-      "updatedFile": "Actualizouse {{count}} ficheiro",
-      "updatedFiles": "Actualizáronse {{count}} ficheiros"
+      "updatedFileCount_one": "Actualizouse {{displayCount}} ficheiro",
+      "updatedFileCount": "Actualizáronse {{displayCount}} ficheiros",
+      "updatedFileCount_other": "Actualizáronse {{displayCount}} ficheiros"
     },
     "toolPatch": {
       "operationAdded": "Engadido",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Cargáronse as mensaxes anteriores",
       "retryHint": "Reintenta cargar as mensaxes anteriores desta sesión.",
-      "omittedOne": "Non se puideron mostrar algúns elementos anteriores desta sesión.",
-      "omittedMany": "Non se puideron mostrar {{count}} elementos anteriores desta sesión.",
+      "omitted_one": "Non se puideron mostrar algúns elementos anteriores desta sesión.",
+      "omitted": "Non se puideron mostrar {{displayCount}} elementos anteriores desta sesión.",
+      "omitted_other": "Non se puideron mostrar {{displayCount}} elementos anteriores desta sesión.",
       "couldNotLoad": "Non se puideron cargar as mensaxes anteriores.",
       "unavailable": "As mensaxes anteriores non están dispoñibles.",
       "tooLarge": "As mensaxes anteriores son demasiado grandes para cargalas."
@@ -2069,10 +2082,12 @@
       "viewTable": "Ver a táboa",
       "title": "Táboa",
       "close": "Pechar a táboa",
-      "column": "columna",
-      "columns": "columnas",
-      "row": "fila",
-      "rows": "filas",
+      "columnCount_one": "columna",
+      "columnCount": "columnas",
+      "columnCount_other": "columnas",
+      "rowCount_one": "fila",
+      "rowCount": "filas",
+      "rowCount_other": "filas",
       "opensFullScreen": "abre en pantalla completa"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "de {{window}} tokens",
       "tokens": "tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
-      "stepsCountOne": "{{steps}} paso",
-      "stepsCountMany": "{{steps}} pasos",
+      "stepsCount_one": "{{steps}} paso",
+      "stepsCount": "{{steps}} pasos",
+      "stepsCount_other": "{{steps}} pasos",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Nova tarefa de codificación",
     "explore": "Explorar",
     "seeAll": "Ver todo",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Bos días",
-    "greetingAfternoon": "Boas tardes",
-    "greetingEvening": "Boas noites"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Pechar {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Ábre a xestión de Kilo Pass na web.",
       "notSubscribed": "Non subscrito",
       "overallocated": "As asignacións de Pass superan as prazas pagadas",
-      "paidSeatOne": "{{count}} praza pagada",
-      "paidSeatOther": "{{count}} prazas pagadas",
+      "paidSeat_one": "{{displayCount}} praza pagada",
+      "paidSeat": "{{displayCount}} prazas pagadas",
+      "paidSeat_other": "{{displayCount}} prazas pagadas",
       "paymentNeedsAttention": "O pagamento precisa atención",
       "paymentPending": "Pagamento pendente",
       "processingBlocked": "Procesamento bloqueado",

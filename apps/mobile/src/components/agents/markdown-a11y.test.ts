@@ -43,7 +43,7 @@ describe('extractNodeText', () => {
 
 describe('linearRowLabel', () => {
   it('pairs each non-empty cell with its header', () => {
-    expect(linearRowLabel(['Name', 'Age'], ['John', '30'])).toBe('Name: John, Age: 30');
+    expect(linearRowLabel(['Name', 'Age'], ['John', '30'])).toBe('Name: John and Age: 30');
   });
 
   it('skips empty cells', () => {
@@ -51,7 +51,7 @@ describe('linearRowLabel', () => {
   });
 
   it('keeps cells without a header as bare text', () => {
-    expect(linearRowLabel(['Name'], ['John', 'extra'])).toBe('Name: John, extra');
+    expect(linearRowLabel(['Name'], ['John', 'extra'])).toBe('Name: John and extra');
   });
 
   it('handles fewer cells than headers', () => {

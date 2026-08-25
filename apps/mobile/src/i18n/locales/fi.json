@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}}/{{total}} tiedostoa ladattu",
       "loadAllFiles": "Lataa kaikki tiedostot",
       "loadAll": "Lataa kaikki",
-      "fileLoaded": "{{count}} tiedosto ladattu",
-      "filesLoaded": "{{count}} tiedostoa ladattu",
-      "fileLoadedOfTotal": "{{count}}/{{total}} tiedosto ladattu",
-      "filesLoadedOfTotal": "{{count}}/{{total}} tiedostoa ladattu",
+      "fileLoadedCount_one": "{{displayCount}} tiedosto ladattu",
+      "fileLoadedCount": "{{displayCount}} tiedostoa ladattu",
+      "fileLoadedCount_other": "{{displayCount}} tiedostoa ladattu",
+      "fileLoadedOfTotalCount_one": "{{displayCount}}/{{total}} tiedosto ladattu",
+      "fileLoadedOfTotalCount": "{{displayCount}}/{{total}} tiedostoa ladattu",
+      "fileLoadedOfTotalCount_other": "{{displayCount}}/{{total}} tiedostoa ladattu",
       "filesStillLoading": "Tiedostoja latautuu vielä. Pyyhkäise päivittääksesi.",
       "goToOverview": "Siirry yleiskatsaukseen",
       "goToOverviewTab": "Siirry yleiskatsaus-välilehteen"
@@ -288,8 +290,9 @@
       "resolved": "Ratkaistu",
       "outdated": "Vanhentunut",
       "file": "Tiedosto",
-      "oneComment": "1 kommentti",
-      "commentCount": "{{count}} kommenttia",
+      "comment_one": "1 kommentti",
+      "comment": "{{displayCount}} kommenttia",
+      "comment_other": "{{displayCount}} kommenttia",
       "startedRelative": " · aloitettu {{relative}}",
       "couldNotLoadMore": "Lisää kommentteja ei voitu ladata.",
       "retryLoadingMore": "Yritä ladata lisää kommentteja uudelleen",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reaktiot",
       "addReaction": "Lisää reaktio",
       "reactionPill": "{{emoji}} reaktio, {{count}} {{countLabel}}",
-      "reactionSingular": "reaktio",
-      "reactionPlural": "reaktiota",
+      "reaction_one": "reaktio",
+      "reaction": "reaktiota",
+      "reaction_other": "reaktiota",
       "commentActions": "Kommentin toiminnot",
       "reportContent": "Ilmianna sisältö",
       "reportUser": "Ilmianna käyttäjä",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Tämä kommentti poistetaan arviointijonosta.",
       "delete": "Poista",
       "summaryOptional": "Yhteenveto (valinnainen)",
-      "pendingCommentSingular": "odottava kommentti",
-      "pendingCommentPlural": "odottavaa kommenttia",
+      "pendingComment_one": "odottava kommentti",
+      "pendingComment": "odottavaa kommenttia",
+      "pendingComment_other": "odottavaa kommenttia",
       "submitCountOfTotal": "Lähetä {{freshCount}}/{{totalCount}} kommenttia",
       "submitReview": "Lähetä arviointi",
       "partialPostedMessage": "Lähetettiin {{freshCount}} kommenttia. {{staleCount}} kommenttia viittaa vanhempaan committiin ja jäi jonoon."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Avoin · Arviointi vaaditaan",
       "stateOpen": "Avoin",
       "unknownAuthor": "Tuntematon tekijä",
-      "commitSingular": "commit",
-      "commitPlural": "commitia",
-      "fileSingular": "tiedosto",
-      "filePlural": "tiedostoa"
+      "commit_one": "commit",
+      "commit": "commitia",
+      "commit_other": "commitia",
+      "file_one": "tiedosto",
+      "file": "tiedostoa",
+      "file_other": "tiedostoa"
     },
     "pendingComment": {
       "editOutdatedA11y": "Muokkaa vanhentunutta odottavaa kommenttia kohteessa {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Joku",
-      "oneTyping": "{{name}} kirjoittaa…",
-      "manyTyping": "{{names}} kirjoittavat…"
+      "typing_one": "{{name}} kirjoittaa…",
+      "typing": "{{names}} kirjoittavat…",
+      "typing_other": "{{names}} kirjoittavat…"
     },
     "botStatus": {
       "online": "Online",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Laskutustietoja ei voitu ladata",
       "manageOnWeb": "Hallinnoi laskutusta verkossa",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} päivää jäljellä",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Viimeinen Commit-jakson päättyy {{date}}. Jatka Standard-sopimuksella hintaan {{price}}, tai isännöinti päättyy.",
       "freeTrial": "Ilmainen kokeilu",
       "hostingEnds": "Isännöinti päättyy",
-      "oneDayLeft": "1 päivä jäljellä",
       "renews": "Uusiutuu",
       "standardMonthToMonth": "Standard kuukausittain",
       "standardStartsOn": "Standard alkaa {{date}} hintaan {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} vaatii huomiota: {{label}}",
-      "openUnreadOne": "Avaa {{name}}, {{count}} lukematon viesti",
-      "openUnreadMany": "Avaa {{name}}, {{count}} lukematonta viestiä",
+      "openUnread_one": "Avaa {{name}}, {{displayCount}} lukematon viesti",
+      "openUnread": "Avaa {{name}}, {{displayCount}} lukematonta viestiä",
+      "openUnread_other": "Avaa {{name}}, {{displayCount}} lukematonta viestiä",
       "open": "Avaa {{name}}",
       "openSettings": "Avaa {{name}}:n asetukset",
       "fixOnKiloAi": "Korjaa osoitteessa kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Otetaanko automaattinen korjaus käyttöön?",
       "enableAutoRemediationConfirmMessage": "Security Agent avaa korjaus-PR:t automaattisesti kelpoisille hyväksikäytettäville havainnoille.",
       "enable": "Ota käyttöön",
-      "queuedOne": "{{count}} olemassa oleva havainto jonossa analyysia varten.",
-      "queuedMany": "{{count}} olemassa olevaa havaintoa jonossa analyysia varten.",
+      "queued_one": "{{displayCount}} olemassa oleva havainto jonossa analyysia varten.",
+      "queued": "{{displayCount}} olemassa olevaa havaintoa jonossa analyysia varten.",
+      "queued_other": "{{displayCount}} olemassa olevaa havaintoa jonossa analyysia varten.",
       "severityCriticalOnly": "Vain kriittiset",
       "severityHighAndAbove": "Korkeat ja sitä korkeammat",
       "severityMediumAndAbove": "Keskitasoiset ja sitä korkeammat",
@@ -1482,8 +1490,9 @@
       "on": "Päällä",
       "off": "Pois",
       "allRepositories": "Kaikki arkistot",
-      "repositorySelected": "{{count}} arkisto valittu",
-      "repositoriesSelected": "{{count}} arkistoa valittu",
+      "repositoriesCount_one": "{{displayCount}} arkisto valittu",
+      "repositoriesCount": "{{displayCount}} arkistoa valittu",
+      "repositoriesCount_other": "{{displayCount}} arkistoa valittu",
       "selectRepositories": "Valitse arkistot",
       "selectRepositoriesSubtitle": "Valitse, mitä arkistoja Security Agent valvoo",
       "repositories": "Arkistot",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Istunto poistettu",
       "needsInput": "vaatii syötettä",
       "fromPlatform": "alustalta {{platform}}",
-      "centOne": "sentti",
-      "centOther": "senttiä",
-      "dollarOne": "dollari",
-      "dollarOther": "dollaria"
+      "cent_one": "sentti",
+      "cent": "senttiä",
+      "cent_other": "senttiä",
+      "dollar_one": "dollari",
+      "dollar": "dollaria",
+      "dollar_other": "dollaria"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubia ei voitu avata",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen."
     },
     "partRenderer": {
-      "updatedFile": "Päivitetty {{count}} tiedosto",
-      "updatedFiles": "Päivitetty {{count}} tiedostoa"
+      "updatedFileCount_one": "Päivitetty {{displayCount}} tiedosto",
+      "updatedFileCount": "Päivitetty {{displayCount}} tiedostoa",
+      "updatedFileCount_other": "Päivitetty {{displayCount}} tiedostoa"
     },
     "toolPatch": {
       "operationAdded": "Lisätty",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Aiemmat viestit ladattu",
       "retryHint": "Yrittää vanhempien viestien lataamista uudelleen tähän istuntoon.",
-      "omittedOne": "Joitakin tämän istunnon aiempia kohteita ei voitu näyttää.",
-      "omittedMany": "{{count}} tämän istunnon aiempaa kohdetta ei voitu näyttää.",
+      "omitted_one": "Joitakin tämän istunnon aiempia kohteita ei voitu näyttää.",
+      "omitted": "{{displayCount}} tämän istunnon aiempaa kohdetta ei voitu näyttää.",
+      "omitted_other": "{{displayCount}} tämän istunnon aiempaa kohdetta ei voitu näyttää.",
       "couldNotLoad": "Vanhempia viestejä ei voitu ladata.",
       "unavailable": "Vanhemmat viestit eivät ole saatavilla.",
       "tooLarge": "Vanhemmat viestit ovat liian suuria ladattaviksi."
@@ -2069,10 +2082,12 @@
       "viewTable": "Näytä taulukko",
       "title": "Taulukko",
       "close": "Sulje taulukko",
-      "column": "sarake",
-      "columns": "sarakkeet",
-      "row": "rivi",
-      "rows": "rivit",
+      "columnCount_one": "sarake",
+      "columnCount": "sarakkeet",
+      "columnCount_other": "sarakkeet",
+      "rowCount_one": "rivi",
+      "rowCount": "rivit",
+      "rowCount_other": "rivit",
       "opensFullScreen": "avautuu koko näytöllä"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "yhteensä {{window}} tokenia",
       "tokens": "tokenia",
       "tokensWithPercentage": "tokenia ({{percentage}})",
-      "stepsCountOne": "{{steps}} vaihe",
-      "stepsCountMany": "{{steps}} vaihetta",
+      "stepsCount_one": "{{steps}} vaihe",
+      "stepsCount": "{{steps}} vaihetta",
+      "stepsCount_other": "{{steps}} vaihetta",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Uusi koodaustehtävä",
     "explore": "Tutustu",
     "seeAll": "Näytä kaikki",
-    "kiloAgents": "Kilo Agentit",
-    "greetingMorning": "Hyvää huomenta",
-    "greetingAfternoon": "Hyvää päivää",
-    "greetingEvening": "Hyvää iltaa"
+    "kiloAgents": "Kilo Agentit"
   },
   "imageViewer": {
     "close": "Sulje {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Avaa Kilo Pass -hallinnan verkossa.",
       "notSubscribed": "Ei tilattu",
       "overallocated": "Pass-varaukset ylittävät maksetut paikat",
-      "paidSeatOne": "{{count}} maksettu paikka",
-      "paidSeatOther": "{{count}} maksettua paikkaa",
+      "paidSeat_one": "{{displayCount}} maksettu paikka",
+      "paidSeat": "{{displayCount}} maksettua paikkaa",
+      "paidSeat_other": "{{displayCount}} maksettua paikkaa",
       "paymentNeedsAttention": "Maksu vaatii huomiota",
       "paymentPending": "Maksu odottaa",
       "processingBlocked": "Käsittely estetty",

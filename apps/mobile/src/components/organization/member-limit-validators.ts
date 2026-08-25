@@ -1,4 +1,5 @@
 import { i18n } from '@/i18n';
+import { formatNumber, parseLocalizedNumber } from '@/lib/format';
 
 const MAX_DAILY_LIMIT_USD = 2000;
 
@@ -10,14 +11,16 @@ export function limitError(value: string): string | null {
   if (trimmed === '') {
     return i18n.t('organization.memberLimit.blankError');
   }
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > MAX_DAILY_LIMIT_USD) {
-    return i18n.t('organization.memberLimit.rangeError', { max: MAX_DAILY_LIMIT_USD });
+  const parsed = parseLocalizedNumber(trimmed, i18n.language);
+  if (parsed === null || parsed < 0 || parsed > MAX_DAILY_LIMIT_USD) {
+    return i18n.t('organization.memberLimit.rangeError', {
+      max: formatNumber(MAX_DAILY_LIMIT_USD, i18n.language),
+    });
   }
   return null;
 }
 
 export function parseLimit(value: string): number | null {
   const trimmed = value.trim();
-  return trimmed === '' ? null : Number(trimmed);
+  return trimmed === '' ? null : parseLocalizedNumber(trimmed, i18n.language);
 }

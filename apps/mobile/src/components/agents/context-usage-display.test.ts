@@ -55,10 +55,10 @@ describe('formatCompactTokens', () => {
   it('formats below one thousand, thousands, and millions', () => {
     expect(formatCompactTokens(0)).toBe('0');
     expect(formatCompactTokens(999)).toBe('999');
-    expect(formatCompactTokens(1000)).toBe('1.0K');
+    expect(formatCompactTokens(1000)).toBe('1K');
     expect(formatCompactTokens(32_418)).toBe('32.4K');
     expect(formatCompactTokens(1500)).toBe('1.5K');
-    expect(formatCompactTokens(995_000)).toBe('995.0K');
+    expect(formatCompactTokens(995_000)).toBe('995K');
     expect(formatCompactTokens(1_200_000)).toBe('1.2M');
   });
 });

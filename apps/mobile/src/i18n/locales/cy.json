@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} o {{total}} ffeil wedi'u llwytho",
       "loadAllFiles": "Llwytho'r holl ffeiliau",
       "loadAll": "Llwytho'r cyfan",
-      "fileLoaded": "{{count}} ffeil wedi'i llwytho",
-      "filesLoaded": "{{count}} ffeil wedi'u llwytho",
-      "fileLoadedOfTotal": "{{count}} ffeil wedi'i llwytho o {{total}}",
-      "filesLoadedOfTotal": "{{count}} ffeil wedi'u llwytho o {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} ffeil wedi'i llwytho",
+      "fileLoadedCount": "{{displayCount}} ffeil wedi'u llwytho",
+      "fileLoadedCount_other": "{{displayCount}} ffeil wedi'u llwytho",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} ffeil wedi'i llwytho o {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} ffeil wedi'u llwytho o {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} ffeil wedi'u llwytho o {{total}}",
       "filesStillLoading": "Mae ffeiliau'n dal i lwytho. Llusgwch i adnewyddu.",
       "goToOverview": "Ewch i'r Trosolwg",
       "goToOverviewTab": "Ewch i dab Trosolwg"
@@ -288,8 +290,9 @@
       "resolved": "Wedi'i ddatrys",
       "outdated": "Hen ffasiwn",
       "file": "Ffeil",
-      "oneComment": "1 sylw",
-      "commentCount": "{{count}} sylw",
+      "comment_one": "1 sylw",
+      "comment": "{{displayCount}} sylw",
+      "comment_other": "{{displayCount}} sylw",
       "startedRelative": " · dechreuodd {{relative}}",
       "couldNotLoadMore": "Ni ellid llwytho mwy o sylwadau.",
       "retryLoadingMore": "Rhoi cynnig eto ar lwytho mwy o sylwadau",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Ymatebion",
       "addReaction": "Ychwanegu ymateb",
       "reactionPill": "{{emoji}} ymateb, {{count}} {{countLabel}}",
-      "reactionSingular": "ymateb",
-      "reactionPlural": "ymatebion",
+      "reaction_one": "ymateb",
+      "reaction": "ymatebion",
+      "reaction_other": "ymatebion",
       "commentActions": "Gweithredoedd sylw",
       "reportContent": "Adrodd am gynnwys",
       "reportUser": "Adrodd am ddefnyddiwr",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Bydd y sylw hwn yn cael ei dynnu o'r ciw adolygu.",
       "delete": "Dileu",
       "summaryOptional": "Crynodeb (dewisol)",
-      "pendingCommentSingular": "sylw ar y gweill",
-      "pendingCommentPlural": "sylwadau ar y gweill",
+      "pendingComment_one": "sylw ar y gweill",
+      "pendingComment": "sylwadau ar y gweill",
+      "pendingComment_other": "sylwadau ar y gweill",
       "submitCountOfTotal": "Cyflwyno {{freshCount}} o {{totalCount}} sylw",
       "submitReview": "Cyflwyno adolygiad",
       "partialPostedMessage": "Postiwyd {{freshCount}} sylw(adau). Mae {{staleCount}} sylw(adau) yn pwyntio at ymrwymiad hŷn ac arhosodd yn eich ciw."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Ar agor · Adolygiad yn ofynnol",
       "stateOpen": "Ar agor",
       "unknownAuthor": "Awdur anhysbys",
-      "commitSingular": "ymrwymiad",
-      "commitPlural": "ymrwymiadau",
-      "fileSingular": "ffeil",
-      "filePlural": "ffeiliau"
+      "commit_one": "ymrwymiad",
+      "commit": "ymrwymiadau",
+      "commit_other": "ymrwymiadau",
+      "file_one": "ffeil",
+      "file": "ffeiliau",
+      "file_other": "ffeiliau"
     },
     "pendingComment": {
       "editOutdatedA11y": "Golygu sylw ar y gweill hen ffasiwn ar {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Rhywun",
-      "oneTyping": "Mae {{name}} yn teipio...",
-      "manyTyping": "Mae {{names}} yn teipio..."
+      "typing_one": "Mae {{name}} yn teipio...",
+      "typing": "Mae {{names}} yn teipio...",
+      "typing_other": "Mae {{names}} yn teipio..."
     },
     "botStatus": {
       "online": "Ar-lein",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Methodd llwytho gwybodaeth bilio",
       "manageOnWeb": "Rheoli Bilio ar y We",
       "commitPlan": "Ymrwymo",
-      "daysLeft": "{{count}} o ddyddiau ar ôl",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Daw eich tymor Ymrwymo olaf i ben ar {{date}}. Parhewch fel Safonol am {{price}}, neu daw cynnal i ben.",
       "freeTrial": "Treial Rhad",
       "hostingEnds": "Daw cynnal i ben",
-      "oneDayLeft": "1 diwrnod ar ôl",
       "renews": "Yn adnewyddu",
       "standardMonthToMonth": "Safonol o fis i fis",
       "standardStartsOn": "Mae Safonol yn dechrau ar {{date}} am {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "Mae angen sylw ar {{name}}: {{label}}",
-      "openUnreadOne": "Agor {{name}}, {{count}} neges heb ei darllen",
-      "openUnreadMany": "Agor {{name}}, {{count}} o negeseuon heb eu darllen",
+      "openUnread_one": "Agor {{name}}, {{displayCount}} neges heb ei darllen",
+      "openUnread": "Agor {{name}}, {{displayCount}} o negeseuon heb eu darllen",
+      "openUnread_other": "Agor {{name}}, {{displayCount}} o negeseuon heb eu darllen",
       "open": "Agor {{name}}",
       "openSettings": "Agor gosodiadau ar gyfer {{name}}",
       "fixOnKiloAi": "Trwsio ar kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Galluogi adfer awto?",
       "enableAutoRemediationConfirmMessage": "Bydd Asiant Diogelwch yn agor PRs adfer yn awtomatig ar gyfer canfyddiadau ecsbloetiadwy cymwys.",
       "enable": "Galluogi",
-      "queuedOne": "Mae {{count}} canfyddiad presennol wedi'i roi mewn ciw ar gyfer dadansoddi.",
-      "queuedMany": "Mae {{count}} canfyddiad presennol wedi'u rhoi mewn ciw ar gyfer dadansoddi.",
+      "queued_one": "Mae {{displayCount}} canfyddiad presennol wedi'i roi mewn ciw ar gyfer dadansoddi.",
+      "queued": "Mae {{displayCount}} canfyddiad presennol wedi'u rhoi mewn ciw ar gyfer dadansoddi.",
+      "queued_other": "Mae {{displayCount}} canfyddiad presennol wedi'u rhoi mewn ciw ar gyfer dadansoddi.",
       "severityCriticalOnly": "Critigol yn unig",
       "severityHighAndAbove": "Uchel ac uwch",
       "severityMediumAndAbove": "Canolig ac uwch",
@@ -1482,8 +1490,9 @@
       "on": "Ymlaen",
       "off": "I ffwrdd",
       "allRepositories": "Pob ystorfa",
-      "repositorySelected": "{{count}} ystorfa wedi'i dewis",
-      "repositoriesSelected": "{{count}} ystorfeydd wedi'u dewis",
+      "repositoriesCount_one": "{{displayCount}} ystorfa wedi'i dewis",
+      "repositoriesCount": "{{displayCount}} ystorfeydd wedi'u dewis",
+      "repositoriesCount_other": "{{displayCount}} ystorfeydd wedi'u dewis",
       "selectRepositories": "Dewis ystorfeydd",
       "selectRepositoriesSubtitle": "Dewiswch pa ystorfeydd y mae Security Agent yn eu monitro",
       "repositories": "Ystorfeydd",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Sesiwn wedi'i dileu",
       "needsInput": "angen mewnbwn",
       "fromPlatform": "o {{platform}}",
-      "centOne": "cent",
-      "centOther": "cents",
-      "dollarOne": "doler",
-      "dollarOther": "doleri"
+      "cent_one": "cent",
+      "cent": "cents",
+      "cent_other": "cents",
+      "dollar_one": "doler",
+      "dollar": "doleri",
+      "dollar_other": "doleri"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Methwyd agor GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Methwyd taflu'r drafft. Ceisiwch eto."
     },
     "partRenderer": {
-      "updatedFile": "Diweddarwyd {{count}} ffeil",
-      "updatedFiles": "Diweddarwyd {{count}} ffeiliau"
+      "updatedFileCount_one": "Diweddarwyd {{displayCount}} ffeil",
+      "updatedFileCount": "Diweddarwyd {{displayCount}} ffeiliau",
+      "updatedFileCount_other": "Diweddarwyd {{displayCount}} ffeiliau"
     },
     "toolPatch": {
       "operationAdded": "Ychwanegwyd",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Llwythwyd negeseuon cynharach",
       "retryHint": "Yn ailgynnig llwytho'r negeseuon cynharach ar gyfer y sesiwn hon.",
-      "omittedOne": "Ni ellid arddangos rhai eitemau cynharach o'r sesiwn hon.",
-      "omittedMany": "Ni ellid arddangos {{count}} eitem cynharach o'r sesiwn hon.",
+      "omitted_one": "Ni ellid arddangos rhai eitemau cynharach o'r sesiwn hon.",
+      "omitted": "Ni ellid arddangos {{displayCount}} eitem cynharach o'r sesiwn hon.",
+      "omitted_other": "Ni ellid arddangos {{displayCount}} eitem cynharach o'r sesiwn hon.",
       "couldNotLoad": "Methwyd llwytho negeseuon cynharach.",
       "unavailable": "Nid yw negeseuon cynharach ar gael.",
       "tooLarge": "Mae negeseuon cynharach yn rhy fawr i'w llwytho."
@@ -2069,10 +2082,12 @@
       "viewTable": "Gweld y tabl",
       "title": "Tabl",
       "close": "Cau'r tabl",
-      "column": "colofn",
-      "columns": "colofnau",
-      "row": "rhes",
-      "rows": "rhesi",
+      "columnCount_one": "colofn",
+      "columnCount": "colofnau",
+      "columnCount_other": "colofnau",
+      "rowCount_one": "rhes",
+      "rowCount": "rhesi",
+      "rowCount_other": "rhesi",
       "opensFullScreen": "agor ar sgrin lawn"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "o {{window}} token",
       "tokens": "tokenau",
       "tokensWithPercentage": "tokenau ({{percentage}})",
-      "stepsCountOne": "{{steps}} cam",
-      "stepsCountMany": "{{steps}} cam",
+      "stepsCount_one": "{{steps}} cam",
+      "stepsCount": "{{steps}} cam",
+      "stepsCount_other": "{{steps}} cam",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Tasg codio newydd",
     "explore": "Archwilio",
     "seeAll": "Gweld y cyfan",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Bore da",
-    "greetingAfternoon": "Prynhawn da",
-    "greetingEvening": "Noswaith dda"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Cau {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Yn agor rheolaeth Kilo Pass ar y we.",
       "notSubscribed": "Heb danysgrifio",
       "overallocated": "Mae aseiniadau Pass yn fwy na seddau taledig",
-      "paidSeatOne": "{{count}} sedd daledig",
-      "paidSeatOther": "{{count}} sedd daledig",
+      "paidSeat_one": "{{displayCount}} sedd daledig",
+      "paidSeat": "{{displayCount}} sedd daledig",
+      "paidSeat_other": "{{displayCount}} sedd daledig",
       "paymentNeedsAttention": "Mae angen sylw ar y taliad",
       "paymentPending": "Taliad yn aros",
       "processingBlocked": "Prosesu wedi'i rwystro",

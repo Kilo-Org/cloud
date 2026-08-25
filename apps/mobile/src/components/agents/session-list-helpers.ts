@@ -66,7 +66,7 @@ export function formatGitUrlProject(gitUrl: string): string {
 }
 
 export function formatMeta(timestamp: string): string {
-  return timeAgo(parseTimestamp(timestamp)).toUpperCase();
+  return timeAgo(parseTimestamp(timestamp)).toLocaleUpperCase(i18n.language);
 }
 
 /**
@@ -277,7 +277,7 @@ export function storedSessionEyebrowLabel(session: {
   created_on_platform: string;
 }): string {
   const repo = repoNameFromGitUrl(session.git_url);
-  return repo ? repo.toUpperCase() : platformLabel(session.created_on_platform);
+  return repo ? repo.toLocaleUpperCase(i18n.language) : platformLabel(session.created_on_platform);
 }
 
 /**
@@ -291,7 +291,7 @@ export function remoteSessionEyebrowLabel(session: {
   createdOnPlatform?: string;
 }): string {
   const repo = repoNameFromGitUrl(session.gitUrl);
-  return repo ? repo.toUpperCase() : remoteAgentLabel(session.createdOnPlatform);
+  return repo ? repo.toLocaleUpperCase(i18n.language) : remoteAgentLabel(session.createdOnPlatform);
 }
 
 /**

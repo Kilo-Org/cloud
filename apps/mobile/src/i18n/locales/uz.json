@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{total}} dan {{loaded}} fayl yuklandi",
       "loadAllFiles": "Barcha fayllarni yuklash",
       "loadAll": "Hammasini yuklash",
-      "fileLoaded": "{{count}} fayl yuklandi",
-      "filesLoaded": "{{count}} fayl yuklandi",
-      "fileLoadedOfTotal": "{{total}} dan {{count}} fayl yuklandi",
-      "filesLoadedOfTotal": "{{total}} dan {{count}} fayl yuklandi",
+      "fileLoadedCount_one": "{{displayCount}} fayl yuklandi",
+      "fileLoadedCount": "{{displayCount}} fayl yuklandi",
+      "fileLoadedCount_other": "{{displayCount}} fayl yuklandi",
+      "fileLoadedOfTotalCount_one": "{{total}} dan {{displayCount}} fayl yuklandi",
+      "fileLoadedOfTotalCount": "{{total}} dan {{displayCount}} fayl yuklandi",
+      "fileLoadedOfTotalCount_other": "{{total}} dan {{displayCount}} fayl yuklandi",
       "filesStillLoading": "Fayllar hali ham yuklanmoqda. Yangilash uchun pastga suring.",
       "goToOverview": "Umumiy ko'rinishga o'tish",
       "goToOverviewTab": "Umumiy ko'rinish yorlig'iga o'tish"
@@ -288,8 +290,9 @@
       "resolved": "Hal qilindi",
       "outdated": "Eskirgan",
       "file": "Fayl",
-      "oneComment": "1 izoh",
-      "commentCount": "{{count}} izoh",
+      "comment_one": "1 izoh",
+      "comment": "{{displayCount}} izoh",
+      "comment_other": "{{displayCount}} izoh",
       "startedRelative": " · {{relative}} da boshlangan",
       "couldNotLoadMore": "Ko'proq izohlarni yuklab bo'lmadi.",
       "retryLoadingMore": "Ko'proq izohlarni yuklashni qayta urinish",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reaksiyalar",
       "addReaction": "Reaksiya qo'shish",
       "reactionPill": "{{emoji}} reaksiya, {{count}} {{countLabel}}",
-      "reactionSingular": "reaksiya",
-      "reactionPlural": "reaksiya",
+      "reaction_one": "reaksiya",
+      "reaction": "reaksiya",
+      "reaction_other": "reaksiya",
       "commentActions": "Izoh amallari",
       "reportContent": "Kontentni shikoyat qilish",
       "reportUser": "Foydalanuvchini shikoyat qilish",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Bu izoh sharh navbatidan o'chiriladi.",
       "delete": "O'chirish",
       "summaryOptional": "Xulosa (ixtiyoriy)",
-      "pendingCommentSingular": "kutilayotgan izoh",
-      "pendingCommentPlural": "kutilayotgan izohlar",
+      "pendingComment_one": "kutilayotgan izoh",
+      "pendingComment": "kutilayotgan izohlar",
+      "pendingComment_other": "kutilayotgan izohlar",
       "submitCountOfTotal": "{{totalCount}} izohdan {{freshCount}} tasini yuborish",
       "submitReview": "Sharhni yuborish",
       "partialPostedMessage": "{{freshCount}} izoh yuborildi. {{staleCount}} izoh eski commitga tegishli bo'lib, navbatingizda qoldi."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Ochiq · Sharh talab qilinadi",
       "stateOpen": "Ochiq",
       "unknownAuthor": "Noma'lum muallif",
-      "commitSingular": "commit",
-      "commitPlural": "commit",
-      "fileSingular": "fayl",
-      "filePlural": "fayl"
+      "commit_one": "commit",
+      "commit": "commit",
+      "commit_other": "commit",
+      "file_one": "fayl",
+      "file": "fayl",
+      "file_other": "fayl"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} dagi eskirgan kutilayotgan izohni tahrirlash",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Kimdir",
-      "oneTyping": "{{name}} yozmoqda...",
-      "manyTyping": "{{names}} yozmoqda..."
+      "typing_one": "{{name}} yozmoqda...",
+      "typing": "{{names}} yozmoqda...",
+      "typing_other": "{{names}} yozmoqda..."
     },
     "botStatus": {
       "online": "Onlayn",
@@ -722,12 +730,10 @@
       "couldNotLoad": "To'lov ma'lumotlarini yuklab bo'lmadi",
       "manageOnWeb": "Vebda to'lovlarni boshqarish",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} kun qoldi",
       "earlybird": "Erta qush",
       "finalCommitTermEndsOn": "Yakuniy Commit muddati {{date}} da tugaydi. Standard rejimda {{price}} narxda davom eting, aks holda xosting tugaydi.",
       "freeTrial": "Bepul sinov",
       "hostingEnds": "Xosting tugaydi",
-      "oneDayLeft": "1 kun qoldi",
       "renews": "Yangilanadi",
       "standardMonthToMonth": "Standard, oylik",
       "standardStartsOn": "Standard rejimi {{date}} da {{price}} narxda boshlanadi.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} e'tibor talab qiladi: {{label}}",
-      "openUnreadOne": "{{name}}ni ochish, {{count}} ta o'qilmagan xabar",
-      "openUnreadMany": "{{name}}ni ochish, {{count}} ta o'qilmagan xabar",
+      "openUnread_one": "{{name}}ni ochish, {{displayCount}} ta o'qilmagan xabar",
+      "openUnread": "{{name}}ni ochish, {{displayCount}} ta o'qilmagan xabar",
+      "openUnread_other": "{{name}}ni ochish, {{displayCount}} ta o'qilmagan xabar",
       "open": "{{name}}ni ochish",
       "openSettings": "{{name}} uchun sozlamalarni ochish",
       "fixOnKiloAi": "kilo.ai da tuzatish: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Avto-tuzatish yoqilsinmi?",
       "enableAutoRemediationConfirmMessage": "Xavfsizlik agenti muvofiq ekspluatatsiya qilinadigan topilmalar uchun tuzatish PRlarini avtomatik ochadi.",
       "enable": "Yoqish",
-      "queuedOne": "{{count}} ta mavjud natija tahlilga navbatga qo'yildi.",
-      "queuedMany": "{{count}} ta mavjud natija tahlilga navbatga qo'yildi.",
+      "queued_one": "{{displayCount}} ta mavjud natija tahlilga navbatga qo'yildi.",
+      "queued": "{{displayCount}} ta mavjud natija tahlilga navbatga qo'yildi.",
+      "queued_other": "{{displayCount}} ta mavjud natija tahlilga navbatga qo'yildi.",
       "severityCriticalOnly": "Faqat tanqidiy",
       "severityHighAndAbove": "Yuqori va undan yuqori",
       "severityMediumAndAbove": "O'rta va undan yuqori",
@@ -1482,8 +1490,9 @@
       "on": "Yoniq",
       "off": "O'chiq",
       "allRepositories": "Barcha repozitoriyalar",
-      "repositorySelected": "{{count}} ta repozitoriya tanlandi",
-      "repositoriesSelected": "{{count}} ta repozitoriya tanlandi",
+      "repositoriesCount_one": "{{displayCount}} ta repozitoriya tanlandi",
+      "repositoriesCount": "{{displayCount}} ta repozitoriya tanlandi",
+      "repositoriesCount_other": "{{displayCount}} ta repozitoriya tanlandi",
       "selectRepositories": "Repozitoriyalarni tanlash",
       "selectRepositoriesSubtitle": "Security Agent qaysi repozitoriyalarni kuzatishini tanlang",
       "repositories": "Repozitoriyalar",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Sessiya o'chirildi",
       "needsInput": "kiritish kerak",
       "fromPlatform": "{{platform}} dan",
-      "centOne": "sent",
-      "centOther": "sent",
-      "dollarOne": "dollar",
-      "dollarOther": "dollar"
+      "cent_one": "sent",
+      "cent": "sent",
+      "cent_other": "sent",
+      "dollar_one": "dollar",
+      "dollar": "dollar",
+      "dollar_other": "dollar"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub'ni ochib bo'lmadi",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} ta fayl yangilandi",
-      "updatedFiles": "{{count}} ta fayl yangilandi"
+      "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi",
+      "updatedFileCount": "{{displayCount}} ta fayl yangilandi",
+      "updatedFileCount_other": "{{displayCount}} ta fayl yangilandi"
     },
     "toolPatch": {
       "operationAdded": "Qo'shildi",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Oldingi xabarlar yuklandi",
       "retryHint": "Bu sessiya uchun oldingi xabarlarni yuklashni qayta amalga oshiradi.",
-      "omittedOne": "Bu sessiyadagi ba'zi oldingi elementlar ko'rsatilmadi.",
-      "omittedMany": "Bu sessiyadagi {{count}} ta oldingi element ko'rsatilmadi.",
+      "omitted_one": "Bu sessiyadagi ba'zi oldingi elementlar ko'rsatilmadi.",
+      "omitted": "Bu sessiyadagi {{displayCount}} ta oldingi element ko'rsatilmadi.",
+      "omitted_other": "Bu sessiyadagi {{displayCount}} ta oldingi element ko'rsatilmadi.",
       "couldNotLoad": "Oldingi xabarlarni yuklab bo'lmadi.",
       "unavailable": "Oldingi xabarlar mavjud emas.",
       "tooLarge": "Oldingi xabarlar yuklash uchun juda katta."
@@ -2069,10 +2082,12 @@
       "viewTable": "Jadvalni ko'rish",
       "title": "Jadval",
       "close": "Jadvalni yopish",
-      "column": "ustun",
-      "columns": "ustunlar",
-      "row": "qator",
-      "rows": "qatorlar",
+      "columnCount_one": "ustun",
+      "columnCount": "ustunlar",
+      "columnCount_other": "ustunlar",
+      "rowCount_one": "qator",
+      "rowCount": "qatorlar",
+      "rowCount_other": "qatorlar",
       "opensFullScreen": "to'liq ekranda ochiladi"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} tokendan",
       "tokens": "tokenlar",
       "tokensWithPercentage": "tokenlar ({{percentage}})",
-      "stepsCountOne": "{{steps}} qadam",
-      "stepsCountMany": "{{steps}} qadam",
+      "stepsCount_one": "{{steps}} qadam",
+      "stepsCount": "{{steps}} qadam",
+      "stepsCount_other": "{{steps}} qadam",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Yangi kodlash vazifasi",
     "explore": "O'rganish",
     "seeAll": "Barchasini ko'rish",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Xayrli tong",
-    "greetingAfternoon": "Xayrli kun",
-    "greetingEvening": "Xayrli oqshom"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "{{filename}} ni yopish",
@@ -2645,8 +2658,9 @@
       "manageHint": "Kilo Pass boshqaruvini internetda ochadi.",
       "notSubscribed": "Obuna emas",
       "overallocated": "Pass tayinlashlar to'langan o'rindiqlardan oshib ketdi",
-      "paidSeatOne": "{{count}} to'langan o'rindiq",
-      "paidSeatOther": "{{count}} to'langan o'rindiq",
+      "paidSeat_one": "{{displayCount}} to'langan o'rindiq",
+      "paidSeat": "{{displayCount}} to'langan o'rindiq",
+      "paidSeat_other": "{{displayCount}} to'langan o'rindiq",
       "paymentNeedsAttention": "To'lov e'tibor talab qiladi",
       "paymentPending": "To'lov kutilmoqda",
       "processingBlocked": "Qayta ishlash bloklandi",

@@ -200,7 +200,7 @@ describe('useVoiceInput integration', () => {
     });
 
     describe('toggle', () => {
-      it('starts when idle, using the latest draft and resolved language and passing draft/feedback callbacks', async () => {
+      it('starts when idle, using the app language and passing draft/feedback callbacks', async () => {
         const { actions, onDraftChange, owner } = buildActions({ draft: 'hello' });
         mockController.setSnapshot(idleSnapshot());
         localizationMock.getLocales.mockReturnValue([{ languageTag: 'nl-NL' }]);
@@ -213,7 +213,7 @@ describe('useVoiceInput integration', () => {
           throw new Error('controller.start was not called');
         }
         expect(startOptions.baseDraft).toBe('hello');
-        expect(startOptions.languageTag).toBe('nl-NL');
+        expect(startOptions.languageTag).toBe('en-US');
         expect(startOptions.owner).toBe(owner);
         expect(startOptions.onDraftChange).toBe(onDraftChange);
         expect(startOptions.onFeedback).toBe(showFeedback);

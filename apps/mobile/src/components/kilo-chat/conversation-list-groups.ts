@@ -34,12 +34,14 @@ function emptyConversationGroup(): ConversationListItem[] {
 
 export function groupConversationsByActivity(
   conversations: ConversationListItem[],
-  nowMs: number
+  nowMs: number,
+  firstWeekday = 1
 ): ConversationListGroup[] {
   const now = new Date(nowMs);
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const yesterdayStart = todayStart - DAY_MS;
-  const weekStart = todayStart - 6 * DAY_MS;
+  const firstDay = firstWeekday - 1;
+  const weekStart = todayStart - ((now.getDay() - firstDay + 7) % 7) * DAY_MS;
   const groups = {
     today: emptyConversationGroup(),
     yesterday: emptyConversationGroup(),

@@ -25,7 +25,7 @@ import {
   selectInvoiceRowState,
   shareOrganizationInvoicePdf,
 } from '@/lib/organization-invoice-download';
-import { cn, firstNonEmpty } from '@/lib/utils';
+import { capitalize, cn, firstNonEmpty } from '@/lib/utils';
 
 const STATUS_META = {
   paid: {
@@ -56,7 +56,7 @@ function statusMeta(status: string) {
     return { label: i18n.t(meta.labelKey), pillClass: meta.pillClass, textClass: meta.textClass };
   }
   return {
-    label: status.charAt(0).toUpperCase() + status.slice(1),
+    label: capitalize(status),
     pillClass: 'bg-muted',
     textClass: 'text-muted-foreground',
   };

@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{total}} पैकी {{loaded}} फाइल्स लोड झाल्या",
       "loadAllFiles": "सर्व फाइल्स लोड करा",
       "loadAll": "सर्व लोड करा",
-      "fileLoaded": "{{count}} फाइल लोड झाली",
-      "filesLoaded": "{{count}} फाइल्स लोड झाल्या",
-      "fileLoadedOfTotal": "{{total}} पैकी {{count}} फाइल लोड झाली",
-      "filesLoadedOfTotal": "{{total}} पैकी {{count}} फाइल्स लोड झाल्या",
+      "fileLoadedCount_one": "{{displayCount}} फाइल लोड झाली",
+      "fileLoadedCount": "{{displayCount}} फाइल्स लोड झाल्या",
+      "fileLoadedCount_other": "{{displayCount}} फाइल्स लोड झाल्या",
+      "fileLoadedOfTotalCount_one": "{{total}} पैकी {{displayCount}} फाइल लोड झाली",
+      "fileLoadedOfTotalCount": "{{total}} पैकी {{displayCount}} फाइल्स लोड झाल्या",
+      "fileLoadedOfTotalCount_other": "{{total}} पैकी {{displayCount}} फाइल्स लोड झाल्या",
       "filesStillLoading": "फाइल्स अजूनही लोड होत आहेत. रीफ्रेश करण्यासाठी ओढा.",
       "goToOverview": "आढाव्यावर जा",
       "goToOverviewTab": "आढावा टॅबवर जा"
@@ -288,8 +290,9 @@
       "resolved": "सोडवलेले",
       "outdated": "कालबाह्य",
       "file": "फाइल",
-      "oneComment": "1 टिप्पणी",
-      "commentCount": "{{count}} टिप्पण्या",
+      "comment_one": "1 टिप्पणी",
+      "comment": "{{displayCount}} टिप्पण्या",
+      "comment_other": "{{displayCount}} टिप्पण्या",
       "startedRelative": " · {{relative}} रोजी सुरू केले",
       "couldNotLoadMore": "अधिक टिप्पण्या लोड करता आल्या नाहीत.",
       "retryLoadingMore": "अधिक टिप्पण्या लोड करण्याचा पुन्हा प्रयत्न करा",
@@ -299,8 +302,9 @@
       "reactionsTitle": "प्रतिक्रिया",
       "addReaction": "प्रतिक्रिया जोडा",
       "reactionPill": "{{emoji}} प्रतिक्रिया, {{count}} {{countLabel}}",
-      "reactionSingular": "प्रतिक्रिया",
-      "reactionPlural": "प्रतिक्रिया",
+      "reaction_one": "प्रतिक्रिया",
+      "reaction": "प्रतिक्रिया",
+      "reaction_other": "प्रतिक्रिया",
       "commentActions": "टिप्पणी क्रिया",
       "reportContent": "सामग्रीची तक्रार करा",
       "reportUser": "वापरकर्त्याची तक्रार करा",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "ही टिप्पणी पुनरावलोकन रांगेतून काढली जाईल.",
       "delete": "हटवा",
       "summaryOptional": "सारांश (पर्यायी)",
-      "pendingCommentSingular": "प्रलंबित टिप्पणी",
-      "pendingCommentPlural": "प्रलंबित टिप्पण्या",
+      "pendingComment_one": "प्रलंबित टिप्पणी",
+      "pendingComment": "प्रलंबित टिप्पण्या",
+      "pendingComment_other": "प्रलंबित टिप्पण्या",
       "submitCountOfTotal": "{{totalCount}} पैकी {{freshCount}} टिप्पण्या सादर करा",
       "submitReview": "पुनरावलोकन सादर करा",
       "partialPostedMessage": "{{freshCount}} टिप्पण्या पोस्ट केल्या. {{staleCount}} टिप्पण्या जुन्या कमिटकडे निर्देश करतात आणि तुमच्या रांगेत राहिल्या."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "उघडा · पुनरावलोकन आवश्यक",
       "stateOpen": "उघडा",
       "unknownAuthor": "अज्ञात लेखक",
-      "commitSingular": "कमिट",
-      "commitPlural": "कमिट्स",
-      "fileSingular": "फाइल",
-      "filePlural": "फाइल्स"
+      "commit_one": "कमिट",
+      "commit": "कमिट्स",
+      "commit_other": "कमिट्स",
+      "file_one": "फाइल",
+      "file": "फाइल्स",
+      "file_other": "फाइल्स"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} वरील कालबाह्य प्रलंबित टिप्पणी संपादित करा",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "कोणीतरी",
-      "oneTyping": "{{name}} टाइप करत आहे...",
-      "manyTyping": "{{names}} टाइप करत आहेत..."
+      "typing_one": "{{name}} टाइप करत आहे...",
+      "typing": "{{names}} टाइप करत आहेत...",
+      "typing_other": "{{names}} टाइप करत आहेत..."
     },
     "botStatus": {
       "online": "ऑनलाइन",
@@ -722,12 +730,10 @@
       "couldNotLoad": "बिलिंग माहिती लोड करता आली नाही",
       "manageOnWeb": "वेबवर बिलिंग व्यवस्थापित करा",
       "commitPlan": "कमिट",
-      "daysLeft": "{{count}} दिवस शिल्लक",
       "earlybird": "अर्लीबर्ड",
       "finalCommitTermEndsOn": "तुमची अंतिम कमिट मुदत {{date}} रोजी संपते. {{price}} ला स्टँडर्ड म्हणून सुरू ठेवा, अन्यथा होस्टिंग संपते.",
       "freeTrial": "मोफत ट्रायल",
       "hostingEnds": "होस्टिंग संपते",
-      "oneDayLeft": "1 दिवस शिल्लक",
       "renews": "नूतनीकरण होते",
       "standardMonthToMonth": "स्टँडर्ड महिन्या-महिन्याने",
       "standardStartsOn": "स्टँडर्ड {{date}} रोजी {{price}} ला सुरू होते.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} ला लक्ष देणे आवश्यक आहे: {{label}}",
-      "openUnreadOne": "{{name}} उघडा, {{count}} न वाचलेला संदेश",
-      "openUnreadMany": "{{name}} उघडा, {{count}} न वाचलेले संदेश",
+      "openUnread_one": "{{name}} उघडा, {{displayCount}} न वाचलेला संदेश",
+      "openUnread": "{{name}} उघडा, {{displayCount}} न वाचलेले संदेश",
+      "openUnread_other": "{{name}} उघडा, {{displayCount}} न वाचलेले संदेश",
       "open": "{{name}} उघडा",
       "openSettings": "{{name}} साठी सेटिंग्ज उघडा",
       "fixOnKiloAi": "kilo.ai वर दुरुस्त करा: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "स्वयं-उपाय सक्षम करायचे?",
       "enableAutoRemediationConfirmMessage": "सिक्युरिटी एजंट पात्र शोषणीय निष्कर्षांसाठी स्वयंचलितपणे उपाय PRs उघडेल.",
       "enable": "सक्षम करा",
-      "queuedOne": "{{count}} अस्तित्वातील शोध विश्लेषणासाठी रांगेत ठेवला.",
-      "queuedMany": "{{count}} अस्तित्वातील शोध विश्लेषणासाठी रांगेत ठेवले.",
+      "queued_one": "{{displayCount}} अस्तित्वातील शोध विश्लेषणासाठी रांगेत ठेवला.",
+      "queued": "{{displayCount}} अस्तित्वातील शोध विश्लेषणासाठी रांगेत ठेवले.",
+      "queued_other": "{{displayCount}} अस्तित्वातील शोध विश्लेषणासाठी रांगेत ठेवले.",
       "severityCriticalOnly": "केवळ गंभीर",
       "severityHighAndAbove": "उच्च आणि त्यावर",
       "severityMediumAndAbove": "मध्यम आणि त्यावर",
@@ -1482,8 +1490,9 @@
       "on": "चालू",
       "off": "बंद",
       "allRepositories": "सर्व भांडारे",
-      "repositorySelected": "{{count}} भांडार निवडले",
-      "repositoriesSelected": "{{count}} भांडारे निवडले",
+      "repositoriesCount_one": "{{displayCount}} भांडार निवडले",
+      "repositoriesCount": "{{displayCount}} भांडारे निवडले",
+      "repositoriesCount_other": "{{displayCount}} भांडारे निवडले",
       "selectRepositories": "भांडारे निवडा",
       "selectRepositoriesSubtitle": "सुरक्षा एजंट कोणत्या भांडारांचे निरीक्षण करते ते निवडा",
       "repositories": "भांडारे",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "सत्र हटवले",
       "needsInput": "इनपुट आवश्यक",
       "fromPlatform": "{{platform}} वरून",
-      "centOne": "सेंट",
-      "centOther": "सेंट",
-      "dollarOne": "डॉलर",
-      "dollarOther": "डॉलर"
+      "cent_one": "सेंट",
+      "cent": "सेंट",
+      "cent_other": "सेंट",
+      "dollar_one": "डॉलर",
+      "dollar": "डॉलर",
+      "dollar_other": "डॉलर"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub उघडता आले नाही",
@@ -1817,8 +1828,9 @@
       "discardFailed": "मसुदा रद्द करता आला नाही. कृपया पुन्हा प्रयत्न करा."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} फाइल अद्ययावत केली",
-      "updatedFiles": "{{count}} फाइल्स अद्ययावत केल्या"
+      "updatedFileCount_one": "{{displayCount}} फाइल अद्ययावत केली",
+      "updatedFileCount": "{{displayCount}} फाइल्स अद्ययावत केल्या",
+      "updatedFileCount_other": "{{displayCount}} फाइल्स अद्ययावत केल्या"
     },
     "toolPatch": {
       "operationAdded": "जोडले",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "आधीचे संदेश लोड झाले",
       "retryHint": "या सत्रासाठी जुन्या संदेशांचे लोडिंग पुन्हा करते.",
-      "omittedOne": "या सत्रातील काही आधीच्या आयटम्स प्रदर्शित करता आल्या नाहीत.",
-      "omittedMany": "या सत्रातील {{count}} आधीच्या आयटम्स प्रदर्शित करता आल्या नाहीत.",
+      "omitted_one": "या सत्रातील काही आधीच्या आयटम्स प्रदर्शित करता आल्या नाहीत.",
+      "omitted": "या सत्रातील {{displayCount}} आधीच्या आयटम्स प्रदर्शित करता आल्या नाहीत.",
+      "omitted_other": "या सत्रातील {{displayCount}} आधीच्या आयटम्स प्रदर्शित करता आल्या नाहीत.",
       "couldNotLoad": "आधीचे संदेश लोड करता आले नाहीत.",
       "unavailable": "आधीचे संदेश उपलब्ध नाहीत.",
       "tooLarge": "आधीचे संदेश लोड करण्यासाठी खूप मोठे आहेत."
@@ -2069,10 +2082,12 @@
       "viewTable": "टेबल पहा",
       "title": "टेबल",
       "close": "टेबल बंद करा",
-      "column": "स्तंभ",
-      "columns": "स्तंभ",
-      "row": "रो",
-      "rows": "रो",
+      "columnCount_one": "स्तंभ",
+      "columnCount": "स्तंभ",
+      "columnCount_other": "स्तंभ",
+      "rowCount_one": "रो",
+      "rowCount": "रो",
+      "rowCount_other": "रो",
       "opensFullScreen": "पूर्ण स्क्रीन उघडते"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} टोकन्सपैकी",
       "tokens": "टोकन्स",
       "tokensWithPercentage": "टोकन्स ({{percentage}})",
-      "stepsCountOne": "{{steps}} पाऊल",
-      "stepsCountMany": "{{steps}} पावले",
+      "stepsCount_one": "{{steps}} पाऊल",
+      "stepsCount": "{{steps}} पावले",
+      "stepsCount_other": "{{steps}} पावले",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "नवीन कोडिंग कार्य",
     "explore": "एक्सप्लोर करा",
     "seeAll": "सर्व पहा",
-    "kiloAgents": "Kilo एजंट्स",
-    "greetingMorning": "शुभ सकाळ",
-    "greetingAfternoon": "शुभ दुपार",
-    "greetingEvening": "शुभ संध्याकाळ"
+    "kiloAgents": "Kilo एजंट्स"
   },
   "imageViewer": {
     "close": "{{filename}} बंद करा",
@@ -2645,8 +2658,9 @@
       "manageHint": "वेबवर Kilo Pass व्यवस्थापन उघडते.",
       "notSubscribed": "सदस्यत्व घेतलेले नाही",
       "overallocated": "पास असाइनमेंट्स पैसे दिलेल्या सीट्सपेक्षा जास्त आहेत",
-      "paidSeatOne": "{{count}} पैसे दिलेली सीट",
-      "paidSeatOther": "{{count}} पैसे दिलेल्या सीट्स",
+      "paidSeat_one": "{{displayCount}} पैसे दिलेली सीट",
+      "paidSeat": "{{displayCount}} पैसे दिलेल्या सीट्स",
+      "paidSeat_other": "{{displayCount}} पैसे दिलेल्या सीट्स",
       "paymentNeedsAttention": "पेमेंटकडे लक्ष आवश्यक",
       "paymentPending": "पेमेंट प्रलंबित",
       "processingBlocked": "प्रक्रिया अवरोधित",

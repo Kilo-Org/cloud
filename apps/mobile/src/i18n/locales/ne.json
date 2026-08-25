@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} / {{total}} फाइलहरू लोड भयो",
       "loadAllFiles": "सबै फाइलहरू लोड गर्नुहोस्",
       "loadAll": "सबै लोड गर्नुहोस्",
-      "fileLoaded": "{{count}} फाइल लोड भयो",
-      "filesLoaded": "{{count}} फाइलहरू लोड भयो",
-      "fileLoadedOfTotal": "{{total}} मध्ये {{count}} फाइल लोड भयो",
-      "filesLoadedOfTotal": "{{total}} मध्ये {{count}} फाइलहरू लोड भयो",
+      "fileLoadedCount_one": "{{displayCount}} फाइल लोड भयो",
+      "fileLoadedCount": "{{displayCount}} फाइलहरू लोड भयो",
+      "fileLoadedCount_other": "{{displayCount}} फाइलहरू लोड भयो",
+      "fileLoadedOfTotalCount_one": "{{total}} मध्ये {{displayCount}} फाइल लोड भयो",
+      "fileLoadedOfTotalCount": "{{total}} मध्ये {{displayCount}} फाइलहरू लोड भयो",
+      "fileLoadedOfTotalCount_other": "{{total}} मध्ये {{displayCount}} फाइलहरू लोड भयो",
       "filesStillLoading": "फाइलहरू अझै लोड हुँदैछन्। ताजा गर्न तल तान्नुहोस्।",
       "goToOverview": "अवलोकनमा जानुहोस्",
       "goToOverviewTab": "अवलोकन ट्याबमा जानुहोस्"
@@ -288,8 +290,9 @@
       "resolved": "समाधान भयो",
       "outdated": "पुरानो",
       "file": "फाइल",
-      "oneComment": "१ टिप्पणी",
-      "commentCount": "{{count}} टिप्पणीहरू",
+      "comment_one": "१ टिप्पणी",
+      "comment": "{{displayCount}} टिप्पणीहरू",
+      "comment_other": "{{displayCount}} टिप्पणीहरू",
       "startedRelative": " · {{relative}} मा सुरु भयो",
       "couldNotLoadMore": "थप टिप्पणीहरू लोड गर्न सकिएन।",
       "retryLoadingMore": "थप टिप्पणीहरू लोड गर्न पुनः प्रयास गर्नुहोस्",
@@ -299,8 +302,9 @@
       "reactionsTitle": "प्रतिक्रियाहरू",
       "addReaction": "प्रतिक्रिया थप्नुहोस्",
       "reactionPill": "{{emoji}} प्रतिक्रिया, {{count}} {{countLabel}}",
-      "reactionSingular": "प्रतिक्रिया",
-      "reactionPlural": "प्रतिक्रियाहरू",
+      "reaction_one": "प्रतिक्रिया",
+      "reaction": "प्रतिक्रियाहरू",
+      "reaction_other": "प्रतिक्रियाहरू",
       "commentActions": "टिप्पणी कार्यहरू",
       "reportContent": "सामग्री रिपोर्ट गर्नुहोस्",
       "reportUser": "प्रयोगकर्ता रिपोर्ट गर्नुहोस्",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "यो टिप्पणी समीक्षा कतारबाट हटाइनेछ।",
       "delete": "मेट्नुहोस्",
       "summaryOptional": "सारांश (वैकल्पिक)",
-      "pendingCommentSingular": "प्रतीक्षामा रहेको टिप्पणी",
-      "pendingCommentPlural": "प्रतीक्षामा रहेका टिप्पणीहरू",
+      "pendingComment_one": "प्रतीक्षामा रहेको टिप्पणी",
+      "pendingComment": "प्रतीक्षामा रहेका टिप्पणीहरू",
+      "pendingComment_other": "प्रतीक्षामा रहेका टिप्पणीहरू",
       "submitCountOfTotal": "{{totalCount}} मध्ये {{freshCount}} टिप्पणीहरू पेश गर्नुहोस्",
       "submitReview": "समीक्षा पेश गर्नुहोस्",
       "partialPostedMessage": "{{freshCount}} टिप्पणी(हरू) पेश गरियो। {{staleCount}} टिप्पणी(हरू) पुरानो कमिटमा औंल्याइएको छ र तपाईंको कतारमा रह्यो।"
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "खुला · समीक्षा आवश्यक",
       "stateOpen": "खुला",
       "unknownAuthor": "अज्ञात लेखक",
-      "commitSingular": "कमिट",
-      "commitPlural": "कमिटहरू",
-      "fileSingular": "फाइल",
-      "filePlural": "फाइलहरू"
+      "commit_one": "कमिट",
+      "commit": "कमिटहरू",
+      "commit_other": "कमिटहरू",
+      "file_one": "फाइल",
+      "file": "फाइलहरू",
+      "file_other": "फाइलहरू"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} मा पुरानो प्रतीक्षामा रहेको टिप्पणी सम्पादन गर्नुहोस्",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "कोही",
-      "oneTyping": "{{name}} टाइप गर्दै छ...",
-      "manyTyping": "{{names}} टाइप गर्दै छन्..."
+      "typing_one": "{{name}} टाइप गर्दै छ...",
+      "typing": "{{names}} टाइप गर्दै छन्...",
+      "typing_other": "{{names}} टाइप गर्दै छन्..."
     },
     "botStatus": {
       "online": "अनलाइन",
@@ -722,12 +730,10 @@
       "couldNotLoad": "बिलिङ जानकारी लोड गर्न सकिएन",
       "manageOnWeb": "वेबमा बिलिङ व्यवस्थापन गर्नुहोस्",
       "commitPlan": "कमिट",
-      "daysLeft": "{{count}} दिन बाँकी",
       "earlybird": "प्रारम्भिक",
       "finalCommitTermEndsOn": "तपाईंको अन्तिम कमिट अवधि {{date}} मा समाप्त हुन्छ। {{price}} मा स्ट्यान्डर्डको रूपमा जारी राख्नुहोस्, वा होस्टिङ समाप्त हुन्छ।",
       "freeTrial": "नि:शुल्क परीक्षण",
       "hostingEnds": "होस्टिङ समाप्त हुन्छ",
-      "oneDayLeft": "१ दिन बाँकी",
       "renews": "नवीकरण हुन्छ",
       "standardMonthToMonth": "स्ट्यान्डर्ड महिना-दर-महिना",
       "standardStartsOn": "स्ट्यान्डर्ड {{date}} मा {{price}} मा सुरु हुन्छ।",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} लाई ध्यान चाहिन्छ: {{label}}",
-      "openUnreadOne": "{{name}} खोल्नुहोस्, {{count}} नपढेको सन्देश",
-      "openUnreadMany": "{{name}} खोल्नुहोस्, {{count}} नपढेका सन्देशहरू",
+      "openUnread_one": "{{name}} खोल्नुहोस्, {{displayCount}} नपढेको सन्देश",
+      "openUnread": "{{name}} खोल्नुहोस्, {{displayCount}} नपढेका सन्देशहरू",
+      "openUnread_other": "{{name}} खोल्नुहोस्, {{displayCount}} नपढेका सन्देशहरू",
       "open": "{{name}} खोल्नुहोस्",
       "openSettings": "{{name}} का लागि सेटिङ्स खोल्नुहोस्",
       "fixOnKiloAi": "kilo.ai मा समाधान गर्नुहोस्: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "स्वचालित सुधार सक्षम गर्ने?",
       "enableAutoRemediationConfirmMessage": "Security Agent ले योग्य शोषणयोग्य फेला परेका कुराहरूका लागि सुधार PRहरू स्वचालित रूपमा खोल्नेछ।",
       "enable": "सक्षम गर्नुहोस्",
-      "queuedOne": "{{count}} वटा अवस्थित निष्कर्ष विश्लेषणका लागि कतारमा राखियो।",
-      "queuedMany": "{{count}} वटा अवस्थित निष्कर्षहरू विश्लेषणका लागि कतारमा राखियो।",
+      "queued_one": "{{displayCount}} वटा अवस्थित निष्कर्ष विश्लेषणका लागि कतारमा राखियो।",
+      "queued": "{{displayCount}} वटा अवस्थित निष्कर्षहरू विश्लेषणका लागि कतारमा राखियो।",
+      "queued_other": "{{displayCount}} वटा अवस्थित निष्कर्षहरू विश्लेषणका लागि कतारमा राखियो।",
       "severityCriticalOnly": "केवल क्रिटिकल",
       "severityHighAndAbove": "उच्च र माथि",
       "severityMediumAndAbove": "मध्यम र माथि",
@@ -1482,8 +1490,9 @@
       "on": "चालू",
       "off": "बन्द",
       "allRepositories": "सबै भण्डारहरू",
-      "repositorySelected": "{{count}} भण्डार चयन गरियो",
-      "repositoriesSelected": "{{count}} भण्डारहरू चयन गरियो",
+      "repositoriesCount_one": "{{displayCount}} भण्डार चयन गरियो",
+      "repositoriesCount": "{{displayCount}} भण्डारहरू चयन गरियो",
+      "repositoriesCount_other": "{{displayCount}} भण्डारहरू चयन गरियो",
       "selectRepositories": "भण्डारहरू चयन गर्नुहोस्",
       "selectRepositoriesSubtitle": "सुरक्षा एजेन्टले कुन भण्डारहरू निगरानी गर्ने भनेर छान्नुहोस्",
       "repositories": "भण्डारहरू",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "सत्र मेटियो",
       "needsInput": "इनपुट चाहिन्छ",
       "fromPlatform": "{{platform}} बाट",
-      "centOne": "सेन्ट",
-      "centOther": "सेन्टहरू",
-      "dollarOne": "डलर",
-      "dollarOther": "डलरहरू"
+      "cent_one": "सेन्ट",
+      "cent": "सेन्टहरू",
+      "cent_other": "सेन्टहरू",
+      "dollar_one": "डलर",
+      "dollar": "डलरहरू",
+      "dollar_other": "डलरहरू"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub खोल्न सकिएन",
@@ -1817,8 +1828,9 @@
       "discardFailed": "ड्राफ्ट खारेज गर्न सकिएन। फेरि प्रयास गर्नुहोस्।"
     },
     "partRenderer": {
-      "updatedFile": "{{count}} फाइल अद्यावधिक गरियो",
-      "updatedFiles": "{{count}} फाइलहरू अद्यावधिक गरियो"
+      "updatedFileCount_one": "{{displayCount}} फाइल अद्यावधिक गरियो",
+      "updatedFileCount": "{{displayCount}} फाइलहरू अद्यावधिक गरियो",
+      "updatedFileCount_other": "{{displayCount}} फाइलहरू अद्यावधिक गरियो"
     },
     "toolPatch": {
       "operationAdded": "थपियो",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "पहिलेका सन्देशहरू लोड भयो",
       "retryHint": "यस सत्रका लागि पहिलेका सन्देशहरूको लोड पुनःप्रयास गर्छ।",
-      "omittedOne": "यस सत्रका केही पहिलेका वस्तुहरू प्रदर्शन गर्न सकिएन।",
-      "omittedMany": "यस सत्रका {{count}} पहिलेका वस्तुहरू प्रदर्शन गर्न सकिएन।",
+      "omitted_one": "यस सत्रका केही पहिलेका वस्तुहरू प्रदर्शन गर्न सकिएन।",
+      "omitted": "यस सत्रका {{displayCount}} पहिलेका वस्तुहरू प्रदर्शन गर्न सकिएन।",
+      "omitted_other": "यस सत्रका {{displayCount}} पहिलेका वस्तुहरू प्रदर्शन गर्न सकिएन।",
       "couldNotLoad": "पहिलेका सन्देशहरू लोड गर्न सकिएन।",
       "unavailable": "पहिलेका सन्देशहरू उपलब्ध छैनन्।",
       "tooLarge": "पहिलेका सन्देशहरू लोड गर्न धेरै ठूला छन्।"
@@ -2069,10 +2082,12 @@
       "viewTable": "तालिका हेर्नुहोस्",
       "title": "तालिका",
       "close": "तालिका बन्द गर्नुहोस्",
-      "column": "स्तम्भ",
-      "columns": "स्तम्भहरू",
-      "row": "पङ्क्ति",
-      "rows": "पङ्क्तिहरू",
+      "columnCount_one": "स्तम्भ",
+      "columnCount": "स्तम्भहरू",
+      "columnCount_other": "स्तम्भहरू",
+      "rowCount_one": "पङ्क्ति",
+      "rowCount": "पङ्क्तिहरू",
+      "rowCount_other": "पङ्क्तिहरू",
       "opensFullScreen": "पूर्ण स्क्रिनमा खोल्छ"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} टोकन मध्ये",
       "tokens": "टोकनहरू",
       "tokensWithPercentage": "टोकनहरू ({{percentage}})",
-      "stepsCountOne": "{{steps}} चरण",
-      "stepsCountMany": "{{steps}} चरणहरू",
+      "stepsCount_one": "{{steps}} चरण",
+      "stepsCount": "{{steps}} चरणहरू",
+      "stepsCount_other": "{{steps}} चरणहरू",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "नयाँ कोडिङ कार्य",
     "explore": "अन्वेषण",
     "seeAll": "सबै हेर्नुहोस्",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "शुभ बिहान",
-    "greetingAfternoon": "शुभ दिउँसो",
-    "greetingEvening": "शुभ साँझ"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "{{filename}} बन्द गर्नुहोस्",
@@ -2645,8 +2658,9 @@
       "manageHint": "वेबमा Kilo Pass व्यवस्थापन खोल्छ।",
       "notSubscribed": "सदस्यता लिइएको छैन",
       "overallocated": "Pass असाइनमेन्टहरू भुक्तान गरिएका सीटहरूभन्दा बढी",
-      "paidSeatOne": "{{count}} भुक्तान गरिएको सीट",
-      "paidSeatOther": "{{count}} भुक्तान गरिएका सीटहरू",
+      "paidSeat_one": "{{displayCount}} भुक्तान गरिएको सीट",
+      "paidSeat": "{{displayCount}} भुक्तान गरिएका सीटहरू",
+      "paidSeat_other": "{{displayCount}} भुक्तान गरिएका सीटहरू",
       "paymentNeedsAttention": "भुक्तानीमा ध्यान चाहिन्छ",
       "paymentPending": "भुक्तानी पर्खाइमा",
       "processingBlocked": "प्रक्रिया रोकिएको",

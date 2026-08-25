@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { dateTimeFormat, numberFormat, relativeTimeFormat } from './intl-cache';
+import {
+  dateTimeFormat,
+  durationFormat,
+  listFormat,
+  numberFormat,
+  relativeTimeFormat,
+  segmenter,
+} from './intl-cache';
 
 describe('intl-cache', () => {
   afterEach(() => {
@@ -31,7 +38,7 @@ describe('intl-cache', () => {
     );
   });
 
-  it('loads localized relative time when Hermes omits the constructor', () => {
+  it('polyfills the constructors that Hermes omits', () => {
     const nativeIntl = Intl;
     vi.stubGlobal('Intl', {
       Collator: nativeIntl.Collator,
@@ -45,5 +52,9 @@ describe('intl-cache', () => {
     expect(relativeTimeFormat('de', { numeric: 'auto' }).format(-5, 'minute')).toBe(
       'vor 5 Minuten'
     );
+    expect(numberFormat('de', {}).format(1234.5)).toContain('1.234,5');
+    expect(listFormat('de', { type: 'conjunction' }).format(['A', 'B'])).toBe('A und B');
+    expect(durationFormat('en', { style: 'short' }).format({ hours: 1 })).toContain('1');
+    expect([...segmenter('en', { granularity: 'grapheme' }).segment('👨‍👩‍👧‍👦X')]).toHaveLength(2);
   });
 });

@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} din {{total}} fișiere încărcate",
       "loadAllFiles": "Încarcă toate fișierele",
       "loadAll": "Încarcă tot",
-      "fileLoaded": "{{count}} fișier încărcat",
-      "filesLoaded": "{{count}} fișiere încărcate",
-      "fileLoadedOfTotal": "{{count}} fișier încărcat din {{total}}",
-      "filesLoadedOfTotal": "{{count}} fișiere încărcate din {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} fișier încărcat",
+      "fileLoadedCount": "{{displayCount}} fișiere încărcate",
+      "fileLoadedCount_other": "{{displayCount}} fișiere încărcate",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} fișier încărcat din {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} fișiere încărcate din {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} fișiere încărcate din {{total}}",
       "filesStillLoading": "Fișierele se mai încarcă. Trage pentru a reîmprospăta.",
       "goToOverview": "Mergi la Prezentare generală",
       "goToOverviewTab": "Mergi la fila Prezentare generală"
@@ -288,8 +290,9 @@
       "resolved": "Rezolvat",
       "outdated": "Învechit",
       "file": "Fișier",
-      "oneComment": "1 comentariu",
-      "commentCount": "{{count}} comentarii",
+      "comment_one": "1 comentariu",
+      "comment": "{{displayCount}} comentarii",
+      "comment_other": "{{displayCount}} comentarii",
       "startedRelative": " · început {{relative}}",
       "couldNotLoadMore": "Nu s-au putut încărca mai multe comentarii.",
       "retryLoadingMore": "Reîncearcă încărcarea a mai multor comentarii",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reacții",
       "addReaction": "Adaugă o reacție",
       "reactionPill": "{{emoji}} reacție, {{count}} {{countLabel}}",
-      "reactionSingular": "reacție",
-      "reactionPlural": "reacții",
+      "reaction_one": "reacție",
+      "reaction": "reacții",
+      "reaction_other": "reacții",
       "commentActions": "Acțiuni pentru comentarii",
       "reportContent": "Raportează conținutul",
       "reportUser": "Raportează utilizatorul",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Acest comentariu va fi eliminat din coada de revizuire.",
       "delete": "Șterge",
       "summaryOptional": "Rezumat (opțional)",
-      "pendingCommentSingular": "comentariu în așteptare",
-      "pendingCommentPlural": "comentarii în așteptare",
+      "pendingComment_one": "comentariu în așteptare",
+      "pendingComment": "comentarii în așteptare",
+      "pendingComment_other": "comentarii în așteptare",
       "submitCountOfTotal": "Trimite {{freshCount}} din {{totalCount}} comentarii",
       "submitReview": "Trimite revizuirea",
       "partialPostedMessage": "Publicate {{freshCount}} comentariu(i). {{staleCount}} comentariu(i) se referă la un commit mai vechi și au rămas în coada ta."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Deschis · Revizuire necesară",
       "stateOpen": "Deschis",
       "unknownAuthor": "Autor necunoscut",
-      "commitSingular": "commit",
-      "commitPlural": "commit-uri",
-      "fileSingular": "fișier",
-      "filePlural": "fișiere"
+      "commit_one": "commit",
+      "commit": "commit-uri",
+      "commit_other": "commit-uri",
+      "file_one": "fișier",
+      "file": "fișiere",
+      "file_other": "fișiere"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editează comentariul învechit în așteptare pe {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Cineva",
-      "oneTyping": "{{name}} scrie...",
-      "manyTyping": "{{names}} scriu..."
+      "typing_one": "{{name}} scrie...",
+      "typing": "{{names}} scriu...",
+      "typing_other": "{{names}} scriu..."
     },
     "botStatus": {
       "online": "Online",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Informațiile de facturare nu au putut fi încărcate",
       "manageOnWeb": "Gestionare facturare pe Web",
       "commitPlan": "Angajare",
-      "daysLeft": "{{count}} zile rămase",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Termenul tău final de angajare se încheie pe {{date}}. Continuă ca Standard la {{price}}, sau găzduirea se încheie.",
       "freeTrial": "Perioadă de probă gratuită",
       "hostingEnds": "Găzduirea se încheie",
-      "oneDayLeft": "1 zi rămasă",
       "renews": "Se reînnoiește",
       "standardMonthToMonth": "Standard lună de lună",
       "standardStartsOn": "Standard începe pe {{date}} la {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} necesită atenție: {{label}}",
-      "openUnreadOne": "Deschide {{name}}, {{count}} mesaj necitit",
-      "openUnreadMany": "Deschide {{name}}, {{count}} mesaje necitite",
+      "openUnread_one": "Deschide {{name}}, {{displayCount}} mesaj necitit",
+      "openUnread": "Deschide {{name}}, {{displayCount}} mesaje necitite",
+      "openUnread_other": "Deschide {{name}}, {{displayCount}} mesaje necitite",
       "open": "Deschide {{name}}",
       "openSettings": "Deschide setările pentru {{name}}",
       "fixOnKiloAi": "Rezolvă pe kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Activezi auto-remedierea?",
       "enableAutoRemediationConfirmMessage": "Security Agent va deschide automat PR-uri de remediere pentru constatările exploatabile eligibile.",
       "enable": "Activează",
-      "queuedOne": "{{count}} constatare existentă pusă în coadă pentru analiză.",
-      "queuedMany": "{{count}} constatări existente puse în coadă pentru analiză.",
+      "queued_one": "{{displayCount}} constatare existentă pusă în coadă pentru analiză.",
+      "queued": "{{displayCount}} constatări existente puse în coadă pentru analiză.",
+      "queued_other": "{{displayCount}} constatări existente puse în coadă pentru analiză.",
       "severityCriticalOnly": "Doar critice",
       "severityHighAndAbove": "Mare și peste",
       "severityMediumAndAbove": "Medie și peste",
@@ -1482,8 +1490,9 @@
       "on": "Activat",
       "off": "Dezactivat",
       "allRepositories": "Toate depozitele",
-      "repositorySelected": "{{count}} depozit selectat",
-      "repositoriesSelected": "{{count}} depozite selectate",
+      "repositoriesCount_one": "{{displayCount}} depozit selectat",
+      "repositoriesCount": "{{displayCount}} depozite selectate",
+      "repositoriesCount_other": "{{displayCount}} depozite selectate",
       "selectRepositories": "Selectează depozitele",
       "selectRepositoriesSubtitle": "Alege depozitele pe care le monitorizează Security Agent",
       "repositories": "Depozite",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Sesiune ștearsă",
       "needsInput": "necesită introducere",
       "fromPlatform": "din {{platform}}",
-      "centOne": "cent",
-      "centOther": "cenți",
-      "dollarOne": "dolar",
-      "dollarOther": "dolari"
+      "cent_one": "cent",
+      "cent": "cenți",
+      "cent_other": "cenți",
+      "dollar_one": "dolar",
+      "dollar": "dolari",
+      "dollar_other": "dolari"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nu s-a putut deschide GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Nu s-a putut renunța la ciornă. Încearcă din nou."
     },
     "partRenderer": {
-      "updatedFile": "Actualizat {{count}} fișier",
-      "updatedFiles": "Actualizate {{count}} fișiere"
+      "updatedFileCount_one": "Actualizat {{displayCount}} fișier",
+      "updatedFileCount": "Actualizate {{displayCount}} fișiere",
+      "updatedFileCount_other": "Actualizate {{displayCount}} fișiere"
     },
     "toolPatch": {
       "operationAdded": "Adăugat",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Mesajele anterioare au fost încărcate",
       "retryHint": "Reîncearcă încărcarea mesajelor anterioare pentru această sesiune.",
-      "omittedOne": "Unele elemente anterioare din această sesiune nu au putut fi afișate.",
-      "omittedMany": "{{count}} elemente anterioare din această sesiune nu au putut fi afișate.",
+      "omitted_one": "Unele elemente anterioare din această sesiune nu au putut fi afișate.",
+      "omitted": "{{displayCount}} elemente anterioare din această sesiune nu au putut fi afișate.",
+      "omitted_other": "{{displayCount}} elemente anterioare din această sesiune nu au putut fi afișate.",
       "couldNotLoad": "Mesajele anterioare nu au putut fi încărcate.",
       "unavailable": "Mesajele anterioare nu sunt disponibile.",
       "tooLarge": "Mesajele anterioare sunt prea mari pentru a fi încărcate."
@@ -2069,10 +2082,12 @@
       "viewTable": "Vezi tabelul",
       "title": "Tabel",
       "close": "Închide tabelul",
-      "column": "coloană",
-      "columns": "coloane",
-      "row": "rând",
-      "rows": "rânduri",
+      "columnCount_one": "coloană",
+      "columnCount": "coloane",
+      "columnCount_other": "coloane",
+      "rowCount_one": "rând",
+      "rowCount": "rânduri",
+      "rowCount_other": "rânduri",
       "opensFullScreen": "deschide pe tot ecranul"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "din {{window}} tokeni",
       "tokens": "tokeni",
       "tokensWithPercentage": "tokeni ({{percentage}})",
-      "stepsCountOne": "{{steps}} pas",
-      "stepsCountMany": "{{steps}} pași",
+      "stepsCount_one": "{{steps}} pas",
+      "stepsCount": "{{steps}} pași",
+      "stepsCount_other": "{{steps}} pași",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Sarcină de codare nouă",
     "explore": "Explorează",
     "seeAll": "Vezi tot",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Bună dimineața",
-    "greetingAfternoon": "Bună ziua",
-    "greetingEvening": "Bună seara"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Închide {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Deschide gestionarea Kilo Pass pe web.",
       "notSubscribed": "Neabonat",
       "overallocated": "Atribuirile de Pass depășesc locurile plătite",
-      "paidSeatOne": "{{count}} loc plătit",
-      "paidSeatOther": "{{count}} locuri plătite",
+      "paidSeat_one": "{{displayCount}} loc plătit",
+      "paidSeat": "{{displayCount}} locuri plătite",
+      "paidSeat_other": "{{displayCount}} locuri plătite",
       "paymentNeedsAttention": "Plata necesită atenție",
       "paymentPending": "Plată în așteptare",
       "processingBlocked": "Procesare blocată",

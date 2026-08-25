@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "Įkelta {{loaded}} iš {{total}} failų",
       "loadAllFiles": "Įkelti visus failus",
       "loadAll": "Įkelti viską",
-      "fileLoaded": "Įkeltas {{count}} failas",
-      "filesLoaded": "Įkelta {{count}} failų",
-      "fileLoadedOfTotal": "Įkeltas {{count}} failas iš {{total}}",
-      "filesLoadedOfTotal": "Įkelta {{count}} failų iš {{total}}",
+      "fileLoadedCount_one": "Įkeltas {{displayCount}} failas",
+      "fileLoadedCount": "Įkelta {{displayCount}} failų",
+      "fileLoadedCount_other": "Įkelta {{displayCount}} failų",
+      "fileLoadedOfTotalCount_one": "Įkeltas {{displayCount}} failas iš {{total}}",
+      "fileLoadedOfTotalCount": "Įkelta {{displayCount}} failų iš {{total}}",
+      "fileLoadedOfTotalCount_other": "Įkelta {{displayCount}} failų iš {{total}}",
       "filesStillLoading": "Failai vis dar įkeliami. Patraukite, kad atnaujintumėte.",
       "goToOverview": "Eiti į apžvalgą",
       "goToOverviewTab": "Eiti į apžvalgos skirtuką"
@@ -288,8 +290,9 @@
       "resolved": "Išspręsta",
       "outdated": "Pasenusi",
       "file": "Failas",
-      "oneComment": "1 komentaras",
-      "commentCount": "{{count}} komentarai",
+      "comment_one": "1 komentaras",
+      "comment": "{{displayCount}} komentarai",
+      "comment_other": "{{displayCount}} komentarai",
       "startedRelative": " · pradėta {{relative}}",
       "couldNotLoadMore": "Nepavyko įkelti daugiau komentarų.",
       "retryLoadingMore": "Bandyti įkelti daugiau komentarų dar kartą",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reakcijos",
       "addReaction": "Pridėti reakciją",
       "reactionPill": "{{emoji}} reakcija, {{count}} {{countLabel}}",
-      "reactionSingular": "reakcija",
-      "reactionPlural": "reakcijos",
+      "reaction_one": "reakcija",
+      "reaction": "reakcijos",
+      "reaction_other": "reakcijos",
       "commentActions": "Komentaro veiksmai",
       "reportContent": "Pranešti apie turinį",
       "reportUser": "Pranešti apie vartotoją",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Šis komentaras bus pašalintas iš peržiūros eilės.",
       "delete": "Ištrinti",
       "summaryOptional": "Santrauka (neprivaloma)",
-      "pendingCommentSingular": "laukiantis komentaras",
-      "pendingCommentPlural": "laukiantys komentarai",
+      "pendingComment_one": "laukiantis komentaras",
+      "pendingComment": "laukiantys komentarai",
+      "pendingComment_other": "laukiantys komentarai",
       "submitCountOfTotal": "Pateikti {{freshCount}} iš {{totalCount}} komentarų",
       "submitReview": "Pateikti peržiūrą",
       "partialPostedMessage": "Paskelbta {{freshCount}} komentaras(-ai). {{staleCount}} komentaras(-ai) nukreipia į senesnį įsipareigojimą ir liko jūsų eilėje."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Atidaryta · Reikalinga peržiūra",
       "stateOpen": "Atidaryta",
       "unknownAuthor": "Nežinomas autorius",
-      "commitSingular": "įsipareigojimas",
-      "commitPlural": "įsipareigojimai",
-      "fileSingular": "failas",
-      "filePlural": "failai"
+      "commit_one": "įsipareigojimas",
+      "commit": "įsipareigojimai",
+      "commit_other": "įsipareigojimai",
+      "file_one": "failas",
+      "file": "failai",
+      "file_other": "failai"
     },
     "pendingComment": {
       "editOutdatedA11y": "Redaguoti pasenusį laukiantį komentarą {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Kažkas",
-      "oneTyping": "{{name}} rašo...",
-      "manyTyping": "{{names}} rašo..."
+      "typing_one": "{{name}} rašo...",
+      "typing": "{{names}} rašo...",
+      "typing_other": "{{names}} rašo..."
     },
     "botStatus": {
       "online": "Prisijungęs",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Nepavyko įkelti atsiskaitymų informacijos",
       "manageOnWeb": "Tvarkyti atsiskaitymus žiniatinklyje",
       "commitPlan": "Commit",
-      "daysLeft": "Liko {{count}} dien.",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Jūsų galutinis Commit terminas baigiasi {{date}}. Tęskite kaip Standard už {{price}} arba priegloba baigsis.",
       "freeTrial": "Nemokama bandomoji laikotarpis",
       "hostingEnds": "Priegloba baigiasi",
-      "oneDayLeft": "Liko 1 diena",
       "renews": "Atnaujinama",
       "standardMonthToMonth": "Standard kas mėnesį",
       "standardStartsOn": "Standard prasideda {{date}} už {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} reikia dėmesio: {{label}}",
-      "openUnreadOne": "Atidaryti {{name}}, {{count}} neskaityta žinutė",
-      "openUnreadMany": "Atidaryti {{name}}, {{count}} neskaitytos žinutės",
+      "openUnread_one": "Atidaryti {{name}}, {{displayCount}} neskaityta žinutė",
+      "openUnread": "Atidaryti {{name}}, {{displayCount}} neskaitytos žinutės",
+      "openUnread_other": "Atidaryti {{name}}, {{displayCount}} neskaitytos žinutės",
       "open": "Atidaryti {{name}}",
       "openSettings": "Atidaryti {{name}} nustatymus",
       "fixOnKiloAi": "Ištaisyti kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Įjungti automatinį taisymą?",
       "enableAutoRemediationConfirmMessage": "Security Agent automatiškai atidarys taisymo PR tinkamiems išnaudojamiems radiniams.",
       "enable": "Įjungti",
-      "queuedOne": "{{count}} rastas radinys įrašytas analizei.",
-      "queuedMany": "{{count}} rasti radiniai įrašyti analizei.",
+      "queued_one": "{{displayCount}} rastas radinys įrašytas analizei.",
+      "queued": "{{displayCount}} rasti radiniai įrašyti analizei.",
+      "queued_other": "{{displayCount}} rasti radiniai įrašyti analizei.",
       "severityCriticalOnly": "Tik kritiniai",
       "severityHighAndAbove": "Aukštas ir didesnis",
       "severityMediumAndAbove": "Vidutinis ir didesnis",
@@ -1482,8 +1490,9 @@
       "on": "Įjungta",
       "off": "Išjungta",
       "allRepositories": "Visos saugyklos",
-      "repositorySelected": "Pasirinkta {{count}} saugykla",
-      "repositoriesSelected": "Pasirinkta {{count}} saugyklos",
+      "repositoriesCount_one": "Pasirinkta {{displayCount}} saugykla",
+      "repositoriesCount": "Pasirinkta {{displayCount}} saugyklos",
+      "repositoriesCount_other": "Pasirinkta {{displayCount}} saugyklos",
       "selectRepositories": "Pasirinkti saugyklas",
       "selectRepositoriesSubtitle": "Pasirinkite, kokias saugyklas stebi Saugos agentas",
       "repositories": "Saugyklos",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Sesija ištrinta",
       "needsInput": "reikia įvesties",
       "fromPlatform": "iš {{platform}}",
-      "centOne": "centas",
-      "centOther": "centai",
-      "dollarOne": "doleris",
-      "dollarOther": "doleriai"
+      "cent_one": "centas",
+      "cent": "centai",
+      "cent_other": "centai",
+      "dollar_one": "doleris",
+      "dollar": "doleriai",
+      "dollar_other": "doleriai"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nepavyko atidaryti GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Nepavyko atmesti juodraščio. Bandykite dar kartą."
     },
     "partRenderer": {
-      "updatedFile": "Atnaujinta {{count}} rinkmena",
-      "updatedFiles": "Atnaujintos {{count}} rinkmenos"
+      "updatedFileCount_one": "Atnaujinta {{displayCount}} rinkmena",
+      "updatedFileCount": "Atnaujintos {{displayCount}} rinkmenos",
+      "updatedFileCount_other": "Atnaujintos {{displayCount}} rinkmenos"
     },
     "toolPatch": {
       "operationAdded": "Pridėta",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Ankstesnės žinutės įkeltos",
       "retryHint": "Bando dar kartą įkelti ankstesnes šios sesijos žinutes.",
-      "omittedOne": "Kai kurie ankstesni šios sesijos elementai negalėjo būti parodyti.",
-      "omittedMany": "{{count}} ankstesni šios sesijos elementai negalėjo būti parodyti.",
+      "omitted_one": "Kai kurie ankstesni šios sesijos elementai negalėjo būti parodyti.",
+      "omitted": "{{displayCount}} ankstesni šios sesijos elementai negalėjo būti parodyti.",
+      "omitted_other": "{{displayCount}} ankstesni šios sesijos elementai negalėjo būti parodyti.",
       "couldNotLoad": "Nepavyko įkelti ankstesnių žinučių.",
       "unavailable": "Ankstesnės žinutės neprieinamos.",
       "tooLarge": "Ankstesnės žinutės per didelės, kad būtų įkeltos."
@@ -2069,10 +2082,12 @@
       "viewTable": "Peržiūrėti lentelę",
       "title": "Lentelė",
       "close": "Uždaryti lentelę",
-      "column": "stulpelis",
-      "columns": "stulpeliai",
-      "row": "eilutė",
-      "rows": "eilutės",
+      "columnCount_one": "stulpelis",
+      "columnCount": "stulpeliai",
+      "columnCount_other": "stulpeliai",
+      "rowCount_one": "eilutė",
+      "rowCount": "eilutės",
+      "rowCount_other": "eilutės",
       "opensFullScreen": "atidaro visą ekraną"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "iš {{window}} žetonų",
       "tokens": "žetonai",
       "tokensWithPercentage": "žetonai ({{percentage}})",
-      "stepsCountOne": "{{steps}} žingsnis",
-      "stepsCountMany": "{{steps}} žingsniai",
+      "stepsCount_one": "{{steps}} žingsnis",
+      "stepsCount": "{{steps}} žingsniai",
+      "stepsCount_other": "{{steps}} žingsniai",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Nauja kodavimo užduotis",
     "explore": "Naršyti",
     "seeAll": "Rodyti viską",
-    "kiloAgents": "Kilo agentai",
-    "greetingMorning": "Labas rytas",
-    "greetingAfternoon": "Laba diena",
-    "greetingEvening": "Labas vakaras"
+    "kiloAgents": "Kilo agentai"
   },
   "imageViewer": {
     "close": "Uždaryti {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Atidaro Kilo Pass valdymą internete.",
       "notSubscribed": "Neprenumeruojama",
       "overallocated": "Pass priskyrimai viršija apmokėtas vietas",
-      "paidSeatOne": "{{count}} apmokėta vieta",
-      "paidSeatOther": "{{count}} apmokėtos vietos",
+      "paidSeat_one": "{{displayCount}} apmokėta vieta",
+      "paidSeat": "{{displayCount}} apmokėtos vietos",
+      "paidSeat_other": "{{displayCount}} apmokėtos vietos",
       "paymentNeedsAttention": "Apmokėjimui reikia dėmesio",
       "paymentPending": "Apmokėjimas laukia",
       "processingBlocked": "Apdorojimas blokuotas",

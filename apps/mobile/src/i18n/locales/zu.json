@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} kwangu-{{total}} amafayela alayishiwe",
       "loadAllFiles": "Layisha wonke amafayela",
       "loadAll": "Layisha konke",
-      "fileLoaded": "Ifayela elingu-{{count}} lilayishiwe",
-      "filesLoaded": "Amafayela angu-{{count}} alayishiwe",
-      "fileLoadedOfTotal": "Ifayela elingu-{{count}} lilayishiwe kwangu-{{total}}",
-      "filesLoadedOfTotal": "Amafayela angu-{{count}} alayishiwe kwangu-{{total}}",
+      "fileLoadedCount_one": "Ifayela elingu-{{displayCount}} lilayishiwe",
+      "fileLoadedCount": "Amafayela angu-{{displayCount}} alayishiwe",
+      "fileLoadedCount_other": "Amafayela angu-{{displayCount}} alayishiwe",
+      "fileLoadedOfTotalCount_one": "Ifayela elingu-{{displayCount}} lilayishiwe kwangu-{{total}}",
+      "fileLoadedOfTotalCount": "Amafayela angu-{{displayCount}} alayishiwe kwangu-{{total}}",
+      "fileLoadedOfTotalCount_other": "Amafayela angu-{{displayCount}} alayishiwe kwangu-{{total}}",
       "filesStillLoading": "Amafayela asalayishwa. Donsela phansi ukuze uvuselele.",
       "goToOverview": "Iya ku-Okubanzi",
       "goToOverviewTab": "Iya kuthebhu yokubanzi"
@@ -288,8 +290,9 @@
       "resolved": "Kuxazululiwe",
       "outdated": "Kwedlule isikhathi",
       "file": "Ifayela",
-      "oneComment": "Amazwana angu-1",
-      "commentCount": "Amazwana angu-{{count}}",
+      "comment_one": "Amazwana angu-1",
+      "comment": "Amazwana angu-{{displayCount}}",
+      "comment_other": "Amazwana angu-{{displayCount}}",
       "startedRelative": " · kuqalwe {{relative}}",
       "couldNotLoadMore": "Asikwazanga ukulayisha amanye amazwana.",
       "retryLoadingMore": "Zama futhi ukulayisha amanye amazwana",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Ukusabela",
       "addReaction": "Engeza ukusabela",
       "reactionPill": "{{emoji}} ukusabela, {{count}} {{countLabel}}",
-      "reactionSingular": "ukusabela",
-      "reactionPlural": "ukusabela",
+      "reaction_one": "ukusabela",
+      "reaction": "ukusabela",
+      "reaction_other": "ukusabela",
       "commentActions": "Izenzo zamazwana",
       "reportContent": "Bika okuqukethwe",
       "reportUser": "Bika umsebenzisi",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Lamazwana azosuswa emgqeni wokubuyekeza.",
       "delete": "Susa",
       "summaryOptional": "Isifinyezo (okukhethwa kukho)",
-      "pendingCommentSingular": "amazwana alindile",
-      "pendingCommentPlural": "amazwana alindile",
+      "pendingComment_one": "amazwana alindile",
+      "pendingComment": "amazwana alindile",
+      "pendingComment_other": "amazwana alindile",
       "submitCountOfTotal": "Thumela amazwana angu-{{freshCount}} kwangu-{{totalCount}}",
       "submitReview": "Thumela ukubuyekeza",
       "partialPostedMessage": "Kuthunyelwe amazwana angu-{{freshCount}}. Amazwana angu-{{staleCount}} akhomba ku-commit endala futhi ahlala emgqeni wakho."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Kuvuliwe · Ukubuyekeza kuyadingeka",
       "stateOpen": "Kuvuliwe",
       "unknownAuthor": "Umbhali ongaziwa",
-      "commitSingular": "i-commit",
-      "commitPlural": "ama-commit",
-      "fileSingular": "ifayela",
-      "filePlural": "amafayela"
+      "commit_one": "i-commit",
+      "commit": "ama-commit",
+      "commit_other": "ama-commit",
+      "file_one": "ifayela",
+      "file": "amafayela",
+      "file_other": "amafayela"
     },
     "pendingComment": {
       "editOutdatedA11y": "Hlela amazwana alindile aphelelwe yisikhathi ku-{{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Othile",
-      "oneTyping": "{{name}} uyabhala...",
-      "manyTyping": "{{names}} bayabhala..."
+      "typing_one": "{{name}} uyabhala...",
+      "typing": "{{names}} bayabhala...",
+      "typing_other": "{{names}} bayabhala..."
     },
     "botStatus": {
       "online": "Inthanethi",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Ayikwazanga ukulayisha imininingwane yokukhokha",
       "manageOnWeb": "Phatha Ukukhokha ku-Web",
       "commitPlan": "Zibophelela",
-      "daysLeft": "Izinsuku {{count}} ezisele",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Ithemu yakho yokugcina ye-Commit iphela nge-{{date}}. Qhubeka njenge-Standard ngo-{{price}}, noma ukusingathwa kuphele.",
       "freeTrial": "Isilingo Samahhala",
       "hostingEnds": "Ukusingathwa kuyaphela",
-      "oneDayLeft": "Usuku 1 olusele",
       "renews": "Kuvuselela",
       "standardMonthToMonth": "I-Standard inyanga nenyanga",
       "standardStartsOn": "I-Standard iqala nge-{{date}} ngo-{{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} idinga ukunakwa: {{label}}",
-      "openUnreadOne": "Vula u-{{name}}, umlayezo ongafundiwe {{count}}",
-      "openUnreadMany": "Vula u-{{name}}, imilayezo engafundiwe engu-{{count}}",
+      "openUnread_one": "Vula u-{{name}}, umlayezo ongafundiwe {{displayCount}}",
+      "openUnread": "Vula u-{{name}}, imilayezo engafundiwe engu-{{displayCount}}",
+      "openUnread_other": "Vula u-{{name}}, imilayezo engafundiwe engu-{{displayCount}}",
       "open": "Vula u-{{name}}",
       "openSettings": "Vula usethi we-{{name}}",
       "fixOnKiloAi": "Lungisa ku-kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Vumela ukulungisa okuzenzakalelayo?",
       "enableAutoRemediationConfirmMessage": "I-Security Agent izovula ama-PR wokulungisa ngokuzenzakalelayo kokutholakele okufanele ukulungiswa.",
       "enable": "Vumela",
-      "queuedOne": "{{count}} ukutholakele okukhona kumisiwe ukuhlaziywa.",
-      "queuedMany": "{{count}} ukutholakele okukhona kumiswe ukuhlaziywa.",
+      "queued_one": "{{displayCount}} ukutholakele okukhona kumisiwe ukuhlaziywa.",
+      "queued": "{{displayCount}} ukutholakele okukhona kumiswe ukuhlaziywa.",
+      "queued_other": "{{displayCount}} ukutholakele okukhona kumiswe ukuhlaziywa.",
       "severityCriticalOnly": "Okubaluleke kakhulu kuphela",
       "severityHighAndAbove": "Okuphezulu nangaphezulu",
       "severityMediumAndAbove": "Okumaphakathi nangaphezulu",
@@ -1482,8 +1490,9 @@
       "on": "Ivuliwe",
       "off": "Ivaliwe",
       "allRepositories": "Wonke ama-repository",
-      "repositorySelected": "{{count}} i-repository ekhethiwe",
-      "repositoriesSelected": "{{count}} ama-repository akhethiwe",
+      "repositoriesCount_one": "{{displayCount}} i-repository ekhethiwe",
+      "repositoriesCount": "{{displayCount}} ama-repository akhethiwe",
+      "repositoriesCount_other": "{{displayCount}} ama-repository akhethiwe",
       "selectRepositories": "Khetha ama-repository",
       "selectRepositoriesSubtitle": "Khetha ukuthi i-Security Agent iqapha yiphi ama-repository",
       "repositories": "Ama-repository",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Iseshini isusiwe",
       "needsInput": "idinga okokufaka",
       "fromPlatform": "kusuka ku-{{platform}}",
-      "centOne": "isenti",
-      "centOther": "amasenti",
-      "dollarOne": "idola",
-      "dollarOther": "amadola"
+      "cent_one": "isenti",
+      "cent": "amasenti",
+      "cent_other": "amasenti",
+      "dollar_one": "idola",
+      "dollar": "amadola",
+      "dollar_other": "amadola"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Akukwazanga ukuvula i-GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Akukwazanga ukulahla idrafuthi. Sicela uzame futhi."
     },
     "partRenderer": {
-      "updatedFile": "Kubuyekezwe ifayela eli-{{count}}",
-      "updatedFiles": "Kubuyekezwe amafayela angu-{{count}}"
+      "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}",
+      "updatedFileCount": "Kubuyekezwe amafayela angu-{{displayCount}}",
+      "updatedFileCount_other": "Kubuyekezwe amafayela angu-{{displayCount}}"
     },
     "toolPatch": {
       "operationAdded": "Kungeziwe",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Imilayezo yangaphambili ilayishiwe",
       "retryHint": "Iphinda izame ukulayisha imilayezo emidala kulesi seshini.",
-      "omittedOne": "Ezinye izinto zangaphambili zalolu hlelo azikwazanga ukuboniswa.",
-      "omittedMany": "Izinto zangaphambili ezi-{{count}} zalolu hlelo azikwazanga ukuboniswa.",
+      "omitted_one": "Ezinye izinto zangaphambili zalolu hlelo azikwazanga ukuboniswa.",
+      "omitted": "Izinto zangaphambili ezi-{{displayCount}} zalolu hlelo azikwazanga ukuboniswa.",
+      "omitted_other": "Izinto zangaphambili ezi-{{displayCount}} zalolu hlelo azikwazanga ukuboniswa.",
       "couldNotLoad": "Ayikwazanga ukulayisha imilayezo yangaphambili.",
       "unavailable": "Imilayezo yangaphambili ayitholakali.",
       "tooLarge": "Imilayezo yangaphambili mikhulu kakhulu ukuthi ilayishwe."
@@ -2069,10 +2082,12 @@
       "viewTable": "Buka itafula",
       "title": "Itafula",
       "close": "Vala itafula",
-      "column": "ikholomu",
-      "columns": "amakholomu",
-      "row": "umugqa",
-      "rows": "imigqa",
+      "columnCount_one": "ikholomu",
+      "columnCount": "amakholomu",
+      "columnCount_other": "amakholomu",
+      "rowCount_one": "umugqa",
+      "rowCount": "imigqa",
+      "rowCount_other": "imigqa",
       "opensFullScreen": "ivula isikrini esigcwele"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "kwamathokheni angu-{{window}}",
       "tokens": "amathokheni",
       "tokensWithPercentage": "amathokheni ({{percentage}})",
-      "stepsCountOne": "{{steps}} isinyathelo",
-      "stepsCountMany": "{{steps}} izinyathelo",
+      "stepsCount_one": "{{steps}} isinyathelo",
+      "stepsCount": "{{steps}} izinyathelo",
+      "stepsCount_other": "{{steps}} izinyathelo",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Umsebenzi omusha wokubhala ikhodi",
     "explore": "Hlola",
     "seeAll": "Bona konke",
-    "kiloAgents": "Ama-Kilo Agents",
-    "greetingMorning": "Sawubona ekuseni",
-    "greetingAfternoon": "Sawubona ntambama",
-    "greetingEvening": "Sawubona kusihlwa"
+    "kiloAgents": "Ama-Kilo Agents"
   },
   "imageViewer": {
     "close": "Vala {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Ivula ukuphathwa kwe-Kilo Pass kuwebhu.",
       "notSubscribed": "Akukabhalisi",
       "overallocated": "Izabelo ze-Pass zidlula izihlalo ezikhokhelwayo",
-      "paidSeatOne": "{{count}} isihlalo esikhokhelwayo",
-      "paidSeatOther": "{{count}} izihlalo ezikhokhelwayo",
+      "paidSeat_one": "{{displayCount}} isihlalo esikhokhelwayo",
+      "paidSeat": "{{displayCount}} izihlalo ezikhokhelwayo",
+      "paidSeat_other": "{{displayCount}} izihlalo ezikhokhelwayo",
       "paymentNeedsAttention": "Inkokhelo idinga ukunakwa",
       "paymentPending": "Inkokhelo ilindile",
       "processingBlocked": "Ukucutshungulwa kuvinjiwe",

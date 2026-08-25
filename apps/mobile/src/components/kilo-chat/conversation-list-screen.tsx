@@ -1,6 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { useBotStatus, useEventServiceClient } from '@kilocode/kilo-chat-hooks';
 import * as Haptics from 'expo-haptics';
+import { getCalendars } from 'expo-localization';
 import { type Href, useRouter } from 'expo-router';
 import { Plus, Settings2 } from '@/components/ui/icons';
 import { useCallback, useMemo } from 'react';
@@ -91,7 +92,8 @@ function flattenConversationGroups(
   nowMs: number
 ): ConversationListEntry[] {
   const entries: ConversationListEntry[] = [];
-  for (const group of groupConversationsByActivity(conversations, nowMs)) {
+  const firstWeekday = getCalendars()[0].firstWeekday ?? 1;
+  for (const group of groupConversationsByActivity(conversations, nowMs, firstWeekday)) {
     entries.push({ kind: 'header', label: group.label });
     for (const conversation of group.items) {
       entries.push({ kind: 'conversation', conversation });

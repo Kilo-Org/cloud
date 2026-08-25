@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { CATALOG_LOADERS } from './catalogs';
 import { SUPPORTED_LANGUAGES } from './languages';
+import ar from './locales/ar.json';
 import en from './locales/en.json';
 
 /**
@@ -48,5 +49,14 @@ describe('label references', () => {
       expect(message).toContain(label);
       expect(message).not.toContain('$t(');
     }
+  });
+});
+
+describe('plural fallback', () => {
+  it('uses a translated singular and the generic Arabic fallback', async () => {
+    await i18n.changeLanguage('ar');
+
+    expect(i18n.t('agents.sessionRow.cent', { count: 1 })).toBe(ar.agents.sessionRow.cent_one);
+    expect(i18n.t('agents.sessionRow.cent', { count: 2 })).toBe(ar.agents.sessionRow.cent);
   });
 });

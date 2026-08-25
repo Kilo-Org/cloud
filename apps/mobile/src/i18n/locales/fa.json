@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} از {{total}} فایل بارگذاری شد",
       "loadAllFiles": "بارگذاری همهٔ فایل‌ها",
       "loadAll": "بارگذاری همه",
-      "fileLoaded": "{{count}} فایل بارگذاری شد",
-      "filesLoaded": "{{count}} فایل بارگذاری شد",
-      "fileLoadedOfTotal": "{{count}} فایل از {{total}} بارگذاری شد",
-      "filesLoadedOfTotal": "{{count}} فایل از {{total}} بارگذاری شد",
+      "fileLoadedCount_one": "{{displayCount}} فایل بارگذاری شد",
+      "fileLoadedCount": "{{displayCount}} فایل بارگذاری شد",
+      "fileLoadedCount_other": "{{displayCount}} فایل بارگذاری شد",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} فایل از {{total}} بارگذاری شد",
+      "fileLoadedOfTotalCount": "{{displayCount}} فایل از {{total}} بارگذاری شد",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} فایل از {{total}} بارگذاری شد",
       "filesStillLoading": "فایل‌ها هنوز در حال بارگذاری هستند. برای بازخوانی به پایین بکشید.",
       "goToOverview": "رفتن به مرور کلی",
       "goToOverviewTab": "رفتن به برگهٔ مرور کلی"
@@ -288,8 +290,9 @@
       "resolved": "حل شد",
       "outdated": "قدیمی",
       "file": "فایل",
-      "oneComment": "۱ نظر",
-      "commentCount": "{{count}} نظر",
+      "comment_one": "۱ نظر",
+      "comment": "{{displayCount}} نظر",
+      "comment_other": "{{displayCount}} نظر",
       "startedRelative": " · شروع {{relative}}",
       "couldNotLoadMore": "بارگذاری نظرات بیشتر ممکن نشد.",
       "retryLoadingMore": "تلاش مجدد برای بارگذاری نظرات بیشتر",
@@ -299,8 +302,9 @@
       "reactionsTitle": "واکنش‌ها",
       "addReaction": "افزودن واکنش",
       "reactionPill": "واکنش {{emoji}}، {{count}} {{countLabel}}",
-      "reactionSingular": "واکنش",
-      "reactionPlural": "واکنش",
+      "reaction_one": "واکنش",
+      "reaction": "واکنش",
+      "reaction_other": "واکنش",
       "commentActions": "اقدامات نظر",
       "reportContent": "گزارش محتوا",
       "reportUser": "گزارش کاربر",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "این نظر از صف بازبینی حذف می‌شود.",
       "delete": "حذف",
       "summaryOptional": "خلاصه (اختیاری)",
-      "pendingCommentSingular": "نظر در انتظار",
-      "pendingCommentPlural": "نظرات در انتظار",
+      "pendingComment_one": "نظر در انتظار",
+      "pendingComment": "نظرات در انتظار",
+      "pendingComment_other": "نظرات در انتظار",
       "submitCountOfTotal": "ارسال {{freshCount}} از {{totalCount}} نظر",
       "submitReview": "ارسال بازبینی",
       "partialPostedMessage": "{{freshCount}} نظر ارسال شد. {{staleCount}} نظر به یک commit قدیمی‌تر اشاره دارد و در صف شما ماند."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "باز · بازبینی لازم است",
       "stateOpen": "باز",
       "unknownAuthor": "نویسندهٔ ناشناس",
-      "commitSingular": "commit",
-      "commitPlural": "commit",
-      "fileSingular": "فایل",
-      "filePlural": "فایل"
+      "commit_one": "commit",
+      "commit": "commit",
+      "commit_other": "commit",
+      "file_one": "فایل",
+      "file": "فایل",
+      "file_other": "فایل"
     },
     "pendingComment": {
       "editOutdatedA11y": "ویرایش نظر قدیمی در انتظار روی {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "شخصی",
-      "oneTyping": "{{name}} در حال تایپ است...",
-      "manyTyping": "{{names}} در حال تایپ هستند..."
+      "typing_one": "{{name}} در حال تایپ است...",
+      "typing": "{{names}} در حال تایپ هستند...",
+      "typing_other": "{{names}} در حال تایپ هستند..."
     },
     "botStatus": {
       "online": "آنلاین",
@@ -722,12 +730,10 @@
       "couldNotLoad": "بارگذاری اطلاعات صورتحساب ناموفق بود",
       "manageOnWeb": "مدیریت صورتحساب در وب",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} روز باقی‌مانده",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "دوره Commit نهایی شما در {{date}} به پایان می‌رسد. در صورت ادامه به‌عنوان Standard با {{price}}، یا هاستینگ قطع می‌شود.",
       "freeTrial": "آزمایشی رایگان",
       "hostingEnds": "پایان هاستینگ",
-      "oneDayLeft": "۱ روز باقی‌مانده",
       "renews": "تمدید",
       "standardMonthToMonth": "Standard ماهانه",
       "standardStartsOn": "Standard از {{date}} با {{price}} شروع می‌شود.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} نیاز به توجه دارد: {{label}}",
-      "openUnreadOne": "باز کردن {{name}}، {{count}} پیام خوانده‌نشده",
-      "openUnreadMany": "باز کردن {{name}}، {{count}} پیام خوانده‌نشده",
+      "openUnread_one": "باز کردن {{name}}، {{displayCount}} پیام خوانده‌نشده",
+      "openUnread": "باز کردن {{name}}، {{displayCount}} پیام خوانده‌نشده",
+      "openUnread_other": "باز کردن {{name}}، {{displayCount}} پیام خوانده‌نشده",
       "open": "باز کردن {{name}}",
       "openSettings": "باز کردن تنظیمات برای {{name}}",
       "fixOnKiloAi": "رفع مشکل در kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "اصلاح خودکار فعال شود؟",
       "enableAutoRemediationConfirmMessage": "عامل امنیتی به‌صورت خودکار برای یافته‌های قابل بهره‌برداری واجد شرایط PR اصلاحی باز می‌کند.",
       "enable": "فعال‌سازی",
-      "queuedOne": "{{count}} یافته موجود برای تحلیل در صف قرار گرفت.",
-      "queuedMany": "{{count}} یافته موجود برای تحلیل در صف قرار گرفت.",
+      "queued_one": "{{displayCount}} یافته موجود برای تحلیل در صف قرار گرفت.",
+      "queued": "{{displayCount}} یافته موجود برای تحلیل در صف قرار گرفت.",
+      "queued_other": "{{displayCount}} یافته موجود برای تحلیل در صف قرار گرفت.",
       "severityCriticalOnly": "فقط بحرانی",
       "severityHighAndAbove": "بالا و بالاتر",
       "severityMediumAndAbove": "متوسط و بالاتر",
@@ -1482,8 +1490,9 @@
       "on": "روشن",
       "off": "خاموش",
       "allRepositories": "همه مخازن",
-      "repositorySelected": "{{count}} مخزن انتخاب شد",
-      "repositoriesSelected": "{{count}} مخزن انتخاب شد",
+      "repositoriesCount_one": "{{displayCount}} مخزن انتخاب شد",
+      "repositoriesCount": "{{displayCount}} مخزن انتخاب شد",
+      "repositoriesCount_other": "{{displayCount}} مخزن انتخاب شد",
       "selectRepositories": "انتخاب مخازن",
       "selectRepositoriesSubtitle": "انتخاب کنید که Security Agent کدام مخازن را پایش کند",
       "repositories": "مخازن",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "نشست حذف شد",
       "needsInput": "نیاز به ورودی",
       "fromPlatform": "از {{platform}}",
-      "centOne": "سنت",
-      "centOther": "سنت",
-      "dollarOne": "دلار",
-      "dollarOther": "دلار"
+      "cent_one": "سنت",
+      "cent": "سنت",
+      "cent_other": "سنت",
+      "dollar_one": "دلار",
+      "dollar": "دلار",
+      "dollar_other": "دلار"
     },
     "githubInstall": {
       "couldNotOpenTitle": "باز کردن GitHub ممکن نشد",
@@ -1817,8 +1828,9 @@
       "discardFailed": "دور انداختن پیشنویس ممکن نشد. لطفاً دوباره تلاش کنید."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} فایل بهروزرسانی شد",
-      "updatedFiles": "{{count}} فایل بهروزرسانی شد"
+      "updatedFileCount_one": "{{displayCount}} فایل بهروزرسانی شد",
+      "updatedFileCount": "{{displayCount}} فایل بهروزرسانی شد",
+      "updatedFileCount_other": "{{displayCount}} فایل بهروزرسانی شد"
     },
     "toolPatch": {
       "operationAdded": "افزوده شد",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "پیام‌های قبلی بارگذاری شدند",
       "retryHint": "بارگذاری پیام‌های قبلی این جلسه را دوباره تلاش می‌کند.",
-      "omittedOne": "برخی از موارد قبلی این جلسه قابل نمایش نبودند.",
-      "omittedMany": "{{count}} مورد قبلی این جلسه قابل نمایش نبودند.",
+      "omitted_one": "برخی از موارد قبلی این جلسه قابل نمایش نبودند.",
+      "omitted": "{{displayCount}} مورد قبلی این جلسه قابل نمایش نبودند.",
+      "omitted_other": "{{displayCount}} مورد قبلی این جلسه قابل نمایش نبودند.",
       "couldNotLoad": "پیام‌های قبلی بارگذاری نشدند.",
       "unavailable": "پیام‌های قبلی در دسترس نیستند.",
       "tooLarge": "پیام‌های قبلی برای بارگذاری بیش از حد بزرگ هستند."
@@ -2069,10 +2082,12 @@
       "viewTable": "مشاهده جدول",
       "title": "جدول",
       "close": "بستن جدول",
-      "column": "ستون",
-      "columns": "ستون‌ها",
-      "row": "ردیف",
-      "rows": "ردیف‌ها",
+      "columnCount_one": "ستون",
+      "columnCount": "ستون‌ها",
+      "columnCount_other": "ستون‌ها",
+      "rowCount_one": "ردیف",
+      "rowCount": "ردیف‌ها",
+      "rowCount_other": "ردیف‌ها",
       "opensFullScreen": "تمام‌صفحه باز می‌شود"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "از {{window}} توکن",
       "tokens": "توکن",
       "tokensWithPercentage": "توکن ({{percentage}})",
-      "stepsCountOne": "{{steps}} گام",
-      "stepsCountMany": "{{steps}} گام",
+      "stepsCount_one": "{{steps}} گام",
+      "stepsCount": "{{steps}} گام",
+      "stepsCount_other": "{{steps}} گام",
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "کار کدنویسی جدید",
     "explore": "کاوش",
     "seeAll": "مشاهده همه",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "صبح بخیر",
-    "greetingAfternoon": "ظهر بخیر",
-    "greetingEvening": "عصر بخیر"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "بستن {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "مدیریت Kilo Pass را در وب باز می‌کند.",
       "notSubscribed": "مشترک نیست",
       "overallocated": "اختصاص‌های Pass از صندلی‌های پرداختی فراتر می‌رود",
-      "paidSeatOne": "{{count}} صندلی پرداختی",
-      "paidSeatOther": "{{count}} صندلی پرداختی",
+      "paidSeat_one": "{{displayCount}} صندلی پرداختی",
+      "paidSeat": "{{displayCount}} صندلی پرداختی",
+      "paidSeat_other": "{{displayCount}} صندلی پرداختی",
       "paymentNeedsAttention": "پرداخت نیاز به توجه دارد",
       "paymentPending": "پرداخت در انتظار است",
       "processingBlocked": "پردازش مسدود است",

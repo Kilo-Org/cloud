@@ -73,7 +73,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     .map(b => b.expiry_date)
     .filter((d): d is string => d !== null)
     // eslint-disable-next-line unicorn/no-array-sort -- toSorted() is not available in Hermes
-    .sort((a, b) => a.localeCompare(b))[0];
+    .sort((a, b) => parseTimestamp(a).getTime() - parseTimestamp(b).getTime())[0];
 
   const selectedLabel = selectedOrgId
     ? (orgs?.find(o => o.organizationId === selectedOrgId)?.organizationName ??

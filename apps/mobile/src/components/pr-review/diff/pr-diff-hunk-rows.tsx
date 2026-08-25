@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { type ExpandSeparatorItem } from '@/lib/pr-review/diff/pr-diff-list-items';
@@ -197,10 +199,12 @@ export function PaginationRow({
         <Text variant="muted" className="text-xs">
           {totalFiles
             ? t('prReview.hunkRows.loadingAllFilesOf', {
-                loaded: loadedFiles.toLocaleString(),
-                total: totalFiles.toLocaleString(),
+                loaded: formatNumber(loadedFiles, i18n.language),
+                total: formatNumber(totalFiles, i18n.language),
               })
-            : t('prReview.hunkRows.loadingAllFiles', { loaded: loadedFiles.toLocaleString() })}
+            : t('prReview.hunkRows.loadingAllFiles', {
+                loaded: formatNumber(loadedFiles, i18n.language),
+              })}
         </Text>
       </View>
     );
@@ -210,8 +214,8 @@ export function PaginationRow({
       <View className="flex-row items-center justify-center gap-3 py-4">
         <Text variant="muted" className="text-xs">
           {t('prReview.hunkRows.loadedOfTotalFiles', {
-            loaded: loadedFiles.toLocaleString(),
-            total: totalFiles?.toLocaleString() ?? '?',
+            loaded: formatNumber(loadedFiles, i18n.language),
+            total: totalFiles == null ? '?' : formatNumber(totalFiles, i18n.language),
           })}
         </Text>
         <Pressable
@@ -225,21 +229,16 @@ export function PaginationRow({
       </View>
     );
   }
-  let loadedLabel =
-    loadedFiles === 1
-      ? t('prReview.hunkRows.fileLoaded', { count: loadedFiles.toLocaleString() })
-      : t('prReview.hunkRows.filesLoaded', { count: loadedFiles.toLocaleString() });
+  let loadedLabel = t('prReview.hunkRows.fileLoadedCount', {
+    count: loadedFiles,
+    displayCount: formatNumber(loadedFiles, i18n.language),
+  });
   if (totalFiles) {
-    loadedLabel =
-      loadedFiles === 1
-        ? t('prReview.hunkRows.fileLoadedOfTotal', {
-            count: loadedFiles.toLocaleString(),
-            total: totalFiles.toLocaleString(),
-          })
-        : t('prReview.hunkRows.filesLoadedOfTotal', {
-            count: loadedFiles.toLocaleString(),
-            total: totalFiles.toLocaleString(),
-          });
+    loadedLabel = t('prReview.hunkRows.fileLoadedOfTotalCount', {
+      count: loadedFiles,
+      displayCount: formatNumber(loadedFiles, i18n.language),
+      total: formatNumber(totalFiles, i18n.language),
+    });
   }
   return (
     <View className="flex-row items-center justify-center gap-2 py-4">

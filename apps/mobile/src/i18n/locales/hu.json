@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} / {{total}} fájl betöltve",
       "loadAllFiles": "Összes fájl betöltése",
       "loadAll": "Összes betöltése",
-      "fileLoaded": "{{count}} fájl betöltve",
-      "filesLoaded": "{{count}} fájl betöltve",
-      "fileLoadedOfTotal": "{{count}} / {{total}} fájl betöltve",
-      "filesLoadedOfTotal": "{{count}} / {{total}} fájl betöltve",
+      "fileLoadedCount_one": "{{displayCount}} fájl betöltve",
+      "fileLoadedCount": "{{displayCount}} fájl betöltve",
+      "fileLoadedCount_other": "{{displayCount}} fájl betöltve",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} / {{total}} fájl betöltve",
+      "fileLoadedOfTotalCount": "{{displayCount}} / {{total}} fájl betöltve",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} / {{total}} fájl betöltve",
       "filesStillLoading": "A fájlok még mindig töltődnek. Húzza lefelé a frissítéshez.",
       "goToOverview": "Ugrás az áttekintésre",
       "goToOverviewTab": "Ugrás az Áttekintés fülre"
@@ -288,8 +290,9 @@
       "resolved": "Megoldva",
       "outdated": "Elavult",
       "file": "Fájl",
-      "oneComment": "1 megjegyzés",
-      "commentCount": "{{count}} megjegyzés",
+      "comment_one": "1 megjegyzés",
+      "comment": "{{displayCount}} megjegyzés",
+      "comment_other": "{{displayCount}} megjegyzés",
       "startedRelative": " · kezdve: {{relative}}",
       "couldNotLoadMore": "Nem sikerült betölteni további megjegyzéseket.",
       "retryLoadingMore": "További megjegyzések betöltésének újrapróbálása",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reakciók",
       "addReaction": "Reakció hozzáadása",
       "reactionPill": "{{emoji}} reakció, {{count}} {{countLabel}}",
-      "reactionSingular": "reakció",
-      "reactionPlural": "reakció",
+      "reaction_one": "reakció",
+      "reaction": "reakció",
+      "reaction_other": "reakció",
       "commentActions": "Megjegyzés műveletei",
       "reportContent": "Tartalom jelentése",
       "reportUser": "Felhasználó jelentése",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Ez a megjegyzés eltávolításra kerül az ellenőrzési sorból.",
       "delete": "Törlés",
       "summaryOptional": "Összefoglaló (opcionális)",
-      "pendingCommentSingular": "függőben lévő megjegyzés",
-      "pendingCommentPlural": "függőben lévő megjegyzés",
+      "pendingComment_one": "függőben lévő megjegyzés",
+      "pendingComment": "függőben lévő megjegyzés",
+      "pendingComment_other": "függőben lévő megjegyzés",
       "submitCountOfTotal": "{{freshCount}} / {{totalCount}} megjegyzés elküldése",
       "submitReview": "Ellenőrzés elküldése",
       "partialPostedMessage": "{{freshCount}} megjegyzés elküldve. {{staleCount}} megjegyzés régebbi commithoz kapcsolódik, és a sorban maradt."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Nyitva · Ellenőrzés szükséges",
       "stateOpen": "Nyitva",
       "unknownAuthor": "Ismeretlen szerző",
-      "commitSingular": "commit",
-      "commitPlural": "commit",
-      "fileSingular": "fájl",
-      "filePlural": "fájl"
+      "commit_one": "commit",
+      "commit": "commit",
+      "commit_other": "commit",
+      "file_one": "fájl",
+      "file": "fájl",
+      "file_other": "fájl"
     },
     "pendingComment": {
       "editOutdatedA11y": "Elavult függőben lévő megjegyzés szerkesztése itt: {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Valaki",
-      "oneTyping": "{{name}} gépel...",
-      "manyTyping": "{{names}} gépel..."
+      "typing_one": "{{name}} gépel...",
+      "typing": "{{names}} gépel...",
+      "typing_other": "{{names}} gépel..."
     },
     "botStatus": {
       "online": "Online",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Nem sikerült betölteni a számlázási adatokat",
       "manageOnWeb": "Számlázás kezelése a weben",
       "commitPlan": "Elköteleződés",
-      "daysLeft": "{{count}} nap van hátra",
       "earlybird": "Korai madár",
       "finalCommitTermEndsOn": "Az utolsó Commit-időszakod {{date}}-kor ér véget. Folytasd Standard csomaggal {{price}} áron, vagy a tárhely megszűnik.",
       "freeTrial": "Ingyenes próba",
       "hostingEnds": "A tárhely megszűnik",
-      "oneDayLeft": "1 nap van hátra",
       "renews": "Megújul",
       "standardMonthToMonth": "Standard havidíj",
       "standardStartsOn": "A Standard {{date}}-kor kezdődik {{price}} áron.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} figyelmet igényel: {{label}}",
-      "openUnreadOne": "{{name}} megnyitása, {{count}} olvasatlan üzenet",
-      "openUnreadMany": "{{name}} megnyitása, {{count}} olvasatlan üzenet",
+      "openUnread_one": "{{name}} megnyitása, {{displayCount}} olvasatlan üzenet",
+      "openUnread": "{{name}} megnyitása, {{displayCount}} olvasatlan üzenet",
+      "openUnread_other": "{{name}} megnyitása, {{displayCount}} olvasatlan üzenet",
       "open": "{{name}} megnyitása",
       "openSettings": "Beállítások megnyitása ehhez: {{name}}",
       "fixOnKiloAi": "Javítás a kilo.ai-n: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Engedélyezed az automatikus hibajavítást?",
       "enableAutoRemediationConfirmMessage": "A Security Agent automatikusan hibajavító PR-eket nyit a jogosult, kihasználható megállapításokhoz.",
       "enable": "Engedélyezés",
-      "queuedOne": "{{count}} meglévő észlelés került sorba elemzésre.",
-      "queuedMany": "{{count}} meglévő észlelés került sorba elemzésre.",
+      "queued_one": "{{displayCount}} meglévő észlelés került sorba elemzésre.",
+      "queued": "{{displayCount}} meglévő észlelés került sorba elemzésre.",
+      "queued_other": "{{displayCount}} meglévő észlelés került sorba elemzésre.",
       "severityCriticalOnly": "Csak kritikus",
       "severityHighAndAbove": "Magas és afölötti",
       "severityMediumAndAbove": "Közepes és afölötti",
@@ -1482,8 +1490,9 @@
       "on": "Be",
       "off": "Ki",
       "allRepositories": "Minden adattár",
-      "repositorySelected": "{{count}} adattár kiválasztva",
-      "repositoriesSelected": "{{count}} adattár kiválasztva",
+      "repositoriesCount_one": "{{displayCount}} adattár kiválasztva",
+      "repositoriesCount": "{{displayCount}} adattár kiválasztva",
+      "repositoriesCount_other": "{{displayCount}} adattár kiválasztva",
       "selectRepositories": "Adattárak kiválasztása",
       "selectRepositoriesSubtitle": "Válassza ki, hogy a Security Agent mely adattárakat figyeli",
       "repositories": "Adattárak",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Munkamenet törölve",
       "needsInput": "bemenetet igényel",
       "fromPlatform": "a(z) {{platform}} alkalmazásból",
-      "centOne": "cent",
-      "centOther": "cent",
-      "dollarOne": "dollár",
-      "dollarOther": "dollár"
+      "cent_one": "cent",
+      "cent": "cent",
+      "cent_other": "cent",
+      "dollar_one": "dollár",
+      "dollar": "dollár",
+      "dollar_other": "dollár"
     },
     "githubInstall": {
       "couldNotOpenTitle": "A GitHub megnyitása nem sikerült",
@@ -1817,8 +1828,9 @@
       "discardFailed": "A piszkozat elvetése nem sikerült. Próbálja újra."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} fájl frissítve",
-      "updatedFiles": "{{count}} fájl frissítve"
+      "updatedFileCount_one": "{{displayCount}} fájl frissítve",
+      "updatedFileCount": "{{displayCount}} fájl frissítve",
+      "updatedFileCount_other": "{{displayCount}} fájl frissítve"
     },
     "toolPatch": {
       "operationAdded": "Hozzáadva",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Korábbi üzenetek betöltve",
       "retryHint": "Újra megpróbálja a korábbi üzenetek betöltését ehhez a munkamenethez.",
-      "omittedOne": "Ennek a munkamenetnek egyes korábbi elemei nem jeleníthetők meg.",
-      "omittedMany": "Ennek a munkamenetnek {{count}} korábbi eleme nem jeleníthető meg.",
+      "omitted_one": "Ennek a munkamenetnek egyes korábbi elemei nem jeleníthetők meg.",
+      "omitted": "Ennek a munkamenetnek {{displayCount}} korábbi eleme nem jeleníthető meg.",
+      "omitted_other": "Ennek a munkamenetnek {{displayCount}} korábbi eleme nem jeleníthető meg.",
       "couldNotLoad": "A korábbi üzeneteket nem sikerült betölteni.",
       "unavailable": "A korábbi üzenetek nem érhetők el.",
       "tooLarge": "A korábbi üzenetek túl nagyok a betöltéshez."
@@ -2069,10 +2082,12 @@
       "viewTable": "Táblázat megtekintése",
       "title": "Táblázat",
       "close": "Táblázat bezárása",
-      "column": "oszlop",
-      "columns": "oszlop",
-      "row": "sor",
-      "rows": "sor",
+      "columnCount_one": "oszlop",
+      "columnCount": "oszlop",
+      "columnCount_other": "oszlop",
+      "rowCount_one": "sor",
+      "rowCount": "sor",
+      "rowCount_other": "sor",
       "opensFullScreen": "teljes képernyőn nyílik meg"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "a(z) {{window}} tokenből",
       "tokens": "token",
       "tokensWithPercentage": "token ({{percentage}})",
-      "stepsCountOne": "{{steps}} lépés",
-      "stepsCountMany": "{{steps}} lépés",
+      "stepsCount_one": "{{steps}} lépés",
+      "stepsCount": "{{steps}} lépés",
+      "stepsCount_other": "{{steps}} lépés",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Új kódolási feladat",
     "explore": "Felfedezés",
     "seeAll": "Összes megtekintése",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Jó reggelt",
-    "greetingAfternoon": "Jó napot",
-    "greetingEvening": "Jó estét"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "{{filename}} bezárása",
@@ -2645,8 +2658,9 @@
       "manageHint": "Megnyitja a Kilo Pass kezelést a weben.",
       "notSubscribed": "Nincs előfizetve",
       "overallocated": "A Pass-hozzárendelések meghaladják a fizetett férőhelyeket",
-      "paidSeatOne": "{{count}} fizetett férőhely",
-      "paidSeatOther": "{{count}} fizetett férőhely",
+      "paidSeat_one": "{{displayCount}} fizetett férőhely",
+      "paidSeat": "{{displayCount}} fizetett férőhely",
+      "paidSeat_other": "{{displayCount}} fizetett férőhely",
       "paymentNeedsAttention": "A fizetés figyelmet igényel",
       "paymentPending": "A fizetés függőben",
       "processingBlocked": "A feldolgozás blokkolva",

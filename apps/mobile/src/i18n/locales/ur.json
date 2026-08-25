@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{total}} میں سے {{loaded}} فائلیں لوڈ ہوئیں",
       "loadAllFiles": "تمام فائلیں لوڈ کریں",
       "loadAll": "سب لوڈ کریں",
-      "fileLoaded": "{{count}} فائل لوڈ ہوئی",
-      "filesLoaded": "{{count}} فائلیں لوڈ ہوئیں",
-      "fileLoadedOfTotal": "{{total}} میں سے {{count}} فائل لوڈ ہوئی",
-      "filesLoadedOfTotal": "{{total}} میں سے {{count}} فائلیں لوڈ ہوئیں",
+      "fileLoadedCount_one": "{{displayCount}} فائل لوڈ ہوئی",
+      "fileLoadedCount": "{{displayCount}} فائلیں لوڈ ہوئیں",
+      "fileLoadedCount_other": "{{displayCount}} فائلیں لوڈ ہوئیں",
+      "fileLoadedOfTotalCount_one": "{{total}} میں سے {{displayCount}} فائل لوڈ ہوئی",
+      "fileLoadedOfTotalCount": "{{total}} میں سے {{displayCount}} فائلیں لوڈ ہوئیں",
+      "fileLoadedOfTotalCount_other": "{{total}} میں سے {{displayCount}} فائلیں لوڈ ہوئیں",
       "filesStillLoading": "فائلیں ابھی لوڈ ہو رہی ہیں۔ تازہ کرنے کے لیے نیچے کھینچیں۔",
       "goToOverview": "جائزہ پر جائیں",
       "goToOverviewTab": "جائزہ ٹیب پر جائیں"
@@ -288,8 +290,9 @@
       "resolved": "حل شدہ",
       "outdated": "پرانا",
       "file": "فائل",
-      "oneComment": "1 تبصرہ",
-      "commentCount": "{{count}} تبصرے",
+      "comment_one": "1 تبصرہ",
+      "comment": "{{displayCount}} تبصرے",
+      "comment_other": "{{displayCount}} تبصرے",
       "startedRelative": " · {{relative}} پر شروع ہوا",
       "couldNotLoadMore": "مزید تبصرے لوڈ نہیں ہو سکے۔",
       "retryLoadingMore": "مزید تبصرے لوڈ کرنے کی دوبارہ کوشش کریں",
@@ -299,8 +302,9 @@
       "reactionsTitle": "ردعمل",
       "addReaction": "ردعمل شامل کریں",
       "reactionPill": "{{emoji}} ردعمل، {{count}} {{countLabel}}",
-      "reactionSingular": "ردعمل",
-      "reactionPlural": "ردعمل",
+      "reaction_one": "ردعمل",
+      "reaction": "ردعمل",
+      "reaction_other": "ردعمل",
       "commentActions": "تبصرے کے اعمال",
       "reportContent": "مواد رپورٹ کریں",
       "reportUser": "صارف رپورٹ کریں",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "یہ تبصرہ جائزے کی قطار سے ہٹا دیا جائے گا۔",
       "delete": "حذف کریں",
       "summaryOptional": "خلاصہ (اختیاری)",
-      "pendingCommentSingular": "زیر التوا تبصرہ",
-      "pendingCommentPlural": "زیر التوا تبصرے",
+      "pendingComment_one": "زیر التوا تبصرہ",
+      "pendingComment": "زیر التوا تبصرے",
+      "pendingComment_other": "زیر التوا تبصرے",
       "submitCountOfTotal": "{{totalCount}} میں سے {{freshCount}} تبصرے جمع کریں",
       "submitReview": "جائزہ جمع کریں",
       "partialPostedMessage": "{{freshCount}} تبصرہ(ے) پوسٹ ہوئے۔ {{staleCount}} تبصرہ(ے) پرانی کمیٹ کی طرف اشارہ کرتے ہیں اور آپ کی قطار میں رہے۔"
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "کھلا · جائزہ مطلوبہ",
       "stateOpen": "کھلا",
       "unknownAuthor": "نامعلوم مصنف",
-      "commitSingular": "کمیٹ",
-      "commitPlural": "کمیٹیں",
-      "fileSingular": "فائل",
-      "filePlural": "فائلیں"
+      "commit_one": "کمیٹ",
+      "commit": "کمیٹیں",
+      "commit_other": "کمیٹیں",
+      "file_one": "فائل",
+      "file": "فائلیں",
+      "file_other": "فائلیں"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} پر پرانا زیر التوا تبصرہ ترمیم کریں",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "کوئی",
-      "oneTyping": "{{name}} ٹائپ کر رہا ہے...",
-      "manyTyping": "{{names}} ٹائپ کر رہے ہیں..."
+      "typing_one": "{{name}} ٹائپ کر رہا ہے...",
+      "typing": "{{names}} ٹائپ کر رہے ہیں...",
+      "typing_other": "{{names}} ٹائپ کر رہے ہیں..."
     },
     "botStatus": {
       "online": "آن لائن",
@@ -722,12 +730,10 @@
       "couldNotLoad": "بلنگ کی معلومات لوڈ نہیں ہو سکیں",
       "manageOnWeb": "ویب پر بلنگ منظم کریں",
       "commitPlan": "کمٹ",
-      "daysLeft": "{{count}} دن باقی",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "آپ کی آخری Commit مدت {{date}} کو ختم ہوتی ہے۔ {{price}} پر Standard جاری رکھیں، ورنہ ہوسٹنگ ختم ہو جائے گی۔",
       "freeTrial": "مفت آزمائش",
       "hostingEnds": "ہوسٹنگ ختم",
-      "oneDayLeft": "1 دن باقی",
       "renews": "تجدید",
       "standardMonthToMonth": "معیاری ماہانہ",
       "standardStartsOn": "Standard {{date}} کو {{price}} پر شروع ہوتا ہے۔",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} کو توجہ درکار ہے: {{label}}",
-      "openUnreadOne": "{{name}} کھولیں، {{count}} غیر پڑھا پیغام",
-      "openUnreadMany": "{{name}} کھولیں، {{count}} غیر پڑھے پیغامات",
+      "openUnread_one": "{{name}} کھولیں، {{displayCount}} غیر پڑھا پیغام",
+      "openUnread": "{{name}} کھولیں، {{displayCount}} غیر پڑھے پیغامات",
+      "openUnread_other": "{{name}} کھولیں، {{displayCount}} غیر پڑھے پیغامات",
       "open": "{{name}} کھولیں",
       "openSettings": "{{name}} کی ترتیبات کھولیں",
       "fixOnKiloAi": "kilo.ai پر درست کریں: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "آٹو اصلاح فعال کریں؟",
       "enableAutoRemediationConfirmMessage": "سیکیورٹی ایجنٹ اہل استعمال کے قابل نتائج کے لیے خود بخود اصلاحی PRs کھولے گا۔",
       "enable": "فعال کریں",
-      "queuedOne": "{{count}} موجودہ نتیجہ تجزیہ کے لیے قطار میں شامل کیا گیا۔",
-      "queuedMany": "{{count}} موجودہ نتائج تجزیہ کے لیے قطار میں شامل کیے گئے۔",
+      "queued_one": "{{displayCount}} موجودہ نتیجہ تجزیہ کے لیے قطار میں شامل کیا گیا۔",
+      "queued": "{{displayCount}} موجودہ نتائج تجزیہ کے لیے قطار میں شامل کیے گئے۔",
+      "queued_other": "{{displayCount}} موجودہ نتائج تجزیہ کے لیے قطار میں شامل کیے گئے۔",
       "severityCriticalOnly": "صرف نازک",
       "severityHighAndAbove": "اعلیٰ اور اس سے اوپر",
       "severityMediumAndAbove": "درمیانی اور اس سے اوپر",
@@ -1482,8 +1490,9 @@
       "on": "آن",
       "off": "آف",
       "allRepositories": "تمام ریپوزٹریز",
-      "repositorySelected": "{{count}} ریپوزٹری منتخب",
-      "repositoriesSelected": "{{count}} ریپوزٹریز منتخب",
+      "repositoriesCount_one": "{{displayCount}} ریپوزٹری منتخب",
+      "repositoriesCount": "{{displayCount}} ریپوزٹریز منتخب",
+      "repositoriesCount_other": "{{displayCount}} ریپوزٹریز منتخب",
       "selectRepositories": "ریپوزٹریز منتخب کریں",
       "selectRepositoriesSubtitle": "منتخب کریں کہ سکیورٹی ایجنٹ کون سی ریپوزٹریز کی نگرانی کرتا ہے",
       "repositories": "ریپوزٹریز",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "سیشن حذف ہو گیا",
       "needsInput": "ان پٹ درکار",
       "fromPlatform": "{{platform}} سے",
-      "centOne": "سینٹ",
-      "centOther": "سینٹ",
-      "dollarOne": "ڈالر",
-      "dollarOther": "ڈالر"
+      "cent_one": "سینٹ",
+      "cent": "سینٹ",
+      "cent_other": "سینٹ",
+      "dollar_one": "ڈالر",
+      "dollar": "ڈالر",
+      "dollar_other": "ڈالر"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub نہیں کھل سکا",
@@ -1817,8 +1828,9 @@
       "discardFailed": "ڈرافٹ خارج نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔"
     },
     "partRenderer": {
-      "updatedFile": "{{count}} فائل اپ ڈیٹ ہوئی",
-      "updatedFiles": "{{count}} فائلیں اپ ڈیٹ ہوئیں"
+      "updatedFileCount_one": "{{displayCount}} فائل اپ ڈیٹ ہوئی",
+      "updatedFileCount": "{{displayCount}} فائلیں اپ ڈیٹ ہوئیں",
+      "updatedFileCount_other": "{{displayCount}} فائلیں اپ ڈیٹ ہوئیں"
     },
     "toolPatch": {
       "operationAdded": "شامل کیا گیا",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "پہلے کے پیغامات لوڈ ہو گئے",
       "retryHint": "اس سیشن کے لیے پرانے پیغامات کی لوڈنگ دوبارہ کرتا ہے۔",
-      "omittedOne": "اس سیشن کی کچھ پہلے کی اشیاء ظاہر نہیں ہو سکیں۔",
-      "omittedMany": "اس سیشن کی {{count}} پہلے کی اشیاء ظاہر نہیں ہو سکیں۔",
+      "omitted_one": "اس سیشن کی کچھ پہلے کی اشیاء ظاہر نہیں ہو سکیں۔",
+      "omitted": "اس سیشن کی {{displayCount}} پہلے کی اشیاء ظاہر نہیں ہو سکیں۔",
+      "omitted_other": "اس سیشن کی {{displayCount}} پہلے کی اشیاء ظاہر نہیں ہو سکیں۔",
       "couldNotLoad": "پہلے کے پیغامات لوڈ نہیں ہو سکے۔",
       "unavailable": "پہلے کے پیغامات دستیاب نہیں ہیں۔",
       "tooLarge": "پہلے کے پیغامات لوڈ کرنے کے لیے بہت بڑے ہیں۔"
@@ -2069,10 +2082,12 @@
       "viewTable": "ٹیبل دیکھیں",
       "title": "ٹیبل",
       "close": "ٹیبل بند کریں",
-      "column": "کالم",
-      "columns": "کالمز",
-      "row": "قطار",
-      "rows": "قطاریں",
+      "columnCount_one": "کالم",
+      "columnCount": "کالمز",
+      "columnCount_other": "کالمز",
+      "rowCount_one": "قطار",
+      "rowCount": "قطاریں",
+      "rowCount_other": "قطاریں",
       "opensFullScreen": "مکمل اسکرین کھولتا ہے"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} ٹوکنز میں سے",
       "tokens": "ٹوکنز",
       "tokensWithPercentage": "ٹوکنز ({{percentage}})",
-      "stepsCountOne": "{{steps}} قدم",
-      "stepsCountMany": "{{steps}} قدم",
+      "stepsCount_one": "{{steps}} قدم",
+      "stepsCount": "{{steps}} قدم",
+      "stepsCount_other": "{{steps}} قدم",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "نیا کوڈنگ کام",
     "explore": "دریافت کریں",
     "seeAll": "سب دیکھیں",
-    "kiloAgents": "Kilo ایجنٹس",
-    "greetingMorning": "صبح بخیر",
-    "greetingAfternoon": "دوپہر بخیر",
-    "greetingEvening": "شام بخیر"
+    "kiloAgents": "Kilo ایجنٹس"
   },
   "imageViewer": {
     "close": "{{filename}} بند کریں",
@@ -2645,8 +2658,9 @@
       "manageHint": "ویب پر Kilo Pass انتظام کھولتا ہے۔",
       "notSubscribed": "سبسکرائب نہیں",
       "overallocated": "پاس کی تفویض ادا شدہ سیٹوں سے زیادہ",
-      "paidSeatOne": "{{count}} ادا شدہ سیٹ",
-      "paidSeatOther": "{{count}} ادا شدہ سیٹیں",
+      "paidSeat_one": "{{displayCount}} ادا شدہ سیٹ",
+      "paidSeat": "{{displayCount}} ادا شدہ سیٹیں",
+      "paidSeat_other": "{{displayCount}} ادا شدہ سیٹیں",
       "paymentNeedsAttention": "ادائیگی کو توجہ کی ضرورت ہے",
       "paymentPending": "ادائیگی زیر التوا",
       "processingBlocked": "پروسیسنگ مسدود",

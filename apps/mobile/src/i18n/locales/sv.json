@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} av {{total}} filer inlästa",
       "loadAllFiles": "Läs in alla filer",
       "loadAll": "Läs in allt",
-      "fileLoaded": "{{count}} fil inläst",
-      "filesLoaded": "{{count}} filer inlästa",
-      "fileLoadedOfTotal": "{{count}} fil inläst av {{total}}",
-      "filesLoadedOfTotal": "{{count}} filer inlästa av {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} fil inläst",
+      "fileLoadedCount": "{{displayCount}} filer inlästa",
+      "fileLoadedCount_other": "{{displayCount}} filer inlästa",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} fil inläst av {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} filer inlästa av {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} filer inlästa av {{total}}",
       "filesStillLoading": "Filer läses fortfarande in. Dra nedåt för att uppdatera.",
       "goToOverview": "Gå till översikt",
       "goToOverviewTab": "Gå till översiktsfliken"
@@ -288,8 +290,9 @@
       "resolved": "Löst",
       "outdated": "Föråldrad",
       "file": "Fil",
-      "oneComment": "1 kommentar",
-      "commentCount": "{{count}} kommentarer",
+      "comment_one": "1 kommentar",
+      "comment": "{{displayCount}} kommentarer",
+      "comment_other": "{{displayCount}} kommentarer",
       "startedRelative": " · startade {{relative}}",
       "couldNotLoadMore": "Kunde inte läsa in fler kommentarer.",
       "retryLoadingMore": "Försök läsa in fler kommentarer igen",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reaktioner",
       "addReaction": "Lägg till reaktion",
       "reactionPill": "{{emoji}}-reaktion, {{count}} {{countLabel}}",
-      "reactionSingular": "reaktion",
-      "reactionPlural": "reaktioner",
+      "reaction_one": "reaktion",
+      "reaction": "reaktioner",
+      "reaction_other": "reaktioner",
       "commentActions": "Kommentaråtgärder",
       "reportContent": "Rapportera innehåll",
       "reportUser": "Rapportera användare",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Den här kommentaren tas bort från granskningskön.",
       "delete": "Ta bort",
       "summaryOptional": "Sammanfattning (valfritt)",
-      "pendingCommentSingular": "väntande kommentar",
-      "pendingCommentPlural": "väntande kommentarer",
+      "pendingComment_one": "väntande kommentar",
+      "pendingComment": "väntande kommentarer",
+      "pendingComment_other": "väntande kommentarer",
       "submitCountOfTotal": "Skicka {{freshCount}} av {{totalCount}} kommentarer",
       "submitReview": "Skicka granskning",
       "partialPostedMessage": "Skickade {{freshCount}} kommentar(er). {{staleCount}} kommentar(er) pekar på en äldre commit och blev kvar i kön."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Öppen · Granskning krävs",
       "stateOpen": "Öppen",
       "unknownAuthor": "Okänd författare",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "fil",
-      "filePlural": "filer"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "fil",
+      "file": "filer",
+      "file_other": "filer"
     },
     "pendingComment": {
       "editOutdatedA11y": "Redigera föråldrad väntande kommentar på {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Någon",
-      "oneTyping": "{{name}} skriver…",
-      "manyTyping": "{{names}} skriver…"
+      "typing_one": "{{name}} skriver…",
+      "typing": "{{names}} skriver…",
+      "typing_other": "{{names}} skriver…"
     },
     "botStatus": {
       "online": "Online",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Kunde inte läsa in faktureringsinformation",
       "manageOnWeb": "Hantera fakturering på webben",
       "commitPlan": "Förbinda",
-      "daysLeft": "{{count}} dagar kvar",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Din sista Commit-period slutar {{date}}. Fortsätt som Standard till {{price}}, annars upphör värdtjänsten.",
       "freeTrial": "Gratis provperiod",
       "hostingEnds": "Värdtjänsten upphör",
-      "oneDayLeft": "1 dag kvar",
       "renews": "Förnyas",
       "standardMonthToMonth": "Standard månadsvis",
       "standardStartsOn": "Standard börjar {{date}} till {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} kräver uppmärksamhet: {{label}}",
-      "openUnreadOne": "Öppna {{name}}, {{count}} oläst meddelande",
-      "openUnreadMany": "Öppna {{name}}, {{count}} olästa meddelanden",
+      "openUnread_one": "Öppna {{name}}, {{displayCount}} oläst meddelande",
+      "openUnread": "Öppna {{name}}, {{displayCount}} olästa meddelanden",
+      "openUnread_other": "Öppna {{name}}, {{displayCount}} olästa meddelanden",
       "open": "Öppna {{name}}",
       "openSettings": "Öppna inställningar för {{name}}",
       "fixOnKiloAi": "Åtgärda på kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Aktivera automatisk åtgärd?",
       "enableAutoRemediationConfirmMessage": "Säkerhetsagenten öppnar åtgärds-PR:er automatiskt för kvalificerade utnyttjningsbara fynd.",
       "enable": "Aktivera",
-      "queuedOne": "{{count}} befintlig finding köad för analys.",
-      "queuedMany": "{{count}} befintliga findings köade för analys.",
+      "queued_one": "{{displayCount}} befintlig finding köad för analys.",
+      "queued": "{{displayCount}} befintliga findings köade för analys.",
+      "queued_other": "{{displayCount}} befintliga findings köade för analys.",
       "severityCriticalOnly": "Endast kritiska",
       "severityHighAndAbove": "Hög och över",
       "severityMediumAndAbove": "Medel och över",
@@ -1482,8 +1490,9 @@
       "on": "På",
       "off": "Av",
       "allRepositories": "Alla arkiv",
-      "repositorySelected": "{{count}} arkiv valt",
-      "repositoriesSelected": "{{count}} arkiv valda",
+      "repositoriesCount_one": "{{displayCount}} arkiv valt",
+      "repositoriesCount": "{{displayCount}} arkiv valda",
+      "repositoriesCount_other": "{{displayCount}} arkiv valda",
       "selectRepositories": "Välj arkiv",
       "selectRepositoriesSubtitle": "Välj vilka arkiv Security Agent övervakar",
       "repositories": "Arkiv",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Session borttagen",
       "needsInput": "kräver indata",
       "fromPlatform": "från {{platform}}",
-      "centOne": "cent",
-      "centOther": "cent",
-      "dollarOne": "dollar",
-      "dollarOther": "dollar"
+      "cent_one": "cent",
+      "cent": "cent",
+      "cent_other": "cent",
+      "dollar_one": "dollar",
+      "dollar": "dollar",
+      "dollar_other": "dollar"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunde inte öppna GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Kunde inte ignorera utkastet. Försök igen."
     },
     "partRenderer": {
-      "updatedFile": "Uppdaterade {{count}} fil",
-      "updatedFiles": "Uppdaterade {{count}} filer"
+      "updatedFileCount_one": "Uppdaterade {{displayCount}} fil",
+      "updatedFileCount": "Uppdaterade {{displayCount}} filer",
+      "updatedFileCount_other": "Uppdaterade {{displayCount}} filer"
     },
     "toolPatch": {
       "operationAdded": "Tillagd",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Tidigare meddelanden lästes in",
       "retryHint": "Försöker igen att läsa in tidigare meddelanden för denna session.",
-      "omittedOne": "Vissa tidigare objekt från denna session kunde inte visas.",
-      "omittedMany": "{{count}} tidigare objekt från denna session kunde inte visas.",
+      "omitted_one": "Vissa tidigare objekt från denna session kunde inte visas.",
+      "omitted": "{{displayCount}} tidigare objekt från denna session kunde inte visas.",
+      "omitted_other": "{{displayCount}} tidigare objekt från denna session kunde inte visas.",
       "couldNotLoad": "Det gick inte att läsa in tidigare meddelanden.",
       "unavailable": "Tidigare meddelanden är inte tillgängliga.",
       "tooLarge": "Tidigare meddelanden är för stora för att läsas in."
@@ -2069,10 +2082,12 @@
       "viewTable": "Visa tabell",
       "title": "Tabell",
       "close": "Stäng tabell",
-      "column": "kolumn",
-      "columns": "kolumner",
-      "row": "rad",
-      "rows": "rader",
+      "columnCount_one": "kolumn",
+      "columnCount": "kolumner",
+      "columnCount_other": "kolumner",
+      "rowCount_one": "rad",
+      "rowCount": "rader",
+      "rowCount_other": "rader",
       "opensFullScreen": "öppnar helskärm"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "av {{window}} token",
       "tokens": "token",
       "tokensWithPercentage": "token ({{percentage}})",
-      "stepsCountOne": "{{steps}} steg",
-      "stepsCountMany": "{{steps}} steg",
+      "stepsCount_one": "{{steps}} steg",
+      "stepsCount": "{{steps}} steg",
+      "stepsCount_other": "{{steps}} steg",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Ny kodningsuppgift",
     "explore": "Utforska",
     "seeAll": "Visa alla",
-    "kiloAgents": "Kilo-agenter",
-    "greetingMorning": "God morgon",
-    "greetingAfternoon": "God eftermiddag",
-    "greetingEvening": "God kväll"
+    "kiloAgents": "Kilo-agenter"
   },
   "imageViewer": {
     "close": "Stäng {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Öppnar Kilo Pass-hanteringen på webben.",
       "notSubscribed": "Inte prenumererad",
       "overallocated": "Pass-tilldelningar överstiger betalda platser",
-      "paidSeatOne": "{{count}} betald plats",
-      "paidSeatOther": "{{count}} betalda platser",
+      "paidSeat_one": "{{displayCount}} betald plats",
+      "paidSeat": "{{displayCount}} betalda platser",
+      "paidSeat_other": "{{displayCount}} betalda platser",
       "paymentNeedsAttention": "Betalningen kräver uppmärksamhet",
       "paymentPending": "Betalningen väntar",
       "processingBlocked": "Bearbetningen blockerad",

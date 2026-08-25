@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} de {{total}} ficheiros carregados",
       "loadAllFiles": "Carregar todos os ficheiros",
       "loadAll": "Carregar tudo",
-      "fileLoaded": "{{count}} ficheiro carregado",
-      "filesLoaded": "{{count}} ficheiros carregados",
-      "fileLoadedOfTotal": "{{count}} ficheiro carregado de {{total}}",
-      "filesLoadedOfTotal": "{{count}} ficheiros carregados de {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} ficheiro carregado",
+      "fileLoadedCount": "{{displayCount}} ficheiros carregados",
+      "fileLoadedCount_other": "{{displayCount}} ficheiros carregados",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} ficheiro carregado de {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} ficheiros carregados de {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} ficheiros carregados de {{total}}",
       "filesStillLoading": "Os ficheiros ainda estão a carregar. Deslize para baixo para atualizar.",
       "goToOverview": "Ir para a Visão Geral",
       "goToOverviewTab": "Ir para o separador Visão Geral"
@@ -288,8 +290,9 @@
       "resolved": "Resolvida",
       "outdated": "Desatualizada",
       "file": "Ficheiro",
-      "oneComment": "1 comentário",
-      "commentCount": "{{count}} comentários",
+      "comment_one": "1 comentário",
+      "comment": "{{displayCount}} comentários",
+      "comment_other": "{{displayCount}} comentários",
       "startedRelative": " · iniciada {{relative}}",
       "couldNotLoadMore": "Não foi possível carregar mais comentários.",
       "retryLoadingMore": "Tentar carregar mais comentários novamente",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reações",
       "addReaction": "Adicionar reação",
       "reactionPill": "{{emoji}} reação, {{count}} {{countLabel}}",
-      "reactionSingular": "reação",
-      "reactionPlural": "reações",
+      "reaction_one": "reação",
+      "reaction": "reações",
+      "reaction_other": "reações",
       "commentActions": "Ações do comentário",
       "reportContent": "Denunciar conteúdo",
       "reportUser": "Denunciar utilizador",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Este comentário será removido da fila de revisão.",
       "delete": "Eliminar",
       "summaryOptional": "Resumo (opcional)",
-      "pendingCommentSingular": "comentário pendente",
-      "pendingCommentPlural": "comentários pendentes",
+      "pendingComment_one": "comentário pendente",
+      "pendingComment": "comentários pendentes",
+      "pendingComment_other": "comentários pendentes",
       "submitCountOfTotal": "Enviar {{freshCount}} de {{totalCount}} comentários",
       "submitReview": "Enviar revisão",
       "partialPostedMessage": "{{freshCount}} comentário(s) enviado(s). {{staleCount}} comentário(s) apontam para um commit mais antigo e ficaram na sua fila."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Aberto · Revisão obrigatória",
       "stateOpen": "Aberto",
       "unknownAuthor": "Autor desconhecido",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "ficheiro",
-      "filePlural": "ficheiros"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "ficheiro",
+      "file": "ficheiros",
+      "file_other": "ficheiros"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editar comentário pendente desatualizado em {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Alguém",
-      "oneTyping": "{{name}} está a escrever...",
-      "manyTyping": "{{names}} estão a escrever..."
+      "typing_one": "{{name}} está a escrever...",
+      "typing": "{{names}} estão a escrever...",
+      "typing_other": "{{names}} estão a escrever..."
     },
     "botStatus": {
       "online": "Online",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Não foi possível carregar as informações de faturação",
       "manageOnWeb": "Gerir faturação na web",
       "commitPlan": "Comprometer",
-      "daysLeft": "Faltam {{count}} dias",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "O seu prazo final de Commit termina em {{date}}. Continue como Standard por {{price}}, ou o alojamento termina.",
       "freeTrial": "Teste gratuito",
       "hostingEnds": "O alojamento termina",
-      "oneDayLeft": "Falta 1 dia",
       "renews": "Renova",
       "standardMonthToMonth": "Standard mês a mês",
       "standardStartsOn": "O Standard começa em {{date}} por {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} necessita de atenção: {{label}}",
-      "openUnreadOne": "Abrir {{name}}, {{count}} mensagem não lida",
-      "openUnreadMany": "Abrir {{name}}, {{count}} mensagens não lidas",
+      "openUnread_one": "Abrir {{name}}, {{displayCount}} mensagem não lida",
+      "openUnread": "Abrir {{name}}, {{displayCount}} mensagens não lidas",
+      "openUnread_other": "Abrir {{name}}, {{displayCount}} mensagens não lidas",
       "open": "Abrir {{name}}",
       "openSettings": "Abrir as definições de {{name}}",
       "fixOnKiloAi": "Corrigir em kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Ativar a correção automática?",
       "enableAutoRemediationConfirmMessage": "O Agente de Segurança abrirá automaticamente PRs de correção para descobertas exploráveis elegíveis.",
       "enable": "Ativar",
-      "queuedOne": "{{count}} ocorrência existente em fila para análise.",
-      "queuedMany": "{{count}} ocorrências existentes em fila para análise.",
+      "queued_one": "{{displayCount}} ocorrência existente em fila para análise.",
+      "queued": "{{displayCount}} ocorrências existentes em fila para análise.",
+      "queued_other": "{{displayCount}} ocorrências existentes em fila para análise.",
       "severityCriticalOnly": "Apenas críticas",
       "severityHighAndAbove": "Alta e acima",
       "severityMediumAndAbove": "Média e acima",
@@ -1482,8 +1490,9 @@
       "on": "Ligado",
       "off": "Desligado",
       "allRepositories": "Todos os repositórios",
-      "repositorySelected": "{{count}} repositório selecionado",
-      "repositoriesSelected": "{{count}} repositórios selecionados",
+      "repositoriesCount_one": "{{displayCount}} repositório selecionado",
+      "repositoriesCount": "{{displayCount}} repositórios selecionados",
+      "repositoriesCount_other": "{{displayCount}} repositórios selecionados",
       "selectRepositories": "Selecionar repositórios",
       "selectRepositoriesSubtitle": "Escolha quais os repositórios que o Security Agent monitoriza",
       "repositories": "Repositórios",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Sessão eliminada",
       "needsInput": "requer entrada",
       "fromPlatform": "de {{platform}}",
-      "centOne": "cêntimo",
-      "centOther": "cêntimos",
-      "dollarOne": "dólar",
-      "dollarOther": "dólares"
+      "cent_one": "cêntimo",
+      "cent": "cêntimos",
+      "cent_other": "cêntimos",
+      "dollar_one": "dólar",
+      "dollar": "dólares",
+      "dollar_other": "dólares"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Não foi possível abrir o GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Não foi possível descartar o rascunho. Tente novamente."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} ficheiro atualizado",
-      "updatedFiles": "{{count}} ficheiros atualizados"
+      "updatedFileCount_one": "{{displayCount}} ficheiro atualizado",
+      "updatedFileCount": "{{displayCount}} ficheiros atualizados",
+      "updatedFileCount_other": "{{displayCount}} ficheiros atualizados"
     },
     "toolPatch": {
       "operationAdded": "Adicionado",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Mensagens anteriores carregadas",
       "retryHint": "Volta a tentar carregar as mensagens anteriores desta sessão.",
-      "omittedOne": "Alguns itens anteriores desta sessão não puderam ser apresentados.",
-      "omittedMany": "{{count}} itens anteriores desta sessão não puderam ser apresentados.",
+      "omitted_one": "Alguns itens anteriores desta sessão não puderam ser apresentados.",
+      "omitted": "{{displayCount}} itens anteriores desta sessão não puderam ser apresentados.",
+      "omitted_other": "{{displayCount}} itens anteriores desta sessão não puderam ser apresentados.",
       "couldNotLoad": "Não foi possível carregar as mensagens anteriores.",
       "unavailable": "As mensagens anteriores não estão disponíveis.",
       "tooLarge": "As mensagens anteriores são demasiado grandes para carregar."
@@ -2069,10 +2082,12 @@
       "viewTable": "Ver tabela",
       "title": "Tabela",
       "close": "Fechar tabela",
-      "column": "coluna",
-      "columns": "colunas",
-      "row": "linha",
-      "rows": "linhas",
+      "columnCount_one": "coluna",
+      "columnCount": "colunas",
+      "columnCount_other": "colunas",
+      "rowCount_one": "linha",
+      "rowCount": "linhas",
+      "rowCount_other": "linhas",
       "opensFullScreen": "abre em ecrã inteiro"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "de {{window}} tokens",
       "tokens": "tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
-      "stepsCountOne": "{{steps}} passo",
-      "stepsCountMany": "{{steps}} passos",
+      "stepsCount_one": "{{steps}} passo",
+      "stepsCount": "{{steps}} passos",
+      "stepsCount_other": "{{steps}} passos",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Nova tarefa de programação",
     "explore": "Explorar",
     "seeAll": "Ver tudo",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Bom dia",
-    "greetingAfternoon": "Boa tarde",
-    "greetingEvening": "Boa noite"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Fechar {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Abre a gestão do Kilo Pass na web.",
       "notSubscribed": "Sem subscrição",
       "overallocated": "As atribuições de Pass excedem os lugares pagos",
-      "paidSeatOne": "{{count}} lugar pago",
-      "paidSeatOther": "{{count}} lugares pagos",
+      "paidSeat_one": "{{displayCount}} lugar pago",
+      "paidSeat": "{{displayCount}} lugares pagos",
+      "paidSeat_other": "{{displayCount}} lugares pagos",
       "paymentNeedsAttention": "O pagamento requer atenção",
       "paymentPending": "Pagamento pendente",
       "processingBlocked": "Processamento bloqueado",

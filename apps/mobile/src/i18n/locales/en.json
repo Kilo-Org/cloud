@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} of {{total}} files loaded",
       "loadAllFiles": "Load all files",
       "loadAll": "Load all",
-      "fileLoaded": "{{count}} file loaded",
-      "filesLoaded": "{{count}} files loaded",
-      "fileLoadedOfTotal": "{{count}} file loaded of {{total}}",
-      "filesLoadedOfTotal": "{{count}} files loaded of {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} file loaded",
+      "fileLoadedCount": "{{displayCount}} files loaded",
+      "fileLoadedCount_other": "{{displayCount}} files loaded",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} file loaded of {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} files loaded of {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} files loaded of {{total}}",
       "filesStillLoading": "Files are still loading. Pull to refresh.",
       "goToOverview": "Go to Overview",
       "goToOverviewTab": "Go to Overview tab"
@@ -288,8 +290,9 @@
       "resolved": "Resolved",
       "outdated": "Outdated",
       "file": "File",
-      "oneComment": "1 comment",
-      "commentCount": "{{count}} comments",
+      "comment_one": "1 comment",
+      "comment": "{{displayCount}} comments",
+      "comment_other": "{{displayCount}} comments",
       "startedRelative": " · started {{relative}}",
       "couldNotLoadMore": "Could not load more comments.",
       "retryLoadingMore": "Retry loading more comments",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reactions",
       "addReaction": "Add reaction",
       "reactionPill": "{{emoji}} reaction, {{count}} {{countLabel}}",
-      "reactionSingular": "reaction",
-      "reactionPlural": "reactions",
+      "reaction_one": "reaction",
+      "reaction": "reactions",
+      "reaction_other": "reactions",
       "commentActions": "Comment actions",
       "reportContent": "Report content",
       "reportUser": "Report user",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "This comment will be removed from the review queue.",
       "delete": "Delete",
       "summaryOptional": "Summary (optional)",
-      "pendingCommentSingular": "pending comment",
-      "pendingCommentPlural": "pending comments",
+      "pendingComment_one": "pending comment",
+      "pendingComment": "pending comments",
+      "pendingComment_other": "pending comments",
       "submitCountOfTotal": "Submit {{freshCount}} of {{totalCount}} comments",
       "submitReview": "Submit review",
       "partialPostedMessage": "Posted {{freshCount}} comment(s). {{staleCount}} comment(s) point at an older commit and stayed in your queue."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Open · Review required",
       "stateOpen": "Open",
       "unknownAuthor": "Unknown author",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "file",
-      "filePlural": "files"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "file",
+      "file": "files",
+      "file_other": "files"
     },
     "pendingComment": {
       "editOutdatedA11y": "Edit outdated pending comment on {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Someone",
-      "oneTyping": "{{name}} is typing...",
-      "manyTyping": "{{names}} are typing..."
+      "typing_one": "{{name}} is typing...",
+      "typing": "{{names}} are typing...",
+      "typing_other": "{{names}} are typing..."
     },
     "botStatus": {
       "online": "Online",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Could not load billing information",
       "manageOnWeb": "Manage Billing on Web",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} days left",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Your final Commit term ends on {{date}}. Continue as Standard at {{price}}, or hosting ends.",
       "freeTrial": "Free Trial",
       "hostingEnds": "Hosting ends",
-      "oneDayLeft": "1 day left",
       "renews": "Renews",
       "standardMonthToMonth": "Standard month-to-month",
       "standardStartsOn": "Standard starts on {{date}} at {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} needs attention: {{label}}",
-      "openUnreadOne": "Open {{name}}, {{count}} unread message",
-      "openUnreadMany": "Open {{name}}, {{count}} unread messages",
+      "openUnread_one": "Open {{name}}, {{displayCount}} unread message",
+      "openUnread": "Open {{name}}, {{displayCount}} unread messages",
+      "openUnread_other": "Open {{name}}, {{displayCount}} unread messages",
       "open": "Open {{name}}",
       "openSettings": "Open settings for {{name}}",
       "fixOnKiloAi": "Fix on kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Enable auto-remediation?",
       "enableAutoRemediationConfirmMessage": "Security Agent will open remediation PRs automatically for eligible exploitable findings.",
       "enable": "Enable",
-      "queuedOne": "{{count}} existing finding queued for analysis.",
-      "queuedMany": "{{count}} existing findings queued for analysis.",
+      "queued_one": "{{displayCount}} existing finding queued for analysis.",
+      "queued": "{{displayCount}} existing findings queued for analysis.",
+      "queued_other": "{{displayCount}} existing findings queued for analysis.",
       "severityCriticalOnly": "Critical only",
       "severityHighAndAbove": "High and above",
       "severityMediumAndAbove": "Medium and above",
@@ -1482,8 +1490,9 @@
       "on": "On",
       "off": "Off",
       "allRepositories": "All repositories",
-      "repositorySelected": "{{count}} repository selected",
-      "repositoriesSelected": "{{count}} repositories selected",
+      "repositoriesCount_one": "{{displayCount}} repository selected",
+      "repositoriesCount": "{{displayCount}} repositories selected",
+      "repositoriesCount_other": "{{displayCount}} repositories selected",
       "selectRepositories": "Select repositories",
       "selectRepositoriesSubtitle": "Choose which repositories Security Agent monitors",
       "repositories": "Repositories",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Session deleted",
       "needsInput": "needs input",
       "fromPlatform": "from {{platform}}",
-      "centOne": "cent",
-      "centOther": "cents",
-      "dollarOne": "dollar",
-      "dollarOther": "dollars"
+      "cent_one": "cent",
+      "cent": "cents",
+      "cent_other": "cents",
+      "dollar_one": "dollar",
+      "dollar": "dollars",
+      "dollar_other": "dollars"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Could not open GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Could not discard the draft. Please try again."
     },
     "partRenderer": {
-      "updatedFile": "Updated {{count}} file",
-      "updatedFiles": "Updated {{count}} files"
+      "updatedFileCount_one": "Updated {{displayCount}} file",
+      "updatedFileCount": "Updated {{displayCount}} files",
+      "updatedFileCount_other": "Updated {{displayCount}} files"
     },
     "toolPatch": {
       "operationAdded": "Added",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Earlier messages loaded",
       "retryHint": "Reattempts the older-messages load for this session.",
-      "omittedOne": "Some earlier items from this session could not be displayed.",
-      "omittedMany": "{{count}} earlier items from this session could not be displayed.",
+      "omitted_one": "Some earlier items from this session could not be displayed.",
+      "omitted": "{{displayCount}} earlier items from this session could not be displayed.",
+      "omitted_other": "{{displayCount}} earlier items from this session could not be displayed.",
       "couldNotLoad": "Couldn't load earlier messages.",
       "unavailable": "Earlier messages aren't available.",
       "tooLarge": "Earlier messages are too large to load."
@@ -2069,10 +2082,12 @@
       "viewTable": "View table",
       "title": "Table",
       "close": "Close table",
-      "column": "column",
-      "columns": "columns",
-      "row": "row",
-      "rows": "rows",
+      "columnCount_one": "column",
+      "columnCount": "columns",
+      "columnCount_other": "columns",
+      "rowCount_one": "row",
+      "rowCount": "rows",
+      "rowCount_other": "rows",
       "opensFullScreen": "opens full screen"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "of {{window}} tokens",
       "tokens": "tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
-      "stepsCountOne": "{{steps}} step",
-      "stepsCountMany": "{{steps}} steps",
+      "stepsCount_one": "{{steps}} step",
+      "stepsCount": "{{steps}} steps",
+      "stepsCount_other": "{{steps}} steps",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "New coding task",
     "explore": "Explore",
     "seeAll": "See all",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Good morning",
-    "greetingAfternoon": "Good afternoon",
-    "greetingEvening": "Good evening"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Close {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Opens Kilo Pass management on web.",
       "notSubscribed": "Not subscribed",
       "overallocated": "Pass assignments exceed paid seats",
-      "paidSeatOne": "{{count}} paid seat",
-      "paidSeatOther": "{{count}} paid seats",
+      "paidSeat_one": "{{displayCount}} paid seat",
+      "paidSeat": "{{displayCount}} paid seats",
+      "paidSeat_other": "{{displayCount}} paid seats",
       "paymentNeedsAttention": "Payment needs attention",
       "paymentPending": "Payment pending",
       "processingBlocked": "Processing blocked",

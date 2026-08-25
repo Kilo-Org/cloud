@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "โหลดไฟล์แล้ว {{loaded}} จาก {{total}}",
       "loadAllFiles": "โหลดไฟล์ทั้งหมด",
       "loadAll": "โหลดทั้งหมด",
-      "fileLoaded": "โหลด {{count}} ไฟล์แล้ว",
-      "filesLoaded": "โหลด {{count}} ไฟล์แล้ว",
-      "fileLoadedOfTotal": "โหลด {{count}} ไฟล์จาก {{total}}",
-      "filesLoadedOfTotal": "โหลด {{count}} ไฟล์จาก {{total}}",
+      "fileLoadedCount_one": "โหลด {{displayCount}} ไฟล์แล้ว",
+      "fileLoadedCount": "โหลด {{displayCount}} ไฟล์แล้ว",
+      "fileLoadedCount_other": "โหลด {{displayCount}} ไฟล์แล้ว",
+      "fileLoadedOfTotalCount_one": "โหลด {{displayCount}} ไฟล์จาก {{total}}",
+      "fileLoadedOfTotalCount": "โหลด {{displayCount}} ไฟล์จาก {{total}}",
+      "fileLoadedOfTotalCount_other": "โหลด {{displayCount}} ไฟล์จาก {{total}}",
       "filesStillLoading": "ไฟล์ยังโหลดอยู่ ดึงลงเพื่อรีเฟรช",
       "goToOverview": "ไปที่ภาพรวม",
       "goToOverviewTab": "ไปที่แท็บภาพรวม"
@@ -288,8 +290,9 @@
       "resolved": "ปิดแล้ว",
       "outdated": "ล้าสมัย",
       "file": "ไฟล์",
-      "oneComment": "1 ความคิดเห็น",
-      "commentCount": "{{count}} ความคิดเห็น",
+      "comment_one": "1 ความคิดเห็น",
+      "comment": "{{displayCount}} ความคิดเห็น",
+      "comment_other": "{{displayCount}} ความคิดเห็น",
       "startedRelative": " · เริ่มเมื่อ {{relative}}",
       "couldNotLoadMore": "ไม่สามารถโหลดความคิดเห็นเพิ่มได้",
       "retryLoadingMore": "ลองโหลดความคิดเห็นเพิ่มอีกครั้ง",
@@ -299,8 +302,9 @@
       "reactionsTitle": "ปฏิกิริยา",
       "addReaction": "เพิ่มปฏิกิริยา",
       "reactionPill": "{{emoji}} ปฏิกิริยา, {{count}} {{countLabel}}",
-      "reactionSingular": "ปฏิกิริยา",
-      "reactionPlural": "ปฏิกิริยา",
+      "reaction_one": "ปฏิกิริยา",
+      "reaction": "ปฏิกิริยา",
+      "reaction_other": "ปฏิกิริยา",
       "commentActions": "การกระทำความคิดเห็น",
       "reportContent": "รายงานเนื้อหา",
       "reportUser": "รายงานผู้ใช้",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "ความคิดเห็นนี้จะถูกลบออกจากคิวรีวิว",
       "delete": "ลบ",
       "summaryOptional": "สรุป (ไม่บังคับ)",
-      "pendingCommentSingular": "ความคิดเห็นที่รอดำเนินการ",
-      "pendingCommentPlural": "ความคิดเห็นที่รอดำเนินการ",
+      "pendingComment_one": "ความคิดเห็นที่รอดำเนินการ",
+      "pendingComment": "ความคิดเห็นที่รอดำเนินการ",
+      "pendingComment_other": "ความคิดเห็นที่รอดำเนินการ",
       "submitCountOfTotal": "ส่ง {{freshCount}} จาก {{totalCount}} ความคิดเห็น",
       "submitReview": "ส่งรีวิว",
       "partialPostedMessage": "โพสต์ {{freshCount}} ความคิดเห็นแล้ว {{staleCount}} ความคิดเห็นชี้ไปที่ commit ที่เก่ากว่าและยังอยู่ในคิวของคุณ"
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "เปิด · ต้องรีวิว",
       "stateOpen": "เปิด",
       "unknownAuthor": "ผู้เขียนที่ไม่รู้จัก",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "ไฟล์",
-      "filePlural": "ไฟล์"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "ไฟล์",
+      "file": "ไฟล์",
+      "file_other": "ไฟล์"
     },
     "pendingComment": {
       "editOutdatedA11y": "แก้ไขความคิดเห็นที่รอดำเนินการที่ล้าสมัยบน {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "มีคน",
-      "oneTyping": "{{name}} กำลังพิมพ์...",
-      "manyTyping": "{{names}} กำลังพิมพ์..."
+      "typing_one": "{{name}} กำลังพิมพ์...",
+      "typing": "{{names}} กำลังพิมพ์...",
+      "typing_other": "{{names}} กำลังพิมพ์..."
     },
     "botStatus": {
       "online": "ออนไลน์",
@@ -722,12 +730,10 @@
       "couldNotLoad": "โหลดข้อมูลการเรียกเก็บเงินไม่สำเร็จ",
       "manageOnWeb": "จัดการการเรียกเก็บเงินบนเว็บ",
       "commitPlan": "Commit",
-      "daysLeft": "เหลือ {{count}} วัน",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "เทอม Commit สุดท้ายของคุณสิ้นสุดใน {{date}} ดำเนินการต่อเป็น Standard ที่ {{price}} หรือโฮสติ้งจะสิ้นสุด",
       "freeTrial": "ทดลองใช้ฟรี",
       "hostingEnds": "โฮสติ้งสิ้นสุด",
-      "oneDayLeft": "เหลือ 1 วัน",
       "renews": "ต่ออายุ",
       "standardMonthToMonth": "Standard รายเดือน",
       "standardStartsOn": "Standard เริ่มใน {{date}} ที่ {{price}}",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} ต้องการความสนใจ: {{label}}",
-      "openUnreadOne": "เปิด {{name}}, ข้อความที่ยังไม่อ่าน {{count}} ข้อความ",
-      "openUnreadMany": "เปิด {{name}}, ข้อความที่ยังไม่อ่าน {{count}} ข้อความ",
+      "openUnread_one": "เปิด {{name}}, ข้อความที่ยังไม่อ่าน {{displayCount}} ข้อความ",
+      "openUnread": "เปิด {{name}}, ข้อความที่ยังไม่อ่าน {{displayCount}} ข้อความ",
+      "openUnread_other": "เปิด {{name}}, ข้อความที่ยังไม่อ่าน {{displayCount}} ข้อความ",
       "open": "เปิด {{name}}",
       "openSettings": "เปิดการตั้งค่าสำหรับ {{name}}",
       "fixOnKiloAi": "แก้ไขบน kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "เปิดการแก้ไขอัตโนมัติ?",
       "enableAutoRemediationConfirmMessage": "Security Agent จะเปิด PR การแก้ไขโดยอัตโนมัติสำหรับผลการค้นหาที่ใช้ประโยชน์ได้และมีสิทธิ์",
       "enable": "เปิด",
-      "queuedOne": "{{count}} finding ที่มีอยู่ถูกจัดคิวสำหรับการวิเคราะห์",
-      "queuedMany": "{{count}} findings ที่มีอยู่ถูกจัดคิวสำหรับการวิเคราะห์",
+      "queued_one": "{{displayCount}} finding ที่มีอยู่ถูกจัดคิวสำหรับการวิเคราะห์",
+      "queued": "{{displayCount}} findings ที่มีอยู่ถูกจัดคิวสำหรับการวิเคราะห์",
+      "queued_other": "{{displayCount}} findings ที่มีอยู่ถูกจัดคิวสำหรับการวิเคราะห์",
       "severityCriticalOnly": "ระดับวิกฤตเท่านั้น",
       "severityHighAndAbove": "สูงขึ้นไป",
       "severityMediumAndAbove": "ปานกลางขึ้นไป",
@@ -1482,8 +1490,9 @@
       "on": "เปิด",
       "off": "ปิด",
       "allRepositories": "repositories ทั้งหมด",
-      "repositorySelected": "เลือก {{count}} repository",
-      "repositoriesSelected": "เลือก {{count}} repositories",
+      "repositoriesCount_one": "เลือก {{displayCount}} repository",
+      "repositoriesCount": "เลือก {{displayCount}} repositories",
+      "repositoriesCount_other": "เลือก {{displayCount}} repositories",
       "selectRepositories": "เลือก repositories",
       "selectRepositoriesSubtitle": "เลือกว่า Security Agent ตรวจสอบ repositories ใด",
       "repositories": "Repositories",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "ลบ session แล้ว",
       "needsInput": "ต้องป้อนข้อมูล",
       "fromPlatform": "จาก {{platform}}",
-      "centOne": "cent",
-      "centOther": "cents",
-      "dollarOne": "ดอลลาร์",
-      "dollarOther": "ดอลลาร์"
+      "cent_one": "cent",
+      "cent": "cents",
+      "cent_other": "cents",
+      "dollar_one": "ดอลลาร์",
+      "dollar": "ดอลลาร์",
+      "dollar_other": "ดอลลาร์"
     },
     "githubInstall": {
       "couldNotOpenTitle": "ไม่สามารถเปิด GitHub ได้",
@@ -1817,8 +1828,9 @@
       "discardFailed": "ไม่สามารถทิ้งฉบับร่างได้ กรุณาลองอีกครั้ง"
     },
     "partRenderer": {
-      "updatedFile": "อัปเดต {{count}} ไฟล์",
-      "updatedFiles": "อัปเดต {{count}} ไฟล์"
+      "updatedFileCount_one": "อัปเดต {{displayCount}} ไฟล์",
+      "updatedFileCount": "อัปเดต {{displayCount}} ไฟล์",
+      "updatedFileCount_other": "อัปเดต {{displayCount}} ไฟล์"
     },
     "toolPatch": {
       "operationAdded": "เพิ่มแล้ว",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "โหลดข้อความก่อนหน้าแล้ว",
       "retryHint": "ลองโหลดข้อความเก่าของเซสชันนี้อีกครั้ง",
-      "omittedOne": "บางรายการก่อนหน้าจากเซสชันนี้ไม่สามารถแสดงได้",
-      "omittedMany": "{{count}} รายการก่อนหน้าจากเซสชันนี้ไม่สามารถแสดงได้",
+      "omitted_one": "บางรายการก่อนหน้าจากเซสชันนี้ไม่สามารถแสดงได้",
+      "omitted": "{{displayCount}} รายการก่อนหน้าจากเซสชันนี้ไม่สามารถแสดงได้",
+      "omitted_other": "{{displayCount}} รายการก่อนหน้าจากเซสชันนี้ไม่สามารถแสดงได้",
       "couldNotLoad": "โหลดข้อความก่อนหน้าไม่สำเร็จ",
       "unavailable": "ข้อความก่อนหน้าไม่พร้อมใช้งาน",
       "tooLarge": "ข้อความก่อนหน้ามีขนาดใหญ่เกินไปที่จะโหลด"
@@ -2069,10 +2082,12 @@
       "viewTable": "ดูตาราง",
       "title": "ตาราง",
       "close": "ปิดตาราง",
-      "column": "คอลัมน์",
-      "columns": "คอลัมน์",
-      "row": "แถว",
-      "rows": "แถว",
+      "columnCount_one": "คอลัมน์",
+      "columnCount": "คอลัมน์",
+      "columnCount_other": "คอลัมน์",
+      "rowCount_one": "แถว",
+      "rowCount": "แถว",
+      "rowCount_other": "แถว",
       "opensFullScreen": "เปิดแบบเต็มหน้าจอ"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "จาก {{window}} โทเคน",
       "tokens": "โทเคน",
       "tokensWithPercentage": "โทเคน ({{percentage}})",
-      "stepsCountOne": "{{steps}} ขั้นตอน",
-      "stepsCountMany": "{{steps}} ขั้นตอน",
+      "stepsCount_one": "{{steps}} ขั้นตอน",
+      "stepsCount": "{{steps}} ขั้นตอน",
+      "stepsCount_other": "{{steps}} ขั้นตอน",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "งานการเขียนโค้ดใหม่",
     "explore": "สำรวจ",
     "seeAll": "ดูทั้งหมด",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "สวัสดีตอนเช้า",
-    "greetingAfternoon": "สวัสดีตอนบ่าย",
-    "greetingEvening": "สวัสดีตอนเย็น"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "ปิด {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "เปิดการจัดการ Kilo Pass บนเว็บ",
       "notSubscribed": "ยังไม่ได้สมัครสมาชิก",
       "overallocated": "การจัดสรร Pass เกินที่นั่งที่ชำระแล้ว",
-      "paidSeatOne": "{{count}} ที่นั่งที่ชำระแล้ว",
-      "paidSeatOther": "{{count}} ที่นั่งที่ชำระแล้ว",
+      "paidSeat_one": "{{displayCount}} ที่นั่งที่ชำระแล้ว",
+      "paidSeat": "{{displayCount}} ที่นั่งที่ชำระแล้ว",
+      "paidSeat_other": "{{displayCount}} ที่นั่งที่ชำระแล้ว",
       "paymentNeedsAttention": "การชำระเงินต้องได้รับการดูแล",
       "paymentPending": "การชำระเงินรอดำเนินการ",
       "processingBlocked": "การประมวลผลถูกบล็อก",

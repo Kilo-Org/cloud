@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{total}} ମଧ୍ୟରୁ {{loaded}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା",
       "loadAllFiles": "ସମସ୍ତ ଫାଇଲ୍ ଲୋଡ୍ କରନ୍ତୁ",
       "loadAll": "ସବୁ ଲୋଡ୍ କରନ୍ତୁ",
-      "fileLoaded": "{{count}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା",
-      "filesLoaded": "{{count}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା",
-      "fileLoadedOfTotal": "{{total}} ମଧ୍ୟରୁ {{count}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା",
-      "filesLoadedOfTotal": "{{total}} ମଧ୍ୟରୁ {{count}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା",
+      "fileLoadedCount_one": "{{displayCount}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା",
+      "fileLoadedCount": "{{displayCount}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା",
+      "fileLoadedCount_other": "{{displayCount}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା",
+      "fileLoadedOfTotalCount_one": "{{total}} ମଧ୍ୟରୁ {{displayCount}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା",
+      "fileLoadedOfTotalCount": "{{total}} ମଧ୍ୟରୁ {{displayCount}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା",
+      "fileLoadedOfTotalCount_other": "{{total}} ମଧ୍ୟରୁ {{displayCount}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା",
       "filesStillLoading": "ଫାଇଲ୍ଗୁଡ଼ିକ ଏବେ ବି ଲୋଡ୍ ହେଉଛି। ରିଫ୍ରେସ୍ କରିବାକୁ ତଳକୁ ଟାଣନ୍ତୁ।",
       "goToOverview": "ଓଭରଭ୍ୟୁ କୁ ଯାଆନ୍ତୁ",
       "goToOverviewTab": "ଓଭରଭ୍ୟୁ ଟ୍ୟାବ୍ କୁ ଯାଆନ୍ତୁ"
@@ -288,8 +290,9 @@
       "resolved": "ସମାଧାନ ହେଲା",
       "outdated": "ଅପ୍ରଚଳିତ",
       "file": "ଫାଇଲ୍",
-      "oneComment": "1 ମନ୍ତବ୍ୟ",
-      "commentCount": "{{count}} ମନ୍ତବ୍ୟ",
+      "comment_one": "1 ମନ୍ତବ୍ୟ",
+      "comment": "{{displayCount}} ମନ୍ତବ୍ୟ",
+      "comment_other": "{{displayCount}} ମନ୍ତବ୍ୟ",
       "startedRelative": " · {{relative}} ରେ ଆରମ୍ଭ ହେଲା",
       "couldNotLoadMore": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ କରାଯାଇ ପାରିଲା ନାହିଁ।",
       "retryLoadingMore": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡିଂ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
@@ -299,8 +302,9 @@
       "reactionsTitle": "ରିଆକ୍ସନ",
       "addReaction": "ରିଆକ୍ସନ ଯୋଡନ୍ତୁ",
       "reactionPill": "{{emoji}} ରିଆକ୍ସନ, {{count}} {{countLabel}}",
-      "reactionSingular": "ରିଆକ୍ସନ",
-      "reactionPlural": "ରିଆକ୍ସନଗୁଡ଼ିକ",
+      "reaction_one": "ରିଆକ୍ସନ",
+      "reaction": "ରିଆକ୍ସନଗୁଡ଼ିକ",
+      "reaction_other": "ରିଆକ୍ସନଗୁଡ଼ିକ",
       "commentActions": "ମନ୍ତବ୍ୟ କାର୍ଯ୍ୟ",
       "reportContent": "ବିଷୟବସ୍ତୁ ରିପୋର୍ଟ କରନ୍ତୁ",
       "reportUser": "ବ୍ୟବହାରକାରୀ ରିପୋର୍ଟ କରନ୍ତୁ",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "ଏହି ମନ୍ତବ୍ୟ ରିଭ୍ୟୁ କ୍ୟୁ ରୁ ହଟାଯିବ।",
       "delete": "ବିଲୋପ କରନ୍ତୁ",
       "summaryOptional": "ସାରାଂଶ (ଐଚ୍ଛିକ)",
-      "pendingCommentSingular": "ବାକି ମନ୍ତବ୍ୟ",
-      "pendingCommentPlural": "ବାକି ମନ୍ତବ୍ୟଗୁଡ଼ିକ",
+      "pendingComment_one": "ବାକି ମନ୍ତବ୍ୟ",
+      "pendingComment": "ବାକି ମନ୍ତବ୍ୟଗୁଡ଼ିକ",
+      "pendingComment_other": "ବାକି ମନ୍ତବ୍ୟଗୁଡ଼ିକ",
       "submitCountOfTotal": "{{totalCount}} ମନ୍ତବ୍ୟ ମଧ୍ୟରୁ {{freshCount}} ଦାଖଲ କରନ୍ତୁ",
       "submitReview": "ରିଭ୍ୟୁ ଦାଖଲ କରନ୍ତୁ",
       "partialPostedMessage": "{{freshCount}} ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା। {{staleCount}} ମନ୍ତବ୍ୟ ଏକ ପୁରୁଣା କମିଟ୍ କୁ ପଏଣ୍ଟ କରେ ଏବଂ ଆପଣଙ୍କ କ୍ୟୁରେ ରହିଲା।"
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "ଖୋଲା · ରିଭ୍ୟୁ ଆବଶ୍ୟକ",
       "stateOpen": "ଖୋଲା",
       "unknownAuthor": "ଅଜ୍ଞାତ ଲେଖକ",
-      "commitSingular": "କମିଟ୍",
-      "commitPlural": "କମିଟ୍",
-      "fileSingular": "ଫାଇଲ୍",
-      "filePlural": "ଫାଇଲ୍"
+      "commit_one": "କମିଟ୍",
+      "commit": "କମିଟ୍",
+      "commit_other": "କମିଟ୍",
+      "file_one": "ଫାଇଲ୍",
+      "file": "ଫାଇଲ୍",
+      "file_other": "ଫାଇଲ୍"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} ରେ ଅପ୍ରଚଳିତ ବାକି ମନ୍ତବ୍ୟ ସମ୍ପାଦନ କରନ୍ତୁ",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "କେହି",
-      "oneTyping": "{{name}} ଟାଇପ୍ କରୁଛନ୍ତି...",
-      "manyTyping": "{{names}} ଟାଇପ୍ କରୁଛନ୍ତି..."
+      "typing_one": "{{name}} ଟାଇପ୍ କରୁଛନ୍ତି...",
+      "typing": "{{names}} ଟାଇପ୍ କରୁଛନ୍ତି...",
+      "typing_other": "{{names}} ଟାଇପ୍ କରୁଛନ୍ତି..."
     },
     "botStatus": {
       "online": "ଅନଲାଇନ",
@@ -722,12 +730,10 @@
       "couldNotLoad": "ବିଲିଂ ସୂଚନା ଲୋଡ୍ କରାଯାଇପାରିଲା ନାହିଁ",
       "manageOnWeb": "ୱେବରେ ବିଲିଂ ପରିଚାଳନା କରନ୍ତୁ",
       "commitPlan": "କମିଟ୍",
-      "daysLeft": "{{count}} ଦିନ ବାକି",
       "earlybird": "ଆରମ୍ଭିକ",
       "finalCommitTermEndsOn": "ଆପଣଙ୍କ ଅନ୍ତିମ କମିଟ୍ ଅବଧି {{date}} ରେ ସମାପ୍ତ ହେବ। {{price}} ରେ ଷ୍ଟାଣ୍ଡାର୍ଡ ଭାବରେ ଜାରି ରଖନ୍ତୁ, କିମ୍ବା ହୋଷ୍ଟିଂ ସମାପ୍ତ ହେବ।",
       "freeTrial": "ମାଗଣା ଟ୍ରାଏଲ",
       "hostingEnds": "ହୋଷ୍ଟିଂ ସମାପ୍ତ ହୁଏ",
-      "oneDayLeft": "୧ ଦିନ ବାକି",
       "renews": "ନବୀକରଣ ହୁଏ",
       "standardMonthToMonth": "ମାସିକ ଷ୍ଟାଣ୍ଡାର୍ଡ",
       "standardStartsOn": "ଷ୍ଟାଣ୍ଡାର୍ଡ {{date}} ରେ {{price}} ରେ ଆରମ୍ଭ ହେବ।",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} ଧ୍ୟାନ ଆବଶ୍ୟକ: {{label}}",
-      "openUnreadOne": "{{name}} ଖୋଲନ୍ତୁ, {{count}} ଅପଢ଼ା ବାର୍ତ୍ତା",
-      "openUnreadMany": "{{name}} ଖୋଲନ୍ତୁ, {{count}} ଅପଢ଼ା ବାର୍ତ୍ତା",
+      "openUnread_one": "{{name}} ଖୋଲନ୍ତୁ, {{displayCount}} ଅପଢ଼ା ବାର୍ତ୍ତା",
+      "openUnread": "{{name}} ଖୋଲନ୍ତୁ, {{displayCount}} ଅପଢ଼ା ବାର୍ତ୍ତା",
+      "openUnread_other": "{{name}} ଖୋଲନ୍ତୁ, {{displayCount}} ଅପଢ଼ା ବାର୍ତ୍ତା",
       "open": "{{name}} ଖୋଲନ୍ତୁ",
       "openSettings": "{{name}} ପାଇଁ ସେଟିଂ ଖୋଲନ୍ତୁ",
       "fixOnKiloAi": "kilo.ai ରେ ସମାଧାନ କରନ୍ତୁ: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "ସ୍ୱୟଂ-ଉପଶମନ ସକ୍ଷମ କରନ୍ତୁ?",
       "enableAutoRemediationConfirmMessage": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ଯୋଗ୍ୟ ଶୋଷଣଯୋଗ୍ୟ ଫାଇଣ୍ଡିଂ ପାଇଁ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ଉପଶମନ PR ଖୋଲିବ।",
       "enable": "ସକ୍ଷମ କରନ୍ତୁ",
-      "queuedOne": "{{count}}ଟି ବିଦ୍ୟମାନ ଫଳାଫଳ ବିଶ୍ଳେଷଣ ପାଇଁ ଧାଡ଼ିରେ ଅଛି।",
-      "queuedMany": "{{count}}ଟି ବିଦ୍ୟମାନ ଫଳାଫଳ ବିଶ୍ଳେଷଣ ପାଇଁ ଧାଡ଼ିରେ ଅଛି।",
+      "queued_one": "{{displayCount}}ଟି ବିଦ୍ୟମାନ ଫଳାଫଳ ବିଶ୍ଳେଷଣ ପାଇଁ ଧାଡ଼ିରେ ଅଛି।",
+      "queued": "{{displayCount}}ଟି ବିଦ୍ୟମାନ ଫଳାଫଳ ବିଶ୍ଳେଷଣ ପାଇଁ ଧାଡ଼ିରେ ଅଛି।",
+      "queued_other": "{{displayCount}}ଟି ବିଦ୍ୟମାନ ଫଳାଫଳ ବିଶ୍ଳେଷଣ ପାଇଁ ଧାଡ଼ିରେ ଅଛି।",
       "severityCriticalOnly": "କେବଳ ଗୁରୁତର",
       "severityHighAndAbove": "ଉଚ୍ଚ ଏବଂ ତା'ଠାରୁ ଅଧିକ",
       "severityMediumAndAbove": "ମଧ୍ୟମ ଏବଂ ତା'ଠାରୁ ଅଧିକ",
@@ -1482,8 +1490,9 @@
       "on": "ଚାଲୁ",
       "off": "ବନ୍ଦ",
       "allRepositories": "ସମସ୍ତ ରିପୋଜିଟୋରୀ",
-      "repositorySelected": "{{count}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ ହୋଇଛି",
-      "repositoriesSelected": "{{count}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ ହୋଇଛି",
+      "repositoriesCount_one": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ ହୋଇଛି",
+      "repositoriesCount": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ ହୋଇଛି",
+      "repositoriesCount_other": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ ହୋଇଛି",
       "selectRepositories": "ରିପୋଜିଟୋରୀ ଚୟନ କରନ୍ତୁ",
       "selectRepositoriesSubtitle": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ କେଉଁ ରିପୋଜିଟୋରୀ ନିରୀକ୍ଷଣ କରେ ତାହା ଚୟନ କରନ୍ତୁ",
       "repositories": "ରିପୋଜିଟୋରୀଗୁଡ଼ିକ",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "ସେସନ୍ ବିଲୋପ ହୋଇଛି",
       "needsInput": "ଇନପୁଟ୍ ଆବଶ୍ୟକ",
       "fromPlatform": "{{platform}} ରୁ",
-      "centOne": "ସେଣ୍ଟ",
-      "centOther": "ସେଣ୍ଟ",
-      "dollarOne": "ଡଲାର",
-      "dollarOther": "ଡଲାର"
+      "cent_one": "ସେଣ୍ଟ",
+      "cent": "ସେଣ୍ଟ",
+      "cent_other": "ସେଣ୍ଟ",
+      "dollar_one": "ଡଲାର",
+      "dollar": "ଡଲାର",
+      "dollar_other": "ଡଲାର"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ଖୋଲାଯାଇପାରିଲା ନାହିଁ",
@@ -1817,8 +1828,9 @@
       "discardFailed": "ଡ୍ରାଫ୍ଟ ପରିତ୍ୟାଗ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁନଃଚେଷ୍ଟା କରନ୍ତୁ।"
     },
     "partRenderer": {
-      "updatedFile": "{{count}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି",
-      "updatedFiles": "{{count}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି"
+      "updatedFileCount_one": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି",
+      "updatedFileCount": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି",
+      "updatedFileCount_other": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି"
     },
     "toolPatch": {
       "operationAdded": "ଯୋଡ଼ାଯାଇଛି",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "ପୂର୍ବ ବାର୍ତ୍ତାଗୁଡ଼ିକ ଲୋଡ୍ ହେଲା",
       "retryHint": "ଏହି ସେସନ୍ ପାଇଁ ପୁରୁଣା ବାର୍ତ୍ତା ଲୋଡ୍ ପୁନଃଚେଷ୍ଟା କରେ।",
-      "omittedOne": "ଏହି ସେସନରୁ କିଛି ପୂର୍ବ ଆଇଟମ୍ ପ୍ରଦର୍ଶିତ ହୋଇପାରିଲା ନାହିଁ।",
-      "omittedMany": "ଏହି ସେସନରୁ {{count}} ପୂର୍ବ ଆଇଟମ୍ ପ୍ରଦର୍ଶିତ ହୋଇପାରିଲା ନାହିଁ।",
+      "omitted_one": "ଏହି ସେସନରୁ କିଛି ପୂର୍ବ ଆଇଟମ୍ ପ୍ରଦର୍ଶିତ ହୋଇପାରିଲା ନାହିଁ।",
+      "omitted": "ଏହି ସେସନରୁ {{displayCount}} ପୂର୍ବ ଆଇଟମ୍ ପ୍ରଦର୍ଶିତ ହୋଇପାରିଲା ନାହିଁ।",
+      "omitted_other": "ଏହି ସେସନରୁ {{displayCount}} ପୂର୍ବ ଆଇଟମ୍ ପ୍ରଦର୍ଶିତ ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotLoad": "ପୂର୍ବ ବାର୍ତ୍ତାଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "unavailable": "ପୂର୍ବ ବାର୍ତ୍ତାଗୁଡ଼ିକ ଉପଲବ୍ଧ ନାହିଁ।",
       "tooLarge": "ପୂର୍ବ ବାର୍ତ୍ତାଗୁଡ଼ିକ ଲୋଡ୍ କରିବାକୁ ଅତି ବଡ଼।"
@@ -2069,10 +2082,12 @@
       "viewTable": "ଟେବୁଲ ଦେଖନ୍ତୁ",
       "title": "ଟେବୁଲ",
       "close": "ଟେବୁଲ ବନ୍ଦ କରନ୍ତୁ",
-      "column": "ସ୍ତମ୍ଭ",
-      "columns": "ସ୍ତମ୍ଭ",
-      "row": "ଧାଡି",
-      "rows": "ଧାଡି",
+      "columnCount_one": "ସ୍ତମ୍ଭ",
+      "columnCount": "ସ୍ତମ୍ଭ",
+      "columnCount_other": "ସ୍ତମ୍ଭ",
+      "rowCount_one": "ଧାଡି",
+      "rowCount": "ଧାଡି",
+      "rowCount_other": "ଧାଡି",
       "opensFullScreen": "ପୂର୍ଣ୍ଣ ସ୍କ୍ରିନରେ ଖୋଲେ"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "{{window}} ଟୋକେନ ମଧ୍ୟରୁ",
       "tokens": "ଟୋକେନ",
       "tokensWithPercentage": "ଟୋକେନ ({{percentage}})",
-      "stepsCountOne": "{{steps}} ପଦକ୍ଷେପ",
-      "stepsCountMany": "{{steps}} ପଦକ୍ଷେପ",
+      "stepsCount_one": "{{steps}} ପଦକ୍ଷେପ",
+      "stepsCount": "{{steps}} ପଦକ୍ଷେପ",
+      "stepsCount_other": "{{steps}} ପଦକ୍ଷେପ",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "ନୂତନ କୋଡିଂ କାର୍ଯ୍ୟ",
     "explore": "ଅନୁସନ୍ଧାନ",
     "seeAll": "ସବୁ ଦେଖନ୍ତୁ",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "ଶୁଭ ସକାଳ",
-    "greetingAfternoon": "ଶୁଭ ମଧ୍ୟାହ୍ନ",
-    "greetingEvening": "ଶୁଭ ସନ୍ଧ୍ୟା"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "{{filename}} ବନ୍ଦ କରନ୍ତୁ",
@@ -2645,8 +2658,9 @@
       "manageHint": "ୱେବରେ Kilo Pass ପରିଚାଳନା ଖୋଲେ।",
       "notSubscribed": "ସବସ୍କ୍ରାଇବ୍ ନାହିଁ",
       "overallocated": "Pass ବଣ୍ଟନ ପୈଠ ସିଟ୍ ଅତିକ୍ରମ କରୁଛି",
-      "paidSeatOne": "{{count}} ପୈଠ ସିଟ୍",
-      "paidSeatOther": "{{count}} ପୈଠ ସିଟ୍",
+      "paidSeat_one": "{{displayCount}} ପୈଠ ସିଟ୍",
+      "paidSeat": "{{displayCount}} ପୈଠ ସିଟ୍",
+      "paidSeat_other": "{{displayCount}} ପୈଠ ସିଟ୍",
       "paymentNeedsAttention": "ପେମେଣ୍ଟର ଧ୍ୟାନ ଦରକାର",
       "paymentPending": "ପେମେଣ୍ଟ ଅପେକ୍ଷାରେ",
       "processingBlocked": "ପ୍ରକ୍ରିୟା ଅବରୁଦ୍ଧ",

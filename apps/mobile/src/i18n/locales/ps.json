@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{total}} فایلونو څخه {{loaded}} بار شوي",
       "loadAllFiles": "ټول فایلونه بار کړئ",
       "loadAll": "ټول بار کړئ",
-      "fileLoaded": "{{count}} فایل بار شو",
-      "filesLoaded": "{{count}} فایلونه بار شول",
-      "fileLoadedOfTotal": "{{total}} څخه {{count}} فایل بار شو",
-      "filesLoadedOfTotal": "{{total}} څخه {{count}} فایلونه بار شول",
+      "fileLoadedCount_one": "{{displayCount}} فایل بار شو",
+      "fileLoadedCount": "{{displayCount}} فایلونه بار شول",
+      "fileLoadedCount_other": "{{displayCount}} فایلونه بار شول",
+      "fileLoadedOfTotalCount_one": "{{total}} څخه {{displayCount}} فایل بار شو",
+      "fileLoadedOfTotalCount": "{{total}} څخه {{displayCount}} فایلونه بار شول",
+      "fileLoadedOfTotalCount_other": "{{total}} څخه {{displayCount}} فایلونه بار شول",
       "filesStillLoading": "فایلونه لاهم بار کیږي. د تازه کولو لپاره راکش کړئ.",
       "goToOverview": "کتنې ته لاړ شئ",
       "goToOverviewTab": "د کتنې ټب ته لاړ شئ"
@@ -288,8 +290,9 @@
       "resolved": "حل شوی",
       "outdated": "زوړ",
       "file": "فایل",
-      "oneComment": "۱ تبصره",
-      "commentCount": "{{count}} تبصرې",
+      "comment_one": "۱ تبصره",
+      "comment": "{{displayCount}} تبصرې",
+      "comment_other": "{{displayCount}} تبصرې",
       "startedRelative": " · {{relative}} پیل شوی",
       "couldNotLoadMore": "نور تبصرې بار کیدی نشو.",
       "retryLoadingMore": "نور تبصرې بارول بیا هڅه وکړئ",
@@ -299,8 +302,9 @@
       "reactionsTitle": "غبرګونونه",
       "addReaction": "غبرګون اضافه کړئ",
       "reactionPill": "{{emoji}} غبرګون، {{count}} {{countLabel}}",
-      "reactionSingular": "غبرګون",
-      "reactionPlural": "غبرګونونه",
+      "reaction_one": "غبرګون",
+      "reaction": "غبرګونونه",
+      "reaction_other": "غبرګونونه",
       "commentActions": "د تبصرې کړنې",
       "reportContent": "منځپانګه راپور کړئ",
       "reportUser": "کارن راپور کړئ",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "دا تبصره به د بیاکتنې قطار څخه لرې شي.",
       "delete": "ړنګ کړئ",
       "summaryOptional": "لنډیز (اختیاري)",
-      "pendingCommentSingular": "په انتظار تبصره",
-      "pendingCommentPlural": "په انتظار تبصرې",
+      "pendingComment_one": "په انتظار تبصره",
+      "pendingComment": "په انتظار تبصرې",
+      "pendingComment_other": "په انتظار تبصرې",
       "submitCountOfTotal": "د {{totalCount}} تبصرو څخه {{freshCount}} وسپارئ",
       "submitReview": "بیاکتنه وسپارئ",
       "partialPostedMessage": "{{freshCount}} تبصره خپره شوه. {{staleCount}} تبصرې په یو زوړ کمټ اشاره کوي او ستاسو په قطار کې پاتې شوې."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "خلاص · بیاکتنه اړینه ده",
       "stateOpen": "خلاص",
       "unknownAuthor": "نامعلوم لیکوال",
-      "commitSingular": "کمټ",
-      "commitPlural": "کمټونه",
-      "fileSingular": "فایل",
-      "filePlural": "فایلونه"
+      "commit_one": "کمټ",
+      "commit": "کمټونه",
+      "commit_other": "کمټونه",
+      "file_one": "فایل",
+      "file": "فایلونه",
+      "file_other": "فایلونه"
     },
     "pendingComment": {
       "editOutdatedA11y": "په {{location}} زوړ په انتظار تبصره سمه کړئ",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "یو څوک",
-      "oneTyping": "{{name}} لیکي...",
-      "manyTyping": "{{names}} لیکي..."
+      "typing_one": "{{name}} لیکي...",
+      "typing": "{{names}} لیکي...",
+      "typing_other": "{{names}} لیکي..."
     },
     "botStatus": {
       "online": "آنلاین",
@@ -722,12 +730,10 @@
       "couldNotLoad": "د بلینګ معلومات بارول ناشوني شول",
       "manageOnWeb": "په ویب کې بلینګ اداره کړئ",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} ورځې پاتې دي",
       "earlybird": "لمړنی مرغۍ",
       "finalCommitTermEndsOn": "ستاسو وروستۍ Commit دوره په {{date}} پای ته رسېږي. د {{price}} په بیه د Standard په توګه دوام وکړئ، یا کوربه توب پای ته رسېږي.",
       "freeTrial": "وړیا تجربه",
       "hostingEnds": "کوربه توب پای ته رسېږي",
-      "oneDayLeft": "۱ ورځ پاتې ده",
       "renews": "نوي کېږي",
       "standardMonthToMonth": "معیاري میاشت په میاشت",
       "standardStartsOn": "Standard په {{date}} د {{price}} په بیه پیلېږي.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} پاملرنې ته اړتیا لري: {{label}}",
-      "openUnreadOne": "{{name}} پرانیستل، {{count}} نالوستی پیغام",
-      "openUnreadMany": "{{name}} پرانیستل، {{count}} نالوستي پیغامونه",
+      "openUnread_one": "{{name}} پرانیستل، {{displayCount}} نالوستی پیغام",
+      "openUnread": "{{name}} پرانیستل، {{displayCount}} نالوستي پیغامونه",
+      "openUnread_other": "{{name}} پرانیستل، {{displayCount}} نالوستي پیغامونه",
       "open": "{{name}} پرانیستل",
       "openSettings": "د {{name}} لپاره ترتیبات پرانیستل",
       "fixOnKiloAi": "په kilo.ai کې حل کړئ: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "اتوماتیک اصلاح فعاله کړئ؟",
       "enableAutoRemediationConfirmMessage": "امنیتي اجنټ به د وړ وړ کار اخیستونکي موندنو لپاره په اتوماتیک ډول د اصلاح PRs پرانیستي.",
       "enable": "فعالول",
-      "queuedOne": "{{count}} موندنه د تحلیل لپاره په صف کې ودرول شوه.",
-      "queuedMany": "{{count}} موندنې د تحلیل لپاره په صف کې ودرول شوې.",
+      "queued_one": "{{displayCount}} موندنه د تحلیل لپاره په صف کې ودرول شوه.",
+      "queued": "{{displayCount}} موندنې د تحلیل لپاره په صف کې ودرول شوې.",
+      "queued_other": "{{displayCount}} موندنې د تحلیل لپاره په صف کې ودرول شوې.",
       "severityCriticalOnly": "یوازې کریټیکل",
       "severityHighAndAbove": "لوړ او پورته",
       "severityMediumAndAbove": "منځنی او پورته",
@@ -1482,8 +1490,9 @@
       "on": "فعال",
       "off": "غیرفعال",
       "allRepositories": "ټولې ذخیرې",
-      "repositorySelected": "{{count}} ذخیره غوره شوه",
-      "repositoriesSelected": "{{count}} ذخیرې غوره شوې",
+      "repositoriesCount_one": "{{displayCount}} ذخیره غوره شوه",
+      "repositoriesCount": "{{displayCount}} ذخیرې غوره شوې",
+      "repositoriesCount_other": "{{displayCount}} ذخیرې غوره شوې",
       "selectRepositories": "ذخیرې غوره کړئ",
       "selectRepositoriesSubtitle": "غوره کړئ چې د امنیت استازی کومې ذخیرې څاري",
       "repositories": "ذخیرې",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "ناسته حذف شوه",
       "needsInput": "ورودی ته اړتیا لري",
       "fromPlatform": "له {{platform}} څخه",
-      "centOne": "سینټ",
-      "centOther": "سینټه",
-      "dollarOne": "ډالر",
-      "dollarOther": "ډالره"
+      "cent_one": "سینټ",
+      "cent": "سینټه",
+      "cent_other": "سینټه",
+      "dollar_one": "ډالر",
+      "dollar": "ډالره",
+      "dollar_other": "ډالره"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub پرانیستل نشو",
@@ -1817,8 +1828,9 @@
       "discardFailed": "مسوده لغوه نه شوه. مهرباني وکړئ بیا هڅه وکړئ."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} فایل تازه شو",
-      "updatedFiles": "{{count}} فایلونه تازه شول"
+      "updatedFileCount_one": "{{displayCount}} فایل تازه شو",
+      "updatedFileCount": "{{displayCount}} فایلونه تازه شول",
+      "updatedFileCount_other": "{{displayCount}} فایلونه تازه شول"
     },
     "toolPatch": {
       "operationAdded": "اضافه شوی",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "پخواني پیغامونه پورته شول",
       "retryHint": "د دې غونډې لپاره د پخوانیو پیغامونو پورته کول بیا هڅوي.",
-      "omittedOne": "د دې غونډې ځینې پخواني توکي نه شول ښودل کېدلای.",
-      "omittedMany": "د دې غونډې {{count}} پخواني توکي نه شول ښودل کېدلای.",
+      "omitted_one": "د دې غونډې ځینې پخواني توکي نه شول ښودل کېدلای.",
+      "omitted": "د دې غونډې {{displayCount}} پخواني توکي نه شول ښودل کېدلای.",
+      "omitted_other": "د دې غونډې {{displayCount}} پخواني توکي نه شول ښودل کېدلای.",
       "couldNotLoad": "پخواني پیغامونه نه شول پورته کېدلای.",
       "unavailable": "پخواني پیغامونه شتون نه لري.",
       "tooLarge": "پخواني پیغامونه د پورته کولو لپاره ډېر لوی دي."
@@ -2069,10 +2082,12 @@
       "viewTable": "جدول وګورئ",
       "title": "جدول",
       "close": "جدول وتړئ",
-      "column": "ستن",
-      "columns": "ستنې",
-      "row": "قطار",
-      "rows": "قطارونه",
+      "columnCount_one": "ستن",
+      "columnCount": "ستنې",
+      "columnCount_other": "ستنې",
+      "rowCount_one": "قطار",
+      "rowCount": "قطارونه",
+      "rowCount_other": "قطارونه",
       "opensFullScreen": "بشپړ سکرین پرانیزي"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "د {{window}} ټوکنونو څخه",
       "tokens": "ټوکنونه",
       "tokensWithPercentage": "ټوکنونه ({{percentage}})",
-      "stepsCountOne": "{{steps}} ګام",
-      "stepsCountMany": "{{steps}} ګامونه",
+      "stepsCount_one": "{{steps}} ګام",
+      "stepsCount": "{{steps}} ګامونه",
+      "stepsCount_other": "{{steps}} ګامونه",
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "د کوډ کولو نوې دنده",
     "explore": "وپلټئ",
     "seeAll": "ټول وګورئ",
-    "kiloAgents": "د Kilo اجنټان",
-    "greetingMorning": "سهار مو پخیر",
-    "greetingAfternoon": "ښه ماسپښین",
-    "greetingEvening": "ښه ماښام"
+    "kiloAgents": "د Kilo اجنټان"
   },
   "imageViewer": {
     "close": "{{filename}} وتړئ",
@@ -2645,8 +2658,9 @@
       "manageHint": "په ویب باندې د Kilo Pass مدیریت پرانیزي.",
       "notSubscribed": "ګډون نه دی شوی",
       "overallocated": "د Pass ګمارنې له ورکړل شویو څوکیو ډېرې دي",
-      "paidSeatOne": "{{count}} ورکړل شوې څوکۍ",
-      "paidSeatOther": "{{count}} ورکړل شوې څوکۍ",
+      "paidSeat_one": "{{displayCount}} ورکړل شوې څوکۍ",
+      "paidSeat": "{{displayCount}} ورکړل شوې څوکۍ",
+      "paidSeat_other": "{{displayCount}} ورکړل شوې څوکۍ",
       "paymentNeedsAttention": "ورکړې ته پاملرنه اړینه ده",
       "paymentPending": "ورکړه په انتظار کې ده",
       "processingBlocked": "پروسس بند شوی",

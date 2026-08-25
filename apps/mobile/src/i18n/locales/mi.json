@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} o {{total}} kōnae kua utaina",
       "loadAllFiles": "Uta i ngā kōnae katoa",
       "loadAll": "Uta katoa",
-      "fileLoaded": "{{count}} kōnae kua utaina",
-      "filesLoaded": "{{count}} kōnae kua utaina",
-      "fileLoadedOfTotal": "{{count}} kōnae kua utaina o {{total}}",
-      "filesLoadedOfTotal": "{{count}} kōnae kua utaina o {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} kōnae kua utaina",
+      "fileLoadedCount": "{{displayCount}} kōnae kua utaina",
+      "fileLoadedCount_other": "{{displayCount}} kōnae kua utaina",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} kōnae kua utaina o {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} kōnae kua utaina o {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} kōnae kua utaina o {{total}}",
       "filesStillLoading": "Kei te uta tonu ngā kōnae. Tōia kia whakahou.",
       "goToOverview": "Haere ki te Tirohanga Whānui",
       "goToOverviewTab": "Haere ki te ripa Tirohanga Whānui"
@@ -288,8 +290,9 @@
       "resolved": "Kua oti",
       "outdated": "Kua tawhito",
       "file": "Kōnae",
-      "oneComment": "1 kōrero",
-      "commentCount": "{{count}} kōrero",
+      "comment_one": "1 kōrero",
+      "comment": "{{displayCount}} kōrero",
+      "comment_other": "{{displayCount}} kōrero",
       "startedRelative": " · i tīmata {{relative}}",
       "couldNotLoadMore": "Kāore i taea te uta ētahi atu kōrero.",
       "retryLoadingMore": "Whakamātau anō te uta i ētahi atu kōrero",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Ngā Urupare",
       "addReaction": "Tāpiri urupare",
       "reactionPill": "Urupare {{emoji}}, {{count}} {{countLabel}}",
-      "reactionSingular": "urupare",
-      "reactionPlural": "ngā urupare",
+      "reaction_one": "urupare",
+      "reaction": "ngā urupare",
+      "reaction_other": "ngā urupare",
       "commentActions": "Ngā mahi kōrero",
       "reportContent": "Pūrongo i te ihirangi",
       "reportUser": "Pūrongo i te kaimahi",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Ka tangohia tēnei kōrero mai i te tūtira arotake.",
       "delete": "Muku",
       "summaryOptional": "Whakarāpopoto (kōwhiringa)",
-      "pendingCommentSingular": "kōrero e tatari ana",
-      "pendingCommentPlural": "ngā kōrero e tatari ana",
+      "pendingComment_one": "kōrero e tatari ana",
+      "pendingComment": "ngā kōrero e tatari ana",
+      "pendingComment_other": "ngā kōrero e tatari ana",
       "submitCountOfTotal": "Tuku i {{freshCount}} o {{totalCount}} kōrero",
       "submitReview": "Tuku i te arotake",
       "partialPostedMessage": "Kua tukuna {{freshCount}} kōrero. E tohu ana {{staleCount}} kōrero ki tētahi commit tawhito, ā, i noho ki tō tūtira."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Tuwhera · E hiahiatia ana te arotake",
       "stateOpen": "Tuwhera",
       "unknownAuthor": "Kaituhi kāore e mōhiotia",
-      "commitSingular": "commit",
-      "commitPlural": "ngā commit",
-      "fileSingular": "kōnae",
-      "filePlural": "ngā kōnae"
+      "commit_one": "commit",
+      "commit": "ngā commit",
+      "commit_other": "ngā commit",
+      "file_one": "kōnae",
+      "file": "ngā kōnae",
+      "file_other": "ngā kōnae"
     },
     "pendingComment": {
       "editOutdatedA11y": "Whakatika i te kōrero tawhito e tatari ana ki {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Tētahi",
-      "oneTyping": "Kei te tuhi a {{name}}...",
-      "manyTyping": "Kei te tuhi {{names}}..."
+      "typing_one": "Kei te tuhi a {{name}}...",
+      "typing": "Kei te tuhi {{names}}...",
+      "typing_other": "Kei te tuhi {{names}}..."
     },
     "botStatus": {
       "online": "I runga ipurangi",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Kāore i taea te uta i ngā mōhiohio utunga",
       "manageOnWeb": "Whakahaere Utunga i te Tukutuku",
       "commitPlan": "Whakapūmau",
-      "daysLeft": "{{count}} rā e toe ana",
       "earlybird": "Manu moata",
       "finalCommitTermEndsOn": "Ka mutu tō wā Whakapūmau whakamutunga i {{date}}. Haere tonu hei Paerewa mō {{price}}, ka mutu rānei te manaaki.",
       "freeTrial": "Whakamātau koreutu",
       "hostingEnds": "Ka mutu te manaaki",
-      "oneDayLeft": "1 rā e toe ana",
       "renews": "Ka whakahōu",
       "standardMonthToMonth": "Paerewa ā-marama",
       "standardStartsOn": "Ka tīmata te Paerewa i {{date}} mō {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "Me aro atu ki a {{name}}: {{label}}",
-      "openUnreadOne": "Uwhera a {{name}}, {{count}} karere kāore i pānuitia",
-      "openUnreadMany": "Uwhera a {{name}}, {{count}} ngā karere kāore i pānuitia",
+      "openUnread_one": "Uwhera a {{name}}, {{displayCount}} karere kāore i pānuitia",
+      "openUnread": "Uwhera a {{name}}, {{displayCount}} ngā karere kāore i pānuitia",
+      "openUnread_other": "Uwhera a {{name}}, {{displayCount}} ngā karere kāore i pānuitia",
       "open": "Uwhera a {{name}}",
       "openSettings": "Uwhera ngā tautuhinga mō {{name}}",
       "fixOnKiloAi": "Whakatika ki kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Whakahohe te whakatika aunoa?",
       "enableAutoRemediationConfirmMessage": "Ka uwheratia e te Kaiwhakahaere Haumaru ngā PR whakatika ā-aunoa mō ngā kitenga e taea ana te whakamahi kino.",
       "enable": "Whakahohe",
-      "queuedOne": "{{count}} kitea tawhito e tū ana hei tātari.",
-      "queuedMany": "{{count}} kitea tawhito e tū ana hei tātari.",
+      "queued_one": "{{displayCount}} kitea tawhito e tū ana hei tātari.",
+      "queued": "{{displayCount}} kitea tawhito e tū ana hei tātari.",
+      "queued_other": "{{displayCount}} kitea tawhito e tū ana hei tātari.",
       "severityCriticalOnly": "Anake te tino kino",
       "severityHighAndAbove": "Teitei me te ake",
       "severityMediumAndAbove": "Waenga me te ake",
@@ -1482,8 +1490,9 @@
       "on": "Kā",
       "off": "Kino",
       "allRepositories": "Ngā pūranga katoa",
-      "repositorySelected": "{{count}} pūranga kua kōwhiria",
-      "repositoriesSelected": "{{count}} pūranga kua kōwhiria",
+      "repositoriesCount_one": "{{displayCount}} pūranga kua kōwhiria",
+      "repositoriesCount": "{{displayCount}} pūranga kua kōwhiria",
+      "repositoriesCount_other": "{{displayCount}} pūranga kua kōwhiria",
       "selectRepositories": "Kōwhiria ngā pūranga",
       "selectRepositoriesSubtitle": "Kōwhiria ko wai ngā pūranga e tirotirohia ana e Security Agent",
       "repositories": "Ngā pūranga",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Kua whakakorea te wātūtū",
       "needsInput": "e hiahia ana ki te whakaurunga",
       "fromPlatform": "mai i {{platform}}",
-      "centOne": "heneti",
-      "centOther": "ngā heneti",
-      "dollarOne": "tāra",
-      "dollarOther": "ngā tāra"
+      "cent_one": "heneti",
+      "cent": "ngā heneti",
+      "cent_other": "ngā heneti",
+      "dollar_one": "tāra",
+      "dollar": "ngā tāra",
+      "dollar_other": "ngā tāra"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kāore i taea te whakatuwhera GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Kāore i taea te whakarere i te tauira. Tēnā whakamātau anō."
     },
     "partRenderer": {
-      "updatedFile": "Kua whakahoutia {{count}} kōnae",
-      "updatedFiles": "Kua whakahoutia {{count}} kōnae"
+      "updatedFileCount_one": "Kua whakahoutia {{displayCount}} kōnae",
+      "updatedFileCount": "Kua whakahoutia {{displayCount}} kōnae",
+      "updatedFileCount_other": "Kua whakahoutia {{displayCount}} kōnae"
     },
     "toolPatch": {
       "operationAdded": "Kua tāpiri",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Kua uta ngā karere o mua",
       "retryHint": "Ka whakamātau anō ki te uta i ngā karere tawhito mō tēnei wātū.",
-      "omittedOne": "Kāore i taea te whakaatu ētahi o ngā mea o mua o tēnei wātū.",
-      "omittedMany": "Kāore i taea te whakaatu ngā mea {{count}} o mua o tēnei wātū.",
+      "omitted_one": "Kāore i taea te whakaatu ētahi o ngā mea o mua o tēnei wātū.",
+      "omitted": "Kāore i taea te whakaatu ngā mea {{displayCount}} o mua o tēnei wātū.",
+      "omitted_other": "Kāore i taea te whakaatu ngā mea {{displayCount}} o mua o tēnei wātū.",
       "couldNotLoad": "Kāore i taea te uta ngā karere o mua.",
       "unavailable": "Kāore ngā karere o mua e wātea ana.",
       "tooLarge": "He nui rawa ngā karere o mua kia utaina."
@@ -2069,10 +2082,12 @@
       "viewTable": "Tirohia te tēpu",
       "title": "Tēpu",
       "close": "Katia te tēpu",
-      "column": "tīwae",
-      "columns": "ngā tīwae",
-      "row": "rarangi",
-      "rows": "ngā rarangi",
+      "columnCount_one": "tīwae",
+      "columnCount": "ngā tīwae",
+      "columnCount_other": "ngā tīwae",
+      "rowCount_one": "rarangi",
+      "rowCount": "ngā rarangi",
+      "rowCount_other": "ngā rarangi",
       "opensFullScreen": "ka whakatuwhera i te mata kī"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "o ngā tōkena {{window}}",
       "tokens": "ngā tōkena",
       "tokensWithPercentage": "ngā tōkena ({{percentage}})",
-      "stepsCountOne": "{{steps}} mahi",
-      "stepsCountMany": "{{steps}} ngā mahi",
+      "stepsCount_one": "{{steps}} mahi",
+      "stepsCount": "{{steps}} ngā mahi",
+      "stepsCount_other": "{{steps}} ngā mahi",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Mahi whakawaehere hōu",
     "explore": "Torotoro",
     "seeAll": "Tirohia katoa",
-    "kiloAgents": "Ngā Kaihoko Kilo",
-    "greetingMorning": "Ata mārie",
-    "greetingAfternoon": "Ahiahi mārie",
-    "greetingEvening": "Pō mārie"
+    "kiloAgents": "Ngā Kaihoko Kilo"
   },
   "imageViewer": {
     "close": "Katia {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Ka whakatuwhera i te whakahaere Kilo Pass i te paetukutuku.",
       "notSubscribed": "Kāore i ohauru",
       "overallocated": "Kua nui ake ngā whakaritenga Pass i ngā tūru kua utua",
-      "paidSeatOne": "{{count}} tūru kua utua",
-      "paidSeatOther": "{{count}} ngā tūru kua utua",
+      "paidSeat_one": "{{displayCount}} tūru kua utua",
+      "paidSeat": "{{displayCount}} ngā tūru kua utua",
+      "paidSeat_other": "{{displayCount}} ngā tūru kua utua",
       "paymentNeedsAttention": "Me aro ki te utu",
       "paymentPending": "E tatari ana te utu",
       "processingBlocked": "Kua āraitia te tukatuka",

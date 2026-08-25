@@ -210,6 +210,10 @@ function scanSource() {
   return { called, referenced };
 }
 
+function pluralBaseKey(key) {
+  return key.replace(/_(?:zero|one|two|few|many|other)$/, '');
+}
+
 const tags = supportedLanguages();
 
 for (const catalog of CATALOGS) {
@@ -309,7 +313,7 @@ for (const catalog of CATALOGS) {
       }
     }
     for (const key of english.keys()) {
-      if (!referenced.has(key)) {
+      if (!referenced.has(key) && !referenced.has(pluralBaseKey(key))) {
         fail(`${catalog.name}: en.json defines "${key}", which no source file uses`);
       }
     }

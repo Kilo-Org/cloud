@@ -14,7 +14,9 @@ import Animated, {
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { dateTimeFormat } from '@/lib/intl-cache';
 import { cn } from '@/lib/utils';
 import { buildMessageBubbleAccessibilityProps } from './message-bubble-a11y';
 import { MessageBubbleContent } from './message-bubble-content';
@@ -45,7 +47,7 @@ type Props = {
 };
 
 function formatTimestamp(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return dateTimeFormat(i18n.language, { hour: 'numeric', minute: '2-digit' }).format(ms);
 }
 
 function MessageBubbleComponent({

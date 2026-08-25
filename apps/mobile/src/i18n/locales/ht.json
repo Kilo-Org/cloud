@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} sou {{total}} fichye chaje",
       "loadAllFiles": "Chaje tout fichye",
       "loadAll": "Chaje tout",
-      "fileLoaded": "{{count}} fichye chaje",
-      "filesLoaded": "{{count}} fichye chaje",
-      "fileLoadedOfTotal": "{{count}} fichye chaje sou {{total}}",
-      "filesLoadedOfTotal": "{{count}} fichye chaje sou {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} fichye chaje",
+      "fileLoadedCount": "{{displayCount}} fichye chaje",
+      "fileLoadedCount_other": "{{displayCount}} fichye chaje",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} fichye chaje sou {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} fichye chaje sou {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} fichye chaje sou {{total}}",
       "filesStillLoading": "Fichye yo toujou ap chaje. Rale pou rafrechi.",
       "goToOverview": "Ale nan Apèsi",
       "goToOverviewTab": "Ale nan tab Apèsi"
@@ -288,8 +290,9 @@
       "resolved": "Rezoud",
       "outdated": "Demode",
       "file": "Fichye",
-      "oneComment": "1 kòmantè",
-      "commentCount": "{{count}} kòmantè",
+      "comment_one": "1 kòmantè",
+      "comment": "{{displayCount}} kòmantè",
+      "comment_other": "{{displayCount}} kòmantè",
       "startedRelative": " · kòmanse {{relative}}",
       "couldNotLoadMore": "Pa t ka chaje plis kòmantè.",
       "retryLoadingMore": "Rekòmanse chaje plis kòmantè",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Reyaksyon",
       "addReaction": "Ajoute reyaksyon",
       "reactionPill": "{{emoji}} reyaksyon, {{count}} {{countLabel}}",
-      "reactionSingular": "reyaksyon",
-      "reactionPlural": "reyaksyon",
+      "reaction_one": "reyaksyon",
+      "reaction": "reyaksyon",
+      "reaction_other": "reyaksyon",
       "commentActions": "Aksyon kòmantè",
       "reportContent": "Rapòte kontni",
       "reportUser": "Rapòte itilizatè",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Kòmantè sa a ap retire nan fil revizyon an.",
       "delete": "Efase",
       "summaryOptional": "Rezime (opsyonèl)",
-      "pendingCommentSingular": "kòmantè an patant",
-      "pendingCommentPlural": "kòmantè an patant",
+      "pendingComment_one": "kòmantè an patant",
+      "pendingComment": "kòmantè an patant",
+      "pendingComment_other": "kòmantè an patant",
       "submitCountOfTotal": "Soumèt {{freshCount}} sou {{totalCount}} kòmantè",
       "submitReview": "Soumèt revizyon",
       "partialPostedMessage": "Pòste {{freshCount}} kòmantè. {{staleCount}} kòmantè deziyen yon komit pi ansyen e rete nan fil ou."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Louvri · Revizyon obligatwa",
       "stateOpen": "Louvri",
       "unknownAuthor": "Otè enkoni",
-      "commitSingular": "komit",
-      "commitPlural": "komit",
-      "fileSingular": "fichye",
-      "filePlural": "fichye"
+      "commit_one": "komit",
+      "commit": "komit",
+      "commit_other": "komit",
+      "file_one": "fichye",
+      "file": "fichye",
+      "file_other": "fichye"
     },
     "pendingComment": {
       "editOutdatedA11y": "Modifye kòmantè an patant demode sou {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Yon moun",
-      "oneTyping": "{{name}} ap tape...",
-      "manyTyping": "{{names}} ap tape..."
+      "typing_one": "{{name}} ap tape...",
+      "typing": "{{names}} ap tape...",
+      "typing_other": "{{names}} ap tape..."
     },
     "botStatus": {
       "online": "Anliy",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Pa t ka chaje enfòmasyon faktirasyon",
       "manageOnWeb": "Jere Faktirasyon sou Web",
       "commitPlan": "Konmèt",
-      "daysLeft": "{{count}} jou rès",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Dènye tèm Commit ou a fini sou {{date}}. Kontinye kòm Standard nan {{price}}, oswa òganizasyon an fini.",
       "freeTrial": "Eseye Gratis",
       "hostingEnds": "Òganizasyon fini",
-      "oneDayLeft": "1 jou rès",
       "renews": "Renouvle",
       "standardMonthToMonth": "Standard mwa pa mwa",
       "standardStartsOn": "Standard kòmanse sou {{date}} nan {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} bezwen atansyon: {{label}}",
-      "openUnreadOne": "Ouvri {{name}}, {{count}} mesaj pa li",
-      "openUnreadMany": "Ouvri {{name}}, {{count}} mesaj pa li",
+      "openUnread_one": "Ouvri {{name}}, {{displayCount}} mesaj pa li",
+      "openUnread": "Ouvri {{name}}, {{displayCount}} mesaj pa li",
+      "openUnread_other": "Ouvri {{name}}, {{displayCount}} mesaj pa li",
       "open": "Ouvri {{name}}",
       "openSettings": "Ouvri paramèt pou {{name}}",
       "fixOnKiloAi": "Korije sou kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Aktive koreksyon otomatik?",
       "enableAutoRemediationConfirmMessage": "Ajan Sekirite ap ouvri PR koreksyon otomatikman pou konstate eksplwatab ki kalifye.",
       "enable": "Aktive",
-      "queuedOne": "{{count}} rezilta ki egziste a an pwosesis pou analiz.",
-      "queuedMany": "{{count}} rezilta ki egziste yo an pwosesis pou analiz.",
+      "queued_one": "{{displayCount}} rezilta ki egziste a an pwosesis pou analiz.",
+      "queued": "{{displayCount}} rezilta ki egziste yo an pwosesis pou analiz.",
+      "queued_other": "{{displayCount}} rezilta ki egziste yo an pwosesis pou analiz.",
       "severityCriticalOnly": "Kritik sèlman",
       "severityHighAndAbove": "Wo ak pi wo",
       "severityMediumAndAbove": "Mwayen ak pi wo",
@@ -1482,8 +1490,9 @@
       "on": "Limye",
       "off": "Etenn",
       "allRepositories": "Tout repo",
-      "repositorySelected": "{{count}} repo ki seleksyone",
-      "repositoriesSelected": "{{count}} repo ki seleksyone",
+      "repositoriesCount_one": "{{displayCount}} repo ki seleksyone",
+      "repositoriesCount": "{{displayCount}} repo ki seleksyone",
+      "repositoriesCount_other": "{{displayCount}} repo ki seleksyone",
       "selectRepositories": "Chwazi repo yo",
       "selectRepositoriesSubtitle": "Chwazi kiyès repo Security Agent siveye",
       "repositories": "Repo",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Sesyon an efase",
       "needsInput": "bezwen input",
       "fromPlatform": "depi {{platform}}",
-      "centOne": "santim",
-      "centOther": "santim",
-      "dollarOne": "dola",
-      "dollarOther": "dola"
+      "cent_one": "santim",
+      "cent": "santim",
+      "cent_other": "santim",
+      "dollar_one": "dola",
+      "dollar": "dola",
+      "dollar_other": "dola"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Pa t 'kapab louvri GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Pa t 'kapab jete bouyon an. Tanpri eseye ankò."
     },
     "partRenderer": {
-      "updatedFile": "Miz ajou {{count}} fichye",
-      "updatedFiles": "Miz ajou {{count}} fichye"
+      "updatedFileCount_one": "Miz ajou {{displayCount}} fichye",
+      "updatedFileCount": "Miz ajou {{displayCount}} fichye",
+      "updatedFileCount_other": "Miz ajou {{displayCount}} fichye"
     },
     "toolPatch": {
       "operationAdded": "Ajoute",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Mesaj pi bonè chaje",
       "retryHint": "Eseye ankò chaje mesaj pi bonè pou sesyon sa a.",
-      "omittedOne": "Gen kèk atik pi bonè nan sesyon sa a ki pa t ka montre.",
-      "omittedMany": "{{count}} atik pi bonè nan sesyon sa a pa t ka montre.",
+      "omitted_one": "Gen kèk atik pi bonè nan sesyon sa a ki pa t ka montre.",
+      "omitted": "{{displayCount}} atik pi bonè nan sesyon sa a pa t ka montre.",
+      "omitted_other": "{{displayCount}} atik pi bonè nan sesyon sa a pa t ka montre.",
       "couldNotLoad": "Pa t ka chaje mesaj pi bonè.",
       "unavailable": "Mesaj pi bonè pa disponib.",
       "tooLarge": "Mesaj pi bonè twò gwo pou chaje."
@@ -2069,10 +2082,12 @@
       "viewTable": "Wè tablo a",
       "title": "Tablo",
       "close": "Fèmen tablo a",
-      "column": "kolòn",
-      "columns": "kolòn",
-      "row": "ranje",
-      "rows": "ranje",
+      "columnCount_one": "kolòn",
+      "columnCount": "kolòn",
+      "columnCount_other": "kolòn",
+      "rowCount_one": "ranje",
+      "rowCount": "ranje",
+      "rowCount_other": "ranje",
       "opensFullScreen": "louvri plen ekran"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "nan {{window}} token",
       "tokens": "token",
       "tokensWithPercentage": "token ({{percentage}})",
-      "stepsCountOne": "{{steps}} etap",
-      "stepsCountMany": "{{steps}} etap",
+      "stepsCount_one": "{{steps}} etap",
+      "stepsCount": "{{steps}} etap",
+      "stepsCount_other": "{{steps}} etap",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Nouvo travay kodaj",
     "explore": "Eksplore",
     "seeAll": "Wè tout",
-    "kiloAgents": "Kilo Ajant",
-    "greetingMorning": "Bonjou",
-    "greetingAfternoon": "Bon apremidi",
-    "greetingEvening": "Bonswa"
+    "kiloAgents": "Kilo Ajant"
   },
   "imageViewer": {
     "close": "Fèmen {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Louvri jesyon Kilo Pass sou wèb.",
       "notSubscribed": "Pa abòne",
       "overallocated": "Atribisyon Pass depase siy peye",
-      "paidSeatOne": "{{count}} siy peye",
-      "paidSeatOther": "{{count}} siy peye",
+      "paidSeat_one": "{{displayCount}} siy peye",
+      "paidSeat": "{{displayCount}} siy peye",
+      "paidSeat_other": "{{displayCount}} siy peye",
       "paymentNeedsAttention": "Peman bezwen atansyon",
       "paymentPending": "Peman annatant",
       "processingBlocked": "Pwosesis bloke",

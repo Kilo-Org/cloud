@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/icons';
 
 import { i18n } from '@/i18n';
+import { formatList } from '@/lib/format';
 import { type PLATFORM_CAPABILITIES, type ReviewConfigData } from '@/lib/code-reviewer-config';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { capitalize } from '@/lib/utils';
@@ -57,7 +58,7 @@ export function buildOverviewRows({
       title: i18n.t('codeReviewer.overview.focusAreas'),
       subtitle:
         data.focusAreas.length > 0
-          ? data.focusAreas.map(capitalize).join(', ')
+          ? formatList(data.focusAreas.map(capitalize), i18n.language)
           : i18n.t('codeReviewer.overview.allAreas'),
     },
     // Custom Instructions is deprecated in favour of REVIEW.md, so the row is

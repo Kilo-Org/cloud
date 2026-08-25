@@ -1,4 +1,5 @@
 import { i18n } from '@/i18n';
+import { formatList } from '@/lib/format';
 
 export function formatTypingIndicatorText({
   botName,
@@ -16,7 +17,9 @@ export function formatTypingIndicatorText({
       ? (botName ?? i18n.t('kiloclaw.title'))
       : i18n.t('chat.typingIndicator.someone')
   );
-  return names.length === 1
-    ? i18n.t('chat.typingIndicator.oneTyping', { name: names[0] })
-    : i18n.t('chat.typingIndicator.manyTyping', { names: names.join(', ') });
+  return i18n.t('chat.typingIndicator.typing', {
+    count: names.length,
+    name: names[0],
+    names: formatList(names, i18n.language),
+  });
 }

@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} kati ya {{total}} faili zimepakiwa",
       "loadAllFiles": "Pakia faili zote",
       "loadAll": "Pakia zote",
-      "fileLoaded": "Faili {{count}} imepakiwa",
-      "filesLoaded": "Faili {{count}} zimepakiwa",
-      "fileLoadedOfTotal": "Faili {{count}} imepakiwa kati ya {{total}}",
-      "filesLoadedOfTotal": "Faili {{count}} zimepakiwa kati ya {{total}}",
+      "fileLoadedCount_one": "Faili {{displayCount}} imepakiwa",
+      "fileLoadedCount": "Faili {{displayCount}} zimepakiwa",
+      "fileLoadedCount_other": "Faili {{displayCount}} zimepakiwa",
+      "fileLoadedOfTotalCount_one": "Faili {{displayCount}} imepakiwa kati ya {{total}}",
+      "fileLoadedOfTotalCount": "Faili {{displayCount}} zimepakiwa kati ya {{total}}",
+      "fileLoadedOfTotalCount_other": "Faili {{displayCount}} zimepakiwa kati ya {{total}}",
       "filesStillLoading": "Faili bado zinapakia. Buruta ili kusasisha.",
       "goToOverview": "Nenda kwa Muhtasari",
       "goToOverviewTab": "Nenda kwenye kichupo cha Muhtasari"
@@ -288,8 +290,9 @@
       "resolved": "Imesuluhishwa",
       "outdated": "Umeisha muda",
       "file": "Faili",
-      "oneComment": "Maoni 1",
-      "commentCount": "Maoni {{count}}",
+      "comment_one": "Maoni 1",
+      "comment": "Maoni {{displayCount}}",
+      "comment_other": "Maoni {{displayCount}}",
       "startedRelative": " · ilianzishwa {{relative}}",
       "couldNotLoadMore": "Imeshindwa kupakia maoni zaidi.",
       "retryLoadingMore": "Jaribu tena kupakia maoni zaidi",
@@ -299,8 +302,9 @@
       "reactionsTitle": "Miitikio",
       "addReaction": "Ongeza mwitikio",
       "reactionPill": "{{emoji}} mwitikio, {{count}} {{countLabel}}",
-      "reactionSingular": "mwitikio",
-      "reactionPlural": "miitikio",
+      "reaction_one": "mwitikio",
+      "reaction": "miitikio",
+      "reaction_other": "miitikio",
       "commentActions": "Vitendo vya maoni",
       "reportContent": "Ripoti maudhui",
       "reportUser": "Ripoti mtumiaji",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "Maoni haya yataondolewa kutoka foleni ya ukaguzi.",
       "delete": "Futa",
       "summaryOptional": "Muhtasari (hiari)",
-      "pendingCommentSingular": "maoni ya kusubiri",
-      "pendingCommentPlural": "maoni ya kusubiri",
+      "pendingComment_one": "maoni ya kusubiri",
+      "pendingComment": "maoni ya kusubiri",
+      "pendingComment_other": "maoni ya kusubiri",
       "submitCountOfTotal": "Wasilisha {{freshCount}} kati ya {{totalCount}} maoni",
       "submitReview": "Wasilisha ukaguzi",
       "partialPostedMessage": "Umetuma maoni {{freshCount}}. Maoni {{staleCount}} yanaelekeza kwenye commit la zamani na yalibaki kwenye foleni yako."
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "Funguliwa · Ukaguzi unahitajika",
       "stateOpen": "Funguliwa",
       "unknownAuthor": "Mwandishi asiyejulikana",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "faili",
-      "filePlural": "faili"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "faili",
+      "file": "faili",
+      "file_other": "faili"
     },
     "pendingComment": {
       "editOutdatedA11y": "Hariri maoni ya zamani ya kusubiri kwenye {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "Mtu",
-      "oneTyping": "{{name}} anaandika...",
-      "manyTyping": "{{names}} wanaandika..."
+      "typing_one": "{{name}} anaandika...",
+      "typing": "{{names}} wanaandika...",
+      "typing_other": "{{names}} wanaandika..."
     },
     "botStatus": {
       "online": "Mtandaoni",
@@ -722,12 +730,10 @@
       "couldNotLoad": "Imeshindwa kupakia taarifa za malipo",
       "manageOnWeb": "Simamia Malipo kwenye Wavuti",
       "commitPlan": "Jitolee",
-      "daysLeft": "{{count}} siku zimebaki",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Muda wako wa mwisho wa Commit unaisha {{date}}. Endelea kama Standard kwa {{price}}, au upangaji unaisha.",
       "freeTrial": "Jaribio Bure",
       "hostingEnds": "Upangaji unaisha",
-      "oneDayLeft": "Siku 1 imebaki",
       "renews": "Inafanywa upya",
       "standardMonthToMonth": "Standard mwezi hadi mwezi",
       "standardStartsOn": "Standard inaanza {{date}} kwa {{price}}.",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} anahitaji uangalizi: {{label}}",
-      "openUnreadOne": "Fungua {{name}}, ujumbe {{count}} ambao haujasomwa",
-      "openUnreadMany": "Fungua {{name}}, ujumbe {{count}} ambao haujasomwa",
+      "openUnread_one": "Fungua {{name}}, ujumbe {{displayCount}} ambao haujasomwa",
+      "openUnread": "Fungua {{name}}, ujumbe {{displayCount}} ambao haujasomwa",
+      "openUnread_other": "Fungua {{name}}, ujumbe {{displayCount}} ambao haujasomwa",
       "open": "Fungua {{name}}",
       "openSettings": "Fungua mipangilio ya {{name}}",
       "fixOnKiloAi": "Suluhisha kwenye kilo.ai: {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "Washa matengenezo ya kiotomatiki?",
       "enableAutoRemediationConfirmMessage": "Security Agent itafungua PR za matengenezo kiotomatiki kwa matokeo yanayofaa na yanayoweza kutumiwa vibaya.",
       "enable": "Washa",
-      "queuedOne": "{{count}} matokeo yaliyopo yamepangwa kwa uchambuzi",
-      "queuedMany": "{{count}} matokeo yaliyopo yamepangwa kwa uchambuzi",
+      "queued_one": "{{displayCount}} matokeo yaliyopo yamepangwa kwa uchambuzi",
+      "queued": "{{displayCount}} matokeo yaliyopo yamepangwa kwa uchambuzi",
+      "queued_other": "{{displayCount}} matokeo yaliyopo yamepangwa kwa uchambuzi",
       "severityCriticalOnly": "Kikubwa tu",
       "severityHighAndAbove": "Juu na kuendelea",
       "severityMediumAndAbove": "Kati na kuendelea",
@@ -1482,8 +1490,9 @@
       "on": "Washa",
       "off": "Zima",
       "allRepositories": "Hazina zote",
-      "repositorySelected": "Hazina {{count}} imechaguliwa",
-      "repositoriesSelected": "Hazina {{count}} zimechaguliwa",
+      "repositoriesCount_one": "Hazina {{displayCount}} imechaguliwa",
+      "repositoriesCount": "Hazina {{displayCount}} zimechaguliwa",
+      "repositoriesCount_other": "Hazina {{displayCount}} zimechaguliwa",
       "selectRepositories": "Chagua hazina",
       "selectRepositoriesSubtitle": "Chagua hazina ambazo Security Agent hufuatilia",
       "repositories": "Hazina",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "Kikao kimefutwa",
       "needsInput": "inahitaji maelezo",
       "fromPlatform": "kutoka {{platform}}",
-      "centOne": "senti",
-      "centOther": "senti",
-      "dollarOne": "dola",
-      "dollarOther": "dola"
+      "cent_one": "senti",
+      "cent": "senti",
+      "cent_other": "senti",
+      "dollar_one": "dola",
+      "dollar": "dola",
+      "dollar_other": "dola"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Haikuweza kufungua GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "Haikuweza kutupa rasimu. Jaribu tena."
     },
     "partRenderer": {
-      "updatedFile": "Imesasisha faili {{count}}",
-      "updatedFiles": "Imesasisha faili {{count}}"
+      "updatedFileCount_one": "Imesasisha faili {{displayCount}}",
+      "updatedFileCount": "Imesasisha faili {{displayCount}}",
+      "updatedFileCount_other": "Imesasisha faili {{displayCount}}"
     },
     "toolPatch": {
       "operationAdded": "Imeongezwa",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "Ujumbe wa awali umepakiwa",
       "retryHint": "Inajaribu upya kupakia ujumbe wa awali kwa kikao hiki.",
-      "omittedOne": "Baadhi ya vitu vya awali vya kikao hiki havikuweza kuonyeshwa.",
-      "omittedMany": "{{count}} vitu vya awali vya kikao hiki havikuweza kuonyeshwa.",
+      "omitted_one": "Baadhi ya vitu vya awali vya kikao hiki havikuweza kuonyeshwa.",
+      "omitted": "{{displayCount}} vitu vya awali vya kikao hiki havikuweza kuonyeshwa.",
+      "omitted_other": "{{displayCount}} vitu vya awali vya kikao hiki havikuweza kuonyeshwa.",
       "couldNotLoad": "Haikuweza kupakia ujumbe wa awali.",
       "unavailable": "Ujumbe wa awali haupatikani.",
       "tooLarge": "Ujumbe wa awali ni mkubwa sana kupakiwa."
@@ -2069,10 +2082,12 @@
       "viewTable": "Tazama jedwali",
       "title": "Jedwali",
       "close": "Funga jedwali",
-      "column": "safu",
-      "columns": "safu",
-      "row": "safu mlalo",
-      "rows": "safu mlalo",
+      "columnCount_one": "safu",
+      "columnCount": "safu",
+      "columnCount_other": "safu",
+      "rowCount_one": "safu mlalo",
+      "rowCount": "safu mlalo",
+      "rowCount_other": "safu mlalo",
       "opensFullScreen": "inafungua skrini kamili"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "ya {{window}} tokeni",
       "tokens": "tokeni",
       "tokensWithPercentage": "tokeni ({{percentage}})",
-      "stepsCountOne": "{{steps}} hatua",
-      "stepsCountMany": "{{steps}} hatua",
+      "stepsCount_one": "{{steps}} hatua",
+      "stepsCount": "{{steps}} hatua",
+      "stepsCount_other": "{{steps}} hatua",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "Kazi mpya ya kuandika msimbo",
     "explore": "Chunguza",
     "seeAll": "Ona zote",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Habari za asubuhi",
-    "greetingAfternoon": "Habari za mchana",
-    "greetingEvening": "Habari za jioni"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "Funga {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "Hufungua usimamizi wa Kilo Pass kwenye wavuti.",
       "notSubscribed": "Haujasajiliwa",
       "overallocated": "Migao ya Pass inazidi nafasi zilizolipwa",
-      "paidSeatOne": "{{count}} nafasi iliyolipwa",
-      "paidSeatOther": "{{count}} nafasi zilizolipwa",
+      "paidSeat_one": "{{displayCount}} nafasi iliyolipwa",
+      "paidSeat": "{{displayCount}} nafasi zilizolipwa",
+      "paidSeat_other": "{{displayCount}} nafasi zilizolipwa",
       "paymentNeedsAttention": "Malipo yanahitaji umakini",
       "paymentPending": "Malipo yanasubiri",
       "processingBlocked": "Uchakataji umezuiliwa",

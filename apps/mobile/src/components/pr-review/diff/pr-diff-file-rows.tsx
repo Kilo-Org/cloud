@@ -1,11 +1,12 @@
 // File-level row components for the PR diff FlashList.
 
 import * as Haptics from 'expo-haptics';
-import { ChevronDown, ChevronRight, Eye, EyeOff, File, Link2 } from '@/components/ui/icons';
+import { ChevronDown, Eye, EyeOff, File, Link2 } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { fileStatusIcon, fileStatusLabel } from '@/components/pr-review/diff/pr-diff-file-status';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Text } from '@/components/ui/text';
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -22,7 +23,7 @@ function ExpandChevron({ hasDiff, expanded }: { hasDiff: boolean; expanded: bool
   if (expanded) {
     return <ChevronDown size={18} color={colors.mutedForeground} />;
   }
-  return <ChevronRight size={18} color={colors.mutedForeground} />;
+  return <DirectionalChevronRight size={18} color={colors.mutedForeground} />;
 }
 
 /** Fixed-size mark-viewed icon toggle — no path-text reflow on toggle (D9/AC6). */

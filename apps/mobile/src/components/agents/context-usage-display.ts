@@ -1,14 +1,11 @@
 import { i18n } from '@/i18n';
-import { formatCurrency } from '@/lib/format';
-import { numberFormat } from '@/lib/intl-cache';
+import { formatCurrency, formatNumber, formatPercent } from '@/lib/format';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
 import { formatSessionTotalCost } from './session-list-helpers';
 import { formatSpokenCost } from './session-row-accessibility-label';
 
 export type ContextTone = 'primary' | 'warning' | 'destructive' | 'neutral';
-
-const NUMBER_FORMAT = numberFormat('en-US', {});
 
 const WARNING_TONE_THRESHOLD = 75;
 const DESTRUCTIVE_TONE_THRESHOLD = 90;
@@ -19,20 +16,17 @@ export function formatCompactTokens(tokens: number): string {
   if (!Number.isFinite(tokens) || tokens < 0) {
     return '0';
   }
-  if (tokens < 1000) {
-    return String(Math.trunc(tokens));
-  }
-  if (tokens < 1_000_000) {
-    return `${(tokens / 1000).toFixed(1)}K`;
-  }
-  return `${(tokens / 1_000_000).toFixed(1)}M`;
+  return formatNumber(Math.trunc(tokens), i18n.language, {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  });
 }
 
 export function formatExactTokens(tokens: number): string {
   if (!Number.isFinite(tokens) || tokens < 0) {
     return '0';
   }
-  return NUMBER_FORMAT.format(Math.trunc(tokens));
+  return formatNumber(Math.trunc(tokens), i18n.language);
 }
 
 export function formatCost(cost: number): string {
@@ -114,7 +108,7 @@ export function getHeaderPillContent({
     const tone = getContextTone(info.percentage);
     const primary =
       info.percentage !== undefined
-        ? `${info.percentage}%`
+        ? formatPercent(info.percentage, i18n.language)
         : formatCompactTokens(info.contextTokens);
     const secondary = formatSessionTotalCost(totalCostMicrodollars);
     return {
@@ -184,9 +178,9 @@ export function getContextSheetContent(
     windowUnavailable: false,
     windowUnavailableLabel: i18n.t('agentChat.contextUsage.windowUnavailable'),
     capacityKnown: true,
-    percentage: `${realPercentage}%`,
+    percentage: formatPercent(realPercentage, i18n.language),
     remainingTokens: formatExactTokens(remaining),
-    remainingPercentage: `${remainingPercentage}%`,
+    remainingPercentage: formatPercent(remainingPercentage, i18n.language),
     cost,
     tone,
   };
@@ -217,7 +211,7 @@ export function getMetricsAccessibilityLabel({
       : `${i18n.t('agentChat.contextUsage.tokensUsage', {
           used: formatExactTokens(info.contextTokens),
           window: formatExactTokens(info.contextWindow),
-          percentage: info.percentage ?? 0,
+          percentage: formatPercent(info.percentage ?? 0, i18n.language),
         })}${costPart}.`;
   return `${body}${tapPart}`;
 }

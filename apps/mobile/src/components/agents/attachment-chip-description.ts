@@ -1,6 +1,5 @@
-import { formatFileSize } from '@kilocode/kilo-chat';
-
 import { i18n } from '@/i18n';
+import { formatFileSize, formatPercent } from '@/lib/format';
 
 export type ChipStateInput = {
   filename: string;
@@ -51,7 +50,7 @@ export function progressLabel(progress: number | null): string {
   if (progress >= 1) {
     return i18n.t('agentChat.attachmentPreview.uploaded');
   }
-  return `${Math.round(progress * 100)}%`;
+  return formatPercent(progress * 100, i18n.language);
 }
 
 /**
@@ -85,7 +84,7 @@ export function describeAttachmentChip(state: ChipStateInput): ChipDescription {
 
   return {
     filename,
-    sizeText: formatFileSize(size),
+    sizeText: formatFileSize(size, i18n.language),
     progressText,
     message,
     accessibilityLabel:

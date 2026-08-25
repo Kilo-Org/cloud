@@ -219,10 +219,12 @@
       "loadedOfTotalFiles": "{{loaded}} ក្នុងចំណោម {{total}} ឯកសារដែលបានផ្ទុក",
       "loadAllFiles": "ផ្ទុកឯកសារទាំងអស់",
       "loadAll": "ផ្ទុកទាំងអស់",
-      "fileLoaded": "{{count}} ឯកសារដែលបានផ្ទុក",
-      "filesLoaded": "{{count}} ឯកសារដែលបានផ្ទុក",
-      "fileLoadedOfTotal": "{{count}} ឯកសារដែលបានផ្ទុកក្នុងចំណោម {{total}}",
-      "filesLoadedOfTotal": "{{count}} ឯកសារដែលបានផ្ទុកក្នុងចំណោម {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} ឯកសារដែលបានផ្ទុក",
+      "fileLoadedCount": "{{displayCount}} ឯកសារដែលបានផ្ទុក",
+      "fileLoadedCount_other": "{{displayCount}} ឯកសារដែលបានផ្ទុក",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} ឯកសារដែលបានផ្ទុកក្នុងចំណោម {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} ឯកសារដែលបានផ្ទុកក្នុងចំណោម {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} ឯកសារដែលបានផ្ទុកក្នុងចំណោម {{total}}",
       "filesStillLoading": "ឯកសារនៅតែកំពុងផ្ទុក។ ទាញដើម្បីធ្វើឱ្យស្រស់។",
       "goToOverview": "ទៅកាន់ទិដ្ឋភាពទូទៅ",
       "goToOverviewTab": "ទៅកាន់ផ្ទាំងទិដ្ឋភាពទូទៅ"
@@ -288,8 +290,9 @@
       "resolved": "បានដោះស្រាយ",
       "outdated": "ហួសសម័យ",
       "file": "ឯកសារ",
-      "oneComment": "1 អត្ថាធិប្បាយ",
-      "commentCount": "{{count}} អត្ថាធិប្បាយ",
+      "comment_one": "1 អត្ថាធិប្បាយ",
+      "comment": "{{displayCount}} អត្ថាធិប្បាយ",
+      "comment_other": "{{displayCount}} អត្ថាធិប្បាយ",
       "startedRelative": " · ចាប់ផ្តើម {{relative}}",
       "couldNotLoadMore": "មិនអាចផ្ទុកអត្ថាធិប្បាយបន្ថែមបានទេ។",
       "retryLoadingMore": "ព្យាយាមផ្ទុកអត្ថាធិប្បាយបន្ថែមម្តងទៀត",
@@ -299,8 +302,9 @@
       "reactionsTitle": "ប្រតិកម្ម",
       "addReaction": "បន្ថែមប្រតិកម្ម",
       "reactionPill": "ប្រតិកម្ម {{emoji}} ចំនួន {{count}} {{countLabel}}",
-      "reactionSingular": "ប្រតិកម្ម",
-      "reactionPlural": "ប្រតិកម្ម",
+      "reaction_one": "ប្រតិកម្ម",
+      "reaction": "ប្រតិកម្ម",
+      "reaction_other": "ប្រតិកម្ម",
       "commentActions": "សកម្មភាពអត្ថាធិប្បាយ",
       "reportContent": "រាយការណ៍ខ្លឹមសារ",
       "reportUser": "រាយការណ៍អ្នកប្រើ",
@@ -452,8 +456,9 @@
       "deletePendingMessage": "អត្ថាធិប្បាយនេះនឹងត្រូវបានដកចេញពីជួររង់ចាំការពិនិត្យ។",
       "delete": "លុប",
       "summaryOptional": "សេចក្តីសង្ខេប (ជាជម្រើស)",
-      "pendingCommentSingular": "អត្ថាធិប្បាយរង់ចាំ",
-      "pendingCommentPlural": "អត្ថាធិប្បាយរង់ចាំ",
+      "pendingComment_one": "អត្ថាធិប្បាយរង់ចាំ",
+      "pendingComment": "អត្ថាធិប្បាយរង់ចាំ",
+      "pendingComment_other": "អត្ថាធិប្បាយរង់ចាំ",
       "submitCountOfTotal": "ដាក់ស្នើ {{freshCount}} ក្នុងចំណោម {{totalCount}} អត្ថាធិប្បាយ",
       "submitReview": "ដាក់ស្នើការពិនិត្យ",
       "partialPostedMessage": "បានប្រកាស {{freshCount}} អត្ថាធិប្បាយ។ {{staleCount}} អត្ថាធិប្បាយចង្អុលទៅ commit ចាស់ ហើយនៅក្នុងជួររង់ចាំរបស់អ្នក។"
@@ -478,10 +483,12 @@
       "stateOpenReviewRequired": "បើក · ទាមទារការពិនិត្យ",
       "stateOpen": "បើក",
       "unknownAuthor": "អ្នកនិពន្ធមិនស្គាល់",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "ឯកសារ",
-      "filePlural": "ឯកសារ"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "ឯកសារ",
+      "file": "ឯកសារ",
+      "file_other": "ឯកសារ"
     },
     "pendingComment": {
       "editOutdatedA11y": "កែសម្រួលអត្ថាធិប្បាយរង់ចាំហួសសម័យនៅ {{location}}",
@@ -691,8 +698,9 @@
     },
     "typingIndicator": {
       "someone": "នរណាម្នាក់",
-      "oneTyping": "{{name}} កំពុងវាយ...",
-      "manyTyping": "{{names}} កំពុងវាយ..."
+      "typing_one": "{{name}} កំពុងវាយ...",
+      "typing": "{{names}} កំពុងវាយ...",
+      "typing_other": "{{names}} កំពុងវាយ..."
     },
     "botStatus": {
       "online": "អនឡាញ",
@@ -722,12 +730,10 @@
       "couldNotLoad": "មិនអាចផ្ទុកព័ត៌មានវិក្កយបត្របានទេ",
       "manageOnWeb": "គ្រប់គ្រងវិក្កយបត្រនៅលើបណ្តាញ",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} ថ្ងៃទៀត",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "រយៈពេល Commit ចុងក្រោយរបស់អ្នកបញ្ចប់នៅ {{date}}។ បន្តជា Standard ក្នុងតម្លៃ {{price}} ឬការបង្ហោះនឹងបញ្ចប់។",
       "freeTrial": "សាកល្បងឥតគិតថ្លៃ",
       "hostingEnds": "ការបង្ហោះបញ្ចប់",
-      "oneDayLeft": "1 ថ្ងៃទៀត",
       "renews": "បន្តឡើងវិញ",
       "standardMonthToMonth": "Standard ប្រចាំខែ",
       "standardStartsOn": "Standard ចាប់ផ្តើមនៅ {{date}} ក្នុងតម្លៃ {{price}}។",
@@ -1060,8 +1066,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} ត្រូវការការយកចិត្តទុកដាក់៖ {{label}}",
-      "openUnreadOne": "បើក {{name}} សារមិនទាន់អាន {{count}}",
-      "openUnreadMany": "បើក {{name}} សារមិនទាន់អាន {{count}}",
+      "openUnread_one": "បើក {{name}} សារមិនទាន់អាន {{displayCount}}",
+      "openUnread": "បើក {{name}} សារមិនទាន់អាន {{displayCount}}",
+      "openUnread_other": "បើក {{name}} សារមិនទាន់អាន {{displayCount}}",
       "open": "បើក {{name}}",
       "openSettings": "បើកការកំណត់សម្រាប់ {{name}}",
       "fixOnKiloAi": "ជួសជុលនៅលើ kilo.ai៖ {{label}}"
@@ -1351,8 +1358,9 @@
       "enableAutoRemediationConfirmTitle": "បើកការកែតម្រូវដោយស្វ័យប្រវត្តិ?",
       "enableAutoRemediationConfirmMessage": "Security Agent នឹងបើក PRs កែតម្រូវដោយស្វ័យប្រវត្តិ សម្រាប់ការរកឃើញដែលអាចកេងប្រវ័ញ្ចបានត្រឹមត្រូវ។",
       "enable": "បើក",
-      "queuedOne": "ការរកឃើញដែលមានស្រាប់ {{count}} ត្រូវបានដាក់ក្នុងជួរសម្រាប់ការវិភាគ។",
-      "queuedMany": "ការរកឃើញដែលមានស្រាប់ {{count}} ត្រូវបានដាក់ក្នុងជួរសម្រាប់ការវិភាគ។",
+      "queued_one": "ការរកឃើញដែលមានស្រាប់ {{displayCount}} ត្រូវបានដាក់ក្នុងជួរសម្រាប់ការវិភាគ។",
+      "queued": "ការរកឃើញដែលមានស្រាប់ {{displayCount}} ត្រូវបានដាក់ក្នុងជួរសម្រាប់ការវិភាគ។",
+      "queued_other": "ការរកឃើញដែលមានស្រាប់ {{displayCount}} ត្រូវបានដាក់ក្នុងជួរសម្រាប់ការវិភាគ។",
       "severityCriticalOnly": "ធ្ងន់ធ្ងរតែប៉ុណ្ណោះ",
       "severityHighAndAbove": "ខ្ពស់ និងលើស",
       "severityMediumAndAbove": "មធ្យម និងលើស",
@@ -1482,8 +1490,9 @@
       "on": "បើក",
       "off": "បិទ",
       "allRepositories": "ឃ្លាំងកូដទាំងអស់",
-      "repositorySelected": "បានជ្រើសរើសឃ្លាំងកូដ {{count}}",
-      "repositoriesSelected": "បានជ្រើសរើសឃ្លាំងកូដ {{count}}",
+      "repositoriesCount_one": "បានជ្រើសរើសឃ្លាំងកូដ {{displayCount}}",
+      "repositoriesCount": "បានជ្រើសរើសឃ្លាំងកូដ {{displayCount}}",
+      "repositoriesCount_other": "បានជ្រើសរើសឃ្លាំងកូដ {{displayCount}}",
       "selectRepositories": "ជ្រើសរើសឃ្លាំងកូដ",
       "selectRepositoriesSubtitle": "ជ្រើសរើសឃ្លាំងកូដដែល Security Agent ត្រួតពិនិត្យ",
       "repositories": "ឃ្លាំងកូដ",
@@ -1720,10 +1729,12 @@
       "sessionDeleted": "វគ្គត្រូវបានលុប",
       "needsInput": "ត្រូវការបញ្ចូល",
       "fromPlatform": "ពី {{platform}}",
-      "centOne": "សេន",
-      "centOther": "សេន",
-      "dollarOne": "ដុល្លារ",
-      "dollarOther": "ដុល្លារ"
+      "cent_one": "សេន",
+      "cent": "សេន",
+      "cent_other": "សេន",
+      "dollar_one": "ដុល្លារ",
+      "dollar": "ដុល្លារ",
+      "dollar_other": "ដុល្លារ"
     },
     "githubInstall": {
       "couldNotOpenTitle": "មិនអាចបើក GitHub",
@@ -1817,8 +1828,9 @@
       "discardFailed": "មិនអាចបោះបង់សេចក្តីព្រាងបានទេ។ សូមព្យាយាមម្តងទៀត។"
     },
     "partRenderer": {
-      "updatedFile": "បានធ្វើបច្ចុប្បន្នភាពឯកសារ {{count}}",
-      "updatedFiles": "បានធ្វើបច្ចុប្បន្នភាពឯកសារ {{count}}"
+      "updatedFileCount_one": "បានធ្វើបច្ចុប្បន្នភាពឯកសារ {{displayCount}}",
+      "updatedFileCount": "បានធ្វើបច្ចុប្បន្នភាពឯកសារ {{displayCount}}",
+      "updatedFileCount_other": "បានធ្វើបច្ចុប្បន្នភាពឯកសារ {{displayCount}}"
     },
     "toolPatch": {
       "operationAdded": "បានបន្ថែម",
@@ -2059,8 +2071,9 @@
     "olderMessages": {
       "arrived": "បានផ្ទុកសារមុនៗ",
       "retryHint": "ព្យាយាមផ្ទុកសារមុនៗសម្រាប់វគ្គនេះម្តងទៀត។",
-      "omittedOne": "ធាតុមុនៗមួយចំនួនពីវគ្គនេះមិនអាចបង្ហាញបានទេ។",
-      "omittedMany": "ធាតុមុនៗ {{count}} ពីវគ្គនេះមិនអាចបង្ហាញបានទេ។",
+      "omitted_one": "ធាតុមុនៗមួយចំនួនពីវគ្គនេះមិនអាចបង្ហាញបានទេ។",
+      "omitted": "ធាតុមុនៗ {{displayCount}} ពីវគ្គនេះមិនអាចបង្ហាញបានទេ។",
+      "omitted_other": "ធាតុមុនៗ {{displayCount}} ពីវគ្គនេះមិនអាចបង្ហាញបានទេ។",
       "couldNotLoad": "មិនអាចផ្ទុកសារមុនៗបានទេ។",
       "unavailable": "សារមុនៗមិនអាចប្រើបានទេ។",
       "tooLarge": "សារមុនៗធំពេកក្នុងការផ្ទុក។"
@@ -2069,10 +2082,12 @@
       "viewTable": "មើលតារាង",
       "title": "តារាង",
       "close": "បិទតារាង",
-      "column": "ជួរឈរ",
-      "columns": "ជួរឈរ",
-      "row": "ជួរ",
-      "rows": "ជួរ",
+      "columnCount_one": "ជួរឈរ",
+      "columnCount": "ជួរឈរ",
+      "columnCount_other": "ជួរឈរ",
+      "rowCount_one": "ជួរ",
+      "rowCount": "ជួរ",
+      "rowCount_other": "ជួរ",
       "opensFullScreen": "បើកពេញអេក្រង់"
     },
     "sessionFilter": {
@@ -2225,8 +2240,9 @@
       "ofWindowTokens": "ក្នុងចំណោម {{window}} tokens",
       "tokens": "tokens",
       "tokensWithPercentage": "tokens ({{percentage}})",
-      "stepsCountOne": "{{steps}} ជំហាន",
-      "stepsCountMany": "{{steps}} ជំហាន",
+      "stepsCount_one": "{{steps}} ជំហាន",
+      "stepsCount": "{{steps}} ជំហាន",
+      "stepsCount_other": "{{steps}} ជំហាន",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2291,10 +2307,7 @@
     "newCodingTask": "កិច្ចការសរសេរកូដថ្មី",
     "explore": "ស្វែងយល់",
     "seeAll": "មើលទាំងអស់",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "អរុណសួស្តី",
-    "greetingAfternoon": "ទស្សនិកាសួស្តី",
-    "greetingEvening": "សាយ័ណ្ហសួស្តី"
+    "kiloAgents": "Kilo Agents"
   },
   "imageViewer": {
     "close": "បិទ {{filename}}",
@@ -2645,8 +2658,9 @@
       "manageHint": "បើកការគ្រប់គ្រង Kilo Pass នៅលើគេហទំព័រ។",
       "notSubscribed": "មិនបានជាវ",
       "overallocated": "ការកំណត់ Pass លើសពីកន្លែងដែលបានបង់",
-      "paidSeatOne": "{{count}} កន្លែងដែលបានបង់",
-      "paidSeatOther": "{{count}} កន្លែងដែលបានបង់",
+      "paidSeat_one": "{{displayCount}} កន្លែងដែលបានបង់",
+      "paidSeat": "{{displayCount}} កន្លែងដែលបានបង់",
+      "paidSeat_other": "{{displayCount}} កន្លែងដែលបានបង់",
       "paymentNeedsAttention": "ការទូទាត់ត្រូវការការយកចិត្តទុកដាក់",
       "paymentPending": "ការទូទាត់កំពុងរង់ចាំ",
       "processingBlocked": "ការដំណើរការត្រូវបានរារាំង",

@@ -12,6 +12,25 @@ export function rememberAttachedRoot(rootKiloSessionId: string, directory: strin
   rootByDirectory.set(directory, rootKiloSessionId);
 }
 
+export function forgetAttachedRoot(rootKiloSessionId: string, directory: string): void {
+  if (
+    rootBySessionId.get(rootKiloSessionId) !== rootKiloSessionId ||
+    directories.get(rootKiloSessionId) !== directory
+  ) {
+    return;
+  }
+
+  for (const [kiloSessionId, root] of rootBySessionId) {
+    if (root !== rootKiloSessionId) continue;
+    rootBySessionId.delete(kiloSessionId);
+    directories.delete(kiloSessionId);
+  }
+
+  if (rootByDirectory.get(directory) === rootKiloSessionId) {
+    rootByDirectory.delete(directory);
+  }
+}
+
 export function rememberChildSession(input: {
   childId: string;
   parentId?: string;

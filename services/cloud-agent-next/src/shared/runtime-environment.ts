@@ -38,3 +38,9 @@ const SYSTEM_GIT_CONFIG_KEYS: ReadonlySet<string> = new Set(Object.keys(SYSTEM_G
 export function isStrippedGitConfigEnvVar(key: string): boolean {
   return key.startsWith('GIT_CONFIG_') && !SYSTEM_GIT_CONFIG_KEYS.has(key);
 }
+
+export const CONTROL_RUNTIME_RESERVED_ENV_VARS = [
+  'SANDBOX_CONTROL_CREDENTIAL',
+  'SANDBOX_CONTROL_URL',
+  'PROVIDER_INSTANCE_ID',
+] as const;

@@ -5,7 +5,11 @@ import migrations from '../../drizzle/migrations';
 import type { Env } from '../types.js';
 import type { SessionId } from '../types/ids.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
-import { parseSessionMetadata, serializeSessionMetadata } from '../persistence/session-metadata.js';
+import {
+  getSandboxProvider,
+  parseSessionMetadata,
+  serializeSessionMetadata,
+} from '../persistence/session-metadata.js';
 import type { OperationResult } from '../persistence/types.js';
 import type { CallbackTarget } from '../callbacks/index.js';
 import {
@@ -30,11 +34,8 @@ import { applyControlPlanePreparingEvent } from './control-plane-preparing.js';
 import { logger } from '../logger.js';
 import { sandboxControlRpc } from './control-rpc.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
-import { getSandboxControlStub } from '../sandbox-control/stub.js';
-import { withDORetry } from '../utils/do-retry.js';
 import { createMessageId } from '../session/message-id.js';
 import { buildSessionAttachPayload, fillAttachGitToken } from './attach-payload.js';
-import { getSandboxProvider } from '../persistence/session-metadata.js';
 import { createPreparationProgressRecorder } from '../session/preparation-progress.js';
 import {
   finalizeOtherRunningAttemptsForMessage,
@@ -54,6 +55,11 @@ import {
 } from './control-dispatch.js';
 import { acceptedAlarmDecision } from './accepted-overdue.js';
 import { bootPreparingStep, provisionPreparingStep } from './preparing-steps.js';
+import { createSandboxTerminalBridge, type SandboxTerminalRecord } from './terminal-bridge.js';
+import {
+  createSandboxTerminalLifecycle,
+  SANDBOX_SESSION_METADATA_KEY,
+} from './terminal-lifecycle.js';
 import {
   acceptQueuedMessage,
   assignPreparationAttemptId,
@@ -75,7 +81,7 @@ import {
   type SessionMessageRecord,
 } from './session-message-queue.js';
 
-const METADATA_KEY = 'session_metadata';
+const METADATA_KEY = SANDBOX_SESSION_METADATA_KEY;
 const MESSAGES_KEY = 'session_messages';
 const QUEUE_RETRY_MS = 5_000;
 
@@ -84,6 +90,8 @@ type MessageRecord = SessionMessageRecord;
 export class SandboxSession extends DurableObject<Env> {
   private readonly sessionId: SessionId | undefined;
   private readonly eventQueries: EventQueries;
+  private readonly terminalLifecycle: ReturnType<typeof createSandboxTerminalLifecycle>;
+  private readonly terminalBridge: ReturnType<typeof createSandboxTerminalBridge>;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -91,6 +99,27 @@ export class SandboxSession extends DurableObject<Env> {
     const lastColon = doName?.lastIndexOf(':') ?? -1;
     const sessionIdPart = doName && lastColon > 0 ? doName.slice(lastColon + 1) : undefined;
     this.sessionId = sessionIdPart ? (sessionIdPart as SessionId) : undefined;
+    this.terminalLifecycle = createSandboxTerminalLifecycle({
+      state: ctx,
+      getSessionId: () => this.requireSessionId(),
+      getControl: sandboxId => sandboxControlRpc(env, sandboxId),
+      getDirectory: metadata => this.directory(metadata),
+      closeTerminalBridge: (ptyId, code, reason) =>
+        this.terminalBridge.closeTerminal(ptyId, code, reason),
+      closeAllBridges: (code, reason) => this.terminalBridge.closeAll(code, reason),
+      closeRuntimeBridges: (wrapperInstanceId, code, reason) =>
+        this.terminalBridge.closeRuntime(wrapperInstanceId, code, reason),
+    });
+    this.terminalBridge = createSandboxTerminalBridge({
+      state: ctx,
+      getMetadata: () => this.getMetadata(),
+      getTerminal: async (ptyId): Promise<SandboxTerminalRecord | undefined> =>
+        this.terminalLifecycle.getTerminal(ptyId),
+      requestConnect: async (record, payload) =>
+        this.terminalLifecycle.requestConnect(record, payload),
+      reportActivity: async record => this.terminalLifecycle.reportActivity(record),
+      markEnded: async record => this.terminalLifecycle.markEnded(record),
+    });
     const db = drizzle(ctx.storage, { logger: false });
     this.eventQueries = createEventQueries(db, ctx.storage.sql);
     void ctx.blockConcurrencyWhile(async () => {
@@ -99,6 +128,16 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
+    const pathname = new URL(request.url).pathname;
+    if (pathname === '/terminal/browser') {
+      return this.terminalBridge.handleBrowserUpgrade(request);
+    }
+    if (pathname === '/terminal/wrapper') {
+      return this.terminalBridge.handleWrapperUpgrade(request);
+    }
+    if (pathname !== '/stream' || this.terminalLifecycle.isBlocked()) {
+      return new Response('Not found', { status: 404 });
+    }
     const sessionId = this.requireSessionId();
     const handler = createStreamHandler(this.ctx, this.eventQueries, sessionId, {
       deriveCloudStatus: () => this.deriveCloudStatus(),
@@ -107,21 +146,30 @@ export class SandboxSession extends DurableObject<Env> {
     return handler.handleStreamRequest(request);
   }
 
-  async webSocketMessage(_ws: WebSocket, _message: string | ArrayBuffer): Promise<void> {}
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    await this.terminalBridge.handleMessage(ws, message);
+  }
 
   async webSocketClose(
-    _ws: WebSocket,
-    _code: number,
-    _reason: string,
-    _wasClean: boolean
-  ): Promise<void> {}
+    ws: WebSocket,
+    code: number,
+    reason: string,
+    wasClean: boolean
+  ): Promise<void> {
+    await this.terminalBridge.handleClose(ws, code, reason, wasClean);
+  }
+
+  async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
+    await this.terminalBridge.handleError(ws, error);
+  }
 
   async receiveSandboxControlEvent(input: {
     identity: { directory: string; kiloSessionId?: string; rootKiloSessionId?: string };
     payload: { type: string; properties: Record<string, unknown>; timestamp?: string };
   }): Promise<{ applied: boolean }> {
     const metadata = await this.getMetadata();
-    if (!metadata) {
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (!metadata || epoch === null) {
       logger
         .withFields({
           sessionId: this.sessionId,
@@ -173,6 +221,7 @@ export class SandboxSession extends DurableObject<Env> {
         } catch {
           internalSecret = undefined;
         }
+        if (!this.terminalLifecycle.isCurrent(epoch)) return { applied: false };
         if (!internalSecret) {
           logger
             .withFields({
@@ -183,7 +232,7 @@ export class SandboxSession extends DurableObject<Env> {
             .warn('Control-plane child session ingest skipped; internal secret unavailable');
         }
       }
-      if (!isChild || internalSecret) {
+      if ((!isChild || internalSecret) && this.terminalLifecycle.isCurrent(epoch)) {
         this.ctx.waitUntil(
           publishControlPlaneSessionIngest({
             fetchIngest: request => this.env.SESSION_INGEST.fetch(request),
@@ -197,13 +246,19 @@ export class SandboxSession extends DurableObject<Env> {
         );
       }
     }
+    if (!this.terminalLifecycle.isCurrent(epoch)) return { applied: false };
     if (terminal) {
       const before = await this.loadMessages();
+      if (!this.terminalLifecycle.isCurrent(epoch)) return { applied: false };
       if (hasAcceptedMessage(before)) {
-        await this.saveMessages(terminalizeAcceptedMessages(before, terminal));
+        if (!(await this.saveMessages(terminalizeAcceptedMessages(before, terminal), epoch))) {
+          return { applied: false };
+        }
         this.broadcastClientEvent(terminal === 'failed' ? 'error' : 'complete');
         const nextId = nextQueuedMessageId(await this.loadMessages());
-        if (nextId) this.ctx.waitUntil(this.dispatchQueued(nextId));
+        if (nextId && this.terminalLifecycle.isCurrent(epoch)) {
+          this.ctx.waitUntil(this.dispatchQueued(nextId));
+        }
       }
     }
     return { applied: true };
@@ -214,7 +269,8 @@ export class SandboxSession extends DurableObject<Env> {
     payload: SessionPreparingPayload;
   }): Promise<{ applied: boolean }> {
     const metadata = await this.getMetadata();
-    if (!metadata) return { applied: false };
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (!metadata || epoch === null) return { applied: false };
     const root = metadata.auth.kiloSessionId;
     if (
       input.identity.rootKiloSessionId !== undefined &&
@@ -223,6 +279,7 @@ export class SandboxSession extends DurableObject<Env> {
     ) {
       return { applied: false };
     }
+    if (!this.terminalLifecycle.isCurrent(epoch)) return { applied: false };
     const sessionId = this.requireSessionId();
     applyControlPlanePreparingEvent({
       sessionId,
@@ -233,20 +290,18 @@ export class SandboxSession extends DurableObject<Env> {
     return { applied: true };
   }
 
-  async closeOrgStreams(_organizationId: string): Promise<number> {
+  async closeOrgStreams(organizationId: string): Promise<number> {
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    if (!metadata?.identity.orgId || metadata.identity.orgId !== organizationId) return 0;
+    const records = this.terminalLifecycle.beginRevocation(metadata);
     const sockets = this.ctx.getWebSockets('stream');
-    for (const ws of sockets) ws.close(1001, 'organization streams closed');
+    for (const ws of sockets) ws.close(1000, 'session access revoked');
+    await this.terminalLifecycle.cleanupSession(metadata, records);
     return sockets.length;
   }
 
   async getMetadata(): Promise<SessionMetadata | null> {
-    const raw = await this.ctx.storage.get<unknown>(METADATA_KEY);
-    if (raw === undefined) return null;
-    try {
-      return parseSessionMetadata(raw);
-    } catch {
-      return null;
-    }
+    return this.terminalLifecycle.isDeleted() ? null : this.terminalLifecycle.getStoredMetadata();
   }
 
   async validateKiloGlobalFeedProducer(_params: {
@@ -293,22 +348,31 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   async markAsInterrupted(): Promise<void> {
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (epoch === null) return;
     const { messages } = cancelActiveMessages(await this.loadMessages());
-    await this.saveMessages(messages);
+    await this.saveMessages(messages, epoch);
   }
 
   async interruptExecution(): Promise<{ success: boolean; message?: string }> {
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (epoch === null) return { success: false, message: 'Session not found' };
     const before = await this.loadMessages();
+    if (!this.terminalLifecycle.isCurrent(epoch)) {
+      return { success: false, message: 'Session not found' };
+    }
     const hadWork = hasInterruptibleWork(before);
     const { messages } = cancelActiveMessages(before);
-    await this.saveMessages(messages);
+    if (!(await this.saveMessages(messages, epoch))) {
+      return { success: false, message: 'Session not found' };
+    }
     if (hadWork) {
       this.broadcastClientEvent('interrupted', { reason: 'interrupted' });
     }
     const metadata = await this.getMetadata();
     const sandboxId = metadata?.workspace?.sandboxId;
     const kiloSessionId = metadata?.auth.kiloSessionId;
-    if (sandboxId && kiloSessionId && this.sessionId) {
+    if (sandboxId && kiloSessionId && this.sessionId && this.terminalLifecycle.isCurrent(epoch)) {
       try {
         await sandboxControlRpc(this.env, sandboxId).request({
           operation: 'session.abort',
@@ -320,11 +384,13 @@ export class SandboxSession extends DurableObject<Env> {
           payload: {},
         });
       } catch (error) {
-        logger
-          .withFields({
-            error: error instanceof Error ? error.message : 'abort failed',
-          })
-          .warn('session.abort failed');
+        if (this.terminalLifecycle.isCurrent(epoch)) {
+          logger
+            .withFields({
+              error: error instanceof Error ? error.message : 'abort failed',
+            })
+            .warn('session.abort failed');
+        }
       }
     }
     return { success: hadWork, ...(hadWork ? {} : { message: 'No session work to interrupt' }) };
@@ -358,23 +424,32 @@ export class SandboxSession extends DurableObject<Env> {
     });
   }
 
-  async createTerminal(_input?: {
+  async createTerminal(input?: {
     cols?: number;
     rows?: number;
+    operationId?: string;
   }): Promise<OperationResult<{ pty: WrapperPty }>> {
-    return { success: false, error: 'Terminal is not available for this session' };
+    return this.terminalLifecycle.createTerminal(input);
   }
 
-  async resizeTerminal(_input?: {
+  async resizeTerminal(input?: {
     ptyId?: string;
     cols?: number;
     rows?: number;
   }): Promise<OperationResult<{ pty: WrapperPty }>> {
-    return { success: false, error: 'Terminal is not available for this session' };
+    return this.terminalLifecycle.resizeTerminal(input);
   }
 
-  async closeTerminal(_input?: { ptyId?: string }): Promise<OperationResult<{ success: boolean }>> {
-    return { success: false, error: 'Terminal is not available for this session' };
+  async closeTerminal(input?: { ptyId?: string }): Promise<OperationResult<{ success: boolean }>> {
+    return this.terminalLifecycle.closeTerminal(input);
+  }
+
+  async invalidateTerminalRuntime(input: {
+    sandboxId: string;
+    wrapperInstanceId: string;
+    confirmed: boolean;
+  }): Promise<void> {
+    this.terminalLifecycle.invalidateRuntime(input);
   }
 
   async isSandboxCleanupScheduled(): Promise<boolean> {
@@ -382,18 +457,18 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   async deleteSession(): Promise<void> {
-    const metadata = await this.getMetadata();
-    const sandboxId = metadata?.workspace?.sandboxId;
-    const sessionId = this.sessionId;
-    if (sandboxId && sessionId) {
-      await this.interruptExecution();
-      await withDORetry(
-        () => getSandboxControlStub(this.env, sandboxId),
-        control => control.detachSession(sessionId),
-        'detachSession'
-      );
+    await this.interruptExecution();
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    const records = this.terminalLifecycle.beginDeletion(metadata);
+    for (const ws of this.ctx.getWebSockets('stream')) {
+      ws.close(1000, 'session access revoked');
     }
-    await this.ctx.storage.deleteAll();
+    await this.terminalLifecycle.cleanupSession(metadata, records);
+    await this.ctx.storage.deleteAlarm();
+    this.ctx.storage.transactionSync(() => {
+      this.eventQueries.deleteOlderThan(Number.MAX_SAFE_INTEGER);
+      this.terminalLifecycle.purgeDeletedState();
+    });
   }
 
   async registerSession(input: {
@@ -406,7 +481,8 @@ export class SandboxSession extends DurableObject<Env> {
     profile?: SessionMetadata['profile'];
     finalization?: SessionMetadata['finalization'];
   }): Promise<OperationResult> {
-    if (await this.getMetadata()) return { success: true };
+    if (this.terminalLifecycle.isBlocked()) return { success: false, error: 'Session not found' };
+    if (this.terminalLifecycle.getStoredMetadata()) return { success: true };
     const repository =
       input.repository &&
       'branch' in input.repository &&
@@ -428,7 +504,8 @@ export class SandboxSession extends DurableObject<Env> {
       ...(input.finalization ? { finalization: input.finalization } : {}),
       lifecycle: { version: 1, timestamp: Date.now() },
     });
-    await this.ctx.storage.put(METADATA_KEY, serializeSessionMetadata(metadata));
+    if (this.terminalLifecycle.isBlocked()) return { success: false, error: 'Session not found' };
+    this.ctx.storage.kv.put(METADATA_KEY, serializeSessionMetadata(metadata));
     return { success: true };
   }
 
@@ -445,14 +522,19 @@ export class SandboxSession extends DurableObject<Env> {
   }): Promise<SessionMessageAdmissionResult> {
     const registered = await this.registerSession(input);
     if (!registered.success) {
-      return { success: false, code: 'INTERNAL', error: registered.error ?? 'register failed' };
+      return {
+        success: false,
+        code: registered.error === 'Session not found' ? 'NOT_FOUND' : 'INTERNAL',
+        error: registered.error ?? 'register failed',
+      };
     }
     return this.queueAndDispatch(input.message.initialTurn);
   }
 
   async tryUpdate(updates: { callbackTarget?: CallbackTarget | null }): Promise<OperationResult> {
     const metadata = await this.getMetadata();
-    if (!metadata) return { success: false, error: 'Session not found' };
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (!metadata || epoch === null) return { success: false, error: 'Session not found' };
     const next = {
       ...metadata,
       callback:
@@ -462,7 +544,10 @@ export class SandboxSession extends DurableObject<Env> {
             ? undefined
             : { target: updates.callbackTarget },
     };
-    await this.ctx.storage.put(METADATA_KEY, serializeSessionMetadata(next));
+    if (!this.terminalLifecycle.isCurrent(epoch)) {
+      return { success: false, error: 'Session not found' };
+    }
+    this.ctx.storage.kv.put(METADATA_KEY, serializeSessionMetadata(next));
     return { success: true };
   }
 
@@ -517,8 +602,11 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   async alarm(): Promise<void> {
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (epoch === null) return;
     const now = Date.now();
     const messages = await this.loadMessages();
+    if (!this.terminalLifecycle.isCurrent(epoch)) return;
     const accepted = messages.find(
       message => message.state === 'accepted' && message.acceptedAt !== undefined
     );
@@ -528,11 +616,14 @@ export class SandboxSession extends DurableObject<Env> {
         await this.failWaitingMessages('accepted_overdue');
         return;
       }
-      await this.ctx.storage.setAlarm(decision.at);
+      if (this.terminalLifecycle.isCurrent(epoch)) {
+        await this.ctx.storage.setAlarm(decision.at);
+      }
       return;
     }
     const queued = messages.filter(message => message.state === 'queued');
     for (const message of queued) {
+      if (!this.terminalLifecycle.isCurrent(epoch)) return;
       await this.dispatchQueued(message.messageId, { allowCreate: false });
     }
   }
@@ -540,16 +631,23 @@ export class SandboxSession extends DurableObject<Env> {
   private async queueAndDispatch(
     turn: AcceptedExecutionTurn
   ): Promise<SessionMessageAdmissionResult> {
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (epoch === null) return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
     const messageId = turn.messageId;
     const messages = await this.loadMessages();
+    if (!this.terminalLifecycle.isCurrent(epoch)) {
+      return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
+    }
     const existing = messages.find(message => message.messageId === messageId);
     if (existing) {
       return { success: true, outcome: 'queued', messageId, compatibilityDelivery: 'queued' };
     }
     messages.push({ messageId, state: 'queued', turn });
-    await this.saveMessages(messages);
+    if (!(await this.saveMessages(messages, epoch))) {
+      return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
+    }
     this.broadcastQueuedMessage(messageId, renderExecutionTurnContent(turn));
-    if (nextQueuedMessageId(messages) === messageId) {
+    if (nextQueuedMessageId(messages) === messageId && this.terminalLifecycle.isCurrent(epoch)) {
       this.ctx.waitUntil(this.dispatchQueued(messageId, { allowCreate: true }));
     }
     return { success: true, outcome: 'queued', messageId, compatibilityDelivery: 'queued' };
@@ -561,18 +659,24 @@ export class SandboxSession extends DurableObject<Env> {
   ): Promise<void> {
     const allowCreate = options?.allowCreate === true;
     const metadata = await this.getMetadata();
+    const epoch = this.terminalLifecycle.captureEpoch();
     const sandboxId = metadata?.workspace?.sandboxId;
     const kiloSessionId = metadata?.auth.kiloSessionId;
     const sessionId = this.sessionId;
-    if (!metadata || !sandboxId || !kiloSessionId || !sessionId) {
-      await this.failWaitingMessages('missing_metadata');
+    if (!metadata || epoch === null || !sandboxId || !kiloSessionId || !sessionId) {
+      if (!this.terminalLifecycle.isBlocked()) await this.failWaitingMessages('missing_metadata');
       return;
     }
     const messages = await this.loadMessages();
-    if (nextQueuedMessageId(messages) !== messageId) return;
+    if (!this.terminalLifecycle.isCurrent(epoch) || nextQueuedMessageId(messages) !== messageId) {
+      return;
+    }
     const assigned = assignPreparationAttemptId(messages, messageId, () => crypto.randomUUID());
     if (!assigned) return;
-    if (assigned.messages !== messages) await this.saveMessages(assigned.messages);
+    if (assigned.messages !== messages && !(await this.saveMessages(assigned.messages, epoch))) {
+      return;
+    }
+    if (!this.terminalLifecycle.isCurrent(epoch)) return;
     const queued = assigned.messages.find(message => message.messageId === messageId);
     const control = sandboxControlRpc(this.env, sandboxId);
     const recorder = createPreparationProgressRecorder({
@@ -591,16 +695,19 @@ export class SandboxSession extends DurableObject<Env> {
       this.broadcastStoredEvent(event);
     }
     let delivery: 'attach' | 'prompt' | undefined;
+    let routeAttached = false;
     try {
       const session = {
         sessionId,
         kiloSessionId,
         directory: this.directory(metadata),
       };
+      if (!this.terminalLifecycle.isCurrent(epoch)) return;
       let before = await control.getStatus();
       const stoppingDeadline = Date.now() + DEADLINE_MS.startup;
       let status: Awaited<ReturnType<typeof control.getStatus>>;
       while (true) {
+        if (!this.terminalLifecycle.isCurrent(epoch)) return;
         if (allowCreate && before.physical === 'stopping') {
           const observed = await observeControlAfterStopping(before, () => control.getStatus(), {
             retryMs: QUEUE_RETRY_MS,
@@ -611,17 +718,20 @@ export class SandboxSession extends DurableObject<Env> {
             await this.failWaitingMessages('environment_failed');
             return;
           }
+          if (!this.terminalLifecycle.isCurrent(epoch)) return;
           if (nextQueuedMessageId(await this.loadMessages()) !== messageId) return;
           before = observed;
         }
         const provision = provisionPreparingStep(before.physical, allowCreate);
         if (provision) recorder.onProgress(provision.step, provision.message);
+        if (!this.terminalLifecycle.isCurrent(epoch)) return;
         status = await control.ensureReady({
           ownerId: metadata.identity.userId,
           provider: getSandboxProvider(metadata),
           allowCreate,
           ...(metadata.auth.kilocodeToken ? { kiloToken: metadata.auth.kilocodeToken } : {}),
         });
+        if (!this.terminalLifecycle.isCurrent(epoch)) return;
         if (!allowCreate || status.physical !== 'stopping') break;
         before = status;
       }
@@ -656,27 +766,42 @@ export class SandboxSession extends DurableObject<Env> {
         }
         return;
       }
+      if (!this.terminalLifecycle.isCurrent(epoch)) return;
+      routeAttached = true;
       await control.attachSession({
         sessionId,
         kiloSessionId,
         directory: session.directory,
         ownerId: metadata.identity.userId,
       });
+      if (!this.terminalLifecycle.isCurrent(epoch)) {
+        await this.compensateSessionAttachment(metadata);
+        return;
+      }
       recorder.onProgress('workspace_setup', 'Setting up workspace…');
       delivery = 'attach';
+      const attachPayload = await fillAttachGitToken(
+        metadata,
+        buildSessionAttachPayload(metadata, {
+          attemptId: recorder.attemptId,
+          triggerMessageId: messageId,
+        }),
+        this.env
+      );
+      if (!this.terminalLifecycle.isCurrent(epoch)) {
+        await this.compensateSessionAttachment(metadata);
+        return;
+      }
       const attached = await control.request({
         operation: 'session.attach',
         session,
-        payload: await fillAttachGitToken(
-          metadata,
-          buildSessionAttachPayload(metadata, {
-            attemptId: recorder.attemptId,
-            triggerMessageId: messageId,
-          }),
-          this.env
-        ),
+        payload: attachPayload,
         timeoutMs: SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
       });
+      if (!this.terminalLifecycle.isCurrent(epoch)) {
+        await this.compensateSessionAttachment(metadata);
+        return;
+      }
       if (!attached.ok) {
         recorder.finalize({ status: 'failed', safeError: 'Environment preparation failed' });
         logger
@@ -689,8 +814,27 @@ export class SandboxSession extends DurableObject<Env> {
         await this.recordDeliveryFailure(messageId, 'attach');
         return;
       }
+      this.terminalLifecycle.recordAttachment({
+        metadata,
+        sandboxId,
+        wrapperInstanceId: status.wrapperInstanceId,
+        epoch,
+      });
+      if (!this.terminalLifecycle.isCurrent(epoch)) {
+        await this.compensateSessionAttachment(metadata);
+        return;
+      }
       recorder.finalize({ status: 'completed' });
-      if (nextQueuedMessageId(await this.loadMessages()) !== messageId) return;
+      const latestMessages = await this.loadMessages();
+      if (
+        !this.terminalLifecycle.isCurrent(epoch) ||
+        nextQueuedMessageId(latestMessages) !== messageId
+      ) {
+        if (!this.terminalLifecycle.isCurrent(epoch)) {
+          await this.compensateSessionAttachment(metadata);
+        }
+        return;
+      }
       delivery = 'prompt';
       const response = await control.request({
         operation: 'session.prompt',
@@ -715,15 +859,31 @@ export class SandboxSession extends DurableObject<Env> {
           },
         },
       });
+      if (!this.terminalLifecycle.isCurrent(epoch)) {
+        await this.compensateSessionAttachment(metadata);
+        return;
+      }
       if (response.ok) {
-        const accepted = acceptQueuedMessage(await this.loadMessages(), messageId, Date.now());
-        if (!accepted) return;
-        await this.saveMessages(accepted);
-        await this.ctx.storage.setAlarm(Date.now() + DEADLINE_MS.acceptedAlarmCap);
+        const pending = await this.loadMessages();
+        if (!this.terminalLifecycle.isCurrent(epoch)) {
+          await this.compensateSessionAttachment(metadata);
+          return;
+        }
+        const accepted = acceptQueuedMessage(pending, messageId, Date.now());
+        if (!accepted || !(await this.saveMessages(accepted, epoch))) return;
+        if (this.terminalLifecycle.isCurrent(epoch)) {
+          await this.ctx.storage.setAlarm(Date.now() + DEADLINE_MS.acceptedAlarmCap);
+        }
       } else {
         await this.recordDeliveryFailure(messageId, 'prompt');
       }
     } catch (error) {
+      if (!this.terminalLifecycle.isCurrent(epoch)) {
+        if (routeAttached || delivery === 'attach' || delivery === 'prompt') {
+          await this.compensateSessionAttachment(metadata);
+        }
+        return;
+      }
       recorder.finalize({ status: 'failed', safeError: 'Environment preparation failed' });
       logger
         .withFields({
@@ -740,12 +900,24 @@ export class SandboxSession extends DurableObject<Env> {
     }
   }
 
+  private async compensateSessionAttachment(metadata: SessionMetadata): Promise<void> {
+    try {
+      await this.terminalLifecycle.cleanupSession(metadata, []);
+    } catch {
+      logger.withFields({ sessionId: this.sessionId }).warn('Control-plane session detach failed');
+    }
+  }
+
   private async recordDeliveryFailure(messageId: string, kind: 'attach' | 'prompt'): Promise<void> {
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (epoch === null) return;
+    const messages = await this.loadMessages();
+    if (!this.terminalLifecycle.isCurrent(epoch)) return;
     const updated =
       kind === 'attach'
-        ? incrementAttachFailure(await this.loadMessages(), messageId)
-        : incrementPromptFailure(await this.loadMessages(), messageId);
-    await this.saveMessages(updated.messages);
+        ? incrementAttachFailure(messages, messageId)
+        : incrementPromptFailure(messages, messageId);
+    if (!(await this.saveMessages(updated.messages, epoch))) return;
     const exhausted =
       kind === 'attach' ? isAttachExhausted(updated.failures) : isPromptExhausted(updated.failures);
     if (exhausted) {
@@ -756,12 +928,16 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   async failWaitingMessages(reason: string): Promise<void> {
-    const { messages, failedIds } = applyFailWaitingMessages(await this.loadMessages(), reason);
-    if (failedIds.length === 0) return;
-    await this.saveMessages(messages);
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (epoch === null) return;
+    const before = await this.loadMessages();
+    if (!this.terminalLifecycle.isCurrent(epoch)) return;
+    const { messages, failedIds } = applyFailWaitingMessages(before, reason);
+    if (failedIds.length === 0 || !(await this.saveMessages(messages, epoch))) return;
     const now = Date.now();
     const safeError = safeErrorFromQueueReason(reason);
     for (const messageId of failedIds) {
+      if (!this.terminalLifecycle.isCurrent(epoch)) return;
       const record = messages.find(message => message.messageId === messageId);
       if (!record) continue;
       if (record.preparationAttemptId) {
@@ -778,6 +954,7 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   private broadcastMessageFailed(message: SessionMessageRecord, now: number): void {
+    if (this.terminalLifecycle.captureEpoch() === null) return;
     const sessionId = this.requireSessionId();
     const payload = JSON.stringify(failedMessageSnapshot(message, now));
     const eventId = this.eventQueries.insert({
@@ -798,12 +975,16 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   private broadcastStoredEvent(event: StoredEvent): void {
+    if (this.terminalLifecycle.captureEpoch() === null) return;
     const sessionId = this.requireSessionId();
     createStreamHandler(this.ctx, this.eventQueries, sessionId).broadcastEvent(event);
   }
 
   private async armQueueRetry(): Promise<void> {
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (epoch === null) return;
     const existing = await this.ctx.storage.getAlarm();
+    if (!this.terminalLifecycle.isCurrent(epoch)) return;
     const when = Date.now() + QUEUE_RETRY_MS;
     if (existing === null || existing > when) {
       await this.ctx.storage.setAlarm(when);
@@ -823,10 +1004,14 @@ export class SandboxSession extends DurableObject<Env> {
     payload: unknown
   ): Promise<{ success: boolean }> {
     const metadata = await this.getMetadata();
+    const epoch = this.terminalLifecycle.captureEpoch();
     const sandboxId = metadata?.workspace?.sandboxId;
     const kiloSessionId = metadata?.auth.kiloSessionId;
     const sessionId = this.sessionId;
-    if (!metadata || !sandboxId || !kiloSessionId || !sessionId) {
+    if (!metadata || epoch === null || !sandboxId || !kiloSessionId || !sessionId) {
+      throw new Error('No wrapper found for session');
+    }
+    if (!this.terminalLifecycle.isCurrent(epoch)) {
       throw new Error('No wrapper found for session');
     }
     const response = await sandboxControlRpc(this.env, sandboxId).request({
@@ -838,6 +1023,9 @@ export class SandboxSession extends DurableObject<Env> {
       },
       payload,
     });
+    if (!this.terminalLifecycle.isCurrent(epoch)) {
+      throw new Error('No wrapper found for session');
+    }
     if (!response.ok) {
       throw new Error(response.error?.message ?? 'Control request failed');
     }
@@ -853,6 +1041,7 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   private broadcastQueuedMessage(messageId: string, content: string): void {
+    if (this.terminalLifecycle.captureEpoch() === null) return;
     const sessionId = this.requireSessionId();
     createStreamHandler(this.ctx, this.eventQueries, sessionId).broadcastEvent({
       id: 0,
@@ -868,6 +1057,7 @@ export class SandboxSession extends DurableObject<Env> {
     streamEventType: 'interrupted' | 'complete' | 'error',
     data: Record<string, unknown> = {}
   ): void {
+    if (this.terminalLifecycle.captureEpoch() === null) return;
     const sessionId = this.requireSessionId();
     const timestamp = Date.now();
     const payload = JSON.stringify(data);
@@ -889,11 +1079,16 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   private async loadMessages(): Promise<MessageRecord[]> {
-    return (await this.ctx.storage.get<MessageRecord[]>(MESSAGES_KEY)) ?? [];
+    if (this.terminalLifecycle.isBlocked()) return [];
+    const messages = await this.ctx.storage.get<MessageRecord[]>(MESSAGES_KEY);
+    return this.terminalLifecycle.isBlocked() ? [] : (messages ?? []);
   }
 
-  private async saveMessages(messages: MessageRecord[]): Promise<void> {
-    await this.ctx.storage.put(MESSAGES_KEY, messages);
+  private async saveMessages(messages: MessageRecord[], epoch?: number): Promise<boolean> {
+    const currentEpoch = epoch ?? this.terminalLifecycle.captureEpoch();
+    if (currentEpoch === null || !this.terminalLifecycle.isCurrent(currentEpoch)) return false;
+    this.ctx.storage.kv.put(MESSAGES_KEY, messages);
+    return true;
   }
 
   private requireSessionId(): SessionId {

@@ -2140,6 +2140,49 @@ describe('router question and permission controls', () => {
 });
 
 describe('router terminal procedures', () => {
+  const controlSessionId = 'workspace_12345678-1234-1234-1234-123456789abc' as SessionId;
+  const controlPty = {
+    id: 'pty_123',
+    title: 'Workspace terminal',
+    command: '/bin/sh',
+    args: [],
+    cwd: '/workspace/repo',
+    status: 'running' as const,
+    pid: 123,
+  };
+
+  beforeEach(() => {
+    requireCurrentSessionAccessMock.mockReset().mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      organizationId: null,
+    });
+  });
+
+  function createControlTerminalCaller(stub: MockSessionStub) {
+    const cloudAgentSession: MockCAS = { idFromName: vi.fn(), get: vi.fn() };
+    const sandboxSession: MockCAS = {
+      idFromName: vi.fn().mockReturnValue('sandbox-session-do-id'),
+      get: vi.fn().mockReturnValue(stub),
+    };
+    const context = {
+      userId: 'test-user-123',
+      authToken: 'token',
+      botId: undefined,
+      request: new Request('http://test.local'),
+      env: {
+        CLOUD_AGENT_SESSION: cloudAgentSession,
+        SANDBOX_SESSION: sandboxSession,
+      },
+    } as unknown as TRPCContext;
+
+    return {
+      caller: appRouter.createCaller(context),
+      cloudAgentSession,
+      sandboxSession,
+      context,
+    };
+  }
+
   it('creates a terminal through the session Durable Object', async () => {
     const createTerminal = vi.fn().mockResolvedValue({
       success: true,
@@ -2190,6 +2233,116 @@ describe('router terminal procedures', () => {
     });
     expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
     expect(createTerminal).toHaveBeenCalledWith({ cols: 120, rows: 32 });
+  });
+
+  it('creates control-plane terminals with a dedicated creation operation identity', async () => {
+    const createTerminal = vi.fn().mockResolvedValue({
+      success: true,
+      data: { pty: controlPty },
+    });
+    const { caller, sandboxSession, cloudAgentSession, context } = createControlTerminalCaller({
+      createTerminal,
+    });
+
+    await expect(
+      caller.createTerminal({ cloudAgentSessionId: controlSessionId, cols: 120, rows: 32 })
+    ).resolves.toEqual({ pty: controlPty });
+
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
+      env: context.env,
+      kiloUserId: 'test-user-123',
+      cloudAgentSessionId: controlSessionId,
+    });
+    expect(sandboxSession.idFromName).toHaveBeenCalledWith(`test-user-123:${controlSessionId}`);
+    expect(cloudAgentSession.idFromName).not.toHaveBeenCalled();
+    expect(createTerminal).toHaveBeenCalledWith({
+      cols: 120,
+      rows: 32,
+      operationId: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      ),
+    });
+  });
+
+  it('reuses the same control-plane creation operation identity after a retryable Durable Object failure', async () => {
+    const createTerminal = vi
+      .fn()
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Durable Object disconnected'), { retryable: true })
+      )
+      .mockResolvedValueOnce({ success: true, data: { pty: controlPty } });
+    const { caller, sandboxSession } = createControlTerminalCaller({ createTerminal });
+
+    await expect(
+      caller.createTerminal({ cloudAgentSessionId: controlSessionId, cols: 80, rows: 24 })
+    ).resolves.toEqual({ pty: controlPty });
+
+    expect(sandboxSession.idFromName).toHaveBeenCalledTimes(2);
+    expect(createTerminal).toHaveBeenCalledTimes(2);
+    expect(createTerminal.mock.calls[0]?.[0]).toEqual(createTerminal.mock.calls[1]?.[0]);
+    expect(createTerminal.mock.calls[0]?.[0]).toMatchObject({
+      cols: 80,
+      rows: 24,
+      operationId: expect.any(String),
+    });
+  });
+
+  it.each(['create', 'resize', 'close'] as const)(
+    'authorizes control-plane terminal %s before accessing its Durable Object',
+    async operation => {
+      requireCurrentSessionAccessMock.mockRejectedValueOnce(
+        new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
+      );
+      const { caller, sandboxSession } = createControlTerminalCaller({
+        createTerminal: vi.fn(),
+        resizeTerminal: vi.fn(),
+        closeTerminal: vi.fn(),
+      });
+
+      const result =
+        operation === 'create'
+          ? caller.createTerminal({ cloudAgentSessionId: controlSessionId, cols: 80, rows: 24 })
+          : operation === 'resize'
+            ? caller.resizeTerminal({
+                cloudAgentSessionId: controlSessionId,
+                ptyId: 'pty_123',
+                cols: 80,
+                rows: 24,
+              })
+            : caller.closeTerminal({ cloudAgentSessionId: controlSessionId, ptyId: 'pty_123' });
+
+      await expect(result).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(requireCurrentSessionAccessMock).toHaveBeenCalledOnce();
+      expect(sandboxSession.idFromName).not.toHaveBeenCalled();
+      expect(sandboxSession.get).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    {
+      error: 'Terminal access denied: the current wrapper does not support terminals',
+      code: 'FORBIDDEN',
+    },
+    {
+      error: 'Terminal access denied: credential containment is unavailable',
+      code: 'FORBIDDEN',
+    },
+    {
+      error: 'Terminal is only available after the workspace is prepared',
+      code: 'PRECONDITION_FAILED',
+    },
+    {
+      error: 'Terminal is only available to interactive Cloud Agent sessions',
+      code: 'FORBIDDEN',
+    },
+    { error: 'Session not found', code: 'NOT_FOUND' },
+  ])('projects control-plane terminal failure "$error" as $code', async ({ error, code }) => {
+    const createTerminal = vi.fn().mockResolvedValue({ success: false, error });
+    const { caller } = createControlTerminalCaller({ createTerminal });
+
+    await expect(
+      caller.createTerminal({ cloudAgentSessionId: controlSessionId, cols: 80, rows: 24 })
+    ).rejects.toMatchObject({ code, message: error });
   });
 
   it('denies terminal creation before Durable Object access', async () => {
@@ -2258,6 +2411,33 @@ describe('router terminal procedures', () => {
     await expect(
       caller.closeTerminal({ cloudAgentSessionId: sessionId, ptyId: 'pty_123' })
     ).resolves.toEqual({ success: true });
+    expect(resizeTerminal).toHaveBeenCalledWith({ ptyId: 'pty_123', cols: 80, rows: 24 });
+    expect(closeTerminal).toHaveBeenCalledWith({ ptyId: 'pty_123' });
+  });
+
+  it('resizes and closes control-plane terminals through the owner-scoped session Durable Object', async () => {
+    const resizeTerminal = vi.fn().mockResolvedValue({ success: true, data: { pty: controlPty } });
+    const closeTerminal = vi.fn().mockResolvedValue({ success: true, data: { success: true } });
+    const { caller, sandboxSession, cloudAgentSession } = createControlTerminalCaller({
+      resizeTerminal,
+      closeTerminal,
+    });
+
+    await expect(
+      caller.resizeTerminal({
+        cloudAgentSessionId: controlSessionId,
+        ptyId: 'pty_123',
+        cols: 80,
+        rows: 24,
+      })
+    ).resolves.toEqual({ pty: controlPty });
+    await expect(
+      caller.closeTerminal({ cloudAgentSessionId: controlSessionId, ptyId: 'pty_123' })
+    ).resolves.toEqual({ success: true });
+
+    expect(sandboxSession.idFromName).toHaveBeenCalledTimes(2);
+    expect(sandboxSession.idFromName).toHaveBeenCalledWith(`test-user-123:${controlSessionId}`);
+    expect(cloudAgentSession.idFromName).not.toHaveBeenCalled();
     expect(resizeTerminal).toHaveBeenCalledWith({ ptyId: 'pty_123', cols: 80, rows: 24 });
     expect(closeTerminal).toHaveBeenCalledWith({ ptyId: 'pty_123' });
   });

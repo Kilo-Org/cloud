@@ -26,6 +26,10 @@ export const SESSION_OPERATIONS = [
   'session.abort',
   'session.sync',
   'session.detach',
+  'session.terminal.create',
+  'session.terminal.resize',
+  'session.terminal.close',
+  'session.terminal.connect',
 ] as const;
 
 export const SANDBOX_EVENTS = ['sandbox.ready', 'sandbox.heartbeat'] as const;
@@ -55,6 +59,14 @@ export const controlErrorCodes = [
 export type ControlErrorCode = (typeof controlErrorCodes)[number];
 
 export const requestIdSchema = z.string().min(1).max(128);
+
+export const terminalPtyIdSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[a-zA-Z0-9_-]+$/, 'Invalid PTY ID format');
+
+export const wrapperInstanceIdSchema = z.string().uuid();
 
 export const sessionRequestIdentitySchema = z.object({
   sessionId: z.string().min(1),
@@ -114,6 +126,7 @@ export type ControlError = z.infer<typeof controlErrorSchema>;
 export const sandboxHelloPayloadSchema = z.object({
   protocolVersion: z.literal(SANDBOX_CONTROL_PROTOCOL_VERSION),
   providerInstanceId: z.string().min(1).max(256),
+  wrapperInstanceId: wrapperInstanceIdSchema.optional(),
   wrapperVersion: z.string().min(1).max(128).optional(),
 });
 
@@ -340,6 +353,77 @@ export const sessionDetachResultSchema = z
   })
   .strict();
 
+const terminalSizeSchema = z.object({
+  cols: z.number().int().min(2).max(500),
+  rows: z.number().int().min(2).max(200),
+});
+
+const terminalPtySchema = z.object({
+  id: terminalPtyIdSchema,
+  title: z.string(),
+  command: z.string(),
+  args: z.array(z.string()),
+  cwd: z.string(),
+  status: z.enum(['running', 'exited']),
+  pid: z.number().int(),
+});
+
+export const sessionTerminalCreatePayloadSchema = z
+  .object({
+    operationId: z.string().uuid(),
+  })
+  .extend(terminalSizeSchema.partial().shape)
+  .strict()
+  .refine(data => (data.cols === undefined) === (data.rows === undefined), {
+    message: 'cols and rows must be provided together',
+  });
+
+export const sessionTerminalCreateResultSchema = z
+  .object({
+    pty: terminalPtySchema,
+  })
+  .strict();
+
+export const sessionTerminalResizePayloadSchema = z
+  .object({
+    ptyId: terminalPtyIdSchema,
+  })
+  .extend(terminalSizeSchema.shape)
+  .strict();
+
+export const sessionTerminalResizeResultSchema = z
+  .object({
+    pty: terminalPtySchema,
+  })
+  .strict();
+
+export const sessionTerminalClosePayloadSchema = z
+  .object({
+    ptyId: terminalPtyIdSchema,
+  })
+  .strict();
+
+export const sessionTerminalCloseResultSchema = z
+  .object({
+    success: z.boolean(),
+  })
+  .strict();
+
+export const sessionTerminalConnectPayloadSchema = z
+  .object({
+    ownerId: z.string().min(1),
+    ptyId: terminalPtyIdSchema,
+    bridgeGeneration: z.string().uuid(),
+    capability: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+
+export const sessionTerminalConnectResultSchema = z
+  .object({
+    connected: z.literal(true),
+  })
+  .strict();
+
 export const sessionEventPayloadSchema = z
   .object({
     type: z.string().min(1).max(256),
@@ -381,14 +465,24 @@ export type SessionSyncPayload = z.infer<typeof sessionSyncPayloadSchema>;
 export type SessionSyncResult = z.infer<typeof sessionSyncResultSchema>;
 export type SessionDetachPayload = z.infer<typeof sessionDetachPayloadSchema>;
 export type SessionDetachResult = z.infer<typeof sessionDetachResultSchema>;
+export type SessionTerminalCreatePayload = z.infer<typeof sessionTerminalCreatePayloadSchema>;
+export type SessionTerminalCreateResult = z.infer<typeof sessionTerminalCreateResultSchema>;
+export type SessionTerminalResizePayload = z.infer<typeof sessionTerminalResizePayloadSchema>;
+export type SessionTerminalResizeResult = z.infer<typeof sessionTerminalResizeResultSchema>;
+export type SessionTerminalClosePayload = z.infer<typeof sessionTerminalClosePayloadSchema>;
+export type SessionTerminalCloseResult = z.infer<typeof sessionTerminalCloseResultSchema>;
+export type SessionTerminalConnectPayload = z.infer<typeof sessionTerminalConnectPayloadSchema>;
+export type SessionTerminalConnectResult = z.infer<typeof sessionTerminalConnectResultSchema>;
 export type SessionEventPayload = z.infer<typeof sessionEventPayloadSchema>;
 export type SessionPreparingPayload = z.infer<typeof sessionPreparingPayloadSchema>;
 
 export const sandboxControlSocketAttachmentSchema = z.object({
   handshakeComplete: z.boolean(),
   acceptedAt: z.number().int().nonnegative(),
+  connectionId: z.string().uuid().optional(),
   protocolVersion: z.literal(SANDBOX_CONTROL_PROTOCOL_VERSION).optional(),
   providerInstanceId: z.string().min(1).max(256).optional(),
+  wrapperInstanceId: wrapperInstanceIdSchema.optional(),
 });
 
 export type SandboxControlSocketAttachment = z.infer<typeof sandboxControlSocketAttachmentSchema>;

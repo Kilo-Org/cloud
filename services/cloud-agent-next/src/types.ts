@@ -14,7 +14,10 @@ import type { SecretBinding } from './auth.js';
 import * as z from 'zod';
 import { Limits } from './schema.js';
 import { SESSION_ID_RE } from './shared/protocol.js';
-import { PNPM_STORE_ENV_VAR } from './shared/runtime-environment.js';
+import {
+  CONTROL_RUNTIME_RESERVED_ENV_VARS,
+  PNPM_STORE_ENV_VAR,
+} from './shared/runtime-environment.js';
 
 export const sessionIdSchema = z.string().regex(SESSION_ID_RE, 'Invalid session ID format');
 
@@ -91,6 +94,7 @@ export const RESERVED_ENV_VARS = [
   'SESSION_ID',
   'SESSION_HOME',
   PNPM_STORE_ENV_VAR,
+  ...CONTROL_RUNTIME_RESERVED_ENV_VARS,
 ] as const;
 
 export const envVarsSchema = z

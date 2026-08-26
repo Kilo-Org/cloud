@@ -35,6 +35,11 @@ export function getDiffSelection(pr: PrIdentity): DiffSelection | null {
   return prDiffSelectionSlot.get(prRouteKey(pr)) ?? null;
 }
 
-export function clearDiffSelection() {
-  prDiffSelectionSlot.clearAll();
+/**
+ * Drops the selection stored for one PR. Scoped, not global: two PR entries
+ * can sit on the navigation stack at once, and clearing the one on top must
+ * not discard the selection the entry underneath is still holding.
+ */
+export function clearDiffSelection(pr: PrIdentity) {
+  prDiffSelectionSlot.clear(prRouteKey(pr));
 }

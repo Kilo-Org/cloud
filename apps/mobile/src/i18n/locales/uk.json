@@ -148,7 +148,9 @@
     "appearanceSystem": "Системна",
     "appearanceLight": "Світла",
     "appearanceDark": "Темна",
-    "account": "Обліковий запис"
+    "account": "Обліковий запис",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "Сповіщення",
@@ -1738,7 +1740,8 @@
       "discardDraftMessage": "Ваш запит буде втрачено.",
       "discardDraftTitle": "Відкинути чернетку?",
       "discardFailed": "Не вдалося відкинути чернетку. Спробуйте ще раз.",
-      "keepEditing": "Продовжити редагування"
+      "keepEditing": "Продовжити редагування",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Оновлено {{displayCount}} файл",
@@ -2234,15 +2237,10 @@
     "couldNotLoadSessions": "Не вдалося завантажити сеанси",
     "couldNotLoadActiveSessions": "Не вдалося завантажити активні сеанси",
     "agentSessions": "Сеанси агента",
-    "showingSavedSessions": "Показано збережені сеанси — живий статус може бути застарілим",
-    "startNewAgentSession": "Розпочати новий сеанс Kilo Agent",
-    "aiCodingSessions": "Сеанси кодування з ШІ",
-    "startCodingTaskFromPhone": "Розпочніть завдання кодування з телефона або продовжте сеанс зі свого CLI.",
-    "tryIt": "Спробувати",
     "newCodingTask": "Нове завдання кодування",
     "explore": "Дослідити",
     "seeAll": "Показати всі",
-    "kiloAgents": "Агенти Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Закрити {{filename}}",

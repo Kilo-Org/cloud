@@ -148,7 +148,9 @@
     "appearanceSystem": "Сістэма",
     "appearanceLight": "Светлая",
     "appearanceDark": "Цёмная",
-    "account": "Уліковы запіс"
+    "account": "Уліковы запіс",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request недаступны",
@@ -2206,7 +2208,8 @@
       "discardDraftMessage": "Ваш запыт будзе страчаны.",
       "keepEditing": "Працягваць рэдагаванне",
       "discard": "Адхіліць",
-      "discardFailed": "Не атрымалася адхіліць чарнавік. Паспрабуйце зноў."
+      "discardFailed": "Не атрымалася адхіліць чарнавік. Паспрабуйце зноў.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл",
@@ -2702,15 +2705,10 @@
     "couldNotLoadSessions": "Не ўдалося загрузіць сеансы",
     "couldNotLoadActiveSessions": "Не ўдалося загрузіць актыўныя сеансы",
     "agentSessions": "Сеансы агента",
-    "showingSavedSessions": "Паказаныя захаваныя сеансы — жывы статус можа быць састарэлым",
-    "startNewAgentSession": "Пачаць новы сеанс агента Kilo",
-    "aiCodingSessions": "Сеансы AI-праграмавання",
-    "startCodingTaskFromPhone": "Пачніце задачу праграмавання з тэлефона або працягніце сеанс з вашага CLI.",
-    "tryIt": "Паспрабаваць",
     "newCodingTask": "Новая задача праграмавання",
     "explore": "Даследаваць",
     "seeAll": "Паказаць усё",
-    "kiloAgents": "Агенты Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Закрыць {{filename}}",

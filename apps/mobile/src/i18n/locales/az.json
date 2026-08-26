@@ -148,7 +148,9 @@
     "appearanceSystem": "Sistem",
     "appearanceLight": "İşıq",
     "appearanceDark": "Qaranlıq",
-    "account": "Hesab"
+    "account": "Hesab",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request əlçatan deyil",
@@ -2176,7 +2178,8 @@
       "discardDraftMessage": "İstəyiniz itiriləcək.",
       "keepEditing": "Redaktəyə davam et",
       "discard": "Ləğv et",
-      "discardFailed": "Qaralama ləğv edilə bilmədi. Zəhmət olmasa yenidən cəhd edin."
+      "discardFailed": "Qaralama ləğv edilə bilmədi. Zəhmət olmasa yenidən cəhd edin.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl yeniləndi",
@@ -2662,15 +2665,10 @@
     "couldNotLoadSessions": "Sessiyalar yüklənə bilmədi",
     "couldNotLoadActiveSessions": "Aktiv sessiyalar yüklənə bilmədi",
     "agentSessions": "Agent sessiyaları",
-    "showingSavedSessions": "Saxlanılmış sessiyalar göstərilir — canlı status köhnəlmiş ola bilər",
-    "startNewAgentSession": "Yeni Kilo Agent sessiyasına başla",
-    "aiCodingSessions": "AI kodlaşdırma sessiyaları",
-    "startCodingTaskFromPhone": "Telefonunuzdan kodlaşdırma tapşırığı başlayın və ya CLI-nizdən sessiyanı davam etdirin.",
-    "tryIt": "Cəhd edin",
     "newCodingTask": "Yeni kodlaşdırma tapşırığı",
     "explore": "Kəşf et",
     "seeAll": "Hamısına bax",
-    "kiloAgents": "Kilo Agentlər"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} bağla",

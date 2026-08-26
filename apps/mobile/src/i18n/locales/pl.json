@@ -148,7 +148,9 @@
     "appearanceSystem": "System",
     "appearanceLight": "Jasny",
     "appearanceDark": "Ciemny",
-    "account": "Konto"
+    "account": "Konto",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "Powiadomienia",
@@ -1738,7 +1740,8 @@
       "discardDraftMessage": "Twoje polecenie zostanie utracone.",
       "discardDraftTitle": "Odrzucić szkic?",
       "discardFailed": "Nie udało się odrzucić szkicu. Spróbuj ponownie.",
-      "keepEditing": "Kontynuuj edycję"
+      "keepEditing": "Kontynuuj edycję",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Zaktualizowano {{displayCount}} plik",
@@ -2234,15 +2237,10 @@
     "couldNotLoadSessions": "Nie można załadować sesji",
     "couldNotLoadActiveSessions": "Nie można załadować aktywnych sesji",
     "agentSessions": "Sesje agenta",
-    "showingSavedSessions": "Wyświetlanie zapisanych sesji — status na żywo może być nieaktualny",
-    "startNewAgentSession": "Rozpocznij nową sesję agenta Kilo",
-    "aiCodingSessions": "Sesje kodowania AI",
-    "startCodingTaskFromPhone": "Rozpocznij zadanie kodowania z telefonu lub kontynuuj sesję z CLI.",
-    "tryIt": "Wypróbuj",
     "newCodingTask": "Nowe zadanie kodowania",
     "explore": "Odkrywaj",
     "seeAll": "Zobacz wszystkie",
-    "kiloAgents": "Agenci Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Zamknij {{filename}}",

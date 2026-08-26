@@ -148,7 +148,9 @@
     "appearanceSystem": "Isistimu",
     "appearanceLight": "Ukukhanya",
     "appearanceDark": "Ubumnyama",
-    "account": "Akhawunti"
+    "account": "Akhawunti",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokudonsa asitholakali",
@@ -2176,7 +2178,8 @@
       "discardDraftMessage": "Umphakamo wakho uzolahleka.",
       "keepEditing": "Qhubeka uhlela",
       "discard": "Lahla",
-      "discardFailed": "Akukwazanga ukulahla idrafuthi. Sicela uzame futhi."
+      "discardFailed": "Akukwazanga ukulahla idrafuthi. Sicela uzame futhi.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}",
@@ -2662,15 +2665,10 @@
     "couldNotLoadSessions": "Asikwazanga ukulayisha amaseshini",
     "couldNotLoadActiveSessions": "Asikwazanga ukulayisha amaseshini asebenzayo",
     "agentSessions": "Amaseshini e-agent",
-    "showingSavedSessions": "Kuboniswa amaseshini agciniwe — isimo esibukhoma singase siphelelwe yisikhathi",
-    "startNewAgentSession": "Qala iseshini entsha ye-Kilo Agent",
-    "aiCodingSessions": "Amaseshini okubhala ikhodi e-AI",
-    "startCodingTaskFromPhone": "Qala umsebenzi wokubhala ikhodi usuka kufoni yakho noma uqhubeke ngeseshini esuka ku-CLI yakho.",
-    "tryIt": "Zama",
     "newCodingTask": "Umsebenzi omusha wokubhala ikhodi",
     "explore": "Hlola",
     "seeAll": "Bona konke",
-    "kiloAgents": "Ama-Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Vala {{filename}}",

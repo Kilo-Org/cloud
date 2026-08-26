@@ -148,7 +148,9 @@
     "appearanceSystem": "Sistema",
     "appearanceLight": "Dawl",
     "appearanceDark": "Skur",
-    "account": "Kont"
+    "account": "Kont",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request mhux disponibbli",
@@ -2221,7 +2223,8 @@
       "discardDraftMessage": "Il-prompt tiegħek se jintilef.",
       "keepEditing": "Kompli ipproċessa",
       "discard": "Warrab",
-      "discardFailed": "Ma setax jintrema l-abbozz. Jekk jogħġbok erġa' pprova."
+      "discardFailed": "Ma setax jintrema l-abbozz. Jekk jogħġbok erġa' pprova.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aġġornat {{displayCount}} fajl",
@@ -2722,15 +2725,10 @@
     "couldNotLoadSessions": "Ma setgħux jitgħabbew is-sessjonijiet",
     "couldNotLoadActiveSessions": "Ma setgħux jitgħabbew is-sessjonijiet attivi",
     "agentSessions": "Sessjonijiet tal-aġent",
-    "showingSavedSessions": "Qed juri s-sessjonijiet salvati — l-istatus dirett jista' jkun skadut",
-    "startNewAgentSession": "Ibda sessjoni ġdida ta' Kilo Agent",
-    "aiCodingSessions": "Sessjonijiet ta' kodifikazzjoni bl-AI",
-    "startCodingTaskFromPhone": "Ibda kompitu ta' kodifikazzjoni mit-telefon tiegħek jew kompli sessjoni mill-CLI tiegħek.",
-    "tryIt": "Ipprova",
     "newCodingTask": "Kompitu ġdid ta' kodifikazzjoni",
     "explore": "Esplora",
     "seeAll": "Ara kollha",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Agħlaq {{filename}}",

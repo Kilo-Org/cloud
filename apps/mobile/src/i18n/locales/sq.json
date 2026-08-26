@@ -148,7 +148,9 @@
     "appearanceSystem": "Sistemi",
     "appearanceLight": "E çelët",
     "appearanceDark": "E errët",
-    "account": "Llogaria"
+    "account": "Llogaria",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Kërkesa e tërheqjes e padisponueshme",
@@ -2176,7 +2178,8 @@
       "discardDraftMessage": "Mesazhi juaj do të humbasë.",
       "keepEditing": "Vazhdo redaktimin",
       "discard": "Hiq",
-      "discardFailed": "Nuk u hoq drafti. Ju lutemi provoni përsëri."
+      "discardFailed": "Nuk u hoq drafti. Ju lutemi provoni përsëri.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar",
@@ -2662,15 +2665,10 @@
     "couldNotLoadSessions": "Seancat nuk u ngarkuan",
     "couldNotLoadActiveSessions": "Seancat aktive nuk u ngarkuan",
     "agentSessions": "Seancat e agjentit",
-    "showingSavedSessions": "Duke shfaqur seancat e ruajtura — statusi i drejtpërdrejtë mund të jetë i vjetëruar",
-    "startNewAgentSession": "Filloni një seancë të re Kilo Agent",
-    "aiCodingSessions": "Seancat e kodimit me AI",
-    "startCodingTaskFromPhone": "Filloni një detyrë kodimi nga telefoni juaj ose vazhdoni një seancë nga CLI juaj.",
-    "tryIt": "Provojeni",
     "newCodingTask": "Detyrë e re kodimi",
     "explore": "Eksploro",
     "seeAll": "Shiko të gjitha",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Mbyll {{filename}}",

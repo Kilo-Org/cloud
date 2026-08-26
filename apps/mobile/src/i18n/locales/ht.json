@@ -148,7 +148,9 @@
     "appearanceSystem": "Sistèm",
     "appearanceLight": "Limye",
     "appearanceDark": "Fènwa",
-    "account": "Kont"
+    "account": "Kont",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Demand rale pa disponib",
@@ -2176,7 +2178,8 @@
       "discardDraftMessage": "Pwòp prompt ou a pral pèdi.",
       "keepEditing": "Kontinye Editè",
       "discard": "Jete",
-      "discardFailed": "Pa t 'kapab jete bouyon an. Tanpri eseye ankò."
+      "discardFailed": "Pa t 'kapab jete bouyon an. Tanpri eseye ankò.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Miz ajou {{displayCount}} fichye",
@@ -2662,15 +2665,10 @@
     "couldNotLoadSessions": "Pa t ka chaje sesyon",
     "couldNotLoadActiveSessions": "Pa t ka chaje sesyon aktif",
     "agentSessions": "Sesyon ajant",
-    "showingSavedSessions": "Ap montre sesyon sove — estati vivan ka pa fèt rive",
-    "startNewAgentSession": "Kòmanse yon nouvo sesyon Kilo Ajant",
-    "aiCodingSessions": "Sesyon kodaj AI",
-    "startCodingTaskFromPhone": "Kòmanse yon travay kodaj soti nan telefòn ou oswa kontinye yon sesyon soti nan CLI ou.",
-    "tryIt": "Eseye li",
     "newCodingTask": "Nouvo travay kodaj",
     "explore": "Eksplore",
     "seeAll": "Wè tout",
-    "kiloAgents": "Kilo Ajant"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Fèmen {{filename}}",

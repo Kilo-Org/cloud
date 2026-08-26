@@ -148,7 +148,9 @@
     "appearanceSystem": "سیستەم",
     "appearanceLight": "ڕووناک",
     "appearanceDark": "تاریک",
-    "account": "هەژمار"
+    "account": "هەژمار",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "داواکاری ڕاکێشان بەردەست نییە",
@@ -2176,7 +2178,8 @@
       "discardDraftMessage": "نووسینەکەت لەدەست دەچێت.",
       "keepEditing": "بەردەوام بە لە دەستکاری",
       "discard": "وازلێهێنان",
-      "discardFailed": "نەتوانرا لە نوسینەکە وازبهێنرێت. تکایە دووبارە هەوڵ بدە."
+      "discardFailed": "نەتوانرا لە نوسینەکە وازبهێنرێت. تکایە دووبارە هەوڵ بدە.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} پەڕگە نوێکرایەوە",
@@ -2662,15 +2665,10 @@
     "couldNotLoadSessions": "نەتوانرا دانیشتنەکان باربکرێن",
     "couldNotLoadActiveSessions": "نەتوانرا دانیشتنە چالاکەکان باربکرێن",
     "agentSessions": "دانیشتنەکانی ئەجێنت",
-    "showingSavedSessions": "نیشاندانی دانیشتنە پاشەکەوتکراوەکان — دۆخی ڕاستەوخۆ لەوانەیە کۆن بێت",
-    "startNewAgentSession": "دەستپێکردنی دانیشتنێکی نوێی ئەجێنتی Kilo",
-    "aiCodingSessions": "دانیشتنەکانی کۆدکردنی AI",
-    "startCodingTaskFromPhone": "ئەرکێکی کۆدکردن لە مۆبایلەکەتەوە دەستپێبکە یان لە CLIـی خۆتەوە دانیشتنێک بەردەوام بکە.",
-    "tryIt": "تاقی بکەرەوە",
     "newCodingTask": "ئەرکی کۆدکردنی نوێ",
     "explore": "گەڕان",
     "seeAll": "بینینی هەموو",
-    "kiloAgents": "ئەجێنتەکانی Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "داخستنی {{filename}}",

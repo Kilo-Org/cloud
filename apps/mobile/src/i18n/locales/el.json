@@ -148,7 +148,9 @@
     "appearanceSystem": "Σύστημα",
     "appearanceLight": "Ανοιχτό",
     "appearanceDark": "Σκούρο",
-    "account": "Λογαριασμός"
+    "account": "Λογαριασμός",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Το pull request δεν είναι διαθέσιμο",
@@ -2176,7 +2178,8 @@
       "discardDraftMessage": "Το μήνυμά σας θα χαθεί.",
       "keepEditing": "Συνέχιση επεξεργασίας",
       "discard": "Απόρριψη",
-      "discardFailed": "Δεν ήταν δυνατή η απόρριψη του πρόχειρου. Δοκιμάστε ξανά."
+      "discardFailed": "Δεν ήταν δυνατή η απόρριψη του πρόχειρου. Δοκιμάστε ξανά.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ενημερώθηκε {{displayCount}} αρχείο",
@@ -2662,15 +2665,10 @@
     "couldNotLoadSessions": "Δεν ήταν δυνατή η φόρτωση συνεδριών",
     "couldNotLoadActiveSessions": "Δεν ήταν δυνατή η φόρτωση ενεργών συνεδριών",
     "agentSessions": "Συνεδρίες πράκτορα",
-    "showingSavedSessions": "Εμφάνιση αποθηκευμένων συνεδριών — η ζωντανή κατάσταση ενδέχεται να είναι ξεπερασμένη",
-    "startNewAgentSession": "Έναρξη νέας συνεδρίας Kilo Agent",
-    "aiCodingSessions": "Συνεδρίες προγραμματισμού με AI",
-    "startCodingTaskFromPhone": "Ξεκινήστε μια εργασία προγραμματισμού από το τηλέφωνό σας ή συνεχίστε μια συνεδρία από το CLI σας.",
-    "tryIt": "Δοκιμάστε το",
     "newCodingTask": "Νέα εργασία προγραμματισμού",
     "explore": "Εξερεύνηση",
     "seeAll": "Προβολή όλων",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Κλείσιμο {{filename}}",

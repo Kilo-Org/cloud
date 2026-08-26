@@ -148,7 +148,9 @@
     "appearanceSystem": "सिस्टम",
     "appearanceLight": "हल्का",
     "appearanceDark": "गहरा",
-    "account": "खाता"
+    "account": "खाता",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "सूचनाएँ",
@@ -1722,7 +1724,8 @@
       "discardDraftMessage": "आपका प्रॉम्प्ट खो जाएगा।",
       "discardDraftTitle": "ड्राफ़्ट छोड़ें?",
       "discardFailed": "ड्राफ़्ट छोड़ा नहीं जा सका। कृपया फिर से कोशिश करें।",
-      "keepEditing": "संपादन जारी रखें"
+      "keepEditing": "संपादन जारी रखें",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फ़ाइल अपडेट की गई",
@@ -2208,15 +2211,10 @@
     "couldNotLoadSessions": "सत्र लोड नहीं हो सके",
     "couldNotLoadActiveSessions": "सक्रिय सत्र लोड नहीं हो सके",
     "agentSessions": "एजेंट सत्र",
-    "showingSavedSessions": "सहेजे गए सत्र दिखाए जा रहे हैं — लाइव स्थिति पुरानी हो सकती है",
-    "startNewAgentSession": "नया Kilo एजेंट सत्र शुरू करें",
-    "aiCodingSessions": "AI कोडिंग सत्र",
-    "startCodingTaskFromPhone": "अपने फ़ोन से कोडिंग कार्य शुरू करें या अपने CLI से सत्र जारी रखें।",
-    "tryIt": "इसे आज़माएँ",
     "newCodingTask": "नया कोडिंग कार्य",
     "explore": "एक्सप्लोर करें",
     "seeAll": "सभी देखें",
-    "kiloAgents": "Kilo एजेंट"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} बंद करें",

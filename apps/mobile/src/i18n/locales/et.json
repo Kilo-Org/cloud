@@ -148,7 +148,9 @@
     "appearanceSystem": "Süsteem",
     "appearanceLight": "Heledas",
     "appearanceDark": "Tumedas",
-    "account": "Konto"
+    "account": "Konto",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole saadaval",
@@ -2176,7 +2178,8 @@
       "discardDraftMessage": "Sinu päring läheb kaotsi.",
       "keepEditing": "Jätka muutmist",
       "discard": "Loobu",
-      "discardFailed": "Mustandist loobumine ebaõnnestus. Proovi uuesti."
+      "discardFailed": "Mustandist loobumine ebaõnnestus. Proovi uuesti.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uuendatud {{displayCount}} fail",
@@ -2662,15 +2665,10 @@
     "couldNotLoadSessions": "Seansse ei õnnestunud laadida",
     "couldNotLoadActiveSessions": "Aktiivseid seansse ei õnnestunud laadida",
     "agentSessions": "Agendi seansid",
-    "showingSavedSessions": "Kuvatakse salvestatud seansid — otseolek võib olla aegunud",
-    "startNewAgentSession": "Alusta uut Kilo Agent seanssi",
-    "aiCodingSessions": "AI kodeerimisseansid",
-    "startCodingTaskFromPhone": "Alustage kodeerimisülesannet telefonist või jätkake seanssi CLI-st.",
-    "tryIt": "Proovi",
     "newCodingTask": "Uus kodeerimisülesanne",
     "explore": "Avasta",
     "seeAll": "Vaata kõiki",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Sulge {{filename}}",

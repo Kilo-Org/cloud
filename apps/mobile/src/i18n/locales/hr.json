@@ -148,7 +148,9 @@
     "appearanceSystem": "Sustav",
     "appearanceLight": "Svijetlo",
     "appearanceDark": "Tamno",
-    "account": "Račun"
+    "account": "Račun",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nedostupan",
@@ -2191,7 +2193,8 @@
       "discardDraftMessage": "Vaš će upit biti izgubljen.",
       "keepEditing": "Nastavi s uređivanjem",
       "discard": "Odbaci",
-      "discardFailed": "Nije moguće odbaciti nacrt. Pokušajte ponovno."
+      "discardFailed": "Nije moguće odbaciti nacrt. Pokušajte ponovno.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirana {{displayCount}} datoteka",
@@ -2682,15 +2685,10 @@
     "couldNotLoadSessions": "Nije moguće učitati sesije",
     "couldNotLoadActiveSessions": "Nije moguće učitati aktivne sesije",
     "agentSessions": "Sesije agenata",
-    "showingSavedSessions": "Prikazuju se spremljene sesije — živi status može biti zastario",
-    "startNewAgentSession": "Pokreni novu Kilo Agent sesiju",
-    "aiCodingSessions": "AI sesije kodiranja",
-    "startCodingTaskFromPhone": "Pokrenite zadatak kodiranja s telefona ili nastavite sesiju sa svog CLI-ja.",
-    "tryIt": "Isprobaj",
     "newCodingTask": "Novi zadatak kodiranja",
     "explore": "Istraži",
     "seeAll": "Prikaži sve",
-    "kiloAgents": "Kilo Agenti"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Zatvori {{filename}}",

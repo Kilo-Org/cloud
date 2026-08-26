@@ -148,7 +148,9 @@
     "appearanceSystem": "Sistema",
     "appearanceLight": "Šviesi",
     "appearanceDark": "Tamsi",
-    "account": "Paskyra"
+    "account": "Paskyra",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nepasiekiamas",
@@ -2206,7 +2208,8 @@
       "discardDraftMessage": "Jūsų užklausa bus prarasta.",
       "keepEditing": "Tęsti redagavimą",
       "discard": "Atmesti",
-      "discardFailed": "Nepavyko atmesti juodraščio. Bandykite dar kartą."
+      "discardFailed": "Nepavyko atmesti juodraščio. Bandykite dar kartą.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujinta {{displayCount}} rinkmena",
@@ -2702,15 +2705,10 @@
     "couldNotLoadSessions": "Nepavyko įkelti sesijų",
     "couldNotLoadActiveSessions": "Nepavyko įkelti aktyvių sesijų",
     "agentSessions": "Agentų sesijos",
-    "showingSavedSessions": "Rodyti išsaugotos sesijos — tiesioginis statusas gali būti pasenęs",
-    "startNewAgentSession": "Pradėti naują Kilo agento sesiją",
-    "aiCodingSessions": "AI kodavimo sesijos",
-    "startCodingTaskFromPhone": "Pradėkite kodavimo užduotį iš savo telefono arba tęskite sesiją iš savo CLI.",
-    "tryIt": "Išbandyti",
     "newCodingTask": "Nauja kodavimo užduotis",
     "explore": "Naršyti",
     "seeAll": "Rodyti viską",
-    "kiloAgents": "Kilo agentai"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Uždaryti {{filename}}",

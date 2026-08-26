@@ -148,7 +148,9 @@
     "appearanceSystem": "Sistēma",
     "appearanceLight": "Gaišs",
     "appearanceDark": "Tumšs",
-    "account": "Konts"
+    "account": "Konts",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nav pieejams",
@@ -2191,7 +2193,8 @@
       "discardDraftMessage": "Tavs jautājums tiks zaudēts.",
       "keepEditing": "Turpināt rediģēšanu",
       "discard": "Atmest",
-      "discardFailed": "Neizdevās atmest melnrakstu. Lūdzu, mēģini vēlreiz."
+      "discardFailed": "Neizdevās atmest melnrakstu. Lūdzu, mēģini vēlreiz.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atjaunināts {{displayCount}} fails",
@@ -2682,15 +2685,10 @@
     "couldNotLoadSessions": "Neizdevās ielādēt sesijas",
     "couldNotLoadActiveSessions": "Neizdevās ielādēt aktīvās sesijas",
     "agentSessions": "Aģenta sesijas",
-    "showingSavedSessions": "Tiek rādītas saglabātās sesijas — tiešais statuss var būt novecojis",
-    "startNewAgentSession": "Sākt jaunu Kilo Agent sesiju",
-    "aiCodingSessions": "AI kodēšanas sesijas",
-    "startCodingTaskFromPhone": "Sāc kodēšanas uzdevumu no tālruņa vai turpini sesiju no sava CLI.",
-    "tryIt": "Izmēģini",
     "newCodingTask": "Jauns kodēšanas uzdevums",
     "explore": "Izpētīt",
     "seeAll": "Skatīt visus",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Aizvērt {{filename}}",

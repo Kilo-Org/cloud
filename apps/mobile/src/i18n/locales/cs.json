@@ -148,7 +148,9 @@
     "appearanceSystem": "Systém",
     "appearanceLight": "Světlý",
     "appearanceDark": "Tmavý",
-    "account": "Účet"
+    "account": "Účet",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request není dostupný",
@@ -2206,7 +2208,8 @@
       "discardDraftMessage": "Váš dotaz bude ztracen.",
       "keepEditing": "Pokračovat v úpravách",
       "discard": "Zahodit",
-      "discardFailed": "Koncept se nepodařilo zahodit. Zkuste to znovu."
+      "discardFailed": "Koncept se nepodařilo zahodit. Zkuste to znovu.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizován {{displayCount}} soubor",
@@ -2702,15 +2705,10 @@
     "couldNotLoadSessions": "Relace se nepodařilo načíst",
     "couldNotLoadActiveSessions": "Aktivní relace se nepodařilo načíst",
     "agentSessions": "Relace agenta",
-    "showingSavedSessions": "Zobrazují se uložené relace — živý stav může být zastaralý",
-    "startNewAgentSession": "Zahájit novou relaci Kilo Agent",
-    "aiCodingSessions": "AI programovací relace",
-    "startCodingTaskFromPhone": "Spusťte programovací úkol z telefonu nebo pokračujte v relaci z CLI.",
-    "tryIt": "Vyzkoušet",
     "newCodingTask": "Nový programovací úkol",
     "explore": "Prozkoumat",
     "seeAll": "Zobrazit vše",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Zavřít {{filename}}",

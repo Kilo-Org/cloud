@@ -148,7 +148,9 @@
     "appearanceSystem": "System",
     "appearanceLight": "Light",
     "appearanceDark": "Dark",
-    "account": "Account"
+    "account": "Account",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request unavailable",
@@ -2176,7 +2178,8 @@
       "discardDraftMessage": "Your prompt will be lost.",
       "keepEditing": "Keep editing",
       "discard": "Discard",
-      "discardFailed": "Could not discard the draft. Please try again."
+      "discardFailed": "Could not discard the draft. Please try again.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Updated {{displayCount}} file",
@@ -2661,16 +2664,11 @@
   "home": {
     "couldNotLoadSessions": "Couldn't load sessions",
     "couldNotLoadActiveSessions": "Couldn't load active sessions",
-    "agentSessions": "Agent sessions",
-    "showingSavedSessions": "Showing saved sessions — live status may be out of date",
-    "startNewAgentSession": "Start a new Kilo Agent session",
-    "aiCodingSessions": "AI coding sessions",
-    "startCodingTaskFromPhone": "Start a coding task from your phone or continue a session from your CLI.",
-    "tryIt": "Try it",
+    "agentSessions": "Live now",
     "newCodingTask": "New coding task",
     "explore": "Explore",
     "seeAll": "See all",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Close {{filename}}",

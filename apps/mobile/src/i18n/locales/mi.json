@@ -148,7 +148,9 @@
     "appearanceSystem": "Pūnaha",
     "appearanceLight": "Mārama",
     "appearanceDark": "Pōuri",
-    "account": "Pūkete"
+    "account": "Pūkete",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Kāore i te wātea te tono huna",
@@ -2176,7 +2178,8 @@
       "discardDraftMessage": "Ka ngaro tō pātai.",
       "keepEditing": "Me whakatika tonu",
       "discard": "Whakarere",
-      "discardFailed": "Kāore i taea te whakarere i te tauira. Tēnā whakamātau anō."
+      "discardFailed": "Kāore i taea te whakarere i te tauira. Tēnā whakamātau anō.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Kua whakahoutia {{displayCount}} kōnae",
@@ -2662,15 +2665,10 @@
     "couldNotLoadSessions": "Kāore i taea te uta ngā wātū",
     "couldNotLoadActiveSessions": "Kāore i taea te uta ngā wātū mahi",
     "agentSessions": "Ngā wātū kaihoko",
-    "showingSavedSessions": "E whakaatu ana i ngā wātū kua tiakina — kua tawhito pea te tūnga ora",
-    "startNewAgentSession": "Tīmata he wātū Kaihoko Kilo hōu",
-    "aiCodingSessions": "Ngā wātū whakawaehere AI",
-    "startCodingTaskFromPhone": "Tīmata he mahi whakawaehere mai i tō waea, haere tonu rānei i tētahi wātū mai i tō CLI.",
-    "tryIt": "Whakamātau",
     "newCodingTask": "Mahi whakawaehere hōu",
     "explore": "Torotoro",
     "seeAll": "Tirohia katoa",
-    "kiloAgents": "Ngā Kaihoko Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Katia {{filename}}",

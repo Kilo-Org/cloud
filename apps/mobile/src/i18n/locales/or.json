@@ -148,7 +148,9 @@
     "appearanceSystem": "ସିଷ୍ଟମ୍",
     "appearanceLight": "ହାଲୁକା",
     "appearanceDark": "ଗାଢ଼",
-    "account": "ଆକାଉଣ୍ଟ"
+    "account": "ଆକାଉଣ୍ଟ",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଉପଲବ୍ଧ ନାହିଁ",
@@ -2176,7 +2178,8 @@
       "discardDraftMessage": "ଆପଣଙ୍କ ପ୍ରମ୍ପ୍ଟ ହଜିଯିବ।",
       "keepEditing": "ସମ୍ପାଦନ ଜାରି ରଖନ୍ତୁ",
       "discard": "ପରିତ୍ୟାଗ କରନ୍ତୁ",
-      "discardFailed": "ଡ୍ରାଫ୍ଟ ପରିତ୍ୟାଗ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁନଃଚେଷ୍ଟା କରନ୍ତୁ।"
+      "discardFailed": "ଡ୍ରାଫ୍ଟ ପରିତ୍ୟାଗ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁନଃଚେଷ୍ଟା କରନ୍ତୁ।",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି",
@@ -2662,15 +2665,10 @@
     "couldNotLoadSessions": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
     "couldNotLoadActiveSessions": "ସକ୍ରିୟ ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
     "agentSessions": "ଏଜେଣ୍ଟ ସେସନ୍",
-    "showingSavedSessions": "ସେଭ୍ ହୋଇଥିବା ସେସନ୍ ଦେଖାଉଛି — ଲାଇଭ୍ ସ୍ଥିତି ଅପଡେଟ୍ ନହୋଇପାରେ",
-    "startNewAgentSession": "ନୂତନ Kilo Agent ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ",
-    "aiCodingSessions": "AI କୋଡିଂ ସେସନ୍",
-    "startCodingTaskFromPhone": "ଆପଣଙ୍କ ଫୋନରୁ କୋଡିଂ କାର୍ଯ୍ୟ ଆରମ୍ଭ କରନ୍ତୁ କିମ୍ବା ଆପଣଙ୍କ CLI ରୁ ସେସନ୍ ଜାରି କରନ୍ତୁ।",
-    "tryIt": "ଚେଷ୍ଟା କରନ୍ତୁ",
     "newCodingTask": "ନୂତନ କୋଡିଂ କାର୍ଯ୍ୟ",
     "explore": "ଅନୁସନ୍ଧାନ",
     "seeAll": "ସବୁ ଦେଖନ୍ତୁ",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} ବନ୍ଦ କରନ୍ତୁ",

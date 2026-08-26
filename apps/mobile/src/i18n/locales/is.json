@@ -148,7 +148,9 @@
     "appearanceSystem": "Kerfi",
     "appearanceLight": "Ljóst",
     "appearanceDark": "Dökkt",
-    "account": "Reikningur"
+    "account": "Reikningur",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ótiltækur",
@@ -2176,7 +2178,8 @@
       "discardDraftMessage": "Skilaboðin þín glatast.",
       "keepEditing": "Halda áfram að breyta",
       "discard": "Farga",
-      "discardFailed": "Ekki tókst að farga drögunum. Reyndu aftur."
+      "discardFailed": "Ekki tókst að farga drögunum. Reyndu aftur.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppfærði {{displayCount}} skrá",
@@ -2662,15 +2665,10 @@
     "couldNotLoadSessions": "Ekki tókst að hlaða lotur",
     "couldNotLoadActiveSessions": "Ekki tókst að hlaða virkar lotur",
     "agentSessions": "Umboðslotur",
-    "showingSavedSessions": "Sýni vistaðar lotur — rauntímastaða getur verið úrelt",
-    "startNewAgentSession": "Byrja nýja Kilo-umboðslotu",
-    "aiCodingSessions": "AI-forritunarlotur",
-    "startCodingTaskFromPhone": "Byrjaðu forritunarverkefni úr símanum þínum eða haltu áfram lotu frá CLI.",
-    "tryIt": "Prófaðu það",
     "newCodingTask": "Nýtt forritunarverkefni",
     "explore": "Kanna",
     "seeAll": "Sjá allt",
-    "kiloAgents": "Kilo-umboð"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Loka {{filename}}",

@@ -1,10 +1,13 @@
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { useAuth } from '@/lib/auth/auth-context';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
+
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 /**
  * The current user's role in the active organization. `trpc.organizations.list`
@@ -140,19 +143,8 @@ export function useOrgUsageStats(organizationId: string | null) {
   );
 }
 
-function useOrgCreditTransactions(organizationId: string | null) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.creditTransactions.queryOptions(
-      { organizationId: organizationId ?? '' },
-      { enabled: organizationId != null }
-    )
-  );
-}
-
-export type CreditTransaction = NonNullable<
-  ReturnType<typeof useOrgCreditTransactions>['data']
->[number];
+export type CreditTransaction =
+  RouterOutputs['organizations']['creditTransactionsPage']['entries'][number];
 
 /**
  * Cursor-paginated credit transactions for an organization. Mirrors the legacy
@@ -181,17 +173,7 @@ export function useOrgCreditTransactionsPage(organizationId: string | null) {
   return { query, entries, hasMore };
 }
 
-function useOrgInvoices(organizationId: string | null) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.invoices.queryOptions(
-      { organizationId: organizationId ?? '', period: 'year' },
-      { enabled: organizationId != null }
-    )
-  );
-}
-
-export type OrgInvoice = NonNullable<ReturnType<typeof useOrgInvoices>['data']>[number];
+export type OrgInvoice = RouterOutputs['organizations']['invoicesPage']['entries'][number];
 
 /**
  * Cursor-paginated invoices for an organization. Mirrors the legacy

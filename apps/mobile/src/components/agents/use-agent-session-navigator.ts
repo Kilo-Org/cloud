@@ -17,7 +17,8 @@ import {
  */
 export function useAgentSessionNavigator(): (
   sessionId: string,
-  organizationId?: string | null
+  organizationId?: string | null,
+  title?: string
 ) => void {
   const router = useRouter();
   const guardRef = useRef<AgentSessionNavGuardState>({ lastPushAt: 0 });
@@ -29,13 +30,14 @@ export function useAgentSessionNavigator(): (
   );
 
   return useCallback(
-    (sessionId: string, organizationId?: string | null) => {
+    (sessionId: string, organizationId?: string | null, title?: string) => {
       pushAgentSessionOnce({
         state: guardRef.current,
         router,
         now: Date.now(),
         sessionId,
         organizationId,
+        title,
       });
     },
     [router]

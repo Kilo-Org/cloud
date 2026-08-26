@@ -38,7 +38,9 @@
     "retry": "Yenidən cəhd edin",
     "search": "Dilləri axtar",
     "noMatches": "Uyğun dil tapılmadı",
-    "deviceLanguage": "Cihazın dili"
+    "deviceLanguage": "Cihazın dili",
+    "current": "Cari",
+    "allLanguages": "Bütün dillər"
   },
   "login": {
     "welcome": "Kilo'ya xoş gəldiniz",
@@ -105,7 +107,7 @@
     "deviceSessionsSubtitle": "Digər cihazları icmal edin və çıxış edin",
     "feedback": "Rəy",
     "privacyChoices": "Məxfilik seçimləri",
-    "signOut": "Çıxış",
+    "signOut": "Çıxış et",
     "deleteAccount": "Hesabı Sil",
     "confirmationCode": "Təsdiq kodu",
     "confirmationCodePlaceholder": "6 rəqəmli kod",
@@ -116,7 +118,7 @@
     "creditBalanceEmpty": "Kredit balansınız boşdur. Bu hesab üçün kreditlər iOS proqramından kənarda idarə olunur.",
     "signOutTitle": "Çıxılsın?",
     "signOutMessage": "İş sahənizə yenidən daxil olmağınız lazım olacaq.",
-    "signOutConfirm": "Çıxış",
+    "signOutConfirm": "Çıxış et",
     "deleteAccountTitle": "Hesab silinsin?",
     "deleteAccountMessage": "Bu, hesabınızı daimi silir və çıxış etdirir. Sizə təsdiq kodu e-poçtla göndərəcəyik.",
     "deleteAccountConfirm": "Hesabı sil",
@@ -148,7 +150,9 @@
     "appearanceSystem": "Sistem",
     "appearanceLight": "İşıq",
     "appearanceDark": "Qaranlıq",
-    "account": "Hesab"
+    "account": "Hesab",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request əlçatan deyil",
@@ -412,7 +416,7 @@
     },
     "couldNotOpenGitHubAppSettings": "GitHub App parametrləri açıla bilmədi",
     "installKiloGitHubApp": "Kilo GitHub App'ini quraşdırın",
-    "connectionExpiredTitle": "GitHub bağlantısı bitdi",
+    "connectionExpiredTitle": "GitHub bağlantısının müddəti bitdi.",
     "connectionExpiredDescription": "GitHub bağlantınız artıq etibarlı deyil. Bağlantınızı yenidən yoxlayın — lazımdırsa yenidən bağlanmağınız istəniləcək.",
     "checkConnection": "Bağlantını yoxla",
     "couldNotLoadPullRequest": "Pull request yüklənə bilmədi",
@@ -464,7 +468,7 @@
       "noReviewRequestsDescription": "Sizin icmalınızı gözləyən pull request'lər burada görünür. Yenə də yuxarıya istənilən PR linkini yapışdıra bilərsiniz.",
       "couldNotLoad": "Gələnlər yüklənə bilmədi",
       "couldNotLoadMore": "Daha çox yüklənə bilmədi",
-      "retryLoadingMore": "Daha çox yüklənməsini yenidən cəhd edin"
+      "retryLoadingMore": "Daha çox yükləməyi təkrarla"
     },
     "composer": {
       "commentBodyPlaceholder": "Şərh yazın",
@@ -480,7 +484,7 @@
       "discardTitle": "Şərh atılsın?",
       "discardMessage": "Qaralamanız itiriləcək.",
       "keepEditing": "Redaktəyə davam et",
-      "discard": "At",
+      "discard": "Ləğv et",
       "comment": "Şərh",
       "insertSuggestionA11y": "Kod təklifi daxil et",
       "insertSuggestion": "Təklif daxil et",
@@ -493,7 +497,7 @@
       "checkFailedTitle": "GitHub bağlantısı yoxlanıla bilmədi",
       "checkFailedMessage": "Daxil olma statusu bu yüklənənə qədər əlçatan deyil.",
       "reconnectTitle": "GitHub-a yenidən bağlan",
-      "title": "GitHub-a bağlan",
+      "title": "GitHub-u qoş",
       "reconnectDescription": "GitHub bağlantınız ləğv edildi. Pull request'ləri mobil cihazda icmal etməyə davam etmək üçün yenidən bağlanın.",
       "description": "Pull request'ləri mobil cihazda icmal etmək üçün GitHub hesabınıza qoşulun."
     },
@@ -518,7 +522,7 @@
       "blockedComment": "Şərh icmalı yerləşdirmək üçün xülasə və ya ən azı bir şərh əlavə edin."
     },
     "reconnectNotice": {
-      "title": "GitHub bağlantısı bitdi",
+      "title": "GitHub bağlantısının müddəti bitdi.",
       "message": "GitHub bağlantınız artıq etibarlı deyil. Bağlantınızı yenidən yoxlayın — lazımdırsa yenidən bağlanmağınız istəniləcək.",
       "checkConnection": "Bağlantını yoxla"
     },
@@ -667,7 +671,7 @@
     "instancePicker": {
       "switchInstance": "Instance'i dəyiş",
       "couldNotLoadInstances": "Instance'lər yüklənə bilmədi",
-      "noInstances": "KiloClaw instance'i yoxdur",
+      "noInstances": "KiloClaw nümunəsi yoxdur",
       "noInstancesDescription": "Söhbətə başlamaq üçün instance qurun.",
       "setUpKiloclaw": "KiloClaw qurun",
       "currentInstance": "{{title}}, cari",
@@ -728,7 +732,7 @@
     },
     "attachment": {
       "open": "{{filename}} açın",
-      "imageUnavailable": "Şəkil əlçatan deyil",
+      "imageUnavailable": "Şəkil mövcud deyil",
       "openFailed": "Əlavə açıla bilmədi. Bağlantınızı yoxlayın və yenidən cəhd edin.",
       "attachFailed": "Fayl əlavə edilə bilmədi",
       "limit": "Ən çox {{displayCount}} fayl əlavə edə bilərsiniz.",
@@ -775,7 +779,7 @@
       "addReactionFailed": "Reaksiya əlavə edilə bilmədi",
       "retrySend": "Yenidən göndər",
       "moreReactions": "Daha çox reaksiya",
-      "reply": "Cavabla",
+      "reply": "Cavab ver",
       "edit": "Redaktə et",
       "sendFailed": "Mesaj göndərilə bilmədi",
       "retrySendFailed": "Yenidən göndərmək alınmadı",
@@ -787,7 +791,7 @@
       "photoLibrary": "Şəkil kitabxanası",
       "files": "Fayllar",
       "cameraAccessDisabled": "Kamera Girişi Söndürülüb",
-      "cameraAccessMessage": "Şəkil çəkmək üçün Parametrlərdə kameraya girişi icazə verin."
+      "cameraAccessMessage": "Şəkil çəkmək üçün Parametrlərdə kamera girişinə icazə verin."
     },
     "typingIndicator": {
       "someone": "Kimsə",
@@ -871,7 +875,7 @@
       "destroyMessage": "Bu, KiloClaw nümunənizi və bütün məlumatlarınızı tamamilə məhv edəcək. Bu əməliyyat geri qaytarıla bilməz.",
       "destroyTitle": "Nümunəni məhv et",
       "instance": "Nümunə",
-      "renameFailed": "Bir şey səhv getdi",
+      "renameFailed": "Nəsə səhv getdi",
       "couldNotCheckStatus": "Xidmət statusu yoxlanıla bilmədi",
       "dangerZone": "TƏHLÜKƏ ZONASI",
       "destroying": "Məhv edilir…",
@@ -936,7 +940,7 @@
       "couldNotLoad": "Modellər yüklənə bilmədi",
       "clearSearch": "Axtarışı təmizlə",
       "noMatches": "Axtarışınıza uyğun model yoxdur",
-      "noModels": "Əlçatan model yoxdur",
+      "noModels": "Mövcud model yoxdur",
       "noModelsDescription": "Modellər mövcud olduqda burada görünəcək.",
       "noResultsFor": "\"{{query}}\" üçün nəticə yoxdur",
       "recommended": "Tövsiyə olunan"
@@ -1047,7 +1051,7 @@
         "openKiloAi": "kilo.ai-ni aç",
         "provisioning": "Hazırlanır",
         "review": "Nəzərdən keçir",
-        "somethingWentWrong": "Bir şey səhv getdi",
+        "somethingWentWrong": "Nəsə səhv getdi",
         "identityTitle": "Botunuza kimlik verin",
         "close": "Bağla",
         "couldNotLoad": "Quraşdırma vəziyyəti yüklənə bilmədi",
@@ -1127,7 +1131,7 @@
       "restarting": "YENİDƏN BAŞLADILIR",
       "running": "İŞLƏYİR",
       "shuttingDown": "SÖNDÜRÜLÜR",
-      "starting": "BAŞLADILIR",
+      "starting": "Başladılır",
       "stopped": "DAYANDIRILIB",
       "stopping": "DAYANDIRILIR",
       "unknown": "NAMƏLUM",
@@ -1139,7 +1143,7 @@
       "frontierDescription": "Ən yüksək performans. Düşünmə qabiliyyəti olan frontier modellərə yönləndirir.",
       "balancedLabel": "Balanslı",
       "balancedDescription": "Sürət və qabiliyyətin ağıllı balansı, daha aşağı qiymətə.",
-      "cost": "Qiymət",
+      "cost": "Xərc",
       "performance": "Performans",
       "autoModelA11y": "{{label}} avtomatik model",
       "currentModel": "Cari model",
@@ -1260,9 +1264,9 @@
       "roast": "Səmimi dürüst, əyləncəli şəkildə",
       "strict": "Hər şeyi qeyd edin, yüksək standart saxlayın"
     },
-    "title": "Code Reviewer",
+    "title": "Kod İcmalçısı",
     "reviewDetail": {
-      "title": "Nəzərdən keçirmə",
+      "title": "İcmal",
       "cancelTitle": "Nəzərdən keçirmə ləğv edilsin?",
       "cancelMessage": "Bu, davam edən kod nəzərdən keçirməsini dayandıracaq.",
       "keepRunning": "İşləməyə davam et",
@@ -1277,16 +1281,16 @@
       "noFindings": "Tapıntı yoxdur",
       "showMore": "Daha çox göstər",
       "details": "Detallar",
-      "branch": "Branch",
+      "branch": "Filial",
       "platform": "Platforma",
       "model": "Model",
       "created": "Yaradılıb",
       "started": "Başlanıb",
       "completed": "Tamamlanıb",
-      "cost": "Qiymət",
+      "cost": "Xərc",
       "tokens": "Tokenlər",
       "tokensInOut": "{{input}} daxil / {{output}} çıxış",
-      "openPullRequest": "Pull request açın",
+      "openPullRequest": "Pull request aç",
       "council": "Şura",
       "decision": "Qərar",
       "gate": "Qapı",
@@ -1334,7 +1338,7 @@
     "webhookSetupDescription": "Bəzi repozitoriyalar avtomatik nəzərdən keçirmə ala bilməz.",
     "autoReviews": "Avtomatik nəzərdən keçirmələr",
     "selectRepository": "Avtomatik nəzərdən keçirmələri aktiv etmək üçün ən azı bir repozitoriya seçin.",
-    "selectRepositories": "Repozitoriyaları seç",
+    "selectRepositories": "Repozitoriyaları seçin",
     "followReviewMd": "REVIEW.md-ni izlə",
     "followReviewMdSubtitle": "Repo başına REVIEW.md təlimat fayllarına hörmət et",
     "readOnlyDescription": "Yalnız təşkilat sahibləri və faktura menecerləri bu parametrləri dəyişə bilər.",
@@ -1404,14 +1408,14 @@
       "noDecision": "Qərar yoxdur",
       "noResult": "Nəticə yoxdur"
     },
-    "eyebrow": "Code Reviewer",
+    "eyebrow": "Kod İcmalçısı",
     "updateFailed": "İcmalçı yenilənə bilmədi",
     "configSaveFailed": "İcmal konfiqurasiyası saxlanıla bilmədi",
     "status": {
       "pending": "Gözlənilir",
       "queued": "Növbəyə alınıb",
-      "running": "İşləyir",
-      "completed": "Tamamlandı",
+      "running": "İŞLƏYİR",
+      "completed": "Tamamlanıb",
       "failed": "Uğursuz",
       "cancelled": "Ləğv edildi",
       "interrupted": "Kəsildi"
@@ -1487,7 +1491,7 @@
       "statusOpen": "Açıq",
       "fixed": "Düzəldilib",
       "statusIgnored": "Görmezden gəlinib",
-      "statusClosed": "Bağlanıb",
+      "statusClosed": "Bağlıdır",
       "severityCritical": "Kritik",
       "severityHigh": "Yüksək",
       "severityMedium": "Orta",
@@ -1500,7 +1504,7 @@
       "outcomeSafeToDismiss": "Silinməsi təhlükəsizdir",
       "outcomeNeedsReview": "Nəzərdən keçirilməlidir",
       "outcomeTriageComplete": "Triage tamamlandı",
-      "outcomeDismissed": "Silinib",
+      "outcomeDismissed": "Rədd edilib",
       "sortSeverityDesc": "Şiddət: yüksəkdən aşağıya",
       "sortSeverityAsc": "Şiddət: aşağıdan yüksəyə",
       "sortSlaDue": "SLA son tarixi",
@@ -1556,7 +1560,7 @@
       "triageConfidence": "Triaj inamı",
       "suggestedAction": "Təklif olunan əməliyyat",
       "triageReasoning": "Triaj səbəbləndirməsi",
-      "exploitable": "İstismar oluna bilən",
+      "exploitable": "İstismar edilə bilən",
       "model": "Model",
       "notRecorded": "Qeyd olunmayıb",
       "analyzed": "Analiz edilib",
@@ -1587,7 +1591,7 @@
       "needsEvidenceReview": "Sübut icmalı tələb olunur",
       "analysisNotComplete": "Analiz tamamlanmayıb",
       "noImmediateAction": "Dərhal əməliyyat yoxdur",
-      "notExploitable": "İstismar oluna bilməz",
+      "notExploitable": "İstismar edilə bilməz",
       "needsYourReview": "İcmalınız tələb olunur",
       "noSlaDeadline": "SLA müddəti təyin edilməyib",
       "noRepositoryData": "Hələ repozitoriya məlumatı yoxdur",
@@ -1686,11 +1690,11 @@
       "couldNotLoadSettings": "Security Agent parametrləri yüklənə bilmədi",
       "couldNotLoadPermissions": "İcazələr yüklənə bilmədi",
       "couldNotLoadRepositories": "Repozitoriyalar yüklənə bilmədi",
-      "securityAgent": "Security Agent",
-      "enabled": "Aktiv",
-      "disabled": "Deaktiv",
+      "securityAgent": "Təhlükəsizlik Agent",
+      "enabled": "Aktiv edilib",
+      "disabled": "Deaktiv edilib",
       "on": "Aktiv",
-      "off": "Deaktiv",
+      "off": "Söndürülüb",
       "allRepositories": "Bütün repozitoriyalar",
       "repositoriesCount_one": "{{displayCount}} repozitoriya seçilib",
       "repositoriesCount": "{{displayCount}} repozitoriya seçilib",
@@ -1796,7 +1800,7 @@
       "clearFilters": "Filtrləri təmizlə"
     },
     "scopeList": {
-      "title": "Security Agent",
+      "title": "Təhlükəsizlik Agent",
       "couldNotLoad": "Təşkilatlar yüklənə bilmədi",
       "personal": "Şəxsi",
       "personalSubtitle": "Öz repozitoriyalarınız"
@@ -1845,7 +1849,7 @@
       "unavailable": "Audit hesabatı mövcud deyil",
       "unavailableDescription": "Yalnız təşkilat sahibləri və hesab menecerləri audit hesabatlarına baxa bilər. Giriş vermək üçün sahibdən və ya hesab menecerindən xahiş edin.",
       "queryFailed": "Hesabat sorğusu tamamlanmadı. Yenidən cəhd edin.",
-      "checkConnection": "Əlaqənizi yoxlayın və yenidən cəhd edin."
+      "checkConnection": "Bağlantınızı yoxlayın və yenidən cəhd edin."
     },
     "notifications": {
       "couldNotLoad": "Bildiriş parametrləri yüklənə bilmədi",
@@ -1892,7 +1896,7 @@
     },
     "queuedActionUntracked": "Növbəyə alınmış əməliyyat artıq izlənilə bilmədi. Ən son vəziyyəti görmək üçün yeniləyin.",
     "initialSyncAdmissionFailed": "Security Agent aktivləşdirildi, lakin ilk sinxronlaşdırma növbəyə alına bilmədi. Yenidən sinxronlaşdırın.",
-    "title": "Security Agent",
+    "title": "Təhlükəsizlik Agent",
     "commands": {
       "findingAlreadyDismissed": "Tapıntı artıq rədd edilib",
       "findingDismissed": "Tapıntı rədd edildi",
@@ -1915,8 +1919,8 @@
       "analyzing": "Təhlil edilir",
       "analyzingTitle": "Təhlil edilir",
       "analyzingDescription": "Tətbiq kodunun təsirlənmiş funksiyaya çata biləcəyi yoxlanılır.",
-      "failed": "Analiz uğursuz oldu",
-      "failedTitle": "Analiz uğursuz oldu",
+      "failed": "Təhlil uğursuz oldu",
+      "failedTitle": "Təhlil uğursuz oldu",
       "failedDescription": "Security Agent analizi tamamlaya bilmədi.",
       "extractionFailed": "Nəzərdən keçirilməlidir",
       "extractionFailedTitle": "Nəzərdən keçirilməlidir",
@@ -1942,8 +1946,8 @@
       "completed": "Analiz edilib",
       "completedTitle": "Analiz edilib",
       "completedDescription": "Analiz xüsusi nəticə qeyd edilmədən tamamlandı.",
-      "notAnalyzed": "Analiz edilməyib",
-      "notAnalyzedTitle": "Analiz edilməyib",
+      "notAnalyzed": "Təhlil edilməyib",
+      "notAnalyzedTitle": "Təhlil edilməyib",
       "notAnalyzedDescription": "Kod bazası analizi bu tapıntı üçün hələ aparılmayıb."
     },
     "deadline": {
@@ -2007,7 +2011,7 @@
       "includeExistingDisabled": "Mövcud tapıntılar avtomatik düzəltmədən xaric edilib.",
       "belowThreshold": "Tapıntı avtomatik şiddət həddindən aşağıdır. Təhlükəsizlik qapıları keçəndə əl ilə düzəltmə hələ də başlaya bilər.",
       "beforeEnablement": "Avtomatik düzəltmə aktivləşdirilməzdən əvvəl analiz tamamlanıb. Təhlükəsizlik qapıları keçəndə əl ilə düzəltmə hələ də başlaya bilər.",
-      "generic": "Bu tapıntı üçün düzəltmə mövcud deyil."
+      "generic": "Bu tapıntı üçün düzəliş mövcud deyil."
     },
     "commandFailure": {
       "ownerCapReached": "Analiz tutumu doludur. Aktiv analizin bitməsini gözləyin, sonra yenidən cəhd edin.",
@@ -2031,8 +2035,8 @@
     "activeNow": "Hal-hazırda aktiv",
     "search": {
       "searching": "Axtarılır",
-      "searchSessions": "Sessiyaları axtar",
-      "searchSessionsPlaceholder": "Sessiyaları axtarın...",
+      "searchSessions": "Sessiyaları axtarın",
+      "searchSessionsPlaceholder": "Sessiyaları axtarın",
       "clearSearch": "Axtarışı təmizlə",
       "clearFilters": "Filtrləri təmizlə"
     },
@@ -2062,7 +2066,7 @@
       "couldNotCopyId": "Sessiya ID kopyalana bilmədi",
       "untitled": "Adsız sessiya",
       "sessionDeleted": "Sessiya silindi",
-      "needsInput": "giriş tələb olunur",
+      "needsInput": "GİRİŞ TƏLƏB OLUNUR",
       "fromPlatform": "{{platform}} platformasından",
       "cent_one": "sent",
       "cent": "sent",
@@ -2099,7 +2103,7 @@
       "copyErrorDetails": "Səhv detallarını kopyala",
       "backToSessions": "Sessiyalara qayıt",
       "accessDenied": "Giriş rədd edildi",
-      "accessDeniedDescription": "Buna baxmaq üçün icazəniz yoxdur.",
+      "accessDeniedDescription": "Bunu görmək üçün icazəniz yoxdur.",
       "couldNotLoad": "Sessiya yüklənə bilmədi",
       "failedToLoadDetails": "Sessiya detalları yüklənə bilmədi",
       "notFound": "Tapılmadı",
@@ -2119,11 +2123,16 @@
       "couldNotLoadThisSession": "Bu sessiya yüklənə bilmədi",
       "cloneFailed": "Bu sessiya klonlana bilmədi.",
       "cloneFailedRetry": "Bu sessiya klonlana bilmədi. Yenidən cəhd edin.",
-      "connectRepositoryToContinue": "Davam etmək üçün repozitoriyaya qoşulun."
+      "connectRepositoryToContinue": "Davam etmək üçün repozitoriyaya qoşulun.",
+      "notEnoughCredits": "Cloud Agent işə salmaq üçün kifayət qədər kredit yoxdur. Kredit əlavə edin və yenidən cəhd edin.",
+      "previousTaskFinishing": "Əvvəlki tapşırıq hələ də tamamlanır. Bir an gözləyin.",
+      "serviceUnavailable": "Xidmət hazırda əlçatan deyil. Yenidən cəhd edin.",
+      "connectionTrouble": "Əlaqə problemi. Bir dəqiqə sonra yenidən cəhd edin.",
+      "modelUnavailable": "Bu model Cloud Agent üçün mövcud deyil. Başqa bir model seçin və yenidən cəhd edin."
     },
     "remoteSession": {
       "failedToCreate": "Uzaq sessiya yaradıla bilmədi",
-      "exited": "Sessiya çıxdı",
+      "exited": "Sessiya başa çatdı",
       "failedToExit": "Sessiyadan çıxmaq mümkün olmadı",
       "exitTitle": "Sessiyadan çıxsın?",
       "exitMessage": "Bu işləyən sessiyanı dayandırır, lakin tarixçəsini saxlayır.",
@@ -2144,7 +2153,7 @@
       "title": "Yeni sessiya",
       "repository": "Repozitoriya",
       "couldNotLoadRepositories": "Repozitoriyalar yüklənə bilmədi",
-      "connectGithub": "GitHub-a qoşul",
+      "connectGithub": "GitHub-u qoş",
       "connectGithubDescription": "Brauzerinizdə GitHub-a qoşulun, sonra repozitoriya seçmək üçün buraya qayıdın.",
       "openGithub": "GitHub-u aç",
       "refreshRepositories": "Repozitoriyaları yenilə",
@@ -2176,7 +2185,8 @@
       "discardDraftMessage": "İstəyiniz itiriləcək.",
       "keepEditing": "Redaktəyə davam et",
       "discard": "Ləğv et",
-      "discardFailed": "Qaralama ləğv edilə bilmədi. Zəhmət olmasa yenidən cəhd edin."
+      "discardFailed": "Qaralama ləğv edilə bilmədi. Zəhmət olmasa yenidən cəhd edin.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl yeniləndi",
@@ -2186,7 +2196,7 @@
     "toolPatch": {
       "operationAdded": "Əlavə edildi",
       "operationDeleted": "Silindi",
-      "operationUpdated": "Yeniləndi"
+      "operationUpdated": "Yenilənib"
     },
     "toolCard": {
       "accessibility": "{{label}} aləti, {{status}}",
@@ -2220,13 +2230,13 @@
     },
     "collectCopyableText": {
       "unserializableInput": "[seriyalaşdırıla bilməyən giriş]",
-      "errorPrefix": "Səhv: {{error}}"
+      "errorPrefix": "xəta: {{error}}"
     },
     "instancePicker": {
       "runOn": "İşə salın",
       "runOnAccessibility": "İşə salın: {{label}}",
       "couldNotLoad": "İnstansiyalar yüklənə bilmədi",
-      "couldNotLoadDescription": "Əlaqənizi yoxlayın və yenidən cəhd edin.",
+      "couldNotLoadDescription": "Bağlantınızı yoxlayın və yenidən cəhd edin.",
       "cloudAgent": "Cloud Agent",
       "loading": "Yüklənir…",
       "cloudAgentDescription": "Kilo-nun bulud sandboxında işə salın",
@@ -2258,8 +2268,8 @@
     },
     "repoPicker": {
       "title": "Repozitoriya seçin",
-      "searchLabel": "Repozitoriyaları axtar",
-      "searchPlaceholder": "Repozitoriyaları axtarın...",
+      "searchLabel": "Repozitoriyaları axtarın",
+      "searchPlaceholder": "Repozitoriyaları axtarın",
       "noMatches": "Uyğunluq yoxdur",
       "noRepositories": "Mövcud repozitoriya yoxdur",
       "noRepositoriesDescription": "Hesabınıza qoşulmuş repozitoriya yoxdur.",
@@ -2290,7 +2300,7 @@
       "total": "Cəmi",
       "reportAiResponseFailedRetryable": "Bu cavab bildirilə bilmədi.",
       "reportAiResponseFailedTerminal": "Bu cavab bildirilə bilməz.",
-      "reportAiResponseSubmitted": "Hesabat göndərildi. Qəbz {{receiptId}}"
+      "reportAiResponseSubmitted": "Bildiriş təqdim edildi. Qəbz {{receiptId}}"
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2447,7 +2457,7 @@
     },
     "sessionFilter": {
       "title": "Sessiyaları filtrlə",
-      "sortBy": "Çeşidlə",
+      "sortBy": "Sırala",
       "sortLastUpdated": "Son yenilənmə",
       "sortCreated": "Yaradılıb",
       "platform": "Platforma",
@@ -2475,7 +2485,7 @@
       "allModels": "Bütün modellər",
       "favorites": "Sevimlilər",
       "noModels": "Mövcud model yoxdur",
-      "recommended": "Tövsiyə olunanlar",
+      "recommended": "Tövsiyə olunan",
       "noModelsDescription": "Seçmək üçün mövcud model yoxdur."
     },
     "modelSelector": {
@@ -2511,9 +2521,9 @@
     },
     "attachmentPicker": {
       "camera": "Kamera",
-      "photoLibrary": "Foto Kitabxana",
+      "photoLibrary": "Şəkil kitabxanası",
       "files": "Fayllar",
-      "cameraAccessDisabled": "Kamera Girişi Deaktiv Edilib",
+      "cameraAccessDisabled": "Kamera Girişi Söndürülüb",
       "cameraAccessMessage": "Şəkil çəkmək üçün Parametrlərdə kamera girişinə icazə verin.",
       "couldNotOpenPhotoPicker": "Foto seçici açıla bilmədi. Kilo-nu yenidən başladın və yenidən cəhd edin.",
       "maxFilesAllowed": "Maksimum {{displayCount}} fayla icazə verilir",
@@ -2539,7 +2549,7 @@
       "linkCopied": "Keçid kopyalandı",
       "reviewPr": "PR-ı nəzərdən keçir",
       "openLink": "Keçidi aç",
-      "copyLink": "Keçidi kopyala",
+      "copyLink": "Linki kopyala",
       "shareLink": "Keçidi paylaş",
       "share": "Paylaş",
       "prLinkActions": "PR keçid hərəkətləri",
@@ -2649,7 +2659,7 @@
     "signOutThisSessionTitle": "Bu sessiyadan çıxış edilsin?",
     "signOutThisSessionMessage": "{{device}} çıxış ediləcək. Bir saata qədər API girişini saxlaya bilər.",
     "signOutConfirm": "Çıxış et",
-    "signOutMessage": "İş sahənizə daxil olmaq üçün yenidən daxil olmalı olacaqsınız."
+    "signOutMessage": "İş sahənizə yenidən daxil olmağınız lazım olacaq."
   },
   "forceUpdate": {
     "couldNotOpenStore": "Tətbiq mağazası açıla bilmədi.",
@@ -2662,15 +2672,10 @@
     "couldNotLoadSessions": "Sessiyalar yüklənə bilmədi",
     "couldNotLoadActiveSessions": "Aktiv sessiyalar yüklənə bilmədi",
     "agentSessions": "Agent sessiyaları",
-    "showingSavedSessions": "Saxlanılmış sessiyalar göstərilir — canlı status köhnəlmiş ola bilər",
-    "startNewAgentSession": "Yeni Kilo Agent sessiyasına başla",
-    "aiCodingSessions": "AI kodlaşdırma sessiyaları",
-    "startCodingTaskFromPhone": "Telefonunuzdan kodlaşdırma tapşırığı başlayın və ya CLI-nizdən sessiyanı davam etdirin.",
-    "tryIt": "Cəhd edin",
     "newCodingTask": "Yeni kodlaşdırma tapşırığı",
     "explore": "Kəşf et",
     "seeAll": "Hamısına bax",
-    "kiloAgents": "Kilo Agentlər"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} bağla",
@@ -2693,14 +2698,14 @@
     "internetRestored": "İnternet bağlantısı bərpa edildi"
   },
   "queryError": {
-    "neutralTitle": "Bir şey səhv getdi",
+    "neutralTitle": "Nəsə səhv getdi",
     "neutralDescription": "Zəhmət olmasa yenidən cəhd edin.",
     "offlineTitle": "Yükləmək mümkün olmadı",
-    "offlineDescription": "Bir şey səhv getdi",
+    "offlineDescription": "Nəsə səhv getdi",
     "permissionTitle": "Giriş rədd edildi",
     "permissionDescription": "Bunu görmək üçün icazəniz yoxdur.",
     "notFoundTitle": "Tapılmadı",
-    "notFoundDescription": "Bu maddə silinmiş və ya artıq mövcud olmaya bilər.",
+    "notFoundDescription": "Bu element silinmiş ola bilər və ya artıq mövcud deyil.",
     "serverTitle": "Yüklənə bilmədi",
     "serverDescription": "Bizim tərəfimizdən bir şey səhv getdi. Zəhmət olmasa yenidən cəhd edin."
   },
@@ -2982,7 +2987,7 @@
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
       "enableA11y": "Aşağı balans xəbərdarlığını aktivləşdir",
-      "enabled": "Aktivdir",
+      "enabled": "Aktiv edilib",
       "notifyEmailsLabel": "Xəbərdarlıq e-poçtları",
       "permissionDenied": "Ödəniş xəbərdarlıqlarını idarə etmək üçün icazəniz yoxdur.",
       "separateEmailsHint": "Bir neçə e-poçtu vergüllə ayırın.",
@@ -3026,7 +3031,7 @@
         "billingManager": "Ödəniş meneceri"
       },
       "emailStatusFailed": "E-poçt uğursuz oldu",
-      "emailStatusPending": "Gözləyir",
+      "emailStatusPending": "Gözlənilir",
       "inviteCreated": "Dəvət yaradıldı",
       "pendingInvitations": "Gözləyən dəvətlər",
       "resendInvite": "Dəvəti yenidən göndər",
@@ -3070,7 +3075,7 @@
       "paymentPending": "Ödəniş gözləyir",
       "processingBlocked": "Emal bloklanıb",
       "processingNeedsReview": "Emal nəzərdən keçirmə tələb edir",
-      "retry": "Yenidən cəhd et",
+      "retry": "Yenidən cəhd edin",
       "retryHint": "Kilo Pass statusunun yüklənməsinə yenidən cəhd edir.",
       "setupHint": "Kilo Pass quraşdırmasını internetdə açır."
     }
@@ -3089,12 +3094,12 @@
     "invalidRequest": "E-poçt ünvanınızı yoxlayın və yenidən cəhd edin.",
     "emailDeliveryFailed": "E-poçt çatdırılması müvəqqəti mümkün deyil. Zəhmət olmasa daha sonra yenidən cəhd edin.",
     "admissionRequired": "Cihazınız təsdiqlənə bilmir. Başqa cihazda və ya veb vasitəsilə daxil olmaq üçün '$t(login.moreSignInOptions)'ni istifadə edin.",
-    "default": "Nəsə səhv oldu. Zəhmət olmasa yenidən cəhd edin.",
+    "default": "Nəsə səhv getdi. Zəhmət olmasa yenidən cəhd edin.",
     "retryableAdmission": "Bu cihazı təsdiqləyə bilmədik. Əlaqənizi yoxlayın və yenidən cəhd edin.",
     "startSignInFailed": "Daxil olma başladıla bilmədi. Zəhmət olmasa yenidən cəhd edin.",
     "couldNotOpenBrowser": "Brauzer açıla bilmədi. Zəhmət olmasa yenidən cəhd edin.",
     "signInTimedOut": "Daxil olmanın vaxtı bitdi. Zəhmət olmasa yenidən cəhd edin.",
-    "signInFailed": "Daxil olma uğursuz oldu. Zəhmət olmasa yenidən cəhd edin.",
+    "signInFailed": "Giriş uğursuz oldu. Zəhmət olmasa yenidən cəhd edin.",
     "networkError": "Şəbəkə xətası. Zəhmət olmasa yenidən cəhd edin.",
     "accessDeniedByUser": "İstifadəçi tərəfindən giriş rədd edildi",
     "codeExpired": "Kodun müddəti bitdi",

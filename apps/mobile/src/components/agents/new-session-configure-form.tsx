@@ -252,6 +252,10 @@ export function NewSessionConfigureForm({
 
       {runTargetBlock}
 
+      <Text className="mt-2 text-xs text-muted-foreground">
+        {t('agentChat.newSession.remoteHint')}
+      </Text>
+
       {showInstanceDisconnectedNote ? (
         <Text className="mt-2 text-sm text-muted-foreground">
           {remoteSpawnInstanceDisconnectedNote()}

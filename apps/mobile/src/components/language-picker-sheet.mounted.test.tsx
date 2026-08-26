@@ -205,7 +205,7 @@ describe('LanguagePickerSheet apply', () => {
     insets.bottom = 24;
     const renderer = await mountSheet(vi.fn<() => void>());
     const overlay = findByType(renderer.root, 'View').find(
-      node => node.props.className === 'flex-1 justify-end bg-black/40'
+      node => node.props.className === 'flex-1 justify-end bg-[#00000066]'
     );
     if (!overlay) {
       throw new Error('keyboard-aware sheet overlay not found');
@@ -232,7 +232,7 @@ describe('LanguagePickerSheet apply', () => {
     insets.bottom = 24;
     const renderer = await mountSheet(vi.fn<() => void>());
     const overlay = findByType(renderer.root, 'View').find(
-      node => node.props.className === 'flex-1 justify-end bg-black/40'
+      node => node.props.className === 'flex-1 justify-end bg-[#00000066]'
     );
     if (!overlay) {
       throw new Error('keyboard-aware sheet overlay not found');

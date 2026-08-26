@@ -1,5 +1,5 @@
 import { relativeTimeFormat } from '@/lib/intl-cache';
-import { firstNonEmpty, formatDate, parseTimestamp } from '@kilocode/app-shared/utils';
+import { firstNonEmpty, parseTimestamp } from '@kilocode/app-shared/utils';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -64,14 +64,4 @@ function capitalize(value: string): string {
   return first.toLocaleUpperCase(i18n.language) + value.slice(first.length);
 }
 
-export {
-  asyncNoop,
-  capitalize,
-  cn,
-  EMAIL_PATTERN,
-  firstNonEmpty,
-  formatDate,
-  parseTimestamp,
-  pick,
-  timeAgo,
-};
+export { asyncNoop, capitalize, cn, EMAIL_PATTERN, firstNonEmpty, parseTimestamp, pick, timeAgo };

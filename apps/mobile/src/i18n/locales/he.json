@@ -38,7 +38,9 @@
     "catalogLoadFailed": "לא ניתן היה לטעון את השפה. אנא נסה שוב.",
     "search": "חיפוש שפות",
     "noMatches": "אין שפות מתאימות",
-    "deviceLanguage": "שפת המכשיר"
+    "deviceLanguage": "שפת המכשיר",
+    "current": "נוכחית",
+    "allLanguages": "כל השפות"
   },
   "login": {
     "welcome": "ברוך הבא ל-Kilo",
@@ -148,7 +150,9 @@
     "appearanceSystem": "מערכת",
     "appearanceLight": "בהיר",
     "appearanceDark": "כהה",
-    "account": "חשבון"
+    "account": "חשבון",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "התראות",
@@ -178,7 +182,7 @@
     "previewFullDescription": "התראות מציגות את טקסט ההודעה במסך הנעילה שלך.",
     "previewGenericDescription": "התראות מציגות שמשהו קרה. פתח את Kilo כדי לקרוא אותו.",
     "channel": {
-      "agent": "הפעלות הסוכן",
+      "agent": "הפעלות סוכן",
       "chat": "הודעות צ׳אט",
       "kiloclaw": "פעילות KiloClaw",
       "balance": "התראות יתרה",
@@ -236,7 +240,7 @@
       "couldNotSignIn": "לא ניתן היה להיכנס לצ׳אט",
       "couldNotRefreshMessages": "לא ניתן היה לרענן הודעות",
       "couldNotLoadHistory": "לא ניתן היה לטעון את היסטוריית השיחה",
-      "rename": "שינוי שם",
+      "rename": "שנה שם",
       "leave": "עזיבה",
       "untitledConversation": "שיחה ללא כותרת",
       "createFailed": "יצירת השיחה נכשלה",
@@ -315,7 +319,7 @@
       "title": "פעולות הודעה",
       "deleteTitle": "למחוק את ההודעה?",
       "deleteMessage": "פעולה זו תסיר את ההודעה מהשיחה.",
-      "delete": "מחיקה",
+      "delete": "מחק",
       "deleteFailed": "מחיקת ההודעה נכשלה",
       "removeReactionFailed": "הסרת התגובה נכשלה",
       "addReactionFailed": "הוספת התגובה נכשלה",
@@ -786,7 +790,7 @@
     },
     "repos": {
       "title": "מאגרים",
-      "couldNotLoad": "לא ניתן לטעון מאגרים",
+      "couldNotLoad": "לא ניתן היה לטעון מאגרים",
       "unavailable": "המאגרים אינם זמינים — השלם את הגדרת Bitbucket ב-kilo.ai.",
       "finishSetup": "השלם הגדרה",
       "manageAccess": "נהל גישה",
@@ -1085,7 +1089,7 @@
     "analysisSettings": {
       "analysisModel": "דגם ניתוח",
       "couldNotLoad": "לא ניתן היה לטעון את הגדרות הניתוח",
-      "couldNotLoadModels": "לא ניתן היה לטעון דגמים",
+      "couldNotLoadModels": "לא ניתן לטעון דגמים",
       "depth": "עומק ניתוח",
       "modeAuto": "אוטומטי",
       "modeDeep": "עמוק",
@@ -1642,7 +1646,7 @@
       "didNotCompleteTitle": "ההתקנה לא הושלמה",
       "didNotCompleteMessage": "התקנת אפליקציית GitHub לא הושלמה. נסה שוב מהאפליקציה."
     },
-    "sessionExited": "היציאה מהסשן הושלמה",
+    "sessionExited": "ההפעלה הסתיימה",
     "remoteSpawnRetryable": "לא ניתן היה ליצור קשר עם המופע — ייתכן שהחיבור נותק.",
     "remoteSpawnNonRetryable": "המופע לא הצליח להפעיל את הסשן — בדוק את המחשב או עדכן את ה-CLI.",
     "remoteSpawnInstanceDisconnected": "המופע שנבחר נותק. התחל סשן ב-Cloud Agent או בחר מופע אחר."
@@ -1673,7 +1677,12 @@
       "couldNotLoadThisSession": "לא ניתן היה לטעון הפעלה זו",
       "cloneFailed": "לא ניתן היה לשכפל הפעלה זו.",
       "cloneFailedRetry": "לא ניתן היה לשכפל הפעלה זו. נסה שוב.",
-      "connectRepositoryToContinue": "חבר מאגר כדי להמשיך."
+      "connectRepositoryToContinue": "חבר מאגר כדי להמשיך.",
+      "notEnoughCredits": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent. הוסף קרדיטים ונסה שוב.",
+      "previousTaskFinishing": "המשימה הקודמת עדיין מסתיימת. אנא המתן רגע.",
+      "serviceUnavailable": "השירות אינו זמין כרגע. אנא נסה שוב.",
+      "connectionTrouble": "בעיית חיבור. אנא נסה שוב בעוד רגע.",
+      "modelUnavailable": "המודל הזה אינו זמין עבור Cloud Agent. בחר מודל אחר ונסה שוב."
     },
     "remoteSession": {
       "failedToCreate": "לא ניתן היה ליצור הפעלה מרוחקת",
@@ -1726,11 +1735,12 @@
       "couldNotReadPendingSessions": "לא ניתן היה לקרוא הפעלות ממתינות. נסה שוב.",
       "failedToCreate": "לא ניתן היה ליצור הפעלה",
       "couldNotRefreshRepositories": "לא ניתן היה לרענן מאגרים. נסה שוב.",
-      "discard": "בטל",
+      "discard": "מחק",
       "discardDraftMessage": "ההנחיה שלך תאבד.",
       "discardDraftTitle": "לבטל את הטיוטה?",
       "discardFailed": "לא ניתן היה לבטל את הטיוטה. נסה שוב.",
-      "keepEditing": "המשך לערוך"
+      "keepEditing": "המשך לערוך",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "עודכן {{displayCount}} קובץ",
@@ -1751,7 +1761,7 @@
       "contentTruncated": "התוכן קוצר",
       "truncated": "קטום",
       "toolRead": "קריאה",
-      "toolEdit": "עריכה",
+      "toolEdit": "ערוך",
       "toolWrite": "כתיבה",
       "toolBash": "bash",
       "toolGlob": "glob",
@@ -2030,7 +2040,7 @@
     "modelPicker": {
       "title": "בחר דגם",
       "searchPlaceholder": "חפש דגמים...",
-      "noModels": "אין דגמים זמינים",
+      "noModels": "אין מודלים זמינים",
       "noModelsDescription": "אין דגמים זמינים לבחירה.",
       "favorites": "מועדפים",
       "recommended": "מומלץ",
@@ -2071,8 +2081,8 @@
       "camera": "מצלמה",
       "photoLibrary": "ספריית תמונות",
       "files": "קבצים",
-      "cameraAccessDisabled": "גישת מצלמה מושבתת",
-      "cameraAccessMessage": "אפשר גישת מצלמה בהגדרות כדי לצלם תמונה.",
+      "cameraAccessDisabled": "הגישה למצלמה מושבתת",
+      "cameraAccessMessage": "אפשר גישה למצלמה בהגדרות כדי לצלם תמונה.",
       "couldNotOpenPhotoPicker": "לא ניתן היה לפתוח את בורר התמונות. הפעל מחדש את Kilo ונסה שוב.",
       "maxFilesAllowed": "מותר לצרף עד {{displayCount}} קבצים",
       "onlyAddingFiles": "מוסיף רק {{accepted}} מתוך {{total}} קבצים (מקסימום {{max}})"
@@ -2180,7 +2190,7 @@
     "couldNotLoadPrivacy": "לא ניתן לטעון אפשרויות פרטיות",
     "couldNotLoadPrivacyDescription": "בדוק את הגדרות האבטחה של המכשיר ונסה שוב.",
     "contentReady": "התוכן מוכן",
-    "signOut": "התנתקות",
+    "signOut": "התנתק",
     "retryLoadingAccount": "נסה לטעון את החשבון שוב",
     "retryLoadingPrivacy": "נסה לטעון את בחירות הפרטיות שוב"
   },
@@ -2190,7 +2200,7 @@
     "billingPage": "דף החיוב"
   },
   "deviceSessions": {
-    "couldNotLoad": "לא ניתן לטעון הפעלות",
+    "couldNotLoad": "לא ניתן היה לטעון הפעלות",
     "couldNotLoadDescription": "ההפעלות הפעילות שלך אינן זמינות עד שזה נטען.",
     "currentDeviceUnidentified": "לא ניתן היה לזהות את המכשיר הנוכחי",
     "noSessions": "אין הפעלות פעילות",
@@ -2221,15 +2231,10 @@
     "couldNotLoadSessions": "לא ניתן לטעון הפעלות",
     "couldNotLoadActiveSessions": "לא ניתן לטעון הפעלות פעילות",
     "agentSessions": "הפעלות סוכן",
-    "showingSavedSessions": "מציג הפעלות שמורות — המצב החי עשוי להיות לא מעודכן",
-    "startNewAgentSession": "התחל הפעלת Kilo Agent חדשה",
-    "aiCodingSessions": "הפעלות קידוד AI",
-    "startCodingTaskFromPhone": "התחל משימת קידוד מהטלפון שלך או המשך הפעלה מה-CLI שלך.",
-    "tryIt": "נסה זאת",
     "newCodingTask": "משימת קידוד חדשה",
     "explore": "חקור",
     "seeAll": "ראה הכל",
-    "kiloAgents": "סוכני Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "סגור את {{filename}}",
@@ -2274,7 +2279,7 @@
     "optionsExpiredDescription": "חזור אחורה ופתח מחדש את הבורר הזה מהמסך הקודם."
   },
   "sessionRow": {
-    "needsInput": "דורש קלט"
+    "needsInput": "נדרש קלט"
   },
   "voiceInput": {
     "listening": "מאזין...",
@@ -2492,7 +2497,7 @@
       "commentBody": "גוף התגובה",
       "commentBodyPlaceholder": "השאר תגובה",
       "commentNow": "הגב עכשיו",
-      "discard": "בטל",
+      "discard": "מחק",
       "discardMessage": "הטיוטה שלך תאבד.",
       "discardTitle": "לבטל את התגובה?",
       "editTitle": "ערוך תגובה",
@@ -2651,7 +2656,7 @@
       "unified": "מאוחד"
     },
     "fileNavigator": {
-      "checkConnection": "בדוק את החיבור ונסה שוב.",
+      "checkConnection": "בדוק את החיבור שלך ונסה שוב.",
       "couldNotLoadFiles": "לא ניתן היה לטעון קבצים",
       "couldNotLoadMoreFiles": "לא ניתן היה לטעון עוד קבצים",
       "diffTooLarge": "diff גדול מדי",
@@ -2727,7 +2732,7 @@
       "loading": "טוען תיבת דואר נכנס",
       "noReviewRequests": "אין בקשות סקירה",
       "noReviewRequestsDescription": "בקשתות משיכה שממתינות לסקירה שלך יופיעו כאן. עדיין תוכל להדביק כל קישור PR למעלה.",
-      "recent": "אחרונים",
+      "recent": "אחרונות",
       "retryLoadingMore": "נסה שוב לטעון עוד",
       "title": "תיבת דואר נכנס"
     },
@@ -2758,7 +2763,7 @@
       "mergePullRequest": "מזג בקשת משיכה",
       "methodLabel": "שיטה",
       "methods": {
-        "merge": "Merge",
+        "merge": "מיזוג",
         "rebase": "Rebase",
         "squash": "Squash"
       },
@@ -2786,7 +2791,7 @@
         "failingChecksDetail": "בדיקות הסטטוס הנדרשות נכשלות.",
         "unstableTitle": "חלק מהבדיקות נכשלות",
         "unstableDetail": "בדיקות שאינן נדרשות נכשלות. הן לא יחסמו את המיזוג.",
-        "draftTitle": "בקשת משיכה בטיוטה",
+        "draftTitle": "טיוטת בקשת משיכה",
         "draftDetail": "סמן את בקשת המשיכה כמוכנה לסקירה לפני המיזוג.",
         "behindTitle": "הענף אינו מעודכן",
         "behindDetailUpdatable": "עדכן את הענף מהבסיס, או בצע rebase, לפני המיזוג.",
@@ -3115,7 +3120,7 @@
     "startSignInFailed": "התחלת הכניסה נכשלה. נסה שוב.",
     "couldNotOpenBrowser": "לא ניתן היה לפתוח את הדפדפן. נסה שוב.",
     "signInTimedOut": "הכניסה פגה. נסה שוב.",
-    "signInFailed": "הכניסה נכשלה. נסה שוב.",
+    "signInFailed": "ההתחברות נכשלה. נסה שוב.",
     "networkError": "שגיאת רשת. נסה שוב.",
     "accessDeniedByUser": "הגישה נדחתה על ידי המשתמש",
     "codeExpired": "הקוד פג",
@@ -3126,7 +3131,7 @@
     "free": "חינם",
     "couldNotUpdateFavorites": "לא ניתן היה לעדכן את המועדפים",
     "thinkingEffort": {
-      "none": "ללא",
+      "none": "אין",
       "minimal": "מינימלי",
       "low": "נמוך",
       "medium": "בינוני",

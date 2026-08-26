@@ -86,11 +86,7 @@ export function renderMemberManagementDrawerContent(
       return {
         header: <h2 className="type-body font-medium">Invite a new person</h2>,
         body: (
-          <InvitePersonWizard
-            parentOrganizationId={parentOrganizationId}
-            children={data.children}
-            onClose={helpers.close}
-          />
+          <InvitePersonWizard parentOrganizationId={parentOrganizationId} onClose={helpers.close} />
         ),
       };
   }

@@ -21,3 +21,21 @@ export function parseParam<T extends string = string>(
   }
   return value as T;
 }
+
+/**
+ * Runtime-validates a dynamic route param that must be a positive integer,
+ * such as a PR number.
+ *
+ * `Number.parseInt` stops at the first non-digit, so `12abc` and `1.5` would
+ * silently resolve to PR 12 and PR 1 instead of the invalid-route state. The
+ * whole segment must be digits, and the result must stay exactly
+ * representable, before it is used in a query.
+ */
+export function parsePositiveIntParam(value: string | string[] | undefined): number | null {
+  const raw = parseParam(value);
+  if (raw === null || !/^[1-9]\d*$/.test(raw)) {
+    return null;
+  }
+  const parsed = Number(raw);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}

@@ -2,7 +2,7 @@ import { type Href, Stack, useLocalSearchParams } from 'expo-router';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { PrReviewScreen } from '@/components/pr-review/pr-review-screen';
-import { parseParam } from '@/lib/route-params';
+import { parseParam, parsePositiveIntParam } from '@/lib/route-params';
 
 type Params = {
   owner: string;
@@ -14,10 +14,9 @@ export default function PrReviewNumberIndexRoute() {
   const { owner, repo, number } = useLocalSearchParams<Params>();
   const parsedOwner = parseParam(owner);
   const parsedRepo = parseParam(repo);
-  const rawNumber = parseParam(number);
-  const numberValue = rawNumber ? Number.parseInt(rawNumber, 10) : Number.NaN;
+  const numberValue = parsePositiveIntParam(number);
 
-  if (!parsedOwner || !parsedRepo || !Number.isInteger(numberValue) || numberValue <= 0) {
+  if (!parsedOwner || !parsedRepo || numberValue === null) {
     return <InvalidRouteState backTo={'/(app)/pr-review' as Href} />;
   }
 

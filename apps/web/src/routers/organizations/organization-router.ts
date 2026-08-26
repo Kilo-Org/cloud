@@ -83,6 +83,7 @@ import { organizationKiloPassRouter } from '@/routers/organizations/organization
 import { organizationGroupsRouter } from '@/routers/organizations/organization-groups-router';
 import { organizationSubOrganizationsRouter } from '@/routers/organizations/organization-sub-organizations-router';
 import { organizationSalesDemoRouter } from '@/routers/organizations/organization-sales-demo-router';
+import { organizationVerifiedDomainsRouter } from '@/routers/organizations/organization-verified-domains-router';
 import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 
@@ -162,6 +163,7 @@ export const organizationsRouter = createTRPCRouter({
   groups: organizationGroupsRouter,
   subOrganizations: organizationSubOrganizationsRouter,
   salesDemo: organizationSalesDemoRouter,
+  verifiedDomains: organizationVerifiedDomainsRouter,
 
   list: baseProcedure.query(async opts => {
     const { user } = opts.ctx;

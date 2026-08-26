@@ -7,6 +7,7 @@ import { OrganizationDataCollectionCard } from './OrganizationDataCollectionCard
 import { SeatUsageCard } from './SeatUsageCard';
 import { KiloPassUsageCard } from './KiloPassUsageCard';
 import { SSOSignupCard } from './SSOSignupCard';
+import { VerifiedDomainsCard } from './VerifiedDomainsCard';
 import { LockableContainer } from './LockableContainer';
 import { OrganizationAdminContextProvider } from './OrganizationContextWrapper';
 import { OrganizationPageHeader } from './OrganizationPageHeader';
@@ -183,6 +184,11 @@ export function OrganizationDashboard({
             {canManageOrganizationBilling(currentRole) && (
               <OrgActiveKiloclawsCard organizationId={organizationId} />
             )}
+            <VerifiedDomainsCard
+              organizationId={organizationId}
+              role={currentRole}
+              isKiloAdmin={isKiloAdmin}
+            />
             {organizationData?.plan === 'enterprise' && (
               <LockableContainer>
                 <SSOSignupCard organization={organizationData} role={currentRole} />

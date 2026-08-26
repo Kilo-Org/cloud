@@ -17,7 +17,7 @@ jest.mock('@/lib/email', () => ({
 }));
 
 import { sendMonthlySpendingAlertEmail } from '@/lib/email';
-import { alertRecipientIdentityHmac } from '../alert-deliveries';
+import { alertRecipientIdentityHmac, claimAlertDeliveries } from '../alert-deliveries';
 import { evaluateMonthlySpendingAlerts } from './monthly-spending-evaluator';
 
 const mockedSend = jest.mocked(sendMonthlySpendingAlertEmail);
@@ -278,6 +278,32 @@ describe('monthly spending alert evaluation', () => {
         row => row.recipient_identity_hmac === alertRecipientIdentityHmac('late@example.com')
       )
     ).toBe(false);
+  });
+
+  it('claims each recipient once when evaluators overlap', async () => {
+    const organizationId = await createEnterpriseOrganization();
+    const alertId = await createAlert(organizationId, {
+      recipients: ['first@example.com', 'second@example.com'],
+    });
+    const occurrence = resolveOrganizationAlertPeriodOccurrence(CALENDAR_MONTH_UTC_V1, new Date());
+    const claim = () =>
+      claimAlertDeliveries({
+        alertId,
+        occurrence,
+        recipients: ['first@example.com', 'second@example.com'],
+        configurationVersion: 1,
+        thresholdMicrodollars: THRESHOLD,
+        measuredSpendMicrodollars: THRESHOLD,
+      });
+
+    // No lock serializes this: delivery identity uniqueness is what keeps a
+    // concurrent evaluator from claiming the same recipient a second time.
+    const [left, right] = await Promise.all([claim(), claim()]);
+
+    expect(left.length + right.length).toBe(2);
+    const rows = await deliveries(alertId);
+    expect(rows).toHaveLength(2);
+    expect(new Set(rows.map(row => row.recipient_identity_hmac)).size).toBe(2);
   });
 
   it('does not count another organization spend toward an alert', async () => {

@@ -43,13 +43,20 @@ export function alertRecipientIdentityHmac(recipient: string): string {
 
 /**
  * Durably claims delivery for each recipient of one crossed alert, before any
- * provider call. Concurrent evaluators are safe two ways: the per-alert-period
- * advisory lock serializes admission so the 10-recipient cap is enforced against
- * a stable count, and the delivery identity uniqueness invariant makes a second
- * claim for the same recipient a no-op even across processes.
+ * provider call.
  *
- * Recipients beyond the cap are deliberately not claimed: the period has already
- * admitted its maximum, which the editor explains rather than silently widening.
+ * This is deliberately lock-free. The guarantee that matters — one recipient is
+ * never emailed twice for the same alert and period — comes from the unique
+ * index on delivery identity, so a concurrent evaluator's duplicate insert is
+ * skipped by `ON CONFLICT` rather than prevented by serialization.
+ *
+ * The 10-recipient admission cap is a fanout bound rather than a safety
+ * invariant, so it is enforced with a plain count instead of a lock. Recipients
+ * are already capped at 10 by the configuration schema, so one sweep can never
+ * exceed the bound on its own; exceeding it requires recipients to be replaced
+ * mid-period while two evaluators overlap, and the only consequence is a couple
+ * of extra admitted addresses for that period. Duplicate email remains
+ * impossible either way.
  */
 export async function claimAlertDeliveries(params: {
   alertId: string;
@@ -59,49 +66,40 @@ export async function claimAlertDeliveries(params: {
   thresholdMicrodollars: number;
   measuredSpendMicrodollars: number;
 }): Promise<OrganizationAlertDelivery[]> {
-  return await db.transaction(async tx => {
-    await tx.execute(sql`
-      SELECT pg_catalog.pg_advisory_xact_lock(
-        pg_catalog.hashtextextended(
-          ${`organization-alert-admission:${params.alertId}:${params.occurrence.occurrenceId}`},
-          0
-        )
+  const admitted = await db
+    .select({ recipientIdentityHmac: organization_alert_deliveries.recipient_identity_hmac })
+    .from(organization_alert_deliveries)
+    .where(
+      and(
+        eq(organization_alert_deliveries.alert_id, params.alertId),
+        eq(organization_alert_deliveries.period_occurrence_id, params.occurrence.occurrenceId)
       )
-    `);
-
-    const admitted = await tx
-      .select({ recipientIdentityHmac: organization_alert_deliveries.recipient_identity_hmac })
-      .from(organization_alert_deliveries)
-      .where(
-        and(
-          eq(organization_alert_deliveries.alert_id, params.alertId),
-          eq(organization_alert_deliveries.period_occurrence_id, params.occurrence.occurrenceId)
-        )
-      );
-
-    const admittedIdentities = new Set(admitted.map(row => row.recipientIdentityHmac));
-    const capacity = MAX_ORGANIZATION_ALERT_RECIPIENTS - admittedIdentities.size;
-    const newIdentities = [...new Set(params.recipients.map(alertRecipientIdentityHmac))].filter(
-      identity => !admittedIdentities.has(identity)
     );
-    if (capacity <= 0 || newIdentities.length === 0) return [];
 
-    return await tx
-      .insert(organization_alert_deliveries)
-      .values(
-        newIdentities.slice(0, capacity).map(identity => ({
-          alert_id: params.alertId,
-          period_occurrence_id: params.occurrence.occurrenceId,
-          recipient_identity_hmac: identity,
-          channel: 'email' as const,
-          claimed_configuration_version: params.configurationVersion,
-          threshold_microdollars: params.thresholdMicrodollars,
-          measured_spend_microdollars: params.measuredSpendMicrodollars,
-        }))
-      )
-      .onConflictDoNothing()
-      .returning();
-  });
+  const admittedIdentities = new Set(admitted.map(row => row.recipientIdentityHmac));
+  const capacity = MAX_ORGANIZATION_ALERT_RECIPIENTS - admittedIdentities.size;
+  const newIdentities = [...new Set(params.recipients.map(alertRecipientIdentityHmac))].filter(
+    identity => !admittedIdentities.has(identity)
+  );
+  if (capacity <= 0 || newIdentities.length === 0) return [];
+
+  // One statement, so a partial claim cannot be left behind by a failure part
+  // way through the batch.
+  return await db
+    .insert(organization_alert_deliveries)
+    .values(
+      newIdentities.slice(0, capacity).map(identity => ({
+        alert_id: params.alertId,
+        period_occurrence_id: params.occurrence.occurrenceId,
+        recipient_identity_hmac: identity,
+        channel: 'email' as const,
+        claimed_configuration_version: params.configurationVersion,
+        threshold_microdollars: params.thresholdMicrodollars,
+        measured_spend_microdollars: params.measuredSpendMicrodollars,
+      }))
+    )
+    .onConflictDoNothing()
+    .returning();
 }
 
 /** Claims still owed a provider call, oldest first, including earlier runs. */

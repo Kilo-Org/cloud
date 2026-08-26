@@ -126,10 +126,10 @@ export type SandboxId =
   | `${string}__${string}`
   | `${string}__${string}__${string}`;
 
-export type AgentSandboxProvider = 'cloudflare';
+export type AgentSandboxProvider = 'cloudflare' | 'vercel';
 
 /** Unique identifier for a session within a sandbox */
-export type SessionId = `agent_${string}`;
+export type SessionId = `agent_${string}` | `workspace_${string}`;
 
 export type SessionContext = {
   sandboxId: SandboxId;
@@ -584,6 +584,18 @@ export type Env = {
   GITHUB_APP_BOT_USER_ID?: string;
   /** Comma-separated org IDs that use per-session Cloudflare sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
+  /** Comma-separated user or org IDs admitted to the call-home control plane. `*` includes personal. */
+  CONTROL_PLANE_IDS?: string;
+  VERCEL_TOKEN?: string;
+  VERCEL_TEAM_ID?: string;
+  VERCEL_PROJECT_ID?: string;
+  VERCEL_SANDBOX_SNAPSHOT_ID?: string;
+  VERCEL_SANDBOX_RUNTIME_BUILD_ID?: string;
+  VERCEL_SANDBOX_RUNTIME?: string;
+  VERCEL_SANDBOX_INITIAL_TIMEOUT_MS?: string;
+  VERCEL_SANDBOX_EXTEND_DURATION_MS?: string;
+  /** Comma-separated org IDs routed to Vercel. Empty is off. `*` includes personal. */
+  VERCEL_SANDBOX_ORG_IDS?: string;
   /** Comma-separated org IDs whose GitHub token uses credential containment, or `*` for all orgs */
   GITHUB_TOKEN_CONTAINMENT_ORG_IDS?: string;
   /** Comma-separated org IDs whose GitLab token uses credential containment, or `*` for all orgs */

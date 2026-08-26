@@ -4,6 +4,7 @@ import { createAgentSandbox } from '../agent-sandbox/factory.js';
 import {
   AgentSandboxUnavailableError,
   type AgentSandbox,
+  type AgentSandboxRuntimeContext,
   type WrapperInstanceLease,
   type WrapperObservation,
 } from '../agent-sandbox/protocol.js';
@@ -89,6 +90,7 @@ export type AgentRuntimeDependencies = {
     fence?: { wrapperGeneration: number; wrapperConnectionId: string }
   ) => boolean;
   getOrchestratorOverride?: () => AgentRuntimeOrchestrator | undefined;
+  sandboxRuntimeContext?: AgentSandboxRuntimeContext;
   createAgentSandbox?: (metadata: SessionMetadata) => AgentSandbox;
   discoverSessionWrappers?: (metadata: SessionMetadata) => Promise<WrapperObservation>;
   requestAlarmAtOrBefore?: (deadline: number) => Promise<void>;
@@ -144,7 +146,8 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
   } = dependencies;
   const resolveAgentSandbox =
     dependencies.createAgentSandbox ??
-    ((metadata: SessionMetadata) => createAgentSandbox(env, metadata));
+    ((metadata: SessionMetadata) =>
+      createAgentSandbox(env, metadata, dependencies.sandboxRuntimeContext));
   let orchestrator: AgentRuntimeOrchestrator | undefined;
 
   function getOrchestrator(): AgentRuntimeOrchestrator {

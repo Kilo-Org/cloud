@@ -158,6 +158,7 @@ import { createAgentSandbox, createAgentSandboxLifecycle } from '../agent-sandbo
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 import type {
   AgentSandboxLifecycle,
+  AgentSandboxRuntimeContext,
   SandboxDeleteReason,
   SessionDeletionIntent,
   StopWrappersResult,
@@ -169,6 +170,16 @@ import {
   CODE_REVIEW_EPHEMERAL_SANDBOX_DESTROY_DELAY_MS,
   isCodeReviewEphemeralSandboxId,
 } from '../code-review-ephemeral-sandbox.js';
+import {
+  parseVercelCreateIntent,
+  parseVercelWrapperLaunchIntent,
+  VERCEL_CREATE_INTENT_KEY,
+  VERCEL_CREATE_RETRY_DELAY_MS,
+  VERCEL_CREATE_SETTLE_MS,
+  VERCEL_DELETION_TOMBSTONE_KEY,
+  VERCEL_WRAPPER_LAUNCH_INTENT_KEY,
+} from '../agent-sandbox/vercel/vercel-runtime-state.js';
+import { updateProviderRuntime } from './session-metadata.js';
 
 // ---------------------------------------------------------------------------
 // Alarm Constants
@@ -732,12 +743,17 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         sendToWrapper: (ingestTagId, command, fence) =>
           this.sendToWrapper(ingestTagId, command, fence),
         getOrchestratorOverride: () => this.orchestrator,
+        sandboxRuntimeContext: this.getAgentSandboxRuntimeContext(),
         discoverSessionWrappers: metadata =>
           this.physicalWrapperObserver
             ? this.physicalWrapperObserver()
             : this.orchestrator
               ? Promise.resolve({ status: 'absent' })
-              : createAgentSandbox(this.env, metadata).discoverSessionWrappers(),
+              : createAgentSandbox(
+                  this.env,
+                  metadata,
+                  this.getAgentSandboxRuntimeContext()
+                ).discoverSessionWrappers(),
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
         checkBillingAdmission: () => this.containerBillingAdmissionFailure(),
       });
@@ -747,7 +763,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   private async hasDeletionIntent(): Promise<boolean> {
-    return (await this.ctx.storage.get<SessionDeletionIntent>(DELETION_INTENT_KEY)) !== undefined;
+    return (
+      (await this.ctx.storage.get<SessionDeletionIntent>(DELETION_INTENT_KEY)) !== undefined ||
+      (await this.ctx.storage.get(VERCEL_DELETION_TOMBSTONE_KEY)) !== undefined
+    );
   }
 
   private async canUseSandboxRuntime(): Promise<boolean> {
@@ -812,6 +831,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (!this.sandboxLifecycle) {
       this.sandboxLifecycle = createAgentSandboxLifecycle(this.env, {
         storage: this.ctx.storage,
+        runtimeContext: this.getAgentSandboxRuntimeContext(),
         scheduleAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
         eraseDurableObjectState: () => this.eraseDurableObjectState(),
         purgeDeletedSessionPayload: () => this.purgeDeletedSessionPayload(),
@@ -819,6 +839,167 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       });
     }
     return this.sandboxLifecycle;
+  }
+
+  private getAgentSandboxRuntimeContext(): AgentSandboxRuntimeContext {
+    return {
+      getCreateIntent: async () => {
+        const raw = await this.ctx.storage.get(VERCEL_CREATE_INTENT_KEY);
+        return raw === undefined ? undefined : parseVercelCreateIntent(raw);
+      },
+      beginCreate: async input => {
+        if (await this.hasDeletionIntent()) throw new Error('Session deletion is pending');
+        const existing = await this.ctx.storage.get(VERCEL_CREATE_INTENT_KEY);
+        if (existing !== undefined) {
+          const intent = parseVercelCreateIntent(existing);
+          if (
+            intent.sandboxName !== input.sandboxName ||
+            intent.projectId !== input.projectId ||
+            intent.snapshotId !== input.snapshotId ||
+            intent.runtimeBuildId !== input.runtimeBuildId ||
+            intent.runtime !== input.runtime
+          ) {
+            throw new Error('Vercel create intent does not match the pinned runtime configuration');
+          }
+          return intent;
+        }
+        const now = Date.now();
+        const intent = parseVercelCreateIntent({
+          version: 1,
+          sandboxName: input.sandboxName,
+          operationId: crypto.randomUUID(),
+          projectId: input.projectId,
+          snapshotId: input.snapshotId,
+          runtimeBuildId: input.runtimeBuildId,
+          runtime: input.runtime,
+          startedAt: now,
+          settleUntil: now + VERCEL_CREATE_SETTLE_MS,
+          attempts: 1,
+          nextRetryAt: now + VERCEL_CREATE_RETRY_DELAY_MS,
+        });
+        await this.ctx.storage.put(VERCEL_CREATE_INTENT_KEY, intent);
+        await this.scheduleAlarmAtOrBefore(intent.nextRetryAt);
+        return intent;
+      },
+      clearCreateIntent: async operationId => {
+        const raw = await this.ctx.storage.get(VERCEL_CREATE_INTENT_KEY);
+        if (raw === undefined) return;
+        const intent = parseVercelCreateIntent(raw);
+        if (intent.operationId === operationId) {
+          await this.ctx.storage.delete(VERCEL_CREATE_INTENT_KEY);
+        }
+      },
+      persistRuntimeOnce: async input => {
+        if (await this.hasDeletionIntent()) throw new Error('Session deletion is pending');
+        await this.ctx.storage.transaction(async transaction => {
+          const rawMetadata = await transaction.get('metadata');
+          if (!rawMetadata) throw new Error('Session metadata unavailable');
+          const metadata = parseSessionMetadata(rawMetadata);
+          const updated = updateProviderRuntime(metadata, {
+            provider: input.provider,
+            sessionId: input.sessionId,
+            projectId: input.projectId,
+            snapshotId: input.snapshotId,
+            runtimeBuildId: input.runtimeBuildId,
+            runtime: input.runtime,
+            wrapper: metadata.workspace?.providerRuntime?.wrapper,
+          });
+          await transaction.put('metadata', updated);
+          await transaction.delete(VERCEL_CREATE_INTENT_KEY);
+        });
+      },
+      getWrapperLaunchIntent: async () => {
+        const raw = await this.ctx.storage.get(VERCEL_WRAPPER_LAUNCH_INTENT_KEY);
+        return raw === undefined ? undefined : parseVercelWrapperLaunchIntent(raw);
+      },
+      clearWrapperLaunchIntent: async launchId => {
+        const raw = await this.ctx.storage.get(VERCEL_WRAPPER_LAUNCH_INTENT_KEY);
+        if (raw === undefined) return;
+        const intent = parseVercelWrapperLaunchIntent(raw);
+        if (intent.launchId === launchId) {
+          await this.ctx.storage.delete(VERCEL_WRAPPER_LAUNCH_INTENT_KEY);
+        }
+      },
+      beginWrapperLaunch: async input => {
+        if (await this.hasDeletionIntent()) throw new Error('Session deletion is pending');
+        const existing = await this.ctx.storage.get(VERCEL_WRAPPER_LAUNCH_INTENT_KEY);
+        if (existing !== undefined) {
+          const intent = parseVercelWrapperLaunchIntent(existing);
+          if (
+            intent.sessionId !== input.sessionId ||
+            intent.instanceId !== input.instance.instanceId ||
+            intent.instanceGeneration !== input.instance.instanceGeneration
+          ) {
+            throw new Error('Vercel wrapper launch intent does not match the current lease');
+          }
+          return intent;
+        }
+        const intent = parseVercelWrapperLaunchIntent({
+          sessionId: input.sessionId,
+          launchId: crypto.randomUUID(),
+          instanceId: input.instance.instanceId,
+          instanceGeneration: input.instance.instanceGeneration,
+          startedAt: Date.now(),
+        });
+        await this.ctx.storage.put(VERCEL_WRAPPER_LAUNCH_INTENT_KEY, intent);
+        return intent;
+      },
+      persistWrapperProcessOnce: async input => {
+        if (await this.hasDeletionIntent()) throw new Error('Session deletion is pending');
+        await this.ctx.storage.transaction(async transaction => {
+          const rawMetadata = await transaction.get('metadata');
+          if (!rawMetadata) throw new Error('Session metadata unavailable');
+          const metadata = parseSessionMetadata(rawMetadata);
+          const runtime = metadata.workspace?.providerRuntime;
+          if (!runtime || runtime.sessionId !== input.sessionId) {
+            throw new Error('Vercel wrapper session does not match persisted runtime');
+          }
+          const launchIntentRaw = await transaction.get(VERCEL_WRAPPER_LAUNCH_INTENT_KEY);
+          if (launchIntentRaw !== undefined) {
+            const launchIntent = parseVercelWrapperLaunchIntent(launchIntentRaw);
+            if (launchIntent.launchId !== input.launchId) {
+              throw new Error('Vercel wrapper process does not match the launch intent');
+            }
+          }
+          const existing = runtime.wrapper;
+          if (
+            existing &&
+            (existing.launchId !== input.launchId ||
+              existing.commandId !== input.commandId ||
+              existing.instanceId !== input.instance.instanceId ||
+              existing.instanceGeneration !== input.instance.instanceGeneration)
+          ) {
+            throw new Error('Vercel wrapper process is immutable until cleared');
+          }
+          const updated = updateProviderRuntime(metadata, {
+            ...runtime,
+            wrapper: {
+              launchId: input.launchId,
+              commandId: input.commandId,
+              instanceId: input.instance.instanceId,
+              instanceGeneration: input.instance.instanceGeneration,
+            },
+          });
+          await transaction.put('metadata', updated);
+          await transaction.delete(VERCEL_WRAPPER_LAUNCH_INTENT_KEY);
+        });
+      },
+      clearWrapperProcess: async input => {
+        if (await this.hasDeletionIntent()) return;
+        const metadata = await this.getStoredMetadata();
+        const runtime = metadata?.workspace?.providerRuntime;
+        if (!metadata || !runtime || runtime.sessionId !== input.sessionId) return;
+        if (runtime.wrapper?.commandId !== input.commandId) return;
+        await this.ctx.storage.put(
+          'metadata',
+          updateProviderRuntime(metadata, {
+            ...runtime,
+            wrapper: undefined,
+          })
+        );
+      },
+      isDeletionPending: () => this.hasDeletionIntent(),
+    };
   }
 
   private getWrapperSupervisor(): WrapperSupervisor {
@@ -861,7 +1042,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             return { status: 'absent' };
           }
           try {
-            return await createAgentSandbox(this.env, metadata).stopWrappers(request);
+            return await createAgentSandbox(
+              this.env,
+              metadata,
+              this.getAgentSandboxRuntimeContext()
+            ).stopWrappers(request);
           } catch (error) {
             return {
               status: 'inspection-failed',
@@ -883,7 +1068,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           ) {
             return { status: 'absent' };
           }
-          return createAgentSandbox(this.env, metadata).observeWrappersWithoutWaking();
+          return createAgentSandbox(
+            this.env,
+            metadata,
+            this.getAgentSandboxRuntimeContext()
+          ).observeWrappersWithoutWaking();
         },
         recordSharedSandboxFailover: routeKey =>
           this.sharedSandboxFailoverRecorder
@@ -1544,6 +1733,16 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       if (existingMetadata.workspace?.sandboxId !== newMetadata.workspace?.sandboxId) {
         throw new Error('Registered sandbox name cannot be changed');
       }
+      const existingRuntime = existingMetadata.workspace?.providerRuntime;
+      const newRuntime = newMetadata.workspace?.providerRuntime;
+      if (existingRuntime?.sessionId !== newRuntime?.sessionId) {
+        throw new Error('Persisted Vercel session ID cannot be changed');
+      }
+      for (const field of ['projectId', 'snapshotId', 'runtimeBuildId', 'runtime'] as const) {
+        if (existingRuntime?.[field] !== newRuntime?.[field]) {
+          throw new Error(`Persisted Vercel ${field} cannot be changed`);
+        }
+      }
     }
     await this.ctx.storage.put('metadata', newMetadata);
 
@@ -1993,9 +2192,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   private async purgeDeletedSessionPayload(
     additionalRetainedKeys: readonly string[] = []
   ): Promise<void> {
-    // The deletion fence survives the purge, along with any durable keys a
-    // provider's deferred deletion plan asked the session to persist.
-    const retainedKeys = new Set<string>([DELETION_INTENT_KEY, ...additionalRetainedKeys]);
+    // The deletion fence survives the purge, along with the Vercel tombstone
+    // (the lifecycle reconciler purges without passing keys) and any durable
+    // keys a provider's deferred deletion plan asked the session to persist.
+    const retainedKeys = new Set<string>([
+      DELETION_INTENT_KEY,
+      VERCEL_DELETION_TOMBSTONE_KEY,
+      ...additionalRetainedKeys,
+    ]);
     while (true) {
       const persistedKeys = await this.ctx.storage.list({ limit: 128 });
       const sensitiveKeys = [...persistedKeys.keys()].filter(key => !retainedKeys.has(key));
@@ -2119,9 +2323,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   ): Promise<'complete' | 'deferred' | 'physical-cleanup-pending'> {
     const metadata = await this.getStoredMetadata();
     if (!metadata) {
-      // Metadata already purged but the deletion fence is still present:
-      // provider-side deletion is reconciling asynchronously via alarms.
-      if (await this.ctx.storage.get(DELETION_INTENT_KEY)) {
+      if (await this.ctx.storage.get(VERCEL_DELETION_TOMBSTONE_KEY)) {
         return 'deferred';
       }
       const lease = await getWrapperLease(this.ctx.storage);

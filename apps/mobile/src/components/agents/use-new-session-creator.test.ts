@@ -831,12 +831,16 @@ describe('useNewSessionCreator intentFingerprint repo identity', () => {
       expect.objectContaining({ operationKey: 'legacy-stored-key' })
     );
     const removedFingerprints = outboxMock.remove.mock.calls.map(call => call[0]);
-    expect(
-      removedFingerprints.some(fingerprint => {
-        const parsed = JSON.parse(fingerprint) as { repo: unknown };
-        return parsed.repo === 'owner/repo';
-      })
-    ).toBe(true);
+    const legacyRemovalIndex = removedFingerprints.findIndex(fingerprint => {
+      const parsed = JSON.parse(fingerprint) as { repo: unknown };
+      return parsed.repo === 'owner/repo';
+    });
+    expect(legacyRemovalIndex).toBeGreaterThanOrEqual(0);
+    // The legacy row goes only after the scoped row is on disk, so a crash
+    // between the two always leaves the key readable under one fingerprint.
+    expect(outboxMock.writeSafeRetry.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+      outboxMock.remove.mock.invocationCallOrder[legacyRemovalIndex] ?? 0
+    );
   });
 
   // A GitLab intent must never reuse a legacy bare-name key: the bare name is

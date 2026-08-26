@@ -351,5 +351,6 @@ describe('OrganizationInvoicesScreen pagination', () => {
     expect(texts).toContain('INV-0001');
     expect(texts).toContain('Older invoices are available.');
     expect(texts).not.toContain("Couldn't load more.");
-    expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);  });
+    expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);
+  });
 });

@@ -175,12 +175,15 @@ export function useNewSessionCreator({
       return;
     }
     let operationKey = getStoredOperationKey(intentFingerprint);
+    // The consumed legacy row migrates to the scoped fingerprint so the normal
+    // success/failure cleanup only ever touches the scoped row. Delete it only
+    // after the scoped row exists: a crash between the two writes would
+    // otherwise lose the key and mint a duplicate session on relaunch.
+    let legacyRowToDrop: string | null = null;
     if (operationKey === null && legacyIntentFingerprint !== null) {
       operationKey = getStoredOperationKey(legacyIntentFingerprint);
       if (operationKey !== null) {
-        // Migrate the consumed legacy row to the scoped fingerprint so the
-        // normal success/failure cleanup only ever touches the scoped row.
-        await removeOutboxRow(legacyIntentFingerprint);
+        legacyRowToDrop = legacyIntentFingerprint;
       }
     }
     operationKey ??= getKey(intentFingerprint);
@@ -212,6 +215,9 @@ export function useNewSessionCreator({
         fingerprint: intentFingerprint,
         input: baseInput,
       });
+      if (legacyRowToDrop !== null) {
+        await removeOutboxRow(legacyRowToDrop);
+      }
 
       const result = organizationId
         ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({

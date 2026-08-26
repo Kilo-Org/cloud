@@ -298,6 +298,8 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   // The departure-refetch effect below intentionally keeps diffing the
   // filtered set: an unenriched row that disappears re-renders from the
   // already-loaded stored pages as soon as the exclusion lifts.
+  // Compatibility: the old Agents combined list used it for exclusion; remove
+  // when no caller remains.
   const activeExclusionIds = useMemo(
     () => selectActiveExclusionIds(active.data?.sessions ?? []),
     [active.data]
@@ -386,6 +388,46 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
           await active.refetch();
         })(),
       ]);
+    },
+  };
+}
+
+/**
+ * Live-only Agents tab variant. Reads the same `activeSessions.list` query as
+ * `useAgentSessions` but never mounts the stored/history infinite query, so the
+ * tab does not wait on stored pages. Reuses the private `useActiveSessions`.
+ */
+export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
+  const active = useActiveSessions(options);
+
+  const activeSessions = useMemo(
+    () =>
+      sortActiveSessionsByCreatedAt(
+        filterActiveSessionsByOrganization(
+          active.data?.sessions ?? [],
+          options?.organizationId ?? null
+        )
+      ),
+    [active.data, options?.organizationId]
+  );
+
+  return {
+    activeSessions,
+    // Compatibility: the old combined `stored.isLoading || active.isLoading`
+    // remains on `useAgentSessions` for Home and Share; the live tab must not
+    // use it — it reads only the active poll. Remove the split only when no
+    // caller needs stored and active loading apart.
+    isLoading: active.isLoading,
+    isError: active.isError,
+    refetch: async () => {
+      // The live-sync owner writes and cancels this same query key, so a plain
+      // refetch alone can be swallowed by it. Drive the owner when one is
+      // attached — it is keyed to the same organization context this hook is
+      // given — and fall back to the plain refetch otherwise.
+      if (await refreshActiveSessionsNow()) {
+        return;
+      }
+      await active.refetch();
     },
   };
 }

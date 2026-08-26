@@ -17,6 +17,13 @@ import { cn, parseTimestamp } from '@/lib/utils';
 
 export const HOME_LIVE_SLOT_MIN_CLASS = 'min-h-[72px]';
 
+/**
+ * Agents tab index href, used by Home See-all. Kept as a named export so the
+ * section test can assert this lands on the live index, never the history
+ * subpage. The trailing slash pins the index route of the Agents stack.
+ */
+export const AGENTS_INDEX_HREF = '/(app)/(tabs)/(2_agents)/' as const;
+
 const MAX_ROWS = 3;
 const CLOUD_AGENT_PLATFORMS = new Set(expandPlatformFilter(['cloud-agent']));
 
@@ -92,7 +99,11 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
         label={t('home.agentSessions')}
         actionLabel={t('home.seeAll')}
         onActionPress={() => {
-          router.push('/(app)/(tabs)/(2_agents)' as Href);
+          // Compatibility: the old href `/(app)/(tabs)/(2_agents)` opened the
+          // tab stack; after history exists the handler must land on the index
+          // route. Remove the special land only when history is not a nested
+          // stack screen.
+          router.dismissTo(AGENTS_INDEX_HREF as Href);
         }}
       />
       <View className="mx-4 gap-2">

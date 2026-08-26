@@ -117,6 +117,27 @@ describe('POST /api/sso/organizations', () => {
     });
   });
 
+  it('enforces required SSO for a discovered legacy Google Workspace account', async () => {
+    mockGetAllUserProviders.mockResolvedValue({
+      kind: 'found',
+      user: {
+        kiloUserId: 'oauth/google:synthetic-account',
+        providers: ['google'],
+        primaryEmail: 'legacy-workspace@example.com',
+      },
+    });
+    mockResolveSsoAuthorityForDomain.mockResolvedValue({
+      status: 'required',
+      domain: 'example.com',
+      sourceOrganizationId: 'organization-1',
+    });
+    mockGetWorkOSOrganization.mockResolvedValue({ id: 'workos-organization-1' } as never);
+
+    await expect(
+      (await POST(request({ email: 'legacy-workspace@example.com' }))).json()
+    ).resolves.toEqual({ kind: 'sso', organizationId: 'workos-organization-1' });
+  });
+
   it('returns server-authorized account-creation choices for an eligible unknown email', async () => {
     await expect((await POST(request({ email: 'new@example.com' }))).json()).resolves.toEqual({
       kind: 'new',

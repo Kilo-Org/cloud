@@ -145,6 +145,7 @@ import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser, insertTestUserAndGoogleAuth } from '@/tests/helpers/user.helper';
+import { hosted_domain_specials } from '@/lib/auth/constants';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 import { randomUUID } from 'crypto';
@@ -421,6 +422,119 @@ describe('User', () => {
     it('returns null for an email that is not linked to an account', async () => {
       await expect(getAllUserProviders('no-match@example.com')).resolves.toEqual({
         kind: 'not_found',
+      });
+    });
+
+    it('uses the explicit legacy provider sentinel when provider rows are missing', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'legacy-provider@example.com',
+        google_user_name: 'Legacy Provider User',
+        normalized_email: 'legacy-provider@example.com',
+        hosted_domain: hosted_domain_specials.github,
+      });
+
+      await expect(getAllUserProviders('legacy-provider@example.com')).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['github'],
+          primaryEmail: 'legacy-provider@example.com',
+          workosHostedDomain: undefined,
+        },
+      });
+    });
+
+    it.each(['google', 'github', 'gitlab'] as const)(
+      'uses legacy %s OAuth ID provenance when provider rows are missing',
+      async provider => {
+        const user = await insertTestUser({
+          id: `oauth/${provider}:synthetic-account`,
+          google_user_email: `legacy-${provider}@example.com`,
+          google_user_name: 'Legacy Workspace User',
+          normalized_email: `legacy-${provider}@example.com`,
+          hosted_domain: 'example.com',
+        });
+
+        await expect(getAllUserProviders(`legacy-${provider}@example.com`)).resolves.toEqual({
+          kind: 'found',
+          user: {
+            kiloUserId: user.id,
+            providers: [provider],
+            primaryEmail: `legacy-${provider}@example.com`,
+            workosHostedDomain: undefined,
+          },
+        });
+      }
+    );
+
+    it('keeps linked provider rows authoritative over legacy OAuth ID provenance', async () => {
+      const user = await insertTestUser({
+        id: 'oauth/google:synthetic-linked-account',
+        google_user_email: 'linked-legacy@example.com',
+        google_user_name: 'Linked Legacy User',
+        normalized_email: 'linked-legacy@example.com',
+        hosted_domain: 'example.com',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: user.id,
+        provider: 'email',
+        provider_account_id: 'linked-legacy@example.com',
+        email: 'linked-legacy@example.com',
+        avatar_url: '',
+        hosted_domain: 'example.com',
+      });
+
+      await expect(getAllUserProviders('linked-legacy@example.com')).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['email'],
+          primaryEmail: 'linked-legacy@example.com',
+          workosHostedDomain: undefined,
+        },
+      });
+    });
+
+    it.each(['oauth/google:', 'oauth/googleish:account', 'oauth/workos:account'])(
+      'does not infer a provider from malformed or unsupported legacy ID %s',
+      async id => {
+        const email = `invalid-legacy-${randomUUID()}@example.com`;
+        const user = await insertTestUser({
+          id,
+          google_user_email: email,
+          google_user_name: 'Invalid Legacy User',
+          normalized_email: email,
+          hosted_domain: 'unknown.example.com',
+        });
+
+        await expect(getAllUserProviders(email)).resolves.toEqual({
+          kind: 'found',
+          user: {
+            kiloUserId: user.id,
+            providers: [],
+            primaryEmail: email,
+            workosHostedDomain: undefined,
+          },
+        });
+      }
+    );
+
+    it('does not infer a provider from an unknown legacy hosted domain', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'unknown-legacy@example.com',
+        google_user_name: 'Unknown Legacy User',
+        normalized_email: 'unknown-legacy@example.com',
+        hosted_domain: 'unknown.example.com',
+      });
+
+      await expect(getAllUserProviders('unknown-legacy@example.com')).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: [],
+          primaryEmail: 'unknown-legacy@example.com',
+          workosHostedDomain: undefined,
+        },
       });
     });
 

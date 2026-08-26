@@ -149,5 +149,6 @@ describe('GET /api/cron/sales-demo-reset', () => {
     expect(Number(reloaded.total_microdollars_acquired) - Number(reloaded.microdollars_used)).toBe(
       25_030_000
     );
+    expect(Number(reloaded.microdollars_balance)).toBe(25_030_000);
   });
 });

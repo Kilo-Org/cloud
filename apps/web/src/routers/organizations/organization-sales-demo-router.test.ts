@@ -116,6 +116,7 @@ describe('organization sales demo reset router', () => {
     expect(Number(org.total_microdollars_acquired) - Number(org.microdollars_used)).toBe(
       25_030_000
     );
+    expect(Number(org.microdollars_balance)).toBe(25_030_000);
     expect(org.settings.is_sales_demo).toBe(true);
 
     const usageRows = await db

@@ -165,6 +165,7 @@ describe('sales demo router', () => {
     expect(Number(org.total_microdollars_acquired) - Number(org.microdollars_used)).toBe(
       25_030_000
     );
+    expect(Number(org.microdollars_balance)).toBe(25_030_000);
     expect(org.settings.sales_demo_seeded_microdollars).toBe(Number(org.microdollars_used));
 
     const [ownerMembership] = await db
@@ -438,6 +439,7 @@ describe('sales demo router', () => {
     expect(Number(after.total_microdollars_acquired) - Number(after.microdollars_used)).toBe(
       25_030_000
     );
+    expect(Number(after.microdollars_balance)).toBe(25_030_000);
     expect(after.settings.is_sales_demo).toBe(true);
     expect(after.settings.enable_usage_limits).toBe(true);
     expect(after.settings.code_indexing_enabled).toBe(true);

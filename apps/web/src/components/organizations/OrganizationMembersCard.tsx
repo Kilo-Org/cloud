@@ -684,14 +684,14 @@ export function OrganizationAdminMembers({
                       className="flex items-center justify-between border-b pb-4 last:border-b-0"
                     >
                       <div className="flex flex-1 items-center justify-between gap-4">
+                        {member.status === 'active' && (
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={member.imageUrl ?? undefined} alt={member.name} />
+                            <AvatarFallback>{getInitialsFromName(member.name)}</AvatarFallback>
+                          </Avatar>
+                        )}
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center gap-2">
-                            {member.status === 'active' && (
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={member.imageUrl ?? undefined} alt={member.name} />
-                                <AvatarFallback>{getInitialsFromName(member.name)}</AvatarFallback>
-                              </Avatar>
-                            )}
                             {member.status === 'active' && member.name ? (
                               showAdminLinks ? (
                                 <Link

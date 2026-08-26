@@ -799,7 +799,9 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                 <div>
                   <h1 className="text-2xl font-bold">Usage</h1>
                   <p className="text-muted-foreground mt-1 text-sm">
-                    Track feature adoption and AI assisted work across {organizationName}.
+                    {isSalesDemo
+                      ? `Track AI usage across ${organizationName}.`
+                      : `Track feature adoption and AI assisted work across ${organizationName}.`}
                   </p>
                 </div>
                 <UsageViewNavigation

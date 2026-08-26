@@ -58,7 +58,14 @@ const connectedInstanceSchema = z.object({
    * CLI's latest attachment did not include a capabilities object (legacy CLI
    * or a build that predates the field).
    */
-  capabilities: z.object({ attachments: z.boolean().optional() }).optional(),
+  capabilities: z
+    .object({
+      attachments: z.boolean().optional(),
+      // Old form is absent sessionClone; treat missing as incapable until
+      // every shipped CLI advertises it.
+      sessionClone: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 const connectedInstancesResponseSchema = z.object({

@@ -35,7 +35,12 @@ type HeartbeatSession = {
   };
 };
 
-type ConnectionCapabilities = { attachments?: boolean };
+type ConnectionCapabilities = {
+  attachments?: boolean;
+  // Old form is absent sessionClone; treat missing as incapable until
+  // every shipped CLI advertises it.
+  sessionClone?: boolean;
+};
 
 type WSAttachment =
   | {

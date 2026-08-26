@@ -256,7 +256,8 @@ export function LanguagePickerSheet({
       }}
     >
       <AppAwareKeyboardPaddingView
-        // `bg-black/40` renders as nothing in this setup, so the scrim is a concrete 40% black.
+        // Tailwind's black/alpha utilities compile to an unparseable #NaN
+        // colour here, so the scrim states its 40% black outright.
         className="flex-1 justify-end bg-[#00000066]"
         keyboardOffset={Platform.OS === 'android' ? insets.bottom : 0}
       >

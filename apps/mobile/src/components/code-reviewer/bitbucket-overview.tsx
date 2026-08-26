@@ -136,8 +136,8 @@ export function BitbucketOverview({
     <View className="flex-1 bg-background">
       <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.title')} />
       <TabScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="pt-4"
+        className="flex-1"
+        contentContainerClassName="px-6 pt-4"
         keyboardShouldPersistTaps="handled"
       >
         <Animated.View layout={LinearTransition}>

@@ -1,4 +1,6 @@
 import {
+  deletionNotifyChannel,
+  deletionNotifyStepSkipped,
   deletionPreflightProgress,
   deletionStepCountLabel,
   deletionStepProgressLabel,
@@ -143,6 +145,54 @@ describe('deletionPreflightProgress', () => {
     expect(deletionPreflightProgress({ status: 'cancelled', preflightAttentionCode: null })).toBe(
       'idle'
     );
+  });
+});
+
+describe('deletionNotifyChannel', () => {
+  it('uses the Pylon path when a ticket is present', () => {
+    expect(
+      deletionNotifyChannel({
+        pylonTicket: '#1001',
+        tasks: [
+          { stepKey: 'pylon_reply', status: 'pending' },
+          { stepKey: 'completion_email', status: 'pending' },
+        ],
+      })
+    ).toBe('pylon');
+  });
+
+  it('uses the email path when there is no ticket', () => {
+    expect(
+      deletionNotifyChannel({
+        pylonTicket: null,
+        tasks: [
+          { stepKey: 'pylon_reply', status: 'pending' },
+          { stepKey: 'completion_email', status: 'pending' },
+        ],
+      })
+    ).toBe('email');
+  });
+
+  it('recovers the Pylon path after the ticket is redacted', () => {
+    expect(
+      deletionNotifyChannel({
+        pylonTicket: null,
+        tasks: [
+          { stepKey: 'pylon_reply', status: 'succeeded' },
+          { stepKey: 'completion_email', status: 'not_applicable' },
+        ],
+      })
+    ).toBe('pylon');
+  });
+});
+
+describe('deletionNotifyStepSkipped', () => {
+  it('skips the unused customer notification for each channel', () => {
+    expect(deletionNotifyStepSkipped('completion_email', 'pylon')).toBe(true);
+    expect(deletionNotifyStepSkipped('pylon_reply', 'pylon')).toBe(false);
+    expect(deletionNotifyStepSkipped('pylon_reply', 'email')).toBe(true);
+    expect(deletionNotifyStepSkipped('pylon_finalize', 'email')).toBe(true);
+    expect(deletionNotifyStepSkipped('completion_email', 'email')).toBe(false);
   });
 });
 

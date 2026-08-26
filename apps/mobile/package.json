@@ -19,6 +19,7 @@
     "format:check": "oxfmt --list-different src",
     "check:unused": "node --env-file=.env node_modules/knip/bin/knip.js --no-config-hints",
     "check:i18n": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.i18n.json apps/mobile/src packages/app-shared/src && node ../../tools/i18n/check-catalogs.mjs",
+    "check:classes": "node ../../tools/nativewind/check-classes.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

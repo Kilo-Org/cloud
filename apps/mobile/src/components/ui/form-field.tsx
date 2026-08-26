@@ -77,7 +77,11 @@ function FormField({
           }
         }}
         className={cn(
-          'rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-[normal] text-foreground',
+          // min-h-[44px] with no vertical padding: the 44pt height meets the
+          // Apple HIG touch floor and centers the text, while the padding
+          // draws the single-line text below the middle. min-h (not h) still
+          // lets Dynamic Type grow the field past the floor.
+          'min-h-[44px] rounded-md border border-input bg-background px-3 text-sm leading-[normal] text-foreground',
           'focus:border-ring',
           displayedError && 'border-destructive',
           disabled && 'opacity-50',

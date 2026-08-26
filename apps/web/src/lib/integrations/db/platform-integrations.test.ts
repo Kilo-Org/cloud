@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import {
   deleteIntegration,
   deleteIntegrationForOwner,
+  createPendingIntegration,
   findIntegrationByInstallationId,
   suspendIntegration,
   suspendIntegrationForOwner,
@@ -283,6 +284,37 @@ describe('upsertPlatformIntegrationForOwner', () => {
         )
       );
     expect(rows).toHaveLength(2);
+  });
+
+  test('concurrent callbacks create one pending row for a GitHub app target', async () => {
+    const accountId = `pending-target-${Date.now()}`;
+    const request = {
+      requester: {
+        kilo_user_id: userId,
+        kilo_user_email: 'requester@example.com',
+        kilo_user_name: 'Requester',
+        requested_at: new Date().toISOString(),
+      },
+      githubRequester: { id: 'github-requester', login: 'requester' },
+      githubRequest: {
+        id: 'github-request',
+        accountId,
+        accountLogin: 'target-org',
+      },
+      githubAppType: 'standard' as const,
+    };
+
+    const results = await Promise.all([
+      createPendingIntegration({ ...request, userId }),
+      createPendingIntegration({ ...request, userId: otherUserId }),
+    ]);
+
+    expect(results.filter(Boolean)).toHaveLength(1);
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_account_id, accountId));
+    expect(rows).toHaveLength(1);
   });
 
   test('same-owner refresh with app type is not confused by another owner other-app-type row', async () => {

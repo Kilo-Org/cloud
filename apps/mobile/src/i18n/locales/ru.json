@@ -38,7 +38,9 @@
     "catalogLoadFailed": "Не удалось загрузить язык. Попробуйте еще раз.",
     "search": "Поиск языков",
     "noMatches": "Нет совпадений по языкам",
-    "deviceLanguage": "Язык устройства"
+    "deviceLanguage": "Язык устройства",
+    "current": "Текущий",
+    "allLanguages": "Все языки"
   },
   "login": {
     "welcome": "Добро пожаловать в Kilo",
@@ -70,13 +72,13 @@
     "terms": "Условиями",
     "termsConnector": " и ",
     "termsSuffix": ".",
-    "privacyPolicy": "Политикой конфиденциальности",
+    "privacyPolicy": "Политика конфиденциальности",
     "moreSignInOptions": "Другие способы входа",
     "couldNotCompleteSignIn": "Не удалось завершить вход. Попробуйте снова.",
     "sessionEnded": "Ваш сеанс завершен. Войдите снова.",
     "signInCodeExpired": "Срок действия вашего кода входа истек. Попробуйте снова.",
     "accessDenied": "В доступе отказано.",
-    "somethingWentWrong": "Что-то пошло не так. Попробуйте снова.",
+    "somethingWentWrong": "Что-то пошло не так. Попробуйте ещё раз.",
     "codeSent": "Код отправлен",
     "signInCodeField": "Код входа",
     "accountCreated": "Аккаунт создан. Добро пожаловать в Kilo.",
@@ -245,7 +247,7 @@
       "leaveFailed": "Не удалось покинуть беседу"
     },
     "reactions": {
-      "title": "Реакции",
+      "title": "реакций",
       "close": "Закрыть реакции",
       "recent": "Недавние",
       "common": "Обычные",
@@ -367,7 +369,7 @@
     "billing": {
       "title": "Оплата",
       "continueMonthToMonth": "Продолжить помесячно",
-      "plan": "Тариф",
+      "plan": "План",
       "finalTermEnds": "Последний период заканчивается",
       "afterFinalTerm": "После последнего периода",
       "remaining": "Осталось",
@@ -722,7 +724,7 @@
       "destroying": "УНИЧТОЖЕНИЕ",
       "provisioned": "ПОДГОТОВЛЕН",
       "restarting": "ПЕРЕЗАПУСК",
-      "running": "РАБОТАЕТ",
+      "running": "Выполняется",
       "shuttingDown": "ЗАВЕРШЕНИЕ РАБОТЫ",
       "starting": "ЗАПУСК",
       "stopped": "ОСТАНОВЛЕН",
@@ -879,12 +881,12 @@
       "council": "Совет",
       "created": "Создано",
       "decision": "Решение",
-      "details": "Сведения",
+      "details": "Детали",
       "findings": "Замечания",
       "gate": "Шлюз",
       "gateHidden": "Скрыт",
       "gateNone": "Нет",
-      "keepRunning": "Оставить запущенной",
+      "keepRunning": "Продолжить выполнение",
       "model": "Модель",
       "noFindings": "Нет замечаний",
       "openPullRequest": "Открыть pull request",
@@ -960,7 +962,7 @@
     "updateFailed": "Не удалось обновить ревьюера",
     "configSaveFailed": "Не удалось сохранить конфигурацию проверки",
     "status": {
-      "pending": "Ожидает",
+      "pending": "Ожидается",
       "queued": "В очереди",
       "running": "Выполняется",
       "completed": "Завершено",
@@ -1103,7 +1105,7 @@
       "checkConnection": "Проверьте подключение и попробуйте снова.",
       "couldNotLoad": "Не удалось загрузить отчет аудита",
       "events": "События",
-      "findings": "Находки",
+      "findings": "Замечания",
       "generated": "Создан {{generatedAt}}",
       "noActivity": "Нет записанной активности",
       "noActivityDescription": "В Kilo нет активности по находкам безопасности, о которой можно сообщить, за период с {{start}} по {{end}}.",
@@ -1168,7 +1170,7 @@
       "daysOverdue": "Просрочено на {{displayCount}} дн.",
       "deadlineToday": "Срок истекает сегодня",
       "filterByRepository": "Фильтровать по репозиторию",
-      "findings": "Находки",
+      "findings": "Замечания",
       "findingsCount": "{{displayCount}} находок",
       "highOverdue": "Высокие просроченные",
       "lastSynced": "Последняя синхронизация: {{time}}",
@@ -1288,7 +1290,7 @@
       "emptyTitle": "Нет открытых находок",
       "noMatchesDescription": "Попробуйте изменить или сбросить выбранные фильтры.",
       "noMatchesTitle": "Нет находок, соответствующих фильтрам",
-      "title": "Находки"
+      "title": "Замечания"
     },
     "findingRow": {
       "a11y": "Находка {{severity}}: {{title}}. {{repo}}. {{analysis}}",
@@ -1359,7 +1361,7 @@
       "allRepositories": "Все репозитории",
       "couldNotLoad": "Не удалось загрузить настройки репозиториев",
       "couldNotLoadRepositories": "Не удалось загрузить репозитории",
-      "couldNotOpenGithubSettings": "Не удалось открыть настройки GitHub App",
+      "couldNotOpenGithubSettings": "Не удалось открыть настройки приложения GitHub",
       "githubAppSettings": "Настройки GitHub App",
       "manageAccess": "Управление доступом GitHub App",
       "noRepositories": "Нет репозиториев",
@@ -1384,7 +1386,7 @@
       "couldNotLoad": "Не удалось загрузить организации",
       "personal": "Личное",
       "personalSubtitle": "Ваши собственные репозитории",
-      "title": "Security Agent"
+      "title": "Агент безопасности"
     },
     "settingsOverview": {
       "allRepositories": "Все репозитории",
@@ -1409,7 +1411,7 @@
       "repositoriesCount": "Выбрано репозиториев: {{displayCount}}",
       "repositoriesCount_other": "Выбрано репозиториев: {{displayCount}}",
       "repositoriesCount_one": "Выбран {{displayCount}} репозиторий",
-      "securityAgent": "Security Agent",
+      "securityAgent": "Агент безопасности",
       "selectRepositories": "Выбрать репозитории",
       "selectRepositoriesSubtitle": "Выберите, какие репозитории отслеживает Security Agent",
       "slaPolicy": "Политика SLA",
@@ -1446,7 +1448,7 @@
       "remediationDeadlineA11y": "Срок исправления {{label}} в днях",
       "title": "Политика SLA"
     },
-    "title": "Security Agent",
+    "title": "Агент безопасности",
     "initialSyncAdmissionFailed": "Security Agent включен, но начальную синхронизацию не удалось поставить в очередь. Синхронизируйте снова.",
     "queuedActionUntracked": "Действие в очереди больше нельзя отслеживать. Обновите, чтобы увидеть актуальное состояние.",
     "commands": {
@@ -1594,7 +1596,7 @@
       "searchSessions": "Поиск сеансов",
       "searchSessionsPlaceholder": "Поиск сеансов...",
       "clearSearch": "Очистить поиск",
-      "clearFilters": "Очистить фильтры"
+      "clearFilters": "Сбросить фильтры"
     },
     "sessionList": {
       "couldNotLoad": "Не удалось загрузить сеансы",
@@ -1683,11 +1685,16 @@
       "couldNotLoadThisSession": "Не удалось загрузить эту сессию",
       "cloneFailed": "Не удалось клонировать эту сессию.",
       "cloneFailedRetry": "Не удалось клонировать эту сессию. Попробуйте снова.",
-      "connectRepositoryToContinue": "Подключите репозиторий, чтобы продолжить."
+      "connectRepositoryToContinue": "Подключите репозиторий, чтобы продолжить.",
+      "notEnoughCredits": "Недостаточно кредитов для запуска Cloud Agent. Добавьте кредиты и попробуйте снова.",
+      "previousTaskFinishing": "Предыдущая задача ещё завершается. Подождите немного.",
+      "serviceUnavailable": "Сервис сейчас недоступен. Попробуйте ещё раз.",
+      "connectionTrouble": "Проблемы с подключением. Повторите через мгновение.",
+      "modelUnavailable": "Эта модель недоступна для Cloud Agent. Выберите другую модель и попробуйте снова."
     },
     "remoteSession": {
       "failedToCreate": "Не удалось создать удаленный сеанс",
-      "exited": "Сеанс завершен",
+      "exited": "Сеанс завершён",
       "failedToExit": "Не удалось выйти из сеанса",
       "exitTitle": "Выйти из сеанса?",
       "exitMessage": "Это остановит текущий сеанс, но сохранит его историю.",
@@ -1763,7 +1770,7 @@
       "contentTruncated": "Содержимое обрезано",
       "truncated": "Обрезано",
       "toolRead": "читать",
-      "toolEdit": "изменить",
+      "toolEdit": "Редактировать",
       "toolWrite": "записать",
       "toolBash": "bash",
       "toolGlob": "glob",
@@ -1868,7 +1875,7 @@
       "textDisplay": "Отображение текста",
       "thinking": "Мышление",
       "thought": "Мысль",
-      "title": "Сведения",
+      "title": "Детали",
       "showDetails": "Показать сведения",
       "pending": "Ожидание…",
       "running": "Выполняется…"
@@ -2084,9 +2091,9 @@
     },
     "attachmentPicker": {
       "camera": "Камера",
-      "photoLibrary": "Библиотека фото",
+      "photoLibrary": "Фотоальбом",
       "files": "Файлы",
-      "cameraAccessDisabled": "Доступ к камере отключен",
+      "cameraAccessDisabled": "Доступ к камере отключён",
       "cameraAccessMessage": "Разрешите доступ к камере в настройках, чтобы сделать фото.",
       "couldNotOpenPhotoPicker": "Не удалось открыть выбор фото. Перезапустите Kilo и попробуйте снова.",
       "maxFilesAllowed": "Максимум {{displayCount}} файлов",
@@ -2236,7 +2243,7 @@
   "home": {
     "couldNotLoadSessions": "Не удалось загрузить сеансы",
     "couldNotLoadActiveSessions": "Не удалось загрузить активные сеансы",
-    "agentSessions": "Сеансы агента",
+    "agentSessions": "Сессии агента",
     "newCodingTask": "Новая задача кодирования",
     "explore": "Исследовать",
     "seeAll": "Смотреть все",
@@ -2285,7 +2292,7 @@
     "optionsExpiredDescription": "Вернитесь и снова откройте этот выбор с предыдущего экрана."
   },
   "sessionRow": {
-    "needsInput": "ТРЕБУЕТСЯ ВВОД"
+    "needsInput": "требует ввода"
   },
   "voiceInput": {
     "listening": "Слушаю...",
@@ -2580,7 +2587,7 @@
       "reaction": "реакций",
       "reaction_other": "реакций",
       "reaction_one": "реакция",
-      "reactionsTitle": "Реакции",
+      "reactionsTitle": "реакций",
       "reply": "Ответить",
       "replyBadRequest": "Этот ответ нельзя отправить. Возможно, ветка изменилась.",
       "replyBody": "Текст ответа",
@@ -3076,7 +3083,7 @@
       "couldNotLoadStatus": "Не удалось загрузить статус",
       "creditProcessingDelayed": "Обработка кредитов задерживается · повторная попытка выполняется автоматически",
       "ended": "Завершено",
-      "endsOn": "Заканчивается {{date}}",
+      "endsOn": "Действует до {{date}}",
       "loading": "Загрузка…",
       "manageHint": "Открывает управление Kilo Pass в веб-версии.",
       "notSubscribed": "Нет подписки",
@@ -3128,7 +3135,7 @@
     "startSignInFailed": "Не удалось начать вход. Попробуйте снова.",
     "couldNotOpenBrowser": "Не удалось открыть браузер. Попробуйте снова.",
     "signInTimedOut": "Время входа истекло. Попробуйте снова.",
-    "signInFailed": "Вход не удался. Попробуйте снова.",
+    "signInFailed": "Не удалось войти. Попробуйте ещё раз.",
     "networkError": "Ошибка сети. Попробуйте снова.",
     "accessDeniedByUser": "Доступ отклонен пользователем",
     "codeExpired": "Срок действия кода истек",

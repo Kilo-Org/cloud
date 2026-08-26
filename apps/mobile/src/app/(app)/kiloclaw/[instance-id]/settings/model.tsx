@@ -21,8 +21,10 @@ export default function ModelSettingsScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('kiloclaw.model.title')} />
-      <ScrollView className="flex-1 px-4 pt-4" contentContainerStyle={{ paddingBottom }}>
-        <ModelPicker />
+      <ScrollView className="flex-1 pt-4" contentContainerStyle={{ paddingBottom }}>
+        <View className="px-4">
+          <ModelPicker />
+        </View>
       </ScrollView>
     </View>
   );

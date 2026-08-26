@@ -132,98 +132,100 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('consent.title')} />
       <ScrollView
-        className="flex-1 px-6"
+        className="flex-1"
         contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={false}
       >
-        <Section
-          title={t('consent.aiProvidersTitle')}
-          what={t('consent.aiProvidersWhat')}
-          why={t('consent.aiProvidersWhy')}
-          who={t('consent.aiProvidersWho')}
-        />
-        <Section
-          title={t('consent.gatewayTitle')}
-          what={t('consent.gatewayWhat')}
-          why={t('consent.gatewayWhy')}
-          who={t('consent.gatewayWho')}
-        />
-        <Section
-          title={t('consent.crashReportingTitle')}
-          what={t('consent.crashReportingWhat')}
-          why={t('consent.crashReportingWhy')}
-          who={t('consent.crashReportingWho')}
-          footer={
-            <View className="mt-3 gap-3">
-              <View className="rounded-md bg-warn-tile-bg p-3">
-                <Text className="text-xs text-warn">{t('consent.crashReportingNote')}</Text>
+        <View className="px-6">
+          <Section
+            title={t('consent.aiProvidersTitle')}
+            what={t('consent.aiProvidersWhat')}
+            why={t('consent.aiProvidersWhy')}
+            who={t('consent.aiProvidersWho')}
+          />
+          <Section
+            title={t('consent.gatewayTitle')}
+            what={t('consent.gatewayWhat')}
+            why={t('consent.gatewayWhy')}
+            who={t('consent.gatewayWho')}
+          />
+          <Section
+            title={t('consent.crashReportingTitle')}
+            what={t('consent.crashReportingWhat')}
+            why={t('consent.crashReportingWhy')}
+            who={t('consent.crashReportingWho')}
+            footer={
+              <View className="mt-3 gap-3">
+                <View className="rounded-md bg-warn-tile-bg p-3">
+                  <Text className="text-xs text-warn">{t('consent.crashReportingNote')}</Text>
+                </View>
               </View>
-            </View>
-          }
-        />
+            }
+          />
 
-        <Text className="mt-6 text-sm font-semibold text-foreground">
-          {mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')}
-        </Text>
-
-        <Section
-          title={t('consent.productAnalyticsTitle')}
-          what={t('consent.productAnalyticsWhat')}
-          why={t('consent.productAnalyticsWhy')}
-          who={t('consent.productAnalyticsWho')}
-          footer={
-            <View className="mt-3">
-              <View className="rounded-md bg-warn-tile-bg p-3">
-                <Text className="text-xs text-warn">{t('consent.productAnalyticsNote')}</Text>
-              </View>
-            </View>
-          }
-        />
-        <Section
-          title={t('consent.errorScreenshotsTitle')}
-          what={t('consent.errorScreenshotsWhat')}
-          why={t('consent.errorScreenshotsWhy')}
-          who={t('consent.errorScreenshotsWho')}
-          footer={
-            <View className="mt-3">
-              <View className="rounded-md bg-warn-tile-bg p-3">
-                <Text className="text-xs text-warn">{t('consent.errorScreenshotsNote')}</Text>
-              </View>
-            </View>
-          }
-        />
-        <Section
-          title={t('consent.installAttributionTitle')}
-          what={t('consent.installAttributionWhat')}
-          why={t('consent.installAttributionWhy')}
-          who={t('consent.installAttributionWho')}
-        />
-        <Section
-          title={t('consent.voiceTranscriptionTitle')}
-          what={t('consent.voiceTranscriptionWhat')}
-          why={t('consent.voiceTranscriptionWhy')}
-          who={t('consent.voiceTranscriptionWho')}
-          footer={<VoiceTranscriptionControl />}
-        />
-
-        <Text className="mt-6 text-xs text-muted-foreground">
-          {t('consent.retentionPrefix')}{' '}
-          <Text className="text-xs text-primary underline" onPress={handleOpenPrivacy}>
-            {t('consent.privacyPolicy')}
+          <Text className="mt-6 text-sm font-semibold text-foreground">
+            {mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')}
           </Text>
-          .
-        </Text>
 
-        <View className="mt-8">
-          <Button
-            size="lg"
-            onPress={() => {
-              router.back();
-            }}
-            accessibilityLabel={t('consent.backToConsent')}
-          >
-            <Text>{t('consent.backToConsent')}</Text>
-          </Button>
+          <Section
+            title={t('consent.productAnalyticsTitle')}
+            what={t('consent.productAnalyticsWhat')}
+            why={t('consent.productAnalyticsWhy')}
+            who={t('consent.productAnalyticsWho')}
+            footer={
+              <View className="mt-3">
+                <View className="rounded-md bg-warn-tile-bg p-3">
+                  <Text className="text-xs text-warn">{t('consent.productAnalyticsNote')}</Text>
+                </View>
+              </View>
+            }
+          />
+          <Section
+            title={t('consent.errorScreenshotsTitle')}
+            what={t('consent.errorScreenshotsWhat')}
+            why={t('consent.errorScreenshotsWhy')}
+            who={t('consent.errorScreenshotsWho')}
+            footer={
+              <View className="mt-3">
+                <View className="rounded-md bg-warn-tile-bg p-3">
+                  <Text className="text-xs text-warn">{t('consent.errorScreenshotsNote')}</Text>
+                </View>
+              </View>
+            }
+          />
+          <Section
+            title={t('consent.installAttributionTitle')}
+            what={t('consent.installAttributionWhat')}
+            why={t('consent.installAttributionWhy')}
+            who={t('consent.installAttributionWho')}
+          />
+          <Section
+            title={t('consent.voiceTranscriptionTitle')}
+            what={t('consent.voiceTranscriptionWhat')}
+            why={t('consent.voiceTranscriptionWhy')}
+            who={t('consent.voiceTranscriptionWho')}
+            footer={<VoiceTranscriptionControl />}
+          />
+
+          <Text className="mt-6 text-xs text-muted-foreground">
+            {t('consent.retentionPrefix')}{' '}
+            <Text className="text-xs text-primary underline" onPress={handleOpenPrivacy}>
+              {t('consent.privacyPolicy')}
+            </Text>
+            .
+          </Text>
+
+          <View className="mt-8">
+            <Button
+              size="lg"
+              onPress={() => {
+                router.back();
+              }}
+              accessibilityLabel={t('consent.backToConsent')}
+            >
+              <Text>{t('consent.backToConsent')}</Text>
+            </Button>
+          </View>
         </View>
       </ScrollView>
     </View>

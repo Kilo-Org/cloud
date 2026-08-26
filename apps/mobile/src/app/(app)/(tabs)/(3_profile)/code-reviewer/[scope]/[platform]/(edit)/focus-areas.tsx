@@ -44,7 +44,7 @@ export default function FocusAreasRoute() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('codeReviewer.focusAreas.title')} />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <Text variant="muted" className="mb-2 text-xs">
           {t('codeReviewer.focusAreas.hint')}
         </Text>

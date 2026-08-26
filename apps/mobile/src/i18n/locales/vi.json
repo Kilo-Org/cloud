@@ -38,7 +38,9 @@
     "catalogLoadFailed": "Không thể tải ngôn ngữ. Vui lòng thử lại.",
     "search": "Tìm ngôn ngữ",
     "noMatches": "Không có ngôn ngữ phù hợp",
-    "deviceLanguage": "Ngôn ngữ của thiết bị"
+    "deviceLanguage": "Ngôn ngữ của thiết bị",
+    "current": "Hiện tại",
+    "allLanguages": "Tất cả ngôn ngữ"
   },
   "login": {
     "welcome": "Chào mừng đến với Kilo",
@@ -289,7 +291,7 @@
       "classificationTooLarge": "Tệp phải từ 20 MB trở xuống",
       "classificationUnreadable": "Không thể đọc tệp này",
       "announceUploaded": "Đã tải tệp đính kèm lên",
-      "cantUpload": "Không thể tải tệp này lên.",
+      "cantUpload": "Không thể tải lên tệp này.",
       "networkError": "Lỗi mạng",
       "uploadFailed": "Tải lên thất bại",
       "failedToUploadFile": "Không thể tải tệp lên: {{reason}}",
@@ -334,8 +336,8 @@
       "takePhoto": "Chụp ảnh",
       "photoLibrary": "Thư viện ảnh",
       "files": "Tệp",
-      "cameraAccessDisabled": "Quyền truy cập camera đã bị tắt",
-      "cameraAccessMessage": "Cho phép truy cập camera trong Cài đặt để chụp ảnh."
+      "cameraAccessDisabled": "Quyền truy cập máy ảnh bị tắt",
+      "cameraAccessMessage": "Cho phép quyền truy cập máy ảnh trong Cài đặt để chụp ảnh."
     },
     "typingIndicator": {
       "someone": "Ai đó",
@@ -644,7 +646,7 @@
         "openKiloAi": "Mở kilo.ai",
         "provisioning": "Đang cấp phát",
         "ready": "Sẵn sàng",
-        "review": "Xem xét",
+        "review": "Đánh giá",
         "settingUp": "Đang thiết lập…",
         "somethingWentWrong": "Đã xảy ra lỗi"
       },
@@ -880,7 +882,7 @@
       "gate": "Cổng",
       "gateHidden": "Ẩn",
       "gateNone": "Không có",
-      "keepRunning": "Giữ chạy tiếp",
+      "keepRunning": "Tiếp tục chạy",
       "model": "Mô hình",
       "noFindings": "Không có phát hiện",
       "openPullRequest": "Mở yêu cầu hợp nhất",
@@ -1096,7 +1098,7 @@
       "triageModel": "Mô hình phân loại"
     },
     "auditReport": {
-      "checkConnection": "Kiểm tra kết nối của bạn và thử lại.",
+      "checkConnection": "Kiểm tra kết nối và thử lại.",
       "couldNotLoad": "Không thể tải báo cáo kiểm toán",
       "events": "Sự kiện",
       "findings": "Phát hiện",
@@ -1333,7 +1335,7 @@
       "openDraftPullRequest": "Mở pull request nháp{{number}}",
       "openPullRequest": "Mở pull request{{number}}",
       "progress": "Tiến độ",
-      "pullRequest": "pull request",
+      "pullRequest": "yêu cầu hợp nhất",
       "retry": "Thử lại khắc phục",
       "start": "Bắt đầu khắc phục",
       "startedBy": "Bắt đầu bởi",
@@ -1353,14 +1355,14 @@
       "allRepositories": "Tất cả kho lưu trữ",
       "couldNotLoad": "Không thể tải cài đặt kho lưu trữ",
       "couldNotLoadRepositories": "Không thể tải các kho lưu trữ",
-      "couldNotOpenGithubSettings": "Không thể mở cài đặt GitHub App",
+      "couldNotOpenGithubSettings": "Không thể mở cài đặt Ứng dụng GitHub",
       "githubAppSettings": "Cài đặt GitHub App",
       "manageAccess": "Quản lý quyền truy cập GitHub App",
       "noRepositories": "Không có kho lưu trữ",
       "noRepositoriesDescription": "Cấp cho Kilo GitHub App quyền truy cập vào các kho lưu trữ",
       "readOnly": "Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể thay đổi các cài đặt này.",
       "selectAtLeastOne": "Chọn ít nhất một kho lưu trữ.",
-      "selectedRepositories": "Kho lưu trữ đã chọn",
+      "selectedRepositories": "Các kho lưu trữ đã chọn",
       "title": "Kho lưu trữ"
     },
     "scopeEntry": {
@@ -1377,8 +1379,8 @@
     "scopeList": {
       "couldNotLoad": "Không thể tải các tổ chức",
       "personal": "Cá nhân",
-      "personalSubtitle": "Kho lưu trữ của riêng bạn",
-      "title": "Security Agent"
+      "personalSubtitle": "Các kho lưu trữ của riêng bạn",
+      "title": "Tác nhân bảo mật"
     },
     "settingsOverview": {
       "allRepositories": "Tất cả kho lưu trữ",
@@ -1403,7 +1405,7 @@
       "repositoriesCount": "Đã chọn {{displayCount}} kho lưu trữ",
       "repositoriesCount_other": "Đã chọn {{displayCount}} kho lưu trữ",
       "repositoriesCount_one": "Đã chọn {{displayCount}} kho lưu trữ",
-      "securityAgent": "Security Agent",
+      "securityAgent": "Tác nhân bảo mật",
       "selectRepositories": "Chọn kho lưu trữ",
       "selectRepositoriesSubtitle": "Chọn kho lưu trữ mà Security Agent giám sát",
       "slaPolicy": "Chính sách SLA",
@@ -1438,7 +1440,7 @@
       "remediationDeadlineA11y": "Hạn chót khắc phục {{label}} theo ngày",
       "title": "Chính sách SLA"
     },
-    "title": "Security Agent",
+    "title": "Tác nhân bảo mật",
     "initialSyncAdmissionFailed": "Security Agent đã được bật, nhưng không thể xếp hàng đồng bộ ban đầu. Đồng bộ lại.",
     "queuedActionUntracked": "Không thể theo dõi một hành động đã xếp hàng nữa. Làm mới để xem trạng thái mới nhất.",
     "commands": {
@@ -1667,7 +1669,12 @@
       "couldNotLoadThisSession": "Không thể tải phiên này",
       "cloneFailed": "Không thể sao chép phiên này.",
       "cloneFailedRetry": "Không thể sao chép phiên này. Hãy thử lại.",
-      "connectRepositoryToContinue": "Kết nối một kho lưu trữ để tiếp tục."
+      "connectRepositoryToContinue": "Kết nối một kho lưu trữ để tiếp tục.",
+      "notEnoughCredits": "Không đủ tín dụng để chạy Cloud Agent. Hãy nạp tín dụng và thử lại.",
+      "previousTaskFinishing": "Tác vụ trước vẫn đang hoàn tất. Vui lòng chờ một chút.",
+      "serviceUnavailable": "Dịch vụ hiện không khả dụng. Vui lòng thử lại.",
+      "connectionTrouble": "Sự cố kết nối. Vui lòng thử lại sau giây lát.",
+      "modelUnavailable": "Mô hình này không khả dụng cho Cloud Agent. Vui lòng chọn mô hình khác và thử lại."
     },
     "remoteSession": {
       "failedToCreate": "Không thể tạo phiên từ xa",
@@ -1745,7 +1752,7 @@
       "contentTruncated": "Nội dung bị cắt bớt",
       "truncated": "Đã cắt bớt",
       "toolRead": "đọc",
-      "toolEdit": "sửa",
+      "toolEdit": "Chỉnh sửa",
       "toolWrite": "ghi",
       "toolBash": "bash",
       "toolGlob": "glob",
@@ -1775,7 +1782,7 @@
       "runOn": "Chạy trên",
       "runOnAccessibility": "Chạy trên: {{label}}",
       "couldNotLoad": "Không thể tải các phiên bản",
-      "couldNotLoadDescription": "Kiểm tra kết nối của bạn và thử lại.",
+      "couldNotLoadDescription": "Kiểm tra kết nối và thử lại.",
       "cloudAgent": "Tác nhân đám mây",
       "loading": "Đang tải…",
       "cloudAgentDescription": "Chạy trên hộp cát đám mây của Kilo",
@@ -1966,7 +1973,7 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Có thể thử lại.",
       "copyToComposer": "Sao chép vào trình soạn",
-      "queued": "Đã xếp hàng đợi",
+      "queued": "Đã xếp hàng",
       "queuedAccessibility": "Tin nhắn đã xếp hàng đợi",
       "userMessage": "Tin nhắn người dùng",
       "assistantMessage": "Tin nhắn trợ lý",
@@ -2158,15 +2165,15 @@
       "open": "yêu cầu kéo đang mở",
       "closed": "yêu cầu kéo đã đóng",
       "merged": "yêu cầu kéo đã hợp nhất",
-      "draft": "yêu cầu kéo bản nháp",
+      "draft": "Yêu cầu hợp nhất nháp",
       "updating": "Đang cập nhật, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "yêu cầu kéo"
+      "externalLinkLabel": "yêu cầu hợp nhất"
     }
   },
   "bootstrap": {
     "couldNotLoadAccount": "Không thể tải tài khoản của bạn",
-    "couldNotLoadAccountDescription": "Kiểm tra kết nối của bạn và thử lại.",
+    "couldNotLoadAccountDescription": "Kiểm tra kết nối và thử lại.",
     "couldNotLoadPrivacy": "Không thể tải các lựa chọn quyền riêng tư",
     "couldNotLoadPrivacyDescription": "Kiểm tra cài đặt bảo mật của thiết bị và thử lại.",
     "contentReady": "Nội dung đã sẵn sàng",
@@ -2259,7 +2266,7 @@
     "optionsExpiredDescription": "Quay lại và mở lại bộ chọn này từ màn hình trước đó."
   },
   "sessionRow": {
-    "needsInput": "CẦN NHẬP LIỆU"
+    "needsInput": "cần nhập"
   },
   "voiceInput": {
     "listening": "Đang nghe...",
@@ -2343,7 +2350,7 @@
     "statusCanceling": "Kilo Pass đang hủy",
     "statusPastDue": "Kilo Pass quá hạn",
     "monthlyCredits": "{{credits}} tín dụng hàng tháng",
-    "ends": "Kết thúc {{date}}",
+    "ends": "Kết thúc vào {{date}}",
     "periodEnd": "cuối kỳ",
     "managedOnGooglePlay": "Được quản lý trên Google Play",
     "managedInAppStore": "Được quản lý trong App Store",
@@ -2906,7 +2913,7 @@
   "organization": {
     "boundary": {
       "backToProfile": "Quay lại hồ sơ",
-      "loadErrorMessage": "Kiểm tra kết nối của bạn và thử lại.",
+      "loadErrorMessage": "Kiểm tra kết nối và thử lại.",
       "loadErrorTitle": "Không thể tải các tổ chức của bạn",
       "organizationUnavailable": "Tổ chức không khả dụng",
       "selectDescription": "Chọn một tổ chức từ hồ sơ của bạn để tiếp tục.",
@@ -2961,7 +2968,7 @@
         "paid": "Đã thanh toán",
         "open": "Đang mở",
         "void": "Vô hiệu",
-        "draft": "Nháp",
+        "draft": "Bản nháp",
         "uncollectible": "Không thể thu hồi",
         "unknown": "Không xác định"
       }
@@ -3038,7 +3045,7 @@
       "ended": "Đã kết thúc",
       "endsOn": "Kết thúc vào {{date}}",
       "loading": "Đang tải…",
-      "manageHint": "Mở quản lý Kilo Pass trên web.",
+      "manageHint": "Mở trang quản lý Kilo Pass trên web.",
       "notSubscribed": "Chưa đăng ký",
       "overallocated": "Số lượt gán Pass vượt quá số ghế đã thanh toán",
       "paidSeat_one": "{{displayCount}} ghế đã thanh toán",
@@ -3081,7 +3088,7 @@
     "invalidRequest": "Kiểm tra địa chỉ email của bạn và thử lại.",
     "emailDeliveryFailed": "Việc gửi email tạm thời không khả dụng. Vui lòng thử lại sau.",
     "admissionRequired": "Không thể xác minh thiết bị của bạn. Dùng '$t(login.moreSignInOptions)' để đăng nhập trên thiết bị khác hoặc qua web.",
-    "default": "Đã xảy ra sự cố. Vui lòng thử lại.",
+    "default": "Đã xảy ra lỗi. Vui lòng thử lại.",
     "retryableAdmission": "Chúng tôi không thể xác minh thiết bị này. Kiểm tra kết nối của bạn và thử lại.",
     "startSignInFailed": "Không thể bắt đầu đăng nhập. Vui lòng thử lại.",
     "couldNotOpenBrowser": "Không thể mở trình duyệt. Vui lòng thử lại.",
@@ -3097,7 +3104,7 @@
     "free": "Miễn phí",
     "couldNotUpdateFavorites": "Không thể cập nhật mục yêu thích",
     "thinkingEffort": {
-      "none": "Không",
+      "none": "Không có",
       "minimal": "Tối thiểu",
       "low": "Thấp",
       "medium": "Trung bình",

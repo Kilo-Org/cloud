@@ -38,7 +38,9 @@
     "retry": "Pokušaj ponovo",
     "search": "Pretraga jezika",
     "noMatches": "Nema jezika koji se podudaraju",
-    "deviceLanguage": "Jezik uređaja"
+    "deviceLanguage": "Jezik uređaja",
+    "current": "Trenutno",
+    "allLanguages": "Svi jezici"
   },
   "login": {
     "welcome": "Dobrodošli u Kilo",
@@ -70,7 +72,7 @@
     "terms": "Uslovima",
     "termsConnector": " i ",
     "termsSuffix": ".",
-    "privacyPolicy": "Politikom privatnosti",
+    "privacyPolicy": "Politika privatnosti",
     "moreSignInOptions": "Još opcija za prijavu",
     "couldNotCompleteSignIn": "Nije moguće dovršiti prijavu. Pokušajte ponovo.",
     "sessionEnded": "Vaša sesija je istekla. Prijavite se ponovo.",
@@ -469,8 +471,8 @@
       "noReviewRequests": "Nema zahteva za pregled",
       "noReviewRequestsDescription": "Pull request-ovi koji čekaju vaš pregled pojavljuju se ovde. I dalje možete nalepiti bilo koji PR link iznad.",
       "couldNotLoad": "Nije moguće učitati pristigle poruke",
-      "couldNotLoadMore": "Nije moguće učitati još",
-      "retryLoadingMore": "Pokušaj ponovo učitavanje još"
+      "couldNotLoadMore": "Nije moguće učitati više",
+      "retryLoadingMore": "Pokušaj ponovo da učitaš više"
     },
     "composer": {
       "commentBodyPlaceholder": "Ostavite komentar",
@@ -485,7 +487,7 @@
       "loadFailedTitle": "Nije moguće učitati komentator",
       "discardTitle": "Odbaciti komentar?",
       "discardMessage": "Vaš nacrt će biti izgubljen.",
-      "keepEditing": "Nastavi uređivanje",
+      "keepEditing": "Nastavi sa uređivanjem",
       "discard": "Odbaci",
       "comment": "Komentar",
       "insertSuggestionA11y": "Umetni predlog koda",
@@ -641,7 +643,7 @@
     "previewFullDescription": "Obaveštenja prikazuju tekst poruke na zaključanom ekranu.",
     "previewGenericDescription": "Obaveštenja pokazuju da se nešto dogodilo. Otvorite Kilo da pročitate.",
     "channel": {
-      "agent": "Sesije agenta",
+      "agent": "Agentske sesije",
       "chat": "Poruke u ćaskanju",
       "kiloclaw": "Aktivnost KiloClaw",
       "balance": "Upozorenja o stanju",
@@ -727,7 +729,7 @@
       "emptyTitle": "Još nema razgovora",
       "emptyDescription": "Kreirajte razgovor da započnete ćaskanje sa vašom KiloClaw instancom.",
       "create": "Kreiraj razgovor",
-      "starting": "Započinjanje…",
+      "starting": "Pokretanje…",
       "newConversation": "Novi razgovor",
       "openInstanceSettings": "Otvori podešavanja instance",
       "today": "Danas",
@@ -793,10 +795,10 @@
     },
     "attachmentPicker": {
       "takePhoto": "Uslikaj",
-      "photoLibrary": "Biblioteka fotografija",
-      "files": "Fajlovi",
+      "photoLibrary": "Fototeka",
+      "files": "Datoteke",
       "cameraAccessDisabled": "Pristup kameri onemogućen",
-      "cameraAccessMessage": "Dozvoli pristup kameri u Podešavanjima da bi uslikao fotografiju."
+      "cameraAccessMessage": "Dozvolite pristup kameri u Postavkama da biste snimili fotografiju."
     },
     "typingIndicator": {
       "someone": "Neko",
@@ -839,7 +841,7 @@
       "managedByAdmin": "Naplatom upravlja administrator tvoje organizacije.",
       "couldNotLoad": "Nije moguće učitati informacije o naplati",
       "manageOnWeb": "Upravljaj naplatom na webu",
-      "commitPlan": "Obaveza",
+      "commitPlan": "commit",
       "earlybird": "Rana ptica",
       "finalCommitTermEndsOn": "Tvoj konačni rok obaveze završava se {{date}}. Nastavi kao Standard po ceni {{price}}, ili se hosting završava.",
       "freeTrial": "Besplatno probno razdoblje",
@@ -856,7 +858,7 @@
       "trialDaysRemaining": "Probno razdoblje: preostalo {{remaining}} dana",
       "trialEndingSoon": "Probno razdoblje se uskoro završava: {{remaining}}",
       "planName": {
-        "commit": "Obaveza",
+        "commit": "commit",
         "standard": "Standard"
       }
     },
@@ -881,7 +883,7 @@
       "destroyMessage": "Ovo će trajno uništiti tvoju KiloClaw instancu i sve njene podatke. Ova radnja se ne može poništiti.",
       "destroyTitle": "Uništi instancu",
       "instance": "Instanca",
-      "renameFailed": "Nešto je pošlo naopako",
+      "renameFailed": "Nešto je pošlo po zlu",
       "couldNotCheckStatus": "Nije moguće proveriti status usluge",
       "dangerZone": "ZONA OPASNOSTI",
       "destroying": "Uništavanje...",
@@ -1057,7 +1059,7 @@
         "openKiloAi": "Otvori kilo.ai",
         "provisioning": "Dodeljivanje resursa",
         "review": "Pregled",
-        "somethingWentWrong": "Nešto je pošlo naopako",
+        "somethingWentWrong": "Nešto je pošlo po zlu",
         "identityTitle": "Daj svom botu identitet",
         "close": "Zatvori",
         "couldNotLoad": "Nije moguće učitati stanje podešavanja",
@@ -1135,9 +1137,9 @@
       "destroying": "UNIŠTAVANJE",
       "provisioned": "DODEĐENO",
       "restarting": "PONOVNO POKRETANJE",
-      "running": "RADI",
+      "running": "U toku",
       "shuttingDown": "GAŠENJE",
-      "starting": "POKRETANJE",
+      "starting": "Započinje",
       "stopped": "ZAUSTAVLJENO",
       "stopping": "ZAUSTAVLJANJE",
       "unknown": "NEPOZNATO",
@@ -1511,7 +1513,7 @@
       "outcomeSafeToDismiss": "Bezbedno za odbacivanje",
       "outcomeNeedsReview": "Zahteva pregled",
       "outcomeTriageComplete": "Triaža završena",
-      "outcomeDismissed": "Odbaceno",
+      "outcomeDismissed": "Odbijeno",
       "sortSeverityDesc": "Ozbiljnost: visoka ka niskoj",
       "sortSeverityAsc": "Ozbiljnost: niska ka visokoj",
       "sortSlaDue": "SLA rok",
@@ -1690,15 +1692,15 @@
       "reasonNoBandwidth": "nema dostupnog kapaciteta",
       "reasonTolerableRisk": "rizik je prihvatljiv",
       "reasonInaccurate": "nalaz nije tačan",
-      "reasonNotUsed": "ranjivi kod se ne koristi",
+      "reasonNotUsed": "Ranljivi kod se ne koristi",
       "reasonAfterReview": "nakon pregleda"
     },
     "settingsOverview": {
       "title": "Podešavanja",
       "couldNotLoadSettings": "Podešavanja Security Agent-a se ne mogu učitati",
       "couldNotLoadPermissions": "Dozvole se ne mogu učitati",
-      "couldNotLoadRepositories": "Repozitorijumi se ne mogu učitati",
-      "securityAgent": "Security Agent",
+      "couldNotLoadRepositories": "Nije moguće učitati repozitorijume",
+      "securityAgent": "Sigurnosni agent",
       "enabled": "Omogućeno",
       "disabled": "Onemogućeno",
       "on": "Uključeno",
@@ -1764,7 +1766,7 @@
       "modeAuto": "Automatski",
       "modeShallow": "Plitko",
       "modeDeep": "Duboko",
-      "couldNotLoadModels": "Modeli se ne mogu učitati",
+      "couldNotLoadModels": "Nije moguće učitati modele",
       "triageModel": "Model trijaže",
       "analysisModel": "Model analize",
       "remediationModel": "Model otklanjanja"
@@ -1809,10 +1811,10 @@
       "clearFilters": "Obriši filtere"
     },
     "scopeList": {
-      "title": "Security Agent",
-      "couldNotLoad": "Organizacije se ne mogu učitati",
+      "title": "Sigurnosni agent",
+      "couldNotLoad": "Nije moguće učitati organizacije",
       "personal": "Lično",
-      "personalSubtitle": "Tvoji repozitorijumi"
+      "personalSubtitle": "Tvoji sopstveni repozitorijumi"
     },
     "commandRetry": {
       "discard": "Odbaci"
@@ -1858,7 +1860,7 @@
       "unavailable": "Izveštaj revizije nije dostupan",
       "unavailableDescription": "Samo vlasnici organizacije i menadžeri naplate mogu da pregledaju izveštaje revizije. Zamoli vlasnika ili menadžera naplate da ti dodeli pristup.",
       "queryFailed": "Upit izveštaja se nije završio. Pokušaj ponovo.",
-      "checkConnection": "Proveri vezu i pokušaj ponovo."
+      "checkConnection": "Proverite vezu i pokušajte ponovo."
     },
     "notifications": {
       "couldNotLoad": "Podešavanja obaveštenja se ne mogu učitati",
@@ -1881,8 +1883,8 @@
     "repositories": {
       "allRepositories": "Svi repozitorijumi",
       "couldNotLoad": "Podešavanja repozitorijuma se ne mogu učitati",
-      "couldNotLoadRepositories": "Repozitorijumi se ne mogu učitati",
-      "couldNotOpenGithubSettings": "Podešavanja GitHub aplikacije se ne mogu otvoriti",
+      "couldNotLoadRepositories": "Nije moguće učitati repozitorijume",
+      "couldNotOpenGithubSettings": "Nije moguće otvoriti podešavanja GitHub aplikacije",
       "githubAppSettings": "Podešavanja GitHub aplikacije",
       "manageAccess": "Upravljaj pristupom GitHub aplikacije",
       "noRepositories": "Nema repozitorijuma",
@@ -1905,7 +1907,7 @@
     },
     "queuedActionUntracked": "Zakazana radnja se više ne može pratiti. Osveži da vidiš najnovije stanje.",
     "initialSyncAdmissionFailed": "Security Agent je omogućen, ali se početna sinhronizacija nije mogla zakazati. Sinhronizuj ponovo.",
-    "title": "Security Agent",
+    "title": "Sigurnosni agent",
     "commands": {
       "findingAlreadyDismissed": "Nalaz je već odbačen",
       "findingDismissed": "Nalaz odbačen",
@@ -2116,7 +2118,7 @@
       "copyErrorDetails": "Kopiraj detalje greške",
       "backToSessions": "Nazad na sesije",
       "accessDenied": "Pristup odbijen",
-      "accessDeniedDescription": "Nemaš dozvolu da ovo vidiš.",
+      "accessDeniedDescription": "Nemate dozvolu da vidite ovo.",
       "couldNotLoad": "Sesija se ne može učitati",
       "failedToLoadDetails": "Detalji sesije se ne mogu učitati",
       "notFound": "Nije pronađeno",
@@ -2136,11 +2138,16 @@
       "couldNotLoadThisSession": "Ova sesija se ne može učitati",
       "cloneFailed": "Ova sesija se ne može klonirati.",
       "cloneFailedRetry": "Ova sesija se ne može klonirati. Pokušaj ponovo.",
-      "connectRepositoryToContinue": "Poveži repozitorijum da nastaviš."
+      "connectRepositoryToContinue": "Poveži repozitorijum da nastaviš.",
+      "notEnoughCredits": "Nema dovoljno kredita za pokretanje Cloud Agent. Dodaj kredite i pokušaj ponovo.",
+      "previousTaskFinishing": "Prethodni zadatak se još završava. Sačekaj malo.",
+      "serviceUnavailable": "Usluga trenutno nije dostupna. Pokušaj ponovo.",
+      "connectionTrouble": "Problem s vezom. Pokušaj ponovo za trenutak.",
+      "modelUnavailable": "Ovaj model nije dostupan za Cloud Agent. Izaberi drugi model i pokušaj ponovo."
     },
     "remoteSession": {
       "failedToCreate": "Daljinska sesija se ne može kreirati",
-      "exited": "Sesija je izašla",
+      "exited": "Sesija je završena",
       "failedToExit": "Izlazak iz sesije nije uspeo",
       "exitTitle": "Izaći iz sesije?",
       "exitMessage": "Ovo zaustavlja sesiju koja radi, ali zadržava njenu istoriju.",
@@ -2245,7 +2252,7 @@
       "runOn": "Pokreni na",
       "runOnAccessibility": "Pokreni na: {{label}}",
       "couldNotLoad": "Instance se ne mogu učitati",
-      "couldNotLoadDescription": "Proveri svoju vezu i pokušaj ponovo.",
+      "couldNotLoadDescription": "Proverite vezu i pokušajte ponovo.",
       "cloudAgent": "Cloud Agent",
       "loading": "Učitavanje…",
       "cloudAgentDescription": "Pokreni na Kilo cloud sandbox-u",
@@ -2272,7 +2279,7 @@
       "codeDescription": "Piši i menjaj kod",
       "planDescription": "Planiraj i dizajniraj rešenja",
       "debugDescription": "Pronađi i ispravi probleme",
-      "orchestratorDescription": "Koordinirај složene zadatke",
+      "orchestratorDescription": "Koordiniraj složene zadatke",
       "askDescription": "Dobij odgovore i objašnjenja"
     },
     "repoPicker": {
@@ -2309,7 +2316,7 @@
       "total": "Ukupno",
       "reportAiResponseFailedRetryable": "Ovaj odgovor se ne može prijaviti.",
       "reportAiResponseFailedTerminal": "Ovaj odgovor se ne može prijaviti.",
-      "reportAiResponseSubmitted": "Prijava je poslata. Potvrda {{receiptId}}"
+      "reportAiResponseSubmitted": "Prijava poslata. Potvrda {{receiptId}}"
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2319,7 +2326,7 @@
       "detailsUnavailable": "Detalji nisu dostupni",
       "textDisplay": "Prikaz teksta",
       "thinking": "Razmišljanje",
-      "thought": "Mисао",
+      "thought": "Misao",
       "title": "Detalji",
       "showDetails": "Prikaži detalje",
       "pending": "Na čekanju…",
@@ -2350,7 +2357,7 @@
       "viewImageWithAlt": "Prikaži sliku {{alt}}",
       "imageOutput": "Izlaz slike",
       "imageOutputWithFilename": "Izlaz slike, {{filename}}",
-      "defaultName": "Fajl",
+      "defaultName": "Datoteka",
       "openFullScreen": "Otvori {{name}} na celom ekranu",
       "preview": "Pregledaj {{name}}",
       "openFile": "Otvori {{name}}",
@@ -2436,7 +2443,7 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Pokušaj ponovo je dostupan.",
       "copyToComposer": "Kopiraj u kompozitor",
-      "queued": "U redu čekanja",
+      "queued": "U redu",
       "queuedAccessibility": "Poruka u redu čekanja",
       "userMessage": "Korisnička poruka",
       "assistantMessage": "Asistentska poruka",
@@ -2632,7 +2639,7 @@
       "open": "otvoren pull request",
       "closed": "zatvoren pull request",
       "merged": "spojen pull request",
-      "draft": "nacrt pull requesta",
+      "draft": "nacrt pull request-a",
       "updating": "Ažuriranje, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2654,7 +2661,7 @@
     "billingPage": "stranica za naplatu"
   },
   "deviceSessions": {
-    "couldNotLoad": "Učitavanje sesija nije uspelo",
+    "couldNotLoad": "Sesije se ne mogu učitati",
     "couldNotLoadDescription": "Vaše aktivne sesije su nedostupne dok se ovo ne učita.",
     "currentDeviceUnidentified": "Trenutni uređaj nije mogao biti identifikovan",
     "noSessions": "Nema aktivnih sesija",
@@ -2671,7 +2678,7 @@
     "signOutThisSessionTitle": "Odjaviti ovu sesiju?",
     "signOutThisSessionMessage": "{{device}} će biti odjavljen. Može zadržati API pristup do jednog sata.",
     "signOutConfirm": "Odjavi se",
-    "signOutMessage": "Morat ćete se ponovo prijaviti da biste pristupili svom radnom prostoru.",
+    "signOutMessage": "Moraćete ponovo da se prijavite da biste pristupili radnom prostoru.",
     "webBrowser": "Veb pregledač"
   },
   "forceUpdate": {
@@ -2692,7 +2699,7 @@
   },
   "imageViewer": {
     "close": "Zatvori {{filename}}",
-    "imageUnavailable": "Slika nedostupna",
+    "imageUnavailable": "Slika nije dostupna",
     "share": "Podeli {{filename}}"
   },
   "invalidRoute": {
@@ -2701,7 +2708,7 @@
     "title": "Stranica nije pronađena"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Sadržaj skraćen",
+    "contentTruncated": "Sadržaj je skraćen",
     "truncated": "Skraćeno",
     "wrap": "Prelomi",
     "scroll": "Pomeri"
@@ -2733,7 +2740,7 @@
     "optionsExpiredDescription": "Vratite se i ponovo otvorite ovaj birač sa prethodnog ekrana."
   },
   "sessionRow": {
-    "needsInput": "POTREBAN UNOS"
+    "needsInput": "zahteva unos"
   },
   "voiceInput": {
     "listening": "Slušanje...",
@@ -2966,7 +2973,7 @@
     },
     "inviteMember": {
       "emailError": "Unesite važeću adresu e-pošte",
-      "emailLabel": "E-pošta",
+      "emailLabel": "Imejl",
       "emailPlaceholder": "name@company.com",
       "permissionDenied": "Nemate dozvolu da pozivate članove.",
       "roleLabel": "Uloga",
@@ -3097,12 +3104,12 @@
     "invalidCode": "Taj kod nije ispravan. Probajte ponovo.",
     "codeInProgress": "Vaš kod se obrađuje. Sačekajte trenutak i probajte ponovo.",
     "tooManyAttempts": "Previše pokušaja. Zatražite novi kod.",
-    "invalidToken": "Prijavljivanje nije uspelo. Probajte ponovo.",
+    "invalidToken": "Prijava nije uspela. Pokušajte ponovo.",
     "invalidEmail": "Nije moguće isporučiti e-poštu na ovu adresu. Koristite drugu adresu e-pošte.",
     "invalidRequest": "Proverite svoju adresu e-pošte i probajte ponovo.",
     "emailDeliveryFailed": "Isporuka e-pošte je privremeno nedostupna. Probajte ponovo kasnije.",
     "admissionRequired": "Vaš uređaj se ne može verifikovati. Koristite '$t(login.moreSignInOptions)' da se prijavite na drugom uređaju ili preko weba.",
-    "default": "Nešto nije u redu. Probajte ponovo.",
+    "default": "Nešto je pošlo po zlu. Pokušajte ponovo.",
     "retryableAdmission": "Nismo mogli da verifikujemo ovaj uređaj. Proverite vezu i probajte ponovo.",
     "startSignInFailed": "Nije moguće pokrenuti prijavu. Pokušajte ponovo.",
     "couldNotOpenBrowser": "Nije moguće otvoriti pregledač. Pokušajte ponovo.",

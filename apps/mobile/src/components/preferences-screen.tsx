@@ -107,8 +107,8 @@ export function PreferencesScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('preferences.title')} />
       <TabScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-3 pt-4"
+        className="flex-1"
+        contentContainerClassName="px-6 gap-3 pt-4"
         showsVerticalScrollIndicator={false}
       >
         <PreferenceRow

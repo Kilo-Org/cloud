@@ -38,7 +38,9 @@
     "retry": "पुन्हा प्रयत्न करा",
     "search": "भाषा शोधा",
     "noMatches": "कोणतीही भाषा जुळत नाही",
-    "deviceLanguage": "डिव्हाइसची भाषा"
+    "deviceLanguage": "डिव्हाइसची भाषा",
+    "current": "सध्याची",
+    "allLanguages": "सर्व भाषा"
   },
   "login": {
     "welcome": "Kilo मध्ये स्वागत आहे",
@@ -353,7 +355,7 @@
       "replyPlaceholder": "उत्तर…",
       "replyBody": "उत्तर मजकूर",
       "submitReply": "उत्तर सादर करा",
-      "reply": "उत्तर",
+      "reply": "उत्तर द्या",
       "termsTitle": "सेवा अटी",
       "termsCopy": "पोस्ट करण्यासाठी तुमचे वय 13 किंवा त्याहून अधिक असणे आवश्यक आहे.",
       "termsAcceptRetry": "अटी स्वीकारता आल्या नाहीत. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
@@ -582,7 +584,7 @@
       "statusDeleted": "हटवले",
       "lineLabel": "{{status}} ओळ {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(रिकामी)"
+      "emptyLine": "(रिकामे)"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड रिकामा आहे",
     "linkPasteNotAPullRequest": "ही GitHub पुल रिक्वेस्ट लिंक नाही",
@@ -669,7 +671,7 @@
     "instancePicker": {
       "switchInstance": "इन्स्टन्स बदला",
       "couldNotLoadInstances": "इन्स्टन्स लोड करता आले नाहीत",
-      "noInstances": "KiloClaw इन्स्टन्स नाहीत",
+      "noInstances": "कोणतेही KiloClaw इन्स्टन्स नाहीत",
       "noInstancesDescription": "चॅट सुरू करण्यासाठी इन्स्टन्स सेट करा.",
       "setUpKiloclaw": "KiloClaw सेट करा",
       "currentInstance": "{{title}}, सध्याचे",
@@ -737,7 +739,7 @@
       "sizeRejection": "{{filename}} ही {{limit}} संलग्नता मर्यादेपेक्षा जास्त आहे.",
       "unreadable": "{{filename}} वाचता आले नाही.",
       "pastedImage": "पेस्ट केलेली प्रतिमा",
-      "defaultName": "संलग्नता",
+      "defaultName": "संलग्नक",
       "classificationDenied": "एक्झिक्युटेबल फाइल्स संलग्न करता येत नाहीत",
       "classificationEmpty": "फाइल रिकामी आहे",
       "classificationTooLarge": "फाइल्स 20 MB किंवा त्यापेक्षा लहान असाव्यात",
@@ -789,7 +791,7 @@
       "photoLibrary": "फोटो लायब्ररी",
       "files": "फाइल्स",
       "cameraAccessDisabled": "कॅमेरा प्रवेश अक्षम",
-      "cameraAccessMessage": "फोटो घेण्यासाठी सेटिंग्जमध्ये कॅमेरा प्रवेश द्या."
+      "cameraAccessMessage": "फोटो घेण्यासाठी सेटिंग्जमध्ये कॅमेरा प्रवेशाची परवानगी द्या."
     },
     "typingIndicator": {
       "someone": "कोणीतरी",
@@ -822,7 +824,7 @@
       "plan": "योजना",
       "finalTermEnds": "अंतिम मुदत संपते",
       "afterFinalTerm": "अंतिम मुदतीनंतर",
-      "remaining": "उर्वरित",
+      "remaining": "शिल्लक",
       "lessThanOneDay": "1 दिवसापेक्षा कमी",
       "ends": "संपते",
       "expires": "कालबाह्य होते",
@@ -923,7 +925,7 @@
       "gmailNotifications": "Gmail सूचना",
       "disconnect": "Google खाते डिस्कनेक्ट करा",
       "connected": "कनेक्ट झाले",
-      "copied": "कॉपी झाले!",
+      "copied": "कॉपी केले",
       "copyCommand": "कमांड कॉपी करा",
       "disabled": "अक्षम",
       "disconnectConfirm": "डिस्कनेक्ट",
@@ -934,11 +936,11 @@
     },
     "modelList": {
       "title": "सर्व मॉडेल्स",
-      "searchPlaceholder": "मॉडेल्स शोधा...",
-      "couldNotLoad": "मॉडेल्स लोड करता आले नाहीत",
+      "searchPlaceholder": "मॉडेल शोधा...",
+      "couldNotLoad": "मॉडेल लोड करता आले नाहीत",
       "clearSearch": "शोध साफ करा",
       "noMatches": "तुमच्या शोधाशी जुळणारी कोणतीही मॉडेल्स नाहीत",
-      "noModels": "कोणतीही मॉडेल्स उपलब्ध नाहीत",
+      "noModels": "कोणतेही मॉडेल उपलब्ध नाही",
       "noModelsDescription": "उपलब्ध झाल्यावर मॉडेल्स येथे दिसतील.",
       "noResultsFor": "\"{{query}}\" साठी कोणतेही परिणाम नाहीत",
       "recommended": "शिफारस केलेले"
@@ -1068,7 +1070,7 @@
         "location": "स्थान",
         "locationPlaceholder": "शहर किंवा प्रदेश (ऐच्छिक)",
         "useCurrentLocation": "सध्याचे स्थान वापरा",
-        "continue": "पुढे",
+        "continue": "सुरू ठेवा",
         "locationDeniedTitle": "स्थान प्रवेश नाकारला",
         "locationDeniedMessage": "तुमचे सध्याचे स्थान वापरण्यासाठी सेटिंग्जमध्ये स्थान प्रवेश सक्षम करा.",
         "locationValidationFailed": "स्थान सत्यापित करता आले नाही.",
@@ -1239,21 +1241,21 @@
       "placeholder": "उदा. आमच्या त्रुटी-हाताळणीच्या परंपरा लागू करा…"
     },
     "repos": {
-      "title": "रिपॉझिटरीज",
-      "couldNotLoad": "रिपॉझिटरीज लोड करता आल्या नाहीत",
+      "title": "भांडारे",
+      "couldNotLoad": "भांडारे लोड करता आली नाहीत",
       "unavailable": "रिपॉझिटरीज अनुपलब्ध — kilo.ai वर Bitbucket सेटअप पूर्ण करा.",
       "finishSetup": "सेटअप पूर्ण करा",
       "manageAccess": "प्रवेश व्यवस्थापित करा",
-      "allRepositories": "सर्व रिपॉझिटरीज",
+      "allRepositories": "सर्व भांडारे",
       "bitbucketNoRepositoriesDescription": "या Bitbucket वर्कस्पेसमध्ये कोणत्याही रिपॉझिटरीज उपलब्ध नाहीत.",
       "bitbucketSetup": "Bitbucket सेटअप",
-      "couldNotOpenGithubSettings": "GitHub ॲप सेटिंग्ज उघडता आल्या नाहीत",
+      "couldNotOpenGithubSettings": "GitHub अॅप सेटिंग्ज उघडता आल्या नाहीत",
       "gitlabNoRepositoriesDescription": "तुम्हाला GitLab वर अधिक गट किंवा प्रकल्पांना प्रवेश द्यावा लागू शकतो.",
       "installGithubApp": "रिपॉझिटरीजवर GitHub ॲप स्थापित करा",
       "installGithubAppDescription": "तुम्हाला पुनरावलोकन करायच्या असलेल्या रिपॉझिटरीजना Kilo GitHub ॲपला प्रवेश द्या.",
       "noRepositoriesFound": "कोणत्याही रिपॉझिटरीज सापडल्या नाहीत",
       "repositoryAccess": "रिपॉझिटरी प्रवेश",
-      "selectedRepositories": "निवडलेल्या रिपॉझिटरीज"
+      "selectedRepositories": "निवडलेली भांडारे"
     },
     "style": {
       "title": "पुनरावलोकन शैली",
@@ -1262,7 +1264,7 @@
       "roast": "निर्दयीपणे प्रामाणिक, मनोरंजकपणे",
       "strict": "प्रत्येक गोष्ट ध्वजांकित करा, उच्च बार ठेवा"
     },
-    "title": "कोड रिव्ह्यूअर",
+    "title": "कोड पुनरावलोकक",
     "reviewDetail": {
       "title": "पुनरावलोकन",
       "cancelTitle": "पुनरावलोकन रद्द करायचे?",
@@ -1275,7 +1277,7 @@
       "couldNotLoad": "पुनरावलोकन लोड करता आले नाही",
       "couldNotGetLatest": "शेवटचे मिळवता आले नाही.",
       "byline": "{{repo}} #{{number}} द्वारे {{author}}",
-      "findings": "निष्कर्ष",
+      "findings": "शोध",
       "noFindings": "कोणतेही निष्कर्ष नाहीत",
       "showMore": "आणखी दाखवा",
       "details": "तपशील",
@@ -1284,7 +1286,7 @@
       "model": "मॉडेल",
       "created": "तयार केले",
       "started": "सुरू केले",
-      "completed": "पूर्ण केले",
+      "completed": "पूर्ण झाले",
       "cost": "खर्च",
       "tokens": "टोकन्स",
       "tokensInOut": "{{input}} आत / {{output}} बाहेर",
@@ -1292,7 +1294,7 @@
       "council": "कौन्सिल",
       "decision": "निर्णय",
       "gate": "गेट",
-      "gateNone": "कोणतेही नाही",
+      "gateNone": "काहीही नाही",
       "gateHidden": "लपलेले",
       "checkRun": "चेक रन",
       "status": "स्थिती",
@@ -1336,7 +1338,7 @@
     "webhookSetupDescription": "काही रिपॉझिटरीजना स्वयंचलित पुनरावलोकने मिळणार नाहीत.",
     "autoReviews": "स्वयंचलित पुनरावलोकने",
     "selectRepository": "स्वयंचलित पुनरावलोकने सक्षम करण्यासाठी किमान एक रिपॉझिटरी निवडा.",
-    "selectRepositories": "रिपॉझिटरीज निवडा",
+    "selectRepositories": "भांडारे निवडा",
     "followReviewMd": "REVIEW.md चे अनुसरण करा",
     "followReviewMdSubtitle": "प्रति-रिपॉझिटरी REVIEW.md सूचना फाईल्सचा सन्मान करा",
     "readOnlyDescription": "फक्त संस्था मालक आणि बिलिंग व्यवस्थापक या सेटिंग्ज बदलू शकतात.",
@@ -1357,7 +1359,7 @@
       "couldNotLoad": "संस्था लोड करता आल्या नाहीत",
       "personalStillAvailable": "वैयक्तिक रिपॉझिटरीज खाली अजूनही उपलब्ध आहेत.",
       "personal": "वैयक्तिक",
-      "personalSubtitle": "तुमच्या स्वतःच्या रिपॉझिटरीज",
+      "personalSubtitle": "तुमची स्वतःची भांडारे",
       "viewOnly": "फक्त पहा"
     },
     "reviewList": {
@@ -1394,8 +1396,8 @@
       "set": "सेट",
       "model": "मॉडेल",
       "mergeGate": "मर्ज गेट",
-      "repositories": "रिपॉझिटरीज",
-      "allRepositories": "सर्व रिपॉझिटरीज",
+      "repositories": "भांडारे",
+      "allRepositories": "सर्व भांडारे",
       "nSelected": "{{displayCount}} निवडले",
       "reviewMemory": "पुनरावलोकन मेमरी",
       "proposedReviewMdGuidance": "प्रस्तावित REVIEW.md मार्गदर्शन"
@@ -1406,7 +1408,7 @@
       "noDecision": "निर्णय नाही",
       "noResult": "परिणाम नाही"
     },
-    "eyebrow": "कोड रिव्ह्यूअर",
+    "eyebrow": "कोड पुनरावलोकक",
     "updateFailed": "पुनरावलोकक अद्ययावत करण्यात अयशस्वी",
     "configSaveFailed": "पुनरावलोकन कॉन्फिग जतन करण्यात अयशस्वी",
     "status": {
@@ -1478,13 +1480,13 @@
       "noFiltersDescription": "परत जा आणि निष्कर्षांच्या यादीतून फिल्टर पुन्हा उघडा.",
       "title": "निष्कर्ष फिल्टर करा",
       "reset": "रीसेट करा",
-      "repository": "रिपॉझिटरी",
+      "repository": "भांडार",
       "status": "स्थिती",
       "severity": "तीव्रता",
       "outcome": "परिणाम",
       "slaStatus": "SLA स्थिती",
       "sortBy": "क्रमवारी लावा",
-      "allRepositories": "सर्व रिपॉझिटरीज",
+      "allRepositories": "सर्व भांडारे",
       "all": "सर्व",
       "statusOpen": "उघडा",
       "fixed": "निराकरण झाले",
@@ -1502,14 +1504,14 @@
       "outcomeSafeToDismiss": "टाकून देणे सुरक्षित",
       "outcomeNeedsReview": "पुनरावलोकन आवश्यक",
       "outcomeTriageComplete": "ट्रायज पूर्ण",
-      "outcomeDismissed": "टाकून दिले",
+      "outcomeDismissed": "रद्द केलेले",
       "sortSeverityDesc": "तीव्रता: उच्च ते कमी",
       "sortSeverityAsc": "तीव्रता: कमी ते उच्च",
       "sortSlaDue": "SLA देय तारीख",
       "overdueOnly": "फक्त थकीत"
     },
     "automation": {
-      "title": "ऑटोमेशन",
+      "title": "स्वयंचलन",
       "couldNotLoad": "ऑटोमेशन सेटिंग्ज लोड करता आल्या नाहीत",
       "autoAnalysis": "स्वयं विश्लेषण",
       "autoRemediation": "स्वयं उपाय",
@@ -1558,7 +1560,7 @@
       "triageConfidence": "वर्गीकरण आत्मविश्वास",
       "suggestedAction": "सुचवलेली कृती",
       "triageReasoning": "वर्गीकरण तर्क",
-      "exploitable": "शोषणयोग्य",
+      "exploitable": "शोषणीय",
       "model": "मॉडेल",
       "notRecorded": "नोंदवलेले नाही",
       "analyzed": "विश्लेषित",
@@ -1589,8 +1591,8 @@
       "needsEvidenceReview": "पुरावा पुनरावलोकन आवश्यक",
       "analysisNotComplete": "विश्लेषण पूर्ण नाही",
       "noImmediateAction": "तात्काळ कृती नाही",
-      "notExploitable": "शोषणयोग्य नाही",
-      "needsYourReview": "तुमच्या पुनरावलोकनाची गरज",
+      "notExploitable": "शोषणीय नाही",
+      "needsYourReview": "तुमचे पुनरावलोकन आवश्यक",
       "noSlaDeadline": "SLA मुदत नियुक्त नाही",
       "noRepositoryData": "अजून भांडार डेटा नाही",
       "noRepositoryDataDescription": "शोध समक्रमित झाल्यानंतर भांडार प्राधान्यक्रम दिसतील.",
@@ -1618,7 +1620,7 @@
       "analysisIncomplete": "विश्लेषण पूर्ण नाही",
       "analysisIncompleteDetail": "प्रकल्पाचा धोका अजून अज्ञात आहे",
       "slaCompliance": "SLA अनुपालन",
-      "notMeasured": "मोजले नाही",
+      "notMeasured": "मोजलेले नाही",
       "withinDeadlineDetail": "{{total}} पैकी {{within}} मुदतीत",
       "noDeadlineData": "कोणत्याही निष्कर्षाला अजून SLA मुदत नाही",
       "deadlinePassed": "मुदत संपली",
@@ -1666,7 +1668,7 @@
       "manifest": "मॅनिफेस्ट",
       "detected": "आढळले",
       "updated": "अद्ययावत केले",
-      "fixed": "निराकरण केले",
+      "fixed": "निराकरण झाले",
       "slaDeadline": "SLA मुदत",
       "sourceRecord": "स्रोत रेकॉर्ड",
       "source": "स्रोत",
@@ -1715,7 +1717,7 @@
     "remediation": {
       "cancellationRequested": "रद्दीकरण विनंती केली",
       "cancelled": "उपाय रद्द केला",
-      "pullRequest": "pull request",
+      "pullRequest": "पुल रिक्वेस्ट",
       "couldNotLoad": "उपाय स्थिती लोड करता आली नाही",
       "noAnalysisTitle": "अजून विश्लेषण नाही",
       "noAnalysisDescription": "तपशील टॅबमधून एक चालवा",
@@ -1804,7 +1806,7 @@
       "personalSubtitle": "तुमची स्वतःची भांडारे"
     },
     "commandRetry": {
-      "discard": "रद्द करा"
+      "discard": "टाकून द्या"
     },
     "findingRow": {
       "nextRemediationPrOpen": "उपाय PR खुला",
@@ -1824,7 +1826,7 @@
       "couldNotOpenGithub": "GitHub उघडता आले नाही. कृपया पुन्हा प्रयत्न करा."
     },
     "settingsSave": {
-      "discard": "रद्द करा",
+      "discard": "टाकून द्या",
       "keepEditing": "संपादन सुरू ठेवा",
       "saveChanges": "बदल जतन करा",
       "unsavedTitle": "जतन न केलेले बदल",
@@ -1871,7 +1873,7 @@
       "allRepositories": "सर्व भांडारे",
       "couldNotLoad": "भांडार सेटिंग्ज लोड करता आल्या नाहीत",
       "couldNotLoadRepositories": "भांडारे लोड करता आली नाहीत",
-      "couldNotOpenGithubSettings": "GitHub App सेटिंग्ज उघडता आल्या नाहीत",
+      "couldNotOpenGithubSettings": "GitHub अॅप सेटिंग्ज उघडता आल्या नाहीत",
       "githubAppSettings": "GitHub App सेटिंग्ज",
       "manageAccess": "GitHub App प्रवेश व्यवस्थापित करा",
       "noRepositories": "भांडारे नाहीत",
@@ -1923,8 +1925,8 @@
       "extractionFailed": "पुनरावलोकन आवश्यक",
       "extractionFailedTitle": "पुनरावलोकन आवश्यक",
       "extractionFailedDescription": "तांत्रिक अहवाल संरचित निकालात बदलता आला नाही.",
-      "exploitable": "शोषणयोग्य",
-      "exploitableTitle": "शोषणयोग्य",
+      "exploitable": "शोषणीय",
+      "exploitableTitle": "शोषणीय",
       "exploitableDescription": "अॅप्लिकेशन कोड प्रभावित फीचरपर्यंत पोहोचू शकतो.",
       "notExploitable": "अप्राप्य",
       "notExploitableTitle": "अप्राप्य",
@@ -2090,7 +2092,7 @@
       "didNotCompleteTitle": "स्थापना पूर्ण झाली नाही",
       "didNotCompleteMessage": "GitHub अॅप स्थापना पूर्ण झाली नाही. अॅपमधून पुन्हा प्रयत्न करा."
     },
-    "sessionExited": "सत्र संपले",
+    "sessionExited": "सत्र बाहेर पडले",
     "remoteSpawnRetryable": "उदाहरणापर्यंत पोहोचता आले नाही — ते डिस्कनेक्ट झाले असावे.",
     "remoteSpawnNonRetryable": "उदाहरण सत्र सुरू करू शकले नाही — मशीन तपासा किंवा CLI अद्यतनित करा.",
     "remoteSpawnInstanceDisconnected": "निवडलेले उदाहरण डिस्कनेक्ट झाले. Cloud Agent वर सत्र सुरू करा किंवा दुसरे उदाहरण निवडा."
@@ -2121,7 +2123,12 @@
       "couldNotLoadThisSession": "हे सत्र लोड करता आले नाही",
       "cloneFailed": "हे सत्र क्लोन करता आले नाही.",
       "cloneFailedRetry": "हे सत्र क्लोन करता आले नाही. पुन्हा प्रयत्न करा.",
-      "connectRepositoryToContinue": "सुरू ठेवण्यासाठी भांडार कनेक्ट करा."
+      "connectRepositoryToContinue": "सुरू ठेवण्यासाठी भांडार कनेक्ट करा.",
+      "notEnoughCredits": "Cloud Agent चालवण्यासाठी पुरेसे क्रेडिट नाहीत. क्रेडिट जोडून पुन्हा प्रयत्न करा.",
+      "previousTaskFinishing": "मागील कार्य अजून पूर्ण होत आहे. कृपया क्षणभर थांबा.",
+      "serviceUnavailable": "सेवा सध्या अनुपलब्ध आहे. पुन्हा प्रयत्न करा.",
+      "connectionTrouble": "कनेक्शन समस्या. कृपया क्षणभरानंतर पुन्हा प्रयत्न करा.",
+      "modelUnavailable": "हे मॉडेल Cloud Agent साठी उपलब्ध नाही. दुसरे मॉडेल निवडून पुन्हा प्रयत्न करा."
     },
     "remoteSession": {
       "failedToCreate": "दूरस्थ सत्र तयार करण्यात अयशस्वी",
@@ -2177,7 +2184,7 @@
       "discardDraftTitle": "मसुदा रद्द करायचा?",
       "discardDraftMessage": "तुमचा प्रॉम्प्ट गमावला जाईल.",
       "keepEditing": "संपादन सुरू ठेवा",
-      "discard": "रद्द करा",
+      "discard": "टाकून द्या",
       "discardFailed": "मसुदा रद्द करता आला नाही. कृपया पुन्हा प्रयत्न करा.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
@@ -2293,7 +2300,7 @@
       "total": "एकूण",
       "reportAiResponseFailedRetryable": "हा प्रतिसाद नोंदवता आला नाही.",
       "reportAiResponseFailedTerminal": "हा प्रतिसाद नोंदवता येत नाही.",
-      "reportAiResponseSubmitted": "नोंदणी सादर केली. पावती {{receiptId}}"
+      "reportAiResponseSubmitted": "तक्रार सादर केली. पावती {{receiptId}}"
     },
     "modelCost": {
       "lessThan": "{{amount}} पेक्षा कमी",
@@ -2523,7 +2530,7 @@
       "onlyAddingFiles": "{{total}} पैकी फक्त {{accepted}} फाइल्स जोडत आहोत (कमाल {{max}})"
     },
     "composer": {
-      "addAttachment": "संलग्नता जोडा",
+      "addAttachment": "संलग्नक जोडा",
       "removeOrRetryFailed": "आधी अयशस्वी संलग्नता काढा किंवा पुन्हा प्रयत्न करा.",
       "attachmentsWithSlashCommands": "स्लॅश कमांडसह संलग्नता पाठवता येत नाहीत.",
       "photoMetadataNotRemoved": "संलग्नतावरून फोटो मेटाडेटा काढता आला नाही.",
@@ -2681,8 +2688,8 @@
     "title": "पृष्ठ सापडले नाही"
   },
   "monoScrollBlock": {
-    "contentTruncated": "सामग्री कापली",
-    "truncated": "कापले",
+    "contentTruncated": "सामग्री छाटलेली",
+    "truncated": "छाटलेले",
     "wrap": "रॅप",
     "scroll": "स्क्रोल"
   },
@@ -2691,14 +2698,14 @@
     "internetRestored": "इंटरनेट कनेक्शन पुनर्संचयित झाले"
   },
   "queryError": {
-    "neutralTitle": "काहीतरी चुकले",
+    "neutralTitle": "काहीतरी चूक झाली",
     "neutralDescription": "कृपया पुन्हा प्रयत्न करा.",
     "offlineTitle": "लोड करण्यात अयशस्वी",
-    "offlineDescription": "काहीतरी चुकले",
+    "offlineDescription": "काहीतरी चूक झाली",
     "permissionTitle": "प्रवेश नाकारला",
-    "permissionDescription": "हे पाहण्याची तुमची परवानगी नाही.",
+    "permissionDescription": "हे पाहण्याची परवानगी तुमच्याकडे नाही.",
     "notFoundTitle": "सापडले नाही",
-    "notFoundDescription": "ही आयटम काढली गेली असू शकते किंवा यापुढे उपलब्ध नाही.",
+    "notFoundDescription": "ही वस्तू काढून टाकली गेली असू शकते किंवा यापुढे उपलब्ध नाही.",
     "serverTitle": "लोड करता आले नाही",
     "serverDescription": "आमच्या बाजूने काहीतरी चुकले. कृपया पुन्हा प्रयत्न करा."
   },
@@ -2964,7 +2971,7 @@
       "sharingUnavailable": "या डिव्हाइसवर सामायिकरण उपलब्ध नाही.",
       "status": {
         "paid": "दिलेले",
-        "open": "उघडे",
+        "open": "उघडा",
         "void": "रद्द",
         "draft": "मसुदा",
         "uncollectible": "वसूल करता न येणारे",
@@ -3076,12 +3083,12 @@
     "invalidCode": "तो कोड चुकीचा आहे. कृपया पुन्हा प्रयत्न करा.",
     "codeInProgress": "तुमचा कोड प्रक्रिया होत आहे. थोडा वेळ थांबा आणि पुन्हा प्रयत्न करा.",
     "tooManyAttempts": "खूप प्रयत्न झाले. कृपया नवीन कोड मागवा.",
-    "invalidToken": "साइन-इन अयशस्वी. कृपया पुन्हा प्रयत्न करा.",
+    "invalidToken": "साइन इन अयशस्वी झाले. कृपया पुन्हा प्रयत्न करा.",
     "invalidEmail": "या पत्त्यावर ईमेल वितरित करण्यात अक्षम. कृपया वेगळा ईमेल वापरा.",
     "invalidRequest": "तुमचा ईमेल पत्ता तपासा आणि पुन्हा प्रयत्न करा.",
     "emailDeliveryFailed": "ईमेल वितरण सध्या अनुपलब्ध आहे. कृपया नंतर पुन्हा प्रयत्न करा.",
     "admissionRequired": "तुमचे डिव्हाइस सत्यापित केले जाऊ शकत नाही. दुसऱ्या डिव्हाइसवर किंवा वेबद्वारे साइन इन करण्यासाठी '$t(login.moreSignInOptions)' वापरा.",
-    "default": "काहीतरी चुकले. कृपया पुन्हा प्रयत्न करा.",
+    "default": "काहीतरी चूक झाली. कृपया पुन्हा प्रयत्न करा.",
     "retryableAdmission": "आम्ही हे डिव्हाइस सत्यापित करू शकलो नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
     "startSignInFailed": "साइन इन सुरू करण्यात अयशस्वी. कृपया पुन्हा प्रयत्न करा.",
     "couldNotOpenBrowser": "ब्राउझर उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",

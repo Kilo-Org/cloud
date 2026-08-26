@@ -209,7 +209,7 @@ export function NewSessionPrompt({
   }
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-black/5">
+    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]">
       <AttachmentPreviewStrip
         attachments={attachments}
         onRemove={onRemoveAttachment}

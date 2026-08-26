@@ -300,7 +300,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
           accessibilityLabel={t('chat.conversationList.newConversation')}
           disabled={createConversation.isPending}
           onPress={handleCreateAndNavigate}
-          className="absolute h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg shadow-black/25 active:opacity-80 disabled:opacity-60"
+          className="absolute h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg shadow-[#00000040] active:opacity-80 disabled:opacity-60"
           style={createButtonStyle}
         >
           {createConversation.isPending ? (

@@ -177,7 +177,7 @@ export function PlatformOverviewScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.eyebrow')} />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <Animated.View layout={LinearTransition}>
           {isLoading && (
             <Animated.View exiting={FadeOut.duration(150)} className="gap-3">

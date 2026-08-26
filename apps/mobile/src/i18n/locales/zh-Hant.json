@@ -38,7 +38,9 @@
     "catalogLoadFailed": "無法載入語言。請再試一次。",
     "search": "搜尋語言",
     "noMatches": "沒有符合的語言",
-    "deviceLanguage": "裝置語言"
+    "deviceLanguage": "裝置語言",
+    "current": "目前",
+    "allLanguages": "所有語言"
   },
   "login": {
     "welcome": "歡迎使用 Kilo",
@@ -180,7 +182,7 @@
     "previewFullDescription": "通知會在鎖定畫面上顯示訊息文字。",
     "previewGenericDescription": "通知會顯示有事件發生。開啟 Kilo 即可閱讀。",
     "channel": {
-      "agent": "代理程式工作階段",
+      "agent": "代理工作階段",
       "chat": "聊天訊息",
       "kiloclaw": "KiloClaw 活動",
       "balance": "餘額提醒",
@@ -572,7 +574,7 @@
       "start": "啟動",
       "startMessage": "確定要啟動此執行個體嗎？",
       "startTitle": "啟動執行個體",
-      "starting": "正在啟動…",
+      "starting": "正在開始…",
       "stop": "停止",
       "stopMessage": "確定要停止此執行個體嗎？",
       "stopTitle": "停止執行個體",
@@ -644,7 +646,7 @@
         "openKiloAi": "開啟 kilo.ai",
         "provisioning": "正在佈建",
         "ready": "就緒",
-        "review": "審核",
+        "review": "審查",
         "settingUp": "正在設定…",
         "somethingWentWrong": "發生錯誤"
       },
@@ -927,7 +929,7 @@
       "personalSubtitle": "您自己的存放庫",
       "viewOnly": "僅供檢視"
     },
-    "selectRepositories": "選取存放庫",
+    "selectRepositories": "選擇存放庫",
     "selectRepository": "至少選取一個存放庫以啟用自動審查。",
     "title": "程式碼審查員",
     "webhookSetup": "Webhook 設定未完成",
@@ -1267,7 +1269,7 @@
       "statusFixed": "已修復",
       "statusOpen": "未解決",
       "sourceDependabot": "GitHub Dependabot",
-      "reasonFixStarted": "修復已開始",
+      "reasonFixStarted": "已開始修復",
       "reasonNoBandwidth": "沒有可用頻寬",
       "reasonTolerableRisk": "風險可以接受",
       "reasonInaccurate": "發現不準確",
@@ -1275,7 +1277,7 @@
       "reasonAfterReview": "審核後"
     },
     "findingList": {
-      "clearFilters": "清除篩選器",
+      "clearFilters": "清除篩選條件",
       "couldNotLoad": "無法載入發現",
       "couldNotLoadMore": "無法載入更多發現",
       "emptyDescription": "目前沒有需要關注的未解決發現。",
@@ -1667,7 +1669,12 @@
       "couldNotLoadThisSession": "無法載入此工作階段",
       "cloneFailed": "無法複製此工作階段。",
       "cloneFailedRetry": "無法複製此工作階段。請重試。",
-      "connectRepositoryToContinue": "連接一個存放庫以繼續。"
+      "connectRepositoryToContinue": "連接一個存放庫以繼續。",
+      "notEnoughCredits": "執行 Cloud Agent 的額度不足。請新增額度後重試。",
+      "previousTaskFinishing": "上一個工作仍在進行中。請稍等片刻。",
+      "serviceUnavailable": "服務目前無法使用。請重試。",
+      "connectionTrouble": "連線發生問題。請稍後重試。",
+      "modelUnavailable": "此模型不適用於 Cloud Agent。請選擇其他模型再試一次。"
     },
     "remoteSession": {
       "failedToCreate": "無法建立遠端工作階段",
@@ -1775,7 +1782,7 @@
       "runOn": "執行於",
       "runOnAccessibility": "執行於：{{label}}",
       "couldNotLoad": "無法載入執行個體",
-      "couldNotLoadDescription": "請檢查連線後重試。",
+      "couldNotLoadDescription": "請檢查您的連線後重試。",
       "cloudAgent": "雲端代理",
       "loading": "載入中…",
       "cloudAgentDescription": "在 Kilo 的雲端沙箱中執行",
@@ -1795,7 +1802,7 @@
     },
     "modeOptions": {
       "code": "程式碼",
-      "plan": "規劃",
+      "plan": "方案",
       "debug": "偵錯",
       "orchestrator": "協調者",
       "ask": "提問",
@@ -1839,7 +1846,7 @@
       "total": "總計",
       "reportAiResponseFailedRetryable": "無法檢舉此回覆。",
       "reportAiResponseFailedTerminal": "此回覆無法檢舉。",
-      "reportAiResponseSubmitted": "檢舉已提交。回執 {{receiptId}}"
+      "reportAiResponseSubmitted": "已提交檢舉。回執 {{receiptId}}"
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2052,7 +2059,7 @@
       "uploading": "正在上傳…",
       "uploaded": "已上傳",
       "uploadFailedRetry": "上傳失敗。點按重試。",
-      "uploadFailedTerminal": "無法上傳此檔案。"
+      "uploadFailedTerminal": "此檔案無法上傳。"
     },
     "attachmentPasteHint": {
       "accessibility": "從剪貼簿貼上圖片",
@@ -2063,7 +2070,7 @@
       "photoLibrary": "照片圖庫",
       "files": "檔案",
       "cameraAccessDisabled": "相機存取已停用",
-      "cameraAccessMessage": "請在「設定」中允許相機存取以拍攝照片。",
+      "cameraAccessMessage": "請在設定中允許相機存取以拍照。",
       "couldNotOpenPhotoPicker": "無法開啟照片選擇器。請重新啟動 Kilo 並再試一次。",
       "maxFilesAllowed": "最多允許 {{displayCount}} 個檔案",
       "onlyAddingFiles": "僅附加 {{total}} 個檔案中的 {{accepted}} 個（最多 {{max}} 個）"
@@ -2166,7 +2173,7 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "無法載入您的帳戶",
-    "couldNotLoadAccountDescription": "請檢查連線後重試。",
+    "couldNotLoadAccountDescription": "請檢查您的連線後重試。",
     "couldNotLoadPrivacy": "無法載入隱私選項",
     "couldNotLoadPrivacyDescription": "請檢查裝置安全設定後重試。",
     "contentReady": "內容已就緒",
@@ -2218,7 +2225,7 @@
   },
   "imageViewer": {
     "close": "關閉 {{filename}}",
-    "imageUnavailable": "影像無法使用",
+    "imageUnavailable": "圖片無法使用",
     "share": "分享 {{filename}}"
   },
   "invalidRoute": {
@@ -2634,7 +2641,7 @@
       "unified": "統一"
     },
     "fileNavigator": {
-      "checkConnection": "請檢查連線後再試一次。",
+      "checkConnection": "請檢查您的連線後重試。",
       "couldNotLoadFiles": "無法載入檔案",
       "couldNotLoadMoreFiles": "無法載入更多檔案",
       "diffTooLarge": "diff 過大",
@@ -2879,7 +2886,7 @@
       "statusDeleted": "已刪除",
       "lineLabel": "{{status}} 行 {{line}}：{{text}}",
       "lineLabelNoNumber": "{{status}}：{{text}}",
-      "emptyLine": "(空)"
+      "emptyLine": "（空白）"
     },
     "linkPasteClipboardEmpty": "剪貼簿是空的",
     "linkPasteNotAPullRequest": "不是 GitHub 提取請求的連結",

@@ -38,7 +38,9 @@
     "retry": "Försök igen",
     "search": "Sök språk",
     "noMatches": "Inga språk matchar",
-    "deviceLanguage": "Enhetens språk"
+    "deviceLanguage": "Enhetens språk",
+    "current": "Aktuellt",
+    "allLanguages": "Alla språk"
   },
   "login": {
     "welcome": "Välkommen till Kilo",
@@ -171,7 +173,7 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "Kunde inte läsa in filer",
-      "checkConnection": "Kontrollera anslutningen och försök igen.",
+      "checkConnection": "Kontrollera din anslutning och försök igen.",
       "retryLoadingFiles": "Försök läsa in filer igen",
       "filterPlaceholder": "Filtrera filer efter sökväg",
       "viewedCount": "{{viewed}} av {{total}} visade",
@@ -274,7 +276,7 @@
       "cannotMerge": "Den här pull requesten kan inte slås samman som den är.",
       "couldNotMerge": "Kunde inte slå samman pull requesten.",
       "methods": {
-        "merge": "Merge",
+        "merge": "Slå samman",
         "squash": "Squash",
         "rebase": "Rebase"
       },
@@ -412,7 +414,7 @@
       },
       "deletedUser": "raderad användare"
     },
-    "couldNotOpenGitHubAppSettings": "Kunde inte öppna GitHub Apps inställningar",
+    "couldNotOpenGitHubAppSettings": "Kunde inte öppna GitHub-appens inställningar",
     "installKiloGitHubApp": "Installera Kilo GitHub App",
     "connectionExpiredTitle": "GitHub-anslutningen har upphört att gälla",
     "connectionExpiredDescription": "Din GitHub-anslutning är inte längre giltig. Kontrollera anslutningen igen — du uppmanas att ansluta igen om det behövs.",
@@ -720,7 +722,7 @@
       "emptyTitle": "Inga konversationer ännu",
       "emptyDescription": "Skapa en konversation för att börja chatta med din KiloClaw-instans.",
       "create": "Skapa konversation",
-      "starting": "Startar...",
+      "starting": "Startar…",
       "newConversation": "Ny konversation",
       "openInstanceSettings": "Öppna instansinställningar",
       "today": "Idag",
@@ -1411,7 +1413,7 @@
     "configSaveFailed": "Det gick inte att spara granskningskonfigurationen",
     "status": {
       "pending": "Väntande",
-      "queued": "Köad",
+      "queued": "I kö",
       "running": "Körs",
       "completed": "Slutförd",
       "failed": "Misslyckades",
@@ -1497,12 +1499,12 @@
       "outcomeNotAnalyzed": "Inte analyserad",
       "outcomeAnalyzing": "Analyserar",
       "outcomeFailed": "Analysen misslyckades",
-      "outcomeExploitable": "Utnyttjningsbar",
-      "outcomeNotExploitable": "Inte utnyttjningsbar",
+      "outcomeExploitable": "Utnyttjbar",
+      "outcomeNotExploitable": "Inte utnyttjbar",
       "outcomeSafeToDismiss": "Säker att avfärda",
       "outcomeNeedsReview": "Kräver granskning",
       "outcomeTriageComplete": "Triagering klar",
-      "outcomeDismissed": "Avfärdad",
+      "outcomeDismissed": "Avskriven",
       "sortSeverityDesc": "Allvarlighet: högt till lågt",
       "sortSeverityAsc": "Allvarlighet: lågt till högt",
       "sortSlaDue": "SLA-förfallodatum",
@@ -1566,7 +1568,7 @@
       "suggestedFix": "Föreslagen fix",
       "whereFound": "Var detta hittades ({{displayCount}})",
       "fullReport": "Fullständig genererad rapport",
-      "unknown": "Okänt",
+      "unknown": "Okänd",
       "yes": "Ja",
       "no": "Nej"
     },
@@ -1597,7 +1599,7 @@
       "repoSummary": "{{open}} öppna · {{critical}} kritiska · {{high}} höga",
       "couldNotLoad": "Kunde inte läsa in instrumentpanelens data",
       "filterByRepository": "Filtrera efter arkiv",
-      "findings": "Findings",
+      "findings": "Fynd",
       "lastSynced": "Senast synkad {{time}}",
       "manageRepositories": "Hantera arkiv",
       "notYetSynced": "Ännu inte synkad",
@@ -1657,7 +1659,7 @@
       "severityLabel": "{{severity}} allvarlighetsgrad",
       "package": "Paket",
       "vulnerableVersions": "Sårbara versioner",
-      "unknown": "Okänt",
+      "unknown": "Okänd",
       "patchedVersion": "Korrigerad version",
       "noPatchAvailable": "Ingen korrigering tillgänglig",
       "cve": "CVE",
@@ -1688,7 +1690,7 @@
       "couldNotLoadSettings": "Kunde inte läsa in Security Agent-inställningar",
       "couldNotLoadPermissions": "Kunde inte läsa in behörigheter",
       "couldNotLoadRepositories": "Kunde inte läsa in arkiv",
-      "securityAgent": "Security Agent",
+      "securityAgent": "Säkerhetsagent",
       "enabled": "Aktiverad",
       "disabled": "Inaktiverad",
       "on": "På",
@@ -1705,7 +1707,7 @@
       "automation": "Automatisering",
       "automationAllOff": "Allt av",
       "automationCount": "{{displayCount}} av 3 aktiverade",
-      "notifications": "Meddelanden",
+      "notifications": "Aviseringar",
       "notificationsCount": "{{displayCount}} av 2 aktiverade",
       "slaPolicy": "SLA-policy",
       "disabledNoManage": "Security Agent är inaktiverad. Endast organisationsägare och faktureringsansvariga kan aktivera den.",
@@ -1743,7 +1745,7 @@
         "noChangesNeeded": "Inga ändringar behövs",
         "cancelled": "Avbruten"
       },
-      "unavailable": "Åtgärd är inte tillgänglig för den här findingen."
+      "unavailable": "Åtgärd är inte tillgänglig för denna finding."
     },
     "analysisSettings": {
       "title": "Modeller & analys",
@@ -1788,7 +1790,7 @@
       "dismissA11y": "Avskriv finding"
     },
     "findingList": {
-      "title": "Findings",
+      "title": "Fynd",
       "couldNotLoad": "Kunde inte läsa in findings",
       "couldNotLoadMore": "Kunde inte läsa in fler findings",
       "noMatchesTitle": "Inga findings matchar filtren",
@@ -1798,13 +1800,13 @@
       "clearFilters": "Rensa filter"
     },
     "scopeList": {
-      "title": "Security Agent",
+      "title": "Säkerhetsagent",
       "couldNotLoad": "Kunde inte läsa in organisationer",
-      "personal": "Personlig",
+      "personal": "Personligt",
       "personalSubtitle": "Dina egna arkiv"
     },
     "commandRetry": {
-      "discard": "Ignorera"
+      "discard": "Kassera"
     },
     "findingRow": {
       "nextRemediationPrOpen": "Åtgärds-PR öppen",
@@ -1824,7 +1826,7 @@
       "couldNotOpenGithub": "Kunde inte öppna GitHub. Försök igen."
     },
     "settingsSave": {
-      "discard": "Ignorera",
+      "discard": "Kassera",
       "keepEditing": "Fortsätt redigera",
       "saveChanges": "Spara ändringar",
       "unsavedTitle": "Osparade ändringar",
@@ -1836,7 +1838,7 @@
     "auditReport": {
       "couldNotLoad": "Kunde inte läsa in revisionsrapporten",
       "events": "Händelser",
-      "findings": "Findings",
+      "findings": "Fynd",
       "generated": "Genererad {{generatedAt}}",
       "noActivity": "Ingen registrerad aktivitet",
       "noActivityDescription": "Kilo har ingen rapporterbar Security Finding-aktivitet från {{start}} till {{end}}.",
@@ -1865,13 +1867,13 @@
       "slaSection": "SLA-varningsmeddelande",
       "slaSeverityLabel": "Minsta allvarlighetsgrad för SLA-meddelande",
       "slaSubtitle": "Skickas före och när findings närmar sig eller överskrider sin SLA-deadline.",
-      "title": "Meddelanden"
+      "title": "Aviseringar"
     },
     "repositories": {
       "allRepositories": "Alla arkiv",
       "couldNotLoad": "Kunde inte läsa in arkivinställningar",
       "couldNotLoadRepositories": "Kunde inte läsa in arkiv",
-      "couldNotOpenGithubSettings": "Kunde inte öppna GitHub App-inställningar",
+      "couldNotOpenGithubSettings": "Kunde inte öppna GitHub-appens inställningar",
       "githubAppSettings": "GitHub App-inställningar",
       "manageAccess": "Hantera GitHub App-åtkomst",
       "noRepositories": "Inga arkiv",
@@ -1894,7 +1896,7 @@
     },
     "queuedActionUntracked": "En köad åtgärd kunde inte längre spåras. Uppdatera för att se det senaste läget.",
     "initialSyncAdmissionFailed": "Security Agent aktiverades, men den första synkningen kunde inte köas. Synka igen.",
-    "title": "Security Agent",
+    "title": "Säkerhetsagent",
     "commands": {
       "findingAlreadyDismissed": "Findingen har redan avskrivits",
       "findingDismissed": "Findingen avskriven",
@@ -1972,7 +1974,7 @@
     "remediationStatus": {
       "cancellationRequested": "Avbokning begärd",
       "notStarted": "Inte startad",
-      "queued": "Köad",
+      "queued": "I kö",
       "starting": "Startar",
       "inProgress": "Pågår",
       "draftPrOpened": "Utkast-PR öppnad",
@@ -2039,7 +2041,7 @@
       "clearFilters": "Rensa filter"
     },
     "sessionList": {
-      "couldNotLoad": "Kunde inte läsa in sessioner",
+      "couldNotLoad": "Det gick inte att läsa in sessioner",
       "couldNotLoadActive": "Kunde inte läsa in aktiva sessioner",
       "noSessionsYet": "Inga sessioner ännu",
       "noSessionsYetDescription": "Starta en kodningsuppgift från din telefon. Dina sessioner visas här.",
@@ -2090,7 +2092,7 @@
       "didNotCompleteTitle": "Installationen slutfördes inte",
       "didNotCompleteMessage": "GitHub App-installationen slutfördes inte. Försök igen från appen."
     },
-    "sessionExited": "Session avslutades",
+    "sessionExited": "Session avslutad",
     "remoteSpawnRetryable": "Kunde inte nå instansen – den kan ha kopplats från.",
     "remoteSpawnNonRetryable": "Instansen kunde inte starta sessionen – kontrollera maskinen eller uppdatera CLI:n.",
     "remoteSpawnInstanceDisconnected": "Den valda instansen kopplades från. Starta en session på Cloud Agent eller välj en annan instans."
@@ -2105,7 +2107,7 @@
       "couldNotLoad": "Kunde inte läsa in session",
       "failedToLoadDetails": "Det gick inte att läsa in sessionsdetaljer",
       "notFound": "Hittades inte",
-      "notFoundDescription": "Det här objektet kan ha tagits bort eller är inte längre tillgängligt.",
+      "notFoundDescription": "Detta objekt kan ha tagits bort eller är inte längre tillgängligt.",
       "failedToStopExecution": "Det gick inte att stoppa körningen",
       "renameSession": "Byt namn på session",
       "renamePlaceholder": "Sessionens namn",
@@ -2121,7 +2123,12 @@
       "couldNotLoadThisSession": "Kunde inte läsa in den här sessionen",
       "cloneFailed": "Kunde inte klona den här sessionen.",
       "cloneFailedRetry": "Kunde inte klona den här sessionen. Försök igen.",
-      "connectRepositoryToContinue": "Anslut ett arkiv för att fortsätta."
+      "connectRepositoryToContinue": "Anslut ett arkiv för att fortsätta.",
+      "notEnoughCredits": "Inte tillräckligt med krediter för att köra Cloud Agent. Lägg till krediter och försök igen.",
+      "previousTaskFinishing": "Den föregående uppgiften håller fortfarande på att avslutas. Vänta en stund.",
+      "serviceUnavailable": "Tjänsten är inte tillgänglig just nu. Försök igen.",
+      "connectionTrouble": "Anslutningsproblem. Försök igen om en liten stund.",
+      "modelUnavailable": "Den här modellen är inte tillgänglig för Cloud Agent. Välj en annan modell och försök igen."
     },
     "remoteSession": {
       "failedToCreate": "Det gick inte att skapa fjärrsession",
@@ -2166,7 +2173,7 @@
       "commitAndPush": "Commita och pusha",
       "startSession": "Starta session",
       "promptPlaceholder": "Vad vill du arbeta med?",
-      "addAttachment": "Lägg till bifogad fil",
+      "addAttachment": "Lägg till bilaga",
       "couldNotLoadModels": "Kunde inte läsa in modeller",
       "prefillRepoAndModelUnavailable": "Den ursprungliga sessionens arkiv och modell är inte längre tillgängliga. Välj dem nedan.",
       "prefillRepoUnavailable": "{{repo}} är inte längre tillgängligt. Välj ett arkiv nedan.",
@@ -2177,7 +2184,7 @@
       "discardDraftTitle": "Ignorera utkast?",
       "discardDraftMessage": "Din prompt går förlorad.",
       "keepEditing": "Fortsätt redigera",
-      "discard": "Ignorera",
+      "discard": "Kassera",
       "discardFailed": "Kunde inte ignorera utkastet. Försök igen.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
@@ -2327,7 +2334,7 @@
     "filePart": {
       "loadingImage": "Läser in bild",
       "imageUnavailableRetry": "Bild otillgänglig, försök läsa in igen",
-      "imageUnavailable": "Bild otillgänglig",
+      "imageUnavailable": "Bilden är inte tillgänglig",
       "imageUnavailableWithAlt": "Bild otillgänglig {{alt}}",
       "imagePreviewUnavailableInSession": "Bildförhandsvisning otillgänglig i den här sessionen.",
       "viewImage": "Visa bild",
@@ -2474,11 +2481,11 @@
     },
     "modelPicker": {
       "title": "Välj modell",
-      "searchPlaceholder": "Sök modeller...",
+      "searchPlaceholder": "Sök modeller…",
       "noModels": "Inga modeller tillgängliga",
       "noModelsDescription": "Inga modeller finns att välja.",
       "favorites": "Favoriter",
-      "recommended": "Rekommenderade",
+      "recommended": "Rekommenderad",
       "allModels": "Alla modeller"
     },
     "modelSelector": {
@@ -2506,7 +2513,7 @@
       "uploading": "Laddar upp…",
       "uploaded": "Uppladdad",
       "uploadFailedRetry": "Uppladdningen misslyckades. Tryck för att försöka igen.",
-      "uploadFailedTerminal": "Denna fil kan inte laddas upp."
+      "uploadFailedTerminal": "Den här filen kan inte laddas upp."
     },
     "attachmentPasteHint": {
       "accessibility": "Klistra in bild från urklipp",
@@ -2516,8 +2523,8 @@
       "camera": "Kamera",
       "photoLibrary": "Fotobibliotek",
       "files": "Filer",
-      "cameraAccessDisabled": "Kameratillgång inaktiverad",
-      "cameraAccessMessage": "Tillåt kameratillgång i Inställningar för att ta ett foto.",
+      "cameraAccessDisabled": "Kameraåtkomst avaktiverad",
+      "cameraAccessMessage": "Tillåt kameraåtkomst i Inställningar för att ta ett foto.",
       "couldNotOpenPhotoPicker": "Det gick inte att öppna fotovalaren. Starta om Kilo och försök igen.",
       "maxFilesAllowed": "Högst {{displayCount}} filer tillåtna",
       "onlyAddingFiles": "Lägger endast till {{accepted}} av {{total}} filer (max {{max}})"
@@ -2612,7 +2619,7 @@
       "open": "öppen pull request",
       "closed": "stängd pull request",
       "merged": "sammanslagen pull request",
-      "draft": "utkast pull request",
+      "draft": "utkast till pull request",
       "updating": "Uppdaterar, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2681,7 +2688,7 @@
     "title": "Sidan hittades inte"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Innehållet trunkerat",
+    "contentTruncated": "Innehåll trunkerat",
     "truncated": "Trunkerat",
     "wrap": "Radbryt",
     "scroll": "Rulla"
@@ -2713,7 +2720,7 @@
     "optionsExpiredDescription": "Gå tillbaka och öppna denna väljare igen från föregående skärm."
   },
   "sessionRow": {
-    "needsInput": "BEHÖVER INMATNING"
+    "needsInput": "kräver indata"
   },
   "voiceInput": {
     "listening": "Lyssnar...",

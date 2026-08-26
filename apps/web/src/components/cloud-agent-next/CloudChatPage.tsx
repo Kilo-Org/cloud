@@ -760,9 +760,7 @@ export default function CloudChatPage({
   // gained an agent since; the worker's `validateModeAgainstRuntimeAgents`
   // accepts only built-in slugs or slugs in that frozen list, so a newer
   // profile agent would be offered here and then rejected on send.
-  const runtimeAgentSlugs = new Set(
-    (sessionConfig?.runtimeAgents ?? []).map(a => a.slug)
-  );
+  const runtimeAgentSlugs = new Set((sessionConfig?.runtimeAgents ?? []).map(a => a.slug));
   const visibleProfileAgents = (selectedProfileDetails?.agents ?? [])
     .filter(a => !a.config.disable && !a.config.hidden && a.config.mode !== 'subagent')
     .filter(a => runtimeAgentSlugs.has(a.slug));

@@ -25,17 +25,8 @@ import {
   Terminal,
 } from 'lucide-react';
 import Link from 'next/link';
-import { formatDistanceToNow } from 'date-fns';
 import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
-
-function formatRelativeTime(timestamp: string | null): string {
-  if (!timestamp) return 'Never';
-  return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
-}
-
-function formatAbsoluteTime(timestamp: string): string {
-  return new Date(timestamp).toLocaleString();
-}
+import { formatAbsoluteTime, formatRelativeTime } from './format';
 
 type AppBuilderProjectDetailPageProps = {
   children: React.ReactNode;

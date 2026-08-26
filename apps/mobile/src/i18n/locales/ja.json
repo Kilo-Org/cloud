@@ -2920,7 +2920,7 @@
       "selectDescription": "続行するには、プロフィールから組織を選択してください。",
       "selectOrganization": "組織を選択",
       "unavailableDescription": "この組織は利用できなくなりました。続行するには、プロフィールから組織を選択してください。",
-      "accessDeniedTitle": "アクセス拒否",
+      "accessDeniedTitle": "アクセスが拒否されました",
       "accessDeniedDescription": "この組織にアクセスする権限がありません。"
     },
     "creditActivity": {

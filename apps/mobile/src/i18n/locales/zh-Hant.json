@@ -2920,7 +2920,7 @@
       "selectDescription": "從您的個人資料中選擇一個組織以繼續。",
       "selectOrganization": "選擇組織",
       "unavailableDescription": "此組織已無法使用。請從您的個人資料中選擇一個以繼續。",
-      "accessDeniedTitle": "無法存取",
+      "accessDeniedTitle": "存取遭拒",
       "accessDeniedDescription": "您沒有存取此組織的權限。"
     },
     "creditActivity": {

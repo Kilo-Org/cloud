@@ -2948,7 +2948,7 @@
       "selectDescription": "Izvēlies organizāciju no sava profila, lai turpinātu.",
       "selectOrganization": "Izvēlēties organizāciju",
       "unavailableDescription": "Šī organizācija vairs nav pieejama. Izvēlies vienu no sava profila, lai turpinātu.",
-      "accessDeniedTitle": "Pieeja liegta",
+      "accessDeniedTitle": "Piekļuve liegta",
       "accessDeniedDescription": "Jums nav piekļuves šai organizācijai."
     },
     "creditActivity": {

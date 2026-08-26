@@ -2948,7 +2948,7 @@
       "selectDescription": "Alege o organizație din profilul tău pentru a continua.",
       "selectOrganization": "Selectează o organizație",
       "unavailableDescription": "Această organizație nu mai este disponibilă. Alege una din profilul tău pentru a continua.",
-      "accessDeniedTitle": "Acces interzis",
+      "accessDeniedTitle": "Acces refuzat",
       "accessDeniedDescription": "Nu ai acces la această organizație."
     },
     "creditActivity": {

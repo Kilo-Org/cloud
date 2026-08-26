@@ -2920,7 +2920,7 @@
       "selectDescription": "Chọn một tổ chức từ hồ sơ của bạn để tiếp tục.",
       "selectOrganization": "Chọn một tổ chức",
       "unavailableDescription": "Tổ chức này không còn khả dụng. Hãy chọn một tổ chức từ hồ sơ của bạn để tiếp tục.",
-      "accessDeniedTitle": "Từ chối truy cập",
+      "accessDeniedTitle": "Truy cập bị từ chối",
       "accessDeniedDescription": "Bạn không có quyền truy cập vào tổ chức này."
     },
     "creditActivity": {

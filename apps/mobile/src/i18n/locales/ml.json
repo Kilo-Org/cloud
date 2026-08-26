@@ -2928,7 +2928,7 @@
       "selectDescription": "തുടരാൻ നിങ്ങളുടെ പ്രൊഫൈലിൽ നിന്ന് ഒരു ഓർഗനൈസേഷൻ തിരഞ്ഞെടുക്കുക.",
       "selectOrganization": "ഒരു ഓർഗനൈസേഷൻ തിരഞ്ഞെടുക്കുക",
       "unavailableDescription": "ഈ ഓർഗനൈസേഷൻ ഇനി ലഭ്യമല്ല. തുടരാൻ നിങ്ങളുടെ പ്രൊഫൈലിൽ നിന്ന് ഒന്ന് തിരഞ്ഞെടുക്കുക.",
-      "accessDeniedTitle": "പ്രവേശനം നിഷേധിച്ചു",
+      "accessDeniedTitle": "ആക്സസ് നിഷേധിച്ചു",
       "accessDeniedDescription": "ഈ ഓർഗനൈസേഷനിലേക്ക് നിങ്ങൾക്ക് പ്രവേശനം ഇല്ല."
     },
     "creditActivity": {

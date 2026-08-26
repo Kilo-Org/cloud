@@ -2928,7 +2928,7 @@
       "selectDescription": "Davam etmək üçün profilinizdən bir təşkilat seçin.",
       "selectOrganization": "Təşkilat seçin",
       "unavailableDescription": "Bu təşkilat artıq mövcud deyil. Davam etmək üçün profilinizdən birini seçin.",
-      "accessDeniedTitle": "Giriş qadağandır",
+      "accessDeniedTitle": "Giriş rədd edildi",
       "accessDeniedDescription": "Bu təşkilata girişiniz yoxdur."
     },
     "creditActivity": {

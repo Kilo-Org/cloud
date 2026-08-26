@@ -2928,7 +2928,7 @@
       "selectDescription": "চালিয়ে যেতে আপনার প্রোফাইল থেকে একটি সংস্থা বেছে নিন।",
       "selectOrganization": "একটি সংস্থা নির্বাচন করুন",
       "unavailableDescription": "এই সংস্থাটি আর উপলব্ধ নয়। চালিয়ে যেতে আপনার প্রোফাইল থেকে একটি বেছে নিন।",
-      "accessDeniedTitle": "অ্যাক্সেস অস্বীকার করা হয়েছে",
+      "accessDeniedTitle": "অ্যাক্সেস অস্বীকৃত",
       "accessDeniedDescription": "আপনার এই সংস্থায় অ্যাক্সেস নেই।"
     },
     "creditActivity": {

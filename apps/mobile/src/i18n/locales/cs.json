@@ -2968,7 +2968,7 @@
       "selectDescription": "Pro pokračování vyberte organizaci ze svého profilu.",
       "selectOrganization": "Vyberte organizaci",
       "unavailableDescription": "Tato organizace již není k dispozici. Pro pokračování vyberte jednu ze svého profilu.",
-      "accessDeniedTitle": "Přístup odepřen",
+      "accessDeniedTitle": "Přístup zamítnut",
       "accessDeniedDescription": "Nemáte přístup do této organizace."
     },
     "creditActivity": {

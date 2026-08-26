@@ -2940,7 +2940,7 @@
       "selectDescription": "בחר ארגון מהפרופיל שלך כדי להמשיך.",
       "selectOrganization": "בחר ארגון",
       "unavailableDescription": "ארגון זה אינו זמין עוד. בחר אחד מהפרופיל שלך כדי להמשיך.",
-      "accessDeniedTitle": "אין גישה",
+      "accessDeniedTitle": "הגישה נדחתה",
       "accessDeniedDescription": "אין לך גישה לארגון זה."
     },
     "creditActivity": {

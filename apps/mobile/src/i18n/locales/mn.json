@@ -2928,7 +2928,7 @@
       "selectDescription": "Үргэлжлүүлэхийн тулд профайлаасаа байгууллага сонгоно уу.",
       "selectOrganization": "Байгууллага сонгох",
       "unavailableDescription": "Энэ байгууллага цаашид боломжгүй. Үргэлжлүүлэхийн тулд профайлаасаа нэгийг сонгоно уу.",
-      "accessDeniedTitle": "Хандалтыг хориглосон",
+      "accessDeniedTitle": "Хандалт татгалзсан",
       "accessDeniedDescription": "Танд энэ байгууллагад хандах эрх байхгүй."
     },
     "creditActivity": {

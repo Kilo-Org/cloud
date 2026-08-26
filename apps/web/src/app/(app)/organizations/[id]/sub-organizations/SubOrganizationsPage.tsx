@@ -34,6 +34,7 @@ import {
   PermissionsSection,
   SectionState,
   UsageSection,
+  type UsageDataStatus,
   type UsageByOrganization,
 } from './SubOrganizationSections';
 import { DistributeFundsPage } from './distribute-funds/DistributeFundsPage';
@@ -156,6 +157,11 @@ export function SubOrganizationsPage({
     () => toMetricMap(thirtyDaySpend.data?.breakdown),
     [thirtyDaySpend.data?.breakdown]
   );
+  const usageDataStatus: UsageDataStatus = thirtyDaySpend.data
+    ? 'available'
+    : thirtyDaySpend.error
+      ? 'unavailable'
+      : 'loading';
   const selectedUsage = useMemo<UsageByOrganization>(() => {
     const costs = toMetricMap(usageCost.data?.breakdown);
     const requests = toMetricMap(usageRequests.data?.breakdown);
@@ -177,7 +183,6 @@ export function SubOrganizationsPage({
     usageTokens.data?.breakdown,
   ]);
 
-  const overviewError = overview.error ?? thirtyDaySpend.error;
   const usageError = usageCost.error ?? usageRequests.error ?? usageTokens.error;
   const usageLoading = usageCost.isLoading || usageRequests.isLoading || usageTokens.isLoading;
 
@@ -208,15 +213,13 @@ export function SubOrganizationsPage({
         </div>
 
         <TabsContent value="overview" className="mt-6">
-          <SectionState
-            isLoading={overview.isLoading || thirtyDaySpend.isLoading}
-            error={overviewError}
-          >
+          <SectionState isLoading={overview.isLoading} error={overview.error}>
             {overview.data && (
               <OverviewSection
                 organizationId={organizationId}
                 data={overview.data}
                 spendByOrganization={thirtyDaySpendByOrganization}
+                usageDataStatus={usageDataStatus}
               />
             )}
           </SectionState>
@@ -255,15 +258,13 @@ export function SubOrganizationsPage({
         </TabsContent>
 
         <TabsContent value="credits" className="mt-6">
-          <SectionState
-            isLoading={credits.isLoading || thirtyDaySpend.isLoading}
-            error={credits.error ?? thirtyDaySpend.error}
-          >
+          <SectionState isLoading={credits.isLoading} error={credits.error}>
             {credits.data && (
               <CreditsSection
                 organizationId={organizationId}
                 data={credits.data}
                 thirtyDaySpend={thirtyDaySpendByOrganization}
+                usageDataStatus={usageDataStatus}
               />
             )}
           </SectionState>

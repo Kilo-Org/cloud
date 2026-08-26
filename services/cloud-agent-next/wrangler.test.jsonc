@@ -19,6 +19,14 @@
         "class_name": "UserKiloFacade",
         "name": "USER_KILO_FACADE",
       },
+      {
+        "class_name": "SandboxControl",
+        "name": "SANDBOX_CONTROL",
+      },
+      {
+        "class_name": "SandboxSession",
+        "name": "SANDBOX_SESSION",
+      },
     ],
   },
   "migrations": [
@@ -33,6 +41,14 @@
     {
       "new_sqlite_classes": ["StreamTicketNonceDO"],
       "tag": "v8",
+    },
+    {
+      "new_sqlite_classes": ["SandboxControl"],
+      "tag": "v9",
+    },
+    {
+      "new_sqlite_classes": ["SandboxSession"],
+      "tag": "v10",
     },
   ],
   "kv_namespaces": [{ "binding": "SHARED_SANDBOX_OVERRIDES" }],

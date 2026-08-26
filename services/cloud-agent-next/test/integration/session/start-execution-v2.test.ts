@@ -3,12 +3,14 @@
  */
 
 import { env, runInDurableObject } from 'cloudflare:test';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { describe, it, expect, vi } from 'vitest';
 import {
   createPendingSessionMessage,
   listPendingSessionMessages,
   storePendingSessionMessage,
 } from '../../../src/session/pending-messages.js';
+import { createEventQueries } from '../../../src/session/queries/events.js';
 import { listNonTerminalAcceptedMessages } from '../../../src/session/session-message-state.js';
 
 import {
@@ -136,6 +138,294 @@ describe('CloudAgentSession message admission', () => {
     expect(result.metadata).toBeNull();
   });
 
+  it('persists Vercel provider selection without obsolete ownership control state', async () => {
+    const userId = 'user_vercel_selection' as const;
+    const sessionId = 'agent_vercel_selection' as const;
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async instance => {
+      const registration = await instance.registerSession({
+        ...groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'select Vercel privately',
+          mode: 'code',
+          model: 'test-model',
+        }),
+        workspace: {
+          sandboxId: 'ses-abcdef',
+          sandboxProvider: 'vercel',
+        },
+      });
+      return {
+        registration,
+        metadata: await instance.getMetadata(),
+      };
+    });
+
+    expect(result.registration.success).toBe(true);
+    expect(result.metadata?.workspace?.sandboxProvider).toBe('vercel');
+    expect(result.metadata?.workspace?.sandboxId).toBe('ses-abcdef');
+    expect(result.metadata?.workspace?.providerRuntime).toBeUndefined();
+  });
+
+  it('finalizes inert Vercel deletion because disabled runtime integration could not create a resource', async () => {
+    const userId = 'user_vercel_inert_delete' as const;
+    const sessionId = 'agent_vercel_inert_delete' as const;
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await instance.registerSession({
+        ...groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'delete without runtime',
+          mode: 'code',
+          model: 'test-model',
+        }),
+        workspace: { sandboxId: 'ses-acde1234', sandboxProvider: 'vercel' },
+      });
+      await instance.deleteSession();
+      return {
+        metadata: await instance.getMetadata(),
+        remainingKeys: [...(await instance.ctx.storage.list()).keys()],
+      };
+    });
+
+    expect(result.metadata).toBeNull();
+    expect(result.remainingKeys).toEqual([]);
+  });
+
+  it('purges large Vercel payloads in bounded batches before exact-session stop', async () => {
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName('user_vercel_purge:agent_vercel_purge')
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await instance.registerSession({
+        ...groupedRegisterSessionInput({
+          sessionId: 'agent_vercel_purge',
+          userId: 'user_vercel_purge',
+          prompt: 'private prompt',
+          mode: 'code',
+          model: 'test-model',
+        }),
+        workspace: { sandboxId: 'ses-acde1234', sandboxProvider: 'vercel' },
+      });
+      const metadata = await instance.getMetadata();
+      if (!metadata) throw new Error('Expected registered metadata');
+      await instance.ctx.storage.put('metadata', {
+        ...metadata,
+        workspace: {
+          ...metadata.workspace,
+          providerRuntime: { provider: 'vercel', sessionId: 'session-exact-1' },
+        },
+      });
+      for (let start = 0; start < 260; start += 100) {
+        await instance.ctx.storage.put(
+          Object.fromEntries(
+            Array.from({ length: Math.min(100, 260 - start) }, (_, index) => [
+              `private:${String(start + index).padStart(3, '0')}`,
+              `user material ${start + index}`,
+            ])
+          )
+        );
+      }
+      const eventQueries = createEventQueries(
+        drizzle(instance.ctx.storage, { logger: false }),
+        instance.ctx.storage.sql
+      );
+      eventQueries.insert({
+        executionId: 'execution-private',
+        sessionId: 'agent_vercel_purge',
+        streamEventType: 'kilocode',
+        payload: '{"private":"event"}',
+        timestamp: Date.now(),
+      });
+
+      Object.assign(instance.env, {
+        VERCEL_TOKEN: 'test-token',
+        VERCEL_TEAM_ID: 'test-team',
+        VERCEL_PROJECT_ID: 'test-project',
+        VERCEL_SANDBOX_SNAPSHOT_ID: 'test-snapshot',
+        VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'test-build',
+        VERCEL_SANDBOX_RUNTIME: 'node24',
+        VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
+        VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
+      });
+
+      const listLimits: Array<number | undefined> = [];
+      const deleteBatchSizes: number[] = [];
+      const tombstoneSurvived: boolean[] = [];
+      const originalList = instance.ctx.storage.list.bind(instance.ctx.storage);
+      const originalDelete = instance.ctx.storage.delete.bind(instance.ctx.storage);
+      vi.spyOn(instance.ctx.storage, 'list').mockImplementation(async options => {
+        listLimits.push(options?.limit);
+        return originalList(options);
+      });
+      vi.spyOn(instance.ctx.storage, 'delete').mockImplementation(async keys => {
+        if (Array.isArray(keys)) deleteBatchSizes.push(keys.length);
+        const deleted = await originalDelete(keys as string & string[]);
+        if (Array.isArray(keys)) {
+          tombstoneSurvived.push(
+            (await instance.ctx.storage.get('vercel_deletion_tombstone')) !== undefined
+          );
+        }
+        return deleted;
+      });
+
+      let keysDuringStop: string[] = [];
+      let eventsDuringStop = -1;
+      const stopSession = vi.fn(async () => {
+        keysDuringStop = [...(await originalList()).keys()];
+        eventsDuringStop = eventQueries.findByFilters({}).length;
+        throw new Error('lost stop response');
+      });
+      vi.spyOn((instance as any).getSandboxLifecycle(), 'restClient').mockReturnValue({
+        stopSession,
+        getSession: vi.fn().mockResolvedValue({ session: { status: 'running' }, routes: [] }),
+      });
+      const putSpy = vi.spyOn(instance.ctx.storage, 'put');
+
+      await instance.deleteSession();
+      await (instance as any).purgeDeletedSessionPayload();
+      const atomicFenceCommitted = putSpy.mock.calls.some(([entries]) => {
+        if (!entries || typeof entries !== 'object' || Array.isArray(entries)) return false;
+        return 'session_deletion_intent' in entries && 'vercel_deletion_tombstone' in entries;
+      });
+      return {
+        listLimits,
+        deleteBatchSizes,
+        tombstoneSurvived,
+        keysDuringStop,
+        eventsDuringStop,
+        remainingKeys: [...(await originalList()).keys()],
+        remainingEvents: eventQueries.findByFilters({}).length,
+        stopCalls: stopSession.mock.calls,
+        atomicFenceCommitted,
+      };
+    });
+
+    expect(result.atomicFenceCommitted).toBe(true);
+    expect(result.listLimits.every(limit => limit === 128)).toBe(true);
+    expect(result.deleteBatchSizes.length).toBeGreaterThan(2);
+    expect(result.deleteBatchSizes.every(size => size <= 128)).toBe(true);
+    expect(result.tombstoneSurvived.every(Boolean)).toBe(true);
+    expect(result.keysDuringStop).toEqual(['session_deletion_intent', 'vercel_deletion_tombstone']);
+    expect(result.eventsDuringStop).toBe(0);
+    expect(result.remainingKeys).toEqual(['session_deletion_intent', 'vercel_deletion_tombstone']);
+    expect(result.remainingEvents).toBe(0);
+    expect(result.stopCalls[0]?.slice(0, 2)).toEqual(['session-exact-1', 'ses-acde1234']);
+  });
+
+  it('settles a lost exact-session stop response through terminal inspection', async () => {
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName('user_vercel_stop_loss:agent_vercel_stop_loss')
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await instance.registerSession({
+        ...groupedRegisterSessionInput({
+          sessionId: 'agent_vercel_stop_loss',
+          userId: 'user_vercel_stop_loss',
+          prompt: 'stop exactly once',
+          mode: 'code',
+          model: 'test-model',
+        }),
+        workspace: { sandboxId: 'ses-acde5678', sandboxProvider: 'vercel' },
+      });
+      const metadata = await instance.getMetadata();
+      if (!metadata) throw new Error('Expected registered metadata');
+      await instance.ctx.storage.put('metadata', {
+        ...metadata,
+        workspace: {
+          ...metadata.workspace,
+          providerRuntime: { provider: 'vercel', sessionId: 'session-stop-loss' },
+        },
+      });
+      Object.assign(instance.env, { VERCEL_TOKEN: 'test-token', VERCEL_TEAM_ID: 'test-team' });
+      const stopSession = vi.fn().mockRejectedValue(new Error('response lost'));
+      const getSession = vi.fn().mockResolvedValue({
+        session: { status: 'stopped' },
+        routes: [],
+      });
+      vi.spyOn((instance as any).getSandboxLifecycle(), 'restClient').mockReturnValue({
+        stopSession,
+        getSession,
+      });
+
+      await instance.deleteSession();
+      return {
+        remainingKeys: [...(await instance.ctx.storage.list()).keys()],
+        stopCalls: stopSession.mock.calls,
+        inspectCalls: getSession.mock.calls,
+      };
+    });
+
+    expect(result.remainingKeys).toEqual([]);
+    expect(result.stopCalls[0]).toEqual(['session-stop-loss', 'ses-acde5678']);
+    expect(result.inspectCalls[0]).toEqual(['session-stop-loss', 'ses-acde5678']);
+  });
+
+  it('adopts a matching late create and stops only its exact session', async () => {
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName('user_vercel_late_create:agent_vercel_late_create')
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await instance.registerSession({
+        ...groupedRegisterSessionInput({
+          sessionId: 'agent_vercel_late_create',
+          userId: 'user_vercel_late_create',
+          prompt: 'delete during creation',
+          mode: 'code',
+          model: 'test-model',
+        }),
+        workspace: { sandboxId: 'ses-acde9012', sandboxProvider: 'vercel' },
+      });
+      await instance.ctx.storage.put('vercel_create_intent', {
+        version: 1,
+        sandboxName: 'ses-acde9012',
+        operationId: 'operation-late',
+        projectId: 'project-pinned',
+        snapshotId: 'snapshot-pinned',
+        runtimeBuildId: 'build-pinned',
+        runtime: 'node24',
+        startedAt: Date.now(),
+        settleUntil: Date.now() + 60_000,
+        attempts: 1,
+        nextRetryAt: Date.now(),
+      });
+      Object.assign(instance.env, { VERCEL_TOKEN: 'test-token', VERCEL_TEAM_ID: 'test-team' });
+      const inspectByName = vi.fn().mockResolvedValue({ session: { id: 'session-late' } });
+      const stopSession = vi.fn().mockResolvedValue({ status: 'stopped' });
+      vi.spyOn((instance as any).getSandboxLifecycle(), 'restClient').mockReturnValue({
+        inspectByName,
+        stopSession,
+      });
+
+      await instance.deleteSession();
+      return {
+        remainingKeys: [...(await instance.ctx.storage.list()).keys()],
+        inspectCalls: inspectByName.mock.calls,
+        stopCalls: stopSession.mock.calls,
+      };
+    });
+
+    expect(result.remainingKeys).toEqual([]);
+    expect(result.inspectCalls[0]?.[0]).toMatchObject({
+      name: 'ses-acde9012',
+      operationId: 'operation-late',
+      snapshotId: 'snapshot-pinned',
+      runtimeBuildId: 'build-pinned',
+    });
+    expect(result.inspectCalls[0]?.[0]).not.toHaveProperty('timeoutMs');
+    expect(result.stopCalls[0]).toEqual(['session-late', 'ses-acde9012']);
+  });
+
   it('routes explicit and retention Cloudflare deletion through the DO sandbox lifecycle owner', async () => {
     const explicitStub = env.CLOUD_AGENT_SESSION.get(
       env.CLOUD_AGENT_SESSION.idFromName('user_cf_explicit_delete:agent_cf_explicit_delete')
@@ -236,7 +526,7 @@ describe('CloudAgentSession message admission', () => {
     expect(result.keys).toEqual([]);
   });
 
-  it('persists the registered sandbox provider selection', async () => {
+  it('keeps Cloudflare registration free of Vercel runtime state', async () => {
     const userId = 'user_cloudflare_selection' as const;
     const sessionId = 'agent_cloudflare_selection' as const;
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -260,6 +550,7 @@ describe('CloudAgentSession message admission', () => {
     });
 
     expect(workspace?.sandboxProvider).toBe('cloudflare');
+    expect(workspace?.providerRuntime).toBeUndefined();
   });
 
   it('surfaces initial admission failure after retaining registered DO metadata', async () => {
@@ -346,7 +637,7 @@ describe('CloudAgentSession message admission', () => {
     expect(result.pending[0]?.messageId).toBe(messageId);
   });
 
-  it('does not mutate persisted sandbox identity when a registration replay changes selection', async () => {
+  it('does not mutate persisted provider selection when a registration replay changes environment selection', async () => {
     const userId = 'user_provider_replay' as const;
     const sessionId = 'agent_provider_replay' as const;
     const messageId = 'msg_018f1e2d3c4bBoundMsgAbCdEf';
@@ -379,7 +670,7 @@ describe('CloudAgentSession message admission', () => {
         ...initialInput,
         workspace: {
           sandboxId: 'ses-abcdef',
-          sandboxProvider: 'cloudflare',
+          sandboxProvider: 'vercel',
         },
       });
       return {
@@ -389,9 +680,51 @@ describe('CloudAgentSession message admission', () => {
 
     expect(result.metadata?.workspace?.sandboxProvider).toBe('cloudflare');
     expect(result.metadata?.workspace?.sandboxId).toBe('usr-abcdef');
+    expect(result.metadata?.workspace?.providerRuntime).toBeUndefined();
   });
 
-  it('rejects metadata updates that replace the registered sandbox name', async () => {
+  it('rejects metadata updates that attempt to change a registered sandbox provider', async () => {
+    const userId = 'user_provider_update' as const;
+    const sessionId = 'agent_provider_update' as const;
+    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+    const result = await runInDurableObject(stub, async instance => {
+      await instance.registerSession({
+        ...groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'immutable provider',
+          mode: 'code',
+          model: 'test-model',
+        }),
+        workspace: {
+          sandboxId: 'ses-abcdef',
+          sandboxProvider: 'vercel',
+        },
+      });
+      const metadata = await instance.getMetadata();
+      if (!metadata) throw new Error('Expected metadata after registration');
+      let error: string | undefined;
+      try {
+        await instance.updateMetadata({
+          ...metadata,
+          workspace: {
+            ...metadata.workspace,
+            sandboxProvider: 'cloudflare',
+          },
+        });
+      } catch (caught) {
+        error = caught instanceof Error ? caught.message : String(caught);
+      }
+      return { error, metadata: await instance.getMetadata() };
+    });
+
+    expect(result.error).toContain('sandbox provider cannot be changed');
+    expect(result.metadata?.workspace?.sandboxProvider).toBe('vercel');
+  });
+
+  it('rejects metadata updates that replace sandbox name or persisted Vercel session ID', async () => {
     const stub = env.CLOUD_AGENT_SESSION.get(
       env.CLOUD_AGENT_SESSION.idFromName('user_runtime_identity:agent_runtime_identity')
     );
@@ -405,24 +738,42 @@ describe('CloudAgentSession message admission', () => {
           mode: 'code',
           model: 'test-model',
         }),
-        workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'cloudflare' },
+        workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'vercel' },
       });
       const metadata = await instance.getMetadata();
       if (!metadata) throw new Error('Expected metadata after registration');
-      let error: string | undefined;
-      try {
-        await instance.updateMetadata({
-          ...metadata,
-          workspace: { ...metadata.workspace, sandboxId: 'ses-fedcba' },
-        });
-      } catch (caught) {
-        error = caught instanceof Error ? caught.message : String(caught);
+      await instance.ctx.storage.put('metadata', {
+        ...metadata,
+        workspace: {
+          ...metadata.workspace,
+          providerRuntime: { provider: 'vercel', sessionId: 'session-1' },
+        },
+      });
+      const pinned = await instance.getMetadata();
+      if (!pinned) throw new Error('Expected pinned metadata');
+      const errors: string[] = [];
+      for (const workspace of [
+        { ...pinned.workspace, sandboxId: 'ses-fedcba' },
+        {
+          ...pinned.workspace,
+          providerRuntime: { provider: 'vercel', sessionId: 'session-2' },
+        },
+      ]) {
+        try {
+          await instance.updateMetadata({ ...pinned, workspace });
+        } catch (error) {
+          errors.push(error instanceof Error ? error.message : String(error));
+        }
       }
-      return { error, metadata: await instance.getMetadata() };
+      return { errors, metadata: await instance.getMetadata() };
     });
 
-    expect(result.error).toBe('Registered sandbox name cannot be changed');
+    expect(result.errors).toEqual([
+      'Registered sandbox name cannot be changed',
+      'Persisted Vercel session ID cannot be changed',
+    ]);
     expect(result.metadata?.workspace?.sandboxId).toBe('ses-abcdef');
+    expect(result.metadata?.workspace?.providerRuntime?.sessionId).toBe('session-1');
   });
 
   it('rejects a grouped replay that changes the immutable initial intent', async () => {

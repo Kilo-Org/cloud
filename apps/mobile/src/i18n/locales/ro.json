@@ -2090,7 +2090,8 @@
       "cent_few": "cenți",
       "dollar_few": "dolari",
       "costSpoken": "cost {{cost}}",
-      "costSpokenWithTime": "cost {{cost}}, {{time}}"
+      "costSpokenWithTime": "cost {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nu s-a putut deschide GitHub",
@@ -2933,16 +2934,10 @@
   "feedback": {
     "noEmailApp": "Nicio aplicație de email disponibilă. Ne poți contacta la {{email}}",
     "couldNotOpenStore": "Magazinul nu a putut fi deschis.",
-    "promptTitle": "Cum îți place aplicația Kilo?",
-    "iLikeIt": "Îmi place",
-    "gladTitle": "Ne bucurăm să auzim asta!",
-    "gladMessage": "O recenzie în magazin ne-ar ajuta enorm. Mulțumim că folosești Kilo!",
-    "rateKilo": "Evaluează Kilo",
-    "needsWork": "Trebuie îmbunătățit",
-    "sorryTitle": "Ne pare rău să auzim asta!",
-    "sorryMessage": "Te rugăm să ne spui ce trebuie îmbunătățit. Inginerul responsabil de aplicație citește fiecare raport!",
-    "emailUs": "Trimite-ne un email",
-    "emailSubject": "feedback despre aplicația mobilă"
+    "emailSubject": "feedback despre aplicația mobilă",
+    "neutralTitle": "Evaluează aplicația Kilo",
+    "rateTheApp": "Evaluează aplicația",
+    "sendFeedback": "Trimite feedback"
   },
   "organization": {
     "boundary": {
@@ -2952,7 +2947,9 @@
       "organizationUnavailable": "Organizație indisponibilă",
       "selectDescription": "Alege o organizație din profilul tău pentru a continua.",
       "selectOrganization": "Selectează o organizație",
-      "unavailableDescription": "Această organizație nu mai este disponibilă. Alege una din profilul tău pentru a continua."
+      "unavailableDescription": "Această organizație nu mai este disponibilă. Alege una din profilul tău pentru a continua.",
+      "accessDeniedTitle": "Acces refuzat",
+      "accessDeniedDescription": "Nu ai acces la această organizație."
     },
     "creditActivity": {
       "emptyDescription": "Achizițiile, utilizarea și ajustările de credite pentru această organizație vor apărea aici pe măsură ce apar.",

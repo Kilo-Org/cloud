@@ -5,6 +5,8 @@ import type { CloudAgentSession } from '../../persistence/CloudAgentSession.js';
 import type { WrapperPty } from '../../kilo/wrapper-client.js';
 import type { SessionId } from '../../types/ids.js';
 import { withDORetry } from '../../utils/do-retry.js';
+import { resolveSessionStub } from '../../sandbox-session/session-stub.js';
+import { sessionHasTerminal } from '../../agent-sandbox/capabilities.js';
 import { protectedProcedure } from '../auth.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import {
@@ -31,13 +33,13 @@ function throwTerminalError(result: OperationResult<unknown>): never {
   throw new TRPCError({ code, message });
 }
 
-function getSessionStub(
-  env: { CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession> },
-  userId: string,
-  sessionId: SessionId
-): DurableObjectStub<CloudAgentSession> {
-  const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-  return env.CLOUD_AGENT_SESSION.get(doId);
+function rejectControlPlaneTerminal(sessionId: string): void {
+  if (!sessionHasTerminal(sessionId)) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Terminal is not available for this session',
+    });
+  }
 }
 
 export function createSessionTerminalHandlers() {
@@ -48,6 +50,7 @@ export function createSessionTerminalHandlers() {
       .mutation(async ({ input, ctx }) => {
         return withLogTags({ source: 'createTerminal' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
+          rejectControlPlaneTerminal(sessionId);
           logger.setTags({ userId: ctx.userId, sessionId });
           logger.withFields({ cols: input.cols, rows: input.rows }).info('Creating terminal');
           await requireCurrentSessionAccess({
@@ -60,7 +63,7 @@ export function createSessionTerminalHandlers() {
             DurableObjectStub<CloudAgentSession>,
             OperationResult<{ pty: WrapperPty }>
           >(
-            () => getSessionStub(ctx.env, ctx.userId, sessionId),
+            () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
             stub =>
               stub.createTerminal({
                 cols: input.cols,
@@ -84,6 +87,7 @@ export function createSessionTerminalHandlers() {
       .mutation(async ({ input, ctx }) => {
         return withLogTags({ source: 'resizeTerminal' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
+          rejectControlPlaneTerminal(sessionId);
           logger.setTags({ userId: ctx.userId, sessionId, ptyId: input.ptyId });
           await requireCurrentSessionAccess({
             env: ctx.env,
@@ -94,7 +98,7 @@ export function createSessionTerminalHandlers() {
             DurableObjectStub<CloudAgentSession>,
             OperationResult<{ pty: WrapperPty }>
           >(
-            () => getSessionStub(ctx.env, ctx.userId, sessionId),
+            () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
             stub =>
               stub.resizeTerminal({
                 ptyId: input.ptyId,
@@ -118,6 +122,7 @@ export function createSessionTerminalHandlers() {
       .mutation(async ({ input, ctx }) => {
         return withLogTags({ source: 'closeTerminal' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
+          rejectControlPlaneTerminal(sessionId);
           logger.setTags({ userId: ctx.userId, sessionId, ptyId: input.ptyId });
           logger.info('Closing terminal');
           await requireCurrentSessionAccess({
@@ -130,7 +135,7 @@ export function createSessionTerminalHandlers() {
             DurableObjectStub<CloudAgentSession>,
             OperationResult<{ success: boolean }>
           >(
-            () => getSessionStub(ctx.env, ctx.userId, sessionId),
+            () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
             stub => stub.closeTerminal({ ptyId: input.ptyId }),
             'closeTerminal'
           );

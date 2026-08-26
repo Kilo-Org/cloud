@@ -4,6 +4,7 @@ import { createAgentSandbox } from '../agent-sandbox/factory.js';
 import {
   AgentSandboxUnavailableError,
   type AgentSandbox,
+  type AgentSandboxRuntimeContext,
   type WrapperInstanceLease,
   type WrapperObservation,
 } from '../agent-sandbox/protocol.js';
@@ -20,6 +21,7 @@ import { WrapperFinalizingError } from '../kilo/wrapper-client.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { WrapperCommand } from '../shared/protocol.js';
 import type { Env as WorkerEnv } from '../types.js';
+import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { WrapperCleanupBlockedError } from './wrapper-cleanup-blocked-error.js';
 import {
   allocateWrapperRuntimeState,
@@ -89,6 +91,7 @@ export type AgentRuntimeDependencies = {
     fence?: { wrapperGeneration: number; wrapperConnectionId: string }
   ) => boolean;
   getOrchestratorOverride?: () => AgentRuntimeOrchestrator | undefined;
+  sandboxRuntimeContext?: AgentSandboxRuntimeContext;
   createAgentSandbox?: (metadata: SessionMetadata) => AgentSandbox;
   discoverSessionWrappers?: (metadata: SessionMetadata) => Promise<WrapperObservation>;
   requestAlarmAtOrBefore?: (deadline: number) => Promise<void>;
@@ -144,7 +147,8 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
   } = dependencies;
   const resolveAgentSandbox =
     dependencies.createAgentSandbox ??
-    ((metadata: SessionMetadata) => createAgentSandbox(env, metadata));
+    ((metadata: SessionMetadata) =>
+      createAgentSandbox(env, metadata, dependencies.sandboxRuntimeContext));
   let orchestrator: AgentRuntimeOrchestrator | undefined;
 
   function getOrchestrator(): AgentRuntimeOrchestrator {
@@ -154,11 +158,7 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
     if (!orchestrator) {
       orchestrator = new ExecutionOrchestrator({
         getAgentSandbox: plan => resolveAgentSandbox(plan.workspace.metadata),
-        getSessionStub: (userId, sessionId) => {
-          const doKey = `${userId}:${sessionId}`;
-          const id = env.CLOUD_AGENT_SESSION.idFromName(doKey);
-          return env.CLOUD_AGENT_SESSION.get(id);
-        },
+        getSessionStub: (userId, sessionId) => resolveSessionStub(env, userId, sessionId),
         env,
       });
     }

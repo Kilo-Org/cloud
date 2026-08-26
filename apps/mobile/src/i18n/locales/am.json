@@ -2075,7 +2075,8 @@
       "dollar": "ዶላሮች",
       "dollar_other": "ዶላሮች",
       "costSpoken": "ዋጋ {{cost}}",
-      "costSpokenWithTime": "ዋጋ {{cost}}፣ {{time}}"
+      "costSpokenWithTime": "ዋጋ {{cost}}፣ {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubን መክፈት አልተቻለም",
@@ -2913,16 +2914,10 @@
   "feedback": {
     "noEmailApp": "ምንም የኢሜይል መተግበሪያ የለም። በ{{email}} ማግኘት ይችላሉ",
     "couldNotOpenStore": "መደብሩን መክፈት አልተቻለም።",
-    "promptTitle": "የKilo መተግበሪያን እንዴት እየወደዱት ነው?",
-    "iLikeIt": "ወድጄዋለሁ",
-    "gladTitle": "ይህን ስለሰማን ደስ ብሎናል!",
-    "gladMessage": "የመደብር ግምገማ በእጅጉ ይረዳናል። Kiloን ስለተጠቀሙ እናመሰግናለን!",
-    "rateKilo": "Kiloን ይገምግሙ",
-    "needsWork": "ማሻሻያ ይፈልጋል",
-    "sorryTitle": "ይህን ስለሰማን አዝነናል!",
-    "sorryMessage": "እባክዎ ምን ማሻሻል እንዳለበት ያሳውቁን። የመተግበሪያው ሃላፊ መሐንዲስ እያንዳንዱን ሪፖርት ያነባል!",
-    "emailUs": "ይፃፉልን",
-    "emailSubject": "የሞባይል መተግበሪያ አስተያየት"
+    "emailSubject": "የሞባይል መተግበሪያ አስተያየት",
+    "neutralTitle": "የKilo መተግበሪያን ደረጃ ይስጡ",
+    "rateTheApp": "መተግበሪያውን ደረጃ ይስጡ",
+    "sendFeedback": "አስተያየት ይላኩ"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2927,9 @@
       "organizationUnavailable": "ድርጅት አይገኝም",
       "selectDescription": "ለመቀጠል ከመገለጫዎ ድርጅት ይምረጡ።",
       "selectOrganization": "ድርጅት ይምረጡ",
-      "unavailableDescription": "ይህ ድርጅት ከአሁን በኋላ አይገኝም። ለመቀጠል ከመገለጫዎ ይምረጡ።"
+      "unavailableDescription": "ይህ ድርጅት ከአሁን በኋላ አይገኝም። ለመቀጠል ከመገለጫዎ ይምረጡ።",
+      "accessDeniedTitle": "መዳረሻ ተከልክሏል",
+      "accessDeniedDescription": "ለዚህ ድርጅት የመዳረሻ ፍቃድ የለዎትም።"
     },
     "creditActivity": {
       "emptyDescription": "ለዚህ ድርጅት ግዢዎች፣ አጠቃቀም እና የክሬዲት ማስተካከያዎች እንደሚከሰቱ እዚህ ይታያሉ።",

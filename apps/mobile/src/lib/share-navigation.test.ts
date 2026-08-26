@@ -1,12 +1,15 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+/* eslint-disable require-await, @typescript-eslint/require-await -- the fake KV factories settle without await because they resolve immediately */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { SHARE_PAYLOAD_MAX_ENTRIES } from './share-payload';
+import { setSharePersistUserId, SHARE_PAYLOAD_MAX_ENTRIES } from './share-payload';
 import {
   __resetPendingShareNavigationForTests,
   appendShareParams,
   isShareNavigationTargetFocused,
   navigationContainsShareGate,
   parseShareHrefParams,
+  persistShareNavigationNow,
+  restoreShareNavigation,
   setPendingShareNavigation,
   shareDeliveryShareId,
   takePendingShareNavigation,
@@ -26,6 +29,30 @@ vi.mock('expo-file-system/legacy', () => ({
     await Promise.resolve();
   }),
 }));
+
+// The drafts module (lazy-required by share-navigation) imports the native
+// encrypted-kv chain; the fake mirrors its upsert semantics.
+const kvStore = vi.hoisted(
+  () => new Map<string, { scope: string; k: string; v: string; updatedAt: number }>()
+);
+const kvMock = vi.hoisted(() => ({
+  getItem: vi.fn(async (_scope: string, _k: string): Promise<string | null> => null),
+  setItem: vi.fn(async (_scope: string, _k: string, _v: string): Promise<void> => undefined),
+  removeItem: vi.fn(async (_scope: string, _k: string): Promise<void> => undefined),
+  listEntries: vi.fn(async (_scope: string): Promise<{ k: string; updatedAt: number }[]> => []),
+}));
+
+vi.mock('@/lib/persist/encrypted-kv', () => kvMock);
+
+vi.mock('@sentry/react-native', () => ({
+  captureException: vi.fn(),
+}));
+
+function storageKey(scope: string, k: string): string {
+  return `${scope}\u0000${k}`;
+}
+
+let nextUpdatedAt = 1;
 
 afterEach(() => {
   __resetPendingShareNavigationForTests();
@@ -91,6 +118,80 @@ describe('share-navigation', () => {
       href: '/(app)/pr-review/octocat/hello-world/42',
       shareId: null,
     });
+  });
+});
+
+describe('share navigation durable persistence', () => {
+  beforeEach(() => {
+    __resetPendingShareNavigationForTests();
+    vi.clearAllMocks();
+    kvStore.clear();
+    nextUpdatedAt = 1;
+    kvMock.getItem.mockImplementation(
+      async (scope, k) => kvStore.get(storageKey(scope, k))?.v ?? null
+    );
+    kvMock.setItem.mockImplementation(async (scope, k, v) => {
+      kvStore.set(storageKey(scope, k), { scope, k, v, updatedAt: nextUpdatedAt });
+      nextUpdatedAt += 1;
+    });
+    kvMock.removeItem.mockImplementation(async (scope, k) => {
+      kvStore.delete(storageKey(scope, k));
+    });
+    kvMock.listEntries.mockImplementation(async scope =>
+      [...kvStore.values()]
+        .filter(entry => entry.scope === scope)
+        .toSorted((a, b) => a.updatedAt - b.updatedAt)
+        .map(entry => ({ k: entry.k, updatedAt: entry.updatedAt }))
+    );
+  });
+
+  afterEach(() => {
+    __resetPendingShareNavigationForTests();
+    setSharePersistUserId(null);
+  });
+
+  it('set then restore returns the same href and shareId', async () => {
+    setSharePersistUserId('u1');
+    setPendingShareNavigation({ href: '/(app)/agent-chat/new?shareId=a', shareId: 'a' });
+    await persistShareNavigationNow();
+    __resetPendingShareNavigationForTests();
+    // simulate process death (clears memory)
+    await restoreShareNavigation('u1');
+    expect(takePendingShareNavigation()).toEqual({
+      href: '/(app)/agent-chat/new?shareId=a',
+      shareId: 'a',
+    });
+  });
+
+  it('take then restore returns null', async () => {
+    setSharePersistUserId('u1');
+    setPendingShareNavigation({ href: '/(app)/agent-chat/ses_1?shareId=b', shareId: 'b' });
+    await persistShareNavigationNow();
+    const taken = takePendingShareNavigation();
+    expect(taken).toEqual({ href: '/(app)/agent-chat/ses_1?shareId=b', shareId: 'b' });
+    await persistShareNavigationNow();
+    __resetPendingShareNavigationForTests();
+    await restoreShareNavigation('u1');
+    expect(takePendingShareNavigation()).toBeNull();
+  });
+
+  it('restore does not replace a non-empty in-memory queue', async () => {
+    setSharePersistUserId('u1');
+    // Persist a draft that differs from the live queue.
+    setPendingShareNavigation({ href: '/(app)/agent-chat/o', shareId: 'o' });
+    await persistShareNavigationNow();
+    __resetPendingShareNavigationForTests();
+
+    // A navigation committed in this process.
+    setPendingShareNavigation({ href: '/(app)/agent-chat/live', shareId: 'live' });
+
+    await restoreShareNavigation('u1');
+
+    expect(takePendingShareNavigation()).toEqual({
+      href: '/(app)/agent-chat/live',
+      shareId: 'live',
+    });
+    expect(takePendingShareNavigation()).toBeNull();
   });
 });
 

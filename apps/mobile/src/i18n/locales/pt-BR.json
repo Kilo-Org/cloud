@@ -1613,7 +1613,8 @@
       "cent_many": "centavos",
       "dollar_many": "dólares",
       "costSpoken": "custo {{cost}}",
-      "costSpokenWithTime": "custo {{cost}}, {{time}}"
+      "costSpokenWithTime": "custo {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Não foi possível iniciar a configuração do GitHub App. Tente novamente.",
@@ -2938,7 +2939,9 @@
       "organizationUnavailable": "Organização indisponível",
       "selectDescription": "Escolha uma organização do seu perfil para continuar.",
       "selectOrganization": "Selecionar organização",
-      "unavailableDescription": "Esta organização não está mais disponível. Escolha uma do seu perfil para continuar."
+      "unavailableDescription": "Esta organização não está mais disponível. Escolha uma do seu perfil para continuar.",
+      "accessDeniedTitle": "Acesso negado",
+      "accessDeniedDescription": "Você não tem acesso a esta organização."
     },
     "creditActivity": {
       "emptyDescription": "Compras, uso e ajustes de crédito desta organização aparecerão aqui conforme acontecerem.",
@@ -3089,17 +3092,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "Não foi possível abrir a loja.",
-    "emailUs": "Envie um e-mail",
-    "gladMessage": "Uma avaliação na loja nos ajudaria muito. Obrigado por usar o Kilo!",
-    "gladTitle": "Ficamos felizes em saber disso!",
-    "iLikeIt": "Eu gosto",
-    "needsWork": "Precisa melhorar",
     "noEmailApp": "Nenhum app de e-mail disponível. Você pode falar conosco em {{email}}",
-    "promptTitle": "O que você está achando do app Kilo?",
-    "rateKilo": "Avaliar o Kilo",
-    "sorryMessage": "Conte para nós o que precisa melhorar. O engenheiro responsável pelo app lê cada relatório!",
-    "sorryTitle": "Lamentamos saber disso!",
-    "emailSubject": "feedback do aplicativo móvel"
+    "emailSubject": "feedback do aplicativo móvel",
+    "neutralTitle": "Avalie o app Kilo",
+    "rateTheApp": "Avalie o app",
+    "sendFeedback": "Enviar feedback"
   },
   "authErrors": {
     "emailAlreadyUsed": "Já existe uma conta com este e-mail usando um método de entrada diferente. Tente outro método ou use '$t(login.moreSignInOptions)'.",

@@ -2075,7 +2075,8 @@
       "dollar": "dolar",
       "dollar_other": "dolar",
       "costSpoken": "kostua {{cost}}",
-      "costSpokenWithTime": "kostua {{cost}}, {{time}}"
+      "costSpokenWithTime": "kostua {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ezin da GitHub ireki",
@@ -2913,16 +2914,10 @@
   "feedback": {
     "noEmailApp": "Ez daude posta-aplikaziorik erabilgarri. {{email}} helbidean harremanetan jar zaitezke gurekin",
     "couldNotOpenStore": "Ezin izan da denda ireki.",
-    "promptTitle": "Nola gustatzen zaizu Kilo aplikazioa?",
-    "iLikeIt": "Gustatzen zait",
-    "gladTitle": "Pozten gara entzuteagatik!",
-    "gladMessage": "Dendako iritzi batek asko lagunduko liguke. Mila esker Kilo erabiltzeagatik!",
-    "rateKilo": "Baloratu Kilo",
-    "needsWork": "Hobetu behar du",
-    "sorryTitle": "Sentitzen dugu entzuteagatik!",
-    "sorryMessage": "Mesedez, esan iezaguzu zer hobetu behar den. Aplikazioaren arduradunak irakurtzen du txosten bakoitza!",
-    "emailUs": "Bidali iezaguzu posta",
-    "emailSubject": "mugikorreko aplikazioaren feedbacka"
+    "emailSubject": "mugikorreko aplikazioaren feedbacka",
+    "neutralTitle": "Kalifikatu Kilo aplikazioa",
+    "rateTheApp": "Kalifikatu aplikazioa",
+    "sendFeedback": "Bidali iritzia"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2927,9 @@
       "organizationUnavailable": "Erakundea ez erabilgarri",
       "selectDescription": "Aukeratu erakunde bat zure profiletik jarraitzeko.",
       "selectOrganization": "Hautatu erakunde bat",
-      "unavailableDescription": "Erakunde hau jada ez daude erabilgarri. Aukeratu bat zure profiletik jarraitzeko."
+      "unavailableDescription": "Erakunde hau jada ez daude erabilgarri. Aukeratu bat zure profiletik jarraitzeko.",
+      "accessDeniedTitle": "Sarbidea ukatu da",
+      "accessDeniedDescription": "Ez duzu erakunde honetarako sarbiderik."
     },
     "creditActivity": {
       "emptyDescription": "Erakunde honen erosketak, erabilerak eta kreditu-doikuntzak hemen agertuko dira gertatzen diren heinean.",

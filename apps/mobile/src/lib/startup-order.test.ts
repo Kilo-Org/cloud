@@ -41,6 +41,24 @@ describe('root layout startup order (text contract)', () => {
     ).toBe(true);
   });
 
+  // The persisted deep-link record is account-bound. Auth bootstrap publishes
+  // the signed-in user id before it clears `authLoading`, so a restore that
+  // runs on an empty dependency array reads a null user id and deletes the
+  // record it was meant to restore.
+  it('gates the persisted deep-link restore on authLoading', () => {
+    const codeSource = stripComments(layoutSource);
+    const restoreEffect =
+      /restorePersistedPendingDeepLink\(\);[\s\S]{0,60}?\}, \[([^\]]*)\]\)/.exec(codeSource);
+    expect(
+      restoreEffect,
+      '_layout.tsx must call restorePersistedPendingDeepLink in an effect'
+    ).not.toBe(null);
+    expect(
+      restoreEffect?.[1]?.includes('authLoading'),
+      'the restore effect must depend on authLoading, not run on mount'
+    ).toBe(true);
+  });
+
   it.each(FORBIDDEN_IDENTIFIERS)('does not reference %s', identifier => {
     expect(layoutSource.includes(identifier), `_layout.tsx must not contain "${identifier}"`).toBe(
       false

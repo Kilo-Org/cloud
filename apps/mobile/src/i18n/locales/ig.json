@@ -2075,7 +2075,8 @@
       "dollar": "dollar",
       "dollar_other": "dollar",
       "costSpoken": "ọnụ ahịa {{cost}}",
-      "costSpokenWithTime": "ọnụ ahịa {{cost}}, {{time}}"
+      "costSpokenWithTime": "ọnụ ahịa {{cost}}, {{time}}",
+      "pullRequest": "arịọta pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Enweghị ike imeghe GitHub",
@@ -2913,16 +2914,10 @@
   "feedback": {
     "noEmailApp": "Ọ dịghị ngwa email dị. Ị nwere ike ịkpọtụrụ anyị na {{email}}",
     "couldNotOpenStore": "Enweghị ike imeghe ụlọ ahịa.",
-    "promptTitle": "Ị na-enwe mmasị na ngwa Kilo otu a?",
-    "iLikeIt": "Ọ na-amasị m",
-    "gladTitle": "Ọ na-anya anyị ụtọ ịnụ nke a!",
-    "gladMessage": "Nyocha ụlọ ahịa ga-enyere anyị aka nke ukwuu. Daalụ maka iji Kilo!",
-    "rateKilo": "Tụọ Kilo",
-    "needsWork": "Ọ chọrọ ọrụ",
-    "sorryTitle": "Ọ dị anyị mwute ịnụ nke a!",
-    "sorryMessage": "Biko gwa anyị ihe kwesịrị ịka mma. Onye injinia na-elekọta ngwa na-agụ akụkọ ọ bụla!",
-    "emailUs": "Ziga anyị email",
-    "emailSubject": "nzaghachi ngwa mobile"
+    "emailSubject": "nzaghachi ngwa mobile",
+    "neutralTitle": "Tụọ ngwa Kilo",
+    "rateTheApp": "Tụọ ngwa",
+    "sendFeedback": "Ziga nzaghachi"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2927,9 @@
       "organizationUnavailable": "Ụlọ ọrụ adịghị",
       "selectDescription": "Họrọ ụlọ ọrụ site na profaịlụ gị ka ị gaa n'ihu.",
       "selectOrganization": "Họrọ ụlọ ọrụ",
-      "unavailableDescription": "Ụlọ ọrụ a adịkwaghị. Họrọ otu site na profaịlụ gị ka ị gaa n'ihu."
+      "unavailableDescription": "Ụlọ ọrụ a adịkwaghị. Họrọ otu site na profaịlụ gị ka ị gaa n'ihu.",
+      "accessDeniedTitle": "Ajụrụ ohere",
+      "accessDeniedDescription": "Ị enweghị ohere na nzukọ a."
     },
     "creditActivity": {
       "emptyDescription": "Ịzụrụ ihe, ojiji, na mgbanwe kredit maka ụlọ ọrụ a ga-apụta ebe a ka ha na-eme.",

@@ -1675,7 +1675,11 @@
       "couldNotLoadThisSession": "No se pudo cargar esta sesión",
       "cloneFailed": "No se pudo clonar esta sesión.",
       "cloneFailedRetry": "No se pudo clonar esta sesión. Inténtalo de nuevo.",
-      "connectRepositoryToContinue": "Conecta un repositorio para continuar."
+      "connectRepositoryToContinue": "Conecta un repositorio para continuar.",
+      "notEnoughCredits": "No hay suficientes créditos para ejecutar Cloud Agent. Añade créditos e inténtalo de nuevo.",
+      "previousTaskFinishing": "La tarea anterior aún está finalizando. Espera un momento.",
+      "serviceUnavailable": "El servicio no está disponible en este momento. Inténtalo de nuevo.",
+      "connectionTrouble": "Problema de conexión. Inténtalo de nuevo en un momento."
     },
     "remoteSession": {
       "failedToCreate": "No se pudo crear la sesión remota",

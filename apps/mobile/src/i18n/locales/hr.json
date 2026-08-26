@@ -2136,7 +2136,11 @@
       "couldNotLoadThisSession": "Nije bilo moguće učitati ovu sesiju",
       "cloneFailed": "Nije bilo moguće klonirati ovu sesiju.",
       "cloneFailedRetry": "Nije bilo moguće klonirati ovu sesiju. Pokušajte ponovno.",
-      "connectRepositoryToContinue": "Povežite repozitorij za nastavak."
+      "connectRepositoryToContinue": "Povežite repozitorij za nastavak.",
+      "notEnoughCredits": "Nema dovoljno kredita za pokretanje Cloud Agenta. Dodajte kredite i pokušajte ponovno.",
+      "previousTaskFinishing": "Prethodni zadatak još uvijek završava. Pričekajte trenutak.",
+      "serviceUnavailable": "Usluga trenutačno nije dostupna. Pokušajte ponovno.",
+      "connectionTrouble": "Problem s vezom. Pokušajte ponovno za trenutak."
     },
     "remoteSession": {
       "failedToCreate": "Stvaranje udaljene sesije nije uspjelo",

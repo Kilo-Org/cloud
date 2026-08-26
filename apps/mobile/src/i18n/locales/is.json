@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Ekki tókst að hlaða þessa lotu",
       "cloneFailed": "Ekki tókst að klóna þessa lotu.",
       "cloneFailedRetry": "Ekki tókst að klóna þessa lotu. Reyndu aftur.",
-      "connectRepositoryToContinue": "Tengdu geymslu til að halda áfram."
+      "connectRepositoryToContinue": "Tengdu geymslu til að halda áfram.",
+      "notEnoughCredits": "Ekki næg kredit til að keyra Cloud Agent. Bættu við kredit og reyndu aftur.",
+      "previousTaskFinishing": "Fyrra verkefni er enn að klárast. Bíddu augnablik.",
+      "serviceUnavailable": "Þjónustan er ekki tiltæk núna. Reyndu aftur.",
+      "connectionTrouble": "Tengingarvandræði. Reyndu aftur eftir augnablik."
     },
     "remoteSession": {
       "failedToCreate": "Ekki tókst að búa til fjarlota lotu",

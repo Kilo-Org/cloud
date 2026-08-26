@@ -1683,7 +1683,11 @@
       "couldNotLoadThisSession": "Не удалось загрузить эту сессию",
       "cloneFailed": "Не удалось клонировать эту сессию.",
       "cloneFailedRetry": "Не удалось клонировать эту сессию. Попробуйте снова.",
-      "connectRepositoryToContinue": "Подключите репозиторий, чтобы продолжить."
+      "connectRepositoryToContinue": "Подключите репозиторий, чтобы продолжить.",
+      "notEnoughCredits": "Недостаточно кредитов для запуска Cloud Agent. Добавьте кредиты и попробуйте снова.",
+      "previousTaskFinishing": "Предыдущая задача ещё завершается. Подождите немного.",
+      "serviceUnavailable": "Сервис сейчас недоступен. Попробуйте ещё раз.",
+      "connectionTrouble": "Проблемы с подключением. Повторите через мгновение."
     },
     "remoteSession": {
       "failedToCreate": "Не удалось создать удаленный сеанс",

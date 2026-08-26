@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "ไม่สามารถโหลด session นี้ได้",
       "cloneFailed": "ไม่สามารถคัดลอก session นี้ได้",
       "cloneFailedRetry": "ไม่สามารถคัดลอก session นี้ได้ ลองอีกครั้ง",
-      "connectRepositoryToContinue": "เชื่อมต่อ repository เพื่อดำเนินการต่อ"
+      "connectRepositoryToContinue": "เชื่อมต่อ repository เพื่อดำเนินการต่อ",
+      "notEnoughCredits": "เครดิตไม่เพียงพอสำหรับเรียกใช้ Cloud Agent โปรดเพิ่มเครดิตแล้วลองอีกครั้ง",
+      "previousTaskFinishing": "งานก่อนหน้ายังไม่เสร็จสิ้น โปรดรอสักครู่",
+      "serviceUnavailable": "ขณะนี้บริการไม่พร้อมใช้งาน โปรดลองอีกครั้ง",
+      "connectionTrouble": "เกิดปัญหาการเชื่อมต่อ โปรดลองอีกครั้งในอีกสักครู่"
     },
     "remoteSession": {
       "failedToCreate": "ไม่สามารถสร้าง remote session ได้",

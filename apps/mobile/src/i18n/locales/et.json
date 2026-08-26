@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Seda seanssi ei õnnestunud laadida",
       "cloneFailed": "Seda seanssi ei õnnestunud kloonida.",
       "cloneFailedRetry": "Seda seanssi ei õnnestunud kloonida. Proovi uuesti.",
-      "connectRepositoryToContinue": "Jätkamiseks ühenda hoidla."
+      "connectRepositoryToContinue": "Jätkamiseks ühenda hoidla.",
+      "notEnoughCredits": "Cloud Agent käivitamiseks ei jätku krediiti. Lisa krediiti ja proovi uuesti.",
+      "previousTaskFinishing": "Eelmine ülesanne on veel lõpetamisel. Palun oota hetk.",
+      "serviceUnavailable": "Teenus pole praegu saadaval. Palun proovi uuesti.",
+      "connectionTrouble": "Ühenduseprobleem. Palun proovi hetke pärast uuesti."
     },
     "remoteSession": {
       "failedToCreate": "Kaugseansi loomine ebaõnnestus",

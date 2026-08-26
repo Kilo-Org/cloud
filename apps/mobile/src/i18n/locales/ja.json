@@ -1667,7 +1667,11 @@
       "couldNotLoadThisSession": "このセッションを読み込めませんでした",
       "cloneFailed": "このセッションを複製できませんでした。",
       "cloneFailedRetry": "このセッションを複製できませんでした。もう一度お試しください。",
-      "connectRepositoryToContinue": "続行するにはリポジトリを接続してください。"
+      "connectRepositoryToContinue": "続行するにはリポジトリを接続してください。",
+      "notEnoughCredits": "Cloud Agentを実行するクレジットが不足しています。クレジットを追加して再試行してください。",
+      "previousTaskFinishing": "前のタスクがまだ終わっていません。少々お待ちください。",
+      "serviceUnavailable": "サービスは現在利用できません。もう一度お試しください。",
+      "connectionTrouble": "接続に問題があります。しばらくしてから再試行してください。"
     },
     "remoteSession": {
       "failedToCreate": "リモートセッションを作成できませんでした",

@@ -1675,7 +1675,11 @@
       "couldNotLoadThisSession": "לא ניתן היה לטעון הפעלה זו",
       "cloneFailed": "לא ניתן היה לשכפל הפעלה זו.",
       "cloneFailedRetry": "לא ניתן היה לשכפל הפעלה זו. נסה שוב.",
-      "connectRepositoryToContinue": "חבר מאגר כדי להמשיך."
+      "connectRepositoryToContinue": "חבר מאגר כדי להמשיך.",
+      "notEnoughCredits": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent. הוסף קרדיטים ונסה שוב.",
+      "previousTaskFinishing": "המשימה הקודמת עדיין מסתיימת. אנא המתן רגע.",
+      "serviceUnavailable": "השירות אינו זמין כרגע. אנא נסה שוב.",
+      "connectionTrouble": "בעיית חיבור. אנא נסה שוב בעוד רגע."
     },
     "remoteSession": {
       "failedToCreate": "לא ניתן היה ליצור הפעלה מרוחקת",

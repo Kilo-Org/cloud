@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Ezin da saio hau kargatu",
       "cloneFailed": "Ezin da saio hau klonatu.",
       "cloneFailedRetry": "Ezin da saio hau klonatu. Saiatu berriro.",
-      "connectRepositoryToContinue": "Konektatu biltegia jarraitzeko."
+      "connectRepositoryToContinue": "Konektatu biltegia jarraitzeko.",
+      "notEnoughCredits": "Kreditu nahikorik ez Cloud Agent exekutatzeko. Gehitu kreditua eta saiatu berriro.",
+      "previousTaskFinishing": "Aurreko zeregina oraindik amaitzen ari da. Itxaron pixka bat.",
+      "serviceUnavailable": "Zerbitzua ez dago eskuragarri oraintxe. Saiatu berriro.",
+      "connectionTrouble": "Konexio-arazoa. Saiatu berriro minutu baten buruan."
     },
     "remoteSession": {
       "failedToCreate": "Ezin da urruneko saioa sortu",

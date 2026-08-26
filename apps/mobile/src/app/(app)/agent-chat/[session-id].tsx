@@ -153,7 +153,7 @@ export default function SessionDetailScreen() {
       message = t('agentChat.session.accessDeniedDescription');
       variant = 'permission';
     }
-    const copyText = buildTerminalErrorCopyText(sessionId, title, message);
+    const copyText = buildTerminalErrorCopyText({ sessionId, title, message });
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('agentChat.session.title')} />

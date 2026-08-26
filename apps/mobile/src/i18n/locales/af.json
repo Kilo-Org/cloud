@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Kon hierdie sessie nie laai nie",
       "cloneFailed": "Kon hierdie sessie nie klone nie.",
       "cloneFailedRetry": "Kon hierdie sessie nie klone nie. Probeer weer.",
-      "connectRepositoryToContinue": "Koppel 'n bewaarplek om voort te gaan."
+      "connectRepositoryToContinue": "Koppel 'n bewaarplek om voort te gaan.",
+      "notEnoughCredits": "Nie genoeg krediete om Cloud Agent te laat loop nie. Voeg krediete by en probeer weer.",
+      "previousTaskFinishing": "Die vorige taak is nog besig. Wag asseblief 'n oomblik.",
+      "serviceUnavailable": "Die diens is tans onbeskikbaar. Probeer asseblief weer.",
+      "connectionTrouble": "Verbindingsprobleem. Probeer asseblief oor 'n oomblik weer."
     },
     "remoteSession": {
       "failedToCreate": "Kon afgeleë sessie nie skep nie",

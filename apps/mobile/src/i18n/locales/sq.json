@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë",
       "cloneFailed": "Nuk u klonua kjo seancë.",
       "cloneFailedRetry": "Nuk u klonua kjo seancë. Provoni përsëri.",
-      "connectRepositoryToContinue": "Lidhni një depo për të vazhduar."
+      "connectRepositoryToContinue": "Lidhni një depo për të vazhduar.",
+      "notEnoughCredits": "Kredi të pamjaftueshme për të ekzekutuar Cloud Agent. Shtoni kredi dhe provoni përsëri.",
+      "previousTaskFinishing": "Detyra e mëparshme ende po përfundon. Ju lutemi prisni një moment.",
+      "serviceUnavailable": "Shërbimi nuk është i disponueshëm tani. Ju lutemi provoni përsëri.",
+      "connectionTrouble": "Probleme me lidhjen. Ju lutemi provoni përsëri pas një momenti."
     },
     "remoteSession": {
       "failedToCreate": "Dështoi krijimi i seancës në distancë",

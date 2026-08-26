@@ -1699,7 +1699,11 @@
       "couldNotLoadThisSession": "تعذّر تحميل هذه الجلسة",
       "cloneFailed": "تعذّر استنساخ هذه الجلسة.",
       "cloneFailedRetry": "تعذّر استنساخ هذه الجلسة. حاول مرة أخرى.",
-      "connectRepositoryToContinue": "اربط مستودعًا للمتابعة."
+      "connectRepositoryToContinue": "اربط مستودعًا للمتابعة.",
+      "notEnoughCredits": "لا توجد ائتمانات كافية لتشغيل Cloud Agent. أضف ائتمانات وحاول مرة أخرى.",
+      "previousTaskFinishing": "لا تزال المهمة السابقة قيد الإنجاز. يرجى الانتظار لحظة.",
+      "serviceUnavailable": "الخدمة غير متاحة الآن. يرجى المحاولة مرة أخرى.",
+      "connectionTrouble": "مشكلة في الاتصال. يرجى إعادة المحاولة بعد لحظة."
     },
     "remoteSession": {
       "failedToCreate": "تعذّر إنشاء الجلسة البعيدة",

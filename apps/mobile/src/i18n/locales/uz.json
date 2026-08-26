@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Ushbu sessiyani yuklab bo'lmadi",
       "cloneFailed": "Ushbu sessiyani klonlab bo'lmadi.",
       "cloneFailedRetry": "Ushbu sessiyani klonlab bo'lmadi. Qayta urinib ko'ring.",
-      "connectRepositoryToContinue": "Davom etish uchun repozitoriyaga ulaning."
+      "connectRepositoryToContinue": "Davom etish uchun repozitoriyaga ulaning.",
+      "notEnoughCredits": "Cloud Agent ishga tushirish uchun kredit yetarli emas. Kredit qo'shing va qayta urinib ko'ring.",
+      "previousTaskFinishing": "Oldingi vazifa hali ham tugamoqda. Iltimos, bir oz kuting.",
+      "serviceUnavailable": "Xizmat hozir mavjud emas. Iltimos, qayta urinib ko'ring.",
+      "connectionTrouble": "Ulanish muammosi. Iltimos, bir ozdan keyin qayta urinib ko'ring."
     },
     "remoteSession": {
       "failedToCreate": "Masofaviy sessiya yaratilmadi",

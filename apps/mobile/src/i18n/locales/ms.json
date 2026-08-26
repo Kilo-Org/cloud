@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini",
       "cloneFailed": "Tidak dapat mengklon sesi ini.",
       "cloneFailedRetry": "Tidak dapat mengklon sesi ini. Cuba lagi.",
-      "connectRepositoryToContinue": "Sambungkan repositori untuk meneruskan."
+      "connectRepositoryToContinue": "Sambungkan repositori untuk meneruskan.",
+      "notEnoughCredits": "Kredit tidak mencukupi untuk menjalankan Cloud Agent. Tambah kredit dan cuba semula.",
+      "previousTaskFinishing": "Tugas sebelumnya masih selesai. Sila tunggu sebentar.",
+      "serviceUnavailable": "Perkhidmatan tidak tersedia buat masa ini. Sila cuba semula.",
+      "connectionTrouble": "Masalah sambungan. Sila cuba semula sebentar lagi."
     },
     "remoteSession": {
       "failedToCreate": "Gagal mencipta sesi jauh",

@@ -2136,7 +2136,11 @@
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió",
       "cloneFailed": "No s'ha pogut clonar aquesta sessió.",
       "cloneFailedRetry": "No s'ha pogut clonar aquesta sessió. Torna-ho a provar.",
-      "connectRepositoryToContinue": "Connecta un repositori per continuar."
+      "connectRepositoryToContinue": "Connecta un repositori per continuar.",
+      "notEnoughCredits": "No tens prou crèdits per executar Cloud Agent. Afegeix crèdits i torna-ho a provar.",
+      "previousTaskFinishing": "La tasca anterior encara s'està acabant. Espera un moment.",
+      "serviceUnavailable": "El servei no està disponible ara mateix. Torna-ho a provar.",
+      "connectionTrouble": "Problema de connexió. Torna-ho a provar d'aquí a un moment."
     },
     "remoteSession": {
       "failedToCreate": "No s'ha pogut crear la sessió remota",

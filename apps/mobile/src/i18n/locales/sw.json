@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Haikuweza kupakia kikao hiki",
       "cloneFailed": "Haikuweza kunakili kikao hiki.",
       "cloneFailedRetry": "Haikuweza kunakili kikao hiki. Jaribu tena.",
-      "connectRepositoryToContinue": "Unganisha hazina kuendelea."
+      "connectRepositoryToContinue": "Unganisha hazina kuendelea.",
+      "notEnoughCredits": "Salio hazitoshi kuendesha Cloud Agent. Ongeza salio na ujaribu tena.",
+      "previousTaskFinishing": "Kazi iliyotangulia bado inakamilika. Tafadhali subiri kidogo.",
+      "serviceUnavailable": "Huduma haipatikani sasa hivi. Tafadhali jaribu tena.",
+      "connectionTrouble": "Tatizo la muunganisho. Tafadhali jaribu tena baada ya muda mfupi."
     },
     "remoteSession": {
       "failedToCreate": "Imeshindwa kuunda kikao cha mbali",

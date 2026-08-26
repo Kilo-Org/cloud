@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Не можа да се зареди тази сесия",
       "cloneFailed": "Не можа да се клонира тази сесия.",
       "cloneFailedRetry": "Не можа да се клонира тази сесия. Опитай отново.",
-      "connectRepositoryToContinue": "Свържи хранилище, за да продължиш."
+      "connectRepositoryToContinue": "Свържи хранилище, за да продължиш.",
+      "notEnoughCredits": "Няма достатъчно кредити за стартиране на Cloud Agent. Добавете кредити и опитайте отново.",
+      "previousTaskFinishing": "Предишната задача все още приключва. Моля, изчакайте момент.",
+      "serviceUnavailable": "Услугата в момента е недостъпна. Моля, опитайте отново.",
+      "connectionTrouble": "Проблем с връзката. Моля, опитайте отново след момент."
     },
     "remoteSession": {
       "failedToCreate": "Неуспешно създаване на отдалечена сесия",

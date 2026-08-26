@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "មិនអាចផ្ទុកវគ្គនេះ",
       "cloneFailed": "មិនអាចក្លូនវគ្គនេះបានទេ។",
       "cloneFailedRetry": "មិនអាចក្លូនវគ្គនេះបានទេ។ ព្យាយាមម្តងទៀត។",
-      "connectRepositoryToContinue": "ភ្ជាប់ឃ្លាំងកូដ ដើម្បីបន្ត។"
+      "connectRepositoryToContinue": "ភ្ជាប់ឃ្លាំងកូដ ដើម្បីបន្ត។",
+      "notEnoughCredits": "ឥណទានមិនគ្រប់គ្រាន់ដើម្បីដំណើរការ Cloud Agent ទេ។ បន្ថែមឥណទាន ហើយព្យាយាមម្តងទៀត។",
+      "previousTaskFinishing": "កិច្ចការមុនកំពុងបញ្ចប់នៅឡើយ។ សូមរង់ចាំបន្តិច។",
+      "serviceUnavailable": "សេវាកម្មមិនអាចប្រើបាននៅពេលនេះទេ។ សូមព្យាយាមម្តងទៀត។",
+      "connectionTrouble": "បញ្ហាការតភ្ជាប់។ សូមព្យាយាមម្តងទៀតក្នុងពេលបន្តិចទៀត។"
     },
     "remoteSession": {
       "failedToCreate": "បរាជ័យក្នុងការបង្កើតវគ្គពីចម្ងាយ",

@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "ບໍ່ສາມາດໂຫຼດເຊດຊັນນີ້",
       "cloneFailed": "ບໍ່ສາມາດສຳເນົາເຊດຊັນນີ້.",
       "cloneFailedRetry": "ບໍ່ສາມາດສຳເນົາເຊດຊັນນີ້. ລອງໃໝ່.",
-      "connectRepositoryToContinue": "ເຊື່ອມຕໍ່ບ່ອນເກັບລະຫັດເພື່ອສືບຕໍ່."
+      "connectRepositoryToContinue": "ເຊື່ອມຕໍ່ບ່ອນເກັບລະຫັດເພື່ອສືບຕໍ່.",
+      "notEnoughCredits": "ບໍ່ມີເຄຣດິດພຽງພໍທີ່ຈະໃຊ້ Cloud Agent. ເພີ່ມເຄຣດິດແລ້ວລອງໃໝ່.",
+      "previousTaskFinishing": "ວຽກກ່ອນໜ້າຍັງບໍ່ທັນສຳເລັດ. ກະລຸນາລໍຖ້າເລັກນ້ອຍ.",
+      "serviceUnavailable": "ບໍລິການບໍ່ສາມາດໃຊ້ໄດ້ໃນຕອນນີ້. ກະລຸນາລອງໃໝ່.",
+      "connectionTrouble": "ມີບັນຫາການເຊື່ອມຕໍ່. ກະລຸນາລອງໃໝ່ໃນອີກເລັກນ້ອຍ."
     },
     "remoteSession": {
       "failedToCreate": "ບໍ່ສາມາດສ້າງເຊດຊັນທາງໄກ",

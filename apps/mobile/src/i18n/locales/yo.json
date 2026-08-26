@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Ko le ṣe ikojọpọ akoko yii",
       "cloneFailed": "Ko le daakọ akoko yii.",
       "cloneFailedRetry": "Ko le daakọ akoko yii. Gbiyanju lẹẹkansi.",
-      "connectRepositoryToContinue": "So ibi ipamọ pọ lati tesiwaju."
+      "connectRepositoryToContinue": "So ibi ipamọ pọ lati tesiwaju.",
+      "notEnoughCredits": "Ko si kirẹditi to lati ṣiṣẹ Cloud Agent. Ṣafikun kirẹditi ki o tun gbiyanju.",
+      "previousTaskFinishing": "Iṣẹ́ ti o ti kọja ṣì ń pari. Jọwọ duro diẹ.",
+      "serviceUnavailable": "Iṣẹ naa ko si lọwọlọwọ. Jọwọ tun gbiyanju.",
+      "connectionTrouble": "Iṣoro asopọ. Jọwọ tun gbiyanju ni iṣẹju diẹ."
     },
     "remoteSession": {
       "failedToCreate": "Kuna lati ṣẹda akoko jijin",

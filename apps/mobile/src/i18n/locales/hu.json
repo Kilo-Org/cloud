@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Ennek a munkamenetnek a betöltése nem sikerült",
       "cloneFailed": "Ennek a munkamenetnek a klónozása nem sikerült.",
       "cloneFailedRetry": "Ennek a munkamenetnek a klónozása nem sikerült. Próbálja újra.",
-      "connectRepositoryToContinue": "Csatlakoztasson egy adattárat a folytatáshoz."
+      "connectRepositoryToContinue": "Csatlakoztasson egy adattárat a folytatáshoz.",
+      "notEnoughCredits": "Nincs elég kredit a Cloud Agent futtatásához. Adjon hozzá krediteket, és próbálja újra.",
+      "previousTaskFinishing": "Az előző feladat még befejeződik. Kérjük, várjon egy pillanatot.",
+      "serviceUnavailable": "A szolgáltatás jelenleg nem érhető el. Kérjük, próbálja újra.",
+      "connectionTrouble": "Kapcsolódási probléma. Kérjük, próbálja újra egy pillanat múlva."
     },
     "remoteSession": {
       "failedToCreate": "A távoli munkamenet létrehozása nem sikerült",

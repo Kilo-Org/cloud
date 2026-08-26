@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد",
       "cloneFailed": "شبیهسازی این نشست ممکن نشد.",
       "cloneFailedRetry": "شبیهسازی این نشست ممکن نشد. دوباره تلاش کنید.",
-      "connectRepositoryToContinue": "برای ادامه یک مخزن را وصل کنید."
+      "connectRepositoryToContinue": "برای ادامه یک مخزن را وصل کنید.",
+      "notEnoughCredits": "اعتبار کافی برای اجرای Cloud Agent وجود ندارد. اعتبار اضافه کنید و دوباره تلاش کنید.",
+      "previousTaskFinishing": "وظیفه قبلی هنوز در حال پایان است. لطفاً لحظهای صبر کنید.",
+      "serviceUnavailable": "سرویس در حال حاضر در دسترس نیست. لطفاً دوباره تلاش کنید.",
+      "connectionTrouble": "مشکل در اتصال. لطفاً لحظهای دیگر دوباره تلاش کنید."
     },
     "remoteSession": {
       "failedToCreate": "ایجاد نشست از راه دور شکست خورد",

@@ -1667,7 +1667,11 @@
       "couldNotLoadThisSession": "यह सत्र लोड नहीं हो सका",
       "cloneFailed": "यह सत्र क्लोन नहीं हो सका।",
       "cloneFailedRetry": "यह सत्र क्लोन नहीं हो सका। फिर से कोशिश करें।",
-      "connectRepositoryToContinue": "जारी रखने के लिए एक रिपॉज़िटरी कनेक्ट करें।"
+      "connectRepositoryToContinue": "जारी रखने के लिए एक रिपॉज़िटरी कनेक्ट करें।",
+      "notEnoughCredits": "Cloud Agent चलाने के लिए पर्याप्त क्रेडिट नहीं हैं. क्रेडिट जोड़ें और फिर से प्रयास करें.",
+      "previousTaskFinishing": "पिछला कार्य अभी भी पूरा हो रहा है. कृपया थोड़ा इंतज़ार करें.",
+      "serviceUnavailable": "सेवा अभी उपलब्ध नहीं है. कृपया फिर से प्रयास करें.",
+      "connectionTrouble": "कनेक्शन समस्या. कृपया थोड़ी देर में फिर से प्रयास करें."
     },
     "sessionConnection": {
       "connecting": "कनेक्ट हो रहा है…",

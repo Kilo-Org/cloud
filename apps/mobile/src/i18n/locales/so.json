@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Kalfadhigan lama shubay",
       "cloneFailed": "Kalfadhigan lama nuqulin.",
       "cloneFailedRetry": "Kalfadhigan lama nuqulin. Mar kale isku day.",
-      "connectRepositoryToContinue": "Ku xidh kayd si aad u sii waddo."
+      "connectRepositoryToContinue": "Ku xidh kayd si aad u sii waddo.",
+      "notEnoughCredits": "Kuma filna dheeraadka si loo shideeyo Cloud Agent. Ku dar dheeraadka oo mar kale isku day.",
+      "previousTaskFinishing": "Hawsha hore weli way dhammaanaysaa. Fadlan sug daqiiqad.",
+      "serviceUnavailable": "Adeeggu hadda ma jiro. Fadlan mar kale isku day.",
+      "connectionTrouble": "Dhibaato xiriir. Fadlan mar kale isku day daqiiqad."
     },
     "remoteSession": {
       "failedToCreate": "Abuuridda kalfadhiga fog way fashilantay",

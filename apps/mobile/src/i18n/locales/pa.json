@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "ਇਹ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
       "cloneFailed": "ਇਹ ਸੈਸ਼ਨ ਕਲੋਨ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "cloneFailedRetry": "ਇਹ ਸੈਸ਼ਨ ਕਲੋਨ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "connectRepositoryToContinue": "ਜਾਰੀ ਰੱਖਣ ਲਈ ਇੱਕ ਰਿਪੋਜ਼ਟਰੀ ਕਨੈਕਟ ਕਰੋ।"
+      "connectRepositoryToContinue": "ਜਾਰੀ ਰੱਖਣ ਲਈ ਇੱਕ ਰਿਪੋਜ਼ਟਰੀ ਕਨੈਕਟ ਕਰੋ।",
+      "notEnoughCredits": "Cloud Agent ਚਲਾਉਣ ਲਈ ਕਾਫ਼ੀ ਕ੍ਰੈਡਿਟ ਨਹੀਂ ਹਨ। ਕ੍ਰੈਡਿਟ ਜੋੜੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "previousTaskFinishing": "ਪਿਛਲਾ ਕੰਮ ਅਜੇ ਖਤਮ ਹੋ ਰਿਹਾ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਪਲ ਉਡੀਕੋ।",
+      "serviceUnavailable": "ਸੇਵਾ ਇਸ ਸਮੇਂ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "connectionTrouble": "ਕਨੈਕਸ਼ਨ ਸਮੱਸਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਪਲ ਬਾਅਦ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "remoteSession": {
       "failedToCreate": "ਰਿਮੋਟ ਸੈਸ਼ਨ ਬਣਾਉਣ ਵਿੱਚ ਅਸਫਲ",

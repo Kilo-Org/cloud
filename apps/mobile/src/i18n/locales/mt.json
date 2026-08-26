@@ -2166,7 +2166,11 @@
       "couldNotLoadThisSession": "Ma setgħetx titgħabba din is-sessjoni",
       "cloneFailed": "Ma setgħetx tiġi kklonjata din is-sessjoni.",
       "cloneFailedRetry": "Ma setgħetx tiġi kklonjata din is-sessjoni. Erġa' pprova.",
-      "connectRepositoryToContinue": "Ikkonnettja repożitorju biex tkompli."
+      "connectRepositoryToContinue": "Ikkonnettja repożitorju biex tkompli.",
+      "notEnoughCredits": "Kreditu mhux biżżejjed biex tħaddem Cloud Agent. Żid il-kreditu u erġa' pprova.",
+      "previousTaskFinishing": "Il-kompitu preċedenti għadu qed jintemm. Jekk jogħġbok stenna mument.",
+      "serviceUnavailable": "Is-servizz mhux disponibbli bħalissa. Jekk jogħġbok erġa' pprova.",
+      "connectionTrouble": "Problema ta' konnessjoni. Jekk jogħġbok erġa' pprova fi ftit."
     },
     "remoteSession": {
       "failedToCreate": "Ma rnexxiliex tinħoloq sessjoni remota",

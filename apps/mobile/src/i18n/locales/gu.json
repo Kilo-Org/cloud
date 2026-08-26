@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "આ સત્ર લોડ થઈ શક્યું નથી",
       "cloneFailed": "આ સત્ર ક્લોન થઈ શક્યું નથી.",
       "cloneFailedRetry": "આ સત્ર ક્લોન થઈ શક્યું નથી. ફરી પ્રયાસ કરો.",
-      "connectRepositoryToContinue": "ચાલુ રાખવા રિપોઝિટરી કનેક્ટ કરો."
+      "connectRepositoryToContinue": "ચાલુ રાખવા રિપોઝિટરી કનેક્ટ કરો.",
+      "notEnoughCredits": "Cloud Agent ચલાવવા માટે પૂરતા ક્રેડિટ નથી. ક્રેડિટ ઉમેરીને ફરી પ્રયાસ કરો.",
+      "previousTaskFinishing": "પાછલું કાર્ય હજી પૂરું થઈ રહ્યું છે. થોડી રાહ જુઓ.",
+      "serviceUnavailable": "સેવા હાલ ઉપલબ્ધ નથી. ફરી પ્રયાસ કરો.",
+      "connectionTrouble": "કનેક્શન સમસ્યા. થોડી વાર પછી ફરી પ્રયાસ કરો."
     },
     "remoteSession": {
       "failedToCreate": "રિમોટ સત્ર બનાવવામાં નિષ્ફળ",

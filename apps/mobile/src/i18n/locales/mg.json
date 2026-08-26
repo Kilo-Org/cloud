@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Tsy afaka namaky ity session ity",
       "cloneFailed": "Tsy afaka nitahiry dika ity session ity.",
       "cloneFailedRetry": "Tsy afaka nitahiry dika ity session ity. Andramo indray.",
-      "connectRepositoryToContinue": "Ampifandraiso repository mba hanohizana."
+      "connectRepositoryToContinue": "Ampifandraiso repository mba hanohizana.",
+      "notEnoughCredits": "Tsy ampy ny crédit handefasana ny Cloud Agent. Ampidiro crédit ary andramo indray.",
+      "previousTaskFinishing": "Ny asa teo aloha mbola vita. Andraso kely azafady.",
+      "serviceUnavailable": "Tsy misy ny serivisy amin'izao fotoana izao. Andramo indray azafady.",
+      "connectionTrouble": "Olana amin'ny fifandraisana. Andramo indray rehefa afaka kely."
     },
     "remoteSession": {
       "failedToCreate": "Tsy nahomby namorona session lavitra",

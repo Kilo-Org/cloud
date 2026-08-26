@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Enweghị ike ibudata nzukọ a",
       "cloneFailed": "Enweghị ike imepụta oyiri nzukọ a.",
       "cloneFailedRetry": "Enweghị ike imepụta oyiri nzukọ a. Nwaa ọzọ.",
-      "connectRepositoryToContinue": "Jikọọ ebe nchekwa iji gaa n'ihu."
+      "connectRepositoryToContinue": "Jikọọ ebe nchekwa iji gaa n'ihu.",
+      "notEnoughCredits": "Kredit ezughị ezu ịgba Cloud Agent. Tinye kredit ma nwaa ọzọ.",
+      "previousTaskFinishing": "Ọrụ gara aga ka na-agwụcha. Biko chere obere oge.",
+      "serviceUnavailable": "Ọrụ ahụ adịghị ugbu a. Biko nwaa ọzọ.",
+      "connectionTrouble": "Nsogbu njikọ. Biko nwaa ọzọ obere oge."
     },
     "remoteSession": {
       "failedToCreate": "Dara ịmepụta nzukọ dị anya",

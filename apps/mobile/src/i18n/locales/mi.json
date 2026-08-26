@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Kāore i taea te uta tēnei wātūtū",
       "cloneFailed": "Kāore i taea te tārua tēnei wātūtū.",
       "cloneFailedRetry": "Kāore i taea te tārua tēnei wātūtū. Whakamātau anō.",
-      "connectRepositoryToContinue": "Hono i tētahi pūranga kia haere tonu."
+      "connectRepositoryToContinue": "Hono i tētahi pūranga kia haere tonu.",
+      "notEnoughCredits": "Kāore i rawa ngā moni hei whakahaere i a Cloud Agent. Tāpirihia he moni, ka whakamātau anō.",
+      "previousTaskFinishing": "Kei te oti tonu te mahi o mua. Tatari kia iti.",
+      "serviceUnavailable": "Kāore te ratonga e wātea ana ināianei. Whakamātau anō.",
+      "connectionTrouble": "He raruraru hononga. Whakamātau anō i muri i tētahi wā poto."
     },
     "remoteSession": {
       "failedToCreate": "I rahua te hanga wātūtū mamao",

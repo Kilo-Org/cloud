@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Kunne ikke indlæse denne session",
       "cloneFailed": "Kunne ikke klone denne session.",
       "cloneFailedRetry": "Kunne ikke klone denne session. Prøv igen.",
-      "connectRepositoryToContinue": "Tilslut et repository for at fortsætte."
+      "connectRepositoryToContinue": "Tilslut et repository for at fortsætte.",
+      "notEnoughCredits": "Ikke nok kreditter til at køre Cloud Agent. Tilføj kreditter og prøv igen.",
+      "previousTaskFinishing": "Den forrige opgave er stadig i gang. Vent et øjeblik.",
+      "serviceUnavailable": "Tjenesten er ikke tilgængelig lige nu. Prøv igen.",
+      "connectionTrouble": "Forbindelsesproblem. Prøv igen om et øjeblik."
     },
     "remoteSession": {
       "failedToCreate": "Kunne ikke oprette fjernsession",

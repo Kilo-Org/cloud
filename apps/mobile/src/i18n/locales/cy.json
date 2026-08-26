@@ -2181,7 +2181,11 @@
       "couldNotLoadThisSession": "Methwyd llwytho'r sesiwn hon",
       "cloneFailed": "Methwyd clonio'r sesiwn hon.",
       "cloneFailedRetry": "Methwyd clonio'r sesiwn hon. Ceisiwch eto.",
-      "connectRepositoryToContinue": "Cysylltwch ystorfa i barhau."
+      "connectRepositoryToContinue": "Cysylltwch ystorfa i barhau.",
+      "notEnoughCredits": "Dim digon o gredydau i redeg Cloud Agent. Ychwanegwch gredydau a cheisiwch eto.",
+      "previousTaskFinishing": "Mae'r dasg flaenorol yn dal i orffen. Arhoswch funud.",
+      "serviceUnavailable": "Nid yw'r gwasanaeth ar gael ar hyn o bryd. Ceisiwch eto.",
+      "connectionTrouble": "Problem cysylltiad. Ceisiwch eto ymhen munud."
     },
     "remoteSession": {
       "failedToCreate": "Methodd creu sesiwn o bell",

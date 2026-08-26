@@ -1683,7 +1683,11 @@
       "couldNotLoadThisSession": "Не вдалося завантажити цей сеанс",
       "cloneFailed": "Не вдалося клонувати цей сеанс.",
       "cloneFailedRetry": "Не вдалося клонувати цей сеанс. Спробуйте ще раз.",
-      "connectRepositoryToContinue": "Підключіть репозиторій, щоб продовжити."
+      "connectRepositoryToContinue": "Підключіть репозиторій, щоб продовжити.",
+      "notEnoughCredits": "Недостатньо кредитів для запуску Cloud Agent. Додайте кредити та спробуйте ще раз.",
+      "previousTaskFinishing": "Попереднє завдання ще завершується. Зачекайте, будь ласка.",
+      "serviceUnavailable": "Сервіс зараз недоступний. Спробуйте ще раз, будь ласка.",
+      "connectionTrouble": "Проблеми зі з'єднанням. Спробуйте ще раз за мить."
     },
     "remoteSession": {
       "failedToCreate": "Не вдалося створити віддалений сеанс",

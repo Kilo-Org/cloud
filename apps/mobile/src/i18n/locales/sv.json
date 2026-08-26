@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Kunde inte läsa in den här sessionen",
       "cloneFailed": "Kunde inte klona den här sessionen.",
       "cloneFailedRetry": "Kunde inte klona den här sessionen. Försök igen.",
-      "connectRepositoryToContinue": "Anslut ett arkiv för att fortsätta."
+      "connectRepositoryToContinue": "Anslut ett arkiv för att fortsätta.",
+      "notEnoughCredits": "Inte tillräckligt med krediter för att köra Cloud Agent. Lägg till krediter och försök igen.",
+      "previousTaskFinishing": "Den föregående uppgiften håller fortfarande på att avslutas. Vänta en stund.",
+      "serviceUnavailable": "Tjänsten är inte tillgänglig just nu. Försök igen.",
+      "connectionTrouble": "Anslutningsproblem. Försök igen om en liten stund."
     },
     "remoteSession": {
       "failedToCreate": "Det gick inte att skapa fjärrsession",

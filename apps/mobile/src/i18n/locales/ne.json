@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "यो सत्र लोड गर्न सकिएन",
       "cloneFailed": "यो सत्र क्लोन गर्न सकिएन।",
       "cloneFailedRetry": "यो सत्र क्लोन गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
-      "connectRepositoryToContinue": "जारी राख्न एउटा भण्डार जडान गर्नुहोस्।"
+      "connectRepositoryToContinue": "जारी राख्न एउटा भण्डार जडान गर्नुहोस्।",
+      "notEnoughCredits": "Cloud Agent चलाउन पर्याप्त क्रेडिट छैन। क्रेडिट थपेर फेरि प्रयास गर्नुहोस्।",
+      "previousTaskFinishing": "अघिल्लो कार्य अझै समाप्त हुँदैछ। कृपया एक क्षण पर्खनुहोस्।",
+      "serviceUnavailable": "सेवा अहिले उपलब्ध छैन। फेरि प्रयास गर्नुहोस्।",
+      "connectionTrouble": "जडान समस्या। कृपया केही क्षणमा फेरि प्रयास गर्नुहोस्।"
     },
     "remoteSession": {
       "failedToCreate": "दूरस्थ सत्र सिर्जना गर्न असफल भयो",

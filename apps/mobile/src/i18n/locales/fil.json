@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Hindi ma-load ang session na ito",
       "cloneFailed": "Hindi ma-clone ang session na ito.",
       "cloneFailedRetry": "Hindi ma-clone ang session na ito. Subukang muli.",
-      "connectRepositoryToContinue": "Ikonekta ang repository para magpatuloy."
+      "connectRepositoryToContinue": "Ikonekta ang repository para magpatuloy.",
+      "notEnoughCredits": "Kulang ang credits para patakbuhin ang Cloud Agent. Magdagdag ng credits at subukan muli.",
+      "previousTaskFinishing": "Tinatapos pa lang ang nakaraang gawain. Pakihintay sandali.",
+      "serviceUnavailable": "Hindi available ang serbisyo ngayon. Pakisubukan muli.",
+      "connectionTrouble": "Problema sa koneksyon. Pakisubukan muli pagkalipas ng ilang sandali."
     },
     "remoteSession": {
       "failedToCreate": "Nabigong gumawa ng remote session",

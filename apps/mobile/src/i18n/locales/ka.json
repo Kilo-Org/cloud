@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "ეს სესია ვერ ჩაირთო",
       "cloneFailed": "ეს სესია ვერ დაიკლონა.",
       "cloneFailedRetry": "ეს სესია ვერ დაიკლონა. სცადეთ ხელახლა.",
-      "connectRepositoryToContinue": "გასაგრძელებლად დააკავშირეთ რეპოზიტორი."
+      "connectRepositoryToContinue": "გასაგრძელებლად დააკავშირეთ რეპოზიტორი.",
+      "notEnoughCredits": "Cloud Agent-ის გასაშვებად კრედიტი არ არის საკმარისი. დაამატეთ კრედიტი და სცადეთ თავიდან.",
+      "previousTaskFinishing": "წინა დავალება ჯერ კიდევ სრულდება. გთხოვთ, ცოტა ხანს დაელოდოთ.",
+      "serviceUnavailable": "სერვისი ამ დროისთვის მიუწვდომელია. გთხოვთ, სცადოთ თავიდან.",
+      "connectionTrouble": "კავშირის პრობლემა. გთხოვთ, ცოტა ხანში სცადოთ თავიდან."
     },
     "remoteSession": {
       "failedToCreate": "დისტანციური სესიის შექმნა ვერ მოხერხდა",

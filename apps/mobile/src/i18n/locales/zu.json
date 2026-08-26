@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Akukwazanga ukulayisha lesi seshini",
       "cloneFailed": "Akukwazanga ukuklona lesi seshini.",
       "cloneFailedRetry": "Akukwazanga ukuklona lesi seshini. Zama futhi.",
-      "connectRepositoryToContinue": "Xhuma i-repository ukuze uqhubeke."
+      "connectRepositoryToContinue": "Xhuma i-repository ukuze uqhubeke.",
+      "notEnoughCredits": "Azikho amakhredithi anele ukusebenzisa i-Cloud Agent. Engeza amakhredithi bese uzama futhi.",
+      "previousTaskFinishing": "Umsebenzi wangaphambilini usaqhubeka. Uyacelwa ukuthi ulinde isikhashana.",
+      "serviceUnavailable": "Inkonzo ayitholakali njengamanje. Uyacelwa ukuthi uzame futhi.",
+      "connectionTrouble": "Inkinga yokuxhumana. Uyacelwa ukuthi uzame futhi emuva kwesikhashana."
     },
     "remoteSession": {
       "failedToCreate": "Kwehlulekile ukudala iseshini ekude",

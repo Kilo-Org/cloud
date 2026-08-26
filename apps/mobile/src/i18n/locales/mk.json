@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Не можеше да се вчита оваа сесија",
       "cloneFailed": "Не можеше да се клонира оваа сесија.",
       "cloneFailedRetry": "Не можеше да се клонира оваа сесија. Обиди се повторно.",
-      "connectRepositoryToContinue": "Поврзи складиште за да продолжиш."
+      "connectRepositoryToContinue": "Поврзи складиште за да продолжиш.",
+      "notEnoughCredits": "Нема доволно кредити за да се изврши Cloud Agent. Додај кредити и обиди се повторно.",
+      "previousTaskFinishing": "Претходната задача сè уште се завршува. Почекај момент.",
+      "serviceUnavailable": "Услугата во моментов не е достапна. Обиди се повторно.",
+      "connectionTrouble": "Проблем со врската. Обиди се повторно по момент."
     },
     "remoteSession": {
       "failedToCreate": "Не успеа да се создаде далечинска сесија",

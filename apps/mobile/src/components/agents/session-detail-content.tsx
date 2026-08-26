@@ -1439,11 +1439,12 @@ export function SessionDetailContent({
       messageCount: messages.length,
     });
     if (terminalError) {
-      const copyText = buildTerminalErrorCopyText(
+      const copyText = buildTerminalErrorCopyText({
         sessionId,
-        terminalError.title,
-        terminalError.message
-      );
+        title: terminalError.title,
+        message: terminalError.message,
+        detail: terminalError.detail,
+      });
       return (
         <View className="flex-1 items-center justify-center gap-3 px-6">
           <QueryError

@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Pa t 'kapab chaje sesyon sa a",
       "cloneFailed": "Pa t 'kapab klone sesyon sa a.",
       "cloneFailedRetry": "Pa t 'kapab klone sesyon sa a. Eseye ankò.",
-      "connectRepositoryToContinue": "Konekte yon repo pou kontinye."
+      "connectRepositoryToContinue": "Konekte yon repo pou kontinye.",
+      "notEnoughCredits": "Pa gen ase kredi pou kouri Cloud Agent. Ajoute kredi epi eseye ankò.",
+      "previousTaskFinishing": "Travay anvan an poko fini. Tanpri tann yon ti moman.",
+      "serviceUnavailable": "Sèvis la pa disponib kounye a. Tanpri eseye ankò.",
+      "connectionTrouble": "Pwoblèm koneksyon. Tanpri eseye ankò nan yon moman."
     },
     "remoteSession": {
       "failedToCreate": "Echwe pou kreye sesyon aleka",

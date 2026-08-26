@@ -1667,7 +1667,11 @@
       "couldNotLoadThisSession": "无法加载此会话",
       "cloneFailed": "无法克隆此会话。",
       "cloneFailedRetry": "无法克隆此会话。请重试。",
-      "connectRepositoryToContinue": "连接一个仓库以继续。"
+      "connectRepositoryToContinue": "连接一个仓库以继续。",
+      "notEnoughCredits": "运行 Cloud Agent 的积分不足。请添加积分后重试。",
+      "previousTaskFinishing": "上一个任务仍在进行中。请稍等片刻。",
+      "serviceUnavailable": "服务当前不可用。请重试。",
+      "connectionTrouble": "连接出现问题。请稍后重试。"
     },
     "remoteSession": {
       "failedToCreate": "创建远程会话失败",

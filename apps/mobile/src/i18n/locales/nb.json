@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Kunne ikke laste inn denne økten",
       "cloneFailed": "Kunne ikke klone denne økten.",
       "cloneFailedRetry": "Kunne ikke klone denne økten. Prøv igjen.",
-      "connectRepositoryToContinue": "Koble til et repository for å fortsette."
+      "connectRepositoryToContinue": "Koble til et repository for å fortsette.",
+      "notEnoughCredits": "Ikke nok kreditt til å kjøre Cloud Agent. Legg til kreditt og prøv igjen.",
+      "previousTaskFinishing": "Den forrige oppgaven er fortsatt i gang. Vent et øyeblikk.",
+      "serviceUnavailable": "Tjenesten er utilgjengelig akkurat nå. Prøv igjen.",
+      "connectionTrouble": "Tilkoblingsproblemer. Prøv igjen om et øyeblikk."
     },
     "remoteSession": {
       "failedToCreate": "Klarte ikke å opprette ekstern økt",

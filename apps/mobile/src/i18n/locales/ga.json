@@ -2166,7 +2166,11 @@
       "couldNotLoadThisSession": "Níorbh fhéidir an seisiún seo a lódáil",
       "cloneFailed": "Níorbh fhéidir an seisiún seo a chlónáil.",
       "cloneFailedRetry": "Níorbh fhéidir an seisiún seo a chlónáil. Bain triail as arís.",
-      "connectRepositoryToContinue": "Ceangail stór chun leanúint ar aghaidh."
+      "connectRepositoryToContinue": "Ceangail stór chun leanúint ar aghaidh.",
+      "notEnoughCredits": "Níl go leor creidmheasanna agat chun Cloud Agent a rith. Cuir creidmheasanna leis agus bain triail as arís.",
+      "previousTaskFinishing": "Tá an tasc roimhe seo fós ag críochnú. Fan nóiméad le do thoil.",
+      "serviceUnavailable": "Níl an tseirbhís ar fáil faoi láthair. Bain triail as arís le do thoil.",
+      "connectionTrouble": "Fadhb cheangail. Bain triail as arís i gceann nóiméid."
     },
     "remoteSession": {
       "failedToCreate": "Theip ar sheisiún cianda a chruthú",

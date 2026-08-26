@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "یہ سیشن لوڈ نہیں ہو سکا",
       "cloneFailed": "یہ سیشن کلون نہیں ہو سکا۔",
       "cloneFailedRetry": "یہ سیشن کلون نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
-      "connectRepositoryToContinue": "جاری رکھنے کے لیے ریپوزٹری جڑیں۔"
+      "connectRepositoryToContinue": "جاری رکھنے کے لیے ریپوزٹری جڑیں۔",
+      "notEnoughCredits": "Cloud Agent چلانے کے لیے کافی کریڈٹس نہیں ہیں۔ کریڈٹس شامل کریں اور دوبارہ کوشش کریں۔",
+      "previousTaskFinishing": "پچھلا کام ابھی مکمل ہو رہا ہے۔ براہ کرم ایک لمحہ انتظار کریں۔",
+      "serviceUnavailable": "سروس اس وقت دستیاب نہیں ہے۔ براہ کرم دوبارہ کوشش کریں۔",
+      "connectionTrouble": "کنکشن کا مسئلہ۔ براہ کرم ایک لمحے بعد دوبارہ کوشش کریں۔"
     },
     "remoteSession": {
       "failedToCreate": "ریموٹ سیشن بنانا ناکام",

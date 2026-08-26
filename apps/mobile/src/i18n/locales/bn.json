@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "এই সেশনটি লোড করা যায়নি",
       "cloneFailed": "এই সেশনটি ক্লোন করা যায়নি।",
       "cloneFailedRetry": "এই সেশনটি ক্লোন করা যায়নি। আবার চেষ্টা করুন।",
-      "connectRepositoryToContinue": "চালিয়ে যেতে একটি রিপোজিটরি সংযোগ করুন।"
+      "connectRepositoryToContinue": "চালিয়ে যেতে একটি রিপোজিটরি সংযোগ করুন।",
+      "notEnoughCredits": "Cloud Agent চালানোর জন্য পর্যাপ্ত ক্রেডিট নেই। ক্রেডিট যোগ করে আবার চেষ্টা করুন।",
+      "previousTaskFinishing": "আগের কাজটি এখনও শেষ হচ্ছে। একটু অপেক্ষা করুন।",
+      "serviceUnavailable": "সেবাটি এখন অনুপলব্ধ। আবার চেষ্টা করুন।",
+      "connectionTrouble": "সংযোগ সমস্যা। কিছুক্ষণ পরে আবার চেষ্টা করুন।"
     },
     "remoteSession": {
       "failedToCreate": "দূরবর্তী সেশন তৈরি করতে ব্যর্থ",

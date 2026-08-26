@@ -1667,7 +1667,11 @@
       "couldNotLoadThisSession": "Bu oturum yüklenemedi",
       "cloneFailed": "Bu oturum kopyalanamadı.",
       "cloneFailedRetry": "Bu oturum kopyalanamadı. Tekrar deneyin.",
-      "connectRepositoryToContinue": "Devam etmek için bir depo bağlayın."
+      "connectRepositoryToContinue": "Devam etmek için bir depo bağlayın.",
+      "notEnoughCredits": "Cloud Agent'i çalıştırmak için yeterli kredi yok. Kredi ekleyip tekrar deneyin.",
+      "previousTaskFinishing": "Önceki görev hâlâ tamamlanıyor. Lütfen bir dakika bekleyin.",
+      "serviceUnavailable": "Hizmet şu anda kullanılamıyor. Lütfen tekrar deneyin.",
+      "connectionTrouble": "Bağlantı sorunu. Lütfen birazdan tekrar deneyin."
     },
     "remoteSession": {
       "failedToCreate": "Uzak oturum oluşturulamadı",

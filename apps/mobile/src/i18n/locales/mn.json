@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Энэ сессийг ачаалж чадсангүй",
       "cloneFailed": "Энэ сессийг клонлож чадсангүй.",
       "cloneFailedRetry": "Энэ сессийг клонлож чадсангүй. Дахин оролдоно уу.",
-      "connectRepositoryToContinue": "Үргэлжлүүлэхийн тулд репозиторийг холбоно уу."
+      "connectRepositoryToContinue": "Үргэлжлүүлэхийн тулд репозиторийг холбоно уу.",
+      "notEnoughCredits": "Cloud Agent ажиллуулахад хангалттай кредит байхгүй. Кредит нэмээд дахин оролдоно уу.",
+      "previousTaskFinishing": "Өмнөх ажил дуусаагүй байна. Түр хүлээнэ үү.",
+      "serviceUnavailable": "Үйлчилгээ яг одоо боломжгүй байна. Дахин оролдоно уу.",
+      "connectionTrouble": "Холболтын асуудал. Түр хүлээгээд дахин оролдоно уу."
     },
     "remoteSession": {
       "failedToCreate": "Алсын сесс үүсгэхэд амжилтгүй болсон",

@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Бұл сессияны жүктеу мүмкін болмады",
       "cloneFailed": "Бұл сессияны клондау мүмкін болмады.",
       "cloneFailedRetry": "Бұл сессияны клондау мүмкін болмады. Қайталап көріңіз.",
-      "connectRepositoryToContinue": "Жалғастыру үшін репозиторийді қосыңыз."
+      "connectRepositoryToContinue": "Жалғастыру үшін репозиторийді қосыңыз.",
+      "notEnoughCredits": "Cloud Agent іске қосуға кредит жеткіліксіз. Кредит қосып, қайта көріңіз.",
+      "previousTaskFinishing": "Алдыңғы тапсырма әлі аяқталуда. Сәл күте тұрыңыз.",
+      "serviceUnavailable": "Қызмет қазір қолжетімсіз. Қайталап көріңіз.",
+      "connectionTrouble": "Байланыс ақауы. Сәлден кейін қайта көріңіз."
     },
     "remoteSession": {
       "failedToCreate": "Қашықтағы сессияны құру сәтсіз аяқталды",

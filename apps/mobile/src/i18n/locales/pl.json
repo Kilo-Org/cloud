@@ -1683,7 +1683,11 @@
       "couldNotLoadThisSession": "Nie udało się załadować tej sesji",
       "cloneFailed": "Nie udało się sklonować tej sesji.",
       "cloneFailedRetry": "Nie udało się sklonować tej sesji. Spróbuj ponownie.",
-      "connectRepositoryToContinue": "Połącz repozytorium, aby kontynuować."
+      "connectRepositoryToContinue": "Połącz repozytorium, aby kontynuować.",
+      "notEnoughCredits": "Za mało kredytów, aby uruchomić Cloud Agent. Dodaj kredyty i spróbuj ponownie.",
+      "previousTaskFinishing": "Poprzednie zadanie wciąż się kończy. Proszę chwilę poczekać.",
+      "serviceUnavailable": "Usługa jest teraz niedostępna. Spróbuj ponownie.",
+      "connectionTrouble": "Problem z połączeniem. Spróbuj ponownie za chwilę."
     },
     "remoteSession": {
       "failedToCreate": "Nie udało się utworzyć sesji zdalnej",

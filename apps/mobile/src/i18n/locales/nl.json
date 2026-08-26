@@ -1667,7 +1667,11 @@
       "couldNotLoadThisSession": "Deze sessie kon niet worden geladen",
       "cloneFailed": "Deze sessie kon niet worden gekloond.",
       "cloneFailedRetry": "Deze sessie kon niet worden gekloond. Probeer het opnieuw.",
-      "connectRepositoryToContinue": "Verbind een repository om door te gaan."
+      "connectRepositoryToContinue": "Verbind een repository om door te gaan.",
+      "notEnoughCredits": "Niet genoeg credits om Cloud Agent te starten. Voeg credits toe en probeer opnieuw.",
+      "previousTaskFinishing": "De vorige taak is nog bezig. Even geduld.",
+      "serviceUnavailable": "De service is momenteel niet beschikbaar. Probeer het opnieuw.",
+      "connectionTrouble": "Verbindingsprobleem. Probeer het over een moment opnieuw."
     },
     "remoteSession": {
       "failedToCreate": "Externe sessie maken mislukt",

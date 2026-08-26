@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Չհաջողվեց բեռնել այս նիստը",
       "cloneFailed": "Չհաջողվեց կլոնավորել այս նիստը։",
       "cloneFailedRetry": "Չհաջողվեց կլոնավորել այս նիստը։ Կրկին փորձեք։",
-      "connectRepositoryToContinue": "Միացրեք պահոցը՝ շարունակելու համար։"
+      "connectRepositoryToContinue": "Միացրեք պահոցը՝ շարունակելու համար։",
+      "notEnoughCredits": "Cloud Agent-ը գործարկելու համար բավարար կրեդիտ չկա։ Ավելացրեք կրեդիտ և փորձեք կրկին։",
+      "previousTaskFinishing": "Նախորդ առաջադրանքը դեռ ավարտվում է։ Խնդրում ենք սպասել մի պահ։",
+      "serviceUnavailable": "Ծառայությունն այս պահին հասանելի չէ։ Խնդրում ենք փորձեք կրկին։",
+      "connectionTrouble": "Կապի խնդիր։ Խնդրում ենք փորձեք կրկին մի պահ հետո։"
     },
     "remoteSession": {
       "failedToCreate": "Չհաջողվեց ստեղծել հեռավոր նիստ",

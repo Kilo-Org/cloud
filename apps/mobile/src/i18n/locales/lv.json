@@ -2136,7 +2136,11 @@
       "couldNotLoadThisSession": "Neizdevās ielādēt šo sesiju",
       "cloneFailed": "Neizdevās klonēt šo sesiju.",
       "cloneFailedRetry": "Neizdevās klonēt šo sesiju. Mēģini vēlreiz.",
-      "connectRepositoryToContinue": "Savieno repozitoriju, lai turpinātu."
+      "connectRepositoryToContinue": "Savieno repozitoriju, lai turpinātu.",
+      "notEnoughCredits": "Nepietiek kredītu, lai palaistu Cloud Agent. Pievieno kredītus un mēģini vēlreiz.",
+      "previousTaskFinishing": "Iepriekšējais uzdevums joprojām tiek pabeigts. Lūdzu, uzgaidi mirkli.",
+      "serviceUnavailable": "Pakalpojums šobrīd nav pieejams. Lūdzu, mēģini vēlreiz.",
+      "connectionTrouble": "Savienojuma problēma. Lūdzu, mēģini vēlreiz pēc mirkļa."
     },
     "remoteSession": {
       "failedToCreate": "Neizdevās izveidot attālo sesiju",

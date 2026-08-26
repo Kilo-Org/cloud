@@ -2151,7 +2151,11 @@
       "couldNotLoadThisSession": "Te seje ni bilo mogoče naložiti",
       "cloneFailed": "Te seje ni bilo mogoče klonirati.",
       "cloneFailedRetry": "Te seje ni bilo mogoče klonirati. Poskusi znova.",
-      "connectRepositoryToContinue": "Poveži skladišče za nadaljevanje."
+      "connectRepositoryToContinue": "Poveži skladišče za nadaljevanje.",
+      "notEnoughCredits": "Premalo kreditov za zagon Cloud Agent. Dodajte kredite in poskusite znova.",
+      "previousTaskFinishing": "Prejšnja naloga se še dokončuje. Počakajte trenutek.",
+      "serviceUnavailable": "Storitev trenutno ni na voljo. Poskusite znova.",
+      "connectionTrouble": "Težava s povezavo. Poskusite znova čez trenutek."
     },
     "remoteSession": {
       "failedToCreate": "Oddaljene seje ni bilo mogoče ustvariti",

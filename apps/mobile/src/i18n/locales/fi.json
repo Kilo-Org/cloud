@@ -2121,7 +2121,11 @@
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
       "cloneFailed": "Tätä istuntoa ei voitu kloonata.",
       "cloneFailedRetry": "Tätä istuntoa ei voitu kloonata. Yritä uudelleen.",
-      "connectRepositoryToContinue": "Yhdistä arkisto jatkaaksesi."
+      "connectRepositoryToContinue": "Yhdistä arkisto jatkaaksesi.",
+      "notEnoughCredits": "Ei riittävästi krediittejä Cloud Agentin käyttämiseen. Lisää krediittejä ja yritä uudelleen.",
+      "previousTaskFinishing": "Edellinen tehtävä on vielä viimeistelyssä. Odota hetki.",
+      "serviceUnavailable": "Palvelu ei ole tällä hetkellä käytettävissä. Yritä uudelleen.",
+      "connectionTrouble": "Yhteysongelma. Yritä uudelleen hetken kuluttua."
     },
     "remoteSession": {
       "failedToCreate": "Etäistunnon luonti epäonnistui",

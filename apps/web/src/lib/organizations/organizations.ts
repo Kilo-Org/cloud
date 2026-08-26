@@ -41,6 +41,7 @@ import { captureOrganizationMemberJoined } from '@/lib/organizations/organizatio
 import { failureResult, successResult } from '@/lib/maybe-result';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
+import { removeOrganizationAlertRecipients } from '@/lib/organizations/alerts/alert-lifecycle';
 
 export async function getOrganizationById(
   id: Organization['id'],
@@ -1057,6 +1058,8 @@ export async function markOrganizationAsDeleted(
   organizationId: Organization['id'],
   txn?: DrizzleTransaction
 ): Promise<void> {
+  // Deletion is soft, so cleanup that normally relies on foreign-key cascades
+  // must run atomically with the deletion itself.
   const execute = async (tx: DrizzleTransaction) => {
     const [organization] = await tx
       .select({ id: organizations.id })
@@ -1071,6 +1074,7 @@ export async function markOrganizationAsDeleted(
       .update(organizations)
       .set({ ...auto_deleted_at })
       .where(eq(organizations.id, organizationId));
+    await removeOrganizationAlertRecipients(tx, organizationId);
   };
   if (txn) await execute(txn);
   else await db.transaction(execute);

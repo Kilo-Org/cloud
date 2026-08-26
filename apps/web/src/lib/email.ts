@@ -19,6 +19,7 @@ export const subjects = {
   signInCode: 'Your Kilo Code sign-in code',
   balanceAlert: 'Kilo: Low Balance Alert',
   spendAlert: 'Kilo: Spend alert',
+  monthlySpendingAlert: 'Kilo: Monthly Spending Alert',
   autoTopUpFailed: 'Kilo: Auto Top-Up Failed',
   codeReviewDisabled: 'Action Required: Code Reviewer Disabled',
   ossInviteNewUser: 'Kilo: OSS Sponsorship Offer',
@@ -452,6 +453,33 @@ export async function sendSpendAlertEmail(
     await Promise.all(to.slice(i, i + BATCH_SIZE).map(sendToRecipient));
   }
   return outcome;
+}
+
+/**
+ * Sends one monthly spending alert to one recipient. Unlike the low balance
+ * alert this deliberately takes a single address: the caller owns a durable
+ * per-recipient delivery claim and must record each recipient's outcome
+ * separately.
+ */
+export async function sendMonthlySpendingAlertEmail(props: {
+  to: string;
+  organizationId: Organization['id'];
+  organizationName: string;
+  thresholdUsd: string;
+  spendUsd: string;
+  periodLabel: string;
+}): Promise<SendResult> {
+  return send({
+    to: props.to,
+    templateName: 'monthlySpendingAlert',
+    templateVars: {
+      organization_name: props.organizationName,
+      threshold_usd: props.thresholdUsd,
+      spend_usd: props.spendUsd,
+      period_label: props.periodLabel,
+      alerts_url: `${NEXTAUTH_URL}/organizations/${props.organizationId}/alerts`,
+    },
+  });
 }
 
 const ossTierConfig = {

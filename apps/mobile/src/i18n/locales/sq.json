@@ -151,8 +151,8 @@
     "appearanceLight": "E çelët",
     "appearanceDark": "E errët",
     "account": "Llogaria",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Shtoni atributin e aplikacionit në rishikimet PR",
+    "prReviewAttributionSubtitle": "Shtoni një fundshënim \"Reviewed via Kilo\" kur paraqisni një rishikim."
   },
   "prReview": {
     "pullRequestUnavailable": "Kërkesa e tërheqjes e padisponueshme",
@@ -2186,7 +2186,7 @@
       "keepEditing": "Vazhdo redaktimin",
       "discard": "Hidhe",
       "discardFailed": "Nuk u hoq drafti. Ju lutemi provoni përsëri.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Ekzekutoni `kilo remote` në kompjuterin tuaj, ose `/remote` në një sesion CLI që po ekzekutohet, për të kontrolluar një proces lokal kilo."
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar",

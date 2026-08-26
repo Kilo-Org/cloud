@@ -41,6 +41,41 @@ const WORDING_EXCEPTIONS = JSON.parse(
   readFileSync(join(ROOT, 'tools/i18n/wording-exceptions.json'), 'utf8')
 );
 
+/**
+ * Proper nouns, format-only strings, and pre-existing English-identical copy
+ * outside this section's five keys. Remove a key from the set when that copy
+ * is translated or the key is deleted.
+ */
+const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
+  'profile.providerAnaconda',
+  'profile.providerApple',
+  'profile.providerDiscord',
+  'profile.providerGithub',
+  'profile.providerGitlab',
+  'profile.providerGoogle',
+  'profile.providerLinkedin',
+  'kiloclaw.status.vcpuValue',
+  'securityAgent.findingDetails.cve',
+  'securityAgent.findingDetails.ghsa',
+  'securityAgent.findingDetails.sourceDependabot',
+  'agentChat.toolCard.toolBash',
+  'agentChat.toolCard.toolGlob',
+  'agentChat.toolCard.toolGrep',
+  'agentChat.modelCost.perMillion',
+  'agentChat.questionCard.option',
+  'agentChat.sessionFilter.platformCli',
+  'agentChat.sessionFilter.platformSlack',
+  'agentChat.sessionFilter.platformGithub',
+  'agentChat.sessionFilter.platformLinear',
+  'agentChat.prBadge.label',
+  'home.noLiveSessions',
+  'share.reviewPrSubtitle',
+  // Format-only strings with no translatable words: a placeholder-only screen
+  // title and a placeholder-plus-UTC time-range label.
+  'prReview.screen.title',
+  'securityAgent.auditReport.periodUtc',
+]);
+
 /** The supported tags, read from the one source of truth. */
 function supportedLanguages() {
   const source = readFileSync(LANGUAGES_FILE, 'utf8');
@@ -363,12 +398,15 @@ for (const catalog of CATALOGS) {
     }
   }
 
+  const localeValues = new Map();
+
   for (const tag of present) {
     if (tag === 'en') {
       continue;
     }
     const label = `${catalog.name}/${tag}`;
     const translated = flatten(parseCatalog(join(catalog.dir, `${tag}.json`), label));
+    localeValues.set(tag, translated);
     const ownValues = new Set(translated.values());
 
     for (const key of english.keys()) {
@@ -496,6 +534,30 @@ for (const catalog of CATALOGS) {
         fail(
           `${label}: English "${source}" is translated ${variants.size} ways: ${shown}. Pick one, or list the English string in tools/i18n/wording-exceptions.json under "${tag}".`
         );
+      }
+    }
+  }
+
+  // A mobile key whose value equals English in every non-English locale was
+  // never translated. Allowlist the proper nouns and format-only strings that
+  // are legitimately identical; fail everything else.
+  if (catalog.name === 'mobile') {
+    for (const [key, englishValue] of english) {
+      if (ENGLISH_IDENTICAL_ALLOWLIST.has(key)) {
+        continue;
+      }
+      let allEqual = true;
+      for (const tag of present) {
+        if (tag === 'en') {
+          continue;
+        }
+        if (localeValues.get(tag).get(key) !== englishValue) {
+          allEqual = false;
+          break;
+        }
+      }
+      if (allEqual) {
+        fail(`mobile: "${key}" equals English in every locale`);
       }
     }
   }

@@ -151,8 +151,8 @@
     "appearanceLight": "Ifa",
     "appearanceDark": "Dukkana",
     "account": "Herrega",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "App attribution PR sakatta'ootti dabali",
+    "prReviewAttributionSubtitle": "Kilo ttiin 'Reviewed via Kilo' footar dabali, sakatta'a yeroo galchitu."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request hin jiraatu",
@@ -2186,7 +2186,7 @@
       "keepEditing": "Gulaala itti fufi",
       "discard": "Haqi",
       "discardFailed": "Daaftarii haquu hin dandeenye. Mee deebi'ee yaali.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "`kilo remote` kompuutara kee irratti baasi, ykn saffata CLI keessa jiru keessatti `/remote` baasi, kiloo lokalii to'achuuf."
     },
     "partRenderer": {
       "updatedFileCount_one": "Faayilii {{displayCount}} haaromfame",

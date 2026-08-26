@@ -151,8 +151,8 @@
     "appearanceLight": "Ukukhanya",
     "appearanceDark": "Ubumnyama",
     "account": "Akhawunti",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Engeza ukukhonjwa kohlelo lokusebenza ezibuyekezweni ze-PR",
+    "prReviewAttributionSubtitle": "Engeza umugqa 'Reviewed via Kilo' uma uthumela isibuyekezo."
   },
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokudonsa asitholakali",
@@ -2186,7 +2186,7 @@
       "keepEditing": "Qhubeka uhlela",
       "discard": "Lahla",
       "discardFailed": "Akukwazanga ukulahla idrafuthi. Sicela uzame futhi.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Sebenzisa i-`kilo remote` kukhompyutha yakho, noma i-`/remote` kuseshini ye-CLI esebenzayo, ukuze ulawule inqubo ye-kilo yasendaweni."
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}",

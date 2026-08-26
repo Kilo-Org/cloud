@@ -151,8 +151,8 @@
     "appearanceLight": "สว่าง",
     "appearanceDark": "มืด",
     "account": "บัญชี",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "เพิ่มการระบุแหล่งที่มาของแอปในรีวิว PR",
+    "prReviewAttributionSubtitle": "ผนวกส่วนท้าย \"Reviewed via Kilo\" เมื่อคุณส่งรีวิว"
   },
   "prReview": {
     "pullRequestUnavailable": "ไม่สามารถใช้ pull request ได้",
@@ -2186,7 +2186,7 @@
       "keepEditing": "แก้ไขต่อไป",
       "discard": "ละทิ้ง",
       "discardFailed": "ไม่สามารถทิ้งฉบับร่างได้ กรุณาลองอีกครั้ง",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "รัน `kilo remote` บนคอมพิวเตอร์ของคุณ หรือ `/remote` ในเซสชัน CLI ที่กำลังรันอยู่ เพื่อควบคุมกระบวนการ kilo ภายในเครื่อง"
     },
     "partRenderer": {
       "updatedFileCount_one": "อัปเดต {{displayCount}} ไฟล์",

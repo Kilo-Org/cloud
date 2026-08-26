@@ -151,8 +151,8 @@
     "appearanceLight": "हल्का",
     "appearanceDark": "गाढा",
     "account": "खाता",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR समीक्षाहरूमा एप विशेषता थप्नुहोस्",
+    "prReviewAttributionSubtitle": "समीक्षा पेश गर्दा Reviewed via Kilo फुटर थप्नुहोस्।"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल अनुरोध उपलब्ध छैन",
@@ -2186,7 +2186,7 @@
       "keepEditing": "सम्पादन जारी राख्नुहोस्",
       "discard": "खारेज गर्नुहोस्",
       "discardFailed": "ड्राफ्ट खारेज गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "आफ्नो कम्प्युटरमा `kilo remote` चलाउनुहोस्, वा चलिरहेको CLI सत्रमा `/remote` प्रयोग गरेर स्थानीय kilo प्रक्रिया नियन्त्रण गर्नुहोस्।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्यावधिक गरियो",

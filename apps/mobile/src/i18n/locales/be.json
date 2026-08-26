@@ -151,8 +151,8 @@
     "appearanceLight": "Светлая",
     "appearanceDark": "Цёмная",
     "account": "Уліковы запіс",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Дадаваць атрыбуцыю дадатку да рэцэнзій PR",
+    "prReviewAttributionSubtitle": "Дадаваць футэр «Reviewed via Kilo» пры адпраўцы рэцэнзіі."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request недаступны",
@@ -2216,7 +2216,7 @@
       "keepEditing": "Працягваць рэдагаванне",
       "discard": "Адхіліць",
       "discardFailed": "Не атрымалася адхіліць чарнавік. Паспрабуйце зноў.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Запусціце `kilo remote` на вашым камп'ютары або `/remote` у працуючым сеансе CLI, каб кіраваць лакальным працэсам kilo."
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл",

@@ -151,8 +151,8 @@
     "appearanceLight": "Haske",
     "appearanceDark": "Duhu",
     "account": "Asusu",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Ƙara asalin app a cikin bitar PR",
+    "prReviewAttributionSubtitle": "Ƙara rubutun ƙasa na \"An bita ta Kilo\" lokacin da ka ƙaddamar da bita."
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar jan ba ta samuwa",
@@ -2186,7 +2186,7 @@
       "keepEditing": "Ci gaba da gyarawa",
       "discard": "Watsi",
       "discardFailed": "An kasa watsi da daftarin. Da fatan za a sake gwadawa.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Gudanar da `kilo remote` a kan kwamfutarka, ko `/remote` a zaman CLI mai aiki, don sarrafa tsarin kilo na gida."
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta {{displayCount}} fayil",

@@ -151,8 +151,8 @@
     "appearanceLight": "ብርሃን",
     "appearanceDark": "ጨለማ",
     "account": "መለያ",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "የመተግበሪያ መለያን ወደ PR ግምገማዎች ያክሉ",
+    "prReviewAttributionSubtitle": "ግምገማ ሲያስገቡ የ'በKilo ተገምግሟል' ግርጌ ያክሉ።"
   },
   "prReview": {
     "pullRequestUnavailable": "የጎተራ ጥያቄ የለም",
@@ -2186,7 +2186,7 @@
       "keepEditing": "ማስተካከል ይቀጥሉ",
       "discard": "ያስወግዱ",
       "discardFailed": "ረቂቁን ማስወገድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "አንድ የአካባቢ kilo ሂደት ለመቆጣጠር በኮምፒውተርዎ ላይ `kilo remote` ያሂዱ፣ ወይም እየሰራ ባለ የCLI ክፍለ-ጊዜ ውስጥ `/remote` ይጠቀሙ።"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ፋይል ተዘምኗል",

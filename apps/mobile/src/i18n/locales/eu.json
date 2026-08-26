@@ -151,8 +151,8 @@
     "appearanceLight": "Argia",
     "appearanceDark": "Iluna",
     "account": "Kontua",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Gehitu aplikazioaren atribuzioa PR berrikuspenetan",
+    "prReviewAttributionSubtitle": "Erantsi 'Kilo-ren bidez berrikusia' orri-oina berrikuspen bat bidaltzen duzunean."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request-a ez dago eskuragarri",
@@ -2186,7 +2186,7 @@
       "keepEditing": "Jarraitu editatzen",
       "discard": "Baztertu",
       "discardFailed": "Ezin da zirriborroa baztertu. Saiatu berriro.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Exekutatu `kilo remote` zure ordenagailuan, edo `/remote` exekutatzen ari den CLI saio batean, tokiko kilo prozesu bat kontrolatzeko."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxategi eguneratu da",

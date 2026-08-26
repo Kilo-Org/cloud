@@ -151,8 +151,8 @@
     "appearanceLight": "ହାଲୁକା",
     "appearanceDark": "ଗାଢ଼",
     "account": "ଆକାଉଣ୍ଟ",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR ସମୀକ୍ଷାରେ ଆପ୍ ଆଟ୍ରିବ୍ୟୁଶନ୍ ଯୋଡନ୍ତୁ",
+    "prReviewAttributionSubtitle": "ଆପଣ ଏକ ସମୀକ୍ଷା ଦାଖଲ କଲେ \"Kilo ମାଧ୍ୟମରେ ସମୀକ୍ଷା ହୋଇଛି\" footer ସଂଲଗ୍ନ କରନ୍ତୁ।"
   },
   "prReview": {
     "pullRequestUnavailable": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଉପଲବ୍ଧ ନାହିଁ",
@@ -2186,7 +2186,7 @@
       "keepEditing": "ସମ୍ପାଦନ ଜାରି ରଖନ୍ତୁ",
       "discard": "ବାତିଲ କରନ୍ତୁ",
       "discardFailed": "ଡ୍ରାଫ୍ଟ ପରିତ୍ୟାଗ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁନଃଚେଷ୍ଟା କରନ୍ତୁ।",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟରରେ `kilo remote` ଚଲାନ୍ତୁ, ଅଥବା ଚାଲୁଥିବା CLI ସେସନ୍ ରେ `/remote` ଚଲାନ୍ତୁ, ଏକ ସ୍ଥାନୀୟ kilo ପ୍ରକ୍ରିୟା ନିୟନ୍ତ୍ରଣ କରିବାକୁ।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି",

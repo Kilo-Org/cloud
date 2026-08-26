@@ -151,8 +151,8 @@
     "appearanceLight": "లైట్",
     "appearanceDark": "డార్క్",
     "account": "ఖాతా",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR సమీక్షలకు యాప్ ఆపాదనను జోడించండి",
+    "prReviewAttributionSubtitle": "మీరు సమీక్షను సమర్పించినప్పుడు Kilo ద్వారా సమీక్షించబడింది అనే ఫుటర్ను జోడించండి."
   },
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",
@@ -2186,7 +2186,7 @@
       "keepEditing": "సవరించడం కొనసాగించండి",
       "discard": "విస్మరించండి",
       "discardFailed": "డ్రాఫ్ట్‌ను విస్మరించలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "మీ కంప్యూటర్‌లో `kilo remote` అమలు చేయండి, లేదా నడుస్తున్న CLI సెషన్‌లో `/remote`, స్థానిక kilo ప్రాసెస్‌ను నియంత్రించడానికి."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్ నవీకరించబడింది",

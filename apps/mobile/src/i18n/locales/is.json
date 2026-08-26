@@ -151,8 +151,8 @@
     "appearanceLight": "Ljóst",
     "appearanceDark": "Dökkt",
     "account": "Reikningur",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Bæta við app-eignarmerki í PR-úttektir",
+    "prReviewAttributionSubtitle": "Bæta við „Reviewed via Kilo“-fótlið þegar þú skilar úttekt."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ótiltækur",
@@ -2186,7 +2186,7 @@
       "keepEditing": "Halda áfram að breyta",
       "discard": "Farga",
       "discardFailed": "Ekki tókst að farga drögunum. Reyndu aftur.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Keyrðu `kilo remote` á tölvunni þinni, eða `/remote` í keyrandi CLI-lotu, til að stjórna staðbundnu kilo-ferli."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppfærði {{displayCount}} skrá",

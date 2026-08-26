@@ -151,8 +151,8 @@
     "appearanceLight": "Гэрэлтэй",
     "appearanceDark": "Харанхуй",
     "account": "Бүртгэл",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR хяналтуудад аппын хамааралыг нэмэх",
+    "prReviewAttributionSubtitle": "Үнэлгээ илгээхдээ 'Kilo-гаар хянасан' тайлбарыг нэмнэ."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request боломжгүй",
@@ -2186,7 +2186,7 @@
       "keepEditing": "Засахыг үргэлжлүүлэх",
       "discard": "Хаях",
       "discardFailed": "Нооргийг хаях боломжгүй. Дахин оролдоно уу.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Компьютер дээрээ `kilo remote`, эсвэл ажиллаж буй CLI сессэд `/remote` командыг ажиллуулж, локал kilo процессыг удирдана."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл шинэчлэгдсэн",

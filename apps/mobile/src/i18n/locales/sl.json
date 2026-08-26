@@ -151,8 +151,8 @@
     "appearanceLight": "Svetlo",
     "appearanceDark": "Temno",
     "account": "Račun",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Dodaj pripis aplikacije k pregledom PR",
+    "prReviewAttributionSubtitle": "K oddaji pregleda dodaj nogo »Reviewed via Kilo«."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ni na voljo",
@@ -2216,7 +2216,7 @@
       "keepEditing": "Nadaljuj z urejanjem",
       "discard": "Zavrzi",
       "discardFailed": "Osnutka ni bilo mogoče zavreči. Poskusi znova.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Zaženite `kilo remote` na svojem računalniku ali `/remote` v tekoči seji CLI za upravljanje lokalnega procesa kilo."
     },
     "partRenderer": {
       "updatedFileCount_one": "Posodobljena {{displayCount}} datoteka",

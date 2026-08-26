@@ -1656,7 +1656,7 @@
       "discardDraftTitle": "Abandonner le brouillon ?",
       "discardFailed": "Impossible d'abandonner le brouillon. Veuillez réessayer.",
       "keepEditing": "Continuer à modifier",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Exécutez `kilo remote` sur votre ordinateur, ou `/remote` dans une session CLI en cours d'exécution, pour contrôler un processus kilo local."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fichier mis à jour",
@@ -2123,8 +2123,8 @@
     "appearanceLight": "Clair",
     "appearanceDark": "Sombre",
     "account": "Compte",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Ajouter l'attribution de l'application aux revues de PR",
+    "prReviewAttributionSubtitle": "Ajouter un pied de page « Revue via Kilo » lorsque vous soumettez une revue."
   },
   "addCredits": {
     "cta": "Ajouter des crédits",

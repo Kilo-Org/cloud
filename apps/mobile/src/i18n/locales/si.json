@@ -151,8 +151,8 @@
     "appearanceLight": "ආලෝකය",
     "appearanceDark": "අඳුරු",
     "account": "ගිණුම",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR සමාලෝචන සඳහා යෙදුම් ආරෝපණය එක් කරන්න",
+    "prReviewAttributionSubtitle": "සමාලෝචනයක් ඉදිරිපත් කරන විට Kilo හරහා සමාලෝචනය යන පාදකය එකතු කරන්න"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ලබා ගත නොහැක",
@@ -2186,7 +2186,7 @@
       "keepEditing": "දිගටම සංස්කරණය කරන්න",
       "discard": "ඉවතලන්න",
       "discardFailed": "කටු සටහන ඉවතලිය නොහැක. කරුණාකර නැවත උත්සාහ කරන්න.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "ඔබේ පරිගණකයේ `kilo remote` ධාවනය කරන්න, නැතහොත් ධාවනය වන CLI සැසියක `/remote`, දේශීය kilo ක්‍රියාවලියක් පාලනය කිරීමට"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ගොනුවක් යාවත්කාලීන කර ඇත",

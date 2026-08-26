@@ -151,8 +151,8 @@
     "appearanceLight": "Lys",
     "appearanceDark": "Mørk",
     "account": "Konto",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Legg til appattribusjon i PR-anmeldelser",
+    "prReviewAttributionSubtitle": "Legg til en «Anmeldt via Kilo»-bunntekst når du sender inn en anmeldelse."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request utilgjengelig",
@@ -2186,7 +2186,7 @@
       "keepEditing": "Fortsett å redigere",
       "discard": "Forkast",
       "discardFailed": "Kunne ikke forkaste utkastet. Prøv igjen.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Kjør `kilo remote` på datamaskinen din, eller `/remote` i en aktiv CLI-økt, for å kontrollere en lokal kilo-prosess."
     },
     "partRenderer": {
       "updatedFileCount_one": "Oppdaterte {{displayCount}} fil",

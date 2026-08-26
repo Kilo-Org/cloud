@@ -151,8 +151,8 @@
     "appearanceLight": "Claro",
     "appearanceDark": "Escuro",
     "account": "Conta",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Engadir atribución da app ás revisións de PR",
+    "prReviewAttributionSubtitle": "Engade un pé de páxina \"Reviewed via Kilo\" cando envíes unha revisión."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request non dispoñible",
@@ -2186,7 +2186,7 @@
       "keepEditing": "Seguir editando",
       "discard": "Descartar",
       "discardFailed": "Non se puido descartar o borrador. Téntao de novo.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Executa `kilo remote` no teu computador, ou `/remote` nunha sesión CLI activa, para controlar un proceso kilo local."
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizouse {{displayCount}} ficheiro",

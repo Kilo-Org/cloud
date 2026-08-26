@@ -151,8 +151,8 @@
     "appearanceLight": "Golau",
     "appearanceDark": "Tywyll",
     "account": "Cyfrif",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Ychwanegu priodoli ap at adolygiadau PR",
+    "prReviewAttributionSubtitle": "Atodwch droedyn 'Adolygwyd drwy Kilo' pan fyddwch yn cyflwyno adolygiad"
   },
   "prReview": {
     "pullRequestUnavailable": "Ni ellir cael y cais tynnu",
@@ -2246,7 +2246,7 @@
       "keepEditing": "Parhau i olygu",
       "discard": "Taflu",
       "discardFailed": "Methwyd taflu'r drafft. Ceisiwch eto.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Rhedwch `kilo remote` ar eich cyfrifiadur, neu `/remote` mewn sesiwn CLI sy'n rhedeg, i reoli proses kilo lleol"
     },
     "partRenderer": {
       "updatedFileCount_one": "Diweddarwyd {{displayCount}} ffeil",

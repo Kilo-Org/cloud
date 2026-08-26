@@ -151,8 +151,8 @@
     "appearanceLight": "வெளிச்சம்",
     "appearanceDark": "இருள்",
     "account": "கணக்கு",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR மதிப்பாய்வுகளில் பயன்பாட்டு பங்களிப்பைச் சேர்க்கவும்",
+    "prReviewAttributionSubtitle": "நீங்கள் ஒரு மதிப்பாய்வை சமர்ப்பிக்கும்போது Reviewed via Kilo அடிக்குறிப்பைச் சேர்க்கவும்"
   },
   "prReview": {
     "pullRequestUnavailable": "இழுப்பு கோரிக்கை கிடைக்கவில்லை",
@@ -2186,7 +2186,7 @@
       "keepEditing": "தொடர்ந்து திருத்து",
       "discard": "நிராகரி",
       "discardFailed": "வரைவை நிராகரிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "உங்கள் கணினியில் `kilo remote` ஐ இயக்கவும், அல்லது இயங்கும் CLI அமர்வில் `/remote` ஐ இயக்கவும், ஒரு உள்ளூர் kilo செயல்முறையைக் கட்டுப்படுத்தவும்"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} கோப்பு புதுப்பிக்கப்பட்டது",

@@ -151,8 +151,8 @@
     "appearanceLight": "Terang",
     "appearanceDark": "Gelap",
     "account": "Akun",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Tambahkan atribusi aplikasi ke ulasan PR",
+    "prReviewAttributionSubtitle": "Tambahkan footer Ditinjau melalui Kilo saat Anda mengirimkan ulasan."
   },
   "notifications": {
     "title": "Notifikasi",
@@ -1732,7 +1732,7 @@
       "discardDraftTitle": "Buang draf?",
       "discardFailed": "Tidak dapat membuang draf. Silakan coba lagi.",
       "keepEditing": "Tetap mengedit",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Jalankan `kilo remote` di komputer Anda, atau `/remote` dalam sesi CLI yang berjalan, untuk mengontrol proses kilo lokal."
     },
     "partRenderer": {
       "updatedFileCount_one": "Memperbarui {{displayCount}} file",

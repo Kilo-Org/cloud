@@ -151,8 +151,8 @@
     "appearanceLight": "Limye",
     "appearanceDark": "Fènwa",
     "account": "Kont",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Ajoute atribisyon aplikasyon nan revizyon PR",
+    "prReviewAttributionSubtitle": "Ajoute yon footer Reviewed via Kilo lè ou soumèt yon revizyon."
   },
   "prReview": {
     "pullRequestUnavailable": "Demand rale pa disponib",
@@ -2186,7 +2186,7 @@
       "keepEditing": "Kontinye modifye",
       "discard": "Jete",
       "discardFailed": "Pa t 'kapab jete bouyon an. Tanpri eseye ankò.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Kouri `kilo remote` sou machin ou, oswa `/remote` nan yon sesyon CLI ki ap kouri, pou kontwole yon pwosesis kilo lokal."
     },
     "partRenderer": {
       "updatedFileCount_one": "Miz ajou {{displayCount}} fichye",

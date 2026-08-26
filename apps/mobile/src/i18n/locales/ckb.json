@@ -151,8 +151,8 @@
     "appearanceLight": "ڕووناک",
     "appearanceDark": "تاریک",
     "account": "هەژمار",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "زیادکردنی خاوەندارییەتی ئەپ بۆ پێداچوونەوەکانی PR",
+    "prReviewAttributionSubtitle": "لە کاتی ناردنی پێداچوونەوەیەک، دەقی «پێداچوونەوە لە ڕێگەی Kilo» لە کۆتاییدا زیاد بکە."
   },
   "prReview": {
     "pullRequestUnavailable": "داواکاری ڕاکێشان بەردەست نییە",
@@ -2186,7 +2186,7 @@
       "keepEditing": "بەردەوام بە لە دەستکاری",
       "discard": "فڕێدان",
       "discardFailed": "نەتوانرا لە نوسینەکە وازبهێنرێت. تکایە دووبارە هەوڵ بدە.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "`kilo remote` لە کۆمپیوتەرەکەتدا جێبەجێ بکە، یان `/remote` لە سێشنی CLIیەکی کارا، بۆ کۆنترۆڵکردنی پرۆسەی ناوخۆیی kilo."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} پەڕگە نوێکرایەوە",

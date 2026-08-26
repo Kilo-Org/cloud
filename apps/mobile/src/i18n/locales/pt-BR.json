@@ -1724,7 +1724,7 @@
       "discardDraftTitle": "Descartar rascunho?",
       "discardFailed": "Não foi possível descartar o rascunho. Tente novamente.",
       "keepEditing": "Continuar editando",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Execute `kilo remote` no seu computador, ou `/remote` em uma sessão CLI ativa, para controlar um processo kilo local."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} arquivo atualizado",
@@ -2191,8 +2191,8 @@
     "appearanceLight": "Claro",
     "appearanceDark": "Escuro",
     "account": "Conta",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Adicionar atribuição do app às avaliações de PR",
+    "prReviewAttributionSubtitle": "Anexe um rodapé \"Reviewed via Kilo\" ao enviar uma avaliação."
   },
   "addCredits": {
     "cta": "Adicionar créditos",

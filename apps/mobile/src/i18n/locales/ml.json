@@ -151,8 +151,8 @@
     "appearanceLight": "ലൈറ്റ്",
     "appearanceDark": "ഡാർക്ക്",
     "account": "അക്കൗണ്ട്",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR അവലോകനങ്ങളിലേക്ക് ആപ്പ് ആട്രിബ്യൂഷൻ ചേർക്കുക",
+    "prReviewAttributionSubtitle": "നിങ്ങൾ ഒരു അവലോകനം സമർപ്പിക്കുമ്പോൾ Reviewed via Kilo ഫൂട്ടർ കൂട്ടിച്ചേർക്കുക."
   },
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",
@@ -2186,7 +2186,7 @@
       "keepEditing": "എഡിറ്റിംഗ് തുടരുക",
       "discard": "ഉപേക്ഷിക്കുക",
       "discardFailed": "ഡ്രാഫ്റ്റ് ഉപേക്ഷിക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "നിങ്ങളുടെ കമ്പ്യൂട്ടറിൽ `kilo remote` പ്രവർത്തിപ്പിക്കുക, അല്ലെങ്കിൽ പ്രവർത്തിക്കുന്ന CLI സെഷനിൽ `/remote`, ഒരു ലോക്കൽ kilo പ്രോസസ്സ് നിയന്ത്രിക്കാൻ."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ഫയൽ അപ്ഡേറ്റ് ചെയ്തു",

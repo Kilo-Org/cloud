@@ -48,7 +48,8 @@ export async function findIntegrationByInstallationId(
 }
 
 /**
- * Gets platform integration for an organization
+ * Gets an organization's preferred integration, including an unhealthy row
+ * when no healthy integration exists. Use this for status and recovery UI.
  */
 export async function getIntegrationForOrganization(organizationId: string, platform: string) {
   const [integration] = await db
@@ -57,8 +58,7 @@ export async function getIntegrationForOrganization(organizationId: string, plat
     .where(
       and(
         eq(platform_integrations.owned_by_organization_id, organizationId),
-        eq(platform_integrations.platform, platform),
-        ...(platform === PLATFORM.GITHUB ? [platformIntegrationHealthSql()] : [])
+        eq(platform_integrations.platform, platform)
       )
     )
     .orderBy(
@@ -71,6 +71,27 @@ export async function getIntegrationForOrganization(organizationId: string, plat
     .limit(1);
 
   return integration || null;
+}
+
+/**
+ * Gets the oldest healthy GitHub integration for an organization.
+ * Operational callers must not fall back to an unhealthy installation.
+ */
+export async function getPrimaryGitHubIntegrationForOrganization(organizationId: string) {
+  const [integration] = await db
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.owned_by_organization_id, organizationId),
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        platformIntegrationHealthSql()
+      )
+    )
+    .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id))
+    .limit(1);
+
+  return integration ?? null;
 }
 
 export async function getAllIntegationsForOrganization(organizationId: string) {
@@ -548,7 +569,7 @@ export async function getIntegrationForOwner(
   status?: IntegrationStatus
 ) {
   if (owner.type === 'org' && platform === PLATFORM.GITHUB) {
-    return getIntegrationForOrganization(owner.id, platform);
+    return getPrimaryGitHubIntegrationForOrganization(owner.id);
   }
   const ownershipCondition =
     owner.type === 'user'

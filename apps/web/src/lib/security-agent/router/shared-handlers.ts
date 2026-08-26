@@ -146,7 +146,7 @@ import {
 
 type Owner = { type: 'user' | 'org'; id: string; userId: string };
 
-type Integration = Awaited<ReturnType<typeof getIntegrationForOwner>>;
+type Integration = Awaited<ReturnType<typeof getIntegrationForOwner>> | null;
 
 /**
  * TExtra represents additional input fields injected by the tRPC procedure middleware.
@@ -159,6 +159,7 @@ type SecurityAgentDeps<TExtra = {}> = {
   resolveResourceId: (ctx: TRPCContext, input: TExtra) => string;
   verifyFindingOwnership: (finding: SecurityFinding, ctx: TRPCContext, input: TExtra) => boolean;
   getIntegration: (ctx: TRPCContext, input: TExtra) => Promise<Integration>;
+  getStatusIntegration?: (ctx: TRPCContext, input: TExtra) => Promise<Integration>;
   trackingExtras: (ctx: TRPCContext, input: TExtra) => { organizationId?: string };
 };
 
@@ -726,7 +727,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     // -----------------------------------------------------------------------
     getPermissionStatus: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
-      const integration = await deps.getIntegration(ctx, extra);
+      const integration = await (deps.getStatusIntegration ?? deps.getIntegration)(ctx, extra);
 
       if (!integration || integration.integration_status !== 'active') {
         return {

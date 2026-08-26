@@ -417,13 +417,12 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
         const shouldKeep = filterResult === true && dbSessionMatchesSearch(session, searchQuery);
         if (!shouldKeep) {
           if (!existing) return current;
-          return { ...current, results: withoutSession, total: Math.max(0, current.total - 1) };
+          return { ...current, results: withoutSession };
         }
         if (!existing) {
           return {
             ...current,
             results: sortSearchRows([dbSessionToSearchRow(mergedSession), ...withoutSession]),
-            total: current.total + 1,
           };
         }
         return {
@@ -456,7 +455,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
         if (!current) return current;
         const withoutSession = current.results.filter(row => row.session_id !== sessionId);
         if (withoutSession.length === current.results.length) return current;
-        return { ...current, results: withoutSession, total: Math.max(0, current.total - 1) };
+        return { ...current, results: withoutSession };
       });
     };
     const patchRow = (

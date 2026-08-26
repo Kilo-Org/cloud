@@ -2075,7 +2075,8 @@
       "dollar": "ڈالر",
       "dollar_other": "ڈالر",
       "costSpoken": "لاگت {{cost}}",
-      "costSpokenWithTime": "لاگت {{cost}}, {{time}}"
+      "costSpokenWithTime": "لاگت {{cost}}, {{time}}",
+      "pullRequest": "پل ریکویسٹ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub نہیں کھل سکا",
@@ -2913,16 +2914,10 @@
   "feedback": {
     "noEmailApp": "کوئی ای میل ایپ دستیاب نہیں۔ آپ ہم تک {{email}} پر پہنچ سکتے ہیں",
     "couldNotOpenStore": "اسٹور نہیں کھل سکا۔",
-    "promptTitle": "آپ کو Kilo ایپ کیسا لگ رہا ہے؟",
-    "iLikeIt": "مجھے یہ پسند ہے",
-    "gladTitle": "ہمیں سن کر خوشی ہوئی!",
-    "gladMessage": "اسٹور ریویو ہماری بہت مدد کرے گا۔ Kilo استعمال کرنے کا شکریہ!",
-    "rateKilo": "Kilo ریٹ کریں",
-    "needsWork": "بہتری کی ضرورت ہے",
-    "sorryTitle": "ہمیں سن کر افسوس ہوا!",
-    "sorryMessage": "براہ کرم ہمیں بتائیں کہ کیا بہتر ہونے کی ضرورت ہے۔ ایپ کا ذمہ دار انجینئر ہر ایک رپورٹ پڑھتا ہے!",
-    "emailUs": "ہمیں ای میل کریں",
-    "emailSubject": "موبائل ایپ رائے"
+    "emailSubject": "موبائل ایپ رائے",
+    "neutralTitle": "Kilo ایپ کی درجہ بندی کریں",
+    "rateTheApp": "ایپ کی درجہ بندی کریں",
+    "sendFeedback": "فیڈ بیک بھیجیں"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2927,9 @@
       "organizationUnavailable": "تنظیم دستیاب نہیں",
       "selectDescription": "جاری رکھنے کے لیے اپنے پروفائل سے ایک تنظیم منتخب کریں۔",
       "selectOrganization": "ایک تنظیم منتخب کریں",
-      "unavailableDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ جاری رکھنے کے لیے اپنے پروفائل سے ایک منتخب کریں۔"
+      "unavailableDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ جاری رکھنے کے لیے اپنے پروفائل سے ایک منتخب کریں۔",
+      "accessDeniedTitle": "رسائی مسترد",
+      "accessDeniedDescription": "آپ کو اس تنظیم تک رسائی حاصل نہیں ہے۔"
     },
     "creditActivity": {
       "emptyDescription": "اس تنظیم کی خریداریاں، استعمال، اور کریڈٹ ایڈجسٹمنٹ ہونے پر یہاں ظاہر ہوں گی۔",

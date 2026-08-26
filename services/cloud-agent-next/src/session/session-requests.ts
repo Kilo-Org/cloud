@@ -20,6 +20,7 @@ export type SessionRepositoryRequest =
   | {
       type: 'github';
       repo: string;
+      githubIntegrationId?: string;
       branch?: string;
     }
   | {

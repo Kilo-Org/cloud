@@ -42,7 +42,7 @@ export function OrganizationBoundary({
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { organizationId, isResolving, isError, isFetching, refetch } =
+  const { organizationId, org, isResolving, isError, isFetching, refetch } =
     useOrgBoundary(organizationIdOverride);
 
   let content: ReactNode = null;
@@ -62,32 +62,48 @@ export function OrganizationBoundary({
       />
     );
   } else {
-    const noSelection = organizationId == null;
-    content = (
-      <EmptyState
-        icon={Building2}
-        title={
-          noSelection
-            ? t('organization.boundary.selectOrganization')
-            : t('organization.boundary.organizationUnavailable')
-        }
-        description={
-          noSelection
-            ? t('organization.boundary.selectDescription')
-            : t('organization.boundary.unavailableDescription')
-        }
-        action={
-          <Button
-            variant="outline"
-            onPress={() => {
-              router.replace(PROFILE_HREF);
-            }}
-          >
-            <Text>{t('organization.boundary.backToProfile')}</Text>
-          </Button>
-        }
-      />
+    // Three distinct settled states, mutually exclusive:
+    // 1. nothing selected and no override — prompt to select an org.
+    // 2. an override that is not in the member list — access denied.
+    // 3. a stale persisted selection (no override) — org unavailable.
+    const backToProfileAction = (
+      <Button
+        variant="outline"
+        onPress={() => {
+          router.replace(PROFILE_HREF);
+        }}
+      >
+        <Text>{t('organization.boundary.backToProfile')}</Text>
+      </Button>
     );
+    if (organizationId == null) {
+      content = (
+        <EmptyState
+          icon={Building2}
+          title={t('organization.boundary.selectOrganization')}
+          description={t('organization.boundary.selectDescription')}
+          action={backToProfileAction}
+        />
+      );
+    } else if (organizationIdOverride != null && org == null) {
+      content = (
+        <EmptyState
+          icon={Building2}
+          title={t('organization.boundary.accessDeniedTitle')}
+          description={t('organization.boundary.accessDeniedDescription')}
+          action={backToProfileAction}
+        />
+      );
+    } else {
+      content = (
+        <EmptyState
+          icon={Building2}
+          title={t('organization.boundary.organizationUnavailable')}
+          description={t('organization.boundary.unavailableDescription')}
+          action={backToProfileAction}
+        />
+      );
+    }
   }
 
   return (

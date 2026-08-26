@@ -1,9 +1,17 @@
 import type { AgentSandboxProvider, SandboxId, Env } from './types.js';
+import { sessionPlaneFromId } from './session-plane.js';
 import type { Sandbox } from '@cloudflare/sandbox';
+import {
+  parseVercelSandboxEnrollment,
+  parseVercelSandboxRuntimeConfig,
+  type VercelSandboxEnrollmentEnv,
+  type VercelSandboxRuntimeConfigEnv,
+} from './agent-sandbox/vercel/vercel-runtime-config.js';
 
 export const MANAGED_SCM_OUTBOUND_HANDLER = 'managedScm';
 
 const SHARED_SANDBOX_ID_VERSION = 'shared-v3';
+const CONTROL_PLANE_SHARED_SANDBOX_ID_VERSION = 'shared-control-v1';
 
 type SharedSandboxPrefix = 'org' | 'usr' | 'bot' | 'ubt';
 type SandboxNamespaceEnv = Pick<
@@ -137,7 +145,8 @@ export type SandboxSelection = {
 
 export type SandboxSelectionEnv = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
-};
+} & VercelSandboxEnrollmentEnv &
+  VercelSandboxRuntimeConfigEnv;
 
 type SelectSandboxForNewSessionInput = {
   env: SandboxSelectionEnv;
@@ -147,6 +156,36 @@ type SelectSandboxForNewSessionInput = {
   botId?: string;
   devcontainer?: boolean;
 };
+
+/**
+ * Resolves the sandbox provider for an already-computed sandbox ID. Vercel
+ * is call-home only: isolated `workspace_` sessions whose owner is on
+ * `VERCEL_SANDBOX_ORG_IDS` (`*` includes personal) with complete operational
+ * configuration. Legacy `agent_` sessions and everything else stay on Cloudflare.
+ */
+export function selectSandboxProvider(input: {
+  env: SandboxSelectionEnv;
+  orgId?: string;
+  sandboxId: SandboxId;
+  sessionId: string;
+  devcontainer?: boolean;
+}): AgentSandboxProvider {
+  const enrollment = parseVercelSandboxEnrollment(input.env);
+  const runtimeConfig = parseVercelSandboxRuntimeConfig(input.env);
+  const enrolled =
+    input.orgId !== undefined
+      ? enrollment.orgIds.has('*') || enrollment.orgIds.has(input.orgId)
+      : enrollment.allowPersonal;
+  const useVercel =
+    sessionPlaneFromId(input.sessionId) === 'control' &&
+    !input.devcontainer &&
+    input.sandboxId.startsWith('ses-') &&
+    enrollment.enabled &&
+    enrolled &&
+    runtimeConfig !== undefined;
+
+  return useVercel ? 'vercel' : 'cloudflare';
+}
 
 export async function selectSandboxForNewSession(
   input: SelectSandboxForNewSessionInput
@@ -159,7 +198,15 @@ export async function selectSandboxForNewSession(
     input.botId,
     input.devcontainer
   );
-  return { sandboxId, provider: 'cloudflare' };
+  const provider = selectSandboxProvider({
+    env: input.env,
+    orgId: input.orgId,
+    sandboxId,
+    sessionId: input.sessionId,
+    devcontainer: input.devcontainer,
+  });
+
+  return { sandboxId, provider };
 }
 
 /**
@@ -204,7 +251,11 @@ export async function generateSandboxRoutingTarget(
     ? `${sandboxOrgSegment}__${userId}__bot:${botId}`
     : `${sandboxOrgSegment}__${userId}`;
   const prefix: SharedSandboxPrefix = botId ? (orgId ? 'bot' : 'ubt') : orgId ? 'org' : 'usr';
-  const routeKey = await hashToSandboxId(`${SHARED_SANDBOX_ID_VERSION}:${originalFormat}`, prefix);
+  const sharedVersion =
+    sessionPlaneFromId(sessionId) === 'control'
+      ? CONTROL_PLANE_SHARED_SANDBOX_ID_VERSION
+      : SHARED_SANDBOX_ID_VERSION;
+  const routeKey = await hashToSandboxId(`${sharedVersion}:${originalFormat}`, prefix);
 
   return {
     kind: 'shared',

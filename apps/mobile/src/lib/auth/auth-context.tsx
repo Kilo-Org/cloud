@@ -14,7 +14,7 @@ import {
 
 import { discardPostHog } from '@/lib/analytics/posthog';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
-import { clearPendingDeepLink, setCurrentDeepLinkUserId } from '@/lib/deep-link-launch';
+import { clearAccountBoundPendingDeepLink, setCurrentDeepLinkUserId } from '@/lib/deep-link-launch';
 import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { runLogoutCleanup } from '@/lib/auth/logout-cleanup';
 import { queryClient } from '@/lib/query-client';
@@ -151,6 +151,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             const pair = await exchangeLegacyToken();
             if (pair) {
               setToken(pair.token);
+              setCurrentDeepLinkUserId(readUserIdFromToken(pair.token));
               setIsLoading(false);
               return;
             }
@@ -178,11 +179,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // or the provider ends bootstrap with no token and sends a
           // signed-in user to the login screen.
           if (currentStored !== stored) {
-            setToken(getActiveToken()?.token ?? currentStored ?? undefined);
+            const published = getActiveToken()?.token ?? currentStored ?? undefined;
+            setToken(published);
+            setCurrentDeepLinkUserId(published ? readUserIdFromToken(published) : null);
             return;
           }
           setActiveToken(stored, expiresAtStr ? Number(expiresAtStr) : null);
           setToken(stored);
+          setCurrentDeepLinkUserId(readUserIdFromToken(stored));
         }
       } finally {
         setIsLoading(false);
@@ -256,12 +260,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // the read-cache mount unsubscribes and cannot resubscribe while the old
       // user id is still cached.
       setSignOutActive(true);
-      // Drop the pending deep-link destination synchronously, before the
-      // first await, so a different account signed in later in this process
-      // cannot navigate to the previous account's destination. The in-memory
-      // clear is synchronous; the persisted delete chains behind any
-      // in-flight persist.
-      clearPendingDeepLink();
+      // Drop an account-bound pending deep-link destination synchronously,
+      // before the first await, so a different account signed in later in this
+      // process cannot navigate to the previous account's destination. A
+      // destination captured while signed out is account-independent and
+      // survives the sign-out (a redundant sign-out, or a signed-out link
+      // opened just before sign-in, must not lose it). The in-memory clear is
+      // synchronous; the persisted delete chains behind any in-flight persist.
+      clearAccountBoundPendingDeepLink();
       try {
         // Close ownership persistence before any await so a late list
         // response cannot write the previous account's answer during

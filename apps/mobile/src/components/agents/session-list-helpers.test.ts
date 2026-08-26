@@ -10,6 +10,7 @@ import {
   canExitSessionFromList,
   composeActiveSessionSpokenMeta,
   composeActiveSessionVisibleMeta,
+  composeSessionProvenanceSubtitle,
   excludeActiveFromGroups,
   expandPlatformFilter,
   formatMeta,
@@ -31,6 +32,20 @@ function makeActive(over: Partial<ActiveSession> = {}): ActiveSession {
     title: 'test',
     connectionId: 'c1',
     ...over,
+  };
+}
+
+function makePr(number: number, title: string) {
+  return {
+    url: `https://github.com/org/repo/pull/${number}`,
+    number,
+    state: 'open',
+    title,
+    headSha: null,
+    lastSyncedAt: '2026-01-01T00:00:00.000Z',
+    reviewDecision: null,
+    reviewDecisionPending: false,
+    platform: 'github',
   };
 }
 
@@ -170,6 +185,106 @@ describe('selectPinnedActiveSessions', () => {
           searchQuery: '100%',
         }).map(s => s.id)
       ).toEqual(['pct']);
+    });
+
+    it('matches a gitUrl repo substring', () => {
+      const match = makeActive({
+        id: 'repo',
+        title: 'Unrelated',
+        gitUrl: 'git@github.com:org/alpha-repo.git',
+      });
+      const other = makeActive({
+        id: 'other',
+        title: 'Unrelated',
+        gitUrl: 'git@github.com:org/beta-repo.git',
+      });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [match, other],
+        projectFilter: [],
+        platformFilter: [],
+        searchQuery: 'alpha-repo',
+      });
+      expect(result.map(s => s.id)).toEqual(['repo']);
+    });
+
+    it('matches a gitBranch substring', () => {
+      const match = makeActive({
+        id: 'branch',
+        title: 'Unrelated',
+        gitBranch: 'feature/awesome-work',
+      });
+      const other = makeActive({ id: 'other', title: 'Unrelated', gitBranch: 'feature/other' });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [match, other],
+        projectFilter: [],
+        platformFilter: [],
+        searchQuery: 'awesome-work',
+      });
+      expect(result.map(s => s.id)).toEqual(['branch']);
+    });
+
+    it('matches an associated PR title substring', () => {
+      const match = makeActive({
+        id: 'pr',
+        title: 'Unrelated',
+        associatedPr: makePr(42, 'Searchable PR title'),
+      });
+      const other = makeActive({ id: 'other', title: 'Unrelated' });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [match, other],
+        projectFilter: [],
+        platformFilter: [],
+        searchQuery: 'searchable pr',
+      });
+      expect(result.map(s => s.id)).toEqual(['pr']);
+    });
+
+    it('matches an associated PR number 42', () => {
+      const match = makeActive({
+        id: 'pr',
+        title: 'Unrelated',
+        associatedPr: makePr(42, 'Anything'),
+      });
+      const other = makeActive({ id: 'other', title: 'Unrelated' });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [match, other],
+        projectFilter: [],
+        platformFilter: [],
+        searchQuery: '42',
+      });
+      expect(result.map(s => s.id)).toEqual(['pr']);
+    });
+
+    it('matches #42 after stripping the leading hash', () => {
+      const match = makeActive({
+        id: 'pr',
+        title: 'Unrelated',
+        associatedPr: makePr(42, 'Anything'),
+      });
+      const other = makeActive({ id: 'other', title: 'Unrelated' });
+      expect(
+        selectPinnedActiveSessions({
+          activeSessions: [match, other],
+          projectFilter: [],
+          platformFilter: [],
+          searchQuery: '#42',
+        }).map(s => s.id)
+      ).toEqual(['pr']);
+    });
+
+    it('keeps a session that matches only a PR field in the tray', () => {
+      const prOnly = makeActive({
+        id: 'pr',
+        title: 'Unrelated',
+        associatedPr: makePr(77, 'Fix deploy'),
+      });
+      const result = selectPinnedActiveSessions({
+        activeSessions: [prOnly],
+        projectFilter: [],
+        platformFilter: [],
+        searchQuery: 'deploy',
+      });
+      expect(result.map(s => s.id)).toEqual(['pr']);
     });
   });
 
@@ -333,6 +448,34 @@ describe('selectPinnedActiveSessions', () => {
       searchQuery: '',
     });
     expect(result.map(s => s.id)).toEqual(['pass']);
+  });
+});
+
+describe('composeSessionProvenanceSubtitle', () => {
+  it('returns "branch · #N" when both branch and PR number exist', () => {
+    expect(composeSessionProvenanceSubtitle({ branch: 'feature/x', prNumber: 42 })).toBe(
+      'feature/x · #42'
+    );
+  });
+
+  it('returns the branch when only branch is present', () => {
+    expect(composeSessionProvenanceSubtitle({ branch: 'feature/x', prNumber: null })).toBe(
+      'feature/x'
+    );
+    expect(composeSessionProvenanceSubtitle({ branch: 'feature/x', prNumber: undefined })).toBe(
+      'feature/x'
+    );
+  });
+
+  it('returns "#N" when only a PR number is present', () => {
+    expect(composeSessionProvenanceSubtitle({ branch: null, prNumber: 7 })).toBe('#7');
+    expect(composeSessionProvenanceSubtitle({ branch: undefined, prNumber: 7 })).toBe('#7');
+  });
+
+  it('returns null when neither branch nor PR number is present', () => {
+    expect(composeSessionProvenanceSubtitle({ branch: null, prNumber: null })).toBeNull();
+    expect(composeSessionProvenanceSubtitle({ branch: undefined, prNumber: undefined })).toBeNull();
+    expect(composeSessionProvenanceSubtitle({ branch: '', prNumber: null })).toBeNull();
   });
 });
 

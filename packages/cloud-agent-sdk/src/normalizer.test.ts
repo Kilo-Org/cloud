@@ -26,6 +26,26 @@ describe('normalize', () => {
       });
     });
 
+    it('unwraps kilocode payloads that also carry an ingest-compat event field', () => {
+      const raw = createRaw('kilocode', {
+        type: 'session.idle',
+        event: 'session.idle',
+        properties: { sessionID: 'sid-1' },
+      });
+      expect(normalize(raw)).toEqual({
+        type: 'session.idle',
+        sessionId: 'sid-1',
+      });
+    });
+
+    it('drops kilocode payloads that only have event, not type', () => {
+      const raw = createRaw('kilocode', {
+        event: 'session.idle',
+        properties: { sessionID: 'sid-1' },
+      });
+      expect(normalize(raw)).toBeNull();
+    });
+
     it('handles direct (non-kilocode) events', () => {
       const raw = createRaw('session.idle', { sessionID: 'sid-1' });
       expect(normalize(raw)).toEqual({

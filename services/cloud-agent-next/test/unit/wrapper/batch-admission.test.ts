@@ -15,6 +15,14 @@ vi.mock('../../../wrapper/src/utils.js', () => ({
   logToFile: vi.fn(),
 }));
 
+vi.mock('../../../wrapper/src/log-uploader.js', () => ({
+  createLogUploader: vi.fn(() => ({
+    start: vi.fn(),
+    uploadNow: vi.fn().mockResolvedValue(undefined),
+    stop: vi.fn(),
+  })),
+}));
+
 const config: ServerConfig = {
   port: 5000,
   workspacePath: '/workspace',

@@ -348,7 +348,14 @@ export class TriggerDO extends DurableObject<Env> {
         updates.cronExpression !== undefined ||
         updates.cronTimezone !== undefined
       ) {
-        // Reactivated or cron expression changed — reschedule
+        // Reactivated or cron expression changed — reschedule from scratch.
+        // Clear the inherited nextScheduledAt first: scheduleNextAlarm() anchors on
+        // a future nextScheduledAt to avoid re-firing an occurrence that was just
+        // handled by alarm(). Here nextScheduledAt still reflects a pending (never
+        // fired) occurrence under the *old* config, so leaving it set would make
+        // scheduleNextAlarm skip past a still-valid, possibly sooner occurrence
+        // under the new cron expression/timezone.
+        updatedConfig.nextScheduledAt = null;
         await this.ctx.storage.deleteAlarm();
         await this.ctx.storage.delete('alarmRetry');
         await this.scheduleNextAlarm(updatedConfig);
@@ -727,7 +734,24 @@ export class TriggerDO extends DurableObject<Env> {
   private async scheduleNextAlarm(config: TriggerConfig): Promise<void> {
     if (!config.cronExpression || config.activationMode !== 'scheduled') return;
 
-    const nextTime = computeNextCronTime(config.cronExpression, config.cronTimezone ?? 'UTC');
+    // Compute strictly after the later of "now" and the occurrence we most recently
+    // targeted (config.nextScheduledAt). Using "now" alone is not enough: if the alarm
+    // fired a little early (e.g. due to jitter), "now" can still be before that target
+    // occurrence, and croner would hand back the *same* occurrence again, causing it to
+    // fire twice. Anchoring on nextScheduledAt when it's still ahead of "now" guarantees
+    // we always advance to the following occurrence instead.
+    const previousTarget = config.nextScheduledAt ? new Date(config.nextScheduledAt) : null;
+    const isValidFutureTarget =
+      previousTarget !== null &&
+      !Number.isNaN(previousTarget.getTime()) &&
+      previousTarget.getTime() > Date.now();
+    const referenceTime = isValidFutureTarget ? previousTarget : undefined;
+
+    const nextTime = computeNextCronTime(
+      config.cronExpression,
+      config.cronTimezone ?? 'UTC',
+      referenceTime
+    );
     if (!nextTime) {
       // DST spring-forward can skip an occurrence. Schedule a retry in 1 hour
       // so the trigger doesn't stop forever. Set a flag so alarm() knows this
@@ -744,8 +768,11 @@ export class TriggerDO extends DurableObject<Env> {
     // cause alarm() to skip the next real cron fire.
     await this.ctx.storage.delete('alarmRetry');
 
-    // Add jitter to prevent thundering herd on popular cron times (±30s)
-    const jitterMs = Math.floor(Math.random() * 60_000) - 30_000;
+    // Add jitter to prevent thundering herd on popular cron times. This must be a
+    // delay only (0-30s) — never negative — otherwise the alarm could fire before
+    // its target occurrence, which (combined with the minimum-delay floor below)
+    // caused the same occurrence to be fired twice in the past.
+    const jitterMs = Math.floor(Math.random() * 30_000);
     const alarmTime = Math.max(nextTime.getTime() + jitterMs, Date.now() + 60_000);
     await this.ctx.storage.setAlarm(alarmTime);
 

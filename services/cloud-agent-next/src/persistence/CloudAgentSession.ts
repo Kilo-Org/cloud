@@ -289,6 +289,7 @@ type GroupedRegisterSessionInput = {
     | 'shallow'
     | 'credentialContainment'
     | 'devcontainerRequested'
+    | 'sandboxAllocation'
   >;
 };
 

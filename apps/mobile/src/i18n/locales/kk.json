@@ -2638,6 +2638,18 @@
       "updating": "Жаңартылуда, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Жүктеу",
+      "loadWithHost": "Жүктеу {{host}}",
+      "httpsOnly": "Тек HTTPS суреттер"
+    },
+    "markdownLink": {
+      "invalidLink": "Бұл сілтемені ашу мүмкін емес.",
+      "hostConfirmTitle": "Сыртқы сілтемені ашу керек пе?",
+      "hostConfirmMessage": "Бұл сілтеме {{host}} браузеріңізде ашылады.",
+      "open": "Ашу",
+      "trustThisHost": "Бұл хостқа сену"
     }
   },
   "bootstrap": {
@@ -3129,5 +3141,13 @@
       "xhigh": "Өте жоғары",
       "max": "Максималды"
     }
+  },
+  "trustedHosts": {
+    "title": "Сенімді хосттар",
+    "subtitle": "Сұрамай-ақ ашуға сенетін хосттарыңыз",
+    "emptyTitle": "Сенімді хосттар жоқ",
+    "emptyDescription": "Сілтеме хостына сенсеңіз, ол қайта сұрамай ашылады.",
+    "revoke": "{{host}} кері қайтару",
+    "backToPreferences": "Баптауларға оралу"
   }
 }

@@ -28,6 +28,8 @@ export const LOGIN_EMAIL_DRAFT_KEY = 'login-email-draft';
 /** Login SSO-recovery banner draft, persisted before an RTL language reload. */
 export const LOGIN_SSO_RECOVERY_DRAFT_KEY = 'login-sso-recovery-draft';
 export const KEEP_SCREEN_ON_KEY = 'keep-session-screen-on';
+/** Revocable per-host list of markdown link hosts that open without an Alert. */
+export const TRUSTED_HOSTS_KEY = 'trusted-hosts';
 export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */
 export const PERSIST_DB_KEY = 'persist-db-key';

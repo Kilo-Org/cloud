@@ -2658,6 +2658,18 @@
       "updating": "A atualizar, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Carregar",
+      "loadWithHost": "Carregar {{host}}",
+      "httpsOnly": "Apenas imagens HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Este link não pode ser aberto.",
+      "hostConfirmTitle": "Abrir link externo?",
+      "hostConfirmMessage": "Este link abre {{host}} no seu navegador.",
+      "open": "Abrir",
+      "trustThisHost": "Confiar neste host"
     }
   },
   "bootstrap": {
@@ -3150,5 +3162,13 @@
       "xhigh": "Muito alto",
       "max": "Máximo"
     }
+  },
+  "trustedHosts": {
+    "title": "Hosts confiáveis",
+    "subtitle": "Hosts em que você confia para abrir sem perguntar",
+    "emptyTitle": "Nenhum host confiável",
+    "emptyDescription": "Quando você confia no host de um link, ele abre sem perguntar novamente.",
+    "revoke": "Revogar {{host}}",
+    "backToPreferences": "Voltar às preferências"
   }
 }

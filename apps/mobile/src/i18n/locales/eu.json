@@ -2638,6 +2638,18 @@
       "updating": "Eguneratzen, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Kargatu",
+      "loadWithHost": "Kargatu {{host}}",
+      "httpsOnly": "HTTPS irudiak soilik"
+    },
+    "markdownLink": {
+      "invalidLink": "Esteka hau ezin da ireki.",
+      "hostConfirmTitle": "Kanpoko esteka ireki?",
+      "hostConfirmMessage": "Esteka honek {{host}} irekitzen du zure arakatzailean.",
+      "open": "Ireki",
+      "trustThisHost": "Konfiantza eman ostalari honi"
     }
   },
   "bootstrap": {
@@ -3129,5 +3141,13 @@
       "xhigh": "Oso altua",
       "max": "Gehienez"
     }
+  },
+  "trustedHosts": {
+    "title": "Konfiantzako ostalariak",
+    "subtitle": "Galdetu gabe irekitzeko konfiantza duzun ostalariak",
+    "emptyTitle": "Konfiantzako ostalaririk ez",
+    "emptyDescription": "Esteka baten ostalariari konfiantza ematean, berriro galdetu gabe irekiko da.",
+    "revoke": "Baliogabetu {{host}}",
+    "backToPreferences": "Itzuli hobespenetara"
   }
 }

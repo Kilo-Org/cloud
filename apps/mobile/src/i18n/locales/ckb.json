@@ -2638,6 +2638,18 @@
       "updating": "نوێکردنەوە، {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "داواکاری ڕاکێشان"
+    },
+    "markdownImage": {
+      "load": "بارکردن",
+      "loadWithHost": "بارکردن {{host}}",
+      "httpsOnly": "تەنها وێنەی HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "ئەم بەستەرە ناتوانرێت بکرێتەوە.",
+      "hostConfirmTitle": "بەستەری دەرەکی بکرێتەوە؟",
+      "hostConfirmMessage": "ئەم بەستەرە {{host}} لە وێبگەڕەکەتدا دەکاتەوە.",
+      "open": "کردنەوە",
+      "trustThisHost": "متمانە بەم خزمەتگوزارە بکە"
     }
   },
   "bootstrap": {
@@ -3129,5 +3141,13 @@
       "xhigh": "زۆر بەرز",
       "max": "زۆرترین"
     }
+  },
+  "trustedHosts": {
+    "title": "خزمەتگوزارە باوەرپێکراوەکان",
+    "subtitle": "ئەو خزمەتگوزارانەی متمانەیان پێ دەکەیت کە بەبێ پرسیارکردن دەکرێنەوە",
+    "emptyTitle": "هیچ خزمەتگوزارێکی باوەرپێکراو نییە",
+    "emptyDescription": "کاتێک متمانە بە خزمەتگوزاری بەستەرێک دەکەیت، بەبێ پرسیارکردنەوە دەکرێتەوە.",
+    "revoke": "هەڵوەشاندنەوەی {{host}}",
+    "backToPreferences": "گەڕانەوە بۆ پەسەندەکان"
   }
 }

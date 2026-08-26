@@ -2678,6 +2678,18 @@
       "updating": "Atnaujinama, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Įkelti",
+      "loadWithHost": "Įkelti {{host}}",
+      "httpsOnly": "Tik HTTPS paveikslėliai"
+    },
+    "markdownLink": {
+      "invalidLink": "Ši nuoroda negali būti atidaryta.",
+      "hostConfirmTitle": "Atidaryti išorinę nuorodą?",
+      "hostConfirmMessage": "Ši nuoroda atidaro {{host}} jūsų naršyklėje.",
+      "open": "Atidaryti",
+      "trustThisHost": "Pasitikėti šiuo serveriu"
     }
   },
   "bootstrap": {
@@ -3171,5 +3183,13 @@
       "xhigh": "Ypač aukštas",
       "max": "Maksimalus"
     }
+  },
+  "trustedHosts": {
+    "title": "Patikimi serveriai",
+    "subtitle": "Serveriai, kuriuos patikite atidaryti be klausimo",
+    "emptyTitle": "Nėra pasitikimų serverių",
+    "emptyDescription": "Kai pasitikite nuorodos serveriu, ji atidaroma be pakartotino klausimo.",
+    "revoke": "Atšaukti {{host}}",
+    "backToPreferences": "Grįžti į nuostatas"
   }
 }

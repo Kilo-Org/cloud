@@ -2638,6 +2638,18 @@
       "updating": "Inasasisha, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Pakua",
+      "loadWithHost": "Pakua {{host}}",
+      "httpsOnly": "Picha za HTTPS pekee"
+    },
+    "markdownLink": {
+      "invalidLink": "Kiungo hiki hakiwezi kufunguliwa.",
+      "hostConfirmTitle": "Fungua kiungo cha nje?",
+      "hostConfirmMessage": "Kiungo hiki kinafungua {{host}} kwenye kivinjari chako.",
+      "open": "Fungua",
+      "trustThisHost": "Amini mwenyeji huyu"
     }
   },
   "bootstrap": {
@@ -3129,5 +3141,13 @@
       "xhigh": "Juu zaidi",
       "max": "Upeo"
     }
+  },
+  "trustedHosts": {
+    "title": "Wenyeji wanaoaminika",
+    "subtitle": "Wenyeji unaowaamini kufunguka bila kuuliza",
+    "emptyTitle": "Hakuna wenyeji wanaoaminika",
+    "emptyDescription": "Unapoamini mwenyeji wa kiungo, hufunguka bila kuuliza tena.",
+    "revoke": "Ondoa {{host}}",
+    "backToPreferences": "Rudi kwenye mapendeleo"
   }
 }

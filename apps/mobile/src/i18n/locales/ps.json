@@ -2638,6 +2638,18 @@
       "updating": "تازه کېږي، {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "د کشولو غوښتنه"
+    },
+    "markdownImage": {
+      "load": "بار کړئ",
+      "loadWithHost": "بار کړئ {{host}}",
+      "httpsOnly": "یوازې HTTPS انځورونه"
+    },
+    "markdownLink": {
+      "invalidLink": "دا لینک نشي خلاصیدلای.",
+      "hostConfirmTitle": "بهرنی لینک خلاص کړم؟",
+      "hostConfirmMessage": "دا لینک ستاسو په براوزر کې {{host}} خلاصوي.",
+      "open": "خلاص کړئ",
+      "trustThisHost": "دې هوسټ باور وکړئ"
     }
   },
   "bootstrap": {
@@ -3129,5 +3141,13 @@
       "xhigh": "ډېر لوړ",
       "max": "اعظمي"
     }
+  },
+  "trustedHosts": {
+    "title": "باوري هوسټونه",
+    "subtitle": "هغه هوسټونه چې تاسو له پوښتلو پرته پرانستلو ته باور لرئ",
+    "emptyTitle": "باوري هوسټونه نشته",
+    "emptyDescription": "کله چې تاسو د لینک هوسټ باور وکړئ، دا بیا له پوښتلو پرته خلاصیږي.",
+    "revoke": "{{host}} لغوه کړئ",
+    "backToPreferences": "بېرته ترجیحاتو ته"
   }
 }

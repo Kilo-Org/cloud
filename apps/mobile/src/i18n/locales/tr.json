@@ -2184,6 +2184,18 @@
       "updating": "Güncelleniyor, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "çekme isteği"
+    },
+    "markdownImage": {
+      "load": "Yükle",
+      "loadWithHost": "Yükle {{host}}",
+      "httpsOnly": "Yalnızca HTTPS görseller"
+    },
+    "markdownLink": {
+      "invalidLink": "Bu bağlantı açılamıyor.",
+      "hostConfirmTitle": "Harici bağlantı açılsın mı?",
+      "hostConfirmMessage": "Bu bağlantı {{host}} adresini tarayıcınızda açar.",
+      "open": "Aç",
+      "trustThisHost": "Bu sunucuya güven"
     }
   },
   "bootstrap": {
@@ -3129,5 +3141,13 @@
       "xhigh": "Çok yüksek",
       "max": "Maksimum"
     }
+  },
+  "trustedHosts": {
+    "title": "Güvenilen sunucular",
+    "subtitle": "Sormadan açmak için güvendiğiniz sunucular",
+    "emptyTitle": "Güvenilen sunucu yok",
+    "emptyDescription": "Bir bağlantının sunucusuna güvendiğinizde, bir daha sormadan açılır.",
+    "revoke": "{{host}} güvenini kaldır",
+    "backToPreferences": "Tercihlere dön"
   }
 }

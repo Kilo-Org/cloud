@@ -2658,6 +2658,18 @@
       "updating": "Actualitzant, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Carrega",
+      "loadWithHost": "Carrega {{host}}",
+      "httpsOnly": "Només imatges HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Aquest enllaç no es pot obrir.",
+      "hostConfirmTitle": "Obrir un enllaç extern?",
+      "hostConfirmMessage": "Aquest enllaç obre {{host}} al navegador.",
+      "open": "Obrir",
+      "trustThisHost": "Confia en aquest host"
     }
   },
   "bootstrap": {
@@ -3150,5 +3162,13 @@
       "xhigh": "Extra alt",
       "max": "Màxim"
     }
+  },
+  "trustedHosts": {
+    "title": "Hosts de confiança",
+    "subtitle": "Hosts en què confies per obrir sense preguntar",
+    "emptyTitle": "Cap host de confiança",
+    "emptyDescription": "Quan confies en el host d'un enllaç, s'obre sense tornar a preguntar.",
+    "revoke": "Revoca {{host}}",
+    "backToPreferences": "Torna a les preferències"
   }
 }

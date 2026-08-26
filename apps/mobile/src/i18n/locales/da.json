@@ -2638,6 +2638,18 @@
       "updating": "Opdaterer, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Indlæs",
+      "loadWithHost": "Indlæs {{host}}",
+      "httpsOnly": "Kun HTTPS-billeder"
+    },
+    "markdownLink": {
+      "invalidLink": "Dette link kan ikke åbnes.",
+      "hostConfirmTitle": "Åbn eksternt link?",
+      "hostConfirmMessage": "Dette link åbner {{host}} i din browser.",
+      "open": "Åbn",
+      "trustThisHost": "Stol på denne host"
     }
   },
   "bootstrap": {
@@ -3129,5 +3141,13 @@
       "xhigh": "Ekstra høj",
       "max": "Maks"
     }
+  },
+  "trustedHosts": {
+    "title": "Betroede hosts",
+    "subtitle": "Hosts, som du stoler på åbnes uden at spørge",
+    "emptyTitle": "Ingen betroede hosts",
+    "emptyDescription": "Når du stoler på et links host, åbnes det uden at spørge igen.",
+    "revoke": "Tilbagekald {{host}}",
+    "backToPreferences": "Tilbage til indstillinger"
   }
 }

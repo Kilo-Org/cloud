@@ -2638,6 +2638,18 @@
       "updating": "በማዘመን ላይ፣ {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "የመጎተቻ ጥያቄ"
+    },
+    "markdownImage": {
+      "load": "ጫን",
+      "loadWithHost": "ጫን {{host}}",
+      "httpsOnly": "HTTPS ምስሎች ብቻ"
+    },
+    "markdownLink": {
+      "invalidLink": "ይህ አገናኝ ሊከፈት አይችልም።",
+      "hostConfirmTitle": "ውጫዊ አገናኝ መክፈት?",
+      "hostConfirmMessage": "ይህ አገናኝ {{host}} በአሳሽዎ ይከፍታል።",
+      "open": "ክፈት",
+      "trustThisHost": "ይህን አስተናጋጅ እመኑ"
     }
   },
   "bootstrap": {
@@ -3129,5 +3141,13 @@
       "xhigh": "እጅግ ከፍተኛ",
       "max": "ከፍተኛው"
     }
+  },
+  "trustedHosts": {
+    "title": "የታመኑ አስተናጋጆች",
+    "subtitle": "ሳይጠይቁ ለመክፈት የምትመኗቸው አስተናጋጆች",
+    "emptyTitle": "የታመኑ አስተናጋጆች የሉም",
+    "emptyDescription": "የአገናኝ አስተናጋጅ ስትመን፣ እንደገና ሳይጠይቅ ይከፈታል።",
+    "revoke": "{{host}} አስቀር",
+    "backToPreferences": "ወደ ምርጫዎች ተመለስ"
   }
 }

@@ -2184,6 +2184,18 @@
       "updating": "Memperbarui, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Muat",
+      "loadWithHost": "Muat {{host}}",
+      "httpsOnly": "Hanya gambar HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Tautan ini tidak dapat dibuka.",
+      "hostConfirmTitle": "Buka tautan eksternal?",
+      "hostConfirmMessage": "Tautan ini membuka {{host}} di browser Anda.",
+      "open": "Buka",
+      "trustThisHost": "Percayai host ini"
     }
   },
   "bootstrap": {
@@ -3129,5 +3141,13 @@
       "xhigh": "Ekstra Tinggi",
       "max": "Maks"
     }
+  },
+  "trustedHosts": {
+    "title": "Host tepercaya",
+    "subtitle": "Host yang Anda percayai untuk dibuka tanpa bertanya",
+    "emptyTitle": "Tidak ada host tepercaya",
+    "emptyDescription": "Saat Anda mempercayai host suatu tautan, tautan tersebut dibuka tanpa bertanya lagi.",
+    "revoke": "Cabut {{host}}",
+    "backToPreferences": "Kembali ke preferensi"
   }
 }

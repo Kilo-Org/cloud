@@ -2638,6 +2638,18 @@
       "updating": "განახლდება, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "პულ-რექვესთი"
+    },
+    "markdownImage": {
+      "load": "ჩატვირთვა",
+      "loadWithHost": "ჩატვირთვა {{host}}",
+      "httpsOnly": "მხოლოდ HTTPS სურათები"
+    },
+    "markdownLink": {
+      "invalidLink": "ამ ბმულის გახსნა შეუძლებელია.",
+      "hostConfirmTitle": "გავხსნათ გარე ბმული?",
+      "hostConfirmMessage": "ეს ბმული ხსნის {{host}}-ს თქვენს ბრაუზერში.",
+      "open": "გახსნა",
+      "trustThisHost": "ამ ჰოსტის ნდობა"
     }
   },
   "bootstrap": {
@@ -3129,5 +3141,13 @@
       "xhigh": "ძალიან მაღალი",
       "max": "მაქსიმალური"
     }
+  },
+  "trustedHosts": {
+    "title": "სანდო ჰოსტები",
+    "subtitle": "ჰოსტები, რომლებსაც ენდობით და ისინი იხსნება კითხვის გარეშე",
+    "emptyTitle": "სანდო ჰოსტები არ არის",
+    "emptyDescription": "როდესაც ენდობით ბმულის ჰოსტს, ის იხსნება ხელახლა კითხვის გარეშე.",
+    "revoke": "გაუქმება {{host}}",
+    "backToPreferences": "დაბრუნება პარამეტრებში"
   }
 }

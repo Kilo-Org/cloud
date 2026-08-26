@@ -1,5 +1,3 @@
-import { type Href, router } from 'expo-router';
-
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 
 import { setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
@@ -75,8 +73,9 @@ export function redirectSystemPath({
         setPendingDeepLink(href, 'universal-link');
       }
     } else {
-      // WARM: router is mounted; group hrefs work here.
-      router.navigate(href as Href, { withAnchor: true });
+      // WARM: stash like the cold path. The layout consumer navigates once the
+      // shell is ready, so a signed-out warm link survives login.
+      setPendingDeepLink(href, 'universal-link');
     }
     // Falsy in both handled cases — critical (see above).
     return null;

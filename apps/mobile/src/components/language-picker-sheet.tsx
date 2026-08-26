@@ -24,6 +24,7 @@ import {
 } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
+import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 
 const SEARCH_RTL = { textAlign: 'right' } as const;
 
@@ -51,12 +52,19 @@ export function LanguagePickerSheet({
   // Bumped on every focus so the uncontrolled TextInput remounts empty.
   const [searchEpoch, setSearchEpoch] = useState(0);
   const skipNextGuardRef = useRef(false);
+  const closeRequestedRef = useRef(false);
   const navigation = useNavigation();
+  const closePicker = useCallback(() => {
+    if (closeRequestedRef.current) {
+      return;
+    }
+    closeRequestedRef.current = true;
+    skipNextGuardRef.current = true;
+    onClose();
+  }, [onClose]);
 
   // While an apply is in flight — busy, restarting, or the reload has failed
   // and Retry is up — a swipe-dismiss or back would close the sheet mid-change.
-  // Block every removal; the applied-ltr path flips skipNextGuardRef just before
-  // closing so its own navigation is replayed instead of blocked.
   usePreventRemove(busy || restarting || reloadFailed, ({ data }) => {
     if (skipNextGuardRef.current) {
       skipNextGuardRef.current = false;
@@ -67,6 +75,8 @@ export function LanguagePickerSheet({
 
   useFocusEffect(
     useCallback(() => {
+      closeRequestedRef.current = false;
+      skipNextGuardRef.current = false;
       setQuery('');
       setSearchEpoch(epoch => epoch + 1);
       setSelected(getLanguagePreference());
@@ -77,6 +87,8 @@ export function LanguagePickerSheet({
       setReloadFailed(false);
     }, [])
   );
+
+  useFocusEffect(useCallback(() => subscribePrivacyCover(closePicker), [closePicker]));
 
   const deviceEndonym = LANGUAGE_ENDONYMS[resolveDeviceLanguage()];
   // The native layout direction, not the catalog's: the row insets and the
@@ -99,13 +111,9 @@ export function LanguagePickerSheet({
     // eslint-disable-next-line default-case
     switch (outcome.kind) {
       case 'applied-ltr': {
-        // Release the guard first: it reads its flag through a ref that only
-        // commits after this render, so setBusy(false) alone would still block
-        // the onClose navigation below.
-        skipNextGuardRef.current = true;
         setBusy(false);
         onApplied?.();
-        onClose();
+        closePicker();
         break;
       }
       case 'restarting-rtl': {
@@ -192,7 +200,7 @@ export function LanguagePickerSheet({
       onDone={() => {
         void handleDone();
       }}
-      onCancel={onClose}
+      onCancel={closePicker}
       doneLabel={t('common.done')}
       disabled={busy}
       scrollable={false}

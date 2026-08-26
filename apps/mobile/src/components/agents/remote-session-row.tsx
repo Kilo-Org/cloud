@@ -25,6 +25,7 @@ import {
   activeSessionMetaTimestamp,
   canExitSessionFromList,
   composeActiveSessionVisibleMeta,
+  composeSessionProvenanceSubtitle,
   formatSessionTotalCost,
   remoteMeta,
   remoteSessionEyebrowLabel,
@@ -93,6 +94,18 @@ export function RemoteSessionRow({
     costSpoken,
     timeSpoken,
   });
+
+  // Provenance subtitle: list rows show "branch · #N", card rows keep the
+  // branch-only subtitle. The spoken label mirrors this, with the PR phrase
+  // only on the list variant.
+  const subtitle =
+    variant === 'card'
+      ? (session.gitBranch ?? null)
+      : composeSessionProvenanceSubtitle({
+          branch: session.gitBranch,
+          prNumber: session.associatedPr?.number,
+        });
+  const spokenPrNumber = variant === 'card' ? null : (session.associatedPr?.number ?? null);
 
   const { iconKind: platformIconKind, spokenPlatform } = selectRowPlatformPresentation({
     platform: session.createdOnPlatform,
@@ -169,6 +182,8 @@ export function RemoteSessionRow({
           needsInput,
           badge: agentLabel,
           meta: spokenMeta,
+          subtitle: session.gitBranch ?? null,
+          prNumber: spokenPrNumber,
           platform: spokenPlatform,
         })}
         className="active:opacity-70"
@@ -176,7 +191,7 @@ export function RemoteSessionRow({
         <SessionRow
           agentLabel={agentLabel}
           title={title}
-          subtitle={session.gitBranch ?? null}
+          subtitle={subtitle}
           meta={composeActiveSessionVisibleMeta(
             formatSessionTotalCost(session.totalCostMicrodollars),
             remoteMeta(session)

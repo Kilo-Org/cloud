@@ -12,6 +12,7 @@ import {
 } from './deep-link-launch';
 import { _resetDevSessionInjectForTests, consumePendingDevSession } from './dev-session-inject';
 import { setGitHubInstallReturnOutcome } from './github-install-return';
+import { resolvePendingNavigation } from './pending-navigation';
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -113,13 +114,17 @@ describe('redirectSystemPath', () => {
   });
 
   describe('warm invariant', () => {
-    it.each(MAPPED_CASES)('navigates $path and leaves pending empty', ({ path, href }) => {
+    it.each(MAPPED_CASES)('stashes $path and does not navigate', ({ path, href }) => {
       const result = redirectSystemPath({ path, initial: false });
       expect(result).toBeNull();
       expect(!result).toBe(true);
-      expect(mocks.navigate).toHaveBeenCalledOnce();
-      expect(mocks.navigate).toHaveBeenCalledWith(href, { withAnchor: true });
-      expect(getPendingDeepLink()).toBeNull();
+      expect(getPendingDeepLink()).toBe(href);
+      expect(resolvePendingNavigation(href)).toEqual({
+        href,
+        method: 'navigate',
+        withAnchor: true,
+      });
+      expect(mocks.navigate).not.toHaveBeenCalled();
     });
   });
 
@@ -166,15 +171,12 @@ describe('redirectSystemPath', () => {
       expect(mocks.navigate).not.toHaveBeenCalled();
     });
 
-    it('warm kiloapp://profile navigates group href and returns null', () => {
+    it('warm kiloapp://profile stashes group href and returns null', () => {
       const result = redirectSystemPath({ path: 'kiloapp://profile', initial: false });
       expect(result).toBeNull();
       expect(!result).toBe(true);
-      expect(mocks.navigate).toHaveBeenCalledOnce();
-      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)', {
-        withAnchor: true,
-      });
-      expect(getPendingDeepLink()).toBeNull();
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
+      expect(mocks.navigate).not.toHaveBeenCalled();
     });
   });
 
@@ -234,9 +236,7 @@ describe('redirectSystemPath', () => {
         initial: false,
       });
       expect(result).toBeNull();
-      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)', {
-        withAnchor: true,
-      });
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(2_agents)');
 
       // Outcome must be stored for the agents tab to read.
       const outcome = mod.getGitHubInstallReturnOutcome();
@@ -252,9 +252,7 @@ describe('redirectSystemPath', () => {
         initial: false,
       });
       expect(result).toBeNull();
-      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)', {
-        withAnchor: true,
-      });
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
       expect(mod.getGitHubInstallReturnOutcome()).toBeNull();
     });
 
@@ -267,9 +265,7 @@ describe('redirectSystemPath', () => {
         initial: false,
       });
       expect(result).toBeNull();
-      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)', {
-        withAnchor: true,
-      });
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(2_agents)');
 
       const outcome = mod.getGitHubInstallReturnOutcome();
       expect(outcome).toEqual({ kind: 'pending' });
@@ -284,9 +280,7 @@ describe('redirectSystemPath', () => {
         initial: false,
       });
       expect(result).toBeNull();
-      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)', {
-        withAnchor: true,
-      });
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(2_agents)');
 
       const outcome = mod.getGitHubInstallReturnOutcome();
       expect(outcome).toEqual({ kind: 'error', code: 'installation_failed' });
@@ -301,9 +295,7 @@ describe('redirectSystemPath', () => {
         initial: false,
       });
       expect(result).toBeNull();
-      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)', {
-        withAnchor: true,
-      });
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(2_agents)');
 
       const outcome = mod.getGitHubInstallReturnOutcome();
       expect(outcome).toEqual({ kind: 'error', code: 'install_state_user_mismatch' });

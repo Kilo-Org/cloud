@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab ଆକାଉଣ୍ଟ",
       "connectGitLab": "GitLab ସଂଯୋଗ କରନ୍ତୁ",
       "gitlabError": "GitLab ସେଟଅପ୍ ଖୋଲାଯାଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "description": "ପୁଲ ରିକ୍ୱେଷ୍ଟ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ସମୀକ୍ଷା କରିବାକୁ Kilo {{label}} ସଂଯୋଗ କରନ୍ତୁ।"
+      "description": "ପୁଲ ରିକ୍ୱେଷ୍ଟ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ସମୀକ୍ଷା କରିବାକୁ Kilo {{label}} ସଂଯୋଗ କରନ୍ତୁ।",
+      "bitbucketError": "Bitbucket ସେଟଅପ୍ ଖୋଲିପାରିଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
     "overview": {
       "reviewStyle": "ସମୀକ୍ଷା ଶୈଳୀ",
@@ -2075,7 +2076,8 @@
       "dollar": "ଡଲାର",
       "dollar_other": "ଡଲାର",
       "costSpoken": "ଖର୍ଚ୍ଚ {{cost}}",
-      "costSpokenWithTime": "ଖର୍ଚ୍ଚ {{cost}}, {{time}}"
+      "costSpokenWithTime": "ଖର୍ଚ୍ଚ {{cost}}, {{time}}",
+      "pullRequest": "ପୁଲ ରିକ୍ୱେଷ୍ଟ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ଖୋଲାଯାଇପାରିଲା ନାହିଁ",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "ନୂଆ ସେସନ୍",
       "repository": "ରିପୋଜିଟୋରୀ",
-      "couldNotLoadRepositories": "ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
       "connectGithub": "GitHub ସଂଯୋଗ କରନ୍ତୁ",
       "connectGithubDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ GitHub ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
       "openGithub": "GitHub ଖୋଲନ୍ତୁ",
       "refreshRepositories": "ରିପୋଜିଟୋରୀ ରିଫ୍ରେସ୍ କରନ୍ତୁ",
-      "githubConnectionNotVisible": "ଆମେ ଆପଣଙ୍କ GitHub ସଂଯୋଗ ଏପର୍ଯ୍ୟନ୍ତ ଦେଖିପାରୁନାହୁଁ",
-      "githubConnectionNotVisibleDescription": "ଯଦି ଆପଣ Kilo GitHub ଆପ୍ ସଂସ୍ଥାପନ କିମ୍ବା ବିନ୍ୟାସ କରିଛନ୍ତି, ପୁନର୍ବାର ଯାଞ୍ଚ କରନ୍ତୁ — କିମ୍ବା ଏହା ଏହି ଆକାଉଣ୍ଟ/ସଂଗଠନ ପାଇଁ ସଂସ୍ଥାପିତ ହୋଇଛି କି ନାହିଁ ନିଶ୍ଚିତ କରନ୍ତୁ।",
-      "checkAgain": "ପୁନର୍ବାର ଯାଞ୍ଚ କରନ୍ତୁ",
       "githubConnected": "GitHub ସଂଯୋଜିତ",
       "noRepositoriesVisible": "କୌଣସି ରିପୋଜିଟୋରୀ ଦେଖାଯାଉନାହିଁ। Kilo GitHub ଆପ୍ ପାଇଁ ରିପୋଜିଟୋରୀ ଉପଲବ୍ଧତା ଯାଞ୍ଚ କରନ୍ତୁ, ତା'ପରେ ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
       "runOnWithTarget": "ଚଲାନ୍ତୁ: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "ସମ୍ପାଦନ ଜାରି ରଖନ୍ତୁ",
       "discard": "ବାତିଲ କରନ୍ତୁ",
       "discardFailed": "ଡ୍ରାଫ୍ଟ ପରିତ୍ୟାଗ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁନଃଚେଷ୍ଟା କରନ୍ତୁ।",
-      "remoteHint": "ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟରରେ `kilo remote` ଚଲାନ୍ତୁ, ଅଥବା ଚାଲୁଥିବା CLI ସେସନ୍ ରେ `/remote` ଚଲାନ୍ତୁ, ଏକ ସ୍ଥାନୀୟ kilo ପ୍ରକ୍ରିୟା ନିୟନ୍ତ୍ରଣ କରିବାକୁ।"
+      "remoteHint": "ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟରରେ `kilo remote` ଚଲାନ୍ତୁ, ଅଥବା ଚାଲୁଥିବା CLI ସେସନ୍ ରେ `/remote` ଚଲାନ୍ତୁ, ଏକ ସ୍ଥାନୀୟ kilo ପ୍ରକ୍ରିୟା ନିୟନ୍ତ୍ରଣ କରିବାକୁ।",
+      "bitbucketConnected": "Bitbucket ସଂଯୋଗ ହୋଇଛି",
+      "connectBitbucket": "Bitbucket ସଂଯୋଗ କରନ୍ତୁ",
+      "connectBitbucketDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ Bitbucket ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
+      "connectGitlab": "GitLab ସଂଯୋଗ କରନ୍ତୁ",
+      "connectGitlabDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ GitLab ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
+      "couldNotLoadBitbucketRepositories": "Bitbucket ରିପୋଜିଟରୀଗୁଡ଼ିକ ଲୋଡ୍ କରିପାରିଲା ନାହିଁ",
+      "couldNotLoadGithubRepositories": "GitHub ରିପୋଜିଟରୀଗୁଡ଼ିକ ଲୋଡ୍ କରିପାରିଲା ନାହିଁ",
+      "couldNotLoadGitlabRepositories": "GitLab ରିପୋଜିଟରୀଗୁଡ଼ିକ ଲୋଡ୍ କରିପାରିଲା ନାହିଁ",
+      "gitlabConnected": "GitLab ସଂଯୋଜିତ",
+      "noRepositoriesVisibleBitbucket": "କୌଣସି ରିପୋଜିଟରୀ ଦୃଶ୍ୟମାନ ନାହିଁ। Bitbucket ପାଇଁ ରିପୋଜିଟରୀ ଆକ୍ସେସ୍ ଯାଞ୍ଚ କରନ୍ତୁ, ତାପରେ ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
+      "noRepositoriesVisibleGitlab": "କୌଣସି ରିପୋଜିଟରୀ ଦୃଶ୍ୟମାନ ନାହିଁ। GitLab ପାଇଁ ରିପୋଜିଟରୀ ଆକ୍ସେସ୍ ଯାଞ୍ଚ କରନ୍ତୁ, ତାପରେ ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
+      "openBitbucket": "Bitbucket ଖୋଲନ୍ତୁ",
+      "openGitlab": "GitLab ଖୋଲନ୍ତୁ",
+      "recentlyUsed": "ସାମ୍ପ୍ରତିକ ଭାବରେ ବ୍ୟବହୃତ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ସହିତ କୌଣସି ରିପୋଜିଟୋରୀ ସଂଯୋଜିତ ନାହିଁ।",
       "tryDifferentSearch": "ଏକ ଭିନ୍ନ ଖୋଜ ଶବ୍ଦ ଚେଷ୍ଟା କରନ୍ତୁ।",
       "loading": "ଲୋଡ୍ ହେଉଛି...",
-      "accessibility": "ରିପୋଜିଟୋରୀ: {{label}}"
+      "accessibility": "ରିପୋଜିଟୋରୀ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "ବାର୍ତ୍ତା ବିବରଣୀ",
@@ -2623,6 +2638,18 @@
       "updating": "ଅପଡେଟ୍ ହେଉଛି, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ"
+    },
+    "markdownImage": {
+      "load": "ଲୋଡ୍",
+      "loadWithHost": "ଲୋଡ୍ {{host}}",
+      "httpsOnly": "କେବଳ HTTPS ଚିତ୍ର"
+    },
+    "markdownLink": {
+      "invalidLink": "ଏହି ଲିଙ୍କ୍ ଖୋଲାଯାଇ ପାରିବ ନାହିଁ।",
+      "hostConfirmTitle": "ବାହ୍ୟ ଲିଙ୍କ୍ ଖୋଲିବେ?",
+      "hostConfirmMessage": "ଏହି ଲିଙ୍କ୍ ଆପଣଙ୍କ ବ୍ରାଉଜରରେ {{host}} ଖୋଲିବ।",
+      "open": "ଖୋଲନ୍ତୁ",
+      "trustThisHost": "ଏହି ହୋଷ୍ଟକୁ ବିଶ୍ୱାସ କରନ୍ତୁ"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "କୌଣସି ଇମେଲ୍ ଆପ୍ ଉପଲବ୍ଧ ନାହିଁ। ଆପଣ ଆମକୁ {{email}} ରେ ଯୋଗାଯୋଗ କରିପାରିବେ",
     "couldNotOpenStore": "ଷ୍ଟୋର ଖୋଲାଯାଇପାରିଲା ନାହିଁ।",
-    "promptTitle": "ଆପଣ Kilo ଆପ୍ କିପରି ପସନ୍ଦ କରୁଛନ୍ତି?",
-    "iLikeIt": "ମୁଁ ଏହାକୁ ପସନ୍ଦ କରେ",
-    "gladTitle": "ଏହା ଶୁଣି ଆମେ ଖୁସି!",
-    "gladMessage": "ଏକ ଷ୍ଟୋର ସମୀକ୍ଷା ଆମକୁ ଅତ୍ୟନ୍ତ ସାହାଯ୍ୟ କରିବ। Kilo ବ୍ୟବହାର କରିଥିବାରୁ ଧନ୍ୟବାଦ!",
-    "rateKilo": "Kilo ରେଟ୍ କରନ୍ତୁ",
-    "needsWork": "ଉନ୍ନତି ଦରକାର",
-    "sorryTitle": "ଏହା ଶୁଣି ଆମେ ଦୁଃଖିତ!",
-    "sorryMessage": "କ'ଣ ଉନ୍ନତ ହେବା ଦରକାର ଆମକୁ ଜଣାନ୍ତୁ। ଆପ୍ ର ଦାୟିତ୍ୱରେ ଥିବା ଇଞ୍ଜିନିୟର ପ୍ରତ୍ୟେକ ରିପୋର୍ଟ ପଢ଼ନ୍ତି!",
-    "emailUs": "ଆମକୁ ଇମେଲ୍ କରନ୍ତୁ",
-    "emailSubject": "ମୋବାଇଲ୍ ଆପ୍ ଫିଡବ୍ୟାକ୍"
+    "emailSubject": "ମୋବାଇଲ୍ ଆପ୍ ଫିଡବ୍ୟାକ୍",
+    "neutralTitle": "Kilo ଆପ୍ କୁ ମୂଲ୍ୟାଙ୍କନ କରନ୍ତୁ",
+    "rateTheApp": "ଆପ୍ କୁ ମୂଲ୍ୟାଙ୍କନ କରନ୍ତୁ",
+    "sendFeedback": "ମତାମତ ପଠାନ୍ତୁ"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "ସଂଗଠନ ଅନୁପଲବ୍ଧ",
       "selectDescription": "ଜାରି ରଖିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଏକ ସଂଗଠନ ଚୟନ କରନ୍ତୁ।",
       "selectOrganization": "ଏକ ସଂଗଠନ ଚୟନ କରନ୍ତୁ",
-      "unavailableDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଜାରି ରଖିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଏକ ଚୟନ କରନ୍ତୁ।"
+      "unavailableDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଜାରି ରଖିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଏକ ଚୟନ କରନ୍ତୁ।",
+      "accessDeniedTitle": "ଆକ୍ସେସ୍ ଅସ୍ୱୀକୃତ",
+      "accessDeniedDescription": "ଆପଣଙ୍କର ଏହି ସଂଗଠନରେ ପ୍ରବେଶ ଅଧିକାର ନାହିଁ।"
     },
     "creditActivity": {
       "emptyDescription": "ଏହି ସଂଗଠନ ପାଇଁ କ୍ରୟ, ବ୍ୟବହାର, ଏବଂ କ୍ରେଡିଟ୍ ସଂଶୋଧନ ଘଟିବା ସମୟରେ ଏଠାରେ ଦେଖାଯିବ।",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "ହିସାବ ସଂଶୋଧନ",
         "credits_expired": "କ୍ରେଡିଟ୍ ସମାପ୍ତ"
-      }
+      },
+      "loadMore": "ଅଧିକ ଲୋଡ୍ କରନ୍ତୁ",
+      "loadMoreFailed": "ଅଧିକ ଲୋଡ୍ କରାଯାଇ ପାରିଲା ନାହିଁ",
+      "truncated": "ପୁରୁଣା କ୍ରେଡିଟ୍ କାର୍ଯ୍ୟକଳାପ ଉପଲବ୍ଧ।"
     },
     "inviteMember": {
       "emailError": "ଏକ ବୈଧ ଇମେଲ୍ ଠିକଣା ପ୍ରବେଶ କରନ୍ତୁ",
@@ -2976,7 +3002,10 @@
         "draft": "ଡ୍ରାଫ୍ଟ",
         "uncollectible": "ଅସଂଗ୍ରହଣୀୟ",
         "unknown": "ଅଜଣା"
-      }
+      },
+      "loadMore": "ଅଧିକ ଲୋଡ୍ କରନ୍ତୁ",
+      "loadMoreFailed": "ଅଧିକ ଲୋଡ୍ କରାଯାଇ ପାରିଲା ନାହିଁ",
+      "truncated": "ପୁରୁଣା ଇନଭଏସ୍ ଉପଲବ୍ଧ।"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "ଅତି ଉଚ୍ଚ",
       "max": "ସର୍ବାଧିକ"
     }
+  },
+  "trustedHosts": {
+    "title": "ବିଶ୍ୱସ୍ତ ହୋଷ୍ଟଗୁଡ଼ିକ",
+    "subtitle": "ପଚାରିବା ବିନା ଖୋଲିବା ପାଇଁ ଆପଣ ବିଶ୍ୱାସ କରୁଥିବା ହୋଷ୍ଟଗୁଡ଼ିକ",
+    "emptyTitle": "କୌଣସି ବିଶ୍ୱସ୍ତ ହୋଷ୍ଟ ନାହିଁ",
+    "emptyDescription": "ଯେତେବେଳେ ଆପଣ ଏକ ଲିଙ୍କ୍‌ର ହୋଷ୍ଟକୁ ବିଶ୍ୱାସ କରନ୍ତି, ଏହା ପୁଣି ପଚାରିବା ବିନା ଖୋଲିଥାଏ।",
+    "revoke": "{{host}} ରଦ୍ଦ କରନ୍ତୁ",
+    "backToPreferences": "ପସନ୍ଦକୁ ଫେରନ୍ତୁ"
   }
 }

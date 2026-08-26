@@ -1395,7 +1395,8 @@
       "gitlabAccount": "Cont GitLab",
       "connectGitLab": "Conectează GitLab",
       "gitlabError": "Configurarea GitLab nu a putut fi deschisă. Te rugăm să încerci din nou.",
-      "description": "Conectează Kilo {{label}} pentru a revizui pull request-urile automat."
+      "description": "Conectează Kilo {{label}} pentru a revizui pull request-urile automat.",
+      "bitbucketError": "Nu s-a putut deschide configurarea Bitbucket. Încearcă din nou."
     },
     "overview": {
       "reviewStyle": "Stil de revizuire",
@@ -2090,7 +2091,8 @@
       "cent_few": "cenți",
       "dollar_few": "dolari",
       "costSpoken": "cost {{cost}}",
-      "costSpokenWithTime": "cost {{cost}}, {{time}}"
+      "costSpokenWithTime": "cost {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nu s-a putut deschide GitHub",
@@ -2167,14 +2169,10 @@
     "newSession": {
       "title": "Sesiune nouă",
       "repository": "Depozit",
-      "couldNotLoadRepositories": "Nu s-au putut încărca depozitele",
       "connectGithub": "Conectează GitHub",
       "connectGithubDescription": "Conectează-te la GitHub în browser, apoi întoarce-te aici pentru a alege un depozit.",
       "openGithub": "Deschide GitHub",
       "refreshRepositories": "Reîmprospătează depozitele",
-      "githubConnectionNotVisible": "Încă nu vedem conexiunea ta la GitHub",
-      "githubConnectionNotVisibleDescription": "Dacă ai instalat sau configurat Kilo GitHub App, verifică din nou — sau asigură-te că a fost instalat pentru acest cont/organizație.",
-      "checkAgain": "Verifică din nou",
       "githubConnected": "GitHub conectat",
       "noRepositoriesVisible": "Nu este vizibil niciun depozit. Verifică accesul la depozite pentru Kilo GitHub App, apoi reîmprospătează.",
       "runOnWithTarget": "Rulează pe: {{target}}",
@@ -2201,7 +2199,21 @@
       "keepEditing": "Continuă editarea",
       "discard": "Renunță",
       "discardFailed": "Nu s-a putut renunța la ciornă. Încearcă din nou.",
-      "remoteHint": "Rulează `kilo remote` pe computerul tău sau `/remote` într-o sesiune CLI activă, pentru a controla un proces kilo local."
+      "remoteHint": "Rulează `kilo remote` pe computerul tău sau `/remote` într-o sesiune CLI activă, pentru a controla un proces kilo local.",
+      "bitbucketConnected": "Bitbucket conectat",
+      "connectBitbucket": "Conectează Bitbucket",
+      "connectBitbucketDescription": "Conectează Bitbucket în browser, apoi întoarce-te aici pentru a alege un depozit.",
+      "connectGitlab": "Conectează GitLab",
+      "connectGitlabDescription": "Conectează GitLab în browser, apoi întoarce-te aici pentru a alege un depozit.",
+      "couldNotLoadBitbucketRepositories": "Nu s-au putut încărca depozitele Bitbucket",
+      "couldNotLoadGithubRepositories": "Nu s-au putut încărca depozitele GitHub",
+      "couldNotLoadGitlabRepositories": "Nu s-au putut încărca depozitele GitLab",
+      "gitlabConnected": "Contul GitLab conectat",
+      "noRepositoriesVisibleBitbucket": "Niciun depozit vizibil. Verifică accesul la depozite pentru Bitbucket, apoi actualizează.",
+      "noRepositoriesVisibleGitlab": "Niciun depozit vizibil. Verifică accesul la depozite pentru GitLab, apoi actualizează.",
+      "openBitbucket": "Deschide Bitbucket",
+      "openGitlab": "Deschide GitLab",
+      "recentlyUsed": "Folosite recent"
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizat {{displayCount}} fișier",
@@ -2291,7 +2303,10 @@
       "noRepositoriesDescription": "Nu este conectat niciun depozit la contul tău.",
       "tryDifferentSearch": "Încearcă un alt termen de căutare.",
       "loading": "Se încarcă...",
-      "accessibility": "Depozit: {{label}}"
+      "accessibility": "Depozit: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detalii mesaj",
@@ -2643,6 +2658,18 @@
       "updating": "Se actualizează, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Încarcă",
+      "loadWithHost": "Încarcă {{host}}",
+      "httpsOnly": "Doar imagini HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Acest link nu poate fi deschis.",
+      "hostConfirmTitle": "Deschideți link extern?",
+      "hostConfirmMessage": "Acest link deschide {{host}} în browser.",
+      "open": "Deschide",
+      "trustThisHost": "Încrede-te în această gazdă"
     }
   },
   "bootstrap": {
@@ -2933,16 +2960,10 @@
   "feedback": {
     "noEmailApp": "Nicio aplicație de email disponibilă. Ne poți contacta la {{email}}",
     "couldNotOpenStore": "Magazinul nu a putut fi deschis.",
-    "promptTitle": "Cum îți place aplicația Kilo?",
-    "iLikeIt": "Îmi place",
-    "gladTitle": "Ne bucurăm să auzim asta!",
-    "gladMessage": "O recenzie în magazin ne-ar ajuta enorm. Mulțumim că folosești Kilo!",
-    "rateKilo": "Evaluează Kilo",
-    "needsWork": "Trebuie îmbunătățit",
-    "sorryTitle": "Ne pare rău să auzim asta!",
-    "sorryMessage": "Te rugăm să ne spui ce trebuie îmbunătățit. Inginerul responsabil de aplicație citește fiecare raport!",
-    "emailUs": "Trimite-ne un email",
-    "emailSubject": "feedback despre aplicația mobilă"
+    "emailSubject": "feedback despre aplicația mobilă",
+    "neutralTitle": "Evaluează aplicația Kilo",
+    "rateTheApp": "Evaluează aplicația",
+    "sendFeedback": "Trimite feedback"
   },
   "organization": {
     "boundary": {
@@ -2952,7 +2973,9 @@
       "organizationUnavailable": "Organizație indisponibilă",
       "selectDescription": "Alege o organizație din profilul tău pentru a continua.",
       "selectOrganization": "Selectează o organizație",
-      "unavailableDescription": "Această organizație nu mai este disponibilă. Alege una din profilul tău pentru a continua."
+      "unavailableDescription": "Această organizație nu mai este disponibilă. Alege una din profilul tău pentru a continua.",
+      "accessDeniedTitle": "Acces refuzat",
+      "accessDeniedDescription": "Nu ai acces la această organizație."
     },
     "creditActivity": {
       "emptyDescription": "Achizițiile, utilizarea și ajustările de credite pentru această organizație vor apărea aici pe măsură ce apar.",
@@ -2969,7 +2992,10 @@
         "team-topup-bonus-2025": "Bonus pentru reîncărcarea echipei 2025",
         "accounting_adjustment": "Ajustare contabilă",
         "credits_expired": "Credite expirate"
-      }
+      },
+      "loadMore": "Încarcă mai mult",
+      "loadMoreFailed": "Nu s-a putut încărca mai mult",
+      "truncated": "Activitatea de credite mai veche este disponibilă."
     },
     "inviteMember": {
       "emailError": "Introdu o adresă de email validă",
@@ -2996,7 +3022,10 @@
         "draft": "Ciornă",
         "uncollectible": "Neîncasabilă",
         "unknown": "Necunoscut"
-      }
+      },
+      "loadMore": "Încarcă mai mult",
+      "loadMoreFailed": "Nu s-a putut încărca mai mult",
+      "truncated": "Sunt disponibile facturi mai vechi."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3133,5 +3162,13 @@
       "xhigh": "Extra ridicat",
       "max": "Maxim"
     }
+  },
+  "trustedHosts": {
+    "title": "Gazde de încredere",
+    "subtitle": "Gazde în care ai încredere să le deschizi fără a întreba",
+    "emptyTitle": "Nicio gazdă de încredere",
+    "emptyDescription": "Când ai încredere în gazda unui link, acesta se deschide fără a te mai întreba.",
+    "revoke": "Revocă {{host}}",
+    "backToPreferences": "Înapoi la preferințe"
   }
 }

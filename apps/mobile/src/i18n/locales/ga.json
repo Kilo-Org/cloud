@@ -1413,7 +1413,8 @@
       "gitlabAccount": "Cuntas GitLab",
       "connectGitLab": "Ceangail GitLab",
       "gitlabError": "Níorbh fhéidir socrú GitLab a oscailt. Bain triail as arís le do thoil.",
-      "description": "Ceangail an Kilo {{label}} chun iarratais tarraingthe a athbhreithniú go huathoibríoch."
+      "description": "Ceangail an Kilo {{label}} chun iarratais tarraingthe a athbhreithniú go huathoibríoch.",
+      "bitbucketError": "Níorbh fhéidir socrú Bitbucket a oscailt. Bain triail as arís."
     },
     "overview": {
       "reviewStyle": "Stíl Athbhreithnithe",
@@ -2120,7 +2121,8 @@
       "dollar_few": "dollar",
       "dollar_many": "dollar",
       "costSpoken": "costas {{cost}}",
-      "costSpokenWithTime": "costas {{cost}}, {{time}}"
+      "costSpokenWithTime": "costas {{cost}}, {{time}}",
+      "pullRequest": "iarraidh tarraingt {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Níorbh fhéidir GitHub a oscailt",
@@ -2197,14 +2199,10 @@
     "newSession": {
       "title": "Seisiún nua",
       "repository": "Stór",
-      "couldNotLoadRepositories": "Níorbh fhéidir stórtha a lódáil",
       "connectGithub": "Ceangail GitHub",
       "connectGithubDescription": "Ceangail GitHub i do bhrabhsálaí, ansin fill anseo chun stór a roghnú.",
       "openGithub": "Oscail GitHub",
       "refreshRepositories": "Athnuaigh stórtha",
-      "githubConnectionNotVisible": "Ní fheicimid do cheangal GitHub fós",
-      "githubConnectionNotVisibleDescription": "Má shuiteáil tú nó má chumraigh tú an Kilo GitHub App, seiceáil arís — nó cinntigh gur suiteáladh é don chuntas/eagraíocht seo.",
-      "checkAgain": "Seiceáil arís",
       "githubConnected": "GitHub ceangailte",
       "noRepositoriesVisible": "Níl aon stórtha le feiceáil. Seiceáil rochtain stóir do Kilo GitHub App, ansin athnuaigh.",
       "runOnWithTarget": "Rith ar: {{target}}",
@@ -2231,7 +2229,21 @@
       "keepEditing": "Lean ar aghaidh ag cur in eagar",
       "discard": "Caith ar lár",
       "discardFailed": "Níorbh fhéidir an dréacht a chaitheamh ar lár. Bain triail as arís le do thoil.",
-      "remoteHint": "Rith `kilo remote` ar do ríomhaire, nó `/remote` i seisiún CLI atá ar siúl, chun próiseas áitiúil kilo a rialú."
+      "remoteHint": "Rith `kilo remote` ar do ríomhaire, nó `/remote` i seisiún CLI atá ar siúl, chun próiseas áitiúil kilo a rialú.",
+      "bitbucketConnected": "Bitbucket nasctha",
+      "connectBitbucket": "Ceangail Bitbucket",
+      "connectBitbucketDescription": "Ceangail Bitbucket i do bhrabhsálaí, agus ansin fill ar ais anseo chun stór a roghnú.",
+      "connectGitlab": "Ceangail GitLab",
+      "connectGitlabDescription": "Ceangail GitLab i do bhrabhsálaí, agus ansin fill ar ais anseo chun stór a roghnú.",
+      "couldNotLoadBitbucketRepositories": "Níorbh fhéidir stórtha Bitbucket a lódáil",
+      "couldNotLoadGithubRepositories": "Níorbh fhéidir stórtha GitHub a lódáil",
+      "couldNotLoadGitlabRepositories": "Níorbh fhéidir stórtha GitLab a lódáil",
+      "gitlabConnected": "GitLab ceangailte",
+      "noRepositoriesVisibleBitbucket": "Níl aon stórtha le feiceáil. Seiceáil rochtain ar stórtha do Bitbucket, agus ansin athnuaigh.",
+      "noRepositoriesVisibleGitlab": "Níl aon stórtha le feiceáil. Seiceáil rochtain ar stórtha do GitLab, agus ansin athnuaigh.",
+      "openBitbucket": "Oscail Bitbucket",
+      "openGitlab": "Oscail GitLab",
+      "recentlyUsed": "A úsáideadh le déanaí"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nuashonraíodh {{displayCount}} comhad",
@@ -2327,7 +2339,10 @@
       "noRepositoriesDescription": "Níl aon stór ceangailte le do chuntas.",
       "tryDifferentSearch": "Bain triail as téarma cuardaigh eile.",
       "loading": "Ag lódáil...",
-      "accessibility": "Stór: {{label}}"
+      "accessibility": "Stór: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Sonraí na teachtaireachta",
@@ -2683,6 +2698,18 @@
       "updating": "Ag nuashonrú, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "iarratas tarraingthe"
+    },
+    "markdownImage": {
+      "load": "Luchdaigh",
+      "loadWithHost": "Luchdaigh {{host}}",
+      "httpsOnly": "Íomhánna HTTPS amháin"
+    },
+    "markdownLink": {
+      "invalidLink": "Ní féidir an nasc seo a oscailt.",
+      "hostConfirmTitle": "An nasc seachtrach a oscailt?",
+      "hostConfirmMessage": "Osclaíonn an nasc seo {{host}} i do bhrabhsálaí.",
+      "open": "Oscail",
+      "trustThisHost": "Muinín as an óstaigh seo"
     }
   },
   "bootstrap": {
@@ -2973,16 +3000,10 @@
   "feedback": {
     "noEmailApp": "Níl aon aip ríomhphoist ar fáil. Is féidir leat teagmháil a dhéanamh linn ag {{email}}",
     "couldNotOpenStore": "Níorbh fhéidir an siopa a oscailt.",
-    "promptTitle": "Conas atá an aip Kilo ag dul duit?",
-    "iLikeIt": "Is maith liom é",
-    "gladTitle": "Tá áthas orainn é sin a chloisteáil!",
-    "gladMessage": "Chuirfeadh léirmheas siopa go mór lenár gcabhair. Go raibh maith agat as Kilo a úsáid!",
-    "rateKilo": "Ráta Kilo",
-    "needsWork": "Teastaíonn obair",
-    "sorryTitle": "Tá brón orainn é sin a chloisteáil!",
-    "sorryMessage": "Inis dúinn cad a chaithfidh a bheith níos fearr. Léann an t-innealtóir atá i gceannas ar an aip gach tuarascáil!",
-    "emailUs": "Seol ríomhphost chugainn",
-    "emailSubject": "aiseolas ar an aip shoghluaiste"
+    "emailSubject": "aiseolas ar an aip shoghluaiste",
+    "neutralTitle": "Grádaigh an aip Kilo",
+    "rateTheApp": "Grádaigh an aip",
+    "sendFeedback": "Seol aiseolas"
   },
   "organization": {
     "boundary": {
@@ -2992,7 +3013,9 @@
       "organizationUnavailable": "Eagraíocht gan fáil",
       "selectDescription": "Roghnaigh eagraíocht ó do phróifíl le leanúint ar aghaidh.",
       "selectOrganization": "Roghnaigh eagraíocht",
-      "unavailableDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Roghnaigh ceann ó do phróifíl le leanúint ar aghaidh."
+      "unavailableDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Roghnaigh ceann ó do phróifíl le leanúint ar aghaidh.",
+      "accessDeniedTitle": "Rochtain diúltaithe",
+      "accessDeniedDescription": "Níl rochtain agat ar an eagraíocht seo."
     },
     "creditActivity": {
       "emptyDescription": "Beidh ceannacháin, úsáid, agus coigeartuithe creidmheasa don eagraíocht seo le feiceáil anseo de réir mar a tharlaíonn siad.",
@@ -3009,7 +3032,10 @@
         "team-topup-bonus-2025": "Bónas forlíonta foirne 2025",
         "accounting_adjustment": "Coigeartú cuntasaíochta",
         "credits_expired": "Creidmheasanna imithe in éag"
-      }
+      },
+      "loadMore": "Lódáil tuilleadh",
+      "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil",
+      "truncated": "Tá gníomhaíocht chreidmheasa níos sine ar fáil."
     },
     "inviteMember": {
       "emailError": "Iontráil seoladh ríomhphoist bailí",
@@ -3036,7 +3062,10 @@
         "draft": "Dréacht",
         "uncollectible": "Dobhailithe",
         "unknown": "Anaithnid"
-      }
+      },
+      "loadMore": "Lódáil tuilleadh",
+      "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil",
+      "truncated": "Tá sonraisc níos sine ar fáil."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3175,5 +3204,13 @@
       "xhigh": "An-ard",
       "max": "Uasmhéid"
     }
+  },
+  "trustedHosts": {
+    "title": "Óstaigh iontaofa",
+    "subtitle": "Óstaigh a bhfuil muinín agat astu a oscailt gan ceist a chur",
+    "emptyTitle": "Níl aon óstaigh iontaofa",
+    "emptyDescription": "Nuair a bhíonn muinín agat as óstach an naisc, osclaíonn sé gan ceist a chur arís.",
+    "revoke": "Cúlghair {{host}}",
+    "backToPreferences": "Ar ais go dtí na roghanna"
   }
 }

@@ -9,6 +9,7 @@ import { i18n } from '@/i18n';
 import { applyLanguagePreference } from '@/i18n/apply-language';
 import type * as ApplyLanguageModule from '@/i18n/apply-language';
 import { LanguagePickerSheet } from '@/components/language-picker-sheet';
+import { emitPrivacyCover } from '@/lib/privacy-cover-events';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -302,6 +303,33 @@ describe('LanguagePickerSheet apply', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(applyLanguagePreference).not.toHaveBeenCalled();
     expect(setLanguagePreferenceAsync).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('closes once when privacy coverage interrupts a language change', async () => {
+    const pendingWrite = Promise.withResolvers<boolean>();
+    setLanguagePreferenceAsync.mockReturnValueOnce(pendingWrite.promise);
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+
+    await act(async () => {
+      (findChoiceRow(renderer.root, 'Español').props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(onClose).not.toHaveBeenCalled();
+
+    act(() => {
+      emitPrivacyCover();
+      emitPrivacyCover();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      pendingWrite.resolve(true);
+      await pendingWrite.promise;
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });

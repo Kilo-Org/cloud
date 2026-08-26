@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab கணக்கு",
       "connectGitLab": "GitLab ஐ இணை",
       "gitlabError": "GitLab அமைவை திறக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-      "description": "Pull requests ஐ தானாக மதிப்பாய்வு செய்ய Kilo {{label}} ஐ இணைக்கவும்."
+      "description": "Pull requests ஐ தானாக மதிப்பாய்வு செய்ய Kilo {{label}} ஐ இணைக்கவும்.",
+      "bitbucketError": "பிட்பக்கெட் அமைப்பைத் திறக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
     },
     "overview": {
       "reviewStyle": "மதிப்பாய்வு பாணி",
@@ -2075,7 +2076,8 @@
       "dollar": "டாலர்கள்",
       "dollar_other": "டாலர்கள்",
       "costSpoken": "செலவு {{cost}}",
-      "costSpokenWithTime": "செலவு {{cost}}, {{time}}"
+      "costSpokenWithTime": "செலவு {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ஐ திறக்க முடியவில்லை",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "புதிய அமர்வு",
       "repository": "களஞ்சியம்",
-      "couldNotLoadRepositories": "களஞ்சியங்களை ஏற்ற முடியவில்லை",
       "connectGithub": "GitHub உடன் இணை",
       "connectGithubDescription": "உங்கள் உலாவியில் GitHub ஐ இணைக்கவும், பின்னர் ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கு திரும்பவும்.",
       "openGithub": "GitHub ஐ திற",
       "refreshRepositories": "களஞ்சியங்களை புதுப்பி",
-      "githubConnectionNotVisible": "உங்கள் GitHub இணைப்பை இன்னும் பார்க்க முடியவில்லை",
-      "githubConnectionNotVisibleDescription": "நீங்கள் Kilo GitHub App ஐ நிறுவியிருந்தால் அல்லது கட்டமைத்திருந்தால், மீண்டும் சரிபார்க்கவும் — அல்லது இந்த கணக்கு/நிறுவனத்திற்காக நிறுவப்பட்டுள்ளதா என்பதை உறுதிப்படுத்தவும்.",
-      "checkAgain": "மீண்டும் சரிபார்",
       "githubConnected": "GitHub இணைக்கப்பட்டது",
       "noRepositoriesVisible": "களஞ்சியங்கள் தெரியவில்லை. Kilo GitHub App க்கான களஞ்சிய அணுகலைச் சரிபார்த்து, பின்னர் புதுப்பிக்கவும்.",
       "runOnWithTarget": "இதில் இயக்கு: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "தொடர்ந்து திருத்து",
       "discard": "நிராகரி",
       "discardFailed": "வரைவை நிராகரிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-      "remoteHint": "உங்கள் கணினியில் `kilo remote` ஐ இயக்கவும், அல்லது இயங்கும் CLI அமர்வில் `/remote` ஐ இயக்கவும், ஒரு உள்ளூர் kilo செயல்முறையைக் கட்டுப்படுத்தவும்"
+      "remoteHint": "உங்கள் கணினியில் `kilo remote` ஐ இயக்கவும், அல்லது இயங்கும் CLI அமர்வில் `/remote` ஐ இயக்கவும், ஒரு உள்ளூர் kilo செயல்முறையைக் கட்டுப்படுத்தவும்",
+      "bitbucketConnected": "Bitbucket இணைக்கப்பட்டது",
+      "connectBitbucket": "Bitbucket ஐ இணை",
+      "connectBitbucketDescription": "உங்கள் உலாவியில் பிட்பக்கெட்டை இணைக்கவும், பின்னர் ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
+      "connectGitlab": "GitLab ஐ இணை",
+      "connectGitlabDescription": "உங்கள் உலாவியில் GitLab-ஐ இணைக்கவும், பின்னர் ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
+      "couldNotLoadBitbucketRepositories": "பிட்பக்கெட் களஞ்சியங்களை ஏற்ற முடியவில்லை",
+      "couldNotLoadGithubRepositories": "GitHub களஞ்சியங்களை ஏற்ற முடியவில்லை",
+      "couldNotLoadGitlabRepositories": "GitLab களஞ்சியங்களை ஏற்ற முடியவில்லை",
+      "gitlabConnected": "GitLab இணைக்கப்பட்டது",
+      "noRepositoriesVisibleBitbucket": "களஞ்சியங்கள் எதுவும் காணப்படவில்லை. பிட்பக்கெட்டிற்கான களஞ்சிய அணுகலைச் சரிபார்த்து, பின்னர் புதுப்பிக்கவும்.",
+      "noRepositoriesVisibleGitlab": "களஞ்சியங்கள் எதுவும் காணப்படவில்லை. GitLab-க்கான களஞ்சிய அணுகலைச் சரிபார்த்து, பின்னர் புதுப்பிக்கவும்.",
+      "openBitbucket": "பிட்பக்கெட்டைத் திறக்கவும்",
+      "openGitlab": "GitLab-ஐத் திறக்கவும்",
+      "recentlyUsed": "சமீபத்தில் பயன்படுத்தியவை"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} கோப்பு புதுப்பிக்கப்பட்டது",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "உங்கள் கணக்கில் களஞ்சியங்கள் எதுவும் இணைக்கப்படவில்லை.",
       "tryDifferentSearch": "வேறு தேடல் சொல்லை முயற்சிக்கவும்.",
       "loading": "ஏற்றுகிறது...",
-      "accessibility": "களஞ்சியம்: {{label}}"
+      "accessibility": "களஞ்சியம்: {{label}}",
+      "platformBitbucket": "பிட்பக்கெட்",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "செய்தி விவரங்கள்",
@@ -2623,6 +2638,18 @@
       "updating": "புதுப்பிக்கிறது, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "இழுப்பு கோரிக்கை"
+    },
+    "markdownImage": {
+      "load": "ஏற்று",
+      "loadWithHost": "ஏற்று {{host}}",
+      "httpsOnly": "HTTPS படங்கள் மட்டுமே"
+    },
+    "markdownLink": {
+      "invalidLink": "இந்த இணைப்பைத் திறக்க முடியாது.",
+      "hostConfirmTitle": "வெளிப்புற இணைப்பைத் திறக்கவா?",
+      "hostConfirmMessage": "இந்த இணைப்பு உங்கள் உலாவியில் {{host}} ஐத் திறக்கும்.",
+      "open": "திறக்கவும்",
+      "trustThisHost": "இந்த ஹோஸ்டை நம்பு"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "மின்னஞ்சல் ஆப் இல்லை. எங்களை {{email}} இல் தொடர்பு கொள்ளலாம்",
     "couldNotOpenStore": "ஸ்டோரைத் திறக்க முடியவில்லை.",
-    "promptTitle": "Kilo ஆப்பை எப்படி விரும்புகிறீர்கள்?",
-    "iLikeIt": "எனக்கு பிடித்துள்ளது",
-    "gladTitle": "இதைக் கேட்பதில் மகிழ்ச்சி!",
-    "gladMessage": "ஒரு ஸ்டோர் மதிப்பாய்வு எங்களுக்கு மிகவும் உதவும். Kilo பயன்படுத்தியதற்கு நன்றி!",
-    "rateKilo": "Kiloவை மதிப்பிடவும்",
-    "needsWork": "மேம்பாடு தேவை",
-    "sorryTitle": "இதைக் கேட்பதற்கு வருந்துகிறோம்!",
-    "sorryMessage": "எதை மேம்படுத்த வேண்டும் என்பதை எங்களுக்குத் தெரியப்படுத்தவும். ஆப்பின் பொறுப்பாளர் ஒவ்வொரு அறிக்கையையும் படிக்கிறார்!",
-    "emailUs": "எங்களுக்கு மின்னஞ்சல் செய்யுங்கள்",
-    "emailSubject": "மொபைல் பயன்பாட்டு கருத்து"
+    "emailSubject": "மொபைல் பயன்பாட்டு கருத்து",
+    "neutralTitle": "Kilo பயன்பாட்டை மதிப்பிடவும்",
+    "rateTheApp": "பயன்பாட்டை மதிப்பிடவும்",
+    "sendFeedback": "கருத்தை அனுப்பவும்"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "நிறுவனம் கிடைக்கவில்லை",
       "selectDescription": "தொடர உங்கள் சுயவிவரத்திலிருந்து ஒரு நிறுவனத்தைத் தேர்ந்தெடுக்கவும்.",
       "selectOrganization": "ஒரு நிறுவனத்தைத் தேர்ந்தெடுக்கவும்",
-      "unavailableDescription": "இந்த நிறுவனம் இனி கிடைக்காது. தொடர உங்கள் சுயவிவரத்திலிருந்து ஒன்றைத் தேர்ந்தெடுக்கவும்."
+      "unavailableDescription": "இந்த நிறுவனம் இனி கிடைக்காது. தொடர உங்கள் சுயவிவரத்திலிருந்து ஒன்றைத் தேர்ந்தெடுக்கவும்.",
+      "accessDeniedTitle": "அணுகல் மறுக்கப்பட்டது",
+      "accessDeniedDescription": "இந்த அமைப்பை அணுக உங்களுக்கு அனுமதி இல்லை."
     },
     "creditActivity": {
       "emptyDescription": "இந்த நிறுவனத்திற்கான வாங்குதல்கள், பயன்பாடு மற்றும் கிரெடிட் சரிசெய்தல்கள் நிகழும்போது இங்கே தோன்றும்.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "குழு டாப்-அப் போனஸ் 2025",
         "accounting_adjustment": "கணக்கியல் சரிசெய்தல்",
         "credits_expired": "கிரெடிட்கள் காலாவதியானது"
-      }
+      },
+      "loadMore": "மேலும் ஏற்று",
+      "loadMoreFailed": "மேலும் ஏற்ற முடியவில்லை",
+      "truncated": "பழைய கிரெடிட் செயல்பாடு கிடைக்கிறது."
     },
     "inviteMember": {
       "emailError": "செல்லுபடியாகும் மின்னஞ்சல் முகவரியை உள்ளிடவும்",
@@ -2976,7 +3002,10 @@
         "draft": "வரைவு",
         "uncollectible": "வசூலிக்க முடியாதது",
         "unknown": "தெரியவில்லை"
-      }
+      },
+      "loadMore": "மேலும் ஏற்று",
+      "loadMoreFailed": "மேலும் ஏற்ற முடியவில்லை",
+      "truncated": "பழைய விலைப்பட்டியல்கள் கிடைக்கின்றன."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "மிக உயர்",
       "max": "அதிகபட்சம்"
     }
+  },
+  "trustedHosts": {
+    "title": "நம்பப்படும் ஹோஸ்ட்கள்",
+    "subtitle": "கேட்காமல் திறக்க நீங்கள் நம்பும் ஹோஸ்ட்கள்",
+    "emptyTitle": "நம்பப்படும் ஹோஸ்ட்கள் இல்லை",
+    "emptyDescription": "ஒரு இணைப்பின் ஹோஸ்டை நீங்கள் நம்பும்போது, அது மீண்டும் கேட்காமல் திறக்கும்.",
+    "revoke": "{{host}} ஐ திரும்பப் பெறு",
+    "backToPreferences": "விருப்பங்களுக்குத் திரும்பு"
   }
 }

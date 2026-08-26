@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab اکاؤنٹ",
       "connectGitLab": "GitLab منسلک کریں",
       "gitlabError": "GitLab سیٹ اپ نہیں کھولا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔",
-      "description": "پل ریکویسٹس کا خودکار جائزہ لینے کے لیے Kilo {{label}} منسلک کریں۔"
+      "description": "پل ریکویسٹس کا خودکار جائزہ لینے کے لیے Kilo {{label}} منسلک کریں۔",
+      "bitbucketError": "Bitbucket سیٹ اپ نہیں کھولا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔"
     },
     "overview": {
       "reviewStyle": "جائزے کا انداز",
@@ -2075,7 +2076,8 @@
       "dollar": "ڈالر",
       "dollar_other": "ڈالر",
       "costSpoken": "لاگت {{cost}}",
-      "costSpokenWithTime": "لاگت {{cost}}, {{time}}"
+      "costSpokenWithTime": "لاگت {{cost}}, {{time}}",
+      "pullRequest": "پل ریکویسٹ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub نہیں کھل سکا",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "نیا سیشن",
       "repository": "ریپوزٹری",
-      "couldNotLoadRepositories": "ریپوزٹریز لوڈ نہیں ہو سکیں",
       "connectGithub": "GitHub منسلک کریں",
       "connectGithubDescription": "اپنے براؤزر میں GitHub سے جڑیں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
       "openGithub": "GitHub کھولیں",
       "refreshRepositories": "ریپوزٹریز تازہ کریں",
-      "githubConnectionNotVisible": "ہم ابھی آپ کا GitHub کنکشن نہیں دیکھ سکتے",
-      "githubConnectionNotVisibleDescription": "اگر آپ نے Kilo GitHub App انسٹال یا ترتیب دی ہے تو دوبارہ چیک کریں — یا یقینی بنائیں کہ یہ اس اکاؤنٹ/تنظیم کے لیے انسٹال ہوئی تھی۔",
-      "checkAgain": "دوبارہ چیک کریں",
       "githubConnected": "GitHub جڑ گیا",
       "noRepositoriesVisible": "کوئی ریپوزٹری نظر نہیں آتی۔ Kilo GitHub App کے لیے ریپوزٹری رسائی چیک کریں، پھر تازہ کریں۔",
       "runOnWithTarget": "چلائیں: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "ترمیم جاری رکھیں",
       "discard": "ضائع کریں",
       "discardFailed": "ڈرافٹ خارج نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
-      "remoteHint": "اپنے کمپیوٹر پر `kilo remote` چلائیں، یا چلتی CLI سیشن میں `/remote` چلائیں، مقامی kilo عمل کو کنٹرول کرنے کے لیے۔"
+      "remoteHint": "اپنے کمپیوٹر پر `kilo remote` چلائیں، یا چلتی CLI سیشن میں `/remote` چلائیں، مقامی kilo عمل کو کنٹرول کرنے کے لیے۔",
+      "bitbucketConnected": "Bitbucket منسلک",
+      "connectBitbucket": "Bitbucket منسلک کریں",
+      "connectBitbucketDescription": "اپنے براؤزر میں Bitbucket سے جڑیں، پھر ذخیرہ منتخب کرنے کے لیے یہاں واپس آئیں۔",
+      "connectGitlab": "GitLab منسلک کریں",
+      "connectGitlabDescription": "اپنے براؤزر میں GitLab سے جڑیں، پھر ذخیرہ منتخب کرنے کے لیے یہاں واپس آئیں۔",
+      "couldNotLoadBitbucketRepositories": "Bitbucket ذخیرے لوڈ نہیں ہو سکے",
+      "couldNotLoadGithubRepositories": "GitHub ذخیرے لوڈ نہیں ہو سکے",
+      "couldNotLoadGitlabRepositories": "GitLab ذخیرے لوڈ نہیں ہو سکے",
+      "gitlabConnected": "GitLab منسلک",
+      "noRepositoriesVisibleBitbucket": "کوئی ذخیرہ نظر نہیں آ رہا۔ Bitbucket کے لیے ذخیرہ رسائی چیک کریں، پھر تازہ کریں۔",
+      "noRepositoriesVisibleGitlab": "کوئی ذخیرہ نظر نہیں آ رہا۔ GitLab کے لیے ذخیرہ رسائی چیک کریں، پھر تازہ کریں۔",
+      "openBitbucket": "Bitbucket کھولیں",
+      "openGitlab": "GitLab کھولیں",
+      "recentlyUsed": "حال ہی میں استعمال شدہ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فائل اپ ڈیٹ ہوئی",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "آپ کے اکاؤنٹ سے کوئی ریپوزٹری جڑی نہیں۔",
       "tryDifferentSearch": "کوئی مختلف تلاش کا لفظ آزمائیں۔",
       "loading": "لوڈ ہو رہا ہے...",
-      "accessibility": "ریپوزٹری: {{label}}"
+      "accessibility": "ریپوزٹری: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "پیغام کی تفصیلات",
@@ -2623,6 +2638,18 @@
       "updating": "اپڈیٹ ہو رہا ہے، {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "پل ریکویسٹ"
+    },
+    "markdownImage": {
+      "load": "لوڈ کریں",
+      "loadWithHost": "لوڈ کریں {{host}}",
+      "httpsOnly": "صرف HTTPS تصاویر"
+    },
+    "markdownLink": {
+      "invalidLink": "یہ لنک نہیں کھولا جا سکتا۔",
+      "hostConfirmTitle": "بیرونی لنک کھولیں؟",
+      "hostConfirmMessage": "یہ لنک {{host}} کو آپ کے براؤزر میں کھولتا ہے۔",
+      "open": "کھولیں",
+      "trustThisHost": "اس ہوسٹ پر بھروسہ کریں"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "کوئی ای میل ایپ دستیاب نہیں۔ آپ ہم تک {{email}} پر پہنچ سکتے ہیں",
     "couldNotOpenStore": "اسٹور نہیں کھل سکا۔",
-    "promptTitle": "آپ کو Kilo ایپ کیسا لگ رہا ہے؟",
-    "iLikeIt": "مجھے یہ پسند ہے",
-    "gladTitle": "ہمیں سن کر خوشی ہوئی!",
-    "gladMessage": "اسٹور ریویو ہماری بہت مدد کرے گا۔ Kilo استعمال کرنے کا شکریہ!",
-    "rateKilo": "Kilo ریٹ کریں",
-    "needsWork": "بہتری کی ضرورت ہے",
-    "sorryTitle": "ہمیں سن کر افسوس ہوا!",
-    "sorryMessage": "براہ کرم ہمیں بتائیں کہ کیا بہتر ہونے کی ضرورت ہے۔ ایپ کا ذمہ دار انجینئر ہر ایک رپورٹ پڑھتا ہے!",
-    "emailUs": "ہمیں ای میل کریں",
-    "emailSubject": "موبائل ایپ رائے"
+    "emailSubject": "موبائل ایپ رائے",
+    "neutralTitle": "Kilo ایپ کی درجہ بندی کریں",
+    "rateTheApp": "ایپ کی درجہ بندی کریں",
+    "sendFeedback": "فیڈ بیک بھیجیں"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "تنظیم دستیاب نہیں",
       "selectDescription": "جاری رکھنے کے لیے اپنے پروفائل سے ایک تنظیم منتخب کریں۔",
       "selectOrganization": "ایک تنظیم منتخب کریں",
-      "unavailableDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ جاری رکھنے کے لیے اپنے پروفائل سے ایک منتخب کریں۔"
+      "unavailableDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ جاری رکھنے کے لیے اپنے پروفائل سے ایک منتخب کریں۔",
+      "accessDeniedTitle": "رسائی مسترد",
+      "accessDeniedDescription": "آپ کو اس تنظیم تک رسائی حاصل نہیں ہے۔"
     },
     "creditActivity": {
       "emptyDescription": "اس تنظیم کی خریداریاں، استعمال، اور کریڈٹ ایڈجسٹمنٹ ہونے پر یہاں ظاہر ہوں گی۔",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "ٹیم ٹاپ اپ بونس 2025",
         "accounting_adjustment": "اکاؤنٹنگ ایڈجسٹمنٹ",
         "credits_expired": "کریڈٹس کی میعاد ختم"
-      }
+      },
+      "loadMore": "مزید لوڈ کریں",
+      "loadMoreFailed": "مزید لوڈ نہیں ہو سکا",
+      "truncated": "پرانے کریڈٹ کی سرگرمی دستیاب ہے۔"
     },
     "inviteMember": {
       "emailError": "درست ای میل پتہ درج کریں",
@@ -2976,7 +3002,10 @@
         "draft": "ڈرافٹ",
         "uncollectible": "ناقابل وصول",
         "unknown": "نامعلوم"
-      }
+      },
+      "loadMore": "مزید لوڈ کریں",
+      "loadMoreFailed": "مزید لوڈ نہیں ہو سکا",
+      "truncated": "پرانے انوائس دستیاب ہیں۔"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "بہت زیادہ",
       "max": "زیادہ سے زیادہ"
     }
+  },
+  "trustedHosts": {
+    "title": "بھروسے کے ہوسٹس",
+    "subtitle": "وہ ہوسٹس جن پر آپ بغیر پوچھے کھولنے کا بھروسہ کرتے ہیں",
+    "emptyTitle": "کوئی بھروسے کا ہوسٹ نہیں",
+    "emptyDescription": "جب آپ کسی لنک کے ہوسٹ پر بھروسہ کرتے ہیں، تو یہ دوبارہ بغیر پوچھے کھل جاتا ہے۔",
+    "revoke": "{{host}} کو منسوخ کریں",
+    "backToPreferences": "ترجیحات پر واپس جائیں"
   }
 }

@@ -2160,7 +2160,13 @@ export const adminRouter = createTRPCRouter({
 
   sessionTraces: createTRPCRouter({
     resolveCloudAgentSession: sessionViewerProcedure
-      .input(z.object({ cloud_agent_session_id: z.string().startsWith('agent_') }))
+      .input(
+        z.object({
+          cloud_agent_session_id: z
+            .string()
+            .regex(/^(agent|workspace)_/, 'Invalid cloud agent session ID'),
+        })
+      )
       .query(async ({ input }) => {
         // Check v1 first
         const [v1] = await db

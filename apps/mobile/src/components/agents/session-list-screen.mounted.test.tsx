@@ -140,6 +140,15 @@ vi.mock('@/lib/organization-context', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ primaryForeground: '#ffffff' }),
 }));
+vi.mock('@/lib/persist/use-draft-load', () => ({
+  useFencedDraftLoad: () => ({ settled: true, value: null }),
+}));
+vi.mock('@/lib/persist/drafts', () => ({
+  SESSION_SEARCH_DRAFT_KEY: 'session-search-query',
+}));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1', isLoading: false }),
+}));
 
 const mountedRenderers: TestRenderer.ReactTestRenderer[] = [];
 

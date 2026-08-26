@@ -40,6 +40,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
+import { PrivacyCoverOverlay } from '@/components/privacy-cover-overlay';
 import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -98,10 +99,22 @@ import {
   clearSharePayload,
   discardUnstoredSharePayload,
   normalizeShareIntent,
+  peekSharePayload,
+  persistSharePayloadsNow,
   putSharePayload,
+  restoreSharePayloads,
+  setSharePersistUserId,
   type ShareId,
   type SharePayload,
 } from '@/lib/share-payload';
+import { persistShareNavigationNow, restoreShareNavigation } from '@/lib/share-navigation';
+import {
+  flushDraft,
+  isStringDraft,
+  loadDraft,
+  PENDING_SHARE_ID_DRAFT_KEY,
+  saveDraft,
+} from '@/lib/persist/drafts';
 import { SENTRY_ENVIRONMENT } from '@/lib/config';
 import { SENTRY_DSN } from '@/lib/sentry-dsn';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
@@ -280,12 +293,27 @@ function RootLayoutNav() {
     void restorePersistedCacheOnColdStart(queryClient);
   }, []);
 
-  // Restore a deep-link destination persisted before process death. Runs before
-  // the gate effect so a restored destination is present when the shell
-  // settles; the observable slot re-triggers the consumer if it lands later.
+  // Restore a deep-link destination persisted before process death. Waits for
+  // auth bootstrap: a persisted record is account-bound, and the token owner
+  // publishes the signed-in user id before `authLoading` clears. Restoring
+  // earlier compares an account-bound record against a null user id, so a
+  // signed-in cold start would delete its own destination. The slot is
+  // observable, so the consumer still fires when the destination lands.
+  const deepLinkRestoreStarted = useRef(false);
   useEffect(() => {
+    if (authLoading || deepLinkRestoreStarted.current) {
+      return;
+    }
+    deepLinkRestoreStarted.current = true;
     void restorePersistedPendingDeepLink();
-  }, []);
+  }, [authLoading]);
+
+  // Scope share persistence to the current account (DEC-01): null while signed
+  // out, so a share captured signed out never persists (in-memory only, and a
+  // same-process login can still open the gate).
+  useEffect(() => {
+    setSharePersistUserId(userId ?? null);
+  }, [userId]);
 
   useSentryConsentSync(consentChecked && !needsConsent && optionalConsent, initSentry);
 
@@ -417,6 +445,70 @@ function RootLayoutNav() {
   // without reading stale state or adding the id to effect deps.
   const pendingShareIdRef = useRef(pendingShareId);
   pendingShareIdRef.current = pendingShareId;
+  // Bumped by the ingest arm and the gate consume so the cold-start restore can
+  // detect any live arm/consume during its async reads and skip the fill.
+  const pendingShareIdEpochRef = useRef(0);
+
+  // Flush a share staged while the account id was still loading: the ingest
+  // effect persisted nothing (userId was falsy), so once userId resolves the
+  // staged payload map, navigation queue, and pending id are written to durable
+  // drafts. A signed-out share never reaches this branch (userId stays null),
+  // so it remains in-memory only. Declared after `pendingShareIdRef` so the
+  // closure references an already-declared const.
+  useEffect(() => {
+    if (userId && pendingShareIdRef.current !== null) {
+      void persistSharePayloadsNow();
+      void persistShareNavigationNow();
+      saveDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, pendingShareIdRef.current);
+      void flushDraft(userId, PENDING_SHARE_ID_DRAFT_KEY);
+    }
+  }, [userId]);
+
+  // Cold-start share restore. Order matters: payloads first, then the
+  // navigation queue (deliveries point at restored payloads), then the pending
+  // id — and only when its payload still exists. A restored id with an empty
+  // map is the existing stale-share empty path, so it must not re-arm the gate.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restoreShare() {
+      const startEpoch = pendingShareIdEpochRef.current;
+      if (!userId) {
+        return;
+      }
+      await restoreSharePayloads(userId);
+      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
+        return;
+      }
+      await restoreShareNavigation(userId);
+      // `cancelled` is set by the cleanup below; the previous check narrows the
+      // fall-through path, but the variable is genuinely mutable.
+      // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
+      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
+        return;
+      }
+      const pendingId = await loadDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, isStringDraft);
+      // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition
+      if (cancelled || pendingShareIdEpochRef.current !== startEpoch) {
+        return;
+      }
+      if (
+        pendingId !== null &&
+        peekSharePayload(pendingId) !== null &&
+        pendingShareIdRef.current === null
+      ) {
+        // Fill only an empty slot: a live ingest that armed a newer pending id
+        // during this restore must win, so never overwrite a non-null slot.
+        setPendingShareId(pendingId);
+      }
+    }
+
+    void restoreShare();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   // Paired with isShellReadyForShare — keep the success-tail guards in lockstep.
   const isShellReady = isShellReadyForShare({
@@ -555,7 +647,14 @@ function RootLayoutNav() {
         if (superseded !== null) {
           clearSharePayload(superseded);
         }
+        pendingShareIdEpochRef.current += 1;
         setPendingShareId(shareId);
+        // Persist the pending id so a process death before the gate opens still
+        // restores it; skipped while the account has not resolved (signed out).
+        if (userId) {
+          saveDraft(userId, PENDING_SHARE_ID_DRAFT_KEY, shareId);
+          void flushDraft(userId, PENDING_SHARE_ID_DRAFT_KEY);
+        }
       } catch (error) {
         if (cancelled) {
           return;
@@ -573,7 +672,7 @@ function RootLayoutNav() {
     return () => {
       cancelled = true;
     };
-  }, [hasShareIntent, shareIntent]);
+  }, [hasShareIntent, shareIntent, userId]);
 
   useEffect(() => {
     const decision = resolveBootstrapDecision({
@@ -716,6 +815,7 @@ function RootLayoutNav() {
     } else {
       router.push(navigation.href as Href);
     }
+    pendingShareIdEpochRef.current += 1;
     setPendingShareId(null);
   }, [pendingShareId, isShellReady, onGateRoute, router]);
 
@@ -861,6 +961,7 @@ function RootLayoutNav() {
       pointerEvents={hidden ? 'none' : 'auto'}
     >
       <Slot />
+      <PrivacyCoverOverlay segments={segments} />
     </View>
   );
 }

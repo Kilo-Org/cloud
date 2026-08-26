@@ -1404,7 +1404,8 @@
       "gitlabAccount": "GitLab paskyra",
       "connectGitLab": "Prijungti GitLab",
       "gitlabError": "Nepavyko atidaryti GitLab sąrankos. Bandykite dar kartą.",
-      "description": "Prijunkite Kilo {{label}}, kad automatiškai peržiūrėtų pull requests."
+      "description": "Prijunkite Kilo {{label}}, kad automatiškai peržiūrėtų pull requests.",
+      "bitbucketError": "Nepavyko atidaryti Bitbucket sąrankos. Bandykite dar kartą."
     },
     "overview": {
       "reviewStyle": "Peržiūros stilius",
@@ -2105,7 +2106,8 @@
       "dollar_few": "doleriai",
       "dollar_many": "dolerių",
       "costSpoken": "kaina {{cost}}",
-      "costSpokenWithTime": "kaina {{cost}}, {{time}}"
+      "costSpokenWithTime": "kaina {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nepavyko atidaryti GitHub",
@@ -2182,14 +2184,10 @@
     "newSession": {
       "title": "Nauja sesija",
       "repository": "Saugykla",
-      "couldNotLoadRepositories": "Nepavyko įkelti saugyklų",
       "connectGithub": "Prijungti GitHub",
       "connectGithubDescription": "Prijunkite GitHub naršyklėje, tada grįžkite čia ir pasirinkite saugyklą.",
       "openGithub": "Atidaryti GitHub",
       "refreshRepositories": "Atnaujinti saugyklas",
-      "githubConnectionNotVisible": "Jūsų GitHub ryšio dar nematome",
-      "githubConnectionNotVisibleDescription": "Jei įdiegėte arba sukonfigūravote Kilo GitHub App, patikrinkite dar kartą — arba įsitikinkite, kad jis įdiegtas šiai paskyrai/organizacijai.",
-      "checkAgain": "Patikrinti dar kartą",
       "githubConnected": "GitHub prijungtas",
       "noRepositoriesVisible": "Saugyklų nematoma. Patikrinkite Kilo GitHub App saugyklų prieigą, tada atnaujinkite.",
       "runOnWithTarget": "Vykdyti: {{target}}",
@@ -2216,7 +2214,21 @@
       "keepEditing": "Tęsti redagavimą",
       "discard": "Atmesti",
       "discardFailed": "Nepavyko atmesti juodraščio. Bandykite dar kartą.",
-      "remoteHint": "Savo kompiuteryje paleiskite `kilo remote` arba `/remote` veikiančioje CLI sesijoje, kad valdytumėte vietinį kilo procesą."
+      "remoteHint": "Savo kompiuteryje paleiskite `kilo remote` arba `/remote` veikiančioje CLI sesijoje, kad valdytumėte vietinį kilo procesą.",
+      "bitbucketConnected": "Bitbucket prijungtas",
+      "connectBitbucket": "Prijungti Bitbucket",
+      "connectBitbucketDescription": "Prijunkite Bitbucket naršyklėje, tada grįžkite čia ir pasirinkite saugyklą.",
+      "connectGitlab": "Prijungti GitLab",
+      "connectGitlabDescription": "Prijunkite GitLab naršyklėje, tada grįžkite čia ir pasirinkite saugyklą.",
+      "couldNotLoadBitbucketRepositories": "Nepavyko įkelti Bitbucket saugyklų",
+      "couldNotLoadGithubRepositories": "Nepavyko įkelti GitHub saugyklų",
+      "couldNotLoadGitlabRepositories": "Nepavyko įkelti GitLab saugyklų",
+      "gitlabConnected": "GitLab prijungtas",
+      "noRepositoriesVisibleBitbucket": "Saugyklų nematyti. Patikrinkite saugyklų prieigą Bitbucket ir atnaujinkite.",
+      "noRepositoriesVisibleGitlab": "Saugyklų nematyti. Patikrinkite saugyklų prieigą GitLab ir atnaujinkite.",
+      "openBitbucket": "Atidaryti Bitbucket",
+      "openGitlab": "Atidaryti GitLab",
+      "recentlyUsed": "Panaudota neseniai"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujinta {{displayCount}} rinkmena",
@@ -2307,7 +2319,10 @@
       "noRepositoriesDescription": "Prie jūsų paskyros neprijungta jokių saugyklų.",
       "tryDifferentSearch": "Pabandykite kitą paieškos terminą.",
       "loading": "Kraunama...",
-      "accessibility": "Saugykla: {{label}}"
+      "accessibility": "Saugykla: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Žinutės informacija",
@@ -2663,6 +2678,18 @@
       "updating": "Atnaujinama, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Įkelti",
+      "loadWithHost": "Įkelti {{host}}",
+      "httpsOnly": "Tik HTTPS paveikslėliai"
+    },
+    "markdownLink": {
+      "invalidLink": "Ši nuoroda negali būti atidaryta.",
+      "hostConfirmTitle": "Atidaryti išorinę nuorodą?",
+      "hostConfirmMessage": "Ši nuoroda atidaro {{host}} jūsų naršyklėje.",
+      "open": "Atidaryti",
+      "trustThisHost": "Pasitikėti šiuo serveriu"
     }
   },
   "bootstrap": {
@@ -2953,16 +2980,10 @@
   "feedback": {
     "noEmailApp": "Nėra prieinamos el. pašto programos. Su mumis galite susisiekti {{email}}",
     "couldNotOpenStore": "Nepavyko atidaryti parduotuvės.",
-    "promptTitle": "Kaip jums patinka Kilo programa?",
-    "iLikeIt": "Man patinka",
-    "gladTitle": "Džiaugiamės tai girdėdami!",
-    "gladMessage": "Parduotuvės įvertinimas mums labai padėtų. Dėkojame, kad naudojatės Kilo!",
-    "rateKilo": "Įvertinti Kilo",
-    "needsWork": "Reikia patobulinti",
-    "sorryTitle": "Mums gaila tai girdėti!",
-    "sorryMessage": "Praneškite mums, ką reikia patobulinti. Už programą atsakingas inžinierius perskaito kiekvieną ataskaitą!",
-    "emailUs": "Parašykite mums",
-    "emailSubject": "mobiliosios programėlės atsiliepimai"
+    "emailSubject": "mobiliosios programėlės atsiliepimai",
+    "neutralTitle": "Įvertinkite Kilo programėlę",
+    "rateTheApp": "Įvertinkite programėlę",
+    "sendFeedback": "Siųsti atsiliepimą"
   },
   "organization": {
     "boundary": {
@@ -2972,7 +2993,9 @@
       "organizationUnavailable": "Organizacija neprieinama",
       "selectDescription": "Pasirinkite organizaciją iš savo profilio, kad tęstumėte.",
       "selectOrganization": "Pasirinkti organizaciją",
-      "unavailableDescription": "Ši organizacija nebėra prieinama. Pasirinkite iš savo profilio, kad tęstumėte."
+      "unavailableDescription": "Ši organizacija nebėra prieinama. Pasirinkite iš savo profilio, kad tęstumėte.",
+      "accessDeniedTitle": "Prieiga uždrausta",
+      "accessDeniedDescription": "Neturite prieigos prie šios organizacijos."
     },
     "creditActivity": {
       "emptyDescription": "Šios organizacijos pirkiniai, naudojimas ir kreditų koregavimai čia pasirodys, kai jie įvyks.",
@@ -2989,7 +3012,10 @@
         "team-topup-bonus-2025": "Komandos papildymo premija 2025",
         "accounting_adjustment": "Apskaitos koregavimas",
         "credits_expired": "Kreditai pasibaigė"
-      }
+      },
+      "loadMore": "Įkelti daugiau",
+      "loadMoreFailed": "Nepavyko įkelti daugiau",
+      "truncated": "Yra ankstesnės kredito veiklos."
     },
     "inviteMember": {
       "emailError": "Įveskite galiojantį el. pašto adresą",
@@ -3016,7 +3042,10 @@
         "draft": "Juodraštis",
         "uncollectible": "Neišieškoma",
         "unknown": "Nežinomas"
-      }
+      },
+      "loadMore": "Įkelti daugiau",
+      "loadMoreFailed": "Nepavyko įkelti daugiau",
+      "truncated": "Yra ankstesnių sąskaitų faktūrų."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3154,5 +3183,13 @@
       "xhigh": "Ypač aukštas",
       "max": "Maksimalus"
     }
+  },
+  "trustedHosts": {
+    "title": "Patikimi serveriai",
+    "subtitle": "Serveriai, kuriuos patikite atidaryti be klausimo",
+    "emptyTitle": "Nėra pasitikimų serverių",
+    "emptyDescription": "Kai pasitikite nuorodos serveriu, ji atidaroma be pakartotino klausimo.",
+    "revoke": "Atšaukti {{host}}",
+    "backToPreferences": "Grįžti į nuostatas"
   }
 }

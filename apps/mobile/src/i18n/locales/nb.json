@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab-konto",
       "connectGitLab": "Koble til GitLab",
       "gitlabError": "Kunne ikke åpne GitLab-oppsettet. Prøv igjen.",
-      "description": "Koble Kilo {{label}} til for å gjennomgå pull requests automatisk."
+      "description": "Koble Kilo {{label}} til for å gjennomgå pull requests automatisk.",
+      "bitbucketError": "Kunne ikke åpne Bitbucket-oppsettet. Prøv igjen."
     },
     "overview": {
       "reviewStyle": "Gjennomgangsstil",
@@ -2075,7 +2076,8 @@
       "dollar": "dollarer",
       "dollar_other": "dollarer",
       "costSpoken": "kostnad {{cost}}",
-      "costSpokenWithTime": "kostnad {{cost}}, {{time}}"
+      "costSpokenWithTime": "kostnad {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunne ikke åpne GitHub",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Ny økt",
       "repository": "Repositorium",
-      "couldNotLoadRepositories": "Kunne ikke laste inn repositories",
       "connectGithub": "Koble til GitHub",
       "connectGithubDescription": "Koble til GitHub i nettleseren, og kom deretter tilbake hit for å velge et repository.",
       "openGithub": "Åpne GitHub",
       "refreshRepositories": "Oppdater repositories",
-      "githubConnectionNotVisible": "Vi kan ikke se GitHub-tilkoblingen din ennå",
-      "githubConnectionNotVisibleDescription": "Hvis du installerte eller konfigurerte Kilo GitHub App, sjekk igjen — eller forsikre deg om at den ble installert for denne kontoen/organisasjonen.",
-      "checkAgain": "Sjekk igjen",
       "githubConnected": "GitHub tilkoblet",
       "noRepositoriesVisible": "Ingen repositories synlige. Sjekk repository-tilgangen for Kilo GitHub App, og oppdater deretter.",
       "runOnWithTarget": "Kjør på: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Fortsett å redigere",
       "discard": "Forkast",
       "discardFailed": "Kunne ikke forkaste utkastet. Prøv igjen.",
-      "remoteHint": "Kjør `kilo remote` på datamaskinen din, eller `/remote` i en aktiv CLI-økt, for å kontrollere en lokal kilo-prosess."
+      "remoteHint": "Kjør `kilo remote` på datamaskinen din, eller `/remote` i en aktiv CLI-økt, for å kontrollere en lokal kilo-prosess.",
+      "bitbucketConnected": "Bitbucket tilkoblet",
+      "connectBitbucket": "Koble til Bitbucket",
+      "connectBitbucketDescription": "Koble til Bitbucket i nettleseren din, og kom deretter tilbake hit for å velge et repositorium.",
+      "connectGitlab": "Koble til GitLab",
+      "connectGitlabDescription": "Koble til GitLab i nettleseren din, og kom deretter tilbake hit for å velge et repositorium.",
+      "couldNotLoadBitbucketRepositories": "Kunne ikke laste Bitbucket-repositorier",
+      "couldNotLoadGithubRepositories": "Kunne ikke laste GitHub-repositorier",
+      "couldNotLoadGitlabRepositories": "Kunne ikke laste GitLab-repositorier",
+      "gitlabConnected": "GitLab er koblet til",
+      "noRepositoriesVisibleBitbucket": "Ingen repositorier synlig. Kontroller tilgangen til Bitbucket-repositorier, og oppdater deretter.",
+      "noRepositoriesVisibleGitlab": "Ingen repositorier synlig. Kontroller tilgangen til GitLab-repositorier, og oppdater deretter.",
+      "openBitbucket": "Åpne Bitbucket",
+      "openGitlab": "Åpne GitLab",
+      "recentlyUsed": "Nylig brukt"
     },
     "partRenderer": {
       "updatedFileCount_one": "Oppdaterte {{displayCount}} fil",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Ingen repositories er koblet til kontoen din.",
       "tryDifferentSearch": "Prøv et annet søkeord.",
       "loading": "Laster...",
-      "accessibility": "Repository: {{label}}"
+      "accessibility": "Repository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Meldingdetaljer",
@@ -2623,6 +2638,18 @@
       "updating": "Oppdaterer, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Last inn",
+      "loadWithHost": "Last inn {{host}}",
+      "httpsOnly": "Kun HTTPS-bilder"
+    },
+    "markdownLink": {
+      "invalidLink": "Denne lenken kan ikke åpnes.",
+      "hostConfirmTitle": "Åpne ekstern lenke?",
+      "hostConfirmMessage": "Denne lenken åpner {{host}} i nettleseren din.",
+      "open": "Åpne",
+      "trustThisHost": "Stol på denne verten"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Ingen e-postapp tilgjengelig. Du kan nå oss på {{email}}",
     "couldNotOpenStore": "Kunne ikke åpne butikken.",
-    "promptTitle": "Hvordan liker du Kilo-appen?",
-    "iLikeIt": "Jeg liker den",
-    "gladTitle": "Så hyggelig å høre!",
-    "gladMessage": "En butikkvurdering ville hjulpet oss enormt. Takk for at du bruker Kilo!",
-    "rateKilo": "Vurder Kilo",
-    "needsWork": "Trenger forbedring",
-    "sorryTitle": "Så leit å høre!",
-    "sorryMessage": "Fortell oss hva som må bli bedre. Ingeniøren som har ansvaret for appen, leser hver eneste rapport!",
-    "emailUs": "Send oss e-post",
-    "emailSubject": "tilbakemelding på mobilappen"
+    "emailSubject": "tilbakemelding på mobilappen",
+    "neutralTitle": "Vurder Kilo-appen",
+    "rateTheApp": "Vurder appen",
+    "sendFeedback": "Send tilbakemelding"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "Organisasjon utilgjengelig",
       "selectDescription": "Velg en organisasjon fra profilen din for å fortsette.",
       "selectOrganization": "Velg en organisasjon",
-      "unavailableDescription": "Denne organisasjonen er ikke lenger tilgjengelig. Velg en fra profilen din for å fortsette."
+      "unavailableDescription": "Denne organisasjonen er ikke lenger tilgjengelig. Velg en fra profilen din for å fortsette.",
+      "accessDeniedTitle": "Tilgang nektet",
+      "accessDeniedDescription": "Du har ikke tilgang til denne organisasjonen."
     },
     "creditActivity": {
       "emptyDescription": "Kjøp, bruk og kredittjusteringer for denne organisasjonen vil vises her etter hvert som de skjer.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Regnskapsjustering",
         "credits_expired": "Kreditter utløpt"
-      }
+      },
+      "loadMore": "Last mer",
+      "loadMoreFailed": "Kunne ikke laste mer",
+      "truncated": "Tidligere kredittaktivitet er tilgjengelig."
     },
     "inviteMember": {
       "emailError": "Angi en gyldig e-postadresse",
@@ -2976,7 +3002,10 @@
         "draft": "Kladd",
         "uncollectible": "Uinnkrevbar",
         "unknown": "Ukjent"
-      }
+      },
+      "loadMore": "Last mer",
+      "loadMoreFailed": "Kunne ikke laste mer",
+      "truncated": "Tidligere fakturaer er tilgjengelige."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "Ekstra høy",
       "max": "Maks"
     }
+  },
+  "trustedHosts": {
+    "title": "Stolte verter",
+    "subtitle": "Verter du stoler på å åpne uten å spørre",
+    "emptyTitle": "Ingen stolte verter",
+    "emptyDescription": "Når du stoler på en lenkes vert, åpnes den uten å spørre igjen.",
+    "revoke": "Fjern {{host}}",
+    "backToPreferences": "Tilbake til innstillinger"
   }
 }

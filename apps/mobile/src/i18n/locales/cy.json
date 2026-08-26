@@ -1422,7 +1422,8 @@
       "gitlabAccount": "Cyfrif GitLab",
       "connectGitLab": "Cysylltu GitLab",
       "gitlabError": "Methodd agor gosod GitLab. Ceisiwch eto.",
-      "description": "Cysylltwch y Kilo {{label}} i adolygu ceisiadau tynnu yn awtomatig."
+      "description": "Cysylltwch y Kilo {{label}} i adolygu ceisiadau tynnu yn awtomatig.",
+      "bitbucketError": "Methu agor setup Bitbucket. Rhowch gynnig arall arni."
     },
     "overview": {
       "reviewStyle": "Arddull Adolygu",
@@ -2135,7 +2136,8 @@
       "dollar_few": "ddoler",
       "dollar_many": "doler",
       "costSpoken": "cost {{cost}}",
-      "costSpokenWithTime": "cost {{cost}}, {{time}}"
+      "costSpokenWithTime": "cost {{cost}}, {{time}}",
+      "pullRequest": "cais tynnu {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Methwyd agor GitHub",
@@ -2212,14 +2214,10 @@
     "newSession": {
       "title": "Sesiwn newydd",
       "repository": "Ystorfa",
-      "couldNotLoadRepositories": "Methwyd llwytho ystorfeydd",
       "connectGithub": "Cysylltu GitHub",
       "connectGithubDescription": "Cysylltwch GitHub yn eich porwr, yna dychwelwch yma i ddewis ystorfa.",
       "openGithub": "Agor GitHub",
       "refreshRepositories": "Adnewyddu ystorfeydd",
-      "githubConnectionNotVisible": "Ni allwn weld eich cysylltiad GitHub eto",
-      "githubConnectionNotVisibleDescription": "Os gosodoch chi neu ffurfweddu Ap GitHub Kilo, gwiriwch eto — neu sicrhewch ei fod wedi'i osod ar gyfer y cyfrif/sefydliad hwn.",
-      "checkAgain": "Gwirio eto",
       "githubConnected": "GitHub wedi'i gysylltu",
       "noRepositoriesVisible": "Dim ystorfeydd i'w gweld. Gwiriwch fynediad ystorfa ar gyfer Ap GitHub Kilo, yna adnewyddwch.",
       "runOnWithTarget": "Rhedeg ar: {{target}}",
@@ -2246,7 +2244,21 @@
       "keepEditing": "Parhau i olygu",
       "discard": "Taflu",
       "discardFailed": "Methwyd taflu'r drafft. Ceisiwch eto.",
-      "remoteHint": "Rhedwch `kilo remote` ar eich cyfrifiadur, neu `/remote` mewn sesiwn CLI sy'n rhedeg, i reoli proses kilo lleol"
+      "remoteHint": "Rhedwch `kilo remote` ar eich cyfrifiadur, neu `/remote` mewn sesiwn CLI sy'n rhedeg, i reoli proses kilo lleol",
+      "bitbucketConnected": "Bitbucket wedi cysylltu",
+      "connectBitbucket": "Cysylltu Bitbucket",
+      "connectBitbucketDescription": "Cysylltwch â Bitbucket yn eich porwr, yna dychwelwch yma i ddewis ystorfa.",
+      "connectGitlab": "Cysylltu GitLab",
+      "connectGitlabDescription": "Cysylltwch â GitLab yn eich porwr, yna dychwelwch yma i ddewis ystorfa.",
+      "couldNotLoadBitbucketRepositories": "Methu llwytho ystorfeydd Bitbucket",
+      "couldNotLoadGithubRepositories": "Methu llwytho ystorfeydd GitHub",
+      "couldNotLoadGitlabRepositories": "Methu llwytho ystorfeydd GitLab",
+      "gitlabConnected": "GitLab wedi'i gysylltu",
+      "noRepositoriesVisibleBitbucket": "Dim ystorfeydd yn weladwy. Gwiriwch fynediad i'r ystorfeydd ar gyfer Bitbucket, yna adnewyddwch.",
+      "noRepositoriesVisibleGitlab": "Dim ystorfeydd yn weladwy. Gwiriwch fynediad i'r ystorfeydd ar gyfer GitLab, yna adnewyddwch.",
+      "openBitbucket": "Agor Bitbucket",
+      "openGitlab": "Agor GitLab",
+      "recentlyUsed": "Defnyddiwyd yn ddiweddar"
     },
     "partRenderer": {
       "updatedFileCount_one": "Diweddarwyd {{displayCount}} ffeil",
@@ -2339,7 +2351,10 @@
       "noRepositoriesDescription": "Dim ystorfeydd wedi'u cysylltu â'ch cyfrif.",
       "tryDifferentSearch": "Ceisiwch derm chwilio gwahanol.",
       "loading": "Yn llwytho...",
-      "accessibility": "Ystorfa: {{label}}"
+      "accessibility": "Ystorfa: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Manylion neges",
@@ -2703,6 +2718,18 @@
       "updating": "Yn diweddaru, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "cais tynnu"
+    },
+    "markdownImage": {
+      "load": "Llwytho",
+      "loadWithHost": "Llwytho {{host}}",
+      "httpsOnly": "Delweddau HTTPS yn unig"
+    },
+    "markdownLink": {
+      "invalidLink": "Ni ellir agor y ddolen hon.",
+      "hostConfirmTitle": "Agor dolen allanol?",
+      "hostConfirmMessage": "Mae'r ddolen hon yn agor {{host}} yn eich porwr.",
+      "open": "Agor",
+      "trustThisHost": "Ymddiried yn y gwesteiwr hwn"
     }
   },
   "bootstrap": {
@@ -2993,16 +3020,10 @@
   "feedback": {
     "noEmailApp": "Dim app e-bost ar gael. Gallwch gysylltu â ni yn {{email}}",
     "couldNotOpenStore": "Methwyd agor y siop.",
-    "promptTitle": "Sut ydych chi'n hoffi'r app Kilo?",
-    "iLikeIt": "Rwy'n ei hoffi",
-    "gladTitle": "Rydym yn falch i glywed hynny!",
-    "gladMessage": "Byddai adolygiad siop yn ein helpu'n aruthrol. Diolch am ddefnyddio Kilo!",
-    "rateKilo": "Graddio Kilo",
-    "needsWork": "Angen gwaith",
-    "sorryTitle": "Mae'n ddrwg gennym glywed hynny!",
-    "sorryMessage": "Rhowch wybod i ni beth sydd angen ei wella. Mae'r peiriannydd sy'n gyfrifol am yr ap yn darllen pob adroddiad!",
-    "emailUs": "E-bostiwch ni",
-    "emailSubject": "Adborth ap symudol"
+    "emailSubject": "Adborth ap symudol",
+    "neutralTitle": "Graduwch ap Kilo",
+    "rateTheApp": "Graduwch yr ap",
+    "sendFeedback": "Anfonwch adborth"
   },
   "organization": {
     "boundary": {
@@ -3012,7 +3033,9 @@
       "organizationUnavailable": "Sefydliad ar gael",
       "selectDescription": "Dewiswch sefydliad o'ch proffil i barhau.",
       "selectOrganization": "Dewis sefydliad",
-      "unavailableDescription": "Nid yw'r sefydliad hwn ar gael mwyach. Dewiswch un o'ch proffil i barhau."
+      "unavailableDescription": "Nid yw'r sefydliad hwn ar gael mwyach. Dewiswch un o'ch proffil i barhau.",
+      "accessDeniedTitle": "Mynediad wedi'i wrthod",
+      "accessDeniedDescription": "Nid oes gennych fynediad i'r sefydliad hwn."
     },
     "creditActivity": {
       "emptyDescription": "Bydd pryniannau, defnydd, ac addasiadau credyd ar gyfer y sefydliad hwn yn ymddangos yma wrth iddynt ddigwydd.",
@@ -3029,7 +3052,10 @@
         "team-topup-bonus-2025": "Bonws ail-lenwi tîm 2025",
         "accounting_adjustment": "Addasiad cyfrifyddu",
         "credits_expired": "Credydau wedi dod i ben"
-      }
+      },
+      "loadMore": "Llwytho mwy",
+      "loadMoreFailed": "Ni ellid llwytho mwy",
+      "truncated": "Mae gweithgaredd credyd hŷn ar gael."
     },
     "inviteMember": {
       "emailError": "Nodwch gyfeiriad e-bost dilys",
@@ -3056,7 +3082,10 @@
         "draft": "Drafft",
         "uncollectible": "Anghasgladwy",
         "unknown": "Anhysbys"
-      }
+      },
+      "loadMore": "Llwytho mwy",
+      "loadMoreFailed": "Ni ellid llwytho mwy",
+      "truncated": "Mae anfonebau hŷn ar gael."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3196,5 +3225,13 @@
       "xhigh": "Uchel iawn",
       "max": "Uchaf"
     }
+  },
+  "trustedHosts": {
+    "title": "Gwesteiwyr dibynadwy",
+    "subtitle": "Gwesteiwyr rydych yn ymddiried ynddynt i agor heb ofyn",
+    "emptyTitle": "Dim gwesteiwyr dibynadwy",
+    "emptyDescription": "Pan fyddwch yn ymddiried yn nhost y ddolen, bydd yn agor heb ofyn eto.",
+    "revoke": "Diddymu {{host}}",
+    "backToPreferences": "Yn ôl i'r dewisiadau"
   }
 }

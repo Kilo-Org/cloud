@@ -302,7 +302,7 @@
   ],
   "uz": ["block", "files", "open", "open pull request", "reactions"],
   "vi": ["open", "open pull request", "plan"],
-  "yo": ["commit", "draft"],
+  "yo": ["commit", "draft", "open"],
   "zh-Hans": ["commit", "file", "files", "open", "open pull request", "reactions"],
   "zh-Hant": ["commit", "created", "file", "files", "open", "open pull request", "reactions"],
   "zu": ["commit", "open"]

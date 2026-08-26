@@ -846,7 +846,8 @@
       "githubApp": "GitHub App",
       "githubError": "Impossible d'ouvrir la configuration GitHub. Veuillez réessayer.",
       "gitlabAccount": "Compte GitLab",
-      "gitlabError": "Impossible d'ouvrir la configuration GitLab. Veuillez réessayer."
+      "gitlabError": "Impossible d'ouvrir la configuration GitLab. Veuillez réessayer.",
+      "bitbucketError": "Impossible d'ouvrir la configuration Bitbucket. Veuillez réessayer."
     },
     "readOnlyDescription": "Seuls les propriétaires d'organisation et les gestionnaires de facturation peuvent modifier ces paramètres.",
     "reviewDetail": {
@@ -1622,14 +1623,10 @@
     "newSession": {
       "title": "Nouvelle session",
       "repository": "Dépôt",
-      "couldNotLoadRepositories": "Impossible de charger les dépôts",
       "connectGithub": "Connecter GitHub",
       "connectGithubDescription": "Connectez GitHub dans votre navigateur, puis revenez ici pour choisir un dépôt.",
       "openGithub": "Ouvrir GitHub",
       "refreshRepositories": "Actualiser les dépôts",
-      "githubConnectionNotVisible": "Nous ne voyons pas encore votre connexion GitHub",
-      "githubConnectionNotVisibleDescription": "Si vous avez installé ou configuré la Kilo GitHub App, vérifiez à nouveau — ou assurez-vous qu'elle a été installée pour ce compte/cette organisation.",
-      "checkAgain": "Vérifier à nouveau",
       "githubConnected": "GitHub connecté",
       "noRepositoriesVisible": "Aucun dépôt visible. Vérifiez l'accès au dépôt de la Kilo GitHub App, puis actualisez.",
       "runOnWithTarget": "Exécuter sur : {{target}}",
@@ -1656,7 +1653,21 @@
       "discardDraftTitle": "Abandonner le brouillon ?",
       "discardFailed": "Impossible d'abandonner le brouillon. Veuillez réessayer.",
       "keepEditing": "Continuer à modifier",
-      "remoteHint": "Exécutez `kilo remote` sur votre ordinateur, ou `/remote` dans une session CLI en cours d'exécution, pour contrôler un processus kilo local."
+      "remoteHint": "Exécutez `kilo remote` sur votre ordinateur, ou `/remote` dans une session CLI en cours d'exécution, pour contrôler un processus kilo local.",
+      "bitbucketConnected": "Bitbucket connecté",
+      "connectBitbucket": "Connecter Bitbucket",
+      "connectBitbucketDescription": "Connectez Bitbucket dans votre navigateur, puis revenez ici pour choisir un dépôt.",
+      "connectGitlab": "Connecter GitLab",
+      "connectGitlabDescription": "Connectez GitLab dans votre navigateur, puis revenez ici pour choisir un dépôt.",
+      "couldNotLoadBitbucketRepositories": "Impossible de charger les dépôts Bitbucket",
+      "couldNotLoadGithubRepositories": "Impossible de charger les dépôts GitHub",
+      "couldNotLoadGitlabRepositories": "Impossible de charger les dépôts GitLab",
+      "gitlabConnected": "GitLab connecté",
+      "noRepositoriesVisibleBitbucket": "Aucun dépôt visible. Vérifiez l'accès aux dépôts pour Bitbucket, puis actualisez.",
+      "noRepositoriesVisibleGitlab": "Aucun dépôt visible. Vérifiez l'accès aux dépôts pour GitLab, puis actualisez.",
+      "openBitbucket": "Ouvrir Bitbucket",
+      "openGitlab": "Ouvrir GitLab",
+      "recentlyUsed": "Utilisés récemment"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fichier mis à jour",
@@ -1731,7 +1742,10 @@
       "noRepositoriesDescription": "Aucun dépôt n'est connecté à votre compte.",
       "tryDifferentSearch": "Essayez un autre terme de recherche.",
       "loading": "Chargement...",
-      "accessibility": "Dépôt : {{label}}"
+      "accessibility": "Dépôt : {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "modeSelector": {
       "accessibility": "Mode : {{label}}"
@@ -2098,6 +2112,18 @@
       "updating": "Mise à jour, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Charger",
+      "loadWithHost": "Charger {{host}}",
+      "httpsOnly": "Images HTTPS uniquement"
+    },
+    "markdownLink": {
+      "invalidLink": "Ce lien ne peut pas être ouvert.",
+      "hostConfirmTitle": "Ouvrir le lien externe ?",
+      "hostConfirmMessage": "Ce lien ouvre {{host}} dans votre navigateur.",
+      "open": "Ouvrir",
+      "trustThisHost": "Faire confiance à cet hôte"
     }
   },
   "bootstrap": {
@@ -2441,7 +2467,8 @@
       "cent_many": "centimes",
       "dollar_many": "dollars",
       "costSpoken": "coût {{cost}}",
-      "costSpokenWithTime": "coût {{cost}}, {{time}}"
+      "costSpokenWithTime": "coût {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Impossible de démarrer la configuration de la GitHub App. Veuillez réessayer.",
@@ -2938,7 +2965,9 @@
       "organizationUnavailable": "Organisation indisponible",
       "selectDescription": "Choisissez une organisation dans votre profil pour continuer.",
       "selectOrganization": "Sélectionner une organisation",
-      "unavailableDescription": "Cette organisation n'est plus disponible. Choisissez-en une dans votre profil pour continuer."
+      "unavailableDescription": "Cette organisation n'est plus disponible. Choisissez-en une dans votre profil pour continuer.",
+      "accessDeniedTitle": "Accès refusé",
+      "accessDeniedDescription": "Vous n'avez pas accès à cette organisation."
     },
     "creditActivity": {
       "emptyDescription": "Les achats, l'utilisation et les ajustements de crédits de cette organisation apparaîtront ici au fur et à mesure.",
@@ -2955,7 +2984,10 @@
         "team-topup-bonus-2025": "Bonus de rechargement d'équipe 2025",
         "accounting_adjustment": "Ajustement comptable",
         "credits_expired": "Crédits expirés"
-      }
+      },
+      "loadMore": "Charger plus",
+      "loadMoreFailed": "Impossible de charger plus",
+      "truncated": "L'activité de crédit plus ancienne est disponible."
     },
     "hub": {
       "balance": "Solde",
@@ -2991,7 +3023,10 @@
         "draft": "Brouillon",
         "uncollectible": "Irrecouvrable",
         "unknown": "Inconnu"
-      }
+      },
+      "loadMore": "Charger plus",
+      "loadMoreFailed": "Impossible de charger plus",
+      "truncated": "Les factures plus anciennes sont disponibles."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "nom@entreprise.com",
@@ -3083,17 +3118,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "Impossible d'ouvrir la boutique.",
-    "emailUs": "Écrivez-nous",
-    "gladMessage": "Un avis sur la boutique nous aiderait énormément. Merci d'utiliser Kilo !",
-    "gladTitle": "Nous sommes ravis de l'entendre !",
-    "iLikeIt": "J'aime",
-    "needsWork": "À améliorer",
     "noEmailApp": "Aucune app de messagerie disponible. Vous pouvez nous joindre à {{email}}",
-    "promptTitle": "Comment trouvez-vous l'app Kilo ?",
-    "rateKilo": "Évaluer Kilo",
-    "sorryMessage": "Dites-nous ce qui doit être amélioré. L'ingénieur responsable de l'app lit chaque rapport !",
-    "sorryTitle": "Nous sommes désolés de l'entendre !",
-    "emailSubject": "retour sur l'app mobile"
+    "emailSubject": "retour sur l'app mobile",
+    "neutralTitle": "Notez l'application Kilo",
+    "rateTheApp": "Notez l'application",
+    "sendFeedback": "Envoyer un avis"
   },
   "authErrors": {
     "emailAlreadyUsed": "Un compte avec cet e-mail existe déjà avec une autre méthode de connexion. Essayez une autre méthode ou utilisez « $t(login.moreSignInOptions) ».",
@@ -3133,5 +3162,13 @@
       "xhigh": "Très élevé",
       "max": "Maximum"
     }
+  },
+  "trustedHosts": {
+    "title": "Hôtes de confiance",
+    "subtitle": "Les hôtes que vous autorisez à ouvrir sans confirmation",
+    "emptyTitle": "Aucun hôte de confiance",
+    "emptyDescription": "Lorsque vous faites confiance à l'hôte d'un lien, il s'ouvre sans redemander.",
+    "revoke": "Révoquer {{host}}",
+    "backToPreferences": "Retour aux préférences"
   }
 }

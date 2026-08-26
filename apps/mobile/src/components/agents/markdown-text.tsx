@@ -18,9 +18,9 @@ export type MarkdownTextProps = {
   onLongPressLink?: MarkdownLinkLongPressHandler;
   /**
    * Optional tap handler invoked when a rendered link is pressed. When this
-   * callback is omitted, or when it returns a falsy value, the link is opened
-   * with `openExternalUrl`. Returning `true` signals that the caller has
-   * fully handled the press and the default browser open should be skipped.
+   * callback is omitted, or when it returns a falsy value, the renderer runs
+   * the default confirm-and-open flow. Returning `true` signals that the
+   * caller has fully handled the press and the default open should be skipped.
    */
   onPressLink?: MarkdownLinkPressHandler;
 };

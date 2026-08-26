@@ -860,7 +860,8 @@
       "githubApp": "GitHub-App",
       "githubError": "GitHub-Einrichtung konnte nicht geöffnet werden. Bitte versuche es erneut.",
       "gitlabAccount": "GitLab-Konto",
-      "gitlabError": "GitLab-Einrichtung konnte nicht geöffnet werden. Bitte versuche es erneut."
+      "gitlabError": "GitLab-Einrichtung konnte nicht geöffnet werden. Bitte versuche es erneut.",
+      "bitbucketError": "Die Bitbucket-Einrichtung konnte nicht geöffnet werden. Bitte versuche es erneut."
     },
     "readOnlyDescription": "Nur Organisationsinhaber und Abrechnungsmanager können diese Einstellungen ändern.",
     "reviewDetail": {
@@ -1621,7 +1622,8 @@
       "dollar": "Dollar",
       "dollar_other": "Dollar",
       "costSpoken": "Kosten {{cost}}",
-      "costSpokenWithTime": "Kosten {{cost}}, {{time}}"
+      "costSpokenWithTime": "Kosten {{cost}}, {{time}}",
+      "pullRequest": "Pull-Request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Das Setup der GitHub-App konnte nicht gestartet werden. Bitte versuche es erneut.",
@@ -1698,14 +1700,10 @@
     "newSession": {
       "title": "Neue Sitzung",
       "repository": "Repository",
-      "couldNotLoadRepositories": "Repositories konnten nicht geladen werden",
       "connectGithub": "GitHub verbinden",
       "connectGithubDescription": "Verbinde GitHub in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
       "openGithub": "GitHub öffnen",
       "refreshRepositories": "Repositories aktualisieren",
-      "githubConnectionNotVisible": "Wir können deine GitHub-Verbindung noch nicht sehen",
-      "githubConnectionNotVisibleDescription": "Wenn du die Kilo GitHub App installiert oder konfiguriert hast, prüfe erneut — oder stelle sicher, dass sie für dieses Konto/diese Organisation installiert wurde.",
-      "checkAgain": "Erneut prüfen",
       "githubConnected": "GitHub verbunden",
       "noRepositoriesVisible": "Keine Repositories sichtbar. Prüfe den Repository-Zugriff für die Kilo GitHub App und aktualisiere dann.",
       "runOnWithTarget": "Ausführen auf: {{target}}",
@@ -1732,7 +1730,21 @@
       "discardDraftTitle": "Entwurf verwerfen?",
       "discardFailed": "Der Entwurf konnte nicht verworfen werden. Bitte versuche es erneut.",
       "keepEditing": "Weiter bearbeiten",
-      "remoteHint": "Führe `kilo remote` auf deinem Computer aus oder `/remote` in einer laufenden CLI-Sitzung, um einen lokalen kilo-Prozess zu steuern."
+      "remoteHint": "Führe `kilo remote` auf deinem Computer aus oder `/remote` in einer laufenden CLI-Sitzung, um einen lokalen kilo-Prozess zu steuern.",
+      "bitbucketConnected": "Bitbucket verbunden",
+      "connectBitbucket": "Bitbucket verbinden",
+      "connectBitbucketDescription": "Verbinde Bitbucket in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
+      "connectGitlab": "GitLab verbinden",
+      "connectGitlabDescription": "Verbinde GitLab in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket-Repositorys konnten nicht geladen werden",
+      "couldNotLoadGithubRepositories": "GitHub-Repositorys konnten nicht geladen werden",
+      "couldNotLoadGitlabRepositories": "GitLab-Repositorys konnten nicht geladen werden",
+      "gitlabConnected": "GitLab verbunden",
+      "noRepositoriesVisibleBitbucket": "Keine Repositorys sichtbar. Prüfe den Repository-Zugriff für Bitbucket und aktualisiere.",
+      "noRepositoriesVisibleGitlab": "Keine Repositorys sichtbar. Prüfe den Repository-Zugriff für GitLab und aktualisiere.",
+      "openBitbucket": "Bitbucket öffnen",
+      "openGitlab": "GitLab öffnen",
+      "recentlyUsed": "Zuletzt verwendet"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} Datei aktualisiert",
@@ -1821,7 +1833,10 @@
       "noRepositoriesDescription": "Mit deinem Konto sind keine Repositories verbunden.",
       "tryDifferentSearch": "Versuche einen anderen Suchbegriff.",
       "loading": "Wird geladen...",
-      "accessibility": "Repository: {{label}}"
+      "accessibility": "Repository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Nachrichtendetails",
@@ -2169,6 +2184,18 @@
       "updating": "Wird aktualisiert, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "Pull-Request"
+    },
+    "markdownImage": {
+      "load": "Laden",
+      "loadWithHost": "Laden {{host}}",
+      "httpsOnly": "Nur HTTPS-Bilder"
+    },
+    "markdownLink": {
+      "invalidLink": "Dieser Link kann nicht geöffnet werden.",
+      "hostConfirmTitle": "Externen Link öffnen?",
+      "hostConfirmMessage": "Dieser Link öffnet {{host}} in Ihrem Browser.",
+      "open": "Öffnen",
+      "trustThisHost": "Diesem Host vertrauen"
     }
   },
   "bootstrap": {
@@ -2918,7 +2945,9 @@
       "organizationUnavailable": "Organisation nicht verfügbar",
       "selectDescription": "Wähle eine Organisation aus deinem Profil, um fortzufahren.",
       "selectOrganization": "Organisation auswählen",
-      "unavailableDescription": "Diese Organisation ist nicht mehr verfügbar. Wähle eine aus deinem Profil, um fortzufahren."
+      "unavailableDescription": "Diese Organisation ist nicht mehr verfügbar. Wähle eine aus deinem Profil, um fortzufahren.",
+      "accessDeniedTitle": "Zugriff verweigert",
+      "accessDeniedDescription": "Du hast keinen Zugriff auf diese Organisation."
     },
     "creditActivity": {
       "emptyDescription": "Käufe, Nutzung und Guthabenänderungen für diese Organisation erscheinen hier, sobald sie passieren.",
@@ -2935,7 +2964,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Buchhaltungsanpassung",
         "credits_expired": "Abgelaufene Credits"
-      }
+      },
+      "loadMore": "Mehr laden",
+      "loadMoreFailed": "Mehr konnte nicht geladen werden",
+      "truncated": "Ältere Guthabenaktivität ist verfügbar."
     },
     "hub": {
       "balance": "Guthaben",
@@ -2971,7 +3003,10 @@
         "draft": "Entwurf",
         "uncollectible": "Nicht einziehbar",
         "unknown": "Unbekannt"
-      }
+      },
+      "loadMore": "Mehr laden",
+      "loadMoreFailed": "Mehr konnte nicht geladen werden",
+      "truncated": "Ältere Rechnungen sind verfügbar."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@firma.de",
@@ -3062,17 +3097,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "Der Store konnte nicht geöffnet werden.",
-    "emailUs": "E-Mail senden",
-    "gladMessage": "Eine Store-Bewertung würde uns enorm helfen. Danke, dass du Kilo nutzt!",
-    "gladTitle": "Das freut uns!",
-    "iLikeIt": "Gefällt mir",
-    "needsWork": "Braucht Verbesserung",
     "noEmailApp": "Keine E-Mail-App verfügbar. Du erreichst uns unter {{email}}",
-    "promptTitle": "Wie gefällt dir die Kilo-App?",
-    "rateKilo": "Kilo bewerten",
-    "sorryMessage": "Bitte sag uns, was besser werden muss. Der für die App zuständige Entwickler liest jeden einzelnen Bericht!",
-    "sorryTitle": "Das tut uns leid!",
-    "emailSubject": "Feedback zur Mobile-App"
+    "emailSubject": "Feedback zur Mobile-App",
+    "neutralTitle": "Kilo-App bewerten",
+    "rateTheApp": "App bewerten",
+    "sendFeedback": "Feedback senden"
   },
   "authErrors": {
     "emailAlreadyUsed": "Ein Konto mit dieser E-Mail existiert bereits mit einer anderen Anmeldemethode. Versuche eine andere Methode oder nutze „$t(login.moreSignInOptions)“.",
@@ -3112,5 +3141,13 @@
       "xhigh": "Extra hoch",
       "max": "Max"
     }
+  },
+  "trustedHosts": {
+    "title": "Vertrauenswürdige Hosts",
+    "subtitle": "Hosts, die Sie ohne Nachfrage öffnen möchten",
+    "emptyTitle": "Keine vertrauenswürdigen Hosts",
+    "emptyDescription": "Wenn Sie dem Host eines Links vertrauen, wird er ohne erneute Nachfrage geöffnet.",
+    "revoke": "Zugriff auf {{host}} widerrufen",
+    "backToPreferences": "Zurück zu den Einstellungen"
   }
 }

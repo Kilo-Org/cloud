@@ -860,7 +860,8 @@
       "githubApp": "GitHub-app",
       "githubError": "Kon de GitHub-installatie niet openen. Probeer het opnieuw.",
       "gitlabAccount": "GitLab-account",
-      "gitlabError": "Kon de GitLab-installatie niet openen. Probeer het opnieuw."
+      "gitlabError": "Kon de GitLab-installatie niet openen. Probeer het opnieuw.",
+      "bitbucketError": "Kon de Bitbucket-instellingen niet openen. Probeer het opnieuw."
     },
     "readOnlyDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen deze instellingen wijzigen.",
     "reviewDetail": {
@@ -1621,7 +1622,8 @@
       "dollar": "dollars",
       "dollar_other": "dollars",
       "costSpoken": "kosten {{cost}}",
-      "costSpokenWithTime": "kosten {{cost}}, {{time}}"
+      "costSpokenWithTime": "kosten {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "We konden de installatie van de GitHub-app niet starten. Probeer het opnieuw.",
@@ -1698,14 +1700,10 @@
     "newSession": {
       "title": "Nieuwe sessie",
       "repository": "Repository",
-      "couldNotLoadRepositories": "Kon repositories niet laden",
       "connectGithub": "GitHub verbinden",
       "connectGithubDescription": "Verbind GitHub in je browser en kom dan hier terug om een repository te kiezen.",
       "openGithub": "GitHub openen",
       "refreshRepositories": "Repositories vernieuwen",
-      "githubConnectionNotVisible": "We zien je GitHub-verbinding nog niet",
-      "githubConnectionNotVisibleDescription": "Als je de Kilo GitHub-app hebt geïnstalleerd of geconfigureerd, controleer dan opnieuw — of zorg dat deze voor dit account/deze organisatie is geïnstalleerd.",
-      "checkAgain": "Opnieuw controleren",
       "githubConnected": "GitHub verbonden",
       "noRepositoriesVisible": "Geen repositories zichtbaar. Controleer de repositorytoegang voor de Kilo GitHub-app en vernieuw daarna.",
       "runOnWithTarget": "Uitvoeren op: {{target}}",
@@ -1732,7 +1730,21 @@
       "discardDraftTitle": "Concept weggooien?",
       "discardFailed": "Kon het concept niet weggooien. Probeer het opnieuw.",
       "keepEditing": "Blijven bewerken",
-      "remoteHint": "Voer `kilo remote` uit op je computer, of `/remote` in een actieve CLI-sessie, om een lokaal kilo-proces te besturen."
+      "remoteHint": "Voer `kilo remote` uit op je computer, of `/remote` in een actieve CLI-sessie, om een lokaal kilo-proces te besturen.",
+      "bitbucketConnected": "Bitbucket verbonden",
+      "connectBitbucket": "Bitbucket verbinden",
+      "connectBitbucketDescription": "Verbind Bitbucket in uw browser en kom daarna hier terug om een repository te kiezen.",
+      "connectGitlab": "GitLab verbinden",
+      "connectGitlabDescription": "Verbind GitLab in uw browser en kom daarna hier terug om een repository te kiezen.",
+      "couldNotLoadBitbucketRepositories": "Kon de Bitbucket-repositories niet laden",
+      "couldNotLoadGithubRepositories": "Kon de GitHub-repositories niet laden",
+      "couldNotLoadGitlabRepositories": "Kon de GitLab-repositories niet laden",
+      "gitlabConnected": "GitLab is verbonden",
+      "noRepositoriesVisibleBitbucket": "Geen repositories zichtbaar. Controleer de repositorytoegang voor Bitbucket en vernieuw daarna.",
+      "noRepositoriesVisibleGitlab": "Geen repositories zichtbaar. Controleer de repositorytoegang voor GitLab en vernieuw daarna.",
+      "openBitbucket": "Bitbucket openen",
+      "openGitlab": "GitLab openen",
+      "recentlyUsed": "Recent gebruikt"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} bestand bijgewerkt",
@@ -1821,7 +1833,10 @@
       "noRepositoriesDescription": "Er zijn geen repositories verbonden met je account.",
       "tryDifferentSearch": "Probeer een andere zoekterm.",
       "loading": "Laden...",
-      "accessibility": "Repository: {{label}}"
+      "accessibility": "Repository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Berichtdetails",
@@ -2169,6 +2184,18 @@
       "updating": "Bijwerken, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull-aanvraag"
+    },
+    "markdownImage": {
+      "load": "Laden",
+      "loadWithHost": "Laden {{host}}",
+      "httpsOnly": "Alleen HTTPS-afbeeldingen"
+    },
+    "markdownLink": {
+      "invalidLink": "Deze link kan niet worden geopend.",
+      "hostConfirmTitle": "Externe link openen?",
+      "hostConfirmMessage": "Deze link opent {{host}} in uw browser.",
+      "open": "Openen",
+      "trustThisHost": "Deze host vertrouwen"
     }
   },
   "bootstrap": {
@@ -2918,7 +2945,9 @@
       "organizationUnavailable": "Organisatie niet beschikbaar",
       "selectDescription": "Kies een organisatie uit je profiel om door te gaan.",
       "selectOrganization": "Een organisatie selecteren",
-      "unavailableDescription": "Deze organisatie is niet meer beschikbaar. Kies er een uit je profiel om door te gaan."
+      "unavailableDescription": "Deze organisatie is niet meer beschikbaar. Kies er een uit je profiel om door te gaan.",
+      "accessDeniedTitle": "Toegang geweigerd",
+      "accessDeniedDescription": "U heeft geen toegang tot deze organisatie."
     },
     "creditActivity": {
       "emptyDescription": "Aankopen, gebruik en creditaanpassingen voor deze organisatie verschijnen hier zodra ze plaatsvinden.",
@@ -2935,7 +2964,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Boekhoudkundige correctie",
         "credits_expired": "Credits verlopen"
-      }
+      },
+      "loadMore": "Meer laden",
+      "loadMoreFailed": "Kon niet meer laden",
+      "truncated": "Oudere creditactiviteit is beschikbaar."
     },
     "hub": {
       "balance": "Saldo",
@@ -2971,7 +3003,10 @@
         "draft": "Concept",
         "uncollectible": "Oninbaar",
         "unknown": "Onbekend"
-      }
+      },
+      "loadMore": "Meer laden",
+      "loadMoreFailed": "Kon niet meer laden",
+      "truncated": "Oudere facturen zijn beschikbaar."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3062,17 +3097,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "Kon de store niet openen.",
-    "emailUs": "E-mail ons",
-    "gladMessage": "Een review in de store zou ons enorm helpen. Bedankt dat je Kilo gebruikt!",
-    "gladTitle": "Wat fijn om te horen!",
-    "iLikeIt": "Ik vind het leuk",
-    "needsWork": "Kan beter",
     "noEmailApp": "Geen e-mailapp beschikbaar. Je kunt ons bereiken op {{email}}",
-    "promptTitle": "Hoe bevalt de Kilo-app je?",
-    "rateKilo": "Kilo beoordelen",
-    "sorryMessage": "Laat ons weten wat er beter kan. De engineer die over de app gaat, leest elk rapport!",
-    "sorryTitle": "Wat jammer om te horen!",
-    "emailSubject": "feedback op mobiele app"
+    "emailSubject": "feedback op mobiele app",
+    "neutralTitle": "Beoordeel de Kilo-app",
+    "rateTheApp": "Beoordeel de app",
+    "sendFeedback": "Feedback sturen"
   },
   "authErrors": {
     "emailAlreadyUsed": "Er bestaat al een account met dit e-mailadres via een andere aanmeldmethode. Probeer een andere methode of gebruik '$t(login.moreSignInOptions)'.",
@@ -3112,5 +3141,13 @@
       "xhigh": "Extra hoog",
       "max": "Max"
     }
+  },
+  "trustedHosts": {
+    "title": "Vertrouwde hosts",
+    "subtitle": "Hosts die u vertrouwt om zonder te vragen te openen",
+    "emptyTitle": "Geen vertrouwde hosts",
+    "emptyDescription": "Wanneer u de host van een link vertrouwt, wordt deze zonder opnieuw te vragen geopend.",
+    "revoke": "{{host}} intrekken",
+    "backToPreferences": "Terug naar voorkeuren"
   }
 }

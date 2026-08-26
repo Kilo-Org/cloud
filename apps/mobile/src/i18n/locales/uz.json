@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab hisobi",
       "connectGitLab": "GitLabni ulash",
       "gitlabError": "GitLab sozlovini ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "description": "Pull requestlarni avtomatik ko'rib chiqish uchun Kilo {{label}}ni ulang."
+      "description": "Pull requestlarni avtomatik ko'rib chiqish uchun Kilo {{label}}ni ulang.",
+      "bitbucketError": "Bitbucket sozlamasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring."
     },
     "overview": {
       "reviewStyle": "Ko'rib chiqish uslubi",
@@ -2075,7 +2076,8 @@
       "dollar": "dollar",
       "dollar_other": "dollar",
       "costSpoken": "xarajat {{cost}}",
-      "costSpokenWithTime": "xarajat {{cost}}, {{time}}"
+      "costSpokenWithTime": "xarajat {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub'ni ochib bo'lmadi",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Yangi sessiya",
       "repository": "Repozitoriy",
-      "couldNotLoadRepositories": "Repozitoriyalarni yuklab bo'lmadi",
       "connectGithub": "GitHubga ulanish",
       "connectGithubDescription": "Brauzeringizda GitHub'ga ulaning, so'ng repozitoriya tanlash uchun shu yerga qayting.",
       "openGithub": "GitHub'ni ochish",
       "refreshRepositories": "Repozitoriyalarni yangilash",
-      "githubConnectionNotVisible": "Hozircha GitHub ulanishingizni ko'ra olmayapmiz",
-      "githubConnectionNotVisibleDescription": "Agar Kilo GitHub App'ini o'rnatgan yoki sozlagan bo'lsangiz, qayta tekshiring — yoki u ushbu hisob/tashkilot uchun o'rnatilganligiga ishonch hosil qiling.",
-      "checkAgain": "Qayta tekshirish",
       "githubConnected": "GitHub ulandi",
       "noRepositoriesVisible": "Ko'rinadigan repozitoriyalar yo'q. Kilo GitHub App'i uchun repozitoriya kirishini tekshiring, so'ng yangilang.",
       "runOnWithTarget": "Yurgizish: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Tahrirlashni davom ettirish",
       "discard": "Bekor qilish",
       "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "remoteHint": "Kompyuteringizda `kilo remote` buyrug'ini ishga tushiring yoki ishlayotgan CLI sessiyasida `/remote` buyrug'ini ishlatib, mahalliy kilo jarayonini boshqaring."
+      "remoteHint": "Kompyuteringizda `kilo remote` buyrug'ini ishga tushiring yoki ishlayotgan CLI sessiyasida `/remote` buyrug'ini ishlatib, mahalliy kilo jarayonini boshqaring.",
+      "bitbucketConnected": "Bitbucket ulandi",
+      "connectBitbucket": "Bitbucketni ulash",
+      "connectBitbucketDescription": "Bitbucket'ga brauzeringizda ulaning, keyin repozitoriy tanlash uchun bu yerga qayting.",
+      "connectGitlab": "GitLabni ulash",
+      "connectGitlabDescription": "GitLab'ga brauzeringizda ulaning, keyin repozitoriy tanlash uchun bu yerga qayting.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarini yuklab bo'lmadi",
+      "couldNotLoadGithubRepositories": "GitHub repozitoriyalarini yuklab bo'lmadi",
+      "couldNotLoadGitlabRepositories": "GitLab repozitoriyalarini yuklab bo'lmadi",
+      "gitlabConnected": "GitLab ulandi",
+      "noRepositoriesVisibleBitbucket": "Hech qanday repozitoriy ko'rinmayapti. Bitbucket uchun repozitoriy kirishini tekshiring, keyin yangilang.",
+      "noRepositoriesVisibleGitlab": "Hech qanday repozitoriy ko'rinmayapti. GitLab uchun repozitoriy kirishini tekshiring, keyin yangilang.",
+      "openBitbucket": "Bitbucket'ni ochish",
+      "openGitlab": "GitLab'ni ochish",
+      "recentlyUsed": "Yaqinda ishlatilgan"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Hisobingizga ulangan repozitoriyalar yo'q.",
       "tryDifferentSearch": "Boshqa qidiruv so'zini sinab ko'ring.",
       "loading": "Yuklanmoqda...",
-      "accessibility": "Repozitoriya: {{label}}"
+      "accessibility": "Repozitoriya: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Xabar tafsilotlari",
@@ -2623,6 +2638,18 @@
       "updating": "Yangilanmoqda, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Yuklash",
+      "loadWithHost": "Yuklash {{host}}",
+      "httpsOnly": "Faqat HTTPS rasmlari"
+    },
+    "markdownLink": {
+      "invalidLink": "Bu havolani ochib bo'lmaydi.",
+      "hostConfirmTitle": "Tashqi havolani ochish kerakmi?",
+      "hostConfirmMessage": "Bu havola {{host}} sahifasini brauzeringizda ochadi.",
+      "open": "Ochish",
+      "trustThisHost": "Bu xostga ishonish"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Email ilovasi mavjud emas. Bizga {{email}} manzilida yozishingiz mumkin",
     "couldNotOpenStore": "Do'konni ochib bo'lmadi.",
-    "promptTitle": "Kilo ilovasini qanchalik yoqtiryapsiz?",
-    "iLikeIt": "Yoqdi",
-    "gladTitle": "Buni eshitganimizdan xursandmiz!",
-    "gladMessage": "Do'kondagi sharh bizga juda katta yordam beradi. Kilodan foydalanganingiz uchun rahmat!",
-    "rateKilo": "Kiloni baholang",
-    "needsWork": "Yaxshilash kerak",
-    "sorryTitle": "Buni eshitganimizdan afsusdamiz!",
-    "sorryMessage": "Iltimos, nimani yaxshilash kerakligini aytib bering. Ilova uchun mas'ul muhandis har bir hisobotni o'qiydi!",
-    "emailUs": "Bizga email yozing",
-    "emailSubject": "mobil ilova fikr-mulohazasi"
+    "emailSubject": "mobil ilova fikr-mulohazasi",
+    "neutralTitle": "Kilo ilovasini baholang",
+    "rateTheApp": "Ilovani baholang",
+    "sendFeedback": "Fikr-mulohaza yuborish"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "Tashkilot mavjud emas",
       "selectDescription": "Davom etish uchun profilingizdan tashkilotni tanlang.",
       "selectOrganization": "Tashkilotni tanlang",
-      "unavailableDescription": "Bu tashkilot endi mavjud emas. Davom etish uchun profilingizdan birini tanlang."
+      "unavailableDescription": "Bu tashkilot endi mavjud emas. Davom etish uchun profilingizdan birini tanlang.",
+      "accessDeniedTitle": "Kirish rad etildi",
+      "accessDeniedDescription": "Sizda ushbu tashkilotga kirish huquqi yo'q."
     },
     "creditActivity": {
       "emptyDescription": "Bu tashkilot uchun xaridlar, foydalanish va kredit tuzatishlari sodir bo'lganda shu yerda ko'rinadi.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Buxgalteriya tuzatmasi",
         "credits_expired": "Kreditlar muddati tugadi"
-      }
+      },
+      "loadMore": "Ko'proq yuklash",
+      "loadMoreFailed": "Ko'proq yuklab bo'lmadi",
+      "truncated": "Eski kredit faoliyati mavjud."
     },
     "inviteMember": {
       "emailError": "To'g'ri email manzil kiriting",
@@ -2976,7 +3002,10 @@
         "draft": "Qoralama",
         "uncollectible": "Undirib bo'lmaydigan",
         "unknown": "Noma'lum"
-      }
+      },
+      "loadMore": "Ko'proq yuklash",
+      "loadMoreFailed": "Ko'proq yuklab bo'lmadi",
+      "truncated": "Eski hisob-fakturalar mavjud."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "Juda yuqori",
       "max": "Maksimal"
     }
+  },
+  "trustedHosts": {
+    "title": "Ishonchli xostlar",
+    "subtitle": "Ishonchli xostlar so'rovsiz ochiladi",
+    "emptyTitle": "Ishonchli xostlar yo'q",
+    "emptyDescription": "Havolaning xostiga ishonsangiz, u yana so'rovsiz ochiladi.",
+    "revoke": "{{host}} ruxsatini bekor qilish",
+    "backToPreferences": "Sozlamalarga qaytish"
   }
 }

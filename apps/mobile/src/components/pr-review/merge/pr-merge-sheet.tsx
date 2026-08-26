@@ -18,6 +18,8 @@ import { Alert, Keyboard, ScrollView, type TextInput, useWindowDimensions } from
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
+
 import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
 import {
   type AllowedMergeMethod,
@@ -73,26 +75,9 @@ type PrMergeSheetProps = Readonly<{
   onDismiss: () => void;
 }>;
 
-type MergePullRequestInput = {
-  owner: string;
-  repo: string;
-  number: number;
-  method: 'merge' | 'squash' | 'rebase';
-  commitTitle?: string;
-  commitMessage?: string;
-  deleteBranch: boolean;
-  expectedHeadSha: string;
-};
-
-type AutoMergeInput = {
-  owner: string;
-  repo: string;
-  number: number;
-  prNodeId: string;
-  method?: 'MERGE' | 'SQUASH' | 'REBASE';
-  commitTitle?: string;
-  commitMessage?: string;
-};
+type RouterInputs = inferRouterInputs<MobileRouter>;
+type MergePullRequestInput = RouterInputs['githubPrReview']['mergePullRequest'];
+type AutoMergeInput = RouterInputs['githubPrReview']['enableAutoMerge'];
 
 /**
  * Wraps an uncontrolled-input ref so every `.current` write (the parts file's

@@ -3,7 +3,7 @@ import { DEFAULT_BACKEND_URL } from '../constants.js';
 const DEFAULT_SESSION_INGEST_URL = 'https://ingest.kilosessions.ai';
 const LOCAL_SANDBOX_HOSTNAME = 'host.docker.internal';
 
-type KiloTargetEnv = {
+export type KiloTargetEnv = {
   KILOCODE_BACKEND_BASE_URL?: string;
   KILO_OPENROUTER_BASE?: string;
   KILO_SESSION_INGEST_URL?: string;

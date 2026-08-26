@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab-konto",
       "connectGitLab": "Anslut GitLab",
       "gitlabError": "Kunde inte öppna GitLab-installationen. Försök igen.",
-      "description": "Anslut Kilo {{label}} för att granska pull requests automatiskt."
+      "description": "Anslut Kilo {{label}} för att granska pull requests automatiskt.",
+      "bitbucketError": "Det gick inte att öppna Bitbucket-inställningarna. Försök igen."
     },
     "overview": {
       "reviewStyle": "Granskningsstil",
@@ -2075,7 +2076,8 @@
       "dollar": "dollar",
       "dollar_other": "dollar",
       "costSpoken": "kostnad {{cost}}",
-      "costSpokenWithTime": "kostnad {{cost}}, {{time}}"
+      "costSpokenWithTime": "kostnad {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunde inte öppna GitHub",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Ny session",
       "repository": "Arkiv",
-      "couldNotLoadRepositories": "Kunde inte läsa in arkiv",
       "connectGithub": "Anslut GitHub",
       "connectGithubDescription": "Anslut GitHub i din webbläsare och återvänd sedan hit för att välja ett arkiv.",
       "openGithub": "Öppna GitHub",
       "refreshRepositories": "Uppdatera arkiv",
-      "githubConnectionNotVisible": "Vi kan ännu inte se din GitHub-anslutning",
-      "githubConnectionNotVisibleDescription": "Om du installerade eller konfigurerade Kilo GitHub App, kontrollera igen – eller se till att den installerades för detta konto/denna organisation.",
-      "checkAgain": "Kontrollera igen",
       "githubConnected": "GitHub ansluten",
       "noRepositoriesVisible": "Inga arkiv synliga. Kontrollera arkivåtkomsten för Kilo GitHub App och uppdatera sedan.",
       "runOnWithTarget": "Kör på: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Fortsätt redigera",
       "discard": "Kassera",
       "discardFailed": "Kunde inte ignorera utkastet. Försök igen.",
-      "remoteHint": "Kör `kilo remote` på din dator, eller `/remote` i en aktiv CLI-session, för att styra en lokal kilo-process."
+      "remoteHint": "Kör `kilo remote` på din dator, eller `/remote` i en aktiv CLI-session, för att styra en lokal kilo-process.",
+      "bitbucketConnected": "Bitbucket ansluten",
+      "connectBitbucket": "Anslut Bitbucket",
+      "connectBitbucketDescription": "Anslut Bitbucket i webbläsaren och kom sedan tillbaka för att välja ett arkiv.",
+      "connectGitlab": "Anslut GitLab",
+      "connectGitlabDescription": "Anslut GitLab i webbläsaren och kom sedan tillbaka för att välja ett arkiv.",
+      "couldNotLoadBitbucketRepositories": "Det gick inte att läsa in Bitbucket-arkiv",
+      "couldNotLoadGithubRepositories": "Det gick inte att läsa in GitHub-arkiv",
+      "couldNotLoadGitlabRepositories": "Det gick inte att läsa in GitLab-arkiv",
+      "gitlabConnected": "GitLab är ansluten",
+      "noRepositoriesVisibleBitbucket": "Inga arkiv visas. Kontrollera arkivåtkomsten för Bitbucket och uppdatera sedan.",
+      "noRepositoriesVisibleGitlab": "Inga arkiv visas. Kontrollera arkivåtkomsten för GitLab och uppdatera sedan.",
+      "openBitbucket": "Öppna Bitbucket",
+      "openGitlab": "Öppna GitLab",
+      "recentlyUsed": "Nyligen använda"
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppdaterade {{displayCount}} fil",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Inga arkiv är anslutna till ditt konto.",
       "tryDifferentSearch": "Prova en annan sökterm.",
       "loading": "Läser in...",
-      "accessibility": "Arkiv: {{label}}"
+      "accessibility": "Arkiv: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Meddelandedetaljer",
@@ -2623,6 +2638,18 @@
       "updating": "Uppdaterar, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Ladda",
+      "loadWithHost": "Ladda {{host}}",
+      "httpsOnly": "Endast HTTPS-bilder"
+    },
+    "markdownLink": {
+      "invalidLink": "Den här länken kan inte öppnas.",
+      "hostConfirmTitle": "Öppna extern länk?",
+      "hostConfirmMessage": "Den här länken öppnar {{host}} i din webbläsare.",
+      "open": "Öppna",
+      "trustThisHost": "Lita på den här värden"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Ingen e-postapp tillgänglig. Du når oss på {{email}}",
     "couldNotOpenStore": "Det gick inte att öppna butiken.",
-    "promptTitle": "Hur tycker du om Kilo-appen?",
-    "iLikeIt": "Jag gillar den",
-    "gladTitle": "Vi är glada att höra det!",
-    "gladMessage": "En butiksrecension skulle hjälpa oss enormt. Tack för att du använder Kilo!",
-    "rateKilo": "Betygsätt Kilo",
-    "needsWork": "Behöver förbättras",
-    "sorryTitle": "Vi är ledsna att höra det!",
-    "sorryMessage": "Berätta gärna vad som behöver bli bättre. Ingenjören som ansvarar för appen läser varje enskild rapport!",
-    "emailUs": "E-posta oss",
-    "emailSubject": "feedback om mobilappen"
+    "emailSubject": "feedback om mobilappen",
+    "neutralTitle": "Betygsätt Kilo-appen",
+    "rateTheApp": "Betygsätt appen",
+    "sendFeedback": "Skicka feedback"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "Organisationen är inte tillgänglig",
       "selectDescription": "Välj en organisation från din profil för att fortsätta.",
       "selectOrganization": "Välj en organisation",
-      "unavailableDescription": "Denna organisation är inte längre tillgänglig. Välj en från din profil för att fortsätta."
+      "unavailableDescription": "Denna organisation är inte längre tillgänglig. Välj en från din profil för att fortsätta.",
+      "accessDeniedTitle": "Åtkomst nekad",
+      "accessDeniedDescription": "Du har inte åtkomst till denna organisation."
     },
     "creditActivity": {
       "emptyDescription": "Köp, användning och kreditjusteringar för denna organisation visas här allteftersom de sker.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-påfyllnadsbonus 2025",
         "accounting_adjustment": "Redovisningsjustering",
         "credits_expired": "Krediter upphörde"
-      }
+      },
+      "loadMore": "Läs in mer",
+      "loadMoreFailed": "Kunde inte läsa in mer",
+      "truncated": "Äldre kreditaktivitet finns tillgänglig."
     },
     "inviteMember": {
       "emailError": "Ange en giltig e-postadress",
@@ -2976,7 +3002,10 @@
         "draft": "Utkast",
         "uncollectible": "Oindrivbar",
         "unknown": "Okänd"
-      }
+      },
+      "loadMore": "Läs in mer",
+      "loadMoreFailed": "Kunde inte läsa in mer",
+      "truncated": "Äldre fakturor finns tillgängliga."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "Extra hög",
       "max": "Max"
     }
+  },
+  "trustedHosts": {
+    "title": "Betrodda värdar",
+    "subtitle": "Värdar du litar på att öppna utan att fråga",
+    "emptyTitle": "Inga betrodda värdar",
+    "emptyDescription": "När du litar på en länks värd öppnas den utan att fråga igen.",
+    "revoke": "Återkalla {{host}}",
+    "backToPreferences": "Tillbaka till inställningar"
   }
 }

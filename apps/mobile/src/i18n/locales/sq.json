@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Llogaria GitLab",
       "connectGitLab": "Lidh GitLab",
       "gitlabError": "Nuk u arrit të hapej konfigurimi i GitLab. Provo përsëri.",
-      "description": "Lidh Kilo {{label}} për të shqyrtuar kërkesat e tërheqjes automatikisht."
+      "description": "Lidh Kilo {{label}} për të shqyrtuar kërkesat e tërheqjes automatikisht.",
+      "bitbucketError": "Nuk u hap konfigurimi i Bitbucket. Provo përsëri."
     },
     "overview": {
       "reviewStyle": "Stili i Shqyrtimit",
@@ -2075,7 +2076,8 @@
       "dollar": "dollarë",
       "dollar_other": "dollarë",
       "costSpoken": "kostoja {{cost}}",
-      "costSpokenWithTime": "kostoja {{cost}}, {{time}}"
+      "costSpokenWithTime": "kostoja {{cost}}, {{time}}",
+      "pullRequest": "kërkesë tërheqjeje {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nuk u hap GitHub",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Seancë e re",
       "repository": "Depoja",
-      "couldNotLoadRepositories": "Nuk u ngarkuan depot",
       "connectGithub": "Lidhu me GitHub",
       "connectGithubDescription": "Lidhni GitHub në shfletuesin tuaj, pastaj kthehuni këtu për të zgjedhur një depo.",
       "openGithub": "Hap GitHub",
       "refreshRepositories": "Rifresko depot",
-      "githubConnectionNotVisible": "Ende nuk e shohim lidhjen tuaj me GitHub",
-      "githubConnectionNotVisibleDescription": "Nëse keni instaluar ose konfiguruar Kilo GitHub App, kontrolloni përsëri — ose sigurohuni që është instaluar për këtë llogari/organizatë.",
-      "checkAgain": "Kontrollo përsëri",
       "githubConnected": "GitHub u lidh",
       "noRepositoriesVisible": "Asnjë depo e dukshme. Kontrolloni aksesin në depo për Kilo GitHub App, pastaj rifreskoni.",
       "runOnWithTarget": "Ekzekuto në: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Vazhdo redaktimin",
       "discard": "Hidhe",
       "discardFailed": "Nuk u hoq drafti. Ju lutemi provoni përsëri.",
-      "remoteHint": "Ekzekutoni `kilo remote` në kompjuterin tuaj, ose `/remote` në një sesion CLI që po ekzekutohet, për të kontrolluar një proces lokal kilo."
+      "remoteHint": "Ekzekutoni `kilo remote` në kompjuterin tuaj, ose `/remote` në një sesion CLI që po ekzekutohet, për të kontrolluar një proces lokal kilo.",
+      "bitbucketConnected": "Bitbucket i lidhur",
+      "connectBitbucket": "Lidh Bitbucket",
+      "connectBitbucketDescription": "Lidhu me Bitbucket në shfletuesin tënd, pastaj kthehu këtu për të zgjedhur një depo.",
+      "connectGitlab": "Lidh GitLab",
+      "connectGitlabDescription": "Lidhu me GitLab në shfletuesin tënd, pastaj kthehu këtu për të zgjedhur një depo.",
+      "couldNotLoadBitbucketRepositories": "Nuk u arrit të ngarkoheshin depo Bitbucket",
+      "couldNotLoadGithubRepositories": "Nuk u arrit të ngarkoheshin depo GitHub",
+      "couldNotLoadGitlabRepositories": "Nuk u arrit të ngarkoheshin depo GitLab",
+      "gitlabConnected": "GitLab i lidhur",
+      "noRepositoriesVisibleBitbucket": "Nuk ka depo të dukshme. Kontrollo aksesin e depove për Bitbucket, pastaj rifresko.",
+      "noRepositoriesVisibleGitlab": "Nuk ka depo të dukshme. Kontrollo aksesin e depove për GitLab, pastaj rifresko.",
+      "openBitbucket": "Hap Bitbucket",
+      "openGitlab": "Hap GitLab",
+      "recentlyUsed": "Të përdorura së fundmi"
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Asnjë depo nuk është e lidhur me llogarinë tuaj.",
       "tryDifferentSearch": "Provoni një term tjetër kërkimi.",
       "loading": "Duke u ngarkuar...",
-      "accessibility": "Depoja: {{label}}"
+      "accessibility": "Depoja: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detajet e mesazhit",
@@ -2623,6 +2638,18 @@
       "updating": "Duke u përditësuar, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "kërkesë për tërheqje"
+    },
+    "markdownImage": {
+      "load": "Ngarko",
+      "loadWithHost": "Ngarko {{host}}",
+      "httpsOnly": "Vetëm imazhe HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Kjo lidhje nuk mund të hapet.",
+      "hostConfirmTitle": "Të hapet lidhja e jashtme?",
+      "hostConfirmMessage": "Kjo lidhje hap {{host}} në shfletuesin tuaj.",
+      "open": "Hap",
+      "trustThisHost": "Beso këtë host"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Nuk ka aplikacion email-i të disponueshëm. Mund të na kontaktoni në {{email}}",
     "couldNotOpenStore": "Dyqani nuk mund të hapej.",
-    "promptTitle": "Si po ju pëlqen aplikacioni Kilo?",
-    "iLikeIt": "Më pëlqen",
-    "gladTitle": "Kënaqemi ta dëgjojmë këtë!",
-    "gladMessage": "Një rishikim në dyqan do të na ndihmonte jashtëzakonisht shumë. Faleminderit që përdorni Kilo!",
-    "rateKilo": "Vlerëso Kilo",
-    "needsWork": "Ka nevojë për përmirësim",
-    "sorryTitle": "Na vjen keq ta dëgjojmë këtë!",
-    "sorryMessage": "Ju lutemi na tregoni se çfarë duhet të përmirësohet. Inxhinieri përgjegjës për aplikacionin e lexon çdo raport!",
-    "emailUs": "Na dërgoni email",
-    "emailSubject": "përshtypjet për aplikacionin celular"
+    "emailSubject": "përshtypjet për aplikacionin celular",
+    "neutralTitle": "Vlerëso aplikacionin Kilo",
+    "rateTheApp": "Vlerëso aplikacionin",
+    "sendFeedback": "Dërgo përshtypje"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "Organizata e padisponueshme",
       "selectDescription": "Zgjidhni një organizatë nga profili juaj për të vazhduar.",
       "selectOrganization": "Zgjidh një organizatë",
-      "unavailableDescription": "Kjo organizatë nuk është më e disponueshme. Zgjidhni një nga profili juaj për të vazhduar."
+      "unavailableDescription": "Kjo organizatë nuk është më e disponueshme. Zgjidhni një nga profili juaj për të vazhduar.",
+      "accessDeniedTitle": "Qasja u refuzua",
+      "accessDeniedDescription": "Ju nuk keni qasje në këtë organizatë."
     },
     "creditActivity": {
       "emptyDescription": "Blerjet, përdorimi dhe rregullimet e krediteve për këtë organizatë do të shfaqen këtu ndërsa ndodhin.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Bonusi i ekipit për rimbushje 2025",
         "accounting_adjustment": "Rregullim kontabël",
         "credits_expired": "Kredite të skaduara"
-      }
+      },
+      "loadMore": "Ngarko më shumë",
+      "loadMoreFailed": "Nuk u arrit të ngarkohej më shumë",
+      "truncated": "Aktiviteti i vjetër i kredisë është i disponueshëm."
     },
     "inviteMember": {
       "emailError": "Futni një adresë email-i të vlefshme",
@@ -2976,7 +3002,10 @@
         "draft": "Draft",
         "uncollectible": "E pakolektueshme",
         "unknown": "E panjohur"
-      }
+      },
+      "loadMore": "Ngarko më shumë",
+      "loadMoreFailed": "Nuk u arrit të ngarkohej më shumë",
+      "truncated": "Faturat më të vjetra janë të disponueshme."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "Shumë i lartë",
       "max": "Maksimal"
     }
+  },
+  "trustedHosts": {
+    "title": "Hostet e besuar",
+    "subtitle": "Hostet që i beson për t'i hapur pa pyetur",
+    "emptyTitle": "Asnjë host i besuar",
+    "emptyDescription": "Kur i beson hostit të një lidhjeje, ajo hapet pa pyetur përsëri.",
+    "revoke": "Heq besimin për {{host}}",
+    "backToPreferences": "Kthehu te preferencat"
   }
 }

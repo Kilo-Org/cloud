@@ -67,6 +67,8 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'agentChat.sessionFilter.platformSlack',
   'agentChat.sessionFilter.platformGithub',
   'agentChat.sessionFilter.platformLinear',
+  'agentChat.repoPicker.platformGithub',
+  'agentChat.repoPicker.platformGitlab',
   'agentChat.prBadge.label',
   'home.noLiveSessions',
   'share.reviewPrSubtitle',

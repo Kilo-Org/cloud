@@ -1404,7 +1404,8 @@
       "gitlabAccount": "GitLab účet",
       "connectGitLab": "Pripojiť GitLab",
       "gitlabError": "Nastavenie GitLab sa nepodarilo otvoriť. Skúste to znova.",
-      "description": "Pripojte Kilo {{label}}, aby ste automaticky preskúmavali pull requesty."
+      "description": "Pripojte Kilo {{label}}, aby ste automaticky preskúmavali pull requesty.",
+      "bitbucketError": "Nepodarilo sa otvoriť nastavenie Bitbucket. Skúste to znova."
     },
     "overview": {
       "reviewStyle": "Štýl preskúmania",
@@ -2105,7 +2106,8 @@
       "dollar_few": "doláre",
       "dollar_many": "dolárov",
       "costSpoken": "cena {{cost}}",
-      "costSpokenWithTime": "cena {{cost}}, {{time}}"
+      "costSpokenWithTime": "cena {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub sa nepodarilo otvoriť",
@@ -2182,14 +2184,10 @@
     "newSession": {
       "title": "Nové sedenie",
       "repository": "Repozitár",
-      "couldNotLoadRepositories": "Repozitáre sa nepodarilo načítať",
       "connectGithub": "Pripojiť GitHub",
       "connectGithubDescription": "Pripojte GitHub vo svojom prehliadači a potom sa sem vráťte, aby ste vybrali repozitár.",
       "openGithub": "Otvoriť GitHub",
       "refreshRepositories": "Obnoviť repozitáre",
-      "githubConnectionNotVisible": "Vaše pripojenie na GitHub zatiaľ nevidíme",
-      "githubConnectionNotVisibleDescription": "Ak ste nainštalovali alebo nakonfigurovali aplikáciu Kilo GitHub App, skontrolujte to znova — alebo sa uistite, že bola nainštalovaná pre tento účet/organizáciu.",
-      "checkAgain": "Skontrolovať znova",
       "githubConnected": "GitHub pripojený",
       "noRepositoriesVisible": "Žiadne repozitáre nie sú viditeľné. Skontrolujte prístup k repozitárom pre aplikáciu Kilo GitHub App a potom obnovte.",
       "runOnWithTarget": "Spustiť na: {{target}}",
@@ -2216,7 +2214,21 @@
       "keepEditing": "Pokračovať v úpravách",
       "discard": "Zahodiť",
       "discardFailed": "Koncept sa nepodarilo zahodiť. Skúste to znova.",
-      "remoteHint": "Spustite `kilo remote` na svojom počítači alebo `/remote` v bežiacej relácii CLI, aby ste ovládali lokálny proces kilo."
+      "remoteHint": "Spustite `kilo remote` na svojom počítači alebo `/remote` v bežiacej relácii CLI, aby ste ovládali lokálny proces kilo.",
+      "bitbucketConnected": "Bitbucket pripojený",
+      "connectBitbucket": "Pripojiť Bitbucket",
+      "connectBitbucketDescription": "Pripojte Bitbucket v prehliadači a potom sa sem vráťte a vyberte repozitár.",
+      "connectGitlab": "Pripojiť GitLab",
+      "connectGitlabDescription": "Pripojte GitLab v prehliadači a potom sa sem vráťte a vyberte repozitár.",
+      "couldNotLoadBitbucketRepositories": "Nepodarilo sa načítať repozitáre Bitbucket",
+      "couldNotLoadGithubRepositories": "Nepodarilo sa načítať repozitáre GitHub",
+      "couldNotLoadGitlabRepositories": "Nepodarilo sa načítať repozitáre GitLab",
+      "gitlabConnected": "GitLab je pripojený",
+      "noRepositoriesVisibleBitbucket": "Nie sú viditeľné žiadne repozitáre. Skontrolujte prístup k repozitárom pre Bitbucket a potom obnovte.",
+      "noRepositoriesVisibleGitlab": "Nie sú viditeľné žiadne repozitáre. Skontrolujte prístup k repozitárom pre GitLab a potom obnovte.",
+      "openBitbucket": "Otvoriť Bitbucket",
+      "openGitlab": "Otvoriť GitLab",
+      "recentlyUsed": "Naposledy použité"
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizovaný {{displayCount}} súbor",
@@ -2307,7 +2319,10 @@
       "noRepositoriesDescription": "K vášmu účtu nie sú pripojené žiadne repozitáre.",
       "tryDifferentSearch": "Skúste iný vyhľadávací výraz.",
       "loading": "Načítava sa...",
-      "accessibility": "Repozitár: {{label}}"
+      "accessibility": "Repozitár: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Podrobnosti správy",
@@ -2663,6 +2678,18 @@
       "updating": "Aktualizuje sa, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Načítať",
+      "loadWithHost": "Načítať {{host}}",
+      "httpsOnly": "Iba HTTPS obrázky"
+    },
+    "markdownLink": {
+      "invalidLink": "Tento odkaz sa nedá otvoriť.",
+      "hostConfirmTitle": "Otvoriť externý odkaz?",
+      "hostConfirmMessage": "Tento odkaz otvorí {{host}} vo vašom prehliadači.",
+      "open": "Otvoriť",
+      "trustThisHost": "Dôverovať tomuto hostiteľovi"
     }
   },
   "bootstrap": {
@@ -2953,16 +2980,10 @@
   "feedback": {
     "noEmailApp": "Nie je k dispozícii žiadna e-mailová aplikácia. Môžete nás kontaktovať na {{email}}",
     "couldNotOpenStore": "Obchod sa nepodarilo otvoriť.",
-    "promptTitle": "Ako sa vám páči aplikácia Kilo?",
-    "iLikeIt": "Páči sa mi",
-    "gladTitle": "Sme radi, že to počujeme!",
-    "gladMessage": "Recenzia v obchode by nám veľmi pomohla. Ďakujeme, že používate Kilo!",
-    "rateKilo": "Ohodnotiť Kilo",
-    "needsWork": "Treba vylepšiť",
-    "sorryTitle": "Mrzí nás, že to počujeme!",
-    "sorryMessage": "Dajte nám prosím vedieť, čo treba zlepšiť. Inžinier zodpovedný za aplikáciu číta každé jednotlivé hlásenie!",
-    "emailUs": "Napíšte nám e-mail",
-    "emailSubject": "spätná väzba k mobilnej aplikácii"
+    "emailSubject": "spätná väzba k mobilnej aplikácii",
+    "neutralTitle": "Ohodnoťte aplikáciu Kilo",
+    "rateTheApp": "Ohodnoťte aplikáciu",
+    "sendFeedback": "Odoslať spätnú väzbu"
   },
   "organization": {
     "boundary": {
@@ -2972,7 +2993,9 @@
       "organizationUnavailable": "Organizácia nie je k dispozícii",
       "selectDescription": "Vyberte organizáciu zo svojho profilu, aby ste pokračovali.",
       "selectOrganization": "Vybrať organizáciu",
-      "unavailableDescription": "Táto organizácia už nie je k dispozícii. Vyberte jednu zo svojho profilu, aby ste pokračovali."
+      "unavailableDescription": "Táto organizácia už nie je k dispozícii. Vyberte jednu zo svojho profilu, aby ste pokračovali.",
+      "accessDeniedTitle": "Prístup zamietnutý",
+      "accessDeniedDescription": "Nemáte prístup k tejto organizácii."
     },
     "creditActivity": {
       "emptyDescription": "Nákupy, používanie a úpravy kreditov pre túto organizáciu sa tu zobrazia, keď sa vyskytnú.",
@@ -2989,7 +3012,10 @@
         "team-topup-bonus-2025": "Tímový bonus za doplnenie kreditov 2025",
         "accounting_adjustment": "Účtovná úprava",
         "credits_expired": "Kredity vypršali"
-      }
+      },
+      "loadMore": "Načítať viac",
+      "loadMoreFailed": "Ďalšie sa nepodarilo načítať",
+      "truncated": "Staršia kreditná aktivita je k dispozícii."
     },
     "inviteMember": {
       "emailError": "Zadajte platnú e-mailovú adresu",
@@ -3016,7 +3042,10 @@
         "draft": "Koncept",
         "uncollectible": "Nevymožiteľná",
         "unknown": "Neznáme"
-      }
+      },
+      "loadMore": "Načítať viac",
+      "loadMoreFailed": "Ďalšie sa nepodarilo načítať",
+      "truncated": "Staršie faktúry sú k dispozícii."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3154,5 +3183,13 @@
       "xhigh": "Veľmi vysoká",
       "max": "Maximálna"
     }
+  },
+  "trustedHosts": {
+    "title": "Dôveryhodné hostitele",
+    "subtitle": "Hostitelia, ktorým dôverujete a ktoré sa otvoria bez opýtania",
+    "emptyTitle": "Žiadne dôveryhodné hostitele",
+    "emptyDescription": "Keď dôverujete hostiteľovi odkazu, otvorí sa bez ďalšieho opýtania.",
+    "revoke": "Odvolať {{host}}",
+    "backToPreferences": "Späť na predvoľby"
   }
 }

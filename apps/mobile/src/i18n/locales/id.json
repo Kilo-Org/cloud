@@ -860,7 +860,8 @@
       "githubApp": "Aplikasi GitHub",
       "githubError": "Tidak dapat membuka penyiapan GitHub. Silakan coba lagi.",
       "gitlabAccount": "Akun GitLab",
-      "gitlabError": "Tidak dapat membuka penyiapan GitLab. Silakan coba lagi."
+      "gitlabError": "Tidak dapat membuka penyiapan GitLab. Silakan coba lagi.",
+      "bitbucketError": "Tidak dapat membuka pengaturan Bitbucket. Silakan coba lagi."
     },
     "readOnlyDescription": "Hanya pemilik organisasi dan manajer penagihan yang dapat mengubah pengaturan ini.",
     "reviewDetail": {
@@ -1621,7 +1622,8 @@
       "dollar": "dolar",
       "dollar_other": "dolar",
       "costSpoken": "biaya {{cost}}",
-      "costSpokenWithTime": "biaya {{cost}}, {{time}}"
+      "costSpokenWithTime": "biaya {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Kami tidak dapat memulai penyiapan Aplikasi GitHub. Silakan coba lagi.",
@@ -1698,14 +1700,10 @@
     "newSession": {
       "title": "Sesi baru",
       "repository": "Repositori",
-      "couldNotLoadRepositories": "Tidak dapat memuat repositori",
       "connectGithub": "Hubungkan GitHub",
       "connectGithubDescription": "Hubungkan GitHub di browser Anda, lalu kembali ke sini untuk memilih repositori.",
       "openGithub": "Buka GitHub",
       "refreshRepositories": "Muat ulang repositori",
-      "githubConnectionNotVisible": "Kami belum dapat melihat koneksi GitHub Anda",
-      "githubConnectionNotVisibleDescription": "Jika Anda memasang atau mengonfigurasi Aplikasi Kilo GitHub, periksa lagi — atau pastikan aplikasi dipasang untuk akun/organisasi ini.",
-      "checkAgain": "Periksa lagi",
       "githubConnected": "GitHub terhubung",
       "noRepositoriesVisible": "Tidak ada repositori terlihat. Periksa akses repositori untuk Aplikasi Kilo GitHub, lalu muat ulang.",
       "runOnWithTarget": "Jalankan di: {{target}}",
@@ -1732,7 +1730,21 @@
       "discardDraftTitle": "Buang draf?",
       "discardFailed": "Tidak dapat membuang draf. Silakan coba lagi.",
       "keepEditing": "Tetap mengedit",
-      "remoteHint": "Jalankan `kilo remote` di komputer Anda, atau `/remote` dalam sesi CLI yang berjalan, untuk mengontrol proses kilo lokal."
+      "remoteHint": "Jalankan `kilo remote` di komputer Anda, atau `/remote` dalam sesi CLI yang berjalan, untuk mengontrol proses kilo lokal.",
+      "bitbucketConnected": "Bitbucket terhubung",
+      "connectBitbucket": "Hubungkan Bitbucket",
+      "connectBitbucketDescription": "Hubungkan Bitbucket di browser Anda, lalu kembali ke sini untuk memilih repositori.",
+      "connectGitlab": "Hubungkan GitLab",
+      "connectGitlabDescription": "Hubungkan GitLab di browser Anda, lalu kembali ke sini untuk memilih repositori.",
+      "couldNotLoadBitbucketRepositories": "Tidak dapat memuat repositori Bitbucket",
+      "couldNotLoadGithubRepositories": "Tidak dapat memuat repositori GitHub",
+      "couldNotLoadGitlabRepositories": "Tidak dapat memuat repositori GitLab",
+      "gitlabConnected": "GitLab terhubung",
+      "noRepositoriesVisibleBitbucket": "Tidak ada repositori yang terlihat. Periksa akses repositori untuk Bitbucket, lalu muat ulang.",
+      "noRepositoriesVisibleGitlab": "Tidak ada repositori yang terlihat. Periksa akses repositori untuk GitLab, lalu muat ulang.",
+      "openBitbucket": "Buka Bitbucket",
+      "openGitlab": "Buka GitLab",
+      "recentlyUsed": "Baru digunakan"
     },
     "partRenderer": {
       "updatedFileCount_one": "Memperbarui {{displayCount}} file",
@@ -1825,7 +1837,10 @@
       "noRepositoriesDescription": "Tidak ada repositori yang terhubung ke akun Anda.",
       "tryDifferentSearch": "Coba istilah pencarian lain.",
       "loading": "Memuat...",
-      "accessibility": "Repositori: {{label}}"
+      "accessibility": "Repositori: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detail pesan",
@@ -2169,6 +2184,18 @@
       "updating": "Memperbarui, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Muat",
+      "loadWithHost": "Muat {{host}}",
+      "httpsOnly": "Hanya gambar HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Tautan ini tidak dapat dibuka.",
+      "hostConfirmTitle": "Buka tautan eksternal?",
+      "hostConfirmMessage": "Tautan ini membuka {{host}} di browser Anda.",
+      "open": "Buka",
+      "trustThisHost": "Percayai host ini"
     }
   },
   "bootstrap": {
@@ -2918,7 +2945,9 @@
       "organizationUnavailable": "Organisasi tidak tersedia",
       "selectDescription": "Pilih organisasi dari profil Anda untuk melanjutkan.",
       "selectOrganization": "Pilih organisasi",
-      "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih salah satu dari profil Anda untuk melanjutkan."
+      "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih salah satu dari profil Anda untuk melanjutkan.",
+      "accessDeniedTitle": "Akses ditolak",
+      "accessDeniedDescription": "Anda tidak memiliki akses ke organisasi ini."
     },
     "creditActivity": {
       "emptyDescription": "Pembelian, penggunaan, dan penyesuaian kredit untuk organisasi ini akan muncul di sini seiring terjadinya.",
@@ -2935,7 +2964,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Penyesuaian akuntansi",
         "credits_expired": "Kredit kedaluwarsa"
-      }
+      },
+      "loadMore": "Muat lebih banyak",
+      "loadMoreFailed": "Tidak dapat memuat lebih banyak",
+      "truncated": "Aktivitas kredit yang lebih lama tersedia."
     },
     "hub": {
       "balance": "Saldo",
@@ -2971,7 +3003,10 @@
         "draft": "Draf",
         "uncollectible": "Tidak tertagih",
         "unknown": "Tidak diketahui"
-      }
+      },
+      "loadMore": "Muat lebih banyak",
+      "loadMoreFailed": "Tidak dapat memuat lebih banyak",
+      "truncated": "Faktur yang lebih lama tersedia."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3062,17 +3097,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "Tidak dapat membuka toko.",
-    "emailUs": "Email kami",
-    "gladMessage": "Ulasan toko akan sangat membantu kami. Terima kasih telah menggunakan Kilo!",
-    "gladTitle": "Kami senang mendengarnya!",
-    "iLikeIt": "Saya menyukainya",
-    "needsWork": "Perlu perbaikan",
     "noEmailApp": "Tidak ada aplikasi email tersedia. Anda dapat menghubungi kami di {{email}}",
-    "promptTitle": "Bagaimana pendapat Anda tentang aplikasi Kilo?",
-    "rateKilo": "Beri Nilai Kilo",
-    "sorryMessage": "Beri tahu kami apa yang perlu diperbaiki. Insinyur yang menangani aplikasi membaca setiap laporan!",
-    "sorryTitle": "Kami menyesal mendengarnya!",
-    "emailSubject": "umpan balik aplikasi seluler"
+    "emailSubject": "umpan balik aplikasi seluler",
+    "neutralTitle": "Nilai aplikasi Kilo",
+    "rateTheApp": "Nilai aplikasinya",
+    "sendFeedback": "Kirim masukan"
   },
   "authErrors": {
     "emailAlreadyUsed": "Akun dengan email ini sudah ada dengan metode masuk yang berbeda. Coba metode lain atau gunakan '$t(login.moreSignInOptions)'.",
@@ -3112,5 +3141,13 @@
       "xhigh": "Ekstra Tinggi",
       "max": "Maks"
     }
+  },
+  "trustedHosts": {
+    "title": "Host tepercaya",
+    "subtitle": "Host yang Anda percayai untuk dibuka tanpa bertanya",
+    "emptyTitle": "Tidak ada host tepercaya",
+    "emptyDescription": "Saat Anda mempercayai host suatu tautan, tautan tersebut dibuka tanpa bertanya lagi.",
+    "revoke": "Cabut {{host}}",
+    "backToPreferences": "Kembali ke preferensi"
   }
 }

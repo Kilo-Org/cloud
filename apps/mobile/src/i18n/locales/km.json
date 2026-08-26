@@ -1386,7 +1386,8 @@
       "gitlabAccount": "គណនី GitLab",
       "connectGitLab": "ភ្ជាប់ GitLab",
       "gitlabError": "មិនអាចបើកការរៀបចំ GitLab បានទេ។ សូមព្យាយាមម្តងទៀត។",
-      "description": "ភ្ជាប់ Kilo {{label}} ដើម្បីត្រួតពិនិត្យ pull requests ដោយស្វ័យប្រវត្តិ។"
+      "description": "ភ្ជាប់ Kilo {{label}} ដើម្បីត្រួតពិនិត្យ pull requests ដោយស្វ័យប្រវត្តិ។",
+      "bitbucketError": "មិនអាចបើកការកំណត់ Bitbucket បានទេ។ សូមព្យាយាមម្ដងទៀត។"
     },
     "overview": {
       "reviewStyle": "រចនាប័ទ្មត្រួតពិនិត្យ",
@@ -2075,7 +2076,8 @@
       "dollar": "ដុល្លារ",
       "dollar_other": "ដុល្លារ",
       "costSpoken": "តម្លៃ {{cost}}",
-      "costSpokenWithTime": "តម្លៃ {{cost}}, {{time}}"
+      "costSpokenWithTime": "តម្លៃ {{cost}}, {{time}}",
+      "pullRequest": "សំណើទាញ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "មិនអាចបើក GitHub",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "វគ្គថ្មី",
       "repository": "ឃ្លាំង",
-      "couldNotLoadRepositories": "មិនអាចផ្ទុកឃ្លាំងកូដ",
       "connectGithub": "ភ្ជាប់ GitHub",
       "connectGithubDescription": "ភ្ជាប់ GitHub ក្នុងកម្មវិធីរុករករបស់អ្នក បន្ទាប់មកត្រឡប់មកទីនេះ ដើម្បីជ្រើសរើសឃ្លាំងកូដ។",
       "openGithub": "បើក GitHub",
       "refreshRepositories": "ធ្វើឱ្យឃ្លាំងកូដថ្មី",
-      "githubConnectionNotVisible": "យើងមិនទាន់អាចមើលឃើញការតភ្ជាប់ GitHub របស់អ្នកទេ",
-      "githubConnectionNotVisibleDescription": "ប្រសិនបើអ្នកបានដំឡើង ឬកំណត់រចនាសម្ព័ន្ធ Kilo GitHub App សូមពិនិត្យម្តងទៀត — ឬត្រូវប្រាកដថាវាត្រូវបានដំឡើងសម្រាប់គណនី/អង្គការនេះ។",
-      "checkAgain": "ពិនិត្យម្តងទៀត",
       "githubConnected": "GitHub ត្រូវបានភ្ជាប់",
       "noRepositoriesVisible": "គ្មានឃ្លាំងកូដដែលអាចមើលឃើញទេ។ ពិនិត្យសិទ្ធិចូលប្រើឃ្លាំងកូដសម្រាប់ Kilo GitHub App បន្ទាប់មកធ្វើឱ្យថ្មី។",
       "runOnWithTarget": "ដំណើរការលើ: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "បន្តកែសម្រួល",
       "discard": "បោះបង់",
       "discardFailed": "មិនអាចបោះបង់សេចក្តីព្រាងបានទេ។ សូមព្យាយាមម្តងទៀត។",
-      "remoteHint": "ដំណើរការ `kilo remote` នៅលើកុំព្យូទ័ររបស់អ្នក ឬ `/remote` នៅក្នុងវគ្គ CLI ដែលកំពុងដំណើរការ ដើម្បីគ្រប់គ្រងដំណើរការ kilo ក្នុងមូលដ្ឋាន។"
+      "remoteHint": "ដំណើរការ `kilo remote` នៅលើកុំព្យូទ័ររបស់អ្នក ឬ `/remote` នៅក្នុងវគ្គ CLI ដែលកំពុងដំណើរការ ដើម្បីគ្រប់គ្រងដំណើរការ kilo ក្នុងមូលដ្ឋាន។",
+      "bitbucketConnected": "Bitbucket បានភ្ជាប់",
+      "connectBitbucket": "ភ្ជាប់ Bitbucket",
+      "connectBitbucketDescription": "ភ្ជាប់ Bitbucket នៅក្នុង browser របស់អ្នក រួចត្រលប់មកទីនេះដើម្បីជ្រើសរើស repository។",
+      "connectGitlab": "ភ្ជាប់ GitLab",
+      "connectGitlabDescription": "ភ្ជាប់ GitLab នៅក្នុង browser របស់អ្នក រួចត្រលប់មកទីនេះដើម្បីជ្រើសរើស repository។",
+      "couldNotLoadBitbucketRepositories": "មិនអាចផ្ទុក repositories របស់ Bitbucket បានទេ",
+      "couldNotLoadGithubRepositories": "មិនអាចផ្ទុក repositories របស់ GitHub បានទេ",
+      "couldNotLoadGitlabRepositories": "មិនអាចផ្ទុក repositories របស់ GitLab បានទេ",
+      "gitlabConnected": "GitLab បានភ្ជាប់",
+      "noRepositoriesVisibleBitbucket": "មិនឃើញ repositories ទេ។ ពិនិត្យសិទ្ធិចូលប្រើ repository សម្រាប់ Bitbucket រួច refresh។",
+      "noRepositoriesVisibleGitlab": "មិនឃើញ repositories ទេ។ ពិនិត្យសិទ្ធិចូលប្រើ repository សម្រាប់ GitLab រួច refresh។",
+      "openBitbucket": "បើក Bitbucket",
+      "openGitlab": "បើក GitLab",
+      "recentlyUsed": "បានប្រើថ្មីៗ"
     },
     "partRenderer": {
       "updatedFileCount_one": "បានធ្វើបច្ចុប្បន្នភាពឯកសារ {{displayCount}}",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "គ្មានឃ្លាំងកូដត្រូវបានភ្ជាប់ទៅគណនីរបស់អ្នកទេ។",
       "tryDifferentSearch": "សាកល្បងពាក្យស្វែងរកផ្សេង។",
       "loading": "កំពុងផ្ទុក...",
-      "accessibility": "ឃ្លាំងកូដ: {{label}}"
+      "accessibility": "ឃ្លាំងកូដ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "ព័ត៌មានលម្អិតនៃសារ",
@@ -2623,6 +2638,18 @@
       "updating": "កំពុងធ្វើបច្ចុប្បន្នភាព, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "សំណើទាញ"
+    },
+    "markdownImage": {
+      "load": "ផ្ទុក",
+      "loadWithHost": "ផ្ទុក {{host}}",
+      "httpsOnly": "រូបភាព HTTPS តែប៉ុណ្ណោះ"
+    },
+    "markdownLink": {
+      "invalidLink": "តំណនេះមិនអាចបើកបានទេ។",
+      "hostConfirmTitle": "បើកតំណខាងក្រៅ?",
+      "hostConfirmMessage": "តំណនេះបើក {{host}} នៅក្នុងកម្មវិធីរុករករបស់អ្នក។",
+      "open": "បើក",
+      "trustThisHost": "ជឿទុកចិត្តម៉ាស៊ីននេះ"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "គ្មានកម្មវិធីអ៊ីមែលអាចប្រើបានទេ។ អ្នកអាចទាក់ទងយើងនៅ {{email}}",
     "couldNotOpenStore": "មិនអាចបើកហាងបានទេ។",
-    "promptTitle": "តើអ្នកចូលចិត្តកម្មវិធី Kilo យ៉ាងដូចម្តេច?",
-    "iLikeIt": "ខ្ញុំចូលចិត្តវា",
-    "gladTitle": "យើងរីករាយដែលបានឮដូច្នេះ!",
-    "gladMessage": "ការវាយតម្លៃក្នុងហាងនឹងជួយយើងយ៉ាងច្រើន។ អរគុណសម្រាប់ការប្រើប្រាស់ Kilo!",
-    "rateKilo": "វាយតម្លៃ Kilo",
-    "needsWork": "ត្រូវការកែលម្អ",
-    "sorryTitle": "យើងសុំទោសដែលបានឮដូច្នេះ!",
-    "sorryMessage": "សូមប្រាប់យើងពីអ្វីដែលត្រូវកែលម្អ។ វិស្វករដែលទទួលបន្ទុកកម្មវិធីអានរាល់របាយការណ៍!",
-    "emailUs": "ផ្ញើអ៊ីមែលមកយើង",
-    "emailSubject": "មតិកែលម្អកម្មវិធីទូរស័ព្ទ"
+    "emailSubject": "មតិកែលម្អកម្មវិធីទូរស័ព្ទ",
+    "neutralTitle": "វាយតម្លៃកម្មវិធី Kilo",
+    "rateTheApp": "វាយតម្លៃកម្មវិធី",
+    "sendFeedback": "ផ្ញើមតិ"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "អង្គការមិនអាចប្រើបាន",
       "selectDescription": "ជ្រើសរើសអង្គការពីប្រវត្តិរូបរបស់អ្នកដើម្បីបន្ត។",
       "selectOrganization": "ជ្រើសរើសអង្គការ",
-      "unavailableDescription": "អង្គការនេះលែងមានទៀតហើយ។ ជ្រើសរើសមួយពីប្រវត្តិរូបរបស់អ្នកដើម្បីបន្ត។"
+      "unavailableDescription": "អង្គការនេះលែងមានទៀតហើយ។ ជ្រើសរើសមួយពីប្រវត្តិរូបរបស់អ្នកដើម្បីបន្ត។",
+      "accessDeniedTitle": "ការចូលប្រើត្រូវបានបដិសេធ",
+      "accessDeniedDescription": "អ្នកមិនមានសិទ្ធិចូលប្រើអង្គការនេះទេ។"
     },
     "creditActivity": {
       "emptyDescription": "ការទិញ ការប្រើប្រាស់ និងការកែតម្រូវឥណទានសម្រាប់អង្គការនេះនឹងបង្ហាញនៅទីនេះនៅពេលវាកើតឡើង។",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "ប្រាក់រង្វាន់បន្ថែមក្រុម 2025",
         "accounting_adjustment": "ការកែតម្រូវគណនេយ្យ",
         "credits_expired": "ឥណទានផុតកំណត់"
-      }
+      },
+      "loadMore": "ផ្ទុកបន្ថែម",
+      "loadMoreFailed": "មិនអាចផ្ទុកបន្ថែមបានទេ",
+      "truncated": "សកម្មភាពឥណទានចាស់ៗអាចប្រើបាន។"
     },
     "inviteMember": {
       "emailError": "បញ្ចូលអាសយដ្ឋានអ៊ីមែលត្រឹមត្រូវ",
@@ -2976,7 +3002,10 @@
         "draft": "សេចក្តីព្រាង",
         "uncollectible": "មិនអាចទារបាន",
         "unknown": "មិនស្គាល់"
-      }
+      },
+      "loadMore": "ផ្ទុកបន្ថែម",
+      "loadMoreFailed": "មិនអាចផ្ទុកបន្ថែមបានទេ",
+      "truncated": "វិក្កយបត្រចាស់ៗអាចប្រើបាន។"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "ខ្ពស់ខ្លាំង",
       "max": "អតិបរមា"
     }
+  },
+  "trustedHosts": {
+    "title": "ម៉ាស៊ីនដែលអ្នកជឿទុកចិត្ត",
+    "subtitle": "ម៉ាស៊ីនដែលអ្នកជឿទុកចិត្តឱ្យបើកដោយមិនសួរ",
+    "emptyTitle": "គ្មានម៉ាស៊ីនដែលជឿទុកចិត្តទេ",
+    "emptyDescription": "នៅពេលអ្នកជឿទុកចិត្តម៉ាស៊ីនរបស់តំណ វានឹងបើកដោយមិនសួរម្តងទៀត។",
+    "revoke": "ដកហូត {{host}}",
+    "backToPreferences": "ត្រឡប់ទៅការកំណត់"
   }
 }

@@ -1404,7 +1404,8 @@
       "gitlabAccount": "Račun GitLab",
       "connectGitLab": "Poveži GitLab",
       "gitlabError": "Namestitve GitLab ni bilo mogoče odpreti. Poskusite znova.",
-      "description": "Povežite Kilo {{label}}, da samodejno pregleduje zahteve za poteg."
+      "description": "Povežite Kilo {{label}}, da samodejno pregleduje zahteve za poteg.",
+      "bitbucketError": "Ni bilo mogoče odpreti nastavitve Bitbucket. Poskusi znova."
     },
     "overview": {
       "reviewStyle": "Slog pregleda",
@@ -2105,7 +2106,8 @@
       "dollar_two": "dolarja",
       "dollar_few": "dolarji",
       "costSpoken": "strošek {{cost}}",
-      "costSpokenWithTime": "stroški {{cost}}, {{time}}"
+      "costSpokenWithTime": "stroški {{cost}}, {{time}}",
+      "pullRequest": "povleci zahtevo {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ni bilo mogoče odpreti",
@@ -2182,14 +2184,10 @@
     "newSession": {
       "title": "Nova seja",
       "repository": "Skladišče",
-      "couldNotLoadRepositories": "Skladišč ni bilo mogoče naložiti",
       "connectGithub": "Poveži GitHub",
       "connectGithubDescription": "Poveži GitHub v svojem brskalniku in se nato vrni sem, da izbereš skladišče.",
       "openGithub": "Odpri GitHub",
       "refreshRepositories": "Osveži skladišča",
-      "githubConnectionNotVisible": "Tvoje povezave z GitHub še ne vidimo",
-      "githubConnectionNotVisibleDescription": "Če si namestil ali konfiguriral aplikacijo Kilo GitHub App, preveri znova — ali pa se prepričaj, da je bila nameščena za ta račun/organizacijo.",
-      "checkAgain": "Preveri znova",
       "githubConnected": "GitHub povezan",
       "noRepositoriesVisible": "Ni vidnih skladišč. Preveri dostop do skladišč za aplikacijo Kilo GitHub App in nato osveži.",
       "runOnWithTarget": "Zaženi na: {{target}}",
@@ -2216,7 +2214,21 @@
       "keepEditing": "Nadaljuj z urejanjem",
       "discard": "Zavrzi",
       "discardFailed": "Osnutka ni bilo mogoče zavreči. Poskusi znova.",
-      "remoteHint": "Zaženite `kilo remote` na svojem računalniku ali `/remote` v tekoči seji CLI za upravljanje lokalnega procesa kilo."
+      "remoteHint": "Zaženite `kilo remote` na svojem računalniku ali `/remote` v tekoči seji CLI za upravljanje lokalnega procesa kilo.",
+      "bitbucketConnected": "Bitbucket je povezan",
+      "connectBitbucket": "Poveži Bitbucket",
+      "connectBitbucketDescription": "Poveži Bitbucket v brskalniku, nato se vrni sem in izberi skladišče.",
+      "connectGitlab": "Poveži GitLab",
+      "connectGitlabDescription": "Poveži GitLab v brskalniku, nato se vrni sem in izberi skladišče.",
+      "couldNotLoadBitbucketRepositories": "Ni bilo mogoče naložiti skladišč Bitbucket",
+      "couldNotLoadGithubRepositories": "Ni bilo mogoče naložiti skladišč GitHub",
+      "couldNotLoadGitlabRepositories": "Ni bilo mogoče naložiti skladišč GitLab",
+      "gitlabConnected": "GitLab povezan",
+      "noRepositoriesVisibleBitbucket": "Ni vidnih skladišč. Preveri dostop do skladišč za Bitbucket in osveži.",
+      "noRepositoriesVisibleGitlab": "Ni vidnih skladišč. Preveri dostop do skladišč za GitLab in osveži.",
+      "openBitbucket": "Odpri Bitbucket",
+      "openGitlab": "Odpri GitLab",
+      "recentlyUsed": "Nedavno uporabljeno"
     },
     "partRenderer": {
       "updatedFileCount_one": "Posodobljena {{displayCount}} datoteka",
@@ -2307,7 +2319,10 @@
       "noRepositoriesDescription": "Nobeno skladišče ni povezano s tvojim računom.",
       "tryDifferentSearch": "Poskusi z drugim iskalnim izrazom.",
       "loading": "Nalaganje...",
-      "accessibility": "Skladišče: {{label}}"
+      "accessibility": "Skladišče: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Podrobnosti sporočila",
@@ -2663,6 +2678,18 @@
       "updating": "Posodabljanje, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Naloži",
+      "loadWithHost": "Naloži {{host}}",
+      "httpsOnly": "Samo HTTPS slike"
+    },
+    "markdownLink": {
+      "invalidLink": "Tega povezave ni mogoče odpreti.",
+      "hostConfirmTitle": "Odpreti zunanjo povezavo?",
+      "hostConfirmMessage": "Ta povezava v brskalniku odpre {{host}}.",
+      "open": "Odpri",
+      "trustThisHost": "Zaupaj temu gostitelju"
     }
   },
   "bootstrap": {
@@ -2953,16 +2980,10 @@
   "feedback": {
     "noEmailApp": "Ni na voljo aplikacije za e-pošto. Dosežeš nas na {{email}}",
     "couldNotOpenStore": "Trgovine ni bilo mogoče odpreti.",
-    "promptTitle": "Kako ti je všeč aplikacija Kilo?",
-    "iLikeIt": "Všeč mi je",
-    "gladTitle": "Veseli nas, da si to slišali!",
-    "gladMessage": "Ocena v trgovini bi nam zelo pomagala. Hvala za uporabo Kilo!",
-    "rateKilo": "Oceni Kilo",
-    "needsWork": "Potrebuje izboljšave",
-    "sorryTitle": "Žal nam je, da si to slišali!",
-    "sorryMessage": "Prosimo, povej nam, kaj je treba izboljšati. Inženir, odgovoren za aplikacijo, prebere vsako posamezno poročilo!",
-    "emailUs": "Piši nam",
-    "emailSubject": "povratne informacije o mobilni aplikaciji"
+    "emailSubject": "povratne informacije o mobilni aplikaciji",
+    "neutralTitle": "Ocenite aplikacijo Kilo",
+    "rateTheApp": "Ocenite aplikacijo",
+    "sendFeedback": "Pošlji povratne informacije"
   },
   "organization": {
     "boundary": {
@@ -2972,7 +2993,9 @@
       "organizationUnavailable": "Organizacija ni na voljo",
       "selectDescription": "Za nadaljevanje izberi organizacijo iz svojega profila.",
       "selectOrganization": "Izberi organizacijo",
-      "unavailableDescription": "Ta organizacija ni več na voljo. Za nadaljevanje izberi eno iz svojega profila."
+      "unavailableDescription": "Ta organizacija ni več na voljo. Za nadaljevanje izberi eno iz svojega profila.",
+      "accessDeniedTitle": "Dostop zavrnjen",
+      "accessDeniedDescription": "Nimate dostopa do te organizacije."
     },
     "creditActivity": {
       "emptyDescription": "Nakupi, poraba in prilagoditve kreditov za to organizacijo bodo tukaj prikazani, ko bodo nastali.",
@@ -2989,7 +3012,10 @@
         "team-topup-bonus-2025": "Ekipni bonus za polnjenje 2025",
         "accounting_adjustment": "Računovodska prilagoditev",
         "credits_expired": "Potečeni krediti"
-      }
+      },
+      "loadMore": "Naloži več",
+      "loadMoreFailed": "Več ni bilo mogoče naložiti",
+      "truncated": "Starejša dejavnost kredita je na voljo."
     },
     "inviteMember": {
       "emailError": "Vnesi veljaven e-poštni naslov",
@@ -3016,7 +3042,10 @@
         "draft": "Osnutek",
         "uncollectible": "Neizterljivo",
         "unknown": "Neznano"
-      }
+      },
+      "loadMore": "Naloži več",
+      "loadMoreFailed": "Več ni bilo mogoče naložiti",
+      "truncated": "Starejši računi so na voljo."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "ime@podjetje.com",
@@ -3154,5 +3183,13 @@
       "xhigh": "Zelo visoko",
       "max": "Največ"
     }
+  },
+  "trustedHosts": {
+    "title": "Zaupanja vredni gostitelji",
+    "subtitle": "Gostitelji, ki jim zaupaš in se odprejo brez vprašanja",
+    "emptyTitle": "Ni zaupanja vrednih gostiteljev",
+    "emptyDescription": "Ko zaupaš gostitelju povezave, se odpre brez ponovnega vprašanja.",
+    "revoke": "Prekliči {{host}}",
+    "backToPreferences": "Nazaj na nastavitve"
   }
 }

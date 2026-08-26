@@ -7,6 +7,7 @@ import { Platform } from 'react-native';
 
 import {
   ADMISSION_CHALLENGE_FAILED,
+  AdmissionChallengeResponseSchema,
   clearAttestKeyOnRefusal,
   hasAttestationCapability,
 } from './admission';
@@ -77,6 +78,28 @@ function invalidKeyError() {
     code: 'ERR_APP_INTEGRITY_INVALID_KEY',
   });
 }
+
+describe('AdmissionChallengeResponseSchema', () => {
+  it('parses a valid challenge body', () => {
+    expect(AdmissionChallengeResponseSchema.parse({ challenge: 'server-challenge' })).toEqual({
+      challenge: 'server-challenge',
+    });
+  });
+
+  it('rejects a missing challenge field', () => {
+    expect(() => AdmissionChallengeResponseSchema.parse({})).toThrow();
+  });
+
+  it('rejects an empty challenge string', () => {
+    expect(() => AdmissionChallengeResponseSchema.parse({ challenge: '' })).toThrow();
+  });
+
+  it('ignores extra fields', () => {
+    expect(
+      AdmissionChallengeResponseSchema.parse({ challenge: 'server-challenge', extra: true })
+    ).toEqual({ challenge: 'server-challenge' });
+  });
+});
 
 describe('hasAttestationCapability', () => {
   afterEach(() => {

@@ -15,6 +15,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
+import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
 import { i18n } from '@/i18n';
 import { announceForA11y } from '@/lib/a11y/announce';
@@ -34,16 +35,8 @@ import {
 
 type PrRef = { owner: string; repo: string; number: number };
 
-type MergePullRequestInput = {
-  owner: string;
-  repo: string;
-  number: number;
-  method: 'merge' | 'squash' | 'rebase';
-  commitTitle?: string;
-  commitMessage?: string;
-  deleteBranch: boolean;
-  expectedHeadSha: string;
-};
+type RouterInputs = inferRouterInputs<MobileRouter>;
+type MergePullRequestInput = RouterInputs['githubPrReview']['mergePullRequest'];
 
 function usePrRefKeys(ref: PrRef) {
   const trpc = useTRPC();

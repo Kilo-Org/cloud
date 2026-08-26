@@ -21,6 +21,7 @@ vi.mock('@/components/ui/icons', () => ({
   Brain: 'Brain',
   Globe: 'Globe',
   MessageSquare: 'MessageSquare',
+  Shield: 'Shield',
   Smartphone: 'Smartphone',
 }));
 vi.mock('@/components/language-picker-sheet', () => ({
@@ -71,6 +72,9 @@ vi.mock('@/lib/hooks/use-theme-preference', () => ({
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ secondaryForeground: '#000000', mutedForeground: '#000000' }),
+}));
+vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
+  useTrustedHosts: () => ({ trustedHosts: [], hasLoaded: true }),
 }));
 
 async function mountPreferences(): Promise<TestRenderer.ReactTestRenderer> {

@@ -44,6 +44,7 @@ const GENERATED_LOCAL_SECRET_KEYS = new Set([
   'CALLBACK_TOKEN_SECRET',
   'BYOK_ENCRYPTION_KEY',
 ]);
+const PUBLIC_SANDBOX_TUNNEL_HOST = /\.trycloudflare\.com(?:\/|$)/i;
 
 function createFlyTokenAutoCreate(flyOrgSlug: string): EnvLocalAutoCreate {
   return {
@@ -725,6 +726,7 @@ function computePlan(
         const source = resolvedSources.get(key);
         if (key === FLY_TOKEN_ENV_KEY && shouldCreateFlyToken) continue;
         if (oldVal && source === 'default') continue;
+        if (oldVal && PUBLIC_SANDBOX_TUNNEL_HOST.test(oldVal)) continue;
         if (oldVal !== newVal) {
           keyChanges.push({ key, oldValue: oldVal, newValue: newVal });
         }

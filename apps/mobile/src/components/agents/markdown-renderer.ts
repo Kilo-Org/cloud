@@ -21,8 +21,6 @@ import { Renderer } from 'react-native-marked';
 
 import { withRtlWritingDirection } from '@/lib/rtl-text';
 
-import { openExternalUrl } from '@/lib/external-link';
-
 import { CodeBlock } from './code-block';
 import { normalizeFenceLanguage } from './code-block-model';
 import { isSupportedScheme, parseHtmlImages } from './markdown-html-image';

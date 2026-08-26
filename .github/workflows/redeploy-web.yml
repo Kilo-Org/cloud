@@ -46,6 +46,7 @@ jobs:
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
+      vercel_project_id_var: VERCEL_PROJECT_ID_APP
       axiom_annotation_dataset: kilocode-app
     secrets:
       AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
@@ -56,5 +57,6 @@ jobs:
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}
+      vercel_project_id_var: VERCEL_PROJECT_ID_GLOBAL_APP
     secrets:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}

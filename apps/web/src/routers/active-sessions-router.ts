@@ -12,7 +12,11 @@ import {
 } from '@kilocode/db/schema';
 import { and, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import { associatedPrSchema, formatAssociatedPr } from './cli-sessions-v2-router';
+import {
+  associatedPrSchema,
+  formatAssociatedPr,
+  sessionPrJoinPredicate,
+} from './cli-sessions-v2-router';
 
 export const activeSessionSchema = z.object({
   id: z.string(),
@@ -166,26 +170,6 @@ type CloudCandidateRow = EnrichmentRow & {
   git_branch: string | null;
   cloud_agent_session_id: string | null;
 };
-
-/**
- * LEFT JOIN predicate that links a session to its per-tenant PR cache row.
- * Local copy of the v2 router's predicate; intentionally not shared so the
- * two routers do not grow a dependency in this direction.
- */
-const sessionPrJoinPredicate = and(
-  eq(github_branch_pull_requests.git_url, cli_sessions_v2.git_url),
-  eq(github_branch_pull_requests.git_branch, cli_sessions_v2.git_branch),
-  or(
-    and(
-      isNotNull(cli_sessions_v2.organization_id),
-      eq(github_branch_pull_requests.owned_by_organization_id, cli_sessions_v2.organization_id)
-    ),
-    and(
-      isNull(cli_sessions_v2.organization_id),
-      eq(github_branch_pull_requests.owned_by_user_id, cli_sessions_v2.kilo_user_id)
-    )
-  )
-);
 
 /**
  * Fold an enriched row's flat PR columns into the `associatedPr` shape.

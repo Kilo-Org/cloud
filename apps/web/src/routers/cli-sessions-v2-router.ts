@@ -383,7 +383,7 @@ const commonSessionFieldsWithPr = {
  * the session's `organization_id` nullability. Identical shape to
  * `getWithRuntimeState` so the planner can reuse the partial unique indexes.
  */
-const sessionPrJoinPredicate = and(
+export const sessionPrJoinPredicate = and(
   eq(github_branch_pull_requests.git_url, cli_sessions_v2.git_url),
   eq(github_branch_pull_requests.git_branch, cli_sessions_v2.git_branch),
   or(

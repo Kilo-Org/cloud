@@ -22,8 +22,8 @@ export function TrustedHostsScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('trustedHosts.title')} />
       <TabScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-3 pt-4"
+        className="flex-1"
+        contentContainerClassName="gap-3 px-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {!hasLoaded && (

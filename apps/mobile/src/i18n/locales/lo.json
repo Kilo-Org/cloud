@@ -150,7 +150,9 @@
     "appearanceSystem": "ລະບົບ",
     "appearanceLight": "ສະຫວ່າງ",
     "appearanceDark": "ມືດ",
-    "account": "ບັນຊີ"
+    "account": "ບັນຊີ",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "pull request ບໍ່ພ້ອມໃຊ້",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "ຂໍ້ຄວາມຂອງທ່ານຈະຖືກລຶບ.",
       "keepEditing": "ສືບຕໍ່ແກ້ໄຂ",
       "discard": "ຍົກເລີກ",
-      "discardFailed": "ບໍ່ສາມາດລະເລີຍຮ່າງ. ກະລຸນາລອງໃໝ່."
+      "discardFailed": "ບໍ່ສາມາດລະເລີຍຮ່າງ. ກະລຸນາລອງໃໝ່.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "ອັບເດດ {{displayCount}} ໄຟລ໌",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "ບໍ່ສາມາດໂຫລດເຊດຊັນ",
     "couldNotLoadActiveSessions": "ບໍ່ສາມາດໂຫລດເຊດຊັນທີ່ໃຊ້ງານ",
     "agentSessions": "ເຊສຊັນຂອງເອເຈນ",
-    "showingSavedSessions": "ສະແດງເຊດຊັນທີ່ບັນທຶກ — ສະຖານະສົດອາດລ້າສະໄຫມ",
-    "startNewAgentSession": "ເລີ່ມເຊດຊັນ Kilo Agent ໃໝ່",
-    "aiCodingSessions": "ເຊດຊັນການຂຽນໂຄ້ດ AI",
-    "startCodingTaskFromPhone": "ເລີ່ມວຽກການຂຽນໂຄ້ດຈາກໂທລະສັບຂອງທ່ານ ຫຼື ສືບຕໍ່ເຊດຊັນຈາກ CLI ຂອງທ່ານ.",
-    "tryIt": "ລອງໃຊ້",
     "newCodingTask": "ວຽກການຂຽນໂຄ້ດໃໝ່",
     "explore": "ສຳຫຼວດ",
     "seeAll": "ເບິ່ງທັງໝົດ",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "ປິດ {{filename}}",

@@ -150,7 +150,9 @@
     "appearanceSystem": "Mfumo",
     "appearanceLight": "Nyepesi",
     "appearanceDark": "Nyeusi",
-    "account": "Akaunti"
+    "account": "Akaunti",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request haipatikani",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "Maagizo yako yatapotea.",
       "keepEditing": "Endelea kuhariri",
       "discard": "Tupa",
-      "discardFailed": "Haikuweza kutupa rasimu. Jaribu tena."
+      "discardFailed": "Haikuweza kutupa rasimu. Jaribu tena.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Imesasisha faili {{displayCount}}",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "Haikuweza kupakia vikao",
     "couldNotLoadActiveSessions": "Haikuweza kupakia vikao vya sasa",
     "agentSessions": "Vipindi vya wakala",
-    "showingSavedSessions": "Inaonyesha vikao vilivyohifadhiwa — hali ya moja kwa moja inaweza kuwa imepitwa na wakati",
-    "startNewAgentSession": "Anza kikao kipya cha Kilo Agent",
-    "aiCodingSessions": "Vikao vya kuandika msimbo kwa AI",
-    "startCodingTaskFromPhone": "Anza kazi ya kuandika msimbo kutoka kwenye simu yako au endelea kikao kutoka kwenye CLI yako.",
-    "tryIt": "Jaribu",
     "newCodingTask": "Kazi mpya ya kuandika msimbo",
     "explore": "Chunguza",
     "seeAll": "Ona zote",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Funga {{filename}}",

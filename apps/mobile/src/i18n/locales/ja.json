@@ -150,7 +150,9 @@
     "appearanceSystem": "システム",
     "appearanceLight": "ライト",
     "appearanceDark": "ダーク",
-    "account": "アカウント"
+    "account": "アカウント",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "通知",
@@ -1729,7 +1731,8 @@
       "discardDraftMessage": "プロンプトは失われます。",
       "discardDraftTitle": "下書きを破棄しますか？",
       "discardFailed": "下書きを破棄できませんでした。もう一度お試しください。",
-      "keepEditing": "編集を続ける"
+      "keepEditing": "編集を続ける",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました",
@@ -2215,15 +2218,10 @@
     "couldNotLoadSessions": "セッションを読み込めませんでした",
     "couldNotLoadActiveSessions": "アクティブなセッションを読み込めませんでした",
     "agentSessions": "エージェントセッション",
-    "showingSavedSessions": "保存されたセッションを表示中 — ライブステータスが古い場合があります",
-    "startNewAgentSession": "新しいKiloエージェントセッションを開始",
-    "aiCodingSessions": "AIコーディングセッション",
-    "startCodingTaskFromPhone": "スマートフォンからコーディングタスクを開始するか、CLIからセッションを続行します。",
-    "tryIt": "試す",
     "newCodingTask": "新しいコーディングタスク",
     "explore": "探索",
     "seeAll": "すべて表示",
-    "kiloAgents": "Kiloエージェント"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}}を閉じる",

@@ -150,7 +150,9 @@
     "appearanceSystem": "Tizim",
     "appearanceLight": "Yorug'",
     "appearanceDark": "Qorong'i",
-    "account": "Hisob"
+    "account": "Hisob",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request mavjud emas",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "Promptingiz yo'qoladi.",
       "keepEditing": "Tahrirlashni davom ettirish",
       "discard": "Bekor qilish",
-      "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring."
+      "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "Sessiyalarni yuklab bo'lmadi",
     "couldNotLoadActiveSessions": "Faol sessiyalarni yuklab bo'lmadi",
     "agentSessions": "Agent sessiyalari",
-    "showingSavedSessions": "Saqlangan sessiyalar ko'rsatilmoqda — jonli holat eskirgan bo'lishi mumkin",
-    "startNewAgentSession": "Yangi Kilo Agent sessiyasini boshlash",
-    "aiCodingSessions": "AI kodlash sessiyalari",
-    "startCodingTaskFromPhone": "Telefoningizdan kodlash vazifasini boshlang yoki CLI'ingizdan sessiyani davom ettiring.",
-    "tryIt": "Sinab ko'ring",
     "newCodingTask": "Yangi kodlash vazifasi",
     "explore": "O'rganish",
     "seeAll": "Barchasini ko'rish",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} ni yopish",

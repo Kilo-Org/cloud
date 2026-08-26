@@ -150,7 +150,9 @@
     "appearanceSystem": "Sistem",
     "appearanceLight": "Luminos",
     "appearanceDark": "Întunecat",
-    "account": "Cont"
+    "account": "Cont",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request indisponibil",
@@ -2198,7 +2200,8 @@
       "discardDraftMessage": "Mesajul tău va fi pierdut.",
       "keepEditing": "Continuă editarea",
       "discard": "Renunță",
-      "discardFailed": "Nu s-a putut renunța la ciornă. Încearcă din nou."
+      "discardFailed": "Nu s-a putut renunța la ciornă. Încearcă din nou.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizat {{displayCount}} fișier",
@@ -2689,15 +2692,10 @@
     "couldNotLoadSessions": "Sesiunile nu au putut fi încărcate",
     "couldNotLoadActiveSessions": "Sesiunile active nu au putut fi încărcate",
     "agentSessions": "Sesiuni de agent",
-    "showingSavedSessions": "Se afișează sesiunile salvate — starea live poate fi neactualizată",
-    "startNewAgentSession": "Începe o sesiune nouă de Kilo Agent",
-    "aiCodingSessions": "Sesiuni de codare AI",
-    "startCodingTaskFromPhone": "Începe o sarcină de codare de pe telefon sau continuă o sesiune de pe CLI.",
-    "tryIt": "Încearcă",
     "newCodingTask": "Sarcină de codare nouă",
     "explore": "Explorează",
     "seeAll": "Vezi tot",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Închide {{filename}}",

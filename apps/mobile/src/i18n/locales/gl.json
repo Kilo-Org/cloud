@@ -150,7 +150,9 @@
     "appearanceSystem": "Sistema",
     "appearanceLight": "Claro",
     "appearanceDark": "Escuro",
-    "account": "Conta"
+    "account": "Conta",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request non dispoñible",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "Perderase o teu indicación.",
       "keepEditing": "Seguir editando",
       "discard": "Descartar",
-      "discardFailed": "Non se puido descartar o borrador. Téntao de novo."
+      "discardFailed": "Non se puido descartar o borrador. Téntao de novo.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizouse {{displayCount}} ficheiro",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "Non se puideron cargar as sesións",
     "couldNotLoadActiveSessions": "Non se puideron cargar as sesións activas",
     "agentSessions": "Sesións de axente",
-    "showingSavedSessions": "Mostrando sesións gardadas — o estado en directo pode estar desactualizado",
-    "startNewAgentSession": "Iniciar unha nova sesión de Kilo Agent",
-    "aiCodingSessions": "Sesións de codificación con IA",
-    "startCodingTaskFromPhone": "Inicia unha tarefa de codificación desde o teu teléfono ou continúa unha sesión desde o teu CLI.",
-    "tryIt": "Probala",
     "newCodingTask": "Nova tarefa de codificación",
     "explore": "Explorar",
     "seeAll": "Ver todo",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Pechar {{filename}}",

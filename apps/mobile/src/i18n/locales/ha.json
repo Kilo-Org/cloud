@@ -150,7 +150,9 @@
     "appearanceSystem": "Tsarin",
     "appearanceLight": "Haske",
     "appearanceDark": "Duhu",
-    "account": "Asusu"
+    "account": "Asusu",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar jan ba ta samuwa",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "Za a ɓata bayaninka.",
       "keepEditing": "Ci gaba da gyarawa",
       "discard": "Watsi",
-      "discardFailed": "An kasa watsi da daftarin. Da fatan za a sake gwadawa."
+      "discardFailed": "An kasa watsi da daftarin. Da fatan za a sake gwadawa.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta {{displayCount}} fayil",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "An kasa ɗora zaman",
     "couldNotLoadActiveSessions": "An kasa ɗora zaman aiki",
     "agentSessions": "Zamannin wakilai",
-    "showingSavedSessions": "Ana nuna zaman da aka adana — matsayin kai tsaye na iya zama tsoho",
-    "startNewAgentSession": "Fara sabon zaman Kilo Agent",
-    "aiCodingSessions": "Zaman shirye-shiryen AI",
-    "startCodingTaskFromPhone": "Fara aikin shirye-shirye daga wayarka ko ci gaba da zama daga CLI ɗinka.",
-    "tryIt": "Gwada shi",
     "newCodingTask": "Sabon aikin shirye-shirye",
     "explore": "Bincika",
     "seeAll": "Duba duka",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Rufe {{filename}}",

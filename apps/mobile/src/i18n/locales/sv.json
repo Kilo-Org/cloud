@@ -150,7 +150,9 @@
     "appearanceSystem": "System",
     "appearanceLight": "Ljust",
     "appearanceDark": "Mörkt",
-    "account": "Konto"
+    "account": "Konto",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request inte tillgänglig",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "Din prompt går förlorad.",
       "keepEditing": "Fortsätt redigera",
       "discard": "Kassera",
-      "discardFailed": "Kunde inte ignorera utkastet. Försök igen."
+      "discardFailed": "Kunde inte ignorera utkastet. Försök igen.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppdaterade {{displayCount}} fil",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "Det gick inte att läsa in sessioner",
     "couldNotLoadActiveSessions": "Det gick inte att läsa in aktiva sessioner",
     "agentSessions": "Agentsessioner",
-    "showingSavedSessions": "Visar sparade sessioner — live-status kan vara inaktuell",
-    "startNewAgentSession": "Starta en ny Kilo Agent-session",
-    "aiCodingSessions": "AI-kodningssessioner",
-    "startCodingTaskFromPhone": "Starta en kodningsuppgift från din telefon eller fortsätt en session från din CLI.",
-    "tryIt": "Prova",
     "newCodingTask": "Ny kodningsuppgift",
     "explore": "Utforska",
     "seeAll": "Visa alla",
-    "kiloAgents": "Kilo-agenter"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Stäng {{filename}}",

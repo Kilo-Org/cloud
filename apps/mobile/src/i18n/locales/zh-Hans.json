@@ -150,7 +150,9 @@
     "appearanceSystem": "跟随系统",
     "appearanceLight": "浅色",
     "appearanceDark": "深色",
-    "account": "账户"
+    "account": "账户",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "通知",
@@ -1729,7 +1731,8 @@
       "discardDraftMessage": "您的提示词将会丢失。",
       "discardDraftTitle": "丢弃草稿？",
       "discardFailed": "无法丢弃草稿。请重试。",
-      "keepEditing": "继续编辑"
+      "keepEditing": "继续编辑",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件",
@@ -2215,15 +2218,10 @@
     "couldNotLoadSessions": "无法加载会话",
     "couldNotLoadActiveSessions": "无法加载活动会话",
     "agentSessions": "智能体会话",
-    "showingSavedSessions": "显示已保存的会话 — 实时状态可能已过时",
-    "startNewAgentSession": "开始新的 Kilo Agent 会话",
-    "aiCodingSessions": "AI 编程会话",
-    "startCodingTaskFromPhone": "从手机开始编程任务，或从 CLI 继续会话。",
-    "tryIt": "试一试",
     "newCodingTask": "新编程任务",
     "explore": "探索",
     "seeAll": "查看全部",
-    "kiloAgents": "Kilo 代理"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "关闭 {{filename}}",

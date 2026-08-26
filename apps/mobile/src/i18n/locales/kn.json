@@ -150,7 +150,9 @@
     "appearanceSystem": "ಸಿಸ್ಟಮ್",
     "appearanceLight": "ಲೈಟ್",
     "appearanceDark": "ಡಾರ್ಕ್",
-    "account": "ಖಾತೆ"
+    "account": "ಖಾತೆ",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "ನಿಮ್ಮ ಪ್ರಾಂಪ್ಟ್ ಕಳೆದುಹೋಗುತ್ತದೆ.",
       "keepEditing": "ಸಂಪಾದನೆಯನ್ನು ಮುಂದುವರಿಸಿ",
       "discard": "ತೆಗೆದುಹಾಕಿ",
-      "discardFailed": "ಡ್ರಾಫ್ಟ್ ತೆಗೆದುಹಾಕಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+      "discardFailed": "ಡ್ರಾಫ್ಟ್ ತೆಗೆದುಹಾಕಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ಫೈಲ್ ನವೀಕರಿಸಲಾಗಿದೆ",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "ಸೆಷನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "couldNotLoadActiveSessions": "ಸಕ್ರಿಯ ಸೆಷನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "agentSessions": "ಏಜೆಂಟ್ ಸೆಷನ್‌ಗಳು",
-    "showingSavedSessions": "ಉಳಿಸಿದ ಸೆಷನ್‌ಗಳನ್ನು ತೋರಿಸುತ್ತಿದೆ — ಲೈವ್ ಸ್ಥಿತಿ ಹಳೆಯದಾಗಿರಬಹುದು",
-    "startNewAgentSession": "ಹೊಸ Kilo Agent ಸೆಷನ್ ಪ್ರಾರಂಭಿಸಿ",
-    "aiCodingSessions": "AI ಕೋಡಿಂಗ್ ಸೆಷನ್‌ಗಳು",
-    "startCodingTaskFromPhone": "ನಿಮ್ಮ ಫೋನ್‌ನಿಂದ ಕೋಡಿಂಗ್ ಕಾರ್ಯ ಪ್ರಾರಂಭಿಸಿ ಅಥವಾ ನಿಮ್ಮ CLI ಯಿಂದ ಸೆಷನ್ ಮುಂದುವರಿಸಿ.",
-    "tryIt": "ಪ್ರಯತ್ನಿಸಿ",
     "newCodingTask": "ಹೊಸ ಕೋಡಿಂಗ್ ಕಾರ್ಯ",
     "explore": "ಅನ್ವೇಷಿಸಿ",
     "seeAll": "ಎಲ್ಲವನ್ನೂ ನೋಡಿ",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} ಮುಚ್ಚಿ",

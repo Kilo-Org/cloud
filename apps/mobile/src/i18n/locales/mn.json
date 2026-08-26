@@ -150,7 +150,9 @@
     "appearanceSystem": "Систем",
     "appearanceLight": "Гэрэлтэй",
     "appearanceDark": "Харанхуй",
-    "account": "Бүртгэл"
+    "account": "Бүртгэл",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request боломжгүй",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "Таны заавар алдагдах болно.",
       "keepEditing": "Засахыг үргэлжлүүлэх",
       "discard": "Хаях",
-      "discardFailed": "Нооргийг хаях боломжгүй. Дахин оролдоно уу."
+      "discardFailed": "Нооргийг хаях боломжгүй. Дахин оролдоно уу.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл шинэчлэгдсэн",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "Сессийг ачаалж чадсангүй",
     "couldNotLoadActiveSessions": "Идэвхтэй сессийг ачаалж чадсангүй",
     "agentSessions": "Агентын сессүүд",
-    "showingSavedSessions": "Хадгалсан сессийг харуулж байна — шууд статус хуучирсан байж болно",
-    "startNewAgentSession": "Шинэ Kilo Agent сесси эхлүүлэх",
-    "aiCodingSessions": "AI кодчилолын сессий",
-    "startCodingTaskFromPhone": "Утаснаасаа кодчилолын даалгавар эхлүүлэх эсвэл CLI-ээсээ сессийг үргэлжлүүлэх.",
-    "tryIt": "Оролдоод үзэх",
     "newCodingTask": "Шинэ кодчилолын даалгавар",
     "explore": "Судлах",
     "seeAll": "Бүгдийг үзэх",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} хаах",

@@ -150,7 +150,9 @@
     "appearanceSystem": "Rafitra",
     "appearanceLight": "Mazava",
     "appearanceDark": "Maizina",
-    "account": "Kaonty"
+    "account": "Kaonty",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Tsy misy ny pull request",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "Ho very ny hafatrao.",
       "keepEditing": "Hanohy fanoratana",
       "discard": "Hanary",
-      "discardFailed": "Tsy afaka nandao ny draft. Andramo indray azafady."
+      "discardFailed": "Tsy afaka nandao ny draft. Andramo indray azafady.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nohavaozina ny rakitra {{displayCount}}",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "Tsy afaka nampidirina ny session",
     "couldNotLoadActiveSessions": "Tsy afaka nampidirina ny session mavitrika",
     "agentSessions": "Session agent",
-    "showingSavedSessions": "Maneho ny session voatahiry — mety tsy manaraka fotoana ny toerana velona",
-    "startNewAgentSession": "Atombohy session Kilo Agent vaovao",
-    "aiCodingSessions": "Session coding AI",
-    "startCodingTaskFromPhone": "Atombohy asa coding avy amin'ny findainao na tohizo session avy amin'ny CLI-nao.",
-    "tryIt": "Andramo",
     "newCodingTask": "Asa coding vaovao",
     "explore": "Mijerena",
     "seeAll": "Jereo daholo",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Hanidy {{filename}}",

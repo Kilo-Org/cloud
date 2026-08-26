@@ -150,7 +150,9 @@
     "appearanceSystem": "System",
     "appearanceLight": "Light",
     "appearanceDark": "Dark",
-    "account": "အကောင့်"
+    "account": "အကောင့်",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request မရနိုင်ပါ",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "သင့်မေးမြန်းချက် ပျောက်သွားမည်။",
       "keepEditing": "ဆက်တည်းဖြတ်ပါ",
       "discard": "ပယ်ဖျက်ပါ",
-      "discardFailed": "မူကြမ်းကို ပယ်ဖျက်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။"
+      "discardFailed": "မူကြမ်းကို ပယ်ဖျက်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "ဖိုင် {{displayCount}} ခု မွမ်းမံပြီး",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "session များကို မတင်နိုင်ပါ",
     "couldNotLoadActiveSessions": "လက်ရှိ session များကို မတင်နိုင်ပါ",
     "agentSessions": "Agent session များ",
-    "showingSavedSessions": "သိမ်းထားသော session များ ပြနေသည် — တိုက်ရိုက် အခြေအနေ နောက်ကျနိုင်သည်",
-    "startNewAgentSession": "Kilo Agent session အသစ် စတင်ရန်",
-    "aiCodingSessions": "AI coding session များ",
-    "startCodingTaskFromPhone": "သင့်ဖုန်းမှ coding အလုပ်တစ်ခု စတင်ပါ သို့မဟုတ် သင့် CLI မှ session တစ်ခု ဆက်ပါ။",
-    "tryIt": "စမ်းကြည့်ပါ",
     "newCodingTask": "coding အလုပ်အသစ်",
     "explore": "ရှာဖွေပါ",
     "seeAll": "အားလုံး ကြည့်ရန်",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} ပိတ်ရန်",

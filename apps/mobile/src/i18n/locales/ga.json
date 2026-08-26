@@ -150,7 +150,9 @@
     "appearanceSystem": "Córas",
     "appearanceLight": "Geal",
     "appearanceDark": "Dorcha",
-    "account": "Cuntas"
+    "account": "Cuntas",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Iarratas tarraingthe ar fáil",
@@ -2228,7 +2230,8 @@
       "discardDraftMessage": "Caillfear do leid.",
       "keepEditing": "Lean ar aghaidh ag cur in eagar",
       "discard": "Caith ar lár",
-      "discardFailed": "Níorbh fhéidir an dréacht a chaitheamh ar lár. Bain triail as arís le do thoil."
+      "discardFailed": "Níorbh fhéidir an dréacht a chaitheamh ar lár. Bain triail as arís le do thoil.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nuashonraíodh {{displayCount}} comhad",
@@ -2729,15 +2732,10 @@
     "couldNotLoadSessions": "Níorbh fhéidir seisiúin a lódáil",
     "couldNotLoadActiveSessions": "Níorbh fhéidir seisiúin ghníomhacha a lódáil",
     "agentSessions": "Seisiúin ghníomhaire",
-    "showingSavedSessions": "Ag taispeáint seisiúin shábháilte — b'fhéidir go bhfuil an stádas beo as dáta",
-    "startNewAgentSession": "Tosaigh seisiún Kilo Agent nua",
-    "aiCodingSessions": "Seisiúin chódaithe AI",
-    "startCodingTaskFromPhone": "Tosaigh tasc códaithe ó do ghuthán nó lean ar aghaidh le seisiún ó do CLI.",
-    "tryIt": "Bain triail as",
     "newCodingTask": "Tasc códaithe nua",
     "explore": "Taiscéal",
     "seeAll": "Féach ar gach ceann",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Dún {{filename}}",

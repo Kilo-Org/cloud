@@ -150,7 +150,9 @@
     "appearanceSystem": "Համակարգ",
     "appearanceLight": "Բաց",
     "appearanceDark": "Մուգ",
-    "account": "Հաշիվ"
+    "account": "Հաշիվ",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request-ը հասանելի չէ",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "Ձեր հուշումը կկորչի։",
       "keepEditing": "Շարունակել խմբագրել",
       "discard": "Մերժել",
-      "discardFailed": "Չհաջողվեց մերժել սևագիրը։ Խնդրում ենք կրկին փորձել։"
+      "discardFailed": "Չհաջողվեց մերժել սևագիրը։ Խնդրում ենք կրկին փորձել։",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "Հնարավոր չեղավ բեռնել նիստերը",
     "couldNotLoadActiveSessions": "Հնարավոր չեղավ բեռնել ակտիվ նիստերը",
     "agentSessions": "Գործակալի նիստեր",
-    "showingSavedSessions": "Ցուցադրվում են պահված նիստերը — կենդանի կարգավիճակը կարող է հնացած լինել",
-    "startNewAgentSession": "Սկսել նոր Kilo Agent նիստ",
-    "aiCodingSessions": "AI ծրագրավորման նիստեր",
-    "startCodingTaskFromPhone": "Սկսեք ծրագրավորման առաջադրանք ձեր հեռախոսից կամ շարունակեք նիստը ձեր CLI-ից:",
-    "tryIt": "Փորձեք",
     "newCodingTask": "Նոր ծրագրավորման առաջադրանք",
     "explore": "Ուսումնասիրել",
     "seeAll": "Տեսնել բոլորը",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Փակել {{filename}}-ը",

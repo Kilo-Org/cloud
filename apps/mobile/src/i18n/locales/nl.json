@@ -150,7 +150,9 @@
     "appearanceSystem": "Systeem",
     "appearanceLight": "Licht",
     "appearanceDark": "Donker",
-    "account": "Account"
+    "account": "Account",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "channel": {
@@ -1729,7 +1731,8 @@
       "discardDraftMessage": "Je prompt gaat verloren.",
       "discardDraftTitle": "Concept weggooien?",
       "discardFailed": "Kon het concept niet weggooien. Probeer het opnieuw.",
-      "keepEditing": "Blijven bewerken"
+      "keepEditing": "Blijven bewerken",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} bestand bijgewerkt",
@@ -2215,15 +2218,10 @@
     "couldNotLoadSessions": "Sessies konden niet worden geladen",
     "couldNotLoadActiveSessions": "Actieve sessies konden niet worden geladen",
     "agentSessions": "Agentsessies",
-    "showingSavedSessions": "Opgeslagen sessies worden getoond — de live status kan verouderd zijn",
-    "startNewAgentSession": "Een nieuwe Kilo Agent-sessie starten",
-    "aiCodingSessions": "AI-codeersessies",
-    "startCodingTaskFromPhone": "Start een codeertaak vanaf je telefoon of ga verder met een sessie vanaf je CLI.",
-    "tryIt": "Probeer het",
     "newCodingTask": "Nieuwe codeertaak",
     "explore": "Verkennen",
     "seeAll": "Alles bekijken",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} sluiten",

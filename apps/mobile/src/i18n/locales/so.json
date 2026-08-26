@@ -150,7 +150,9 @@
     "appearanceSystem": "Nidaamka",
     "appearanceLight": "Iftiin",
     "appearanceDark": "Madow",
-    "account": "Xisaabta"
+    "account": "Xisaabta",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ma heli karo",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "Wax-soo-galkaaga wuu lumi doonaa.",
       "keepEditing": "Sii wad wax ka beddelka",
       "discard": "Tuur",
-      "discardFailed": "Qabyada lama tuuri karin. Fadlan mar kale isku day."
+      "discardFailed": "Qabyada lama tuuri karin. Fadlan mar kale isku day.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl ayaa la cusboonaysiiyay",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "Kalfadhiyada lama soo dejin karin",
     "couldNotLoadActiveSessions": "Kalfadhiyada firfircoon lama soo dejin karin",
     "agentSessions": "Fadhiyada wakiilka",
-    "showingSavedSessions": "Waxaa la tusi doonaa kalfadhiyo la kaydiyay — xaaladda tooska ah waxaa laga yaabaa inay ka da'do",
-    "startNewAgentSession": "Bilow kalfadhi cusub oo Kilo Agent",
-    "aiCodingSessions": "Kalfadhiyada codeynta AI",
-    "startCodingTaskFromPhone": "Ka bilow hawshooda codeynta taleefankaaga ama sii wad kalfadhi CLI-gaaga.",
-    "tryIt": "Isku day",
     "newCodingTask": "Hawshooda cusub ee codeynta",
     "explore": "Sahan",
     "seeAll": "Fiiri dhammaan",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Xidh {{filename}}",

@@ -150,7 +150,9 @@
     "appearanceSystem": "Sistema",
     "appearanceLight": "Argia",
     "appearanceDark": "Iluna",
-    "account": "Kontua"
+    "account": "Kontua",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request-a ez dago eskuragarri",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "Zure proposamena galduko da.",
       "keepEditing": "Jarraitu editatzen",
       "discard": "Baztertu",
-      "discardFailed": "Ezin da zirriborroa baztertu. Saiatu berriro."
+      "discardFailed": "Ezin da zirriborroa baztertu. Saiatu berriro.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxategi eguneratu da",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "Ezin izan dira saioak kargatu",
     "couldNotLoadActiveSessions": "Ezin izan dira saio aktiboak kargatu",
     "agentSessions": "Agente-saioak",
-    "showingSavedSessions": "Gordetako saioak erakusten — egoera zuzena ez egon daiteke",
-    "startNewAgentSession": "Hasi Kilo Agent saio berri bat",
-    "aiCodingSessions": "AI kodetze-saioak",
-    "startCodingTaskFromPhone": "Hasi kodetze-lan bat zure telefonotik edo jarraitu saio bat zure CLI-tik.",
-    "tryIt": "Probatu",
     "newCodingTask": "Kodetze-lan berria",
     "explore": "Arakatu",
     "seeAll": "Ikusi guztiak",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Itxi {{filename}}",

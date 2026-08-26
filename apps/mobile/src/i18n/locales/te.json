@@ -150,7 +150,9 @@
     "appearanceSystem": "సిస్టమ్",
     "appearanceLight": "లైట్",
     "appearanceDark": "డార్క్",
-    "account": "ఖాతా"
+    "account": "ఖాతా",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "మీ ప్రాంప్ట్ కోల్పోతుంది.",
       "keepEditing": "సవరించడం కొనసాగించండి",
       "discard": "విస్మరించండి",
-      "discardFailed": "డ్రాఫ్ట్‌ను విస్మరించలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి."
+      "discardFailed": "డ్రాఫ్ట్‌ను విస్మరించలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్ నవీకరించబడింది",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "సెషన్లను లోడ్ చేయలేకపోయాము",
     "couldNotLoadActiveSessions": "యాక్టివ్ సెషన్లను లోడ్ చేయలేకపోయాము",
     "agentSessions": "ఏజెంట్ సెషన్లు",
-    "showingSavedSessions": "సేవ్ చేసిన సెషన్లను చూపిస్తోంది — లైవ్ స్థితి పాతది కావచ్చు",
-    "startNewAgentSession": "కొత్త Kilo ఏజెంట్ సెషన్ను ప్రారంభించండి",
-    "aiCodingSessions": "AI కోడింగ్ సెషన్లు",
-    "startCodingTaskFromPhone": "మీ ఫోన్ నుండి కోడింగ్ పనిని ప్రారంభించండి లేదా మీ CLI నుండి సెషన్ను కొనసాగించండి.",
-    "tryIt": "ప్రయత్నించండి",
     "newCodingTask": "కొత్త కోడింగ్ పని",
     "explore": "అన్వేషించండి",
     "seeAll": "అన్నీ చూడండి",
-    "kiloAgents": "Kilo ఏజెంట్లు"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} మూసివేయండి",

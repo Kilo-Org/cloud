@@ -1655,7 +1655,8 @@
       "discardDraftMessage": "Votre prompt sera perdu.",
       "discardDraftTitle": "Abandonner le brouillon ?",
       "discardFailed": "Impossible d'abandonner le brouillon. Veuillez réessayer.",
-      "keepEditing": "Continuer à modifier"
+      "keepEditing": "Continuer à modifier",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fichier mis à jour",
@@ -2121,7 +2122,9 @@
     "appearanceSystem": "Système",
     "appearanceLight": "Clair",
     "appearanceDark": "Sombre",
-    "account": "Compte"
+    "account": "Compte",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "addCredits": {
     "cta": "Ajouter des crédits",
@@ -2160,15 +2163,10 @@
     "couldNotLoadSessions": "Impossible de charger les sessions",
     "couldNotLoadActiveSessions": "Impossible de charger les sessions actives",
     "agentSessions": "Sessions de l’agent",
-    "showingSavedSessions": "Affichage des sessions enregistrées — le statut en direct peut être obsolète",
-    "startNewAgentSession": "Démarrer une nouvelle session Kilo Agent",
-    "aiCodingSessions": "Sessions de codage IA",
-    "startCodingTaskFromPhone": "Démarrez une tâche de codage depuis votre téléphone ou continuez une session depuis votre CLI.",
-    "tryIt": "Essayer",
     "newCodingTask": "Nouvelle tâche de codage",
     "explore": "Explorer",
     "seeAll": "Tout voir",
-    "kiloAgents": "Agents Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Fermer {{filename}}",

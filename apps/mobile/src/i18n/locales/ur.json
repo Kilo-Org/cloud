@@ -150,7 +150,9 @@
     "appearanceSystem": "سسٹم",
     "appearanceLight": "روشنی",
     "appearanceDark": "تاریک",
-    "account": "اکاؤنٹ"
+    "account": "اکاؤنٹ",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "آپ کا پرامپٹ ضائع ہو جائے گا۔",
       "keepEditing": "ترمیم جاری رکھیں",
       "discard": "ضائع کریں",
-      "discardFailed": "ڈرافٹ خارج نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔"
+      "discardFailed": "ڈرافٹ خارج نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فائل اپ ڈیٹ ہوئی",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "سیشنز لوڈ نہیں ہو سکے",
     "couldNotLoadActiveSessions": "فعال سیشنز لوڈ نہیں ہو سکے",
     "agentSessions": "ایجنٹ سیشنز",
-    "showingSavedSessions": "محفوظ شدہ سیشن دکھا رہے ہیں — لائیو سٹیٹس پرانی ہو سکتی ہے",
-    "startNewAgentSession": "نیا Kilo ایجنٹ سیشن شروع کریں",
-    "aiCodingSessions": "AI کوڈنگ سیشنز",
-    "startCodingTaskFromPhone": "اپنے فون سے کوڈنگ کا کام شروع کریں یا اپنے CLI سے سیشن جاری رکھیں۔",
-    "tryIt": "آزمائیں",
     "newCodingTask": "نیا کوڈنگ کام",
     "explore": "دریافت کریں",
     "seeAll": "سب دیکھیں",
-    "kiloAgents": "Kilo ایجنٹس"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} بند کریں",

@@ -150,7 +150,9 @@
     "appearanceSystem": "System",
     "appearanceLight": "Lys",
     "appearanceDark": "Mørk",
-    "account": "Konto"
+    "account": "Konto",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request utilgjengelig",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "Forespørselen din vil gå tapt.",
       "keepEditing": "Fortsett å redigere",
       "discard": "Forkast",
-      "discardFailed": "Kunne ikke forkaste utkastet. Prøv igjen."
+      "discardFailed": "Kunne ikke forkaste utkastet. Prøv igjen.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Oppdaterte {{displayCount}} fil",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "Kunne ikke laste økter",
     "couldNotLoadActiveSessions": "Kunne ikke laste aktive økter",
     "agentSessions": "Agentsesjoner",
-    "showingSavedSessions": "Viser lagrede økter — sanntidsstatus kan være utdatert",
-    "startNewAgentSession": "Start en ny Kilo Agent-økt",
-    "aiCodingSessions": "AI-kodeøkter",
-    "startCodingTaskFromPhone": "Start en kodeoppgave fra telefonen din eller fortsett en økt fra CLI-en din.",
-    "tryIt": "Prøv det",
     "newCodingTask": "Ny kodeoppgave",
     "explore": "Utforsk",
     "seeAll": "Se alle",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Lukk {{filename}}",

@@ -150,7 +150,9 @@
     "appearanceSystem": "පද්ධතිය",
     "appearanceLight": "ආලෝකය",
     "appearanceDark": "අඳුරු",
-    "account": "ගිණුම"
+    "account": "ගිණුම",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ලබා ගත නොහැක",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "ඔබේ ඉල්ලීම අහිමි වනු ඇත.",
       "keepEditing": "දිගටම සංස්කරණය කරන්න",
       "discard": "ඉවතලන්න",
-      "discardFailed": "කටු සටහන ඉවතලිය නොහැක. කරුණාකර නැවත උත්සාහ කරන්න."
+      "discardFailed": "කටු සටහන ඉවතලිය නොහැක. කරුණාකර නැවත උත්සාහ කරන්න.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ගොනුවක් යාවත්කාලීන කර ඇත",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "සැසි පූරණය කළ නොහැකි විය",
     "couldNotLoadActiveSessions": "ක්‍රියාකාරී සැසි පූරණය කළ නොහැකි විය",
     "agentSessions": "නියෝජිත සැසි",
-    "showingSavedSessions": "සුරැකි සැසි පෙන්වමින් — සජීවී තත්ත්වය කල් ඉකුත් විය හැක",
-    "startNewAgentSession": "නව Kilo Agent සැසියක් ආරම්භ කරන්න",
-    "aiCodingSessions": "AI කේතීකරණ සැසි",
-    "startCodingTaskFromPhone": "ඔබගේ දුරකථනයෙන් කේතීකරණ කාර්යයක් ආරම්භ කරන්න හෝ ඔබගේ CLI වෙතින් සැසියක් දිගටම කරගෙන යන්න.",
-    "tryIt": "උත්සාහ කරන්න",
     "newCodingTask": "නව කේතීකරණ කාර්යය",
     "explore": "ගවේෂණය",
     "seeAll": "සියල්ල බලන්න",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} වසන්න",

@@ -150,7 +150,9 @@
     "appearanceSystem": "Sistem",
     "appearanceLight": "Açık",
     "appearanceDark": "Koyu",
-    "account": "Hesap"
+    "account": "Hesap",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "Bildirimler",
@@ -1729,7 +1731,8 @@
       "discardDraftMessage": "İsteminiz kaybolacak.",
       "discardDraftTitle": "Taslak silinsin mi?",
       "discardFailed": "Taslak silinemedi. Lütfen tekrar deneyin.",
-      "keepEditing": "Düzenlemeye devam et"
+      "keepEditing": "Düzenlemeye devam et",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} dosya güncellendi",
@@ -2215,15 +2218,10 @@
     "couldNotLoadSessions": "Oturumlar yüklenemedi",
     "couldNotLoadActiveSessions": "Etkin oturumlar yüklenemedi",
     "agentSessions": "Ajan oturumları",
-    "showingSavedSessions": "Kayıtlı oturumlar gösteriliyor — canlı durum güncel olmayabilir",
-    "startNewAgentSession": "Yeni bir Kilo Ajanı oturumu başlat",
-    "aiCodingSessions": "Yapay zeka kodlama oturumları",
-    "startCodingTaskFromPhone": "Telefonunuzdan bir kodlama görevi başlatın veya CLI'nizden bir oturuma devam edin.",
-    "tryIt": "Dene",
     "newCodingTask": "Yeni kodlama görevi",
     "explore": "Keşfet",
     "seeAll": "Tümünü gör",
-    "kiloAgents": "Kilo Ajanları"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} kapat",

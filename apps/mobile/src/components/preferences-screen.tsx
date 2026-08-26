@@ -1,5 +1,12 @@
 import { type Href, useRouter } from 'expo-router';
-import { Bell, Brain, Globe, type LucideIcon, Smartphone } from '@/components/ui/icons';
+import {
+  Bell,
+  Brain,
+  Globe,
+  type LucideIcon,
+  MessageSquare,
+  Smartphone,
+} from '@/components/ui/icons';
 import { useState } from 'react';
 import { Switch, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +21,7 @@ import { attemptPushRegistrationReconciliation } from '@/lib/auth/push-registrat
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { getResolvedLanguage, useLanguagePreference } from '@/lib/hooks/use-language-preference';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
+import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { cn } from '@/lib/utils';
 import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
@@ -80,6 +88,11 @@ export function PreferencesScreen() {
     hasLoaded: keepScreenOnLoaded,
     setKeepScreenOn,
   } = useKeepScreenOnPreference();
+  const {
+    prReviewFooter,
+    hasLoaded: prReviewFooterLoaded,
+    setPrReviewFooter,
+  } = usePrReviewFooterPreference();
   const { t } = useTranslation();
   const { userId } = useCurrentUserId();
   const { preference: languagePreference } = useLanguagePreference();
@@ -113,6 +126,14 @@ export function PreferencesScreen() {
           value={keepScreenOn}
           disabled={!keepScreenOnLoaded}
           onValueChange={setKeepScreenOn}
+        />
+        <PreferenceRow
+          icon={MessageSquare}
+          title={t('preferences.prReviewAttribution')}
+          subtitle={t('preferences.prReviewAttributionSubtitle')}
+          value={prReviewFooter}
+          disabled={!prReviewFooterLoaded}
+          onValueChange={setPrReviewFooter}
         />
 
         {/* Appearance */}

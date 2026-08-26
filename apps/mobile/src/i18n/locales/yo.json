@@ -150,7 +150,9 @@
     "appearanceSystem": "Eto",
     "appearanceLight": "Imọlẹ",
     "appearanceDark": "Dudu",
-    "account": "Àkọọ́lẹ̀"
+    "account": "Àkọọ́lẹ̀",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Ibeere fifa ko si",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "A yoo padanu iyanilenu rẹ.",
       "keepEditing": "Tẹsiwaju ṣatunkọ",
       "discard": "Jù silẹ",
-      "discardFailed": "Ko le fi osere silẹ. Jọwọ gbiyanju lẹẹkansi."
+      "discardFailed": "Ko le fi osere silẹ. Jọwọ gbiyanju lẹẹkansi.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ti ṣe imudojuiwọn {{displayCount}} faili",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "Ko le ṣagbewọ awọn igba-ijiroro",
     "couldNotLoadActiveSessions": "Ko le ṣagbewọ awọn igba-ijiroro ti n ṣiṣẹ",
     "agentSessions": "Awọn igba-ijiroro aṣoju",
-    "showingSavedSessions": "Nfi awọn igba-ijiroro ti o ti fi pamọ han — ipo laaye le ti atijo",
-    "startNewAgentSession": "Bẹrẹ igba-ijiroro Kilo Agent tuntun",
-    "aiCodingSessions": "Awọn igba-ijiroro koodu AI",
-    "startCodingTaskFromPhone": "Bẹrẹ iṣẹ-ṣiṣe koodu lati foonu rẹ tabi tẹsiwaju igba-ijiroro lati CLI rẹ.",
-    "tryIt": "Gbiyanju",
     "newCodingTask": "Iṣẹ-ṣiṣe koodu tuntun",
     "explore": "Ṣàwárí",
     "seeAll": "Wo gbogbo",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Pa {{filename}}",

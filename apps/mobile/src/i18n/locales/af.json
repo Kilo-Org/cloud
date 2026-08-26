@@ -150,7 +150,9 @@
     "appearanceSystem": "Stelsel",
     "appearanceLight": "Lig",
     "appearanceDark": "Donker",
-    "account": "Rekening"
+    "account": "Rekening",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",
@@ -2183,7 +2185,8 @@
       "discardDraftMessage": "Jou aansporing sal verlore gaan.",
       "keepEditing": "Bly redigeer",
       "discard": "Gooi weg",
-      "discardFailed": "Kon die konsep nie weggooi nie. Probeer asseblief weer."
+      "discardFailed": "Kon die konsep nie weggooi nie. Probeer asseblief weer.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer bygewerk",
@@ -2669,15 +2672,10 @@
     "couldNotLoadSessions": "Kon nie sessies laai nie",
     "couldNotLoadActiveSessions": "Kon nie aktiewe sessies laai nie",
     "agentSessions": "Agentsessies",
-    "showingSavedSessions": "Wys gestoorde sessies — lewende status mag verouderd wees",
-    "startNewAgentSession": "Begin 'n nuwe Kilo Agent-sessie",
-    "aiCodingSessions": "AI-koderingsessies",
-    "startCodingTaskFromPhone": "Begin 'n koderingstaak van jou foon af of gaan voort met 'n sessie vanaf jou CLI.",
-    "tryIt": "Probeer dit",
     "newCodingTask": "Nuwe koderingstaak",
     "explore": "Verken",
     "seeAll": "Sien alles",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Maak {{filename}} toe",

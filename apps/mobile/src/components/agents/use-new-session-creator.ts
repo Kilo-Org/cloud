@@ -7,7 +7,10 @@ import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 import { type AgentMode } from '@/components/agents/mode-selector';
-import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
+import {
+  type NewSessionRepository,
+  type RepositoryPlatform,
+} from '@/components/agents/new-session-repository-state';
 import { resolveNewSessionPromptForCreate } from '@/components/agents/new-session-prompt-state';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
@@ -136,12 +139,30 @@ export function useNewSessionCreator({
       mode,
       model,
       variant: variant || undefined,
-      repo: selectedRepository ? selectedRepository.fullName : '',
+      repo: resolveRepoFingerprint(selectedRepository),
       autoCommit,
       organizationId: organizationId ?? null,
       profileId: profileId ?? null,
       attachments: attachmentWire ?? null,
     });
+    // Pre-fix safe-retry rows persisted the bare `fullName` as `repo`. A GitHub
+    // `owner/repo` is inherently a single-provider identity, so only GitHub
+    // intents fall back to the legacy bare-name lookup: two same-named
+    // GitLab/Bitbucket rows must never share the stale retry key.
+    const legacyIntentFingerprint =
+      selectedRepository?.platform === 'github'
+        ? JSON.stringify({
+            prompt,
+            mode,
+            model,
+            variant: variant || undefined,
+            repo: selectedRepository.fullName,
+            autoCommit,
+            organizationId: organizationId ?? null,
+            profileId: profileId ?? null,
+            attachments: attachmentWire ?? null,
+          })
+        : null;
     // Reuse a stored safe-retry key for this fingerprint on relaunch; mint a
     // fresh key only when no stored row exists. A stored row must never be
     // replaced by a new in-memory key. Gate on the outbox load first: a submit
@@ -153,7 +174,16 @@ export function useNewSessionCreator({
       setIsCreating(false);
       return;
     }
-    const operationKey = getStoredOperationKey(intentFingerprint) ?? getKey(intentFingerprint);
+    let operationKey = getStoredOperationKey(intentFingerprint);
+    if (operationKey === null && legacyIntentFingerprint !== null) {
+      operationKey = getStoredOperationKey(legacyIntentFingerprint);
+      if (operationKey !== null) {
+        // Migrate the consumed legacy row to the scoped fingerprint so the
+        // normal success/failure cleanup only ever touches the scoped row.
+        await removeOutboxRow(legacyIntentFingerprint);
+      }
+    }
+    operationKey ??= getKey(intentFingerprint);
 
     try {
       const initialMessageId = generateMessageId();
@@ -265,6 +295,31 @@ export function useNewSessionCreator({
   ]);
 
   return { createSessionFromDraft, promptRef };
+}
+
+/**
+ * The retry fingerprint's repository identity. Includes the platform so two
+ * same-named repos on different providers mint distinct retry keys, and the
+ * Bitbucket workspace/repository uuids so a workspace rename cannot collide.
+ */
+function resolveRepoFingerprint(repository: NewSessionRepository | null): {
+  platform: RepositoryPlatform;
+  fullName: string;
+  workspaceUuid?: string | null;
+  repositoryUuid?: string | null;
+} | null {
+  if (!repository) {
+    return null;
+  }
+  if (repository.platform === 'bitbucket') {
+    return {
+      platform: repository.platform,
+      fullName: repository.fullName,
+      workspaceUuid: repository.workspaceUuid ?? null,
+      repositoryUuid: repository.repositoryUuid ?? null,
+    };
+  }
+  return { platform: repository.platform, fullName: repository.fullName };
 }
 
 /**

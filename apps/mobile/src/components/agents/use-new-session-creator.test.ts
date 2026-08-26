@@ -119,8 +119,10 @@ vi.mock('expo-crypto', () => {
 
 const outboxMock = vi.hoisted(() => ({
   getStoredOperationKey: vi.fn((_fingerprint: string): string | null => null),
-  writeSafeRetry: vi.fn(async (): Promise<void> => undefined),
-  remove: vi.fn(async (): Promise<void> => undefined),
+  writeSafeRetry: vi.fn(
+    async (_row: { operationKey: string; fingerprint: string }): Promise<void> => undefined
+  ),
+  remove: vi.fn(async (_fingerprint: string): Promise<void> => undefined),
   whenLoaded: vi.fn(async (): Promise<boolean> => true),
 }));
 
@@ -752,23 +754,115 @@ describe('useNewSessionCreator repository platform payload', () => {
   });
 });
 
-describe('useNewSessionCreator intentFingerprint repo field', () => {
-  // The deployed app persisted safe-retry rows with the bare `fullName` in the
-  // fingerprint's `repo` field. A regression to `${platform}/${fullName}` would
-  // make `getStoredOperationKey` mint a fresh key on relaunch and bypass the
-  // operation-key dedupe (duplicate sessions, orphaned outbox rows).
-  it('fingerprints the bare fullName so persisted safe-retry rows keep matching', async () => {
-    prepareSessionMutate.mockResolvedValue(sessionResult());
+describe('useNewSessionCreator intentFingerprint repo identity', () => {
+  // Two same-name repos on different providers must marshal distinct retry
+  // identities, otherwise a GitHub and a GitLab create for `owner/repo` would
+  // share one safe-retry key and dedupe/replay each other's session.
+  it('mints distinct retry fingerprints for same-name GitHub and GitLab intents', async () => {
+    const githubCreator = runCreator({
+      selectedRepository: { platform: 'github', fullName: 'owner/repo', isPrivate: false },
+    });
+    const gitlabCreator = runCreator({
+      selectedRepository: { platform: 'gitlab', fullName: 'owner/repo', isPrivate: false },
+    });
+
+    githubCreator.promptRef.current = 'hello';
+    await githubCreator.createSessionFromDraft();
+    gitlabCreator.promptRef.current = 'hello';
+    await gitlabCreator.createSessionFromDraft();
+
+    const writtenFingerprints = outboxMock.writeSafeRetry.mock.calls.map(
+      call => call[0].fingerprint
+    );
+    const githubFingerprint = writtenFingerprints[0] ?? '';
+    const gitlabFingerprint = writtenFingerprints[1] ?? '';
+    expect(githubFingerprint).not.toBe(gitlabFingerprint);
+    expect(
+      (JSON.parse(githubFingerprint) as { repo: { platform: string; fullName: string } }).repo
+    ).toEqual({ platform: 'github', fullName: 'owner/repo' });
+    expect(
+      (JSON.parse(gitlabFingerprint) as { repo: { platform: string; fullName: string } }).repo
+    ).toEqual({ platform: 'gitlab', fullName: 'owner/repo' });
+  });
+
+  it('includes Bitbucket workspace and repository uuids in the fingerprint', async () => {
     const creator = runCreator({
-      selectedRepository: { platform: 'gitlab', fullName: 'group/project', isPrivate: true },
+      selectedRepository: {
+        platform: 'bitbucket',
+        fullName: 'workspace/repo',
+        isPrivate: true,
+        workspaceUuid: 'ws-1234',
+        repositoryUuid: 'repo-5678',
+      },
     });
 
     creator.promptRef.current = 'hello';
     await creator.createSessionFromDraft();
 
-    const fingerprint = outboxMock.getStoredOperationKey.mock.calls[0]?.[0] ?? '';
-    const parsed = JSON.parse(fingerprint) as { repo: string };
-    expect(parsed.repo).toBe('group/project');
+    const fingerprint =
+      outboxMock.writeSafeRetry.mock.calls.map(call => call[0].fingerprint)[0] ?? '';
+    expect((JSON.parse(fingerprint) as { repo: unknown }).repo).toEqual({
+      platform: 'bitbucket',
+      fullName: 'workspace/repo',
+      workspaceUuid: 'ws-1234',
+      repositoryUuid: 'repo-5678',
+    });
+  });
+
+  // The deployed app persisted safe-retry rows with the bare `fullName` as
+  // `repo`. A GitHub relaunch-retry must still reuse that legacy key (and
+  // migrate the row to the scoped fingerprint) instead of minting a duplicate
+  // session.
+  it('reuses a persisted legacy bare-name key for a GitHub intent', async () => {
+    outboxMock.getStoredOperationKey.mockImplementation((fingerprint: string) => {
+      const parsed = JSON.parse(fingerprint) as { repo: unknown };
+      return typeof parsed.repo === 'string' && parsed.repo === 'owner/repo'
+        ? 'legacy-stored-key'
+        : null;
+    });
+
+    const creator = runCreator({
+      selectedRepository: { platform: 'github', fullName: 'owner/repo', isPrivate: false },
+    });
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: 'legacy-stored-key' })
+    );
+    const removedFingerprints = outboxMock.remove.mock.calls.map(call => call[0]);
+    expect(
+      removedFingerprints.some(fingerprint => {
+        const parsed = JSON.parse(fingerprint) as { repo: unknown };
+        return parsed.repo === 'owner/repo';
+      })
+    ).toBe(true);
+  });
+
+  // A GitLab intent must never reuse a legacy bare-name key: the bare name is
+  // ambiguous across providers, so the GitLab request stays scoped and mints
+  // its own identity.
+  it('does not fall back to a legacy bare-name key for a GitLab intent', async () => {
+    outboxMock.getStoredOperationKey.mockImplementation((fingerprint: string) => {
+      const parsed = JSON.parse(fingerprint) as { repo: unknown };
+      return typeof parsed.repo === 'string' ? 'legacy-stored-key' : null;
+    });
+
+    const creator = runCreator({
+      selectedRepository: { platform: 'gitlab', fullName: 'owner/repo', isPrivate: false },
+    });
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    // The only looked-up fingerprints are the scoped one (repo is an object),
+    // never the bare name.
+    const lookedUpRepos = outboxMock.getStoredOperationKey.mock.calls.map(
+      call => (JSON.parse(call[0]) as { repo: unknown }).repo
+    );
+    expect(lookedUpRepos.every(repo => typeof repo === 'object')).toBe(true);
+    expect(prepareSessionMutate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: 'legacy-stored-key' })
+    );
   });
 });
 

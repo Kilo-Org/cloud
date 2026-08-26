@@ -169,8 +169,9 @@ export function NewSessionScreenBody() {
   });
 
   // The picker reports a `platform:fullName` key; resolve it to the full row so
-  // the creator can send the platform-specific repository field. Fall back to a
-  // bare fullName so a prefill-seeded selection still resolves.
+  // the creator can send the platform-specific repository field. The prefill
+  // seeds the same platform-qualified key, so no bare-fullName fallback is
+  // needed (and one would bind a same-named GitLab/Bitbucket row).
   const selectedRepository = useMemo(() => {
     if (!selectedRepo) {
       return null;
@@ -178,9 +179,7 @@ export function NewSessionScreenBody() {
     return (
       repositories.find(
         repository => `${repository.platform}:${repository.fullName}` === selectedRepo
-      ) ??
-      repositories.find(repository => repository.fullName === selectedRepo) ??
-      null
+      ) ?? null
     );
   }, [repositories, selectedRepo]);
 
@@ -433,6 +432,7 @@ export function NewSessionScreenBody() {
         isSubmitting,
         model: displayModel,
         selectedRepo,
+        selectedRepositoryResolved: selectedRepository !== null,
         isProfileLoading,
       });
 

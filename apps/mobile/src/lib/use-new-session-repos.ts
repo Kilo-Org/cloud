@@ -245,6 +245,13 @@ export function useNewSessionRepos({
       }),
       staleTime: 0,
     });
+    // A non-`available` force-fresh result is a refresh failure, not a
+    // cacheable snapshot: writing it over an existing `available` cache would
+    // clear good rows on a transient Bitbucket outage. Throw so
+    // `refreshReposForceFresh` toasts `couldNotRefreshRepositories`.
+    if (fresh.status !== 'available') {
+      throw new Error('Bitbucket repositories are not available');
+    }
     queryClient.setQueryData(
       trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryKey({
         organizationId,

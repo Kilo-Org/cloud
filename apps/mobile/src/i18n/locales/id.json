@@ -365,7 +365,7 @@
     "billing": {
       "title": "Penagihan",
       "continueMonthToMonth": "Lanjutkan bulan ke bulan",
-      "plan": "Paket",
+      "plan": "Rencana",
       "finalTermEnds": "Periode akhir berakhir",
       "afterFinalTerm": "Setelah periode akhir",
       "remaining": "Tersisa",
@@ -546,7 +546,7 @@
       "iosTitle": "KiloClaw tidak tersedia di iOS",
       "multipleCurrentConflictBody": "Kami menemukan lebih dari satu langganan aktif di akun Anda, jadi kami menjeda semuanya untuk menghindari penagihan ganda.",
       "multipleCurrentConflictCta": "Lanjutkan di kilo.ai",
-      "multipleCurrentConflictTitle": "Akun perlu ditinjau",
+      "multipleCurrentConflictTitle": "Akun perlu peninjauan",
       "nonCanonicalEarlybirdBody": "Paket akses awal Anda perlu ditinjau manual sebelum dapat digunakan di seluler.",
       "nonCanonicalEarlybirdCta": "Lanjutkan di kilo.ai",
       "nonCanonicalEarlybirdTitle": "Paket lama terdeteksi",
@@ -644,7 +644,7 @@
         "openKiloAi": "Buka kilo.ai",
         "provisioning": "Penyediaan",
         "ready": "Siap",
-        "review": "Tinjau",
+        "review": "Tinjauan",
         "settingUp": "Menyiapkan…",
         "somethingWentWrong": "Terjadi kesalahan"
       },
@@ -1378,7 +1378,7 @@
       "couldNotLoad": "Tidak dapat memuat organisasi",
       "personal": "Pribadi",
       "personalSubtitle": "Repositori Anda sendiri",
-      "title": "Security Agent"
+      "title": "Agen Keamanan"
     },
     "settingsOverview": {
       "allRepositories": "Semua repositori",
@@ -1403,7 +1403,7 @@
       "repositoriesCount": "{{displayCount}} repositori dipilih",
       "repositoriesCount_other": "{{displayCount}} repositori dipilih",
       "repositoriesCount_one": "{{displayCount}} repositori dipilih",
-      "securityAgent": "Security Agent",
+      "securityAgent": "Agen Keamanan",
       "selectRepositories": "Pilih repositori",
       "selectRepositoriesSubtitle": "Pilih repositori yang dipantau Security Agent",
       "slaPolicy": "Kebijakan SLA",
@@ -1438,7 +1438,7 @@
       "remediationDeadlineA11y": "Tenggat remediasi {{label}} dalam hari",
       "title": "Kebijakan SLA"
     },
-    "title": "Security Agent",
+    "title": "Agen Keamanan",
     "initialSyncAdmissionFailed": "Security Agent telah diaktifkan, tetapi sinkronisasi awal tidak dapat diantrekan. Sinkronkan lagi.",
     "queuedActionUntracked": "Tindakan yang diantrekan tidak dapat dilacak lagi. Muat ulang untuk melihat status terbaru.",
     "commands": {
@@ -1675,7 +1675,7 @@
     },
     "remoteSession": {
       "failedToCreate": "Gagal membuat sesi jarak jauh",
-      "exited": "Sesi keluar",
+      "exited": "Sesi berakhir",
       "failedToExit": "Gagal keluar dari sesi",
       "exitTitle": "Keluar dari sesi?",
       "exitMessage": "Ini menghentikan sesi yang berjalan tetapi menyimpan riwayatnya.",
@@ -1969,7 +1969,7 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Coba lagi tersedia.",
       "copyToComposer": "Salin ke komposer",
-      "queued": "Antre",
+      "queued": "Diantrekan",
       "queuedAccessibility": "Pesan dalam antrean",
       "userMessage": "Pesan pengguna",
       "assistantMessage": "Pesan asisten",
@@ -2063,7 +2063,7 @@
     },
     "attachmentPicker": {
       "camera": "Kamera",
-      "photoLibrary": "Perpustakaan Foto",
+      "photoLibrary": "Galeri foto",
       "files": "File",
       "cameraAccessDisabled": "Akses Kamera Dinonaktifkan",
       "cameraAccessMessage": "Izinkan akses kamera di Pengaturan untuk mengambil foto.",
@@ -2161,7 +2161,7 @@
       "open": "pull request terbuka",
       "closed": "pull request tertutup",
       "merged": "pull request tergabung",
-      "draft": "pull request draf",
+      "draft": "Draf pull request",
       "updating": "Memperbarui, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2267,7 +2267,7 @@
     "optionsExpiredDescription": "Kembali dan buka ulang pemilih ini dari layar sebelumnya."
   },
   "sessionRow": {
-    "needsInput": "PERLU MASUKAN"
+    "needsInput": "memerlukan input"
   },
   "voiceInput": {
     "listening": "Mendengarkan...",
@@ -2747,7 +2747,7 @@
       "mergePullRequest": "Gabungkan pull request",
       "methodLabel": "Metode",
       "methods": {
-        "merge": "Merge",
+        "merge": "Gabung",
         "rebase": "Rebase",
         "squash": "Squash"
       },
@@ -2971,7 +2971,7 @@
         "void": "Batal",
         "draft": "Draf",
         "uncollectible": "Tidak tertagih",
-        "unknown": "Tidak dikenal"
+        "unknown": "Tidak diketahui"
       }
     },
     "lowBalanceAlert": {
@@ -3089,12 +3089,12 @@
     "invalidRequest": "Periksa alamat email Anda dan coba lagi.",
     "emailDeliveryFailed": "Pengiriman email untuk sementara tidak tersedia. Silakan coba lagi nanti.",
     "admissionRequired": "Perangkat Anda tidak dapat diverifikasi. Gunakan '$t(login.moreSignInOptions)' untuk masuk di perangkat lain atau melalui web.",
-    "default": "Terjadi kesalahan. Silakan coba lagi.",
+    "default": "Terjadi kesalahan. Coba lagi.",
     "retryableAdmission": "Kami tidak dapat memverifikasi perangkat ini. Periksa koneksi Anda dan coba lagi.",
     "startSignInFailed": "Gagal memulai proses masuk. Silakan coba lagi.",
     "couldNotOpenBrowser": "Tidak dapat membuka browser. Silakan coba lagi.",
     "signInTimedOut": "Proses masuk habis waktu. Silakan coba lagi.",
-    "signInFailed": "Gagal masuk. Silakan coba lagi.",
+    "signInFailed": "Masuk gagal. Silakan coba lagi.",
     "networkError": "Kesalahan jaringan. Silakan coba lagi.",
     "accessDeniedByUser": "Akses ditolak oleh pengguna",
     "codeExpired": "Kode kedaluwarsa",

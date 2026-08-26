@@ -574,7 +574,7 @@
       "start": "Uruchom",
       "startMessage": "Czy na pewno chcesz uruchomić tę instancję?",
       "startTitle": "Uruchom instancję",
-      "starting": "Uruchamianie…",
+      "starting": "Rozpoczynanie…",
       "stop": "Zatrzymaj",
       "stopMessage": "Czy na pewno chcesz zatrzymać tę instancję?",
       "stopTitle": "Zatrzymaj instancję",
@@ -613,7 +613,7 @@
         "subscriptionCanceled": "Subskrypcja nieaktywna, wznowij subskrypcję, aby nadal korzystać z tej instancji",
         "subscriptionPastDue": "Problem z płatnością, zaktualizuj dane rozliczeniowe, aby nadal korzystać z tej instancji",
         "quarantined": "Instancja w kwarantannie, wymaga ręcznej weryfikacji",
-        "multipleCurrentConflict": "Konto wymaga weryfikacji",
+        "multipleCurrentConflict": "Konto wymaga przeglądu",
         "nonCanonicalEarlybird": "Plan legacy wymaga weryfikacji"
       }
     },
@@ -722,9 +722,9 @@
       "destroying": "NISZCZENIE",
       "provisioned": "PRZYGOTOWANA",
       "restarting": "PONOWNE URUCHAMIANIE",
-      "running": "DZIAŁA",
+      "running": "W toku",
       "shuttingDown": "ZAMYKANIE",
-      "starting": "URUCHAMIANIE",
+      "starting": "Rozpoczynanie",
       "stopped": "ZATRZYMANA",
       "stopping": "ZATRZYMYWANIE",
       "unknown": "NIEZNANY",
@@ -880,7 +880,7 @@
       "created": "Utworzono",
       "decision": "Decyzja",
       "details": "Szczegóły",
-      "findings": "Znaleziska",
+      "findings": "Ustalenia",
       "gate": "Bramka",
       "gateHidden": "Ukryta",
       "gateNone": "Brak",
@@ -933,7 +933,7 @@
     },
     "selectRepositories": "Wybierz repozytoria",
     "selectRepository": "Wybierz co najmniej jedno repozytorium, aby włączyć automatyczne przeglądy.",
-    "title": "Code Reviewer",
+    "title": "Recenzent kodu",
     "webhookSetup": "Konfiguracja webhooka niekompletna",
     "webhookSetupDescription": "Niektóre repozytoria mogą nie otrzymywać automatycznych przeglądów.",
     "decision": {
@@ -942,7 +942,7 @@
       "noResult": "Brak wyniku",
       "pass": "Zaliczono"
     },
-    "eyebrow": "Code Reviewer",
+    "eyebrow": "Recenzent kodu",
     "overview": {
       "allAreas": "Wszystkie obszary",
       "allRepositories": "Wszystkie repozytoria",
@@ -986,7 +986,7 @@
       "off": "Wyłączone",
       "all": "Wszystkie",
       "warning": "Ostrzeżenia",
-      "critical": "Krytyczne"
+      "critical": "Krytyczna"
     },
     "actionRequired": {
       "githubInstallationRequired": {
@@ -1381,10 +1381,10 @@
       "setupFailed": "Nie udało się rozpocząć konfiguracji GitHub. Spróbuj ponownie."
     },
     "scopeList": {
-      "couldNotLoad": "Nie można załadować organizacji",
+      "couldNotLoad": "Nie udało się załadować organizacji",
       "personal": "Osobiste",
       "personalSubtitle": "Twoje własne repozytoria",
-      "title": "Security Agent"
+      "title": "Agent bezpieczeństwa"
     },
     "settingsOverview": {
       "allRepositories": "Wszystkie repozytoria",
@@ -1403,13 +1403,13 @@
       "modelsAndAnalysis": "Modele i analiza",
       "notifications": "Powiadomienia",
       "notificationsCount": "Włączono {{displayCount}} z 2",
-      "off": "Wył.",
+      "off": "Wyłączone",
       "on": "Wł.",
       "repositories": "Repozytoria",
       "repositoriesCount": "Wybrano {{displayCount}} repozytoriów",
       "repositoriesCount_other": "Wybrano {{displayCount}} repozytoriów",
       "repositoriesCount_one": "Wybrano {{displayCount}} repozytorium",
-      "securityAgent": "Security Agent",
+      "securityAgent": "Agent bezpieczeństwa",
       "selectRepositories": "Wybierz repozytoria",
       "selectRepositoriesSubtitle": "Wybierz, które repozytoria monitoruje Security Agent",
       "slaPolicy": "Polityka SLA",
@@ -1446,7 +1446,7 @@
       "remediationDeadlineA11y": "Termin naprawy dla {{label}} w dniach",
       "title": "Polityka SLA"
     },
-    "title": "Security Agent",
+    "title": "Agent bezpieczeństwa",
     "initialSyncAdmissionFailed": "Security Agent został włączony, ale nie udało się dodać początkowej synchronizacji do kolejki. Synchronizuj ponownie.",
     "queuedActionUntracked": "Nie można już śledzić akcji w kolejce. Odśwież, aby zobaczyć najnowszy stan.",
     "commands": {
@@ -2025,7 +2025,7 @@
       "title": "Filtruj sesje",
       "sortBy": "Sortuj według",
       "sortLastUpdated": "Ostatnio zaktualizowane",
-      "sortCreated": "Utworzone",
+      "sortCreated": "Utworzono",
       "platform": "Platforma",
       "platformCloud": "Chmura",
       "platformExtension": "Rozszerzenie",
@@ -2187,7 +2187,7 @@
       "open": "otwarty pull request",
       "closed": "zamknięty pull request",
       "merged": "scalony pull request",
-      "draft": "szkic pull requesta",
+      "draft": "Pull request w wersji roboczej",
       "updating": "Aktualizowanie, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2209,7 +2209,7 @@
     "billingPage": "strona rozliczeń"
   },
   "deviceSessions": {
-    "couldNotLoad": "Nie można załadować sesji",
+    "couldNotLoad": "Nie udało się załadować sesji",
     "couldNotLoadDescription": "Twoje aktywne sesje będą niedostępne, dopóki to się nie załaduje.",
     "currentDeviceUnidentified": "Nie można zidentyfikować bieżącego urządzenia",
     "noSessions": "Brak aktywnych sesji",
@@ -2293,7 +2293,7 @@
     "optionsExpiredDescription": "Wróć i otwórz ponownie ten wybór z poprzedniego ekranu."
   },
   "sessionRow": {
-    "needsInput": "WYMAGA DANYCH WEJŚCIOWYCH"
+    "needsInput": "wymaga danych"
   },
   "voiceInput": {
     "listening": "Słuchanie...",
@@ -2652,12 +2652,12 @@
       "removeFromRecentsMessage": "Ten pull request zostanie usunięty z ostatnich.",
       "removeFromRecentsTitle": "Usunąć z ostatnich?",
       "removeRecentAccessibility": "Usuń {{repo}} z ostatnich",
-      "title": "Przegląd PR",
+      "title": "Recenzja PR",
       "urlAccessibility": "Adres URL pull requesta GitHub"
     },
     "eventChips": {
       "approve": "Zatwierdź",
-      "comment": "Skomentuj",
+      "comment": "Komentarz",
       "label": "Zdarzenie przeglądu",
       "requestChanges": "Poproś o zmiany"
     },
@@ -2878,7 +2878,7 @@
       "shareA11y": "Udostępnij pull request",
       "title": "#{{number}}"
     },
-    "screenTitle": "Przegląd PR",
+    "screenTitle": "Recenzja PR",
     "sideBySide": {
       "emptyDiffColumn": "pusta kolumna diffa",
       "emptyDiffRow": "Pusty wiersz diffa",
@@ -2981,7 +2981,7 @@
     "hub": {
       "balance": "Saldo",
       "lowBalanceBelow": "Poniżej {{amount}}",
-      "lowBalanceOff": "Wył.",
+      "lowBalanceOff": "Wyłączone",
       "organizationSeats": "Miejsca w organizacji",
       "renamePlaceholder": "Wpisz nazwę organizacji",
       "renameTitle": "Zmień nazwę organizacji",
@@ -3009,7 +3009,7 @@
         "paid": "Opłacono",
         "open": "Otwarta",
         "void": "Unieważniona",
-        "draft": "Wersja robocza",
+        "draft": "Szkic",
         "uncollectible": "Nieściągalna",
         "unknown": "Nieznana"
       }
@@ -3086,7 +3086,7 @@
       "ended": "Zakończono",
       "endsOn": "Kończy się {{date}}",
       "loading": "Ładowanie…",
-      "manageHint": "Otwiera zarządzanie Kilo Pass w sieci.",
+      "manageHint": "Otwiera zarządzanie Kilo Pass w internecie.",
       "notSubscribed": "Brak subskrypcji",
       "overallocated": "Przydziały Pass przekraczają opłacone miejsca",
       "paidSeat_one": "{{displayCount}} opłacone miejsce",

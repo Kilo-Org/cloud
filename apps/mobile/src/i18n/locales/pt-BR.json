@@ -566,7 +566,7 @@
       "stopping": "Parando…"
     },
     "empty": {
-      "finishingSetup": "Concluindo configuração",
+      "finishingSetup": "Concluindo a configuração",
       "finishingSetupDescription": "Aguarde, estamos finalizando sua conta. Isso geralmente leva um instante.",
       "getStarted": "Começar",
       "noInstances": "Nenhuma instância do KiloClaw",
@@ -706,7 +706,7 @@
       "destroying": "DESTRUINDO",
       "provisioned": "PROVISIONADO",
       "restarting": "REINICIANDO",
-      "running": "EXECUTANDO",
+      "running": "Em execução",
       "shuttingDown": "DESLIGANDO",
       "starting": "INICIANDO",
       "stopped": "PARADO",
@@ -921,7 +921,7 @@
     "webhookSetup": "Configuração de webhook incompleta",
     "webhookSetupDescription": "Alguns repositórios podem não receber revisões automáticas.",
     "decision": {
-      "block": "Bloqueado",
+      "block": "Bloquear",
       "noDecision": "Sem decisão",
       "noResult": "Sem resultado",
       "pass": "Aprovado"
@@ -1087,7 +1087,7 @@
       "checkConnection": "Verifique sua conexão e tente novamente.",
       "couldNotLoad": "Não foi possível carregar o relatório de auditoria",
       "events": "Eventos",
-      "findings": "Descobertas",
+      "findings": "Achados",
       "generated": "Gerado em {{generatedAt}}",
       "noActivity": "Nenhuma atividade registrada",
       "noActivityDescription": "O Kilo não tem atividade de descobertas de segurança reportável de {{start}} a {{end}}.",
@@ -1151,7 +1151,7 @@
       "daysOverdue": "{{displayCount}} dias em atraso",
       "deadlineToday": "Prazo vence hoje",
       "filterByRepository": "Filtrar por repositório",
-      "findings": "Descobertas",
+      "findings": "Achados",
       "findingsCount": "{{displayCount}} descobertas",
       "highOverdue": "Alto em atraso",
       "lastSynced": "Última sincronização em {{time}}",
@@ -1271,7 +1271,7 @@
       "emptyTitle": "Nenhuma descoberta aberta",
       "noMatchesDescription": "Tente ajustar ou limpar os filtros selecionados.",
       "noMatchesTitle": "Nenhuma descoberta corresponde aos filtros",
-      "title": "Descobertas"
+      "title": "Achados"
     },
     "findingRow": {
       "a11y": "Descoberta de gravidade {{severity}}: {{title}}. {{repo}}. {{analysis}}",
@@ -1315,7 +1315,7 @@
       "cancellationRequested": "Cancelamento solicitado",
       "cancelled": "Remediação cancelada",
       "couldNotLoad": "Não foi possível carregar o status da remediação",
-      "keepRunning": "Continuar executando",
+      "keepRunning": "Manter em execução",
       "model": "Modelo",
       "noAnalysisDescription": "Execute uma na aba Detalhes",
       "noAnalysisTitle": "Nenhuma análise ainda",
@@ -1547,7 +1547,7 @@
       "includeExistingDisabled": "As descobertas existentes são excluídas da remediação automática.",
       "belowThreshold": "A descoberta está abaixo do limite de gravidade automático. A remediação manual ainda pode ser iniciada quando as verificações de segurança passarem.",
       "beforeEnablement": "A análise foi concluída antes da ativação da remediação automática. A remediação manual ainda pode ser iniciada quando as verificações de segurança passarem.",
-      "generic": "A remediação está indisponível para esta descoberta."
+      "generic": "A remediação não está disponível para este achado."
     },
     "commandFailure": {
       "ownerCapReached": "A capacidade de análise está cheia. Aguarde uma análise ativa terminar e tente novamente.",
@@ -2226,7 +2226,7 @@
   "home": {
     "couldNotLoadSessions": "Não foi possível carregar as sessões",
     "couldNotLoadActiveSessions": "Não foi possível carregar as sessões ativas",
-    "agentSessions": "Sessões de agentes",
+    "agentSessions": "Sessões do agente",
     "showingSavedSessions": "Mostrando sessões salvas — o status ao vivo pode estar desatualizado",
     "startNewAgentSession": "Iniciar uma nova sessão do Kilo Agent",
     "aiCodingSessions": "Sessões de codificação com IA",
@@ -2642,7 +2642,7 @@
     },
     "eventChips": {
       "approve": "Aprovar",
-      "comment": "Comentar",
+      "comment": "Comentário",
       "label": "Evento da revisão",
       "requestChanges": "Solicitar alterações"
     },
@@ -2972,7 +2972,7 @@
       "emailLabel": "E-mail",
       "emailPlaceholder": "nome@empresa.com",
       "permissionDenied": "Você não tem permissão para convidar membros.",
-      "roleLabel": "Função",
+      "roleLabel": "Papel",
       "roleMember": "Função: Membro",
       "sendInvite": "Enviar convite",
       "title": "Convidar membro"
@@ -2987,7 +2987,7 @@
       "sharingUnavailable": "O compartilhamento não está disponível neste dispositivo.",
       "status": {
         "paid": "Pago",
-        "open": "Em aberto",
+        "open": "Aberto",
         "void": "Cancelada",
         "draft": "Rascunho",
         "uncollectible": "Incobrável",

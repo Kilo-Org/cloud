@@ -205,7 +205,7 @@
   },
   "tabs": {
     "home": "Home",
-    "agents": "Agenten",
+    "agents": "Agents",
     "profile": "Profiel",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -365,7 +365,7 @@
     "billing": {
       "title": "Facturering",
       "continueMonthToMonth": "Maandelijks doorgaan",
-      "plan": "Abonnement",
+      "plan": "Plan",
       "finalTermEnds": "Laatste termijn eindigt",
       "afterFinalTerm": "Na de laatste termijn",
       "remaining": "Resterend",
@@ -609,7 +609,7 @@
         "subscriptionCanceled": "Abonnement inactief, abonneer je opnieuw om dit exemplaar te blijven gebruiken",
         "subscriptionPastDue": "Betalingsprobleem, werk je factuurgegevens bij om dit exemplaar te blijven gebruiken",
         "quarantined": "Exemplaar in quarantaine, handmatige controle nodig",
-        "multipleCurrentConflict": "Account heeft controle nodig",
+        "multipleCurrentConflict": "Account moet worden beoordeeld",
         "nonCanonicalEarlybird": "Oud plan heeft controle nodig"
       }
     },
@@ -644,7 +644,7 @@
         "openKiloAi": "kilo.ai openen",
         "provisioning": "Inrichten",
         "ready": "Klaar",
-        "review": "Beoordeling",
+        "review": "Review",
         "settingUp": "Instellen…",
         "somethingWentWrong": "Er is iets misgegaan"
       },
@@ -718,7 +718,7 @@
       "destroying": "VERNIETIGEN",
       "provisioned": "INGERICHT",
       "restarting": "HERSTARTEN",
-      "running": "ACTIEF",
+      "running": "Bezig",
       "shuttingDown": "AFSLUITEN",
       "starting": "STARTEN",
       "stopped": "GESTOPT",
@@ -793,7 +793,7 @@
       "allRepositories": "Alle repositories",
       "bitbucketNoRepositoriesDescription": "Er zijn geen repositories beschikbaar in deze Bitbucket-werkruimte.",
       "bitbucketSetup": "Bitbucket-instellingen",
-      "couldNotOpenGithubSettings": "Instellingen van de GitHub-app konden niet worden geopend",
+      "couldNotOpenGithubSettings": "Kon de instellingen van de GitHub-app niet openen",
       "gitlabNoRepositoriesDescription": "Je moet mogelijk toegang verlenen tot meer groepen of projecten op GitLab.",
       "installGithubApp": "Installeer de GitHub-app op repositories",
       "installGithubAppDescription": "Geef de Kilo GitHub-app toegang tot de repositories die je wilt laten beoordelen.",
@@ -1085,7 +1085,7 @@
     "analysisSettings": {
       "analysisModel": "Analysemodel",
       "couldNotLoad": "Analyse-instellingen konden niet worden geladen",
-      "couldNotLoadModels": "Modellen konden niet worden geladen",
+      "couldNotLoadModels": "Kon modellen niet laden",
       "depth": "Analysediepte",
       "modeAuto": "Auto",
       "modeDeep": "Diep",
@@ -1352,8 +1352,8 @@
     "repositories": {
       "allRepositories": "Alle repositories",
       "couldNotLoad": "Repository-instellingen konden niet worden geladen",
-      "couldNotLoadRepositories": "Repositories konden niet worden geladen",
-      "couldNotOpenGithubSettings": "Instellingen van de GitHub-app konden niet worden geopend",
+      "couldNotLoadRepositories": "Kon repositories niet laden",
+      "couldNotOpenGithubSettings": "Kon de instellingen van de GitHub-app niet openen",
       "githubAppSettings": "Instellingen van de GitHub-app",
       "manageAccess": "Toegang tot de GitHub-app beheren",
       "noRepositories": "Geen repositories",
@@ -1375,7 +1375,7 @@
       "setupFailed": "GitHub-installatie kon niet worden gestart. Probeer het opnieuw."
     },
     "scopeList": {
-      "couldNotLoad": "Organisaties konden niet worden geladen",
+      "couldNotLoad": "Kon organisaties niet laden",
       "personal": "Persoonlijk",
       "personalSubtitle": "Je eigen repositories",
       "title": "Security Agent"
@@ -1387,7 +1387,7 @@
       "automationAllOff": "Alles uit",
       "automationCount": "{{displayCount}} van 3 ingeschakeld",
       "couldNotLoadPermissions": "Rechten konden niet worden geladen",
-      "couldNotLoadRepositories": "Repositories konden niet worden geladen",
+      "couldNotLoadRepositories": "Kon repositories niet laden",
       "couldNotLoadSettings": "Instellingen van Security Agent konden niet worden geladen",
       "disabled": "Uitgeschakeld",
       "disabledNoManage": "Security Agent is uitgeschakeld. Alleen organisatie-eigenaren en factureringsbeheerders kunnen deze inschakelen.",
@@ -1570,8 +1570,8 @@
       "generic": "De actie in de wachtrij is mislukt. Probeer de actie opnieuw."
     },
     "analysisMode": {
-      "auto": "Automatisch",
-      "shallow": "Oppervlakkig",
+      "auto": "Auto",
+      "shallow": "Ondiep",
       "deep": "Diep"
     }
   },
@@ -2183,7 +2183,7 @@
     "billingPage": "factureringspagina"
   },
   "deviceSessions": {
-    "couldNotLoad": "Sessies konden niet worden geladen",
+    "couldNotLoad": "Kon sessies niet laden",
     "couldNotLoadDescription": "Je actieve sessies zijn niet beschikbaar tot dit is geladen.",
     "currentDeviceUnidentified": "Huidig apparaat kon niet worden geïdentificeerd",
     "noSessions": "Geen actieve sessies",
@@ -2267,7 +2267,7 @@
     "optionsExpiredDescription": "Ga terug en open deze kiezer opnieuw vanaf het vorige scherm."
   },
   "sessionRow": {
-    "needsInput": "INVOER VEREIST"
+    "needsInput": "heeft invoer nodig"
   },
   "voiceInput": {
     "listening": "Luisteren...",
@@ -2563,7 +2563,7 @@
       "reaction_other": "reacties",
       "reaction_one": "reactie",
       "reactionsTitle": "Reacties",
-      "reply": "Reageren",
+      "reply": "Beantwoorden",
       "replyBadRequest": "Deze reactie kan niet worden geplaatst. De thread is mogelijk gewijzigd.",
       "replyBody": "Reactietekst",
       "replyForbidden": "Je hebt geen toestemming om op deze pull-aanvraag te reageren.",

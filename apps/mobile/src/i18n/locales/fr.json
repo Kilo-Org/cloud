@@ -533,7 +533,7 @@
       "iosTitle": "KiloClaw indisponible sur iOS",
       "multipleCurrentConflictBody": "Nous avons trouvé plusieurs abonnements actifs sur votre compte. Nous avons donc tout mis en pause pour éviter une double facturation.",
       "multipleCurrentConflictCta": "Continuer sur kilo.ai",
-      "multipleCurrentConflictTitle": "Le compte doit être vérifié",
+      "multipleCurrentConflictTitle": "Compte nécessite un examen",
       "nonCanonicalEarlybirdBody": "Votre forfait d'accès anticipé nécessite une vérification manuelle avant de pouvoir être utilisé sur mobile.",
       "nonCanonicalEarlybirdCta": "Continuer sur kilo.ai",
       "nonCanonicalEarlybirdTitle": "Ancien forfait détecté",
@@ -632,7 +632,7 @@
         "openKiloAi": "Ouvrir kilo.ai",
         "provisioning": "Provisionnement",
         "ready": "Prêt",
-        "review": "Vérification",
+        "review": "Revue",
         "settingUp": "Configuration…",
         "somethingWentWrong": "Une erreur s'est produite"
       },
@@ -864,7 +864,7 @@
       "created": "Créé",
       "decision": "Décision",
       "details": "Détails",
-      "findings": "Signalements",
+      "findings": "Résultats",
       "gate": "Porte",
       "gateHidden": "Masqué",
       "gateNone": "Aucun",
@@ -1015,7 +1015,7 @@
       "allRepositories": "Tous les dépôts",
       "fixed": "Corrigé",
       "outcome": "Résultat",
-      "outcomeAnalyzing": "En cours d'analyse",
+      "outcomeAnalyzing": "Analyse en cours",
       "outcomeDismissed": "Ignoré",
       "outcomeExploitable": "Exploitable",
       "outcomeFailed": "Analyse échouée",
@@ -1037,7 +1037,7 @@
       "sortSeverityAsc": "Gravité : faible à haute",
       "sortSeverityDesc": "Gravité : haute à faible",
       "sortSlaDue": "Échéance SLA",
-      "status": "État",
+      "status": "Statut",
       "statusClosed": "Fermé",
       "statusIgnored": "Ignoré",
       "statusOpen": "Ouvert"
@@ -1547,7 +1547,7 @@
       "includeExistingDisabled": "Les résultats existants sont exclus de la remédiation automatique.",
       "belowThreshold": "Le résultat est sous le seuil de gravité automatique. La remédiation manuelle peut toujours démarrer lorsque les contrôles de sécurité passent.",
       "beforeEnablement": "L'analyse a été réalisée avant l'activation de la remédiation automatique. La remédiation manuelle peut toujours démarrer lorsque les contrôles de sécurité passent.",
-      "generic": "La remédiation n'est pas disponible pour ce résultat."
+      "generic": "La remédiation n'est pas disponible pour cette découverte."
     },
     "commandFailure": {
       "ownerCapReached": "La capacité d'analyse est pleine. Attendez qu'une analyse active se termine, puis réessayez.",
@@ -1996,7 +1996,7 @@
       "photoLibrary": "Photothèque",
       "files": "Fichiers",
       "cameraAccessDisabled": "Accès à l'appareil photo désactivé",
-      "cameraAccessMessage": "Autorisez l'accès à l'appareil photo dans les Réglages pour prendre une photo.",
+      "cameraAccessMessage": "Autorisez l'accès à l'appareil photo dans Réglages pour prendre une photo.",
       "couldNotOpenPhotoPicker": "Impossible d'ouvrir le sélecteur de photos. Redémarrez Kilo et réessayez.",
       "maxFilesAllowed": "Maximum {{displayCount}} fichiers autorisés",
       "onlyAddingFiles": "Ajout de {{accepted}} fichiers sur {{total}} uniquement (max {{max}})"
@@ -2158,7 +2158,7 @@
   "home": {
     "couldNotLoadSessions": "Impossible de charger les sessions",
     "couldNotLoadActiveSessions": "Impossible de charger les sessions actives",
-    "agentSessions": "Sessions d'agents",
+    "agentSessions": "Sessions de l’agent",
     "showingSavedSessions": "Affichage des sessions enregistrées — le statut en direct peut être obsolète",
     "startNewAgentSession": "Démarrer une nouvelle session Kilo Agent",
     "aiCodingSessions": "Sessions de codage IA",
@@ -3110,7 +3110,7 @@
     "invalidRequest": "Vérifiez votre adresse e-mail et réessayez.",
     "emailDeliveryFailed": "La livraison des e-mails est temporairement indisponible. Veuillez réessayer plus tard.",
     "admissionRequired": "Impossible de vérifier votre appareil. Utilisez « $t(login.moreSignInOptions) » pour vous connecter sur un autre appareil ou via le web.",
-    "default": "Une erreur est survenue. Veuillez réessayer.",
+    "default": "Une erreur s'est produite. Veuillez réessayer.",
     "retryableAdmission": "Nous n'avons pas pu vérifier cet appareil. Vérifiez votre connexion et réessayez.",
     "startSignInFailed": "Échec du démarrage de la connexion. Veuillez réessayer.",
     "couldNotOpenBrowser": "Impossible d'ouvrir le navigateur. Veuillez réessayer.",

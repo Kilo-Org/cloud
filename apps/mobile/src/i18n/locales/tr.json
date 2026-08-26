@@ -180,7 +180,7 @@
     "previewFullDescription": "Bildirimler kilit ekranınızda mesaj metnini gösterir.",
     "previewGenericDescription": "Bildirimler bir şey olduğunu gösterir. Okumak için Kilo'yu açın.",
     "channel": {
-      "agent": "Aracı oturumları",
+      "agent": "Ajan oturumları",
       "chat": "Sohbet mesajları",
       "kiloclaw": "KiloClaw etkinliği",
       "balance": "Bakiye uyarıları",
@@ -335,7 +335,7 @@
       "photoLibrary": "Fotoğraf arşivi",
       "files": "Dosyalar",
       "cameraAccessDisabled": "Kamera Erişimi Devre Dışı",
-      "cameraAccessMessage": "Fotoğraf çekmek için Ayarlar'da kamera erişimine izin ver."
+      "cameraAccessMessage": "Fotoğraf çekmek için Ayarlar'da kamera erişimine izin verin."
     },
     "typingIndicator": {
       "someone": "Biri",
@@ -609,7 +609,7 @@
         "subscriptionCanceled": "Abonelik aktif değil, bu instance'ı kullanmaya devam etmek için yeniden abone olun",
         "subscriptionPastDue": "Ödeme sorunu var, bu instance'ı kullanmaya devam etmek için fatura bilgilerini güncelleyin",
         "quarantined": "Instance karantinaya alındı, manuel inceleme gerekiyor",
-        "multipleCurrentConflict": "Hesap inceleme gerektiriyor",
+        "multipleCurrentConflict": "Hesabın incelenmesi gerekiyor",
         "nonCanonicalEarlybird": "Eski plan inceleme gerektiriyor"
       }
     },
@@ -718,9 +718,9 @@
       "destroying": "YOK EDİLİYOR",
       "provisioned": "SAĞLANDI",
       "restarting": "YENİDEN BAŞLATILIYOR",
-      "running": "ÇALIŞIYOR",
+      "running": "Çalışıyor",
       "shuttingDown": "KAPATILIYOR",
-      "starting": "BAŞLATILIYOR",
+      "starting": "Başlatılıyor",
       "stopped": "DURDURULDU",
       "stopping": "DURDURULUYOR",
       "unknown": "BİLİNMİYOR",
@@ -1149,7 +1149,7 @@
       "title": "Otomasyon"
     },
     "commandRetry": {
-      "discard": "At"
+      "discard": "Vazgeç"
     },
     "dashboard": {
       "actFirst": "Önce harekete geç",
@@ -1378,7 +1378,7 @@
       "couldNotLoad": "Kuruluşlar yüklenemedi",
       "personal": "Kişisel",
       "personalSubtitle": "Kendi depolarınız",
-      "title": "Security Agent"
+      "title": "Güvenlik Ajanı"
     },
     "settingsOverview": {
       "allRepositories": "Tüm depolar",
@@ -1403,7 +1403,7 @@
       "repositoriesCount": "{{displayCount}} depo seçildi",
       "repositoriesCount_other": "{{displayCount}} depo seçildi",
       "repositoriesCount_one": "{{displayCount}} depo seçildi",
-      "securityAgent": "Security Agent",
+      "securityAgent": "Güvenlik Ajanı",
       "selectRepositories": "Depoları seç",
       "selectRepositoriesSubtitle": "Security Agent'ın hangi depoları izleyeceğini seçin",
       "slaPolicy": "SLA ilkesi",
@@ -1438,7 +1438,7 @@
       "remediationDeadlineA11y": "{{label}} iyileştirme son tarihi (gün)",
       "title": "SLA ilkesi"
     },
-    "title": "Security Agent",
+    "title": "Güvenlik Ajanı",
     "initialSyncAdmissionFailed": "Security Agent etkinleştirildi ancak ilk eşitleme kuyruğa alınamadı. Tekrar eşitleyin.",
     "queuedActionUntracked": "Kuyruğa alınmış bir eylem artık izlenemiyor. En son durumu görmek için yenileyin.",
     "commands": {
@@ -1580,7 +1580,7 @@
     "search": {
       "searching": "Aranıyor",
       "searchSessions": "Oturumları ara",
-      "searchSessionsPlaceholder": "Oturum ara...",
+      "searchSessionsPlaceholder": "Oturumları ara...",
       "clearSearch": "Aramayı temizle",
       "clearFilters": "Filtreleri temizle"
     },
@@ -1610,7 +1610,7 @@
       "couldNotCopyId": "Oturum kimliği kopyalanamadı",
       "untitled": "Başlıksız oturum",
       "sessionDeleted": "Oturum silindi",
-      "needsInput": "girdi gerekli",
+      "needsInput": "Girdi gerekli",
       "fromPlatform": "{{platform}} üzerinden",
       "cent_one": "sent",
       "cent": "sent",
@@ -1675,7 +1675,7 @@
     },
     "remoteSession": {
       "failedToCreate": "Uzak oturum oluşturulamadı",
-      "exited": "Oturum sona erdi",
+      "exited": "Oturumdan çıkıldı",
       "failedToExit": "Oturumdan çıkılamadı",
       "exitTitle": "Oturumdan çıkılsın mı?",
       "exitMessage": "Bu, çalışan oturumu durdurur ancak geçmişini korur.",
@@ -1696,7 +1696,7 @@
       "title": "Yeni oturum",
       "repository": "Depo",
       "couldNotLoadRepositories": "Depolar yüklenemedi",
-      "connectGithub": "GitHub'ı bağla",
+      "connectGithub": "GitHub'a bağlan",
       "connectGithubDescription": "Tarayıcınızda GitHub'ı bağlayın, ardından bir depo seçmek için buraya dönün.",
       "openGithub": "GitHub'ı aç",
       "refreshRepositories": "Depoları yenile",
@@ -2161,10 +2161,10 @@
       "open": "açık pull request",
       "closed": "kapalı pull request",
       "merged": "birleştirilmiş pull request",
-      "draft": "taslak pull request",
+      "draft": "Taslak çekme isteği",
       "updating": "Güncelleniyor, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "pull request"
+      "externalLinkLabel": "çekme isteği"
     }
   },
   "bootstrap": {
@@ -2267,7 +2267,7 @@
     "optionsExpiredDescription": "Geri dönün ve bu seçiciyi önceki ekrandan yeniden açın."
   },
   "sessionRow": {
-    "needsInput": "GİRİŞ GEREKLİ"
+    "needsInput": "Girdi gerekli"
   },
   "voiceInput": {
     "listening": "Dinleniyor...",
@@ -2569,7 +2569,7 @@
       "replyForbidden": "Bu çekme isteğine yanıt verme izniniz yok.",
       "replyPlaceholder": "Yanıtla…",
       "reportContent": "İçeriği bildir",
-      "reportSubmitted": "Bildirim gönderildi. Kayıt numarası {{receiptId}}",
+      "reportSubmitted": "Bildirim gönderildi. Makbuz {{receiptId}}",
       "reportUser": "Kullanıcıyı bildir",
       "resolveThread": "Konuyu çöz",
       "resolved": "Çözüldü",
@@ -2642,7 +2642,7 @@
       "unified": "Birleşik"
     },
     "fileNavigator": {
-      "checkConnection": "Bağlantınızı kontrol edin ve tekrar deneyin.",
+      "checkConnection": "Bağlantınızı kontrol edip tekrar deneyin.",
       "couldNotLoadFiles": "Dosyalar yüklenemedi",
       "couldNotLoadMoreFiles": "Daha fazla dosya yüklenemedi",
       "diffTooLarge": "diff çok büyük",
@@ -3044,9 +3044,9 @@
       "couldNotLoadStatus": "Durum yüklenemedi",
       "creditProcessingDelayed": "Kredi işleme gecikti · otomatik olarak yeniden deneniyor",
       "ended": "Sona erdi",
-      "endsOn": "{{date}} tarihinde sona eriyor",
+      "endsOn": "Bitiş: {{date}}",
       "loading": "Yükleniyor…",
-      "manageHint": "Web'de Kilo Pass yönetimini açar.",
+      "manageHint": "Kilo Pass yönetimini web'de açar.",
       "notSubscribed": "Abone değil",
       "overallocated": "Pass atamaları ödenen koltuk sayısını aşıyor",
       "paidSeat_one": "{{displayCount}} ödenen koltuk",

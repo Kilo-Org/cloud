@@ -323,7 +323,7 @@
       "addReactionFailed": "प्रतिक्रिया जोड़ने में विफल",
       "retrySend": "फिर से भेजें",
       "moreReactions": "और प्रतिक्रियाएँ",
-      "reply": "जवाब दें",
+      "reply": "उत्तर दें",
       "edit": "संपादित करें",
       "sendFailed": "संदेश भेजने में विफल",
       "retrySendFailed": "फिर से भेजने में विफल",
@@ -376,7 +376,7 @@
       "managedByAdmin": "बिलिंग आपके संगठन के एडमिन द्वारा प्रबंधित है।",
       "couldNotLoad": "बिलिंग जानकारी लोड नहीं हो सकी",
       "manageOnWeb": "वेब पर बिलिंग प्रबंधित करें",
-      "commitPlan": "Commit",
+      "commitPlan": "कमिट",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "आपकी अंतिम Commit अवधि {{date}} को समाप्त हो रही है. {{price}} पर Standard के रूप में जारी रखें, अन्यथा होस्टिंग समाप्त हो जाएगी.",
       "freeTrial": "मुफ़्त परीक्षण",
@@ -394,7 +394,7 @@
       "trialDaysRemaining": "परीक्षण: {{remaining}} शेष",
       "trialEndingSoon": "परीक्षण जल्द समाप्त हो रहा है: {{remaining}}",
       "planName": {
-        "commit": "Commit",
+        "commit": "कमिट",
         "standard": "Standard"
       }
     },
@@ -419,7 +419,7 @@
       "destroyMessage": "यह आपके KiloClaw इंस्टेंस और उसके सभी डेटा को स्थायी रूप से नष्ट कर देगा. इस क्रिया को पूर्ववत नहीं किया जा सकता.",
       "destroyTitle": "इंस्टेंस नष्ट करें",
       "instance": "इंस्टेंस",
-      "renameFailed": "कुछ गलत हो गया",
+      "renameFailed": "कुछ गड़बड़ हो गई",
       "couldNotCheckStatus": "सेवा स्थिति जाँची नहीं जा सकी",
       "dangerZone": "खतरा क्षेत्र",
       "destroying": "नष्ट हो रहा है…",
@@ -546,7 +546,7 @@
       "iosTitle": "KiloClaw iOS में अनुपलब्ध",
       "multipleCurrentConflictBody": "हमें आपके खाते पर एक से अधिक सक्रिय सदस्यताएँ मिलीं, इसलिए आपसे दोहरा शुल्क लेने से बचने के लिए हमने चीज़ें रोक दी हैं।",
       "multipleCurrentConflictCta": "kilo.ai पर जारी रखें",
-      "multipleCurrentConflictTitle": "खाते की समीक्षा आवश्यक",
+      "multipleCurrentConflictTitle": "खाते की समीक्षा आवश्यक है",
       "nonCanonicalEarlybirdBody": "मोबाइल पर उपयोग से पहले आपके अर्ली-एक्सेस प्लान की मैन्युअल समीक्षा आवश्यक है।",
       "nonCanonicalEarlybirdCta": "kilo.ai पर जारी रखें",
       "nonCanonicalEarlybirdTitle": "पुराना प्लान पाया गया",
@@ -958,7 +958,7 @@
     "status": {
       "pending": "लंबित",
       "queued": "कतार में",
-      "running": "चल रहा है",
+      "running": "चालू",
       "completed": "पूर्ण",
       "failed": "विफल",
       "cancelled": "रद्द किया गया",
@@ -1149,7 +1149,7 @@
       "title": "ऑटोमेशन"
     },
     "commandRetry": {
-      "discard": "छोड़ें"
+      "discard": "ख़ारिज करें"
     },
     "dashboard": {
       "actFirst": "पहले कार्रवाई करें",
@@ -1353,7 +1353,7 @@
       "allRepositories": "सभी रिपॉज़िटरी",
       "couldNotLoad": "रिपॉज़िटरी सेटिंग लोड नहीं हो सकीं",
       "couldNotLoadRepositories": "रिपॉज़िटरी लोड नहीं हो सकीं",
-      "couldNotOpenGithubSettings": "GitHub App सेटिंग नहीं खोल सका",
+      "couldNotOpenGithubSettings": "GitHub ऐप सेटिंग नहीं खोल सका",
       "githubAppSettings": "GitHub App सेटिंग",
       "manageAccess": "GitHub App पहुँच प्रबंधित करें",
       "noRepositories": "कोई रिपॉज़िटरी नहीं",
@@ -1378,7 +1378,7 @@
       "couldNotLoad": "संगठन लोड नहीं हो सके",
       "personal": "व्यक्तिगत",
       "personalSubtitle": "आपकी अपनी रिपॉज़िटरी",
-      "title": "Security Agent"
+      "title": "सुरक्षा एजेंट"
     },
     "settingsOverview": {
       "allRepositories": "सभी रिपॉज़िटरी",
@@ -1403,14 +1403,14 @@
       "repositoriesCount": "{{displayCount}} रिपॉज़िटरी चयनित",
       "repositoriesCount_other": "{{displayCount}} रिपॉज़िटरी चयनित",
       "repositoriesCount_one": "{{displayCount}} रिपॉज़िटरी चयनित",
-      "securityAgent": "Security Agent",
+      "securityAgent": "सुरक्षा एजेंट",
       "selectRepositories": "रिपॉज़िटरी चुनें",
       "selectRepositoriesSubtitle": "चुनें कि Security Agent किन रिपॉज़िटरी की निगरानी करे",
       "slaPolicy": "SLA नीति",
       "title": "सेटिंग"
     },
     "settingsSave": {
-      "discard": "छोड़ें",
+      "discard": "ख़ारिज करें",
       "keepEditing": "संपादन जारी रखें",
       "saveChanges": "बदलाव सहेजें",
       "unsavedMessage": "इस स्क्रीन से बाहर जाने से पहले अपने बदलाव सहेजें?",
@@ -1438,7 +1438,7 @@
       "remediationDeadlineA11y": "{{label}} सुधार समय सीमा दिनों में",
       "title": "SLA नीति"
     },
-    "title": "Security Agent",
+    "title": "सुरक्षा एजेंट",
     "initialSyncAdmissionFailed": "Security Agent सक्षम हो गया, लेकिन प्रारंभिक सिंक कतार में नहीं लग सका। फिर से सिंक करें।",
     "queuedActionUntracked": "कतार में लगी कार्रवाई अब ट्रैक नहीं की जा सकती। नवीनतम स्थिति देखने के लिए रीफ़्रेश करें।",
     "commands": {
@@ -1555,7 +1555,7 @@
       "includeExistingDisabled": "मौजूदा निष्कर्ष स्वचालित सुधार से बाहर रखे गए हैं।",
       "belowThreshold": "निष्कर्ष स्वचालित गंभीरता सीमा से नीचे है। सुरक्षा गेट पार होने पर मैन्युअल सुधार फिर भी शुरू हो सकता है।",
       "beforeEnablement": "ऑटो सुधार सक्षम होने से पहले विश्लेषण पूरा हुआ। सुरक्षा गेट पार होने पर मैन्युअल सुधार फिर भी शुरू हो सकता है।",
-      "generic": "इस निष्कर्ष के लिए सुधार अनुपलब्ध है।"
+      "generic": "इस निष्कर्ष के लिए सुधार उपलब्ध नहीं है।"
     },
     "commandFailure": {
       "ownerCapReached": "विश्लेषण क्षमता भर गई है। किसी सक्रिय विश्लेषण के समाप्त होने की प्रतीक्षा करें, फिर दोबारा प्रयास करें।",
@@ -1610,7 +1610,7 @@
       "renameMessage": "इस सत्र के लिए नया नाम दर्ज करें",
       "untitled": "बिना शीर्षक वाला सत्र",
       "sessionDeleted": "सत्र हटाया गया",
-      "needsInput": "इनपुट की आवश्यकता है",
+      "needsInput": "इनपुट आवश्यक",
       "fromPlatform": "{{platform}} से",
       "cent_one": "सेंट",
       "cent": "सेंट",
@@ -1636,7 +1636,7 @@
       "didNotCompleteTitle": "इंस्टॉल पूरा नहीं हुआ",
       "didNotCompleteMessage": "GitHub ऐप इंस्टॉल पूरा नहीं हुआ। ऐप से फिर से कोशिश करें।"
     },
-    "sessionExited": "सत्र समाप्त हुआ",
+    "sessionExited": "सत्र समाप्त हो गया",
     "remoteSpawnRetryable": "इंस्टेंस तक नहीं पहुँचा जा सका — हो सकता है वह डिस्कनेक्ट हो गया हो।",
     "remoteSpawnNonRetryable": "इंस्टेंस सत्र शुरू करने में विफल रहा — मशीन जाँचें या CLI अपडेट करें।",
     "remoteSpawnInstanceDisconnected": "चयनित इंस्टेंस डिस्कनेक्ट हो गया। Cloud Agent पर सत्र शुरू करें या दूसरा इंस्टेंस चुनें।"
@@ -1647,11 +1647,11 @@
       "copyErrorDetails": "त्रुटि विवरण कॉपी करें",
       "backToSessions": "सत्रों पर वापस जाएँ",
       "accessDenied": "पहुँच अस्वीकृत",
-      "accessDeniedDescription": "आपके पास इसे देखने की अनुमति नहीं है.",
+      "accessDeniedDescription": "आपके पास इसे देखने की अनुमति नहीं है।",
       "couldNotLoad": "सत्र लोड नहीं हो सका",
       "failedToLoadDetails": "सत्र का विवरण लोड नहीं हो सका",
       "notFound": "नहीं मिला",
-      "notFoundDescription": "हो सकता है कि यह आइटम हटा दिया गया हो या अब उपलब्ध न हो.",
+      "notFoundDescription": "हो सकता है कि यह आइटम हटा दिया गया हो या अब उपलब्ध न हो।",
       "emptyDescription": "शुरू करने के लिए नीचे एक संदेश भेजें।",
       "failedToStopExecution": "निष्पादन रोकने में विफल",
       "readOnly": "यह एक केवल-पढ़ने वाला सत्र है",
@@ -1724,7 +1724,7 @@
       "couldNotReadPendingSessions": "लंबित सत्र पढ़े नहीं जा सके। फिर से कोशिश करें।",
       "failedToCreate": "सत्र बनाने में विफल",
       "couldNotRefreshRepositories": "रिपॉज़िटरी रीफ़्रेश नहीं हो सकीं। कृपया फिर से कोशिश करें।",
-      "discard": "छोड़ें",
+      "discard": "ख़ारिज करें",
       "discardDraftMessage": "आपका प्रॉम्प्ट खो जाएगा।",
       "discardDraftTitle": "ड्राफ़्ट छोड़ें?",
       "discardFailed": "ड्राफ़्ट छोड़ा नहीं जा सका। कृपया फिर से कोशिश करें।",
@@ -1792,7 +1792,7 @@
       "noMatches": "कोई मिलान नहीं",
       "noRepositories": "कोई रिपॉज़िटरी उपलब्ध नहीं",
       "noRepositoriesDescription": "आपके खाते से कोई रिपॉज़िटरी कनेक्ट नहीं है.",
-      "tryDifferentSearch": "कोई दूसरा खोज शब्द आज़माएँ.",
+      "tryDifferentSearch": "कोई दूसरा खोज शब्द आज़माएँ।",
       "accessibility": "रिपॉज़िटरी: {{label}}",
       "loading": "लोड हो रहा है..."
     },
@@ -1819,7 +1819,7 @@
       "copyText": "टेक्स्ट कॉपी करें",
       "reportAiResponseFailedRetryable": "यह प्रतिक्रिया रिपोर्ट नहीं की जा सकी।",
       "reportAiResponseFailedTerminal": "यह प्रतिक्रिया रिपोर्ट नहीं की जा सकती।",
-      "reportAiResponseSubmitted": "रिपोर्ट भेजी गई। रसीद {{receiptId}}"
+      "reportAiResponseSubmitted": "रिपोर्ट सबमिट की गई। रसीद {{receiptId}}"
     },
     "partDetail": {
       "detailsUnavailable": "विवरण उपलब्ध नहीं",
@@ -1972,7 +1972,7 @@
     },
     "sessionFilter": {
       "title": "सत्र फ़िल्टर करें",
-      "sortBy": "इसके अनुसार क्रमबद्ध करें",
+      "sortBy": "इससे क्रमबद्ध करें",
       "sortLastUpdated": "अंतिम बार अपडेट",
       "sortCreated": "बनाया गया",
       "platform": "प्लेटफ़ॉर्म",
@@ -2031,8 +2031,8 @@
       "camera": "कैमरा",
       "photoLibrary": "फ़ोटो लाइब्रेरी",
       "files": "फ़ाइलें",
-      "cameraAccessDisabled": "कैमरा पहुँच अक्षम",
-      "cameraAccessMessage": "फ़ोटो लेने के लिए सेटिंग में कैमरा पहुँच की अनुमति दें।",
+      "cameraAccessDisabled": "कैमरा एक्सेस अक्षम",
+      "cameraAccessMessage": "फ़ोटो लेने के लिए सेटिंग में कैमरा एक्सेस की अनुमति दें।",
       "couldNotOpenPhotoPicker": "फ़ोटो पिकर नहीं खुल सका। Kilo को पुनः आरंभ करें और फिर से कोशिश करें।",
       "maxFilesAllowed": "अधिकतम {{displayCount}} फ़ाइलें अनुमत हैं",
       "onlyAddingFiles": "केवल {{accepted}} फ़ाइलें जोड़ी जा रही हैं ({{total}} में से, अधिकतम {{max}})"
@@ -2161,10 +2161,10 @@
       "open": "खुला पुल अनुरोध",
       "closed": "बंद पुल अनुरोध",
       "merged": "मर्ज किया गया पुल अनुरोध",
-      "draft": "ड्राफ़्ट पुल अनुरोध",
+      "draft": "ड्राफ़्ट पुल रिक्वेस्ट",
       "updating": "अपडेट हो रहा है, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "पुल अनुरोध"
+      "externalLinkLabel": "पुल रिक्वेस्ट"
     }
   },
   "bootstrap": {
@@ -2806,7 +2806,7 @@
       "file_one": "फ़ाइल",
       "stateClosed": "बंद",
       "stateDraft": "ड्राफ़्ट",
-      "stateMerged": "मर्ज किया गया",
+      "stateMerged": "मर्ज हो गया",
       "stateOpen": "खुला",
       "stateOpenApproved": "खुला · स्वीकृत",
       "stateOpenChangesRequested": "खुला · परिवर्तन अनुरोधित",
@@ -3056,7 +3056,7 @@
       "paymentPending": "भुगतान लंबित",
       "processingBlocked": "प्रोसेसिंग अवरुद्ध",
       "processingNeedsReview": "प्रोसेसिंग की समीक्षा आवश्यक है",
-      "retry": "फिर से कोशिश करें",
+      "retry": "फिर से प्रयास करें",
       "retryHint": "Kilo Pass स्थिति फिर से आज़माता है।",
       "setupHint": "वेब पर Kilo Pass सेटअप खोलता है।"
     }
@@ -3089,12 +3089,12 @@
     "invalidRequest": "अपना ईमेल पता जाँचें और फिर से प्रयास करें।",
     "emailDeliveryFailed": "ईमेल डिलीवरी अस्थायी रूप से अनुपलब्ध है। कृपया बाद में फिर से प्रयास करें।",
     "admissionRequired": "आपके डिवाइस की पुष्टि नहीं की जा सकती। किसी दूसरे डिवाइस पर या वेब के माध्यम से साइन इन करने के लिए '$t(login.moreSignInOptions)' का उपयोग करें।",
-    "default": "कुछ गलत हो गया। कृपया फिर से प्रयास करें।",
+    "default": "कुछ गड़बड़ हो गई। कृपया फिर से कोशिश करें।",
     "retryableAdmission": "हम इस डिवाइस की पुष्टि नहीं कर सके। अपना कनेक्शन जाँचें और फिर से प्रयास करें।",
     "startSignInFailed": "साइन इन शुरू करना विफल रहा। कृपया फिर से कोशिश करें।",
     "couldNotOpenBrowser": "ब्राउज़र नहीं खुल सका। कृपया फिर से कोशिश करें।",
     "signInTimedOut": "साइन-इन का समय समाप्त हो गया। कृपया फिर से कोशिश करें।",
-    "signInFailed": "साइन-इन विफल रहा। कृपया फिर से कोशिश करें।",
+    "signInFailed": "साइन-इन विफल रहा। कृपया फिर से प्रयास करें।",
     "networkError": "नेटवर्क त्रुटि। कृपया फिर से कोशिश करें।",
     "accessDeniedByUser": "उपयोगकर्ता द्वारा पहुँच अस्वीकृत",
     "codeExpired": "कोड समाप्त हो गया",

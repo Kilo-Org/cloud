@@ -365,7 +365,7 @@
       "acceptTerms": "Prijať",
       "replyBadRequest": "Túto odpoveď nemožno odoslať. Vlákno sa mohlo zmeniť.",
       "replyForbidden": "Nemáte povolenie odpovedať na tento pull request.",
-      "couldNotReply": "Odpoveď sa nepodarilo odoslať.",
+      "couldNotReply": "Nepodarilo sa odpovedať.",
       "moderation": {
         "reportContent": {
           "terminal": "Tento komentár sa nedá nahlásiť.",
@@ -420,7 +420,7 @@
       },
       "deletedUser": "vymazaný používateľ"
     },
-    "couldNotOpenGitHubAppSettings": "Nastavenia aplikácie GitHub App sa nepodarilo otvoriť",
+    "couldNotOpenGitHubAppSettings": "Nastavenia GitHub aplikácie sa nepodarilo otvoriť",
     "installKiloGitHubApp": "Nainštalovať aplikáciu Kilo GitHub App",
     "connectionExpiredTitle": "Pripojenie GitHub vypršalo",
     "connectionExpiredDescription": "Vaše pripojenie GitHub už nie je platné. Skontrolujte pripojenie znova — ak to bude potrebné, vyzveme vás na opätovné pripojenie.",
@@ -489,7 +489,7 @@
       "loadFailedTitle": "Editor komentára sa nepodarilo načítať",
       "discardTitle": "Zahodiť komentár?",
       "discardMessage": "Váš koncept sa stratí.",
-      "keepEditing": "Pokračovať v úprave",
+      "keepEditing": "Pokračovať v úpravách",
       "discard": "Zahodiť",
       "comment": "Komentovať",
       "insertSuggestionA11y": "Vložiť návrh kódu",
@@ -516,7 +516,7 @@
       "loadFailedTitle": "Odoslanie kontroly sa nepodarilo načítať",
       "deletePendingTitle": "Vymazať čakajúci komentár?",
       "deletePendingMessage": "Tento komentár sa odstráni z frontu kontroly.",
-      "delete": "Vymazať",
+      "delete": "Odstrániť",
       "summaryOptional": "Zhrnutie (voliteľné)",
       "pendingComment_one": "čakajúci komentár",
       "pendingComment": "čakajúce komentáre",
@@ -785,7 +785,7 @@
       "title": "Akcie správy",
       "deleteTitle": "Vymazať správu?",
       "deleteMessage": "Toto odstráni správu z konverzácie.",
-      "delete": "Vymazať",
+      "delete": "Odstrániť",
       "deleteFailed": "Vymazanie správy zlyhalo",
       "removeReactionFailed": "Odstránenie reakcie zlyhalo",
       "addReactionFailed": "Nepodarilo sa pridať reakciu",
@@ -1143,7 +1143,7 @@
       "destroying": "NIČÍ SA",
       "provisioned": "POSKYTNUTÉ",
       "restarting": "REŠTARTUJE SA",
-      "running": "BEŽÍ",
+      "running": "Prebieha",
       "shuttingDown": "VYPÍNA SA",
       "starting": "SPÚŠŤA SA",
       "stopped": "ZASTAVENÉ",
@@ -1155,7 +1155,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Frontier",
       "frontierDescription": "Najvyšší výkon. Smeruje na frontier modely s uvažovaním.",
-      "balancedLabel": "Vyvážené",
+      "balancedLabel": "Vyvážený",
       "balancedDescription": "Chytrá rovnováha rýchlosti a schopnosti za nižšiu cenu.",
       "cost": "Cena",
       "performance": "Výkon",
@@ -1280,9 +1280,9 @@
       "roast": "Brutálne úprimný, zábavne taký",
       "strict": "Označiť všetko, držať vysokú latku"
     },
-    "title": "Code Reviewer",
+    "title": "Kontrolór kódu",
     "reviewDetail": {
-      "title": "Preskúmanie",
+      "title": "Kontrola",
       "cancelTitle": "Zrušiť preskúmanie?",
       "cancelMessage": "Toto zastaví prebiehajúce preskúmanie kódu.",
       "keepRunning": "Nechajte bežať",
@@ -1320,7 +1320,7 @@
     "reviewMemory": {
       "title": "Pamäť preskúmaní",
       "couldNotLoadMore": "Ďalšie sa nepodarilo načítať",
-      "retryLoadingMore": "Skúsiť znova načítať viac",
+      "retryLoadingMore": "Skúsiť načítať viac znova",
       "loading": "Načítava sa pamäť preskúmaní",
       "couldNotLoad": "Pamäť preskúmaní sa nepodarilo načítať",
       "off": "Pamäť preskúmaní je vypnutá",
@@ -1424,7 +1424,7 @@
       "noDecision": "Bez rozhodnutia",
       "noResult": "Bez výsledku"
     },
-    "eyebrow": "Code Reviewer",
+    "eyebrow": "Kontrolór kódu",
     "updateFailed": "Kontrolóra sa nepodarilo aktualizovať",
     "configSaveFailed": "Konfiguráciu kontroly sa nepodarilo uložiť",
     "status": {
@@ -1510,17 +1510,17 @@
       "statusClosed": "Zatvorené",
       "severityCritical": "Kritické",
       "severityHigh": "Vysoká",
-      "severityMedium": "Stredná",
-      "severityLow": "Nízka",
+      "severityMedium": "Stredné",
+      "severityLow": "Nízke",
       "outcomeNotAnalyzed": "Neanalyzované",
       "outcomeAnalyzing": "Analyzuje sa",
       "outcomeFailed": "Analýza zlyhala",
-      "outcomeExploitable": "Využiteľné",
-      "outcomeNotExploitable": "Nie je využiteľné",
+      "outcomeExploitable": "Zneužívateľné",
+      "outcomeNotExploitable": "Nezneužívateľné",
       "outcomeSafeToDismiss": "Bezpečné zamietnuť",
       "outcomeNeedsReview": "Vyžaduje preskúmanie",
       "outcomeTriageComplete": "Triedenie dokončené",
-      "outcomeDismissed": "Zamietnuté",
+      "outcomeDismissed": "Odmietnuté",
       "sortSeverityDesc": "Závažnosť: vysoká po nízku",
       "sortSeverityAsc": "Závažnosť: nízka po vysokú",
       "sortSlaDue": "Termín SLA",
@@ -1617,7 +1617,7 @@
       "repoSummary": "{{open}} otvorených · {{critical}} kritických · {{high}} vysokých",
       "couldNotLoad": "Údaje tabule sa nepodarilo načítať",
       "filterByRepository": "Filtrovať podľa repozitára",
-      "findings": "Výsledky",
+      "findings": "Nálezy",
       "lastSynced": "Naposledy synchronizované {{time}}",
       "manageRepositories": "Spravovať repozitáre",
       "notYetSynced": "Zatiaľ nesynchronizované",
@@ -1708,7 +1708,7 @@
       "couldNotLoadSettings": "Nastavenia Security Agent sa nepodarilo načítať",
       "couldNotLoadPermissions": "Oprávnenia sa nepodarilo načítať",
       "couldNotLoadRepositories": "Repozitáre sa nepodarilo načítať",
-      "securityAgent": "Security Agent",
+      "securityAgent": "Bezpečnostný agent",
       "enabled": "Povolené",
       "disabled": "Zakázané",
       "on": "Zapnuté",
@@ -1745,7 +1745,7 @@
       "retry": "Skúsiť nápravu znova",
       "cancelTitle": "Zrušiť túto nápravu?",
       "cancelMessage": "Security Agent zastaví prebiehajúci pokus o nápravu.",
-      "keepRunning": "Pokračovať v behu",
+      "keepRunning": "Nechajte bežať",
       "cancelRemediation": "Zrušiť nápravu",
       "openPullRequest": "Otvoriť pull request{{number}}",
       "openDraftPullRequest": "Otvoriť koncept pull request{{number}}",
@@ -1810,7 +1810,7 @@
       "dismissA11y": "Odmietnuť nález"
     },
     "findingList": {
-      "title": "Výsledky",
+      "title": "Nálezy",
       "couldNotLoad": "Nálezy sa nepodarilo načítať",
       "couldNotLoadMore": "Ďalšie nálezy sa nepodarilo načítať",
       "noMatchesTitle": "Žiadne nálezy nezodpovedajú filtrom",
@@ -1820,7 +1820,7 @@
       "clearFilters": "Vymazať filtre"
     },
     "scopeList": {
-      "title": "Security Agent",
+      "title": "Bezpečnostný agent",
       "couldNotLoad": "Organizácie sa nepodarilo načítať",
       "personal": "Osobné",
       "personalSubtitle": "Vaše vlastné repozitáre"
@@ -1835,7 +1835,7 @@
       "nextRemediationAvailable": "Náprava je dostupná",
       "retryAnalysis": "Skúsiť analýzu znova",
       "runAnalysis": "Spustiť analýzu",
-      "nextNeedsManualReview": "Vyžaduje manuálnu kontrolu",
+      "nextNeedsManualReview": "Vyžaduje manuálne preskúmanie",
       "nextViewDetails": "Zobraziť podrobnosti",
       "viewPr": "Zobraziť PR",
       "analyze": "Analyzovať",
@@ -1893,7 +1893,7 @@
       "allRepositories": "Všetky repozitáre",
       "couldNotLoad": "Nastavenia repozitára sa nepodarilo načítať",
       "couldNotLoadRepositories": "Repozitáre sa nepodarilo načítať",
-      "couldNotOpenGithubSettings": "Nastavenia aplikácie GitHub App sa nepodarilo otvoriť",
+      "couldNotOpenGithubSettings": "Nastavenia GitHub aplikácie sa nepodarilo otvoriť",
       "githubAppSettings": "Nastavenia aplikácie GitHub App",
       "manageAccess": "Spravovať prístup aplikácie GitHub App",
       "noRepositories": "Žiadne repozitáre",
@@ -1916,7 +1916,7 @@
     },
     "queuedActionUntracked": "Zaradenú akciu už nebolo možné sledovať. Obnovte, aby ste videli najnovší stav.",
     "initialSyncAdmissionFailed": "Security Agent bol povolený, ale prvotnú synchronizáciu nebolo možné zaradiť. Synchronizujte znova.",
-    "title": "Security Agent",
+    "title": "Bezpečnostný agent",
     "commands": {
       "findingAlreadyDismissed": "Nález už bol odmietnutý",
       "findingDismissed": "Nález odmietnutý",
@@ -2051,7 +2051,7 @@
     },
     "analysisMode": {
       "auto": "Automaticky",
-      "shallow": "Plytká",
+      "shallow": "Povrchná",
       "deep": "Hlboká"
     }
   },
@@ -2061,11 +2061,11 @@
       "searching": "Vyhľadávanie",
       "searchSessions": "Vyhľadať sedenia",
       "searchSessionsPlaceholder": "Vyhľadať sedenia...",
-      "clearSearch": "Vymazať vyhľadávanie",
+      "clearSearch": "Vyčistiť hľadanie",
       "clearFilters": "Vymazať filtre"
     },
     "sessionList": {
-      "couldNotLoad": "Sedenie sa nepodarilo načítať",
+      "couldNotLoad": "Relácie sa nepodarilo načítať",
       "couldNotLoadActive": "Aktívne sedenia sa nepodarilo načítať",
       "noSessionsYet": "Zatiaľ žiadne sedenia",
       "noSessionsYetDescription": "Spustite programátorskú úlohu z telefónu. Vaše sedenia sa zobrazia tu.",
@@ -2120,7 +2120,7 @@
       "didNotCompleteTitle": "Inštalácia sa nedokončila",
       "didNotCompleteMessage": "Inštalácia aplikácie GitHub App sa nedokončila. Skúste to znova z aplikácie."
     },
-    "sessionExited": "Relácia sa ukončila",
+    "sessionExited": "Sedenie ukončené",
     "remoteSpawnRetryable": "Nedá sa dosiahnuť inštancia — možno sa odpojila.",
     "remoteSpawnNonRetryable": "Inštancia nedokázala spustiť reláciu — skontrolujte zariadenie alebo aktualizujte CLI.",
     "remoteSpawnInstanceDisconnected": "Vybraná inštancia sa odpojila. Spustite reláciu na Cloud Agent alebo vyberte inú inštanciu."
@@ -2131,7 +2131,7 @@
       "copyErrorDetails": "Kopírovať podrobnosti chyby",
       "backToSessions": "Späť na sedenia",
       "accessDenied": "Prístup zamietnutý",
-      "accessDeniedDescription": "Nemáte povolenie na zobrazenie tohto obsahu.",
+      "accessDeniedDescription": "Nemáte povolenie to zobraziť.",
       "couldNotLoad": "Sedenie sa nepodarilo načítať",
       "failedToLoadDetails": "Podrobnosti sedenia sa nepodarilo načítať",
       "notFound": "Nenájdené",
@@ -2223,7 +2223,7 @@
     },
     "toolPatch": {
       "operationAdded": "Pridané",
-      "operationDeleted": "Odstránené",
+      "operationDeleted": "Vymazané",
       "operationUpdated": "Aktualizované"
     },
     "toolCard": {
@@ -2319,7 +2319,7 @@
       "sent": "Odoslané",
       "model": "Model",
       "costAndTokens": "Náklady a tokeny",
-      "cost": "Náklady",
+      "cost": "Cena",
       "input": "Vstup",
       "output": "Výstup",
       "reasoning": "Uvažovanie",
@@ -2328,7 +2328,7 @@
       "total": "Spolu",
       "reportAiResponseFailedRetryable": "Túto odpoveď sa nepodarilo nahlásiť.",
       "reportAiResponseFailedTerminal": "Túto odpoveď nemožno nahlásiť.",
-      "reportAiResponseSubmitted": "Odpoveď nahlásená. Potvrdenie {{receiptId}}"
+      "reportAiResponseSubmitted": "Nahlásenie odoslané. Potvrdenie {{receiptId}}"
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2362,7 +2362,7 @@
     "filePart": {
       "loadingImage": "Načítava sa obrázok",
       "imageUnavailableRetry": "Obrázok nedostupný, skúsiť znova načítať",
-      "imageUnavailable": "Obrázok nedostupný",
+      "imageUnavailable": "Obrázok nie je dostupný",
       "imageUnavailableWithAlt": "Obrázok nedostupný {{alt}}",
       "imagePreviewUnavailableInSession": "Náhľad obrázka nie je v tomto sedení dostupný.",
       "viewImage": "Zobraziť obrázok",
@@ -2515,8 +2515,8 @@
     },
     "modelPicker": {
       "title": "Vybrať model",
-      "searchPlaceholder": "Hľadať modely...",
-      "noModels": "Nie sú k dispozícii žiadne modely",
+      "searchPlaceholder": "Hľadať modely…",
+      "noModels": "Žiadne dostupné modely",
       "noModelsDescription": "Nie sú k dispozícii žiadne modely na výber.",
       "favorites": "Obľúbené",
       "recommended": "Odporúčané",
@@ -2557,8 +2557,8 @@
       "camera": "Fotoaparát",
       "photoLibrary": "Knižnica fotiek",
       "files": "Súbory",
-      "cameraAccessDisabled": "Prístup k fotoaparátu je zakázaný",
-      "cameraAccessMessage": "Povoľte prístup k fotoaparátu v Nastaveniach, aby ste mohli odfotiť.",
+      "cameraAccessDisabled": "Prístup ku kamere zakázaný",
+      "cameraAccessMessage": "Povoľte prístup ku kamere v Nastaveniach, aby ste mohli odfotiť.",
       "couldNotOpenPhotoPicker": "Výber fotiek sa nepodarilo otvoriť. Reštartujte Kilo a skúste to znova.",
       "maxFilesAllowed": "Maximálny počet {{displayCount}} súborov",
       "onlyAddingFiles": "Pridávajú sa iba súbory {{accepted}} z {{total}} (max {{max}})"
@@ -2655,7 +2655,7 @@
       "open": "otvorený pull request",
       "closed": "zatvorený pull request",
       "merged": "zlúčený pull request",
-      "draft": "koncept pull requestu",
+      "draft": "Koncept pull request",
       "updating": "Aktualizuje sa, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2693,8 +2693,8 @@
     "signOutThisDeviceTitle": "Odhlásiť toto zariadenie?",
     "signOutThisSessionTitle": "Odhlásiť túto reláciu?",
     "signOutThisSessionMessage": "{{device}} bude odhlásený. Môže si ponechať prístup k API až hodinu.",
-    "signOutConfirm": "Odhlásiť",
-    "signOutMessage": "Ak chcete pristupovať k svojmu pracovnému priestoru, budete sa musieť znova prihlásiť.",
+    "signOutConfirm": "Odhlásiť sa",
+    "signOutMessage": "Ak chcete získať prístup k svojmu pracovnému priestoru, budete sa musieť znova prihlásiť.",
     "webBrowser": "Webový prehliadač"
   },
   "forceUpdate": {
@@ -2707,7 +2707,7 @@
   "home": {
     "couldNotLoadSessions": "Relácie sa nepodarilo načítať",
     "couldNotLoadActiveSessions": "Aktívne relácie sa nepodarilo načítať",
-    "agentSessions": "Relácie agenta",
+    "agentSessions": "Relácie agentov",
     "showingSavedSessions": "Zobrazujú sa uložené relácie — živý stav môže byť zastaraný",
     "startNewAgentSession": "Spustiť novú reláciu agenta Kilo",
     "aiCodingSessions": "AI programovacie relácie",
@@ -2720,7 +2720,7 @@
   },
   "imageViewer": {
     "close": "Zavrieť {{filename}}",
-    "imageUnavailable": "Obrázok nie je k dispozícii",
+    "imageUnavailable": "Obrázok nie je dostupný",
     "share": "Zdieľať {{filename}}"
   },
   "invalidRoute": {
@@ -2729,7 +2729,7 @@
     "title": "Stránka sa nenašla"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Obsah bol skrátený",
+    "contentTruncated": "Obsah skrátený",
     "truncated": "Skrátené",
     "wrap": "Zalamovať",
     "scroll": "Posúvať"
@@ -2746,7 +2746,7 @@
     "permissionTitle": "Prístup zamietnutý",
     "permissionDescription": "Nemáte povolenie to zobraziť.",
     "notFoundTitle": "Nenájdené",
-    "notFoundDescription": "Táto položka mohla byť odstránená alebo už nie je k dispozícii.",
+    "notFoundDescription": "Táto položka mohla byť odstránená alebo už nie je dostupná.",
     "serverTitle": "Nepodarilo sa načítať",
     "serverDescription": "Na našej strane sa niečo pokazilo. Skúste to znova."
   },
@@ -2787,7 +2787,7 @@
     "close": "Zavrieť",
     "reviewPr": "Skontrolovať PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Nové relácie",
+    "newSession": "Nové sedenie",
     "searchPlaceholder": "Hľadať nedávne relácie",
     "connectedCli": "Na pripojenom CLI",
     "newSessionOn": "Nové relácie na {{name}}",
@@ -2886,7 +2886,7 @@
     "privacyPolicyPrefix": "Vaše údaje sú spracúvané podľa",
     "privacyPolicy": "zásad ochrany súkromia Kilo",
     "onDevice": "V zariadení",
-    "loading": "Načítavam…",
+    "loading": "Načítava sa…",
     "couldNotLoadTranscription": "Vaše nastavenie prepisu sa nepodarilo načítať.",
     "signInToManageTranscription": "Prihláste sa, aby ste spravovali online prepis.",
     "onlineTranscription": "Online prepis",
@@ -3099,7 +3099,7 @@
       "creditProcessingDelayed": "Spracovanie kreditov oneskorené · automatické opakovanie",
       "ended": "Skončené",
       "endsOn": "Končí {{date}}",
-      "loading": "Načítavam…",
+      "loading": "Načítava sa…",
       "manageHint": "Otvorí správu Kilo Pass na webe.",
       "notSubscribed": "Bez predplatného",
       "overallocated": "Priradenia Pass presahujú platené miesta",
@@ -3110,7 +3110,7 @@
       "paymentPending": "Platba čaká",
       "processingBlocked": "Spracovanie zablokované",
       "processingNeedsReview": "Spracovanie si vyžaduje kontrolu",
-      "retry": "Opakovať",
+      "retry": "Skúsiť znova",
       "retryHint": "Znova skúša načítať stav Kilo Pass.",
       "setupHint": "Otvorí nastavenie Kilo Pass na webe.",
       "paidSeat_few": "{{displayCount}} platené miesta",
@@ -3149,8 +3149,8 @@
     "thinkingEffort": {
       "none": "Žiadna",
       "minimal": "Minimálna",
-      "low": "Nízka",
-      "medium": "Stredná",
+      "low": "Nízke",
+      "medium": "Stredné",
       "high": "Vysoká",
       "xhigh": "Veľmi vysoká",
       "max": "Maximálna"

@@ -238,7 +238,7 @@
       "couldNotSignIn": "채팅에 로그인할 수 없습니다",
       "couldNotRefreshMessages": "메시지를 새로 고칠 수 없습니다",
       "couldNotLoadHistory": "대화 기록을 불러올 수 없습니다",
-      "rename": "이름 바꾸기",
+      "rename": "이름 변경",
       "leave": "나가기",
       "untitledConversation": "제목 없는 대화",
       "createFailed": "대화를 만들지 못했습니다",
@@ -323,8 +323,8 @@
       "addReactionFailed": "반응을 추가하지 못했습니다",
       "retrySend": "다시 보내기",
       "moreReactions": "더 많은 반응",
-      "reply": "답장",
-      "edit": "수정",
+      "reply": "답글",
+      "edit": "편집",
       "sendFailed": "메시지를 보내지 못했습니다",
       "retrySendFailed": "다시 보내지 못했습니다",
       "editFailed": "메시지를 수정하지 못했습니다",
@@ -377,7 +377,7 @@
       "managedByAdmin": "결제는 조직 관리자가 관리합니다.",
       "couldNotLoad": "결제 정보를 불러올 수 없습니다",
       "manageOnWeb": "웹에서 결제 관리",
-      "commitPlan": "Commit",
+      "commitPlan": "커밋",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "마지막 Commit 기간이 {{date}}에 종료됩니다. {{price}}에 Standard로 계속하거나 호스팅이 종료됩니다.",
       "freeTrial": "무료 체험",
@@ -394,7 +394,7 @@
       "trialDaysRemaining": "체험: {{remaining}} 남음",
       "trialEndingSoon": "체험 종료 임박: {{remaining}}",
       "planName": {
-        "commit": "Commit",
+        "commit": "커밋",
         "standard": "Standard"
       }
     },
@@ -487,7 +487,7 @@
       "noModels": "사용 가능한 모델이 없습니다",
       "noModelsDescription": "모델은 사용 가능해지면 여기에 표시됩니다.",
       "noResultsFor": "\"{{query}}\"에 대한 결과 없음",
-      "recommended": "권장"
+      "recommended": "추천"
     },
     "model": {
       "title": "모델"
@@ -546,7 +546,7 @@
       "iosTitle": "iOS에서 KiloClaw를 사용할 수 없음",
       "multipleCurrentConflictBody": "계정에 활성 구독이 두 개 이상 발견되어 이중 청구를 방지하기 위해 일시 중지했습니다.",
       "multipleCurrentConflictCta": "kilo.ai에서 계속",
-      "multipleCurrentConflictTitle": "계정 검토 필요",
+      "multipleCurrentConflictTitle": "계정 검토가 필요합니다.",
       "nonCanonicalEarlybirdBody": "얼리 액세스 플랜은 모바일에서 사용하기 전에 수동 검토가 필요합니다.",
       "nonCanonicalEarlybirdCta": "kilo.ai에서 계속",
       "nonCanonicalEarlybirdTitle": "레거시 플랜 감지됨",
@@ -644,7 +644,7 @@
         "openKiloAi": "kilo.ai 열기",
         "provisioning": "프로비저닝",
         "ready": "준비됨",
-        "review": "검토",
+        "review": "리뷰",
         "settingUp": "설정 중…",
         "somethingWentWrong": "문제가 발생했습니다"
       },
@@ -785,8 +785,8 @@
       "placeholder": "예: 오류 처리 규칙 적용…"
     },
     "repos": {
-      "title": "리포지토리",
-      "couldNotLoad": "리포지토리를 불러올 수 없습니다",
+      "title": "저장소",
+      "couldNotLoad": "저장소를 불러올 수 없습니다",
       "unavailable": "리포지토리를 사용할 수 없음 — kilo.ai에서 Bitbucket 설정을 완료하세요.",
       "finishSetup": "설정 완료",
       "manageAccess": "액세스 관리",
@@ -929,7 +929,7 @@
     },
     "selectRepositories": "저장소 선택",
     "selectRepository": "자동 리뷰를 사용하려면 저장소를 하나 이상 선택하세요.",
-    "title": "Code Reviewer",
+    "title": "코드 리뷰어",
     "webhookSetup": "웹훅 설정이 완료되지 않았습니다",
     "webhookSetupDescription": "일부 저장소는 자동 리뷰를 받지 못할 수 있습니다.",
     "decision": {
@@ -938,7 +938,7 @@
       "noResult": "결과 없음",
       "pass": "통과"
     },
-    "eyebrow": "Code Reviewer",
+    "eyebrow": "코드 리뷰어",
     "overview": {
       "allAreas": "모든 영역",
       "allRepositories": "모든 저장소",
@@ -956,7 +956,7 @@
     "updateFailed": "리뷰어를 업데이트하지 못했습니다",
     "configSaveFailed": "리뷰 구성을 저장하지 못했습니다",
     "status": {
-      "pending": "보류 중",
+      "pending": "대기 중",
       "queued": "대기 중",
       "running": "실행 중",
       "completed": "완료됨",
@@ -1176,7 +1176,7 @@
       "noRepositoryDataDescription": "발견 사항이 동기화되면 저장소 우선순위가 표시됩니다.",
       "noSlaDeadline": "SLA 마감일 미지정",
       "notExploitable": "악용 불가",
-      "notMeasured": "측정 안 됨",
+      "notMeasured": "측정되지 않음",
       "notYetSynced": "아직 동기화 안 됨",
       "refreshFailed": "새로고침할 수 없습니다 — 마지막 동기화 데이터를 표시합니다.",
       "repoSummary": "열림 {{open}} · 치명적 {{critical}} · 높음 {{high}}",
@@ -1378,7 +1378,7 @@
       "couldNotLoad": "조직을 불러올 수 없습니다",
       "personal": "개인",
       "personalSubtitle": "내 저장소",
-      "title": "Security Agent"
+      "title": "보안 에이전트"
     },
     "settingsOverview": {
       "allRepositories": "모든 저장소",
@@ -1403,7 +1403,7 @@
       "repositoriesCount": "저장소 {{displayCount}}개 선택됨",
       "repositoriesCount_other": "저장소 {{displayCount}}개 선택됨",
       "repositoriesCount_one": "저장소 {{displayCount}}개 선택됨",
-      "securityAgent": "Security Agent",
+      "securityAgent": "보안 에이전트",
       "selectRepositories": "저장소 선택",
       "selectRepositoriesSubtitle": "Security Agent가 모니터링할 저장소를 선택하세요",
       "slaPolicy": "SLA 정책",
@@ -1438,7 +1438,7 @@
       "remediationDeadlineA11y": "{{label}} 수정 마감일(일)",
       "title": "SLA 정책"
     },
-    "title": "Security Agent",
+    "title": "보안 에이전트",
     "initialSyncAdmissionFailed": "Security Agent가 활성화되었지만 초기 동기화를 대기열에 추가할 수 없습니다. 다시 동기화하세요.",
     "queuedActionUntracked": "대기 중인 작업을 더 이상 추적할 수 없습니다. 최신 상태를 보려면 새로고침하세요.",
     "commands": {
@@ -1555,7 +1555,7 @@
       "includeExistingDisabled": "기존 발견 사항은 자동 수정에서 제외됩니다.",
       "belowThreshold": "발견 사항이 자동 심각도 기준보다 낮습니다. 안전 검사를 통과하면 수동 수정을 시작할 수 있습니다.",
       "beforeEnablement": "자동 수정이 활성화되기 전에 분석이 완료되었습니다. 안전 검사를 통과하면 수동 수정을 시작할 수 있습니다.",
-      "generic": "이 발견 사항에는 수정을 사용할 수 없습니다."
+      "generic": "이 발견 항목에는 수정을 사용할 수 없습니다."
     },
     "commandFailure": {
       "ownerCapReached": "분석 용량이 가득 찼습니다. 진행 중인 분석이 끝날 때까지 기다린 후 다시 시도하세요.",
@@ -1694,7 +1694,7 @@
     },
     "newSession": {
       "title": "새 세션",
-      "repository": "리포지토리",
+      "repository": "저장소",
       "couldNotLoadRepositories": "리포지토리를 불러올 수 없습니다",
       "connectGithub": "GitHub 연결",
       "connectGithubDescription": "브라우저에서 GitHub를 연결한 다음 여기로 돌아와 리포지토리를 선택하세요.",
@@ -2065,8 +2065,8 @@
       "camera": "카메라",
       "photoLibrary": "사진 보관함",
       "files": "파일",
-      "cameraAccessDisabled": "카메라 액세스 비활성화됨",
-      "cameraAccessMessage": "사진을 찍으려면 설정에서 카메라 액세스를 허용하세요.",
+      "cameraAccessDisabled": "카메라 접근이 비활성화됨",
+      "cameraAccessMessage": "사진을 찍으려면 설정에서 카메라 접근을 허용하세요.",
       "couldNotOpenPhotoPicker": "사진 선택기를 열 수 없습니다. Kilo를 다시 시작하고 다시 시도하세요.",
       "maxFilesAllowed": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
       "onlyAddingFiles": "{{accepted}}개의 파일만 추가합니다 ({{total}}개 중, 최대 {{max}}개)"
@@ -2458,7 +2458,7 @@
     "installAttributionPromptTitle": "설치 기여 분석을 허용할까요?"
   },
   "prReview": {
-    "accessDenied": "액세스 거부됨",
+    "accessDenied": "액세스가 거부되었습니다",
     "accessDeniedDescription": "이 풀 리퀘스트를 볼 권한이 없습니다.",
     "checkConnection": "연결 확인",
     "checks": {
@@ -2510,7 +2510,7 @@
     },
     "connectionExpired": "GitHub 연결이 만료되었습니다.",
     "connectionExpiredDescription": "GitHub 연결이 더 이상 유효하지 않습니다. 연결을 다시 확인하세요 — 필요하면 다시 연결하라는 메시지가 표시됩니다.",
-    "connectionExpiredTitle": "GitHub 연결 만료됨",
+    "connectionExpiredTitle": "GitHub 연결이 만료되었습니다.",
     "couldNotLoadPullRequest": "풀 리퀘스트를 불러올 수 없습니다",
     "couldNotOpenGitHubAppSettings": "GitHub 앱 설정을 열 수 없습니다",
     "description": "설명",
@@ -2832,7 +2832,7 @@
     "reconnectNotice": {
       "checkConnection": "연결 확인",
       "message": "GitHub 연결이 더 이상 유효하지 않습니다. 연결을 다시 확인하세요 — 필요하면 다시 연결하라는 메시지가 표시됩니다.",
-      "title": "GitHub 연결 만료됨"
+      "title": "GitHub 연결이 만료되었습니다."
     },
     "review": "리뷰",
     "reviewPullRequest": "풀 리퀘스트 리뷰",
@@ -3029,7 +3029,7 @@
     },
     "permissionDenied": {
       "back": "뒤로",
-      "title": "액세스 거부됨"
+      "title": "액세스가 거부되었습니다"
     },
     "usageStats": {
       "cost": "비용",
@@ -3094,7 +3094,7 @@
     "startSignInFailed": "로그인을 시작하지 못했습니다. 다시 시도해 주세요.",
     "couldNotOpenBrowser": "브라우저를 열 수 없습니다. 다시 시도해 주세요.",
     "signInTimedOut": "로그인 시간이 초과되었습니다. 다시 시도해 주세요.",
-    "signInFailed": "로그인에 실패했습니다. 다시 시도해 주세요.",
+    "signInFailed": "로그인에 실패했습니다. 다시 시도하세요.",
     "networkError": "네트워크 오류. 다시 시도해 주세요.",
     "accessDeniedByUser": "사용자가 액세스를 거부했습니다",
     "codeExpired": "코드가 만료되었습니다",

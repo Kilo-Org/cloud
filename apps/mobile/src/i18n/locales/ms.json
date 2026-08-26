@@ -430,7 +430,7 @@
       "noRecentPrs": "Tiada PR terkini",
       "noRecentPrsDescription": "Tampal pautan PR di atas untuk memulakan semakan — ia akan muncul di sini pada masa akan datang.",
       "couldNotLoad": "Tidak dapat memuatkan",
-      "remove": "Alih keluar",
+      "remove": "Buang",
       "removeFromRecentsTitle": "Alih keluar daripada terkini?",
       "removeFromRecentsMessage": "Permintaan tarik ini akan dialih keluar daripada terkini anda.",
       "removeRecentAccessibility": "Alih keluar {{repo}} daripada terkini",
@@ -495,7 +495,7 @@
       "checkFailedTitle": "Tidak dapat menyemak sambungan GitHub",
       "checkFailedMessage": "Status log masuk tidak tersedia sehingga ini dimuatkan.",
       "reconnectTitle": "Sambung semula GitHub",
-      "title": "Sambung GitHub",
+      "title": "Sambungkan GitHub",
       "reconnectDescription": "Sambungan GitHub anda telah dibatalkan. Sambung semula untuk terus menyemak permintaan tarik pada mudah alih.",
       "description": "Sambungkan akaun GitHub anda untuk menyemak permintaan tarik pada mudah alih."
     },
@@ -537,7 +537,7 @@
       "stateOpenApproved": "Buka · Diluluskan",
       "stateOpenChangesRequested": "Buka · Perubahan diminta",
       "stateOpenReviewRequired": "Buka · Semakan diperlukan",
-      "stateOpen": "Buka",
+      "stateOpen": "Terbuka",
       "unknownAuthor": "Pengarang tidak diketahui",
       "commit_one": "komit",
       "commit": "komit",
@@ -778,7 +778,7 @@
       "retrySend": "Cuba hantar semula",
       "moreReactions": "Lebih banyak reaksi",
       "reply": "Balas",
-      "edit": "Edit",
+      "edit": "sunting",
       "sendFailed": "Gagal menghantar mesej",
       "retrySendFailed": "Gagal mencuba hantar semula",
       "editFailed": "Gagal mengedit mesej",
@@ -929,7 +929,7 @@
       "disconnectConfirm": "Putuskan",
       "disconnectMessage": "Buang akaun Google anda daripada contoh ini? Ini akan melumpuhkan pemberitahuan Gmail. Guna semula selepas memutuskan untuk menggunakan perubahan.",
       "disconnectTitle": "Putuskan Google",
-      "enabled": "Diaktifkan",
+      "enabled": "Didayakan",
       "notConnected": "Tidak disambungkan"
     },
     "modelList": {
@@ -1013,7 +1013,7 @@
       "finishingSetup": "Menyelesaikan persediaan",
       "finishingSetupDescription": "Bersabar, kami sedang memuktamadkan akaun anda. Ini biasanya mengambil sedikit masa.",
       "getStarted": "Mula",
-      "noInstances": "Tiada contoh KiloClaw",
+      "noInstances": "Tiada instance KiloClaw",
       "noInstancesDescription": "Buat contoh pertama anda untuk mula menjalankan ejen pengekodan."
     },
     "instance": {
@@ -1127,9 +1127,9 @@
       "destroying": "MEMUSNAHKAN",
       "provisioned": "DISEDIAKAN",
       "restarting": "MEMULAKAN SEMULA",
-      "running": "BERJALAN",
+      "running": "Sedang berjalan",
       "shuttingDown": "MENUTUP",
-      "starting": "MEMULAKAN",
+      "starting": "Sedang dimulakan",
       "stopped": "DIHENTIKAN",
       "stopping": "MENGHENTIKAN",
       "unknown": "TIDAK DIKETAHUI",
@@ -1247,7 +1247,7 @@
       "allRepositories": "Semua repositori",
       "bitbucketNoRepositoriesDescription": "Tiada repositori tersedia dalam ruang kerja Bitbucket ini.",
       "bitbucketSetup": "Persediaan Bitbucket",
-      "couldNotOpenGithubSettings": "Tidak dapat membuka tetapan GitHub App",
+      "couldNotOpenGithubSettings": "Tidak dapat membuka tetapan Apl GitHub",
       "gitlabNoRepositoriesDescription": "Anda mungkin perlu memberikan akses kepada lebih banyak kumpulan atau projek pada GitLab.",
       "installGithubApp": "Pasang apl GitHub pada repositori",
       "installGithubAppDescription": "Berikan akses Kilo GitHub App kepada repositori yang anda mahu disemak.",
@@ -1262,7 +1262,7 @@
       "roast": "Jujur tanpa belas kasihan, dengan cara yang menghiburkan",
       "strict": "Tandakan semua, pegang standard tinggi"
     },
-    "title": "Semakan Kod",
+    "title": "Penyemak Kod",
     "reviewDetail": {
       "title": "Semakan",
       "cancelTitle": "Batal semakan?",
@@ -1284,7 +1284,7 @@
       "model": "Model",
       "created": "Dicipta",
       "started": "Dimulakan",
-      "completed": "Disiapkan",
+      "completed": "Selesai",
       "cost": "Kos",
       "tokens": "Token",
       "tokensInOut": "{{input}} masuk / {{output}} keluar",
@@ -1301,8 +1301,8 @@
     },
     "reviewMemory": {
       "title": "Memori semakan",
-      "couldNotLoadMore": "Tidak dapat memuatkan lebih banyak",
-      "retryLoadingMore": "Cuba memuatkan lebih banyak semula",
+      "couldNotLoadMore": "Tidak dapat memuatkan lagi",
+      "retryLoadingMore": "Cuba memuatkan lagi semula",
       "loading": "Memuatkan memori semakan",
       "couldNotLoad": "Tidak dapat memuatkan memori semakan",
       "off": "Memori semakan dimatikan",
@@ -1321,7 +1321,7 @@
       "couldNotLoadProviders": "Kami tidak dapat memuatkan pembekal yang disambungkan anda. Sila cuba lagi.",
       "connectProvider": "Sambung pembekal",
       "connectProviderDescription": "Sambung GitHub untuk memulakan semakan manual permintaan tarik.",
-      "connectGitHub": "Sambung GitHub",
+      "connectGitHub": "Sambungkan GitHub",
       "platform": "Platform",
       "notConnected": "Tidak disambungkan",
       "pullRequestUrl": "URL permintaan tarik",
@@ -1379,7 +1379,7 @@
     },
     "providerConnect": {
       "githubApp": "GitHub App",
-      "connectGitHub": "Sambung GitHub",
+      "connectGitHub": "Sambungkan GitHub",
       "githubError": "Tidak dapat membuka persediaan GitHub. Sila cuba lagi.",
       "gitlabAccount": "Akaun GitLab",
       "connectGitLab": "Sambung GitLab",
@@ -1406,7 +1406,7 @@
       "noDecision": "Tiada keputusan",
       "noResult": "Tiada hasil"
     },
-    "eyebrow": "Semakan Kod",
+    "eyebrow": "Penyemak Kod",
     "updateFailed": "Gagal mengemas kini penyemak",
     "configSaveFailed": "Gagal menyimpan konfigurasi semakan",
     "status": {
@@ -1487,7 +1487,7 @@
       "allRepositories": "Semua repositori",
       "all": "Semua",
       "statusOpen": "Terbuka",
-      "fixed": "Dibaiki",
+      "fixed": "Diperbaiki",
       "statusIgnored": "Diabaikan",
       "statusClosed": "Ditutup",
       "severityCritical": "Kritikal",
@@ -1561,7 +1561,7 @@
       "exploitable": "Boleh dieksploitasi",
       "model": "Model",
       "notRecorded": "Tidak direkodkan",
-      "analyzed": "Analisis selesai",
+      "analyzed": "Dianalisis",
       "exploitabilityReasoning": "Penalaran kebolehkesploitasian",
       "suggestedFix": "Pembetulan yang dicadangkan",
       "whereFound": "Di mana ini ditemui ({{displayCount}})",
@@ -1613,9 +1613,9 @@
       "openFindingsDetail": "{{critical}} kritikal, {{high}} tinggi",
       "confirmedExploitable": "Disahkan boleh dieksploitasi",
       "confirmedExploitableDetail": "Risiko projek disahkan oleh analisis",
-      "needsReview": "Memerlukan semakan anda",
+      "needsReview": "Perlu semakan anda",
       "needsReviewDetail": "Keputusan manusia diperlukan",
-      "analysisIncomplete": "Analisis belum selesai",
+      "analysisIncomplete": "Analisis tidak lengkap",
       "analysisIncompleteDetail": "Risiko projek masih tidak diketahui",
       "slaCompliance": "Pematuhan SLA",
       "notMeasured": "Tidak diukur",
@@ -1652,7 +1652,7 @@
     "findingDetails": {
       "supersededBy": "Digantikan oleh penemuan semasa",
       "supersededByDescription": "Ketik untuk membuka rekod semasa untuk status, analisis, dan pemulihan.",
-      "dismissed": "Dibuang",
+      "dismissed": "Diketepikan",
       "dismissedBecause": "Dibuang kerana {{reason}}.",
       "severityLabel": "Keterukan {{severity}}",
       "package": "Pakej",
@@ -1688,7 +1688,7 @@
       "couldNotLoadSettings": "Tidak dapat memuatkan tetapan Security Agent",
       "couldNotLoadPermissions": "Tidak dapat memuatkan kebenaran",
       "couldNotLoadRepositories": "Tidak dapat memuatkan repositori",
-      "securityAgent": "Security Agent",
+      "securityAgent": "Ejen Keselamatan",
       "enabled": "Didayakan",
       "disabled": "Dilumpuhkan",
       "on": "Hidup",
@@ -1798,7 +1798,7 @@
       "clearFilters": "Kosongkan penapis"
     },
     "scopeList": {
-      "title": "Security Agent",
+      "title": "Ejen Keselamatan",
       "couldNotLoad": "Tidak dapat memuatkan organisasi",
       "personal": "Peribadi",
       "personalSubtitle": "Repositori anda sendiri"
@@ -1871,7 +1871,7 @@
       "allRepositories": "Semua repositori",
       "couldNotLoad": "Tidak dapat memuatkan tetapan repositori",
       "couldNotLoadRepositories": "Tidak dapat memuatkan repositori",
-      "couldNotOpenGithubSettings": "Tidak dapat membuka tetapan GitHub App",
+      "couldNotOpenGithubSettings": "Tidak dapat membuka tetapan Apl GitHub",
       "githubAppSettings": "Tetapan GitHub App",
       "manageAccess": "Urus akses GitHub App",
       "noRepositories": "Tiada repositori",
@@ -1894,7 +1894,7 @@
     },
     "queuedActionUntracked": "Tindakan beratur tidak lagi dapat dijejaki. Segarkan untuk melihat keadaan terkini.",
     "initialSyncAdmissionFailed": "Security Agent didayakan, tetapi penyegerakan awal tidak dapat dijadualkan. Segerakkan lagi.",
-    "title": "Security Agent",
+    "title": "Ejen Keselamatan",
     "commands": {
       "findingAlreadyDismissed": "Penemuan sudah dibuang",
       "findingDismissed": "Penemuan dibuang",
@@ -1954,7 +1954,7 @@
       "fixedOn": "Diperbaiki pada {{date}}",
       "resolutionRecorded": "Resolusi direkodkan",
       "superseded": "Digantikan",
-      "dismissed": "Dibuang",
+      "dismissed": "Diketepikan",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Tarikh akhir tidak ditetapkan",
       "noSlaDeadline": "Tiada tarikh akhir SLA",
@@ -2057,7 +2057,7 @@
       "deleteMessage": "Ini tidak boleh dibatalkan.",
       "delete": "Padam",
       "deleteSession": "Padam sesi",
-      "rename": "Nama semula",
+      "rename": "Namakan semula",
       "renameMessage": "Masukkan nama baharu untuk sesi ini",
       "copyId": "Salin ID sesi",
       "idCopied": "ID sesi disalin",
@@ -2090,7 +2090,7 @@
       "didNotCompleteTitle": "Pemasangan tidak selesai",
       "didNotCompleteMessage": "Pemasangan Apl GitHub tidak selesai. Cuba lagi daripada apl."
     },
-    "sessionExited": "Sesi keluar",
+    "sessionExited": "Sesi ditamatkan",
     "remoteSpawnRetryable": "Tidak dapat mencapai instance — ia mungkin telah terputus sambungan.",
     "remoteSpawnNonRetryable": "Instance gagal memulakan sesi — semak mesin atau kemas kini CLI.",
     "remoteSpawnInstanceDisconnected": "Instance yang dipilih terputus sambungan. Mulakan sesi pada Cloud Agent atau pilih instance lain."
@@ -2100,7 +2100,7 @@
       "title": "Sesi",
       "copyErrorDetails": "Salin butiran ralat",
       "backToSessions": "Kembali ke sesi",
-      "accessDenied": "Akses dinafikan",
+      "accessDenied": "Akses ditolak",
       "accessDeniedDescription": "Anda tidak mempunyai kebenaran untuk melihat ini.",
       "couldNotLoad": "Tidak dapat memuatkan sesi",
       "failedToLoadDetails": "Gagal memuatkan butiran sesi",
@@ -2408,7 +2408,7 @@
       "modelAccessibility": "Model: {{modelLabel}}",
       "openHint": "Buka sesi subejen",
       "subagent": "Subejen",
-      "task": "Tugas",
+      "task": "tugasan",
       "waitingForActivity": "Menunggu aktiviti"
     },
     "childSessionSheet": {
@@ -2423,7 +2423,7 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Cuba semula tersedia.",
       "copyToComposer": "Salin ke komposer",
-      "queued": "Dalam baris gilir",
+      "queued": "Dijadualkan",
       "queuedAccessibility": "Mesej dalam baris gilir",
       "userMessage": "Mesej pengguna",
       "assistantMessage": "Mesej pembantu",
@@ -2623,7 +2623,7 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "Tidak dapat memuatkan akaun anda",
-    "couldNotLoadAccountDescription": "Periksa sambungan anda dan cuba lagi.",
+    "couldNotLoadAccountDescription": "Semak sambungan anda dan cuba lagi.",
     "couldNotLoadPrivacy": "Tidak dapat memuatkan pilihan privasi",
     "couldNotLoadPrivacyDescription": "Periksa tetapan keselamatan peranti anda dan cuba lagi.",
     "contentReady": "Kandungan sedia",
@@ -2703,10 +2703,10 @@
     "neutralDescription": "Sila cuba lagi.",
     "offlineTitle": "Gagal dimuatkan",
     "offlineDescription": "Ada sesuatu yang tidak kena",
-    "permissionTitle": "Akses dinafikan",
+    "permissionTitle": "Akses ditolak",
     "permissionDescription": "Anda tidak mempunyai kebenaran untuk melihat ini.",
-    "notFoundTitle": "Tidak dijumpai",
-    "notFoundDescription": "Item ini mungkin telah dibuang atau tidak lagi tersedia.",
+    "notFoundTitle": "Tidak ditemui",
+    "notFoundDescription": "Item ini mungkin telah dialih keluar atau tidak lagi tersedia.",
     "serverTitle": "Tidak dapat dimuatkan",
     "serverDescription": "Ada sesuatu yang tidak kena pada pihak kami. Sila cuba lagi."
   },
@@ -2721,7 +2721,7 @@
     "optionsExpiredDescription": "Kembali dan buka semula pemilih ini daripada skrin sebelumnya."
   },
   "sessionRow": {
-    "needsInput": "PERLUKAN INPUT"
+    "needsInput": "perlu input"
   },
   "voiceInput": {
     "listening": "Mendengar...",
@@ -2928,7 +2928,7 @@
   "organization": {
     "boundary": {
       "backToProfile": "Kembali ke profil",
-      "loadErrorMessage": "Periksa sambungan anda dan cuba lagi.",
+      "loadErrorMessage": "Semak sambungan anda dan cuba lagi.",
       "loadErrorTitle": "Tidak dapat memuatkan organisasi anda",
       "organizationUnavailable": "Organisasi tidak tersedia",
       "selectDescription": "Pilih organisasi daripada profil anda untuk meneruskan.",
@@ -3026,7 +3026,7 @@
         "billingManager": "Pengurus pengebilan"
       },
       "emailStatusFailed": "E-mel gagal",
-      "emailStatusPending": "Belum selesai",
+      "emailStatusPending": "Tertunda",
       "inviteCreated": "Jemputan dicipta",
       "pendingInvitations": "Jemputan belum selesai",
       "resendInvite": "Hantar semula jemputan",
@@ -3034,7 +3034,7 @@
     },
     "permissionDenied": {
       "back": "Kembali",
-      "title": "Akses dinafikan"
+      "title": "Akses ditolak"
     },
     "usageStats": {
       "cost": "Kos",
@@ -3070,7 +3070,7 @@
       "paymentPending": "Pembayaran belum selesai",
       "processingBlocked": "Pemprosesan disekat",
       "processingNeedsReview": "Pemprosesan memerlukan semakan",
-      "retry": "Cuba semula",
+      "retry": "Cuba lagi",
       "retryHint": "Mencuba semula memuatkan status Kilo Pass.",
       "setupHint": "Membuka penyediaan Kilo Pass pada web."
     }
@@ -3089,7 +3089,7 @@
     "invalidRequest": "Semak alamat emel anda dan cuba lagi.",
     "emailDeliveryFailed": "Penghantaran emel tidak tersedia buat sementara waktu. Sila cuba lagi kemudian.",
     "admissionRequired": "Peranti anda tidak dapat disahkan. Gunakan '$t(login.moreSignInOptions)' untuk log masuk pada peranti lain atau melalui web.",
-    "default": "Sesuatu tidak kena. Sila cuba lagi.",
+    "default": "Ada sesuatu yang tidak kena. Sila cuba lagi.",
     "retryableAdmission": "Kami tidak dapat mengesahkan peranti ini. Semak sambungan anda dan cuba lagi.",
     "startSignInFailed": "Gagal memulakan log masuk. Sila cuba lagi.",
     "couldNotOpenBrowser": "Tidak dapat membuka penyemak imbas. Sila cuba lagi.",

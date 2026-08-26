@@ -353,7 +353,7 @@
       "replyPlaceholder": "ಉತ್ತರ…",
       "replyBody": "ಉತ್ತರದ ದೇಹ",
       "submitReply": "ಉತ್ತರ ಸಲ್ಲಿಸಿ",
-      "reply": "ಉತ್ತರ",
+      "reply": "ಉತ್ತರಿಸಿ",
       "termsTitle": "ಸೇವಾ ನಿಯಮಗಳು",
       "termsCopy": "ಪೋಸ್ಟ್ ಮಾಡಲು ನೀವು 13 ಅಥವಾ ಅದಕ್ಕಿಂತ ಹೆಚ್ಚು ವಯಸ್ಸಿನವರಾಗಿರಬೇಕು.",
       "termsAcceptRetry": "ನಿಯಮಗಳನ್ನು ಸ್ವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
@@ -412,7 +412,7 @@
       },
       "deletedUser": "ಅಳಿಸಲಾದ ಬಳಕೆದಾರ"
     },
-    "couldNotOpenGitHubAppSettings": "GitHub App ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+    "couldNotOpenGitHubAppSettings": "GitHub App ಸೆಟ್ಟಿಂಗ್ಗಳನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "installKiloGitHubApp": "Kilo GitHub App ಅನ್ನು ಸ್ಥಾಪಿಸಿ",
     "connectionExpiredTitle": "GitHub ಸಂಪರ್ಕ ಅವಧಿ ಮೀರಿದೆ",
     "connectionExpiredDescription": "ನಿಮ್ಮ GitHub ಸಂಪರ್ಕವು ಇನ್ನು ಮುಂದೆ ಮಾನ್ಯವಾಗಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ — ಅಗತ್ಯವಿದ್ದರೆ ನಿಮ್ಮನ್ನು ಮತ್ತೆ ಸಂಪರ್ಕಿಸಲು ಕೇಳಲಾಗುತ್ತದೆ.",
@@ -481,8 +481,8 @@
       "loadFailedTitle": "ಕಾಮೆಂಟ್ ಕಂಪೋಸರ್ ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "discardTitle": "ಕಾಮೆಂಟ್ ತ್ಯಜಿಸುವುದೇ?",
       "discardMessage": "ನಿಮ್ಮ ಡ್ರಾಫ್ಟ್ ಕಳೆದುಹೋಗುತ್ತದೆ.",
-      "keepEditing": "ಸಂಪಾದನೆ ಮುಂದುವರಿಸಿ",
-      "discard": "ತ್ಯಜಿಸಿ",
+      "keepEditing": "ಸಂಪಾದನೆಯನ್ನು ಮುಂದುವರಿಸಿ",
+      "discard": "ತೆಗೆದುಹಾಕಿ",
       "comment": "ಕಾಮೆಂಟ್",
       "insertSuggestionA11y": "ಕೋಡ್ ಸಲಹೆಯನ್ನು ಸೇರಿಸಿ",
       "insertSuggestion": "ಸಲಹೆ ಸೇರಿಸಿ",
@@ -537,7 +537,7 @@
       "stateOpenApproved": "ಮುಕ್ತ · ಅನುಮೋದಿಸಲಾಗಿದೆ",
       "stateOpenChangesRequested": "ಮುಕ್ತ · ಬದಲಾವಣೆಗಳನ್ನು ವಿನಂತಿಸಲಾಗಿದೆ",
       "stateOpenReviewRequired": "ಮುಕ್ತ · ವಿಮರ್ಶೆ ಅಗತ್ಯವಿದೆ",
-      "stateOpen": "ಮುಕ್ತ",
+      "stateOpen": "ತೆರೆದಿದೆ",
       "unknownAuthor": "ಅಜ್ಞಾತ ಲೇಖಕ",
       "commit_one": "ಕಮಿಟ್",
       "commit": "ಕಮಿಟ್‌ಗಳು",
@@ -787,7 +787,7 @@
     "attachmentPicker": {
       "takePhoto": "ಫೋಟೋ ತೆಗೆಯಿರಿ",
       "photoLibrary": "ಫೋಟೋ ಲೈಬ್ರರಿ",
-      "files": "ಫೈಲ್ಗಳು",
+      "files": "ಫೈಲ್‌ಗಳು",
       "cameraAccessDisabled": "ಕ್ಯಾಮೆರಾ ಪ್ರವೇಶ ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ",
       "cameraAccessMessage": "ಫೋಟೋ ತೆಗೆಯಲು ಸೆಟ್ಟಿಂಗ್ಗಳಲ್ಲಿ ಕ್ಯಾಮೆರಾ ಪ್ರವೇಶವನ್ನು ಅನುಮತಿಸಿ."
     },
@@ -935,10 +935,10 @@
     "modelList": {
       "title": "ಎಲ್ಲಾ ಮಾದರಿಗಳು",
       "searchPlaceholder": "ಮಾದರಿಗಳನ್ನು ಹುಡುಕಿ...",
-      "couldNotLoad": "ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
-      "clearSearch": "ಹುಡುಕಾಟ ತೆರವುಗೊಳಿಸಿ",
+      "couldNotLoad": "ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
+      "clearSearch": "ಹುಡುಕಾಟವನ್ನು ತೆರವುಗೊಳಿಸಿ",
       "noMatches": "ನಿಮ್ಮ ಹುಡುಕಾಟಕ್ಕೆ ಹೊಂದುವ ಮಾದರಿಗಳಿಲ್ಲ",
-      "noModels": "ಯಾವುದೇ ಮಾದರಿ ಲಭ್ಯವಿಲ್ಲ",
+      "noModels": "ಯಾವುದೇ ಮಾದರಿಗಳು ಲಭ್ಯವಿಲ್ಲ",
       "noModelsDescription": "ಮಾದರಿಗಳು ಲಭ್ಯವಾದಾಗ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
       "noResultsFor": "\"{{query}}\" ಗೆ ಯಾವುದೇ ಫಲಿತಾಂಶಗಳಿಲ್ಲ",
       "recommended": "ಶಿಫಾರಸು ಮಾಡಲಾಗಿದೆ"
@@ -1003,7 +1003,7 @@
       "start": "ಪ್ರಾರಂಭಿಸಿ",
       "startMessage": "ಈ ಉದಾಹರಣೆಯನ್ನು ಪ್ರಾರಂಭಿಸಲು ನೀವು ಖಚಿತವಾಗಿ ಬಯಸುವಿರಾ?",
       "startTitle": "ಉದಾಹರಣೆ ಪ್ರಾರಂಭಿಸಿ",
-      "starting": "ಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ…",
+      "starting": "ಪ್ರಾರಂಭವಾಗುತ್ತಿದೆ…",
       "stop": "ನಿಲ್ಲಿಸಿ",
       "stopMessage": "ಈ ಉದಾಹರಣೆಯನ್ನು ನಿಲ್ಲಿಸಲು ನೀವು ಖಚಿತವಾಗಿ ಬಯಸುವಿರಾ?",
       "stopTitle": "ಉದಾಹರಣೆ ನಿಲ್ಲಿಸಿ",
@@ -1013,7 +1013,7 @@
       "finishingSetup": "ಸೆಟಪ್ ಪೂರ್ಣಗೊಳಿಸಲಾಗುತ್ತಿದೆ",
       "finishingSetupDescription": "ಇಲ್ಲಿ ನಿಲ್ಲಿ, ನಾವು ನಿಮ್ಮ ಖಾತೆಯನ್ನು ಅಂತಿಮಗೊಳಿಸುತ್ತಿದ್ದೇವೆ. ಇದು ಸಾಮಾನ್ಯವಾಗಿ ಒಂದು ಕ್ಷಣ ತೆಗೆದುಕೊಳ್ಳುತ್ತದೆ.",
       "getStarted": "ಪ್ರಾರಂಭಿಸಿ",
-      "noInstances": "ಯಾವುದೇ KiloClaw ಉದಾಹರಣೆಗಳಿಲ್ಲ",
+      "noInstances": "ಯಾವುದೇ KiloClaw ಇನ್ಸ್ಟೆನ್ಸ್‌ಗಳಿಲ್ಲ",
       "noInstancesDescription": "ಕೋಡಿಂಗ್ ಏಜೆಂಟ್ಗಳನ್ನು ಚಲಾಯಿಸಲು ನಿಮ್ಮ ಮೊದಲ ಉದಾಹರಣೆಯನ್ನು ರಚಿಸಿ."
     },
     "instance": {
@@ -1139,7 +1139,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Frontier",
       "frontierDescription": "ಅತ್ಯುನ್ನತ ಕಾರ್ಯಕ್ಷಮತೆ. ತಾರ್ಕಿಕತೆಯೊಂದಿಗೆ frontier ಮಾದರಿಗಳಿಗೆ ಮಾರ್ಗ ಮಾಡುತ್ತದೆ.",
-      "balancedLabel": "Balanced",
+      "balancedLabel": "ಸಮತೋಲಿತ",
       "balancedDescription": "ಕಡಿಮೆ ವೆಚ್ಚದಲ್ಲಿ ವೇಗ ಮತ್ತು ಸಾಮರ್ಥ್ಯದ ಸಮತೋಲನ.",
       "cost": "ವೆಚ್ಚ",
       "performance": "ಕಾರ್ಯಕ್ಷಮತೆ",
@@ -1240,7 +1240,7 @@
     },
     "repos": {
       "title": "ರೆಪೊಸಿಟರಿಗಳು",
-      "couldNotLoad": "ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+      "couldNotLoad": "ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
       "unavailable": "ರೆಪೊಸಿಟರಿಗಳು ಲಭ್ಯವಿಲ್ಲ — kilo.ai ನಲ್ಲಿ Bitbucket ಸೆಟಪ್ ಪೂರ್ಣಗೊಳಿಸಿ.",
       "finishSetup": "ಸೆಟಪ್ ಪೂರ್ಣಗೊಳಿಸಿ",
       "manageAccess": "ಪ್ರವೇಶ ನಿರ್ವಹಿಸಿ",
@@ -1262,9 +1262,9 @@
       "roast": "ಕ್ರೂರವಾಗಿ ಪ್ರಾಮಾಣಿಕ, ಮನರಂಜನಾತ್ಮಕವಾಗಿ",
       "strict": "ಎಲ್ಲವನ್ನೂ ಗುರುತಿಸಿ, ಉನ್ನತ ಮಟ್ಟವನ್ನು ಹೊಂದಿರಿ"
     },
-    "title": "Code Reviewer",
+    "title": "ಕೋಡ್ ರಿವ್ಯೂಯರ್",
     "reviewDetail": {
-      "title": "ಪರಿಶೀಲನೆ",
+      "title": "ವಿಮರ್ಶೆ",
       "cancelTitle": "ಪರಿಶೀಲನೆ ರದ್ದುಗೊಳಿಸುವುದೇ?",
       "cancelMessage": "ಇದು ಪ್ರಗತಿಯಲ್ಲಿರುವ ಕೋಡ್ ಪರಿಶೀಲನೆಯನ್ನು ನಿಲ್ಲಿಸುತ್ತದೆ.",
       "keepRunning": "ಚಲಾಯಿಸುತ್ತಲೇ ಇರಿ",
@@ -1406,7 +1406,7 @@
       "noDecision": "ನಿರ್ಧಾರವಿಲ್ಲ",
       "noResult": "ಫಲಿತಾಂಶವಿಲ್ಲ"
     },
-    "eyebrow": "Code Reviewer",
+    "eyebrow": "ಕೋಡ್ ರಿವ್ಯೂಯರ್",
     "updateFailed": "ರಿವ್ಯೂಯರ್ ಅನ್ನು ನವೀಕರಿಸಲು ವಿಫಲವಾಗಿದೆ",
     "configSaveFailed": "ವಿಮರ್ಶೆ ಕಾನ್ಫಿಗ್ ಉಳಿಸಲು ವಿಫಲವಾಗಿದೆ",
     "status": {
@@ -1436,7 +1436,7 @@
       "off": "ಆಫ್",
       "all": "ಎಲ್ಲಾ",
       "warning": "ಎಚ್ಚರಿಕೆ",
-      "critical": "ನಿರ್ಣಾಯಕ"
+      "critical": "ಗಂಭೀರ"
     },
     "actionRequired": {
       "githubInstallationRequired": {
@@ -1486,19 +1486,19 @@
       "sortBy": "ವಿಂಗಡಿಸಿ",
       "allRepositories": "ಎಲ್ಲಾ ರೆಪೊಸಿಟರಿಗಳು",
       "all": "ಎಲ್ಲಾ",
-      "statusOpen": "ತೆರೆದ",
+      "statusOpen": "ತೆರೆದಿದೆ",
       "fixed": "ಸರಿಪಡಿಸಲಾಗಿದೆ",
       "statusIgnored": "ನಿರ್ಲಕ್ಷಿಸಲಾಗಿದೆ",
       "statusClosed": "ಮುಚ್ಚಲಾಗಿದೆ",
-      "severityCritical": "ನಿರ್ಣಾಯಕ",
+      "severityCritical": "ಗಂಭೀರ",
       "severityHigh": "ಹೆಚ್ಚಿನ",
       "severityMedium": "ಮಧ್ಯಮ",
       "severityLow": "ಕಡಿಮೆ",
       "outcomeNotAnalyzed": "ವಿಶ್ಲೇಷಿಸಲಾಗಿಲ್ಲ",
       "outcomeAnalyzing": "ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತಿದೆ",
       "outcomeFailed": "ವಿಶ್ಲೇಷಣೆ ವಿಫಲವಾಗಿದೆ",
-      "outcomeExploitable": "ದುರ್ಬಳಕೆ ಸಾಧ್ಯ",
-      "outcomeNotExploitable": "ದುರ್ಬಳಕೆ ಸಾಧ್ಯವಿಲ್ಲ",
+      "outcomeExploitable": "ದುರ್ಬಳಕೆ ಮಾಡಬಹುದಾದ",
+      "outcomeNotExploitable": "ದುರ್ಬಳಕೆ ಮಾಡಲಾಗುವುದಿಲ್ಲ",
       "outcomeSafeToDismiss": "ತೆಗೆದುಹಾಕಲು ಸುರಕ್ಷಿತ",
       "outcomeNeedsReview": "ಪರಿಶೀಲನೆ ಅಗತ್ಯವಿದೆ",
       "outcomeTriageComplete": "ಟ್ರಯಾಜ್ ಪೂರ್ಣಗೊಂಡಿದೆ",
@@ -1509,7 +1509,7 @@
       "overdueOnly": "ಕೇವಲ ಬಾಕಿ ಇರುವವು"
     },
     "automation": {
-      "title": "ಆಟೊಮೇಷನ್",
+      "title": "ಸ್ವಯಂಚಾಲನೆ",
       "couldNotLoad": "ಆಟೊಮೇಷನ್ ಸೆಟ್ಟಿಂಗ್ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "autoAnalysis": "ಸ್ವಯಂ ವಿಶ್ಲೇಷಣೆ",
       "autoRemediation": "ಸ್ವಯಂ ಪರಿಹಾರ",
@@ -1688,7 +1688,7 @@
       "couldNotLoadSettings": "Security Agent ಸೆಟ್ಟಿಂಗ್ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
       "couldNotLoadPermissions": "ಅನುಮತಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
       "couldNotLoadRepositories": "ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
-      "securityAgent": "Security Agent",
+      "securityAgent": "ಭದ್ರತಾ ಏಜೆಂಟ್",
       "enabled": "ಸಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ",
       "disabled": "ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ",
       "on": "ಆನ್",
@@ -1732,7 +1732,7 @@
       "attemptNumber": "ಪ್ರಯತ್ನ #{{number}}",
       "startedBy": "ರಿಂದ ಪ್ರಾರಂಭಿಸಲಾಗಿದೆ",
       "model": "ಮಾದರಿ",
-      "branch": "ಶಾಖೆ",
+      "branch": "ಬ್ರಾಂಚ್",
       "queued": "ಪರಿಹಾರ ಸೇರಿಸಲಾಗಿದೆ",
       "retryQueued": "ಪರಿಹಾರ ಮರುಪ್ರಯತ್ನ ಸೇರಿಸಲಾಗಿದೆ",
       "timeline": {
@@ -1798,8 +1798,8 @@
       "clearFilters": "ಫಿಲ್ಟರ್ಗಳನ್ನು ತೆರವುಗೊಳಿಸಿ"
     },
     "scopeList": {
-      "title": "Security Agent",
-      "couldNotLoad": "ಸಂಸ್ಥೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
+      "title": "ಭದ್ರತಾ ಏಜೆಂಟ್",
+      "couldNotLoad": "ಸಂಸ್ಥೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "personal": "ವೈಯಕ್ತಿಕ",
       "personalSubtitle": "ನಿಮ್ಮ ಸ್ವಂತ ರೆಪೊಸಿಟರಿಗಳು"
     },
@@ -1813,7 +1813,7 @@
       "nextRemediationAvailable": "ಪರಿಹಾರ ಲಭ್ಯವಿದೆ",
       "retryAnalysis": "ವಿಶ್ಲೇಷಣೆಯನ್ನು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
       "runAnalysis": "ವಿಶ್ಲೇಷಣೆಯನ್ನು ಚಲಾಯಿಸಿ",
-      "nextNeedsManualReview": "ಹಸ್ತಚಾಲಿತ ಪರಿಶೀಲನೆ ಅಗತ್ಯ",
+      "nextNeedsManualReview": "ಹಸ್ತಚಾಲಿತ ಪರಿಶೀಲನೆ ಅಗತ್ಯವಿದೆ",
       "nextViewDetails": "ವಿವರಗಳನ್ನು ನೋಡಿ",
       "viewPr": "PR ನೋಡಿ",
       "analyze": "ವಿಶ್ಲೇಷಿಸಿ",
@@ -1847,7 +1847,7 @@
       "unavailable": "ಆಡಿಟ್ ವರದಿ ಲಭ್ಯವಿಲ್ಲ",
       "unavailableDescription": "ಆಡಿಟ್ ವರದಿಗಳನ್ನು ನೋಡಲು ಸಂಸ್ಥೆ ಮಾಲೀಕರು ಮತ್ತು ಬಿಲ್ಲಿಂಗ್ ನಿರ್ವಾಹಕರು ಮಾತ್ರ ಸಾಧ್ಯ. ನಿಮಗೆ ಪ್ರವೇಶ ನೀಡಲು ಮಾಲೀಕರನ್ನು ಅಥವಾ ಬಿಲ್ಲಿಂಗ್ ನಿರ್ವಾಹಕರನ್ನು ಕೇಳಿ.",
       "queryFailed": "ವರದಿ ಪ್ರಶ್ನೆ ಮುಗಿಯಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-      "checkConnection": "ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+      "checkConnection": "ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
     "notifications": {
       "couldNotLoad": "ಅಧಿಸೂಚನೆ ಸೆಟ್ಟಿಂಗ್ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
@@ -1894,7 +1894,7 @@
     },
     "queuedActionUntracked": "ಸೇರಿಸಲಾದ ಕ್ರಿಯೆಯನ್ನು ಇನ್ನು ಮುಂದೆ ಟ್ರ್ಯಾಕ್ ಮಾಡಲಾಗಲಿಲ್ಲ. ಇತ್ತೀಚಿನ ಸ್ಥಿತಿಯನ್ನು ನೋಡಲು ರಿಫ್ರೆಶ್ ಮಾಡಿ.",
     "initialSyncAdmissionFailed": "Security Agent ಸಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ, ಆದರೆ ಆರಂಭಿಕ ಸಿಂಕ್ ಅನ್ನು ಸೇರಿಸಲಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಸಿಂಕ್ ಮಾಡಿ.",
-    "title": "Security Agent",
+    "title": "ಭದ್ರತಾ ಏಜೆಂಟ್",
     "commands": {
       "findingAlreadyDismissed": "ಸಂಶೋಧನೆಯನ್ನು ಈಗಾಗಲೇ ತೆಗೆದುಹಾಕಲಾಗಿದೆ",
       "findingDismissed": "ಸಂಶೋಧನೆಯನ್ನು ತೆಗೆದುಹಾಕಲಾಗಿದೆ",
@@ -2064,7 +2064,7 @@
       "couldNotCopyId": "ಸೆಶನ್ ID ನಕಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "untitled": "ಶೀರ್ಷಿಕೆಯಿಲ್ಲದ ಸೆಶನ್",
       "sessionDeleted": "ಸೆಶನ್ ಅಳಿಸಲಾಗಿದೆ",
-      "needsInput": "ಇನ್ಪುಟ್ ಅಗತ್ಯವಿದೆ",
+      "needsInput": "ಇನ್‌ಪುಟ್ ಅಗತ್ಯವಿದೆ",
       "fromPlatform": "{{platform}} ನಿಂದ",
       "cent_one": "ಸೆಂಟ್",
       "cent": "ಸೆಂಟ್ಗಳು",
@@ -2129,7 +2129,7 @@
     },
     "remoteSession": {
       "failedToCreate": "ರಿಮೋಟ್ ಸೆಶನ್ ರಚಿಸಲು ವಿಫಲವಾಗಿದೆ",
-      "exited": "ಸೆಶನ್ ನಿರ್ಗಮಿಸಿತು",
+      "exited": "ಸೆಶನ್ ನಿರ್ಗಮಿಸಿದೆ",
       "failedToExit": "ಸೆಶನ್ ನಿರ್ಗಮಿಸಲು ವಿಫಲವಾಗಿದೆ",
       "exitTitle": "ಸೆಶನ್ ನಿರ್ಗಮಿಸಬೇಕೆ?",
       "exitMessage": "ಇದು ಚಲಾಯಿಸುತ್ತಿರುವ ಸೆಶನ್ ಅನ್ನು ನಿಲ್ಲಿಸುತ್ತದೆ ಆದರೆ ಅದರ ಇತಿಹಾಸವನ್ನು ಇಟ್ಟುಕೊಳ್ಳುತ್ತದೆ.",
@@ -2202,14 +2202,14 @@
       "contentTruncated": "ವಿಷಯವನ್ನು ಕತ್ತರಿಸಲಾಗಿದೆ",
       "truncated": "ಕತ್ತರಿಸಲಾಗಿದೆ",
       "toolRead": "read",
-      "toolEdit": "edit",
+      "toolEdit": "ಸಂಪಾದಿಸಿ",
       "toolWrite": "write",
       "toolBash": "bash",
       "toolGlob": "glob",
       "toolGrep": "grep",
       "toolList": "list",
       "toolPatch": "patch",
-      "toolTask": "task",
+      "toolTask": "ಕಾರ್ಯ",
       "readTodos": "todos ಓದಿ",
       "updateTodos": "todos ನವೀಕರಿಸಿ",
       "linesBadge": "{{displayCount}} ಸಾಲುಗಳು",
@@ -2232,7 +2232,7 @@
       "runOn": "ಇದರ ಮೇಲೆ ಚಲಾಯಿಸಿ",
       "runOnAccessibility": "ಇದರ ಮೇಲೆ ಚಲಾಯಿಸಿ: {{label}}",
       "couldNotLoad": "ಇನ್ಸ್ಟನ್ಸ್ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
-      "couldNotLoadDescription": "ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "couldNotLoadDescription": "ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "cloudAgent": "Cloud Agent",
       "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
       "cloudAgentDescription": "Kilo ನ ಕ್ಲೌಡ್ ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್ನಲ್ಲಿ ಚಲಾಯಿಸಿ",
@@ -2423,7 +2423,7 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. ಮರುಪ್ರಯತ್ನ ಲಭ್ಯವಿದೆ.",
       "copyToComposer": "ಸಂಯೋಜಕಕ್ಕೆ ನಕಲಿಸಿ",
-      "queued": "ಕ್ಯೂ ಮಾಡಲಾಗಿದೆ",
+      "queued": "ಸರದಿಯಲ್ಲಿದೆ",
       "queuedAccessibility": "ಸಂದೇಶ ಕ್ಯೂ ಮಾಡಲಾಗಿದೆ",
       "userMessage": "ಬಳಕೆದಾರ ಸಂದೇಶ",
       "assistantMessage": "ಸಹಾಯಕ ಸಂದೇಶ",
@@ -2456,7 +2456,7 @@
       "sortBy": "ವಿಂಗಡಿಸಿ",
       "sortLastUpdated": "ಕೊನೆಯದಾಗಿ ನವೀಕರಿಸಲಾಗಿದೆ",
       "sortCreated": "ರಚಿಸಲಾಗಿದೆ",
-      "platform": "ಪ್ಲಾಟ್‌ಫಾರ್ಮ್",
+      "platform": "ಪ್ಲಾಟ್ಫಾರ್ಮ್",
       "platformCloud": "ಕ್ಲೌಡ್",
       "platformExtension": "ಎಕ್ಸ್ಟೆನ್ಶನ್",
       "platformCli": "CLI",
@@ -2481,7 +2481,7 @@
       "noModels": "ಯಾವುದೇ ಮಾದರಿಗಳು ಲಭ್ಯವಿಲ್ಲ",
       "noModelsDescription": "ಆಯ್ಕೆ ಮಾಡಲು ಯಾವುದೇ ಮಾದರಿಗಳು ಲಭ್ಯವಿಲ್ಲ.",
       "favorites": "ಮೆಚ್ಚಿನವುಗಳು",
-      "recommended": "ಶಿಫಾರಸು ಮಾಡಲಾದ",
+      "recommended": "ಶಿಫಾರಸು ಮಾಡಲಾಗಿದೆ",
       "allModels": "ಎಲ್ಲಾ ಮಾದರಿಗಳು"
     },
     "modelSelector": {
@@ -2518,9 +2518,9 @@
     "attachmentPicker": {
       "camera": "ಕ್ಯಾಮೆರಾ",
       "photoLibrary": "ಫೋಟೋ ಲೈಬ್ರರಿ",
-      "files": "ಫೈಲ್ಗಳು",
+      "files": "ಫೈಲ್‌ಗಳು",
       "cameraAccessDisabled": "ಕ್ಯಾಮೆರಾ ಪ್ರವೇಶ ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ",
-      "cameraAccessMessage": "ಫೋಟೋ ತೆಗೆಯಲು ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಕ್ಯಾಮೆರಾ ಪ್ರವೇಶವನ್ನು ಅನುಮತಿಸಿ.",
+      "cameraAccessMessage": "ಫೋಟೋ ತೆಗೆಯಲು ಸೆಟ್ಟಿಂಗ್ಗಳಲ್ಲಿ ಕ್ಯಾಮೆರಾ ಪ್ರವೇಶವನ್ನು ಅನುಮತಿಸಿ.",
       "couldNotOpenPhotoPicker": "ಫೋಟೋ ಪಿಕರ್ ಅನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. Kilo ಅನ್ನು ಮರುಪ್ರಾರಂಭಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "maxFilesAllowed": "ಗರಿಷ್ಠ {{displayCount}} ಫೈಲ್‌ಗಳನ್ನು ಅನುಮತಿಸಲಾಗಿದೆ",
       "onlyAddingFiles": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{accepted}} ಮಾತ್ರ ಸೇರಿಸಲಾಗುತ್ತಿದೆ (ಗರಿಷ್ಠ {{max}})"
@@ -2604,7 +2604,7 @@
       "olderActivity": "ಹಳೆಯ ಚಟುವಟಿಕೆ",
       "olderActivityDescription": "ಲೋಡ್ ಮಾಡಿದ ಇತಿಹಾಸಕ್ಕೆ ಆಪಾದಿಸದ ವೆಚ್ಚ",
       "ofWindowTokens": "{{window}} ಟೋಕನ್‌ಗಳಲ್ಲಿ",
-      "tokens": "ಟೋಕನ್‌ಗಳು",
+      "tokens": "ಟೋಕನ್ಗಳು",
       "tokensWithPercentage": "ಟೋಕನ್‌ಗಳು ({{percentage}})",
       "stepsCount_one": "{{steps}} ಹಂತ",
       "stepsCount": "{{steps}} ಹಂತಗಳು",
@@ -2637,7 +2637,7 @@
     "billingPage": "ಬಿಲ್ಲಿಂಗ್ ಪುಟ"
   },
   "deviceSessions": {
-    "couldNotLoad": "ಸೆಷನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+    "couldNotLoad": "ಸೆಶನ್ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
     "couldNotLoadDescription": "ಇದು ಲೋಡ್ ಆಗುವವರೆಗೆ ನಿಮ್ಮ ಸಕ್ರಿಯ ಸೆಷನ್‌ಗಳು ಲಭ್ಯವಿಲ್ಲ.",
     "currentDeviceUnidentified": "ಪ್ರಸ್ತುತ ಸಾಧನವನ್ನು ಗುರುತಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "noSessions": "ಯಾವುದೇ ಸಕ್ರಿಯ ಸೆಷನ್‌ಗಳಿಲ್ಲ",
@@ -2654,7 +2654,7 @@
     "signOutThisSessionTitle": "ಈ ಸೆಷನ್ನಿಂದ ಸೈನ್ ಔಟ್ ಮಾಡುವುದೇ?",
     "signOutThisSessionMessage": "{{device}} ಸೈನ್ ಔಟ್ ಆಗುತ್ತದೆ. ಇದು ಒಂದು ಗಂಟೆಯವರೆಗೆ API ಪ್ರವೇಶವನ್ನು ಹೊಂದಬಹುದು.",
     "signOutConfirm": "ಸೈನ್ ಔಟ್",
-    "signOutMessage": "ನಿಮ್ಮ ವರ್ಕ್‌ಸ್ಪೇಸ್ ಅನ್ನು ಪ್ರವೇಶಿಸಲು ನೀವು ಮತ್ತೆ ಸೈನ್ ಇನ್ ಮಾಡಬೇಕಾಗುತ್ತದೆ.",
+    "signOutMessage": "ನಿಮ್ಮ ವರ್ಕ್‌ಸ್ಪೇಸ್ ಪ್ರವೇಶಿಸಲು ನೀವು ಮತ್ತೆ ಸೈನ್ ಇನ್ ಮಾಡಬೇಕಾಗುತ್ತದೆ.",
     "webBrowser": "ವೆಬ್ ಬ್ರೌಸರ್"
   },
   "forceUpdate": {
@@ -2689,7 +2689,7 @@
     "title": "ಪುಟ ಕಂಡುಬಂದಿಲ್ಲ"
   },
   "monoScrollBlock": {
-    "contentTruncated": "ವಿಷಯ ಕತ್ತರಿಸಲಾಗಿದೆ",
+    "contentTruncated": "ವಿಷಯವನ್ನು ಕತ್ತರಿಸಲಾಗಿದೆ",
     "truncated": "ಕತ್ತರಿಸಲಾಗಿದೆ",
     "wrap": "ಸುತ್ತಿ",
     "scroll": "ಸ್ಕ್ರಾಲ್"
@@ -2704,9 +2704,9 @@
     "offlineTitle": "ಲೋಡ್ ವಿಫಲವಾಗಿದೆ",
     "offlineDescription": "ಏನೋ ತಪ್ಪಾಗಿದೆ",
     "permissionTitle": "ಪ್ರವೇಶ ನಿರಾಕರಿಸಲಾಗಿದೆ",
-    "permissionDescription": "ಇದನ್ನು ವೀಕ್ಷಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
+    "permissionDescription": "ಇದನ್ನು ನೋಡಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
     "notFoundTitle": "ಕಂಡುಬಂದಿಲ್ಲ",
-    "notFoundDescription": "ಈ ಐಟಂ ಅನ್ನು ತೆಗೆದುಹಾಕಿರಬಹುದು ಅಥವಾ ಅದು ಇನ್ನು ಮುಂದೆ ಲಭ್ಯವಿಲ್ಲ.",
+    "notFoundDescription": "ಈ ಐಟಂ ಅನ್ನು ತೆಗೆದುಹಾಕಿರಬಹುದು ಅಥವಾ ಇನ್ನು ಮುಂದೆ ಲಭ್ಯವಿಲ್ಲದಿರಬಹುದು.",
     "serverTitle": "ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "serverDescription": "ನಮ್ಮ ಕಡೆಯಿಂದ ಏನೋ ತಪ್ಪಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
   },
@@ -2747,7 +2747,7 @@
     "close": "ಮುಚ್ಚಿ",
     "reviewPr": "PR ವಿಮರ್ಶಿಸಿ",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "ಹೊಸ ಸೆಷನ್",
+    "newSession": "ಹೊಸ ಸೆಶನ್",
     "searchPlaceholder": "ಇತ್ತೀಚಿನ ಸೆಷನ್‌ಗಳನ್ನು ಹುಡುಕಿ",
     "connectedCli": "ಸಂಪರ್ಕಿತ CLI ಯಲ್ಲಿ",
     "newSessionOn": "{{name}} ನಲ್ಲಿ ಹೊಸ ಸೆಷನ್",
@@ -3094,7 +3094,7 @@
     "startSignInFailed": "ಸೈನ್ ಇನ್ ಪ್ರಾರಂಭಿಸಲು ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "couldNotOpenBrowser": "ಬ್ರೌಸರ್ ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "signInTimedOut": "ಸೈನ್ ಇನ್ ಅವಧಿ ಮೀರಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-    "signInFailed": "ಸೈನ್ ಇನ್ ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "signInFailed": "ಸೈನ್-ಇನ್ ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "networkError": "ನೆಟ್‌ವರ್ಕ್ ದೋಷ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "accessDeniedByUser": "ಬಳಕೆದಾರರಿಂದ ಪ್ರವೇಶ ನಿರಾಕರಿಸಲಾಗಿದೆ",
     "codeExpired": "ಕೋಡ್ ಅವಧಿ ಮೀರಿದೆ",

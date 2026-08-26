@@ -20,11 +20,12 @@ export default function AppLanguagePickerScreen() {
   const bridge = getLanguagePickerBridge();
 
   useFocusEffect(
-    useCallback(() => {
-      return () => {
+    useCallback(
+      () => () => {
         clearLanguagePickerBridge();
-      };
-    }, [])
+      },
+      []
+    )
   );
 
   return (

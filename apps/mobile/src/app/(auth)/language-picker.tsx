@@ -20,11 +20,12 @@ export default function AuthLanguagePickerScreen() {
   const bridge = getLanguagePickerBridge();
 
   useFocusEffect(
-    useCallback(() => {
-      return () => {
+    useCallback(
+      () => () => {
         clearLanguagePickerBridge();
-      };
-    }, [])
+      },
+      []
+    )
   );
 
   return (

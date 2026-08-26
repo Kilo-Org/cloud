@@ -3,7 +3,6 @@ import { useEditMessage, useRedeliverMessage } from '@kilocode/kilo-chat-hooks';
 import {
   buildMessageEditContent,
   contentBlocksToText,
-  formatKiloChatError,
   type InputContentBlock,
   type KiloChatClient,
   type Message,
@@ -15,6 +14,7 @@ import { i18n } from '@/i18n';
 import { captureEvent, MESSAGE_SENT_EVENT } from '@/lib/analytics/posthog';
 
 import { resolveMobileMessageInputAvailability } from '../bot-send-state';
+import { formatMobileKiloChatError } from '../kilo-chat-error';
 import { type MessageInputSubmitControls } from '../message-input-state';
 import {
   buildSendMessageVariables,
@@ -107,7 +107,9 @@ export function useConversationMessageController({
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           },
           onError: err => {
-            toast.error(formatKiloChatError(err, i18n.t('chat.messageActions.retrySendFailed')));
+            toast.error(
+              formatMobileKiloChatError(err, i18n.t('chat.messageActions.retrySendFailed'))
+            );
           },
         }
       );
@@ -151,7 +153,7 @@ export function useConversationMessageController({
           setRemovedEditAttachmentIds([]);
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } catch (error) {
-          toast.error(formatKiloChatError(error, i18n.t('chat.messageActions.editFailed')));
+          toast.error(formatMobileKiloChatError(error, i18n.t('chat.messageActions.editFailed')));
         }
         return;
       }

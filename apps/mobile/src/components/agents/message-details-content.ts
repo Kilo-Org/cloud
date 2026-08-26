@@ -2,6 +2,7 @@ import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { dateTimeFormat } from '@/lib/intl-cache';
 
 import { collectCopyableText } from './collect-copyable-text';
 import { formatCost } from './context-usage-display';
@@ -23,11 +24,6 @@ type MessageDetailsContent = {
   copyableText: string | null;
   canSelectText: boolean;
 };
-
-const SENT_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
 
 /**
  * Pure projection of a StoredMessage into the details-sheet fields.
@@ -155,5 +151,8 @@ export function formatMessageSentTime(created: number | undefined | null): strin
   if (Number.isNaN(date.getTime())) {
     return null;
   }
-  return SENT_TIME_FORMATTER.format(date);
+  return dateTimeFormat(i18n.language, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
 }

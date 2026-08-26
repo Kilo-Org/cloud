@@ -25,6 +25,16 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
+const SUBSCRIPTION_PLAN_KEYS = {
+  commit: 'kiloclaw.billing.planName.commit',
+  standard: 'kiloclaw.billing.planName.standard',
+} satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
+
 function DetailRow({
   label,
   value,
@@ -132,8 +142,8 @@ function PlanDetails({
     return <FinalCommitTermDetails billing={billing} />;
   }
   if (billing.subscription) {
-    const planName =
-      billing.subscription.plan.charAt(0).toUpperCase() + billing.subscription.plan.slice(1);
+    const planKey = lookup(SUBSCRIPTION_PLAN_KEYS, billing.subscription.plan);
+    const planName = planKey ? t(planKey) : billing.subscription.plan;
     const cancelling = billing.subscription.cancelAtPeriodEnd;
     return (
       <View>
@@ -163,10 +173,7 @@ function PlanDetails({
     );
   }
   if (billing.earlybird) {
-    const daysText =
-      billing.earlybird.daysRemaining === 1
-        ? t('kiloclaw.billing.oneDayLeft')
-        : t('kiloclaw.billing.daysLeft', { count: billing.earlybird.daysRemaining });
+    const daysText = formatRemainingDays(billing.earlybird.daysRemaining);
     return (
       <View>
         <DetailRow label={t('kiloclaw.billing.plan')} value={t('kiloclaw.billing.earlybird')} />

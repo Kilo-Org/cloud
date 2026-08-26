@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
+import { i18n } from '@/i18n';
+
 import {
   type ClipboardImageFile,
   hasClipboardImage,
@@ -9,7 +11,9 @@ import {
   readClipboardText,
 } from './clipboard-image';
 
-export const CLIPBOARD_PASTE_EMPTY_MESSAGE = 'Nothing to paste';
+export function clipboardPasteEmptyMessage(): string {
+  return i18n.t('chat.attachment.nothingToPaste');
+}
 
 type UseClipboardPasteOptions = {
   /** Gates `visible` only — `paste` always works. Defaults to true. Pass each

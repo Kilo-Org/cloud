@@ -327,6 +327,27 @@ importers:
       '@expo/react-native-action-sheet':
         specifier: 4.1.1
         version: 4.1.1(@types/react@19.2.14)(react@19.2.3)
+      '@formatjs/intl-durationformat':
+        specifier: ^0.10.18
+        version: 0.10.18
+      '@formatjs/intl-listformat':
+        specifier: ^8.3.13
+        version: 8.3.13
+      '@formatjs/intl-locale':
+        specifier: ^5.3.10
+        version: 5.3.10
+      '@formatjs/intl-numberformat':
+        specifier: ^9.4.0
+        version: 9.4.0
+      '@formatjs/intl-pluralrules':
+        specifier: ^6.3.13
+        version: 6.3.13
+      '@formatjs/intl-relativetimeformat':
+        specifier: ^12.3.13
+        version: 12.3.13
+      '@formatjs/intl-segmenter':
+        specifier: ^12.2.13
+        version: 12.2.13
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../../packages/app-shared
@@ -1341,7 +1362,7 @@ importers:
         version: 7.0.0-dev.20260514.1
       jest:
         specifier: 30.3.0
-        version: 30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)
+        version: 30.3.0(@types/node@25.5.2)(node-notifier@10.0.1)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -5191,6 +5212,42 @@ packages:
 
   '@fontsource-variable/roboto-mono@5.3.0':
     resolution: {integrity: sha512-h5r+KY/6qy8JEOj33JgcrFO81YAnvrc1EAwMpl/EPJLb2OIvOy0/jmB5M7qs7x/uXk5JUP5Ux4LrkeOK7faHkQ==}
+
+  '@formatjs/bigdecimal@0.2.7':
+    resolution: {integrity: sha512-B4+XY/e4u5v261r3a37Kq2ax91gPZSKGyVpx8X5dygAggLlUz+6MeBpmAhaBFGB8WQ4JB1qD+QtKHk9aJkEb9Q==}
+
+  '@formatjs/fast-memoize@3.1.7':
+    resolution: {integrity: sha512-zXfhLpvA6T7+efdt9JLbBwZ00tT7NsBMDVnDu8rpHeNNv8KfRZAMo2gkG0k9lK/Nzc//3kJ9pImsfuJxk3KhUA==}
+
+  '@formatjs/intl-durationformat@0.10.18':
+    resolution: {integrity: sha512-Wyn7TYW1c5EORLuh6IeAyEpaJf6GmvHPN7TXjJj3VT0bl9U2/zv/A518R+5lYtCmXLmmxX7DYz4iKSKzoKkR7g==}
+
+  '@formatjs/intl-getcanonicallocales@3.2.11':
+    resolution: {integrity: sha512-3FX+dgs+n7IZ6LGewqKV+JhAN7PeknS17j2QH0Qq4yQ64QJCmd8ST5FIRRvVgM93T6L2sARpcSH1gNiVMgVy6w==}
+
+  '@formatjs/intl-listformat@8.3.13':
+    resolution: {integrity: sha512-BTyqgBrZJdNM0CKIpsRXyuaSWAQ5Y+wP94cQTadTtT4XogvNh9YjnqLqgez6vQS4dTFgqOz5y/gP9rms4C1k1w==}
+
+  '@formatjs/intl-locale@5.3.10':
+    resolution: {integrity: sha512-JAlo479jZagR6Ze7EI4HGcV8Fi0PYVvEYmsis7c5i7I9Wa5d1Cbo+ThvDikhkQi6Gt86fpGriDOiOQP8CT2WZA==}
+
+  '@formatjs/intl-localematcher@0.8.13':
+    resolution: {integrity: sha512-kHEAFOkeJSPNi7c5PaKaRjxcBrJwzzt81ifUu+8uve1EDW/VJl83KsxmqgqNZLzcFEhSliZGvx3+pk/RH0IOmg==}
+
+  '@formatjs/intl-numberformat@9.4.0':
+    resolution: {integrity: sha512-j7H3YoHOdfYjESj3yU9Aw/SApIBd3H91D87HpplkPWs0aIR7MOs9wh6GN8GSLKJQy6zXuK4d0Bgng5h+3JkrJg==}
+
+  '@formatjs/intl-pluralrules@6.3.13':
+    resolution: {integrity: sha512-78dxY4nu4BbB9J7WqqIFzr1EbhrbB6VE4KOGw4qlmX+IpS6YPM7tVYLLhDq7qOQCzq9+741iDMrgB1JlhHUM/Q==}
+
+  '@formatjs/intl-relativetimeformat@12.3.13':
+    resolution: {integrity: sha512-qgH6XQugzCrFyZIMvhi5xlk6JcJxyF87kcWzH8XT6X8oJQpdljt4xQSsF55TjaRHhi+iK1Nu7YAI9QkNGF7L2g==}
+
+  '@formatjs/intl-segmenter@12.2.13':
+    resolution: {integrity: sha512-jhxNn6FnvlIOYzn+VG4xRjcLRrLHlDGoRd723YuwdsNHZRvvcC4qvnh5xC5udSv0CiwbBKnPY3OzDNni2NxqIw==}
+
+  '@formatjs/intl-supportedvaluesof@2.3.9':
+    resolution: {integrity: sha512-RquyMkDVrJ5c0fYJSehVfzp7fWELH7vWY4nIvCoEchkDA32Mdm06ms6QvWdW+slECykCmoG4p8SLhwOKj2nCcg==}
 
   '@fregante/relaxed-json@2.0.0':
     resolution: {integrity: sha512-PyUXQWB42s4jBli435TDiYuVsadwRHnMc27YaLouINktvTWsL3FcKrRMGawTayFk46X+n5bE23RjUTWQwrukWw==}
@@ -21813,6 +21870,52 @@ snapshots:
 
   '@fontsource-variable/roboto-mono@5.3.0': {}
 
+  '@formatjs/bigdecimal@0.2.7': {}
+
+  '@formatjs/fast-memoize@3.1.7': {}
+
+  '@formatjs/intl-durationformat@0.10.18':
+    dependencies:
+      '@formatjs/bigdecimal': 0.2.7
+      '@formatjs/intl-localematcher': 0.8.13
+
+  '@formatjs/intl-getcanonicallocales@3.2.11': {}
+
+  '@formatjs/intl-listformat@8.3.13':
+    dependencies:
+      '@formatjs/intl-localematcher': 0.8.13
+
+  '@formatjs/intl-locale@5.3.10':
+    dependencies:
+      '@formatjs/intl-getcanonicallocales': 3.2.11
+      '@formatjs/intl-supportedvaluesof': 2.3.9
+
+  '@formatjs/intl-localematcher@0.8.13':
+    dependencies:
+      '@formatjs/fast-memoize': 3.1.7
+
+  '@formatjs/intl-numberformat@9.4.0':
+    dependencies:
+      '@formatjs/bigdecimal': 0.2.7
+      '@formatjs/intl-localematcher': 0.8.13
+
+  '@formatjs/intl-pluralrules@6.3.13':
+    dependencies:
+      '@formatjs/bigdecimal': 0.2.7
+      '@formatjs/intl-localematcher': 0.8.13
+
+  '@formatjs/intl-relativetimeformat@12.3.13':
+    dependencies:
+      '@formatjs/intl-localematcher': 0.8.13
+
+  '@formatjs/intl-segmenter@12.2.13':
+    dependencies:
+      '@formatjs/intl-localematcher': 0.8.13
+
+  '@formatjs/intl-supportedvaluesof@2.3.9':
+    dependencies:
+      '@formatjs/fast-memoize': 3.1.7
+
   '@fregante/relaxed-json@2.0.0': {}
 
   '@google/genai@2.10.0(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
@@ -27200,7 +27303,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.0.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
 
   '@vitest/expect@3.2.4':
     dependencies:
@@ -27278,7 +27381,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.28.1)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
 
   '@vitest/utils@3.2.4':
     dependencies:

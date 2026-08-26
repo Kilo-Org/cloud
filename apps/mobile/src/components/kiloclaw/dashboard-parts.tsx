@@ -7,21 +7,11 @@ import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { agentColor, toneColor } from '@/lib/agent-color';
+import { formatDuration } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
-
-function formatUptime(seconds: number): string {
-  if (seconds < 60) {
-    return `${String(seconds)}s`;
-  }
-  if (seconds < 3600) {
-    return `${String(Math.floor(seconds / 60))}m`;
-  }
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  return `${String(h)}h ${String(m)}m`;
-}
 
 type DashboardHeroProps = {
   name: string;
@@ -34,7 +24,7 @@ export function DashboardHero({ name, status, uptime }: Readonly<DashboardHeroPr
   const { t } = useTranslation();
   const tone = statusTone(status);
   const label = statusLabel(status);
-  const uptimeStr = uptime == null ? null : formatUptime(uptime);
+  const uptimeStr = uptime == null ? null : formatDuration(uptime, i18n.language);
   const tint = agentColor(name);
   return (
     <View className="flex-row items-center gap-3 px-[22px] pb-4 pt-2">

@@ -69,6 +69,7 @@ import {
   useLanguagePreference,
 } from '@/lib/hooks/use-language-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
+import { prewarmIntl } from '@/lib/intl-cache';
 import {
   captureLaunchDeepLink,
   getPendingDeepLink,
@@ -368,8 +369,12 @@ function RootLayoutNav() {
         router.replace('/(app)/(tabs)/(3_profile)/preferences');
       }
       try {
+        // The plural-rules polyfill must be in place before the first render in the new language.
+        prewarmIntl(resolved);
         await i18n.changeLanguage(resolved);
       } catch {
+        // The plural-rules polyfill must be in place before the first render in the new language.
+        prewarmIntl('en');
         await i18n.changeLanguage('en');
       }
       void renameAndroidNotificationChannels();

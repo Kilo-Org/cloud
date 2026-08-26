@@ -1,5 +1,7 @@
+import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
 import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
+import { numberFormat } from '@/lib/intl-cache';
 import { parseTimestamp } from '@/lib/utils';
 
 import { type useKiloClawBillingStatus } from './use-kiloclaw-queries';
@@ -87,8 +89,11 @@ export function formatBillingDate(iso: string): string {
 
 export function formatRemainingDays(daysRemaining: number): string {
   if (daysRemaining <= 0) {
-    return 'Less than 1 day left';
+    return i18n.t('kiloclaw.billing.lessThanOneDay');
   }
-
-  return `${String(daysRemaining)} day${daysRemaining === 1 ? '' : 's'} left`;
+  return numberFormat(getResolvedLanguage(), {
+    style: 'unit',
+    unit: 'day',
+    unitDisplay: 'long',
+  }).format(daysRemaining);
 }

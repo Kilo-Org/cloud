@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the prefill resolver suite covers build/append/read/resolve/describe plus the platform-qualified selection resolver */
 import { describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -10,6 +11,7 @@ import {
   readNewSessionPrefill,
   resolvePrefillModel,
   resolvePrefillRepo,
+  resolvePrefillRepoSelection,
 } from './new-session-prefill';
 
 vi.mock('@/components/ui/icons', () => ({
@@ -249,6 +251,55 @@ describe('resolvePrefillRepo', () => {
   ])('returns null when repo is $desc', ({ repo, reposOverride }) => {
     const result = resolvePrefillRepo(reposOverride ?? repos, { mode: 'code', repo });
     expect(result).toBeNull();
+  });
+});
+
+// ════════════════════════════════════════════════════════════════
+// resolvePrefillRepoSelection
+// ════════════════════════════════════════════════════════════════
+
+describe('resolvePrefillRepoSelection', () => {
+  const repos = [
+    { platform: 'gitlab', fullName: 'kilo-org/cloud' },
+    { platform: 'bitbucket', fullName: 'kilo-org/cloud' },
+    { platform: 'github', fullName: 'Kilo-Org/cloud' },
+  ];
+
+  it('selects the GitHub row and never a same-named GitLab/Bitbucket row', () => {
+    const result = resolvePrefillRepoSelection(repos, { mode: 'code', repo: 'kilo-org/cloud' });
+    expect(result).toBe('github:Kilo-Org/cloud');
+  });
+
+  it('returns the GitHub row when only the GitLab row shares the name', () => {
+    const result = resolvePrefillRepoSelection(
+      [
+        { platform: 'gitlab', fullName: 'owner/repo' },
+        { platform: 'github', fullName: 'owner/repo' },
+      ],
+      { mode: 'code', repo: 'owner/repo' }
+    );
+    expect(result).toBe('github:owner/repo');
+  });
+
+  it('returns null when no GitHub row matches, even if a GitLab row does', () => {
+    const result = resolvePrefillRepoSelection([{ platform: 'gitlab', fullName: 'owner/repo' }], {
+      mode: 'code',
+      repo: 'owner/repo',
+    });
+    expect(result).toBeNull();
+  });
+
+  it('matches case-insensitively and returns the canonical GitHub casing', () => {
+    const result = resolvePrefillRepoSelection(repos, { mode: 'code', repo: 'kilo-Org/Cloud' });
+    expect(result).toBe('github:Kilo-Org/cloud');
+  });
+
+  it.each([
+    { repo: 'gh/other', desc: 'no match' },
+    { repo: undefined, desc: 'absent' },
+    { repo: '', desc: 'empty string' },
+  ])('returns null when repo is $desc', ({ repo }) => {
+    expect(resolvePrefillRepoSelection(repos, { mode: 'code', repo })).toBeNull();
   });
 });
 

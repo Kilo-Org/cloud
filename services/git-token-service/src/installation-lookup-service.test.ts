@@ -3,6 +3,7 @@ import { getWorkerDb } from '@kilocode/db/client';
 import {
   buildInstallationLookupQuery,
   buildInstallationRefreshCandidatesQuery,
+  buildManagedInstallationLookupQuery,
 } from './installation-lookup-service.js';
 
 const params = {
@@ -54,5 +55,25 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.sql).toContain('"kilocode_users"."blocked_reason" is null');
     expect(query.sql).toContain('"organization_memberships"."id" is not null');
     expect(query.params).toContain(10);
+  });
+
+  it('uses a supplied integration ID as an exact organization authorization fence', () => {
+    const db = getWorkerDb('postgres://unused:unused@localhost:0/unused');
+    const expectedIntegrationId = '00000000-0000-4000-8000-000000000002';
+    const query = buildManagedInstallationLookupQuery(db, {
+      ...params,
+      expectedIntegrationId,
+    }).toSQL();
+
+    expect(query.sql).toContain('"platform_integrations"."id" =');
+    expect(query.sql).toContain('"platform_integrations"."integration_status" =');
+    expect(query.sql).toContain('"platform_integrations"."owned_by_organization_id" =');
+    expect(query.sql).toContain('"platform_integrations"."owned_by_user_id" is null');
+    expect(query.sql).toContain('"organization_memberships"."id" is not null');
+    expect(query.sql).not.toContain('"platform_integrations"."owned_by_user_id" =');
+    expect(query.params).toContain(expectedIntegrationId);
+    expect(query.params).toContain(params.orgId);
+    expect(query.params).toContain('renamed-owner');
+    expect(query.params).toContain(1);
   });
 });

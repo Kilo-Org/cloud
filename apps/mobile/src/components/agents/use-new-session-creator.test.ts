@@ -6,6 +6,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { type NewSessionRepository } from './new-session-repository-state';
 import { useNewSessionCreator } from './use-new-session-creator';
 import { clearDraft, flushDraft, loadDraft } from '@/lib/persist/drafts';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
@@ -118,8 +119,10 @@ vi.mock('expo-crypto', () => {
 
 const outboxMock = vi.hoisted(() => ({
   getStoredOperationKey: vi.fn((_fingerprint: string): string | null => null),
-  writeSafeRetry: vi.fn(async (): Promise<void> => undefined),
-  remove: vi.fn(async (): Promise<void> => undefined),
+  writeSafeRetry: vi.fn(
+    async (_row: { operationKey: string; fingerprint: string }): Promise<void> => undefined
+  ),
+  remove: vi.fn(async (_fingerprint: string): Promise<void> => undefined),
   whenLoaded: vi.fn(async (): Promise<boolean> => true),
 }));
 
@@ -156,7 +159,7 @@ function createInput(overrides: Partial<CreatorInput> = {}): CreatorInput {
     mode: 'code' as AgentMode,
     model: 'anthropic/claude-sonnet-4',
     organizationId: undefined,
-    selectedRepo: '',
+    selectedRepository: null,
     setIsCreating: vi.fn(() => undefined),
     variant: 'medium',
     autoCommit: false,
@@ -277,7 +280,7 @@ function runCreator(args: {
   model?: string;
   variant?: string;
   organizationId?: string;
-  selectedRepo?: string;
+  selectedRepository?: NewSessionRepository | null;
   autoCommit?: boolean;
   profileId?: string | null;
 }): CreatorResult {
@@ -318,7 +321,11 @@ function runCreator(args: {
       mode: (args.mode ?? 'code') as never,
       model: args.model ?? 'model-1',
       organizationId: args.organizationId,
-      selectedRepo: args.selectedRepo ?? 'owner/repo',
+      selectedRepository: args.selectedRepository ?? {
+        platform: 'github' as const,
+        fullName: 'owner/repo',
+        isPrivate: false,
+      },
       // eslint-disable-next-line no-empty-function -- no-op state setter
       setIsCreating: () => {},
       variant: args.variant ?? 'v1',
@@ -685,6 +692,182 @@ describe('useNewSessionCreator autoCommit', () => {
     await creator.createSessionFromDraft();
 
     expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({ autoCommit: true });
+  });
+});
+
+describe('useNewSessionCreator repository platform payload', () => {
+  it('sends only githubRepo for a GitHub row', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({
+      selectedRepository: { platform: 'github', fullName: 'owner/repo', isPrivate: false },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).toMatchObject({ githubRepo: 'owner/repo' });
+    expect(payload).not.toHaveProperty('gitlabProject');
+    expect(payload).not.toHaveProperty('bitbucketRepo');
+  });
+
+  it('sends only gitlabProject for a GitLab row and never githubRepo', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({
+      selectedRepository: { platform: 'gitlab', fullName: 'group/project', isPrivate: true },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).toMatchObject({ gitlabProject: 'group/project' });
+    expect(payload).not.toHaveProperty('githubRepo');
+    expect(payload).not.toHaveProperty('bitbucketRepo');
+  });
+
+  it('sends only bitbucketRepo with workspace and repository uuids for a Bitbucket row', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({
+      organizationId: 'org-1',
+      selectedRepository: {
+        platform: 'bitbucket',
+        fullName: 'workspace/repo',
+        isPrivate: true,
+        workspaceUuid: 'ws-1234',
+        repositoryUuid: 'repo-5678',
+      },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      bitbucketRepo: {
+        fullName: 'workspace/repo',
+        workspaceUuid: 'ws-1234',
+        repositoryUuid: 'repo-5678',
+      },
+    });
+    expect(payload).not.toHaveProperty('githubRepo');
+    expect(payload).not.toHaveProperty('gitlabProject');
+  });
+});
+
+describe('useNewSessionCreator intentFingerprint repo identity', () => {
+  // Two same-name repos on different providers must marshal distinct retry
+  // identities, otherwise a GitHub and a GitLab create for `owner/repo` would
+  // share one safe-retry key and dedupe/replay each other's session.
+  it('mints distinct retry fingerprints for same-name GitHub and GitLab intents', async () => {
+    const githubCreator = runCreator({
+      selectedRepository: { platform: 'github', fullName: 'owner/repo', isPrivate: false },
+    });
+    const gitlabCreator = runCreator({
+      selectedRepository: { platform: 'gitlab', fullName: 'owner/repo', isPrivate: false },
+    });
+
+    githubCreator.promptRef.current = 'hello';
+    await githubCreator.createSessionFromDraft();
+    gitlabCreator.promptRef.current = 'hello';
+    await gitlabCreator.createSessionFromDraft();
+
+    const writtenFingerprints = outboxMock.writeSafeRetry.mock.calls.map(
+      call => call[0].fingerprint
+    );
+    const githubFingerprint = writtenFingerprints[0] ?? '';
+    const gitlabFingerprint = writtenFingerprints[1] ?? '';
+    expect(githubFingerprint).not.toBe(gitlabFingerprint);
+    expect(
+      (JSON.parse(githubFingerprint) as { repo: { platform: string; fullName: string } }).repo
+    ).toEqual({ platform: 'github', fullName: 'owner/repo' });
+    expect(
+      (JSON.parse(gitlabFingerprint) as { repo: { platform: string; fullName: string } }).repo
+    ).toEqual({ platform: 'gitlab', fullName: 'owner/repo' });
+  });
+
+  it('includes Bitbucket workspace and repository uuids in the fingerprint', async () => {
+    const creator = runCreator({
+      selectedRepository: {
+        platform: 'bitbucket',
+        fullName: 'workspace/repo',
+        isPrivate: true,
+        workspaceUuid: 'ws-1234',
+        repositoryUuid: 'repo-5678',
+      },
+    });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const fingerprint =
+      outboxMock.writeSafeRetry.mock.calls.map(call => call[0].fingerprint)[0] ?? '';
+    expect((JSON.parse(fingerprint) as { repo: unknown }).repo).toEqual({
+      platform: 'bitbucket',
+      fullName: 'workspace/repo',
+      workspaceUuid: 'ws-1234',
+      repositoryUuid: 'repo-5678',
+    });
+  });
+
+  // The deployed app persisted safe-retry rows with the bare `fullName` as
+  // `repo`. A GitHub relaunch-retry must still reuse that legacy key (and
+  // migrate the row to the scoped fingerprint) instead of minting a duplicate
+  // session.
+  it('reuses a persisted legacy bare-name key for a GitHub intent', async () => {
+    outboxMock.getStoredOperationKey.mockImplementation((fingerprint: string) => {
+      const parsed = JSON.parse(fingerprint) as { repo: unknown };
+      return typeof parsed.repo === 'string' && parsed.repo === 'owner/repo'
+        ? 'legacy-stored-key'
+        : null;
+    });
+
+    const creator = runCreator({
+      selectedRepository: { platform: 'github', fullName: 'owner/repo', isPrivate: false },
+    });
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: 'legacy-stored-key' })
+    );
+    const removedFingerprints = outboxMock.remove.mock.calls.map(call => call[0]);
+    const legacyRemovalIndex = removedFingerprints.findIndex(fingerprint => {
+      const parsed = JSON.parse(fingerprint) as { repo: unknown };
+      return parsed.repo === 'owner/repo';
+    });
+    expect(legacyRemovalIndex).toBeGreaterThanOrEqual(0);
+    // The legacy row goes only after the scoped row is on disk, so a crash
+    // between the two always leaves the key readable under one fingerprint.
+    expect(outboxMock.writeSafeRetry.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+      outboxMock.remove.mock.invocationCallOrder[legacyRemovalIndex] ?? 0
+    );
+  });
+
+  // A GitLab intent must never reuse a legacy bare-name key: the bare name is
+  // ambiguous across providers, so the GitLab request stays scoped and mints
+  // its own identity.
+  it('does not fall back to a legacy bare-name key for a GitLab intent', async () => {
+    outboxMock.getStoredOperationKey.mockImplementation((fingerprint: string) => {
+      const parsed = JSON.parse(fingerprint) as { repo: unknown };
+      return typeof parsed.repo === 'string' ? 'legacy-stored-key' : null;
+    });
+
+    const creator = runCreator({
+      selectedRepository: { platform: 'gitlab', fullName: 'owner/repo', isPrivate: false },
+    });
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    // The only looked-up fingerprints are the scoped one (repo is an object),
+    // never the bare name.
+    const lookedUpRepos = outboxMock.getStoredOperationKey.mock.calls.map(
+      call => (JSON.parse(call[0]) as { repo: unknown }).repo
+    );
+    expect(lookedUpRepos.every(repo => typeof repo === 'object')).toBe(true);
+    expect(prepareSessionMutate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: 'legacy-stored-key' })
+    );
   });
 });
 

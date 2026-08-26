@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab ਖਾਤਾ",
       "connectGitLab": "GitLab ਕਨੈਕਟ ਕਰੋ",
       "gitlabError": "GitLab ਸੈੱਟਅੱਪ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "description": "ਪੁੱਲ ਬੇਨਤੀਆਂ ਦੀ ਆਟੋਮੈਟਿਕ ਸਮੀਖਿਆ ਕਰਨ ਲਈ Kilo {{label}} ਕਨੈਕਟ ਕਰੋ।"
+      "description": "ਪੁੱਲ ਬੇਨਤੀਆਂ ਦੀ ਆਟੋਮੈਟਿਕ ਸਮੀਖਿਆ ਕਰਨ ਲਈ Kilo {{label}} ਕਨੈਕਟ ਕਰੋ।",
+      "bitbucketError": "Bitbucket ਸੈੱਟਅੱਪ ਖੋਲ੍ਹ ਨਹੀਂ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "overview": {
       "reviewStyle": "ਸਮੀਖਿਆ ਸ਼ੈਲੀ",
@@ -2075,7 +2076,8 @@
       "dollar": "ਡਾਲਰ",
       "dollar_other": "ਡਾਲਰ",
       "costSpoken": "ਲਾਗਤ {{cost}}",
-      "costSpokenWithTime": "ਲਾਗਤ {{cost}}, {{time}}"
+      "costSpokenWithTime": "ਲਾਗਤ {{cost}}, {{time}}",
+      "pullRequest": "ਪੁੱਲ ਰਿਕਵਸਟ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "ਨਵਾਂ ਸੈਸ਼ਨ",
       "repository": "ਰਿਪੋਜ਼ਟਰੀ",
-      "couldNotLoadRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ",
       "connectGithub": "GitHub ਨਾਲ ਕਨੈਕਟ ਕਰੋ",
       "connectGithubDescription": "ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ GitHub ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
       "openGithub": "GitHub ਖੋਲ੍ਹੋ",
       "refreshRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਰਿਫਰੈਸ਼ ਕਰੋ",
-      "githubConnectionNotVisible": "ਅਸੀਂ ਅਜੇ ਤੁਹਾਡਾ GitHub ਕਨੈਕਸ਼ਨ ਨਹੀਂ ਦੇਖ ਸਕਦੇ",
-      "githubConnectionNotVisibleDescription": "ਜੇਕਰ ਤੁਸੀਂ Kilo GitHub ਐਪ ਸਥਾਪਤ ਜਾਂ ਸੰਰਚਿਤ ਕੀਤੀ ਹੈ, ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ — ਜਾਂ ਯਕੀਨੀ ਬਣਾਓ ਕਿ ਇਹ ਇਸ ਖਾਤੇ/ਸੰਗਠਨ ਲਈ ਸਥਾਪਤ ਕੀਤੀ ਗਈ ਸੀ।",
-      "checkAgain": "ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ",
       "githubConnected": "GitHub ਕਨੈਕਟ ਹੋਇਆ",
       "noRepositoriesVisible": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦੇ ਰਹੀ। Kilo GitHub ਐਪ ਲਈ ਰਿਪੋਜ਼ਟਰੀ ਪਹੁੰਚ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
       "runOnWithTarget": "ਇਸ 'ਤੇ ਚਲਾਓ: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "ਸੰਪਾਦਨ ਜਾਰੀ ਰੱਖੋ",
       "discard": "ਰੱਦ ਕਰੋ",
       "discardFailed": "ਡਰਾਫਟ ਰੱਦ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket ਕਨੈਕਟ ਹੋਇਆ",
+      "connectBitbucket": "Bitbucket ਕਨੈਕਟ ਕਰੋ",
+      "connectBitbucketDescription": "Bitbucket ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
+      "connectGitlab": "GitLab ਕਨੈਕਟ ਕਰੋ",
+      "connectGitlabDescription": "GitLab ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
+      "couldNotLoadBitbucketRepositories": "Bitbucket ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕਰ ਸਕੇ",
+      "couldNotLoadGithubRepositories": "GitHub ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕਰ ਸਕੇ",
+      "couldNotLoadGitlabRepositories": "GitLab ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕਰ ਸਕੇ",
+      "gitlabConnected": "GitLab ਕਨੈਕਟ ਹੋਇਆ",
+      "noRepositoriesVisibleBitbucket": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦਿੰਦੀ। Bitbucket ਲਈ ਰਿਪੋਜ਼ਟਰੀ ਪਹੁੰਚ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫ੍ਰੈਸ਼ ਕਰੋ।",
+      "noRepositoriesVisibleGitlab": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦਿੰਦੀ। GitLab ਲਈ ਰਿਪੋਜ਼ਟਰੀ ਪਹੁੰਚ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫ੍ਰੈਸ਼ ਕਰੋ।",
+      "openBitbucket": "Bitbucket ਖੋਲ੍ਹੋ",
+      "openGitlab": "GitLab ਖੋਲ੍ਹੋ",
+      "recentlyUsed": "ਹਾਲ ਹੀ ਵਿੱਚ ਵਰਤੇ ਗਏ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ਫਾਈਲ ਅੱਪਡੇਟ ਕੀਤੀ ਗਈ",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "ਤੁਹਾਡੇ ਖਾਤੇ ਨਾਲ ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਕਨੈਕਟ ਨਹੀਂ ਹੈ।",
       "tryDifferentSearch": "ਵੱਖਰਾ ਖੋਜ ਸ਼ਬਦ ਅਜ਼ਮਾਓ।",
       "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ...",
-      "accessibility": "ਰਿਪੋਜ਼ਟਰੀ: {{label}}"
+      "accessibility": "ਰਿਪੋਜ਼ਟਰੀ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "ਸੁਨੇਹਾ ਵੇਰਵੇ",
@@ -2925,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "ਕੋਈ ਈਮੇਲ ਐਪ ਉਪਲਬਧ ਨਹੀਂ। ਤੁਸੀਂ ਸਾਡੇ ਤੱਕ {{email}} 'ਤੇ ਪਹੁੰਚ ਸਕਦੇ ਹੋ",
     "couldNotOpenStore": "ਸਟੋਰ ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
-    "promptTitle": "ਤੁਹਾਨੂੰ Kilo ਐਪ ਕਿਵੇਂ ਪਸੰਦ ਆ ਰਹੀ ਹੈ?",
-    "iLikeIt": "ਮੈਨੂੰ ਪਸੰਦ ਹੈ",
-    "gladTitle": "ਇਹ ਸੁਣ ਕੇ ਸਾਨੂੰ ਖੁਸ਼ੀ ਹੋਈ!",
-    "gladMessage": "ਇੱਕ ਸਟੋਰ ਸਮੀਖਿਆ ਸਾਡੀ ਬਹੁਤ ਮਦਦ ਕਰੇਗੀ। Kilo ਵਰਤਣ ਲਈ ਧੰਨਵਾਦ!",
-    "rateKilo": "Kilo ਨੂੰ ਦਰਜਾ ਦਿਓ",
-    "needsWork": "ਸੁਧਾਰ ਦੀ ਲੋੜ ਹੈ",
-    "sorryTitle": "ਇਹ ਸੁਣ ਕੇ ਸਾਨੂੰ ਅਫਸੋਸ ਹੈ!",
-    "sorryMessage": "ਕਿਰਪਾ ਕਰਕੇ ਸਾਨੂੰ ਦੱਸੋ ਕਿ ਕੀ ਸੁਧਾਰ ਕਰਨ ਦੀ ਲੋੜ ਹੈ। ਐਪ ਦੀ ਜ਼ਿੰਮੇਵਾਰ ਇੰਜੀਨੀਅਰ ਹਰ ਇੱਕ ਰਿਪੋਰਟ ਪੜ੍ਹਦਾ ਹੈ!",
-    "emailUs": "ਸਾਨੂੰ ਈਮੇਲ ਕਰੋ",
-    "emailSubject": "ਮੋਬਾਈਲ ਐਪ ਫੀਡਬੈਕ"
+    "emailSubject": "ਮੋਬਾਈਲ ਐਪ ਫੀਡਬੈਕ",
+    "neutralTitle": "Kilo ਐਪ ਨੂੰ ਰੇਟ ਕਰੋ",
+    "rateTheApp": "ਐਪ ਨੂੰ ਰੇਟ ਕਰੋ",
+    "sendFeedback": "ਫੀਡਬੈਕ ਭੇਜੋ"
   },
   "organization": {
     "boundary": {
@@ -2944,7 +2953,9 @@
       "organizationUnavailable": "ਸੰਸਥਾ ਅਨੁਪਲਬਧ",
       "selectDescription": "ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣੇ ਪ੍ਰੋਫਾਈਲ ਤੋਂ ਇੱਕ ਸੰਸਥਾ ਚੁਣੋ।",
       "selectOrganization": "ਇੱਕ ਸੰਸਥਾ ਚੁਣੋ",
-      "unavailableDescription": "ਇਹ ਸੰਸਥਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣੇ ਪ੍ਰੋਫਾਈਲ ਤੋਂ ਇੱਕ ਚੁਣੋ।"
+      "unavailableDescription": "ਇਹ ਸੰਸਥਾ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣੇ ਪ੍ਰੋਫਾਈਲ ਤੋਂ ਇੱਕ ਚੁਣੋ।",
+      "accessDeniedTitle": "ਪਹੁੰਚ ਤੋਂ ਇਨਕਾਰ",
+      "accessDeniedDescription": "ਤੁਹਾਡੀ ਇਸ ਸੰਸਥਾ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੈ।"
     },
     "creditActivity": {
       "emptyDescription": "ਇਸ ਸੰਸਥਾ ਲਈ ਖਰੀਦਾਂ, ਵਰਤੋਂ, ਅਤੇ ਕ੍ਰੈਡਿਟ ਸਮਾਯੋਜਨ ਇੱਥੇ ਹੋਣ 'ਤੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
@@ -2961,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "ਲੇਖਾ ਸਮਾਯੋਜਨ",
         "credits_expired": "ਕ੍ਰੈਡਿਟ ਮਿਆਦ ਪੁੱਗ ਗਏ"
-      }
+      },
+      "loadMore": "ਹੋਰ ਲੋਡ ਕਰੋ",
+      "loadMoreFailed": "ਹੋਰ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ",
+      "truncated": "ਪੁਰਾਣੀ ਕ੍ਰੈਡਿਟ ਗਤੀਵਿਧੀ ਉਪਲਬਧ ਹੈ।"
     },
     "inviteMember": {
       "emailError": "ਵੈਧ ਈਮੇਲ ਪਤਾ ਦਰਜ ਕਰੋ",
@@ -2988,7 +3002,10 @@
         "draft": "ਡਰਾਫਟ",
         "uncollectible": "ਅਵਸੂਲਯੋਗ",
         "unknown": "ਅਣਜਾਣ"
-      }
+      },
+      "loadMore": "ਹੋਰ ਲੋਡ ਕਰੋ",
+      "loadMoreFailed": "ਹੋਰ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ",
+      "truncated": "ਪੁਰਾਣੇ ਇਨਵੌਇਸ ਉਪਲਬਧ ਹਨ।"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

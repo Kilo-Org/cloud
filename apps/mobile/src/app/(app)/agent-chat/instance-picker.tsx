@@ -14,11 +14,8 @@ import { radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import {
-  clearInstancePickerBridge,
-  getInstancePickerBridge,
-  type InstancePickerInstance,
-} from '@/lib/picker-bridge';
+import { type InstancePickerInstance } from '@/lib/picker-bridge';
+import { instancePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import {
   dedupeInstanceLabels,
   type LabeledInstance,
@@ -34,8 +31,9 @@ export default function InstancePickerScreen() {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
-  const [bridge, setBridge] = useState(() => getInstancePickerBridge());
+  const [bridge, setBridge] = useState(() => instancePickerSlot.get(UNFENCED_ROUTE_KEY));
   const bridgeRef = useRef(bridge);
+  useRouteRegistry(UNFENCED_ROUTE_KEY);
 
   const closePicker = useCallback(() => {
     router.back();
@@ -69,7 +67,7 @@ export default function InstancePickerScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const nextBridge = getInstancePickerBridge();
+      const nextBridge = instancePickerSlot.get(UNFENCED_ROUTE_KEY);
       bridgeRef.current = nextBridge;
       setBridge(nextBridge);
       // kilocode_change - `refetchOnWindowFocus` only reacts to OS-level
@@ -80,8 +78,8 @@ export default function InstancePickerScreen() {
       void refetchInstances();
 
       return () => {
-        clearInstancePickerBridge();
-        bridgeRef.current = null;
+        instancePickerSlot.clear(UNFENCED_ROUTE_KEY);
+        bridgeRef.current = undefined;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps -- refetchInstances is a stable react-query function identity; including it would re-run this effect on every render because react-query does not memoize it across renders.
     }, [])
@@ -103,8 +101,8 @@ export default function InstancePickerScreen() {
   const handleSelectCloudAgent = useCallback(() => {
     void Haptics.selectionAsync();
     bridgeRef.current?.onSelect(null);
-    clearInstancePickerBridge();
-    bridgeRef.current = null;
+    instancePickerSlot.clear(UNFENCED_ROUTE_KEY);
+    bridgeRef.current = undefined;
     closePicker();
   }, [closePicker]);
 
@@ -112,8 +110,8 @@ export default function InstancePickerScreen() {
     (instance: InstancePickerInstance) => {
       void Haptics.selectionAsync();
       bridgeRef.current?.onSelect(instance);
-      clearInstancePickerBridge();
-      bridgeRef.current = null;
+      instancePickerSlot.clear(UNFENCED_ROUTE_KEY);
+      bridgeRef.current = undefined;
       closePicker();
     },
     [closePicker]

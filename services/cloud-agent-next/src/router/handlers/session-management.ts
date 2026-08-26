@@ -12,6 +12,7 @@ import {
   fetchSessionMetadata,
 } from '../../session-service.js';
 import { withDORetry } from '../../utils/do-retry.js';
+import { resolveSessionStub } from '../../sandbox-session/session-stub.js';
 import { protectedProcedure, publicProcedure, internalApiProtectedProcedure } from '../auth.js';
 import {
   sessionIdSchema,
@@ -84,9 +85,8 @@ async function deleteSessionResources(
     await authorizeExistingSession?.();
 
     try {
-      const doKey = `${userId}:${sessionId}`;
       await withDORetry(
-        () => env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey)),
+        () => resolveSessionStub(env, userId, sessionId),
         stub => stub.deleteSession(),
         'deleteSession'
       );
@@ -196,9 +196,7 @@ export function createSessionManagementHandlers() {
 
             // Mark session as interrupted in DO before killing processes (with retry)
             // This signals the streaming generator to stop
-            const doKey = `${userId}:${sessionId}`;
-            const getStub = () =>
-              env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
+            const getStub = () => resolveSessionStub(env, userId, sessionId);
 
             await withDORetry(getStub, stub => stub.markAsInterrupted(), 'markAsInterrupted');
 
@@ -266,9 +264,7 @@ export function createSessionManagementHandlers() {
           });
 
           // Get DO stub keyed by userId:sessionId for user isolation
-          const doKey = `${userId}:${sessionId}`;
-          const getStub = () =>
-            env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
+          const getStub = () => resolveSessionStub(env, userId, sessionId);
 
           // Fetch metadata with retry
           const metadata = await withDORetry<
@@ -544,9 +540,7 @@ export function createSessionManagementHandlers() {
             cloudAgentSessionId: sessionId,
           });
 
-          const doKey = `${userId}:${sessionId}`;
-          const getStub = () =>
-            env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
+          const getStub = () => resolveSessionStub(env, userId, sessionId);
 
           const metadata = await withDORetry<
             ReturnType<typeof getStub>,
@@ -639,9 +633,7 @@ export function createSessionManagementHandlers() {
             kiloUserId: userId,
             cloudAgentSessionId: sessionId,
           });
-          const doKey = `${userId}:${sessionId}`;
-          const getStub = () =>
-            env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
+          const getStub = () => resolveSessionStub(env, userId, sessionId);
 
           const response = await withDORetry<
             DurableObjectStub<CloudAgentSession>,
@@ -684,9 +676,7 @@ export function createSessionManagementHandlers() {
             cloudAgentSessionId: sessionId,
           });
 
-          const doKey = `${userId}:${sessionId}`;
-          const getStub = () =>
-            env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
+          const getStub = () => resolveSessionStub(env, userId, sessionId);
 
           const metadata = await withDORetry<
             DurableObjectStub<CloudAgentSession>,

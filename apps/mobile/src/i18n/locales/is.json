@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab reikningur",
       "connectGitLab": "Tengja GitLab",
       "gitlabError": "Tókst ekki að opna GitLab uppsetningu. Vinsamlegast reyndu aftur.",
-      "description": "Tengdu Kilo {{label}} til að fara yfir pull requests sjálfkrafa."
+      "description": "Tengdu Kilo {{label}} til að fara yfir pull requests sjálfkrafa.",
+      "bitbucketError": "Gat ekki opnað Bitbucket uppsetningu. Vinsamlegast reyndu aftur."
     },
     "overview": {
       "reviewStyle": "Yfirferðarstíll",
@@ -2075,7 +2076,8 @@
       "dollar": "dalir",
       "dollar_other": "dalir",
       "costSpoken": "kostnaður {{cost}}",
-      "costSpokenWithTime": "kostnaður {{cost}}, {{time}}"
+      "costSpokenWithTime": "kostnaður {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ekki tókst að opna GitHub",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Ný lota",
       "repository": "Geymsla",
-      "couldNotLoadRepositories": "Ekki tókst að hlaða geymslur",
       "connectGithub": "Tengja GitHub",
       "connectGithubDescription": "Tengdu GitHub í vafranum þínum, og komdu svo aftur hingað til að velja geymslu.",
       "openGithub": "Opna GitHub",
       "refreshRepositories": "Endurnýja geymslur",
-      "githubConnectionNotVisible": "Við sjáum ekki GitHub-tenginguna þína ennþá",
-      "githubConnectionNotVisibleDescription": "Ef þú settir upp eða stilltir Kilo GitHub App, athugaðu aftur — eða gakktu úr skugga um að hann var settur upp fyrir þessa reikninga/stofnun.",
-      "checkAgain": "Athuga aftur",
       "githubConnected": "GitHub tengt",
       "noRepositoriesVisible": "Engar geymslur sýnilegar. Athugaðu geymsluaðgang fyrir Kilo GitHub App og endurnýjaðu svo.",
       "runOnWithTarget": "Keyra á: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Halda áfram að breyta",
       "discard": "Farga",
       "discardFailed": "Ekki tókst að farga drögunum. Reyndu aftur.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket tengt",
+      "connectBitbucket": "Tengja Bitbucket",
+      "connectBitbucketDescription": "Tengdu Bitbucket í vafranum þínum og komdu svo aftur hingað til að velja geymslu.",
+      "connectGitlab": "Tengja GitLab",
+      "connectGitlabDescription": "Tengdu GitLab í vafranum þínum og komdu svo aftur hingað til að velja geymslu.",
+      "couldNotLoadBitbucketRepositories": "Gat ekki hlaðið Bitbucket geymslur",
+      "couldNotLoadGithubRepositories": "Gat ekki hlaðið GitHub geymslur",
+      "couldNotLoadGitlabRepositories": "Gat ekki hlaðið GitLab geymslur",
+      "gitlabConnected": "GitLab tengt",
+      "noRepositoriesVisibleBitbucket": "Engar geymslur sjáanlegar. Athugaðu geymsluaðgang að Bitbucket og endurnýjaðu.",
+      "noRepositoriesVisibleGitlab": "Engar geymslur sjáanlegar. Athugaðu geymsluaðgang að GitLab og endurnýjaðu.",
+      "openBitbucket": "Opna Bitbucket",
+      "openGitlab": "Opna GitLab",
+      "recentlyUsed": "Nýlega notað"
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppfærði {{displayCount}} skrá",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Engar geymslur eru tengdar við reikninginn þinn.",
       "tryDifferentSearch": "Prófaðu annað leitarorð.",
       "loading": "Hleður...",
-      "accessibility": "Geymsla: {{label}}"
+      "accessibility": "Geymsla: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Skilaboðaupplýsingar",
@@ -2925,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Ekkert tölvupóstforrit tiltækt. Þú getur náð í okkur á {{email}}",
     "couldNotOpenStore": "Ekki tókst að opna verslunina.",
-    "promptTitle": "Hvernig líkar þér Kilo-appið?",
-    "iLikeIt": "Mér líkar það",
-    "gladTitle": "Við erum glöð að heyra það!",
-    "gladMessage": "Umsögn í verslun myndi hjálpa okkur gríðarlega. Takk fyrir að nota Kilo!",
-    "rateKilo": "Metu Kilo",
-    "needsWork": "Þarfnast úrbóta",
-    "sorryTitle": "Okkur þykir leitt að heyra það!",
-    "sorryMessage": "Vinsamlega láttu okkur vita hvað þarf að bæta. Verkfræðingurinn sem sér um appið les hverja einustu skýrslu!",
-    "emailUs": "Sendu okkur tölvupóst",
-    "emailSubject": "Ábending um farsímaapp"
+    "emailSubject": "Ábending um farsímaapp",
+    "neutralTitle": "Metdu Kilo-forritið",
+    "rateTheApp": "Metdu forritið",
+    "sendFeedback": "Senda endurgjöf"
   },
   "organization": {
     "boundary": {
@@ -2944,7 +2953,9 @@
       "organizationUnavailable": "Félag ótiltækt",
       "selectDescription": "Veldu félag úr prófílnum þínum til að halda áfram.",
       "selectOrganization": "Veldu félag",
-      "unavailableDescription": "Þetta félag er ekki lengur tiltækt. Veldu eitt úr prófílnum þínum til að halda áfram."
+      "unavailableDescription": "Þetta félag er ekki lengur tiltækt. Veldu eitt úr prófílnum þínum til að halda áfram.",
+      "accessDeniedTitle": "Aðgangi neitað",
+      "accessDeniedDescription": "Þú hefur ekki aðgang að þessari stofnun."
     },
     "creditActivity": {
       "emptyDescription": "Kaup, notkun og kreditleiðréttingar fyrir þetta félag birtast hér þegar þær verða.",
@@ -2961,7 +2972,10 @@
         "team-topup-bonus-2025": "Hópáfyllingarbónus 2025",
         "accounting_adjustment": "Bókhaldsleiðrétting",
         "credits_expired": "Kredítur runnu út"
-      }
+      },
+      "loadMore": "Hlaða meira",
+      "loadMoreFailed": "Ekki tókst að hlaða meira",
+      "truncated": "Eldri kreditfærsla er í boði."
     },
     "inviteMember": {
       "emailError": "Sláðu inn gilt tölvupóstfang",
@@ -2988,7 +3002,10 @@
         "draft": "Drög",
         "uncollectible": "Óinnheimtanlegt",
         "unknown": "Óþekkt"
-      }
+      },
+      "loadMore": "Hlaða meira",
+      "loadMoreFailed": "Ekki tókst að hlaða meira",
+      "truncated": "Eldri reikningar eru í boði."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

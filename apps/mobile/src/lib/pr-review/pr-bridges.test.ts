@@ -14,7 +14,8 @@ const PR_B = { owner: 'octocat', repo: 'hello', number: 2 };
 
 describe('diff-selection-bridge', () => {
   beforeEach(() => {
-    clearDiffSelection();
+    clearDiffSelection(PR_A);
+    clearDiffSelection(PR_B);
   });
 
   it('returns the selection only to the PR that produced it', () => {
@@ -32,9 +33,19 @@ describe('diff-selection-bridge', () => {
 
   it('clears the selection so it never leaks into the next visit', () => {
     setDiffSelection({ ...PR_A, path: 'a.ts', side: 'RIGHT', line: 3, selectedText: 'x' });
-    clearDiffSelection();
+    clearDiffSelection(PR_A);
 
     expect(getDiffSelection(PR_A)).toBeNull();
+  });
+
+  it('clears only the requested PR when two PRs hold a selection', () => {
+    setDiffSelection({ ...PR_A, path: 'a.ts', side: 'RIGHT', line: 3, selectedText: 'x' });
+    setDiffSelection({ ...PR_B, path: 'b.ts', side: 'LEFT', line: 9, selectedText: 'y' });
+
+    clearDiffSelection(PR_A);
+
+    expect(getDiffSelection(PR_A)).toBeNull();
+    expect(getDiffSelection(PR_B)?.path).toBe('b.ts');
   });
 });
 

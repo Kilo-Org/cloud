@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
 import { formatDate, formatMoney } from '@/lib/format';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useOrganization } from '@/lib/organization-context';
@@ -33,28 +34,51 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const { organizationId, setOrganizationId } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;
 
+  const { userId, isError: userIdError, refetch: refetchUserId } = useCurrentUserId({ enabled });
+  const hasUserId = userId !== undefined;
+
+  const balanceOptions = trpc.user.getContextBalance.queryOptions({
+    organizationId: selectedOrgId,
+  });
+
+  // tRPC v11 `isPrefixedQueryKey` misreads a 3-element query key (e.g. one
+  // suffixed with the userId) as `[prefix, path, args]` and makes the queryFn
+  // throw `path.join is not a function` before any network request. Keep the
+  // raw 2-element key and fail fast if it ever regresses.
+  if (balanceOptions.queryKey.length !== 2) {
+    throw new Error('getContextBalance query key must stay 2-element ([path, input])');
+  }
+  const personalCreditOptions = trpc.user.getCreditBlocks.queryOptions({});
+  const orgCreditOptions = trpc.organizations.getCreditBlocks.queryOptions({
+    organizationId: selectedOrgId ?? '',
+  });
+
   const {
     data: balance,
     isLoading: balanceLoading,
     isFetching: balanceFetching,
-    isError: balanceError,
+    isError: balanceQueryError,
     refetch: refetchBalance,
   } = useQuery({
-    ...trpc.user.getContextBalance.queryOptions({ organizationId: selectedOrgId }),
-    enabled,
+    ...balanceOptions,
+    enabled: enabled && hasUserId,
     placeholderData: keepPreviousData,
   });
 
   const { data: personalCreditData, isLoading: personalCreditsLoading } = useQuery({
-    ...trpc.user.getCreditBlocks.queryOptions({}),
-    enabled: enabled && !selectedOrgId,
+    ...personalCreditOptions,
+    enabled: enabled && hasUserId && !selectedOrgId,
   });
 
   const { data: orgCreditData, isLoading: orgCreditsLoading } = useQuery({
-    ...trpc.organizations.getCreditBlocks.queryOptions({ organizationId: selectedOrgId ?? '' }),
-    enabled: enabled && Boolean(selectedOrgId),
+    ...orgCreditOptions,
+    enabled: enabled && hasUserId && Boolean(selectedOrgId),
     placeholderData: keepPreviousData,
   });
+
+  // A failed getMe (no userId) can never render a trusted balance, so it shares
+  // the balance error surface. Retry re-resolves the owner and re-fetches.
+  const balanceFailed = balanceQueryError || userIdError;
 
   const creditData = selectedOrgId ? orgCreditData : personalCreditData;
   const creditsLoading = selectedOrgId ? orgCreditsLoading : personalCreditsLoading;
@@ -64,7 +88,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // not fetching, so `balanceLoading` (isLoading) is false while `balance`
   // is still undefined. Treat "no data yet" as loading so the card shows a
   // skeleton instead of `$0` on a cold launch before NetInfo settles.
-  const balancePending = balance === undefined && !balanceError;
+  const balancePending = balance === undefined && !balanceFailed;
   const expiringBlocks = creditData?.creditBlocks.filter(b => b.expiry_date !== null) ?? [];
   const expiringTotal = fromMicrodollars(
     expiringBlocks.reduce((sum, b) => sum + b.balance_mUsd, 0)
@@ -146,15 +170,18 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       </View>
 
       {(balanceLoading || balancePending) && <Skeleton className="min-h-16 w-full rounded-lg" />}
-      {balanceError && (
+      {balanceFailed && (
         <Pressable
           className="min-h-16 justify-center rounded-lg bg-secondary px-3 py-3 active:opacity-70"
-          onPress={() => void refetchBalance()}
+          onPress={() => {
+            refetchUserId();
+            void refetchBalance();
+          }}
         >
           <Text className="text-sm text-destructive">{t('profile.failedToLoadBalance')}</Text>
         </Pressable>
       )}
-      {!balanceLoading && !balancePending && !balanceError && (
+      {!balanceLoading && !balancePending && !balanceFailed && (
         <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
           <Animated.View className="flex-1 justify-center" layout={LinearTransition.duration(200)}>
             <Text className="text-2xl font-bold">{formatMoney(balanceDollars, i18n.language)}</Text>
@@ -181,7 +208,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       )}
       {!balanceLoading &&
         !balancePending &&
-        !balanceError &&
+        !balanceFailed &&
         balanceDollars === 0 &&
         canShowZeroBalanceCta && (
           <AddCreditsRow url={zeroBalanceUrl} className="rounded-lg bg-secondary px-3 py-3" />
@@ -191,7 +218,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           IAP, and a non-money-role member just lacks access). */}
       {!balanceLoading &&
         !balancePending &&
-        !balanceError &&
+        !balanceFailed &&
         balanceDollars === 0 &&
         !canShowZeroBalanceCta &&
         selectedOrgId == null && (

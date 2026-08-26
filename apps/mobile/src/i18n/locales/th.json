@@ -1386,7 +1386,8 @@
       "gitlabAccount": "บัญชี GitLab",
       "connectGitLab": "เชื่อมต่อ GitLab",
       "gitlabError": "ไม่สามารถเปิดการติดตั้ง GitLab ได้ โปรดลองอีกครั้ง",
-      "description": "เชื่อมต่อ Kilo {{label}} เพื่อตรวจสอบ pull requests โดยอัตโนมัติ"
+      "description": "เชื่อมต่อ Kilo {{label}} เพื่อตรวจสอบ pull requests โดยอัตโนมัติ",
+      "bitbucketError": "ไม่สามารถเปิดการตั้งค่า Bitbucket ได้ โปรดลองอีกครั้ง"
     },
     "overview": {
       "reviewStyle": "รูปแบบการตรวจสอบ",
@@ -2075,7 +2076,8 @@
       "dollar": "ดอลลาร์",
       "dollar_other": "ดอลลาร์",
       "costSpoken": "ค่าใช้จ่าย {{cost}}",
-      "costSpokenWithTime": "ค่าใช้จ่าย {{cost}}, {{time}}"
+      "costSpokenWithTime": "ค่าใช้จ่าย {{cost}}, {{time}}",
+      "pullRequest": "คำขอ pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "ไม่สามารถเปิด GitHub ได้",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "เซสชันใหม่",
       "repository": "ที่เก็บ",
-      "couldNotLoadRepositories": "ไม่สามารถโหลด repositories ได้",
       "connectGithub": "เชื่อมต่อ GitHub",
       "connectGithubDescription": "เชื่อมต่อ GitHub ในเบราว์เซอร์ของคุณ แล้วกลับมาที่นี่เพื่อเลือก repository",
       "openGithub": "เปิด GitHub",
       "refreshRepositories": "รีเฟรช repositories",
-      "githubConnectionNotVisible": "เรายังไม่เห็นการเชื่อมต่อ GitHub ของคุณ",
-      "githubConnectionNotVisibleDescription": "หากคุณติดตั้งหรือตั้งค่า Kilo GitHub App แล้ว ตรวจสอบอีกครั้ง — หรือตรวจสอบให้แน่ใจว่าติดตั้งสำหรับบัญชี/องค์กรนี้",
-      "checkAgain": "ตรวจสอบอีกครั้ง",
       "githubConnected": "เชื่อมต่อ GitHub แล้ว",
       "noRepositoriesVisible": "ไม่มี repositories ที่มองเห็น ตรวจสอบสิทธิ์การเข้าถึง repository สำหรับ Kilo GitHub App แล้วรีเฟรช",
       "runOnWithTarget": "รันบน: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "แก้ไขต่อไป",
       "discard": "ละทิ้ง",
       "discardFailed": "ไม่สามารถทิ้งฉบับร่างได้ กรุณาลองอีกครั้ง",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "เชื่อมต่อ Bitbucket แล้ว",
+      "connectBitbucket": "เชื่อมต่อ Bitbucket",
+      "connectBitbucketDescription": "เชื่อมต่อ Bitbucket ในเบราว์เซอร์ของคุณ แล้วกลับมาที่นี่เพื่อเลือกที่เก็บ",
+      "connectGitlab": "เชื่อมต่อ GitLab",
+      "connectGitlabDescription": "เชื่อมต่อ GitLab ในเบราว์เซอร์ของคุณ แล้วกลับมาที่นี่เพื่อเลือกที่เก็บ",
+      "couldNotLoadBitbucketRepositories": "ไม่สามารถโหลดที่เก็บของ Bitbucket ได้",
+      "couldNotLoadGithubRepositories": "ไม่สามารถโหลดที่เก็บของ GitHub ได้",
+      "couldNotLoadGitlabRepositories": "ไม่สามารถโหลดที่เก็บของ GitLab ได้",
+      "gitlabConnected": "เชื่อมต่อ GitLab แล้ว",
+      "noRepositoriesVisibleBitbucket": "ไม่พบที่เก็บที่แสดง ตรวจสอบสิทธิ์การเข้าถึงที่เก็บสำหรับ Bitbucket แล้วรีเฟรช",
+      "noRepositoriesVisibleGitlab": "ไม่พบที่เก็บที่แสดง ตรวจสอบสิทธิ์การเข้าถึงที่เก็บสำหรับ GitLab แล้วรีเฟรช",
+      "openBitbucket": "เปิด Bitbucket",
+      "openGitlab": "เปิด GitLab",
+      "recentlyUsed": "ใช้ล่าสุด"
     },
     "partRenderer": {
       "updatedFileCount_one": "อัปเดต {{displayCount}} ไฟล์",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "ไม่มี repositories ที่เชื่อมต่อกับบัญชีของคุณ",
       "tryDifferentSearch": "ลองใช้คำค้นหาอื่น",
       "loading": "กำลังโหลด...",
-      "accessibility": "Repository: {{label}}"
+      "accessibility": "Repository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "รายละเอียดข้อความ",
@@ -2925,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "ไม่มีแอปอีเมลพร้อมใช้งาน คุณสามารถติดต่อเราได้ที่ {{email}}",
     "couldNotOpenStore": "เปิดร้านค้าไม่สำเร็จ",
-    "promptTitle": "คุณรู้สึกอย่างไรกับแอป Kilo?",
-    "iLikeIt": "ฉันชอบมัน",
-    "gladTitle": "เราดีใจที่ได้ยินแบบนั้น!",
-    "gladMessage": "รีวิวในร้านค้าจะช่วยเราอย่างมาก ขอบคุณที่ใช้ Kilo!",
-    "rateKilo": "ให้คะแนน Kilo",
-    "needsWork": "ต้องปรับปรุง",
-    "sorryTitle": "เราขอโทษที่ได้ยินแบบนั้น!",
-    "sorryMessage": "กรุณาแจ้งให้เรารู้ว่าต้องปรับปรุงอะไรบ้าง วิศวกรที่รับผิดชอบแอปอ่านทุกรายงาน!",
-    "emailUs": "ส่งอีเมลถึงเรา",
-    "emailSubject": "ข้อเสนอแนะแอปมือถือ"
+    "emailSubject": "ข้อเสนอแนะแอปมือถือ",
+    "neutralTitle": "ให้คะแนนแอป Kilo",
+    "rateTheApp": "ให้คะแนนแอป",
+    "sendFeedback": "ส่งความคิดเห็น"
   },
   "organization": {
     "boundary": {
@@ -2944,7 +2953,9 @@
       "organizationUnavailable": "องค์กรไม่พร้อมใช้งาน",
       "selectDescription": "เลือกองค์กรจากโปรไฟล์ของคุณเพื่อดำเนินการต่อ",
       "selectOrganization": "เลือกองค์กร",
-      "unavailableDescription": "องค์กรนี้ไม่พร้อมใช้งานอีกต่อไป เลือกหนึ่งรายการจากโปรไฟล์ของคุณเพื่อดำเนินการต่อ"
+      "unavailableDescription": "องค์กรนี้ไม่พร้อมใช้งานอีกต่อไป เลือกหนึ่งรายการจากโปรไฟล์ของคุณเพื่อดำเนินการต่อ",
+      "accessDeniedTitle": "ปฏิเสธการเข้าถึง",
+      "accessDeniedDescription": "คุณไม่มีสิทธิ์เข้าถึงองค์กรนี้"
     },
     "creditActivity": {
       "emptyDescription": "การซื้อ การใช้งาน และการปรับยอดเครดิตสำหรับองค์กรนี้จะปรากฏที่นี่เมื่อเกิดขึ้น",
@@ -2961,7 +2972,10 @@
         "team-topup-bonus-2025": "โบนัสเติมเงินทีม 2025",
         "accounting_adjustment": "การปรับปรุงบัญชี",
         "credits_expired": "เครดิตหมดอายุ"
-      }
+      },
+      "loadMore": "โหลดเพิ่ม",
+      "loadMoreFailed": "ไม่สามารถโหลดเพิ่มได้",
+      "truncated": "มีกิจกรรมเครดิตเก่ากว่าให้ดู"
     },
     "inviteMember": {
       "emailError": "ป้อนที่อยู่อีเมลที่ถูกต้อง",
@@ -2988,7 +3002,10 @@
         "draft": "ฉบับร่าง",
         "uncollectible": "เก็บไม่ได้",
         "unknown": "ไม่ทราบ"
-      }
+      },
+      "loadMore": "โหลดเพิ่ม",
+      "loadMoreFailed": "ไม่สามารถโหลดเพิ่มได้",
+      "truncated": "มีใบแจ้งหนี้เก่ากว่าให้ดู"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

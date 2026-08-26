@@ -71,9 +71,11 @@ COPY src/shared /tmp/wrapper-build/src/shared
 # Install wrapper dependencies (pnpm symlinks don't survive COPY) and build
 RUN cd /tmp/wrapper-build/wrapper && \
     bun install --production && \
+    ln -sfn /tmp/wrapper-build/wrapper/node_modules /tmp/wrapper-build/node_modules && \
     bun build src/main.ts --outfile=/usr/local/bin/kilocode-wrapper.js --target=bun --minify && \
     bun build src/restore-session.ts --outfile=/usr/local/bin/kilo-restore-session.js --target=bun --minify && \
     bun build src/bitbucket-review-cli.ts --outfile=/usr/local/bin/bb --target=bun --minify && \
+    bun build src/control/main.ts --outfile=/usr/local/bin/kilocode-control-wrapper.js --target=bun --minify && \
     chmod +x /usr/local/bin/bb && \
     rm -rf /tmp/wrapper-build
 

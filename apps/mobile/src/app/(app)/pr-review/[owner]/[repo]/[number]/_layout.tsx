@@ -10,7 +10,7 @@ import {
   PendingReviewProvider,
 } from '@/lib/pr-review/pending-review-provider';
 import { useFormSheetDetents } from '@/lib/form-sheet';
-import { parseParam } from '@/lib/route-params';
+import { parseParam, parsePositiveIntParam } from '@/lib/route-params';
 
 type Params = {
   owner: string;
@@ -37,13 +37,12 @@ export default function PrReviewNumberLayout() {
   const params = useLocalSearchParams<Params>();
   const owner = parseParam(params.owner);
   const repo = parseParam(params.repo);
-  const rawNumber = parseParam(params.number);
-  const number = rawNumber ? Number.parseInt(rawNumber, 10) : Number.NaN;
+  const number = parsePositiveIntParam(params.number);
   const { fullSheetDetent } = useFormSheetDetents();
   const { userId } = useCurrentUserId();
   useRouteForegroundRefresh([[['githubPrReview']]]);
 
-  if (!owner || !repo || !Number.isInteger(number) || number <= 0) {
+  if (!owner || !repo || number === null) {
     return <InvalidRouteState backTo={'/(app)/pr-review' as Href} />;
   }
 

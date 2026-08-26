@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Kaonty GitLab",
       "connectGitLab": "Ampifandraiso ny GitLab",
       "gitlabError": "Tsy afaka nanokatra ny fanamboarana GitLab. Andramo indray azafady.",
-      "description": "Ampifandraiso ny Kilo {{label}} mba hanamarinana pull requests mandeha ho azy."
+      "description": "Ampifandraiso ny Kilo {{label}} mba hanamarinana pull requests mandeha ho azy.",
+      "bitbucketError": "Tsy afaka nanokatra ny fanamboarana Bitbucket. Andramo indray azafady."
     },
     "overview": {
       "reviewStyle": "Fomba fanamarinana",
@@ -2075,7 +2076,8 @@
       "dollar": "dolara",
       "dollar_other": "dolara",
       "costSpoken": "vidy {{cost}}",
-      "costSpokenWithTime": "vidy {{cost}}, {{time}}"
+      "costSpokenWithTime": "vidy {{cost}}, {{time}}",
+      "pullRequest": "Pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Tsy afaka nanokatra ny GitHub",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Session vaovao",
       "repository": "Repository",
-      "couldNotLoadRepositories": "Tsy afaka namaky ny repository",
       "connectGithub": "Hampifandray GitHub",
       "connectGithubDescription": "Ampifandraiso ny GitHub amin'ny navigateur-nao, dia miverena eto hisafidy repository.",
       "openGithub": "Sokafy ny GitHub",
       "refreshRepositories": "Avereno vaovao ny repository",
-      "githubConnectionNotVisible": "Mbola tsy hitanay ny fifandraisanao amin'ny GitHub",
-      "githubConnectionNotVisibleDescription": "Raha nampidirinao na noforonina ny Kilo GitHub App, jereo indray — na ataovy azo antoka fa nampidirina ho an'ity kaonty/fikambanana ity izy.",
-      "checkAgain": "Jereo indray",
       "githubConnected": "Voampifandraisina ny GitHub",
       "noRepositoriesVisible": "Tsy misy repository hita. Jereo ny fidirana repository ho an'ny Kilo GitHub App, dia avereno vaovao.",
       "runOnWithTarget": "Ampandeho amin'ny: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Hanohy fanoratana",
       "discard": "Hanary",
       "discardFailed": "Tsy afaka nandao ny draft. Andramo indray azafady.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Mifandray ny Bitbucket",
+      "connectBitbucket": "Ampifandraiso ny Bitbucket",
+      "connectBitbucketDescription": "Ampifandraiso amin'i Bitbucket ao amin'ny navigateur-nao, dia miverena eto mba hisafidy repository.",
+      "connectGitlab": "Ampifandraiso ny GitLab",
+      "connectGitlabDescription": "Ampifandraiso amin'i GitLab ao amin'ny navigateur-nao, dia miverena eto mba hisafidy repository.",
+      "couldNotLoadBitbucketRepositories": "Tsy afaka nandrakotra ny repository an'i Bitbucket",
+      "couldNotLoadGithubRepositories": "Tsy afaka nandrakotra ny repository an'i GitHub",
+      "couldNotLoadGitlabRepositories": "Tsy afaka nandrakotra ny repository an'i GitLab",
+      "gitlabConnected": "GitLab mifandray",
+      "noRepositoriesVisibleBitbucket": "Tsy misy repository hita. Hamarino ny fahafahana miditra amin'ny repository an'i Bitbucket, dia avereno.",
+      "noRepositoriesVisibleGitlab": "Tsy misy repository hita. Hamarino ny fahafahana miditra amin'ny repository an'i GitLab, dia avereno.",
+      "openBitbucket": "Sokafy ny Bitbucket",
+      "openGitlab": "Sokafy ny GitLab",
+      "recentlyUsed": "Ampiasaina vao haingana"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nohavaozina ny rakitra {{displayCount}}",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Tsy misy repository mifandray amin'ny kaontinao.",
       "tryDifferentSearch": "Andramo teny fikarohana hafa.",
       "loading": "Mampiditra...",
-      "accessibility": "Repository: {{label}}"
+      "accessibility": "Repository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Antsipirian'ny hafatra",
@@ -2925,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Tsy misy app email. Azonao atao ny mifandray aminay ao amin'ny {{email}}",
     "couldNotOpenStore": "Tsy afaka nanokatra ny magazay.",
-    "promptTitle": "Ahoana ny fahitanao ny app Kilo?",
-    "iLikeIt": "Tiako izy",
-    "gladTitle": "Faly izahay mandre izany!",
-    "gladMessage": "Ny review amin'ny magazay dia hanampy anay be. Misaotra ny fampiasanao ny Kilo!",
-    "rateKilo": "Asaivo ny Kilo",
-    "needsWork": "Mila fanatsarana",
-    "sorryTitle": "Malahelo izahay mandre izany!",
-    "sorryMessage": "Ampahafantaro anay azafady izay tokony ho tsara kokoa. Mamaky ny tatitra rehetra ny injenieran'ny app!",
-    "emailUs": "Alefaso email",
-    "emailSubject": "fanehoan-kevitra momba ny app mobile"
+    "emailSubject": "fanehoan-kevitra momba ny app mobile",
+    "neutralTitle": "Laharam-pahaizana ny fampiharana Kilo",
+    "rateTheApp": "Laharam-pahaizana ny fampiharana",
+    "sendFeedback": "Alefaso ny hevitrao"
   },
   "organization": {
     "boundary": {
@@ -2944,7 +2953,9 @@
       "organizationUnavailable": "Tsy misy ny orinasa",
       "selectDescription": "Fidio orinasa avy amin'ny profily mba hanohy.",
       "selectOrganization": "Fidio orinasa",
-      "unavailableDescription": "Tsy misy intsony ity orinasa ity. Fidio iray avy amin'ny profily mba hanohy."
+      "unavailableDescription": "Tsy misy intsony ity orinasa ity. Fidio iray avy amin'ny profily mba hanohy.",
+      "accessDeniedTitle": "Tsy azo idirana",
+      "accessDeniedDescription": "Tsy manana alalana hiditra amin'ity fikambanana ity ianao."
     },
     "creditActivity": {
       "emptyDescription": "Ny fividianana, fampiasana, ary fanitsiana crédit ho an'ity orinasa ity dia hiseho eto rehefa mitranga.",
@@ -2961,7 +2972,10 @@
         "team-topup-bonus-2025": "Bonus top-up ekipa 2025",
         "accounting_adjustment": "Fanitsiana kaonty",
         "credits_expired": "Lany daty ny credits"
-      }
+      },
+      "loadMore": "Hamaky bebe kokoa",
+      "loadMoreFailed": "Tsy afaka namaky fanampiny",
+      "truncated": "Misy ny fiasana crédit taloha kokoa."
     },
     "inviteMember": {
       "emailError": "Ampidiro adiresy email sahaza",
@@ -2988,7 +3002,10 @@
         "draft": "Draft",
         "uncollectible": "Tsy azo angonina",
         "unknown": "Tsy fantatra"
-      }
+      },
+      "loadMore": "Hamaky bebe kokoa",
+      "loadMoreFailed": "Tsy afaka namaky fanampiny",
+      "truncated": "Misy ny faktiora taloha kokoa."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

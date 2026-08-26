@@ -44,7 +44,7 @@ function createMemoryStorage(
   } as MemoryRuntimeStorage & DurableObjectStorage;
 }
 
-function createMetadata(provider: 'cloudflare' = 'cloudflare'): SessionMetadata {
+function createMetadata(provider: 'cloudflare' | 'vercel' = 'cloudflare'): SessionMetadata {
   return {
     metadataSchemaVersion: 2,
     identity: {
@@ -129,30 +129,30 @@ describe('AgentRuntime', () => {
     expect(createSandbox).not.toHaveBeenCalled();
   });
 
-  it('returns a permanent delivery failure for an intentionally unavailable sandbox capability', async () => {
+  it('returns a permanent delivery failure for a disabled persisted Vercel capability', async () => {
     const createSandbox = vi.fn(
       () =>
         ({
           discoverSessionWrappers: async () => {
-            throw new AgentSandboxUnavailableError('Sandbox runtime is unavailable');
+            throw new AgentSandboxUnavailableError('Vercel sandbox runtime is unavailable');
           },
         }) as unknown as AgentSandbox
     );
     const runtime = createAgentRuntime({
       storage: createMemoryStorage(),
       env: { WORKER_URL: 'http://worker.test' } as Env,
-      getMetadata: async () => createMetadata(),
+      getMetadata: async () => createMetadata('vercel'),
       createAgentSandbox: createSandbox,
       getSessionIdForLogs: () => 'agent_runtime',
       sendToWrapper: () => false,
     });
 
-    await expect(runtime.send(createPlan(createMetadata()))).resolves.toEqual({
+    await expect(runtime.send(createPlan(createMetadata('vercel')))).resolves.toEqual({
       success: false,
       code: 'SANDBOX_CAPABILITY_UNAVAILABLE',
       error: 'Sandbox runtime delivery is unavailable for this session',
     });
-    expect(createSandbox).toHaveBeenCalledWith(createMetadata());
+    expect(createSandbox).toHaveBeenCalledWith(createMetadata('vercel'));
   });
 
   it('preflights cold delivery, authorizes its physical lease, and returns the existing queue result shape', async () => {

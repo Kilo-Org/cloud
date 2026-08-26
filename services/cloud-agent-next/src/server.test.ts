@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
+import { VERCEL_SANDBOX_UNAVAILABLE_MESSAGE } from './agent-sandbox/vercel/vercel-agent-sandbox.js';
 import type { Env } from './types.js';
 import { mintWrapperDispatchTicket, type WrapperDispatchTicketClaims } from './auth.js';
 
@@ -95,6 +96,14 @@ vi.mock('./persistence/CloudAgentSession.js', () => ({
   CloudAgentSession: class CloudAgentSession {},
 }));
 
+vi.mock('./persistence/SandboxControl.js', () => ({
+  SandboxControl: class SandboxControl {},
+}));
+
+vi.mock('./sandbox-session/SandboxSession.js', () => ({
+  SandboxSession: class SandboxSession {},
+}));
+
 vi.mock('./db/pg.js', () => ({
   getPgDb: getPgDbMock,
 }));
@@ -134,6 +143,13 @@ type MockEnv = {
     idFromName: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
   };
+  SANDBOX_CONTROL: {
+    getByName: ReturnType<typeof vi.fn>;
+  };
+  SANDBOX_SESSION: {
+    idFromName: ReturnType<typeof vi.fn>;
+    get: ReturnType<typeof vi.fn>;
+  };
 };
 
 function createEnv(): MockEnv {
@@ -152,6 +168,13 @@ function createEnv(): MockEnv {
       get: vi.fn(),
     },
     STREAM_TICKET_NONCE_DO: {
+      idFromName: vi.fn(),
+      get: vi.fn(),
+    },
+    SANDBOX_CONTROL: {
+      getByName: vi.fn(),
+    },
+    SANDBOX_SESSION: {
       idFromName: vi.fn(),
       get: vi.fn(),
     },
@@ -303,6 +326,23 @@ describe('server background reporting', () => {
 });
 
 describe('server /terminal', () => {
+  it('rejects control-plane sessions before consuming the ticket nonce', async () => {
+    const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const env = createEnv();
+    const request = new Request(
+      `http://worker.test/terminal?cloudAgentSessionId=${sessionId}&ptyId=pty_123&ticket=unused`,
+      { headers: { Upgrade: 'websocket' } }
+    );
+
+    const response = await fetchWorker(request, env);
+
+    expect(response.status).toBe(412);
+    await expect(response.text()).resolves.toBe('Terminal is not available for this session');
+    expect(env.STREAM_TICKET_NONCE_DO.idFromName).not.toHaveBeenCalled();
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+
   it('proxies valid terminal tickets directly to the wrapper container', async () => {
     const ticket = jwt.sign(
       {
@@ -398,6 +438,53 @@ describe('server /terminal', () => {
     expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
     expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();
     expect(getRunningTerminalClientMock).not.toHaveBeenCalled();
+  });
+
+  it('returns the explicit provider capability error for Vercel terminal transport', async () => {
+    const ticket = jwt.sign(
+      {
+        type: 'stream_ticket',
+        purpose: 'terminal',
+        userId: 'user-1',
+        cloudAgentSessionId: 'session-1',
+        ptyId: 'pty_123',
+        nonce: 'nonce-1',
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-terminal' }
+    );
+    const env = createEnv();
+    env.STREAM_TICKET_NONCE_DO.idFromName.mockReturnValue('nonce-do-id');
+    env.STREAM_TICKET_NONCE_DO.get.mockReturnValue({
+      consume: vi.fn().mockResolvedValue(true),
+    });
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      getMetadata: vi.fn().mockResolvedValue({
+        metadataSchemaVersion: 2,
+        identity: {
+          sessionId: 'session-1',
+          userId: 'user-1',
+          createdOnPlatform: 'cloud-agent-web',
+        },
+        auth: {},
+        workspace: { sandboxId: 'ses-vercel', sandboxProvider: 'vercel', workspacePath: '/repo' },
+        lifecycle: { version: 1, timestamp: 1, preparedAt: 1 },
+      }),
+    });
+    getRunningTerminalClientMock.mockResolvedValue({
+      status: 'capability-unavailable',
+      message: VERCEL_SANDBOX_UNAVAILABLE_MESSAGE,
+    });
+    const request = new Request(
+      `http://worker.test/terminal?cloudAgentSessionId=session-1&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
+      { headers: { Upgrade: 'websocket' } }
+    );
+
+    const response = await fetchWorker(request, env);
+
+    expect(response.status).toBe(503);
+    await expect(response.text()).resolves.toBe(VERCEL_SANDBOX_UNAVAILABLE_MESSAGE);
   });
 
   it('rejects stream-purpose tickets', async () => {
@@ -1019,6 +1106,42 @@ describe('server /internal/streams/close', () => {
     expect(closeOrgStreams).toHaveBeenCalledWith('org_1');
   });
 
+  it('closes workspace_ org streams on SANDBOX_SESSION', async () => {
+    const env = createEnv();
+    const closeOrgStreams = vi.fn().mockResolvedValue(1);
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('control-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ closeOrgStreams });
+
+    getPgDbMock.mockReturnValue({
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () => [
+            { cloudAgentSessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+          ]),
+        })),
+      })),
+    });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/streams/close', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ userId: 'usr_removed', organizationId: 'org_1' }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(env.SANDBOX_SESSION.idFromName).toHaveBeenCalledWith(
+      'usr_removed:workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    );
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(closeOrgStreams).toHaveBeenCalledWith('org_1');
+  });
+
   it('skips rows without a cloud agent session id', async () => {
     const env = createEnv();
     const closeOrgStreams = vi.fn().mockResolvedValue(0);
@@ -1048,5 +1171,85 @@ describe('server /internal/streams/close', () => {
     expect(response.status).toBe(204);
     expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
     expect(closeOrgStreams).not.toHaveBeenCalled();
+  });
+});
+
+describe('server /internal/sandbox-control/seed', () => {
+  it('rejects without the internal API key', async () => {
+    const env = createEnv();
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/sandbox-control/seed', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId: 'sbx_test' }),
+      }),
+      env
+    );
+    expect(response.status).toBe(401);
+    expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
+  });
+
+  it('stores the credential hash on the sandbox Durable Object', async () => {
+    const env = createEnv();
+    const setWrapperCredentialHash = vi.fn().mockResolvedValue(undefined);
+    env.SANDBOX_CONTROL.getByName.mockReturnValue({ setWrapperCredentialHash });
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/sandbox-control/seed', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ sandboxId: 'sbx_test' }),
+      }),
+      env
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { sandboxId: string; credential: string };
+    expect(body.sandboxId).toBe('sbx_test');
+    expect(body.credential).toMatch(/^[0-9a-f]{64}$/);
+    expect(env.SANDBOX_CONTROL.getByName).toHaveBeenCalledWith('sbx_test');
+    expect(setWrapperCredentialHash).toHaveBeenCalledOnce();
+    expect(setWrapperCredentialHash.mock.calls[0]?.[0]).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('server /sandbox-control', () => {
+  it('rejects non-websocket requests', async () => {
+    const env = createEnv();
+    const response = await fetchWorker(
+      new Request('http://worker.test/sandbox-control/sbx_test'),
+      env
+    );
+    expect(response.status).toBe(426);
+    expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid sandboxId before looking up the Durable Object', async () => {
+    const env = createEnv();
+    const response = await fetchWorker(
+      new Request('http://worker.test/sandbox-control/not%20valid', {
+        headers: { Upgrade: 'websocket' },
+      }),
+      env
+    );
+    expect(response.status).toBe(400);
+    expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
+  });
+
+  it('forwards the upgrade to SANDBOX_CONTROL keyed by sandboxId', async () => {
+    const env = createEnv();
+    const stubResponse = { status: 101 } as Response;
+    const fetch = vi.fn().mockResolvedValue(stubResponse);
+    env.SANDBOX_CONTROL.getByName.mockReturnValue({ fetch });
+
+    const request = new Request('http://worker.test/sandbox-control/sbx_test', {
+      headers: { Upgrade: 'websocket', Authorization: 'Bearer secret' },
+    });
+    const response = await fetchWorker(request, env);
+
+    expect(env.SANDBOX_CONTROL.getByName).toHaveBeenCalledWith('sbx_test');
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(response).toBe(stubResponse);
   });
 });

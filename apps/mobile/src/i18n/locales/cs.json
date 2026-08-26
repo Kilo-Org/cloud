@@ -1404,7 +1404,8 @@
       "gitlabAccount": "Účet GitLab",
       "connectGitLab": "Připojit GitLab",
       "gitlabError": "Nastavení GitLabu se nepodařilo otevřít. Zkuste to prosím znovu.",
-      "description": "Připojte Kilo {{label}} pro automatickou kontrolu pull requestů."
+      "description": "Připojte Kilo {{label}} pro automatickou kontrolu pull requestů.",
+      "bitbucketError": "Nelze otevřít nastavení Bitbucket. Zkuste to znovu."
     },
     "overview": {
       "reviewStyle": "Styl kontroly",
@@ -2105,7 +2106,8 @@
       "dollar_few": "dolary",
       "dollar_many": "dolarů",
       "costSpoken": "cena {{cost}}",
-      "costSpokenWithTime": "náklady {{cost}}, {{time}}"
+      "costSpokenWithTime": "náklady {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub se nepodařilo otevřít",
@@ -2182,14 +2184,10 @@
     "newSession": {
       "title": "Nová relace",
       "repository": "Repozitář",
-      "couldNotLoadRepositories": "Repozitáře se nepodařilo načíst",
       "connectGithub": "Připojit GitHub",
       "connectGithubDescription": "Připojte GitHub v prohlížeči a pak se sem vraťte pro výběr repozitáře.",
       "openGithub": "Otevřít GitHub",
       "refreshRepositories": "Obnovit repozitáře",
-      "githubConnectionNotVisible": "Vaše připojení GitHubu zatím nevidíme",
-      "githubConnectionNotVisibleDescription": "Pokud jste nainstalovali nebo nakonfigurovali aplikaci Kilo GitHub, zkontrolujte to znovu — nebo se ujistěte, že byla nainstalována pro tento účet/organizaci.",
-      "checkAgain": "Zkontrolovat znovu",
       "githubConnected": "GitHub připojen",
       "noRepositoriesVisible": "Žádné repozitáře nejsou viditelné. Zkontrolujte přístup k repozitářům pro aplikaci Kilo GitHub a pak obnovte.",
       "runOnWithTarget": "Spustit na: {{target}}",
@@ -2216,7 +2214,21 @@
       "keepEditing": "Pokračovat v úpravách",
       "discard": "Zahodit",
       "discardFailed": "Koncept se nepodařilo zahodit. Zkuste to znovu.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket připojen",
+      "connectBitbucket": "Připojit Bitbucket",
+      "connectBitbucketDescription": "Připojte Bitbucket v prohlížeči a pak se sem vraťte pro výběr úložiště.",
+      "connectGitlab": "Připojit GitLab",
+      "connectGitlabDescription": "Připojte GitLab v prohlížeči a pak se sem vraťte pro výběr úložiště.",
+      "couldNotLoadBitbucketRepositories": "Nepodařilo se načíst úložiště Bitbucket",
+      "couldNotLoadGithubRepositories": "Nepodařilo se načíst úložiště GitHub",
+      "couldNotLoadGitlabRepositories": "Nepodařilo se načíst úložiště GitLab",
+      "gitlabConnected": "GitLab připojen",
+      "noRepositoriesVisibleBitbucket": "Nebyla viditelná žádná úložiště. Zkontrolujte přístup k úložištím pro Bitbucket a pak obnovte.",
+      "noRepositoriesVisibleGitlab": "Nebyla viditelná žádná úložiště. Zkontrolujte přístup k úložištím pro GitLab a pak obnovte.",
+      "openBitbucket": "Otevřít Bitbucket",
+      "openGitlab": "Otevřít GitLab",
+      "recentlyUsed": "Nedávno použité"
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizován {{displayCount}} soubor",
@@ -2307,7 +2319,10 @@
       "noRepositoriesDescription": "K vašemu účtu nejsou připojeny žádné repozitáře.",
       "tryDifferentSearch": "Zkuste jiný hledaný výraz.",
       "loading": "Načítání...",
-      "accessibility": "Repozitář: {{label}}"
+      "accessibility": "Repozitář: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Podrobnosti zprávy",
@@ -2965,16 +2980,10 @@
   "feedback": {
     "noEmailApp": "Žádná aplikace e-mailu není k dispozici. Můžete nás kontaktovat na {{email}}",
     "couldNotOpenStore": "Obchod se nepodařilo otevřít.",
-    "promptTitle": "Jak se vám líbí aplikace Kilo?",
-    "iLikeIt": "Líbí se mi",
-    "gladTitle": "Jsme rádi, že to slyšíme!",
-    "gladMessage": "Recenze v obchodě by nám nesmírně pomohla. Díky, že používáte Kilo!",
-    "rateKilo": "Ohodnotit Kilo",
-    "needsWork": "Vyžaduje zlepšení",
-    "sorryTitle": "Je nám líto, že to slyšíme!",
-    "sorryMessage": "Dejte nám prosím vědět, co by mělo být lepší. Inženýr odpovědný za aplikaci čte každou jednotlivou zprávu!",
-    "emailUs": "Napište nám e-mail",
-    "emailSubject": "zpětná vazba k mobilní aplikaci"
+    "emailSubject": "zpětná vazba k mobilní aplikaci",
+    "neutralTitle": "Ohodnoťte aplikaci Kilo",
+    "rateTheApp": "Ohodnoťte aplikaci",
+    "sendFeedback": "Odeslat zpětnou vazbu"
   },
   "organization": {
     "boundary": {
@@ -2984,7 +2993,9 @@
       "organizationUnavailable": "Organizace není k dispozici",
       "selectDescription": "Pro pokračování vyberte organizaci ze svého profilu.",
       "selectOrganization": "Vyberte organizaci",
-      "unavailableDescription": "Tato organizace již není k dispozici. Pro pokračování vyberte jednu ze svého profilu."
+      "unavailableDescription": "Tato organizace již není k dispozici. Pro pokračování vyberte jednu ze svého profilu.",
+      "accessDeniedTitle": "Přístup zamítnut",
+      "accessDeniedDescription": "Nemáte přístup do této organizace."
     },
     "creditActivity": {
       "emptyDescription": "Nákupy, využití a úpravy kreditů pro tuto organizaci se zde zobrazí, jakmile nastanou.",
@@ -3001,7 +3012,10 @@
         "team-topup-bonus-2025": "Bonus za doplnění týmu 2025",
         "accounting_adjustment": "Účetní úprava",
         "credits_expired": "Kredity s prošlou platností"
-      }
+      },
+      "loadMore": "Načíst více",
+      "loadMoreFailed": "Další se nepodařilo načíst",
+      "truncated": "Starší aktivita kreditů je k dispozici."
     },
     "inviteMember": {
       "emailError": "Zadejte platnou e-mailovou adresu",
@@ -3028,7 +3042,10 @@
         "draft": "Návrh",
         "uncollectible": "Nedobytné",
         "unknown": "Neznámé"
-      }
+      },
+      "loadMore": "Načíst více",
+      "loadMoreFailed": "Další se nepodařilo načíst",
+      "truncated": "Starší faktury jsou k dispozici."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

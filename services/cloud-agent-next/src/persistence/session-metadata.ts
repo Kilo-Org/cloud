@@ -28,7 +28,30 @@ const SharedSandboxIdSchema = z
   .transform(s => s as SandboxId);
 
 const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
-const SandboxProviderSchema = z.enum(['cloudflare']);
+const SandboxProviderSchema = z.enum(['cloudflare', 'vercel']);
+
+const VercelProviderRuntimeSchema = z
+  .object({
+    provider: z.literal('vercel'),
+    sessionId: z.string().min(1),
+    projectId: z.string().min(1).optional(),
+    snapshotId: z.string().min(1).optional(),
+    runtimeBuildId: z.string().min(1).optional(),
+    runtime: z.enum(['node22', 'node24', 'node26', 'python3.13']).optional(),
+    wrapper: z
+      .object({
+        launchId: z.string().min(1),
+        commandId: z.string().min(1),
+        instanceId: z.string().min(1),
+        instanceGeneration: z.number().int().nonnegative(),
+      })
+      .strip()
+      .optional(),
+  })
+  .strip();
+
+/** One member per provider that persists runtime identity in session metadata. */
+const ProviderRuntimeSchema = z.discriminatedUnion('provider', [VercelProviderRuntimeSchema]);
 
 const MetadataIdentitySchema = z
   .object({
@@ -100,6 +123,7 @@ const MetadataRepositorySchema = z.preprocess(
           type: z.literal('github'),
           repo: z.string(),
           platform: z.literal('github').optional(),
+          githubIntegrationId: z.string().uuid().optional(),
           githubInstallationId: z.string().optional(),
           githubAppType: z.enum(['standard', 'lite']).optional(),
           ...RepositoryCommonSchema,
@@ -213,6 +237,7 @@ const MetadataWorkspaceSchema = z
     sandboxId: SandboxIdSchema.optional(),
     sandboxRoute: MetadataSharedSandboxRouteSchema.optional(),
     sandboxProvider: SandboxProviderSchema.optional(),
+    providerRuntime: ProviderRuntimeSchema.optional(),
     workspacePath: z.string().optional(),
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
@@ -254,9 +279,20 @@ const MetadataWorkspaceSchema = z
   })
   .refine(
     workspace =>
+      workspace.sandboxProvider !== 'vercel' || workspace.sandboxId?.startsWith('ses-') === true,
+    'Vercel sandbox metadata requires an isolated ses-* sandbox'
+  )
+  .refine(
+    workspace =>
       PROVIDER_CAPABILITIES[workspace.sandboxProvider ?? 'cloudflare'].devcontainer ||
       workspace.devcontainerRequested !== true,
     'Sandbox provider does not support devcontainers'
+  )
+  .refine(
+    workspace =>
+      workspace.providerRuntime === undefined ||
+      workspace.providerRuntime.provider === workspace.sandboxProvider,
+    'Provider runtime must match the workspace sandbox provider'
   );
 
 const MetadataDevContainerSchema = z
@@ -492,4 +528,31 @@ export function parseSessionMetadata(raw: unknown): SessionMetadata {
 
 export function serializeSessionMetadata(metadata: SessionMetadata): SessionMetadata {
   return CurrentSessionMetadataSchema.parse(metadata);
+}
+
+export function updateProviderRuntime(
+  metadata: SessionMetadata,
+  providerRuntime: z.input<typeof ProviderRuntimeSchema>
+): SessionMetadata {
+  const workspace = metadata.workspace;
+  if (workspace?.sandboxProvider !== providerRuntime.provider) {
+    throw new Error('Vercel provider runtime requires Vercel sandbox metadata');
+  }
+  const existing = workspace.providerRuntime;
+  if (existing !== undefined && existing.sessionId !== providerRuntime.sessionId) {
+    throw new Error('Vercel session ID is immutable');
+  }
+  for (const field of ['projectId', 'snapshotId', 'runtimeBuildId', 'runtime'] as const) {
+    if (existing?.[field] !== undefined && existing[field] !== providerRuntime[field]) {
+      throw new Error(`Vercel ${field} is immutable`);
+    }
+  }
+
+  return serializeSessionMetadata({
+    ...metadata,
+    workspace: {
+      ...workspace,
+      providerRuntime: ProviderRuntimeSchema.parse(providerRuntime),
+    },
+  });
 }

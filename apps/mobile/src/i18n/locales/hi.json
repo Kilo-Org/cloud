@@ -860,7 +860,8 @@
       "githubApp": "GitHub ऐप",
       "githubError": "GitHub सेटअप नहीं खोल सका। कृपया फिर से कोशिश करें।",
       "gitlabAccount": "GitLab खाता",
-      "gitlabError": "GitLab सेटअप नहीं खोल सका। कृपया फिर से कोशिश करें।"
+      "gitlabError": "GitLab सेटअप नहीं खोल सका। कृपया फिर से कोशिश करें।",
+      "bitbucketError": "Bitbucket सेटअप नहीं खोला जा सका। कृपया फिर से प्रयास करें।"
     },
     "readOnlyDescription": "केवल संगठन के मालिक और बिलिंग मैनेजर ही ये सेटिंग बदल सकते हैं।",
     "reviewDetail": {
@@ -1621,7 +1622,8 @@
       "dollar": "डॉलर",
       "dollar_other": "डॉलर",
       "costSpoken": "लागत {{cost}}",
-      "costSpokenWithTime": "लागत {{cost}}, {{time}}"
+      "costSpokenWithTime": "लागत {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "हम GitHub ऐप सेटअप शुरू नहीं कर सके। कृपया फिर से कोशिश करें।",
@@ -1698,14 +1700,10 @@
     "newSession": {
       "title": "नया सत्र",
       "repository": "रिपॉज़िटरी",
-      "couldNotLoadRepositories": "रिपॉज़िटरी लोड नहीं हो सकीं",
       "connectGithub": "GitHub कनेक्ट करें",
       "connectGithubDescription": "अपने ब्राउज़र में GitHub कनेक्ट करें, फिर रिपॉज़िटरी चुनने के लिए यहाँ वापस आएँ।",
       "openGithub": "GitHub खोलें",
       "refreshRepositories": "रिपॉज़िटरी रीफ़्रेश करें",
-      "githubConnectionNotVisible": "हमें अभी आपका GitHub कनेक्शन नहीं दिख रहा",
-      "githubConnectionNotVisibleDescription": "यदि आपने Kilo GitHub ऐप इंस्टॉल या कॉन्फ़िगर किया है, तो फिर से जाँचें — या सुनिश्चित करें कि यह इस खाते/संगठन के लिए इंस्टॉल किया गया था।",
-      "checkAgain": "फिर से जाँचें",
       "githubConnected": "GitHub कनेक्ट हो गया",
       "noRepositoriesVisible": "कोई रिपॉज़िटरी दिखाई नहीं दे रही। Kilo GitHub ऐप के लिए रिपॉज़िटरी पहुँच जाँचें, फिर रीफ़्रेश करें।",
       "runOnWithTarget": "इस पर चलाएँ: {{target}}",
@@ -1732,7 +1730,21 @@
       "discardDraftTitle": "ड्राफ़्ट छोड़ें?",
       "discardFailed": "ड्राफ़्ट छोड़ा नहीं जा सका। कृपया फिर से कोशिश करें।",
       "keepEditing": "संपादन जारी रखें",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket कनेक्टेड",
+      "connectBitbucket": "Bitbucket कनेक्ट करें",
+      "connectBitbucketDescription": "अपने ब्राउज़र में Bitbucket कनेक्ट करें, फिर रिपॉज़िटरी चुनने के लिए यहाँ लौटें।",
+      "connectGitlab": "GitLab कनेक्ट करें",
+      "connectGitlabDescription": "अपने ब्राउज़र में GitLab कनेक्ट करें, फिर रिपॉज़िटरी चुनने के लिए यहाँ लौटें।",
+      "couldNotLoadBitbucketRepositories": "Bitbucket रिपॉज़िटरी लोड नहीं हो सकीं",
+      "couldNotLoadGithubRepositories": "GitHub रिपॉज़िटरी लोड नहीं हो सकीं",
+      "couldNotLoadGitlabRepositories": "GitLab रिपॉज़िटरी लोड नहीं हो सकीं",
+      "gitlabConnected": "GitLab कनेक्टेड",
+      "noRepositoriesVisibleBitbucket": "कोई रिपॉज़िटरी दिखाई नहीं दे रही। Bitbucket के लिए रिपॉज़िटरी एक्सेस जाँचें, फिर रिफ़्रेश करें।",
+      "noRepositoriesVisibleGitlab": "कोई रिपॉज़िटरी दिखाई नहीं दे रही। GitLab के लिए रिपॉज़िटरी एक्सेस जाँचें, फिर रिफ़्रेश करें।",
+      "openBitbucket": "Bitbucket खोलें",
+      "openGitlab": "GitLab खोलें",
+      "recentlyUsed": "हाल में उपयोग की गईं"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फ़ाइल अपडेट की गई",
@@ -1798,7 +1810,10 @@
       "noRepositoriesDescription": "आपके खाते से कोई रिपॉज़िटरी कनेक्ट नहीं है.",
       "tryDifferentSearch": "कोई दूसरा खोज शब्द आज़माएँ।",
       "accessibility": "रिपॉज़िटरी: {{label}}",
-      "loading": "लोड हो रहा है..."
+      "loading": "लोड हो रहा है...",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "संदेश विवरण",
@@ -2930,7 +2945,9 @@
       "organizationUnavailable": "संगठन अनुपलब्ध",
       "selectDescription": "जारी रखने के लिए अपनी प्रोफ़ाइल से एक संगठन चुनें।",
       "selectOrganization": "एक संगठन चुनें",
-      "unavailableDescription": "यह संगठन अब उपलब्ध नहीं है। जारी रखने के लिए अपनी प्रोफ़ाइल से एक चुनें।"
+      "unavailableDescription": "यह संगठन अब उपलब्ध नहीं है। जारी रखने के लिए अपनी प्रोफ़ाइल से एक चुनें।",
+      "accessDeniedTitle": "पहुँच अस्वीकृत",
+      "accessDeniedDescription": "आपके पास इस संगठन तक पहुँच नहीं है।"
     },
     "creditActivity": {
       "emptyDescription": "इस संगठन के लिए खरीदारी, उपयोग और क्रेडिट समायोजन होते ही यहाँ दिखाई देंगे।",
@@ -2947,7 +2964,10 @@
         "team-topup-bonus-2025": "टीम टॉप-अप बोनस 2025",
         "accounting_adjustment": "लेखा समायोजन",
         "credits_expired": "क्रेडिट समाप्त हुए"
-      }
+      },
+      "loadMore": "और लोड करें",
+      "loadMoreFailed": "और लोड नहीं हो सका",
+      "truncated": "पुरानी क्रेडिट गतिविधि उपलब्ध है।"
     },
     "hub": {
       "balance": "बैलेंस",
@@ -2983,7 +3003,10 @@
         "draft": "ड्राफ़्ट",
         "uncollectible": "वसूली योग्य नहीं",
         "unknown": "अज्ञात"
-      }
+      },
+      "loadMore": "और लोड करें",
+      "loadMoreFailed": "और लोड नहीं हो सका",
+      "truncated": "पुराने चालान उपलब्ध हैं।"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3074,17 +3097,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "स्टोर नहीं खुल सका।",
-    "emailUs": "हमें ईमेल करें",
-    "gladMessage": "स्टोर समीक्षा से हमें बहुत मदद मिलेगी। Kilo उपयोग करने के लिए धन्यवाद!",
-    "gladTitle": "यह सुनकर हमें खुशी हुई!",
-    "iLikeIt": "मुझे यह पसंद है",
-    "needsWork": "सुधार की ज़रूरत है",
     "noEmailApp": "कोई ईमेल ऐप उपलब्ध नहीं है। आप हमसे {{email}} पर संपर्क कर सकते हैं।",
-    "promptTitle": "आपको Kilo ऐप कैसा लग रहा है?",
-    "rateKilo": "Kilo को रेट करें",
-    "sorryMessage": "कृपया हमें बताएँ कि क्या बेहतर होना चाहिए। ऐप का प्रभारी इंजीनियर हर एक रिपोर्ट पढ़ता है!",
-    "sorryTitle": "यह सुनकर हमें खेद है!",
-    "emailSubject": "मोबाइल ऐप फ़ीडबैक"
+    "emailSubject": "मोबाइल ऐप फ़ीडबैक",
+    "neutralTitle": "Kilo ऐप को रेट करें",
+    "rateTheApp": "ऐप को रेट करें",
+    "sendFeedback": "फ़ीडबैक भेजें"
   },
   "authErrors": {
     "emailAlreadyUsed": "इस ईमेल वाला एक खाता पहले से मौजूद है, लेकिन एक अलग साइन-इन विधि के साथ। कोई दूसरी विधि आज़माएँ या '$t(login.moreSignInOptions)' का उपयोग करें।",

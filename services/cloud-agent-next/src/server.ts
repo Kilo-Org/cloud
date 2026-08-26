@@ -38,6 +38,10 @@ import {
   KILO_FACADE_GLOBAL_FEED_PATH,
   KILO_FACADE_USER_ID_HEADER,
 } from './kilo-facade/user-kilo-facade.js';
+import { getSandboxControlStub, isSandboxControlId } from './sandbox-control/stub.js';
+import { resolveSessionStub } from './sandbox-session/session-stub.js';
+import { sessionPlaneFromId } from './session-plane.js';
+import { generateSandboxCredential, hashSandboxCredential } from './sandbox-control/credential.js';
 
 const app = new Hono<HonoContext>();
 
@@ -62,6 +66,10 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
   if (!cloudAgentSessionId) {
     logger.warn('/terminal: Missing cloudAgentSessionId parameter');
     return new Response('Missing cloudAgentSessionId parameter', { status: 400 });
+  }
+
+  if (sessionPlaneFromId(cloudAgentSessionId) === 'control') {
+    return new Response('Terminal is not available for this session', { status: 412 });
   }
 
   const ptyId = url.searchParams.get('ptyId');
@@ -144,8 +152,7 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
 
   logger.withFields({ cloudAgentSessionId, userId, ptyId }).info('/terminal: WebSocket authorized');
 
-  const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${cloudAgentSessionId}`);
-  const stub = env.CLOUD_AGENT_SESSION.get(doId);
+  const stub = resolveSessionStub(env, userId, cloudAgentSessionId);
   const metadata = await stub.getMetadata();
   const terminal = await resolveTerminalWrapperClient({
     env,
@@ -173,6 +180,48 @@ app.get('/health', (c: Context<HonoContext>) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
   });
+});
+
+function requireInternalApi(c: Context<HonoContext>): Response | null {
+  if (!c.env.INTERNAL_API_SECRET) {
+    return c.text('Internal API secret not configured', 500);
+  }
+  const internalApiKey = c.req.header('x-internal-api-key');
+  if (!internalApiKey || !timingSafeEqual(internalApiKey, c.env.INTERNAL_API_SECRET)) {
+    return c.text('Invalid or missing internal API key', 401);
+  }
+  return null;
+}
+
+app.post('/internal/sandbox-control/seed', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const body = (await c.req.json().catch(() => null)) as { sandboxId?: unknown } | null;
+  const sandboxId = body?.sandboxId;
+  if (typeof sandboxId !== 'string' || !isSandboxControlId(sandboxId)) {
+    return c.text('Invalid sandboxId', 400);
+  }
+
+  const credential = generateSandboxCredential();
+  const stub = getSandboxControlStub(c.env, sandboxId);
+  await stub.setWrapperCredentialHash(await hashSandboxCredential(credential));
+  return c.json({ sandboxId, credential });
+});
+
+app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
+  const upgradeHeader = c.req.header('Upgrade');
+  if (upgradeHeader?.toLowerCase() !== 'websocket') {
+    return c.text('Expected WebSocket upgrade', 426);
+  }
+
+  const sandboxId = c.req.param('sandboxId');
+  if (!sandboxId || !isSandboxControlId(sandboxId)) {
+    return c.text('Invalid sandboxId', 400);
+  }
+
+  const stub = getSandboxControlStub(c.env, sandboxId);
+  return stub.fetch(c.req.raw);
 });
 
 function createSanitizedForwardRequest(
@@ -353,8 +402,7 @@ app.get('/stream', async (c: Context<HonoContext>) => {
 
   logger.withFields({ cloudAgentSessionId, userId }).info('/stream: WebSocket upgrade authorized');
 
-  const doId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${cloudAgentSessionId}`);
-  const stub = c.env.CLOUD_AGENT_SESSION.get(doId);
+  const stub = resolveSessionStub(c.env, userId, cloudAgentSessionId);
   return stub.fetch(c.req.raw);
 });
 
@@ -372,6 +420,9 @@ app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<Hon
   const cloudAgentSessionId = c.req.param('sessionId');
   if (!rawUserId || !cloudAgentSessionId) {
     return c.text('Missing route params', 400);
+  }
+  if (sessionPlaneFromId(cloudAgentSessionId) === 'control') {
+    return c.text('Not found', 404);
   }
 
   let userId: string;
@@ -436,8 +487,7 @@ app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<Hon
     return projectSessionAccessHttpError(error);
   }
 
-  const sessionDoId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${cloudAgentSessionId}`);
-  const sessionStub = c.env.CLOUD_AGENT_SESSION.get(sessionDoId);
+  const sessionStub = resolveSessionStub(c.env, userId, cloudAgentSessionId);
   const validation = await sessionStub.validateKiloGlobalFeedProducer({
     kiloSessionId,
     wrapperRunId,
@@ -522,8 +572,11 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
     return projectSessionAccessHttpError(error);
   }
 
-  const doId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-  const stub = c.env.CLOUD_AGENT_SESSION.get(doId);
+  if (sessionPlaneFromId(sessionId) === 'control') {
+    return c.text('Not found', 404);
+  }
+
+  const stub = resolveSessionStub(c.env, userId, sessionId);
   const doUrl = new URL(c.req.url);
   doUrl.pathname = '/ingest';
   const doRequest = new Request(doUrl.toString(), c.req.raw);
@@ -630,13 +683,8 @@ app.put(
 );
 
 app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
-  const internalApiKey = c.req.header('x-internal-api-key');
-  if (!c.env.INTERNAL_API_SECRET) {
-    return c.text('Internal API secret not configured', 500);
-  }
-  if (!internalApiKey || !timingSafeEqual(internalApiKey, c.env.INTERNAL_API_SECRET)) {
-    return c.text('Invalid or missing internal API key', 401);
-  }
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
 
   const body = (await c.req.json().catch(() => null)) as {
     userId?: unknown;
@@ -667,8 +715,7 @@ app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
 
   for (const row of rows) {
     if (!row.cloudAgentSessionId) continue;
-    const doId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${row.cloudAgentSessionId}`);
-    const stub = c.env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = resolveSessionStub(c.env, userId, row.cloudAgentSessionId);
     await stub.closeOrgStreams(organizationId);
   }
 

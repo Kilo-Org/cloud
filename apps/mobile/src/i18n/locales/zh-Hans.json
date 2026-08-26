@@ -860,7 +860,8 @@
       "githubApp": "GitHub 应用",
       "githubError": "无法打开 GitHub 设置。请重试。",
       "gitlabAccount": "GitLab 账户",
-      "gitlabError": "无法打开 GitLab 设置。请重试。"
+      "gitlabError": "无法打开 GitLab 设置。请重试。",
+      "bitbucketError": "无法打开 Bitbucket 设置。请重试。"
     },
     "readOnlyDescription": "只有组织所有者和账单管理员可以更改这些设置。",
     "reviewDetail": {
@@ -1621,7 +1622,8 @@
       "dollar": "美元",
       "dollar_other": "美元",
       "costSpoken": "费用 {{cost}}",
-      "costSpokenWithTime": "费用 {{cost}}，{{time}}"
+      "costSpokenWithTime": "费用 {{cost}}，{{time}}",
+      "pullRequest": "拉取请求 {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "我们无法启动 GitHub App 设置。请重试。",
@@ -1698,14 +1700,10 @@
     "newSession": {
       "title": "新会话",
       "repository": "仓库",
-      "couldNotLoadRepositories": "无法加载仓库",
       "connectGithub": "连接 GitHub",
       "connectGithubDescription": "在浏览器中连接 GitHub，然后返回此处选择仓库。",
       "openGithub": "打开 GitHub",
       "refreshRepositories": "刷新仓库",
-      "githubConnectionNotVisible": "我们暂时看不到您的 GitHub 连接",
-      "githubConnectionNotVisibleDescription": "如果您已安装或配置 Kilo GitHub App，请再检查一次 — 或确认它是为此账户/组织安装的。",
-      "checkAgain": "再检查一次",
       "githubConnected": "GitHub 已连接",
       "noRepositoriesVisible": "看不到任何仓库。请检查 Kilo GitHub App 的仓库访问权限，然后刷新。",
       "runOnWithTarget": "运行于：{{target}}",
@@ -1732,7 +1730,21 @@
       "discardDraftTitle": "丢弃草稿？",
       "discardFailed": "无法丢弃草稿。请重试。",
       "keepEditing": "继续编辑",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket 已连接",
+      "connectBitbucket": "连接 Bitbucket",
+      "connectBitbucketDescription": "在浏览器中连接 Bitbucket，然后返回此处选择仓库。",
+      "connectGitlab": "连接 GitLab",
+      "connectGitlabDescription": "在浏览器中连接 GitLab，然后返回此处选择仓库。",
+      "couldNotLoadBitbucketRepositories": "无法加载 Bitbucket 仓库",
+      "couldNotLoadGithubRepositories": "无法加载 GitHub 仓库",
+      "couldNotLoadGitlabRepositories": "无法加载 GitLab 仓库",
+      "gitlabConnected": "GitLab 已连接",
+      "noRepositoriesVisibleBitbucket": "没有可见的仓库。请检查 Bitbucket 的仓库访问权限，然后刷新。",
+      "noRepositoriesVisibleGitlab": "没有可见的仓库。请检查 GitLab 的仓库访问权限，然后刷新。",
+      "openBitbucket": "打开 Bitbucket",
+      "openGitlab": "打开 GitLab",
+      "recentlyUsed": "最近使用"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件",
@@ -1821,7 +1833,10 @@
       "noRepositoriesDescription": "您的账户没有连接任何仓库。",
       "tryDifferentSearch": "请尝试其他搜索词。",
       "loading": "加载中...",
-      "accessibility": "仓库：{{label}}"
+      "accessibility": "仓库：{{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "消息详情",
@@ -2930,7 +2945,9 @@
       "organizationUnavailable": "组织不可用",
       "selectDescription": "从您的个人资料中选择一个组织以继续。",
       "selectOrganization": "选择组织",
-      "unavailableDescription": "此组织不再可用。请从您的个人资料中选择一个以继续。"
+      "unavailableDescription": "此组织不再可用。请从您的个人资料中选择一个以继续。",
+      "accessDeniedTitle": "访问被拒绝",
+      "accessDeniedDescription": "您无权访问此组织。"
     },
     "creditActivity": {
       "emptyDescription": "此组织的购买、用量和积分调整将在这里实时显示。",
@@ -2947,7 +2964,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "会计调整",
         "credits_expired": "积分已过期"
-      }
+      },
+      "loadMore": "加载更多",
+      "loadMoreFailed": "无法加载更多",
+      "truncated": "可查看更早的信用活动。"
     },
     "hub": {
       "balance": "余额",
@@ -2983,7 +3003,10 @@
         "draft": "草稿",
         "uncollectible": "无法收回",
         "unknown": "未知"
-      }
+      },
+      "loadMore": "加载更多",
+      "loadMoreFailed": "无法加载更多",
+      "truncated": "可查看更早的发票。"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3074,17 +3097,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "无法打开应用商店。",
-    "emailUs": "给我们发邮件",
-    "gladMessage": "在应用商店留下评价会对我们有很大帮助。感谢您使用 Kilo！",
-    "gladTitle": "很高兴听到您这么说！",
-    "iLikeIt": "我喜欢",
-    "needsWork": "有待改进",
     "noEmailApp": "没有可用的邮件应用。您可以通过 {{email}} 联系我们",
-    "promptTitle": "您觉得 Kilo 应用怎么样？",
-    "rateKilo": "给 Kilo 评分",
-    "sorryMessage": "请告诉我们哪些地方需要改进。负责该应用的工程师会阅读每一份报告！",
-    "sorryTitle": "很抱歉听到您这么说！",
-    "emailSubject": "移动应用反馈"
+    "emailSubject": "移动应用反馈",
+    "neutralTitle": "评价 Kilo 应用",
+    "rateTheApp": "评价应用",
+    "sendFeedback": "发送反馈"
   },
   "authErrors": {
     "emailAlreadyUsed": "使用此邮箱的账户已存在，但登录方式不同。请尝试其他方式或使用\"$t(login.moreSignInOptions)\"。",

@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab အကောင့်",
       "connectGitLab": "GitLab ချိတ်ဆက်ရန်",
       "gitlabError": "GitLab ပြင်ဆင်မှု ဖွင့်၍ မရပါ။ ထပ်ကြိုးစားပါ။",
-      "description": "pull requests များကို အလိုအလျောက် စစ်ဆေးရန် Kilo {{label}} ကို ချိတ်ဆက်ပါ။"
+      "description": "pull requests များကို အလိုအလျောက် စစ်ဆေးရန် Kilo {{label}} ကို ချိတ်ဆက်ပါ။",
+      "bitbucketError": "Bitbucket သတ်မှတ်မှုကို မဖွင့်နိုင်ပါ။ ထပ်ကြိုးစားပါ။"
     },
     "overview": {
       "reviewStyle": "စစ်ဆေးမှု ပုံစံ",
@@ -2075,7 +2076,8 @@
       "dollar": "ဒေါ်လာများ",
       "dollar_other": "ဒေါ်လာများ",
       "costSpoken": "ကုန်ကျစရိတ် {{cost}}",
-      "costSpokenWithTime": "ကုန်ကျစရိတ် {{cost}}, {{time}}"
+      "costSpokenWithTime": "ကုန်ကျစရိတ် {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ကို မဖွင့်နိုင်ခဲ့ပါ",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "စက်ရှင်အသစ်",
       "repository": "သိုလှောင်မှု",
-      "couldNotLoadRepositories": "သိုလှောင်မှုများကို မဖွင့်နိုင်ခဲ့ပါ",
       "connectGithub": "GitHub ချိတ်ဆက်ပါ",
       "connectGithubDescription": "သင့်ဘရောက်ဆာတွင် GitHub ကို ချိတ်ဆက်ပြီး သိုလှောင်မှုတစ်ခု ရွေးချယ်ရန် ဤနေရာသို့ ပြန်လာပါ။",
       "openGithub": "GitHub ဖွင့်ပါ",
       "refreshRepositories": "သိုလှောင်မှုများ ပြန်လည်စတင်ပါ",
-      "githubConnectionNotVisible": "သင့် GitHub ချိတ်ဆက်မှုကို ကျွန်ုပ်တို့ မမြင်ရသေးပါ",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub App ကို သင်ထည့်သွင်းခဲ့သည် သို့မဟုတ် ပြင်ဆင်ခဲ့လျှင် ထပ်မံစစ်ဆေးပါ — သို့မဟုတ် ၎င်းကို ဤအကောင့်/အဖွဲ့အစည်းအတွက် ထည့်သွင်းထားကြောင်း သေချာပါစေ။",
-      "checkAgain": "ထပ်မံစစ်ဆေးပါ",
       "githubConnected": "GitHub ချိတ်ဆက်ပြီး",
       "noRepositoriesVisible": "မြင်နိုင်သော သိုလှောင်မှုများ မရှိပါ။ Kilo GitHub App အတွက် သိုလှောင်မှုဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး ပြန်လည်စတင်ပါ။",
       "runOnWithTarget": "လုပ်ဆောင်မည့်နေရာ- {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "ဆက်တည်းဖြတ်ပါ",
       "discard": "ပယ်ဖျက်ပါ",
       "discardFailed": "မူကြမ်းကို ပယ်ဖျက်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket ချိတ်ဆက်ပြီး",
+      "connectBitbucket": "Bitbucket ချိတ်ဆက်ရန်",
+      "connectBitbucketDescription": "သင့်ဘရောက်ဆာတွင် Bitbucket ကို ချိတ်ဆက်ပြီး၊ repository တစ်ခုရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
+      "connectGitlab": "GitLab ချိတ်ဆက်ရန်",
+      "connectGitlabDescription": "သင့်ဘရောက်ဆာတွင် GitLab ကို ချိတ်ဆက်ပြီး၊ repository တစ်ခုရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
+      "couldNotLoadBitbucketRepositories": "Bitbucket repository များကို မဖွင့်နိုင်ပါ",
+      "couldNotLoadGithubRepositories": "GitHub repository များကို မဖွင့်နိုင်ပါ",
+      "couldNotLoadGitlabRepositories": "GitLab repository များကို မဖွင့်နိုင်ပါ",
+      "gitlabConnected": "GitLab ချိတ်ဆက်ပြီးပါပြီ",
+      "noRepositoriesVisibleBitbucket": "repository များ မမြင်ရပါ။ Bitbucket အတွက် repository ဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး၊ ပြန်လည်စတင်ပါ။",
+      "noRepositoriesVisibleGitlab": "repository များ မမြင်ရပါ။ GitLab အတွက် repository ဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး၊ ပြန်လည်စတင်ပါ။",
+      "openBitbucket": "Bitbucket ဖွင့်ပါ",
+      "openGitlab": "GitLab ဖွင့်ပါ",
+      "recentlyUsed": "မကြာသေးမီအသုံးပြုထားသော"
     },
     "partRenderer": {
       "updatedFileCount_one": "ဖိုင် {{displayCount}} ခု မွမ်းမံပြီး",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "သင့်အကောင့်သို့ ချိတ်ဆက်ထားသော သိုလှောင်မှု မရှိပါ။",
       "tryDifferentSearch": "အခြားရှာဖွေမှုအသုံးအနှုန်းတစ်ခု ကြိုးစားပါ။",
       "loading": "ဖွင့်နေသည်...",
-      "accessibility": "သိုလှောင်မှု- {{label}}"
+      "accessibility": "သိုလှောင်မှု- {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "မက်ဆေ့ခ်ျအသေးစိတ်",
@@ -2925,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "အီးမေးလ် အက်ပ် မရနိုင်ပါ။ {{email}} တွင် ကျွန်ုပ်တို့ထံ ဆက်သွယ်နိုင်ပါသည်",
     "couldNotOpenStore": "စတိုးကို မဖွင့်နိုင်ပါ။",
-    "promptTitle": "Kilo အက်ပ်ကို သင်မည်သို့ နှစ်သက်ပါသနည်း။",
-    "iLikeIt": "ကျွန်ုပ် နှစ်သက်သည်",
-    "gladTitle": "ထိုသတင်းကြားရသည့်အတွက် ဝမ်းသာပါသည်။",
-    "gladMessage": "စတိုး သုံးသပ်ချက်တစ်ခုက ကျွန်ုပ်တို့ကို အလွန် အထောက်အကူပြုပါမည်။ Kilo ကို သုံးသည့်အတွက် ကျေးဇူးတင်ပါသည်။",
-    "rateKilo": "Kilo ကို အဆင့်သတ်မှတ်ပါ",
-    "needsWork": "တိုးတက်ရန် လိုသည်",
-    "sorryTitle": "ထိုသတင်းကြားရသည့်အတွက် ဝမ်းနည်းပါသည်။",
-    "sorryMessage": "ဘာတွေ ပိုကောင်းအောင် လုပ်ရန် လိုသည်ကို အသိပေးပါ။ အက်ပ်တာဝန်ခံ အင်ဂျင်နီယာသည် အစီရင်ခံချက်တိုင်းကို ဖတ်ပါသည်။",
-    "emailUs": "ကျွန်ုပ်တို့ထံ အီးမေးလ် ပို့ပါ",
-    "emailSubject": "မိုဘိုင်းအက်ပ် တုံ့ပြန်ချက်"
+    "emailSubject": "မိုဘိုင်းအက်ပ် တုံ့ပြန်ချက်",
+    "neutralTitle": "Kilo အက်ပ်ကို အဆင့်သတ်မှတ်ပါ",
+    "rateTheApp": "အက်ပ်ကို အဆင့်သတ်မှတ်ပါ",
+    "sendFeedback": "တုံ့ပြန်ချက် ပေးပို့ပါ"
   },
   "organization": {
     "boundary": {
@@ -2944,7 +2953,9 @@
       "organizationUnavailable": "အဖွဲ့အစည်း မရနိုင်ပါ",
       "selectDescription": "ဆက်လုပ်ရန် သင့် profile မှ အဖွဲ့အစည်းတစ်ခု ရွေးပါ။",
       "selectOrganization": "အဖွဲ့အစည်း ရွေးရန်",
-      "unavailableDescription": "ဤ အဖွဲ့အစည်း မရနိုင်တော့ပါ။ ဆက်လုပ်ရန် သင့် profile မှ တစ်ခု ရွေးပါ။"
+      "unavailableDescription": "ဤ အဖွဲ့အစည်း မရနိုင်တော့ပါ။ ဆက်လုပ်ရန် သင့် profile မှ တစ်ခု ရွေးပါ။",
+      "accessDeniedTitle": "ဝင်ရောက်ခွင့် ငြင်းပယ်ခဲ့သည်",
+      "accessDeniedDescription": "ဤအဖွဲ့အစည်းသို့ ဝင်ရောက်ခွင့်မရှိပါ။"
     },
     "creditActivity": {
       "emptyDescription": "ဤ အဖွဲ့အစည်းအတွက် ဝယ်ယူမှုများ၊ အသုံးပြုမှုနှင့် credit ပြုပြင်မှုများသည် ဖြစ်ပျက်သည်နှင့် ဤနေရာတွင် ပေါ်လာပါမည်။",
@@ -2961,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "စာရင်းကိုင် ပြုပြင်မှု",
         "credits_expired": "သက်တမ်းကုန် ခရက်ဒစ်များ"
-      }
+      },
+      "loadMore": "နောက်ထပ်တင်ပါ",
+      "loadMoreFailed": "နောက်ထပ်တင်မရပါ",
+      "truncated": "ပိုဟောင်းသော ခရက်ဒစ်လုပ်ဆောင်ချက်များ ရနိုင်ပါသည်။"
     },
     "inviteMember": {
       "emailError": "မှန်ကန်သော အီးမေးလ် လိပ်စာ ထည့်ပါ",
@@ -2988,7 +3002,10 @@
         "draft": "အမူကြမ်း",
         "uncollectible": "ကောက်ခံ၍မရသော",
         "unknown": "အမည်မသိ"
-      }
+      },
+      "loadMore": "နောက်ထပ်တင်ပါ",
+      "loadMoreFailed": "နောက်ထပ်တင်မရပါ",
+      "truncated": "ပိုဟောင်းသော ငွေတောင်းခံလွှာများ ရနိုင်ပါသည်။"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

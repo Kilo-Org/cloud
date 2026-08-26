@@ -108,7 +108,7 @@ function resolveKilocodeToken(): string | undefined {
   return fs.readFileSync(tokenFile, 'utf8').replace(/[\r\n]+$/, '');
 }
 
-type SnapshotInfoValidation = 'valid' | 'missing' | 'invalid';
+type SnapshotInfoValidation = 'valid' | 'empty' | 'missing' | 'invalid';
 type SnapshotInfoValidationResult = {
   validation: SnapshotInfoValidation;
   infoId?: string;
@@ -260,20 +260,26 @@ async function skipJsonObject(reader: JsonCharReader): Promise<boolean> {
 }
 
 async function skipJsonArray(reader: JsonCharReader): Promise<boolean> {
+  return (await validateJsonArray(reader)).ok;
+}
+
+type JsonArrayValidation = { ok: true; empty: boolean } | { ok: false };
+
+async function validateJsonArray(reader: JsonCharReader): Promise<JsonArrayValidation> {
   const firstChar = await nextNonWhitespace(reader);
-  if (firstChar === null) return false;
-  if (firstChar === ']') return true;
+  if (firstChar === null) return { ok: false };
+  if (firstChar === ']') return { ok: true, empty: true };
   reader.unread(firstChar);
 
   while (true) {
-    if (!(await skipJsonValue(reader))) return false;
+    if (!(await skipJsonValue(reader))) return { ok: false };
 
     const separator = await nextNonWhitespace(reader);
-    if (separator === ']') return true;
-    if (separator !== ',') return false;
+    if (separator === ']') return { ok: true, empty: false };
+    if (separator !== ',') return { ok: false };
 
     const nextValue = await nextNonWhitespace(reader);
-    if (nextValue === null || nextValue === ']') return false;
+    if (nextValue === null || nextValue === ']') return { ok: false };
     reader.unread(nextValue);
   }
 }
@@ -289,13 +295,13 @@ async function skipJsonValue(reader: JsonCharReader): Promise<boolean> {
   return skipJsonScalar(reader, firstChar);
 }
 
-type InfoObjectValidation = { ok: true; infoId?: string } | { ok: false };
+type InfoObjectValidation = { ok: true; infoId?: string; empty: boolean } | { ok: false };
 
 async function validateInfoObject(reader: JsonCharReader): Promise<InfoObjectValidation> {
   let infoId: string | undefined;
   const firstChar = await nextNonWhitespace(reader);
   if (firstChar === null) return { ok: false };
-  if (firstChar === '}') return { ok: true };
+  if (firstChar === '}') return { ok: true, empty: true };
   reader.unread(firstChar);
 
   while (true) {
@@ -320,7 +326,7 @@ async function validateInfoObject(reader: JsonCharReader): Promise<InfoObjectVal
     }
 
     const separator = await nextNonWhitespace(reader);
-    if (separator === '}') return infoId === undefined ? { ok: true } : { ok: true, infoId };
+    if (separator === '}') return { ok: true, infoId, empty: false };
     if (separator !== ',') return { ok: false };
 
     const nextMember = await nextNonWhitespace(reader);
@@ -338,6 +344,14 @@ async function validateSnapshotInfoId(
     if ((await nextNonWhitespace(reader)) !== '{') return { validation: 'invalid' };
 
     let infoId: string | undefined;
+    let infoIsEmpty = false;
+    let messagesIsEmpty = false;
+    let sessionDiffIsEmpty = false;
+    let sawInfo = false;
+    let sawMessages = false;
+    let sawSessionDiff = false;
+    let hasUnexpectedTopLevelField = false;
+    const seenTopLevelFields = new Set<string>();
     const firstChar = await nextNonWhitespace(reader);
     if (firstChar === null) return { validation: 'invalid' };
     if (firstChar !== '}') {
@@ -350,20 +364,48 @@ async function validateSnapshotInfoId(
           return { validation: 'invalid' };
         }
 
+        if (seenTopLevelFields.has(key)) hasUnexpectedTopLevelField = true;
+        seenTopLevelFields.add(key);
+
         if (key === 'info') {
+          sawInfo = true;
           const infoStart = await nextNonWhitespace(reader);
           if (infoStart === null) return { validation: 'invalid' };
           if (infoStart === '{') {
             const infoValidation = await validateInfoObject(reader);
             if (!infoValidation.ok) return { validation: 'invalid' };
             infoId = infoValidation.infoId;
+            infoIsEmpty = infoValidation.empty;
           } else {
             reader.unread(infoStart);
             if (!(await skipJsonValue(reader))) return { validation: 'invalid' };
             infoId = undefined;
+            infoIsEmpty = false;
+          }
+        } else if (key === 'messages' || key === 'sessionDiff') {
+          const valueStart = await nextNonWhitespace(reader);
+          if (valueStart === null) return { validation: 'invalid' };
+          let valueIsEmpty = false;
+          if (valueStart === '[') {
+            const arrayValidation = await validateJsonArray(reader);
+            if (!arrayValidation.ok) return { validation: 'invalid' };
+            valueIsEmpty = arrayValidation.empty;
+          } else {
+            reader.unread(valueStart);
+            if (!(await skipJsonValue(reader))) return { validation: 'invalid' };
+          }
+
+          if (key === 'messages') {
+            sawMessages = true;
+            messagesIsEmpty = valueIsEmpty;
+          } else {
+            sawSessionDiff = true;
+            sessionDiffIsEmpty = valueIsEmpty;
           }
         } else if (!(await skipJsonValue(reader))) {
           return { validation: 'invalid' };
+        } else {
+          hasUnexpectedTopLevelField = true;
         }
 
         const separator = await nextNonWhitespace(reader);
@@ -377,6 +419,18 @@ async function validateSnapshotInfoId(
     }
 
     if ((await nextNonWhitespace(reader)) !== null) return { validation: 'invalid' };
+    if (
+      infoId === undefined &&
+      sawInfo &&
+      sawMessages &&
+      sawSessionDiff &&
+      infoIsEmpty &&
+      messagesIsEmpty &&
+      sessionDiffIsEmpty &&
+      !hasUnexpectedTopLevelField
+    ) {
+      return { validation: 'empty' };
+    }
     return infoId === undefined ? { validation: 'missing' } : { validation: 'valid', infoId };
   } finally {
     reader.close();
@@ -696,6 +750,10 @@ export async function restoreSession(
       if (snapshotInfoValidation.validation === 'invalid') {
         log('snapshot is not valid JSON before info.id metadata');
         return fail(`snapshot is not valid JSON (${bytesWritten} bytes)`, null, 'download');
+      }
+      if (snapshotInfoValidation.validation === 'empty') {
+        log('snapshot is an empty session export; treating it as not found');
+        return fail('snapshot not found (empty export)', 404, 'download');
       }
       if (snapshotInfoValidation.validation === 'missing') {
         log('snapshot missing info.id — likely an error response');

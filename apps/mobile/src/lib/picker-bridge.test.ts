@@ -1,12 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   areModelPickerSelectionScopesEqual,
-  clearModelPickerBridge,
   commitModelPickerSelection,
-  getModelPickerBridge,
   resolveModelPickerSelection,
-  setModelPickerBridge,
 } from './picker-bridge';
 
 const remoteOption = {
@@ -32,27 +29,14 @@ const currentSelectionScope = {
 };
 
 describe('model picker bridge', () => {
-  beforeEach(() => {
-    clearModelPickerBridge();
-  });
-
   it('preserves exact model identity and override source while resetting an invalid variant', () => {
-    const onSelect = vi.fn();
-    setModelPickerBridge({
+    const bridge = {
       ...currentSelectionScope,
       options: [remoteOption],
       currentValue: remoteOption.id,
       currentVariant: 'removed',
-      onSelect: selection => {
-        onSelect(selection);
-      },
-    });
-
-    const bridge = getModelPickerBridge();
-    expect(bridge).not.toBeNull();
-    if (!bridge) {
-      throw new Error('Expected model picker bridge');
-    }
+      onSelect: vi.fn(),
+    };
 
     const selection = resolveModelPickerSelection(bridge, remoteOption.id, 'removed');
     if (!selection) {

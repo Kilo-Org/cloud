@@ -130,6 +130,7 @@ describe('resolveNewSessionStartDisabled', () => {
   ) {
     return {
       ...validInput(),
+      selectedRepositoryResolved: true,
       isProfileLoading: false,
       ...overrides,
     };
@@ -143,5 +144,21 @@ describe('resolveNewSessionStartDisabled', () => {
 
   it('blocks Start while the profile query is loading', () => {
     expect(resolveNewSessionStartDisabled(startInput({ isProfileLoading: true }))).toBe(true);
+  });
+
+  it('blocks Start when the selected repo key no longer resolves to a row (stale selection)', () => {
+    expect(
+      resolveNewSessionStartDisabled(
+        startInput({ selectedRepo: 'github:owner/repo', selectedRepositoryResolved: false })
+      )
+    ).toBe(true);
+  });
+
+  it('keeps Start enabled when the selected repo key still resolves to a row', () => {
+    expect(
+      resolveNewSessionStartDisabled(
+        startInput({ selectedRepo: 'github:owner/repo', selectedRepositoryResolved: true })
+      )
+    ).toBe(false);
   });
 });

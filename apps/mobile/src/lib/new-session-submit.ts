@@ -88,9 +88,16 @@ export function resolveNewSessionStartDisabled(input: {
   isSubmitting: boolean;
   model: string;
   selectedRepo: string;
+  /** True when the selected repo key still resolves to a picker row. */
+  selectedRepositoryResolved: boolean;
   isProfileLoading: boolean;
 }): boolean {
+  // A selected key that no longer resolves to a row (after a refresh or a
+  // provider change) must not submit: the create body would carry no
+  // repository field and the server would reject it.
+  const staleSelection = input.selectedRepo !== '' && !input.selectedRepositoryResolved;
   return (
+    staleSelection ||
     resolveNewSessionSubmitDisabled({
       attachmentsHasFailed: input.attachmentsHasFailed,
       attachmentsIsUploading: input.attachmentsIsUploading,
@@ -100,6 +107,7 @@ export function resolveNewSessionStartDisabled(input: {
       isSubmitting: input.isSubmitting,
       model: input.model,
       selectedRepo: input.selectedRepo,
-    }) || input.isProfileLoading
+    }) ||
+    input.isProfileLoading
   );
 }

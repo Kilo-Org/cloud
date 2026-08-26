@@ -1395,7 +1395,8 @@
       "gitlabAccount": "Compte de GitLab",
       "connectGitLab": "Connecta GitLab",
       "gitlabError": "No s'ha pogut obrir la configuració de GitLab. Torna-ho a provar.",
-      "description": "Connecta el Kilo {{label}} per revisar les sol·licituds d'extracció automàticament."
+      "description": "Connecta el Kilo {{label}} per revisar les sol·licituds d'extracció automàticament.",
+      "bitbucketError": "No s'ha pogut obrir la configuració de Bitbucket. Torna-ho a provar."
     },
     "overview": {
       "reviewStyle": "Estil de revisió",
@@ -2090,7 +2091,8 @@
       "cent_many": "cèntims",
       "dollar_many": "dòlars",
       "costSpoken": "cost {{cost}}",
-      "costSpokenWithTime": "cost {{cost}}, {{time}}"
+      "costSpokenWithTime": "cost {{cost}}, {{time}}",
+      "pullRequest": "sol·licitud d'extracció {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "No s'ha pogut obrir GitHub",
@@ -2167,14 +2169,10 @@
     "newSession": {
       "title": "Nova sessió",
       "repository": "Repositori",
-      "couldNotLoadRepositories": "No s'han pogut carregar els repositoris",
       "connectGithub": "Connecta GitHub",
       "connectGithubDescription": "Connecta GitHub al navegador i torna aquí per triar un repositori.",
       "openGithub": "Obre GitHub",
       "refreshRepositories": "Actualitza els repositoris",
-      "githubConnectionNotVisible": "Encara no veiem la teva connexió de GitHub",
-      "githubConnectionNotVisibleDescription": "Si has instal·lat o configurat l'aplicació de GitHub de Kilo, comprova-ho de nou; o assegura't que s'ha instal·lat per a aquest compte/organització.",
-      "checkAgain": "Comprova-ho de nou",
       "githubConnected": "GitHub connectat",
       "noRepositoriesVisible": "No es veu cap repositori. Comprova l'accés als repositoris de l'aplicació de GitHub de Kilo i actualitza.",
       "runOnWithTarget": "Executa a: {{target}}",
@@ -2201,7 +2199,21 @@
       "keepEditing": "Continua editant",
       "discard": "Descarta",
       "discardFailed": "No s'ha pogut descartar l'esborrany. Torna-ho a provar.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket connectat",
+      "connectBitbucket": "Connecta Bitbucket",
+      "connectBitbucketDescription": "Connecta Bitbucket al teu navegador i torna aquí per triar un repositori.",
+      "connectGitlab": "Connecta GitLab",
+      "connectGitlabDescription": "Connecta GitLab al teu navegador i torna aquí per triar un repositori.",
+      "couldNotLoadBitbucketRepositories": "No s'han pogut carregar els repositoris de Bitbucket",
+      "couldNotLoadGithubRepositories": "No s'han pogut carregar els repositoris de GitHub",
+      "couldNotLoadGitlabRepositories": "No s'han pogut carregar els repositoris de GitLab",
+      "gitlabConnected": "GitLab connectat",
+      "noRepositoriesVisibleBitbucket": "No hi ha repositoris visibles. Comprova l'accés als repositoris de Bitbucket i actualitza.",
+      "noRepositoriesVisibleGitlab": "No hi ha repositoris visibles. Comprova l'accés als repositoris de GitLab i actualitza.",
+      "openBitbucket": "Obre Bitbucket",
+      "openGitlab": "Obre GitLab",
+      "recentlyUsed": "Utilitzats recentment"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxer actualitzat",
@@ -2291,7 +2303,10 @@
       "noRepositoriesDescription": "Cap repositori no està connectat al teu compte.",
       "tryDifferentSearch": "Prova amb un altre terme de cerca.",
       "loading": "Carregant...",
-      "accessibility": "Repositori: {{label}}"
+      "accessibility": "Repositori: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detalls del missatge",
@@ -2945,16 +2960,10 @@
   "feedback": {
     "noEmailApp": "No hi ha cap aplicació de correu disponible. Podeu contactar amb nosaltres a {{email}}",
     "couldNotOpenStore": "No s'ha pogut obrir la botiga.",
-    "promptTitle": "Com valores l'aplicació Kilo?",
-    "iLikeIt": "M'agrada",
-    "gladTitle": "Ens alegrem de sentir-ho!",
-    "gladMessage": "Una ressenya a la botiga ens ajudaria moltíssim. Gràcies per utilitzar Kilo!",
-    "rateKilo": "Valora Kilo",
-    "needsWork": "Necessita millores",
-    "sorryTitle": "Ens sap greu sentir-ho!",
-    "sorryMessage": "Si us plau, feu-nos saber què cal millorar. L'enginyer responsable de l'aplicació llegeix tots i cadascun dels informes!",
-    "emailUs": "Escriu-nos",
-    "emailSubject": "comentaris de l'aplicació mòbil"
+    "emailSubject": "comentaris de l'aplicació mòbil",
+    "neutralTitle": "Valora l'aplicació Kilo",
+    "rateTheApp": "Valora l'aplicació",
+    "sendFeedback": "Envia comentaris"
   },
   "organization": {
     "boundary": {
@@ -2964,7 +2973,9 @@
       "organizationUnavailable": "Organització no disponible",
       "selectDescription": "Trieu una organització del vostre perfil per continuar.",
       "selectOrganization": "Selecciona una organització",
-      "unavailableDescription": "Aquesta organització ja no està disponible. Trieu una del vostre perfil per continuar."
+      "unavailableDescription": "Aquesta organització ja no està disponible. Trieu una del vostre perfil per continuar.",
+      "accessDeniedTitle": "Accés denegat",
+      "accessDeniedDescription": "No tens accés a aquesta organització."
     },
     "creditActivity": {
       "emptyDescription": "Les compres, l'ús i els ajustos de crèdit d'aquesta organització apareixeran aquí a mesura que es produeixin.",
@@ -2981,7 +2992,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Ajust comptable",
         "credits_expired": "Crèdits caducats"
-      }
+      },
+      "loadMore": "Carrega més",
+      "loadMoreFailed": "No s'ha pogut carregar més",
+      "truncated": "Hi ha activitat de crèdit més antiga disponible."
     },
     "inviteMember": {
       "emailError": "Introduïu una adreça de correu vàlida",
@@ -3008,7 +3022,10 @@
         "draft": "Esborrany",
         "uncollectible": "No cobrable",
         "unknown": "Desconegut"
-      }
+      },
+      "loadMore": "Carrega més",
+      "loadMoreFailed": "No s'ha pogut carregar més",
+      "truncated": "Hi ha factures més antigues disponibles."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

@@ -3,7 +3,10 @@ import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
-import { type RepositorySectionView } from '@/components/agents/new-session-repository-state';
+import {
+  type NewSessionRepository,
+  type RepositoryGroup,
+} from '@/components/agents/new-session-repository-state';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
@@ -157,12 +160,13 @@ function defaultProps() {
     isLoadingInstances: false,
     onChangeRunOnInstance: vi.fn(),
     showInstanceDisconnectedNote: false,
-    view: 'loading' as RepositorySectionView,
+    groups: [] as RepositoryGroup[],
     isRetrying: false,
     onChangeRepo: vi.fn(),
-    onOpenGitHubIntegration: vi.fn(),
+    onConnectProvider: vi.fn(),
     onRefreshRepos: vi.fn(),
-    repositories: [] as { fullName: string; isPrivate: boolean }[],
+    repositories: [] as NewSessionRepository[],
+    recents: [] as NewSessionRepository[],
     selectedRepo: '',
     profile: null as {
       id: string;
@@ -205,10 +209,10 @@ describe('NewSessionConfigureForm', () => {
   it('passes the ordered repository array unchanged into NewSessionRepositorySection', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
-    const orderedRepositories = [
-      { fullName: 'Kilo-Org/cloud', isPrivate: true },
-      { fullName: 'octocat/Hello-World', isPrivate: false },
-      { fullName: 'acme/widgets', isPrivate: true },
+    const orderedRepositories: NewSessionRepository[] = [
+      { platform: 'github', fullName: 'Kilo-Org/cloud', isPrivate: true },
+      { platform: 'github', fullName: 'octocat/Hello-World', isPrivate: false },
+      { platform: 'gitlab', fullName: 'acme/widgets', isPrivate: true },
     ];
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -222,6 +226,28 @@ describe('NewSessionConfigureForm', () => {
     expect(section).not.toBeNull();
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
     expect(section!.repositories).toEqual(orderedRepositories);
+  });
+
+  // ── Case 1c: recents pass through unchanged ──
+  it('passes the recents array unchanged into NewSessionRepositorySection', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    const recentRows: NewSessionRepository[] = [
+      { platform: 'github', fullName: 'Kilo-Org/cloud', isPrivate: true },
+      { platform: 'gitlab', fullName: 'acme/widgets', isPrivate: true },
+    ];
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      recents: recentRows,
+    }) as Node;
+
+    const section = findElementByType(element, 'NewSessionRepositorySection');
+    expect(section).not.toBeNull();
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(section!.recents).toEqual(recentRows);
   });
 
   // ── Case 2: Cloud, selector hidden ──

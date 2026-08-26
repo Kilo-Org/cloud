@@ -7,7 +7,7 @@ import {
   type NewSessionPrefill,
   readNewSessionPrefill,
   resolvePrefillModel,
-  resolvePrefillRepo,
+  resolvePrefillRepoSelection,
 } from '@/components/agents/new-session-prefill';
 
 /**
@@ -33,7 +33,7 @@ export function useNewSessionPrefill(): NewSessionPrefill {
 }
 
 export type UseNewSessionPrefillTargetsInput = {
-  repositories: { fullName: string }[];
+  repositories: { platform: string; fullName: string }[];
   // !isLoadingRepos && !isReposError && repositories.length > 0
   reposSettled: boolean;
   models: { id: string; variants: string[] }[];
@@ -59,7 +59,7 @@ export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsIn
 
   if (!hasAppliedRepo.current && reposSettled && !selectedRepo) {
     hasAppliedRepo.current = true;
-    const resolved = resolvePrefillRepo(repositories, prefill);
+    const resolved = resolvePrefillRepoSelection(repositories, prefill);
     if (resolved) {
       setSelectedRepo(resolved);
     }
@@ -74,7 +74,7 @@ export function useNewSessionPrefillTargets(input: UseNewSessionPrefillTargetsIn
       prefill,
       repos: {
         settled: reposSettled,
-        matched: resolvePrefillRepo(repositories, prefill) !== null,
+        matched: resolvePrefillRepoSelection(repositories, prefill) !== null,
       },
       models: {
         settled: modelsSettled,

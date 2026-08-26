@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Àpamọ́ GitLab",
       "connectGitLab": "Sopọ̀ GitLab",
       "gitlabError": "Kò lè ṣí ìtòlẹ́tò GitLab. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan síi.",
-      "description": "Sopọ̀ Kilo {{label}} láti ṣàtúnyẹ̀wò àwọn ìbéèrè ìfa ládàá."
+      "description": "Sopọ̀ Kilo {{label}} láti ṣàtúnyẹ̀wò àwọn ìbéèrè ìfa ládàá.",
+      "bitbucketError": "Ko le ṣii eto Bitbucket. Jọwọ gbiyanju lẹẹkansi."
     },
     "overview": {
       "reviewStyle": "Àrà Àtúnyẹ̀wò",
@@ -2075,7 +2076,8 @@
       "dollar": "awọn dọla",
       "dollar_other": "awọn dọla",
       "costSpoken": "idiyele {{cost}}",
-      "costSpokenWithTime": "idiyele {{cost}}, {{time}}"
+      "costSpokenWithTime": "idiyele {{cost}}, {{time}}",
+      "pullRequest": "ẹ̀bẹ̀ yíyọ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ko le ṣii GitHub",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Igba-ijiroro tuntun",
       "repository": "Ìpamọ́",
-      "couldNotLoadRepositories": "Ko le ṣe ikojọpọ awọn ibi ipamọ",
       "connectGithub": "Sopọ̀ GitHub",
       "connectGithubDescription": "So GitHub pọ ninu ẹrọ aṣàwákiri rẹ, lẹhinna pada si ibi lati yan ibi ipamọ.",
       "openGithub": "Ṣii GitHub",
       "refreshRepositories": "Tun awọn ibi ipamọ ṣe",
-      "githubConnectionNotVisible": "A ko le ri asopọ GitHub rẹ sibẹsibẹ",
-      "githubConnectionNotVisibleDescription": "Ti o ba fi sori tabi ṣeto Kilo GitHub App, ṣayẹwo lẹẹkansi — tabi rii daju pe a fi sori fun akọọlẹ/àjọ yii.",
-      "checkAgain": "Ṣayẹwo lẹẹkansi",
       "githubConnected": "GitHub ti sopọ",
       "noRepositoriesVisible": "Ko si awọn ibi ipamọ ti o han. Ṣayẹwo iraye ibi ipamọ fun Kilo GitHub App, lẹhinna tun ṣe.",
       "runOnWithTarget": "Ṣiṣẹ lori: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Tẹsiwaju ṣatunkọ",
       "discard": "Jù silẹ",
       "discardFailed": "Ko le fi osere silẹ. Jọwọ gbiyanju lẹẹkansi.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket ti sopọ̀",
+      "connectBitbucket": "Sopọ̀ Bitbucket",
+      "connectBitbucketDescription": "So Bitbucket pọ ninu browser rẹ, lẹhinna pada sibi lati yan ibi ipamọ data.",
+      "connectGitlab": "Sopọ̀ GitLab",
+      "connectGitlabDescription": "So GitLab pọ ninu browser rẹ, lẹhinna pada sibi lati yan ibi ipamọ data.",
+      "couldNotLoadBitbucketRepositories": "Ko le gbe awọn ibi ipamọ data Bitbucket",
+      "couldNotLoadGithubRepositories": "Ko le gbe awọn ibi ipamọ data GitHub",
+      "couldNotLoadGitlabRepositories": "Ko le gbe awọn ibi ipamọ data GitLab",
+      "gitlabConnected": "GitLab ti sopọ",
+      "noRepositoriesVisibleBitbucket": "Ko si ibi ipamọ data ti o han. Ṣayẹwo iwọle ibi ipamọ data fun Bitbucket, lẹhinna tunse.",
+      "noRepositoriesVisibleGitlab": "Ko si ibi ipamọ data ti o han. Ṣayẹwo iwọle ibi ipamọ data fun GitLab, lẹhinna tunse.",
+      "openBitbucket": "Ṣii Bitbucket",
+      "openGitlab": "Ṣii GitLab",
+      "recentlyUsed": "Ti a lo laipẹ"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ti ṣe imudojuiwọn {{displayCount}} faili",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Ko si awọn ibi ipamọ ti o sopọ si akọọlẹ rẹ.",
       "tryDifferentSearch": "Gbiyanju ọrọ wiwa ti o yatọ.",
       "loading": "Ti n ṣe ikojọpọ...",
-      "accessibility": "Ibi ipamọ: {{label}}"
+      "accessibility": "Ibi ipamọ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Awọn alaye ifiranṣẹ",
@@ -2925,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Ko si app imeeli to wa. O le kan si wa ni {{email}}",
     "couldNotOpenStore": "Ko le ṣii ile-itaja.",
-    "promptTitle": "Bawo ni o ṣe n fẹran app Kilo?",
-    "iLikeIt": "Mo fẹran rẹ",
-    "gladTitle": "Inu wa dun lati gbọ iyẹn!",
-    "gladMessage": "Atunwo ile-itaja yoo ran wa lọwọ pupọ. O ṣeun fun lilo Kilo!",
-    "rateKilo": "Gbe Kilo si",
-    "needsWork": "Nilo iṣẹ",
-    "sorryTitle": "A binu lati gbọ iyẹn!",
-    "sorryMessage": "Jọwọ jẹ ki a mọ ohun ti o nilo lati dara. Ẹlẹrọ ti n ṣakoso app ka gbogbo ijabọ kan!",
-    "emailUs": "Fi imeeli ranṣẹ si wa",
-    "emailSubject": "ìdáhùn ohun-èlò alágbèéká"
+    "emailSubject": "ìdáhùn ohun-èlò alágbèéká",
+    "neutralTitle": "Ṣe ìdìwọ́n ohun èlò Kilo",
+    "rateTheApp": "Ṣe ìdìwọ́n ohun èlò náà",
+    "sendFeedback": "Fi èsì ránṣẹ́"
   },
   "organization": {
     "boundary": {
@@ -2944,7 +2953,9 @@
       "organizationUnavailable": "Ajọ ko si",
       "selectDescription": "Yan ajọ lati profaìlì rẹ lati tẹsiwaju.",
       "selectOrganization": "Yan ajọ",
-      "unavailableDescription": "Ajọ yii ko si mọ. Yan ọkan lati profaìlì rẹ lati tẹsiwaju."
+      "unavailableDescription": "Ajọ yii ko si mọ. Yan ọkan lati profaìlì rẹ lati tẹsiwaju.",
+      "accessDeniedTitle": "Wiwọle ti kọ",
+      "accessDeniedDescription": "O kò ní àǹfààní sí àjọ yìí."
     },
     "creditActivity": {
       "emptyDescription": "Awọn rira, lilo, ati awọn atunṣe kirẹditi fun ajọ yii yoo han nibi bi wọn ṣe n ṣẹlẹ.",
@@ -2961,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Àtúnṣe ìṣirò-owó",
         "credits_expired": "Àwọn kíredìtì ti parí"
-      }
+      },
+      "loadMore": "Kojọ diẹ sii",
+      "loadMoreFailed": "Kò lè gbé síwájú síi",
+      "truncated": "Ìgbòkègbodò àwọn iṣẹ́ àwíjàre tó ti gbọjú wà."
     },
     "inviteMember": {
       "emailError": "Tẹ adirẹsi imeeli ti o wulo",
@@ -2988,7 +3002,10 @@
         "draft": "Àkọsílẹ̀",
         "uncollectible": "Àìlègbà",
         "unknown": "Àìmọ̀"
-      }
+      },
+      "loadMore": "Kojọ diẹ sii",
+      "loadMoreFailed": "Kò lè gbé síwájú síi",
+      "truncated": "Àwọn ìwé-owó tó ti gbọjú wà."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

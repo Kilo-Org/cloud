@@ -11,6 +11,7 @@ const claims = {
   userId: 'user_1',
   outboundContainerId: 'outbound-container-1',
   orgId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145b',
+  integrationId: 'a65bf5a4-00f7-4a80-8841-4212d4fa9ede',
   owner: 'acme',
   repo: 'widgets',
   source: 'user',
@@ -44,6 +45,7 @@ describe('GitHubSessionCapabilityCodec', () => {
       userId: 'user_1',
       outboundContainerId: claims.outboundContainerId,
       orgId: claims.orgId,
+      integrationId: claims.integrationId,
       owner: 'acme',
       repo: 'widgets',
       source: 'user',
@@ -73,6 +75,15 @@ describe('GitHubSessionCapabilityCodec', () => {
     });
     expect(codec.decode(capability)).not.toHaveProperty('outboundContainerId');
     vi.useRealTimers();
+  });
+
+  it('continues decoding existing claims without an integration ID', () => {
+    const { integrationId: _integrationId, ...existingClaims } = claims;
+    const codec = new GitHubSessionCapabilityCodec(encryptionKey);
+
+    const decoded = codec.decode(codec.issue(existingClaims));
+
+    expect(decoded).not.toHaveProperty('integrationId');
   });
 
   it.each([

@@ -62,6 +62,14 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
     appPath: '/(app)/(tabs)/(3_profile)/code-reviewer/<1>/reviews/<2>',
     exclusions: ['review-md'],
   },
+  {
+    webPath: '/organizations/*/overview',
+    appPath: '/(app)/(tabs)/(3_profile)/organization/<1>',
+  },
+  {
+    webPath: '/pr-review/*/*/*',
+    appPath: '/(app)/pr-review/<1>/<2>/<3>',
+  },
 ] as const;
 
 const KILO_WEB_HOST = 'app.kilo.ai';

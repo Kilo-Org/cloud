@@ -87,6 +87,7 @@ const {
   fetchSessionWithNotFoundRetry,
   isCloudPrepareRetryableError,
   readFetchSessionErrorCode,
+  StreamTicketResponseSchema,
 } = await import('@/components/agents/mobile-session-manager');
 
 const SESSION_ID = 'ses_test_session_id_0000000001' as KiloSessionId;
@@ -369,6 +370,37 @@ describe('fetchSessionWithNotFoundRetry', () => {
     ).rejects.toBe(error);
     expect(queryMock).toHaveBeenCalledTimes(1);
     expect(sleep).not.toHaveBeenCalled();
+  });
+});
+
+describe('StreamTicketResponseSchema', () => {
+  it('parses a valid body with a numeric expiresAt', () => {
+    expect(
+      StreamTicketResponseSchema.parse({ ticket: 'ticket-123', expiresAt: 1_700_000_000 })
+    ).toEqual({ ticket: 'ticket-123', expiresAt: 1_700_000_000 });
+  });
+
+  it('rejects a non-string ticket', () => {
+    expect(() => StreamTicketResponseSchema.parse({ ticket: 123, expiresAt: 1 })).toThrow();
+  });
+
+  it('rejects a non-numeric expiresAt', () => {
+    expect(() =>
+      StreamTicketResponseSchema.parse({ ticket: 'ticket-123', expiresAt: 'soon' })
+    ).toThrow();
+  });
+
+  it('permits missing optional fields — the required-field check runs after parse', () => {
+    expect(StreamTicketResponseSchema.parse({})).toEqual({});
+  });
+
+  it('ignores extra fields', () => {
+    expect(
+      StreamTicketResponseSchema.parse({ ticket: 'ticket-123', expiresAt: 1, extra: true })
+    ).toEqual({
+      ticket: 'ticket-123',
+      expiresAt: 1,
+    });
   });
 });
 

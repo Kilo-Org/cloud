@@ -49,8 +49,10 @@ async function requestChallenge(): Promise<{ challenge: string }> {
     throw new Error(ADMISSION_CHALLENGE_FAILED);
   }
 
-  return response.json() as Promise<{ challenge: string }>;
+  return AdmissionChallengeResponseSchema.parse(await response.json());
 }
+
+export const AdmissionChallengeResponseSchema = z.object({ challenge: z.string().min(1) });
 
 const invalidKeyErrorSchema = z.object({ code: z.literal('ERR_APP_INTEGRITY_INVALID_KEY') });
 

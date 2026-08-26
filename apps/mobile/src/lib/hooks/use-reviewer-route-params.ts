@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 
-import { parseReviewerPlatform, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { parseReviewerPlatform, type ReviewerScopePlatform } from '@/lib/code-reviewer-config';
 import { parseParam } from '@/lib/route-params';
 
 /**
@@ -10,18 +10,14 @@ import { parseParam } from '@/lib/route-params';
  * `parseReviewerPlatform`), so callers can render a single invalid-route
  * fallback instead of duplicating this parse+guard preamble per screen.
  */
-export function useValidatedReviewerRouteParams(): {
-  scope: string;
-  platform: ReviewerPlatform;
-} | null {
+export function useValidatedReviewerRouteParams(): ReviewerScopePlatform | null {
   const { scope: rawScope, platform: rawPlatform } = useLocalSearchParams<{
     scope: string;
     platform: string;
   }>();
   const scope = parseParam(rawScope);
-  const platform = scope ? parseReviewerPlatform(scope, rawPlatform) : null;
-  if (!scope || !platform) {
+  if (!scope) {
     return null;
   }
-  return { scope, platform };
+  return parseReviewerPlatform(scope, rawPlatform);
 }

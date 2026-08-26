@@ -523,6 +523,24 @@ describe('useSignInFlow discovery cancellation', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('returns a remembered user from the email form to their sign-in option', () => {
+    mockHint = {
+      lastEmail: 'returning@example.com',
+      lastAuthMethod: 'google',
+      lastLogin: '2026-08-26T00:00:00.000Z',
+    };
+    mounted = mountFlow({ searchParams: {} });
+
+    expect(mounted.container.querySelector('#tier')?.textContent).toBe('returning');
+    expect(mounted.container.querySelector('#email-input')?.textContent).toBe('true');
+
+    act(() => button(mounted!.container, 'back').click());
+
+    expect(mounted.container.querySelector('#tier')?.textContent).toBe('returning');
+    expect(mounted.container.querySelector('#email-input')?.textContent).toBe('false');
+    expect(mockClearHint).not.toHaveBeenCalled();
+  });
+
   it('auto-opens once for a genuinely changed prefilled query email', () => {
     mounted = mountFlow({ searchParams: { email: 'first@example.com' } });
 

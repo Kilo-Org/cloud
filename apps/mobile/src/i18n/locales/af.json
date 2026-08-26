@@ -38,7 +38,9 @@
     "retry": "Probeer weer",
     "search": "Soek tale",
     "noMatches": "Geen tale stem ooreen nie",
-    "deviceLanguage": "Toesteltaal"
+    "deviceLanguage": "Toesteltaal",
+    "current": "Huidig",
+    "allLanguages": "Alle tale"
   },
   "login": {
     "welcome": "Welkom by Kilo",

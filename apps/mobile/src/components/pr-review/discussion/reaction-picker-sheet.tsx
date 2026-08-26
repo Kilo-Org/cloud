@@ -66,7 +66,7 @@ export function ReactionPickerSheet({
       }}
       onRequestClose={onClose}
     >
-      <View className="flex-1 justify-end bg-black/40">
+      <View className="flex-1 justify-end bg-[#00000066]">
         <Pressable
           className="flex-1"
           accessibilityLabel={t('prReview.discussion.closeReactions')}

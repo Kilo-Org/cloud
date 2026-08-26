@@ -38,7 +38,9 @@
     "retry": "Νέα προσπάθεια",
     "search": "Αναζήτηση γλωσσών",
     "noMatches": "Καμία γλώσσα δεν ταιριάζει",
-    "deviceLanguage": "Γλώσσα συσκευής"
+    "deviceLanguage": "Γλώσσα συσκευής",
+    "current": "Τρέχουσα",
+    "allLanguages": "Όλες οι γλώσσες"
   },
   "login": {
     "welcome": "Καλώς ήρθατε στο Kilo",

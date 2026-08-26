@@ -38,7 +38,9 @@
     "retry": "Arís",
     "search": "Cuardaigh teangacha",
     "noMatches": "Ní oireann aon teanga",
-    "deviceLanguage": "Teanga an ghléis"
+    "deviceLanguage": "Teanga an ghléis",
+    "current": "Reatha",
+    "allLanguages": "Gach teanga"
   },
   "login": {
     "welcome": "Fáilte go Kilo",

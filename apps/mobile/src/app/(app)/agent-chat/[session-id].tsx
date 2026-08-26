@@ -4,10 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { SessionDetailContent } from '@/components/agents/session-detail-content';
 import {
-  SessionDetailContent,
+  SessionComposerSkeleton,
   SessionSkeletonMessages,
-} from '@/components/agents/session-detail-content';
+} from '@/components/agents/session-detail-skeleton';
 import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { AgentSessionProvider } from '@/components/agents/session-provider';
@@ -32,6 +33,7 @@ export default function SessionDetailScreen() {
     shareId: shareIdParam,
     autoSend: autoSendRaw,
     mode: modeParam,
+    title: titleParam,
   } = useLocalSearchParams<{
     'session-id': string;
     organizationId?: string;
@@ -51,6 +53,8 @@ export default function SessionDetailScreen() {
     autoSend?: string;
     /** Agent mode the spawn was started with; seeds the composer before the CLI reports one. */
     mode?: string;
+    /** Title the list row already showed; paints the header on the first frame. */
+    title?: string;
   }>();
   // `session-id` is required: a malformed deep link can hand us `undefined`
   // or a `string[]`, both of which parseParam rejects. Optional params keep
@@ -60,6 +64,10 @@ export default function SessionDetailScreen() {
   const shareId = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const autoSendParam = Array.isArray(autoSendRaw) ? autoSendRaw[0] : autoSendRaw;
   const spawnedMode = Array.isArray(modeParam) ? modeParam[0] : modeParam;
+  // The row the user tapped already showed this title, so the header opens
+  // with it instead of a generic label that swaps a beat later. Deep links
+  // and push opens carry no title and keep the fallback.
+  const cachedTitle = Array.isArray(titleParam) ? titleParam[0] : titleParam;
   const trpc = useTRPC();
   const router = useRouter();
   const { t } = useTranslation();
@@ -103,10 +111,12 @@ export default function SessionDetailScreen() {
   }
 
   if (routeOrganizationId === undefined && sessionQuery.isPending) {
+    // The composer placeholder holds its own height: nothing may shift when
+    // the query resolves.
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          title={t('agentChat.session.title')}
+          title={cachedTitle ?? t('agentChat.session.title')}
           headerRight={
             <SessionContextMetrics
               info={undefined}
@@ -117,7 +127,8 @@ export default function SessionDetailScreen() {
           }
         />
         <SessionConnectionIndicator />
-        <SessionSkeletonMessages />
+        <SessionSkeletonMessages sessionId={sessionId} />
+        <SessionComposerSkeleton />
       </View>
     );
   }
@@ -190,6 +201,7 @@ export default function SessionDetailScreen() {
     >
       <SessionDetailContent
         sessionId={sessionId as KiloSessionId}
+        cachedTitle={cachedTitle}
         openedVia={via === 'push' ? 'push' : 'app'}
         shareId={shareId}
         autoSend={autoSendParam === '1'}

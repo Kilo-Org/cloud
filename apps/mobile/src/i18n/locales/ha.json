@@ -38,7 +38,9 @@
     "retry": "Sake gwadawa",
     "search": "Nemo harsuna",
     "noMatches": "Babu harsunan da suka dace",
-    "deviceLanguage": "Harshen na'urar"
+    "deviceLanguage": "Harshen na'urar",
+    "current": "Na yanzu",
+    "allLanguages": "Duk harsuna"
   },
   "login": {
     "welcome": "Barka da zuwa Kilo",

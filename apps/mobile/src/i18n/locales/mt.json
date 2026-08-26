@@ -38,7 +38,9 @@
     "retry": "Erġa' pprova",
     "search": "Fittex lingwi",
     "noMatches": "L-ebda lingwa ma taqbel",
-    "deviceLanguage": "Lingwa tal-apparat"
+    "deviceLanguage": "Lingwa tal-apparat",
+    "current": "Attwali",
+    "allLanguages": "Il-lingwi kollha"
   },
   "login": {
     "welcome": "Merħba f'Kilo",

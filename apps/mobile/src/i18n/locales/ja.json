@@ -38,7 +38,9 @@
     "catalogLoadFailed": "言語を読み込めませんでした。もう一度お試しください。",
     "search": "言語を検索",
     "noMatches": "一致する言語がありません",
-    "deviceLanguage": "端末の言語"
+    "deviceLanguage": "端末の言語",
+    "current": "現在",
+    "allLanguages": "すべての言語"
   },
   "login": {
     "welcome": "Kiloへようこそ",

@@ -38,7 +38,9 @@
     "retry": "නැවත උත්සාහ කරන්න",
     "search": "භාෂා සොයන්න",
     "noMatches": "ගැළපෙන භාෂා නොමැත",
-    "deviceLanguage": "උපාංග භාෂාව"
+    "deviceLanguage": "උපාංග භාෂාව",
+    "current": "වත්මන්",
+    "allLanguages": "සියලු භාෂා"
   },
   "login": {
     "welcome": "Kilo වෙත සාදරයෙන් පිළිගනිමු",

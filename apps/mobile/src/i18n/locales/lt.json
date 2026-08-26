@@ -38,7 +38,9 @@
     "retry": "Bandyti dar kartą",
     "search": "Ieškoti kalbų",
     "noMatches": "Kalbų nesutapo",
-    "deviceLanguage": "Įrenginio kalba"
+    "deviceLanguage": "Įrenginio kalba",
+    "current": "Dabartinė",
+    "allLanguages": "Visos kalbos"
   },
   "login": {
     "welcome": "Sveiki atvykę į Kilo",

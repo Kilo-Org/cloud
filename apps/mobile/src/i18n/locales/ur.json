@@ -38,7 +38,9 @@
     "retry": "دوبارہ کوشش کریں",
     "search": "زبانیں تلاش کریں",
     "noMatches": "کوئی زبان نہیں ملتی",
-    "deviceLanguage": "آلے کی زبان"
+    "deviceLanguage": "آلے کی زبان",
+    "current": "موجودہ",
+    "allLanguages": "تمام زبانیں"
   },
   "login": {
     "welcome": "Kilo میں خوش آمدید",

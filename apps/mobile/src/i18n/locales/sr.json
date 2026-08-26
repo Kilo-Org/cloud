@@ -38,7 +38,9 @@
     "retry": "Pokušaj ponovo",
     "search": "Pretraga jezika",
     "noMatches": "Nema jezika koji se podudaraju",
-    "deviceLanguage": "Jezik uređaja"
+    "deviceLanguage": "Jezik uređaja",
+    "current": "Тренутно",
+    "allLanguages": "Сви језици"
   },
   "login": {
     "welcome": "Dobrodošli u Kilo",

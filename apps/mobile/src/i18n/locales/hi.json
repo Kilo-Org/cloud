@@ -38,7 +38,9 @@
     "catalogLoadFailed": "भाषा लोड नहीं हो सकी। कृपया फिर से प्रयास करें।",
     "search": "भाषा खोजें",
     "noMatches": "कोई भाषा मेल नहीं खाती",
-    "deviceLanguage": "डिवाइस भाषा"
+    "deviceLanguage": "डिवाइस भाषा",
+    "current": "वर्तमान",
+    "allLanguages": "सभी भाषाएँ"
   },
   "login": {
     "welcome": "Kilo में आपका स्वागत है",

@@ -38,7 +38,9 @@
     "retry": "Qayta urinish",
     "search": "Tillar qidirish",
     "noMatches": "Hech qanday til mos kelmadi",
-    "deviceLanguage": "Qurilma tili"
+    "deviceLanguage": "Qurilma tili",
+    "current": "Joriy",
+    "allLanguages": "Barcha tillar"
   },
   "login": {
     "welcome": "Kiloga xush kelibsiz",

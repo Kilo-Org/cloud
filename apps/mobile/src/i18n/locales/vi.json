@@ -38,7 +38,9 @@
     "catalogLoadFailed": "Không thể tải ngôn ngữ. Vui lòng thử lại.",
     "search": "Tìm ngôn ngữ",
     "noMatches": "Không có ngôn ngữ phù hợp",
-    "deviceLanguage": "Ngôn ngữ của thiết bị"
+    "deviceLanguage": "Ngôn ngữ của thiết bị",
+    "current": "Hiện tại",
+    "allLanguages": "Tất cả ngôn ngữ"
   },
   "login": {
     "welcome": "Chào mừng đến với Kilo",

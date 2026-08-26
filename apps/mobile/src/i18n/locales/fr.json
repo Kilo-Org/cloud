@@ -38,7 +38,9 @@
     "catalogLoadFailed": "Impossible de charger la langue. Veuillez réessayer.",
     "search": "Rechercher des langues",
     "noMatches": "Aucune langue ne correspond",
-    "deviceLanguage": "Langue de l'appareil"
+    "deviceLanguage": "Langue de l'appareil",
+    "current": "Actuelle",
+    "allLanguages": "Toutes les langues"
   },
   "login": {
     "welcome": "Bienvenue sur Kilo",

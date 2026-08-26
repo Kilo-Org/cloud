@@ -38,7 +38,9 @@
     "catalogLoadFailed": "De taal kon niet worden geladen. Probeer het opnieuw.",
     "search": "Talen zoeken",
     "noMatches": "Geen talen gevonden",
-    "deviceLanguage": "Taal van apparaat"
+    "deviceLanguage": "Taal van apparaat",
+    "current": "Huidig",
+    "allLanguages": "Alle talen"
   },
   "login": {
     "welcome": "Welkom bij Kilo",

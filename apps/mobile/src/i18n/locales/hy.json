@@ -38,7 +38,9 @@
     "retry": "Կրկին փորձել",
     "search": "Որոնել լեզուներ",
     "noMatches": "Ոչ մի լեզու չի համընկնում",
-    "deviceLanguage": "Սարքի լեզու"
+    "deviceLanguage": "Սարքի լեզու",
+    "current": "Ընթացիկ",
+    "allLanguages": "Բոլոր լեզուները"
   },
   "login": {
     "welcome": "Բարի գալուստ Kilo",

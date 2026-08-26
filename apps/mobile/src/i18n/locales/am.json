@@ -38,7 +38,9 @@
     "retry": "ደግሞ ሞክር",
     "search": "ቋንቋዎችን ይፈልጉ",
     "noMatches": "ምንም የሚዛመድ ቋንቋ የለም",
-    "deviceLanguage": "የመሣሪያ ቋንቋ"
+    "deviceLanguage": "የመሣሪያ ቋንቋ",
+    "current": "አሁን ያለው",
+    "allLanguages": "ሁሉም ቋንቋዎች"
   },
   "login": {
     "welcome": "ወደ Kilo እንኳን ደህና መጡ",

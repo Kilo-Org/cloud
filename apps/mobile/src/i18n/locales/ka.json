@@ -38,7 +38,9 @@
     "retry": "ხელახლა ცდა",
     "search": "ენების ძებნა",
     "noMatches": "ენები ვერ მოიძებნა",
-    "deviceLanguage": "მოწყობილობის ენა"
+    "deviceLanguage": "მოწყობილობის ენა",
+    "current": "მიმდინარე",
+    "allLanguages": "ყველა ენა"
   },
   "login": {
     "welcome": "კეთილი იყოს თქვენი მობრძანება Kilo-ში",

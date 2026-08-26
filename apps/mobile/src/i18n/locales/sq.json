@@ -38,7 +38,9 @@
     "retry": "Riprovo",
     "search": "Kërko gjuhët",
     "noMatches": "Asnjë gjuhë nuk përputhet",
-    "deviceLanguage": "Gjuha e pajisjes"
+    "deviceLanguage": "Gjuha e pajisjes",
+    "current": "Aktuale",
+    "allLanguages": "Të gjitha gjuhët"
   },
   "login": {
     "welcome": "Mirë se erdhe në Kilo",

@@ -38,7 +38,9 @@
     "retry": "Zama futhi",
     "search": "Khangela izilimi",
     "noMatches": "Azikho izilimi ezihambisanayo",
-    "deviceLanguage": "Ulimi lwedivayisi"
+    "deviceLanguage": "Ulimi lwedivayisi",
+    "current": "Okwamanje",
+    "allLanguages": "Zonke izilimi"
   },
   "login": {
     "welcome": "Wamukelekile ku-Kilo",

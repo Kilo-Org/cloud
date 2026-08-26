@@ -38,7 +38,9 @@
     "retry": "Yritä uudelleen",
     "search": "Hae kieliä",
     "noMatches": "Mikään kieli ei täsmää",
-    "deviceLanguage": "Laitteen kieli"
+    "deviceLanguage": "Laitteen kieli",
+    "current": "Nykyinen",
+    "allLanguages": "Kaikki kielet"
   },
   "login": {
     "welcome": "Tervetuloa Kiloon",

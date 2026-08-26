@@ -38,7 +38,9 @@
     "catalogLoadFailed": "無法載入語言。請再試一次。",
     "search": "搜尋語言",
     "noMatches": "沒有符合的語言",
-    "deviceLanguage": "裝置語言"
+    "deviceLanguage": "裝置語言",
+    "current": "目前",
+    "allLanguages": "所有語言"
   },
   "login": {
     "welcome": "歡迎使用 Kilo",

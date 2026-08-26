@@ -38,7 +38,9 @@
     "retry": "Retry",
     "search": "Search languages",
     "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "deviceLanguage": "Device language",
+    "current": "Current",
+    "allLanguages": "All languages"
   },
   "login": {
     "welcome": "Welcome to Kilo",

@@ -38,7 +38,9 @@
     "retry": "Torna-ho a provar",
     "search": "Cerca idiomes",
     "noMatches": "No hi coincideix cap idioma",
-    "deviceLanguage": "Idioma del dispositiu"
+    "deviceLanguage": "Idioma del dispositiu",
+    "current": "Actual",
+    "allLanguages": "Tots els idiomes"
   },
   "login": {
     "welcome": "Benvingut/da a Kilo",

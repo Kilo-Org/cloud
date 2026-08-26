@@ -38,7 +38,9 @@
     "retry": "تلاش مجدد",
     "search": "جستجوی زبانها",
     "noMatches": "هیچ زبانی مطابقت ندارد",
-    "deviceLanguage": "زبان دستگاه"
+    "deviceLanguage": "زبان دستگاه",
+    "current": "فعلی",
+    "allLanguages": "همه زبان‌ها"
   },
   "login": {
     "welcome": "به Kilo خوش آمدید",

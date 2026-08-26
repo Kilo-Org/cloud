@@ -38,7 +38,9 @@
     "retry": "Jaribu tena",
     "search": "Tafuta lugha",
     "noMatches": "Hakuna lugha zinazolingana",
-    "deviceLanguage": "Lugha ya kifaa"
+    "deviceLanguage": "Lugha ya kifaa",
+    "current": "Ya sasa",
+    "allLanguages": "Lugha zote"
   },
   "login": {
     "welcome": "Karibu Kilo",

@@ -38,7 +38,9 @@
     "catalogLoadFailed": "לא ניתן היה לטעון את השפה. אנא נסה שוב.",
     "search": "חיפוש שפות",
     "noMatches": "אין שפות מתאימות",
-    "deviceLanguage": "שפת המכשיר"
+    "deviceLanguage": "שפת המכשיר",
+    "current": "נוכחית",
+    "allLanguages": "כל השפות"
   },
   "login": {
     "welcome": "ברוך הבא ל-Kilo",

@@ -38,7 +38,9 @@
     "retry": "Skúsiť znova",
     "search": "Vyhľadať jazyky",
     "noMatches": "Žiadne jazyky sa nezhodujú",
-    "deviceLanguage": "Jazyk zariadenia"
+    "deviceLanguage": "Jazyk zariadenia",
+    "current": "Aktuálny",
+    "allLanguages": "Všetky jazyky"
   },
   "login": {
     "welcome": "Vitajte v Kilo",

@@ -38,7 +38,9 @@
     "retry": "Andramana indray",
     "search": "Karohy ny fiteny",
     "noMatches": "Tsy misy fiteny mifanaraka",
-    "deviceLanguage": "Fitenin'ny fitaovana"
+    "deviceLanguage": "Fitenin'ny fitaovana",
+    "current": "Ankehitriny",
+    "allLanguages": "Fiteny rehetra"
   },
   "login": {
     "welcome": "Tongasoa eto amin'ny Kilo",

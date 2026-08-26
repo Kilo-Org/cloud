@@ -38,7 +38,9 @@
     "retry": "Reyna aftur",
     "search": "Leita að tungumálum",
     "noMatches": "Engin tungumál passa",
-    "deviceLanguage": "Tækjatungumál"
+    "deviceLanguage": "Tækjatungumál",
+    "current": "Núverandi",
+    "allLanguages": "Öll tungumál"
   },
   "login": {
     "welcome": "Velkomin(n) til Kilo",

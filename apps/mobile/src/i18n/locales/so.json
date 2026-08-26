@@ -38,7 +38,9 @@
     "retry": "Mar kale day",
     "search": "Raadso luqadaha",
     "noMatches": "Ma jiro luqad ku habboon",
-    "deviceLanguage": "Luqadda qalabka"
+    "deviceLanguage": "Luqadda qalabka",
+    "current": "Hadda",
+    "allLanguages": "Dhammaan luqadaha"
   },
   "login": {
     "welcome": "Ku soo dhawoow Kilo",

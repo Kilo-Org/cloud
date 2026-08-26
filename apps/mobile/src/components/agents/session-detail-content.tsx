@@ -74,6 +74,7 @@ import {
 } from '@/components/kilo-chat/hooks/use-cli-session-presence';
 import { useInteractionHandlers } from '@/components/agents/use-interaction-handlers';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
+import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
   getSessionTranscriptItemKey,
@@ -102,7 +103,6 @@ import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
 import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
@@ -146,6 +146,8 @@ type SessionDetailContentProps = {
   autoSend?: boolean;
   /** Mode picked at spawn; seeds the mode until the session reports its own. */
   spawnedMode?: string;
+  /** Title the route read from the session-list cache, so the header never blinks to a generic label. */
+  cachedTitle?: string;
 };
 
 const EMPTY_IDS: ReadonlySet<string> = new Set();
@@ -156,6 +158,7 @@ export function SessionDetailContent({
   shareId,
   autoSend,
   spawnedMode,
+  cachedTitle,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const { t } = useTranslation();
@@ -958,7 +961,9 @@ export function SessionDetailContent({
     sessionId,
     isLoaded: isSessionLoaded,
     serverTitle,
-    fallbackTitle: t('agentChat.session.title'),
+    // Same seed the route's loading screen used, so the header keeps the
+    // title it opened with instead of blinking back to "Session".
+    fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
@@ -1474,7 +1479,7 @@ export function SessionDetailContent({
       );
     }
     if (shouldBlockMessages) {
-      return <SessionSkeletonMessages />;
+      return <SessionSkeletonMessages sessionId={sessionId} />;
     }
     if (messages.length === 0) {
       return (
@@ -1491,22 +1496,26 @@ export function SessionDetailContent({
       );
     }
     return (
-      <SessionMessageList
-        sessionId={sessionId}
-        items={transcript}
-        keyExtractor={getSessionTranscriptItemKey}
-        hasOlderMessages={hasOlderMessages}
-        isLoadingOlderMessages={isLoadingOlderMessages}
-        olderMessagesError={olderMessagesError}
-        olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
-        onLoadOlderMessages={() => {
-          void manager.loadOlderMessages();
-        }}
-        onReachedBottom={() => {
-          manager.trimRetainedHistory();
-        }}
-        renderItem={renderItem}
-      />
+      // Fades in as the skeleton fades out, so the transcript resolves in
+      // place instead of replacing the placeholder in one frame.
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        <SessionMessageList
+          sessionId={sessionId}
+          items={transcript}
+          keyExtractor={getSessionTranscriptItemKey}
+          hasOlderMessages={hasOlderMessages}
+          isLoadingOlderMessages={isLoadingOlderMessages}
+          olderMessagesError={olderMessagesError}
+          olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+          onLoadOlderMessages={() => {
+            void manager.loadOlderMessages();
+          }}
+          onReachedBottom={() => {
+            manager.trimRetainedHistory();
+          }}
+          renderItem={renderItem}
+        />
+      </Animated.View>
     );
   }
 }
@@ -1516,23 +1525,4 @@ function ActiveSessionKeepAwake({ sessionId }: Readonly<{ sessionId: KiloSession
   // does not release the wake lock another visible session still needs.
   useKeepAwake(`session-${sessionId}`);
   return null;
-}
-
-// Mirrors MessageBubble's bubble geometry (px-4 py-1 wrapper,
-// rounded-2xl with an asymmetric "tail" corner, self-start/self-end
-// alignment) so the loading state reads as a message list, not a spinner.
-export function SessionSkeletonMessages() {
-  return (
-    <View className="flex-1 pt-2">
-      <View className="items-start px-4 py-1">
-        <Skeleton className="h-16 w-3/4 rounded-2xl rounded-tl-sm" />
-      </View>
-      <View className="items-end px-4 py-1">
-        <Skeleton className="h-10 w-1/2 rounded-2xl rounded-tr-sm" />
-      </View>
-      <View className="items-start px-4 py-1">
-        <Skeleton className="h-24 w-2/3 rounded-2xl rounded-tl-sm" />
-      </View>
-    </View>
-  );
 }

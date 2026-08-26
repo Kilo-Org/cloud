@@ -38,7 +38,9 @@
     "retry": "Prøv igjen",
     "search": "Søk etter språk",
     "noMatches": "Ingen språk samsvarer",
-    "deviceLanguage": "Enhetens språk"
+    "deviceLanguage": "Enhetens språk",
+    "current": "Gjeldende",
+    "allLanguages": "Alle språk"
   },
   "login": {
     "welcome": "Velkommen til Kilo",

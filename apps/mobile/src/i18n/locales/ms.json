@@ -38,7 +38,9 @@
     "retry": "Cuba lagi",
     "search": "Cari bahasa",
     "noMatches": "Tiada bahasa sepadan",
-    "deviceLanguage": "Bahasa peranti"
+    "deviceLanguage": "Bahasa peranti",
+    "current": "Semasa",
+    "allLanguages": "Semua bahasa"
   },
   "login": {
     "welcome": "Selamat datang ke Kilo",

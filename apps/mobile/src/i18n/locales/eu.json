@@ -38,7 +38,9 @@
     "retry": "Saiatu berriro",
     "search": "Hizkuntzak bilatu",
     "noMatches": "Hizkuntza batek ere ez du bat egiten",
-    "deviceLanguage": "Gailuaren hizkuntza"
+    "deviceLanguage": "Gailuaren hizkuntza",
+    "current": "Unekoa",
+    "allLanguages": "Hizkuntza guztiak"
   },
   "login": {
     "welcome": "Ongi etorri Kilo-ra",

@@ -38,7 +38,9 @@
     "retry": "पुन्हा प्रयत्न करा",
     "search": "भाषा शोधा",
     "noMatches": "कोणतीही भाषा जुळत नाही",
-    "deviceLanguage": "डिव्हाइसची भाषा"
+    "deviceLanguage": "डिव्हाइसची भाषा",
+    "current": "सध्याची",
+    "allLanguages": "सर्व भाषा"
   },
   "login": {
     "welcome": "Kilo मध्ये स्वागत आहे",

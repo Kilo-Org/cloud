@@ -38,7 +38,9 @@
     "retry": "Паўтарыць",
     "search": "Пошук моў",
     "noMatches": "Няма супадзенняў моў",
-    "deviceLanguage": "Мова прылады"
+    "deviceLanguage": "Мова прылады",
+    "current": "Бягучая",
+    "allLanguages": "Усе мовы"
   },
   "login": {
     "welcome": "Сардэчна запрашаем у Kilo",

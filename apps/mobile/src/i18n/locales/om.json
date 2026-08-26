@@ -38,7 +38,9 @@
     "retry": "Irra deebi'i",
     "search": "Afaanota barbaadi",
     "noMatches": "Afaanonni tokkollee hin miku",
-    "deviceLanguage": "Afaan meeshaa"
+    "deviceLanguage": "Afaan meeshaa",
+    "current": "Ammaa",
+    "allLanguages": "Afaanota hunda"
   },
   "login": {
     "welcome": "Kilo keessatti baga nagaan dhufte",

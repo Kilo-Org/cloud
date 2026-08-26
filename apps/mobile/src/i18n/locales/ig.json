@@ -38,7 +38,9 @@
     "retry": "Nwaa ọzọ",
     "search": "Chọọ asụsụ",
     "noMatches": "Ọ dịghị asụsụ dabara adaba",
-    "deviceLanguage": "Asụsụ ngwaọrụ"
+    "deviceLanguage": "Asụsụ ngwaọrụ",
+    "current": "Ugbu a",
+    "allLanguages": "Asụsụ niile"
   },
   "login": {
     "welcome": "Nnọọ na Kilo",

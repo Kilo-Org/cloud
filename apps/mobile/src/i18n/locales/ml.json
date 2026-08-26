@@ -38,7 +38,9 @@
     "retry": "വീണ്ടും ശ്രമിക്കുക",
     "search": "ഭാഷകൾ തിരയുക",
     "noMatches": "ഭാഷകൾ ഒന്നും യോജിക്കുന്നില്ല",
-    "deviceLanguage": "ഉപകരണ ഭാഷ"
+    "deviceLanguage": "ഉപകരണ ഭാഷ",
+    "current": "നിലവിലുള്ളത്",
+    "allLanguages": "എല്ലാ ഭാഷകളും"
   },
   "login": {
     "welcome": "Kilo-യിലേക്ക് സ്വാഗതം",

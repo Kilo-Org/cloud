@@ -38,7 +38,9 @@
     "catalogLoadFailed": "Nie udało się wczytać języka. Spróbuj ponownie.",
     "search": "Szukaj języków",
     "noMatches": "Brak pasujących języków",
-    "deviceLanguage": "Język urządzenia"
+    "deviceLanguage": "Język urządzenia",
+    "current": "Bieżący",
+    "allLanguages": "Wszystkie języki"
   },
   "login": {
     "welcome": "Witamy w Kilo",

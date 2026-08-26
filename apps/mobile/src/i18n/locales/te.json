@@ -38,7 +38,9 @@
     "retry": "మళ్ళీ ప్రయత్నించండి",
     "search": "భాషలను వెతకండి",
     "noMatches": "భాషలు సరిపోలలేదు",
-    "deviceLanguage": "పరికర భాష"
+    "deviceLanguage": "పరికర భాష",
+    "current": "ప్రస్తుత",
+    "allLanguages": "అన్ని భాషలు"
   },
   "login": {
     "welcome": "Kiloకు స్వాగతం",

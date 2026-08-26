@@ -38,7 +38,9 @@
     "catalogLoadFailed": "Не удалось загрузить язык. Попробуйте еще раз.",
     "search": "Поиск языков",
     "noMatches": "Нет совпадений по языкам",
-    "deviceLanguage": "Язык устройства"
+    "deviceLanguage": "Язык устройства",
+    "current": "Текущий",
+    "allLanguages": "Все языки"
   },
   "login": {
     "welcome": "Добро пожаловать в Kilo",

@@ -38,7 +38,9 @@
     "catalogLoadFailed": "Не вдалося завантажити мову. Спробуйте ще раз.",
     "search": "Пошук мов",
     "noMatches": "Немає мов за запитом",
-    "deviceLanguage": "Мова пристрою"
+    "deviceLanguage": "Мова пристрою",
+    "current": "Поточна",
+    "allLanguages": "Усі мови"
   },
   "login": {
     "welcome": "Ласкаво просимо до Kilo",

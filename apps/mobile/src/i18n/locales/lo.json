@@ -38,7 +38,9 @@
     "retry": "ລອງໃໝ່",
     "search": "ຄົ້ນຫາພາສາ",
     "noMatches": "ບໍ່ມີພາສາທີ່ກົງກັນ",
-    "deviceLanguage": "ພາສາຂອງອຸປະກອນ"
+    "deviceLanguage": "ພາສາຂອງອຸປະກອນ",
+    "current": "ປັດຈຸບັນ",
+    "allLanguages": "ທຸກພາສາ"
   },
   "login": {
     "welcome": "ຍິນດີຕ້ອນຮັບສູ່ Kilo",

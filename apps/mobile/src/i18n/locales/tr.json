@@ -38,7 +38,9 @@
     "catalogLoadFailed": "Dil yüklenemedi. Lütfen tekrar deneyin.",
     "search": "Dilleri ara",
     "noMatches": "Eşleşen dil yok",
-    "deviceLanguage": "Cihaz dili"
+    "deviceLanguage": "Cihaz dili",
+    "current": "Geçerli",
+    "allLanguages": "Tüm diller"
   },
   "login": {
     "welcome": "Kilo’ya hoş geldiniz",

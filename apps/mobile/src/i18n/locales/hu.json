@@ -38,7 +38,9 @@
     "retry": "Újra",
     "search": "Nyelvek keresése",
     "noMatches": "Nem található nyelv",
-    "deviceLanguage": "Eszköz nyelve"
+    "deviceLanguage": "Eszköz nyelve",
+    "current": "Jelenlegi",
+    "allLanguages": "Minden nyelv"
   },
   "login": {
     "welcome": "Üdvözöljük a Kilo szolgáltatásban",

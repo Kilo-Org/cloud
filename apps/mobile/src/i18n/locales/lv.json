@@ -38,7 +38,9 @@
     "retry": "Mēģināt vēlreiz",
     "search": "Meklēt valodas",
     "noMatches": "Neviena valoda neatbilst",
-    "deviceLanguage": "Ierīces valoda"
+    "deviceLanguage": "Ierīces valoda",
+    "current": "Pašreizējā",
+    "allLanguages": "Visas valodas"
   },
   "login": {
     "welcome": "Laipni lūdzam Kilo",

@@ -38,7 +38,9 @@
     "retry": "ထပ်စမ်းကြည့်",
     "search": "ဘာသာစကားများကို ရှာပါ",
     "noMatches": "ဘာသာစကား မကိုက်ညီပါ",
-    "deviceLanguage": "စက်၏ ဘာသာစကား"
+    "deviceLanguage": "စက်၏ ဘာသာစကား",
+    "current": "လက်ရှိ",
+    "allLanguages": "ဘာသာစကားအားလုံး"
   },
   "login": {
     "welcome": "Kilo မှ ကြိုဆိုပါသည်",

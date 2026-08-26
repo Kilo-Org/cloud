@@ -38,7 +38,9 @@
     "retry": "Rhoi cynnig eto",
     "search": "Chwilio ieithoedd",
     "noMatches": "Dim ieithoedd yn cyfateb",
-    "deviceLanguage": "Iaith y ddyfais"
+    "deviceLanguage": "Iaith y ddyfais",
+    "current": "Cyfredol",
+    "allLanguages": "Pob iaith"
   },
   "login": {
     "welcome": "Croeso i Kilo",

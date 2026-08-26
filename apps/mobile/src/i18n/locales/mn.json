@@ -38,7 +38,9 @@
     "retry": "Дахин оролдох",
     "search": "Хэл хайх",
     "noMatches": "Хэл таарахгүй байна",
-    "deviceLanguage": "Төхөөрөмжийн хэл"
+    "deviceLanguage": "Төхөөрөмжийн хэл",
+    "current": "Одоогийн",
+    "allLanguages": "Бүх хэл"
   },
   "login": {
     "welcome": "Kilo-д тавтай морил",

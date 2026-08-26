@@ -38,7 +38,9 @@
     "retry": "Subukan muli",
     "search": "Maghanap ng mga wika",
     "noMatches": "Walang tugmang wika",
-    "deviceLanguage": "Wika ng device"
+    "deviceLanguage": "Wika ng device",
+    "current": "Kasalukuyan",
+    "allLanguages": "Lahat ng wika"
   },
   "login": {
     "welcome": "Maligayang pagdating sa Kilo",

@@ -38,7 +38,9 @@
     "retry": "Whakamātau anō",
     "search": "Rapua ngā reo",
     "noMatches": "Kāore he reo e taurite",
-    "deviceLanguage": "Reo o te pūrere"
+    "deviceLanguage": "Reo o te pūrere",
+    "current": "Ōnāianei",
+    "allLanguages": "Ngā reo katoa"
   },
   "login": {
     "welcome": "Nau mai ki Kilo",

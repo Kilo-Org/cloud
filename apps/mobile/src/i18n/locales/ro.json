@@ -38,7 +38,9 @@
     "retry": "Reîncearcă",
     "search": "Caută limbi",
     "noMatches": "Nicio limbă nu corespunde",
-    "deviceLanguage": "Limba dispozitivului"
+    "deviceLanguage": "Limba dispozitivului",
+    "current": "Curentă",
+    "allLanguages": "Toate limbile"
   },
   "login": {
     "welcome": "Bine ai venit la Kilo",

@@ -38,7 +38,9 @@
     "retry": "மீண்டும் முயற்சி",
     "search": "மொழிகளைத் தேடு",
     "noMatches": "எந்த மொழியும் பொருந்தவில்லை",
-    "deviceLanguage": "சாதன மொழி"
+    "deviceLanguage": "சாதன மொழி",
+    "current": "தற்போதைய",
+    "allLanguages": "அனைத்து மொழிகளும்"
   },
   "login": {
     "welcome": "Kilo விற்கு வரவேற்கிறோம்",

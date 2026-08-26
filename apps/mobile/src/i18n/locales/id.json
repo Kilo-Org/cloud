@@ -38,7 +38,9 @@
     "catalogLoadFailed": "Tidak dapat memuat bahasa. Silakan coba lagi.",
     "search": "Cari bahasa",
     "noMatches": "Tidak ada bahasa yang cocok",
-    "deviceLanguage": "Bahasa perangkat"
+    "deviceLanguage": "Bahasa perangkat",
+    "current": "Saat ini",
+    "allLanguages": "Semua bahasa"
   },
   "login": {
     "welcome": "Selamat datang di Kilo",

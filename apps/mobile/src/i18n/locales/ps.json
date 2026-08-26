@@ -38,7 +38,9 @@
     "retry": "بیا هڅه وکړئ",
     "search": "ژبې لټون",
     "noMatches": "هېڅ ژبه نه شته",
-    "deviceLanguage": "د وسیلې ژبه"
+    "deviceLanguage": "د وسیلې ژبه",
+    "current": "اوسنی",
+    "allLanguages": "ټولې ژبې"
   },
   "login": {
     "welcome": "کلیو ته ښه راغلاست",

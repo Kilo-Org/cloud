@@ -161,7 +161,11 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
                 variant="card"
                 interactive={false}
                 onPress={() => {
-                  navigateToSession(session.session_id, session.organization_id);
+                  navigateToSession(
+                    session.session_id,
+                    session.organization_id,
+                    session.title ?? undefined
+                  );
                 }}
               />
             </View>

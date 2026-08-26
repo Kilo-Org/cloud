@@ -38,7 +38,9 @@
     "retry": "Proovi uuesti",
     "search": "Otsi keeli",
     "noMatches": "Ükski keel ei ühti",
-    "deviceLanguage": "Seadme keel"
+    "deviceLanguage": "Seadme keel",
+    "current": "Praegune",
+    "allLanguages": "Kõik keeled"
   },
   "login": {
     "welcome": "Tere tulemast Kilosse",

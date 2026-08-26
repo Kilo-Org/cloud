@@ -38,7 +38,9 @@
     "retry": "Қайталау",
     "search": "Тілдерді іздеу",
     "noMatches": "Тілдер сәйкес келмеді",
-    "deviceLanguage": "Құрылғы тілі"
+    "deviceLanguage": "Құрылғы тілі",
+    "current": "Ағымдағы",
+    "allLanguages": "Барлық тілдер"
   },
   "login": {
     "welcome": "Kilo-ға қош келдіңіз",

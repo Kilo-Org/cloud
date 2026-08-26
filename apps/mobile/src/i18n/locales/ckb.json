@@ -38,7 +38,9 @@
     "retry": "هەوڵدانەوە",
     "search": "گەڕان لە زمانەکان",
     "noMatches": "هیچ زمانێک نەگونجاوە",
-    "deviceLanguage": "زمانی ئامێرەکە"
+    "deviceLanguage": "زمانی ئامێرەکە",
+    "current": "ئێستا",
+    "allLanguages": "هەموو زمانەکان"
   },
   "login": {
     "welcome": "بەخێربێیت بۆ Kilo",

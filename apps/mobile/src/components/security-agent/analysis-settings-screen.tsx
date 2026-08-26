@@ -153,7 +153,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           ) : undefined
         }
       />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
             {t('securityAgent.analysisSettings.permissionNote')}

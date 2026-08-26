@@ -38,7 +38,9 @@
     "catalogLoadFailed": "تعذّر تحميل اللغة. يرجى المحاولة مرة أخرى.",
     "search": "البحث في اللغات",
     "noMatches": "لا توجد لغات مطابقة",
-    "deviceLanguage": "لغة الجهاز"
+    "deviceLanguage": "لغة الجهاز",
+    "current": "الحالية",
+    "allLanguages": "كل اللغات"
   },
   "login": {
     "welcome": "مرحبًا بك في Kilo",

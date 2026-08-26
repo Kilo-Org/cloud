@@ -38,7 +38,9 @@
     "retry": "ព្យាយាមម្តងទៀត",
     "search": "ស្វែងរកភាសា",
     "noMatches": "គ្មានភាសាដែលត្រូវគ្នា។",
-    "deviceLanguage": "ភាសារបស់ឧបករណ៍"
+    "deviceLanguage": "ភាសារបស់ឧបករណ៍",
+    "current": "បច្ចុប្បន្ន",
+    "allLanguages": "ភាសាទាំងអស់"
   },
   "login": {
     "welcome": "សូមស្វាគមន៍មកកាន់ Kilo",

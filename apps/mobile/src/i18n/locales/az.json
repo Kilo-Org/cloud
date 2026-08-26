@@ -38,7 +38,9 @@
     "retry": "Yenidən cəhd edin",
     "search": "Dilləri axtar",
     "noMatches": "Uyğun dil tapılmadı",
-    "deviceLanguage": "Cihazın dili"
+    "deviceLanguage": "Cihazın dili",
+    "current": "Cari",
+    "allLanguages": "Bütün dillər"
   },
   "login": {
     "welcome": "Kilo'ya xoş gəldiniz",

@@ -38,7 +38,9 @@
     "catalogLoadFailed": "无法加载语言。请重试。",
     "search": "搜索语言",
     "noMatches": "没有匹配的语言",
-    "deviceLanguage": "设备语言"
+    "deviceLanguage": "设备语言",
+    "current": "当前",
+    "allLanguages": "所有语言"
   },
   "login": {
     "welcome": "欢迎使用 Kilo",

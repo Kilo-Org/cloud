@@ -38,7 +38,9 @@
     "retry": "Rekòmanse",
     "search": "Chèche lang yo",
     "noMatches": "Okenn lang pa matche",
-    "deviceLanguage": "Lang aparèy la"
+    "deviceLanguage": "Lang aparèy la",
+    "current": "Aktyèl",
+    "allLanguages": "Tout lang"
   },
   "login": {
     "welcome": "Byenvini nan Kilo",

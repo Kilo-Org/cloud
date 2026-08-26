@@ -38,7 +38,9 @@
     "retry": "Gbìyànjú lẹẹkansi",
     "search": "Ṣàwárí àwọn èdè",
     "noMatches": "Kò sí èdè tó bá mu",
-    "deviceLanguage": "Èdè ẹ̀rọ"
+    "deviceLanguage": "Èdè ẹ̀rọ",
+    "current": "Lọwọlọwọ",
+    "allLanguages": "Gbogbo èdè"
   },
   "login": {
     "welcome": "Káàbọ̀ sí Kilo",

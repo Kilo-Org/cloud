@@ -38,7 +38,9 @@
     "retry": "Опитай отново",
     "search": "Търсене на езици",
     "noMatches": "Няма съвпадения на езици",
-    "deviceLanguage": "Език на устройството"
+    "deviceLanguage": "Език на устройството",
+    "current": "Текущ",
+    "allLanguages": "Всички езици"
   },
   "login": {
     "welcome": "Добре дошъл в Kilo",

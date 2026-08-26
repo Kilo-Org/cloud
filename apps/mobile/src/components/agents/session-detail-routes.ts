@@ -9,10 +9,26 @@ import { type AgentSessionRouterLike } from '@/components/agents/session-router-
  * and the provider at that route re-keys on the `organizationId` so the new
  * session's manager picks up the right org context.
  */
-export function getAgentSessionPath(kiloSessionId: string, organizationId?: string): Href {
-  return organizationId
-    ? (`/(app)/agent-chat/${kiloSessionId}?organizationId=${organizationId}` as Href)
-    : (`/(app)/agent-chat/${kiloSessionId}` as Href);
+export function getAgentSessionPath(
+  kiloSessionId: string,
+  organizationId?: string,
+  /**
+   * Title the caller already has on screen. The detail route paints its
+   * header with it on the first frame instead of the generic "Session"
+   * label its own query would swap out a beat later. Deep links and push
+   * opens carry no title and keep the fallback.
+   */
+  title?: string
+): Href {
+  const params = [
+    organizationId ? `organizationId=${encodeURIComponent(organizationId)}` : null,
+    title?.trim() ? `title=${encodeURIComponent(title.trim())}` : null,
+  ].filter(Boolean);
+  return (
+    params.length > 0
+      ? `/(app)/agent-chat/${kiloSessionId}?${params.join('&')}`
+      : `/(app)/agent-chat/${kiloSessionId}`
+  ) as Href;
 }
 
 /**

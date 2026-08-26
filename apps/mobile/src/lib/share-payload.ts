@@ -5,6 +5,7 @@ import { type ShareIntent } from 'expo-share-intent';
 
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import type * as DraftsModule from '@/lib/persist/drafts';
+import { registerTempFile } from '@/lib/temp-file-registry';
 
 // Durable persistence of the in-memory payload store (DEC-01 drafts). Loaded
 // lazily via dynamic import so unit tests that only touch the in-memory map or
@@ -319,6 +320,7 @@ async function defaultCopyToCache(args: { from: string; fileName: string }): Pro
   const safeName = args.fileName.replaceAll(/[/\\]/g, '_') || 'shared-file';
   const destination = `${root}share-${Crypto.randomUUID()}-${safeName}`;
   await copyAsync({ from: args.from, to: destination });
+  registerTempFile(destination);
   return destination;
 }
 

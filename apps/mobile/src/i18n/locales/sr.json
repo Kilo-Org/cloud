@@ -151,8 +151,8 @@
     "appearanceLight": "Svetlo",
     "appearanceDark": "Tamno",
     "account": "Nalog",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Dodaj atribuciju aplikacije u PR preglede",
+    "prReviewAttributionSubtitle": "Dodaj 'Reviewed via Kilo' podnožje kada pošalješ pregled."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nije dostupan",
@@ -1395,7 +1395,8 @@
       "gitlabAccount": "GitLab nalog",
       "connectGitLab": "Poveži GitLab",
       "gitlabError": "Nije moguće otvoriti GitLab podešavanje. Pokušaj ponovo.",
-      "description": "Poveži Kilo {{label}} da automatski pregleda pull requests."
+      "description": "Poveži Kilo {{label}} da automatski pregleda pull requests.",
+      "bitbucketError": "Nije moguće otvoriti Bitbucket podešavanja. Pokušaj ponovo."
     },
     "overview": {
       "reviewStyle": "Stil pregleda",
@@ -2168,14 +2169,10 @@
     "newSession": {
       "title": "Nova sesija",
       "repository": "Repozitorijum",
-      "couldNotLoadRepositories": "Repozitorijumi se ne mogu učitati",
       "connectGithub": "Poveži GitHub",
       "connectGithubDescription": "Poveži GitHub u pregledaču, a zatim se vrati ovde da izabereš repozitorijum.",
       "openGithub": "Otvori GitHub",
       "refreshRepositories": "Osveži repozitorijume",
-      "githubConnectionNotVisible": "Još ne vidimo tvoju GitHub vezu",
-      "githubConnectionNotVisibleDescription": "Ako si instalirao ili konfigurisao Kilo GitHub aplikaciju, proveri ponovo — ili se uveri da je instalirana za ovaj nalog/organizaciju.",
-      "checkAgain": "Proveri ponovo",
       "githubConnected": "GitHub je povezan",
       "noRepositoriesVisible": "Nema vidljivih repozitorijuma. Proveri pristup repozitorijumu za Kilo GitHub aplikaciju, a zatim osveži.",
       "runOnWithTarget": "Pokreni na: {{target}}",
@@ -2202,7 +2199,21 @@
       "keepEditing": "Nastavi sa uređivanjem",
       "discard": "Odbaci",
       "discardFailed": "Nacrt se ne može odbaciti. Pokušaj ponovo.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Pokreni `kilo remote` na tvom računaru, ili `/remote` u aktivnoj CLI sesiji, da kontrolišeš lokalni kilo proces.",
+      "bitbucketConnected": "Bitbucket povezan",
+      "connectBitbucket": "Poveži Bitbucket",
+      "connectBitbucketDescription": "Poveži Bitbucket u pregledaču, a zatim se vrati ovde da izabereš repozitorijum.",
+      "connectGitlab": "Poveži GitLab",
+      "connectGitlabDescription": "Poveži GitLab u pregledaču, a zatim se vrati ovde da izabereš repozitorijum.",
+      "couldNotLoadBitbucketRepositories": "Nije moguće učitati Bitbucket repozitorijume",
+      "couldNotLoadGithubRepositories": "Nije moguće učitati GitHub repozitorijume",
+      "couldNotLoadGitlabRepositories": "Nije moguće učitati GitLab repozitorijume",
+      "gitlabConnected": "GitLab je povezan",
+      "noRepositoriesVisibleBitbucket": "Nema vidljivih repozitorijuma. Proveri pristup repozitorijumima za Bitbucket, pa osveži.",
+      "noRepositoriesVisibleGitlab": "Nema vidljivih repozitorijuma. Proveri pristup repozitorijumima za GitLab, pa osveži.",
+      "openBitbucket": "Otvori Bitbucket",
+      "openGitlab": "Otvori GitLab",
+      "recentlyUsed": "Nedavno korišćeno"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažuriran {{displayCount}} fajl",
@@ -2292,7 +2303,10 @@
       "noRepositoriesDescription": "Nijedan repozitorijum nije povezan sa tvojim nalogom.",
       "tryDifferentSearch": "Probaj drugi termin za pretragu.",
       "loading": "Učitavanje...",
-      "accessibility": "Repozitorijum: {{label}}"
+      "accessibility": "Repozitorijum: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detalji poruke",
@@ -2644,6 +2658,18 @@
       "updating": "Ažuriranje, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Učitaj",
+      "loadWithHost": "Učitaj {{host}}",
+      "httpsOnly": "Samo HTTPS slike"
+    },
+    "markdownLink": {
+      "invalidLink": "Ova veza se ne može otvoriti.",
+      "hostConfirmTitle": "Otvoriti eksternu vezu?",
+      "hostConfirmMessage": "Ova veza otvara {{host}} u vašem pregledaču.",
+      "open": "Otvori",
+      "trustThisHost": "Veruj ovom hostu"
     }
   },
   "bootstrap": {
@@ -2966,7 +2992,10 @@
         "team-topup-bonus-2025": "Timski bonus za dopunu 2025",
         "accounting_adjustment": "Računovodstveno usklađivanje",
         "credits_expired": "Istekli krediti"
-      }
+      },
+      "loadMore": "Učitaj još",
+      "loadMoreFailed": "Nije moguće učitati više",
+      "truncated": "Starija kreditna aktivnost je dostupna."
     },
     "inviteMember": {
       "emailError": "Unesite važeću adresu e-pošte",
@@ -2993,7 +3022,10 @@
         "draft": "Nacrt",
         "uncollectible": "Nenaplativo",
         "unknown": "Nepoznato"
-      }
+      },
+      "loadMore": "Učitaj još",
+      "loadMoreFailed": "Nije moguće učitati više",
+      "truncated": "Starije fakture su dostupne."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3130,5 +3162,13 @@
       "xhigh": "Veoma visoko",
       "max": "Maksimalno"
     }
+  },
+  "trustedHosts": {
+    "title": "Pouzdani hostovi",
+    "subtitle": "Hostovi kojima veruješ da se otvore bez pitanja",
+    "emptyTitle": "Nema pouzdanih hostova",
+    "emptyDescription": "Kada veruješ hostu veze, ona se otvara bez ponovnog pitanja.",
+    "revoke": "Opozovi {{host}}",
+    "backToPreferences": "Nazad na podešavanja"
   }
 }

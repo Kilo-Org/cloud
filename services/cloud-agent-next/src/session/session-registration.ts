@@ -68,6 +68,34 @@ type SharedSandboxRouteMetadata = NonNullable<
   NonNullable<SessionMetadata['workspace']>['sandboxRoute']
 >;
 
+function assertSupportedSandboxAllocation(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
+): void {
+  if (
+    input.runtime?.sandboxAllocation === 'isolated-standard' &&
+    (input.runtime.devcontainer === true || options?.billingOrigin === 'code-review')
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Isolated Standard allocation is incompatible with specialized sandbox routing',
+    });
+  }
+  if (
+    input.runtime?.sandboxAllocation === 'isolated-standard' &&
+    sessionPlaneForNewOwner(ctx.env, {
+      userId: ctx.userId,
+      orgId: input.options?.kilocodeOrganizationId,
+    }) === 'control'
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Isolated Standard allocation is not supported for control-plane sessions',
+    });
+  }
+}
+
 export type SessionRegistrationContext = {
   env: Env;
   userId: string;
@@ -465,6 +493,7 @@ async function allocateNewSession(
       {
         devcontainer: input.runtime?.devcontainer,
         createdOnPlatform: options?.billingOrigin === 'code-review' ? 'code-review' : undefined,
+        sandboxAllocation: input.runtime?.sandboxAllocation,
       }
     );
     if (target.kind === 'shared') {
@@ -769,6 +798,9 @@ function buildSessionRegistrationCommand(
       ...(allocation.sandboxRoute ? { sandboxRoute: allocation.sandboxRoute } : {}),
       credentialContainment: allocation.credentialContainment,
       ...(input.runtime?.devcontainer ? { devcontainerRequested: true } : {}),
+      ...(input.runtime?.sandboxAllocation
+        ? { sandboxAllocation: input.runtime.sandboxAllocation }
+        : {}),
     },
   };
 }
@@ -785,6 +817,7 @@ export async function registerNewSession(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): Promise<SessionRegistrationResult> {
+  assertSupportedSandboxAllocation(input, ctx, options);
   const allocation = await allocateNewSession(input, ctx, options);
   const stub = resolveSessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId);
   let registerResult: Awaited<ReturnType<typeof stub.registerSession>>;
@@ -1039,6 +1072,7 @@ export async function startNewSession(
   options?: { billingOrigin?: string },
   ledger?: SessionCreationLedgerHooks
 ): Promise<StartedSessionResult> {
+  assertSupportedSandboxAllocation(input, ctx, options);
   const allocation = await allocateSessionForCreate(input, ctx, options, ledger);
   return registerAndAdmitInitialTurn(input, ctx, options, allocation, ledger);
 }
@@ -1198,7 +1232,14 @@ export async function sessionCreateIntentFingerprint(
       },
       repository: repositoryCreateIntent(input.repository),
       finalization: input.finalization,
-      runtime: input.runtime?.devcontainer ? { devcontainer: true } : undefined,
+      runtime: input.runtime
+        ? {
+            ...(input.runtime.devcontainer ? { devcontainer: true } : {}),
+            ...(input.runtime.sandboxAllocation
+              ? { sandboxAllocation: input.runtime.sandboxAllocation }
+              : {}),
+          }
+        : undefined,
       options: input.options
         ? {
             kilocodeOrganizationId: input.options.kilocodeOrganizationId || undefined,
@@ -1242,6 +1283,7 @@ export async function createSessionWithLedger(
   ctx: SessionRegistrationContext,
   options: SessionLedgerCreateOptions
 ): Promise<LedgerSessionCreateResult> {
+  assertSupportedSandboxAllocation(input, ctx, { billingOrigin: options.billingOrigin });
   const db = getPgDb(ctx.env);
   const admission = await admitOperation(db, {
     userId: ctx.userId,

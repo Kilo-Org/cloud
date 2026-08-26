@@ -151,8 +151,8 @@
     "appearanceLight": "Ανοιχτό",
     "appearanceDark": "Σκούρο",
     "account": "Λογαριασμός",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Προσθήκη αναφοράς της εφαρμογής στις ανασκοπήσεις PR",
+    "prReviewAttributionSubtitle": "Προσθέστε μια υποσημείωση «Reviewed via Kilo» όταν υποβάλλετε μια ανασκόπηση."
   },
   "prReview": {
     "pullRequestUnavailable": "Το pull request δεν είναι διαθέσιμο",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Λογαριασμός GitLab",
       "connectGitLab": "Σύνδεση GitLab",
       "gitlabError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης GitLab. Δοκιμάστε ξανά.",
-      "description": "Συνδέστε το Kilo {{label}} για την αυτόματη αναθεώρηση pull requests."
+      "description": "Συνδέστε το Kilo {{label}} για την αυτόματη αναθεώρηση pull requests.",
+      "bitbucketError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης του Bitbucket. Δοκιμάστε ξανά."
     },
     "overview": {
       "reviewStyle": "Στυλ αναθεώρησης",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Νέα συνεδρία",
       "repository": "Αποθετήριο",
-      "couldNotLoadRepositories": "Δεν ήταν δυνατή η φόρτωση των αποθετηρίων",
       "connectGithub": "Σύνδεση στο GitHub",
       "connectGithubDescription": "Συνδεθείτε στο GitHub στο πρόγραμμα περιήγησής σας και επιστρέψτε εδώ για να επιλέξετε ένα αποθετήριο.",
       "openGithub": "Άνοιγμα GitHub",
       "refreshRepositories": "Ανανέωση αποθετηρίων",
-      "githubConnectionNotVisible": "Δεν μπορούμε να δούμε ακόμα τη σύνδεσή σας στο GitHub",
-      "githubConnectionNotVisibleDescription": "Εάν εγκαταστήσατε ή διαμορφώσατε την εφαρμογή Kilo GitHub, ελέγξτε ξανά — ή βεβαιωθείτε ότι εγκαταστάθηκε για αυτόν τον λογαριασμό/οργανισμό.",
-      "checkAgain": "Έλεγχος ξανά",
       "githubConnected": "Σύνδεση GitHub επιτυχής",
       "noRepositoriesVisible": "Κανένα ορατό αποθετήριο. Ελέγξτε την πρόσβαση αποθετηρίων για την εφαρμογή Kilo GitHub και ανανεώστε.",
       "runOnWithTarget": "Εκτέλεση σε: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Συνέχιση επεξεργασίας",
       "discard": "Απόρριψη",
       "discardFailed": "Δεν ήταν δυνατή η απόρριψη του πρόχειρου. Δοκιμάστε ξανά.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Εκτελέστε το `kilo remote` στον υπολογιστή σας ή το `/remote` σε μια ενεργή συνεδρία CLI, για να ελέγξετε μια τοπική διαδικασία kilo.",
+      "bitbucketConnected": "Το Bitbucket συνδέθηκε",
+      "connectBitbucket": "Σύνδεση Bitbucket",
+      "connectBitbucketDescription": "Συνδέστε το Bitbucket στο πρόγραμμα περιήγησης και μετά επιστρέψτε εδώ για να επιλέξετε ένα αποθετήριο.",
+      "connectGitlab": "Σύνδεση GitLab",
+      "connectGitlabDescription": "Συνδέστε το GitLab στο πρόγραμμα περιήγησης και μετά επιστρέψτε εδώ για να επιλέξετε ένα αποθετήριο.",
+      "couldNotLoadBitbucketRepositories": "Δεν ήταν δυνατή η φόρτωση των αποθετηρίων του Bitbucket",
+      "couldNotLoadGithubRepositories": "Δεν ήταν δυνατή η φόρτωση των αποθετηρίων του GitHub",
+      "couldNotLoadGitlabRepositories": "Δεν ήταν δυνατή η φόρτωση των αποθετηρίων του GitLab",
+      "gitlabConnected": "Το GitLab συνδέθηκε",
+      "noRepositoriesVisibleBitbucket": "Δεν υπάρχουν ορατά αποθετήρια. Ελέγξτε την πρόσβαση στα αποθετήρια του Bitbucket και ανανεώστε.",
+      "noRepositoriesVisibleGitlab": "Δεν υπάρχουν ορατά αποθετήρια. Ελέγξτε την πρόσβαση στα αποθετήρια του GitLab και ανανεώστε.",
+      "openBitbucket": "Άνοιγμα Bitbucket",
+      "openGitlab": "Άνοιγμα GitLab",
+      "recentlyUsed": "Πρόσφατη χρήση"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ενημερώθηκε {{displayCount}} αρχείο",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Κανένα αποθετήριο δεν είναι συνδεδεμένο με τον λογαριασμό σας.",
       "tryDifferentSearch": "Δοκιμάστε διαφορετικό όρο αναζήτησης.",
       "loading": "Φόρτωση...",
-      "accessibility": "Αποθετήριο: {{label}}"
+      "accessibility": "Αποθετήριο: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Λεπτομέρειες μηνύματος",
@@ -2624,6 +2638,18 @@
       "updating": "Ενημέρωση, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "αίτημα έλξης"
+    },
+    "markdownImage": {
+      "load": "Φόρτωση",
+      "loadWithHost": "Φόρτωση {{host}}",
+      "httpsOnly": "Μόνο εικόνες HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Αυτός ο σύνδεσμος δεν μπορεί να ανοίξει.",
+      "hostConfirmTitle": "Άνοιγμα εξωτερικού συνδέσμου;",
+      "hostConfirmMessage": "Αυτός ο σύνδεσμος ανοίγει το {{host}} στο πρόγραμμα περιήγησής σας.",
+      "open": "Άνοιγμα",
+      "trustThisHost": "Εμπιστευτείτε αυτόν τον κεντρικό υπολογιστή"
     }
   },
   "bootstrap": {
@@ -2946,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Λογιστική προσαρμογή",
         "credits_expired": "Ληγμένες πιστώσεις"
-      }
+      },
+      "loadMore": "Φόρτωση περισσότερων",
+      "loadMoreFailed": "Δεν ήταν δυνατή η φόρτωση περισσότερων",
+      "truncated": "Παλαιότερη δραστηριότητα πιστώσεων είναι διαθέσιμη."
     },
     "inviteMember": {
       "emailError": "Εισαγάγετε μια έγκυρη διεύθυνση email",
@@ -2973,7 +3002,10 @@
         "draft": "Πρόχειρο",
         "uncollectible": "Μη εισπράξιμο",
         "unknown": "Άγνωστο"
-      }
+      },
+      "loadMore": "Φόρτωση περισσότερων",
+      "loadMoreFailed": "Δεν ήταν δυνατή η φόρτωση περισσότερων",
+      "truncated": "Παλαιότερα τιμολόγια είναι διαθέσιμα."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3109,5 +3141,13 @@
       "xhigh": "Πολύ υψηλή",
       "max": "Μέγιστη"
     }
+  },
+  "trustedHosts": {
+    "title": "Αξιόπιστοι κεντρικοί υπολογιστές",
+    "subtitle": "Κεντρικοί υπολογιστές που εμπιστεύεστε να ανοίγουν χωρίς ερώτηση",
+    "emptyTitle": "Κανένας αξιόπιστος κεντρικός υπολογιστής",
+    "emptyDescription": "Όταν εμπιστεύεστε τον κεντρικό υπολογιστή ενός συνδέσμου, ανοίγει χωρίς να ρωτά ξανά.",
+    "revoke": "Ανάκληση {{host}}",
+    "backToPreferences": "Επιστροφή στις προτιμήσεις"
   }
 }

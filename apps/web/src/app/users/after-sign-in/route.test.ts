@@ -204,6 +204,18 @@ describe('GET /users/after-sign-in', () => {
     expect(location.searchParams.get('to')).toBe('/cloud/sessions');
   });
 
+  it('preserves an explicit permitted callback over the preferred organization', async () => {
+    const response = await GET(
+      new NextRequest('http://localhost:3000/users/after-sign-in?callbackPath=%2Fprofile')
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost:3000/users/continue?to=%2Fprofile'
+    );
+    expect(mockGetProfileRedirectPath).not.toHaveBeenCalled();
+  });
+
   it('does not route single-org /organizations/<id> through the interstitial', async () => {
     mockGetProfileRedirectPath.mockResolvedValueOnce('/organizations/org-1');
 

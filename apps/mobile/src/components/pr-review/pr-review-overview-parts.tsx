@@ -113,6 +113,7 @@ export function PrAuthorRow({
           source={{ uri: author.avatarUrl }}
           className="size-6 rounded-full"
           transition={0}
+          cachePolicy="memory"
           accessibilityIgnoresInvertColors
         />
       ) : (

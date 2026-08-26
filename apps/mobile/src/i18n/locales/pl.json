@@ -151,8 +151,8 @@
     "appearanceLight": "Jasny",
     "appearanceDark": "Ciemny",
     "account": "Konto",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Dodaj atrybucję aplikacji do recenzji PR",
+    "prReviewAttributionSubtitle": "Dodaj stopkę „Reviewed via Kilo”, gdy wysyłasz recenzję."
   },
   "notifications": {
     "title": "Powiadomienia",
@@ -864,7 +864,8 @@
       "githubApp": "Aplikacja GitHub",
       "githubError": "Nie udało się otworzyć konfiguracji GitHub. Spróbuj ponownie.",
       "gitlabAccount": "Konto GitLab",
-      "gitlabError": "Nie udało się otworzyć konfiguracji GitLab. Spróbuj ponownie."
+      "gitlabError": "Nie udało się otworzyć konfiguracji GitLab. Spróbuj ponownie.",
+      "bitbucketError": "Nie można otworzyć konfiguracji Bitbucket. Spróbuj ponownie."
     },
     "readOnlyDescription": "Tylko właściciele organizacji i menedżerowie rozliczeń mogą zmieniać te ustawienia.",
     "reviewDetail": {
@@ -1715,14 +1716,10 @@
     "newSession": {
       "title": "Nowa sesja",
       "repository": "Repozytorium",
-      "couldNotLoadRepositories": "Nie udało się załadować repozytoriów",
       "connectGithub": "Połącz GitHub",
       "connectGithubDescription": "Połącz GitHub w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
       "openGithub": "Otwórz GitHub",
       "refreshRepositories": "Odśwież repozytoria",
-      "githubConnectionNotVisible": "Nie widzimy jeszcze Twojego połączenia z GitHub",
-      "githubConnectionNotVisibleDescription": "Jeśli zainstalowałeś lub skonfigurowałeś aplikację Kilo GitHub, sprawdź ponownie — lub upewnij się, że została zainstalowana dla tego konta/organizacji.",
-      "checkAgain": "Sprawdź ponownie",
       "githubConnected": "GitHub połączony",
       "noRepositoriesVisible": "Brak widocznych repozytoriów. Sprawdź dostęp repozytoriów dla aplikacji Kilo GitHub, a następnie odśwież.",
       "runOnWithTarget": "Uruchom na: {{target}}",
@@ -1749,7 +1746,21 @@
       "discardDraftTitle": "Odrzucić szkic?",
       "discardFailed": "Nie udało się odrzucić szkicu. Spróbuj ponownie.",
       "keepEditing": "Kontynuuj edycję",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Uruchom `kilo remote` na swoim komputerze lub `/remote` w działającej sesji CLI, aby kontrolować lokalny proces kilo.",
+      "bitbucketConnected": "Bitbucket połączony",
+      "connectBitbucket": "Połącz Bitbucket",
+      "connectBitbucketDescription": "Połącz Bitbucket w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
+      "connectGitlab": "Połącz GitLab",
+      "connectGitlabDescription": "Połącz GitLab w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
+      "couldNotLoadBitbucketRepositories": "Nie można wczytać repozytoriów Bitbucket",
+      "couldNotLoadGithubRepositories": "Nie można wczytać repozytoriów GitHub",
+      "couldNotLoadGitlabRepositories": "Nie można wczytać repozytoriów GitLab",
+      "gitlabConnected": "Połączono z GitLab",
+      "noRepositoriesVisibleBitbucket": "Brak widocznych repozytoriów. Sprawdź dostęp do repozytoriów Bitbucket, a następnie odśwież.",
+      "noRepositoriesVisibleGitlab": "Brak widocznych repozytoriów. Sprawdź dostęp do repozytoriów GitLab, a następnie odśwież.",
+      "openBitbucket": "Otwórz Bitbucket",
+      "openGitlab": "Otwórz GitLab",
+      "recentlyUsed": "Ostatnio używane"
     },
     "partRenderer": {
       "updatedFileCount_one": "Zaktualizowano {{displayCount}} plik",
@@ -1840,7 +1851,10 @@
       "noRepositoriesDescription": "Z Twoim kontem nie są połączone żadne repozytoria.",
       "tryDifferentSearch": "Spróbuj użyć innego hasła wyszukiwania.",
       "loading": "Ładowanie...",
-      "accessibility": "Repozytorium: {{label}}"
+      "accessibility": "Repozytorium: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Szczegóły wiadomości",
@@ -2196,6 +2210,18 @@
       "updating": "Aktualizowanie, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Wczytaj",
+      "loadWithHost": "Wczytaj {{host}}",
+      "httpsOnly": "Tylko obrazy HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Tego linku nie można otworzyć.",
+      "hostConfirmTitle": "Otworzyć link zewnętrzny?",
+      "hostConfirmMessage": "Ten link otwiera {{host}} w Twojej przeglądarce.",
+      "open": "Otwórz",
+      "trustThisHost": "Zaufaj temu hostowi"
     }
   },
   "bootstrap": {
@@ -2978,7 +3004,10 @@
         "team-topup-bonus-2025": "Bonus doładowania zespołu 2025",
         "accounting_adjustment": "Korekta księgowa",
         "credits_expired": "Kredyty wygasły"
-      }
+      },
+      "loadMore": "Załaduj więcej",
+      "loadMoreFailed": "Nie udało się załadować więcej",
+      "truncated": "Dostępna jest starsza historia kredytów."
     },
     "hub": {
       "balance": "Saldo",
@@ -3014,7 +3043,10 @@
         "draft": "Szkic",
         "uncollectible": "Nieściągalna",
         "unknown": "Nieznana"
-      }
+      },
+      "loadMore": "Załaduj więcej",
+      "loadMoreFailed": "Nie udało się załadować więcej",
+      "truncated": "Dostępne są starsze faktury."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3151,5 +3183,13 @@
       "xhigh": "Bardzo wysoki",
       "max": "Maksymalny"
     }
+  },
+  "trustedHosts": {
+    "title": "Zaufane hosty",
+    "subtitle": "Hosty, którym ufasz, że otworzą się bez pytania",
+    "emptyTitle": "Brak zaufanych hostów",
+    "emptyDescription": "Gdy zaufasz hostowi linku, otworzy się on bez ponownego pytania.",
+    "revoke": "Cofnij {{host}}",
+    "backToPreferences": "Wróć do preferencji"
   }
 }

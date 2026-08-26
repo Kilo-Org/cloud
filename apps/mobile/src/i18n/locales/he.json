@@ -151,8 +151,8 @@
     "appearanceLight": "בהיר",
     "appearanceDark": "כהה",
     "account": "חשבון",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "הוסף שיוך אפליקציה לסקירות PR",
+    "prReviewAttributionSubtitle": "הוסף כותרת תחתונה של 'נסקר דרך Kilo' כשאתה שולח סקירה."
   },
   "notifications": {
     "title": "התראות",
@@ -862,7 +862,8 @@
       "githubApp": "אפליקציית GitHub",
       "githubError": "לא ניתן היה לפתוח את הגדרת GitHub. נסה שוב.",
       "gitlabAccount": "חשבון GitLab",
-      "gitlabError": "לא ניתן היה לפתוח את הגדרת GitLab. נסה שוב."
+      "gitlabError": "לא ניתן היה לפתוח את הגדרת GitLab. נסה שוב.",
+      "bitbucketError": "לא ניתן היה לפתוח את ההתקנה של Bitbucket. נסה שוב."
     },
     "readOnlyDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לשנות את ההגדרות האלה.",
     "reviewDetail": {
@@ -1707,14 +1708,10 @@
     "newSession": {
       "title": "הפעלה חדשה",
       "repository": "מאגר",
-      "couldNotLoadRepositories": "לא ניתן היה לטעון מאגרים",
       "connectGithub": "חבר GitHub",
       "connectGithubDescription": "חבר את GitHub בדפדפן שלך, ואז חזור לכאן כדי לבחור מאגר.",
       "openGithub": "פתח GitHub",
       "refreshRepositories": "רענן מאגרים",
-      "githubConnectionNotVisible": "אנחנו עדיין לא רואים את חיבור ה-GitHub שלך",
-      "githubConnectionNotVisibleDescription": "אם התקנת או הגדרת את אפליקציית Kilo GitHub, בדוק שוב — או ודא שהיא הותקנה עבור החשבון/הארגון הזה.",
-      "checkAgain": "בדוק שוב",
       "githubConnected": "GitHub מחובר",
       "noRepositoriesVisible": "לא נראים מאגרים. בדוק את גישת המאגרים של אפליקציית Kilo GitHub, ואז רענן.",
       "runOnWithTarget": "הרץ על: {{target}}",
@@ -1741,7 +1738,21 @@
       "discardDraftTitle": "לבטל את הטיוטה?",
       "discardFailed": "לא ניתן היה לבטל את הטיוטה. נסה שוב.",
       "keepEditing": "המשך לערוך",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "הרץ את `kilo remote` במחשב שלך, או `/remote` בהפעלת CLI פעילה, כדי לשלוט בתהליך kilo מקומי.",
+      "bitbucketConnected": "Bitbucket מחובר",
+      "connectBitbucket": "חבר את Bitbucket",
+      "connectBitbucketDescription": "חבר את Bitbucket בדפדפן, ולאחר מכן חזור לכאן כדי לבחור מאגר.",
+      "connectGitlab": "חבר GitLab",
+      "connectGitlabDescription": "חבר את GitLab בדפדפן, ולאחר מכן חזור לכאן כדי לבחור מאגר.",
+      "couldNotLoadBitbucketRepositories": "לא ניתן היה לטעון את המאגרים של Bitbucket",
+      "couldNotLoadGithubRepositories": "לא ניתן היה לטעון את המאגרים של GitHub",
+      "couldNotLoadGitlabRepositories": "לא ניתן היה לטעון את המאגרים של GitLab",
+      "gitlabConnected": "GitLab מחובר",
+      "noRepositoriesVisibleBitbucket": "אין מאגרים גלויים. בדוק את הגישה למאגרים של Bitbucket, ואז רענן.",
+      "noRepositoriesVisibleGitlab": "אין מאגרים גלויים. בדוק את הגישה למאגרים של GitLab, ואז רענן.",
+      "openBitbucket": "פתח את Bitbucket",
+      "openGitlab": "פתח את GitLab",
+      "recentlyUsed": "בשימוש לאחרונה"
     },
     "partRenderer": {
       "updatedFileCount_one": "עודכן {{displayCount}} קובץ",
@@ -1835,7 +1846,10 @@
       "noRepositoriesDescription": "לא מחוברים מאגרים לחשבון שלך.",
       "tryDifferentSearch": "נסה מונח חיפוש אחר.",
       "loading": "טוען...",
-      "accessibility": "מאגר: {{label}}"
+      "accessibility": "מאגר: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "פרטי הודעה",
@@ -2183,6 +2197,18 @@
       "updating": "מעדכן, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "בקשת משיכה"
+    },
+    "markdownImage": {
+      "load": "טען",
+      "loadWithHost": "טען {{host}}",
+      "httpsOnly": "תמונות HTTPS בלבד"
+    },
+    "markdownLink": {
+      "invalidLink": "לא ניתן לפתוח קישור זה.",
+      "hostConfirmTitle": "לפתוח קישור חיצוני?",
+      "hostConfirmMessage": "קישור זה פותח את {{host}} בדפדפן שלך.",
+      "open": "פתח",
+      "trustThisHost": "בטח במארח זה"
     }
   },
   "bootstrap": {
@@ -2958,7 +2984,10 @@
         "team-topup-bonus-2025": "בונוס טופ-אפ של צוות 2025",
         "accounting_adjustment": "התאמה חשבונאית",
         "credits_expired": "הקרדיטים פגו"
-      }
+      },
+      "loadMore": "טען עוד",
+      "loadMoreFailed": "לא ניתן היה לטעון עוד",
+      "truncated": "קיימת פעילות אשראי ישנה יותר."
     },
     "hub": {
       "balance": "יתרה",
@@ -2994,7 +3023,10 @@
         "draft": "טיוטה",
         "uncollectible": "לא ניתן לגביה",
         "unknown": "לא ידוע"
-      }
+      },
+      "loadMore": "טען עוד",
+      "loadMoreFailed": "לא ניתן היה לטעון עוד",
+      "truncated": "קיימות חשבוניות ישנות יותר."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3130,5 +3162,13 @@
       "xhigh": "גבוה במיוחד",
       "max": "מקסימום"
     }
+  },
+  "trustedHosts": {
+    "title": "מארחים מהימנים",
+    "subtitle": "מארחים שבהם אתה בוטח לפתיחה ללא שאלה",
+    "emptyTitle": "אין מארחים מהימנים",
+    "emptyDescription": "כשאתה בוטח במארח של קישור, הוא נפתח ללא שאלה נוספת.",
+    "revoke": "בטל אמון ב{{host}}",
+    "backToPreferences": "חזור להעדפות"
   }
 }

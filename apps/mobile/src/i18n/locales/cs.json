@@ -151,8 +151,8 @@
     "appearanceLight": "Světlý",
     "appearanceDark": "Tmavý",
     "account": "Účet",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Přidat atribuci aplikace k recenzím PR",
+    "prReviewAttributionSubtitle": "Při odeslání recenze přidejte zápatí „Reviewed via Kilo“."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request není dostupný",
@@ -1404,7 +1404,8 @@
       "gitlabAccount": "Účet GitLab",
       "connectGitLab": "Připojit GitLab",
       "gitlabError": "Nastavení GitLabu se nepodařilo otevřít. Zkuste to prosím znovu.",
-      "description": "Připojte Kilo {{label}} pro automatickou kontrolu pull requestů."
+      "description": "Připojte Kilo {{label}} pro automatickou kontrolu pull requestů.",
+      "bitbucketError": "Nelze otevřít nastavení Bitbucket. Zkuste to znovu."
     },
     "overview": {
       "reviewStyle": "Styl kontroly",
@@ -2183,14 +2184,10 @@
     "newSession": {
       "title": "Nová relace",
       "repository": "Repozitář",
-      "couldNotLoadRepositories": "Repozitáře se nepodařilo načíst",
       "connectGithub": "Připojit GitHub",
       "connectGithubDescription": "Připojte GitHub v prohlížeči a pak se sem vraťte pro výběr repozitáře.",
       "openGithub": "Otevřít GitHub",
       "refreshRepositories": "Obnovit repozitáře",
-      "githubConnectionNotVisible": "Vaše připojení GitHubu zatím nevidíme",
-      "githubConnectionNotVisibleDescription": "Pokud jste nainstalovali nebo nakonfigurovali aplikaci Kilo GitHub, zkontrolujte to znovu — nebo se ujistěte, že byla nainstalována pro tento účet/organizaci.",
-      "checkAgain": "Zkontrolovat znovu",
       "githubConnected": "GitHub připojen",
       "noRepositoriesVisible": "Žádné repozitáře nejsou viditelné. Zkontrolujte přístup k repozitářům pro aplikaci Kilo GitHub a pak obnovte.",
       "runOnWithTarget": "Spustit na: {{target}}",
@@ -2217,7 +2214,21 @@
       "keepEditing": "Pokračovat v úpravách",
       "discard": "Zahodit",
       "discardFailed": "Koncept se nepodařilo zahodit. Zkuste to znovu.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Spusťte `kilo remote` na svém počítači nebo `/remote` v běžící relaci CLI pro ovládání místního procesu kilo.",
+      "bitbucketConnected": "Bitbucket připojen",
+      "connectBitbucket": "Připojit Bitbucket",
+      "connectBitbucketDescription": "Připojte Bitbucket v prohlížeči a pak se sem vraťte pro výběr úložiště.",
+      "connectGitlab": "Připojit GitLab",
+      "connectGitlabDescription": "Připojte GitLab v prohlížeči a pak se sem vraťte pro výběr úložiště.",
+      "couldNotLoadBitbucketRepositories": "Nepodařilo se načíst úložiště Bitbucket",
+      "couldNotLoadGithubRepositories": "Nepodařilo se načíst úložiště GitHub",
+      "couldNotLoadGitlabRepositories": "Nepodařilo se načíst úložiště GitLab",
+      "gitlabConnected": "GitLab připojen",
+      "noRepositoriesVisibleBitbucket": "Nebyla viditelná žádná úložiště. Zkontrolujte přístup k úložištím pro Bitbucket a pak obnovte.",
+      "noRepositoriesVisibleGitlab": "Nebyla viditelná žádná úložiště. Zkontrolujte přístup k úložištím pro GitLab a pak obnovte.",
+      "openBitbucket": "Otevřít Bitbucket",
+      "openGitlab": "Otevřít GitLab",
+      "recentlyUsed": "Nedávno použité"
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizován {{displayCount}} soubor",
@@ -2308,7 +2319,10 @@
       "noRepositoriesDescription": "K vašemu účtu nejsou připojeny žádné repozitáře.",
       "tryDifferentSearch": "Zkuste jiný hledaný výraz.",
       "loading": "Načítání...",
-      "accessibility": "Repozitář: {{label}}"
+      "accessibility": "Repozitář: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Podrobnosti zprávy",
@@ -2664,6 +2678,18 @@
       "updating": "Aktualizuje se, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Načíst",
+      "loadWithHost": "Načíst {{host}}",
+      "httpsOnly": "Pouze obrázky přes HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Tento odkaz nelze otevřít.",
+      "hostConfirmTitle": "Otevřít externí odkaz?",
+      "hostConfirmMessage": "Tento odkaz otevře {{host}} ve vašem prohlížeči.",
+      "open": "Otevřít",
+      "trustThisHost": "Důvěřovat tomuto hostiteli"
     }
   },
   "bootstrap": {
@@ -2986,7 +3012,10 @@
         "team-topup-bonus-2025": "Bonus za doplnění týmu 2025",
         "accounting_adjustment": "Účetní úprava",
         "credits_expired": "Kredity s prošlou platností"
-      }
+      },
+      "loadMore": "Načíst více",
+      "loadMoreFailed": "Další se nepodařilo načíst",
+      "truncated": "Starší aktivita kreditů je k dispozici."
     },
     "inviteMember": {
       "emailError": "Zadejte platnou e-mailovou adresu",
@@ -3013,7 +3042,10 @@
         "draft": "Návrh",
         "uncollectible": "Nedobytné",
         "unknown": "Neznámé"
-      }
+      },
+      "loadMore": "Načíst více",
+      "loadMoreFailed": "Další se nepodařilo načíst",
+      "truncated": "Starší faktury jsou k dispozici."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3151,5 +3183,13 @@
       "xhigh": "Velmi vysoké",
       "max": "Maximální"
     }
+  },
+  "trustedHosts": {
+    "title": "Důvěryhodní hostitelé",
+    "subtitle": "Hostitelé, kterým důvěřujete, se otevřou bez dotázání",
+    "emptyTitle": "Žádní důvěryhodní hostitelé",
+    "emptyDescription": "Když důvěřujete hostiteli odkazu, otevře se bez dalšího dotázání.",
+    "revoke": "Odebrat {{host}}",
+    "backToPreferences": "Zpět na předvolby"
   }
 }

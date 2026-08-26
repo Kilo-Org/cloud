@@ -14,7 +14,7 @@ export type ModelPickerSelectionScope = {
   catalogGenerationIdentity: object | null;
 };
 
-type ModelPickerBridge = {
+export type ModelPickerBridge = {
   options: SessionModelOption[];
   currentValue: string;
   currentVariant: string;
@@ -35,19 +35,40 @@ export function areModelPickerSelectionScopesEqual(
   );
 }
 
-type ModePickerBridge = {
+export type ModePickerBridge = {
   currentValue: AgentMode;
   onSelect: (mode: AgentMode) => void;
   customOptions?: ModeOption[];
 };
 
+export type RepoPlatform = 'github' | 'gitlab' | 'bitbucket';
+
+/** i18n key for each repository provider's display name (rows, closed selector, and group headers). */
+export const REPO_PLATFORM_LABEL_KEYS = {
+  github: 'agentChat.repoPicker.platformGithub',
+  gitlab: 'agentChat.repoPicker.platformGitlab',
+  bitbucket: 'agentChat.repoPicker.platformBitbucket',
+} satisfies Record<RepoPlatform, string>;
+
 export type RepoOption = {
+  platform: RepoPlatform;
   fullName: string;
   isPrivate: boolean;
+  workspaceUuid?: string;
+  repositoryUuid?: string;
 };
 
-type RepoPickerBridge = {
+export type RepoPickerSection = {
+  key: 'recents' | RepoPlatform;
+  /** i18n key the picker resolves for the section header. */
+  titleKey: string;
+  repos: RepoOption[];
+};
+
+export type RepoPickerBridge = {
   repositories: RepoOption[];
+  /** Grouped sections (recents, then providers) shown when the search box is empty. */
+  sections: RepoPickerSection[];
   currentValue: string;
   onSelect: (repo: string) => void;
 };
@@ -66,16 +87,18 @@ export type InstancePickerInstance = {
   capabilities?: { attachments?: boolean };
 };
 
-type InstancePickerBridge = {
+export type InstancePickerBridge = {
   instances: InstancePickerInstance[];
   currentValue: InstancePickerInstance | null;
   onSelect: (instance: InstancePickerInstance | null) => void;
 };
 
-let modelBridge: ModelPickerBridge | null = null;
-let modeBridge: ModePickerBridge | null = null;
-let repoBridge: RepoPickerBridge | null = null;
-let instanceBridge: InstancePickerBridge | null = null;
+type LanguagePickerBridge = {
+  beforeReload?: () => Promise<void>;
+  onApplied?: () => void;
+};
+
+let languageBridge: LanguagePickerBridge | null = null;
 
 export function resolveModelPickerSelection(
   bridge: ModelPickerBridge,
@@ -111,42 +134,14 @@ export function commitModelPickerSelection(
   return true;
 }
 
-export function setModelPickerBridge(bridge: ModelPickerBridge) {
-  modelBridge = bridge;
-}
-export function getModelPickerBridge() {
-  return modelBridge;
-}
-export function clearModelPickerBridge() {
-  modelBridge = null;
+export function setLanguagePickerBridge(bridge: LanguagePickerBridge) {
+  languageBridge = bridge;
 }
 
-export function setModePickerBridge(bridge: ModePickerBridge) {
-  modeBridge = bridge;
-}
-export function getModePickerBridge() {
-  return modeBridge;
-}
-export function clearModePickerBridge() {
-  modeBridge = null;
+export function getLanguagePickerBridge() {
+  return languageBridge;
 }
 
-export function setRepoPickerBridge(bridge: RepoPickerBridge) {
-  repoBridge = bridge;
-}
-export function getRepoPickerBridge() {
-  return repoBridge;
-}
-export function clearRepoPickerBridge() {
-  repoBridge = null;
-}
-
-export function setInstancePickerBridge(bridge: InstancePickerBridge) {
-  instanceBridge = bridge;
-}
-export function getInstancePickerBridge() {
-  return instanceBridge;
-}
-export function clearInstancePickerBridge() {
-  instanceBridge = null;
+export function clearLanguagePickerBridge() {
+  languageBridge = null;
 }

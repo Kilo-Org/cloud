@@ -12,6 +12,7 @@ import {
 } from './deep-link-launch';
 import { _resetDevSessionInjectForTests, consumePendingDevSession } from './dev-session-inject';
 import { setGitHubInstallReturnOutcome } from './github-install-return';
+import { resolvePendingNavigation } from './pending-navigation';
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -66,6 +67,10 @@ const MAPPED_CASES = [
     path: 'https://app.kilo.ai/code-reviews/rev_9',
     href: '/(app)/(tabs)/(3_profile)/code-reviewer/personal/reviews/rev_9',
   },
+  {
+    path: 'https://app.kilo.ai/organizations/org_1/code-reviews/rev_9',
+    href: '/(app)/(tabs)/(3_profile)/code-reviewer/org_1/reviews/rev_9',
+  },
 ] as const;
 
 describe('redirectSystemPath', () => {
@@ -114,6 +119,11 @@ describe('redirectSystemPath', () => {
       expect(result).toBeNull();
       expect(!result).toBe(true);
       expect(getPendingDeepLink()).toBe(href);
+      expect(resolvePendingNavigation(href)).toEqual({
+        href,
+        method: 'navigate',
+        withAnchor: true,
+      });
       expect(mocks.navigate).not.toHaveBeenCalled();
     });
   });

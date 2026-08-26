@@ -371,7 +371,7 @@ export async function addUserToOrganization(
   return added;
 }
 
-async function lockOrganizationMembershipMutation(
+export async function lockOrganizationMembershipMutation(
   tx: DrizzleTransaction,
   organizationId: Organization['id'],
   userId: User['id']

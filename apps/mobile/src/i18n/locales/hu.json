@@ -151,8 +151,8 @@
     "appearanceLight": "Világos",
     "appearanceDark": "Sötét",
     "account": "Fiók",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Alkalmazás-hozzárendelés hozzáadása a PR-ellenőrzésekhez",
+    "prReviewAttributionSubtitle": "A 'Reviewed via Kilo' lábléc hozzáfűzése, amikor ellenőrzést küld el."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nem érhető el",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab-fiók",
       "connectGitLab": "GitLab csatlakoztatása",
       "gitlabError": "Nem sikerült megnyitni a GitLab beállítását. Kérjük, próbáld újra.",
-      "description": "Csatlakoztasd a Kilo {{label}}t a pull requestek automatikus áttekintéséhez."
+      "description": "Csatlakoztasd a Kilo {{label}}t a pull requestek automatikus áttekintéséhez.",
+      "bitbucketError": "Nem sikerült megnyitni a Bitbucket beállítását. Kérjük, próbáld újra."
     },
     "overview": {
       "reviewStyle": "Áttekintési stílus",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Új munkamenet",
       "repository": "Adattár",
-      "couldNotLoadRepositories": "Az adattárak betöltése nem sikerült",
       "connectGithub": "GitHub csatlakoztatása",
       "connectGithubDescription": "Csatlakoztassa a GitHubot a böngészőjében, majd térjen vissza ide egy adattár kiválasztásához.",
       "openGithub": "GitHub megnyitása",
       "refreshRepositories": "Adattárak frissítése",
-      "githubConnectionNotVisible": "Még nem látjuk a GitHub-kapcsolatát",
-      "githubConnectionNotVisibleDescription": "Ha telepítette vagy beállította a Kilo GitHub Appot, ellenőrizze újra — vagy győződjön meg róla, hogy ehhez a fiókhoz/szervezethez lett telepítve.",
-      "checkAgain": "Újra ellenőrzés",
       "githubConnected": "GitHub csatlakoztatva",
       "noRepositoriesVisible": "Nincs látható adattár. Ellenőrizze a Kilo GitHub App adattár-hozzáférését, majd frissítsen.",
       "runOnWithTarget": "Futtatás a következőn: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Szerkesztés folytatása",
       "discard": "Elvetés",
       "discardFailed": "A piszkozat elvetése nem sikerült. Próbálja újra.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "A helyi kilo folyamat vezérléséhez futtassa a(z) `kilo remote` parancsot a számítógépén, vagy a(z) `/remote` parancsot egy futó CLI-munkamenetben.",
+      "bitbucketConnected": "Bitbucket csatlakoztatva",
+      "connectBitbucket": "Bitbucket csatlakoztatása",
+      "connectBitbucketDescription": "Csatlakoztasd a Bitbucketet a böngésződben, majd térj vissza ide a tároló kiválasztásához.",
+      "connectGitlab": "GitLab csatlakoztatása",
+      "connectGitlabDescription": "Csatlakoztasd a GitLabot a böngésződben, majd térj vissza ide a tároló kiválasztásához.",
+      "couldNotLoadBitbucketRepositories": "Nem sikerült betölteni a Bitbucket-tárolókat",
+      "couldNotLoadGithubRepositories": "Nem sikerült betölteni a GitHub-tárolókat",
+      "couldNotLoadGitlabRepositories": "Nem sikerült betölteni a GitLab-tárolókat",
+      "gitlabConnected": "GitLab csatlakoztatva",
+      "noRepositoriesVisibleBitbucket": "Nincs látható tároló. Ellenőrizd a Bitbucket-tárolókhoz való hozzáférést, majd frissíts.",
+      "noRepositoriesVisibleGitlab": "Nincs látható tároló. Ellenőrizd a GitLab-tárolókhoz való hozzáférést, majd frissíts.",
+      "openBitbucket": "Bitbucket megnyitása",
+      "openGitlab": "GitLab megnyitása",
+      "recentlyUsed": "Legutóbb használt"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fájl frissítve",
@@ -2280,7 +2291,10 @@
       "noRepositoriesDescription": "Nem kapcsolódik adattár a fiókjához.",
       "tryDifferentSearch": "Próbáljon másik keresőszót.",
       "loading": "Betöltés...",
-      "accessibility": "Adattár: {{label}}"
+      "accessibility": "Adattár: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Üzenet részletei",
@@ -2624,6 +2638,18 @@
       "updating": "Frissítés, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Betöltés",
+      "loadWithHost": "Betöltés {{host}}",
+      "httpsOnly": "Csak HTTPS-képek"
+    },
+    "markdownLink": {
+      "invalidLink": "Ezt a linket nem lehet megnyitni.",
+      "hostConfirmTitle": "Megnyitja a külső linket?",
+      "hostConfirmMessage": "Ez a link a(z) {{host}} oldalt nyitja meg a böngészőjében.",
+      "open": "Megnyitás",
+      "trustThisHost": "Megbízás ebben a hostban"
     }
   },
   "bootstrap": {
@@ -2946,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Számviteli kiigazítás",
         "credits_expired": "Lejárt kreditek"
-      }
+      },
+      "loadMore": "További betöltése",
+      "loadMoreFailed": "Nem sikerült betölteni továbbiakat",
+      "truncated": "Korábbi hitelaktivitás érhető el."
     },
     "inviteMember": {
       "emailError": "Adj meg érvényes e-mail címet",
@@ -2973,7 +3002,10 @@
         "draft": "Piszkozat",
         "uncollectible": "Behajthatatlan",
         "unknown": "Ismeretlen"
-      }
+      },
+      "loadMore": "További betöltése",
+      "loadMoreFailed": "Nem sikerült betölteni továbbiakat",
+      "truncated": "Korábbi számlák érhetők el."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3109,5 +3141,13 @@
       "xhigh": "Extra magas",
       "max": "Maximum"
     }
+  },
+  "trustedHosts": {
+    "title": "Megbízható hostok",
+    "subtitle": "Hostok, amelyeket kérdezés nélkül nyithat meg",
+    "emptyTitle": "Nincs megbízható host",
+    "emptyDescription": "Ha megbízik egy link hostjában, az a továbbiakban kérdezés nélkül megnyílik.",
+    "revoke": "Visszavonás ({{host}})",
+    "backToPreferences": "Vissza a beállításokhoz"
   }
 }

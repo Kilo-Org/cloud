@@ -151,8 +151,8 @@
     "appearanceLight": "Vaalea",
     "appearanceDark": "Tumma",
     "account": "Tili",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Lisää sovelluksen määrittäminen PR-arvosteluihin",
+    "prReviewAttributionSubtitle": "Liitä Reviewed via Kilo -alaviite, kun lähetät arvostelun."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole käytettävissä",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab-tili",
       "connectGitLab": "Yhdistä GitLab",
       "gitlabError": "GitLab-asennusta ei voitu avata. Yritä uudelleen.",
-      "description": "Yhdistä Kilo {{label}} arvioidaksesi vetopyynnöt automaattisesti."
+      "description": "Yhdistä Kilo {{label}} arvioidaksesi vetopyynnöt automaattisesti.",
+      "bitbucketError": "Bitbucket-asetusten avaaminen ei onnistunut. Yritä uudelleen."
     },
     "overview": {
       "reviewStyle": "Arviointityyli",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Uusi istunto",
       "repository": "Arkisto",
-      "couldNotLoadRepositories": "Arkistoja ei voitu ladata",
       "connectGithub": "Yhdistä GitHub",
       "connectGithubDescription": "Yhdistä GitHub selaimessa ja palaa sitten tänne valitaksesi arkiston.",
       "openGithub": "Avaa GitHub",
       "refreshRepositories": "Päivitä arkistot",
-      "githubConnectionNotVisible": "Emme näe GitHub-yhteyttäsi vielä",
-      "githubConnectionNotVisibleDescription": "Jos asensit tai määritit Kilo GitHub Appin, tarkista uudelleen — tai varmista, että se asennettiin tälle tilille/organisaatiolle.",
-      "checkAgain": "Tarkista uudelleen",
       "githubConnected": "GitHub yhdistetty",
       "noRepositoriesVisible": "Ei näkyviä arkistoja. Tarkista Kilo GitHub Appin arkistopääsy ja päivitä sitten.",
       "runOnWithTarget": "Aja kohteessa: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Jatka muokkausta",
       "discard": "Hylkää",
       "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Suorita `kilo remote` tietokoneellasi tai `/remote` käynnissä olevassa CLI-istunnossa hallitaksesi paikallista kilo-prosessia.",
+      "bitbucketConnected": "Bitbucket yhdistetty",
+      "connectBitbucket": "Yhdistä Bitbucket",
+      "connectBitbucketDescription": "Yhdistä Bitbucket selaimessa ja palaa sitten tähän valitsemaan repositorion.",
+      "connectGitlab": "Yhdistä GitLab",
+      "connectGitlabDescription": "Yhdistä GitLab selaimessa ja palaa sitten tähän valitsemaan repositorion.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket-repositorioiden lataus epäonnistui",
+      "couldNotLoadGithubRepositories": "GitHub-repositorioiden lataus epäonnistui",
+      "couldNotLoadGitlabRepositories": "GitLab-repositorioiden lataus epäonnistui",
+      "gitlabConnected": "GitLab yhdistetty",
+      "noRepositoriesVisibleBitbucket": "Repositorioita ei näy. Tarkista repositorion käyttöoikeus Bitbucketiin ja päivitä sitten.",
+      "noRepositoriesVisibleGitlab": "Repositorioita ei näy. Tarkista repositorion käyttöoikeus GitLabiin ja päivitä sitten.",
+      "openBitbucket": "Avaa Bitbucket",
+      "openGitlab": "Avaa GitLab",
+      "recentlyUsed": "Äskettäin käytetyt"
     },
     "partRenderer": {
       "updatedFileCount_one": "Päivitetty {{displayCount}} tiedosto",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Tilillesi ei ole yhdistetty arkistoja.",
       "tryDifferentSearch": "Kokeile toista hakusanaa.",
       "loading": "Ladataan...",
-      "accessibility": "Arkisto: {{label}}"
+      "accessibility": "Arkisto: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Viestin tiedot",
@@ -2624,6 +2638,18 @@
       "updating": "Päivitetään, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Lataa",
+      "loadWithHost": "Lataa {{host}}",
+      "httpsOnly": "Vain HTTPS-kuvat"
+    },
+    "markdownLink": {
+      "invalidLink": "Tätä linkkiä ei voi avata.",
+      "hostConfirmTitle": "Avataanko ulkoinen linkki?",
+      "hostConfirmMessage": "Tämä linkki avaa {{host}} selaimessasi.",
+      "open": "Avaa",
+      "trustThisHost": "Luota tähän isäntään"
     }
   },
   "bootstrap": {
@@ -2946,7 +2972,10 @@
         "team-topup-bonus-2025": "Tiimin topup-bonus 2025",
         "accounting_adjustment": "Kirjanpidon oikaisu",
         "credits_expired": "Krediitit vanhentuivat"
-      }
+      },
+      "loadMore": "Lataa lisää",
+      "loadMoreFailed": "Lisää ei voitu ladata",
+      "truncated": "Vanhempaa luottotapahtumahistoriaa on saatavilla."
     },
     "inviteMember": {
       "emailError": "Syötä kelvollinen sähköpostiosoite",
@@ -2973,7 +3002,10 @@
         "draft": "Luonnos",
         "uncollectible": "Perimiskelvoton",
         "unknown": "Tuntematon"
-      }
+      },
+      "loadMore": "Lataa lisää",
+      "loadMoreFailed": "Lisää ei voitu ladata",
+      "truncated": "Vanhempia laskuja on saatavilla."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3109,5 +3141,13 @@
       "xhigh": "Erittäin korkea",
       "max": "Maksimi"
     }
+  },
+  "trustedHosts": {
+    "title": "Luotetut isännät",
+    "subtitle": "Isännät, jotka voit avata kysymättä",
+    "emptyTitle": "Ei luotettuja isäntiä",
+    "emptyDescription": "Kun luotat linkin isäntään, se avataan kysymättä uudelleen.",
+    "revoke": "Peruuta {{host}}",
+    "backToPreferences": "Takaisin asetuksiin"
   }
 }

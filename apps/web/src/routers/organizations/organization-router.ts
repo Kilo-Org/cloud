@@ -31,7 +31,7 @@ import {
 } from '@/lib/organizations/organizations';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
-import { getStripeInvoices } from '@/lib/stripe';
+import { getStripeInvoices, getStripeInvoicesPage } from '@/lib/stripe';
 import { adminProcedure, baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
@@ -48,7 +48,10 @@ import { organizationsUsageDetailsRouter } from '@/routers/organizations/organiz
 import { TRPCError } from '@trpc/server';
 import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
-import { getCreditTransactionsForOrganization } from '@/lib/creditTransactions';
+import {
+  getCreditTransactionsForOrganization,
+  getCreditTransactionsForOrganizationPage,
+} from '@/lib/creditTransactions';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
 import { processOrganizationExpirations } from '@/lib/creditExpiration';
 import { credit_transactions } from '@kilocode/db/schema';
@@ -81,6 +84,7 @@ import { organizationAlertsRouter } from '@/routers/organizations/organization-a
 import { organizationGroupsRouter } from '@/routers/organizations/organization-groups-router';
 import { organizationSubOrganizationsRouter } from '@/routers/organizations/organization-sub-organizations-router';
 import { organizationSalesDemoRouter } from '@/routers/organizations/organization-sales-demo-router';
+import { organizationVerifiedDomainsRouter } from '@/routers/organizations/organization-verified-domains-router';
 import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
 import { disableOrganizationAlertsForDowngrade } from '@/lib/organizations/alerts/alert-lifecycle';
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
@@ -104,6 +108,14 @@ const OrganizationOnboardingSummarySchema = z.object({
 
 const OrganizationInvoicesInputSchema = OrganizationIdInputSchema.extend({
   period: TimePeriodSchema.optional().default('month'),
+});
+
+const OrganizationTransactionsPageInputSchema = OrganizationIdInputSchema.extend({
+  cursor: z.string().optional(),
+});
+
+const OrganizationInvoicesPageInputSchema = OrganizationInvoicesInputSchema.extend({
+  cursor: z.string().optional(),
 });
 
 function daysAgo(days: number): Date {
@@ -154,6 +166,7 @@ export const organizationsRouter = createTRPCRouter({
   alerts: organizationAlertsRouter,
   subOrganizations: organizationSubOrganizationsRouter,
   salesDemo: organizationSalesDemoRouter,
+  verifiedDomains: organizationVerifiedDomainsRouter,
 
   list: baseProcedure.query(async opts => {
     const { user } = opts.ctx;
@@ -587,6 +600,15 @@ export const organizationsRouter = createTRPCRouter({
     return await getCreditTransactionsForOrganization(opts.input.organizationId);
   }),
 
+  creditTransactionsPage: organizationMemberProcedure
+    .input(OrganizationTransactionsPageInputSchema)
+    .query(async opts => {
+      return await getCreditTransactionsForOrganizationPage(
+        opts.input.organizationId,
+        opts.input.cursor
+      );
+    }),
+
   getCreditBlocks: organizationMemberProcedure.query(async opts => {
     const now = new Date();
     const organizationId = opts.input.organizationId;
@@ -651,5 +673,26 @@ export const organizationsRouter = createTRPCRouter({
 
       const invoices = await getStripeInvoices(stripeId, dateThreshold);
       return invoices;
+    }),
+
+  invoicesPage: organizationBillingProcedure
+    .input(OrganizationInvoicesPageInputSchema)
+    .query(async opts => {
+      const organization = await getOrganizationById(opts.input.organizationId);
+      if (!organization) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
+
+      const dateThreshold = getDateThreshold(opts.input.period);
+
+      let stripeId = organization.stripe_customer_id;
+      if (!stripeId) {
+        stripeId = await getOrCreateStripeCustomerIdForOrganization(opts.input.organizationId);
+      }
+
+      return await getStripeInvoicesPage(stripeId, dateThreshold, opts.input.cursor);
     }),
 });

@@ -151,8 +151,8 @@
     "appearanceLight": "Light",
     "appearanceDark": "Dark",
     "account": "အကောင့်",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR သုံးသပ်ချက်များတွင် app ရင်းမြစ် သတ်မှတ်ခြင်း ထည့်ပါ",
+    "prReviewAttributionSubtitle": "သင်သုံးသပ်ချက် တင်သွင်းသည့်အခါ Reviewed via Kilo footer ကို ထည့်ပါ။"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request မရနိုင်ပါ",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab အကောင့်",
       "connectGitLab": "GitLab ချိတ်ဆက်ရန်",
       "gitlabError": "GitLab ပြင်ဆင်မှု ဖွင့်၍ မရပါ။ ထပ်ကြိုးစားပါ။",
-      "description": "pull requests များကို အလိုအလျောက် စစ်ဆေးရန် Kilo {{label}} ကို ချိတ်ဆက်ပါ။"
+      "description": "pull requests များကို အလိုအလျောက် စစ်ဆေးရန် Kilo {{label}} ကို ချိတ်ဆက်ပါ။",
+      "bitbucketError": "Bitbucket သတ်မှတ်မှုကို မဖွင့်နိုင်ပါ။ ထပ်ကြိုးစားပါ။"
     },
     "overview": {
       "reviewStyle": "စစ်ဆေးမှု ပုံစံ",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "စက်ရှင်အသစ်",
       "repository": "သိုလှောင်မှု",
-      "couldNotLoadRepositories": "သိုလှောင်မှုများကို မဖွင့်နိုင်ခဲ့ပါ",
       "connectGithub": "GitHub ချိတ်ဆက်ပါ",
       "connectGithubDescription": "သင့်ဘရောက်ဆာတွင် GitHub ကို ချိတ်ဆက်ပြီး သိုလှောင်မှုတစ်ခု ရွေးချယ်ရန် ဤနေရာသို့ ပြန်လာပါ။",
       "openGithub": "GitHub ဖွင့်ပါ",
       "refreshRepositories": "သိုလှောင်မှုများ ပြန်လည်စတင်ပါ",
-      "githubConnectionNotVisible": "သင့် GitHub ချိတ်ဆက်မှုကို ကျွန်ုပ်တို့ မမြင်ရသေးပါ",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub App ကို သင်ထည့်သွင်းခဲ့သည် သို့မဟုတ် ပြင်ဆင်ခဲ့လျှင် ထပ်မံစစ်ဆေးပါ — သို့မဟုတ် ၎င်းကို ဤအကောင့်/အဖွဲ့အစည်းအတွက် ထည့်သွင်းထားကြောင်း သေချာပါစေ။",
-      "checkAgain": "ထပ်မံစစ်ဆေးပါ",
       "githubConnected": "GitHub ချိတ်ဆက်ပြီး",
       "noRepositoriesVisible": "မြင်နိုင်သော သိုလှောင်မှုများ မရှိပါ။ Kilo GitHub App အတွက် သိုလှောင်မှုဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး ပြန်လည်စတင်ပါ။",
       "runOnWithTarget": "လုပ်ဆောင်မည့်နေရာ- {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "ဆက်တည်းဖြတ်ပါ",
       "discard": "ပယ်ဖျက်ပါ",
       "discardFailed": "မူကြမ်းကို ပယ်ဖျက်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "သင့်ကွန်ပျူတာတွင် `kilo remote` ကို လုပ်ဆောင်ပါ၊ သို့မဟုတ် လည်ပတ်နေသော CLI session တွင် `/remote` ကို လုပ်ဆောင်ပါ။ ဤသည်မှာ local kilo process တစ်ခုကို ထိန်းချုပ်ရန် ဖြစ်သည်။",
+      "bitbucketConnected": "Bitbucket ချိတ်ဆက်ပြီး",
+      "connectBitbucket": "Bitbucket ချိတ်ဆက်ရန်",
+      "connectBitbucketDescription": "သင့်ဘရောက်ဆာတွင် Bitbucket ကို ချိတ်ဆက်ပြီး၊ repository တစ်ခုရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
+      "connectGitlab": "GitLab ချိတ်ဆက်ရန်",
+      "connectGitlabDescription": "သင့်ဘရောက်ဆာတွင် GitLab ကို ချိတ်ဆက်ပြီး၊ repository တစ်ခုရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
+      "couldNotLoadBitbucketRepositories": "Bitbucket repository များကို မဖွင့်နိုင်ပါ",
+      "couldNotLoadGithubRepositories": "GitHub repository များကို မဖွင့်နိုင်ပါ",
+      "couldNotLoadGitlabRepositories": "GitLab repository များကို မဖွင့်နိုင်ပါ",
+      "gitlabConnected": "GitLab ချိတ်ဆက်ပြီးပါပြီ",
+      "noRepositoriesVisibleBitbucket": "repository များ မမြင်ရပါ။ Bitbucket အတွက် repository ဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး၊ ပြန်လည်စတင်ပါ။",
+      "noRepositoriesVisibleGitlab": "repository များ မမြင်ရပါ။ GitLab အတွက် repository ဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး၊ ပြန်လည်စတင်ပါ။",
+      "openBitbucket": "Bitbucket ဖွင့်ပါ",
+      "openGitlab": "GitLab ဖွင့်ပါ",
+      "recentlyUsed": "မကြာသေးမီအသုံးပြုထားသော"
     },
     "partRenderer": {
       "updatedFileCount_one": "ဖိုင် {{displayCount}} ခု မွမ်းမံပြီး",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "သင့်အကောင့်သို့ ချိတ်ဆက်ထားသော သိုလှောင်မှု မရှိပါ။",
       "tryDifferentSearch": "အခြားရှာဖွေမှုအသုံးအနှုန်းတစ်ခု ကြိုးစားပါ။",
       "loading": "ဖွင့်နေသည်...",
-      "accessibility": "သိုလှောင်မှု- {{label}}"
+      "accessibility": "သိုလှောင်မှု- {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "မက်ဆေ့ခ်ျအသေးစိတ်",
@@ -2624,6 +2638,18 @@
       "updating": "ပြုပြင်နေသည်၊ {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "တင်မည်",
+      "loadWithHost": "တင်မည် {{host}}",
+      "httpsOnly": "HTTPS ရုပ်ပုံများသာ"
+    },
+    "markdownLink": {
+      "invalidLink": "ဤလင့်ကို မဖွင့်နိုင်ပါ။",
+      "hostConfirmTitle": "ပြင်ပလင့်ကို ဖွင့်မလား။",
+      "hostConfirmMessage": "ဤလင့်သည် သင့်ဘရောက်ဆာတွင် {{host}} ကို ဖွင့်ပါသည်။",
+      "open": "ဖွင့်မည်",
+      "trustThisHost": "ဤ host ကို ယုံကြည်မည်"
     }
   },
   "bootstrap": {
@@ -2946,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "စာရင်းကိုင် ပြုပြင်မှု",
         "credits_expired": "သက်တမ်းကုန် ခရက်ဒစ်များ"
-      }
+      },
+      "loadMore": "နောက်ထပ်တင်ပါ",
+      "loadMoreFailed": "နောက်ထပ်တင်မရပါ",
+      "truncated": "ပိုဟောင်းသော ခရက်ဒစ်လုပ်ဆောင်ချက်များ ရနိုင်ပါသည်။"
     },
     "inviteMember": {
       "emailError": "မှန်ကန်သော အီးမေးလ် လိပ်စာ ထည့်ပါ",
@@ -2973,7 +3002,10 @@
         "draft": "အမူကြမ်း",
         "uncollectible": "ကောက်ခံ၍မရသော",
         "unknown": "အမည်မသိ"
-      }
+      },
+      "loadMore": "နောက်ထပ်တင်ပါ",
+      "loadMoreFailed": "နောက်ထပ်တင်မရပါ",
+      "truncated": "ပိုဟောင်းသော ငွေတောင်းခံလွှာများ ရနိုင်ပါသည်။"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3109,5 +3141,13 @@
       "xhigh": "အလွန်မြင့်",
       "max": "အမြင့်ဆုံး"
     }
+  },
+  "trustedHosts": {
+    "title": "ယုံကြည်ထားသော host များ",
+    "subtitle": "မေးစရာမလိုဘဲ ဖွင့်ရန် သင်ယုံကြည်သော host များ",
+    "emptyTitle": "ယုံကြည်ထားသော host မရှိပါ",
+    "emptyDescription": "လင့်တစ်ခု၏ host ကို သင်ယုံကြည်သောအခါ ၎င်းကို ထပ်မံမေးစရာမလိုဘဲ ဖွင့်ပါသည်။",
+    "revoke": "{{host}} ကို ပယ်ဖျက်မည်",
+    "backToPreferences": "နှစ်သက်မှုများသို့ ပြန်သွားမည်"
   }
 }

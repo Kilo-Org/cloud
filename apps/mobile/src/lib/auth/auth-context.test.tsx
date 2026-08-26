@@ -157,6 +157,36 @@ vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({ clearKeepScreenOnP
 
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference }));
 
+// These imported session-clear modules pull in native bindings that crash the
+// node test environment: use-trusted-hosts -> secure-store-preference ->
+// sonner-native -> react-native (Flow `import typeof`), and the cache/file
+// modules -> expo-file-system / expo-clipboard / expo-crypto. Mock them the
+// same way use-persisted-agent-model is, since this suite only asserts the
+// teardown ordering of the modules it lists as tracked mocks.
+vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
+  clearTrustedHosts: vi.fn(),
+}));
+
+vi.mock('@/components/agents/markdown-image-confirm', () => ({
+  clearMarkdownImageConfirmMemory: vi.fn(),
+}));
+
+vi.mock('@/components/agents/tool-card-image-cache', () => ({
+  clearToolCardImageCache: vi.fn(),
+}));
+
+vi.mock('@/components/agents/file-part-cache', () => ({
+  clearFilePartCache: vi.fn(),
+}));
+
+vi.mock('@/lib/agent-attachments/clipboard-image', () => ({
+  clearClipboardImages: vi.fn(),
+}));
+
+vi.mock('@/lib/temp-file-registry', () => ({
+  reapTempFiles: vi.fn(),
+}));
+
 vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({ clearPrReviewFooterPreference }));
 
 vi.mock('@/lib/last-active-instance', () => ({
@@ -385,6 +415,21 @@ describe('sign-out teardown ordering', () => {
     });
 
     expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).toHaveBeenCalledWith('user-1');
+
+    unmount();
+  });
+
+  it('clears the trusted hosts and image confirmations on sign-in', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const trustedHosts = await import('@/lib/hooks/use-trusted-hosts');
+    const imageConfirm = await import('@/components/agents/markdown-image-confirm');
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    expect(trustedHosts.clearTrustedHosts).toHaveBeenCalled();
+    expect(imageConfirm.clearMarkdownImageConfirmMemory).toHaveBeenCalled();
 
     unmount();
   });

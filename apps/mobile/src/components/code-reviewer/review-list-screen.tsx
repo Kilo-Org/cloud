@@ -15,6 +15,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
+import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 // Tone classes stay mobile-local; the label is the translated catalog key
@@ -60,6 +61,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
   const { data, isLoading, isError, isFetching, error, refetch } = useReviewList(scope);
+  useRouteForegroundRefresh([[['codeReviews']]]);
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
   const hasConnectedProvider =

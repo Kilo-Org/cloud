@@ -7,6 +7,7 @@ import {
 } from '@kilocode/container-usage';
 import { z } from 'zod';
 import { logger } from './logger.js';
+import { classifySandboxId, isIsolatedSandboxId, isValidSandboxId } from './sandbox-id.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import type { SandboxId, SandboxInstance } from './types.js';
 import type { BillingContext } from '@kilocode/container-usage';
@@ -75,10 +76,7 @@ const sandboxBillingInputEnvelopeSchema = z
       .string()
       .min(1)
       .max(63)
-      .refine(
-        value => /^(ses|crv|dind|org|usr|bot|ubt)-[0-9a-f]+$/.test(value) || value.includes('__'),
-        'Invalid sandboxId format'
-      )
+      .refine(isValidSandboxId, 'Invalid sandboxId format')
       .transform(value => value as SandboxId),
     subject: billingSubjectSchema,
     actor: billingActorSchema,
@@ -116,10 +114,6 @@ function normalizedOrigin(origin: string | undefined): string {
   return KNOWN_ORIGINS.has(origin) ? origin : 'other';
 }
 
-function isIsolatedSandbox(sandboxId: SandboxId): boolean {
-  return /^(crv|dind|ses)-/.test(sandboxId);
-}
-
 export function buildSandboxBillingInput(
   metadata: SessionMetadata,
   sandboxId: SandboxId,
@@ -131,7 +125,7 @@ export function buildSandboxBillingInput(
   const actor = metadata.identity.botId
     ? { type: 'bot' as const, id: metadata.identity.botId }
     : { type: 'user' as const, id: metadata.identity.userId };
-  const isolated = isIsolatedSandbox(sandboxId);
+  const isolated = isIsolatedSandboxId(sandboxId);
 
   return {
     sandboxId,
@@ -163,15 +157,18 @@ export function assertSandboxBillingAllocation(
   sandboxClassName: SandboxClassName,
   input: SandboxBillingInput
 ): void {
-  const shared = sandboxClassName === 'Sandbox' || sandboxClassName === 'SandboxContainment';
-  if (shared) {
+  const sandboxIdClass = classifySandboxId(input.sandboxId);
+  const standardClass = sandboxClassName === 'Sandbox' || sandboxClassName === 'SandboxContainment';
+  const isolatedPrefixedLegacyId =
+    /^(ses|istd|crv|dind)-/.test(input.sandboxId) && input.sandboxId.includes('__');
+  if (isolatedPrefixedLegacyId) {
+    throw new Error('Shared sandbox billing requires a shared sandbox ID');
+  }
+  const sharedAllocation = sandboxIdClass === 'shared' || sandboxIdClass === 'legacy-shared';
+
+  if (standardClass && sharedAllocation) {
     if (input.sessionId !== undefined) {
       throw new Error('Shared sandbox billing cannot contain session attribution');
-    }
-    const legacySharedId =
-      !/^(ses|crv|dind)-/.test(input.sandboxId) && input.sandboxId.includes('__');
-    if (!/^(org|usr|bot|ubt)-/.test(input.sandboxId) && !legacySharedId) {
-      throw new Error('Shared sandbox billing requires a shared sandbox ID');
     }
     if (input.metadata !== undefined && Object.keys(input.metadata).length > 0) {
       throw new Error('Shared sandbox billing cannot contain metadata');
@@ -179,14 +176,15 @@ export function assertSandboxBillingAllocation(
     return;
   }
 
-  const expectedPrefix =
-    sandboxClassName === 'SandboxDIND'
-      ? 'dind-'
+  const expectedSandboxIdClass = standardClass
+    ? 'isolated-standard'
+    : sandboxClassName === 'SandboxDIND'
+      ? 'devcontainer'
       : sandboxClassName === 'SandboxSmall' || sandboxClassName === 'SandboxSmallContainment'
-        ? 'ses-'
-        : 'crv-';
-  if (!input.sandboxId.startsWith(expectedPrefix)) {
-    throw new Error(`${sandboxClassName} billing requires a ${expectedPrefix} sandbox ID`);
+        ? 'isolated-small'
+        : 'code-review';
+  if (sandboxIdClass !== expectedSandboxIdClass) {
+    throw new Error(`${sandboxClassName} billing received an incompatible sandbox ID`);
   }
   if (!input.sessionId) {
     throw new Error('Isolated sandbox billing requires session attribution');

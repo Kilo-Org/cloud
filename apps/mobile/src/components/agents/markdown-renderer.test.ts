@@ -6,7 +6,7 @@ import { createElement, type ReactElement, type ReactNode } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { openExternalUrl } from '@/lib/external-link';
+import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 
 import { type MarkdownPalette } from './markdown-palette';
 import { type MarkdownRenderer } from './markdown-renderer';
@@ -92,8 +92,8 @@ vi.mock('./markdown-link', () => ({
   getLinkLongPressHandler: () => undefined,
   resolveLinkAccessibilityLabel: () => 'label',
 }));
-vi.mock('@/lib/external-link', () => ({
-  openExternalUrl: vi.fn(),
+vi.mock('./markdown-link-confirm', () => ({
+  confirmAndOpenMarkdownLink: vi.fn(),
 }));
 const palette: MarkdownPalette = {
   textColor: '#111111',
@@ -327,14 +327,23 @@ describe('MarkdownRenderer key stability', () => {
       expect(Array.isArray(result)).toBe(true);
       expect((result as ReactNode[])[1]).toMatchObject({ type: 'MarkdownImage' });
     }
-    // link() wraps image children in a Pressable with link behavior
+    // link() wraps image children in an inert Pressable: the image owns the
+    // default action, so the wrapper is not accessible (it must not group the
+    // image controls into one link) and carries no onPress.
     const linkResult = renderer.link(children, 'https://example.com') as ReactElement<
       Record<string, unknown>
     >;
     expect(linkResult.type).toBe('Pressable');
-    expect(linkResult.props.children).toEqual(children);
-    expect(linkResult.props.accessibilityRole).toBe('link');
-    expect(typeof linkResult.props.onPress).toBe('function');
+    expect(linkResult.props.accessible).toBe(false);
+    expect(linkResult.props.accessibilityRole).toBeUndefined();
+    expect(linkResult.props.onPress).toBeUndefined();
+    // The image child keeps its type and gains the link's showLinkActions
+    // callback; non-image children pass through unchanged.
+    const linkChildren = linkResult.props.children as ReactNode[];
+    expect(linkChildren).toHaveLength(3);
+    const linkedImage = linkChildren[1] as ReactElement<Record<string, unknown>>;
+    expect(linkedImage.type).toBe('MarkdownImage');
+    expect(typeof linkedImage.props.onShowLinkActions).toBe('function');
     // Ancestors must not wrap the Pressable in native Text.
     expect(Array.isArray(renderer.text([linkResult]))).toBe(true);
     expect(Array.isArray(renderer.strong([linkResult]))).toBe(true);
@@ -389,7 +398,7 @@ describe('MarkdownRenderer heading semantics', () => {
 
 describe('MarkdownRenderer link interaction', () => {
   beforeEach(() => {
-    vi.mocked(openExternalUrl).mockClear();
+    vi.mocked(confirmAndOpenMarkdownLink).mockClear();
   });
 
   it('text links keep selection, link role, label, hint, and press handler', async () => {
@@ -416,10 +425,10 @@ describe('MarkdownRenderer link interaction', () => {
 
     element.props.onPress();
 
-    expect(openExternalUrl).not.toHaveBeenCalled();
+    expect(confirmAndOpenMarkdownLink).not.toHaveBeenCalled();
   });
 
-  it('an unhandled text-link press opens the external URL with the resolved label', async () => {
+  it('an unhandled text-link press confirms and opens through the shared helper', async () => {
     const renderer = await createRenderer();
     const element = renderer.link('click here', 'https://example.com') as ReactElement<{
       onPress: () => void;
@@ -427,7 +436,57 @@ describe('MarkdownRenderer link interaction', () => {
 
     element.props.onPress();
 
-    expect(openExternalUrl).toHaveBeenCalledWith('https://example.com', { label: 'label' });
+    expect(confirmAndOpenMarkdownLink).toHaveBeenCalledWith('https://example.com', {
+      label: 'label',
+    });
+  });
+
+  it('a default long-press also confirms through the shared helper', async () => {
+    const renderer = await createRenderer();
+    const element = renderer.link('click here', 'https://example.com') as ReactElement<{
+      onLongPress: () => void;
+    }>;
+
+    element.props.onLongPress();
+
+    expect(confirmAndOpenMarkdownLink).toHaveBeenCalledWith('https://example.com', {
+      label: 'label',
+    });
+  });
+
+  it('a linked image showLinkActions confirms through the shared helper by default', async () => {
+    const renderer = await createRenderer();
+    const children: ReactNode[] = [renderer.html('<img alt="a" src="https://x/a.png">')];
+    const element = renderer.link(children, 'https://example.com') as ReactElement<
+      Record<string, unknown>
+    >;
+    const linkedImage = (element.props.children as ReactNode[])[0] as ReactElement<{
+      onShowLinkActions: () => void;
+    }>;
+
+    linkedImage.props.onShowLinkActions();
+
+    expect(confirmAndOpenMarkdownLink).toHaveBeenCalledWith('https://example.com', {
+      label: 'label',
+    });
+  });
+
+  it('a linked image showLinkActions calls the renderer long-press handler in chat', async () => {
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const onLongPressLink = vi.fn<(href: string) => void>();
+    const renderer = new RendererClass(palette, true, { onLongPressLink });
+    const children: ReactNode[] = [renderer.html('<img alt="a" src="https://x/a.png">')];
+    const element = renderer.link(children, 'https://example.com') as ReactElement<
+      Record<string, unknown>
+    >;
+    const linkedImage = (element.props.children as ReactNode[])[0] as ReactElement<{
+      onShowLinkActions: () => void;
+    }>;
+
+    linkedImage.props.onShowLinkActions();
+
+    expect(onLongPressLink).toHaveBeenCalledWith('https://example.com');
+    expect(confirmAndOpenMarkdownLink).not.toHaveBeenCalled();
   });
 });
 

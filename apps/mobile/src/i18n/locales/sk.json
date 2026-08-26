@@ -151,8 +151,8 @@
     "appearanceLight": "Svetlý",
     "appearanceDark": "Tmavý",
     "account": "Účet",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Pridať atribúciu aplikácie do kontrol PR",
+    "prReviewAttributionSubtitle": "Keď odošlete kontrolu, pridajte pätičku Reviewed via Kilo."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nie je dostupný",
@@ -1404,7 +1404,8 @@
       "gitlabAccount": "GitLab účet",
       "connectGitLab": "Pripojiť GitLab",
       "gitlabError": "Nastavenie GitLab sa nepodarilo otvoriť. Skúste to znova.",
-      "description": "Pripojte Kilo {{label}}, aby ste automaticky preskúmavali pull requesty."
+      "description": "Pripojte Kilo {{label}}, aby ste automaticky preskúmavali pull requesty.",
+      "bitbucketError": "Nepodarilo sa otvoriť nastavenie Bitbucket. Skúste to znova."
     },
     "overview": {
       "reviewStyle": "Štýl preskúmania",
@@ -2183,14 +2184,10 @@
     "newSession": {
       "title": "Nové sedenie",
       "repository": "Repozitár",
-      "couldNotLoadRepositories": "Repozitáre sa nepodarilo načítať",
       "connectGithub": "Pripojiť GitHub",
       "connectGithubDescription": "Pripojte GitHub vo svojom prehliadači a potom sa sem vráťte, aby ste vybrali repozitár.",
       "openGithub": "Otvoriť GitHub",
       "refreshRepositories": "Obnoviť repozitáre",
-      "githubConnectionNotVisible": "Vaše pripojenie na GitHub zatiaľ nevidíme",
-      "githubConnectionNotVisibleDescription": "Ak ste nainštalovali alebo nakonfigurovali aplikáciu Kilo GitHub App, skontrolujte to znova — alebo sa uistite, že bola nainštalovaná pre tento účet/organizáciu.",
-      "checkAgain": "Skontrolovať znova",
       "githubConnected": "GitHub pripojený",
       "noRepositoriesVisible": "Žiadne repozitáre nie sú viditeľné. Skontrolujte prístup k repozitárom pre aplikáciu Kilo GitHub App a potom obnovte.",
       "runOnWithTarget": "Spustiť na: {{target}}",
@@ -2217,7 +2214,21 @@
       "keepEditing": "Pokračovať v úpravách",
       "discard": "Zahodiť",
       "discardFailed": "Koncept sa nepodarilo zahodiť. Skúste to znova.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Spustite `kilo remote` na svojom počítači alebo `/remote` v bežiacej relácii CLI, aby ste ovládali lokálny proces kilo.",
+      "bitbucketConnected": "Bitbucket pripojený",
+      "connectBitbucket": "Pripojiť Bitbucket",
+      "connectBitbucketDescription": "Pripojte Bitbucket v prehliadači a potom sa sem vráťte a vyberte repozitár.",
+      "connectGitlab": "Pripojiť GitLab",
+      "connectGitlabDescription": "Pripojte GitLab v prehliadači a potom sa sem vráťte a vyberte repozitár.",
+      "couldNotLoadBitbucketRepositories": "Nepodarilo sa načítať repozitáre Bitbucket",
+      "couldNotLoadGithubRepositories": "Nepodarilo sa načítať repozitáre GitHub",
+      "couldNotLoadGitlabRepositories": "Nepodarilo sa načítať repozitáre GitLab",
+      "gitlabConnected": "GitLab je pripojený",
+      "noRepositoriesVisibleBitbucket": "Nie sú viditeľné žiadne repozitáre. Skontrolujte prístup k repozitárom pre Bitbucket a potom obnovte.",
+      "noRepositoriesVisibleGitlab": "Nie sú viditeľné žiadne repozitáre. Skontrolujte prístup k repozitárom pre GitLab a potom obnovte.",
+      "openBitbucket": "Otvoriť Bitbucket",
+      "openGitlab": "Otvoriť GitLab",
+      "recentlyUsed": "Naposledy použité"
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizovaný {{displayCount}} súbor",
@@ -2308,7 +2319,10 @@
       "noRepositoriesDescription": "K vášmu účtu nie sú pripojené žiadne repozitáre.",
       "tryDifferentSearch": "Skúste iný vyhľadávací výraz.",
       "loading": "Načítava sa...",
-      "accessibility": "Repozitár: {{label}}"
+      "accessibility": "Repozitár: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Podrobnosti správy",
@@ -2664,6 +2678,18 @@
       "updating": "Aktualizuje sa, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Načítať",
+      "loadWithHost": "Načítať {{host}}",
+      "httpsOnly": "Iba HTTPS obrázky"
+    },
+    "markdownLink": {
+      "invalidLink": "Tento odkaz sa nedá otvoriť.",
+      "hostConfirmTitle": "Otvoriť externý odkaz?",
+      "hostConfirmMessage": "Tento odkaz otvorí {{host}} vo vašom prehliadači.",
+      "open": "Otvoriť",
+      "trustThisHost": "Dôverovať tomuto hostiteľovi"
     }
   },
   "bootstrap": {
@@ -2986,7 +3012,10 @@
         "team-topup-bonus-2025": "Tímový bonus za doplnenie kreditov 2025",
         "accounting_adjustment": "Účtovná úprava",
         "credits_expired": "Kredity vypršali"
-      }
+      },
+      "loadMore": "Načítať viac",
+      "loadMoreFailed": "Ďalšie sa nepodarilo načítať",
+      "truncated": "Staršia kreditná aktivita je k dispozícii."
     },
     "inviteMember": {
       "emailError": "Zadajte platnú e-mailovú adresu",
@@ -3013,7 +3042,10 @@
         "draft": "Koncept",
         "uncollectible": "Nevymožiteľná",
         "unknown": "Neznáme"
-      }
+      },
+      "loadMore": "Načítať viac",
+      "loadMoreFailed": "Ďalšie sa nepodarilo načítať",
+      "truncated": "Staršie faktúry sú k dispozícii."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3151,5 +3183,13 @@
       "xhigh": "Veľmi vysoká",
       "max": "Maximálna"
     }
+  },
+  "trustedHosts": {
+    "title": "Dôveryhodné hostitele",
+    "subtitle": "Hostitelia, ktorým dôverujete a ktoré sa otvoria bez opýtania",
+    "emptyTitle": "Žiadne dôveryhodné hostitele",
+    "emptyDescription": "Keď dôverujete hostiteľovi odkazu, otvorí sa bez ďalšieho opýtania.",
+    "revoke": "Odvolať {{host}}",
+    "backToPreferences": "Späť na predvoľby"
   }
 }

@@ -261,6 +261,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
           >
             <Image
               source={{ uri: url }}
+              cachePolicy="memory"
               className="aspect-video w-full"
               contentFit="contain"
               accessible

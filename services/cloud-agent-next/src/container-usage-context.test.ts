@@ -130,6 +130,27 @@ describe('container usage context', () => {
     expect(JSON.stringify(input)).not.toContain('Kilo-Org/cloud');
   });
 
+  it.each(['scheduled', 'webhook'])(
+    'attributes isolated Standard %s usage to the session',
+    origin => {
+      const input = buildSandboxBillingInput(
+        metadata({
+          sessionId: `agent_${origin}`,
+          userId: 'user_standard',
+          orgId: 'org_standard',
+          billingOrigin: origin,
+        }),
+        'istd-abcdef'
+      );
+
+      expect(input).toMatchObject({
+        sandboxId: 'istd-abcdef',
+        sessionId: `agent_${origin}`,
+        metadata: { origin },
+      });
+    }
+  );
+
   it('omits session, origin, and repository metadata for shared containers', () => {
     const first = buildSandboxBillingInput(
       metadata({
@@ -228,6 +249,32 @@ describe('container usage context', () => {
     ).toThrow('Isolated sandbox billing requires session attribution');
   });
 
+  it.each(['Sandbox', 'SandboxContainment'] as const)(
+    'accepts isolated Standard attribution for %s',
+    sandboxClassName => {
+      expect(() =>
+        assertSandboxBillingAllocation(sandboxClassName, {
+          sandboxId: 'istd-abcdef',
+          subject: { type: 'org', id: 'org_standard' },
+          actor: { type: 'user', id: 'user_standard' },
+          sessionId: 'agent_standard',
+          metadata: { origin: 'scheduled' },
+        })
+      ).not.toThrow();
+    }
+  );
+
+  it('requires session attribution for isolated Standard sandboxes', () => {
+    expect(() =>
+      assertSandboxBillingAllocation('Sandbox', {
+        sandboxId: 'istd-abcdef',
+        subject: { type: 'org', id: 'org_standard' },
+        actor: { type: 'user', id: 'user_standard' },
+        metadata: { origin: 'webhook' },
+      })
+    ).toThrow('Isolated sandbox billing requires session attribution');
+  });
+
   it('rejects unsupported isolated origins at the sandbox RPC boundary', () => {
     expect(() =>
       assertSandboxBillingAllocation('SandboxSmall', {
@@ -249,7 +296,19 @@ describe('container usage context', () => {
         sessionId: 'agent_1',
         metadata: { origin: 'cloud-agent' },
       })
-    ).toThrow('SandboxDIND billing requires a dind- sandbox ID');
+    ).toThrow('SandboxDIND billing received an incompatible sandbox ID');
+  });
+
+  it('rejects isolated Standard IDs for Small container classes', () => {
+    expect(() =>
+      assertSandboxBillingAllocation('SandboxSmall', {
+        sandboxId: 'istd-abcdef',
+        subject: { type: 'user', id: 'user_1' },
+        actor: { type: 'user', id: 'user_1' },
+        sessionId: 'agent_1',
+        metadata: { origin: 'cloud-agent' },
+      })
+    ).toThrow('SandboxSmall billing received an incompatible sandbox ID');
   });
 
   it('skips shadow configuration when a sandbox does not expose the metering RPC', async () => {

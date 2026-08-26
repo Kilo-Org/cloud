@@ -241,6 +241,30 @@ describe('session metadata boundary', () => {
     expect(getSandboxProvider(parseSessionMetadata(current))).toBe('cloudflare');
   });
 
+  it('round-trips isolated Standard allocation metadata as Cloudflare', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: {
+        sessionId: 'agent_isolated_standard',
+        userId: 'user_isolated_standard',
+      },
+      auth: {},
+      workspace: {
+        sandboxId: 'istd-abcdef' as const,
+        sandboxAllocation: 'isolated-standard' as const,
+      },
+      lifecycle: {
+        version: 1,
+        timestamp: 1,
+      },
+    };
+
+    const parsed = parseSessionMetadata(current);
+    expect(parsed).toEqual(current);
+    expect(getSandboxProvider(parsed)).toBe('cloudflare');
+    expect(parseSessionMetadata(serializeSessionMetadata(parsed))).toEqual(current);
+  });
+
   it('accepts Vercel metadata only for an isolated non-devcontainer sandbox', () => {
     const current = {
       metadataSchemaVersion: 2 as const,

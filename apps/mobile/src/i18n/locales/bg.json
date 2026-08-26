@@ -151,8 +151,8 @@
     "appearanceLight": "Светъл",
     "appearanceDark": "Тъмен",
     "account": "Акаунт",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Добави приписване на приложението към прегледите на PR",
+    "prReviewAttributionSubtitle": "Добави футър „Reviewed via Kilo“, когато изпратиш преглед."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request-ът е недостъпен",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab акаунт",
       "connectGitLab": "Свържи GitLab",
       "gitlabError": "Неуспешно отваряне на настройката на GitLab. Моля, опитай отново.",
-      "description": "Свържи {{label}} на Kilo, за да преглежда заявките за сливане автоматично."
+      "description": "Свържи {{label}} на Kilo, за да преглежда заявките за сливане автоматично.",
+      "bitbucketError": "Не можахме да отворим настройките на Bitbucket. Моля, опитайте отново."
     },
     "overview": {
       "reviewStyle": "Стил на прегледа",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Нова сесия",
       "repository": "Хранилище",
-      "couldNotLoadRepositories": "Не можаха да се заредят хранилищата",
       "connectGithub": "Свържи GitHub",
       "connectGithubDescription": "Свържи GitHub в браузъра си, след което се върни тук, за да избереш хранилище.",
       "openGithub": "Отвори GitHub",
       "refreshRepositories": "Опресни хранилищата",
-      "githubConnectionNotVisible": "Все още не виждаме твоята GitHub връзка",
-      "githubConnectionNotVisibleDescription": "Ако си инсталирал или конфигурирал Kilo GitHub App, провери отново — или се увери, че е инсталиран за този акаунт/организация.",
-      "checkAgain": "Провери отново",
       "githubConnected": "GitHub е свързан",
       "noRepositoriesVisible": "Няма видими хранилища. Провери достъпа до хранилищата за Kilo GitHub App, след което опресни.",
       "runOnWithTarget": "Изпълни в: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Продължи редактирането",
       "discard": "Отхвърли",
       "discardFailed": "Не можа да се отхвърли черновата. Моля, опитай отново.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Изпълни `kilo remote` на компютъра си или `/remote` в работеща CLI сесия, за да управляваш локален kilo процес.",
+      "bitbucketConnected": "Bitbucket е свързан",
+      "connectBitbucket": "Свържи Bitbucket",
+      "connectBitbucketDescription": "Свържете Bitbucket в браузъра си, след което се върнете тук, за да изберете хранилище.",
+      "connectGitlab": "Свържи GitLab",
+      "connectGitlabDescription": "Свържете GitLab в браузъра си, след което се върнете тук, за да изберете хранилище.",
+      "couldNotLoadBitbucketRepositories": "Не можахме да заредим хранилищата на Bitbucket",
+      "couldNotLoadGithubRepositories": "Не можахме да заредим хранилищата на GitHub",
+      "couldNotLoadGitlabRepositories": "Не можахме да заредим хранилищата на GitLab",
+      "gitlabConnected": "GitLab е свързан",
+      "noRepositoriesVisibleBitbucket": "Няма видими хранилища. Проверете достъпа до хранилищата за Bitbucket, след което опреснете.",
+      "noRepositoriesVisibleGitlab": "Няма видими хранилища. Проверете достъпа до хранилищата за GitLab, след което опреснете.",
+      "openBitbucket": "Отваряне на Bitbucket",
+      "openGitlab": "Отваряне на GitLab",
+      "recentlyUsed": "Наскоро използвани"
     },
     "partRenderer": {
       "updatedFileCount_one": "Актуализиран {{displayCount}} файл",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Няма хранилища, свързани с твоя акаунт.",
       "tryDifferentSearch": "Опитай с различен термин за търсене.",
       "loading": "Зареждане...",
-      "accessibility": "Хранилище: {{label}}"
+      "accessibility": "Хранилище: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Детайли на съобщението",
@@ -2624,6 +2638,18 @@
       "updating": "Актуализиране, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "заявка за сливане"
+    },
+    "markdownImage": {
+      "load": "Зареждане",
+      "loadWithHost": "Зареждане {{host}}",
+      "httpsOnly": "Само HTTPS изображения"
+    },
+    "markdownLink": {
+      "invalidLink": "Тази връзка не може да бъде отворена.",
+      "hostConfirmTitle": "Да се отвори външна връзка?",
+      "hostConfirmMessage": "Тази връзка отваря {{host}} в браузъра ви.",
+      "open": "Отвори",
+      "trustThisHost": "Доверявай се на този хост"
     }
   },
   "bootstrap": {
@@ -2946,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Счетоводна корекция",
         "credits_expired": "Изтекли кредити"
-      }
+      },
+      "loadMore": "Зареди още",
+      "loadMoreFailed": "Неуспешно зареждане на още",
+      "truncated": "Налична е по-стара кредитна активност."
     },
     "inviteMember": {
       "emailError": "Въведете валиден имейл адрес",
@@ -2973,7 +3002,10 @@
         "draft": "Чернова",
         "uncollectible": "Несъбираема",
         "unknown": "Неизвестна"
-      }
+      },
+      "loadMore": "Зареди още",
+      "loadMoreFailed": "Неуспешно зареждане на още",
+      "truncated": "Налични са по-стари фактури."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3109,5 +3141,13 @@
       "xhigh": "Много високо",
       "max": "Максимум"
     }
+  },
+  "trustedHosts": {
+    "title": "Доверени хостове",
+    "subtitle": "Хостове, на които се доверявате да се отварят без запитване",
+    "emptyTitle": "Няма доверени хостове",
+    "emptyDescription": "Когато се доверите на хоста на връзка, тя се отваря без да пита отново.",
+    "revoke": "Отмени {{host}}",
+    "backToPreferences": "Обратно към предпочитанията"
   }
 }

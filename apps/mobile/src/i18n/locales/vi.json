@@ -151,8 +151,8 @@
     "appearanceLight": "Sáng",
     "appearanceDark": "Tối",
     "account": "Tài khoản",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Thêm ghi công ứng dụng vào các đánh giá PR",
+    "prReviewAttributionSubtitle": "Thêm chân trang Reviewed via Kilo khi bạn gửi đánh giá."
   },
   "notifications": {
     "title": "Thông báo",
@@ -860,7 +860,8 @@
       "githubApp": "Ứng dụng GitHub",
       "githubError": "Không thể mở thiết lập GitHub. Vui lòng thử lại.",
       "gitlabAccount": "Tài khoản GitLab",
-      "gitlabError": "Không thể mở thiết lập GitLab. Vui lòng thử lại."
+      "gitlabError": "Không thể mở thiết lập GitLab. Vui lòng thử lại.",
+      "bitbucketError": "Không thể mở thiết lập Bitbucket. Vui lòng thử lại."
     },
     "readOnlyDescription": "Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể thay đổi các cài đặt này.",
     "reviewDetail": {
@@ -1699,14 +1700,10 @@
     "newSession": {
       "title": "Phiên mới",
       "repository": "Kho lưu trữ",
-      "couldNotLoadRepositories": "Không thể tải các kho lưu trữ",
       "connectGithub": "Kết nối GitHub",
       "connectGithubDescription": "Kết nối GitHub trong trình duyệt của bạn, sau đó quay lại đây để chọn kho lưu trữ.",
       "openGithub": "Mở GitHub",
       "refreshRepositories": "Làm mới kho lưu trữ",
-      "githubConnectionNotVisible": "Chúng tôi chưa thấy kết nối GitHub của bạn",
-      "githubConnectionNotVisibleDescription": "Nếu bạn đã cài đặt hoặc cấu hình ứng dụng Kilo GitHub, hãy kiểm tra lại — hoặc đảm bảo nó đã được cài đặt cho tài khoản/tổ chức này.",
-      "checkAgain": "Kiểm tra lại",
       "githubConnected": "Đã kết nối GitHub",
       "noRepositoriesVisible": "Không thấy kho lưu trữ nào. Kiểm tra quyền truy cập kho lưu trữ cho ứng dụng Kilo GitHub, sau đó làm mới.",
       "runOnWithTarget": "Chạy trên: {{target}}",
@@ -1733,7 +1730,21 @@
       "discardDraftTitle": "Hủy bản nháp?",
       "discardFailed": "Không thể hủy bản nháp. Vui lòng thử lại.",
       "keepEditing": "Tiếp tục chỉnh sửa",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Chạy `kilo remote` trên máy tính của bạn, hoặc `/remote` trong một phiên CLI đang chạy, để điều khiển một tiến trình kilo cục bộ.",
+      "bitbucketConnected": "Đã kết nối Bitbucket",
+      "connectBitbucket": "Kết nối Bitbucket",
+      "connectBitbucketDescription": "Kết nối Bitbucket trong trình duyệt của bạn, rồi quay lại đây để chọn một kho lưu trữ.",
+      "connectGitlab": "Kết nối GitLab",
+      "connectGitlabDescription": "Kết nối GitLab trong trình duyệt của bạn, rồi quay lại đây để chọn một kho lưu trữ.",
+      "couldNotLoadBitbucketRepositories": "Không thể tải kho lưu trữ Bitbucket",
+      "couldNotLoadGithubRepositories": "Không thể tải kho lưu trữ GitHub",
+      "couldNotLoadGitlabRepositories": "Không thể tải kho lưu trữ GitLab",
+      "gitlabConnected": "Đã kết nối GitLab",
+      "noRepositoriesVisibleBitbucket": "Không có kho lưu trữ hiển thị. Kiểm tra quyền truy cập kho lưu trữ cho Bitbucket, rồi làm mới.",
+      "noRepositoriesVisibleGitlab": "Không có kho lưu trữ hiển thị. Kiểm tra quyền truy cập kho lưu trữ cho GitLab, rồi làm mới.",
+      "openBitbucket": "Mở Bitbucket",
+      "openGitlab": "Mở GitLab",
+      "recentlyUsed": "Đã dùng gần đây"
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp",
@@ -1822,7 +1833,10 @@
       "noRepositoriesDescription": "Không có kho lưu trữ nào được kết nối với tài khoản của bạn.",
       "tryDifferentSearch": "Hãy thử một cụm từ tìm kiếm khác.",
       "loading": "Đang tải...",
-      "accessibility": "Kho lưu trữ: {{label}}"
+      "accessibility": "Kho lưu trữ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Chi tiết tin nhắn",
@@ -2170,6 +2184,18 @@
       "updating": "Đang cập nhật, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "yêu cầu hợp nhất"
+    },
+    "markdownImage": {
+      "load": "Tải",
+      "loadWithHost": "Tải {{host}}",
+      "httpsOnly": "Chỉ hình ảnh HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Không thể mở liên kết này.",
+      "hostConfirmTitle": "Mở liên kết ngoài?",
+      "hostConfirmMessage": "Liên kết này mở {{host}} trong trình duyệt của bạn.",
+      "open": "Mở",
+      "trustThisHost": "Tin cậy máy chủ này"
     }
   },
   "bootstrap": {
@@ -2938,7 +2964,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Điều chỉnh kế toán",
         "credits_expired": "Tín dụng đã hết hạn"
-      }
+      },
+      "loadMore": "Tải thêm",
+      "loadMoreFailed": "Không thể tải thêm",
+      "truncated": "Hoạt động tín dụng cũ hơn có sẵn."
     },
     "hub": {
       "balance": "Số dư",
@@ -2974,7 +3003,10 @@
         "draft": "Bản nháp",
         "uncollectible": "Không thể thu hồi",
         "unknown": "Không xác định"
-      }
+      },
+      "loadMore": "Tải thêm",
+      "loadMoreFailed": "Không thể tải thêm",
+      "truncated": "Hóa đơn cũ hơn có sẵn."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3109,5 +3141,13 @@
       "xhigh": "Rất cao",
       "max": "Tối đa"
     }
+  },
+  "trustedHosts": {
+    "title": "Máy chủ đáng tin cậy",
+    "subtitle": "Các máy chủ bạn tin cậy để mở mà không cần hỏi",
+    "emptyTitle": "Không có máy chủ đáng tin cậy",
+    "emptyDescription": "Khi bạn tin cậy máy chủ của một liên kết, liên kết đó sẽ mở mà không hỏi lại.",
+    "revoke": "Thu hồi {{host}}",
+    "backToPreferences": "Quay lại cài đặt"
   }
 }

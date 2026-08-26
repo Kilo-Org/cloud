@@ -1,5 +1,5 @@
 {
-  "id": "9e938478-4c29-4a89-84af-ccd513805d15",
+  "id": "81c1c88d-9d4a-4afd-a6b1-74c380f74ff5",
   "prevId": "9a3208d9-94e7-4b7e-aa8b-b638b2e2c859",
   "version": "7",
   "dialect": "postgresql",
@@ -26441,370 +26441,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.organization_alert_deliveries": {
-      "name": "organization_alert_deliveries",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "alert_id": {
-          "name": "alert_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "period_occurrence_id": {
-          "name": "period_occurrence_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "recipient_identity_hmac": {
-          "name": "recipient_identity_hmac",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "channel": {
-          "name": "channel",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "claimed_configuration_version": {
-          "name": "claimed_configuration_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "claim_version": {
-          "name": "claim_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "threshold_microdollars": {
-          "name": "threshold_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "measured_spend_microdollars": {
-          "name": "measured_spend_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "attempt_count": {
-          "name": "attempt_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "next_attempt_at": {
-          "name": "next_attempt_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "lease_expires_at": {
-          "name": "lease_expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "submitting_at": {
-          "name": "submitting_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_message_id": {
-          "name": "provider_message_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_error_code": {
-          "name": "last_error_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "IDX_organization_alert_deliveries_dispatch": {
-          "name": "IDX_organization_alert_deliveries_dispatch",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "next_attempt_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "organization_alert_deliveries_alert_id_organization_alerts_id_fk": {
-          "name": "organization_alert_deliveries_alert_id_organization_alerts_id_fk",
-          "tableFrom": "organization_alert_deliveries",
-          "tableTo": "organization_alerts",
-          "columnsFrom": [
-            "alert_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "UQ_organization_alert_deliveries_identity": {
-          "name": "UQ_organization_alert_deliveries_identity",
-          "nullsNotDistinct": false,
-          "columns": [
-            "alert_id",
-            "period_occurrence_id",
-            "recipient_identity_hmac",
-            "channel"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "organization_alert_deliveries_identity_fields_check": {
-          "name": "organization_alert_deliveries_identity_fields_check",
-          "value": "length(\"organization_alert_deliveries\".\"period_occurrence_id\") > 0 AND length(\"organization_alert_deliveries\".\"recipient_identity_hmac\") > 0"
-        },
-        "organization_alert_deliveries_channel_check": {
-          "name": "organization_alert_deliveries_channel_check",
-          "value": "\"organization_alert_deliveries\".\"channel\" = 'email'"
-        },
-        "organization_alert_deliveries_status_check": {
-          "name": "organization_alert_deliveries_status_check",
-          "value": "\"organization_alert_deliveries\".\"status\" IN ('pending', 'submitting', 'accepted', 'ambiguous', 'canceled')"
-        },
-        "organization_alert_deliveries_counters_check": {
-          "name": "organization_alert_deliveries_counters_check",
-          "value": "\"organization_alert_deliveries\".\"claimed_configuration_version\" > 0 AND \"organization_alert_deliveries\".\"claim_version\" > 0 AND \"organization_alert_deliveries\".\"attempt_count\" >= 0"
-        },
-        "organization_alert_deliveries_spend_check": {
-          "name": "organization_alert_deliveries_spend_check",
-          "value": "\"organization_alert_deliveries\".\"threshold_microdollars\" > 0 AND \"organization_alert_deliveries\".\"measured_spend_microdollars\" >= \"organization_alert_deliveries\".\"threshold_microdollars\""
-        },
-        "organization_alert_deliveries_submission_check": {
-          "name": "organization_alert_deliveries_submission_check",
-          "value": "(\"organization_alert_deliveries\".\"status\" = 'submitting') = (\"organization_alert_deliveries\".\"lease_expires_at\" IS NOT NULL) AND (\"organization_alert_deliveries\".\"status\" NOT IN ('submitting', 'accepted', 'ambiguous') OR \"organization_alert_deliveries\".\"submitting_at\" IS NOT NULL)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.organization_alerts": {
-      "name": "organization_alerts",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "type": {
-          "name": "type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "configuration": {
-          "name": "configuration",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "configuration_version": {
-          "name": "configuration_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "archived_at": {
-          "name": "archived_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "IDX_organization_alerts_organization_status_created_id": {
-          "name": "IDX_organization_alerts_organization_status_created_id",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_organization_alerts_enabled_organization_id": {
-          "name": "IDX_organization_alerts_enabled_organization_id",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"organization_alerts\".\"status\" = 'enabled'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "organization_alerts_organization_id_organizations_id_fk": {
-          "name": "organization_alerts_organization_id_organizations_id_fk",
-          "tableFrom": "organization_alerts",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "organization_alerts_type_check": {
-          "name": "organization_alerts_type_check",
-          "value": "\"organization_alerts\".\"type\" IN ('monthly_spending')"
-        },
-        "organization_alerts_status_check": {
-          "name": "organization_alerts_status_check",
-          "value": "\"organization_alerts\".\"status\" IN ('enabled', 'disabled', 'archived')"
-        },
-        "organization_alerts_configuration_version_check": {
-          "name": "organization_alerts_configuration_version_check",
-          "value": "\"organization_alerts\".\"configuration_version\" > 0"
-        },
-        "organization_alerts_archive_check": {
-          "name": "organization_alerts_archive_check",
-          "value": "(\"organization_alerts\".\"status\" = 'archived') = (\"organization_alerts\".\"archived_at\" IS NOT NULL)"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.organization_audit_logs": {
       "name": "organization_audit_logs",
       "schema": "",
@@ -26927,6 +26563,161 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.organization_domain_claims": {
+      "name": "organization_domain_claims",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "domain": {
+          "name": "domain",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "workos_organization_id": {
+          "name": "workos_organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "workos_domain_id": {
+          "name": "workos_domain_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "verified_at": {
+          "name": "verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_organization_domain_claims_verified_domain": {
+          "name": "UQ_organization_domain_claims_verified_domain",
+          "columns": [
+            {
+              "expression": "domain",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"organization_domain_claims\".\"status\" = 'verified'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_organization_domain_claims_workos_domain_id": {
+          "name": "UQ_organization_domain_claims_workos_domain_id",
+          "columns": [
+            {
+              "expression": "workos_domain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"organization_domain_claims\".\"workos_domain_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_organization_domain_claims_organization_id": {
+          "name": "IDX_organization_domain_claims_organization_id",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "organization_domain_claims_organization_id_organizations_id_fk": {
+          "name": "organization_domain_claims_organization_id_organizations_id_fk",
+          "tableFrom": "organization_domain_claims",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_organization_domain_claims_organization_domain": {
+          "name": "UQ_organization_domain_claims_organization_domain",
+          "nullsNotDistinct": false,
+          "columns": [
+            "organization_id",
+            "domain"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "organization_domain_claims_canonical_domain_check": {
+          "name": "organization_domain_claims_canonical_domain_check",
+          "value": "length(\"organization_domain_claims\".\"domain\") BETWEEN 1 AND 253 AND \"organization_domain_claims\".\"domain\" = lower(btrim(\"organization_domain_claims\".\"domain\"))"
+        },
+        "organization_domain_claims_status_check": {
+          "name": "organization_domain_claims_status_check",
+          "value": "\"organization_domain_claims\".\"status\" IN ('pending', 'verified')"
+        },
+        "organization_domain_claims_verification_shape_check": {
+          "name": "organization_domain_claims_verification_shape_check",
+          "value": "(\"organization_domain_claims\".\"status\" = 'pending' AND \"organization_domain_claims\".\"verified_at\" IS NULL)\n        OR (\"organization_domain_claims\".\"status\" = 'verified' AND \"organization_domain_claims\".\"verified_at\" IS NOT NULL AND \"organization_domain_claims\".\"workos_organization_id\" IS NOT NULL AND \"organization_domain_claims\".\"workos_domain_id\" IS NOT NULL)"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.organization_group_memberships": {

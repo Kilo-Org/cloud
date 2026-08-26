@@ -33,7 +33,7 @@ vi.mock('@sentry/react-native', () => ({ TimeToFullDisplay: () => null }));
 // String host so findByType works and props.onLoad stays callable.
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 // No Vitest project transforms .png.
-vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
+vi.mock('@/../assets/images/logo-mark.png', () => ({ default: 1 }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

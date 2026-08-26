@@ -3369,6 +3369,57 @@ export const organization_alert_deliveries = pgTable(
 export type OrganizationAlertDelivery = typeof organization_alert_deliveries.$inferSelect;
 export type NewOrganizationAlertDelivery = typeof organization_alert_deliveries.$inferInsert;
 
+export type OrganizationDomainClaimStatus = 'pending' | 'verified';
+
+export const organization_domain_claims = pgTable(
+  'organization_domain_claims',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    domain: text().notNull(),
+    status: text().$type<OrganizationDomainClaimStatus>().notNull().default('pending'),
+    workos_organization_id: text(),
+    workos_domain_id: text(),
+    verified_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_organization_domain_claims_organization_domain').on(
+      table.organization_id,
+      table.domain
+    ),
+    uniqueIndex('UQ_organization_domain_claims_verified_domain')
+      .on(table.domain)
+      .where(sql`${table.status} = 'verified'`),
+    uniqueIndex('UQ_organization_domain_claims_workos_domain_id')
+      .on(table.workos_domain_id)
+      .where(sql`${table.workos_domain_id} IS NOT NULL`),
+    index('IDX_organization_domain_claims_organization_id').on(table.organization_id),
+    check(
+      'organization_domain_claims_canonical_domain_check',
+      sql`length(${table.domain}) BETWEEN 1 AND 253 AND ${table.domain} = lower(btrim(${table.domain}))`
+    ),
+    check(
+      'organization_domain_claims_status_check',
+      sql`${table.status} IN ('pending', 'verified')`
+    ),
+    check(
+      'organization_domain_claims_verification_shape_check',
+      sql`(${table.status} = 'pending' AND ${table.verified_at} IS NULL)
+        OR (${table.status} = 'verified' AND ${table.verified_at} IS NOT NULL AND ${table.workos_organization_id} IS NOT NULL AND ${table.workos_domain_id} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type OrganizationDomainClaim = typeof organization_domain_claims.$inferSelect;
+export type NewOrganizationDomainClaim = typeof organization_domain_claims.$inferInsert;
+
 export const kilo_pass_org_term_versions = pgTable(
   'kilo_pass_org_term_versions',
   {
@@ -6130,6 +6181,47 @@ export const cloud_agent_sessions = pgTable(
 
 export type CloudAgentSession = typeof cloud_agent_sessions.$inferSelect;
 export type NewCloudAgentSession = typeof cloud_agent_sessions.$inferInsert;
+
+/**
+ * Pending-upload ledger for cloud agent attachments. A presign admits a row in
+ * status 'pending'; send-time finalization flips the matching rows to 'linked'
+ * in one transaction; a cron reaper deletes the R2 objects behind abandoned
+ * 'pending' rows whose lease has expired and records them as 'reaped'.
+ * kilo_user_id is text() because user IDs are not always UUIDs (OAuth users).
+ */
+export const cloud_agent_pending_uploads = pgTable(
+  'cloud_agent_pending_uploads',
+  {
+    id: text().primaryKey().notNull(),
+    kilo_user_id: text().notNull(),
+    object_key: text().notNull().unique(),
+    message_uuid: text().notNull(),
+    attachment_id: text().notNull(),
+    byte_size: integer().notNull(),
+    status: text().notNull().default('pending'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+  },
+  table => [
+    index('IDX_cloud_agent_pending_uploads_user_message_status').on(
+      table.kilo_user_id,
+      table.message_uuid,
+      table.status
+    ),
+    // The hourly reaper scans `status = 'pending' AND expires_at < now()`,
+    // which the composite index above cannot serve.
+    index('IDX_cloud_agent_pending_uploads_expired')
+      .on(table.expires_at)
+      .where(sql`${table.status} = 'pending'`),
+    check(
+      'cloud_agent_pending_uploads_status_check',
+      sql`${table.status} IN ('pending', 'linked', 'reaped')`
+    ),
+  ]
+);
+
+export type CloudAgentPendingUpload = typeof cloud_agent_pending_uploads.$inferSelect;
+export type NewCloudAgentPendingUpload = typeof cloud_agent_pending_uploads.$inferInsert;
 
 export type CloudAgentSessionRunStatus =
   | 'queued'

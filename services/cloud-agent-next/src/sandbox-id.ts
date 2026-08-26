@@ -44,7 +44,35 @@ export type SandboxRoutingTarget =
 export type SandboxRoutingOptions = {
   devcontainer?: boolean;
   createdOnPlatform?: string;
+  sandboxAllocation?: 'isolated-standard';
 };
+
+export type SandboxIdClass =
+  | 'shared'
+  | 'legacy-shared'
+  | 'isolated-small'
+  | 'isolated-standard'
+  | 'code-review'
+  | 'devcontainer'
+  | 'unknown';
+
+export function classifySandboxId(sandboxId: string): SandboxIdClass {
+  if (/^istd-[0-9a-f]+$/.test(sandboxId)) return 'isolated-standard';
+  if (/^ses-[0-9a-f]+$/.test(sandboxId)) return 'isolated-small';
+  if (/^crv-[0-9a-f]+$/.test(sandboxId)) return 'code-review';
+  if (/^dind-[0-9a-f]+$/.test(sandboxId)) return 'devcontainer';
+  if (/^(org|usr|bot|ubt)-[0-9a-f]+$/.test(sandboxId)) return 'shared';
+  if (sandboxId.includes('__')) return 'legacy-shared';
+  return 'unknown';
+}
+
+export function isValidSandboxId(sandboxId: string): sandboxId is SandboxId {
+  return classifySandboxId(sandboxId) !== 'unknown';
+}
+
+export function isIsolatedSandboxId(sandboxId: string): boolean {
+  return /^(ses|istd|crv|dind)-/.test(sandboxId);
+}
 
 export function isGeneratedSharedSandboxId(sandboxId: string): sandboxId is SandboxId {
   return /^(org|usr|bot|ubt)-[0-9a-f]{48}$/.test(sandboxId);
@@ -91,8 +119,9 @@ export function isOrgInList(raw: string | undefined, orgId: string | undefined):
  * Returns the correct DurableObjectNamespace for the given sandbox ID.
  * - Docker-in-Docker sandboxes (dind-* prefix) use SandboxDIND
  * - Code Reviewer ephemeral sandboxes (crv-* prefix) use SandboxCodeReview
- * - Per-session sandboxes (ses-* prefix) use SandboxSmall
- * - All others use Sandbox
+ * - Per-session Small sandboxes (ses-* prefix) use SandboxSmall
+ * - Per-session Standard sandboxes (istd-* prefix) use Sandbox
+ * - Shared and legacy shared sandboxes use Sandbox
  */
 export function getSandboxNamespace(
   env: SandboxNamespaceEnv,
@@ -107,6 +136,9 @@ export function getSandboxNamespace(
   }
   if (sandboxId.startsWith('ses-')) {
     return options.managedScmContainment === true ? env.SandboxSmallContainment : env.SandboxSmall;
+  }
+  if (sandboxId.startsWith('istd-')) {
+    return options.managedScmContainment === true ? env.SandboxContainment : env.Sandbox;
   }
   return options.managedScmContainment === true ? env.SandboxContainment : env.Sandbox;
 }
@@ -241,6 +273,9 @@ export async function generateSandboxRoutingTarget(
   }
   if (routingOptions.createdOnPlatform === 'code-review') {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'crv') };
+  }
+  if (routingOptions.sandboxAllocation === 'isolated-standard') {
+    return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'istd') };
   }
   if (perSessionOrgs.has('*') || (orgId !== undefined && perSessionOrgs.has(orgId))) {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'ses') };

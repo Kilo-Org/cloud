@@ -151,8 +151,8 @@
     "appearanceLight": "ສະຫວ່າງ",
     "appearanceDark": "ມືດ",
     "account": "ບັນຊີ",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "ຕື່ມການລະບຸແຫຼ່ງຂອງແອັບລົງໃນການທົບທວນ PR",
+    "prReviewAttributionSubtitle": "ຕື່ມ footer ທີ່ລະບຸວ່າ \"ທົບທວນຜ່ານ Kilo\" ເມື່ອທ່ານສົ່ງການທົບທວນ."
   },
   "prReview": {
     "pullRequestUnavailable": "pull request ບໍ່ພ້ອມໃຊ້",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "ບັນຊີ GitLab",
       "connectGitLab": "ເຊື່ອມຕໍ່ GitLab",
       "gitlabError": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າ GitLab. ກະລຸນາລອງອີກ.",
-      "description": "ເຊື່ອມຕໍ່ Kilo {{label}} ເພື່ອທົບທວນ pull requests ອັດຕະໂນມັດ."
+      "description": "ເຊື່ອມຕໍ່ Kilo {{label}} ເພື່ອທົບທວນ pull requests ອັດຕະໂນມັດ.",
+      "bitbucketError": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າ Bitbucket ໄດ້. ກະລຸນາລອງໃໝ່."
     },
     "overview": {
       "reviewStyle": "ຮູບແບບການທົບທວນ",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "ເຊດຊັນໃໝ່",
       "repository": "ບ່ອນເກັບລະຫັດ",
-      "couldNotLoadRepositories": "ບໍ່ສາມາດໂຫຼດບ່ອນເກັບລະຫັດ",
       "connectGithub": "ເຊື່ອມຕໍ່ GitHub",
       "connectGithubDescription": "ເຊື່ອມຕໍ່ GitHub ໃນບຣາວເຊີຂອງທ່ານ, ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກບ່ອນເກັບລະຫັດ.",
       "openGithub": "ເປີດ GitHub",
       "refreshRepositories": "ໂຫຼດບ່ອນເກັບລະຫັດຄືນ",
-      "githubConnectionNotVisible": "ພວກເຮົາຍັງເບິ່ງບໍ່ເຫັນການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານ",
-      "githubConnectionNotVisibleDescription": "ຖ້າທ່ານຕິດຕັ້ງ ຫຼື ກຳນົດຄ່າ Kilo GitHub App, ກວດອີກຄັ້ງ — ຫຼື ໃຫ້ແນ່ໃຈວ່າມັນຖືກຕິດຕັ້ງສຳລັບບັນຊີ/ອົງກອນນີ້.",
-      "checkAgain": "ກວດອີກຄັ້ງ",
       "githubConnected": "ເຊື່ອມຕໍ່ GitHub ແລ້ວ",
       "noRepositoriesVisible": "ບໍ່ມີບ່ອນເກັບລະຫັດທີ່ເຫັນໄດ້. ກວດການເຂົ້າເຖິງບ່ອນເກັບລະຫັດສຳລັບ Kilo GitHub App, ແລ້ວໂຫຼດຄືນ.",
       "runOnWithTarget": "ດຳເນີນການໃນ: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "ສືບຕໍ່ແກ້ໄຂ",
       "discard": "ຍົກເລີກ",
       "discardFailed": "ບໍ່ສາມາດລະເລີຍຮ່າງ. ກະລຸນາລອງໃໝ່.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "ດຳເນີນການ `kilo remote` ໃນຄອມພິວເຕີຂອງທ່ານ, ຫຼື ໃຊ້ `/remote` ໃນເຊດຊັນ CLI ທີ່ກຳລັງດຳເນີນຢູ່, ເພື່ອຄວບຄຸມຂະບວນການ kilo ທ້ອງຖິ່ນ.",
+      "bitbucketConnected": "Bitbucket ເຊື່ອມຕໍ່ແລ້ວ",
+      "connectBitbucket": "ເຊື່ອມຕໍ່ Bitbucket",
+      "connectBitbucketDescription": "ເຊື່ອມຕໍ່ Bitbucket ໃນບຣາວເຊີຂອງທ່ານ, ຈາກນັ້ນກັບມາທີ່ນີ້ເພື່ອເລືອກ repository.",
+      "connectGitlab": "ເຊື່ອມຕໍ່ GitLab",
+      "connectGitlabDescription": "ເຊື່ອມຕໍ່ GitLab ໃນບຣາວເຊີຂອງທ່ານ, ຈາກນັ້ນກັບມາທີ່ນີ້ເພື່ອເລືອກ repository.",
+      "couldNotLoadBitbucketRepositories": "ບໍ່ສາມາດໂຫຼດ repositories ຂອງ Bitbucket ໄດ້",
+      "couldNotLoadGithubRepositories": "ບໍ່ສາມາດໂຫຼດ repositories ຂອງ GitHub ໄດ້",
+      "couldNotLoadGitlabRepositories": "ບໍ່ສາມາດໂຫຼດ repositories ຂອງ GitLab ໄດ້",
+      "gitlabConnected": "ເຊື່ອມຕໍ່ GitLab ແລ້ວ",
+      "noRepositoriesVisibleBitbucket": "ບໍ່ມີ repositories ທີ່ເຫັນ. ກວດເບິ່ງການເຂົ້າເຖິງ repository ສຳລັບ Bitbucket, ຈາກນັ້ນ refresh.",
+      "noRepositoriesVisibleGitlab": "ບໍ່ມີ repositories ທີ່ເຫັນ. ກວດເບິ່ງການເຂົ້າເຖິງ repository ສຳລັບ GitLab, ຈາກນັ້ນ refresh.",
+      "openBitbucket": "ເປີດ Bitbucket",
+      "openGitlab": "ເປີດ GitLab",
+      "recentlyUsed": "ຫຼ້າສຸດທີ່ໃຊ້"
     },
     "partRenderer": {
       "updatedFileCount_one": "ອັບເດດ {{displayCount}} ໄຟລ໌",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "ບໍ່ມີບ່ອນເກັບລະຫັດທີ່ເຊື່ອມຕໍ່ກັບບັນຊີຂອງທ່ານ.",
       "tryDifferentSearch": "ລອງຄຳຄົ້ນຫາທີ່ແຕກຕ່າງ.",
       "loading": "Loading...",
-      "accessibility": "ບ່ອນເກັບລະຫັດ: {{label}}"
+      "accessibility": "ບ່ອນເກັບລະຫັດ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "ລາຍລະອຽດຂໍ້ຄວາມ",
@@ -2624,6 +2638,18 @@
       "updating": "ກຳລັງອັບເດດ, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "ໂຫຼດ",
+      "loadWithHost": "ໂຫຼດ {{host}}",
+      "httpsOnly": "ຮູບພາບ HTTPS ເທົ່ານັ້ນ"
+    },
+    "markdownLink": {
+      "invalidLink": "ບໍ່ສາມາດເປີດລິ້ງນີ້ໄດ້.",
+      "hostConfirmTitle": "ເປີດລິ້ງພາຍນອກບໍ?",
+      "hostConfirmMessage": "ລິ້ງນີ້ເປີດ {{host}} ໃນບຣາວເຊີຂອງທ່ານ.",
+      "open": "ເປີດ",
+      "trustThisHost": "ໄວ້ໃຈໂຮສນີ້"
     }
   },
   "bootstrap": {
@@ -2946,7 +2972,10 @@
         "team-topup-bonus-2025": "ໂບນັດເຕີມເງິນທີມ 2025",
         "accounting_adjustment": "ການປັບບັນຊີ",
         "credits_expired": "ເຄຣດິດໝົດອາຍຸ"
-      }
+      },
+      "loadMore": "ໂຫຼດເພີ່ມເຕີມ",
+      "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມເຕີມໄດ້",
+      "truncated": "ກິດຈະກຳສິນເຊື່ອເກົ່າກວ່າມີໃຫ້."
     },
     "inviteMember": {
       "emailError": "ໃສ່ທີ່ຢູ່ອີເມວທີ່ຖືກຕ້ອງ",
@@ -2973,7 +3002,10 @@
         "draft": "ຮ່າງ",
         "uncollectible": "ເກັບບໍ່ໄດ້",
         "unknown": "ບໍ່ຮູ້"
-      }
+      },
+      "loadMore": "ໂຫຼດເພີ່ມເຕີມ",
+      "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມເຕີມໄດ້",
+      "truncated": "ໃບແຈ້ງໜີ້ເກົ່າກວ່າມີໃຫ້."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3109,5 +3141,13 @@
       "xhigh": "ສູງພິເສດ",
       "max": "ສູງສຸດ"
     }
+  },
+  "trustedHosts": {
+    "title": "ໂຮສທີ່ໄວ້ໃຈ",
+    "subtitle": "ໂຮສທີ່ທ່ານໄວ້ໃຈໃຫ້ເປີດໂດຍບໍ່ຕ້ອງຖາມ",
+    "emptyTitle": "ບໍ່ມີໂຮສທີ່ໄວ້ໃຈ",
+    "emptyDescription": "ເມື່ອທ່ານໄວ້ໃຈໂຮສຂອງລິ້ງ, ມັນຈະເປີດໂດຍບໍ່ຖາມອີກ.",
+    "revoke": "ຖອນ {{host}}",
+    "backToPreferences": "ກັບໄປທີ່ການຕັ້ງຄ່າ"
   }
 }

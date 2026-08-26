@@ -35,6 +35,10 @@ const expoSharingMock = vi.hoisted(() => ({
   shareAsync: vi.fn(),
 }));
 
+const tempFileRegistryMock = vi.hoisted(() => ({
+  registerTempFile: vi.fn(),
+}));
+
 vi.mock('expo-file-system', () => ({
   Directory: expoFileSystemMock.Directory,
   File: expoFileSystemMock.File,
@@ -48,6 +52,10 @@ vi.mock('react-native', () => ({
 vi.mock('expo-sharing', () => ({
   isAvailableAsync: expoSharingMock.isAvailableAsync,
   shareAsync: expoSharingMock.shareAsync,
+}));
+
+vi.mock('@/lib/temp-file-registry', () => ({
+  registerTempFile: tempFileRegistryMock.registerTempFile,
 }));
 
 beforeEach(() => {
@@ -102,7 +110,7 @@ describe('shareLocalFile', () => {
 });
 
 describe('shareMaterializedRemoteFile', () => {
-  it('deletes the temp file after a successful iOS share', async () => {
+  it('keeps the temp file for the TTL reap after a successful iOS share', async () => {
     const deleted: string[] = [];
     await shareMaterializedRemoteFile(
       {
@@ -115,10 +123,13 @@ describe('shareMaterializedRemoteFile', () => {
         await Promise.resolve();
       }
     );
-    expect(deleted).toEqual(['file:///cache/org-invoices/a.pdf']);
+    expect(deleted).toEqual([]);
+    expect(tempFileRegistryMock.registerTempFile).toHaveBeenCalledWith(
+      'file:///cache/org-invoices/a.pdf'
+    );
   });
 
-  it('keeps the temp file after a successful Android share', async () => {
+  it('keeps the temp file for the TTL reap after a successful Android share', async () => {
     reactNativeMock.Platform.OS = 'android';
     const deleted: string[] = [];
     await shareMaterializedRemoteFile(
@@ -133,6 +144,9 @@ describe('shareMaterializedRemoteFile', () => {
       }
     );
     expect(deleted).toEqual([]);
+    expect(tempFileRegistryMock.registerTempFile).toHaveBeenCalledWith(
+      'file:///cache/org-invoices/a.pdf'
+    );
   });
 
   it('deletes the temp file after share failures', async () => {
@@ -152,6 +166,7 @@ describe('shareMaterializedRemoteFile', () => {
       )
     ).rejects.toThrow('share failed');
     expect(deleted).toEqual(['file:///cache/org-invoices/a.pdf']);
+    expect(tempFileRegistryMock.registerTempFile).not.toHaveBeenCalled();
   });
 });
 
@@ -218,6 +233,7 @@ describe('shareRemoteFile', () => {
     expect(expoFileSystemMock.Directory).toHaveBeenCalledWith('file:///cache', 'org-invoices');
     expect(expoFileSystemMock.File.downloadFileAsync).toHaveBeenCalled();
     expect(expoSharingMock.shareAsync).toHaveBeenCalledWith(downloaded.uri, undefined);
-    expect(downloaded.delete).toHaveBeenCalled();
+    expect(downloaded.delete).not.toHaveBeenCalled();
+    expect(tempFileRegistryMock.registerTempFile).toHaveBeenCalledWith(downloaded.uri);
   });
 });

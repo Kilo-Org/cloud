@@ -151,8 +151,8 @@
     "appearanceLight": "लाइट",
     "appearanceDark": "डार्क",
     "account": "खाते",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR पुनरावलोकनांमध्ये अ‍ॅप श्रेय जोडा",
+    "prReviewAttributionSubtitle": "पुनरावलोकन सबमिट करताना Reviewed via Kilo फूटर जोडा"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट अनुपलब्ध",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab खाते",
       "connectGitLab": "GitLab कनेक्ट करा",
       "gitlabError": "GitLab सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",
-      "description": "पुल रिक्वेस्ट्स स्वयंचलितपणे पुनरावलोकन करण्यासाठी Kilo {{label}} कनेक्ट करा."
+      "description": "पुल रिक्वेस्ट्स स्वयंचलितपणे पुनरावलोकन करण्यासाठी Kilo {{label}} कनेक्ट करा.",
+      "bitbucketError": "Bitbucket सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा."
     },
     "overview": {
       "reviewStyle": "पुनरावलोकन शैली",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "नवीन सत्र",
       "repository": "भांडार",
-      "couldNotLoadRepositories": "भांडारे लोड करता आली नाहीत",
       "connectGithub": "GitHub कनेक्ट करा",
       "connectGithubDescription": "तुमच्या ब्राउझरमध्ये GitHub कनेक्ट करा, नंतर भांडार निवडण्यासाठी येथे परत या.",
       "openGithub": "GitHub उघडा",
       "refreshRepositories": "भांडारे रिफ्रेश करा",
-      "githubConnectionNotVisible": "तुमचे GitHub कनेक्शन आम्हाला अजून दिसत नाही",
-      "githubConnectionNotVisibleDescription": "जर तुम्ही Kilo GitHub App स्थापित किंवा कॉन्फिगर केले असेल, तर पुन्हा तपासा — किंवा ते या खाते/संस्थेसाठी स्थापित केले असल्याचे सुनिश्चित करा.",
-      "checkAgain": "पुन्हा तपासा",
       "githubConnected": "GitHub कनेक्ट केले",
       "noRepositoriesVisible": "कोणतीही भांडारे दिसत नाहीत. Kilo GitHub App साठी भांडार प्रवेश तपासा, नंतर रिफ्रेश करा.",
       "runOnWithTarget": "यावर चालवा: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "संपादन सुरू ठेवा",
       "discard": "टाकून द्या",
       "discardFailed": "मसुदा रद्द करता आला नाही. कृपया पुन्हा प्रयत्न करा.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "तुमच्या संगणकावर `kilo remote` चालवा, किंवा चालू असलेल्या CLI सत्रात `/remote`, स्थानिक kilo प्रक्रिया नियंत्रित करण्यासाठी.",
+      "bitbucketConnected": "Bitbucket कनेक्ट झाले",
+      "connectBitbucket": "Bitbucket कनेक्ट करा",
+      "connectBitbucketDescription": "तुमच्या ब्राउझरमध्ये Bitbucket कनेक्ट करा, नंतर रिपॉझिटरी निवडण्यासाठी येथे परत या.",
+      "connectGitlab": "GitLab कनेक्ट करा",
+      "connectGitlabDescription": "तुमच्या ब्राउझरमध्ये GitLab कनेक्ट करा, नंतर रिपॉझिटरी निवडण्यासाठी येथे परत या.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket रिपॉझिटरी लोड करता आल्या नाहीत",
+      "couldNotLoadGithubRepositories": "GitHub रिपॉझिटरी लोड करता आल्या नाहीत",
+      "couldNotLoadGitlabRepositories": "GitLab रिपॉझिटरी लोड करता आल्या नाहीत",
+      "gitlabConnected": "GitLab कनेक्ट केले",
+      "noRepositoriesVisibleBitbucket": "कोणतीही रिपॉझिटरी दिसत नाही. Bitbucket साठी रिपॉझिटरी प्रवेश तपासा, नंतर रिफ्रेश करा.",
+      "noRepositoriesVisibleGitlab": "कोणतीही रिपॉझिटरी दिसत नाही. GitLab साठी रिपॉझिटरी प्रवेश तपासा, नंतर रिफ्रेश करा.",
+      "openBitbucket": "Bitbucket उघडा",
+      "openGitlab": "GitLab उघडा",
+      "recentlyUsed": "अलीकडे वापरलेले"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्ययावत केली",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "तुमच्या खात्याशी कोणतीही भांडारे कनेक्ट केलेली नाहीत.",
       "tryDifferentSearch": "भिन्न शोध संज्ञा वापरून पहा.",
       "loading": "लोड होत आहे...",
-      "accessibility": "भांडार: {{label}}"
+      "accessibility": "भांडार: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "संदेश तपशील",
@@ -2624,6 +2638,18 @@
       "updating": "अपडेट होत आहे, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "पुल रिक्वेस्ट"
+    },
+    "markdownImage": {
+      "load": "लोड करा",
+      "loadWithHost": "लोड करा {{host}}",
+      "httpsOnly": "फक्त HTTPS प्रतिमा"
+    },
+    "markdownLink": {
+      "invalidLink": "ही लिंक उघडता येत नाही.",
+      "hostConfirmTitle": "बाह्य लिंक उघडायची?",
+      "hostConfirmMessage": "ही लिंक तुमच्या ब्राउझरमध्ये {{host}} उघडते.",
+      "open": "उघडा",
+      "trustThisHost": "या होस्टवर विश्वास ठेवा"
     }
   },
   "bootstrap": {
@@ -2946,7 +2972,10 @@
         "team-topup-bonus-2025": "टीम टॉप-अप बोनस-2025",
         "accounting_adjustment": "लेखा समायोजन",
         "credits_expired": "क्रेडिट कालबाह्य झाले"
-      }
+      },
+      "loadMore": "अधिक लोड करा",
+      "loadMoreFailed": "अधिक लोड करता आले नाही",
+      "truncated": "जुनी क्रेडिट क्रियाकलाप उपलब्ध आहे."
     },
     "inviteMember": {
       "emailError": "वैध ईमेल पत्ता प्रविष्ट करा",
@@ -2973,7 +3002,10 @@
         "draft": "मसुदा",
         "uncollectible": "वसूल करता न येणारे",
         "unknown": "अज्ञात"
-      }
+      },
+      "loadMore": "अधिक लोड करा",
+      "loadMoreFailed": "अधिक लोड करता आले नाही",
+      "truncated": "जुने इनव्हॉइस उपलब्ध आहेत."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3109,5 +3141,13 @@
       "xhigh": "अति उच्च",
       "max": "जास्तीत जास्त"
     }
+  },
+  "trustedHosts": {
+    "title": "विश्वासार्ह होस्ट",
+    "subtitle": "तुम्ही विचारल्याशिवाय उघडणाऱ्या होस्ट",
+    "emptyTitle": "विश्वासार्ह होस्ट नाहीत",
+    "emptyDescription": "जेव्हा तुम्ही लिंकच्या होस्टवर विश्वास ठेवता, तेव्हा ती पुन्हा न विचारता उघडते.",
+    "revoke": "{{host}} रद्द करा",
+    "backToPreferences": "प्राधान्यांवर परत जा"
   }
 }

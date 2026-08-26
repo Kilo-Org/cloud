@@ -46,11 +46,14 @@ import {
   baseCloseTerminalNextOutputSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
+  cloudAgentLinkPendingUploadsSchema,
+  cloudAgentReleasePendingUploadsSchema,
 } from '../cloud-agent-next-schemas';
 import {
   generateCloudAgentAttachmentUploadUrl,
   generateImageUploadUrl,
 } from '@/lib/r2/cloud-agent-attachments';
+import { linkPendingUploads, releasePendingUploads } from '@/lib/r2/cloud-agent-pending-uploads';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
@@ -143,6 +146,14 @@ const ImageUploadUrlInput = cloudAgentGetImageUploadUrlSchema.extend({
 });
 
 const AttachmentUploadUrlInput = cloudAgentGetAttachmentUploadUrlSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const LinkPendingUploadsInput = cloudAgentLinkPendingUploadsSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const ReleasePendingUploadsInput = cloudAgentReleasePendingUploadsSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -274,13 +285,28 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       }
 
       try {
-        return await client.prepareSession({
+        const result = await client.prepareSession({
           ...restInput,
           ...gitParams,
           attachments: attachments ?? images,
           createdOnPlatform: 'cloud-agent-web',
           kilocodeOrganizationId: organizationId,
         });
+
+        // New-session flows call prepareSession without a follow-up
+        // sendMessage, so the server must link the admitted attachment rows
+        // here too; otherwise the reaper deletes new-session objects. Only
+        // ATTACHMENT rows are admitted (images are never admitted; only
+        // generateCloudAgentAttachmentUploadUrl admits).
+        if (attachments && attachments.files.length > 0) {
+          await linkPendingUploads(
+            ctx.user.id,
+            attachments.path,
+            attachments.files.map(file => `${ctx.user.id}/cloud-agent/${attachments.path}/${file}`)
+          );
+        }
+
+        return result;
       } catch (error) {
         rethrowAsPaymentRequired(error);
         throw error;
@@ -368,13 +394,30 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       // for GitHub, GIT_TOKEN_SERVICE for managed GitLab). organizationId is
       // consumed by the membership middleware; it is not forwarded.
       try {
-        return await client.sendMessage({
+        const result = await client.sendMessage({
           cloudAgentSessionId: input.cloudAgentSessionId,
           payload: input.payload,
           autoCommit: input.autoCommit,
           messageId: input.messageId ?? generateMessageId(),
           attachments: input.attachments ?? input.images,
         });
+
+        // Compatibility: the server links authoritatively so any client whose
+        // send goes through sendMessage keeps its objects (mobile, old tabs).
+        // The client does not link pre-send, so a failed or abandoned send
+        // leaves rows 'pending' for the reaper. Only ATTACHMENT rows are
+        // admitted (images are never admitted; only
+        // generateCloudAgentAttachmentUploadUrl admits).
+        const attachments = input.attachments;
+        if (attachments && attachments.files.length > 0) {
+          await linkPendingUploads(
+            ctx.user.id,
+            attachments.path,
+            attachments.files.map(file => `${ctx.user.id}/cloud-agent/${attachments.path}/${file}`)
+          );
+        }
+
+        return result;
       } catch (error) {
         rethrowAsPaymentRequired(error);
         throw error;
@@ -510,6 +553,33 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         contentLength: input.contentLength,
         ...(input.extension ? { extension: input.extension } : {}),
       });
+    }),
+
+  /**
+   * Finalize send-time attachment ledger rows in the organization context.
+   * The pending rows are keyed by the uploading member's user id, so the link
+   * is still scoped to ctx.user.id; organizationId only gates membership.
+   */
+  linkPendingUploads: organizationMemberMutationProcedure
+    .input(LinkPendingUploadsInput)
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await linkPendingUploads(ctx.user.id, input.messageUuid, input.objectKeys);
+      return { success: true };
+    }),
+
+  /**
+   * Release abandoned composer files' pending-ledger rows in the organization
+   * context. The rows are keyed by the uploading member's user id, so the
+   * release is still scoped to ctx.user.id; organizationId only gates
+   * membership.
+   */
+  releasePendingUploads: organizationMemberMutationProcedure
+    .input(ReleasePendingUploadsInput)
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await releasePendingUploads(ctx.user.id, input.objectKeys);
+      return { success: true };
     }),
 
   /**

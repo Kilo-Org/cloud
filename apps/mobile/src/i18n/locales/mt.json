@@ -151,8 +151,8 @@
     "appearanceLight": "Dawl",
     "appearanceDark": "Skur",
     "account": "Kont",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Żid attribuzzjoni tal-app mar-reviżjonijiet tal-PR",
+    "prReviewAttributionSubtitle": "Żid footer 'Reviewed via Kilo' meta tissottometti reviżjoni."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request mhux disponibbli",
@@ -1413,7 +1413,8 @@
       "gitlabAccount": "Kont GitLab",
       "connectGitLab": "Ikkonnettja GitLab",
       "gitlabError": "Ma stajniex niftħu s-setup ta' GitLab. Jekk jogħġbok erġa' pprova.",
-      "description": "Ikkonnettja l-{{label}} ta' Kilo biex tirrevedi l-pull requests b'mod awtomatiku."
+      "description": "Ikkonnettja l-{{label}} ta' Kilo biex tirrevedi l-pull requests b'mod awtomatiku.",
+      "bitbucketError": "Ma setax jiftaħ is-setup ta' Bitbucket. Jekk jogħġbok erġa' pprova."
     },
     "overview": {
       "reviewStyle": "Stil ta' Reviżjoni",
@@ -2198,14 +2199,10 @@
     "newSession": {
       "title": "Sessjoni ġdida",
       "repository": "Repożitorju",
-      "couldNotLoadRepositories": "Ma setgħux jintgħabbu r-repożitorji",
       "connectGithub": "Ikkonnettja GitHub",
       "connectGithubDescription": "Ikkonnettja GitHub fil-browser tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju.",
       "openGithub": "Iftaħ GitHub",
       "refreshRepositories": "Aġġorna r-repożitorji",
-      "githubConnectionNotVisible": "Għadna ma narawx il-konnessjoni tiegħek ta' GitHub",
-      "githubConnectionNotVisibleDescription": "Jekk installajt jew ikkonfigurajt il-Kilo GitHub App, iċċekkja mill-ġdid — jew kun żgur li ġiet installata għal dan il-kont/organizzazzjoni.",
-      "checkAgain": "Iċċekkja mill-ġdid",
       "githubConnected": "GitHub imqabbad",
       "noRepositoriesVisible": "L-ebda repożitorju viżibbli. Iċċekkja l-aċċess tar-repożitorji għall-Kilo GitHub App, imbagħad aġġorna.",
       "runOnWithTarget": "Mexxi fuq: {{target}}",
@@ -2232,7 +2229,21 @@
       "keepEditing": "Kompli jeditja",
       "discard": "Warrab",
       "discardFailed": "Ma setax jintrema l-abbozz. Jekk jogħġbok erġa' pprova.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Mexxi `kilo remote` fuq il-kompjuter tiegħek, jew `/remote` f'sessjoni CLI li qed taħdem, biex tikkontrolla proċess kilo lokali.",
+      "bitbucketConnected": "Bitbucket imqabbad",
+      "connectBitbucket": "Ikkonnettja Bitbucket",
+      "connectBitbucketDescription": "Qabbad Bitbucket fil-browser tiegħek, imbagħad erġa' lura hawn biex tagħżel repository.",
+      "connectGitlab": "Ikkonnettja GitLab",
+      "connectGitlabDescription": "Qabbad GitLab fil-browser tiegħek, imbagħad erġa' lura hawn biex tagħżel repository.",
+      "couldNotLoadBitbucketRepositories": "Ma setgħux jittellgħu r-repositories ta' Bitbucket",
+      "couldNotLoadGithubRepositories": "Ma setgħux jittellgħu r-repositories ta' GitHub",
+      "couldNotLoadGitlabRepositories": "Ma setgħux jittellgħu r-repositories ta' GitLab",
+      "gitlabConnected": "GitLab imqabbad",
+      "noRepositoriesVisibleBitbucket": "L-ebda repository mhux viżibbli. Iċċekkja l-aċċess tar-repositories għal Bitbucket, imbagħad aġġorna.",
+      "noRepositoriesVisibleGitlab": "L-ebda repository mhux viżibbli. Iċċekkja l-aċċess tar-repositories għal GitLab, imbagħad aġġorna.",
+      "openBitbucket": "Iftaħ Bitbucket",
+      "openGitlab": "Iftaħ GitLab",
+      "recentlyUsed": "Użati reċentement"
     },
     "partRenderer": {
       "updatedFileCount_one": "Aġġornat {{displayCount}} fajl",
@@ -2324,7 +2335,10 @@
       "noRepositoriesDescription": "L-ebda repożitorju mhux imqabbad mal-kont tiegħek.",
       "tryDifferentSearch": "Ipprova terminu ta' tfittxija differenti.",
       "loading": "Qed jgħabbi...",
-      "accessibility": "Repożitorju: {{label}}"
+      "accessibility": "Repożitorju: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Dettalji tal-messaġġ",
@@ -2684,6 +2698,18 @@
       "updating": "Qed jaġġorna, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Ittajja",
+      "loadWithHost": "Ittajja {{host}}",
+      "httpsOnly": "Stamp' HTTPS biss"
+    },
+    "markdownLink": {
+      "invalidLink": "Dan il-link ma jistax jinfetaħ.",
+      "hostConfirmTitle": "Niftaħ link estern?",
+      "hostConfirmMessage": "Dan il-link jiftaħ {{host}} fil-browser tiegħek.",
+      "open": "Iftaħ",
+      "trustThisHost": "Afda f'dan il-host"
     }
   },
   "bootstrap": {
@@ -3006,7 +3032,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Aġġustament tal-kontabilità",
         "credits_expired": "Krediti skaduti"
-      }
+      },
+      "loadMore": "Għabbi aktar",
+      "loadMoreFailed": "Ma stajniex nittellgħu aktar",
+      "truncated": "Attività ta' kreditu aktar antika hija disponibbli."
     },
     "inviteMember": {
       "emailError": "Daħħal indirizz ta' email validu",
@@ -3033,7 +3062,10 @@
         "draft": "Abbozz",
         "uncollectible": "Ma jistax jinġabar",
         "unknown": "Mhux magħruf"
-      }
+      },
+      "loadMore": "Għabbi aktar",
+      "loadMoreFailed": "Ma stajniex nittellgħu aktar",
+      "truncated": "Fatturi aktar antiki huma disponibbli."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3172,5 +3204,13 @@
       "xhigh": "Għoli ħafna",
       "max": "Massimu"
     }
+  },
+  "trustedHosts": {
+    "title": "Hosts fdati",
+    "subtitle": "Hosts li tafdahom jinfetħu mingħajr ma jistaqsu",
+    "emptyTitle": "Ebda hosts fdati",
+    "emptyDescription": "Meta tafda l-host ta' link, jinfetaħ mingħajr ma jistaqsi għal darb'oħra.",
+    "revoke": "Irrevoka {{host}}",
+    "backToPreferences": "Lura għall-preferenzi"
   }
 }

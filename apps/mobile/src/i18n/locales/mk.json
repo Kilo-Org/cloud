@@ -151,8 +151,8 @@
     "appearanceLight": "Светло",
     "appearanceDark": "Темно",
     "account": "Сметка",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Додајте припишување на апликацијата во прегледите на PR",
+    "prReviewAttributionSubtitle": "Додајте потпис „Прегледано преку Kilo“ кога поднесувате преглед."
   },
   "prReview": {
     "pullRequestUnavailable": "Барањето за повлекување е недостапно",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab сметка",
       "connectGitLab": "Поврзи GitLab",
       "gitlabError": "Не можев да го отворам GitLab поставувањето. Обиди се повторно.",
-      "description": "Поврзи го Kilo {{label}} за автоматски прегледи на барањата за повлекување."
+      "description": "Поврзи го Kilo {{label}} за автоматски прегледи на барањата за повлекување.",
+      "bitbucketError": "Не можеше да се отвори поставувањето на Битубакет. Обидете се повторно."
     },
     "overview": {
       "reviewStyle": "Стил на преглед",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Нова сесија",
       "repository": "Репозиториум",
-      "couldNotLoadRepositories": "Не можеше да се вчитаат складиштата",
       "connectGithub": "Поврзи GitHub",
       "connectGithubDescription": "Поврзи се со GitHub во твојот прелистувач, а потоа врати се тука за да избереш складиште.",
       "openGithub": "Отвори GitHub",
       "refreshRepositories": "Освежи ги складиштата",
-      "githubConnectionNotVisible": "Сè уште не ја гледаме твојата GitHub врска",
-      "githubConnectionNotVisibleDescription": "Ако си инсталирал или конфигурирал Kilo GitHub App, провери повторно — или провери дали е инсталиран за оваа сметка/организација.",
-      "checkAgain": "Провери повторно",
       "githubConnected": "GitHub е поврзан",
       "noRepositoriesVisible": "Нема видливи складишта. Провери го пристапот до складиштата за Kilo GitHub App, а потоа освежи.",
       "runOnWithTarget": "Изврши на: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Продолжи со уредување",
       "discard": "Отфрли",
       "discardFailed": "Не можеше да се отфрли нацртот. Обиди се повторно.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Стартувајте `kilo remote` на вашиот компјутер, или `/remote` во активна CLI сесија, за да управувате со локален kilo процес.",
+      "bitbucketConnected": "Bitbucket е поврзан",
+      "connectBitbucket": "Поврзи Bitbucket",
+      "connectBitbucketDescription": "Поврзете Битубакет во вашиот прелистувач, па вратете се овде за да изберете репозиториум.",
+      "connectGitlab": "Поврзи GitLab",
+      "connectGitlabDescription": "Поврзете GitLab во вашиот прелистувач, па вратете се овде за да изберете репозиториум.",
+      "couldNotLoadBitbucketRepositories": "Не можеше да се вчитаат репозиториумите на Битубакет",
+      "couldNotLoadGithubRepositories": "Не можеше да се вчитаат репозиториумите на GitHub",
+      "couldNotLoadGitlabRepositories": "Не можеше да се вчитаат репозиториумите на GitLab",
+      "gitlabConnected": "GitLab е поврзан",
+      "noRepositoriesVisibleBitbucket": "Нема видливи репозиториуми. Проверете го пристапот до репозиториуми за Битубакет, па освежете.",
+      "noRepositoriesVisibleGitlab": "Нема видливи репозиториуми. Проверете го пристапот до репозиториуми за GitLab, па освежете.",
+      "openBitbucket": "Отвори Битубакет",
+      "openGitlab": "Отвори GitLab",
+      "recentlyUsed": "Неодамнешно користени"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ажурирана {{displayCount}} датотека",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Ниту едно складиште не е поврзано со твојата сметка.",
       "tryDifferentSearch": "Обиди се со различен поим за пребарување.",
       "loading": "Вчитување...",
-      "accessibility": "Складиште: {{label}}"
+      "accessibility": "Складиште: {{label}}",
+      "platformBitbucket": "Битубакет",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Детали за пораката",
@@ -2624,6 +2638,18 @@
       "updating": "Се ажурира, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "барање за повлекување"
+    },
+    "markdownImage": {
+      "load": "Вчитај",
+      "loadWithHost": "Вчитај {{host}}",
+      "httpsOnly": "Само HTTPS слики"
+    },
+    "markdownLink": {
+      "invalidLink": "Оваа врска не може да се отвори.",
+      "hostConfirmTitle": "Да се отвори надворешна врска?",
+      "hostConfirmMessage": "Оваа врска го отвора {{host}} во вашиот прелистувач.",
+      "open": "Отвори",
+      "trustThisHost": "Верувај на овој домаќин"
     }
   },
   "bootstrap": {
@@ -2946,7 +2972,10 @@
         "team-topup-bonus-2025": "Тимски top-up бонус 2025",
         "accounting_adjustment": "Сметководствена корекција",
         "credits_expired": "Истечени кредити"
-      }
+      },
+      "loadMore": "Вчитај повеќе",
+      "loadMoreFailed": "Не можеше да се вчитаат повеќе",
+      "truncated": "Постара активност на кредит е достапна."
     },
     "inviteMember": {
       "emailError": "Внесете валидна е-пошта адреса",
@@ -2973,7 +3002,10 @@
         "draft": "Нацрт",
         "uncollectible": "Ненаплатливо",
         "unknown": "Непознато"
-      }
+      },
+      "loadMore": "Вчитај повеќе",
+      "loadMoreFailed": "Не можеше да се вчитаат повеќе",
+      "truncated": "Постари фактури се достапни."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3109,5 +3141,13 @@
       "xhigh": "Екстра високо",
       "max": "Максимално"
     }
+  },
+  "trustedHosts": {
+    "title": "Доверливи домаќини",
+    "subtitle": "Домаќини на кои им верувате да се отвораат без да праша",
+    "emptyTitle": "Нема доверливи домаќини",
+    "emptyDescription": "Кога ќе му верувате на домаќинот на врската, таа се отвора без да праша повторно.",
+    "revoke": "Одземете {{host}}",
+    "backToPreferences": "Назад до поставки"
   }
 }

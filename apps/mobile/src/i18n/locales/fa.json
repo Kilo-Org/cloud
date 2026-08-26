@@ -151,8 +151,8 @@
     "appearanceLight": "روشن",
     "appearanceDark": "تیره",
     "account": "حساب",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "افزودن انتساب برنامه به مرورهای PR",
+    "prReviewAttributionSubtitle": "هنگام ارسال یک مرور، یک پانوشت «بازبینی شده از طریق Kilo» اضافه کنید."
   },
   "prReview": {
     "pullRequestUnavailable": "درخواست pull در دسترس نیست",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "حساب GitLab",
       "connectGitLab": "اتصال GitLab",
       "gitlabError": "باز کردن راه‌اندازی GitLab ناموفق بود. لطفاً دوباره تلاش کنید.",
-      "description": "برای بررسی خودکار pull requestها، Kilo {{label}} را متصل کنید."
+      "description": "برای بررسی خودکار pull requestها، Kilo {{label}} را متصل کنید.",
+      "bitbucketError": "باز کردن تنظیمات Bitbucket ممکن نشد. لطفاً دوباره تلاش کنید."
     },
     "overview": {
       "reviewStyle": "سبک بررسی",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "جلسه جدید",
       "repository": "مخزن",
-      "couldNotLoadRepositories": "بارگذاری مخازن ممکن نشد",
       "connectGithub": "اتصال GitHub",
       "connectGithubDescription": "GitHub را در مرورگر خود وصل کنید، سپس برای انتخاب مخزن به اینجا برگردید.",
       "openGithub": "باز کردن GitHub",
       "refreshRepositories": "تازهسازی مخازن",
-      "githubConnectionNotVisible": "ما هنوز اتصال GitHub شما را نمیبینیم",
-      "githubConnectionNotVisibleDescription": "اگر GitHub App کیلا را نصب یا پیکربندی کردهاید، دوباره بررسی کنید — یا مطمئن شوید که برای این حساب/سازمان نصب شده است.",
-      "checkAgain": "دوباره بررسی کنید",
       "githubConnected": "GitHub وصل شد",
       "noRepositoriesVisible": "هیچ مخزنی قابل مشاهده نیست. دسترسی مخزن GitHub App کیلا را بررسی کنید، سپس تازهسازی کنید.",
       "runOnWithTarget": "اجرا بر روی: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "ادامه ویرایش",
       "discard": "دور انداختن",
       "discardFailed": "دور انداختن پیشنویس ممکن نشد. لطفاً دوباره تلاش کنید.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "روی رایانه خود `kilo remote` را اجرا کنید، یا در یک نشست CLI در حال اجرا `/remote` را اجرا کنید تا یک فرآیند محلی kilo را کنترل کنید.",
+      "bitbucketConnected": "Bitbucket متصل شد",
+      "connectBitbucket": "اتصال Bitbucket",
+      "connectBitbucketDescription": "در مرورگر خود به Bitbucket متصل شوید، سپس برای انتخاب مخزن به اینجا بازگردید.",
+      "connectGitlab": "اتصال GitLab",
+      "connectGitlabDescription": "در مرورگر خود به GitLab متصل شوید، سپس برای انتخاب مخزن به اینجا بازگردید.",
+      "couldNotLoadBitbucketRepositories": "بارگیری مخازن Bitbucket ممکن نشد",
+      "couldNotLoadGithubRepositories": "بارگیری مخازن GitHub ممکن نشد",
+      "couldNotLoadGitlabRepositories": "بارگیری مخازن GitLab ممکن نشد",
+      "gitlabConnected": "GitLab متصل شد",
+      "noRepositoriesVisibleBitbucket": "هیچ مخزنی قابل مشاهده نیست. دسترسی مخزن را برای Bitbucket بررسی کنید، سپس تازه‌سازی کنید.",
+      "noRepositoriesVisibleGitlab": "هیچ مخزنی قابل مشاهده نیست. دسترسی مخزن را برای GitLab بررسی کنید، سپس تازه‌سازی کنید.",
+      "openBitbucket": "باز کردن Bitbucket",
+      "openGitlab": "باز کردن GitLab",
+      "recentlyUsed": "اخیراً استفاده‌شده"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل بهروزرسانی شد",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "هیچ مخزنی به حساب شما وصل نیست.",
       "tryDifferentSearch": "عبارت جستجوی دیگری را امتحان کنید.",
       "loading": "در حال بارگذاری...",
-      "accessibility": "مخزن: {{label}}"
+      "accessibility": "مخزن: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "جزئیات پیام",
@@ -2624,6 +2638,18 @@
       "updating": "در حال به‌روزرسانی، {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "درخواست pull"
+    },
+    "markdownImage": {
+      "load": "بارگذاری",
+      "loadWithHost": "بارگذاری {{host}}",
+      "httpsOnly": "فقط تصاویر HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "این پیوند باز نمیشود.",
+      "hostConfirmTitle": "پیوند خارجی باز شود؟",
+      "hostConfirmMessage": "این پیوند {{host}} را در مرورگر شما باز میکند.",
+      "open": "باز کردن",
+      "trustThisHost": "اعتماد به این میزبان"
     }
   },
   "bootstrap": {
@@ -2946,7 +2972,10 @@
         "team-topup-bonus-2025": "پاداش شارژ تیم 2025",
         "accounting_adjustment": "تعدیل حسابداری",
         "credits_expired": "اعتبارها منقضی شدند"
-      }
+      },
+      "loadMore": "بارگذاری بیشتر",
+      "loadMoreFailed": "بارگذاری بیشتر ممکن نشد",
+      "truncated": "فعالیت اعتبار قدیمیتر در دسترس است."
     },
     "inviteMember": {
       "emailError": "یک آدرس ایمیل معتبر وارد کنید",
@@ -2973,7 +3002,10 @@
         "draft": "پیش‌نویس",
         "uncollectible": "وصول‌نشدنی",
         "unknown": "ناشناخته"
-      }
+      },
+      "loadMore": "بارگذاری بیشتر",
+      "loadMoreFailed": "بارگذاری بیشتر ممکن نشد",
+      "truncated": "فاکتورهای قدیمیتر در دسترس هستند."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3109,5 +3141,13 @@
       "xhigh": "خیلی زیاد",
       "max": "حداکثر"
     }
+  },
+  "trustedHosts": {
+    "title": "میزبانهای مورد اعتماد",
+    "subtitle": "میزبانهایی که به آنها اعتماد دارید تا بدون پرسیدن باز شوند",
+    "emptyTitle": "میزبان مورد اعتمادی نیست",
+    "emptyDescription": "وقتی به میزبان یک پیوند اعتماد کنید، بدون پرسیدن دوباره باز میشود.",
+    "revoke": "بازگرداندن {{host}}",
+    "backToPreferences": "بازگشت به تنظیمات"
   }
 }

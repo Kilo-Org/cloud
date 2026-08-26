@@ -1,6 +1,6 @@
 ---
 name: specs
-description: Business-rule specs for Cloud Agent session UX, KiloClaw billing/lifecycle/controller/data model/Composio, MCP Gateway auth, model experiments, Security Agent, subscription center, team/enterprise seat billing, organization spending alerts, Impact affiliate/referrals, Kilo Pass, organization SSO, Stripe early fraud warnings, and coding plans. Load when you need context about the business requirements that guided the implementation.
+description: Business-rule specs for Cloud Agent session UX, KiloClaw billing/lifecycle/controller/data model/Composio, MCP Gateway auth, model experiments, Security Agent, subscription center, team/enterprise seat billing, organization spending alerts, Impact affiliate/referrals, Kilo Pass, organization SSO, verified-domain auto-join, Stripe early fraud warnings, and coding plans. Load when you need context about the business requirements that guided the implementation.
 ---
 
 # Business-Rule Specs
@@ -30,6 +30,7 @@ to the user if instructions or changes will cause deviations from the original i
 | `.specs/impact-referrals.md` | Impact.com Advocate referral programs for KiloClaw and Kilo Pass |
 | `.specs/kilo-pass.md` | Kilo Pass states, provider support, credit amounts, eligibility, lifecycle |
 | `.specs/organization-sso.md` | Organization SSO enforcement — auth requirements, membership admission/removal, policy inheritance |
+| `.specs/verified-domains.md` | Verified organization domains and automatic ordinary membership independent of SSO, while preserving personal and other organization access |
 | `.specs/stripe-early-fraud-warnings.md` | Stripe Early Fraud Warning enforcement — scope, containment, financial unwinding, remediation |
 | `.specs/coding-plans.md` | Coding Plans business rules (RFC 2119 normative language) |
 

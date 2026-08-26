@@ -151,8 +151,8 @@
     "appearanceLight": "Heledas",
     "appearanceDark": "Tumedas",
     "account": "Konto",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Lisa rakenduse viide PR-ülevaatustesse",
+    "prReviewAttributionSubtitle": "Kui esitad ülevaate, lisa jalusesse 'Reviewed via Kilo'."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole saadaval",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLabi konto",
       "connectGitLab": "Ühenda GitLab",
       "gitlabError": "GitLabi seadistuse avamine ebaõnnestus. Proovige palun uuesti.",
-      "description": "Ühendage Kilo {{label}} pull request'ide automaatseks ülevaatamiseks."
+      "description": "Ühendage Kilo {{label}} pull request'ide automaatseks ülevaatamiseks.",
+      "bitbucketError": "Bitbucketi seadistuse avamine ebaõnnestus. Proovi uuesti."
     },
     "overview": {
       "reviewStyle": "Ülevaate stiil",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Uus seanss",
       "repository": "Hoidla",
-      "couldNotLoadRepositories": "Hoidlaid ei õnnestunud laadida",
       "connectGithub": "Ühenda GitHub",
       "connectGithubDescription": "Ühenda GitHub oma brauseris, seejärel tule siia tagasi hoidla valimiseks.",
       "openGithub": "Ava GitHub",
       "refreshRepositories": "Värskenda hoidlaid",
-      "githubConnectionNotVisible": "Me ei näe veel sinu GitHub'i ühendust",
-      "githubConnectionNotVisibleDescription": "Kui installeerisid või seadistasid Kilo GitHub App'i, kontrolli uuesti — või veendu, et see oli installeeritud selle konto/organisatsiooni jaoks.",
-      "checkAgain": "Kontrolli uuesti",
       "githubConnected": "GitHub on ühendatud",
       "noRepositoriesVisible": "Ühtegi hoidlat pole nähtav. Kontrolli Kilo GitHub App'i hoidlajuurdepääsu ja värskenda seejärel.",
       "runOnWithTarget": "Käitamine: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Jätka muutmist",
       "discard": "Loobu",
       "discardFailed": "Mustandist loobumine ebaõnnestus. Proovi uuesti.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Käivita `kilo remote` oma arvutis või `/remote` käivitatavas CLI-seansis, et juhtida kohalikku kilo protsessi.",
+      "bitbucketConnected": "Bitbucket on ühendatud",
+      "connectBitbucket": "Ühenda Bitbucket",
+      "connectBitbucketDescription": "Ühenda Bitbucket brauseris ja naase siia, et valida hoidla.",
+      "connectGitlab": "Ühenda GitLab",
+      "connectGitlabDescription": "Ühenda GitLab brauseris ja naase siia, et valida hoidla.",
+      "couldNotLoadBitbucketRepositories": "Bitbucketi hoidlate laadimine ebaõnnestus",
+      "couldNotLoadGithubRepositories": "GitHubi hoidlate laadimine ebaõnnestus",
+      "couldNotLoadGitlabRepositories": "GitLabi hoidlate laadimine ebaõnnestus",
+      "gitlabConnected": "GitLab on ühendatud",
+      "noRepositoriesVisibleBitbucket": "Hoidlaid pole nähtaval. Kontrolli Bitbucketi hoidlate juurdepääsu ja värskenda.",
+      "noRepositoriesVisibleGitlab": "Hoidlaid pole nähtaval. Kontrolli GitLabi hoidlate juurdepääsu ja värskenda.",
+      "openBitbucket": "Ava Bitbucket",
+      "openGitlab": "Ava GitLab",
+      "recentlyUsed": "Hiljuti kasutatud"
     },
     "partRenderer": {
       "updatedFileCount_one": "Uuendatud {{displayCount}} fail",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Sinu kontoga pole ühendatud ühtegi hoidlat.",
       "tryDifferentSearch": "Proovi teistsugust otsingusõna.",
       "loading": "Laadimine...",
-      "accessibility": "Hoidla: {{label}}"
+      "accessibility": "Hoidla: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Sõnumi üksikasjad",
@@ -2624,6 +2638,18 @@
       "updating": "Uuendamine, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Laadi",
+      "loadWithHost": "Laadi {{host}}",
+      "httpsOnly": "Ainult HTTPS-pildid"
+    },
+    "markdownLink": {
+      "invalidLink": "Seda linki ei saa avada.",
+      "hostConfirmTitle": "Avada väline link?",
+      "hostConfirmMessage": "See link avab {{host}} sinu brauseris.",
+      "open": "Ava",
+      "trustThisHost": "Usalda seda hosti"
     }
   },
   "bootstrap": {
@@ -2946,7 +2972,10 @@
         "team-topup-bonus-2025": "Meeskonna täiendusboonus 2025",
         "accounting_adjustment": "Raamatupidamiskorrigeerimine",
         "credits_expired": "Krediidid aegusid"
-      }
+      },
+      "loadMore": "Laadi rohkem",
+      "loadMoreFailed": "Rohkemate laadimine ebaõnnestus",
+      "truncated": "Varasem krediidiajalugu on saadaval."
     },
     "inviteMember": {
       "emailError": "Sisestage kehtiv e-posti aadress",
@@ -2973,7 +3002,10 @@
         "draft": "Mustand",
         "uncollectible": "Sissenõudmatu",
         "unknown": "Teadmata"
-      }
+      },
+      "loadMore": "Laadi rohkem",
+      "loadMoreFailed": "Rohkemate laadimine ebaõnnestus",
+      "truncated": "Varasemad arved on saadaval."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3109,5 +3141,13 @@
       "xhigh": "Väga kõrge",
       "max": "Maksimaalne"
     }
+  },
+  "trustedHosts": {
+    "title": "Usaldatud hostid",
+    "subtitle": "Hostid, mida usaldad ilma küsimata avada",
+    "emptyTitle": "Usaldatud hoste pole",
+    "emptyDescription": "Kui usaldad lingi hosti, avaneb see ilma uuesti küsimata.",
+    "revoke": "Tühista {{host}}",
+    "backToPreferences": "Tagasi eelistuste juurde"
   }
 }

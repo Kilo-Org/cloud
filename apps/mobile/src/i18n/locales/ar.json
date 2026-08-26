@@ -151,8 +151,8 @@
     "appearanceLight": "فاتح",
     "appearanceDark": "داكن",
     "account": "الحساب",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "أضِف إسناد التطبيق إلى مراجعات PR",
+    "prReviewAttributionSubtitle": "ألحق تذييل \"تمت المراجعة عبر Kilo\" عند إرسال مراجعة."
   },
   "notifications": {
     "title": "الإشعارات",
@@ -868,7 +868,8 @@
       "githubApp": "تطبيق GitHub",
       "githubError": "تعذّر فتح إعداد GitHub. يرجى المحاولة مرة أخرى.",
       "gitlabAccount": "حساب GitLab",
-      "gitlabError": "تعذّر فتح إعداد GitLab. يرجى المحاولة مرة أخرى."
+      "gitlabError": "تعذّر فتح إعداد GitLab. يرجى المحاولة مرة أخرى.",
+      "bitbucketError": "تعذّر فتح إعداد Bitbucket. يرجى المحاولة مرة أخرى."
     },
     "readOnlyDescription": "يمكن لمالكي المؤسسة ومديري الفوترة فقط تغيير هذه الإعدادات.",
     "reviewDetail": {
@@ -1731,14 +1732,10 @@
     "newSession": {
       "title": "جلسة جديدة",
       "repository": "المستودع",
-      "couldNotLoadRepositories": "تعذّر تحميل المستودعات",
       "connectGithub": "ربط GitHub",
       "connectGithubDescription": "اربط GitHub في متصفحك، ثم عد إلى هنا لاختيار مستودع.",
       "openGithub": "فتح GitHub",
       "refreshRepositories": "تحديث المستودعات",
-      "githubConnectionNotVisible": "لا يمكننا رؤية اتصال GitHub الخاص بك بعد",
-      "githubConnectionNotVisibleDescription": "إذا ثبّت تطبيق Kilo GitHub أو ضبطته، فتحقق مرة أخرى — أو تأكد من تثبيته لهذا الحساب/المؤسسة.",
-      "checkAgain": "تحقق مرة أخرى",
       "githubConnected": "تم ربط GitHub",
       "noRepositoriesVisible": "لا توجد مستودعات مرئية. تحقق من وصول المستودع لتطبيق Kilo GitHub، ثم حدّث.",
       "runOnWithTarget": "التشغيل على: {{target}}",
@@ -1765,7 +1762,21 @@
       "discardDraftTitle": "تجاهل المسودة؟",
       "discardFailed": "تعذّر تجاهل المسودة. يرجى المحاولة مرة أخرى.",
       "keepEditing": "متابعة التعديل",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "شغّل `kilo remote` على جهاز الكمبيوتر، أو `/remote` في جلسة CLI قيد التشغيل، للتحكم في عملية kilo محلية.",
+      "bitbucketConnected": "تم ربط Bitbucket",
+      "connectBitbucket": "ربط Bitbucket",
+      "connectBitbucketDescription": "اتصل بـ Bitbucket في المتصفح، ثم عد إلى هنا لاختيار مستودع.",
+      "connectGitlab": "ربط GitLab",
+      "connectGitlabDescription": "اتصل بـ GitLab في المتصفح، ثم عد إلى هنا لاختيار مستودع.",
+      "couldNotLoadBitbucketRepositories": "تعذّر تحميل مستودعات Bitbucket",
+      "couldNotLoadGithubRepositories": "تعذّر تحميل مستودعات GitHub",
+      "couldNotLoadGitlabRepositories": "تعذّر تحميل مستودعات GitLab",
+      "gitlabConnected": "تم الاتصال بـ GitLab",
+      "noRepositoriesVisibleBitbucket": "لا توجد مستودعات ظاهرة. تحقق من وصول المستودعات لـ Bitbucket، ثم حدّث.",
+      "noRepositoriesVisibleGitlab": "لا توجد مستودعات ظاهرة. تحقق من وصول المستودعات لـ GitLab، ثم حدّث.",
+      "openBitbucket": "فتح Bitbucket",
+      "openGitlab": "فتح GitLab",
+      "recentlyUsed": "مستخدم مؤخرًا"
     },
     "partRenderer": {
       "updatedFileCount_one": "تم تحديث {{displayCount}} ملف",
@@ -1858,7 +1869,10 @@
       "noRepositoriesDescription": "لا توجد مستودعات متصلة بحسابك.",
       "tryDifferentSearch": "جرّب مصطلح بحث مختلف.",
       "loading": "جارٍ التحميل...",
-      "accessibility": "المستودع: {{label}}"
+      "accessibility": "المستودع: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "تفاصيل الرسالة",
@@ -2222,6 +2236,18 @@
       "updating": "جارٍ التحديث، {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "طلب سحب"
+    },
+    "markdownImage": {
+      "load": "تحميل",
+      "loadWithHost": "تحميل {{host}}",
+      "httpsOnly": "صور HTTPS فقط"
+    },
+    "markdownLink": {
+      "invalidLink": "لا يمكن فتح هذا الرابط.",
+      "hostConfirmTitle": "فتح رابط خارجي؟",
+      "hostConfirmMessage": "يفتح هذا الرابط {{host}} في متصفحك.",
+      "open": "فتح",
+      "trustThisHost": "الثقة بهذا المضيف"
     }
   },
   "bootstrap": {
@@ -3018,7 +3044,10 @@
         "team-topup-bonus-2025": "مكافأة شحن الفريق 2025",
         "accounting_adjustment": "تعديل محاسبي",
         "credits_expired": "انتهت صلاحية الأرصدة"
-      }
+      },
+      "loadMore": "تحميل المزيد",
+      "loadMoreFailed": "تعذّر تحميل المزيد",
+      "truncated": "تتوفر نشاطات رصيد أقدم."
     },
     "hub": {
       "balance": "الرصيد",
@@ -3054,7 +3083,10 @@
         "draft": "مسودة",
         "uncollectible": "غير قابل للتحصيل",
         "unknown": "غير معروف"
-      }
+      },
+      "loadMore": "تحميل المزيد",
+      "loadMoreFailed": "تعذّر تحميل المزيد",
+      "truncated": "تتوفر فواتير أقدم."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3193,5 +3225,13 @@
       "xhigh": "عالٍ جدًا",
       "max": "الحد الأقصى"
     }
+  },
+  "trustedHosts": {
+    "title": "المضيفون الموثوقون",
+    "subtitle": "مضيفون تثق بهم لفتحها دون سؤال",
+    "emptyTitle": "لا توجد مضيفون موثوقون",
+    "emptyDescription": "عندما تثق بمضيف رابط، يُفتح دون سؤال مرة أخرى.",
+    "revoke": "إبطال {{host}}",
+    "backToPreferences": "العودة إلى التفضيلات"
   }
 }

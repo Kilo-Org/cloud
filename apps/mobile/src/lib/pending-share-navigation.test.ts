@@ -4,6 +4,8 @@ import {
   isShellReadyForShare,
   resolvePendingShareNavigation,
   resolveSupersededPendingShareId,
+  SHARE_INTENT_OPTIONS,
+  shouldIngestShareIntent,
 } from './pending-share-navigation';
 
 const ready = {
@@ -129,5 +131,32 @@ describe('resolveSupersededPendingShareId', () => {
   it('returns the prior id for any distinct pair', () => {
     expect(resolveSupersededPendingShareId('a', 'b')).toBe('a');
     expect(resolveSupersededPendingShareId('b', 'a')).toBe('b');
+  });
+});
+
+describe('shouldIngestShareIntent', () => {
+  it('is true only when a share intent exists and the shell is ready', () => {
+    expect(shouldIngestShareIntent({ hasShareIntent: true, isShellReady: true })).toBe(true);
+    expect(shouldIngestShareIntent({ hasShareIntent: true, isShellReady: false })).toBe(false);
+    expect(shouldIngestShareIntent({ hasShareIntent: false, isShellReady: true })).toBe(false);
+    expect(shouldIngestShareIntent({ hasShareIntent: false, isShellReady: false })).toBe(false);
+  });
+
+  it('stays in lockstep with isShellReadyForShare', () => {
+    // The ingest copies temp files that only the share gate consumes. If it ran
+    // on a guard the gate does not share, the sign-in reap would delete them.
+    for (const key of Object.keys(ready) as (keyof typeof ready)[]) {
+      const isShellReady = isShellReadyForShare({ ...ready, [key]: !ready[key] });
+      expect(shouldIngestShareIntent({ hasShareIntent: true, isShellReady })).toBe(isShellReady);
+    }
+  });
+});
+
+describe('SHARE_INTENT_OPTIONS', () => {
+  it('keeps the share intent across a backgrounding', () => {
+    // A signed-out share becomes ingestable only after a sign-in that leaves
+    // the app. The provider default (resetOnBackground: true) would clear the
+    // payload first and the deferred ingest would never run.
+    expect(SHARE_INTENT_OPTIONS.resetOnBackground).toBe(false);
   });
 });

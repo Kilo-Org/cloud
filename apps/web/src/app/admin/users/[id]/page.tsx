@@ -11,6 +11,7 @@ import {
   organization_memberships,
   organizations,
   auto_top_up_configs,
+  user_auth_provider,
 } from '@kilocode/db/schema';
 import { eq, inArray, desc } from 'drizzle-orm';
 import { findUserById } from '@/lib/user';
@@ -65,6 +66,11 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
   const paymentMethodsByUserId = await getPaymentStatusByUserIds([user.id]);
   const creditInfo = await getBalanceForUser(user);
   const hasReceivedCardValidationCredits = await hasReceivedAnyFreeWelcomeCredits(user.id);
+  const authProviders = await db
+    .selectDistinct({ provider: user_auth_provider.provider })
+    .from(user_auth_provider)
+    .where(eq(user_auth_provider.kilo_user_id, userId))
+    .orderBy(user_auth_provider.provider);
 
   // Fetch auto-top-up config
   const autoTopUpConfig =
@@ -92,6 +98,7 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
     organization_memberships: organizationMemberships,
     autoTopUpConfig,
     is_sso_protected_domain: isSSOProtectedDomain,
+    login_methods: authProviders.length > 0 ? authProviders.map(row => row.provider) : ['email'],
   };
 }
 

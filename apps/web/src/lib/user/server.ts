@@ -25,7 +25,7 @@ import DiscordProvider from 'next-auth/providers/discord';
 import WorkOSProvider from 'next-auth/providers/workos';
 import AppleProvider from 'next-auth/providers/apple';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { allow_fake_login, ORGANIZATION_ID_HEADER } from '@/lib/constants';
+import { allow_fake_login, IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { redirect } from 'next/navigation';
@@ -46,6 +46,7 @@ import type { AuthProviderId } from '@kilocode/db/schema-types';
 import PostHogClient from '@/lib/posthog';
 import { captureException } from '@sentry/nextjs';
 import {
+  getProfileOrganizations,
   getSingleUserOrganization,
   getUserOrganizationsWithSeats,
   isOrganizationMember,
@@ -53,6 +54,8 @@ import {
 import { findLiveSalesDemoForUser } from '@/lib/organizations/sales-demo';
 import { compareOrganizationsForDefault } from '@/lib/organizations/sales-demo-sort';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
+import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
+import { resolvePreferredVerifiedDomainOrganizationId } from '@/lib/organizations/verified-domain-destination';
 import type { AccountLinkingSession } from '@/lib/account-linking-session';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import { linkAccountToExistingUser } from '@/lib/user';
@@ -560,8 +563,12 @@ type ExtendedProfile = Profile & {
 };
 
 const posthogClient = PostHogClient();
+// NextAuth calls a user-provided `debug` logger regardless of the `debug` option,
+// and its debug payloads contain sensitive data (tokens, secrets, provider config).
+// Only wire up the debug logger in local development.
+// https://next-auth.js.org/configuration/options
 const logger: LoggerInstance = {
-  debug: logExceptInTest,
+  debug: IS_DEVELOPMENT ? logExceptInTest : () => {},
   warn: sentryLogger('NEXTAUTH', 'warning'),
   error: sentryLogger('NEXTAUTH', 'error'),
 };
@@ -945,6 +952,10 @@ export const authOptions: NextAuthOptions = {
           return redirectUrlForCode(`BLOCKED`);
         }
 
+        if (!isAccountLinking && autoLinkToExistingUser) {
+          await ensureVerifiedDomainOrganizationMembership(result.user.id);
+        }
+
         // NOTE(bmc): this is sad but its here for a reason, don't change it
         if (profile) {
           const extendedProfile = profile as ExtendedProfile;
@@ -1319,10 +1330,20 @@ export function getUserUUID(user: User): string {
   }
 }
 
-// decides if we want to redirect to /profile or the org page
-// the org page will be redirected to if the user is a member of exactly one organization
-// or if the org is SSO org
+// Prefer the user's verified-domain organization, then preserve the existing
+// personal-account and single-organization fallbacks.
 export async function getProfileRedirectPath(user: User) {
+  const profileOrganizations = await getProfileOrganizations(user.id, {
+    excludeAccessBlocked: true,
+  });
+  const preferredOrganizationId = await resolvePreferredVerifiedDomainOrganizationId(
+    user,
+    profileOrganizations
+  );
+  if (preferredOrganizationId) {
+    return `/organizations/${preferredOrganizationId}`;
+  }
+
   // Users whose personal account is disabled have no personal surface;
   // always send them into an organization regardless of org count.
   if (user.personal_account_disabled) {

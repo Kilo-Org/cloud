@@ -151,8 +151,8 @@
     "appearanceLight": "Ìhè",
     "appearanceDark": "Ọchịchịrị",
     "account": "Akaụntụ",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Tinye nzere ngwa na nyocha PR",
+    "prReviewAttributionSubtitle": "Gbakwunye nkebi 'Reviewed via Kilo' n'ala mgbe ị bipụtara nyocha."
   },
   "prReview": {
     "pullRequestUnavailable": "Arịrịọ dọrọ adịghị",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Akaụntụ GitLab",
       "connectGitLab": "Jikọọ GitLab",
       "gitlabError": "Enweghị ike imepe nhazi GitLab. Biko gbalịa ọzọ.",
-      "description": "Jikọọ Kilo {{label}} ka ọ nyochaa arịrịọ njikọ na akpaaka."
+      "description": "Jikọọ Kilo {{label}} ka ọ nyochaa arịrịọ njikọ na akpaaka.",
+      "bitbucketError": "Enweghị ike imeghe nhazi Bitbucket. Biko nwaa ọzọ."
     },
     "overview": {
       "reviewStyle": "Ụdị Nyocha",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Nzukọ ọhụrụ",
       "repository": "Ebe nchekwa",
-      "couldNotLoadRepositories": "Enweghị ike ibudata ebe nchekwa",
       "connectGithub": "Jikọọ GitHub",
       "connectGithubDescription": "Jikọọ GitHub na browser gị, wee laghachite ebe a iji họrọ ebe nchekwa.",
       "openGithub": "Meghe GitHub",
       "refreshRepositories": "Meegharịa ebe nchekwa",
-      "githubConnectionNotVisible": "Anyị enweghị ike ịhụ njikọ GitHub gị aka",
-      "githubConnectionNotVisibleDescription": "Ọ bụrụ na i wụnyere ma ọ bụ hazie Kilo GitHub App, lelee ọzọ — ma ọ bụ gbaa mbọ hụ na ewụnyere ya maka akaụntụ/nzukọ a.",
-      "checkAgain": "Lelee ọzọ",
       "githubConnected": "Ejikọrọ GitHub",
       "noRepositoriesVisible": "Enweghị ebe nchekwa a na-ahụ anya. Lelee ohere ebe nchekwa maka Kilo GitHub App, wee megharịa.",
       "runOnWithTarget": "Gbaa na: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Nọgide na-edezi",
       "discard": "Tụfuo",
       "discardFailed": "Enweghị ike ịtụfu akwụkwọ a na-ede. Biko nwaa ọzọ.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Gbaa `kilo remote` na kọmputa gị, ma ọ bụ `/remote` n'ime nnọkọ CLI na-agba ọsọ, iji chịkwaa usoro kilo dị n'ógbè.",
+      "bitbucketConnected": "Bitbucket jikọrọ",
+      "connectBitbucket": "Jikọọ Bitbucket",
+      "connectBitbucketDescription": "Jikọọ Bitbucket na ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa.",
+      "connectGitlab": "Jikọọ GitLab",
+      "connectGitlabDescription": "Jikọọ GitLab na ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa.",
+      "couldNotLoadBitbucketRepositories": "Enweghị ike ibu ebe nchekwa Bitbucket",
+      "couldNotLoadGithubRepositories": "Enweghị ike ibu ebe nchekwa GitHub",
+      "couldNotLoadGitlabRepositories": "Enweghị ike ibu ebe nchekwa GitLab",
+      "gitlabConnected": "Ejikọtara GitLab",
+      "noRepositoriesVisibleBitbucket": "Ọ dịghị ebe nchekwa a na-ahụ. Lelee ohere ebe nchekwa maka Bitbucket, wee melite.",
+      "noRepositoriesVisibleGitlab": "Ọ dịghị ebe nchekwa a na-ahụ. Lelee ohere ebe nchekwa maka GitLab, wee melite.",
+      "openBitbucket": "Meghee Bitbucket",
+      "openGitlab": "Meghee GitLab",
+      "recentlyUsed": "Ejiri ya nso nso a"
     },
     "partRenderer": {
       "updatedFileCount_one": "Emelitere {{displayCount}} faịlụ",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Enweghị ebe nchekwa ejikọrọ na akaụntụ gị.",
       "tryDifferentSearch": "Nwaa okwu ọchụchọ dị iche.",
       "loading": "Na-ebudata...",
-      "accessibility": "Ebe nchekwa: {{label}}"
+      "accessibility": "Ebe nchekwa: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Nkọwa ozi",
@@ -2624,6 +2638,18 @@
       "updating": "Na-emelite, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "arịrịọ ndọrọ"
+    },
+    "markdownImage": {
+      "load": "Bupụta",
+      "loadWithHost": "Bupụta {{host}}",
+      "httpsOnly": "Onyonyo HTTPS naanị"
+    },
+    "markdownLink": {
+      "invalidLink": "Enweghị ike imeghe njikọ a.",
+      "hostConfirmTitle": "Meghe njikọ mpụga?",
+      "hostConfirmMessage": "Njikọ a na-emeghe {{host}} na ihe nchọgharị gị.",
+      "open": "Meghe",
+      "trustThisHost": "Tụkwasị obi n'onye nlekọta a"
     }
   },
   "bootstrap": {
@@ -2946,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Mmezi ndekọ ego",
         "credits_expired": "Kredit emebiwo"
-      }
+      },
+      "loadMore": "Bugo ọzọ",
+      "loadMoreFailed": "Enweghị ike ibugo ọzọ",
+      "truncated": "Ọrụ kredit ochie dị."
     },
     "inviteMember": {
       "emailError": "Tinye adres email ziri ezi",
@@ -2973,7 +3002,10 @@
         "draft": "Ihe odide",
         "uncollectible": "Enweghị ike ịnakọta",
         "unknown": "Amaghị"
-      }
+      },
+      "loadMore": "Bugo ọzọ",
+      "loadMoreFailed": "Enweghị ike ibugo ọzọ",
+      "truncated": "Akwụkwọ ọnụahịa ochie dị."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3109,5 +3141,13 @@
       "xhigh": "Dị elu karịsịa",
       "max": "Kachasị"
     }
+  },
+  "trustedHosts": {
+    "title": "Ndị nlekọta a tụkwasịrị obi",
+    "subtitle": "Ndị nlekọta ị tụkwasịrị obi imeghe na-enweghị ịjụ",
+    "emptyTitle": "Enweghị ndị nlekọta a tụkwasịrị obi",
+    "emptyDescription": "Mgbe ị tụkwasịrị obi n'onye nlekọta njikọ, ọ na-emeghe na-enweghị ịjụ ọzọ.",
+    "revoke": "Weghachite {{host}}",
+    "backToPreferences": "Laghachi na mmasị"
   }
 }

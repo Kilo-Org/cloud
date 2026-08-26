@@ -151,8 +151,8 @@
     "appearanceLight": "Mārama",
     "appearanceDark": "Pōuri",
     "account": "Pūkete",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Tāpiri te tautohu taupānga ki ngā arotake PR",
+    "prReviewAttributionSubtitle": "Tāpiri he hiku 'Kua arotakea mā Kilo' ina tuku koe i tētahi arotake."
   },
   "prReview": {
     "pullRequestUnavailable": "Kāore i te wātea te tono huna",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Pūkete GitLab",
       "connectGitLab": "Hono GitLab",
       "gitlabError": "Kāore i taea te uwhera i te whakatū GitLab. Tēnā whakamātau anō.",
-      "description": "Hono te Kilo {{label}} ki te arotake tono hītō ā-aunoa."
+      "description": "Hono te Kilo {{label}} ki te arotake tono hītō ā-aunoa.",
+      "bitbucketError": "Kāore i taea te whakatuwhera i te tautuhinga Bitbucket. Tēnā whakamātau anō."
     },
     "overview": {
       "reviewStyle": "Te Āhua Arotake",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Wātū hōu",
       "repository": "Pūranga",
-      "couldNotLoadRepositories": "Kāore i taea te uta ngā pūranga",
       "connectGithub": "Hono ki GitHub",
       "connectGithubDescription": "Honohia a GitHub i tō pūtirotiro, kātahi hoki mai ki konei ki te kōwhiri i tētahi pūranga.",
       "openGithub": "Whakatuwhera GitHub",
       "refreshRepositories": "Whakahou ngā pūranga",
-      "githubConnectionNotVisible": "Kāore anō e kitea e mātou tō hononga GitHub",
-      "githubConnectionNotVisibleDescription": "Mēnā kua whakauru, kua whirihora rānei koe i te Kilo GitHub App, tirohia anō — kia whakapūmau rānei i whakaurua mō tēnei pūkete/whakahaere.",
-      "checkAgain": "Tirohia anō",
       "githubConnected": "Kua hono a GitHub",
       "noRepositoriesVisible": "Kāore he pūranga e kitea ana. Tirohia te wāhi atu pūranga mō te Kilo GitHub App, kātahi whakahou.",
       "runOnWithTarget": "Oma i runga i: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Me whakatika tonu",
       "discard": "Whakarere",
       "discardFailed": "Kāore i taea te whakarere i te tauira. Tēnā whakamātau anō.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Whakahaere `kilo remote` i tō rorohiko, rānei `/remote` i roto i tētahi huinga CLI e rere ana, hei whakahaere i tētahi tukanga kilo ā-rohe.",
+      "bitbucketConnected": "Kua hono a Bitbucket",
+      "connectBitbucket": "Hono Bitbucket",
+      "connectBitbucketDescription": "Hono atu ki Bitbucket i tō pūtirotiro, kātahi hoki mai ki konei ki te kōwhiri pūputunga.",
+      "connectGitlab": "Hono GitLab",
+      "connectGitlabDescription": "Hono atu ki GitLab i tō pūtirotiro, kātahi hoki mai ki konei ki te kōwhiri pūputunga.",
+      "couldNotLoadBitbucketRepositories": "Kāore i taea te uta i ngā pūputunga Bitbucket",
+      "couldNotLoadGithubRepositories": "Kāore i taea te uta i ngā pūputunga GitHub",
+      "couldNotLoadGitlabRepositories": "Kāore i taea te uta i ngā pūputunga GitLab",
+      "gitlabConnected": "Kua hono a GitLab",
+      "noRepositoriesVisibleBitbucket": "Kāore he pūputunga e kitea ana. Tirohia te uru pūputunga mō Bitbucket, kātahi whakahōu.",
+      "noRepositoriesVisibleGitlab": "Kāore he pūputunga e kitea ana. Tirohia te uru pūputunga mō GitLab, kātahi whakahōu.",
+      "openBitbucket": "Whakatuwhera Bitbucket",
+      "openGitlab": "Whakatuwhera GitLab",
+      "recentlyUsed": "Kua whakamahia tata nei"
     },
     "partRenderer": {
       "updatedFileCount_one": "Kua whakahoutia {{displayCount}} kōnae",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Kāore he pūranga i hono ki tō pūkete.",
       "tryDifferentSearch": "Whakamātauhia tētahi kupu rapu rerekē.",
       "loading": "Kei te uta...",
-      "accessibility": "Pūranga: {{label}}"
+      "accessibility": "Pūranga: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Ngā taipitopito karere",
@@ -2624,6 +2638,18 @@
       "updating": "E whakahou ana, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "tono huna"
+    },
+    "markdownImage": {
+      "load": "Utaina",
+      "loadWithHost": "Utaina {{host}}",
+      "httpsOnly": "He whakaahua HTTPS anake"
+    },
+    "markdownLink": {
+      "invalidLink": "Kāore e taea te whakatuwhera tēnei hono.",
+      "hostConfirmTitle": "Tuwhera i te hono o waho?",
+      "hostConfirmMessage": "Ka tuwhera tēnei hono i a {{host}} i tō pūtirotiro.",
+      "open": "Tuwhera",
+      "trustThisHost": "Whakawhirinaki ki tēnei kaihautū"
     }
   },
   "bootstrap": {
@@ -2946,7 +2972,10 @@
         "team-topup-bonus-2025": "Te top-up bonus rōpū 2025",
         "accounting_adjustment": "Te whakatikatika kaute",
         "credits_expired": "Kua pau ngā whiwhinga"
-      }
+      },
+      "loadMore": "Uta anō",
+      "loadMoreFailed": "Kāore i taea te uta ētahi atu",
+      "truncated": "E wātea ana ngā mahi kirimana tawhito."
     },
     "inviteMember": {
       "emailError": "Whakaurua he wāhitau īmēra tika",
@@ -2973,7 +3002,10 @@
         "draft": "Hukitanga",
         "uncollectible": "Kāore e taea te kohi",
         "unknown": "Kāore e mōhiotia"
-      }
+      },
+      "loadMore": "Uta anō",
+      "loadMoreFailed": "Kāore i taea te uta ētahi atu",
+      "truncated": "E wātea ana ngā nama tawhito."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3109,5 +3141,13 @@
       "xhigh": "Tino teitei",
       "max": "Mōrahi"
     }
+  },
+  "trustedHosts": {
+    "title": "Ngā kaihautū kua whakawhirinakihia",
+    "subtitle": "Ngā kaihautū e whakawhirinaki ana koe ki te tuwhera me te kore pātai",
+    "emptyTitle": "Kāore he kaihautū kua whakawhirinakihia",
+    "emptyDescription": "Inā whakawhirinaki koe ki te kaihautū o tētahi hono, ka tuwhera me te kore anō e pātai.",
+    "revoke": "Whakakore i a {{host}}",
+    "backToPreferences": "Hoki ki ngā manakohanga"
   }
 }

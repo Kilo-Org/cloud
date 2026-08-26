@@ -972,6 +972,7 @@ describe('pending session messages', () => {
     );
 
     const result = await runInDurableObject(stub, async (instance, state) => {
+      instance.env.VERCEL_PROJECT_ID = '';
       const volatileEvents: Array<{ streamEventType: string; payload: string }> = [];
       (instance as any).broadcastVolatileEvent = (event: {
         streamEventType: string;

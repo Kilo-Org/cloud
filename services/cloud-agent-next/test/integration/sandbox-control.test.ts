@@ -1,10 +1,14 @@
 import { SELF, env, runInDurableObject } from 'cloudflare:test';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { describe, expect, it, vi } from 'vitest';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
 } from '../../src/sandbox-control/credential.js';
-import { loadDeadlines } from '../../src/sandbox-control/durable-state.js';
+import { DEADLINE_MS } from '../../src/sandbox-control/deadlines.js';
+import { loadDeadlines, saveDeadlines } from '../../src/sandbox-control/durable-state.js';
+import type { SessionMessageRecord } from '../../src/sandbox-session/session-message-queue.js';
+import { createEventQueries } from '../../src/session/queries/index.js';
 import {
   SANDBOX_CONTROL_AUTO_PING,
   SANDBOX_CONTROL_AUTO_PONG,
@@ -12,15 +16,15 @@ import {
 
 const sandboxId = 'sbx_control_smoke';
 
-async function seedCredential(credential: string): Promise<void> {
-  const stub = env.SANDBOX_CONTROL.getByName(sandboxId);
+async function seedCredential(credential: string, id = sandboxId): Promise<void> {
+  const stub = env.SANDBOX_CONTROL.getByName(id);
   await runInDurableObject(stub, async instance => {
     await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
   });
 }
 
-async function connect(credential: string): Promise<WebSocket> {
-  const response = await SELF.fetch(`http://worker.test/sandbox-control/${sandboxId}`, {
+async function connect(credential: string, id = sandboxId): Promise<WebSocket> {
+  const response = await SELF.fetch(`http://worker.test/sandbox-control/${id}`, {
     headers: {
       Upgrade: 'websocket',
       Authorization: `Bearer ${credential}`,
@@ -114,6 +118,35 @@ describe('SandboxControl in the Workers runtime', () => {
     await expect(firstClosed).resolves.toBe(4000);
 
     second.close();
+  });
+
+  it('closes duplicate provisional sockets after a successful handshake', async () => {
+    const id = 'sbx_control_provisional_duplicates';
+    const credential = generateSandboxCredential();
+    await seedCredential(credential, id);
+    const stub = env.SANDBOX_CONTROL.getByName(id);
+    await runInDurableObject(stub, async instance => {
+      await instance.claimCreate('intent_provisional_duplicates');
+      await instance.confirmInstance('inst_1');
+    });
+
+    const provisional = await connect(credential, id);
+    const successful = await connect(credential, id);
+    const provisionalClosed = new Promise<number>(resolve => {
+      provisional.addEventListener('close', event => resolve(event.code), { once: true });
+    });
+
+    await completeHello(successful, 'hello-provisional-duplicates');
+    await expect(provisionalClosed).resolves.toBe(1008);
+    await runInDurableObject(stub, async (instance, state) => {
+      await expect(instance.getStatus()).resolves.toMatchObject({
+        physical: 'running',
+        connection: 'connected',
+      });
+      expect((await loadDeadlines(state.storage)).socketHandshake).toBeUndefined();
+    });
+
+    successful.close();
   });
 
   it('closes the live socket when the credential hash rotates', async () => {
@@ -233,6 +266,88 @@ describe('SandboxControl owner identity', () => {
       );
       await expect(instance.getOwner()).resolves.toBeNull();
     });
+  });
+});
+
+describe('SandboxControl recovery watchdogs', () => {
+  it('restores and preserves wrapper readiness when an unknown provider recovers disconnected', async () => {
+    const stub = env.SANDBOX_CONTROL.getByName('sbx_control_recovery_disconnected');
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.claimCreate('intent_recovery_disconnected');
+      await instance.confirmInstance('inst_1');
+      await instance.observeProvider('unknown');
+      expect((await loadDeadlines(state.storage)).wrapperReadiness).toBeUndefined();
+
+      const recoveredAt = Date.now();
+      await expect(instance.observeProvider('active')).resolves.toMatchObject({
+        state: 'running',
+        providerRef: 'inst_1',
+      });
+      const deadlines = await loadDeadlines(state.storage);
+      expect(deadlines.wrapperReadiness).toBeGreaterThanOrEqual(
+        recoveredAt + DEADLINE_MS.wrapperReadiness
+      );
+      expect(deadlines.heartbeatExpiry).toBeUndefined();
+      expect(await state.storage.getAlarm()).toBe(deadlines.wrapperReadiness);
+
+      await instance.observeProvider('unknown');
+      await instance.observeProvider('active');
+      expect((await loadDeadlines(state.storage)).wrapperReadiness).toBe(
+        deadlines.wrapperReadiness
+      );
+    });
+  });
+
+  it('restores and preserves heartbeat expiry when an unknown provider recovers ready', async () => {
+    const id = 'sbx_control_recovery_ready';
+    const credential = generateSandboxCredential();
+    await seedCredential(credential, id);
+    const stub = env.SANDBOX_CONTROL.getByName(id);
+    await runInDurableObject(stub, async instance => {
+      await instance.claimCreate('intent_recovery_ready');
+      await instance.confirmInstance('inst_1');
+    });
+
+    const ws = await connect(credential, id);
+    await completeHello(ws, 'hello-recovery-ready');
+    ws.send(
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.ready',
+        payload: { kiloReady: true, globalFeedAttached: true },
+      })
+    );
+    await vi.waitFor(async () => {
+      await runInDurableObject(stub, async instance => {
+        await expect(instance.getStatus()).resolves.toMatchObject({ connection: 'ready' });
+      });
+    });
+
+    await runInDurableObject(stub, async (instance, state) => {
+      const initialDeadlines = await loadDeadlines(state.storage);
+      expect(initialDeadlines.heartbeatExpiry).toEqual(expect.any(Number));
+      delete initialDeadlines.heartbeatExpiry;
+      await saveDeadlines(state.storage, initialDeadlines);
+      await instance.observeProvider('unknown');
+
+      const recoveredAt = Date.now();
+      await expect(instance.observeProvider('active')).resolves.toMatchObject({
+        state: 'running',
+        providerRef: 'inst_1',
+      });
+      const deadlines = await loadDeadlines(state.storage);
+      expect(deadlines.heartbeatExpiry).toBeGreaterThanOrEqual(
+        recoveredAt + DEADLINE_MS.heartbeatExpiry
+      );
+      expect(deadlines.wrapperReadiness).toBeUndefined();
+      expect(await state.storage.getAlarm()).toBe(deadlines.heartbeatExpiry);
+
+      await instance.observeProvider('unknown');
+      await instance.observeProvider('active');
+      expect((await loadDeadlines(state.storage)).heartbeatExpiry).toBe(deadlines.heartbeatExpiry);
+    });
+
+    ws.close();
   });
 });
 
@@ -527,4 +642,135 @@ describe('SandboxControl durable remainder', () => {
     await prompt('ses_b', 'kilo_b', '/workspace/b', 'msg_b');
     response.webSocket.close();
   });
+});
+
+describe('SandboxSession control-plane regressions', () => {
+  it('preserves repository branches and structured initial and follow-up command turns', async () => {
+    const userId = 'user_control_commands' as const;
+    const sessionId = 'workspace_control_commands';
+    const stub = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
+    await runInDurableObject(stub, async (instance, state) => {
+      const blocker = {
+        messageId: 'msg_blocker',
+        state: 'accepted',
+        acceptedAt: 1,
+        lastActivityAt: 1,
+      } satisfies SessionMessageRecord;
+      await state.storage.put('session_messages', [blocker]);
+
+      const repository = {
+        type: 'github',
+        repo: 'acme/demo',
+        branch: 'feature/commands',
+      } as const;
+      const initialTurn = {
+        type: 'command',
+        messageId: 'msg_initial_command',
+        command: 'review',
+        arguments: '--all changes',
+      } as const;
+      await expect(
+        instance.createSessionWithInitialAdmission({
+          identity: { sessionId, userId },
+          auth: { kiloSessionId: 'kilo_root' },
+          agent: { mode: 'code', model: 'test' },
+          repository,
+          message: { initialTurn },
+        })
+      ).resolves.toMatchObject({ success: true, messageId: initialTurn.messageId });
+      await expect(instance.getMetadata()).resolves.toMatchObject({
+        repository: {
+          type: 'github',
+          repo: repository.repo,
+          upstreamBranch: repository.branch,
+        },
+      });
+
+      const followUpTurn = {
+        type: 'command',
+        id: 'msg_followup_command',
+        command: 'compact',
+        arguments: '--aggressive',
+      } as const;
+      await expect(
+        instance.admitSubmittedMessage({ userId, turn: followUpTurn })
+      ).resolves.toMatchObject({ success: true, messageId: followUpTurn.id });
+      expect(await state.storage.get<SessionMessageRecord[]>('session_messages')).toEqual([
+        blocker,
+        { messageId: initialTurn.messageId, state: 'queued', turn: initialTurn },
+        {
+          messageId: followUpTurn.id,
+          state: 'queued',
+          turn: {
+            type: 'command',
+            messageId: followUpTurn.id,
+            command: followUpTurn.command,
+            arguments: followUpTurn.arguments,
+          },
+        },
+      ]);
+    });
+  });
+
+  it.each(['session.turn.close', 'session.error'])(
+    'preserves parent work and the persisted child %s event',
+    async eventType => {
+      const userId = 'user_control_child';
+      const sessionId = `workspace_control_child_${eventType.replaceAll('.', '_')}`;
+      const stub = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
+      await runInDurableObject(stub, async (instance, state) => {
+        await instance.registerSession({
+          identity: { sessionId, userId },
+          auth: { kiloSessionId: 'kilo_root' },
+          agent: { mode: 'code', model: 'test' },
+        });
+        const accepted = {
+          messageId: 'msg_parent',
+          state: 'accepted',
+          acceptedAt: 1,
+          lastActivityAt: 2,
+          turn: { type: 'prompt', messageId: 'msg_parent', prompt: 'parent turn' },
+        } satisfies SessionMessageRecord;
+        const queued = {
+          messageId: 'msg_next',
+          state: 'queued',
+          turn: { type: 'command', messageId: 'msg_next', command: 'status', arguments: '' },
+        } satisfies SessionMessageRecord;
+        await state.storage.put('session_messages', [accepted, queued]);
+
+        const observedAt = Date.now();
+        await expect(
+          instance.receiveSandboxControlEvent({
+            identity: {
+              directory: '/workspace/root',
+              kiloSessionId: 'kilo_child',
+              rootKiloSessionId: 'kilo_root',
+            },
+            payload: { type: eventType, properties: { sessionID: 'kilo_child' } },
+          })
+        ).resolves.toEqual({ applied: true });
+
+        const messages = await state.storage.get<SessionMessageRecord[]>('session_messages');
+        expect(messages).toEqual([{ ...accepted, lastActivityAt: expect.any(Number) }, queued]);
+        expect(messages?.[0]?.lastActivityAt).toBeGreaterThanOrEqual(observedAt);
+        await expect(instance.getCurrentMessageWork()).resolves.toEqual({
+          messageId: accepted.messageId,
+          status: 'running',
+          health: 'healthy',
+        });
+
+        const events = createEventQueries(
+          drizzle(state.storage, { logger: false }),
+          state.storage.sql
+        ).findByFilters({ eventTypes: ['kilocode'] });
+        expect(events.map(event => JSON.parse(event.payload))).toEqual([
+          {
+            type: eventType,
+            event: eventType,
+            properties: { sessionID: 'kilo_child' },
+          },
+        ]);
+      });
+    }
+  );
 });

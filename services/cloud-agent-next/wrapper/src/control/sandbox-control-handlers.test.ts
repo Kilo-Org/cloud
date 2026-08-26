@@ -85,6 +85,41 @@ describe('handleControlRequest', () => {
     ]);
   });
 
+  it('calls sendCommand with the structured command and messageId', async () => {
+    const commands: unknown[] = [];
+    const prompts: unknown[] = [];
+    const kiloClient = fakeKilo({
+      sendCommand: async opts => {
+        commands.push(opts);
+      },
+      sendPromptAsync: async opts => {
+        prompts.push(opts);
+      },
+    });
+
+    const result = await handleControlRequest(
+      'session.prompt',
+      session,
+      {
+        messageId: 'msg_command',
+        turn: { type: 'command', command: 'review', arguments: '--all changes' },
+        agent: { mode: 'code', model: 'kilo-model' },
+      },
+      deps({ kiloClient })
+    );
+
+    expect(result).toEqual({ ok: true, result: { messageId: 'msg_command', status: 'accepted' } });
+    expect(commands).toEqual([
+      {
+        sessionId: 'kilo_1',
+        command: 'review',
+        args: '--all changes',
+        messageId: 'msg_command',
+      },
+    ]);
+    expect(prompts).toEqual([]);
+  });
+
   it('returns protocol_error for session.prompt without session', async () => {
     const result = await handleControlRequest(
       'session.prompt',

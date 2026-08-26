@@ -666,8 +666,7 @@ function rebuildCloneAllocation(
     kiloSessionId.length === 0 ||
     typeof sandboxId !== 'string' ||
     sandboxId.length === 0 ||
-    typeof sandboxProvider !== 'string' ||
-    sandboxProvider !== 'cloudflare'
+    (sandboxProvider !== 'cloudflare' && sandboxProvider !== 'vercel')
   ) {
     throw creationInProgressError();
   }
@@ -702,7 +701,7 @@ function rebuildCloneAllocation(
     kiloSessionId,
     sandboxId: sandboxId as SandboxId,
     sandboxRoute: route,
-    sandboxProvider: sandboxProvider as SandboxSelection['provider'],
+    sandboxProvider,
     initialTurn,
     credentialContainment: computeCredentialContainment(input, ctx),
     sessionService,
@@ -954,16 +953,13 @@ async function registerAllocatedSession(
   allocation: NewSessionAllocation,
   ledger: SessionCreationLedgerHooks | undefined
 ): Promise<{ cloudAgentSessionId: string; kiloSessionId: string }> {
-  const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(
-    `${ctx.userId}:${allocation.cloudAgentSessionId}`
-  );
   let registerResult: Awaited<ReturnType<CloudAgentSession['registerSession']>>;
   try {
     registerResult = await withDORetry<
       DurableObjectStub<CloudAgentSession>,
       Awaited<ReturnType<CloudAgentSession['registerSession']>>
     >(
-      () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
+      () => resolveSessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId),
       stub =>
         stub.registerSession(buildSessionRegistrationCommand(input, ctx, allocation, options)),
       'registerSession'

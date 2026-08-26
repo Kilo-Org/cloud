@@ -314,9 +314,9 @@ describe('CloudAgentSession message admission', () => {
     expect(result.deleteBatchSizes.length).toBeGreaterThan(2);
     expect(result.deleteBatchSizes.every(size => size <= 128)).toBe(true);
     expect(result.tombstoneSurvived.every(Boolean)).toBe(true);
-    expect(result.keysDuringStop).toEqual(['vercel_deletion_tombstone']);
+    expect(result.keysDuringStop).toEqual(['session_deletion_intent', 'vercel_deletion_tombstone']);
     expect(result.eventsDuringStop).toBe(0);
-    expect(result.remainingKeys).toEqual(['vercel_deletion_tombstone']);
+    expect(result.remainingKeys).toEqual(['session_deletion_intent', 'vercel_deletion_tombstone']);
     expect(result.remainingEvents).toBe(0);
     expect(result.stopCalls[0]?.slice(0, 2)).toEqual(['session-exact-1', 'ses-acde1234']);
   });

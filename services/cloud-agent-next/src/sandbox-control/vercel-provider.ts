@@ -106,6 +106,7 @@ export function createVercelProviderAdapter(deps: {
           cwd: '/',
           env: {
             ...intent.env,
+            PROVIDER_INSTANCE_ID: providerRef,
             WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
           },
           sudo: false,
@@ -135,7 +136,7 @@ export function createVercelProviderAdapter(deps: {
     },
     async stop(ref) {
       const parsed = decodeVercelProviderRef(ref);
-      if (parsed === null) return 'terminal';
+      if (parsed === null) return ref === null ? 'terminal' : 'retryable';
       try {
         const session = await restClient.stopSession(parsed.sessionId, parsed.sandboxName);
         return TERMINAL_STATUSES.has(session.status) ? 'terminal' : 'retryable';

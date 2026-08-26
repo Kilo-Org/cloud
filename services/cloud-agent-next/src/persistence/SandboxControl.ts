@@ -342,6 +342,10 @@ export class SandboxControl extends DurableObject<Env> {
     const current = await loadPhysicalRecord(this.ctx.storage);
     const next = observe(current, result);
     await this.persistPhysical(current, next, `observe:${result}`);
+    if (current.state === 'unknown' && next.state === 'running') {
+      const deadline = this.connectionState() === 'ready' ? 'heartbeatExpiry' : 'wrapperReadiness';
+      await this.armDeadlineIfAbsent(deadline, Date.now() + DEADLINE_MS[deadline]);
+    }
     if (next.state === 'stopped') {
       await this.cancelDeadlineAndAlarm('startup');
       await this.cancelDeadlineAndAlarm('stopAttempt');
@@ -520,6 +524,7 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   private async onHandshakeComplete(providerInstanceId: string): Promise<void> {
+    this.socketHandler.closeProvisionalSockets();
     await this.cancelDeadlineAndAlarm('socketHandshake');
     const now = Date.now();
     const current = await loadPhysicalRecord(this.ctx.storage);

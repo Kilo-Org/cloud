@@ -23,7 +23,7 @@ const noFs = {
 };
 
 describe('applySessionAttach', () => {
-  it('clones into the session directory without mutating process.env', async () => {
+  it('clones and checks out a non-default branch without mutating process.env', async () => {
     const gitCalls: string[][] = [];
     const mkdirCalls: string[] = [];
     const envBefore = process.env.KILOCODE_TOKEN;
@@ -31,7 +31,7 @@ describe('applySessionAttach', () => {
       session,
       {
         directory: '/workspace/a',
-        branch: 'main',
+        branch: 'feature/non-default',
         git: { url: 'https://github.com/acme/demo.git', token: 'secret', platform: 'github' },
         env: { KILOCODE_TOKEN: 'cap_1' },
       },
@@ -52,7 +52,12 @@ describe('applySessionAttach', () => {
     expect(mkdirCalls).toEqual(['/workspace/a']);
     expect(gitCalls[0]?.[0]).toBe('clone');
     expect(gitCalls[0]?.includes('--branch')).toBe(false);
-    expect(gitCalls[1]).toEqual(['checkout', '-B', 'main']);
+    expect(gitCalls[1]).toEqual([
+      'checkout',
+      '-B',
+      'feature/non-default',
+      'origin/feature/non-default',
+    ]);
     expect(gitCalls[0]?.some(arg => arg.includes('secret'))).toBe(true);
     expect(process.env.KILOCODE_TOKEN).toBe(envBefore);
   });
@@ -95,7 +100,9 @@ describe('applySessionAttach', () => {
     );
 
     expect(result).toEqual({ ok: true, result: { attached: true } });
-    expect(gitCalls).toEqual([{ args: ['checkout', '-B', 'feature/retry'], cwd: '/workspace/a' }]);
+    expect(gitCalls).toEqual([
+      { args: ['checkout', '-B', 'feature/retry', 'origin/feature/retry'], cwd: '/workspace/a' },
+    ]);
   });
 
   it('retries branch checkout after cloning succeeds but the initial checkout fails', async () => {
@@ -158,8 +165,8 @@ describe('applySessionAttach', () => {
     expect(retried).toEqual({ ok: true, result: { attached: true } });
     expect(gitCalls).toEqual([
       ['clone', 'https://github.com/acme/demo.git', '/workspace/a'],
-      ['checkout', '-B', 'feature/retry'],
-      ['checkout', '-B', 'feature/retry'],
+      ['checkout', '-B', 'feature/retry', 'origin/feature/retry'],
+      ['checkout', '-B', 'feature/retry', 'origin/feature/retry'],
     ]);
     expect(setupCalls).toEqual(['pnpm install']);
     expect(markerWrites).toBe(1);

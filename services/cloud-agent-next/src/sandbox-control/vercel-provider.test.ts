@@ -90,6 +90,7 @@ describe('vercel provider adapter', () => {
       env: {
         SANDBOX_CONTROL_URL: 'wss://example.test/sandbox-control/ses-abc',
         SANDBOX_CONTROL_CREDENTIAL: 'secret',
+        PROVIDER_INSTANCE_ID: 'ses-abc',
       },
     });
     expect(created).toEqual({
@@ -102,6 +103,10 @@ describe('vercel provider adapter', () => {
         wait: false,
         env: expect.objectContaining({
           SANDBOX_CONTROL_CREDENTIAL: 'secret',
+          PROVIDER_INSTANCE_ID: encodeVercelProviderRef({
+            sandboxName: 'ses-abc',
+            sessionId: 'vsess_1',
+          }),
           WRAPPER_LOG_PATH: '/tmp/kilocode-control-wrapper.log',
         }),
       })
@@ -165,13 +170,16 @@ describe('vercel provider adapter', () => {
 
   it('stop is terminal on 404 or stopped, retryable otherwise', async () => {
     const ref = encodeVercelProviderRef({ sandboxName: 'ses-abc', sessionId: 'vsess_1' });
+    const stopSession = vi.fn().mockResolvedValue({ ...runningSession, status: 'stopped' });
     const stopped = createVercelProviderAdapter({
       sandboxName: 'ses-abc',
       config,
-      restClient: fakeClient(),
+      restClient: fakeClient({ stopSession }),
     });
     await expect(stopped.stop(ref)).resolves.toBe('terminal');
     await expect(stopped.stop(null)).resolves.toBe('terminal');
+    await expect(stopped.stop('not-json')).resolves.toBe('retryable');
+    expect(stopSession).toHaveBeenCalledTimes(1);
 
     const gone = createVercelProviderAdapter({
       sandboxName: 'ses-abc',

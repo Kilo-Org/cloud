@@ -208,7 +208,10 @@ export async function applySessionAttach(
             }
           }
           if (attach.branch) {
-            const checked = await runGit(['checkout', '-B', attach.branch], directory);
+            const checked = await runGit(
+              ['checkout', '-B', attach.branch, `origin/${attach.branch}`],
+              directory
+            );
             if (checked.exitCode !== 0) {
               progress.fail('cloning', cloneStepId, 'git checkout failed');
               return fail('not_ready', 'git checkout failed', true);

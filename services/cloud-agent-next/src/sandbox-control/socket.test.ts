@@ -247,7 +247,7 @@ describe('sandbox control socket handler', () => {
     });
     const handler = createSandboxControlSocketHandler(createFakeState([ws]), 'sbx_test');
     const pending = handler.sendRequest({ operation: 'sandbox.status', payload: {} });
-    handler.handleClose(asWs(ws));
+    await handler.handleClose(asWs(ws));
     await expect(pending).rejects.toMatchObject({
       code: 'not_ready',
       message: 'Wrapper socket closed',

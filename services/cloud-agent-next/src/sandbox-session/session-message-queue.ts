@@ -1,3 +1,4 @@
+import { renderExecutionTurnContent, type AcceptedExecutionTurn } from '../execution/types.js';
 import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
 
 export type SessionMessageState = 'queued' | 'accepted' | 'completed' | 'failed' | 'cancelled';
@@ -7,6 +8,7 @@ export type SessionMessageRecord = {
   state: SessionMessageState;
   acceptedAt?: number;
   lastActivityAt?: number;
+  turn?: AcceptedExecutionTurn;
   prompt?: string;
   failedReason?: string;
   attachFailures?: number;
@@ -97,7 +99,18 @@ export function nextQueuedMessageId(messages: readonly SessionMessageRecord[]): 
   return messages.find(message => message.state === 'queued')?.messageId;
 }
 
-export function userTurnTerminalState(type: string): 'completed' | 'failed' | undefined {
+export function userTurnTerminalState(
+  type: string,
+  kiloSessionId?: string,
+  rootKiloSessionId?: string
+): 'completed' | 'failed' | undefined {
+  if (
+    kiloSessionId !== undefined &&
+    rootKiloSessionId !== undefined &&
+    kiloSessionId !== rootKiloSessionId
+  ) {
+    return undefined;
+  }
   if (type === 'session.turn.close') return 'completed';
   if (type === 'session.error') return 'failed';
   return undefined;
@@ -206,7 +219,7 @@ export function streamQueuedSnapshots(
     )
     .map(message => ({
       messageId: message.messageId,
-      content: message.prompt ?? '',
+      content: message.turn ? renderExecutionTurnContent(message.turn) : (message.prompt ?? ''),
       timestamp: message.acceptedAt ?? now,
       ...(message.state === 'failed'
         ? { terminalFailure: failedMessageSnapshot(message, now) }

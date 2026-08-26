@@ -8,10 +8,12 @@ import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { parseSessionMetadata, serializeSessionMetadata } from '../persistence/session-metadata.js';
 import type { OperationResult } from '../persistence/types.js';
 import type { CallbackTarget } from '../callbacks/index.js';
-import type {
-  LegacyRegisteredInitialAdmissionRequest,
-  SessionMessageAdmissionResult,
-  SubmittedSessionMessageRequest,
+import {
+  renderExecutionTurnContent,
+  type AcceptedExecutionTurn,
+  type LegacyRegisteredInitialAdmissionRequest,
+  type SessionMessageAdmissionResult,
+  type SubmittedSessionMessageRequest,
 } from '../execution/types.js';
 import type { MessageResultRPCResponse } from '../session/message-result.js';
 import type { LatestAssistantMessage } from '../session/types.js';
@@ -149,13 +151,15 @@ export class SandboxSession extends DurableObject<Env> {
       eventQueries: this.eventQueries,
       broadcast: event => this.broadcastStoredEvent(event),
     });
-    const terminal = userTurnTerminalState(input.payload.type);
+    const eventKiloSessionId =
+      input.identity.kiloSessionId ??
+      ingestKiloSessionId(input.payload.type, input.payload.properties);
+    const terminal = userTurnTerminalState(input.payload.type, eventKiloSessionId, root);
     if (!terminal) {
       const activeMessages = recordAcceptedMessageActivity(await this.loadMessages(), Date.now());
       if (activeMessages) await this.saveMessages(activeMessages);
     }
     const ingestItems = controlEventToIngestItems(input.payload.type, input.payload.properties);
-    const eventKiloSessionId = ingestKiloSessionId(input.payload.type, input.payload.properties);
     const rootKiloSessionId = metadata.auth.kiloSessionId;
     const token = metadata.auth.kilocodeToken;
     if (ingestItems.length > 0 && rootKiloSessionId && token && this.env.SESSION_INGEST) {
@@ -390,12 +394,21 @@ export class SandboxSession extends DurableObject<Env> {
     finalization?: SessionMetadata['finalization'];
   }): Promise<OperationResult> {
     if (await this.getMetadata()) return { success: true };
+    const repository =
+      input.repository &&
+      'branch' in input.repository &&
+      typeof input.repository.branch === 'string'
+        ? {
+            ...input.repository,
+            upstreamBranch: input.repository.upstreamBranch ?? input.repository.branch,
+          }
+        : input.repository;
     const metadata = parseSessionMetadata({
       metadataSchemaVersion: 2,
       identity: input.identity,
       auth: input.auth,
       agent: input.agent,
-      ...(input.repository ? { repository: input.repository } : {}),
+      ...(repository ? { repository } : {}),
       workspace: input.workspace ?? {},
       ...(input.callback ? { callback: input.callback } : {}),
       ...(input.profile ? { profile: input.profile } : {}),
@@ -415,14 +428,13 @@ export class SandboxSession extends DurableObject<Env> {
     callback?: SessionMetadata['callback'];
     profile?: SessionMetadata['profile'];
     finalization?: SessionMetadata['finalization'];
-    message: { initialTurn: { messageId: string; type: string } };
+    message: { initialTurn: AcceptedExecutionTurn };
   }): Promise<SessionMessageAdmissionResult> {
     const registered = await this.registerSession(input);
     if (!registered.success) {
       return { success: false, code: 'INTERNAL', error: registered.error ?? 'register failed' };
     }
-    const initial = input.message.initialTurn as { messageId: string; prompt?: string };
-    return this.queueAndDispatch(initial.messageId, initial.prompt);
+    return this.queueAndDispatch(input.message.initialTurn);
   }
 
   async tryUpdate(updates: { callbackTarget?: CallbackTarget | null }): Promise<OperationResult> {
@@ -462,11 +474,21 @@ export class SandboxSession extends DurableObject<Env> {
     request: SubmittedSessionMessageRequest
   ): Promise<SessionMessageAdmissionResult> {
     const messageId = request.turn.id ?? createMessageId();
-    const prompt =
-      'prompt' in request.turn && typeof request.turn.prompt === 'string'
-        ? request.turn.prompt
-        : undefined;
-    return this.queueAndDispatch(messageId, prompt);
+    const turn: AcceptedExecutionTurn =
+      request.turn.type === 'prompt'
+        ? {
+            type: 'prompt',
+            messageId,
+            prompt: request.turn.prompt,
+            ...(request.turn.attachments ? { attachments: request.turn.attachments } : {}),
+          }
+        : {
+            type: 'command',
+            messageId,
+            command: request.turn.command,
+            arguments: request.turn.arguments,
+          };
+    return this.queueAndDispatch(turn);
   }
 
   async replayPreparedInitialMessage(
@@ -503,17 +525,17 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   private async queueAndDispatch(
-    messageId: string,
-    prompt?: string
+    turn: AcceptedExecutionTurn
   ): Promise<SessionMessageAdmissionResult> {
+    const messageId = turn.messageId;
     const messages = await this.loadMessages();
     const existing = messages.find(message => message.messageId === messageId);
     if (existing) {
       return { success: true, outcome: 'queued', messageId, compatibilityDelivery: 'queued' };
     }
-    messages.push({ messageId, state: 'queued', ...(prompt ? { prompt } : {}) });
+    messages.push({ messageId, state: 'queued', turn });
     await this.saveMessages(messages);
-    this.broadcastQueuedMessage(messageId, prompt ?? '');
+    this.broadcastQueuedMessage(messageId, renderExecutionTurnContent(turn));
     if (nextQueuedMessageId(messages) === messageId) {
       this.ctx.waitUntil(this.dispatchQueued(messageId, { allowCreate: true }));
     }
@@ -662,7 +684,17 @@ export class SandboxSession extends DurableObject<Env> {
         session,
         payload: {
           messageId,
-          turn: { type: 'prompt', prompt: queued?.prompt ?? '' },
+          turn:
+            queued?.turn?.type === 'command'
+              ? {
+                  type: 'command',
+                  command: queued.turn.command,
+                  arguments: queued.turn.arguments,
+                }
+              : {
+                  type: 'prompt',
+                  prompt: queued?.turn?.prompt ?? queued?.prompt ?? '',
+                },
           agent: {
             mode: metadata.agent?.mode ?? 'code',
             model: metadata.agent?.model ?? 'default',

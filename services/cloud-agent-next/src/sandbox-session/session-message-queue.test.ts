@@ -72,6 +72,15 @@ describe('userTurnTerminalState', () => {
     expect(userTurnTerminalState('session.idle')).toBeUndefined();
     expect(userTurnTerminalState('message.updated')).toBeUndefined();
   });
+
+  it.each([
+    ['session.turn.close', 'completed'],
+    ['session.error', 'failed'],
+  ])('settles %s only for the root session', (type, state) => {
+    expect(userTurnTerminalState(type, 'root', 'root')).toBe(state);
+    expect(userTurnTerminalState(type, 'child', 'root')).toBeUndefined();
+    expect(userTurnTerminalState(type, undefined, 'root')).toBe(state);
+  });
 });
 
 describe('terminalizeAcceptedMessages', () => {
@@ -137,6 +146,28 @@ describe('acceptQueuedMessage', () => {
     });
   });
 
+  it('preserves structured prompt attachments and command arguments', () => {
+    const prompt = {
+      type: 'prompt' as const,
+      messageId: 'a',
+      prompt: 'inspect attachment',
+      attachments: { path: 'attachment-path', files: ['document.pdf'] },
+    };
+    const command = {
+      type: 'command' as const,
+      messageId: 'b',
+      command: 'review',
+      arguments: '--all changes',
+    };
+
+    expect(
+      acceptQueuedMessage([{ messageId: 'a', state: 'queued', turn: prompt }], 'a', 10)?.[0]
+    ).toMatchObject({ state: 'accepted', turn: prompt });
+    expect(
+      acceptQueuedMessage([{ messageId: 'b', state: 'queued', turn: command }], 'b', 20)?.[0]
+    ).toMatchObject({ state: 'accepted', turn: command });
+  });
+
   it('does not resurrect a cancelled message after interrupt', () => {
     expect(
       acceptQueuedMessage([msg('a', 'cancelled'), msg('b', 'queued')], 'a', 10)
@@ -172,6 +203,25 @@ describe('recordAcceptedMessageActivity', () => {
     }
   );
 
+  it.each(['session.turn.close', 'session.error'])(
+    'keeps the parent active and the next turn queued for a child %s',
+    eventType => {
+      const messages: SessionMessageRecord[] = [
+        { messageId: 'parent', state: 'accepted', acceptedAt: 10, lastActivityAt: 20 },
+        { messageId: 'next', state: 'queued' },
+      ];
+
+      expect(userTurnTerminalState(eventType, 'child', 'root')).toBeUndefined();
+      const activeMessages = recordAcceptedMessageActivity(messages, 30);
+
+      expect(activeMessages).toEqual([
+        { messageId: 'parent', state: 'accepted', acceptedAt: 10, lastActivityAt: 30 },
+        { messageId: 'next', state: 'queued' },
+      ]);
+      expect(nextQueuedMessageId(activeMessages ?? [])).toBeUndefined();
+    }
+  );
+
   it('does not update messages when no turn is accepted', () => {
     expect(
       recordAcceptedMessageActivity([msg('a', 'queued'), msg('b', 'completed')], 30)
@@ -188,7 +238,7 @@ describe('hasInterruptibleWork', () => {
 });
 
 describe('streamQueuedSnapshots', () => {
-  it('surfaces queued and accepted prompts for /stream catch-up', () => {
+  it('surfaces queued and accepted legacy prompts for /stream catch-up', () => {
     expect(
       streamQueuedSnapshots(
         [
@@ -201,6 +251,36 @@ describe('streamQueuedSnapshots', () => {
     ).toEqual([
       { messageId: 'a', content: 'hello', timestamp: 99 },
       { messageId: 'b', content: 'world', timestamp: 20 },
+    ]);
+  });
+
+  it('renders structured prompts and commands for queued-message reconnect', () => {
+    expect(
+      streamQueuedSnapshots(
+        [
+          {
+            messageId: 'a',
+            state: 'accepted',
+            acceptedAt: 20,
+            turn: { type: 'prompt', messageId: 'a', prompt: 'hello' },
+          },
+          {
+            messageId: 'b',
+            state: 'queued',
+            turn: { type: 'command', messageId: 'b', command: 'review', arguments: '--all' },
+          },
+          {
+            messageId: 'c',
+            state: 'queued',
+            turn: { type: 'command', messageId: 'c', command: 'status', arguments: '' },
+          },
+        ],
+        99
+      )
+    ).toEqual([
+      { messageId: 'a', content: 'hello', timestamp: 20 },
+      { messageId: 'b', content: '/review --all', timestamp: 99 },
+      { messageId: 'c', content: '/status', timestamp: 99 },
     ]);
   });
 });

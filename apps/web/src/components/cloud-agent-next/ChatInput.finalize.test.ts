@@ -148,6 +148,39 @@ function setTextareaValue(rootContainer: HTMLElement, value: string) {
   onChange({ target: { value } });
 }
 
+/** Drive the textarea's own onKeyDown, the path a second Enter takes. */
+function pressEnter(rootContainer: HTMLElement) {
+  type Fiber = {
+    type: unknown;
+    memoizedProps?: { onKeyDown?: (event: unknown) => void };
+    child?: Fiber | null;
+    sibling?: Fiber | null;
+  };
+  const reactKey = Object.keys(rootContainer).find(key => key.startsWith('__reactContainer'));
+  const host = reactKey
+    ? (rootContainer as unknown as Record<string, { stateNode?: { current?: Fiber } }>)[reactKey]
+    : undefined;
+  const walk = (fiber: Fiber | null | undefined, visit: (f: Fiber) => void) => {
+    if (!fiber) return;
+    visit(fiber);
+    walk(fiber.child, visit);
+    walk(fiber.sibling, visit);
+  };
+  let onKeyDown: ((event: unknown) => void) | undefined;
+  walk(host?.stateNode?.current, fiber => {
+    if (fiber.type === 'textarea' && typeof fiber.memoizedProps?.onKeyDown === 'function') {
+      onKeyDown = fiber.memoizedProps.onKeyDown;
+    }
+  });
+  if (!onKeyDown) throw new Error('textarea onKeyDown not found on fiber tree');
+  onKeyDown({
+    key: 'Enter',
+    shiftKey: false,
+    preventDefault: () => {},
+    nativeEvent: { isComposing: false, keyCode: 13 },
+  });
+}
+
 // Runtime modules are loaded after the jest.mock registrations above so the
 // presentational children and the upload hook are stubbed before ChatInput's
 // own import graph resolves.
@@ -217,6 +250,57 @@ describe('ChatInput finalize failure', () => {
       const textarea = dom.container.querySelector('textarea');
       expect(textarea).not.toBeNull();
       expect((textarea as HTMLTextAreaElement).value).toBe('first message');
+    } finally {
+      act(() => {
+        root.unmount();
+      });
+      dom.cleanup();
+    }
+  });
+
+  it('ignores a second Enter while the link RPC is still in flight', async () => {
+    let resolveFinalize!: (value: CloudAgentAttachments | undefined) => void;
+    const finalizeAttachments = jest.fn(
+      () =>
+        new Promise<CloudAgentAttachments | undefined>(resolve => {
+          resolveFinalize = resolve;
+        })
+    );
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload({ finalizeAttachments }));
+    const onSend = jest.fn(async () => true);
+
+    const dom = installLinkedomDom();
+    let root!: Root;
+    try {
+      act(() => {
+        root = createRoot(dom.container);
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+          })
+        );
+      });
+
+      act(() => {
+        setTextareaValue(dom.container, 'first message');
+      });
+
+      act(() => {
+        pressEnter(dom.container);
+      });
+      act(() => {
+        pressEnter(dom.container);
+      });
+
+      expect(finalizeAttachments).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveFinalize({ path: 'test-message-uuid', files: ['file.png'] });
+        await Promise.resolve();
+      });
+
+      expect(onSend).toHaveBeenCalledTimes(1);
     } finally {
       act(() => {
         root.unmount();

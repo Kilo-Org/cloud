@@ -1611,6 +1611,13 @@
       "when": 1787738671363,
       "tag": "0229_steep_imperial_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 230,
+      "version": "7",
+      "when": 1787745543754,
+      "tag": "0230_fancy_mariko_yashida",
+      "breakpoints": true
     }
   ]
 }

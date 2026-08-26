@@ -135,6 +135,12 @@ export function ChatInput({
     setValue(nextValue);
   }, []);
 
+  /** Ref for the synchronous re-entry guard, state for the disabled UI. */
+  const setAttachmentSubmissionPending = useCallback((pending: boolean) => {
+    attachmentSubmissionPendingRef.current = pending;
+    setIsAttachmentSubmissionPending(pending);
+  }, []);
+
   const attachmentUpload = useCloudAgentAttachmentUpload(attachmentUploadOptions);
   const isAttachmentLimitReached =
     attachmentUpload.attachments.length >= CLOUD_AGENT_ATTACHMENT_MAX_COUNT;
@@ -211,9 +217,15 @@ export function ChatInput({
 
       let attachmentsData: CloudAgentAttachments | undefined;
       if (attachmentsEnabled) {
+        // Take the in-flight guard BEFORE the link RPC: while finalize awaits,
+        // the send button stays enabled and Enter still reaches sendMessage,
+        // so an unguarded await lets a second submit start its own
+        // finalize + send.
+        setAttachmentSubmissionPending(true);
         try {
           attachmentsData = await attachmentUpload.finalizeAttachments();
         } catch (error) {
+          setAttachmentSubmissionPending(false);
           toast.error('Failed to attach files. Please try again.', {
             description: String(error instanceof Error ? error.message : ''),
           });
@@ -223,9 +235,8 @@ export function ChatInput({
       const submittedAttachments = attachmentsEnabled ? attachmentUpload.attachments : [];
       const submitsAttachments = hasSubmissionAttachmentPayload(attachmentsData);
 
-      if (submitsAttachments) {
-        attachmentSubmissionPendingRef.current = true;
-        setIsAttachmentSubmissionPending(true);
+      if (!submitsAttachments) {
+        setAttachmentSubmissionPending(false);
       }
       setInputValue('');
       if (textareaRef.current) {
@@ -247,8 +258,7 @@ export function ChatInput({
         return true;
       } finally {
         if (submitsAttachments) {
-          attachmentSubmissionPendingRef.current = false;
-          setIsAttachmentSubmissionPending(false);
+          setAttachmentSubmissionPending(false);
         }
         if (!accepted && valueRef.current === '') {
           setInputValue(trimmed);
@@ -262,6 +272,7 @@ export function ChatInput({
       disabled,
       onSend,
       onSendCommand,
+      setAttachmentSubmissionPending,
       setInputValue,
       slashCommands,
     ]

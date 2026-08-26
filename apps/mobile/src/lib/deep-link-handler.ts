@@ -76,7 +76,7 @@ export function redirectSystemPath({
       }
     } else {
       // WARM: router is mounted; group hrefs work here.
-      router.navigate(href as Href);
+      router.navigate(href as Href, { withAnchor: true });
     }
     // Falsy in both handled cases — critical (see above).
     return null;

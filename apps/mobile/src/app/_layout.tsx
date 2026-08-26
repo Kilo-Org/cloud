@@ -694,7 +694,7 @@ function RootLayoutNav() {
     }
     const navigation = resolvePendingNavigation(getPendingDeepLink());
     if (navigation) {
-      router.navigate(navigation.href as Href);
+      router.navigate(navigation.href as Href, { withAnchor: navigation.withAnchor });
     }
   }, [pendingDeepLink, isShellReady, router]);
 

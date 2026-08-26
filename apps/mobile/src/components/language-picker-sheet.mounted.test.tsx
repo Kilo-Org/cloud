@@ -161,9 +161,15 @@ async function applySelection(
   beforeReload?: () => Promise<void>
 ): Promise<TestRenderer.ReactTestRenderer> {
   const renderer = await mountSheet(onClose, beforeReload);
-  act(() => {
+  await act(async () => {
     (findChoiceRow(renderer.root, endonym).props.onPress as () => void)();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
   });
+  if (vi.mocked(applyLanguagePreference).mock.calls.length > 0) {
+    return renderer;
+  }
   const sheet = findByType(renderer.root, 'PickerSheet')[0];
   if (!sheet) {
     throw new Error('PickerSheet not found');
@@ -186,6 +192,7 @@ describe('LanguagePickerSheet apply', () => {
     setLanguagePreferenceAsync.mockResolvedValue(true);
     reloadAppAsync.mockReset();
     writeLanguageReturnTarget.mockReset();
+    insets.bottom = 0;
     i18nManager.isRTL = false;
     i18nManager.forceRTL.mockReset();
     vi.mocked(applyLanguagePreference).mockClear();
@@ -224,7 +231,19 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
-  it('applies an LTR language in place without reloading the app', async () => {
+  it('preserves horizontal padding and the safe-area inset', async () => {
+    insets.bottom = 24;
+    const renderer = await mountSheet(vi.fn<() => void>());
+    const list = renderer.root.findByType(flatListMock);
+
+    expect(list.props.contentContainerClassName).toBe('px-4 pb-4');
+    expect(list.props.contentContainerStyle).toBeUndefined();
+    expect(list.props.ListFooterComponent).toMatchObject({ props: { style: { height: 24 } } });
+
+    renderer.unmount();
+  });
+
+  it('applies an LTR language immediately without reloading the app', async () => {
     const onClose = vi.fn<() => void>();
     const renderer = await applySelection(onClose, 'Español');
 
@@ -233,6 +252,35 @@ describe('LanguagePickerSheet apply', () => {
     expect(reloadAppAsync).not.toHaveBeenCalled();
     expect(i18nManager.forceRTL).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('waits for Done before applying a language that changes direction', async () => {
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+
+    act(() => {
+      (findChoiceRow(renderer.root, 'العربية').props.onPress as () => void)();
+    });
+
+    expect(applyLanguagePreference).not.toHaveBeenCalled();
+    expect(setLanguagePreferenceAsync).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!sheet) {
+      throw new Error('PickerSheet not found');
+    }
+    await act(async () => {
+      (sheet.props.onDone as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });
@@ -355,7 +403,7 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
-  it('applies a same-direction RTL language in place without reloading', async () => {
+  it('applies a same-direction RTL language immediately without reloading', async () => {
     i18nManager.isRTL = true;
     const onClose = vi.fn<() => void>();
     const renderer = await applySelection(onClose, 'العربية');

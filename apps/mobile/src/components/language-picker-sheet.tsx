@@ -42,8 +42,6 @@ export function LanguagePickerSheet({
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const [selected, setSelected] = useState<LanguagePreference>('device');
-  // Captured when the sheet opens, never updated from `selected`: the groups
-  // must describe what is applied, so tapping a row moves only the checkmark.
   const [applied, setApplied] = useState<LanguagePreference>('device');
   const [appliedLanguage, setAppliedLanguage] = useState<SupportedLanguage>('en');
   const [busy, setBusy] = useState(false);
@@ -86,16 +84,16 @@ export function LanguagePickerSheet({
   const isRtl = I18nManager.isRTL;
   const items = languagePickerItems(query, appliedLanguage, applied === 'device');
 
-  const handleDone = async () => {
+  const handleDone = async (preference = selected) => {
     if (busy) {
       return;
     }
-    const resolved = selected === 'device' ? resolveDeviceLanguage() : selected;
+    const resolved = preference === 'device' ? resolveDeviceLanguage() : preference;
     if (I18nManager.isRTL !== isRtlLanguage(resolved)) {
       setRestarting(true);
     }
     setBusy(true);
-    const outcome = await applyLanguagePreference(selected, resolved, returnTarget, beforeReload);
+    const outcome = await applyLanguagePreference(preference, resolved, returnTarget, beforeReload);
     // `ApplyLanguageOutcome` is a closed union and every kind is handled
     // above, so no `default` branch is reachable.
     // eslint-disable-next-line default-case
@@ -205,8 +203,8 @@ export function LanguagePickerSheet({
         keyExtractor={item => item.key}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        contentContainerClassName="px-4"
-        contentContainerStyle={{ paddingBottom: insets.bottom }}
+        contentContainerClassName="px-4 pb-4"
+        ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
         ListHeaderComponent={
           <View className="pb-2 pt-3">
             <TextInput
@@ -249,7 +247,13 @@ export function LanguagePickerSheet({
             disabled={busy}
             deviceEndonym={deviceEndonym}
             isRtl={isRtl}
-            onSelect={setSelected}
+            onSelect={preference => {
+              setSelected(preference);
+              const resolved = preference === 'device' ? resolveDeviceLanguage() : preference;
+              if (I18nManager.isRTL === isRtlLanguage(resolved)) {
+                void handleDone(preference);
+              }
+            }}
           />
         )}
       />

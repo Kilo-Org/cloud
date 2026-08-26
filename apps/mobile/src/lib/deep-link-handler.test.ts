@@ -66,6 +66,10 @@ const MAPPED_CASES = [
     path: 'https://app.kilo.ai/code-reviews/rev_9',
     href: '/(app)/(tabs)/(3_profile)/code-reviewer/personal/reviews/rev_9',
   },
+  {
+    path: 'https://app.kilo.ai/organizations/org_1/code-reviews/rev_9',
+    href: '/(app)/(tabs)/(3_profile)/code-reviewer/org_1/reviews/rev_9',
+  },
 ] as const;
 
 describe('redirectSystemPath', () => {
@@ -114,7 +118,7 @@ describe('redirectSystemPath', () => {
       expect(result).toBeNull();
       expect(!result).toBe(true);
       expect(mocks.navigate).toHaveBeenCalledOnce();
-      expect(mocks.navigate).toHaveBeenCalledWith(href);
+      expect(mocks.navigate).toHaveBeenCalledWith(href, { withAnchor: true });
       expect(getPendingDeepLink()).toBeNull();
     });
   });
@@ -167,7 +171,9 @@ describe('redirectSystemPath', () => {
       expect(result).toBeNull();
       expect(!result).toBe(true);
       expect(mocks.navigate).toHaveBeenCalledOnce();
-      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)');
+      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)', {
+        withAnchor: true,
+      });
       expect(getPendingDeepLink()).toBeNull();
     });
   });
@@ -228,7 +234,9 @@ describe('redirectSystemPath', () => {
         initial: false,
       });
       expect(result).toBeNull();
-      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)');
+      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)', {
+        withAnchor: true,
+      });
 
       // Outcome must be stored for the agents tab to read.
       const outcome = mod.getGitHubInstallReturnOutcome();
@@ -244,7 +252,9 @@ describe('redirectSystemPath', () => {
         initial: false,
       });
       expect(result).toBeNull();
-      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)');
+      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)', {
+        withAnchor: true,
+      });
       expect(mod.getGitHubInstallReturnOutcome()).toBeNull();
     });
 
@@ -257,7 +267,9 @@ describe('redirectSystemPath', () => {
         initial: false,
       });
       expect(result).toBeNull();
-      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)');
+      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)', {
+        withAnchor: true,
+      });
 
       const outcome = mod.getGitHubInstallReturnOutcome();
       expect(outcome).toEqual({ kind: 'pending' });
@@ -272,7 +284,9 @@ describe('redirectSystemPath', () => {
         initial: false,
       });
       expect(result).toBeNull();
-      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)');
+      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)', {
+        withAnchor: true,
+      });
 
       const outcome = mod.getGitHubInstallReturnOutcome();
       expect(outcome).toEqual({ kind: 'error', code: 'installation_failed' });
@@ -287,7 +301,9 @@ describe('redirectSystemPath', () => {
         initial: false,
       });
       expect(result).toBeNull();
-      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)');
+      expect(mocks.navigate).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)', {
+        withAnchor: true,
+      });
 
       const outcome = mod.getGitHubInstallReturnOutcome();
       expect(outcome).toEqual({ kind: 'error', code: 'install_state_user_mismatch' });

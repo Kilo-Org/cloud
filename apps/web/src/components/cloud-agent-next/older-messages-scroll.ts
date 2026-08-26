@@ -41,7 +41,7 @@ export function restoreScrollAfterPrepend(
   el.scrollTop += el.scrollHeight - previousScrollHeight;
 }
 
-export function canAutoloadOlderMessages(el: { hidden: boolean; clientHeight: number }): boolean {
+export function canAutoloadOlderMessages(el: Pick<HTMLElement, 'hidden' | 'clientHeight'>): boolean {
   return !el.hidden && el.clientHeight > 0;
 }
 

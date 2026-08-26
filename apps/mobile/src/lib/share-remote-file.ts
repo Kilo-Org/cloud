@@ -1,6 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
+import { registerTempFile } from './temp-file-registry';
 import { truncateUtf8, utf8ByteLength } from './utf8-utils';
 
 const MAX_CACHE_FILENAME_BYTES = 255;
@@ -79,8 +80,13 @@ export async function shareMaterializedRemoteFile(
 ): Promise<void> {
   try {
     await shareFile(file.uri);
-    file.delete();
+    // `shareAsync` resolves when the share sheet closes, not when the
+    // receiving app finished reading the uri (Android hands the target a
+    // lazily-read content:// uri). Deleting here truncates that read, so the
+    // copy goes to the TTL reap instead.
+    registerTempFile(file.uri);
   } catch (error) {
+    // Nothing consumed the copy on the failure path, so drop it now.
     file.delete();
     throw error;
   }

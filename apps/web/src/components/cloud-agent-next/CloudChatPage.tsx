@@ -30,6 +30,12 @@ import { SuggestionContextProvider } from './SuggestionCard';
 import { SessionContinuationPanel } from './SessionContinuationPanel';
 import { CloudAgentTerminalPane } from './CloudAgentTerminalDock';
 import { CloudAgentBillingError } from './CloudAgentBillingError';
+import { OlderMessagesHeader } from './OlderMessagesHeader';
+import {
+  OLDER_MESSAGES_NEAR_BOTTOM_PX,
+  shouldAnnounceOlderMessagesArrival,
+  useOlderMessagesPagination,
+} from './older-messages-scroll';
 import { billingPayerPresentation } from './billing-payer-presentation';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
@@ -284,6 +290,10 @@ export default function CloudChatPage({
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
+  const hasOlderMessages = useAtomValue(manager.atoms.hasOlderMessages);
+  const isLoadingOlderMessages = useAtomValue(manager.atoms.isLoadingOlderMessages);
+  const olderMessagesError = useAtomValue(manager.atoms.olderMessagesError);
+  const olderMessagesOmittedItemCount = useAtomValue(manager.atoms.olderMessagesOmittedItemCount);
 
   useCliSessionPresence(fetchedSessionData?.kiloSessionId ?? null);
 
@@ -361,6 +371,24 @@ export default function CloudChatPage({
   const isAutoScrollingRef = useRef(false);
   const autoScrollRunRef = useRef(0);
   const lastScrollTopRef = useRef(0);
+  const wasNearBottomRef = useRef(true);
+  const olderArrivalInitializedRef = useRef(false);
+  const olderArrivalCountRef = useRef(0);
+  const olderArrivalNewestKeyRef = useRef<string | null>(null);
+  const [olderArrivalAnnouncement, setOlderArrivalAnnouncement] = useState('');
+
+  const loadOlderMessages = useCallback(() => manager.loadOlderMessages(), [manager]);
+  const { requestOlderMessages, tryLoadOlderFromScroll } = useOlderMessagesPagination({
+    scrollElementRef: scrollContainerRef,
+    hasOlderMessages,
+    isLoadingOlderMessages,
+    olderMessagesError,
+    onLoad: loadOlderMessages,
+    isProgrammaticScrollRef: isAutoScrollingRef,
+    lastScrollTopRef,
+    resetKey: sessionIdFromParams,
+    overflowCheckKey: `${chatTabActive}:${staticMessages.length + dynamicMessages.length}`,
+  });
 
   const autoScrollFrameRef = useRef(0);
   const followUpAutoScrollFrameRef = useRef(0);
@@ -448,9 +476,33 @@ export default function CloudChatPage({
 
     setChatUI({ shouldAutoScroll: true });
     lastScrollTopRef.current = 0;
+    wasNearBottomRef.current = true;
+    olderArrivalInitializedRef.current = false;
+    olderArrivalCountRef.current = 0;
+    olderArrivalNewestKeyRef.current = null;
+    setOlderArrivalAnnouncement('');
     setShowScrollButton(false);
     scheduleScrollToBottom();
   }, [sessionIdFromParams, setChatUI, scheduleScrollToBottom]);
+
+  useEffect(() => {
+    const newest = dynamicMessages.at(-1)?.info.id ?? staticMessages.at(-1)?.info.id ?? null;
+    const nextCount = staticMessages.length + dynamicMessages.length;
+    if (
+      shouldAnnounceOlderMessagesArrival({
+        wasInitialized: olderArrivalInitializedRef.current,
+        previousCount: olderArrivalCountRef.current,
+        nextCount,
+        previousNewestKey: olderArrivalNewestKeyRef.current,
+        nextNewestKey: newest,
+      })
+    ) {
+      setOlderArrivalAnnouncement('Earlier messages loaded');
+    }
+    olderArrivalInitializedRef.current = true;
+    olderArrivalCountRef.current = nextCount;
+    olderArrivalNewestKeyRef.current = newest;
+  }, [dynamicMessages, staticMessages]);
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -468,10 +520,18 @@ export default function CloudChatPage({
 
     if (scrolledUp) {
       setChatUI({ shouldAutoScroll: false });
-    } else if (distanceFromBottom < 100) {
+    } else if (distanceFromBottom < OLDER_MESSAGES_NEAR_BOTTOM_PX) {
       setChatUI({ shouldAutoScroll: true });
     }
-  }, [setChatUI]);
+
+    tryLoadOlderFromScroll(el.scrollTop);
+
+    const isNearBottom = distanceFromBottom < OLDER_MESSAGES_NEAR_BOTTOM_PX;
+    if (isNearBottom && !wasNearBottomRef.current) {
+      manager.trimRetainedHistory();
+    }
+    wasNearBottomRef.current = isNearBottom;
+  }, [manager, setChatUI, tryLoadOlderFromScroll]);
 
   const scrollToBottom = useCallback(() => {
     setChatUI({ shouldAutoScroll: true });
@@ -888,6 +948,15 @@ export default function CloudChatPage({
                           onScroll={handleScroll}
                         >
                           <div ref={messagesContentRef}>
+                            <div className="sr-only" aria-live="polite">
+                              {olderArrivalAnnouncement}
+                            </div>
+                            <OlderMessagesHeader
+                              isLoadingOlderMessages={isLoadingOlderMessages}
+                              olderMessagesError={olderMessagesError}
+                              olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+                              onRetry={requestOlderMessages}
+                            />
                             <StaticMessages
                               messages={staticMessages}
                               pendingMessages={pendingMessages}

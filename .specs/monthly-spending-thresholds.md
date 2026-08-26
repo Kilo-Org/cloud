@@ -327,10 +327,14 @@ contract for this release.
    and deduplicated within an alert.
 4. An enabled alert MUST have 1-10 current recipients. A disabled alert MAY have
    zero recipients to permit safe disclosure removal.
-5. At most 10 distinct recipients may be admitted to delivery for one alert and
-   period, including addresses removed or replaced after a claim. This bound is
-   alert-scoped, not organization-scoped, and admission MUST enforce it
-   atomically under concurrent evaluators.
+5. At most 10 distinct recipients SHOULD be admitted to delivery for one alert
+   and period, including addresses removed or replaced after a claim. This bound
+   is alert-scoped, not organization-scoped. It limits fanout from mid-period
+   recipient churn and is not a safety invariant, so admission MAY enforce it
+   with an unsynchronized count: overlapping evaluators may admit a small number
+   of additional addresses for a period. At-most-once delivery per recipient and
+   period MUST NOT depend on this bound; it is guaranteed by delivery identity
+   uniqueness instead.
 6. One address MAY be configured on any number of alerts. Recipient limits and
    delivery history on one alert MUST NOT consume capacity or suppress delivery
    on another alert.
@@ -581,12 +585,14 @@ durably distinguish pre-submission from submitting work; refresh or retry only
 when the provider is known not to have accepted it; and retain ambiguous or
 accepted claims according to recipient PII policy.
 
-Uniqueness on delivery identity is what prevents duplicate claims. The separate
-10-recipient admission cap needs serialized counting, not more columns: take a
-per-alert transaction-scoped advisory lock, as organization Group Policy does,
-count that alert-period's existing claims, and insert within the same
-transaction. Prune old claims on a retention cutoff over existing timestamps,
-the way other Kilo retention jobs do.
+Uniqueness on delivery identity is what prevents duplicate claims, and it is
+sufficient on its own: claim insertion needs neither an explicit lock nor extra
+slot columns. Count that alert-period's existing claims, insert the remaining
+recipients in one statement, and let `ON CONFLICT` absorb a concurrent
+evaluator's overlap. The 10-recipient cap is a fanout bound, so an
+unsynchronized count is the right trade for keeping the claim path lock-free.
+Prune old claims on a retention cutoff over existing timestamps, the way other
+Kilo retention jobs do.
 
 Create a dedicated template and sender. Link to organization usage or Alerts,
 never the discontinued Cost Insights route.
@@ -728,8 +734,9 @@ safeguards. They MUST NOT be inferred from this design.
     The surface shows Low Balance as a distinct legacy control and opens its
     existing editor without moving its settings or changing its delivery.
 22. After 10 distinct recipients are admitted for A in one period, replacing
-    addresses cannot create more A deliveries until the next period. Another
-    alert remains independently eligible for up to 10 recipients.
+    addresses does not create more A deliveries until the next period, absent
+    concurrent evaluation of A. Another alert remains independently eligible for
+    up to 10 recipients.
 23. An entitled organization creates two otherwise identical alerts. Both are
     retained as intentional independent rules rather than deduplicated at save.
 24. An archived-alert edit, enable, or reuse-ID request is rejected. Retried

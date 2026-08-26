@@ -188,7 +188,7 @@ describe('resolveTerminalWrapperClient', () => {
   it('surfaces the provider capability-unavailable outcome reported by the sandbox', async () => {
     const getRunningTerminalClient = vi.fn().mockResolvedValue({
       status: 'capability-unavailable',
-      message: 'Terminal access is unavailable for this sandbox provider',
+      message: 'Terminal access is unavailable for Vercel sandbox sessions',
     });
     const createSandbox = vi
       .fn()
@@ -196,7 +196,10 @@ describe('resolveTerminalWrapperClient', () => {
     const result = await resolveTerminalWrapperClient(
       {
         env: {} as Env,
-        metadata: baseMetadata,
+        metadata: {
+          ...baseMetadata,
+          workspace: { ...baseMetadata.workspace, sandboxProvider: 'vercel' },
+        },
         sessionId: baseMetadata.identity.sessionId,
       },
       { createSandbox }
@@ -204,21 +207,24 @@ describe('resolveTerminalWrapperClient', () => {
 
     expect(result).toEqual({
       success: false,
-      error: 'Terminal access is unavailable for this sandbox provider',
+      error: 'Terminal access is unavailable for Vercel sandbox sessions',
     });
   });
 
   it('maps sandbox construction failures to a terminal-unavailable outcome', async () => {
     const createSandbox = vi.fn(() => {
       throw new AgentSandboxUnavailableError(
-        'Sandbox operational configuration is incomplete',
+        'Vercel sandbox operational configuration is incomplete',
         'provider_not_configured'
       );
     });
     const result = await resolveTerminalWrapperClient(
       {
         env: {} as Env,
-        metadata: baseMetadata,
+        metadata: {
+          ...baseMetadata,
+          workspace: { ...baseMetadata.workspace, sandboxProvider: 'vercel' },
+        },
         sessionId: baseMetadata.identity.sessionId,
       },
       { createSandbox }
@@ -226,7 +232,7 @@ describe('resolveTerminalWrapperClient', () => {
 
     expect(result).toEqual({
       success: false,
-      error: 'Sandbox operational configuration is incomplete',
+      error: 'Vercel sandbox operational configuration is incomplete',
     });
   });
 });

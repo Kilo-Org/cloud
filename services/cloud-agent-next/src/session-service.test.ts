@@ -391,6 +391,12 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
         updateMetadata: vi.fn().mockResolvedValue(undefined),
       })),
     } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
+    SANDBOX_SESSION: {
+      idFromName: vi.fn(() => 'sandbox-session-do-id' as unknown as DurableObjectId),
+      get: vi.fn(() => ({
+        getMetadata: vi.fn().mockResolvedValue(null),
+      })),
+    } as unknown as PersistenceEnv['SANDBOX_SESSION'],
     SESSION_INGEST: {
       fetch: vi.fn(),
       createSessionForCloudAgent: vi.fn().mockResolvedValue(undefined),

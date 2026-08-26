@@ -370,11 +370,13 @@ function RootLayoutNav() {
         router.replace('/(app)/(tabs)/(3_profile)/preferences');
       }
       try {
-        await i18n.changeLanguage(resolved);
+        // The plural-rules polyfill must be in place before the first render in the new language.
         prewarmIntl(resolved);
+        await i18n.changeLanguage(resolved);
       } catch {
-        await i18n.changeLanguage('en');
+        // The plural-rules polyfill must be in place before the first render in the new language.
         prewarmIntl('en');
+        await i18n.changeLanguage('en');
       }
       void renameAndroidNotificationChannels();
       if (!cancelled) {

@@ -2,11 +2,16 @@ import { shouldPolyfill as shouldPolyfillDurationFormat } from '@formatjs/intl-d
 import { shouldPolyfill as shouldPolyfillListFormat } from '@formatjs/intl-listformat/should-polyfill.js';
 import { shouldPolyfill as shouldPolyfillLocale } from '@formatjs/intl-locale/should-polyfill.js';
 import { shouldPolyfill as shouldPolyfillNumberFormat } from '@formatjs/intl-numberformat/should-polyfill.js';
+import { shouldPolyfill as shouldPolyfillPluralRules } from '@formatjs/intl-pluralrules/should-polyfill.js';
 import { shouldPolyfill as shouldPolyfillRelativeTimeFormat } from '@formatjs/intl-relativetimeformat/should-polyfill.js';
 import { shouldPolyfill as shouldPolyfillSegmenter } from '@formatjs/intl-segmenter/should-polyfill.js';
 
 import { isSupportedLanguage, type SupportedLanguage } from '@/i18n/languages';
-import { loadListFormatLocaleData, loadNumberFormatLocaleData } from '@/lib/formatjs-locale-data';
+import {
+  loadListFormatLocaleData,
+  loadNumberFormatLocaleData,
+  loadPluralRulesLocaleData,
+} from '@/lib/formatjs-locale-data';
 import { RELATIVE_TIME_LOCALE_LOADERS } from '@/lib/relative-time-locales';
 
 /**
@@ -26,6 +31,7 @@ const durationFormats = new Map<string, Intl.DurationFormat>();
 const collators = new Map<string, Intl.Collator>();
 const segmenters = new Map<string, Intl.Segmenter>();
 let usesNumberFormatPolyfill = false;
+let usesPluralRulesPolyfill = false;
 let usesListFormatPolyfill = false;
 let usesRelativeTimePolyfill = false;
 let usesDurationFormatPolyfill = false;
@@ -54,8 +60,22 @@ function ensureLocale(): void {
   }
 }
 
+// Hermes ships without Intl.PluralRules, and the NumberFormat and
+// RelativeTimeFormat polyfills construct one.
+function ensurePluralRules(language: SupportedLanguage): void {
+  if (!usesPluralRulesPolyfill && shouldPolyfillPluralRules(language)) {
+    require('@formatjs/intl-pluralrules/polyfill-force.js');
+    usesPluralRulesPolyfill = true;
+  }
+  if (usesPluralRulesPolyfill) {
+    ensureLocale();
+    loadPluralRulesLocaleData(language);
+  }
+}
+
 function ensureNumberFormat(locale: string): void {
   const language = localeDataLanguage(locale);
+  ensurePluralRules(language);
   if (!usesNumberFormatPolyfill && shouldPolyfillNumberFormat(locale)) {
     require('@formatjs/intl-numberformat/polyfill-force.js');
     usesNumberFormatPolyfill = true;

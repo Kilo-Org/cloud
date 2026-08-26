@@ -40,6 +40,13 @@ let launchLinkHandled = false;
 // restores.
 let currentDeepLinkUserId: string | null = null;
 
+// The signed-in user id the CURRENT in-memory slot was captured for, or null
+// when it was captured while signed out. Mirrors the persisted record's
+// `userId` field so a sign-out can drop only an account-bound destination
+// (one that belongs to the account being signed out) while keeping a
+// signed-out destination (which any later sign-in may still want).
+let pendingDeepLinkUserId: string | null = null;
+
 /** Sets the signed-in user id that `persistPendingDeepLink` records. */
 export function setCurrentDeepLinkUserId(userId: string | null): void {
   currentDeepLinkUserId = userId;
@@ -142,6 +149,7 @@ export function setPendingDeepLink(href: string, source: DeepLinkSource): void {
   } else {
     return;
   }
+  pendingDeepLinkUserId = currentDeepLinkUserId;
   pendingDeepLinkEpoch += 1;
   persistPendingDeepLink(href, source);
   notifyPendingDeepLinkListeners();
@@ -152,6 +160,7 @@ export function getPendingDeepLink(): string | null {
   const href = pendingDeepLink;
   pendingDeepLink = null;
   pendingSource = null;
+  pendingDeepLinkUserId = null;
   pendingDeepLinkEpoch += 1;
   deletePersistedPendingDeepLink();
   notifyPendingDeepLinkListeners();
@@ -167,9 +176,23 @@ export function getPendingDeepLink(): string | null {
 export function clearPendingDeepLink(): void {
   pendingDeepLink = null;
   pendingSource = null;
+  pendingDeepLinkUserId = null;
   pendingDeepLinkEpoch += 1;
   deletePersistedPendingDeepLink();
   notifyPendingDeepLinkListeners();
+}
+
+/**
+ * Sign-out drop: clear only an account-bound destination (captured while a
+ * user was signed in). A destination captured while signed out is
+ * account-independent — it is the link the user opened before signing in —
+ * so a redundant sign-out must not drop it. The in-memory clear is
+ * synchronous; the persisted delete chains behind any in-flight persist.
+ */
+export function clearAccountBoundPendingDeepLink(): void {
+  if (pendingDeepLinkUserId !== null) {
+    clearPendingDeepLink();
+  }
 }
 
 /** Current pending href without clearing. For `useSyncExternalStore`. */
@@ -310,6 +333,7 @@ export function wasLaunchLinkHandled(): boolean {
 export function _resetDeepLinkLaunchForTests(): void {
   pendingDeepLink = null;
   pendingSource = null;
+  pendingDeepLinkUserId = null;
   launchLinkHandled = false;
   getLinkingURLForTests = null;
   pendingDeepLinkListeners.clear();

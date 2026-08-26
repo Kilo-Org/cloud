@@ -63,7 +63,7 @@ const hoisted = vi.hoisted(() => {
   };
 
   const deepLinkLaunch = {
-    clearPendingDeepLink: vi.fn(),
+    clearAccountBoundPendingDeepLink: vi.fn(),
     setCurrentDeepLinkUserId: vi.fn(),
   };
 
@@ -119,7 +119,7 @@ vi.mock('@/lib/appsflyer', () => ({
 }));
 
 vi.mock('@/lib/deep-link-launch', () => ({
-  clearPendingDeepLink: hoisted.deepLinkLaunch.clearPendingDeepLink,
+  clearAccountBoundPendingDeepLink: hoisted.deepLinkLaunch.clearAccountBoundPendingDeepLink,
   setCurrentDeepLinkUserId: hoisted.deepLinkLaunch.setCurrentDeepLinkUserId,
 }));
 
@@ -356,7 +356,7 @@ describe('sign-out teardown ordering', () => {
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('notification-prompt-seen');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('pending-deep-link');
-    expect(hoisted.deepLinkLaunch.clearPendingDeepLink).toHaveBeenCalled();
+    expect(hoisted.deepLinkLaunch.clearAccountBoundPendingDeepLink).toHaveBeenCalled();
 
     unmount();
   });

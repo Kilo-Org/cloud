@@ -2140,7 +2140,8 @@
       "notEnoughCredits": "Nepietiek kredītu, lai palaistu Cloud Agent. Pievieno kredītus un mēģini vēlreiz.",
       "previousTaskFinishing": "Iepriekšējais uzdevums joprojām tiek pabeigts. Lūdzu, uzgaidi mirkli.",
       "serviceUnavailable": "Pakalpojums šobrīd nav pieejams. Lūdzu, mēģini vēlreiz.",
-      "connectionTrouble": "Savienojuma problēma. Lūdzu, mēģini vēlreiz pēc mirkļa."
+      "connectionTrouble": "Savienojuma problēma. Lūdzu, mēģini vēlreiz pēc mirkļa.",
+      "modelUnavailable": "Šis modelis nav pieejams Cloud Agent. Izvēlieties citu modeli un mēģiniet vēlreiz."
     },
     "remoteSession": {
       "failedToCreate": "Neizdevās izveidot attālo sesiju",

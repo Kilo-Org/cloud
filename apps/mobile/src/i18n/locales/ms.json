@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Kredit tidak mencukupi untuk menjalankan Cloud Agent. Tambah kredit dan cuba semula.",
       "previousTaskFinishing": "Tugas sebelumnya masih selesai. Sila tunggu sebentar.",
       "serviceUnavailable": "Perkhidmatan tidak tersedia buat masa ini. Sila cuba semula.",
-      "connectionTrouble": "Masalah sambungan. Sila cuba semula sebentar lagi."
+      "connectionTrouble": "Masalah sambungan. Sila cuba semula sebentar lagi.",
+      "modelUnavailable": "Model ini tidak tersedia untuk Cloud Agent. Pilih model lain dan cuba semula."
     },
     "remoteSession": {
       "failedToCreate": "Gagal mencipta sesi jauh",

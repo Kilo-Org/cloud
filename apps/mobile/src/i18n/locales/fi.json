@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Ei riittävästi krediittejä Cloud Agentin käyttämiseen. Lisää krediittejä ja yritä uudelleen.",
       "previousTaskFinishing": "Edellinen tehtävä on vielä viimeistelyssä. Odota hetki.",
       "serviceUnavailable": "Palvelu ei ole tällä hetkellä käytettävissä. Yritä uudelleen.",
-      "connectionTrouble": "Yhteysongelma. Yritä uudelleen hetken kuluttua."
+      "connectionTrouble": "Yhteysongelma. Yritä uudelleen hetken kuluttua.",
+      "modelUnavailable": "Tämä malli ei ole käytettävissä Cloud Agentille. Valitse toinen malli ja yritä uudelleen."
     },
     "remoteSession": {
       "failedToCreate": "Etäistunnon luonti epäonnistui",

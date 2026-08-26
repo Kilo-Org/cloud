@@ -2170,7 +2170,8 @@
       "notEnoughCredits": "Kreditu mhux biżżejjed biex tħaddem Cloud Agent. Żid il-kreditu u erġa' pprova.",
       "previousTaskFinishing": "Il-kompitu preċedenti għadu qed jintemm. Jekk jogħġbok stenna mument.",
       "serviceUnavailable": "Is-servizz mhux disponibbli bħalissa. Jekk jogħġbok erġa' pprova.",
-      "connectionTrouble": "Problema ta' konnessjoni. Jekk jogħġbok erġa' pprova fi ftit."
+      "connectionTrouble": "Problema ta' konnessjoni. Jekk jogħġbok erġa' pprova fi ftit.",
+      "modelUnavailable": "Dan il-mudell mhux disponibbli għal Cloud Agent. Agħżel mudell ieħor u erġa' pprova."
     },
     "remoteSession": {
       "failedToCreate": "Ma rnexxiliex tinħoloq sessjoni remota",

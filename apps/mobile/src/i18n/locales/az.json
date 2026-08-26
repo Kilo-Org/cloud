@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Cloud Agent işə salmaq üçün kifayət qədər kredit yoxdur. Kredit əlavə edin və yenidən cəhd edin.",
       "previousTaskFinishing": "Əvvəlki tapşırıq hələ də tamamlanır. Bir an gözləyin.",
       "serviceUnavailable": "Xidmət hazırda əlçatan deyil. Yenidən cəhd edin.",
-      "connectionTrouble": "Əlaqə problemi. Bir dəqiqə sonra yenidən cəhd edin."
+      "connectionTrouble": "Əlaqə problemi. Bir dəqiqə sonra yenidən cəhd edin.",
+      "modelUnavailable": "Bu model Cloud Agent üçün mövcud deyil. Başqa bir model seçin və yenidən cəhd edin."
     },
     "remoteSession": {
       "failedToCreate": "Uzaq sessiya yaradıla bilmədi",

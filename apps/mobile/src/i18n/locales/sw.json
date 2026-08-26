@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Salio hazitoshi kuendesha Cloud Agent. Ongeza salio na ujaribu tena.",
       "previousTaskFinishing": "Kazi iliyotangulia bado inakamilika. Tafadhali subiri kidogo.",
       "serviceUnavailable": "Huduma haipatikani sasa hivi. Tafadhali jaribu tena.",
-      "connectionTrouble": "Tatizo la muunganisho. Tafadhali jaribu tena baada ya muda mfupi."
+      "connectionTrouble": "Tatizo la muunganisho. Tafadhali jaribu tena baada ya muda mfupi.",
+      "modelUnavailable": "Mfano huu haupatikani kwa Cloud Agent. Chagua mfano mwingine na ujaribu tena."
     },
     "remoteSession": {
       "failedToCreate": "Imeshindwa kuunda kikao cha mbali",

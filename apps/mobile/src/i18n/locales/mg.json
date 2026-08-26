@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Tsy ampy ny crédit handefasana ny Cloud Agent. Ampidiro crédit ary andramo indray.",
       "previousTaskFinishing": "Ny asa teo aloha mbola vita. Andraso kely azafady.",
       "serviceUnavailable": "Tsy misy ny serivisy amin'izao fotoana izao. Andramo indray azafady.",
-      "connectionTrouble": "Olana amin'ny fifandraisana. Andramo indray rehefa afaka kely."
+      "connectionTrouble": "Olana amin'ny fifandraisana. Andramo indray rehefa afaka kely.",
+      "modelUnavailable": "Tsy misy io modely io ho an'ny Cloud Agent. Misafidìa modely hafa ary andramo indray."
     },
     "remoteSession": {
       "failedToCreate": "Tsy nahomby namorona session lavitra",

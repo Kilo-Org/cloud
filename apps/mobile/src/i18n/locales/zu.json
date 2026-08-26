@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Azikho amakhredithi anele ukusebenzisa i-Cloud Agent. Engeza amakhredithi bese uzama futhi.",
       "previousTaskFinishing": "Umsebenzi wangaphambilini usaqhubeka. Uyacelwa ukuthi ulinde isikhashana.",
       "serviceUnavailable": "Inkonzo ayitholakali njengamanje. Uyacelwa ukuthi uzame futhi.",
-      "connectionTrouble": "Inkinga yokuxhumana. Uyacelwa ukuthi uzame futhi emuva kwesikhashana."
+      "connectionTrouble": "Inkinga yokuxhumana. Uyacelwa ukuthi uzame futhi emuva kwesikhashana.",
+      "modelUnavailable": "Le modeli ayitholakali ku-Cloud Agent. Khetha enye bese uzama futhi."
     },
     "remoteSession": {
       "failedToCreate": "Kwehlulekile ukudala iseshini ekude",

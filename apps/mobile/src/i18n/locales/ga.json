@@ -2170,7 +2170,8 @@
       "notEnoughCredits": "Níl go leor creidmheasanna agat chun Cloud Agent a rith. Cuir creidmheasanna leis agus bain triail as arís.",
       "previousTaskFinishing": "Tá an tasc roimhe seo fós ag críochnú. Fan nóiméad le do thoil.",
       "serviceUnavailable": "Níl an tseirbhís ar fáil faoi láthair. Bain triail as arís le do thoil.",
-      "connectionTrouble": "Fadhb cheangail. Bain triail as arís i gceann nóiméid."
+      "connectionTrouble": "Fadhb cheangail. Bain triail as arís i gceann nóiméid.",
+      "modelUnavailable": "Níl an tsamhail seo ar fáil do Cloud Agent. Roghnaigh samhail eile agus bain triail as arís."
     },
     "remoteSession": {
       "failedToCreate": "Theip ar sheisiún cianda a chruthú",

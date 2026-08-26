@@ -1671,7 +1671,8 @@
       "notEnoughCredits": "Nicht genug Credits zum Ausführen von Cloud Agent. Füge Credits hinzu und versuche es erneut.",
       "previousTaskFinishing": "Die vorherige Aufgabe wird noch abgeschlossen. Bitte warte einen Moment.",
       "serviceUnavailable": "Der Dienst ist gerade nicht verfügbar. Bitte versuche es erneut.",
-      "connectionTrouble": "Verbindungsproblem. Bitte versuche es in einem Moment erneut."
+      "connectionTrouble": "Verbindungsproblem. Bitte versuche es in einem Moment erneut.",
+      "modelUnavailable": "Dieses Modell ist für Cloud Agent nicht verfügbar. Wähle ein anderes Modell und versuche es erneut."
     },
     "remoteSession": {
       "failedToCreate": "Remote-Sitzung konnte nicht erstellt werden",

@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Ekki næg kredit til að keyra Cloud Agent. Bættu við kredit og reyndu aftur.",
       "previousTaskFinishing": "Fyrra verkefni er enn að klárast. Bíddu augnablik.",
       "serviceUnavailable": "Þjónustan er ekki tiltæk núna. Reyndu aftur.",
-      "connectionTrouble": "Tengingarvandræði. Reyndu aftur eftir augnablik."
+      "connectionTrouble": "Tengingarvandræði. Reyndu aftur eftir augnablik.",
+      "modelUnavailable": "Þetta líkan er ekki tiltækt fyrir Cloud Agent. Veldu annað líkan og reyndu aftur."
     },
     "remoteSession": {
       "failedToCreate": "Ekki tókst að búa til fjarlota lotu",

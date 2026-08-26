@@ -1671,7 +1671,8 @@
       "notEnoughCredits": "Niet genoeg credits om Cloud Agent te starten. Voeg credits toe en probeer opnieuw.",
       "previousTaskFinishing": "De vorige taak is nog bezig. Even geduld.",
       "serviceUnavailable": "De service is momenteel niet beschikbaar. Probeer het opnieuw.",
-      "connectionTrouble": "Verbindingsprobleem. Probeer het over een moment opnieuw."
+      "connectionTrouble": "Verbindingsprobleem. Probeer het over een moment opnieuw.",
+      "modelUnavailable": "Dit model is niet beschikbaar voor Cloud Agent. Kies een ander model en probeer het opnieuw."
     },
     "remoteSession": {
       "failedToCreate": "Externe sessie maken mislukt",

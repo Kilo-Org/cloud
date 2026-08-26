@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Kreditu nahikorik ez Cloud Agent exekutatzeko. Gehitu kreditua eta saiatu berriro.",
       "previousTaskFinishing": "Aurreko zeregina oraindik amaitzen ari da. Itxaron pixka bat.",
       "serviceUnavailable": "Zerbitzua ez dago eskuragarri oraintxe. Saiatu berriro.",
-      "connectionTrouble": "Konexio-arazoa. Saiatu berriro minutu baten buruan."
+      "connectionTrouble": "Konexio-arazoa. Saiatu berriro minutu baten buruan.",
+      "modelUnavailable": "Modelu hau ez dago eskuragarri Cloud Agent-erako. Aukeratu beste modelo bat eta saiatu berriro."
     },
     "remoteSession": {
       "failedToCreate": "Ezin da urruneko saioa sortu",

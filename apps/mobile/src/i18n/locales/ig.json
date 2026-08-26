@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Kredit ezughị ezu ịgba Cloud Agent. Tinye kredit ma nwaa ọzọ.",
       "previousTaskFinishing": "Ọrụ gara aga ka na-agwụcha. Biko chere obere oge.",
       "serviceUnavailable": "Ọrụ ahụ adịghị ugbu a. Biko nwaa ọzọ.",
-      "connectionTrouble": "Nsogbu njikọ. Biko nwaa ọzọ obere oge."
+      "connectionTrouble": "Nsogbu njikọ. Biko nwaa ọzọ obere oge.",
+      "modelUnavailable": "Ihe nlereanya a adịghị maka Cloud Agent. Họrọ ihe nlereanya ọzọ ma nwaa ọzọ."
     },
     "remoteSession": {
       "failedToCreate": "Dara ịmepụta nzukọ dị anya",

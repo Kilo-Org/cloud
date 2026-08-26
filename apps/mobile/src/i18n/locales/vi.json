@@ -1671,7 +1671,8 @@
       "notEnoughCredits": "Không đủ tín dụng để chạy Cloud Agent. Hãy nạp tín dụng và thử lại.",
       "previousTaskFinishing": "Tác vụ trước vẫn đang hoàn tất. Vui lòng chờ một chút.",
       "serviceUnavailable": "Dịch vụ hiện không khả dụng. Vui lòng thử lại.",
-      "connectionTrouble": "Sự cố kết nối. Vui lòng thử lại sau giây lát."
+      "connectionTrouble": "Sự cố kết nối. Vui lòng thử lại sau giây lát.",
+      "modelUnavailable": "Mô hình này không khả dụng cho Cloud Agent. Vui lòng chọn mô hình khác và thử lại."
     },
     "remoteSession": {
       "failedToCreate": "Không thể tạo phiên từ xa",

@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Cloud Agent käivitamiseks ei jätku krediiti. Lisa krediiti ja proovi uuesti.",
       "previousTaskFinishing": "Eelmine ülesanne on veel lõpetamisel. Palun oota hetk.",
       "serviceUnavailable": "Teenus pole praegu saadaval. Palun proovi uuesti.",
-      "connectionTrouble": "Ühenduseprobleem. Palun proovi hetke pärast uuesti."
+      "connectionTrouble": "Ühenduseprobleem. Palun proovi hetke pärast uuesti.",
+      "modelUnavailable": "See mudel pole Cloud Agenti jaoks saadaval. Vali teine mudel ja proovi uuesti."
     },
     "remoteSession": {
       "failedToCreate": "Kaugseansi loomine ebaõnnestus",

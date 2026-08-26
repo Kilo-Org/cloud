@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Kulang ang credits para patakbuhin ang Cloud Agent. Magdagdag ng credits at subukan muli.",
       "previousTaskFinishing": "Tinatapos pa lang ang nakaraang gawain. Pakihintay sandali.",
       "serviceUnavailable": "Hindi available ang serbisyo ngayon. Pakisubukan muli.",
-      "connectionTrouble": "Problema sa koneksyon. Pakisubukan muli pagkalipas ng ilang sandali."
+      "connectionTrouble": "Problema sa koneksyon. Pakisubukan muli pagkalipas ng ilang sandali.",
+      "modelUnavailable": "Hindi available ang modelong ito para sa Cloud Agent. Pumili ng ibang modelo at subukang muli."
     },
     "remoteSession": {
       "failedToCreate": "Nabigong gumawa ng remote session",

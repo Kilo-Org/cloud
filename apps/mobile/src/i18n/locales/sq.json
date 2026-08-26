@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Kredi të pamjaftueshme për të ekzekutuar Cloud Agent. Shtoni kredi dhe provoni përsëri.",
       "previousTaskFinishing": "Detyra e mëparshme ende po përfundon. Ju lutemi prisni një moment.",
       "serviceUnavailable": "Shërbimi nuk është i disponueshëm tani. Ju lutemi provoni përsëri.",
-      "connectionTrouble": "Probleme me lidhjen. Ju lutemi provoni përsëri pas një momenti."
+      "connectionTrouble": "Probleme me lidhjen. Ju lutemi provoni përsëri pas një momenti.",
+      "modelUnavailable": "Ky model nuk është i disponueshëm për Cloud Agent. Zgjidhni një model tjetër dhe provoni përsëri."
     },
     "remoteSession": {
       "failedToCreate": "Dështoi krijimi i seancës në distancë",

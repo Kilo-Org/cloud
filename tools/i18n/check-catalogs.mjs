@@ -283,7 +283,10 @@ function scriptCounts(values) {
 
 /** Fold a value for wording comparison: case, edge space and end punctuation. */
 function wording(value) {
-  return value.trim().toLowerCase().replace(/[.!:。！：]+$/u, '');
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[.!:。！：]+$/u, '');
 }
 
 const PLURAL_SUFFIX_RE = /_(zero|one|two|few|many|other)$/;

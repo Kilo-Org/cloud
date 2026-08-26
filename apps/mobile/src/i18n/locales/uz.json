@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Cloud Agent ishga tushirish uchun kredit yetarli emas. Kredit qo'shing va qayta urinib ko'ring.",
       "previousTaskFinishing": "Oldingi vazifa hali ham tugamoqda. Iltimos, bir oz kuting.",
       "serviceUnavailable": "Xizmat hozir mavjud emas. Iltimos, qayta urinib ko'ring.",
-      "connectionTrouble": "Ulanish muammosi. Iltimos, bir ozdan keyin qayta urinib ko'ring."
+      "connectionTrouble": "Ulanish muammosi. Iltimos, bir ozdan keyin qayta urinib ko'ring.",
+      "modelUnavailable": "Bu model Cloud Agent uchun mavjud emas. Boshqa modelni tanlab, qayta urinib ko'ring."
     },
     "remoteSession": {
       "failedToCreate": "Masofaviy sessiya yaratilmadi",

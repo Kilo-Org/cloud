@@ -1703,7 +1703,8 @@
       "notEnoughCredits": "لا توجد ائتمانات كافية لتشغيل Cloud Agent. أضف ائتمانات وحاول مرة أخرى.",
       "previousTaskFinishing": "لا تزال المهمة السابقة قيد الإنجاز. يرجى الانتظار لحظة.",
       "serviceUnavailable": "الخدمة غير متاحة الآن. يرجى المحاولة مرة أخرى.",
-      "connectionTrouble": "مشكلة في الاتصال. يرجى إعادة المحاولة بعد لحظة."
+      "connectionTrouble": "مشكلة في الاتصال. يرجى إعادة المحاولة بعد لحظة.",
+      "modelUnavailable": "هذا النموذج غير متاح لـ Cloud Agent. اختر نموذجًا آخر وحاول مرة أخرى."
     },
     "remoteSession": {
       "failedToCreate": "تعذّر إنشاء الجلسة البعيدة",

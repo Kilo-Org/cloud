@@ -11,6 +11,11 @@ describe('classifyTerminalError', () => {
     ['You are not authorized to use the Cloud Agent.', 'permission'],
     ['Insufficient credits. Please add at least $1 to continue using Cloud Agent.', 'credits'],
     ['Previous task is still finishing up. Please wait a moment.', 'busy'],
+    [
+      'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.',
+      'model',
+    ],
+    ['This session is no longer available.', 'gone'],
     ['Service is unavailable right now. Please try again.', 'unavailable'],
     ['Service is temporarily unavailable. Please retry in a moment.', 'unavailable'],
     ['Connection lost. Please retry in a moment.', 'transient'],
@@ -100,8 +105,44 @@ describe('resolveSessionTerminalError', () => {
     ['Insufficient credits. Please add at least $1 to continue using Cloud Agent.', false],
     ['You are not authorized to use the Cloud Agent.', false],
     ['some unexpected failure', false],
+    // A Retry cannot recover either of these: the user has to change the model
+    // or leave the session.
+    [
+      'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.',
+      false,
+    ],
+    ['This session is no longer available.', false],
   ] as const)('offers retry for %s: %s', (message, retryable) => {
     expect(resolveSessionTerminalError(indicatorFor(message))?.retryable).toBe(retryable);
+  });
+
+  it('keeps the selected-model error out of the service-outage class', () => {
+    expect(
+      resolveSessionTerminalError(
+        indicatorFor(
+          'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.'
+        )
+      )
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: "This model isn't available for Cloud Agent. Choose another model and try again.",
+      retryable: false,
+      detail:
+        'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.',
+    });
+  });
+
+  it('shows a gone session as not found', () => {
+    expect(
+      resolveSessionTerminalError(indicatorFor('This session is no longer available.'))
+    ).toEqual({
+      variant: 'not-found',
+      title: 'Not found',
+      message: 'This item may have been removed or is no longer available.',
+      retryable: false,
+      detail: 'This session is no longer available.',
+    });
   });
 });
 

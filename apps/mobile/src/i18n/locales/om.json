@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Cloud Agenti hojii irra oolchuuf kireedii gahaa hin qabdu. Kireedii itti dabaliitii deebi'ii yaali.",
       "previousTaskFinishing": "Hojii duraan ture amma iyyuu xumurameera. Mee yeroo xinnoo eegi.",
       "serviceUnavailable": "Tajaajilli amma hin jiraatu. Mee deebi'ii yaali.",
-      "connectionTrouble": "Hidhannaan rakkoo qaba. Mee yeroo xinnoo booda deebi'ii yaali."
+      "connectionTrouble": "Hidhannaan rakkoo qaba. Mee yeroo xinnoo booda deebi'ii yaali.",
+      "modelUnavailable": "Moodelii kun Cloud Agentf hin jiraatu. Mee moodelii biraa filadhuu deebi'ii yaali."
     },
     "remoteSession": {
       "failedToCreate": "Xalayyii fagoo uumuu hin danda'ame",

@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "เครดิตไม่เพียงพอสำหรับเรียกใช้ Cloud Agent โปรดเพิ่มเครดิตแล้วลองอีกครั้ง",
       "previousTaskFinishing": "งานก่อนหน้ายังไม่เสร็จสิ้น โปรดรอสักครู่",
       "serviceUnavailable": "ขณะนี้บริการไม่พร้อมใช้งาน โปรดลองอีกครั้ง",
-      "connectionTrouble": "เกิดปัญหาการเชื่อมต่อ โปรดลองอีกครั้งในอีกสักครู่"
+      "connectionTrouble": "เกิดปัญหาการเชื่อมต่อ โปรดลองอีกครั้งในอีกสักครู่",
+      "modelUnavailable": "โมเดลนี้ไม่พร้อมใช้งานสำหรับ Cloud Agent โปรดเลือกโมเดลอื่นแล้วลองอีกครั้ง"
     },
     "remoteSession": {
       "failedToCreate": "ไม่สามารถสร้าง remote session ได้",

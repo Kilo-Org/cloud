@@ -1671,7 +1671,8 @@
       "notEnoughCredits": "运行 Cloud Agent 的积分不足。请添加积分后重试。",
       "previousTaskFinishing": "上一个任务仍在进行中。请稍等片刻。",
       "serviceUnavailable": "服务当前不可用。请重试。",
-      "connectionTrouble": "连接出现问题。请稍后重试。"
+      "connectionTrouble": "连接出现问题。请稍后重试。",
+      "modelUnavailable": "此模型不适用于 Cloud Agent。请选择其他模型重试。"
     },
     "remoteSession": {
       "failedToCreate": "创建远程会话失败",

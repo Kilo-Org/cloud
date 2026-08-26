@@ -1687,7 +1687,8 @@
       "notEnoughCredits": "Za mało kredytów, aby uruchomić Cloud Agent. Dodaj kredyty i spróbuj ponownie.",
       "previousTaskFinishing": "Poprzednie zadanie wciąż się kończy. Proszę chwilę poczekać.",
       "serviceUnavailable": "Usługa jest teraz niedostępna. Spróbuj ponownie.",
-      "connectionTrouble": "Problem z połączeniem. Spróbuj ponownie za chwilę."
+      "connectionTrouble": "Problem z połączeniem. Spróbuj ponownie za chwilę.",
+      "modelUnavailable": "Ten model nie jest dostępny dla Cloud Agent. Wybierz inny model i spróbuj ponownie."
     },
     "remoteSession": {
       "failedToCreate": "Nie udało się utworzyć sesji zdalnej",

@@ -1679,7 +1679,8 @@
       "notEnoughCredits": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent. הוסף קרדיטים ונסה שוב.",
       "previousTaskFinishing": "המשימה הקודמת עדיין מסתיימת. אנא המתן רגע.",
       "serviceUnavailable": "השירות אינו זמין כרגע. אנא נסה שוב.",
-      "connectionTrouble": "בעיית חיבור. אנא נסה שוב בעוד רגע."
+      "connectionTrouble": "בעיית חיבור. אנא נסה שוב בעוד רגע.",
+      "modelUnavailable": "המודל הזה אינו זמין עבור Cloud Agent. בחר מודל אחר ונסה שוב."
     },
     "remoteSession": {
       "failedToCreate": "לא ניתן היה ליצור הפעלה מרוחקת",

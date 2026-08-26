@@ -1671,7 +1671,8 @@
       "notEnoughCredits": "Cloud Agent'i çalıştırmak için yeterli kredi yok. Kredi ekleyip tekrar deneyin.",
       "previousTaskFinishing": "Önceki görev hâlâ tamamlanıyor. Lütfen bir dakika bekleyin.",
       "serviceUnavailable": "Hizmet şu anda kullanılamıyor. Lütfen tekrar deneyin.",
-      "connectionTrouble": "Bağlantı sorunu. Lütfen birazdan tekrar deneyin."
+      "connectionTrouble": "Bağlantı sorunu. Lütfen birazdan tekrar deneyin.",
+      "modelUnavailable": "Bu model Cloud Agent için kullanılamıyor. Başka bir model seçip tekrar deneyin."
     },
     "remoteSession": {
       "failedToCreate": "Uzak oturum oluşturulamadı",

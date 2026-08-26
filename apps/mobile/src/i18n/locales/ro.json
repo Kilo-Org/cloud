@@ -2140,7 +2140,8 @@
       "notEnoughCredits": "Credite insuficiente pentru a rula Cloud Agent. Adaugă credite și încearcă din nou.",
       "previousTaskFinishing": "Sarcina anterioară încă se finalizează. Te rugăm să aștepți un moment.",
       "serviceUnavailable": "Serviciul nu este disponibil acum. Te rugăm să încerci din nou.",
-      "connectionTrouble": "Probleme de conexiune. Te rugăm să reîncerci într-un moment."
+      "connectionTrouble": "Probleme de conexiune. Te rugăm să reîncerci într-un moment.",
+      "modelUnavailable": "Acest model nu este disponibil pentru Cloud Agent. Alege alt model și încearcă din nou."
     },
     "remoteSession": {
       "failedToCreate": "Nu s-a putut crea sesiunea de la distanță",

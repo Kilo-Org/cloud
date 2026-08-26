@@ -2155,7 +2155,8 @@
       "notEnoughCredits": "Nepakanka kreditų paleisti Cloud Agent. Pridėkite kreditų ir bandykite dar kartą.",
       "previousTaskFinishing": "Ankstesnė užduotis dar baigiama. Palaukite akimirką.",
       "serviceUnavailable": "Paslauga šiuo metu nepasiekiama. Bandykite dar kartą.",
-      "connectionTrouble": "Ryšio problema. Bandykite dar kartą po akimirkos."
+      "connectionTrouble": "Ryšio problema. Bandykite dar kartą po akimirkos.",
+      "modelUnavailable": "Šis modelis nėra pasiekiamas Cloud Agent. Pasirinkite kitą modelį ir bandykite dar kartą."
     },
     "remoteSession": {
       "failedToCreate": "Nepavyko sukurti nuotolinės sesijos",

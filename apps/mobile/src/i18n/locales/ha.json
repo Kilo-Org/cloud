@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Ba isassun kiredit don gudanar da Cloud Agent ba. Ƙara kiredit ka sake gwadawa.",
       "previousTaskFinishing": "Aikin da ya gabata har yanzu yana ƙarewa. Da fatan za ka jira ɗan lokaci.",
       "serviceUnavailable": "Sabis ɗin ba ya aiki a yanzu. Da fatan za ka sake gwadawa.",
-      "connectionTrouble": "Matsalar haɗi. Da fatan za ka sake gwadawa bayan ɗan lokaci."
+      "connectionTrouble": "Matsalar haɗi. Da fatan za ka sake gwadawa bayan ɗan lokaci.",
+      "modelUnavailable": "Wannan samfurin ba shi da aiki ga Cloud Agent. Zaɓi wani samfurin kuma sake gwadawa."
     },
     "remoteSession": {
       "failedToCreate": "An kasa ƙirƙirar zaman na nesa",

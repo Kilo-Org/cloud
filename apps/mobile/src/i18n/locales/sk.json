@@ -2155,7 +2155,8 @@
       "notEnoughCredits": "Nemáte dosť kreditov na spustenie Cloud Agent. Pridajte kredity a skúste znova.",
       "previousTaskFinishing": "Predchádzajúca úloha sa ešte dokončuje. Počkajte chvíľu.",
       "serviceUnavailable": "Služba je momentálne nedostupná. Skúste to znova.",
-      "connectionTrouble": "Problém s pripojením. Skúste to znova o chvíľu."
+      "connectionTrouble": "Problém s pripojením. Skúste to znova o chvíľu.",
+      "modelUnavailable": "Tento model nie je dostupný pre Cloud Agent. Vyberte iný model a skúste to znova."
     },
     "remoteSession": {
       "failedToCreate": "Vzdialené sedenie sa nepodarilo vytvoriť",

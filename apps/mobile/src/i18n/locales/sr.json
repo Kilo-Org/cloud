@@ -2140,7 +2140,8 @@
       "notEnoughCredits": "Nema dovoljno kredita za pokretanje Cloud Agent. Dodaj kredite i pokušaj ponovo.",
       "previousTaskFinishing": "Prethodni zadatak se još završava. Sačekaj malo.",
       "serviceUnavailable": "Usluga trenutno nije dostupna. Pokušaj ponovo.",
-      "connectionTrouble": "Problem s vezom. Pokušaj ponovo za trenutak."
+      "connectionTrouble": "Problem s vezom. Pokušaj ponovo za trenutak.",
+      "modelUnavailable": "Ovaj model nije dostupan za Cloud Agent. Izaberi drugi model i pokušaj ponovo."
     },
     "remoteSession": {
       "failedToCreate": "Daljinska sesija se ne može kreirati",

@@ -11,6 +11,8 @@ export type TerminalErrorClass =
   | 'permission'
   | 'credits'
   | 'busy'
+  | 'model'
+  | 'gone'
   | 'unavailable'
   | 'transient'
   | 'unknown';
@@ -22,8 +24,11 @@ export type TerminalErrorClass =
  * `'unknown'`, which shows the generic message and offers no retry (safer
  * than a fake one).
  *
- * Order matters: "Service is temporarily unavailable. Please retry in a
- * moment." matches both the unavailable and the transient test.
+ * The two service strings are matched in full rather than on "unavailable":
+ * the selected-model error carries that word too, and calling it a service
+ * outage would offer a Retry that cannot succeed until the model changes.
+ * Order still matters — "Service is temporarily unavailable. Please retry in
+ * a moment." satisfies both the unavailable and the transient test.
  */
 export function classifyTerminalError(message: string): TerminalErrorClass {
   if (message.includes('not authorized')) {
@@ -35,7 +40,16 @@ export function classifyTerminalError(message: string): TerminalErrorClass {
   if (message.includes('still finishing up')) {
     return 'busy';
   }
-  if (message.includes('unavailable')) {
+  if (message.includes('Selected model is unavailable')) {
+    return 'model';
+  }
+  if (message.includes('no longer available')) {
+    return 'gone';
+  }
+  if (
+    message.includes('Service is unavailable right now') ||
+    message.includes('Service is temporarily unavailable')
+  ) {
     return 'unavailable';
   }
   if (message.includes('retry in a moment')) {
@@ -45,12 +59,18 @@ export function classifyTerminalError(message: string): TerminalErrorClass {
 }
 
 function variantForClass(cls: TerminalErrorClass): QueryErrorVariant {
-  return cls === 'permission' ? 'permission' : 'server';
+  if (cls === 'permission') {
+    return 'permission';
+  }
+  return cls === 'gone' ? 'not-found' : 'server';
 }
 
 function titleForClass(cls: TerminalErrorClass): string {
   if (cls === 'permission') {
     return i18n.t('agentChat.session.accessDenied');
+  }
+  if (cls === 'gone') {
+    return i18n.t('agentChat.session.notFound');
   }
   return i18n.t('agentChat.session.couldNotLoadThisSession');
 }
@@ -66,6 +86,12 @@ function messageForClass(cls: TerminalErrorClass): string {
   if (cls === 'busy') {
     return i18n.t('agentChat.session.previousTaskFinishing');
   }
+  if (cls === 'model') {
+    return i18n.t('agentChat.session.modelUnavailable');
+  }
+  if (cls === 'gone') {
+    return i18n.t('agentChat.session.notFoundDescription');
+  }
   if (cls === 'unavailable') {
     return i18n.t('agentChat.session.serviceUnavailable');
   }
@@ -75,7 +101,11 @@ function messageForClass(cls: TerminalErrorClass): string {
   return i18n.t('agentChat.session.failedToLoadDetails');
 }
 
-/** Waiting or a connection hiccup passes; a denial or an empty wallet does not. */
+/**
+ * Waiting or a connection hiccup passes on its own. A denial, an empty wallet,
+ * a session that is gone and a model the agent cannot use all need the user to
+ * change something first, so they get no Retry.
+ */
 function retryableClass(cls: TerminalErrorClass): boolean {
   return cls === 'transient' || cls === 'busy' || cls === 'unavailable';
 }

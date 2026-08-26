@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Pa gen ase kredi pou kouri Cloud Agent. Ajoute kredi epi eseye ankò.",
       "previousTaskFinishing": "Travay anvan an poko fini. Tanpri tann yon ti moman.",
       "serviceUnavailable": "Sèvis la pa disponib kounye a. Tanpri eseye ankò.",
-      "connectionTrouble": "Pwoblèm koneksyon. Tanpri eseye ankò nan yon moman."
+      "connectionTrouble": "Pwoblèm koneksyon. Tanpri eseye ankò nan yon moman.",
+      "modelUnavailable": "Modèl sa a pa disponib pou Cloud Agent. Chwazi yon lòt modèl epi eseye ankò."
     },
     "remoteSession": {
       "failedToCreate": "Echwe pou kreye sesyon aleka",

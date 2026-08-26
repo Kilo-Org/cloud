@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Kuma filna dheeraadka si loo shideeyo Cloud Agent. Ku dar dheeraadka oo mar kale isku day.",
       "previousTaskFinishing": "Hawsha hore weli way dhammaanaysaa. Fadlan sug daqiiqad.",
       "serviceUnavailable": "Adeeggu hadda ma jiro. Fadlan mar kale isku day.",
-      "connectionTrouble": "Dhibaato xiriir. Fadlan mar kale isku day daqiiqad."
+      "connectionTrouble": "Dhibaato xiriir. Fadlan mar kale isku day daqiiqad.",
+      "modelUnavailable": "Moodeelkani looma heli karo Cloud Agent. Dooro moodeel kale oo mar kale isku day."
     },
     "remoteSession": {
       "failedToCreate": "Abuuridda kalfadhiga fog way fashilantay",

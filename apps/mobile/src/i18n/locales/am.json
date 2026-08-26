@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Cloud Agent ለማስኬድ በቂ ክሬዲት የለዎትም። ክሬዲት ጨምረው እንደገና ይሞክሩ።",
       "previousTaskFinishing": "የቀደመው ተግባር አሁንም እያለቀ ነው። እባክዎ ጠብቅ።",
       "serviceUnavailable": "አገልግሎቱ አሁን አይገኝም። እባክዎ እንደገና ይሞክሩ።",
-      "connectionTrouble": "የግንኙነት ችግር። እባክዎ በአጭር ጊዜ ውስጥ እንደገና ይሞክሩ።"
+      "connectionTrouble": "የግንኙነት ችግር። እባክዎ በአጭር ጊዜ ውስጥ እንደገና ይሞክሩ።",
+      "modelUnavailable": "ይህ ሞዴል ለ Cloud Agent አይገኝም። ሌላ ሞዴል ይምረጡ እና እንደገና ይሞክሩ።"
     },
     "remoteSession": {
       "failedToCreate": "የርቀት ክፍለ ጊዜ መፍጠር አልተሳካም",

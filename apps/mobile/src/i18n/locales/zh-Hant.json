@@ -1671,7 +1671,8 @@
       "notEnoughCredits": "執行 Cloud Agent 的額度不足。請新增額度後重試。",
       "previousTaskFinishing": "上一個工作仍在進行中。請稍等片刻。",
       "serviceUnavailable": "服務目前無法使用。請重試。",
-      "connectionTrouble": "連線發生問題。請稍後重試。"
+      "connectionTrouble": "連線發生問題。請稍後重試。",
+      "modelUnavailable": "此模型不適用於 Cloud Agent。請選擇其他模型再試一次。"
     },
     "remoteSession": {
       "failedToCreate": "無法建立遠端工作階段",

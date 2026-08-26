@@ -2125,7 +2125,8 @@
       "notEnoughCredits": "Ikke nok kreditter til at køre Cloud Agent. Tilføj kreditter og prøv igen.",
       "previousTaskFinishing": "Den forrige opgave er stadig i gang. Vent et øjeblik.",
       "serviceUnavailable": "Tjenesten er ikke tilgængelig lige nu. Prøv igen.",
-      "connectionTrouble": "Forbindelsesproblem. Prøv igen om et øjeblik."
+      "connectionTrouble": "Forbindelsesproblem. Prøv igen om et øjeblik.",
+      "modelUnavailable": "Denne model er ikke tilgængelig for Cloud Agent. Vælg en anden model og prøv igen."
     },
     "remoteSession": {
       "failedToCreate": "Kunne ikke oprette fjernsession",

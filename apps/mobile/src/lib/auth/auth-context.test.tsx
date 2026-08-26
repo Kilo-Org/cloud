@@ -869,6 +869,28 @@ describe('bootstrap and foreground race fencing', () => {
     unmount();
   });
 
+  it('binds the deep-link user id from the restored session during bootstrap', async () => {
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    // Mock queue consumed by the bootstrap load: preloadedToken,
+    // preloadedRefreshToken, the bootstrap expiry read, then the bootstrap
+    // credential re-read (unchanged, so the main restore publishes the token).
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce(storedToken)
+      .mockResolvedValueOnce('stored-refresh')
+      .mockResolvedValueOnce('9999999999999')
+      .mockResolvedValueOnce(storedToken);
+
+    const { getCtx, unmount } = await mountProvider();
+
+    // The restored session owns the user id: a destination captured while this
+    // account is signed in drops on sign-out because the pending slot's
+    // stash-time user id is non-null.
+    expect(getCtx().token).toBe(storedToken);
+    expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).toHaveBeenCalledWith('user-1');
+
+    unmount();
+  });
+
   it('regression: a foreground event from a stale epoch does not refresh or publish a token after sign-out', async () => {
     const { getCtx, unmount } = await mountProvider();
 

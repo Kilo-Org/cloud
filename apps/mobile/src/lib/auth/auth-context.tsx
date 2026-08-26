@@ -150,6 +150,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             const pair = await exchangeLegacyToken();
             if (pair) {
               setToken(pair.token);
+              setCurrentDeepLinkUserId(readUserIdFromToken(pair.token));
               setIsLoading(false);
               return;
             }
@@ -177,11 +178,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // or the provider ends bootstrap with no token and sends a
           // signed-in user to the login screen.
           if (currentStored !== stored) {
-            setToken(getActiveToken()?.token ?? currentStored ?? undefined);
+            const published = getActiveToken()?.token ?? currentStored ?? undefined;
+            setToken(published);
+            setCurrentDeepLinkUserId(published ? readUserIdFromToken(published) : null);
             return;
           }
           setActiveToken(stored, expiresAtStr ? Number(expiresAtStr) : null);
           setToken(stored);
+          setCurrentDeepLinkUserId(readUserIdFromToken(stored));
         }
       } finally {
         setIsLoading(false);

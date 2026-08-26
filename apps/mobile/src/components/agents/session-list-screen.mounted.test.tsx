@@ -69,6 +69,7 @@ vi.mock('expo-router', () => ({
     focusCallback.current = effect;
   },
   useRouter: () => ({ push: routerPushSpy, dismissTo: routerDismissToSpy }),
+  useScrollToTop: () => undefined,
 }));
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries }),
@@ -189,6 +190,7 @@ describe('AgentSessionListScreen live tab', () => {
     sessionListState.isLoading = false;
     sessionListState.isError = false;
     refetchSpy.mockClear();
+    refetchSpy.mockResolvedValue(true);
     routerPushSpy.mockClear();
     routerDismissToSpy.mockClear();
     invalidateQueries.mockClear();
@@ -306,6 +308,18 @@ describe('AgentSessionListScreen live tab', () => {
     expect(findTypeCount(renderer, 'Skeleton')).toBe(8);
   });
 
+  it('renders skeletons while the live query is loading with no cached rows', async () => {
+    sessionListState.isLoading = true;
+    sessionListState.isError = false;
+    sessionListState.activeSessions = [];
+
+    const renderer = await renderScreen();
+
+    expect(findTypeCount(renderer, 'Skeleton')).toBe(8);
+    expect(findTypeCount(renderer, 'EmptyState')).toBe(0);
+    expect(findTypeCount(renderer, 'QueryError')).toBe(0);
+  });
+
   it('renders the empty state when there are no live sessions', async () => {
     const renderer = await renderScreen();
     const emptyState = renderer.root.find(
@@ -358,24 +372,49 @@ describe('AgentSessionListScreen live tab', () => {
     expect(list.props.data).toHaveLength(1);
   });
 
-  it('announces a refresh error once on the false→true edge with cached rows', async () => {
+  it('announces a refresh failure once on a failed pull with cached rows', async () => {
     sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
-    sessionListState.isError = false;
+    refetchSpy.mockResolvedValue(false);
 
     const renderer = await renderScreen();
-    expect(toastErrorSpy).not.toHaveBeenCalled();
 
-    sessionListState.isError = true;
+    const flatList = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
+    );
+    const refreshControl = flatList.props.refreshControl as {
+      props: { onRefresh: () => void };
+    };
     act(() => {
-      renderer.update(createElement(AgentSessionListScreen));
+      refreshControl.props.onRefresh();
     });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
     expect(toastErrorSpy).toHaveBeenCalledTimes(1);
     expect(toastErrorSpy).toHaveBeenCalledWith('common.couldNotRefresh');
+  });
 
+  it('does not announce on a successful pull with cached rows', async () => {
+    sessionListState.activeSessions = [{ id: 'a1', organizationId: null }];
+    refetchSpy.mockResolvedValue(true);
+
+    const renderer = await renderScreen();
+
+    const flatList = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'FlatList'
+    );
+    const refreshControl = flatList.props.refreshControl as {
+      props: { onRefresh: () => void };
+    };
     act(() => {
-      renderer.update(createElement(AgentSessionListScreen));
+      refreshControl.props.onRefresh();
     });
-    expect(toastErrorSpy).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(toastErrorSpy).not.toHaveBeenCalled();
   });
 
   it('refetches live sessions on route focus', async () => {

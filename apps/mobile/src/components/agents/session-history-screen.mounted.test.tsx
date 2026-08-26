@@ -195,4 +195,16 @@ describe('SessionHistoryScreen', () => {
 
     expect(findNodesByType(renderer, 'SessionListSearchHeader').length).toBe(1);
   });
+
+  it('keeps the search header and an active query while searching with no stored rows', async () => {
+    listState.isSearching = true;
+    listState.storedSessions = [];
+
+    const renderer = await renderScreen();
+
+    expect(findNodesByType(renderer, 'SessionListSearchHeader').length).toBe(1);
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.hasActiveQuery).toBe(true);
+    expect(content.props.hasAnySessions).toBe(true);
+  });
 });

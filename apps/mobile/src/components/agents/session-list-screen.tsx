@@ -29,7 +29,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 
-import { type Href, useFocusEffect, useNavigation, useRouter } from 'expo-router';
+import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
 
 const SKELETON_ROW_COUNT = 8;
 
@@ -67,6 +67,9 @@ export function AgentSessionListScreen() {
     }, [])
   );
 
+  const listRef = useRef<FlatList<ActiveSession>>(null);
+  useScrollToTop(listRef);
+
   // App-foreground refresh for the live Agents list. The live query keeps its
   // own poll interval; an OS foreground transition re-reads focus live via
   // `navigation.isFocused()` because a frozen (unfocused) tab does not
@@ -83,15 +86,6 @@ export function AgentSessionListScreen() {
       subscription.remove();
     };
   }, [queryClient, navigation]);
-
-  // Refresh error: keep cached rows and announce once on the false→true edge.
-  const prevErrorRef = useRef(isError);
-  useEffect(() => {
-    if (isError && !prevErrorRef.current && hasLiveRows) {
-      announcingToast.error(t('common.couldNotRefresh'));
-    }
-    prevErrorRef.current = isError;
-  }, [isError, hasLiveRows, t]);
 
   const navigateToSession = useAgentSessionNavigator();
 
@@ -119,12 +113,15 @@ export function AgentSessionListScreen() {
     void (async () => {
       setRefreshing(true);
       try {
-        await refetch();
+        const ok = await refetch();
+        if (!ok && hasLiveRows) {
+          announcingToast.error(t('common.couldNotRefresh'));
+        }
       } finally {
         setRefreshing(false);
       }
     })();
-  }, [refetch]);
+  }, [refetch, hasLiveRows, t]);
 
   const renderItem = useCallback(
     ({ item }: { item: ActiveSession }) => (
@@ -204,6 +201,7 @@ export function AgentSessionListScreen() {
   } else {
     body = (
       <FlatList
+        ref={listRef}
         data={activeSessions}
         renderItem={renderItem}
         keyExtractor={keyExtractor}

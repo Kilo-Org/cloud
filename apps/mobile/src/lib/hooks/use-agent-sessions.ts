@@ -398,7 +398,15 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
  * tab does not wait on stored pages. Reuses the private `useActiveSessions`.
  */
 export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
+  const trpc = useTRPC();
   const active = useActiveSessions(options);
+  const queryClient = useQueryClient();
+
+  const input = useMemo(
+    () => buildActiveSessionsTrayInput(options?.organizationId),
+    [options?.organizationId]
+  );
+  const queryKey = useMemo(() => trpc.activeSessions.list.queryKey(input), [trpc, input]);
 
   const activeSessions = useMemo(
     () =>
@@ -419,15 +427,20 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
     // caller needs stored and active loading apart.
     isLoading: active.isLoading,
     isError: active.isError,
-    refetch: async () => {
+    refetch: async (): Promise<boolean> => {
       // The live-sync owner writes and cancels this same query key, so a plain
       // refetch alone can be swallowed by it. Drive the owner when one is
       // attached — it is keyed to the same organization context this hook is
       // given — and fall back to the plain refetch otherwise.
       if (await refreshActiveSessionsNow()) {
-        return;
+        // The owner drove the refresh and swallows its own failures; read the
+        // settled query state to report success to the caller. Match by the
+        // exact owner query key (`getQueryState` is exact by default), not by
+        // a loose prefix.
+        return queryClient.getQueryState(queryKey)?.status !== 'error';
       }
-      await active.refetch();
+      const result = await active.refetch();
+      return !result.isError;
     },
   };
 }

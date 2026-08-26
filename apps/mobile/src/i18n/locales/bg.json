@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab акаунт",
       "connectGitLab": "Свържи GitLab",
       "gitlabError": "Неуспешно отваряне на настройката на GitLab. Моля, опитай отново.",
-      "description": "Свържи {{label}} на Kilo, за да преглежда заявките за сливане автоматично."
+      "description": "Свържи {{label}} на Kilo, за да преглежда заявките за сливане автоматично.",
+      "bitbucketError": "Не можахме да отворим настройките на Bitbucket. Моля, опитайте отново."
     },
     "overview": {
       "reviewStyle": "Стил на прегледа",
@@ -2075,7 +2076,8 @@
       "dollar": "долара",
       "dollar_other": "долара",
       "costSpoken": "разход {{cost}}",
-      "costSpokenWithTime": "разход {{cost}}, {{time}}"
+      "costSpokenWithTime": "разход {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не може да се отвори GitHub",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Нова сесия",
       "repository": "Хранилище",
-      "couldNotLoadRepositories": "Не можаха да се заредят хранилищата",
       "connectGithub": "Свържи GitHub",
       "connectGithubDescription": "Свържи GitHub в браузъра си, след което се върни тук, за да избереш хранилище.",
       "openGithub": "Отвори GitHub",
       "refreshRepositories": "Опресни хранилищата",
-      "githubConnectionNotVisible": "Все още не виждаме твоята GitHub връзка",
-      "githubConnectionNotVisibleDescription": "Ако си инсталирал или конфигурирал Kilo GitHub App, провери отново — или се увери, че е инсталиран за този акаунт/организация.",
-      "checkAgain": "Провери отново",
       "githubConnected": "GitHub е свързан",
       "noRepositoriesVisible": "Няма видими хранилища. Провери достъпа до хранилищата за Kilo GitHub App, след което опресни.",
       "runOnWithTarget": "Изпълни в: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Продължи редактирането",
       "discard": "Отхвърли",
       "discardFailed": "Не можа да се отхвърли черновата. Моля, опитай отново.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket е свързан",
+      "connectBitbucket": "Свържи Bitbucket",
+      "connectBitbucketDescription": "Свържете Bitbucket в браузъра си, след което се върнете тук, за да изберете хранилище.",
+      "connectGitlab": "Свържи GitLab",
+      "connectGitlabDescription": "Свържете GitLab в браузъра си, след което се върнете тук, за да изберете хранилище.",
+      "couldNotLoadBitbucketRepositories": "Не можахме да заредим хранилищата на Bitbucket",
+      "couldNotLoadGithubRepositories": "Не можахме да заредим хранилищата на GitHub",
+      "couldNotLoadGitlabRepositories": "Не можахме да заредим хранилищата на GitLab",
+      "gitlabConnected": "GitLab е свързан",
+      "noRepositoriesVisibleBitbucket": "Няма видими хранилища. Проверете достъпа до хранилищата за Bitbucket, след което опреснете.",
+      "noRepositoriesVisibleGitlab": "Няма видими хранилища. Проверете достъпа до хранилищата за GitLab, след което опреснете.",
+      "openBitbucket": "Отваряне на Bitbucket",
+      "openGitlab": "Отваряне на GitLab",
+      "recentlyUsed": "Наскоро използвани"
     },
     "partRenderer": {
       "updatedFileCount_one": "Актуализиран {{displayCount}} файл",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Няма хранилища, свързани с твоя акаунт.",
       "tryDifferentSearch": "Опитай с различен термин за търсене.",
       "loading": "Зареждане...",
-      "accessibility": "Хранилище: {{label}}"
+      "accessibility": "Хранилище: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Детайли на съобщението",
@@ -2925,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Няма налично приложение за имейл. Можете да се свържете с нас на {{email}}",
     "couldNotOpenStore": "Не може да се отвори магазинът.",
-    "promptTitle": "Как ви харесва приложението Kilo?",
-    "iLikeIt": "Харесва ми",
-    "gladTitle": "Радваме се да чуем това!",
-    "gladMessage": "Отзив в магазина би ни помогнал изключително много. Благодарим, че използвате Kilo!",
-    "rateKilo": "Оценете Kilo",
-    "needsWork": "Има нужда от подобрение",
-    "sorryTitle": "Съжаляваме, че чуваме това!",
-    "sorryMessage": "Моля, уведомете ни какво трябва да се подобри. Инженерът, отговарящ за приложението, чете всеки един доклад!",
-    "emailUs": "Пишете ни",
-    "emailSubject": "обратна връзка за мобилното приложение"
+    "emailSubject": "обратна връзка за мобилното приложение",
+    "neutralTitle": "Оценете приложението Kilo",
+    "rateTheApp": "Оценете приложението",
+    "sendFeedback": "Изпратете отзив"
   },
   "organization": {
     "boundary": {
@@ -2944,7 +2953,9 @@
       "organizationUnavailable": "Организацията е недостъпна",
       "selectDescription": "Изберете организация от профила си, за да продължите.",
       "selectOrganization": "Изберете организация",
-      "unavailableDescription": "Тази организация вече не е налична. Изберете една от профила си, за да продължите."
+      "unavailableDescription": "Тази организация вече не е налична. Изберете една от профила си, за да продължите.",
+      "accessDeniedTitle": "Достъпът е отказан",
+      "accessDeniedDescription": "Нямате достъп до тази организация."
     },
     "creditActivity": {
       "emptyDescription": "Покупките, използването и корекциите на кредити за тази организация ще се появяват тук при настъпването им.",
@@ -2961,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Счетоводна корекция",
         "credits_expired": "Изтекли кредити"
-      }
+      },
+      "loadMore": "Зареди още",
+      "loadMoreFailed": "Неуспешно зареждане на още",
+      "truncated": "Налична е по-стара кредитна активност."
     },
     "inviteMember": {
       "emailError": "Въведете валиден имейл адрес",
@@ -2988,7 +3002,10 @@
         "draft": "Чернова",
         "uncollectible": "Несъбираема",
         "unknown": "Неизвестна"
-      }
+      },
+      "loadMore": "Зареди още",
+      "loadMoreFailed": "Неуспешно зареждане на още",
+      "truncated": "Налични са по-стари фактури."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

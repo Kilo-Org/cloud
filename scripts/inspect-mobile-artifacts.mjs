@@ -7,16 +7,25 @@
  *   node scripts/inspect-mobile-artifacts.mjs --select <build.json>
  *
  * The full mode unzips the IPA, parses its Info.plist, dumps the AAB manifest
- * with bundletool, and checks debug symbols. The --select mode validates the
- * EAS build.json (every build FINISHED, one IOS and one ANDROID entry with an
- * applicationArchiveUrl) and prints the two archive URLs, one per line.
+ * with bundletool, checks debug symbols, and prints a signed-artifact size
+ * table (JS bundles, fonts, and grammar modules). The --select mode validates
+ * the EAS build.json (every build FINISHED, one IOS and one ANDROID entry with
+ * an applicationArchiveUrl) and prints the two archive URLs, one per line.
  *
  * Exits 1 with a clear message on any contract violation.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
 const ANDROID_PACKAGE = 'com.kilocode.kiloapp';
@@ -36,6 +45,10 @@ const BLOCKED_PERMISSIONS = [
   'android.permission.READ_MEDIA_VIDEO',
   'android.permission.READ_MEDIA_AUDIO',
 ];
+const FONT_RE = /\.(otf|ttf)$/i;
+const JS_BUNDLE_RE = /\.(jsbundle|bundle|hbc)$/i;
+const GRAMMAR_RE = /highlight\.js|lowlight|refractor|prism|shiki|grammar/i;
+const GRAMMAR_FILE_RE = /\.(c|m)?js$/i;
 
 const failures = [];
 
@@ -262,6 +275,96 @@ function checkSymbols(aabPath) {
   check(aabHasDebugSymbols, `no debug symbols: the AAB has no ${DEBUGSYMBOLS_PREFIX} entries`);
 }
 
+function classify(path) {
+  if (FONT_RE.test(path)) {
+    return 'font';
+  }
+  if (JS_BUNDLE_RE.test(path)) {
+    return 'jsbundle';
+  }
+  if (GRAMMAR_FILE_RE.test(path) && GRAMMAR_RE.test(path)) {
+    return 'grammar';
+  }
+  return null;
+}
+
+function walkFiles(dir, base) {
+  const results = [];
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return results;
+  }
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name);
+    const relPath = base ? `${base}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      results.push(...walkFiles(fullPath, relPath));
+    } else if (entry.isFile()) {
+      results.push({ fullPath, relPath });
+    }
+  }
+  return results;
+}
+
+function measureArtifactSizes(artifactPath, label) {
+  const rows = [];
+  const work = mkdtempSync(join(tmpdir(), 'kilo-inspect-size-'));
+  try {
+    const extractDir = join(work, 'extracted');
+    mkdirSync(extractDir, { recursive: true });
+    try {
+      run('unzip', ['-q', '-o', artifactPath, '-d', extractDir]);
+    } catch (error) {
+      console.error(`size table: cannot unzip ${artifactPath}: ${error.message}`);
+      return rows;
+    }
+    for (const { fullPath, relPath } of walkFiles(extractDir)) {
+      const category = classify(relPath);
+      if (!category) {
+        continue;
+      }
+      let bytes;
+      try {
+        bytes = statSync(fullPath).size;
+      } catch {
+        continue;
+      }
+      rows.push({ bytes, artifact: label, category, path: relPath });
+    }
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+  return rows;
+}
+
+function printSizeTable(ipaPath, aabPath) {
+  const rows = [
+    ...measureArtifactSizes(ipaPath, basename(ipaPath)),
+    ...measureArtifactSizes(aabPath, basename(aabPath)),
+  ];
+  rows.sort((a, b) => b.bytes - a.bytes || a.path.localeCompare(b.path));
+
+  const groups = [
+    ['jsbundle', 'JS bundles'],
+    ['font', 'Fonts'],
+    ['grammar', 'Grammar modules'],
+  ];
+  console.log('\nSigned artifact sizes:');
+  for (const [key, label] of groups) {
+    const matches = rows.filter(row => row.category === key);
+    if (matches.length === 0) {
+      console.log(`\n${label}: (none found)`);
+      continue;
+    }
+    console.log(`\n${label}:`);
+    for (const row of matches) {
+      console.log(`  ${String(row.bytes).padStart(10)}  ${row.artifact}  ${row.path}`);
+    }
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
   if (args[0] === '--select') {
@@ -283,6 +386,7 @@ function main() {
   inspectIos(ipaPath);
   inspectAndroid(aabPath);
   checkSymbols(aabPath);
+  printSizeTable(ipaPath, aabPath);
   reportAndExit();
 }
 

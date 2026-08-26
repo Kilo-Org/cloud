@@ -29,6 +29,7 @@
     "dev:stop": "tsx dev/local/cli.ts stop",
     "dev:status": "tsx dev/local/cli.ts status",
     "dev:restart": "tsx dev/local/cli.ts restart",
+    "dev:start-command": "tsx dev/local/cli.ts start-command",
     "dev:capture": "tsx dev/local/cli.ts capture",
     "dev:env": "tsx dev/local/cli.ts env",
     "dev:infra-env": "tsx dev/local/infra-env.ts",

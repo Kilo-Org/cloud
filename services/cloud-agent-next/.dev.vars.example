@@ -51,6 +51,24 @@ KILOCODE_TOKEN_CONTAINMENT_ORG_IDS=
 # Comma-separated list of org IDs that receive workspace repo snapshots, or `*` for all orgs/users
 REPO_SNAPSHOT_ORG_IDS=
 
+# Vercel Sandbox operational configuration (optional)
+# Snapshot/build values must come from a successful `pnpm --filter cloud-agent-next snapshot:vercel`
+# acceptance run. Partial configuration never enables Vercel.
+VERCEL_PROJECT_ID=
+VERCEL_TEAM_ID=
+VERCEL_SANDBOX_SNAPSHOT_ID=
+VERCEL_SANDBOX_RUNTIME_BUILD_ID=
+VERCEL_SANDBOX_RUNTIME=node24
+VERCEL_SANDBOX_INITIAL_TIMEOUT_MS=300000
+VERCEL_SANDBOX_EXTEND_DURATION_MS=600000
+# Keep `VERCEL_TOKEN` in local secrets/.dev.vars only; never commit a token value.
+# VERCEL_TOKEN=
+
+# Vercel enrollment is the allowlist itself. Empty is off. Comma-separated org
+# IDs, or `*` for every organization and personal accounts. Organizations must
+# also be isolated by PER_SESSION_SANDBOX_ORG_IDS.
+VERCEL_SANDBOX_ORG_IDS=
+
 # GitHub App credentials for git commit attribution
 # These identify commits as coming from the Kilo Code GitHub App
 # Format for git config:

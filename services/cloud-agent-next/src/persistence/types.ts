@@ -1,6 +1,7 @@
 import type { SandboxId, SessionId, SessionContext, ExecutionSession } from '../types.js';
 import type { Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './CloudAgentSession.js';
+import type { SandboxSession } from '../sandbox-session/SandboxSession.js';
 import type { MCPSecretValue } from '../router/schemas.js';
 import type { SessionMetadata } from './session-metadata.js';
 import type { SessionIngestBinding } from '../session-ingest-binding.js';
@@ -128,6 +129,10 @@ export type PersistenceEnv = {
   SandboxCodeReviewContainment: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
+  /** Durable Object namespace for control-plane sessions */
+  SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
+  /** Comma-separated user or org IDs admitted to the call-home control plane. `*` includes personal. */
+  CONTROL_PLANE_IDS?: string;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
   /** Shared secret for JWT token validation */
@@ -176,6 +181,14 @@ export type PersistenceEnv = {
   GITLAB_TOKEN_CONTAINMENT_ORG_IDS?: string;
   /** Comma-separated org IDs whose Kilo token uses credential containment, or `*` for all orgs */
   KILOCODE_TOKEN_CONTAINMENT_ORG_IDS?: string;
+  VERCEL_TOKEN?: string;
+  VERCEL_TEAM_ID?: string;
+  VERCEL_PROJECT_ID?: string;
+  VERCEL_SANDBOX_SNAPSHOT_ID?: string;
+  VERCEL_SANDBOX_RUNTIME_BUILD_ID?: string;
+  VERCEL_SANDBOX_RUNTIME?: string;
+  VERCEL_SANDBOX_INITIAL_TIMEOUT_MS?: string;
+  VERCEL_SANDBOX_EXTEND_DURATION_MS?: string;
   /** Service binding for centralized git token generation */
   GIT_TOKEN_SERVICE?: GitTokenService;
   /** Service binding for dispatching push notifications */

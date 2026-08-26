@@ -134,6 +134,7 @@ describe('router sessionId validation', () => {
       '../agent_12345678-1234-1234-1234-123456789abc',
       // Missing or wrong prefix
       'session_12345678-1234-1234-1234-123456789abc',
+      'agent2_12345678-1234-1234-1234-123456789abc',
       '12345678-1234-1234-1234-123456789abc',
       // Incomplete formats
       'agent_',
@@ -169,6 +170,7 @@ describe('router sessionId validation', () => {
       'agent_ffffffff-ffff-ffff-ffff-ffffffffffff',
       'agent_ABCDEF01-2345-6789-ABCD-EF0123456789', // Case-insensitive
       'agent_Abcd1234-5678-90AB-cdef-0123456789aB', // Mixed case
+      'workspace_12345678-1234-1234-1234-123456789abc',
     ];
 
     for (const validId of validIds) {
@@ -355,6 +357,8 @@ describe('router sessionId validation', () => {
               SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
               SandboxCodeReviewContainment:
                 {} as TRPCContext['env']['SandboxCodeReviewContainment'],
+              SANDBOX_CONTROL: {} as TRPCContext['env']['SANDBOX_CONTROL'],
+              SANDBOX_SESSION: {} as TRPCContext['env']['SANDBOX_SESSION'],
               CLOUD_AGENT_SESSION: {
                 idFromName: vi.fn((id: string) => ({ id })),
                 get: vi.fn(() => ({
@@ -498,6 +502,24 @@ describe('router sessionId validation', () => {
 
             expect(result).toEqual({ success: true });
             expect(getSandbox).not.toHaveBeenCalled();
+          });
+
+          it('does not invoke Cloudflare cleanup for Vercel-pinned session metadata', async () => {
+            const sessionId: SessionId = 'agent_22222222-3333-4444-5555-666666666667';
+            const metadata = parseSessionMetadata({
+              metadataSchemaVersion: 2,
+              identity: { sessionId, userId: 'test-user-123', orgId: 'org-123' },
+              auth: {},
+              workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'vercel' },
+              lifecycle: { version: 123456789, timestamp: 123456789 },
+            });
+            vi.mocked(fetchSessionMetadata).mockResolvedValue(metadata);
+
+            const result = await caller.deleteSession({ sessionId });
+
+            expect(result).toEqual({ success: true });
+            expect(getSandbox).not.toHaveBeenCalled();
+            expect(cloudAgentSession.get).toHaveBeenCalled();
           });
 
           it('should route per-session sandbox ID to SandboxSmall namespace', async () => {
@@ -793,6 +815,8 @@ describe('router sessionId validation', () => {
             SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
             SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
             SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
+            SANDBOX_CONTROL: {} as TRPCContext['env']['SANDBOX_CONTROL'],
+            SANDBOX_SESSION: {} as TRPCContext['env']['SANDBOX_SESSION'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => mockSessionStub),
@@ -878,6 +902,31 @@ describe('router sessionId validation', () => {
         expect(getSandbox).not.toHaveBeenCalled();
         expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
       });
+
+      it('routes workspace_ interrupts to SANDBOX_SESSION', async () => {
+        const sessionId: SessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
+        const sandboxSession = {
+          idFromName: vi.fn((id: string) => ({ id })),
+          get: vi.fn(() => mockSessionStub),
+        };
+        mockContext.env.SANDBOX_SESSION =
+          sandboxSession as unknown as TRPCContext['env']['SANDBOX_SESSION'];
+        const metadata = legacySessionMetadata({
+          version: 123456789,
+          sessionId,
+          orgId: 'org-123',
+          userId: 'test-user-123',
+          timestamp: 123456789,
+        });
+        vi.mocked(fetchSessionMetadata).mockResolvedValue(metadata);
+
+        const result = await caller.interruptSession({ sessionId });
+
+        expect(result.success).toBe(true);
+        expect(sandboxSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
+        expect(cloudAgentSession.idFromName).not.toHaveBeenCalled();
+        expect(mockSessionStub.interruptExecution).toHaveBeenCalled();
+      });
     });
 
     describe('getSession procedure', () => {
@@ -909,6 +958,8 @@ describe('router sessionId validation', () => {
             SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
             SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
             SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
+            SANDBOX_CONTROL: {} as TRPCContext['env']['SANDBOX_CONTROL'],
+            SANDBOX_SESSION: {} as TRPCContext['env']['SANDBOX_SESSION'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => ({
@@ -1006,9 +1057,34 @@ describe('router sessionId validation', () => {
           // (e.g. X-Internal-Secret) and must never be returned to the
           // session's owning user via this surface.
           expect(result).not.toHaveProperty('callbackTarget');
+          expect(result).not.toHaveProperty('providerRuntime');
 
           // Verify DO was accessed with correct key
           expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
+        });
+
+        it('returns only the logical sandbox identity for Vercel-pinned sessions', async () => {
+          const sessionId: SessionId = 'agent_10101010-1010-1010-1010-101010101011';
+          mockGetMetadata.mockResolvedValue(
+            parseSessionMetadata({
+              metadataSchemaVersion: 2,
+              identity: { sessionId, userId: 'test-user-123', orgId: 'org-123' },
+              auth: {},
+              workspace: {
+                sandboxId: 'ses-abcdef',
+                sandboxProvider: 'vercel',
+                providerRuntime: { provider: 'vercel', sessionId: 'provider-session-private' },
+              },
+              lifecycle: { version: 1, timestamp: 1 },
+            })
+          );
+
+          const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+          expect(result.sandboxId).toBe('ses-abcdef');
+          expect(result).not.toHaveProperty('sandboxProvider');
+          expect(result).not.toHaveProperty('providerRuntime');
+          expect(JSON.stringify(result)).not.toContain('provider-session-private');
         });
 
         it('does not expose stranded legacy execution rows as current session work', async () => {
@@ -1214,6 +1290,8 @@ describe('router sessionId validation', () => {
               SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
               SandboxCodeReviewContainment:
                 {} as TRPCContext['env']['SandboxCodeReviewContainment'],
+              SANDBOX_CONTROL: {} as TRPCContext['env']['SANDBOX_CONTROL'],
+              SANDBOX_SESSION: {} as TRPCContext['env']['SANDBOX_SESSION'],
               CLOUD_AGENT_SESSION: {
                 idFromName: vi.fn((id: string) => ({ id })),
                 get: vi.fn(() => ({
@@ -1331,6 +1409,8 @@ describe('router sessionId validation', () => {
             SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
             SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
             SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
+            SANDBOX_CONTROL: {} as TRPCContext['env']['SANDBOX_CONTROL'],
+            SANDBOX_SESSION: {} as TRPCContext['env']['SANDBOX_SESSION'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => ({
@@ -1394,6 +1474,24 @@ describe('router sessionId validation', () => {
         expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
         expect(getSandbox).toHaveBeenCalledWith(mockContext.env.SandboxSmall, sandboxId);
         expect(mockListProcesses).toHaveBeenCalled();
+      });
+
+      it('does not probe a Cloudflare sandbox for Vercel-pinned session health', async () => {
+        const sessionId: SessionId = 'agent_88888888-8888-8888-8888-888888888887';
+        mockGetMetadata.mockResolvedValue(
+          parseSessionMetadata({
+            metadataSchemaVersion: 2,
+            identity: { sessionId, userId: 'test-user-123', orgId: 'org-123' },
+            auth: {},
+            workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'vercel' },
+            lifecycle: { version: 123456789, timestamp: 123456789 },
+          })
+        );
+
+        const result = await caller.getSessionHealth({ cloudAgentSessionId: sessionId });
+
+        expect(result.sandboxStatus).toBe('unknown');
+        expect(getSandbox).not.toHaveBeenCalled();
       });
 
       it('reports pending message-native work as active through existing health fields', async () => {
@@ -1622,6 +1720,8 @@ describe('router sessionId validation', () => {
             SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
             SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
             SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
+            SANDBOX_CONTROL: {} as TRPCContext['env']['SANDBOX_CONTROL'],
+            SANDBOX_SESSION: {} as TRPCContext['env']['SANDBOX_SESSION'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => ({
@@ -1955,6 +2055,87 @@ describe('router question and permission controls', () => {
     answerQuestion.mockRestore();
     rejectQuestion.mockRestore();
     answerPermission.mockRestore();
+  });
+
+  it('fails Vercel wrapper controls closed without probing a Cloudflare sandbox', async () => {
+    vi.clearAllMocks();
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+        userId: 'test-user-123',
+      },
+      auth: {},
+      workspace: { sandboxId: `ses-${'2'.repeat(48)}`, sandboxProvider: 'vercel' },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    vi.mocked(fetchSessionMetadata).mockResolvedValue(metadata);
+    const context = {
+      userId: 'test-user-123',
+      authToken: 'token',
+      botId: undefined,
+      request: new Request('http://test.local'),
+      env: { Sandbox: {}, SandboxSmall: {}, SandboxDIND: {} },
+    } as unknown as TRPCContext;
+    const caller = appRouter.createCaller(context);
+
+    await expect(
+      caller.answerQuestion({
+        sessionId: metadata.identity.sessionId as SessionId,
+        questionId: 'q_1',
+        answers: [['yes']],
+      })
+    ).rejects.toThrow('Vercel sandbox operational configuration is incomplete');
+    expect(getSandbox).not.toHaveBeenCalled();
+  });
+
+  it('forwards workspace_ permission and question responses through SANDBOX_SESSION', async () => {
+    vi.clearAllMocks();
+    const sessionId = 'workspace_12345678-1234-1234-1234-123456789abc' as SessionId;
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId, userId: 'test-user-123' },
+      auth: { kiloSessionId: 'ses_control' },
+      workspace: { sandboxId: `ses-${'2'.repeat(48)}`, sandboxProvider: 'cloudflare' },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    vi.mocked(fetchSessionMetadata).mockResolvedValue(metadata);
+    const answerQuestion = vi.fn().mockResolvedValue({ success: true });
+    const rejectQuestion = vi.fn().mockResolvedValue({ success: true });
+    const answerPermission = vi.fn().mockResolvedValue({ success: true });
+    const sandboxSession = {
+      idFromName: vi.fn((id: string) => ({ id })),
+      get: vi.fn(() => ({ answerQuestion, rejectQuestion, answerPermission })),
+    };
+    const context = {
+      userId: 'test-user-123',
+      authToken: 'token',
+      botId: undefined,
+      request: new Request('http://test.local'),
+      env: {
+        Sandbox: {},
+        SandboxSmall: {},
+        SandboxDIND: {},
+        SANDBOX_SESSION: sandboxSession,
+      },
+    } as unknown as TRPCContext;
+    const caller = appRouter.createCaller(context);
+
+    await expect(
+      caller.answerQuestion({ sessionId, questionId: 'q_1', answers: [['yes']] })
+    ).resolves.toEqual({ success: true });
+    await expect(caller.rejectQuestion({ sessionId, questionId: 'q_2' })).resolves.toEqual({
+      success: true,
+    });
+    await expect(
+      caller.answerPermission({ sessionId, permissionId: 'p_1', response: 'once' })
+    ).resolves.toEqual({ success: true });
+
+    expect(answerQuestion).toHaveBeenCalledWith({ questionId: 'q_1', answers: [['yes']] });
+    expect(rejectQuestion).toHaveBeenCalledWith({ questionId: 'q_2' });
+    expect(answerPermission).toHaveBeenCalledWith({ permissionId: 'p_1', response: 'once' });
+    expect(sandboxSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
+    expect(getSandbox).not.toHaveBeenCalled();
   });
 });
 

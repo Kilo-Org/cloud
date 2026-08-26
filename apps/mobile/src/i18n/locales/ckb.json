@@ -1386,7 +1386,8 @@
       "gitlabAccount": "هەژماری GitLab",
       "connectGitLab": "پەیوەندیکردن بە GitLab",
       "gitlabError": "نەتوانرا ڕێکخستنی GitLab بکرێتەوە. تکایە دووبارە هەوڵبدەوە.",
-      "description": "بۆ پێداچوونەوەی ئۆتۆماتیکی بە داواکارییەکانی ڕاکێشان پەیوەندی بە Kilo {{label}} بکە."
+      "description": "بۆ پێداچوونەوەی ئۆتۆماتیکی بە داواکارییەکانی ڕاکێشان پەیوەندی بە Kilo {{label}} بکە.",
+      "bitbucketError": "نەتوانرا دامەزراندنی Bitbucket بکرێتەوە. تکایە دووبارە هەوڵبدەوە"
     },
     "overview": {
       "reviewStyle": "شێوازی پێداچوونەوە",
@@ -2075,7 +2076,8 @@
       "dollar": "دۆلار",
       "dollar_other": "دۆلار",
       "costSpoken": "تێچوون {{cost}}",
-      "costSpokenWithTime": "تێچووی {{cost}}، {{time}}"
+      "costSpokenWithTime": "تێچووی {{cost}}، {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "نەتوانرا GitHub بکرێتەوە",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "دانیشتنی نوێ",
       "repository": "کۆگا",
-      "couldNotLoadRepositories": "نەتوانرا کۆگاکان بار بکرێن",
       "connectGithub": "پەیوەندیکردن بە GitHub",
       "connectGithubDescription": "GitHub لە وێبگەڕەکەتدا ببەستە، پاشان بگەڕێوە لێرە بۆ هەڵبژاردنی کۆگا.",
       "openGithub": "کردنەوەی GitHub",
       "refreshRepositories": "نوێکردنەوەی کۆگاکان",
-      "githubConnectionNotVisible": "هێشتا ناتوانین پەیوەندی GitHubەکەت ببینین",
-      "githubConnectionNotVisibleDescription": "ئەگەر GitHub Appی Kilo دامەزراندیت یان ڕێکخستیت، دووبارە بپشکنە — یان دڵنیا بە بۆ ئەم هەژمارە/ڕێکخراوە دامەزراوە.",
-      "checkAgain": "دووبارە بپشکنە",
       "githubConnected": "GitHub بەسترایەوە",
       "noRepositoriesVisible": "هیچ کۆگایەک نەبینراوە. دەستپێگەیشتنی کۆگای GitHub Appی Kilo بپشکنە، پاشان نوێ بکەرەوە.",
       "runOnWithTarget": "جێبەجێ بکە لەسەر: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "بەردەوام بە لە دەستکاری",
       "discard": "فڕێدان",
       "discardFailed": "نەتوانرا لە نوسینەکە وازبهێنرێت. تکایە دووبارە هەوڵ بدە.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket پەیوەندی کرا",
+      "connectBitbucket": "پەیوەندیکردن بە Bitbucket",
+      "connectBitbucketDescription": "لە وێبگەڕەکەتدا پەیوەندی بە Bitbucket بکە، ئینجا بگەڕێوە بۆ ئێرە بۆ هەڵبژاردنی ڕیپۆ",
+      "connectGitlab": "پەیوەندیکردن بە GitLab",
+      "connectGitlabDescription": "لە وێبگەڕەکەتدا پەیوەندی بە GitLab بکە، ئینجا بگەڕێوە بۆ ئێرە بۆ هەڵبژاردنی ڕیپۆ",
+      "couldNotLoadBitbucketRepositories": "نەتوانرا ڕیپۆکانی Bitbucket بار بکرێن",
+      "couldNotLoadGithubRepositories": "نەتوانرا ڕیپۆکانی GitHub بار بکرێن",
+      "couldNotLoadGitlabRepositories": "نەتوانرا ڕیپۆکانی GitLab بار بکرێن",
+      "gitlabConnected": "GitLab پەیوەند کرا",
+      "noRepositoriesVisibleBitbucket": "هیچ ڕیپۆیەک نەبینراوە. دەستگەیشتن بە ڕیپۆکانی Bitbucket بپشکنە، ئینجا نوێ بکەوە",
+      "noRepositoriesVisibleGitlab": "هیچ ڕیپۆیەک نەبینراوە. دەستگەیشتن بە ڕیپۆکانی GitLab بپشکنە، ئینجا نوێ بکەوە",
+      "openBitbucket": "کردنەوەی Bitbucket",
+      "openGitlab": "کردنەوەی GitLab",
+      "recentlyUsed": "بەم دواییە بەکارهاتووە"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} پەڕگە نوێکرایەوە",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "هیچ کۆگایەک پەیوەندیدار نییە بە هەژمارەکەت.",
       "tryDifferentSearch": "وشەیەکی گەڕانی جیاواز تاقی بکەرەوە.",
       "loading": "بارکردن...",
-      "accessibility": "کۆگا: {{label}}"
+      "accessibility": "کۆگا: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "وردەکاری پەیام",
@@ -2925,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "هیچ ئەپێکی ئیمەیڵ بەردەست نییە. دەتوانیت لە {{email}} پەیوەندیمان پێوە بکەیت",
     "couldNotOpenStore": "نەتوانرا دوکانەکە بکرێتەوە.",
-    "promptTitle": "چۆن ئەپی Kilo بەدڵتە؟",
-    "iLikeIt": "بەدڵمە",
-    "gladTitle": "دڵخۆشین بە بیستنی ئەوە!",
-    "gladMessage": "پێداچوونەوەیەک لە دوکانەکە زۆر یارمەتیمان دەدات. سوپاس بۆ بەکارهێنانی Kilo!",
-    "rateKilo": "نرخدان بە Kilo",
-    "needsWork": "پێویستی بە کارە",
-    "sorryTitle": "دڵگرانین بە بیستنی ئەوە!",
-    "sorryMessage": "تکایە ڕای بگەیەنە کە چی پێویستە باشتر بێت. ئەندازیارێک کە بەرپرسە لە ئەپ هەر ڕاپۆرتێک دەخوێنێتەوە!",
-    "emailUs": "ئیمەیڵمان بۆ بنێرە",
-    "emailSubject": "بۆچوونی ئەپی مۆبایل"
+    "emailSubject": "بۆچوونی ئەپی مۆبایل",
+    "neutralTitle": "هەڵسەنگاندنی ئەپی Kilo",
+    "rateTheApp": "هەڵسەنگاندنی ئەپەکە",
+    "sendFeedback": "ناردنی تێبینی"
   },
   "organization": {
     "boundary": {
@@ -2944,7 +2953,9 @@
       "organizationUnavailable": "ڕێکخراوە بەردەست نییە",
       "selectDescription": "لە پڕۆفایلەکەتەوە ڕێکخراوێک هەڵبژێرە بۆ بەردەوامبوون.",
       "selectOrganization": "هەڵبژاردنی ڕێکخراوێک",
-      "unavailableDescription": "ئەم ڕێکخراوە چیتر بەردەست نییە. لە پڕۆفایلەکەتەوە یەکێک هەڵبژێرە بۆ بەردەوامبوون."
+      "unavailableDescription": "ئەم ڕێکخراوە چیتر بەردەست نییە. لە پڕۆفایلەکەتەوە یەکێک هەڵبژێرە بۆ بەردەوامبوون.",
+      "accessDeniedTitle": "دەستگەیشتن ڕەتکرایەوە",
+      "accessDeniedDescription": "تۆ ڕێگەپێدراو نیت بۆ ئەم ڕێکخراوە."
     },
     "creditActivity": {
       "emptyDescription": "کڕینەکان، بەکارهێنان و ڕێکخستنەکانی کرێدت بۆ ئەم ڕێکخراوە لێرەدا دەردەکەون کاتێک ڕوودەدەن.",
@@ -2961,7 +2972,10 @@
         "team-topup-bonus-2025": "بۆنەی زیادکردنی تیم 2025",
         "accounting_adjustment": "ڕێکخستنی هەژماری",
         "credits_expired": "بەسەرچوونی کرێدت"
-      }
+      },
+      "loadMore": "بارکردنی زیاتر",
+      "loadMoreFailed": "نەتوانرا زیاتر بار بکرێت",
+      "truncated": "چالاکی بەرایی کۆنیتر بەردەستە."
     },
     "inviteMember": {
       "emailError": "ناونیشانی ئیمەیڵی دروست بنووسە",
@@ -2988,7 +3002,10 @@
         "draft": "ڕەشنووس",
         "uncollectible": "نەکۆڵکراو",
         "unknown": "نەزانراو"
-      }
+      },
+      "loadMore": "بارکردنی زیاتر",
+      "loadMoreFailed": "نەتوانرا زیاتر بار بکرێت",
+      "truncated": "فاکتورە کۆنەکان بەردەستن."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

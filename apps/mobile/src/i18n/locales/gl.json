@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Conta de GitLab",
       "connectGitLab": "Conectar GitLab",
       "gitlabError": "Non se puido abrir a configuración de GitLab. Téntao de novo.",
-      "description": "Conecta o Kilo {{label}} para revisar pull requests automaticamente."
+      "description": "Conecta o Kilo {{label}} para revisar pull requests automaticamente.",
+      "bitbucketError": "Non se puido abrir a configuración de Bitbucket. Inténtao de novo."
     },
     "overview": {
       "reviewStyle": "Estilo de revisión",
@@ -2075,7 +2076,8 @@
       "dollar": "dólares",
       "dollar_other": "dólares",
       "costSpoken": "custo {{cost}}",
-      "costSpokenWithTime": "custo {{cost}}, {{time}}"
+      "costSpokenWithTime": "custo {{cost}}, {{time}}",
+      "pullRequest": "solicitude de extracción {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Non se puido abrir GitHub",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Nova sesión",
       "repository": "Repositorio",
-      "couldNotLoadRepositories": "Non se puido cargar os repositorios",
       "connectGithub": "Conectar GitHub",
       "connectGithubDescription": "Conecta GitHub no teu navegador e despois volve aquí para escoller un repositorio.",
       "openGithub": "Abrir GitHub",
       "refreshRepositories": "Actualizar repositorios",
-      "githubConnectionNotVisible": "Aínda non podemos ver a túa conexión de GitHub",
-      "githubConnectionNotVisibleDescription": "Se instalaches ou configuraste a app de GitHub de Kilo, compróbao de novo ou asegúrate de que se instalou para esta conta/organización.",
-      "checkAgain": "Comprobar de novo",
       "githubConnected": "GitHub conectado",
       "noRepositoriesVisible": "Non se ve ningún repositorio. Comproba o acceso aos repositorios da app de GitHub de Kilo e despois actualiza.",
       "runOnWithTarget": "Executar en: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Seguir editando",
       "discard": "Descartar",
       "discardFailed": "Non se puido descartar o borrador. Téntao de novo.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket conectado",
+      "connectBitbucket": "Conectar Bitbucket",
+      "connectBitbucketDescription": "Conecta Bitbucket no teu navegador e despois volve aquí para escoller un repositorio.",
+      "connectGitlab": "Conectar GitLab",
+      "connectGitlabDescription": "Conecta GitLab no teu navegador e despois volve aquí para escoller un repositorio.",
+      "couldNotLoadBitbucketRepositories": "Non se puideron cargar os repositorios de Bitbucket",
+      "couldNotLoadGithubRepositories": "Non se puideron cargar os repositorios de GitHub",
+      "couldNotLoadGitlabRepositories": "Non se puideron cargar os repositorios de GitLab",
+      "gitlabConnected": "GitLab conectado",
+      "noRepositoriesVisibleBitbucket": "Non hai repositorios visibles. Comproba o acceso aos repositorios de Bitbucket e refresca.",
+      "noRepositoriesVisibleGitlab": "Non hai repositorios visibles. Comproba o acceso aos repositorios de GitLab e refresca.",
+      "openBitbucket": "Abrir Bitbucket",
+      "openGitlab": "Abrir GitLab",
+      "recentlyUsed": "Usados recentemente"
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizouse {{displayCount}} ficheiro",
@@ -2279,7 +2291,10 @@
       "noRepositoriesDescription": "Non hai repositorios conectados á túa conta.",
       "tryDifferentSearch": "Probas un termo de busca diferente.",
       "loading": "Cargando...",
-      "accessibility": "Repositorio: {{label}}"
+      "accessibility": "Repositorio: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detalles da mensaxe",
@@ -2925,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Non hai ningunha app de correo dispoñible. Podes contactar connosco en {{email}}",
     "couldNotOpenStore": "Non se puido abrir a tenda.",
-    "promptTitle": "Que che está parecendo a app de Kilo?",
-    "iLikeIt": "Gústame",
-    "gladTitle": "Alegrámonos de que che guste!",
-    "gladMessage": "Unha valoración na tenda axudaríanos enormemente. Grazas por usar Kilo!",
-    "rateKilo": "Valorar Kilo",
-    "needsWork": "Necesita melloras",
-    "sorryTitle": "Sentímolo!",
-    "sorryMessage": "Por favor, dínos que precisa mellorar. A persoa enxeñeira responsable da app le cada un dos informes!",
-    "emailUs": "Escríbenos",
-    "emailSubject": "comentarios sobre a app móbil"
+    "emailSubject": "comentarios sobre a app móbil",
+    "neutralTitle": "Valora a aplicación Kilo",
+    "rateTheApp": "Valora a aplicación",
+    "sendFeedback": "Envía comentarios"
   },
   "organization": {
     "boundary": {
@@ -2944,7 +2953,9 @@
       "organizationUnavailable": "Organización non dispoñible",
       "selectDescription": "Escolle unha organización desde o teu perfil para continuar.",
       "selectOrganization": "Seleccionar unha organización",
-      "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar."
+      "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar.",
+      "accessDeniedTitle": "Acceso denegado",
+      "accessDeniedDescription": "Non tes acceso a esta organización."
     },
     "creditActivity": {
       "emptyDescription": "As compras, o uso e os axustes de crédito desta organización aparecerán aquí segundo ocorran.",
@@ -2961,7 +2972,10 @@
         "team-topup-bonus-2025": "Bono de recarga de equipo 2025",
         "accounting_adjustment": "Axuste contable",
         "credits_expired": "Créditos caducados"
-      }
+      },
+      "loadMore": "Cargar máis",
+      "loadMoreFailed": "Non se puideron cargar máis",
+      "truncated": "Hai dispoñible actividade de crédito máis antiga."
     },
     "inviteMember": {
       "emailError": "Introduce un enderezo de correo válido",
@@ -2988,7 +3002,10 @@
         "draft": "Borrador",
         "uncollectible": "Incobrable",
         "unknown": "Descoñecido"
-      }
+      },
+      "loadMore": "Cargar máis",
+      "loadMoreFailed": "Non se puideron cargar máis",
+      "truncated": "Hai facturas máis antigas dispoñibles."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "nome@empresa.com",

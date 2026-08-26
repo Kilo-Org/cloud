@@ -1386,7 +1386,8 @@
       "gitlabAccount": "د GitLab حساب",
       "connectGitLab": "GitLab وصل کول",
       "gitlabError": "د GitLab جوړونه پرانیستل ناشوني شول. مهرباني وکړئ بیا هڅه وکړئ.",
-      "description": "د کش غوښتنو اتوماتیک بیاکتنې لپاره د Kilo {{label}} وصل کړئ."
+      "description": "د کش غوښتنو اتوماتیک بیاکتنې لپاره د Kilo {{label}} وصل کړئ.",
+      "bitbucketError": "د Bitbucket تنظیم نه شو پرانیستلی. مهرباني وکړئ بیا هڅه وکړئ."
     },
     "overview": {
       "reviewStyle": "د بیاکتنې سټایل",
@@ -2075,7 +2076,8 @@
       "dollar": "ډالره",
       "dollar_other": "ډالره",
       "costSpoken": "لګښت {{cost}}",
-      "costSpokenWithTime": "لګښت {{cost}}، {{time}}"
+      "costSpokenWithTime": "لګښت {{cost}}، {{time}}",
+      "pullRequest": "پل ریکویسټ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub پرانیستل نشو",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "نوې ناسته",
       "repository": "ریپوزیټورۍ",
-      "couldNotLoadRepositories": "ذخیرې بار نه شوې",
       "connectGithub": "GitHub وصل کړئ",
       "connectGithubDescription": "GitHub په خپل براوزر کې وصل کړئ، بیا دلته راستانه شئ ترڅو یوه ذخیره غوره کړئ.",
       "openGithub": "GitHub پرانیزئ",
       "refreshRepositories": "ذخیرې تازه کړئ",
-      "githubConnectionNotVisible": "موږ ستاسو د GitHub اړیکه لا نه وینو",
-      "githubConnectionNotVisibleDescription": "که تاسو د Kilo GitHub اپ نصب یا تنظیم کړی، بیا وګورئ — یا ډاډ ترلاسه کړئ چې دا د دې حساب/سازمان لپاره نصب شوی.",
-      "checkAgain": "بیا وګورئ",
       "githubConnected": "GitHub وصل شو",
       "noRepositoriesVisible": "هیڅ ذخیره نه ښکاري. د Kilo GitHub اپ لپاره د ذخیرې لاسرسی وګورئ، بیا تازه کړئ.",
       "runOnWithTarget": "پر باندې پرمخ یوسئ: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "سمون ته دوام ورکړئ",
       "discard": "لغوه کړئ",
       "discardFailed": "مسوده لغوه نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket وصل شو",
+      "connectBitbucket": "Bitbucket وصل کول",
+      "connectBitbucketDescription": "Bitbucket په خپل براوزر کې ونښلئ، بیا دلته راګرځئ تر څو یو ریپوزیټري غوره کړئ.",
+      "connectGitlab": "GitLab وصل کول",
+      "connectGitlabDescription": "GitLab په خپل براوزر کې ونښلئ، بیا دلته راګرځئ تر څو یو ریپوزیټري غوره کړئ.",
+      "couldNotLoadBitbucketRepositories": "د Bitbucket ریپوزیټریان بارول ممکن نه شول",
+      "couldNotLoadGithubRepositories": "د GitHub ریپوزیټریان بارول ممکن نه شول",
+      "couldNotLoadGitlabRepositories": "د GitLab ریپوزیټریان بارول ممکن نه شول",
+      "gitlabConnected": "GitLab ونښلول شو",
+      "noRepositoriesVisibleBitbucket": "کوم ریپوزیټري نه لیدل کیږي. د Bitbucket لپاره د ریپوزیټري لاسرسی وګورئ، بیا تازه یې کړئ.",
+      "noRepositoriesVisibleGitlab": "کوم ریپوزیټري نه لیدل کیږي. د GitLab لپاره د ریپوزیټري لاسرسی وګورئ، بیا تازه یې کړئ.",
+      "openBitbucket": "Bitbucket پرانیزئ",
+      "openGitlab": "GitLab پرانیزئ",
+      "recentlyUsed": "وروستي کارول شوي"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل تازه شو",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "هیڅ ذخیره ستاسو حساب سره وصل نه ده.",
       "tryDifferentSearch": "مختلف لټون شرط هڅه کړئ.",
       "loading": "بارول روان دي...",
-      "accessibility": "ذخیره: {{label}}"
+      "accessibility": "ذخیره: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "د پیغام تفصیلات",
@@ -2925,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "هیڅ بریښنالیک ایپ شتون نلري. تاسو کولای شئ په {{email}} کې موږ ته ورسیږئ",
     "couldNotOpenStore": "پلورنځی نه شو خلاصېدلای.",
-    "promptTitle": "تاسو د Kilo ایپ څنګه خوښوئ؟",
-    "iLikeIt": "زه یې خوښوم",
-    "gladTitle": "موږ د دې اوریدو څخه خوښ یو!",
-    "gladMessage": "د پلورنځي بیاکتنه به موږ ته ډېره مرسته وکړي. د Kilo کارولو څخه مننه!",
-    "rateKilo": "Kilo درجه بندي کړئ",
-    "needsWork": "کار ته اړتیا لري",
-    "sorryTitle": "موږ د دې اوریدو څخه بخښنه غواړو!",
-    "sorryMessage": "مهرباني وکړئ موږ ته خبر راکړئ چې څه باید ښه شي. د ایپ مسؤل انجنیر هر راپور لولي!",
-    "emailUs": "موږ ته بریښنالیک واستوئ",
-    "emailSubject": "د موبایل ایپ غبرګون"
+    "emailSubject": "د موبایل ایپ غبرګون",
+    "neutralTitle": "د کیلو اپ ارزونه وکړئ",
+    "rateTheApp": "د اپ ارزونه وکړئ",
+    "sendFeedback": "نظر واستوئ"
   },
   "organization": {
     "boundary": {
@@ -2944,7 +2953,9 @@
       "organizationUnavailable": "سازمان شتون نلري",
       "selectDescription": "د دوام لپاره له خپل پروفایل څخه یو سازمان وټاکئ.",
       "selectOrganization": "یو سازمان وټاکئ",
-      "unavailableDescription": "دا سازمان نور شتون نلري. د دوام لپاره له خپل پروفایل څخه یو وټاکئ."
+      "unavailableDescription": "دا سازمان نور شتون نلري. د دوام لپاره له خپل پروفایل څخه یو وټاکئ.",
+      "accessDeniedTitle": "لاسرسی رد شو",
+      "accessDeniedDescription": "تاسو دې سازمان ته لاسرسی نه لرئ."
     },
     "creditActivity": {
       "emptyDescription": "د دې سازمان پیرودونه، کارول، او کریډیټ سمونونه به دلته څرګند شي لکه څنګه چې پېښیږي.",
@@ -2961,7 +2972,10 @@
         "team-topup-bonus-2025": "د ټیم ټاپ اپ بونس 2025",
         "accounting_adjustment": "د محاسبې سمون",
         "credits_expired": "کریډیټونه منقضي شوي"
-      }
+      },
+      "loadMore": "نور بار کړئ",
+      "loadMoreFailed": "نور بار کیدی نشو",
+      "truncated": "پخوانۍ کریډیټي کړنې شته دي."
     },
     "inviteMember": {
       "emailError": "یو سم بریښنالیک آدرس دننه کړئ",
@@ -2988,7 +3002,10 @@
         "draft": "مسوده",
         "uncollectible": "نه راټولېدونکی",
         "unknown": "نامعلوم"
-      }
+      },
+      "loadMore": "نور بار کړئ",
+      "loadMoreFailed": "نور بار کیدی نشو",
+      "truncated": "پخوانۍ رسیدونه شته دي."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

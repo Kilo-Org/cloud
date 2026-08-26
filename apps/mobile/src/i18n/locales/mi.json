@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Pūkete GitLab",
       "connectGitLab": "Hono GitLab",
       "gitlabError": "Kāore i taea te uwhera i te whakatū GitLab. Tēnā whakamātau anō.",
-      "description": "Hono te Kilo {{label}} ki te arotake tono hītō ā-aunoa."
+      "description": "Hono te Kilo {{label}} ki te arotake tono hītō ā-aunoa.",
+      "bitbucketError": "Kāore i taea te whakatuwhera i te tautuhinga Bitbucket. Tēnā whakamātau anō."
     },
     "overview": {
       "reviewStyle": "Te Āhua Arotake",
@@ -2075,7 +2076,8 @@
       "dollar": "ngā tāra",
       "dollar_other": "ngā tāra",
       "costSpoken": "utu {{cost}}",
-      "costSpokenWithTime": "utu {{cost}}, {{time}}"
+      "costSpokenWithTime": "utu {{cost}}, {{time}}",
+      "pullRequest": "tono kumea {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kāore i taea te whakatuwhera GitHub",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Wātū hōu",
       "repository": "Pūranga",
-      "couldNotLoadRepositories": "Kāore i taea te uta ngā pūranga",
       "connectGithub": "Hono ki GitHub",
       "connectGithubDescription": "Honohia a GitHub i tō pūtirotiro, kātahi hoki mai ki konei ki te kōwhiri i tētahi pūranga.",
       "openGithub": "Whakatuwhera GitHub",
       "refreshRepositories": "Whakahou ngā pūranga",
-      "githubConnectionNotVisible": "Kāore anō e kitea e mātou tō hononga GitHub",
-      "githubConnectionNotVisibleDescription": "Mēnā kua whakauru, kua whirihora rānei koe i te Kilo GitHub App, tirohia anō — kia whakapūmau rānei i whakaurua mō tēnei pūkete/whakahaere.",
-      "checkAgain": "Tirohia anō",
       "githubConnected": "Kua hono a GitHub",
       "noRepositoriesVisible": "Kāore he pūranga e kitea ana. Tirohia te wāhi atu pūranga mō te Kilo GitHub App, kātahi whakahou.",
       "runOnWithTarget": "Oma i runga i: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Me whakatika tonu",
       "discard": "Whakarere",
       "discardFailed": "Kāore i taea te whakarere i te tauira. Tēnā whakamātau anō.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Kua hono a Bitbucket",
+      "connectBitbucket": "Hono Bitbucket",
+      "connectBitbucketDescription": "Hono atu ki Bitbucket i tō pūtirotiro, kātahi hoki mai ki konei ki te kōwhiri pūputunga.",
+      "connectGitlab": "Hono GitLab",
+      "connectGitlabDescription": "Hono atu ki GitLab i tō pūtirotiro, kātahi hoki mai ki konei ki te kōwhiri pūputunga.",
+      "couldNotLoadBitbucketRepositories": "Kāore i taea te uta i ngā pūputunga Bitbucket",
+      "couldNotLoadGithubRepositories": "Kāore i taea te uta i ngā pūputunga GitHub",
+      "couldNotLoadGitlabRepositories": "Kāore i taea te uta i ngā pūputunga GitLab",
+      "gitlabConnected": "Kua hono a GitLab",
+      "noRepositoriesVisibleBitbucket": "Kāore he pūputunga e kitea ana. Tirohia te uru pūputunga mō Bitbucket, kātahi whakahōu.",
+      "noRepositoriesVisibleGitlab": "Kāore he pūputunga e kitea ana. Tirohia te uru pūputunga mō GitLab, kātahi whakahōu.",
+      "openBitbucket": "Whakatuwhera Bitbucket",
+      "openGitlab": "Whakatuwhera GitLab",
+      "recentlyUsed": "Kua whakamahia tata nei"
     },
     "partRenderer": {
       "updatedFileCount_one": "Kua whakahoutia {{displayCount}} kōnae",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Kāore he pūranga i hono ki tō pūkete.",
       "tryDifferentSearch": "Whakamātauhia tētahi kupu rapu rerekē.",
       "loading": "Kei te uta...",
-      "accessibility": "Pūranga: {{label}}"
+      "accessibility": "Pūranga: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Ngā taipitopito karere",
@@ -2925,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Kāore he taupānga īmēra e wātea ana. Ka taea e koe te whakapā mai ki {{email}}",
     "couldNotOpenStore": "Kāore i taea te whakatuwhera te toa.",
-    "promptTitle": "Kei te pēhea tō pai ki te taupānga Kilo?",
-    "iLikeIt": "E pai ana ahau",
-    "gladTitle": "E koa ana mātou!",
-    "gladMessage": "He arotake toa he āwhina nui mā mātou. Ngā mihi mō te whakamahi Kilo!",
-    "rateKilo": "Whakawātea a Kilo",
-    "needsWork": "Me mahi anō",
-    "sorryTitle": "E aroha ana mātou!",
-    "sorryMessage": "Tēnā whakamōhio mai ki a mātou te mea hei whakapai. Ka pānui te pūkaha o te taupānga i ia pūrongo!",
-    "emailUs": "Īmēra mai",
-    "emailSubject": "urupare taupānga pūkoro"
+    "emailSubject": "urupare taupānga pūkoro",
+    "neutralTitle": "Whakatau i te taupānga Kilo",
+    "rateTheApp": "Whakatauria te taupānga",
+    "sendFeedback": "Tukuna whakahoki kōrero"
   },
   "organization": {
     "boundary": {
@@ -2944,7 +2953,9 @@
       "organizationUnavailable": "Kāore e wātea ana te whakahaere",
       "selectDescription": "Kōwhiri he whakahaere mai i tō kōtaha kia haere tonu.",
       "selectOrganization": "Kōwhiri he whakahaere",
-      "unavailableDescription": "Kāore tēnei whakahaere e wātea ana. Kōwhiri tētahi mai i tō kōtaha kia haere tonu."
+      "unavailableDescription": "Kāore tēnei whakahaere e wātea ana. Kōwhiri tētahi mai i tō kōtaha kia haere tonu.",
+      "accessDeniedTitle": "Kua whakakorehia te uru",
+      "accessDeniedDescription": "Kāore ō whakaaetanga ki tēnei whakahaere."
     },
     "creditActivity": {
       "emptyDescription": "Ka puta ki konei ngā hokonga, te whakamahinga, me ngā whakarerekē whiwhinga mō tēnei whakahaere i a rātou e tupu ana.",
@@ -2961,7 +2972,10 @@
         "team-topup-bonus-2025": "Te top-up bonus rōpū 2025",
         "accounting_adjustment": "Te whakatikatika kaute",
         "credits_expired": "Kua pau ngā whiwhinga"
-      }
+      },
+      "loadMore": "Uta anō",
+      "loadMoreFailed": "Kāore i taea te uta ētahi atu",
+      "truncated": "E wātea ana ngā mahi kirimana tawhito."
     },
     "inviteMember": {
       "emailError": "Whakaurua he wāhitau īmēra tika",
@@ -2988,7 +3002,10 @@
         "draft": "Hukitanga",
         "uncollectible": "Kāore e taea te kohi",
         "unknown": "Kāore e mōhiotia"
-      }
+      },
+      "loadMore": "Uta anō",
+      "loadMoreFailed": "Kāore i taea te uta ētahi atu",
+      "truncated": "E wātea ana ngā nama tawhito."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

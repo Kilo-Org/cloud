@@ -10,8 +10,13 @@ import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { clearRepoPickerBridge, getRepoPickerBridge } from '@/lib/picker-bridge';
+import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
+import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
+
+type PickerListItem =
+  | { key: string; kind: 'header'; titleKey: string }
+  | { key: string; kind: 'repo'; repo: RepoOption };
 
 export default function RepoPickerScreen() {
   const router = useRouter();
@@ -19,9 +24,10 @@ export default function RepoPickerScreen() {
   const { bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
-  const [bridge, setBridge] = useState(() => getRepoPickerBridge());
+  const [bridge, setBridge] = useState(() => repoPickerSlot.get(UNFENCED_ROUTE_KEY));
 
   const bridgeRef = useRef(bridge);
+  useRouteRegistry(UNFENCED_ROUTE_KEY);
 
   const closePicker = useCallback(() => {
     router.back();
@@ -29,14 +35,14 @@ export default function RepoPickerScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const nextBridge = getRepoPickerBridge();
+      const nextBridge = repoPickerSlot.get(UNFENCED_ROUTE_KEY);
       bridgeRef.current = nextBridge;
       setBridge(nextBridge);
       setSearch('');
 
       return () => {
-        clearRepoPickerBridge();
-        bridgeRef.current = null;
+        repoPickerSlot.clear(UNFENCED_ROUTE_KEY);
+        bridgeRef.current = undefined;
       };
     }, [])
   );
@@ -46,12 +52,36 @@ export default function RepoPickerScreen() {
     [bridge, search]
   );
 
+  // When the search box is empty, render grouped sections (Recently used, then
+  // per-provider); when it is non-empty, render the flat filtered list exactly
+  // as before.
+  const listItems = useMemo<PickerListItem[]>(() => {
+    if (search.trim()) {
+      return filtered.map(repo => ({
+        key: `${repo.platform}:${repo.fullName}`,
+        kind: 'repo',
+        repo,
+      }));
+    }
+    const sections = bridge?.sections ?? [];
+    const items: PickerListItem[] = [];
+    for (const section of sections) {
+      if (section.repos.length > 0) {
+        items.push({ key: `header:${section.key}`, kind: 'header', titleKey: section.titleKey });
+        for (const repo of section.repos) {
+          items.push({ key: `${repo.platform}:${repo.fullName}`, kind: 'repo', repo });
+        }
+      }
+    }
+    return items;
+  }, [bridge, filtered, search]);
+
   const handleSelect = useCallback(
     (repo: string) => {
       void Haptics.selectionAsync();
       bridgeRef.current?.onSelect(repo);
-      clearRepoPickerBridge();
-      bridgeRef.current = null;
+      repoPickerSlot.clear(UNFENCED_ROUTE_KEY);
+      bridgeRef.current = undefined;
       closePicker();
     },
     [closePicker]
@@ -72,8 +102,8 @@ export default function RepoPickerScreen() {
     <PickerSheet title={t('agentChat.repoPicker.title')} onDone={closePicker} scrollable={false}>
       <FlatList
         className="flex-1 bg-background"
-        data={filtered}
-        keyExtractor={repo => repo.fullName}
+        data={listItems}
+        keyExtractor={item => item.key}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         contentContainerStyle={{ paddingBottom: bottom }}
@@ -110,28 +140,46 @@ export default function RepoPickerScreen() {
             }
           />
         }
-        renderItem={({ item: repo }) => (
-          <Pressable
-            className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary will-change-pressable"
-            onPress={() => {
-              handleSelect(repo.fullName);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={repo.fullName}
-          >
-            {repo.isPrivate ? (
-              <Lock size={14} color={colors.mutedForeground} />
-            ) : (
-              <Unlock size={14} color={colors.mutedForeground} />
-            )}
-            <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
-              {repo.fullName}
-            </Text>
-            {bridge.currentValue === repo.fullName ? (
-              <Check size={18} color={colors.primary} />
-            ) : null}
-          </Pressable>
-        )}
+        renderItem={({ item }) => {
+          if (item.kind === 'header') {
+            return (
+              <Text className="px-4 pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {t(item.titleKey)}
+              </Text>
+            );
+          }
+          const repo = item.repo;
+          const platformName = t(REPO_PLATFORM_LABEL_KEYS[repo.platform]);
+          const rowLabel = `${platformName} ${repo.fullName}`;
+          return (
+            <Pressable
+              className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary will-change-pressable"
+              onPress={() => {
+                handleSelect(`${repo.platform}:${repo.fullName}`);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={rowLabel}
+            >
+              {repo.isPrivate ? (
+                <Lock size={14} color={colors.mutedForeground} />
+              ) : (
+                <Unlock size={14} color={colors.mutedForeground} />
+              )}
+              <Text
+                className="w-16 shrink-0 text-xs font-medium text-muted-foreground"
+                numberOfLines={1}
+              >
+                {platformName}
+              </Text>
+              <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
+                {repo.fullName}
+              </Text>
+              {bridge.currentValue === `${repo.platform}:${repo.fullName}` ? (
+                <Check size={18} color={colors.primary} />
+              ) : null}
+            </Pressable>
+          );
+        }}
       />
     </PickerSheet>
   );

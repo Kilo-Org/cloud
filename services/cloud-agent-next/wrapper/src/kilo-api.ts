@@ -228,6 +228,7 @@ export type KiloEvent = {
 export type WrapperKiloClient = {
   createSession: (opts?: { title?: string }) => Promise<{ id: string }>;
   getSession: (sessionId: string) => Promise<{ id: string }>;
+  ensureSession: (sessionId: string, directory: string) => Promise<void>;
   sendPromptAsync: (opts: {
     sessionId: string;
     messageId: string;
@@ -349,6 +350,41 @@ export function createWrapperKiloClient(
         throw new Error(`Session get returned no data for ${sessionId}`);
       }
       return { id: result.data.id };
+    },
+
+    ensureSession: async (sessionId, directory) => {
+      const existing = await fetch(`${serverUrl}/session/${encodeURIComponent(sessionId)}`, {
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (existing.ok) return;
+      if (existing.status !== 404) {
+        throw new Error(`Session get failed for ${sessionId}: HTTP ${existing.status}`);
+      }
+      const now = Date.now();
+      const imported = await fetch(
+        `${serverUrl}/kilocode/session-import/session?directory=${encodeURIComponent(directory)}`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          signal: AbortSignal.timeout(8_000),
+          body: JSON.stringify({
+            id: sessionId,
+            projectID: 'global',
+            slug: sessionId.slice(0, 24),
+            directory,
+            title: 'Cloud Agent',
+            version: '7.4.20',
+            timeCreated: now,
+            timeUpdated: now,
+          }),
+        }
+      );
+      if (!imported.ok) {
+        const detail = await imported.text();
+        throw new Error(
+          `Session import failed for ${sessionId}: HTTP ${imported.status} ${detail}`
+        );
+      }
     },
 
     sendPromptAsync: async opts => {

@@ -860,7 +860,8 @@
       "githubApp": "Ứng dụng GitHub",
       "githubError": "Không thể mở thiết lập GitHub. Vui lòng thử lại.",
       "gitlabAccount": "Tài khoản GitLab",
-      "gitlabError": "Không thể mở thiết lập GitLab. Vui lòng thử lại."
+      "gitlabError": "Không thể mở thiết lập GitLab. Vui lòng thử lại.",
+      "bitbucketError": "Không thể mở thiết lập Bitbucket. Vui lòng thử lại."
     },
     "readOnlyDescription": "Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể thay đổi các cài đặt này.",
     "reviewDetail": {
@@ -1621,7 +1622,8 @@
       "dollar": "đô la",
       "dollar_other": "đô la",
       "costSpoken": "chi phí {{cost}}",
-      "costSpokenWithTime": "chi phí {{cost}}, {{time}}"
+      "costSpokenWithTime": "chi phí {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Chúng tôi không thể bắt đầu thiết lập ứng dụng GitHub. Vui lòng thử lại.",
@@ -1698,14 +1700,10 @@
     "newSession": {
       "title": "Phiên mới",
       "repository": "Kho lưu trữ",
-      "couldNotLoadRepositories": "Không thể tải các kho lưu trữ",
       "connectGithub": "Kết nối GitHub",
       "connectGithubDescription": "Kết nối GitHub trong trình duyệt của bạn, sau đó quay lại đây để chọn kho lưu trữ.",
       "openGithub": "Mở GitHub",
       "refreshRepositories": "Làm mới kho lưu trữ",
-      "githubConnectionNotVisible": "Chúng tôi chưa thấy kết nối GitHub của bạn",
-      "githubConnectionNotVisibleDescription": "Nếu bạn đã cài đặt hoặc cấu hình ứng dụng Kilo GitHub, hãy kiểm tra lại — hoặc đảm bảo nó đã được cài đặt cho tài khoản/tổ chức này.",
-      "checkAgain": "Kiểm tra lại",
       "githubConnected": "Đã kết nối GitHub",
       "noRepositoriesVisible": "Không thấy kho lưu trữ nào. Kiểm tra quyền truy cập kho lưu trữ cho ứng dụng Kilo GitHub, sau đó làm mới.",
       "runOnWithTarget": "Chạy trên: {{target}}",
@@ -1732,7 +1730,21 @@
       "discardDraftTitle": "Hủy bản nháp?",
       "discardFailed": "Không thể hủy bản nháp. Vui lòng thử lại.",
       "keepEditing": "Tiếp tục chỉnh sửa",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Đã kết nối Bitbucket",
+      "connectBitbucket": "Kết nối Bitbucket",
+      "connectBitbucketDescription": "Kết nối Bitbucket trong trình duyệt của bạn, rồi quay lại đây để chọn một kho lưu trữ.",
+      "connectGitlab": "Kết nối GitLab",
+      "connectGitlabDescription": "Kết nối GitLab trong trình duyệt của bạn, rồi quay lại đây để chọn một kho lưu trữ.",
+      "couldNotLoadBitbucketRepositories": "Không thể tải kho lưu trữ Bitbucket",
+      "couldNotLoadGithubRepositories": "Không thể tải kho lưu trữ GitHub",
+      "couldNotLoadGitlabRepositories": "Không thể tải kho lưu trữ GitLab",
+      "gitlabConnected": "Đã kết nối GitLab",
+      "noRepositoriesVisibleBitbucket": "Không có kho lưu trữ hiển thị. Kiểm tra quyền truy cập kho lưu trữ cho Bitbucket, rồi làm mới.",
+      "noRepositoriesVisibleGitlab": "Không có kho lưu trữ hiển thị. Kiểm tra quyền truy cập kho lưu trữ cho GitLab, rồi làm mới.",
+      "openBitbucket": "Mở Bitbucket",
+      "openGitlab": "Mở GitLab",
+      "recentlyUsed": "Đã dùng gần đây"
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp",
@@ -1821,7 +1833,10 @@
       "noRepositoriesDescription": "Không có kho lưu trữ nào được kết nối với tài khoản của bạn.",
       "tryDifferentSearch": "Hãy thử một cụm từ tìm kiếm khác.",
       "loading": "Đang tải...",
-      "accessibility": "Kho lưu trữ: {{label}}"
+      "accessibility": "Kho lưu trữ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Chi tiết tin nhắn",
@@ -2930,7 +2945,9 @@
       "organizationUnavailable": "Tổ chức không khả dụng",
       "selectDescription": "Chọn một tổ chức từ hồ sơ của bạn để tiếp tục.",
       "selectOrganization": "Chọn một tổ chức",
-      "unavailableDescription": "Tổ chức này không còn khả dụng. Hãy chọn một tổ chức từ hồ sơ của bạn để tiếp tục."
+      "unavailableDescription": "Tổ chức này không còn khả dụng. Hãy chọn một tổ chức từ hồ sơ của bạn để tiếp tục.",
+      "accessDeniedTitle": "Truy cập bị từ chối",
+      "accessDeniedDescription": "Bạn không có quyền truy cập vào tổ chức này."
     },
     "creditActivity": {
       "emptyDescription": "Các giao dịch mua, mức sử dụng và điều chỉnh tín dụng của tổ chức này sẽ xuất hiện tại đây khi phát sinh.",
@@ -2947,7 +2964,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Điều chỉnh kế toán",
         "credits_expired": "Tín dụng đã hết hạn"
-      }
+      },
+      "loadMore": "Tải thêm",
+      "loadMoreFailed": "Không thể tải thêm",
+      "truncated": "Hoạt động tín dụng cũ hơn có sẵn."
     },
     "hub": {
       "balance": "Số dư",
@@ -2983,7 +3003,10 @@
         "draft": "Bản nháp",
         "uncollectible": "Không thể thu hồi",
         "unknown": "Không xác định"
-      }
+      },
+      "loadMore": "Tải thêm",
+      "loadMoreFailed": "Không thể tải thêm",
+      "truncated": "Hóa đơn cũ hơn có sẵn."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3074,17 +3097,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "Không thể mở cửa hàng.",
-    "emailUs": "Gửi email cho chúng tôi",
-    "gladMessage": "Một đánh giá trên cửa hàng sẽ giúp chúng tôi rất nhiều. Cảm ơn bạn đã dùng Kilo!",
-    "gladTitle": "Chúng tôi rất vui khi nghe điều đó!",
-    "iLikeIt": "Tôi thích",
-    "needsWork": "Cần cải thiện",
     "noEmailApp": "Không có ứng dụng email khả dụng. Bạn có thể liên hệ chúng tôi qua {{email}}",
-    "promptTitle": "Bạn thấy ứng dụng Kilo thế nào?",
-    "rateKilo": "Đánh giá Kilo",
-    "sorryMessage": "Vui lòng cho chúng tôi biết điều cần cải thiện. Kỹ sư phụ trách ứng dụng đọc từng báo cáo một!",
-    "sorryTitle": "Chúng tôi rất tiếc khi nghe điều đó!",
-    "emailSubject": "phản hồi ứng dụng di động"
+    "emailSubject": "phản hồi ứng dụng di động",
+    "neutralTitle": "Đánh giá ứng dụng Kilo",
+    "rateTheApp": "Đánh giá ứng dụng",
+    "sendFeedback": "Gửi phản hồi"
   },
   "authErrors": {
     "emailAlreadyUsed": "Đã có tài khoản với email này nhưng sử dụng phương thức đăng nhập khác. Hãy thử phương thức khác hoặc dùng '$t(login.moreSignInOptions)'.",

@@ -345,6 +345,7 @@ const PrepareSessionSharedFields = {
     .string()
     .regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/, 'Invalid repository format')
     .optional(),
+  githubIntegrationId: z.uuid().optional(),
   gitlabProject: z
     .string()
     .regex(
@@ -430,6 +431,10 @@ export const basePrepareSessionNextSchema = z
       path: ['githubRepo'],
     }
   )
+  .refine(data => data.githubIntegrationId === undefined || data.githubRepo !== undefined, {
+    message: 'GitHub integration requires a GitHub repository',
+    path: ['githubIntegrationId'],
+  })
   .refine(hasOnlyOneAttachmentField, {
     message: 'Must not provide both attachments and images',
     path: ['attachments'],

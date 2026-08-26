@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Kont GitLab",
       "connectGitLab": "Konekte GitLab",
       "gitlabError": "Pa t ka ouvri enstalasyon GitLab. Tanpri eseye ankò.",
-      "description": "Konekte {{label}} Kilo a pou revize demann fuzion otomatikman."
+      "description": "Konekte {{label}} Kilo a pou revize demann fuzion otomatikman.",
+      "bitbucketError": "Pa t kapab louvri konfigirasyon Bitbucket. Tanpri eseye ankò."
     },
     "overview": {
       "reviewStyle": "Estil Revizyon",
@@ -2075,7 +2076,8 @@
       "dollar": "dola",
       "dollar_other": "dola",
       "costSpoken": "kout {{cost}}",
-      "costSpokenWithTime": "Pri {{cost}}, {{time}}"
+      "costSpokenWithTime": "Pri {{cost}}, {{time}}",
+      "pullRequest": "demann pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Pa t 'kapab louvri GitHub",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Nouvo sesyon",
       "repository": "Depo",
-      "couldNotLoadRepositories": "Pa t 'kapab chaje repo yo",
       "connectGithub": "Konekte GitHub",
       "connectGithubDescription": "Konekte GitHub nan navigatè ou, epi tounen isit la pou chwazi yon repo.",
       "openGithub": "Louvri GitHub",
       "refreshRepositories": "Rafrechi repo yo",
-      "githubConnectionNotVisible": "Nou pa kapab wè koneksyon GitHub ou ankò",
-      "githubConnectionNotVisibleDescription": "Si ou enstale oswa konfigure GitHub App Kilo a, tcheke ankò — oswa verifye li te enstale pou kont/òganizasyon sa a.",
-      "checkAgain": "Tcheke ankò",
       "githubConnected": "GitHub konekte",
       "noRepositoriesVisible": "Pa gen repo ki vizib. Tcheke aksè repo pou GitHub App Kilo a, epi rafrechi.",
       "runOnWithTarget": "Kouri sou: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Kontinye modifye",
       "discard": "Jete",
       "discardFailed": "Pa t 'kapab jete bouyon an. Tanpri eseye ankò.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket konekte",
+      "connectBitbucket": "Konekte Bitbucket",
+      "connectBitbucketDescription": "Konekte Bitbucket nan navigatè ou, apre sa retounen isit la pou chwazi yon depo.",
+      "connectGitlab": "Konekte GitLab",
+      "connectGitlabDescription": "Konekte GitLab nan navigatè ou, apre sa retounen isit la pou chwazi yon depo.",
+      "couldNotLoadBitbucketRepositories": "Pa t kapab chaje depo Bitbucket",
+      "couldNotLoadGithubRepositories": "Pa t kapab chaje depo GitHub",
+      "couldNotLoadGitlabRepositories": "Pa t kapab chaje depo GitLab",
+      "gitlabConnected": "GitLab konekte",
+      "noRepositoriesVisibleBitbucket": "Pa gen depo ki vizib. Tcheke aksè depo pou Bitbucket, apre sa rafrechi.",
+      "noRepositoriesVisibleGitlab": "Pa gen depo ki vizib. Tcheke aksè depo pou GitLab, apre sa rafrechi.",
+      "openBitbucket": "Louvri Bitbucket",
+      "openGitlab": "Louvri GitLab",
+      "recentlyUsed": "Itilize dènyèman"
     },
     "partRenderer": {
       "updatedFileCount_one": "Miz ajou {{displayCount}} fichye",
@@ -2279,7 +2291,10 @@
       "noRepositoriesDescription": "Pa gen repo ki konekte ak kont ou.",
       "tryDifferentSearch": "Eseye yon tèm rechèch diferan.",
       "loading": "Ap chaje…",
-      "accessibility": "Repo: {{label}}"
+      "accessibility": "Repo: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detay mesaj",
@@ -2925,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Pa gen aplikasyon imel disponib. Ou ka kontakte nou nan {{email}}",
     "couldNotOpenStore": "Pa t ka louvri magazen an.",
-    "promptTitle": "Kijan ou renmen aplikasyon Kilo a?",
-    "iLikeIt": "Mwen renmen li",
-    "gladTitle": "Nou kontan tande sa!",
-    "gladMessage": "Yon revizyon magazen ta ede nou anpil. Mèsi paske w ap itilize Kilo!",
-    "rateKilo": "Evalye Kilo",
-    "needsWork": "Gen travay pou fè",
-    "sorryTitle": "Nou regrèt tande sa!",
-    "sorryMessage": "Tanpri fè nou konnen kisa ki bezwen pi byen. Enjenyè ki responsab aplikasyon an li chak rapò!",
-    "emailUs": "Imel nou",
-    "emailSubject": "kòmantè sou aplikasyon mobil"
+    "emailSubject": "kòmantè sou aplikasyon mobil",
+    "neutralTitle": "Evalye aplikasyon Kilo a",
+    "rateTheApp": "Evalye aplikasyon an",
+    "sendFeedback": "Voye fidbak"
   },
   "organization": {
     "boundary": {
@@ -2944,7 +2953,9 @@
       "organizationUnavailable": "Òganizasyon pa disponib",
       "selectDescription": "Chwazi yon òganizasyon nan pwofil ou pou kontinye.",
       "selectOrganization": "Chwazi yon òganizasyon",
-      "unavailableDescription": "Òganizasyon sa a pa disponib ankò. Chwazi yon youn nan pwofil ou pou kontinye."
+      "unavailableDescription": "Òganizasyon sa a pa disponib ankò. Chwazi yon youn nan pwofil ou pou kontinye.",
+      "accessDeniedTitle": "Aksè refize",
+      "accessDeniedDescription": "Ou pa gen aksè nan òganizasyon sa a."
     },
     "creditActivity": {
       "emptyDescription": "Acha, itilizasyon, ak ajisteman kredi pou òganizasyon sa a ap parèt isit la jan yo rive.",
@@ -2961,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Ajisteman kontab",
         "credits_expired": "Kredi ekspire"
-      }
+      },
+      "loadMore": "Chaje plis",
+      "loadMoreFailed": "Pa t ka chaje plis",
+      "truncated": "Gen plis aktivite kredi ki pi ansyen disponib."
     },
     "inviteMember": {
       "emailError": "Antre yon adrès imel valid",
@@ -2988,7 +3002,10 @@
         "draft": "Brouyon",
         "uncollectible": "Enkobrèb",
         "unknown": "Enkoni"
-      }
+      },
+      "loadMore": "Chaje plis",
+      "loadMoreFailed": "Pa t ka chaje plis",
+      "truncated": "Gen plis fakti ki pi ansyen disponib."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

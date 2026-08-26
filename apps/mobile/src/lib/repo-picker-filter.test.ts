@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
+import { type RepoOption } from './picker-bridge';
 import { filterRepoPickerOptions } from './repo-picker-filter';
 
-const repositories = [
-  { fullName: 'Kilo-Org/cloud', isPrivate: true },
-  { fullName: 'octocat/Hello-World', isPrivate: false },
-  { fullName: 'acme/widgets', isPrivate: true },
+const repositories: RepoOption[] = [
+  { fullName: 'Kilo-Org/cloud', isPrivate: true, platform: 'github' },
+  { fullName: 'octocat/Hello-World', isPrivate: false, platform: 'github' },
+  { fullName: 'acme/widgets', isPrivate: true, platform: 'github' },
 ];
 
 describe('filterRepoPickerOptions', () => {

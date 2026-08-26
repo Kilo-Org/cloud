@@ -7,12 +7,15 @@ import { AlertCircle, Download } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { buildAuthHeaders } from '@/lib/auth/auth-header';
 import { getActiveToken } from '@/lib/auth/token-owner';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { confirmMarkdownImage, isMarkdownImageConfirmed } from './markdown-image-confirm';
-import { resolveMarkdownImageSrc } from './markdown-image-src';
+import {
+  buildMarkdownImageHeaders,
+  refreshMarkdownImageSrc,
+  resolveMarkdownImageSrc,
+} from './markdown-image-src';
 import { getLinkAccessibilityActions } from './markdown-link';
 import {
   IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,
@@ -164,15 +167,35 @@ export function MarkdownImage({
     return <Text className="text-xs text-muted-foreground">{alt || 'image'}</Text>;
   }
 
-  // The media proxy requires authentication. With no sync token we cannot
-  // request the image, so render the retry fail chip and never fetch (an
-  // unauthenticated expo-image source would just 401).
+  // The media proxy requires authentication. The token is read during render
+  // without subscribing: no token yet means auth has not settled, so show the
+  // loading placeholder rather than a retry chip, because retrying cannot help
+  // until a token exists. Nothing re-renders on a token rotation either, so
+  // the Image is keyed on the token: once a re-render does happen the source
+  // is re-issued with the new one instead of reusing the expired request.
   const token = getActiveToken();
 
-  if (failed || !token) {
+  if (!token) {
+    return (
+      <View
+        className="my-1 w-full overflow-hidden rounded-md bg-neutral-100 dark:bg-neutral-900"
+        accessibilityRole="image"
+        accessibilityLabel={t('agentChat.filePart.loadingImage')}
+        // eslint-disable-next-line react-native/no-inline-styles -- measured aspect ratio cannot be a Tailwind class
+        style={{ aspectRatio: aspectRatio ?? IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO }}
+      >
+        <Skeleton className="absolute inset-0" />
+      </View>
+    );
+  }
+
+  if (failed) {
     return (
       <Pressable
         onPress={() => {
+          // A fresh proxy URI on every retry, so no client image cache can
+          // replay the failed load against the old one.
+          refreshMarkdownImageSrc(uri);
           setFailed(false);
           setMeasuredAspectRatio(undefined);
           setAttempt(prev => prev + 1);
@@ -217,10 +240,10 @@ export function MarkdownImage({
       >
         {measuredAspectRatio === undefined ? <Skeleton className="absolute inset-0" /> : null}
         <Image
-          key={attempt}
+          key={`${attempt}:${token.token}`}
           source={{
             uri: resolveMarkdownImageSrc(uri),
-            headers: buildAuthHeaders(token.token),
+            headers: buildMarkdownImageHeaders(token.token, uri),
           }}
           cachePolicy="memory"
           className="h-full w-full"

@@ -64,7 +64,7 @@ export function MessageReactionPickerSheet({
       <Animated.View
         entering={FadeIn.duration(150)}
         exiting={FadeOut.duration(150)}
-        className="absolute inset-0 justify-end bg-black/40"
+        className="absolute inset-0 justify-end bg-[#00000066]"
       >
         <Pressable
           className="flex-1"

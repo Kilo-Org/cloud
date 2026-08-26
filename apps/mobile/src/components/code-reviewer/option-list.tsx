@@ -54,7 +54,7 @@ export function OptionList<T extends string, TSaveResult>({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={title} />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <RadioGroup label={title}>
           {options.map(option => (
             <View key={option} className="relative">

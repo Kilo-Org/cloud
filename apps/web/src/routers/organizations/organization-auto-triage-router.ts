@@ -5,7 +5,7 @@ import {
   organizationBillingMutationProcedure,
 } from './utils';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
+import { getPrimaryGitHubIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import {
   getAgentConfig,
   upsertAgentConfig,
@@ -40,7 +40,7 @@ const sharedHandlers = createAutoTriageRouter({
 
   integrationGetter: async owner => {
     if (owner.type !== 'org') return null;
-    return await getIntegrationForOrganization(owner.id, 'github');
+    return await getPrimaryGitHubIntegrationForOrganization(owner.id);
   },
 
   repositoryFetcher: async owner => {

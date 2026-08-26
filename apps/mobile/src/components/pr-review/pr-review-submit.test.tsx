@@ -22,6 +22,15 @@ vi.mock('@/lib/pr-review/use-pr-review-mutations', () => ({
   }),
 }));
 
+const footerPreferenceMock = vi.hoisted(() => ({
+  hasLoaded: true,
+  prReviewFooter: false,
+}));
+
+vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
+  usePrReviewFooterPreference: () => footerPreferenceMock,
+}));
+
 vi.mock('@/components/pr-review/discussion/reply-input', () => ({
   ensureTermsAcceptedOutcome: vi.fn(async () => ({ kind: 'accepted' as const })),
 }));
@@ -58,6 +67,7 @@ vi.mock('expo-router', () => ({
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   Keyboard: { addListener: () => ({ remove: vi.fn() }) },
+  Platform: { OS: 'ios' },
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
   View: 'View',
@@ -73,6 +83,7 @@ vi.mock('@/components/pr-review/review-event-chips', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/pr-review/pr-review-pending-comment-row', () => ({
   focusAfterPendingCommentRemoval: vi.fn(),
@@ -164,11 +175,29 @@ function submitOnPress(renderer: TestRenderer.ReactTestRenderer): () => void {
   return button.props.onPress as () => void;
 }
 
+function findSubmitButton(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
+  const button = renderer.root.findAll(node => Object.hasOwn(node.props, 'loading'))[0];
+  if (!button) {
+    throw new Error('Submit button not found');
+  }
+  return button.props as Record<string, unknown>;
+}
+
+function findSummaryField(renderer: TestRenderer.ReactTestRenderer): Record<string, unknown> {
+  const summary = renderer.root.findAll(node => Object.hasOwn(node.props, 'defaultValue'))[0];
+  if (!summary) {
+    throw new Error('Summary field not found');
+  }
+  return summary.props as Record<string, unknown>;
+}
+
 beforeEach(() => {
   latestItems = [];
   addCommentFn = null;
   submitMutationMock.mutateAsync.mockReset();
   submitMutationMock.mutateAsync.mockResolvedValue(undefined);
+  footerPreferenceMock.hasLoaded = true;
+  footerPreferenceMock.prReviewFooter = false;
 });
 
 describe('PrReviewSubmit queue retention', () => {
@@ -211,5 +240,31 @@ describe('PrReviewSubmit queue retention', () => {
     // Success removes exactly the fresh ids; the stale item stays queued.
     expect(submitMutationMock.mutateAsync).toHaveBeenCalledTimes(1);
     expect(latestItems.map(item => item.id)).toEqual(['stale-c']);
+  });
+});
+
+describe('PrReviewSubmit footer preference', () => {
+  it('prefills the platform footer and enables submit when the setting is on', () => {
+    footerPreferenceMock.prReviewFooter = true;
+    const renderer = mount();
+
+    expect(findSummaryField(renderer).defaultValue).toBe(
+      '\n\n---\nReviewed via the [Kilo iOS app](https://apps.apple.com/app/id6761193135)'
+    );
+
+    // hasSummary was set from the prefilled footer, so a comment review with no
+    // queued comments is not blocked: the submit button is enabled.
+    expect(findSubmitButton(renderer).disabled).toBe(false);
+  });
+
+  it('leaves the body empty and blocks submit when the setting is off', () => {
+    footerPreferenceMock.prReviewFooter = false;
+    const renderer = mount();
+
+    expect(findSummaryField(renderer).defaultValue).toBe('');
+
+    // No prefilled footer and no queued comments: the comment review is
+    // blocked, so the submit button is disabled.
+    expect(findSubmitButton(renderer).disabled).toBe(true);
   });
 });

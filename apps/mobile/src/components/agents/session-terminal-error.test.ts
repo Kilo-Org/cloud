@@ -7,43 +7,31 @@ import {
 } from './session-terminal-error';
 
 describe('classifyTerminalError', () => {
-  it('classifies the permission string', () => {
-    expect(classifyTerminalError('You are not authorized to use the Cloud Agent.')).toBe(
-      'permission'
-    );
+  it.each([
+    ['You are not authorized to use the Cloud Agent.', 'permission'],
+    ['Insufficient credits. Please add at least $1 to continue using Cloud Agent.', 'credits'],
+    ['Previous task is still finishing up. Please wait a moment.', 'busy'],
+    [
+      'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.',
+      'model',
+    ],
+    ['This session is no longer available.', 'gone'],
+    ['Service is unavailable right now. Please try again.', 'unavailable'],
+    ['Service is temporarily unavailable. Please retry in a moment.', 'unavailable'],
+    ['Connection lost. Please retry in a moment.', 'transient'],
+    ['Connection failed. Please retry in a moment.', 'transient'],
+    ['Something went wrong. Please retry in a moment.', 'transient'],
+    ['some unexpected failure', 'unknown'],
+    ['', 'unknown'],
+  ] as const)('classifies %s', (message, expected) => {
+    expect(classifyTerminalError(message)).toBe(expected);
   });
+});
 
-  it('classifies the not-found string', () => {
-    expect(classifyTerminalError('Service is unavailable right now. Please try again.')).toBe(
-      'not-found'
-    );
-  });
-
-  it('classifies connection-loss as transient', () => {
-    expect(classifyTerminalError('Connection lost. Please retry in a moment.')).toBe('transient');
-    expect(classifyTerminalError('Connection failed. Please retry in a moment.')).toBe('transient');
-  });
-
-  it('classifies service-unavailable as transient', () => {
-    expect(
-      classifyTerminalError('Service is temporarily unavailable. Please retry in a moment.')
-    ).toBe('transient');
-  });
-
-  it('classifies the generic retry string as transient', () => {
-    expect(classifyTerminalError('Something went wrong. Please retry in a moment.')).toBe(
-      'transient'
-    );
-  });
-
-  it('classifies unrecognized text as unknown', () => {
-    expect(classifyTerminalError('Insufficient credits. Please add at least $1.')).toBe('unknown');
-    expect(
-      classifyTerminalError('Previous task is still finishing up. Please wait a moment.')
-    ).toBe('unknown');
-    expect(classifyTerminalError('')).toBe('unknown');
-    expect(classifyTerminalError('some unexpected failure')).toBe('unknown');
-  });
+const indicatorFor = (message: string) => ({
+  error: null,
+  statusIndicator: { type: 'error' as const, message },
+  messageCount: 0,
 });
 
 describe('resolveSessionTerminalError', () => {
@@ -73,121 +61,121 @@ describe('resolveSessionTerminalError', () => {
     ).toBeNull();
   });
 
-  it('treats the error atom as a retryable server failure', () => {
+  it('shows translated copy for the error atom and keeps the original for Copy', () => {
     expect(
       resolveSessionTerminalError({ error: 'boom', statusIndicator: null, messageCount: 0 })
     ).toEqual({
       variant: 'server',
       title: "Couldn't load this session",
-      message: 'boom',
+      message: 'Failed to load session details',
       retryable: true,
+      detail: 'boom',
+    });
+  });
+
+  it('never shows the English transport message to the reader', () => {
+    const resolved = resolveSessionTerminalError(
+      indicatorFor('Connection failed. Please retry in a moment.')
+    );
+    expect(resolved).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: 'Connection trouble. Please retry in a moment.',
+      retryable: true,
+      detail: 'Connection failed. Please retry in a moment.',
     });
   });
 
   it('classifies a permission indicator as non-retryable', () => {
     expect(
-      resolveSessionTerminalError({
-        error: null,
-        statusIndicator: {
-          type: 'error',
-          message: 'You are not authorized to use the Cloud Agent.',
-        },
-        messageCount: 0,
-      })
+      resolveSessionTerminalError(indicatorFor('You are not authorized to use the Cloud Agent.'))
     ).toEqual({
       variant: 'permission',
       title: 'Access denied',
-      message: 'You are not authorized to use the Cloud Agent.',
+      message: "You don't have permission to view this.",
       retryable: false,
+      detail: 'You are not authorized to use the Cloud Agent.',
     });
-  });
-
-  it('classifies a not-found indicator as non-retryable', () => {
-    expect(
-      resolveSessionTerminalError({
-        error: null,
-        statusIndicator: {
-          type: 'error',
-          message: 'Service is unavailable right now. Please try again.',
-        },
-        messageCount: 0,
-      })
-    ).toEqual({
-      variant: 'not-found',
-      title: 'Not found',
-      message: 'Service is unavailable right now. Please try again.',
-      retryable: false,
-    });
-  });
-
-  it('classifies a transient indicator as retryable', () => {
-    expect(
-      resolveSessionTerminalError({
-        error: null,
-        statusIndicator: {
-          type: 'error',
-          message: 'Connection lost. Please retry in a moment.',
-        },
-        messageCount: 0,
-      })
-    ).toEqual({
-      variant: 'server',
-      title: "Couldn't load this session",
-      message: 'Connection lost. Please retry in a moment.',
-      retryable: true,
-    });
-  });
-
-  it('treats an unknown indicator as non-retryable (permanent is safer)', () => {
-    expect(
-      resolveSessionTerminalError({
-        error: null,
-        statusIndicator: { type: 'error', message: 'some unexpected failure' },
-        messageCount: 0,
-      })
-    ).toEqual({
-      variant: 'server',
-      title: "Couldn't load this session",
-      message: 'some unexpected failure',
-      retryable: false,
-    });
-  });
-});
-
-const indicatorFor = (message: string) => ({
-  error: null,
-  statusIndicator: { type: 'error' as const, message },
-  messageCount: 0,
-});
-
-describe('resolveSessionTerminalError Copy / Retry presence', () => {
-  it('offers Retry only for the transient class', () => {
-    expect(
-      resolveSessionTerminalError(indicatorFor('Connection lost. Please retry in a moment.'))
-        ?.retryable
-    ).toBe(true);
   });
 
   it.each([
-    ['not-found', 'Service is unavailable right now. Please try again.'],
-    ['permission', 'You are not authorized to use the Cloud Agent.'],
-    ['unknown', 'some unexpected failure'],
-  ] as const)('hides Retry for the %s class', (_cls, message) => {
-    const resolved = resolveSessionTerminalError(indicatorFor(message));
-    expect(resolved?.retryable).toBe(false);
+    ['Connection lost. Please retry in a moment.', true],
+    ['Previous task is still finishing up. Please wait a moment.', true],
+    ['Service is unavailable right now. Please try again.', true],
+    ['Insufficient credits. Please add at least $1 to continue using Cloud Agent.', false],
+    ['You are not authorized to use the Cloud Agent.', false],
+    ['some unexpected failure', false],
+    // A Retry cannot recover either of these: the user has to change the model
+    // or leave the session.
+    [
+      'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.',
+      false,
+    ],
+    ['This session is no longer available.', false],
+  ] as const)('offers retry for %s: %s', (message, retryable) => {
+    expect(resolveSessionTerminalError(indicatorFor(message))?.retryable).toBe(retryable);
+  });
+
+  it('keeps the selected-model error out of the service-outage class', () => {
+    expect(
+      resolveSessionTerminalError(
+        indicatorFor(
+          'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.'
+        )
+      )
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: "This model isn't available for Cloud Agent. Choose another model and try again.",
+      retryable: false,
+      detail:
+        'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.',
+    });
+  });
+
+  it('shows a gone session as not found', () => {
+    expect(
+      resolveSessionTerminalError(indicatorFor('This session is no longer available.'))
+    ).toEqual({
+      variant: 'not-found',
+      title: 'Not found',
+      message: 'This item may have been removed or is no longer available.',
+      retryable: false,
+      detail: 'This session is no longer available.',
+    });
   });
 });
 
 describe('buildTerminalErrorCopyText', () => {
-  it('joins session id, title, and message with newlines', () => {
-    expect(buildTerminalErrorCopyText('sess-1', 'Not found', 'This item was removed.')).toBe(
-      'sess-1\nNot found\nThis item was removed.'
-    );
+  it('joins session id, title, message and the untranslated original', () => {
+    expect(
+      buildTerminalErrorCopyText({
+        sessionId: 'sess-1',
+        title: 'Not found',
+        message: 'This item was removed.',
+        detail: 'HTTP 404',
+      })
+    ).toBe('sess-1\nNot found\nThis item was removed.\nHTTP 404');
   });
 
   it('omits empty parts', () => {
-    expect(buildTerminalErrorCopyText('sess-1', '', 'This item was removed.')).toBe(
-      'sess-1\nThis item was removed.'
-    );
+    expect(
+      buildTerminalErrorCopyText({
+        sessionId: 'sess-1',
+        title: '',
+        message: 'This item was removed.',
+      })
+    ).toBe('sess-1\nThis item was removed.');
+  });
+
+  it('does not repeat a detail that is already the message', () => {
+    expect(
+      buildTerminalErrorCopyText({
+        sessionId: 'sess-1',
+        title: 'Title',
+        message: 'Same',
+        detail: 'Same',
+      })
+    ).toBe('sess-1\nTitle\nSame');
   });
 });

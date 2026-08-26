@@ -36,6 +36,7 @@ export function OrganizationAdminSalesDemoReset({ organizationId }: { organizati
         setIsOpen(false);
         void queryClient.invalidateQueries({ queryKey: ['organization', organizationId] });
         void queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
+        void queryClient.invalidateQueries({ queryKey: trpc.usageAnalytics.pathKey() });
         void invalidate();
       },
     })
@@ -64,12 +65,19 @@ export function OrganizationAdminSalesDemoReset({ organizationId }: { organizati
           Reset demo organization
         </CardTitle>
         <CardDescription>
-          Restore the $50.00 balance, the owner plus 25 demo members, and the demo organization
-          settings.
+          Restore the $25.03 populated balance, the owner plus 25 demo members, and the demo
+          organization settings.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog
+          open={isOpen}
+          onOpenChange={open => {
+            // Ignore dismiss requests while a reset is in flight.
+            if (resetMutation.isPending) return;
+            setIsOpen(open);
+          }}
+        >
           <DialogTrigger asChild>
             <Button className="w-full sm:w-auto">Reset demo organization</Button>
           </DialogTrigger>
@@ -77,12 +85,16 @@ export function OrganizationAdminSalesDemoReset({ organizationId }: { organizati
             <DialogHeader>
               <DialogTitle>Reset demo organization</DialogTitle>
               <DialogDescription>
-                This restores the organization to its demo state: a $50.00 balance, the owner plus
-                25 demo members, and the demo organization settings. Usage and credits are cleared.
+                This restores the organization to its demo state: a $25.03 populated balance, the
+                owner plus 25 demo members, and 30 days of usage.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setIsOpen(false)}
+                disabled={resetMutation.isPending}
+              >
                 Cancel
               </Button>
               <Button onClick={handleReset} disabled={resetMutation.isPending}>

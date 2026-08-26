@@ -289,7 +289,7 @@ export function AgentSessionListScreen() {
           onPress={() => {
             router.push(getNewAgentSessionPath(organizationId) as Href);
           }}
-          className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-black/25 active:opacity-80"
+          className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-[#00000040] active:opacity-80"
           style={fabStyle}
         >
           <Plus size={24} color={colors.primaryForeground} />

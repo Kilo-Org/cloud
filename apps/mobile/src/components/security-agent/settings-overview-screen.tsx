@@ -223,7 +223,7 @@ export function SettingsOverviewScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('securityAgent.settingsOverview.title')} headerRight={auditAction} />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
         <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
           <View className="flex-1 pr-3">
             <Text className="text-sm font-medium">

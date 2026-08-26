@@ -4118,6 +4118,140 @@ describe('UserConnectionDO', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Same-host reconnect: a rebooted host advertises the same instance name and
+  // projectName on a fresh connectionId. The stale socket must be closed so
+  // `getConnectedInstances` lists the host exactly once.
+  // -------------------------------------------------------------------------
+
+  describe('same-host replace', () => {
+    it('closes the stale socket when a second connectionId heartbeats the same instance identity', async () => {
+      const { doInstance, mockCtx } = setup();
+      const first = addCliSocket(mockCtx, 'conn-1');
+      const second = addCliSocket(mockCtx, 'conn-2');
+
+      sendHeartbeat(doInstance, first, [], {
+        instance: { name: 'host-a', projectName: 'proj' },
+      });
+      sendHeartbeat(doInstance, second, [], {
+        instance: { name: 'host-a', projectName: 'proj' },
+      });
+
+      expect(first.close).toHaveBeenCalledWith(1000, 'replaced by same-host reconnect');
+      expect(second.close).not.toHaveBeenCalled();
+
+      // The mock close does not drop the socket; remove it to mirror the
+      // runtime close before asserting the live-instance scan.
+      mockCtx.removeSocket(first);
+
+      const { instances } = doInstance.getConnectedInstances();
+      expect(instances).toHaveLength(1);
+      expect(instances[0].connectionId).toBe('conn-2');
+      expect(instances[0]).toEqual({
+        connectionId: 'conn-2',
+        name: 'host-a',
+        projectName: 'proj',
+      });
+    });
+
+    it('keeps both sockets open when the projectName differs', async () => {
+      const { doInstance, mockCtx } = setup();
+      const first = addCliSocket(mockCtx, 'conn-1');
+      const second = addCliSocket(mockCtx, 'conn-2');
+
+      sendHeartbeat(doInstance, first, [], {
+        instance: { name: 'host-a', projectName: 'proj-1' },
+      });
+      sendHeartbeat(doInstance, second, [], {
+        instance: { name: 'host-a', projectName: 'proj-2' },
+      });
+
+      expect(first.close).not.toHaveBeenCalled();
+      expect(second.close).not.toHaveBeenCalled();
+    });
+
+    it('keeps both sockets open when the name differs', async () => {
+      const { doInstance, mockCtx } = setup();
+      const first = addCliSocket(mockCtx, 'conn-1');
+      const second = addCliSocket(mockCtx, 'conn-2');
+
+      sendHeartbeat(doInstance, first, [], {
+        instance: { name: 'host-a', projectName: 'proj' },
+      });
+      sendHeartbeat(doInstance, second, [], {
+        instance: { name: 'host-b', projectName: 'proj' },
+      });
+
+      expect(first.close).not.toHaveBeenCalled();
+      expect(second.close).not.toHaveBeenCalled();
+    });
+
+    it('does not broadcast cli.disconnected or overwrite the owner-change terminal result for a same-host replaced socket', async () => {
+      const { doInstance, mockCtx } = setup();
+      const first = addCliSocket(mockCtx, 'conn-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, first, [makeSession('s1')], {
+        instance: { name: 'host-a', projectName: 'proj' },
+      });
+
+      // An owner-fenced pending command targets the first socket.
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'send_message',
+        sessionId: 's1',
+        connectionId: 'conn-1',
+      });
+      const correlationId = getCorrelationId(first);
+      webWs.send.mockClear();
+
+      // A second socket on a different connectionId claims the same host.
+      const second = addCliSocket(mockCtx, 'conn-2');
+      sendHeartbeat(doInstance, second, [], {
+        instance: { name: 'host-a', projectName: 'proj' },
+      });
+
+      expect(first.close).toHaveBeenCalledWith(1000, 'replaced by same-host reconnect');
+
+      // Drain the stale-close failPendingCommandsForSocket waitUntil so the
+      // owner-change terminal result settles before the close event runs.
+      await flushAsync();
+
+      // The stale close delivers the owner-change error, not 'CLI disconnected'.
+      const preClose = allSent(webWs);
+      expect(preClose.find(m => m.type === 'response' && m.id === 'cmd-1')).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'SESSION_OWNER_CHANGED',
+          message: 'Session owner changed',
+        },
+      });
+      webWs.send.mockClear();
+
+      // The close event for the stale first socket now fires.
+      mockCtx.removeSocket(first);
+      await disconnectCli(doInstance, first);
+
+      const msgs = allSent(webWs);
+      expect(msgs.some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(false);
+      expect(msgs.filter(m => m.type === 'response' && m.id === 'cmd-1')).toHaveLength(0);
+
+      // Durable terminal entry keeps the owner-change error.
+      const durable = mockCtx.storage.store.get(`pendingCommand/${correlationId}`) as {
+        state: string;
+        error?: unknown;
+      };
+      expect(durable.state).toBe('done');
+      expect(durable.error).toEqual({
+        source: 'relay',
+        code: 'SESSION_OWNER_CHANGED',
+        message: 'Session owner changed',
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // WS attachment size guardrail (W3)
   // -------------------------------------------------------------------------
 

@@ -68,6 +68,7 @@ git diff --check
 - iOS: never control text with `value` plus state. Store text in a ref via `onChangeText`, use state only for derived UI, read the ref on submit.
 - Use `defaultValue` only for initial content.
 - Single-line inputs: use `leading-[normal]`. A `lineHeight` above the font's natural one (which `text-sm`/`text-base` set on their own) makes iOS draw the placeholder lower than the typed text and clip it. Multi-line inputs keep an explicit `leading-*`.
+- Single-line inputs: set the height with `min-h-*`, not `py-*`. iOS insets the already-centered text rect by the padding, so vertical padding draws the text and the placeholder low.
 - Put input screens in a `ScrollView` with `automaticallyAdjustKeyboardInsets`.
 
 ## UI and UX Rules

@@ -160,6 +160,7 @@ function FlowProbe({ props = { searchParams: {} } }: { props?: SignInFlowProps }
       id: 'submit-email',
       onClick: () => flow.handleEmailSubmit({ preventDefault: () => undefined } as React.FormEvent),
     }),
+    createElement('button', { id: 'clear-hint', onClick: flow.handleClearHint }),
     createElement('button', { id: 'clear-invite', onClick: flow.handleClearInvite }),
     createElement('button', { id: 'retry-turnstile', onClick: flow.handleRetryTurnstile })
   );
@@ -539,6 +540,28 @@ describe('useSignInFlow discovery cancellation', () => {
     expect(mounted.container.querySelector('#tier')?.textContent).toBe('returning');
     expect(mounted.container.querySelector('#email-input')?.textContent).toBe('false');
     expect(mockClearHint).not.toHaveBeenCalled();
+  });
+
+  it('clears a remembered account and returns to neutral email-first sign-in', () => {
+    mockHint = {
+      lastEmail: 'returning@example.com',
+      lastAuthMethod: 'google',
+      lastLogin: '2026-08-26T00:00:00.000Z',
+    };
+    mockClearHint.mockImplementation(() => {
+      mockHint = null;
+    });
+    mounted = mountFlow({ searchParams: {} });
+
+    act(() => button(mounted!.container, 'back').click());
+    expect(mounted.container.querySelector('#email-input')?.textContent).toBe('false');
+
+    act(() => button(mounted!.container, 'clear-hint').click());
+
+    expect(mockClearHint).toHaveBeenCalledTimes(1);
+    expect(mounted.container.querySelector('#tier')?.textContent).toBe('new');
+    expect(mounted.container.querySelector('#email-input')?.textContent).toBe('true');
+    expect(mounted.container.querySelector('#email')?.textContent).toBe('');
   });
 
   it('auto-opens once for a genuinely changed prefilled query email', () => {

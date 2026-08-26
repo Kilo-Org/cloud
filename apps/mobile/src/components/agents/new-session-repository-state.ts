@@ -1,4 +1,6 @@
-export type RepositoryPlatform = 'github' | 'gitlab' | 'bitbucket';
+import { type RepoPlatform } from '@/lib/picker-bridge';
+
+export type RepositoryPlatform = RepoPlatform;
 
 /**
  * One selectable repository row. `platform` is required so two rows with the

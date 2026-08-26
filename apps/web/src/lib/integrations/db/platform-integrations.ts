@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, isNull, desc, sql } from 'drizzle-orm';
+import { eq, and, isNull, asc, desc, sql } from 'drizzle-orm';
 import type {
   GitHubRequester,
   IntegrationPermissions,
@@ -48,7 +48,8 @@ export async function findIntegrationByInstallationId(
 }
 
 /**
- * Gets platform integration for an organization
+ * Gets an organization's preferred integration, including an unhealthy row
+ * when no healthy integration exists. Use this for status and recovery UI.
  */
 export async function getIntegrationForOrganization(organizationId: string, platform: string) {
   const [integration] = await db
@@ -60,10 +61,37 @@ export async function getIntegrationForOrganization(organizationId: string, plat
         eq(platform_integrations.platform, platform)
       )
     )
-    .orderBy(desc(platformIntegrationHealthSql()), desc(platform_integrations.updated_at))
+    .orderBy(
+      desc(platformIntegrationHealthSql()),
+      platform === PLATFORM.GITHUB
+        ? asc(platform_integrations.created_at)
+        : desc(platform_integrations.updated_at),
+      asc(platform_integrations.id)
+    )
     .limit(1);
 
   return integration || null;
+}
+
+/**
+ * Gets the oldest healthy GitHub integration for an organization.
+ * Operational callers must not fall back to an unhealthy installation.
+ */
+export async function getPrimaryGitHubIntegrationForOrganization(organizationId: string) {
+  const [integration] = await db
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.owned_by_organization_id, organizationId),
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        platformIntegrationHealthSql()
+      )
+    )
+    .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id))
+    .limit(1);
+
+  return integration ?? null;
 }
 
 export async function getAllIntegationsForOrganization(organizationId: string) {
@@ -90,6 +118,27 @@ export async function getIntegrationById(integrationId: string, organizationId?:
     .limit(1);
 
   return integration || null;
+}
+
+export async function getGitHubIntegrationById(owner: Owner, integrationId: string) {
+  const ownershipCondition =
+    owner.type === 'user'
+      ? eq(platform_integrations.owned_by_user_id, owner.id)
+      : eq(platform_integrations.owned_by_organization_id, owner.id);
+
+  const [integration] = await db
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.id, integrationId),
+        ownershipCondition,
+        eq(platform_integrations.platform, PLATFORM.GITHUB)
+      )
+    )
+    .limit(1);
+
+  return integration ?? null;
 }
 
 /**
@@ -519,6 +568,9 @@ export async function getIntegrationForOwner(
   platform: string,
   status?: IntegrationStatus
 ) {
+  if (owner.type === 'org' && platform === PLATFORM.GITHUB) {
+    return getPrimaryGitHubIntegrationForOrganization(owner.id);
+  }
   const ownershipCondition =
     owner.type === 'user'
       ? eq(platform_integrations.owned_by_user_id, owner.id)

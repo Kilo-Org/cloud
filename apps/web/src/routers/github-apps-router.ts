@@ -3,7 +3,9 @@ import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import * as z from 'zod';
 import * as githubAppsService from '@/lib/integrations/github-apps-service';
 import {
+  findIntegrationByInstallationId,
   getIntegrationForOwner,
+  getGitHubIntegrationById,
   upsertPlatformIntegrationForOwner,
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
@@ -27,6 +29,7 @@ import {
 import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
 import { createGitHubUserAuthorizationState } from '@/lib/integrations/platforms/github/user-authorization-state';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
+import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import {
   disconnectGitHubUserAuthorization,
   getGitHubUserAuthorizationStatus,
@@ -140,6 +143,7 @@ export const githubAppsRouter = createTRPCRouter({
     return {
       installed: isInstalled,
       installation: {
+        id: integration.id,
         installationId: integration.platform_installation_id,
         accountId: integration.platform_account_id,
         accountLogin: integration.platform_account_login,
@@ -216,28 +220,45 @@ export const githubAppsRouter = createTRPCRouter({
     }),
 
   // Uninstall GitHub App
-  uninstallApp: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {
-    const owner = await resolveAuthorizedOwner(ctx, input?.organizationId);
-    const result = await githubAppsService.uninstallApp(
-      owner,
-      ctx.user.id,
-      ctx.user.google_user_email,
-      ctx.user.google_user_name
-    );
+  uninstallApp: baseProcedure
+    .input(
+      z
+        .object({
+          organizationId: z.string().uuid().optional(),
+          integrationId: z.string().uuid().optional(),
+        })
+        .optional()
+    )
+    .mutation(async ({ ctx, input }) => {
+      const owner = await resolveAuthorizedOwner(
+        ctx,
+        input?.organizationId,
+        input?.organizationId ? ORGANIZATION_MANAGE_ROLES : undefined
+      );
+      if (input?.organizationId && !input.integrationId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Integration ID is required' });
+      }
+      const result = await githubAppsService.uninstallApp(
+        owner,
+        input?.integrationId,
+        ctx.user.id,
+        ctx.user.google_user_email,
+        ctx.user.google_user_name
+      );
 
-    if (input?.organizationId) {
-      await createAuditLog({
-        organization_id: input.organizationId,
-        action: 'organization.settings.change',
-        actor_id: ctx.user.id,
-        actor_email: ctx.user.google_user_email,
-        actor_name: ctx.user.google_user_name,
-        message: 'Uninstalled Kilo GitHub App',
-      });
-    }
+      if (input?.organizationId) {
+        await createAuditLog({
+          organization_id: input.organizationId,
+          action: 'organization.settings.change',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          message: `Uninstalled Kilo GitHub App installation ${input.integrationId}`,
+        });
+      }
 
-    return result;
-  }),
+      return result;
+    }),
 
   // List repositories accessible by an integration
   listRepositories: baseProcedure
@@ -275,13 +296,39 @@ export const githubAppsRouter = createTRPCRouter({
 
   // Cancel pending installation
   cancelPendingInstallation: baseProcedure
-    .input(optionalOrgInput)
+    .input(
+      z
+        .object({
+          organizationId: z.string().uuid().optional(),
+          integrationId: z.string().uuid().optional(),
+        })
+        .optional()
+    )
     .mutation(async ({ ctx, input }) => {
+      let role: Awaited<ReturnType<typeof ensureOrganizationAccess>> | null = null;
       if (input?.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        role = await ensureOrganizationAccess(ctx, input.organizationId);
+        if (!input.integrationId) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Integration ID is required' });
+        }
       }
       const owner = resolveOwner(ctx, input?.organizationId);
-      const result = await githubAppsService.cancelPendingInstallation(owner);
+      if (input?.integrationId) {
+        const integration = await getGitHubIntegrationById(owner, input.integrationId);
+        if (!integration) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Pending installation not found' });
+        }
+        const canCancel =
+          !input.organizationId ||
+          ctx.user.is_admin ||
+          role === 'owner' ||
+          role === 'admin' ||
+          integration.kilo_requester_user_id === ctx.user.id;
+        if (!canCancel) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Cannot cancel this request' });
+        }
+      }
+      const result = await githubAppsService.cancelPendingInstallation(owner, input?.integrationId);
 
       if (input?.organizationId) {
         await createAuditLog({
@@ -298,69 +345,83 @@ export const githubAppsRouter = createTRPCRouter({
     }),
 
   // Refresh installation details from GitHub (permissions, events, repositories)
-  refreshInstallation: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {
-    if (input?.organizationId) {
-      await ensureOrganizationAccess(ctx, input.organizationId);
-    }
-    const owner = resolveOwner(ctx, input?.organizationId);
+  refreshInstallation: baseProcedure
+    .input(
+      z
+        .object({
+          organizationId: z.string().uuid().optional(),
+          integrationId: z.string().uuid().optional(),
+        })
+        .optional()
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input?.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = resolveOwner(ctx, input?.organizationId);
 
-    const integration = await getIntegrationForOwner(owner, 'github');
-    if (!integration || !integration.platform_installation_id) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'No GitHub integration found',
+      if (input?.organizationId && !input.integrationId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Integration ID is required' });
+      }
+      const integration = input?.integrationId
+        ? await getGitHubIntegrationById(owner, input.integrationId)
+        : await getIntegrationForOwner(owner, 'github');
+      if (!integration || !integration.platform_installation_id) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'No GitHub integration found',
+        });
+      }
+
+      const installationId = integration.platform_installation_id;
+      const appType = integration.github_app_type || 'standard';
+
+      const installationDetails = await fetchGitHubInstallationDetails(installationId, appType);
+      if (!installationDetails.account.id || !installationDetails.account.login) {
+        throw new TRPCError({
+          code: 'BAD_GATEWAY',
+          message: 'GitHub installation account identity unavailable',
+        });
+      }
+
+      const upsertResult = await upsertPlatformIntegrationForOwner(owner, {
+        platform: 'github',
+        integrationType: 'app',
+        platformInstallationId: installationId,
+        platformAccountId: installationDetails.account.id.toString(),
+        platformAccountLogin: installationDetails.account.login,
+        permissions: installationDetails.permissions,
+        scopes: installationDetails.events,
+        repositoryAccess: installationDetails.repository_selection,
+        installedAt: installationDetails.created_at,
+        // Keep the integration's app type so a lite refresh is never matched
+        // against (or converted into) the standard app's row.
+        githubAppType: appType,
       });
-    }
 
-    const installationId = integration.platform_installation_id;
-    const appType = integration.github_app_type || 'standard';
+      if (!upsertResult.ok) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This GitHub installation is already claimed by another account.',
+        });
+      }
 
-    const installationDetails = await fetchGitHubInstallationDetails(installationId, appType);
-    if (!installationDetails.account.id || !installationDetails.account.login) {
-      throw new TRPCError({
-        code: 'BAD_GATEWAY',
-        message: 'GitHub installation account identity unavailable',
-      });
-    }
+      const repositories = await fetchGitHubRepositories(installationId, appType);
+      await updateRepositoriesForIntegration(integration.id, repositories);
 
-    const upsertResult = await upsertPlatformIntegrationForOwner(owner, {
-      platform: 'github',
-      integrationType: 'app',
-      platformInstallationId: installationId,
-      platformAccountId: installationDetails.account.id.toString(),
-      platformAccountLogin: installationDetails.account.login,
-      permissions: installationDetails.permissions,
-      scopes: installationDetails.events,
-      repositoryAccess: installationDetails.repository_selection,
-      installedAt: installationDetails.created_at,
-      // Keep the integration's app type so a lite refresh is never matched
-      // against (or converted into) the standard app's row.
-      githubAppType: appType,
-    });
+      if (input?.organizationId) {
+        await createAuditLog({
+          organization_id: input.organizationId,
+          action: 'organization.settings.change',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          message: `Refreshed GitHub App installation ${integration.id}`,
+        });
+      }
 
-    if (!upsertResult.ok) {
-      throw new TRPCError({
-        code: 'CONFLICT',
-        message: 'This GitHub installation is already claimed by another account.',
-      });
-    }
-
-    const repositories = await fetchGitHubRepositories(installationId, appType);
-    await updateRepositoriesForIntegration(integration.id, repositories);
-
-    if (input?.organizationId) {
-      await createAuditLog({
-        organization_id: input.organizationId,
-        action: 'organization.settings.change',
-        actor_id: ctx.user.id,
-        actor_email: ctx.user.google_user_email,
-        actor_name: ctx.user.google_user_name,
-        message: 'Refreshed GitHub App installation details',
-      });
-    }
-
-    return { success: true };
-  }),
+      return { success: true };
+    }),
 
   // Dev-only: Add an existing GitHub installation manually
   devAddInstallation: baseProcedure
@@ -408,8 +469,16 @@ export const githubAppsRouter = createTRPCRouter({
         });
       }
 
-      const integration = await getIntegrationForOwner(owner, 'github');
-      if (integration) {
+      const integration = await findIntegrationByInstallationId(
+        'github',
+        input.installationId,
+        appType
+      );
+      const belongsToOwner =
+        integration &&
+        ((owner.type === 'org' && integration.owned_by_organization_id === owner.id) ||
+          (owner.type === 'user' && integration.owned_by_user_id === owner.id));
+      if (integration && belongsToOwner) {
         const repositories = await fetchGitHubRepositories(input.installationId, appType);
         await updateRepositoriesForIntegration(integration.id, repositories);
       }

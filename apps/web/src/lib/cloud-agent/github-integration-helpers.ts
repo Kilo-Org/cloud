@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server';
 import {
   getIntegrationForOrganization,
   getIntegrationForOwner,
+  getPrimaryGitHubIntegrationForOrganization,
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import {
@@ -50,7 +51,7 @@ const missingIntegrationResponse = (message: string): GitHubRepositoriesResult =
 export async function getGitHubTokenForOrganization(
   organizationId: string
 ): Promise<string | undefined> {
-  const integration = await getIntegrationForOrganization(organizationId, PLATFORM.GITHUB);
+  const integration = await getPrimaryGitHubIntegrationForOrganization(organizationId);
 
   if (!integration?.platform_installation_id) {
     return undefined;
@@ -102,7 +103,7 @@ export async function getGitHubTokenForUser(userId: string): Promise<string | un
 export async function getGitHubInstallationIdForOrganization(
   organizationId: string
 ): Promise<string | undefined> {
-  const integration = await getIntegrationForOrganization(organizationId, PLATFORM.GITHUB);
+  const integration = await getPrimaryGitHubIntegrationForOrganization(organizationId);
   return integration?.platform_installation_id ?? undefined;
 }
 
@@ -123,14 +124,23 @@ export async function fetchGitHubRepositoriesForOrganization(
   organizationId: string,
   forceRefresh: boolean = false
 ): Promise<GitHubRepositoriesResult> {
-  const integration = await getIntegrationForOrganization(organizationId, PLATFORM.GITHUB);
+  const integration = await getPrimaryGitHubIntegrationForOrganization(organizationId);
 
   if (!integration) {
+    const unavailableIntegration = await getIntegrationForOrganization(
+      organizationId,
+      PLATFORM.GITHUB
+    );
+    if (isPlatformIntegrationSuspended(unavailableIntegration)) {
+      return missingIntegrationResponse('GitHub integration is suspended');
+    }
+    if (unavailableIntegration?.auth_invalid_at) {
+      return missingIntegrationResponse('GitHub integration requires reauthorization');
+    }
+    if (unavailableIntegration) {
+      return missingIntegrationResponse('GitHub integration is not properly configured');
+    }
     return missingIntegrationResponse('No GitHub integration found for this organization');
-  }
-
-  if (isPlatformIntegrationSuspended(integration)) {
-    return missingIntegrationResponse('GitHub integration is suspended');
   }
 
   if (!integration.platform_installation_id) {

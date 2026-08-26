@@ -21,7 +21,7 @@ import {
 import { getAcceptInviteUrl } from '@/lib/organizations/organizations';
 import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
 import { TRPCError } from '@trpc/server';
-import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
+import { getPrimaryGitHubIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import { getAgentConfig } from '@/lib/agent-config/db/agent-configs';
 
 const OssCsvRowSchema = z.object({
@@ -348,8 +348,8 @@ export const ossSponsorshipRouter = createTRPCRouter({
         const monthlyCredits = org.settings.oss_monthly_credit_amount_microdollars;
 
         // Check GitHub integration status
-        const githubIntegration = await getIntegrationForOrganization(org.id, 'github');
-        const hasGitHubIntegration = githubIntegration?.integration_status === 'active';
+        const githubIntegration = await getPrimaryGitHubIntegrationForOrganization(org.id);
+        const hasGitHubIntegration = githubIntegration !== null;
 
         // Check Code Reviews configuration status
         const codeReviewConfig = await getAgentConfig(org.id, 'code_review', 'github');

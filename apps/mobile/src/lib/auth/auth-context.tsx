@@ -102,21 +102,6 @@ function readUserIdFromToken(token: string): string | null {
   }
 }
 
-/**
- * Clear the session-scoped local state that must not leak across an account
- * boundary: trusted hosts, confirmed markdown images, media caches, and
- * app-owned temp copies. Every member is synchronous and best-effort; a throw
- * falls through to the caller's own sign-in/sign-out state reset.
- */
-function clearSessionScopedState(): void {
-  clearTrustedHosts();
-  clearMarkdownImageConfirmMemory();
-  clearToolCardImageCache();
-  clearFilePartCache();
-  clearClipboardImages();
-  reapTempFiles({ all: true });
-}
-
 type AuthContextValue = {
   token: string | undefined;
   isLoading: boolean;

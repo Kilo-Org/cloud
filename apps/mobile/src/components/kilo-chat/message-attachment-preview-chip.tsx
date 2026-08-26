@@ -70,7 +70,7 @@ export function MessageAttachmentPreviewChip({ row, localUri, onRemove, onRetry 
       )}
 
       {isImage && uploading ? (
-        <View className="absolute inset-0 items-center justify-center bg-black/20">
+        <View className="absolute inset-0 items-center justify-center bg-[#00000033]">
           <ActivityIndicator size="small" color={colors.foreground} />
           <Text className="mt-1 text-[10px] text-foreground">
             {formatPercent(row.progress * 100, i18n.language)}

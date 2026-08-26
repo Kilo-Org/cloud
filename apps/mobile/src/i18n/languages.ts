@@ -169,7 +169,7 @@ export const LANGUAGE_ENDONYMS = {
   pa: 'ਪੰਜਾਬੀ',
   ro: 'Română',
   ru: 'Русский',
-  sr: 'Српски',
+  sr: 'Srpski',
   si: 'සිංහල',
   sk: 'Slovenčina',
   sl: 'Slovenščina',

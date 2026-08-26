@@ -526,8 +526,8 @@ export function NotificationsScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('notifications.title')} />
       <TabScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4"
+        className="flex-1"
+        contentContainerClassName="px-6 gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {/* Master gate */}

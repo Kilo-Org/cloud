@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { formatDate, parseTimestamp } from '@/lib/utils';
+import { formatDate } from '@/lib/format';
+import { parseTimestamp } from '@/lib/utils';
 import {
   KILO_PASS_MANAGE_CTA_LABEL,
   KILO_PASS_TITLE,
@@ -22,7 +23,7 @@ const activeAppStoreSubscription = {
   status: 'active',
 };
 
-const endDate = formatDate(parseTimestamp(activeAppStoreSubscription.refillAt));
+const endDate = formatDate(parseTimestamp(activeAppStoreSubscription.refillAt), 'en');
 
 describe('getKiloPassSubscriptionCardContentState', () => {
   it('keeps pending presentation or state non-actionable while loading', () => {

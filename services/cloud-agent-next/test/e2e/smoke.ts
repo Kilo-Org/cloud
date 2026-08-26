@@ -7,10 +7,8 @@
  *   tsx test/e2e/smoke.ts
  *
  * Not wired into `pnpm test` / `pnpm test:all` on purpose — this requires a
- * running stack with the fake-LLM harness configured:
- *   1. Edit `.dev.vars` so `KILO_OPENROUTER_BASE` points at the fake LLM:
- *        `KILO_OPENROUTER_BASE=http://localhost:<8811 + portOffset>/api`
- *   2. `pnpm dev:start cloud-agent fake-llm`
+ * running stack (`pnpm dev:start cloud-agent`). Leave
+ * `KILO_OPENROUTER_BASE` on Next.js; the driver uses `kilo/fake-deterministic`.
  */
 
 import path from 'node:path';

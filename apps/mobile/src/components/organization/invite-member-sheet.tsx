@@ -36,7 +36,7 @@ export function InviteMemberSheet() {
 
   if (isResolving) {
     return (
-      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+      <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
         <Skeleton className="h-11 rounded-lg" />
         <Skeleton className="h-11 rounded-lg" />
       </ScrollView>
@@ -67,8 +67,8 @@ export function InviteMemberSheet() {
 
   return (
     <ScrollView
-      className="flex-1 bg-background px-6"
-      contentContainerClassName="gap-6 pb-8 pt-4"
+      className="flex-1 bg-background"
+      contentContainerClassName="px-6 gap-6 pb-8 pt-4"
       automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
     >

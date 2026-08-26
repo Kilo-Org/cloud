@@ -176,7 +176,7 @@ function AuditReportView({ report }: Readonly<{ report: SecurityAgentAuditReport
   }
 
   return (
-    <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-4 pt-4">
+    <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-4">
       <ReportHeader report={report} />
       <ReportSummary report={report} />
       {report.findings.map(finding => (

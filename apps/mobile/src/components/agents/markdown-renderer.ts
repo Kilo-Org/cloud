@@ -19,6 +19,10 @@ import {
 } from 'react-native';
 import { Renderer } from 'react-native-marked';
 
+import { withRtlWritingDirection } from '@/lib/rtl-text';
+
+import { openExternalUrl } from '@/lib/external-link';
+
 import { CodeBlock } from './code-block';
 import { normalizeFenceLanguage } from './code-block-model';
 import { isSupportedScheme, parseHtmlImages } from './markdown-html-image';
@@ -147,7 +151,12 @@ export class MarkdownRenderer extends Renderer {
   ): ReactNode {
     return createElement(
       Text,
-      { selectable: this.selectable, key: this.getKey(), style: styles, ...extraProps },
+      {
+        selectable: this.selectable,
+        key: this.getKey(),
+        style: withRtlWritingDirection(styles),
+        ...extraProps,
+      },
       children
     );
   }
@@ -276,7 +285,7 @@ export class MarkdownRenderer extends Renderer {
         ...interactionProps,
         selectable: this.selectable,
         key: this.getKey(),
-        style: styles,
+        style: withRtlWritingDirection(styles),
       },
       children
     );

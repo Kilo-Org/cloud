@@ -46,6 +46,7 @@ vi.mock('react', async () => {
   };
 });
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   Modal: 'Modal',
   Pressable: 'Pressable',
   Text: 'Text',

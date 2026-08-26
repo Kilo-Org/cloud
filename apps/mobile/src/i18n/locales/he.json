@@ -862,7 +862,8 @@
       "githubApp": "אפליקציית GitHub",
       "githubError": "לא ניתן היה לפתוח את הגדרת GitHub. נסה שוב.",
       "gitlabAccount": "חשבון GitLab",
-      "gitlabError": "לא ניתן היה לפתוח את הגדרת GitLab. נסה שוב."
+      "gitlabError": "לא ניתן היה לפתוח את הגדרת GitLab. נסה שוב.",
+      "bitbucketError": "לא ניתן היה לפתוח את ההתקנה של Bitbucket. נסה שוב."
     },
     "readOnlyDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לשנות את ההגדרות האלה.",
     "reviewDetail": {
@@ -1707,14 +1708,10 @@
     "newSession": {
       "title": "הפעלה חדשה",
       "repository": "מאגר",
-      "couldNotLoadRepositories": "לא ניתן היה לטעון מאגרים",
       "connectGithub": "חבר GitHub",
       "connectGithubDescription": "חבר את GitHub בדפדפן שלך, ואז חזור לכאן כדי לבחור מאגר.",
       "openGithub": "פתח GitHub",
       "refreshRepositories": "רענן מאגרים",
-      "githubConnectionNotVisible": "אנחנו עדיין לא רואים את חיבור ה-GitHub שלך",
-      "githubConnectionNotVisibleDescription": "אם התקנת או הגדרת את אפליקציית Kilo GitHub, בדוק שוב — או ודא שהיא הותקנה עבור החשבון/הארגון הזה.",
-      "checkAgain": "בדוק שוב",
       "githubConnected": "GitHub מחובר",
       "noRepositoriesVisible": "לא נראים מאגרים. בדוק את גישת המאגרים של אפליקציית Kilo GitHub, ואז רענן.",
       "runOnWithTarget": "הרץ על: {{target}}",
@@ -1741,7 +1738,21 @@
       "discardDraftTitle": "לבטל את הטיוטה?",
       "discardFailed": "לא ניתן היה לבטל את הטיוטה. נסה שוב.",
       "keepEditing": "המשך לערוך",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket מחובר",
+      "connectBitbucket": "חבר את Bitbucket",
+      "connectBitbucketDescription": "חבר את Bitbucket בדפדפן, ולאחר מכן חזור לכאן כדי לבחור מאגר.",
+      "connectGitlab": "חבר GitLab",
+      "connectGitlabDescription": "חבר את GitLab בדפדפן, ולאחר מכן חזור לכאן כדי לבחור מאגר.",
+      "couldNotLoadBitbucketRepositories": "לא ניתן היה לטעון את המאגרים של Bitbucket",
+      "couldNotLoadGithubRepositories": "לא ניתן היה לטעון את המאגרים של GitHub",
+      "couldNotLoadGitlabRepositories": "לא ניתן היה לטעון את המאגרים של GitLab",
+      "gitlabConnected": "GitLab מחובר",
+      "noRepositoriesVisibleBitbucket": "אין מאגרים גלויים. בדוק את הגישה למאגרים של Bitbucket, ואז רענן.",
+      "noRepositoriesVisibleGitlab": "אין מאגרים גלויים. בדוק את הגישה למאגרים של GitLab, ואז רענן.",
+      "openBitbucket": "פתח את Bitbucket",
+      "openGitlab": "פתח את GitLab",
+      "recentlyUsed": "בשימוש לאחרונה"
     },
     "partRenderer": {
       "updatedFileCount_one": "עודכן {{displayCount}} קובץ",
@@ -1835,7 +1846,10 @@
       "noRepositoriesDescription": "לא מחוברים מאגרים לחשבון שלך.",
       "tryDifferentSearch": "נסה מונח חיפוש אחר.",
       "loading": "טוען...",
-      "accessibility": "מאגר: {{label}}"
+      "accessibility": "מאגר: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "פרטי הודעה",

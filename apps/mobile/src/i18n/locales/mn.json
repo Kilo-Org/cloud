@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab бүртгэл",
       "connectGitLab": "GitLab-г холбох",
       "gitlabError": "GitLab тохиргоог нээж чадсангүй. Дахин оролдоно уу.",
-      "description": "Pull request-уудыг автоматаар шалгахын тулд Kilo {{label}}-г холбоорой."
+      "description": "Pull request-уудыг автоматаар шалгахын тулд Kilo {{label}}-г холбоорой.",
+      "bitbucketError": "Bitbucket тохиргоог нээж чадсангүй. Дахин оролдоно уу."
     },
     "overview": {
       "reviewStyle": "Шалгалтын хэв маяг",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Шинэ сесс",
       "repository": "Репозитори",
-      "couldNotLoadRepositories": "Репозиториудыг ачаалж чадсангүй",
       "connectGithub": "GitHub-г холбох",
       "connectGithubDescription": "GitHub-ыг хөтөчдөө холбоод, репозитори сонгохын тулд энд буцаж ирнэ үү.",
       "openGithub": "GitHub-ыг нээх",
       "refreshRepositories": "Репозиториудыг сэргээх",
-      "githubConnectionNotVisible": "Бид таны GitHub холболтыг хараахан харж чадахгүй байна",
-      "githubConnectionNotVisibleDescription": "Хэрэв та Kilo GitHub App-ийг суулгасан эсвэл тохируулсан бол дахин шалгана уу — эсвэл энэ бүртгэл/байгууллагад суулгагдсан эсэхийг шалгана уу.",
-      "checkAgain": "Дахин шалгах",
       "githubConnected": "GitHub холбогдсон",
       "noRepositoriesVisible": "Үзэгдэх репозитори байхгүй. Kilo GitHub App-ийн репозиторийн хандалтыг шалгаад, сэргээнэ үү.",
       "runOnWithTarget": "Дээр ажиллуулах: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Засахыг үргэлжлүүлэх",
       "discard": "Хаях",
       "discardFailed": "Нооргийг хаях боломжгүй. Дахин оролдоно уу.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket холбогдсон",
+      "connectBitbucket": "Bitbucket холбох",
+      "connectBitbucketDescription": "Bitbucket-ыг хөтөчөөрөө холбож, буцаж ирээд repository сонгоно уу.",
+      "connectGitlab": "GitLab-г холбох",
+      "connectGitlabDescription": "GitLab-ыг хөтөчөөрөө холбож, буцаж ирээд repository сонгоно уу.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket repository-уудыг ачаалж чадсангүй",
+      "couldNotLoadGithubRepositories": "GitHub repository-уудыг ачаалж чадсангүй",
+      "couldNotLoadGitlabRepositories": "GitLab repository-уудыг ачаалж чадсангүй",
+      "gitlabConnected": "GitLab холбогдсон",
+      "noRepositoriesVisibleBitbucket": "Харагдах repository байхгүй. Bitbucket-ийн repository хандалтыг шалгаад, шинэчилнэ үү.",
+      "noRepositoriesVisibleGitlab": "Харагдах repository байхгүй. GitLab-ийн repository хандалтыг шалгаад, шинэчилнэ үү.",
+      "openBitbucket": "Bitbucket нээх",
+      "openGitlab": "GitLab нээх",
+      "recentlyUsed": "Сүүлд ашигласан"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл шинэчлэгдсэн",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Таны бүртгэлд холбогдсон репозитори байхгүй.",
       "tryDifferentSearch": "Өөр хайлтын нэр томьёо туршиж үзнэ үү.",
       "loading": "Ачаалж байна...",
-      "accessibility": "Репозитори: {{label}}"
+      "accessibility": "Репозитори: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Мессежийн мэдээлэл",

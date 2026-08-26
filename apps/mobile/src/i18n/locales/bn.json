@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab অ্যাকাউন্ট",
       "connectGitLab": "GitLab সংযুক্ত করুন",
       "gitlabError": "GitLab সেটআপ খোলা যায়নি। আবার চেষ্টা করুন।",
-      "description": "পুল রিকোয়েস্ট স্বয়ংক্রিয়ভাবে পর্যালোচনা করতে Kilo {{label}} সংযুক্ত করুন।"
+      "description": "পুল রিকোয়েস্ট স্বয়ংক্রিয়ভাবে পর্যালোচনা করতে Kilo {{label}} সংযুক্ত করুন।",
+      "bitbucketError": "Bitbucket সেটআপ খোলা যায়নি। আবার চেষ্টা করুন।"
     },
     "overview": {
       "reviewStyle": "পর্যালোচনার ধরন",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "নতুন সেশন",
       "repository": "রিপোজিটরি",
-      "couldNotLoadRepositories": "রিপোজিটরি লোড করা যায়নি",
       "connectGithub": "GitHub সংযোগ করুন",
       "connectGithubDescription": "আপনার ব্রাউজারে GitHub সংযোগ করুন, তারপর রিপোজিটরি বাছাই করতে এখানে ফিরে আসুন।",
       "openGithub": "GitHub খুলুন",
       "refreshRepositories": "রিপোজিটরি রিফ্রেশ করুন",
-      "githubConnectionNotVisible": "আমরা এখনও আপনার GitHub সংযোগ দেখতে পাচ্ছি না",
-      "githubConnectionNotVisibleDescription": "আপনি কিলো GitHub অ্যাপ ইনস্টল বা কনফিগার করলে আবার পরীক্ষা করুন — অথবা নিশ্চিত করুন এটি এই অ্যাকাউন্ট/সংস্থার জন্য ইনস্টল করা হয়েছে।",
-      "checkAgain": "আবার পরীক্ষা করুন",
       "githubConnected": "GitHub সংযুক্ত",
       "noRepositoriesVisible": "কোনো রিপোজিটরি দৃশ্যমান নেই। কিলো GitHub অ্যাপের জন্য রিপোজিটরি অ্যাক্সেস পরীক্ষা করুন, তারপর রিফ্রেশ করুন।",
       "runOnWithTarget": "চলবে: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "সম্পাদনা চালিয়ে যান",
       "discard": "বাতিল করুন",
       "discardFailed": "ড্রাফ্টটি বাতিল করা যায়নি। আবার চেষ্টা করুন।",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket সংযুক্ত",
+      "connectBitbucket": "Bitbucket সংযুক্ত করুন",
+      "connectBitbucketDescription": "আপনার ব্রাউজারে Bitbucket সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
+      "connectGitlab": "GitLab সংযুক্ত করুন",
+      "connectGitlabDescription": "আপনার ব্রাউজারে GitLab সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
+      "couldNotLoadBitbucketRepositories": "Bitbucket রিপোজিটরি লোড করা যায়নি",
+      "couldNotLoadGithubRepositories": "GitHub রিপোজিটরি লোড করা যায়নি",
+      "couldNotLoadGitlabRepositories": "GitLab রিপোজিটরি লোড করা যায়নি",
+      "gitlabConnected": "GitLab সংযুক্ত",
+      "noRepositoriesVisibleBitbucket": "কোনো রিপোজিটরি দেখা যাচ্ছে না। Bitbucket-এর জন্য রিপোজিটরি অ্যাক্সেস পরীক্ষা করুন, তারপর রিফ্রেশ করুন।",
+      "noRepositoriesVisibleGitlab": "কোনো রিপোজিটরি দেখা যাচ্ছে না। GitLab-এর জন্য রিপোজিটরি অ্যাক্সেস পরীক্ষা করুন, তারপর রিফ্রেশ করুন।",
+      "openBitbucket": "Bitbucket খুলুন",
+      "openGitlab": "GitLab খুলুন",
+      "recentlyUsed": "সম্প্রতি ব্যবহৃত"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}টি ফাইল আপডেট হয়েছে",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "আপনার অ্যাকাউন্টে কোনো রিপোজিটরি সংযুক্ত নেই।",
       "tryDifferentSearch": "একটি ভিন্ন অনুসন্ধান শব্দ চেষ্টা করুন।",
       "loading": "লোড হচ্ছে...",
-      "accessibility": "রিপোজিটরি: {{label}}"
+      "accessibility": "রিপোজিটরি: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "বার্তার বিস্তারিত",

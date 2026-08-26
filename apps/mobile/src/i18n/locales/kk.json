@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab аккаунты",
       "connectGitLab": "GitLab қосу",
       "gitlabError": "GitLab орнатуды ашу мүмкін болмады. Қайта көріңіз.",
-      "description": "Pull request-терді автоматты шолу үшін Kilo {{label}} қосыңыз."
+      "description": "Pull request-терді автоматты шолу үшін Kilo {{label}} қосыңыз.",
+      "bitbucketError": "Bitbucket параметрлерін ашу мүмкін болмады. Қайталап көріңіз."
     },
     "overview": {
       "reviewStyle": "Шолу стилі",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Жаңа сессия",
       "repository": "Репозиторий",
-      "couldNotLoadRepositories": "Репозиторийлерді жүктеу мүмкін болмады",
       "connectGithub": "GitHub қосу",
       "connectGithubDescription": "Браузеріңізде GitHub-ты қосыңыз, содан кейін репозиторий таңдау үшін осыған оралыңыз.",
       "openGithub": "GitHub ашу",
       "refreshRepositories": "Репозиторийлерді жаңарту",
-      "githubConnectionNotVisible": "GitHub қосылымыңызды әлі көре алмаймыз",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub App орнатқан немесе конфигурациялаған болсаңыз, қайта тексеріңіз — немесе оның осы аккаунт/ұйым үшін орнатылғанына көз жеткізіңіз.",
-      "checkAgain": "Қайта тексеру",
       "githubConnected": "GitHub қосылды",
       "noRepositoriesVisible": "Көрінетін репозиторийлер жоқ. Kilo GitHub App үшін репозиторий қолжетімділігін тексеріп, содан кейін жаңартыңыз.",
       "runOnWithTarget": "Іске қосу орны: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Өңдеуді жалғастыру",
       "discard": "Жою",
       "discardFailed": "Жобаны жою мүмкін болмады. Қайталап көріңіз.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket қосылды",
+      "connectBitbucket": "Bitbucket қосу",
+      "connectBitbucketDescription": "Bitbucket-ті браузерде қосыңыз, содан кейін репозиторийді таңдау үшін осында оралыңыз.",
+      "connectGitlab": "GitLab қосу",
+      "connectGitlabDescription": "GitLab-ді браузерде қосыңыз, содан кейін репозиторийді таңдау үшін осында оралыңыз.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket репозиторийлерін жүктеу мүмкін болмады",
+      "couldNotLoadGithubRepositories": "GitHub репозиторийлерін жүктеу мүмкін болмады",
+      "couldNotLoadGitlabRepositories": "GitLab репозиторийлерін жүктеу мүмкін болмады",
+      "gitlabConnected": "GitLab қосылды",
+      "noRepositoriesVisibleBitbucket": "Репозиторийлер көрінбейді. Bitbucket үшін репозиторий қолжетімділігін тексеріңіз, содан кейін жаңартыңыз.",
+      "noRepositoriesVisibleGitlab": "Репозиторийлер көрінбейді. GitLab үшін репозиторий қолжетімділігін тексеріңіз, содан кейін жаңартыңыз.",
+      "openBitbucket": "Bitbucket-ті ашу",
+      "openGitlab": "GitLab-ді ашу",
+      "recentlyUsed": "Жақында қолданылған"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл жаңартылды",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Аккаунтыңызға қосылған репозиторийлер жоқ.",
       "tryDifferentSearch": "Басқа іздеу сөзін қолданып көріңіз.",
       "loading": "Жүктелуде...",
-      "accessibility": "Репозиторий: {{label}}"
+      "accessibility": "Репозиторий: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Хабарлама мәліметтері",

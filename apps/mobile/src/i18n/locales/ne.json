@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab खाता",
       "connectGitLab": "GitLab जडान गर्नुहोस्",
       "gitlabError": "GitLab सेटअप खोल्न सकिएन। कृपया फेरि प्रयास गर्नुहोस्।",
-      "description": "पुल रिक्वेस्टहरू स्वचालित रूपमा समीक्षा गर्न Kilo {{label}} जडान गर्नुहोस्।"
+      "description": "पुल रिक्वेस्टहरू स्वचालित रूपमा समीक्षा गर्न Kilo {{label}} जडान गर्नुहोस्।",
+      "bitbucketError": "बिटबकेट सेटअप खोल्न सकिएन। कृपया फेरि प्रयास गर्नुहोस्।"
     },
     "overview": {
       "reviewStyle": "समीक्षा शैली",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "नयाँ सत्र",
       "repository": "रिपोजिटरी",
-      "couldNotLoadRepositories": "भण्डारहरू लोड गर्न सकिएन",
       "connectGithub": "GitHub जडान गर्नुहोस्",
       "connectGithubDescription": "तपाईंको ब्राउजरमा GitHub जडान गर्नुहोस्, त्यसपछि भण्डार छान्न यहाँ फर्कनुहोस्।",
       "openGithub": "GitHub खोल्नुहोस्",
       "refreshRepositories": "भण्डारहरू रिफ्रेस गर्नुहोस्",
-      "githubConnectionNotVisible": "हामीले तपाईंको GitHub जडान अहिलेसम्म देख्न सक्दैनौं",
-      "githubConnectionNotVisibleDescription": "यदि तपाईंले Kilo GitHub App स्थापना वा कन्फिगर गर्नुभयो भने, फेरि जाँच्नुहोस् — वा यो यो खाता/संगठनका लागि स्थापना भएको सुनिश्चित गर्नुहोस्।",
-      "checkAgain": "फेरि जाँच्नुहोस्",
       "githubConnected": "GitHub जडान भयो",
       "noRepositoriesVisible": "कुनै भण्डार देखिँदैन। Kilo GitHub App का लागि भण्डार पहुँच जाँच्नुहोस्, त्यसपछि रिफ्रेस गर्नुहोस्।",
       "runOnWithTarget": "मा चलाउनुहोस्: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "सम्पादन जारी राख्नुहोस्",
       "discard": "खारेज गर्नुहोस्",
       "discardFailed": "ड्राफ्ट खारेज गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket जडान भयो",
+      "connectBitbucket": "Bitbucket जडान गर्नुहोस्",
+      "connectBitbucketDescription": "आफ्नो ब्राउजरमा बिटबकेट जडान गर्नुहोस्, त्यसपछि रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
+      "connectGitlab": "GitLab जडान गर्नुहोस्",
+      "connectGitlabDescription": "आफ्नो ब्राउजरमा गिटल्याब जडान गर्नुहोस्, त्यसपछि रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
+      "couldNotLoadBitbucketRepositories": "बिटबकेट रिपोजिटरीहरू लोड गर्न सकिएन",
+      "couldNotLoadGithubRepositories": "गिथहब रिपोजिटरीहरू लोड गर्न सकिएन",
+      "couldNotLoadGitlabRepositories": "गिटल्याब रिपोजिटरीहरू लोड गर्न सकिएन",
+      "gitlabConnected": "गिटल्याब जडान भयो",
+      "noRepositoriesVisibleBitbucket": "कुनै रिपोजिटरी देखिएन। बिटबकेटको लागि रिपोजिटरी पहुँच जाँच्नुहोस्, त्यसपछि रिफ्रेस गर्नुहोस्।",
+      "noRepositoriesVisibleGitlab": "कुनै रिपोजिटरी देखिएन। गिटल्याबको लागि रिपोजिटरी पहुँच जाँच्नुहोस्, त्यसपछि रिफ्रेस गर्नुहोस्।",
+      "openBitbucket": "बिटबकेट खोल्नुहोस्",
+      "openGitlab": "गिटल्याब खोल्नुहोस्",
+      "recentlyUsed": "हालै प्रयोग गरिएका"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्यावधिक गरियो",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "कुनै भण्डारहरू तपाईंको खातामा जडान भएका छैनन्।",
       "tryDifferentSearch": "फरक खोज शब्द प्रयास गर्नुहोस्।",
       "loading": "लोड गर्दै...",
-      "accessibility": "भण्डार: {{label}}"
+      "accessibility": "भण्डार: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "सन्देश विवरण",

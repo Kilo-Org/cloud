@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab ගිණුම",
       "connectGitLab": "GitLab සම්බන්ධ කරන්න",
       "gitlabError": "GitLab සැකසුම විවෘත කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
-      "description": "pull requests ස්වයංක්රීයව සමාලෝචනය කිරීමට Kilo {{label}} සම්බන්ධ කරන්න."
+      "description": "pull requests ස්වයංක්රීයව සමාලෝචනය කිරීමට Kilo {{label}} සම්බන්ධ කරන්න.",
+      "bitbucketError": "Bitbucket සැකසුම විවෘත කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න."
     },
     "overview": {
       "reviewStyle": "සමාලෝචන විලාසය",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "නව සැසිය",
       "repository": "ගබඩාව",
-      "couldNotLoadRepositories": "ගබඩා පූරණය කළ නොහැකි විය",
       "connectGithub": "GitHub සම්බන්ධ කරන්න",
       "connectGithubDescription": "ඔබගේ බ්රවුසරයේ GitHub සම්බන්ධ කරන්න, පසුව ගබඩාවක් තේරීමට මෙහි නැවත එන්න.",
       "openGithub": "GitHub විවෘත කරන්න",
       "refreshRepositories": "ගබඩා නැවුම් කරන්න",
-      "githubConnectionNotVisible": "අපට තවම ඔබගේ GitHub සම්බන්ධතාවය නොපෙනේ",
-      "githubConnectionNotVisibleDescription": "ඔබ Kilo GitHub App ස්ථාපනය කළා හෝ වින්යාස කළා නම්, නැවත පරීක්ෂා කරන්න — නැතහොත් එය මෙම ගිණුම/සංවිධානය සඳහා ස්ථාපනය කර ඇති බවට වග බලා ගන්න.",
-      "checkAgain": "නැවත පරීක්ෂා කරන්න",
       "githubConnected": "GitHub සම්බන්ධ විය",
       "noRepositoriesVisible": "දෘශ්යමාන ගබඩා නැත. Kilo GitHub App සඳහා ගබඩා ප්රවේශය පරීක්ෂා කරන්න, පසුව නැවුම් කරන්න.",
       "runOnWithTarget": "ධාවනය කරන්න: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "දිගටම සංස්කරණය කරන්න",
       "discard": "ඉවතලන්න",
       "discardFailed": "කටු සටහන ඉවතලිය නොහැක. කරුණාකර නැවත උත්සාහ කරන්න.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket සම්බන්ධ විය",
+      "connectBitbucket": "Bitbucket සම්බන්ධ කරන්න",
+      "connectBitbucketDescription": "ඔබේ බ්‍රවුසරයේ Bitbucket සම්බන්ධ කර, පසුව ගබඩාවක් තේරීමට මෙහි ආපසු එන්න.",
+      "connectGitlab": "GitLab සම්බන්ධ කරන්න",
+      "connectGitlabDescription": "ඔබේ බ්‍රවුසරයේ GitLab සම්බන්ධ කර, පසුව ගබඩාවක් තේරීමට මෙහි ආපසු එන්න.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket ගබඩා පූරණය කළ නොහැකි විය",
+      "couldNotLoadGithubRepositories": "GitHub ගබඩා පූරණය කළ නොහැකි විය",
+      "couldNotLoadGitlabRepositories": "GitLab ගබඩා පූරණය කළ නොහැකි විය",
+      "gitlabConnected": "GitLab සම්බන්ධයි",
+      "noRepositoriesVisibleBitbucket": "ගබඩා නොපෙනේ. Bitbucket සඳහා ගබඩා ප්‍රවේශය පරීක්ෂා කර, පසුව නැවුම් කරන්න.",
+      "noRepositoriesVisibleGitlab": "ගබඩා නොපෙනේ. GitLab සඳහා ගබඩා ප්‍රවේශය පරීක්ෂා කර, පසුව නැවුම් කරන්න.",
+      "openBitbucket": "Bitbucket විවෘත කරන්න",
+      "openGitlab": "GitLab විවෘත කරන්න",
+      "recentlyUsed": "මෑතකදී භාවිතා කළ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ගොනුවක් යාවත්කාලීන කර ඇත",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "ඔබේ ගිණුමට සම්බන්ධ වූ ගබඩා නොමැත.",
       "tryDifferentSearch": "වෙනස් සෙවුම් පදයක් උත්සාහ කරන්න.",
       "loading": "පූරණය වෙමින්...",
-      "accessibility": "ගබඩාව: {{label}}"
+      "accessibility": "ගබඩාව: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "පණිවිඩ විස්තර",

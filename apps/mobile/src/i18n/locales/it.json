@@ -846,7 +846,8 @@
       "githubApp": "GitHub App",
       "githubError": "Impossibile aprire la configurazione di GitHub. Riprova.",
       "gitlabAccount": "Account GitLab",
-      "gitlabError": "Impossibile aprire la configurazione di GitLab. Riprova."
+      "gitlabError": "Impossibile aprire la configurazione di GitLab. Riprova.",
+      "bitbucketError": "Impossibile aprire la configurazione di Bitbucket. Riprova."
     },
     "readOnlyDescription": "Solo i proprietari dell'organizzazione e i responsabili della fatturazione possono modificare queste impostazioni.",
     "reviewDetail": {
@@ -1691,14 +1692,10 @@
     "newSession": {
       "title": "Nuova sessione",
       "repository": "Repository",
-      "couldNotLoadRepositories": "Impossibile caricare i repository",
       "connectGithub": "Connetti GitHub",
       "connectGithubDescription": "Collega GitHub nel browser, poi torna qui per scegliere un repository.",
       "openGithub": "Apri GitHub",
       "refreshRepositories": "Aggiorna repository",
-      "githubConnectionNotVisible": "Non vediamo ancora la tua connessione GitHub",
-      "githubConnectionNotVisibleDescription": "Se hai installato o configurato la Kilo GitHub App, controlla di nuovo, oppure assicurati che sia stata installata per questo account o organizzazione.",
-      "checkAgain": "Controlla di nuovo",
       "githubConnected": "GitHub collegato",
       "noRepositoriesVisible": "Nessun repository visibile. Controlla l'accesso ai repository per la Kilo GitHub App, poi aggiorna.",
       "runOnWithTarget": "Esegui su: {{target}}",
@@ -1725,7 +1722,21 @@
       "discardDraftTitle": "Scartare la bozza?",
       "discardFailed": "Impossibile scartare la bozza. Riprova.",
       "keepEditing": "Continua a modificare",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket connesso",
+      "connectBitbucket": "Connetti Bitbucket",
+      "connectBitbucketDescription": "Connetti Bitbucket nel browser, poi torna qui per scegliere un repository.",
+      "connectGitlab": "Connetti GitLab",
+      "connectGitlabDescription": "Connetti GitLab nel browser, poi torna qui per scegliere un repository.",
+      "couldNotLoadBitbucketRepositories": "Impossibile caricare i repository Bitbucket",
+      "couldNotLoadGithubRepositories": "Impossibile caricare i repository GitHub",
+      "couldNotLoadGitlabRepositories": "Impossibile caricare i repository GitLab",
+      "gitlabConnected": "GitLab connesso",
+      "noRepositoriesVisibleBitbucket": "Nessun repository visibile. Controlla l'accesso ai repository per Bitbucket, poi aggiorna.",
+      "noRepositoriesVisibleGitlab": "Nessun repository visibile. Controlla l'accesso ai repository per GitLab, poi aggiorna.",
+      "openBitbucket": "Apri Bitbucket",
+      "openGitlab": "Apri GitLab",
+      "recentlyUsed": "Usati di recente"
     },
     "partRenderer": {
       "updatedFileCount_one": "Aggiornato {{displayCount}} file",
@@ -1815,7 +1826,10 @@
       "noRepositoriesDescription": "Nessun repository è collegato al tuo account.",
       "tryDifferentSearch": "Prova un termine di ricerca diverso.",
       "loading": "Caricamento...",
-      "accessibility": "Repository: {{label}}"
+      "accessibility": "Repository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Dettagli messaggio",

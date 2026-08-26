@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab account",
       "connectGitLab": "Ikonekta ang GitLab",
       "gitlabError": "Hindi mabuksan ang GitLab setup. Pakisubukang muli.",
-      "description": "Ikonekta ang Kilo {{label}} para awtomatikong mag-review ng mga pull request."
+      "description": "Ikonekta ang Kilo {{label}} para awtomatikong mag-review ng mga pull request.",
+      "bitbucketError": "Hindi mabuksan ang setup ng Bitbucket. Pakisubukan muli."
     },
     "overview": {
       "reviewStyle": "Estilo ng Pagsusuri",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Bagong session",
       "repository": "Repository",
-      "couldNotLoadRepositories": "Hindi ma-load ang mga repository",
       "connectGithub": "Ikonekta ang GitHub",
       "connectGithubDescription": "Ikonekta ang GitHub sa iyong browser, pagkatapos ay bumalik dito para pumili ng repository.",
       "openGithub": "Buksan ang GitHub",
       "refreshRepositories": "I-refresh ang mga repository",
-      "githubConnectionNotVisible": "Hindi pa namin nakikita ang iyong koneksyon sa GitHub",
-      "githubConnectionNotVisibleDescription": "Kung na-install o na-configure mo ang Kilo GitHub App, i-check muli — o tiyaking na-install ito para sa account/organization na ito.",
-      "checkAgain": "I-check muli",
       "githubConnected": "Konektado ang GitHub",
       "noRepositoriesVisible": "Walang nakikitang repository. I-check ang access sa repository para sa Kilo GitHub App, pagkatapos ay i-refresh.",
       "runOnWithTarget": "Patakbuhin sa: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Patuloy na mag-edit",
       "discard": "I-discard",
       "discardFailed": "Hindi ma-discard ang draft. Pakisubukang muli.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Nakakonekta ang Bitbucket",
+      "connectBitbucket": "Ikonekta ang Bitbucket",
+      "connectBitbucketDescription": "Ikonekta ang Bitbucket sa iyong browser, pagkatapos ay bumalik dito para pumili ng repository.",
+      "connectGitlab": "Ikonekta ang GitLab",
+      "connectGitlabDescription": "Ikonekta ang GitLab sa iyong browser, pagkatapos ay bumalik dito para pumili ng repository.",
+      "couldNotLoadBitbucketRepositories": "Hindi ma-load ang mga repository ng Bitbucket",
+      "couldNotLoadGithubRepositories": "Hindi ma-load ang mga repository ng GitHub",
+      "couldNotLoadGitlabRepositories": "Hindi ma-load ang mga repository ng GitLab",
+      "gitlabConnected": "Konektado ang GitLab",
+      "noRepositoriesVisibleBitbucket": "Walang nakikitang repository. Suriin ang access sa repository para sa Bitbucket, pagkatapos ay i-refresh.",
+      "noRepositoriesVisibleGitlab": "Walang nakikitang repository. Suriin ang access sa repository para sa GitLab, pagkatapos ay i-refresh.",
+      "openBitbucket": "Buksan ang Bitbucket",
+      "openGitlab": "Buksan ang GitLab",
+      "recentlyUsed": "Kamakailang ginamit"
     },
     "partRenderer": {
       "updatedFileCount_one": "Na-update ang {{displayCount}} file",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Walang repository na konektado sa iyong account.",
       "tryDifferentSearch": "Subukan ang ibang termino sa paghahanap.",
       "loading": "Naglo-load...",
-      "accessibility": "Repository: {{label}}"
+      "accessibility": "Repository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Mga detalye ng mensahe",

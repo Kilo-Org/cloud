@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Akoonka GitLab",
       "connectGitLab": "Xiri GitLab",
       "gitlabError": "Hagaajinta GitLab lama furi karin. Fadlan mar kale isku day.",
-      "description": "Xiri Kilo {{label}} si uu si otomaatig ah u dib-u-eego codsyada isku-dhafka."
+      "description": "Xiri Kilo {{label}} si uu si otomaatig ah u dib-u-eego codsyada isku-dhafka.",
+      "bitbucketError": "Lama furi karin dejinta Bitbucket. Fadlan mar kale isku day."
     },
     "overview": {
       "reviewStyle": "Qaabka Dib-u-Eegista",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Kalfadhi cusub",
       "repository": "Kaydka",
-      "couldNotLoadRepositories": "Kaydka lama shubay",
       "connectGithub": "Xiri GitHub",
       "connectGithubDescription": "Ku xidh GitHub browser-kaaga, ka dib halkan ku noqo si aad u dooratid kayd.",
       "openGithub": "Fur GitHub",
       "refreshRepositories": "Cusboonaysii kaydka",
-      "githubConnectionNotVisible": "Weli ma aragno xiriirkaaga GitHub",
-      "githubConnectionNotVisibleDescription": "Haddii aad rakibtay ama qorsheysay App-ka Kilo GitHub, mar kale hubi — ama hubi in loo rakibay akoonka/ururkan.",
-      "checkAgain": "Mar kale hubi",
       "githubConnected": "GitHub waa la xidhay",
       "noRepositoriesVisible": "Ma jiraan kayd la arki karo. Hubi helitaanka kaydka ee App-ka Kilo GitHub, ka dib cusboonaysii.",
       "runOnWithTarget": "Ku socodsii: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Sii wad wax ka beddelka",
       "discard": "Tuur",
       "discardFailed": "Qabyada lama tuuri karin. Fadlan mar kale isku day.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket waa ku xiran",
+      "connectBitbucket": "Xiri Bitbucket",
+      "connectBitbucketDescription": "Ku xiriiray Bitbucket browser-kaaga, ka dibna ku soo noqo halkan si aad u doorato keyd.",
+      "connectGitlab": "Xiri GitLab",
+      "connectGitlabDescription": "Ku xiriiray GitLab browser-kaaga, ka dibna ku soo noqo halkan si aad u doorato keyd.",
+      "couldNotLoadBitbucketRepositories": "Lama soo gelin karin keydka Bitbucket",
+      "couldNotLoadGithubRepositories": "Lama soo gelin karin keydka GitHub",
+      "couldNotLoadGitlabRepositories": "Lama soo gelin karin keydka GitLab",
+      "gitlabConnected": "GitLab wuu xiriiray",
+      "noRepositoriesVisibleBitbucket": "Ma jiraan keyd la arki karo. Hubi gelitaanka keydka ee Bitbucket, ka dibna cusbooneysii.",
+      "noRepositoriesVisibleGitlab": "Ma jiraan keyd la arki karo. Hubi gelitaanka keydka ee GitLab, ka dibna cusbooneysii.",
+      "openBitbucket": "Fur Bitbucket",
+      "openGitlab": "Fur GitLab",
+      "recentlyUsed": "Markii dhaw la isticmaalay"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl ayaa la cusboonaysiiyay",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Ma jiraan kayd oo ku xidhan akoonkaaga.",
       "tryDifferentSearch": "Isku day erey raadin oo kala duwan.",
       "loading": "Shubid...",
-      "accessibility": "Kaydka: {{label}}"
+      "accessibility": "Kaydka: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Faahfaahinta farriinta",

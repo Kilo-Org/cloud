@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab ଆକାଉଣ୍ଟ",
       "connectGitLab": "GitLab ସଂଯୋଗ କରନ୍ତୁ",
       "gitlabError": "GitLab ସେଟଅପ୍ ଖୋଲାଯାଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "description": "ପୁଲ ରିକ୍ୱେଷ୍ଟ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ସମୀକ୍ଷା କରିବାକୁ Kilo {{label}} ସଂଯୋଗ କରନ୍ତୁ।"
+      "description": "ପୁଲ ରିକ୍ୱେଷ୍ଟ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ସମୀକ୍ଷା କରିବାକୁ Kilo {{label}} ସଂଯୋଗ କରନ୍ତୁ।",
+      "bitbucketError": "Bitbucket ସେଟଅପ୍ ଖୋଲିପାରିଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
     "overview": {
       "reviewStyle": "ସମୀକ୍ଷା ଶୈଳୀ",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "ନୂଆ ସେସନ୍",
       "repository": "ରିପୋଜିଟୋରୀ",
-      "couldNotLoadRepositories": "ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
       "connectGithub": "GitHub ସଂଯୋଗ କରନ୍ତୁ",
       "connectGithubDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ GitHub ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
       "openGithub": "GitHub ଖୋଲନ୍ତୁ",
       "refreshRepositories": "ରିପୋଜିଟୋରୀ ରିଫ୍ରେସ୍ କରନ୍ତୁ",
-      "githubConnectionNotVisible": "ଆମେ ଆପଣଙ୍କ GitHub ସଂଯୋଗ ଏପର୍ଯ୍ୟନ୍ତ ଦେଖିପାରୁନାହୁଁ",
-      "githubConnectionNotVisibleDescription": "ଯଦି ଆପଣ Kilo GitHub ଆପ୍ ସଂସ୍ଥାପନ କିମ୍ବା ବିନ୍ୟାସ କରିଛନ୍ତି, ପୁନର୍ବାର ଯାଞ୍ଚ କରନ୍ତୁ — କିମ୍ବା ଏହା ଏହି ଆକାଉଣ୍ଟ/ସଂଗଠନ ପାଇଁ ସଂସ୍ଥାପିତ ହୋଇଛି କି ନାହିଁ ନିଶ୍ଚିତ କରନ୍ତୁ।",
-      "checkAgain": "ପୁନର୍ବାର ଯାଞ୍ଚ କରନ୍ତୁ",
       "githubConnected": "GitHub ସଂଯୋଜିତ",
       "noRepositoriesVisible": "କୌଣସି ରିପୋଜିଟୋରୀ ଦେଖାଯାଉନାହିଁ। Kilo GitHub ଆପ୍ ପାଇଁ ରିପୋଜିଟୋରୀ ଉପଲବ୍ଧତା ଯାଞ୍ଚ କରନ୍ତୁ, ତା'ପରେ ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
       "runOnWithTarget": "ଚଲାନ୍ତୁ: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "ସମ୍ପାଦନ ଜାରି ରଖନ୍ତୁ",
       "discard": "ବାତିଲ କରନ୍ତୁ",
       "discardFailed": "ଡ୍ରାଫ୍ଟ ପରିତ୍ୟାଗ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁନଃଚେଷ୍ଟା କରନ୍ତୁ।",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket ସଂଯୋଗ ହୋଇଛି",
+      "connectBitbucket": "Bitbucket ସଂଯୋଗ କରନ୍ତୁ",
+      "connectBitbucketDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ Bitbucket ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
+      "connectGitlab": "GitLab ସଂଯୋଗ କରନ୍ତୁ",
+      "connectGitlabDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ GitLab ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
+      "couldNotLoadBitbucketRepositories": "Bitbucket ରିପୋଜିଟରୀଗୁଡ଼ିକ ଲୋଡ୍ କରିପାରିଲା ନାହିଁ",
+      "couldNotLoadGithubRepositories": "GitHub ରିପୋଜିଟରୀଗୁଡ଼ିକ ଲୋଡ୍ କରିପାରିଲା ନାହିଁ",
+      "couldNotLoadGitlabRepositories": "GitLab ରିପୋଜିଟରୀଗୁଡ଼ିକ ଲୋଡ୍ କରିପାରିଲା ନାହିଁ",
+      "gitlabConnected": "GitLab ସଂଯୋଜିତ",
+      "noRepositoriesVisibleBitbucket": "କୌଣସି ରିପୋଜିଟରୀ ଦୃଶ୍ୟମାନ ନାହିଁ। Bitbucket ପାଇଁ ରିପୋଜିଟରୀ ଆକ୍ସେସ୍ ଯାଞ୍ଚ କରନ୍ତୁ, ତାପରେ ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
+      "noRepositoriesVisibleGitlab": "କୌଣସି ରିପୋଜିଟରୀ ଦୃଶ୍ୟମାନ ନାହିଁ। GitLab ପାଇଁ ରିପୋଜିଟରୀ ଆକ୍ସେସ୍ ଯାଞ୍ଚ କରନ୍ତୁ, ତାପରେ ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
+      "openBitbucket": "Bitbucket ଖୋଲନ୍ତୁ",
+      "openGitlab": "GitLab ଖୋଲନ୍ତୁ",
+      "recentlyUsed": "ସାମ୍ପ୍ରତିକ ଭାବରେ ବ୍ୟବହୃତ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ସହିତ କୌଣସି ରିପୋଜିଟୋରୀ ସଂଯୋଜିତ ନାହିଁ।",
       "tryDifferentSearch": "ଏକ ଭିନ୍ନ ଖୋଜ ଶବ୍ଦ ଚେଷ୍ଟା କରନ୍ତୁ।",
       "loading": "ଲୋଡ୍ ହେଉଛି...",
-      "accessibility": "ରିପୋଜିଟୋରୀ: {{label}}"
+      "accessibility": "ରିପୋଜିଟୋରୀ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "ବାର୍ତ୍ତା ବିବରଣୀ",

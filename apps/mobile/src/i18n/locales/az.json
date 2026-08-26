@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab hesabı",
       "connectGitLab": "GitLab-ı qoş",
       "gitlabError": "GitLab quraşdırması açıla bilmədi. Zəhmət olmasa yenidən cəhd edin.",
-      "description": "Pull request-ləri avtomatik nəzərdən keçirmək üçün Kilo {{label}} qoşun."
+      "description": "Pull request-ləri avtomatik nəzərdən keçirmək üçün Kilo {{label}} qoşun.",
+      "bitbucketError": "Bitbucket quraşdırması açıla bilmədi. Yenidən cəhd edin."
     },
     "overview": {
       "reviewStyle": "Nəzərdən keçirmə Üslubu",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Yeni sessiya",
       "repository": "Repozitoriya",
-      "couldNotLoadRepositories": "Repozitoriyalar yüklənə bilmədi",
       "connectGithub": "GitHub-u qoş",
       "connectGithubDescription": "Brauzerinizdə GitHub-a qoşulun, sonra repozitoriya seçmək üçün buraya qayıdın.",
       "openGithub": "GitHub-u aç",
       "refreshRepositories": "Repozitoriyaları yenilə",
-      "githubConnectionNotVisible": "Hələ GitHub əlaqənizi görə bilmirik",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub App quraşdırıb və ya konfiqurasiya edibsəsiniz, yenidən yoxlayın — ya da bu hesab/təşkilat üçün quraşdırıldığından əmin olun.",
-      "checkAgain": "Yenidən yoxla",
       "githubConnected": "GitHub qoşuldu",
       "noRepositoriesVisible": "Görünən repozitoriya yoxdur. Kilo GitHub App üçün repozitoriya girişini yoxlayın, sonra yeniləyin.",
       "runOnWithTarget": "İşə salın: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Redaktəyə davam et",
       "discard": "Ləğv et",
       "discardFailed": "Qaralama ləğv edilə bilmədi. Zəhmət olmasa yenidən cəhd edin.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket qoşulub",
+      "connectBitbucket": "Bitbucket-u qoş",
+      "connectBitbucketDescription": "Depo seçmək üçün brauzerdə Bitbucket-a qoşulun, sonra buraya qayıdın.",
+      "connectGitlab": "GitLab-ı qoş",
+      "connectGitlabDescription": "Depo seçmək üçün brauzerdə GitLab-a qoşulun, sonra buraya qayıdın.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket depoları yüklənə bilmədi",
+      "couldNotLoadGithubRepositories": "GitHub depoları yüklənə bilmədi",
+      "couldNotLoadGitlabRepositories": "GitLab depoları yüklənə bilmədi",
+      "gitlabConnected": "GitLab qoşuldu",
+      "noRepositoriesVisibleBitbucket": "Depo görünmür. Bitbucket üçün depo girişini yoxlayın, sonra yeniləyin.",
+      "noRepositoriesVisibleGitlab": "Depo görünmür. GitLab üçün depo girişini yoxlayın, sonra yeniləyin.",
+      "openBitbucket": "Bitbucket-ı aç",
+      "openGitlab": "GitLab-ı aç",
+      "recentlyUsed": "Son istifadə olunanlar"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl yeniləndi",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Hesabınıza qoşulmuş repozitoriya yoxdur.",
       "tryDifferentSearch": "Fərqli axtarış termini cəhd edin.",
       "loading": "Yüklənir...",
-      "accessibility": "Repozitoriya: {{label}}"
+      "accessibility": "Repozitoriya: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Mesaj detalları",

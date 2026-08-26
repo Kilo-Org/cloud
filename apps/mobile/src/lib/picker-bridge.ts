@@ -43,6 +43,13 @@ export type ModePickerBridge = {
 
 export type RepoPlatform = 'github' | 'gitlab' | 'bitbucket';
 
+/** i18n key for each repository provider's display name (rows, closed selector, and group headers). */
+export const REPO_PLATFORM_LABEL_KEYS = {
+  github: 'agentChat.repoPicker.platformGithub',
+  gitlab: 'agentChat.repoPicker.platformGitlab',
+  bitbucket: 'agentChat.repoPicker.platformBitbucket',
+} satisfies Record<RepoPlatform, string>;
+
 export type RepoOption = {
   platform: RepoPlatform;
   fullName: string;
@@ -51,8 +58,17 @@ export type RepoOption = {
   repositoryUuid?: string;
 };
 
+export type RepoPickerSection = {
+  key: 'recents' | RepoPlatform;
+  /** i18n key the picker resolves for the section header. */
+  titleKey: string;
+  repos: RepoOption[];
+};
+
 export type RepoPickerBridge = {
   repositories: RepoOption[];
+  /** Grouped sections (recents, then providers) shown when the search box is empty. */
+  sections: RepoPickerSection[];
   currentValue: string;
   onSelect: (repo: string) => void;
 };

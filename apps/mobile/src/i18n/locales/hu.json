@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab-fiók",
       "connectGitLab": "GitLab csatlakoztatása",
       "gitlabError": "Nem sikerült megnyitni a GitLab beállítását. Kérjük, próbáld újra.",
-      "description": "Csatlakoztasd a Kilo {{label}}t a pull requestek automatikus áttekintéséhez."
+      "description": "Csatlakoztasd a Kilo {{label}}t a pull requestek automatikus áttekintéséhez.",
+      "bitbucketError": "Nem sikerült megnyitni a Bitbucket beállítását. Kérjük, próbáld újra."
     },
     "overview": {
       "reviewStyle": "Áttekintési stílus",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Új munkamenet",
       "repository": "Adattár",
-      "couldNotLoadRepositories": "Az adattárak betöltése nem sikerült",
       "connectGithub": "GitHub csatlakoztatása",
       "connectGithubDescription": "Csatlakoztassa a GitHubot a böngészőjében, majd térjen vissza ide egy adattár kiválasztásához.",
       "openGithub": "GitHub megnyitása",
       "refreshRepositories": "Adattárak frissítése",
-      "githubConnectionNotVisible": "Még nem látjuk a GitHub-kapcsolatát",
-      "githubConnectionNotVisibleDescription": "Ha telepítette vagy beállította a Kilo GitHub Appot, ellenőrizze újra — vagy győződjön meg róla, hogy ehhez a fiókhoz/szervezethez lett telepítve.",
-      "checkAgain": "Újra ellenőrzés",
       "githubConnected": "GitHub csatlakoztatva",
       "noRepositoriesVisible": "Nincs látható adattár. Ellenőrizze a Kilo GitHub App adattár-hozzáférését, majd frissítsen.",
       "runOnWithTarget": "Futtatás a következőn: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Szerkesztés folytatása",
       "discard": "Elvetés",
       "discardFailed": "A piszkozat elvetése nem sikerült. Próbálja újra.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket csatlakoztatva",
+      "connectBitbucket": "Bitbucket csatlakoztatása",
+      "connectBitbucketDescription": "Csatlakoztasd a Bitbucketet a böngésződben, majd térj vissza ide a tároló kiválasztásához.",
+      "connectGitlab": "GitLab csatlakoztatása",
+      "connectGitlabDescription": "Csatlakoztasd a GitLabot a böngésződben, majd térj vissza ide a tároló kiválasztásához.",
+      "couldNotLoadBitbucketRepositories": "Nem sikerült betölteni a Bitbucket-tárolókat",
+      "couldNotLoadGithubRepositories": "Nem sikerült betölteni a GitHub-tárolókat",
+      "couldNotLoadGitlabRepositories": "Nem sikerült betölteni a GitLab-tárolókat",
+      "gitlabConnected": "GitLab csatlakoztatva",
+      "noRepositoriesVisibleBitbucket": "Nincs látható tároló. Ellenőrizd a Bitbucket-tárolókhoz való hozzáférést, majd frissíts.",
+      "noRepositoriesVisibleGitlab": "Nincs látható tároló. Ellenőrizd a GitLab-tárolókhoz való hozzáférést, majd frissíts.",
+      "openBitbucket": "Bitbucket megnyitása",
+      "openGitlab": "GitLab megnyitása",
+      "recentlyUsed": "Legutóbb használt"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fájl frissítve",
@@ -2280,7 +2291,10 @@
       "noRepositoriesDescription": "Nem kapcsolódik adattár a fiókjához.",
       "tryDifferentSearch": "Próbáljon másik keresőszót.",
       "loading": "Betöltés...",
-      "accessibility": "Adattár: {{label}}"
+      "accessibility": "Adattár: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Üzenet részletei",

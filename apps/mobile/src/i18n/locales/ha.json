@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Asusun GitLab",
       "connectGitLab": "Haɗa GitLab",
       "gitlabError": "An kasa buɗe saitin GitLab. Da fatan sake gwadawa.",
-      "description": "Haɗa Kilo {{label}} don bitar buƙatun jawo ta atomatik."
+      "description": "Haɗa Kilo {{label}} don bitar buƙatun jawo ta atomatik.",
+      "bitbucketError": "Ba a iya buɗe saitin Bitbucket ba. Don Allah a sake gwadawa."
     },
     "overview": {
       "reviewStyle": "Salon Bita",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Sabon zama",
       "repository": "Ma'ajiya",
-      "couldNotLoadRepositories": "An kasa loda ma'ajiyoyi",
       "connectGithub": "Haɗa GitHub",
       "connectGithubDescription": "Haɗa GitHub a cikin burauzarka, sannan ka dawo nan domin zaɓar ma'ajiya.",
       "openGithub": "Buɗe GitHub",
       "refreshRepositories": "Sabunta ma'ajiyoyi",
-      "githubConnectionNotVisible": "Ba mu ga haɗin GitHub ɗinka ba har yanzu",
-      "githubConnectionNotVisibleDescription": "Idan ka shigar ko ka tsara GitHub App na Kilo, sake duba — ko ka tabbatar an shigar da shi domin wannan asusu/kungiya.",
-      "checkAgain": "Sake duba",
       "githubConnected": "An haɗa GitHub",
       "noRepositoriesVisible": "Babu ma'ajiyoyi da ake gani. Duba damar ma'ajiya ga GitHub App na Kilo, sannan sabunta.",
       "runOnWithTarget": "Gudanar a: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Ci gaba da gyarawa",
       "discard": "Watsi",
       "discardFailed": "An kasa watsi da daftarin. Da fatan za a sake gwadawa.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "An haɗa Bitbucket",
+      "connectBitbucket": "Haɗa Bitbucket",
+      "connectBitbucketDescription": "Haɗa Bitbucket a cikin burauzar ka, sannan ka dawo nan don zaɓar ma'ajiya.",
+      "connectGitlab": "Haɗa GitLab",
+      "connectGitlabDescription": "Haɗa GitLab a cikin burauzar ka, sannan ka dawo nan don zaɓar ma'ajiya.",
+      "couldNotLoadBitbucketRepositories": "Ba a iya loda ma'ajin Bitbucket ba",
+      "couldNotLoadGithubRepositories": "Ba a iya loda ma'ajin GitHub ba",
+      "couldNotLoadGitlabRepositories": "Ba a iya loda ma'ajin GitLab ba",
+      "gitlabConnected": "An haɗa GitLab",
+      "noRepositoriesVisibleBitbucket": "Babu ma'ajiya da ake gani. Duba samun damar ma'ajiya na Bitbucket, sannan ka sabunta.",
+      "noRepositoriesVisibleGitlab": "Babu ma'ajiya da ake gani. Duba samun damar ma'ajiya na GitLab, sannan ka sabunta.",
+      "openBitbucket": "Buɗe Bitbucket",
+      "openGitlab": "Buɗe GitLab",
+      "recentlyUsed": "Waɗanda aka yi amfani da su kwanan nan"
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta {{displayCount}} fayil",
@@ -2280,7 +2291,10 @@
       "noRepositoriesDescription": "Babu ma'ajiyoyi da aka haɗa da asusunka.",
       "tryDifferentSearch": "Gwada wani kalmar bincike dabam.",
       "loading": "Ana loda...",
-      "accessibility": "Ma'ajiya: {{label}}"
+      "accessibility": "Ma'ajiya: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Cikakkun bayanan saƙo",

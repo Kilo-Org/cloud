@@ -1404,7 +1404,8 @@
       "gitlabAccount": "Račun GitLab",
       "connectGitLab": "Poveži GitLab",
       "gitlabError": "Namestitve GitLab ni bilo mogoče odpreti. Poskusite znova.",
-      "description": "Povežite Kilo {{label}}, da samodejno pregleduje zahteve za poteg."
+      "description": "Povežite Kilo {{label}}, da samodejno pregleduje zahteve za poteg.",
+      "bitbucketError": "Ni bilo mogoče odpreti nastavitve Bitbucket. Poskusi znova."
     },
     "overview": {
       "reviewStyle": "Slog pregleda",
@@ -2183,14 +2184,10 @@
     "newSession": {
       "title": "Nova seja",
       "repository": "Skladišče",
-      "couldNotLoadRepositories": "Skladišč ni bilo mogoče naložiti",
       "connectGithub": "Poveži GitHub",
       "connectGithubDescription": "Poveži GitHub v svojem brskalniku in se nato vrni sem, da izbereš skladišče.",
       "openGithub": "Odpri GitHub",
       "refreshRepositories": "Osveži skladišča",
-      "githubConnectionNotVisible": "Tvoje povezave z GitHub še ne vidimo",
-      "githubConnectionNotVisibleDescription": "Če si namestil ali konfiguriral aplikacijo Kilo GitHub App, preveri znova — ali pa se prepričaj, da je bila nameščena za ta račun/organizacijo.",
-      "checkAgain": "Preveri znova",
       "githubConnected": "GitHub povezan",
       "noRepositoriesVisible": "Ni vidnih skladišč. Preveri dostop do skladišč za aplikacijo Kilo GitHub App in nato osveži.",
       "runOnWithTarget": "Zaženi na: {{target}}",
@@ -2217,7 +2214,21 @@
       "keepEditing": "Nadaljuj z urejanjem",
       "discard": "Zavrzi",
       "discardFailed": "Osnutka ni bilo mogoče zavreči. Poskusi znova.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket je povezan",
+      "connectBitbucket": "Poveži Bitbucket",
+      "connectBitbucketDescription": "Poveži Bitbucket v brskalniku, nato se vrni sem in izberi skladišče.",
+      "connectGitlab": "Poveži GitLab",
+      "connectGitlabDescription": "Poveži GitLab v brskalniku, nato se vrni sem in izberi skladišče.",
+      "couldNotLoadBitbucketRepositories": "Ni bilo mogoče naložiti skladišč Bitbucket",
+      "couldNotLoadGithubRepositories": "Ni bilo mogoče naložiti skladišč GitHub",
+      "couldNotLoadGitlabRepositories": "Ni bilo mogoče naložiti skladišč GitLab",
+      "gitlabConnected": "GitLab povezan",
+      "noRepositoriesVisibleBitbucket": "Ni vidnih skladišč. Preveri dostop do skladišč za Bitbucket in osveži.",
+      "noRepositoriesVisibleGitlab": "Ni vidnih skladišč. Preveri dostop do skladišč za GitLab in osveži.",
+      "openBitbucket": "Odpri Bitbucket",
+      "openGitlab": "Odpri GitLab",
+      "recentlyUsed": "Nedavno uporabljeno"
     },
     "partRenderer": {
       "updatedFileCount_one": "Posodobljena {{displayCount}} datoteka",
@@ -2308,7 +2319,10 @@
       "noRepositoriesDescription": "Nobeno skladišče ni povezano s tvojim računom.",
       "tryDifferentSearch": "Poskusi z drugim iskalnim izrazom.",
       "loading": "Nalaganje...",
-      "accessibility": "Skladišče: {{label}}"
+      "accessibility": "Skladišče: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Podrobnosti sporočila",

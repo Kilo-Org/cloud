@@ -860,7 +860,8 @@
       "githubApp": "GitHub 앱",
       "githubError": "GitHub 설정을 열 수 없습니다. 다시 시도하세요.",
       "gitlabAccount": "GitLab 계정",
-      "gitlabError": "GitLab 설정을 열 수 없습니다. 다시 시도하세요."
+      "gitlabError": "GitLab 설정을 열 수 없습니다. 다시 시도하세요.",
+      "bitbucketError": "Bitbucket 설정을 열 수 없습니다. 다시 시도하세요."
     },
     "readOnlyDescription": "조직 소유자와 결제 관리자만 이 설정을 변경할 수 있습니다.",
     "reviewDetail": {
@@ -1699,14 +1700,10 @@
     "newSession": {
       "title": "새 세션",
       "repository": "저장소",
-      "couldNotLoadRepositories": "리포지토리를 불러올 수 없습니다",
       "connectGithub": "GitHub 연결",
       "connectGithubDescription": "브라우저에서 GitHub를 연결한 다음 여기로 돌아와 리포지토리를 선택하세요.",
       "openGithub": "GitHub 열기",
       "refreshRepositories": "리포지토리 새로고침",
-      "githubConnectionNotVisible": "아직 GitHub 연결을 확인할 수 없습니다",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub 앱을 설치하거나 구성했다면 다시 확인하세요. 또는 이 계정/조직에 설치되었는지 확인하세요.",
-      "checkAgain": "다시 확인",
       "githubConnected": "GitHub 연결됨",
       "noRepositoriesVisible": "표시되는 리포지토리가 없습니다. Kilo GitHub 앱의 리포지토리 액세스를 확인한 다음 새로고침하세요.",
       "runOnWithTarget": "실행 위치: {{target}}",
@@ -1733,7 +1730,21 @@
       "discardDraftTitle": "초안을 삭제할까요?",
       "discardFailed": "초안을 삭제할 수 없습니다. 다시 시도하세요.",
       "keepEditing": "계속 수정",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket 연결됨",
+      "connectBitbucket": "Bitbucket 연결",
+      "connectBitbucketDescription": "브라우저에서 Bitbucket을 연결한 후 여기로 돌아와 저장소를 선택하세요.",
+      "connectGitlab": "GitLab 연결",
+      "connectGitlabDescription": "브라우저에서 GitLab을 연결한 후 여기로 돌아와 저장소를 선택하세요.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket 저장소를 불러올 수 없습니다",
+      "couldNotLoadGithubRepositories": "GitHub 저장소를 불러올 수 없습니다",
+      "couldNotLoadGitlabRepositories": "GitLab 저장소를 불러올 수 없습니다",
+      "gitlabConnected": "GitLab 연결됨",
+      "noRepositoriesVisibleBitbucket": "표시된 저장소가 없습니다. Bitbucket의 저장소 접근 권한을 확인한 후 새로고침하세요.",
+      "noRepositoriesVisibleGitlab": "표시된 저장소가 없습니다. GitLab의 저장소 접근 권한을 확인한 후 새로고침하세요.",
+      "openBitbucket": "Bitbucket 열기",
+      "openGitlab": "GitLab 열기",
+      "recentlyUsed": "최근 사용"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}개 파일 업데이트됨",
@@ -1822,7 +1833,10 @@
       "noRepositoriesDescription": "계정에 연결된 저장소가 없습니다.",
       "tryDifferentSearch": "다른 검색어를 사용해 보세요.",
       "loading": "로드 중...",
-      "accessibility": "리포지토리: {{label}}"
+      "accessibility": "리포지토리: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "메시지 세부 정보",

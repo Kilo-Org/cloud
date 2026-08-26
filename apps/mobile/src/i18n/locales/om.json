@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Herrega GitLab",
       "connectGitLab": "GitLab walqabi",
       "gitlabError": "Qophii GitLab banaa uffachuu hin dandeenye. Maaloo irra deebi'ii yaali.",
-      "description": "Pull request of-rakkoo sakatta'uuf Kilo {{label}} walqabi."
+      "description": "Pull request of-rakkoo sakatta'uuf Kilo {{label}} walqabi.",
+      "bitbucketError": "Irra deebi'ii yaali. Qindeessaa Bitbucket banuu hin dandeenye."
     },
     "overview": {
       "reviewStyle": "Haala Sakatta'aa",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Shumarra haaraa",
       "repository": "Repository",
-      "couldNotLoadRepositories": "Repositorylee dhiisuu hin dandeenyne",
       "connectGithub": "GitHub walqabi",
       "connectGithubDescription": "Browser kee keessatti GitHub wal qabsi, sana booda repository filachuuf as deebi'i.",
       "openGithub": "GitHub bani",
       "refreshRepositories": "Repositorylee haaromsi",
-      "githubConnectionNotVisible": "Walqabxii GitHub kee hamma ammaatti hin arginu",
-      "githubConnectionNotVisibleDescription": "Yoo Kilo GitHub App feene ykn qindeesse, deebi'ee ilaali — ykn akka account/dhaabbata kanaaf fe'ame mirkaneessi.",
-      "checkAgain": "Deebi'ee ilaali",
       "githubConnected": "GitHub wal qabame",
       "noRepositoriesVisible": "Repository mul'atu hin jiru. Kilo GitHub App'tti argama repository ilaaliitii haaromsi.",
       "runOnWithTarget": "Irratti hojjedhu: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Gulaala itti fufi",
       "discard": "Haqi",
       "discardFailed": "Daaftarii haquu hin dandeenye. Mee deebi'ee yaali.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket walqabateera",
+      "connectBitbucket": "Bitbucket walqabi",
+      "connectBitbucketDescription": "Bitbucket brauzarii keessan keessatti qindeessaa, sana booda asitti deebi'aa repo tokko filachuuf.",
+      "connectGitlab": "GitLab walqabi",
+      "connectGitlabDescription": "GitLab brauzarii keessan keessatti qindeessaa, sana booda asitti deebi'aa repo tokko filachuuf.",
+      "couldNotLoadBitbucketRepositories": "Repositorywwan Bitbucket fudhachuu hin dandeenye",
+      "couldNotLoadGithubRepositories": "Repositorywwan GitHub fudhachuu hin dandeenye",
+      "couldNotLoadGitlabRepositories": "Repositorywwan GitLab fudhachuu hin dandeenye",
+      "gitlabConnected": "GitLab walqabateera",
+      "noRepositoriesVisibleBitbucket": "Repository tokko iyyuu hin mul'atu. Bitbucket irratti argachuu repo keessan ilaalaa, sana booda haaromsi.",
+      "noRepositoriesVisibleGitlab": "Repository tokko iyyuu hin mul'atu. GitLab irratti argachuu repo keessan ilaalaa, sana booda haaromsi.",
+      "openBitbucket": "Bitbucket bani",
+      "openGitlab": "GitLab bani",
+      "recentlyUsed": "Yeroo dhihoo itti fayyadamame"
     },
     "partRenderer": {
       "updatedFileCount_one": "Faayilii {{displayCount}} haaromfame",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Repository akkauntaa kee wajjin wal qabatan hin jiran.",
       "tryDifferentSearch": "Jecha barbaaduu adda ta'e yaali.",
       "loading": "Fe'eessaa jira...",
-      "accessibility": "Repository: {{label}}"
+      "accessibility": "Repository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Ibsa ergaa",

@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab kontua",
       "connectGitLab": "Konektatu GitLab",
       "gitlabError": "GitLab konfigurazioa ezin izan da ireki. Saiatu berriro.",
-      "description": "Konektatu Kilo {{label}} pull request-ak automatikoki berrikusteko."
+      "description": "Konektatu Kilo {{label}} pull request-ak automatikoki berrikusteko.",
+      "bitbucketError": "Ezin izan da Bitbucket-en konfigurazioa ireki. Mesedez, saiatu berriro."
     },
     "overview": {
       "reviewStyle": "Berrikuspen-estiloa",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Saio berria",
       "repository": "Biltegia",
-      "couldNotLoadRepositories": "Ezin dira biltegiak kargatu",
       "connectGithub": "Konektatu GitHub",
       "connectGithubDescription": "Konektatu GitHub zure arakatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
       "openGithub": "Ireki GitHub",
       "refreshRepositories": "Freskatu biltegiak",
-      "githubConnectionNotVisible": "Oraindik ezin dugu zure GitHub konexioa ikusi",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub App instalatu edo konfiguratu baduzu, egiaztatu berriro — edo ziurtatu kontu/erakunde honetarako instalatu zela.",
-      "checkAgain": "Egiaztatu berriro",
       "githubConnected": "GitHub konektatuta",
       "noRepositoriesVisible": "Ez dago biltegi ikusgarririk. Egiaztatu Kilo GitHub App-aren biltegi-sarbidea, eta gero freskatu.",
       "runOnWithTarget": "Exekutatu honetan: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Jarraitu editatzen",
       "discard": "Baztertu",
       "discardFailed": "Ezin da zirriborroa baztertu. Saiatu berriro.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket konektatuta",
+      "connectBitbucket": "Konektatu Bitbucket",
+      "connectBitbucketDescription": "Konektatu Bitbucket-era zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
+      "connectGitlab": "Konektatu GitLab",
+      "connectGitlabDescription": "Konektatu GitLab-era zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
+      "couldNotLoadBitbucketRepositories": "Ezin izan dira Bitbucket-eko biltegiak kargatu",
+      "couldNotLoadGithubRepositories": "Ezin izan dira GitHub-eko biltegiak kargatu",
+      "couldNotLoadGitlabRepositories": "Ezin izan dira GitLab-eko biltegiak kargatu",
+      "gitlabConnected": "GitLab konektatuta",
+      "noRepositoriesVisibleBitbucket": "Ez dago biltegirik ikusgai. Egiaztatu Bitbucket-erako biltegien sarbidea, eta gero freskatu.",
+      "noRepositoriesVisibleGitlab": "Ez dago biltegirik ikusgai. Egiaztatu GitLab-erako biltegien sarbidea, eta gero freskatu.",
+      "openBitbucket": "Ireki Bitbucket",
+      "openGitlab": "Ireki GitLab",
+      "recentlyUsed": "Azken erabiliak"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxategi eguneratu da",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Ez dago biltegirik zure kontuarekin konektatuta.",
       "tryDifferentSearch": "Saiatu bilaketa-termino desberdin batekin.",
       "loading": "Kargatzen...",
-      "accessibility": "Biltegia: {{label}}"
+      "accessibility": "Biltegia: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Mezuaren xehetasunak",

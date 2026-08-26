@@ -860,7 +860,8 @@
       "githubApp": "GitHub 应用",
       "githubError": "无法打开 GitHub 设置。请重试。",
       "gitlabAccount": "GitLab 账户",
-      "gitlabError": "无法打开 GitLab 设置。请重试。"
+      "gitlabError": "无法打开 GitLab 设置。请重试。",
+      "bitbucketError": "无法打开 Bitbucket 设置。请重试。"
     },
     "readOnlyDescription": "只有组织所有者和账单管理员可以更改这些设置。",
     "reviewDetail": {
@@ -1699,14 +1700,10 @@
     "newSession": {
       "title": "新会话",
       "repository": "仓库",
-      "couldNotLoadRepositories": "无法加载仓库",
       "connectGithub": "连接 GitHub",
       "connectGithubDescription": "在浏览器中连接 GitHub，然后返回此处选择仓库。",
       "openGithub": "打开 GitHub",
       "refreshRepositories": "刷新仓库",
-      "githubConnectionNotVisible": "我们暂时看不到您的 GitHub 连接",
-      "githubConnectionNotVisibleDescription": "如果您已安装或配置 Kilo GitHub App，请再检查一次 — 或确认它是为此账户/组织安装的。",
-      "checkAgain": "再检查一次",
       "githubConnected": "GitHub 已连接",
       "noRepositoriesVisible": "看不到任何仓库。请检查 Kilo GitHub App 的仓库访问权限，然后刷新。",
       "runOnWithTarget": "运行于：{{target}}",
@@ -1733,7 +1730,21 @@
       "discardDraftTitle": "丢弃草稿？",
       "discardFailed": "无法丢弃草稿。请重试。",
       "keepEditing": "继续编辑",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket 已连接",
+      "connectBitbucket": "连接 Bitbucket",
+      "connectBitbucketDescription": "在浏览器中连接 Bitbucket，然后返回此处选择仓库。",
+      "connectGitlab": "连接 GitLab",
+      "connectGitlabDescription": "在浏览器中连接 GitLab，然后返回此处选择仓库。",
+      "couldNotLoadBitbucketRepositories": "无法加载 Bitbucket 仓库",
+      "couldNotLoadGithubRepositories": "无法加载 GitHub 仓库",
+      "couldNotLoadGitlabRepositories": "无法加载 GitLab 仓库",
+      "gitlabConnected": "GitLab 已连接",
+      "noRepositoriesVisibleBitbucket": "没有可见的仓库。请检查 Bitbucket 的仓库访问权限，然后刷新。",
+      "noRepositoriesVisibleGitlab": "没有可见的仓库。请检查 GitLab 的仓库访问权限，然后刷新。",
+      "openBitbucket": "打开 Bitbucket",
+      "openGitlab": "打开 GitLab",
+      "recentlyUsed": "最近使用"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件",
@@ -1822,7 +1833,10 @@
       "noRepositoriesDescription": "您的账户没有连接任何仓库。",
       "tryDifferentSearch": "请尝试其他搜索词。",
       "loading": "加载中...",
-      "accessibility": "仓库：{{label}}"
+      "accessibility": "仓库：{{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "消息详情",

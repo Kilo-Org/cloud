@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab ఖాతా",
       "connectGitLab": "GitLabను కనెక్ట్ చేయండి",
       "gitlabError": "GitLab సెటప్ను తెరవలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి.",
-      "description": "పుల్ రిక్వెస్ట్లను ఆటోమేటిక్గా సమీక్షించడానికి Kilo {{label}}ను కనెక్ట్ చేయండి."
+      "description": "పుల్ రిక్వెస్ట్లను ఆటోమేటిక్గా సమీక్షించడానికి Kilo {{label}}ను కనెక్ట్ చేయండి.",
+      "bitbucketError": "బిట్‌బకెట్ సెటప్‌ను తెరవలేకపోయాము. దయచేసి మళ్ళీ ప్రయత్నించండి."
     },
     "overview": {
       "reviewStyle": "సమీక్ష శైలి",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "కొత్త సెషన్",
       "repository": "రిపోజిటరీ",
-      "couldNotLoadRepositories": "రిపోజిటరీలను లోడ్ చేయలేకపోయింది",
       "connectGithub": "GitHubను కనెక్ట్ చేయండి",
       "connectGithubDescription": "మీ బ్రౌజర్‌లో GitHubను కనెక్ట్ చేయండి, ఆపై రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడకు తిరిగి రండి.",
       "openGithub": "GitHub తెరవండి",
       "refreshRepositories": "రిపోజిటరీలను రిఫ్రెష్ చేయండి",
-      "githubConnectionNotVisible": "మీ GitHub కనెక్షన్ మాకు ఇంకా కనిపించడం లేదు",
-      "githubConnectionNotVisibleDescription": "మీరు Kilo GitHub Appను ఇన్‌స్టాల్ చేసిన లేదా కాన్ఫిగర్ చేసినట్లయితే, మళ్ళీ తనిఖీ చేయండి — లేదా అది ఈ ఖాతా/సంస్థ కోసం ఇన్‌స్టాల్ చేయబడిందని నిర్ధారించుకోండి.",
-      "checkAgain": "మళ్ళీ తనిఖీ చేయండి",
       "githubConnected": "GitHub కనెక్ట్ అయింది",
       "noRepositoriesVisible": "రిపోజిటరీలు కనిపించడం లేదు. Kilo GitHub App కోసం రిపోజిటరీ యాక్సెస్‌ను తనిఖీ చేయండి, ఆపై రిఫ్రెష్ చేయండి.",
       "runOnWithTarget": "అమలు చేయండి: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "సవరించడం కొనసాగించండి",
       "discard": "విస్మరించండి",
       "discardFailed": "డ్రాఫ్ట్‌ను విస్మరించలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket కనెక్ట్ అయింది",
+      "connectBitbucket": "Bitbucketను కనెక్ట్ చేయండి",
+      "connectBitbucketDescription": "మీ బ్రౌజర్‌లో బిట్‌బకెట్ కనెక్ట్ చేయండి, ఆపై రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడకు తిరిగి వెళ్ళండి.",
+      "connectGitlab": "GitLabను కనెక్ట్ చేయండి",
+      "connectGitlabDescription": "మీ బ్రౌజర్‌లో గిట్‌ల్యాబ్ కనెక్ట్ చేయండి, ఆపై రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడకు తిరిగి వెళ్ళండి.",
+      "couldNotLoadBitbucketRepositories": "బిట్‌బకెట్ రిపోజిటరీలను లోడ్ చేయలేకపోయాము",
+      "couldNotLoadGithubRepositories": "గిట్‌హబ్ రిపోజిటరీలను లోడ్ చేయలేకపోయాము",
+      "couldNotLoadGitlabRepositories": "గిట్‌ల్యాబ్ రిపోజిటరీలను లోడ్ చేయలేకపోయాము",
+      "gitlabConnected": "గిట్‌ల్యాబ్ కనెక్ట్ అయింది",
+      "noRepositoriesVisibleBitbucket": "రిపోజిటరీలు కనిపించడం లేదు. బిట్‌బకెట్ కోసం రిపోజిటరీ యాక్సెస్ తనిఖీ చేయండి, ఆపై రిఫ్రెష్ చేయండి.",
+      "noRepositoriesVisibleGitlab": "రిపోజిటరీలు కనిపించడం లేదు. గిట్‌ల్యాబ్ కోసం రిపోజిటరీ యాక్సెస్ తనిఖీ చేయండి, ఆపై రిఫ్రెష్ చేయండి.",
+      "openBitbucket": "బిట్‌బకెట్ తెరవండి",
+      "openGitlab": "గిట్‌ల్యాబ్ తెరవండి",
+      "recentlyUsed": "ఇటీవల ఉపయోగించినవి"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్ నవీకరించబడింది",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "మీ ఖాతాకు ఏ రిపోజిటరీలు కనెక్ట్ చేయబడలేదు.",
       "tryDifferentSearch": "వేరే శోధన పదాన్ని ప్రయత్నించండి.",
       "loading": "లోడ్ అవుతోంది...",
-      "accessibility": "రిపోజిటరీ: {{label}}"
+      "accessibility": "రిపోజిటరీ: {{label}}",
+      "platformBitbucket": "బిట్‌బకెట్",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "సందేశ వివరాలు",

@@ -323,6 +323,22 @@ describe('OrganizationInvoicesScreen pagination', () => {
     expect(pageQuery.fetchNextPage).toHaveBeenCalledTimes(1);
   });
 
+  it('marks Retry busy while the next page is loading after a later-page failure', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageQuery.isFetchNextPageError = true;
+    pageQuery.isError = true;
+    pageQuery.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    pageQuery.isFetchingNextPage = true;
+    pageHook.entries = [INVOICE];
+    pageHook.hasMore = true;
+
+    await renderScreen();
+
+    const retry = buttons.rendered.find(button => button.accessibilityLabel === 'Retry');
+    expect(retry).toBeDefined();
+    expect(retry?.loading).toBe(true);
+  });
+
   it('keeps Load more when a background refetch fails after pages loaded', async () => {
     pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
     pageQuery.isError = true;

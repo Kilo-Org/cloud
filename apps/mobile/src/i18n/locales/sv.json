@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab-konto",
       "connectGitLab": "Anslut GitLab",
       "gitlabError": "Kunde inte öppna GitLab-installationen. Försök igen.",
-      "description": "Anslut Kilo {{label}} för att granska pull requests automatiskt."
+      "description": "Anslut Kilo {{label}} för att granska pull requests automatiskt.",
+      "bitbucketError": "Det gick inte att öppna Bitbucket-inställningarna. Försök igen."
     },
     "overview": {
       "reviewStyle": "Granskningsstil",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Ny session",
       "repository": "Arkiv",
-      "couldNotLoadRepositories": "Kunde inte läsa in arkiv",
       "connectGithub": "Anslut GitHub",
       "connectGithubDescription": "Anslut GitHub i din webbläsare och återvänd sedan hit för att välja ett arkiv.",
       "openGithub": "Öppna GitHub",
       "refreshRepositories": "Uppdatera arkiv",
-      "githubConnectionNotVisible": "Vi kan ännu inte se din GitHub-anslutning",
-      "githubConnectionNotVisibleDescription": "Om du installerade eller konfigurerade Kilo GitHub App, kontrollera igen – eller se till att den installerades för detta konto/denna organisation.",
-      "checkAgain": "Kontrollera igen",
       "githubConnected": "GitHub ansluten",
       "noRepositoriesVisible": "Inga arkiv synliga. Kontrollera arkivåtkomsten för Kilo GitHub App och uppdatera sedan.",
       "runOnWithTarget": "Kör på: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Fortsätt redigera",
       "discard": "Kassera",
       "discardFailed": "Kunde inte ignorera utkastet. Försök igen.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket ansluten",
+      "connectBitbucket": "Anslut Bitbucket",
+      "connectBitbucketDescription": "Anslut Bitbucket i webbläsaren och kom sedan tillbaka för att välja ett arkiv.",
+      "connectGitlab": "Anslut GitLab",
+      "connectGitlabDescription": "Anslut GitLab i webbläsaren och kom sedan tillbaka för att välja ett arkiv.",
+      "couldNotLoadBitbucketRepositories": "Det gick inte att läsa in Bitbucket-arkiv",
+      "couldNotLoadGithubRepositories": "Det gick inte att läsa in GitHub-arkiv",
+      "couldNotLoadGitlabRepositories": "Det gick inte att läsa in GitLab-arkiv",
+      "gitlabConnected": "GitLab är ansluten",
+      "noRepositoriesVisibleBitbucket": "Inga arkiv visas. Kontrollera arkivåtkomsten för Bitbucket och uppdatera sedan.",
+      "noRepositoriesVisibleGitlab": "Inga arkiv visas. Kontrollera arkivåtkomsten för GitLab och uppdatera sedan.",
+      "openBitbucket": "Öppna Bitbucket",
+      "openGitlab": "Öppna GitLab",
+      "recentlyUsed": "Nyligen använda"
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppdaterade {{displayCount}} fil",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Inga arkiv är anslutna till ditt konto.",
       "tryDifferentSearch": "Prova en annan sökterm.",
       "loading": "Läser in...",
-      "accessibility": "Arkiv: {{label}}"
+      "accessibility": "Arkiv: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Meddelandedetaljer",

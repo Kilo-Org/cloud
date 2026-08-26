@@ -1395,7 +1395,8 @@
       "gitlabAccount": "GitLab račun",
       "connectGitLab": "Poveži GitLab",
       "gitlabError": "Nije moguće otvoriti GitLab postavljanje. Pokušajte ponovno.",
-      "description": "Povežite Kilo {{label}} za automatski pregled zahtjeva za povlačenje."
+      "description": "Povežite Kilo {{label}} za automatski pregled zahtjeva za povlačenje.",
+      "bitbucketError": "Otvaranje Bitbucket postavki nije uspjelo. Pokušaj ponovno."
     },
     "overview": {
       "reviewStyle": "Stil pregleda",
@@ -2168,14 +2169,10 @@
     "newSession": {
       "title": "Nova sesija",
       "repository": "Spremište",
-      "couldNotLoadRepositories": "Nije bilo moguće učitati repozitorije",
       "connectGithub": "Poveži GitHub",
       "connectGithubDescription": "Povežite GitHub u pregledniku, a zatim se vratite ovdje za odabir repozitorija.",
       "openGithub": "Otvori GitHub",
       "refreshRepositories": "Osvježi repozitorije",
-      "githubConnectionNotVisible": "Još ne vidimo vašu GitHub vezu",
-      "githubConnectionNotVisibleDescription": "Ako ste instalirali ili konfigurirali Kilo GitHub aplikaciju, provjerite ponovno — ili provjerite je li instalirana za ovaj račun/organizaciju.",
-      "checkAgain": "Provjeri ponovno",
       "githubConnected": "GitHub povezan",
       "noRepositoriesVisible": "Nema vidljivih repozitorija. Provjerite pristup repozitorijima za Kilo GitHub aplikaciju, a zatim osvježite.",
       "runOnWithTarget": "Pokreni na: {{target}}",
@@ -2202,7 +2199,21 @@
       "keepEditing": "Nastavi s uređivanjem",
       "discard": "Odbaci",
       "discardFailed": "Nije moguće odbaciti nacrt. Pokušajte ponovno.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket povezan",
+      "connectBitbucket": "Poveži Bitbucket",
+      "connectBitbucketDescription": "Poveži Bitbucket u pregledniku, a zatim se vrati ovdje da odabereš repozitorij.",
+      "connectGitlab": "Poveži GitLab",
+      "connectGitlabDescription": "Poveži GitLab u pregledniku, a zatim se vrati ovdje da odabereš repozitorij.",
+      "couldNotLoadBitbucketRepositories": "Učitavanje Bitbucket repozitorija nije uspjelo",
+      "couldNotLoadGithubRepositories": "Učitavanje GitHub repozitorija nije uspjelo",
+      "couldNotLoadGitlabRepositories": "Učitavanje GitLab repozitorija nije uspjelo",
+      "gitlabConnected": "GitLab je povezan",
+      "noRepositoriesVisibleBitbucket": "Nema vidljivih repozitorija. Provjeri pristup repozitorijima za Bitbucket, a zatim osvježi.",
+      "noRepositoriesVisibleGitlab": "Nema vidljivih repozitorija. Provjeri pristup repozitorijima za GitLab, a zatim osvježi.",
+      "openBitbucket": "Otvori Bitbucket",
+      "openGitlab": "Otvori GitLab",
+      "recentlyUsed": "Nedavno korišteno"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirana {{displayCount}} datoteka",
@@ -2296,7 +2307,10 @@
       "noRepositoriesDescription": "Nijedan repozitorij nije povezan s vašim računom.",
       "tryDifferentSearch": "Pokušajte drugi pojam pretrage.",
       "loading": "Učitavanje...",
-      "accessibility": "Repozitorij: {{label}}"
+      "accessibility": "Repozitorij: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Pojedinosti poruke",

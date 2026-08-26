@@ -1386,7 +1386,8 @@
       "gitlabAccount": "I-akhawunti ye-GitLab",
       "connectGitLab": "Xhuma i-GitLab",
       "gitlabError": "Ayikwazanga ukuvula ukusetha kwe-GitLab. Uyacelwa uzame futhi.",
-      "description": "Xhuma i-Kilo {{label}} ukuze ibuyekeze izicelo zokudonsa ngokuzenzakalelayo."
+      "description": "Xhuma i-Kilo {{label}} ukuze ibuyekeze izicelo zokudonsa ngokuzenzakalelayo.",
+      "bitbucketError": "I-akhile ukuvula ukulungiswa kwe-Bitbucket. Sicela uzame futhi."
     },
     "overview": {
       "reviewStyle": "Isitayela Sokubuyekeza",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Iseshini entsha",
       "repository": "IRepository",
-      "couldNotLoadRepositories": "Akukwazanga ukulayisha ama-repository",
       "connectGithub": "Xhuma i-GitHub",
       "connectGithubDescription": "Xhuma ku-GitHub kusibukeli sakho, bese ubuyela lapha ukukhetha i-repository.",
       "openGithub": "Vula i-GitHub",
       "refreshRepositories": "Vuselela ama-repository",
-      "githubConnectionNotVisible": "Asikwazi ukubona ukuxhumana kwakho kwe-GitHub okwamanje",
-      "githubConnectionNotVisibleDescription": "Uma ufake noma ulungise i-Kilo GitHub App, bheka futhi — noma qinisekisa ukuthi yafakelwa le akhawunti/inhlangano.",
-      "checkAgain": "Bheka futhi",
       "githubConnected": "I-GitHub ixhunyiwe",
       "noRepositoriesVisible": "Akukho ma-repository abonakalayo. Bheka ukufinyelela kwe-repository ye-Kilo GitHub App, bese uvuselela.",
       "runOnWithTarget": "Sebenza ku: {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Qhubeka uhlela",
       "discard": "Lahla",
       "discardFailed": "Akukwazanga ukulahla idrafuthi. Sicela uzame futhi.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "I-Bitbucket ixhunyiwe",
+      "connectBitbucket": "Xhuma i-Bitbucket",
+      "connectBitbucketDescription": "Xhuma i-Bitbucket kusiphequluli sakho, bese ubuya lapha ukuze ukhethe irepository.",
+      "connectGitlab": "Xhuma i-GitLab",
+      "connectGitlabDescription": "Xhuma i-GitLab kusiphequluli sakho, bese ubuya lapha ukuze ukhethe irepository.",
+      "couldNotLoadBitbucketRepositories": "I-akhile ukulayisha ama-repository e-Bitbucket",
+      "couldNotLoadGithubRepositories": "I-akhile ukulayisha ama-repository e-GitHub",
+      "couldNotLoadGitlabRepositories": "I-akhile ukulayisha ama-repository e-GitLab",
+      "gitlabConnected": "I-GitLab ixhumekile",
+      "noRepositoriesVisibleBitbucket": "Awekho ama-repository abonakalayo. Bheka ukufinyelela kwe-repository ye-Bitbucket, bese uvuselela.",
+      "noRepositoriesVisibleGitlab": "Awekho ama-repository abonakalayo. Bheka ukufinyelela kwe-repository ye-GitLab, bese uvuselela.",
+      "openBitbucket": "Vula i-Bitbucket",
+      "openGitlab": "Vula i-GitLab",
+      "recentlyUsed": "Esetshenziswe muva nje"
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}",
@@ -2276,7 +2287,10 @@
       "noRepositoriesDescription": "Akukho ma-repository axhunyiwe kwi-akhawunti yakho.",
       "tryDifferentSearch": "Zama igama lokusesha elihlukile.",
       "loading": "Iyathanda...",
-      "accessibility": "IRepository: {{label}}"
+      "accessibility": "IRepository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Imininingwane yomlayezo",

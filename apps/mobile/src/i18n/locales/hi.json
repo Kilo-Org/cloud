@@ -860,7 +860,8 @@
       "githubApp": "GitHub ऐप",
       "githubError": "GitHub सेटअप नहीं खोल सका। कृपया फिर से कोशिश करें।",
       "gitlabAccount": "GitLab खाता",
-      "gitlabError": "GitLab सेटअप नहीं खोल सका। कृपया फिर से कोशिश करें।"
+      "gitlabError": "GitLab सेटअप नहीं खोल सका। कृपया फिर से कोशिश करें।",
+      "bitbucketError": "Bitbucket सेटअप नहीं खोला जा सका। कृपया फिर से प्रयास करें।"
     },
     "readOnlyDescription": "केवल संगठन के मालिक और बिलिंग मैनेजर ही ये सेटिंग बदल सकते हैं।",
     "reviewDetail": {
@@ -1699,14 +1700,10 @@
     "newSession": {
       "title": "नया सत्र",
       "repository": "रिपॉज़िटरी",
-      "couldNotLoadRepositories": "रिपॉज़िटरी लोड नहीं हो सकीं",
       "connectGithub": "GitHub कनेक्ट करें",
       "connectGithubDescription": "अपने ब्राउज़र में GitHub कनेक्ट करें, फिर रिपॉज़िटरी चुनने के लिए यहाँ वापस आएँ।",
       "openGithub": "GitHub खोलें",
       "refreshRepositories": "रिपॉज़िटरी रीफ़्रेश करें",
-      "githubConnectionNotVisible": "हमें अभी आपका GitHub कनेक्शन नहीं दिख रहा",
-      "githubConnectionNotVisibleDescription": "यदि आपने Kilo GitHub ऐप इंस्टॉल या कॉन्फ़िगर किया है, तो फिर से जाँचें — या सुनिश्चित करें कि यह इस खाते/संगठन के लिए इंस्टॉल किया गया था।",
-      "checkAgain": "फिर से जाँचें",
       "githubConnected": "GitHub कनेक्ट हो गया",
       "noRepositoriesVisible": "कोई रिपॉज़िटरी दिखाई नहीं दे रही। Kilo GitHub ऐप के लिए रिपॉज़िटरी पहुँच जाँचें, फिर रीफ़्रेश करें।",
       "runOnWithTarget": "इस पर चलाएँ: {{target}}",
@@ -1733,7 +1730,21 @@
       "discardDraftTitle": "ड्राफ़्ट छोड़ें?",
       "discardFailed": "ड्राफ़्ट छोड़ा नहीं जा सका। कृपया फिर से कोशिश करें।",
       "keepEditing": "संपादन जारी रखें",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket कनेक्टेड",
+      "connectBitbucket": "Bitbucket कनेक्ट करें",
+      "connectBitbucketDescription": "अपने ब्राउज़र में Bitbucket कनेक्ट करें, फिर रिपॉज़िटरी चुनने के लिए यहाँ लौटें।",
+      "connectGitlab": "GitLab कनेक्ट करें",
+      "connectGitlabDescription": "अपने ब्राउज़र में GitLab कनेक्ट करें, फिर रिपॉज़िटरी चुनने के लिए यहाँ लौटें।",
+      "couldNotLoadBitbucketRepositories": "Bitbucket रिपॉज़िटरी लोड नहीं हो सकीं",
+      "couldNotLoadGithubRepositories": "GitHub रिपॉज़िटरी लोड नहीं हो सकीं",
+      "couldNotLoadGitlabRepositories": "GitLab रिपॉज़िटरी लोड नहीं हो सकीं",
+      "gitlabConnected": "GitLab कनेक्टेड",
+      "noRepositoriesVisibleBitbucket": "कोई रिपॉज़िटरी दिखाई नहीं दे रही। Bitbucket के लिए रिपॉज़िटरी एक्सेस जाँचें, फिर रिफ़्रेश करें।",
+      "noRepositoriesVisibleGitlab": "कोई रिपॉज़िटरी दिखाई नहीं दे रही। GitLab के लिए रिपॉज़िटरी एक्सेस जाँचें, फिर रिफ़्रेश करें।",
+      "openBitbucket": "Bitbucket खोलें",
+      "openGitlab": "GitLab खोलें",
+      "recentlyUsed": "हाल में उपयोग की गईं"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फ़ाइल अपडेट की गई",
@@ -1799,7 +1810,10 @@
       "noRepositoriesDescription": "आपके खाते से कोई रिपॉज़िटरी कनेक्ट नहीं है.",
       "tryDifferentSearch": "कोई दूसरा खोज शब्द आज़माएँ।",
       "accessibility": "रिपॉज़िटरी: {{label}}",
-      "loading": "लोड हो रहा है..."
+      "loading": "लोड हो रहा है...",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "संदेश विवरण",

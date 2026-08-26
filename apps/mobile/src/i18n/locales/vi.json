@@ -860,7 +860,8 @@
       "githubApp": "Ứng dụng GitHub",
       "githubError": "Không thể mở thiết lập GitHub. Vui lòng thử lại.",
       "gitlabAccount": "Tài khoản GitLab",
-      "gitlabError": "Không thể mở thiết lập GitLab. Vui lòng thử lại."
+      "gitlabError": "Không thể mở thiết lập GitLab. Vui lòng thử lại.",
+      "bitbucketError": "Không thể mở thiết lập Bitbucket. Vui lòng thử lại."
     },
     "readOnlyDescription": "Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể thay đổi các cài đặt này.",
     "reviewDetail": {
@@ -1699,14 +1700,10 @@
     "newSession": {
       "title": "Phiên mới",
       "repository": "Kho lưu trữ",
-      "couldNotLoadRepositories": "Không thể tải các kho lưu trữ",
       "connectGithub": "Kết nối GitHub",
       "connectGithubDescription": "Kết nối GitHub trong trình duyệt của bạn, sau đó quay lại đây để chọn kho lưu trữ.",
       "openGithub": "Mở GitHub",
       "refreshRepositories": "Làm mới kho lưu trữ",
-      "githubConnectionNotVisible": "Chúng tôi chưa thấy kết nối GitHub của bạn",
-      "githubConnectionNotVisibleDescription": "Nếu bạn đã cài đặt hoặc cấu hình ứng dụng Kilo GitHub, hãy kiểm tra lại — hoặc đảm bảo nó đã được cài đặt cho tài khoản/tổ chức này.",
-      "checkAgain": "Kiểm tra lại",
       "githubConnected": "Đã kết nối GitHub",
       "noRepositoriesVisible": "Không thấy kho lưu trữ nào. Kiểm tra quyền truy cập kho lưu trữ cho ứng dụng Kilo GitHub, sau đó làm mới.",
       "runOnWithTarget": "Chạy trên: {{target}}",
@@ -1733,7 +1730,21 @@
       "discardDraftTitle": "Hủy bản nháp?",
       "discardFailed": "Không thể hủy bản nháp. Vui lòng thử lại.",
       "keepEditing": "Tiếp tục chỉnh sửa",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Đã kết nối Bitbucket",
+      "connectBitbucket": "Kết nối Bitbucket",
+      "connectBitbucketDescription": "Kết nối Bitbucket trong trình duyệt của bạn, rồi quay lại đây để chọn một kho lưu trữ.",
+      "connectGitlab": "Kết nối GitLab",
+      "connectGitlabDescription": "Kết nối GitLab trong trình duyệt của bạn, rồi quay lại đây để chọn một kho lưu trữ.",
+      "couldNotLoadBitbucketRepositories": "Không thể tải kho lưu trữ Bitbucket",
+      "couldNotLoadGithubRepositories": "Không thể tải kho lưu trữ GitHub",
+      "couldNotLoadGitlabRepositories": "Không thể tải kho lưu trữ GitLab",
+      "gitlabConnected": "Đã kết nối GitLab",
+      "noRepositoriesVisibleBitbucket": "Không có kho lưu trữ hiển thị. Kiểm tra quyền truy cập kho lưu trữ cho Bitbucket, rồi làm mới.",
+      "noRepositoriesVisibleGitlab": "Không có kho lưu trữ hiển thị. Kiểm tra quyền truy cập kho lưu trữ cho GitLab, rồi làm mới.",
+      "openBitbucket": "Mở Bitbucket",
+      "openGitlab": "Mở GitLab",
+      "recentlyUsed": "Đã dùng gần đây"
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp",
@@ -1822,7 +1833,10 @@
       "noRepositoriesDescription": "Không có kho lưu trữ nào được kết nối với tài khoản của bạn.",
       "tryDifferentSearch": "Hãy thử một cụm từ tìm kiếm khác.",
       "loading": "Đang tải...",
-      "accessibility": "Kho lưu trữ: {{label}}"
+      "accessibility": "Kho lưu trữ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Chi tiết tin nhắn",

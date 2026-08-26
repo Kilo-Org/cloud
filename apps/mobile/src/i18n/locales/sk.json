@@ -1404,7 +1404,8 @@
       "gitlabAccount": "GitLab účet",
       "connectGitLab": "Pripojiť GitLab",
       "gitlabError": "Nastavenie GitLab sa nepodarilo otvoriť. Skúste to znova.",
-      "description": "Pripojte Kilo {{label}}, aby ste automaticky preskúmavali pull requesty."
+      "description": "Pripojte Kilo {{label}}, aby ste automaticky preskúmavali pull requesty.",
+      "bitbucketError": "Nepodarilo sa otvoriť nastavenie Bitbucket. Skúste to znova."
     },
     "overview": {
       "reviewStyle": "Štýl preskúmania",
@@ -2183,14 +2184,10 @@
     "newSession": {
       "title": "Nové sedenie",
       "repository": "Repozitár",
-      "couldNotLoadRepositories": "Repozitáre sa nepodarilo načítať",
       "connectGithub": "Pripojiť GitHub",
       "connectGithubDescription": "Pripojte GitHub vo svojom prehliadači a potom sa sem vráťte, aby ste vybrali repozitár.",
       "openGithub": "Otvoriť GitHub",
       "refreshRepositories": "Obnoviť repozitáre",
-      "githubConnectionNotVisible": "Vaše pripojenie na GitHub zatiaľ nevidíme",
-      "githubConnectionNotVisibleDescription": "Ak ste nainštalovali alebo nakonfigurovali aplikáciu Kilo GitHub App, skontrolujte to znova — alebo sa uistite, že bola nainštalovaná pre tento účet/organizáciu.",
-      "checkAgain": "Skontrolovať znova",
       "githubConnected": "GitHub pripojený",
       "noRepositoriesVisible": "Žiadne repozitáre nie sú viditeľné. Skontrolujte prístup k repozitárom pre aplikáciu Kilo GitHub App a potom obnovte.",
       "runOnWithTarget": "Spustiť na: {{target}}",
@@ -2217,7 +2214,21 @@
       "keepEditing": "Pokračovať v úpravách",
       "discard": "Zahodiť",
       "discardFailed": "Koncept sa nepodarilo zahodiť. Skúste to znova.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket pripojený",
+      "connectBitbucket": "Pripojiť Bitbucket",
+      "connectBitbucketDescription": "Pripojte Bitbucket v prehliadači a potom sa sem vráťte a vyberte repozitár.",
+      "connectGitlab": "Pripojiť GitLab",
+      "connectGitlabDescription": "Pripojte GitLab v prehliadači a potom sa sem vráťte a vyberte repozitár.",
+      "couldNotLoadBitbucketRepositories": "Nepodarilo sa načítať repozitáre Bitbucket",
+      "couldNotLoadGithubRepositories": "Nepodarilo sa načítať repozitáre GitHub",
+      "couldNotLoadGitlabRepositories": "Nepodarilo sa načítať repozitáre GitLab",
+      "gitlabConnected": "GitLab je pripojený",
+      "noRepositoriesVisibleBitbucket": "Nie sú viditeľné žiadne repozitáre. Skontrolujte prístup k repozitárom pre Bitbucket a potom obnovte.",
+      "noRepositoriesVisibleGitlab": "Nie sú viditeľné žiadne repozitáre. Skontrolujte prístup k repozitárom pre GitLab a potom obnovte.",
+      "openBitbucket": "Otvoriť Bitbucket",
+      "openGitlab": "Otvoriť GitLab",
+      "recentlyUsed": "Naposledy použité"
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizovaný {{displayCount}} súbor",
@@ -2308,7 +2319,10 @@
       "noRepositoriesDescription": "K vášmu účtu nie sú pripojené žiadne repozitáre.",
       "tryDifferentSearch": "Skúste iný vyhľadávací výraz.",
       "loading": "Načítava sa...",
-      "accessibility": "Repozitár: {{label}}"
+      "accessibility": "Repozitár: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Podrobnosti správy",

@@ -232,6 +232,7 @@ export function OrganizationCreditActivityScreen() {
               variant="outline"
               size="sm"
               onPress={() => void query.fetchNextPage()}
+              loading={query.isFetchingNextPage}
               accessibilityLabel={t('common.retry')}
             >
               <Text>{t('common.retry')}</Text>

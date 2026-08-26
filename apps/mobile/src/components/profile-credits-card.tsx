@@ -1,7 +1,6 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { useQuery } from '@tanstack/react-query';
-import { type TRPCQueryKey } from '@trpc/tanstack-react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ChevronDown } from '@/components/ui/icons';
 import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -26,11 +25,6 @@ type CreditsCardProps = {
   orgs: OrgListEntry[] | undefined;
 };
 
-function ownerScopedKey(key: TRPCQueryKey, userId: string | undefined): TRPCQueryKey {
-  const scoped: readonly unknown[] = [...key, userId ?? 'unsigned'];
-  return scoped as TRPCQueryKey;
-}
-
 export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
@@ -46,17 +40,18 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const balanceOptions = trpc.user.getContextBalance.queryOptions({
     organizationId: selectedOrgId,
   });
+
+  // tRPC v11 `isPrefixedQueryKey` misreads a 3-element query key (e.g. one
+  // suffixed with the userId) as `[prefix, path, args]` and makes the queryFn
+  // throw `path.join is not a function` before any network request. Keep the
+  // raw 2-element key and fail fast if it ever regresses.
+  if (balanceOptions.queryKey.length !== 2) {
+    throw new Error('getContextBalance query key must stay 2-element ([path, input])');
+  }
   const personalCreditOptions = trpc.user.getCreditBlocks.queryOptions({});
   const orgCreditOptions = trpc.organizations.getCreditBlocks.queryOptions({
     organizationId: selectedOrgId ?? '',
   });
-
-  // Key every financial query by the signed-in owner. The last key element is
-  // the userId; the placeholder gate below compares against it so a user switch
-  // never reuses another owner's cached balance as the current amount.
-  const balanceQueryKey = ownerScopedKey(balanceOptions.queryKey, userId);
-  const personalQueryKey = ownerScopedKey(personalCreditOptions.queryKey, userId);
-  const orgQueryKey = ownerScopedKey(orgCreditOptions.queryKey, userId);
 
   const {
     data: balance,
@@ -66,24 +61,19 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     refetch: refetchBalance,
   } = useQuery({
     ...balanceOptions,
-    queryKey: balanceQueryKey,
     enabled: enabled && hasUserId,
-    placeholderData: (previousData, previousQuery) =>
-      previousQuery?.queryKey.at(-1) === userId ? previousData : undefined,
+    placeholderData: keepPreviousData,
   });
 
   const { data: personalCreditData, isLoading: personalCreditsLoading } = useQuery({
     ...personalCreditOptions,
-    queryKey: personalQueryKey,
     enabled: enabled && hasUserId && !selectedOrgId,
   });
 
   const { data: orgCreditData, isLoading: orgCreditsLoading } = useQuery({
     ...orgCreditOptions,
-    queryKey: orgQueryKey,
     enabled: enabled && hasUserId && Boolean(selectedOrgId),
-    placeholderData: (previousData, previousQuery) =>
-      previousQuery?.queryKey.at(-1) === userId ? previousData : undefined,
+    placeholderData: keepPreviousData,
   });
 
   // A failed getMe (no userId) can never render a trusted balance, so it shares

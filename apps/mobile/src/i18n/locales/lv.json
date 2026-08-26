@@ -1395,7 +1395,8 @@
       "gitlabAccount": "GitLab konts",
       "connectGitLab": "Savienot GitLab",
       "gitlabError": "Neizdevās atvērt GitLab iestatīšanu. Lūdzu, mēģiniet vēlreiz.",
-      "description": "Savienojiet Kilo {{label}}, lai automātiski pārskatītu pull requests."
+      "description": "Savienojiet Kilo {{label}}, lai automātiski pārskatītu pull requests.",
+      "bitbucketError": "Neizdevās atvērt Bitbucket iestatīšanu. Lūdzu, mēģiniet vēlreiz."
     },
     "overview": {
       "reviewStyle": "Pārskatīšanas stils",
@@ -2168,14 +2169,10 @@
     "newSession": {
       "title": "Jauna sesija",
       "repository": "Repozitorijs",
-      "couldNotLoadRepositories": "Neizdevās ielādēt repozitorijus",
       "connectGithub": "Savienot GitHub",
       "connectGithubDescription": "Savieno GitHub savā pārlūkā, tad atgriezies šeit, lai izvēlētos repozitoriju.",
       "openGithub": "Atvērt GitHub",
       "refreshRepositories": "Atsvaidzināt repozitorijus",
-      "githubConnectionNotVisible": "Mēs vēl neredzam tavu GitHub savienojumu",
-      "githubConnectionNotVisibleDescription": "Ja instalēji vai konfigurēji Kilo GitHub App, pārbaudi vēlreiz — vai pārliecinies, ka tas tika instalēts šim kontam/organizācijai.",
-      "checkAgain": "Pārbaudīt vēlreiz",
       "githubConnected": "GitHub savienots",
       "noRepositoriesVisible": "Nav redzamu repozitoriju. Pārbaudi repozitorija piekļuvi Kilo GitHub App, tad atsvaidzini.",
       "runOnWithTarget": "Palaist uz: {{target}}",
@@ -2202,7 +2199,21 @@
       "keepEditing": "Turpināt rediģēt",
       "discard": "Atmest",
       "discardFailed": "Neizdevās atmest melnrakstu. Lūdzu, mēģini vēlreiz.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket savienots",
+      "connectBitbucket": "Savienot Bitbucket",
+      "connectBitbucketDescription": "Savienojiet Bitbucket savā pārlūkprogrammā, pēc tam atgriezieties, lai izvēlētos repozitoriju.",
+      "connectGitlab": "Savienot GitLab",
+      "connectGitlabDescription": "Savienojiet GitLab savā pārlūkprogrammā, pēc tam atgriezieties, lai izvēlētos repozitoriju.",
+      "couldNotLoadBitbucketRepositories": "Neizdevās ielādēt Bitbucket repozitorijus",
+      "couldNotLoadGithubRepositories": "Neizdevās ielādēt GitHub repozitorijus",
+      "couldNotLoadGitlabRepositories": "Neizdevās ielādēt GitLab repozitorijus",
+      "gitlabConnected": "GitLab ir savienots",
+      "noRepositoriesVisibleBitbucket": "Nav redzamu repozitoriju. Pārbaudiet repozitoriju piekļuvi Bitbucket, pēc tam atsvaidziniet.",
+      "noRepositoriesVisibleGitlab": "Nav redzamu repozitoriju. Pārbaudiet repozitoriju piekļuvi GitLab, pēc tam atsvaidziniet.",
+      "openBitbucket": "Atvērt Bitbucket",
+      "openGitlab": "Atvērt GitLab",
+      "recentlyUsed": "Nesen lietots"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atjaunināts {{displayCount}} fails",
@@ -2292,7 +2303,10 @@
       "noRepositoriesDescription": "Tavam kontam nav savienotu repozitoriju.",
       "tryDifferentSearch": "Izmēģini citu meklēšanas vārdu.",
       "loading": "Ielādē...",
-      "accessibility": "Repozitorijs: {{label}}"
+      "accessibility": "Repozitorijs: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Ziņojuma detaļas",

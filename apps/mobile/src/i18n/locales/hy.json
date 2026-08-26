@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab հաշիվ",
       "connectGitLab": "Միացնել GitLab-ը",
       "gitlabError": "Հնարավոր չեղավ բացել GitLab կարգավորումը: Խնդրում ենք կրկին փորձել:",
-      "description": "Միացրեք Kilo {{label}}-ը՝ pull requests-ները ավտոմատ ստուգելու համար:"
+      "description": "Միացրեք Kilo {{label}}-ը՝ pull requests-ները ավտոմատ ստուգելու համար:",
+      "bitbucketError": "Չհաջողվեց բացել Bitbucket-ի կարգավորումը: Խնդրում ենք փորձել կրկին:"
     },
     "overview": {
       "reviewStyle": "Ստուգման ոճ",
@@ -2153,14 +2154,10 @@
     "newSession": {
       "title": "Նոր նիստ",
       "repository": "Պահոց",
-      "couldNotLoadRepositories": "Չհաջողվեց բեռնել պահոցները",
       "connectGithub": "Միացնել GitHub-ը",
       "connectGithubDescription": "Միացրեք GitHub-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
       "openGithub": "Բացել GitHub-ը",
       "refreshRepositories": "Թարմացնել պահոցները",
-      "githubConnectionNotVisible": "Մենք դեռ չենք տեսնում ձեր GitHub կապը",
-      "githubConnectionNotVisibleDescription": "Եթե տեղադրել կամ կարգավորել եք Kilo GitHub App-ը, նորից ստուգեք — կամ համոզվեք, որ այն տեղադրված է այս հաշվի/կազմակերպության համար։",
-      "checkAgain": "Կրկին ստուգել",
       "githubConnected": "GitHub-ը միացված է",
       "noRepositoriesVisible": "Պահոցներ չեն երևում։ Ստուգեք Kilo GitHub App-ի պահոցի հասանելիությունը, ապա թարմացրեք։",
       "runOnWithTarget": "Գործարկել՝ {{target}}",
@@ -2187,7 +2184,21 @@
       "keepEditing": "Շարունակել խմբագրել",
       "discard": "Մերժել",
       "discardFailed": "Չհաջողվեց մերժել սևագիրը։ Խնդրում ենք կրկին փորձել։",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket-ը միացված է",
+      "connectBitbucket": "Միացնել Bitbucket-ը",
+      "connectBitbucketDescription": "Միացրեք Bitbucket-ը ձեր բրաուզերում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար:",
+      "connectGitlab": "Միացնել GitLab-ը",
+      "connectGitlabDescription": "Միացրեք GitLab-ը ձեր բրաուզերում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար:",
+      "couldNotLoadBitbucketRepositories": "Չհաջողվեց բեռնել Bitbucket-ի պահոցները",
+      "couldNotLoadGithubRepositories": "Չհաջողվեց բեռնել GitHub-ի պահոցները",
+      "couldNotLoadGitlabRepositories": "Չհաջողվեց բեռնել GitLab-ի պահոցները",
+      "gitlabConnected": "GitLab-ը միացված է",
+      "noRepositoriesVisibleBitbucket": "Պահոցներ չեն երևում: Ստուգեք Bitbucket-ի պահոցների հասանելիությունը, ապա թարմացրեք:",
+      "noRepositoriesVisibleGitlab": "Պահոցներ չեն երևում: Ստուգեք GitLab-ի պահոցների հասանելիությունը, ապա թարմացրեք:",
+      "openBitbucket": "Բացել Bitbucket",
+      "openGitlab": "Բացել GitLab",
+      "recentlyUsed": "Վերջերս օգտագործված"
     },
     "partRenderer": {
       "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ",
@@ -2280,7 +2291,10 @@
       "noRepositoriesDescription": "Ձեր հաշվին միացված պահոցներ չկան։",
       "tryDifferentSearch": "Փորձեք որոնման այլ տերմին։",
       "loading": "Բեռնում...",
-      "accessibility": "Պահոց՝ {{label}}"
+      "accessibility": "Պահոց՝ {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Հաղորդագրության մանրամասներ",

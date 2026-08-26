@@ -860,7 +860,8 @@
       "githubApp": "GitHub App",
       "githubError": "GitHubのセットアップを開けませんでした。もう一度お試しください。",
       "gitlabAccount": "GitLabアカウント",
-      "gitlabError": "GitLabのセットアップを開けませんでした。もう一度お試しください。"
+      "gitlabError": "GitLabのセットアップを開けませんでした。もう一度お試しください。",
+      "bitbucketError": "Bitbucket のセットアップを開けませんでした。もう一度お試しください。"
     },
     "readOnlyDescription": "これらの設定を変更できるのは組織のオーナーと請求管理者のみです。",
     "reviewDetail": {
@@ -1699,14 +1700,10 @@
     "newSession": {
       "title": "新しいセッション",
       "repository": "リポジトリ",
-      "couldNotLoadRepositories": "リポジトリを読み込めませんでした",
       "connectGithub": "GitHubを接続",
       "connectGithubDescription": "ブラウザーでGitHubを接続し、ここに戻ってリポジトリを選択してください。",
       "openGithub": "GitHubを開く",
       "refreshRepositories": "リポジトリを更新",
-      "githubConnectionNotVisible": "GitHub接続がまだ確認できません",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub Appをインストールまたは設定した場合は、もう一度確認してください。または、このアカウント/組織に対してインストールされていることを確認してください。",
-      "checkAgain": "もう一度確認",
       "githubConnected": "GitHub接続済み",
       "noRepositoriesVisible": "リポジトリが表示されません。Kilo GitHub Appのリポジトリアクセスを確認してから更新してください。",
       "runOnWithTarget": "実行先: {{target}}",
@@ -1733,7 +1730,21 @@
       "discardDraftTitle": "下書きを破棄しますか？",
       "discardFailed": "下書きを破棄できませんでした。もう一度お試しください。",
       "keepEditing": "編集を続ける",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket接続済み",
+      "connectBitbucket": "Bitbucketを接続",
+      "connectBitbucketDescription": "ブラウザで Bitbucket に接続し、この画面に戻ってリポジトリを選択してください。",
+      "connectGitlab": "GitLabを接続",
+      "connectGitlabDescription": "ブラウザで GitLab に接続し、この画面に戻ってリポジトリを選択してください。",
+      "couldNotLoadBitbucketRepositories": "Bitbucket のリポジトリを読み込めませんでした",
+      "couldNotLoadGithubRepositories": "GitHub のリポジトリを読み込めませんでした",
+      "couldNotLoadGitlabRepositories": "GitLab のリポジトリを読み込めませんでした",
+      "gitlabConnected": "GitLab に接続しました",
+      "noRepositoriesVisibleBitbucket": "表示できるリポジトリがありません。Bitbucket のリポジトリへのアクセスを確認し、更新してください。",
+      "noRepositoriesVisibleGitlab": "表示できるリポジトリがありません。GitLab のリポジトリへのアクセスを確認し、更新してください。",
+      "openBitbucket": "Bitbucket を開く",
+      "openGitlab": "GitLab を開く",
+      "recentlyUsed": "最近使用した項目"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました",
@@ -1822,7 +1833,10 @@
       "noRepositoriesDescription": "アカウントに接続されたリポジトリはありません。",
       "tryDifferentSearch": "別の検索語をお試しください。",
       "loading": "読み込み中...",
-      "accessibility": "リポジトリ: {{label}}"
+      "accessibility": "リポジトリ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "メッセージの詳細",

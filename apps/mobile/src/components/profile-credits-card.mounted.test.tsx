@@ -1,10 +1,9 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 
-// Owner-keyed financial queries: the balance card must never render one signed-in
-// owner's cached balance as the current amount after the owner switches. Each
-// query key is suffixed with the userId, and the placeholder gate compares the
-// previous query key's last element against the current userId, so a user switch
-// shows the skeleton instead of reusing the previous owner's cache.
+// Balance across owners: the card keeps the raw 2-element tRPC query key
+// (`[path, { input, type }]`), never a userId-suffixed key. Owner switches are
+// safe because sign-out clears the React Query cache (`queryClient.clear()`), so
+// a new owner refetches and never reuses the previous owner's cached balance.
 
 import { createElement, type ReactElement } from 'react';
 import { Pressable } from 'react-native';
@@ -152,7 +151,6 @@ function cardElement(orgs?: OrgListEntry[]): ReactElement {
 type CardHandle = {
   renderer: ReactTestRenderer;
   texts: () => string[];
-  rerender: () => Promise<void>;
   unmount: () => void;
 };
 
@@ -173,15 +171,6 @@ async function mountCard(queryClient: QueryClient = createTestQueryClient()): Pr
   return {
     renderer,
     texts: () => collectText(renderer.toJSON()),
-    // Toggling `orgs` (undefined <-> []) forces a re-render without changing
-    // the visible tree (both render the personal context with no picker), so a
-    // userId change read from the mocked hook is picked up by the queries.
-    rerender: async () => {
-      await act(async () => {
-        renderer.update(wrapper([]));
-        await Promise.resolve();
-      });
-    },
     unmount: () => {
       act(() => {
         renderer.unmount();
@@ -215,7 +204,7 @@ describe('CreditsCard balance state', () => {
   it('shows the balance when data is cached for the signed-in user', async () => {
     currentUser.userId = 'user-A';
     const queryClient = createTestQueryClient();
-    queryClient.setQueryData([...BALANCE_KEY, 'user-A'], { balance: 1 });
+    queryClient.setQueryData([...BALANCE_KEY], { balance: 1 });
 
     const { texts, unmount } = await mountCard(queryClient);
 
@@ -227,12 +216,14 @@ describe('CreditsCard balance state', () => {
   });
 
   it('never renders user A balance as current after switching to user B', async () => {
-    currentUser.userId = 'user-A';
     const queryClient = createTestQueryClient();
-    queryClient.setQueryData([...BALANCE_KEY, 'user-A'], { balance: 10 });
 
-    // Hold user B's balance fetch until the test resolves it, so the skeleton
-    // state between the switch and the resolved fetch is observable.
+    // Owner A signs in and has a cached balance.
+    currentUser.userId = 'user-A';
+    queryClient.setQueryData([...BALANCE_KEY], { balance: 10 });
+
+    // Hold the next owner's balance fetch until the test resolves it, so the
+    // skeleton state between the switch and the resolved fetch is observable.
     let resolveB: ((value: { balance: number }) => void) | undefined = undefined;
     getContextBalanceQueryFn.mockReturnValue(
       new Promise<{ balance: number }>(resolve => {
@@ -240,32 +231,35 @@ describe('CreditsCard balance state', () => {
       })
     );
 
-    const { texts, rerender, unmount } = await mountCard(queryClient);
+    const a = await mountCard(queryClient);
 
     // User A renders from cache.
-    await waitFor(() => texts().includes('$10.00'));
-    expect(texts()).toContain('$10.00');
+    await waitFor(() => a.texts().includes('$10.00'));
+    expect(a.texts()).toContain('$10.00');
 
-    // Switch the owner to user B, who has no cache.
+    // Sign-out unmounts the profile and clears the React Query cache.
+    a.unmount();
+
+    // Owner B mounts with an empty cache and must refetch.
     currentUser.userId = 'user-B';
-    await rerender();
+    const b = await mountCard(queryClient);
 
-    // The placeholder gate must not reuse A's cache: show the skeleton, and A's
-    // dollars must never appear as the current amount.
-    expect(texts()).toContain('SKELETON');
-    expect(texts()).not.toContain('$10.00');
+    // B must never reuse A's cache: show the skeleton while B's fetch is in
+    // flight, and A's dollars must never appear as the current amount.
+    expect(b.texts()).toContain('SKELETON');
+    expect(b.texts()).not.toContain('$10.00');
 
     // Resolve user B's balance.
     await act(async () => {
       resolveB?.({ balance: 25 });
       await Promise.resolve();
     });
-    await waitFor(() => texts().includes('$25.00'));
+    await waitFor(() => b.texts().includes('$25.00'));
 
-    expect(texts()).toContain('$25.00');
-    expect(texts()).not.toContain('$10.00');
+    expect(b.texts()).toContain('$25.00');
+    expect(b.texts()).not.toContain('$10.00');
 
-    unmount();
+    b.unmount();
   });
 
   it('shows the failed-to-load-balance copy when getMe errors, and retries both', async () => {

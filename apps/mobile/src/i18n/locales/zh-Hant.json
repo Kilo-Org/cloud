@@ -860,7 +860,8 @@
       "githubApp": "GitHub App",
       "githubError": "無法開啟 GitHub 設定。請再試一次。",
       "gitlabAccount": "GitLab 帳戶",
-      "gitlabError": "無法開啟 GitLab 設定。請再試一次。"
+      "gitlabError": "無法開啟 GitLab 設定。請再試一次。",
+      "bitbucketError": "無法開啟 Bitbucket 設定。請再試一次。"
     },
     "readOnlyDescription": "只有組織擁有者和帳單管理員可以變更這些設定。",
     "reviewDetail": {
@@ -1699,14 +1700,10 @@
     "newSession": {
       "title": "新工作階段",
       "repository": "存放庫",
-      "couldNotLoadRepositories": "無法載入存放庫",
       "connectGithub": "連接 GitHub",
       "connectGithubDescription": "在瀏覽器中連接 GitHub，然後返回此處選取存放庫。",
       "openGithub": "開啟 GitHub",
       "refreshRepositories": "重新整理存放庫",
-      "githubConnectionNotVisible": "我們還看不到您的 GitHub 連線",
-      "githubConnectionNotVisibleDescription": "如果您已安裝或設定 Kilo GitHub App，請再次檢查 — 或確認它已為此帳戶/組織安裝。",
-      "checkAgain": "再次檢查",
       "githubConnected": "GitHub 已連接",
       "noRepositoriesVisible": "看不到任何存放庫。請檢查 Kilo GitHub App 的存放庫存取權限，然後重新整理。",
       "runOnWithTarget": "執行於：{{target}}",
@@ -1733,7 +1730,21 @@
       "discardDraftTitle": "捨棄草稿？",
       "discardFailed": "無法捨棄草稿。請再試一次。",
       "keepEditing": "繼續編輯",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket 已連接",
+      "connectBitbucket": "連接 Bitbucket",
+      "connectBitbucketDescription": "在瀏覽器中連接 Bitbucket，然後返回此處挑選儲存庫。",
+      "connectGitlab": "連接 GitLab",
+      "connectGitlabDescription": "在瀏覽器中連接 GitLab，然後返回此處挑選儲存庫。",
+      "couldNotLoadBitbucketRepositories": "無法載入 Bitbucket 儲存庫",
+      "couldNotLoadGithubRepositories": "無法載入 GitHub 儲存庫",
+      "couldNotLoadGitlabRepositories": "無法載入 GitLab 儲存庫",
+      "gitlabConnected": "已連接 GitLab",
+      "noRepositoriesVisibleBitbucket": "沒有可見的儲存庫。檢查 Bitbucket 的儲存庫存取權限，然後重新整理。",
+      "noRepositoriesVisibleGitlab": "沒有可見的儲存庫。檢查 GitLab 的儲存庫存取權限，然後重新整理。",
+      "openBitbucket": "開啟 Bitbucket",
+      "openGitlab": "開啟 GitLab",
+      "recentlyUsed": "最近使用"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 個檔案",
@@ -1822,7 +1833,10 @@
       "noRepositoriesDescription": "您的帳戶沒有連接任何存放庫。",
       "tryDifferentSearch": "請嘗試其他搜尋字詞。",
       "loading": "載入中...",
-      "accessibility": "存放庫：{{label}}"
+      "accessibility": "存放庫：{{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "訊息詳細資料",

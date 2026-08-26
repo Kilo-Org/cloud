@@ -1,18 +1,31 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePostHog } from 'posthog-js/react';
 
-import { useSetChildMemberships } from '@/app/api/organizations/hooks';
+import { useSetChildMemberships, useUpdateMemberRole } from '@/app/api/organizations/hooks';
 import {
   useIsKiloAdmin,
   useUserOrganizationRole,
 } from '@/components/organizations/OrganizationContext';
 import { OrganizationAdminContextProvider } from '@/components/organizations/OrganizationContextWrapper';
 import { canInviteMembers } from '@/components/organizations/OrganizationMembersCard';
+import {
+  getAvailableInviteRoles,
+  ROLE_LABELS,
+} from '@/components/organizations/members/InviteMemberDialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import type { SubOrganizationPeopleData } from '../types';
 import {
   addEligibilityLabel,
@@ -40,7 +53,7 @@ type AddPersonRow = { person: Person; eligibleTargetOrganizationIds: string[] };
 const STEP_TITLES: Record<Step, string> = {
   select: 'Step 1 of 4: Select people',
   target: 'Step 2 of 4: Pick target sub-organizations',
-  preview: 'Step 3 of 4: Preview and confirm',
+  preview: 'Step 3 of 4: Preview and choose a role',
   results: 'Step 4 of 4: Results',
 };
 
@@ -61,6 +74,7 @@ export function AddPeopleWizard({
   const [selected, setSelected] = useState<Set<string>>(() => new Set(seededIdentityKeys));
   const [search, setSearch] = useState('');
   const [targetOrganizationIds, setTargetOrganizationIds] = useState<Set<string>>(() => new Set());
+  const [role, setRole] = useState<OrganizationRole>('member');
 
   const selectedPeople = useMemo(
     () => people.filter(person => selected.has(person.identityKey)),
@@ -134,6 +148,8 @@ export function AddPeopleWizard({
             <PreviewStep
               selectedPeople={selectedPeople}
               targetOrganizations={targetOrganizations}
+              role={role}
+              onChangeRole={setRole}
               onBack={() => setStep('target')}
               onConfirm={() => setStep('results')}
             />
@@ -142,6 +158,7 @@ export function AddPeopleWizard({
               parentOrganizationId={parentOrganizationId}
               selectedPeople={selectedPeople}
               targetOrganizations={targetOrganizations}
+              role={role}
               onClose={onClose}
             />
           )}
@@ -249,11 +266,15 @@ function TargetStep({
 function PreviewStep({
   selectedPeople,
   targetOrganizations,
+  role,
+  onChangeRole,
   onBack,
   onConfirm,
 }: {
   selectedPeople: Person[];
   targetOrganizations: Child[];
+  role: OrganizationRole;
+  onChangeRole: (role: OrganizationRole) => void;
   onBack: () => void;
   onConfirm: () => void;
 }) {
@@ -266,6 +287,31 @@ function PreviewStep({
   // try. A caller who fails the server's stricter check still gets an
   // ordinary per-row failure in the results step.
   const canAddToChildOrganizations = canInviteMembers(currentUserRole, isKiloAdmin);
+  // Reusing `getAvailableInviteRoles` here — rather than a member-only
+  // constant — is what keeps this picker's options honest: `setChildMemberships`
+  // only ever adds someone as `member`, so any elevated role picked here is
+  // applied by a follow-up `organizations.members.update` call per newly
+  // added org (see `AddResultsStep`), and that call's own authorization is
+  // scoped to each *child* org, not the parent. A parent owner/admin's
+  // inherited access to every direct child satisfies it; a parent
+  // billing_manager's does not, matching exactly the roles
+  // `getAvailableInviteRoles('billing_manager', false)` returns (`['member']`
+  // only) — so a billing_manager never sees an elevated option that would
+  // just fail the follow-up call.
+  const availableRoles = useMemo(
+    () => getAvailableInviteRoles(currentUserRole, isKiloAdmin),
+    [currentUserRole, isKiloAdmin]
+  );
+
+  // Resets to a role that's actually valid for the viewer, mirroring
+  // `InvitePersonWizard`'s own reset behavior.
+  useEffect(() => {
+    if (availableRoles.length === 0) return;
+    if (availableRoles.includes(role)) return;
+    onChangeRole(availableRoles.includes('member') ? 'member' : availableRoles[0]);
+    // Only re-derive when the viewer's available roles change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableRoles]);
 
   const addableCount = selectedPeople.filter(
     person =>
@@ -283,6 +329,31 @@ function PreviewStep({
           You don't have permission to add members into the selected sub-organizations.
         </p>
       )}
+
+      <div className="space-y-2">
+        <Label htmlFor="add-people-role">Role in each sub-organization</Label>
+        <Select value={role} onValueChange={value => onChangeRole(value as OrganizationRole)}>
+          <SelectTrigger
+            id="add-people-role"
+            className="w-full"
+            disabled={!canAddToChildOrganizations}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          {/* `z-[70]` matches the fix already established for a `Select`
+              rendered inside this same drawer-stack family: the drawer's own
+              layers render at `zIndex: 61 + ...`, above `Select`'s default
+              `z-50` portal, so without this override the dropdown opens but
+              paints invisibly behind the drawer panel. */}
+          <SelectContent className="z-[70]">
+            {availableRoles.map(roleOption => (
+              <SelectItem key={roleOption} value={roleOption}>
+                {ROLE_LABELS[roleOption]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* Grouped by person, with each person's target orgs listed underneath —
           keeps each person's name/email from repeating once per org the way a
@@ -348,15 +419,18 @@ function AddResultsStep({
   parentOrganizationId,
   selectedPeople,
   targetOrganizations,
+  role,
   onClose,
 }: {
   parentOrganizationId: string;
   selectedPeople: Person[];
   targetOrganizations: Child[];
+  role: OrganizationRole;
   onClose: () => void;
 }) {
   const posthog = usePostHog();
   const setChildMembershipsMutation = useSetChildMemberships();
+  const updateMemberRoleMutation = useUpdateMemberRole();
 
   // One row per PERSON — `setChildMemberships` takes one call per person
   // with that person's full desired child-org set, not one call per
@@ -398,8 +472,28 @@ function AddResultsStep({
         memberId: person.kiloUserId,
         childOrganizationIds: desiredChildOrganizationIds(person, eligibleTargetOrganizationIds),
       });
+
+      // `setChildMemberships` always adds as `member` — it has no role
+      // parameter. A non-default chosen role is applied with a follow-up
+      // `update` call per newly added org, sequentially like everything
+      // else in this row, so a role that this specific org's authorization
+      // doesn't allow (see `PreviewStep`'s `availableRoles` comment) surfaces
+      // as an ordinary per-row failure rather than silently downgrading —
+      // the person was still added as `member` in that case, just not
+      // promoted; re-running this wizard for them is a no-op `skip` (see
+      // above), so the fix-up path is the per-child manage drawer's Role
+      // dropdown, not a re-run of this wizard.
+      if (role !== 'member') {
+        for (const organizationId of eligibleTargetOrganizationIds) {
+          await updateMemberRoleMutation.mutateAsync({
+            organizationId,
+            memberId: person.kiloUserId,
+            role,
+          });
+        }
+      }
     },
-    [setChildMembershipsMutation, parentOrganizationId]
+    [setChildMembershipsMutation, updateMemberRoleMutation, parentOrganizationId, role]
   );
 
   const { outcomes, isRunning, progress, start, retryFailed } = useRowExecutor(rows, skip, execute);
@@ -425,11 +519,14 @@ function AddResultsStep({
     const addedToNames = eligibleTargetOrganizationIds.map(
       organizationId => targetOrganizationNamesById.get(organizationId) ?? organizationId
     );
+    const roleSuffix = role !== 'member' ? ` as ${ROLE_LABELS[role]}` : '';
     return {
       key: person.identityKey,
       label: person.name,
       sublabel:
-        addedToNames.length > 0 ? `${person.email} → ${addedToNames.join(', ')}` : person.email,
+        addedToNames.length > 0
+          ? `${person.email} → ${addedToNames.join(', ')}${roleSuffix}`
+          : person.email,
     };
   });
 

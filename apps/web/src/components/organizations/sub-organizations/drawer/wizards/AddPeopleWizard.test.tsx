@@ -27,6 +27,7 @@ import { AddPeopleWizard } from './AddPeopleWizard';
 
 const setChildMembershipsMutateAsync = jest.fn();
 const inviteMutateAsync = jest.fn();
+const updateMemberRoleMutateAsync = jest.fn();
 
 jest.mock('@/app/api/organizations/hooks', () => ({
   useOrganizationWithMembers: () => ({
@@ -36,6 +37,7 @@ jest.mock('@/app/api/organizations/hooks', () => ({
   }),
   useInviteMember: () => ({ mutateAsync: inviteMutateAsync }),
   useSetChildMemberships: () => ({ mutateAsync: setChildMembershipsMutateAsync }),
+  useUpdateMemberRole: () => ({ mutateAsync: updateMemberRoleMutateAsync }),
 }));
 
 jest.mock('next-auth/react', () => ({
@@ -138,6 +140,8 @@ describe('AddPeopleWizard full-flow', () => {
     setChildMembershipsMutateAsync.mockReset();
     setChildMembershipsMutateAsync.mockResolvedValue(undefined);
     inviteMutateAsync.mockReset();
+    updateMemberRoleMutateAsync.mockReset();
+    updateMemberRoleMutateAsync.mockResolvedValue(undefined);
   });
 
   it('walks select -> target -> preview -> results, calling setChildMemberships once per eligible person', async () => {
@@ -157,7 +161,7 @@ describe('AddPeopleWizard full-flow', () => {
     // Step 3: Bob is already a member of Child One, so his per-org row shows
     // "Already a member" there, but he's still addable overall (to Child
     // Two) — both people count toward the "Add 2 people" total.
-    screen.getByText('Step 3 of 4: Preview and confirm');
+    screen.getByText('Step 3 of 4: Preview and choose a role');
     screen.getByText('Already a member');
     fireEvent.click(screen.getByRole('button', { name: 'Add 2 people' }));
 
@@ -181,9 +185,76 @@ describe('AddPeopleWizard full-flow', () => {
 
     screen.getByText('alice@example.com → Child One, Child Two');
     screen.getByText('bob@example.com → Child Two');
+    // Default role is `member`, which `setChildMemberships` already
+    // satisfies on its own — no follow-up `update` call needed.
+    expect(updateMemberRoleMutateAsync).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies a chosen elevated role with a follow-up update call per newly added org', async () => {
+    renderWizard({ onClose: jest.fn(), seededIdentityKeys: ['bob@example.com'] });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next (1 selected)' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Child One' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Child Two' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next (2 selected)' }));
+
+    // Bob is already a member of Child One, so only Child Two is a newly
+    // added org for him — the elevated role must only be applied there.
+    fireEvent.click(screen.getByRole('combobox'));
+    await screen.findByRole('listbox');
+    fireEvent.click(screen.getByRole('option', { name: 'Admin' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add 1 person' }));
+
+    await waitFor(() => screen.getByText('Done: 1 succeeded, 0 failed, 0 skipped.'));
+    expect(setChildMembershipsMutateAsync).toHaveBeenCalledWith({
+      organizationId: 'parent-1',
+      memberId: 'user-bob',
+      childOrganizationIds: ['child-1', 'child-2'],
+    });
+    expect(updateMemberRoleMutateAsync).toHaveBeenCalledTimes(1);
+    expect(updateMemberRoleMutateAsync).toHaveBeenCalledWith({
+      organizationId: 'child-2',
+      memberId: 'user-bob',
+      role: 'admin',
+    });
+    screen.getByText('bob@example.com → Child Two as Admin');
+    expect(inviteMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed follow-up role update as a failed row without retrying the already-successful membership add', async () => {
+    updateMemberRoleMutateAsync.mockRejectedValueOnce(new Error('You cannot remove an owner'));
+    renderWizard({ onClose: jest.fn(), seededIdentityKeys: ['bob@example.com'] });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next (1 selected)' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Child Two' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next (1 selected)' }));
+
+    fireEvent.click(screen.getByRole('combobox'));
+    await screen.findByRole('listbox');
+    fireEvent.click(screen.getByRole('option', { name: 'Admin' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add 1 person' }));
+
+    await waitFor(() => screen.getByText('Done: 0 succeeded, 1 failed, 0 skipped.'));
+    screen.getByText(/Failed: You cannot remove an owner/);
+    // setChildMemberships already ran once (Bob is now a plain member of
+    // Child Two).
+    expect(setChildMembershipsMutateAsync).toHaveBeenCalledTimes(1);
+
+    updateMemberRoleMutateAsync.mockResolvedValueOnce(undefined);
+    fireEvent.click(screen.getByRole('button', { name: 'Retry failed (1)' }));
+
+    // A retry re-runs the whole row from scratch, so it re-issues
+    // setChildMemberships too — that's a safe no-op server-side (Bob is
+    // already in `childOrganizationIds`), not a targeted "retry only the
+    // role update" step. This asserts that redundant re-run stays harmless.
+    await waitFor(() => screen.getByText('Done: 1 succeeded, 0 failed, 0 skipped.'));
+    expect(setChildMembershipsMutateAsync).toHaveBeenCalledTimes(2);
+    expect(updateMemberRoleMutateAsync).toHaveBeenCalledTimes(2);
   });
 
   it('surfaces a failed setChildMemberships call and lets the user retry only that person', async () => {

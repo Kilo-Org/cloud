@@ -8,3 +8,12 @@ import { TextDecoder, TextEncoder } from 'node:util';
 if (typeof globalThis.TextEncoder === 'undefined') {
   Object.assign(globalThis, { TextEncoder, TextDecoder });
 }
+
+// jsdom does not implement `Element.prototype.scrollIntoView` at all — Radix
+// `Select` calls it while positioning `SelectContent` on open and again when
+// scrolling the newly-chosen item into view after a click, so any test that
+// actually clicks a `SelectItem` (not just asserts one is present) throws and
+// unmounts the tree with "scrollIntoView is not a function" otherwise.
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function scrollIntoView() {};
+}

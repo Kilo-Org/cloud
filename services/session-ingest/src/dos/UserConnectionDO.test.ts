@@ -4117,13 +4117,44 @@ describe('UserConnectionDO', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Same-host reconnect: a rebooted host advertises the same instance name and
-  // projectName on a fresh connectionId. The stale socket must be closed so
-  // `getConnectedInstances` lists the host exactly once.
-  // -------------------------------------------------------------------------
+  describe('same-host connections', () => {
+    it('keeps two same-folder clients connected when they advertise the same session', async () => {
+      const { doInstance, mockCtx } = setup();
+      const first = addCliSocket(mockCtx, 'conn-1');
+      const second = addCliSocket(mockCtx, 'conn-2');
+      const instance = { name: 'host-a', projectName: 'proj', version: '1.2.3' };
+      const sessions = [makeSession('shared', 'idle')];
 
-  describe('same-host replace', () => {
+      for (let cycle = 0; cycle < 3; cycle++) {
+        sendHeartbeat(doInstance, first, sessions, { instance });
+        sendHeartbeat(doInstance, second, sessions, { instance });
+
+        expect(first.close).not.toHaveBeenCalled();
+        expect(second.close).not.toHaveBeenCalled();
+        expect(doInstance.getConnectedInstances().instances).toEqual([
+          { connectionId: 'conn-1', ...instance },
+          { connectionId: 'conn-2', ...instance },
+        ]);
+      }
+    });
+
+    it('keeps two idle same-folder clients visible immediately', async () => {
+      const { doInstance, mockCtx } = setup();
+      const first = addCliSocket(mockCtx, 'conn-1');
+      const second = addCliSocket(mockCtx, 'conn-2');
+      const instance = { name: 'host-a', projectName: 'proj', version: '1.2.3' };
+
+      sendHeartbeat(doInstance, first, [], { instance });
+      sendHeartbeat(doInstance, second, [], { instance });
+
+      expect(first.close).not.toHaveBeenCalled();
+      expect(second.close).not.toHaveBeenCalled();
+      expect(doInstance.getConnectedInstances().instances).toEqual([
+        { connectionId: 'conn-1', ...instance },
+        { connectionId: 'conn-2', ...instance },
+      ]);
+    });
+
     it('keeps concurrent same-host connections with distinct sessions open across repeated heartbeats', async () => {
       const { doInstance, mockCtx } = setup();
       const first = addCliSocket(mockCtx, 'conn-1');
@@ -4167,39 +4198,6 @@ describe('UserConnectionDO', () => {
       expect(doInstance.getConnectedInstances().instances).toHaveLength(3);
     });
 
-    it('replaces a same-host connection immediately when the new connection claims its session', async () => {
-      const { doInstance, mockCtx } = setup();
-      const first = addCliSocket(mockCtx, 'conn-1');
-      const second = addCliSocket(mockCtx, 'conn-2');
-      const instance = { name: 'host-a', projectName: 'proj' };
-
-      sendHeartbeat(doInstance, first, [makeSession('s1')], { instance });
-      sendHeartbeat(doInstance, second, [makeSession('s1')], { instance });
-
-      expect(first.close).toHaveBeenCalledWith(1000, 'replaced by same-host reconnect');
-      expect(second.close).not.toHaveBeenCalled();
-      expect(doInstance.getConnectedInstances().instances).toEqual([
-        { connectionId: 'conn-2', ...instance },
-      ]);
-    });
-
-    it('replaces a same-host connection when a later heartbeat claims its sessions', async () => {
-      const { doInstance, mockCtx } = setup();
-      const first = addCliSocket(mockCtx, 'conn-1');
-      const second = addCliSocket(mockCtx, 'conn-2');
-      const instance = { name: 'host-a', projectName: 'proj' };
-
-      sendHeartbeat(doInstance, first, [makeSession('s1')], { instance });
-      sendHeartbeat(doInstance, second, [], { instance });
-
-      expect(first.close).not.toHaveBeenCalled();
-
-      sendHeartbeat(doInstance, second, [makeSession('s1')], { instance });
-
-      expect(first.close).toHaveBeenCalledWith(1000, 'replaced by same-host reconnect');
-      expect(second.close).not.toHaveBeenCalled();
-    });
-
     it('keeps a same-host connection open when only some sessions transfer', async () => {
       const { doInstance, mockCtx } = setup();
       const first = addCliSocket(mockCtx, 'conn-1');
@@ -4235,7 +4233,7 @@ describe('UserConnectionDO', () => {
       ]);
     });
 
-    it('hides a stale same-host connection while keeping fresh concurrent connections open', async () => {
+    it('removes an expired same-host connection while keeping fresh concurrent connections open', async () => {
       const { doInstance, mockCtx } = setup();
       const stale = addCliSocket(mockCtx, 'conn-stale');
       const fresh = addCliSocket(mockCtx, 'conn-fresh');
@@ -4254,12 +4252,13 @@ describe('UserConnectionDO', () => {
       expect(stale.close).not.toHaveBeenCalled();
       expect(fresh.close).not.toHaveBeenCalled();
       expect(replacement.close).not.toHaveBeenCalled();
+      expect(doInstance.getConnectedInstances().instances).toHaveLength(3);
+
+      clock.mockReturnValue(now + 30_000);
       expect(doInstance.getConnectedInstances().instances).toEqual([
         { connectionId: 'conn-fresh', ...instance },
         { connectionId: 'conn-replacement', ...instance },
       ]);
-
-      clock.mockReturnValue(now + 30_000);
       await doInstance.alarm();
 
       expect(stale.close).toHaveBeenCalledWith(4408, 'heartbeat timeout');
@@ -4267,7 +4266,7 @@ describe('UserConnectionDO', () => {
       expect(replacement.close).not.toHaveBeenCalled();
     });
 
-    it('immediately hides a stale idle connection and closes it after the heartbeat timeout', async () => {
+    it('removes a stale idle connection from the instance list when its heartbeat expires', async () => {
       const { doInstance, mockCtx } = setup();
       const first = addCliSocket(mockCtx, 'conn-1');
       const second = addCliSocket(mockCtx, 'conn-2');
@@ -4281,19 +4280,23 @@ describe('UserConnectionDO', () => {
       expect(first.close).not.toHaveBeenCalled();
       expect(second.close).not.toHaveBeenCalled();
       expect(doInstance.getConnectedInstances().instances).toEqual([
+        { connectionId: 'conn-1', ...instance },
         { connectionId: 'conn-2', ...instance },
       ]);
 
       clock.mockReturnValue(now + 29_000);
       sendHeartbeat(doInstance, second, [], { instance });
       clock.mockReturnValue(now + 30_000);
+      expect(doInstance.getConnectedInstances().instances).toEqual([
+        { connectionId: 'conn-2', ...instance },
+      ]);
       await doInstance.alarm();
 
       expect(first.close).toHaveBeenCalledWith(4408, 'heartbeat timeout');
       expect(second.close).not.toHaveBeenCalled();
     });
 
-    it('preserves hidden stale instances across hibernation and restores a live instance on heartbeat', async () => {
+    it('preserves both same-folder instances across hibernation', async () => {
       const { doInstance, ctx, mockCtx } = setup();
       const first = addCliSocket(mockCtx, 'conn-1');
       const second = addCliSocket(mockCtx, 'conn-2');
@@ -4304,12 +4307,6 @@ describe('UserConnectionDO', () => {
 
       const restored = new UserConnectionDO(ctx as never, {} as never);
       expect(restored.getConnectedInstances().instances).toEqual([
-        { connectionId: 'conn-2', ...instance },
-      ]);
-
-      sendHeartbeat(restored, first, [], { instance });
-
-      expect(restored.getConnectedInstances().instances).toEqual([
         { connectionId: 'conn-1', ...instance },
         { connectionId: 'conn-2', ...instance },
       ]);
@@ -4317,7 +4314,7 @@ describe('UserConnectionDO', () => {
       expect(second.close).not.toHaveBeenCalled();
     });
 
-    it('expires a hidden stale connection after hibernation without resetting its heartbeat age', async () => {
+    it('expires a stale connection after hibernation without resetting its heartbeat age', async () => {
       const { doInstance, ctx, mockCtx } = setup();
       const first = addCliSocket(mockCtx, 'conn-1');
       const second = addCliSocket(mockCtx, 'conn-2');
@@ -4400,16 +4397,13 @@ describe('UserConnectionDO', () => {
       expect(second.close).not.toHaveBeenCalled();
     });
 
-    it('does not broadcast cli.disconnected or overwrite the owner-change terminal result for a same-host replaced socket', async () => {
+    it('preserves both clients when shared-session ownership changes during a pending command', async () => {
       const { doInstance, mockCtx } = setup();
       const first = addCliSocket(mockCtx, 'conn-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
+      const instance = { name: 'host-a', projectName: 'proj' };
 
-      sendHeartbeat(doInstance, first, [makeSession('s1')], {
-        instance: { name: 'host-a', projectName: 'proj' },
-      });
-
-      // An owner-fenced pending command targets the first socket.
+      sendHeartbeat(doInstance, first, [makeSession('s1')], { instance });
       await sendCommand(doInstance, webWs, {
         id: 'cmd-1',
         command: 'send_message',
@@ -4418,22 +4412,13 @@ describe('UserConnectionDO', () => {
       });
       const correlationId = getCorrelationId(first);
       webWs.send.mockClear();
-
-      // A second socket on a different connectionId claims the same host.
       const second = addCliSocket(mockCtx, 'conn-2');
-      sendHeartbeat(doInstance, second, [makeSession('s1')], {
-        instance: { name: 'host-a', projectName: 'proj' },
-      });
-
-      expect(first.close).toHaveBeenCalledWith(1000, 'replaced by same-host reconnect');
-
-      // Drain the stale-close failPendingCommandsForSocket waitUntil so the
-      // owner-change terminal result settles before the close event runs.
+      sendHeartbeat(doInstance, second, [makeSession('s1')], { instance });
       await flushAsync();
 
-      // The stale close delivers the owner-change error, not 'CLI disconnected'.
-      const preClose = allSent(webWs);
-      expect(preClose.find(m => m.type === 'response' && m.id === 'cmd-1')).toEqual({
+      expect(first.close).not.toHaveBeenCalled();
+      expect(second.close).not.toHaveBeenCalled();
+      expect(allSent(webWs).find(message => message.id === 'cmd-1')).toEqual({
         type: 'response',
         id: 'cmd-1',
         error: {
@@ -4442,17 +4427,7 @@ describe('UserConnectionDO', () => {
           message: 'Session owner changed',
         },
       });
-      webWs.send.mockClear();
 
-      // The close event for the stale first socket now fires.
-      mockCtx.removeSocket(first);
-      await disconnectCli(doInstance, first);
-
-      const msgs = allSent(webWs);
-      expect(msgs.some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(false);
-      expect(msgs.filter(m => m.type === 'response' && m.id === 'cmd-1')).toHaveLength(0);
-
-      // Durable terminal entry keeps the owner-change error.
       const durable = mockCtx.storage.store.get(`pendingCommand/${correlationId}`) as {
         state: string;
         error?: unknown;

@@ -42,12 +42,6 @@ type WSAttachment =
       role: 'cli';
       connectionId: string;
       sessions: HeartbeatSession[];
-      // Set on a stale same-host socket just before its close so
-      // `handleCliDisconnect` treats the close as a replacement (the new
-      // socket already heartbeated) and skips the `cliGone` pending-command
-      // sweep and the `cli.disconnected` broadcast.
-      replaced?: true;
-      hiddenUntilHeartbeat?: true;
       heartbeatAt?: number;
       // Undefined means no protocolVersion has been reported yet — either the
       // CLI hasn't sent its first heartbeat, or it's a legacy build that
@@ -587,20 +581,6 @@ export class UserConnectionDO extends DurableObject<Env> {
     instance: Instance | undefined
   ): void {
     const { connectionId } = attachment;
-    // Legacy CLIs omit `instance` entirely; only close a stale same-host
-    // socket when the heartbeat actually carries an instance identity.
-    if (instance) {
-      const isNewInstance =
-        attachment.instance?.name !== instance.name ||
-        attachment.instance.projectName !== instance.projectName;
-      this.closeStaleSocketsForInstance(
-        instance.name,
-        instance.projectName,
-        connectionId,
-        sessions,
-        isNewInstance
-      );
-    }
     const now = Date.now();
     this.lastHeartbeatAt.set(connectionId, now);
     this.connectionProtocolVersion.set(connectionId, protocolVersion);
@@ -1758,16 +1738,11 @@ export class UserConnectionDO extends DurableObject<Env> {
     // Exclude the closing socket: under wrangler/workerd, getWebSockets() still
     // includes it during webSocketClose, so matching self would always look "replaced"
     // and skip ownership cleanup + attention reset (DEF-5 E2E failure).
-    // A same-host replacement sets the `replaced` marker on this socket's own
-    // attachment before closing (see closeStaleSocketsForInstance), because its
-    // replacement carries a different connectionId.
-    const replaced =
-      attachment.replaced ||
-      this.ctx.getWebSockets('cli').some(ws => {
-        if (ws === disconnectedWs) return false;
-        const att = ws.deserializeAttachment() as WSAttachment | null;
-        return att?.role === 'cli' && att.connectionId === connectionId;
-      });
+    const replaced = this.ctx.getWebSockets('cli').some(ws => {
+      if (ws === disconnectedWs) return false;
+      const att = ws.deserializeAttachment() as WSAttachment | null;
+      return att?.role === 'cli' && att.connectionId === connectionId;
+    });
 
     // Fail pending commands that targeted this specific socket.
     // Await so the durable terminal entries are persisted before we proceed
@@ -1920,9 +1895,12 @@ export class UserConnectionDO extends DurableObject<Env> {
   getConnectedInstances(): { instances: ConnectedInstanceRow[] } {
     this.ensureState();
     const instances: ConnectedInstanceRow[] = [];
+    const now = Date.now();
     for (const ws of this.ctx.getWebSockets('cli')) {
       const att = ws.deserializeAttachment() as WSAttachment | null;
-      if (att?.role !== 'cli' || !att.instance || att.replaced || att.hiddenUntilHeartbeat) {
+      if (att?.role !== 'cli' || !att.instance || ws.readyState !== WebSocket.OPEN) continue;
+      const heartbeatAt = this.lastHeartbeatAt.get(att.connectionId);
+      if (heartbeatAt !== undefined && now - heartbeatAt >= UserConnectionDO.HEARTBEAT_TIMEOUT_MS) {
         continue;
       }
       instances.push({
@@ -2057,60 +2035,6 @@ export class UserConnectionDO extends DurableObject<Env> {
       }
     }
     return false;
-  }
-
-  private closeStaleSocketsForInstance(
-    name: string,
-    projectName: string,
-    keepConnectionId: string,
-    sessions: HeartbeatSession[],
-    isNewInstance: boolean
-  ): void {
-    if (!name || !projectName) return;
-
-    const incomingSessionIds = new Set(sessions.map(session => session.id));
-
-    for (const ws of this.ctx.getWebSockets('cli')) {
-      const att = ws.deserializeAttachment() as WSAttachment | null;
-      if (att?.role !== 'cli' || att.connectionId === keepConnectionId || att.replaced) continue;
-      if (att.instance?.name !== name || att.instance?.projectName !== projectName) continue;
-
-      const ownsSameSessions =
-        att.sessions.length > 0 &&
-        att.sessions.length === incomingSessionIds.size &&
-        att.sessions.every(session => incomingSessionIds.has(session.id));
-      if (!ownsSameSessions) {
-        if (
-          ws.readyState === WebSocket.OPEN &&
-          isNewInstance &&
-          att.sessions.length === 0 &&
-          sessions.length === 0
-        ) {
-          ws.serializeAttachment({ ...att, hiddenUntilHeartbeat: true });
-        }
-        continue;
-      }
-
-      console.log('Closing stale CLI socket for same-host reconnect', {
-        connectionId: att.connectionId,
-        name,
-        projectName,
-      });
-      this.ctx.waitUntil(
-        this.failPendingCommandsForSocket(ws, false).catch((error: unknown) => {
-          console.error('Failed to persist terminal commands for stale socket', {
-            connectionId: att.connectionId,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        })
-      );
-      // Preserve session ownership — the rebooting host's replacement socket
-      // re-claims the same sessions in its first heartbeat.
-      // Mark the attachment so `handleCliDisconnect` routes this close through
-      // the `replaced` early-return (the replacement already heartbeated).
-      ws.serializeAttachment({ ...att, replaced: true });
-      ws.close(1000, 'replaced by same-host reconnect');
-    }
   }
 
   private replaceWebSocket(connectionId: string): void {

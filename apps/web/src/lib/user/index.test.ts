@@ -430,25 +430,28 @@ describe('User', () => {
       });
     });
 
-    it('uses legacy OAuth ID provenance for a Google Workspace account', async () => {
-      const user = await insertTestUser({
-        id: 'oauth/google:synthetic-workspace-account',
-        google_user_email: 'legacy-workspace@example.com',
-        google_user_name: 'Legacy Workspace User',
-        normalized_email: 'legacy-workspace@example.com',
-        hosted_domain: 'example.com',
-      });
+    it.each(['google', 'github', 'gitlab'] as const)(
+      'uses legacy %s OAuth ID provenance when provider rows are missing',
+      async provider => {
+        const user = await insertTestUser({
+          id: `oauth/${provider}:synthetic-account`,
+          google_user_email: `legacy-${provider}@example.com`,
+          google_user_name: 'Legacy Workspace User',
+          normalized_email: `legacy-${provider}@example.com`,
+          hosted_domain: 'example.com',
+        });
 
-      await expect(getAllUserProviders('legacy-workspace@example.com')).resolves.toEqual({
-        kind: 'found',
-        user: {
-          kiloUserId: user.id,
-          providers: ['google'],
-          primaryEmail: 'legacy-workspace@example.com',
-          workosHostedDomain: undefined,
-        },
-      });
-    });
+        await expect(getAllUserProviders(`legacy-${provider}@example.com`)).resolves.toEqual({
+          kind: 'found',
+          user: {
+            kiloUserId: user.id,
+            providers: [provider],
+            primaryEmail: `legacy-${provider}@example.com`,
+            workosHostedDomain: undefined,
+          },
+        });
+      }
+    );
 
     it('keeps linked provider rows authoritative over legacy OAuth ID provenance', async () => {
       const user = await insertTestUser({
@@ -477,6 +480,30 @@ describe('User', () => {
         },
       });
     });
+
+    it.each(['oauth/google:', 'oauth/googleish:account', 'oauth/workos:account'])(
+      'does not infer a provider from malformed or unsupported legacy ID %s',
+      async id => {
+        const email = `invalid-legacy-${randomUUID()}@example.com`;
+        const user = await insertTestUser({
+          id,
+          google_user_email: email,
+          google_user_name: 'Invalid Legacy User',
+          normalized_email: email,
+          hosted_domain: 'unknown.example.com',
+        });
+
+        await expect(getAllUserProviders(email)).resolves.toEqual({
+          kind: 'found',
+          user: {
+            kiloUserId: user.id,
+            providers: [],
+            primaryEmail: email,
+            workosHostedDomain: undefined,
+          },
+        });
+      }
+    );
 
     it('does not infer a provider from an unknown legacy hosted domain', async () => {
       const user = await insertTestUser({

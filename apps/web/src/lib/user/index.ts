@@ -1949,9 +1949,8 @@ async function getUserProviderInfo(user: User): Promise<UserProviderLookupResult
 }
 
 function legacyProviderFromHostedDomain(user: User): AuthProviderId[] {
-  if (user.id.startsWith('oauth/google:')) return ['google'];
-  if (user.id.startsWith('oauth/github:')) return ['github'];
-  if (user.id.startsWith('oauth/gitlab:')) return ['gitlab'];
+  const legacyOAuthProvider = parseLegacyOAuthProvider(user.id);
+  if (legacyOAuthProvider) return [legacyOAuthProvider];
 
   switch (user.hosted_domain) {
     case hosted_domain_specials.non_workspace_google_account:
@@ -1972,6 +1971,18 @@ function legacyProviderFromHostedDomain(user: User): AuthProviderId[] {
       return ['email'];
     default:
       return [];
+  }
+}
+
+function parseLegacyOAuthProvider(userId: string): AuthProviderId | null {
+  const match = /^oauth\/(google|github|gitlab):(.+)$/.exec(userId);
+  switch (match?.[1]) {
+    case 'google':
+    case 'github':
+    case 'gitlab':
+      return match[1];
+    default:
+      return null;
   }
 }
 

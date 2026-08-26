@@ -1629,7 +1629,8 @@
       "cent_many": "céntimos",
       "dollar_many": "dólares",
       "costSpoken": "coste {{cost}}",
-      "costSpokenWithTime": "coste {{cost}}, {{time}}"
+      "costSpokenWithTime": "coste {{cost}}, {{time}}",
+      "pullRequest": "solicitud de extracción {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "No pudimos iniciar la configuración de la GitHub App. Inténtalo de nuevo.",
@@ -2938,7 +2939,9 @@
       "organizationUnavailable": "Organización no disponible",
       "selectDescription": "Elige una organización de tu perfil para continuar.",
       "selectOrganization": "Seleccionar una organización",
-      "unavailableDescription": "Esta organización ya no está disponible. Elige una de tu perfil para continuar."
+      "unavailableDescription": "Esta organización ya no está disponible. Elige una de tu perfil para continuar.",
+      "accessDeniedTitle": "Acceso denegado",
+      "accessDeniedDescription": "No tienes acceso a esta organización."
     },
     "creditActivity": {
       "emptyDescription": "Las compras, el uso y los ajustes de créditos de esta organización aparecerán aquí a medida que ocurran.",
@@ -3083,17 +3086,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "No se pudo abrir la tienda.",
-    "emailUs": "Envíanos un correo",
-    "gladMessage": "Una reseña en la tienda nos ayudaría muchísimo. ¡Gracias por usar Kilo!",
-    "gladTitle": "¡Nos alegra saberlo!",
-    "iLikeIt": "Me gusta",
-    "needsWork": "Necesita mejoras",
     "noEmailApp": "No hay ninguna app de correo disponible. Puedes escribirnos a {{email}}",
-    "promptTitle": "¿Qué te parece la app de Kilo?",
-    "rateKilo": "Valora Kilo",
-    "sorryMessage": "Cuéntanos qué se puede mejorar. ¡El ingeniero responsable de la app lee todos los informes!",
-    "sorryTitle": "¡Lamentamos oírlo!",
-    "emailSubject": "comentarios sobre la aplicación móvil"
+    "emailSubject": "comentarios sobre la aplicación móvil",
+    "neutralTitle": "Valora la app de Kilo",
+    "rateTheApp": "Valora la app",
+    "sendFeedback": "Enviar comentarios"
   },
   "authErrors": {
     "emailAlreadyUsed": "Ya existe una cuenta con este correo, pero con otro método de inicio de sesión. Prueba otro método o usa '$t(login.moreSignInOptions)'.",

@@ -2075,7 +2075,8 @@
       "dollar": "dalir",
       "dollar_other": "dalir",
       "costSpoken": "kostnaður {{cost}}",
-      "costSpokenWithTime": "kostnaður {{cost}}, {{time}}"
+      "costSpokenWithTime": "kostnaður {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ekki tókst að opna GitHub",
@@ -2913,16 +2914,10 @@
   "feedback": {
     "noEmailApp": "Ekkert tölvupóstforrit tiltækt. Þú getur náð í okkur á {{email}}",
     "couldNotOpenStore": "Ekki tókst að opna verslunina.",
-    "promptTitle": "Hvernig líkar þér Kilo-appið?",
-    "iLikeIt": "Mér líkar það",
-    "gladTitle": "Við erum glöð að heyra það!",
-    "gladMessage": "Umsögn í verslun myndi hjálpa okkur gríðarlega. Takk fyrir að nota Kilo!",
-    "rateKilo": "Metu Kilo",
-    "needsWork": "Þarfnast úrbóta",
-    "sorryTitle": "Okkur þykir leitt að heyra það!",
-    "sorryMessage": "Vinsamlega láttu okkur vita hvað þarf að bæta. Verkfræðingurinn sem sér um appið les hverja einustu skýrslu!",
-    "emailUs": "Sendu okkur tölvupóst",
-    "emailSubject": "Ábending um farsímaapp"
+    "emailSubject": "Ábending um farsímaapp",
+    "neutralTitle": "Metdu Kilo-forritið",
+    "rateTheApp": "Metdu forritið",
+    "sendFeedback": "Senda endurgjöf"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2927,9 @@
       "organizationUnavailable": "Félag ótiltækt",
       "selectDescription": "Veldu félag úr prófílnum þínum til að halda áfram.",
       "selectOrganization": "Veldu félag",
-      "unavailableDescription": "Þetta félag er ekki lengur tiltækt. Veldu eitt úr prófílnum þínum til að halda áfram."
+      "unavailableDescription": "Þetta félag er ekki lengur tiltækt. Veldu eitt úr prófílnum þínum til að halda áfram.",
+      "accessDeniedTitle": "Aðgangi neitað",
+      "accessDeniedDescription": "Þú hefur ekki aðgang að þessari stofnun."
     },
     "creditActivity": {
       "emptyDescription": "Kaup, notkun og kreditleiðréttingar fyrir þetta félag birtast hér þegar þær verða.",

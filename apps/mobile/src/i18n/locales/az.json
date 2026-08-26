@@ -2075,7 +2075,8 @@
       "dollar": "dollar",
       "dollar_other": "dollar",
       "costSpoken": "xərc {{cost}}",
-      "costSpokenWithTime": "xərc {{cost}}, {{time}}"
+      "costSpokenWithTime": "xərc {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub açıla bilmədi",
@@ -2913,16 +2914,10 @@
   "feedback": {
     "noEmailApp": "Mövcud e-poçt tətbiqi yoxdur. Bizə {{email}} ünvanında müraciət edə bilərsiniz",
     "couldNotOpenStore": "Mağaza açıla bilmədi.",
-    "promptTitle": "Kilo tətbiqini necə bəyənirsiniz?",
-    "iLikeIt": "Bəyənirəm",
-    "gladTitle": "Bunu eşitdiyimizə sevindik!",
-    "gladMessage": "Mağaza rəyi bizə çox kömək edərdi. Kilo istifadə etdiyiniz üçün təşəkkürlər!",
-    "rateKilo": "Kilo-ya qiymət ver",
-    "needsWork": "Təkmilləşdirmə lazımdır",
-    "sorryTitle": "Bunu eşitdiyimizə təəssüflənirik!",
-    "sorryMessage": "Zəhmət olmasa nəyin yaxşılaşdırılması lazım olduğunu bizə bildirin. Tətbiqə cavabdeh olan mühəndis hər hesabatı oxuyur!",
-    "emailUs": "Bizə e-poçt göndərin",
-    "emailSubject": "mobil tətbiq rəyi"
+    "emailSubject": "mobil tətbiq rəyi",
+    "neutralTitle": "Kilo tətbiqini qiymətləndirin",
+    "rateTheApp": "Tətbiqi qiymətləndirin",
+    "sendFeedback": "Rəy göndərin"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2927,9 @@
       "organizationUnavailable": "Təşkilat mövcud deyil",
       "selectDescription": "Davam etmək üçün profilinizdən bir təşkilat seçin.",
       "selectOrganization": "Təşkilat seçin",
-      "unavailableDescription": "Bu təşkilat artıq mövcud deyil. Davam etmək üçün profilinizdən birini seçin."
+      "unavailableDescription": "Bu təşkilat artıq mövcud deyil. Davam etmək üçün profilinizdən birini seçin.",
+      "accessDeniedTitle": "Giriş rədd edildi",
+      "accessDeniedDescription": "Bu təşkilata girişiniz yoxdur."
     },
     "creditActivity": {
       "emptyDescription": "Bu təşkilat üçün alışlar, istifadə və kredit düzəlişləri baş verdikcə burada görünəcək.",

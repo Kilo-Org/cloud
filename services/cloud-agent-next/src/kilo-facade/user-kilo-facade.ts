@@ -24,6 +24,7 @@ import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { UserId } from '../types/ids.js';
 import type { Env } from '../types.js';
 import { withDORetry } from '../utils/do-retry.js';
+import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { preflightAndAdmitPromptMessage } from '../session/queue-message.js';
 import { parseBasicKiloPrompt } from './basic-prompt.js';
 import {
@@ -772,11 +773,8 @@ async function defaultAdmitPrompt(params: {
   cloudAgentSessionId: string;
   request: SubmittedSessionMessageRequest;
 }): Promise<SessionMessageAdmissionResult> {
-  const id = params.env.CLOUD_AGENT_SESSION.idFromName(
-    `${params.userId}:${params.cloudAgentSessionId}`
-  );
   return withDORetry<DurableObjectStub<CloudAgentSession>, SessionMessageAdmissionResult>(
-    () => params.env.CLOUD_AGENT_SESSION.get(id),
+    () => resolveSessionStub(params.env, params.userId, params.cloudAgentSessionId),
     stub => stub.admitSubmittedMessage(params.request),
     'admitSubmittedMessage'
   );
@@ -875,14 +873,11 @@ async function defaultInterruptPrompt(params: {
   userId: string;
   cloudAgentSessionId: string;
 }): Promise<Awaited<ReturnType<CloudAgentSession['interruptExecution']>>> {
-  const id = params.env.CLOUD_AGENT_SESSION.idFromName(
-    `${params.userId}:${params.cloudAgentSessionId}`
-  );
   return withDORetry<
     DurableObjectStub<CloudAgentSession>,
     Awaited<ReturnType<CloudAgentSession['interruptExecution']>>
   >(
-    () => params.env.CLOUD_AGENT_SESSION.get(id),
+    () => resolveSessionStub(params.env, params.userId, params.cloudAgentSessionId),
     stub => stub.interruptExecution(),
     'interruptExecution'
   );
@@ -1492,10 +1487,7 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
   }
 
   private validateGlobalFeedProducer(source: GlobalFeedSource) {
-    const sessionDoId = this.env.CLOUD_AGENT_SESSION.idFromName(
-      `${source.userId}:${source.cloudAgentSessionId}`
-    );
-    const sessionStub = this.env.CLOUD_AGENT_SESSION.get(sessionDoId);
+    const sessionStub = resolveSessionStub(this.env, source.userId, source.cloudAgentSessionId);
     return sessionStub.validateKiloGlobalFeedProducer({
       kiloSessionId: source.kiloSessionId,
       wrapperRunId: source.wrapperRunId,

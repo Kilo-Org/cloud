@@ -122,6 +122,7 @@ const OPERATION_KEY = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 const USER_ID = 'test-user-123';
 const AUTH_TOKEN = 'test-auth-token';
 const CLOUD_AGENT_SESSION_ID = 'agent_12345678-1234-1234-1234-123456789abc';
+const WORKSPACE_SESSION_ID = 'workspace_12345678-1234-1234-1234-123456789abc';
 const KILO_SESSION_ID = 'ses_12345678901234567890123456';
 const INITIAL_MESSAGE_ID = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const ROW_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
@@ -205,6 +206,10 @@ function makeEnv(doStub: ReturnType<typeof makeDoStub>): Env {
       idFromName: vi.fn((name: string) => ({ toString: () => name })),
       get: vi.fn(() => doStub),
     } as unknown as Env['CLOUD_AGENT_SESSION'],
+    SANDBOX_SESSION: {
+      idFromName: vi.fn((name: string) => ({ toString: () => name })),
+      get: vi.fn(() => doStub),
+    } as unknown as Env['SANDBOX_SESSION'],
     HYPERDRIVE: {
       connectionString: 'postgres://session-create-test',
     } as Env['HYPERDRIVE'],
@@ -1550,6 +1555,25 @@ describe('createSessionWithLedger changed-intent rejection', () => {
       }),
     },
     {
+      name: 'the GitHub integration',
+      original: makeRequest({
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
+      retry: makeRequest({
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId: '123e4567-e89b-12d3-a456-426614174099',
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
+    },
+    {
       name: 'the model',
       retry: makeRequest({ agent: { mode: 'code', model: 'gpt-4' }, options: ORIGINAL_OPTIONS }),
     },
@@ -1878,6 +1902,30 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     });
   });
 
+  it('registers a clone-only workspace session on the sandbox-session namespace', async () => {
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 1 },
+    });
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    const sandboxSessionIdFromName = vi.spyOn(ctx.env.SANDBOX_SESSION, 'idFromName');
+    const sandboxSessionGet = vi.spyOn(ctx.env.SANDBOX_SESSION, 'get');
+    const cloudAgentSessionGet = vi.spyOn(ctx.env.CLOUD_AGENT_SESSION, 'get');
+    ctx.env.CONTROL_PLANE_IDS = USER_ID;
+
+    await expect(runCreate(ctx, cloneRequest())).resolves.toEqual({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+    });
+
+    expect(sandboxSessionIdFromName).toHaveBeenCalledWith(`${USER_ID}:${WORKSPACE_SESSION_ID}`);
+    expect(sandboxSessionGet).toHaveBeenCalledTimes(1);
+    expect(cloudAgentSessionGet).not.toHaveBeenCalled();
+    expect(doStub.registerSession).toHaveBeenCalledTimes(1);
+  });
+
   it('surfaces BAD_REQUEST session_clone_failed when the clone is rejected', async () => {
     createCliSessionMock.mockResolvedValue({ status: 'rejected', code: 'source_access_denied' });
     const doStub = makeDoStub();
@@ -2187,6 +2235,55 @@ describe('createSessionWithLedger clone reconciliation', () => {
       kiloSessionId: KILO_SESSION_ID,
       replayed: true,
     });
+  });
+
+  it('resumes a workspace clone with its persisted Vercel provider', async () => {
+    const request = cloneRequest();
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: await cloneRow({ cloudAgentSessionId: WORKSPACE_SESSION_ID, sandboxProvider: 'vercel' }),
+    });
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 1 },
+    });
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    await expect(runCreate(ctx, request)).resolves.toEqual({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
+        workspace: expect.objectContaining({ sandboxProvider: 'vercel' }),
+      })
+    );
+  });
+
+  it('rejects an unsupported persisted sandbox provider when resuming a clone', async () => {
+    const request = cloneRequest();
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: await cloneRow({ sandboxProvider: 'unsupported' }),
+    });
+    createCliSessionMock.mockResolvedValue({
+      status: 'ready',
+      clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 1 },
+    });
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+    const doStub = makeDoStub();
+
+    await expect(runCreate(makeContext(doStub), request)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'creation_in_progress',
+    });
+
+    expect(doStub.registerSession).not.toHaveBeenCalled();
   });
 
   it('settles a clone-only create completed when ownership and metadata are both present', async () => {

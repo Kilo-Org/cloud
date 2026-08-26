@@ -178,6 +178,11 @@ type PreservedFields = {
    * guard).
    */
   totalCostMicrodollars: number | undefined;
+  /**
+   * Sticky: WS payloads never carry the associated PR. Preserved so the
+   * tray `#N` mark and PR search survive a heartbeat and a snapshot.
+   */
+  associatedPr: ActiveSession['associatedPr'];
 };
 
 function readEnrichment(current: CachedActiveSession | undefined): PreservedFields {
@@ -193,6 +198,7 @@ function readEnrichment(current: CachedActiveSession | undefined): PreservedFiel
     lastActivityAt: current?.lastActivityAt,
     organizationId: current?.organizationId,
     totalCostMicrodollars: current?.totalCostMicrodollars,
+    associatedPr: current?.associatedPr,
   };
 }
 

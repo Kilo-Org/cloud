@@ -29,7 +29,7 @@ export type ResolveGitHubTokenResult =
 
 export async function resolveGitHubTokenForRepo(
   env: GitTokenServiceEnv,
-  params: { githubRepo: string; userId: string; orgId?: string }
+  params: { githubRepo: string; userId: string; orgId?: string; expectedIntegrationId?: string }
 ): Promise<ResolveGitHubTokenResult> {
   try {
     if (!env.GIT_TOKEN_SERVICE) {
@@ -107,6 +107,7 @@ type IssueCloudAgentGitHubSessionCapabilityParams = {
   userId: string;
   outboundContainerId: string;
   orgId?: string;
+  expectedIntegrationId?: string;
   allowUserAuthorization: boolean;
 };
 
@@ -120,12 +121,15 @@ type CloudAgentGitHubAuthResult =
 
 async function resolveLegacyInstallationAuthForRepo(
   env: GitTokenServiceEnv,
-  params: { githubRepo: string; userId: string; orgId?: string }
+  params: { githubRepo: string; userId: string; orgId?: string; expectedIntegrationId?: string }
 ): Promise<CloudAgentGitHubAuthResult> {
   const legacyParams = {
     githubRepo: params.githubRepo,
     userId: params.userId,
     ...(params.orgId !== undefined ? { orgId: params.orgId } : {}),
+    ...(params.expectedIntegrationId !== undefined
+      ? { expectedIntegrationId: params.expectedIntegrationId }
+      : {}),
   };
   const result = await resolveGitHubTokenForRepo(env, legacyParams);
   if (!result.success) return result;
@@ -147,6 +151,7 @@ export async function resolveCloudAgentGitHubAuthForRepo(
     githubRepo: string;
     userId: string;
     orgId?: string;
+    expectedIntegrationId?: string;
     allowUserAuthorization: boolean;
   }
 ): Promise<CloudAgentGitHubAuthResult> {
@@ -213,6 +218,9 @@ function resolveGitHubAuthFallbackForCapability(
     githubRepo: params.githubRepo,
     userId: params.userId,
     ...(params.orgId !== undefined ? { orgId: params.orgId } : {}),
+    ...(params.expectedIntegrationId !== undefined
+      ? { expectedIntegrationId: params.expectedIntegrationId }
+      : {}),
     allowUserAuthorization: params.allowUserAuthorization,
   });
 }

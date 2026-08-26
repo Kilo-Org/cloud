@@ -212,6 +212,52 @@ describe('github-integration-helpers', () => {
       ]);
     });
 
+    it('returns repositories from healthy installations when a sibling fetch fails', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-1',
+          repositories: [{ id: 1, name: 'api', full_name: 'acme-core/api', private: true }],
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          repositories: null,
+        }),
+      ]);
+      mockFetchGitHubRepositories.mockRejectedValue(new Error('GitHub unavailable'));
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          fullName: 'acme-core/api',
+          platformIntegrationId: 'integration-1',
+        }),
+      ]);
+    });
+
+    it('fails when no installation can provide repositories', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({ repositories: null }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          repositories: null,
+        }),
+      ]);
+      mockFetchGitHubRepositories.mockRejectedValue(new Error('GitHub unavailable'));
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+
+      await expect(fetchAllGitHubRepositoriesForOrganization('org-123')).rejects.toThrow(
+        'Failed to fetch GitHub repositories'
+      );
+    });
+
     it('returns integrationInstalled false when no integration exists', async () => {
       mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
       mockGetIntegrationForOrganization.mockResolvedValue(null);

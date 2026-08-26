@@ -206,7 +206,7 @@ async function fetchRepositoriesForIntegrations(
   }
 
   try {
-    const results = await Promise.all(
+    const settledResults = await Promise.allSettled(
       integrations.map(async integration => {
         if (!integration.platform_installation_id) return { repositories: [], syncedAt: null };
         const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
@@ -227,6 +227,12 @@ async function fetchRepositoriesForIntegrations(
         };
       })
     );
+    const results = settledResults
+      .filter(result => result.status === 'fulfilled')
+      .map(result => result.value);
+    if (results.length === 0) {
+      throw new Error('All GitHub repository fetches failed');
+    }
     return {
       integrationInstalled: true,
       repositories: results.flatMap(result => result.repositories),

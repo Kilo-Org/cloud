@@ -4,18 +4,27 @@ export type Person = SubOrganizationPeopleData['people'][number];
 
 export type AddEligibility =
   | { eligible: true }
-  | { eligible: false; reason: 'already-member' | 'already-invited' };
+  | { eligible: false; reason: 'not-parent-member' | 'already-member' | 'already-invited' };
 
 /**
- * Whether `person` may be invited into `targetOrganizationId`. A person who
- * already has a membership or a pending invitation there is never silently
- * overwritten — the add wizard shows them as a disabled, labeled row
- * instead of re-issuing (and possibly duplicating) an invite.
+ * Whether `person` may be added into `targetOrganizationId`. Adding an
+ * existing directory person to a child org goes through `setChildMemberships`
+ * (see `desiredChildOrganizationIds`), which requires the target to already
+ * be an accepted PARENT org member — a person with no `kiloUserId` (never
+ * signed up) or no accepted `parentMembership` fails that precondition for
+ * every target org, not just some, so it's checked before any per-org state.
+ * A person who passes that but already has a membership or a pending
+ * invitation in `targetOrganizationId` is never silently overwritten — the
+ * add wizard shows them as a disabled, labeled row instead of re-adding (and
+ * possibly duplicating) them.
  */
 export function computeAddEligibility(
   person: Person,
   targetOrganizationId: string
 ): AddEligibility {
+  if (person.kiloUserId == null || person.parentMembership == null) {
+    return { eligible: false, reason: 'not-parent-member' };
+  }
   if (person.memberships.some(membership => membership.organizationId === targetOrganizationId)) {
     return { eligible: false, reason: 'already-member' };
   }
@@ -25,6 +34,15 @@ export function computeAddEligibility(
   return { eligible: true };
 }
 
+const ADD_ELIGIBILITY_LABELS: Record<
+  Exclude<AddEligibility, { eligible: true }>['reason'],
+  string
+> = {
+  'not-parent-member': 'Must be a member of the parent organization first',
+  'already-member': 'Already a member',
+  'already-invited': 'Already invited',
+};
+
 /**
  * Human-readable reason `person` can't be added, or `null` if they're
  * eligible. Shared by the add wizard's preview step (disabled row label)
@@ -33,8 +51,52 @@ export function computeAddEligibility(
  */
 export function addEligibilityLabel(person: Person, targetOrganizationId: string): string | null {
   const eligibility = computeAddEligibility(person, targetOrganizationId);
-  if (eligibility.eligible) return null;
-  return eligibility.reason === 'already-member' ? 'Already a member' : 'Already invited';
+  return eligibility.eligible ? null : ADD_ELIGIBILITY_LABELS[eligibility.reason];
+}
+
+/**
+ * Whether `person` passes the `setChildMemberships` precondition at all —
+ * a whole-person check, independent of which target orgs are selected. A
+ * person who fails this can't be added to ANY child org through this
+ * action, since no other mutation exists to add them another way.
+ */
+export function personCanBeAddedToChildOrganizations(person: Person): boolean {
+  return person.kiloUserId != null && person.parentMembership != null;
+}
+
+/**
+ * Of `targetOrganizationIds`, the ones `person` can actually be added to —
+ * i.e. `computeAddEligibility` returns eligible. Drives both the add
+ * wizard's per-person "will be added to" count and the row it executes.
+ */
+export function eligibleAddTargetOrganizationIds(
+  person: Person,
+  targetOrganizationIds: string[]
+): string[] {
+  return targetOrganizationIds.filter(
+    organizationId => computeAddEligibility(person, organizationId).eligible
+  );
+}
+
+/**
+ * The full child-org membership set `person` should have after this add
+ * run. `organizations.members.setChildMemberships` is a diff/"set"
+ * operation per person, not additive — it reconciles away any existing
+ * `member`-role child membership omitted from `childOrganizationIds` — so
+ * every call must include `person`'s pre-existing child memberships (which
+ * this router's own query already excludes the parent org row from)
+ * alongside the newly eligible target orgs, or those existing memberships
+ * would be silently removed.
+ */
+export function desiredChildOrganizationIds(
+  person: Person,
+  newTargetOrganizationIds: string[]
+): string[] {
+  const ids = new Set(person.memberships.map(membership => membership.organizationId));
+  for (const organizationId of newTargetOrganizationIds) {
+    ids.add(organizationId);
+  }
+  return Array.from(ids);
 }
 
 /**

@@ -46,7 +46,38 @@ type Step = 'target' | 'invite';
  */
 export const PARENT_ORGANIZATION_LABEL = 'Parent organization';
 
-type OrgOption = { id: string; name: string };
+/**
+ * Mirrors the server's own, unconditional rule: `inviteUserToOrganization`
+ * (`apps/web/src/lib/organizations/organizations.ts`) throws whenever the
+ * target organization has a `parent_organization_id` set, *regardless* of
+ * who the inviting user is, and `organization-members-router.ts` maps that
+ * to this exact user-facing sentence. This is a hard organizational-
+ * topology constraint — not a per-viewer permission check — so this wizard
+ * reuses the server's own wording rather than inventing new copy for it,
+ * both in the target step's disabled child rows and in the defensive
+ * submit guard below.
+ */
+export const CHILD_ORG_DIRECT_INVITE_BLOCKED_MESSAGE =
+  'Child organizations manage membership through their parent organization — invite this person into the parent, then use "Add people to sub-organizations" to assign them to sub-organizations once they\'ve joined.';
+
+/**
+ * Only the organization this wizard was opened for (`parentOrganizationId`)
+ * can ever be a valid direct-invite target — every other id in
+ * `orgOptions` is one of its direct children, which
+ * `CHILD_ORG_DIRECT_INVITE_BLOCKED_MESSAGE` above rules out categorically.
+ * Exported as its own pure predicate, rather than inlined, so the
+ * defensive check `handleInvite` re-runs before ever calling
+ * `useInviteMember`'s mutation is directly testable on its own, independent
+ * of whatever DOM state (dis)allows reaching that call in practice.
+ */
+export function isDirectInviteTarget(
+  organizationId: string,
+  parentOrganizationId: string
+): boolean {
+  return organizationId === parentOrganizationId;
+}
+
+type OrgOption = { id: string; name: string; isChild: boolean };
 
 const STEP_TITLES: Record<Step, string> = {
   target: 'Step 1 of 2: Choose an organization',
@@ -59,11 +90,14 @@ const emailSchema = z.email();
  * Reports whether the viewer can invite into `organizationId`, and with
  * which roles, by mounting the same real per-org role context the
  * manage-members drawer and the other bulk wizards use — rather than a
- * dedicated access-check endpoint. Mounted once per candidate organization
- * (parent + every direct child) so the target step can disable ones the
- * viewer can't use *before* they're picked, which the existing wizards
- * never needed since they only ever resolve access for an org once it's
- * already selected.
+ * dedicated access-check endpoint. Only ever mounted for organizations that
+ * can receive a direct invite from *any* admin in the first place (i.e.
+ * the parent — see `CHILD_ORG_DIRECT_INVITE_BLOCKED_MESSAGE`); whether this
+ * particular viewer has access to invite into a child org is a moot
+ * question when no one can invite into a child org at all, so child orgs
+ * never mount this probe. Mounted before the org is picked (unlike the
+ * other bulk wizards, which only ever resolve access for an org once it's
+ * already selected) so the target step can disable it in advance.
  */
 function OrgAccessReporter({
   organizationId,
@@ -130,8 +164,8 @@ export function InvitePersonWizard({
 
   const orgOptions = useMemo<OrgOption[]>(
     () => [
-      { id: parentOrganizationId, name: PARENT_ORGANIZATION_LABEL },
-      ...children.map(child => ({ id: child.id, name: child.name })),
+      { id: parentOrganizationId, name: PARENT_ORGANIZATION_LABEL, isChild: false },
+      ...children.map(child => ({ id: child.id, name: child.name, isChild: true })),
     ],
     [parentOrganizationId, children]
   );
@@ -178,6 +212,17 @@ export function InvitePersonWizard({
 
   const handleInvite = () => {
     if (!targetOrganizationId || !canInviteIntoTarget) return;
+    // Belt-and-suspenders: the target step already disables every child
+    // org's radio unconditionally, so this should be unreachable, but this
+    // is an organizational-topology constraint the server enforces
+    // unconditionally (`inviteUserToOrganization`), not a soft permission
+    // check — so it's re-verified here independently of whatever UI state
+    // produced `targetOrganizationId`, instead of trusting the picker and
+    // letting the server's raw error reach the user.
+    if (!isDirectInviteTarget(targetOrganizationId, parentOrganizationId)) {
+      toast.error(CHILD_ORG_DIRECT_INVITE_BLOCKED_MESSAGE);
+      return;
+    }
     if (!isEmailValid) {
       toast.error('Please enter a valid email address');
       return;
@@ -217,9 +262,15 @@ export function InvitePersonWizard({
 
   return (
     <>
-      {orgOptions.map(option => (
-        <OrgAccessProbe key={option.id} organizationId={option.id} onResult={handleAccessResult} />
-      ))}
+      {orgOptions
+        .filter(option => !option.isChild)
+        .map(option => (
+          <OrgAccessProbe
+            key={option.id}
+            organizationId={option.id}
+            onResult={handleAccessResult}
+          />
+        ))}
 
       <WizardChrome stepTitle={STEP_TITLES[step]}>
         {step === 'target' && (
@@ -275,6 +326,39 @@ function TargetStep({
     <>
       <RadioGroup value={targetOrganizationId ?? undefined} onValueChange={onChangeTarget}>
         {orgOptions.map(option => {
+          // Child organizations are a hard, universal constraint — no
+          // viewer, not even a Kilo admin, can invite directly into one
+          // (see `CHILD_ORG_DIRECT_INVITE_BLOCKED_MESSAGE`) — so this
+          // branch never resolves through `accessByOrg` at all and is
+          // rendered distinctly (a permanent, categorical explanation)
+          // from the per-viewer "Checking access…"/"You can't invite
+          // here" pair below, which describe the viewer's own role and
+          // resolve asynchronously.
+          if (option.isChild) {
+            return (
+              <div
+                key={option.id}
+                className="flex flex-col gap-1 rounded-md border px-3 py-2 opacity-50"
+                aria-disabled="true"
+              >
+                <label
+                  htmlFor={`invite-person-target-${option.id}`}
+                  className="flex items-center gap-3"
+                >
+                  <RadioGroupItem
+                    value={option.id}
+                    id={`invite-person-target-${option.id}`}
+                    disabled
+                  />
+                  <span className="text-sm">{option.name}</span>
+                </label>
+                <p className="text-muted-foreground pl-7 text-xs leading-snug">
+                  {CHILD_ORG_DIRECT_INVITE_BLOCKED_MESSAGE}
+                </p>
+              </div>
+            );
+          }
+
           const availableRoles = accessByOrg.get(option.id);
           const isLoadingAccess = availableRoles === undefined;
           const canInvite = (availableRoles?.length ?? 0) > 0;

@@ -76,7 +76,13 @@ function DailyUsageLimitDisplay({ member }: DailyUsageLimitDisplayProps) {
 export const canManageMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
   isKiloAdmin || canManageOrganization(role);
 
-const canInviteMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
+// `ChildTeamsControl` below gates its own edit affordance on this exact
+// check; the add-people wizard's permission precheck mirrors it rather than
+// the stricter owner/billing_manager check `setChildMemberships` itself
+// enforces, so an admin who fails that server check still sees the same
+// per-row failure message an existing `ChildTeamsControl` click would give
+// them, instead of two different UIs disagreeing about who can try.
+export const canInviteMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
   canManageMembers(role, isKiloAdmin) || role === 'billing_manager';
 
 /**

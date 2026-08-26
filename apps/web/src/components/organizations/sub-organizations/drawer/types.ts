@@ -49,8 +49,12 @@ export type MemberManagementDrawerEntry =
       /**
        * Invites a brand-new person — someone with no existing membership or
        * invitation anywhere in this org tree, so they can't be seeded from
-       * the directory table the way `add-people`/`remove-people` are —
-       * into the parent org or any one of its direct children.
+       * the directory table the way `add-people`/`remove-people` are — into
+       * the parent org. Direct children are never a valid target here: a
+       * child org can only be reached by first inviting into the parent,
+       * then using `add-people` once the person appears in the directory —
+       * see `CHILD_ORG_DIRECT_INVITE_BLOCKED_MESSAGE` in
+       * `InvitePersonWizard.tsx`.
        */
       type: 'invite-person';
     };

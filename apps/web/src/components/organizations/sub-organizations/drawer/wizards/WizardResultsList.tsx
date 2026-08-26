@@ -14,12 +14,12 @@ export type ResultRow = {
 /**
  * Per-row Succeeded / Failed / Skipped display shared by both bulk-action
  * wizards. Every wizard's rows are ultimately "one action, one outcome" —
- * one person for the remove wizard, one (person, target org) pair for the
- * add wizard — so a single label/sublabel pair is enough for either; the add
- * wizard folds its target org into `sublabel` (e.g. "person@example.com →
- * Acme EMEA") rather than this component needing an org-specific column. If
- * a future wizard needs materially different columns, render its own list
- * instead of stretching this one.
+ * one person, for both the remove wizard and the add wizard — so a single
+ * label/sublabel pair is enough for either; the add wizard folds the target
+ * org(s) that person was actually added to into `sublabel` (e.g.
+ * "person@example.com → Acme Sales, Acme EMEA") rather than this component
+ * needing an org-specific column. If a future wizard needs materially
+ * different columns, render its own list instead of stretching this one.
  */
 export function WizardResultsList({
   rows,

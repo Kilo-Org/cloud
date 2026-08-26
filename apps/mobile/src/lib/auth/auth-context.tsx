@@ -230,9 +230,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         trackEvent('login');
         resetPurchaseErrorToastDedup();
         setToken(tokenValue);
-        // A prior account's confirmed image URIs must not auto-load for this
-        // new session.
+        // A prior account's confirmed image URIs and trusted link hosts must
+        // not carry into this new session. Sign-in over an existing session
+        // (an account switch with no sign-out) never runs the sign-out
+        // teardown, and both stores use one device-wide key.
         clearMarkdownImageConfirmMemory();
+        clearTrustedHosts();
       });
     },
     []

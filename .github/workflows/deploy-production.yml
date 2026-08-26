@@ -101,7 +101,7 @@ jobs:
       axiom_annotation_dataset: kilocode-app
     secrets:
       AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
-      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   promote-global-app:
     needs: [stage-global-app, check-production-db-startup, run-migrations]
@@ -109,7 +109,7 @@ jobs:
     with:
       deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}
     secrets:
-      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   resolve-worker-base:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}

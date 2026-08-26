@@ -217,6 +217,37 @@ describe('grouped unified session input contracts', () => {
 });
 
 describe('legacy live attachment input compatibility', () => {
+  it('accepts only the supported isolated Standard allocation', () => {
+    const input = {
+      prompt: 'Update the repository',
+      mode: 'code',
+      model: 'claude-sonnet-4-5-20250929',
+      githubRepo: 'acme/repo',
+    };
+
+    expect(
+      PrepareSessionInput.safeParse({ ...input, sandboxAllocation: 'isolated-standard' }).success
+    ).toBe(true);
+    expect(PrepareSessionInput.safeParse({ ...input, sandboxAllocation: 'standard' }).success).toBe(
+      false
+    );
+    expect(
+      PrepareSessionInput.safeParse({
+        ...input,
+        devcontainer: true,
+        autoInitiate: true,
+        sandboxAllocation: 'isolated-standard',
+      }).success
+    ).toBe(false);
+    expect(
+      PrepareSessionInput.safeParse({
+        ...input,
+        createdOnPlatform: 'code-review',
+        sandboxAllocation: 'isolated-standard',
+      }).success
+    ).toBe(false);
+  });
+
   it('accepts a GitHub integration id only with a legacy GitHub repository', () => {
     const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
     const input = {

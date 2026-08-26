@@ -123,6 +123,7 @@ export type SandboxId =
   | `bot-${string}`
   | `ubt-${string}`
   | `ses-${string}`
+  | `istd-${string}`
   | `crv-${string}`
   | `dind-${string}`
   | `${string}__${string}`

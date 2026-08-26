@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { BUILTIN_AGENT_MODES, Limits } from '../schema.js';
+import { isValidSandboxId } from '../sandbox-id.js';
 import type { SandboxId } from '../types.js';
 
 /**
@@ -497,10 +498,7 @@ export const MetadataSchema = z.object({
   branchName: z.string().optional(),
   sandboxId: z
     .string()
-    .refine(
-      s => /^(ses|crv|dind|org|usr|bot|ubt)-[0-9a-f]+$/.test(s) || s.includes('__'),
-      'Invalid sandboxId format'
-    )
+    .refine(isValidSandboxId, 'Invalid sandboxId format')
     .transform(s => s as SandboxId)
     .optional(),
   devcontainer: z

@@ -173,7 +173,7 @@ function SelectPeopleStep({
         value={search}
         onChange={event => onSearchChange(event.target.value)}
       />
-      <ul className="divide-border max-h-96 divide-y overflow-y-auto rounded-md border">
+      <ul className="divide-border flex-1 min-h-0 divide-y overflow-y-auto rounded-md border">
         {people.map(person => (
           <li key={person.identityKey} className="flex items-center gap-3 px-3 py-2">
             <Checkbox
@@ -217,7 +217,7 @@ function TargetStep({
 }) {
   return (
     <>
-      <ul className="divide-border max-h-96 divide-y overflow-y-auto rounded-md border">
+      <ul className="divide-border flex-1 min-h-0 divide-y overflow-y-auto rounded-md border">
         {children.map(child => (
           <li key={child.id} className="flex items-center gap-3 px-3 py-2">
             <Checkbox
@@ -291,7 +291,7 @@ function PreviewStep({
           `setChildMemberships` precondition is flagged once, without a
           per-org breakdown, since no selection of target orgs changes their
           outcome. */}
-      <ul className="divide-border max-h-80 divide-y overflow-y-auto rounded-md border">
+      <ul className="divide-border flex-1 min-h-0 divide-y overflow-y-auto rounded-md border">
         {selectedPeople.map(person => {
           const isParentMember = personCanBeAddedToChildOrganizations(person);
           return (

@@ -214,7 +214,7 @@ function SelectPeopleStep({
 }) {
   return (
     <>
-      <ul className="divide-border max-h-96 divide-y overflow-y-auto rounded-md border">
+      <ul className="divide-border flex-1 min-h-0 divide-y overflow-y-auto rounded-md border">
         {people.map(person => (
           <li key={person.identityKey} className="flex items-center gap-3 px-3 py-2">
             <Checkbox
@@ -282,7 +282,7 @@ function PreviewStep({
         cannot be undone — they will need a new invitation to rejoin.
       </p>
 
-      <ul className="divide-border max-h-80 divide-y overflow-y-auto rounded-md border">
+      <ul className="divide-border flex-1 min-h-0 divide-y overflow-y-auto rounded-md border">
         {rows.map(({ person, target, disabledReason }) => (
           <li
             key={person.identityKey}

@@ -20,6 +20,11 @@ export type ResultRow = {
  * "person@example.com → Acme Sales, Acme EMEA") rather than this component
  * needing an org-specific column. If a future wizard needs materially
  * different columns, render its own list instead of stretching this one.
+ *
+ * Renders a Fragment, not its own wrapping element — like every other step
+ * component in these wizards, it relies on being rendered directly inside
+ * `WizardChrome`'s flex column for its layout (padding, gap, and the row
+ * list's `flex-1` fill-and-scroll behavior).
  */
 export function WizardResultsList({
   rows,
@@ -42,7 +47,7 @@ export function WizardResultsList({
   const isDone = !isRunning && progress.completed >= progress.total;
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <>
       <div className="space-y-2">
         <p className="text-muted-foreground text-sm">
           {isRunning
@@ -56,7 +61,7 @@ export function WizardResultsList({
         />
       </div>
 
-      <ul className="divide-border divide-y rounded-md border">
+      <ul className="divide-border flex-1 min-h-0 divide-y overflow-y-auto rounded-md border">
         {rows.map((row, index) => {
           const outcome = outcomes[index];
           return (
@@ -83,7 +88,7 @@ export function WizardResultsList({
           Done
         </Button>
       </div>
-    </div>
+    </>
   );
 }
 

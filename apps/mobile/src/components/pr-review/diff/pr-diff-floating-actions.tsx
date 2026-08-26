@@ -102,7 +102,7 @@ export function PrDiffFloatingActions({
       className="absolute inset-x-0 bottom-0 items-center gap-2 px-4 pt-3"
       style={{ paddingBottom: 24 + insets.bottom }}
     >
-      <View className="w-full gap-2 rounded-2xl border border-border bg-background px-3 py-3 shadow-lg shadow-black/10">
+      <View className="w-full gap-2 rounded-2xl border border-border bg-background px-3 py-3 shadow-lg shadow-[#0000001A]">
         {showSelectionAction ? (
           <View className="flex-row items-center gap-2">
             <Text className="flex-1 text-xs text-muted-foreground" numberOfLines={1}>

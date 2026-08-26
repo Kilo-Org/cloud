@@ -235,6 +235,20 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     title: 'Could not confirm the Pylon deletion reply',
     action: 'Open the ticket, check for the deletion reply, then Retry or Mark done with evidence.',
   },
+  completion_email_unavailable: {
+    title: 'Completion email provider is not configured',
+    action: 'Repair the Mailgun configuration, then use Retry to send the completion email.',
+  },
+  completion_email_rejected: {
+    title: 'Completion email recipient was rejected',
+    action:
+      'Investigate the recipient address and NeverBounce result, then Mark done with evidence when appropriate.',
+  },
+  completion_email_ambiguous: {
+    title: 'Completion email delivery is ambiguous',
+    action:
+      'Check Mailgun delivery records without resending, then Mark done with evidence when the outcome is confirmed.',
+  },
   ownership_mismatch: {
     title: 'KiloClaw instance is not owned by this user',
     action:

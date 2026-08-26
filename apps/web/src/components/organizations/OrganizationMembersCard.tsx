@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getInitialsFromName } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -61,9 +63,23 @@ const formatDate = (dateString: string) => {
 
 type DailyUsageLimitDisplayProps = {
   member: OrganizationMemberResponse;
+  isSalesDemo: boolean;
 };
 
-function DailyUsageLimitDisplay({ member }: DailyUsageLimitDisplayProps) {
+function DailyUsageLimitDisplay({ member, isSalesDemo }: DailyUsageLimitDisplayProps) {
+  if (
+    isSalesDemo &&
+    member.dailyUsageLimitUsd !== null &&
+    'currentDailyUsageUsd' in member &&
+    member.currentDailyUsageUsd !== null
+  ) {
+    return (
+      <span className="tabular-nums">
+        ${member.currentDailyUsageUsd.toFixed(2)} / ${member.dailyUsageLimitUsd.toFixed(2)}
+      </span>
+    );
+  }
+
   if (member.dailyUsageLimitUsd !== null) {
     return <span>Daily limit: ${member.dailyUsageLimitUsd.toFixed(2)}</span>;
   }
@@ -668,7 +684,13 @@ export function OrganizationAdminMembers({
                       className="flex items-center justify-between border-b pb-4 last:border-b-0"
                     >
                       <div className="flex flex-1 items-center justify-between gap-4">
-                        <div className="flex-1 space-y-1">
+                        {member.status === 'active' && (
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={member.imageUrl ?? undefined} alt={member.name} />
+                            <AvatarFallback>{getInitialsFromName(member.name)}</AvatarFallback>
+                          </Avatar>
+                        )}
+                        <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center gap-2">
                             {member.status === 'active' && member.name ? (
                               showAdminLinks ? (
@@ -680,7 +702,7 @@ export function OrganizationAdminMembers({
                                   <UserCog className="h-3 w-3" />
                                 </Link>
                               ) : (
-                                <span className="font-medium">{member.name}</span>
+                                <span className="min-w-0 truncate font-medium">{member.name}</span>
                               )
                             ) : (
                               <span className="text-muted-foreground italic">
@@ -693,7 +715,9 @@ export function OrganizationAdminMembers({
                               member={member}
                             />
                           </div>
-                          <p className="text-muted-foreground text-sm">{member.email}</p>
+                          <p className="text-muted-foreground min-w-0 truncate text-sm">
+                            {member.email}
+                          </p>
                           {member.status === 'active' && groupsQuery.data?.access === 'manager' && (
                             <div className="flex flex-wrap gap-1 pt-1">
                               {groupsQuery.data.groups
@@ -709,7 +733,10 @@ export function OrganizationAdminMembers({
                             <span>
                               Joined: {member.inviteDate ? formatDate(member.inviteDate) : 'N/A'}
                             </span>
-                            <DailyUsageLimitDisplay member={member} />
+                            <DailyUsageLimitDisplay
+                              member={member}
+                              isSalesDemo={organizationData.settings.is_sales_demo === true}
+                            />
                           </div>
                           <ChildTeamsControl
                             organization={organizationData}

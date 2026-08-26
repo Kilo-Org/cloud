@@ -38,7 +38,9 @@
     "retry": "Prøv igjen",
     "search": "Søk etter språk",
     "noMatches": "Ingen språk samsvarer",
-    "deviceLanguage": "Enhetens språk"
+    "deviceLanguage": "Enhetens språk",
+    "current": "Gjeldende",
+    "allLanguages": "Alle språk"
   },
   "login": {
     "welcome": "Velkommen til Kilo",
@@ -115,7 +117,7 @@
     "bonusCreditsExpiring": "{{amount}} i bonuspoeng utløper {{date}}",
     "creditBalanceEmpty": "Kredittsaldoløpet ditt er tomt. Kreditter administreres utenfor iOS-appen for denne kontoen.",
     "signOutTitle": "Logge ut?",
-    "signOutMessage": "Du må logge på igjen for å få tilgang til arbeidsområdet ditt.",
+    "signOutMessage": "Du må logge inn igjen for å få tilgang til arbeidsområdet ditt.",
     "signOutConfirm": "Logg ut",
     "deleteAccountTitle": "Slette kontoen?",
     "deleteAccountMessage": "Dette sletter kontoen din permanent og logger deg ut. Vi sender en bekreftelseskode på e-post.",
@@ -148,7 +150,9 @@
     "appearanceSystem": "System",
     "appearanceLight": "Lys",
     "appearanceDark": "Mørk",
-    "account": "Konto"
+    "account": "Konto",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request utilgjengelig",
@@ -784,7 +788,7 @@
     },
     "attachmentPicker": {
       "takePhoto": "Ta bilde",
-      "photoLibrary": "Bildebibliotek",
+      "photoLibrary": "Fotobibliotek",
       "files": "Filer",
       "cameraAccessDisabled": "Kameratilgang deaktivert",
       "cameraAccessMessage": "Tillat kameratilgang i Innstillinger for å ta et bilde."
@@ -829,7 +833,7 @@
       "managedByAdmin": "Fakturering administreres av organisasjonsadministratoren din.",
       "couldNotLoad": "Kunne ikke laste faktureringsinformasjon",
       "manageOnWeb": "Administrer fakturering på nettet",
-      "commitPlan": "Bindende plan",
+      "commitPlan": "commit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Den siste bindende perioden din slutter {{date}}. Fortsett som Standard til {{price}}, eller slutten på hosting.",
       "freeTrial": "Gratis prøveperiode",
@@ -846,7 +850,7 @@
       "trialDaysRemaining": "Prøveperiode: {{remaining}}",
       "trialEndingSoon": "Prøveperioden slutter snart: {{remaining}}",
       "planName": {
-        "commit": "Bindende plan",
+        "commit": "commit",
         "standard": "Standard"
       }
     },
@@ -936,7 +940,7 @@
       "couldNotLoad": "Kunne ikke laste modeller",
       "clearSearch": "Tøm søk",
       "noMatches": "Ingen modeller samsvarer med søket ditt",
-      "noModels": "Ingen modeller tilgjengelig",
+      "noModels": "Ingen modeller tilgjengelige",
       "noModelsDescription": "Modeller vises her når de blir tilgjengelige.",
       "noResultsFor": "Ingen resultater for \"{{query}}\"",
       "recommended": "Anbefalt"
@@ -1245,7 +1249,7 @@
       "allRepositories": "Alle repositorier",
       "bitbucketNoRepositoriesDescription": "Ingen repositorier er tilgjengelige i dette Bitbucket-arbeidsområdet.",
       "bitbucketSetup": "Bitbucket-oppsett",
-      "couldNotOpenGithubSettings": "Kunne ikke åpne GitHub App-innstillinger",
+      "couldNotOpenGithubSettings": "Kunne ikke åpne GitHub-appinnstillingene",
       "gitlabNoRepositoriesDescription": "Du må kanskje gi tilgang til flere grupper eller prosjekter på GitLab.",
       "installGithubApp": "Installer GitHub-appen på repositorier",
       "installGithubAppDescription": "Gi Kilo GitHub-appen tilgang til repositoriene du vil skal gjennomgås.",
@@ -1260,7 +1264,7 @@
       "roast": "Brutalt ærlig, underholdende så",
       "strict": "Marker alt, hold en høy standard"
     },
-    "title": "Code Reviewer",
+    "title": "Kodeanmelder",
     "reviewDetail": {
       "title": "Gjennomgang",
       "cancelTitle": "Avbryte gjennomgangen?",
@@ -1300,7 +1304,7 @@
     "reviewMemory": {
       "title": "Gjennomgangsminne",
       "couldNotLoadMore": "Kunne ikke laste mer",
-      "retryLoadingMore": "Prøv å laste mer på nytt",
+      "retryLoadingMore": "Prøv å laste mer igjen",
       "loading": "Laster gjennomgangsminne",
       "couldNotLoad": "Kunne ikke laste gjennomgangsminne",
       "off": "Gjennomgangsminne er av",
@@ -1404,7 +1408,7 @@
       "noDecision": "Ingen avgjørelse",
       "noResult": "Ingen resultat"
     },
-    "eyebrow": "Code Reviewer",
+    "eyebrow": "Kodeanmelder",
     "updateFailed": "Kunne ikke oppdatere anmelderen",
     "configSaveFailed": "Kunne ikke lagre anmeldelseskonfigurasjonen",
     "status": {
@@ -1611,7 +1615,7 @@
       "openFindingsDetail": "{{critical}} kritiske, {{high}} høye",
       "confirmedExploitable": "Bekreftet utnyttbar",
       "confirmedExploitableDetail": "Prosjektrisiko bekreftet av analyse",
-      "needsReview": "Trenger din vurdering",
+      "needsReview": "Trenger din gjennomgang",
       "needsReviewDetail": "Menneskelig avgjørelse kreves",
       "analysisIncomplete": "Analysen er ikke fullført",
       "analysisIncompleteDetail": "Prosjektrisikoen er fortsatt ukjent",
@@ -1660,18 +1664,18 @@
       "noPatchAvailable": "Ingen lapp tilgjengelig",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "Repository",
+      "repository": "Repositorium",
       "manifest": "Manifest",
       "detected": "Oppdaget",
       "updated": "Oppdatert",
-      "fixed": "Rettet",
+      "fixed": "Fikset",
       "slaDeadline": "SLA-frist",
       "sourceRecord": "Kildepost",
       "source": "Kilde",
       "sourceId": "Kilde-ID",
       "viewAdvisory": "Vis rådgivning på GitHub",
       "statusSuperseded": "Erstattet",
-      "statusFixed": "Rettet",
+      "statusFixed": "Fikset",
       "statusOpen": "Åpen",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "en rettelse er allerede startet",
@@ -1685,19 +1689,19 @@
       "title": "Innstillinger",
       "couldNotLoadSettings": "Kunne ikke laste inn Security Agent-innstillinger",
       "couldNotLoadPermissions": "Kunne ikke laste inn tillatelser",
-      "couldNotLoadRepositories": "Kunne ikke laste inn repositories",
-      "securityAgent": "Security Agent",
+      "couldNotLoadRepositories": "Kunne ikke laste repositorier",
+      "securityAgent": "Sikkerhetsagent",
       "enabled": "Aktivert",
       "disabled": "Deaktivert",
       "on": "På",
       "off": "Av",
-      "allRepositories": "Alle repositories",
+      "allRepositories": "Alle repositorier",
       "repositoriesCount_one": "{{displayCount}} repository valgt",
       "repositoriesCount": "{{displayCount}} repositories valgt",
       "repositoriesCount_other": "{{displayCount}} repositories valgt",
-      "selectRepositories": "Velg repositories",
+      "selectRepositories": "Velg repositorier",
       "selectRepositoriesSubtitle": "Velg hvilke repositories Security Agent overvåker",
-      "repositories": "Repositories",
+      "repositories": "Repositorier",
       "modelsAndAnalysis": "Modeller og analyse",
       "analysisModeSubtitle": "{{mode}}-analyse",
       "automation": "Automatisering",
@@ -1730,7 +1734,7 @@
       "attemptNumber": "Forsøk #{{number}}",
       "startedBy": "Startet av",
       "model": "Modell",
-      "branch": "Branch",
+      "branch": "Gren",
       "queued": "Utbedring i kø",
       "retryQueued": "Utbedringsforsøk i kø",
       "timeline": {
@@ -1751,7 +1755,7 @@
       "modeAuto": "Auto",
       "modeShallow": "Grunn",
       "modeDeep": "Dyp",
-      "couldNotLoadModels": "Kunne ikke laste inn modeller",
+      "couldNotLoadModels": "Kunne ikke laste modeller",
       "triageModel": "Triage-modell",
       "analysisModel": "Analysemodell",
       "remediationModel": "Utbedringsmodell"
@@ -1796,10 +1800,10 @@
       "clearFilters": "Fjern filtre"
     },
     "scopeList": {
-      "title": "Security Agent",
-      "couldNotLoad": "Kunne ikke laste inn organisasjoner",
+      "title": "Sikkerhetsagent",
+      "couldNotLoad": "Kunne ikke laste organisasjoner",
       "personal": "Personlig",
-      "personalSubtitle": "Dine egne repositories"
+      "personalSubtitle": "Dine egne repositorier"
     },
     "commandRetry": {
       "discard": "Forkast"
@@ -1809,7 +1813,7 @@
       "nextRemediationInProgress": "Utbedring pågår",
       "nextRetryRemediation": "Prøv utbedring på nytt tilgjengelig",
       "nextRemediationAvailable": "Utbedring tilgjengelig",
-      "retryAnalysis": "Prøv analyse på nytt",
+      "retryAnalysis": "Prøv analysen på nytt",
       "runAnalysis": "Kjør analyse",
       "nextNeedsManualReview": "Trenger manuell gjennomgang",
       "nextViewDetails": "Vis detaljer",
@@ -1845,7 +1849,7 @@
       "unavailable": "Revisjonsrapport utilgjengelig",
       "unavailableDescription": "Bare organisasjonseiere og faktureringsansvarlige kan se revisjonsrapporter. Be en eier eller faktureringsansvarlig om å gi deg tilgang.",
       "queryFailed": "Rapportspørringen ble ikke fullført. Prøv igjen.",
-      "checkConnection": "Sjekk forbindelsen og prøv igjen."
+      "checkConnection": "Sjekk tilkoblingen og prøv igjen."
     },
     "notifications": {
       "couldNotLoad": "Kunne ikke laste inn varslingsinnstillinger",
@@ -1866,18 +1870,18 @@
       "title": "Varsler"
     },
     "repositories": {
-      "allRepositories": "Alle repositories",
+      "allRepositories": "Alle repositorier",
       "couldNotLoad": "Kunne ikke laste inn repository-innstillinger",
-      "couldNotLoadRepositories": "Kunne ikke laste inn repositories",
-      "couldNotOpenGithubSettings": "Kunne ikke åpne GitHub App-innstillinger",
+      "couldNotLoadRepositories": "Kunne ikke laste repositorier",
+      "couldNotOpenGithubSettings": "Kunne ikke åpne GitHub-appinnstillingene",
       "githubAppSettings": "GitHub App-innstillinger",
       "manageAccess": "Administrer GitHub App-tilgang",
       "noRepositories": "Ingen repositories",
       "noRepositoriesDescription": "Gi Kilo GitHub App tilgang til repositories",
       "readOnly": "Bare organisasjonseiere og faktureringsansvarlige kan endre disse innstillingene.",
       "selectAtLeastOne": "Velg minst ett repository.",
-      "selectedRepositories": "Valgte repositories",
-      "title": "Repositories"
+      "selectedRepositories": "Valgte repositorier",
+      "title": "Repositorier"
     },
     "scopeEntry": {
       "connectDescription": "Installer Kilo GitHub App for å synkronisere Dependabot-varsler automatisk og administrere sikkerhetsfunn på tvers av repositories dine.",
@@ -1892,7 +1896,7 @@
     },
     "queuedActionUntracked": "En handling i kø kunne ikke lenger spores. Oppdater for å se den nyeste tilstanden.",
     "initialSyncAdmissionFailed": "Security Agent ble aktivert, men den første synkroniseringen kunne ikke settes i kø. Synkroniser igjen.",
-    "title": "Security Agent",
+    "title": "Sikkerhetsagent",
     "commands": {
       "findingAlreadyDismissed": "Funnet er allerede avvist",
       "findingDismissed": "Funnet er avvist",
@@ -1948,7 +1952,7 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "Rettet før fristen",
-      "fixed": "Rettet",
+      "fixed": "Fikset",
       "fixedOn": "Rettet {{date}}",
       "resolutionRecorded": "Løsning registrert",
       "superseded": "Erstattet",
@@ -2033,7 +2037,7 @@
       "searching": "Søker",
       "searchSessions": "Søk i økter",
       "searchSessionsPlaceholder": "Søk i økter...",
-      "clearSearch": "Fjern søk",
+      "clearSearch": "Tøm søk",
       "clearFilters": "Fjern filtre"
     },
     "sessionList": {
@@ -2119,7 +2123,12 @@
       "couldNotLoadThisSession": "Kunne ikke laste inn denne økten",
       "cloneFailed": "Kunne ikke klone denne økten.",
       "cloneFailedRetry": "Kunne ikke klone denne økten. Prøv igjen.",
-      "connectRepositoryToContinue": "Koble til et repository for å fortsette."
+      "connectRepositoryToContinue": "Koble til et repository for å fortsette.",
+      "notEnoughCredits": "Ikke nok kreditt til å kjøre Cloud Agent. Legg til kreditt og prøv igjen.",
+      "previousTaskFinishing": "Den forrige oppgaven er fortsatt i gang. Vent et øyeblikk.",
+      "serviceUnavailable": "Tjenesten er utilgjengelig akkurat nå. Prøv igjen.",
+      "connectionTrouble": "Tilkoblingsproblemer. Prøv igjen om et øyeblikk.",
+      "modelUnavailable": "Denne modellen er ikke tilgjengelig for Cloud Agent. Velg en annen modell og prøv igjen."
     },
     "remoteSession": {
       "failedToCreate": "Klarte ikke å opprette ekstern økt",
@@ -2142,7 +2151,7 @@
     },
     "newSession": {
       "title": "Ny økt",
-      "repository": "Repository",
+      "repository": "Repositorium",
       "couldNotLoadRepositories": "Kunne ikke laste inn repositories",
       "connectGithub": "Koble til GitHub",
       "connectGithubDescription": "Koble til GitHub i nettleseren, og kom deretter tilbake hit for å velge et repository.",
@@ -2176,7 +2185,8 @@
       "discardDraftMessage": "Forespørselen din vil gå tapt.",
       "keepEditing": "Fortsett å redigere",
       "discard": "Forkast",
-      "discardFailed": "Kunne ikke forkaste utkastet. Prøv igjen."
+      "discardFailed": "Kunne ikke forkaste utkastet. Prøv igjen.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Oppdaterte {{displayCount}} fil",
@@ -2226,7 +2236,7 @@
       "runOn": "Kjør på",
       "runOnAccessibility": "Kjør på: {{label}}",
       "couldNotLoad": "Kunne ikke laste inn instanser",
-      "couldNotLoadDescription": "Sjekk forbindelsen og prøv igjen.",
+      "couldNotLoadDescription": "Sjekk tilkoblingen og prøv igjen.",
       "cloudAgent": "Cloud Agent",
       "loading": "Laster…",
       "cloudAgentDescription": "Kjør på Kilos skybaserte sandkasse",
@@ -2514,7 +2524,7 @@
       "photoLibrary": "Fotobibliotek",
       "files": "Filer",
       "cameraAccessDisabled": "Kameratilgang deaktivert",
-      "cameraAccessMessage": "Gi kameratilgang i Innstillinger for å ta et bilde.",
+      "cameraAccessMessage": "Tillat kameratilgang i Innstillinger for å ta et bilde.",
       "couldNotOpenPhotoPicker": "Kunne ikke åpne fotovelegeren. Start Kilo på nytt og prøv igjen.",
       "maxFilesAllowed": "Maksimum {{displayCount}} filer tillatt",
       "onlyAddingFiles": "Legger bare til {{accepted}} av {{total}} filer (maks {{max}})"
@@ -2585,7 +2595,7 @@
       "tokensUsage": "Kontekst {{used}} av {{window}} tokens, {{percentage}} brukt",
       "title": "Kontekstbruk",
       "used": "Brukt",
-      "remaining": "Gjenstående",
+      "remaining": "Gjenstår",
       "provider": "Leverandør",
       "totalCost": "Total kostnad",
       "usageReflectsLatest": "Bruken gjenspeiler det siste fullførte assistentsvaret.",
@@ -2609,7 +2619,7 @@
       "open": "åpen pull request",
       "closed": "lukket pull request",
       "merged": "slått sammen pull request",
-      "draft": "kladd pull request",
+      "draft": "Utkast til pull request",
       "updating": "Oppdaterer, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2617,7 +2627,7 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "Kunne ikke laste kontoen din",
-    "couldNotLoadAccountDescription": "Sjekk tilkoblingen din og prøv igjen.",
+    "couldNotLoadAccountDescription": "Sjekk tilkoblingen og prøv igjen.",
     "couldNotLoadPrivacy": "Kunne ikke laste personvernvalg",
     "couldNotLoadPrivacyDescription": "Sjekk enhetens sikkerhetsinnstillinger og prøv igjen.",
     "contentReady": "Innhold klart",
@@ -2631,7 +2641,7 @@
     "billingPage": "faktureringsside"
   },
   "deviceSessions": {
-    "couldNotLoad": "Kunne ikke laste økter",
+    "couldNotLoad": "Kunne ikke laste inn økter",
     "couldNotLoadDescription": "Dine aktive økter er utilgjengelige til dette lastes.",
     "currentDeviceUnidentified": "Gjeldende enhet kunne ikke identifiseres",
     "noSessions": "Ingen aktive økter",
@@ -2639,7 +2649,7 @@
     "onlyKiloAppSignIns": "Kun Kilo-appinnlogginger vises her. Redigerings- og CLI-innlogginger er ikke listet.",
     "signedIn": "Logget inn {{signedIn}} · Sist sett {{lastSeen}}",
     "thisDevice": "Denne enheten",
-    "title": "Enhetsøkter",
+    "title": "Enhetssesjoner",
     "viewProfile": "Vis profil",
     "signOutThisDevice": "Logg ut denne enheten",
     "signOutThisSession": "Logg ut denne økten",
@@ -2661,16 +2671,11 @@
   "home": {
     "couldNotLoadSessions": "Kunne ikke laste økter",
     "couldNotLoadActiveSessions": "Kunne ikke laste aktive økter",
-    "agentSessions": "Agentøkter",
-    "showingSavedSessions": "Viser lagrede økter — sanntidsstatus kan være utdatert",
-    "startNewAgentSession": "Start en ny Kilo Agent-økt",
-    "aiCodingSessions": "AI-kodeøkter",
-    "startCodingTaskFromPhone": "Start en kodeoppgave fra telefonen din eller fortsett en økt fra CLI-en din.",
-    "tryIt": "Prøv det",
+    "agentSessions": "Agentsesjoner",
     "newCodingTask": "Ny kodeoppgave",
     "explore": "Utforsk",
     "seeAll": "Se alle",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Lukk {{filename}}",
@@ -2811,7 +2816,7 @@
     "unavailableDescription": "Kilo Pass er ikke tilgjengelig som et kjøp i appen på Android. Administrer det på nettet.",
     "webManagementDescription": "Denne Kilo Pass-en administreres på nettet.",
     "legalDisclosure": "Kilo Pass er et automatisk fornybart månedsabonnement. Betaling belastes Apple-ID-en din ved bekreftelse av kjøpet. Abonnementet fornyes automatisk hver måned til prisen som vises, med mindre det kanselleres minst 24 timer før slutten av gjeldende periode. Administrer eller kanseller når som helst i App Store-kontoinnstillingene.",
-    "legalPrivacyPolicy": "Personvernpolicy",
+    "legalPrivacyPolicy": "Personvernerklæring",
     "legalTermsOfUse": "Bruksvilkår (EULA)",
     "purchaseDifferentAccount": "Dette App Store-kjøpet er ikke koblet til Kilo-kontoen din. Logg på Apple-kontoen som ble brukt for kjøpet, og prøv igjen.",
     "restoreFailed": "Kunne ikke gjenopprette kjøp. Prøv igjen.",
@@ -2922,7 +2927,7 @@
   "organization": {
     "boundary": {
       "backToProfile": "Tilbake til profil",
-      "loadErrorMessage": "Sjekk tilkoblingen din og prøv igjen.",
+      "loadErrorMessage": "Sjekk tilkoblingen og prøv igjen.",
       "loadErrorTitle": "Kunne ikke laste organisasjonene dine",
       "organizationUnavailable": "Organisasjon utilgjengelig",
       "selectDescription": "Velg en organisasjon fra profilen din for å fortsette.",

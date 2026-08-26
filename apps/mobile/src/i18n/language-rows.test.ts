@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { languageRows } from './language-rows';
+import { languagePickerItems, languageRows } from './language-rows';
 import { SUPPORTED_LANGUAGES } from './languages';
 
 describe('languageRows', () => {
@@ -11,10 +11,6 @@ describe('languageRows', () => {
   it('sorts by endonym', () => {
     const endonyms = languageRows('').map(row => row.endonym);
     expect(endonyms.toSorted((a, b) => a.localeCompare(b))).toEqual(endonyms);
-  });
-
-  it('pins the active language first', () => {
-    expect(languageRows('', 'zu')[0]?.tag).toBe('zu');
   });
 
   it('matches the endonym without diacritics', () => {
@@ -29,5 +25,39 @@ describe('languageRows', () => {
 
   it('returns nothing when the query matches no language', () => {
     expect(languageRows('klingon')).toHaveLength(0);
+  });
+});
+
+describe('languagePickerItems', () => {
+  it('opens on the current group, then every language', () => {
+    const items = languagePickerItems('', 'zu', false);
+    expect(items.slice(0, 4).map(item => item.key)).toEqual([
+      'section:current',
+      'device',
+      'zu',
+      'section:all',
+    ]);
+  });
+
+  it('does not repeat the pinned language in the full list', () => {
+    const items = languagePickerItems('', 'zu', false);
+    expect(items.filter(item => item.key === 'zu')).toHaveLength(1);
+    expect(items.filter(item => item.kind === 'language')).toHaveLength(SUPPORTED_LANGUAGES.length);
+  });
+
+  it('pins nothing extra when the preference is the device language', () => {
+    const items = languagePickerItems('', 'zu', true);
+    expect(items.slice(0, 3).map(item => item.key)).toEqual([
+      'section:current',
+      'device',
+      'section:all',
+    ]);
+    expect(items.filter(item => item.kind === 'language')).toHaveLength(SUPPORTED_LANGUAGES.length);
+  });
+
+  it('drops the groups while a query is active', () => {
+    const items = languagePickerItems('german', 'zu', false);
+    expect(items.every(item => item.kind === 'language')).toBe(true);
+    expect(items.map(item => item.key)).toContain('de');
   });
 });

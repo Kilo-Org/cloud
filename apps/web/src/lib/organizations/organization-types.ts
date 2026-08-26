@@ -138,6 +138,7 @@ export const ActiveOrganizationMemberSchema = z.object({
   role: OrganizationRoleSchema,
   status: z.literal('active'),
   inviteDate: z.string().nullable(),
+  imageUrl: z.string().nullable().optional(),
   dailyUsageLimitUsd: z.number().nullable(),
   currentDailyUsageUsd: z.number().nullable(),
 });
@@ -149,6 +150,7 @@ type ActiveMember = {
   role: OrganizationRole;
   status: 'active';
   inviteDate: string | null;
+  imageUrl?: string | null;
   dailyUsageLimitUsd: number | null;
   currentDailyUsageUsd: number | null;
   childOrganizationMemberships?: ChildOrganizationMembership[];

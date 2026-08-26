@@ -38,7 +38,9 @@
     "retry": "మళ్ళీ ప్రయత్నించండి",
     "search": "భాషలను వెతకండి",
     "noMatches": "భాషలు సరిపోలలేదు",
-    "deviceLanguage": "పరికర భాష"
+    "deviceLanguage": "పరికర భాష",
+    "current": "ప్రస్తుత",
+    "allLanguages": "అన్ని భాషలు"
   },
   "login": {
     "welcome": "Kiloకు స్వాగతం",
@@ -148,7 +150,9 @@
     "appearanceSystem": "సిస్టమ్",
     "appearanceLight": "లైట్",
     "appearanceDark": "డార్క్",
-    "account": "ఖాతా"
+    "account": "ఖాతా",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",
@@ -351,7 +355,7 @@
       "replyPlaceholder": "ప్రత్యుత్తరం…",
       "replyBody": "ప్రత్యుత్తరం బాడీ",
       "submitReply": "ప్రత్యుత్తరం సమర్పించండి",
-      "reply": "ప్రత్యుత్తరం",
+      "reply": "బదులివ్వండి",
       "termsTitle": "సేవా నిబంధనలు",
       "termsCopy": "పోస్ట్ చేయడానికి మీకు 13 లేదా అంతకంటే ఎక్కువ వయస్సు ఉండాలి.",
       "termsAcceptRetry": "నిబంధనలను అంగీకరించలేకపోయింది. మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి.",
@@ -410,7 +414,7 @@
       },
       "deletedUser": "తొలగించిన వినియోగదారు"
     },
-    "couldNotOpenGitHubAppSettings": "GitHub యాప్ సెట్టింగ్లను తెరవలేకపోయింది",
+    "couldNotOpenGitHubAppSettings": "GitHub App సెట్టింగ్లను తెరవలేకపోయాము",
     "installKiloGitHubApp": "Kilo GitHub యాప్ను ఇన్స్టాల్ చేయండి",
     "connectionExpiredTitle": "GitHub కనెక్షన్ గడువు ముగిసింది",
     "connectionExpiredDescription": "మీ GitHub కనెక్షన్ ఇక చెల్లదు. మీ కనెక్షన్ను మళ్ళీ తనిఖీ చేయండి — అవసరమైతే మళ్ళీ కనెక్ట్ చేయమని ప్రాంప్ట్ చేయబడతారు.",
@@ -463,8 +467,8 @@
       "noReviewRequests": "సమీక్ష అభ్యర్థనలు లేవు",
       "noReviewRequestsDescription": "మీ సమీక్ష కోసం వేచి ఉన్న పుల్ రిక్వెస్ట్లు ఇక్కడ కనిపిస్తాయి. మీరు పైన ఏదైనా PR లింక్ను పేస్ట్ చేయవచ్చు.",
       "couldNotLoad": "ఇన్బాక్స్ను లోడ్ చేయలేకపోయింది",
-      "couldNotLoadMore": "మరింత లోడ్ చేయలేకపోయింది",
-      "retryLoadingMore": "మరింత లోడ్ చేయడం మళ్ళీ ప్రయత్నించండి"
+      "couldNotLoadMore": "మరిన్ని లోడ్ చేయలేకపోయాము",
+      "retryLoadingMore": "మరిన్ని లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి"
     },
     "composer": {
       "commentBodyPlaceholder": "వ్యాఖ్య రాయండి",
@@ -535,7 +539,7 @@
       "stateOpenApproved": "తెరిచింది · ఆమోదించబడింది",
       "stateOpenChangesRequested": "తెరిచింది · మార్పులు అభ్యర్థించబడ్డాయి",
       "stateOpenReviewRequired": "తెరిచింది · సమీక్ష అవసరం",
-      "stateOpen": "తెరిచింది",
+      "stateOpen": "తెరిచి ఉంది",
       "unknownAuthor": "తెలియని రచయిత",
       "commit_one": "కమిట్",
       "commit": "కమిట్లు",
@@ -741,7 +745,7 @@
       "classificationTooLarge": "ఫైల్లు 20 MB లేదా అంతకంటే చిన్నవిగా ఉండాలి",
       "classificationUnreadable": "ఈ ఫైల్ను చదవలేకపోయింది",
       "announceUploaded": "అటాచ్మెంట్ అప్లోడ్ చేయబడింది",
-      "cantUpload": "ఈ ఫైల్ను అప్‌లోడ్ చేయలేము.",
+      "cantUpload": "ఈ ఫైల్ను అప్లోడ్ చేయలేము.",
       "networkError": "నెట్‌వర్క్ లోపం",
       "uploadFailed": "అప్‌లోడ్ విఫలమైంది",
       "failedToUploadFile": "ఫైల్ అప్‌లోడ్ చేయడంలో విఫలమైంది: {{reason}}",
@@ -785,7 +789,7 @@
     "attachmentPicker": {
       "takePhoto": "ఫోటో తీయండి",
       "photoLibrary": "ఫోటో లైబ్రరీ",
-      "files": "ఫైళ్లు",
+      "files": "ఫైల్లు",
       "cameraAccessDisabled": "కెమెరా యాక్సెస్ నిలిపివేయబడింది",
       "cameraAccessMessage": "ఫోటో తీయడానికి సెట్టింగ్లలో కెమెరా యాక్సెస్ను అనుమతించండి."
     },
@@ -899,7 +903,7 @@
       "approveDeviceTitle": "డివైస్ను ఆమోదించండి",
       "approveMessage": "{{label}} (కోడ్: {{code}}) మీ ఇన్స్టాన్స్కు కనెక్ట్ అవ్వడానికి అనుమతించాలా?",
       "approveTitle": "పెయిరింగ్ అభ్యర్థనను ఆమోదించండి",
-      "device": "డివైస్",
+      "device": "పరికరం",
       "unknownDevice": "తెలియని డివైస్"
     },
     "execPolicy": {
@@ -921,7 +925,7 @@
       "gmailNotifications": "Gmail నోటిఫికేషన్లు",
       "disconnect": "Google ఖాతాను డిస్కనెక్ట్ చేయండి",
       "connected": "కనెక్ట్ అయింది",
-      "copied": "కాపీ అయింది!",
+      "copied": "కాపీ చేయబడింది",
       "copyCommand": "ఆదేశాన్ని కాపీ చేయండి",
       "disabled": "నిలిపివేయబడింది",
       "disconnectConfirm": "డిస్కనెక్ట్",
@@ -939,7 +943,7 @@
       "noModels": "మోడళ్లు అందుబాటులో లేవు",
       "noModelsDescription": "అందుబాటులోకి వచ్చిన తర్వాత మోడళ్లు ఇక్కడ కనిపిస్తాయి.",
       "noResultsFor": "\"{{query}}\"కి ఫలితాలు లేవు",
-      "recommended": "సిఫార్సు చేయబడింది"
+      "recommended": "సిఫార్సు చేయబడినవి"
     },
     "model": {
       "title": "మోడల్"
@@ -1125,9 +1129,9 @@
       "destroying": "DESTROYING",
       "provisioned": "PROVISIONED",
       "restarting": "RESTARTING",
-      "running": "RUNNING",
+      "running": "నడుస్తోంది",
       "shuttingDown": "SHUTTING DOWN",
-      "starting": "STARTING",
+      "starting": "ప్రారంభిస్తోంది",
       "stopped": "STOPPED",
       "stopping": "STOPPING",
       "unknown": "UNKNOWN",
@@ -1139,7 +1143,7 @@
       "frontierDescription": "అత్యధిక పనితీరు. రీజనింగ్తో ఫ్రాంటియర్ మోడళ్లకు మళ్లిస్తుంది.",
       "balancedLabel": "సమతుల్యం",
       "balancedDescription": "తక్కువ ధరకు వేగం మరియు సామర్థ్యం యొక్క తెలివైన సమతుల్యత.",
-      "cost": "ధర",
+      "cost": "ఖర్చు",
       "performance": "పనితీరు",
       "autoModelA11y": "{{label}} ఆటో మోడల్",
       "currentModel": "ప్రస్తుత మోడల్",
@@ -1260,12 +1264,12 @@
       "roast": "నిర్దాక్షిణ్యంగా నిజాయితీగా, వినోదాత్మకంగా",
       "strict": "ప్రతిదీ ఫ్లాగ్ చేయండి, ఉన్నత ప్రమాణాన్ని ఉంచండి"
     },
-    "title": "Code Reviewer",
+    "title": "కోడ్ రివ్యూయర్",
     "reviewDetail": {
       "title": "సమీక్ష",
       "cancelTitle": "సమీక్షను రద్దు చేయాలా?",
       "cancelMessage": "ఇది జరుగుతున్న కోడ్ సమీక్షను ఆపుతుంది.",
-      "keepRunning": "నడుపుతూనే ఉండండి",
+      "keepRunning": "నడుస్తూనే ఉంచండి",
       "cancelReview": "సమీక్షను రద్దు చేయండి",
       "retryTitle": "సమీక్షను మళ్లీ ప్రయత్నించాలా?",
       "retryMessage": "ఇది కోడ్ సమీక్షను మళ్లీ నడుపుతుంది.",
@@ -1273,7 +1277,7 @@
       "couldNotLoad": "సమీక్షను లోడ్ చేయలేకపోయాము",
       "couldNotGetLatest": "తాజాదాన్ని పొందలేకపోయాము.",
       "byline": "{{repo}} #{{number}} — {{author}}",
-      "findings": "ఫైండింగ్లు",
+      "findings": "ఫలితాలు",
       "noFindings": "ఫైండింగ్లు లేవు",
       "showMore": "మరిన్ని చూపండి",
       "details": "వివరాలు",
@@ -1283,7 +1287,7 @@
       "created": "సృష్టించబడింది",
       "started": "ప్రారంభించబడింది",
       "completed": "పూర్తయింది",
-      "cost": "ధర",
+      "cost": "ఖర్చు",
       "tokens": "టోకెన్లు",
       "tokensInOut": "{{input}} ఇన్ / {{output}} అవుట్",
       "openPullRequest": "పుల్ రిక్వెస్ట్ను తెరవండి",
@@ -1404,7 +1408,7 @@
       "noDecision": "నిర్ణయం లేదు",
       "noResult": "ఫలితం లేదు"
     },
-    "eyebrow": "Code Reviewer",
+    "eyebrow": "కోడ్ రివ్యూయర్",
     "updateFailed": "రివ్యూయర్‌ను నవీకరించడంలో విఫలమైంది",
     "configSaveFailed": "సమీక్ష కాన్ఫిగ్‌ను సేవ్ చేయడంలో విఫలమైంది",
     "status": {
@@ -1481,10 +1485,10 @@
       "severity": "తీవ్రత",
       "outcome": "ఫలితం",
       "slaStatus": "SLA స్థితి",
-      "sortBy": "దీని ద్వారా క్రమబద్ధీకరించండి",
+      "sortBy": "దీని ప్రకారం క్రమబద్ధీకరించండి",
       "allRepositories": "అన్ని రిపోజిటరీలు",
       "all": "అన్నీ",
-      "statusOpen": "తెరవండి",
+      "statusOpen": "తెరిచి ఉంది",
       "fixed": "పరిష్కరించబడింది",
       "statusIgnored": "విస్మరించబడింది",
       "statusClosed": "మూసివేయబడింది",
@@ -1650,7 +1654,7 @@
     "findingDetails": {
       "supersededBy": "ప్రస్తుత ఫలితం ద్వారా భర్తీ చేయబడింది",
       "supersededByDescription": "స్థితి, విశ్లేషణ మరియు పరిష్కారం కోసం ప్రస్తుత రికార్డును తెరవడానికి నొక్కండి.",
-      "dismissed": "తీసివేయబడింది",
+      "dismissed": "తోసివేయబడింది",
       "dismissedBecause": "{{reason}} కారణంగా తీసివేయబడింది.",
       "severityLabel": "{{severity}} తీవ్రత",
       "package": "ప్యాకేజీ",
@@ -1685,7 +1689,7 @@
       "title": "సెట్టింగ్‌లు",
       "couldNotLoadSettings": "సెక్యూరిటీ ఏజెంట్ సెట్టింగ్‌లను లోడ్ చేయలేకపోయింది",
       "couldNotLoadPermissions": "అనుమతులను లోడ్ చేయలేకపోయింది",
-      "couldNotLoadRepositories": "రిపోజిటరీలను లోడ్ చేయలేకపోయింది",
+      "couldNotLoadRepositories": "రిపోజిటరీలను లోడ్ చేయలేకపోయాము",
       "securityAgent": "సెక్యూరిటీ ఏజెంట్",
       "enabled": "ప్రారంభించబడింది",
       "disabled": "నిలిపివేయబడింది",
@@ -1703,7 +1707,7 @@
       "automation": "ఆటోమేషన్",
       "automationAllOff": "అన్నీ ఆఫ్",
       "automationCount": "{{displayCount}} / 3 ప్రారంభించబడింది",
-      "notifications": "నోటిఫికేషన్‌లు",
+      "notifications": "నోటిఫికేషన్లు",
       "notificationsCount": "{{displayCount}} / 2 ప్రారంభించబడింది",
       "slaPolicy": "SLA విధానం",
       "disabledNoManage": "సెక్యూరిటీ ఏజెంట్ నిలిపివేయబడింది. సంస్థ యజమానులు మరియు బిల్లింగ్ మేనేజర్లు మాత్రమే దీన్ని ఆన్ చేయగలరు.",
@@ -1751,7 +1755,7 @@
       "modeAuto": "ఆటో",
       "modeShallow": "ఉపరితల",
       "modeDeep": "లోతైన",
-      "couldNotLoadModels": "మోడల్స్‌ను లోడ్ చేయలేకపోయింది",
+      "couldNotLoadModels": "మోడళ్లను లోడ్ చేయలేకపోయాము",
       "triageModel": "ట్రయాజ్ మోడల్",
       "analysisModel": "విశ్లేషణ మోడల్",
       "remediationModel": "పరిష్కార మోడల్"
@@ -1759,9 +1763,9 @@
     "sla": {
       "title": "SLA విధానం",
       "couldNotLoad": "SLA సెట్టింగ్‌లను లోడ్ చేయలేకపోయింది",
-      "critical": "క్లిష్టమైన",
-      "high": "అధిక",
-      "medium": "మధ్యస్థ",
+      "critical": "క్రిటికల్",
+      "high": "అధికం",
+      "medium": "మధ్యస్థం",
       "low": "తక్కువ",
       "criticalDescription": "ప్రమాణీకరణ లేకుండా రిమోట్ దుర్వినియోగం.",
       "highDescription": "ముఖ్యమైన డేటా బహిర్గతం అయ్యే అవకాశం.",
@@ -1797,8 +1801,8 @@
     },
     "scopeList": {
       "title": "సెక్యూరిటీ ఏజెంట్",
-      "couldNotLoad": "సంస్థలను లోడ్ చేయలేకపోయింది",
-      "personal": "వ్యక్తిగత",
+      "couldNotLoad": "సంస్థలను లోడ్ చేయలేకపోయాము",
+      "personal": "వ్యక్తిగతం",
       "personalSubtitle": "మీ స్వంత రిపోజిటరీలు"
     },
     "commandRetry": {
@@ -1823,7 +1827,7 @@
     },
     "settingsSave": {
       "discard": "విస్మరించండి",
-      "keepEditing": "ఎడిటింగ్ కొనసాగించండి",
+      "keepEditing": "సవరించడం కొనసాగించండి",
       "saveChanges": "మార్పులను సేవ్ చేయండి",
       "unsavedTitle": "సేవ్ చేయని మార్పులు",
       "unsavedMessage": "ఈ స్క్రీన్ నుండి బయలుదేరే ముందు మీ మార్పులను సేవ్ చేయాలా?"
@@ -1845,7 +1849,7 @@
       "unavailable": "ఆడిట్ నివేదిక అందుబాటులో లేదు",
       "unavailableDescription": "సంస్థ యజమానులు మరియు బిల్లింగ్ మేనేజర్లు మాత్రమే ఆడిట్ నివేదికలను చూడగలరు. యాక్సెస్ ఇవ్వమని యజమానిని లేదా బిల్లింగ్ మేనేజర్‌ను అడగండి.",
       "queryFailed": "నివేదిక క్వెరీ పూర్తి కాలేదు. మళ్ళీ ప్రయత్నించండి.",
-      "checkConnection": "మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి."
+      "checkConnection": "మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి."
     },
     "notifications": {
       "couldNotLoad": "నోటిఫికేషన్ సెట్టింగ్‌లను లోడ్ చేయలేకపోయింది",
@@ -1863,13 +1867,13 @@
       "slaSection": "SLA హెచ్చరిక నోటిఫికేషన్",
       "slaSeverityLabel": "SLA నోటిఫికేషన్ కనీస తీవ్రత",
       "slaSubtitle": "ఫలితాలు వాటి SLA గడువును సమీపించినప్పుడు లేదా మీరినప్పుడు, దానికి ముందు మరియు సమయంలో పంపబడుతుంది.",
-      "title": "నోటిఫికేషన్‌లు"
+      "title": "నోటిఫికేషన్లు"
     },
     "repositories": {
       "allRepositories": "అన్ని రిపోజిటరీలు",
       "couldNotLoad": "రిపోజిటరీ సెట్టింగ్‌లను లోడ్ చేయలేకపోయింది",
-      "couldNotLoadRepositories": "రిపోజిటరీలను లోడ్ చేయలేకపోయింది",
-      "couldNotOpenGithubSettings": "GitHub App సెట్టింగ్‌లను తెరవలేకపోయింది",
+      "couldNotLoadRepositories": "రిపోజిటరీలను లోడ్ చేయలేకపోయాము",
+      "couldNotOpenGithubSettings": "GitHub App సెట్టింగ్లను తెరవలేకపోయాము",
       "githubAppSettings": "GitHub App సెట్టింగ్‌లు",
       "manageAccess": "GitHub App యాక్సెస్‌ను నిర్వహించండి",
       "noRepositories": "రిపోజిటరీలు లేవు",
@@ -1952,7 +1956,7 @@
       "fixedOn": "{{date}} నాటికి పరిష్కరించబడింది",
       "resolutionRecorded": "పరిష్కారం నమోదు చేయబడింది",
       "superseded": "భర్తీ చేయబడింది",
-      "dismissed": "తీసివేయబడింది",
+      "dismissed": "తోసివేయబడింది",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "గడువు నిర్ణయించబడలేదు",
       "noSlaDeadline": "SLA గడువు లేదు",
@@ -2103,7 +2107,7 @@
       "couldNotLoad": "సెషన్‌ను లోడ్ చేయలేకపోయింది",
       "failedToLoadDetails": "సెషన్ వివరాలను లోడ్ చేయడంలో విఫలమైంది",
       "notFound": "కనుగొనబడలేదు",
-      "notFoundDescription": "ఈ అంశం తీసివేయబడి ఉండవచ్చు లేదా ఇకపై అందుబాటులో ఉండకపోవచ్చు.",
+      "notFoundDescription": "ఈ అంశం తీసివేయబడి ఉండవచ్చు లేదా ఇక అందుబాటులో ఉండకపోవచ్చు.",
       "failedToStopExecution": "అమలును ఆపడంలో విఫలమైంది",
       "renameSession": "సెషన్‌ను పేరు మార్చండి",
       "renamePlaceholder": "సెషన్ పేరు",
@@ -2119,7 +2123,12 @@
       "couldNotLoadThisSession": "ఈ సెషన్‌ను లోడ్ చేయలేకపోయింది",
       "cloneFailed": "ఈ సెషన్‌ను క్లోన్ చేయలేకపోయింది.",
       "cloneFailedRetry": "ఈ సెషన్‌ను క్లోన్ చేయలేకపోయింది. మళ్ళీ ప్రయత్నించండి.",
-      "connectRepositoryToContinue": "కొనసాగించడానికి రిపోజిటరీని కనెక్ట్ చేయండి."
+      "connectRepositoryToContinue": "కొనసాగించడానికి రిపోజిటరీని కనెక్ట్ చేయండి.",
+      "notEnoughCredits": "Cloud Agentను అమలు చేయడానికి తగినంత క్రెడిట్లు లేవు. క్రెడిట్లను జోడించి మళ్లీ ప్రయత్నించండి.",
+      "previousTaskFinishing": "మునుపటి పని ఇంకా పూర్తవుతోంది. దయచేసి కాసేపు వేచి ఉండండి.",
+      "serviceUnavailable": "సేవ ప్రస్తుతం అందుబాటులో లేదు. దయచేసి మళ్లీ ప్రయత్నించండి.",
+      "connectionTrouble": "కనెక్షన్ సమస్య. దయచేసి కాసేపటి తర్వాత మళ్లీ ప్రయత్నించండి.",
+      "modelUnavailable": "ఈ మోడల్ Cloud Agent కోసం అందుబాటులో లేదు. మరొక మోడల్ని ఎంచుకుని మళ్లీ ప్రయత్నించండి."
     },
     "remoteSession": {
       "failedToCreate": "రిమోట్ సెషన్‌ను సృష్టించడంలో విఫలమైంది",
@@ -2174,9 +2183,10 @@
       "couldNotRefreshRepositories": "రిపోజిటరీలను రిఫ్రెష్ చేయలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
       "discardDraftTitle": "డ్రాఫ్ట్‌ను విస్మరించాలా?",
       "discardDraftMessage": "మీ ప్రాంప్ట్ కోల్పోతుంది.",
-      "keepEditing": "ఎడిటింగ్ కొనసాగించండి",
+      "keepEditing": "సవరించడం కొనసాగించండి",
       "discard": "విస్మరించండి",
-      "discardFailed": "డ్రాఫ్ట్‌ను విస్మరించలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి."
+      "discardFailed": "డ్రాఫ్ట్‌ను విస్మరించలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్ నవీకరించబడింది",
@@ -2196,7 +2206,7 @@
       "contentTruncated": "కంటెంట్ ట్రంకేట్ చేయబడింది",
       "truncated": "ట్రంకేట్ చేయబడింది",
       "toolRead": "చదవండి",
-      "toolEdit": "ఎడిట్",
+      "toolEdit": "సవరించండి",
       "toolWrite": "రాయండి",
       "toolBash": "bash",
       "toolGlob": "glob",
@@ -2226,7 +2236,7 @@
       "runOn": "అమలు చేయండి",
       "runOnAccessibility": "అమలు చేయండి: {{label}}",
       "couldNotLoad": "ఇన్‌స్టాన్స్‌లను లోడ్ చేయలేకపోయింది",
-      "couldNotLoadDescription": "మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి.",
+      "couldNotLoadDescription": "మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి.",
       "cloudAgent": "క్లౌడ్ ఏజెంట్",
       "loading": "లోడ్ అవుతోంది…",
       "cloudAgentDescription": "Kilo యొక్క క్లౌడ్ శాండ్‌బాక్స్‌లో అమలు చేయండి",
@@ -2334,7 +2344,7 @@
       "defaultName": "ఫైల్",
       "openFullScreen": "{{name}} పూర్తి స్క్రీన్‌లో తెరవండి",
       "preview": "{{name}} ప్రివ్యూ",
-      "openFile": "{{name}} తెరవండి",
+      "openFile": "{{name}}ను తెరవండి",
       "couldNotLoadFile": "ఈ ఫైల్‌ను లోడ్ చేయలేకపోయింది.",
       "couldNotLoadFileRetry": "ఈ ఫైల్‌ను లోడ్ చేయలేకపోయింది. మళ్ళీ ప్రయత్నించండి.",
       "retryLoadingFile": "ఫైల్ లోడింగ్ మళ్ళీ ప్రయత్నించండి",
@@ -2402,7 +2412,7 @@
       "modelAccessibility": "మోడల్: {{modelLabel}}",
       "openHint": "సబ్ఏజెంట్ సెషన్ను తెరవండి",
       "subagent": "సబ్ఏజెంట్",
-      "task": "పని",
+      "task": "టాస్క్",
       "waitingForActivity": "కార్యాచరణ కోసం వేచి ఉంది"
     },
     "childSessionSheet": {
@@ -2471,12 +2481,12 @@
     },
     "modelPicker": {
       "title": "మోడల్ను ఎంచుకోండి",
-      "searchPlaceholder": "మోడల్లను శోధించండి...",
-      "noModels": "ఏ మోడల్లు అందుబాటులో లేవు",
+      "searchPlaceholder": "మోడళ్లను వెతకండి...",
+      "noModels": "మోడళ్లు అందుబాటులో లేవు",
       "noModelsDescription": "ఎంచుకోవడానికి ఏ మోడల్లు అందుబాటులో లేవు.",
       "favorites": "ఇష్టమైనవి",
       "recommended": "సిఫార్సు చేయబడినవి",
-      "allModels": "అన్ని మోడల్లు"
+      "allModels": "అన్ని మోడళ్లు"
     },
     "modelSelector": {
       "model": "మోడల్",
@@ -2520,7 +2530,7 @@
       "onlyAddingFiles": "{{total}} ఫైల్లలో {{accepted}} మాత్రమే జోడిస్తోంది (గరిష్టం {{max}})"
     },
     "composer": {
-      "addAttachment": "అటాచ్మెంట్ జోడించండి",
+      "addAttachment": "అటాచ్‌మెంట్ జోడించండి",
       "removeOrRetryFailed": "విఫలమైన అటాచ్మెంట్లను ముందుగా తీసివేయండి లేదా మళ్లీ ప్రయత్నించండి.",
       "attachmentsWithSlashCommands": "స్లాష్ కమాండ్లతో అటాచ్మెంట్లను పంపలేరు.",
       "photoMetadataNotRemoved": "అటాచ్మెంట్ నుండి ఫోటో మెటాడేటాను తీసివేయలేకపోయాము.",
@@ -2585,7 +2595,7 @@
       "tokensUsage": "సందర్భం {{window}} టోకెన్లలో {{used}} ఉపయోగించబడింది, {{percentage}} ఉపయోగించబడింది",
       "title": "సందర్భ వినియోగం",
       "used": "ఉపయోగించబడింది",
-      "remaining": "మిగిలి ఉంది",
+      "remaining": "మిగిలినది",
       "provider": "ప్రొవైడర్",
       "totalCost": "మొత్తం ఖర్చు",
       "usageReflectsLatest": "వినియోగం తాజా పూర్తయిన సహాయక ప్రతిస్పందనను ప్రతిబింబిస్తుంది.",
@@ -2617,7 +2627,7 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "మీ ఖాతాను లోడ్ చేయలేకపోయాము",
-    "couldNotLoadAccountDescription": "మీ కనెక్షన్ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
+    "couldNotLoadAccountDescription": "మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి.",
     "couldNotLoadPrivacy": "గోప్యతా ఎంపికలను లోడ్ చేయలేకపోయాము",
     "couldNotLoadPrivacyDescription": "మీ పరికర భద్రతా సెట్టింగ్లను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
     "contentReady": "కంటెంట్ సిద్ధంగా ఉంది",
@@ -2631,7 +2641,7 @@
     "billingPage": "బిల్లింగ్ పేజీ"
   },
   "deviceSessions": {
-    "couldNotLoad": "సెషన్లను లోడ్ చేయలేకపోయాము",
+    "couldNotLoad": "సెషన్‌లను లోడ్ చేయలేకపోయింది",
     "couldNotLoadDescription": "ఇది లోడ్ అయ్యే వరకు మీ యాక్టివ్ సెషన్లు అందుబాటులో ఉండవు.",
     "currentDeviceUnidentified": "ప్రస్తుత పరికరాన్ని గుర్తించలేకపోయాము",
     "noSessions": "యాక్టివ్ సెషన్లు లేవు",
@@ -2648,7 +2658,7 @@
     "signOutThisSessionTitle": "ఈ సెషన్ నుండి సైన్ అవుట్ చేయాలా?",
     "signOutThisSessionMessage": "{{device}} సైన్ అవుట్ చేయబడుతుంది. ఇది గంట వరకు API యాక్సెస్ను ఉంచుకోవచ్చు.",
     "signOutConfirm": "సైన్ అవుట్",
-    "signOutMessage": "మీ వర్క్స్పేస్ను యాక్సెస్ చేయడానికి మీరు మళ్లీ సైన్ ఇన్ చేయాలి.",
+    "signOutMessage": "మీ వర్క్స్పేస్ను యాక్సెస్ చేయడానికి మీరు మళ్ళీ సైన్ ఇన్ చేయాలి.",
     "webBrowser": "వెబ్ బ్రౌజర్"
   },
   "forceUpdate": {
@@ -2662,15 +2672,10 @@
     "couldNotLoadSessions": "సెషన్లను లోడ్ చేయలేకపోయాము",
     "couldNotLoadActiveSessions": "యాక్టివ్ సెషన్లను లోడ్ చేయలేకపోయాము",
     "agentSessions": "ఏజెంట్ సెషన్లు",
-    "showingSavedSessions": "సేవ్ చేసిన సెషన్లను చూపిస్తోంది — లైవ్ స్థితి పాతది కావచ్చు",
-    "startNewAgentSession": "కొత్త Kilo ఏజెంట్ సెషన్ను ప్రారంభించండి",
-    "aiCodingSessions": "AI కోడింగ్ సెషన్లు",
-    "startCodingTaskFromPhone": "మీ ఫోన్ నుండి కోడింగ్ పనిని ప్రారంభించండి లేదా మీ CLI నుండి సెషన్ను కొనసాగించండి.",
-    "tryIt": "ప్రయత్నించండి",
     "newCodingTask": "కొత్త కోడింగ్ పని",
     "explore": "అన్వేషించండి",
     "seeAll": "అన్నీ చూడండి",
-    "kiloAgents": "Kilo ఏజెంట్లు"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} మూసివేయండి",
@@ -2683,8 +2688,8 @@
     "title": "పేజీ కనుగొనబడలేదు"
   },
   "monoScrollBlock": {
-    "contentTruncated": "కంటెంట్ కత్తిరించబడింది",
-    "truncated": "కత్తిరించబడింది",
+    "contentTruncated": "కంటెంట్ ట్రంకేట్ చేయబడింది",
+    "truncated": "ట్రంకేట్ చేయబడింది",
     "wrap": "చుట్టు",
     "scroll": "స్క్రోల్"
   },
@@ -2857,7 +2862,7 @@
     "voiceTranscriptionTitle": "వాయిస్ ట్రాన్స్క్రిప్షన్",
     "retentionPrefix": "పూర్తి నిలుపుదల వ్యవధులు, మీ హక్కులు మరియు సంప్రదింపు సమాచారం",
     "backToConsent": "అనుమతికి వెనక్కి",
-    "back": "వెనక్కి",
+    "back": "వెనుకకు",
     "revokeConsent": "అనుమతిని రద్దు చేయండి",
     "revokeConsentTitle": "డేటా భాగస్వామ్య అనుమతిని రద్దు చేయాలా?",
     "acceptAndContinue": "అంగీకరించి కొనసాగించండి",
@@ -2922,7 +2927,7 @@
   "organization": {
     "boundary": {
       "backToProfile": "ప్రొఫైల్కు వెనక్కి",
-      "loadErrorMessage": "మీ కనెక్షన్ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
+      "loadErrorMessage": "మీ కనెక్షన్ను తనిఖీ చేసి మళ్ళీ ప్రయత్నించండి.",
       "loadErrorTitle": "మీ ఆర్గనైజేషన్లను లోడ్ చేయలేకపోయాము",
       "organizationUnavailable": "ఆర్గనైజేషన్ అందుబాటులో లేదు",
       "selectDescription": "కొనసాగించడానికి మీ ప్రొఫైల్ నుండి ఆర్గనైజేషన్ను ఎంచుకోండి.",
@@ -2966,11 +2971,11 @@
       "sharingUnavailable": "ఈ పరికరంలో షేరింగ్ అందుబాటులో లేదు.",
       "status": {
         "paid": "చెల్లించినది",
-        "open": "ఓపెన్",
+        "open": "తెరిచి ఉంది",
         "void": "రద్దు",
         "draft": "డ్రాఫ్ట్",
         "uncollectible": "వసూలు చేయలేనిది",
-        "unknown": "తెలియనిది"
+        "unknown": "తెలియదు"
       }
     },
     "lowBalanceAlert": {
@@ -3020,14 +3025,14 @@
         "billingManager": "బిల్లింగ్ మేనేజర్"
       },
       "emailStatusFailed": "ఇమెయిల్ విఫలమైంది",
-      "emailStatusPending": "పెండింగ్",
+      "emailStatusPending": "వేచి ఉంది",
       "inviteCreated": "ఆహ్వానం సృష్టించబడింది",
       "pendingInvitations": "పెండింగ్ ఆహ్వానాలు",
       "resendInvite": "ఆహ్వానాన్ని మళ్లీ పంపండి",
       "shareInviteLink": "ఆహ్వాన లింక్ను భాగస్వామ్యం చేయండి"
     },
     "permissionDenied": {
-      "back": "వెనక్కి",
+      "back": "వెనుకకు",
       "title": "యాక్సెస్ నిరాకరించబడింది"
     },
     "usageStats": {
@@ -3038,7 +3043,7 @@
       "requests": "అభ్యర్థనలు"
     },
     "hub": {
-      "title": "ఆర్గనైజేషన్",
+      "title": "సంస్థ",
       "renameTitle": "ఆర్గనైజేషన్ను పేరు మార్చండి",
       "renamePlaceholder": "ఆర్గనైజేషన్ పేరును నమోదు చేయండి",
       "balance": "బ్యాలెన్స్",
@@ -3064,7 +3069,7 @@
       "paymentPending": "చెల్లింపు పెండింగ్",
       "processingBlocked": "ప్రాసెసింగ్ నిరోధించబడింది",
       "processingNeedsReview": "ప్రాసెసింగ్కు సమీక్ష అవసరం",
-      "retry": "మళ్లీ ప్రయత్నించండి",
+      "retry": "మళ్ళీ ప్రయత్నించండి",
       "retryHint": "Kilo Pass స్థితి లోడ్ను మళ్లీ ప్రయత్నిస్తుంది.",
       "setupHint": "వెబ్లో Kilo Pass సెటప్ను తెరుస్తుంది."
     }
@@ -3083,12 +3088,12 @@
     "invalidRequest": "మీ ఇమెయిల్ చిరునామాను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
     "emailDeliveryFailed": "ఇమెయిల్ డెలివరీ ప్రస్తుతం అందుబాటులో లేదు. దయచేసి తరువాత మళ్లీ ప్రయత్నించండి.",
     "admissionRequired": "మీ పరికరాన్ని ధృవీకరించలేము. మరొక పరికరంలో లేదా వెబ్ ద్వారా సైన్-ఇన్ చేయడానికి '$t(login.moreSignInOptions)' ఉపయోగించండి.",
-    "default": "ఏదో తప్పు జరిగింది. దయచేసి మళ్లీ ప్రయత్నించండి.",
+    "default": "ఏదో తప్పు జరిగింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
     "retryableAdmission": "మేము ఈ పరికరాన్ని ధృవీకరించలేకపోయాము. మీ కనెక్షన్ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
     "startSignInFailed": "సైన్ ఇన్ ప్రారంభించడంలో విఫలమైంది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
     "couldNotOpenBrowser": "బ్రౌజర్ను తెరవలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
     "signInTimedOut": "సైన్ ఇన్ గడువు ముగిసింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
-    "signInFailed": "సైన్ ఇన్ విఫలమైంది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+    "signInFailed": "సైన్-ఇన్ విఫలమైంది. దయచేసి మళ్లీ ప్రయత్నించండి.",
     "networkError": "నెట్వర్క్ లోపం. దయచేసి మళ్ళీ ప్రయత్నించండి.",
     "accessDeniedByUser": "వినియోగదారు ద్వారా యాక్సెస్ నిరాకరించబడింది",
     "codeExpired": "కోడ్ గడువు ముగిసింది",
@@ -3099,7 +3104,7 @@
     "free": "ఉచితం",
     "couldNotUpdateFavorites": "ఫేవరిట్లను నవీకరించలేకపోయింది",
     "thinkingEffort": {
-      "none": "ఏదీ లేదు",
+      "none": "లేదు",
       "minimal": "కనిష్టం",
       "low": "తక్కువ",
       "medium": "మధ్యస్థం",

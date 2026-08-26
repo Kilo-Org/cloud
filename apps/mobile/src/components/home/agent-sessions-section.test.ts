@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { hasDisplayableAgentSessions } from '@/components/home/agent-sessions-section';
+import { buildRows } from '@/components/home/agent-sessions-section';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 
 vi.mock('expo-router', () => ({
@@ -20,12 +20,12 @@ vi.mock('@/components/agents/remote-session-row', () => ({
   RemoteSessionRow: () => null,
 }));
 
-vi.mock('@/components/agents/session-row', () => ({
-  StoredSessionRow: () => null,
-}));
-
 vi.mock('@/components/ui/text', () => ({
   Text: () => null,
+}));
+
+vi.mock('@/components/agents/session-row', () => ({
+  StoredSessionRow: () => null,
 }));
 
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
@@ -68,27 +68,59 @@ function makeStored(over: Partial<StoredSession> = {}): StoredSession {
   };
 }
 
-describe('hasDisplayableAgentSessions', () => {
-  it('returns true when there is at least one active session', () => {
-    expect(hasDisplayableAgentSessions([], [makeActive()])).toBe(true);
+describe('buildRows', () => {
+  it('yields no rows when there are no live sessions', () => {
+    const rows = buildRows({
+      activeSessions: [],
+      storedSessions: [],
+      activeSessionIds: new Set(),
+    });
+    expect(rows).toEqual([]);
   });
 
-  it('returns true when a cloud-agent stored session exists', () => {
-    expect(
-      hasDisplayableAgentSessions([makeStored({ created_on_platform: 'cloud-agent' })], [])
-    ).toBe(true);
-    expect(
-      hasDisplayableAgentSessions([makeStored({ created_on_platform: 'cloud-agent-web' })], [])
-    ).toBe(true);
+  it('yields one row for one active session', () => {
+    const active = makeActive();
+    const rows = buildRows({
+      activeSessions: [active],
+      storedSessions: [],
+      activeSessionIds: new Set([active.id]),
+    });
+    expect(rows.map(row => row.key)).toEqual(['active:a1']);
   });
 
-  it('returns false when only non-cloud-agent stored sessions exist', () => {
-    expect(hasDisplayableAgentSessions([makeStored({ created_on_platform: 'cli' })], [])).toBe(
-      false
-    );
+  it('caps the rows at three live sessions', () => {
+    const activeSessions = [
+      makeActive({ id: 'a1' }),
+      makeActive({ id: 'a2' }),
+      makeActive({ id: 'a3' }),
+      makeActive({ id: 'a4' }),
+    ];
+    const rows = buildRows({
+      activeSessions,
+      storedSessions: [],
+      activeSessionIds: new Set(['a1', 'a2', 'a3', 'a4']),
+    });
+    expect(rows).toHaveLength(3);
+    expect(rows.every(row => row.kind === 'active')).toBe(true);
   });
 
-  it('returns false when both arrays are empty', () => {
-    expect(hasDisplayableAgentSessions([], [])).toBe(false);
+  it('drops an offline stored session', () => {
+    const offline = makeStored({ session_id: 'off1', created_on_platform: 'cloud-agent' });
+    const rows = buildRows({
+      activeSessions: [],
+      storedSessions: [offline],
+      activeSessionIds: new Set(),
+    });
+    expect(rows).toEqual([]);
+  });
+
+  it('keeps a live cloud-agent stored session', () => {
+    const live = makeStored({ session_id: 'on1', created_on_platform: 'cloud-agent' });
+    const rows = buildRows({
+      activeSessions: [],
+      storedSessions: [live],
+      activeSessionIds: new Set(['on1']),
+    });
+    expect(rows.map(row => row.key)).toEqual(['stored:on1']);
   });
 });

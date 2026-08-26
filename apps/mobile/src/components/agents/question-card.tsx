@@ -321,7 +321,7 @@ export function QuestionCard({
                         accessibilityLabel={t('agentChat.questionCard.typeYourOwnAnswer')}
                         accessibilityState={{ disabled: interactionDisabled }}
                         className={cn(
-                          'rounded-md border px-3 py-2.5 text-sm shadow-sm shadow-black/5',
+                          'rounded-md border px-3 py-2.5 text-sm shadow-sm shadow-[#0000000D]',
                           isCustomActive
                             ? 'border-primary bg-primary text-primary-foreground'
                             : 'border-border bg-background text-foreground dark:border-neutral-700 dark:bg-secondary',

@@ -292,12 +292,20 @@ function RootLayoutNav() {
     void restorePersistedCacheOnColdStart(queryClient);
   }, []);
 
-  // Restore a deep-link destination persisted before process death. Runs before
-  // the gate effect so a restored destination is present when the shell
-  // settles; the observable slot re-triggers the consumer if it lands later.
+  // Restore a deep-link destination persisted before process death. Waits for
+  // auth bootstrap: a persisted record is account-bound, and the token owner
+  // publishes the signed-in user id before `authLoading` clears. Restoring
+  // earlier compares an account-bound record against a null user id, so a
+  // signed-in cold start would delete its own destination. The slot is
+  // observable, so the consumer still fires when the destination lands.
+  const deepLinkRestoreStarted = useRef(false);
   useEffect(() => {
+    if (authLoading || deepLinkRestoreStarted.current) {
+      return;
+    }
+    deepLinkRestoreStarted.current = true;
     void restorePersistedPendingDeepLink();
-  }, []);
+  }, [authLoading]);
 
   // Scope share persistence to the current account (DEC-01): null while signed
   // out, so a share captured signed out never persists (in-memory only, and a

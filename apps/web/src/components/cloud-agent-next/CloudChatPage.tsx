@@ -727,8 +727,8 @@ export default function CloudChatPage({
 
   // Surface the session's custom agents plus the current visible profile
   // agents to the chat picker. `runtimeAgents` are the agents active when the
-  // session was created; the profile list keeps the current default profile's
-  // agents selectable even when that profile changed since.
+  // session was created; the profile list enriches those same agents with
+  // their current descriptions, filtered to slugs the session can still run.
   //
   // Only agents that would surface in NewSessionPanel's picker are included
   // (not disabled, not hidden, not subagent-only). Built-in slugs are dropped
@@ -755,9 +755,17 @@ export default function CloudChatPage({
     organizationId: effectiveAgentProfileOrg,
     enabled: !!effectiveAgentProfileId,
   });
-  const visibleProfileAgents = (selectedProfileDetails?.agents ?? []).filter(
-    a => !a.config.disable && !a.config.hidden && a.config.mode !== 'subagent'
+  // Only surface profile agents the session can still run. `runtimeAgents` is
+  // frozen at session creation, but the current visible profile may have
+  // gained an agent since; the worker's `validateModeAgainstRuntimeAgents`
+  // accepts only built-in slugs or slugs in that frozen list, so a newer
+  // profile agent would be offered here and then rejected on send.
+  const runtimeAgentSlugs = new Set(
+    (sessionConfig?.runtimeAgents ?? []).map(a => a.slug)
   );
+  const visibleProfileAgents = (selectedProfileDetails?.agents ?? [])
+    .filter(a => !a.config.disable && !a.config.hidden && a.config.mode !== 'subagent')
+    .filter(a => runtimeAgentSlugs.has(a.slug));
 
   const runtimeCustomOptions: CustomModeOption[] = (sessionConfig?.runtimeAgents ?? []).map(a => ({
     value: a.slug,

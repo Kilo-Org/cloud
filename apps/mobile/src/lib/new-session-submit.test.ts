@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  resolveContinueStartDisabled,
   resolveNewSessionStartDisabled,
   resolveNewSessionSubmitDisabled,
   resolveNewSessionSubmitEnabled,
@@ -19,6 +20,25 @@ function validInput(overrides: Partial<Parameters<typeof resolveNewSessionSubmit
     isSubmitting: false,
     model: 'claude-opus-4-7',
     selectedRepo: 'org/repo',
+    ...overrides,
+  };
+}
+
+function continueInput(
+  overrides: Partial<Parameters<typeof resolveContinueStartDisabled>[0]> = {}
+) {
+  return {
+    hasPrompt: false,
+    isCreating: false,
+    isSubmitting: false,
+    isSpawningRemote: false,
+    model: 'claude-opus-4-7',
+    selectedRepo: 'org/repo',
+    isRemoteTargetSelected: false,
+    instanceCatalogLoading: false,
+    instanceHasSessionClone: true,
+    isProfileLoading: false,
+    cloneImportFailureKey: null,
     ...overrides,
   };
 }
@@ -143,5 +163,102 @@ describe('resolveNewSessionStartDisabled', () => {
 
   it('blocks Start while the profile query is loading', () => {
     expect(resolveNewSessionStartDisabled(startInput({ isProfileLoading: true }))).toBe(true);
+  });
+
+  it('non-clone empty prompt stays disabled through the ordinary gate', () => {
+    expect(resolveNewSessionStartDisabled(startInput({ hasPrompt: false }))).toBe(true);
+  });
+});
+
+describe('resolveContinueStartDisabled', () => {
+  it('clone Cloud with no prompt and a loaded repo/model is enabled', () => {
+    expect(
+      resolveContinueStartDisabled(continueInput({ hasPrompt: false, isProfileLoading: true }))
+    ).toBe(false);
+  });
+
+  it('clone Cloud with no repository is disabled', () => {
+    expect(resolveContinueStartDisabled(continueInput({ selectedRepo: '' }))).toBe(true);
+  });
+
+  it('clone Cloud ignores the profile loading gate', () => {
+    expect(resolveContinueStartDisabled(continueInput({ isProfileLoading: true }))).toBe(false);
+  });
+
+  it('clone Cloud ignores the empty prompt gate', () => {
+    expect(resolveContinueStartDisabled(continueInput({ hasPrompt: false }))).toBe(false);
+  });
+
+  it('clone Cloud is disabled while creating or submitting', () => {
+    expect(resolveContinueStartDisabled(continueInput({ isCreating: true }))).toBe(true);
+    expect(resolveContinueStartDisabled(continueInput({ isSubmitting: true }))).toBe(true);
+  });
+
+  it('clone Cloud with no model is disabled', () => {
+    expect(resolveContinueStartDisabled(continueInput({ model: '' }))).toBe(true);
+  });
+
+  it('clone CLI with no repository is enabled', () => {
+    expect(
+      resolveContinueStartDisabled(
+        continueInput({ isRemoteTargetSelected: true, selectedRepo: '' })
+      )
+    ).toBe(false);
+  });
+
+  it('clone CLI ignores the empty prompt gate', () => {
+    expect(
+      resolveContinueStartDisabled(
+        continueInput({ isRemoteTargetSelected: true, hasPrompt: false })
+      )
+    ).toBe(false);
+  });
+
+  it('clone CLI without sessionClone is disabled', () => {
+    expect(
+      resolveContinueStartDisabled(
+        continueInput({ isRemoteTargetSelected: true, instanceHasSessionClone: false })
+      )
+    ).toBe(true);
+  });
+
+  it('clone CLI is disabled while the instance catalog is loading', () => {
+    expect(
+      resolveContinueStartDisabled(
+        continueInput({ isRemoteTargetSelected: true, instanceCatalogLoading: true })
+      )
+    ).toBe(true);
+  });
+
+  it('clone CLI is disabled while spawning or submitting', () => {
+    expect(
+      resolveContinueStartDisabled(
+        continueInput({ isRemoteTargetSelected: true, isSpawningRemote: true })
+      )
+    ).toBe(true);
+    expect(
+      resolveContinueStartDisabled(
+        continueInput({ isRemoteTargetSelected: true, isSubmitting: true })
+      )
+    ).toBe(true);
+  });
+
+  it('clone CLI with a delivered clone/import failure is disabled until Run-on changes', () => {
+    expect(
+      resolveContinueStartDisabled(
+        continueInput({
+          isRemoteTargetSelected: true,
+          cloneImportFailureKey: 'agentChat.session.notFound',
+        })
+      )
+    ).toBe(true);
+  });
+
+  it('clone CLI with no clone/import failure is not disabled by the failure field', () => {
+    expect(
+      resolveContinueStartDisabled(
+        continueInput({ isRemoteTargetSelected: true, cloneImportFailureKey: null })
+      )
+    ).toBe(false);
   });
 });

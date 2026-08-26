@@ -4,6 +4,7 @@ import { toast } from 'sonner-native';
 import { type ModelSelection } from '@kilocode/cloud-agent-sdk';
 
 import { getSpawnedAgentSessionPath } from '@/components/agents/session-detail-routes';
+import { i18n } from '@/i18n';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import {
   buildCreateRemoteSessionInput,
@@ -13,6 +14,7 @@ import {
   type RemoteInstanceSpawnStatus,
   useRemoteInstanceSpawn,
 } from '@/lib/hooks/use-remote-instance-spawn';
+import { resolveCloneImportFailure } from '@/lib/hooks/remote-instance-spawn-classifier';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { resolveLiveInstance } from '@/lib/resolve-live-instance';
 import {
@@ -69,6 +71,19 @@ type UseRemoteSpawnDispatchArgs = {
    */
   getSubmitPayload?: () => SharePayload | null;
   /**
+   * Kilo session id the clone/continue form clones from. When set, the spawn
+   * carries `cloneFromKiloSessionId` only if the selected instance advertises
+   * `sessionClone`, and clone/import failures surface through
+   * `onCloneImportFailure` instead of the generic spawn toast.
+   */
+  cloneFromKiloSessionId?: string | null;
+  /**
+   * Invoked with an inline failure i18n key when a clone/import spawn fails
+   * non-retryably (delivered CLI clone error, or the instance lacks
+   * `sessionClone`). The route shows the key under "Run on" and disables Start.
+   */
+  onCloneImportFailure?: (key: string) => void;
+  /**
    * Invoked when `onStart` admits the press-time snapshot and commits to a
    * spawn attempt: the caller already passed voice settlement (it only calls
    * `onStart` after the voice input settled) and `resolveRemoteSpawnAdmission`
@@ -84,6 +99,12 @@ type UseRemoteSpawnDispatchArgs = {
    * `onSpawnAdmitted` armed, so a later back/swipe still confirms.
    */
   onSpawnFailed?: () => void;
+  /**
+   * Invoked right before a `ready` spawn navigates (the success replace). The
+   * clone entry uses it to arm a one-shot busy leave-lock bypass so the
+   * success navigation is not intercepted as an abandon.
+   */
+  onSpawnReady?: () => void;
 };
 
 type UseRemoteSpawnDispatchResult = {
@@ -142,8 +163,11 @@ export function useRemoteSpawnDispatch({
   refetchInstances,
   instanceList,
   getSubmitPayload,
+  cloneFromKiloSessionId,
+  onCloneImportFailure,
   onSpawnAdmitted,
   onSpawnFailed,
+  onSpawnReady,
 }: UseRemoteSpawnDispatchArgs): UseRemoteSpawnDispatchResult {
   const router = useRouter();
   // Route param is frozen at navigation: missing param means personal, not
@@ -184,15 +208,29 @@ export function useRemoteSpawnDispatch({
   // Read the press-time inputs through refs so `onStart` stays stable across
   // renders while always seeing the route's latest values.
   const getSubmitPayloadRef = useRef(getSubmitPayload);
-  const spawnFieldsRef = useRef({ mode, selection, organizationId });
+  const spawnFieldsRef = useRef({ mode, selection, organizationId, cloneFromKiloSessionId });
   const onSpawnAdmittedRef = useRef(onSpawnAdmitted);
   const onSpawnFailedRef = useRef(onSpawnFailed);
+  const onSpawnReadyRef = useRef(onSpawnReady);
+  const onCloneImportFailureRef = useRef(onCloneImportFailure);
   useEffect(() => {
     getSubmitPayloadRef.current = getSubmitPayload;
-    spawnFieldsRef.current = { mode, selection, organizationId };
+    spawnFieldsRef.current = { mode, selection, organizationId, cloneFromKiloSessionId };
     onSpawnAdmittedRef.current = onSpawnAdmitted;
     onSpawnFailedRef.current = onSpawnFailed;
-  }, [getSubmitPayload, mode, selection, organizationId, onSpawnAdmitted, onSpawnFailed]);
+    onSpawnReadyRef.current = onSpawnReady;
+    onCloneImportFailureRef.current = onCloneImportFailure;
+  }, [
+    getSubmitPayload,
+    mode,
+    selection,
+    organizationId,
+    cloneFromKiloSessionId,
+    onSpawnAdmitted,
+    onSpawnFailed,
+    onSpawnReady,
+    onCloneImportFailure,
+  ]);
 
   const onStart = useCallback(() => {
     if (runOnInstance === null) {
@@ -209,6 +247,14 @@ export function useRemoteSpawnDispatch({
       toast.error(admission.toast);
       return;
     }
+    // Clone entry: the selected instance must advertise `sessionClone` before
+    // we send the source id. Fail before spawn (and before admitting the
+    // attempt) when the flag is missing, so the route shows the inline
+    // "cannot continue" note instead of firing a spawn that the CLI rejects.
+    if (fields.cloneFromKiloSessionId && runOnInstance.capabilities?.sessionClone !== true) {
+      onCloneImportFailureRef.current?.('agentChat.newSession.cliCannotContinue');
+      return;
+    }
     // Admission passed and voice settlement already happened at the caller:
     // commit to the spawn attempt. The route arms its draft-clearing marker
     // here, so a tap that stops at admission can never clear the draft.
@@ -217,6 +263,7 @@ export function useRemoteSpawnDispatch({
       mode: fields.mode,
       selection: fields.selection,
       organizationId: fields.organizationId,
+      cloneFromKiloSessionId: fields.cloneFromKiloSessionId,
     });
     void (async () => {
       setIsResolvingInstance(true);
@@ -262,6 +309,9 @@ export function useRemoteSpawnDispatch({
           // The spawn settled; the next submit is a fresh intent.
           rotateKey();
           const spawnedPath = getSpawnedAgentSessionPath(outcome.sessionID, organizationId);
+          // Arm the clone entry's busy leave-lock bypass right before the
+          // success replace so the navigation is not intercepted as an abandon.
+          onSpawnReadyRef.current?.();
           if (submitPayload === null) {
             router.replace(spawnedPath);
             return;
@@ -281,12 +331,26 @@ export function useRemoteSpawnDispatch({
         if (outcome.status === 'nonRetryable') {
           // A typed non-retryable rejection ends the intent.
           rotateKey();
+          const cloneFailureKey = fields.cloneFromKiloSessionId
+            ? resolveCloneImportFailure(outcome)
+            : null;
+          if (cloneFailureKey !== null) {
+            // Delivered clone/import error: surface the inline reason under
+            // "Run on" instead of the generic spawn toast.
+            onCloneImportFailureRef.current?.(cloneFailureKey);
+            return;
+          }
           toast.error(remoteSpawnNonRetryableToast());
           return;
         }
-        // outcome.status === 'retryable': refetch the instance list and
-        // re-evaluate whether the previously-selected instance is still
-        // present.
+        // outcome.status === 'retryable': a clone/import retry keeps the form
+        // and re-enables Start; the selection is never reset to Cloud Agent.
+        if (fields.cloneFromKiloSessionId) {
+          toast.error(i18n.t('agentChat.session.cloneFailedRetry'));
+          return;
+        }
+        // Non-clone retryable: refetch the instance list and re-evaluate
+        // whether the previously-selected instance is still present.
         toast.error(remoteSpawnRetryableToast());
         // Seed from the fresh pre-spawn list, not the press-time
         // `instanceList`: if the spawn remapped the selection to a live

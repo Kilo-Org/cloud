@@ -10,7 +10,7 @@ import * as Haptics from 'expo-haptics';
 
 import { normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
-import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
+import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
 import { i18n } from '@/i18n';
 import { useHoistedOperationKey } from '@/lib/operation-key';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
@@ -19,7 +19,9 @@ import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 export function useContinueCloudCreate(
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  /** Invoked once the clone settled, right before the success navigation. */
+  onCreated?: () => void
 ): (
   sessionId: KiloSessionId,
   dest: { repo: string; model: string; variant: string },
@@ -118,7 +120,16 @@ export function useContinueCloudCreate(
           // A failed haptics call is cosmetic; stay silent and navigate.
         }
         try {
-          router.push(getAgentSessionPath(result.kiloSessionId, organizationId));
+          // Arm the route's busy leave-lock bypass right before the replace so
+          // the success navigation is not intercepted as an abandon.
+          onCreated?.();
+        } catch {
+          // The session exists; a host callback failure must not skip navigation.
+        }
+        try {
+          // Replace (not push) the continue form with the cloned session so
+          // back from the new session returns to the source session.
+          replaceWithAgentSession(router, result.kiloSessionId, organizationId);
         } catch {
           // A navigation failure is not a create failure.
         }
@@ -142,6 +153,7 @@ export function useContinueCloudCreate(
       writeSafeRetry,
       removeOutboxRow,
       whenLoaded,
+      onCreated,
     ]
   );
 }

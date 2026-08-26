@@ -1,0 +1,229 @@
+/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount the hook under vitest (node env, no jsdom) */
+/* eslint-disable require-await, @typescript-eslint/require-await -- the fake mutate/outbox factories settle without await */
+import * as React from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
+
+import { useContinueCloudCreate } from './use-continue-cloud-create';
+
+const prepareSessionMutate = vi.hoisted(() => vi.fn());
+const routerReplace = vi.hoisted(() => vi.fn());
+const routerPush = vi.hoisted(() => vi.fn());
+const captureEventMock = vi.hoisted(() => vi.fn());
+const invalidateAgentSessionQueries = vi.hoisted(() => vi.fn(async () => undefined));
+
+const operationKeyMock = vi.hoisted(() => ({
+  getKey: vi.fn((_fingerprint: string): string => 'op-key-1'),
+  rotateKey: vi.fn(),
+}));
+
+const outboxMock = vi.hoisted(() => ({
+  getStoredOperationKey: vi.fn((_fingerprint: string): string | null => null),
+  writeSafeRetry: vi.fn(async (): Promise<void> => undefined),
+  remove: vi.fn(async (): Promise<void> => undefined),
+  whenLoaded: vi.fn(async (): Promise<boolean> => true),
+}));
+
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ replace: routerReplace, push: routerPush }),
+}));
+
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({}),
+}));
+
+vi.mock('expo-haptics', () => ({
+  notificationAsync: async (): Promise<void> => undefined,
+  NotificationFeedbackType: { Success: 'success' },
+}));
+
+vi.mock('@/lib/agent-session-cache', () => ({
+  invalidateAgentSessionQueries,
+}));
+
+vi.mock('@/lib/analytics/posthog', () => ({
+  captureEvent: captureEventMock,
+  SESSION_CREATED_EVENT: 'session_created',
+}));
+
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {
+    cloudAgentNext: { prepareSession: { mutate: prepareSessionMutate } },
+    organizations: { cloudAgentNext: { prepareSession: { mutate: prepareSessionMutate } } },
+  },
+  useTRPC: () => ({}),
+}));
+
+vi.mock('@/lib/operation-key', () => ({
+  useHoistedOperationKey: () => operationKeyMock,
+}));
+
+vi.mock('@/lib/persist/use-mutation-outbox', () => ({
+  useMutationOutbox: () => outboxMock,
+}));
+
+// Mirror of the real retryability predicate (covered by its own suite); this
+// test only needs to distinguish one retryable and one terminal shape so the
+// hook's key/outbox behavior is exercised per branch.
+vi.mock('@/components/agents/mobile-session-manager', () => ({
+  isCloudPrepareRetryableError: (error: unknown) => {
+    const record = error as { data?: { code?: string }; code?: string; message?: string };
+    const code = record.data?.code ?? record.code;
+    if (code === undefined) {
+      return true;
+    }
+    if (code === 'CONFLICT') {
+      return record.message === 'creation_in_progress';
+    }
+    return new Set([
+      'INTERNAL_SERVER_ERROR',
+      'BAD_GATEWAY',
+      'SERVICE_UNAVAILABLE',
+      'GATEWAY_TIMEOUT',
+      'TIMEOUT',
+      'TOO_MANY_REQUESTS',
+    ]).has(code);
+  },
+}));
+
+type RunContinue = ReturnType<typeof useContinueCloudCreate>;
+
+function Harness({
+  organizationId,
+  onCreated,
+  resultRef,
+}: {
+  organizationId: string | undefined;
+  onCreated: (() => void) | undefined;
+  resultRef: { current: RunContinue | null };
+}) {
+  const run = useContinueCloudCreate(organizationId, onCreated);
+  resultRef.current = run;
+  return null;
+}
+
+function mountContinue(organizationId?: string, onCreated?: () => void): RunContinue {
+  const resultRef: { current: RunContinue | null } = { current: null };
+  act(() => {
+    TestRenderer.create(React.createElement(Harness, { organizationId, onCreated, resultRef }));
+  });
+  const run = resultRef.current;
+  if (run === null) {
+    throw new Error('useContinueCloudCreate did not run');
+  }
+  return run;
+}
+
+const SOURCE_SESSION = 'ses_source' as KiloSessionId;
+const DEST = { repo: 'owner/repo', model: 'claude-x', variant: 'high' };
+const SESSION_RESULT = { kiloSessionId: 'ses_12345678901234567890123456' };
+
+function creationInProgressError(): Error {
+  return Object.assign(new Error('creation_in_progress'), { data: { code: 'CONFLICT' } });
+}
+
+function badRequestError(): Error {
+  return Object.assign(new Error('session_creation_failed'), { data: { code: 'BAD_REQUEST' } });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  prepareSessionMutate.mockResolvedValue(SESSION_RESULT);
+  invalidateAgentSessionQueries.mockResolvedValue(undefined);
+  operationKeyMock.getKey.mockReturnValue('op-key-1');
+  outboxMock.getStoredOperationKey.mockReturnValue(null);
+  outboxMock.writeSafeRetry.mockResolvedValue(undefined);
+  outboxMock.remove.mockResolvedValue(undefined);
+  outboxMock.whenLoaded.mockResolvedValue(true);
+});
+
+describe('useContinueCloudCreate', () => {
+  it('success replaces the route (replaceWithAgentSession, never push)', async () => {
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await run(SOURCE_SESSION, DEST, 'code');
+    });
+
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+    expect(routerReplace).toHaveBeenCalledWith(
+      expect.stringContaining('agent-chat/ses_12345678901234567890123456')
+    );
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it('runs a clone-only prepare: no prompt or initialMessageId', async () => {
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await run(SOURCE_SESSION, DEST, 'code');
+    });
+
+    const input = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input).toMatchObject({
+      mode: 'code',
+      model: 'claude-x',
+      variant: 'high',
+      githubRepo: 'owner/repo',
+      autoCommit: false,
+      autoInitiate: true,
+      cloneFromKiloSessionId: 'ses_source',
+      operationKey: 'op-key-1',
+      organizationId: 'org-1',
+    });
+    expect(input).not.toHaveProperty('prompt');
+    expect(input).not.toHaveProperty('initialMessageId');
+  });
+
+  it('rethrows a retryable prepare error without rotating the key or removing the row (route toasts cloneFailedRetry and re-enables)', async () => {
+    prepareSessionMutate.mockRejectedValueOnce(creationInProgressError());
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await expect(run(SOURCE_SESSION, DEST, 'code')).rejects.toThrow('creation_in_progress');
+    });
+
+    // The retry keeps the same operation key and the safe-retry row, so the
+    // next Start tap replays the intent instead of minting a duplicate.
+    expect(operationKeyMock.rotateKey).not.toHaveBeenCalled();
+    expect(outboxMock.remove).not.toHaveBeenCalled();
+  });
+
+  it('rethrows a non-retryable prepare error after rotating the key and removing the row (route toasts the message)', async () => {
+    prepareSessionMutate.mockRejectedValueOnce(badRequestError());
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await expect(run(SOURCE_SESSION, DEST, 'code')).rejects.toThrow('session_creation_failed');
+    });
+
+    expect(operationKeyMock.rotateKey).toHaveBeenCalledTimes(1);
+    expect(outboxMock.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires the onCreated bypass right before the success replace', async () => {
+    const onCreated = vi.fn(() => undefined);
+    const run = mountContinue('org-1', onCreated);
+
+    await act(async () => {
+      await run(SOURCE_SESSION, DEST, 'code');
+    });
+
+    expect(onCreated).toHaveBeenCalledTimes(1);
+    // The route arms its busy leave-lock bypass before the replace lands.
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+  });
+
+  it('prepares against the personal router when no organization is scoped', async () => {
+    const run = mountContinue(undefined);
+
+    await act(async () => {
+      await run(SOURCE_SESSION, DEST, 'code');
+    });
+
+    const input = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input).not.toHaveProperty('organizationId');
+    expect(input).toMatchObject({ cloneFromKiloSessionId: 'ses_source' });
+  });
+});

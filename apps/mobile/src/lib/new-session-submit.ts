@@ -103,3 +103,46 @@ export function resolveNewSessionStartDisabled(input: {
     }) || input.isProfileLoading
   );
 }
+
+/**
+ * Whether the continue-form Start button is disabled. Distinct from the
+ * ordinary new-session gate: a clone carries no prompt and no profile
+ * requirement.
+ *
+ *   - Clone Cloud Agent: disabled while creating, submitting, without a model,
+ *     or without a repository. Empty prompt and profile loading do NOT block.
+ *   - Clone live CLI: disabled while spawning, submitting, without a model,
+ *     while the instance catalog is loading, when the instance lacks the
+ *     `sessionClone` capability, or while a delivered clone/import failure is
+ *     shown inline. Empty prompt, empty repository, and profile loading do NOT
+ *     block.
+ *
+ * `hasPrompt` and `isProfileLoading` are accepted but deliberately ignored so
+ * callers can reuse the same shape as the ordinary gate; the tests pin that
+ * the clone path never falls back to the prompt/profile rules.
+ */
+export function resolveContinueStartDisabled(input: {
+  hasPrompt: boolean;
+  isCreating: boolean;
+  isSubmitting: boolean;
+  isSpawningRemote: boolean;
+  model: string;
+  selectedRepo: string;
+  isRemoteTargetSelected: boolean;
+  instanceCatalogLoading: boolean;
+  instanceHasSessionClone: boolean;
+  isProfileLoading: boolean;
+  cloneImportFailureKey: string | null;
+}): boolean {
+  if (input.isRemoteTargetSelected) {
+    return (
+      input.isSpawningRemote ||
+      input.isSubmitting ||
+      input.model === '' ||
+      input.instanceCatalogLoading ||
+      !input.instanceHasSessionClone ||
+      input.cloneImportFailureKey !== null
+    );
+  }
+  return input.isCreating || input.isSubmitting || input.model === '' || input.selectedRepo === '';
+}

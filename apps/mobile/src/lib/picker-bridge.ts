@@ -63,7 +63,7 @@ export type InstancePickerInstance = {
   projectName: string;
   version?: string;
   /** Optional capability map carried through from the tRPC row. */
-  capabilities?: { attachments?: boolean };
+  capabilities?: { attachments?: boolean; sessionClone?: boolean };
 };
 
 type InstancePickerBridge = {

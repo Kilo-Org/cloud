@@ -108,6 +108,52 @@ function getFirstParam(record: Record<string, string | string[] | undefined>, ke
 }
 
 /**
+ * Build the new-session route `Href` for a Continue entry. Starts at
+ * `/(app)/agent-chat/new`, appends `organizationId` when the source has one
+ * (same pattern as `new-task-button.tsx`), then the prefill keys, then the
+ * clone id and the clone-source title. An empty title is omitted so the form
+ * falls back to the session title.
+ */
+export function buildContinueHref(input: {
+  organizationId?: string | null;
+  cloneFromKiloSessionId: string;
+  cloneSourceTitle?: string | null;
+  prefill: NewSessionPrefillParams;
+}): string {
+  let href = '/(app)/agent-chat/new';
+  if (input.organizationId) {
+    href = `${href}?organizationId=${encodeURIComponent(input.organizationId)}`;
+  }
+  href = appendNewSessionPrefill(href, input.prefill);
+
+  const entries: [string, string][] = [];
+  if (input.cloneFromKiloSessionId) {
+    entries.push(['cloneFromKiloSessionId', input.cloneFromKiloSessionId]);
+  }
+  if (input.cloneSourceTitle) {
+    entries.push(['cloneSourceTitle', input.cloneSourceTitle]);
+  }
+  if (entries.length === 0) {
+    return href;
+  }
+  const separator = href.includes('?') ? '&' : '?';
+  const query = entries.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+  return `${href}${separator}${query}`;
+}
+
+/** Read the clone source session id from route search params (first array value). */
+export function readCloneFromKiloSessionId(
+  raw: Record<string, string | string[] | undefined>
+): string {
+  return getFirstParam(raw, 'cloneFromKiloSessionId');
+}
+
+/** Read the clone source title from route search params (first array value). */
+export function readCloneSourceTitle(raw: Record<string, string | string[] | undefined>): string {
+  return getFirstParam(raw, 'cloneSourceTitle');
+}
+
+/**
  * Read prefill values from route search params. Each param can be
  * `string | string[]` — take the first element of an array. Mode is
  * always normalized to a valid `AgentMode`. Empty strings are treated

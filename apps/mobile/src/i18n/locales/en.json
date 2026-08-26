@@ -2186,7 +2186,11 @@
       "keepEditing": "Keep editing",
       "discard": "Discard",
       "discardFailed": "Could not discard the draft. Please try again.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "continueFrom": "Continuing {{title}}",
+      "importingSession": "Importing session",
+      "cliCannotContinue": "This CLI cannot continue a session. Pick Cloud Agent or another CLI.",
+      "importFailed": "Couldn't import this session."
     },
     "partRenderer": {
       "updatedFileCount_one": "Updated {{displayCount}} file",

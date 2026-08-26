@@ -35,7 +35,7 @@ jobs:
     environment: production
 
     env:
-      VERCEL_VERSION: '53.3.1'
+      VERCEL_VERSION: '59.5.0'
 
     steps:
       - name: Install Vercel CLI

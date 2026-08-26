@@ -52,6 +52,27 @@ describe('computeNextCronTime', () => {
   it('returns null for invalid expression', () => {
     expect(computeNextCronTime('invalid', 'UTC')).toBeNull();
   });
+
+  it('returns the occurrence after a given reference time, not after now', () => {
+    // Every minute, anchored on a fixed reference in the past relative to "now"
+    // but in the future relative to some earlier point — the result should be
+    // strictly after the reference, regardless of the current wall-clock time.
+    const reference = new Date(Date.now() + 5 * 60_000); // 5 minutes from now
+    const next = computeNextCronTime('* * * * *', 'UTC', reference);
+    expect(next).toBeInstanceOf(Date);
+    expect(next!.getTime()).toBeGreaterThan(reference.getTime());
+  });
+
+  it('does not return the same occurrence twice when called again before that occurrence passes', () => {
+    // Simulates the alarm firing early: compute the target occurrence, then
+    // immediately ask for the "next" occurrence using that target as the reference.
+    // It must advance past it instead of returning the same time again.
+    const first = computeNextCronTime('* * * * *', 'UTC');
+    expect(first).toBeInstanceOf(Date);
+    const second = computeNextCronTime('* * * * *', 'UTC', first!);
+    expect(second).toBeInstanceOf(Date);
+    expect(second!.getTime()).toBeGreaterThan(first!.getTime());
+  });
 });
 
 describe('enforcesMinimumInterval', () => {

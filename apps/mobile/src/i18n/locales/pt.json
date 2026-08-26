@@ -2971,7 +2971,7 @@
         "credits_expired": "Créditos expirados"
       },
       "loadMore": "Carregar mais",
-      "loadMoreFailed": "Não foi possível carregar mais.",
+      "loadMoreFailed": "Não foi possível carregar mais",
       "truncated": "Está disponível atividade de crédito mais antiga."
     },
     "inviteMember": {
@@ -3001,7 +3001,7 @@
         "unknown": "Desconhecido"
       },
       "loadMore": "Carregar mais",
-      "loadMoreFailed": "Não foi possível carregar mais.",
+      "loadMoreFailed": "Não foi possível carregar mais",
       "truncated": "Estão disponíveis faturas mais antigas."
     },
     "lowBalanceAlert": {

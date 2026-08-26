@@ -2951,7 +2951,7 @@
         "credits_expired": "Créditos caducados"
       },
       "loadMore": "Cargar máis",
-      "loadMoreFailed": "Non se puido cargar máis.",
+      "loadMoreFailed": "Non se puideron cargar máis",
       "truncated": "Hai dispoñible actividade de crédito máis antiga."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "Descoñecido"
       },
       "loadMore": "Cargar máis",
-      "loadMoreFailed": "Non se puido cargar máis.",
+      "loadMoreFailed": "Non se puideron cargar máis",
       "truncated": "Hai facturas máis antigas dispoñibles."
     },
     "lowBalanceAlert": {

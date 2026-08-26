@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "Àtúnṣe ìṣirò-owó",
         "credits_expired": "Àwọn kíredìtì ti parí"
       },
-      "loadMore": "Ṣàgbé síwájú síi",
-      "loadMoreFailed": "Kò lè ṣàgbé síwájú síi.",
+      "loadMore": "Kojọ diẹ sii",
+      "loadMoreFailed": "Kò lè gbé síwájú síi",
       "truncated": "Ìgbòkègbodò àwọn iṣẹ́ àwíjàre tó ti gbọjú wà."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "Àìlègbà",
         "unknown": "Àìmọ̀"
       },
-      "loadMore": "Ṣàgbé síwájú síi",
-      "loadMoreFailed": "Kò lè ṣàgbé síwájú síi.",
+      "loadMore": "Kojọ diẹ sii",
+      "loadMoreFailed": "Kò lè gbé síwájú síi",
       "truncated": "Àwọn ìwé-owó tó ti gbọjú wà."
     },
     "lowBalanceAlert": {

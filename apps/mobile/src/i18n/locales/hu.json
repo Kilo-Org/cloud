@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "Számviteli kiigazítás",
         "credits_expired": "Lejárt kreditek"
       },
-      "loadMore": "Továbbiak betöltése",
-      "loadMoreFailed": "A továbbiak betöltése nem sikerült.",
+      "loadMore": "További betöltése",
+      "loadMoreFailed": "Nem sikerült betölteni továbbiakat",
       "truncated": "Korábbi hitelaktivitás érhető el."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "Behajthatatlan",
         "unknown": "Ismeretlen"
       },
-      "loadMore": "Továbbiak betöltése",
-      "loadMoreFailed": "A továbbiak betöltése nem sikerült.",
+      "loadMore": "További betöltése",
+      "loadMoreFailed": "Nem sikerült betölteni továbbiakat",
       "truncated": "Korábbi számlák érhetők el."
     },
     "lowBalanceAlert": {

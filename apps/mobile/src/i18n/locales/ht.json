@@ -2951,7 +2951,7 @@
         "credits_expired": "Kredi ekspire"
       },
       "loadMore": "Chaje plis",
-      "loadMoreFailed": "Nou pa t ka chaje plis.",
+      "loadMoreFailed": "Pa t ka chaje plis",
       "truncated": "Gen plis aktivite kredi ki pi ansyen disponib."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "Enkoni"
       },
       "loadMore": "Chaje plis",
-      "loadMoreFailed": "Nou pa t ka chaje plis.",
+      "loadMoreFailed": "Pa t ka chaje plis",
       "truncated": "Gen plis fakti ki pi ansyen disponib."
     },
     "lowBalanceAlert": {

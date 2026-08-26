@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "Sirreeffama herregaa",
         "credits_expired": "Kiriiditiin xumuramte"
       },
-      "loadMore": "Itti dabalii",
-      "loadMoreFailed": "Dabalataan baachuu hin dandeenye.",
+      "loadMore": "Dabalata fayyadami",
+      "loadMoreFailed": "Dabalataa fe'achuu hin dandeenye",
       "truncated": "Sochii kireedii durii argachuun ni danda'ama."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "Kan walitti hin qabamne",
         "unknown": "Hin beekamu"
       },
-      "loadMore": "Itti dabalii",
-      "loadMoreFailed": "Dabalataan baachuu hin dandeenye.",
+      "loadMore": "Dabalata fayyadami",
+      "loadMoreFailed": "Dabalataa fe'achuu hin dandeenye",
       "truncated": "Baallii durii argachuun ni danda'ama."
     },
     "lowBalanceAlert": {

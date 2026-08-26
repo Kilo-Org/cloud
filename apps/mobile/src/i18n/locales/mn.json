@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "Нягтлан бодох бүртгэлийн тохируулга",
         "credits_expired": "Кредит дууссан"
       },
-      "loadMore": "Цааш ачаалах",
-      "loadMoreFailed": "Цааш ачаалах боломжгүй.",
+      "loadMore": "Нэмэлт ачаалах",
+      "loadMoreFailed": "Нэмэлт ачаалж чадсангүй",
       "truncated": "Хуучин кредит үйл ажиллагааг үзэх боломжтой."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "Цуглуулах боломжгүй",
         "unknown": "Тодорхойгүй"
       },
-      "loadMore": "Цааш ачаалах",
-      "loadMoreFailed": "Цааш ачаалах боломжгүй.",
+      "loadMore": "Нэмэлт ачаалах",
+      "loadMoreFailed": "Нэмэлт ачаалж чадсангүй",
       "truncated": "Хуучин нэхэмжлэлийг үзэх боломжтой."
     },
     "lowBalanceAlert": {

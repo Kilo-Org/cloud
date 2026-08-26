@@ -2951,7 +2951,7 @@
         "credits_expired": "Кредиттердің мерзімі аяқталды"
       },
       "loadMore": "Көбірек жүктеу",
-      "loadMoreFailed": "Көбірек жүктелмеді.",
+      "loadMoreFailed": "Қосымша жүктелмеді",
       "truncated": "Ескі несие белсенділігі қолжетімді."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "Белгісіз"
       },
       "loadMore": "Көбірек жүктеу",
-      "loadMoreFailed": "Көбірек жүктелмеді.",
+      "loadMoreFailed": "Қосымша жүктелмеді",
       "truncated": "Ескі шот-фактуралар қолжетімді."
     },
     "lowBalanceAlert": {

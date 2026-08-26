@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "Ukulungiswa kwezimali",
         "credits_expired": "Amakhredithi aphelelwe yisikhathi"
       },
-      "loadMore": "Layisha okunye",
-      "loadMoreFailed": "Ayikwazanga ukulayisha okunye.",
+      "loadMore": "Layisha okwengeziwe",
+      "loadMoreFailed": "Asikwazanga ukulayisha okwengeziwe",
       "truncated": "Umsebenzi wekhredithi omdala uyatholakala."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "Okungakhokhiwa",
         "unknown": "Okungaziwa"
       },
-      "loadMore": "Layisha okunye",
-      "loadMoreFailed": "Ayikwazanga ukulayisha okunye.",
+      "loadMore": "Layisha okwengeziwe",
+      "loadMoreFailed": "Asikwazanga ukulayisha okwengeziwe",
       "truncated": "Ama-invoyisi amadala ayatholakala."
     },
     "lowBalanceAlert": {

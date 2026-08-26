@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "అకౌంటింగ్ సర్దుబాటు",
         "credits_expired": "క్రెడిట్లు గడువు ముగిశాయి"
       },
-      "loadMore": "మరిన్ని లోడ్ చేయండి",
-      "loadMoreFailed": "మరిన్ని లోడ్ చేయలేకపోయాము.",
+      "loadMore": "మరింత లోడ్ చేయండి",
+      "loadMoreFailed": "మరిన్ని లోడ్ చేయలేకపోయాము",
       "truncated": "పాత క్రెడిట్ కార్యకలాపం అందుబాటులో ఉంది."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "వసూలు చేయలేనిది",
         "unknown": "తెలియదు"
       },
-      "loadMore": "మరిన్ని లోడ్ చేయండి",
-      "loadMoreFailed": "మరిన్ని లోడ్ చేయలేకపోయాము.",
+      "loadMore": "మరింత లోడ్ చేయండి",
+      "loadMoreFailed": "మరిన్ని లోడ్ చేయలేకపోయాము",
       "truncated": "పాత ఇన్వాయిస్లు అందుబాటులో ఉన్నాయి."
     },
     "lowBalanceAlert": {

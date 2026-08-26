@@ -2937,7 +2937,7 @@
         "credits_expired": "Abgelaufene Credits"
       },
       "loadMore": "Mehr laden",
-      "loadMoreFailed": "Konnte nicht mehr laden.",
+      "loadMoreFailed": "Mehr konnte nicht geladen werden",
       "truncated": "Ältere Guthabenaktivität ist verfügbar."
     },
     "hub": {
@@ -2976,7 +2976,7 @@
         "unknown": "Unbekannt"
       },
       "loadMore": "Mehr laden",
-      "loadMoreFailed": "Konnte nicht mehr laden.",
+      "loadMoreFailed": "Mehr konnte nicht geladen werden",
       "truncated": "Ältere Rechnungen sind verfügbar."
     },
     "lowBalanceAlert": {

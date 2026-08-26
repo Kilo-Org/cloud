@@ -2951,7 +2951,7 @@
         "credits_expired": "Սպառված կրեդիտներ"
       },
       "loadMore": "Բեռնել ավելին",
-      "loadMoreFailed": "Չհաջողվեց բեռնել ավելին։",
+      "loadMoreFailed": "Չհաջողվեց բեռնել ավելին",
       "truncated": "Հին վարկային գործունեությունը հասանելի է։"
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "Անհայտ"
       },
       "loadMore": "Բեռնել ավելին",
-      "loadMoreFailed": "Չհաջողվեց բեռնել ավելին։",
+      "loadMoreFailed": "Չհաջողվեց բեռնել ավելին",
       "truncated": "Հին հաշիվ-ապրանքագրերը հասանելի են։"
     },
     "lowBalanceAlert": {

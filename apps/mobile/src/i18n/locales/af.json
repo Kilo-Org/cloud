@@ -2951,7 +2951,7 @@
         "credits_expired": "Krediete verval"
       },
       "loadMore": "Laai meer",
-      "loadMoreFailed": "Kon nie meer laai nie.",
+      "loadMoreFailed": "Kon nie meer laai nie",
       "truncated": "Ouer kredietaktiwiteit is beskikbaar."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "Onbekend"
       },
       "loadMore": "Laai meer",
-      "loadMoreFailed": "Kon nie meer laai nie.",
+      "loadMoreFailed": "Kon nie meer laai nie",
       "truncated": "Ouer faktuur is beskikbaar."
     },
     "lowBalanceAlert": {

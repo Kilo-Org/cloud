@@ -2951,7 +2951,7 @@
         "credits_expired": "କ୍ରେଡିଟ୍ ସମାପ୍ତ"
       },
       "loadMore": "ଅଧିକ ଲୋଡ୍ କରନ୍ତୁ",
-      "loadMoreFailed": "ଅଧିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "loadMoreFailed": "ଅଧିକ ଲୋଡ୍ କରାଯାଇ ପାରିଲା ନାହିଁ",
       "truncated": "ପୁରୁଣା କ୍ରେଡିଟ୍ କାର୍ଯ୍ୟକଳାପ ଉପଲବ୍ଧ।"
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "ଅଜଣା"
       },
       "loadMore": "ଅଧିକ ଲୋଡ୍ କରନ୍ତୁ",
-      "loadMoreFailed": "ଅଧିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "loadMoreFailed": "ଅଧିକ ଲୋଡ୍ କରାଯାଇ ପାରିଲା ନାହିଁ",
       "truncated": "ପୁରୁଣା ଇନଭଏସ୍ ଉପଲବ୍ଧ।"
     },
     "lowBalanceAlert": {

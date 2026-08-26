@@ -2951,7 +2951,7 @@
         "credits_expired": "Kredítur runnu út"
       },
       "loadMore": "Hlaða meira",
-      "loadMoreFailed": "Ekki tókst að hlaða meira.",
+      "loadMoreFailed": "Ekki tókst að hlaða meira",
       "truncated": "Eldri kreditfærsla er í boði."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "Óþekkt"
       },
       "loadMore": "Hlaða meira",
-      "loadMoreFailed": "Ekki tókst að hlaða meira.",
+      "loadMoreFailed": "Ekki tókst að hlaða meira",
       "truncated": "Eldri reikningar eru í boði."
     },
     "lowBalanceAlert": {

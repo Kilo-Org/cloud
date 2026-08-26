@@ -3031,7 +3031,7 @@
         "credits_expired": "Credydau wedi dod i ben"
       },
       "loadMore": "Llwytho mwy",
-      "loadMoreFailed": "Methwyd llwytho mwy.",
+      "loadMoreFailed": "Ni ellid llwytho mwy",
       "truncated": "Mae gweithgaredd credyd hŷn ar gael."
     },
     "inviteMember": {
@@ -3061,7 +3061,7 @@
         "unknown": "Anhysbys"
       },
       "loadMore": "Llwytho mwy",
-      "loadMoreFailed": "Methwyd llwytho mwy.",
+      "loadMoreFailed": "Ni ellid llwytho mwy",
       "truncated": "Mae anfonebau hŷn ar gael."
     },
     "lowBalanceAlert": {

@@ -2951,7 +2951,7 @@
         "credits_expired": "بەسەرچوونی کرێدت"
       },
       "loadMore": "بارکردنی زیاتر",
-      "loadMoreFailed": "نەتوانرا زیاتر بار بکرێت.",
+      "loadMoreFailed": "نەتوانرا زیاتر بار بکرێت",
       "truncated": "چالاکی بەرایی کۆنیتر بەردەستە."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "نەزانراو"
       },
       "loadMore": "بارکردنی زیاتر",
-      "loadMoreFailed": "نەتوانرا زیاتر بار بکرێت.",
+      "loadMoreFailed": "نەتوانرا زیاتر بار بکرێت",
       "truncated": "فاکتورە کۆنەکان بەردەستن."
     },
     "lowBalanceAlert": {

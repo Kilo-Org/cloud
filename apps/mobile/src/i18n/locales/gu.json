@@ -2951,7 +2951,7 @@
         "credits_expired": "ક્રેડિટ સમાપ્ત થઈ"
       },
       "loadMore": "વધુ લોડ કરો",
-      "loadMoreFailed": "વધુ લોડ કરી શકાયું નથી.",
+      "loadMoreFailed": "વધુ લોડ કરી શકાયું નહીં",
       "truncated": "જૂની ક્રેડિટ પ્રવૃત્તિ ઉપલબ્ધ છે."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "અજ્ઞાત"
       },
       "loadMore": "વધુ લોડ કરો",
-      "loadMoreFailed": "વધુ લોડ કરી શકાયું નથી.",
+      "loadMoreFailed": "વધુ લોડ કરી શકાયું નહીં",
       "truncated": "જૂના ઇન્વૉઇસ ઉપલબ્ધ છે."
     },
     "lowBalanceAlert": {

@@ -2951,7 +2951,7 @@
         "credits_expired": "ឥណទានផុតកំណត់"
       },
       "loadMore": "ផ្ទុកបន្ថែម",
-      "loadMoreFailed": "មិនអាចផ្ទុកបន្ថែមទៀតបានទេ។",
+      "loadMoreFailed": "មិនអាចផ្ទុកបន្ថែមបានទេ",
       "truncated": "សកម្មភាពឥណទានចាស់ៗអាចប្រើបាន។"
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "មិនស្គាល់"
       },
       "loadMore": "ផ្ទុកបន្ថែម",
-      "loadMoreFailed": "មិនអាចផ្ទុកបន្ថែមទៀតបានទេ។",
+      "loadMoreFailed": "មិនអាចផ្ទុកបន្ថែមបានទេ",
       "truncated": "វិក្កយបត្រចាស់ៗអាចប្រើបាន។"
     },
     "lowBalanceAlert": {

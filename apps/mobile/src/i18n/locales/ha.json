@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "Daidaitawar lissafin kuɗi",
         "credits_expired": "Credits sun ƙare"
       },
-      "loadMore": "Ɗauke ƙari",
-      "loadMoreFailed": "Ba a iya Ɗauke ƙari ba.",
+      "loadMore": "Ɗauki ƙari",
+      "loadMoreFailed": "Ba a iya ƙara ɗora ba",
       "truncated": "Ayyukan bashi na baya suna nan."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "Ba za a iya karɓa ba",
         "unknown": "Ba a sani ba"
       },
-      "loadMore": "Ɗauke ƙari",
-      "loadMoreFailed": "Ba a iya Ɗauke ƙari ba.",
+      "loadMore": "Ɗauki ƙari",
+      "loadMoreFailed": "Ba a iya ƙara ɗora ba",
       "truncated": "Lissafin kuɗi na baya suna nan."
     },
     "lowBalanceAlert": {

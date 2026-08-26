@@ -2937,7 +2937,7 @@
         "credits_expired": "积分已过期"
       },
       "loadMore": "加载更多",
-      "loadMoreFailed": "无法加载更多。",
+      "loadMoreFailed": "无法加载更多",
       "truncated": "可查看更早的信用活动。"
     },
     "hub": {
@@ -2976,7 +2976,7 @@
         "unknown": "未知"
       },
       "loadMore": "加载更多",
-      "loadMoreFailed": "无法加载更多。",
+      "loadMoreFailed": "无法加载更多",
       "truncated": "可查看更早的发票。"
     },
     "lowBalanceAlert": {

@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "Mühasibat düzəlişi",
         "credits_expired": "Kreditlərin müddəti bitib"
       },
-      "loadMore": "Yüklə",
-      "loadMoreFailed": "Daha çox yüklənmədi.",
+      "loadMore": "Daha çox yüklə",
+      "loadMoreFailed": "Daha çox yüklənə bilmədi",
       "truncated": "Köhnə kredit fəaliyyəti mövcuddur."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "Yığıla bilməyən",
         "unknown": "Naməlum"
       },
-      "loadMore": "Yüklə",
-      "loadMoreFailed": "Daha çox yüklənmədi.",
+      "loadMore": "Daha çox yüklə",
+      "loadMoreFailed": "Daha çox yüklənə bilmədi",
       "truncated": "Köhnə qaimələr mövcuddur."
     },
     "lowBalanceAlert": {

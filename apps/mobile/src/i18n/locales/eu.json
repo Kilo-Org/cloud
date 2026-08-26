@@ -2951,7 +2951,7 @@
         "credits_expired": "Kredituak iraungita"
       },
       "loadMore": "Kargatu gehiago",
-      "loadMoreFailed": "Ezin izan da gehiago kargatu.",
+      "loadMoreFailed": "Ezin izan dira gehiago kargatu",
       "truncated": "Kreditu-jarduera zaharragoa eskuragarri dago."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "Ezezaguna"
       },
       "loadMore": "Kargatu gehiago",
-      "loadMoreFailed": "Ezin izan da gehiago kargatu.",
+      "loadMoreFailed": "Ezin izan dira gehiago kargatu",
       "truncated": "Faktura zaharrak eskuragarri daude."
     },
     "lowBalanceAlert": {

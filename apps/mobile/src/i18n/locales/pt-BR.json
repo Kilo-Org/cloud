@@ -2957,7 +2957,7 @@
         "credits_expired": "Créditos expirados"
       },
       "loadMore": "Carregar mais",
-      "loadMoreFailed": "Não foi possível carregar mais.",
+      "loadMoreFailed": "Não foi possível carregar mais",
       "truncated": "A atividade de crédito mais antiga está disponível."
     },
     "hub": {
@@ -2996,7 +2996,7 @@
         "unknown": "Desconhecido"
       },
       "loadMore": "Carregar mais",
-      "loadMoreFailed": "Não foi possível carregar mais.",
+      "loadMoreFailed": "Não foi possível carregar mais",
       "truncated": "As faturas mais antigas estão disponíveis."
     },
     "lowBalanceAlert": {

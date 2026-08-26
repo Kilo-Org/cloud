@@ -2957,7 +2957,7 @@
         "credits_expired": "הקרדיטים פגו"
       },
       "loadMore": "טען עוד",
-      "loadMoreFailed": "לא ניתן היה לטעון עוד.",
+      "loadMoreFailed": "לא ניתן היה לטעון עוד",
       "truncated": "קיימת פעילות אשראי ישנה יותר."
     },
     "hub": {
@@ -2996,7 +2996,7 @@
         "unknown": "לא ידוע"
       },
       "loadMore": "טען עוד",
-      "loadMoreFailed": "לא ניתן היה לטעון עוד.",
+      "loadMoreFailed": "לא ניתן היה לטעון עוד",
       "truncated": "קיימות חשבוניות ישנות יותר."
     },
     "lowBalanceAlert": {

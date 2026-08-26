@@ -2976,8 +2976,8 @@
         "accounting_adjustment": "Korekta księgowa",
         "credits_expired": "Kredyty wygasły"
       },
-      "loadMore": "Pokaż więcej",
-      "loadMoreFailed": "Nie udało się wczytać więcej.",
+      "loadMore": "Załaduj więcej",
+      "loadMoreFailed": "Nie udało się załadować więcej",
       "truncated": "Dostępna jest starsza historia kredytów."
     },
     "hub": {
@@ -3015,8 +3015,8 @@
         "uncollectible": "Nieściągalna",
         "unknown": "Nieznana"
       },
-      "loadMore": "Pokaż więcej",
-      "loadMoreFailed": "Nie udało się wczytać więcej.",
+      "loadMore": "Załaduj więcej",
+      "loadMoreFailed": "Nie udało się załadować więcej",
       "truncated": "Dostępne są starsze faktury."
     },
     "lowBalanceAlert": {

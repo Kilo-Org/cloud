@@ -109,7 +109,7 @@ const OrganizationInvoicesInputSchema = OrganizationIdInputSchema.extend({
 });
 
 const OrganizationTransactionsPageInputSchema = OrganizationIdInputSchema.extend({
-  cursor: z.number().int().min(0).default(0),
+  cursor: z.string().optional(),
 });
 
 const OrganizationInvoicesPageInputSchema = OrganizationInvoicesInputSchema.extend({

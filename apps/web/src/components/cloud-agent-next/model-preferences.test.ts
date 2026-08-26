@@ -1,6 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
 import {
-  appendCloudAgentNextLocalTestModel,
   getDevcontainerEnabledStorageKey,
   getLastUsedModelStorageKey,
   getLastUsedRepoStorageKey,
@@ -18,39 +17,6 @@ const modelOptions = [
   { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5' },
   { id: 'openai/gpt-5.1', name: 'GPT 5.1' },
 ] satisfies ModelOption[];
-
-describe('appendCloudAgentNextLocalTestModel', () => {
-  it('leaves the normal selector list unchanged when local model exposure is disabled', () => {
-    expect(appendCloudAgentNextLocalTestModel(modelOptions, false)).toEqual(modelOptions);
-  });
-
-  it('appends the deterministic local testing model without changing existing fallback defaults', () => {
-    const exposedModelOptions = appendCloudAgentNextLocalTestModel(modelOptions, true);
-
-    expect(exposedModelOptions).toEqual([
-      ...modelOptions,
-      { id: 'kilo/fake-deterministic', name: 'Deterministic test model' },
-    ]);
-    expect(
-      getPreferredInitialModel({
-        modelOptions: exposedModelOptions,
-        lastUsedModel: null,
-        defaultModel: 'blocked/model',
-      })
-    ).toBe('anthropic/claude-sonnet-4.5');
-  });
-
-  it('does not duplicate an already exposed deterministic local testing model', () => {
-    const existingTestModelOptions = [
-      ...modelOptions,
-      { id: 'kilo/fake-deterministic', name: 'Gateway-provided fake model' },
-    ] satisfies ModelOption[];
-
-    expect(appendCloudAgentNextLocalTestModel(existingTestModelOptions, true)).toEqual(
-      existingTestModelOptions
-    );
-  });
-});
 
 describe('getPreferredInitialModel', () => {
   it('prefers the last used model when it is available', () => {

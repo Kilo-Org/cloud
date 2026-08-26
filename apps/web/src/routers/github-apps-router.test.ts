@@ -42,6 +42,8 @@ jest.mock('@/lib/integrations/github-apps-service', () => ({}));
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getIntegrationForOwner: (owner: Owner, platform: string) =>
     mockGetIntegrationForOwner(owner, platform),
+  getGitHubIntegrationById: (_owner: Owner, _integrationId: string) =>
+    mockGetIntegrationForOwner(_owner, 'github'),
   upsertPlatformIntegrationForOwner: (owner: Owner, details: Record<string, unknown>) =>
     mockUpsertPlatformIntegrationForOwner(owner, details),
   updateRepositoriesForIntegration: (integrationId: string, repositories: unknown[]) =>

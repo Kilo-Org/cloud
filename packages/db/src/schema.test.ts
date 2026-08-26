@@ -676,6 +676,7 @@ describe('database schema', () => {
         'anonymize',
         'pylon_reply',
         'pylon_finalize',
+        'completion_email',
         'pylon_contact',
         'csa_support_db',
       ],

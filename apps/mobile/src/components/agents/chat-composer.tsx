@@ -6,6 +6,7 @@
 import * as Haptics from 'expo-haptics';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import {
   type Ref,
@@ -474,7 +475,7 @@ export function ChatComposer({
   useSharePrefill({
     shareId,
     inputRef,
-    maxLength: 4000,
+    maxLength: CLOUD_AGENT_PROMPT_MAX_LENGTH,
     onChangeText: handleChangeText,
     addCandidates,
     onDelivered: () => {
@@ -500,7 +501,7 @@ export function ChatComposer({
       applyVoiceDraftToInput({
         input: inputRef.current,
         draft,
-        maxLength: 4000,
+        maxLength: CLOUD_AGENT_PROMPT_MAX_LENGTH,
         onChangeText: handleChangeText,
       });
     },
@@ -537,7 +538,7 @@ export function ChatComposer({
         input: inputRef.current,
         draft: textRef.current,
         selection: selectionRef.current,
-        maxLength: 4000,
+        maxLength: CLOUD_AGENT_PROMPT_MAX_LENGTH,
         onChangeText: handleChangeText,
       });
     },

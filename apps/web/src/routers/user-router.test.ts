@@ -1507,6 +1507,59 @@ describe('user router - account deletion', () => {
     );
   });
 
+  it('rejects self-service deletion for organization-managed users before any side effect', async () => {
+    await db
+      .update(kilocode_users)
+      .set({ personal_account_disabled: true })
+      .where(eq(kilocode_users.id, deletionUser.id));
+    const caller = await createCallerForUser(deletionUser.id);
+
+    await expect(caller.user.requestAccountDeletionChallenge()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId: crypto.randomUUID(), code: '123456' })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(caller.user.requestAccountDeletion()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+
+    expect(mockSendSignInCodeEmail).not.toHaveBeenCalled();
+    expect(mockSendDeletionConfirmation).not.toHaveBeenCalled();
+    expect(mockSendDeletionSupportNotification).not.toHaveBeenCalled();
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+
+    const codeRows = await db
+      .select()
+      .from(magic_link_tokens)
+      .where(eq(magic_link_tokens.email, deletionUser.google_user_email));
+    expect(codeRows).toHaveLength(0);
+
+    const [user] = await db
+      .select({ requestedAt: kilocode_users.account_deletion_requested_at })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, deletionUser.id));
+    expect(user?.requestedAt).toBeNull();
+  });
+
+  it('uses the primary eligibility flag when the authenticated user is stale', async () => {
+    const caller = await createCallerForUser(deletionUser.id);
+    await db
+      .update(kilocode_users)
+      .set({ personal_account_disabled: true })
+      .where(eq(kilocode_users.id, deletionUser.id));
+
+    await expect(caller.user.requestAccountDeletionChallenge()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    await expect(
+      caller.user.requestAccountDeletion({ challengeId: crypto.randomUUID(), code: '123456' })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(mockSendSignInCodeEmail).not.toHaveBeenCalled();
+    expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+  });
+
   it('challenge returns devCode when the email sends in non-production', async () => {
     mockSendSignInCodeEmail.mockResolvedValue({ sent: true });
     const caller = await createCallerForUser(deletionUser.id);

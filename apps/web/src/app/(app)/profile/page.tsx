@@ -14,7 +14,7 @@ import { cookies } from 'next/headers';
 import CreditPurchaseOptions from '@/components/payment/CreditPurchaseOptions';
 import { MessageErrorBoundary } from '@/components/cloud-agent/MessageErrorBoundary';
 
-import { Coins } from 'lucide-react';
+import { AlertTriangle, Coins } from 'lucide-react';
 import { SurveyCredits } from '@/components/SurveyCredits';
 import { RedeemPromoCode } from '@/components/profile/RedeemPromoCode';
 import { AutoTopUpToggle } from '@/components/payment/AutoTopUpToggle';
@@ -29,6 +29,7 @@ import { UserProfileCard } from '@/components/profile/UserProfileCard';
 import { getContributorChampionProfileBadgeForUser } from '@/lib/contributor-champions/service';
 import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import { smartAppBannerItunes } from '@/lib/smart-app-banner';
+import { DeleteAccountDialog } from '@/components/profile/DeleteAccountDialog';
 
 export const metadata = { itunes: smartAppBannerItunes('/profile') };
 
@@ -133,19 +134,28 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
         />
       )}
 
-      {/* <Card className="w-full rounded-xl border-red-200 shadow">
+      {!user.personal_account_disabled && (
+        <Card className="w-full rounded-xl border-destructive/40 shadow">
           <CardHeader>
-            <CardTitle className="mb-2 flex items-center gap-2 text-red-600">
-              <AlertTriangle className="h-5 w-5" />
-              Danger
+            <CardTitle className="mb-2 flex items-center gap-2">
+              <AlertTriangle className="size-5 text-destructive" />
+              Danger Zone
             </CardTitle>
+            <CardDescription>
+              Account deletion is permanent. Cancel active subscriptions before starting.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex max-w-[272px] flex-col gap-2">
+            <div className="flex flex-col gap-3">
+              <p className="text-muted-foreground text-sm">
+                Your account data will be deleted and anonymized. You will be signed out after the
+                deletion request starts.
+              </p>
               <DeleteAccountDialog />
             </div>
           </CardContent>
-        </Card> */}
+        </Card>
+      )}
 
       {process.env.NODE_ENV === 'development' && process.env.DEBUG_SHOW_DEV_UI && (
         <Card className="w-full rounded-xl border-red-800 bg-red-950/50 shadow lg:w-1/2">

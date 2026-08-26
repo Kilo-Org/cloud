@@ -33,6 +33,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppState, View } from 'react-native';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
@@ -40,6 +41,7 @@ import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
 import { PrivacyCoverOverlay } from '@/components/privacy-cover-overlay';
+import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useAuth } from '@/lib/auth/auth-context';
 import { resolveBootstrapDecision } from '@/lib/bootstrap-decision';
@@ -369,7 +371,11 @@ function RootLayoutNav() {
       } else if (returnTarget === 'profile') {
         router.replace('/(app)/(tabs)/(3_profile)');
       } else if (returnTarget === 'preferences') {
-        router.replace('/(app)/(tabs)/(3_profile)/preferences');
+        // Two steps, not one `replace`: the relaunched stack has no entry
+        // below the reopened screen, so a lone `replace` leaves the header's
+        // back control with nothing to pop.
+        router.replace('/(app)/(tabs)/(3_profile)');
+        router.push('/(app)/(tabs)/(3_profile)/preferences');
       }
       try {
         // The plural-rules polyfill must be in place before the first render in the new language.
@@ -863,6 +869,18 @@ function RootLayoutNav() {
   );
 }
 
+/** Settles the app tree from the splash overlay's overscan back to 1. */
+function AppContentReveal({ children }: Readonly<{ children: React.ReactNode }>) {
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: splashContentScale.value }],
+  }));
+  return (
+    <Animated.View className="flex-1" style={style}>
+      {children}
+    </Animated.View>
+  );
+}
+
 function RootLayout() {
   const navigationTheme = useNavigationTheme();
 
@@ -893,7 +911,9 @@ function RootLayout() {
       <ThemeProvider value={navigationTheme}>
         <AppRootProviders>
           <StatusBar style="auto" />
-          <RootLayoutNav />
+          <AppContentReveal>
+            <RootLayoutNav />
+          </AppContentReveal>
           <AnimatedSplashOverlay />
         </AppRootProviders>
       </ThemeProvider>

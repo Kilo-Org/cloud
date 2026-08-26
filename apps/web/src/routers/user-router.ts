@@ -62,6 +62,21 @@ const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
 const PERSONAL_TOP_UP_DESCRIPTIONS = ['Top-up via stripe', 'Auto top-up via stripe'];
 
+async function assertSelfServiceAccountDeletionAllowed(userId: string): Promise<void> {
+  const [user] = await db
+    .select({ personal_account_disabled: kilocode_users.personal_account_disabled })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, userId))
+    .limit(1);
+
+  if (!user || user.personal_account_disabled) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Self-service account deletion is unavailable for organization-managed accounts.',
+    });
+  }
+}
+
 /**
  * Revoke a device session owned by `userId`.
  *
@@ -979,6 +994,7 @@ export const userRouter = createTRPCRouter({
     .mutation(async ({ ctx }) => {
       const userEmail = ctx.user.google_user_email;
       const userId = ctx.user.id;
+      await assertSelfServiceAccountDeletionAllowed(userId);
 
       const lastRequested = ctx.user.account_deletion_requested_at;
       if (
@@ -1036,6 +1052,7 @@ export const userRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const userEmail = ctx.user.google_user_email;
       const userId = ctx.user.id;
+      await assertSelfServiceAccountDeletionAllowed(userId);
 
       // TODO: remove this branch, and make the input required again, once no
       // shipped client calls this without a challenge. Builds already in the

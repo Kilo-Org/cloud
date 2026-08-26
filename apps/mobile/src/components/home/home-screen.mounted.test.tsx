@@ -6,10 +6,8 @@ import { describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { HomeScreen } from '@/components/home/home-screen';
 
-const hasSessions = vi.hoisted(() => ({ value: true }));
 const activeIsError = vi.hoisted(() => ({ value: false }));
 const storedIsError = vi.hoisted(() => ({ value: false }));
-const storedIsSuccess = vi.hoisted(() => ({ value: true }));
 const sessionsLoading = vi.hoisted(() => ({ value: false }));
 const orgLoaded = vi.hoisted(() => ({ value: true }));
 
@@ -29,10 +27,7 @@ vi.mock('react-native-reanimated', () => ({
 }));
 vi.mock('@/components/home/agent-sessions-section', () => ({
   AgentSessionsSection: 'AgentSessionsSection',
-  hasDisplayableAgentSessions: () => hasSessions.value,
-}));
-vi.mock('@/components/home/agents-promo-card', () => ({
-  AgentsPromoCard: 'AgentsPromoCard',
+  HOME_LIVE_SLOT_MIN_CLASS: 'min-h-[72px]',
 }));
 vi.mock('@/components/home/greeting', () => ({
   buildTimedGreeting: () => 'Good morning',
@@ -61,7 +56,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
     isLoading: sessionsLoading.value,
     storedSessions: [{}],
     storedIsError: storedIsError.value,
-    storedIsSuccess: storedIsSuccess.value,
+    storedIsSuccess: true,
     activeIsError: activeIsError.value,
     refetch: vi.fn(),
   }),
@@ -98,8 +93,27 @@ async function mountHome(): Promise<TestRenderer.ReactTestRenderer> {
 }
 
 describe('HomeScreen composition', () => {
+  it('renders the sessions section and new-task button on an empty load', async () => {
+    storedIsError.value = false;
+    activeIsError.value = false;
+    sessionsLoading.value = false;
+    orgLoaded.value = true;
+    const renderer = await mountHome();
+    expect(nodeCount(renderer.root, 'AgentSessionsSection')).toBe(1);
+    expect(nodeCount(renderer.root, 'NewTaskButton')).toBe(1);
+    expect(nodeCount(renderer.root, 'ProductChoices')).toBe(1);
+    expect(nodeCount(renderer.root, 'AgentsPromoCard')).toBe(0);
+    expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.unmount();
+    });
+  });
+
   it('renders the sessions section and new-task button when sessions are present', async () => {
-    hasSessions.value = true;
+    storedIsError.value = false;
+    activeIsError.value = false;
     sessionsLoading.value = false;
     orgLoaded.value = true;
     const renderer = await mountHome();
@@ -114,30 +128,8 @@ describe('HomeScreen composition', () => {
     });
   });
 
-  it('renders only the agents promo card when there are no sessions', async () => {
-    hasSessions.value = false;
+  it('shows the active-sessions error, not the section, on active error', async () => {
     storedIsError.value = false;
-    storedIsSuccess.value = true;
-    activeIsError.value = false;
-    sessionsLoading.value = false;
-    orgLoaded.value = true;
-    const renderer = await mountHome();
-    expect(nodeCount(renderer.root, 'AgentsPromoCard')).toBe(1);
-    expect(nodeCount(renderer.root, 'QueryError')).toBe(0);
-    expect(nodeCount(renderer.root, 'AgentSessionsSection')).toBe(0);
-    expect(nodeCount(renderer.root, 'NewTaskButton')).toBe(0);
-    expect(nodeCount(renderer.root, 'ProductChoices')).toBe(1);
-
-    await act(async () => {
-      await Promise.resolve();
-      renderer.unmount();
-    });
-  });
-
-  it('shows unavailable, not the promo, on active error with zero rows', async () => {
-    hasSessions.value = false;
-    storedIsError.value = false;
-    storedIsSuccess.value = true;
     activeIsError.value = true;
     sessionsLoading.value = false;
     orgLoaded.value = true;
@@ -146,9 +138,28 @@ describe('HomeScreen composition', () => {
     expect(queryError).toBeDefined();
     expect(queryError?.props.title).toBe("Couldn't load active sessions");
     expect(typeof queryError?.props.onRetry).toBe('function');
-    expect(nodeCount(renderer.root, 'AgentsPromoCard')).toBe(0);
     expect(nodeCount(renderer.root, 'AgentSessionsSection')).toBe(0);
-    expect(nodeCount(renderer.root, 'NewTaskButton')).toBe(0);
+    expect(nodeCount(renderer.root, 'NewTaskButton')).toBe(1);
+    expect(nodeCount(renderer.root, 'ProductChoices')).toBe(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.unmount();
+    });
+  });
+
+  it('shows the stored-sessions error, not the section, on stored error', async () => {
+    storedIsError.value = true;
+    activeIsError.value = false;
+    sessionsLoading.value = false;
+    orgLoaded.value = true;
+    const renderer = await mountHome();
+    const queryError = findNode(renderer.root, 'QueryError');
+    expect(queryError).toBeDefined();
+    expect(queryError?.props.title).toBe("Couldn't load sessions");
+    expect(typeof queryError?.props.onRetry).toBe('function');
+    expect(nodeCount(renderer.root, 'AgentSessionsSection')).toBe(0);
+    expect(nodeCount(renderer.root, 'NewTaskButton')).toBe(1);
     expect(nodeCount(renderer.root, 'ProductChoices')).toBe(1);
 
     await act(async () => {

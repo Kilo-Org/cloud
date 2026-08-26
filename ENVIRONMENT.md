@@ -174,7 +174,6 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 ### Ablation / Experimentation
 
-- `NEXT_PUBLIC_CLOUD_AGENT_NEXT_ENABLE_LOCAL_FAKE_MODEL` - Feature flag for local fake model routing in the Cloud Agent Next UI. [PUBLIC]
 - `GLOBAL_KILO_BACKEND` - Override to select the global backend region/endpoint; used in `next.config.mjs`. [SERVER]
 - `ANALYZE` - Next.js bundle analyzer switch; enables `@next/bundle-analyzer` in `next.config.mjs`. [SERVER]
 
@@ -258,7 +257,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `INCEPTION_API_KEY` - Inception Labs API key; used in `apps/web/src/app/api/fim/completions/route.ts` and `apps/web/src/app/api/edit/completions/route.ts` as a fill-in-the-middle (FIM) provider, with endpoint `https://api.inceptionlabs.ai/v1/fim/completions`. Defined in `apps/web/src/lib/config.server.ts`. `[SECRET]`
 - `AI_ATTRIBUTION_ADMIN_SECRET` - Admin secret for the AI Attribution service (`apps/web/src/lib/ai-attribution-service.ts`); sent as `X-Admin-Secret` header. `[SECRET]`
 - `ARTIFICIAL_ANALYSIS_API_KEY` - API key for Artificial Analysis (`apps/web/src/lib/model-stats/sync-artificial-analysis.ts`); sent as `x-api-key` header for model benchmarking data sync. `[SECRET]`
-- `FAKE_LLM_URL` - URL for a fake/local LLM server used in `services/cloud-agent-next` E2E tests (`test/e2e/client.ts`, `test/e2e/fake-llm-server.ts`, `test/e2e/README.md`); defaults to `http://localhost:8811`. [SERVER]
+- `FAKE_LLM_URL` - Local-only URL for the fake-llm service. Next.js uses it in development to list and route `fake-deterministic` through the real gateway (`apps/web/.env.development.local.example`, `apps/web/src/lib/ai-gateway/local-fake-llm.ts`). The cloud-agent-next E2E driver uses the same var for `/test/*` side channels (`test/e2e/client.ts`, `test/e2e/fake-llm-server.ts`, `test/e2e/README.md`). Defaults to `http://localhost:8811`. Ignored on Vercel. [SERVER]
 
 ### Vector DBs
 

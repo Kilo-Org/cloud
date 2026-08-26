@@ -138,7 +138,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
           ) : undefined
         }
       />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         {!canManage && (
           <Text className="pb-4 text-center text-xs text-muted-foreground">
             {t('securityAgent.repositories.readOnly')}

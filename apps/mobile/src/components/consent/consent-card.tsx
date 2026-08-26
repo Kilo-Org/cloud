@@ -174,114 +174,122 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   return (
     <View className="flex-1 bg-background" style={rootStyle}>
       <ScrollView
-        className="flex-1 px-6"
+        className="flex-1"
         contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-row items-center gap-3">
-          <View className="h-10 w-10 items-center justify-center rounded-lg bg-secondary">
-            <Shield size={20} color={colors.foreground} />
+        <View className="px-6">
+          <View className="flex-row items-center gap-3">
+            <View className="h-10 w-10 items-center justify-center rounded-lg bg-secondary">
+              <Shield size={20} color={colors.foreground} />
+            </View>
+            <Text className="text-base font-semibold text-foreground">{t('consent.kilo')}</Text>
           </View>
-          <Text className="text-base font-semibold text-foreground">{t('consent.kilo')}</Text>
-        </View>
 
-        <Text className="mt-6 text-2xl font-bold text-foreground">
-          {t('consent.beforeWeGetStarted')}
-        </Text>
-        <Text className="mt-3 text-base text-muted-foreground">
-          {t('consent.introDescription')}
-        </Text>
-
-        <Text className="mt-6 text-sm font-semibold text-foreground">{t('consent.required')}</Text>
-
-        <View className="mt-3 gap-5">
-          <ConsentRow
-            icon={MessageSquare}
-            title={t('consent.promptsTitle')}
-            description={t('consent.promptsDescription')}
-          />
-          <ConsentRow
-            icon={User}
-            title={t('consent.accountTitle')}
-            description={t('consent.accountDescription')}
-          />
-          <ConsentRow
-            icon={Smartphone}
-            title={t('consent.diagnosticsTitle')}
-            description={t('consent.diagnosticsDescription')}
-          />
-        </View>
-
-        <Text className="mt-6 text-sm font-semibold text-foreground">{t('consent.optional')}</Text>
-
-        <View className="mt-3 flex-row items-start gap-3 rounded-lg border border-border p-4">
-          <View className="mt-0.5">
-            <LineChart size={18} color={colors.mutedForeground} />
-          </View>
-          <View className="flex-1 shrink gap-1">
-            <Text className="text-base font-semibold text-foreground">
-              {t('consent.helpImprove')}
-            </Text>
-            <Text className="text-sm text-muted-foreground">
-              {t('consent.helpImproveDescription')}
-            </Text>
-          </View>
-          <Switch
-            value={optionalToggle}
-            disabled={mode === 'review' && savingOptional}
-            accessibilityLabel={t('consent.helpImprove')}
-            onValueChange={handleToggleOptional}
-          />
-        </View>
-
-        <Pressable
-          onPress={() => {
-            router.push(
-              mode === 'review'
-                ? ('/(app)/consent-details?mode=review' as Href)
-                : ('/(app)/consent-details' as Href)
-            );
-          }}
-          hitSlop={8}
-          accessibilityLabel={t('consent.seeFullDetails')}
-          className="mt-6 flex-row items-center gap-1 active:opacity-70"
-        >
-          <Text className="text-sm font-semibold text-primary">{t('consent.seeFullDetails')}</Text>
-          <DirectionalChevronRight size={16} color={colors.primary} />
-        </Pressable>
-
-        <Text className="mt-6 text-xs text-muted-foreground">
-          {t('consent.privacyPolicyPrefix')}{' '}
-          <Text className="text-xs text-primary underline" onPress={handleOpenPrivacy}>
-            {t('consent.privacyPolicy')}
+          <Text className="mt-6 text-2xl font-bold text-foreground">
+            {t('consent.beforeWeGetStarted')}
           </Text>
-          .
-        </Text>
+          <Text className="mt-3 text-base text-muted-foreground">
+            {t('consent.introDescription')}
+          </Text>
 
-        <AccessibleStatus message={error} className="mt-6 text-sm" />
+          <Text className="mt-6 text-sm font-semibold text-foreground">
+            {t('consent.required')}
+          </Text>
 
-        <View className="mt-8 gap-3">
-          <Button
+          <View className="mt-3 gap-5">
+            <ConsentRow
+              icon={MessageSquare}
+              title={t('consent.promptsTitle')}
+              description={t('consent.promptsDescription')}
+            />
+            <ConsentRow
+              icon={User}
+              title={t('consent.accountTitle')}
+              description={t('consent.accountDescription')}
+            />
+            <ConsentRow
+              icon={Smartphone}
+              title={t('consent.diagnosticsTitle')}
+              description={t('consent.diagnosticsDescription')}
+            />
+          </View>
+
+          <Text className="mt-6 text-sm font-semibold text-foreground">
+            {t('consent.optional')}
+          </Text>
+
+          <View className="mt-3 flex-row items-start gap-3 rounded-lg border border-border p-4">
+            <View className="mt-0.5">
+              <LineChart size={18} color={colors.mutedForeground} />
+            </View>
+            <View className="flex-1 shrink gap-1">
+              <Text className="text-base font-semibold text-foreground">
+                {t('consent.helpImprove')}
+              </Text>
+              <Text className="text-sm text-muted-foreground">
+                {t('consent.helpImproveDescription')}
+              </Text>
+            </View>
+            <Switch
+              value={optionalToggle}
+              disabled={mode === 'review' && savingOptional}
+              accessibilityLabel={t('consent.helpImprove')}
+              onValueChange={handleToggleOptional}
+            />
+          </View>
+
+          <Pressable
             onPress={() => {
-              void handlePrimaryAction();
+              router.push(
+                mode === 'review'
+                  ? ('/(app)/consent-details?mode=review' as Href)
+                  : ('/(app)/consent-details' as Href)
+              );
             }}
-            size="lg"
-            accessibilityLabel={actions.primaryLabel}
-            disabled={pendingAction === 'secondary'}
-            loading={pendingAction === 'primary'}
+            hitSlop={8}
+            accessibilityLabel={t('consent.seeFullDetails')}
+            className="mt-6 flex-row items-center gap-1 active:opacity-70"
           >
-            <Text>{actions.primaryLabel}</Text>
-          </Button>
-          <Button
-            variant={mode === 'review' ? 'destructive' : 'outline'}
-            size="lg"
-            onPress={handleSecondaryAction}
-            accessibilityLabel={actions.secondaryLabel}
-            disabled={pendingAction === 'primary'}
-            loading={pendingAction === 'secondary'}
-          >
-            <Text>{actions.secondaryLabel}</Text>
-          </Button>
+            <Text className="text-sm font-semibold text-primary">
+              {t('consent.seeFullDetails')}
+            </Text>
+            <DirectionalChevronRight size={16} color={colors.primary} />
+          </Pressable>
+
+          <Text className="mt-6 text-xs text-muted-foreground">
+            {t('consent.privacyPolicyPrefix')}{' '}
+            <Text className="text-xs text-primary underline" onPress={handleOpenPrivacy}>
+              {t('consent.privacyPolicy')}
+            </Text>
+            .
+          </Text>
+
+          <AccessibleStatus message={error} className="mt-6 text-sm" />
+
+          <View className="mt-8 gap-3">
+            <Button
+              onPress={() => {
+                void handlePrimaryAction();
+              }}
+              size="lg"
+              accessibilityLabel={actions.primaryLabel}
+              disabled={pendingAction === 'secondary'}
+              loading={pendingAction === 'primary'}
+            >
+              <Text>{actions.primaryLabel}</Text>
+            </Button>
+            <Button
+              variant={mode === 'review' ? 'destructive' : 'outline'}
+              size="lg"
+              onPress={handleSecondaryAction}
+              accessibilityLabel={actions.secondaryLabel}
+              disabled={pendingAction === 'primary'}
+              loading={pendingAction === 'secondary'}
+            >
+              <Text>{actions.secondaryLabel}</Text>
+            </Button>
+          </View>
         </View>
       </ScrollView>
     </View>

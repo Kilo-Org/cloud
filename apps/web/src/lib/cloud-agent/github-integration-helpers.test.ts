@@ -7,6 +7,8 @@ const mockGetIntegrationForOrganization =
   jest.fn<(organizationId: string, platform: string) => Promise<PlatformIntegration | null>>();
 const mockGetIntegrationForOwner =
   jest.fn<(owner: Owner, platform: string) => Promise<PlatformIntegration | null>>();
+const mockGetPrimaryGitHubIntegrationForOrganization =
+  jest.fn<(organizationId: string) => Promise<PlatformIntegration | null>>();
 const mockUpdateRepositoriesForIntegration =
   jest.fn<(integrationId: string, repositories: unknown[]) => Promise<void>>();
 const mockFetchGitHubRepositories =
@@ -27,6 +29,7 @@ const mockCheckExistingFork =
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getIntegrationForOrganization: mockGetIntegrationForOrganization,
   getIntegrationForOwner: mockGetIntegrationForOwner,
+  getPrimaryGitHubIntegrationForOrganization: mockGetPrimaryGitHubIntegrationForOrganization,
   updateRepositoriesForIntegration: mockUpdateRepositoriesForIntegration,
 }));
 
@@ -101,6 +104,7 @@ describe('github-integration-helpers', () => {
 
       expect(result.integrationInstalled).toBe(false);
       expect(result.repositories).toEqual([]);
+      expect(result.errorMessage).toBe('GitHub integration is suspended');
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
     });
 
@@ -151,7 +155,7 @@ describe('github-integration-helpers', () => {
 
   describe('fetchGitHubRepositoriesForOrganization', () => {
     it('returns cached repositories for an active integration', async () => {
-      mockGetIntegrationForOrganization.mockResolvedValue(buildIntegration());
+      mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(buildIntegration());
 
       const { fetchGitHubRepositoriesForOrganization } =
         await import('./github-integration-helpers');
@@ -165,6 +169,7 @@ describe('github-integration-helpers', () => {
     });
 
     it('returns integrationInstalled false when no integration exists', async () => {
+      mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
       mockGetIntegrationForOrganization.mockResolvedValue(null);
 
       const { fetchGitHubRepositoriesForOrganization } =
@@ -176,6 +181,7 @@ describe('github-integration-helpers', () => {
     });
 
     it('returns no repositories when the integration is suspended', async () => {
+      mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
       mockGetIntegrationForOrganization.mockResolvedValue(
         buildIntegration({
           integration_status: 'suspended',
@@ -190,10 +196,27 @@ describe('github-integration-helpers', () => {
 
       expect(result.integrationInstalled).toBe(false);
       expect(result.repositories).toEqual([]);
+      expect(result.errorMessage).toBe('GitHub integration is suspended');
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    });
+
+    it('returns no repositories when the integration requires reauthorization', async () => {
+      mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
+      mockGetIntegrationForOrganization.mockResolvedValue(
+        buildIntegration({ auth_invalid_at: '2026-06-25 18:00:00+00' })
+      );
+
+      const { fetchGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.integrationInstalled).toBe(false);
+      expect(result.errorMessage).toBe('GitHub integration requires reauthorization');
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
     });
 
     it('does not refresh repositories for a suspended integration even with forceRefresh', async () => {
+      mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
       mockGetIntegrationForOrganization.mockResolvedValue(
         buildIntegration({ integration_status: 'suspended' })
       );

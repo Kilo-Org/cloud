@@ -10824,10 +10824,12 @@ export const compute_usage_charge = pgTable(
 export type ComputeUsageCharge = typeof compute_usage_charge.$inferSelect;
 export type NewComputeUsageCharge = typeof compute_usage_charge.$inferInsert;
 
-// Surviving record of the spend a sales-demo reset discards. The reset deletes
-// the org's usage and credit rows, so a row here is the only remaining proof
-// that a demo cost money. `microdollars_used` is the org counter at reset time,
-// which covers LLM, Exa, and compute spend. A reset with no spend writes nothing.
+// Surviving record of the real spend a sales-demo reset discards. The reset
+// deletes the org's usage and credit rows, so a row here is the only remaining
+// proof that a demo cost money. `microdollars_used` records real spend, computed
+// as the org counter minus `coalesce(settings.sales_demo_seeded_microdollars, 0)`
+// at reset time, and it writes a row only when that difference is above zero.
+// It covers LLM, Exa, and compute spend. A reset with no spend writes nothing.
 export const sales_demo_spend_ledger = pgTable(
   'sales_demo_spend_ledger',
   {

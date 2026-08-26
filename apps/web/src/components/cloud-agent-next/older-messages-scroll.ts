@@ -41,6 +41,10 @@ export function restoreScrollAfterPrepend(
   el.scrollTop += el.scrollHeight - previousScrollHeight;
 }
 
+export function canAutoloadOlderMessages(el: { hidden: boolean; clientHeight: number }): boolean {
+  return !el.hidden && el.clientHeight > 0;
+}
+
 export type OlderMessagesHeaderState =
   | { kind: 'hidden' }
   | { kind: 'retryable' }
@@ -171,12 +175,17 @@ export function useOlderMessagesPagination({
     const el = scrollElementRef.current;
     pendingHeightRef.current = null;
     if (!el) return;
+    if (olderMessagesError != null) return;
     isProgrammaticScrollRef.current = true;
     restoreScrollAfterPrepend(el, previousHeight);
     lastScrollTopRef.current = el.scrollTop;
     requestAnimationFrame(() => {
       isProgrammaticScrollRef.current = false;
-      if (el.scrollTop < OLDER_MESSAGES_NEAR_TOP_PX && olderMessagesError === null) {
+      if (
+        canAutoloadOlderMessages(el) &&
+        el.scrollTop < OLDER_MESSAGES_NEAR_TOP_PX &&
+        olderMessagesError === null
+      ) {
         requestOlderMessages();
       }
     });
@@ -193,6 +202,7 @@ export function useOlderMessagesPagination({
     if (olderMessagesError) return;
     const el = scrollElementRef.current;
     if (!el) return;
+    if (!canAutoloadOlderMessages(el)) return;
     if (el.scrollHeight <= el.clientHeight) {
       requestOlderMessages();
     }

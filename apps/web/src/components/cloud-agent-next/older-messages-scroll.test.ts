@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import {
+  canAutoloadOlderMessages,
   restoreScrollAfterPrepend,
   selectOlderMessagesHeaderState,
   shouldAnnounceOlderMessagesArrival,
@@ -98,6 +99,20 @@ describe('shouldTriggerOlderMessagesLoad', () => {
         olderMessagesError: error('retryable'),
       })
     ).toBe(false);
+  });
+});
+
+describe('canAutoloadOlderMessages', () => {
+  it('returns false when the scroller is hidden', () => {
+    expect(canAutoloadOlderMessages({ hidden: true, clientHeight: 400 })).toBe(false);
+  });
+
+  it('returns false when the scroller has no height', () => {
+    expect(canAutoloadOlderMessages({ hidden: false, clientHeight: 0 })).toBe(false);
+  });
+
+  it('returns true when the scroller is visible and has height', () => {
+    expect(canAutoloadOlderMessages({ hidden: false, clientHeight: 400 })).toBe(true);
   });
 });
 

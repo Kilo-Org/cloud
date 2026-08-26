@@ -387,7 +387,7 @@ export default function CloudChatPage({
     isProgrammaticScrollRef: isAutoScrollingRef,
     lastScrollTopRef,
     resetKey: sessionIdFromParams,
-    overflowCheckKey: staticMessages.length + dynamicMessages.length,
+    overflowCheckKey: `${chatTabActive}:${staticMessages.length + dynamicMessages.length}`,
   });
 
   const autoScrollFrameRef = useRef(0);

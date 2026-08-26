@@ -15,6 +15,14 @@ vi.mock('../../../wrapper/src/utils.js', () => ({
   logToFile: vi.fn(),
 }));
 
+vi.mock('../../../wrapper/src/log-uploader.js', () => ({
+  createLogUploader: vi.fn(() => ({
+    start: vi.fn(),
+    uploadNow: vi.fn().mockResolvedValue(undefined),
+    stop: vi.fn(),
+  })),
+}));
+
 const config: ServerConfig = {
   port: 5000,
   workspacePath: '/workspace',
@@ -190,7 +198,6 @@ describe('wrapper batch admission', () => {
     const sendToIngest = vi.fn();
     state.setSendToIngestFn(sendToIngest);
     await bindSessionContext(binding, config, deps);
-    state.setLogUploader(null);
     state.acceptMessage('message-1', { autoCommit: false, condenseOnComplete: false });
     const lifecycle = createLifecycleManager(
       { workspacePath: '/workspace' },
@@ -241,7 +248,6 @@ describe('wrapper batch admission', () => {
     const sendToIngest = vi.fn();
     state.setSendToIngestFn(sendToIngest);
     await bindSessionContext(binding, config, deps);
-    state.setLogUploader(null);
     let resolvePrompt: (() => void) | undefined;
     vi.mocked(deps.kiloClient.sendPromptAsync).mockImplementationOnce(
       () =>

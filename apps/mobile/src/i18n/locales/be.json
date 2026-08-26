@@ -1400,7 +1400,8 @@
       "gitlabAccount": "Уліковы запіс GitLab",
       "connectGitLab": "Падключыць GitLab",
       "gitlabError": "Не атрымалася адкрыць наладку GitLab. Паспрабуйце яшчэ раз.",
-      "description": "Падключыце Kilo {{label}}, каб аўтаматычна правяраць pull requests."
+      "description": "Падключыце Kilo {{label}}, каб аўтаматычна правяраць pull requests.",
+      "bitbucketError": "Не атрымалася адкрыць налады Bitbucket. Паспрабуйце яшчэ раз."
     },
     "overview": {
       "reviewStyle": "Стыль праверкі",
@@ -2202,7 +2203,21 @@
       "discardDraftMessage": "Ваш запыт будзе страчаны.",
       "keepEditing": "Працягваць рэдагаванне",
       "discard": "Адхіліць",
-      "discardFailed": "Не атрымалася адхіліць чарнавік. Паспрабуйце зноў."
+      "discardFailed": "Не атрымалася адхіліць чарнавік. Паспрабуйце зноў.",
+      "bitbucketConnected": "Bitbucket падключаны",
+      "connectBitbucket": "Падключыць Bitbucket",
+      "connectBitbucketDescription": "Падключыце Bitbucket у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
+      "connectGitlab": "Падключыць GitLab",
+      "connectGitlabDescription": "Падключыце GitLab у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
+      "couldNotLoadBitbucketRepositories": "Не атрымалася загрузіць рэпазіторыі Bitbucket",
+      "couldNotLoadGithubRepositories": "Не атрымалася загрузіць рэпазіторыі GitHub",
+      "couldNotLoadGitlabRepositories": "Не атрымалася загрузіць рэпазіторыі GitLab",
+      "gitlabConnected": "GitLab падключаны",
+      "noRepositoriesVisibleBitbucket": "Няма бачных рэпазіторыяў. Праверце доступ да рэпазіторыяў Bitbucket і абнавіце.",
+      "noRepositoriesVisibleGitlab": "Няма бачных рэпазіторыяў. Праверце доступ да рэпазіторыяў GitLab і абнавіце.",
+      "openBitbucket": "Адкрыць Bitbucket",
+      "openGitlab": "Адкрыць GitLab",
+      "recentlyUsed": "Нядаўна выкарыстаныя"
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл",
@@ -2293,7 +2308,10 @@
       "noRepositoriesDescription": "Да вашага акаўнта не падключаны рэпазіторыі.",
       "tryDifferentSearch": "Паспрабуйце іншы пошукавы запыт.",
       "loading": "Загрузка...",
-      "accessibility": "Рэпазіторый: {{label}}"
+      "accessibility": "Рэпазіторый: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Падрабязнасці паведамлення",

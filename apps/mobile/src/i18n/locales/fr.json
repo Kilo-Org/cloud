@@ -844,7 +844,8 @@
       "githubApp": "GitHub App",
       "githubError": "Impossible d'ouvrir la configuration GitHub. Veuillez réessayer.",
       "gitlabAccount": "Compte GitLab",
-      "gitlabError": "Impossible d'ouvrir la configuration GitLab. Veuillez réessayer."
+      "gitlabError": "Impossible d'ouvrir la configuration GitLab. Veuillez réessayer.",
+      "bitbucketError": "Impossible d'ouvrir la configuration Bitbucket. Veuillez réessayer."
     },
     "readOnlyDescription": "Seuls les propriétaires d'organisation et les gestionnaires de facturation peuvent modifier ces paramètres.",
     "reviewDetail": {
@@ -1644,7 +1645,21 @@
       "discardDraftMessage": "Votre prompt sera perdu.",
       "discardDraftTitle": "Abandonner le brouillon ?",
       "discardFailed": "Impossible d'abandonner le brouillon. Veuillez réessayer.",
-      "keepEditing": "Continuer à modifier"
+      "keepEditing": "Continuer à modifier",
+      "bitbucketConnected": "Bitbucket connecté",
+      "connectBitbucket": "Connecter Bitbucket",
+      "connectBitbucketDescription": "Connectez Bitbucket dans votre navigateur, puis revenez ici pour choisir un dépôt.",
+      "connectGitlab": "Connecter GitLab",
+      "connectGitlabDescription": "Connectez GitLab dans votre navigateur, puis revenez ici pour choisir un dépôt.",
+      "couldNotLoadBitbucketRepositories": "Impossible de charger les dépôts Bitbucket",
+      "couldNotLoadGithubRepositories": "Impossible de charger les dépôts GitHub",
+      "couldNotLoadGitlabRepositories": "Impossible de charger les dépôts GitLab",
+      "gitlabConnected": "GitLab connecté",
+      "noRepositoriesVisibleBitbucket": "Aucun dépôt visible. Vérifiez l'accès aux dépôts pour Bitbucket, puis actualisez.",
+      "noRepositoriesVisibleGitlab": "Aucun dépôt visible. Vérifiez l'accès aux dépôts pour GitLab, puis actualisez.",
+      "openBitbucket": "Ouvrir Bitbucket",
+      "openGitlab": "Ouvrir GitLab",
+      "recentlyUsed": "Utilisés récemment"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fichier mis à jour",
@@ -1719,7 +1734,10 @@
       "noRepositoriesDescription": "Aucun dépôt n'est connecté à votre compte.",
       "tryDifferentSearch": "Essayez un autre terme de recherche.",
       "loading": "Chargement...",
-      "accessibility": "Dépôt : {{label}}"
+      "accessibility": "Dépôt : {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "modeSelector": {
       "accessibility": "Mode : {{label}}"

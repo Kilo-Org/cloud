@@ -858,7 +858,8 @@
       "githubApp": "אפליקציית GitHub",
       "githubError": "לא ניתן היה לפתוח את הגדרת GitHub. נסה שוב.",
       "gitlabAccount": "חשבון GitLab",
-      "gitlabError": "לא ניתן היה לפתוח את הגדרת GitLab. נסה שוב."
+      "gitlabError": "לא ניתן היה לפתוח את הגדרת GitLab. נסה שוב.",
+      "bitbucketError": "לא ניתן היה לפתוח את ההתקנה של Bitbucket. נסה שוב."
     },
     "readOnlyDescription": "רק בעלי הארגון ומנהלי החיוב יכולים לשנות את ההגדרות האלה.",
     "reviewDetail": {
@@ -1726,7 +1727,21 @@
       "discardDraftMessage": "ההנחיה שלך תאבד.",
       "discardDraftTitle": "לבטל את הטיוטה?",
       "discardFailed": "לא ניתן היה לבטל את הטיוטה. נסה שוב.",
-      "keepEditing": "המשך לערוך"
+      "keepEditing": "המשך לערוך",
+      "bitbucketConnected": "Bitbucket מחובר",
+      "connectBitbucket": "חיבור Bitbucket",
+      "connectBitbucketDescription": "חבר את Bitbucket בדפדפן, ולאחר מכן חזור לכאן כדי לבחור מאגר.",
+      "connectGitlab": "חיבור GitLab",
+      "connectGitlabDescription": "חבר את GitLab בדפדפן, ולאחר מכן חזור לכאן כדי לבחור מאגר.",
+      "couldNotLoadBitbucketRepositories": "לא ניתן היה לטעון את המאגרים של Bitbucket",
+      "couldNotLoadGithubRepositories": "לא ניתן היה לטעון את המאגרים של GitHub",
+      "couldNotLoadGitlabRepositories": "לא ניתן היה לטעון את המאגרים של GitLab",
+      "gitlabConnected": "GitLab מחובר",
+      "noRepositoriesVisibleBitbucket": "אין מאגרים גלויים. בדוק את הגישה למאגרים של Bitbucket, ואז רענן.",
+      "noRepositoriesVisibleGitlab": "אין מאגרים גלויים. בדוק את הגישה למאגרים של GitLab, ואז רענן.",
+      "openBitbucket": "פתח את Bitbucket",
+      "openGitlab": "פתח את GitLab",
+      "recentlyUsed": "בשימוש לאחרונה"
     },
     "partRenderer": {
       "updatedFileCount_one": "עודכן {{displayCount}} קובץ",
@@ -1820,7 +1835,10 @@
       "noRepositoriesDescription": "לא מחוברים מאגרים לחשבון שלך.",
       "tryDifferentSearch": "נסה מונח חיפוש אחר.",
       "loading": "טוען...",
-      "accessibility": "מאגר: {{label}}"
+      "accessibility": "מאגר: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "פרטי הודעה",

@@ -1382,7 +1382,8 @@
       "gitlabAccount": "የGitLab መለያ",
       "connectGitLab": "GitLabን ያገናኙ",
       "gitlabError": "የGitLab ማዋቀርን መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
-      "description": "የመጎተቻ ጥያቄዎችን በራስ-ሰር ለመገምገም Kilo {{label}}ን ያገናኙ።"
+      "description": "የመጎተቻ ጥያቄዎችን በራስ-ሰር ለመገምገም Kilo {{label}}ን ያገናኙ።",
+      "bitbucketError": "የBitbucket ማዋቀር መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
     },
     "overview": {
       "reviewStyle": "የግምገማ ዘይቤ",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "ጥያቄዎ ይጠፋል።",
       "keepEditing": "ማስተካከል ይቀጥሉ",
       "discard": "ያስወግዱ",
-      "discardFailed": "ረቂቁን ማስወገድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
+      "discardFailed": "ረቂቁን ማስወገድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
+      "bitbucketConnected": "Bitbucket ተገናኝቷል",
+      "connectBitbucket": "Bitbucket ያገናኙ",
+      "connectBitbucketDescription": "Bitbucket ን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ እዚህ ይመለሱ።",
+      "connectGitlab": "GitLab ያገናኙ",
+      "connectGitlabDescription": "GitLab ን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ እዚህ ይመለሱ።",
+      "couldNotLoadBitbucketRepositories": "የBitbucket ማከማቻዎች መጫን አልቻለም",
+      "couldNotLoadGithubRepositories": "የGitHub ማከማቻዎች መጫን አልቻለም",
+      "couldNotLoadGitlabRepositories": "የGitLab ማከማቻዎች መጫን አልቻለም",
+      "gitlabConnected": "GitLab ተገናኝቷል",
+      "noRepositoriesVisibleBitbucket": "ምንም የሚታዩ ማከማቻዎች የሉም። የBitbucket ማከማቻ መዳረሻን ያረጋግጡ፣ ከዚያ ያድሱ።",
+      "noRepositoriesVisibleGitlab": "ምንም የሚታዩ ማከማቻዎች የሉም። የGitLab ማከማቻ መዳረሻን ያረጋግጡ፣ ከዚያ ያድሱ።",
+      "openBitbucket": "Bitbucket ይክፈቱ",
+      "openGitlab": "GitLab ይክፈቱ",
+      "recentlyUsed": "በቅርቡ ጥቅም ላይ የዋሉ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ፋይል ተዘምኗል",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "ከመለያዎ ጋር ምንም ማከማቻዎች አልተገናኙም።",
       "tryDifferentSearch": "የተለየ የፍለጋ ቃል ይሞክሩ።",
       "loading": "በመጫን ላይ...",
-      "accessibility": "ማከማቻ: {{label}}"
+      "accessibility": "ማከማቻ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "የመልእክት ዝርዝሮች",

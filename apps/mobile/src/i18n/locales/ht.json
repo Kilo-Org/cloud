@@ -1382,7 +1382,8 @@
       "gitlabAccount": "Kont GitLab",
       "connectGitLab": "Konekte GitLab",
       "gitlabError": "Pa t ka ouvri enstalasyon GitLab. Tanpri eseye ankò.",
-      "description": "Konekte {{label}} Kilo a pou revize demann fuzion otomatikman."
+      "description": "Konekte {{label}} Kilo a pou revize demann fuzion otomatikman.",
+      "bitbucketError": "Pa t kapab louvri konfigirasyon Bitbucket. Tanpri eseye ankò."
     },
     "overview": {
       "reviewStyle": "Estil Revizyon",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Pwòp prompt ou a pral pèdi.",
       "keepEditing": "Kontinye Editè",
       "discard": "Jete",
-      "discardFailed": "Pa t 'kapab jete bouyon an. Tanpri eseye ankò."
+      "discardFailed": "Pa t 'kapab jete bouyon an. Tanpri eseye ankò.",
+      "bitbucketConnected": "Bitbucket konekte",
+      "connectBitbucket": "Konekte Bitbucket",
+      "connectBitbucketDescription": "Konekte Bitbucket nan navigatè ou, apre sa retounen isit la pou chwazi yon depo.",
+      "connectGitlab": "Konekte GitLab",
+      "connectGitlabDescription": "Konekte GitLab nan navigatè ou, apre sa retounen isit la pou chwazi yon depo.",
+      "couldNotLoadBitbucketRepositories": "Pa t kapab chaje depo Bitbucket",
+      "couldNotLoadGithubRepositories": "Pa t kapab chaje depo GitHub",
+      "couldNotLoadGitlabRepositories": "Pa t kapab chaje depo GitLab",
+      "gitlabConnected": "GitLab konekte",
+      "noRepositoriesVisibleBitbucket": "Pa gen depo ki vizib. Tcheke aksè depo pou Bitbucket, apre sa rafrechi.",
+      "noRepositoriesVisibleGitlab": "Pa gen depo ki vizib. Tcheke aksè depo pou GitLab, apre sa rafrechi.",
+      "openBitbucket": "Louvri Bitbucket",
+      "openGitlab": "Louvri GitLab",
+      "recentlyUsed": "Itilize dènyèman"
     },
     "partRenderer": {
       "updatedFileCount_one": "Miz ajou {{displayCount}} fichye",
@@ -2265,7 +2280,10 @@
       "noRepositoriesDescription": "Pa gen repo ki konekte ak kont ou.",
       "tryDifferentSearch": "Eseye yon tèm rechèch diferan.",
       "loading": "Ap chaje…",
-      "accessibility": "Repo: {{label}}"
+      "accessibility": "Repo: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detay mesaj",

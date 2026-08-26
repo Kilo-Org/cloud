@@ -1382,7 +1382,8 @@
       "gitlabAccount": "Kaonty GitLab",
       "connectGitLab": "Ampifandraiso ny GitLab",
       "gitlabError": "Tsy afaka nanokatra ny fanamboarana GitLab. Andramo indray azafady.",
-      "description": "Ampifandraiso ny Kilo {{label}} mba hanamarinana pull requests mandeha ho azy."
+      "description": "Ampifandraiso ny Kilo {{label}} mba hanamarinana pull requests mandeha ho azy.",
+      "bitbucketError": "Tsy afaka nanokatra ny fanamboarana Bitbucket. Andramo indray azafady."
     },
     "overview": {
       "reviewStyle": "Fomba fanamarinana",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Ho very ny hafatrao.",
       "keepEditing": "Tohizo ny fanitsiana",
       "discard": "Ario",
-      "discardFailed": "Tsy afaka nandao ny draft. Andramo indray azafady."
+      "discardFailed": "Tsy afaka nandao ny draft. Andramo indray azafady.",
+      "bitbucketConnected": "Bitbucket mifandray",
+      "connectBitbucket": "Ampifandraiso amin'i Bitbucket",
+      "connectBitbucketDescription": "Ampifandraiso amin'i Bitbucket ao amin'ny navigateur-nao, dia miverena eto mba hisafidy repository.",
+      "connectGitlab": "Ampifandraiso amin'i GitLab",
+      "connectGitlabDescription": "Ampifandraiso amin'i GitLab ao amin'ny navigateur-nao, dia miverena eto mba hisafidy repository.",
+      "couldNotLoadBitbucketRepositories": "Tsy afaka nandrakotra ny repository an'i Bitbucket",
+      "couldNotLoadGithubRepositories": "Tsy afaka nandrakotra ny repository an'i GitHub",
+      "couldNotLoadGitlabRepositories": "Tsy afaka nandrakotra ny repository an'i GitLab",
+      "gitlabConnected": "GitLab mifandray",
+      "noRepositoriesVisibleBitbucket": "Tsy misy repository hita. Hamarino ny fahafahana miditra amin'ny repository an'i Bitbucket, dia avereno.",
+      "noRepositoriesVisibleGitlab": "Tsy misy repository hita. Hamarino ny fahafahana miditra amin'ny repository an'i GitLab, dia avereno.",
+      "openBitbucket": "Sokafy ny Bitbucket",
+      "openGitlab": "Sokafy ny GitLab",
+      "recentlyUsed": "Ampiasaina vao haingana"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nohavaozina ny rakitra {{displayCount}}",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Tsy misy repository mifandray amin'ny kaontinao.",
       "tryDifferentSearch": "Andramo teny fikarohana hafa.",
       "loading": "Mampiditra...",
-      "accessibility": "Repository: {{label}}"
+      "accessibility": "Repository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Antsipirian'ny hafatra",

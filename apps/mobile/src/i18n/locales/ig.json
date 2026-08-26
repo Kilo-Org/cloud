@@ -1382,7 +1382,8 @@
       "gitlabAccount": "Akaụntụ GitLab",
       "connectGitLab": "Jikọọ GitLab",
       "gitlabError": "Enweghị ike imepe nhazi GitLab. Biko gbalịa ọzọ.",
-      "description": "Jikọọ Kilo {{label}} ka ọ nyochaa arịrịọ njikọ na akpaaka."
+      "description": "Jikọọ Kilo {{label}} ka ọ nyochaa arịrịọ njikọ na akpaaka.",
+      "bitbucketError": "Enweghị ike imeghe nhazi Bitbucket. Biko nwaa ọzọ."
     },
     "overview": {
       "reviewStyle": "Ụdị Nyocha",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Ihe ị dere ga-efu.",
       "keepEditing": "Nọgide na-edezi",
       "discard": "Tụfuo",
-      "discardFailed": "Enweghị ike ịtụfu akwụkwọ a na-ede. Biko nwaa ọzọ."
+      "discardFailed": "Enweghị ike ịtụfu akwụkwọ a na-ede. Biko nwaa ọzọ.",
+      "bitbucketConnected": "Ejikọtara Bitbucket",
+      "connectBitbucket": "Jikọọ Bitbucket",
+      "connectBitbucketDescription": "Jikọọ Bitbucket na ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa.",
+      "connectGitlab": "Jikọọ GitLab",
+      "connectGitlabDescription": "Jikọọ GitLab na ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa.",
+      "couldNotLoadBitbucketRepositories": "Enweghị ike ibu ebe nchekwa Bitbucket",
+      "couldNotLoadGithubRepositories": "Enweghị ike ibu ebe nchekwa GitHub",
+      "couldNotLoadGitlabRepositories": "Enweghị ike ibu ebe nchekwa GitLab",
+      "gitlabConnected": "Ejikọtara GitLab",
+      "noRepositoriesVisibleBitbucket": "Ọ dịghị ebe nchekwa a na-ahụ. Lelee ohere ebe nchekwa maka Bitbucket, wee melite.",
+      "noRepositoriesVisibleGitlab": "Ọ dịghị ebe nchekwa a na-ahụ. Lelee ohere ebe nchekwa maka GitLab, wee melite.",
+      "openBitbucket": "Meghee Bitbucket",
+      "openGitlab": "Meghee GitLab",
+      "recentlyUsed": "Ejiri ya nso nso a"
     },
     "partRenderer": {
       "updatedFileCount_one": "Emelitere {{displayCount}} faịlụ",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Enweghị ebe nchekwa ejikọrọ na akaụntụ gị.",
       "tryDifferentSearch": "Nwaa okwu ọchụchọ dị iche.",
       "loading": "Na-ebudata...",
-      "accessibility": "Ebe nchekwa: {{label}}"
+      "accessibility": "Ebe nchekwa: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Nkọwa ozi",

@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab бүртгэл",
       "connectGitLab": "GitLab-г холбох",
       "gitlabError": "GitLab тохиргоог нээж чадсангүй. Дахин оролдоно уу.",
-      "description": "Pull request-уудыг автоматаар шалгахын тулд Kilo {{label}}-г холбоорой."
+      "description": "Pull request-уудыг автоматаар шалгахын тулд Kilo {{label}}-г холбоорой.",
+      "bitbucketError": "Bitbucket тохиргоог нээж чадсангүй. Дахин оролдоно уу."
     },
     "overview": {
       "reviewStyle": "Шалгалтын хэв маяг",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Таны заавар алдагдах болно.",
       "keepEditing": "Засварлахыг үргэлжлүүлэх",
       "discard": "Хаях",
-      "discardFailed": "Нооргийг хаях боломжгүй. Дахин оролдоно уу."
+      "discardFailed": "Нооргийг хаях боломжгүй. Дахин оролдоно уу.",
+      "bitbucketConnected": "Bitbucket холбогдсон",
+      "connectBitbucket": "Bitbucket холбох",
+      "connectBitbucketDescription": "Bitbucket-ыг хөтөчөөрөө холбож, буцаж ирээд repository сонгоно уу.",
+      "connectGitlab": "GitLab холбох",
+      "connectGitlabDescription": "GitLab-ыг хөтөчөөрөө холбож, буцаж ирээд repository сонгоно уу.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket repository-уудыг ачаалж чадсангүй",
+      "couldNotLoadGithubRepositories": "GitHub repository-уудыг ачаалж чадсангүй",
+      "couldNotLoadGitlabRepositories": "GitLab repository-уудыг ачаалж чадсангүй",
+      "gitlabConnected": "GitLab холбогдсон",
+      "noRepositoriesVisibleBitbucket": "Харагдах repository байхгүй. Bitbucket-ийн repository хандалтыг шалгаад, шинэчилнэ үү.",
+      "noRepositoriesVisibleGitlab": "Харагдах repository байхгүй. GitLab-ийн repository хандалтыг шалгаад, шинэчилнэ үү.",
+      "openBitbucket": "Bitbucket нээх",
+      "openGitlab": "GitLab нээх",
+      "recentlyUsed": "Сүүлд ашигласан"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл шинэчлэгдсэн",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Таны бүртгэлд холбогдсон репозитори байхгүй.",
       "tryDifferentSearch": "Өөр хайлтын нэр томьёо туршиж үзнэ үү.",
       "loading": "Ачаалж байна...",
-      "accessibility": "Репозитори: {{label}}"
+      "accessibility": "Репозитори: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Мессежийн мэдээлэл",

@@ -1391,7 +1391,8 @@
       "gitlabAccount": "GitLab konts",
       "connectGitLab": "Savienot GitLab",
       "gitlabError": "Neizdevās atvērt GitLab iestatīšanu. Lūdzu, mēģiniet vēlreiz.",
-      "description": "Savienojiet Kilo {{label}}, lai automātiski pārskatītu pull requests."
+      "description": "Savienojiet Kilo {{label}}, lai automātiski pārskatītu pull requests.",
+      "bitbucketError": "Neizdevās atvērt Bitbucket iestatīšanu. Lūdzu, mēģiniet vēlreiz."
     },
     "overview": {
       "reviewStyle": "Pārskatīšanas stils",
@@ -2187,7 +2188,21 @@
       "discardDraftMessage": "Tavs jautājums tiks zaudēts.",
       "keepEditing": "Turpināt rediģēšanu",
       "discard": "Atmest",
-      "discardFailed": "Neizdevās atmest melnrakstu. Lūdzu, mēģini vēlreiz."
+      "discardFailed": "Neizdevās atmest melnrakstu. Lūdzu, mēģini vēlreiz.",
+      "bitbucketConnected": "Bitbucket ir savienots",
+      "connectBitbucket": "Savienot Bitbucket",
+      "connectBitbucketDescription": "Savienojiet Bitbucket savā pārlūkprogrammā, pēc tam atgriezieties, lai izvēlētos repozitoriju.",
+      "connectGitlab": "Savienot GitLab",
+      "connectGitlabDescription": "Savienojiet GitLab savā pārlūkprogrammā, pēc tam atgriezieties, lai izvēlētos repozitoriju.",
+      "couldNotLoadBitbucketRepositories": "Neizdevās ielādēt Bitbucket repozitorijus",
+      "couldNotLoadGithubRepositories": "Neizdevās ielādēt GitHub repozitorijus",
+      "couldNotLoadGitlabRepositories": "Neizdevās ielādēt GitLab repozitorijus",
+      "gitlabConnected": "GitLab ir savienots",
+      "noRepositoriesVisibleBitbucket": "Nav redzamu repozitoriju. Pārbaudiet repozitoriju piekļuvi Bitbucket, pēc tam atsvaidziniet.",
+      "noRepositoriesVisibleGitlab": "Nav redzamu repozitoriju. Pārbaudiet repozitoriju piekļuvi GitLab, pēc tam atsvaidziniet.",
+      "openBitbucket": "Atvērt Bitbucket",
+      "openGitlab": "Atvērt GitLab",
+      "recentlyUsed": "Nesen lietots"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atjaunināts {{displayCount}} fails",
@@ -2277,7 +2292,10 @@
       "noRepositoriesDescription": "Tavam kontam nav savienotu repozitoriju.",
       "tryDifferentSearch": "Izmēģini citu meklēšanas vārdu.",
       "loading": "Ielādē...",
-      "accessibility": "Repozitorijs: {{label}}"
+      "accessibility": "Repozitorijs: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Ziņojuma detaļas",

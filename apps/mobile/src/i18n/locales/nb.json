@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab-konto",
       "connectGitLab": "Koble til GitLab",
       "gitlabError": "Kunne ikke åpne GitLab-oppsettet. Prøv igjen.",
-      "description": "Koble Kilo {{label}} til for å gjennomgå pull requests automatisk."
+      "description": "Koble Kilo {{label}} til for å gjennomgå pull requests automatisk.",
+      "bitbucketError": "Kunne ikke åpne Bitbucket-oppsettet. Prøv igjen."
     },
     "overview": {
       "reviewStyle": "Gjennomgangsstil",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Forespørselen din vil gå tapt.",
       "keepEditing": "Fortsett å redigere",
       "discard": "Forkast",
-      "discardFailed": "Kunne ikke forkaste utkastet. Prøv igjen."
+      "discardFailed": "Kunne ikke forkaste utkastet. Prøv igjen.",
+      "bitbucketConnected": "Bitbucket er koblet til",
+      "connectBitbucket": "Koble til Bitbucket",
+      "connectBitbucketDescription": "Koble til Bitbucket i nettleseren din, og kom deretter tilbake hit for å velge et repositorium.",
+      "connectGitlab": "Koble til GitLab",
+      "connectGitlabDescription": "Koble til GitLab i nettleseren din, og kom deretter tilbake hit for å velge et repositorium.",
+      "couldNotLoadBitbucketRepositories": "Kunne ikke laste Bitbucket-repositorier",
+      "couldNotLoadGithubRepositories": "Kunne ikke laste GitHub-repositorier",
+      "couldNotLoadGitlabRepositories": "Kunne ikke laste GitLab-repositorier",
+      "gitlabConnected": "GitLab er koblet til",
+      "noRepositoriesVisibleBitbucket": "Ingen repositorier synlig. Kontroller tilgangen til Bitbucket-repositorier, og oppdater deretter.",
+      "noRepositoriesVisibleGitlab": "Ingen repositorier synlig. Kontroller tilgangen til GitLab-repositorier, og oppdater deretter.",
+      "openBitbucket": "Åpne Bitbucket",
+      "openGitlab": "Åpne GitLab",
+      "recentlyUsed": "Nylig brukt"
     },
     "partRenderer": {
       "updatedFileCount_one": "Oppdaterte {{displayCount}} fil",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Ingen repositories er koblet til kontoen din.",
       "tryDifferentSearch": "Prøv et annet søkeord.",
       "loading": "Laster...",
-      "accessibility": "Repository: {{label}}"
+      "accessibility": "Repository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Meldingdetaljer",

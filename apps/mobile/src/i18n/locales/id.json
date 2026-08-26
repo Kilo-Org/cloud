@@ -856,7 +856,8 @@
       "githubApp": "Aplikasi GitHub",
       "githubError": "Tidak dapat membuka penyiapan GitHub. Silakan coba lagi.",
       "gitlabAccount": "Akun GitLab",
-      "gitlabError": "Tidak dapat membuka penyiapan GitLab. Silakan coba lagi."
+      "gitlabError": "Tidak dapat membuka penyiapan GitLab. Silakan coba lagi.",
+      "bitbucketError": "Tidak dapat membuka pengaturan Bitbucket. Silakan coba lagi."
     },
     "readOnlyDescription": "Hanya pemilik organisasi dan manajer penagihan yang dapat mengubah pengaturan ini.",
     "reviewDetail": {
@@ -1718,7 +1719,21 @@
       "discardDraftMessage": "Prompt Anda akan hilang.",
       "discardDraftTitle": "Buang draf?",
       "discardFailed": "Tidak dapat membuang draf. Silakan coba lagi.",
-      "keepEditing": "Tetap mengedit"
+      "keepEditing": "Tetap mengedit",
+      "bitbucketConnected": "Bitbucket terhubung",
+      "connectBitbucket": "Hubungkan Bitbucket",
+      "connectBitbucketDescription": "Hubungkan Bitbucket di browser Anda, lalu kembali ke sini untuk memilih repositori.",
+      "connectGitlab": "Hubungkan GitLab",
+      "connectGitlabDescription": "Hubungkan GitLab di browser Anda, lalu kembali ke sini untuk memilih repositori.",
+      "couldNotLoadBitbucketRepositories": "Tidak dapat memuat repositori Bitbucket",
+      "couldNotLoadGithubRepositories": "Tidak dapat memuat repositori GitHub",
+      "couldNotLoadGitlabRepositories": "Tidak dapat memuat repositori GitLab",
+      "gitlabConnected": "GitLab terhubung",
+      "noRepositoriesVisibleBitbucket": "Tidak ada repositori yang terlihat. Periksa akses repositori untuk Bitbucket, lalu muat ulang.",
+      "noRepositoriesVisibleGitlab": "Tidak ada repositori yang terlihat. Periksa akses repositori untuk GitLab, lalu muat ulang.",
+      "openBitbucket": "Buka Bitbucket",
+      "openGitlab": "Buka GitLab",
+      "recentlyUsed": "Baru digunakan"
     },
     "partRenderer": {
       "updatedFileCount_one": "Memperbarui {{displayCount}} file",
@@ -1811,7 +1826,10 @@
       "noRepositoriesDescription": "Tidak ada repositori yang terhubung ke akun Anda.",
       "tryDifferentSearch": "Coba istilah pencarian lain.",
       "loading": "Memuat...",
-      "accessibility": "Repositori: {{label}}"
+      "accessibility": "Repositori: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detail pesan",

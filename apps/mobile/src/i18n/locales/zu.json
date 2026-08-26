@@ -1382,7 +1382,8 @@
       "gitlabAccount": "I-akhawunti ye-GitLab",
       "connectGitLab": "Xhuma i-GitLab",
       "gitlabError": "Ayikwazanga ukuvula ukusetha kwe-GitLab. Uyacelwa uzame futhi.",
-      "description": "Xhuma i-Kilo {{label}} ukuze ibuyekeze izicelo zokudonsa ngokuzenzakalelayo."
+      "description": "Xhuma i-Kilo {{label}} ukuze ibuyekeze izicelo zokudonsa ngokuzenzakalelayo.",
+      "bitbucketError": "I-akhile ukuvula ukulungiswa kwe-Bitbucket. Sicela uzame futhi."
     },
     "overview": {
       "reviewStyle": "Isitayela Sokubuyekeza",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Umphakamo wakho uzolahleka.",
       "keepEditing": "Qhubeka uhlela",
       "discard": "Lahla",
-      "discardFailed": "Akukwazanga ukulahla idrafuthi. Sicela uzame futhi."
+      "discardFailed": "Akukwazanga ukulahla idrafuthi. Sicela uzame futhi.",
+      "bitbucketConnected": "I-Bitbucket ixhumekile",
+      "connectBitbucket": "Xhuma i-Bitbucket",
+      "connectBitbucketDescription": "Xhuma i-Bitbucket kusiphequluli sakho, bese ubuya lapha ukuze ukhethe irepository.",
+      "connectGitlab": "Xhuma i-GitLab",
+      "connectGitlabDescription": "Xhuma i-GitLab kusiphequluli sakho, bese ubuya lapha ukuze ukhethe irepository.",
+      "couldNotLoadBitbucketRepositories": "I-akhile ukulayisha ama-repository e-Bitbucket",
+      "couldNotLoadGithubRepositories": "I-akhile ukulayisha ama-repository e-GitHub",
+      "couldNotLoadGitlabRepositories": "I-akhile ukulayisha ama-repository e-GitLab",
+      "gitlabConnected": "I-GitLab ixhumekile",
+      "noRepositoriesVisibleBitbucket": "Awekho ama-repository abonakalayo. Bheka ukufinyelela kwe-repository ye-Bitbucket, bese uvuselela.",
+      "noRepositoriesVisibleGitlab": "Awekho ama-repository abonakalayo. Bheka ukufinyelela kwe-repository ye-GitLab, bese uvuselela.",
+      "openBitbucket": "Vula i-Bitbucket",
+      "openGitlab": "Vula i-GitLab",
+      "recentlyUsed": "Esetshenziswe muva nje"
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Akukho ma-repository axhunyiwe kwi-akhawunti yakho.",
       "tryDifferentSearch": "Zama igama lokusesha elihlukile.",
       "loading": "Iyathanda...",
-      "accessibility": "IRepository: {{label}}"
+      "accessibility": "IRepository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Imininingwane yomlayezo",

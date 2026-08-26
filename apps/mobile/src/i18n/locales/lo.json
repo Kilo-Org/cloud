@@ -1382,7 +1382,8 @@
       "gitlabAccount": "ບັນຊີ GitLab",
       "connectGitLab": "ເຊື່ອມຕໍ່ GitLab",
       "gitlabError": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າ GitLab. ກະລຸນາລອງອີກ.",
-      "description": "ເຊື່ອມຕໍ່ Kilo {{label}} ເພື່ອທົບທວນ pull requests ອັດຕະໂນມັດ."
+      "description": "ເຊື່ອມຕໍ່ Kilo {{label}} ເພື່ອທົບທວນ pull requests ອັດຕະໂນມັດ.",
+      "bitbucketError": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າ Bitbucket ໄດ້. ກະລຸນາລອງໃໝ່."
     },
     "overview": {
       "reviewStyle": "ຮູບແບບການທົບທວນ",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "ຂໍ້ຄວາມຂອງທ່ານຈະຖືກລຶບ.",
       "keepEditing": "ແກ້ໄຂຕໍ່ໄປ",
       "discard": "ລະເລີຍ",
-      "discardFailed": "ບໍ່ສາມາດລະເລີຍຮ່າງ. ກະລຸນາລອງໃໝ່."
+      "discardFailed": "ບໍ່ສາມາດລະເລີຍຮ່າງ. ກະລຸນາລອງໃໝ່.",
+      "bitbucketConnected": "ເຊື່ອມຕໍ່ Bitbucket ແລ້ວ",
+      "connectBitbucket": "ເຊື່ອມຕໍ່ Bitbucket",
+      "connectBitbucketDescription": "ເຊື່ອມຕໍ່ Bitbucket ໃນບຣາວເຊີຂອງທ່ານ, ຈາກນັ້ນກັບມາທີ່ນີ້ເພື່ອເລືອກ repository.",
+      "connectGitlab": "ເຊື່ອມຕໍ່ GitLab",
+      "connectGitlabDescription": "ເຊື່ອມຕໍ່ GitLab ໃນບຣາວເຊີຂອງທ່ານ, ຈາກນັ້ນກັບມາທີ່ນີ້ເພື່ອເລືອກ repository.",
+      "couldNotLoadBitbucketRepositories": "ບໍ່ສາມາດໂຫຼດ repositories ຂອງ Bitbucket ໄດ້",
+      "couldNotLoadGithubRepositories": "ບໍ່ສາມາດໂຫຼດ repositories ຂອງ GitHub ໄດ້",
+      "couldNotLoadGitlabRepositories": "ບໍ່ສາມາດໂຫຼດ repositories ຂອງ GitLab ໄດ້",
+      "gitlabConnected": "ເຊື່ອມຕໍ່ GitLab ແລ້ວ",
+      "noRepositoriesVisibleBitbucket": "ບໍ່ມີ repositories ທີ່ເຫັນ. ກວດເບິ່ງການເຂົ້າເຖິງ repository ສຳລັບ Bitbucket, ຈາກນັ້ນ refresh.",
+      "noRepositoriesVisibleGitlab": "ບໍ່ມີ repositories ທີ່ເຫັນ. ກວດເບິ່ງການເຂົ້າເຖິງ repository ສຳລັບ GitLab, ຈາກນັ້ນ refresh.",
+      "openBitbucket": "ເປີດ Bitbucket",
+      "openGitlab": "ເປີດ GitLab",
+      "recentlyUsed": "ຫຼ້າສຸດທີ່ໃຊ້"
     },
     "partRenderer": {
       "updatedFileCount_one": "ອັບເດດ {{displayCount}} ໄຟລ໌",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "ບໍ່ມີບ່ອນເກັບລະຫັດທີ່ເຊື່ອມຕໍ່ກັບບັນຊີຂອງທ່ານ.",
       "tryDifferentSearch": "ລອງຄຳຄົ້ນຫາທີ່ແຕກຕ່າງ.",
       "loading": "Loading...",
-      "accessibility": "ບ່ອນເກັບລະຫັດ: {{label}}"
+      "accessibility": "ບ່ອນເກັບລະຫັດ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "ລາຍລະອຽດຂໍ້ຄວາມ",

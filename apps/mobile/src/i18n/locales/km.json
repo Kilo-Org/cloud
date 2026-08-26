@@ -1382,7 +1382,8 @@
       "gitlabAccount": "គណនី GitLab",
       "connectGitLab": "ភ្ជាប់ GitLab",
       "gitlabError": "មិនអាចបើកការរៀបចំ GitLab បានទេ។ សូមព្យាយាមម្តងទៀត។",
-      "description": "ភ្ជាប់ Kilo {{label}} ដើម្បីត្រួតពិនិត្យ pull requests ដោយស្វ័យប្រវត្តិ។"
+      "description": "ភ្ជាប់ Kilo {{label}} ដើម្បីត្រួតពិនិត្យ pull requests ដោយស្វ័យប្រវត្តិ។",
+      "bitbucketError": "មិនអាចបើកការកំណត់ Bitbucket បានទេ។ សូមព្យាយាមម្ដងទៀត។"
     },
     "overview": {
       "reviewStyle": "រចនាប័ទ្មត្រួតពិនិត្យ",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "ប្រអប់បញ្ចូលរបស់អ្នកនឹងត្រូវបាត់បង់។",
       "keepEditing": "បន្តកែសម្រួល",
       "discard": "បោះបង់",
-      "discardFailed": "មិនអាចបោះបង់សេចក្តីព្រាងបានទេ។ សូមព្យាយាមម្តងទៀត។"
+      "discardFailed": "មិនអាចបោះបង់សេចក្តីព្រាងបានទេ។ សូមព្យាយាមម្តងទៀត។",
+      "bitbucketConnected": "Bitbucket បានភ្ជាប់",
+      "connectBitbucket": "ភ្ជាប់ Bitbucket",
+      "connectBitbucketDescription": "ភ្ជាប់ Bitbucket នៅក្នុង browser របស់អ្នក រួចត្រលប់មកទីនេះដើម្បីជ្រើសរើស repository។",
+      "connectGitlab": "ភ្ជាប់ GitLab",
+      "connectGitlabDescription": "ភ្ជាប់ GitLab នៅក្នុង browser របស់អ្នក រួចត្រលប់មកទីនេះដើម្បីជ្រើសរើស repository។",
+      "couldNotLoadBitbucketRepositories": "មិនអាចផ្ទុក repositories របស់ Bitbucket បានទេ",
+      "couldNotLoadGithubRepositories": "មិនអាចផ្ទុក repositories របស់ GitHub បានទេ",
+      "couldNotLoadGitlabRepositories": "មិនអាចផ្ទុក repositories របស់ GitLab បានទេ",
+      "gitlabConnected": "GitLab បានភ្ជាប់",
+      "noRepositoriesVisibleBitbucket": "មិនឃើញ repositories ទេ។ ពិនិត្យសិទ្ធិចូលប្រើ repository សម្រាប់ Bitbucket រួច refresh។",
+      "noRepositoriesVisibleGitlab": "មិនឃើញ repositories ទេ។ ពិនិត្យសិទ្ធិចូលប្រើ repository សម្រាប់ GitLab រួច refresh។",
+      "openBitbucket": "បើក Bitbucket",
+      "openGitlab": "បើក GitLab",
+      "recentlyUsed": "បានប្រើថ្មីៗ"
     },
     "partRenderer": {
       "updatedFileCount_one": "បានធ្វើបច្ចុប្បន្នភាពឯកសារ {{displayCount}}",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "គ្មានឃ្លាំងកូដត្រូវបានភ្ជាប់ទៅគណនីរបស់អ្នកទេ។",
       "tryDifferentSearch": "សាកល្បងពាក្យស្វែងរកផ្សេង។",
       "loading": "កំពុងផ្ទុក...",
-      "accessibility": "ឃ្លាំងកូដ: {{label}}"
+      "accessibility": "ឃ្លាំងកូដ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "ព័ត៌មានលម្អិតនៃសារ",

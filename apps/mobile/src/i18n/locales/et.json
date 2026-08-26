@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLabi konto",
       "connectGitLab": "Ühenda GitLab",
       "gitlabError": "GitLabi seadistuse avamine ebaõnnestus. Proovige palun uuesti.",
-      "description": "Ühendage Kilo {{label}} pull request'ide automaatseks ülevaatamiseks."
+      "description": "Ühendage Kilo {{label}} pull request'ide automaatseks ülevaatamiseks.",
+      "bitbucketError": "Bitbucketi seadistuse avamine ebaõnnestus. Proovi uuesti."
     },
     "overview": {
       "reviewStyle": "Ülevaate stiil",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Sinu päring läheb kaotsi.",
       "keepEditing": "Jätka muutmist",
       "discard": "Loobu",
-      "discardFailed": "Mustandist loobumine ebaõnnestus. Proovi uuesti."
+      "discardFailed": "Mustandist loobumine ebaõnnestus. Proovi uuesti.",
+      "bitbucketConnected": "Bitbucket on ühendatud",
+      "connectBitbucket": "Ühenda Bitbucket",
+      "connectBitbucketDescription": "Ühenda Bitbucket brauseris ja naase siia, et valida hoidla.",
+      "connectGitlab": "Ühenda GitLab",
+      "connectGitlabDescription": "Ühenda GitLab brauseris ja naase siia, et valida hoidla.",
+      "couldNotLoadBitbucketRepositories": "Bitbucketi hoidlate laadimine ebaõnnestus",
+      "couldNotLoadGithubRepositories": "GitHubi hoidlate laadimine ebaõnnestus",
+      "couldNotLoadGitlabRepositories": "GitLabi hoidlate laadimine ebaõnnestus",
+      "gitlabConnected": "GitLab on ühendatud",
+      "noRepositoriesVisibleBitbucket": "Hoidlaid pole nähtaval. Kontrolli Bitbucketi hoidlate juurdepääsu ja värskenda.",
+      "noRepositoriesVisibleGitlab": "Hoidlaid pole nähtaval. Kontrolli GitLabi hoidlate juurdepääsu ja värskenda.",
+      "openBitbucket": "Ava Bitbucket",
+      "openGitlab": "Ava GitLab",
+      "recentlyUsed": "Hiljuti kasutatud"
     },
     "partRenderer": {
       "updatedFileCount_one": "Uuendatud {{displayCount}} fail",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Sinu kontoga pole ühendatud ühtegi hoidlat.",
       "tryDifferentSearch": "Proovi teistsugust otsingusõna.",
       "loading": "Laadimine...",
-      "accessibility": "Hoidla: {{label}}"
+      "accessibility": "Hoidla: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Sõnumi üksikasjad",

@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab аккаунты",
       "connectGitLab": "GitLab қосу",
       "gitlabError": "GitLab орнатуды ашу мүмкін болмады. Қайта көріңіз.",
-      "description": "Pull request-терді автоматты шолу үшін Kilo {{label}} қосыңыз."
+      "description": "Pull request-терді автоматты шолу үшін Kilo {{label}} қосыңыз.",
+      "bitbucketError": "Bitbucket параметрлерін ашу мүмкін болмады. Қайталап көріңіз."
     },
     "overview": {
       "reviewStyle": "Шолу стилі",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Сұрағыңыз жоғалады.",
       "keepEditing": "Өңдеуді жалғастыру",
       "discard": "Жою",
-      "discardFailed": "Жобаны жою мүмкін болмады. Қайталап көріңіз."
+      "discardFailed": "Жобаны жою мүмкін болмады. Қайталап көріңіз.",
+      "bitbucketConnected": "Bitbucket қосылды",
+      "connectBitbucket": "Bitbucket-ті қосу",
+      "connectBitbucketDescription": "Bitbucket-ті браузерде қосыңыз, содан кейін репозиторийді таңдау үшін осында оралыңыз.",
+      "connectGitlab": "GitLab-ді қосу",
+      "connectGitlabDescription": "GitLab-ді браузерде қосыңыз, содан кейін репозиторийді таңдау үшін осында оралыңыз.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket репозиторийлерін жүктеу мүмкін болмады",
+      "couldNotLoadGithubRepositories": "GitHub репозиторийлерін жүктеу мүмкін болмады",
+      "couldNotLoadGitlabRepositories": "GitLab репозиторийлерін жүктеу мүмкін болмады",
+      "gitlabConnected": "GitLab қосылды",
+      "noRepositoriesVisibleBitbucket": "Репозиторийлер көрінбейді. Bitbucket үшін репозиторий қолжетімділігін тексеріңіз, содан кейін жаңартыңыз.",
+      "noRepositoriesVisibleGitlab": "Репозиторийлер көрінбейді. GitLab үшін репозиторий қолжетімділігін тексеріңіз, содан кейін жаңартыңыз.",
+      "openBitbucket": "Bitbucket-ті ашу",
+      "openGitlab": "GitLab-ді ашу",
+      "recentlyUsed": "Жақында қолданылған"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл жаңартылды",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Аккаунтыңызға қосылған репозиторийлер жоқ.",
       "tryDifferentSearch": "Басқа іздеу сөзін қолданып көріңіз.",
       "loading": "Жүктелуде...",
-      "accessibility": "Репозиторий: {{label}}"
+      "accessibility": "Репозиторий: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Хабарлама мәліметтері",

@@ -1391,7 +1391,8 @@
       "gitlabAccount": "Cont GitLab",
       "connectGitLab": "Conectează GitLab",
       "gitlabError": "Configurarea GitLab nu a putut fi deschisă. Te rugăm să încerci din nou.",
-      "description": "Conectează Kilo {{label}} pentru a revizui pull request-urile automat."
+      "description": "Conectează Kilo {{label}} pentru a revizui pull request-urile automat.",
+      "bitbucketError": "Nu s-a putut deschide configurarea Bitbucket. Încearcă din nou."
     },
     "overview": {
       "reviewStyle": "Stil de revizuire",
@@ -2187,7 +2188,21 @@
       "discardDraftMessage": "Mesajul tău va fi pierdut.",
       "keepEditing": "Continuă editarea",
       "discard": "Renunță",
-      "discardFailed": "Nu s-a putut renunța la ciornă. Încearcă din nou."
+      "discardFailed": "Nu s-a putut renunța la ciornă. Încearcă din nou.",
+      "bitbucketConnected": "Contul Bitbucket conectat",
+      "connectBitbucket": "Conectează Bitbucket",
+      "connectBitbucketDescription": "Conectează Bitbucket în browser, apoi întoarce-te aici pentru a alege un depozit.",
+      "connectGitlab": "Conectează GitLab",
+      "connectGitlabDescription": "Conectează GitLab în browser, apoi întoarce-te aici pentru a alege un depozit.",
+      "couldNotLoadBitbucketRepositories": "Nu s-au putut încărca depozitele Bitbucket",
+      "couldNotLoadGithubRepositories": "Nu s-au putut încărca depozitele GitHub",
+      "couldNotLoadGitlabRepositories": "Nu s-au putut încărca depozitele GitLab",
+      "gitlabConnected": "Contul GitLab conectat",
+      "noRepositoriesVisibleBitbucket": "Niciun depozit vizibil. Verifică accesul la depozite pentru Bitbucket, apoi actualizează.",
+      "noRepositoriesVisibleGitlab": "Niciun depozit vizibil. Verifică accesul la depozite pentru GitLab, apoi actualizează.",
+      "openBitbucket": "Deschide Bitbucket",
+      "openGitlab": "Deschide GitLab",
+      "recentlyUsed": "Folosite recent"
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizat {{displayCount}} fișier",
@@ -2277,7 +2292,10 @@
       "noRepositoriesDescription": "Nu este conectat niciun depozit la contul tău.",
       "tryDifferentSearch": "Încearcă un alt termen de căutare.",
       "loading": "Se încarcă...",
-      "accessibility": "Depozit: {{label}}"
+      "accessibility": "Depozit: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detalii mesaj",

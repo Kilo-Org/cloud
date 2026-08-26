@@ -1382,7 +1382,8 @@
       "gitlabAccount": "Pūkete GitLab",
       "connectGitLab": "Hono GitLab",
       "gitlabError": "Kāore i taea te uwhera i te whakatū GitLab. Tēnā whakamātau anō.",
-      "description": "Hono te Kilo {{label}} ki te arotake tono hītō ā-aunoa."
+      "description": "Hono te Kilo {{label}} ki te arotake tono hītō ā-aunoa.",
+      "bitbucketError": "Kāore i taea te whakatuwhera i te tautuhinga Bitbucket. Tēnā whakamātau anō."
     },
     "overview": {
       "reviewStyle": "Te Āhua Arotake",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Ka ngaro tō pātai.",
       "keepEditing": "Me whakatika tonu",
       "discard": "Whakarere",
-      "discardFailed": "Kāore i taea te whakarere i te tauira. Tēnā whakamātau anō."
+      "discardFailed": "Kāore i taea te whakarere i te tauira. Tēnā whakamātau anō.",
+      "bitbucketConnected": "Kua hono a Bitbucket",
+      "connectBitbucket": "Hono atu ki Bitbucket",
+      "connectBitbucketDescription": "Hono atu ki Bitbucket i tō pūtirotiro, kātahi hoki mai ki konei ki te kōwhiri pūputunga.",
+      "connectGitlab": "Hono atu ki GitLab",
+      "connectGitlabDescription": "Hono atu ki GitLab i tō pūtirotiro, kātahi hoki mai ki konei ki te kōwhiri pūputunga.",
+      "couldNotLoadBitbucketRepositories": "Kāore i taea te uta i ngā pūputunga Bitbucket",
+      "couldNotLoadGithubRepositories": "Kāore i taea te uta i ngā pūputunga GitHub",
+      "couldNotLoadGitlabRepositories": "Kāore i taea te uta i ngā pūputunga GitLab",
+      "gitlabConnected": "Kua hono a GitLab",
+      "noRepositoriesVisibleBitbucket": "Kāore he pūputunga e kitea ana. Tirohia te uru pūputunga mō Bitbucket, kātahi whakahōu.",
+      "noRepositoriesVisibleGitlab": "Kāore he pūputunga e kitea ana. Tirohia te uru pūputunga mō GitLab, kātahi whakahōu.",
+      "openBitbucket": "Whakatuwhera Bitbucket",
+      "openGitlab": "Whakatuwhera GitLab",
+      "recentlyUsed": "Kua whakamahia tata nei"
     },
     "partRenderer": {
       "updatedFileCount_one": "Kua whakahoutia {{displayCount}} kōnae",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Kāore he pūranga i hono ki tō pūkete.",
       "tryDifferentSearch": "Whakamātauhia tētahi kupu rapu rerekē.",
       "loading": "Kei te uta...",
-      "accessibility": "Pūranga: {{label}}"
+      "accessibility": "Pūranga: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Ngā taipitopito karere",

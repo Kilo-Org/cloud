@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab-konto",
       "connectGitLab": "Tilslut GitLab",
       "gitlabError": "Kunne ikke åbne GitLab-opsætningen. Prøv venligst igen.",
-      "description": "Tilslut Kilo {{label}} for automatisk at gennemgå pull requests."
+      "description": "Tilslut Kilo {{label}} for automatisk at gennemgå pull requests.",
+      "bitbucketError": "Kunne ikke åbne Bitbucket-opsætningen. Prøv igen."
     },
     "overview": {
       "reviewStyle": "Gennemgangsstil",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Din prompt vil gå tabt.",
       "keepEditing": "Fortsæt med at redigere",
       "discard": "Kassér",
-      "discardFailed": "Kunne ikke kassere kladden. Prøv igen."
+      "discardFailed": "Kunne ikke kassere kladden. Prøv igen.",
+      "bitbucketConnected": "Bitbucket er forbundet",
+      "connectBitbucket": "Forbind Bitbucket",
+      "connectBitbucketDescription": "Forbind Bitbucket i din browser, og vend tilbage her for at vælge et repository.",
+      "connectGitlab": "Forbind GitLab",
+      "connectGitlabDescription": "Forbind GitLab i din browser, og vend tilbage her for at vælge et repository.",
+      "couldNotLoadBitbucketRepositories": "Kunne ikke indlæse Bitbucket-repositories",
+      "couldNotLoadGithubRepositories": "Kunne ikke indlæse GitHub-repositories",
+      "couldNotLoadGitlabRepositories": "Kunne ikke indlæse GitLab-repositories",
+      "gitlabConnected": "GitLab er forbundet",
+      "noRepositoriesVisibleBitbucket": "Ingen repositories synlige. Kontrollér adgangen til Bitbucket-repositories, og opdater derefter.",
+      "noRepositoriesVisibleGitlab": "Ingen repositories synlige. Kontrollér adgangen til GitLab-repositories, og opdater derefter.",
+      "openBitbucket": "Åbn Bitbucket",
+      "openGitlab": "Åbn GitLab",
+      "recentlyUsed": "Senest brugt"
     },
     "partRenderer": {
       "updatedFileCount_one": "Opdaterede {{displayCount}} fil",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Ingen repositories er forbundet til din konto.",
       "tryDifferentSearch": "Prøv et andet søgeord.",
       "loading": "Indlæser...",
-      "accessibility": "Repository: {{label}}"
+      "accessibility": "Repository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Beskedoplysninger",

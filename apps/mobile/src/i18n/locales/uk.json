@@ -860,7 +860,8 @@
       "githubApp": "Застосунок GitHub",
       "githubError": "Не вдалося відкрити налаштування GitHub. Спробуйте ще раз.",
       "gitlabAccount": "Обліковий запис GitLab",
-      "gitlabError": "Не вдалося відкрити налаштування GitLab. Спробуйте ще раз."
+      "gitlabError": "Не вдалося відкрити налаштування GitLab. Спробуйте ще раз.",
+      "bitbucketError": "Не вдалося відкрити налаштування Bitbucket. Спробуйте ще раз."
     },
     "readOnlyDescription": "Змінювати ці налаштування можуть лише власники організації та менеджери з оплати.",
     "reviewDetail": {
@@ -1734,7 +1735,21 @@
       "discardDraftMessage": "Ваш запит буде втрачено.",
       "discardDraftTitle": "Відкинути чернетку?",
       "discardFailed": "Не вдалося відкинути чернетку. Спробуйте ще раз.",
-      "keepEditing": "Продовжити редагування"
+      "keepEditing": "Продовжити редагування",
+      "bitbucketConnected": "Bitbucket підключено",
+      "connectBitbucket": "Підключити Bitbucket",
+      "connectBitbucketDescription": "Підключіть Bitbucket у браузері, а потім поверніться сюди, щоб обрати репозиторій.",
+      "connectGitlab": "Підключити GitLab",
+      "connectGitlabDescription": "Підключіть GitLab у браузері, а потім поверніться сюди, щоб обрати репозиторій.",
+      "couldNotLoadBitbucketRepositories": "Не вдалося завантажити репозиторії Bitbucket",
+      "couldNotLoadGithubRepositories": "Не вдалося завантажити репозиторії GitHub",
+      "couldNotLoadGitlabRepositories": "Не вдалося завантажити репозиторії GitLab",
+      "gitlabConnected": "GitLab підключено",
+      "noRepositoriesVisibleBitbucket": "Репозиторіїв не видно. Перевірте доступ до репозиторіїв Bitbucket, а потім оновіть.",
+      "noRepositoriesVisibleGitlab": "Репозиторіїв не видно. Перевірте доступ до репозиторіїв GitLab, а потім оновіть.",
+      "openBitbucket": "Відкрити Bitbucket",
+      "openGitlab": "Відкрити GitLab",
+      "recentlyUsed": "Нещодавно використані"
     },
     "partRenderer": {
       "updatedFileCount_one": "Оновлено {{displayCount}} файл",
@@ -1825,7 +1840,10 @@
       "noRepositoriesDescription": "До вашого облікового запису не підключено жодних репозиторіїв.",
       "tryDifferentSearch": "Спробуйте інший пошуковий запит.",
       "loading": "Завантаження...",
-      "accessibility": "Репозиторій: {{label}}"
+      "accessibility": "Репозиторій: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Відомості про повідомлення",

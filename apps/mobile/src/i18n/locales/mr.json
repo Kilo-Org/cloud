@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab खाते",
       "connectGitLab": "GitLab कनेक्ट करा",
       "gitlabError": "GitLab सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",
-      "description": "पुल रिक्वेस्ट्स स्वयंचलितपणे पुनरावलोकन करण्यासाठी Kilo {{label}} कनेक्ट करा."
+      "description": "पुल रिक्वेस्ट्स स्वयंचलितपणे पुनरावलोकन करण्यासाठी Kilo {{label}} कनेक्ट करा.",
+      "bitbucketError": "Bitbucket सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा."
     },
     "overview": {
       "reviewStyle": "पुनरावलोकन शैली",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "तुमचा प्रॉम्प्ट गमावला जाईल.",
       "keepEditing": "संपादन सुरू ठेवा",
       "discard": "रद्द करा",
-      "discardFailed": "मसुदा रद्द करता आला नाही. कृपया पुन्हा प्रयत्न करा."
+      "discardFailed": "मसुदा रद्द करता आला नाही. कृपया पुन्हा प्रयत्न करा.",
+      "bitbucketConnected": "Bitbucket कनेक्ट केले",
+      "connectBitbucket": "Bitbucket कनेक्ट करा",
+      "connectBitbucketDescription": "तुमच्या ब्राउझरमध्ये Bitbucket कनेक्ट करा, नंतर रिपॉझिटरी निवडण्यासाठी येथे परत या.",
+      "connectGitlab": "GitLab कनेक्ट करा",
+      "connectGitlabDescription": "तुमच्या ब्राउझरमध्ये GitLab कनेक्ट करा, नंतर रिपॉझिटरी निवडण्यासाठी येथे परत या.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket रिपॉझिटरी लोड करता आल्या नाहीत",
+      "couldNotLoadGithubRepositories": "GitHub रिपॉझिटरी लोड करता आल्या नाहीत",
+      "couldNotLoadGitlabRepositories": "GitLab रिपॉझिटरी लोड करता आल्या नाहीत",
+      "gitlabConnected": "GitLab कनेक्ट केले",
+      "noRepositoriesVisibleBitbucket": "कोणतीही रिपॉझिटरी दिसत नाही. Bitbucket साठी रिपॉझिटरी प्रवेश तपासा, नंतर रिफ्रेश करा.",
+      "noRepositoriesVisibleGitlab": "कोणतीही रिपॉझिटरी दिसत नाही. GitLab साठी रिपॉझिटरी प्रवेश तपासा, नंतर रिफ्रेश करा.",
+      "openBitbucket": "Bitbucket उघडा",
+      "openGitlab": "GitLab उघडा",
+      "recentlyUsed": "अलीकडे वापरलेले"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्ययावत केली",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "तुमच्या खात्याशी कोणतीही भांडारे कनेक्ट केलेली नाहीत.",
       "tryDifferentSearch": "भिन्न शोध संज्ञा वापरून पहा.",
       "loading": "लोड होत आहे...",
-      "accessibility": "भांडार: {{label}}"
+      "accessibility": "भांडार: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "संदेश तपशील",

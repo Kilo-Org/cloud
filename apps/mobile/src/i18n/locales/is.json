@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab reikningur",
       "connectGitLab": "Tengja GitLab",
       "gitlabError": "Tókst ekki að opna GitLab uppsetningu. Vinsamlegast reyndu aftur.",
-      "description": "Tengdu Kilo {{label}} til að fara yfir pull requests sjálfkrafa."
+      "description": "Tengdu Kilo {{label}} til að fara yfir pull requests sjálfkrafa.",
+      "bitbucketError": "Gat ekki opnað Bitbucket uppsetningu. Vinsamlegast reyndu aftur."
     },
     "overview": {
       "reviewStyle": "Yfirferðarstíll",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Skilaboðin þín glatast.",
       "keepEditing": "Halda áfram að breyta",
       "discard": "Farga",
-      "discardFailed": "Ekki tókst að farga drögunum. Reyndu aftur."
+      "discardFailed": "Ekki tókst að farga drögunum. Reyndu aftur.",
+      "bitbucketConnected": "Bitbucket tengt",
+      "connectBitbucket": "Tengja Bitbucket",
+      "connectBitbucketDescription": "Tengdu Bitbucket í vafranum þínum og komdu svo aftur hingað til að velja geymslu.",
+      "connectGitlab": "Tengja GitLab",
+      "connectGitlabDescription": "Tengdu GitLab í vafranum þínum og komdu svo aftur hingað til að velja geymslu.",
+      "couldNotLoadBitbucketRepositories": "Gat ekki hlaðið Bitbucket geymslur",
+      "couldNotLoadGithubRepositories": "Gat ekki hlaðið GitHub geymslur",
+      "couldNotLoadGitlabRepositories": "Gat ekki hlaðið GitLab geymslur",
+      "gitlabConnected": "GitLab tengt",
+      "noRepositoriesVisibleBitbucket": "Engar geymslur sjáanlegar. Athugaðu geymsluaðgang að Bitbucket og endurnýjaðu.",
+      "noRepositoriesVisibleGitlab": "Engar geymslur sjáanlegar. Athugaðu geymsluaðgang að GitLab og endurnýjaðu.",
+      "openBitbucket": "Opna Bitbucket",
+      "openGitlab": "Opna GitLab",
+      "recentlyUsed": "Nýlega notað"
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppfærði {{displayCount}} skrá",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Engar geymslur eru tengdar við reikninginn þinn.",
       "tryDifferentSearch": "Prófaðu annað leitarorð.",
       "loading": "Hleður...",
-      "accessibility": "Geymsla: {{label}}"
+      "accessibility": "Geymsla: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Skilaboðaupplýsingar",

@@ -1418,7 +1418,8 @@
       "gitlabAccount": "Cyfrif GitLab",
       "connectGitLab": "Cysylltu GitLab",
       "gitlabError": "Methodd agor gosod GitLab. Ceisiwch eto.",
-      "description": "Cysylltwch y Kilo {{label}} i adolygu ceisiadau tynnu yn awtomatig."
+      "description": "Cysylltwch y Kilo {{label}} i adolygu ceisiadau tynnu yn awtomatig.",
+      "bitbucketError": "Methu agor setup Bitbucket. Rhowch gynnig arall arni."
     },
     "overview": {
       "reviewStyle": "Arddull Adolygu",
@@ -2232,7 +2233,21 @@
       "discardDraftMessage": "Bydd eich anogiad yn cael ei golli.",
       "keepEditing": "Parhau i olygu",
       "discard": "Taflu",
-      "discardFailed": "Methwyd taflu'r drafft. Ceisiwch eto."
+      "discardFailed": "Methwyd taflu'r drafft. Ceisiwch eto.",
+      "bitbucketConnected": "Bitbucket wedi'i gysylltu",
+      "connectBitbucket": "Cysylltu â Bitbucket",
+      "connectBitbucketDescription": "Cysylltwch â Bitbucket yn eich porwr, yna dychwelwch yma i ddewis ystorfa.",
+      "connectGitlab": "Cysylltu â GitLab",
+      "connectGitlabDescription": "Cysylltwch â GitLab yn eich porwr, yna dychwelwch yma i ddewis ystorfa.",
+      "couldNotLoadBitbucketRepositories": "Methu llwytho ystorfeydd Bitbucket",
+      "couldNotLoadGithubRepositories": "Methu llwytho ystorfeydd GitHub",
+      "couldNotLoadGitlabRepositories": "Methu llwytho ystorfeydd GitLab",
+      "gitlabConnected": "GitLab wedi'i gysylltu",
+      "noRepositoriesVisibleBitbucket": "Dim ystorfeydd yn weladwy. Gwiriwch fynediad i'r ystorfeydd ar gyfer Bitbucket, yna adnewyddwch.",
+      "noRepositoriesVisibleGitlab": "Dim ystorfeydd yn weladwy. Gwiriwch fynediad i'r ystorfeydd ar gyfer GitLab, yna adnewyddwch.",
+      "openBitbucket": "Agor Bitbucket",
+      "openGitlab": "Agor GitLab",
+      "recentlyUsed": "Defnyddiwyd yn ddiweddar"
     },
     "partRenderer": {
       "updatedFileCount_one": "Diweddarwyd {{displayCount}} ffeil",
@@ -2325,7 +2340,10 @@
       "noRepositoriesDescription": "Dim ystorfeydd wedi'u cysylltu â'ch cyfrif.",
       "tryDifferentSearch": "Ceisiwch derm chwilio gwahanol.",
       "loading": "Yn llwytho...",
-      "accessibility": "Ystorfa: {{label}}"
+      "accessibility": "Ystorfa: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Manylion neges",

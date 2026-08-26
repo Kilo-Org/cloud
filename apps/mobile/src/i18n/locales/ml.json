@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab അക്കൗണ്ട്",
       "connectGitLab": "GitLab കണക്റ്റുചെയ്യുക",
       "gitlabError": "GitLab സെറ്റപ്പ് തുറക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
-      "description": "പുൾ റിക്വസ്റ്റുകൾ ഓട്ടോമാറ്റിക്കായി അവലോകനം ചെയ്യാൻ Kilo {{label}} കണക്റ്റുചെയ്യുക."
+      "description": "പുൾ റിക്വസ്റ്റുകൾ ഓട്ടോമാറ്റിക്കായി അവലോകനം ചെയ്യാൻ Kilo {{label}} കണക്റ്റുചെയ്യുക.",
+      "bitbucketError": "Bitbucket സജ്ജീകരണം തുറക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക."
     },
     "overview": {
       "reviewStyle": "അവലോകന ശൈലി",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "നിങ്ങളുടെ പ്രോംപ്റ്റ് നഷ്ടപ്പെടും.",
       "keepEditing": "എഡിറ്റിംഗ് തുടരുക",
       "discard": "ഉപേക്ഷിക്കുക",
-      "discardFailed": "ഡ്രാഫ്റ്റ് ഉപേക്ഷിക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക."
+      "discardFailed": "ഡ്രാഫ്റ്റ് ഉപേക്ഷിക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
+      "bitbucketConnected": "Bitbucket കണക്റ്റ് ചെയ്തു",
+      "connectBitbucket": "Bitbucket കണക്റ്റ് ചെയ്യുക",
+      "connectBitbucketDescription": "നിങ്ങളുടെ ബ്രൗസറിൽ Bitbucket കണക്റ്റ് ചെയ്യുക, തുടർന്ന് ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കാൻ ഇവിടെ തിരികെ വരിക.",
+      "connectGitlab": "GitLab കണക്റ്റ് ചെയ്യുക",
+      "connectGitlabDescription": "നിങ്ങളുടെ ബ്രൗസറിൽ GitLab കണക്റ്റ് ചെയ്യുക, തുടർന്ന് ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കാൻ ഇവിടെ തിരികെ വരിക.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket റിപ്പോസിറ്ററികൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
+      "couldNotLoadGithubRepositories": "GitHub റിപ്പോസിറ്ററികൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
+      "couldNotLoadGitlabRepositories": "GitLab റിപ്പോസിറ്ററികൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
+      "gitlabConnected": "GitLab കണക്റ്റ് ചെയ്തു",
+      "noRepositoriesVisibleBitbucket": "റിപ്പോസിറ്ററികൾ ദൃശ്യമല്ല. Bitbucket-നുള്ള റിപ്പോസിറ്ററി ആക്സസ് പരിശോധിക്കുക, തുടർന്ന് റിഫ്രഷ് ചെയ്യുക.",
+      "noRepositoriesVisibleGitlab": "റിപ്പോസിറ്ററികൾ ദൃശ്യമല്ല. GitLab-നുള്ള റിപ്പോസിറ്ററി ആക്സസ് പരിശോധിക്കുക, തുടർന്ന് റിഫ്രഷ് ചെയ്യുക.",
+      "openBitbucket": "Bitbucket തുറക്കുക",
+      "openGitlab": "GitLab തുറക്കുക",
+      "recentlyUsed": "അടുത്തിടെ ഉപയോഗിച്ചവ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ഫയൽ അപ്ഡേറ്റ് ചെയ്തു",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "നിങ്ങളുടെ അക്കൗണ്ടിലേക്ക് റിപ്പോസിറ്ററികളൊന്നും കണക്റ്റ് ചെയ്തിട്ടില്ല.",
       "tryDifferentSearch": "മറ്റൊരു തിരയൽ പദം ശ്രമിക്കുക.",
       "loading": "ലോഡ് ചെയ്യുന്നു...",
-      "accessibility": "റിപ്പോസിറ്ററി: {{label}}"
+      "accessibility": "റിപ്പോസിറ്ററി: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "സന്ദേശ വിശദാംശങ്ങൾ",

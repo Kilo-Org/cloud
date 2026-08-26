@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab hisobi",
       "connectGitLab": "GitLabni ulash",
       "gitlabError": "GitLab sozlovini ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "description": "Pull requestlarni avtomatik ko'rib chiqish uchun Kilo {{label}}ni ulang."
+      "description": "Pull requestlarni avtomatik ko'rib chiqish uchun Kilo {{label}}ni ulang.",
+      "bitbucketError": "Bitbucket sozlamasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring."
     },
     "overview": {
       "reviewStyle": "Ko'rib chiqish uslubi",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Promptingiz yo'qoladi.",
       "keepEditing": "Tahrirlashda davom etish",
       "discard": "Bekor qilish",
-      "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring."
+      "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring.",
+      "bitbucketConnected": "Bitbucket ulandi",
+      "connectBitbucket": "Bitbucket'ga ulanish",
+      "connectBitbucketDescription": "Bitbucket'ga brauzeringizda ulaning, keyin repozitoriy tanlash uchun bu yerga qayting.",
+      "connectGitlab": "GitLab'ga ulanish",
+      "connectGitlabDescription": "GitLab'ga brauzeringizda ulaning, keyin repozitoriy tanlash uchun bu yerga qayting.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarini yuklab bo'lmadi",
+      "couldNotLoadGithubRepositories": "GitHub repozitoriyalarini yuklab bo'lmadi",
+      "couldNotLoadGitlabRepositories": "GitLab repozitoriyalarini yuklab bo'lmadi",
+      "gitlabConnected": "GitLab ulandi",
+      "noRepositoriesVisibleBitbucket": "Hech qanday repozitoriy ko'rinmayapti. Bitbucket uchun repozitoriy kirishini tekshiring, keyin yangilang.",
+      "noRepositoriesVisibleGitlab": "Hech qanday repozitoriy ko'rinmayapti. GitLab uchun repozitoriy kirishini tekshiring, keyin yangilang.",
+      "openBitbucket": "Bitbucket'ni ochish",
+      "openGitlab": "GitLab'ni ochish",
+      "recentlyUsed": "Yaqinda ishlatilgan"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Hisobingizga ulangan repozitoriyalar yo'q.",
       "tryDifferentSearch": "Boshqa qidiruv so'zini sinab ko'ring.",
       "loading": "Yuklanmoqda...",
-      "accessibility": "Repozitoriya: {{label}}"
+      "accessibility": "Repozitoriya: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Xabar tafsilotlari",

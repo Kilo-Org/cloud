@@ -1391,7 +1391,8 @@
       "gitlabAccount": "GitLab račun",
       "connectGitLab": "Poveži GitLab",
       "gitlabError": "GitLab podešavanje nije bilo moguće otvoriti. Pokušajte ponovo.",
-      "description": "Povežite Kilo {{label}} da biste automatski pregledavali pull requestove."
+      "description": "Povežite Kilo {{label}} da biste automatski pregledavali pull requestove.",
+      "bitbucketError": "Nije moguće otvoriti Bitbucket postavke. Pokušaj ponovo."
     },
     "overview": {
       "reviewStyle": "Stil pregleda",
@@ -2187,7 +2188,21 @@
       "discardDraftMessage": "Vaš upit bit će izgubljen.",
       "keepEditing": "Nastavi uređivati",
       "discard": "Odbaci",
-      "discardFailed": "Nije moguće odbaciti nacrt. Pokušajte ponovo."
+      "discardFailed": "Nije moguće odbaciti nacrt. Pokušajte ponovo.",
+      "bitbucketConnected": "Bitbucket povezan",
+      "connectBitbucket": "Poveži Bitbucket",
+      "connectBitbucketDescription": "Poveži Bitbucket u pregledniku, zatim se vrati ovdje da odabereš spremište.",
+      "connectGitlab": "Poveži GitLab",
+      "connectGitlabDescription": "Poveži GitLab u pregledniku, zatim se vrati ovdje da odabereš spremište.",
+      "couldNotLoadBitbucketRepositories": "Nije moguće učitati Bitbucket spremišta",
+      "couldNotLoadGithubRepositories": "Nije moguće učitati GitHub spremišta",
+      "couldNotLoadGitlabRepositories": "Nije moguće učitati GitLab spremišta",
+      "gitlabConnected": "GitLab povezan",
+      "noRepositoriesVisibleBitbucket": "Nema vidljivih spremišta. Provjeri pristup spremištima za Bitbucket, zatim osvježi.",
+      "noRepositoriesVisibleGitlab": "Nema vidljivih spremišta. Provjeri pristup spremištima za GitLab, zatim osvježi.",
+      "openBitbucket": "Otvori Bitbucket",
+      "openGitlab": "Otvori GitLab",
+      "recentlyUsed": "Nedavno korišteno"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirano {{displayCount}} datoteka",
@@ -2277,7 +2292,10 @@
       "noRepositoriesDescription": "Nijedan repozitorij nije povezan s vašim računom.",
       "tryDifferentSearch": "Pokušajte drugi pojam pretrage.",
       "loading": "Učitavanje...",
-      "accessibility": "Repozitorij: {{label}}"
+      "accessibility": "Repozitorij: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detalji poruke",

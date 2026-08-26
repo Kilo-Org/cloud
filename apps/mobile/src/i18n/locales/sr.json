@@ -1391,7 +1391,8 @@
       "gitlabAccount": "GitLab nalog",
       "connectGitLab": "Poveži GitLab",
       "gitlabError": "Nije moguće otvoriti GitLab podešavanje. Pokušaj ponovo.",
-      "description": "Poveži Kilo {{label}} da automatski pregleda pull requests."
+      "description": "Poveži Kilo {{label}} da automatski pregleda pull requests.",
+      "bitbucketError": "Nije moguće otvoriti Bitbucket podešavanja. Pokušaj ponovo."
     },
     "overview": {
       "reviewStyle": "Stil pregleda",
@@ -2187,7 +2188,21 @@
       "discardDraftMessage": "Tvoj upit će biti izgubljen.",
       "keepEditing": "Nastavi sa uređivanjem",
       "discard": "Odbaci",
-      "discardFailed": "Nacrt se ne može odbaciti. Pokušaj ponovo."
+      "discardFailed": "Nacrt se ne može odbaciti. Pokušaj ponovo.",
+      "bitbucketConnected": "Bitbucket je povezan",
+      "connectBitbucket": "Poveži Bitbucket",
+      "connectBitbucketDescription": "Poveži Bitbucket u pregledaču, a zatim se vrati ovde da izabereš repozitorijum.",
+      "connectGitlab": "Poveži GitLab",
+      "connectGitlabDescription": "Poveži GitLab u pregledaču, a zatim se vrati ovde da izabereš repozitorijum.",
+      "couldNotLoadBitbucketRepositories": "Nije moguće učitati Bitbucket repozitorijume",
+      "couldNotLoadGithubRepositories": "Nije moguće učitati GitHub repozitorijume",
+      "couldNotLoadGitlabRepositories": "Nije moguće učitati GitLab repozitorijume",
+      "gitlabConnected": "GitLab je povezan",
+      "noRepositoriesVisibleBitbucket": "Nema vidljivih repozitorijuma. Proveri pristup repozitorijumima za Bitbucket, pa osveži.",
+      "noRepositoriesVisibleGitlab": "Nema vidljivih repozitorijuma. Proveri pristup repozitorijumima za GitLab, pa osveži.",
+      "openBitbucket": "Otvori Bitbucket",
+      "openGitlab": "Otvori GitLab",
+      "recentlyUsed": "Nedavno korišćeno"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažuriran {{displayCount}} fajl",
@@ -2277,7 +2292,10 @@
       "noRepositoriesDescription": "Nijedan repozitorijum nije povezan sa tvojim nalogom.",
       "tryDifferentSearch": "Probaj drugi termin za pretragu.",
       "loading": "Učitavanje...",
-      "accessibility": "Repozitorijum: {{label}}"
+      "accessibility": "Repozitorijum: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detalji poruke",

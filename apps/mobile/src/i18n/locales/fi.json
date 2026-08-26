@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab-tili",
       "connectGitLab": "Yhdistä GitLab",
       "gitlabError": "GitLab-asennusta ei voitu avata. Yritä uudelleen.",
-      "description": "Yhdistä Kilo {{label}} arvioidaksesi vetopyynnöt automaattisesti."
+      "description": "Yhdistä Kilo {{label}} arvioidaksesi vetopyynnöt automaattisesti.",
+      "bitbucketError": "Bitbucket-asetusten avaaminen ei onnistunut. Yritä uudelleen."
     },
     "overview": {
       "reviewStyle": "Arviointityyli",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Kehotteesi menetetään.",
       "keepEditing": "Jatka muokkausta",
       "discard": "Hylkää",
-      "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen."
+      "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen.",
+      "bitbucketConnected": "Bitbucket yhdistetty",
+      "connectBitbucket": "Yhdistä Bitbucket",
+      "connectBitbucketDescription": "Yhdistä Bitbucket selaimessa ja palaa sitten tähän valitsemaan repositorion.",
+      "connectGitlab": "Yhdistä GitLab",
+      "connectGitlabDescription": "Yhdistä GitLab selaimessa ja palaa sitten tähän valitsemaan repositorion.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket-repositorioiden lataus epäonnistui",
+      "couldNotLoadGithubRepositories": "GitHub-repositorioiden lataus epäonnistui",
+      "couldNotLoadGitlabRepositories": "GitLab-repositorioiden lataus epäonnistui",
+      "gitlabConnected": "GitLab yhdistetty",
+      "noRepositoriesVisibleBitbucket": "Repositorioita ei näy. Tarkista repositorion käyttöoikeus Bitbucketiin ja päivitä sitten.",
+      "noRepositoriesVisibleGitlab": "Repositorioita ei näy. Tarkista repositorion käyttöoikeus GitLabiin ja päivitä sitten.",
+      "openBitbucket": "Avaa Bitbucket",
+      "openGitlab": "Avaa GitLab",
+      "recentlyUsed": "Äskettäin käytetyt"
     },
     "partRenderer": {
       "updatedFileCount_one": "Päivitetty {{displayCount}} tiedosto",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Tilillesi ei ole yhdistetty arkistoja.",
       "tryDifferentSearch": "Kokeile toista hakusanaa.",
       "loading": "Ladataan...",
-      "accessibility": "Arkisto: {{label}}"
+      "accessibility": "Arkisto: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Viestin tiedot",

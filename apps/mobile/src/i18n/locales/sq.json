@@ -1382,7 +1382,8 @@
       "gitlabAccount": "Llogaria GitLab",
       "connectGitLab": "Lidh GitLab",
       "gitlabError": "Nuk u arrit të hapej konfigurimi i GitLab. Provo përsëri.",
-      "description": "Lidh Kilo {{label}} për të shqyrtuar kërkesat e tërheqjes automatikisht."
+      "description": "Lidh Kilo {{label}} për të shqyrtuar kërkesat e tërheqjes automatikisht.",
+      "bitbucketError": "Nuk u hap konfigurimi i Bitbucket. Provo përsëri."
     },
     "overview": {
       "reviewStyle": "Stili i Shqyrtimit",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Mesazhi juaj do të humbasë.",
       "keepEditing": "Vazhdo redaktimin",
       "discard": "Hiq",
-      "discardFailed": "Nuk u hoq drafti. Ju lutemi provoni përsëri."
+      "discardFailed": "Nuk u hoq drafti. Ju lutemi provoni përsëri.",
+      "bitbucketConnected": "Bitbucket i lidhur",
+      "connectBitbucket": "Lidhu me Bitbucket",
+      "connectBitbucketDescription": "Lidhu me Bitbucket në shfletuesin tënd, pastaj kthehu këtu për të zgjedhur një depo.",
+      "connectGitlab": "Lidhu me GitLab",
+      "connectGitlabDescription": "Lidhu me GitLab në shfletuesin tënd, pastaj kthehu këtu për të zgjedhur një depo.",
+      "couldNotLoadBitbucketRepositories": "Nuk u arrit të ngarkoheshin depo Bitbucket",
+      "couldNotLoadGithubRepositories": "Nuk u arrit të ngarkoheshin depo GitHub",
+      "couldNotLoadGitlabRepositories": "Nuk u arrit të ngarkoheshin depo GitLab",
+      "gitlabConnected": "GitLab i lidhur",
+      "noRepositoriesVisibleBitbucket": "Nuk ka depo të dukshme. Kontrollo aksesin e depove për Bitbucket, pastaj rifresko.",
+      "noRepositoriesVisibleGitlab": "Nuk ka depo të dukshme. Kontrollo aksesin e depove për GitLab, pastaj rifresko.",
+      "openBitbucket": "Hap Bitbucket",
+      "openGitlab": "Hap GitLab",
+      "recentlyUsed": "Të përdorura së fundmi"
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Asnjë depo nuk është e lidhur me llogarinë tuaj.",
       "tryDifferentSearch": "Provoni një term tjetër kërkimi.",
       "loading": "Duke u ngarkuar...",
-      "accessibility": "Depoja: {{label}}"
+      "accessibility": "Depoja: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detajet e mesazhit",

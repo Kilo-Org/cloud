@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab hesabı",
       "connectGitLab": "GitLab-ı qoş",
       "gitlabError": "GitLab quraşdırması açıla bilmədi. Zəhmət olmasa yenidən cəhd edin.",
-      "description": "Pull request-ləri avtomatik nəzərdən keçirmək üçün Kilo {{label}} qoşun."
+      "description": "Pull request-ləri avtomatik nəzərdən keçirmək üçün Kilo {{label}} qoşun.",
+      "bitbucketError": "Bitbucket quraşdırması açıla bilmədi. Yenidən cəhd edin."
     },
     "overview": {
       "reviewStyle": "Nəzərdən keçirmə Üslubu",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "İstəyiniz itiriləcək.",
       "keepEditing": "Redaktəyə davam et",
       "discard": "Ləğv et",
-      "discardFailed": "Qaralama ləğv edilə bilmədi. Zəhmət olmasa yenidən cəhd edin."
+      "discardFailed": "Qaralama ləğv edilə bilmədi. Zəhmət olmasa yenidən cəhd edin.",
+      "bitbucketConnected": "Bitbucket qoşuldu",
+      "connectBitbucket": "Bitbucket-a qoşul",
+      "connectBitbucketDescription": "Depo seçmək üçün brauzerdə Bitbucket-a qoşulun, sonra buraya qayıdın.",
+      "connectGitlab": "GitLab-a qoşul",
+      "connectGitlabDescription": "Depo seçmək üçün brauzerdə GitLab-a qoşulun, sonra buraya qayıdın.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket depoları yüklənə bilmədi",
+      "couldNotLoadGithubRepositories": "GitHub depoları yüklənə bilmədi",
+      "couldNotLoadGitlabRepositories": "GitLab depoları yüklənə bilmədi",
+      "gitlabConnected": "GitLab qoşuldu",
+      "noRepositoriesVisibleBitbucket": "Depo görünmür. Bitbucket üçün depo girişini yoxlayın, sonra yeniləyin.",
+      "noRepositoriesVisibleGitlab": "Depo görünmür. GitLab üçün depo girişini yoxlayın, sonra yeniləyin.",
+      "openBitbucket": "Bitbucket-ı aç",
+      "openGitlab": "GitLab-ı aç",
+      "recentlyUsed": "Son istifadə olunanlar"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl yeniləndi",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Hesabınıza qoşulmuş repozitoriya yoxdur.",
       "tryDifferentSearch": "Fərqli axtarış termini cəhd edin.",
       "loading": "Yüklənir...",
-      "accessibility": "Repozitoriya: {{label}}"
+      "accessibility": "Repozitoriya: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Mesaj detalları",

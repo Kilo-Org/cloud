@@ -856,7 +856,8 @@
       "githubApp": "GitHub-app",
       "githubError": "Kon de GitHub-installatie niet openen. Probeer het opnieuw.",
       "gitlabAccount": "GitLab-account",
-      "gitlabError": "Kon de GitLab-installatie niet openen. Probeer het opnieuw."
+      "gitlabError": "Kon de GitLab-installatie niet openen. Probeer het opnieuw.",
+      "bitbucketError": "Kon de Bitbucket-instellingen niet openen. Probeer het opnieuw."
     },
     "readOnlyDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen deze instellingen wijzigen.",
     "reviewDetail": {
@@ -1718,7 +1719,21 @@
       "discardDraftMessage": "Je prompt gaat verloren.",
       "discardDraftTitle": "Concept weggooien?",
       "discardFailed": "Kon het concept niet weggooien. Probeer het opnieuw.",
-      "keepEditing": "Blijven bewerken"
+      "keepEditing": "Blijven bewerken",
+      "bitbucketConnected": "Bitbucket is verbonden",
+      "connectBitbucket": "Bitbucket verbinden",
+      "connectBitbucketDescription": "Verbind Bitbucket in uw browser en kom daarna hier terug om een repository te kiezen.",
+      "connectGitlab": "GitLab verbinden",
+      "connectGitlabDescription": "Verbind GitLab in uw browser en kom daarna hier terug om een repository te kiezen.",
+      "couldNotLoadBitbucketRepositories": "Kon de Bitbucket-repositories niet laden",
+      "couldNotLoadGithubRepositories": "Kon de GitHub-repositories niet laden",
+      "couldNotLoadGitlabRepositories": "Kon de GitLab-repositories niet laden",
+      "gitlabConnected": "GitLab is verbonden",
+      "noRepositoriesVisibleBitbucket": "Geen repositories zichtbaar. Controleer de repositorytoegang voor Bitbucket en vernieuw daarna.",
+      "noRepositoriesVisibleGitlab": "Geen repositories zichtbaar. Controleer de repositorytoegang voor GitLab en vernieuw daarna.",
+      "openBitbucket": "Bitbucket openen",
+      "openGitlab": "GitLab openen",
+      "recentlyUsed": "Recent gebruikt"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} bestand bijgewerkt",
@@ -1807,7 +1822,10 @@
       "noRepositoriesDescription": "Er zijn geen repositories verbonden met je account.",
       "tryDifferentSearch": "Probeer een andere zoekterm.",
       "loading": "Laden...",
-      "accessibility": "Repository: {{label}}"
+      "accessibility": "Repository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Berichtdetails",

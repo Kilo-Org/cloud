@@ -1409,7 +1409,8 @@
       "gitlabAccount": "Cuntas GitLab",
       "connectGitLab": "Ceangail GitLab",
       "gitlabError": "Níorbh fhéidir socrú GitLab a oscailt. Bain triail as arís le do thoil.",
-      "description": "Ceangail an Kilo {{label}} chun iarratais tarraingthe a athbhreithniú go huathoibríoch."
+      "description": "Ceangail an Kilo {{label}} chun iarratais tarraingthe a athbhreithniú go huathoibríoch.",
+      "bitbucketError": "Níorbh fhéidir socrú Bitbucket a oscailt. Bain triail as arís."
     },
     "overview": {
       "reviewStyle": "Stíl Athbhreithnithe",
@@ -2217,7 +2218,21 @@
       "discardDraftMessage": "Caillfear do leid.",
       "keepEditing": "Coinnigh ag eagarthóireacht",
       "discard": "Caith ar lár",
-      "discardFailed": "Níorbh fhéidir an dréacht a chaitheamh ar lár. Bain triail as arís le do thoil."
+      "discardFailed": "Níorbh fhéidir an dréacht a chaitheamh ar lár. Bain triail as arís le do thoil.",
+      "bitbucketConnected": "Bitbucket ceangailte",
+      "connectBitbucket": "Ceangail Bitbucket",
+      "connectBitbucketDescription": "Ceangail Bitbucket i do bhrabhsálaí, agus ansin fill ar ais anseo chun stór a roghnú.",
+      "connectGitlab": "Ceangail GitLab",
+      "connectGitlabDescription": "Ceangail GitLab i do bhrabhsálaí, agus ansin fill ar ais anseo chun stór a roghnú.",
+      "couldNotLoadBitbucketRepositories": "Níorbh fhéidir stórtha Bitbucket a lódáil",
+      "couldNotLoadGithubRepositories": "Níorbh fhéidir stórtha GitHub a lódáil",
+      "couldNotLoadGitlabRepositories": "Níorbh fhéidir stórtha GitLab a lódáil",
+      "gitlabConnected": "GitLab ceangailte",
+      "noRepositoriesVisibleBitbucket": "Níl aon stórtha le feiceáil. Seiceáil rochtain ar stórtha do Bitbucket, agus ansin athnuaigh.",
+      "noRepositoriesVisibleGitlab": "Níl aon stórtha le feiceáil. Seiceáil rochtain ar stórtha do GitLab, agus ansin athnuaigh.",
+      "openBitbucket": "Oscail Bitbucket",
+      "openGitlab": "Oscail GitLab",
+      "recentlyUsed": "A úsáideadh le déanaí"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nuashonraíodh {{displayCount}} comhad",
@@ -2313,7 +2328,10 @@
       "noRepositoriesDescription": "Níl aon stór ceangailte le do chuntas.",
       "tryDifferentSearch": "Bain triail as téarma cuardaigh eile.",
       "loading": "Ag lódáil...",
-      "accessibility": "Stór: {{label}}"
+      "accessibility": "Stór: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Sonraí na teachtaireachta",

@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab ਖਾਤਾ",
       "connectGitLab": "GitLab ਕਨੈਕਟ ਕਰੋ",
       "gitlabError": "GitLab ਸੈੱਟਅੱਪ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "description": "ਪੁੱਲ ਬੇਨਤੀਆਂ ਦੀ ਆਟੋਮੈਟਿਕ ਸਮੀਖਿਆ ਕਰਨ ਲਈ Kilo {{label}} ਕਨੈਕਟ ਕਰੋ।"
+      "description": "ਪੁੱਲ ਬੇਨਤੀਆਂ ਦੀ ਆਟੋਮੈਟਿਕ ਸਮੀਖਿਆ ਕਰਨ ਲਈ Kilo {{label}} ਕਨੈਕਟ ਕਰੋ।",
+      "bitbucketError": "Bitbucket ਸੈੱਟਅੱਪ ਖੋਲ੍ਹ ਨਹੀਂ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "overview": {
       "reviewStyle": "ਸਮੀਖਿਆ ਸ਼ੈਲੀ",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "ਤੁਹਾਡਾ ਪ੍ਰੋਂਪਟ ਗੁਆਚ ਜਾਵੇਗਾ।",
       "keepEditing": "ਸੰਪਾਦਨ ਜਾਰੀ ਰੱਖੋ",
       "discard": "ਰੱਦ ਕਰੋ",
-      "discardFailed": "ਡਰਾਫਟ ਰੱਦ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      "discardFailed": "ਡਰਾਫਟ ਰੱਦ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "bitbucketConnected": "Bitbucket ਕਨੈਕਟ ਹੋਇਆ",
+      "connectBitbucket": "Bitbucket ਨਾਲ ਕਨੈਕਟ ਕਰੋ",
+      "connectBitbucketDescription": "Bitbucket ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
+      "connectGitlab": "GitLab ਨਾਲ ਕਨੈਕਟ ਕਰੋ",
+      "connectGitlabDescription": "GitLab ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
+      "couldNotLoadBitbucketRepositories": "Bitbucket ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕਰ ਸਕੇ",
+      "couldNotLoadGithubRepositories": "GitHub ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕਰ ਸਕੇ",
+      "couldNotLoadGitlabRepositories": "GitLab ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕਰ ਸਕੇ",
+      "gitlabConnected": "GitLab ਕਨੈਕਟ ਹੋਇਆ",
+      "noRepositoriesVisibleBitbucket": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦਿੰਦੀ। Bitbucket ਲਈ ਰਿਪੋਜ਼ਟਰੀ ਪਹੁੰਚ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫ੍ਰੈਸ਼ ਕਰੋ।",
+      "noRepositoriesVisibleGitlab": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦਿੰਦੀ। GitLab ਲਈ ਰਿਪੋਜ਼ਟਰੀ ਪਹੁੰਚ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫ੍ਰੈਸ਼ ਕਰੋ।",
+      "openBitbucket": "Bitbucket ਖੋਲ੍ਹੋ",
+      "openGitlab": "GitLab ਖੋਲ੍ਹੋ",
+      "recentlyUsed": "ਹਾਲ ਹੀ ਵਿੱਚ ਵਰਤੇ ਗਏ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ਫਾਈਲ ਅੱਪਡੇਟ ਕੀਤੀ ਗਈ",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "ਤੁਹਾਡੇ ਖਾਤੇ ਨਾਲ ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਕਨੈਕਟ ਨਹੀਂ ਹੈ।",
       "tryDifferentSearch": "ਵੱਖਰਾ ਖੋਜ ਸ਼ਬਦ ਅਜ਼ਮਾਓ।",
       "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ...",
-      "accessibility": "ਰਿਪੋਜ਼ਟਰੀ: {{label}}"
+      "accessibility": "ਰਿਪੋਜ਼ਟਰੀ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "ਸੁਨੇਹਾ ਵੇਰਵੇ",

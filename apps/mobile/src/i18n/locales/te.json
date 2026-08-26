@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab ఖాతా",
       "connectGitLab": "GitLabను కనెక్ట్ చేయండి",
       "gitlabError": "GitLab సెటప్ను తెరవలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి.",
-      "description": "పుల్ రిక్వెస్ట్లను ఆటోమేటిక్గా సమీక్షించడానికి Kilo {{label}}ను కనెక్ట్ చేయండి."
+      "description": "పుల్ రిక్వెస్ట్లను ఆటోమేటిక్గా సమీక్షించడానికి Kilo {{label}}ను కనెక్ట్ చేయండి.",
+      "bitbucketError": "బిట్‌బకెట్ సెటప్‌ను తెరవలేకపోయాము. దయచేసి మళ్ళీ ప్రయత్నించండి."
     },
     "overview": {
       "reviewStyle": "సమీక్ష శైలి",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "మీ ప్రాంప్ట్ కోల్పోతుంది.",
       "keepEditing": "ఎడిటింగ్ కొనసాగించండి",
       "discard": "విస్మరించండి",
-      "discardFailed": "డ్రాఫ్ట్‌ను విస్మరించలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి."
+      "discardFailed": "డ్రాఫ్ట్‌ను విస్మరించలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
+      "bitbucketConnected": "బిట్‌బకెట్ కనెక్ట్ అయింది",
+      "connectBitbucket": "బిట్‌బకెట్ కనెక్ట్ చేయండి",
+      "connectBitbucketDescription": "మీ బ్రౌజర్‌లో బిట్‌బకెట్ కనెక్ట్ చేయండి, ఆపై రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడకు తిరిగి వెళ్ళండి.",
+      "connectGitlab": "గిట్‌ల్యాబ్ కనెక్ట్ చేయండి",
+      "connectGitlabDescription": "మీ బ్రౌజర్‌లో గిట్‌ల్యాబ్ కనెక్ట్ చేయండి, ఆపై రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడకు తిరిగి వెళ్ళండి.",
+      "couldNotLoadBitbucketRepositories": "బిట్‌బకెట్ రిపోజిటరీలను లోడ్ చేయలేకపోయాము",
+      "couldNotLoadGithubRepositories": "గిట్‌హబ్ రిపోజిటరీలను లోడ్ చేయలేకపోయాము",
+      "couldNotLoadGitlabRepositories": "గిట్‌ల్యాబ్ రిపోజిటరీలను లోడ్ చేయలేకపోయాము",
+      "gitlabConnected": "గిట్‌ల్యాబ్ కనెక్ట్ అయింది",
+      "noRepositoriesVisibleBitbucket": "రిపోజిటరీలు కనిపించడం లేదు. బిట్‌బకెట్ కోసం రిపోజిటరీ యాక్సెస్ తనిఖీ చేయండి, ఆపై రిఫ్రెష్ చేయండి.",
+      "noRepositoriesVisibleGitlab": "రిపోజిటరీలు కనిపించడం లేదు. గిట్‌ల్యాబ్ కోసం రిపోజిటరీ యాక్సెస్ తనిఖీ చేయండి, ఆపై రిఫ్రెష్ చేయండి.",
+      "openBitbucket": "బిట్‌బకెట్ తెరవండి",
+      "openGitlab": "గిట్‌ల్యాబ్ తెరవండి",
+      "recentlyUsed": "ఇటీవల ఉపయోగించినవి"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్ నవీకరించబడింది",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "మీ ఖాతాకు ఏ రిపోజిటరీలు కనెక్ట్ చేయబడలేదు.",
       "tryDifferentSearch": "వేరే శోధన పదాన్ని ప్రయత్నించండి.",
       "loading": "లోడ్ అవుతోంది...",
-      "accessibility": "రిపోజిటరీ: {{label}}"
+      "accessibility": "రిపోజిటరీ: {{label}}",
+      "platformBitbucket": "బిట్‌బకెట్",
+      "platformGithub": "గిట్‌హబ్",
+      "platformGitlab": "గిట్‌ల్యాబ్"
     },
     "messageDetails": {
       "title": "సందేశ వివరాలు",

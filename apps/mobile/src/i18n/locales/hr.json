@@ -1391,7 +1391,8 @@
       "gitlabAccount": "GitLab račun",
       "connectGitLab": "Poveži GitLab",
       "gitlabError": "Nije moguće otvoriti GitLab postavljanje. Pokušajte ponovno.",
-      "description": "Povežite Kilo {{label}} za automatski pregled zahtjeva za povlačenje."
+      "description": "Povežite Kilo {{label}} za automatski pregled zahtjeva za povlačenje.",
+      "bitbucketError": "Otvaranje Bitbucket postavki nije uspjelo. Pokušaj ponovno."
     },
     "overview": {
       "reviewStyle": "Stil pregleda",
@@ -2187,7 +2188,21 @@
       "discardDraftMessage": "Vaš će upit biti izgubljen.",
       "keepEditing": "Nastavi s uređivanjem",
       "discard": "Odbaci",
-      "discardFailed": "Nije moguće odbaciti nacrt. Pokušajte ponovno."
+      "discardFailed": "Nije moguće odbaciti nacrt. Pokušajte ponovno.",
+      "bitbucketConnected": "Bitbucket je povezan",
+      "connectBitbucket": "Poveži Bitbucket",
+      "connectBitbucketDescription": "Poveži Bitbucket u pregledniku, a zatim se vrati ovdje da odabereš repozitorij.",
+      "connectGitlab": "Poveži GitLab",
+      "connectGitlabDescription": "Poveži GitLab u pregledniku, a zatim se vrati ovdje da odabereš repozitorij.",
+      "couldNotLoadBitbucketRepositories": "Učitavanje Bitbucket repozitorija nije uspjelo",
+      "couldNotLoadGithubRepositories": "Učitavanje GitHub repozitorija nije uspjelo",
+      "couldNotLoadGitlabRepositories": "Učitavanje GitLab repozitorija nije uspjelo",
+      "gitlabConnected": "GitLab je povezan",
+      "noRepositoriesVisibleBitbucket": "Nema vidljivih repozitorija. Provjeri pristup repozitorijima za Bitbucket, a zatim osvježi.",
+      "noRepositoriesVisibleGitlab": "Nema vidljivih repozitorija. Provjeri pristup repozitorijima za GitLab, a zatim osvježi.",
+      "openBitbucket": "Otvori Bitbucket",
+      "openGitlab": "Otvori GitLab",
+      "recentlyUsed": "Nedavno korišteno"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirana {{displayCount}} datoteka",
@@ -2281,7 +2296,10 @@
       "noRepositoriesDescription": "Nijedan repozitorij nije povezan s vašim računom.",
       "tryDifferentSearch": "Pokušajte drugi pojam pretrage.",
       "loading": "Učitavanje...",
-      "accessibility": "Repozitorij: {{label}}"
+      "accessibility": "Repozitorij: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Pojedinosti poruke",

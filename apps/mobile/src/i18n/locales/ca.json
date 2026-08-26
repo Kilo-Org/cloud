@@ -1391,7 +1391,8 @@
       "gitlabAccount": "Compte de GitLab",
       "connectGitLab": "Connecta GitLab",
       "gitlabError": "No s'ha pogut obrir la configuració de GitLab. Torna-ho a provar.",
-      "description": "Connecta el Kilo {{label}} per revisar les sol·licituds d'extracció automàticament."
+      "description": "Connecta el Kilo {{label}} per revisar les sol·licituds d'extracció automàticament.",
+      "bitbucketError": "No s'ha pogut obrir la configuració de Bitbucket. Torna-ho a provar."
     },
     "overview": {
       "reviewStyle": "Estil de revisió",
@@ -2187,7 +2188,21 @@
       "discardDraftMessage": "El teu missatge es perdrà.",
       "keepEditing": "Continua editant",
       "discard": "Descarta",
-      "discardFailed": "No s'ha pogut descartar l'esborrany. Torna-ho a provar."
+      "discardFailed": "No s'ha pogut descartar l'esborrany. Torna-ho a provar.",
+      "bitbucketConnected": "Bitbucket connectat",
+      "connectBitbucket": "Connecta Bitbucket",
+      "connectBitbucketDescription": "Connecta Bitbucket al teu navegador i torna aquí per triar un repositori.",
+      "connectGitlab": "Connecta GitLab",
+      "connectGitlabDescription": "Connecta GitLab al teu navegador i torna aquí per triar un repositori.",
+      "couldNotLoadBitbucketRepositories": "No s'han pogut carregar els repositoris de Bitbucket",
+      "couldNotLoadGithubRepositories": "No s'han pogut carregar els repositoris de GitHub",
+      "couldNotLoadGitlabRepositories": "No s'han pogut carregar els repositoris de GitLab",
+      "gitlabConnected": "GitLab connectat",
+      "noRepositoriesVisibleBitbucket": "No hi ha repositoris visibles. Comprova l'accés als repositoris de Bitbucket i actualitza.",
+      "noRepositoriesVisibleGitlab": "No hi ha repositoris visibles. Comprova l'accés als repositoris de GitLab i actualitza.",
+      "openBitbucket": "Obre Bitbucket",
+      "openGitlab": "Obre GitLab",
+      "recentlyUsed": "Utilitzats recentment"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxer actualitzat",
@@ -2277,7 +2292,10 @@
       "noRepositoriesDescription": "Cap repositori no està connectat al teu compte.",
       "tryDifferentSearch": "Prova amb un altre terme de cerca.",
       "loading": "Carregant...",
-      "accessibility": "Repositori: {{label}}"
+      "accessibility": "Repositori: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detalls del missatge",

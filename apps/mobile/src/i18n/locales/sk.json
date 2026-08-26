@@ -1400,7 +1400,8 @@
       "gitlabAccount": "GitLab účet",
       "connectGitLab": "Pripojiť GitLab",
       "gitlabError": "Nastavenie GitLab sa nepodarilo otvoriť. Skúste to znova.",
-      "description": "Pripojte Kilo {{label}}, aby ste automaticky preskúmavali pull requesty."
+      "description": "Pripojte Kilo {{label}}, aby ste automaticky preskúmavali pull requesty.",
+      "bitbucketError": "Nepodarilo sa otvoriť nastavenie Bitbucket. Skúste to znova."
     },
     "overview": {
       "reviewStyle": "Štýl preskúmania",
@@ -2202,7 +2203,21 @@
       "discardDraftMessage": "Váš prompt sa stratí.",
       "keepEditing": "Pokračovať v úpravách",
       "discard": "Zahodiť",
-      "discardFailed": "Koncept sa nepodarilo zahodiť. Skúste to znova."
+      "discardFailed": "Koncept sa nepodarilo zahodiť. Skúste to znova.",
+      "bitbucketConnected": "Bitbucket je pripojený",
+      "connectBitbucket": "Pripojiť Bitbucket",
+      "connectBitbucketDescription": "Pripojte Bitbucket v prehliadači a potom sa sem vráťte a vyberte repozitár.",
+      "connectGitlab": "Pripojiť GitLab",
+      "connectGitlabDescription": "Pripojte GitLab v prehliadači a potom sa sem vráťte a vyberte repozitár.",
+      "couldNotLoadBitbucketRepositories": "Nepodarilo sa načítať repozitáre Bitbucket",
+      "couldNotLoadGithubRepositories": "Nepodarilo sa načítať repozitáre GitHub",
+      "couldNotLoadGitlabRepositories": "Nepodarilo sa načítať repozitáre GitLab",
+      "gitlabConnected": "GitLab je pripojený",
+      "noRepositoriesVisibleBitbucket": "Nie sú viditeľné žiadne repozitáre. Skontrolujte prístup k repozitárom pre Bitbucket a potom obnovte.",
+      "noRepositoriesVisibleGitlab": "Nie sú viditeľné žiadne repozitáre. Skontrolujte prístup k repozitárom pre GitLab a potom obnovte.",
+      "openBitbucket": "Otvoriť Bitbucket",
+      "openGitlab": "Otvoriť GitLab",
+      "recentlyUsed": "Naposledy použité"
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizovaný {{displayCount}} súbor",
@@ -2293,7 +2308,10 @@
       "noRepositoriesDescription": "K vášmu účtu nie sú pripojené žiadne repozitáre.",
       "tryDifferentSearch": "Skúste iný vyhľadávací výraz.",
       "loading": "Načítava sa...",
-      "accessibility": "Repozitár: {{label}}"
+      "accessibility": "Repozitár: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Podrobnosti správy",

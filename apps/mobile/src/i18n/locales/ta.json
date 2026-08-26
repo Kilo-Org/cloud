@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab கணக்கு",
       "connectGitLab": "GitLab ஐ இணை",
       "gitlabError": "GitLab அமைவை திறக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-      "description": "Pull requests ஐ தானாக மதிப்பாய்வு செய்ய Kilo {{label}} ஐ இணைக்கவும்."
+      "description": "Pull requests ஐ தானாக மதிப்பாய்வு செய்ய Kilo {{label}} ஐ இணைக்கவும்.",
+      "bitbucketError": "பிட்பக்கெட் அமைப்பைத் திறக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
     },
     "overview": {
       "reviewStyle": "மதிப்பாய்வு பாணி",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "உங்கள் வினவல் இழக்கப்படும்.",
       "keepEditing": "தொடர்ந்து திருத்து",
       "discard": "நிராகரி",
-      "discardFailed": "வரைவை நிராகரிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
+      "discardFailed": "வரைவை நிராகரிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
+      "bitbucketConnected": "பிட்பக்கெட் இணைக்கப்பட்டது",
+      "connectBitbucket": "பிட்பக்கெட்டை இணைக்கவும்",
+      "connectBitbucketDescription": "உங்கள் உலாவியில் பிட்பக்கெட்டை இணைக்கவும், பின்னர் ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
+      "connectGitlab": "GitLab-ஐ இணைக்கவும்",
+      "connectGitlabDescription": "உங்கள் உலாவியில் GitLab-ஐ இணைக்கவும், பின்னர் ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
+      "couldNotLoadBitbucketRepositories": "பிட்பக்கெட் களஞ்சியங்களை ஏற்ற முடியவில்லை",
+      "couldNotLoadGithubRepositories": "GitHub களஞ்சியங்களை ஏற்ற முடியவில்லை",
+      "couldNotLoadGitlabRepositories": "GitLab களஞ்சியங்களை ஏற்ற முடியவில்லை",
+      "gitlabConnected": "GitLab இணைக்கப்பட்டது",
+      "noRepositoriesVisibleBitbucket": "களஞ்சியங்கள் எதுவும் காணப்படவில்லை. பிட்பக்கெட்டிற்கான களஞ்சிய அணுகலைச் சரிபார்த்து, பின்னர் புதுப்பிக்கவும்.",
+      "noRepositoriesVisibleGitlab": "களஞ்சியங்கள் எதுவும் காணப்படவில்லை. GitLab-க்கான களஞ்சிய அணுகலைச் சரிபார்த்து, பின்னர் புதுப்பிக்கவும்.",
+      "openBitbucket": "பிட்பக்கெட்டைத் திறக்கவும்",
+      "openGitlab": "GitLab-ஐத் திறக்கவும்",
+      "recentlyUsed": "சமீபத்தில் பயன்படுத்தியவை"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} கோப்பு புதுப்பிக்கப்பட்டது",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "உங்கள் கணக்கில் களஞ்சியங்கள் எதுவும் இணைக்கப்படவில்லை.",
       "tryDifferentSearch": "வேறு தேடல் சொல்லை முயற்சிக்கவும்.",
       "loading": "ஏற்றுகிறது...",
-      "accessibility": "களஞ்சியம்: {{label}}"
+      "accessibility": "களஞ்சியம்: {{label}}",
+      "platformBitbucket": "பிட்பக்கெட்",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "செய்தி விவரங்கள்",

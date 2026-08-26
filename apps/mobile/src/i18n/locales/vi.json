@@ -856,7 +856,8 @@
       "githubApp": "Ứng dụng GitHub",
       "githubError": "Không thể mở thiết lập GitHub. Vui lòng thử lại.",
       "gitlabAccount": "Tài khoản GitLab",
-      "gitlabError": "Không thể mở thiết lập GitLab. Vui lòng thử lại."
+      "gitlabError": "Không thể mở thiết lập GitLab. Vui lòng thử lại.",
+      "bitbucketError": "Không thể mở thiết lập Bitbucket. Vui lòng thử lại."
     },
     "readOnlyDescription": "Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể thay đổi các cài đặt này.",
     "reviewDetail": {
@@ -1718,7 +1719,21 @@
       "discardDraftMessage": "Lời nhắc của bạn sẽ bị mất.",
       "discardDraftTitle": "Hủy bản nháp?",
       "discardFailed": "Không thể hủy bản nháp. Vui lòng thử lại.",
-      "keepEditing": "Tiếp tục chỉnh sửa"
+      "keepEditing": "Tiếp tục chỉnh sửa",
+      "bitbucketConnected": "Đã kết nối Bitbucket",
+      "connectBitbucket": "Kết nối Bitbucket",
+      "connectBitbucketDescription": "Kết nối Bitbucket trong trình duyệt của bạn, rồi quay lại đây để chọn một kho lưu trữ.",
+      "connectGitlab": "Kết nối GitLab",
+      "connectGitlabDescription": "Kết nối GitLab trong trình duyệt của bạn, rồi quay lại đây để chọn một kho lưu trữ.",
+      "couldNotLoadBitbucketRepositories": "Không thể tải kho lưu trữ Bitbucket",
+      "couldNotLoadGithubRepositories": "Không thể tải kho lưu trữ GitHub",
+      "couldNotLoadGitlabRepositories": "Không thể tải kho lưu trữ GitLab",
+      "gitlabConnected": "Đã kết nối GitLab",
+      "noRepositoriesVisibleBitbucket": "Không có kho lưu trữ hiển thị. Kiểm tra quyền truy cập kho lưu trữ cho Bitbucket, rồi làm mới.",
+      "noRepositoriesVisibleGitlab": "Không có kho lưu trữ hiển thị. Kiểm tra quyền truy cập kho lưu trữ cho GitLab, rồi làm mới.",
+      "openBitbucket": "Mở Bitbucket",
+      "openGitlab": "Mở GitLab",
+      "recentlyUsed": "Đã dùng gần đây"
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp",
@@ -1807,7 +1822,10 @@
       "noRepositoriesDescription": "Không có kho lưu trữ nào được kết nối với tài khoản của bạn.",
       "tryDifferentSearch": "Hãy thử một cụm từ tìm kiếm khác.",
       "loading": "Đang tải...",
-      "accessibility": "Kho lưu trữ: {{label}}"
+      "accessibility": "Kho lưu trữ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Chi tiết tin nhắn",

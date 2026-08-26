@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab kontua",
       "connectGitLab": "Konektatu GitLab",
       "gitlabError": "GitLab konfigurazioa ezin izan da ireki. Saiatu berriro.",
-      "description": "Konektatu Kilo {{label}} pull request-ak automatikoki berrikusteko."
+      "description": "Konektatu Kilo {{label}} pull request-ak automatikoki berrikusteko.",
+      "bitbucketError": "Ezin izan da Bitbucket-en konfigurazioa ireki. Mesedez, saiatu berriro."
     },
     "overview": {
       "reviewStyle": "Berrikuspen-estiloa",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Zure proposamena galduko da.",
       "keepEditing": "Editatzen jarraitu",
       "discard": "Baztertu",
-      "discardFailed": "Ezin da zirriborroa baztertu. Saiatu berriro."
+      "discardFailed": "Ezin da zirriborroa baztertu. Saiatu berriro.",
+      "bitbucketConnected": "Bitbucket konektatuta",
+      "connectBitbucket": "Konektatu Bitbucket-era",
+      "connectBitbucketDescription": "Konektatu Bitbucket-era zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
+      "connectGitlab": "Konektatu GitLab-era",
+      "connectGitlabDescription": "Konektatu GitLab-era zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
+      "couldNotLoadBitbucketRepositories": "Ezin izan dira Bitbucket-eko biltegiak kargatu",
+      "couldNotLoadGithubRepositories": "Ezin izan dira GitHub-eko biltegiak kargatu",
+      "couldNotLoadGitlabRepositories": "Ezin izan dira GitLab-eko biltegiak kargatu",
+      "gitlabConnected": "GitLab konektatuta",
+      "noRepositoriesVisibleBitbucket": "Ez dago biltegirik ikusgai. Egiaztatu Bitbucket-erako biltegien sarbidea, eta gero freskatu.",
+      "noRepositoriesVisibleGitlab": "Ez dago biltegirik ikusgai. Egiaztatu GitLab-erako biltegien sarbidea, eta gero freskatu.",
+      "openBitbucket": "Ireki Bitbucket",
+      "openGitlab": "Ireki GitLab",
+      "recentlyUsed": "Azken erabiliak"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxategi eguneratu da",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Ez dago biltegirik zure kontuarekin konektatuta.",
       "tryDifferentSearch": "Saiatu bilaketa-termino desberdin batekin.",
       "loading": "Kargatzen...",
-      "accessibility": "Biltegia: {{label}}"
+      "accessibility": "Biltegia: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Mezuaren xehetasunak",

@@ -1382,7 +1382,8 @@
       "gitlabAccount": "บัญชี GitLab",
       "connectGitLab": "เชื่อมต่อ GitLab",
       "gitlabError": "ไม่สามารถเปิดการติดตั้ง GitLab ได้ โปรดลองอีกครั้ง",
-      "description": "เชื่อมต่อ Kilo {{label}} เพื่อตรวจสอบ pull requests โดยอัตโนมัติ"
+      "description": "เชื่อมต่อ Kilo {{label}} เพื่อตรวจสอบ pull requests โดยอัตโนมัติ",
+      "bitbucketError": "ไม่สามารถเปิดการตั้งค่า Bitbucket ได้ โปรดลองอีกครั้ง"
     },
     "overview": {
       "reviewStyle": "รูปแบบการตรวจสอบ",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "ข้อความของคุณจะสูญหาย",
       "keepEditing": "แก้ไขต่อไป",
       "discard": "ทิ้ง",
-      "discardFailed": "ไม่สามารถทิ้งฉบับร่างได้ กรุณาลองอีกครั้ง"
+      "discardFailed": "ไม่สามารถทิ้งฉบับร่างได้ กรุณาลองอีกครั้ง",
+      "bitbucketConnected": "เชื่อมต่อ Bitbucket แล้ว",
+      "connectBitbucket": "เชื่อมต่อ Bitbucket",
+      "connectBitbucketDescription": "เชื่อมต่อ Bitbucket ในเบราว์เซอร์ของคุณ แล้วกลับมาที่นี่เพื่อเลือกที่เก็บ",
+      "connectGitlab": "เชื่อมต่อ GitLab",
+      "connectGitlabDescription": "เชื่อมต่อ GitLab ในเบราว์เซอร์ของคุณ แล้วกลับมาที่นี่เพื่อเลือกที่เก็บ",
+      "couldNotLoadBitbucketRepositories": "ไม่สามารถโหลดที่เก็บของ Bitbucket ได้",
+      "couldNotLoadGithubRepositories": "ไม่สามารถโหลดที่เก็บของ GitHub ได้",
+      "couldNotLoadGitlabRepositories": "ไม่สามารถโหลดที่เก็บของ GitLab ได้",
+      "gitlabConnected": "เชื่อมต่อ GitLab แล้ว",
+      "noRepositoriesVisibleBitbucket": "ไม่พบที่เก็บที่แสดง ตรวจสอบสิทธิ์การเข้าถึงที่เก็บสำหรับ Bitbucket แล้วรีเฟรช",
+      "noRepositoriesVisibleGitlab": "ไม่พบที่เก็บที่แสดง ตรวจสอบสิทธิ์การเข้าถึงที่เก็บสำหรับ GitLab แล้วรีเฟรช",
+      "openBitbucket": "เปิด Bitbucket",
+      "openGitlab": "เปิด GitLab",
+      "recentlyUsed": "ใช้ล่าสุด"
     },
     "partRenderer": {
       "updatedFileCount_one": "อัปเดต {{displayCount}} ไฟล์",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "ไม่มี repositories ที่เชื่อมต่อกับบัญชีของคุณ",
       "tryDifferentSearch": "ลองใช้คำค้นหาอื่น",
       "loading": "กำลังโหลด...",
-      "accessibility": "Repository: {{label}}"
+      "accessibility": "Repository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "รายละเอียดข้อความ",

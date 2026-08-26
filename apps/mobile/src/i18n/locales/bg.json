@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab акаунт",
       "connectGitLab": "Свържи GitLab",
       "gitlabError": "Неуспешно отваряне на настройката на GitLab. Моля, опитай отново.",
-      "description": "Свържи {{label}} на Kilo, за да преглежда заявките за сливане автоматично."
+      "description": "Свържи {{label}} на Kilo, за да преглежда заявките за сливане автоматично.",
+      "bitbucketError": "Не можахме да отворим настройките на Bitbucket. Моля, опитайте отново."
     },
     "overview": {
       "reviewStyle": "Стил на прегледа",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Твоята подкана ще бъде загубена.",
       "keepEditing": "Продължи редактирането",
       "discard": "Отхвърли",
-      "discardFailed": "Не можа да се отхвърли черновата. Моля, опитай отново."
+      "discardFailed": "Не можа да се отхвърли черновата. Моля, опитай отново.",
+      "bitbucketConnected": "Bitbucket е свързан",
+      "connectBitbucket": "Свързване с Bitbucket",
+      "connectBitbucketDescription": "Свържете Bitbucket в браузъра си, след което се върнете тук, за да изберете хранилище.",
+      "connectGitlab": "Свързване с GitLab",
+      "connectGitlabDescription": "Свържете GitLab в браузъра си, след което се върнете тук, за да изберете хранилище.",
+      "couldNotLoadBitbucketRepositories": "Не можахме да заредим хранилищата на Bitbucket",
+      "couldNotLoadGithubRepositories": "Не можахме да заредим хранилищата на GitHub",
+      "couldNotLoadGitlabRepositories": "Не можахме да заредим хранилищата на GitLab",
+      "gitlabConnected": "GitLab е свързан",
+      "noRepositoriesVisibleBitbucket": "Няма видими хранилища. Проверете достъпа до хранилищата за Bitbucket, след което опреснете.",
+      "noRepositoriesVisibleGitlab": "Няма видими хранилища. Проверете достъпа до хранилищата за GitLab, след което опреснете.",
+      "openBitbucket": "Отваряне на Bitbucket",
+      "openGitlab": "Отваряне на GitLab",
+      "recentlyUsed": "Наскоро използвани"
     },
     "partRenderer": {
       "updatedFileCount_one": "Актуализиран {{displayCount}} файл",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Няма хранилища, свързани с твоя акаунт.",
       "tryDifferentSearch": "Опитай с различен термин за търсене.",
       "loading": "Зареждане...",
-      "accessibility": "Хранилище: {{label}}"
+      "accessibility": "Хранилище: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Детайли на съобщението",

@@ -864,7 +864,8 @@
       "githubApp": "تطبيق GitHub",
       "githubError": "تعذّر فتح إعداد GitHub. يرجى المحاولة مرة أخرى.",
       "gitlabAccount": "حساب GitLab",
-      "gitlabError": "تعذّر فتح إعداد GitLab. يرجى المحاولة مرة أخرى."
+      "gitlabError": "تعذّر فتح إعداد GitLab. يرجى المحاولة مرة أخرى.",
+      "bitbucketError": "تعذّر فتح إعداد Bitbucket. يرجى المحاولة مرة أخرى."
     },
     "readOnlyDescription": "يمكن لمالكي المؤسسة ومديري الفوترة فقط تغيير هذه الإعدادات.",
     "reviewDetail": {
@@ -1750,7 +1751,21 @@
       "discardDraftMessage": "ستفقد مطالبتك.",
       "discardDraftTitle": "تجاهل المسودة؟",
       "discardFailed": "تعذّر تجاهل المسودة. يرجى المحاولة مرة أخرى.",
-      "keepEditing": "متابعة التعديل"
+      "keepEditing": "متابعة التعديل",
+      "bitbucketConnected": "تم الاتصال بـ Bitbucket",
+      "connectBitbucket": "الاتصال بـ Bitbucket",
+      "connectBitbucketDescription": "اتصل بـ Bitbucket في المتصفح، ثم عد إلى هنا لاختيار مستودع.",
+      "connectGitlab": "الاتصال بـ GitLab",
+      "connectGitlabDescription": "اتصل بـ GitLab في المتصفح، ثم عد إلى هنا لاختيار مستودع.",
+      "couldNotLoadBitbucketRepositories": "تعذّر تحميل مستودعات Bitbucket",
+      "couldNotLoadGithubRepositories": "تعذّر تحميل مستودعات GitHub",
+      "couldNotLoadGitlabRepositories": "تعذّر تحميل مستودعات GitLab",
+      "gitlabConnected": "تم الاتصال بـ GitLab",
+      "noRepositoriesVisibleBitbucket": "لا توجد مستودعات ظاهرة. تحقق من وصول المستودعات لـ Bitbucket، ثم حدّث.",
+      "noRepositoriesVisibleGitlab": "لا توجد مستودعات ظاهرة. تحقق من وصول المستودعات لـ GitLab، ثم حدّث.",
+      "openBitbucket": "فتح Bitbucket",
+      "openGitlab": "فتح GitLab",
+      "recentlyUsed": "مستخدم مؤخرًا"
     },
     "partRenderer": {
       "updatedFileCount_one": "تم تحديث {{displayCount}} ملف",
@@ -1843,7 +1858,10 @@
       "noRepositoriesDescription": "لا توجد مستودعات متصلة بحسابك.",
       "tryDifferentSearch": "جرّب مصطلح بحث مختلف.",
       "loading": "جارٍ التحميل...",
-      "accessibility": "المستودع: {{label}}"
+      "accessibility": "المستودع: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "تفاصيل الرسالة",

@@ -1382,7 +1382,8 @@
       "gitlabAccount": "Λογαριασμός GitLab",
       "connectGitLab": "Σύνδεση GitLab",
       "gitlabError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης GitLab. Δοκιμάστε ξανά.",
-      "description": "Συνδέστε το Kilo {{label}} για την αυτόματη αναθεώρηση pull requests."
+      "description": "Συνδέστε το Kilo {{label}} για την αυτόματη αναθεώρηση pull requests.",
+      "bitbucketError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης του Bitbucket. Δοκιμάστε ξανά."
     },
     "overview": {
       "reviewStyle": "Στυλ αναθεώρησης",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Το μήνυμά σας θα χαθεί.",
       "keepEditing": "Συνέχιση επεξεργασίας",
       "discard": "Απόρριψη",
-      "discardFailed": "Δεν ήταν δυνατή η απόρριψη του πρόχειρου. Δοκιμάστε ξανά."
+      "discardFailed": "Δεν ήταν δυνατή η απόρριψη του πρόχειρου. Δοκιμάστε ξανά.",
+      "bitbucketConnected": "Το Bitbucket συνδέθηκε",
+      "connectBitbucket": "Σύνδεση Bitbucket",
+      "connectBitbucketDescription": "Συνδέστε το Bitbucket στο πρόγραμμα περιήγησης και μετά επιστρέψτε εδώ για να επιλέξετε ένα αποθετήριο.",
+      "connectGitlab": "Σύνδεση GitLab",
+      "connectGitlabDescription": "Συνδέστε το GitLab στο πρόγραμμα περιήγησης και μετά επιστρέψτε εδώ για να επιλέξετε ένα αποθετήριο.",
+      "couldNotLoadBitbucketRepositories": "Δεν ήταν δυνατή η φόρτωση των αποθετηρίων του Bitbucket",
+      "couldNotLoadGithubRepositories": "Δεν ήταν δυνατή η φόρτωση των αποθετηρίων του GitHub",
+      "couldNotLoadGitlabRepositories": "Δεν ήταν δυνατή η φόρτωση των αποθετηρίων του GitLab",
+      "gitlabConnected": "Το GitLab συνδέθηκε",
+      "noRepositoriesVisibleBitbucket": "Δεν υπάρχουν ορατά αποθετήρια. Ελέγξτε την πρόσβαση στα αποθετήρια του Bitbucket και ανανεώστε.",
+      "noRepositoriesVisibleGitlab": "Δεν υπάρχουν ορατά αποθετήρια. Ελέγξτε την πρόσβαση στα αποθετήρια του GitLab και ανανεώστε.",
+      "openBitbucket": "Άνοιγμα Bitbucket",
+      "openGitlab": "Άνοιγμα GitLab",
+      "recentlyUsed": "Πρόσφατη χρήση"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ενημερώθηκε {{displayCount}} αρχείο",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Κανένα αποθετήριο δεν είναι συνδεδεμένο με τον λογαριασμό σας.",
       "tryDifferentSearch": "Δοκιμάστε διαφορετικό όρο αναζήτησης.",
       "loading": "Φόρτωση...",
-      "accessibility": "Αποθετήριο: {{label}}"
+      "accessibility": "Αποθετήριο: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Λεπτομέρειες μηνύματος",

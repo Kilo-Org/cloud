@@ -860,7 +860,8 @@
       "githubApp": "Приложение GitHub",
       "githubError": "Не удалось открыть настройку GitHub. Попробуйте снова.",
       "gitlabAccount": "Аккаунт GitLab",
-      "gitlabError": "Не удалось открыть настройку GitLab. Попробуйте снова."
+      "gitlabError": "Не удалось открыть настройку GitLab. Попробуйте снова.",
+      "bitbucketError": "Не удалось открыть настройки Bitbucket. Повторите попытку."
     },
     "readOnlyDescription": "Изменять эти настройки могут только владельцы организации и менеджеры по оплате.",
     "reviewDetail": {
@@ -1734,7 +1735,21 @@
       "discardDraftMessage": "Ваш запрос будет потерян.",
       "discardDraftTitle": "Отменить черновик?",
       "discardFailed": "Не удалось отменить черновик. Попробуйте снова.",
-      "keepEditing": "Продолжить редактирование"
+      "keepEditing": "Продолжить редактирование",
+      "bitbucketConnected": "Bitbucket подключен",
+      "connectBitbucket": "Подключить Bitbucket",
+      "connectBitbucketDescription": "Подключите Bitbucket в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
+      "connectGitlab": "Подключить GitLab",
+      "connectGitlabDescription": "Подключите GitLab в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
+      "couldNotLoadBitbucketRepositories": "Не удалось загрузить репозитории Bitbucket",
+      "couldNotLoadGithubRepositories": "Не удалось загрузить репозитории GitHub",
+      "couldNotLoadGitlabRepositories": "Не удалось загрузить репозитории GitLab",
+      "gitlabConnected": "GitLab подключен",
+      "noRepositoriesVisibleBitbucket": "Репозитории не отображаются. Проверьте доступ к репозиториям Bitbucket, затем обновите.",
+      "noRepositoriesVisibleGitlab": "Репозитории не отображаются. Проверьте доступ к репозиториям GitLab, затем обновите.",
+      "openBitbucket": "Открыть Bitbucket",
+      "openGitlab": "Открыть GitLab",
+      "recentlyUsed": "Недавно использованные"
     },
     "partRenderer": {
       "updatedFileCount_one": "Обновлен {{displayCount}} файл",
@@ -1825,7 +1840,10 @@
       "noRepositoriesDescription": "К вашей учетной записи не подключены репозитории.",
       "tryDifferentSearch": "Попробуйте другой поисковый запрос.",
       "loading": "Загрузка...",
-      "accessibility": "Репозиторий: {{label}}"
+      "accessibility": "Репозиторий: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Сведения о сообщении",

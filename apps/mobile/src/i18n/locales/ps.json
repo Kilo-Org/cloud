@@ -1382,7 +1382,8 @@
       "gitlabAccount": "د GitLab حساب",
       "connectGitLab": "GitLab وصل کول",
       "gitlabError": "د GitLab جوړونه پرانیستل ناشوني شول. مهرباني وکړئ بیا هڅه وکړئ.",
-      "description": "د کش غوښتنو اتوماتیک بیاکتنې لپاره د Kilo {{label}} وصل کړئ."
+      "description": "د کش غوښتنو اتوماتیک بیاکتنې لپاره د Kilo {{label}} وصل کړئ.",
+      "bitbucketError": "د Bitbucket تنظیم نه شو پرانیستلی. مهرباني وکړئ بیا هڅه وکړئ."
     },
     "overview": {
       "reviewStyle": "د بیاکتنې سټایل",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "ستاسو پرامپټ به له لاسه ورکړل شي.",
       "keepEditing": "سمون ته دوام ورکړئ",
       "discard": "لغوه کړئ",
-      "discardFailed": "مسوده لغوه نه شوه. مهرباني وکړئ بیا هڅه وکړئ."
+      "discardFailed": "مسوده لغوه نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
+      "bitbucketConnected": "Bitbucket ونښلول شو",
+      "connectBitbucket": "Bitbucket سره ونښلئ",
+      "connectBitbucketDescription": "Bitbucket په خپل براوزر کې ونښلئ، بیا دلته راګرځئ تر څو یو ریپوزیټري غوره کړئ.",
+      "connectGitlab": "GitLab سره ونښلئ",
+      "connectGitlabDescription": "GitLab په خپل براوزر کې ونښلئ، بیا دلته راګرځئ تر څو یو ریپوزیټري غوره کړئ.",
+      "couldNotLoadBitbucketRepositories": "د Bitbucket ریپوزیټریان بارول ممکن نه شول",
+      "couldNotLoadGithubRepositories": "د GitHub ریپوزیټریان بارول ممکن نه شول",
+      "couldNotLoadGitlabRepositories": "د GitLab ریپوزیټریان بارول ممکن نه شول",
+      "gitlabConnected": "GitLab ونښلول شو",
+      "noRepositoriesVisibleBitbucket": "کوم ریپوزیټري نه لیدل کیږي. د Bitbucket لپاره د ریپوزیټري لاسرسی وګورئ، بیا تازه یې کړئ.",
+      "noRepositoriesVisibleGitlab": "کوم ریپوزیټري نه لیدل کیږي. د GitLab لپاره د ریپوزیټري لاسرسی وګورئ، بیا تازه یې کړئ.",
+      "openBitbucket": "Bitbucket پرانیزئ",
+      "openGitlab": "GitLab پرانیزئ",
+      "recentlyUsed": "وروستي کارول شوي"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل تازه شو",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "هیڅ ذخیره ستاسو حساب سره وصل نه ده.",
       "tryDifferentSearch": "مختلف لټون شرط هڅه کړئ.",
       "loading": "بارول روان دي...",
-      "accessibility": "ذخیره: {{label}}"
+      "accessibility": "ذخیره: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "د پیغام تفصیلات",

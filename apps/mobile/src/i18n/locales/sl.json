@@ -1400,7 +1400,8 @@
       "gitlabAccount": "Račun GitLab",
       "connectGitLab": "Poveži GitLab",
       "gitlabError": "Namestitve GitLab ni bilo mogoče odpreti. Poskusite znova.",
-      "description": "Povežite Kilo {{label}}, da samodejno pregleduje zahteve za poteg."
+      "description": "Povežite Kilo {{label}}, da samodejno pregleduje zahteve za poteg.",
+      "bitbucketError": "Ni bilo mogoče odpreti nastavitve Bitbucket. Poskusi znova."
     },
     "overview": {
       "reviewStyle": "Slog pregleda",
@@ -2202,7 +2203,21 @@
       "discardDraftMessage": "Tvoja zahteva bo izgubljena.",
       "keepEditing": "Nadaljuj z urejanjem",
       "discard": "Zavrzi",
-      "discardFailed": "Osnutka ni bilo mogoče zavreči. Poskusi znova."
+      "discardFailed": "Osnutka ni bilo mogoče zavreči. Poskusi znova.",
+      "bitbucketConnected": "Bitbucket povezan",
+      "connectBitbucket": "Poveži Bitbucket",
+      "connectBitbucketDescription": "Poveži Bitbucket v brskalniku, nato se vrni sem in izberi skladišče.",
+      "connectGitlab": "Poveži GitLab",
+      "connectGitlabDescription": "Poveži GitLab v brskalniku, nato se vrni sem in izberi skladišče.",
+      "couldNotLoadBitbucketRepositories": "Ni bilo mogoče naložiti skladišč Bitbucket",
+      "couldNotLoadGithubRepositories": "Ni bilo mogoče naložiti skladišč GitHub",
+      "couldNotLoadGitlabRepositories": "Ni bilo mogoče naložiti skladišč GitLab",
+      "gitlabConnected": "GitLab povezan",
+      "noRepositoriesVisibleBitbucket": "Ni vidnih skladišč. Preveri dostop do skladišč za Bitbucket in osveži.",
+      "noRepositoriesVisibleGitlab": "Ni vidnih skladišč. Preveri dostop do skladišč za GitLab in osveži.",
+      "openBitbucket": "Odpri Bitbucket",
+      "openGitlab": "Odpri GitLab",
+      "recentlyUsed": "Nedavno uporabljeno"
     },
     "partRenderer": {
       "updatedFileCount_one": "Posodobljena {{displayCount}} datoteka",
@@ -2293,7 +2308,10 @@
       "noRepositoriesDescription": "Nobeno skladišče ni povezano s tvojim računom.",
       "tryDifferentSearch": "Poskusi z drugim iskalnim izrazom.",
       "loading": "Nalaganje...",
-      "accessibility": "Skladišče: {{label}}"
+      "accessibility": "Skladišče: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Podrobnosti sporočila",

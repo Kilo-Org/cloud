@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab اکاؤنٹ",
       "connectGitLab": "GitLab منسلک کریں",
       "gitlabError": "GitLab سیٹ اپ نہیں کھولا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔",
-      "description": "پل ریکویسٹس کا خودکار جائزہ لینے کے لیے Kilo {{label}} منسلک کریں۔"
+      "description": "پل ریکویسٹس کا خودکار جائزہ لینے کے لیے Kilo {{label}} منسلک کریں۔",
+      "bitbucketError": "Bitbucket سیٹ اپ نہیں کھولا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔"
     },
     "overview": {
       "reviewStyle": "جائزے کا انداز",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "آپ کا پرامپٹ ضائع ہو جائے گا۔",
       "keepEditing": "ترمیم جاری رکھیں",
       "discard": "خارج کریں",
-      "discardFailed": "ڈرافٹ خارج نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔"
+      "discardFailed": "ڈرافٹ خارج نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
+      "bitbucketConnected": "Bitbucket منسلک",
+      "connectBitbucket": "Bitbucket سے جڑیں",
+      "connectBitbucketDescription": "اپنے براؤزر میں Bitbucket سے جڑیں، پھر ذخیرہ منتخب کرنے کے لیے یہاں واپس آئیں۔",
+      "connectGitlab": "GitLab سے جڑیں",
+      "connectGitlabDescription": "اپنے براؤزر میں GitLab سے جڑیں، پھر ذخیرہ منتخب کرنے کے لیے یہاں واپس آئیں۔",
+      "couldNotLoadBitbucketRepositories": "Bitbucket ذخیرے لوڈ نہیں ہو سکے",
+      "couldNotLoadGithubRepositories": "GitHub ذخیرے لوڈ نہیں ہو سکے",
+      "couldNotLoadGitlabRepositories": "GitLab ذخیرے لوڈ نہیں ہو سکے",
+      "gitlabConnected": "GitLab منسلک",
+      "noRepositoriesVisibleBitbucket": "کوئی ذخیرہ نظر نہیں آ رہا۔ Bitbucket کے لیے ذخیرہ رسائی چیک کریں، پھر تازہ کریں۔",
+      "noRepositoriesVisibleGitlab": "کوئی ذخیرہ نظر نہیں آ رہا۔ GitLab کے لیے ذخیرہ رسائی چیک کریں، پھر تازہ کریں۔",
+      "openBitbucket": "Bitbucket کھولیں",
+      "openGitlab": "GitLab کھولیں",
+      "recentlyUsed": "حال ہی میں استعمال شدہ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فائل اپ ڈیٹ ہوئی",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "آپ کے اکاؤنٹ سے کوئی ریپوزٹری جڑی نہیں۔",
       "tryDifferentSearch": "کوئی مختلف تلاش کا لفظ آزمائیں۔",
       "loading": "لوڈ ہو رہا ہے...",
-      "accessibility": "ریپوزٹری: {{label}}"
+      "accessibility": "ریپوزٹری: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "پیغام کی تفصیلات",

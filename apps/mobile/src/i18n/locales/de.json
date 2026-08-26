@@ -856,7 +856,8 @@
       "githubApp": "GitHub-App",
       "githubError": "GitHub-Einrichtung konnte nicht geöffnet werden. Bitte versuche es erneut.",
       "gitlabAccount": "GitLab-Konto",
-      "gitlabError": "GitLab-Einrichtung konnte nicht geöffnet werden. Bitte versuche es erneut."
+      "gitlabError": "GitLab-Einrichtung konnte nicht geöffnet werden. Bitte versuche es erneut.",
+      "bitbucketError": "Die Bitbucket-Einrichtung konnte nicht geöffnet werden. Bitte versuche es erneut."
     },
     "readOnlyDescription": "Nur Organisationsinhaber und Abrechnungsmanager können diese Einstellungen ändern.",
     "reviewDetail": {
@@ -1718,7 +1719,21 @@
       "discardDraftMessage": "Dein Prompt geht verloren.",
       "discardDraftTitle": "Entwurf verwerfen?",
       "discardFailed": "Der Entwurf konnte nicht verworfen werden. Bitte versuche es erneut.",
-      "keepEditing": "Weiter bearbeiten"
+      "keepEditing": "Weiter bearbeiten",
+      "bitbucketConnected": "Bitbucket verbunden",
+      "connectBitbucket": "Bitbucket verbinden",
+      "connectBitbucketDescription": "Verbinde Bitbucket in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
+      "connectGitlab": "GitLab verbinden",
+      "connectGitlabDescription": "Verbinde GitLab in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket-Repositorys konnten nicht geladen werden",
+      "couldNotLoadGithubRepositories": "GitHub-Repositorys konnten nicht geladen werden",
+      "couldNotLoadGitlabRepositories": "GitLab-Repositorys konnten nicht geladen werden",
+      "gitlabConnected": "GitLab verbunden",
+      "noRepositoriesVisibleBitbucket": "Keine Repositorys sichtbar. Prüfe den Repository-Zugriff für Bitbucket und aktualisiere.",
+      "noRepositoriesVisibleGitlab": "Keine Repositorys sichtbar. Prüfe den Repository-Zugriff für GitLab und aktualisiere.",
+      "openBitbucket": "Bitbucket öffnen",
+      "openGitlab": "GitLab öffnen",
+      "recentlyUsed": "Zuletzt verwendet"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} Datei aktualisiert",
@@ -1807,7 +1822,10 @@
       "noRepositoriesDescription": "Mit deinem Konto sind keine Repositories verbunden.",
       "tryDifferentSearch": "Versuche einen anderen Suchbegriff.",
       "loading": "Wird geladen...",
-      "accessibility": "Repository: {{label}}"
+      "accessibility": "Repository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Nachrichtendetails",

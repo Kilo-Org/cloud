@@ -1382,7 +1382,8 @@
       "gitlabAccount": "Àpamọ́ GitLab",
       "connectGitLab": "Sopọ̀ GitLab",
       "gitlabError": "Kò lè ṣí ìtòlẹ́tò GitLab. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan síi.",
-      "description": "Sopọ̀ Kilo {{label}} láti ṣàtúnyẹ̀wò àwọn ìbéèrè ìfa ládàá."
+      "description": "Sopọ̀ Kilo {{label}} láti ṣàtúnyẹ̀wò àwọn ìbéèrè ìfa ládàá.",
+      "bitbucketError": "Ko le ṣii eto Bitbucket. Jọwọ gbiyanju lẹẹkansi."
     },
     "overview": {
       "reviewStyle": "Àrà Àtúnyẹ̀wò",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "A yoo padanu iyanilenu rẹ.",
       "keepEditing": "Pa ṣatunkọ mọ",
       "discard": "Jù silẹ",
-      "discardFailed": "Ko le fi osere silẹ. Jọwọ gbiyanju lẹẹkansi."
+      "discardFailed": "Ko le fi osere silẹ. Jọwọ gbiyanju lẹẹkansi.",
+      "bitbucketConnected": "Bitbucket ti sopọ",
+      "connectBitbucket": "So Bitbucket pọ",
+      "connectBitbucketDescription": "So Bitbucket pọ ninu browser rẹ, lẹhinna pada sibi lati yan ibi ipamọ data.",
+      "connectGitlab": "So GitLab pọ",
+      "connectGitlabDescription": "So GitLab pọ ninu browser rẹ, lẹhinna pada sibi lati yan ibi ipamọ data.",
+      "couldNotLoadBitbucketRepositories": "Ko le gbe awọn ibi ipamọ data Bitbucket",
+      "couldNotLoadGithubRepositories": "Ko le gbe awọn ibi ipamọ data GitHub",
+      "couldNotLoadGitlabRepositories": "Ko le gbe awọn ibi ipamọ data GitLab",
+      "gitlabConnected": "GitLab ti sopọ",
+      "noRepositoriesVisibleBitbucket": "Ko si ibi ipamọ data ti o han. Ṣayẹwo iwọle ibi ipamọ data fun Bitbucket, lẹhinna tunse.",
+      "noRepositoriesVisibleGitlab": "Ko si ibi ipamọ data ti o han. Ṣayẹwo iwọle ibi ipamọ data fun GitLab, lẹhinna tunse.",
+      "openBitbucket": "Ṣii Bitbucket",
+      "openGitlab": "Ṣii GitLab",
+      "recentlyUsed": "Ti a lo laipẹ"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ti ṣe imudojuiwọn {{displayCount}} faili",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Ko si awọn ibi ipamọ ti o sopọ si akọọlẹ rẹ.",
       "tryDifferentSearch": "Gbiyanju ọrọ wiwa ti o yatọ.",
       "loading": "Ti n ṣe ikojọpọ...",
-      "accessibility": "Ibi ipamọ: {{label}}"
+      "accessibility": "Ibi ipamọ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Awọn alaye ifiranṣẹ",

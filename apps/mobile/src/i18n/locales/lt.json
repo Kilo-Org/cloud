@@ -1400,7 +1400,8 @@
       "gitlabAccount": "GitLab paskyra",
       "connectGitLab": "Prijungti GitLab",
       "gitlabError": "Nepavyko atidaryti GitLab sąrankos. Bandykite dar kartą.",
-      "description": "Prijunkite Kilo {{label}}, kad automatiškai peržiūrėtų pull requests."
+      "description": "Prijunkite Kilo {{label}}, kad automatiškai peržiūrėtų pull requests.",
+      "bitbucketError": "Nepavyko atidaryti Bitbucket sąrankos. Bandykite dar kartą."
     },
     "overview": {
       "reviewStyle": "Peržiūros stilius",
@@ -2202,7 +2203,21 @@
       "discardDraftMessage": "Jūsų užklausa bus prarasta.",
       "keepEditing": "Tęsti redagavimą",
       "discard": "Atmesti",
-      "discardFailed": "Nepavyko atmesti juodraščio. Bandykite dar kartą."
+      "discardFailed": "Nepavyko atmesti juodraščio. Bandykite dar kartą.",
+      "bitbucketConnected": "Bitbucket prijungtas",
+      "connectBitbucket": "Prijungti Bitbucket",
+      "connectBitbucketDescription": "Prijunkite Bitbucket naršyklėje, tada grįžkite čia ir pasirinkite saugyklą.",
+      "connectGitlab": "Prijungti GitLab",
+      "connectGitlabDescription": "Prijunkite GitLab naršyklėje, tada grįžkite čia ir pasirinkite saugyklą.",
+      "couldNotLoadBitbucketRepositories": "Nepavyko įkelti Bitbucket saugyklų",
+      "couldNotLoadGithubRepositories": "Nepavyko įkelti GitHub saugyklų",
+      "couldNotLoadGitlabRepositories": "Nepavyko įkelti GitLab saugyklų",
+      "gitlabConnected": "GitLab prijungtas",
+      "noRepositoriesVisibleBitbucket": "Saugyklų nematyti. Patikrinkite saugyklų prieigą Bitbucket ir atnaujinkite.",
+      "noRepositoriesVisibleGitlab": "Saugyklų nematyti. Patikrinkite saugyklų prieigą GitLab ir atnaujinkite.",
+      "openBitbucket": "Atidaryti Bitbucket",
+      "openGitlab": "Atidaryti GitLab",
+      "recentlyUsed": "Panaudota neseniai"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujinta {{displayCount}} rinkmena",
@@ -2293,7 +2308,10 @@
       "noRepositoriesDescription": "Prie jūsų paskyros neprijungta jokių saugyklų.",
       "tryDifferentSearch": "Pabandykite kitą paieškos terminą.",
       "loading": "Kraunama...",
-      "accessibility": "Saugykla: {{label}}"
+      "accessibility": "Saugykla: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Žinutės informacija",

@@ -1409,7 +1409,8 @@
       "gitlabAccount": "Kont GitLab",
       "connectGitLab": "Ikkonnettja GitLab",
       "gitlabError": "Ma stajniex niftħu s-setup ta' GitLab. Jekk jogħġbok erġa' pprova.",
-      "description": "Ikkonnettja l-{{label}} ta' Kilo biex tirrevedi l-pull requests b'mod awtomatiku."
+      "description": "Ikkonnettja l-{{label}} ta' Kilo biex tirrevedi l-pull requests b'mod awtomatiku.",
+      "bitbucketError": "Ma setax jiftaħ is-setup ta' Bitbucket. Jekk jogħġbok erġa' pprova."
     },
     "overview": {
       "reviewStyle": "Stil ta' Reviżjoni",
@@ -2217,7 +2218,21 @@
       "discardDraftMessage": "Il-prompt tiegħek se jintilef.",
       "keepEditing": "Kompli ipproċessa",
       "discard": "Warrab",
-      "discardFailed": "Ma setax jintrema l-abbozz. Jekk jogħġbok erġa' pprova."
+      "discardFailed": "Ma setax jintrema l-abbozz. Jekk jogħġbok erġa' pprova.",
+      "bitbucketConnected": "Bitbucket imqabbad",
+      "connectBitbucket": "Qabbad Bitbucket",
+      "connectBitbucketDescription": "Qabbad Bitbucket fil-browser tiegħek, imbagħad erġa' lura hawn biex tagħżel repository.",
+      "connectGitlab": "Qabbad GitLab",
+      "connectGitlabDescription": "Qabbad GitLab fil-browser tiegħek, imbagħad erġa' lura hawn biex tagħżel repository.",
+      "couldNotLoadBitbucketRepositories": "Ma setgħux jittellgħu r-repositories ta' Bitbucket",
+      "couldNotLoadGithubRepositories": "Ma setgħux jittellgħu r-repositories ta' GitHub",
+      "couldNotLoadGitlabRepositories": "Ma setgħux jittellgħu r-repositories ta' GitLab",
+      "gitlabConnected": "GitLab imqabbad",
+      "noRepositoriesVisibleBitbucket": "L-ebda repository mhux viżibbli. Iċċekkja l-aċċess tar-repositories għal Bitbucket, imbagħad aġġorna.",
+      "noRepositoriesVisibleGitlab": "L-ebda repository mhux viżibbli. Iċċekkja l-aċċess tar-repositories għal GitLab, imbagħad aġġorna.",
+      "openBitbucket": "Iftaħ Bitbucket",
+      "openGitlab": "Iftaħ GitLab",
+      "recentlyUsed": "Użati reċentement"
     },
     "partRenderer": {
       "updatedFileCount_one": "Aġġornat {{displayCount}} fajl",
@@ -2309,7 +2324,10 @@
       "noRepositoriesDescription": "L-ebda repożitorju mhux imqabbad mal-kont tiegħek.",
       "tryDifferentSearch": "Ipprova terminu ta' tfittxija differenti.",
       "loading": "Qed jgħabbi...",
-      "accessibility": "Repożitorju: {{label}}"
+      "accessibility": "Repożitorju: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Dettalji tal-messaġġ",

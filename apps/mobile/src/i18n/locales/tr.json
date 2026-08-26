@@ -856,7 +856,8 @@
       "githubApp": "GitHub Uygulaması",
       "githubError": "GitHub kurulumu açılamadı. Lütfen tekrar deneyin.",
       "gitlabAccount": "GitLab hesabı",
-      "gitlabError": "GitLab kurulumu açılamadı. Lütfen tekrar deneyin."
+      "gitlabError": "GitLab kurulumu açılamadı. Lütfen tekrar deneyin.",
+      "bitbucketError": "Bitbucket kurulumu açılamadı. Lütfen tekrar deneyin."
     },
     "readOnlyDescription": "Bu ayarları yalnızca kuruluş sahipleri ve faturalandırma yöneticileri değiştirebilir.",
     "reviewDetail": {
@@ -1718,7 +1719,21 @@
       "discardDraftMessage": "İsteminiz kaybolacak.",
       "discardDraftTitle": "Taslak silinsin mi?",
       "discardFailed": "Taslak silinemedi. Lütfen tekrar deneyin.",
-      "keepEditing": "Düzenlemeye devam et"
+      "keepEditing": "Düzenlemeye devam et",
+      "bitbucketConnected": "Bitbucket bağlandı",
+      "connectBitbucket": "Bitbucket'a Bağlan",
+      "connectBitbucketDescription": "Bitbucket'ı tarayıcınızda bağlayın, ardından bir depo seçmek için buraya dönün.",
+      "connectGitlab": "GitLab'a Bağlan",
+      "connectGitlabDescription": "GitLab'ı tarayıcınızda bağlayın, ardından bir depo seçmek için buraya dönün.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket depoları yüklenemedi",
+      "couldNotLoadGithubRepositories": "GitHub depoları yüklenemedi",
+      "couldNotLoadGitlabRepositories": "GitLab depoları yüklenemedi",
+      "gitlabConnected": "GitLab bağlandı",
+      "noRepositoriesVisibleBitbucket": "Görünür depo yok. Bitbucket için depo erişimini kontrol edin, ardından yenileyin.",
+      "noRepositoriesVisibleGitlab": "Görünür depo yok. GitLab için depo erişimini kontrol edin, ardından yenileyin.",
+      "openBitbucket": "Bitbucket'ı Aç",
+      "openGitlab": "GitLab'ı Aç",
+      "recentlyUsed": "Son kullanılanlar"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} dosya güncellendi",
@@ -1807,7 +1822,10 @@
       "noRepositoriesDescription": "Hesabınıza bağlı depo yok.",
       "tryDifferentSearch": "Farklı bir arama terimi deneyin.",
       "loading": "Yükleniyor...",
-      "accessibility": "Depo: {{label}}"
+      "accessibility": "Depo: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Mesaj ayrıntıları",

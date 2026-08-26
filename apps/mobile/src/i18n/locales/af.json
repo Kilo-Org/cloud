@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab-rekening",
       "connectGitLab": "Koppel GitLab",
       "gitlabError": "Kon nie GitLab-opstel oopmaak nie. Probeer asseblief weer.",
-      "description": "Koppel die Kilo {{label}} om pull requests outomaties te hersien."
+      "description": "Koppel die Kilo {{label}} om pull requests outomaties te hersien.",
+      "bitbucketError": "Kon nie Bitbucket-opstelling oopmaak nie. Probeer asseblief weer."
     },
     "overview": {
       "reviewStyle": "Hersieningstyl",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Jou aansporing sal verlore gaan.",
       "keepEditing": "Bly redigeer",
       "discard": "Gooi weg",
-      "discardFailed": "Kon die konsep nie weggooi nie. Probeer asseblief weer."
+      "discardFailed": "Kon die konsep nie weggooi nie. Probeer asseblief weer.",
+      "bitbucketConnected": "Bitbucket is gekoppel",
+      "connectBitbucket": "Koppel Bitbucket",
+      "connectBitbucketDescription": "Koppel Bitbucket in jou blaaier, en keer dan hier terug om 'n bewaarplek te kies.",
+      "connectGitlab": "Koppel GitLab",
+      "connectGitlabDescription": "Koppel GitLab in jou blaaier, en keer dan hier terug om 'n bewaarplek te kies.",
+      "couldNotLoadBitbucketRepositories": "Kon nie Bitbucket-bewaarplekke laai nie",
+      "couldNotLoadGithubRepositories": "Kon nie GitHub-bewaarplekke laai nie",
+      "couldNotLoadGitlabRepositories": "Kon nie GitLab-bewaarplekke laai nie",
+      "gitlabConnected": "GitLab is gekoppel",
+      "noRepositoriesVisibleBitbucket": "Geen bewaarplekke sigbaar nie. Gaan Bitbucket-bewaarplektoegang na, en verfris dan.",
+      "noRepositoriesVisibleGitlab": "Geen bewaarplekke sigbaar nie. Gaan GitLab-bewaarplektoegang na, en verfris dan.",
+      "openBitbucket": "Maak Bitbucket oop",
+      "openGitlab": "Maak GitLab oop",
+      "recentlyUsed": "Onlangs gebruik"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer bygewerk",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Geen bewaarplekke is aan jou rekening gekoppel nie.",
       "tryDifferentSearch": "Probeer 'n ander soekterm.",
       "loading": "Laai...",
-      "accessibility": "Bewaarplek: {{label}}"
+      "accessibility": "Bewaarplek: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Boodskapbesonderhede",

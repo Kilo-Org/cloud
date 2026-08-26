@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab એકાઉન્ટ",
       "connectGitLab": "GitLab કનેક્ટ કરો",
       "gitlabError": "GitLab સેટઅપ ખોલી શકાયું નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
-      "description": "પુલ રિક્વેસ્ટ આપમેળે સમીક્ષા કરવા Kilo {{label}} કનેક્ટ કરો."
+      "description": "પુલ રિક્વેસ્ટ આપમેળે સમીક્ષા કરવા Kilo {{label}} કનેક્ટ કરો.",
+      "bitbucketError": "Bitbucket સેટઅપ ખોલી શકાયું નહીં. કૃપા કરીને ફરી પ્રયાસ કરો."
     },
     "overview": {
       "reviewStyle": "સમીક્ષા શૈલી",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "તમારો પ્રોમ્પ્ટ ખોવાઈ જશે.",
       "keepEditing": "સંપાદન ચાલુ રાખો",
       "discard": "કાઢી નાખો",
-      "discardFailed": "ડ્રાફ્ટ કાઢી નાખી શકાયો નથી. કૃપા કરીને ફરી પ્રયાસ કરો."
+      "discardFailed": "ડ્રાફ્ટ કાઢી નાખી શકાયો નથી. કૃપા કરીને ફરી પ્રયાસ કરો.",
+      "bitbucketConnected": "Bitbucket કનેક્ટ થયું",
+      "connectBitbucket": "Bitbucket કનેક્ટ કરો",
+      "connectBitbucketDescription": "તમારા બ્રાઉઝરમાં Bitbucket કનેક્ટ કરો, પછી રિપોઝિટરી પસંદ કરવા અહીં પાછા આવો.",
+      "connectGitlab": "GitLab કનેક્ટ કરો",
+      "connectGitlabDescription": "તમારા બ્રાઉઝરમાં GitLab કનેક્ટ કરો, પછી રિપોઝિટરી પસંદ કરવા અહીં પાછા આવો.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં",
+      "couldNotLoadGithubRepositories": "GitHub રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં",
+      "couldNotLoadGitlabRepositories": "GitLab રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં",
+      "gitlabConnected": "GitLab કનેક્ટ થયું",
+      "noRepositoriesVisibleBitbucket": "કોઈ રિપોઝિટરી દેખાતી નથી. Bitbucket માટે રિપોઝિટરી એક્સેસ તપાસો, પછી રિફ્રેશ કરો.",
+      "noRepositoriesVisibleGitlab": "કોઈ રિપોઝિટરી દેખાતી નથી. GitLab માટે રિપોઝિટરી એક્સેસ તપાસો, પછી રિફ્રેશ કરો.",
+      "openBitbucket": "Bitbucket ખોલો",
+      "openGitlab": "GitLab ખોલો",
+      "recentlyUsed": "તાજેતરમાં ઉપયોગમાં લેવાયેલું"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ફાઇલ અપડેટ કરેલ",
@@ -2265,7 +2280,10 @@
       "noRepositoriesDescription": "તમારા એકાઉન્ટ સાથે કોઈ રિપોઝિટરી કનેક્ટ થયેલ નથી.",
       "tryDifferentSearch": "અલગ શોધ શબ્દ અજમાવો.",
       "loading": "લોડ થઈ રહ્યું છે...",
-      "accessibility": "રિપોઝિટરી: {{label}}"
+      "accessibility": "રિપોઝિટરી: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "સંદેશ વિગતો",

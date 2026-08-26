@@ -1382,7 +1382,8 @@
       "gitlabAccount": "Akaun GitLab",
       "connectGitLab": "Sambung GitLab",
       "gitlabError": "Tidak dapat membuka persediaan GitLab. Sila cuba lagi.",
-      "description": "Sambung Kilo {{label}} untuk menyemak permintaan tarik secara automatik."
+      "description": "Sambung Kilo {{label}} untuk menyemak permintaan tarik secara automatik.",
+      "bitbucketError": "Tidak dapat membuka persediaan Bitbucket. Sila cuba lagi."
     },
     "overview": {
       "reviewStyle": "Gaya Semakan",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Prompt anda akan hilang.",
       "keepEditing": "Teruskan mengedit",
       "discard": "Buang",
-      "discardFailed": "Tidak dapat membuang draf. Sila cuba lagi."
+      "discardFailed": "Tidak dapat membuang draf. Sila cuba lagi.",
+      "bitbucketConnected": "Bitbucket disambungkan",
+      "connectBitbucket": "Sambung Bitbucket",
+      "connectBitbucketDescription": "Sambung Bitbucket dalam penyemak imbas anda, kemudian kembali ke sini untuk memilih repositori.",
+      "connectGitlab": "Sambung GitLab",
+      "connectGitlabDescription": "Sambung GitLab dalam penyemak imbas anda, kemudian kembali ke sini untuk memilih repositori.",
+      "couldNotLoadBitbucketRepositories": "Gagal memuatkan repositori Bitbucket",
+      "couldNotLoadGithubRepositories": "Gagal memuatkan repositori GitHub",
+      "couldNotLoadGitlabRepositories": "Gagal memuatkan repositori GitLab",
+      "gitlabConnected": "GitLab disambungkan",
+      "noRepositoriesVisibleBitbucket": "Tiada repositori kelihatan. Semak akses repositori untuk Bitbucket, kemudian muat semula.",
+      "noRepositoriesVisibleGitlab": "Tiada repositori kelihatan. Semak akses repositori untuk GitLab, kemudian muat semula.",
+      "openBitbucket": "Buka Bitbucket",
+      "openGitlab": "Buka GitLab",
+      "recentlyUsed": "Baru digunakan"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fail dikemas kini",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Tiada repositori disambungkan ke akaun anda.",
       "tryDifferentSearch": "Cuba istilah carian yang berbeza.",
       "loading": "Memuatkan...",
-      "accessibility": "Repositori: {{label}}"
+      "accessibility": "Repositori: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Butiran mesej",

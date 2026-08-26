@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab-fiók",
       "connectGitLab": "GitLab csatlakoztatása",
       "gitlabError": "Nem sikerült megnyitni a GitLab beállítását. Kérjük, próbáld újra.",
-      "description": "Csatlakoztasd a Kilo {{label}}t a pull requestek automatikus áttekintéséhez."
+      "description": "Csatlakoztasd a Kilo {{label}}t a pull requestek automatikus áttekintéséhez.",
+      "bitbucketError": "Nem sikerült megnyitni a Bitbucket beállítását. Kérjük, próbáld újra."
     },
     "overview": {
       "reviewStyle": "Áttekintési stílus",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "A promptja el fog veszni.",
       "keepEditing": "Szerkesztés folytatása",
       "discard": "Elvetés",
-      "discardFailed": "A piszkozat elvetése nem sikerült. Próbálja újra."
+      "discardFailed": "A piszkozat elvetése nem sikerült. Próbálja újra.",
+      "bitbucketConnected": "Bitbucket csatlakoztatva",
+      "connectBitbucket": "Bitbucket csatlakoztatása",
+      "connectBitbucketDescription": "Csatlakoztasd a Bitbucketet a böngésződben, majd térj vissza ide a tároló kiválasztásához.",
+      "connectGitlab": "GitLab csatlakoztatása",
+      "connectGitlabDescription": "Csatlakoztasd a GitLabot a böngésződben, majd térj vissza ide a tároló kiválasztásához.",
+      "couldNotLoadBitbucketRepositories": "Nem sikerült betölteni a Bitbucket-tárolókat",
+      "couldNotLoadGithubRepositories": "Nem sikerült betölteni a GitHub-tárolókat",
+      "couldNotLoadGitlabRepositories": "Nem sikerült betölteni a GitLab-tárolókat",
+      "gitlabConnected": "GitLab csatlakoztatva",
+      "noRepositoriesVisibleBitbucket": "Nincs látható tároló. Ellenőrizd a Bitbucket-tárolókhoz való hozzáférést, majd frissíts.",
+      "noRepositoriesVisibleGitlab": "Nincs látható tároló. Ellenőrizd a GitLab-tárolókhoz való hozzáférést, majd frissíts.",
+      "openBitbucket": "Bitbucket megnyitása",
+      "openGitlab": "GitLab megnyitása",
+      "recentlyUsed": "Legutóbb használt"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fájl frissítve",
@@ -2265,7 +2280,10 @@
       "noRepositoriesDescription": "Nem kapcsolódik adattár a fiókjához.",
       "tryDifferentSearch": "Próbáljon másik keresőszót.",
       "loading": "Betöltés...",
-      "accessibility": "Adattár: {{label}}"
+      "accessibility": "Adattár: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Üzenet részletei",

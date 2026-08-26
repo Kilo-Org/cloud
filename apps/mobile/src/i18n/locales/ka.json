@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab ანგარიში",
       "connectGitLab": "GitLab-ის დაკავშირება",
       "gitlabError": "GitLab-ის დაყენების გახსნა ვერ მოხერხდა. გთხოვთ, სცადოთ ხელახლა.",
-      "description": "დააკავშირეთ Kilo {{label}}, რომ ავტომატურად მიმოიხილოთ პულ რექვესტები."
+      "description": "დააკავშირეთ Kilo {{label}}, რომ ავტომატურად მიმოიხილოთ პულ რექვესტები.",
+      "bitbucketError": "Bitbucket-ის დაყენების გახსნა ვერ მოხერხდა. გთხოვთ, სცადოთ კიდევ."
     },
     "overview": {
       "reviewStyle": "მიმოხილვის სტილი",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "თქვენი შეტყობინება დაიკარგება.",
       "keepEditing": "რედაქტირების გაგრძელება",
       "discard": "გაუქმება",
-      "discardFailed": "დრაფტის გაუქმება ვერ მოხერხდა. გთხოვთ, სცადეთ ხელახლა."
+      "discardFailed": "დრაფტის გაუქმება ვერ მოხერხდა. გთხოვთ, სცადეთ ხელახლა.",
+      "bitbucketConnected": "Bitbucket დაკავშირებულია",
+      "connectBitbucket": "Bitbucket-ის დაკავშირება",
+      "connectBitbucketDescription": "დაუკავშირდით Bitbucket-ს თქვენს ბრაუზერში, შემდეგ დაბრუნდით აქ რეპოზიტორის ასარჩევად.",
+      "connectGitlab": "GitLab-ის დაკავშირება",
+      "connectGitlabDescription": "დაუკავშირდით GitLab-ს თქვენს ბრაუზერში, შემდეგ დაბრუნდით აქ რეპოზიტორის ასარჩევად.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket-ის რეპოზიტორების ჩატვირთვა ვერ მოხერხდა",
+      "couldNotLoadGithubRepositories": "GitHub-ის რეპოზიტორების ჩატვირთვა ვერ მოხერხდა",
+      "couldNotLoadGitlabRepositories": "GitLab-ის რეპოზიტორების ჩატვირთვა ვერ მოხერხდა",
+      "gitlabConnected": "GitLab დაკავშირებულია",
+      "noRepositoriesVisibleBitbucket": "რეპოზიტორები არ ჩანს. შეამოწმეთ Bitbucket-ის რეპოზიტორებზე წვდომა, შემდეგ განაახლეთ.",
+      "noRepositoriesVisibleGitlab": "რეპოზიტორები არ ჩანს. შეამოწმეთ GitLab-ის რეპოზიტორებზე წვდომა, შემდეგ განაახლეთ.",
+      "openBitbucket": "Bitbucket-ის გახსნა",
+      "openGitlab": "GitLab-ის გახსნა",
+      "recentlyUsed": "ბოლოს გამოყენებული"
     },
     "partRenderer": {
       "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "თქვენს ანგარიშთან დაკავშირებული რეპოზიტორები არ არის.",
       "tryDifferentSearch": "სცადეთ სხვა საძიებო სიტყვა.",
       "loading": "ჩატვირთვა...",
-      "accessibility": "რეპოზიტორი: {{label}}"
+      "accessibility": "რეპოზიტორი: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "შეტყობინების დეტალები",

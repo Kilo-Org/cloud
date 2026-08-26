@@ -1382,7 +1382,8 @@
       "gitlabAccount": "هەژماری GitLab",
       "connectGitLab": "پەیوەندیکردن بە GitLab",
       "gitlabError": "نەتوانرا ڕێکخستنی GitLab بکرێتەوە. تکایە دووبارە هەوڵبدەوە.",
-      "description": "بۆ پێداچوونەوەی ئۆتۆماتیکی بە داواکارییەکانی ڕاکێشان پەیوەندی بە Kilo {{label}} بکە."
+      "description": "بۆ پێداچوونەوەی ئۆتۆماتیکی بە داواکارییەکانی ڕاکێشان پەیوەندی بە Kilo {{label}} بکە.",
+      "bitbucketError": "نەتوانرا دامەزراندنی Bitbucket بکرێتەوە. تکایە دووبارە هەوڵبدەوە"
     },
     "overview": {
       "reviewStyle": "شێوازی پێداچوونەوە",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "نووسینەکەت لەدەست دەچێت.",
       "keepEditing": "بەردەوام بە لە دەستکاری",
       "discard": "وازلێهێنان",
-      "discardFailed": "نەتوانرا لە نوسینەکە وازبهێنرێت. تکایە دووبارە هەوڵ بدە."
+      "discardFailed": "نەتوانرا لە نوسینەکە وازبهێنرێت. تکایە دووبارە هەوڵ بدە.",
+      "bitbucketConnected": "Bitbucket پەیوەند کرا",
+      "connectBitbucket": "پەیوەندی بکە بە Bitbucket",
+      "connectBitbucketDescription": "لە وێبگەڕەکەتدا پەیوەندی بە Bitbucket بکە، ئینجا بگەڕێوە بۆ ئێرە بۆ هەڵبژاردنی ڕیپۆ",
+      "connectGitlab": "پەیوەندی بکە بە GitLab",
+      "connectGitlabDescription": "لە وێبگەڕەکەتدا پەیوەندی بە GitLab بکە، ئینجا بگەڕێوە بۆ ئێرە بۆ هەڵبژاردنی ڕیپۆ",
+      "couldNotLoadBitbucketRepositories": "نەتوانرا ڕیپۆکانی Bitbucket بار بکرێن",
+      "couldNotLoadGithubRepositories": "نەتوانرا ڕیپۆکانی GitHub بار بکرێن",
+      "couldNotLoadGitlabRepositories": "نەتوانرا ڕیپۆکانی GitLab بار بکرێن",
+      "gitlabConnected": "GitLab پەیوەند کرا",
+      "noRepositoriesVisibleBitbucket": "هیچ ڕیپۆیەک نەبینراوە. دەستگەیشتن بە ڕیپۆکانی Bitbucket بپشکنە، ئینجا نوێ بکەوە",
+      "noRepositoriesVisibleGitlab": "هیچ ڕیپۆیەک نەبینراوە. دەستگەیشتن بە ڕیپۆکانی GitLab بپشکنە، ئینجا نوێ بکەوە",
+      "openBitbucket": "کردنەوەی Bitbucket",
+      "openGitlab": "کردنەوەی GitLab",
+      "recentlyUsed": "بەم دواییە بەکارهاتووە"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} پەڕگە نوێکرایەوە",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "هیچ کۆگایەک پەیوەندیدار نییە بە هەژمارەکەت.",
       "tryDifferentSearch": "وشەیەکی گەڕانی جیاواز تاقی بکەرەوە.",
       "loading": "بارکردن...",
-      "accessibility": "کۆگا: {{label}}"
+      "accessibility": "کۆگا: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "وردەکاری پەیام",

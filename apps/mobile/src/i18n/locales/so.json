@@ -1382,7 +1382,8 @@
       "gitlabAccount": "Akoonka GitLab",
       "connectGitLab": "Xiri GitLab",
       "gitlabError": "Hagaajinta GitLab lama furi karin. Fadlan mar kale isku day.",
-      "description": "Xiri Kilo {{label}} si uu si otomaatig ah u dib-u-eego codsyada isku-dhafka."
+      "description": "Xiri Kilo {{label}} si uu si otomaatig ah u dib-u-eego codsyada isku-dhafka.",
+      "bitbucketError": "Lama furi karin dejinta Bitbucket. Fadlan mar kale isku day."
     },
     "overview": {
       "reviewStyle": "Qaabka Dib-u-Eegista",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Wax-soo-galkaaga wuu lumi doonaa.",
       "keepEditing": "Si wad wax ku tafatir",
       "discard": "Isku tuur",
-      "discardFailed": "Qabyada lama tuuri karin. Fadlan mar kale isku day."
+      "discardFailed": "Qabyada lama tuuri karin. Fadlan mar kale isku day.",
+      "bitbucketConnected": "Bitbucket wuu xiriiray",
+      "connectBitbucket": "Ku xiriiray Bitbucket",
+      "connectBitbucketDescription": "Ku xiriiray Bitbucket browser-kaaga, ka dibna ku soo noqo halkan si aad u doorato keyd.",
+      "connectGitlab": "Ku xiriiray GitLab",
+      "connectGitlabDescription": "Ku xiriiray GitLab browser-kaaga, ka dibna ku soo noqo halkan si aad u doorato keyd.",
+      "couldNotLoadBitbucketRepositories": "Lama soo gelin karin keydka Bitbucket",
+      "couldNotLoadGithubRepositories": "Lama soo gelin karin keydka GitHub",
+      "couldNotLoadGitlabRepositories": "Lama soo gelin karin keydka GitLab",
+      "gitlabConnected": "GitLab wuu xiriiray",
+      "noRepositoriesVisibleBitbucket": "Ma jiraan keyd la arki karo. Hubi gelitaanka keydka ee Bitbucket, ka dibna cusbooneysii.",
+      "noRepositoriesVisibleGitlab": "Ma jiraan keyd la arki karo. Hubi gelitaanka keydka ee GitLab, ka dibna cusbooneysii.",
+      "openBitbucket": "Fur Bitbucket",
+      "openGitlab": "Fur GitLab",
+      "recentlyUsed": "Markii dhaw la isticmaalay"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl ayaa la cusboonaysiiyay",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Ma jiraan kayd oo ku xidhan akoonkaaga.",
       "tryDifferentSearch": "Isku day erey raadin oo kala duwan.",
       "loading": "Shubid...",
-      "accessibility": "Kaydka: {{label}}"
+      "accessibility": "Kaydka: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Faahfaahinta farriinta",

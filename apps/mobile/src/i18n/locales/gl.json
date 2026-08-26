@@ -1382,7 +1382,8 @@
       "gitlabAccount": "Conta de GitLab",
       "connectGitLab": "Conectar GitLab",
       "gitlabError": "Non se puido abrir a configuración de GitLab. Téntao de novo.",
-      "description": "Conecta o Kilo {{label}} para revisar pull requests automaticamente."
+      "description": "Conecta o Kilo {{label}} para revisar pull requests automaticamente.",
+      "bitbucketError": "Non se puido abrir a configuración de Bitbucket. Inténtao de novo."
     },
     "overview": {
       "reviewStyle": "Estilo de revisión",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Perderase o teu indicación.",
       "keepEditing": "Continuar editando",
       "discard": "Descartar",
-      "discardFailed": "Non se puido descartar o borrador. Téntao de novo."
+      "discardFailed": "Non se puido descartar o borrador. Téntao de novo.",
+      "bitbucketConnected": "Bitbucket conectado",
+      "connectBitbucket": "Conectar Bitbucket",
+      "connectBitbucketDescription": "Conecta Bitbucket no teu navegador e despois volve aquí para escoller un repositorio.",
+      "connectGitlab": "Conectar GitLab",
+      "connectGitlabDescription": "Conecta GitLab no teu navegador e despois volve aquí para escoller un repositorio.",
+      "couldNotLoadBitbucketRepositories": "Non se puideron cargar os repositorios de Bitbucket",
+      "couldNotLoadGithubRepositories": "Non se puideron cargar os repositorios de GitHub",
+      "couldNotLoadGitlabRepositories": "Non se puideron cargar os repositorios de GitLab",
+      "gitlabConnected": "GitLab conectado",
+      "noRepositoriesVisibleBitbucket": "Non hai repositorios visibles. Comproba o acceso aos repositorios de Bitbucket e refresca.",
+      "noRepositoriesVisibleGitlab": "Non hai repositorios visibles. Comproba o acceso aos repositorios de GitLab e refresca.",
+      "openBitbucket": "Abrir Bitbucket",
+      "openGitlab": "Abrir GitLab",
+      "recentlyUsed": "Usados recentemente"
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizouse {{displayCount}} ficheiro",
@@ -2265,7 +2280,10 @@
       "noRepositoriesDescription": "Non hai repositorios conectados á túa conta.",
       "tryDifferentSearch": "Probas un termo de busca diferente.",
       "loading": "Cargando...",
-      "accessibility": "Repositorio: {{label}}"
+      "accessibility": "Repositorio: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detalles da mensaxe",

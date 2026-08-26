@@ -1382,7 +1382,8 @@
       "gitlabAccount": "حساب GitLab",
       "connectGitLab": "اتصال GitLab",
       "gitlabError": "باز کردن راه‌اندازی GitLab ناموفق بود. لطفاً دوباره تلاش کنید.",
-      "description": "برای بررسی خودکار pull requestها، Kilo {{label}} را متصل کنید."
+      "description": "برای بررسی خودکار pull requestها، Kilo {{label}} را متصل کنید.",
+      "bitbucketError": "باز کردن تنظیمات Bitbucket ممکن نشد. لطفاً دوباره تلاش کنید."
     },
     "overview": {
       "reviewStyle": "سبک بررسی",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "پیام شما از بین خواهد رفت.",
       "keepEditing": "ادامه ویرایش",
       "discard": "دور انداختن",
-      "discardFailed": "دور انداختن پیشنویس ممکن نشد. لطفاً دوباره تلاش کنید."
+      "discardFailed": "دور انداختن پیشنویس ممکن نشد. لطفاً دوباره تلاش کنید.",
+      "bitbucketConnected": "بیت‌باکت متصل شد",
+      "connectBitbucket": "اتصال به Bitbucket",
+      "connectBitbucketDescription": "در مرورگر خود به Bitbucket متصل شوید، سپس برای انتخاب مخزن به اینجا بازگردید.",
+      "connectGitlab": "اتصال به GitLab",
+      "connectGitlabDescription": "در مرورگر خود به GitLab متصل شوید، سپس برای انتخاب مخزن به اینجا بازگردید.",
+      "couldNotLoadBitbucketRepositories": "بارگیری مخازن Bitbucket ممکن نشد",
+      "couldNotLoadGithubRepositories": "بارگیری مخازن GitHub ممکن نشد",
+      "couldNotLoadGitlabRepositories": "بارگیری مخازن GitLab ممکن نشد",
+      "gitlabConnected": "GitLab متصل شد",
+      "noRepositoriesVisibleBitbucket": "هیچ مخزنی قابل مشاهده نیست. دسترسی مخزن را برای Bitbucket بررسی کنید، سپس تازه‌سازی کنید.",
+      "noRepositoriesVisibleGitlab": "هیچ مخزنی قابل مشاهده نیست. دسترسی مخزن را برای GitLab بررسی کنید، سپس تازه‌سازی کنید.",
+      "openBitbucket": "باز کردن Bitbucket",
+      "openGitlab": "باز کردن GitLab",
+      "recentlyUsed": "اخیراً استفاده‌شده"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل بهروزرسانی شد",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "هیچ مخزنی به حساب شما وصل نیست.",
       "tryDifferentSearch": "عبارت جستجوی دیگری را امتحان کنید.",
       "loading": "در حال بارگذاری...",
-      "accessibility": "مخزن: {{label}}"
+      "accessibility": "مخزن: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "جزئیات پیام",

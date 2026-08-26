@@ -860,7 +860,8 @@
       "githubApp": "Aplikacja GitHub",
       "githubError": "Nie udało się otworzyć konfiguracji GitHub. Spróbuj ponownie.",
       "gitlabAccount": "Konto GitLab",
-      "gitlabError": "Nie udało się otworzyć konfiguracji GitLab. Spróbuj ponownie."
+      "gitlabError": "Nie udało się otworzyć konfiguracji GitLab. Spróbuj ponownie.",
+      "bitbucketError": "Nie można otworzyć konfiguracji Bitbucket. Spróbuj ponownie."
     },
     "readOnlyDescription": "Tylko właściciele organizacji i menedżerowie rozliczeń mogą zmieniać te ustawienia.",
     "reviewDetail": {
@@ -1734,7 +1735,21 @@
       "discardDraftMessage": "Twoje polecenie zostanie utracone.",
       "discardDraftTitle": "Odrzucić szkic?",
       "discardFailed": "Nie udało się odrzucić szkicu. Spróbuj ponownie.",
-      "keepEditing": "Kontynuuj edycję"
+      "keepEditing": "Kontynuuj edycję",
+      "bitbucketConnected": "Połączono z Bitbucket",
+      "connectBitbucket": "Połącz Bitbucket",
+      "connectBitbucketDescription": "Połącz Bitbucket w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
+      "connectGitlab": "Połącz GitLab",
+      "connectGitlabDescription": "Połącz GitLab w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
+      "couldNotLoadBitbucketRepositories": "Nie można wczytać repozytoriów Bitbucket",
+      "couldNotLoadGithubRepositories": "Nie można wczytać repozytoriów GitHub",
+      "couldNotLoadGitlabRepositories": "Nie można wczytać repozytoriów GitLab",
+      "gitlabConnected": "Połączono z GitLab",
+      "noRepositoriesVisibleBitbucket": "Brak widocznych repozytoriów. Sprawdź dostęp do repozytoriów Bitbucket, a następnie odśwież.",
+      "noRepositoriesVisibleGitlab": "Brak widocznych repozytoriów. Sprawdź dostęp do repozytoriów GitLab, a następnie odśwież.",
+      "openBitbucket": "Otwórz Bitbucket",
+      "openGitlab": "Otwórz GitLab",
+      "recentlyUsed": "Ostatnio używane"
     },
     "partRenderer": {
       "updatedFileCount_one": "Zaktualizowano {{displayCount}} plik",
@@ -1825,7 +1840,10 @@
       "noRepositoriesDescription": "Z Twoim kontem nie są połączone żadne repozytoria.",
       "tryDifferentSearch": "Spróbuj użyć innego hasła wyszukiwania.",
       "loading": "Ładowanie...",
-      "accessibility": "Repozytorium: {{label}}"
+      "accessibility": "Repozytorium: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Szczegóły wiadomości",

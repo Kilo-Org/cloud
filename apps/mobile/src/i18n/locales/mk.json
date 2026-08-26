@@ -1382,7 +1382,8 @@
       "gitlabAccount": "GitLab сметка",
       "connectGitLab": "Поврзи GitLab",
       "gitlabError": "Не можев да го отворам GitLab поставувањето. Обиди се повторно.",
-      "description": "Поврзи го Kilo {{label}} за автоматски прегледи на барањата за повлекување."
+      "description": "Поврзи го Kilo {{label}} за автоматски прегледи на барањата за повлекување.",
+      "bitbucketError": "Не можеше да се отвори поставувањето на Битубакет. Обидете се повторно."
     },
     "overview": {
       "reviewStyle": "Стил на преглед",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Твојот предлог ќе биде изгубен.",
       "keepEditing": "Продолжи со уредување",
       "discard": "Отфрли",
-      "discardFailed": "Не можеше да се отфрли нацртот. Обиди се повторно."
+      "discardFailed": "Не можеше да се отфрли нацртот. Обиди се повторно.",
+      "bitbucketConnected": "Битубакет е поврзан",
+      "connectBitbucket": "Поврзи Битубакет",
+      "connectBitbucketDescription": "Поврзете Битубакет во вашиот прелистувач, па вратете се овде за да изберете репозиториум.",
+      "connectGitlab": "Поврзи GitLab",
+      "connectGitlabDescription": "Поврзете GitLab во вашиот прелистувач, па вратете се овде за да изберете репозиториум.",
+      "couldNotLoadBitbucketRepositories": "Не можеше да се вчитаат репозиториумите на Битубакет",
+      "couldNotLoadGithubRepositories": "Не можеше да се вчитаат репозиториумите на GitHub",
+      "couldNotLoadGitlabRepositories": "Не можеше да се вчитаат репозиториумите на GitLab",
+      "gitlabConnected": "GitLab е поврзан",
+      "noRepositoriesVisibleBitbucket": "Нема видливи репозиториуми. Проверете го пристапот до репозиториуми за Битубакет, па освежете.",
+      "noRepositoriesVisibleGitlab": "Нема видливи репозиториуми. Проверете го пристапот до репозиториуми за GitLab, па освежете.",
+      "openBitbucket": "Отвори Битубакет",
+      "openGitlab": "Отвори GitLab",
+      "recentlyUsed": "Неодамнешно користени"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ажурирана {{displayCount}} датотека",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Ниту едно складиште не е поврзано со твојата сметка.",
       "tryDifferentSearch": "Обиди се со различен поим за пребарување.",
       "loading": "Вчитување...",
-      "accessibility": "Складиште: {{label}}"
+      "accessibility": "Складиште: {{label}}",
+      "platformBitbucket": "Битубакет",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Детали за пораката",

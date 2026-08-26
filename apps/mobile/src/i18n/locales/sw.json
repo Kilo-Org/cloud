@@ -1382,7 +1382,8 @@
       "gitlabAccount": "Akaunti ya GitLab",
       "connectGitLab": "Unganisha GitLab",
       "gitlabError": "Haikuweza kufungua usanidi wa GitLab. Tafadhali jaribu tena.",
-      "description": "Unganisha Kilo {{label}} ili kukagua maombi ya kuunganisha kiotomatiki."
+      "description": "Unganisha Kilo {{label}} ili kukagua maombi ya kuunganisha kiotomatiki.",
+      "bitbucketError": "Haikuweza kufungua usanidi wa Bitbucket. Tafadhali jaribu tena."
     },
     "overview": {
       "reviewStyle": "Mtindo wa Ukaguzi",
@@ -2172,7 +2173,21 @@
       "discardDraftMessage": "Maagizo yako yatapotea.",
       "keepEditing": "Endelea kuhariri",
       "discard": "Tupa",
-      "discardFailed": "Haikuweza kutupa rasimu. Jaribu tena."
+      "discardFailed": "Haikuweza kutupa rasimu. Jaribu tena.",
+      "bitbucketConnected": "Bitbucket imeunganishwa",
+      "connectBitbucket": "Unganisha Bitbucket",
+      "connectBitbucketDescription": "Unganisha Bitbucket kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
+      "connectGitlab": "Unganisha GitLab",
+      "connectGitlabDescription": "Unganisha GitLab kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
+      "couldNotLoadBitbucketRepositories": "Haikuweza kupakia hazina za Bitbucket",
+      "couldNotLoadGithubRepositories": "Haikuweza kupakia hazina za GitHub",
+      "couldNotLoadGitlabRepositories": "Haikuweza kupakia hazina za GitLab",
+      "gitlabConnected": "GitLab imeunganishwa",
+      "noRepositoriesVisibleBitbucket": "Hakuna hazina zinazoonekana. Angalia ufikiaji wa hazina kwa Bitbucket, kisha onyesha upya.",
+      "noRepositoriesVisibleGitlab": "Hakuna hazina zinazoonekana. Angalia ufikiaji wa hazina kwa GitLab, kisha onyesha upya.",
+      "openBitbucket": "Fungua Bitbucket",
+      "openGitlab": "Fungua GitLab",
+      "recentlyUsed": "Zilizotumika hivi karibuni"
     },
     "partRenderer": {
       "updatedFileCount_one": "Imesasisha faili {{displayCount}}",
@@ -2261,7 +2276,10 @@
       "noRepositoriesDescription": "Hakuna hazina zilizounganishwa kwenye akaunti yako.",
       "tryDifferentSearch": "Jaribu neno lingine la utafutaji.",
       "loading": "Inapakia...",
-      "accessibility": "Hazina: {{label}}"
+      "accessibility": "Hazina: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Maelezo ya ujumbe",

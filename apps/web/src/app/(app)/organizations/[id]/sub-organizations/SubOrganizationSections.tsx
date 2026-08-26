@@ -480,6 +480,13 @@ function PeopleSectionContent({ data }: { data: People }) {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => drawer.open({ type: 'invite-person' })}
+              >
+                Invite person…
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 disabled={selectedIdentityKeys.size === 0}
                 onClick={() =>
                   drawer.open({

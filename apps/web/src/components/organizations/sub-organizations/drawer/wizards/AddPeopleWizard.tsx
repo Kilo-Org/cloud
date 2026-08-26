@@ -16,7 +16,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
   SelectContent,
@@ -29,14 +28,18 @@ import type { SubOrganizationPeopleData } from '../types';
 import { addEligibilityLabel, computeAddEligibility, type Person } from './eligibility';
 import { useRowExecutor } from './rowExecutor';
 import { useWizardRunTelemetry } from './wizardAnalytics';
+import { WizardChrome } from './WizardChrome';
 import { WizardResultsList, type ResultRow } from './WizardResultsList';
 
 type Child = SubOrganizationPeopleData['children'][number];
 type Step = 'select' | 'target' | 'preview' | 'results';
 
+/** One person invited into one target org — the executable unit of an add-people run. */
+type AddPersonToOrgRow = { person: Person; organization: Child };
+
 const STEP_TITLES: Record<Step, string> = {
   select: 'Step 1 of 4: Select people',
-  target: 'Step 2 of 4: Pick target sub-organization',
+  target: 'Step 2 of 4: Pick target sub-organizations',
   preview: 'Step 3 of 4: Preview and choose a role',
   results: 'Step 4 of 4: Results',
 };
@@ -57,12 +60,17 @@ export function AddPeopleWizard({
   const [step, setStep] = useState<Step>('select');
   const [selected, setSelected] = useState<Set<string>>(() => new Set(seededIdentityKeys));
   const [search, setSearch] = useState('');
-  const [targetOrganizationId, setTargetOrganizationId] = useState<string | null>(null);
+  const [targetOrganizationIds, setTargetOrganizationIds] = useState<Set<string>>(() => new Set());
   const [role, setRole] = useState<OrganizationRole>('member');
 
   const selectedPeople = useMemo(
     () => people.filter(person => selected.has(person.identityKey)),
     [people, selected]
+  );
+
+  const targetOrganizations = useMemo(
+    () => children.filter(child => targetOrganizationIds.has(child.id)),
+    [children, targetOrganizationIds]
   );
 
   const filteredPeople = useMemo(() => {
@@ -83,12 +91,26 @@ export function AddPeopleWizard({
     });
   }, []);
 
-  return (
-    <div className="flex flex-col gap-4 p-4">
-      <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-        {STEP_TITLES[step]}
-      </p>
+  const toggleTarget = useCallback((organizationId: string, checked: boolean) => {
+    setTargetOrganizationIds(previous => {
+      const next = new Set(previous);
+      if (checked) next.add(organizationId);
+      else next.delete(organizationId);
+      return next;
+    });
+  }, []);
 
+  // The role picker's options below reflect the acting user's permissions in
+  // only the first selected target org, not every selected org — computing
+  // an exact per-org intersection would need a separate org-membership fetch
+  // just to populate a dropdown. If the picked role isn't actually valid in
+  // a different selected org, that pair simply fails server-side and is
+  // reported as an ordinary per-row failure in the results step, the same
+  // way a seat-limit rejection is — see `rowExecutor.ts`.
+  const primaryTargetOrganizationId = targetOrganizations[0]?.id ?? null;
+
+  return (
+    <WizardChrome stepTitle={STEP_TITLES[step]}>
       {step === 'select' && (
         <SelectPeopleStep
           people={filteredPeople}
@@ -103,19 +125,19 @@ export function AddPeopleWizard({
       {step === 'target' && (
         <TargetStep
           children={children}
-          targetOrganizationId={targetOrganizationId}
-          onChangeTarget={setTargetOrganizationId}
+          targetOrganizationIds={targetOrganizationIds}
+          onToggleTarget={toggleTarget}
           onBack={() => setStep('select')}
           onNext={() => setStep('preview')}
         />
       )}
 
-      {(step === 'preview' || step === 'results') && targetOrganizationId && (
-        <OrganizationAdminContextProvider organizationId={targetOrganizationId}>
+      {(step === 'preview' || step === 'results') && primaryTargetOrganizationId && (
+        <OrganizationAdminContextProvider organizationId={primaryTargetOrganizationId}>
           {step === 'preview' ? (
             <PreviewStep
               selectedPeople={selectedPeople}
-              targetOrganizationId={targetOrganizationId}
+              targetOrganizations={targetOrganizations}
               role={role}
               onChangeRole={setRole}
               onBack={() => setStep('target')}
@@ -125,14 +147,14 @@ export function AddPeopleWizard({
             <AddResultsStep
               parentOrganizationId={parentOrganizationId}
               selectedPeople={selectedPeople}
-              targetOrganizationId={targetOrganizationId}
+              targetOrganizations={targetOrganizations}
               role={role}
               onClose={onClose}
             />
           )}
         </OrganizationAdminContextProvider>
       )}
-    </div>
+    </WizardChrome>
   );
 }
 
@@ -189,40 +211,42 @@ function SelectPeopleStep({
 
 function TargetStep({
   children,
-  targetOrganizationId,
-  onChangeTarget,
+  targetOrganizationIds,
+  onToggleTarget,
   onBack,
   onNext,
 }: {
   children: Child[];
-  targetOrganizationId: string | null;
-  onChangeTarget: (id: string) => void;
+  targetOrganizationIds: Set<string>;
+  onToggleTarget: (id: string, checked: boolean) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
   return (
     <>
-      <RadioGroup value={targetOrganizationId ?? undefined} onValueChange={onChangeTarget}>
+      <ul className="divide-border max-h-96 divide-y overflow-y-auto rounded-md border">
         {children.map(child => (
-          <label
-            key={child.id}
-            htmlFor={`add-people-target-${child.id}`}
-            className="hover:bg-surface-hover flex items-center gap-3 rounded-md border px-3 py-2"
-          >
-            <RadioGroupItem value={child.id} id={`add-people-target-${child.id}`} />
+          <li key={child.id} className="flex items-center gap-3 px-3 py-2">
+            <Checkbox
+              aria-label={`Select ${child.name}`}
+              checked={targetOrganizationIds.has(child.id)}
+              onCheckedChange={checked => onToggleTarget(child.id, Boolean(checked))}
+            />
             <span className="text-sm">{child.name}</span>
-          </label>
+          </li>
         ))}
         {children.length === 0 && (
-          <p className="text-muted-foreground text-sm">No sub-organizations available.</p>
+          <li className="text-muted-foreground px-3 py-6 text-center text-sm">
+            No sub-organizations available.
+          </li>
         )}
-      </RadioGroup>
+      </ul>
       <div className="flex justify-between gap-2">
         <Button variant="outline" onClick={onBack}>
           Back
         </Button>
-        <Button onClick={onNext} disabled={!targetOrganizationId}>
-          Next
+        <Button onClick={onNext} disabled={targetOrganizationIds.size === 0}>
+          Next ({targetOrganizationIds.size} selected)
         </Button>
       </div>
     </>
@@ -231,14 +255,14 @@ function TargetStep({
 
 function PreviewStep({
   selectedPeople,
-  targetOrganizationId,
+  targetOrganizations,
   role,
   onChangeRole,
   onBack,
   onConfirm,
 }: {
   selectedPeople: Person[];
-  targetOrganizationId: string;
+  targetOrganizations: Child[];
   role: OrganizationRole;
   onChangeRole: (role: OrganizationRole) => void;
   onBack: () => void;
@@ -251,9 +275,14 @@ function PreviewStep({
     [currentUserRole, isKiloAdmin]
   );
   const canInvite = availableRoles.length > 0;
-  const eligibleCount = selectedPeople.filter(
-    person => computeAddEligibility(person, targetOrganizationId).eligible
-  ).length;
+  const eligibleCount = selectedPeople.reduce(
+    (count, person) =>
+      count +
+      targetOrganizations.filter(
+        organization => computeAddEligibility(person, organization.id).eligible
+      ).length,
+    0
+  );
 
   return (
     <>
@@ -277,30 +306,39 @@ function PreviewStep({
         </div>
       ) : (
         <p className="text-destructive text-sm">
-          You don't have permission to invite members into this sub-organization.
+          You don't have permission to invite members into the selected sub-organizations.
         </p>
       )}
 
+      {/* Grouped by person, with each person's target orgs listed underneath —
+          keeps each person's name/email from repeating once per org the way a
+          flat (person, org) table would, and mirrors the results step's
+          "person → org" framing below. */}
       <ul className="divide-border max-h-80 divide-y overflow-y-auto rounded-md border">
-        {selectedPeople.map(person => {
-          const disabledLabel = addEligibilityLabel(person, targetOrganizationId);
-          return (
-            <li
-              key={person.identityKey}
-              className="flex items-center justify-between gap-3 px-3 py-2"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{person.name}</p>
-                <p className="text-muted-foreground truncate text-xs">{person.email}</p>
-              </div>
-              {disabledLabel && (
-                <span className="text-muted-foreground text-xs whitespace-nowrap">
-                  {disabledLabel}
-                </span>
-              )}
-            </li>
-          );
-        })}
+        {selectedPeople.map(person => (
+          <li key={person.identityKey} className="px-3 py-2">
+            <p className="truncate text-sm font-medium">{person.name}</p>
+            <p className="text-muted-foreground truncate text-xs">{person.email}</p>
+            <ul className="mt-1.5 space-y-1">
+              {targetOrganizations.map(organization => {
+                const disabledLabel = addEligibilityLabel(person, organization.id);
+                return (
+                  <li
+                    key={organization.id}
+                    className="flex items-center justify-between gap-3 pl-1 text-xs"
+                  >
+                    <span className="text-muted-foreground truncate">{organization.name}</span>
+                    {disabledLabel && (
+                      <span className="text-muted-foreground whitespace-nowrap">
+                        {disabledLabel}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </li>
+        ))}
       </ul>
 
       <div className="flex justify-between gap-2">
@@ -308,7 +346,7 @@ function PreviewStep({
           Back
         </Button>
         <Button onClick={onConfirm} disabled={!canInvite || eligibleCount === 0}>
-          Invite {eligibleCount} {eligibleCount === 1 ? 'person' : 'people'}
+          Invite {eligibleCount} {eligibleCount === 1 ? 'invitation' : 'invitations'}
         </Button>
       </div>
     </>
@@ -318,40 +356,49 @@ function PreviewStep({
 function AddResultsStep({
   parentOrganizationId,
   selectedPeople,
-  targetOrganizationId,
+  targetOrganizations,
   role,
   onClose,
 }: {
   parentOrganizationId: string;
   selectedPeople: Person[];
-  targetOrganizationId: string;
+  targetOrganizations: Child[];
   role: OrganizationRole;
   onClose: () => void;
 }) {
   const posthog = usePostHog();
   const inviteMutation = useInviteMember();
 
+  // One row per (person, target org) pair — every selected person crossed
+  // with every selected target org. `rowExecutor` runs this flat list
+  // strictly sequentially regardless of which org each row targets: seats
+  // are consumed per-org, but a global sequential run is still the safest
+  // default and keeps a single, easy-to-follow progress/results list.
+  const rows: AddPersonToOrgRow[] = useMemo(
+    () =>
+      selectedPeople.flatMap(person =>
+        targetOrganizations.map(organization => ({ person, organization }))
+      ),
+    [selectedPeople, targetOrganizations]
+  );
+
   const skip = useCallback(
-    (person: Person) => addEligibilityLabel(person, targetOrganizationId),
-    [targetOrganizationId]
+    ({ person, organization }: AddPersonToOrgRow) => addEligibilityLabel(person, organization.id),
+    []
   );
 
   const execute = useCallback(
-    async (person: Person) => {
+    async ({ person, organization }: AddPersonToOrgRow) => {
       await inviteMutation.mutateAsync({
-        organizationId: targetOrganizationId,
+        organizationId: organization.id,
         email: person.email,
         role,
       });
     },
-    [inviteMutation, targetOrganizationId, role]
+    [inviteMutation, role]
   );
 
-  const { outcomes, isRunning, progress, start, retryFailed } = useRowExecutor(
-    selectedPeople,
-    skip,
-    execute
-  );
+  const { outcomes, isRunning, progress, start, retryFailed } = useRowExecutor(rows, skip, execute);
 
   // This step only mounts when the wizard transitions into the results
   // step, so the mount/completion telemetry lifecycle below also kicks off
@@ -360,22 +407,22 @@ function AddResultsStep({
     posthog,
     parentOrganizationId,
     wizardType: 'add',
-    targetOrganizationId,
+    targetOrganizationIds: targetOrganizations.map(organization => organization.id),
     selectedPersonCount: selectedPeople.length,
     start,
     isRunning,
     outcomes,
   });
 
-  const rows: ResultRow[] = selectedPeople.map(person => ({
-    key: person.identityKey,
+  const resultRows: ResultRow[] = rows.map(({ person, organization }) => ({
+    key: `${person.identityKey}::${organization.id}`,
     label: person.name,
-    sublabel: person.email,
+    sublabel: `${person.email} → ${organization.name}`,
   }));
 
   return (
     <WizardResultsList
-      rows={rows}
+      rows={resultRows}
       outcomes={outcomes}
       isRunning={isRunning}
       progress={progress}

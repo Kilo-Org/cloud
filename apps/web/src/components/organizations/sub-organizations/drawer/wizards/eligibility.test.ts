@@ -77,6 +77,28 @@ describe('computeAddEligibility', () => {
     });
     expect(computeAddEligibility(person, 'target-org')).toEqual({ eligible: true });
   });
+
+  it('evaluates independently per (person, target org) pair when a person is a member of one selected org but not another — the multi-target add wizard scenario', () => {
+    const person = buildPerson({
+      memberships: [
+        {
+          organizationId: 'org-a',
+          organizationName: 'Org A',
+          role: 'member',
+          status: 'accepted',
+          canManageMemberships: true,
+        },
+      ],
+    });
+    // Ineligible for the org they're already a member of...
+    expect(computeAddEligibility(person, 'org-a')).toEqual({
+      eligible: false,
+      reason: 'already-member',
+    });
+    // ...but still eligible for a second selected org, from the exact same
+    // person object — nothing about eligibility is global to the person.
+    expect(computeAddEligibility(person, 'org-b')).toEqual({ eligible: true });
+  });
 });
 
 describe('personHasPresenceInOrganization', () => {

@@ -13,10 +13,13 @@ export type ResultRow = {
 
 /**
  * Per-row Succeeded / Failed / Skipped display shared by both bulk-action
- * wizards. Both wizards' rows are ultimately "one person, one outcome", so a
- * single label/sublabel pair is enough for either — if a future wizard
- * needs materially different columns, render its own list instead of
- * stretching this one.
+ * wizards. Every wizard's rows are ultimately "one action, one outcome" —
+ * one person for the remove wizard, one (person, target org) pair for the
+ * add wizard — so a single label/sublabel pair is enough for either; the add
+ * wizard folds its target org into `sublabel` (e.g. "person@example.com →
+ * Acme EMEA") rather than this component needing an org-specific column. If
+ * a future wizard needs materially different columns, render its own list
+ * instead of stretching this one.
  */
 export function WizardResultsList({
   rows,
@@ -46,7 +49,7 @@ export function WizardResultsList({
             ? `Processing ${Math.min(progress.completed + 1, progress.total)} of ${progress.total}…`
             : isDone
               ? `Done: ${succeededCount} succeeded, ${failedCount} failed, ${skippedCount} skipped.`
-              : `${progress.total} people queued.`}
+              : `${progress.total} queued.`}
         </p>
         <Progress
           value={progress.total === 0 ? 100 : (progress.completed / progress.total) * 100}

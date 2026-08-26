@@ -58,6 +58,9 @@ jest.mock('./wizards/RemovePeopleWizard', () => ({
     <div data-testid="remove-people-wizard-probe" data-seeded={seededIdentityKeys.join(',')} />
   ),
 }));
+jest.mock('./wizards/InvitePersonWizard', () => ({
+  InvitePersonWizard: () => <div data-testid="invite-person-wizard-probe" />,
+}));
 
 // The parent organization's viewer is an owner; the child organization's
 // viewer is a plain member. If context ever leaked from the outer provider,
@@ -248,6 +251,7 @@ describe('MemberManagementDrawerStack entry dispatch', () => {
         >
           open remove-people
         </button>
+        <button onClick={() => drawer.open({ type: 'invite-person' })}>open invite-person</button>
       </>
     );
   }
@@ -287,5 +291,13 @@ describe('MemberManagementDrawerStack entry dispatch', () => {
     const probe = screen.getByTestId('remove-people-wizard-probe');
     expect(probe.dataset.seeded).toBe('id-3');
     expect(screen.queryByTestId('add-people-wizard-probe')).toBeNull();
+  });
+
+  it('renders the invite-person wizard for an invite-person entry', () => {
+    renderHarness();
+    fireEvent.click(screen.getByText('open invite-person'));
+    screen.getByTestId('invite-person-wizard-probe');
+    expect(screen.queryByTestId('add-people-wizard-probe')).toBeNull();
+    expect(screen.queryByTestId('remove-people-wizard-probe')).toBeNull();
   });
 });

@@ -29,6 +29,7 @@ import {
 } from './eligibility';
 import { useRowExecutor } from './rowExecutor';
 import { useWizardRunTelemetry } from './wizardAnalytics';
+import { WizardChrome } from './WizardChrome';
 import { WizardResultsList, type ResultRow } from './WizardResultsList';
 
 type Child = SubOrganizationPeopleData['children'][number];
@@ -118,11 +119,7 @@ export function RemovePeopleWizard({
   }, []);
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-        {STEP_TITLES[step]}
-      </p>
-
+    <WizardChrome stepTitle={STEP_TITLES[step]}>
       {step === 'target' && (
         <TargetStep
           children={children}
@@ -161,7 +158,7 @@ export function RemovePeopleWizard({
           )}
         </OrganizationAdminContextProvider>
       )}
-    </div>
+    </WizardChrome>
   );
 }
 
@@ -386,7 +383,7 @@ function RemoveResultsStep({
     posthog,
     parentOrganizationId,
     wizardType: 'remove',
-    targetOrganizationId,
+    targetOrganizationIds: [targetOrganizationId],
     selectedPersonCount: selectedPeople.length,
     start,
     isRunning,

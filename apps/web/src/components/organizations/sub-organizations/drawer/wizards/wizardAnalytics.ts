@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { PostHog } from 'posthog-js/react';
 import type { RowOutcome } from './rowExecutor';
 
-export type WizardType = 'add' | 'remove';
+export type WizardType = 'add' | 'remove' | 'invite';
 
 /**
  * Selections at or above this size are flagged as "large" for telemetry —
@@ -81,16 +81,16 @@ export function captureWizardRun(
   params: {
     parentOrganizationId: string;
     wizardType: WizardType;
-    targetOrganizationId: string;
+    targetOrganizationIds: string[];
     selectedPersonCount: number;
   }
 ): void {
-  const { parentOrganizationId, wizardType, targetOrganizationId, selectedPersonCount } = params;
+  const { parentOrganizationId, wizardType, targetOrganizationIds, selectedPersonCount } = params;
 
   posthog?.capture('sub_org_directory.wizard_run', {
     parentOrganizationId,
     wizardType,
-    targetOrganizationId,
+    targetOrganizationIds,
     selectedPersonCount,
   });
 
@@ -98,7 +98,7 @@ export function captureWizardRun(
     posthog?.capture('sub_org_directory.wizard_large_selection', {
       parentOrganizationId,
       wizardType,
-      targetOrganizationId,
+      targetOrganizationIds,
       selectedPersonCount,
     });
   }
@@ -144,7 +144,7 @@ export function useWizardRunTelemetry(params: {
   posthog: PostHog | undefined;
   parentOrganizationId: string;
   wizardType: WizardType;
-  targetOrganizationId: string;
+  targetOrganizationIds: string[];
   selectedPersonCount: number;
   start: () => void;
   isRunning: boolean;
@@ -154,7 +154,7 @@ export function useWizardRunTelemetry(params: {
     posthog,
     parentOrganizationId,
     wizardType,
-    targetOrganizationId,
+    targetOrganizationIds,
     selectedPersonCount,
     start,
     isRunning,
@@ -168,7 +168,7 @@ export function useWizardRunTelemetry(params: {
     captureWizardRun(posthog, {
       parentOrganizationId,
       wizardType,
-      targetOrganizationId,
+      targetOrganizationIds,
       selectedPersonCount,
     });
     start();

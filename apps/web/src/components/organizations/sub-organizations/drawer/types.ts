@@ -44,4 +44,13 @@ export type MemberManagementDrawerEntry =
       type: 'remove-people';
       /** Same seeding contract as `add-people`. */
       seededIdentityKeys: string[];
+    }
+  | {
+      /**
+       * Invites a brand-new person — someone with no existing membership or
+       * invitation anywhere in this org tree, so they can't be seeded from
+       * the directory table the way `add-people`/`remove-people` are —
+       * into the parent org or any one of its direct children.
+       */
+      type: 'invite-person';
     };

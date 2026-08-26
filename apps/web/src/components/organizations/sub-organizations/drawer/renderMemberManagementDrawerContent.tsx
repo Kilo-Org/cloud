@@ -6,6 +6,7 @@ import { OrganizationAdminContextProvider } from '@/components/organizations/Org
 import { OrganizationAdminMembers } from '@/components/organizations/OrganizationMembersCard';
 import type { MemberManagementDrawerEntry, SubOrganizationPeopleData } from './types';
 import { AddPeopleWizard } from './wizards/AddPeopleWizard';
+import { InvitePersonWizard } from './wizards/InvitePersonWizard';
 import { RemovePeopleWizard } from './wizards/RemovePeopleWizard';
 
 /**
@@ -57,7 +58,7 @@ export function renderMemberManagementDrawerContent(
       };
     case 'add-people':
       return {
-        header: <h2 className="type-body font-medium">Add people to a sub-organization</h2>,
+        header: <h2 className="type-body font-medium">Add people to sub-organizations</h2>,
         body: (
           <AddPeopleWizard
             parentOrganizationId={parentOrganizationId}
@@ -77,6 +78,17 @@ export function renderMemberManagementDrawerContent(
             people={data.people}
             children={data.children}
             seededIdentityKeys={entry.seededIdentityKeys}
+            onClose={helpers.close}
+          />
+        ),
+      };
+    case 'invite-person':
+      return {
+        header: <h2 className="type-body font-medium">Invite a new person</h2>,
+        body: (
+          <InvitePersonWizard
+            parentOrganizationId={parentOrganizationId}
+            children={data.children}
             onClose={helpers.close}
           />
         ),

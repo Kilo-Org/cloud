@@ -131,7 +131,7 @@ describe('PeopleSection bulk-action toolbar', () => {
     openDrawerMock.mockClear();
   });
 
-  it('disables the add/remove buttons when no rows are selected', () => {
+  it('disables the add/remove buttons when no rows are selected, but not the invite-person button', () => {
     render(<PeopleSection organizationId="parent-1" data={buildData()} />);
 
     expect(
@@ -142,6 +142,19 @@ describe('PeopleSection bulk-action toolbar', () => {
       (screen.getByRole('button', { name: 'Remove from sub-organization…' }) as HTMLButtonElement)
         .disabled
     ).toBe(true);
+    // Inviting a brand-new person never depends on the row selection — there
+    // is nothing to select for someone not yet in the directory.
+    expect(
+      (screen.getByRole('button', { name: 'Invite person…' }) as HTMLButtonElement).disabled
+    ).toBe(false);
+  });
+
+  it('opens the invite-person drawer entry when the invite-person button is clicked', () => {
+    render(<PeopleSection organizationId="parent-1" data={buildData()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Invite person…' }));
+
+    expect(openDrawerMock).toHaveBeenCalledWith({ type: 'invite-person' });
   });
 
   it('enables the add/remove buttons once a row is selected, and opens the right wizard entry', () => {

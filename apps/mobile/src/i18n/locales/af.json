@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "Span-hervulling-bonus-2025",
         "accounting_adjustment": "Rekeningkundige aanpassing",
         "credits_expired": "Krediete verval"
-      }
+      },
+      "loadMore": "Laai meer",
+      "loadMoreFailed": "Kon nie meer laai nie.",
+      "truncated": "Ouer kredietaktiwiteit is beskikbaar."
     },
     "inviteMember": {
       "emailError": "Voer 'n geldige e-posadres in",
@@ -2971,7 +2974,10 @@
         "draft": "Konsep",
         "uncollectible": "Oninbaar",
         "unknown": "Onbekend"
-      }
+      },
+      "loadMore": "Laai meer",
+      "loadMoreFailed": "Kon nie meer laai nie.",
+      "truncated": "Ouer faktuur is beskikbaar."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "پاداش شارژ تیم 2025",
         "accounting_adjustment": "تعدیل حسابداری",
         "credits_expired": "اعتبارها منقضی شدند"
-      }
+      },
+      "loadMore": "بارگذاری بیشتر",
+      "loadMoreFailed": "نمیتوان بیشتر بارگذاری کرد.",
+      "truncated": "فعالیت اعتبار قدیمیتر در دسترس است."
     },
     "inviteMember": {
       "emailError": "یک آدرس ایمیل معتبر وارد کنید",
@@ -2971,7 +2974,10 @@
         "draft": "پیش‌نویس",
         "uncollectible": "وصول‌نشدنی",
         "unknown": "ناشناخته"
-      }
+      },
+      "loadMore": "بارگذاری بیشتر",
+      "loadMoreFailed": "نمیتوان بیشتر بارگذاری کرد.",
+      "truncated": "فاکتورهای قدیمیتر در دسترس هستند."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

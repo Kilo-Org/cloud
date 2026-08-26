@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "โบนัสเติมเงินทีม 2025",
         "accounting_adjustment": "การปรับปรุงบัญชี",
         "credits_expired": "เครดิตหมดอายุ"
-      }
+      },
+      "loadMore": "โหลดเพิ่ม",
+      "loadMoreFailed": "ไม่สามารถโหลดเพิ่มได้",
+      "truncated": "มีกิจกรรมเครดิตเก่ากว่าให้ดู"
     },
     "inviteMember": {
       "emailError": "ป้อนที่อยู่อีเมลที่ถูกต้อง",
@@ -2971,7 +2974,10 @@
         "draft": "ฉบับร่าง",
         "uncollectible": "เก็บไม่ได้",
         "unknown": "ไม่ทราบ"
-      }
+      },
+      "loadMore": "โหลดเพิ่ม",
+      "loadMoreFailed": "ไม่สามารถโหลดเพิ่มได้",
+      "truncated": "มีใบแจ้งหนี้เก่ากว่าให้ดู"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

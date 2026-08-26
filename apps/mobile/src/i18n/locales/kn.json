@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "ತಂಡದ ಟಾಪ್-ಅಪ್ ಬೋನಸ್ 2025",
         "accounting_adjustment": "ಲೆಕ್ಕಪತ್ರ ಹೊಂದಾಣಿಕೆ",
         "credits_expired": "ಕ್ರೆಡಿಟ್‌ಗಳು ಅವಧಿ ಮುಗಿದವು"
-      }
+      },
+      "loadMore": "ಹೆಚ್ಚು ಲೋಡ್ ಮಾಡಿ",
+      "loadMoreFailed": "ಇನ್ನಷ್ಟು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ.",
+      "truncated": "ಹಳೆಯ ಕ್ರೆಡಿಟ್ ಚಟುವಟಿಕೆ ಲಭ್ಯವಿದೆ."
     },
     "inviteMember": {
       "emailError": "ಮಾನ್ಯ ಇಮೇಲ್ ವಿಳಾಸವನ್ನು ನಮೂದಿಸಿ",
@@ -2971,7 +2974,10 @@
         "draft": "ಡ್ರಾಫ್ಟ್",
         "uncollectible": "ವಸೂಲಿ ಮಾಡಲಾಗದ",
         "unknown": "ತಿಳಿದಿಲ್ಲ"
-      }
+      },
+      "loadMore": "ಹೆಚ್ಚು ಲೋಡ್ ಮಾಡಿ",
+      "loadMoreFailed": "ಇನ್ನಷ್ಟು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ.",
+      "truncated": "ಹಳೆಯ ಇನ್ವಾಯ್ಸ್ಗಳು ಲಭ್ಯವಿದೆ."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

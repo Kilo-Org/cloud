@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "2025 කණ්ඩායම් ඉහළ දැමීමේ ප්‍රසාදය",
         "accounting_adjustment": "ගිණුම්කරණ ගැලපීම",
         "credits_expired": "ණය කල් ඉකුත් විය"
-      }
+      },
+      "loadMore": "තව බාගන්න",
+      "loadMoreFailed": "තව බාගත නොහැකි විය.",
+      "truncated": "පැරණි ණය ක්රියාකාරකම් ලබා ගත හැක."
     },
     "inviteMember": {
       "emailError": "වලංගු ඊමේල් ලිපිනයක් ඇතුළු කරන්න",
@@ -2971,7 +2974,10 @@
         "draft": "කෙටුම්පත",
         "uncollectible": "එකතු කළ නොහැකි",
         "unknown": "නොදන්නා"
-      }
+      },
+      "loadMore": "තව බාගන්න",
+      "loadMoreFailed": "තව බාගත නොහැකි විය.",
+      "truncated": "පැරණි ඉන්වොයිස් ලබා ගත හැක."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

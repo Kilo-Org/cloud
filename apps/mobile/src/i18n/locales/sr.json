@@ -2964,7 +2964,10 @@
         "team-topup-bonus-2025": "Timski bonus za dopunu 2025",
         "accounting_adjustment": "Računovodstveno usklađivanje",
         "credits_expired": "Istekli krediti"
-      }
+      },
+      "loadMore": "Učitaj još",
+      "loadMoreFailed": "Ne mogu da učitam još.",
+      "truncated": "Starija kreditna aktivnost je dostupna."
     },
     "inviteMember": {
       "emailError": "Unesite važeću adresu e-pošte",
@@ -2991,7 +2994,10 @@
         "draft": "Nacrt",
         "uncollectible": "Nenaplativo",
         "unknown": "Nepoznato"
-      }
+      },
+      "loadMore": "Učitaj još",
+      "loadMoreFailed": "Ne mogu da učitam još.",
+      "truncated": "Starije fakture su dostupne."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

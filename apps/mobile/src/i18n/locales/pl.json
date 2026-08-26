@@ -2970,7 +2970,10 @@
         "team-topup-bonus-2025": "Bonus doładowania zespołu 2025",
         "accounting_adjustment": "Korekta księgowa",
         "credits_expired": "Kredyty wygasły"
-      }
+      },
+      "loadMore": "Pokaż więcej",
+      "loadMoreFailed": "Nie udało się wczytać więcej.",
+      "truncated": "Dostępna jest starsza historia kredytów."
     },
     "hub": {
       "balance": "Saldo",
@@ -3006,7 +3009,10 @@
         "draft": "Wersja robocza",
         "uncollectible": "Nieściągalna",
         "unknown": "Nieznana"
-      }
+      },
+      "loadMore": "Pokaż więcej",
+      "loadMoreFailed": "Nie udało się wczytać więcej.",
+      "truncated": "Dostępne są starsze faktury."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

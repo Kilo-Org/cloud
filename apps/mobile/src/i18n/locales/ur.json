@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "ٹیم ٹاپ اپ بونس 2025",
         "accounting_adjustment": "اکاؤنٹنگ ایڈجسٹمنٹ",
         "credits_expired": "کریڈٹس کی میعاد ختم"
-      }
+      },
+      "loadMore": "مزید لوڈ کریں",
+      "loadMoreFailed": "مزید لوڈ نہیں ہو سکا۔",
+      "truncated": "پرانے کریڈٹ کی سرگرمی دستیاب ہے۔"
     },
     "inviteMember": {
       "emailError": "درست ای میل پتہ درج کریں",
@@ -2971,7 +2974,10 @@
         "draft": "ڈرافٹ",
         "uncollectible": "ناقابل وصول",
         "unknown": "نامعلوم"
-      }
+      },
+      "loadMore": "مزید لوڈ کریں",
+      "loadMoreFailed": "مزید لوڈ نہیں ہو سکا۔",
+      "truncated": "پرانے انوائس دستیاب ہیں۔"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

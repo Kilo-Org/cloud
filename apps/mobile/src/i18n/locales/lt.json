@@ -2984,7 +2984,10 @@
         "team-topup-bonus-2025": "Komandos papildymo premija 2025",
         "accounting_adjustment": "Apskaitos koregavimas",
         "credits_expired": "Kreditai pasibaigė"
-      }
+      },
+      "loadMore": "Įkelti daugiau",
+      "loadMoreFailed": "Nepavyko įkelti daugiau.",
+      "truncated": "Yra ankstesnės kredito veiklos."
     },
     "inviteMember": {
       "emailError": "Įveskite galiojantį el. pašto adresą",
@@ -3011,7 +3014,10 @@
         "draft": "Juodraštis",
         "uncollectible": "Neišieškoma",
         "unknown": "Nežinoma"
-      }
+      },
+      "loadMore": "Įkelti daugiau",
+      "loadMoreFailed": "Nepavyko įkelti daugiau.",
+      "truncated": "Yra ankstesnių sąskaitų faktūrų."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

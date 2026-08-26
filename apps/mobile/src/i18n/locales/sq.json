@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "Bonusi i ekipit për rimbushje 2025",
         "accounting_adjustment": "Rregullim kontabël",
         "credits_expired": "Kredite të skaduara"
-      }
+      },
+      "loadMore": "Shkarko më shumë",
+      "loadMoreFailed": "Nuk u shkarkua dot më shumë.",
+      "truncated": "Aktiviteti i vjetër i kredisë është i disponueshëm."
     },
     "inviteMember": {
       "emailError": "Futni një adresë email-i të vlefshme",
@@ -2971,7 +2974,10 @@
         "draft": "Draft",
         "uncollectible": "E pakolektueshme",
         "unknown": "E panjohur"
-      }
+      },
+      "loadMore": "Shkarko më shumë",
+      "loadMoreFailed": "Nuk u shkarkua dot më shumë.",
+      "truncated": "Faturat më të vjetra janë të disponueshme."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

@@ -3010,7 +3010,10 @@
         "team-topup-bonus-2025": "مكافأة شحن الفريق 2025",
         "accounting_adjustment": "تعديل محاسبي",
         "credits_expired": "انتهت صلاحية الأرصدة"
-      }
+      },
+      "loadMore": "تحميل المزيد",
+      "loadMoreFailed": "تعذّر تحميل المزيد.",
+      "truncated": "تتوفر نشاطات رصيد أقدم."
     },
     "hub": {
       "balance": "الرصيد",
@@ -3046,7 +3049,10 @@
         "draft": "مسودة",
         "uncollectible": "غير قابل للتحصيل",
         "unknown": "غير معروف"
-      }
+      },
+      "loadMore": "تحميل المزيد",
+      "loadMoreFailed": "تعذّر تحميل المزيد.",
+      "truncated": "تتوفر فواتير أقدم."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

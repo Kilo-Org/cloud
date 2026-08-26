@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "ប្រាក់រង្វាន់បន្ថែមក្រុម 2025",
         "accounting_adjustment": "ការកែតម្រូវគណនេយ្យ",
         "credits_expired": "ឥណទានផុតកំណត់"
-      }
+      },
+      "loadMore": "ផ្ទុកបន្ថែម",
+      "loadMoreFailed": "មិនអាចផ្ទុកបន្ថែមទៀតបានទេ។",
+      "truncated": "សកម្មភាពឥណទានចាស់ៗអាចប្រើបាន។"
     },
     "inviteMember": {
       "emailError": "បញ្ចូលអាសយដ្ឋានអ៊ីមែលត្រឹមត្រូវ",
@@ -2971,7 +2974,10 @@
         "draft": "សេចក្តីព្រាង",
         "uncollectible": "មិនអាចទារបាន",
         "unknown": "មិនស្គាល់"
-      }
+      },
+      "loadMore": "ផ្ទុកបន្ថែម",
+      "loadMoreFailed": "មិនអាចផ្ទុកបន្ថែមទៀតបានទេ។",
+      "truncated": "វិក្កយបត្រចាស់ៗអាចប្រើបាន។"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

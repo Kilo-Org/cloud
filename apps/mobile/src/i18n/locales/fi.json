@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "Tiimin topup-bonus 2025",
         "accounting_adjustment": "Kirjanpidon oikaisu",
         "credits_expired": "Krediitit vanhentuivat"
-      }
+      },
+      "loadMore": "Lataa lisää",
+      "loadMoreFailed": "Lisää ei voitu ladata.",
+      "truncated": "Vanhempaa luottotapahtumahistoriaa on saatavilla."
     },
     "inviteMember": {
       "emailError": "Syötä kelvollinen sähköpostiosoite",
@@ -2971,7 +2974,10 @@
         "draft": "Luonnos",
         "uncollectible": "Perimiskelvoton",
         "unknown": "Tuntematon"
-      }
+      },
+      "loadMore": "Lataa lisää",
+      "loadMoreFailed": "Lisää ei voitu ladata.",
+      "truncated": "Vanhempia laskuja on saatavilla."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

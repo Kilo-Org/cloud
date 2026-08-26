@@ -140,7 +140,7 @@ export function useOrgUsageStats(organizationId: string | null) {
   );
 }
 
-export function useOrgCreditTransactions(organizationId: string | null) {
+function useOrgCreditTransactions(organizationId: string | null) {
   const trpc = useTRPC();
   return useQuery(
     trpc.organizations.creditTransactions.queryOptions(
@@ -181,7 +181,7 @@ export function useOrgCreditTransactionsPage(organizationId: string | null) {
   return { query, entries, hasMore };
 }
 
-export function useOrgInvoices(organizationId: string | null) {
+function useOrgInvoices(organizationId: string | null) {
   const trpc = useTRPC();
   return useQuery(
     trpc.organizations.invoices.queryOptions(

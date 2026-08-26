@@ -354,7 +354,7 @@ export function LoginScreen() {
         <Pressable
           onPress={() => {
             setLanguagePickerBridge({ beforeReload: persistLoginDrafts });
-            router.push('/(auth)/language-picker?returnTarget=login' as Href);
+            router.push('/(auth)/language-picker' as Href);
           }}
           disabled={globeDisabled}
           hitSlop={8}

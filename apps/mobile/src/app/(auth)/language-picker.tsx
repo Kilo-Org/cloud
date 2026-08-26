@@ -1,22 +1,11 @@
 import { useCallback } from 'react';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { LanguagePickerSheet } from '@/components/language-picker-sheet';
-import { type LanguageReturnTarget } from '@/i18n/return-target';
 import { clearLanguagePickerBridge, getLanguagePickerBridge } from '@/lib/picker-bridge';
 
 export default function AuthLanguagePickerScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ returnTarget?: string }>();
-  const rawReturnTarget = Array.isArray(params.returnTarget)
-    ? params.returnTarget[0]
-    : params.returnTarget;
-  const returnTarget: LanguageReturnTarget =
-    rawReturnTarget === 'login' ||
-    rawReturnTarget === 'profile' ||
-    rawReturnTarget === 'preferences'
-      ? rawReturnTarget
-      : 'login';
   const bridge = getLanguagePickerBridge();
 
   useFocusEffect(
@@ -30,7 +19,7 @@ export default function AuthLanguagePickerScreen() {
 
   return (
     <LanguagePickerSheet
-      returnTarget={returnTarget}
+      returnTarget="login"
       beforeReload={bridge?.beforeReload}
       onApplied={bridge?.onApplied}
       onClose={() => {

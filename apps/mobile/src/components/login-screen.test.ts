@@ -338,7 +338,7 @@ describe('login-screen language globe', () => {
     expect(setLanguagePickerBridge).toHaveBeenCalledTimes(1);
     expect(setLanguagePickerBridge).toHaveBeenCalledWith({ beforeReload: persistLoginDrafts });
     expect(push).toHaveBeenCalledTimes(1);
-    expect(push).toHaveBeenCalledWith('/(auth)/language-picker?returnTarget=login');
+    expect(push).toHaveBeenCalledWith('/(auth)/language-picker');
 
     renderer.unmount();
   });

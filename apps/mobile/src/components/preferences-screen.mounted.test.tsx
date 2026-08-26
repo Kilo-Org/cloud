@@ -119,7 +119,7 @@ describe('PreferencesScreen account rows', () => {
       (language.props.onPress as () => void)();
     });
 
-    expect(push).toHaveBeenCalledWith('/(app)/language-picker?returnTarget=preferences');
+    expect(push).toHaveBeenCalledWith('/(app)/language-picker');
     expect(setLanguagePickerBridge).toHaveBeenCalledTimes(1);
     expect(setLanguagePickerBridge).toHaveBeenCalledWith({
       onApplied: expect.any(Function),

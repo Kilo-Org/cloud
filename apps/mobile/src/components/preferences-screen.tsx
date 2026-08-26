@@ -169,7 +169,7 @@ export function PreferencesScreen() {
                   }
                 },
               });
-              router.push('/(app)/language-picker?returnTarget=preferences' as Href);
+              router.push('/(app)/language-picker' as Href);
             }}
           />
           <ConfigureRow

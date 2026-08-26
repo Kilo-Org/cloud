@@ -19,7 +19,7 @@ describe('memory provider adapter', () => {
 
   it('observe never returns a boolean', async () => {
     const provider = createMemoryProviderAdapter();
-    const created = await provider.create({ intentId: 'a' });
+    const created = await provider.create({ intentId: 'a', env: {} });
     if (!('providerRef' in created)) throw new Error('expected providerRef');
 
     const results = [
@@ -38,13 +38,15 @@ describe('memory provider adapter', () => {
 
   it('create then observe is active', async () => {
     const provider = createMemoryProviderAdapter();
-    await expect(provider.create({ intentId: 'a' })).resolves.toEqual({ providerRef: 'mem_a' });
+    await expect(provider.create({ intentId: 'a', env: {} })).resolves.toEqual({
+      providerRef: 'mem_a',
+    });
     await expect(provider.observe('mem_a')).resolves.toBe('active');
   });
 
   it('stop then observe is terminal', async () => {
     const provider = createMemoryProviderAdapter();
-    await provider.create({ intentId: 'a' });
+    await provider.create({ intentId: 'a', env: {} });
     await expect(provider.stop('mem_a')).resolves.toBe('terminal');
     await expect(provider.observe('mem_a')).resolves.toBe('terminal');
   });

@@ -5,12 +5,13 @@ import {
   incrementPromptFailure,
   isPromptExhausted,
   nextQueuedMessageId,
+  type SessionMessageRecord,
 } from '../session-message-queue.js';
 
 describe('prompt exhausted', () => {
   it('fails the waiting queue after five prompt failures', () => {
     expect(PROMPT_FAILURE_LIMIT).toBe(5);
-    let current = [{ messageId: 'a', state: 'queued' as const }];
+    let current: SessionMessageRecord[] = [{ messageId: 'a', state: 'queued' }];
     let failures = 0;
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const next = incrementPromptFailure(current, 'a');

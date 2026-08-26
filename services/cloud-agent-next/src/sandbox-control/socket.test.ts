@@ -59,7 +59,7 @@ describe('sandbox control socket handler', () => {
     const state = createFakeState([current, incoming]);
     const handler = createSandboxControlSocketHandler(state, 'sbx_test');
 
-    handler.handleMessage(
+    void handler.handleMessage(
       asWs(incoming),
       JSON.stringify({
         type: 'request',
@@ -95,7 +95,7 @@ describe('sandbox control socket handler', () => {
     const state = createFakeState([current, incoming]);
     const handler = createSandboxControlSocketHandler(state, 'sbx_test');
 
-    handler.handleMessage(
+    void handler.handleMessage(
       asWs(incoming),
       JSON.stringify({
         type: 'request',
@@ -135,7 +135,7 @@ describe('sandbox control socket handler', () => {
       providerInstanceId: 'inst_1',
     });
     const handler = createSandboxControlSocketHandler(createFakeState([ws]), 'sbx_test');
-    handler.handleMessage(
+    void handler.handleMessage(
       asWs(ws),
       JSON.stringify({
         type: 'request',
@@ -160,7 +160,7 @@ describe('sandbox control socket handler', () => {
       acceptedAt: Date.now() - 11_000,
     });
     const handler = createSandboxControlSocketHandler(createFakeState([ws]), 'sbx_test');
-    handler.handleMessage(
+    void handler.handleMessage(
       asWs(ws),
       JSON.stringify({
         type: 'request',
@@ -176,7 +176,7 @@ describe('sandbox control socket handler', () => {
   it('closes oversized frames with payload_too_large', () => {
     const ws = createFakeWebSocket();
     const handler = createSandboxControlSocketHandler(createFakeState([ws]), 'sbx_test');
-    handler.handleMessage(asWs(ws), 'x'.repeat(1 * 1024 * 1024 + 1));
+    void handler.handleMessage(asWs(ws), 'x'.repeat(1 * 1024 * 1024 + 1));
     expect(ws.close).toHaveBeenCalledWith(1009, 'payload_too_large');
   });
 
@@ -188,7 +188,7 @@ describe('sandbox control socket handler', () => {
       providerInstanceId: 'inst_1',
     });
     const handler = createSandboxControlSocketHandler(createFakeState([ws]), 'sbx_test');
-    handler.handleMessage(
+    void handler.handleMessage(
       asWs(ws),
       JSON.stringify({
         type: 'request',
@@ -226,7 +226,7 @@ describe('sandbox control socket handler', () => {
       operation: string;
     };
     expect(sent.operation).toBe('sandbox.status');
-    handler.handleMessage(
+    void handler.handleMessage(
       asWs(ws),
       JSON.stringify({
         type: 'response',
@@ -396,7 +396,7 @@ describe('sandbox control socket handler', () => {
       'sbx_test'
     );
     const pending = handler.sendRequest({ operation: 'sandbox.status', payload: {} });
-    handler.handleMessage(
+    void handler.handleMessage(
       asWs(incoming),
       JSON.stringify({
         type: 'request',

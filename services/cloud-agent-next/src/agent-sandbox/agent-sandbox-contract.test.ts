@@ -6,6 +6,9 @@ import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { Env, SandboxInstance } from '../types.js';
 import { CloudflareAgentSandbox } from './cloudflare/cloudflare-agent-sandbox.js';
 import type { AgentSandbox } from './protocol.js';
+import { VercelAgentSandbox } from './vercel/vercel-agent-sandbox.js';
+import type { VercelSandboxRuntimeConfig } from './vercel/vercel-runtime-config.js';
+import type { VercelSandboxRestClient } from './vercel/vercel-sandbox-rest-client.js';
 
 /**
  * Shared behavioral contract every AgentSandbox adapter must satisfy for a
@@ -13,7 +16,7 @@ import type { AgentSandbox } from './protocol.js';
  * workspace preparation, reconciliation) stay in the per-provider suites.
  */
 
-function sessionMetadata(provider: 'cloudflare'): SessionMetadata {
+function sessionMetadata(provider: 'cloudflare' | 'vercel'): SessionMetadata {
   return {
     metadataSchemaVersion: 2,
     identity: { sessionId: 'agent_contract', userId: 'user_contract' },
@@ -36,56 +39,75 @@ function idleCloudflareSandbox(): AgentSandbox {
   });
 }
 
-describe.each([['cloudflare', idleCloudflareSandbox]] as const)(
-  'AgentSandbox contract (%s)',
-  (_provider, createIdleSandbox) => {
-    it('reports absent wrappers when none are running', async () => {
-      await expect(createIdleSandbox().discoverSessionWrappers()).resolves.toEqual({
-        status: 'absent',
-      });
+function idleVercelSandbox(): AgentSandbox {
+  const config: VercelSandboxRuntimeConfig = {
+    accessToken: 'token',
+    teamId: 'team',
+    projectId: 'project',
+    snapshotId: 'snapshot',
+    runtimeBuildId: 'build',
+    runtime: 'node24',
+    initialTimeoutMs: 300_000,
+    extendDurationMs: 600_000,
+  };
+  const restClient = {} as VercelSandboxRestClient;
+  return new VercelAgentSandbox(sessionMetadata('vercel'), config, undefined, {
+    restClient,
+    sleep: () => Promise.resolve(),
+    now: () => 1,
+  });
+}
+
+describe.each([
+  ['cloudflare', idleCloudflareSandbox],
+  ['vercel', idleVercelSandbox],
+] as const)('AgentSandbox contract (%s)', (_provider, createIdleSandbox) => {
+  it('reports absent wrappers when none are running', async () => {
+    await expect(createIdleSandbox().discoverSessionWrappers()).resolves.toEqual({
+      status: 'absent',
+    });
+  });
+
+  it('treats stopping wrappers as settled when none are running', async () => {
+    const result = await createIdleSandbox().stopWrappers({
+      target: { kind: 'session' },
+      attemptId: 'attempt-contract',
+      reason: 'session-delete',
     });
 
-    it('treats stopping wrappers as settled when none are running', async () => {
-      const result = await createIdleSandbox().stopWrappers({
-        target: { kind: 'session' },
-        attemptId: 'attempt-contract',
-        reason: 'session-delete',
-      });
+    expect(result.status).toBe('absent');
+  });
 
-      expect(result.status).toBe('absent');
+  it('scopes instance-targeted stops to the leased instance', async () => {
+    const result = await createIdleSandbox().stopWrappers({
+      target: {
+        kind: 'instance',
+        instance: { instanceId: 'instance-other', instanceGeneration: 7 },
+      },
+      attemptId: 'attempt-contract',
+      reason: 'startup-failed',
     });
 
-    it('scopes instance-targeted stops to the leased instance', async () => {
-      const result = await createIdleSandbox().stopWrappers({
-        target: {
-          kind: 'instance',
-          instance: { instanceId: 'instance-other', instanceGeneration: 7 },
-        },
-        attemptId: 'attempt-contract',
-        reason: 'startup-failed',
-      });
+    expect(result.status).toBe('absent');
+  });
 
-      expect(result.status).toBe('absent');
-    });
+  it('returns no running wrapper when none exists', async () => {
+    await expect(createIdleSandbox().getRunningWrapper()).resolves.toBeNull();
+  });
 
-    it('returns no running wrapper when none exists', async () => {
-      await expect(createIdleSandbox().getRunningWrapper()).resolves.toBeNull();
-    });
+  it('resolves recovery deletion without throwing', async () => {
+    await expect(createIdleSandbox().delete('recovery')).resolves.toBeUndefined();
+  });
 
-    it('resolves recovery deletion without throwing', async () => {
-      await expect(createIdleSandbox().delete('recovery')).resolves.toBeUndefined();
-    });
+  it('keeps the sandbox alive without a running wrapper', async () => {
+    await expect(createIdleSandbox().keepAlive()).resolves.toBeUndefined();
+  });
 
-    it('keeps the sandbox alive without a running wrapper', async () => {
-      await expect(createIdleSandbox().keepAlive()).resolves.toBeUndefined();
-    });
+  it('reports terminal availability as a declared capability outcome', async () => {
+    const result = await createIdleSandbox().getRunningTerminalClient();
 
-    it('reports terminal availability as a declared capability outcome', async () => {
-      const result = await createIdleSandbox().getRunningTerminalClient();
-
-      expect(['ready', 'not-running', 'unhealthy', 'capability-unavailable']).toContain(
-        result.status
-      );
-    });
-  }
-);
+    expect(['ready', 'not-running', 'unhealthy', 'capability-unavailable']).toContain(
+      result.status
+    );
+  });
+});

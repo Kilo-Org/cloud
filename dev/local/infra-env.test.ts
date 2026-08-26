@@ -9,6 +9,8 @@ import {
   buildAppEnv,
   buildComposeEnv,
   composeProjectName,
+  currentComposeProject,
+  DEFAULT_COMPOSE_PROJECT,
   syncInfraEnv,
 } from './infra-env';
 import { applyPortOffset, portOffset } from './services';
@@ -102,4 +104,13 @@ test('leaves a value that already names the target host and port', () => {
   assert.deepEqual(kept, []);
   assert.ok(!changed.includes('POSTGRES_URL'));
   assert.equal(content.split('\n')[0], before.trim());
+});
+
+test('currentComposeProject names the project compose really uses', () => {
+  // At offset 0 no dev/.env is written, so compose falls back to the basename
+  // of its project directory. `composeProjectName(root, 0)` names a project no
+  // container ever carries — comparing against it makes a checkout's own
+  // database look like another worktree's squatter.
+  assert.equal(currentComposeProject('/repo/kilo', 0), DEFAULT_COMPOSE_PROJECT);
+  assert.equal(currentComposeProject('/repo/kilo', 2500), 'kilo-dev-kilo-2500');
 });

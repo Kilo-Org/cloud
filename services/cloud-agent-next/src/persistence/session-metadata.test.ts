@@ -7,6 +7,7 @@ import {
   parseSessionMetadata,
   requiresContainmentSandbox,
   serializeSessionMetadata,
+  updateProviderRuntime,
 } from './session-metadata.js';
 
 const callbackTarget = {
@@ -98,6 +99,7 @@ describe('session metadata boundary', () => {
         type: 'github' as const,
         repo: 'acme/repo',
         token: 'github-token',
+        githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
         githubInstallationId: '987',
         githubAppType: 'standard' as const,
         upstreamBranch: 'main',
@@ -148,6 +150,20 @@ describe('session metadata boundary', () => {
     expect(parseSessionMetadata(current)).toEqual(current);
     expect(serializeSessionMetadata(current)).toEqual(current);
     expect(CurrentSessionMetadataSchema.parse(current)).toEqual(current);
+  });
+
+  it('keeps existing GitHub metadata valid when the integration id is omitted', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_legacy_github', userId: 'user_legacy_github' },
+      auth: {},
+      repository: { type: 'github' as const, repo: 'acme/repo' },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
+    expect(parseSessionMetadata(current).repository).not.toHaveProperty('githubIntegrationId');
   });
 
   it('parses and serializes clone source metadata', () => {
@@ -223,6 +239,156 @@ describe('session metadata boundary', () => {
 
     expect(parseSessionMetadata(current)).toEqual(current);
     expect(getSandboxProvider(parseSessionMetadata(current))).toBe('cloudflare');
+  });
+
+  it('accepts Vercel metadata only for an isolated non-devcontainer sandbox', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: {
+        sessionId: 'agent_vercel_provider',
+        userId: 'user_vercel_provider',
+      },
+      auth: {},
+      workspace: {
+        sandboxId: 'ses-abcdef' as const,
+        sandboxProvider: 'vercel' as const,
+      },
+      lifecycle: {
+        version: 1,
+        timestamp: 1,
+      },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(getSandboxProvider(parseSessionMetadata(current))).toBe('vercel');
+  });
+
+  it('persists one immutable Vercel session locator and mutable wrapper lease', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_vercel_runtime', userId: 'user_vercel_runtime' },
+      auth: {},
+      workspace: {
+        sandboxId: 'ses-abcdef',
+        sandboxProvider: 'vercel',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    const runtimeLocator = {
+      provider: 'vercel' as const,
+      sessionId: 'session-1',
+      projectId: 'project-1',
+      snapshotId: 'snapshot-1',
+      runtimeBuildId: 'build-1',
+      runtime: 'node24' as const,
+    };
+    const located = updateProviderRuntime(metadata, runtimeLocator);
+    const launched = updateProviderRuntime(located, {
+      ...runtimeLocator,
+      wrapper: {
+        launchId: 'launch-1',
+        commandId: 'command-1',
+        instanceId: 'instance-1',
+        instanceGeneration: 2,
+      },
+    });
+
+    expect(serializeSessionMetadata(launched).workspace?.providerRuntime).toEqual({
+      ...runtimeLocator,
+      wrapper: {
+        launchId: 'launch-1',
+        commandId: 'command-1',
+        instanceId: 'instance-1',
+        instanceGeneration: 2,
+      },
+    });
+    expect(updateProviderRuntime(launched, runtimeLocator).workspace?.providerRuntime).toEqual(
+      runtimeLocator
+    );
+    expect(() =>
+      updateProviderRuntime(located, { ...runtimeLocator, sessionId: 'session-2' })
+    ).toThrow('Vercel session ID is immutable');
+    expect(() =>
+      updateProviderRuntime(located, { ...runtimeLocator, runtimeBuildId: 'build-2' })
+    ).toThrow('Vercel runtimeBuildId is immutable');
+  });
+
+  it('rejects provider runtime mismatches and devcontainers', () => {
+    const base = {
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_runtime_mismatch', userId: 'user_runtime_mismatch' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(() =>
+      parseSessionMetadata({
+        ...base,
+        workspace: {
+          sandboxId: 'ses-abcdef',
+          sandboxProvider: 'cloudflare',
+          providerRuntime: { provider: 'vercel', sessionId: 'session-1' },
+        },
+      })
+    ).toThrow('Invalid current session metadata');
+    expect(() =>
+      parseSessionMetadata({
+        ...base,
+        workspace: {
+          sandboxId: 'ses-abcdef',
+          sandboxProvider: 'vercel',
+          providerRuntime: { provider: 'vercel', sessionId: 'session-1' },
+          devcontainerRequested: true,
+        },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it('rejects Vercel metadata pinned to a shared sandbox identity', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_vercel_shared', userId: 'user_vercel_shared' },
+        auth: {},
+        workspace: { sandboxId: 'org-abcdef', sandboxProvider: 'vercel' },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it('rejects Vercel metadata requesting a devcontainer runtime', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_vercel_dind', userId: 'user_vercel_dind' },
+        auth: {},
+        workspace: {
+          sandboxId: 'ses-abcdef',
+          sandboxProvider: 'vercel',
+          devcontainerRequested: true,
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it('rejects Vercel metadata carrying an already prepared devcontainer', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_vercel_prepared_dind', userId: 'user_vercel_dind' },
+        auth: {},
+        workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'vercel' },
+        devcontainer: {
+          workspacePath: '/workspace/user/sessions/agent_vercel_prepared_dind',
+          innerWorkspaceFolder: '/workspaces/repo',
+          wrapperPort: 4173,
+          configPath: '.devcontainer/devcontainer.json',
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
   });
 
   it('parses and serializes current grouped DIND workspace metadata', () => {

@@ -2120,7 +2120,8 @@
       "dollar_few": "dollar",
       "dollar_many": "dollar",
       "costSpoken": "costas {{cost}}",
-      "costSpokenWithTime": "costas {{cost}}, {{time}}"
+      "costSpokenWithTime": "costas {{cost}}, {{time}}",
+      "pullRequest": "iarraidh tarraingt {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Níorbh fhéidir GitHub a oscailt",
@@ -2973,16 +2974,10 @@
   "feedback": {
     "noEmailApp": "Níl aon aip ríomhphoist ar fáil. Is féidir leat teagmháil a dhéanamh linn ag {{email}}",
     "couldNotOpenStore": "Níorbh fhéidir an siopa a oscailt.",
-    "promptTitle": "Conas atá an aip Kilo ag dul duit?",
-    "iLikeIt": "Is maith liom é",
-    "gladTitle": "Tá áthas orainn é sin a chloisteáil!",
-    "gladMessage": "Chuirfeadh léirmheas siopa go mór lenár gcabhair. Go raibh maith agat as Kilo a úsáid!",
-    "rateKilo": "Ráta Kilo",
-    "needsWork": "Teastaíonn obair",
-    "sorryTitle": "Tá brón orainn é sin a chloisteáil!",
-    "sorryMessage": "Inis dúinn cad a chaithfidh a bheith níos fearr. Léann an t-innealtóir atá i gceannas ar an aip gach tuarascáil!",
-    "emailUs": "Seol ríomhphost chugainn",
-    "emailSubject": "aiseolas ar an aip shoghluaiste"
+    "emailSubject": "aiseolas ar an aip shoghluaiste",
+    "neutralTitle": "Grádaigh an aip Kilo",
+    "rateTheApp": "Grádaigh an aip",
+    "sendFeedback": "Seol aiseolas"
   },
   "organization": {
     "boundary": {
@@ -2992,7 +2987,9 @@
       "organizationUnavailable": "Eagraíocht gan fáil",
       "selectDescription": "Roghnaigh eagraíocht ó do phróifíl le leanúint ar aghaidh.",
       "selectOrganization": "Roghnaigh eagraíocht",
-      "unavailableDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Roghnaigh ceann ó do phróifíl le leanúint ar aghaidh."
+      "unavailableDescription": "Níl an eagraíocht seo ar fáil a thuilleadh. Roghnaigh ceann ó do phróifíl le leanúint ar aghaidh.",
+      "accessDeniedTitle": "Rochtain diúltaithe",
+      "accessDeniedDescription": "Níl rochtain agat ar an eagraíocht seo."
     },
     "creditActivity": {
       "emptyDescription": "Beidh ceannacháin, úsáid, agus coigeartuithe creidmheasa don eagraíocht seo le feiceáil anseo de réir mar a tharlaíonn siad.",

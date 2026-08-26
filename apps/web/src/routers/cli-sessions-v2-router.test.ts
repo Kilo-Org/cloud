@@ -14,11 +14,7 @@ import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
 import { TRPCError } from '@trpc/server';
-import {
-  parseGitHubOwnerRepo,
-  parseGitHubPrUrl,
-  computeSearchNextCursor,
-} from '@/routers/cli-sessions-v2-router';
+import { parseGitHubOwnerRepo, parseGitHubPrUrl } from '@/routers/cli-sessions-v2-router';
 import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { captureException } from '@sentry/nextjs';
@@ -1091,7 +1087,6 @@ describe('cli-sessions-v2-router', () => {
       });
 
       expect(result.results).toEqual([]);
-      expect(result.total).toBe(0);
     });
 
     it('recentRepositories omits organization sessions after their creator loses membership', async () => {
@@ -1985,6 +1980,122 @@ describe('cli-sessions-v2-router', () => {
     });
   });
 
+  describe('search provenance', () => {
+    const sessionByUrl = 'ses_search_prov_url_0001';
+    const sessionByBranch = 'ses_search_prov_branch_0001';
+    const sessionByPr = 'ses_search_prov_pr_0001';
+    const sessionTitleOnly = 'ses_search_prov_title_0001';
+    const allProvIds = [sessionByUrl, sessionByBranch, sessionByPr, sessionTitleOnly];
+    const CACHE_GIT_URL = 'https://github.com/kilo/search-provenance-repo';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: sessionByUrl,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: 'url session',
+          git_url: 'https://github.com/kilo/alpha-repo',
+          git_branch: 'main',
+        },
+        {
+          session_id: sessionByBranch,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: 'branch session',
+          git_url: 'https://github.com/kilo/beta-repo',
+          git_branch: 'feature/awesome-work',
+        },
+        {
+          session_id: sessionByPr,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: 'pr session',
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/pr-x',
+        },
+        {
+          session_id: sessionTitleOnly,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          title: 'title only session',
+          git_url: 'https://github.com/kilo/gamma-repo',
+          git_branch: 'main',
+        },
+      ]);
+      await db.insert(github_branch_pull_requests).values({
+        git_url: CACHE_GIT_URL,
+        git_branch: 'feature/pr-x',
+        owned_by_user_id: regularUser.id,
+        pr_url: 'https://github.com/kilo/search-provenance-repo/pull/42',
+        pr_number: 42,
+        pr_state: 'open',
+        pr_title: 'Searchable PR title',
+        pr_head_sha: 'beef42',
+      });
+    });
+
+    afterEach(async () => {
+      await db
+        .delete(github_branch_pull_requests)
+        .where(
+          and(
+            eq(github_branch_pull_requests.git_url, CACHE_GIT_URL),
+            eq(github_branch_pull_requests.owned_by_user_id, regularUser.id)
+          )
+        );
+      await db.delete(cli_sessions_v2).where(inArray(cli_sessions_v2.session_id, allProvIds));
+    });
+
+    it('matches by git_url substring', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: 'alpha-repo' });
+      expect(result.results.map(s => s.session_id)).toEqual([sessionByUrl]);
+    });
+
+    it('matches by git_branch substring', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: 'awesome-work' });
+      expect(result.results.map(s => s.session_id)).toEqual([sessionByBranch]);
+    });
+
+    it('matches by pr_title substring', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: 'Searchable PR' });
+      expect(result.results.map(s => s.session_id)).toEqual([sessionByPr]);
+    });
+
+    it('matches by exact pr_number 42', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: '42' });
+      expect(result.results.map(s => s.session_id)).toEqual([sessionByPr]);
+    });
+
+    it('matches by #42 after stripping one leading hash', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: '#42' });
+      expect(result.results.map(s => s.session_id)).toEqual([sessionByPr]);
+    });
+
+    it('does not match a title-only session with no provenance for 42', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: '42' });
+      expect(result.results.map(s => s.session_id)).not.toContain(sessionTitleOnly);
+    });
+
+    it('returns no matches for a hash-only needle', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: '#' });
+      expect(result.results).toEqual([]);
+    });
+
+    it('returns no matches for a whitespace-only needle', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({ search_string: '  ' });
+      expect(result.results).toEqual([]);
+    });
+  });
+
   describe('refreshAssociatedPullRequest', () => {
     const sessionId = 'ses_refresh_pr_1234';
     // Session git_url is stored in the canonical normalized shape that the
@@ -2520,7 +2631,6 @@ describe('cli-sessions-v2-router', () => {
       const result = await caller.cliSessionsV2.search({ search_string: needle, limit: 2 });
 
       expect(result.results).toHaveLength(2);
-      expect(result.total).toBe(3);
       expect(result.offset).toBe(0);
       expect(result.nextCursor).toBe(2);
       // Default sort is updated_at descending.
@@ -2539,7 +2649,6 @@ describe('cli-sessions-v2-router', () => {
       });
 
       expect(page2.results).toHaveLength(1);
-      expect(page2.total).toBe(3);
       expect(page2.offset).toBe(2);
       expect(page2.nextCursor).toBeNull();
       expect(page1Ids.has(page2.results[0].session_id)).toBe(false);
@@ -2568,28 +2677,21 @@ describe('cli-sessions-v2-router', () => {
       });
 
       expect(result.results).toHaveLength(2);
-      expect(result.total).toBe(3);
       expect(result.offset).toBe(0);
     });
 
-    it('returns null nextCursor on an empty page even when nextOffset < total', () => {
-      // Empty page: results.length === 0, nextOffset === pageOffset.
-      // When pageOffset (2) < total (3), the naive formula
-      //   nextOffset < total ? nextOffset : null
-      // returns 2 — a non-null cursor that would cause an infinite loop.
-      // The empty-results guard prevents this.
-      const resultsLength = 0;
-      const nextOffset = 2;
-      const total = 3;
+    it('returns null nextCursor on a page past the last row', async () => {
+      // A cursor beyond the result set yields an empty page. `hasMore` is
+      // false there, so paging stops instead of handing back the same cursor.
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: needle,
+        limit: 2,
+        cursor: 4,
+      });
 
-      const withGuard = computeSearchNextCursor(resultsLength, nextOffset, total);
-      expect(withGuard).toBeNull();
-
-      // Old formula:  nextOffset < total → truthy, returns nextOffset (wrong)
-      // Empty guard:  resultsLength > 0 → false → null (correct)
-      const oldFormula: number | null = nextOffset < total ? nextOffset : null;
-      expect(oldFormula).toBe(nextOffset);
-      expect(withGuard).not.toBe(oldFormula);
+      expect(result.results).toEqual([]);
+      expect(result.nextCursor).toBeNull();
     });
   });
 
@@ -2728,7 +2830,6 @@ describe('cli-sessions-v2-router', () => {
       });
 
       expect(result.results.map(session => session.session_id)).not.toContain(placeholderId);
-      expect(result.total).toBe(0);
     });
   });
 

@@ -49,6 +49,19 @@ export function composeProjectName(worktreeRoot: string, offset: number): string
   return `kilo-dev-${slug}-${offset}`;
 }
 
+/**
+ * Compose's own default project name: the basename of the project directory,
+ * which for `docker compose -f dev/docker-compose.yml` is `dev/`. The primary
+ * checkout publishes no `dev/.env`, so this is the project its containers
+ * really carry — `composeProjectName(root, 0)` names a project nothing uses.
+ */
+export const DEFAULT_COMPOSE_PROJECT = 'dev';
+
+/** The project label this worktree's containers carry at `offset`. */
+export function currentComposeProject(worktreeRoot: string, offset: number): string {
+  return offset === 0 ? DEFAULT_COMPOSE_PROJECT : composeProjectName(worktreeRoot, offset);
+}
+
 export function buildComposeEnv(
   project: string,
   ports: Record<string, number>

@@ -2075,7 +2075,8 @@
       "dollar": "ଡଲାର",
       "dollar_other": "ଡଲାର",
       "costSpoken": "ଖର୍ଚ୍ଚ {{cost}}",
-      "costSpokenWithTime": "ଖର୍ଚ୍ଚ {{cost}}, {{time}}"
+      "costSpokenWithTime": "ଖର୍ଚ୍ଚ {{cost}}, {{time}}",
+      "pullRequest": "ପୁଲ ରିକ୍ୱେଷ୍ଟ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ଖୋଲାଯାଇପାରିଲା ନାହିଁ",
@@ -2913,16 +2914,10 @@
   "feedback": {
     "noEmailApp": "କୌଣସି ଇମେଲ୍ ଆପ୍ ଉପଲବ୍ଧ ନାହିଁ। ଆପଣ ଆମକୁ {{email}} ରେ ଯୋଗାଯୋଗ କରିପାରିବେ",
     "couldNotOpenStore": "ଷ୍ଟୋର ଖୋଲାଯାଇପାରିଲା ନାହିଁ।",
-    "promptTitle": "ଆପଣ Kilo ଆପ୍ କିପରି ପସନ୍ଦ କରୁଛନ୍ତି?",
-    "iLikeIt": "ମୁଁ ଏହାକୁ ପସନ୍ଦ କରେ",
-    "gladTitle": "ଏହା ଶୁଣି ଆମେ ଖୁସି!",
-    "gladMessage": "ଏକ ଷ୍ଟୋର ସମୀକ୍ଷା ଆମକୁ ଅତ୍ୟନ୍ତ ସାହାଯ୍ୟ କରିବ। Kilo ବ୍ୟବହାର କରିଥିବାରୁ ଧନ୍ୟବାଦ!",
-    "rateKilo": "Kilo ରେଟ୍ କରନ୍ତୁ",
-    "needsWork": "ଉନ୍ନତି ଦରକାର",
-    "sorryTitle": "ଏହା ଶୁଣି ଆମେ ଦୁଃଖିତ!",
-    "sorryMessage": "କ'ଣ ଉନ୍ନତ ହେବା ଦରକାର ଆମକୁ ଜଣାନ୍ତୁ। ଆପ୍ ର ଦାୟିତ୍ୱରେ ଥିବା ଇଞ୍ଜିନିୟର ପ୍ରତ୍ୟେକ ରିପୋର୍ଟ ପଢ଼ନ୍ତି!",
-    "emailUs": "ଆମକୁ ଇମେଲ୍ କରନ୍ତୁ",
-    "emailSubject": "ମୋବାଇଲ୍ ଆପ୍ ଫିଡବ୍ୟାକ୍"
+    "emailSubject": "ମୋବାଇଲ୍ ଆପ୍ ଫିଡବ୍ୟାକ୍",
+    "neutralTitle": "Kilo ଆପ୍ କୁ ମୂଲ୍ୟାଙ୍କନ କରନ୍ତୁ",
+    "rateTheApp": "ଆପ୍ କୁ ମୂଲ୍ୟାଙ୍କନ କରନ୍ତୁ",
+    "sendFeedback": "ମତାମତ ପଠାନ୍ତୁ"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2927,9 @@
       "organizationUnavailable": "ସଂଗଠନ ଅନୁପଲବ୍ଧ",
       "selectDescription": "ଜାରି ରଖିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଏକ ସଂଗଠନ ଚୟନ କରନ୍ତୁ।",
       "selectOrganization": "ଏକ ସଂଗଠନ ଚୟନ କରନ୍ତୁ",
-      "unavailableDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଜାରି ରଖିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଏକ ଚୟନ କରନ୍ତୁ।"
+      "unavailableDescription": "ଏହି ସଂଗଠନ ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଜାରି ରଖିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରୁ ଏକ ଚୟନ କରନ୍ତୁ।",
+      "accessDeniedTitle": "ଆକ୍ସେସ୍ ଅସ୍ୱୀକୃତ",
+      "accessDeniedDescription": "ଆପଣଙ୍କର ଏହି ସଂଗଠନରେ ପ୍ରବେଶ ଅଧିକାର ନାହିଁ।"
     },
     "creditActivity": {
       "emptyDescription": "ଏହି ସଂଗଠନ ପାଇଁ କ୍ରୟ, ବ୍ୟବହାର, ଏବଂ କ୍ରେଡିଟ୍ ସଂଶୋଧନ ଘଟିବା ସମୟରେ ଏଠାରେ ଦେଖାଯିବ।",

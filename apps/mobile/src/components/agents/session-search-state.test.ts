@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createSessionSearchController,
+  resolveSearchRestoreDecision,
   SEARCH_DEBOUNCE_MS,
   type SearchTimer,
   type SessionSearchController,
@@ -187,5 +188,39 @@ describe('createSessionSearchController', () => {
     controller.scheduleSearch('beta');
     timer.fire();
     expect(commits).toEqual(['', 'beta']);
+  });
+});
+
+describe('resolveSearchRestoreDecision', () => {
+  it('seeds a non-empty restored query and remounts the input', () => {
+    expect(
+      resolveSearchRestoreDecision({ settled: true, hasTyped: false, restoredQuery: 'hello' })
+    ).toEqual({ shouldSeed: true, query: 'hello', hasText: true, shouldRemount: true });
+  });
+
+  it('does not seed before the load settles', () => {
+    expect(
+      resolveSearchRestoreDecision({ settled: false, hasTyped: false, restoredQuery: 'hello' })
+    ).toEqual({ shouldSeed: false, query: '', hasText: false, shouldRemount: false });
+  });
+
+  it('does not overwrite text the user has already typed', () => {
+    expect(
+      resolveSearchRestoreDecision({ settled: true, hasTyped: true, restoredQuery: 'hello' })
+    ).toEqual({ shouldSeed: false, query: '', hasText: false, shouldRemount: false });
+  });
+
+  it('seeds empty when nothing was stored (null)', () => {
+    expect(
+      resolveSearchRestoreDecision({ settled: true, hasTyped: false, restoredQuery: null })
+    ).toEqual({ shouldSeed: true, query: '', hasText: false, shouldRemount: false });
+  });
+
+  it('an empty persisted clear does not reload the previous query', () => {
+    // A clear persists '' (not the prior non-empty text); restore must seed the
+    // empty value, never a stale previous query.
+    expect(
+      resolveSearchRestoreDecision({ settled: true, hasTyped: false, restoredQuery: '' })
+    ).toEqual({ shouldSeed: true, query: '', hasText: false, shouldRemount: false });
   });
 });

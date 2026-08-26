@@ -13,6 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
+  buildInfraDownArgs,
   composeInterpolatedKeys,
   formatComposeEnvAssignment,
   writeComposeSecretsEnvFile,
@@ -134,4 +135,16 @@ void test('writeComposeSecretsEnvFile returns undefined when no keys match', () 
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('buildInfraDownArgs can target a project other than the published one', () => {
+  const [, defaultArgs] = buildInfraDownArgs();
+  assert.equal(defaultArgs.includes('-p'), false);
+
+  // Tearing down the offset this worktree just moved off: dev/.env still names
+  // the old project's ports, but `down` matches by label, so -p is enough.
+  const [cmd, args] = buildInfraDownArgs('kilo-dev-sticky-slider-2500');
+  assert.equal(cmd, 'docker');
+  assert.deepEqual(args.slice(0, 3), ['compose', '-p', 'kilo-dev-sticky-slider-2500']);
+  assert.equal(args.at(-1), 'down');
 });

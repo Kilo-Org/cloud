@@ -244,6 +244,7 @@ should pass against the local PostgreSQL database.
 | Command | Description |
 |---|---|
 | `KILO_PORT_OFFSET=auto pnpm dev:start` | Start all local services in a tmux dashboard with worktree-safe ports |
+| `pnpm dev:start agents cloud-agent-public-tunnels` | Same as `dev:start agents`, plus Cloudflare quick tunnels for sandbox-facing Worker/Next/session-ingest URLs |
 | `pnpm dev:stop` | Stop the tmux session and all services |
 | `pnpm dev:env` | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
 | `pnpm dev:env --missing-secrets-only` | Sync env files and create missing local Secrets Store entries without refreshing existing secrets |

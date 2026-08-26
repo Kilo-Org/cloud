@@ -19,7 +19,9 @@
           { "/": "/organizations/*/security-agent/findings" },
           { "/": "/organizations/*/code-reviews" },
           { "/": "/organizations/*/code-reviews/review-md", "exclude": true },
-          { "/": "/organizations/*/code-reviews/*" }
+          { "/": "/organizations/*/code-reviews/*" },
+          { "/": "/organizations/*/overview" },
+          { "/": "/pr-review/*/*/*" }
         ]
       }
     ]

@@ -63,7 +63,7 @@ const hoisted = vi.hoisted(() => {
   };
 
   const deepLinkLaunch = {
-    clearPendingDeepLink: vi.fn(),
+    clearAccountBoundPendingDeepLink: vi.fn(),
     setCurrentDeepLinkUserId: vi.fn(),
   };
 
@@ -119,7 +119,7 @@ vi.mock('@/lib/appsflyer', () => ({
 }));
 
 vi.mock('@/lib/deep-link-launch', () => ({
-  clearPendingDeepLink: hoisted.deepLinkLaunch.clearPendingDeepLink,
+  clearAccountBoundPendingDeepLink: hoisted.deepLinkLaunch.clearAccountBoundPendingDeepLink,
   setCurrentDeepLinkUserId: hoisted.deepLinkLaunch.setCurrentDeepLinkUserId,
 }));
 
@@ -360,7 +360,7 @@ describe('sign-out teardown ordering', () => {
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('notification-prompt-seen');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('pending-deep-link');
-    expect(hoisted.deepLinkLaunch.clearPendingDeepLink).toHaveBeenCalled();
+    expect(hoisted.deepLinkLaunch.clearAccountBoundPendingDeepLink).toHaveBeenCalled();
 
     unmount();
   });
@@ -870,6 +870,28 @@ describe('bootstrap and foreground race fencing', () => {
     expect(tokenOwner.getActiveToken()).toBeNull();
     expect(getCtx().token).toBeUndefined();
     expect(getCtx().sessionEnded).toBe(true);
+
+    unmount();
+  });
+
+  it('binds the deep-link user id from the restored session during bootstrap', async () => {
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    // Mock queue consumed by the bootstrap load: preloadedToken,
+    // preloadedRefreshToken, the bootstrap expiry read, then the bootstrap
+    // credential re-read (unchanged, so the main restore publishes the token).
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce(storedToken)
+      .mockResolvedValueOnce('stored-refresh')
+      .mockResolvedValueOnce('9999999999999')
+      .mockResolvedValueOnce(storedToken);
+
+    const { getCtx, unmount } = await mountProvider();
+
+    // The restored session owns the user id: a destination captured while this
+    // account is signed in drops on sign-out because the pending slot's
+    // stash-time user id is non-null.
+    expect(getCtx().token).toBe(storedToken);
+    expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).toHaveBeenCalledWith('user-1');
 
     unmount();
   });

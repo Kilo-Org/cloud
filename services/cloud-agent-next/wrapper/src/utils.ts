@@ -15,6 +15,7 @@ export type ProcessOutputStream = 'stdout' | 'stderr';
 
 export type ProcessOptions = {
   cwd?: string;
+  env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
   inactivityTimeoutMs?: number;
   hardTimeoutMs?: number;
@@ -120,6 +121,7 @@ export function runProcess(
   return new Promise((resolve, reject) => {
     const proc = spawn(command, args, {
       cwd: opts?.cwd,
+      ...(opts?.env ? { env: { ...process.env, ...opts.env } } : {}),
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });

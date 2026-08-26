@@ -407,6 +407,34 @@ export function finalizePreparationAttempt(
   return events;
 }
 
+export function finalizeOtherRunningAttemptsForMessage(
+  eventQueries: EventQueries,
+  triggerMessageId: string,
+  keepAttemptId: string,
+  timestamp: number
+): StoredEvent[] {
+  const events: StoredEvent[] = [];
+  for (const row of getPreparationSnapshots(eventQueries)) {
+    const snapshot = parseSnapshot(row.payload);
+    if (snapshot?.action !== 'attempt_snapshot') continue;
+    const attempt = snapshot.attempt;
+    if (
+      attempt.status !== 'running' ||
+      attempt.triggerMessageId !== triggerMessageId ||
+      attempt.id === keepAttemptId
+    ) {
+      continue;
+    }
+    events.push(
+      ...finalizePreparationAttempt(eventQueries, attempt.id, {
+        status: 'completed',
+        timestamp,
+      })
+    );
+  }
+  return events;
+}
+
 /**
  * Repair attempts stranded in 'running'. Preparation is hard-capped well
  * below this timeout, so a running attempt whose snapshots stopped updating

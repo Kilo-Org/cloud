@@ -1,5 +1,5 @@
 {
-  "id": "336c3586-a6b7-42a8-9596-138b1b562e7b",
+  "id": "00cfbfbe-31a4-425b-8cbf-3cfbc3c59edd",
   "prevId": "2ba333b6-32bb-44cc-bfba-84e1da79d750",
   "version": "7",
   "dialect": "postgresql",
@@ -4403,27 +4403,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_cli_sessions_v2_user_created": {
-          "name": "IDX_cli_sessions_v2_user_created",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -11876,27 +11855,6 @@
           "isUnique": true,
           "where": "\"github_branch_pull_requests\".\"owned_by_user_id\" is not null",
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_github_branch_prs_url_branch": {
-          "name": "IDX_github_branch_prs_url_branch",
-          "columns": [
-            {
-              "expression": "git_url",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "git_branch",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         }
@@ -28877,6 +28835,34 @@
           "isUnique": true,
           "where": "\"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"platform_installation_id\" IS NOT NULL",
           "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_platform_integrations_github_pending_target": {
+          "name": "UQ_platform_integrations_github_pending_target",
+          "columns": [
+            {
+              "expression": "platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "github_app_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"integration_status\" = 'pending' AND \"platform_integrations\".\"platform_installation_id\" IS NULL AND \"platform_integrations\".\"platform_account_id\" IS NOT NULL",
+          "concurrently": false,
           "method": "btree",
           "with": {}
         },

@@ -1084,7 +1084,12 @@ function canonicalJson(value: unknown): string {
 function repositoryCreateIntent(repository: SessionRepositoryRequest): Record<string, unknown> {
   switch (repository.type) {
     case 'github':
-      return { type: 'github', repo: repository.repo, branch: repository.branch };
+      return {
+        type: 'github',
+        repo: repository.repo,
+        githubIntegrationId: repository.githubIntegrationId,
+        branch: repository.branch,
+      };
     case 'gitlab':
       return { type: 'gitlab', url: repository.url, branch: repository.branch };
     case 'bitbucket':

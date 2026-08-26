@@ -15,6 +15,10 @@ on:
       deployment_url:
         description: 'Staged Vercel deployment URL'
         value: ${{ jobs.stage.outputs.deployment_url }}
+    secrets:
+      VERCEL_PROJECT_TOKEN:
+        description: 'Vercel token scoped to the project being deployed'
+        required: true
 
 permissions:
   contents: read
@@ -30,7 +34,7 @@ jobs:
 
     env:
       TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
-      VERCEL_VERSION: '53.3.1'
+      VERCEL_VERSION: '59.5.0'
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ vars[inputs.vercel_project_id_var] }}
 
@@ -47,9 +51,9 @@ jobs:
         id: deploy
         run: |
           if [ "$TARGET_ENVIRONMENT" = "production" ]; then
-            deployment_output=$(vercel deploy --prod --skip-domain --token=${{ secrets.VERCEL_TOKEN }})
+            deployment_output=$(vercel deploy --prod --skip-domain --token=${{ secrets.VERCEL_PROJECT_TOKEN }})
           else
-            deployment_output=$(vercel deploy --target="$TARGET_ENVIRONMENT" --token=${{ secrets.VERCEL_TOKEN }})
+            deployment_output=$(vercel deploy --target="$TARGET_ENVIRONMENT" --token=${{ secrets.VERCEL_PROJECT_TOKEN }})
           fi
 
           deployment_url=$(printf '%s\n' "$deployment_output" | tail -n 1)

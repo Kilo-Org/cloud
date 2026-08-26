@@ -1,6 +1,6 @@
 {
-  "id": "84d85249-ddf1-47d8-a6d7-7e141431dbc0",
-  "prevId": "336c3586-a6b7-42a8-9596-138b1b562e7b",
+  "id": "9a3208d9-94e7-4b7e-aa8b-b638b2e2c859",
+  "prevId": "00cfbfbe-31a4-425b-8cbf-3cfbc3c59edd",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -28847,6 +28847,34 @@
           "isUnique": true,
           "where": "\"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"platform_installation_id\" IS NOT NULL",
           "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_platform_integrations_github_pending_target": {
+          "name": "UQ_platform_integrations_github_pending_target",
+          "columns": [
+            {
+              "expression": "platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "github_app_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"integration_status\" = 'pending' AND \"platform_integrations\".\"platform_installation_id\" IS NULL AND \"platform_integrations\".\"platform_account_id\" IS NOT NULL",
+          "concurrently": false,
           "method": "btree",
           "with": {}
         },

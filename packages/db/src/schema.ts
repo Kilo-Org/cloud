@@ -4212,6 +4212,11 @@ export const platform_integrations = pgTable(
       .on(table.platform, table.github_app_type, table.platform_installation_id)
       .concurrently()
       .where(sql`${table.platform} = 'github' AND ${table.platform_installation_id} IS NOT NULL`),
+    uniqueIndex('UQ_platform_integrations_github_pending_target')
+      .on(table.platform, table.github_app_type, table.platform_account_id)
+      .where(
+        sql`${table.platform} = 'github' AND ${table.integration_status} = 'pending' AND ${table.platform_installation_id} IS NULL AND ${table.platform_account_id} IS NOT NULL`
+      ),
     uniqueIndex('UQ_platform_integrations_user_bitbucket')
       .on(table.owned_by_user_id)
       .where(sql`${table.platform} = 'bitbucket' AND ${table.owned_by_user_id} IS NOT NULL`),
@@ -5997,6 +6002,11 @@ export const cloud_agent_pending_uploads = pgTable(
       table.message_uuid,
       table.status
     ),
+    // The hourly reaper scans `status = 'pending' AND expires_at < now()`,
+    // which the composite index above cannot serve.
+    index('IDX_cloud_agent_pending_uploads_expired')
+      .on(table.expires_at)
+      .where(sql`${table.status} = 'pending'`),
     check(
       'cloud_agent_pending_uploads_status_check',
       sql`${table.status} IN ('pending', 'linked', 'reaped')`

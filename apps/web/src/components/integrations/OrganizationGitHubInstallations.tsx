@@ -127,11 +127,14 @@ export function OrganizationGitHubInstallations({
               className="min-h-11 w-full shrink-0 sm:min-h-0 sm:w-auto"
             >
               <Github className="size-4" />
-              {starting ? 'Opening GitHub...' : 'Connect GitHub'}
+              {starting
+                ? 'Opening GitHub...'
+                : installations.length
+                  ? 'Add organization'
+                  : 'Connect GitHub'}
             </Button>
           )}
         </div>
-
         {query.isError ? (
           <p className="border-border border-t px-5 py-6 text-sm text-destructive sm:px-6">
             Could not load GitHub organizations.

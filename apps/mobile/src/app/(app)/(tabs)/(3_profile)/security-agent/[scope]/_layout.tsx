@@ -2,6 +2,7 @@ import { type Href, Stack, useLocalSearchParams } from 'expo-router';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { SecurityAgentCommandObserver } from '@/components/security-agent/security-agent-command-observer';
+import { privacyScreenLayout } from '@/components/privacy-cover-overlay';
 import { useFormSheetDetents } from '@/lib/form-sheet';
 import { parseParam } from '@/lib/route-params';
 
@@ -23,7 +24,7 @@ export default function SecurityAgentScopeLayout() {
   return (
     <>
       <SecurityAgentCommandObserver scope={scope} />
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack screenLayout={privacyScreenLayout} screenOptions={{ headerShown: false }}>
         <Stack.Screen
           name="dismiss/[id]"
           options={{

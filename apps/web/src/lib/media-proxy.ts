@@ -6,6 +6,8 @@ import { isIP } from 'net';
 const MAX_REDIRECT_HOPS = 3;
 /** Maximum response body size, 10 MiB. */
 const MAX_BODY_BYTES = 10 * 1024 * 1024;
+/** Maximum time for a single upstream hop, including reading its body. */
+const UPSTREAM_TIMEOUT_MS = 10_000;
 
 /** Image content types this proxy will forward. Anything else is rejected. */
 const ALLOWED_CONTENT_TYPES = new Set([
@@ -100,6 +102,44 @@ export async function assertSafeMediaUrl(urlString: string): Promise<URL> {
   return url;
 }
 
+/**
+ * Reads the response body and throws as soon as it passes `MAX_BODY_BYTES`,
+ * so an origin that lies about `Content-Length` cannot force a large
+ * allocation. Cancels the upstream stream on every exit path.
+ */
+async function readCappedBody(response: Response): Promise<Uint8Array<ArrayBuffer>> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    return new Uint8Array();
+  }
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      total += value.byteLength;
+      if (total > MAX_BODY_BYTES) {
+        throw new MediaProxyError('Media body exceeds the size limit.');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
 function baseContentType(header: string | null): string {
   return header ? (header.split(';')[0]?.trim().toLowerCase() ?? '') : '';
 }
@@ -107,7 +147,8 @@ function baseContentType(header: string | null): string {
 /**
  * Fetches a media URL through the proxy safety chain: validates the URL and
  * every redirect hop, follows at most three hops, requires an allowlisted
- * image content type, caps the body at 10 MiB, and forwards only a sanitized
+ * image content type, aborts a hop that runs past 10 seconds, streams the body
+ * and stops at 10 MiB, and forwards only a sanitized
  * response (no `Set-Cookie`, `Set-Cookie2`, or `WWW-Authenticate`, never the
  * upstream redirect status).
  */
@@ -115,7 +156,10 @@ export async function fetchSafeMedia(urlString: string): Promise<Response> {
   let url = await assertSafeMediaUrl(urlString);
 
   for (let hop = 0; hop <= MAX_REDIRECT_HOPS; hop++) {
-    const response = await fetch(url, { redirect: 'manual' });
+    const response = await fetch(url, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
 
     if (response.status >= 300 && response.status < 400) {
       if (hop === MAX_REDIRECT_HOPS) {
@@ -138,10 +182,12 @@ export async function fetchSafeMedia(urlString: string): Promise<Response> {
       throw new MediaProxyError('Media is not an allowed image type.');
     }
 
-    const body = new Uint8Array(await response.arrayBuffer());
-    if (body.byteLength > MAX_BODY_BYTES) {
+    const declaredLength = Number(response.headers.get('content-length'));
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
       throw new MediaProxyError('Media body exceeds the size limit.');
     }
+
+    const body = await readCappedBody(response);
 
     const headers = new Headers();
     headers.set('content-type', contentType);

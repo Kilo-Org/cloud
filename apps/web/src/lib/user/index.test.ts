@@ -177,6 +177,18 @@ jest.mock('@/lib/impact/affiliate-events', () => ({
   recordAffiliateAttributionAndQueueParentEvent: jest.fn(async () => null),
 }));
 
+// Account deletion purges the deleted user's pending cloud-agent objects from
+// R2 before it drops the ledger rows; keep that off the network in tests.
+const mockR2Send = jest.fn(async (_command: { input: { Key?: string } }) => ({}));
+jest.mock('@/lib/r2/client', () => ({
+  // Read through a wrapper: the factory runs while the module graph loads,
+  // before the const below is initialized.
+  r2Client: { send: (command: { input: { Key?: string } }) => mockR2Send(command) },
+  r2CliSessionsBucketName: 'cli-sessions-bucket',
+  r2CloudAgentAttachmentsBucketName: 'attachment-bucket',
+  r2ExperimentPromptsBucketName: 'experiment-prompts-bucket',
+}));
+
 const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
   recordAffiliateAttributionAndQueueParentEvent
 );
@@ -1251,6 +1263,12 @@ describe('User', () => {
       }
 
       await softDeleteUser(user.id);
+
+      // The rows are the only handle the reaper has on these objects, so the
+      // private objects must be deleted before the rows go.
+      const deletedKeys = mockR2Send.mock.calls.map(call => call[0].input.Key);
+      expect(deletedKeys).toContain(userPending.object_key);
+      expect(deletedKeys).not.toContain(otherPending.object_key);
 
       expect(
         await db

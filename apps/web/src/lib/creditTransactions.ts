@@ -136,15 +136,39 @@ type OrganizationCreditTransaction = Awaited<
 
 export type CreditTransactionsPage = {
   entries: OrganizationCreditTransaction[];
-  nextCursor: number | null;
+  nextCursor: string | null;
   hasMore: boolean;
   summary: CreditSummary;
 };
 
+/**
+ * Opaque keyset cursor: the ordering key of the last row a page returned,
+ * as `<created_at>|<id>`. An OFFSET cursor is not stable here — the ledger
+ * grows at the head, so a row inserted between two requests shifts every
+ * later page and page 2 repeats a row page 1 already showed.
+ *
+ * `created_at` is read in `mode: 'string'`, so the value keeps the full
+ * Postgres microsecond precision a JS `Date` would round away.
+ */
+function encodeLedgerCursor(row: { created_at: string; id: string }): string {
+  return `${row.created_at}|${row.id}`;
+}
+
+function decodeLedgerCursor(cursor: string): { createdAt: string; id: string } | null {
+  const separator = cursor.indexOf('|');
+  if (separator <= 0 || separator === cursor.length - 1) {
+    return null;
+  }
+  return { createdAt: cursor.slice(0, separator), id: cursor.slice(separator + 1) };
+}
+
 export async function getCreditTransactionsForOrganizationPage(
   organizationId: Organization['id'],
-  cursor: number = 0
+  cursor?: string | null
 ): Promise<CreditTransactionsPage> {
+  // A malformed cursor reads as "start from the top" rather than throwing: the
+  // value is opaque to the client and a stale one must not break the screen.
+  const decoded = cursor ? decodeLedgerCursor(cursor) : null;
   const [transactions, summary] = await Promise.all([
     db
       .select({
@@ -173,21 +197,26 @@ export async function getCreditTransactionsForOrganizationPage(
           or(
             isNull(credit_transactions.credit_category),
             notLike(credit_transactions.credit_category, 'kpo:consumption:%')
-          )
+          ),
+          // Row-value comparison in the same (created_at desc, id desc) order,
+          // so later pages stay disjoint from the ones already shown.
+          decoded
+            ? sql`(${credit_transactions.created_at}, ${credit_transactions.id}) < (${decoded.createdAt}::timestamptz, ${decoded.id}::uuid)`
+            : undefined
         )
       )
       .orderBy(desc(credit_transactions.created_at), desc(credit_transactions.id))
-      .limit(CREDIT_TRANSACTIONS_PAGE_SIZE + 1)
-      .offset(cursor),
+      .limit(CREDIT_TRANSACTIONS_PAGE_SIZE + 1),
     getCreditTransactionsSummaryForOrganization(organizationId),
   ]);
 
   const hasMore = transactions.length > CREDIT_TRANSACTIONS_PAGE_SIZE;
   const entries = transactions.slice(0, CREDIT_TRANSACTIONS_PAGE_SIZE);
+  const lastEntry = entries.at(-1);
 
   return {
     entries,
-    nextCursor: hasMore ? cursor + CREDIT_TRANSACTIONS_PAGE_SIZE : null,
+    nextCursor: hasMore && lastEntry ? encodeLedgerCursor(lastEntry) : null,
     hasMore,
     summary,
   };

@@ -706,25 +706,47 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
     expect(serviceMocks.getToken).not.toHaveBeenCalled();
   });
 
-  it('forwards the expected integration fence and exposes only its sanitized mismatch', async () => {
+  it('repairs stale login metadata within the expected integration fence', async () => {
     const params = {
       githubRepo: 'acme/repository',
       userId: 'user-1',
       orgId: '00000000-0000-4000-8000-000000000001',
       expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
     };
-    serviceMocks.findInstallationId.mockResolvedValue({
-      success: false,
-      reason: 'integration_mismatch',
+    serviceMocks.findInstallationId
+      .mockResolvedValueOnce({ success: false, reason: 'integration_mismatch' })
+      .mockResolvedValueOnce({
+        success: true,
+        installationId: '123',
+        accountLogin: 'acme',
+        githubAppType: 'standard',
+      });
+    serviceMocks.findRefreshCandidates.mockResolvedValue({
+      success: true,
+      candidates: [
+        {
+          integrationId: params.expectedIntegrationId,
+          installationId: '123',
+          accountLogin: 'old-acme',
+          githubAppType: 'standard',
+        },
+      ],
     });
+    serviceMocks.refreshInstallationAccountLoginIfDue.mockResolvedValue('acme');
+    serviceMocks.updateAccountLogin.mockResolvedValue(true);
+    serviceMocks.getTokenForRepo.mockResolvedValue('scoped-token');
+    vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await expect(createService().getTokenForRepo(params)).resolves.toEqual({
-      success: false,
-      reason: 'integration_mismatch',
+    await expect(createService().getTokenForRepo(params)).resolves.toMatchObject({
+      success: true,
+      token: 'scoped-token',
     });
-    expect(serviceMocks.findInstallationId).toHaveBeenCalledWith(params);
-    expect(serviceMocks.findRefreshCandidates).not.toHaveBeenCalled();
-    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.findInstallationId).toHaveBeenCalledTimes(2);
+    expect(serviceMocks.findRefreshCandidates).toHaveBeenCalledWith(params);
+    expect(serviceMocks.updateAccountLogin).toHaveBeenCalledWith(
+      params.expectedIntegrationId,
+      'acme'
+    );
   });
 });
 
@@ -823,7 +845,7 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     });
   });
 
-  it('returns integration_mismatch when a capability fence no longer authorizes its row', async () => {
+  it('returns integration_mismatch when repair cannot restore a capability fence', async () => {
     const service = createService();
     const issued = await service.issueGitHubSessionCapability({
       githubRepo: 'acme/repo',
@@ -831,13 +853,16 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       orgId: '00000000-0000-4000-8000-000000000001',
       expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
       outboundContainerId,
+      allowUserAuthorization: true,
     });
     if (!issued.success) throw new Error('Expected successful issuance');
     serviceMocks.getTokenForRepo.mockClear();
-    serviceMocks.findManagedInstallationForRepo.mockResolvedValueOnce({
+    serviceMocks.findManagedInstallationForRepo.mockClear();
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValue({
       success: false,
       reason: 'integration_mismatch',
     });
+    serviceMocks.findRefreshCandidates.mockResolvedValue({ success: true, candidates: [] });
 
     await expect(
       service.redeemGitHubSessionCapability({
@@ -847,6 +872,13 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
         requestUrl: 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack',
       })
     ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+    expect(serviceMocks.findManagedInstallationForRepo).toHaveBeenCalledTimes(2);
+    expect(serviceMocks.findRefreshCandidates).toHaveBeenCalledWith({
+      userId: 'user_1',
+      orgId: '00000000-0000-4000-8000-000000000001',
+      expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
+      githubRepo: 'acme/repo',
+    });
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
   });
 

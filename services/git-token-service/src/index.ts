@@ -43,7 +43,10 @@ import {
   handleGitLabCredentialBrokerRequest,
 } from './gitlab-credential-broker-handler.js';
 import type { GitLabCredentialBroker } from './gitlab-credential-broker.js';
-import { InstallationLookupService } from './installation-lookup-service.js';
+import {
+  InstallationLookupService,
+  type InstallationLookupFailure,
+} from './installation-lookup-service.js';
 import {
   GitHubSessionCapabilityCodec,
   GitHubSessionCapabilityError,
@@ -757,6 +760,40 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     }
   }
 
+  private shouldRepairGitHubInstallationLogin(
+    params: GetTokenForRepoParams,
+    reason: InstallationLookupFailure['reason'] | 'repository_not_installed'
+  ): boolean {
+    return (
+      reason === 'no_installation_found' ||
+      (params.expectedIntegrationId !== undefined && reason === 'integration_mismatch')
+    );
+  }
+
+  private async findInstallationIdWithLoginRepair(params: GetTokenForRepoParams) {
+    let installation = await this.installationLookupService.findInstallationId(params);
+    if (
+      !installation.success &&
+      this.shouldRepairGitHubInstallationLogin(params, installation.reason)
+    ) {
+      await this.refreshGitHubInstallationLogins(params);
+      installation = await this.installationLookupService.findInstallationId(params);
+    }
+    return installation;
+  }
+
+  private async findManagedInstallationWithLoginRepair(params: GetTokenForRepoParams) {
+    let installation = await this.installationLookupService.findManagedInstallationForRepo(params);
+    if (
+      !installation.success &&
+      this.shouldRepairGitHubInstallationLogin(params, installation.reason)
+    ) {
+      await this.refreshGitHubInstallationLogins(params);
+      installation = await this.installationLookupService.findManagedInstallationForRepo(params);
+    }
+    return installation;
+  }
+
   /**
    * Get a GitHub token for a repository.
    *
@@ -769,11 +806,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
    * @returns Token and installation details, or a failure reason
    */
   async getTokenForRepo(params: GetTokenForRepoParams): Promise<GetTokenForRepoResult> {
-    let installation = await this.installationLookupService.findInstallationId(params);
-    if (!installation.success && installation.reason === 'no_installation_found') {
-      await this.refreshGitHubInstallationLogins(params);
-      installation = await this.installationLookupService.findInstallationId(params);
-    }
+    const installation = await this.findInstallationIdWithLoginRepair(params);
     if (!installation.success) {
       switch (installation.reason) {
         case 'ambiguous_installation':
@@ -810,11 +843,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   async getCloudAgentAuthForRepo(
     params: GetCloudAgentAuthForRepoParams
   ): Promise<GetCloudAgentAuthForRepoResult> {
-    let installation = await this.installationLookupService.findManagedInstallationForRepo(params);
-    if (!installation.success && installation.reason === 'no_installation_found') {
-      await this.refreshGitHubInstallationLogins(params);
-      installation = await this.installationLookupService.findManagedInstallationForRepo(params);
-    }
+    const installation = await this.findManagedInstallationWithLoginRepair(params);
     if (!installation.success) {
       switch (installation.reason) {
         case 'ambiguous_installation':
@@ -998,8 +1027,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   private async redeemPinnedUserAuthorization(
     params: GetTokenForRepoParams
   ): Promise<GetCloudAgentAuthForRepoResult | null> {
-    const installation =
-      await this.installationLookupService.findManagedInstallationForRepo(params);
+    const installation = await this.findManagedInstallationWithLoginRepair(params);
     if (!installation.success && installation.reason === 'integration_mismatch') {
       return { success: false, reason: 'integration_mismatch' };
     }

@@ -1,1 +1,0 @@
-CREATE INDEX "IDX_cloud_agent_pending_uploads_expired" ON "cloud_agent_pending_uploads" USING btree ("expires_at") WHERE "cloud_agent_pending_uploads"."status" = 'pending';

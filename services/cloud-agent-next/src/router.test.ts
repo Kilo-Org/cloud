@@ -2441,6 +2441,21 @@ describe('router terminal procedures', () => {
     expect(resizeTerminal).toHaveBeenCalledWith({ ptyId: 'pty_123', cols: 80, rows: 24 });
     expect(closeTerminal).toHaveBeenCalledWith({ ptyId: 'pty_123' });
   });
+
+  it('returns a retryable error when control-plane terminal closure fails', async () => {
+    const closeTerminal = vi
+      .fn()
+      .mockResolvedValueOnce({ success: false, error: 'Terminal closure failed; please retry' })
+      .mockResolvedValueOnce({ success: true, data: { success: true } });
+    const { caller } = createControlTerminalCaller({ closeTerminal });
+    const input = { cloudAgentSessionId: controlSessionId, ptyId: 'pty_123' };
+
+    await expect(caller.closeTerminal(input)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Terminal closure failed; please retry',
+    });
+    await expect(caller.closeTerminal(input)).resolves.toEqual({ success: true });
+  });
 });
 
 describe('legacy V2 execution response compatibility', () => {

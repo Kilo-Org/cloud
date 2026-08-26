@@ -323,7 +323,7 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
     control: TerminalControl,
     session: SessionRequestIdentity,
     ptyId: string
-  ): Promise<void> {
+  ): Promise<boolean> {
     const payload = sessionTerminalClosePayloadSchema.parse({ ptyId });
     try {
       const response = await control.request({
@@ -331,9 +331,11 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
         session,
         payload,
       });
-      if (response.ok) sessionTerminalCloseResultSchema.safeParse(response.result);
+      if (!response.ok) return false;
+      const result = sessionTerminalCloseResultSchema.safeParse(response.result);
+      return result.success && result.data.success;
     } catch {
-      return;
+      return false;
     }
   }
 
@@ -600,12 +602,12 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
     }
     const { context, record } = ownership.data;
     if (!isCurrent(context.epoch)) return unavailableSession();
+    const closed = await closeWrapperTerminal(context.control, context.session, record.ptyId);
+    if (!isCurrent(context.epoch)) return unavailableSession();
+    if (!closed) return terminalError('Terminal closure failed; please retry');
     markEnded(record);
     deps.closeTerminalBridge(record.ptyId, 1000, 'PTY session ended');
-    await closeWrapperTerminal(context.control, context.session, record.ptyId);
-    return isCurrent(context.epoch)
-      ? { success: true, data: { success: true } }
-      : unavailableSession();
+    return { success: true, data: { success: true } };
   }
 
   async function requestConnect(

@@ -345,14 +345,30 @@ describe('SandboxSession terminal lifecycle', () => {
     expect(fixture.control.request).toHaveBeenCalledOnce();
   });
 
-  it('closes wrapper PTYs and removes operation ownership on explicit close', async () => {
+  it('ends the terminal only after the wrapper confirms PTY deletion', async () => {
     const fixture = createFixture();
     await fixture.lifecycle.createTerminal({ operationId: FIRST_OPERATION_ID });
-
-    await expect(fixture.lifecycle.closeTerminal({ ptyId: 'pty_1' })).resolves.toEqual({
-      success: true,
-      data: { success: true },
+    let finishClose: (frame: ResponseFrame) => void = () => undefined;
+    let notifyCloseStarted: () => void = () => undefined;
+    const closeStarted = new Promise<void>(resolve => {
+      notifyCloseStarted = resolve;
     });
+    const delayedClose = new Promise<ResponseFrame>(resolve => {
+      finishClose = resolve;
+    });
+    fixture.control.request.mockImplementationOnce(async () => {
+      notifyCloseStarted();
+      return delayedClose;
+    });
+
+    const pending = fixture.lifecycle.closeTerminal({ ptyId: 'pty_1' });
+    await closeStarted;
+    expect(fixture.values.get('terminal:pty_1')).toMatchObject({ state: 'running' });
+    expect(fixture.values.has(`terminal_operation:${FIRST_OPERATION_ID}`)).toBe(true);
+    expect(fixture.closeTerminalBridge).not.toHaveBeenCalled();
+
+    finishClose(response({ success: true }));
+    await expect(pending).resolves.toEqual({ success: true, data: { success: true } });
     expect(fixture.closeTerminalBridge).toHaveBeenCalledWith('pty_1', 1000, 'PTY session ended');
     expect(fixture.values.get('terminal:pty_1')).toMatchObject({ state: 'ended' });
     expect(fixture.values.has(`terminal_operation:${FIRST_OPERATION_ID}`)).toBe(false);
@@ -364,18 +380,69 @@ describe('SandboxSession terminal lifecycle', () => {
     );
   });
 
-  it('still closes local terminal capabilities when wrapper PTY deletion fails', async () => {
+  it.each([
+    { failure: 'a rejected control request', result: new Error('wrapper unavailable') },
+    {
+      failure: 'an unsuccessful control response',
+      result: {
+        type: 'response',
+        requestId: 'request_1',
+        ok: false,
+        error: { code: 'not_ready', message: 'Wrapper unavailable', retryable: true },
+      } satisfies ResponseFrame,
+    },
+    { failure: 'failed PTY deletion', result: response({ success: false }) },
+    { failure: 'an invalid close result', result: response({ success: 'true' }) },
+  ])('preserves durable ownership for a close retry after $failure', async ({ result }) => {
     const fixture = createFixture();
     await fixture.lifecycle.createTerminal({ operationId: FIRST_OPERATION_ID });
-    fixture.control.request.mockRejectedValueOnce(new Error('wrapper unavailable'));
+    if (result instanceof Error) {
+      fixture.control.request.mockRejectedValueOnce(result);
+    } else {
+      fixture.control.request.mockResolvedValueOnce(result);
+    }
 
     await expect(fixture.lifecycle.closeTerminal({ ptyId: 'pty_1' })).resolves.toEqual({
+      success: false,
+      error: 'Terminal closure failed; please retry',
+    });
+    expect(fixture.closeTerminalBridge).not.toHaveBeenCalled();
+    expect(fixture.values.get('terminal:pty_1')).toMatchObject({ state: 'running' });
+    expect(fixture.values.has(`terminal_operation:${FIRST_OPERATION_ID}`)).toBe(true);
+
+    const restarted = createSandboxTerminalLifecycle({
+      state: { storage: fixture.storage },
+      getSessionId: () => SESSION_ID,
+      getControl: () => fixture.control,
+      getDirectory: () => DIRECTORY,
+      closeTerminalBridge: fixture.closeTerminalBridge,
+      closeAllBridges: fixture.closeAllBridges,
+      closeRuntimeBridges: fixture.closeRuntimeBridges,
+    });
+    await expect(restarted.closeTerminal({ ptyId: 'pty_1' })).resolves.toEqual({
       success: true,
       data: { success: true },
     });
     expect(fixture.closeTerminalBridge).toHaveBeenCalledWith('pty_1', 1000, 'PTY session ended');
     expect(fixture.values.get('terminal:pty_1')).toMatchObject({ state: 'ended' });
     expect(fixture.values.has(`terminal_operation:${FIRST_OPERATION_ID}`)).toBe(false);
+  });
+
+  it('does not restore terminal records when close finishes after session deletion', async () => {
+    const fixture = createFixture();
+    await fixture.lifecycle.createTerminal({ operationId: FIRST_OPERATION_ID });
+    fixture.control.request.mockImplementationOnce(async () => {
+      fixture.lifecycle.beginDeletion(fixture.metadata);
+      fixture.lifecycle.purgeDeletedState();
+      return response({ success: true });
+    });
+
+    await expect(fixture.lifecycle.closeTerminal({ ptyId: 'pty_1' })).resolves.toEqual({
+      success: false,
+      error: 'Session not found',
+    });
+    expect([...fixture.values.keys()]).toEqual([SANDBOX_SESSION_LIFECYCLE_KEY]);
+    expect(fixture.closeTerminalBridge).not.toHaveBeenCalled();
   });
 
   it('invalidates only confirmed terminals belonging to the requested runtime', async () => {

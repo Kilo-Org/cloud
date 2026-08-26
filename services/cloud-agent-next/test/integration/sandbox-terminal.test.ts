@@ -10,6 +10,7 @@ import {
   responseFrameSchema,
   sessionTerminalConnectPayloadSchema,
   type RequestFrame,
+  type ResponseFrame,
   type SessionTerminalConnectPayload,
 } from '../../src/shared/sandbox-control-protocol.js';
 import type { SandboxId } from '../../src/types.js';
@@ -53,6 +54,7 @@ type TerminalFixture = {
   connections: TerminalConnection[];
   browsers: BrowserConnection[];
   nextBehavior: ConnectionBehavior;
+  nextCloseResponse?: Omit<ResponseFrame, 'type' | 'requestId'>;
   errors: Error[];
   openBrowser: (behavior?: ConnectionBehavior) => Promise<BrowserConnection>;
   reverseUrl: () => string;
@@ -292,7 +294,9 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
     }
 
     if (request.operation === 'session.terminal.close') {
-      sendResponse(control, request.requestId, { success: true });
+      const response = fixture.nextCloseResponse ?? { ok: true, result: { success: true } };
+      fixture.nextCloseResponse = undefined;
+      control.send(JSON.stringify({ type: 'response', requestId: request.requestId, ...response }));
       return;
     }
 
@@ -406,7 +410,9 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
       auth: { kiloSessionId },
       agent: { mode: 'code', model: 'test-model' },
       workspace: { sandboxId, sandboxProvider: 'cloudflare' },
-      message: { initialTurn: { messageId: `msg_${identity}`, type: 'prompt' } },
+      message: {
+        initialTurn: { messageId: `msg_${identity}`, type: 'prompt', prompt: 'Prepare workspace' },
+      },
     })
   );
   if (!admission.success) throw new Error(`Session admission failed: ${admission.error}`);
@@ -630,6 +636,56 @@ describe('SandboxSession terminal bridge in the Workers runtime', () => {
     if (!replacement) throw new Error('Missing replacement reverse socket');
     replacement.socket.send('upstream recovered');
     await expect(reconnected.inbox.next()).resolves.toBe('upstream recovered');
+    expect(fixture.errors).toEqual([]);
+  });
+
+  it.each([
+    {
+      failure: 'a control request fails',
+      response: {
+        ok: false,
+        error: { code: 'not_ready', message: 'Wrapper unavailable', retryable: true },
+      } satisfies Omit<ResponseFrame, 'type' | 'requestId'>,
+    },
+    { failure: 'PTY deletion returns false', response: { ok: true, result: { success: false } } },
+  ])('keeps a terminal usable and retries close when $failure', async ({ response }) => {
+    const fixture = await createFixture();
+    const browser = await fixture.openBrowser();
+    const wrapper = fixture.connections[0];
+    if (!wrapper) throw new Error('Missing reverse socket');
+    const session = getSandboxSessionStub(env, fixture.ownerId, fixture.sessionId);
+    fixture.nextCloseResponse = response;
+
+    await expect(
+      runInDurableObject(session, instance => instance.closeTerminal({ ptyId: fixture.ptyId }))
+    ).resolves.toEqual({ success: false, error: 'Terminal closure failed; please retry' });
+    await expect(
+      runInDurableObject(session, async (_instance, state) =>
+        state.storage.kv.get(`terminal:${fixture.ptyId}`)
+      )
+    ).resolves.toMatchObject({ state: 'running' });
+
+    browser.socket.send('still running after failed close');
+    await expect(wrapper.inbox.next()).resolves.toBe('still running after failed close');
+    wrapper.socket.send('close can be retried');
+    await expect(browser.inbox.next()).resolves.toBe('close can be retried');
+
+    await expect(
+      runInDurableObject(session, instance => instance.closeTerminal({ ptyId: fixture.ptyId }))
+    ).resolves.toEqual({ success: true, data: { success: true } });
+    await expect(browser.closed).resolves.toMatchObject({
+      code: 1000,
+      reason: 'PTY session ended',
+    });
+    await expect(wrapper.closed).resolves.toMatchObject({
+      code: 1000,
+      reason: 'PTY session ended',
+    });
+    await expect(
+      runInDurableObject(session, async (_instance, state) =>
+        state.storage.kv.get(`terminal:${fixture.ptyId}`)
+      )
+    ).resolves.toMatchObject({ state: 'ended' });
     expect(fixture.errors).toEqual([]);
   });
 

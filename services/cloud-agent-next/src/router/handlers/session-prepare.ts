@@ -273,7 +273,13 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       variant: input.variant,
     },
     repository,
-    runtime: input.devcontainer ? { devcontainer: true } : undefined,
+    runtime:
+      input.devcontainer || input.sandboxAllocation
+        ? {
+            ...(input.devcontainer ? { devcontainer: true } : {}),
+            ...(input.sandboxAllocation ? { sandboxAllocation: input.sandboxAllocation } : {}),
+          }
+        : undefined,
     clone: input.cloneFromKiloSessionId
       ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
       : undefined,

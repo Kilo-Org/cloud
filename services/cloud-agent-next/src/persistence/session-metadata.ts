@@ -2,7 +2,7 @@ import * as z from 'zod';
 import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 
 import { PROVIDER_CAPABILITIES } from '../agent-sandbox/capabilities.js';
-import { isGeneratedSharedSandboxId } from '../sandbox-id.js';
+import { isGeneratedSharedSandboxId, isValidSandboxId } from '../sandbox-id.js';
 import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { type AgentSandboxProvider, type SandboxId } from '../types.js';
@@ -16,10 +16,7 @@ import {
 
 const SandboxIdSchema = z
   .string()
-  .refine(
-    s => /^(ses|crv|dind|org|usr|bot|ubt)-[0-9a-f]+$/.test(s) || s.includes('__'),
-    'Invalid sandboxId format'
-  )
+  .refine(isValidSandboxId, 'Invalid sandboxId format')
   .transform(s => s as SandboxId);
 
 const SharedSandboxIdSchema = z
@@ -245,6 +242,7 @@ const MetadataWorkspaceSchema = z
     credentialContainment: CredentialContainmentSchema.optional(),
     managedScmContainment: z.boolean().optional(),
     devcontainerRequested: z.boolean().optional(),
+    sandboxAllocation: z.literal('isolated-standard').optional(),
   })
   .strip()
   .superRefine((workspace, context) => {

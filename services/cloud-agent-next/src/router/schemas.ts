@@ -572,6 +572,10 @@ const PrepareSessionSharedFields = {
     .describe(
       'When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes'
     ),
+  sandboxAllocation: z
+    .literal('isolated-standard')
+    .optional()
+    .describe('Allocate a dedicated Standard Cloudflare container for this session'),
 };
 
 const PrepareSessionNonCloneVariant = z.object({

@@ -331,6 +331,40 @@ describe('createSessionWithLedger admission ladder', () => {
     });
   });
 
+  it('routes and persists isolated Standard allocation for an agent session', async () => {
+    const sandboxId = `istd-${'a'.repeat(48)}` as const;
+    generateSandboxRoutingTargetMock.mockResolvedValueOnce({ kind: 'isolated', sandboxId });
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        runtime: { sandboxAllocation: 'isolated-standard' },
+        options: { operationKey: OPERATION_KEY, createdOnPlatform: 'webhook' },
+      })
+    );
+
+    expect(generateSandboxRoutingTargetMock).toHaveBeenCalledWith(
+      undefined,
+      undefined,
+      USER_ID,
+      CLOUD_AGENT_SESSION_ID,
+      undefined,
+      expect.objectContaining({ sandboxAllocation: 'isolated-standard' })
+    );
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ createdOnPlatform: 'webhook' }),
+        workspace: expect.objectContaining({
+          sandboxId,
+          sandboxProvider: 'cloudflare',
+          sandboxAllocation: 'isolated-standard',
+        }),
+      })
+    );
+  });
+
   it('passes a normalized GitHub repository URL to the session-ingest create call', async () => {
     const ctx = makeContext(makeDoStub());
 
@@ -1595,6 +1629,13 @@ describe('createSessionWithLedger changed-intent rejection', () => {
       retry: makeRequest({ finalization: { autoCommit: true }, options: ORIGINAL_OPTIONS }),
     },
     {
+      name: 'the sandbox allocation',
+      retry: makeRequest({
+        runtime: { sandboxAllocation: 'isolated-standard' },
+        options: ORIGINAL_OPTIONS,
+      }),
+    },
+    {
       name: 'the appended system prompt',
       retry: makeRequest({
         profile: { overrides: { appendSystemPrompt: 'Follow these extra rules' } },
@@ -1924,6 +1965,30 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     expect(sandboxSessionGet).toHaveBeenCalledTimes(1);
     expect(cloudAgentSessionGet).not.toHaveBeenCalled();
     expect(doStub.registerSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects isolated Standard allocation for workspace sessions before external effects', async () => {
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = USER_ID;
+
+    await expect(
+      runCreate(
+        ctx,
+        makeRequest({
+          runtime: { sandboxAllocation: 'isolated-standard' },
+          options: { operationKey: OPERATION_KEY },
+        })
+      )
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Isolated Standard allocation is not supported for control-plane sessions',
+    });
+
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(admitOperationMock).not.toHaveBeenCalled();
   });
 
   it('surfaces BAD_REQUEST session_clone_failed when the clone is rejected', async () => {
@@ -2644,5 +2709,19 @@ describe('prepareInputToSessionCreateRequest clone mapping', () => {
     });
 
     expect(request.clone).toBeUndefined();
+  });
+
+  it('maps isolated Standard allocation into grouped runtime intent', () => {
+    const request = prepareInputToSessionCreateRequest({
+      prompt: 'Continue',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      shallow: false,
+      devcontainer: false,
+      sandboxAllocation: 'isolated-standard',
+    });
+
+    expect(request.runtime).toEqual({ sandboxAllocation: 'isolated-standard' });
   });
 });

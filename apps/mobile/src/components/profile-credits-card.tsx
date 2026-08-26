@@ -37,6 +37,9 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const { userId, isError: userIdError, refetch: refetchUserId } = useCurrentUserId({ enabled });
   const hasUserId = userId !== undefined;
 
+  // Keep the raw 2-element tRPC query keys from `queryOptions`. A 3-element key
+  // (e.g. appending the userId) is misread by tRPC v11 `isPrefixedQueryKey` as
+  // `[prefix, path, args]`, which breaks the queryFn before any network request.
   const balanceOptions = trpc.user.getContextBalance.queryOptions({
     organizationId: selectedOrgId,
   });

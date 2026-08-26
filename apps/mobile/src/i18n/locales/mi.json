@@ -2075,7 +2075,8 @@
       "dollar": "ngā tāra",
       "dollar_other": "ngā tāra",
       "costSpoken": "utu {{cost}}",
-      "costSpokenWithTime": "utu {{cost}}, {{time}}"
+      "costSpokenWithTime": "utu {{cost}}, {{time}}",
+      "pullRequest": "tono kumea {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kāore i taea te whakatuwhera GitHub",
@@ -2913,16 +2914,10 @@
   "feedback": {
     "noEmailApp": "Kāore he taupānga īmēra e wātea ana. Ka taea e koe te whakapā mai ki {{email}}",
     "couldNotOpenStore": "Kāore i taea te whakatuwhera te toa.",
-    "promptTitle": "Kei te pēhea tō pai ki te taupānga Kilo?",
-    "iLikeIt": "E pai ana ahau",
-    "gladTitle": "E koa ana mātou!",
-    "gladMessage": "He arotake toa he āwhina nui mā mātou. Ngā mihi mō te whakamahi Kilo!",
-    "rateKilo": "Whakawātea a Kilo",
-    "needsWork": "Me mahi anō",
-    "sorryTitle": "E aroha ana mātou!",
-    "sorryMessage": "Tēnā whakamōhio mai ki a mātou te mea hei whakapai. Ka pānui te pūkaha o te taupānga i ia pūrongo!",
-    "emailUs": "Īmēra mai",
-    "emailSubject": "urupare taupānga pūkoro"
+    "emailSubject": "urupare taupānga pūkoro",
+    "neutralTitle": "Whakatau i te taupānga Kilo",
+    "rateTheApp": "Whakatauria te taupānga",
+    "sendFeedback": "Tukuna whakahoki kōrero"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2927,9 @@
       "organizationUnavailable": "Kāore e wātea ana te whakahaere",
       "selectDescription": "Kōwhiri he whakahaere mai i tō kōtaha kia haere tonu.",
       "selectOrganization": "Kōwhiri he whakahaere",
-      "unavailableDescription": "Kāore tēnei whakahaere e wātea ana. Kōwhiri tētahi mai i tō kōtaha kia haere tonu."
+      "unavailableDescription": "Kāore tēnei whakahaere e wātea ana. Kōwhiri tētahi mai i tō kōtaha kia haere tonu.",
+      "accessDeniedTitle": "Kua whakakorehia te uru",
+      "accessDeniedDescription": "Kāore ō whakaaetanga ki tēnei whakahaere."
     },
     "creditActivity": {
       "emptyDescription": "Ka puta ki konei ngā hokonga, te whakamahinga, me ngā whakarerekē whiwhinga mō tēnei whakahaere i a rātou e tupu ana.",

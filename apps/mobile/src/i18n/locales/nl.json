@@ -1621,7 +1621,8 @@
       "dollar": "dollars",
       "dollar_other": "dollars",
       "costSpoken": "kosten {{cost}}",
-      "costSpokenWithTime": "kosten {{cost}}, {{time}}"
+      "costSpokenWithTime": "kosten {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "We konden de installatie van de GitHub-app niet starten. Probeer het opnieuw.",
@@ -2918,7 +2919,9 @@
       "organizationUnavailable": "Organisatie niet beschikbaar",
       "selectDescription": "Kies een organisatie uit je profiel om door te gaan.",
       "selectOrganization": "Een organisatie selecteren",
-      "unavailableDescription": "Deze organisatie is niet meer beschikbaar. Kies er een uit je profiel om door te gaan."
+      "unavailableDescription": "Deze organisatie is niet meer beschikbaar. Kies er een uit je profiel om door te gaan.",
+      "accessDeniedTitle": "Toegang geweigerd",
+      "accessDeniedDescription": "U heeft geen toegang tot deze organisatie."
     },
     "creditActivity": {
       "emptyDescription": "Aankopen, gebruik en creditaanpassingen voor deze organisatie verschijnen hier zodra ze plaatsvinden.",
@@ -3062,17 +3065,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "Kon de store niet openen.",
-    "emailUs": "E-mail ons",
-    "gladMessage": "Een review in de store zou ons enorm helpen. Bedankt dat je Kilo gebruikt!",
-    "gladTitle": "Wat fijn om te horen!",
-    "iLikeIt": "Ik vind het leuk",
-    "needsWork": "Kan beter",
     "noEmailApp": "Geen e-mailapp beschikbaar. Je kunt ons bereiken op {{email}}",
-    "promptTitle": "Hoe bevalt de Kilo-app je?",
-    "rateKilo": "Kilo beoordelen",
-    "sorryMessage": "Laat ons weten wat er beter kan. De engineer die over de app gaat, leest elk rapport!",
-    "sorryTitle": "Wat jammer om te horen!",
-    "emailSubject": "feedback op mobiele app"
+    "emailSubject": "feedback op mobiele app",
+    "neutralTitle": "Beoordeel de Kilo-app",
+    "rateTheApp": "Beoordeel de app",
+    "sendFeedback": "Feedback sturen"
   },
   "authErrors": {
     "emailAlreadyUsed": "Er bestaat al een account met dit e-mailadres via een andere aanmeldmethode. Probeer een andere methode of gebruik '$t(login.moreSignInOptions)'.",

@@ -15,6 +15,10 @@ type SessionListSearchHeaderProps = {
   showInlineError: boolean;
   onChangeText: (text: string) => void;
   onClearSearch: () => void;
+  /** Initial content for the uncontrolled input, applied on a restore remount. */
+  defaultValue?: string;
+  /** Remount key: changes once when a stored non-empty draft is restored. */
+  inputKey?: string;
 };
 
 export function SessionListSearchHeader({
@@ -24,6 +28,8 @@ export function SessionListSearchHeader({
   showInlineError,
   onChangeText,
   onClearSearch,
+  defaultValue,
+  inputKey,
 }: Readonly<SessionListSearchHeaderProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -43,12 +49,14 @@ export function SessionListSearchHeader({
           )}
         </View>
         <TextInput
+          key={inputKey}
           ref={inputRef}
           accessibilityLabel={t('agents.search.searchSessions')}
-          className="min-h-6 flex-1 py-1 text-[15px] leading-6 text-foreground"
+          className="min-h-6 flex-1 py-1 text-[15px] leading-[normal] text-foreground"
           placeholder={t('agents.search.searchSessionsPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
           onChangeText={onChangeText}
+          defaultValue={defaultValue}
           returnKeyType="search"
           autoCapitalize="none"
           autoCorrect={false}

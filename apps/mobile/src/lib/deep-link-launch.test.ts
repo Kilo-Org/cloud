@@ -34,6 +34,7 @@ import {
   _setGetLinkingURLForTests,
   _setSecureStoreForTests,
   captureLaunchDeepLink,
+  clearAccountBoundPendingDeepLink,
   clearPendingDeepLink,
   getPendingDeepLink,
   getPendingDeepLinkSnapshot,
@@ -470,6 +471,43 @@ describe('deep-link-launch', () => {
       expect(getPendingDeepLinkSnapshot()).toBeNull();
 
       unsubscribe();
+    });
+  });
+
+  describe('clearAccountBoundPendingDeepLink', () => {
+    it('clears a destination captured while signed in', () => {
+      setCurrentDeepLinkUserId('user-a');
+      setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'universal-link');
+
+      clearAccountBoundPendingDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+    });
+
+    it('keeps a destination captured while signed out', () => {
+      // currentDeepLinkUserId is null by default: the slot was captured signed out.
+      setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'universal-link');
+
+      clearAccountBoundPendingDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBe('/(app)/(tabs)/(3_profile)');
+      // The slot is still consumable after the redundant sign-out.
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
+    });
+
+    it('keeps a signed-out destination and its persisted record on clear', async () => {
+      setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'universal-link');
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
+      });
+
+      clearAccountBoundPendingDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBe('/(app)/(tabs)/(3_profile)');
+      // The persisted record survives so a later process still restores it.
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
+      });
     });
   });
 

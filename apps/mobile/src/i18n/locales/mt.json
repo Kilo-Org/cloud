@@ -2120,7 +2120,8 @@
       "dollar_few": "dollari",
       "dollar_many": "dollaru",
       "costSpoken": "spiża {{cost}}",
-      "costSpokenWithTime": "spiża {{cost}}, {{time}}"
+      "costSpokenWithTime": "spiża {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ma setax jinfetaħ GitHub",
@@ -2973,16 +2974,10 @@
   "feedback": {
     "noEmailApp": "L-ebda app tal-email disponibbli. Tista' tikkuntattjana fuq {{email}}",
     "couldNotOpenStore": "Ma setgħetx tinfetaħ il-ħanut.",
-    "promptTitle": "Kemm qed togħġbok l-app Kilo?",
-    "iLikeIt": "Jogħġobni",
-    "gladTitle": "Ferħanin li nisimgħu dan!",
-    "gladMessage": "Reviżjoni fil-ħanut tgħinna ferm. Grazzi talli tuża Kilo!",
-    "rateKilo": "Irrekja Kilo",
-    "needsWork": "Għandu bżonn titjib",
-    "sorryTitle": "Iddispjċina li nisimgħu dan!",
-    "sorryMessage": "Jekk jogħġbok għidilna x'għandu jitjieb. L-inġinier responsabbli mill-app jaqra kull rapport!",
-    "emailUs": "Ibgħatilna email",
-    "emailSubject": "feedback dwar l-app tal-mowbajl"
+    "emailSubject": "feedback dwar l-app tal-mowbajl",
+    "neutralTitle": "Irrata l-app Kilo",
+    "rateTheApp": "Irrata l-app",
+    "sendFeedback": "Ibgħat feedback"
   },
   "organization": {
     "boundary": {
@@ -2992,7 +2987,9 @@
       "organizationUnavailable": "L-organizzazzjoni mhux disponibbli",
       "selectDescription": "Agħżel organizzazzjoni mill-profil tiegħek biex tkompli.",
       "selectOrganization": "Agħżel organizzazzjoni",
-      "unavailableDescription": "Din l-organizzazzjoni m'għadhiex disponibbli. Agħżel waħda mill-profil tiegħek biex tkompli."
+      "unavailableDescription": "Din l-organizzazzjoni m'għadhiex disponibbli. Agħżel waħda mill-profil tiegħek biex tkompli.",
+      "accessDeniedTitle": "Aċċess miċħud",
+      "accessDeniedDescription": "M'għandekx aċċess għal din l-organizzazzjoni."
     },
     "creditActivity": {
       "emptyDescription": "Xirjiet, użu, u aġġustamenti tal-kreditu għal din l-organizzazzjoni se jidhru hawnhekk hekk kif iseħħu.",

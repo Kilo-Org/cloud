@@ -14,6 +14,10 @@ const submitMutationMock = vi.hoisted(() => ({
   mutateAsync: vi.fn(async (): Promise<unknown> => undefined),
 }));
 
+const feedbackMock = vi.hoisted(() => ({
+  maybeAskAfterSuccessfulOutcome: vi.fn(async (): Promise<void> => undefined),
+}));
+
 vi.mock('@/lib/pr-review/use-pr-review-mutations', () => ({
   useSubmitReviewMutation: () => ({
     mutateAsync: submitMutationMock.mutateAsync,
@@ -58,6 +62,7 @@ vi.mock('expo-crypto', () => ({
 
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
+  NotificationFeedbackType: { Success: 'success' },
 }));
 
 vi.mock('expo-router', () => ({
@@ -66,6 +71,10 @@ vi.mock('expo-router', () => ({
 
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
+  InteractionManager: {
+    // eslint-disable-next-line promise/prefer-await-to-callbacks, typescript-eslint/no-confusing-void-expression -- passthrough so the deferred feedback ask runs synchronously and stays observable
+    runAfterInteractions: (callback: () => void) => callback(),
+  },
   Keyboard: { addListener: () => ({ remove: vi.fn() }) },
   Platform: { OS: 'ios' },
   ScrollView: 'ScrollView',
@@ -93,6 +102,12 @@ vi.mock('@/components/pr-review/pr-review-pending-comment-row', () => ({
 }));
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
+}));
+vi.mock('@/lib/feedback', () => ({
+  maybeAskAfterSuccessfulOutcome: feedbackMock.maybeAskAfterSuccessfulOutcome,
+}));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'user-1' }),
 }));
 
 const ITEM_FRESH_A: PendingReviewItem = {
@@ -165,12 +180,13 @@ async function flush(): Promise<void> {
   });
 }
 
-function submitOnPress(renderer: TestRenderer.ReactTestRenderer): () => void {
-  const button = renderer.root.findAll(
-    node => node.props.accessibilityLabel === 'Submit 2 of 3 comments'
-  )[0];
+function submitOnPress(
+  renderer: TestRenderer.ReactTestRenderer,
+  label = 'Submit 2 of 3 comments'
+): () => void {
+  const button = renderer.root.findAll(node => node.props.accessibilityLabel === label)[0];
   if (!button) {
-    throw new Error('Submit button not found');
+    throw new Error(`Submit button not found: ${label}`);
   }
   return button.props.onPress as () => void;
 }
@@ -196,6 +212,8 @@ beforeEach(() => {
   addCommentFn = null;
   submitMutationMock.mutateAsync.mockReset();
   submitMutationMock.mutateAsync.mockResolvedValue(undefined);
+  feedbackMock.maybeAskAfterSuccessfulOutcome.mockReset();
+  feedbackMock.maybeAskAfterSuccessfulOutcome.mockResolvedValue(undefined);
   footerPreferenceMock.hasLoaded = true;
   footerPreferenceMock.prReviewFooter = false;
 });
@@ -221,6 +239,7 @@ describe('PrReviewSubmit queue retention', () => {
     // and stale items all stay queued, with no optimistic removal.
     expect(submitMutationMock.mutateAsync).toHaveBeenCalledTimes(1);
     expect(latestItems.map(item => item.id)).toEqual(['fresh-a', 'fresh-b', 'stale-c']);
+    expect(feedbackMock.maybeAskAfterSuccessfulOutcome).not.toHaveBeenCalled();
   });
 
   it('removes only the fresh items on success, leaving stale items queued', async () => {
@@ -237,9 +256,31 @@ describe('PrReviewSubmit queue retention', () => {
     });
     await flush();
 
-    // Success removes exactly the fresh ids; the stale item stays queued.
+    // Success removes exactly the fresh ids; the stale item stays queued and
+    // no feedback prompt fires (stale still needs attention).
     expect(submitMutationMock.mutateAsync).toHaveBeenCalledTimes(1);
     expect(latestItems.map(item => item.id)).toEqual(['stale-c']);
+    expect(feedbackMock.maybeAskAfterSuccessfulOutcome).not.toHaveBeenCalled();
+  });
+
+  it('a full submit asks for feedback once', async () => {
+    const renderer = mount();
+
+    act(() => {
+      addCommentFn?.(ITEM_FRESH_A);
+      addCommentFn?.(ITEM_FRESH_B);
+    });
+
+    act(() => {
+      submitOnPress(renderer, 'Submit review')();
+    });
+    await flush();
+
+    // No stale items, so the sheet dismisses and the feedback prompt fires once.
+    expect(submitMutationMock.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(latestItems.map(item => item.id)).toEqual([]);
+    expect(feedbackMock.maybeAskAfterSuccessfulOutcome).toHaveBeenCalledTimes(1);
+    expect(feedbackMock.maybeAskAfterSuccessfulOutcome).toHaveBeenCalledWith('user-1');
   });
 });
 

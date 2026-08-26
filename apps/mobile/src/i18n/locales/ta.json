@@ -38,7 +38,9 @@
     "retry": "மீண்டும் முயற்சி",
     "search": "மொழிகளைத் தேடு",
     "noMatches": "எந்த மொழியும் பொருந்தவில்லை",
-    "deviceLanguage": "சாதன மொழி"
+    "deviceLanguage": "சாதன மொழி",
+    "current": "தற்போதைய",
+    "allLanguages": "அனைத்து மொழிகளும்"
   },
   "login": {
     "welcome": "Kilo விற்கு வரவேற்கிறோம்",
@@ -347,13 +349,13 @@
       "mute": "முடக்கு",
       "block": "தடு",
       "somethingWentWrong": "ஏதோ தவறு நடந்தது",
-      "reportSubmitted": "புகார் சமர்ப்பிக்கப்பட்டது. ரசீது {{receiptId}}",
+      "reportSubmitted": "அறிக்கை சமர்ப்பிக்கப்பட்டது. ரசீது {{receiptId}}",
       "blockedUser": "{{login}} தடுக்கப்பட்டது",
       "mutedUser": "{{login}} முடக்கப்பட்டது",
       "replyPlaceholder": "பதில்…",
       "replyBody": "பதில் உடல்",
       "submitReply": "பதிலை சமர்ப்பி",
-      "reply": "பதில்",
+      "reply": "பதிலளி",
       "termsTitle": "சேவை விதிமுறைகள்",
       "termsCopy": "இடுகையிட நீங்கள் 13 அல்லது அதற்கு மேல் இருக்க வேண்டும்.",
       "termsAcceptRetry": "விதிமுறைகளை ஏற்க முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
@@ -430,7 +432,7 @@
       "noRecentPrs": "சமீபத்திய PR இல்லை",
       "noRecentPrsDescription": "மதிப்பாய்வைத் தொடங்க மேலே ஒரு PR இணைப்பை ஒட்டவும் — அடுத்த முறை அது இங்கே காட்டப்படும்.",
       "couldNotLoad": "ஏற்ற முடியவில்லை",
-      "remove": "அகற்று",
+      "remove": "நீக்கு",
       "removeFromRecentsTitle": "சமீபத்தியவற்றிலிருந்து அகற்றவா?",
       "removeFromRecentsMessage": "இந்த இழுப்பு கோரிக்கை உங்கள் சமீபத்தியவற்றிலிருந்து அகற்றப்படும்.",
       "removeRecentAccessibility": "{{repo}} ஐ சமீபத்தியவற்றிலிருந்து அகற்று",
@@ -537,9 +539,9 @@
       "stateOpenApproved": "திற · அங்கீகரிக்கப்பட்டது",
       "stateOpenChangesRequested": "திற · மாற்றங்கள் கோரப்பட்டன",
       "stateOpenReviewRequired": "திற · மதிப்பாய்வு தேவை",
-      "stateOpen": "திற",
+      "stateOpen": "திறந்த",
       "unknownAuthor": "தெரியாத ஆசிரியர்",
-      "commit_one": "commit",
+      "commit_one": "கமிட்",
       "commit": "commits",
       "commit_other": "commits",
       "file_one": "கோப்பு",
@@ -669,7 +671,7 @@
     "instancePicker": {
       "switchInstance": "instance ஐ மாற்று",
       "couldNotLoadInstances": "instances ஐ ஏற்ற முடியவில்லை",
-      "noInstances": "KiloClaw instances இல்லை",
+      "noInstances": "KiloClaw நிகழ்வுகள் இல்லை",
       "noInstancesDescription": "அரட்டையிடத் தொடங்க ஒரு instance ஐ அமைக்கவும்.",
       "setUpKiloclaw": "KiloClaw ஐ அமைக்கவும்",
       "currentInstance": "{{title}}, தற்போது",
@@ -822,7 +824,7 @@
       "plan": "திட்டம்",
       "finalTermEnds": "இறுதி காலம் முடிவடைகிறது",
       "afterFinalTerm": "இறுதி காலத்திற்குப் பிறகு",
-      "remaining": "மீதமுள்ளது",
+      "remaining": "மீதம்",
       "lessThanOneDay": "1 நாளுக்கும் குறைவு",
       "ends": "முடிவடைகிறது",
       "expires": "காலாவதியாகிறது",
@@ -831,7 +833,7 @@
       "managedByAdmin": "பில்லிங் உங்கள் நிறுவன நிர்வாகியால் நிர்வகிக்கப்படுகிறது.",
       "couldNotLoad": "பில்லிங் தகவலை ஏற்ற முடியவில்லை",
       "manageOnWeb": "வலைத்தளத்தில் பில்லிங் நிர்வகி",
-      "commitPlan": "உறுதி",
+      "commitPlan": "கமிட்",
       "earlybird": "முன்கூட்டிய சலுகை",
       "finalCommitTermEndsOn": "உங்கள் இறுதி உறுதி காலம் {{date}} அன்று முடிவடைகிறது. {{price}} விலையில் Standard ஆக தொடரவும், இல்லையெனில் ஹோஸ்டிங் முடிவடையும்.",
       "freeTrial": "இலவச சோதனை",
@@ -848,7 +850,7 @@
       "trialDaysRemaining": "சோதனை: {{remaining}} நாட்கள் மீதம்",
       "trialEndingSoon": "சோதனை விரைவில் முடிவடைகிறது: {{remaining}}",
       "planName": {
-        "commit": "Commit",
+        "commit": "கமிட்",
         "standard": "Standard"
       }
     },
@@ -1003,7 +1005,7 @@
       "start": "தொடங்கு",
       "startMessage": "இந்த நிகழ்வைத் தொடங்க விரும்புகிறீர்களா?",
       "startTitle": "நிகழ்வைத் தொடங்கு",
-      "starting": "தொடங்குகிறது...",
+      "starting": "தொடங்குகிறது…",
       "stop": "நிறுத்து",
       "stopMessage": "இந்த நிகழ்வை நிறுத்த விரும்புகிறீர்களா?",
       "stopTitle": "நிகழ்வை நிறுத்து",
@@ -1176,7 +1178,7 @@
       "openUnread_one": "{{name}} திற, {{displayCount}} படிக்காத செய்தி",
       "openUnread": "{{name}} திற, {{displayCount}} படிக்காத செய்திகள்",
       "openUnread_other": "{{name}} திற, {{displayCount}} படிக்காத செய்திகள்",
-      "open": "{{name}} திற",
+      "open": "{{name}} ஐ திற",
       "openSettings": "{{name}} க்கான அமைப்புகளை திற",
       "fixOnKiloAi": "kilo.ai இல் சரிசெய்: {{label}}"
     },
@@ -1247,7 +1249,7 @@
       "allRepositories": "அனைத்து களஞ்சியங்கள்",
       "bitbucketNoRepositoriesDescription": "இந்த Bitbucket பணியிடத்தில் களஞ்சியங்கள் எதுவும் இல்லை.",
       "bitbucketSetup": "Bitbucket அமைவு",
-      "couldNotOpenGithubSettings": "GitHub App அமைப்புகளை திறக்க முடியவில்லை",
+      "couldNotOpenGithubSettings": "GitHub App அமைப்புகளைத் திறக்க முடியவில்லை",
       "gitlabNoRepositoriesDescription": "GitLab இல் மேலும் குழுக்கள் அல்லது திட்டங்களுக்கு அணுகலை வழங்க வேண்டியிருக்கலாம்.",
       "installGithubApp": "களஞ்சியங்களில் GitHub app ஐ நிறுவு",
       "installGithubAppDescription": "நீங்கள் மதிப்பாய்வு செய்ய விரும்பும் களஞ்சியங்களுக்கு Kilo GitHub App அணுகலை வழங்கவும்.",
@@ -1284,11 +1286,11 @@
       "model": "மாதிரி",
       "created": "உருவாக்கப்பட்டது",
       "started": "தொடங்கப்பட்டது",
-      "completed": "நிறைவடைந்தது",
+      "completed": "முடிந்தது",
       "cost": "செலவு",
       "tokens": "டோக்கன்கள்",
       "tokensInOut": "{{input}} உள்ளீடு / {{output}} வெளியீடு",
-      "openPullRequest": "Pull request திற",
+      "openPullRequest": "இழுப்பு கோரிக்கையைத் திற",
       "council": "குழு",
       "decision": "முடிவு",
       "gate": "நுழைவாயில்",
@@ -1297,12 +1299,12 @@
       "checkRun": "சரிபார்ப்பு இயக்கம்",
       "status": "நிலை",
       "threshold": "வரம்பு",
-      "pullRequest": "pull request"
+      "pullRequest": "இழுப்பு கோரிக்கை"
     },
     "reviewMemory": {
       "title": "மதிப்பாய்வு நினைவகம்",
       "couldNotLoadMore": "மேலும் ஏற்ற முடியவில்லை",
-      "retryLoadingMore": "மேலும் ஏற்ற மீண்டும் முயற்சி",
+      "retryLoadingMore": "மேலும் ஏற்றுவதை மீண்டும் முயற்சி",
       "loading": "மதிப்பாய்வு நினைவகத்தை ஏற்றுகிறது",
       "couldNotLoad": "மதிப்பாய்வு நினைவகத்தை ஏற்ற முடியவில்லை",
       "off": "மதிப்பாய்வு நினைவகம் முடக்கப்பட்டுள்ளது",
@@ -1321,7 +1323,7 @@
       "couldNotLoadProviders": "உங்கள் இணைக்கப்பட்ட வழங்குநர்களை ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "connectProvider": "ஒரு வழங்குநரை இணைக்கவும்",
       "connectProviderDescription": "Pull request இன் கைமுறை மதிப்பாய்வைத் தொடங்க GitHub ஐ இணைக்கவும்.",
-      "connectGitHub": "GitHub ஐ இணை",
+      "connectGitHub": "GitHub உடன் இணை",
       "platform": "தளம்",
       "notConnected": "இணைக்கப்படவில்லை",
       "pullRequestUrl": "Pull request URL",
@@ -1379,7 +1381,7 @@
     },
     "providerConnect": {
       "githubApp": "GitHub App",
-      "connectGitHub": "GitHub ஐ இணை",
+      "connectGitHub": "GitHub உடன் இணை",
       "githubError": "GitHub அமைவை திறக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "gitlabAccount": "GitLab கணக்கு",
       "connectGitLab": "GitLab ஐ இணை",
@@ -1589,7 +1591,7 @@
       "needsEvidenceReview": "சான்று மதிப்பாய்வு தேவை",
       "analysisNotComplete": "பகுப்பாய்வு முடிவடையவில்லை",
       "noImmediateAction": "உடனடி செயல் இல்லை",
-      "notExploitable": "சுரண்டக்கூடியது அல்ல",
+      "notExploitable": "சுரண்ட முடியாதது",
       "needsYourReview": "உங்கள் மதிப்பாய்வு தேவை",
       "noSlaDeadline": "SLA காலக்கெடு ஒதுக்கப்படவில்லை",
       "noRepositoryData": "இன்னும் களஞ்சிய தரவு இல்லை",
@@ -1688,7 +1690,7 @@
       "couldNotLoadSettings": "Security Agent அமைப்புகளை ஏற்ற முடியவில்லை",
       "couldNotLoadPermissions": "அனுமதிகளை ஏற்ற முடியவில்லை",
       "couldNotLoadRepositories": "களஞ்சியங்களை ஏற்ற முடியவில்லை",
-      "securityAgent": "Security Agent",
+      "securityAgent": "பாதுகாப்பு முகவர்",
       "enabled": "இயக்கப்பட்டது",
       "disabled": "முடக்கப்பட்டது",
       "on": "ஆன்",
@@ -1715,7 +1717,7 @@
     "remediation": {
       "cancellationRequested": "ரத்து கோரப்பட்டது",
       "cancelled": "சரிசெய்தல் ரத்து செய்யப்பட்டது",
-      "pullRequest": "புல் ரிக்வெஸ்ட்",
+      "pullRequest": "இழுப்பு கோரிக்கை",
       "couldNotLoad": "சரிசெய்தல் நிலையை ஏற்ற முடியவில்லை",
       "noAnalysisTitle": "இன்னும் பகுப்பாய்வு இல்லை",
       "noAnalysisDescription": "விவரங்கள் தாவலில் இருந்து ஒன்றை இயக்கவும்",
@@ -1798,7 +1800,7 @@
       "clearFilters": "வடிகட்டிகளை அழி"
     },
     "scopeList": {
-      "title": "Security Agent",
+      "title": "பாதுகாப்பு முகவர்",
       "couldNotLoad": "நிறுவனங்களை ஏற்ற முடியவில்லை",
       "personal": "தனிப்பட்ட",
       "personalSubtitle": "உங்கள் சொந்த களஞ்சியங்கள்"
@@ -1894,7 +1896,7 @@
     },
     "queuedActionUntracked": "வரிசையில் உள்ள செயலை இனி கண்காணிக்க முடியவில்லை. சமீபத்திய நிலையைப் பார்க்க புதுப்பிக்கவும்.",
     "initialSyncAdmissionFailed": "Security Agent இயக்கப்பட்டது, ஆனால் ஆரம்ப ஒத்திசைவை வரிசையில் சேர்க்க முடியவில்லை. மீண்டும் ஒத்திசைக்கவும்.",
-    "title": "Security Agent",
+    "title": "பாதுகாப்பு முகவர்",
     "commands": {
       "findingAlreadyDismissed": "கண்டுபிடிப்பு ஏற்கனவே நிராகரிக்கப்பட்டது",
       "findingDismissed": "கண்டுபிடிப்பு நிராகரிக்கப்பட்டது",
@@ -1972,7 +1974,7 @@
     "remediationStatus": {
       "cancellationRequested": "ரத்து கோரப்பட்டது",
       "notStarted": "தொடங்கப்படவில்லை",
-      "queued": "வரிசையில் உள்ளது",
+      "queued": "வரிசையில்",
       "starting": "தொடங்குகிறது",
       "inProgress": "நடைபெறுகிறது",
       "draftPrOpened": "வரைவு PR திறக்கப்பட்டது",
@@ -2105,7 +2107,7 @@
       "accessDeniedDescription": "இதைப் பார்க்க உங்களுக்கு அனுமதி இல்லை.",
       "couldNotLoad": "அமர்வை ஏற்ற முடியவில்லை",
       "failedToLoadDetails": "அமர்வு விவரங்களை ஏற்ற முடியவில்லை",
-      "notFound": "கிடைக்கவில்லை",
+      "notFound": "காணப்படவில்லை",
       "notFoundDescription": "இந்த உருப்படி நீக்கப்பட்டிருக்கலாம் அல்லது இனி கிடைக்காமல் இருக்கலாம்.",
       "failedToStopExecution": "செயலாக்கத்தை நிறுத்த முடியவில்லை",
       "renameSession": "அமர்வை மறுபெயரிடு",
@@ -2122,7 +2124,12 @@
       "couldNotLoadThisSession": "இந்த அமர்வை ஏற்ற முடியவில்லை",
       "cloneFailed": "இந்த அமர்வை குளோன் செய்ய முடியவில்லை.",
       "cloneFailedRetry": "இந்த அமர்வை குளோன் செய்ய முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-      "connectRepositoryToContinue": "தொடர ஒரு களஞ்சியத்தை இணைக்கவும்."
+      "connectRepositoryToContinue": "தொடர ஒரு களஞ்சியத்தை இணைக்கவும்.",
+      "notEnoughCredits": "Cloud Agent ஐ இயக்க போதுமான கிரெடிட்கள் இல்லை. கிரெடிட்களைச் சேர்த்து மீண்டும் முயற்சிக்கவும்.",
+      "previousTaskFinishing": "முந்தைய பணி இன்னும் முடிவடைந்து கொண்டிருக்கிறது. சிறிது காத்திருக்கவும்.",
+      "serviceUnavailable": "சேவை இப்போது கிடைக்கவில்லை. மீண்டும் முயற்சிக்கவும்.",
+      "connectionTrouble": "இணைப்பில் சிக்கல். சிறிது நேரம் கழித்து மீண்டும் முயற்சிக்கவும்.",
+      "modelUnavailable": "இந்த மாதிரி Cloud Agent-க்குக் கிடைக்கவில்லை. வேறு மாதிரியைத் தேர்ந்தெடுத்து மீண்டும் முயற்சிக்கவும்."
     },
     "remoteSession": {
       "failedToCreate": "தொலை அமர்வை உருவாக்க முடியவில்லை",
@@ -2147,7 +2154,7 @@
       "title": "புதிய அமர்வு",
       "repository": "களஞ்சியம்",
       "couldNotLoadRepositories": "களஞ்சியங்களை ஏற்ற முடியவில்லை",
-      "connectGithub": "GitHub ஐ இணை",
+      "connectGithub": "GitHub உடன் இணை",
       "connectGithubDescription": "உங்கள் உலாவியில் GitHub ஐ இணைக்கவும், பின்னர் ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கு திரும்பவும்.",
       "openGithub": "GitHub ஐ திற",
       "refreshRepositories": "களஞ்சியங்களை புதுப்பி",
@@ -2200,7 +2207,7 @@
       "contentTruncated": "உள்ளடக்கம் துண்டிக்கப்பட்டது",
       "truncated": "துண்டிக்கப்பட்டது",
       "toolRead": "படிக்க",
-      "toolEdit": "திருத்த",
+      "toolEdit": "திருத்து",
       "toolWrite": "எழுத",
       "toolBash": "bash",
       "toolGlob": "glob",
@@ -2421,7 +2428,7 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. மீண்டும் முயற்சி கிடைக்கிறது.",
       "copyToComposer": "கம்போசருக்கு நகலெடுக்கவும்",
-      "queued": "வரிசையில் உள்ளது",
+      "queued": "வரிசையில்",
       "queuedAccessibility": "செய்தி வரிசையில் உள்ளது",
       "userMessage": "பயனர் செய்தி",
       "assistantMessage": "உதவியாளர் செய்தி",
@@ -2476,10 +2483,10 @@
     "modelPicker": {
       "title": "மாதிரியைத் தேர்ந்தெடுக்கவும்",
       "searchPlaceholder": "மாதிரிகளைத் தேடு...",
-      "noModels": "மாதிரிகள் இல்லை",
+      "noModels": "கிடைக்கக்கூடிய மாதிரிகள் இல்லை",
       "noModelsDescription": "தேர்ந்தெடுக்கக்கூடிய மாதிரிகள் எதுவும் இல்லை.",
       "favorites": "பிடித்தவை",
-      "recommended": "பரிந்துரைக்கப்பட்டவை",
+      "recommended": "பரிந்துரைக்கப்படுகிறது",
       "allModels": "அனைத்து மாதிரிகள்"
     },
     "modelSelector": {
@@ -2524,7 +2531,7 @@
       "onlyAddingFiles": "{{total}} கோப்புகளில் {{accepted}} மட்டுமே சேர்க்கிறது (அதிகபட்சம் {{max}})"
     },
     "composer": {
-      "addAttachment": "இணைப்பைச் சேர்க்கவும்",
+      "addAttachment": "இணைப்பு சேர்",
       "removeOrRetryFailed": "தோல்வியடைந்த இணைப்புகளை முதலில் அகற்றவும் அல்லது மீண்டும் முயற்சிக்கவும்.",
       "attachmentsWithSlashCommands": "ஸ்லாஷ் கட்டளைகளுடன் இணைப்புகளை அனுப்ப முடியாது.",
       "photoMetadataNotRemoved": "ஒரு இணைப்பிலிருந்து புகைப்பட மெட்டாடேட்டாவை அகற்ற முடியவில்லை.",
@@ -2610,13 +2617,13 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
-      "open": "திறந்த இழு கோரிக்கை",
+      "open": "திறந்த இழுப்பு கோரிக்கை",
       "closed": "மூடிய இழு கோரிக்கை",
       "merged": "இணைக்கப்பட்ட இழு கோரிக்கை",
-      "draft": "வரைவு இழு கோரிக்கை",
+      "draft": "வரைவு இழுப்பு கோரிக்கை",
       "updating": "புதுப்பிக்கிறது, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "இழு கோரிக்கை"
+      "externalLinkLabel": "இழுப்பு கோரிக்கை"
     }
   },
   "bootstrap": {
@@ -2692,14 +2699,14 @@
     "internetRestored": "இணைய இணைப்பு மீட்டமைக்கப்பட்டது"
   },
   "queryError": {
-    "neutralTitle": "ஏதோ தவறு ஏற்பட்டது",
+    "neutralTitle": "ஏதோ தவறு நடந்தது",
     "neutralDescription": "மீண்டும் முயற்சிக்கவும்.",
     "offlineTitle": "ஏற்ற முடியவில்லை",
-    "offlineDescription": "ஏதோ தவறு ஏற்பட்டது",
+    "offlineDescription": "ஏதோ தவறு நடந்தது",
     "permissionTitle": "அணுகல் மறுக்கப்பட்டது",
     "permissionDescription": "இதைப் பார்க்க உங்களுக்கு அனுமதி இல்லை.",
     "notFoundTitle": "காணப்படவில்லை",
-    "notFoundDescription": "இந்த உருப்படி அகற்றப்பட்டிருக்கலாம் அல்லது இனி கிடைக்காது.",
+    "notFoundDescription": "இந்த உருப்படி நீக்கப்பட்டிருக்கலாம் அல்லது இனி கிடைக்காமல் இருக்கலாம்.",
     "serverTitle": "ஏற்ற முடியவில்லை",
     "serverDescription": "எங்கள் பக்கத்தில் ஏதோ தவறு ஏற்பட்டது. மீண்டும் முயற்சிக்கவும்."
   },
@@ -2961,11 +2968,11 @@
       "sharingUnavailable": "இந்த சாதனத்தில் பகிர்வு கிடைக்கவில்லை.",
       "status": {
         "paid": "செலுத்தப்பட்டது",
-        "open": "திற",
+        "open": "திறந்த",
         "void": "செல்லாது",
         "draft": "வரைவு",
         "uncollectible": "வசூலிக்க முடியாதது",
-        "unknown": "தெரியாதது"
+        "unknown": "தெரியவில்லை"
       }
     },
     "lowBalanceAlert": {
@@ -3000,7 +3007,7 @@
       "limitPerDay": "{{amount}}/நாள்",
       "manageA11y": "{{name}} நிர்வகி",
       "manageInvitationA11y": "{{email}}க்கான அழைப்பை நிர்வகி",
-      "removeConfirm": "அகற்று",
+      "removeConfirm": "நீக்கு",
       "removeMember": "உறுப்பினரை அகற்று",
       "removeMemberMessage": "இந்த நிறுவனத்திலிருந்து {{name}}வை அகற்றவா?",
       "revokeConfirm": "ரத்து செய்",
@@ -3015,7 +3022,7 @@
         "billingManager": "பில்லிங் மேலாளர்"
       },
       "emailStatusFailed": "மின்னஞ்சல் தோல்வியடைந்தது",
-      "emailStatusPending": "நிலுவையில் உள்ளது",
+      "emailStatusPending": "நிலுவையில்",
       "inviteCreated": "அழைப்பு உருவாக்கப்பட்டது",
       "pendingInvitations": "நிலுவையில் உள்ள அழைப்புகள்",
       "resendInvite": "அழைப்பை மீண்டும் அனுப்பு",
@@ -3039,7 +3046,7 @@
       "balance": "இருப்பு",
       "organizationSeats": "நிறுவன இருக்கைகள்",
       "lowBalanceBelow": "{{amount}} க்கு கீழே",
-      "lowBalanceOff": "அணை"
+      "lowBalanceOff": "ஆஃப்"
     },
     "kiloPass": {
       "activating": "செயல்படுத்துகிறது",
@@ -3094,10 +3101,10 @@
     "free": "இலவசம்",
     "couldNotUpdateFavorites": "பிடித்தவைகளைப் புதுப்பிக்க முடியவில்லை",
     "thinkingEffort": {
-      "none": "எதுவும் இல்லை",
+      "none": "ஏதுமில்லை",
       "minimal": "குறைந்தபட்சம்",
       "low": "குறைந்த",
-      "medium": "நடுத்தர",
+      "medium": "நடுத்தரம்",
       "high": "உயர்",
       "xhigh": "மிக உயர்",
       "max": "அதிகபட்சம்"

@@ -38,7 +38,9 @@
     "retry": "Prøv igen",
     "search": "Søg sprog",
     "noMatches": "Ingen sprog matcher",
-    "deviceLanguage": "Enhedens sprog"
+    "deviceLanguage": "Enhedens sprog",
+    "current": "Aktuelt",
+    "allLanguages": "Alle sprog"
   },
   "login": {
     "welcome": "Velkommen til Kilo",
@@ -155,7 +157,7 @@
   "prReview": {
     "pullRequestUnavailable": "Pull request utilgængelig",
     "pullRequestUnavailableDescription": "Denne PR kan ikke åbnes. Den kan være slettet, repositoryet kan være privat, eller Kilo GitHub-appen er ikke installeret på den.",
-    "accessDenied": "Adgang afvist",
+    "accessDenied": "Adgang nægtet",
     "accessDeniedDescription": "Du har ikke tilladelse til at se denne pull request.",
     "noFilesChanged": "Ingen filer ændret",
     "noFilesChangedDescription": "Denne pull request har ingen filændringer.",
@@ -495,7 +497,7 @@
       "checkFailedTitle": "Kunne ikke kontrollere GitHub-forbindelsen",
       "checkFailedMessage": "Login-status er utilgængelig, indtil dette indlæses.",
       "reconnectTitle": "Genskab GitHub-forbindelse",
-      "title": "Opret forbindelse til GitHub",
+      "title": "Tilslut GitHub",
       "reconnectDescription": "Din GitHub-forbindelse blev tilbagekaldt. Genskab forbindelsen for at fortsætte med at anmelde pull requests på mobil.",
       "description": "Opret forbindelse til din GitHub-konto for at anmelde pull requests på mobil."
     },
@@ -778,7 +780,7 @@
       "retrySend": "Prøv at sende igen",
       "moreReactions": "Flere reaktioner",
       "reply": "Svar",
-      "edit": "Rediger",
+      "edit": "redigér",
       "sendFailed": "Kunne ikke sende besked",
       "retrySendFailed": "Kunne ikke prøve at sende igen",
       "editFailed": "Kunne ikke redigere besked",
@@ -941,7 +943,7 @@
       "noModels": "Ingen modeller tilgængelige",
       "noModelsDescription": "Modeller vises her, når de er tilgængelige.",
       "noResultsFor": "Ingen resultater for \"{{query}}\"",
-      "recommended": "Anbefalet"
+      "recommended": "Anbefalede"
     },
     "model": {
       "title": "Model"
@@ -1013,7 +1015,7 @@
       "finishingSetup": "Afslutter opsætning",
       "finishingSetupDescription": "Et øjeblik, vi færdiggør din konto. Dette tager normalt et øjeblik.",
       "getStarted": "Kom i gang",
-      "noInstances": "Ingen KiloClaw-forekomster",
+      "noInstances": "Ingen KiloClaw-instanser",
       "noInstancesDescription": "Opret din første forekomst for at begynde at køre kodningsagenter."
     },
     "instance": {
@@ -1025,7 +1027,7 @@
     "list": {
       "createInstance": "Opret forekomst",
       "organizations": "Organisationer",
-      "personal": "Personligt",
+      "personal": "Personlig",
       "accessIssue": {
         "trialExpired": "Prøveperiode sluttede, abonner for at fortsætte med at bruge denne forekomst",
         "subscriptionCanceled": "Abonnement inaktivt, genabonner for at fortsætte med at bruge denne forekomst",
@@ -1247,7 +1249,7 @@
       "allRepositories": "Alle repositories",
       "bitbucketNoRepositoriesDescription": "Ingen repositories er tilgængelige i dette Bitbucket-område.",
       "bitbucketSetup": "Bitbucket-opsætning",
-      "couldNotOpenGithubSettings": "Kunne ikke åbne GitHub App-indstillinger",
+      "couldNotOpenGithubSettings": "Kunne ikke åbne GitHub-appindstillinger",
       "gitlabNoRepositoriesDescription": "Du skal muligvis give adgang til flere grupper eller projekter på GitLab.",
       "installGithubApp": "Installér GitHub-appen på repositories",
       "installGithubAppDescription": "Giv Kilo GitHub App adgang til de repositories, du vil have gennemgået.",
@@ -1262,7 +1264,7 @@
       "roast": "Brutalt ærlig, på underholdende vis",
       "strict": "Marker alt, hold en høj standard"
     },
-    "title": "Code Reviewer",
+    "title": "Kodeanmelder",
     "reviewDetail": {
       "title": "Gennemgang",
       "cancelTitle": "Annuller gennemgang?",
@@ -1356,7 +1358,7 @@
     "scopeList": {
       "couldNotLoad": "Kunne ikke indlæse organisationer",
       "personalStillAvailable": "Personlige repositories er stadig tilgængelige nedenfor.",
-      "personal": "Personligt",
+      "personal": "Personlig",
       "personalSubtitle": "Dine egne repositories",
       "viewOnly": "Kun visning"
     },
@@ -1406,7 +1408,7 @@
       "noDecision": "Ingen beslutning",
       "noResult": "Intet resultat"
     },
-    "eyebrow": "Code Reviewer",
+    "eyebrow": "Kodeanmelder",
     "updateFailed": "Kunne ikke opdatere Code Reviewer",
     "configSaveFailed": "Kunne ikke gemme gennemgangskonfigurationen",
     "status": {
@@ -1487,16 +1489,16 @@
       "allRepositories": "Alle repositories",
       "all": "Alle",
       "statusOpen": "Åben",
-      "fixed": "Rettet",
+      "fixed": "Løst",
       "statusIgnored": "Ignoreret",
       "statusClosed": "Lukket",
       "severityCritical": "Kritisk",
       "severityHigh": "Høj",
-      "severityMedium": "Medium",
+      "severityMedium": "Middel",
       "severityLow": "Lav",
       "outcomeNotAnalyzed": "Ikke analyseret",
       "outcomeAnalyzing": "Analyserer",
-      "outcomeFailed": "Analyse mislykkedes",
+      "outcomeFailed": "Analysen mislykkedes",
       "outcomeExploitable": "Udnyttelig",
       "outcomeNotExploitable": "Ikke udnyttelig",
       "outcomeSafeToDismiss": "Sikkert at afvise",
@@ -1688,7 +1690,7 @@
       "couldNotLoadSettings": "Kunne ikke indlæse Security Agent-indstillinger",
       "couldNotLoadPermissions": "Kunne ikke indlæse tilladelser",
       "couldNotLoadRepositories": "Kunne ikke indlæse repositories",
-      "securityAgent": "Security Agent",
+      "securityAgent": "Sikkerhedsagent",
       "enabled": "Aktiveret",
       "disabled": "Deaktiveret",
       "on": "Til",
@@ -1723,7 +1725,7 @@
       "retry": "Prøv afhjælpning igen",
       "cancelTitle": "Annullér denne afhjælpning?",
       "cancelMessage": "Security Agent stopper det igangværende afhjælpningsforsøg.",
-      "keepRunning": "Fortsæt med at køre",
+      "keepRunning": "Fortsæt kørsel",
       "cancelRemediation": "Annullér afhjælpning",
       "openPullRequest": "Åbn pull request{{number}}",
       "openDraftPullRequest": "Åbn kladdepull request{{number}}",
@@ -1798,7 +1800,7 @@
       "clearFilters": "Fjern filtre"
     },
     "scopeList": {
-      "title": "Security Agent",
+      "title": "Sikkerhedsagent",
       "couldNotLoad": "Kunne ikke indlæse organisationer",
       "personal": "Personlig",
       "personalSubtitle": "Dine egne repositories"
@@ -1847,7 +1849,7 @@
       "unavailable": "Revisionsrapport utilgængelig",
       "unavailableDescription": "Kun organisationsejere og faktureringsadministratorer kan se revisionsrapporter. Bed en ejer eller faktureringsadministrator om at give dig adgang.",
       "queryFailed": "Rapportforespørgslen blev ikke færdig. Prøv igen.",
-      "checkConnection": "Kontrollér din forbindelse, og prøv igen."
+      "checkConnection": "Tjek din forbindelse og prøv igen."
     },
     "notifications": {
       "couldNotLoad": "Kunne ikke indlæse meddelelsesindstillinger",
@@ -1871,7 +1873,7 @@
       "allRepositories": "Alle repositories",
       "couldNotLoad": "Kunne ikke indlæse repository-indstillinger",
       "couldNotLoadRepositories": "Kunne ikke indlæse repositories",
-      "couldNotOpenGithubSettings": "Kunne ikke åbne GitHub App-indstillinger",
+      "couldNotOpenGithubSettings": "Kunne ikke åbne GitHub-appindstillinger",
       "githubAppSettings": "GitHub App-indstillinger",
       "manageAccess": "Administrer GitHub App-adgang",
       "noRepositories": "Ingen repositories",
@@ -1894,7 +1896,7 @@
     },
     "queuedActionUntracked": "En handling i kø kunne ikke længere spores. Opdater for at se den nyeste tilstand.",
     "initialSyncAdmissionFailed": "Security Agent blev aktiveret, men den indledende synkronisering kunne ikke sættes i kø. Synkronisér igen.",
-    "title": "Security Agent",
+    "title": "Sikkerhedsagent",
     "commands": {
       "findingAlreadyDismissed": "Funden er allerede afvist",
       "findingDismissed": "Fund afvist",
@@ -2122,11 +2124,16 @@
       "couldNotLoadThisSession": "Kunne ikke indlæse denne session",
       "cloneFailed": "Kunne ikke klone denne session.",
       "cloneFailedRetry": "Kunne ikke klone denne session. Prøv igen.",
-      "connectRepositoryToContinue": "Tilslut et repository for at fortsætte."
+      "connectRepositoryToContinue": "Tilslut et repository for at fortsætte.",
+      "notEnoughCredits": "Ikke nok kreditter til at køre Cloud Agent. Tilføj kreditter og prøv igen.",
+      "previousTaskFinishing": "Den forrige opgave er stadig i gang. Vent et øjeblik.",
+      "serviceUnavailable": "Tjenesten er ikke tilgængelig lige nu. Prøv igen.",
+      "connectionTrouble": "Forbindelsesproblem. Prøv igen om et øjeblik.",
+      "modelUnavailable": "Denne model er ikke tilgængelig for Cloud Agent. Vælg en anden model og prøv igen."
     },
     "remoteSession": {
       "failedToCreate": "Kunne ikke oprette fjernsession",
-      "exited": "Session afsluttet",
+      "exited": "Sessionen blev afsluttet",
       "failedToExit": "Kunne ikke afslutte session",
       "exitTitle": "Afslut session?",
       "exitMessage": "Dette stopper den kørende session, men bevarer dens historik.",
@@ -2230,7 +2237,7 @@
       "runOn": "Kør på",
       "runOnAccessibility": "Kør på: {{label}}",
       "couldNotLoad": "Kunne ikke indlæse instanser",
-      "couldNotLoadDescription": "Kontrollér din forbindelse, og prøv igen.",
+      "couldNotLoadDescription": "Tjek din forbindelse og prøv igen.",
       "cloudAgent": "Cloud Agent",
       "loading": "Indlæser…",
       "cloudAgentDescription": "Kør på Kilos cloud-sandkasse",
@@ -2285,7 +2292,7 @@
       "sent": "Sendt",
       "model": "Model",
       "costAndTokens": "Omkostning og tokens",
-      "cost": "Omkostning",
+      "cost": "Pris",
       "input": "Input",
       "output": "Output",
       "reasoning": "Ræsonnement",
@@ -2451,7 +2458,7 @@
     },
     "sessionFilter": {
       "title": "Filtrér sessioner",
-      "sortBy": "Sorter efter",
+      "sortBy": "Sortér efter",
       "sortLastUpdated": "Sidst opdateret",
       "sortCreated": "Oprettet",
       "platform": "Platform",
@@ -2517,8 +2524,8 @@
       "camera": "Kamera",
       "photoLibrary": "Fotobibliotek",
       "files": "Filer",
-      "cameraAccessDisabled": "Kameradgang deaktiveret",
-      "cameraAccessMessage": "Giv kameradgang i Indstillinger for at tage et billede.",
+      "cameraAccessDisabled": "Kameraadgang deaktiveret",
+      "cameraAccessMessage": "Tillad kameraadgang i Indstillinger for at tage et billede.",
       "couldNotOpenPhotoPicker": "Kunne ikke åbne fotovælgeren. Genstart Kilo og prøv igen.",
       "maxFilesAllowed": "Maksimalt {{displayCount}} filer tilladt",
       "onlyAddingFiles": "Tilføjer kun {{accepted}} af {{total}} filer (maks. {{max}})"
@@ -2543,7 +2550,7 @@
       "linkCopied": "Link kopieret",
       "reviewPr": "Gennemgå PR",
       "openLink": "Åbn link",
-      "copyLink": "Kopier link",
+      "copyLink": "Kopiér link",
       "shareLink": "Del link",
       "share": "Del",
       "prLinkActions": "PR-linkhandlinger",
@@ -2699,7 +2706,7 @@
     "permissionTitle": "Adgang nægtet",
     "permissionDescription": "Du har ikke tilladelse til at se dette.",
     "notFoundTitle": "Ikke fundet",
-    "notFoundDescription": "Denne vare kan være fjernet eller er ikke længere tilgængelig.",
+    "notFoundDescription": "Dette element kan være blevet fjernet eller er ikke længere tilgængeligt.",
     "serverTitle": "Kunne ikke indlæse",
     "serverDescription": "Noget gik galt på vores side. Prøv igen."
   },
@@ -2810,7 +2817,7 @@
     "unavailableDescription": "Kilo Pass er ikke tilgængelig som et køb i appen på Android. Administrér det på nettet.",
     "webManagementDescription": "Denne Kilo Pass administreres på nettet.",
     "legalDisclosure": "Kilo Pass er et automatisk fornyeligt månedligt abonnement. Betaling opkræves på din Apple ID ved bekræftelse af købet. Abonnementer fornyes automatisk hver måned til den viste pris, medmindre de annulleres mindst 24 timer før udløbet af den aktuelle periode. Administrér eller annullér når som helst i dine App Store-kontoindstillinger.",
-    "legalPrivacyPolicy": "Fortrolighedspolitik",
+    "legalPrivacyPolicy": "Privatlivspolitik",
     "legalTermsOfUse": "Vilkår for brug (EULA)",
     "purchaseDifferentAccount": "Dette App Store-køb er ikke knyttet til din Kilo-konto. Log ind på den Apple-konto, der blev brugt til købet, og prøv igen.",
     "restoreFailed": "Kunne ikke gendanne køb. Prøv igen.",
@@ -3026,7 +3033,7 @@
       "title": "Adgang nægtet"
     },
     "usageStats": {
-      "cost": "Omkostning",
+      "cost": "Pris",
       "inputTokens": "Input-tokens",
       "last30Days": "Sidste 30 dage",
       "outputTokens": "Output-tokens",
@@ -3073,12 +3080,12 @@
     "invalidCode": "Den kode er forkert. Prøv venligst igen.",
     "codeInProgress": "Din kode behandles. Vent et øjeblik, og prøv igen.",
     "tooManyAttempts": "For mange forsøg. Anmod venligst om en ny kode.",
-    "invalidToken": "Login mislykkedes. Prøv venligst igen.",
+    "invalidToken": "Login mislykkedes. Prøv igen.",
     "invalidEmail": "Det er ikke muligt at levere e-mail til denne adresse. Brug venligst en anden e-mail.",
     "invalidRequest": "Kontrollér din e-mailadresse, og prøv igen.",
     "emailDeliveryFailed": "E-maillevering er midlertidigt utilgængelig. Prøv venligst igen senere.",
     "admissionRequired": "Din enhed kan ikke verificeres. Brug '$t(login.moreSignInOptions)' for at logge ind på en anden enhed eller via nettet.",
-    "default": "Der gik noget galt. Prøv venligst igen.",
+    "default": "Noget gik galt. Prøv igen.",
     "retryableAdmission": "Vi kunne ikke verificere denne enhed. Kontrollér din forbindelse, og prøv igen.",
     "startSignInFailed": "Kunne ikke starte login. Prøv igen.",
     "couldNotOpenBrowser": "Kunne ikke åbne browseren. Prøv igen.",
@@ -3097,7 +3104,7 @@
       "none": "Ingen",
       "minimal": "Minimal",
       "low": "Lav",
-      "medium": "Mellem",
+      "medium": "Middel",
       "high": "Høj",
       "xhigh": "Ekstra høj",
       "max": "Maks"

@@ -38,7 +38,9 @@
     "retry": "Retry",
     "search": "Search languages",
     "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "deviceLanguage": "Device language",
+    "current": "Current",
+    "allLanguages": "All languages"
   },
   "login": {
     "welcome": "Welcome to Kilo",
@@ -2122,7 +2124,12 @@
       "couldNotLoadThisSession": "Couldn't load this session",
       "cloneFailed": "Couldn't clone this session.",
       "cloneFailedRetry": "Couldn't clone this session. Try again.",
-      "connectRepositoryToContinue": "Connect a repository to continue."
+      "connectRepositoryToContinue": "Connect a repository to continue.",
+      "notEnoughCredits": "Not enough credits to run Cloud Agent. Add credits and try again.",
+      "previousTaskFinishing": "The previous task is still finishing. Please wait a moment.",
+      "serviceUnavailable": "The service is unavailable right now. Please try again.",
+      "connectionTrouble": "Connection trouble. Please retry in a moment.",
+      "modelUnavailable": "This model isn't available for Cloud Agent. Choose another model and try again."
     },
     "remoteSession": {
       "failedToCreate": "Failed to create remote session",

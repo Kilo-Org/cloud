@@ -7,7 +7,7 @@
     "continue": "جاری رکھیں",
     "notNow": "ابھی نہیں",
     "language": "زبان",
-    "device": "آلہ",
+    "device": "ڈیوائس",
     "share": "{{title}} شیئر کریں",
     "justNow": "ابھی ابھی",
     "couldNotSaveSetting": "ترتیب محفوظ نہیں ہو سکی",
@@ -38,7 +38,9 @@
     "retry": "دوبارہ کوشش کریں",
     "search": "زبانیں تلاش کریں",
     "noMatches": "کوئی زبان نہیں ملتی",
-    "deviceLanguage": "آلے کی زبان"
+    "deviceLanguage": "آلے کی زبان",
+    "current": "موجودہ",
+    "allLanguages": "تمام زبانیں"
   },
   "login": {
     "welcome": "Kilo میں خوش آمدید",
@@ -101,7 +103,7 @@
     "app": "ایپ",
     "preferences": "ترجیحات",
     "preferencesSubtitle": "ظاہری شکل، اطلاعیں، سوچ، اور اسکرین کا رویہ",
-    "deviceSessions": "آلہ سیشنز",
+    "deviceSessions": "ڈیوائس سیشنز",
     "deviceSessionsSubtitle": "دوسرے آلات کا جائزہ لیں اور سائن آؤٹ کریں",
     "feedback": "رائے",
     "privacyChoices": "رازداری کے انتخاب",
@@ -353,7 +355,7 @@
       "replyPlaceholder": "جواب...",
       "replyBody": "جواب کا متن",
       "submitReply": "جواب جمع کریں",
-      "reply": "جواب",
+      "reply": "جواب دیں",
       "termsTitle": "خدمت کی شرائط",
       "termsCopy": "پوسٹ کرنے کے لیے آپ کی عمر 13 یا اس سے زیادہ ہونی چاہیے۔",
       "termsAcceptRetry": "شرائط قبول نہیں ہو سکیں۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
@@ -412,7 +414,7 @@
       },
       "deletedUser": "حذف شدہ صارف"
     },
-    "couldNotOpenGitHubAppSettings": "GitHub ایپ کی سیٹنگز نہیں کھلی سکیں",
+    "couldNotOpenGitHubAppSettings": "GitHub App کی ترتیبات نہیں کھل سکیں",
     "installKiloGitHubApp": "Kilo GitHub ایپ انسٹال کریں",
     "connectionExpiredTitle": "GitHub کنکشن ختم ہو گیا",
     "connectionExpiredDescription": "آپ کا GitHub کنکشن اب درست نہیں ہے۔ اپنا کنکشن دوبارہ چیک کریں — ضرورت پڑنے پر آپ کو دوبارہ منسلک ہونے کا کہا جائے گا۔",
@@ -539,7 +541,7 @@
       "stateOpenReviewRequired": "کھلا · جائزہ مطلوبہ",
       "stateOpen": "کھلا",
       "unknownAuthor": "نامعلوم مصنف",
-      "commit_one": "کمیٹ",
+      "commit_one": "کمٹ",
       "commit": "کمیٹیں",
       "commit_other": "کمیٹیں",
       "file_one": "فائل",
@@ -634,7 +636,7 @@
     "previewFullDescription": "اطلاعیں آپ کی لاک اسکرین پر پیغام کا متن دکھاتی ہیں۔",
     "previewGenericDescription": "اطلاعیں دکھاتی ہیں کہ کچھ ہوا ہے۔ پڑھنے کے لیے Kilo کھولیں۔",
     "channel": {
-      "agent": "ایجینٹ سیشنز",
+      "agent": "ایجنٹ سیشنز",
       "chat": "چیٹ پیغامات",
       "kiloclaw": "KiloClaw سرگرمی",
       "balance": "بیلنس الرٹس",
@@ -778,7 +780,7 @@
       "retrySend": "دوبارہ بھیجیں",
       "moreReactions": "مزید ری ایکشنز",
       "reply": "جواب دیں",
-      "edit": "ترمیم",
+      "edit": "ترمیم کریں",
       "sendFailed": "پیغام بھیجنے میں ناکامی",
       "retrySendFailed": "دوبارہ بھیجنے میں ناکامی",
       "editFailed": "پیغام میں ترمیم کرنے میں ناکامی",
@@ -1141,7 +1143,7 @@
       "frontierDescription": "اعلیٰ ترین کارکردگی۔ استدلال کے ساتھ فرنٹیئر ماڈلز کی طرف رہنمائی کرتا ہے۔",
       "balancedLabel": "متوازن",
       "balancedDescription": "کم قیمت پر رفتار اور صلاحیت کا سمارٹ توازن۔",
-      "cost": "قیمت",
+      "cost": "لاگت",
       "performance": "کارکردگی",
       "autoModelA11y": "{{label}} آٹو ماڈل",
       "currentModel": "موجودہ ماڈل",
@@ -1247,7 +1249,7 @@
       "allRepositories": "تمام ریپوزٹریز",
       "bitbucketNoRepositoriesDescription": "اس Bitbucket ورک اسپیس میں کوئی ریپوزٹری دستیاب نہیں ہے۔",
       "bitbucketSetup": "Bitbucket سیٹ اپ",
-      "couldNotOpenGithubSettings": "GitHub App ترتیبات نہیں کھولی جا سکیں",
+      "couldNotOpenGithubSettings": "GitHub App کی ترتیبات نہیں کھل سکیں",
       "gitlabNoRepositoriesDescription": "آپ کو GitLab پر مزید گروپس یا پروجیکٹس تک رسائی دینے کی ضرورت پڑ سکتی ہے۔",
       "installGithubApp": "ریپوزٹریز پر GitHub ایپ انسٹال کریں",
       "installGithubAppDescription": "Kilo GitHub ایپ کو ان ریپوزٹریز تک رسائی دیں جن کا آپ جائزہ لینا چاہتے ہیں۔",
@@ -1285,7 +1287,7 @@
       "created": "تخلیق شدہ",
       "started": "شروع ہوا",
       "completed": "مکمل ہوا",
-      "cost": "قیمت",
+      "cost": "لاگت",
       "tokens": "ٹوکنز",
       "tokensInOut": "{{input}} داخل / {{output}} خارج",
       "openPullRequest": "پل ریکویسٹ کھولیں",
@@ -1491,16 +1493,16 @@
       "statusIgnored": "نظر انداز کیا گیا",
       "statusClosed": "بند",
       "severityCritical": "سنگین",
-      "severityHigh": "اعلی",
-      "severityMedium": "درمیانہ",
+      "severityHigh": "اعلیٰ",
+      "severityMedium": "درمیانی",
       "severityLow": "کم",
       "outcomeNotAnalyzed": "تجزیہ نہیں کیا گیا",
       "outcomeAnalyzing": "تجزیہ ہو رہا ہے",
       "outcomeFailed": "تجزیہ ناکام",
-      "outcomeExploitable": "استعمال کے قابل",
-      "outcomeNotExploitable": "استعمال کے قابل نہیں",
+      "outcomeExploitable": "قابلِ استحصال",
+      "outcomeNotExploitable": "قابلِ استحصال نہیں",
       "outcomeSafeToDismiss": "مسترد کرنا محفوظ",
-      "outcomeNeedsReview": "جائزے کی ضرورت",
+      "outcomeNeedsReview": "جائزے کی ضرورت ہے",
       "outcomeTriageComplete": "ٹرائج مکمل",
       "outcomeDismissed": "مسترد کیا گیا",
       "sortSeverityDesc": "شدت: اعلی سے کم",
@@ -1652,7 +1654,7 @@
     "findingDetails": {
       "supersededBy": "موجودہ نتیجے سے تبدیل شدہ",
       "supersededByDescription": "حالت، تجزیہ اور اصلاح کے لیے موجودہ ریکارڈ کھولنے کے لیے تھپتھپائیں۔",
-      "dismissed": "خارج کیا گیا",
+      "dismissed": "مسترد کیا گیا",
       "dismissedBecause": "کیونکہ خارج کیا گیا: {{reason}}۔",
       "severityLabel": "{{severity}} شدت",
       "package": "پیکیج",
@@ -1688,11 +1690,11 @@
       "couldNotLoadSettings": "سکیورٹی ایجنٹ کی ترتیبات لوڈ نہیں ہو سکیں",
       "couldNotLoadPermissions": "اجازتیں لوڈ نہیں ہو سکیں",
       "couldNotLoadRepositories": "ریپوزٹریز لوڈ نہیں ہو سکیں",
-      "securityAgent": "سکیورٹی ایجنٹ",
+      "securityAgent": "سیکیورٹی ایجنٹ",
       "enabled": "فعال",
       "disabled": "غیر فعال",
       "on": "آن",
-      "off": "آف",
+      "off": "بند",
       "allRepositories": "تمام ریپوزٹریز",
       "repositoriesCount_one": "{{displayCount}} ریپوزٹری منتخب",
       "repositoriesCount": "{{displayCount}} ریپوزٹریز منتخب",
@@ -1702,10 +1704,10 @@
       "repositories": "ریپوزٹریز",
       "modelsAndAnalysis": "ماڈلز اور تجزیہ",
       "analysisModeSubtitle": "{{mode}} تجزیہ",
-      "automation": "خودکار کاری",
+      "automation": "آٹومیشن",
       "automationAllOff": "سب آف",
       "automationCount": "{{displayCount}} میں سے 3 فعال",
-      "notifications": "اطلاعات",
+      "notifications": "اطلاعیں",
       "notificationsCount": "{{displayCount}} میں سے 2 فعال",
       "slaPolicy": "SLA پالیسی",
       "disabledNoManage": "سکیورٹی ایجنٹ غیر فعال ہے۔ صرف تنظیم کے مالکان اور بلنگ مینیجر اسے آن کر سکتے ہیں۔",
@@ -1715,7 +1717,7 @@
     "remediation": {
       "cancellationRequested": "منسوخی کی درخواست کی گئی",
       "cancelled": "اصلاح منسوخ",
-      "pullRequest": "pull request",
+      "pullRequest": "پل ریکویسٹ",
       "couldNotLoad": "اصلاح کی حالت لوڈ نہیں ہو سکی",
       "noAnalysisTitle": "ابھی کوئی تجزیہ نہیں",
       "noAnalysisDescription": "تفصیلات کے ٹیب سے ایک چلائیں",
@@ -1723,7 +1725,7 @@
       "retry": "اصلاح دوبارہ آزمائیں",
       "cancelTitle": "کیا یہ اصلاح منسوخ کریں؟",
       "cancelMessage": "سکیورٹی ایجنٹ جاری اصلاح کی کوشش روک دے گا۔",
-      "keepRunning": "چلاتے رہیں",
+      "keepRunning": "چلتے رہنے دیں",
       "cancelRemediation": "اصلاح منسوخ کریں",
       "openPullRequest": "Pull request کھولیں{{number}}",
       "openDraftPullRequest": "ڈرافٹ pull request کھولیں{{number}}",
@@ -1737,7 +1739,7 @@
       "retryQueued": "اصلاح دوبارہ آزمائش قطار میں ہے",
       "timeline": {
         "queued": "اصلاح کی درخواست کی گئی",
-        "prOpened": "PR کھلا",
+        "prOpened": "PR کھولا گیا",
         "failed": "اصلاح ناکام",
         "blocked": "اصلاح مسدود",
         "noChangesNeeded": "کوئی تبدیلی درکار نہیں",
@@ -1761,7 +1763,7 @@
     "sla": {
       "title": "SLA پالیسی",
       "couldNotLoad": "SLA ترتیبات لوڈ نہیں ہو سکیں",
-      "critical": "نازک",
+      "critical": "سنگین",
       "high": "اعلیٰ",
       "medium": "درمیانی",
       "low": "کم",
@@ -1798,13 +1800,13 @@
       "clearFilters": "فلٹرز صاف کریں"
     },
     "scopeList": {
-      "title": "سکیورٹی ایجنٹ",
+      "title": "سیکیورٹی ایجنٹ",
       "couldNotLoad": "تنظیمیں لوڈ نہیں ہو سکیں",
       "personal": "ذاتی",
       "personalSubtitle": "آپ کی اپنی ریپوزٹریز"
     },
     "commandRetry": {
-      "discard": "خارج کریں"
+      "discard": "ضائع کریں"
     },
     "findingRow": {
       "nextRemediationPrOpen": "اصلاح PR کھلا",
@@ -1824,7 +1826,7 @@
       "couldNotOpenGithub": "GitHub نہیں کھل سکا۔ براہ کرم دوبارہ کوشش کریں۔"
     },
     "settingsSave": {
-      "discard": "خارج کریں",
+      "discard": "ضائع کریں",
       "keepEditing": "ترمیم جاری رکھیں",
       "saveChanges": "تبدیلیاں محفوظ کریں",
       "unsavedTitle": "غیر محفوظ تبدیلیاں",
@@ -1865,7 +1867,7 @@
       "slaSection": "SLA انتباہ کی اطلاع",
       "slaSeverityLabel": "SLA اطلاع کی کم از کم شدت",
       "slaSubtitle": "اس سے پہلے اور جب نتائج اپنی SLA آخری تاریخ کے قریب آئیں یا اس کی خلاف ورزی کریں بھیجی جاتی ہے۔",
-      "title": "اطلاعات"
+      "title": "اطلاعیں"
     },
     "repositories": {
       "allRepositories": "تمام ریپوزٹریز",
@@ -1878,7 +1880,7 @@
       "noRepositoriesDescription": "Kilo GitHub App کو ریپوزٹریز تک رسائی دیں",
       "readOnly": "صرف تنظیم کے مالکان اور بلنگ مینیجر یہ ترتیبات تبدیل کر سکتے ہیں۔",
       "selectAtLeastOne": "کم از کم ایک ریپوزٹری منتخب کریں۔",
-      "selectedRepositories": "منتخب شدہ ریپوزٹریز",
+      "selectedRepositories": "منتخب ریپوزٹریز",
       "title": "ریپوزٹریز"
     },
     "scopeEntry": {
@@ -1894,7 +1896,7 @@
     },
     "queuedActionUntracked": "قطار میں موجود عمل کا مزید سراغ نہیں لگایا جا سکا۔ تازہ ترین حالت دیکھنے کے لیے تازہ کریں۔",
     "initialSyncAdmissionFailed": "سکیورٹی ایجنٹ فعال کیا گیا، لیکن ابتدائی ہم آہنگی قطار میں نہیں لگائی جا سکی۔ دوبارہ ہم آہنگ کریں۔",
-    "title": "سکیورٹی ایجنٹ",
+    "title": "سیکیورٹی ایجنٹ",
     "commands": {
       "findingAlreadyDismissed": "نتیجہ پہلے ہی خارج کیا جا چکا ہے",
       "findingDismissed": "نتیجہ خارج کر دیا گیا",
@@ -1936,7 +1938,7 @@
       "safeToDismissTitle": "مسترد کرنا محفوظ",
       "safeToDismissDescription": "چھانٹی نے طے کیا کہ اسے کوڈبیس تجزیے کے بغیر محفوظ طریقے سے مسترد کیا جا سکتا ہے۔",
       "manualReview": "جائزے کی ضرورت ہے",
-      "manualReviewTitle": "دستی جائزے کی ضرورت ہے",
+      "manualReviewTitle": "دستی جائزہ درکار ہے",
       "manualReviewDescription": "چھانٹی نے اس نتیجے کو دستی جائزے کے لیے نشان زد کیا۔",
       "analysisRequired": "تجزیہ درکار ہے",
       "analysisRequiredTitle": "کوڈبیس تجزیہ درکار ہے",
@@ -2106,7 +2108,7 @@
       "couldNotLoad": "سیشن لوڈ نہیں ہو سکا",
       "failedToLoadDetails": "سیشن کی تفصیلات لوڈ نہیں ہو سکیں",
       "notFound": "نہیں ملا",
-      "notFoundDescription": "یہ شے شاید ہٹا دی گئی ہو یا اب دستیاب نہیں۔",
+      "notFoundDescription": "یہ آئٹم ہٹا دیا گیا ہو سکتا ہے یا اب دستیاب نہیں ہے۔",
       "failedToStopExecution": "عمل درآمد روکنا ناکام",
       "renameSession": "سیشن کا نام تبدیل کریں",
       "renamePlaceholder": "سیشن کا نام",
@@ -2122,11 +2124,16 @@
       "couldNotLoadThisSession": "یہ سیشن لوڈ نہیں ہو سکا",
       "cloneFailed": "یہ سیشن کلون نہیں ہو سکا۔",
       "cloneFailedRetry": "یہ سیشن کلون نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
-      "connectRepositoryToContinue": "جاری رکھنے کے لیے ریپوزٹری جڑیں۔"
+      "connectRepositoryToContinue": "جاری رکھنے کے لیے ریپوزٹری جڑیں۔",
+      "notEnoughCredits": "Cloud Agent چلانے کے لیے کافی کریڈٹس نہیں ہیں۔ کریڈٹس شامل کریں اور دوبارہ کوشش کریں۔",
+      "previousTaskFinishing": "پچھلا کام ابھی مکمل ہو رہا ہے۔ براہ کرم ایک لمحہ انتظار کریں۔",
+      "serviceUnavailable": "سروس اس وقت دستیاب نہیں ہے۔ براہ کرم دوبارہ کوشش کریں۔",
+      "connectionTrouble": "کنکشن کا مسئلہ۔ براہ کرم ایک لمحے بعد دوبارہ کوشش کریں۔",
+      "modelUnavailable": "یہ ماڈل Cloud Agent کے لیے دستیاب نہیں ہے۔ کوئی اور ماڈل منتخب کر کے دوبارہ کوشش کریں۔"
     },
     "remoteSession": {
       "failedToCreate": "ریموٹ سیشن بنانا ناکام",
-      "exited": "سیشن سے باہر نکل گیا",
+      "exited": "سیشن ختم ہو گیا",
       "failedToExit": "سیشن سے باہر نکلنا ناکام",
       "exitTitle": "سیشن سے باہر نکلیں؟",
       "exitMessage": "یہ چلتے ہوئے سیشن کو روکتا ہے لیکن اس کی تاریخ محفوظ رکھتا ہے۔",
@@ -2147,7 +2154,7 @@
       "title": "نیا سیشن",
       "repository": "ریپوزٹری",
       "couldNotLoadRepositories": "ریپوزٹریز لوڈ نہیں ہو سکیں",
-      "connectGithub": "GitHub جڑیں",
+      "connectGithub": "GitHub منسلک کریں",
       "connectGithubDescription": "اپنے براؤزر میں GitHub سے جڑیں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
       "openGithub": "GitHub کھولیں",
       "refreshRepositories": "ریپوزٹریز تازہ کریں",
@@ -2167,7 +2174,7 @@
       "commitAndPush": "کمٹ اور پش کریں",
       "startSession": "سیشن شروع کریں",
       "promptPlaceholder": "آپ کس چیز پر کام کرنا چاہیں گے؟",
-      "addAttachment": "منسلکہ شامل کریں",
+      "addAttachment": "اٹیچمنٹ شامل کریں",
       "couldNotLoadModels": "ماڈلز لوڈ نہیں ہو سکے",
       "prefillRepoAndModelUnavailable": "اصل سیشن کی ریپوزٹری اور ماڈل اب دستیاب نہیں۔ انہیں نیچے منتخب کریں۔",
       "prefillRepoUnavailable": "{{repo}} اب دستیاب نہیں۔ نیچے ریپوزٹری منتخب کریں۔",
@@ -2178,7 +2185,7 @@
       "discardDraftTitle": "ڈرافٹ خارج کریں؟",
       "discardDraftMessage": "آپ کا پرامپٹ ضائع ہو جائے گا۔",
       "keepEditing": "ترمیم جاری رکھیں",
-      "discard": "خارج کریں",
+      "discard": "ضائع کریں",
       "discardFailed": "ڈرافٹ خارج نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
@@ -2188,8 +2195,8 @@
       "updatedFileCount_other": "{{displayCount}} فائلیں اپ ڈیٹ ہوئیں"
     },
     "toolPatch": {
-      "operationAdded": "شامل کیا گیا",
-      "operationDeleted": "حذف کیا گیا",
+      "operationAdded": "شامل شدہ",
+      "operationDeleted": "حذف شدہ",
       "operationUpdated": "اپ ڈیٹ کیا گیا"
     },
     "toolCard": {
@@ -2250,7 +2257,7 @@
     },
     "modeOptions": {
       "code": "کوڈ",
-      "plan": "پلان",
+      "plan": "منصوبہ",
       "debug": "ڈی بگ",
       "orchestrator": "آرکیسٹریٹر",
       "ask": "پوچھیں",
@@ -2294,7 +2301,7 @@
       "total": "کل",
       "reportAiResponseFailedRetryable": "یہ جواب رپورٹ نہیں ہو سکا۔",
       "reportAiResponseFailedTerminal": "یہ جواب رپورٹ نہیں کیا جا سکتا۔",
-      "reportAiResponseSubmitted": "رپورٹ جمع کرائی گئی۔ رسید {{receiptId}}"
+      "reportAiResponseSubmitted": "رپورٹ جمع ہو گئی۔ رسید {{receiptId}}"
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2507,7 +2514,7 @@
       "uploading": "اپ لوڈ ہو رہا ہے…",
       "uploaded": "اپ لوڈ ہو گیا",
       "uploadFailedRetry": "اپ لوڈ ناکام۔ دوبارہ کوشش کے لیے تھپتھپائیں۔",
-      "uploadFailedTerminal": "یہ فائل اپ لوڈ نہیں ہو سکتی۔"
+      "uploadFailedTerminal": "یہ فائل اپ لوڈ نہیں کی جا سکتی۔"
     },
     "attachmentPasteHint": {
       "accessibility": "کلپ بورڈ سے تصویر چسپاں کریں",
@@ -2517,8 +2524,8 @@
       "camera": "کیمرہ",
       "photoLibrary": "فوٹو لائبریری",
       "files": "فائلیں",
-      "cameraAccessDisabled": "کیمرہ رسائی غیر فعال",
-      "cameraAccessMessage": "تصویر لینے کے لیے سیٹنگز میں کیمرہ رسائی کی اجازت دیں۔",
+      "cameraAccessDisabled": "کیمرے تک رسائی غیر فعال ہے",
+      "cameraAccessMessage": "تصویر لینے کے لیے ترتیبات میں کیمرے تک رسائی کی اجازت دیں۔",
       "couldNotOpenPhotoPicker": "فوٹو پیکر نہیں کھل سکا۔ Kilo کو دوبارہ شروع کریں اور دوبارہ کوشش کریں۔",
       "maxFilesAllowed": "زیادہ سے زیادہ {{displayCount}} فائلیں مجاز ہیں",
       "onlyAddingFiles": "صرف {{accepted}} میں سے {{total}} فائلیں شامل کر رہے ہیں (زیادہ سے زیادہ {{max}})"
@@ -2682,7 +2689,7 @@
     "title": "صفحہ نہیں ملا"
   },
   "monoScrollBlock": {
-    "contentTruncated": "مواد کاٹا گیا",
+    "contentTruncated": "مواد کٹا ہوا",
     "truncated": "کٹا ہوا",
     "wrap": "لپیٹیں",
     "scroll": "اسکرول کریں"
@@ -2697,7 +2704,7 @@
     "offlineTitle": "لوڈ کرنے میں ناکامی",
     "offlineDescription": "کچھ غلط ہو گیا",
     "permissionTitle": "رسائی مسترد",
-    "permissionDescription": "آپ کو یہ دیکھنے کی اجازت نہیں ہے۔",
+    "permissionDescription": "آپ کے پاس اسے دیکھنے کی اجازت نہیں۔",
     "notFoundTitle": "نہیں ملا",
     "notFoundDescription": "یہ آئٹم ہٹا دیا گیا ہو سکتا ہے یا اب دستیاب نہیں ہے۔",
     "serverTitle": "لوڈ نہیں ہو سکا",
@@ -2714,7 +2721,7 @@
     "optionsExpiredDescription": "واپس جائیں اور اس پیکر کو پچھلی اسکرین سے دوبارہ کھولیں۔"
   },
   "sessionRow": {
-    "needsInput": "معلومات درکار ہیں"
+    "needsInput": "ان پٹ درکار"
   },
   "voiceInput": {
     "listening": "سن رہے ہیں...",
@@ -3097,8 +3104,8 @@
       "none": "کوئی نہیں",
       "minimal": "کم سے کم",
       "low": "کم",
-      "medium": "درمیانہ",
-      "high": "زیادہ",
+      "medium": "درمیانی",
+      "high": "اعلیٰ",
       "xhigh": "بہت زیادہ",
       "max": "زیادہ سے زیادہ"
     }

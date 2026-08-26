@@ -1597,6 +1597,13 @@
       "when": 1787685886103,
       "tag": "0227_exotic_scarecrow",
       "breakpoints": true
+    },
+    {
+      "idx": 228,
+      "version": "7",
+      "when": 1787728280349,
+      "tag": "0228_faithful_thanos",
+      "breakpoints": true
     }
   ]
 }

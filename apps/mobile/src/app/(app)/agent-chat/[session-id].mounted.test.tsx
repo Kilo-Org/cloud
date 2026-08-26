@@ -52,7 +52,11 @@ vi.mock('@/components/invalid-route-state', () => ({
 
 vi.mock('@/components/agents/session-detail-content', () => ({
   SessionDetailContent: 'SessionDetailContent',
+}));
+
+vi.mock('@/components/agents/session-detail-skeleton', () => ({
   SessionSkeletonMessages: 'SessionSkeletonMessages',
+  SessionComposerSkeleton: 'SessionComposerSkeleton',
 }));
 
 vi.mock('@/components/agents/session-connection-indicator', () => ({

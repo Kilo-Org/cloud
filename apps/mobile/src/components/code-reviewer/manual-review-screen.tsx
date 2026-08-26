@@ -176,8 +176,8 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         eyebrow={t('codeReviewer.title')}
       />
       <TabScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4"
+        className="flex-1"
+        contentContainerClassName="px-6 gap-6 pt-4"
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"

@@ -38,7 +38,9 @@
     "catalogLoadFailed": "Impossibile caricare la lingua. Riprova.",
     "search": "Cerca lingue",
     "noMatches": "Nessuna lingua corrisponde",
-    "deviceLanguage": "Lingua del dispositivo"
+    "deviceLanguage": "Lingua del dispositivo",
+    "current": "Attuale",
+    "allLanguages": "Tutte le lingue"
   },
   "login": {
     "welcome": "Benvenuto su Kilo",
@@ -319,7 +321,7 @@
       "photoLibrary": "Libreria foto",
       "files": "File",
       "cameraAccessDisabled": "Accesso alla fotocamera disattivato",
-      "cameraAccessMessage": "Consenti l'accesso alla fotocamera in Impostazioni per scattare una foto."
+      "cameraAccessMessage": "Consenti l'accesso alla fotocamera nelle Impostazioni per scattare una foto."
     },
     "typingIndicator": {
       "someone": "Qualcuno",
@@ -456,11 +458,11 @@
       "connected": "Connesso",
       "copied": "Copiato!",
       "copyCommand": "Copia comando",
-      "disabled": "Disattivato",
+      "disabled": "Disabilitato",
       "disconnectConfirm": "Disconnetti",
       "disconnectMessage": "Rimuovere il tuo account Google da questa istanza? Questo disattiverà le notifiche Gmail. Ridistribuisci dopo la disconnessione per applicare le modifiche.",
       "disconnectTitle": "Disconnetti Google",
-      "enabled": "Attivato",
+      "enabled": "Abilitato",
       "notConnected": "Non connesso"
     },
     "modelList": {
@@ -595,7 +597,7 @@
         "subscriptionCanceled": "Abbonamento non attivo, riabbonati per continuare a usare questa istanza",
         "subscriptionPastDue": "Problema di pagamento, aggiorna la fatturazione per continuare a usare questa istanza",
         "quarantined": "Istanza in quarantena, richiede una revisione manuale",
-        "multipleCurrentConflict": "L'account richiede una revisione",
+        "multipleCurrentConflict": "L'account richiede una verifica",
         "nonCanonicalEarlybird": "Il piano legacy richiede una revisione"
       }
     },
@@ -630,7 +632,7 @@
         "openKiloAi": "Apri kilo.ai",
         "provisioning": "Provisioning",
         "ready": "Pronto",
-        "review": "Verifica",
+        "review": "Revisione",
         "settingUp": "Configurazione…",
         "somethingWentWrong": "Qualcosa è andato storto"
       },
@@ -772,11 +774,11 @@
     },
     "repos": {
       "title": "Repository",
-      "couldNotLoad": "Impossibile caricare i repository",
+      "couldNotLoad": "Impossibile caricare le repository",
       "unavailable": "Repository non disponibili — completa la configurazione di Bitbucket su kilo.ai.",
       "finishSetup": "Completa la configurazione",
       "manageAccess": "Gestisci accesso",
-      "allRepositories": "Tutti i repository",
+      "allRepositories": "Tutte le repository",
       "bitbucketNoRepositoriesDescription": "Nessun repository è disponibile in questo workspace Bitbucket.",
       "bitbucketSetup": "Configurazione Bitbucket",
       "couldNotOpenGithubSettings": "Impossibile aprire le impostazioni della GitHub App",
@@ -785,7 +787,7 @@
       "installGithubAppDescription": "Concedi alla Kilo GitHub App l'accesso ai repository che vuoi far revisionare.",
       "noRepositoriesFound": "Nessun repository trovato",
       "repositoryAccess": "accesso al repository",
-      "selectedRepositories": "Repository selezionati"
+      "selectedRepositories": "Repository selezionate"
     },
     "style": {
       "title": "Stile di revisione",
@@ -859,7 +861,7 @@
       "couldNotGetLatest": "Impossibile ottenere l'ultima versione.",
       "couldNotLoad": "Impossibile caricare la revisione",
       "council": "Council",
-      "created": "Creata",
+      "created": "Creato",
       "decision": "Decisione",
       "details": "Dettagli",
       "findings": "Rilievi",
@@ -910,7 +912,7 @@
       "couldNotLoad": "Impossibile caricare le organizzazioni",
       "personal": "Personale",
       "personalStillAvailable": "I repository personali sono ancora disponibili qui sotto.",
-      "personalSubtitle": "I tuoi repository",
+      "personalSubtitle": "Le tue repository",
       "viewOnly": "Sola visualizzazione"
     },
     "selectRepositories": "Seleziona repository",
@@ -927,7 +929,7 @@
     "eyebrow": "Code Reviewer",
     "overview": {
       "allAreas": "Tutte le aree",
-      "allRepositories": "Tutti i repository",
+      "allRepositories": "Tutte le repository",
       "customInstructions": "Istruzioni personalizzate",
       "focusAreas": "Aree di interesse",
       "mergeGate": "Gate di merge",
@@ -968,7 +970,7 @@
       "off": "Disattivato",
       "all": "Tutti",
       "warning": "Avviso",
-      "critical": "Critico"
+      "critical": "Critica"
     },
     "actionRequired": {
       "githubInstallationRequired": {
@@ -1085,7 +1087,7 @@
       "checkConnection": "Controlla la connessione e riprova.",
       "couldNotLoad": "Impossibile caricare il report di audit",
       "events": "Eventi",
-      "findings": "Risultati",
+      "findings": "Rilievi",
       "generated": "Generato il {{generatedAt}}",
       "noActivity": "Nessuna attività registrata",
       "noActivityDescription": "Kilo non ha attività di Security Finding segnalabili da {{start}} a {{end}}.",
@@ -1149,7 +1151,7 @@
       "daysOverdue": "{{displayCount}} giorni di ritardo",
       "deadlineToday": "Scadenza raggiunta oggi",
       "filterByRepository": "Filtra per repository",
-      "findings": "Risultati",
+      "findings": "Rilievi",
       "findingsCount": "{{displayCount}} risultati",
       "highOverdue": "Alti in ritardo",
       "lastSynced": "Ultima sincronizzazione {{time}}",
@@ -1269,7 +1271,7 @@
       "emptyTitle": "Nessun risultato aperto",
       "noMatchesDescription": "Prova a modificare o cancellare i filtri selezionati.",
       "noMatchesTitle": "Nessun risultato corrisponde ai filtri",
-      "title": "Risultati"
+      "title": "Rilievi"
     },
     "findingRow": {
       "a11y": "Risultato {{severity}}: {{title}}. {{repo}}. {{analysis}}",
@@ -1340,7 +1342,7 @@
       "allRepositories": "Tutte le repository",
       "couldNotLoad": "Impossibile caricare le impostazioni delle repository",
       "couldNotLoadRepositories": "Impossibile caricare le repository",
-      "couldNotOpenGithubSettings": "Impossibile aprire le impostazioni dell'app GitHub",
+      "couldNotOpenGithubSettings": "Impossibile aprire le impostazioni della GitHub App",
       "githubAppSettings": "Impostazioni dell'app GitHub",
       "manageAccess": "Gestisci l'accesso dell'app GitHub",
       "noRepositories": "Nessuna repository",
@@ -1545,7 +1547,7 @@
       "includeExistingDisabled": "I risultati esistenti sono esclusi dalla remediation automatica.",
       "belowThreshold": "Il risultato è al di sotto della soglia automatica di gravità. La remediation manuale può comunque iniziare quando i gate di sicurezza vengono superati.",
       "beforeEnablement": "L'analisi è stata completata prima che la remediation automatica venisse abilitata. La remediation manuale può comunque iniziare quando i gate di sicurezza vengono superati.",
-      "generic": "La remediation non è disponibile per questo risultato."
+      "generic": "La correzione non è disponibile per questo risultato."
     },
     "commandFailure": {
       "ownerCapReached": "La capacità di analisi è piena. Attendi il completamento di un'analisi attiva, poi riprova.",
@@ -1660,7 +1662,12 @@
       "couldNotLoadThisSession": "Impossibile caricare questa sessione",
       "cloneFailed": "Impossibile clonare questa sessione.",
       "cloneFailedRetry": "Impossibile clonare questa sessione. Riprova.",
-      "connectRepositoryToContinue": "Collega un repository per continuare."
+      "connectRepositoryToContinue": "Collega un repository per continuare.",
+      "notEnoughCredits": "Crediti insufficienti per eseguire Cloud Agent. Aggiungi crediti e riprova.",
+      "previousTaskFinishing": "L'attività precedente sta ancora terminando. Attendere un momento.",
+      "serviceUnavailable": "Il servizio non è disponibile al momento. Riprova.",
+      "connectionTrouble": "Problemi di connessione. Riprova tra un momento.",
+      "modelUnavailable": "Questo modello non è disponibile per Cloud Agent. Scegli un altro modello e riprova."
     },
     "remoteSession": {
       "failedToCreate": "Impossibile creare la sessione remota",
@@ -1685,7 +1692,7 @@
       "title": "Nuova sessione",
       "repository": "Repository",
       "couldNotLoadRepositories": "Impossibile caricare i repository",
-      "connectGithub": "Collega GitHub",
+      "connectGithub": "Connetti GitHub",
       "connectGithubDescription": "Collega GitHub nel browser, poi torna qui per scegliere un repository.",
       "openGithub": "Apri GitHub",
       "refreshRepositories": "Aggiorna repository",
@@ -2021,7 +2028,7 @@
       "noModels": "Nessun modello disponibile",
       "noModelsDescription": "Nessun modello è disponibile per la selezione.",
       "favorites": "Preferiti",
-      "recommended": "Consigliati",
+      "recommended": "Consigliato",
       "allModels": "Tutti i modelli"
     },
     "modelSelector": {
@@ -2224,7 +2231,7 @@
   "home": {
     "couldNotLoadSessions": "Impossibile caricare le sessioni",
     "couldNotLoadActiveSessions": "Impossibile caricare le sessioni attive",
-    "agentSessions": "Sessioni agente",
+    "agentSessions": "Sessioni dell’agente",
     "newCodingTask": "Nuova attività di codifica",
     "explore": "Esplora",
     "seeAll": "Vedi tutto",
@@ -2757,7 +2764,7 @@
       "mergePullRequest": "Unisci pull request",
       "methodLabel": "Metodo",
       "methods": {
-        "merge": "Merge",
+        "merge": "Unisci",
         "rebase": "Rebase",
         "squash": "Squash"
       },

@@ -75,7 +75,7 @@ type AgentSessionListContentProps = {
   refetch: () => Promise<void>;
   onRetry: () => void;
   onEndReached: () => void;
-  onSessionPress: (sessionId: string, organizationId?: string | null) => void;
+  onSessionPress: (sessionId: string, organizationId?: string | null, title?: string) => void;
   hasActiveQuery: boolean;
   isSearching: boolean;
   /** Committed (debounced) search query — scroll-to-top fires when this value changes. */
@@ -243,7 +243,7 @@ export function AgentSessionListContent({
         session={item}
         sortBy={sortBy}
         onPress={() => {
-          onSessionPress(item.session_id, item.organization_id);
+          onSessionPress(item.session_id, item.organization_id, item.title ?? undefined);
         }}
         onDelete={() => {
           // The hook's success toast announces the deletion; onDeleted only

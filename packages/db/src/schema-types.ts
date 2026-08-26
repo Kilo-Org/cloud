@@ -513,6 +513,7 @@ export const UserDeletionStepKey = {
   Anonymize: 'anonymize',
   PylonReply: 'pylon_reply',
   PylonFinalize: 'pylon_finalize',
+  CompletionEmail: 'completion_email',
   PylonContact: 'pylon_contact',
   CsaSupportDb: 'csa_support_db',
 } as const;
@@ -571,6 +572,16 @@ export const UserDeletionPylonReplyState = {
 export type UserDeletionPylonReplyState =
   (typeof UserDeletionPylonReplyState)[keyof typeof UserDeletionPylonReplyState];
 
+export const UserDeletionCompletionEmailState = {
+  NotSent: 'not_sent',
+  Sending: 'sending',
+  Sent: 'sent',
+  Ambiguous: 'ambiguous',
+} as const;
+
+export type UserDeletionCompletionEmailState =
+  (typeof UserDeletionCompletionEmailState)[keyof typeof UserDeletionCompletionEmailState];
+
 export type UserDeletionTaskProgress = {
   processed_count?: number;
   scanned_count?: number;
@@ -582,6 +593,7 @@ export type UserDeletionTaskProgress = {
   checkpoint_at?: string;
   reply_state?: UserDeletionPylonReplyState;
   reply_message_id?: string;
+  completion_email_state?: UserDeletionCompletionEmailState;
   close_confirmed?: boolean;
   verify_attempt_count?: number;
 };

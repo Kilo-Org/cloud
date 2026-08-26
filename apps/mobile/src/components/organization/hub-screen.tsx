@@ -101,8 +101,8 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
     <View className="flex-1 bg-background">
       <ScreenHeader title={org.organizationName} />
       <TabScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4"
+        className="flex-1"
+        contentContainerClassName="px-6 gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">

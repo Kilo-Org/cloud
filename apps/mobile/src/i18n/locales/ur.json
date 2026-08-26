@@ -2951,7 +2951,7 @@
         "credits_expired": "کریڈٹس کی میعاد ختم"
       },
       "loadMore": "مزید لوڈ کریں",
-      "loadMoreFailed": "مزید لوڈ نہیں ہو سکا۔",
+      "loadMoreFailed": "مزید لوڈ نہیں ہو سکا",
       "truncated": "پرانے کریڈٹ کی سرگرمی دستیاب ہے۔"
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "نامعلوم"
       },
       "loadMore": "مزید لوڈ کریں",
-      "loadMoreFailed": "مزید لوڈ نہیں ہو سکا۔",
+      "loadMoreFailed": "مزید لوڈ نہیں ہو سکا",
       "truncated": "پرانے انوائس دستیاب ہیں۔"
     },
     "lowBalanceAlert": {

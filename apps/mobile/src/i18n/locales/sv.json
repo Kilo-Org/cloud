@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "Redovisningsjustering",
         "credits_expired": "Krediter upphörde"
       },
-      "loadMore": "Ladda fler",
-      "loadMoreFailed": "Kunde inte ladda mer.",
+      "loadMore": "Läs in mer",
+      "loadMoreFailed": "Kunde inte läsa in mer",
       "truncated": "Äldre kreditaktivitet finns tillgänglig."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "Oindrivbar",
         "unknown": "Okänd"
       },
-      "loadMore": "Ladda fler",
-      "loadMoreFailed": "Kunde inte ladda mer.",
+      "loadMore": "Läs in mer",
+      "loadMoreFailed": "Kunde inte läsa in mer",
       "truncated": "Äldre fakturor finns tillgängliga."
     },
     "lowBalanceAlert": {

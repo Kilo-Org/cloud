@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "Pagsasaayos ng accounting",
         "credits_expired": "Nag-expire na credits"
       },
-      "loadMore": "Mag-load pa",
-      "loadMoreFailed": "Hindi makapag-load pa.",
+      "loadMore": "I-load pa",
+      "loadMoreFailed": "Hindi ma-load ang iba pa",
       "truncated": "Magagamit ang mas lumang aktibidad ng kredito."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "Hindi makokolekta",
         "unknown": "Hindi alam"
       },
-      "loadMore": "Mag-load pa",
-      "loadMoreFailed": "Hindi makapag-load pa.",
+      "loadMore": "I-load pa",
+      "loadMoreFailed": "Hindi ma-load ang iba pa",
       "truncated": "Magagamit ang mas lumang mga invoice."
     },
     "lowBalanceAlert": {

@@ -2951,7 +2951,7 @@
         "credits_expired": "क्रेडिट कालबाह्य झाले"
       },
       "loadMore": "अधिक लोड करा",
-      "loadMoreFailed": "अधिक लोड करता आले नाही.",
+      "loadMoreFailed": "अधिक लोड करता आले नाही",
       "truncated": "जुनी क्रेडिट क्रियाकलाप उपलब्ध आहे."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "अज्ञात"
       },
       "loadMore": "अधिक लोड करा",
-      "loadMoreFailed": "अधिक लोड करता आले नाही.",
+      "loadMoreFailed": "अधिक लोड करता आले नाही",
       "truncated": "जुने इनव्हॉइस उपलब्ध आहेत."
     },
     "lowBalanceAlert": {

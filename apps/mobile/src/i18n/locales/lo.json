@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "ການປັບບັນຊີ",
         "credits_expired": "ເຄຣດິດໝົດອາຍຸ"
       },
-      "loadMore": "ໂຫຼດເພີ່ມ",
-      "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມໄດ້.",
+      "loadMore": "ໂຫຼດເພີ່ມເຕີມ",
+      "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມເຕີມໄດ້",
       "truncated": "ກິດຈະກຳສິນເຊື່ອເກົ່າກວ່າມີໃຫ້."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "ເກັບບໍ່ໄດ້",
         "unknown": "ບໍ່ຮູ້"
       },
-      "loadMore": "ໂຫຼດເພີ່ມ",
-      "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມໄດ້.",
+      "loadMore": "ໂຫຼດເພີ່ມເຕີມ",
+      "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມເຕີມໄດ້",
       "truncated": "ໃບແຈ້ງໜີ້ເກົ່າກວ່າມີໃຫ້."
     },
     "lowBalanceAlert": {

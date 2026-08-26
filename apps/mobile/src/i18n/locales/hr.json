@@ -2971,7 +2971,7 @@
         "credits_expired": "Istekli krediti"
       },
       "loadMore": "Učitaj više",
-      "loadMoreFailed": "Nije moguće učitati više.",
+      "loadMoreFailed": "Nije moguće učitati više",
       "truncated": "Dostupna je starija aktivnost kredita."
     },
     "inviteMember": {
@@ -3001,7 +3001,7 @@
         "unknown": "Nepoznato"
       },
       "loadMore": "Učitaj više",
-      "loadMoreFailed": "Nije moguće učitati više.",
+      "loadMoreFailed": "Nije moguće učitati više",
       "truncated": "Dostupne su starije fakture."
     },
     "lowBalanceAlert": {

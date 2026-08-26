@@ -2951,7 +2951,7 @@
         "credits_expired": "Mikopo imeisha"
       },
       "loadMore": "Pakia zaidi",
-      "loadMoreFailed": "Imeshindwa kupakia zaidi.",
+      "loadMoreFailed": "Imeshindwa kupakia zaidi",
       "truncated": "Shughuli za zamani za mkopo zinapatikana."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "Isiyojulikana"
       },
       "loadMore": "Pakia zaidi",
-      "loadMoreFailed": "Imeshindwa kupakia zaidi.",
+      "loadMoreFailed": "Imeshindwa kupakia zaidi",
       "truncated": "Ankara za zamani zinapatikana."
     },
     "lowBalanceAlert": {

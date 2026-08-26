@@ -2951,7 +2951,7 @@
         "credits_expired": "Kredit tamat tempoh"
       },
       "loadMore": "Muatkan lagi",
-      "loadMoreFailed": "Tidak dapat memuatkan lagi.",
+      "loadMoreFailed": "Tidak dapat memuatkan lagi",
       "truncated": "Aktiviti kredit yang lebih lama tersedia."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "Tidak diketahui"
       },
       "loadMore": "Muatkan lagi",
-      "loadMoreFailed": "Tidak dapat memuatkan lagi.",
+      "loadMoreFailed": "Tidak dapat memuatkan lagi",
       "truncated": "Invois yang lebih lama tersedia."
     },
     "lowBalanceAlert": {

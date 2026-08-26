@@ -2970,8 +2970,8 @@
         "accounting_adjustment": "Ajustare contabilă",
         "credits_expired": "Credite expirate"
       },
-      "loadMore": "Încarcă mai multe",
-      "loadMoreFailed": "Nu s-a putut încărca mai mult.",
+      "loadMore": "Încarcă mai mult",
+      "loadMoreFailed": "Nu s-a putut încărca mai mult",
       "truncated": "Activitatea de credite mai veche este disponibilă."
     },
     "inviteMember": {
@@ -3000,8 +3000,8 @@
         "uncollectible": "Neîncasabilă",
         "unknown": "Necunoscut"
       },
-      "loadMore": "Încarcă mai multe",
-      "loadMoreFailed": "Nu s-a putut încărca mai mult.",
+      "loadMore": "Încarcă mai mult",
+      "loadMoreFailed": "Nu s-a putut încărca mai mult",
       "truncated": "Sunt disponibile facturi mai vechi."
     },
     "lowBalanceAlert": {

@@ -2937,7 +2937,7 @@
         "credits_expired": "クレジット失効"
       },
       "loadMore": "さらに読み込む",
-      "loadMoreFailed": "さらに読み込めませんでした。",
+      "loadMoreFailed": "これ以上読み込めませんでした",
       "truncated": "以前のクレジット利用状況が利用可能です。"
     },
     "hub": {
@@ -2976,7 +2976,7 @@
         "unknown": "不明"
       },
       "loadMore": "さらに読み込む",
-      "loadMoreFailed": "さらに読み込めませんでした。",
+      "loadMoreFailed": "これ以上読み込めませんでした",
       "truncated": "以前の請求書が利用可能です。"
     },
     "lowBalanceAlert": {

@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "Regnskapsjustering",
         "credits_expired": "Kreditter utløpt"
       },
-      "loadMore": "Last inn flere",
-      "loadMoreFailed": "Kunne ikke laste inn flere.",
+      "loadMore": "Last mer",
+      "loadMoreFailed": "Kunne ikke laste mer",
       "truncated": "Tidligere kredittaktivitet er tilgjengelig."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "Uinnkrevbar",
         "unknown": "Ukjent"
       },
-      "loadMore": "Last inn flere",
-      "loadMoreFailed": "Kunne ikke laste inn flere.",
+      "loadMore": "Last mer",
+      "loadMoreFailed": "Kunne ikke laste mer",
       "truncated": "Tidligere fakturaer er tilgjengelige."
     },
     "lowBalanceAlert": {

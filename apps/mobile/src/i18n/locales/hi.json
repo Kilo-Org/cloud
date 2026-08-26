@@ -2937,7 +2937,7 @@
         "credits_expired": "क्रेडिट समाप्त हुए"
       },
       "loadMore": "और लोड करें",
-      "loadMoreFailed": "अधिक लोड नहीं कर सके।",
+      "loadMoreFailed": "और लोड नहीं हो सका",
       "truncated": "पुरानी क्रेडिट गतिविधि उपलब्ध है।"
     },
     "hub": {
@@ -2976,7 +2976,7 @@
         "unknown": "अज्ञात"
       },
       "loadMore": "और लोड करें",
-      "loadMoreFailed": "अधिक लोड नहीं कर सके।",
+      "loadMoreFailed": "और लोड नहीं हो सका",
       "truncated": "पुराने चालान उपलब्ध हैं।"
     },
     "lowBalanceAlert": {

@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "د محاسبې سمون",
         "credits_expired": "کریډیټونه منقضي شوي"
       },
-      "loadMore": "نور مه پورته کړئ",
-      "loadMoreFailed": "نور پورته کېدل ناشوني شول.",
+      "loadMore": "نور بار کړئ",
+      "loadMoreFailed": "نور بار کیدی نشو",
       "truncated": "پخوانۍ کریډیټي کړنې شته دي."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "نه راټولېدونکی",
         "unknown": "نامعلوم"
       },
-      "loadMore": "نور مه پورته کړئ",
-      "loadMoreFailed": "نور پورته کېدل ناشوني شول.",
+      "loadMore": "نور بار کړئ",
+      "loadMoreFailed": "نور بار کیدی نشو",
       "truncated": "پخوانۍ رسیدونه شته دي."
     },
     "lowBalanceAlert": {

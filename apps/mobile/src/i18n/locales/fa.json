@@ -2951,7 +2951,7 @@
         "credits_expired": "اعتبارها منقضی شدند"
       },
       "loadMore": "بارگذاری بیشتر",
-      "loadMoreFailed": "نمیتوان بیشتر بارگذاری کرد.",
+      "loadMoreFailed": "بارگذاری بیشتر ممکن نشد",
       "truncated": "فعالیت اعتبار قدیمیتر در دسترس است."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "ناشناخته"
       },
       "loadMore": "بارگذاری بیشتر",
-      "loadMoreFailed": "نمیتوان بیشتر بارگذاری کرد.",
+      "loadMoreFailed": "بارگذاری بیشتر ممکن نشد",
       "truncated": "فاکتورهای قدیمیتر در دسترس هستند."
     },
     "lowBalanceAlert": {

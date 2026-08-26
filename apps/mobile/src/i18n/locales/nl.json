@@ -2937,7 +2937,7 @@
         "credits_expired": "Credits verlopen"
       },
       "loadMore": "Meer laden",
-      "loadMoreFailed": "Meer laden lukte niet.",
+      "loadMoreFailed": "Kon niet meer laden",
       "truncated": "Oudere creditactiviteit is beschikbaar."
     },
     "hub": {
@@ -2976,7 +2976,7 @@
         "unknown": "Onbekend"
       },
       "loadMore": "Meer laden",
-      "loadMoreFailed": "Meer laden lukte niet.",
+      "loadMoreFailed": "Kon niet meer laden",
       "truncated": "Oudere facturen zijn beschikbaar."
     },
     "lowBalanceAlert": {

@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "கணக்கியல் சரிசெய்தல்",
         "credits_expired": "கிரெடிட்கள் காலாவதியானது"
       },
-      "loadMore": "மேலும் ஏற்றவும்",
-      "loadMoreFailed": "மேலும் ஏற்ற முடியவில்லை.",
+      "loadMore": "மேலும் ஏற்று",
+      "loadMoreFailed": "மேலும் ஏற்ற முடியவில்லை",
       "truncated": "பழைய கிரெடிட் செயல்பாடு கிடைக்கிறது."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "வசூலிக்க முடியாதது",
         "unknown": "தெரியவில்லை"
       },
-      "loadMore": "மேலும் ஏற்றவும்",
-      "loadMoreFailed": "மேலும் ஏற்ற முடியவில்லை.",
+      "loadMore": "மேலும் ஏற்று",
+      "loadMoreFailed": "மேலும் ஏற்ற முடியவில்லை",
       "truncated": "பழைய விலைப்பட்டியல்கள் கிடைக்கின்றன."
     },
     "lowBalanceAlert": {

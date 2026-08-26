@@ -2951,7 +2951,7 @@
         "credits_expired": "Krediitit vanhentuivat"
       },
       "loadMore": "Lataa lisää",
-      "loadMoreFailed": "Lisää ei voitu ladata.",
+      "loadMoreFailed": "Lisää ei voitu ladata",
       "truncated": "Vanhempaa luottotapahtumahistoriaa on saatavilla."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "Tuntematon"
       },
       "loadMore": "Lataa lisää",
-      "loadMoreFailed": "Lisää ei voitu ladata.",
+      "loadMoreFailed": "Lisää ei voitu ladata",
       "truncated": "Vanhempia laskuja on saatavilla."
     },
     "lowBalanceAlert": {

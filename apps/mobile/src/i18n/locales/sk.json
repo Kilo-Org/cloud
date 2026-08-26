@@ -2991,7 +2991,7 @@
         "credits_expired": "Kredity vypršali"
       },
       "loadMore": "Načítať viac",
-      "loadMoreFailed": "Nepodarilo sa načítať viac.",
+      "loadMoreFailed": "Ďalšie sa nepodarilo načítať",
       "truncated": "Staršia kreditná aktivita je k dispozícii."
     },
     "inviteMember": {
@@ -3021,7 +3021,7 @@
         "unknown": "Neznáme"
       },
       "loadMore": "Načítať viac",
-      "loadMoreFailed": "Nepodarilo sa načítať viac.",
+      "loadMoreFailed": "Ďalšie sa nepodarilo načítať",
       "truncated": "Staršie faktúry sú k dispozícii."
     },
     "lowBalanceAlert": {

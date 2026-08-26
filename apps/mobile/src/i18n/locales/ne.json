@@ -2951,7 +2951,7 @@
         "credits_expired": "म्याद सकिएका क्रेडिटहरू"
       },
       "loadMore": "थप लोड गर्नुहोस्",
-      "loadMoreFailed": "थप लोड गर्न सकिएन।",
+      "loadMoreFailed": "थप लोड गर्न सकिएन",
       "truncated": "पुरानो क्रेडिट गतिविधि उपलब्ध छ।"
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "अज्ञात"
       },
       "loadMore": "थप लोड गर्नुहोस्",
-      "loadMoreFailed": "थप लोड गर्न सकिएन।",
+      "loadMoreFailed": "थप लोड गर्न सकिएन",
       "truncated": "पुराना इनभ्वाइसहरू उपलब्ध छन्।"
     },
     "lowBalanceAlert": {

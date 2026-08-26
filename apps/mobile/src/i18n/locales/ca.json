@@ -2970,8 +2970,8 @@
         "accounting_adjustment": "Ajust comptable",
         "credits_expired": "Crèdits caducats"
       },
-      "loadMore": "Carrega'n més",
-      "loadMoreFailed": "No s'ha pogut carregar més.",
+      "loadMore": "Carrega més",
+      "loadMoreFailed": "No s'ha pogut carregar més",
       "truncated": "Hi ha activitat de crèdit més antiga disponible."
     },
     "inviteMember": {
@@ -3000,8 +3000,8 @@
         "uncollectible": "No cobrable",
         "unknown": "Desconegut"
       },
-      "loadMore": "Carrega'n més",
-      "loadMoreFailed": "No s'ha pogut carregar més.",
+      "loadMore": "Carrega més",
+      "loadMoreFailed": "No s'ha pogut carregar més",
       "truncated": "Hi ha factures més antigues disponibles."
     },
     "lowBalanceAlert": {

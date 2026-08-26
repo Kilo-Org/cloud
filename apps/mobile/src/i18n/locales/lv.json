@@ -2971,7 +2971,7 @@
         "credits_expired": "Kredīti beigušies"
       },
       "loadMore": "Ielādēt vairāk",
-      "loadMoreFailed": "Neizdevās ielādēt vairāk.",
+      "loadMoreFailed": "Neizdevās ielādēt vairāk",
       "truncated": "Ir pieejama vecāka kredīta aktivitāte."
     },
     "inviteMember": {
@@ -3001,7 +3001,7 @@
         "unknown": "Nezināms"
       },
       "loadMore": "Ielādēt vairāk",
-      "loadMoreFailed": "Neizdevās ielādēt vairāk.",
+      "loadMoreFailed": "Neizdevās ielādēt vairāk",
       "truncated": "Ir pieejami vecāki rēķini."
     },
     "lowBalanceAlert": {

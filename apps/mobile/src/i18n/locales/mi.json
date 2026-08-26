@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "Te whakatikatika kaute",
         "credits_expired": "Kua pau ngā whiwhinga"
       },
-      "loadMore": "Utaina ētahi atu",
-      "loadMoreFailed": "Kāore i taea te uta ētahi atu.",
+      "loadMore": "Uta anō",
+      "loadMoreFailed": "Kāore i taea te uta ētahi atu",
       "truncated": "E wātea ana ngā mahi kirimana tawhito."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "Kāore e taea te kohi",
         "unknown": "Kāore e mōhiotia"
       },
-      "loadMore": "Utaina ētahi atu",
-      "loadMoreFailed": "Kāore i taea te uta ētahi atu.",
+      "loadMore": "Uta anō",
+      "loadMoreFailed": "Kāore i taea te uta ētahi atu",
       "truncated": "E wātea ana ngā nama tawhito."
     },
     "lowBalanceAlert": {

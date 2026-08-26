@@ -2990,8 +2990,8 @@
         "accounting_adjustment": "Бухгалтарская карэкціроўка",
         "credits_expired": "Крэдыты скончыліся"
       },
-      "loadMore": "Загрузіць яшчэ",
-      "loadMoreFailed": "Не атрымалася загрузіць больш.",
+      "loadMore": "Загрузіць больш",
+      "loadMoreFailed": "Не атрымалася загрузіць больш",
       "truncated": "Даступная больш ранняя актыўнасць па крэдыту."
     },
     "inviteMember": {
@@ -3020,8 +3020,8 @@
         "uncollectible": "Неспагнаны",
         "unknown": "Невядомы"
       },
-      "loadMore": "Загрузіць яшчэ",
-      "loadMoreFailed": "Не атрымалася загрузіць больш.",
+      "loadMore": "Загрузіць больш",
+      "loadMoreFailed": "Не атрымалася загрузіць больш",
       "truncated": "Даступныя больш раннія рахункі."
     },
     "lowBalanceAlert": {

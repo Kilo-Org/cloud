@@ -2951,7 +2951,7 @@
         "credits_expired": "Kreditlar muddati tugadi"
       },
       "loadMore": "Ko'proq yuklash",
-      "loadMoreFailed": "Ko'proq yuklab bo'lmadi.",
+      "loadMoreFailed": "Ko'proq yuklab bo'lmadi",
       "truncated": "Eski kredit faoliyati mavjud."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "Noma'lum"
       },
       "loadMore": "Ko'proq yuklash",
-      "loadMoreFailed": "Ko'proq yuklab bo'lmadi.",
+      "loadMoreFailed": "Ko'proq yuklab bo'lmadi",
       "truncated": "Eski hisob-fakturalar mavjud."
     },
     "lowBalanceAlert": {

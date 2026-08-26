@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "ගිණුම්කරණ ගැලපීම",
         "credits_expired": "ණය කල් ඉකුත් විය"
       },
-      "loadMore": "තව බාගන්න",
-      "loadMoreFailed": "තව බාගත නොහැකි විය.",
+      "loadMore": "තව පූරණය කරන්න",
+      "loadMoreFailed": "තවත් පූරණය කළ නොහැකි විය",
       "truncated": "පැරණි ණය ක්රියාකාරකම් ලබා ගත හැක."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "එකතු කළ නොහැකි",
         "unknown": "නොදන්නා"
       },
-      "loadMore": "තව බාගන්න",
-      "loadMoreFailed": "තව බාගත නොහැකි විය.",
+      "loadMore": "තව පූරණය කරන්න",
+      "loadMoreFailed": "තවත් පූරණය කළ නොහැකි විය",
       "truncated": "පැරණි ඉන්වොයිස් ලබා ගත හැක."
     },
     "lowBalanceAlert": {

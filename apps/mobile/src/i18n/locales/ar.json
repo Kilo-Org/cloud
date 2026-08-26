@@ -3017,7 +3017,7 @@
         "credits_expired": "انتهت صلاحية الأرصدة"
       },
       "loadMore": "تحميل المزيد",
-      "loadMoreFailed": "تعذّر تحميل المزيد.",
+      "loadMoreFailed": "تعذّر تحميل المزيد",
       "truncated": "تتوفر نشاطات رصيد أقدم."
     },
     "hub": {
@@ -3056,7 +3056,7 @@
         "unknown": "غير معروف"
       },
       "loadMore": "تحميل المزيد",
-      "loadMoreFailed": "تعذّر تحميل المزيد.",
+      "loadMoreFailed": "تعذّر تحميل المزيد",
       "truncated": "تتوفر فواتير أقدم."
     },
     "lowBalanceAlert": {

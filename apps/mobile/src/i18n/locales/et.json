@@ -2951,7 +2951,7 @@
         "credits_expired": "Krediidid aegusid"
       },
       "loadMore": "Laadi rohkem",
-      "loadMoreFailed": "Rohkem ei õnnestunud laadida.",
+      "loadMoreFailed": "Rohkemate laadimine ebaõnnestus",
       "truncated": "Varasem krediidiajalugu on saadaval."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "Teadmata"
       },
       "loadMore": "Laadi rohkem",
-      "loadMoreFailed": "Rohkem ei õnnestunud laadida.",
+      "loadMoreFailed": "Rohkemate laadimine ebaõnnestus",
       "truncated": "Varasemad arved on saadaval."
     },
     "lowBalanceAlert": {

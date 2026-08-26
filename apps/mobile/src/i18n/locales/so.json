@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "Hagaajinta xisaabta",
         "credits_expired": "Credits oo dhacay"
       },
-      "loadMore": "Wax badan",
-      "loadMoreFailed": "Kuma soo shuban karin wax badan.",
+      "loadMore": "Soo qaad dheeri ah",
+      "loadMoreFailed": "In ka badan lama soo qaadin karin",
       "truncated": "Hawlaha credit ee hore waa la heli karaa."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "Lama ururin karo",
         "unknown": "Lama garanayo"
       },
-      "loadMore": "Wax badan",
-      "loadMoreFailed": "Kuma soo shuban karin wax badan.",
+      "loadMore": "Soo qaad dheeri ah",
+      "loadMoreFailed": "In ka badan lama soo qaadin karin",
       "truncated": "Qaansheegyada hore waa la heli karaa."
     },
     "lowBalanceAlert": {

@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "စာရင်းကိုင် ပြုပြင်မှု",
         "credits_expired": "သက်တမ်းကုန် ခရက်ဒစ်များ"
       },
-      "loadMore": "နောက်ထပ်ဖတ်ပါ",
-      "loadMoreFailed": "နောက်ထပ်ဖတ်၍မရပါ။",
+      "loadMore": "နောက်ထပ်တင်ပါ",
+      "loadMoreFailed": "နောက်ထပ်တင်မရပါ",
       "truncated": "ပိုဟောင်းသော ခရက်ဒစ်လုပ်ဆောင်ချက်များ ရနိုင်ပါသည်။"
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "ကောက်ခံ၍မရသော",
         "unknown": "အမည်မသိ"
       },
-      "loadMore": "နောက်ထပ်ဖတ်ပါ",
-      "loadMoreFailed": "နောက်ထပ်ဖတ်၍မရပါ။",
+      "loadMore": "နောက်ထပ်တင်ပါ",
+      "loadMoreFailed": "နောက်ထပ်တင်မရပါ",
       "truncated": "ပိုဟောင်းသော ငွေတောင်းခံလွှာများ ရနိုင်ပါသည်။"
     },
     "lowBalanceAlert": {

@@ -2991,7 +2991,7 @@
         "credits_expired": "Kreditai pasibaigė"
       },
       "loadMore": "Įkelti daugiau",
-      "loadMoreFailed": "Nepavyko įkelti daugiau.",
+      "loadMoreFailed": "Nepavyko įkelti daugiau",
       "truncated": "Yra ankstesnės kredito veiklos."
     },
     "inviteMember": {
@@ -3021,7 +3021,7 @@
         "unknown": "Nežinomas"
       },
       "loadMore": "Įkelti daugiau",
-      "loadMoreFailed": "Nepavyko įkelti daugiau.",
+      "loadMoreFailed": "Nepavyko įkelti daugiau",
       "truncated": "Yra ankstesnių sąskaitų faktūrų."
     },
     "lowBalanceAlert": {

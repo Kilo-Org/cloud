@@ -2951,7 +2951,7 @@
         "credits_expired": "Изтекли кредити"
       },
       "loadMore": "Зареди още",
-      "loadMoreFailed": "Не можа да се зареди още.",
+      "loadMoreFailed": "Неуспешно зареждане на още",
       "truncated": "Налична е по-стара кредитна активност."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "Неизвестна"
       },
       "loadMore": "Зареди още",
-      "loadMoreFailed": "Не можа да се зареди още.",
+      "loadMoreFailed": "Неуспешно зареждане на още",
       "truncated": "Налични са по-стари фактури."
     },
     "lowBalanceAlert": {

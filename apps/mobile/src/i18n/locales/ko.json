@@ -2937,7 +2937,7 @@
         "credits_expired": "크레딧 만료"
       },
       "loadMore": "더 불러오기",
-      "loadMoreFailed": "더 불러올 수 없습니다.",
+      "loadMoreFailed": "더 불러올 수 없습니다",
       "truncated": "이전 크레딧 활동을 확인할 수 있습니다."
     },
     "hub": {
@@ -2976,7 +2976,7 @@
         "unknown": "알 수 없음"
       },
       "loadMore": "더 불러오기",
-      "loadMoreFailed": "더 불러올 수 없습니다.",
+      "loadMoreFailed": "더 불러올 수 없습니다",
       "truncated": "이전 인보이스를 확인할 수 있습니다."
     },
     "lowBalanceAlert": {

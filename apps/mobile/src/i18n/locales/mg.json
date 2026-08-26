@@ -2950,8 +2950,8 @@
         "accounting_adjustment": "Fanitsiana kaonty",
         "credits_expired": "Lany daty ny credits"
       },
-      "loadMore": "Havao bebe kokoa",
-      "loadMoreFailed": "Tsy afaka ny havaozina bebe kokoa.",
+      "loadMore": "Hamaky bebe kokoa",
+      "loadMoreFailed": "Tsy afaka namaky fanampiny",
       "truncated": "Misy ny fiasana crédit taloha kokoa."
     },
     "inviteMember": {
@@ -2980,8 +2980,8 @@
         "uncollectible": "Tsy azo angonina",
         "unknown": "Tsy fantatra"
       },
-      "loadMore": "Havao bebe kokoa",
-      "loadMoreFailed": "Tsy afaka ny havaozina bebe kokoa.",
+      "loadMore": "Hamaky bebe kokoa",
+      "loadMoreFailed": "Tsy afaka namaky fanampiny",
       "truncated": "Misy ny faktiora taloha kokoa."
     },
     "lowBalanceAlert": {

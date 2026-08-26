@@ -2991,7 +2991,7 @@
         "credits_expired": "Potečeni krediti"
       },
       "loadMore": "Naloži več",
-      "loadMoreFailed": "Ni bilo mogoče naložiti več.",
+      "loadMoreFailed": "Več ni bilo mogoče naložiti",
       "truncated": "Starejša dejavnost kredita je na voljo."
     },
     "inviteMember": {
@@ -3021,7 +3021,7 @@
         "unknown": "Neznano"
       },
       "loadMore": "Naloži več",
-      "loadMoreFailed": "Ni bilo mogoče naložiti več.",
+      "loadMoreFailed": "Več ni bilo mogoče naložiti",
       "truncated": "Starejši računi so na voljo."
     },
     "lowBalanceAlert": {

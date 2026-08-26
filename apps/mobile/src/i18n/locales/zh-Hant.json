@@ -2937,7 +2937,7 @@
         "credits_expired": "點數已到期"
       },
       "loadMore": "載入更多",
-      "loadMoreFailed": "無法載入更多。",
+      "loadMoreFailed": "無法載入更多",
       "truncated": "可查看較舊的額度活動。"
     },
     "hub": {
@@ -2976,7 +2976,7 @@
         "unknown": "未知"
       },
       "loadMore": "載入更多",
-      "loadMoreFailed": "無法載入更多。",
+      "loadMoreFailed": "無法載入更多",
       "truncated": "可查看較舊的發票。"
     },
     "lowBalanceAlert": {

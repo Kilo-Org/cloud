@@ -2951,7 +2951,7 @@
         "credits_expired": "Udløbne kreditter"
       },
       "loadMore": "Indlæs mere",
-      "loadMoreFailed": "Det lykkedes ikke at indlæse mere.",
+      "loadMoreFailed": "Kunne ikke indlæse mere",
       "truncated": "Ældre kreditaktivitet er tilgængelig."
     },
     "inviteMember": {
@@ -2981,7 +2981,7 @@
         "unknown": "Ukendt"
       },
       "loadMore": "Indlæs mere",
-      "loadMoreFailed": "Det lykkedes ikke at indlæse mere.",
+      "loadMoreFailed": "Kunne ikke indlæse mere",
       "truncated": "Ældre fakturaer er tilgængelige."
     },
     "lowBalanceAlert": {

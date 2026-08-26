@@ -3011,7 +3011,7 @@
         "credits_expired": "Creidmheasanna imithe in éag"
       },
       "loadMore": "Lódáil tuilleadh",
-      "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil.",
+      "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil",
       "truncated": "Tá gníomhaíocht chreidmheasa níos sine ar fáil."
     },
     "inviteMember": {
@@ -3041,7 +3041,7 @@
         "unknown": "Anaithnid"
       },
       "loadMore": "Lódáil tuilleadh",
-      "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil.",
+      "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil",
       "truncated": "Tá sonraisc níos sine ar fáil."
     },
     "lowBalanceAlert": {

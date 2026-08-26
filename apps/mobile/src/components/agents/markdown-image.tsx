@@ -42,7 +42,11 @@ function imageHostDisplay(uri: string): string | null {
 }
 
 /** Static chip for http and data URIs: HTTPS-only copy, host name for http. */
-function BlockedImageChip({ kind, uri }: Readonly<{ kind: 'http' | 'data'; uri: string }>) {
+function BlockedImageChip({
+  kind,
+  uri,
+  onShowLinkActions,
+}: Readonly<{ kind: 'http' | 'data'; uri: string; onShowLinkActions?: () => void }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const host = kind === 'http' ? imageHostDisplay(uri) : null;
@@ -54,6 +58,12 @@ function BlockedImageChip({ kind, uri }: Readonly<{ kind: 'http' | 'data'; uri: 
       className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
       accessibilityRole="text"
       accessibilityLabel={label}
+      accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
+      onAccessibilityAction={event => {
+        if (event.nativeEvent.actionName === 'showLinkActions') {
+          onShowLinkActions?.();
+        }
+      }}
     >
       <AlertCircle size={14} color={colors.mutedForeground} />
       <Text className="shrink text-xs text-muted-foreground" numberOfLines={1}>
@@ -140,7 +150,7 @@ export function MarkdownImage({
   const confirmed = isMarkdownImageConfirmed(uri);
 
   if (kind === 'http' || kind === 'data') {
-    return <BlockedImageChip kind={kind} uri={uri} />;
+    return <BlockedImageChip kind={kind} uri={uri} onShowLinkActions={onShowLinkActions} />;
   }
 
   if (kind === 'https' && !confirmed) {
@@ -170,9 +180,16 @@ export function MarkdownImage({
           setMeasuredAspectRatio(undefined);
           setAttempt(prev => prev + 1);
         }}
-        className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
+        onLongPress={onShowLinkActions}
+        className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
         accessibilityRole="button"
         accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
+        accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
+        onAccessibilityAction={event => {
+          if (event.nativeEvent.actionName === 'showLinkActions') {
+            onShowLinkActions?.();
+          }
+        }}
       >
         <AlertCircle size={14} color={colors.mutedForeground} />
         <Text className="text-xs text-muted-foreground">
@@ -190,6 +207,7 @@ export function MarkdownImage({
         onPress={() => {
           setViewerVisible(true);
         }}
+        onLongPress={onShowLinkActions}
         className="my-1 w-full overflow-hidden rounded-md bg-neutral-100 active:opacity-80 dark:bg-neutral-900"
         accessibilityRole="button"
         accessibilityLabel={
@@ -230,7 +248,7 @@ export function MarkdownImage({
       {viewerVisible && (
         <ImageViewerModal
           visible={viewerVisible}
-          uri={uri}
+          uri={resolveMarkdownImageSrc(uri)}
           filename={filename}
           onClose={() => {
             setViewerVisible(false);

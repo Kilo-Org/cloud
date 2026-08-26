@@ -342,9 +342,8 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             clearViewedFiles(),
             clearSessionAttentionForSignOut(),
           ]);
-          // Synchronous preference clears so they don't leak to the next
-          // signed-in account. A synchronous throw here still falls through
-          // to the state reset below.
+          // Synchronous preference clears (best-effort) so nothing leaks to
+          // the next signed-in account.
           clearAgentModelPreference();
           clearReasoningPreference();
           clearKeepScreenOnPreference();

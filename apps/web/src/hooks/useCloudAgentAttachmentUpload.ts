@@ -195,12 +195,6 @@ export function useCloudAgentAttachmentUpload(
   const { mutateAsync: orgMutateAsync } = useMutation(
     trpc.organizations.cloudAgentNext.getAttachmentUploadUrl.mutationOptions()
   );
-  const { mutateAsync: personalLinkMutateAsync } = useMutation(
-    trpc.cloudAgentNext.linkPendingUploads.mutationOptions()
-  );
-  const { mutateAsync: orgLinkMutateAsync } = useMutation(
-    trpc.organizations.cloudAgentNext.linkPendingUploads.mutationOptions()
-  );
   const { mutateAsync: personalReleaseMutateAsync } = useMutation(
     trpc.cloudAgentNext.releasePendingUploads.mutationOptions()
   );
@@ -471,35 +465,16 @@ export function useCloudAgentAttachmentUpload(
   );
 
   /**
-   * Flip the completed uploads' pending-ledger rows to 'linked' just before
-   * the caller submits the message, then return the attachment payload. Without
-   * this the admitted rows stay 'pending' and the cron reaper deletes objects
-   * the user did send.
+   * Build the attachment payload for the caller to submit. The pending-ledger
+   * rows are NOT linked here: the server links authoritatively only after the
+   * send or prepare succeeds (both the personal and organization routers call
+   * linkPendingUploads post-send). Linking client-side before the send would
+   * leave a failed or abandoned send with 'linked' rows that the reaper never
+   * deletes.
    */
   const finalizeAttachments = useCallback(async (): Promise<CloudAgentAttachments | undefined> => {
-    const completeKeys = attachmentsRef.current
-      .filter(
-        (attachment): attachment is CloudAgentAttachmentFile & { r2Key: string } =>
-          attachment.status === 'complete' && Boolean(attachment.r2Key)
-      )
-      .map(attachment => attachment.r2Key);
-
-    if (completeKeys.length > 0) {
-      if (organizationId) {
-        await orgLinkMutateAsync({ messageUuid, objectKeys: completeKeys, organizationId });
-      } else {
-        await personalLinkMutateAsync({ messageUuid, objectKeys: completeKeys });
-      }
-    }
-
     return getAttachmentsData();
-  }, [
-    getAttachmentsData,
-    messageUuid,
-    orgLinkMutateAsync,
-    organizationId,
-    personalLinkMutateAsync,
-  ]);
+  }, [getAttachmentsData]);
 
   const handleDragEnter = useCallback((event: React.DragEvent) => {
     event.preventDefault();

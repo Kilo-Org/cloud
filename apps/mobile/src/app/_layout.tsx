@@ -32,7 +32,7 @@ import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { AppState, View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -94,6 +94,8 @@ import {
   isShellReadyForShare,
   resolvePendingShareNavigation,
   resolveSupersededPendingShareId,
+  SHARE_INTENT_OPTIONS,
+  shouldIngestShareIntent,
 } from '@/lib/pending-share-navigation';
 import {
   clearSharePayload,
@@ -122,6 +124,8 @@ import { applySentryContext, setSentryContext } from '@/lib/sentry-context';
 import { scrubBreadcrumb, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 import { resolveSentryEnvironment } from '@/lib/sentry-environment';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
+import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
+import { reapTempFiles } from '@/lib/temp-file-registry';
 
 const expoRouterIntegration = Sentry.expoRouterIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
@@ -626,7 +630,10 @@ function RootLayoutNav() {
   // error path. Calls go through resetShareIntentRef so the unstable context
   // function stays out of the deps.
   useEffect(() => {
-    if (!hasShareIntent) {
+    // Copy the shared files only once the shell can open the gate. The
+    // provider keeps the intent across a backgrounding (SHARE_INTENT_OPTIONS)
+    // so a sign-in that leaves the app cannot drop the deferred payload.
+    if (!shouldIngestShareIntent({ hasShareIntent, isShellReady })) {
       return undefined;
     }
 
@@ -672,7 +679,7 @@ function RootLayoutNav() {
     return () => {
       cancelled = true;
     };
-  }, [hasShareIntent, shareIntent, userId]);
+  }, [hasShareIntent, shareIntent, isShellReady, userId]);
 
   useEffect(() => {
     const decision = resolveBootstrapDecision({
@@ -988,8 +995,28 @@ function RootLayout() {
     };
   }, []);
 
+  // Reap expired temp files at cold start and whenever the app returns to the
+  // foreground, deferred past the current interaction frame so a navigation
+  // never waits on it. AppState is already `active` at launch, so the change
+  // listener alone never reaps in a launch/use/kill cycle.
+  useEffect(() => {
+    scheduleCacheMaintenance(() => {
+      reapTempFiles();
+    });
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') {
+        scheduleCacheMaintenance(() => {
+          reapTempFiles();
+        });
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   return (
-    <ShareIntentProvider>
+    <ShareIntentProvider options={SHARE_INTENT_OPTIONS}>
       <ThemeProvider value={navigationTheme}>
         <AppRootProviders>
           <StatusBar style="auto" />

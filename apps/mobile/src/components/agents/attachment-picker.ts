@@ -11,6 +11,7 @@ import { mimeForExtension, normalizeAttachmentExtension } from '@/lib/agent-atta
 import { IMAGE_PICKER_OPTIONS, launchImagePicker } from '@/lib/agent-attachments/image-picker';
 import { writePickerLaunchContext } from '@/lib/agent-attachments/picker-launch-context';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { registerTempFile } from '@/lib/temp-file-registry';
 
 function showPermissionSettingsAlert({ message, title }: { message: string; title: string }) {
   Alert.alert(title, message, [
@@ -90,7 +91,11 @@ async function pickAgentCameraImage(): Promise<AgentAttachmentCandidate[]> {
     return [];
   }
   const assets = await launchImagePicker(ImagePicker.launchCameraAsync(IMAGE_PICKER_OPTIONS));
-  return assets.map(asset => normalizeImageAsset(asset));
+  const candidates = assets.map(asset => normalizeImageAsset(asset));
+  for (const candidate of candidates) {
+    registerTempFile(candidate.uri);
+  }
+  return candidates;
 }
 
 async function pickAgentLibraryImages(): Promise<AgentAttachmentCandidate[]> {
@@ -100,7 +105,11 @@ async function pickAgentLibraryImages(): Promise<AgentAttachmentCandidate[]> {
       allowsMultipleSelection: true,
     })
   );
-  return assets.map(asset => normalizeImageAsset(asset));
+  const candidates = assets.map(asset => normalizeImageAsset(asset));
+  for (const candidate of candidates) {
+    registerTempFile(candidate.uri);
+  }
+  return candidates;
 }
 
 async function pickAgentDocuments(): Promise<AgentAttachmentCandidate[]> {
@@ -112,7 +121,11 @@ async function pickAgentDocuments(): Promise<AgentAttachmentCandidate[]> {
   if (result.canceled) {
     return [];
   }
-  return result.assets.map(normalizeDocumentAsset);
+  const candidates = result.assets.map(normalizeDocumentAsset);
+  for (const candidate of candidates) {
+    registerTempFile(candidate.uri);
+  }
+  return candidates;
 }
 
 type AttachmentSource = 'camera' | 'library' | 'files';

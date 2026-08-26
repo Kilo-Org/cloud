@@ -78,6 +78,7 @@ function ToolCardImageAttachment({
         {aspectRatio === undefined ? <Skeleton className="absolute inset-0" /> : null}
         <Image
           source={{ uri }}
+          cachePolicy="memory"
           className="h-full w-full"
           contentFit="contain"
           transition={0}

@@ -1625,6 +1625,13 @@
       "when": 1787757944374,
       "tag": "0231_flaky_manta",
       "breakpoints": true
+    },
+    {
+      "idx": 232,
+      "version": "7",
+      "when": 1787769039561,
+      "tag": "0232_sweet_diamondback",
+      "breakpoints": true
     }
   ]
 }

@@ -128,6 +128,7 @@ import {
   user_terms_acceptances,
   user_deletion_requests,
   user_deletion_steps,
+  cloud_agent_pending_uploads,
 } from '@kilocode/db/schema';
 
 import { eq, count, inArray, sql } from 'drizzle-orm';
@@ -174,6 +175,18 @@ jest.mock('@/lib/stripe-client', () => ({
 
 jest.mock('@/lib/impact/affiliate-events', () => ({
   recordAffiliateAttributionAndQueueParentEvent: jest.fn(async () => null),
+}));
+
+// Account deletion purges the deleted user's pending cloud-agent objects from
+// R2 before it drops the ledger rows; keep that off the network in tests.
+const mockR2Send = jest.fn(async (_command: { input: { Key?: string } }) => ({}));
+jest.mock('@/lib/r2/client', () => ({
+  // Read through a wrapper: the factory runs while the module graph loads,
+  // before the const below is initialized.
+  r2Client: { send: (command: { input: { Key?: string } }) => mockR2Send(command) },
+  r2CliSessionsBucketName: 'cli-sessions-bucket',
+  r2CloudAgentAttachmentsBucketName: 'attachment-bucket',
+  r2ExperimentPromptsBucketName: 'experiment-prompts-bucket',
 }));
 
 const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
@@ -255,6 +268,7 @@ describe('User', () => {
     await db.delete(magic_link_tokens);
     await db.delete(bot_request_cloud_agent_sessions);
     await db.delete(bot_requests);
+    await db.delete(cloud_agent_pending_uploads);
     await db.delete(coding_plan_availability_intents);
     await db.delete(coding_plan_subscriptions);
     await db.delete(byok_api_keys);
@@ -1212,6 +1226,62 @@ describe('User', () => {
             inArray(analytics_event_outbox.id, [userOutbox.id, fallbackOutbox.id, otherOutbox.id])
           )
       ).toEqual([expect.objectContaining({ id: otherOutbox.id })]);
+    });
+
+    it("deletes the user's cloud agent pending-upload rows and leaves other users' rows", async () => {
+      const user = await insertTestUser({ google_user_email: 'pending-upload-user@example.com' });
+      const otherUser = await insertTestUser();
+
+      const [userPending] = await db
+        .insert(cloud_agent_pending_uploads)
+        .values({
+          id: crypto.randomUUID(),
+          kilo_user_id: user.id,
+          object_key: `${user.id}/cloud-agent/msg-1/att-1.bin`,
+          message_uuid: '11111111-1111-4111-8111-111111111111',
+          attachment_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          byte_size: 42,
+          status: 'pending',
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .returning();
+      const [otherPending] = await db
+        .insert(cloud_agent_pending_uploads)
+        .values({
+          id: crypto.randomUUID(),
+          kilo_user_id: otherUser.id,
+          object_key: `${otherUser.id}/cloud-agent/msg-1/att-1.bin`,
+          message_uuid: '22222222-2222-4222-8222-222222222222',
+          attachment_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          byte_size: 42,
+          status: 'pending',
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .returning();
+      if (!userPending || !otherPending) {
+        throw new Error('Failed to seed pending upload rows');
+      }
+
+      await softDeleteUser(user.id);
+
+      // The rows are the only handle the reaper has on these objects, so the
+      // private objects must be deleted before the rows go.
+      const deletedKeys = mockR2Send.mock.calls.map(call => call[0].input.Key);
+      expect(deletedKeys).toContain(userPending.object_key);
+      expect(deletedKeys).not.toContain(otherPending.object_key);
+
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pending_uploads)
+          .where(eq(cloud_agent_pending_uploads.id, userPending.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pending_uploads)
+          .where(eq(cloud_agent_pending_uploads.id, otherPending.id))
+      ).toHaveLength(1);
     });
 
     it('deletes user data export state and dependent multipart and outbox rows', async () => {

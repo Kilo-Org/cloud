@@ -7,7 +7,10 @@ import {
   OrganizationIdInputSchema,
 } from './utils';
 
-import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
+import {
+  getIntegrationForOrganization,
+  getPrimaryGitHubIntegrationForOrganization,
+} from '@/lib/integrations/db/platform-integrations';
 import { createSecurityAgentHandlers } from '@/lib/security-agent/router/shared-handlers';
 
 const handlers = createSecurityAgentHandlers<{ organizationId: string }>({
@@ -23,6 +26,8 @@ const handlers = createSecurityAgentHandlers<{ organizationId: string }>({
   verifyFindingOwnership: (finding, _ctx, input) =>
     finding.owned_by_organization_id === input.organizationId,
   getIntegration: async (_ctx, input) =>
+    await getPrimaryGitHubIntegrationForOrganization(input.organizationId),
+  getStatusIntegration: async (_ctx, input) =>
     await getIntegrationForOrganization(input.organizationId, 'github'),
   trackingExtras: (_ctx, input) => ({
     organizationId: input.organizationId,

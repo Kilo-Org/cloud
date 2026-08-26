@@ -8,9 +8,7 @@ import { describe, expect, it } from 'vitest';
 // Text-contract guard over the root layout source. The module-scope bootstrap
 // kicks (Sentry init, notification wiring, prefetch, theme preload) must stay
 // in _layout.tsx, and the deferred connections/analytics must stay out of it.
-const layoutPath = fileURLToPath(
-  new URL('../components/root-layout-controller.tsx', import.meta.url)
-);
+const layoutPath = fileURLToPath(new URL('../app/_layout.tsx', import.meta.url));
 const layoutSource = readFileSync(layoutPath, 'utf8');
 
 const FORBIDDEN_IDENTIFIERS = [

@@ -38,7 +38,9 @@
     "catalogLoadFailed": "Impossible de charger la langue. Veuillez réessayer.",
     "search": "Rechercher des langues",
     "noMatches": "Aucune langue ne correspond",
-    "deviceLanguage": "Langue de l'appareil"
+    "deviceLanguage": "Langue de l'appareil",
+    "current": "Actuelle",
+    "allLanguages": "Toutes les langues"
   },
   "login": {
     "welcome": "Bienvenue sur Kilo",
@@ -454,7 +456,7 @@
       "gmailNotifications": "Notifications Gmail",
       "disconnect": "Déconnecter le compte Google",
       "connected": "Connecté",
-      "copied": "Copié !",
+      "copied": "Copié",
       "copyCommand": "Copier la commande",
       "disabled": "Désactivé",
       "disconnectConfirm": "Déconnecter",
@@ -531,7 +533,7 @@
       "iosTitle": "KiloClaw indisponible sur iOS",
       "multipleCurrentConflictBody": "Nous avons trouvé plusieurs abonnements actifs sur votre compte. Nous avons donc tout mis en pause pour éviter une double facturation.",
       "multipleCurrentConflictCta": "Continuer sur kilo.ai",
-      "multipleCurrentConflictTitle": "Le compte doit être vérifié",
+      "multipleCurrentConflictTitle": "Compte nécessite un examen",
       "nonCanonicalEarlybirdBody": "Votre forfait d'accès anticipé nécessite une vérification manuelle avant de pouvoir être utilisé sur mobile.",
       "nonCanonicalEarlybirdCta": "Continuer sur kilo.ai",
       "nonCanonicalEarlybirdTitle": "Ancien forfait détecté",
@@ -630,7 +632,7 @@
         "openKiloAi": "Ouvrir kilo.ai",
         "provisioning": "Provisionnement",
         "ready": "Prêt",
-        "review": "Vérification",
+        "review": "Revue",
         "settingUp": "Configuration…",
         "somethingWentWrong": "Une erreur s'est produite"
       },
@@ -863,7 +865,7 @@
       "created": "Créé",
       "decision": "Décision",
       "details": "Détails",
-      "findings": "Signalements",
+      "findings": "Résultats",
       "gate": "Porte",
       "gateHidden": "Masqué",
       "gateNone": "Aucun",
@@ -1014,7 +1016,7 @@
       "allRepositories": "Tous les dépôts",
       "fixed": "Corrigé",
       "outcome": "Résultat",
-      "outcomeAnalyzing": "En cours d'analyse",
+      "outcomeAnalyzing": "Analyse en cours",
       "outcomeDismissed": "Ignoré",
       "outcomeExploitable": "Exploitable",
       "outcomeFailed": "Analyse échouée",
@@ -1036,7 +1038,7 @@
       "sortSeverityAsc": "Gravité : faible à haute",
       "sortSeverityDesc": "Gravité : haute à faible",
       "sortSlaDue": "Échéance SLA",
-      "status": "État",
+      "status": "Statut",
       "statusClosed": "Fermé",
       "statusIgnored": "Ignoré",
       "statusOpen": "Ouvert"
@@ -1546,7 +1548,7 @@
       "includeExistingDisabled": "Les résultats existants sont exclus de la remédiation automatique.",
       "belowThreshold": "Le résultat est sous le seuil de gravité automatique. La remédiation manuelle peut toujours démarrer lorsque les contrôles de sécurité passent.",
       "beforeEnablement": "L'analyse a été réalisée avant l'activation de la remédiation automatique. La remédiation manuelle peut toujours démarrer lorsque les contrôles de sécurité passent.",
-      "generic": "La remédiation n'est pas disponible pour ce résultat."
+      "generic": "La remédiation n'est pas disponible pour cette découverte."
     },
     "commandFailure": {
       "ownerCapReached": "La capacité d'analyse est pleine. Attendez qu'une analyse active se termine, puis réessayez.",
@@ -1592,7 +1594,12 @@
       "couldNotLoadThisSession": "Impossible de charger cette session",
       "cloneFailed": "Impossible de cloner cette session.",
       "cloneFailedRetry": "Impossible de cloner cette session. Réessayez.",
-      "connectRepositoryToContinue": "Connectez un dépôt pour continuer."
+      "connectRepositoryToContinue": "Connectez un dépôt pour continuer.",
+      "notEnoughCredits": "Crédits insuffisants pour exécuter Cloud Agent. Ajoutez des crédits et réessayez.",
+      "previousTaskFinishing": "La tâche précédente est encore en cours. Veuillez patienter un instant.",
+      "serviceUnavailable": "Le service est indisponible pour le moment. Veuillez réessayer.",
+      "connectionTrouble": "Problème de connexion. Veuillez réessayer dans un instant.",
+      "modelUnavailable": "Ce modèle n'est pas disponible pour Cloud Agent. Choisissez un autre modèle et réessayez."
     },
     "remoteSession": {
       "failedToCreate": "Échec de la création de la session distante",
@@ -1616,10 +1623,14 @@
     "newSession": {
       "title": "Nouvelle session",
       "repository": "Dépôt",
+      "couldNotLoadRepositories": "Impossible de charger les dépôts",
       "connectGithub": "Connecter GitHub",
       "connectGithubDescription": "Connectez GitHub dans votre navigateur, puis revenez ici pour choisir un dépôt.",
       "openGithub": "Ouvrir GitHub",
       "refreshRepositories": "Actualiser les dépôts",
+      "githubConnectionNotVisible": "Nous ne voyons pas encore votre connexion GitHub",
+      "githubConnectionNotVisibleDescription": "Si vous avez installé ou configuré la Kilo GitHub App, vérifiez à nouveau — ou assurez-vous qu'elle a été installée pour ce compte/cette organisation.",
+      "checkAgain": "Vérifier à nouveau",
       "githubConnected": "GitHub connecté",
       "noRepositoriesVisible": "Aucun dépôt visible. Vérifiez l'accès au dépôt de la Kilo GitHub App, puis actualisez.",
       "runOnWithTarget": "Exécuter sur : {{target}}",
@@ -1646,6 +1657,7 @@
       "discardDraftTitle": "Abandonner le brouillon ?",
       "discardFailed": "Impossible d'abandonner le brouillon. Veuillez réessayer.",
       "keepEditing": "Continuer à modifier",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "Bitbucket connecté",
       "connectBitbucket": "Connecter Bitbucket",
       "connectBitbucketDescription": "Connectez Bitbucket dans votre navigateur, puis revenez ici pour choisir un dépôt.",
@@ -2004,7 +2016,7 @@
       "photoLibrary": "Photothèque",
       "files": "Fichiers",
       "cameraAccessDisabled": "Accès à l'appareil photo désactivé",
-      "cameraAccessMessage": "Autorisez l'accès à l'appareil photo dans les Réglages pour prendre une photo.",
+      "cameraAccessMessage": "Autorisez l'accès à l'appareil photo dans Réglages pour prendre une photo.",
       "couldNotOpenPhotoPicker": "Impossible d'ouvrir le sélecteur de photos. Redémarrez Kilo et réessayez.",
       "maxFilesAllowed": "Maximum {{displayCount}} fichiers autorisés",
       "onlyAddingFiles": "Ajout de {{accepted}} fichiers sur {{total}} uniquement (max {{max}})"
@@ -2128,7 +2140,9 @@
     "appearanceSystem": "Système",
     "appearanceLight": "Clair",
     "appearanceDark": "Sombre",
-    "account": "Compte"
+    "account": "Compte",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "addCredits": {
     "cta": "Ajouter des crédits",
@@ -2166,16 +2180,11 @@
   "home": {
     "couldNotLoadSessions": "Impossible de charger les sessions",
     "couldNotLoadActiveSessions": "Impossible de charger les sessions actives",
-    "agentSessions": "Sessions d'agents",
-    "showingSavedSessions": "Affichage des sessions enregistrées — le statut en direct peut être obsolète",
-    "startNewAgentSession": "Démarrer une nouvelle session Kilo Agent",
-    "aiCodingSessions": "Sessions de codage IA",
-    "startCodingTaskFromPhone": "Démarrez une tâche de codage depuis votre téléphone ou continuez une session depuis votre CLI.",
-    "tryIt": "Essayer",
+    "agentSessions": "Sessions de l’agent",
     "newCodingTask": "Nouvelle tâche de codage",
     "explore": "Explorer",
     "seeAll": "Tout voir",
-    "kiloAgents": "Agents Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Fermer {{filename}}",
@@ -3124,7 +3133,7 @@
     "invalidRequest": "Vérifiez votre adresse e-mail et réessayez.",
     "emailDeliveryFailed": "La livraison des e-mails est temporairement indisponible. Veuillez réessayer plus tard.",
     "admissionRequired": "Impossible de vérifier votre appareil. Utilisez « $t(login.moreSignInOptions) » pour vous connecter sur un autre appareil ou via le web.",
-    "default": "Une erreur est survenue. Veuillez réessayer.",
+    "default": "Une erreur s'est produite. Veuillez réessayer.",
     "retryableAdmission": "Nous n'avons pas pu vérifier cet appareil. Vérifiez votre connexion et réessayez.",
     "startSignInFailed": "Échec du démarrage de la connexion. Veuillez réessayer.",
     "couldNotOpenBrowser": "Impossible d'ouvrir le navigateur. Veuillez réessayer.",

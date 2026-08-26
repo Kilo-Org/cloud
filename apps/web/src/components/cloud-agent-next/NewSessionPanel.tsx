@@ -83,7 +83,6 @@ import {
   CLOUD_AGENT_PROMPT_MAX_LENGTH,
 } from '@/lib/cloud-agent/constants';
 import {
-  appendCloudAgentNextLocalTestModel,
   getDevcontainerEnabled,
   getLastUsedModel,
   getLastUsedRepo,
@@ -198,9 +197,8 @@ export function NewSessionPanel({
       hasUserByokAvailable: model.hasUserByokAvailable,
       variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
     }));
-    const withLocalTest = appendCloudAgentNextLocalTestModel(options);
-    if (!hasLimitedAccess) return withLocalTest;
-    return withLocalTest.filter(option => option.isFree || option.hasUserByokAvailable);
+    if (!hasLimitedAccess) return options;
+    return options.filter(option => option.isFree || option.hasUserByokAvailable);
   }, [allModels, hasLimitedAccess]);
 
   // ---------------------------------------------------------------------------

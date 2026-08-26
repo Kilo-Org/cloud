@@ -38,7 +38,9 @@
     "retry": "Retry",
     "search": "Search languages",
     "noMatches": "No languages match",
-    "deviceLanguage": "Device language"
+    "deviceLanguage": "Device language",
+    "current": "Current",
+    "allLanguages": "All languages"
   },
   "login": {
     "welcome": "Welcome to Kilo",
@@ -148,7 +150,9 @@
     "appearanceSystem": "System",
     "appearanceLight": "Light",
     "appearanceDark": "Dark",
-    "account": "Account"
+    "account": "Account",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request unavailable",
@@ -2120,7 +2124,12 @@
       "couldNotLoadThisSession": "Couldn't load this session",
       "cloneFailed": "Couldn't clone this session.",
       "cloneFailedRetry": "Couldn't clone this session. Try again.",
-      "connectRepositoryToContinue": "Connect a repository to continue."
+      "connectRepositoryToContinue": "Connect a repository to continue.",
+      "notEnoughCredits": "Not enough credits to run Cloud Agent. Add credits and try again.",
+      "previousTaskFinishing": "The previous task is still finishing. Please wait a moment.",
+      "serviceUnavailable": "The service is unavailable right now. Please try again.",
+      "connectionTrouble": "Connection trouble. Please retry in a moment.",
+      "modelUnavailable": "This model isn't available for Cloud Agent. Choose another model and try again."
     },
     "remoteSession": {
       "failedToCreate": "Failed to create remote session",
@@ -2187,7 +2196,8 @@
       "discardDraftMessage": "Your prompt will be lost.",
       "keepEditing": "Keep editing",
       "discard": "Discard",
-      "discardFailed": "Could not discard the draft. Please try again."
+      "discardFailed": "Could not discard the draft. Please try again.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Updated {{displayCount}} file",
@@ -2675,16 +2685,11 @@
   "home": {
     "couldNotLoadSessions": "Couldn't load sessions",
     "couldNotLoadActiveSessions": "Couldn't load active sessions",
-    "agentSessions": "Agent sessions",
-    "showingSavedSessions": "Showing saved sessions — live status may be out of date",
-    "startNewAgentSession": "Start a new Kilo Agent session",
-    "aiCodingSessions": "AI coding sessions",
-    "startCodingTaskFromPhone": "Start a coding task from your phone or continue a session from your CLI.",
-    "tryIt": "Try it",
+    "agentSessions": "Live now",
     "newCodingTask": "New coding task",
     "explore": "Explore",
     "seeAll": "See all",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Close {{filename}}",

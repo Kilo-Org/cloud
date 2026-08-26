@@ -38,7 +38,9 @@
     "retry": "تلاش مجدد",
     "search": "جستجوی زبانها",
     "noMatches": "هیچ زبانی مطابقت ندارد",
-    "deviceLanguage": "زبان دستگاه"
+    "deviceLanguage": "زبان دستگاه",
+    "current": "فعلی",
+    "allLanguages": "همه زبان‌ها"
   },
   "login": {
     "welcome": "به Kilo خوش آمدید",
@@ -70,7 +72,7 @@
     "terms": "شرایط",
     "termsConnector": " و ",
     "termsSuffix": ".",
-    "privacyPolicy": "سیاست حفظ حریم خصوصی",
+    "privacyPolicy": "خطمشی حریم خصوصی",
     "moreSignInOptions": "گزینه‌های بیشتر ورود",
     "couldNotCompleteSignIn": "تکمیل ورود ممکن نشد. لطفاً دوباره تلاش کنید.",
     "sessionEnded": "نشست شما به پایان رسید. لطفاً دوباره وارد شوید.",
@@ -86,7 +88,7 @@
   "profile": {
     "title": "پروفایل",
     "agents": "عامل‌ها",
-    "codeReviewer": "بازبین کد",
+    "codeReviewer": "بررسی‌کننده کد",
     "codeReviewerSubtitle": "بازبینی خودکار PR",
     "securityAgent": "عامل امنیت",
     "securityAgentSubtitle": "یافتن و رفع آسیب‌پذیری‌ها",
@@ -101,7 +103,7 @@
     "app": "برنامه",
     "preferences": "ترجیحات",
     "preferencesSubtitle": "ظاهر، اعلان‌ها، تفکر و رفتار صفحه",
-    "deviceSessions": "نشست‌های دستگاه",
+    "deviceSessions": "جلسات دستگاه",
     "deviceSessionsSubtitle": "بررسی و خروج از سایر دستگاه‌ها",
     "feedback": "بازخورد",
     "privacyChoices": "انتخاب‌های حریم خصوصی",
@@ -148,7 +150,9 @@
     "appearanceSystem": "سیستم",
     "appearanceLight": "روشن",
     "appearanceDark": "تیره",
-    "account": "حساب"
+    "account": "حساب",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "درخواست pull در دسترس نیست",
@@ -418,7 +422,7 @@
     "couldNotLoadPullRequest": "بارگذاری درخواست pull ممکن نشد",
     "description": "توضیحات",
     "noDescriptionProvided": "توضیحی ارائه نشده است.",
-    "review": "بازبینی",
+    "review": "بررسی",
     "reviewPullRequest": "بازبینی درخواست pull",
     "headLine": "{{counts}} · head {{sha}}",
     "entry": {
@@ -479,7 +483,7 @@
       "loadFailedTitle": "بارگذاری ویرایشگر نظر ممکن نشد",
       "discardTitle": "دور انداختن نظر؟",
       "discardMessage": "پیش‌نویس شما از بین می‌رود.",
-      "keepEditing": "ادامهٔ ویرایش",
+      "keepEditing": "ادامه ویرایش",
       "discard": "دور انداختن",
       "comment": "نظر",
       "insertSuggestionA11y": "درج یک پیشنهاد کد",
@@ -632,7 +636,7 @@
     "previewFullDescription": "اعلان‌ها متن پیام را روی صفحهٔ قفل شما نشان می‌دهند.",
     "previewGenericDescription": "اعلان‌ها نشان می‌دهند که چیزی رخ داده است. برای خواندن آن Kilo را باز کنید.",
     "channel": {
-      "agent": "نشست‌های عامل",
+      "agent": "جلسات عامل",
       "chat": "پیام‌های گفتگو",
       "kiloclaw": "فعالیت KiloClaw",
       "balance": "هشدارهای موجودی",
@@ -667,7 +671,7 @@
     "instancePicker": {
       "switchInstance": "تغییر نمونه",
       "couldNotLoadInstances": "بارگذاری نمونه‌ها ممکن نشد",
-      "noInstances": "هیچ نمونهٔ KiloClaw نیست",
+      "noInstances": "هیچ نمونه KiloClaw وجود ندارد",
       "noInstancesDescription": "برای شروع گفتگو یک نمونه راه‌اندازی کنید.",
       "setUpKiloclaw": "راه‌اندازی KiloClaw",
       "currentInstance": "{{title}}، فعلی",
@@ -784,7 +788,7 @@
     },
     "attachmentPicker": {
       "takePhoto": "گرفتن عکس",
-      "photoLibrary": "گالری عکس",
+      "photoLibrary": "کتابخانه عکس",
       "files": "فایل‌ها",
       "cameraAccessDisabled": "دسترسی به دوربین غیرفعال است",
       "cameraAccessMessage": "برای گرفتن عکس، در تنظیمات به دوربین دسترسی بدهید."
@@ -1237,21 +1241,21 @@
       "placeholder": "مثلاً قراردادهای مدیریت خطای ما را رعایت کنید…"
     },
     "repos": {
-      "title": "مخزن‌ها",
-      "couldNotLoad": "بارگذاری مخزن‌ها ناموفق بود",
+      "title": "مخازن",
+      "couldNotLoad": "بارگذاری مخازن ناموفق بود",
       "unavailable": "مخزن‌ها در دسترس نیستند — راه‌اندازی Bitbucket را در kilo.ai تمام کنید.",
       "finishSetup": "پایان راه‌اندازی",
       "manageAccess": "مدیریت دسترسی",
-      "allRepositories": "همه مخزن‌ها",
+      "allRepositories": "همه مخازن",
       "bitbucketNoRepositoriesDescription": "در این فضای کاری Bitbucket مخزنی در دسترس نیست.",
       "bitbucketSetup": "راه‌اندازی Bitbucket",
-      "couldNotOpenGithubSettings": "باز کردن تنظیمات GitHub App ناموفق بود",
+      "couldNotOpenGithubSettings": "باز کردن تنظیمات GitHub App ممکن نشد",
       "gitlabNoRepositoriesDescription": "ممکن است لازم باشد در GitLab به گروه‌ها یا پروژه‌های بیشتری دسترسی بدهید.",
       "installGithubApp": "نصب اپ GitHub روی مخزن‌ها",
       "installGithubAppDescription": "به GitHub App Kilo دسترسی به مخزن‌هایی که می‌خواهید بررسی شوند بدهید.",
       "noRepositoriesFound": "مخزنی پیدا نشد",
       "repositoryAccess": "دسترسی به مخزن",
-      "selectedRepositories": "مخزن‌های انتخاب‌شده"
+      "selectedRepositories": "مخازن انتخاب‌شده"
     },
     "style": {
       "title": "سبک بررسی",
@@ -1280,13 +1284,13 @@
       "branch": "شاخه",
       "platform": "پلتفرم",
       "model": "مدل",
-      "created": "ایجاد شد",
+      "created": "ایجاد شده",
       "started": "شروع شد",
       "completed": "تکمیل شد",
       "cost": "هزینه",
       "tokens": "توکن‌ها",
       "tokensInOut": "{{input}} ورودی / {{output}} خروجی",
-      "openPullRequest": "باز کردن pull request",
+      "openPullRequest": "باز کردن درخواست pull",
       "council": "شورا",
       "decision": "تصمیم",
       "gate": "دروازه",
@@ -1295,12 +1299,12 @@
       "checkRun": "اجرای بررسی",
       "status": "وضعیت",
       "threshold": "آستانه",
-      "pullRequest": "pull request"
+      "pullRequest": "درخواست pull"
     },
     "reviewMemory": {
       "title": "حافظه بررسی",
-      "couldNotLoadMore": "بارگذاری بیشتر ناموفق بود",
-      "retryLoadingMore": "تلاش دوباره برای بارگذاری بیشتر",
+      "couldNotLoadMore": "بارگذاری بیشتر ممکن نشد",
+      "retryLoadingMore": "تلاش مجدد برای بارگذاری بیشتر",
       "loading": "در حال بارگذاری حافظه بررسی",
       "couldNotLoad": "بارگذاری حافظه بررسی ناموفق بود",
       "off": "حافظه بررسی خاموش است",
@@ -1334,7 +1338,7 @@
     "webhookSetupDescription": "برخی مخزن‌ها ممکن است بررسی‌های خودکار دریافت نکنند.",
     "autoReviews": "بررسی‌های خودکار",
     "selectRepository": "برای فعال‌سازی بررسی‌های خودکار حداقل یک مخزن را انتخاب کنید.",
-    "selectRepositories": "انتخاب مخزن‌ها",
+    "selectRepositories": "انتخاب مخازن",
     "followReviewMd": "دنبال کردن REVIEW.md",
     "followReviewMdSubtitle": "رعایت فایل‌های دستورالعمل REVIEW.md هر مخزن",
     "readOnlyDescription": "فقط دارندگان سازمان و مدیران صورتحساب می‌توانند این تنظیمات را تغییر دهند.",
@@ -1355,7 +1359,7 @@
       "couldNotLoad": "بارگذاری سازمان‌ها ناموفق بود",
       "personalStillAvailable": "مخزن‌های شخصی هنوز در زیر در دسترس هستند.",
       "personal": "شخصی",
-      "personalSubtitle": "مخزن‌های خود شما",
+      "personalSubtitle": "مخازن خودتان",
       "viewOnly": "فقط مشاهده"
     },
     "reviewList": {
@@ -1393,8 +1397,8 @@
       "set": "تنظیم",
       "model": "مدل",
       "mergeGate": "دروازه ادغام",
-      "repositories": "مخزن‌ها",
-      "allRepositories": "همه مخزن‌ها",
+      "repositories": "مخازن",
+      "allRepositories": "همه مخازن",
       "nSelected": "{{displayCount}} انتخاب شد",
       "reviewMemory": "حافظه بررسی",
       "proposedReviewMdGuidance": "راهنمای پیشنهادی REVIEW.md"
@@ -1483,10 +1487,10 @@
       "outcome": "نتیجه",
       "slaStatus": "وضعیت SLA",
       "sortBy": "مرتب‌سازی بر اساس",
-      "allRepositories": "همه مخزن‌ها",
+      "allRepositories": "همه مخازن",
       "all": "همه",
       "statusOpen": "باز",
-      "fixed": "رفع‌شده",
+      "fixed": "برطرف شده",
       "statusIgnored": "نادیده‌گرفته‌شده",
       "statusClosed": "بسته",
       "severityCritical": "بحرانی",
@@ -1501,7 +1505,7 @@
       "outcomeSafeToDismiss": "ایمن برای نادیده‌گرفتن",
       "outcomeNeedsReview": "نیاز به بررسی دارد",
       "outcomeTriageComplete": "دسته‌بندی تکمیل شد",
-      "outcomeDismissed": "نادیده‌گرفته شد",
+      "outcomeDismissed": "رد شده",
       "sortSeverityDesc": "شدت: بالا به پایین",
       "sortSeverityAsc": "شدت: پایین به بالا",
       "sortSlaDue": "تاریخ سررسید SLA",
@@ -1557,7 +1561,7 @@
       "triageConfidence": "اطمینان اولویتبندی",
       "suggestedAction": "اقدام پیشنهادی",
       "triageReasoning": "استدلال اولویتبندی",
-      "exploitable": "قابل بهرهبرداری",
+      "exploitable": "قابل بهره‌برداری",
       "model": "مدل",
       "notRecorded": "ثبت نشده",
       "analyzed": "تحلیل شده",
@@ -1571,7 +1575,7 @@
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} یافته",
-      "notMeasured": "اندازهگیری نشده",
+      "notMeasured": "اندازه‌گیری نشده",
       "actFirst": "اول اقدام کنید",
       "slaPosture": "SLA posture",
       "actionPosture": "Action posture",
@@ -1584,11 +1588,11 @@
       "criticalOverdue": "عقبافتاده بحرانی",
       "highOverdue": "عقبافتاده با شدت بالا",
       "mediumLowOverdue": "عقبافتاده متوسط و کم",
-      "confirmedExploitable": "قابل بهرهبرداری تأیید شده",
+      "confirmedExploitable": "قابل بهره‌برداری تأیید شده",
       "needsEvidenceReview": "نیاز به بررسی شواهد",
       "analysisNotComplete": "تحلیل کامل نشده",
       "noImmediateAction": "اقدام فوری لازم نیست",
-      "notExploitable": "قابل بهرهبرداری نیست",
+      "notExploitable": "غیرقابل بهره‌برداری",
       "needsYourReview": "نیاز به بررسی شما",
       "noSlaDeadline": "هیچ مهلت SLA اختصاص داده نشده",
       "noRepositoryData": "هنوز داده مخزنی وجود ندارد",
@@ -1596,7 +1600,7 @@
       "repoSummary": "{{open}} باز · {{critical}} بحرانی · {{high}} بالا",
       "couldNotLoad": "بارگذاری داده داشبورد ممکن نشد",
       "filterByRepository": "فیلتر بر اساس مخزن",
-      "findings": "یافتهها",
+      "findings": "یافته‌ها",
       "lastSynced": "آخرین همگامسازی {{time}}",
       "manageRepositories": "مدیریت مخازن",
       "notYetSynced": "هنوز همگامسازی نشده",
@@ -1636,7 +1640,7 @@
       "reasonNoBandwidth": "هیچ ظرفیتی در دسترس نیست",
       "reasonTolerableRisk": "ریسک قابل تحمل است",
       "reasonInaccurate": "یافته دقیق نیست",
-      "reasonNotUsed": "کد آسیبپذیر استفاده نمیشود",
+      "reasonNotUsed": "کد آسیب‌پذیر استفاده نمی‌شود",
       "commentLabel": "نظر (اختیاری)",
       "commentAccessibility": "نظر رد",
       "commentPlaceholder": "زمینهای برای این رد اضافه کنید…",
@@ -1672,7 +1676,7 @@
       "sourceId": "شناسه منبع",
       "viewAdvisory": "مشاهده مشاوره در GitHub",
       "statusSuperseded": "جایگزین شد",
-      "statusFixed": "برطرف شد",
+      "statusFixed": "برطرف شده",
       "statusOpen": "باز",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "یک اصلاح قبلاً شروع شده است",
@@ -1686,8 +1690,8 @@
       "title": "تنظیمات",
       "couldNotLoadSettings": "بارگذاری تنظیمات Security Agent ممکن نشد",
       "couldNotLoadPermissions": "بارگذاری مجوزها ممکن نشد",
-      "couldNotLoadRepositories": "بارگذاری مخازن ممکن نشد",
-      "securityAgent": "Security Agent",
+      "couldNotLoadRepositories": "بارگذاری مخازن ناموفق بود",
+      "securityAgent": "عامل امنیت",
       "enabled": "فعال",
       "disabled": "غیرفعال",
       "on": "روشن",
@@ -1701,10 +1705,10 @@
       "repositories": "مخازن",
       "modelsAndAnalysis": "مدلها و تحلیل",
       "analysisModeSubtitle": "تحلیل {{mode}}",
-      "automation": "خودکارسازی",
+      "automation": "اتوماسیون",
       "automationAllOff": "همه خاموش",
       "automationCount": "{{displayCount}} از ۳ فعال است",
-      "notifications": "اعلانها",
+      "notifications": "اعلان‌ها",
       "notificationsCount": "{{displayCount}} از ۲ فعال است",
       "slaPolicy": "خطمشی SLA",
       "disabledNoManage": "Security Agent غیرفعال است. فقط مالکان سازمان و مدیران صورتحساب میتوانند آن را روشن کنند.",
@@ -1714,7 +1718,7 @@
     "remediation": {
       "cancellationRequested": "لغو درخواست شد",
       "cancelled": "رفع لغو شد",
-      "pullRequest": "pull request",
+      "pullRequest": "درخواست pull",
       "couldNotLoad": "بارگذاری وضعیت رفع ممکن نشد",
       "noAnalysisTitle": "هنوز تحلیلی وجود ندارد",
       "noAnalysisDescription": "از برگه جزئیات اجرا کنید",
@@ -1752,7 +1756,7 @@
       "modeAuto": "خودکار",
       "modeShallow": "سطحی",
       "modeDeep": "عمیق",
-      "couldNotLoadModels": "بارگذاری مدلها ممکن نشد",
+      "couldNotLoadModels": "بارگذاری مدل‌ها ناموفق بود",
       "triageModel": "مدل اولویتبندی",
       "analysisModel": "مدل تحلیل",
       "remediationModel": "مدل رفع"
@@ -1787,7 +1791,7 @@
       "dismissA11y": "رد یافته"
     },
     "findingList": {
-      "title": "یافتهها",
+      "title": "یافته‌ها",
       "couldNotLoad": "بارگذاری یافتهها ممکن نشد",
       "couldNotLoadMore": "بارگذاری یافتههای بیشتر ممکن نشد",
       "noMatchesTitle": "هیچ یافتهای با فیلترها مطابقت ندارد",
@@ -1797,8 +1801,8 @@
       "clearFilters": "پاک کردن فیلترها"
     },
     "scopeList": {
-      "title": "Security Agent",
-      "couldNotLoad": "بارگذاری سازمانها ممکن نشد",
+      "title": "عامل امنیت",
+      "couldNotLoad": "بارگذاری سازمان‌ها ناموفق بود",
       "personal": "شخصی",
       "personalSubtitle": "مخازن خودتان"
     },
@@ -1835,7 +1839,7 @@
     "auditReport": {
       "couldNotLoad": "بارگذاری گزارش ممیزی ممکن نشد",
       "events": "رویدادها",
-      "findings": "یافتهها",
+      "findings": "یافته‌ها",
       "generated": "تولید شده در {{generatedAt}}",
       "noActivity": "هیچ فعالیتی ثبت نشده",
       "noActivityDescription": "Kilo هیچ فعالیت قابل گزارش یافته امنیتی از {{start}} تا {{end}} ندارد.",
@@ -1864,12 +1868,12 @@
       "slaSection": "اعلان هشدار SLA",
       "slaSeverityLabel": "حداقل شدت برای اعلان SLA",
       "slaSubtitle": "قبل و هنگام نزدیک شدن یا تجاوز یافتهها از مهلت SLA ارسال میشود.",
-      "title": "اعلانها"
+      "title": "اعلان‌ها"
     },
     "repositories": {
       "allRepositories": "همه مخازن",
       "couldNotLoad": "بارگذاری تنظیمات مخزن ممکن نشد",
-      "couldNotLoadRepositories": "بارگذاری مخازن ممکن نشد",
+      "couldNotLoadRepositories": "بارگذاری مخازن ناموفق بود",
       "couldNotOpenGithubSettings": "باز کردن تنظیمات GitHub App ممکن نشد",
       "githubAppSettings": "تنظیمات GitHub App",
       "manageAccess": "مدیریت دسترسی GitHub App",
@@ -1877,7 +1881,7 @@
       "noRepositoriesDescription": "به GitHub App کیلا دسترسی به مخازن بدهید",
       "readOnly": "فقط مالکان سازمان و مدیران صورتحساب میتوانند این تنظیمات را تغییر دهند.",
       "selectAtLeastOne": "حداقل یک مخزن انتخاب کنید.",
-      "selectedRepositories": "مخازن انتخابشده",
+      "selectedRepositories": "مخازن انتخاب‌شده",
       "title": "مخازن"
     },
     "scopeEntry": {
@@ -1893,7 +1897,7 @@
     },
     "queuedActionUntracked": "یک اقدام در صف دیگر قابل ردیابی نبود. برای دیدن آخرین وضعیت تازهسازی کنید.",
     "initialSyncAdmissionFailed": "Security Agent فعال شد، اما همگامسازی اولیه در صف قرار نگرفت. دوباره همگامسازی کنید.",
-    "title": "Security Agent",
+    "title": "عامل امنیت",
     "commands": {
       "findingAlreadyDismissed": "یافته قبلاً رد شده است",
       "findingDismissed": "یافته رد شد",
@@ -1935,7 +1939,7 @@
       "safeToDismissTitle": "ایمن برای نادیده‌گرفتن",
       "safeToDismissDescription": "اولویت‌بندی تعیین کرد که بدون تحلیل کدبیس می‌توان این را با خیال راحت نادیده گرفت.",
       "manualReview": "نیاز به بررسی دارد",
-      "manualReviewTitle": "نیاز به بررسی دستی دارد",
+      "manualReviewTitle": "نیاز به بررسی دستی",
       "manualReviewDescription": "اولویت‌بندی این یافته را برای بررسی دستی علامت‌گذاری کرد.",
       "analysisRequired": "تحلیل لازم است",
       "analysisRequiredTitle": "تحلیل کدبیس لازم است",
@@ -1949,11 +1953,11 @@
     },
     "deadline": {
       "fixedBeforeDeadline": "قبل از مهلت برطرف شد",
-      "fixed": "برطرف شد",
+      "fixed": "برطرف شده",
       "fixedOn": "برطرف شد {{date}}",
       "resolutionRecorded": "راه‌حل ثبت شد",
       "superseded": "جایگزین شد",
-      "dismissed": "رد شد",
+      "dismissed": "رد شده",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "مهلتی تعیین نشده است",
       "noSlaDeadline": "هیچ مهلت SLA اختصاص داده نشده",
@@ -2008,7 +2012,7 @@
       "includeExistingDisabled": "یافته‌های موجود از اصلاح خودکار مستثنی شده‌اند.",
       "belowThreshold": "یافته زیر آستانهٔ شدت خودکار است. اصلاح دستی همچنان می‌تواند وقتی دروازه‌های امنیتی عبور کنند شروع شود.",
       "beforeEnablement": "تحلیل قبل از فعال‌سازی اصلاح خودکار کامل شد. اصلاح دستی همچنان می‌تواند وقتی دروازه‌های امنیتی عبور کنند شروع شود.",
-      "generic": "اصلاح برای این یافته در دسترس نیست."
+      "generic": "رفع برای این یافته در دسترس نیست."
     },
     "commandFailure": {
       "ownerCapReached": "ظرفیت تحلیل کامل است. صبر کنید تا تحلیل فعال پایان یابد، سپس دوباره تلاش کنید.",
@@ -2038,7 +2042,7 @@
       "clearFilters": "پاک کردن فیلترها"
     },
     "sessionList": {
-      "couldNotLoad": "بارگذاری نشستها ممکن نشد",
+      "couldNotLoad": "جلسات بارگذاری نشدند",
       "couldNotLoadActive": "بارگذاری نشستهای فعال ممکن نشد",
       "noSessionsYet": "هنوز نشستی وجود ندارد",
       "noSessionsYetDescription": "از تلفن خود یک کار کدنویسی شروع کنید. نشستهای شما اینجا ظاهر میشوند.",
@@ -2120,11 +2124,16 @@
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد",
       "cloneFailed": "شبیهسازی این نشست ممکن نشد.",
       "cloneFailedRetry": "شبیهسازی این نشست ممکن نشد. دوباره تلاش کنید.",
-      "connectRepositoryToContinue": "برای ادامه یک مخزن را وصل کنید."
+      "connectRepositoryToContinue": "برای ادامه یک مخزن را وصل کنید.",
+      "notEnoughCredits": "اعتبار کافی برای اجرای Cloud Agent وجود ندارد. اعتبار اضافه کنید و دوباره تلاش کنید.",
+      "previousTaskFinishing": "وظیفه قبلی هنوز در حال پایان است. لطفاً لحظهای صبر کنید.",
+      "serviceUnavailable": "سرویس در حال حاضر در دسترس نیست. لطفاً دوباره تلاش کنید.",
+      "connectionTrouble": "مشکل در اتصال. لطفاً لحظهای دیگر دوباره تلاش کنید.",
+      "modelUnavailable": "این مدل برای Cloud Agent در دسترس نیست. مدل دیگری انتخاب کنید و دوباره تلاش کنید."
     },
     "remoteSession": {
       "failedToCreate": "ایجاد نشست از راه دور شکست خورد",
-      "exited": "نشست خارج شد",
+      "exited": "جلسه خاتمه یافت",
       "failedToExit": "خروج از نشست شکست خورد",
       "exitTitle": "از نشست خارج شویم؟",
       "exitMessage": "این نشست در حال اجرا را متوقف میکند اما تاریخچه آن را نگه میدارد.",
@@ -2142,12 +2151,16 @@
       "retryConnection": "تلاش دوباره اتصال"
     },
     "newSession": {
-      "title": "نشست جدید",
+      "title": "جلسه جدید",
       "repository": "مخزن",
+      "couldNotLoadRepositories": "بارگذاری مخازن ممکن نشد",
       "connectGithub": "اتصال GitHub",
       "connectGithubDescription": "GitHub را در مرورگر خود وصل کنید، سپس برای انتخاب مخزن به اینجا برگردید.",
       "openGithub": "باز کردن GitHub",
       "refreshRepositories": "تازهسازی مخازن",
+      "githubConnectionNotVisible": "ما هنوز اتصال GitHub شما را نمیبینیم",
+      "githubConnectionNotVisibleDescription": "اگر GitHub App کیلا را نصب یا پیکربندی کردهاید، دوباره بررسی کنید — یا مطمئن شوید که برای این حساب/سازمان نصب شده است.",
+      "checkAgain": "دوباره بررسی کنید",
       "githubConnected": "GitHub وصل شد",
       "noRepositoriesVisible": "هیچ مخزنی قابل مشاهده نیست. دسترسی مخزن GitHub App کیلا را بررسی کنید، سپس تازهسازی کنید.",
       "runOnWithTarget": "اجرا بر روی: {{target}}",
@@ -2174,6 +2187,7 @@
       "keepEditing": "ادامه ویرایش",
       "discard": "دور انداختن",
       "discardFailed": "دور انداختن پیشنویس ممکن نشد. لطفاً دوباره تلاش کنید.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "بیت‌باکت متصل شد",
       "connectBitbucket": "اتصال به Bitbucket",
       "connectBitbucketDescription": "در مرورگر خود به Bitbucket متصل شوید، سپس برای انتخاب مخزن به اینجا بازگردید.",
@@ -2197,7 +2211,7 @@
     "toolPatch": {
       "operationAdded": "افزوده شد",
       "operationDeleted": "حذف شد",
-      "operationUpdated": "بهروزرسانی شد"
+      "operationUpdated": "بهروزرسانی شده"
     },
     "toolCard": {
       "accessibility": "ابزار {{label}}، {{status}}",
@@ -2205,7 +2219,7 @@
       "fileEmpty": "این فایل خالی است.",
       "noTasks": "هیچ کاری وجود ندارد.",
       "contentTruncated": "محتوای بریدهشده",
-      "truncated": "بریده شد",
+      "truncated": "کوتاه شده",
       "toolRead": "خواندن",
       "toolEdit": "ویرایش",
       "toolWrite": "نوشتن",
@@ -2214,7 +2228,7 @@
       "toolGrep": "grep",
       "toolList": "فهرست",
       "toolPatch": "patch",
-      "toolTask": "کار",
+      "toolTask": "وظیفه",
       "readTodos": "خواندن کارها",
       "updateTodos": "بهروزرسانی کارها",
       "linesBadge": "{{displayCount}} خط",
@@ -2257,7 +2271,7 @@
     },
     "modeOptions": {
       "code": "کد",
-      "plan": "برنامه",
+      "plan": "طرح",
       "debug": "اشکالزدایی",
       "orchestrator": "هماهنگکننده",
       "ask": "پرسش",
@@ -2490,7 +2504,7 @@
       "noModelsDescription": "هیچ مدلی برای انتخاب در دسترس نیست.",
       "favorites": "موردعلاقهها",
       "recommended": "پیشنهادی",
-      "allModels": "همه مدلها"
+      "allModels": "همه مدل‌ها"
     },
     "modelSelector": {
       "model": "مدل",
@@ -2527,8 +2541,8 @@
       "camera": "دوربین",
       "photoLibrary": "کتابخانه عکس",
       "files": "فایل‌ها",
-      "cameraAccessDisabled": "دسترسی دوربین غیرفعال است",
-      "cameraAccessMessage": "برای گرفتن عکس، دسترسی دوربین را در تنظیمات مجاز کنید.",
+      "cameraAccessDisabled": "دسترسی به دوربین غیرفعال است",
+      "cameraAccessMessage": "برای گرفتن عکس، در تنظیمات به دوربین دسترسی بدهید.",
       "couldNotOpenPhotoPicker": "انتخاب‌گر عکس باز نشد. Kilo را راه‌اندازی مجدد کنید و دوباره تلاش کنید.",
       "maxFilesAllowed": "حداکثر {{displayCount}} فایل مجاز است",
       "onlyAddingFiles": "فقط {{accepted}} از {{total}} فایل اضافه می‌شود (حداکثر {{max}})"
@@ -2623,10 +2637,10 @@
       "open": "درخواست کشش باز",
       "closed": "درخواست کشش بسته",
       "merged": "درخواست کشش ادغام‌شده",
-      "draft": "درخواست کشش پیش‌نویس",
+      "draft": "درخواست pull پیش‌نویس",
       "updating": "در حال به‌روزرسانی، {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "درخواست کشش"
+      "externalLinkLabel": "درخواست pull"
     }
   },
   "bootstrap": {
@@ -2676,15 +2690,10 @@
     "couldNotLoadSessions": "جلسات بارگذاری نشدند",
     "couldNotLoadActiveSessions": "جلسات فعال بارگذاری نشدند",
     "agentSessions": "جلسات عامل",
-    "showingSavedSessions": "نمایش جلسات ذخیره‌شده — وضعیت زنده ممکن است به‌روز نباشد",
-    "startNewAgentSession": "شروع یک جلسه جدید Kilo Agent",
-    "aiCodingSessions": "جلسات کدنویسی هوش مصنوعی",
-    "startCodingTaskFromPhone": "از تلفن خود یک کار کدنویسی را شروع کنید یا جلسه را از CLI ادامه دهید.",
-    "tryIt": "امتحان کنید",
     "newCodingTask": "کار کدنویسی جدید",
     "explore": "کاوش",
     "seeAll": "مشاهده همه",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "بستن {{filename}}",
@@ -2697,7 +2706,7 @@
     "title": "صفحه پیدا نشد"
   },
   "monoScrollBlock": {
-    "contentTruncated": "محتوا کوتاه شد",
+    "contentTruncated": "محتوای بریده‌شده",
     "truncated": "کوتاه شده",
     "wrap": "بازگشت به خط",
     "scroll": "پیمایش"
@@ -2712,8 +2721,8 @@
     "offlineTitle": "بارگذاری ناموفق بود",
     "offlineDescription": "مشکلی پیش آمد",
     "permissionTitle": "دسترسی رد شد",
-    "permissionDescription": "شما اجازه مشاهده این مورد را ندارید.",
-    "notFoundTitle": "پیدا نشد",
+    "permissionDescription": "شما مجوز مشاهده این مورد را ندارید.",
+    "notFoundTitle": "یافت نشد",
     "notFoundDescription": "این مورد ممکن است حذف شده باشد یا دیگر در دسترس نباشد.",
     "serverTitle": "بارگذاری ممکن نشد",
     "serverDescription": "از طرف ما مشکلی پیش آمد. لطفاً دوباره تلاش کنید."
@@ -3123,7 +3132,7 @@
       "minimal": "حداقلی",
       "low": "کم",
       "medium": "متوسط",
-      "high": "زیاد",
+      "high": "بالا",
       "xhigh": "خیلی زیاد",
       "max": "حداکثر"
     }

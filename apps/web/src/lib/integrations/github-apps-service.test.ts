@@ -2,7 +2,11 @@ import { describe, expect, it } from '@jest/globals';
 import { organizations, platform_integrations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
-import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
+import {
+  getIntegrationForOrganization,
+  getIntegrationForOwner,
+  getPrimaryGitHubIntegrationForOrganization,
+} from '@/lib/integrations/db/platform-integrations';
 import { getInstallation, isInstallationGoneError } from './github-apps-service';
 
 describe('getInstallation', () => {
@@ -40,6 +44,80 @@ describe('getInstallation', () => {
 
       expect(integration?.id).toBe(rows[1].id);
       expect(sharedIntegration?.id).toBe(rows[1].id);
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+
+  it('keeps the oldest healthy organization installation primary', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `GitHub primary ${crypto.randomUUID()}` })
+      .returning();
+    const oldestCreatedAt = '2026-01-01T00:00:00.000Z';
+    const newestCreatedAt = '2026-02-01T00:00:00.000Z';
+    const rows = await db
+      .insert(platform_integrations)
+      .values([
+        {
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: crypto.randomUUID(),
+          integration_status: 'active',
+          repository_access: 'all',
+          created_at: oldestCreatedAt,
+        },
+        {
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: crypto.randomUUID(),
+          integration_status: 'active',
+          repository_access: 'all',
+          created_at: newestCreatedAt,
+        },
+      ])
+      .returning();
+
+    try {
+      const integration = await getInstallation({ type: 'org', id: organization.id });
+      expect(integration?.id).toBe(rows[0].id);
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+
+  it('keeps an auth-invalid installation visible without selecting it as primary', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `GitHub recovery ${crypto.randomUUID()}` })
+      .returning();
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: crypto.randomUUID(),
+        integration_status: 'active',
+        repository_access: 'all',
+        auth_invalid_at: new Date().toISOString(),
+        auth_invalid_reason: 'installation_token_auth_failed',
+      })
+      .returning();
+
+    try {
+      const visibleIntegration = await getIntegrationForOrganization(organization.id, 'github');
+      const primaryIntegration = await getPrimaryGitHubIntegrationForOrganization(organization.id);
+      const ownerIntegration = await getIntegrationForOwner(
+        { type: 'org', id: organization.id },
+        'github'
+      );
+
+      expect(visibleIntegration?.id).toBe(row.id);
+      expect(primaryIntegration).toBeNull();
+      expect(ownerIntegration).toBeNull();
     } finally {
       await db.delete(organizations).where(eq(organizations.id, organization.id));
     }

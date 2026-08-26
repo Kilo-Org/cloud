@@ -202,13 +202,13 @@ function AttachmentChip({
       )}
 
       {isImage && isUploading ? (
-        <View className="absolute inset-0 items-center justify-center bg-black/30">
+        <View className="absolute inset-0 items-center justify-center bg-[#0000004D]">
           <ActivityIndicator size="small" color={colors.foreground} />
         </View>
       ) : null}
 
       {isImage && isErrored ? (
-        <View className="absolute inset-0 items-center justify-center bg-black/30">
+        <View className="absolute inset-0 items-center justify-center bg-[#0000004D]">
           <AlertCircle size={20} color="white" />
         </View>
       ) : null}

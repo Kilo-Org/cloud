@@ -33,6 +33,11 @@ import { getGoogleServiceAccountAccessToken } from '@/lib/ai-gateway/custom-llm/
 import { userHasCustomLlmAccess } from '@/lib/ai-gateway/custom-llm/access';
 import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import {
+  getLocalFakeLlmProvider,
+  isLocalFakeDeterministicModel,
+  isLocalFakeLlmEnabled,
+} from '@/lib/ai-gateway/local-fake-llm';
 
 /**
  * Metadata about the experiment that resolved this provider, attached when
@@ -218,6 +223,18 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     machineId,
     getRoutingProviderConfig,
   } = input;
+
+  if (isLocalFakeLlmEnabled() && isLocalFakeDeterministicModel(requestedModel)) {
+    const localFakeProvider = getLocalFakeLlmProvider();
+    if (localFakeProvider) {
+      return {
+        kind: 'provider',
+        provider: localFakeProvider,
+        userByok: null,
+        bypassAccessCheck: true,
+      };
+    }
+  }
 
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
   if (directByokByok) {

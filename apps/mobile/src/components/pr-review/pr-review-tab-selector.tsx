@@ -44,7 +44,7 @@ export function PrReviewTabSelector({ activeTab, onChange }: PrReviewTabSelector
             }}
             className={cn(
               'flex-1 items-center justify-center rounded-md py-2 active:opacity-70',
-              active && 'bg-card shadow-sm shadow-black/5'
+              active && 'bg-card shadow-sm shadow-[#0000000D]'
             )}
           >
             <Text

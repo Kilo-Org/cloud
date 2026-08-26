@@ -10,6 +10,7 @@ import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list
 import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
 import { readDb } from '@/lib/drizzle';
 import { addAutoRoutingModels } from '@/lib/ai-gateway/auto-routing-models';
+import { appendLocalFakeDeterministicCatalogModels } from '@/lib/ai-gateway/local-fake-llm';
 
 async function tryGetUserFromAuth() {
   try {
@@ -51,7 +52,7 @@ export async function GET(
     if (!auth?.user) {
       const experimentModels = await listAvailableExperimentModels();
       return NextResponse.json({
-        data: models.concat(experimentModels),
+        data: appendLocalFakeDeterministicCatalogModels(models.concat(experimentModels)),
       });
     }
 
@@ -65,7 +66,9 @@ export async function GET(
       enabledByokProviderIds
     );
     return NextResponse.json({
-      data: modelsWithByokAvailability.concat(byokModels, experimentModels),
+      data: appendLocalFakeDeterministicCatalogModels(
+        modelsWithByokAvailability.concat(byokModels, experimentModels)
+      ),
     });
   } catch (error) {
     captureException(error, {

@@ -38,7 +38,9 @@
     "catalogLoadFailed": "Die Sprache konnte nicht geladen werden. Bitte versuche es erneut.",
     "search": "Sprachen suchen",
     "noMatches": "Keine Sprachen gefunden",
-    "deviceLanguage": "Gerätesprache"
+    "deviceLanguage": "Gerätesprache",
+    "current": "Aktuell",
+    "allLanguages": "Alle Sprachen"
   },
   "login": {
     "welcome": "Willkommen bei Kilo",
@@ -60,7 +62,7 @@
     "emailAddress": "E-Mail-Adresse",
     "emailPlaceholder": "du@beispiel.de",
     "continueWithEmail": "Mit E-Mail fortfahren",
-    "continue": "Fortfahren",
+    "continue": "Weiter",
     "enterCodeSentTo": "Gib den Code ein, der an {{email}} gesendet wurde",
     "codeArrivalHint": "Wenn diese Adresse berechtigt ist, kommt der Code innerhalb einer Minute an.",
     "verifyCode": "Code bestätigen",
@@ -148,7 +150,9 @@
     "appearanceSystem": "System",
     "appearanceLight": "Hell",
     "appearanceDark": "Dunkel",
-    "account": "Konto"
+    "account": "Konto",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "Benachrichtigungen",
@@ -363,7 +367,7 @@
     "billing": {
       "title": "Abrechnung",
       "continueMonthToMonth": "Monatlich fortfahren",
-      "plan": "Tarif",
+      "plan": "Plan",
       "finalTermEnds": "Letzte Laufzeit endet",
       "afterFinalTerm": "Nach der letzten Laufzeit",
       "remaining": "Verbleibend",
@@ -642,7 +646,7 @@
         "openKiloAi": "kilo.ai öffnen",
         "provisioning": "Wird bereitgestellt",
         "ready": "Bereit",
-        "review": "Prüfen",
+        "review": "Review",
         "settingUp": "Wird eingerichtet…",
         "somethingWentWrong": "Etwas ist schiefgelaufen"
       },
@@ -894,7 +898,7 @@
       "title": "Review",
       "tokens": "Tokens",
       "tokensInOut": "{{input}} rein / {{output}} raus",
-      "pullRequest": "Pull Request"
+      "pullRequest": "Pull-Request"
     },
     "reviewList": {
       "configureProvider": "Anbieter konfigurieren",
@@ -1098,7 +1102,7 @@
       "checkConnection": "Prüfe deine Verbindung und versuche es erneut.",
       "couldNotLoad": "Der Auditbericht konnte nicht geladen werden",
       "events": "Ereignisse",
-      "findings": "Findings",
+      "findings": "Befunde",
       "generated": "Erstellt {{generatedAt}}",
       "noActivity": "Keine erfasste Aktivität",
       "noActivityDescription": "Kilo hat keine meldepflichtige Security-Finding-Aktivität von {{start}} bis {{end}}.",
@@ -1161,7 +1165,7 @@
       "daysOverdue": "{{displayCount}} Tage überfällig",
       "deadlineToday": "Frist heute erreicht",
       "filterByRepository": "Nach Repository filtern",
-      "findings": "Findings",
+      "findings": "Befunde",
       "findingsCount": "{{displayCount}} Findings",
       "highOverdue": "Hoch überfällig",
       "lastSynced": "Zuletzt synchronisiert {{time}}",
@@ -1281,7 +1285,7 @@
       "emptyTitle": "Keine offenen Findings",
       "noMatchesDescription": "Passe die ausgewählten Filter an oder lösche sie.",
       "noMatchesTitle": "Keine Findings entsprechen den Filtern",
-      "title": "Findings"
+      "title": "Befunde"
     },
     "findingRow": {
       "a11y": "{{severity}}-Finding: {{title}}. {{repo}}. {{analysis}}",
@@ -1517,7 +1521,7 @@
     "remediationStatus": {
       "cancellationRequested": "Abbruch angefordert",
       "notStarted": "Nicht gestartet",
-      "queued": "Eingereiht",
+      "queued": "In Warteschlange",
       "starting": "Wird gestartet",
       "inProgress": "In Bearbeitung",
       "draftPrOpened": "Entwurfs-PR geöffnet",
@@ -1554,7 +1558,7 @@
       "includeExistingDisabled": "Bestehende Findings sind von der automatischen Behebung ausgeschlossen.",
       "belowThreshold": "Das Finding liegt unter der automatischen Schweregradschwelle. Die manuelle Behebung kann weiterhin starten, wenn die Sicherheitsgates bestanden sind.",
       "beforeEnablement": "Die Analyse wurde abgeschlossen, bevor die automatische Behebung aktiviert wurde. Die manuelle Behebung kann weiterhin starten, wenn die Sicherheitsgates bestanden sind.",
-      "generic": "Die Behebung ist für dieses Finding nicht verfügbar."
+      "generic": "Die Behebung ist für diesen Befund nicht verfügbar."
     },
     "commandFailure": {
       "ownerCapReached": "Die Analysekapazität ist voll. Warte, bis eine aktive Analyse abgeschlossen ist, und versuche es dann erneut.",
@@ -1569,8 +1573,8 @@
       "generic": "Die eingereihte Aktion ist fehlgeschlagen. Wiederhole die Aktion."
     },
     "analysisMode": {
-      "auto": "Auto",
-      "shallow": "Oberflächlich",
+      "auto": "Automatisch",
+      "shallow": "Flach",
       "deep": "Tief"
     }
   },
@@ -1666,7 +1670,12 @@
       "couldNotLoadThisSession": "Diese Sitzung konnte nicht geladen werden",
       "cloneFailed": "Diese Sitzung konnte nicht geklont werden.",
       "cloneFailedRetry": "Diese Sitzung konnte nicht geklont werden. Versuche es erneut.",
-      "connectRepositoryToContinue": "Verbinde ein Repository, um fortzufahren."
+      "connectRepositoryToContinue": "Verbinde ein Repository, um fortzufahren.",
+      "notEnoughCredits": "Nicht genug Credits zum Ausführen von Cloud Agent. Füge Credits hinzu und versuche es erneut.",
+      "previousTaskFinishing": "Die vorherige Aufgabe wird noch abgeschlossen. Bitte warte einen Moment.",
+      "serviceUnavailable": "Der Dienst ist gerade nicht verfügbar. Bitte versuche es erneut.",
+      "connectionTrouble": "Verbindungsproblem. Bitte versuche es in einem Moment erneut.",
+      "modelUnavailable": "Dieses Modell ist für Cloud Agent nicht verfügbar. Wähle ein anderes Modell und versuche es erneut."
     },
     "remoteSession": {
       "failedToCreate": "Remote-Sitzung konnte nicht erstellt werden",
@@ -1690,10 +1699,14 @@
     "newSession": {
       "title": "Neue Sitzung",
       "repository": "Repository",
+      "couldNotLoadRepositories": "Repositories konnten nicht geladen werden",
       "connectGithub": "GitHub verbinden",
       "connectGithubDescription": "Verbinde GitHub in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
       "openGithub": "GitHub öffnen",
       "refreshRepositories": "Repositories aktualisieren",
+      "githubConnectionNotVisible": "Wir können deine GitHub-Verbindung noch nicht sehen",
+      "githubConnectionNotVisibleDescription": "Wenn du die Kilo GitHub App installiert oder konfiguriert hast, prüfe erneut — oder stelle sicher, dass sie für dieses Konto/diese Organisation installiert wurde.",
+      "checkAgain": "Erneut prüfen",
       "githubConnected": "GitHub verbunden",
       "noRepositoriesVisible": "Keine Repositories sichtbar. Prüfe den Repository-Zugriff für die Kilo GitHub App und aktualisiere dann.",
       "runOnWithTarget": "Ausführen auf: {{target}}",
@@ -1720,6 +1733,7 @@
       "discardDraftTitle": "Entwurf verwerfen?",
       "discardFailed": "Der Entwurf konnte nicht verworfen werden. Bitte versuche es erneut.",
       "keepEditing": "Weiter bearbeiten",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "Bitbucket verbunden",
       "connectBitbucket": "Bitbucket verbinden",
       "connectBitbucketDescription": "Verbinde Bitbucket in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
@@ -2221,16 +2235,11 @@
   "home": {
     "couldNotLoadSessions": "Sitzungen konnten nicht geladen werden",
     "couldNotLoadActiveSessions": "Aktive Sitzungen konnten nicht geladen werden",
-    "agentSessions": "Agentensitzungen",
-    "showingSavedSessions": "Gespeicherte Sitzungen werden angezeigt — der Live-Status kann veraltet sein",
-    "startNewAgentSession": "Neue Kilo-Agent-Sitzung starten",
-    "aiCodingSessions": "KI-Codiersitzungen",
-    "startCodingTaskFromPhone": "Starte eine Codieraufgabe von deinem Telefon oder setze eine Sitzung von deiner CLI fort.",
-    "tryIt": "Ausprobieren",
+    "agentSessions": "Agent-Sitzungen",
     "newCodingTask": "Neue Codieraufgabe",
     "explore": "Entdecken",
     "seeAll": "Alle ansehen",
-    "kiloAgents": "Kilo-Agenten"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} schließen",
@@ -2359,12 +2368,12 @@
     "statusCanceling": "Kilo Pass wird storniert",
     "statusPastDue": "Kilo Pass überfällig",
     "monthlyCredits": "{{credits}} monatliche Credits",
-    "ends": "Endet {{date}}",
+    "ends": "Endet am {{date}}",
     "periodEnd": "Ende des Zeitraums",
     "managedOnGooglePlay": "Verwaltet über Google Play",
     "managedInAppStore": "Verwaltet im App Store",
     "managedOnWeb": "Dieser Kilo Pass wird im Web verwaltet",
-    "opensManagementOnWeb": "Öffnet die Kilo Pass-Verwaltung im Web.",
+    "opensManagementOnWeb": "Öffnet die Kilo-Pass-Verwaltung im Web.",
     "opensAppStoreManagement": "Öffnet die Abonnementverwaltung des App Store.",
     "opensPlans": "Öffnet die Kilo Pass-Pläne.",
     "tryAgainFromProfile": "Versuche es erneut über das Profil.",
@@ -2461,7 +2470,7 @@
     "what": "Was",
     "why": "Warum",
     "who": "Wer",
-    "continue": "Fortfahren",
+    "continue": "Weiter",
     "installAttributionPromptMessage": "Kilo nutzt Apples Tracking-Berechtigung nur, um zu erfahren, über welchen Kanal du hierher gekommen bist. Deine Prompts und Unterhaltungen werden niemals verwendet.",
     "installAttributionPromptTitle": "Installationszuordnung erlauben?"
   },
@@ -2484,7 +2493,7 @@
       "title": "Checks",
       "viewOnGitHub": "PR auf GitHub ansehen",
       "checkDetails": "Check-Details",
-      "pullRequest": "Pull Request"
+      "pullRequest": "Pull-Request"
     },
     "composer": {
       "addTitle": "Kommentar hinzufügen",
@@ -2755,7 +2764,7 @@
       "mergePullRequest": "Pull Request zusammenführen",
       "methodLabel": "Methode",
       "methods": {
-        "merge": "Merge",
+        "merge": "Zusammenführen",
         "rebase": "Rebase",
         "squash": "Squash"
       },
@@ -2783,7 +2792,7 @@
         "failingChecksDetail": "Erforderliche Status-Checks schlagen fehl.",
         "unstableTitle": "Einige Checks schlagen fehl",
         "unstableDetail": "Nicht erforderliche Checks schlagen fehl. Sie blockieren den Merge nicht.",
-        "draftTitle": "Pull Request als Entwurf",
+        "draftTitle": "Pull-Request-Entwurf",
         "draftDetail": "Markiere den Pull Request als für Review bereit, bevor du zusammenführst.",
         "behindTitle": "Branch ist nicht mehr aktuell",
         "behindDetailUpdatable": "Aktualisiere den Branch vom Basis-Branch aus oder führe ein Rebase durch, bevor du zusammenführst.",

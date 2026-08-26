@@ -38,7 +38,9 @@
     "catalogLoadFailed": "No se pudo cargar el idioma. Inténtalo de nuevo.",
     "search": "Buscar idiomas",
     "noMatches": "Ningún idioma coincide",
-    "deviceLanguage": "Idioma del dispositivo"
+    "deviceLanguage": "Idioma del dispositivo",
+    "current": "Actual",
+    "allLanguages": "Todos los idiomas"
   },
   "login": {
     "welcome": "Te damos la bienvenida a Kilo",
@@ -86,7 +88,7 @@
   "profile": {
     "title": "Perfil",
     "agents": "Agentes",
-    "codeReviewer": "Code Reviewer",
+    "codeReviewer": "Revisor de código",
     "codeReviewerSubtitle": "Revisiones automáticas de PR",
     "securityAgent": "Security Agent",
     "securityAgentSubtitle": "Encuentra y corrige vulnerabilidades",
@@ -148,7 +150,9 @@
     "appearanceSystem": "Sistema",
     "appearanceLight": "Claro",
     "appearanceDark": "Oscuro",
-    "account": "Cuenta"
+    "account": "Cuenta",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "channel": {
@@ -468,7 +472,7 @@
       "gmailNotifications": "Notificaciones de Gmail",
       "disconnect": "Desconectar cuenta de Google",
       "connected": "Conectado",
-      "copied": "¡Copiado!",
+      "copied": "Copiado",
       "copyCommand": "Copiar comando",
       "disabled": "Desactivado",
       "disconnectConfirm": "Desconectar",
@@ -545,7 +549,7 @@
       "iosTitle": "KiloClaw no disponible en iOS",
       "multipleCurrentConflictBody": "Encontramos más de una suscripción activa en tu cuenta, así que pausamos todo para evitar cobrarte dos veces.",
       "multipleCurrentConflictCta": "Continuar en kilo.ai",
-      "multipleCurrentConflictTitle": "La cuenta necesita revisión",
+      "multipleCurrentConflictTitle": "La cuenta requiere revisión",
       "nonCanonicalEarlybirdBody": "Tu plan de acceso anticipado necesita una revisión manual antes de poder usarse en el móvil.",
       "nonCanonicalEarlybirdCta": "Continuar en kilo.ai",
       "nonCanonicalEarlybirdTitle": "Plan heredado detectado",
@@ -644,7 +648,7 @@
         "openKiloAi": "Abrir kilo.ai",
         "provisioning": "Aprovisionando",
         "ready": "Listo",
-        "review": "Revisar",
+        "review": "Revisión",
         "settingUp": "Configurando…",
         "somethingWentWrong": "Algo salió mal"
       },
@@ -939,7 +943,7 @@
       "noResult": "Sin resultado",
       "pass": "Aprobar"
     },
-    "eyebrow": "Code Reviewer",
+    "eyebrow": "Revisor de código",
     "overview": {
       "allAreas": "Todas las áreas",
       "allRepositories": "Todos los repositorios",
@@ -1328,7 +1332,7 @@
       "cancellationRequested": "Cancelación solicitada",
       "cancelled": "Corrección cancelada",
       "couldNotLoad": "No se pudo cargar el estado de la corrección",
-      "keepRunning": "Seguir ejecutando",
+      "keepRunning": "Mantener en ejecución",
       "model": "Modelo",
       "noAnalysisDescription": "Ejecuta uno desde la pestaña Detalles",
       "noAnalysisTitle": "Aún no hay análisis",
@@ -1355,7 +1359,7 @@
       "allRepositories": "Todos los repositorios",
       "couldNotLoad": "No se pudieron cargar los ajustes de repositorios",
       "couldNotLoadRepositories": "No se pudieron cargar los repositorios",
-      "couldNotOpenGithubSettings": "No se pudieron abrir los ajustes de la GitHub App",
+      "couldNotOpenGithubSettings": "No se pudo abrir la configuración de la GitHub App",
       "githubAppSettings": "Ajustes de la GitHub App",
       "manageAccess": "Gestionar el acceso de la GitHub App",
       "noRepositories": "Sin repositorios",
@@ -1674,11 +1678,16 @@
       "couldNotLoadThisSession": "No se pudo cargar esta sesión",
       "cloneFailed": "No se pudo clonar esta sesión.",
       "cloneFailedRetry": "No se pudo clonar esta sesión. Inténtalo de nuevo.",
-      "connectRepositoryToContinue": "Conecta un repositorio para continuar."
+      "connectRepositoryToContinue": "Conecta un repositorio para continuar.",
+      "notEnoughCredits": "No hay suficientes créditos para ejecutar Cloud Agent. Añade créditos e inténtalo de nuevo.",
+      "previousTaskFinishing": "La tarea anterior aún está finalizando. Espera un momento.",
+      "serviceUnavailable": "El servicio no está disponible en este momento. Inténtalo de nuevo.",
+      "connectionTrouble": "Problema de conexión. Inténtalo de nuevo en un momento.",
+      "modelUnavailable": "Este modelo no está disponible para Cloud Agent. Elige otro modelo e inténtalo de nuevo."
     },
     "remoteSession": {
       "failedToCreate": "No se pudo crear la sesión remota",
-      "exited": "La sesión terminó",
+      "exited": "La sesión finalizó",
       "failedToExit": "No se pudo salir de la sesión",
       "exitTitle": "¿Salir de la sesión?",
       "exitMessage": "Esto detiene la sesión en ejecución pero conserva su historial.",
@@ -1698,10 +1707,14 @@
     "newSession": {
       "title": "Nueva sesión",
       "repository": "Repositorio",
+      "couldNotLoadRepositories": "No se pudieron cargar los repositorios",
       "connectGithub": "Conectar GitHub",
       "connectGithubDescription": "Conecta GitHub en tu navegador y vuelve aquí para elegir un repositorio.",
       "openGithub": "Abrir GitHub",
       "refreshRepositories": "Actualizar repositorios",
+      "githubConnectionNotVisible": "Aún no vemos tu conexión de GitHub",
+      "githubConnectionNotVisibleDescription": "Si instalaste o configuraste la Kilo GitHub App, compruébalo de nuevo o asegúrate de que se instaló para esta cuenta u organización.",
+      "checkAgain": "Comprobar de nuevo",
       "githubConnected": "GitHub conectado",
       "noRepositoriesVisible": "No hay repositorios visibles. Comprueba el acceso a repositorios de la Kilo GitHub App y actualiza.",
       "runOnWithTarget": "Ejecutar en: {{target}}",
@@ -1728,6 +1741,7 @@
       "discardDraftTitle": "¿Descartar borrador?",
       "discardFailed": "No se pudo descartar el borrador. Inténtalo de nuevo.",
       "keepEditing": "Seguir editando",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "Bitbucket conectado",
       "connectBitbucket": "Conectar Bitbucket",
       "connectBitbucketDescription": "Conecta Bitbucket en tu navegador y vuelve aquí para elegir un repositorio.",
@@ -1859,7 +1873,7 @@
       "total": "Total",
       "reportAiResponseFailedRetryable": "No se pudo reportar esta respuesta.",
       "reportAiResponseFailedTerminal": "Esta respuesta no se puede reportar.",
-      "reportAiResponseSubmitted": "Reporte enviado. Recibo {{receiptId}}"
+      "reportAiResponseSubmitted": "Denuncia enviada. Recibo {{receiptId}}"
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2086,7 +2100,7 @@
       "photoLibrary": "Biblioteca de fotos",
       "files": "Archivos",
       "cameraAccessDisabled": "Acceso a la cámara desactivado",
-      "cameraAccessMessage": "Permite el acceso a la cámara en Ajustes para hacer una foto.",
+      "cameraAccessMessage": "Permite el acceso a la cámara en Ajustes para tomar una foto.",
       "couldNotOpenPhotoPicker": "No se pudo abrir el selector de fotos. Reinicia Kilo e inténtalo de nuevo.",
       "maxFilesAllowed": "Máximo {{displayCount}} archivos permitidos",
       "onlyAddingFiles": "Solo se añaden {{accepted}} de {{total}} archivos (máx. {{max}})"
@@ -2182,10 +2196,10 @@
       "open": "solicitud de cambios abierta",
       "closed": "solicitud de cambios cerrada",
       "merged": "solicitud de cambios fusionada",
-      "draft": "solicitud de cambios en borrador",
+      "draft": "Pull request en borrador",
       "updating": "Actualizando, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "solicitud de cambios"
+      "externalLinkLabel": "pull request"
     }
   },
   "bootstrap": {
@@ -2234,16 +2248,11 @@
   "home": {
     "couldNotLoadSessions": "No se pudieron cargar las sesiones",
     "couldNotLoadActiveSessions": "No se pudieron cargar las sesiones activas",
-    "agentSessions": "Sesiones de agentes",
-    "showingSavedSessions": "Mostrando sesiones guardadas: el estado en vivo puede estar desactualizado",
-    "startNewAgentSession": "Iniciar una nueva sesión de Kilo Agent",
-    "aiCodingSessions": "Sesiones de codificación con IA",
-    "startCodingTaskFromPhone": "Inicia una tarea de codificación desde tu teléfono o continúa una sesión desde tu CLI.",
-    "tryIt": "Pruébalo",
+    "agentSessions": "Sesiones del agente",
     "newCodingTask": "Nueva tarea de codificación",
     "explore": "Explorar",
     "seeAll": "Ver todo",
-    "kiloAgents": "Agentes de Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Cerrar {{filename}}",
@@ -2650,7 +2659,7 @@
     },
     "eventChips": {
       "approve": "Aprobar",
-      "comment": "Comentar",
+      "comment": "Comentario",
       "label": "Evento de revisión",
       "requestChanges": "Solicitar cambios"
     },
@@ -3062,7 +3071,7 @@
       "shareInviteLink": "Compartir enlace de invitación"
     },
     "permissionDenied": {
-      "back": "Volver",
+      "back": "Atrás",
       "title": "Acceso denegado"
     },
     "usageStats": {
@@ -3078,7 +3087,7 @@
       "couldNotLoadStatus": "No se pudo cargar el estado",
       "creditProcessingDelayed": "Procesamiento de créditos retrasado · reintentando automáticamente",
       "ended": "Finalizado",
-      "endsOn": "Termina el {{date}}",
+      "endsOn": "Finaliza el {{date}}",
       "loading": "Cargando…",
       "manageHint": "Abre la gestión de Kilo Pass en la web.",
       "notSubscribed": "Sin suscripción",

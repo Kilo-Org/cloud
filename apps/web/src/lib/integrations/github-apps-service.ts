@@ -2,14 +2,15 @@ import 'server-only';
 import { db } from '@/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, desc, isNull } from 'drizzle-orm';
+import { eq, and, asc, desc, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { requireNumericPlatformRepositories, type Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { platformIntegrationHealthSql } from '@/lib/integrations/core/health';
 import {
-  deleteIntegration,
+  deleteIntegrationForOwner,
   findPendingInstallationByKiloUserId,
+  getGitHubIntegrationById,
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import {
@@ -32,7 +33,8 @@ export async function listIntegrations(owner: Owner) {
   const integrations = await db
     .select()
     .from(platform_integrations)
-    .where(and(ownershipCondition, eq(platform_integrations.platform, 'github')));
+    .where(and(ownershipCondition, eq(platform_integrations.platform, 'github')))
+    .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id));
 
   return integrations;
 }
@@ -50,7 +52,13 @@ export async function getInstallation(owner: Owner): Promise<PlatformIntegration
     .select()
     .from(platform_integrations)
     .where(and(ownershipCondition, eq(platform_integrations.platform, 'github')))
-    .orderBy(desc(platformIntegrationHealthSql()), desc(platform_integrations.updated_at))
+    .orderBy(
+      desc(platformIntegrationHealthSql()),
+      owner.type === 'org'
+        ? asc(platform_integrations.created_at)
+        : desc(platform_integrations.updated_at),
+      asc(platform_integrations.id)
+    )
     .limit(1);
 
   return integration || null;
@@ -85,27 +93,16 @@ export function isInstallationGoneError(error: unknown): boolean {
  */
 export async function uninstallApp(
   owner: Owner,
+  integrationId: string | undefined,
   _userId: string,
   _userEmail: string,
   _userName: string
 ) {
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
-
-  // Get the integration
-  const [integration] = await db
-    .select()
-    .from(platform_integrations)
-    .where(
-      and(
-        ownershipCondition,
-        eq(platform_integrations.platform, 'github'),
-        eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE)
-      )
-    )
-    .limit(1);
+  const integration = integrationId
+    ? await getGitHubIntegrationById(owner, integrationId)
+    : owner.type === 'user'
+      ? await getInstallation(owner)
+      : null;
 
   if (!integration) {
     throw new TRPCError({
@@ -137,21 +134,12 @@ export async function uninstallApp(
     // Installation is already gone on GitHub, continue to delete from our database
   }
 
-  // Delete from database
-  if (owner.type === 'org') {
-    await deleteIntegration(owner.id, 'github');
-    // TODO: Add audit log when integration audit actions are defined
-  } else {
-    // Delete for user
-    await db
-      .delete(platform_integrations)
-      .where(
-        and(
-          eq(platform_integrations.owned_by_user_id, owner.id),
-          eq(platform_integrations.platform, 'github')
-        )
-      );
-  }
+  await deleteIntegrationForOwner(
+    owner,
+    PLATFORM.GITHUB,
+    appType,
+    integration.platform_installation_id
+  );
 
   return { success: true };
 }
@@ -218,7 +206,7 @@ export async function listRepositories(
 /**
  * Cancel a pending installation
  */
-export async function cancelPendingInstallation(owner: Owner) {
+export async function cancelPendingInstallation(owner: Owner, integrationId?: string) {
   const ownershipCondition =
     owner.type === 'user'
       ? eq(platform_integrations.owned_by_user_id, owner.id)
@@ -231,6 +219,7 @@ export async function cancelPendingInstallation(owner: Owner) {
     .where(
       and(
         ownershipCondition,
+        ...(integrationId ? [eq(platform_integrations.id, integrationId)] : []),
         eq(platform_integrations.platform, 'github'),
         eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
         isNull(platform_integrations.platform_installation_id)

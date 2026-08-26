@@ -227,8 +227,8 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
       <ScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-6 pb-8 pt-4"
+        className="flex-1"
+        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >

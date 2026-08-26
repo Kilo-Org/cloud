@@ -95,6 +95,7 @@ Every template must include this branding footer below the content table:
 | `clawEarlybirdExpiresTomorrow.html` | `expiry_date`, `claw_url`, `year` | `30` |
 | `clawComplementaryInferenceEnded.html` | `claw_url`, `year` | — |
 | `accountDeletionRequest.html` | `email`, `year` | — |
+| `accountDeletionCompleted.html` | `completion_message`, `year` | — |
 | `userDataExportReady.html` | `data_exports_url`, `expiry_date`, `year` | — |
 | `dataExportDownloadCode.html` | `code`, `email`, `expires_in`, `year` | — |
 | `creditsTopUp.html` | `heading`, `intro`, `amount_usd`, `credits_usd`, `purchase_date`, `credits_url`, `receipt_section`, `year`. Org variants render org-specific copy into `intro` before template rendering; when provided, the organization name is interpolated there rather than passed as a separate template variable. | — |

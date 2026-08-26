@@ -69,8 +69,8 @@ export default function InstructionsRoute() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('codeReviewer.instructions.title')} />
       <TabScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="pt-4"
+        className="flex-1"
+        contentContainerClassName="px-6 pt-4"
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >

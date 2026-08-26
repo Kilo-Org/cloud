@@ -574,4 +574,29 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'SegmentedControl')).toBeNull();
     expect(findTextContent(element, t => t === 'Changes')).toBe(false);
   });
+
+  // ── Case 12: kilo remote hint ──
+  it('names both `kilo remote` and `/remote` for cloud and remote targets', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const cloud = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+    }) as Node;
+    expect(findTextContent(cloud, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
+      true
+    );
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const remote = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      showRunOnSelector: false,
+    }) as Node;
+    expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
+      true
+    );
+  });
 });

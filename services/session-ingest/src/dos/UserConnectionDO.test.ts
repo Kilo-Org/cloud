@@ -4184,6 +4184,71 @@ describe('UserConnectionDO', () => {
       expect(first.close).not.toHaveBeenCalled();
       expect(second.close).not.toHaveBeenCalled();
     });
+
+    it('does not broadcast cli.disconnected or overwrite the owner-change terminal result for a same-host replaced socket', async () => {
+      const { doInstance, mockCtx } = setup();
+      const first = addCliSocket(mockCtx, 'conn-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, first, [makeSession('s1')], {
+        instance: { name: 'host-a', projectName: 'proj' },
+      });
+
+      // An owner-fenced pending command targets the first socket.
+      await sendCommand(doInstance, webWs, {
+        id: 'cmd-1',
+        command: 'send_message',
+        sessionId: 's1',
+        connectionId: 'conn-1',
+      });
+      const correlationId = getCorrelationId(first);
+      webWs.send.mockClear();
+
+      // A second socket on a different connectionId claims the same host.
+      const second = addCliSocket(mockCtx, 'conn-2');
+      sendHeartbeat(doInstance, second, [], {
+        instance: { name: 'host-a', projectName: 'proj' },
+      });
+
+      expect(first.close).toHaveBeenCalledWith(1000, 'replaced by same-host reconnect');
+
+      // Drain the stale-close failPendingCommandsForSocket waitUntil so the
+      // owner-change terminal result settles before the close event runs.
+      await flushAsync();
+
+      // The stale close delivers the owner-change error, not 'CLI disconnected'.
+      const preClose = allSent(webWs);
+      expect(preClose.find(m => m.type === 'response' && m.id === 'cmd-1')).toEqual({
+        type: 'response',
+        id: 'cmd-1',
+        error: {
+          source: 'relay',
+          code: 'SESSION_OWNER_CHANGED',
+          message: 'Session owner changed',
+        },
+      });
+      webWs.send.mockClear();
+
+      // The close event for the stale first socket now fires.
+      mockCtx.removeSocket(first);
+      await disconnectCli(doInstance, first);
+
+      const msgs = allSent(webWs);
+      expect(msgs.some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(false);
+      expect(msgs.filter(m => m.type === 'response' && m.id === 'cmd-1')).toHaveLength(0);
+
+      // Durable terminal entry keeps the owner-change error.
+      const durable = mockCtx.storage.store.get(`pendingCommand/${correlationId}`) as {
+        state: string;
+        error?: unknown;
+      };
+      expect(durable.state).toBe('done');
+      expect(durable.error).toEqual({
+        source: 'relay',
+        code: 'SESSION_OWNER_CHANGED',
+        message: 'Session owner changed',
+      });
+    });
   });
 
   // -------------------------------------------------------------------------

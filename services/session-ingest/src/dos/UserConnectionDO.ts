@@ -42,6 +42,11 @@ type WSAttachment =
       role: 'cli';
       connectionId: string;
       sessions: HeartbeatSession[];
+      // Set on a stale same-host socket just before its close so
+      // `handleCliDisconnect` treats the close as a replacement (the new
+      // socket already heartbeated) and skips the `cliGone` pending-command
+      // sweep and the `cli.disconnected` broadcast.
+      replaced?: true;
       // Undefined means no protocolVersion has been reported yet — either the
       // CLI hasn't sent its first heartbeat, or it's a legacy build that
       // predates this field entirely. Both cases fall back to legacy behavior.
@@ -1736,11 +1741,16 @@ export class UserConnectionDO extends DurableObject<Env> {
     // Exclude the closing socket: under wrangler/workerd, getWebSockets() still
     // includes it during webSocketClose, so matching self would always look "replaced"
     // and skip ownership cleanup + attention reset (DEF-5 E2E failure).
-    const replaced = this.ctx.getWebSockets('cli').some(ws => {
-      if (ws === disconnectedWs) return false;
-      const att = ws.deserializeAttachment() as WSAttachment | null;
-      return att?.role === 'cli' && att.connectionId === connectionId;
-    });
+    // A same-host replacement sets the `replaced` marker on this socket's own
+    // attachment before closing (see closeStaleSocketsForInstance), because its
+    // replacement carries a different connectionId.
+    const replaced =
+      attachment.replaced ||
+      this.ctx.getWebSockets('cli').some(ws => {
+        if (ws === disconnectedWs) return false;
+        const att = ws.deserializeAttachment() as WSAttachment | null;
+        return att?.role === 'cli' && att.connectionId === connectionId;
+      });
 
     // Fail pending commands that targeted this specific socket.
     // Await so the durable terminal entries are persisted before we proceed
@@ -2058,6 +2068,9 @@ export class UserConnectionDO extends DurableObject<Env> {
       );
       // Preserve session ownership — the rebooting host's replacement socket
       // re-claims the same sessions in its first heartbeat.
+      // Mark the attachment so `handleCliDisconnect` routes this close through
+      // the `replaced` early-return (the replacement already heartbeated).
+      ws.serializeAttachment({ ...att, replaced: true });
       ws.close(1000, 'replaced by same-host reconnect');
     }
   }

@@ -1,6 +1,6 @@
 import { allowScreenCaptureAsync, preventScreenCaptureAsync } from 'expo-screen-capture';
 import { useEffect } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, type AppStateStatus, Platform } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 import { isPrivacyCoverRoute } from '@/lib/privacy-cover';
@@ -21,9 +21,15 @@ export function PrivacyCoverOverlay({ segments }: Readonly<PrivacyCoverOverlayPr
   const covered = isPrivacyCoverRoute(segments);
   const opacity = useSharedValue(0);
 
-  // FLAG_SECURE (Android Recents blank) / screenshot+recording block (iOS)
-  // follows the route, not the lifecycle.
+  // FLAG_SECURE is the Android Recents cover. On iOS, preventScreenCaptureAsync
+  // re-parents keyWindow.layer under a secure UITextField, which blanks
+  // screenshots but stops native UIAlertController presentation (the markdown
+  // link host-confirm Alert never appears on covered routes). The iOS Recents
+  // cover is the JS overlay plus Modal dismissal, so skip the native path.
   useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
     void (async () => {
       try {
         await (covered ? preventScreenCaptureAsync() : allowScreenCaptureAsync());

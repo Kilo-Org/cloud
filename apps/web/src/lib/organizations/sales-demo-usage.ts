@@ -23,7 +23,7 @@ import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
-import { demoOrganizationSettings, SALES_DEMO_REMAINING_MICRODOLLARS } from './sales-demo';
+import { demoOrganizationSettings, SALES_DEMO_REMAINING_MICRODOLLARS } from './sales-demo-settings';
 import type { FEATURE_VALUES } from '@/lib/feature-detection';
 
 // Stable per-1K-token rates (microdollars) for the current paid models. Rates

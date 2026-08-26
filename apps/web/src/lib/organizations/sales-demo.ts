@@ -19,10 +19,10 @@ import {
 } from '@kilocode/db/schema';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { addUserToOrganization } from '@/lib/organizations/organizations';
+import { demoOrganizationSettings } from './sales-demo-settings';
 import { populateSalesDemoUsage } from './sales-demo-usage';
 
 export const SALES_DEMO_MEMBER_COUNT = 25;
-export const SALES_DEMO_REMAINING_MICRODOLLARS = 25_030_000;
 
 export const ALREADY_OWNS_DEMO = 'ALREADY_OWNS_DEMO';
 export const NOT_LIVE_SALES_DEMO = 'NOT_LIVE_SALES_DEMO';
@@ -84,17 +84,6 @@ export function salesDemoMemberName(n: number): string {
 export function salesDemoMemberAvatarUrl(email: string): string {
   const hash = createHash('md5').update(email.toLowerCase().trim()).digest('hex');
   return `https://www.gravatar.com/avatar/${hash}?s=80&d=identicon`;
-}
-
-export function demoOrganizationSettings(now: Date) {
-  return {
-    enable_usage_limits: true,
-    code_indexing_enabled: true,
-    suppress_trial_messaging: true,
-    recommendations_digest_enabled: true,
-    is_sales_demo: true,
-    sales_demo_last_reset_at: now.toISOString(),
-  };
 }
 
 /**

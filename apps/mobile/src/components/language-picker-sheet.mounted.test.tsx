@@ -162,15 +162,10 @@ async function applySelection(
   beforeReload?: () => Promise<void>
 ): Promise<TestRenderer.ReactTestRenderer> {
   const renderer = await mountSheet(onClose, beforeReload);
-  await act(async () => {
+  act(() => {
     (findChoiceRow(renderer.root, endonym).props.onPress as () => void)();
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
   });
-  if (vi.mocked(applyLanguagePreference).mock.calls.length > 0) {
-    return renderer;
-  }
+  expect(applyLanguagePreference).not.toHaveBeenCalled();
   const sheet = findByType(renderer.root, 'PickerSheet')[0];
   if (!sheet) {
     throw new Error('PickerSheet not found');
@@ -244,7 +239,7 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
-  it('applies an LTR language immediately without reloading the app', async () => {
+  it('applies an LTR language on Done without reloading the app', async () => {
     const onClose = vi.fn<() => void>();
     const renderer = await applySelection(onClose, 'Español');
 
@@ -286,26 +281,37 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
-  it('Cancel calls onClose only and never applies a language', async () => {
-    const onClose = vi.fn<() => void>();
-    const renderer = await mountSheet(onClose);
+  it.each(['Cancel', 'back/swipe'])(
+    '%s discards a same-direction language selection',
+    async dismissal => {
+      const onClose = vi.fn<() => void>();
+      const renderer = await mountSheet(onClose);
 
-    const sheet = findByType(renderer.root, 'PickerSheet')[0];
-    if (!sheet) {
-      throw new Error('PickerSheet not found');
+      await act(async () => {
+        (findChoiceRow(renderer.root, 'Español').props.onPress as () => void)();
+        await Promise.resolve();
+      });
+
+      if (dismissal === 'Cancel') {
+        const sheet = findByType(renderer.root, 'PickerSheet')[0];
+        if (!sheet) {
+          throw new Error('PickerSheet not found');
+        }
+        act(() => {
+          (sheet.props.onCancel as () => void)();
+        });
+      }
+      act(() => {
+        renderer.unmount();
+      });
+
+      expect(onClose).toHaveBeenCalledTimes(dismissal === 'Cancel' ? 1 : 0);
+      expect(applyLanguagePreference).not.toHaveBeenCalled();
+      expect(setLanguagePreferenceAsync).not.toHaveBeenCalled();
+      expect(i18n.language).toBe('en');
+      expect(reloadAppAsync).not.toHaveBeenCalled();
     }
-    expect(sheet.props.onCancel).toBeDefined();
-
-    act(() => {
-      (sheet.props.onCancel as () => void)();
-    });
-
-    expect(onClose).toHaveBeenCalledTimes(1);
-    expect(applyLanguagePreference).not.toHaveBeenCalled();
-    expect(setLanguagePreferenceAsync).not.toHaveBeenCalled();
-
-    renderer.unmount();
-  });
+  );
 
   it('closes once when privacy coverage interrupts a language change', async () => {
     const pendingWrite = Promise.withResolvers<boolean>();
@@ -313,10 +319,18 @@ describe('LanguagePickerSheet apply', () => {
     const onClose = vi.fn<() => void>();
     const renderer = await mountSheet(onClose);
 
-    await act(async () => {
+    act(() => {
       (findChoiceRow(renderer.root, 'Español').props.onPress as () => void)();
+    });
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!sheet) {
+      throw new Error('PickerSheet not found');
+    }
+    await act(async () => {
+      (sheet.props.onDone as () => void)();
       await Promise.resolve();
     });
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es', 'en');
     expect(onClose).not.toHaveBeenCalled();
 
     act(() => {
@@ -431,7 +445,7 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
-  it('applies a same-direction RTL language immediately without reloading', async () => {
+  it('applies a same-direction RTL language on Done without reloading', async () => {
     i18nManager.isRTL = true;
     const onClose = vi.fn<() => void>();
     const renderer = await applySelection(onClose, 'العربية');

@@ -96,16 +96,16 @@ export function LanguagePickerSheet({
   const isRtl = I18nManager.isRTL;
   const items = languagePickerItems(query, appliedLanguage, applied === 'device');
 
-  const handleDone = async (preference = selected) => {
+  const handleDone = async () => {
     if (busy) {
       return;
     }
-    const resolved = preference === 'device' ? resolveDeviceLanguage() : preference;
+    const resolved = selected === 'device' ? resolveDeviceLanguage() : selected;
     if (I18nManager.isRTL !== isRtlLanguage(resolved)) {
       setRestarting(true);
     }
     setBusy(true);
-    const outcome = await applyLanguagePreference(preference, resolved, returnTarget, beforeReload);
+    const outcome = await applyLanguagePreference(selected, resolved, returnTarget, beforeReload);
     // `ApplyLanguageOutcome` is a closed union and every kind is handled
     // above, so no `default` branch is reachable.
     // eslint-disable-next-line default-case
@@ -255,13 +255,7 @@ export function LanguagePickerSheet({
             disabled={busy}
             deviceEndonym={deviceEndonym}
             isRtl={isRtl}
-            onSelect={preference => {
-              setSelected(preference);
-              const resolved = preference === 'device' ? resolveDeviceLanguage() : preference;
-              if (I18nManager.isRTL === isRtlLanguage(resolved)) {
-                void handleDone(preference);
-              }
-            }}
+            onSelect={setSelected}
           />
         )}
       />

@@ -1,15 +1,11 @@
 import { useCallback, useMemo } from 'react';
 
 import {
-  excludeActiveFromGroups,
   expandPlatformFilter,
   formatGitUrlProject,
-  selectPinnedActiveSessions,
   type SessionSection,
 } from '@/components/agents/session-list-helpers';
-import { shouldBackfillHistoryAfterActiveExclusion } from '@/components/agents/session-list-backfill';
 import { selectEffectiveSearchQuery } from '@/components/agents/session-list-search-busy';
-import { useHistoryBackfill } from '@/components/agents/use-history-backfill';
 import { type AgentSessionSortBy } from '@/lib/agent-session-sort';
 import {
   useAgentSessions,
@@ -37,11 +33,7 @@ export function useAgentSessionListData(options: {
   const {
     storedSessions,
     dateGroups,
-    activeSessions,
-    activeSessionIds,
-    activeExclusionIds,
     activeIsError,
-    isLoading,
     storedIsError,
     storedIsFetching,
     storedLoadedPageCount,
@@ -127,80 +119,13 @@ export function useAgentSessionListData(options: {
       search.fetchNextPage,
     ]
   );
-  const pinnedActive = useMemo(
-    () =>
-      selectPinnedActiveSessions({
-        activeSessions,
-        projectFilter,
-        platformFilter,
-        searchQuery: effectiveSearchQuery,
-      }),
-    [activeSessions, effectiveSearchQuery, platformFilter, projectFilter]
-  );
-  // History/active exclusivity. The full history view excludes by the
-  // UNFILTERED active cache id set: a session leaves history the moment its
-  // live state arrives (WS write or poll), before the org-attributed row can
-  // pin it in the tray — the direct move. A narrowed view keeps the
-  // org-filtered set instead: an unenriched live row cannot yet prove it
-  // matches the narrowing, so hiding its stored twin would flash a false
-  // "No sessions match" — the transition there stays atomic via the
-  // animation-free tray. `isSearching` (committed query non-empty), NOT
-  // `effectiveSearchQuery`, drives the search half: once a search is
-  // committed the pre-existing exclusion semantics stay in force for the
-  // stored groups that remain rendered until results land. Pinned ⊆ exclusion holds
-  // at every commit in both modes, so a session never renders in both places.
   const sections = useMemo<SessionSection[]>(() => {
     const storedGroups = effectiveSearchQuery ? search.dateGroups : dateGroups;
-    const narrowed = isSearching || platformFilter.length > 0 || projectFilter.length > 0;
-    const exclusionIds = narrowed ? activeSessionIds : activeExclusionIds;
-    return excludeActiveFromGroups(storedGroups, exclusionIds).map(group => ({
+    return storedGroups.map(group => ({
       title: group.label,
       data: group.sessions,
     }));
-  }, [
-    activeExclusionIds,
-    activeSessionIds,
-    dateGroups,
-    effectiveSearchQuery,
-    isSearching,
-    platformFilter,
-    projectFilter,
-    search.dateGroups,
-  ]);
-  // Bounded automatic backfill: when active-set exclusion empties every
-  // rendered stored page and no gate (search, loading, error, in-flight
-  // stored fetch, page bound, empty tray) blocks, fetch the next stored page
-  // so history still surfaces below a viewport-filling tray. `paging` selects
-  // the search vs stored pagination; the `isSearching` gate keeps the stored
-  // fetch from ever firing during committed search mode.
-  const shouldBackfill = useMemo(
-    () =>
-      shouldBackfillHistoryAfterActiveExclusion({
-        hasHistoryContent: sections.length > 0,
-        hasStoredSessions: storedSessions.length > 0,
-        hasPinnedActive: pinnedActive.length > 0,
-        hasMoreHistory: paging.hasNextPage,
-        isFetchingNextPage: paging.isFetchingNextPage,
-        isFetching: storedIsFetching,
-        isSearching,
-        isLoading,
-        isError: contentIsError,
-        loadedPageCount: storedLoadedPageCount,
-      }),
-    [
-      contentIsError,
-      isLoading,
-      isSearching,
-      paging.hasNextPage,
-      paging.isFetchingNextPage,
-      pinnedActive,
-      sections,
-      storedIsFetching,
-      storedLoadedPageCount,
-      storedSessions,
-    ]
-  );
-  useHistoryBackfill({ shouldBackfill, fetchNextPage: paging.fetchNextPage });
+  }, [dateGroups, effectiveSearchQuery, search.dateGroups]);
   const projectOptions = useMemo(() => {
     const byGitUrl = new Map<string, { gitUrl: string; displayName: string }>();
     for (const project of recentRepositories?.repositories.slice(0, 3) ?? []) {
@@ -222,9 +147,7 @@ export function useAgentSessionListData(options: {
 
   return {
     storedSessions,
-    activeSessions,
     activeIsError,
-    isLoading,
     storedIsFetching,
     storedLoadedPageCount,
     paging,
@@ -235,7 +158,6 @@ export function useAgentSessionListData(options: {
     search,
     projectOptions,
     contentIsError,
-    pinnedActive,
     sections,
     effectiveSearchQuery,
   };

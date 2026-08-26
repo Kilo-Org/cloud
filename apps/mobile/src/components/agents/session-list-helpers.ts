@@ -1,10 +1,7 @@
-import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
-
 import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
-import { type AgentSessionDateGroup } from '@/lib/agent-session-groups';
 import { CURRENCY_ZERO_THRESHOLD, formatCurrency } from '@/lib/format';
-import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
+import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -14,9 +11,8 @@ import { parseTimestamp, timeAgo } from '@/lib/utils';
 export { platformLabel };
 
 /**
- * One stored-history section. Exclusivity against the "Active now" tray is
- * enforced on the history side via `excludeActiveFromGroups`; active sessions
- * no longer appear as `SessionItem`s in any section.
+ * One stored-history section. A stored session that is also live still
+ * appears in its section; the stored list is rendered as-is.
  */
 export type SessionSection = {
   title: string;
@@ -328,108 +324,4 @@ export function composeSessionProvenanceSubtitle(params: {
     return `#${prNumber}`;
   }
   return null;
-}
-
-/**
- * Normalize a search needle the same way the server does: trim, lowercase,
- * then strip one leading `#` so `"#42"` and `"42"` are equivalent needles.
- */
-function normalizeSessionSearchNeedle(raw: string): string {
-  const trimmed = raw.trim().toLowerCase();
-  return trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
-}
-
-const KNOWN_PLATFORM_VALUES: readonly string[] = KNOWN_PLATFORMS;
-
-/**
- * Select which active sessions appear in the pinned "Active now" tray.
- *
- * `searchQuery` narrows the tray with the same semantics as the
- * server-side history search: a case-insensitive substring match on the
- * session's `title`, `id`, `gitUrl`, `gitBranch`, associated PR `title`, or
- * associated PR `number` (`position()`/`includes` — LIKE wildcards match
- * literally). A leading `#` in the query is stripped, so `#42` and `42`
- * both match PR number 42. Empty or whitespace-only queries perform no
- * narrowing. The text query applies in conjunction with the platform/project
- * filters, which mirror the server-side narrowing used by the stored-session
- * list.
- *
- * No dedup against stored pages is performed here — exclusivity is enforced
- * on the history side by Task 3, so this helper stays pure and symmetric.
- */
-export function selectPinnedActiveSessions(params: {
-  activeSessions: ActiveSession[];
-  projectFilter: string[];
-  platformFilter: string[];
-  searchQuery: string;
-}): ActiveSession[] {
-  const { activeSessions, projectFilter, platformFilter, searchQuery } = params;
-  const projectActive = projectFilter.length > 0;
-  const platformActive = platformFilter.length > 0;
-  const needle = normalizeSessionSearchNeedle(searchQuery);
-
-  const concretePlatforms = platformFilter.filter(p => p !== 'other');
-  const includeOther = platformFilter.includes('other');
-  const expanded = expandPlatformFilter(concretePlatforms);
-  return activeSessions.filter(session => {
-    if (needle.length > 0) {
-      const hayTitle = session.title.toLowerCase();
-      const hayId = session.id.toLowerCase();
-      const hayGitUrl = (session.gitUrl ?? '').toLowerCase();
-      const hayBranch = (session.gitBranch ?? '').toLowerCase();
-      const pr = session.associatedPr;
-      const hayPrTitle = (pr?.title ?? '').toLowerCase();
-      const hayPrNumber = pr?.number != null ? String(pr.number) : '';
-      if (
-        !hayTitle.includes(needle) &&
-        !hayId.includes(needle) &&
-        !hayGitUrl.includes(needle) &&
-        !hayBranch.includes(needle) &&
-        !hayPrTitle.includes(needle) &&
-        !hayPrNumber.includes(needle)
-      ) {
-        return false;
-      }
-    }
-
-    if (projectActive && (!session.gitUrl || !projectFilter.includes(session.gitUrl))) {
-      return false;
-    }
-
-    if (platformActive) {
-      if (!session.createdOnPlatform) {
-        return false;
-      }
-      const knownMatch = expanded.includes(session.createdOnPlatform);
-      const otherMatch = includeOther && !KNOWN_PLATFORM_VALUES.includes(session.createdOnPlatform);
-      if (!knownMatch && !otherMatch) {
-        return false;
-      }
-    }
-
-    return true;
-  });
-}
-
-/**
- * Drop sessions whose `session_id` is in the active set from date-bucketed
- * groups, and drop any groups that become empty as a result. Preserves the
- * original group order.
- *
- * The generic is constrained to the intersection of what the helper needs
- * (`session_id`) and what `AgentSessionDateGroup` itself requires
- * (`created_at`/`updated_at`); the Task 3 caller passes
- * `AgentSessionDateGroup<StoredSession>[]` which satisfies both bounds.
- */
-export function excludeActiveFromGroups<
-  T extends { session_id: string; created_at: string; updated_at: string },
->(groups: AgentSessionDateGroup<T>[], activeSessionIds: Set<string>): AgentSessionDateGroup<T>[] {
-  const result: AgentSessionDateGroup<T>[] = [];
-  for (const group of groups) {
-    const remaining = group.sessions.filter(s => !activeSessionIds.has(s.session_id));
-    if (remaining.length > 0) {
-      result.push({ label: group.label, sessions: remaining });
-    }
-  }
-  return result;
 }

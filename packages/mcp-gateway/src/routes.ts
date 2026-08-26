@@ -33,11 +33,6 @@ export type ScopedConnectRoute = {
   descendantPath: string | null;
 };
 
-export function ownerScopeFromRouteScope(routeScope: GatewayRouteScope): GatewayOwnerScope {
-  if (routeScope === GatewayRouteScope.User) return GatewayOwnerScope.Personal;
-  return GatewayOwnerScope.Organization;
-}
-
 export function buildScopedConnectRootPath(params: {
   ownerScope: GatewayOwnerScope;
   ownerId: string;

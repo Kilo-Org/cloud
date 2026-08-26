@@ -1699,14 +1699,10 @@
     "newSession": {
       "title": "Sesi baru",
       "repository": "Repositori",
-      "couldNotLoadRepositories": "Tidak dapat memuat repositori",
       "connectGithub": "Hubungkan GitHub",
       "connectGithubDescription": "Hubungkan GitHub di browser Anda, lalu kembali ke sini untuk memilih repositori.",
       "openGithub": "Buka GitHub",
       "refreshRepositories": "Muat ulang repositori",
-      "githubConnectionNotVisible": "Kami belum dapat melihat koneksi GitHub Anda",
-      "githubConnectionNotVisibleDescription": "Jika Anda memasang atau mengonfigurasi Aplikasi Kilo GitHub, periksa lagi — atau pastikan aplikasi dipasang untuk akun/organisasi ini.",
-      "checkAgain": "Periksa lagi",
       "githubConnected": "GitHub terhubung",
       "noRepositoriesVisible": "Tidak ada repositori terlihat. Periksa akses repositori untuk Aplikasi Kilo GitHub, lalu muat ulang.",
       "runOnWithTarget": "Jalankan di: {{target}}",
@@ -2955,7 +2951,7 @@
         "credits_expired": "Kredit kedaluwarsa"
       },
       "loadMore": "Muat lebih banyak",
-      "loadMoreFailed": "Tidak dapat memuat lebih banyak.",
+      "loadMoreFailed": "Tidak dapat memuat lebih banyak",
       "truncated": "Aktivitas kredit yang lebih lama tersedia."
     },
     "hub": {
@@ -2994,7 +2990,7 @@
         "unknown": "Tidak diketahui"
       },
       "loadMore": "Muat lebih banyak",
-      "loadMoreFailed": "Tidak dapat memuat lebih banyak.",
+      "loadMoreFailed": "Tidak dapat memuat lebih banyak",
       "truncated": "Faktur yang lebih lama tersedia."
     },
     "lowBalanceAlert": {

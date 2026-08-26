@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "ເຊດຊັນໃໝ່",
       "repository": "ບ່ອນເກັບລະຫັດ",
-      "couldNotLoadRepositories": "ບໍ່ສາມາດໂຫຼດບ່ອນເກັບລະຫັດ",
       "connectGithub": "ເຊື່ອມຕໍ່ GitHub",
       "connectGithubDescription": "ເຊື່ອມຕໍ່ GitHub ໃນບຣາວເຊີຂອງທ່ານ, ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກບ່ອນເກັບລະຫັດ.",
       "openGithub": "ເປີດ GitHub",
       "refreshRepositories": "ໂຫຼດບ່ອນເກັບລະຫັດຄືນ",
-      "githubConnectionNotVisible": "ພວກເຮົາຍັງເບິ່ງບໍ່ເຫັນການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານ",
-      "githubConnectionNotVisibleDescription": "ຖ້າທ່ານຕິດຕັ້ງ ຫຼື ກຳນົດຄ່າ Kilo GitHub App, ກວດອີກຄັ້ງ — ຫຼື ໃຫ້ແນ່ໃຈວ່າມັນຖືກຕິດຕັ້ງສຳລັບບັນຊີ/ອົງກອນນີ້.",
-      "checkAgain": "ກວດອີກຄັ້ງ",
       "githubConnected": "ເຊື່ອມຕໍ່ GitHub ແລ້ວ",
       "noRepositoriesVisible": "ບໍ່ມີບ່ອນເກັບລະຫັດທີ່ເຫັນໄດ້. ກວດການເຂົ້າເຖິງບ່ອນເກັບລະຫັດສຳລັບ Kilo GitHub App, ແລ້ວໂຫຼດຄືນ.",
       "runOnWithTarget": "ດຳເນີນການໃນ: {{target}}",
@@ -2188,7 +2184,7 @@
       "discard": "ຍົກເລີກ",
       "discardFailed": "ບໍ່ສາມາດລະເລີຍຮ່າງ. ກະລຸນາລອງໃໝ່.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "ເຊື່ອມຕໍ່ Bitbucket ແລ້ວ",
+      "bitbucketConnected": "Bitbucket ເຊື່ອມຕໍ່ແລ້ວ",
       "connectBitbucket": "ເຊື່ອມຕໍ່ Bitbucket",
       "connectBitbucketDescription": "ເຊື່ອມຕໍ່ Bitbucket ໃນບຣາວເຊີຂອງທ່ານ, ຈາກນັ້ນກັບມາທີ່ນີ້ເພື່ອເລືອກ repository.",
       "connectGitlab": "ເຊື່ອມຕໍ່ GitLab",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "ການປັບບັນຊີ",
         "credits_expired": "ເຄຣດິດໝົດອາຍຸ"
       },
-      "loadMore": "ໂຫຼດເພີ່ມ",
-      "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມໄດ້.",
+      "loadMore": "ໂຫຼດເພີ່ມເຕີມ",
+      "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມເຕີມໄດ້",
       "truncated": "ກິດຈະກຳສິນເຊື່ອເກົ່າກວ່າມີໃຫ້."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "ເກັບບໍ່ໄດ້",
         "unknown": "ບໍ່ຮູ້"
       },
-      "loadMore": "ໂຫຼດເພີ່ມ",
-      "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມໄດ້.",
+      "loadMore": "ໂຫຼດເພີ່ມເຕີມ",
+      "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມເຕີມໄດ້",
       "truncated": "ໃບແຈ້ງໜີ້ເກົ່າກວ່າມີໃຫ້."
     },
     "lowBalanceAlert": {

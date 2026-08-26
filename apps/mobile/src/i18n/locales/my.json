@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "စက်ရှင်အသစ်",
       "repository": "သိုလှောင်မှု",
-      "couldNotLoadRepositories": "သိုလှောင်မှုများကို မဖွင့်နိုင်ခဲ့ပါ",
       "connectGithub": "GitHub ချိတ်ဆက်ပါ",
       "connectGithubDescription": "သင့်ဘရောက်ဆာတွင် GitHub ကို ချိတ်ဆက်ပြီး သိုလှောင်မှုတစ်ခု ရွေးချယ်ရန် ဤနေရာသို့ ပြန်လာပါ။",
       "openGithub": "GitHub ဖွင့်ပါ",
       "refreshRepositories": "သိုလှောင်မှုများ ပြန်လည်စတင်ပါ",
-      "githubConnectionNotVisible": "သင့် GitHub ချိတ်ဆက်မှုကို ကျွန်ုပ်တို့ မမြင်ရသေးပါ",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub App ကို သင်ထည့်သွင်းခဲ့သည် သို့မဟုတ် ပြင်ဆင်ခဲ့လျှင် ထပ်မံစစ်ဆေးပါ — သို့မဟုတ် ၎င်းကို ဤအကောင့်/အဖွဲ့အစည်းအတွက် ထည့်သွင်းထားကြောင်း သေချာပါစေ။",
-      "checkAgain": "ထပ်မံစစ်ဆေးပါ",
       "githubConnected": "GitHub ချိတ်ဆက်ပြီး",
       "noRepositoriesVisible": "မြင်နိုင်သော သိုလှောင်မှုများ မရှိပါ။ Kilo GitHub App အတွက် သိုလှောင်မှုဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး ပြန်လည်စတင်ပါ။",
       "runOnWithTarget": "လုပ်ဆောင်မည့်နေရာ- {{target}}",
@@ -2188,10 +2184,10 @@
       "discard": "ပယ်ဖျက်ပါ",
       "discardFailed": "မူကြမ်းကို ပယ်ဖျက်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket ချိတ်ဆက်ပြီးပါပြီ",
-      "connectBitbucket": "Bitbucket ချိတ်ဆက်ပါ",
+      "bitbucketConnected": "Bitbucket ချိတ်ဆက်ပြီး",
+      "connectBitbucket": "Bitbucket ချိတ်ဆက်ရန်",
       "connectBitbucketDescription": "သင့်ဘရောက်ဆာတွင် Bitbucket ကို ချိတ်ဆက်ပြီး၊ repository တစ်ခုရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
-      "connectGitlab": "GitLab ချိတ်ဆက်ပါ",
+      "connectGitlab": "GitLab ချိတ်ဆက်ရန်",
       "connectGitlabDescription": "သင့်ဘရောက်ဆာတွင် GitLab ကို ချိတ်ဆက်ပြီး၊ repository တစ်ခုရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
       "couldNotLoadBitbucketRepositories": "Bitbucket repository များကို မဖွင့်နိုင်ပါ",
       "couldNotLoadGithubRepositories": "GitHub repository များကို မဖွင့်နိုင်ပါ",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "စာရင်းကိုင် ပြုပြင်မှု",
         "credits_expired": "သက်တမ်းကုန် ခရက်ဒစ်များ"
       },
-      "loadMore": "နောက်ထပ်ဖတ်ပါ",
-      "loadMoreFailed": "နောက်ထပ်ဖတ်၍မရပါ။",
+      "loadMore": "နောက်ထပ်တင်ပါ",
+      "loadMoreFailed": "နောက်ထပ်တင်မရပါ",
       "truncated": "ပိုဟောင်းသော ခရက်ဒစ်လုပ်ဆောင်ချက်များ ရနိုင်ပါသည်။"
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "ကောက်ခံ၍မရသော",
         "unknown": "အမည်မသိ"
       },
-      "loadMore": "နောက်ထပ်ဖတ်ပါ",
-      "loadMoreFailed": "နောက်ထပ်ဖတ်၍မရပါ။",
+      "loadMore": "နောက်ထပ်တင်ပါ",
+      "loadMoreFailed": "နောက်ထပ်တင်မရပါ",
       "truncated": "ပိုဟောင်းသော ငွေတောင်းခံလွှာများ ရနိုင်ပါသည်။"
     },
     "lowBalanceAlert": {

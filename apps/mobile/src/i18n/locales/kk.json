@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Жаңа сессия",
       "repository": "Репозиторий",
-      "couldNotLoadRepositories": "Репозиторийлерді жүктеу мүмкін болмады",
       "connectGithub": "GitHub қосу",
       "connectGithubDescription": "Браузеріңізде GitHub-ты қосыңыз, содан кейін репозиторий таңдау үшін осыған оралыңыз.",
       "openGithub": "GitHub ашу",
       "refreshRepositories": "Репозиторийлерді жаңарту",
-      "githubConnectionNotVisible": "GitHub қосылымыңызды әлі көре алмаймыз",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub App орнатқан немесе конфигурациялаған болсаңыз, қайта тексеріңіз — немесе оның осы аккаунт/ұйым үшін орнатылғанына көз жеткізіңіз.",
-      "checkAgain": "Қайта тексеру",
       "githubConnected": "GitHub қосылды",
       "noRepositoriesVisible": "Көрінетін репозиторийлер жоқ. Kilo GitHub App үшін репозиторий қолжетімділігін тексеріп, содан кейін жаңартыңыз.",
       "runOnWithTarget": "Іске қосу орны: {{target}}",
@@ -2189,9 +2185,9 @@
       "discardFailed": "Жобаны жою мүмкін болмады. Қайталап көріңіз.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "Bitbucket қосылды",
-      "connectBitbucket": "Bitbucket-ті қосу",
+      "connectBitbucket": "Bitbucket қосу",
       "connectBitbucketDescription": "Bitbucket-ті браузерде қосыңыз, содан кейін репозиторийді таңдау үшін осында оралыңыз.",
-      "connectGitlab": "GitLab-ді қосу",
+      "connectGitlab": "GitLab қосу",
       "connectGitlabDescription": "GitLab-ді браузерде қосыңыз, содан кейін репозиторийді таңдау үшін осында оралыңыз.",
       "couldNotLoadBitbucketRepositories": "Bitbucket репозиторийлерін жүктеу мүмкін болмады",
       "couldNotLoadGithubRepositories": "GitHub репозиторийлерін жүктеу мүмкін болмады",
@@ -2969,7 +2965,7 @@
         "credits_expired": "Кредиттердің мерзімі аяқталды"
       },
       "loadMore": "Көбірек жүктеу",
-      "loadMoreFailed": "Көбірек жүктелмеді.",
+      "loadMoreFailed": "Қосымша жүктелмеді",
       "truncated": "Ескі несие белсенділігі қолжетімді."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "Белгісіз"
       },
       "loadMore": "Көбірек жүктеу",
-      "loadMoreFailed": "Көбірек жүктелмеді.",
+      "loadMoreFailed": "Қосымша жүктелмеді",
       "truncated": "Ескі шот-фактуралар қолжетімді."
     },
     "lowBalanceAlert": {

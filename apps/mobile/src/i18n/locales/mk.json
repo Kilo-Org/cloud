@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Нова сесија",
       "repository": "Репозиториум",
-      "couldNotLoadRepositories": "Не можеше да се вчитаат складиштата",
       "connectGithub": "Поврзи GitHub",
       "connectGithubDescription": "Поврзи се со GitHub во твојот прелистувач, а потоа врати се тука за да избереш складиште.",
       "openGithub": "Отвори GitHub",
       "refreshRepositories": "Освежи ги складиштата",
-      "githubConnectionNotVisible": "Сè уште не ја гледаме твојата GitHub врска",
-      "githubConnectionNotVisibleDescription": "Ако си инсталирал или конфигурирал Kilo GitHub App, провери повторно — или провери дали е инсталиран за оваа сметка/организација.",
-      "checkAgain": "Провери повторно",
       "githubConnected": "GitHub е поврзан",
       "noRepositoriesVisible": "Нема видливи складишта. Провери го пристапот до складиштата за Kilo GitHub App, а потоа освежи.",
       "runOnWithTarget": "Изврши на: {{target}}",
@@ -2188,8 +2184,8 @@
       "discard": "Отфрли",
       "discardFailed": "Не можеше да се отфрли нацртот. Обиди се повторно.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Битубакет е поврзан",
-      "connectBitbucket": "Поврзи Битубакет",
+      "bitbucketConnected": "Bitbucket е поврзан",
+      "connectBitbucket": "Поврзи Bitbucket",
       "connectBitbucketDescription": "Поврзете Битубакет во вашиот прелистувач, па вратете се овде за да изберете репозиториум.",
       "connectGitlab": "Поврзи GitLab",
       "connectGitlabDescription": "Поврзете GitLab во вашиот прелистувач, па вратете се овде за да изберете репозиториум.",
@@ -2969,7 +2965,7 @@
         "credits_expired": "Истечени кредити"
       },
       "loadMore": "Вчитај повеќе",
-      "loadMoreFailed": "Не можеше да се вчитаат повеќе.",
+      "loadMoreFailed": "Не можеше да се вчитаат повеќе",
       "truncated": "Постара активност на кредит е достапна."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "Непознато"
       },
       "loadMore": "Вчитај повеќе",
-      "loadMoreFailed": "Не можеше да се вчитаат повеќе.",
+      "loadMoreFailed": "Не можеше да се вчитаат повеќе",
       "truncated": "Постари фактури се достапни."
     },
     "lowBalanceAlert": {

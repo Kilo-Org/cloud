@@ -1691,14 +1691,10 @@
     "newSession": {
       "title": "Nuova sessione",
       "repository": "Repository",
-      "couldNotLoadRepositories": "Impossibile caricare i repository",
       "connectGithub": "Connetti GitHub",
       "connectGithubDescription": "Collega GitHub nel browser, poi torna qui per scegliere un repository.",
       "openGithub": "Apri GitHub",
       "refreshRepositories": "Aggiorna repository",
-      "githubConnectionNotVisible": "Non vediamo ancora la tua connessione GitHub",
-      "githubConnectionNotVisibleDescription": "Se hai installato o configurato la Kilo GitHub App, controlla di nuovo, oppure assicurati che sia stata installata per questo account o organizzazione.",
-      "checkAgain": "Controlla di nuovo",
       "githubConnected": "GitHub collegato",
       "noRepositoriesVisible": "Nessun repository visibile. Controlla l'accesso ai repository per la Kilo GitHub App, poi aggiorna.",
       "runOnWithTarget": "Esegui su: {{target}}",
@@ -2975,7 +2971,7 @@
         "credits_expired": "Crediti scaduti"
       },
       "loadMore": "Carica altri",
-      "loadMoreFailed": "Impossibile caricare altri.",
+      "loadMoreFailed": "Impossibile caricare altri elementi",
       "truncated": "Sono disponibili attività di credito più vecchie."
     },
     "hub": {
@@ -3014,7 +3010,7 @@
         "unknown": "Sconosciuto"
       },
       "loadMore": "Carica altri",
-      "loadMoreFailed": "Impossibile caricare altri.",
+      "loadMoreFailed": "Impossibile caricare altri elementi",
       "truncated": "Sono disponibili fatture più vecchie."
     },
     "lowBalanceAlert": {

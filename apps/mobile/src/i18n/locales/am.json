@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "አዲስ ክፍለ-ጊዜ",
       "repository": "ማከማቻ",
-      "couldNotLoadRepositories": "ማከማቻዎችን ማግኘት አልተቻለም",
       "connectGithub": "GitHubን ያገናኙ",
       "connectGithubDescription": "GitHubን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
       "openGithub": "GitHubን ይክፈቱ",
       "refreshRepositories": "ማከማቻዎችን ያድሱ",
-      "githubConnectionNotVisible": "የGitHub ግንኙነትዎን እስካሁን ማየት አንችልም",
-      "githubConnectionNotVisibleDescription": "የKilo GitHub Appን ከጫኑ ወይም ካዋቀሩ፣ እንደገና ይፈትሹ — ወይም ለዚህ መለያ/ድርጅት መጫኑን ያረጋግጡ።",
-      "checkAgain": "እንደገና ይፈትሹ",
       "githubConnected": "GitHub ተገናኝቷል",
       "noRepositoriesVisible": "ምንም ማከማቻዎች አይታዩም። የKilo GitHub Appን የማከማቻ መዳረሻ ይፈትሹ፣ ከዚያ ያድሱ።",
       "runOnWithTarget": "በርቷል ላይ ያሂዱ: {{target}}",
@@ -2189,9 +2185,9 @@
       "discardFailed": "ረቂቁን ማስወገድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "Bitbucket ተገናኝቷል",
-      "connectBitbucket": "Bitbucket ያገናኙ",
+      "connectBitbucket": "Bitbucketን ያገናኙ",
       "connectBitbucketDescription": "Bitbucket ን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ እዚህ ይመለሱ።",
-      "connectGitlab": "GitLab ያገናኙ",
+      "connectGitlab": "GitLabን ያገናኙ",
       "connectGitlabDescription": "GitLab ን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ እዚህ ይመለሱ።",
       "couldNotLoadBitbucketRepositories": "የBitbucket ማከማቻዎች መጫን አልቻለም",
       "couldNotLoadGithubRepositories": "የGitHub ማከማቻዎች መጫን አልቻለም",
@@ -2969,7 +2965,7 @@
         "credits_expired": "ክሬዲቶች ጊዜያቸው አልፏል"
       },
       "loadMore": "ተጨማሪ ጫን",
-      "loadMoreFailed": "ተጨማሪ መጫን አልተቻለም።",
+      "loadMoreFailed": "ተጨማሪ መጫን አልተቻለም",
       "truncated": "የቆዩ የክሬዲት እንቅስቃሴዎች ይገኛሉ።"
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "ያልታወቀ"
       },
       "loadMore": "ተጨማሪ ጫን",
-      "loadMoreFailed": "ተጨማሪ መጫን አልተቻለም።",
+      "loadMoreFailed": "ተጨማሪ መጫን አልተቻለም",
       "truncated": "የቆዩ ኢንቮይሶች ይገኛሉ።"
     },
     "lowBalanceAlert": {

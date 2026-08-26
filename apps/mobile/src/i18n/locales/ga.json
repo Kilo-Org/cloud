@@ -2198,14 +2198,10 @@
     "newSession": {
       "title": "Seisiún nua",
       "repository": "Stór",
-      "couldNotLoadRepositories": "Níorbh fhéidir stórtha a lódáil",
       "connectGithub": "Ceangail GitHub",
       "connectGithubDescription": "Ceangail GitHub i do bhrabhsálaí, ansin fill anseo chun stór a roghnú.",
       "openGithub": "Oscail GitHub",
       "refreshRepositories": "Athnuaigh stórtha",
-      "githubConnectionNotVisible": "Ní fheicimid do cheangal GitHub fós",
-      "githubConnectionNotVisibleDescription": "Má shuiteáil tú nó má chumraigh tú an Kilo GitHub App, seiceáil arís — nó cinntigh gur suiteáladh é don chuntas/eagraíocht seo.",
-      "checkAgain": "Seiceáil arís",
       "githubConnected": "GitHub ceangailte",
       "noRepositoriesVisible": "Níl aon stórtha le feiceáil. Seiceáil rochtain stóir do Kilo GitHub App, ansin athnuaigh.",
       "runOnWithTarget": "Rith ar: {{target}}",
@@ -2233,7 +2229,7 @@
       "discard": "Caith ar lár",
       "discardFailed": "Níorbh fhéidir an dréacht a chaitheamh ar lár. Bain triail as arís le do thoil.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket ceangailte",
+      "bitbucketConnected": "Bitbucket nasctha",
       "connectBitbucket": "Ceangail Bitbucket",
       "connectBitbucketDescription": "Ceangail Bitbucket i do bhrabhsálaí, agus ansin fill ar ais anseo chun stór a roghnú.",
       "connectGitlab": "Ceangail GitLab",
@@ -3029,7 +3025,7 @@
         "credits_expired": "Creidmheasanna imithe in éag"
       },
       "loadMore": "Lódáil tuilleadh",
-      "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil.",
+      "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil",
       "truncated": "Tá gníomhaíocht chreidmheasa níos sine ar fáil."
     },
     "inviteMember": {
@@ -3059,7 +3055,7 @@
         "unknown": "Anaithnid"
       },
       "loadMore": "Lódáil tuilleadh",
-      "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil.",
+      "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil",
       "truncated": "Tá sonraisc níos sine ar fáil."
     },
     "lowBalanceAlert": {

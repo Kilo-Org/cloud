@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Nouvo sesyon",
       "repository": "Depo",
-      "couldNotLoadRepositories": "Pa t 'kapab chaje repo yo",
       "connectGithub": "Konekte GitHub",
       "connectGithubDescription": "Konekte GitHub nan navigatè ou, epi tounen isit la pou chwazi yon repo.",
       "openGithub": "Louvri GitHub",
       "refreshRepositories": "Rafrechi repo yo",
-      "githubConnectionNotVisible": "Nou pa kapab wè koneksyon GitHub ou ankò",
-      "githubConnectionNotVisibleDescription": "Si ou enstale oswa konfigure GitHub App Kilo a, tcheke ankò — oswa verifye li te enstale pou kont/òganizasyon sa a.",
-      "checkAgain": "Tcheke ankò",
       "githubConnected": "GitHub konekte",
       "noRepositoriesVisible": "Pa gen repo ki vizib. Tcheke aksè repo pou GitHub App Kilo a, epi rafrechi.",
       "runOnWithTarget": "Kouri sou: {{target}}",
@@ -2969,7 +2965,7 @@
         "credits_expired": "Kredi ekspire"
       },
       "loadMore": "Chaje plis",
-      "loadMoreFailed": "Nou pa t ka chaje plis.",
+      "loadMoreFailed": "Pa t ka chaje plis",
       "truncated": "Gen plis aktivite kredi ki pi ansyen disponib."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "Enkoni"
       },
       "loadMore": "Chaje plis",
-      "loadMoreFailed": "Nou pa t ka chaje plis.",
+      "loadMoreFailed": "Pa t ka chaje plis",
       "truncated": "Gen plis fakti ki pi ansyen disponib."
     },
     "lowBalanceAlert": {

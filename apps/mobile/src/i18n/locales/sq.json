@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Seancë e re",
       "repository": "Depoja",
-      "couldNotLoadRepositories": "Nuk u ngarkuan depot",
       "connectGithub": "Lidhu me GitHub",
       "connectGithubDescription": "Lidhni GitHub në shfletuesin tuaj, pastaj kthehuni këtu për të zgjedhur një depo.",
       "openGithub": "Hap GitHub",
       "refreshRepositories": "Rifresko depot",
-      "githubConnectionNotVisible": "Ende nuk e shohim lidhjen tuaj me GitHub",
-      "githubConnectionNotVisibleDescription": "Nëse keni instaluar ose konfiguruar Kilo GitHub App, kontrolloni përsëri — ose sigurohuni që është instaluar për këtë llogari/organizatë.",
-      "checkAgain": "Kontrollo përsëri",
       "githubConnected": "GitHub u lidh",
       "noRepositoriesVisible": "Asnjë depo e dukshme. Kontrolloni aksesin në depo për Kilo GitHub App, pastaj rifreskoni.",
       "runOnWithTarget": "Ekzekuto në: {{target}}",
@@ -2189,9 +2185,9 @@
       "discardFailed": "Nuk u hoq drafti. Ju lutemi provoni përsëri.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "Bitbucket i lidhur",
-      "connectBitbucket": "Lidhu me Bitbucket",
+      "connectBitbucket": "Lidh Bitbucket",
       "connectBitbucketDescription": "Lidhu me Bitbucket në shfletuesin tënd, pastaj kthehu këtu për të zgjedhur një depo.",
-      "connectGitlab": "Lidhu me GitLab",
+      "connectGitlab": "Lidh GitLab",
       "connectGitlabDescription": "Lidhu me GitLab në shfletuesin tënd, pastaj kthehu këtu për të zgjedhur një depo.",
       "couldNotLoadBitbucketRepositories": "Nuk u arrit të ngarkoheshin depo Bitbucket",
       "couldNotLoadGithubRepositories": "Nuk u arrit të ngarkoheshin depo GitHub",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "Rregullim kontabël",
         "credits_expired": "Kredite të skaduara"
       },
-      "loadMore": "Shkarko më shumë",
-      "loadMoreFailed": "Nuk u shkarkua dot më shumë.",
+      "loadMore": "Ngarko më shumë",
+      "loadMoreFailed": "Nuk u arrit të ngarkohej më shumë",
       "truncated": "Aktiviteti i vjetër i kredisë është i disponueshëm."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "E pakolektueshme",
         "unknown": "E panjohur"
       },
-      "loadMore": "Shkarko më shumë",
-      "loadMoreFailed": "Nuk u shkarkua dot më shumë.",
+      "loadMore": "Ngarko më shumë",
+      "loadMoreFailed": "Nuk u arrit të ngarkohej më shumë",
       "truncated": "Faturat më të vjetra janë të disponueshme."
     },
     "lowBalanceAlert": {

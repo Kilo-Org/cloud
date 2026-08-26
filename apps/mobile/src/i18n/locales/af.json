@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Nuwe sessie",
       "repository": "Bewaarplek",
-      "couldNotLoadRepositories": "Kon bewaarplekke nie laai nie",
       "connectGithub": "Koppel GitHub",
       "connectGithubDescription": "Koppel GitHub in jou blaaier, en keer dan hier terug om 'n bewaarplek te kies.",
       "openGithub": "Maak GitHub oop",
       "refreshRepositories": "Verfris bewaarplekke",
-      "githubConnectionNotVisible": "Ons kan jou GitHub-verbinding nog nie sien nie",
-      "githubConnectionNotVisibleDescription": "As jy die Kilo GitHub App geïnstalleer of gekonfigureer het, kyk weer — of maak seker dit is vir hierdie rekening/organisasie geïnstalleer.",
-      "checkAgain": "Kyk weer",
       "githubConnected": "GitHub gekoppel",
       "noRepositoriesVisible": "Geen bewaarplekke sigbaar nie. Kontroleer bewaarplektoegang vir die Kilo GitHub App, en verfris dan.",
       "runOnWithTarget": "Loop op: {{target}}",
@@ -2188,7 +2184,7 @@
       "discard": "Gooi weg",
       "discardFailed": "Kon die konsep nie weggooi nie. Probeer asseblief weer.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket is gekoppel",
+      "bitbucketConnected": "Bitbucket gekoppel",
       "connectBitbucket": "Koppel Bitbucket",
       "connectBitbucketDescription": "Koppel Bitbucket in jou blaaier, en keer dan hier terug om 'n bewaarplek te kies.",
       "connectGitlab": "Koppel GitLab",
@@ -2969,7 +2965,7 @@
         "credits_expired": "Krediete verval"
       },
       "loadMore": "Laai meer",
-      "loadMoreFailed": "Kon nie meer laai nie.",
+      "loadMoreFailed": "Kon nie meer laai nie",
       "truncated": "Ouer kredietaktiwiteit is beskikbaar."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "Onbekend"
       },
       "loadMore": "Laai meer",
-      "loadMoreFailed": "Kon nie meer laai nie.",
+      "loadMoreFailed": "Kon nie meer laai nie",
       "truncated": "Ouer faktuur is beskikbaar."
     },
     "lowBalanceAlert": {

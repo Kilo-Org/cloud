@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "ନୂଆ ସେସନ୍",
       "repository": "ରିପୋଜିଟୋରୀ",
-      "couldNotLoadRepositories": "ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
       "connectGithub": "GitHub ସଂଯୋଗ କରନ୍ତୁ",
       "connectGithubDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ GitHub ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
       "openGithub": "GitHub ଖୋଲନ୍ତୁ",
       "refreshRepositories": "ରିପୋଜିଟୋରୀ ରିଫ୍ରେସ୍ କରନ୍ତୁ",
-      "githubConnectionNotVisible": "ଆମେ ଆପଣଙ୍କ GitHub ସଂଯୋଗ ଏପର୍ଯ୍ୟନ୍ତ ଦେଖିପାରୁନାହୁଁ",
-      "githubConnectionNotVisibleDescription": "ଯଦି ଆପଣ Kilo GitHub ଆପ୍ ସଂସ୍ଥାପନ କିମ୍ବା ବିନ୍ୟାସ କରିଛନ୍ତି, ପୁନର୍ବାର ଯାଞ୍ଚ କରନ୍ତୁ — କିମ୍ବା ଏହା ଏହି ଆକାଉଣ୍ଟ/ସଂଗଠନ ପାଇଁ ସଂସ୍ଥାପିତ ହୋଇଛି କି ନାହିଁ ନିଶ୍ଚିତ କରନ୍ତୁ।",
-      "checkAgain": "ପୁନର୍ବାର ଯାଞ୍ଚ କରନ୍ତୁ",
       "githubConnected": "GitHub ସଂଯୋଜିତ",
       "noRepositoriesVisible": "କୌଣସି ରିପୋଜିଟୋରୀ ଦେଖାଯାଉନାହିଁ। Kilo GitHub ଆପ୍ ପାଇଁ ରିପୋଜିଟୋରୀ ଉପଲବ୍ଧତା ଯାଞ୍ଚ କରନ୍ତୁ, ତା'ପରେ ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
       "runOnWithTarget": "ଚଲାନ୍ତୁ: {{target}}",
@@ -2188,7 +2184,7 @@
       "discard": "ବାତିଲ କରନ୍ତୁ",
       "discardFailed": "ଡ୍ରାଫ୍ଟ ପରିତ୍ୟାଗ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁନଃଚେଷ୍ଟା କରନ୍ତୁ।",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket ସଂଯୋଜିତ",
+      "bitbucketConnected": "Bitbucket ସଂଯୋଗ ହୋଇଛି",
       "connectBitbucket": "Bitbucket ସଂଯୋଗ କରନ୍ତୁ",
       "connectBitbucketDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ Bitbucket ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
       "connectGitlab": "GitLab ସଂଯୋଗ କରନ୍ତୁ",
@@ -2969,7 +2965,7 @@
         "credits_expired": "କ୍ରେଡିଟ୍ ସମାପ୍ତ"
       },
       "loadMore": "ଅଧିକ ଲୋଡ୍ କରନ୍ତୁ",
-      "loadMoreFailed": "ଅଧିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "loadMoreFailed": "ଅଧିକ ଲୋଡ୍ କରାଯାଇ ପାରିଲା ନାହିଁ",
       "truncated": "ପୁରୁଣା କ୍ରେଡିଟ୍ କାର୍ଯ୍ୟକଳାପ ଉପଲବ୍ଧ।"
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "ଅଜଣା"
       },
       "loadMore": "ଅଧିକ ଲୋଡ୍ କରନ୍ତୁ",
-      "loadMoreFailed": "ଅଧିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "loadMoreFailed": "ଅଧିକ ଲୋଡ୍ କରାଯାଇ ପାରିଲା ନାହିଁ",
       "truncated": "ପୁରୁଣା ଇନଭଏସ୍ ଉପଲବ୍ଧ।"
     },
     "lowBalanceAlert": {

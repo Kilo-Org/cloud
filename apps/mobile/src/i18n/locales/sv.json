@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Ny session",
       "repository": "Arkiv",
-      "couldNotLoadRepositories": "Kunde inte läsa in arkiv",
       "connectGithub": "Anslut GitHub",
       "connectGithubDescription": "Anslut GitHub i din webbläsare och återvänd sedan hit för att välja ett arkiv.",
       "openGithub": "Öppna GitHub",
       "refreshRepositories": "Uppdatera arkiv",
-      "githubConnectionNotVisible": "Vi kan ännu inte se din GitHub-anslutning",
-      "githubConnectionNotVisibleDescription": "Om du installerade eller konfigurerade Kilo GitHub App, kontrollera igen – eller se till att den installerades för detta konto/denna organisation.",
-      "checkAgain": "Kontrollera igen",
       "githubConnected": "GitHub ansluten",
       "noRepositoriesVisible": "Inga arkiv synliga. Kontrollera arkivåtkomsten för Kilo GitHub App och uppdatera sedan.",
       "runOnWithTarget": "Kör på: {{target}}",
@@ -2188,7 +2184,7 @@
       "discard": "Kassera",
       "discardFailed": "Kunde inte ignorera utkastet. Försök igen.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket är ansluten",
+      "bitbucketConnected": "Bitbucket ansluten",
       "connectBitbucket": "Anslut Bitbucket",
       "connectBitbucketDescription": "Anslut Bitbucket i webbläsaren och kom sedan tillbaka för att välja ett arkiv.",
       "connectGitlab": "Anslut GitLab",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "Redovisningsjustering",
         "credits_expired": "Krediter upphörde"
       },
-      "loadMore": "Ladda fler",
-      "loadMoreFailed": "Kunde inte ladda mer.",
+      "loadMore": "Läs in mer",
+      "loadMoreFailed": "Kunde inte läsa in mer",
       "truncated": "Äldre kreditaktivitet finns tillgänglig."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "Oindrivbar",
         "unknown": "Okänd"
       },
-      "loadMore": "Ladda fler",
-      "loadMoreFailed": "Kunde inte ladda mer.",
+      "loadMore": "Läs in mer",
+      "loadMoreFailed": "Kunde inte läsa in mer",
       "truncated": "Äldre fakturor finns tillgängliga."
     },
     "lowBalanceAlert": {

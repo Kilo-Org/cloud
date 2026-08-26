@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "វគ្គថ្មី",
       "repository": "ឃ្លាំង",
-      "couldNotLoadRepositories": "មិនអាចផ្ទុកឃ្លាំងកូដ",
       "connectGithub": "ភ្ជាប់ GitHub",
       "connectGithubDescription": "ភ្ជាប់ GitHub ក្នុងកម្មវិធីរុករករបស់អ្នក បន្ទាប់មកត្រឡប់មកទីនេះ ដើម្បីជ្រើសរើសឃ្លាំងកូដ។",
       "openGithub": "បើក GitHub",
       "refreshRepositories": "ធ្វើឱ្យឃ្លាំងកូដថ្មី",
-      "githubConnectionNotVisible": "យើងមិនទាន់អាចមើលឃើញការតភ្ជាប់ GitHub របស់អ្នកទេ",
-      "githubConnectionNotVisibleDescription": "ប្រសិនបើអ្នកបានដំឡើង ឬកំណត់រចនាសម្ព័ន្ធ Kilo GitHub App សូមពិនិត្យម្តងទៀត — ឬត្រូវប្រាកដថាវាត្រូវបានដំឡើងសម្រាប់គណនី/អង្គការនេះ។",
-      "checkAgain": "ពិនិត្យម្តងទៀត",
       "githubConnected": "GitHub ត្រូវបានភ្ជាប់",
       "noRepositoriesVisible": "គ្មានឃ្លាំងកូដដែលអាចមើលឃើញទេ។ ពិនិត្យសិទ្ធិចូលប្រើឃ្លាំងកូដសម្រាប់ Kilo GitHub App បន្ទាប់មកធ្វើឱ្យថ្មី។",
       "runOnWithTarget": "ដំណើរការលើ: {{target}}",
@@ -2969,7 +2965,7 @@
         "credits_expired": "ឥណទានផុតកំណត់"
       },
       "loadMore": "ផ្ទុកបន្ថែម",
-      "loadMoreFailed": "មិនអាចផ្ទុកបន្ថែមទៀតបានទេ។",
+      "loadMoreFailed": "មិនអាចផ្ទុកបន្ថែមបានទេ",
       "truncated": "សកម្មភាពឥណទានចាស់ៗអាចប្រើបាន។"
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "មិនស្គាល់"
       },
       "loadMore": "ផ្ទុកបន្ថែម",
-      "loadMoreFailed": "មិនអាចផ្ទុកបន្ថែមទៀតបានទេ។",
+      "loadMoreFailed": "មិនអាចផ្ទុកបន្ថែមបានទេ",
       "truncated": "វិក្កយបត្រចាស់ៗអាចប្រើបាន។"
     },
     "lowBalanceAlert": {

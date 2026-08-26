@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Igba-ijiroro tuntun",
       "repository": "Ìpamọ́",
-      "couldNotLoadRepositories": "Ko le ṣe ikojọpọ awọn ibi ipamọ",
       "connectGithub": "Sopọ̀ GitHub",
       "connectGithubDescription": "So GitHub pọ ninu ẹrọ aṣàwákiri rẹ, lẹhinna pada si ibi lati yan ibi ipamọ.",
       "openGithub": "Ṣii GitHub",
       "refreshRepositories": "Tun awọn ibi ipamọ ṣe",
-      "githubConnectionNotVisible": "A ko le ri asopọ GitHub rẹ sibẹsibẹ",
-      "githubConnectionNotVisibleDescription": "Ti o ba fi sori tabi ṣeto Kilo GitHub App, ṣayẹwo lẹẹkansi — tabi rii daju pe a fi sori fun akọọlẹ/àjọ yii.",
-      "checkAgain": "Ṣayẹwo lẹẹkansi",
       "githubConnected": "GitHub ti sopọ",
       "noRepositoriesVisible": "Ko si awọn ibi ipamọ ti o han. Ṣayẹwo iraye ibi ipamọ fun Kilo GitHub App, lẹhinna tun ṣe.",
       "runOnWithTarget": "Ṣiṣẹ lori: {{target}}",
@@ -2188,10 +2184,10 @@
       "discard": "Jù silẹ",
       "discardFailed": "Ko le fi osere silẹ. Jọwọ gbiyanju lẹẹkansi.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket ti sopọ",
-      "connectBitbucket": "So Bitbucket pọ",
+      "bitbucketConnected": "Bitbucket ti sopọ̀",
+      "connectBitbucket": "Sopọ̀ Bitbucket",
       "connectBitbucketDescription": "So Bitbucket pọ ninu browser rẹ, lẹhinna pada sibi lati yan ibi ipamọ data.",
-      "connectGitlab": "So GitLab pọ",
+      "connectGitlab": "Sopọ̀ GitLab",
       "connectGitlabDescription": "So GitLab pọ ninu browser rẹ, lẹhinna pada sibi lati yan ibi ipamọ data.",
       "couldNotLoadBitbucketRepositories": "Ko le gbe awọn ibi ipamọ data Bitbucket",
       "couldNotLoadGithubRepositories": "Ko le gbe awọn ibi ipamọ data GitHub",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "Àtúnṣe ìṣirò-owó",
         "credits_expired": "Àwọn kíredìtì ti parí"
       },
-      "loadMore": "Ṣàgbé síwájú síi",
-      "loadMoreFailed": "Kò lè ṣàgbé síwájú síi.",
+      "loadMore": "Kojọ diẹ sii",
+      "loadMoreFailed": "Kò lè gbé síwájú síi",
       "truncated": "Ìgbòkègbodò àwọn iṣẹ́ àwíjàre tó ti gbọjú wà."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "Àìlègbà",
         "unknown": "Àìmọ̀"
       },
-      "loadMore": "Ṣàgbé síwájú síi",
-      "loadMoreFailed": "Kò lè ṣàgbé síwájú síi.",
+      "loadMore": "Kojọ diẹ sii",
+      "loadMoreFailed": "Kò lè gbé síwájú síi",
       "truncated": "Àwọn ìwé-owó tó ti gbọjú wà."
     },
     "lowBalanceAlert": {

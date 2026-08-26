@@ -1715,14 +1715,10 @@
     "newSession": {
       "title": "Новый сеанс",
       "repository": "Репозиторий",
-      "couldNotLoadRepositories": "Не удалось загрузить репозитории",
       "connectGithub": "Подключить GitHub",
       "connectGithubDescription": "Подключите GitHub в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
       "openGithub": "Открыть GitHub",
       "refreshRepositories": "Обновить репозитории",
-      "githubConnectionNotVisible": "Мы пока не видим ваше подключение GitHub",
-      "githubConnectionNotVisibleDescription": "Если вы установили или настроили приложение Kilo GitHub, проверьте снова — или убедитесь, что оно установлено для этого аккаунта или организации.",
-      "checkAgain": "Проверить снова",
       "githubConnected": "GitHub подключен",
       "noRepositoriesVisible": "Репозитории не видны. Проверьте доступ к репозиториям для приложения Kilo GitHub, затем обновите.",
       "runOnWithTarget": "Запустить на: {{target}}",
@@ -2994,8 +2990,8 @@
         "accounting_adjustment": "Бухгалтерская корректировка",
         "credits_expired": "Кредиты истекли"
       },
-      "loadMore": "Загрузить ещё",
-      "loadMoreFailed": "Не удалось загрузить.",
+      "loadMore": "Загрузить больше",
+      "loadMoreFailed": "Не удалось загрузить больше",
       "truncated": "Доступна более ранняя активность по кредитам."
     },
     "hub": {
@@ -3033,8 +3029,8 @@
         "uncollectible": "Не подлежит взысканию",
         "unknown": "Неизвестно"
       },
-      "loadMore": "Загрузить ещё",
-      "loadMoreFailed": "Не удалось загрузить.",
+      "loadMore": "Загрузить больше",
+      "loadMoreFailed": "Не удалось загрузить больше",
       "truncated": "Доступны более ранние счета."
     },
     "lowBalanceAlert": {

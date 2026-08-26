@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "नयाँ सत्र",
       "repository": "रिपोजिटरी",
-      "couldNotLoadRepositories": "भण्डारहरू लोड गर्न सकिएन",
       "connectGithub": "GitHub जडान गर्नुहोस्",
       "connectGithubDescription": "तपाईंको ब्राउजरमा GitHub जडान गर्नुहोस्, त्यसपछि भण्डार छान्न यहाँ फर्कनुहोस्।",
       "openGithub": "GitHub खोल्नुहोस्",
       "refreshRepositories": "भण्डारहरू रिफ्रेस गर्नुहोस्",
-      "githubConnectionNotVisible": "हामीले तपाईंको GitHub जडान अहिलेसम्म देख्न सक्दैनौं",
-      "githubConnectionNotVisibleDescription": "यदि तपाईंले Kilo GitHub App स्थापना वा कन्फिगर गर्नुभयो भने, फेरि जाँच्नुहोस् — वा यो यो खाता/संगठनका लागि स्थापना भएको सुनिश्चित गर्नुहोस्।",
-      "checkAgain": "फेरि जाँच्नुहोस्",
       "githubConnected": "GitHub जडान भयो",
       "noRepositoriesVisible": "कुनै भण्डार देखिँदैन। Kilo GitHub App का लागि भण्डार पहुँच जाँच्नुहोस्, त्यसपछि रिफ्रेस गर्नुहोस्।",
       "runOnWithTarget": "मा चलाउनुहोस्: {{target}}",
@@ -2188,10 +2184,10 @@
       "discard": "खारेज गर्नुहोस्",
       "discardFailed": "ड्राफ्ट खारेज गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "बिटबकेट जडान भयो",
-      "connectBitbucket": "बिटबकेट जडान गर्नुहोस्",
+      "bitbucketConnected": "Bitbucket जडान भयो",
+      "connectBitbucket": "Bitbucket जडान गर्नुहोस्",
       "connectBitbucketDescription": "आफ्नो ब्राउजरमा बिटबकेट जडान गर्नुहोस्, त्यसपछि रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
-      "connectGitlab": "गिटल्याब जडान गर्नुहोस्",
+      "connectGitlab": "GitLab जडान गर्नुहोस्",
       "connectGitlabDescription": "आफ्नो ब्राउजरमा गिटल्याब जडान गर्नुहोस्, त्यसपछि रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
       "couldNotLoadBitbucketRepositories": "बिटबकेट रिपोजिटरीहरू लोड गर्न सकिएन",
       "couldNotLoadGithubRepositories": "गिथहब रिपोजिटरीहरू लोड गर्न सकिएन",
@@ -2969,7 +2965,7 @@
         "credits_expired": "म्याद सकिएका क्रेडिटहरू"
       },
       "loadMore": "थप लोड गर्नुहोस्",
-      "loadMoreFailed": "थप लोड गर्न सकिएन।",
+      "loadMoreFailed": "थप लोड गर्न सकिएन",
       "truncated": "पुरानो क्रेडिट गतिविधि उपलब्ध छ।"
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "अज्ञात"
       },
       "loadMore": "थप लोड गर्नुहोस्",
-      "loadMoreFailed": "थप लोड गर्न सकिएन।",
+      "loadMoreFailed": "थप लोड गर्न सकिएन",
       "truncated": "पुराना इनभ्वाइसहरू उपलब्ध छन्।"
     },
     "lowBalanceAlert": {

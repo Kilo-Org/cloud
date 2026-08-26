@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Új munkamenet",
       "repository": "Adattár",
-      "couldNotLoadRepositories": "Az adattárak betöltése nem sikerült",
       "connectGithub": "GitHub csatlakoztatása",
       "connectGithubDescription": "Csatlakoztassa a GitHubot a böngészőjében, majd térjen vissza ide egy adattár kiválasztásához.",
       "openGithub": "GitHub megnyitása",
       "refreshRepositories": "Adattárak frissítése",
-      "githubConnectionNotVisible": "Még nem látjuk a GitHub-kapcsolatát",
-      "githubConnectionNotVisibleDescription": "Ha telepítette vagy beállította a Kilo GitHub Appot, ellenőrizze újra — vagy győződjön meg róla, hogy ehhez a fiókhoz/szervezethez lett telepítve.",
-      "checkAgain": "Újra ellenőrzés",
       "githubConnected": "GitHub csatlakoztatva",
       "noRepositoriesVisible": "Nincs látható adattár. Ellenőrizze a Kilo GitHub App adattár-hozzáférését, majd frissítsen.",
       "runOnWithTarget": "Futtatás a következőn: {{target}}",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "Számviteli kiigazítás",
         "credits_expired": "Lejárt kreditek"
       },
-      "loadMore": "Továbbiak betöltése",
-      "loadMoreFailed": "A továbbiak betöltése nem sikerült.",
+      "loadMore": "További betöltése",
+      "loadMoreFailed": "Nem sikerült betölteni továbbiakat",
       "truncated": "Korábbi hitelaktivitás érhető el."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "Behajthatatlan",
         "unknown": "Ismeretlen"
       },
-      "loadMore": "Továbbiak betöltése",
-      "loadMoreFailed": "A továbbiak betöltése nem sikerült.",
+      "loadMore": "További betöltése",
+      "loadMoreFailed": "Nem sikerült betölteni továbbiakat",
       "truncated": "Korábbi számlák érhetők el."
     },
     "lowBalanceAlert": {

@@ -2183,14 +2183,10 @@
     "newSession": {
       "title": "Новы сеанс",
       "repository": "Рэпазіторый",
-      "couldNotLoadRepositories": "Не атрымалася загрузіць рэпазіторыі",
       "connectGithub": "Падключыць GitHub",
       "connectGithubDescription": "Падключыце GitHub у браўзеры, затым вярніцеся сюды, каб выбраць рэпазіторый.",
       "openGithub": "Адкрыць GitHub",
       "refreshRepositories": "Абнавіць рэпазіторыі",
-      "githubConnectionNotVisible": "Мы пакуль не бачым ваша падключэнне да GitHub",
-      "githubConnectionNotVisibleDescription": "Калі вы ўсталявалі або наладзілі Kilo GitHub App, праверце зноў — або пераканайцеся, што ён усталяваны для гэтага акаўнта/арганізацыі.",
-      "checkAgain": "Праверыць зноў",
       "githubConnected": "GitHub падключаны",
       "noRepositoriesVisible": "Няма бачных рэпазіторыяў. Праверце доступ да рэпазіторыяў для Kilo GitHub App, затым абнавіце.",
       "runOnWithTarget": "Запуск на: {{target}}",
@@ -3008,8 +3004,8 @@
         "accounting_adjustment": "Бухгалтарская карэкціроўка",
         "credits_expired": "Крэдыты скончыліся"
       },
-      "loadMore": "Загрузіць яшчэ",
-      "loadMoreFailed": "Не атрымалася загрузіць больш.",
+      "loadMore": "Загрузіць больш",
+      "loadMoreFailed": "Не атрымалася загрузіць больш",
       "truncated": "Даступная больш ранняя актыўнасць па крэдыту."
     },
     "inviteMember": {
@@ -3038,8 +3034,8 @@
         "uncollectible": "Неспагнаны",
         "unknown": "Невядомы"
       },
-      "loadMore": "Загрузіць яшчэ",
-      "loadMoreFailed": "Не атрымалася загрузіць больш.",
+      "loadMore": "Загрузіць больш",
+      "loadMoreFailed": "Не атрымалася загрузіць больш",
       "truncated": "Даступныя больш раннія рахункі."
     },
     "lowBalanceAlert": {

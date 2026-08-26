@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Ny økt",
       "repository": "Repositorium",
-      "couldNotLoadRepositories": "Kunne ikke laste inn repositories",
       "connectGithub": "Koble til GitHub",
       "connectGithubDescription": "Koble til GitHub i nettleseren, og kom deretter tilbake hit for å velge et repository.",
       "openGithub": "Åpne GitHub",
       "refreshRepositories": "Oppdater repositories",
-      "githubConnectionNotVisible": "Vi kan ikke se GitHub-tilkoblingen din ennå",
-      "githubConnectionNotVisibleDescription": "Hvis du installerte eller konfigurerte Kilo GitHub App, sjekk igjen — eller forsikre deg om at den ble installert for denne kontoen/organisasjonen.",
-      "checkAgain": "Sjekk igjen",
       "githubConnected": "GitHub tilkoblet",
       "noRepositoriesVisible": "Ingen repositories synlige. Sjekk repository-tilgangen for Kilo GitHub App, og oppdater deretter.",
       "runOnWithTarget": "Kjør på: {{target}}",
@@ -2188,7 +2184,7 @@
       "discard": "Forkast",
       "discardFailed": "Kunne ikke forkaste utkastet. Prøv igjen.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket er koblet til",
+      "bitbucketConnected": "Bitbucket tilkoblet",
       "connectBitbucket": "Koble til Bitbucket",
       "connectBitbucketDescription": "Koble til Bitbucket i nettleseren din, og kom deretter tilbake hit for å velge et repositorium.",
       "connectGitlab": "Koble til GitLab",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "Regnskapsjustering",
         "credits_expired": "Kreditter utløpt"
       },
-      "loadMore": "Last inn flere",
-      "loadMoreFailed": "Kunne ikke laste inn flere.",
+      "loadMore": "Last mer",
+      "loadMoreFailed": "Kunne ikke laste mer",
       "truncated": "Tidligere kredittaktivitet er tilgjengelig."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "Uinnkrevbar",
         "unknown": "Ukjent"
       },
-      "loadMore": "Last inn flere",
-      "loadMoreFailed": "Kunne ikke laste inn flere.",
+      "loadMore": "Last mer",
+      "loadMoreFailed": "Kunne ikke laste mer",
       "truncated": "Tidligere fakturaer er tilgjengelige."
     },
     "lowBalanceAlert": {

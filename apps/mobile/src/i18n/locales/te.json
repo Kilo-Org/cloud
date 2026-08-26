@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "కొత్త సెషన్",
       "repository": "రిపోజిటరీ",
-      "couldNotLoadRepositories": "రిపోజిటరీలను లోడ్ చేయలేకపోయింది",
       "connectGithub": "GitHubను కనెక్ట్ చేయండి",
       "connectGithubDescription": "మీ బ్రౌజర్‌లో GitHubను కనెక్ట్ చేయండి, ఆపై రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడకు తిరిగి రండి.",
       "openGithub": "GitHub తెరవండి",
       "refreshRepositories": "రిపోజిటరీలను రిఫ్రెష్ చేయండి",
-      "githubConnectionNotVisible": "మీ GitHub కనెక్షన్ మాకు ఇంకా కనిపించడం లేదు",
-      "githubConnectionNotVisibleDescription": "మీరు Kilo GitHub Appను ఇన్‌స్టాల్ చేసిన లేదా కాన్ఫిగర్ చేసినట్లయితే, మళ్ళీ తనిఖీ చేయండి — లేదా అది ఈ ఖాతా/సంస్థ కోసం ఇన్‌స్టాల్ చేయబడిందని నిర్ధారించుకోండి.",
-      "checkAgain": "మళ్ళీ తనిఖీ చేయండి",
       "githubConnected": "GitHub కనెక్ట్ అయింది",
       "noRepositoriesVisible": "రిపోజిటరీలు కనిపించడం లేదు. Kilo GitHub App కోసం రిపోజిటరీ యాక్సెస్‌ను తనిఖీ చేయండి, ఆపై రిఫ్రెష్ చేయండి.",
       "runOnWithTarget": "అమలు చేయండి: {{target}}",
@@ -2188,10 +2184,10 @@
       "discard": "విస్మరించండి",
       "discardFailed": "డ్రాఫ్ట్‌ను విస్మరించలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "బిట్‌బకెట్ కనెక్ట్ అయింది",
-      "connectBitbucket": "బిట్‌బకెట్ కనెక్ట్ చేయండి",
+      "bitbucketConnected": "Bitbucket కనెక్ట్ అయింది",
+      "connectBitbucket": "Bitbucketను కనెక్ట్ చేయండి",
       "connectBitbucketDescription": "మీ బ్రౌజర్‌లో బిట్‌బకెట్ కనెక్ట్ చేయండి, ఆపై రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడకు తిరిగి వెళ్ళండి.",
-      "connectGitlab": "గిట్‌ల్యాబ్ కనెక్ట్ చేయండి",
+      "connectGitlab": "GitLabను కనెక్ట్ చేయండి",
       "connectGitlabDescription": "మీ బ్రౌజర్‌లో గిట్‌ల్యాబ్ కనెక్ట్ చేయండి, ఆపై రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడకు తిరిగి వెళ్ళండి.",
       "couldNotLoadBitbucketRepositories": "బిట్‌బకెట్ రిపోజిటరీలను లోడ్ చేయలేకపోయాము",
       "couldNotLoadGithubRepositories": "గిట్‌హబ్ రిపోజిటరీలను లోడ్ చేయలేకపోయాము",
@@ -2292,8 +2288,8 @@
       "loading": "లోడ్ అవుతోంది...",
       "accessibility": "రిపోజిటరీ: {{label}}",
       "platformBitbucket": "బిట్‌బకెట్",
-      "platformGithub": "గిట్‌హబ్",
-      "platformGitlab": "గిట్‌ల్యాబ్"
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "సందేశ వివరాలు",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "అకౌంటింగ్ సర్దుబాటు",
         "credits_expired": "క్రెడిట్లు గడువు ముగిశాయి"
       },
-      "loadMore": "మరిన్ని లోడ్ చేయండి",
-      "loadMoreFailed": "మరిన్ని లోడ్ చేయలేకపోయాము.",
+      "loadMore": "మరింత లోడ్ చేయండి",
+      "loadMoreFailed": "మరిన్ని లోడ్ చేయలేకపోయాము",
       "truncated": "పాత క్రెడిట్ కార్యకలాపం అందుబాటులో ఉంది."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "వసూలు చేయలేనిది",
         "unknown": "తెలియదు"
       },
-      "loadMore": "మరిన్ని లోడ్ చేయండి",
-      "loadMoreFailed": "మరిన్ని లోడ్ చేయలేకపోయాము.",
+      "loadMore": "మరింత లోడ్ చేయండి",
+      "loadMoreFailed": "మరిన్ని లోడ్ చేయలేకపోయాము",
       "truncated": "పాత ఇన్వాయిస్లు అందుబాటులో ఉన్నాయి."
     },
     "lowBalanceAlert": {

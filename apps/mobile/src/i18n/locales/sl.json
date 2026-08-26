@@ -2183,14 +2183,10 @@
     "newSession": {
       "title": "Nova seja",
       "repository": "Skladišče",
-      "couldNotLoadRepositories": "Skladišč ni bilo mogoče naložiti",
       "connectGithub": "Poveži GitHub",
       "connectGithubDescription": "Poveži GitHub v svojem brskalniku in se nato vrni sem, da izbereš skladišče.",
       "openGithub": "Odpri GitHub",
       "refreshRepositories": "Osveži skladišča",
-      "githubConnectionNotVisible": "Tvoje povezave z GitHub še ne vidimo",
-      "githubConnectionNotVisibleDescription": "Če si namestil ali konfiguriral aplikacijo Kilo GitHub App, preveri znova — ali pa se prepričaj, da je bila nameščena za ta račun/organizacijo.",
-      "checkAgain": "Preveri znova",
       "githubConnected": "GitHub povezan",
       "noRepositoriesVisible": "Ni vidnih skladišč. Preveri dostop do skladišč za aplikacijo Kilo GitHub App in nato osveži.",
       "runOnWithTarget": "Zaženi na: {{target}}",
@@ -2218,7 +2214,7 @@
       "discard": "Zavrzi",
       "discardFailed": "Osnutka ni bilo mogoče zavreči. Poskusi znova.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket povezan",
+      "bitbucketConnected": "Bitbucket je povezan",
       "connectBitbucket": "Poveži Bitbucket",
       "connectBitbucketDescription": "Poveži Bitbucket v brskalniku, nato se vrni sem in izberi skladišče.",
       "connectGitlab": "Poveži GitLab",
@@ -3009,7 +3005,7 @@
         "credits_expired": "Potečeni krediti"
       },
       "loadMore": "Naloži več",
-      "loadMoreFailed": "Ni bilo mogoče naložiti več.",
+      "loadMoreFailed": "Več ni bilo mogoče naložiti",
       "truncated": "Starejša dejavnost kredita je na voljo."
     },
     "inviteMember": {
@@ -3039,7 +3035,7 @@
         "unknown": "Neznano"
       },
       "loadMore": "Naloži več",
-      "loadMoreFailed": "Ni bilo mogoče naložiti več.",
+      "loadMoreFailed": "Več ni bilo mogoče naložiti",
       "truncated": "Starejši računi so na voljo."
     },
     "lowBalanceAlert": {

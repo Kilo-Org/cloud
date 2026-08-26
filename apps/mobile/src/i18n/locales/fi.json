@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Uusi istunto",
       "repository": "Arkisto",
-      "couldNotLoadRepositories": "Arkistoja ei voitu ladata",
       "connectGithub": "Yhdistä GitHub",
       "connectGithubDescription": "Yhdistä GitHub selaimessa ja palaa sitten tänne valitaksesi arkiston.",
       "openGithub": "Avaa GitHub",
       "refreshRepositories": "Päivitä arkistot",
-      "githubConnectionNotVisible": "Emme näe GitHub-yhteyttäsi vielä",
-      "githubConnectionNotVisibleDescription": "Jos asensit tai määritit Kilo GitHub Appin, tarkista uudelleen — tai varmista, että se asennettiin tälle tilille/organisaatiolle.",
-      "checkAgain": "Tarkista uudelleen",
       "githubConnected": "GitHub yhdistetty",
       "noRepositoriesVisible": "Ei näkyviä arkistoja. Tarkista Kilo GitHub Appin arkistopääsy ja päivitä sitten.",
       "runOnWithTarget": "Aja kohteessa: {{target}}",
@@ -2969,7 +2965,7 @@
         "credits_expired": "Krediitit vanhentuivat"
       },
       "loadMore": "Lataa lisää",
-      "loadMoreFailed": "Lisää ei voitu ladata.",
+      "loadMoreFailed": "Lisää ei voitu ladata",
       "truncated": "Vanhempaa luottotapahtumahistoriaa on saatavilla."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "Tuntematon"
       },
       "loadMore": "Lataa lisää",
-      "loadMoreFailed": "Lisää ei voitu ladata.",
+      "loadMoreFailed": "Lisää ei voitu ladata",
       "truncated": "Vanhempia laskuja on saatavilla."
     },
     "lowBalanceAlert": {

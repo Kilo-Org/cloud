@@ -2183,14 +2183,10 @@
     "newSession": {
       "title": "Nové sedenie",
       "repository": "Repozitár",
-      "couldNotLoadRepositories": "Repozitáre sa nepodarilo načítať",
       "connectGithub": "Pripojiť GitHub",
       "connectGithubDescription": "Pripojte GitHub vo svojom prehliadači a potom sa sem vráťte, aby ste vybrali repozitár.",
       "openGithub": "Otvoriť GitHub",
       "refreshRepositories": "Obnoviť repozitáre",
-      "githubConnectionNotVisible": "Vaše pripojenie na GitHub zatiaľ nevidíme",
-      "githubConnectionNotVisibleDescription": "Ak ste nainštalovali alebo nakonfigurovali aplikáciu Kilo GitHub App, skontrolujte to znova — alebo sa uistite, že bola nainštalovaná pre tento účet/organizáciu.",
-      "checkAgain": "Skontrolovať znova",
       "githubConnected": "GitHub pripojený",
       "noRepositoriesVisible": "Žiadne repozitáre nie sú viditeľné. Skontrolujte prístup k repozitárom pre aplikáciu Kilo GitHub App a potom obnovte.",
       "runOnWithTarget": "Spustiť na: {{target}}",
@@ -2218,7 +2214,7 @@
       "discard": "Zahodiť",
       "discardFailed": "Koncept sa nepodarilo zahodiť. Skúste to znova.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket je pripojený",
+      "bitbucketConnected": "Bitbucket pripojený",
       "connectBitbucket": "Pripojiť Bitbucket",
       "connectBitbucketDescription": "Pripojte Bitbucket v prehliadači a potom sa sem vráťte a vyberte repozitár.",
       "connectGitlab": "Pripojiť GitLab",
@@ -3009,7 +3005,7 @@
         "credits_expired": "Kredity vypršali"
       },
       "loadMore": "Načítať viac",
-      "loadMoreFailed": "Nepodarilo sa načítať viac.",
+      "loadMoreFailed": "Ďalšie sa nepodarilo načítať",
       "truncated": "Staršia kreditná aktivita je k dispozícii."
     },
     "inviteMember": {
@@ -3039,7 +3035,7 @@
         "unknown": "Neznáme"
       },
       "loadMore": "Načítať viac",
-      "loadMoreFailed": "Nepodarilo sa načítať viac.",
+      "loadMoreFailed": "Ďalšie sa nepodarilo načítať",
       "truncated": "Staršie faktúry sú k dispozícii."
     },
     "lowBalanceAlert": {

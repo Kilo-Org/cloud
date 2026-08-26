@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "નવું સત્ર",
       "repository": "રિપોઝિટરી",
-      "couldNotLoadRepositories": "રિપોઝિટરીઓ લોડ થઈ શકી નથી",
       "connectGithub": "GitHub કનેક્ટ કરો",
       "connectGithubDescription": "તમારા બ્રાઉઝરમાં GitHub કનેક્ટ કરો, પછી રિપોઝિટરી પસંદ કરવા અહીં પાછા આવો.",
       "openGithub": "GitHub ખોલો",
       "refreshRepositories": "રિપોઝિટરીઓ રિફ્રેશ કરો",
-      "githubConnectionNotVisible": "અમે હજુ તમારું GitHub કનેક્શન જોઈ શકતા નથી",
-      "githubConnectionNotVisibleDescription": "જો તમે Kilo GitHub App ઇન્સ્ટોલ કર્યું અથવા ગોઠવ્યું હોય, ફરી ચકાસો — અથવા ખાતરી કરો કે તે આ એકાઉન્ટ/સંસ્થા માટે ઇન્સ્ટોલ થયું હતું.",
-      "checkAgain": "ફરી ચકાસો",
       "githubConnected": "GitHub કનેક્ટ થયેલ",
       "noRepositoriesVisible": "કોઈ રિપોઝિટરી દેખાતી નથી. Kilo GitHub App માટે રિપોઝિટરી ઍક્સેસ ચકાસો, પછી રિફ્રેશ કરો.",
       "runOnWithTarget": "પર ચલાવો: {{target}}",
@@ -2188,7 +2184,7 @@
       "discard": "કાઢી નાખો",
       "discardFailed": "ડ્રાફ્ટ કાઢી નાખી શકાયો નથી. કૃપા કરીને ફરી પ્રયાસ કરો.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket કનેક્ટ થયું",
+      "bitbucketConnected": "Bitbucket કનેક્ટેડ",
       "connectBitbucket": "Bitbucket કનેક્ટ કરો",
       "connectBitbucketDescription": "તમારા બ્રાઉઝરમાં Bitbucket કનેક્ટ કરો, પછી રિપોઝિટરી પસંદ કરવા અહીં પાછા આવો.",
       "connectGitlab": "GitLab કનેક્ટ કરો",
@@ -2969,7 +2965,7 @@
         "credits_expired": "ક્રેડિટ સમાપ્ત થઈ"
       },
       "loadMore": "વધુ લોડ કરો",
-      "loadMoreFailed": "વધુ લોડ કરી શકાયું નથી.",
+      "loadMoreFailed": "વધુ લોડ કરી શકાયું નહીં",
       "truncated": "જૂની ક્રેડિટ પ્રવૃત્તિ ઉપલબ્ધ છે."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "અજ્ઞાત"
       },
       "loadMore": "વધુ લોડ કરો",
-      "loadMoreFailed": "વધુ લોડ કરી શકાયું નથી.",
+      "loadMoreFailed": "વધુ લોડ કરી શકાયું નહીં",
       "truncated": "જૂના ઇન્વૉઇસ ઉપલબ્ધ છે."
     },
     "lowBalanceAlert": {

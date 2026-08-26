@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Νέα συνεδρία",
       "repository": "Αποθετήριο",
-      "couldNotLoadRepositories": "Δεν ήταν δυνατή η φόρτωση των αποθετηρίων",
       "connectGithub": "Σύνδεση στο GitHub",
       "connectGithubDescription": "Συνδεθείτε στο GitHub στο πρόγραμμα περιήγησής σας και επιστρέψτε εδώ για να επιλέξετε ένα αποθετήριο.",
       "openGithub": "Άνοιγμα GitHub",
       "refreshRepositories": "Ανανέωση αποθετηρίων",
-      "githubConnectionNotVisible": "Δεν μπορούμε να δούμε ακόμα τη σύνδεσή σας στο GitHub",
-      "githubConnectionNotVisibleDescription": "Εάν εγκαταστήσατε ή διαμορφώσατε την εφαρμογή Kilo GitHub, ελέγξτε ξανά — ή βεβαιωθείτε ότι εγκαταστάθηκε για αυτόν τον λογαριασμό/οργανισμό.",
-      "checkAgain": "Έλεγχος ξανά",
       "githubConnected": "Σύνδεση GitHub επιτυχής",
       "noRepositoriesVisible": "Κανένα ορατό αποθετήριο. Ελέγξτε την πρόσβαση αποθετηρίων για την εφαρμογή Kilo GitHub και ανανεώστε.",
       "runOnWithTarget": "Εκτέλεση σε: {{target}}",
@@ -2969,7 +2965,7 @@
         "credits_expired": "Ληγμένες πιστώσεις"
       },
       "loadMore": "Φόρτωση περισσότερων",
-      "loadMoreFailed": "Δεν ήταν δυνατή η φόρτωση περισσότερων.",
+      "loadMoreFailed": "Δεν ήταν δυνατή η φόρτωση περισσότερων",
       "truncated": "Παλαιότερη δραστηριότητα πιστώσεων είναι διαθέσιμη."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "Άγνωστο"
       },
       "loadMore": "Φόρτωση περισσότερων",
-      "loadMoreFailed": "Δεν ήταν δυνατή η φόρτωση περισσότερων.",
+      "loadMoreFailed": "Δεν ήταν δυνατή η φόρτωση περισσότερων",
       "truncated": "Παλαιότερα τιμολόγια είναι διαθέσιμα."
     },
     "lowBalanceAlert": {

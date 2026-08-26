@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Iseshini entsha",
       "repository": "IRepository",
-      "couldNotLoadRepositories": "Akukwazanga ukulayisha ama-repository",
       "connectGithub": "Xhuma i-GitHub",
       "connectGithubDescription": "Xhuma ku-GitHub kusibukeli sakho, bese ubuyela lapha ukukhetha i-repository.",
       "openGithub": "Vula i-GitHub",
       "refreshRepositories": "Vuselela ama-repository",
-      "githubConnectionNotVisible": "Asikwazi ukubona ukuxhumana kwakho kwe-GitHub okwamanje",
-      "githubConnectionNotVisibleDescription": "Uma ufake noma ulungise i-Kilo GitHub App, bheka futhi — noma qinisekisa ukuthi yafakelwa le akhawunti/inhlangano.",
-      "checkAgain": "Bheka futhi",
       "githubConnected": "I-GitHub ixhunyiwe",
       "noRepositoriesVisible": "Akukho ma-repository abonakalayo. Bheka ukufinyelela kwe-repository ye-Kilo GitHub App, bese uvuselela.",
       "runOnWithTarget": "Sebenza ku: {{target}}",
@@ -2188,7 +2184,7 @@
       "discard": "Lahla",
       "discardFailed": "Akukwazanga ukulahla idrafuthi. Sicela uzame futhi.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "I-Bitbucket ixhumekile",
+      "bitbucketConnected": "I-Bitbucket ixhunyiwe",
       "connectBitbucket": "Xhuma i-Bitbucket",
       "connectBitbucketDescription": "Xhuma i-Bitbucket kusiphequluli sakho, bese ubuya lapha ukuze ukhethe irepository.",
       "connectGitlab": "Xhuma i-GitLab",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "Ukulungiswa kwezimali",
         "credits_expired": "Amakhredithi aphelelwe yisikhathi"
       },
-      "loadMore": "Layisha okunye",
-      "loadMoreFailed": "Ayikwazanga ukulayisha okunye.",
+      "loadMore": "Layisha okwengeziwe",
+      "loadMoreFailed": "Asikwazanga ukulayisha okwengeziwe",
       "truncated": "Umsebenzi wekhredithi omdala uyatholakala."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "Okungakhokhiwa",
         "unknown": "Okungaziwa"
       },
-      "loadMore": "Layisha okunye",
-      "loadMoreFailed": "Ayikwazanga ukulayisha okunye.",
+      "loadMore": "Layisha okwengeziwe",
+      "loadMoreFailed": "Asikwazanga ukulayisha okwengeziwe",
       "truncated": "Ama-invoyisi amadala ayatholakala."
     },
     "lowBalanceAlert": {

@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Wātū hōu",
       "repository": "Pūranga",
-      "couldNotLoadRepositories": "Kāore i taea te uta ngā pūranga",
       "connectGithub": "Hono ki GitHub",
       "connectGithubDescription": "Honohia a GitHub i tō pūtirotiro, kātahi hoki mai ki konei ki te kōwhiri i tētahi pūranga.",
       "openGithub": "Whakatuwhera GitHub",
       "refreshRepositories": "Whakahou ngā pūranga",
-      "githubConnectionNotVisible": "Kāore anō e kitea e mātou tō hononga GitHub",
-      "githubConnectionNotVisibleDescription": "Mēnā kua whakauru, kua whirihora rānei koe i te Kilo GitHub App, tirohia anō — kia whakapūmau rānei i whakaurua mō tēnei pūkete/whakahaere.",
-      "checkAgain": "Tirohia anō",
       "githubConnected": "Kua hono a GitHub",
       "noRepositoriesVisible": "Kāore he pūranga e kitea ana. Tirohia te wāhi atu pūranga mō te Kilo GitHub App, kātahi whakahou.",
       "runOnWithTarget": "Oma i runga i: {{target}}",
@@ -2189,9 +2185,9 @@
       "discardFailed": "Kāore i taea te whakarere i te tauira. Tēnā whakamātau anō.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "Kua hono a Bitbucket",
-      "connectBitbucket": "Hono atu ki Bitbucket",
+      "connectBitbucket": "Hono Bitbucket",
       "connectBitbucketDescription": "Hono atu ki Bitbucket i tō pūtirotiro, kātahi hoki mai ki konei ki te kōwhiri pūputunga.",
-      "connectGitlab": "Hono atu ki GitLab",
+      "connectGitlab": "Hono GitLab",
       "connectGitlabDescription": "Hono atu ki GitLab i tō pūtirotiro, kātahi hoki mai ki konei ki te kōwhiri pūputunga.",
       "couldNotLoadBitbucketRepositories": "Kāore i taea te uta i ngā pūputunga Bitbucket",
       "couldNotLoadGithubRepositories": "Kāore i taea te uta i ngā pūputunga GitHub",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "Te whakatikatika kaute",
         "credits_expired": "Kua pau ngā whiwhinga"
       },
-      "loadMore": "Utaina ētahi atu",
-      "loadMoreFailed": "Kāore i taea te uta ētahi atu.",
+      "loadMore": "Uta anō",
+      "loadMoreFailed": "Kāore i taea te uta ētahi atu",
       "truncated": "E wātea ana ngā mahi kirimana tawhito."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "Kāore e taea te kohi",
         "unknown": "Kāore e mōhiotia"
       },
-      "loadMore": "Utaina ētahi atu",
-      "loadMoreFailed": "Kāore i taea te uta ētahi atu.",
+      "loadMore": "Uta anō",
+      "loadMoreFailed": "Kāore i taea te uta ētahi atu",
       "truncated": "E wātea ana ngā nama tawhito."
     },
     "lowBalanceAlert": {

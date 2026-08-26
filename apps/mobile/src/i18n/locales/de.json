@@ -1699,14 +1699,10 @@
     "newSession": {
       "title": "Neue Sitzung",
       "repository": "Repository",
-      "couldNotLoadRepositories": "Repositories konnten nicht geladen werden",
       "connectGithub": "GitHub verbinden",
       "connectGithubDescription": "Verbinde GitHub in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
       "openGithub": "GitHub öffnen",
       "refreshRepositories": "Repositories aktualisieren",
-      "githubConnectionNotVisible": "Wir können deine GitHub-Verbindung noch nicht sehen",
-      "githubConnectionNotVisibleDescription": "Wenn du die Kilo GitHub App installiert oder konfiguriert hast, prüfe erneut — oder stelle sicher, dass sie für dieses Konto/diese Organisation installiert wurde.",
-      "checkAgain": "Erneut prüfen",
       "githubConnected": "GitHub verbunden",
       "noRepositoriesVisible": "Keine Repositories sichtbar. Prüfe den Repository-Zugriff für die Kilo GitHub App und aktualisiere dann.",
       "runOnWithTarget": "Ausführen auf: {{target}}",
@@ -2955,7 +2951,7 @@
         "credits_expired": "Abgelaufene Credits"
       },
       "loadMore": "Mehr laden",
-      "loadMoreFailed": "Konnte nicht mehr laden.",
+      "loadMoreFailed": "Mehr konnte nicht geladen werden",
       "truncated": "Ältere Guthabenaktivität ist verfügbar."
     },
     "hub": {
@@ -2994,7 +2990,7 @@
         "unknown": "Unbekannt"
       },
       "loadMore": "Mehr laden",
-      "loadMoreFailed": "Konnte nicht mehr laden.",
+      "loadMoreFailed": "Mehr konnte nicht geladen werden",
       "truncated": "Ältere Rechnungen sind verfügbar."
     },
     "lowBalanceAlert": {

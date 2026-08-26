@@ -2168,14 +2168,10 @@
     "newSession": {
       "title": "Sesiune nouă",
       "repository": "Depozit",
-      "couldNotLoadRepositories": "Nu s-au putut încărca depozitele",
       "connectGithub": "Conectează GitHub",
       "connectGithubDescription": "Conectează-te la GitHub în browser, apoi întoarce-te aici pentru a alege un depozit.",
       "openGithub": "Deschide GitHub",
       "refreshRepositories": "Reîmprospătează depozitele",
-      "githubConnectionNotVisible": "Încă nu vedem conexiunea ta la GitHub",
-      "githubConnectionNotVisibleDescription": "Dacă ai instalat sau configurat Kilo GitHub App, verifică din nou — sau asigură-te că a fost instalat pentru acest cont/organizație.",
-      "checkAgain": "Verifică din nou",
       "githubConnected": "GitHub conectat",
       "noRepositoriesVisible": "Nu este vizibil niciun depozit. Verifică accesul la depozite pentru Kilo GitHub App, apoi reîmprospătează.",
       "runOnWithTarget": "Rulează pe: {{target}}",
@@ -2203,7 +2199,7 @@
       "discard": "Renunță",
       "discardFailed": "Nu s-a putut renunța la ciornă. Încearcă din nou.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Contul Bitbucket conectat",
+      "bitbucketConnected": "Bitbucket conectat",
       "connectBitbucket": "Conectează Bitbucket",
       "connectBitbucketDescription": "Conectează Bitbucket în browser, apoi întoarce-te aici pentru a alege un depozit.",
       "connectGitlab": "Conectează GitLab",
@@ -2988,8 +2984,8 @@
         "accounting_adjustment": "Ajustare contabilă",
         "credits_expired": "Credite expirate"
       },
-      "loadMore": "Încarcă mai multe",
-      "loadMoreFailed": "Nu s-a putut încărca mai mult.",
+      "loadMore": "Încarcă mai mult",
+      "loadMoreFailed": "Nu s-a putut încărca mai mult",
       "truncated": "Activitatea de credite mai veche este disponibilă."
     },
     "inviteMember": {
@@ -3018,8 +3014,8 @@
         "uncollectible": "Neîncasabilă",
         "unknown": "Necunoscut"
       },
-      "loadMore": "Încarcă mai multe",
-      "loadMoreFailed": "Nu s-a putut încărca mai mult.",
+      "loadMore": "Încarcă mai mult",
+      "loadMoreFailed": "Nu s-a putut încărca mai mult",
       "truncated": "Sunt disponibile facturi mai vechi."
     },
     "lowBalanceAlert": {

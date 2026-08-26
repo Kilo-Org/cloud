@@ -2183,14 +2183,10 @@
     "newSession": {
       "title": "Nová relace",
       "repository": "Repozitář",
-      "couldNotLoadRepositories": "Repozitáře se nepodařilo načíst",
       "connectGithub": "Připojit GitHub",
       "connectGithubDescription": "Připojte GitHub v prohlížeči a pak se sem vraťte pro výběr repozitáře.",
       "openGithub": "Otevřít GitHub",
       "refreshRepositories": "Obnovit repozitáře",
-      "githubConnectionNotVisible": "Vaše připojení GitHubu zatím nevidíme",
-      "githubConnectionNotVisibleDescription": "Pokud jste nainstalovali nebo nakonfigurovali aplikaci Kilo GitHub, zkontrolujte to znovu — nebo se ujistěte, že byla nainstalována pro tento účet/organizaci.",
-      "checkAgain": "Zkontrolovat znovu",
       "githubConnected": "GitHub připojen",
       "noRepositoriesVisible": "Žádné repozitáře nejsou viditelné. Zkontrolujte přístup k repozitářům pro aplikaci Kilo GitHub a pak obnovte.",
       "runOnWithTarget": "Spustit na: {{target}}",
@@ -3009,7 +3005,7 @@
         "credits_expired": "Kredity s prošlou platností"
       },
       "loadMore": "Načíst více",
-      "loadMoreFailed": "Nepodařilo se načíst další.",
+      "loadMoreFailed": "Další se nepodařilo načíst",
       "truncated": "Starší aktivita kreditů je k dispozici."
     },
     "inviteMember": {
@@ -3039,7 +3035,7 @@
         "unknown": "Neznámé"
       },
       "loadMore": "Načíst více",
-      "loadMoreFailed": "Nepodařilo se načíst další.",
+      "loadMoreFailed": "Další se nepodařilo načíst",
       "truncated": "Starší faktury jsou k dispozici."
     },
     "lowBalanceAlert": {

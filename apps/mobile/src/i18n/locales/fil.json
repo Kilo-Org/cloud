@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Bagong session",
       "repository": "Repository",
-      "couldNotLoadRepositories": "Hindi ma-load ang mga repository",
       "connectGithub": "Ikonekta ang GitHub",
       "connectGithubDescription": "Ikonekta ang GitHub sa iyong browser, pagkatapos ay bumalik dito para pumili ng repository.",
       "openGithub": "Buksan ang GitHub",
       "refreshRepositories": "I-refresh ang mga repository",
-      "githubConnectionNotVisible": "Hindi pa namin nakikita ang iyong koneksyon sa GitHub",
-      "githubConnectionNotVisibleDescription": "Kung na-install o na-configure mo ang Kilo GitHub App, i-check muli — o tiyaking na-install ito para sa account/organization na ito.",
-      "checkAgain": "I-check muli",
       "githubConnected": "Konektado ang GitHub",
       "noRepositoriesVisible": "Walang nakikitang repository. I-check ang access sa repository para sa Kilo GitHub App, pagkatapos ay i-refresh.",
       "runOnWithTarget": "Patakbuhin sa: {{target}}",
@@ -2188,7 +2184,7 @@
       "discard": "I-discard",
       "discardFailed": "Hindi ma-discard ang draft. Pakisubukang muli.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Konektado ang Bitbucket",
+      "bitbucketConnected": "Nakakonekta ang Bitbucket",
       "connectBitbucket": "Ikonekta ang Bitbucket",
       "connectBitbucketDescription": "Ikonekta ang Bitbucket sa iyong browser, pagkatapos ay bumalik dito para pumili ng repository.",
       "connectGitlab": "Ikonekta ang GitLab",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "Pagsasaayos ng accounting",
         "credits_expired": "Nag-expire na credits"
       },
-      "loadMore": "Mag-load pa",
-      "loadMoreFailed": "Hindi makapag-load pa.",
+      "loadMore": "I-load pa",
+      "loadMoreFailed": "Hindi ma-load ang iba pa",
       "truncated": "Magagamit ang mas lumang aktibidad ng kredito."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "Hindi makokolekta",
         "unknown": "Hindi alam"
       },
-      "loadMore": "Mag-load pa",
-      "loadMoreFailed": "Hindi makapag-load pa.",
+      "loadMore": "I-load pa",
+      "loadMoreFailed": "Hindi ma-load ang iba pa",
       "truncated": "Magagamit ang mas lumang mga invoice."
     },
     "lowBalanceAlert": {

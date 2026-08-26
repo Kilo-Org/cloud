@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "புதிய அமர்வு",
       "repository": "களஞ்சியம்",
-      "couldNotLoadRepositories": "களஞ்சியங்களை ஏற்ற முடியவில்லை",
       "connectGithub": "GitHub உடன் இணை",
       "connectGithubDescription": "உங்கள் உலாவியில் GitHub ஐ இணைக்கவும், பின்னர் ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கு திரும்பவும்.",
       "openGithub": "GitHub ஐ திற",
       "refreshRepositories": "களஞ்சியங்களை புதுப்பி",
-      "githubConnectionNotVisible": "உங்கள் GitHub இணைப்பை இன்னும் பார்க்க முடியவில்லை",
-      "githubConnectionNotVisibleDescription": "நீங்கள் Kilo GitHub App ஐ நிறுவியிருந்தால் அல்லது கட்டமைத்திருந்தால், மீண்டும் சரிபார்க்கவும் — அல்லது இந்த கணக்கு/நிறுவனத்திற்காக நிறுவப்பட்டுள்ளதா என்பதை உறுதிப்படுத்தவும்.",
-      "checkAgain": "மீண்டும் சரிபார்",
       "githubConnected": "GitHub இணைக்கப்பட்டது",
       "noRepositoriesVisible": "களஞ்சியங்கள் தெரியவில்லை. Kilo GitHub App க்கான களஞ்சிய அணுகலைச் சரிபார்த்து, பின்னர் புதுப்பிக்கவும்.",
       "runOnWithTarget": "இதில் இயக்கு: {{target}}",
@@ -2188,10 +2184,10 @@
       "discard": "நிராகரி",
       "discardFailed": "வரைவை நிராகரிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "பிட்பக்கெட் இணைக்கப்பட்டது",
-      "connectBitbucket": "பிட்பக்கெட்டை இணைக்கவும்",
+      "bitbucketConnected": "Bitbucket இணைக்கப்பட்டது",
+      "connectBitbucket": "Bitbucket ஐ இணை",
       "connectBitbucketDescription": "உங்கள் உலாவியில் பிட்பக்கெட்டை இணைக்கவும், பின்னர் ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
-      "connectGitlab": "GitLab-ஐ இணைக்கவும்",
+      "connectGitlab": "GitLab ஐ இணை",
       "connectGitlabDescription": "உங்கள் உலாவியில் GitLab-ஐ இணைக்கவும், பின்னர் ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
       "couldNotLoadBitbucketRepositories": "பிட்பக்கெட் களஞ்சியங்களை ஏற்ற முடியவில்லை",
       "couldNotLoadGithubRepositories": "GitHub களஞ்சியங்களை ஏற்ற முடியவில்லை",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "கணக்கியல் சரிசெய்தல்",
         "credits_expired": "கிரெடிட்கள் காலாவதியானது"
       },
-      "loadMore": "மேலும் ஏற்றவும்",
-      "loadMoreFailed": "மேலும் ஏற்ற முடியவில்லை.",
+      "loadMore": "மேலும் ஏற்று",
+      "loadMoreFailed": "மேலும் ஏற்ற முடியவில்லை",
       "truncated": "பழைய கிரெடிட் செயல்பாடு கிடைக்கிறது."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "வசூலிக்க முடியாதது",
         "unknown": "தெரியவில்லை"
       },
-      "loadMore": "மேலும் ஏற்றவும்",
-      "loadMoreFailed": "மேலும் ஏற்ற முடியவில்லை.",
+      "loadMore": "மேலும் ஏற்று",
+      "loadMoreFailed": "மேலும் ஏற்ற முடியவில்லை",
       "truncated": "பழைய விலைப்பட்டியல்கள் கிடைக்கின்றன."
     },
     "lowBalanceAlert": {

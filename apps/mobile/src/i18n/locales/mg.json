@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Session vaovao",
       "repository": "Repository",
-      "couldNotLoadRepositories": "Tsy afaka namaky ny repository",
       "connectGithub": "Hampifandray GitHub",
       "connectGithubDescription": "Ampifandraiso ny GitHub amin'ny navigateur-nao, dia miverena eto hisafidy repository.",
       "openGithub": "Sokafy ny GitHub",
       "refreshRepositories": "Avereno vaovao ny repository",
-      "githubConnectionNotVisible": "Mbola tsy hitanay ny fifandraisanao amin'ny GitHub",
-      "githubConnectionNotVisibleDescription": "Raha nampidirinao na noforonina ny Kilo GitHub App, jereo indray — na ataovy azo antoka fa nampidirina ho an'ity kaonty/fikambanana ity izy.",
-      "checkAgain": "Jereo indray",
       "githubConnected": "Voampifandraisina ny GitHub",
       "noRepositoriesVisible": "Tsy misy repository hita. Jereo ny fidirana repository ho an'ny Kilo GitHub App, dia avereno vaovao.",
       "runOnWithTarget": "Ampandeho amin'ny: {{target}}",
@@ -2188,10 +2184,10 @@
       "discard": "Hanary",
       "discardFailed": "Tsy afaka nandao ny draft. Andramo indray azafady.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket mifandray",
-      "connectBitbucket": "Ampifandraiso amin'i Bitbucket",
+      "bitbucketConnected": "Mifandray ny Bitbucket",
+      "connectBitbucket": "Ampifandraiso ny Bitbucket",
       "connectBitbucketDescription": "Ampifandraiso amin'i Bitbucket ao amin'ny navigateur-nao, dia miverena eto mba hisafidy repository.",
-      "connectGitlab": "Ampifandraiso amin'i GitLab",
+      "connectGitlab": "Ampifandraiso ny GitLab",
       "connectGitlabDescription": "Ampifandraiso amin'i GitLab ao amin'ny navigateur-nao, dia miverena eto mba hisafidy repository.",
       "couldNotLoadBitbucketRepositories": "Tsy afaka nandrakotra ny repository an'i Bitbucket",
       "couldNotLoadGithubRepositories": "Tsy afaka nandrakotra ny repository an'i GitHub",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "Fanitsiana kaonty",
         "credits_expired": "Lany daty ny credits"
       },
-      "loadMore": "Havao bebe kokoa",
-      "loadMoreFailed": "Tsy afaka ny havaozina bebe kokoa.",
+      "loadMore": "Hamaky bebe kokoa",
+      "loadMoreFailed": "Tsy afaka namaky fanampiny",
       "truncated": "Misy ny fiasana crédit taloha kokoa."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "Tsy azo angonina",
         "unknown": "Tsy fantatra"
       },
-      "loadMore": "Havao bebe kokoa",
-      "loadMoreFailed": "Tsy afaka ny havaozina bebe kokoa.",
+      "loadMore": "Hamaky bebe kokoa",
+      "loadMoreFailed": "Tsy afaka namaky fanampiny",
       "truncated": "Misy ny faktiora taloha kokoa."
     },
     "lowBalanceAlert": {

@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Yangi sessiya",
       "repository": "Repozitoriy",
-      "couldNotLoadRepositories": "Repozitoriyalarni yuklab bo'lmadi",
       "connectGithub": "GitHubga ulanish",
       "connectGithubDescription": "Brauzeringizda GitHub'ga ulaning, so'ng repozitoriya tanlash uchun shu yerga qayting.",
       "openGithub": "GitHub'ni ochish",
       "refreshRepositories": "Repozitoriyalarni yangilash",
-      "githubConnectionNotVisible": "Hozircha GitHub ulanishingizni ko'ra olmayapmiz",
-      "githubConnectionNotVisibleDescription": "Agar Kilo GitHub App'ini o'rnatgan yoki sozlagan bo'lsangiz, qayta tekshiring — yoki u ushbu hisob/tashkilot uchun o'rnatilganligiga ishonch hosil qiling.",
-      "checkAgain": "Qayta tekshirish",
       "githubConnected": "GitHub ulandi",
       "noRepositoriesVisible": "Ko'rinadigan repozitoriyalar yo'q. Kilo GitHub App'i uchun repozitoriya kirishini tekshiring, so'ng yangilang.",
       "runOnWithTarget": "Yurgizish: {{target}}",
@@ -2189,9 +2185,9 @@
       "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "Bitbucket ulandi",
-      "connectBitbucket": "Bitbucket'ga ulanish",
+      "connectBitbucket": "Bitbucketni ulash",
       "connectBitbucketDescription": "Bitbucket'ga brauzeringizda ulaning, keyin repozitoriy tanlash uchun bu yerga qayting.",
-      "connectGitlab": "GitLab'ga ulanish",
+      "connectGitlab": "GitLabni ulash",
       "connectGitlabDescription": "GitLab'ga brauzeringizda ulaning, keyin repozitoriy tanlash uchun bu yerga qayting.",
       "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarini yuklab bo'lmadi",
       "couldNotLoadGithubRepositories": "GitHub repozitoriyalarini yuklab bo'lmadi",
@@ -2969,7 +2965,7 @@
         "credits_expired": "Kreditlar muddati tugadi"
       },
       "loadMore": "Ko'proq yuklash",
-      "loadMoreFailed": "Ko'proq yuklab bo'lmadi.",
+      "loadMoreFailed": "Ko'proq yuklab bo'lmadi",
       "truncated": "Eski kredit faoliyati mavjud."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "Noma'lum"
       },
       "loadMore": "Ko'proq yuklash",
-      "loadMoreFailed": "Ko'proq yuklab bo'lmadi.",
+      "loadMoreFailed": "Ko'proq yuklab bo'lmadi",
       "truncated": "Eski hisob-fakturalar mavjud."
     },
     "lowBalanceAlert": {

@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Saio berria",
       "repository": "Biltegia",
-      "couldNotLoadRepositories": "Ezin dira biltegiak kargatu",
       "connectGithub": "Konektatu GitHub",
       "connectGithubDescription": "Konektatu GitHub zure arakatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
       "openGithub": "Ireki GitHub",
       "refreshRepositories": "Freskatu biltegiak",
-      "githubConnectionNotVisible": "Oraindik ezin dugu zure GitHub konexioa ikusi",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub App instalatu edo konfiguratu baduzu, egiaztatu berriro — edo ziurtatu kontu/erakunde honetarako instalatu zela.",
-      "checkAgain": "Egiaztatu berriro",
       "githubConnected": "GitHub konektatuta",
       "noRepositoriesVisible": "Ez dago biltegi ikusgarririk. Egiaztatu Kilo GitHub App-aren biltegi-sarbidea, eta gero freskatu.",
       "runOnWithTarget": "Exekutatu honetan: {{target}}",
@@ -2189,9 +2185,9 @@
       "discardFailed": "Ezin da zirriborroa baztertu. Saiatu berriro.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "Bitbucket konektatuta",
-      "connectBitbucket": "Konektatu Bitbucket-era",
+      "connectBitbucket": "Konektatu Bitbucket",
       "connectBitbucketDescription": "Konektatu Bitbucket-era zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
-      "connectGitlab": "Konektatu GitLab-era",
+      "connectGitlab": "Konektatu GitLab",
       "connectGitlabDescription": "Konektatu GitLab-era zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
       "couldNotLoadBitbucketRepositories": "Ezin izan dira Bitbucket-eko biltegiak kargatu",
       "couldNotLoadGithubRepositories": "Ezin izan dira GitHub-eko biltegiak kargatu",
@@ -2969,7 +2965,7 @@
         "credits_expired": "Kredituak iraungita"
       },
       "loadMore": "Kargatu gehiago",
-      "loadMoreFailed": "Ezin izan da gehiago kargatu.",
+      "loadMoreFailed": "Ezin izan dira gehiago kargatu",
       "truncated": "Kreditu-jarduera zaharragoa eskuragarri dago."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "Ezezaguna"
       },
       "loadMore": "Kargatu gehiago",
-      "loadMoreFailed": "Ezin izan da gehiago kargatu.",
+      "loadMoreFailed": "Ezin izan dira gehiago kargatu",
       "truncated": "Faktura zaharrak eskuragarri daude."
     },
     "lowBalanceAlert": {

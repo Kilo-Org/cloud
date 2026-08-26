@@ -1731,14 +1731,10 @@
     "newSession": {
       "title": "جلسة جديدة",
       "repository": "المستودع",
-      "couldNotLoadRepositories": "تعذّر تحميل المستودعات",
       "connectGithub": "ربط GitHub",
       "connectGithubDescription": "اربط GitHub في متصفحك، ثم عد إلى هنا لاختيار مستودع.",
       "openGithub": "فتح GitHub",
       "refreshRepositories": "تحديث المستودعات",
-      "githubConnectionNotVisible": "لا يمكننا رؤية اتصال GitHub الخاص بك بعد",
-      "githubConnectionNotVisibleDescription": "إذا ثبّت تطبيق Kilo GitHub أو ضبطته، فتحقق مرة أخرى — أو تأكد من تثبيته لهذا الحساب/المؤسسة.",
-      "checkAgain": "تحقق مرة أخرى",
       "githubConnected": "تم ربط GitHub",
       "noRepositoriesVisible": "لا توجد مستودعات مرئية. تحقق من وصول المستودع لتطبيق Kilo GitHub، ثم حدّث.",
       "runOnWithTarget": "التشغيل على: {{target}}",
@@ -1766,10 +1762,10 @@
       "discardFailed": "تعذّر تجاهل المسودة. يرجى المحاولة مرة أخرى.",
       "keepEditing": "متابعة التعديل",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "تم الاتصال بـ Bitbucket",
-      "connectBitbucket": "الاتصال بـ Bitbucket",
+      "bitbucketConnected": "تم ربط Bitbucket",
+      "connectBitbucket": "ربط Bitbucket",
       "connectBitbucketDescription": "اتصل بـ Bitbucket في المتصفح، ثم عد إلى هنا لاختيار مستودع.",
-      "connectGitlab": "الاتصال بـ GitLab",
+      "connectGitlab": "ربط GitLab",
       "connectGitlabDescription": "اتصل بـ GitLab في المتصفح، ثم عد إلى هنا لاختيار مستودع.",
       "couldNotLoadBitbucketRepositories": "تعذّر تحميل مستودعات Bitbucket",
       "couldNotLoadGithubRepositories": "تعذّر تحميل مستودعات GitHub",
@@ -3035,7 +3031,7 @@
         "credits_expired": "انتهت صلاحية الأرصدة"
       },
       "loadMore": "تحميل المزيد",
-      "loadMoreFailed": "تعذّر تحميل المزيد.",
+      "loadMoreFailed": "تعذّر تحميل المزيد",
       "truncated": "تتوفر نشاطات رصيد أقدم."
     },
     "hub": {
@@ -3074,7 +3070,7 @@
         "unknown": "غير معروف"
       },
       "loadMore": "تحميل المزيد",
-      "loadMoreFailed": "تعذّر تحميل المزيد.",
+      "loadMoreFailed": "تعذّر تحميل المزيد",
       "truncated": "تتوفر فواتير أقدم."
     },
     "lowBalanceAlert": {

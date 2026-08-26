@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Sesi baharu",
       "repository": "Repositori",
-      "couldNotLoadRepositories": "Tidak dapat memuatkan repositori",
       "connectGithub": "Sambungkan GitHub",
       "connectGithubDescription": "Sambungkan GitHub dalam pelayar anda, kemudian kembali ke sini untuk memilih repositori.",
       "openGithub": "Buka GitHub",
       "refreshRepositories": "Segarkan repositori",
-      "githubConnectionNotVisible": "Kami belum dapat melihat sambungan GitHub anda",
-      "githubConnectionNotVisibleDescription": "Jika anda telah memasang atau mengkonfigurasi GitHub App Kilo, semak semula — atau pastikan ia dipasang untuk akaun/organisasi ini.",
-      "checkAgain": "Semak semula",
       "githubConnected": "GitHub disambungkan",
       "noRepositoriesVisible": "Tiada repositori kelihatan. Semak akses repositori untuk GitHub App Kilo, kemudian segarkan.",
       "runOnWithTarget": "Jalankan pada: {{target}}",
@@ -2969,7 +2965,7 @@
         "credits_expired": "Kredit tamat tempoh"
       },
       "loadMore": "Muatkan lagi",
-      "loadMoreFailed": "Tidak dapat memuatkan lagi.",
+      "loadMoreFailed": "Tidak dapat memuatkan lagi",
       "truncated": "Aktiviti kredit yang lebih lama tersedia."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "Tidak diketahui"
       },
       "loadMore": "Muatkan lagi",
-      "loadMoreFailed": "Tidak dapat memuatkan lagi.",
+      "loadMoreFailed": "Tidak dapat memuatkan lagi",
       "truncated": "Invois yang lebih lama tersedia."
     },
     "lowBalanceAlert": {

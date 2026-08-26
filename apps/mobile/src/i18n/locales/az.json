@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Yeni sessiya",
       "repository": "Repozitoriya",
-      "couldNotLoadRepositories": "Repozitoriyalar yüklənə bilmədi",
       "connectGithub": "GitHub-u qoş",
       "connectGithubDescription": "Brauzerinizdə GitHub-a qoşulun, sonra repozitoriya seçmək üçün buraya qayıdın.",
       "openGithub": "GitHub-u aç",
       "refreshRepositories": "Repozitoriyaları yenilə",
-      "githubConnectionNotVisible": "Hələ GitHub əlaqənizi görə bilmirik",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub App quraşdırıb və ya konfiqurasiya edibsəsiniz, yenidən yoxlayın — ya da bu hesab/təşkilat üçün quraşdırıldığından əmin olun.",
-      "checkAgain": "Yenidən yoxla",
       "githubConnected": "GitHub qoşuldu",
       "noRepositoriesVisible": "Görünən repozitoriya yoxdur. Kilo GitHub App üçün repozitoriya girişini yoxlayın, sonra yeniləyin.",
       "runOnWithTarget": "İşə salın: {{target}}",
@@ -2188,10 +2184,10 @@
       "discard": "Ləğv et",
       "discardFailed": "Qaralama ləğv edilə bilmədi. Zəhmət olmasa yenidən cəhd edin.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket qoşuldu",
-      "connectBitbucket": "Bitbucket-a qoşul",
+      "bitbucketConnected": "Bitbucket qoşulub",
+      "connectBitbucket": "Bitbucket-u qoş",
       "connectBitbucketDescription": "Depo seçmək üçün brauzerdə Bitbucket-a qoşulun, sonra buraya qayıdın.",
-      "connectGitlab": "GitLab-a qoşul",
+      "connectGitlab": "GitLab-ı qoş",
       "connectGitlabDescription": "Depo seçmək üçün brauzerdə GitLab-a qoşulun, sonra buraya qayıdın.",
       "couldNotLoadBitbucketRepositories": "Bitbucket depoları yüklənə bilmədi",
       "couldNotLoadGithubRepositories": "GitHub depoları yüklənə bilmədi",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "Mühasibat düzəlişi",
         "credits_expired": "Kreditlərin müddəti bitib"
       },
-      "loadMore": "Yüklə",
-      "loadMoreFailed": "Daha çox yüklənmədi.",
+      "loadMore": "Daha çox yüklə",
+      "loadMoreFailed": "Daha çox yüklənə bilmədi",
       "truncated": "Köhnə kredit fəaliyyəti mövcuddur."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "Yığıla bilməyən",
         "unknown": "Naməlum"
       },
-      "loadMore": "Yüklə",
-      "loadMoreFailed": "Daha çox yüklənmədi.",
+      "loadMore": "Daha çox yüklə",
+      "loadMoreFailed": "Daha çox yüklənə bilmədi",
       "truncated": "Köhnə qaimələr mövcuddur."
     },
     "lowBalanceAlert": {

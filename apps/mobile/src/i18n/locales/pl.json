@@ -1715,14 +1715,10 @@
     "newSession": {
       "title": "Nowa sesja",
       "repository": "Repozytorium",
-      "couldNotLoadRepositories": "Nie udało się załadować repozytoriów",
       "connectGithub": "Połącz GitHub",
       "connectGithubDescription": "Połącz GitHub w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
       "openGithub": "Otwórz GitHub",
       "refreshRepositories": "Odśwież repozytoria",
-      "githubConnectionNotVisible": "Nie widzimy jeszcze Twojego połączenia z GitHub",
-      "githubConnectionNotVisibleDescription": "Jeśli zainstalowałeś lub skonfigurowałeś aplikację Kilo GitHub, sprawdź ponownie — lub upewnij się, że została zainstalowana dla tego konta/organizacji.",
-      "checkAgain": "Sprawdź ponownie",
       "githubConnected": "GitHub połączony",
       "noRepositoriesVisible": "Brak widocznych repozytoriów. Sprawdź dostęp repozytoriów dla aplikacji Kilo GitHub, a następnie odśwież.",
       "runOnWithTarget": "Uruchom na: {{target}}",
@@ -1750,7 +1746,7 @@
       "discardFailed": "Nie udało się odrzucić szkicu. Spróbuj ponownie.",
       "keepEditing": "Kontynuuj edycję",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Połączono z Bitbucket",
+      "bitbucketConnected": "Bitbucket połączony",
       "connectBitbucket": "Połącz Bitbucket",
       "connectBitbucketDescription": "Połącz Bitbucket w przeglądarce, a następnie wróć tutaj, aby wybrać repozytorium.",
       "connectGitlab": "Połącz GitLab",
@@ -2994,8 +2990,8 @@
         "accounting_adjustment": "Korekta księgowa",
         "credits_expired": "Kredyty wygasły"
       },
-      "loadMore": "Pokaż więcej",
-      "loadMoreFailed": "Nie udało się wczytać więcej.",
+      "loadMore": "Załaduj więcej",
+      "loadMoreFailed": "Nie udało się załadować więcej",
       "truncated": "Dostępna jest starsza historia kredytów."
     },
     "hub": {
@@ -3033,8 +3029,8 @@
         "uncollectible": "Nieściągalna",
         "unknown": "Nieznana"
       },
-      "loadMore": "Pokaż więcej",
-      "loadMoreFailed": "Nie udało się wczytać więcej.",
+      "loadMore": "Załaduj więcej",
+      "loadMoreFailed": "Nie udało się załadować więcej",
       "truncated": "Dostępne są starsze faktury."
     },
     "lowBalanceAlert": {

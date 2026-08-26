@@ -1699,14 +1699,10 @@
     "newSession": {
       "title": "새 세션",
       "repository": "저장소",
-      "couldNotLoadRepositories": "리포지토리를 불러올 수 없습니다",
       "connectGithub": "GitHub 연결",
       "connectGithubDescription": "브라우저에서 GitHub를 연결한 다음 여기로 돌아와 리포지토리를 선택하세요.",
       "openGithub": "GitHub 열기",
       "refreshRepositories": "리포지토리 새로고침",
-      "githubConnectionNotVisible": "아직 GitHub 연결을 확인할 수 없습니다",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub 앱을 설치하거나 구성했다면 다시 확인하세요. 또는 이 계정/조직에 설치되었는지 확인하세요.",
-      "checkAgain": "다시 확인",
       "githubConnected": "GitHub 연결됨",
       "noRepositoriesVisible": "표시되는 리포지토리가 없습니다. Kilo GitHub 앱의 리포지토리 액세스를 확인한 다음 새로고침하세요.",
       "runOnWithTarget": "실행 위치: {{target}}",
@@ -2955,7 +2951,7 @@
         "credits_expired": "크레딧 만료"
       },
       "loadMore": "더 불러오기",
-      "loadMoreFailed": "더 불러올 수 없습니다.",
+      "loadMoreFailed": "더 불러올 수 없습니다",
       "truncated": "이전 크레딧 활동을 확인할 수 있습니다."
     },
     "hub": {
@@ -2994,7 +2990,7 @@
         "unknown": "알 수 없음"
       },
       "loadMore": "더 불러오기",
-      "loadMoreFailed": "더 불러올 수 없습니다.",
+      "loadMoreFailed": "더 불러올 수 없습니다",
       "truncated": "이전 인보이스를 확인할 수 있습니다."
     },
     "lowBalanceAlert": {

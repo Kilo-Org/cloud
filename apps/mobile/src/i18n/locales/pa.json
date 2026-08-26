@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "ਨਵਾਂ ਸੈਸ਼ਨ",
       "repository": "ਰਿਪੋਜ਼ਟਰੀ",
-      "couldNotLoadRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ",
       "connectGithub": "GitHub ਨਾਲ ਕਨੈਕਟ ਕਰੋ",
       "connectGithubDescription": "ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ GitHub ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
       "openGithub": "GitHub ਖੋਲ੍ਹੋ",
       "refreshRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਰਿਫਰੈਸ਼ ਕਰੋ",
-      "githubConnectionNotVisible": "ਅਸੀਂ ਅਜੇ ਤੁਹਾਡਾ GitHub ਕਨੈਕਸ਼ਨ ਨਹੀਂ ਦੇਖ ਸਕਦੇ",
-      "githubConnectionNotVisibleDescription": "ਜੇਕਰ ਤੁਸੀਂ Kilo GitHub ਐਪ ਸਥਾਪਤ ਜਾਂ ਸੰਰਚਿਤ ਕੀਤੀ ਹੈ, ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ — ਜਾਂ ਯਕੀਨੀ ਬਣਾਓ ਕਿ ਇਹ ਇਸ ਖਾਤੇ/ਸੰਗਠਨ ਲਈ ਸਥਾਪਤ ਕੀਤੀ ਗਈ ਸੀ।",
-      "checkAgain": "ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ",
       "githubConnected": "GitHub ਕਨੈਕਟ ਹੋਇਆ",
       "noRepositoriesVisible": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦੇ ਰਹੀ। Kilo GitHub ਐਪ ਲਈ ਰਿਪੋਜ਼ਟਰੀ ਪਹੁੰਚ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
       "runOnWithTarget": "ਇਸ 'ਤੇ ਚਲਾਓ: {{target}}",
@@ -2189,9 +2185,9 @@
       "discardFailed": "ਡਰਾਫਟ ਰੱਦ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "Bitbucket ਕਨੈਕਟ ਹੋਇਆ",
-      "connectBitbucket": "Bitbucket ਨਾਲ ਕਨੈਕਟ ਕਰੋ",
+      "connectBitbucket": "Bitbucket ਕਨੈਕਟ ਕਰੋ",
       "connectBitbucketDescription": "Bitbucket ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
-      "connectGitlab": "GitLab ਨਾਲ ਕਨੈਕਟ ਕਰੋ",
+      "connectGitlab": "GitLab ਕਨੈਕਟ ਕਰੋ",
       "connectGitlabDescription": "GitLab ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
       "couldNotLoadBitbucketRepositories": "Bitbucket ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕਰ ਸਕੇ",
       "couldNotLoadGithubRepositories": "GitHub ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕਰ ਸਕੇ",
@@ -2969,7 +2965,7 @@
         "credits_expired": "ਕ੍ਰੈਡਿਟ ਮਿਆਦ ਪੁੱਗ ਗਏ"
       },
       "loadMore": "ਹੋਰ ਲੋਡ ਕਰੋ",
-      "loadMoreFailed": "ਹੋਰ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
+      "loadMoreFailed": "ਹੋਰ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ",
       "truncated": "ਪੁਰਾਣੀ ਕ੍ਰੈਡਿਟ ਗਤੀਵਿਧੀ ਉਪਲਬਧ ਹੈ।"
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "ਅਣਜਾਣ"
       },
       "loadMore": "ਹੋਰ ਲੋਡ ਕਰੋ",
-      "loadMoreFailed": "ਹੋਰ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
+      "loadMoreFailed": "ਹੋਰ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ",
       "truncated": "ਪੁਰਾਣੇ ਇਨਵੌਇਸ ਉਪਲਬਧ ਹਨ।"
     },
     "lowBalanceAlert": {

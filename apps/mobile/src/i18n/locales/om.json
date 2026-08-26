@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Shumarra haaraa",
       "repository": "Repository",
-      "couldNotLoadRepositories": "Repositorylee dhiisuu hin dandeenyne",
       "connectGithub": "GitHub walqabi",
       "connectGithubDescription": "Browser kee keessatti GitHub wal qabsi, sana booda repository filachuuf as deebi'i.",
       "openGithub": "GitHub bani",
       "refreshRepositories": "Repositorylee haaromsi",
-      "githubConnectionNotVisible": "Walqabxii GitHub kee hamma ammaatti hin arginu",
-      "githubConnectionNotVisibleDescription": "Yoo Kilo GitHub App feene ykn qindeesse, deebi'ee ilaali — ykn akka account/dhaabbata kanaaf fe'ame mirkaneessi.",
-      "checkAgain": "Deebi'ee ilaali",
       "githubConnected": "GitHub wal qabame",
       "noRepositoriesVisible": "Repository mul'atu hin jiru. Kilo GitHub App'tti argama repository ilaaliitii haaromsi.",
       "runOnWithTarget": "Irratti hojjedhu: {{target}}",
@@ -2189,9 +2185,9 @@
       "discardFailed": "Daaftarii haquu hin dandeenye. Mee deebi'ee yaali.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "Bitbucket walqabateera",
-      "connectBitbucket": "Bitbucket qindeessi",
+      "connectBitbucket": "Bitbucket walqabi",
       "connectBitbucketDescription": "Bitbucket brauzarii keessan keessatti qindeessaa, sana booda asitti deebi'aa repo tokko filachuuf.",
-      "connectGitlab": "GitLab qindeessi",
+      "connectGitlab": "GitLab walqabi",
       "connectGitlabDescription": "GitLab brauzarii keessan keessatti qindeessaa, sana booda asitti deebi'aa repo tokko filachuuf.",
       "couldNotLoadBitbucketRepositories": "Repositorywwan Bitbucket fudhachuu hin dandeenye",
       "couldNotLoadGithubRepositories": "Repositorywwan GitHub fudhachuu hin dandeenye",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "Sirreeffama herregaa",
         "credits_expired": "Kiriiditiin xumuramte"
       },
-      "loadMore": "Itti dabalii",
-      "loadMoreFailed": "Dabalataan baachuu hin dandeenye.",
+      "loadMore": "Dabalata fayyadami",
+      "loadMoreFailed": "Dabalataa fe'achuu hin dandeenye",
       "truncated": "Sochii kireedii durii argachuun ni danda'ama."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "Kan walitti hin qabamne",
         "unknown": "Hin beekamu"
       },
-      "loadMore": "Itti dabalii",
-      "loadMoreFailed": "Dabalataan baachuu hin dandeenye.",
+      "loadMore": "Dabalata fayyadami",
+      "loadMoreFailed": "Dabalataa fe'achuu hin dandeenye",
       "truncated": "Baallii durii argachuun ni danda'ama."
     },
     "lowBalanceAlert": {

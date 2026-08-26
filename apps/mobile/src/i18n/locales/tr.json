@@ -1699,14 +1699,10 @@
     "newSession": {
       "title": "Yeni oturum",
       "repository": "Depo",
-      "couldNotLoadRepositories": "Depolar yüklenemedi",
       "connectGithub": "GitHub'a bağlan",
       "connectGithubDescription": "Tarayıcınızda GitHub'ı bağlayın, ardından bir depo seçmek için buraya dönün.",
       "openGithub": "GitHub'ı aç",
       "refreshRepositories": "Depoları yenile",
-      "githubConnectionNotVisible": "GitHub bağlantınızı henüz göremiyoruz",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub Uygulamasını kurduysanız veya yapılandırdıysanız tekrar kontrol edin — veya bu hesap/kuruluş için kurulduğundan emin olun.",
-      "checkAgain": "Tekrar kontrol et",
       "githubConnected": "GitHub bağlandı",
       "noRepositoriesVisible": "Görünür depo yok. Kilo GitHub Uygulaması için depo erişimini kontrol edin, ardından yenileyin.",
       "runOnWithTarget": "Çalıştırma yeri: {{target}}",
@@ -1735,9 +1731,9 @@
       "keepEditing": "Düzenlemeye devam et",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "Bitbucket bağlandı",
-      "connectBitbucket": "Bitbucket'a Bağlan",
+      "connectBitbucket": "Bitbucket'e bağlan",
       "connectBitbucketDescription": "Bitbucket'ı tarayıcınızda bağlayın, ardından bir depo seçmek için buraya dönün.",
-      "connectGitlab": "GitLab'a Bağlan",
+      "connectGitlab": "GitLab'a bağlan",
       "connectGitlabDescription": "GitLab'ı tarayıcınızda bağlayın, ardından bir depo seçmek için buraya dönün.",
       "couldNotLoadBitbucketRepositories": "Bitbucket depoları yüklenemedi",
       "couldNotLoadGithubRepositories": "GitHub depoları yüklenemedi",
@@ -2955,7 +2951,7 @@
         "credits_expired": "Kredilerin süresi doldu"
       },
       "loadMore": "Daha fazla yükle",
-      "loadMoreFailed": "Daha fazla yüklenemedi.",
+      "loadMoreFailed": "Daha fazlası yüklenemedi",
       "truncated": "Daha eski kredi hareketleri mevcut."
     },
     "hub": {
@@ -2994,7 +2990,7 @@
         "unknown": "BİLİNMİYOR"
       },
       "loadMore": "Daha fazla yükle",
-      "loadMoreFailed": "Daha fazla yüklenemedi.",
+      "loadMoreFailed": "Daha fazlası yüklenemedi",
       "truncated": "Daha eski faturalar mevcut."
     },
     "lowBalanceAlert": {

@@ -2183,14 +2183,10 @@
     "newSession": {
       "title": "Nauja sesija",
       "repository": "Saugykla",
-      "couldNotLoadRepositories": "Nepavyko įkelti saugyklų",
       "connectGithub": "Prijungti GitHub",
       "connectGithubDescription": "Prijunkite GitHub naršyklėje, tada grįžkite čia ir pasirinkite saugyklą.",
       "openGithub": "Atidaryti GitHub",
       "refreshRepositories": "Atnaujinti saugyklas",
-      "githubConnectionNotVisible": "Jūsų GitHub ryšio dar nematome",
-      "githubConnectionNotVisibleDescription": "Jei įdiegėte arba sukonfigūravote Kilo GitHub App, patikrinkite dar kartą — arba įsitikinkite, kad jis įdiegtas šiai paskyrai/organizacijai.",
-      "checkAgain": "Patikrinti dar kartą",
       "githubConnected": "GitHub prijungtas",
       "noRepositoriesVisible": "Saugyklų nematoma. Patikrinkite Kilo GitHub App saugyklų prieigą, tada atnaujinkite.",
       "runOnWithTarget": "Vykdyti: {{target}}",
@@ -3009,7 +3005,7 @@
         "credits_expired": "Kreditai pasibaigė"
       },
       "loadMore": "Įkelti daugiau",
-      "loadMoreFailed": "Nepavyko įkelti daugiau.",
+      "loadMoreFailed": "Nepavyko įkelti daugiau",
       "truncated": "Yra ankstesnės kredito veiklos."
     },
     "inviteMember": {
@@ -3039,7 +3035,7 @@
         "unknown": "Nežinomas"
       },
       "loadMore": "Įkelti daugiau",
-      "loadMoreFailed": "Nepavyko įkelti daugiau.",
+      "loadMoreFailed": "Nepavyko įkelti daugiau",
       "truncated": "Yra ankstesnių sąskaitų faktūrų."
     },
     "lowBalanceAlert": {

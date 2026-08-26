@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "ახალი სესია",
       "repository": "რეპოზიტორი",
-      "couldNotLoadRepositories": "რეპოზიტორები ვერ ჩაირთო",
       "connectGithub": "GitHub-თან დაკავშირება",
       "connectGithubDescription": "დააკავშირეთ GitHub თქვენს ბრაუზერში, შემდეგ დაბრუნდით აქ რეპოზიტორის ასარჩევად.",
       "openGithub": "GitHub-ის გახსნა",
       "refreshRepositories": "რეპოზიტორების განახლება",
-      "githubConnectionNotVisible": "თქვენს GitHub კავშირს ჯერ ვერ ვხედავთ",
-      "githubConnectionNotVisibleDescription": "თუ დააინსტალირეთ ან კონფიგურაცია გაუკეთეთ Kilo GitHub App-ს, შეამოწმეთ ხელახლა — ან დარწმუნდით, რომ იგი დაყენებულია ამ ანგარიშის/ორგანიზაციისთვის.",
-      "checkAgain": "ხელახლა შემოწმება",
       "githubConnected": "GitHub დაკავშირებულია",
       "noRepositoriesVisible": "რეპოზიტორები არ ჩანს. შეამოწმეთ რეპოზიტორის წვდომა Kilo GitHub App-ისთვის, შემდეგ განაახლეთ.",
       "runOnWithTarget": "გაშვება: {{target}}",
@@ -2969,7 +2965,7 @@
         "credits_expired": "ვადაგასული კრედიტები"
       },
       "loadMore": "მეტის ჩატვირთვა",
-      "loadMoreFailed": "მეტის ჩატვირთვა ვერ მოხერხდა.",
+      "loadMoreFailed": "მეტის ჩატვირთვა ვერ მოხერხდა",
       "truncated": "უფრო ძველი კრედიტის აქტივობა ხელმისაწვდომია."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "უცნობი"
       },
       "loadMore": "მეტის ჩატვირთვა",
-      "loadMoreFailed": "მეტის ჩატვირთვა ვერ მოხერხდა.",
+      "loadMoreFailed": "მეტის ჩატვირთვა ვერ მოხერხდა",
       "truncated": "უფრო ძველი ინვოისები ხელმისაწვდომია."
     },
     "lowBalanceAlert": {

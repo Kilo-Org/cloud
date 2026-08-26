@@ -2198,14 +2198,10 @@
     "newSession": {
       "title": "Sessjoni ġdida",
       "repository": "Repożitorju",
-      "couldNotLoadRepositories": "Ma setgħux jintgħabbu r-repożitorji",
       "connectGithub": "Ikkonnettja GitHub",
       "connectGithubDescription": "Ikkonnettja GitHub fil-browser tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju.",
       "openGithub": "Iftaħ GitHub",
       "refreshRepositories": "Aġġorna r-repożitorji",
-      "githubConnectionNotVisible": "Għadna ma narawx il-konnessjoni tiegħek ta' GitHub",
-      "githubConnectionNotVisibleDescription": "Jekk installajt jew ikkonfigurajt il-Kilo GitHub App, iċċekkja mill-ġdid — jew kun żgur li ġiet installata għal dan il-kont/organizzazzjoni.",
-      "checkAgain": "Iċċekkja mill-ġdid",
       "githubConnected": "GitHub imqabbad",
       "noRepositoriesVisible": "L-ebda repożitorju viżibbli. Iċċekkja l-aċċess tar-repożitorji għall-Kilo GitHub App, imbagħad aġġorna.",
       "runOnWithTarget": "Mexxi fuq: {{target}}",
@@ -2234,9 +2230,9 @@
       "discardFailed": "Ma setax jintrema l-abbozz. Jekk jogħġbok erġa' pprova.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "Bitbucket imqabbad",
-      "connectBitbucket": "Qabbad Bitbucket",
+      "connectBitbucket": "Ikkonnettja Bitbucket",
       "connectBitbucketDescription": "Qabbad Bitbucket fil-browser tiegħek, imbagħad erġa' lura hawn biex tagħżel repository.",
-      "connectGitlab": "Qabbad GitLab",
+      "connectGitlab": "Ikkonnettja GitLab",
       "connectGitlabDescription": "Qabbad GitLab fil-browser tiegħek, imbagħad erġa' lura hawn biex tagħżel repository.",
       "couldNotLoadBitbucketRepositories": "Ma setgħux jittellgħu r-repositories ta' Bitbucket",
       "couldNotLoadGithubRepositories": "Ma setgħux jittellgħu r-repositories ta' GitHub",
@@ -3028,8 +3024,8 @@
         "accounting_adjustment": "Aġġustament tal-kontabilità",
         "credits_expired": "Krediti skaduti"
       },
-      "loadMore": "Tagħbija aktar",
-      "loadMoreFailed": "Ma setgħux jitgħabbew aktar.",
+      "loadMore": "Għabbi aktar",
+      "loadMoreFailed": "Ma stajniex nittellgħu aktar",
       "truncated": "Attività ta' kreditu aktar antika hija disponibbli."
     },
     "inviteMember": {
@@ -3058,8 +3054,8 @@
         "uncollectible": "Ma jistax jinġabar",
         "unknown": "Mhux magħruf"
       },
-      "loadMore": "Tagħbija aktar",
-      "loadMoreFailed": "Ma setgħux jitgħabbew aktar.",
+      "loadMore": "Għabbi aktar",
+      "loadMoreFailed": "Ma stajniex nittellgħu aktar",
       "truncated": "Fatturi aktar antiki huma disponibbli."
     },
     "lowBalanceAlert": {

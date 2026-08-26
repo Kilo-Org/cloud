@@ -1715,14 +1715,10 @@
     "newSession": {
       "title": "Новий сеанс",
       "repository": "Репозиторій",
-      "couldNotLoadRepositories": "Не вдалося завантажити репозиторії",
       "connectGithub": "Підключити GitHub",
       "connectGithubDescription": "Підключіть GitHub у браузері, потім поверніться сюди, щоб вибрати репозиторій.",
       "openGithub": "Відкрити GitHub",
       "refreshRepositories": "Оновити репозиторії",
-      "githubConnectionNotVisible": "Ми поки не бачимо ваше підключення GitHub",
-      "githubConnectionNotVisibleDescription": "Якщо ви встановили або налаштували застосунок Kilo GitHub, перевірте ще раз — або переконайтеся, що його встановлено для цього облікового запису/організації.",
-      "checkAgain": "Перевірити ще раз",
       "githubConnected": "GitHub підключено",
       "noRepositoriesVisible": "Репозиторіїв не видно. Перевірте доступ до репозиторіїв для застосунку Kilo GitHub, потім оновіть.",
       "runOnWithTarget": "Запустити на: {{target}}",
@@ -2994,8 +2990,8 @@
         "accounting_adjustment": "Бухгалтерське коригування",
         "credits_expired": "Термін дії кредитів минув"
       },
-      "loadMore": "Завантажити ще",
-      "loadMoreFailed": "Не вдалося завантажити ще.",
+      "loadMore": "Завантажити більше",
+      "loadMoreFailed": "Не вдалося завантажити більше",
       "truncated": "Доступна старіша активність за кредитами."
     },
     "hub": {
@@ -3033,8 +3029,8 @@
         "uncollectible": "Безнадійний",
         "unknown": "Невідомо"
       },
-      "loadMore": "Завантажити ще",
-      "loadMoreFailed": "Не вдалося завантажити ще.",
+      "loadMore": "Завантажити більше",
+      "loadMoreFailed": "Не вдалося завантажити більше",
       "truncated": "Доступні старіші рахунки-фактури."
     },
     "lowBalanceAlert": {

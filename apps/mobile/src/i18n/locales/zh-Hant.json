@@ -1699,14 +1699,10 @@
     "newSession": {
       "title": "新工作階段",
       "repository": "存放庫",
-      "couldNotLoadRepositories": "無法載入存放庫",
       "connectGithub": "連接 GitHub",
       "connectGithubDescription": "在瀏覽器中連接 GitHub，然後返回此處選取存放庫。",
       "openGithub": "開啟 GitHub",
       "refreshRepositories": "重新整理存放庫",
-      "githubConnectionNotVisible": "我們還看不到您的 GitHub 連線",
-      "githubConnectionNotVisibleDescription": "如果您已安裝或設定 Kilo GitHub App，請再次檢查 — 或確認它已為此帳戶/組織安裝。",
-      "checkAgain": "再次檢查",
       "githubConnected": "GitHub 已連接",
       "noRepositoriesVisible": "看不到任何存放庫。請檢查 Kilo GitHub App 的存放庫存取權限，然後重新整理。",
       "runOnWithTarget": "執行於：{{target}}",
@@ -1734,7 +1730,7 @@
       "discardFailed": "無法捨棄草稿。請再試一次。",
       "keepEditing": "繼續編輯",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "已連接 Bitbucket",
+      "bitbucketConnected": "Bitbucket 已連接",
       "connectBitbucket": "連接 Bitbucket",
       "connectBitbucketDescription": "在瀏覽器中連接 Bitbucket，然後返回此處挑選儲存庫。",
       "connectGitlab": "連接 GitLab",
@@ -2955,7 +2951,7 @@
         "credits_expired": "點數已到期"
       },
       "loadMore": "載入更多",
-      "loadMoreFailed": "無法載入更多。",
+      "loadMoreFailed": "無法載入更多",
       "truncated": "可查看較舊的額度活動。"
     },
     "hub": {
@@ -2994,7 +2990,7 @@
         "unknown": "未知"
       },
       "loadMore": "載入更多",
-      "loadMoreFailed": "無法載入更多。",
+      "loadMoreFailed": "無法載入更多",
       "truncated": "可查看較舊的發票。"
     },
     "lowBalanceAlert": {

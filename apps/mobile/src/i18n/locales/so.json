@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Kalfadhi cusub",
       "repository": "Kaydka",
-      "couldNotLoadRepositories": "Kaydka lama shubay",
       "connectGithub": "Xiri GitHub",
       "connectGithubDescription": "Ku xidh GitHub browser-kaaga, ka dib halkan ku noqo si aad u dooratid kayd.",
       "openGithub": "Fur GitHub",
       "refreshRepositories": "Cusboonaysii kaydka",
-      "githubConnectionNotVisible": "Weli ma aragno xiriirkaaga GitHub",
-      "githubConnectionNotVisibleDescription": "Haddii aad rakibtay ama qorsheysay App-ka Kilo GitHub, mar kale hubi — ama hubi in loo rakibay akoonka/ururkan.",
-      "checkAgain": "Mar kale hubi",
       "githubConnected": "GitHub waa la xidhay",
       "noRepositoriesVisible": "Ma jiraan kayd la arki karo. Hubi helitaanka kaydka ee App-ka Kilo GitHub, ka dib cusboonaysii.",
       "runOnWithTarget": "Ku socodsii: {{target}}",
@@ -2188,10 +2184,10 @@
       "discard": "Tuur",
       "discardFailed": "Qabyada lama tuuri karin. Fadlan mar kale isku day.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket wuu xiriiray",
-      "connectBitbucket": "Ku xiriiray Bitbucket",
+      "bitbucketConnected": "Bitbucket waa ku xiran",
+      "connectBitbucket": "Xiri Bitbucket",
       "connectBitbucketDescription": "Ku xiriiray Bitbucket browser-kaaga, ka dibna ku soo noqo halkan si aad u doorato keyd.",
-      "connectGitlab": "Ku xiriiray GitLab",
+      "connectGitlab": "Xiri GitLab",
       "connectGitlabDescription": "Ku xiriiray GitLab browser-kaaga, ka dibna ku soo noqo halkan si aad u doorato keyd.",
       "couldNotLoadBitbucketRepositories": "Lama soo gelin karin keydka Bitbucket",
       "couldNotLoadGithubRepositories": "Lama soo gelin karin keydka GitHub",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "Hagaajinta xisaabta",
         "credits_expired": "Credits oo dhacay"
       },
-      "loadMore": "Wax badan",
-      "loadMoreFailed": "Kuma soo shuban karin wax badan.",
+      "loadMore": "Soo qaad dheeri ah",
+      "loadMoreFailed": "In ka badan lama soo qaadin karin",
       "truncated": "Hawlaha credit ee hore waa la heli karaa."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "Lama ururin karo",
         "unknown": "Lama garanayo"
       },
-      "loadMore": "Wax badan",
-      "loadMoreFailed": "Kuma soo shuban karin wax badan.",
+      "loadMore": "Soo qaad dheeri ah",
+      "loadMoreFailed": "In ka badan lama soo qaadin karin",
       "truncated": "Qaansheegyada hore waa la heli karaa."
     },
     "lowBalanceAlert": {

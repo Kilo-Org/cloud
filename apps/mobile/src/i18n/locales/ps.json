@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "نوې ناسته",
       "repository": "ریپوزیټورۍ",
-      "couldNotLoadRepositories": "ذخیرې بار نه شوې",
       "connectGithub": "GitHub وصل کړئ",
       "connectGithubDescription": "GitHub په خپل براوزر کې وصل کړئ، بیا دلته راستانه شئ ترڅو یوه ذخیره غوره کړئ.",
       "openGithub": "GitHub پرانیزئ",
       "refreshRepositories": "ذخیرې تازه کړئ",
-      "githubConnectionNotVisible": "موږ ستاسو د GitHub اړیکه لا نه وینو",
-      "githubConnectionNotVisibleDescription": "که تاسو د Kilo GitHub اپ نصب یا تنظیم کړی، بیا وګورئ — یا ډاډ ترلاسه کړئ چې دا د دې حساب/سازمان لپاره نصب شوی.",
-      "checkAgain": "بیا وګورئ",
       "githubConnected": "GitHub وصل شو",
       "noRepositoriesVisible": "هیڅ ذخیره نه ښکاري. د Kilo GitHub اپ لپاره د ذخیرې لاسرسی وګورئ، بیا تازه کړئ.",
       "runOnWithTarget": "پر باندې پرمخ یوسئ: {{target}}",
@@ -2188,10 +2184,10 @@
       "discard": "لغوه کړئ",
       "discardFailed": "مسوده لغوه نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket ونښلول شو",
-      "connectBitbucket": "Bitbucket سره ونښلئ",
+      "bitbucketConnected": "Bitbucket وصل شو",
+      "connectBitbucket": "Bitbucket وصل کول",
       "connectBitbucketDescription": "Bitbucket په خپل براوزر کې ونښلئ، بیا دلته راګرځئ تر څو یو ریپوزیټري غوره کړئ.",
-      "connectGitlab": "GitLab سره ونښلئ",
+      "connectGitlab": "GitLab وصل کول",
       "connectGitlabDescription": "GitLab په خپل براوزر کې ونښلئ، بیا دلته راګرځئ تر څو یو ریپوزیټري غوره کړئ.",
       "couldNotLoadBitbucketRepositories": "د Bitbucket ریپوزیټریان بارول ممکن نه شول",
       "couldNotLoadGithubRepositories": "د GitHub ریپوزیټریان بارول ممکن نه شول",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "د محاسبې سمون",
         "credits_expired": "کریډیټونه منقضي شوي"
       },
-      "loadMore": "نور مه پورته کړئ",
-      "loadMoreFailed": "نور پورته کېدل ناشوني شول.",
+      "loadMore": "نور بار کړئ",
+      "loadMoreFailed": "نور بار کیدی نشو",
       "truncated": "پخوانۍ کریډیټي کړنې شته دي."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "نه راټولېدونکی",
         "unknown": "نامعلوم"
       },
-      "loadMore": "نور مه پورته کړئ",
-      "loadMoreFailed": "نور پورته کېدل ناشوني شول.",
+      "loadMore": "نور بار کړئ",
+      "loadMoreFailed": "نور بار کیدی نشو",
       "truncated": "پخوانۍ رسیدونه شته دي."
     },
     "lowBalanceAlert": {

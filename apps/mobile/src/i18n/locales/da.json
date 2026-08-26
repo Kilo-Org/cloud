@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Ny session",
       "repository": "Repository",
-      "couldNotLoadRepositories": "Kunne ikke indlæse repositories",
       "connectGithub": "Tilslut GitHub",
       "connectGithubDescription": "Tilslut GitHub i din browser, og vend derefter tilbage hertil for at vælge et repository.",
       "openGithub": "Åbn GitHub",
       "refreshRepositories": "Opdatér repositories",
-      "githubConnectionNotVisible": "Vi kan ikke se din GitHub-forbindelse endnu",
-      "githubConnectionNotVisibleDescription": "Hvis du installerede eller konfigurerede Kilo GitHub App, så tjek igen – eller sørg for, at den blev installeret for denne konto/organisation.",
-      "checkAgain": "Tjek igen",
       "githubConnected": "GitHub forbundet",
       "noRepositoriesVisible": "Ingen repositories synlige. Tjek repository-adgang for Kilo GitHub App, og opdatér derefter.",
       "runOnWithTarget": "Kør på: {{target}}",
@@ -2188,10 +2184,10 @@
       "discard": "Kassér",
       "discardFailed": "Kunne ikke kassere kladden. Prøv igen.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket er forbundet",
-      "connectBitbucket": "Forbind Bitbucket",
+      "bitbucketConnected": "Bitbucket tilsluttet",
+      "connectBitbucket": "Tilslut Bitbucket",
       "connectBitbucketDescription": "Forbind Bitbucket i din browser, og vend tilbage her for at vælge et repository.",
-      "connectGitlab": "Forbind GitLab",
+      "connectGitlab": "Tilslut GitLab",
       "connectGitlabDescription": "Forbind GitLab i din browser, og vend tilbage her for at vælge et repository.",
       "couldNotLoadBitbucketRepositories": "Kunne ikke indlæse Bitbucket-repositories",
       "couldNotLoadGithubRepositories": "Kunne ikke indlæse GitHub-repositories",
@@ -2969,7 +2965,7 @@
         "credits_expired": "Udløbne kreditter"
       },
       "loadMore": "Indlæs mere",
-      "loadMoreFailed": "Det lykkedes ikke at indlæse mere.",
+      "loadMoreFailed": "Kunne ikke indlæse mere",
       "truncated": "Ældre kreditaktivitet er tilgængelig."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "Ukendt"
       },
       "loadMore": "Indlæs mere",
-      "loadMoreFailed": "Det lykkedes ikke at indlæse mere.",
+      "loadMoreFailed": "Kunne ikke indlæse mere",
       "truncated": "Ældre fakturaer er tilgængelige."
     },
     "lowBalanceAlert": {

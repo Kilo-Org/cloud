@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "نیا سیشن",
       "repository": "ریپوزٹری",
-      "couldNotLoadRepositories": "ریپوزٹریز لوڈ نہیں ہو سکیں",
       "connectGithub": "GitHub منسلک کریں",
       "connectGithubDescription": "اپنے براؤزر میں GitHub سے جڑیں، پھر ریپوزٹری منتخب کرنے کے لیے یہاں واپس آئیں۔",
       "openGithub": "GitHub کھولیں",
       "refreshRepositories": "ریپوزٹریز تازہ کریں",
-      "githubConnectionNotVisible": "ہم ابھی آپ کا GitHub کنکشن نہیں دیکھ سکتے",
-      "githubConnectionNotVisibleDescription": "اگر آپ نے Kilo GitHub App انسٹال یا ترتیب دی ہے تو دوبارہ چیک کریں — یا یقینی بنائیں کہ یہ اس اکاؤنٹ/تنظیم کے لیے انسٹال ہوئی تھی۔",
-      "checkAgain": "دوبارہ چیک کریں",
       "githubConnected": "GitHub جڑ گیا",
       "noRepositoriesVisible": "کوئی ریپوزٹری نظر نہیں آتی۔ Kilo GitHub App کے لیے ریپوزٹری رسائی چیک کریں، پھر تازہ کریں۔",
       "runOnWithTarget": "چلائیں: {{target}}",
@@ -2189,9 +2185,9 @@
       "discardFailed": "ڈرافٹ خارج نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "Bitbucket منسلک",
-      "connectBitbucket": "Bitbucket سے جڑیں",
+      "connectBitbucket": "Bitbucket منسلک کریں",
       "connectBitbucketDescription": "اپنے براؤزر میں Bitbucket سے جڑیں، پھر ذخیرہ منتخب کرنے کے لیے یہاں واپس آئیں۔",
-      "connectGitlab": "GitLab سے جڑیں",
+      "connectGitlab": "GitLab منسلک کریں",
       "connectGitlabDescription": "اپنے براؤزر میں GitLab سے جڑیں، پھر ذخیرہ منتخب کرنے کے لیے یہاں واپس آئیں۔",
       "couldNotLoadBitbucketRepositories": "Bitbucket ذخیرے لوڈ نہیں ہو سکے",
       "couldNotLoadGithubRepositories": "GitHub ذخیرے لوڈ نہیں ہو سکے",
@@ -2969,7 +2965,7 @@
         "credits_expired": "کریڈٹس کی میعاد ختم"
       },
       "loadMore": "مزید لوڈ کریں",
-      "loadMoreFailed": "مزید لوڈ نہیں ہو سکا۔",
+      "loadMoreFailed": "مزید لوڈ نہیں ہو سکا",
       "truncated": "پرانے کریڈٹ کی سرگرمی دستیاب ہے۔"
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "نامعلوم"
       },
       "loadMore": "مزید لوڈ کریں",
-      "loadMoreFailed": "مزید لوڈ نہیں ہو سکا۔",
+      "loadMoreFailed": "مزید لوڈ نہیں ہو سکا",
       "truncated": "پرانے انوائس دستیاب ہیں۔"
     },
     "lowBalanceAlert": {

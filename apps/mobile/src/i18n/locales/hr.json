@@ -2168,14 +2168,10 @@
     "newSession": {
       "title": "Nova sesija",
       "repository": "Spremište",
-      "couldNotLoadRepositories": "Nije bilo moguće učitati repozitorije",
       "connectGithub": "Poveži GitHub",
       "connectGithubDescription": "Povežite GitHub u pregledniku, a zatim se vratite ovdje za odabir repozitorija.",
       "openGithub": "Otvori GitHub",
       "refreshRepositories": "Osvježi repozitorije",
-      "githubConnectionNotVisible": "Još ne vidimo vašu GitHub vezu",
-      "githubConnectionNotVisibleDescription": "Ako ste instalirali ili konfigurirali Kilo GitHub aplikaciju, provjerite ponovno — ili provjerite je li instalirana za ovaj račun/organizaciju.",
-      "checkAgain": "Provjeri ponovno",
       "githubConnected": "GitHub povezan",
       "noRepositoriesVisible": "Nema vidljivih repozitorija. Provjerite pristup repozitorijima za Kilo GitHub aplikaciju, a zatim osvježite.",
       "runOnWithTarget": "Pokreni na: {{target}}",
@@ -2203,7 +2199,7 @@
       "discard": "Odbaci",
       "discardFailed": "Nije moguće odbaciti nacrt. Pokušajte ponovno.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket je povezan",
+      "bitbucketConnected": "Bitbucket povezan",
       "connectBitbucket": "Poveži Bitbucket",
       "connectBitbucketDescription": "Poveži Bitbucket u pregledniku, a zatim se vrati ovdje da odabereš repozitorij.",
       "connectGitlab": "Poveži GitLab",
@@ -2989,7 +2985,7 @@
         "credits_expired": "Istekli krediti"
       },
       "loadMore": "Učitaj više",
-      "loadMoreFailed": "Nije moguće učitati više.",
+      "loadMoreFailed": "Nije moguće učitati više",
       "truncated": "Dostupna je starija aktivnost kredita."
     },
     "inviteMember": {
@@ -3019,7 +3015,7 @@
         "unknown": "Nepoznato"
       },
       "loadMore": "Učitaj više",
-      "loadMoreFailed": "Nije moguće učitati više.",
+      "loadMoreFailed": "Nije moguće učitati više",
       "truncated": "Dostupne su starije fakture."
     },
     "lowBalanceAlert": {

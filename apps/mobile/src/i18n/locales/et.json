@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Uus seanss",
       "repository": "Hoidla",
-      "couldNotLoadRepositories": "Hoidlaid ei õnnestunud laadida",
       "connectGithub": "Ühenda GitHub",
       "connectGithubDescription": "Ühenda GitHub oma brauseris, seejärel tule siia tagasi hoidla valimiseks.",
       "openGithub": "Ava GitHub",
       "refreshRepositories": "Värskenda hoidlaid",
-      "githubConnectionNotVisible": "Me ei näe veel sinu GitHub'i ühendust",
-      "githubConnectionNotVisibleDescription": "Kui installeerisid või seadistasid Kilo GitHub App'i, kontrolli uuesti — või veendu, et see oli installeeritud selle konto/organisatsiooni jaoks.",
-      "checkAgain": "Kontrolli uuesti",
       "githubConnected": "GitHub on ühendatud",
       "noRepositoriesVisible": "Ühtegi hoidlat pole nähtav. Kontrolli Kilo GitHub App'i hoidlajuurdepääsu ja värskenda seejärel.",
       "runOnWithTarget": "Käitamine: {{target}}",
@@ -2969,7 +2965,7 @@
         "credits_expired": "Krediidid aegusid"
       },
       "loadMore": "Laadi rohkem",
-      "loadMoreFailed": "Rohkem ei õnnestunud laadida.",
+      "loadMoreFailed": "Rohkemate laadimine ebaõnnestus",
       "truncated": "Varasem krediidiajalugu on saadaval."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "Teadmata"
       },
       "loadMore": "Laadi rohkem",
-      "loadMoreFailed": "Rohkem ei õnnestunud laadida.",
+      "loadMoreFailed": "Rohkemate laadimine ebaõnnestus",
       "truncated": "Varasemad arved on saadaval."
     },
     "lowBalanceAlert": {

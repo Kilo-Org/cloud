@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "नवीन सत्र",
       "repository": "भांडार",
-      "couldNotLoadRepositories": "भांडारे लोड करता आली नाहीत",
       "connectGithub": "GitHub कनेक्ट करा",
       "connectGithubDescription": "तुमच्या ब्राउझरमध्ये GitHub कनेक्ट करा, नंतर भांडार निवडण्यासाठी येथे परत या.",
       "openGithub": "GitHub उघडा",
       "refreshRepositories": "भांडारे रिफ्रेश करा",
-      "githubConnectionNotVisible": "तुमचे GitHub कनेक्शन आम्हाला अजून दिसत नाही",
-      "githubConnectionNotVisibleDescription": "जर तुम्ही Kilo GitHub App स्थापित किंवा कॉन्फिगर केले असेल, तर पुन्हा तपासा — किंवा ते या खाते/संस्थेसाठी स्थापित केले असल्याचे सुनिश्चित करा.",
-      "checkAgain": "पुन्हा तपासा",
       "githubConnected": "GitHub कनेक्ट केले",
       "noRepositoriesVisible": "कोणतीही भांडारे दिसत नाहीत. Kilo GitHub App साठी भांडार प्रवेश तपासा, नंतर रिफ्रेश करा.",
       "runOnWithTarget": "यावर चालवा: {{target}}",
@@ -2188,7 +2184,7 @@
       "discard": "टाकून द्या",
       "discardFailed": "मसुदा रद्द करता आला नाही. कृपया पुन्हा प्रयत्न करा.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket कनेक्ट केले",
+      "bitbucketConnected": "Bitbucket कनेक्ट झाले",
       "connectBitbucket": "Bitbucket कनेक्ट करा",
       "connectBitbucketDescription": "तुमच्या ब्राउझरमध्ये Bitbucket कनेक्ट करा, नंतर रिपॉझिटरी निवडण्यासाठी येथे परत या.",
       "connectGitlab": "GitLab कनेक्ट करा",
@@ -2969,7 +2965,7 @@
         "credits_expired": "क्रेडिट कालबाह्य झाले"
       },
       "loadMore": "अधिक लोड करा",
-      "loadMoreFailed": "अधिक लोड करता आले नाही.",
+      "loadMoreFailed": "अधिक लोड करता आले नाही",
       "truncated": "जुनी क्रेडिट क्रियाकलाप उपलब्ध आहे."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "अज्ञात"
       },
       "loadMore": "अधिक लोड करा",
-      "loadMoreFailed": "अधिक लोड करता आले नाही.",
+      "loadMoreFailed": "अधिक लोड करता आले नाही",
       "truncated": "जुने इनव्हॉइस उपलब्ध आहेत."
     },
     "lowBalanceAlert": {

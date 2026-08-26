@@ -2168,14 +2168,10 @@
     "newSession": {
       "title": "Nova sessió",
       "repository": "Repositori",
-      "couldNotLoadRepositories": "No s'han pogut carregar els repositoris",
       "connectGithub": "Connecta GitHub",
       "connectGithubDescription": "Connecta GitHub al navegador i torna aquí per triar un repositori.",
       "openGithub": "Obre GitHub",
       "refreshRepositories": "Actualitza els repositoris",
-      "githubConnectionNotVisible": "Encara no veiem la teva connexió de GitHub",
-      "githubConnectionNotVisibleDescription": "Si has instal·lat o configurat l'aplicació de GitHub de Kilo, comprova-ho de nou; o assegura't que s'ha instal·lat per a aquest compte/organització.",
-      "checkAgain": "Comprova-ho de nou",
       "githubConnected": "GitHub connectat",
       "noRepositoriesVisible": "No es veu cap repositori. Comprova l'accés als repositoris de l'aplicació de GitHub de Kilo i actualitza.",
       "runOnWithTarget": "Executa a: {{target}}",
@@ -2988,8 +2984,8 @@
         "accounting_adjustment": "Ajust comptable",
         "credits_expired": "Crèdits caducats"
       },
-      "loadMore": "Carrega'n més",
-      "loadMoreFailed": "No s'ha pogut carregar més.",
+      "loadMore": "Carrega més",
+      "loadMoreFailed": "No s'ha pogut carregar més",
       "truncated": "Hi ha activitat de crèdit més antiga disponible."
     },
     "inviteMember": {
@@ -3018,8 +3014,8 @@
         "uncollectible": "No cobrable",
         "unknown": "Desconegut"
       },
-      "loadMore": "Carrega'n més",
-      "loadMoreFailed": "No s'ha pogut carregar més.",
+      "loadMore": "Carrega més",
+      "loadMoreFailed": "No s'ha pogut carregar més",
       "truncated": "Hi ha factures més antigues disponibles."
     },
     "lowBalanceAlert": {

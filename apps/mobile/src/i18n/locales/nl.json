@@ -1699,14 +1699,10 @@
     "newSession": {
       "title": "Nieuwe sessie",
       "repository": "Repository",
-      "couldNotLoadRepositories": "Kon repositories niet laden",
       "connectGithub": "GitHub verbinden",
       "connectGithubDescription": "Verbind GitHub in je browser en kom dan hier terug om een repository te kiezen.",
       "openGithub": "GitHub openen",
       "refreshRepositories": "Repositories vernieuwen",
-      "githubConnectionNotVisible": "We zien je GitHub-verbinding nog niet",
-      "githubConnectionNotVisibleDescription": "Als je de Kilo GitHub-app hebt geïnstalleerd of geconfigureerd, controleer dan opnieuw — of zorg dat deze voor dit account/deze organisatie is geïnstalleerd.",
-      "checkAgain": "Opnieuw controleren",
       "githubConnected": "GitHub verbonden",
       "noRepositoriesVisible": "Geen repositories zichtbaar. Controleer de repositorytoegang voor de Kilo GitHub-app en vernieuw daarna.",
       "runOnWithTarget": "Uitvoeren op: {{target}}",
@@ -1734,7 +1730,7 @@
       "discardFailed": "Kon het concept niet weggooien. Probeer het opnieuw.",
       "keepEditing": "Blijven bewerken",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket is verbonden",
+      "bitbucketConnected": "Bitbucket verbonden",
       "connectBitbucket": "Bitbucket verbinden",
       "connectBitbucketDescription": "Verbind Bitbucket in uw browser en kom daarna hier terug om een repository te kiezen.",
       "connectGitlab": "GitLab verbinden",
@@ -2955,7 +2951,7 @@
         "credits_expired": "Credits verlopen"
       },
       "loadMore": "Meer laden",
-      "loadMoreFailed": "Meer laden lukte niet.",
+      "loadMoreFailed": "Kon niet meer laden",
       "truncated": "Oudere creditactiviteit is beschikbaar."
     },
     "hub": {
@@ -2994,7 +2990,7 @@
         "unknown": "Onbekend"
       },
       "loadMore": "Meer laden",
-      "loadMoreFailed": "Meer laden lukte niet.",
+      "loadMoreFailed": "Kon niet meer laden",
       "truncated": "Oudere facturen zijn beschikbaar."
     },
     "lowBalanceAlert": {

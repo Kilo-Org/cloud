@@ -2168,14 +2168,10 @@
     "newSession": {
       "title": "Jauna sesija",
       "repository": "Repozitorijs",
-      "couldNotLoadRepositories": "Neizdevās ielādēt repozitorijus",
       "connectGithub": "Savienot GitHub",
       "connectGithubDescription": "Savieno GitHub savā pārlūkā, tad atgriezies šeit, lai izvēlētos repozitoriju.",
       "openGithub": "Atvērt GitHub",
       "refreshRepositories": "Atsvaidzināt repozitorijus",
-      "githubConnectionNotVisible": "Mēs vēl neredzam tavu GitHub savienojumu",
-      "githubConnectionNotVisibleDescription": "Ja instalēji vai konfigurēji Kilo GitHub App, pārbaudi vēlreiz — vai pārliecinies, ka tas tika instalēts šim kontam/organizācijai.",
-      "checkAgain": "Pārbaudīt vēlreiz",
       "githubConnected": "GitHub savienots",
       "noRepositoriesVisible": "Nav redzamu repozitoriju. Pārbaudi repozitorija piekļuvi Kilo GitHub App, tad atsvaidzini.",
       "runOnWithTarget": "Palaist uz: {{target}}",
@@ -2203,7 +2199,7 @@
       "discard": "Atmest",
       "discardFailed": "Neizdevās atmest melnrakstu. Lūdzu, mēģini vēlreiz.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket ir savienots",
+      "bitbucketConnected": "Bitbucket savienots",
       "connectBitbucket": "Savienot Bitbucket",
       "connectBitbucketDescription": "Savienojiet Bitbucket savā pārlūkprogrammā, pēc tam atgriezieties, lai izvēlētos repozitoriju.",
       "connectGitlab": "Savienot GitLab",
@@ -2989,7 +2985,7 @@
         "credits_expired": "Kredīti beigušies"
       },
       "loadMore": "Ielādēt vairāk",
-      "loadMoreFailed": "Neizdevās ielādēt vairāk.",
+      "loadMoreFailed": "Neizdevās ielādēt vairāk",
       "truncated": "Ir pieejama vecāka kredīta aktivitāte."
     },
     "inviteMember": {
@@ -3019,7 +3015,7 @@
         "unknown": "Nezināms"
       },
       "loadMore": "Ielādēt vairāk",
-      "loadMoreFailed": "Neizdevās ielādēt vairāk.",
+      "loadMoreFailed": "Neizdevās ielādēt vairāk",
       "truncated": "Ir pieejami vecāki rēķini."
     },
     "lowBalanceAlert": {

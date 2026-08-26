@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Нова сесия",
       "repository": "Хранилище",
-      "couldNotLoadRepositories": "Не можаха да се заредят хранилищата",
       "connectGithub": "Свържи GitHub",
       "connectGithubDescription": "Свържи GitHub в браузъра си, след което се върни тук, за да избереш хранилище.",
       "openGithub": "Отвори GitHub",
       "refreshRepositories": "Опресни хранилищата",
-      "githubConnectionNotVisible": "Все още не виждаме твоята GitHub връзка",
-      "githubConnectionNotVisibleDescription": "Ако си инсталирал или конфигурирал Kilo GitHub App, провери отново — или се увери, че е инсталиран за този акаунт/организация.",
-      "checkAgain": "Провери отново",
       "githubConnected": "GitHub е свързан",
       "noRepositoriesVisible": "Няма видими хранилища. Провери достъпа до хранилищата за Kilo GitHub App, след което опресни.",
       "runOnWithTarget": "Изпълни в: {{target}}",
@@ -2189,9 +2185,9 @@
       "discardFailed": "Не можа да се отхвърли черновата. Моля, опитай отново.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "bitbucketConnected": "Bitbucket е свързан",
-      "connectBitbucket": "Свързване с Bitbucket",
+      "connectBitbucket": "Свържи Bitbucket",
       "connectBitbucketDescription": "Свържете Bitbucket в браузъра си, след което се върнете тук, за да изберете хранилище.",
-      "connectGitlab": "Свързване с GitLab",
+      "connectGitlab": "Свържи GitLab",
       "connectGitlabDescription": "Свържете GitLab в браузъра си, след което се върнете тук, за да изберете хранилище.",
       "couldNotLoadBitbucketRepositories": "Не можахме да заредим хранилищата на Bitbucket",
       "couldNotLoadGithubRepositories": "Не можахме да заредим хранилищата на GitHub",
@@ -2969,7 +2965,7 @@
         "credits_expired": "Изтекли кредити"
       },
       "loadMore": "Зареди още",
-      "loadMoreFailed": "Не можа да се зареди още.",
+      "loadMoreFailed": "Неуспешно зареждане на още",
       "truncated": "Налична е по-стара кредитна активност."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "Неизвестна"
       },
       "loadMore": "Зареди още",
-      "loadMoreFailed": "Не можа да се зареди още.",
+      "loadMoreFailed": "Неуспешно зареждане на още",
       "truncated": "Налични са по-стари фактури."
     },
     "lowBalanceAlert": {

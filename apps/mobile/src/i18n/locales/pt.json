@@ -2168,14 +2168,10 @@
     "newSession": {
       "title": "Nova sessão",
       "repository": "Repositório",
-      "couldNotLoadRepositories": "Não foi possível carregar os repositórios",
       "connectGithub": "Ligar GitHub",
       "connectGithubDescription": "Ligue o GitHub no seu navegador e depois volte aqui para escolher um repositório.",
       "openGithub": "Abrir GitHub",
       "refreshRepositories": "Atualizar repositórios",
-      "githubConnectionNotVisible": "Ainda não conseguimos ver a sua ligação ao GitHub",
-      "githubConnectionNotVisibleDescription": "Se instalou ou configurou a aplicação Kilo GitHub, verifique novamente — ou confirme que foi instalada para esta conta/organização.",
-      "checkAgain": "Verificar novamente",
       "githubConnected": "GitHub ligado",
       "noRepositoriesVisible": "Nenhum repositório visível. Verifique o acesso aos repositórios da aplicação Kilo GitHub e depois atualize.",
       "runOnWithTarget": "Executar em: {{target}}",
@@ -2203,10 +2199,10 @@
       "discard": "Descartar",
       "discardFailed": "Não foi possível descartar o rascunho. Tente novamente.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Bitbucket conectado",
-      "connectBitbucket": "Conectar o Bitbucket",
+      "bitbucketConnected": "Bitbucket ligado",
+      "connectBitbucket": "Ligar Bitbucket",
       "connectBitbucketDescription": "Conecte o Bitbucket no seu navegador e depois volte aqui para escolher um repositório.",
-      "connectGitlab": "Conectar o GitLab",
+      "connectGitlab": "Ligar GitLab",
       "connectGitlabDescription": "Conecte o GitLab no seu navegador e depois volte aqui para escolher um repositório.",
       "couldNotLoadBitbucketRepositories": "Nao foi possível carregar os repositórios do Bitbucket",
       "couldNotLoadGithubRepositories": "Nao foi possível carregar os repositórios do GitHub",
@@ -2989,7 +2985,7 @@
         "credits_expired": "Créditos expirados"
       },
       "loadMore": "Carregar mais",
-      "loadMoreFailed": "Não foi possível carregar mais.",
+      "loadMoreFailed": "Não foi possível carregar mais",
       "truncated": "Está disponível atividade de crédito mais antiga."
     },
     "inviteMember": {
@@ -3019,7 +3015,7 @@
         "unknown": "Desconhecido"
       },
       "loadMore": "Carregar mais",
-      "loadMoreFailed": "Não foi possível carregar mais.",
+      "loadMoreFailed": "Não foi possível carregar mais",
       "truncated": "Estão disponíveis faturas mais antigas."
     },
     "lowBalanceAlert": {

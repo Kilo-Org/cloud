@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Nzukọ ọhụrụ",
       "repository": "Ebe nchekwa",
-      "couldNotLoadRepositories": "Enweghị ike ibudata ebe nchekwa",
       "connectGithub": "Jikọọ GitHub",
       "connectGithubDescription": "Jikọọ GitHub na browser gị, wee laghachite ebe a iji họrọ ebe nchekwa.",
       "openGithub": "Meghe GitHub",
       "refreshRepositories": "Meegharịa ebe nchekwa",
-      "githubConnectionNotVisible": "Anyị enweghị ike ịhụ njikọ GitHub gị aka",
-      "githubConnectionNotVisibleDescription": "Ọ bụrụ na i wụnyere ma ọ bụ hazie Kilo GitHub App, lelee ọzọ — ma ọ bụ gbaa mbọ hụ na ewụnyere ya maka akaụntụ/nzukọ a.",
-      "checkAgain": "Lelee ọzọ",
       "githubConnected": "Ejikọrọ GitHub",
       "noRepositoriesVisible": "Enweghị ebe nchekwa a na-ahụ anya. Lelee ohere ebe nchekwa maka Kilo GitHub App, wee megharịa.",
       "runOnWithTarget": "Gbaa na: {{target}}",
@@ -2188,7 +2184,7 @@
       "discard": "Tụfuo",
       "discardFailed": "Enweghị ike ịtụfu akwụkwọ a na-ede. Biko nwaa ọzọ.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
-      "bitbucketConnected": "Ejikọtara Bitbucket",
+      "bitbucketConnected": "Bitbucket jikọrọ",
       "connectBitbucket": "Jikọọ Bitbucket",
       "connectBitbucketDescription": "Jikọọ Bitbucket na ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa.",
       "connectGitlab": "Jikọọ GitLab",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "Mmezi ndekọ ego",
         "credits_expired": "Kredit emebiwo"
       },
-      "loadMore": "Bufuo ihe ndị ọzọ",
-      "loadMoreFailed": "Enweghị ike ibufu ihe ndị ọzọ.",
+      "loadMore": "Bugo ọzọ",
+      "loadMoreFailed": "Enweghị ike ibugo ọzọ",
       "truncated": "Ọrụ kredit ochie dị."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "Enweghị ike ịnakọta",
         "unknown": "Amaghị"
       },
-      "loadMore": "Bufuo ihe ndị ọzọ",
-      "loadMoreFailed": "Enweghị ike ibufu ihe ndị ọzọ.",
+      "loadMore": "Bugo ọzọ",
+      "loadMoreFailed": "Enweghị ike ibugo ọzọ",
       "truncated": "Akwụkwọ ọnụahịa ochie dị."
     },
     "lowBalanceAlert": {

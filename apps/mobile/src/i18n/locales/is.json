@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Ný lota",
       "repository": "Geymsla",
-      "couldNotLoadRepositories": "Ekki tókst að hlaða geymslur",
       "connectGithub": "Tengja GitHub",
       "connectGithubDescription": "Tengdu GitHub í vafranum þínum, og komdu svo aftur hingað til að velja geymslu.",
       "openGithub": "Opna GitHub",
       "refreshRepositories": "Endurnýja geymslur",
-      "githubConnectionNotVisible": "Við sjáum ekki GitHub-tenginguna þína ennþá",
-      "githubConnectionNotVisibleDescription": "Ef þú settir upp eða stilltir Kilo GitHub App, athugaðu aftur — eða gakktu úr skugga um að hann var settur upp fyrir þessa reikninga/stofnun.",
-      "checkAgain": "Athuga aftur",
       "githubConnected": "GitHub tengt",
       "noRepositoriesVisible": "Engar geymslur sýnilegar. Athugaðu geymsluaðgang fyrir Kilo GitHub App og endurnýjaðu svo.",
       "runOnWithTarget": "Keyra á: {{target}}",
@@ -2969,7 +2965,7 @@
         "credits_expired": "Kredítur runnu út"
       },
       "loadMore": "Hlaða meira",
-      "loadMoreFailed": "Ekki tókst að hlaða meira.",
+      "loadMoreFailed": "Ekki tókst að hlaða meira",
       "truncated": "Eldri kreditfærsla er í boði."
     },
     "inviteMember": {
@@ -2999,7 +2995,7 @@
         "unknown": "Óþekkt"
       },
       "loadMore": "Hlaða meira",
-      "loadMoreFailed": "Ekki tókst að hlaða meira.",
+      "loadMoreFailed": "Ekki tókst að hlaða meira",
       "truncated": "Eldri reikningar eru í boði."
     },
     "lowBalanceAlert": {

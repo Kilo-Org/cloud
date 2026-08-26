@@ -2153,14 +2153,10 @@
     "newSession": {
       "title": "Sabon zama",
       "repository": "Ma'ajiya",
-      "couldNotLoadRepositories": "An kasa loda ma'ajiyoyi",
       "connectGithub": "Haɗa GitHub",
       "connectGithubDescription": "Haɗa GitHub a cikin burauzarka, sannan ka dawo nan domin zaɓar ma'ajiya.",
       "openGithub": "Buɗe GitHub",
       "refreshRepositories": "Sabunta ma'ajiyoyi",
-      "githubConnectionNotVisible": "Ba mu ga haɗin GitHub ɗinka ba har yanzu",
-      "githubConnectionNotVisibleDescription": "Idan ka shigar ko ka tsara GitHub App na Kilo, sake duba — ko ka tabbatar an shigar da shi domin wannan asusu/kungiya.",
-      "checkAgain": "Sake duba",
       "githubConnected": "An haɗa GitHub",
       "noRepositoriesVisible": "Babu ma'ajiyoyi da ake gani. Duba damar ma'ajiya ga GitHub App na Kilo, sannan sabunta.",
       "runOnWithTarget": "Gudanar a: {{target}}",
@@ -2968,8 +2964,8 @@
         "accounting_adjustment": "Daidaitawar lissafin kuɗi",
         "credits_expired": "Credits sun ƙare"
       },
-      "loadMore": "Ɗauke ƙari",
-      "loadMoreFailed": "Ba a iya Ɗauke ƙari ba.",
+      "loadMore": "Ɗauki ƙari",
+      "loadMoreFailed": "Ba a iya ƙara ɗora ba",
       "truncated": "Ayyukan bashi na baya suna nan."
     },
     "inviteMember": {
@@ -2998,8 +2994,8 @@
         "uncollectible": "Ba za a iya karɓa ba",
         "unknown": "Ba a sani ba"
       },
-      "loadMore": "Ɗauke ƙari",
-      "loadMoreFailed": "Ba a iya Ɗauke ƙari ba.",
+      "loadMore": "Ɗauki ƙari",
+      "loadMoreFailed": "Ba a iya ƙara ɗora ba",
       "truncated": "Lissafin kuɗi na baya suna nan."
     },
     "lowBalanceAlert": {

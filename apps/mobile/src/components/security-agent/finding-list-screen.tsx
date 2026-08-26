@@ -2,6 +2,7 @@ import {
   DEFAULT_SECURITY_FINDING_FILTERS,
   getSecurityRepositoriesInScope,
   hasActiveSecurityFindingFilters,
+  isPersonalSecurityScope,
   parseSecurityFindingFilters,
   type SecurityFindingRouteParams,
   toSecurityFindingQuery,
@@ -68,7 +69,12 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   const query = useMemo(() => toSecurityFindingQuery(filters), [filters]);
   const findings = useSecurityFindings(scope, query);
   const capacity = useSecurityAnalysisCapacity(scope);
-  useRouteForegroundRefresh([[['securityAgent']]]);
+  // An org scope stores its findings under the `organizations.securityAgent`
+  // tRPC prefix, so the personal prefix alone matches nothing and the screen
+  // never refreshes on focus.
+  useRouteForegroundRefresh(
+    isPersonalSecurityScope(scope) ? [[['securityAgent']]] : [[['organizations', 'securityAgent']]]
+  );
 
   const slaEnabled = config.data?.slaEnabled ?? true;
   const hasAnalysisCapacity =

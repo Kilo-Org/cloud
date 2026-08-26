@@ -213,8 +213,10 @@ export function OrganizationInvoicesScreen() {
   }
 
   // A later-page failure must keep the already-loaded rows and offer an inline
-  // retry instead of replacing the list.
-  const isLaterPageError = query.isError && hasLoadedPages;
+  // retry instead of replacing the list. Read `isFetchNextPageError`, not
+  // `isError`: a failed background refetch of page 1 also raises `isError`,
+  // and the inline Retry calls `fetchNextPage()`, which can never clear it.
+  const isLaterPageError = query.isFetchNextPageError;
 
   let body: ReactNode = null;
   if (isLoading) {

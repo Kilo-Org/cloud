@@ -39,6 +39,8 @@ vi.mock('@/components/agents/use-session-search-input', () => ({
     searchInputRef: { current: null },
     hasText: false,
     awaitingCommit: false,
+    searchInputKey: 'session-search-empty',
+    searchDefaultValue: undefined,
     handleSearchInputChange: vi.fn(),
     handleClearSearchInput: vi.fn(),
     clearSearchInput: vi.fn(),
@@ -83,6 +85,15 @@ vi.mock('@/lib/hooks/use-persisted-agent-session-filters', () => ({
     setPlatformFilter: vi.fn(),
     setProjectFilter: vi.fn(),
   }),
+}));
+vi.mock('@/lib/hooks/use-current-user-id', () => ({
+  useCurrentUserId: () => ({ userId: 'u1', isLoading: false }),
+}));
+vi.mock('@/lib/persist/use-draft-load', () => ({
+  useFencedDraftLoad: () => ({ value: null, settled: true }),
+}));
+vi.mock('@/lib/persist/drafts', () => ({
+  SESSION_SEARCH_DRAFT_KEY: 'session-search-query',
 }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: null, isLoaded: true }),

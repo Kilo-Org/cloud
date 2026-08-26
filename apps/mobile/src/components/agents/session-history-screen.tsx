@@ -14,6 +14,9 @@ import { useSessionSearchInput } from '@/components/agents/use-session-search-in
 import { ScreenHeader } from '@/components/screen-header';
 import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
+import { SESSION_SEARCH_DRAFT_KEY } from '@/lib/persist/drafts';
 import { useOrganization } from '@/lib/organization-context';
 
 const noopCreateSession = () => {
@@ -40,6 +43,16 @@ export function SessionHistoryScreen() {
   } = usePersistedAgentSessionFilters();
   const [showFilterModal, setShowFilterModal] = useState(false);
 
+  // Durable session-list search draft. The input mounts immediately — typing
+  // never waits on the account query — and the stored draft settles behind it
+  // (same pattern as the new-session prompt draft in agent-chat/new.tsx).
+  const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
+  const searchDraftState = useFencedDraftLoad({
+    userId,
+    isIdentityLoading,
+    entityKey: SESSION_SEARCH_DRAFT_KEY,
+  });
+
   const {
     searchQuery,
     searchInputRef,
@@ -49,7 +62,13 @@ export function SessionHistoryScreen() {
     handleClearSearchInput,
     clearSearchInput,
     searchController,
-  } = useSessionSearchInput();
+    searchInputKey,
+    searchDefaultValue,
+  } = useSessionSearchInput({
+    userId,
+    restoredQuery: searchDraftState.value,
+    restoreSettled: searchDraftState.settled,
+  });
 
   const ready = filtersLoaded && orgLoaded;
 
@@ -154,6 +173,8 @@ export function SessionHistoryScreen() {
           showInlineError={showInlineError}
           onChangeText={handleSearchInputChange}
           onClearSearch={handleClearSearchInput}
+          defaultValue={searchDefaultValue}
+          inputKey={searchInputKey}
         />
       ) : null}
       <View className="flex-1">

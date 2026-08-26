@@ -100,10 +100,9 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
         actionLabel={t('home.seeAll')}
         onActionPress={() => {
           // Compatibility: the old href `/(app)/(tabs)/(2_agents)` opened the
-          // tab stack; after history exists the handler must land on the index
-          // route. Remove the special land only when history is not a nested
-          // stack screen.
-          router.dismissTo(AGENTS_INDEX_HREF as Href);
+          // tab stack; after history exists, `navigate` switches to the Agents
+          // tab and lands on the index, dismissing a leftover history push.
+          router.navigate(AGENTS_INDEX_HREF as Href);
         }}
       />
       <View className="mx-4 gap-2">

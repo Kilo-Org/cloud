@@ -6,10 +6,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentSessionsSection, buildRows } from '@/components/home/agent-sessions-section';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 
-const dismissToSpy = vi.hoisted(() => vi.fn());
+const navigateSpy = vi.hoisted(() => vi.fn());
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ dismissTo: dismissToSpy }),
+  useRouter: () => ({ navigate: navigateSpy }),
   useFocusEffect: vi.fn(),
 }));
 
@@ -136,11 +136,11 @@ describe('buildRows', () => {
 
 describe('Home See-all navigation', () => {
   beforeEach(() => {
-    dismissToSpy.mockClear();
+    navigateSpy.mockClear();
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   });
 
-  it('dismisses to the Agents index, never the history subpage', async () => {
+  it('navigates to the Agents index, never the history subpage', async () => {
     const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
       current: undefined,
     };
@@ -162,8 +162,8 @@ describe('Home See-all navigation', () => {
     expect(onActionPress).toBeTypeOf('function');
 
     onActionPress();
-    expect(dismissToSpy).toHaveBeenCalledTimes(1);
-    const href = dismissToSpy.mock.calls[0]?.[0] as string;
+    expect(navigateSpy).toHaveBeenCalledTimes(1);
+    const href = navigateSpy.mock.calls[0]?.[0] as string;
     expect(href).toBe('/(app)/(tabs)/(2_agents)/');
     expect(href).not.toContain('history');
 

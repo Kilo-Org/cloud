@@ -40,6 +40,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
+import { PrivacyCoverOverlay } from '@/components/privacy-cover-overlay';
 import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -960,6 +961,7 @@ function RootLayoutNav() {
       pointerEvents={hidden ? 'none' : 'auto'}
     >
       <Slot />
+      <PrivacyCoverOverlay segments={segments} />
     </View>
   );
 }

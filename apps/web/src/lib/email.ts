@@ -6,6 +6,7 @@ import { NEXTAUTH_URL } from '@/lib/config.server';
 import { getEmailVerificationRecipient, sendViaMailgun } from '@/lib/email-mailgun';
 import { verifyEmail } from '@/lib/email-neverbounce';
 import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
+import { USER_DELETION_COMPLETION_HTML } from '@/lib/user/deletion-queue/deletion-constants';
 
 // Subject lines for each template — also serves as the canonical list of template names
 export const subjects = {
@@ -53,6 +54,7 @@ export const subjects = {
   clawCreditRenewalFailed: 'Action Required: KiloClaw Hosting Renewal Failed',
   clawComplementaryInferenceEnded: 'Your Free AI Inference Period Has Ended',
   accountDeletionRequest: 'Kilo: Account Deletion Request Received',
+  accountDeletionCompleted: 'Kilo: Account deletion complete',
   creditsTopUp: 'Your Kilo credit top-up',
   kiloClawSubscriptionStarted: 'Your KiloClaw subscription is active',
   kiloPassDuplicateCardCanceled: 'Kilo Pass: Subscription Cancelled',
@@ -452,6 +454,16 @@ export async function sendAccountDeletionConfirmationEmail(to: string): Promise<
     to,
     templateName: 'accountDeletionRequest',
     templateVars: { email: to },
+  });
+}
+
+export async function sendAccountDeletionCompletedEmail(to: string): Promise<SendResult> {
+  return send({
+    to,
+    templateName: 'accountDeletionCompleted',
+    templateVars: {
+      completion_message: new RawHtml(USER_DELETION_COMPLETION_HTML),
+    },
   });
 }
 

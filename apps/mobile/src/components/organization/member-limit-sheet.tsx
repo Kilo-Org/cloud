@@ -114,7 +114,7 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
 
   if (isResolving || orgWithMembers.isLoading) {
     return (
-      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+      <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
         <View className="gap-1">
           <Text className="text-center text-lg font-semibold text-foreground">
             {t('organization.memberLimit.title')}
@@ -135,7 +135,7 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
 
   if (orgWithMembers.isError && !orgWithMembers.data) {
     return (
-      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+      <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
         <Text className="text-center text-lg font-semibold text-foreground">
           {t('organization.memberLimit.title')}
         </Text>
@@ -150,7 +150,7 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
 
   if (!member) {
     return (
-      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+      <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
         <Text className="text-center text-lg font-semibold text-foreground">
           {t('organization.memberLimit.title')}
         </Text>
@@ -163,8 +163,8 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
 
   return (
     <ScrollView
-      className="flex-1 bg-background px-6"
-      contentContainerClassName="gap-6 pb-8 pt-4"
+      className="flex-1 bg-background"
+      contentContainerClassName="px-6 gap-6 pb-8 pt-4"
       automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
     >

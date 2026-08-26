@@ -10,13 +10,13 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-primary active:opacity-80 shadow-sm shadow-black/5',
-        destructive: 'bg-destructive active:opacity-80 shadow-sm shadow-black/5',
-        outline: 'border-border bg-card active:opacity-80 border shadow-sm shadow-black/5',
-        secondary: 'bg-secondary active:opacity-80 shadow-sm shadow-black/5',
+        default: 'bg-primary active:opacity-80 shadow-sm shadow-[#0000000D]',
+        destructive: 'bg-destructive active:opacity-80 shadow-sm shadow-[#0000000D]',
+        outline: 'border-border bg-card active:opacity-80 border shadow-sm shadow-[#0000000D]',
+        secondary: 'bg-secondary active:opacity-80 shadow-sm shadow-[#0000000D]',
         ghost: 'active:opacity-60',
         link: '',
-        'accent-soft': 'bg-accent-soft active:opacity-80 shadow-sm shadow-black/5',
+        'accent-soft': 'bg-accent-soft active:opacity-80 shadow-sm shadow-[#0000000D]',
       },
       size: {
         // min-h (not fixed h) so the button grows to fit text scaled by large

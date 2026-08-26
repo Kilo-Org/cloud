@@ -1,4 +1,17 @@
-import { renderNonAutolinkedText, renderTemplate, subjects } from '@/lib/email';
+jest.mock('@/lib/email-mailgun', () => ({
+  getEmailVerificationRecipient: jest.fn(() => null),
+  sendViaMailgun: jest.fn().mockResolvedValue({}),
+}));
+
+import {
+  RawHtml,
+  renderNonAutolinkedText,
+  renderTemplate,
+  sendAccountDeletionCompletedEmail,
+  subjects,
+} from '@/lib/email';
+import { sendViaMailgun } from '@/lib/email-mailgun';
+import { USER_DELETION_COMPLETION_HTML } from '@/lib/user/deletion-queue/deletion-constants';
 
 describe('email rendering helpers', () => {
   it('escapes HTML while neutralizing URL autolinking', () => {
@@ -39,5 +52,33 @@ describe('data export download code email', () => {
     expect(html).toContain('10 minutes');
     // The code must be the only way to act on this email.
     expect(html).not.toContain('href');
+  });
+});
+
+describe('account deletion completed email', () => {
+  it('uses the canonical completion copy and transactional footer', async () => {
+    expect(subjects.accountDeletionCompleted).toBe('Kilo: Account deletion complete');
+    const html = renderTemplate('accountDeletionCompleted', {
+      completion_message: new RawHtml(USER_DELETION_COMPLETION_HTML),
+      year: '2026',
+    });
+
+    expect(html).toContain('permanently deleted and anonymized');
+    expect(html).toContain('contact Kilo support immediately');
+    expect(html).toContain('Kilo Code, Inc');
+    expect(html).not.toContain('case management');
+    expect(html).not.toContain('1–2 business days');
+
+    await expect(sendAccountDeletionCompletedEmail('user@example.com')).resolves.toEqual({
+      sent: true,
+    });
+    expect(sendViaMailgun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'user@example.com',
+        subject: subjects.accountDeletionCompleted,
+        category: 'accountDeletionCompleted',
+        html: expect.stringContaining(USER_DELETION_COMPLETION_HTML),
+      })
+    );
   });
 });

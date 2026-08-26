@@ -212,7 +212,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           ) : undefined
         }
       />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('securityAgent.automation.autoAnalysis')}

@@ -224,8 +224,8 @@ function MessageBubbleComponent({
             <Animated.View
               pointerEvents="none"
               className={cn(
-                'absolute inset-0 rounded-2xl bg-black/5',
-                !isFromMe && 'dark:bg-white/10'
+                'absolute inset-0 rounded-2xl bg-[#0000000D]',
+                !isFromMe && 'dark:bg-[#FFFFFF1A]'
               )}
               style={longPressHighlightStyle}
             />

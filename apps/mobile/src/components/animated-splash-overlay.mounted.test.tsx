@@ -15,6 +15,10 @@ vi.mock('react-native-reanimated', () => ({
   useSharedValue: (v: unknown) => ({ value: v }),
   useAnimatedStyle: () => ({}),
   withTiming: (v: unknown) => v,
+  withDelay: (_delay: number, v: unknown) => v,
+  withSequence: (...values: unknown[]) => values.at(-1),
+  makeMutable: (v: unknown) => ({ value: v }),
+  Easing: { out: (v: unknown) => v, in: (v: unknown) => v, quad: 0, cubic: 0 },
   // Reduced motion keeps animation callbacks out of the test.
   useReducedMotion: () => true,
 }));

@@ -37,6 +37,7 @@ import {
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
+import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearMarkdownImageConfirmMemory } from '@/components/agents/markdown-image-confirm';
@@ -359,6 +360,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearFilePartCache();
           clearClipboardImages();
           reapTempFiles({ all: true });
+          clearPrReviewFooterPreference();
         } finally {
           queryClient.clear();
           setSessionEnded(ended);

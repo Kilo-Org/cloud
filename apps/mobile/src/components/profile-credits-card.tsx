@@ -37,12 +37,17 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const { userId, isError: userIdError, refetch: refetchUserId } = useCurrentUserId({ enabled });
   const hasUserId = userId !== undefined;
 
-  // Keep the raw 2-element tRPC query keys from `queryOptions`. A 3-element key
-  // (e.g. appending the userId) is misread by tRPC v11 `isPrefixedQueryKey` as
-  // `[prefix, path, args]`, which breaks the queryFn before any network request.
   const balanceOptions = trpc.user.getContextBalance.queryOptions({
     organizationId: selectedOrgId,
   });
+
+  // tRPC v11 `isPrefixedQueryKey` misreads a 3-element query key (e.g. one
+  // suffixed with the userId) as `[prefix, path, args]` and makes the queryFn
+  // throw `path.join is not a function` before any network request. Keep the
+  // raw 2-element key and fail fast if it ever regresses.
+  if (balanceOptions.queryKey.length !== 2) {
+    throw new Error('getContextBalance query key must stay 2-element ([path, input])');
+  }
   const personalCreditOptions = trpc.user.getCreditBlocks.queryOptions({});
   const orgCreditOptions = trpc.organizations.getCreditBlocks.queryOptions({
     organizationId: selectedOrgId ?? '',

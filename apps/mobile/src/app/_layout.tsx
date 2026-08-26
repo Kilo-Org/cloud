@@ -94,6 +94,8 @@ import {
   isShellReadyForShare,
   resolvePendingShareNavigation,
   resolveSupersededPendingShareId,
+  SHARE_INTENT_OPTIONS,
+  shouldIngestShareIntent,
 } from '@/lib/pending-share-navigation';
 import {
   clearSharePayload,
@@ -537,10 +539,10 @@ function RootLayoutNav() {
   // error path. Calls go through resetShareIntentRef so the unstable context
   // function stays out of the deps.
   useEffect(() => {
-    // Copy the shared files only once the shell can open the gate. Copying
-    // while signed out registers temp files that the sign-in reap in
-    // `clearSessionScopedState` deletes before the gate ever reads them.
-    if (!hasShareIntent || !isShellReady) {
+    // Copy the shared files only once the shell can open the gate. The
+    // provider keeps the intent across a backgrounding (SHARE_INTENT_OPTIONS)
+    // so a sign-in that leaves the app cannot drop the deferred payload.
+    if (!shouldIngestShareIntent({ hasShareIntent, isShellReady })) {
       return undefined;
     }
 
@@ -915,7 +917,7 @@ function RootLayout() {
   }, []);
 
   return (
-    <ShareIntentProvider>
+    <ShareIntentProvider options={SHARE_INTENT_OPTIONS}>
       <ThemeProvider value={navigationTheme}>
         <AppRootProviders>
           <StatusBar style="auto" />

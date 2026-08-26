@@ -17,6 +17,7 @@ vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   Brain: 'Brain',
   Globe: 'Globe',
+  MessageSquare: 'MessageSquare',
   Smartphone: 'Smartphone',
 }));
 vi.mock('@/components/language-picker-sheet', () => ({
@@ -42,6 +43,13 @@ vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
     keepScreenOn: false,
     hasLoaded: true,
     setKeepScreenOn: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
+  usePrReviewFooterPreference: () => ({
+    prReviewFooter: true,
+    hasLoaded: true,
+    setPrReviewFooter: vi.fn(),
   }),
 }));
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({

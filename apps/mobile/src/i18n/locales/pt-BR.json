@@ -38,7 +38,9 @@
     "catalogLoadFailed": "Não foi possível carregar o idioma. Tente novamente.",
     "search": "Pesquisar idiomas",
     "noMatches": "Nenhum idioma corresponde",
-    "deviceLanguage": "Idioma do dispositivo"
+    "deviceLanguage": "Idioma do dispositivo",
+    "current": "Atual",
+    "allLanguages": "Todos os idiomas"
   },
   "login": {
     "welcome": "Boas-vindas ao Kilo",
@@ -564,7 +566,7 @@
       "stopping": "Parando…"
     },
     "empty": {
-      "finishingSetup": "Concluindo configuração",
+      "finishingSetup": "Concluindo a configuração",
       "finishingSetupDescription": "Aguarde, estamos finalizando sua conta. Isso geralmente leva um instante.",
       "getStarted": "Começar",
       "noInstances": "Nenhuma instância do KiloClaw",
@@ -704,7 +706,7 @@
       "destroying": "DESTRUINDO",
       "provisioned": "PROVISIONADO",
       "restarting": "REINICIANDO",
-      "running": "EXECUTANDO",
+      "running": "Em execução",
       "shuttingDown": "DESLIGANDO",
       "starting": "INICIANDO",
       "stopped": "PARADO",
@@ -919,7 +921,7 @@
     "webhookSetup": "Configuração de webhook incompleta",
     "webhookSetupDescription": "Alguns repositórios podem não receber revisões automáticas.",
     "decision": {
-      "block": "Bloqueado",
+      "block": "Bloquear",
       "noDecision": "Sem decisão",
       "noResult": "Sem resultado",
       "pass": "Aprovado"
@@ -1085,7 +1087,7 @@
       "checkConnection": "Verifique sua conexão e tente novamente.",
       "couldNotLoad": "Não foi possível carregar o relatório de auditoria",
       "events": "Eventos",
-      "findings": "Descobertas",
+      "findings": "Achados",
       "generated": "Gerado em {{generatedAt}}",
       "noActivity": "Nenhuma atividade registrada",
       "noActivityDescription": "O Kilo não tem atividade de descobertas de segurança reportável de {{start}} a {{end}}.",
@@ -1149,7 +1151,7 @@
       "daysOverdue": "{{displayCount}} dias em atraso",
       "deadlineToday": "Prazo vence hoje",
       "filterByRepository": "Filtrar por repositório",
-      "findings": "Descobertas",
+      "findings": "Achados",
       "findingsCount": "{{displayCount}} descobertas",
       "highOverdue": "Alto em atraso",
       "lastSynced": "Última sincronização em {{time}}",
@@ -1269,7 +1271,7 @@
       "emptyTitle": "Nenhuma descoberta aberta",
       "noMatchesDescription": "Tente ajustar ou limpar os filtros selecionados.",
       "noMatchesTitle": "Nenhuma descoberta corresponde aos filtros",
-      "title": "Descobertas"
+      "title": "Achados"
     },
     "findingRow": {
       "a11y": "Descoberta de gravidade {{severity}}: {{title}}. {{repo}}. {{analysis}}",
@@ -1313,7 +1315,7 @@
       "cancellationRequested": "Cancelamento solicitado",
       "cancelled": "Remediação cancelada",
       "couldNotLoad": "Não foi possível carregar o status da remediação",
-      "keepRunning": "Continuar executando",
+      "keepRunning": "Manter em execução",
       "model": "Modelo",
       "noAnalysisDescription": "Execute uma na aba Detalhes",
       "noAnalysisTitle": "Nenhuma análise ainda",
@@ -1545,7 +1547,7 @@
       "includeExistingDisabled": "As descobertas existentes são excluídas da remediação automática.",
       "belowThreshold": "A descoberta está abaixo do limite de gravidade automático. A remediação manual ainda pode ser iniciada quando as verificações de segurança passarem.",
       "beforeEnablement": "A análise foi concluída antes da ativação da remediação automática. A remediação manual ainda pode ser iniciada quando as verificações de segurança passarem.",
-      "generic": "A remediação está indisponível para esta descoberta."
+      "generic": "A remediação não está disponível para este achado."
     },
     "commandFailure": {
       "ownerCapReached": "A capacidade de análise está cheia. Aguarde uma análise ativa terminar e tente novamente.",
@@ -1659,7 +1661,12 @@
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão",
       "cloneFailed": "Não foi possível clonar esta sessão.",
       "cloneFailedRetry": "Não foi possível clonar esta sessão. Tente novamente.",
-      "connectRepositoryToContinue": "Conecte um repositório para continuar."
+      "connectRepositoryToContinue": "Conecte um repositório para continuar.",
+      "notEnoughCredits": "Créditos insuficientes para executar o Cloud Agent. Adicione créditos e tente novamente.",
+      "previousTaskFinishing": "A tarefa anterior ainda está terminando. Aguarde um momento.",
+      "serviceUnavailable": "O serviço está indisponível no momento. Tente novamente.",
+      "connectionTrouble": "Problema de conexão. Tente novamente em um momento.",
+      "modelUnavailable": "Este modelo não está disponível para o Cloud Agent. Escolha outro modelo e tente novamente."
     },
     "remoteSession": {
       "failedToCreate": "Falha ao criar a sessão remota",
@@ -1716,7 +1723,8 @@
       "discardDraftMessage": "Seu prompt será perdido.",
       "discardDraftTitle": "Descartar rascunho?",
       "discardFailed": "Não foi possível descartar o rascunho. Tente novamente.",
-      "keepEditing": "Continuar editando"
+      "keepEditing": "Continuar editando",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} arquivo atualizado",
@@ -2182,7 +2190,9 @@
     "appearanceSystem": "Sistema",
     "appearanceLight": "Claro",
     "appearanceDark": "Escuro",
-    "account": "Conta"
+    "account": "Conta",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "addCredits": {
     "cta": "Adicionar créditos",
@@ -2220,16 +2230,11 @@
   "home": {
     "couldNotLoadSessions": "Não foi possível carregar as sessões",
     "couldNotLoadActiveSessions": "Não foi possível carregar as sessões ativas",
-    "agentSessions": "Sessões de agentes",
-    "showingSavedSessions": "Mostrando sessões salvas — o status ao vivo pode estar desatualizado",
-    "startNewAgentSession": "Iniciar uma nova sessão do Kilo Agent",
-    "aiCodingSessions": "Sessões de codificação com IA",
-    "startCodingTaskFromPhone": "Inicie uma tarefa de codificação pelo celular ou continue uma sessão pela CLI.",
-    "tryIt": "Experimente",
+    "agentSessions": "Sessões do agente",
     "newCodingTask": "Nova tarefa de codificação",
     "explore": "Explorar",
     "seeAll": "Ver tudo",
-    "kiloAgents": "Agentes Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Fechar {{filename}}",
@@ -2636,7 +2641,7 @@
     },
     "eventChips": {
       "approve": "Aprovar",
-      "comment": "Comentar",
+      "comment": "Comentário",
       "label": "Evento da revisão",
       "requestChanges": "Solicitar alterações"
     },
@@ -2969,7 +2974,7 @@
       "emailLabel": "E-mail",
       "emailPlaceholder": "nome@empresa.com",
       "permissionDenied": "Você não tem permissão para convidar membros.",
-      "roleLabel": "Função",
+      "roleLabel": "Papel",
       "roleMember": "Função: Membro",
       "sendInvite": "Enviar convite",
       "title": "Convidar membro"
@@ -2984,7 +2989,7 @@
       "sharingUnavailable": "O compartilhamento não está disponível neste dispositivo.",
       "status": {
         "paid": "Pago",
-        "open": "Em aberto",
+        "open": "Aberto",
         "void": "Cancelada",
         "draft": "Rascunho",
         "uncollectible": "Incobrável",

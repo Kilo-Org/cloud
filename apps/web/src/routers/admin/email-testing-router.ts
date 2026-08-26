@@ -12,6 +12,7 @@ import {
   type TemplateName,
 } from '@/lib/email';
 import { securityFindingTemplateVars } from '@/lib/security-notification-email-vars';
+import { USER_DELETION_COMPLETION_HTML } from '@/lib/user/deletion-queue/deletion-constants';
 import * as z from 'zod';
 import { format } from 'date-fns';
 
@@ -180,6 +181,8 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
       return { claw_url: `${NEXTAUTH_URL}/claw` };
     case 'accountDeletionRequest':
       return { email: 'user@example.com' };
+    case 'accountDeletionCompleted':
+      return { completion_message: new RawHtml(USER_DELETION_COMPLETION_HTML) };
     case 'dataExportDownloadCode':
       return { code: '123456', email: 'user@example.com', expires_in: '10 minutes' };
     case 'creditsTopUp':

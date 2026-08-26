@@ -38,7 +38,9 @@
     "retry": "Yritä uudelleen",
     "search": "Hae kieliä",
     "noMatches": "Mikään kieli ei täsmää",
-    "deviceLanguage": "Laitteen kieli"
+    "deviceLanguage": "Laitteen kieli",
+    "current": "Nykyinen",
+    "allLanguages": "Kaikki kielet"
   },
   "login": {
     "welcome": "Tervetuloa Kiloon",
@@ -101,7 +103,7 @@
     "app": "Sovellus",
     "preferences": "Asetukset",
     "preferencesSubtitle": "Ulkoasu, ilmoitukset, ajattelu ja näytön toiminta",
-    "deviceSessions": "Laiteistunnot",
+    "deviceSessions": "Laitteen istunnot",
     "deviceSessionsSubtitle": "Tarkastele ja kirjaa ulos muista laitteista",
     "feedback": "Palaute",
     "privacyChoices": "Tietosuojavalinnat",
@@ -115,7 +117,7 @@
     "bonusCreditsExpiring": "{{amount}} bonus-hyvitystä vanhenemassa {{date}}",
     "creditBalanceEmpty": "Hyvityssaldosi on tyhjä. Tämän tilin hyvityksiä hallinnoidaan iOS-sovelluksen ulkopuolella.",
     "signOutTitle": "Kirjaudu ulos?",
-    "signOutMessage": "Sinun on kirjauduttava uudelleen, jotta pääset työtilaan.",
+    "signOutMessage": "Sinun on kirjauduttava sisään uudelleen päästäksesi työtilaan.",
     "signOutConfirm": "Kirjaudu ulos",
     "deleteAccountTitle": "Poista tili?",
     "deleteAccountMessage": "Tämä poistaa tilisi pysyvästi ja kirjaa sinut ulos. Lähetämme vahvistuskoodin sähköpostitse.",
@@ -148,7 +150,9 @@
     "appearanceSystem": "Järjestelmä",
     "appearanceLight": "Vaalea",
     "appearanceDark": "Tumma",
-    "account": "Tili"
+    "account": "Tili",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole käytettävissä",
@@ -410,7 +414,7 @@
       },
       "deletedUser": "poistettu käyttäjä"
     },
-    "couldNotOpenGitHubAppSettings": "GitHub-sovelluksen asetuksia ei voitu avata",
+    "couldNotOpenGitHubAppSettings": "GitHub App -asetuksia ei voitu avata",
     "installKiloGitHubApp": "Asenna Kilo GitHub -sovellus",
     "connectionExpiredTitle": "GitHub-yhteys vanhentui",
     "connectionExpiredDescription": "GitHub-yhteytesi ei ole enää kelvollinen. Tarkista yhteys uudelleen — sinua pyydetään yhdistämään tarvittaessa.",
@@ -479,7 +483,7 @@
       "loadFailedTitle": "Kommenttieditoria ei voitu ladata",
       "discardTitle": "Hylätäänkö kommentti?",
       "discardMessage": "Luonnoksesi menetetään.",
-      "keepEditing": "Jatka muokkaamista",
+      "keepEditing": "Jatka muokkausta",
       "discard": "Hylkää",
       "comment": "Kommentti",
       "insertSuggestionA11y": "Lisää koodiehdotus",
@@ -787,7 +791,7 @@
       "photoLibrary": "Valokuvakirjasto",
       "files": "Tiedostot",
       "cameraAccessDisabled": "Kameran käyttö estetty",
-      "cameraAccessMessage": "Salli kameran käyttö Asetuksista ottaksesi valokuvan."
+      "cameraAccessMessage": "Salli kameran käyttö Asetuksissa ottaaksesi valokuvan."
     },
     "typingIndicator": {
       "someone": "Joku",
@@ -871,7 +875,7 @@
       "destroyMessage": "Tämä tuhoaa pysyvästi KiloClaw-instanssisi ja kaikki sen tiedot. Tätä toimintoa ei voi kumota.",
       "destroyTitle": "Tuhoa instanssi",
       "instance": "Instanssi",
-      "renameFailed": "Jotain meni pieleen",
+      "renameFailed": "Jokin meni pieleen",
       "couldNotCheckStatus": "Palvelun tilaa ei voitu tarkistaa",
       "dangerZone": "VAARAVYÖHYKE",
       "destroying": "Tuhotaan…",
@@ -936,7 +940,7 @@
       "couldNotLoad": "Malleja ei voitu ladata",
       "clearSearch": "Tyhjennä haku",
       "noMatches": "Mikään malli ei vastaa hakua",
-      "noModels": "Ei käytettävissä olevia malleja",
+      "noModels": "Ei malleja saatavilla",
       "noModelsDescription": "Mallit näkyvät täällä, kun niitä on saatavilla.",
       "noResultsFor": "Ei tuloksia haulle \"{{query}}\"",
       "recommended": "Suositeltu"
@@ -1001,7 +1005,7 @@
       "start": "Käynnistä",
       "startMessage": "Haluatko varmasti käynnistää tämän instanssin?",
       "startTitle": "Käynnistä instanssi",
-      "starting": "Käynnistetään…",
+      "starting": "Aloitetaan...",
       "stop": "Pysäytä",
       "stopMessage": "Haluatko varmasti pysäyttää tämän instanssin?",
       "stopTitle": "Pysäytä instanssi",
@@ -1047,7 +1051,7 @@
         "openKiloAi": "Avaa kilo.ai",
         "provisioning": "Varataan",
         "review": "Tarkista",
-        "somethingWentWrong": "Jotain meni pieleen",
+        "somethingWentWrong": "Jokin meni pieleen",
         "identityTitle": "Anna botillesi identiteetti",
         "close": "Sulje",
         "couldNotLoad": "Onboarding-tilaa ei voitu ladata",
@@ -1137,7 +1141,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Frontier",
       "frontierDescription": "Korkein suorituskyky. Reitittää frontier-malleihin, joissa on päättely.",
-      "balancedLabel": "Balanced",
+      "balancedLabel": "Tasapainoinen",
       "balancedDescription": "Älykäs tasapaino nopeuden ja kyvykkyyden välillä halvemmalla hinnalla.",
       "cost": "Hinta",
       "performance": "Suorituskyky",
@@ -1237,12 +1241,12 @@
       "placeholder": "esim. Noudata virheenkäsittelykäytäntöjämme…"
     },
     "repos": {
-      "title": "Repositoriot",
-      "couldNotLoad": "Repositorioita ei voitu ladata",
+      "title": "Arkistot",
+      "couldNotLoad": "Arkistoja ei voitu ladata",
       "unavailable": "Repositoriot eivät käytettävissä — viimeistele Bitbucket-asennus osoitteessa kilo.ai.",
       "finishSetup": "Viimeistele asennus",
       "manageAccess": "Hallinnoi käyttöoikeuksia",
-      "allRepositories": "Kaikki repositoriot",
+      "allRepositories": "Kaikki arkistot",
       "bitbucketNoRepositoriesDescription": "Tässä Bitbucket-työtilassa ei ole käytettävissä olevia repositorioita.",
       "bitbucketSetup": "Bitbucket-asennus",
       "couldNotOpenGithubSettings": "GitHub App -asetuksia ei voitu avata",
@@ -1251,7 +1255,7 @@
       "installGithubAppDescription": "Myönnä Kilo GitHub Appille pääsy repositorioihin, jotka haluat arvioitavan.",
       "noRepositoriesFound": "Repositorioita ei löytynyt",
       "repositoryAccess": "repositorion käyttöoikeus",
-      "selectedRepositories": "Valitut repositoriot"
+      "selectedRepositories": "Valitut arkistot"
     },
     "style": {
       "title": "Arviointityyli",
@@ -1260,7 +1264,7 @@
       "roast": "Armottoman rehellinen, viihdyttävällä tavalla",
       "strict": "Merkitse kaikki, pidä korkea rimma"
     },
-    "title": "Code Reviewer",
+    "title": "Koodin arvioija",
     "reviewDetail": {
       "title": "Arviointi",
       "cancelTitle": "Peruutetaanko arviointi?",
@@ -1286,7 +1290,7 @@
       "cost": "Hinta",
       "tokens": "Tunnukset",
       "tokensInOut": "{{input}} sisään / {{output}} ulos",
-      "openPullRequest": "Avaa vetopyyntö",
+      "openPullRequest": "Avaa pull request",
       "council": "Neuvosto",
       "decision": "Päätös",
       "gate": "Portti",
@@ -1295,7 +1299,7 @@
       "checkRun": "Tarkistusajo",
       "status": "Tila",
       "threshold": "Kynnysarvo",
-      "pullRequest": "vetopyyntö"
+      "pullRequest": "pull request"
     },
     "reviewMemory": {
       "title": "Arviointimuisti",
@@ -1334,7 +1338,7 @@
     "webhookSetupDescription": "Jotkin repositoriot eivät ehkä vastaanota automaattisia arviointeja.",
     "autoReviews": "Automaattiset arvioinnit",
     "selectRepository": "Valitse vähintään yksi repositorio ottaksesi automaattiset arvioinnit käyttöön.",
-    "selectRepositories": "Valitse repositoriot",
+    "selectRepositories": "Valitse arkistot",
     "followReviewMd": "Noudata REVIEW.md-tiedostoa",
     "followReviewMdSubtitle": "Kunnioita repositoriokohtaisia REVIEW.md-ohjetiedostoja",
     "readOnlyDescription": "Vain organisaation omistajat ja laskutuksen ylläpitäjät voivat muuttaa näitä asetuksia.",
@@ -1355,7 +1359,7 @@
       "couldNotLoad": "Organisaatioita ei voitu ladata",
       "personalStillAvailable": "Henkilökohtaiset repositoriot ovat edelleen käytettävissä alla.",
       "personal": "Henkilökohtainen",
-      "personalSubtitle": "Omat repositoriosi",
+      "personalSubtitle": "Sinun omat arkistosi",
       "viewOnly": "Vain katselu"
     },
     "reviewList": {
@@ -1392,8 +1396,8 @@
       "set": "Aseta",
       "model": "Malli",
       "mergeGate": "Yhdistämisportti",
-      "repositories": "Repositoriot",
-      "allRepositories": "Kaikki repositoriot",
+      "repositories": "Arkistot",
+      "allRepositories": "Kaikki arkistot",
       "nSelected": "{{displayCount}} valittu",
       "reviewMemory": "Arviointimuisti",
       "proposedReviewMdGuidance": "Ehdotettu REVIEW.md-ohjeistus"
@@ -1404,7 +1408,7 @@
       "noDecision": "Ei päätöstä",
       "noResult": "Ei tulosta"
     },
-    "eyebrow": "Code Reviewer",
+    "eyebrow": "Koodin arvioija",
     "updateFailed": "Arvioijan päivittäminen epäonnistui",
     "configSaveFailed": "Arvioinnin konfiguraation tallentaminen epäonnistui",
     "status": {
@@ -1476,13 +1480,13 @@
       "noFiltersDescription": "Palaa takaisin ja avaa suodattimet uudelleen havaintoluettelosta.",
       "title": "Suodata havaintoja",
       "reset": "Palauta",
-      "repository": "Repositorio",
+      "repository": "Arkisto",
       "status": "Tila",
       "severity": "Vakavuus",
       "outcome": "Tulos",
       "slaStatus": "SLA-tila",
-      "sortBy": "Järjestä",
-      "allRepositories": "Kaikki repositoriot",
+      "sortBy": "Lajittele",
+      "allRepositories": "Kaikki arkistot",
       "all": "Kaikki",
       "statusOpen": "Avoin",
       "fixed": "Korjattu",
@@ -1495,8 +1499,8 @@
       "outcomeNotAnalyzed": "Ei analysoitu",
       "outcomeAnalyzing": "Analysoidaan",
       "outcomeFailed": "Analyysi epäonnistui",
-      "outcomeExploitable": "Hyväksikäytettävissä",
-      "outcomeNotExploitable": "Ei hyväksikäytettävissä",
+      "outcomeExploitable": "Hyödynnettävissä",
+      "outcomeNotExploitable": "Ei hyödynnettävissä",
       "outcomeSafeToDismiss": "Turvallista hylätä",
       "outcomeNeedsReview": "Vaatii tarkistuksen",
       "outcomeTriageComplete": "Luokittelu valmis",
@@ -1686,9 +1690,9 @@
       "couldNotLoadSettings": "Security Agent -asetuksia ei voitu ladata",
       "couldNotLoadPermissions": "Käyttöoikeuksia ei voitu ladata",
       "couldNotLoadRepositories": "Arkistoja ei voitu ladata",
-      "securityAgent": "Security Agent",
+      "securityAgent": "Tietoturva-agentti",
       "enabled": "Käytössä",
-      "disabled": "Poissa käytöstä",
+      "disabled": "Poistettu käytöstä",
       "on": "Päällä",
       "off": "Pois",
       "allRepositories": "Kaikki arkistot",
@@ -1700,7 +1704,7 @@
       "repositories": "Arkistot",
       "modelsAndAnalysis": "Mallit ja analyysi",
       "analysisModeSubtitle": "{{mode}}-analyysi",
-      "automation": "Automatisointi",
+      "automation": "Automaatio",
       "automationAllOff": "Kaikki pois",
       "automationCount": "{{displayCount}}/3 käytössä",
       "notifications": "Ilmoitukset",
@@ -1711,7 +1715,7 @@
       "disabledPrompt": "Ota Security Agent käyttöön synkronoidaksesi Dependabot-hälytykset, valitaksesi arkistot ja määrittääksesi automatisoinnin."
     },
     "remediation": {
-      "cancellationRequested": "Peruutus pyydetty",
+      "cancellationRequested": "Peruutusta pyydetty",
       "cancelled": "Korjaustoimenpide peruttu",
       "pullRequest": "pull request",
       "couldNotLoad": "Korjaustoimenpiteen tilaa ei voitu ladata",
@@ -1721,7 +1725,7 @@
       "retry": "Yritä korjaustoimenpidettä uudelleen",
       "cancelTitle": "Peruutetaanko tämä korjaustoimenpide?",
       "cancelMessage": "Security Agent pysäyttää käynnissä olevan korjaustoimenpiteen.",
-      "keepRunning": "Jatka käynnissä olevana",
+      "keepRunning": "Jatka suorittamista",
       "cancelRemediation": "Peruuta korjaustoimenpide",
       "openPullRequest": "Avaa pull request{{number}}",
       "openDraftPullRequest": "Avaa luonnos-pull request{{number}}",
@@ -1741,7 +1745,7 @@
         "noChangesNeeded": "Muutoksia ei tarvita",
         "cancelled": "Peruttu"
       },
-      "unavailable": "Korjaustoimenpide ei ole käytettävissä tälle havainnolle."
+      "unavailable": "Korjaus ei ole käytettävissä tälle havainnolle."
     },
     "analysisSettings": {
       "title": "Mallit ja analyysi",
@@ -1761,7 +1765,7 @@
       "couldNotLoad": "SLA-asetuksia ei voitu ladata",
       "critical": "Kriittinen",
       "high": "Korkea",
-      "medium": "Keskitasoinen",
+      "medium": "Keskitaso",
       "low": "Matala",
       "criticalDescription": "Etähallinta ilman todennusta.",
       "highDescription": "Mahdollinen merkittävä tietojen altistuminen.",
@@ -1796,7 +1800,7 @@
       "clearFilters": "Tyhjennä suodattimet"
     },
     "scopeList": {
-      "title": "Security Agent",
+      "title": "Tietoturva-agentti",
       "couldNotLoad": "Organisaatioita ei voitu ladata",
       "personal": "Henkilökohtainen",
       "personalSubtitle": "Sinun omat arkistosi"
@@ -1892,7 +1896,7 @@
     },
     "queuedActionUntracked": "Jonossa olevaa toimenpidettä ei voitu enää seurata. Päivitä nähdäksesi uusimman tilan.",
     "initialSyncAdmissionFailed": "Security Agent otettiin käyttöön, mutta alkusynkronointia ei voitu asettaa jonoon. Synkronoi uudelleen.",
-    "title": "Security Agent",
+    "title": "Tietoturva-agentti",
     "commands": {
       "findingAlreadyDismissed": "Havainto on jo hylätty",
       "findingDismissed": "Havainto hylätty",
@@ -2119,11 +2123,16 @@
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
       "cloneFailed": "Tätä istuntoa ei voitu kloonata.",
       "cloneFailedRetry": "Tätä istuntoa ei voitu kloonata. Yritä uudelleen.",
-      "connectRepositoryToContinue": "Yhdistä arkisto jatkaaksesi."
+      "connectRepositoryToContinue": "Yhdistä arkisto jatkaaksesi.",
+      "notEnoughCredits": "Ei riittävästi krediittejä Cloud Agentin käyttämiseen. Lisää krediittejä ja yritä uudelleen.",
+      "previousTaskFinishing": "Edellinen tehtävä on vielä viimeistelyssä. Odota hetki.",
+      "serviceUnavailable": "Palvelu ei ole tällä hetkellä käytettävissä. Yritä uudelleen.",
+      "connectionTrouble": "Yhteysongelma. Yritä uudelleen hetken kuluttua.",
+      "modelUnavailable": "Tämä malli ei ole käytettävissä Cloud Agentille. Valitse toinen malli ja yritä uudelleen."
     },
     "remoteSession": {
       "failedToCreate": "Etäistunnon luonti epäonnistui",
-      "exited": "Istunto suljettu",
+      "exited": "Istunto päättyi",
       "failedToExit": "Istunnon sulkeminen epäonnistui",
       "exitTitle": "Poistutaanko istunnosta?",
       "exitMessage": "Tämä pysäyttää käynnissä olevan istunnon mutta säilyttää sen historian.",
@@ -2176,7 +2185,8 @@
       "discardDraftMessage": "Kehotteesi menetetään.",
       "keepEditing": "Jatka muokkausta",
       "discard": "Hylkää",
-      "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen."
+      "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Päivitetty {{displayCount}} tiedosto",
@@ -2203,7 +2213,7 @@
       "toolGrep": "grep",
       "toolList": "list",
       "toolPatch": "patch",
-      "toolTask": "task",
+      "toolTask": "Tehtävä",
       "readTodos": "Lue tehtävät",
       "updateTodos": "Päivitä tehtävät",
       "linesBadge": "{{displayCount}} riviä",
@@ -2281,7 +2291,7 @@
       "sent": "Lähetetty",
       "model": "Malli",
       "costAndTokens": "Kustannukset ja tokenit",
-      "cost": "Kustannus",
+      "cost": "Hinta",
       "input": "Syöte",
       "output": "Lähtö",
       "reasoning": "Päättely",
@@ -2471,11 +2481,11 @@
     },
     "modelPicker": {
       "title": "Valitse malli",
-      "searchPlaceholder": "Hae malleja...",
+      "searchPlaceholder": "Hae malleja…",
       "noModels": "Ei malleja saatavilla",
       "noModelsDescription": "Ei ole malleja valittavaksi.",
       "favorites": "Suosikit",
-      "recommended": "Suositellut",
+      "recommended": "Suositeltu",
       "allModels": "Kaikki mallit"
     },
     "modelSelector": {
@@ -2511,7 +2521,7 @@
     },
     "attachmentPicker": {
       "camera": "Kamera",
-      "photoLibrary": "Kuvakirjasto",
+      "photoLibrary": "Valokuvakirjasto",
       "files": "Tiedostot",
       "cameraAccessDisabled": "Kameran käyttö estetty",
       "cameraAccessMessage": "Salli kameran käyttö Asetuksissa ottaaksesi valokuvan.",
@@ -2609,7 +2619,7 @@
       "open": "avoin pull request",
       "closed": "suljettu pull request",
       "merged": "yhdistetty pull request",
-      "draft": "luonnos pull request",
+      "draft": "Luonnos-pull request",
       "updating": "Päivitetään, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
@@ -2617,7 +2627,7 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "Tiliäsi ei voitu ladata",
-    "couldNotLoadAccountDescription": "Tarkista yhteytesi ja yritä uudelleen.",
+    "couldNotLoadAccountDescription": "Tarkista yhteys ja yritä uudelleen.",
     "couldNotLoadPrivacy": "Yksityisyysvalintoja ei voitu ladata",
     "couldNotLoadPrivacyDescription": "Tarkista laitteesi tietoturva-asetukset ja yritä uudelleen.",
     "contentReady": "Sisältö valmis",
@@ -2662,19 +2672,14 @@
     "couldNotLoadSessions": "Istuntoja ei voitu ladata",
     "couldNotLoadActiveSessions": "Aktiivisia istuntoja ei voitu ladata",
     "agentSessions": "Agentti-istunnot",
-    "showingSavedSessions": "Näytetään tallennetut istunnot — reaaliaikainen tila voi olla vanhentunut",
-    "startNewAgentSession": "Aloita uusi Kilo Agent -istunto",
-    "aiCodingSessions": "AI-koodausistunnot",
-    "startCodingTaskFromPhone": "Aloita koodaustehtävä puhelimestasi tai jatka istuntoa CLI:stäsi.",
-    "tryIt": "Kokeile",
     "newCodingTask": "Uusi koodaustehtävä",
     "explore": "Tutustu",
     "seeAll": "Näytä kaikki",
-    "kiloAgents": "Kilo Agentit"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Sulje {{filename}}",
-    "imageUnavailable": "Kuva ei saatavilla",
+    "imageUnavailable": "Kuva ei käytettävissä",
     "share": "Jaa {{filename}}"
   },
   "invalidRoute": {
@@ -2697,10 +2702,10 @@
     "neutralDescription": "Yritä uudelleen.",
     "offlineTitle": "Lataus epäonnistui",
     "offlineDescription": "Jokin meni pieleen",
-    "permissionTitle": "Pääsy estetty",
+    "permissionTitle": "Pääsy evätty",
     "permissionDescription": "Sinulla ei ole oikeutta tarkastella tätä.",
     "notFoundTitle": "Ei löytynyt",
-    "notFoundDescription": "Tämä kohde on ehkä poistettu tai ei ole enää saatavilla.",
+    "notFoundDescription": "Tämä kohde on saatettu poistaa tai se ei ole enää käytettävissä.",
     "serverTitle": "Ei voitu ladata",
     "serverDescription": "Jokin meni pieleen meidän puolellamme. Yritä uudelleen."
   },
@@ -2715,7 +2720,7 @@
     "optionsExpiredDescription": "Palaa takaisin ja avaa tämä valitsin uudelleen edellisestä näkymästä."
   },
   "sessionRow": {
-    "needsInput": "VAATII SYÖTTEEN"
+    "needsInput": "vaatii syötettä"
   },
   "voiceInput": {
     "listening": "Kuunnellaan...",
@@ -2922,7 +2927,7 @@
   "organization": {
     "boundary": {
       "backToProfile": "Takaisin profiiliin",
-      "loadErrorMessage": "Tarkista yhteytesi ja yritä uudelleen.",
+      "loadErrorMessage": "Tarkista yhteys ja yritä uudelleen.",
       "loadErrorTitle": "Organisaatioitasi ei voitu ladata",
       "organizationUnavailable": "Organisaatio ei käytettävissä",
       "selectDescription": "Valitse organisaatio profiilistasi jatkaaksesi.",
@@ -3034,10 +3039,10 @@
     },
     "permissionDenied": {
       "back": "Takaisin",
-      "title": "Pääsy estetty"
+      "title": "Pääsy evätty"
     },
     "usageStats": {
-      "cost": "Kustannus",
+      "cost": "Hinta",
       "inputTokens": "Syöttötokenit",
       "last30Days": "Viimeiset 30 päivää",
       "outputTokens": "Tulostetokenit",

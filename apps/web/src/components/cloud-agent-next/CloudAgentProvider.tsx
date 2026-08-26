@@ -19,6 +19,7 @@ import {
 import type { SendMessagePayload } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@/lib/constants';
 import { usePostHog } from 'posthog-js/react';
+import { fetchWebSessionSnapshotPage } from './session-page-adapter';
 
 const ManagerContext = createContext<SessionManager | null>(null);
 const UserWebConnectionContext = createContext<UserWebConnection | null>(null);
@@ -145,6 +146,8 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           messages: messagesResult.messages as SessionSnapshot['messages'],
         };
       },
+
+      fetchSnapshotPage: (id, options) => fetchWebSessionSnapshotPage(trpcClient, id, options),
 
       userWebConnection: sharedConnection,
 

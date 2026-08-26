@@ -1,15 +1,14 @@
 /**
- * Fake LLM gateway for cloud-agent E2E harness.
+ * Fake LLM for cloud-agent E2E harness.
  *
- * Masquerades as the OpenRouter-compatible endpoint used by model preflight
- * and real kilo through `@openrouter/ai-sdk-provider`. When `.dev.vars` sets
- * `KILO_OPENROUTER_BASE=http://localhost:<port>/api`, the Worker calls
- * `POST /api/openrouter/models/validate` and translates the URL for sandboxed
- * kilo requests to `GET /api/openrouter/models` and
- * `POST /api/openrouter/chat/completions`.
+ * Preferred path: local Next.js routes `fake-deterministic` here while
+ * `KILO_OPENROUTER_BASE` stays on the real gateway. Masquerade routes
+ * (`/api/openrouter/{models,models/validate,chat/completions}`) still work
+ * if something points at this service directly.
  *
  * Directives in the last user message's content drive scenarios:
  *   `__fake__:<scenario>[:<arg1>[:<arg2>...]]`
+ * No directive echoes the last user message (minus kilo wrappers).
  *
  * See `README.md` in this directory for the local harness protocol.
  *
@@ -120,7 +119,7 @@ type Message = { role?: string; content?: string | MessagePart[] };
  * `[{ type: 'text', text: '...' }, ...]`. Concatenates all text parts.
  *
  * Returns '' if there's no user message or no extractable text — which will
- * route to the unknown-scenario fallback.
+ * echo an empty completion.
  */
 export function extractLastUserMessageText(body: unknown): string {
   if (typeof body !== 'object' || body === null) return '';
@@ -141,6 +140,14 @@ export function extractLastUserMessageText(body: unknown): string {
     return '';
   }
   return '';
+}
+
+/**
+ * Drop kilo's appended `<environment_details>` block so a default echo does
+ * not write system context back into the assistant transcript.
+ */
+export function stripKiloPromptWrapping(text: string): string {
+  return text.replace(/<environment_details>[\s\S]*?<\/environment_details>/gi, '').trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -301,6 +308,12 @@ export type ScenarioContext = {
 
 export type ScenarioHandler = (args: string[], ctx: ScenarioContext) => Promise<void> | void;
 
+function emitEcho(ctx: ScenarioContext, text: string): void {
+  writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { role: 'assistant', content: text }));
+  writeFinish(ctx.res, ctx.id, ctx.model, text.length);
+  ctx.res.end();
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -311,17 +324,11 @@ function sleep(ms: number): Promise<void> {
  */
 export const scenarioRegistry: Record<string, ScenarioHandler> = {
   echo(args, ctx) {
-    // Kilo wraps the user message with `<environment_details>` and other
-    // system context; strip that so the echo'd assistant response contains
-    // only the scenario's payload. Otherwise kilo's subsequent turns see
-    // garbled history (assistant text containing system tags) and stop
-    // issuing LLM calls — a real-LLM scenario would never have that
-    // contamination because real LLMs don't blindly echo their input.
+    // Harness `echo:<token>` only takes the first identifier so kilo's
+    // appended `<environment_details>` cannot leak into the transcript.
     const rawArg = args[0] ?? '';
     const text = rawArg.match(/^([A-Za-z0-9_-]*)/)?.[1] ?? '';
-    writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { role: 'assistant', content: text }));
-    writeFinish(ctx.res, ctx.id, ctx.model, text.length);
-    ctx.res.end();
+    emitEcho(ctx, text);
   },
 
   async slow(args, ctx) {
@@ -514,8 +521,8 @@ async function handleChatCompletions(
     route: 'POST /api/openrouter/chat/completions',
     model: bodyModel,
     messages: messageCount,
-    scenario: directive?.scenario,
-    args: directive ? directive.args.join('|') : undefined,
+    scenario: directive?.scenario ?? 'echo',
+    args: directive ? directive.args.join('|') : '(default)',
   });
 
   const ctx: ScenarioContext = {
@@ -545,7 +552,7 @@ async function handleChatCompletions(
   });
 
   if (directive === null) {
-    writeJsonError(res, 402, `unknown fake scenario: <missing directive>`, 'invalid_request');
+    emitEcho(ctx, stripKiloPromptWrapping(prompt));
     return;
   }
 

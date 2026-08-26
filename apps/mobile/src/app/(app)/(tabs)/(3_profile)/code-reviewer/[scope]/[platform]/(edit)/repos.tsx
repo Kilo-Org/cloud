@@ -115,7 +115,7 @@ export default function ReposRoute() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('codeReviewer.repos.title')} />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         {capabilities.selectionModePicker && (
           <RadioGroup label={t('codeReviewer.repos.title')}>
             {(['all', 'selected'] as const).map(option => (

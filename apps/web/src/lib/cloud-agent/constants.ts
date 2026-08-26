@@ -178,11 +178,7 @@ export function normalizeAttachmentExtension(extension: string | undefined | nul
 export type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 
 /**
- * Maximum prompt length (in characters) accepted by the cloud agent.
- *
- * Mirrors the server-side cap in `services/cloud-agent-next/src/schema.ts`
- * (`Limits.MAX_PROMPT_LENGTH`). Prompts exceeding this would be rejected by
- * the worker, so we enforce the same limit client-side to give users
- * immediate feedback.
+ * Maximum prompt length (in characters) accepted by the cloud agent. Defined
+ * once in the SDK so the web, mobile, and extension composers share it.
  */
-export const CLOUD_AGENT_PROMPT_MAX_LENGTH = 100_000;
+export { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';

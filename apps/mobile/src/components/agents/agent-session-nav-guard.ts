@@ -27,12 +27,14 @@ export function pushAgentSessionOnce(params: {
   now: number;
   sessionId: string;
   organizationId?: string | null;
+  /** Title already on screen; seeds the destination header's first frame. */
+  title?: string;
 }): boolean {
-  const { state, router, now, sessionId, organizationId } = params;
+  const { state, router, now, sessionId, organizationId, title } = params;
   if (now - state.lastPushAt < AGENT_SESSION_NAV_GUARD_MS) {
     return false;
   }
   state.lastPushAt = now;
-  router.push(getAgentSessionPath(sessionId, organizationId ?? undefined));
+  router.push(getAgentSessionPath(sessionId, organizationId ?? undefined, title));
   return true;
 }

@@ -12,6 +12,7 @@ import {
   extractLastUserMessageText,
   parseDirective,
   startFakeLlmServer,
+  stripKiloPromptWrapping,
   type FakeLlmServerHandle,
 } from '../e2e/fake-llm-server.js';
 
@@ -109,6 +110,20 @@ describe('extractLastUserMessageText', () => {
 
   it('returns empty when no user message exists', () => {
     expect(extractLastUserMessageText({ messages: [{ role: 'system', content: 'sys' }] })).toBe('');
+  });
+});
+
+describe('stripKiloPromptWrapping', () => {
+  it('returns the prompt unchanged when no wrappers are present', () => {
+    expect(stripKiloPromptWrapping('hello world')).toBe('hello world');
+  });
+
+  it('removes environment_details and trims leftover whitespace', () => {
+    expect(
+      stripKiloPromptWrapping(
+        'hello world\n\n<environment_details>\nCurrent time: 2026-05-05T10:17:23+00:00\n</environment_details>'
+      )
+    ).toBe('hello world');
   });
 });
 
@@ -299,12 +314,26 @@ describe('fake-llm-server HTTP', () => {
     expect(body.error.message).toContain('unknown fake scenario: nosuch');
   });
 
-  it('missing directive returns HTTP 402', async () => {
+  it('missing directive echoes the last user message', async () => {
     const h = await start();
     const res = await postChat(h.url, 'just some prompt with no directive');
-    expect(res.status).toBe(402);
-    const body = (await res.json()) as { error: { message: string } };
-    expect(body.error.message).toContain('missing directive');
+    expect(res.status).toBe(200);
+    const chunks = await readAllSse(res.body!);
+    const parsed = chunks.slice(0, -1).map(c => JSON.parse(c.data));
+    expect(parsed[0].choices[0].delta.content).toBe('just some prompt with no directive');
+    expect(parsed[parsed.length - 1].choices[0].finish_reason).toBe('stop');
+  });
+
+  it('missing directive strips kilo environment_details from the echo', async () => {
+    const h = await start();
+    const res = await postChat(
+      h.url,
+      'hello world\n<environment_details>\nCurrent time: 2026-05-05T10:17:23+00:00\n</environment_details>'
+    );
+    expect(res.status).toBe(200);
+    const chunks = await readAllSse(res.body!);
+    const parsed = chunks.slice(0, -1).map(c => JSON.parse(c.data));
+    expect(parsed[0].choices[0].delta.content).toBe('hello world');
   });
 
   it('invalid JSON body returns HTTP 400', async () => {

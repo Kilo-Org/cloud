@@ -38,7 +38,9 @@
     "catalogLoadFailed": "Не вдалося завантажити мову. Спробуйте ще раз.",
     "search": "Пошук мов",
     "noMatches": "Немає мов за запитом",
-    "deviceLanguage": "Мова пристрою"
+    "deviceLanguage": "Мова пристрою",
+    "current": "Поточна",
+    "allLanguages": "Усі мови"
   },
   "login": {
     "welcome": "Ласкаво просимо до Kilo",
@@ -148,7 +150,9 @@
     "appearanceSystem": "Системна",
     "appearanceLight": "Світла",
     "appearanceDark": "Темна",
-    "account": "Обліковий запис"
+    "account": "Обліковий запис",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "Сповіщення",
@@ -245,7 +249,7 @@
     "reactions": {
       "title": "Реакції",
       "close": "Закрити реакції",
-      "recent": "Недавні",
+      "recent": "Нещодавні",
       "common": "Поширені",
       "reactWith": "Реагувати з {{reaction}}",
       "accessibility": "{{emoji}} реакція, {{displayCount}}"
@@ -330,7 +334,7 @@
     },
     "attachmentPicker": {
       "takePhoto": "Зробити фото",
-      "photoLibrary": "Фотоальбом",
+      "photoLibrary": "Фототека",
       "files": "Файли",
       "cameraAccessDisabled": "Доступ до камери вимкнено",
       "cameraAccessMessage": "Дозвольте доступ до камери в налаштуваннях, щоб зробити фото."
@@ -344,7 +348,7 @@
       "typing_many": "{{names}} друкують..."
     },
     "botStatus": {
-      "online": "У мережі",
+      "online": "Онлайн",
       "idle": "Неактивний",
       "offline": "Не в мережі",
       "unknown": "Невідомо",
@@ -365,7 +369,7 @@
     "billing": {
       "title": "Оплата",
       "continueMonthToMonth": "Продовжити щомісячно",
-      "plan": "Тариф",
+      "plan": "План",
       "finalTermEnds": "Останній період завершується",
       "afterFinalTerm": "Після останнього періоду",
       "remaining": "Залишилося",
@@ -720,7 +724,7 @@
       "destroying": "ЗНИЩЕННЯ",
       "provisioned": "ПІДГОТОВЛЕНО",
       "restarting": "ПЕРЕЗАПУСК",
-      "running": "ПРАЦЮЄ",
+      "running": "Виконується",
       "shuttingDown": "ЗАВЕРШЕННЯ РОБОТИ",
       "starting": "ЗАПУСК",
       "stopped": "ЗУПИНЕНО",
@@ -878,11 +882,11 @@
       "created": "Створено",
       "decision": "Рішення",
       "details": "Деталі",
-      "findings": "Зауваження",
+      "findings": "Знахідки",
       "gate": "Шлюз",
       "gateHidden": "Приховано",
       "gateNone": "Немає",
-      "keepRunning": "Продовжити",
+      "keepRunning": "Продовжити виконання",
       "model": "Модель",
       "noFindings": "Зауважень немає",
       "openPullRequest": "Відкрити pull request",
@@ -924,14 +928,14 @@
     },
     "scopeList": {
       "couldNotLoad": "Не вдалося завантажити організації",
-      "personal": "Особисті",
+      "personal": "Особисте",
       "personalStillAvailable": "Особисті репозиторії все ще доступні нижче.",
       "personalSubtitle": "Ваші власні репозиторії",
       "viewOnly": "Лише перегляд"
     },
     "selectRepositories": "Вибрати репозиторії",
     "selectRepository": "Виберіть принаймні один репозиторій, щоб увімкнути автоматичні перевірки.",
-    "title": "Code Reviewer",
+    "title": "Перевіряльник коду",
     "webhookSetup": "Налаштування вебхука не завершено",
     "webhookSetupDescription": "Деякі репозиторії можуть не отримувати автоматичні перевірки.",
     "decision": {
@@ -940,7 +944,7 @@
       "noResult": "Без результату",
       "pass": "Пройдено"
     },
-    "eyebrow": "Code Reviewer",
+    "eyebrow": "Перевіряльник коду",
     "overview": {
       "allAreas": "Усі області",
       "allRepositories": "Усі репозиторії",
@@ -1681,11 +1685,16 @@
       "couldNotLoadThisSession": "Не вдалося завантажити цей сеанс",
       "cloneFailed": "Не вдалося клонувати цей сеанс.",
       "cloneFailedRetry": "Не вдалося клонувати цей сеанс. Спробуйте ще раз.",
-      "connectRepositoryToContinue": "Підключіть репозиторій, щоб продовжити."
+      "connectRepositoryToContinue": "Підключіть репозиторій, щоб продовжити.",
+      "notEnoughCredits": "Недостатньо кредитів для запуску Cloud Agent. Додайте кредити та спробуйте ще раз.",
+      "previousTaskFinishing": "Попереднє завдання ще завершується. Зачекайте, будь ласка.",
+      "serviceUnavailable": "Сервіс зараз недоступний. Спробуйте ще раз, будь ласка.",
+      "connectionTrouble": "Проблеми зі з'єднанням. Спробуйте ще раз за мить.",
+      "modelUnavailable": "Ця модель недоступна для Cloud Agent. Виберіть іншу модель і спробуйте ще раз."
     },
     "remoteSession": {
       "failedToCreate": "Не вдалося створити віддалений сеанс",
-      "exited": "Сеанс завершено",
+      "exited": "Сесію завершено",
       "failedToExit": "Не вдалося завершити сеанс",
       "exitTitle": "Завершити сеанс?",
       "exitMessage": "Це зупиняє запущений сеанс, але зберігає його історію.",
@@ -1738,7 +1747,8 @@
       "discardDraftMessage": "Ваш запит буде втрачено.",
       "discardDraftTitle": "Відкинути чернетку?",
       "discardFailed": "Не вдалося відкинути чернетку. Спробуйте ще раз.",
-      "keepEditing": "Продовжити редагування"
+      "keepEditing": "Продовжити редагування",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Оновлено {{displayCount}} файл",
@@ -1865,7 +1875,7 @@
       "textDisplay": "Текстове відображення",
       "thinking": "Мислення",
       "thought": "Думка",
-      "title": "Відомості",
+      "title": "Деталі",
       "showDetails": "Показати відомості",
       "pending": "Очікування…",
       "running": "Виконання…"
@@ -2233,16 +2243,11 @@
   "home": {
     "couldNotLoadSessions": "Не вдалося завантажити сеанси",
     "couldNotLoadActiveSessions": "Не вдалося завантажити активні сеанси",
-    "agentSessions": "Сеанси агента",
-    "showingSavedSessions": "Показано збережені сеанси — живий статус може бути застарілим",
-    "startNewAgentSession": "Розпочати новий сеанс Kilo Agent",
-    "aiCodingSessions": "Сеанси кодування з ШІ",
-    "startCodingTaskFromPhone": "Розпочніть завдання кодування з телефона або продовжте сеанс зі свого CLI.",
-    "tryIt": "Спробувати",
+    "agentSessions": "Сесії агента",
     "newCodingTask": "Нове завдання кодування",
     "explore": "Дослідити",
     "seeAll": "Показати всі",
-    "kiloAgents": "Агенти Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Закрити {{filename}}",
@@ -2251,7 +2256,7 @@
   },
   "invalidRoute": {
     "description": "Це посилання більше недійсне.",
-    "goBack": "Повернутися",
+    "goBack": "Назад",
     "title": "Сторінку не знайдено"
   },
   "monoScrollBlock": {
@@ -2287,7 +2292,7 @@
     "optionsExpiredDescription": "Поверніться та знову відкрийте цей вибір з попереднього екрана."
   },
   "sessionRow": {
-    "needsInput": "ПОТРІБНЕ ВВЕДЕННЯ"
+    "needsInput": "потребує вводу"
   },
   "voiceInput": {
     "listening": "Слухаю...",
@@ -2376,7 +2381,7 @@
     "managedOnGooglePlay": "Керується в Google Play",
     "managedInAppStore": "Керується в App Store",
     "managedOnWeb": "Цим Kilo Pass керують у веб-версії",
-    "opensManagementOnWeb": "Відкриває керування Kilo Pass у веб-версії.",
+    "opensManagementOnWeb": "Відкриває керування Kilo Pass у вебверсії.",
     "opensAppStoreManagement": "Відкриває керування підпискою в App Store.",
     "opensPlans": "Відкриває тарифи Kilo Pass.",
     "tryAgainFromProfile": "Спробуйте ще раз у профілі.",
@@ -3069,7 +3074,7 @@
     },
     "permissionDenied": {
       "back": "Назад",
-      "title": "У доступі відмовлено"
+      "title": "Доступ заборонено"
     },
     "usageStats": {
       "cost": "Вартість",
@@ -3084,7 +3089,7 @@
       "couldNotLoadStatus": "Не вдалося завантажити стан",
       "creditProcessingDelayed": "Обробку кредитів затримано · повторюється автоматично",
       "ended": "Завершено",
-      "endsOn": "Завершується {{date}}",
+      "endsOn": "Закінчується {{date}}",
       "loading": "Завантаження…",
       "manageHint": "Відкриває керування Kilo Pass у вебверсії.",
       "notSubscribed": "Немає підписки",
@@ -3136,7 +3141,7 @@
     "startSignInFailed": "Не вдалося розпочати вхід. Спробуйте ще раз.",
     "couldNotOpenBrowser": "Не вдалося відкрити браузер. Спробуйте ще раз.",
     "signInTimedOut": "Час входу минув. Спробуйте ще раз.",
-    "signInFailed": "Вхід не вдався. Спробуйте ще раз.",
+    "signInFailed": "Не вдалося ввійти. Спробуйте ще раз.",
     "networkError": "Помилка мережі. Спробуйте ще раз.",
     "accessDeniedByUser": "Користувач відмовив у доступі",
     "codeExpired": "Термін дії коду минув",

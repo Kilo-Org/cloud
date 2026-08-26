@@ -3,13 +3,19 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
-import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { expandPlatformFilter } from '@/components/agents/session-list-helpers';
 import { StoredSessionRow } from '@/components/agents/session-row';
+import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { SectionHeader } from '@/components/home/section-header';
 import { Text } from '@/components/ui/text';
-import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
-import { parseTimestamp } from '@/lib/utils';
+import {
+  type ActiveSession,
+  type StoredSession,
+  useAgentSessions,
+} from '@/lib/hooks/use-agent-sessions';
+import { cn, parseTimestamp } from '@/lib/utils';
+
+export const HOME_LIVE_SLOT_MIN_CLASS = 'min-h-[72px]';
 
 const MAX_ROWS = 3;
 const CLOUD_AGENT_PLATFORMS = new Set(expandPlatformFilter(['cloud-agent']));
@@ -26,7 +32,7 @@ type Row =
       session: StoredSession;
     };
 
-function buildRows(params: {
+export function buildRows(params: {
   activeSessions: ActiveSession[];
   storedSessions: StoredSession[];
   activeSessionIds: Set<string>;
@@ -47,7 +53,6 @@ function buildRows(params: {
     CLOUD_AGENT_PLATFORMS.has(s.created_on_platform)
   );
   const live = cloudAgentStored.filter(s => activeSessionIds.has(s.session_id));
-  const offline = cloudAgentStored.filter(s => !activeSessionIds.has(s.session_id));
 
   const sortByUpdated = (a: StoredSession, b: StoredSession) =>
     parseTimestamp(b.status_updated_at ?? b.updated_at).getTime() -
@@ -64,57 +69,22 @@ function buildRows(params: {
     }
   }
 
-  // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; spread already prevents mutation of the source
-  for (const session of [...offline].sort(sortByUpdated)) {
-    if (rows.length >= MAX_ROWS) {
-      break;
-    }
-    if (!seenSessionIds.has(session.session_id)) {
-      rows.push({ key: `stored:${session.session_id}`, kind: 'stored', session });
-      seenSessionIds.add(session.session_id);
-    }
-  }
-
   return rows;
 }
 
-// Whether the Home "Agent sessions" section has anything to render — mirrors
-// buildRows' inclusion rule (any active session, or a cloud-agent stored
-// session; stored CLI/other-platform sessions live on the Agents tab, not
-// Home). The Home screen gates its section/promo/new-task button on this so a
-// CLI-only account shows the first-use promo instead of an empty section.
-export function hasDisplayableAgentSessions(
-  storedSessions: StoredSession[],
-  activeSessions: ActiveSession[]
-): boolean {
-  return (
-    activeSessions.length > 0 ||
-    storedSessions.some(s => CLOUD_AGENT_PLATFORMS.has(s.created_on_platform))
-  );
-}
-
 type AgentSessionsSectionProps = {
-  activeSessions: ActiveSession[];
-  storedSessions: StoredSession[];
-  activeSessionIds: Set<string>;
-  activeIsError: boolean;
+  organizationId: string | null;
 };
 
-export function AgentSessionsSection({
-  activeSessions,
-  storedSessions,
-  activeSessionIds,
-  activeIsError,
-}: Readonly<AgentSessionsSectionProps>) {
+export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsSectionProps>) {
   const router = useRouter();
   const { t } = useTranslation();
+  const { activeSessions, storedSessions, activeSessionIds } = useAgentSessions({
+    organizationId,
+  });
   const navigateToSession = useAgentSessionNavigator();
 
   const rows = buildRows({ activeSessions, storedSessions, activeSessionIds });
-
-  if (rows.length === 0) {
-    return null;
-  }
 
   return (
     <View>
@@ -125,19 +95,18 @@ export function AgentSessionsSection({
           router.push('/(app)/(tabs)/(2_agents)' as Href);
         }}
       />
-      {activeIsError ? (
-        <Text variant="muted" className="mx-4 mb-2 text-xs">
-          {t('home.showingSavedSessions')}
-        </Text>
-      ) : null}
       <View className="mx-4 gap-2">
+        {rows.length === 0 && <LiveNowEmpty />}
         {rows.map(row => {
           if (row.kind === 'active') {
             const { session } = row;
             return (
               <View
                 key={row.key}
-                className="overflow-hidden rounded-2xl border border-border bg-card"
+                className={cn(
+                  'overflow-hidden rounded-2xl border border-border bg-card',
+                  HOME_LIVE_SLOT_MIN_CLASS
+                )}
               >
                 <RemoteSessionRow
                   session={session}
@@ -154,7 +123,10 @@ export function AgentSessionsSection({
           return (
             <View
               key={row.key}
-              className="overflow-hidden rounded-2xl border border-border bg-card"
+              className={cn(
+                'overflow-hidden rounded-2xl border border-border bg-card',
+                HOME_LIVE_SLOT_MIN_CLASS
+              )}
             >
               <StoredSessionRow
                 session={session}
@@ -162,13 +134,34 @@ export function AgentSessionsSection({
                 variant="card"
                 interactive={false}
                 onPress={() => {
-                  navigateToSession(session.session_id, session.organization_id);
+                  navigateToSession(
+                    session.session_id,
+                    session.organization_id,
+                    session.title ?? undefined
+                  );
                 }}
               />
             </View>
           );
         })}
       </View>
+    </View>
+  );
+}
+
+function LiveNowEmpty() {
+  const { t } = useTranslation();
+
+  return (
+    <View
+      className={cn(
+        'items-center justify-center rounded-2xl border border-border bg-card px-4',
+        HOME_LIVE_SLOT_MIN_CLASS
+      )}
+    >
+      <Text variant="muted" className="text-sm">
+        {t('home.noLiveSessions')}
+      </Text>
     </View>
   );
 }

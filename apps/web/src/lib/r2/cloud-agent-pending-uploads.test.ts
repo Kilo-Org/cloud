@@ -409,4 +409,36 @@ describe('cloud-agent pending-upload ledger', () => {
       )[0]?.status
     ).toBe('pending');
   });
+
+  it('claims an expired row before deleting its object so a late link cannot lose it', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachment = crypto.randomUUID();
+    const objectKey = buildObjectKey(kiloUserId, messageUuid, attachment);
+    const past = new Date(Date.now() - 60_000).toISOString();
+
+    await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: attachment,
+      expiresAt: past,
+    });
+
+    // A row picked by the reaper must already be claimed when DeleteObject
+    // runs. If it were still 'pending', linkPendingUploads could flip it to
+    // 'linked' and the sent attachment would lose its object.
+    const statusesAtDelete: (string | undefined)[] = [];
+    mockSend.mockImplementation(async () => {
+      const rows = await db
+        .select({ status: cloud_agent_pending_uploads.status })
+        .from(cloud_agent_pending_uploads)
+        .where(eq(cloud_agent_pending_uploads.object_key, objectKey));
+      statusesAtDelete.push(rows[0]?.status);
+      return {};
+    });
+
+    await reapAbandonedUploads();
+
+    expect(statusesAtDelete).toEqual(['reaped']);
+  });
 });

@@ -436,6 +436,14 @@ export async function createPendingIntegration({
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
+    .onConflictDoNothing({
+      target: [
+        platform_integrations.platform,
+        platform_integrations.github_app_type,
+        platform_integrations.platform_account_id,
+      ],
+      where: sql`${platform_integrations.platform} = 'github' AND ${platform_integrations.integration_status} = 'pending' AND ${platform_integrations.platform_installation_id} IS NULL AND ${platform_integrations.platform_account_id} IS NOT NULL`,
+    })
     .returning();
 
   return result;

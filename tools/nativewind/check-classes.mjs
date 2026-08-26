@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Tailwind classes that NativeWind silently drops on native.
+ * Tailwind classes that go wrong in a way nothing else reports.
  *
- * A dropped class is invisible: the element renders with no background, no
- * alignment, no border, and nothing in the build says so. Each rule below is
- * pinned by a compiler assertion further down, so the ban lifts the moment
- * react-native-css handles the value.
+ * Two kinds. Some are dropped outright, so the element renders with no
+ * background, no shadow, no alignment, and the build stays quiet — each of
+ * those bans is pinned to a compiler assertion further down, so it lifts the
+ * moment react-native-css handles the value. The rest apply, but land in the
+ * wrong place, and only in one writing direction.
  *
  * Usage: node tools/nativewind/check-classes.mjs
  */
@@ -65,6 +66,35 @@ const RULES = [
   },
 ];
 
+/**
+ * Horizontal padding on a scroll container's own `className` reaches the
+ * native scroll view instead of its content, and in RTL the content is then
+ * offset by the padding — measured at 0dp / 42dp on a screen that should have
+ * been 21 / 21, with cards running off the trailing edge. Correct in LTR, so
+ * nothing catches it until someone reads the app in Arabic, Farsi or Hebrew.
+ */
+const SCROLL_CONTAINERS =
+  '(?:Animated\\.)?(?:ScrollView|TabScreenScrollView|FlatList|FlashList|KeyboardAwareScrollView)';
+const SCROLL_TAG = new RegExp(`<(${SCROLL_CONTAINERS})\\b([^>]*?)/?>`, 'gs');
+const OWN_CLASS_NAME = /(?<!contentContainer)className="([^"]*)"/;
+const HORIZONTAL_PADDING = /^-?(?:px|pl|pr|ps|pe)-/;
+
+function checkScrollPadding(relative, text) {
+  for (const match of text.matchAll(SCROLL_TAG)) {
+    const className = OWN_CLASS_NAME.exec(match[2]);
+    if (!className) {
+      continue;
+    }
+    const padding = className[1].split(/\s+/).filter(cls => HORIZONTAL_PADDING.test(cls));
+    if (padding.length > 0) {
+      const line = text.slice(0, match.index).split('\n').length;
+      fail(
+        `${relative}:${line}: <${match[1]}> carries "${padding.join(' ')}" on its own className; move it to contentContainerClassName or the RTL layout offsets by it`
+      );
+    }
+  }
+}
+
 function sourceFiles(dir, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
@@ -82,6 +112,8 @@ function sourceFiles(dir, out = []) {
 for (const dir of SOURCE_DIRS) {
   for (const file of sourceFiles(dir)) {
     const text = readFileSync(file, 'utf8');
+    const relative = file.slice(ROOT.length);
+    checkScrollPadding(relative, text);
     const lines = text.split('\n');
     for (const rule of RULES) {
       for (const [index, line] of lines.entries()) {
@@ -90,7 +122,6 @@ for (const dir of SOURCE_DIRS) {
           continue;
         }
         for (const match of line.matchAll(rule.pattern)) {
-          const relative = file.slice(ROOT.length);
           fail(`${relative}:${index + 1}: "${match[0]}" ${rule.advice}`);
         }
       }
@@ -139,4 +170,4 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log('check-classes: no silently-dropped NativeWind classes');
+console.log('check-classes: no dropped or direction-dependent NativeWind classes');

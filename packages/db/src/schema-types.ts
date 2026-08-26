@@ -997,6 +997,9 @@ const OrganizationSettingsSchema = z.object({
   is_sales_demo: z.boolean().optional(),
   // When sales demo credits were last reset (ISO timestamp string)
   sales_demo_last_reset_at: z.string().nullable().optional(),
+  // Seeded usage microdollars written by the sales demo populate step. Used to
+  // separate seeded usage from real spend when computing the ledger entry.
+  sales_demo_seeded_microdollars: z.number().optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;

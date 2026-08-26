@@ -430,7 +430,7 @@
       "noRecentPrs": "Enweghị PR na-adịbeghị anya",
       "noRecentPrsDescription": "Mado njikọ PR n'elu ịmalite nyocha — ọ ga-apụta ebe a oge ọzọ.",
       "couldNotLoad": "Enweghị ike ibugo",
-      "remove": "Wepu",
+      "remove": "Wepụ",
       "removeFromRecentsTitle": "Wepu na ndị na-adịbeghị anya?",
       "removeFromRecentsMessage": "A ga-ewepụ arịrịọ dọrọ a na ndị na-adịbeghị anya.",
       "removeRecentAccessibility": "Wepu {{repo}} na ndị na-adịbeghị anya",
@@ -1228,10 +1228,10 @@
     },
     "gate": {
       "title": "Ọnụ ụzọ ijikọ",
-      "all": "Daа mgbe ị hụrụ ihe ọ bụla",
-      "critical": "Daа naanị mgbe ị hụrụ ihe dị oke mkpa",
-      "off": "Adịla mgbe ọ bụla mee PR check daа",
-      "warning": "Daа na ịdọ aka ná ntị na ihe dị oke mkpa"
+      "all": "Daa mgbe ị hụrụ ihe ọ bụla",
+      "critical": "Daa naanị mgbe ị hụrụ ihe dị oke mkpa",
+      "off": "Adịla mgbe ọ bụla mee PR check daa",
+      "warning": "Daa na ịdọ aka ná ntị na ihe dị oke mkpa"
     },
     "instructions": {
       "title": "Ntụziaka omenala",
@@ -1496,7 +1496,7 @@
       "severityLow": "Ala",
       "outcomeNotAnalyzed": "Achọpụtaghị",
       "outcomeAnalyzing": "Na-enyocha",
-      "outcomeFailed": "Nyocha daа",
+      "outcomeFailed": "Nyocha daa",
       "outcomeExploitable": "Enwere ike iji",
       "outcomeNotExploitable": "Enweghị ike iji",
       "outcomeSafeToDismiss": "Ọ dị mma ịkagbu",
@@ -2513,7 +2513,7 @@
     },
     "attachmentPicker": {
       "camera": "Kamera",
-      "photoLibrary": "Ọba Foto",
+      "photoLibrary": "Ọbá foto",
       "files": "Faịlụ",
       "cameraAccessDisabled": "Kamera Enyochaghị Ya",
       "cameraAccessMessage": "Kwe ka kamera nweta ohere na Ntọala ka ị see foto.",
@@ -2701,7 +2701,7 @@
     "offlineDescription": "Ọ dịghị ihe gara nke ọma",
     "permissionTitle": "Ekwenyereghị ohere",
     "permissionDescription": "Ị nweghị ikike ile anya nke a.",
-    "notFoundTitle": "Ahụghị ya",
+    "notFoundTitle": "A hụghị ya",
     "notFoundDescription": "E nwere ike ihichapụ ihe a ma ọ bụ na ọ dịkwaghị.",
     "serverTitle": "Enweghị ike ibutu",
     "serverDescription": "Ọ dịghị ihe gara nke ọma n'akụkụ anyị. Biko nwaa ọzọ."
@@ -3033,7 +3033,7 @@
       "title": "Ekwenyereghị ohere"
     },
     "usageStats": {
-      "cost": "Ọnụ ahịa",
+      "cost": "Ọnụahịa",
       "inputTokens": "Tokens Ntinye",
       "last30Days": "Ụbọchị 30 gara aga",
       "outputTokens": "Tokens Mwepụta",

@@ -1728,7 +1728,7 @@
       "openPullRequest": "Louvri demann tiraj{{number}}",
       "openDraftPullRequest": "Louvri demann tiraj bouyon{{number}}",
       "progress": "Pwogrè",
-      "attemptHistory": "Istwа tentativ ({{displayCount}})",
+      "attemptHistory": "Istwa tentativ ({{displayCount}})",
       "attemptNumber": "Tentativ #{{number}}",
       "startedBy": "Kòmanse pa",
       "model": "Modèl",
@@ -2515,8 +2515,8 @@
       "camera": "Kamèra",
       "photoLibrary": "Bibliyotèk Foto",
       "files": "Fichye",
-      "cameraAccessDisabled": "Akse Kamèra Dezaktive",
-      "cameraAccessMessage": "Pèmèt akse kamèra nan Paramèt pou pran yon foto.",
+      "cameraAccessDisabled": "Aksè Kamera Dezaktive",
+      "cameraAccessMessage": "Pèmèt aksè kamera nan Paramèt pou pran yon foto.",
       "couldNotOpenPhotoPicker": "Pa t ka louvri selektè foto a. Relance Kilo epi eseye ankò.",
       "maxFilesAllowed": "Maksimòm {{displayCount}} fichye pèmèt",
       "onlyAddingFiles": "Ap ajoute sèlman {{accepted}} nan {{total}} fichye (maks {{max}})"
@@ -2699,7 +2699,7 @@
     "neutralDescription": "Tanpri eseye ankò.",
     "offlineTitle": "Echèk pou chaje",
     "offlineDescription": "Yon bagay ale mal",
-    "permissionTitle": "Akse refize",
+    "permissionTitle": "Aksè refize",
     "permissionDescription": "Ou pa gen pèmisyon pou wè sa.",
     "notFoundTitle": "Pa jwenn",
     "notFoundDescription": "Atik sa a ka te retire oswa pa disponib ankò.",
@@ -2950,7 +2950,7 @@
     },
     "inviteMember": {
       "emailError": "Antre yon adrès imel valid",
-      "emailLabel": "Imel",
+      "emailLabel": "Imèl",
       "emailPlaceholder": "name@company.com",
       "permissionDenied": "Ou pa gen pèmisyon pou envite manm.",
       "roleLabel": "Wòl",
@@ -3030,7 +3030,7 @@
     },
     "permissionDenied": {
       "back": "Retounen",
-      "title": "Akse refize"
+      "title": "Aksè refize"
     },
     "usageStats": {
       "cost": "Kout",

@@ -2117,7 +2117,7 @@
       "renameAccessibility": "ناوگۆڕینی سێشن: {{title}}",
       "connectRepository": "بەستنی کۆگا",
       "cloningSession": "کۆپیکردنی سێشن",
-      "continue": "بەردەوام بوون",
+      "continue": "بەردەوامبوون",
       "couldNotLoadThisSession": "نەتوانرا ئەم سێشنە بار بکرێت",
       "cloneFailed": "نەتوانرا ئەم سێشنە کۆپی بکرێت.",
       "cloneFailedRetry": "نەتوانرا ئەم سێشنە کۆپی بکرێت. دووبارە هەوڵ بدە.",
@@ -2505,7 +2505,7 @@
       "uploading": "بارکردن…",
       "uploaded": "بارکرا",
       "uploadFailedRetry": "بارکردن سەرکەوتوو نەبوو. دابکە بۆ دووبارە هەوڵدان.",
-      "uploadFailedTerminal": "ئەم فایلە ناتوانرێت باربکرێت."
+      "uploadFailedTerminal": "ئەم فایلە ناتوانرێت بار بکرێت."
     },
     "attachmentPasteHint": {
       "accessibility": "لە کلپبۆردەوە وێنە بلکێنە",

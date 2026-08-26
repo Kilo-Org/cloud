@@ -31,6 +31,16 @@ const CATALOGS = [
 const problems = [];
 const fail = message => problems.push(message);
 
+/**
+ * English strings a catalog is allowed to render more than one way, because
+ * its grammar forces the difference — a counter form, a plural stem, a verb
+ * where English reuses the noun. Everything else must read the same way
+ * everywhere in one catalog.
+ */
+const WORDING_EXCEPTIONS = JSON.parse(
+  readFileSync(join(ROOT, 'tools/i18n/wording-exceptions.json'), 'utf8')
+);
+
 /** The supported tags, read from the one source of truth. */
 function supportedLanguages() {
   const source = readFileSync(LANGUAGES_FILE, 'utf8');
@@ -210,6 +220,72 @@ function scanSource() {
   return { called, referenced };
 }
 
+/**
+ * The scripts one catalog may write in. Latin rides along everywhere for
+ * product names and abbreviations; every other script must be the catalog's
+ * own. A catalog that mixes two alphabets reads as two different languages —
+ * Serbian shipped Latin copy beside Cyrillic strays for exactly that reason.
+ */
+const SCRIPT_PATTERNS = {
+  Latin: /\p{Script=Latin}/u,
+  Cyrillic: /\p{Script=Cyrillic}/u,
+  Arabic: /\p{Script=Arabic}/u,
+  Greek: /\p{Script=Greek}/u,
+  Hebrew: /\p{Script=Hebrew}/u,
+  Devanagari: /\p{Script=Devanagari}/u,
+  Han: /\p{Script=Han}/u,
+  Hangul: /\p{Script=Hangul}/u,
+  Hiragana: /\p{Script=Hiragana}/u,
+  Katakana: /\p{Script=Katakana}/u,
+  Thai: /\p{Script=Thai}/u,
+  Armenian: /\p{Script=Armenian}/u,
+  Georgian: /\p{Script=Georgian}/u,
+  Bengali: /\p{Script=Bengali}/u,
+  Tamil: /\p{Script=Tamil}/u,
+  Telugu: /\p{Script=Telugu}/u,
+  Gujarati: /\p{Script=Gujarati}/u,
+  Gurmukhi: /\p{Script=Gurmukhi}/u,
+  Kannada: /\p{Script=Kannada}/u,
+  Malayalam: /\p{Script=Malayalam}/u,
+  Oriya: /\p{Script=Oriya}/u,
+  Sinhala: /\p{Script=Sinhala}/u,
+  Myanmar: /\p{Script=Myanmar}/u,
+  Khmer: /\p{Script=Khmer}/u,
+  Lao: /\p{Script=Lao}/u,
+  Ethiopic: /\p{Script=Ethiopic}/u,
+};
+
+/** Languages whose own orthography needs more than one script. */
+const MULTI_SCRIPT_LANGUAGES = { ja: ['Hiragana', 'Katakana', 'Han'] };
+
+function scriptOf(char) {
+  for (const [name, pattern] of Object.entries(SCRIPT_PATTERNS)) {
+    if (pattern.test(char)) {
+      return name;
+    }
+  }
+  return null;
+}
+
+/** Every script in `values`, counted, so the dominant one can be picked. */
+function scriptCounts(values) {
+  const counts = new Map();
+  for (const value of values) {
+    for (const char of value) {
+      const name = scriptOf(char);
+      if (name) {
+        counts.set(name, (counts.get(name) ?? 0) + 1);
+      }
+    }
+  }
+  return counts;
+}
+
+/** Fold a value for wording comparison: case, edge space and end punctuation. */
+function wording(value) {
+  return value.trim().toLowerCase().replace(/[.!:。！：]+$/u, '');
+}
+
 const PLURAL_SUFFIX_RE = /_(zero|one|two|few|many|other)$/;
 
 function pluralBaseKey(key) {
@@ -251,6 +327,21 @@ for (const catalog of CATALOGS) {
       .map(parts => parts.base)
   );
   const englishValues = new Set(english.values());
+  // Keys whose English text is identical. Short strings only: a long sentence
+  // repeated verbatim is rare, and a 60-character cap keeps the groups to the
+  // labels and messages where one wording actually matters.
+  const wordingGroups = new Map();
+  for (const [key, value] of english) {
+    if (value.length < 2 || value.length > 60) {
+      continue;
+    }
+    const folded = wording(value);
+    if (!wordingGroups.has(folded)) {
+      wordingGroups.set(folded, []);
+    }
+    wordingGroups.get(folded).push(key);
+  }
+  const sharedWordings = [...wordingGroups].filter(([, keys]) => keys.length > 1);
   for (const [key, value] of english) {
     if (value.trim() === '') {
       fail(`${catalog.name}/en: "${key}" is empty`);
@@ -349,6 +440,59 @@ for (const catalog of CATALOGS) {
         if (englishValues.has(run) && !holdsLabel(ownValues, run)) {
           fail(`${label}: "${key}" quotes the English label "${run}"; name its key with $t()`);
         }
+      }
+    }
+
+    // One alphabet per catalog.
+    const counts = scriptCounts(translated.values());
+    const allowed = new Set(MULTI_SCRIPT_LANGUAGES[tag] ?? []);
+    if (allowed.size === 0) {
+      // The catalog's own script is its largest non-Latin one, but only when
+      // it carries a real share of the letters. Latin rides along in every
+      // catalog through product names and placeholders, so a bare "most
+      // frequent" rule would call a short Korean catalog Latin — while a
+      // Latin catalog holding a handful of Cyrillic look-alike letters (a
+      // Cyrillic "а" inside a Latin word) would adopt Cyrillic and pass.
+      const letters = [...counts.values()].reduce((sum, n) => sum + n, 0);
+      const [own] = [...counts]
+        .filter(([name, n]) => name !== 'Latin' && n >= letters * 0.05)
+        .sort((a, b) => b[1] - a[1])[0] ?? ['Latin'];
+      allowed.add(own);
+    }
+    allowed.add('Latin');
+    const strayScripts = [...counts.keys()].filter(name => !allowed.has(name));
+    if (strayScripts.length > 0) {
+      const examples = [...translated]
+        .filter(([, value]) => [...value].some(char => strayScripts.includes(scriptOf(char))))
+        .slice(0, 3)
+        .map(([key]) => key);
+      fail(
+        `${label}: writes ${strayScripts.join(' and ')} beside ${[...allowed].join(' and ')} (e.g. ${examples.join(', ')}); keep one alphabet`
+      );
+    }
+
+    // One wording per English string.
+    const exceptions = new Set(WORDING_EXCEPTIONS[tag] ?? []);
+    for (const [source, keys] of sharedWordings) {
+      if (exceptions.has(source)) {
+        continue;
+      }
+      const variants = new Map();
+      for (const key of keys) {
+        const value = translated.get(key);
+        if (value === undefined) {
+          continue;
+        }
+        const folded = wording(value);
+        if (!variants.has(folded)) {
+          variants.set(folded, key);
+        }
+      }
+      if (variants.size > 1) {
+        const shown = [...variants].map(([value, key]) => `"${value}" (${key})`).join(' vs ');
+        fail(
+          `${label}: English "${source}" is translated ${variants.size} ways: ${shown}. Pick one, or list the English string in tools/i18n/wording-exceptions.json under "${tag}".`
+        );
       }
     }
   }

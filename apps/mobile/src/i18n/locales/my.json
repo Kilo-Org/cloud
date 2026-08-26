@@ -1702,7 +1702,7 @@
       "repositories": "သိုလှောင်မှုများ",
       "modelsAndAnalysis": "မော်ဒယ်များနှင့် ခွဲခြမ်းစိတ်ဖြာမှု",
       "analysisModeSubtitle": "{{mode}} ခွဲခြမ်းစိတ်ဖြာမှု",
-      "automation": "အလိုအလျောက်လုပ်ဆောင်မှု",
+      "automation": "အလိုအလျောက် လုပ်ဆောင်မှု",
       "automationAllOff": "အားလုံး ပိတ်",
       "automationCount": "3 ခုတွင် {{displayCount}} ခု ဖွင့်ထား",
       "notifications": "အသိပေးချက်များ",

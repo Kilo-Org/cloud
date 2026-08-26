@@ -347,7 +347,7 @@
       "online": "Çevrimiçi",
       "idle": "Boşta",
       "offline": "Çevrimdışı",
-      "unknown": "Bilinmiyor",
+      "unknown": "BİLİNMİYOR",
       "loadingUser": "Kullanıcı yükleniyor...",
       "waitingForStatus": "Bot durumu bekleniyor...",
       "offlineMessage": "Bot çevrimdışı. Yeniden bağlandığında mesajlar devam edecek."
@@ -1077,7 +1077,7 @@
       "suggestedFix": "Önerilen düzeltme",
       "triageConfidence": "Triyaj güveni",
       "triageReasoning": "Triyaj gerekçesi",
-      "unknown": "Bilinmiyor",
+      "unknown": "BİLİNMİYOR",
       "watchInCloudAgent": "Bulut Ajanı'nda izle",
       "whereFound": "Bunun bulunduğu yer ({{displayCount}})",
       "yes": "Evet"
@@ -1259,7 +1259,7 @@
       "sourceRecord": "Kaynak kaydı",
       "supersededBy": "Güncel bir bulgu tarafından geçersiz kılındı",
       "supersededByDescription": "Durum, analiz ve iyileştirme için güncel kaydı açmak üzere dokunun.",
-      "unknown": "Bilinmiyor",
+      "unknown": "BİLİNMİYOR",
       "updated": "Güncellendi",
       "viewAdvisory": "GitHub'da güvenlik bildirimini görüntüle",
       "vulnerableVersions": "Savunmasız sürümler",
@@ -1911,9 +1911,9 @@
       "denyPermission": "İzni reddet",
       "deny": "Reddet",
       "allowOnce": "Bir Kez İzin Ver",
-      "allowOnceAccessibility": "Bir kez izin ver",
+      "allowOnceAccessibility": "Bir Kez İzin Ver",
       "alwaysAllow": "Her Zaman İzin Ver",
-      "alwaysAllowAccessibility": "Her zaman izin ver",
+      "alwaysAllowAccessibility": "Her Zaman İzin Ver",
       "retrying": "Tekrar deneniyor…"
     },
     "questionCard": {
@@ -2967,7 +2967,7 @@
         "void": "Geçersiz",
         "draft": "Taslak",
         "uncollectible": "Tahsil edilemez",
-        "unknown": "Bilinmiyor"
+        "unknown": "BİLİNMİYOR"
       }
     },
     "lowBalanceAlert": {

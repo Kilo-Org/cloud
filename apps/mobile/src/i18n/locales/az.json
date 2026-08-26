@@ -1412,7 +1412,7 @@
     "status": {
       "pending": "Gözlənilir",
       "queued": "Növbəyə alınıb",
-      "running": "İşləyir",
+      "running": "İŞLƏYİR",
       "completed": "Tamamlandı",
       "failed": "Uğursuz",
       "cancelled": "Ləğv edildi",
@@ -2064,7 +2064,7 @@
       "couldNotCopyId": "Sessiya ID kopyalana bilmədi",
       "untitled": "Adsız sessiya",
       "sessionDeleted": "Sessiya silindi",
-      "needsInput": "giriş tələb olunur",
+      "needsInput": "GİRİŞ TƏLƏB OLUNUR",
       "fromPlatform": "{{platform}} platformasından",
       "cent_one": "sent",
       "cent": "sent",

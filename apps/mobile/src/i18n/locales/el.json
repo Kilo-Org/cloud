@@ -1132,7 +1132,7 @@
       "starting": "ΕΚΚΙΝΗΣΗ",
       "stopped": "ΣΤΑΜΑΤΗΜΕΝΟ",
       "stopping": "ΔΙΑΚΟΠΗ",
-      "unknown": "ΑΓΝΩΣΤΟ",
+      "unknown": "Άγνωστο",
       "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {

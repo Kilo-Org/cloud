@@ -1579,7 +1579,7 @@
       "codebaseRisk": "Risco do código",
       "repositoryActionPlan": "Plan de acción do repositorio",
       "noOpenFindings": "Non hai achados abertos que requiran atención",
-      "deadlineToday": "Prazо alcanzado hoxe",
+      "deadlineToday": "Prazo alcanzado hoxe",
       "daysOverdue": "{{displayCount}} días de atraso",
       "withinDeadline": "Dentro da praza",
       "criticalOverdue": "Crítico atrasado",

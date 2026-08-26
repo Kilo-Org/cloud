@@ -669,7 +669,7 @@
     "instancePicker": {
       "switchInstance": "Ndrysho instancën",
       "couldNotLoadInstances": "Nuk u arrit të ngarkoheshin instancat",
-      "noInstances": "Asnjë instance KiloClaw",
+      "noInstances": "Asnjë instancë KiloClaw",
       "noInstancesDescription": "Konfiguro një instancë për të filluar bisedën.",
       "setUpKiloclaw": "Konfiguro KiloClaw",
       "currentInstance": "{{title}}, aktuale",

@@ -2619,7 +2619,7 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "មិនអាចផ្ទុកគណនីរបស់អ្នកបានទេ",
-    "couldNotLoadAccountDescription": "ពិនិត្យការតភ្ជាប់របស់អ្នកហើយព្យាយាមម្តងទៀត។",
+    "couldNotLoadAccountDescription": "ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
     "couldNotLoadPrivacy": "មិនអាចផ្ទុកជម្រើសឯកជនភាពបានទេ",
     "couldNotLoadPrivacyDescription": "ពិនិត្យការកំណត់សុវត្ថិភាពរបស់ឧបករណ៍អ្នកហើយព្យាយាមម្តងទៀត។",
     "contentReady": "បរិមាត្របានត្រៀម",
@@ -2924,7 +2924,7 @@
   "organization": {
     "boundary": {
       "backToProfile": "ត្រឡប់ទៅប្រវត្តិរូប",
-      "loadErrorMessage": "ពិនិត្យការតភ្ជាប់របស់អ្នកហើយព្យាយាមម្តងទៀត។",
+      "loadErrorMessage": "ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
       "loadErrorTitle": "មិនអាចផ្ទុកអង្គការរបស់អ្នកបានទេ",
       "organizationUnavailable": "អង្គការមិនអាចប្រើបាន",
       "selectDescription": "ជ្រើសរើសអង្គការពីប្រវត្តិរូបរបស់អ្នកដើម្បីបន្ត។",

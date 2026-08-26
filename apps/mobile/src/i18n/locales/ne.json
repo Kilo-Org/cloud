@@ -2516,7 +2516,7 @@
       "photoLibrary": "फोटो लाइब्रेरी",
       "files": "फाइलहरू",
       "cameraAccessDisabled": "क्यामेरा पहुँच असक्षम गरियो",
-      "cameraAccessMessage": "फोटो खिच्न सेटिङ्स मा क्यामेरा पहुँच अनुमति दिनुहोस्।",
+      "cameraAccessMessage": "फोटो खिच्न सेटिङ्समा क्यामेरा पहुँच अनुमति दिनुहोस्।",
       "couldNotOpenPhotoPicker": "फोटो पिकर खोल्न सकिएन। Kilo पुनः सुरु गरेर फेरि प्रयास गर्नुहोस्।",
       "maxFilesAllowed": "अधिकतम {{displayCount}} फाइलहरू अनुमति छ",
       "onlyAddingFiles": "{{total}} फाइलमध्ये {{accepted}} मात्र थप्दै (अधिकतम {{max}})"

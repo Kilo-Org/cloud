@@ -2663,7 +2663,7 @@
   "home": {
     "couldNotLoadSessions": "A munkameneteket nem sikerült betölteni",
     "couldNotLoadActiveSessions": "Az aktív munkameneteket nem sikerült betölteni",
-    "agentSessions": "Ügynök munkamenetek",
+    "agentSessions": "Ügynökmunkamenetek",
     "showingSavedSessions": "Mentett munkamenetek megjelenítése — az élő állapot elavult lehet",
     "startNewAgentSession": "Új Kilo Agent munkamenet indítása",
     "aiCodingSessions": "AI kódolási munkamenetek",

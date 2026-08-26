@@ -2600,7 +2600,7 @@
       "olderActivity": "กิจกรรมเก่า",
       "olderActivityDescription": "ค่าใช้จ่ายที่ไม่ได้ระบุกับประวัติที่โหลด",
       "ofWindowTokens": "จาก {{window}} โทเคน",
-      "tokens": "โทเคน",
+      "tokens": "โทเค็น",
       "tokensWithPercentage": "โทเคน ({{percentage}})",
       "stepsCount_one": "{{steps}} ขั้นตอน",
       "stepsCount": "{{steps}} ขั้นตอน",

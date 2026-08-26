@@ -39,8 +39,8 @@
     "search": "Pretraga jezika",
     "noMatches": "Nema jezika koji se podudaraju",
     "deviceLanguage": "Jezik uređaja",
-    "current": "Тренутно",
-    "allLanguages": "Сви језици"
+    "current": "Trenutno",
+    "allLanguages": "Svi jezici"
   },
   "login": {
     "welcome": "Dobrodošli u Kilo",
@@ -2271,7 +2271,7 @@
       "codeDescription": "Piši i menjaj kod",
       "planDescription": "Planiraj i dizajniraj rešenja",
       "debugDescription": "Pronađi i ispravi probleme",
-      "orchestratorDescription": "Koordinirај složene zadatke",
+      "orchestratorDescription": "Koordiniraj složene zadatke",
       "askDescription": "Dobij odgovore i objašnjenja"
     },
     "repoPicker": {
@@ -2318,7 +2318,7 @@
       "detailsUnavailable": "Detalji nisu dostupni",
       "textDisplay": "Prikaz teksta",
       "thinking": "Razmišljanje",
-      "thought": "Mисао",
+      "thought": "Misao",
       "title": "Detalji",
       "showDetails": "Prikaži detalje",
       "pending": "Na čekanju…",

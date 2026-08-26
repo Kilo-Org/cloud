@@ -334,7 +334,7 @@
       "takePhoto": "التقاط صورة",
       "photoLibrary": "مكتبة الصور",
       "files": "الملفات",
-      "cameraAccessDisabled": "الوصول إلى الكاميرا معطل",
+      "cameraAccessDisabled": "الوصول إلى الكاميرا معطّل",
       "cameraAccessMessage": "اسمح بالوصول إلى الكاميرا في الإعدادات لالتقاط صورة."
     },
     "typingIndicator": {

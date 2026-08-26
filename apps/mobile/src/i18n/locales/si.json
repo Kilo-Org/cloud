@@ -1275,7 +1275,7 @@
       "couldNotLoad": "සමාලෝචනය පූරණය කිරීමට නොහැකි විය",
       "couldNotGetLatest": "නවතම ලබා ගත නොහැකි විය.",
       "byline": "{{repo}} #{{number}} {{author}} විසින්",
-      "findings": "සොයා ගැනීම්",
+      "findings": "සොයාගැනීම්",
       "noFindings": "සොයා ගැනීම් නොමැත",
       "showMore": "තවත් පෙන්වන්න",
       "details": "විස්තර",
@@ -2702,7 +2702,7 @@
     "permissionTitle": "ප්‍රවේශය ප්‍රතික්ෂේප විය",
     "permissionDescription": "මෙය බැලීමට ඔබට අවසර නොමැත.",
     "notFoundTitle": "හමු නොවීය",
-    "notFoundDescription": "මෙම අයිතමය ඉවත් කර තිබිය හැක හෝ තවදුරටත් ලබා ගත නොහැක.",
+    "notFoundDescription": "මෙම අයිතමය ඉවත් කර තිබිය හැක හෝ තවදුරටත් ලබාගත නොහැක.",
     "serverTitle": "පූරණය කළ නොහැකි විය",
     "serverDescription": "අපගේ පැත්තෙන් යම් දෙයක් වැරදී ගියේය. කරුණාකර නැවත උත්සාහ කරන්න."
   },

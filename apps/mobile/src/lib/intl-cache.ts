@@ -38,11 +38,23 @@ let usesDurationFormatPolyfill = false;
 let usesSegmenterPolyfill = false;
 let usesLocalePolyfill = false;
 
+/**
+ * The tag every formatter is built with.
+ *
+ * A bare tag can resolve to data the catalog does not use. `pt` resolves to
+ * Brazilian data while the `pt` catalog is European Portuguese, and `sr`
+ * resolves to Cyrillic while the `sr` catalog is written in Latin — a Serbian
+ * user would read Latin copy beside a Cyrillic month name. Name the script or
+ * the region so every Intl surface agrees with the catalog.
+ */
 function localeOrEnglish(locale: string): string {
   if (!locale) {
     return 'en';
   }
-  return locale === 'pt' ? 'pt-PT' : locale;
+  if (locale === 'pt') {
+    return 'pt-PT';
+  }
+  return locale === 'sr' ? 'sr-Latn' : locale;
 }
 
 function localeDataLanguage(locale: string): SupportedLanguage {
@@ -125,10 +137,13 @@ export function numberFormat(locale: string, options: Intl.NumberFormatOptions):
 }
 
 export function dateTimeFormat(
-  locale: Intl.LocalesArgument,
+  /** Omitted only to read the device's own resolved options, e.g. its time zone. */
+  locale: string | undefined,
   options: Intl.DateTimeFormatOptions
 ): Intl.DateTimeFormat {
-  const activeLocale = locale === 'pt' ? 'pt-PT' : locale;
+  // Through `localeOrEnglish` like every other formatter: this used to carry
+  // its own `pt` special case and so missed the `sr` one added beside it.
+  const activeLocale = locale === undefined ? undefined : localeOrEnglish(locale);
   const key = `${JSON.stringify(activeLocale)}|${JSON.stringify(options)}`;
   let format = dateTimeFormats.get(key);
   if (!format) {

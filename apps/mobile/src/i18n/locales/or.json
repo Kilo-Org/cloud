@@ -944,7 +944,7 @@
       "recommended": "ସୁପାରିଶ କରାଯାଇଛି"
     },
     "model": {
-      "title": "ମଡେଲ"
+      "title": "ମଡେଲ୍"
     },
     "secrets": {
       "title": "ଗୁପ୍ତ",
@@ -1013,7 +1013,7 @@
       "finishingSetup": "ସେଟଅପ୍ ସମାପ୍ତ କରୁଛି",
       "finishingSetupDescription": "ଅପେକ୍ଷା କରନ୍ତୁ, ଆମେ ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ଚୂଡ଼ାନ୍ତ କରୁଛୁ। ଏହା ସାଧାରଣତଃ କିଛି ସମୟ ନେଇଥାଏ।",
       "getStarted": "ଆରମ୍ଭ କରନ୍ତୁ",
-      "noInstances": "କୌଣସି KiloClaw ଇନ୍ସଟାନ୍ସ ନାହିଁ",
+      "noInstances": "କୌଣସି KiloClaw ଇନସ୍ଟାନ୍ସ ନାହିଁ",
       "noInstancesDescription": "କୋଡିଂ ଏଜେଣ୍ଟ ଚଲାଇବା ଆରମ୍ଭ କରିବାକୁ ଆପଣଙ୍କ ପ୍ରଥମ ଇନ୍ସଟାନ୍ସ ତିଆରି କରନ୍ତୁ।"
     },
     "instance": {
@@ -1117,7 +1117,7 @@
       "gatewayProcess": "ଗେଟୱେ ପ୍ରକ୍ରିୟା",
       "lastExit": "ଶେଷ ପ୍ରସ୍ଥାନ",
       "memory": "ମେମୋରୀ",
-      "model": "ମଡେଲ",
+      "model": "ମଡେଲ୍",
       "region": "ଅଞ୍ଚଳ",
       "resources": "ସମ୍ବଳ",
       "restarts": "ପୁନଃ ଆରମ୍ଭ",
@@ -1190,7 +1190,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "googleLabel": "ଗୁଗୁଲ୍ ଆକାଉଣ୍ଟ",
       "modelDescription": "AI ମଡେଲ ଚୟନ",
-      "modelLabel": "ମଡେଲ",
+      "modelLabel": "ମଡେଲ୍",
       "secretsDescription": "ଏନକ୍ରିପ୍ଟେଡ୍ ପ୍ରମାଣପତ୍ର",
       "secretsLabel": "ଗୁପ୍ତ",
       "versionPinDescription": "ଏକ ନିର୍ଦ୍ଦିଷ୍ଟ ସଂସ୍କରଣରେ ପିନ୍ କରନ୍ତୁ",
@@ -1281,7 +1281,7 @@
       "details": "ବିବରଣୀ",
       "branch": "ବ୍ରାଞ୍ଚ",
       "platform": "ପ୍ଲାଟଫର୍ମ",
-      "model": "ମଡେଲ",
+      "model": "ମଡେଲ୍",
       "created": "ତିଆରି ହୋଇଛି",
       "started": "ଆରମ୍ଭ ହୋଇଛି",
       "completed": "ସମାପ୍ତ ହୋଇଛି",
@@ -1297,11 +1297,11 @@
       "checkRun": "ଚେକ୍ ରନ୍",
       "status": "ସ୍ଥିତି",
       "threshold": "ସୀମା",
-      "pullRequest": "ପୁଲ ରିକ୍ୱେଷ୍ଟ"
+      "pullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ"
     },
     "reviewMemory": {
       "title": "ସମୀକ୍ଷା ସ୍ମୃତି",
-      "couldNotLoadMore": "ଅଧିକ ଲୋଡ୍ କରାଯାଇପାରିଲା ନାହିଁ",
+      "couldNotLoadMore": "ଅଧିକ ଲୋଡ୍ କରାଯାଇ ପାରିଲା ନାହିଁ",
       "retryLoadingMore": "ଅଧିକ ଲୋଡ୍ କରିବା ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
       "loading": "ସମୀକ୍ଷା ସ୍ମୃତି ଲୋଡ୍ କରୁଛି",
       "couldNotLoad": "ସମୀକ୍ଷା ସ୍ମୃତି ଲୋଡ୍ କରାଯାଇପାରିଲା ନାହିଁ",
@@ -1327,7 +1327,7 @@
       "pullRequestUrl": "ପୁଲ ରିକ୍ୱେଷ୍ଟ URL",
       "instructions": "ନିର୍ଦ୍ଦେଶ (ଐଚ୍ଛିକ)",
       "instructionsPlaceholder": "ସମୀକ୍ଷକ ଯାହା ଉପରେ ଧ୍ୟାନ ଦେବା ଉଚିତ ସେହି କୌଣସି ନିର୍ଦ୍ଦିଷ୍ଟ ବିଷୟ…",
-      "model": "ମଡେଲ",
+      "model": "ମଡେଲ୍",
       "starting": "ସମୀକ୍ଷା ଆରମ୍ଭ କରୁଛି…",
       "start": "ସମୀକ୍ଷା ଆରମ୍ଭ କରନ୍ତୁ"
     },
@@ -1392,7 +1392,7 @@
       "allAreas": "ସମସ୍ତ କ୍ଷେତ୍ର",
       "customInstructions": "କଷ୍ଟମ ନିର୍ଦ୍ଦେଶ",
       "set": "ସେଟ୍ କରନ୍ତୁ",
-      "model": "ମଡେଲ",
+      "model": "ମଡେଲ୍",
       "mergeGate": "ମର୍ଜ ଗେଟ୍",
       "repositories": "ରିପୋଜିଟୋରୀ",
       "allRepositories": "ସମସ୍ତ ରିପୋଜିଟୋରୀ",
@@ -2419,7 +2419,7 @@
       "failure": "{{title}}।",
       "failureRetryAvailable": "{{title}}। ପୁନଃଚେଷ୍ଟା ଉପଲବ୍ଧ।",
       "copyToComposer": "କମ୍ପୋଜରରେ କପି କରନ୍ତୁ",
-      "queued": "ଧାଡିରେ",
+      "queued": "ଧାଡ଼ିରେ",
       "queuedAccessibility": "ବାର୍ତ୍ତା ଧାଡିରେ ଅଛି",
       "userMessage": "ବ୍ୟବହାରକାରୀ ବାର୍ତ୍ତା",
       "assistantMessage": "ସହାୟକ ବାର୍ତ୍ତା",
@@ -2481,7 +2481,7 @@
       "recommended": "ସୁପାରିଶ କରାଯାଇଛି"
     },
     "modelSelector": {
-      "model": "ମଡେଲ",
+      "model": "ମଡେଲ୍",
       "provider": "ପ୍ରଦାନକାରୀ {{id}}",
       "modelId": "ମଡେଲ {{id}}",
       "unavailable": "ଅନୁପଲବ୍ଧ",
@@ -2505,7 +2505,7 @@
       "uploading": "ଅପଲୋଡ୍ ହେଉଛି…",
       "uploaded": "ଅପଲୋଡ୍ ହେଲା",
       "uploadFailedRetry": "ଅପଲୋଡ୍ ବିଫଳ। ପୁନଃଚେଷ୍ଟା ପାଇଁ ଟାପ୍ କରନ୍ତୁ।",
-      "uploadFailedTerminal": "ଏହି ଫାଇଲ ଅପଲୋଡ୍ ହୋଇପାରିବ ନାହିଁ।"
+      "uploadFailedTerminal": "ଏହି ଫାଇଲ୍ ଅପଲୋଡ୍ ହୋଇପାରିବ ନାହିଁ।"
     },
     "attachmentPasteHint": {
       "accessibility": "କ୍ଲିପବୋର୍ଡରୁ ଛବି ପେଷ୍ଟ କରନ୍ତୁ",
@@ -2541,7 +2541,7 @@
       "linkCopied": "ଲିଙ୍କ କପି ହେଲା",
       "reviewPr": "PR ସମୀକ୍ଷା କରନ୍ତୁ",
       "openLink": "ଲିଙ୍କ ଖୋଲନ୍ତୁ",
-      "copyLink": "ଲିଙ୍କ କପି କରନ୍ତୁ",
+      "copyLink": "ଲିଙ୍କ୍ କପି କରନ୍ତୁ",
       "shareLink": "ଲିଙ୍କ ଅଂଶୀଦାର କରନ୍ତୁ",
       "share": "ଅଂଶୀଦାର",
       "prLinkActions": "PR ଲିଙ୍କ କାର୍ଯ୍ୟ",
@@ -2600,7 +2600,7 @@
       "olderActivity": "ପୁରୁଣା କାର୍ଯ୍ୟକଳାପ",
       "olderActivityDescription": "ଲୋଡ୍ ହୋଇଥିବା ଇତିହାସକୁ ଆପତ୍ତି ହୋଇନଥିବା ଖର୍ଚ୍ଚ",
       "ofWindowTokens": "{{window}} ଟୋକେନ ମଧ୍ୟରୁ",
-      "tokens": "ଟୋକେନ",
+      "tokens": "ଟୋକେନ୍",
       "tokensWithPercentage": "ଟୋକେନ ({{percentage}})",
       "stepsCount_one": "{{steps}} ପଦକ୍ଷେପ",
       "stepsCount": "{{steps}} ପଦକ୍ଷେପ",

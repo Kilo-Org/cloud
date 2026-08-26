@@ -245,7 +245,7 @@
       "leaveFailed": "Не удалось покинуть беседу"
     },
     "reactions": {
-      "title": "Реакции",
+      "title": "реакций",
       "close": "Закрыть реакции",
       "recent": "Недавние",
       "common": "Обычные",
@@ -1687,7 +1687,7 @@
     },
     "remoteSession": {
       "failedToCreate": "Не удалось создать удаленный сеанс",
-      "exited": "Сеанс завершен",
+      "exited": "Сеанс завершён",
       "failedToExit": "Не удалось выйти из сеанса",
       "exitTitle": "Выйти из сеанса?",
       "exitMessage": "Это остановит текущий сеанс, но сохранит его историю.",
@@ -2085,7 +2085,7 @@
       "camera": "Камера",
       "photoLibrary": "Библиотека фото",
       "files": "Файлы",
-      "cameraAccessDisabled": "Доступ к камере отключен",
+      "cameraAccessDisabled": "Доступ к камере отключён",
       "cameraAccessMessage": "Разрешите доступ к камере в настройках, чтобы сделать фото.",
       "couldNotOpenPhotoPicker": "Не удалось открыть выбор фото. Перезапустите Kilo и попробуйте снова.",
       "maxFilesAllowed": "Максимум {{displayCount}} файлов",
@@ -2584,7 +2584,7 @@
       "reaction": "реакций",
       "reaction_other": "реакций",
       "reaction_one": "реакция",
-      "reactionsTitle": "Реакции",
+      "reactionsTitle": "реакций",
       "reply": "Ответить",
       "replyBadRequest": "Этот ответ нельзя отправить. Возможно, ветка изменилась.",
       "replyBody": "Текст ответа",

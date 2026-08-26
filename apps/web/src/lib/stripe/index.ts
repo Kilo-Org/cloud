@@ -739,10 +739,13 @@ export async function getStripeInvoicesPage(
   const entries = mapStripeInvoicesToUnified(invoices.data);
   const lastInvoice = invoices.data[invoices.data.length - 1];
 
+  // Tie the cursor to Stripe's own continuation signal. A full final page has
+  // a last invoice but no next page, and advertising its id as a cursor makes
+  // the caller fetch an empty page it can never end on.
   return {
     entries,
     hasMore: invoices.has_more,
-    nextCursor: lastInvoice ? lastInvoice.id : null,
+    nextCursor: invoices.has_more ? (lastInvoice?.id ?? null) : null,
   };
 }
 

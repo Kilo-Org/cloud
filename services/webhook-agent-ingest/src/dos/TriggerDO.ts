@@ -348,7 +348,14 @@ export class TriggerDO extends DurableObject<Env> {
         updates.cronExpression !== undefined ||
         updates.cronTimezone !== undefined
       ) {
-        // Reactivated or cron expression changed — reschedule
+        // Reactivated or cron expression changed — reschedule from scratch.
+        // Clear the inherited nextScheduledAt first: scheduleNextAlarm() anchors on
+        // a future nextScheduledAt to avoid re-firing an occurrence that was just
+        // handled by alarm(). Here nextScheduledAt still reflects a pending (never
+        // fired) occurrence under the *old* config, so leaving it set would make
+        // scheduleNextAlarm skip past a still-valid, possibly sooner occurrence
+        // under the new cron expression/timezone.
+        updatedConfig.nextScheduledAt = null;
         await this.ctx.storage.deleteAlarm();
         await this.ctx.storage.delete('alarmRetry');
         await this.scheduleNextAlarm(updatedConfig);
@@ -734,8 +741,11 @@ export class TriggerDO extends DurableObject<Env> {
     // fire twice. Anchoring on nextScheduledAt when it's still ahead of "now" guarantees
     // we always advance to the following occurrence instead.
     const previousTarget = config.nextScheduledAt ? new Date(config.nextScheduledAt) : null;
-    const referenceTime =
-      previousTarget && previousTarget.getTime() > Date.now() ? previousTarget : undefined;
+    const isValidFutureTarget =
+      previousTarget !== null &&
+      !Number.isNaN(previousTarget.getTime()) &&
+      previousTarget.getTime() > Date.now();
+    const referenceTime = isValidFutureTarget ? previousTarget : undefined;
 
     const nextTime = computeNextCronTime(
       config.cronExpression,

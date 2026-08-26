@@ -73,6 +73,21 @@ describe('computeNextCronTime', () => {
     expect(second).toBeInstanceOf(Date);
     expect(second!.getTime()).toBeGreaterThan(first!.getTime());
   });
+
+  it('advances across a day boundary when anchored far in the future', () => {
+    // Daily-at-midnight schedule, anchored 3 days out — must skip ahead to the
+    // occurrence after the anchor, not just the next occurrence after "now".
+    const reference = new Date(Date.now() + 3 * 24 * 60 * 60_000);
+    const next = computeNextCronTime('0 0 * * *', 'UTC', reference);
+    expect(next).toBeInstanceOf(Date);
+    expect(next!.getTime()).toBeGreaterThan(reference.getTime());
+  });
+
+  it('returns null instead of throwing when `after` is an Invalid Date', () => {
+    const invalidDate = new Date('not-a-date');
+    expect(invalidDate.getTime()).toBeNaN();
+    expect(computeNextCronTime('* * * * *', 'UTC', invalidDate)).toBeNull();
+  });
 });
 
 describe('enforcesMinimumInterval', () => {

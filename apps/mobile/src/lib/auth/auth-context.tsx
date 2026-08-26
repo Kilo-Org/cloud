@@ -39,8 +39,7 @@ import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
-import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
-import { clearMarkdownImageConfirmMemory } from '@/components/agents/markdown-image-confirm';
+import { clearSessionScopedState } from '@/lib/auth/session-scoped-state';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
@@ -234,12 +233,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         trackEvent('login');
         resetPurchaseErrorToastDedup();
         setToken(tokenValue);
-        // A prior account's confirmed image URIs and trusted link hosts must
-        // not carry into this new session. Sign-in over an existing session
-        // (an account switch with no sign-out) never runs the sign-out
-        // teardown, and both stores use one device-wide key.
-        clearMarkdownImageConfirmMemory();
-        clearTrustedHosts();
+        // A direct account switch must not keep the prior account's session
+        // state: trusted hosts, image confirms, media caches, temp copies.
+        clearSessionScopedState();
       });
     },
     []
@@ -346,14 +342,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             clearViewedFiles(),
             clearSessionAttentionForSignOut(),
           ]);
-          // Synchronous preference clears so they don't leak to the next
-          // signed-in account. A synchronous throw here still falls through
-          // to the state reset below.
+          // Synchronous preference clears (best-effort) so nothing leaks to
+          // the next signed-in account.
           clearAgentModelPreference();
           clearReasoningPreference();
-          clearTrustedHosts();
-          clearMarkdownImageConfirmMemory();
           clearKeepScreenOnPreference();
+          clearSessionScopedState();
           clearPrReviewFooterPreference();
         } finally {
           queryClient.clear();

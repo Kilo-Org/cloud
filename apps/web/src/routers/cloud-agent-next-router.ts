@@ -39,12 +39,15 @@ import {
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentGetImageUploadUrlSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
+  cloudAgentLinkPendingUploadsSchema,
+  cloudAgentReleasePendingUploadsSchema,
 } from './cloud-agent-next-schemas';
 import {
   generateCloudAgentAttachmentUploadUrl,
   generateCloudAgentAttachmentDownloadUrl,
   generateImageUploadUrl,
 } from '@/lib/r2/cloud-agent-attachments';
+import { linkPendingUploads, releasePendingUploads } from '@/lib/r2/cloud-agent-pending-uploads';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
@@ -169,12 +172,27 @@ export const cloudAgentNextRouter = createTRPCRouter({
       }
 
       try {
-        return await client.prepareSession({
+        const result = await client.prepareSession({
           ...restInput,
           ...gitParams,
           attachments: attachments ?? images,
           createdOnPlatform: 'cloud-agent-web',
         });
+
+        // New-session flows (mobile, continue-cloud-create) call prepareSession
+        // without a follow-up sendMessage, so the server must link the admitted
+        // attachment rows here too; otherwise the reaper deletes new-session
+        // objects. Only ATTACHMENT rows are admitted (images are never admitted;
+        // only generateCloudAgentAttachmentUploadUrl admits).
+        if (attachments && attachments.files.length > 0) {
+          await linkPendingUploads(
+            ctx.user.id,
+            attachments.path,
+            attachments.files.map(file => `${ctx.user.id}/cloud-agent/${attachments.path}/${file}`)
+          );
+        }
+
+        return result;
       } catch (error) {
         rethrowAsPaymentRequired(error);
         throw error;
@@ -253,11 +271,27 @@ export const cloudAgentNextRouter = createTRPCRouter({
       // for GitHub, GIT_TOKEN_SERVICE for managed GitLab).
       try {
         const { attachments, images, ...restInput } = input;
-        return await client.sendMessage({
+        const result = await client.sendMessage({
           ...restInput,
           attachments: attachments ?? images,
           messageId: input.messageId ?? generateMessageId(),
         });
+
+        // Compatibility: the server links authoritatively so any client whose
+        // send goes through sendMessage keeps its objects (mobile, old tabs).
+        // The client does not link pre-send, so a failed or abandoned send
+        // leaves rows 'pending' for the reaper. Only ATTACHMENT rows are
+        // admitted (images are never admitted; only
+        // generateCloudAgentAttachmentUploadUrl admits).
+        if (attachments && attachments.files.length > 0) {
+          await linkPendingUploads(
+            ctx.user.id,
+            attachments.path,
+            attachments.files.map(file => `${ctx.user.id}/cloud-agent/${attachments.path}/${file}`)
+          );
+        }
+
+        return result;
       } catch (error) {
         rethrowAsPaymentRequired(error);
         throw error;
@@ -378,6 +412,32 @@ export const cloudAgentNextRouter = createTRPCRouter({
         messageUuid: input.messageUuid,
         filename: input.filename,
       });
+    }),
+
+  /**
+   * Finalize send-time attachment ledger rows: flip the caller's pending
+   * uploads for a message to 'linked'. Personal scope; the R2 key prefix is
+   * the caller's own user id.
+   */
+  linkPendingUploads: baseProcedure
+    .input(cloudAgentLinkPendingUploadsSchema)
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await linkPendingUploads(ctx.user.id, input.messageUuid, input.objectKeys);
+      return { success: true };
+    }),
+
+  /**
+   * Release abandoned composer files' pending-ledger rows so they stop
+   * consuming the per-message quota before the 24-hour reaper would have
+   * cleared them. Scoped to the caller's own pending rows only.
+   */
+  releasePendingUploads: baseProcedure
+    .input(cloudAgentReleasePendingUploadsSchema)
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await releasePendingUploads(ctx.user.id, input.objectKeys);
+      return { success: true };
     }),
 
   /**

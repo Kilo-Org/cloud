@@ -23,7 +23,6 @@ export { GatewayErrorCode, GatewayError, createGatewayError } from './errors';
 export {
   UserConnectRouteParamsSchema,
   OrgConnectRouteParamsSchema,
-  ownerScopeFromRouteScope,
   buildScopedConnectRootPath,
   buildScopedConnectCanonicalUrl,
   buildMCPID,

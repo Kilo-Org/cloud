@@ -348,6 +348,32 @@ describe('generateSandboxId', () => {
     });
   });
 
+  describe('isolated Standard sandbox', () => {
+    it('bypasses organization routing with a deterministic per-session identity', async () => {
+      await expect(
+        generateSandboxRoutingTarget(undefined, 'my-org', 'user-id', 'agent_abc123', undefined, {
+          sandboxAllocation: 'isolated-standard',
+        })
+      ).resolves.toEqual({
+        kind: 'isolated',
+        sandboxId: 'istd-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370',
+      });
+    });
+
+    it('produces different identities for different sessions', async () => {
+      const first = await generateSandboxId(undefined, 'org', 'user', 'session-a', undefined, {
+        sandboxAllocation: 'isolated-standard',
+      });
+      const second = await generateSandboxId(undefined, 'org', 'user', 'session-b', undefined, {
+        sandboxAllocation: 'isolated-standard',
+      });
+
+      expect(first).toMatch(/^istd-[0-9a-f]{48}$/);
+      expect(second).toMatch(/^istd-[0-9a-f]{48}$/);
+      expect(first).not.toBe(second);
+    });
+  });
+
   describe('devcontainer sandbox', () => {
     it('bypasses shared slot routing', async () => {
       await expect(
@@ -678,6 +704,23 @@ describe('getSandboxNamespace', () => {
     expect(ns).toBe(mockSandboxSmallContainment);
   });
 
+  it('should return Sandbox for istd- prefixed IDs', () => {
+    const ns = getSandboxNamespace(
+      mockEnv,
+      'istd-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6'
+    );
+    expect(ns).toBe(mockSandbox);
+  });
+
+  it('should return SandboxContainment for contained istd- prefixed IDs', () => {
+    const ns = getSandboxNamespace(
+      mockEnv,
+      'istd-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6',
+      { managedScmContainment: true }
+    );
+    expect(ns).toBe(mockSandboxContainment);
+  });
+
   it('should return SandboxCodeReview for crv- prefixed IDs', () => {
     const ns = getSandboxNamespace(mockEnv, 'crv-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
     expect(ns).toBe(mockSandboxCodeReview);
@@ -730,6 +773,7 @@ describe('getOutboundContainerId', () => {
   it.each([
     ['org-a1b2c3', 'shared-do-id'],
     ['ses-a1b2c3', 'small-do-id'],
+    ['istd-a1b2c3', 'shared-do-id'],
     ['dind-a1b2c3', 'dind-do-id'],
   ])('derives %s from the selected sandbox namespace', (sandboxId, expected) => {
     const createNamespace = (containerId: string) => ({

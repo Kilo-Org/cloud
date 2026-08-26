@@ -308,9 +308,10 @@ function runCreator(args: {
   try {
     // eslint-disable-next-line react-hooks/rules-of-hooks -- fake dispatcher drives the hook in a plain vitest run
     return useNewSessionCreator({
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- attachment fake shape; only `attachments` and `uploadPending` are read by the create path
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- attachment fake shape; only `attachments`, `uploadPending`, and `reset` are read by the create path
       attachments: {
         attachments: [],
+        reset: vi.fn(() => undefined),
         uploadPending: async () => ({
           ok: true as const,
           wire: attachmentsWire,

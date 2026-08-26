@@ -128,6 +128,7 @@ import {
   user_terms_acceptances,
   user_deletion_requests,
   user_deletion_steps,
+  cloud_agent_pending_uploads,
 } from '@kilocode/db/schema';
 
 import { eq, count, inArray, sql } from 'drizzle-orm';
@@ -144,6 +145,7 @@ import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser, insertTestUserAndGoogleAuth } from '@/tests/helpers/user.helper';
+import { hosted_domain_specials } from '@/lib/auth/constants';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 import { randomUUID } from 'crypto';
@@ -174,6 +176,18 @@ jest.mock('@/lib/stripe-client', () => ({
 
 jest.mock('@/lib/impact/affiliate-events', () => ({
   recordAffiliateAttributionAndQueueParentEvent: jest.fn(async () => null),
+}));
+
+// Account deletion purges the deleted user's pending cloud-agent objects from
+// R2 before it drops the ledger rows; keep that off the network in tests.
+const mockR2Send = jest.fn(async (_command: { input: { Key?: string } }) => ({}));
+jest.mock('@/lib/r2/client', () => ({
+  // Read through a wrapper: the factory runs while the module graph loads,
+  // before the const below is initialized.
+  r2Client: { send: (command: { input: { Key?: string } }) => mockR2Send(command) },
+  r2CliSessionsBucketName: 'cli-sessions-bucket',
+  r2CloudAgentAttachmentsBucketName: 'attachment-bucket',
+  r2ExperimentPromptsBucketName: 'experiment-prompts-bucket',
 }));
 
 const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
@@ -255,6 +269,7 @@ describe('User', () => {
     await db.delete(magic_link_tokens);
     await db.delete(bot_request_cloud_agent_sessions);
     await db.delete(bot_requests);
+    await db.delete(cloud_agent_pending_uploads);
     await db.delete(coding_plan_availability_intents);
     await db.delete(coding_plan_subscriptions);
     await db.delete(byok_api_keys);
@@ -407,6 +422,119 @@ describe('User', () => {
     it('returns null for an email that is not linked to an account', async () => {
       await expect(getAllUserProviders('no-match@example.com')).resolves.toEqual({
         kind: 'not_found',
+      });
+    });
+
+    it('uses the explicit legacy provider sentinel when provider rows are missing', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'legacy-provider@example.com',
+        google_user_name: 'Legacy Provider User',
+        normalized_email: 'legacy-provider@example.com',
+        hosted_domain: hosted_domain_specials.github,
+      });
+
+      await expect(getAllUserProviders('legacy-provider@example.com')).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['github'],
+          primaryEmail: 'legacy-provider@example.com',
+          workosHostedDomain: undefined,
+        },
+      });
+    });
+
+    it.each(['google', 'github', 'gitlab'] as const)(
+      'uses legacy %s OAuth ID provenance when provider rows are missing',
+      async provider => {
+        const user = await insertTestUser({
+          id: `oauth/${provider}:synthetic-account`,
+          google_user_email: `legacy-${provider}@example.com`,
+          google_user_name: 'Legacy Workspace User',
+          normalized_email: `legacy-${provider}@example.com`,
+          hosted_domain: 'example.com',
+        });
+
+        await expect(getAllUserProviders(`legacy-${provider}@example.com`)).resolves.toEqual({
+          kind: 'found',
+          user: {
+            kiloUserId: user.id,
+            providers: [provider],
+            primaryEmail: `legacy-${provider}@example.com`,
+            workosHostedDomain: undefined,
+          },
+        });
+      }
+    );
+
+    it('keeps linked provider rows authoritative over legacy OAuth ID provenance', async () => {
+      const user = await insertTestUser({
+        id: 'oauth/google:synthetic-linked-account',
+        google_user_email: 'linked-legacy@example.com',
+        google_user_name: 'Linked Legacy User',
+        normalized_email: 'linked-legacy@example.com',
+        hosted_domain: 'example.com',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: user.id,
+        provider: 'email',
+        provider_account_id: 'linked-legacy@example.com',
+        email: 'linked-legacy@example.com',
+        avatar_url: '',
+        hosted_domain: 'example.com',
+      });
+
+      await expect(getAllUserProviders('linked-legacy@example.com')).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['email'],
+          primaryEmail: 'linked-legacy@example.com',
+          workosHostedDomain: undefined,
+        },
+      });
+    });
+
+    it.each(['oauth/google:', 'oauth/googleish:account', 'oauth/workos:account'])(
+      'does not infer a provider from malformed or unsupported legacy ID %s',
+      async id => {
+        const email = `invalid-legacy-${randomUUID()}@example.com`;
+        const user = await insertTestUser({
+          id,
+          google_user_email: email,
+          google_user_name: 'Invalid Legacy User',
+          normalized_email: email,
+          hosted_domain: 'unknown.example.com',
+        });
+
+        await expect(getAllUserProviders(email)).resolves.toEqual({
+          kind: 'found',
+          user: {
+            kiloUserId: user.id,
+            providers: [],
+            primaryEmail: email,
+            workosHostedDomain: undefined,
+          },
+        });
+      }
+    );
+
+    it('does not infer a provider from an unknown legacy hosted domain', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'unknown-legacy@example.com',
+        google_user_name: 'Unknown Legacy User',
+        normalized_email: 'unknown-legacy@example.com',
+        hosted_domain: 'unknown.example.com',
+      });
+
+      await expect(getAllUserProviders('unknown-legacy@example.com')).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: [],
+          primaryEmail: 'unknown-legacy@example.com',
+          workosHostedDomain: undefined,
+        },
       });
     });
 
@@ -1212,6 +1340,62 @@ describe('User', () => {
             inArray(analytics_event_outbox.id, [userOutbox.id, fallbackOutbox.id, otherOutbox.id])
           )
       ).toEqual([expect.objectContaining({ id: otherOutbox.id })]);
+    });
+
+    it("deletes the user's cloud agent pending-upload rows and leaves other users' rows", async () => {
+      const user = await insertTestUser({ google_user_email: 'pending-upload-user@example.com' });
+      const otherUser = await insertTestUser();
+
+      const [userPending] = await db
+        .insert(cloud_agent_pending_uploads)
+        .values({
+          id: crypto.randomUUID(),
+          kilo_user_id: user.id,
+          object_key: `${user.id}/cloud-agent/msg-1/att-1.bin`,
+          message_uuid: '11111111-1111-4111-8111-111111111111',
+          attachment_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          byte_size: 42,
+          status: 'pending',
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .returning();
+      const [otherPending] = await db
+        .insert(cloud_agent_pending_uploads)
+        .values({
+          id: crypto.randomUUID(),
+          kilo_user_id: otherUser.id,
+          object_key: `${otherUser.id}/cloud-agent/msg-1/att-1.bin`,
+          message_uuid: '22222222-2222-4222-8222-222222222222',
+          attachment_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          byte_size: 42,
+          status: 'pending',
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .returning();
+      if (!userPending || !otherPending) {
+        throw new Error('Failed to seed pending upload rows');
+      }
+
+      await softDeleteUser(user.id);
+
+      // The rows are the only handle the reaper has on these objects, so the
+      // private objects must be deleted before the rows go.
+      const deletedKeys = mockR2Send.mock.calls.map(call => call[0].input.Key);
+      expect(deletedKeys).toContain(userPending.object_key);
+      expect(deletedKeys).not.toContain(otherPending.object_key);
+
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pending_uploads)
+          .where(eq(cloud_agent_pending_uploads.id, userPending.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_pending_uploads)
+          .where(eq(cloud_agent_pending_uploads.id, otherPending.id))
+      ).toHaveLength(1);
     });
 
     it('deletes user data export state and dependent multipart and outbox rows', async () => {

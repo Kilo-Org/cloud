@@ -116,6 +116,66 @@ describe('handleCliV2Sessions', () => {
     expect(maxInFlight).toBe(3);
   });
 
+  it('nulls public_id before the ingest DELETE is sent', async () => {
+    const user = await insertTestUser();
+    const sessionId = newSessionId('pub');
+    await insertSession(user.id, sessionId, undefined, '00000000-0000-4000-8000-000000000001');
+
+    let publicIdAtDelete: string | null | undefined = 'unset';
+    jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const sid = sessionIdFromUrl(input);
+      publicIdAtDelete = await publicIdFor(user.id, sid);
+      await deleteSessionRow(user.id, sid);
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
+    });
+
+    const outcome = await handleCliV2Sessions({
+      request: { user_id: user.id } as UserDeletionRequest,
+      step: runningStep(),
+      context: handlerContext(),
+    });
+
+    expect(outcome).toEqual({ kind: 'succeeded', progress: { processed_count: 1 } });
+    expect(publicIdAtDelete).toBeNull();
+  });
+
+  it('leaves public_id null when the ingest DELETE fails', async () => {
+    const user = await insertTestUser();
+    const sessionId = newSessionId('failpub');
+    await insertSession(user.id, sessionId, undefined, '00000000-0000-4000-8000-000000000002');
+
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('unavailable', { status: 500 }));
+
+    const outcome = await handleCliV2Sessions({
+      request: { user_id: user.id } as UserDeletionRequest,
+      step: runningStep(),
+      context: handlerContext(),
+    });
+
+    expect(outcome.kind).toBe('retry');
+    expect(await publicIdFor(user.id, sessionId)).toBeNull();
+  });
+
+  it('does not null public_id on a session owned by another user', async () => {
+    const user = await insertTestUser();
+    const other = await insertTestUser();
+    const targetId = newSessionId('targetpub');
+    const otherId = newSessionId('otherpub');
+    await insertSession(user.id, targetId, undefined, '00000000-0000-4000-8000-000000000003');
+    await insertSession(other.id, otherId, undefined, '00000000-0000-4000-8000-000000000004');
+
+    mockIngestDelete(user.id);
+
+    const outcome = await handleCliV2Sessions({
+      request: { user_id: user.id } as UserDeletionRequest,
+      step: runningStep(),
+      context: handlerContext(),
+    });
+
+    expect(outcome).toEqual({ kind: 'succeeded', progress: { processed_count: 1 } });
+    expect(await publicIdFor(other.id, otherId)).toBe('00000000-0000-4000-8000-000000000004');
+  });
+
   it('continues after a 409 without dropping already-deleted siblings', async () => {
     const user = await insertTestUser();
     const keepId = newSessionId('keep');
@@ -259,11 +319,17 @@ function newSessionId(label: string): string {
   return `ses_${label}${crypto.randomUUID().replaceAll('-', '')}`.slice(0, 30);
 }
 
-async function insertSession(userId: string, sessionId: string, parentSessionId?: string) {
+async function insertSession(
+  userId: string,
+  sessionId: string,
+  parentSessionId?: string,
+  publicId?: string
+) {
   await db.insert(cli_sessions_v2).values({
     session_id: sessionId,
     kilo_user_id: userId,
     parent_session_id: parentSessionId,
+    public_id: publicId,
     created_on_platform: 'cli',
   });
 }
@@ -282,6 +348,16 @@ async function remainingSessionIds(userId: string): Promise<string[]> {
     .from(cli_sessions_v2)
     .where(eq(cli_sessions_v2.kilo_user_id, userId));
   return rows.map(row => row.session_id).sort();
+}
+
+async function publicIdFor(userId: string, sessionId: string): Promise<string | null> {
+  const rows = await db
+    .select({ public_id: cli_sessions_v2.public_id })
+    .from(cli_sessions_v2)
+    .where(
+      and(eq(cli_sessions_v2.kilo_user_id, userId), eq(cli_sessions_v2.session_id, sessionId))
+    );
+  return rows[0]?.public_id ?? null;
 }
 
 function sessionIdFromUrl(input: RequestInfo | URL): string {

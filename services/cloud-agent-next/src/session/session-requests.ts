@@ -45,6 +45,7 @@ export type SessionRepositoryRequest =
 
 export type SessionRuntimeIntent = {
   devcontainer?: boolean;
+  sandboxAllocation?: 'isolated-standard';
 };
 
 export type SessionCreateRequest = {

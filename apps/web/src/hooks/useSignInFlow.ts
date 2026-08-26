@@ -817,8 +817,8 @@ export function useSignInFlow({
     setTurnstileError(false);
     setError('');
     setAvailableProviders([]);
-    setShowEmailInput(!isSignUp);
-  }, [clearPendingSso, isSignUp, retireTurnstileWidget]);
+    setShowEmailInput(tier === 'new' && !isSignUp);
+  }, [clearPendingSso, isSignUp, retireTurnstileWidget, tier]);
 
   const handleShowEmailInput = useCallback(() => {
     retireTurnstileWidget();

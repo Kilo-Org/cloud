@@ -1057,7 +1057,7 @@ export function NewSessionPanel({
         autoCommit: true,
         autoInitiate: true,
         initialMessageId,
-        attachments: attachmentUpload.getAttachmentsData(),
+        attachments: await attachmentUpload.finalizeAttachments(),
         ...(slashCommand
           ? {
               initialPayload: {

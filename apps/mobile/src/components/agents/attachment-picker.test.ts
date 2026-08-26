@@ -19,6 +19,38 @@ vi.mock('react-native', () => ({
   Linking: { openSettings: reactNativeMock.openSettings },
 }));
 
+const expoFileSystemMock = vi.hoisted(() => {
+  const files = new Map<string, string>();
+  const File = vi.fn(function FileMock(_base: unknown, ...rest: unknown[]) {
+    const uri =
+      rest.length > 0 ? `${(_base as { uri: string }).uri}/${String(rest[0])}` : String(_base);
+    return {
+      uri,
+      get exists() {
+        return files.has(uri);
+      },
+      write(content: string) {
+        files.set(uri, content);
+      },
+      textSync() {
+        return files.get(uri) ?? '';
+      },
+      delete() {
+        files.delete(uri);
+      },
+    };
+  });
+  return {
+    File,
+    Paths: { cache: { uri: 'file:///cache' } },
+  };
+});
+
+vi.mock('expo-file-system', () => ({
+  File: expoFileSystemMock.File,
+  Paths: expoFileSystemMock.Paths,
+}));
+
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: announcingToastMock.error, success: vi.fn(), warning: vi.fn() },
 }));

@@ -1,4 +1,35 @@
+import { type ShareIntentProvider } from 'expo-share-intent';
+import { type ComponentProps } from 'react';
+
 import { type ShareId } from '@/lib/share-payload';
+
+/** The provider does not re-export its own options type. */
+type ShareIntentOptions = NonNullable<ComponentProps<typeof ShareIntentProvider>['options']>;
+
+/**
+ * Options for the app's single `ShareIntentProvider`.
+ *
+ * `resetOnBackground` defaults to `true`, which clears the native payload and
+ * the JS state whenever the app leaves the foreground. The share ingest waits
+ * for `isShellReadyForShare`, and a signed-out share reaches that state only
+ * after a sign-in that leaves the app (OAuth browser, Apple/Google sheet), so
+ * the default would drop the payload before the ingest ever runs. The ingest
+ * resets the intent itself once it has copied the files.
+ */
+export const SHARE_INTENT_OPTIONS: ShareIntentOptions = { resetOnBackground: false };
+
+/**
+ * Guard for the share ingest effect in `_layout.tsx`. Copying the shared files
+ * while signed out registers temp files that the sign-in reap in
+ * `clearSessionScopedState` deletes before the gate ever reads them, so the
+ * copy waits for the same `isShellReadyForShare` result the gate effect uses.
+ */
+export function shouldIngestShareIntent(input: {
+  hasShareIntent: boolean;
+  isShellReady: boolean;
+}): boolean {
+  return input.hasShareIntent && input.isShellReady;
+}
 
 /**
  * Conjunction of the guards the auth effect in `_layout.tsx` passes before its

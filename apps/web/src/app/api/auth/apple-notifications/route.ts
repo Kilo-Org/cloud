@@ -1,12 +1,13 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/drizzle';
-import { user_auth_provider } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { device_refresh_tokens, device_sessions, user_auth_provider } from '@kilocode/db/schema';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest } from '@/lib/utils.server';
 import { APPLE_CLIENT_ID } from '@/lib/config.server';
 import { AppleJwtClientError, verifyAppleJwtWithJwks } from '@/lib/auth/apple-jwks';
+import { revokeWebSessions } from '@/lib/web-session-revocation';
 
 type AppleEvent = {
   type: 'consent-revoked' | 'account-delete' | 'email-disabled' | 'email-enabled';
@@ -31,14 +32,47 @@ async function handleAppleEvent(event: AppleEvent): Promise<void> {
   logExceptInTest(`Apple auth event: ${type} for sub=${sub}`);
 
   if (type === 'consent-revoked' || type === 'account-delete') {
-    await db
-      .delete(user_auth_provider)
-      .where(
-        and(
-          eq(user_auth_provider.provider, 'apple'),
-          eq(user_auth_provider.provider_account_id, sub)
+    // Compatibility: the old handler deleted the provider row only. Keep the
+    // extra web/device revocation until Apple stops sending these events.
+    await db.transaction(async tx => {
+      const deletedProviders = await tx
+        .delete(user_auth_provider)
+        .where(
+          and(
+            eq(user_auth_provider.provider, 'apple'),
+            eq(user_auth_provider.provider_account_id, sub)
+          )
         )
-      );
+        .returning({ kilo_user_id: user_auth_provider.kilo_user_id });
+      if (deletedProviders.length === 0) return;
+
+      const now = new Date().toISOString();
+      for (const { kilo_user_id } of deletedProviders) {
+        await revokeWebSessions(kilo_user_id, tx);
+
+        await tx
+          .update(device_sessions)
+          .set({ revoked_at: now, revoked_reason: 'apple_provider_revoked' })
+          .where(
+            and(eq(device_sessions.kilo_user_id, kilo_user_id), isNull(device_sessions.revoked_at))
+          );
+
+        await tx
+          .delete(device_refresh_tokens)
+          .where(
+            and(
+              inArray(
+                device_refresh_tokens.device_session_id,
+                tx
+                  .select({ id: device_sessions.id })
+                  .from(device_sessions)
+                  .where(eq(device_sessions.kilo_user_id, kilo_user_id))
+              ),
+              isNull(device_refresh_tokens.consumed_at)
+            )
+          );
+      }
+    });
     logExceptInTest(`Removed apple auth provider for sub=${sub} (${type})`);
   }
   // email-disabled and email-enabled are informational — no action needed

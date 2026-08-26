@@ -58,6 +58,7 @@ import {
   slack_bot_requests,
   bot_requests,
   cloud_agent_code_reviews,
+  cloud_agent_pending_uploads,
   code_review_feedback_events,
   code_review_memory_proposals,
   kiloclaw_instances,
@@ -124,6 +125,7 @@ import type { TRPCError } from '@trpc/server';
 import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
+import { hosted_domain_specials } from '@/lib/auth/constants';
 import {
   generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
@@ -132,6 +134,7 @@ import {
 import { normalizeEmail } from '@/lib/utils';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import { extractEmailDomain } from '@/lib/email-domain';
+import { purgeUserPendingUploads } from '@/lib/r2/cloud-agent-pending-uploads';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
 import {
@@ -1397,6 +1400,13 @@ export async function anonymizeCloudUserData(
   await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));
   await tx.delete(slack_bot_requests).where(eq(slack_bot_requests.owned_by_user_id, userId));
   await tx.delete(bot_requests).where(eq(bot_requests.created_by, userId));
+  // Delete the private objects first: the ledger rows are the only handle the
+  // reaper has on them, so dropping the rows alone strands the objects in the
+  // bucket after the account is gone.
+  await purgeUserPendingUploads(userId);
+  await tx
+    .delete(cloud_agent_pending_uploads)
+    .where(eq(cloud_agent_pending_uploads.kilo_user_id, userId));
   await tx
     .delete(cloud_agent_code_reviews)
     .where(eq(cloud_agent_code_reviews.owned_by_user_id, userId));
@@ -1933,16 +1943,56 @@ async function getUserProviderInfo(user: User): Promise<UserProviderLookupResult
     .orderBy(user_auth_provider.created_at);
 
   const workosProvider = providers.find(p => p.provider === 'workos');
+  const discoveredProviders =
+    providers.length > 0 ? providers.map(p => p.provider) : legacyProviderFromHostedDomain(user);
 
   return {
     kind: 'found',
     user: {
       kiloUserId: user.id,
-      providers: providers.map(p => p.provider),
+      providers: discoveredProviders,
       primaryEmail: user.google_user_email,
       workosHostedDomain: workosProvider?.hosted_domain ?? undefined,
     },
   };
+}
+
+function legacyProviderFromHostedDomain(user: User): AuthProviderId[] {
+  const legacyOAuthProvider = parseLegacyOAuthProvider(user.id);
+  if (legacyOAuthProvider) return [legacyOAuthProvider];
+
+  switch (user.hosted_domain) {
+    case hosted_domain_specials.non_workspace_google_account:
+      return ['google'];
+    case hosted_domain_specials.anaconda:
+      return ['anaconda'];
+    case hosted_domain_specials.apple:
+      return ['apple'];
+    case hosted_domain_specials.github:
+      return ['github'];
+    case hosted_domain_specials.gitlab:
+      return ['gitlab'];
+    case hosted_domain_specials.linkedin:
+      return ['linkedin'];
+    case hosted_domain_specials.discord:
+      return ['discord'];
+    case hosted_domain_specials.email:
+      return ['email'];
+    default:
+      return [];
+  }
+}
+
+function parseLegacyOAuthProvider(userId: string): AuthProviderId | null {
+  const match = /^oauth\/(google|github|gitlab):(.+)$/.exec(userId);
+  switch (match?.[1]) {
+    case 'google':
+    case 'github':
+    case 'gitlab':
+      return match[1];
+    default:
+      return null;
+  }
 }
 
 /**

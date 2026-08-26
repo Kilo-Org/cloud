@@ -21,6 +21,10 @@ const reactNativeMock = vi.hoisted(() => ({
   Platform: { OS: 'ios' },
 }));
 
+const tempFileRegistryMock = vi.hoisted(() => ({
+  registerTempFile: vi.fn(),
+}));
+
 vi.mock('expo-file-system', () => ({
   Directory: expoFileSystemMock.Directory,
   File: expoFileSystemMock.File,
@@ -36,8 +40,13 @@ vi.mock('expo-sharing', () => ({
   shareAsync: vi.fn(),
 }));
 
+vi.mock('@/lib/temp-file-registry', () => ({
+  registerTempFile: tempFileRegistryMock.registerTempFile,
+}));
+
 beforeEach(() => {
   reactNativeMock.Platform.OS = 'ios';
+  tempFileRegistryMock.registerTempFile.mockClear();
 });
 
 describe('message attachment render state', () => {
@@ -90,7 +99,7 @@ describe('message attachment render state', () => {
     expect(cacheFilename.endsWith('.png')).toBe(true);
   });
 
-  it('deletes materialized attachment files after sharing', async () => {
+  it('keeps materialized attachment files for the TTL reap after sharing', async () => {
     const deleted: string[] = [];
     const shared: string[] = [];
 
@@ -108,7 +117,10 @@ describe('message attachment render state', () => {
     );
 
     expect(shared).toEqual(['file:///cache/kilo-chat-attachments/attachment.txt']);
-    expect(deleted).toEqual(['file:///cache/kilo-chat-attachments/attachment.txt']);
+    expect(deleted).toEqual([]);
+    expect(tempFileRegistryMock.registerTempFile).toHaveBeenCalledWith(
+      'file:///cache/kilo-chat-attachments/attachment.txt'
+    );
   });
 
   it('keeps materialized attachment files after successful Android shares', async () => {
@@ -128,6 +140,9 @@ describe('message attachment render state', () => {
     );
 
     expect(deleted).toEqual([]);
+    expect(tempFileRegistryMock.registerTempFile).toHaveBeenCalledWith(
+      'file:///cache/kilo-chat-attachments/attachment.txt'
+    );
   });
 
   it('deletes materialized attachment files after share failures', async () => {

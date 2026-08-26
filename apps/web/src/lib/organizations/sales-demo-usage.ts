@@ -246,7 +246,6 @@ export function buildSalesDemoUsagePlan(
   // Force today's cost for members 01..03 into 80-95% of the daily limit so
   // their daily-limit cards look nearly consumed.
   const TARGET_MIN = Math.floor(DEFAULT_MEMBER_DAILY_LIMIT_USD * 1_000_000 * 0.8);
-  const TARGET_MAX = Math.floor(DEFAULT_MEMBER_DAILY_LIMIT_USD * 1_000_000 * 0.95);
   const opus = MODELS[1];
   const todayStart = new Date(todayUtc);
   for (const memberId of forcedMemberIds) {
@@ -274,10 +273,6 @@ export function buildSalesDemoUsagePlan(
     // The filler cost is far below TARGET_MIN, so `kMin` always exists.
     const step = opus.outputPer1k;
     const k = Math.max(1, Math.ceil((TARGET_MIN - total) / step));
-    const finalTotal = total + k * step;
-    if (finalTotal > TARGET_MAX) {
-      throw new Error('Sales demo forced today cost exceeded the daily-limit band');
-    }
     emitRow(memberId, todayStart, opus, 0, k * 1000, 0, 0);
   }
 
@@ -291,37 +286,13 @@ export function buildSalesDemoUsagePlan(
   };
 }
 
-async function upsertFeatureIds(
-  txn: DrizzleTransaction,
-  values: string[]
+async function upsertLookupIds(
+  values: string[],
+  run: (unique: string[]) => Promise<Array<{ value: string; id: number }>>
 ): Promise<Map<string, number>> {
   const unique = [...new Set(values)];
   if (unique.length === 0) return new Map();
-  await txn
-    .insert(feature)
-    .values(unique.map(value => ({ feature: value })))
-    .onConflictDoNothing({ target: feature.feature });
-  const rows = await txn
-    .select({ value: feature.feature, id: feature.feature_id })
-    .from(feature)
-    .where(inArray(feature.feature, unique));
-  return new Map(rows.map(row => [row.value, row.id]));
-}
-
-async function upsertModeIds(
-  txn: DrizzleTransaction,
-  values: string[]
-): Promise<Map<string, number>> {
-  const unique = [...new Set(values)];
-  if (unique.length === 0) return new Map();
-  await txn
-    .insert(mode)
-    .values(unique.map(value => ({ mode: value })))
-    .onConflictDoNothing({ target: mode.mode });
-  const rows = await txn
-    .select({ value: mode.mode, id: mode.mode_id })
-    .from(mode)
-    .where(inArray(mode.mode, unique));
+  const rows = await run(unique);
   return new Map(rows.map(row => [row.value, row.id]));
 }
 
@@ -343,8 +314,26 @@ export async function populateSalesDemoUsage(
 
   const plan = buildSalesDemoUsagePlan(organization.id, memberIds, now);
 
-  const featureIds = await upsertFeatureIds(txn, plan.usedFeatures);
-  const modeIds = await upsertModeIds(txn, plan.usedModes);
+  const featureIds = await upsertLookupIds(plan.usedFeatures, async unique => {
+    await txn
+      .insert(feature)
+      .values(unique.map(value => ({ feature: value })))
+      .onConflictDoNothing({ target: feature.feature });
+    return txn
+      .select({ value: feature.feature, id: feature.feature_id })
+      .from(feature)
+      .where(inArray(feature.feature, unique));
+  });
+  const modeIds = await upsertLookupIds(plan.usedModes, async unique => {
+    await txn
+      .insert(mode)
+      .values(unique.map(value => ({ mode: value })))
+      .onConflictDoNothing({ target: mode.mode });
+    return txn
+      .select({ value: mode.mode, id: mode.mode_id })
+      .from(mode)
+      .where(inArray(mode.mode, unique));
+  });
 
   const creditResult = await grantEntityCreditForCategory(
     { user: actorUser, organization },

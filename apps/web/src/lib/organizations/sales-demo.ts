@@ -31,7 +31,7 @@ export const NOT_LIVE_SALES_DEMO = 'NOT_LIVE_SALES_DEMO';
  * Fixed 25 human names for the demo members. Index `n - 1` aligns with
  * `salesDemoMemberId(n)` so member `01` uses the first entry.
  */
-export const SALES_DEMO_MEMBER_PROFILES: ReadonlyArray<{ first: string; last: string }> = [
+const SALES_DEMO_MEMBER_PROFILES: ReadonlyArray<{ first: string; last: string }> = [
   { first: 'Ava', last: 'Chen' },
   { first: 'Liam', last: 'Rodriguez' },
   { first: 'Sofia', last: 'Patel' },

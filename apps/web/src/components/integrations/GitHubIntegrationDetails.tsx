@@ -175,7 +175,32 @@ export function GitHubIntegrationDetails(props: GitHubIntegrationDetailsProps) {
     <>
       <GitHubIntegrationOutcomeToasts {...props} />
       {props.organizationId && !props.appReturnPath ? (
-        <OrganizationGitHubInstallations organizationId={props.organizationId} />
+        <div className="space-y-6">
+          <OrganizationGitHubInstallations organizationId={props.organizationId} />
+          <Card>
+            <CardHeader>
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <UserRound className="h-5 w-5" />
+                    Use your GitHub identity
+                  </CardTitle>
+                  <Badge variant="outline">Optional</Badge>
+                </div>
+                <CardDescription>
+                  Your GitHub identity is personal, not owned by this organization. Manage it from
+                  your personal integration to let eligible Cloud Agent sessions act as you where
+                  supported repository access is available.
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline">
+                <Link href="/integrations/github#github-identity">Manage GitHub identity</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       ) : (
         <GitHubIntegrationDetailsContent {...props} />
       )}

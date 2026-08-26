@@ -112,14 +112,14 @@ export type ReapAbandonedUploadsSummary = {
 };
 
 /**
- * Delete the private objects behind these pending rows, then mark the rows
- * whose delete succeeded 'reaped'. Object first, row second: a failed delete
- * or a run that is cut short leaves the row 'pending', so the next reaper run
- * retries it instead of orphaning the object. Deleting an absent key is a
- * no-op, so a retry is safe. Returns the number of rows marked.
+ * Delete these private objects one by one and report which keys succeeded and
+ * which failed. Deleting an absent key is a no-op, so a retry is safe.
  */
-async function purgePendingUploadObjects(objectKeys: string[]): Promise<number> {
+async function deletePendingUploadObjects(
+  objectKeys: string[]
+): Promise<{ deletedKeys: string[]; failedKeys: string[] }> {
   const deletedKeys: string[] = [];
+  const failedKeys: string[] = [];
   for (const objectKey of objectKeys) {
     try {
       await r2Client.send(
@@ -131,8 +131,20 @@ async function purgePendingUploadObjects(objectKeys: string[]): Promise<number> 
       deletedKeys.push(objectKey);
     } catch (error) {
       console.error('[cloud-agent] Failed to delete abandoned upload', objectKey, error);
+      failedKeys.push(objectKey);
     }
   }
+  return { deletedKeys, failedKeys };
+}
+
+/**
+ * Delete the private objects behind these pending rows, then mark the rows
+ * whose delete succeeded 'reaped'. Object first, row second: a failed delete
+ * or a run that is cut short leaves the row 'pending', so the next reaper run
+ * retries it instead of orphaning the object. Returns the number of rows marked.
+ */
+async function purgePendingUploadObjects(objectKeys: string[]): Promise<number> {
+  const { deletedKeys } = await deletePendingUploadObjects(objectKeys);
 
   if (deletedKeys.length === 0) return 0;
 
@@ -153,10 +165,12 @@ async function purgePendingUploadObjects(objectKeys: string[]): Promise<number> 
 /**
  * Release a set of pending rows back out of the per-message quota when the
  * caller abandons the files before sending (e.g. removes them from the
- * composer). The private object is deleted first, so an admit/PUT/release loop
- * frees quota without accumulating objects the reaper can no longer see. Only
- * the caller's own 'pending' rows are touched; 'linked' rows (already sent) and
- * other users' rows stay untouched.
+ * composer). The rows are claimed in one statement before the object delete:
+ * a link landing after the claim matches no 'pending' row, so an attachment
+ * that was actually sent can never lose its object. Only the caller's own
+ * 'pending' rows are claimed; 'linked' rows (already sent) and other users'
+ * rows stay untouched. A delete that fails puts its row back to 'pending' so
+ * the reaper retries it instead of orphaning the object.
  */
 export async function releasePendingUploads(
   kiloUserId: string,
@@ -164,18 +178,34 @@ export async function releasePendingUploads(
 ): Promise<void> {
   if (objectKeys.length === 0) return;
 
-  const rows = await db
-    .select({ object_key: cloud_agent_pending_uploads.object_key })
-    .from(cloud_agent_pending_uploads)
+  const claimed = await db
+    .update(cloud_agent_pending_uploads)
+    .set({ status: 'reaped' })
     .where(
       and(
         eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
         eq(cloud_agent_pending_uploads.status, 'pending'),
         inArray(cloud_agent_pending_uploads.object_key, objectKeys)
       )
-    );
+    )
+    .returning({ object_key: cloud_agent_pending_uploads.object_key });
 
-  await purgePendingUploadObjects(rows.map(row => row.object_key));
+  if (claimed.length === 0) return;
+
+  const { failedKeys } = await deletePendingUploadObjects(claimed.map(row => row.object_key));
+
+  if (failedKeys.length > 0) {
+    await db
+      .update(cloud_agent_pending_uploads)
+      .set({ status: 'pending' })
+      .where(
+        and(
+          eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+          eq(cloud_agent_pending_uploads.status, 'reaped'),
+          inArray(cloud_agent_pending_uploads.object_key, failedKeys)
+        )
+      );
+  }
 }
 
 /**

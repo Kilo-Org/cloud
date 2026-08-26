@@ -5,7 +5,6 @@ import { ActivityIndicator, Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { openModelPicker } from '@/components/agents/model-selector';
-import { getCodeReviewActionRequiredCopy } from '@kilocode/app-shared/code-reviews';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
 import {
   buildOverviewRows,
@@ -34,6 +33,7 @@ import {
   useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ACTION_REQUIRED_KEYS } from '@/components/code-reviewer/action-required-keys';
 
 export function PlatformOverviewScreen({
   scope,
@@ -171,15 +171,13 @@ export function PlatformOverviewScreen({
               : undefined,
         });
 
-  const actionRequiredCopy =
-    data?.actionRequired != null
-      ? getCodeReviewActionRequiredCopy(data.actionRequired.reason)
-      : null;
+  const actionRequiredKeys =
+    data?.actionRequired != null ? ACTION_REQUIRED_KEYS[data.actionRequired.reason] : null;
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.eyebrow')} />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <Animated.View layout={LinearTransition}>
           {isLoading && (
             <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
@@ -236,14 +234,14 @@ export function PlatformOverviewScreen({
                 </View>
               )}
 
-              {actionRequiredCopy != null && (
+              {actionRequiredKeys != null && (
                 <View className="rounded-lg bg-warn-tile-bg p-4">
-                  <Text className="text-sm font-medium">{actionRequiredCopy.title}</Text>
+                  <Text className="text-sm font-medium">{t(actionRequiredKeys.title)}</Text>
                   <Text variant="muted" className="text-xs">
-                    {actionRequiredCopy.description}
+                    {t(actionRequiredKeys.description)}
                   </Text>
                   <Text className="mt-1 text-xs font-medium">
-                    {actionRequiredCopy.recoveryLabel}
+                    {t(actionRequiredKeys.recoveryLabel)}
                   </Text>
                 </View>
               )}

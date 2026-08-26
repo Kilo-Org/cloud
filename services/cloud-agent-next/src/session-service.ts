@@ -11,7 +11,10 @@ import {
 } from './types.js';
 import { generateSandboxId, getOutboundContainerId } from './sandbox-id.js';
 import { mintWrapperDispatchTicket, resolveSecret } from './auth.js';
-import { normalizeKilocodeModel } from './persistence/model-utils.js';
+import {
+  isLocalFakeDeterministicModel,
+  normalizeKilocodeModel,
+} from './persistence/model-utils.js';
 import {
   isTemporaryManagedBitbucketTokenFailure,
   issueCloudAgentGitHubSessionCapability,
@@ -54,6 +57,7 @@ import {
   requiresContainmentSandbox,
 } from './persistence/session-metadata.js';
 import { withDORetry } from './utils/do-retry.js';
+import { resolveSessionStub } from './sandbox-session/session-stub.js';
 import { decryptWithPrivateKey, mergeEnvVarsWithSecrets } from './utils/encryption.js';
 import { codeReviewIdFromCallbackTarget, type MCPSecretValue } from './router/schemas.js';
 import type { SessionProfileBundle } from './session-profile.js';
@@ -82,7 +86,12 @@ import {
   type WrapperWorkspaceReady,
 } from './shared/wrapper-bootstrap.js';
 import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
-import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from './shared/runtime-environment.js';
+import {
+  isStrippedGitConfigEnvVar,
+  PNPM_STORE_DIR,
+  PNPM_STORE_ENV_VAR,
+  SYSTEM_GIT_CONFIG_ENV,
+} from './shared/runtime-environment.js';
 import type {
   FencedLegacyExecutionRequest,
   FencedWrapperDispatchRequest,
@@ -1058,10 +1067,8 @@ export async function fetchSessionMetadata(
   userId: string,
   sessionId: string
 ): Promise<CloudAgentSessionState | null> {
-  const doKey = `${userId}:${sessionId}`;
-
   const metadata = await withDORetry(
-    () => env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey)),
+    () => resolveSessionStub(env, userId, sessionId),
     stub => stub.getMetadata(),
     'getMetadata'
   );
@@ -1085,12 +1092,7 @@ export async function fetchSessionMetadata(
   }
 }
 
-/**
- * Generate a unique session ID with the agent_ prefix.
- */
-export function generateSessionId(): SessionId {
-  return `agent_${crypto.randomUUID()}`;
-}
+export { generateSessionId } from './session-plane.js';
 
 function githubRepository(metadata: CloudAgentSessionState) {
   return metadata.repository?.type === 'github' ? metadata.repository : undefined;
@@ -1363,6 +1365,8 @@ export class SessionService {
       SESSION_ID: sessionId,
       SESSION_HOME: sessionHome,
       [PNPM_STORE_ENV_VAR]: PNPM_STORE_DIR,
+      ...SYSTEM_GIT_CONFIG_ENV,
+      GIT_TERMINAL_PROMPT: '0',
       // Opaque Kilo capability — redeemed for the real credential at the outbound interceptor
       KILOCODE_TOKEN: kiloCapability,
       // Backend auth surface (session restore/import).
@@ -1373,6 +1377,12 @@ export class SessionService {
       // Feature attribution for microdollar usage tracking
       KILOCODE_FEATURE: createdOnPlatform ?? 'cloud-agent',
     };
+
+    for (const key of Object.keys(envVars)) {
+      if (isStrippedGitConfigEnvVar(key)) {
+        delete envVars[key];
+      }
+    }
 
     const providerOptions: Record<string, string> = {
       apiKey: kiloCapability,
@@ -1505,6 +1515,11 @@ export class SessionService {
       configContent.model = normalizeKilocodeModel(kilocodeModel);
     }
     const agentConfig: Record<string, unknown> = {};
+    if (isLocalFakeDeterministicModel(kilocodeModel)) {
+      const fakeModel = normalizeKilocodeModel(kilocodeModel);
+      configContent.small_model = fakeModel;
+      agentConfig.title = { model: fakeModel };
+    }
     if (appendSystemPrompt && appendSystemPrompt.trim()) {
       agentConfig.custom = { prompt: appendSystemPrompt };
     }
@@ -1714,6 +1729,9 @@ export class SessionService {
         githubRepo: github.repo,
         userId: metadata.identity.userId,
         orgId: metadata.identity.orgId,
+        ...(github.githubIntegrationId
+          ? { expectedIntegrationId: github.githubIntegrationId }
+          : {}),
         allowUserAuthorization:
           metadata.identity.createdOnPlatform === 'cloud-agent-web' ||
           metadata.identity.createdOnPlatform === 'slack',
@@ -2700,9 +2718,14 @@ export class SessionService {
    *
    * GitHub App installation tokens expire after ~1h, and server-resolved GitLab
    * credentials can rotate independently of a warm workspace. The URL-embedded
-   * credentials from the original clone go stale quickly. `GH_TOKEN` /
-   * `GITLAB_TOKEN` env vars don't rescue `git` itself (they only affect the
-   * provider CLIs / GitLab HTTP integrations), so we rewrite `origin` whenever
+   * credentials from the original clone go stale quickly.
+   *
+   * The pinned `credential.helper` (`SYSTEM_GIT_CONFIG_ENV`) does serve `git`
+   * itself from `GH_TOKEN` / `GITLAB_TOKEN`, but it only rescues a remote whose
+   * URL lacks a password: when the URL carries both a username and a password,
+   * git sends that pair and never issues a `get` to the helper (verified against
+   * git 2.50 — on the 401 it only calls `erase`). A stale embedded pair
+   * therefore fails the fetch outright, so we still rewrite `origin` whenever
    * the token is resolved by us.
    */
   private async refreshGitRemoteToken(

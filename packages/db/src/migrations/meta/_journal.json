@@ -1569,6 +1569,62 @@
       "when": 1787579129083,
       "tag": "0223_right_makkari",
       "breakpoints": true
+    },
+    {
+      "idx": 224,
+      "version": "7",
+      "when": 1787673476900,
+      "tag": "0224_retire_kiloclaw_referral_rewards",
+      "breakpoints": true
+    },
+    {
+      "idx": 225,
+      "version": "7",
+      "when": 1787677353599,
+      "tag": "0225_rare_captain_britain",
+      "breakpoints": true
+    },
+    {
+      "idx": 226,
+      "version": "7",
+      "when": 1787683856423,
+      "tag": "0226_aromatic_paper_doll",
+      "breakpoints": true
+    },
+    {
+      "idx": 227,
+      "version": "7",
+      "when": 1787685886103,
+      "tag": "0227_exotic_scarecrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 228,
+      "version": "7",
+      "when": 1787728280349,
+      "tag": "0228_faithful_thanos",
+      "breakpoints": true
+    },
+    {
+      "idx": 229,
+      "version": "7",
+      "when": 1787738981235,
+      "tag": "0229_burly_bloodscream",
+      "breakpoints": true
+    },
+    {
+      "idx": 230,
+      "version": "7",
+      "when": 1787747556620,
+      "tag": "0230_melted_anthem",
+      "breakpoints": true
+    },
+    {
+      "idx": 231,
+      "version": "7",
+      "when": 1787762404304,
+      "tag": "0231_lively_cargill",
+      "breakpoints": true
     }
   ]
 }

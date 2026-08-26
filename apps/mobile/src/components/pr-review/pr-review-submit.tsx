@@ -12,7 +12,15 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Keyboard, ScrollView, type TextInput, View } from 'react-native';
+import {
+  Alert,
+  InteractionManager,
+  Keyboard,
+  Platform,
+  ScrollView,
+  type TextInput,
+  View,
+} from 'react-native';
 
 import {
   PrFormSheetFooter,
@@ -22,6 +30,7 @@ import {
 import { ReviewEventChips } from '@/components/pr-review/review-event-chips';
 import { Button } from '@/components/ui/button';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
   focusAfterPendingCommentRemoval,
@@ -37,11 +46,16 @@ import {
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 import { type PendingReviewItem, usePendingReview } from '@/lib/pr-review/pending-review-provider';
 import { partitionPendingItems } from '@/lib/pr-review/partition-pending-items';
 import { useSubmitReviewMutation } from '@/lib/pr-review/use-pr-review-mutations';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
+import { maybeAskAfterSuccessfulOutcome } from '@/lib/feedback';
+import { buildReviewFooter } from '@/lib/pr-review/review-footer';
 import {
   selectPartialSubmitMessage,
   selectSubmitCtaLabel,
@@ -65,6 +79,8 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const pending = usePendingReview();
   const { t } = useTranslation();
   const submitReview = useSubmitReviewMutation({ owner, repo, number });
+  const { userId } = useCurrentUserId();
+  const { prReviewFooter, hasLoaded: prReviewFooterLoaded } = usePrReviewFooterPreference();
 
   const [event, setEvent] = useState<ReviewEvent>('COMMENT');
   const [hasSummary, setHasSummary] = useState(false);
@@ -77,6 +93,18 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const bodyRef = useRef<string>('');
   const bodyInputRef = useRef<TextInput | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
+
+  // Seed the summary refs from the default-on footer preference once it
+  // resolves, before the summary field mounts, so a prefilled footer survives
+  // the async load without flashing an empty input.
+  const footerSeededRef = useRef(false);
+  const initialFooter =
+    prReviewFooterLoaded && prReviewFooter ? buildReviewFooter(Platform.OS) : '';
+  if (prReviewFooterLoaded && !footerSeededRef.current) {
+    footerSeededRef.current = true;
+    bodyRef.current = initialFooter;
+    setHasSummary(initialFooter.trim().length > 0);
+  }
 
   const isSubmitting = submitReview.isPending;
   const queuedCount = pending.items.length;
@@ -175,6 +203,10 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         );
       } else {
         onDismiss();
+        // eslint-disable-next-line typescript-eslint/no-deprecated -- InteractionManager.runAfterInteractions is the documented API for deferring work past the current interaction frame.
+        InteractionManager.runAfterInteractions(() => {
+          void maybeAskAfterSuccessfulOutcome(userId);
+        });
       }
     } catch {
       // Classified into inlineError by the effect above.
@@ -266,23 +298,26 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
             <Text className="text-sm font-medium text-foreground">
               {t('prReview.submit.summaryOptional')}
             </Text>
-            <ReviewSummaryField
-              bodyRef={bodyRef}
-              inputRef={bodyInputRef}
-              isDisabled={isSubmitting}
-              onChange={() => {
-                setHasSummary(bodyRef.current.trim().length > 0);
-                clearRecoverableError();
-              }}
-            />
+            {prReviewFooterLoaded ? (
+              <ReviewSummaryField
+                bodyRef={bodyRef}
+                inputRef={bodyInputRef}
+                isDisabled={isSubmitting}
+                defaultValue={initialFooter}
+                onChange={() => {
+                  setHasSummary(bodyRef.current.trim().length > 0);
+                  clearRecoverableError();
+                }}
+              />
+            ) : (
+              <Skeleton className="h-32" />
+            )}
           </View>
 
           <View className="gap-1 rounded-lg border border-hair-soft bg-secondary px-3 py-1.5">
             <Text className="text-sm font-medium text-foreground">
-              {queuedCount}{' '}
-              {queuedCount === 1
-                ? t('prReview.submit.pendingCommentSingular')
-                : t('prReview.submit.pendingCommentPlural')}
+              {formatNumber(queuedCount, i18n.language)}{' '}
+              {t('prReview.submit.pendingComment', { count: queuedCount })}
             </Text>
             {queueHint}
             {/* Keyboard-open viewport is tight; keep the count, hide per-item

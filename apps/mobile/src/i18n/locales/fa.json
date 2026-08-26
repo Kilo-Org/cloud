@@ -22,7 +22,12 @@
     "copiedToClipboard": "در کلیپ‌بورد کپی شد",
     "couldNotCopyToClipboard": "کپی در کلیپ‌بورد ممکن نشد",
     "required": "الزامی",
-    "error": "خطا: {{error}}"
+    "error": "خطا: {{error}}",
+    "back": "بازگشت",
+    "somethingWentWrong": "مشکلی پیش آمد",
+    "couldNotOpen": "باز کردن {{label}} ممکن نشد",
+    "link": "پیوند",
+    "takingLonger": "این کار بیش از حد انتظار طول می‌کشد. می‌توانید این را ببندید و دوباره بررسی کنید."
   },
   "language": {
     "title": "زبان",
@@ -33,7 +38,9 @@
     "retry": "تلاش مجدد",
     "search": "جستجوی زبانها",
     "noMatches": "هیچ زبانی مطابقت ندارد",
-    "deviceLanguage": "زبان دستگاه"
+    "deviceLanguage": "زبان دستگاه",
+    "current": "فعلی",
+    "allLanguages": "همه زبان‌ها"
   },
   "login": {
     "welcome": "به Kilo خوش آمدید",
@@ -65,7 +72,7 @@
     "terms": "شرایط",
     "termsConnector": " و ",
     "termsSuffix": ".",
-    "privacyPolicy": "سیاست حفظ حریم خصوصی",
+    "privacyPolicy": "خطمشی حریم خصوصی",
     "moreSignInOptions": "گزینه‌های بیشتر ورود",
     "couldNotCompleteSignIn": "تکمیل ورود ممکن نشد. لطفاً دوباره تلاش کنید.",
     "sessionEnded": "نشست شما به پایان رسید. لطفاً دوباره وارد شوید.",
@@ -81,7 +88,7 @@
   "profile": {
     "title": "پروفایل",
     "agents": "عامل‌ها",
-    "codeReviewer": "بازبین کد",
+    "codeReviewer": "بررسی‌کننده کد",
     "codeReviewerSubtitle": "بازبینی خودکار PR",
     "securityAgent": "عامل امنیت",
     "securityAgentSubtitle": "یافتن و رفع آسیب‌پذیری‌ها",
@@ -96,7 +103,7 @@
     "app": "برنامه",
     "preferences": "ترجیحات",
     "preferencesSubtitle": "ظاهر، اعلان‌ها، تفکر و رفتار صفحه",
-    "deviceSessions": "نشست‌های دستگاه",
+    "deviceSessions": "جلسات دستگاه",
     "deviceSessionsSubtitle": "بررسی و خروج از سایر دستگاه‌ها",
     "feedback": "بازخورد",
     "privacyChoices": "انتخاب‌های حریم خصوصی",
@@ -143,7 +150,9 @@
     "appearanceSystem": "سیستم",
     "appearanceLight": "روشن",
     "appearanceDark": "تیره",
-    "account": "حساب"
+    "account": "حساب",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "درخواست pull در دسترس نیست",
@@ -206,11 +215,11 @@
       "loadingLines": "در حال بارگذاری {{loaded}} از {{total}} خط…",
       "expandContext": "باز کردن زمینه",
       "expandMoreContext": "باز کردن زمینهٔ بیشتر",
-      "expandLines": "باز کردن {{count}} خط ({{start}}–{{end}})",
-      "expandMoreLines": "باز کردن {{count}} خط بیشتر ({{start}}–{{end}})",
-      "expandLinesOfContext": "باز کردن {{count}} خط از زمینه",
+      "expandLines": "باز کردن {{displayCount}} خط ({{start}}–{{end}})",
+      "expandMoreLines": "باز کردن {{displayCount}} خط بیشتر ({{start}}–{{end}})",
+      "expandLinesOfContext": "باز کردن {{displayCount}} خط از زمینه",
       "expandAll": "باز کردن همه",
-      "expandAllLines": "باز کردن همهٔ {{count}} خط",
+      "expandAllLines": "باز کردن همهٔ {{displayCount}} خط",
       "loadingMoreFiles": "در حال بارگذاری فایل‌های بیشتر…",
       "retryLoadingNextPage": "تلاش مجدد برای بارگذاری صفحهٔ بعد",
       "failedToLoadMoreFiles": "بارگذاری فایل‌های بیشتر ممکن نشد — برای تلاش مجدد ضربه بزنید",
@@ -219,10 +228,12 @@
       "loadedOfTotalFiles": "{{loaded}} از {{total}} فایل بارگذاری شد",
       "loadAllFiles": "بارگذاری همهٔ فایل‌ها",
       "loadAll": "بارگذاری همه",
-      "fileLoaded": "{{count}} فایل بارگذاری شد",
-      "filesLoaded": "{{count}} فایل بارگذاری شد",
-      "fileLoadedOfTotal": "{{count}} فایل از {{total}} بارگذاری شد",
-      "filesLoadedOfTotal": "{{count}} فایل از {{total}} بارگذاری شد",
+      "fileLoadedCount_one": "{{displayCount}} فایل بارگذاری شد",
+      "fileLoadedCount": "{{displayCount}} فایل بارگذاری شد",
+      "fileLoadedCount_other": "{{displayCount}} فایل بارگذاری شد",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} فایل از {{total}} بارگذاری شد",
+      "fileLoadedOfTotalCount": "{{displayCount}} فایل از {{total}} بارگذاری شد",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} فایل از {{total}} بارگذاری شد",
       "filesStillLoading": "فایل‌ها هنوز در حال بارگذاری هستند. برای بازخوانی به پایین بکشید.",
       "goToOverview": "رفتن به مرور کلی",
       "goToOverviewTab": "رفتن به برگهٔ مرور کلی"
@@ -278,7 +289,36 @@
         "body": "حذف شاخه ممکن نشد: {{reason}}",
         "accessibility": "ادغام شد. حذف شاخه ممکن نشد: {{reason}}"
       },
-      "loadFailedTitle": "بارگذاری گزینه‌های ادغام ممکن نشد"
+      "loadFailedTitle": "بارگذاری گزینه‌های ادغام ممکن نشد",
+      "blocked": {
+        "unknownStateTitle": "GitHub وضعیت ادغام‌پذیری را گزارش نکرده است",
+        "unknownStateDetail": "کمی بعد بازخوانی نمای کلی را امتحان کنید.",
+        "conflictsTitle": "تعارض‌های ادغام",
+        "conflictsDetail": "قبل از ادغام، تعارض‌های ادغام را روی این شاخه حل کنید.",
+        "requiredReviewsTitle": "بازبینی‌های لازم موجود نیستند",
+        "requiredReviewsDetail": "تأییدهای بازبین‌های لازم وجود ندارند یا در انتظار هستند.",
+        "failingChecksTitle": "بررسی‌های لازم ناموفق",
+        "failingChecksDetail": "بررسی‌های وضعیت لازم در حال شکست هستند.",
+        "unstableTitle": "برخی بررسی‌ها در حال شکست هستند",
+        "unstableDetail": "بررسی‌های غیرالزامی در حال شکست هستند. آن‌ها مانع ادغام نمی‌شوند.",
+        "draftTitle": "درخواست pull پیش‌نویس",
+        "draftDetail": "قبل از ادغام، درخواست pull را به‌عنوان آمادهٔ بازبینی علامت‌گذاری کنید.",
+        "behindTitle": "شاخه قدیمی است",
+        "behindDetailUpdatable": "قبل از ادغام، شاخه را از پایه به‌روزرسانی کنید یا rebase کنید.",
+        "behindDetail": "شاخهٔ head از پایه عقب است. قبل از ادغام، شاخه را rebase یا به‌روزرسانی کنید.",
+        "notMergeableTitle": "این درخواست pull هنوز قابل ادغام نیست",
+        "notMergeableDetail": "GitHub وضعیت ادغام‌پذیری {{state}} را گزارش کرده است."
+      },
+      "methodLabels": {
+        "merge": "ایجاد یک commit ادغام",
+        "squash": "Squash و ادغام",
+        "rebase": "Rebase و ادغام"
+      },
+      "methodDescriptions": {
+        "merge": "همهٔ commitهای این شاخه را با یک commit ادغام در شاخهٔ پایه ترکیب کنید.",
+        "squash": "همهٔ commitهای این شاخه را در یک commit واحد در شاخهٔ پایه ترکیب کنید.",
+        "rebase": "همهٔ commitهای این شاخه را بدون commit ادغام روی شاخهٔ پایه پخش کنید."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "رشتهٔ بحث {{anchorLabel}}",
@@ -288,8 +328,9 @@
       "resolved": "حل شد",
       "outdated": "قدیمی",
       "file": "فایل",
-      "oneComment": "۱ نظر",
-      "commentCount": "{{count}} نظر",
+      "comment_one": "۱ نظر",
+      "comment": "{{displayCount}} نظر",
+      "comment_other": "{{displayCount}} نظر",
       "startedRelative": " · شروع {{relative}}",
       "couldNotLoadMore": "بارگذاری نظرات بیشتر ممکن نشد.",
       "retryLoadingMore": "تلاش مجدد برای بارگذاری نظرات بیشتر",
@@ -298,9 +339,10 @@
       "closeReactions": "بستن واکنش‌ها",
       "reactionsTitle": "واکنش‌ها",
       "addReaction": "افزودن واکنش",
-      "reactionPill": "واکنش {{emoji}}، {{count}} {{countLabel}}",
-      "reactionSingular": "واکنش",
-      "reactionPlural": "واکنش",
+      "reactionPill": "واکنش {{emoji}}، {{displayCount}} {{countLabel}}",
+      "reaction_one": "واکنش",
+      "reaction": "واکنش",
+      "reaction_other": "واکنش",
       "commentActions": "اقدامات نظر",
       "reportContent": "گزارش محتوا",
       "reportUser": "گزارش کاربر",
@@ -349,10 +391,28 @@
       "noDiscussionDescription": "هیچ رشتهٔ بازبینی یا نظری در این درخواست pull نیست.",
       "reviewFiles": "بازبینی فایل‌ها",
       "quotedDiffSnippet": "بخش diff نقل‌قول‌شده",
-      "moreLinesAbove": "… {{count}} خط بیشتر در بالا",
+      "moreLinesAbove": "… {{displayCount}} خط بیشتر در بالا",
       "termsAcceptRequired": "برای ارسال باید شرایط استفاده را بپذیرید.",
       "termsOutdatedCopy": "شرایط استفاده تغییر کرده است. برای پذیرش آخرین نسخه این صفحه را دوباره باز کنید.",
-      "termsCheckRetryCopy": "بررسی شرایط استفاده ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید."
+      "termsCheckRetryCopy": "بررسی شرایط استفاده ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+      "reactions": {
+        "thumbsUp": "شست رو به بالا",
+        "thumbsDown": "شست رو به پایین",
+        "laugh": "خنده",
+        "hooray": "هورا",
+        "confused": "سردرگم",
+        "heart": "قلب",
+        "rocket": "موشک",
+        "eyes": "چشم‌ها"
+      },
+      "anchor": {
+        "fileCommentOnPath": "نظر روی فایل: {{path}}",
+        "fileComment": "نظر روی فایل",
+        "outdatedOnPathLines": "قدیمی: {{path}} {{lines}}",
+        "outdatedOnLines": "قدیمی: {{lines}}",
+        "outdatedOnPath": "قدیمی: {{path}}"
+      },
+      "deletedUser": "کاربر حذف‌شده"
     },
     "couldNotOpenGitHubAppSettings": "باز کردن تنظیمات GitHub App ممکن نشد",
     "installKiloGitHubApp": "نصب Kilo GitHub App",
@@ -362,7 +422,7 @@
     "couldNotLoadPullRequest": "بارگذاری درخواست pull ممکن نشد",
     "description": "توضیحات",
     "noDescriptionProvided": "توضیحی ارائه نشده است.",
-    "review": "بازبینی",
+    "review": "بررسی",
     "reviewPullRequest": "بازبینی درخواست pull",
     "headLine": "{{counts}} · head {{sha}}",
     "entry": {
@@ -391,11 +451,11 @@
       "retryChecks": "تلاش مجدد برای بررسی‌ها",
       "viewOnGitHub": "مشاهدهٔ PR در GitHub",
       "noChecksReported": "هیچ بررسی‌ای گزارش نشده است",
-      "passed": "{{count}} موفق",
-      "failed": "{{count}} ناموفق",
-      "pending": "{{count}} در انتظار",
-      "skipped": "{{count}} رد شده",
-      "checksCount": "{{count}} بررسی",
+      "passed": "{{displayCount}} موفق",
+      "failed": "{{displayCount}} ناموفق",
+      "pending": "{{displayCount}} در انتظار",
+      "skipped": "{{displayCount}} رد شده",
+      "checksCount": "{{displayCount}} بررسی",
       "checkDetails": "جزئیات بررسی",
       "pullRequest": "درخواست pull"
     },
@@ -423,7 +483,7 @@
       "loadFailedTitle": "بارگذاری ویرایشگر نظر ممکن نشد",
       "discardTitle": "دور انداختن نظر؟",
       "discardMessage": "پیش‌نویس شما از بین می‌رود.",
-      "keepEditing": "ادامهٔ ویرایش",
+      "keepEditing": "ادامه ویرایش",
       "discard": "دور انداختن",
       "comment": "نظر",
       "insertSuggestionA11y": "درج یک پیشنهاد کد",
@@ -452,11 +512,14 @@
       "deletePendingMessage": "این نظر از صف بازبینی حذف می‌شود.",
       "delete": "حذف",
       "summaryOptional": "خلاصه (اختیاری)",
-      "pendingCommentSingular": "نظر در انتظار",
-      "pendingCommentPlural": "نظرات در انتظار",
-      "submitCountOfTotal": "ارسال {{freshCount}} از {{totalCount}} نظر",
+      "pendingComment_one": "نظر در انتظار",
+      "pendingComment": "نظرات در انتظار",
+      "pendingComment_other": "نظرات در انتظار",
+      "submitCountOfTotal": "ارسال {{displayFreshCount}} از {{displayTotalCount}} نظر",
       "submitReview": "ارسال بازبینی",
-      "partialPostedMessage": "{{freshCount}} نظر ارسال شد. {{staleCount}} نظر به یک commit قدیمی‌تر اشاره دارد و در صف شما ماند."
+      "partialPostedMessage": "{{displayFreshCount}} نظر ارسال شد. {{displayStaleCount}} نظر به یک commit قدیمی‌تر اشاره دارد و در صف شما ماند.",
+      "blockedRequestChanges": "برای درخواست تغییرات، یک خلاصه یا حداقل یک نظر اضافه کنید.",
+      "blockedComment": "برای ارسال بازبینی نظری، یک خلاصه یا حداقل یک نظر اضافه کنید."
     },
     "reconnectNotice": {
       "title": "اتصال GitHub منقضی شد",
@@ -478,10 +541,12 @@
       "stateOpenReviewRequired": "باز · بازبینی لازم است",
       "stateOpen": "باز",
       "unknownAuthor": "نویسندهٔ ناشناس",
-      "commitSingular": "commit",
-      "commitPlural": "commit",
-      "fileSingular": "فایل",
-      "filePlural": "فایل"
+      "commit_one": "commit",
+      "commit": "commit",
+      "commit_other": "commit",
+      "file_one": "فایل",
+      "file": "فایل",
+      "file_other": "فایل"
     },
     "pendingComment": {
       "editOutdatedA11y": "ویرایش نظر قدیمی در انتظار روی {{location}}",
@@ -512,10 +577,36 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} انتخاب شد، برای تغییر انتخاب ضربه بزنید",
-      "tapToComment": "{{label}}، برای نظر ضربه بزنید"
+      "tapToComment": "{{label}}، برای نظر ضربه بزنید",
+      "truncationBanner": "نمایش {{limit}} فایل اول از {{total}} فایل تغییر یافته — سقف API گیتهاب",
+      "statusAdded": "افزوده شده",
+      "statusContext": "زمینه",
+      "statusDeleted": "حذف شده",
+      "lineLabel": "{{status}} خط {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(خالی)"
     },
     "linkPasteClipboardEmpty": "کلیپبورد خالی است",
-    "linkPasteNotAPullRequest": "این پیوند درخواست کشش GitHub نیست"
+    "linkPasteNotAPullRequest": "این پیوند درخواست کشش GitHub نیست",
+    "announce": {
+      "commentPosted": "نظر ارسال شد",
+      "reviewSubmitted": "بازبینی ارسال شد",
+      "autoMergeEnabled": "ادغام خودکار فعال شد"
+    },
+    "mutationError": {
+      "commentNotPosted": "این نظر قابل ارسال نیست. ممکن است خط انتخاب‌شده تغییر کرده باشد یا PR به‌روزرسانی شده باشد.",
+      "reviewNotSubmitted": "این بازبینی در وضعیت فعلی قابل ارسال نیست. ممکن است PR تغییر کرده باشد یا نتوانید درخواست pull خودتان را بازبینی کنید.",
+      "couldNotPostComment": "ارسال نظر ممکن نشد.",
+      "couldNotSubmitReview": "ارسال بازبینی ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید."
+    },
+    "operation": {
+      "couldNotReply": "پاسخ ممکن نشد.",
+      "couldNotCompleteAction": "تکمیل این عمل ممکن نشد.",
+      "mergeResultDefaultError": "GitHub ادغام را تکمیل نکرد.",
+      "ambiguous": "نمی‌توان تأیید کرد — قبل از تلاش مجدد، PR را بررسی کنید.",
+      "persistenceFailed": "نتوانستیم این اقدام را ثبت کنیم. لطفاً بعداً دوباره تلاش کنید.",
+      "forbidden": "ممنوع"
+    }
   },
   "notifications": {
     "title": "اعلان‌ها",
@@ -545,7 +636,7 @@
     "previewFullDescription": "اعلان‌ها متن پیام را روی صفحهٔ قفل شما نشان می‌دهند.",
     "previewGenericDescription": "اعلان‌ها نشان می‌دهند که چیزی رخ داده است. برای خواندن آن Kilo را باز کنید.",
     "channel": {
-      "agent": "نشست‌های عامل",
+      "agent": "جلسات عامل",
       "chat": "پیام‌های گفتگو",
       "kiloclaw": "فعالیت KiloClaw",
       "balance": "هشدارهای موجودی",
@@ -573,13 +664,14 @@
     "agents": "عامل‌ها",
     "profile": "پروفایل",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}، تب، {{position}} از {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "تغییر نمونه",
       "couldNotLoadInstances": "بارگذاری نمونه‌ها ممکن نشد",
-      "noInstances": "هیچ نمونهٔ KiloClaw نیست",
+      "noInstances": "هیچ نمونه KiloClaw وجود ندارد",
       "noInstancesDescription": "برای شروع گفتگو یک نمونه راه‌اندازی کنید.",
       "setUpKiloclaw": "راه‌اندازی KiloClaw",
       "currentInstance": "{{title}}، فعلی",
@@ -614,7 +706,7 @@
       "recent": "اخیر",
       "common": "متداول",
       "reactWith": "واکنش با {{reaction}}",
-      "accessibility": "واکنش {{emoji}}، {{count}}"
+      "accessibility": "واکنش {{emoji}}، {{displayCount}}"
     },
     "composer": {
       "replyingTo": "در حال پاسخ به",
@@ -643,11 +735,21 @@
       "imageUnavailable": "تصویر در دسترس نیست",
       "openFailed": "باز کردن پیوست ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
       "attachFailed": "پیوست فایل ممکن نشد",
-      "limit": "می‌توانید حداکثر {{count}} فایل پیوست کنید.",
+      "limit": "می‌توانید حداکثر {{displayCount}} فایل پیوست کنید.",
       "sizeRejection": "{{filename}} از محدودیت پیوست {{limit}} فراتر می‌رود.",
       "unreadable": "خواندن {{filename}} ممکن نشد.",
       "pastedImage": "تصویر جای‌گذاری‌شده",
-      "defaultName": "پیوست"
+      "defaultName": "پیوست",
+      "classificationDenied": "فایل‌های اجرایی قابل پیوست کردن نیستند",
+      "classificationEmpty": "فایل خالی است",
+      "classificationTooLarge": "فایل‌ها باید 20 MB یا کوچک‌تر باشند",
+      "classificationUnreadable": "خواندن این فایل ممکن نشد",
+      "announceUploaded": "پیوست بارگذاری شد",
+      "cantUpload": "این فایل قابل بارگذاری نیست.",
+      "networkError": "خطای شبکه",
+      "uploadFailed": "بارگذاری ناموفق بود",
+      "failedToUploadFile": "بارگذاری فایل ناموفق بود: {{reason}}",
+      "nothingToPaste": "چیزی برای جای‌گذاری نیست"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -661,7 +763,9 @@
       "moreActions": "اقدامات بیشتر",
       "message": "پیام",
       "notDelivered": "تحویل نشده",
-      "edited": "(ویرایش شده)"
+      "edited": "(ویرایش شده)",
+      "image": "تصویر",
+      "attachment": "پیوست"
     },
     "messageActions": {
       "copied": "کپی شد",
@@ -684,15 +788,16 @@
     },
     "attachmentPicker": {
       "takePhoto": "گرفتن عکس",
-      "photoLibrary": "گالری عکس",
+      "photoLibrary": "کتابخانه عکس",
       "files": "فایل‌ها",
       "cameraAccessDisabled": "دسترسی به دوربین غیرفعال است",
       "cameraAccessMessage": "برای گرفتن عکس، در تنظیمات به دوربین دسترسی بدهید."
     },
     "typingIndicator": {
       "someone": "شخصی",
-      "oneTyping": "{{name}} در حال تایپ است...",
-      "manyTyping": "{{names}} در حال تایپ هستند..."
+      "typing_one": "{{name}} در حال تایپ است...",
+      "typing": "{{names}} در حال تایپ هستند...",
+      "typing_other": "{{names}} در حال تایپ هستند..."
     },
     "botStatus": {
       "online": "آنلاین",
@@ -702,6 +807,12 @@
       "loadingUser": "در حال بارگذاری کاربر...",
       "waitingForStatus": "در انتظار وضعیت ربات...",
       "offlineMessage": "ربات آفلاین است. پیام‌ها پس از اتصال مجدد از سر گرفته می‌شوند."
+    },
+    "errors": {
+      "notAllowed": "مجاز نیست",
+      "messageTooLong": "پیام بیش از حد طولانی است — آن را زیر {{limit}} کاراکتر نگه دارید",
+      "titleTooLong": "عنوان بیش از حد طولانی است — آن را زیر {{limit}} کاراکتر نگه دارید",
+      "messageEmpty": "پیام نمی‌تواند خالی باشد"
     }
   },
   "kiloclaw": {
@@ -714,6 +825,7 @@
       "finalTermEnds": "پایان دوره نهایی",
       "afterFinalTerm": "پس از دوره نهایی",
       "remaining": "باقی‌مانده",
+      "lessThanOneDay": "کمتر از 1 روز",
       "ends": "پایان",
       "expires": "انقضا",
       "noActivePlan": "طرح فعالی وجود ندارد",
@@ -722,23 +834,25 @@
       "couldNotLoad": "بارگذاری اطلاعات صورتحساب ناموفق بود",
       "manageOnWeb": "مدیریت صورتحساب در وب",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} روز باقی‌مانده",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "دوره Commit نهایی شما در {{date}} به پایان می‌رسد. در صورت ادامه به‌عنوان Standard با {{price}}، یا هاستینگ قطع می‌شود.",
       "freeTrial": "آزمایشی رایگان",
       "hostingEnds": "پایان هاستینگ",
-      "oneDayLeft": "۱ روز باقی‌مانده",
       "renews": "تمدید",
       "standardMonthToMonth": "Standard ماهانه",
       "standardStartsOn": "Standard از {{date}} با {{price}} شروع می‌شود.",
       "yourStandardMonthlyPrice": "قیمت ماهانه Standard شما",
       "perMonth": "/ماه",
       "earlybirdAccessUntil": "دسترسی Earlybird تا {{date}}",
-      "earlybirdEnding": "پایان Earlybird: {{days}} روز باقی‌مانده",
+      "earlybirdEnding": "پایان Earlybird: {{remaining}}",
       "paymentPastDue": "پرداخت معوق است. لطفاً روش پرداخت خود را به‌روزرسانی کنید.",
       "subscriptionCancels": "اشتراک در {{date}} لغو می‌شود",
-      "trialDaysRemaining": "آزمایشی: {{days}} روز باقی‌مانده",
-      "trialEndingSoon": "به زودی پایان آزمایشی: {{days}}"
+      "trialDaysRemaining": "آزمایشی: {{remaining}} باقی‌مانده",
+      "trialEndingSoon": "به زودی پایان آزمایشی: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "چه خبر",
@@ -990,7 +1104,7 @@
         "stalledTitle": "مشکلی پیش آمد",
         "stalledBody": "نتوانستیم راه‌اندازی {{name}} را تمام کنیم. دوباره تلاش کنید، یا اگر این مشکل ادامه یافت به hi@kilo.ai ایمیل بزنید.",
         "timeoutTitle": "بیش از حد انتظار طول می‌کشد",
-        "timeoutBody": "راه‌اندازی {{name}} بیش از حد معمول طول می‌کشد (بیش از {{minutes}} دقیقه).",
+        "timeoutBody": "راه‌اندازی {{name}} بیش از حد معمول طول می‌کشد (بیش از {{displayMinutes}} دقیقه).",
         "continueInBackground": "ادامه در پس‌زمینه",
         "settingUp": "در حال راه‌اندازی {{name}}",
         "finishingSetup": "پایان راه‌اندازی",
@@ -1020,7 +1134,8 @@
       "starting": "در حال شروع",
       "stopped": "متوقف",
       "stopping": "در حال توقف",
-      "unknown": "ناشناخته"
+      "unknown": "ناشناخته",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1060,8 +1175,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} نیاز به توجه دارد: {{label}}",
-      "openUnreadOne": "باز کردن {{name}}، {{count}} پیام خوانده‌نشده",
-      "openUnreadMany": "باز کردن {{name}}، {{count}} پیام خوانده‌نشده",
+      "openUnread_one": "باز کردن {{name}}، {{displayCount}} پیام خوانده‌نشده",
+      "openUnread": "باز کردن {{name}}، {{displayCount}} پیام خوانده‌نشده",
+      "openUnread_other": "باز کردن {{name}}، {{displayCount}} پیام خوانده‌نشده",
       "open": "باز کردن {{name}}",
       "openSettings": "باز کردن تنظیمات برای {{name}}",
       "fixOnKiloAi": "رفع مشکل در kilo.ai: {{label}}"
@@ -1103,7 +1219,9 @@
       "sparkles": "جرقه‌ها",
       "strongArm": "بازوی قوی",
       "talisman": "طلسم"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "این نمونه نمی‌تواند فایل دریافت کند.",
+    "instanceSwitcherTitle": "نمونهٔ KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1123,21 +1241,21 @@
       "placeholder": "مثلاً قراردادهای مدیریت خطای ما را رعایت کنید…"
     },
     "repos": {
-      "title": "مخزن‌ها",
-      "couldNotLoad": "بارگذاری مخزن‌ها ناموفق بود",
+      "title": "مخازن",
+      "couldNotLoad": "بارگذاری مخازن ناموفق بود",
       "unavailable": "مخزن‌ها در دسترس نیستند — راه‌اندازی Bitbucket را در kilo.ai تمام کنید.",
       "finishSetup": "پایان راه‌اندازی",
       "manageAccess": "مدیریت دسترسی",
-      "allRepositories": "همه مخزن‌ها",
+      "allRepositories": "همه مخازن",
       "bitbucketNoRepositoriesDescription": "در این فضای کاری Bitbucket مخزنی در دسترس نیست.",
       "bitbucketSetup": "راه‌اندازی Bitbucket",
-      "couldNotOpenGithubSettings": "باز کردن تنظیمات GitHub App ناموفق بود",
+      "couldNotOpenGithubSettings": "باز کردن تنظیمات GitHub App ممکن نشد",
       "gitlabNoRepositoriesDescription": "ممکن است لازم باشد در GitLab به گروه‌ها یا پروژه‌های بیشتری دسترسی بدهید.",
       "installGithubApp": "نصب اپ GitHub روی مخزن‌ها",
       "installGithubAppDescription": "به GitHub App Kilo دسترسی به مخزن‌هایی که می‌خواهید بررسی شوند بدهید.",
       "noRepositoriesFound": "مخزنی پیدا نشد",
       "repositoryAccess": "دسترسی به مخزن",
-      "selectedRepositories": "مخزن‌های انتخاب‌شده"
+      "selectedRepositories": "مخازن انتخاب‌شده"
     },
     "style": {
       "title": "سبک بررسی",
@@ -1166,13 +1284,13 @@
       "branch": "شاخه",
       "platform": "پلتفرم",
       "model": "مدل",
-      "created": "ایجاد شد",
+      "created": "ایجاد شده",
       "started": "شروع شد",
       "completed": "تکمیل شد",
       "cost": "هزینه",
       "tokens": "توکن‌ها",
       "tokensInOut": "{{input}} ورودی / {{output}} خروجی",
-      "openPullRequest": "باز کردن pull request",
+      "openPullRequest": "باز کردن درخواست pull",
       "council": "شورا",
       "decision": "تصمیم",
       "gate": "دروازه",
@@ -1181,12 +1299,12 @@
       "checkRun": "اجرای بررسی",
       "status": "وضعیت",
       "threshold": "آستانه",
-      "pullRequest": "pull request"
+      "pullRequest": "درخواست pull"
     },
     "reviewMemory": {
       "title": "حافظه بررسی",
-      "couldNotLoadMore": "بارگذاری بیشتر ناموفق بود",
-      "retryLoadingMore": "تلاش دوباره برای بارگذاری بیشتر",
+      "couldNotLoadMore": "بارگذاری بیشتر ممکن نشد",
+      "retryLoadingMore": "تلاش مجدد برای بارگذاری بیشتر",
       "loading": "در حال بارگذاری حافظه بررسی",
       "couldNotLoad": "بارگذاری حافظه بررسی ناموفق بود",
       "off": "حافظه بررسی خاموش است",
@@ -1220,7 +1338,7 @@
     "webhookSetupDescription": "برخی مخزن‌ها ممکن است بررسی‌های خودکار دریافت نکنند.",
     "autoReviews": "بررسی‌های خودکار",
     "selectRepository": "برای فعال‌سازی بررسی‌های خودکار حداقل یک مخزن را انتخاب کنید.",
-    "selectRepositories": "انتخاب مخزن‌ها",
+    "selectRepositories": "انتخاب مخازن",
     "followReviewMd": "دنبال کردن REVIEW.md",
     "followReviewMdSubtitle": "رعایت فایل‌های دستورالعمل REVIEW.md هر مخزن",
     "readOnlyDescription": "فقط دارندگان سازمان و مدیران صورتحساب می‌توانند این تنظیمات را تغییر دهند.",
@@ -1241,7 +1359,7 @@
       "couldNotLoad": "بارگذاری سازمان‌ها ناموفق بود",
       "personalStillAvailable": "مخزن‌های شخصی هنوز در زیر در دسترس هستند.",
       "personal": "شخصی",
-      "personalSubtitle": "مخزن‌های خود شما",
+      "personalSubtitle": "مخازن خودتان",
       "viewOnly": "فقط مشاهده"
     },
     "reviewList": {
@@ -1278,9 +1396,9 @@
       "set": "تنظیم",
       "model": "مدل",
       "mergeGate": "دروازه ادغام",
-      "repositories": "مخزن‌ها",
-      "allRepositories": "همه مخزن‌ها",
-      "nSelected": "{{count}} انتخاب شد",
+      "repositories": "مخازن",
+      "allRepositories": "همه مخازن",
+      "nSelected": "{{displayCount}} انتخاب شد",
       "reviewMemory": "حافظه بررسی",
       "proposedReviewMdGuidance": "راهنمای پیشنهادی REVIEW.md"
     },
@@ -1290,7 +1408,71 @@
       "noDecision": "بدون تصمیم",
       "noResult": "بدون نتیجه"
     },
-    "eyebrow": "بررسی‌کننده کد"
+    "eyebrow": "بررسی‌کننده کد",
+    "updateFailed": "به‌روزرسانی بازبین ممکن نشد",
+    "configSaveFailed": "ذخیرهٔ پیکربندی بازبینی ممکن نشد",
+    "status": {
+      "pending": "در انتظار",
+      "queued": "در صف",
+      "running": "در حال اجرا",
+      "completed": "تکمیل شد",
+      "failed": "شکست خورد",
+      "cancelled": "لغو شد",
+      "interrupted": "قطع شد"
+    },
+    "reviewStyle": {
+      "strict": "سخت‌گیرانه",
+      "balanced": "متعادل",
+      "lenient": "سهل‌گیر",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "امنیت",
+      "performance": "عملکرد",
+      "bugs": "باگ‌ها",
+      "style": "سبک",
+      "testing": "تست",
+      "documentation": "مستندات"
+    },
+    "gateThreshold": {
+      "off": "خاموش",
+      "all": "همه",
+      "warning": "هشدار",
+      "critical": "بحرانی"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "بررسی‌کننده کد نیاز به توجه دارد",
+        "description": "بررسی‌کننده کد غیرفعال شد، زیرا Kilo نمی‌تواند با نصب فعال GitHub App به این مخزن دسترسی پیدا کند. نصب GitHub App را به‌روزرسانی کنید، سپس دوباره بررسی‌کننده کد را فعال کنید.",
+        "recoveryLabel": "به‌روزرسانی GitHub App"
+      },
+      "githubIpAllowList": {
+        "title": "بررسی‌کننده کد نیاز به توجه دارد",
+        "description": "بررسی‌کننده کد غیرفعال شد، زیرا این سازمان GitHub از فهرست مجاز IP استفاده می‌کند که Kilo را مسدود می‌کند. برای کمک با hi@kilocode.ai تماس بگیرید، سپس دوباره بررسی‌کننده کد را فعال کنید.",
+        "recoveryLabel": "تماس با پشتیبانی"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "بررسی‌کننده کد نیاز به توجه دارد",
+        "description": "بررسی‌کننده کد غیرفعال شد، زیرا Kilo نمی‌تواند برای این پروژه Token دسترسی پروژه GitLab ایجاد کند. دسترسی نگهدارنده را اعطا کنید یا Tokenهای دسترسی پروژه را فعال کنید، سپس دوباره بررسی‌کننده کد را فعال کنید.",
+        "recoveryLabel": "به‌روزرسانی یکپارچه‌سازی GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "بررسی‌کننده کد نیاز به توجه دارد",
+        "description": "بررسی‌کننده کد غیرفعال شد، زیرا کلید API BYOK انتخاب‌شده نامعتبر، لغو شده یا فاقد مجوز است. کلید را به‌روزرسانی کنید یا مدل دیگری انتخاب کنید، سپس دوباره بررسی‌کننده کد را فعال کنید.",
+        "recoveryLabel": "به‌روزرسانی تنظیمات BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "بررسی‌کننده کد نیاز به توجه دارد",
+        "description": "بررسی‌کننده کد غیرفعال شد، زیرا مدل انتخاب‌شده برای جلسات عامل ابری در دسترس نیست. یک مدل در دسترس انتخاب کنید، سپس دوباره بررسی‌کننده کد را فعال کنید.",
+        "recoveryLabel": "به‌روزرسانی تنظیمات بررسی‌کننده کد"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "بررسی‌کننده کد نیاز به توجه دارد",
+        "description": "بررسی‌کننده کد پس از سه وقفهٔ مهلت شبیه‌سازی مخزن امروز غیرفعال شد. برای کمک با hi@kilocode.ai تماس بگیرید، سپس دوباره بررسی‌کننده کد را فعال کنید.",
+        "recoveryLabel": "تماس با پشتیبانی"
+      }
+    },
+    "unknownError": "خطای ناشناخته"
   },
   "securityAgent": {
     "filter": {
@@ -1304,10 +1486,10 @@
       "outcome": "نتیجه",
       "slaStatus": "وضعیت SLA",
       "sortBy": "مرتب‌سازی بر اساس",
-      "allRepositories": "همه مخزن‌ها",
+      "allRepositories": "همه مخازن",
       "all": "همه",
       "statusOpen": "باز",
-      "fixed": "رفع‌شده",
+      "fixed": "برطرف شده",
       "statusIgnored": "نادیده‌گرفته‌شده",
       "statusClosed": "بسته",
       "severityCritical": "بحرانی",
@@ -1322,7 +1504,7 @@
       "outcomeSafeToDismiss": "ایمن برای نادیده‌گرفتن",
       "outcomeNeedsReview": "نیاز به بررسی دارد",
       "outcomeTriageComplete": "دسته‌بندی تکمیل شد",
-      "outcomeDismissed": "نادیده‌گرفته شد",
+      "outcomeDismissed": "رد شده",
       "sortSeverityDesc": "شدت: بالا به پایین",
       "sortSeverityAsc": "شدت: پایین به بالا",
       "sortSlaDue": "تاریخ سررسید SLA",
@@ -1351,8 +1533,9 @@
       "enableAutoRemediationConfirmTitle": "اصلاح خودکار فعال شود؟",
       "enableAutoRemediationConfirmMessage": "عامل امنیتی به‌صورت خودکار برای یافته‌های قابل بهره‌برداری واجد شرایط PR اصلاحی باز می‌کند.",
       "enable": "فعال‌سازی",
-      "queuedOne": "{{count}} یافته موجود برای تحلیل در صف قرار گرفت.",
-      "queuedMany": "{{count}} یافته موجود برای تحلیل در صف قرار گرفت.",
+      "queued_one": "{{displayCount}} یافته موجود برای تحلیل در صف قرار گرفت.",
+      "queued": "{{displayCount}} یافته موجود برای تحلیل در صف قرار گرفت.",
+      "queued_other": "{{displayCount}} یافته موجود برای تحلیل در صف قرار گرفت.",
       "severityCriticalOnly": "فقط بحرانی",
       "severityHighAndAbove": "بالا و بالاتر",
       "severityMediumAndAbove": "متوسط و بالاتر",
@@ -1377,21 +1560,21 @@
       "triageConfidence": "اطمینان اولویتبندی",
       "suggestedAction": "اقدام پیشنهادی",
       "triageReasoning": "استدلال اولویتبندی",
-      "exploitable": "قابل بهرهبرداری",
+      "exploitable": "قابل بهره‌برداری",
       "model": "مدل",
       "notRecorded": "ثبت نشده",
       "analyzed": "تحلیل شده",
       "exploitabilityReasoning": "استدلال قابلیت بهرهبرداری",
       "suggestedFix": "اصلاح پیشنهادی",
-      "whereFound": "محل شناسایی ({{count}})",
+      "whereFound": "محل شناسایی ({{displayCount}})",
       "fullReport": "گزارش کامل تولید شده",
       "unknown": "ناشناخته",
       "yes": "بله",
       "no": "خیر"
     },
     "dashboard": {
-      "findingsCount": "{{count}} یافته",
-      "notMeasured": "اندازهگیری نشده",
+      "findingsCount": "{{displayCount}} یافته",
+      "notMeasured": "اندازه‌گیری نشده",
       "actFirst": "اول اقدام کنید",
       "slaPosture": "SLA posture",
       "actionPosture": "Action posture",
@@ -1399,16 +1582,16 @@
       "repositoryActionPlan": "برنامه اقدام مخزن",
       "noOpenFindings": "هیچ یافته باز نیاز به توجه ندارد",
       "deadlineToday": "مهلت امروز به پایان میرسد",
-      "daysOverdue": "{{count}} روز عقبافتاده",
+      "daysOverdue": "{{displayCount}} روز عقبافتاده",
       "withinDeadline": "در محدوده مهلت",
       "criticalOverdue": "عقبافتاده بحرانی",
       "highOverdue": "عقبافتاده با شدت بالا",
       "mediumLowOverdue": "عقبافتاده متوسط و کم",
-      "confirmedExploitable": "قابل بهرهبرداری تأیید شده",
+      "confirmedExploitable": "قابل بهره‌برداری تأیید شده",
       "needsEvidenceReview": "نیاز به بررسی شواهد",
       "analysisNotComplete": "تحلیل کامل نشده",
       "noImmediateAction": "اقدام فوری لازم نیست",
-      "notExploitable": "قابل بهرهبرداری نیست",
+      "notExploitable": "غیرقابل بهره‌برداری",
       "needsYourReview": "نیاز به بررسی شما",
       "noSlaDeadline": "هیچ مهلت SLA اختصاص داده نشده",
       "noRepositoryData": "هنوز داده مخزنی وجود ندارد",
@@ -1416,7 +1599,7 @@
       "repoSummary": "{{open}} باز · {{critical}} بحرانی · {{high}} بالا",
       "couldNotLoad": "بارگذاری داده داشبورد ممکن نشد",
       "filterByRepository": "فیلتر بر اساس مخزن",
-      "findings": "یافتهها",
+      "findings": "یافته‌ها",
       "lastSynced": "آخرین همگامسازی {{time}}",
       "manageRepositories": "مدیریت مخازن",
       "notYetSynced": "هنوز همگامسازی نشده",
@@ -1427,6 +1610,27 @@
       "syncQueued": "همگامسازی در صف قرار گرفت",
       "syncStatusUnavailable": "وضعیت همگامسازی در دسترس نیست"
     },
+    "dashboardMetrics": {
+      "openFindings": "یافته‌های باز",
+      "openFindingsDetail": "{{critical}} بحرانی، {{high}} بالا",
+      "confirmedExploitable": "قابل بهره‌برداری تأیید شده",
+      "confirmedExploitableDetail": "ریسک پروژه توسط تحلیل تأیید شد",
+      "needsReview": "نیاز به بررسی شما",
+      "needsReviewDetail": "نیاز به تصمیم انسانی دارد",
+      "analysisIncomplete": "تحلیل کامل نشده",
+      "analysisIncompleteDetail": "ریسک پروژه هنوز ناشناخته است",
+      "slaCompliance": "رعایت SLA",
+      "notMeasured": "اندازه‌گیری نشده",
+      "withinDeadlineDetail": "{{within}} از {{total}} در محدوده مهلت",
+      "noDeadlineData": "هنوز هیچ یافته‌ای مهلت SLA ندارد",
+      "deadlinePassed": "مهلت گذشته است",
+      "deadlinePassedDetail": "{{critical}} بحرانی، {{high}} بالا",
+      "dueThisWeek": "سررسید این هفته",
+      "dueThisWeekDetail": "{{exploitable}} قابل بهره‌برداری تأیید شده",
+      "noDeadline": "بدون مهلت",
+      "reviewSlaAssignment": "بررسی اختصاص SLA",
+      "allOpenFindingsTracked": "همه یافته‌های باز ردیابی می‌شوند"
+    },
     "dismiss": {
       "title": "رد یافته",
       "submit": "رد یافته",
@@ -1435,7 +1639,7 @@
       "reasonNoBandwidth": "هیچ ظرفیتی در دسترس نیست",
       "reasonTolerableRisk": "ریسک قابل تحمل است",
       "reasonInaccurate": "یافته دقیق نیست",
-      "reasonNotUsed": "کد آسیبپذیر استفاده نمیشود",
+      "reasonNotUsed": "کد آسیب‌پذیر استفاده نمی‌شود",
       "commentLabel": "نظر (اختیاری)",
       "commentAccessibility": "نظر رد",
       "commentPlaceholder": "زمینهای برای این رد اضافه کنید…",
@@ -1469,31 +1673,42 @@
       "sourceRecord": "رکورد منبع",
       "source": "منبع",
       "sourceId": "شناسه منبع",
-      "viewAdvisory": "مشاهده مشاوره در GitHub"
+      "viewAdvisory": "مشاهده مشاوره در GitHub",
+      "statusSuperseded": "جایگزین شد",
+      "statusFixed": "برطرف شده",
+      "statusOpen": "باز",
+      "sourceDependabot": "GitHub Dependabot",
+      "reasonFixStarted": "یک اصلاح قبلاً شروع شده است",
+      "reasonNoBandwidth": "هیچ ظرفیتی در دسترس نیست",
+      "reasonTolerableRisk": "ریسک قابل تحمل است",
+      "reasonInaccurate": "یافته دقیق نیست",
+      "reasonNotUsed": "کد آسیب‌پذیر استفاده نمی‌شود",
+      "reasonAfterReview": "پس از بررسی"
     },
     "settingsOverview": {
       "title": "تنظیمات",
       "couldNotLoadSettings": "بارگذاری تنظیمات Security Agent ممکن نشد",
       "couldNotLoadPermissions": "بارگذاری مجوزها ممکن نشد",
-      "couldNotLoadRepositories": "بارگذاری مخازن ممکن نشد",
-      "securityAgent": "Security Agent",
+      "couldNotLoadRepositories": "بارگذاری مخازن ناموفق بود",
+      "securityAgent": "عامل امنیت",
       "enabled": "فعال",
       "disabled": "غیرفعال",
       "on": "روشن",
       "off": "خاموش",
       "allRepositories": "همه مخازن",
-      "repositorySelected": "{{count}} مخزن انتخاب شد",
-      "repositoriesSelected": "{{count}} مخزن انتخاب شد",
+      "repositoriesCount_one": "{{displayCount}} مخزن انتخاب شد",
+      "repositoriesCount": "{{displayCount}} مخزن انتخاب شد",
+      "repositoriesCount_other": "{{displayCount}} مخزن انتخاب شد",
       "selectRepositories": "انتخاب مخازن",
       "selectRepositoriesSubtitle": "انتخاب کنید که Security Agent کدام مخازن را پایش کند",
       "repositories": "مخازن",
       "modelsAndAnalysis": "مدلها و تحلیل",
       "analysisModeSubtitle": "تحلیل {{mode}}",
-      "automation": "خودکارسازی",
+      "automation": "اتوماسیون",
       "automationAllOff": "همه خاموش",
-      "automationCount": "{{count}} از ۳ فعال است",
-      "notifications": "اعلانها",
-      "notificationsCount": "{{count}} از ۲ فعال است",
+      "automationCount": "{{displayCount}} از ۳ فعال است",
+      "notifications": "اعلان‌ها",
+      "notificationsCount": "{{displayCount}} از ۲ فعال است",
       "slaPolicy": "خطمشی SLA",
       "disabledNoManage": "Security Agent غیرفعال است. فقط مالکان سازمان و مدیران صورتحساب میتوانند آن را روشن کنند.",
       "disabledNoRepo": "قبل از فعال کردن Security Agent حداقل یک مخزن انتخاب کنید.",
@@ -1502,7 +1717,7 @@
     "remediation": {
       "cancellationRequested": "لغو درخواست شد",
       "cancelled": "رفع لغو شد",
-      "pullRequest": "pull request",
+      "pullRequest": "درخواست pull",
       "couldNotLoad": "بارگذاری وضعیت رفع ممکن نشد",
       "noAnalysisTitle": "هنوز تحلیلی وجود ندارد",
       "noAnalysisDescription": "از برگه جزئیات اجرا کنید",
@@ -1515,7 +1730,7 @@
       "openPullRequest": "باز کردن pull request{{number}}",
       "openDraftPullRequest": "باز کردن pull request پیشنویس{{number}}",
       "progress": "پیشرفت",
-      "attemptHistory": "تاریخچه تلاشها ({{count}})",
+      "attemptHistory": "تاریخچه تلاشها ({{displayCount}})",
       "attemptNumber": "تلاش #{{number}}",
       "startedBy": "شروع شده توسط",
       "model": "مدل",
@@ -1540,7 +1755,7 @@
       "modeAuto": "خودکار",
       "modeShallow": "سطحی",
       "modeDeep": "عمیق",
-      "couldNotLoadModels": "بارگذاری مدلها ممکن نشد",
+      "couldNotLoadModels": "بارگذاری مدل‌ها ناموفق بود",
       "triageModel": "مدل اولویتبندی",
       "analysisModel": "مدل تحلیل",
       "remediationModel": "مدل رفع"
@@ -1575,7 +1790,7 @@
       "dismissA11y": "رد یافته"
     },
     "findingList": {
-      "title": "یافتهها",
+      "title": "یافته‌ها",
       "couldNotLoad": "بارگذاری یافتهها ممکن نشد",
       "couldNotLoadMore": "بارگذاری یافتههای بیشتر ممکن نشد",
       "noMatchesTitle": "هیچ یافتهای با فیلترها مطابقت ندارد",
@@ -1585,8 +1800,8 @@
       "clearFilters": "پاک کردن فیلترها"
     },
     "scopeList": {
-      "title": "Security Agent",
-      "couldNotLoad": "بارگذاری سازمانها ممکن نشد",
+      "title": "عامل امنیت",
+      "couldNotLoad": "بارگذاری سازمان‌ها ناموفق بود",
       "personal": "شخصی",
       "personalSubtitle": "مخازن خودتان"
     },
@@ -1623,7 +1838,7 @@
     "auditReport": {
       "couldNotLoad": "بارگذاری گزارش ممیزی ممکن نشد",
       "events": "رویدادها",
-      "findings": "یافتهها",
+      "findings": "یافته‌ها",
       "generated": "تولید شده در {{generatedAt}}",
       "noActivity": "هیچ فعالیتی ثبت نشده",
       "noActivityDescription": "Kilo هیچ فعالیت قابل گزارش یافته امنیتی از {{start}} تا {{end}} ندارد.",
@@ -1652,12 +1867,12 @@
       "slaSection": "اعلان هشدار SLA",
       "slaSeverityLabel": "حداقل شدت برای اعلان SLA",
       "slaSubtitle": "قبل و هنگام نزدیک شدن یا تجاوز یافتهها از مهلت SLA ارسال میشود.",
-      "title": "اعلانها"
+      "title": "اعلان‌ها"
     },
     "repositories": {
       "allRepositories": "همه مخازن",
       "couldNotLoad": "بارگذاری تنظیمات مخزن ممکن نشد",
-      "couldNotLoadRepositories": "بارگذاری مخازن ممکن نشد",
+      "couldNotLoadRepositories": "بارگذاری مخازن ناموفق بود",
       "couldNotOpenGithubSettings": "باز کردن تنظیمات GitHub App ممکن نشد",
       "githubAppSettings": "تنظیمات GitHub App",
       "manageAccess": "مدیریت دسترسی GitHub App",
@@ -1665,7 +1880,7 @@
       "noRepositoriesDescription": "به GitHub App کیلا دسترسی به مخازن بدهید",
       "readOnly": "فقط مالکان سازمان و مدیران صورتحساب میتوانند این تنظیمات را تغییر دهند.",
       "selectAtLeastOne": "حداقل یک مخزن انتخاب کنید.",
-      "selectedRepositories": "مخازن انتخابشده",
+      "selectedRepositories": "مخازن انتخاب‌شده",
       "title": "مخازن"
     },
     "scopeEntry": {
@@ -1681,7 +1896,140 @@
     },
     "queuedActionUntracked": "یک اقدام در صف دیگر قابل ردیابی نبود. برای دیدن آخرین وضعیت تازهسازی کنید.",
     "initialSyncAdmissionFailed": "Security Agent فعال شد، اما همگامسازی اولیه در صف قرار نگرفت. دوباره همگامسازی کنید.",
-    "title": "Security Agent"
+    "title": "عامل امنیت",
+    "commands": {
+      "findingAlreadyDismissed": "یافته قبلاً رد شده است",
+      "findingDismissed": "یافته رد شد",
+      "noRemediationsQueued": "یافته موجودی در صف نیست",
+      "remediationsQueued": "اصلاح‌های موجود در صف قرار گرفتند",
+      "analysisComplete": "تحلیل کامل شد",
+      "syncComplete": "همگام‌سازی کامل شد"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "سرویس امنیت پیکربندی نشده است. ارسال مجدد تا رفع این مشکل موفق نمی‌شود.",
+      "syncMayNotHaveCompleted": "ممکن است همگام‌سازی کامل نشده باشد. برای هماهنگ کردن آن دوباره تلاش کنید یا آن را دور بیندازید.",
+      "syncInProgress": "یک همگام‌سازی امنیتی در حال انجام است. لطفاً دوباره تلاش کنید.",
+      "dismissalInProgress": "این رد در حال انجام است. لطفاً دوباره تلاش کنید.",
+      "couldNotReadPendingSyncs": "خواندن همگام‌سازی‌های در انتظار ممکن نشد. دوباره تلاش کنید."
+    },
+    "analysisState": {
+      "queued": "تحلیل در صف قرار گرفت",
+      "queuedTitle": "تحلیل در صف قرار گرفت",
+      "queuedDescription": "در انتظار آزاد شدن ظرفیت تحلیل.",
+      "analyzing": "در حال تحلیل",
+      "analyzingTitle": "در حال تحلیل",
+      "analyzingDescription": "بررسی اینکه آیا کد برنامه می‌تواند به ویژگی آسیب‌دیده دسترسی پیدا کند.",
+      "failed": "تحلیل ناموفق بود",
+      "failedTitle": "تحلیل ناموفق بود",
+      "failedDescription": "عامل امنیت نتوانست تحلیل را کامل کند.",
+      "extractionFailed": "نیاز به بررسی دارد",
+      "extractionFailedTitle": "نیاز به بررسی دارد",
+      "extractionFailedDescription": "تبدیل گزارش فنی به نتیجهٔ ساختاریافته ممکن نشد.",
+      "exploitable": "قابل بهره‌برداری",
+      "exploitableTitle": "قابل بهره‌برداری",
+      "exploitableDescription": "کد برنامه می‌تواند به ویژگی آسیب‌دیده دسترسی پیدا کند.",
+      "notExploitable": "غیرقابل بهره‌برداری",
+      "notExploitableTitle": "غیرقابل بهره‌برداری",
+      "notExploitableDescription": "در این مخزن مسیر قابل دسترسی پیدا نشد.",
+      "unknown": "نیاز به بررسی دارد",
+      "unknownTitle": "نیاز به بررسی دارد",
+      "unknownDescription": "تحلیل نتوانست تأیید کند که آیا ویژگی آسیب‌پذیر قابل دسترسی است.",
+      "safeToDismiss": "ایمن برای نادیده‌گرفتن",
+      "safeToDismissTitle": "ایمن برای نادیده‌گرفتن",
+      "safeToDismissDescription": "اولویت‌بندی تعیین کرد که بدون تحلیل کدبیس می‌توان این را با خیال راحت نادیده گرفت.",
+      "manualReview": "نیاز به بررسی دارد",
+      "manualReviewTitle": "نیاز به بررسی دستی",
+      "manualReviewDescription": "اولویت‌بندی این یافته را برای بررسی دستی علامت‌گذاری کرد.",
+      "analysisRequired": "تحلیل لازم است",
+      "analysisRequiredTitle": "تحلیل کدبیس لازم است",
+      "analysisRequiredDescription": "اولویت‌بندی قبل از تصمیم‌گیری دربارهٔ پاسخ، تحلیل مخزن را توصیه می‌کند.",
+      "completed": "تحلیل شده",
+      "completedTitle": "تحلیل شده",
+      "completedDescription": "تحلیل بدون ثبت نتیجهٔ خاصی کامل شد.",
+      "notAnalyzed": "تحلیل‌نشده",
+      "notAnalyzedTitle": "تحلیل‌نشده",
+      "notAnalyzedDescription": "تحلیل کدبیس هنوز برای این یافته اجرا نشده است."
+    },
+    "deadline": {
+      "fixedBeforeDeadline": "قبل از مهلت برطرف شد",
+      "fixed": "برطرف شده",
+      "fixedOn": "برطرف شد {{date}}",
+      "resolutionRecorded": "راه‌حل ثبت شد",
+      "superseded": "جایگزین شد",
+      "dismissed": "رد شده",
+      "closedOn": "{{status}} {{date}}",
+      "deadlineNotSet": "مهلتی تعیین نشده است",
+      "noSlaDeadline": "هیچ مهلت SLA اختصاص داده نشده",
+      "dueOn": "سررسید {{date}}",
+      "overdueNow": "معوق",
+      "overdue_one": "{{count}} روز عقب‌افتاده",
+      "overdue_other": "{{count}} روز عقب‌افتاده",
+      "dueToday": "سررسید امروز",
+      "dueTomorrow": "سررسید فردا",
+      "dueInDays_one": "سررسید تا {{count}} روز دیگر",
+      "dueInDays_other": "سررسید تا {{count}} روز دیگر",
+      "overdue": "{{count}} روز عقب‌افتاده",
+      "dueInDays": "سررسید تا {{count}} روز دیگر"
+    },
+    "remediationStatus": {
+      "cancellationRequested": "لغو درخواست شد",
+      "notStarted": "شروع نشده",
+      "queued": "در صف",
+      "starting": "در حال شروع",
+      "inProgress": "در حال انجام",
+      "draftPrOpened": "PR پیش‌نویس باز شد",
+      "prOpened": "PR باز شد",
+      "blocked": "مسدود شد",
+      "failed": "شکست خورد",
+      "noChangesNeeded": "تغییری لازم نیست",
+      "cancelled": "لغو شد",
+      "originAutomaticPolicy": "خط‌مشی خودکار",
+      "originIncludeExistingPolicy": "خط‌مشی شامل موارد موجود",
+      "originManual": "دستی",
+      "validationCheck": "بررسی اعتبارسنجی {{number}}"
+    },
+    "remediationUnavailable": {
+      "findingNotFound": "یافتهٔ امنیتی دیگر وجود ندارد.",
+      "approvalRequired": "اصلاح خودکار نیاز به تأیید دارد. برای تأیید آن، اصلاح را به‌صورت دستی شروع کنید.",
+      "findingNotOpen": "یافته دیگر باز نیست.",
+      "repoNotInScope": "مخزن برای Security Agent انتخاب نشده است.",
+      "analysisRequired": "قبل از شروع اصلاح، تحلیل کدبیس را اجرا کنید.",
+      "sandboxAnalysisRequired": "قبل از شروع اصلاح، تحلیل کدبیس را اجرا کنید.",
+      "staleAnalysis": "یافته پس از تحلیل تغییر کرد. قبل از شروع اصلاح، تحلیل را دوباره اجرا کنید.",
+      "notExploitable": "تحلیل مسیر آسیب‌پذیر قابل دسترسی پیدا نکرد. اصلاح خودکار در دسترس نیست.",
+      "exploitabilityUnknown": "تحلیل نتوانست قابلیت بهره‌برداری را تأیید کند. قبل از اصلاح تک‌کلیکی، بررسی دستی لازم است.",
+      "manualReviewRequired": "تحلیل بررسی دستی را توصیه می‌کند، بنابراین اصلاح تک‌کلیکی در دسترس نیست.",
+      "monitorRequired": "تحلیل به‌جای باز کردن PR، نظارت را توصیه می‌کند.",
+      "triageOnly": "فقط اولویت‌بندی کامل شده است. قبل از شروع اصلاح، تحلیل کدبیس را اجرا کنید.",
+      "actionNotConcrete": "هیچ وصلهٔ وابستگی مشخص یا اصلاح پیشنهادی در دسترس نیست.",
+      "remediationActive": "یک تلاش اصلاح در حال حاضر فعال است.",
+      "prAlreadyOpened": "یک PR اصلاح در حال حاضر باز است.",
+      "duplicateAnalysisResult": "این نتیجهٔ تحلیل قبلاً کار اصلاح تولید کرده است.",
+      "retryNotAllowed": "تلاش دوباره برای این اقدام در دسترس نیست.",
+      "securityAgentDisabled": "Security Agent برای این مالک غیرفعال است.",
+      "autoRemediationDisabled": "اصلاح خودکار غیرفعال است. اصلاح دستی همچنان می‌تواند وقتی دروازه‌های امنیتی عبور کنند شروع شود.",
+      "includeExistingDisabled": "یافته‌های موجود از اصلاح خودکار مستثنی شده‌اند.",
+      "belowThreshold": "یافته زیر آستانهٔ شدت خودکار است. اصلاح دستی همچنان می‌تواند وقتی دروازه‌های امنیتی عبور کنند شروع شود.",
+      "beforeEnablement": "تحلیل قبل از فعال‌سازی اصلاح خودکار کامل شد. اصلاح دستی همچنان می‌تواند وقتی دروازه‌های امنیتی عبور کنند شروع شود.",
+      "generic": "رفع برای این یافته در دسترس نیست."
+    },
+    "commandFailure": {
+      "ownerCapReached": "ظرفیت تحلیل کامل است. صبر کنید تا تحلیل فعال پایان یابد، سپس دوباره تلاش کنید.",
+      "githubTokenUnavailable": "مجوز GitHub نیاز به توجه دارد. GitHub App را دوباره مجاز کنید، سپس دوباره تلاش کنید.",
+      "githubAuthInvalid": "مجوز GitHub نیاز به توجه دارد. GitHub App را دوباره مجاز کنید، سپس دوباره تلاش کنید.",
+      "findingUnavailable": "یافته دیگر در دسترس نیست. یافته‌ها را تازه‌سازی کنید و اگر همچنان باز است، دوباره تلاش کنید.",
+      "repositoryUnavailable": "مخزن دیگر برای GitHub App در دسترس نیست. دسترسی به مخزن را تازه‌سازی کنید، سپس دوباره تلاش کنید.",
+      "invalidDismissTarget": "یافته را نمی‌توان رد کرد، زیرا هدف Dependabot آن نامعتبر است.",
+      "commandStalled": "عمل در صف به‌موقع تمام نشد. عمل را دوباره تلاش کنید.",
+      "queueRetriesExhausted": "پس از چند بار تلاش، عمل تکمیل نشد. عمل را دوباره تلاش کنید.",
+      "queueAdmissionFailed": "عمل در صف پذیرفته نشد. عمل را دوباره تلاش کنید.",
+      "generic": "عمل در صف ناموفق بود. عمل را دوباره تلاش کنید."
+    },
+    "analysisMode": {
+      "auto": "خودکار",
+      "shallow": "سطحی",
+      "deep": "عمیق"
+    }
   },
   "agents": {
     "activeNow": "اکنون فعال",
@@ -1693,7 +2041,7 @@
       "clearFilters": "پاک کردن فیلترها"
     },
     "sessionList": {
-      "couldNotLoad": "بارگذاری نشستها ممکن نشد",
+      "couldNotLoad": "جلسات بارگذاری نشدند",
       "couldNotLoadActive": "بارگذاری نشستهای فعال ممکن نشد",
       "noSessionsYet": "هنوز نشستی وجود ندارد",
       "noSessionsYetDescription": "از تلفن خود یک کار کدنویسی شروع کنید. نشستهای شما اینجا ظاهر میشوند.",
@@ -1720,14 +2068,30 @@
       "sessionDeleted": "نشست حذف شد",
       "needsInput": "نیاز به ورودی",
       "fromPlatform": "از {{platform}}",
-      "centOne": "سنت",
-      "centOther": "سنت",
-      "dollarOne": "دلار",
-      "dollarOther": "دلار"
+      "cent_one": "سنت",
+      "cent": "سنت",
+      "cent_other": "سنت",
+      "dollar_one": "دلار",
+      "dollar": "دلار",
+      "dollar_other": "دلار",
+      "costSpoken": "هزینه {{cost}}",
+      "costSpokenWithTime": "هزینه {{cost}}، {{time}}",
+      "pullRequest": "درخواست کشش {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "باز کردن GitHub ممکن نشد",
-      "couldNotOpenMessage": "شروع راهاندازی GitHub App ممکن نشد. لطفاً دوباره تلاش کنید."
+      "couldNotOpenMessage": "شروع راهاندازی GitHub App ممکن نشد. لطفاً دوباره تلاش کنید.",
+      "installedTitle": "GitHub App نصب شد",
+      "installedMessage": "مخزن‌های شما اکنون متصل شده‌اند.",
+      "pendingTitle": "در انتظار تأیید مدیر",
+      "pendingMessage": "یک مدیر سازمان باید درخواست نصب را تأیید کند.",
+      "accountMismatchTitle": "عدم تطابق حساب",
+      "accountMismatchMessage": "این اتصال از Kilo App که با یک حساب دیگر وارد شده شروع شد. با آن حساب در وب وارد شوید، یا از برنامه دوباره شروع کنید.",
+      "cannotCompleteTitle": "تکمیل نصب ممکن نیست",
+      "notAdminMessage": "فقط یک مدیر GitHub آن حساب می‌تواند آن را متصل کند. از یک مدیر سازمان بخواهید Kilo را نصب کند.",
+      "alreadyClaimedMessage": "آن نصب GitHub قبلاً به حساب Kilo دیگری متصل است. ابتدا آنجا قطعش کنید.",
+      "didNotCompleteTitle": "نصب تکمیل نشد",
+      "didNotCompleteMessage": "نصب GitHub App تکمیل نشد. از برنامه دوباره تلاش کنید."
     },
     "sessionExited": "جلسه خاتمه یافت",
     "remoteSpawnRetryable": "امکان دسترسی به نمونه وجود نداشت — شاید قطع شده باشد.",
@@ -1760,17 +2124,25 @@
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد",
       "cloneFailed": "شبیهسازی این نشست ممکن نشد.",
       "cloneFailedRetry": "شبیهسازی این نشست ممکن نشد. دوباره تلاش کنید.",
-      "connectRepositoryToContinue": "برای ادامه یک مخزن را وصل کنید."
+      "connectRepositoryToContinue": "برای ادامه یک مخزن را وصل کنید.",
+      "notEnoughCredits": "اعتبار کافی برای اجرای Cloud Agent وجود ندارد. اعتبار اضافه کنید و دوباره تلاش کنید.",
+      "previousTaskFinishing": "وظیفه قبلی هنوز در حال پایان است. لطفاً لحظهای صبر کنید.",
+      "serviceUnavailable": "سرویس در حال حاضر در دسترس نیست. لطفاً دوباره تلاش کنید.",
+      "connectionTrouble": "مشکل در اتصال. لطفاً لحظهای دیگر دوباره تلاش کنید.",
+      "modelUnavailable": "این مدل برای Cloud Agent در دسترس نیست. مدل دیگری انتخاب کنید و دوباره تلاش کنید."
     },
     "remoteSession": {
       "failedToCreate": "ایجاد نشست از راه دور شکست خورد",
-      "exited": "نشست خارج شد",
+      "exited": "جلسه خاتمه یافت",
       "failedToExit": "خروج از نشست شکست خورد",
       "exitTitle": "از نشست خارج شویم؟",
       "exitMessage": "این نشست در حال اجرا را متوقف میکند اما تاریخچه آن را نگه میدارد.",
       "keepSessionRunning": "نشست در حال اجرا بماند",
       "exitSession": "خروج از نشست",
-      "restartExitFailed": "یک نشست جدید شروع شد. نشست قبلی همچنان باز است."
+      "restartExitFailed": "یک نشست جدید شروع شد. نشست قبلی همچنان باز است.",
+      "exitNotSupported": "خروج از نشست از راه دور برای نشست فعلی پشتیبانی نمی‌شود",
+      "exitUnavailable": "خروج از نشست از راه دور برای نشست فعلی در دسترس نیست",
+      "exitNeedsNewerCli": "دستورات اسلش از راه دور به نسخه جدیدتری از Kilo CLI نیاز دارند. Kilo CLI را به‌روزرسانی کنید و دوباره متصل شوید."
     },
     "sessionConnection": {
       "connecting": "در حال اتصال…",
@@ -1779,7 +2151,7 @@
       "retryConnection": "تلاش دوباره اتصال"
     },
     "newSession": {
-      "title": "نشست جدید",
+      "title": "جلسه جدید",
       "repository": "مخزن",
       "couldNotLoadRepositories": "بارگذاری مخازن ممکن نشد",
       "connectGithub": "اتصال GitHub",
@@ -1814,16 +2186,18 @@
       "discardDraftMessage": "پیام شما از بین خواهد رفت.",
       "keepEditing": "ادامه ویرایش",
       "discard": "دور انداختن",
-      "discardFailed": "دور انداختن پیشنویس ممکن نشد. لطفاً دوباره تلاش کنید."
+      "discardFailed": "دور انداختن پیشنویس ممکن نشد. لطفاً دوباره تلاش کنید.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} فایل بهروزرسانی شد",
-      "updatedFiles": "{{count}} فایل بهروزرسانی شد"
+      "updatedFileCount_one": "{{displayCount}} فایل بهروزرسانی شد",
+      "updatedFileCount": "{{displayCount}} فایل بهروزرسانی شد",
+      "updatedFileCount_other": "{{displayCount}} فایل بهروزرسانی شد"
     },
     "toolPatch": {
       "operationAdded": "افزوده شد",
       "operationDeleted": "حذف شد",
-      "operationUpdated": "بهروزرسانی شد"
+      "operationUpdated": "بهروزرسانی شده"
     },
     "toolCard": {
       "accessibility": "ابزار {{label}}، {{status}}",
@@ -1831,7 +2205,7 @@
       "fileEmpty": "این فایل خالی است.",
       "noTasks": "هیچ کاری وجود ندارد.",
       "contentTruncated": "محتوای بریدهشده",
-      "truncated": "بریده شد",
+      "truncated": "کوتاه شده",
       "toolRead": "خواندن",
       "toolEdit": "ویرایش",
       "toolWrite": "نوشتن",
@@ -1840,12 +2214,12 @@
       "toolGrep": "grep",
       "toolList": "فهرست",
       "toolPatch": "patch",
-      "toolTask": "کار",
+      "toolTask": "وظیفه",
       "readTodos": "خواندن کارها",
       "updateTodos": "بهروزرسانی کارها",
-      "linesBadge": "{{count}} خط",
-      "filesBadge": "{{count}} فایل",
-      "matchesBadge": "{{count}} مورد مطابق"
+      "linesBadge": "{{displayCount}} خط",
+      "filesBadge": "{{displayCount}} فایل",
+      "matchesBadge": "{{displayCount}} مورد مطابق"
     },
     "readToolMarkdown": {
       "linesTruncated": "خطوط {{start}}–{{end}} (بریده شده)",
@@ -1883,7 +2257,7 @@
     },
     "modeOptions": {
       "code": "کد",
-      "plan": "برنامه",
+      "plan": "طرح",
       "debug": "اشکالزدایی",
       "orchestrator": "هماهنگکننده",
       "ask": "پرسش",
@@ -1928,6 +2302,10 @@
       "reportAiResponseFailedRetryable": "گزارش این پاسخ ممکن نشد.",
       "reportAiResponseFailedTerminal": "گزارش این پاسخ ممکن نیست.",
       "reportAiResponseSubmitted": "گزارش ارسال شد. رسید {{receiptId}}"
+    },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
     },
     "partDetail": {
       "detailsUnavailable": "جزئیات در دسترس نیست",
@@ -1987,7 +2365,7 @@
       "preparationComplete": "آمادهسازی کامل شد",
       "preparationFailed": "آمادهسازی شکست خورد",
       "setupCommand": "دستور راهاندازی {{index}}",
-      "setupCommandOf": "دستور راهاندازی {{index}} از {{count}}"
+      "setupCommandOf": "دستور راهاندازی {{index}} از {{displayCount}}"
     },
     "permissionCard": {
       "title": "مجوز لازم است",
@@ -2024,7 +2402,7 @@
       "submissionFailed": "ارسال ناموفق بود. لطفاً دوباره تلاش کنید.",
       "questionAnnouncement": "عامل به ورودی شما نیاز دارد. تا پاسخ شما، ویرایشگر متوقف است.",
       "permissionAnnouncement": "عامل برای ادامه به مجوز نیاز دارد. تا تصمیم شما، ویرایشگر متوقف است.",
-      "positionHint": "({{count}} از ۱)",
+      "positionHint": "({{displayCount}} از ۱)",
       "movedPastPrompt": "عامل از این پرسش عبور کرده است. این کارت هنگام ادامه جلسه بسته می‌شود.",
       "waitingForAnswer": "عامل منتظر پاسخ شماست. تا باز بودن این پرسش، پیام شما به عامل متوقف است.",
       "waitingForPermission": "عامل منتظر مجوز است. تا باز بودن این درخواست، پیام شما به عامل متوقف است."
@@ -2059,8 +2437,9 @@
     "olderMessages": {
       "arrived": "پیام‌های قبلی بارگذاری شدند",
       "retryHint": "بارگذاری پیام‌های قبلی این جلسه را دوباره تلاش می‌کند.",
-      "omittedOne": "برخی از موارد قبلی این جلسه قابل نمایش نبودند.",
-      "omittedMany": "{{count}} مورد قبلی این جلسه قابل نمایش نبودند.",
+      "omitted_one": "برخی از موارد قبلی این جلسه قابل نمایش نبودند.",
+      "omitted": "{{displayCount}} مورد قبلی این جلسه قابل نمایش نبودند.",
+      "omitted_other": "{{displayCount}} مورد قبلی این جلسه قابل نمایش نبودند.",
       "couldNotLoad": "پیام‌های قبلی بارگذاری نشدند.",
       "unavailable": "پیام‌های قبلی در دسترس نیستند.",
       "tooLarge": "پیام‌های قبلی برای بارگذاری بیش از حد بزرگ هستند."
@@ -2069,10 +2448,12 @@
       "viewTable": "مشاهده جدول",
       "title": "جدول",
       "close": "بستن جدول",
-      "column": "ستون",
-      "columns": "ستون‌ها",
-      "row": "ردیف",
-      "rows": "ردیف‌ها",
+      "columnCount_one": "ستون",
+      "columnCount": "ستون‌ها",
+      "columnCount_other": "ستون‌ها",
+      "rowCount_one": "ردیف",
+      "rowCount": "ردیف‌ها",
+      "rowCount_other": "ردیف‌ها",
       "opensFullScreen": "تمام‌صفحه باز می‌شود"
     },
     "sessionFilter": {
@@ -2103,7 +2484,10 @@
       "title": "انتخاب مدل",
       "searchPlaceholder": "جستجوی مدل‌ها...",
       "noModels": "مدلی در دسترس نیست",
-      "noModelsDescription": "هیچ مدلی برای انتخاب در دسترس نیست."
+      "noModelsDescription": "هیچ مدلی برای انتخاب در دسترس نیست.",
+      "favorites": "موردعلاقهها",
+      "recommended": "پیشنهادی",
+      "allModels": "همه مدل‌ها"
     },
     "modelSelector": {
       "model": "مدل",
@@ -2120,7 +2504,8 @@
       "addToFavorites": "افزودن {{name}} به موارد دلخواه",
       "removeFromFavorites": "حذف {{name}} از موارد دلخواه",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "متوسط"
+      "thinkingEffortMedium": "متوسط",
+      "sessionModel": "مدل جلسه"
     },
     "attachmentPreview": {
       "openFailedRetry": "باز کردن فایل ناموفق بود. لطفاً دوباره تلاش کنید.",
@@ -2139,10 +2524,10 @@
       "camera": "دوربین",
       "photoLibrary": "کتابخانه عکس",
       "files": "فایل‌ها",
-      "cameraAccessDisabled": "دسترسی دوربین غیرفعال است",
-      "cameraAccessMessage": "برای گرفتن عکس، دسترسی دوربین را در تنظیمات مجاز کنید.",
+      "cameraAccessDisabled": "دسترسی به دوربین غیرفعال است",
+      "cameraAccessMessage": "برای گرفتن عکس، در تنظیمات به دوربین دسترسی بدهید.",
       "couldNotOpenPhotoPicker": "انتخاب‌گر عکس باز نشد. Kilo را راه‌اندازی مجدد کنید و دوباره تلاش کنید.",
-      "maxFilesAllowed": "حداکثر {{count}} فایل مجاز است",
+      "maxFilesAllowed": "حداکثر {{displayCount}} فایل مجاز است",
       "onlyAddingFiles": "فقط {{accepted}} از {{total}} فایل اضافه می‌شود (حداکثر {{max}})"
     },
     "composer": {
@@ -2188,7 +2573,8 @@
       "delegatingWork": "در حال واگذاری کار",
       "askingQuestion": "در حال پرسیدن سؤال",
       "consideringNextSteps": "در حال بررسی گام‌های بعدی",
-      "writingResponse": "در حال نوشتن پاسخ"
+      "writingResponse": "در حال نوشتن پاسخ",
+      "initializingSnapshot": "در حال راه‌اندازی اسنپ‌شات…"
     },
     "slashCommands": {
       "startNewSession": "شروع یک جلسه جدید",
@@ -2207,7 +2593,7 @@
       "costPrefix": "هزینه {{cost}}",
       "costSuffix": "، هزینه {{cost}}",
       "tokensWindowUnavailable": "{{used}} توکن زمینه، پنجره در دسترس نیست",
-      "tokensUsage": "{{used}} از {{window}} توکن زمینه، {{percentage}}٪ استفاده شده",
+      "tokensUsage": "{{used}} از {{window}} توکن زمینه، {{percentage}} استفاده شده",
       "title": "استفاده از زمینه",
       "used": "استفاده شده",
       "remaining": "باقی‌مانده",
@@ -2216,7 +2602,7 @@
       "usageReflectsLatest": "استفاده، آخرین پاسخ تکمیل‌شده دستیار را نشان می‌دهد.",
       "tokenUsage": "استفاده از توکن",
       "cacheRate": "نرخ کش",
-      "modelsCount": "مدل‌ها ({{count}})",
+      "modelsCount": "مدل‌ها ({{displayCount}})",
       "tokenTotalsNote": "مجموع توکن‌ها فقط این جلسه را پوشش می‌دهد و توکن‌های زیرعامل/جلسه فرزند را شامل نمی‌شود.",
       "subagents": "زیرعامل‌ها",
       "subagentsDescription": "هزینه باقی‌مانده از جلسات فرزند",
@@ -2225,18 +2611,19 @@
       "ofWindowTokens": "از {{window}} توکن",
       "tokens": "توکن",
       "tokensWithPercentage": "توکن ({{percentage}})",
-      "stepsCountOne": "{{steps}} گام",
-      "stepsCountMany": "{{steps}} گام",
+      "stepsCount_one": "{{steps}} گام",
+      "stepsCount": "{{steps}} گام",
+      "stepsCount_other": "{{steps}} گام",
       "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
     },
     "prBadge": {
       "open": "درخواست کشش باز",
       "closed": "درخواست کشش بسته",
       "merged": "درخواست کشش ادغام‌شده",
-      "draft": "درخواست کشش پیش‌نویس",
+      "draft": "درخواست pull پیش‌نویس",
       "updating": "در حال به‌روزرسانی، {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "درخواست کشش"
+      "externalLinkLabel": "درخواست pull"
     }
   },
   "bootstrap": {
@@ -2251,7 +2638,8 @@
   },
   "addCredits": {
     "cta": "افزودن اعتبار",
-    "description": "برای ادامه استفاده، اعتبار اضافه کنید."
+    "description": "برای ادامه استفاده، اعتبار اضافه کنید.",
+    "billingPage": "صفحه صورتحساب"
   },
   "deviceSessions": {
     "couldNotLoad": "جلسات بارگذاری نشدند",
@@ -2271,30 +2659,24 @@
     "signOutThisSessionTitle": "از این جلسه خارج شوم؟",
     "signOutThisSessionMessage": "{{device}} از سیستم خارج می‌شود. تا یک ساعت دسترسی API را حفظ می‌کند.",
     "signOutConfirm": "خروج",
-    "signOutMessage": "برای دسترسی به فضای کاری خود باید دوباره وارد شوید."
+    "signOutMessage": "برای دسترسی به فضای کاری خود باید دوباره وارد شوید.",
+    "webBrowser": "مرورگر وب"
   },
   "forceUpdate": {
     "couldNotOpenStore": "باز کردن فروشگاه برنامه ممکن نشد.",
     "description": "نسخه جدیدی از Kilo در دسترس است. برای ادامه، به‌روزرسانی کنید.",
     "title": "به‌روزرسانی لازم است",
-    "updateNow": "اکنون به‌روزرسانی کنید"
+    "updateNow": "اکنون به‌روزرسانی کنید",
+    "appStorePage": "صفحهٔ فروشگاه برنامه"
   },
   "home": {
     "couldNotLoadSessions": "جلسات بارگذاری نشدند",
     "couldNotLoadActiveSessions": "جلسات فعال بارگذاری نشدند",
     "agentSessions": "جلسات عامل",
-    "showingSavedSessions": "نمایش جلسات ذخیره‌شده — وضعیت زنده ممکن است به‌روز نباشد",
-    "startNewAgentSession": "شروع یک جلسه جدید Kilo Agent",
-    "aiCodingSessions": "جلسات کدنویسی هوش مصنوعی",
-    "startCodingTaskFromPhone": "از تلفن خود یک کار کدنویسی را شروع کنید یا جلسه را از CLI ادامه دهید.",
-    "tryIt": "امتحان کنید",
     "newCodingTask": "کار کدنویسی جدید",
     "explore": "کاوش",
     "seeAll": "مشاهده همه",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "صبح بخیر",
-    "greetingAfternoon": "ظهر بخیر",
-    "greetingEvening": "عصر بخیر"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "بستن {{filename}}",
@@ -2307,7 +2689,7 @@
     "title": "صفحه پیدا نشد"
   },
   "monoScrollBlock": {
-    "contentTruncated": "محتوا کوتاه شد",
+    "contentTruncated": "محتوای بریده‌شده",
     "truncated": "کوتاه شده",
     "wrap": "بازگشت به خط",
     "scroll": "پیمایش"
@@ -2322,8 +2704,8 @@
     "offlineTitle": "بارگذاری ناموفق بود",
     "offlineDescription": "مشکلی پیش آمد",
     "permissionTitle": "دسترسی رد شد",
-    "permissionDescription": "شما اجازه مشاهده این مورد را ندارید.",
-    "notFoundTitle": "پیدا نشد",
+    "permissionDescription": "شما مجوز مشاهده این مورد را ندارید.",
+    "notFoundTitle": "یافت نشد",
     "notFoundDescription": "این مورد ممکن است حذف شده باشد یا دیگر در دسترس نباشد.",
     "serverTitle": "بارگذاری ممکن نشد",
     "serverDescription": "از طرف ما مشکلی پیش آمد. لطفاً دوباره تلاش کنید."
@@ -2348,7 +2730,17 @@
     "onlineMessage": "این دستگاه نمی‌تواند آفلاین رونویسی کند. ضبط شما برای تبدیل به متن به {{provider}} ارسال می‌شود. Kilo صدا را ذخیره نمی‌کند.",
     "allow": "مجاز",
     "start": "شروع ورودی صوتی",
-    "stop": "توقف ورودی صوتی"
+    "stop": "توقف ورودی صوتی",
+    "restricted": "ورودی صوتی در این دستگاه محدود شده است.",
+    "micRequired": "برای ورودی صوتی، دسترسی به میکروفون لازم است.",
+    "micOff": "دسترسی به میکروفون خاموش است. برای استفاده از ورودی صوتی، آن را در تنظیمات روشن کنید.",
+    "micOffTitle": "دسترسی به میکروفون خاموش است",
+    "noSpeech": "گفتاری تشخیص داده نشد. برای تلاش مجدد روی میکروفون ضربه بزنید.",
+    "needsConnection": "ورودی صوتی در حال حاضر به اتصال نیاز دارد. دوباره تلاش کنید.",
+    "busy": "ورودی صوتی مشغول است. دوباره تلاش کنید.",
+    "stopped": "ورودی صوتی متوقف شد. برای تلاش مجدد روی میکروفون ضربه بزنید.",
+    "unavailableDevice": "ورودی صوتی در این دستگاه در دسترس نیست.",
+    "unavailableLanguage": "ورودی صوتی برای زبان این دستگاه در دسترس نیست."
   },
   "share": {
     "title": "اشتراک در Kilo",
@@ -2360,7 +2752,7 @@
     "connectedCli": "روی CLI متصل",
     "newSessionOn": "جلسه جدید در {{name}}",
     "noMatchingSessions": "جلسه‌ای مطابقت ندارد.",
-    "onlyFirstFilesAttached": "فقط {{count}} فایل اول پیوست می‌شوند.",
+    "onlyFirstFilesAttached": "فقط {{displayCount}} فایل اول پیوست می‌شوند.",
     "staleMessage": "این اشتراک دیگر در دسترس نیست.",
     "retryableMessage": "جلسات شما بارگذاری نشدند.",
     "emptyMessage": "هنوز جلسه‌ای نیست — برای ارسال این، یک جلسه جدید شروع کنید.",
@@ -2393,7 +2785,7 @@
     "otherAccountCopy": "Kilo Pass روی این Apple Account متعلق به یک حساب Kilo دیگر است. برای مدیریت آن وارد آن حساب Kilo شوید.",
     "alreadySubscribed": "شما قبلاً اشتراک Kilo Pass دارید.",
     "purchaseUnavailable": "خرید Kilo Pass در حال حاضر در دسترس نیست.",
-    "tierCredits": "${{amount}} اعتبار",
+    "tierCredits": "{{amount}} اعتبار",
     "perMonth": "{{price}}/ماه",
     "verifyPurchaseFailed": "خرید شما تأیید نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
     "productsCouldNotLoad": "محصولات Kilo Pass از App Store بارگذاری نشدند.",
@@ -2404,7 +2796,7 @@
     "manageFailed": "باز کردن مدیریت اشتراک App Store ناموفق بود.",
     "kiloPassSetup": "راه‌اندازی Kilo Pass",
     "subscriptionHeaderDescription": "اشتراک ماهانه که برای اجرای جلسات کدنویسی هوش مصنوعی در Kilo App — Cloud Agents، جلسات از راه دور و گفتگوهای KiloClaw، به موجودی Kilo شما اعتبار اضافه می‌کند.",
-    "tierDescription": "${{price}} اعتبار پرداخت‌شده ماهانه برای استفاده از Kilo App اضافه می‌شود.",
+    "tierDescription": "{{price}} اعتبار پرداخت‌شده ماهانه برای استفاده از Kilo App اضافه می‌شود.",
     "subscribe": "اشتراک",
     "subscribeDescription": "اعتبار ماهانه با پیشرفت پاداش",
     "manage": "مدیریت",
@@ -2412,7 +2804,7 @@
     "statusPending": "Kilo Pass در انتظار است",
     "statusCanceling": "Kilo Pass در حال لغو",
     "statusPastDue": "Kilo Pass معوق است",
-    "monthlyCredits": "${{credits}} اعتبار ماهانه",
+    "monthlyCredits": "{{credits}} اعتبار ماهانه",
     "ends": "پایان در {{date}}",
     "periodEnd": "پایان دوره",
     "managedOnGooglePlay": "مدیریت در Google Play",
@@ -2426,7 +2818,15 @@
     "webManagementDescription": "این Kilo Pass در وب مدیریت میشود.",
     "legalDisclosure": "Kilo Pass یک اشتراک ماهانه با تمدید خودکار است. پرداخت در تأیید خرید از Apple ID شما کسر میشود. اشتراکها هر ماه بهصورت خودکار با قیمت نشاندادهشده تمدید میشوند، مگر اینکه حداقل ۲۴ ساعت قبل از پایان دوره فعلی لغو شوند. هر زمان میتوانید در تنظیمات حساب App Store خود آن را مدیریت یا لغو کنید.",
     "legalPrivacyPolicy": "خطمشی حریم خصوصی",
-    "legalTermsOfUse": "شرایط استفاده (EULA)"
+    "legalTermsOfUse": "شرایط استفاده (EULA)",
+    "purchaseDifferentAccount": "این خرید App Store به حساب Kilo شما متصل نیست. با Apple Account مورد استفاده برای خرید وارد شوید، سپس دوباره تلاش کنید.",
+    "restoreFailed": "بازیابی خریدها ممکن نشد. دوباره تلاش کنید.",
+    "purchaseFailed": "تکمیل خرید ممکن نشد.",
+    "purchaseStartFailed": "شروع خرید App Store ممکن نشد.",
+    "purchaseOwnedByAnotherAccount": "Kilo Pass روی این Apple Account متعلق به یک حساب Kilo دیگر است.",
+    "couldNotConnectToAppStore": "اتصال به App Store ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+    "noMatchingProducts": "App Store هیچ محصول منطبقی از Kilo Pass برنگرداند.",
+    "purchaseMissingSignedTransaction": "خرید App Store شامل تراکنش امضاشدهٔ JWS نبود."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2514,15 +2914,10 @@
   "feedback": {
     "noEmailApp": "هیچ برنامه ایمیلی در دسترس نیست. می‌توانید از {{email}} با ما تماس بگیرید.",
     "couldNotOpenStore": "باز کردن فروشگاه ممکن نشد.",
-    "promptTitle": "از برنامه Kilo چقدر راضی هستید؟",
-    "iLikeIt": "دوستش دارم",
-    "gladTitle": "از شنیدن این خوشحالیم!",
-    "gladMessage": "یک نظر در فروشگاه به ما خیلی کمک می‌کند. ممنون از استفاده شما از Kilo!",
-    "rateKilo": "امتیاز به Kilo",
-    "needsWork": "نیاز به بهبود دارد",
-    "sorryTitle": "از شنیدن این متأسفیم!",
-    "sorryMessage": "لطفاً به ما اطلاع دهید چه چیزی باید بهتر شود. مهندس مسئول برنامه هر گزارش را می‌خواند!",
-    "emailUs": "برای ما ایمیل بفرستید"
+    "emailSubject": "بازخورد برنامه موبایل",
+    "neutralTitle": "به اپلیکیشن Kilo امتیاز دهید",
+    "rateTheApp": "به برنامه امتیاز دهید",
+    "sendFeedback": "ارسال بازخورد"
   },
   "organization": {
     "boundary": {
@@ -2532,14 +2927,26 @@
       "organizationUnavailable": "سازمان در دسترس نیست",
       "selectDescription": "برای ادامه از نمایه خود یک سازمان انتخاب کنید.",
       "selectOrganization": "انتخاب سازمان",
-      "unavailableDescription": "این سازمان دیگر در دسترس نیست. برای ادامه یکی را از نمایه خود انتخاب کنید."
+      "unavailableDescription": "این سازمان دیگر در دسترس نیست. برای ادامه یکی را از نمایه خود انتخاب کنید.",
+      "accessDeniedTitle": "دسترسی رد شد",
+      "accessDeniedDescription": "شما به این سازمان دسترسی ندارید."
     },
     "creditActivity": {
       "emptyDescription": "خریدها، استفاده و تنظیمات اعتبار این سازمان به محض وقوع در اینجا ظاهر می‌شوند.",
       "emptyTitle": "فعالیت اعتباری نیست",
       "expires": "انقضا در {{date}}",
       "title": "فعالیت اعتباری",
-      "transactionFallback": "تراکنش اعتباری"
+      "transactionFallback": "تراکنش اعتباری",
+      "category": {
+        "organization_custom": "سفارشی سازمان",
+        "parent_to_child_transfer_in": "انتقال از والد به فرزند (ورودی)",
+        "parent_to_child_transfer_out": "انتقال از والد به فرزند (خروجی)",
+        "oss-sponsorship": "حمایت مالی OSS",
+        "oss-monthly-reset": "بازنشانی ماهانه OSS",
+        "team-topup-bonus-2025": "پاداش شارژ تیم 2025",
+        "accounting_adjustment": "تعدیل حسابداری",
+        "credits_expired": "اعتبارها منقضی شدند"
+      }
     },
     "inviteMember": {
       "emailError": "یک آدرس ایمیل معتبر وارد کنید",
@@ -2556,10 +2963,17 @@
       "emptyDescription": "فاکتورها به‌صورت خودکار در هر چرخه صورتحساب تولید می‌شوند و پس از صدور صورتحساب سازمان شما در اینجا ظاهر می‌شوند.",
       "emptyTitle": "فاکتوری نیست",
       "invoiceFallback": "فاکتور",
-      "statusOpen": "باز",
-      "statusPaid": "پرداخت شده",
-      "statusVoid": "باطل",
-      "title": "فاکتورها"
+      "title": "فاکتورها",
+      "downloadFailed": "دانلود فاکتور ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+      "sharingUnavailable": "اشتراک‌گذاری در این دستگاه در دسترس نیست.",
+      "status": {
+        "paid": "پرداخت شده",
+        "open": "باز",
+        "void": "باطل",
+        "draft": "پیش‌نویس",
+        "uncollectible": "وصول‌نشدنی",
+        "unknown": "ناشناخته"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2645,8 +3059,9 @@
       "manageHint": "مدیریت Kilo Pass را در وب باز می‌کند.",
       "notSubscribed": "مشترک نیست",
       "overallocated": "اختصاص‌های Pass از صندلی‌های پرداختی فراتر می‌رود",
-      "paidSeatOne": "{{count}} صندلی پرداختی",
-      "paidSeatOther": "{{count}} صندلی پرداختی",
+      "paidSeat_one": "{{displayCount}} صندلی پرداختی",
+      "paidSeat": "{{displayCount}} صندلی پرداختی",
+      "paidSeat_other": "{{displayCount}} صندلی پرداختی",
       "paymentNeedsAttention": "پرداخت نیاز به توجه دارد",
       "paymentPending": "پرداخت در انتظار است",
       "processingBlocked": "پردازش مسدود است",
@@ -2671,10 +3086,28 @@
     "emailDeliveryFailed": "ارسال ایمیل بهطور موقت در دسترس نیست. لطفاً بعداً دوباره تلاش کنید.",
     "admissionRequired": "دستگاه شما قابل تأیید نیست. از «$t(login.moreSignInOptions)» استفاده کنید تا در دستگاه دیگری یا از طریق وب وارد شوید.",
     "default": "مشکلی پیش آمد. لطفاً دوباره تلاش کنید.",
-    "retryableAdmission": "ما نتوانستیم این دستگاه را تأیید کنیم. اتصال خود را بررسی کنید و دوباره تلاش کنید."
+    "retryableAdmission": "ما نتوانستیم این دستگاه را تأیید کنیم. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+    "startSignInFailed": "شروع ورود ممکن نشد. لطفاً دوباره تلاش کنید.",
+    "couldNotOpenBrowser": "باز کردن مرورگر ممکن نشد. لطفاً دوباره تلاش کنید.",
+    "signInTimedOut": "زمان ورود تمام شد. لطفاً دوباره تلاش کنید.",
+    "signInFailed": "ورود ناموفق بود. لطفاً دوباره تلاش کنید.",
+    "networkError": "خطای شبکه. لطفاً دوباره تلاش کنید.",
+    "accessDeniedByUser": "دسترسی توسط کاربر رد شد",
+    "codeExpired": "کد منقضی شد",
+    "tooManySignInAttempts": "تعداد تلاش‌های ورود زیاد است. لطفاً صبر کنید و دوباره تلاش کنید."
   },
   "models": {
     "dataCollected": "دادههای جمعآوریشده",
-    "free": "رایگان"
+    "free": "رایگان",
+    "couldNotUpdateFavorites": "به‌روزرسانی موردعلاقه‌ها ممکن نشد",
+    "thinkingEffort": {
+      "none": "هیچ",
+      "minimal": "حداقلی",
+      "low": "کم",
+      "medium": "متوسط",
+      "high": "بالا",
+      "xhigh": "خیلی زیاد",
+      "max": "حداکثر"
+    }
   }
 }

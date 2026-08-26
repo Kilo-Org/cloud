@@ -1,3 +1,4 @@
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
@@ -33,7 +34,7 @@ import { VoiceInputButton, VoiceInputStatus } from '@/components/voice-input-con
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { AGENT_ATTACHMENT_MAX_BYTES } from '@/lib/agent-attachments/constants';
 import {
-  CLIPBOARD_PASTE_EMPTY_MESSAGE,
+  clipboardPasteEmptyMessage,
   useClipboardPaste,
 } from '@/lib/agent-attachments/use-clipboard-paste';
 
@@ -45,7 +46,7 @@ const PROMPT_INPUT_LINE_HEIGHT = 24;
 const PROMPT_INPUT_VERTICAL_PADDING = 16;
 const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
-const PROMPT_INPUT_MAX_CHARS = 4000;
+const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
 const PROMPT_INPUT_MIN_HEIGHT =
   PROMPT_INPUT_LINE_HEIGHT * PROMPT_INPUT_DEFAULT_LINES + PROMPT_INPUT_VERTICAL_PADDING;
 const PROMPT_INPUT_MAX_HEIGHT =
@@ -184,7 +185,7 @@ export function NewSessionPrompt({
     },
     onFailure: reason => {
       toast.error(
-        reason === 'empty' ? CLIPBOARD_PASTE_EMPTY_MESSAGE : describeClassificationFailure(reason)
+        reason === 'empty' ? clipboardPasteEmptyMessage() : describeClassificationFailure(reason)
       );
     },
     maxBytes: AGENT_ATTACHMENT_MAX_BYTES,
@@ -208,7 +209,7 @@ export function NewSessionPrompt({
   }
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-black/5">
+    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]">
       <AttachmentPreviewStrip
         attachments={attachments}
         onRemove={onRemoveAttachment}

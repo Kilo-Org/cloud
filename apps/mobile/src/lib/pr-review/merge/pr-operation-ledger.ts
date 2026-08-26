@@ -4,6 +4,7 @@
 // per-surface PR copy. The per-intent key and the raw markers live in
 // `@/lib/operation-key`, which every ledgered surface shares.
 
+import { i18n } from '@/i18n';
 import { isOperationInProgress } from '@/lib/operation-key';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 
@@ -18,18 +19,39 @@ export type PrMutationSurface = 'create-comment' | 'submit-review' | 'reply' | '
 
 // Existing retryable fallback copy per surface (mirrors the sheet/composer
 // defaults so an in-progress duplicate reads like a normal retryable failure).
+// Values are catalog keys, translated at the use site.
 const PR_SURFACE_RETRYABLE_COPY = {
-  'create-comment': 'Could not post comment.',
-  'submit-review': 'Could not submit review. Check your connection and try again.',
-  reply: 'Could not reply.',
-  merge: 'Could not merge pull request.',
+  'create-comment': 'prReview.mutationError.couldNotPostComment',
+  'submit-review': 'prReview.mutationError.couldNotSubmitReview',
+  reply: 'prReview.operation.couldNotReply',
+  merge: 'prReview.merge.couldNotMerge',
 } satisfies Record<PrMutationSurface, string>;
 
+/**
+ * A ledger marker re-wrapped for display. The kind travels on the error, not in
+ * its text, so the sheets can still classify it after the message is
+ * translated. The server's own English marker is still matched below.
+ */
+class PrOperationMarkerError extends Error {
+  kind: 'ambiguous' | 'persistence-failed';
+
+  constructor(kind: 'ambiguous' | 'persistence-failed', message: string) {
+    super(message);
+    this.kind = kind;
+  }
+}
+
 export function isPrOperationAmbiguous(error: unknown): boolean {
+  if (error instanceof PrOperationMarkerError) {
+    return error.kind === 'ambiguous';
+  }
   return error instanceof Error && error.message === PR_OPERATION_AMBIGUOUS_MESSAGE;
 }
 
 export function isPrOperationPersistenceFailed(error: unknown): boolean {
+  if (error instanceof PrOperationMarkerError) {
+    return error.kind === 'persistence-failed';
+  }
   return error instanceof Error && error.message === PR_OPERATION_PERSISTENCE_FAILED_MESSAGE;
 }
 
@@ -54,13 +76,16 @@ export function isPrMutationRetryable(error: unknown): boolean {
  */
 export function mapPrOperationError<T>(error: T, surface: PrMutationSurface): T | Error {
   if (isOperationInProgress(error)) {
-    return new Error(PR_SURFACE_RETRYABLE_COPY[surface]);
+    return new Error(i18n.t(PR_SURFACE_RETRYABLE_COPY[surface]));
   }
   if (isPrOperationAmbiguous(error)) {
-    return new Error(PR_OPERATION_AMBIGUOUS_MESSAGE);
+    return new PrOperationMarkerError('ambiguous', i18n.t('prReview.operation.ambiguous'));
   }
   if (isPrOperationPersistenceFailed(error)) {
-    return new Error(PR_OPERATION_PERSISTENCE_FAILED_MESSAGE);
+    return new PrOperationMarkerError(
+      'persistence-failed',
+      i18n.t('prReview.operation.persistenceFailed')
+    );
   }
   return error;
 }
@@ -68,5 +93,7 @@ export function mapPrOperationError<T>(error: T, surface: PrMutationSurface): T 
 /** Toast message for a PR mutation error, after ledger-outcome mapping. */
 export function prOperationToastMessage(error: unknown, surface: PrMutationSurface): string {
   const mapped = mapPrOperationError(error, surface);
-  return mapped instanceof Error ? mapped.message : 'Could not complete this action.';
+  return mapped instanceof Error
+    ? mapped.message
+    : i18n.t('prReview.operation.couldNotCompleteAction');
 }

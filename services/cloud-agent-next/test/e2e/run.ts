@@ -14,9 +14,10 @@
  *   tsx test/e2e/run.ts callback-completion echo:done
  *   tsx test/e2e/run.ts --api=legacy hot echo:hi
  *
- * The stack must be running with `.dev.vars` pointing
- * `KILO_OPENROUTER_BASE` at `http://localhost:<8811 + portOffset>/api`
- * and the `fake-llm` dev service started (`pnpm dev:start cloud-agent fake-llm`).
+ * The stack must be running (`pnpm dev:start cloud-agent`). Leave
+ * `KILO_OPENROUTER_BASE` on Next.js and select `kilo/fake-deterministic`.
+ * Prefix `WORKER_URL` / `FAKE_LLM_URL` from `pnpm dev:status --json` when
+ * the session port offset is non-zero.
  */
 
 import path from 'node:path';

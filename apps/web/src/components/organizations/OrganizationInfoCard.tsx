@@ -44,6 +44,7 @@ import { SpendingAlertsModal } from './SpendingAlertsModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useExpiringCredits } from './useExpiringCredits';
 import { useAdminOrganizationHierarchy } from '@/app/admin/api/organizations/hooks';
+import { OrganizationSalesDemoResetButton } from './OrganizationSalesDemoResetButton';
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -299,10 +300,18 @@ function Inner(props: InnerProps) {
   return (
     <Card className={className}>
       <CardHeader>
-        <CardTitle>
-          <Building2 className="mr-2 inline h-5 w-5" />
-          Organization Information
-        </CardTitle>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle>
+            <Building2 className="mr-2 inline h-5 w-5" />
+            Organization Information
+          </CardTitle>
+          {!showAdminControls && (
+            <OrganizationSalesDemoResetButton
+              organizationId={id}
+              isSalesDemo={info.settings.is_sales_demo === true}
+            />
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {isInAdminDashboard && hierarchyQuery.data ? (

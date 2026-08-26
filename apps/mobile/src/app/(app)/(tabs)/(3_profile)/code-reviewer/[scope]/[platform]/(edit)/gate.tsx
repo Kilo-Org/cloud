@@ -10,6 +10,12 @@ export default function GateThresholdRoute() {
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const { t } = useTranslation();
+  const labels = {
+    off: t('codeReviewer.gateThreshold.off'),
+    all: t('codeReviewer.gateThreshold.all'),
+    warning: t('codeReviewer.gateThreshold.warning'),
+    critical: t('codeReviewer.gateThreshold.critical'),
+  } as const;
   const descriptions = {
     off: t('codeReviewer.gate.off'),
     all: t('codeReviewer.gate.all'),
@@ -22,6 +28,7 @@ export default function GateThresholdRoute() {
       title={t('codeReviewer.gate.title')}
       options={GATE_THRESHOLDS}
       selected={data?.gateThreshold}
+      labels={labels}
       descriptions={descriptions}
       disabled={data == null}
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule

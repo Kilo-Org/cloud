@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Bell, FileText, Pencil, Receipt, Users } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -26,7 +26,7 @@ import { i18n } from '@/i18n';
 import { agentColor, type Tint, toneColor } from '@/lib/agent-color';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatNumber } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   isMoneyRole,
@@ -35,12 +35,35 @@ import {
   useOrgWithMembers,
 } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useOrganization } from '@/lib/organization-context';
 import { cn } from '@/lib/utils';
 
-export function OrganizationHubScreen() {
+type OrganizationHubScreenProps = Readonly<{
+  /** Explicit org id from a deep link (e.g. /organizations/<id>/overview). */
+  organizationIdOverride?: string;
+}>;
+
+export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHubScreenProps = {}) {
   const router = useRouter();
   const colors = useThemeColors();
-  const { organizationId, role, org, isResolving } = useOrgBoundary();
+  const { organizationId, role, org, isResolving } = useOrgBoundary(organizationIdOverride);
+  const { setOrganizationId } = useOrganization();
+  const appliedOverrideRef = useRef<string | null>(null);
+
+  // A deep-linked org id must become the persisted selection so tabs and
+  // sibling screens keep working, but only after membership is confirmed
+  // (org non-null) and only once per override.
+  useEffect(() => {
+    if (organizationIdOverride == null || org == null) {
+      return;
+    }
+    if (appliedOverrideRef.current === organizationIdOverride) {
+      return;
+    }
+    appliedOverrideRef.current = organizationIdOverride;
+    setOrganizationId(organizationIdOverride);
+  }, [organizationIdOverride, org, setOrganizationId]);
+
   const orgWithMembers = useOrgWithMembers(organizationId);
   // The summary API is parent-only (`organizationParentBillingProcedure`
   // rejects child orgs and non-billing roles), so a child org must never fire
@@ -52,7 +75,12 @@ export function OrganizationHubScreen() {
   const { t } = useTranslation();
 
   if (isResolving || organizationId == null || org == null) {
-    return <OrganizationBoundary title={t('organization.hub.title')} />;
+    return (
+      <OrganizationBoundary
+        title={t('organization.hub.title')}
+        organizationIdOverride={organizationIdOverride}
+      />
+    );
   }
 
   const showMoney = isMoneyRole(role);
@@ -73,8 +101,8 @@ export function OrganizationHubScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={org.organizationName} />
       <TabScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4"
+        className="flex-1"
+        contentContainerClassName="px-6 gap-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
@@ -114,8 +142,11 @@ export function OrganizationHubScreen() {
             // purchased capacity and can legitimately be zero.
             value={
               org.requireSeats
-                ? `${org.seatCount.used} / ${org.seatCount.total}`
-                : String(org.seatCount.used)
+                ? `${formatNumber(org.seatCount.used, i18n.language)} / ${formatNumber(
+                    org.seatCount.total,
+                    i18n.language
+                  )}`
+                : formatNumber(org.seatCount.used, i18n.language)
             }
             last
           />

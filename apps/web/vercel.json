@@ -21,6 +21,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/organization-alerts",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/kilo-pass-yearly-monthly-base",
       "schedule": "0 * * * *"
     },
@@ -47,6 +51,10 @@
     {
       "path": "/api/cron/oss-monthly-reset",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/sales-demo-reset",
+      "schedule": "0 5 * * *"
     },
     {
       "path": "/api/discord/gateway",

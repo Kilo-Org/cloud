@@ -1,6 +1,8 @@
 import { execSync, execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 
+import { hasRunningService } from './process-tree';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -503,37 +505,33 @@ function pipeServicePane(sessionName: string, serviceName: string, command: stri
   );
 }
 
-function isPaneRunningCommand(sessionName: string, pane: PaneInfo): boolean {
+function panePid(sessionName: string, pane: PaneInfo): number | undefined {
   try {
-    const command = execSync(
-      `tmux display-message -p -t ${sessionName}:${pane.windowIndex}.${pane.paneIndex} "#{pane_current_command}"`,
+    const pid = execSync(
+      `tmux display-message -p -t ${sessionName}:${pane.windowIndex}.${pane.paneIndex} "#{pane_pid}"`,
       { encoding: 'utf-8' }
     ).trim();
-    const commandName = path.basename(command).replace(/^-/, '');
-    return commandName !== '' && !['bash', 'fish', 'nu', 'sh', 'tcsh', 'zsh'].includes(commandName);
+    return /^\d+$/.test(pid) ? Number(pid) : undefined;
   } catch {
-    return false;
+    return undefined;
   }
 }
 
 /**
- * Whether the pane's shell currently has a child process. `pane_current_command`
- * cannot answer this: services run under a `$SHELL -lc '<cmd>; exec $SHELL -l'`
+ * Whether the pane is running an actual service. `pane_current_command` cannot
+ * answer this: services run under a `$SHELL -lc '<cmd>; exec $SHELL -l'`
  * wrapper, so it reports the wrapper shell even while the service is alive.
- * Used to tell "service still shutting down" from "idle shell, safe to type".
+ * "Has any child" cannot answer it either — ctrl-c and dashboard clicks leave
+ * extra login shells parented to the pane shell, which read as "still
+ * shutting down" forever.
+ *
+ * Used to tell "service still shutting down" from "idle shell, safe to type",
+ * and to report status for services that listen on no port.
  */
-function paneHasRunningChild(sessionName: string, pane: PaneInfo): boolean {
-  try {
-    const panePid = execSync(
-      `tmux display-message -p -t ${sessionName}:${pane.windowIndex}.${pane.paneIndex} "#{pane_pid}"`,
-      { encoding: 'utf-8' }
-    ).trim();
-    if (!/^\d+$/.test(panePid)) return false;
-    execSync(`pgrep -P ${panePid}`, { stdio: 'ignore' });
-    return true; // pgrep exits 0 only when at least one child matches
-  } catch {
-    return false;
-  }
+function paneHasRunningService(sessionName: string, pane: PaneInfo): boolean {
+  const pid = panePid(sessionName, pane);
+  if (pid === undefined) return false;
+  return hasRunningService(pid);
 }
 
 function selectPane(sessionName: string, windowTarget: string | number, pane: number): void {
@@ -582,6 +580,16 @@ function pipePane(
     `tmux pipe-pane -t ${paneTarget(sessionName, windowTarget, pane)} -o ${escapeForShell(command)}`,
     { stdio: 'ignore' }
   );
+}
+
+function closePipePane(sessionName: string, windowTarget: string | number, pane: number): void {
+  try {
+    execFileSync('tmux', ['pipe-pane', '-t', paneTarget(sessionName, windowTarget, pane)], {
+      stdio: 'ignore',
+    });
+  } catch {
+    // No pipe, or the pane is already gone.
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -639,12 +647,12 @@ export {
   findServicePane,
   captureServicePane,
   pipeServicePane,
-  isPaneRunningCommand,
-  paneHasRunningChild,
+  paneHasRunningService,
   selectPane,
   setPaneTitle,
   enablePaneBorders,
   pipePane,
+  closePipePane,
   isTmuxAvailable,
   isInsideTmux,
 };

@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import {
   useSecurityAgentCapability,
   useSecurityAgentConfig,
@@ -22,7 +23,17 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { getSecurityAgentPath } from '@/lib/security-agent';
-import { capitalize } from '@/lib/utils';
+
+const ANALYSIS_MODE_KEYS = {
+  auto: 'securityAgent.analysisMode.auto',
+  shallow: 'securityAgent.analysisMode.shallow',
+  deep: 'securityAgent.analysisMode.deep',
+} satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+}
 
 function SettingsOverviewSkeleton() {
   const { t } = useTranslation();
@@ -125,15 +136,12 @@ export function SettingsOverviewScreen({
   // keeps the CTA reachable.
   const showRepoCta =
     !data.isEnabled && capability.canManage && !hasEffectiveRepo && !repositoriesEmpty;
-  let repoCountLabel = t('securityAgent.settingsOverview.repositoriesSelected', {
+  let repoCountLabel = t('securityAgent.settingsOverview.repositoriesCount', {
     count: data.selectedRepositoryIds.length,
+    displayCount: formatNumber(data.selectedRepositoryIds.length, i18n.language),
   });
   if (data.repositorySelectionMode === 'all') {
     repoCountLabel = t('securityAgent.settingsOverview.allRepositories');
-  } else if (data.selectedRepositoryIds.length === 1) {
-    repoCountLabel = t('securityAgent.settingsOverview.repositorySelected', {
-      count: data.selectedRepositoryIds.length,
-    });
   }
   const automationEnabledCount = [
     data.autoAnalysisEnabled,
@@ -144,6 +152,8 @@ export function SettingsOverviewScreen({
     data.newFindingNotificationsEnabled,
     data.slaNotificationsEnabled,
   ].filter(Boolean).length;
+  const analysisModeKey = lookup(ANALYSIS_MODE_KEYS, data.analysisMode);
+  const analysisModeLabel = analysisModeKey ? t(analysisModeKey) : data.analysisMode;
 
   const handleToggle = (value: boolean) => {
     void Haptics.selectionAsync();
@@ -213,7 +223,7 @@ export function SettingsOverviewScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('securityAgent.settingsOverview.title')} headerRight={auditAction} />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
         <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
           <View className="flex-1 pr-3">
             <Text className="text-sm font-medium">
@@ -269,7 +279,7 @@ export function SettingsOverviewScreen({
               icon={Cpu}
               title={t('securityAgent.settingsOverview.modelsAndAnalysis')}
               subtitle={t('securityAgent.settingsOverview.analysisModeSubtitle', {
-                mode: capitalize(data.analysisMode),
+                mode: analysisModeLabel,
               })}
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'settings/analysis'));
@@ -283,6 +293,7 @@ export function SettingsOverviewScreen({
                   ? t('securityAgent.settingsOverview.automationAllOff')
                   : t('securityAgent.settingsOverview.automationCount', {
                       count: automationEnabledCount,
+                      displayCount: formatNumber(automationEnabledCount, i18n.language),
                     })
               }
               onPress={() => {
@@ -297,6 +308,7 @@ export function SettingsOverviewScreen({
                   ? t('securityAgent.settingsOverview.off')
                   : t('securityAgent.settingsOverview.notificationsCount', {
                       count: notificationsEnabledCount,
+                      displayCount: formatNumber(notificationsEnabledCount, i18n.language),
                     })
               }
               onPress={() => {

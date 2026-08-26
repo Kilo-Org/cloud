@@ -1,0 +1,187 @@
+export type SessionActivityState = 'idle' | 'active' | 'finalizing';
+
+export type SessionRoute = {
+  sessionId: string;
+  kiloSessionId: string;
+  directory: string;
+  ownerId: string;
+  lastState: SessionActivityState | null;
+  lastStateAt: number | null;
+  idleForMs: number | null;
+  waitingOn: 'model' | 'tool' | 'finalizing' | null;
+  needsSync: boolean;
+  stalled: boolean;
+};
+
+export type AttachRouteInput = {
+  sessionId: string;
+  kiloSessionId: string;
+  directory: string;
+  ownerId: string;
+};
+
+export type SessionStateReport = {
+  state: SessionActivityState;
+  idleForMs: number;
+  waitingOn?: 'model' | 'tool' | 'finalizing';
+};
+
+export type SessionEventIdentity = {
+  directory: string;
+  kiloSessionId?: string;
+  rootKiloSessionId?: string;
+};
+
+export function emptyRouteTable(): Map<string, SessionRoute> {
+  return new Map();
+}
+
+export function attachRoute(
+  table: Map<string, SessionRoute>,
+  input: AttachRouteInput,
+  sandboxOwnerId: string
+): { table: Map<string, SessionRoute>; route: SessionRoute; changed: boolean } {
+  if (input.ownerId !== sandboxOwnerId) {
+    throw new Error('Sandbox owner mismatch');
+  }
+
+  const existing = table.get(input.sessionId);
+  if (existing) {
+    if (existing.directory === input.directory && existing.kiloSessionId === input.kiloSessionId) {
+      return { table, route: existing, changed: false };
+    }
+    throw new Error('Session route conflict');
+  }
+
+  for (const route of table.values()) {
+    if (route.directory === input.directory) {
+      throw new Error('Directory already attached');
+    }
+    if (route.kiloSessionId === input.kiloSessionId) {
+      throw new Error('Kilo session already attached');
+    }
+  }
+
+  const route: SessionRoute = {
+    sessionId: input.sessionId,
+    kiloSessionId: input.kiloSessionId,
+    directory: input.directory,
+    ownerId: input.ownerId,
+    lastState: null,
+    lastStateAt: null,
+    idleForMs: null,
+    waitingOn: null,
+    needsSync: false,
+    stalled: false,
+  };
+  table.set(input.sessionId, route);
+  return { table, route, changed: true };
+}
+
+export function detachRoute(
+  table: Map<string, SessionRoute>,
+  sessionId: string
+): { table: Map<string, SessionRoute>; existed: boolean } {
+  const existed = table.delete(sessionId);
+  return { table, existed };
+}
+
+export function getRouteBySessionId(
+  table: Map<string, SessionRoute>,
+  sessionId: string
+): SessionRoute | undefined {
+  return table.get(sessionId);
+}
+
+export function getRouteByDirectory(
+  table: Map<string, SessionRoute>,
+  directory: string
+): SessionRoute | undefined {
+  for (const route of table.values()) {
+    if (route.directory === directory) return route;
+  }
+  return undefined;
+}
+
+export function getRouteByKiloSessionId(
+  table: Map<string, SessionRoute>,
+  kiloSessionId: string
+): SessionRoute | undefined {
+  for (const route of table.values()) {
+    if (route.kiloSessionId === kiloSessionId) return route;
+  }
+  return undefined;
+}
+
+export function resolveSessionEventRoute(
+  table: Map<string, SessionRoute>,
+  identity: SessionEventIdentity
+): SessionRoute | null {
+  const route =
+    getRouteByDirectory(table, identity.directory) ??
+    (identity.rootKiloSessionId
+      ? getRouteByKiloSessionId(table, identity.rootKiloSessionId)
+      : undefined) ??
+    (identity.kiloSessionId ? getRouteByKiloSessionId(table, identity.kiloSessionId) : undefined);
+  if (!route) return null;
+  if (
+    identity.rootKiloSessionId !== undefined &&
+    identity.rootKiloSessionId !== route.kiloSessionId
+  ) {
+    return null;
+  }
+  return route;
+}
+
+export function markNeedsSync(
+  table: Map<string, SessionRoute>,
+  sessionId: string
+): Map<string, SessionRoute> {
+  const route = table.get(sessionId);
+  if (route) route.needsSync = true;
+  return table;
+}
+
+export function clearNeedsSync(
+  table: Map<string, SessionRoute>,
+  sessionId: string
+): Map<string, SessionRoute> {
+  const route = table.get(sessionId);
+  if (route) route.needsSync = false;
+  return table;
+}
+
+export function applyReportedSessionState(
+  table: Map<string, SessionRoute>,
+  kiloSessionId: string,
+  report: SessionStateReport,
+  receivedAt: number
+): { table: Map<string, SessionRoute>; changed: boolean } {
+  const route = getRouteByKiloSessionId(table, kiloSessionId);
+  if (!route) return { table, changed: false };
+
+  const waitingOn = report.waitingOn ?? null;
+  const changed = route.lastState !== report.state || route.waitingOn !== waitingOn;
+  route.lastState = report.state;
+  route.lastStateAt = receivedAt;
+  route.idleForMs = report.idleForMs;
+  route.waitingOn = waitingOn;
+  return { table, changed };
+}
+
+export function markStalled(
+  table: Map<string, SessionRoute>,
+  sessionId: string
+): Map<string, SessionRoute> {
+  const route = table.get(sessionId);
+  if (route) route.stalled = true;
+  return table;
+}
+
+export function hasActiveWork(table: Map<string, SessionRoute>): boolean {
+  for (const route of table.values()) {
+    if (route.stalled) continue;
+    if (route.lastState === 'active' || route.lastState === 'finalizing') return true;
+  }
+  return false;
+}

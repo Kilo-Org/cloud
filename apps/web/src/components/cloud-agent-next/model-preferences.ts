@@ -5,34 +5,13 @@ import type { RepositoryOption, RepositoryPlatform } from '@/components/shared/R
 const MODEL_STORAGE_KEY_PREFIX = 'cloud-agent:last-used-model';
 const VARIANTS_STORAGE_KEY_PREFIX = 'cloud-agent:last-used-variants';
 const DEVCONTAINER_ENABLED_STORAGE_KEY = 'cloud-agent:devcontainer-enabled';
-const CLOUD_AGENT_NEXT_LOCAL_TEST_MODEL = {
-  id: 'kilo/fake-deterministic',
-  name: 'Deterministic test model',
-} satisfies ModelOption;
 const REPO_STORAGE_KEY_PREFIX = 'cloud-agent:last-used-repo';
 
-type LastUsedRepo = { fullName: string; platform: RepositoryPlatform };
-
-export function shouldExposeCloudAgentNextLocalTestModel() {
-  return (
-    process.env.NODE_ENV === 'development' &&
-    process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_ENABLE_LOCAL_FAKE_MODEL === 'true'
-  );
-}
-
-export function appendCloudAgentNextLocalTestModel(
-  modelOptions: ModelOption[],
-  shouldExposeLocalTestModel = shouldExposeCloudAgentNextLocalTestModel()
-): ModelOption[] {
-  if (
-    !shouldExposeLocalTestModel ||
-    modelOptions.some(model => model.id === CLOUD_AGENT_NEXT_LOCAL_TEST_MODEL.id)
-  ) {
-    return modelOptions;
-  }
-
-  return [...modelOptions, CLOUD_AGENT_NEXT_LOCAL_TEST_MODEL];
-}
+type LastUsedRepo = {
+  fullName: string;
+  platform: RepositoryPlatform;
+  platformIntegrationId?: string;
+};
 
 export function getLastUsedRepoStorageKey(organizationId?: string) {
   return organizationId
@@ -55,7 +34,14 @@ export function parseLastUsedRepo(rawValue: string | null): LastUsedRepo | null 
         parsed.platform === 'gitlab' ||
         parsed.platform === 'bitbucket')
     ) {
-      return { fullName: parsed.fullName, platform: parsed.platform };
+      return {
+        fullName: parsed.fullName,
+        platform: parsed.platform,
+        platformIntegrationId:
+          'platformIntegrationId' in parsed && typeof parsed.platformIntegrationId === 'string'
+            ? parsed.platformIntegrationId
+            : undefined,
+      };
     }
     return null;
   } catch {
@@ -70,11 +56,12 @@ export function getLastUsedRepo(organizationId?: string): LastUsedRepo | null {
 export function setLastUsedRepo(
   fullName: string,
   platform: RepositoryPlatform,
-  organizationId?: string
+  organizationId?: string,
+  platformIntegrationId?: string
 ) {
   safeLocalStorage.setItem(
     getLastUsedRepoStorageKey(organizationId),
-    JSON.stringify({ fullName, platform } satisfies LastUsedRepo)
+    JSON.stringify({ fullName, platform, platformIntegrationId } satisfies LastUsedRepo)
   );
 }
 
@@ -96,10 +83,14 @@ export function getPreferredInitialRepo({
   isLoadingBitbucketRepos: boolean;
 }): RepositoryOption | undefined {
   if (lastUsedRepo) {
-    const match = availableRepos.find(
-      repo => repo.fullName === lastUsedRepo.fullName && repo.platform === lastUsedRepo.platform
+    const matches = availableRepos.filter(
+      repo =>
+        repo.fullName === lastUsedRepo.fullName &&
+        repo.platform === lastUsedRepo.platform &&
+        (lastUsedRepo.platformIntegrationId === undefined ||
+          repo.platformIntegrationId === lastUsedRepo.platformIntegrationId)
     );
-    if (match) return match;
+    if (matches.length === 1) return matches[0];
 
     const isSavedRepoLoading =
       lastUsedRepo.platform === 'github'

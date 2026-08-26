@@ -15,6 +15,8 @@ export const CONSENT_USER_KEY_PREFIX = 'consent-accepted-';
 export const AGENT_MODEL_PREFERENCE_KEY = 'agent-model-preference';
 export const REASONING_DEFAULT_EXPANDED_KEY = 'agent-reasoning-default-expanded';
 export const REVIEW_REQUESTED_AT_KEY = 'store-review-requested-at';
+/** One-time gate for the neutral post-success feedback prompt. */
+export const FEEDBACK_LAST_ASKED_AT_KEY = 'feedback-last-asked-at';
 export const PR_REVIEW_RECENTS_KEY = 'pr-review-recents';
 export const PR_REVIEW_VIEWED_KEY = 'pr-review-viewed';
 export const THEME_PREFERENCE_KEY = 'theme-preference';
@@ -26,6 +28,7 @@ export const LOGIN_EMAIL_DRAFT_KEY = 'login-email-draft';
 /** Login SSO-recovery banner draft, persisted before an RTL language reload. */
 export const LOGIN_SSO_RECOVERY_DRAFT_KEY = 'login-sso-recovery-draft';
 export const KEEP_SCREEN_ON_KEY = 'keep-session-screen-on';
+export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */
 export const PERSIST_DB_KEY = 'persist-db-key';
 /**

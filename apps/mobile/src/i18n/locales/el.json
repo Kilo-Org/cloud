@@ -2,7 +2,7 @@
   "common": {
     "cancel": "Ακύρωση",
     "done": "Τέλος",
-    "retry": "Νέα προσπάθεια",
+    "retry": "Επανάληψη",
     "tryAgain": "Δοκιμάστε ξανά",
     "continue": "Συνέχεια",
     "notNow": "Όχι τώρα",
@@ -22,7 +22,12 @@
     "copiedToClipboard": "Αντιγράφηκε στο πρόχειρο",
     "couldNotCopyToClipboard": "Δεν ήταν δυνατή η αντιγραφή στο πρόχειρο",
     "required": "απαιτείται",
-    "error": "σφάλμα: {{error}}"
+    "error": "σφάλμα: {{error}}",
+    "back": "Πίσω",
+    "somethingWentWrong": "Κάτι πήγε στραβά",
+    "couldNotOpen": "Δεν ήταν δυνατό το άνοιγμα {{label}}",
+    "link": "σύνδεσμος",
+    "takingLonger": "Αυτό διαρκεί περισσότερο από το αναμενόμενο. Μπορείτε να το κλείσετε και να ελέγξετε ξανά."
   },
   "language": {
     "title": "Γλώσσα",
@@ -30,10 +35,12 @@
     "couldNotRestart": "Δεν ήταν δυνατή η επανεκκίνηση",
     "languageSaved": "Η γλώσσα σας αποθηκεύτηκε.",
     "catalogLoadFailed": "Δεν ήταν δυνατή η φόρτωση της γλώσσας. Δοκιμάστε ξανά.",
-    "retry": "Νέα προσπάθεια",
+    "retry": "Επανάληψη",
     "search": "Αναζήτηση γλωσσών",
     "noMatches": "Καμία γλώσσα δεν ταιριάζει",
-    "deviceLanguage": "Γλώσσα συσκευής"
+    "deviceLanguage": "Γλώσσα συσκευής",
+    "current": "Τρέχουσα",
+    "allLanguages": "Όλες οι γλώσσες"
   },
   "login": {
     "welcome": "Καλώς ήρθατε στο Kilo",
@@ -118,7 +125,7 @@
     "accountDeleted": "Ο λογαριασμός σας διαγράφηκε.",
     "viewOrganization": "Προβολή οργανισμού",
     "manageOrganization": "Διαχείριση οργανισμού",
-    "personal": "Προσωπικό",
+    "personal": "Προσωπικά",
     "selectAccount": "Επιλογή λογαριασμού",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
@@ -143,7 +150,9 @@
     "appearanceSystem": "Σύστημα",
     "appearanceLight": "Ανοιχτό",
     "appearanceDark": "Σκούρο",
-    "account": "Λογαριασμός"
+    "account": "Λογαριασμός",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Το pull request δεν είναι διαθέσιμο",
@@ -206,11 +215,11 @@
       "loadingLines": "Φόρτωση {{loaded}} από {{total}} γραμμές…",
       "expandContext": "Επέκταση περιεχομένου",
       "expandMoreContext": "Επέκταση περισσότερου περιεχομένου",
-      "expandLines": "Επέκταση {{count}} γραμμών ({{start}}–{{end}})",
-      "expandMoreLines": "Επέκταση ακόμα {{count}} γραμμών ({{start}}–{{end}})",
-      "expandLinesOfContext": "Επέκταση {{count}} γραμμών περιεχομένου",
+      "expandLines": "Επέκταση {{displayCount}} γραμμών ({{start}}–{{end}})",
+      "expandMoreLines": "Επέκταση ακόμα {{displayCount}} γραμμών ({{start}}–{{end}})",
+      "expandLinesOfContext": "Επέκταση {{displayCount}} γραμμών περιεχομένου",
       "expandAll": "Επέκταση όλων",
-      "expandAllLines": "Επέκταση όλων των {{count}} γραμμών",
+      "expandAllLines": "Επέκταση όλων των {{displayCount}} γραμμών",
       "loadingMoreFiles": "Φόρτωση περισσότερων αρχείων…",
       "retryLoadingNextPage": "Νέα προσπάθεια φόρτωσης επόμενης σελίδας",
       "failedToLoadMoreFiles": "Δεν ήταν δυνατή η φόρτωση περισσότερων αρχείων — πατήστε για νέα προσπάθεια",
@@ -219,10 +228,12 @@
       "loadedOfTotalFiles": "{{loaded}} από {{total}} αρχεία φορτώθηκαν",
       "loadAllFiles": "Φόρτωση όλων των αρχείων",
       "loadAll": "Φόρτωση όλων",
-      "fileLoaded": "{{count}} αρχείο φορτώθηκε",
-      "filesLoaded": "{{count}} αρχεία φορτώθηκαν",
-      "fileLoadedOfTotal": "{{count}} αρχείο φορτώθηκε από {{total}}",
-      "filesLoadedOfTotal": "{{count}} αρχεία φορτώθηκαν από {{total}}",
+      "fileLoadedCount_one": "{{displayCount}} αρχείο φορτώθηκε",
+      "fileLoadedCount": "{{displayCount}} αρχεία φορτώθηκαν",
+      "fileLoadedCount_other": "{{displayCount}} αρχεία φορτώθηκαν",
+      "fileLoadedOfTotalCount_one": "{{displayCount}} αρχείο φορτώθηκε από {{total}}",
+      "fileLoadedOfTotalCount": "{{displayCount}} αρχεία φορτώθηκαν από {{total}}",
+      "fileLoadedOfTotalCount_other": "{{displayCount}} αρχεία φορτώθηκαν από {{total}}",
       "filesStillLoading": "Τα αρχεία φορτώνονται ακόμα. Σύρετε για ανανέωση.",
       "goToOverview": "Μετάβαση στην επισκόπηση",
       "goToOverviewTab": "Μετάβαση στην καρτέλα επισκόπησης"
@@ -278,7 +289,36 @@
         "body": "Δεν ήταν δυνατή η διαγραφή του κλάδου: {{reason}}",
         "accessibility": "Συγχωνεύτηκε. Δεν ήταν δυνατή η διαγραφή του κλάδου: {{reason}}"
       },
-      "loadFailedTitle": "Δεν ήταν δυνατή η φόρτωση των επιλογών συγχώνευσης"
+      "loadFailedTitle": "Δεν ήταν δυνατή η φόρτωση των επιλογών συγχώνευσης",
+      "blocked": {
+        "unknownStateTitle": "Το GitHub δεν ανέφερε κατάσταση συγχώνευσης",
+        "unknownStateDetail": "Δοκιμάστε να ανανεώσετε την επισκόπηση σε λίγο.",
+        "conflictsTitle": "Συγκρούσεις συγχώνευσης",
+        "conflictsDetail": "Επιλύστε τις συγκρούσεις συγχώνευσης σε αυτόν τον κλάδο πριν τη συγχώνευση.",
+        "requiredReviewsTitle": "Λείπουν απαιτούμενες αναθεωρήσεις",
+        "requiredReviewsDetail": "Οι εγκρίσεις από τους απαιτούμενους αναθεωρητές λείπουν ή εκκρεμούν.",
+        "failingChecksTitle": "Αποτυγχάνουν απαιτούμενοι έλεγχοι",
+        "failingChecksDetail": "Οι απαιτούμενοι έλεγχοι κατάστασης αποτυγχάνουν.",
+        "unstableTitle": "Αποτυγχάνουν ορισμένοι έλεγχοι",
+        "unstableDetail": "Αποτυγχάνουν μη απαιτούμενοι έλεγχοι. Δεν θα μπλοκάρουν τη συγχώνευση.",
+        "draftTitle": "Πρόχειρο pull request",
+        "draftDetail": "Σημειώστε το pull request ως έτοιμο για αναθεώρηση πριν τη συγχώνευση.",
+        "behindTitle": "Ο κλάδος είναι ξεπερασμένος",
+        "behindDetailUpdatable": "Ενημερώστε τον κλάδο από το βασικό ή κάντε rebase πριν τη συγχώνευση.",
+        "behindDetail": "Ο κλάδος κεφαλής υστερεί σε σχέση με τον βασικό. Κάντε rebase ή ενημερώστε τον κλάδο πριν τη συγχώνευση.",
+        "notMergeableTitle": "Αυτό το pull request δεν μπορεί ακόμα να συγχωνευθεί",
+        "notMergeableDetail": "Το GitHub ανέφερε κατάσταση συγχώνευσης {{state}}."
+      },
+      "methodLabels": {
+        "merge": "Δημιουργία commit συγχώνευσης",
+        "squash": "Squash και συγχώνευση",
+        "rebase": "Rebase και συγχώνευση"
+      },
+      "methodDescriptions": {
+        "merge": "Συνδυάστε όλα τα commits από αυτόν τον κλάδο στον βασικό κλάδο με ένα commit συγχώνευσης.",
+        "squash": "Συνδυάστε όλα τα commits από αυτόν τον κλάδο σε ένα μόνο commit στον βασικό κλάδο.",
+        "rebase": "Αναπαραγάγετε όλα τα commits από αυτόν τον κλάδο στον βασικό κλάδο χωρίς commit συγχώνευσης."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "Νήμα συζήτησης {{anchorLabel}}",
@@ -288,8 +328,9 @@
       "resolved": "Επιλύθηκε",
       "outdated": "Ξεπερασμένο",
       "file": "Αρχείο",
-      "oneComment": "1 σχόλιο",
-      "commentCount": "{{count}} σχόλια",
+      "comment_one": "1 σχόλιο",
+      "comment": "{{displayCount}} σχόλια",
+      "comment_other": "{{displayCount}} σχόλια",
       "startedRelative": " · ξεκίνησε {{relative}}",
       "couldNotLoadMore": "Δεν ήταν δυνατή η φόρτωση περισσότερων σχολίων.",
       "retryLoadingMore": "Νέα προσπάθεια φόρτωσης περισσότερων σχολίων",
@@ -298,9 +339,10 @@
       "closeReactions": "Κλείσιμο αντιδράσεων",
       "reactionsTitle": "Αντιδράσεις",
       "addReaction": "Προσθήκη αντίδρασης",
-      "reactionPill": "{{emoji}} αντίδραση, {{count}} {{countLabel}}",
-      "reactionSingular": "αντίδραση",
-      "reactionPlural": "αντιδράσεις",
+      "reactionPill": "{{emoji}} αντίδραση, {{displayCount}} {{countLabel}}",
+      "reaction_one": "αντίδραση",
+      "reaction": "αντιδράσεις",
+      "reaction_other": "αντιδράσεις",
       "commentActions": "Ενέργειες σχολίου",
       "reportContent": "Αναφορά περιεχομένου",
       "reportUser": "Αναφορά χρήστη",
@@ -349,12 +391,30 @@
       "noDiscussionDescription": "Δεν υπάρχουν νήματα αναθεώρησης ή σχόλια συνομιλίας σε αυτό το pull request.",
       "reviewFiles": "Αρχεία αναθεώρησης",
       "quotedDiffSnippet": "Απόσπασμα diff σε εισαγωγικά",
-      "moreLinesAbove": "… {{count}} επιπλέον γραμμές παραπάνω",
+      "moreLinesAbove": "… {{displayCount}} επιπλέον γραμμές παραπάνω",
       "termsAcceptRequired": "Πρέπει να αποδεχτείτε τους Όρους χρήσης για να δημοσιεύσετε.",
       "termsOutdatedCopy": "Οι Όροι χρήσης άλλαξαν. Ανοίξτε ξανά αυτή την οθόνη για να αποδεχτείτε την τελευταία έκδοση.",
-      "termsCheckRetryCopy": "Δεν ήταν δυνατός ο έλεγχος των Όρων χρήσης. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά."
+      "termsCheckRetryCopy": "Δεν ήταν δυνατός ο έλεγχος των Όρων χρήσης. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",
+      "reactions": {
+        "thumbsUp": "Μου αρέσει",
+        "thumbsDown": "Δεν μου αρέσει",
+        "laugh": "Γέλιο",
+        "hooray": "Ζήτω",
+        "confused": "Μπερδεμένος",
+        "heart": "Καρδιά",
+        "rocket": "Πύραυλος",
+        "eyes": "Μάτια"
+      },
+      "anchor": {
+        "fileCommentOnPath": "Σχόλιο αρχείου στο {{path}}",
+        "fileComment": "Σχόλιο αρχείου",
+        "outdatedOnPathLines": "Ξεπερασμένο στο {{path}} {{lines}}",
+        "outdatedOnLines": "Ξεπερασμένο στις {{lines}}",
+        "outdatedOnPath": "Ξεπερασμένο στο {{path}}"
+      },
+      "deletedUser": "διαγραμμένος χρήστης"
     },
-    "couldNotOpenGitHubAppSettings": "Δεν ήταν δυνατό το άνοιγμα των ρυθμίσεων GitHub App",
+    "couldNotOpenGitHubAppSettings": "Δεν ήταν δυνατό το άνοιγμα των ρυθμίσεων της εφαρμογής GitHub",
     "installKiloGitHubApp": "Εγκατάσταση του Kilo GitHub App",
     "connectionExpiredTitle": "Η σύνδεση GitHub έληξε",
     "connectionExpiredDescription": "Η σύνδεσή σας στο GitHub δεν ισχύει πλέον. Ελέγξτε ξανά τη σύνδεσή σας — θα σας ζητηθεί επανασύνδεση αν χρειαστεί.",
@@ -380,7 +440,7 @@
       "clearLink": "Εκκαθάριση συνδέσμου pull request",
       "pasteLink": "Επικόλληση συνδέσμου pull request",
       "open": "Άνοιγμα",
-      "openPullRequest": "Άνοιγμα pull request"
+      "openPullRequest": "Άνοιγμα αιτήματος έλξης"
     },
     "checks": {
       "title": "Έλεγχοι",
@@ -391,13 +451,13 @@
       "retryChecks": "Νέα προσπάθεια ελέγχων",
       "viewOnGitHub": "Προβολή PR στο GitHub",
       "noChecksReported": "Δεν αναφέρθηκαν έλεγχοι",
-      "passed": "{{count}} πέρασαν",
-      "failed": "{{count}} απέτυχαν",
-      "pending": "{{count}} σε εκκρεμότητα",
-      "skipped": "{{count}} παραλείφθηκαν",
-      "checksCount": "{{count}} έλεγχοι",
+      "passed": "{{displayCount}} πέρασαν",
+      "failed": "{{displayCount}} απέτυχαν",
+      "pending": "{{displayCount}} σε εκκρεμότητα",
+      "skipped": "{{displayCount}} παραλείφθηκαν",
+      "checksCount": "{{displayCount}} έλεγχοι",
       "checkDetails": "λεπτομέρειες ελέγχου",
-      "pullRequest": "pull request"
+      "pullRequest": "αίτημα έλξης"
     },
     "inbox": {
       "title": "Εισερχόμενα",
@@ -408,7 +468,7 @@
       "noReviewRequestsDescription": "Τα pull requests που περιμένουν την αναθεώρησή σας εμφανίζονται εδώ. Μπορείτε ακόμα να επικολλήσετε οποιονδήποτε σύνδεσμο PR παραπάνω.",
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των εισερχομένων",
       "couldNotLoadMore": "Δεν ήταν δυνατή η φόρτωση περισσότερων",
-      "retryLoadingMore": "Νέα προσπάθεια φόρτωσης περισσότερων"
+      "retryLoadingMore": "Επανάληψη φόρτωσης περισσότερων"
     },
     "composer": {
       "commentBodyPlaceholder": "Αφήστε ένα σχόλιο",
@@ -437,7 +497,7 @@
       "checkFailedTitle": "Δεν ήταν δυνατός ο έλεγχος της σύνδεσης GitHub",
       "checkFailedMessage": "Η κατάσταση σύνδεσης δεν είναι διαθέσιμη μέχρι να ολοκληρωθεί αυτό.",
       "reconnectTitle": "Επανασύνδεση GitHub",
-      "title": "Σύνδεση GitHub",
+      "title": "Σύνδεση στο GitHub",
       "reconnectDescription": "Η σύνδεσή σας στο GitHub ανακλήθηκε. Συνδεθείτε ξανά για να συνεχίσετε την αναθεώρηση pull requests στο κινητό.",
       "description": "Συνδέστε τον λογαριασμό σας GitHub για να αναθεωρείτε pull requests στο κινητό."
     },
@@ -452,11 +512,14 @@
       "deletePendingMessage": "Αυτό το σχόλιο θα αφαιρεθεί από την ουρά αναθεώρησης.",
       "delete": "Διαγραφή",
       "summaryOptional": "Σύνοψη (προαιρετική)",
-      "pendingCommentSingular": "εκκρεμές σχόλιο",
-      "pendingCommentPlural": "εκκρεμή σχόλια",
-      "submitCountOfTotal": "Υποβολή {{freshCount}} από {{totalCount}} σχόλια",
+      "pendingComment_one": "εκκρεμές σχόλιο",
+      "pendingComment": "εκκρεμή σχόλια",
+      "pendingComment_other": "εκκρεμή σχόλια",
+      "submitCountOfTotal": "Υποβολή {{displayFreshCount}} από {{displayTotalCount}} σχόλια",
       "submitReview": "Υποβολή αναθεώρησης",
-      "partialPostedMessage": "Δημοσιεύτηκαν {{freshCount}} σχόλιο(α). {{staleCount}} σχόλιο(α) αναφέρονται σε παλαιότερο commit και παρέμειναν στην ουρά σας."
+      "partialPostedMessage": "Δημοσιεύτηκαν {{displayFreshCount}} σχόλιο(α). {{displayStaleCount}} σχόλιο(α) αναφέρονται σε παλαιότερο commit και παρέμειναν στην ουρά σας.",
+      "blockedRequestChanges": "Προσθέστε μια σύνοψη ή τουλάχιστον ένα σχόλιο για να ζητήσετε αλλαγές.",
+      "blockedComment": "Προσθέστε μια σύνοψη ή τουλάχιστον ένα σχόλιο για να δημοσιεύσετε μια αναθεώρηση με σχόλιο."
     },
     "reconnectNotice": {
       "title": "Η σύνδεση GitHub έληξε",
@@ -478,10 +541,12 @@
       "stateOpenReviewRequired": "Ανοιχτό · Απαιτείται αναθεώρηση",
       "stateOpen": "Ανοιχτό",
       "unknownAuthor": "Άγνωστος συγγραφέας",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "αρχείο",
-      "filePlural": "αρχεία"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "αρχείο",
+      "file": "αρχεία",
+      "file_other": "αρχεία"
     },
     "pendingComment": {
       "editOutdatedA11y": "Επεξεργασία ξεπερασμένου εκκρεμούς σχολίου στο {{location}}",
@@ -512,10 +577,36 @@
     },
     "diff": {
       "selectedTapToChange": "Επιλεγμένο {{label}}, πατήστε για αλλαγή επιλογής",
-      "tapToComment": "{{label}}, πατήστε για σχόλιο"
+      "tapToComment": "{{label}}, πατήστε για σχόλιο",
+      "truncationBanner": "Εμφάνιση των πρώτων {{limit}} από {{total}} αλλαγμένα αρχεία — όριο API του GitHub",
+      "statusAdded": "Προστέθηκε",
+      "statusContext": "Πλαίσιο",
+      "statusDeleted": "Διαγράφηκε",
+      "lineLabel": "{{status}} γραμμή {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(κενό)"
     },
     "linkPasteClipboardEmpty": "Το πρόχειρο είναι άδειο",
-    "linkPasteNotAPullRequest": "Δεν είναι σύνδεσμος pull request του GitHub"
+    "linkPasteNotAPullRequest": "Δεν είναι σύνδεσμος pull request του GitHub",
+    "announce": {
+      "commentPosted": "Δημοσιεύτηκε το σχόλιο",
+      "reviewSubmitted": "Υποβλήθηκε η αναθεώρηση",
+      "autoMergeEnabled": "Η αυτόματη συγχώνευση ενεργοποιήθηκε"
+    },
+    "mutationError": {
+      "commentNotPosted": "Αυτό το σχόλιο δεν μπορεί να δημοσιευτεί. Η επιλεγμένη γραμμή μπορεί να έχει αλλάξει ή το PR μπορεί να έχει ενημερωθεί.",
+      "reviewNotSubmitted": "Αυτή η αναθεώρηση δεν μπορεί να υποβληθεί ως έχει. Το PR μπορεί να έχει αλλάξει ή δεν μπορείτε να αναθεωρήσετε το δικό σας pull request.",
+      "couldNotPostComment": "Δεν ήταν δυνατή η δημοσίευση του σχολίου.",
+      "couldNotSubmitReview": "Δεν ήταν δυνατή η υποβολή της αναθεώρησης. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά."
+    },
+    "operation": {
+      "couldNotReply": "Δεν ήταν δυνατή η απάντηση.",
+      "couldNotCompleteAction": "Δεν ήταν δυνατή η ολοκλήρωση αυτής της ενέργειας.",
+      "mergeResultDefaultError": "Το GitHub δεν ολοκλήρωσε τη συγχώνευση.",
+      "ambiguous": "Δεν ήταν δυνατή η επιβεβαίωση — ελέγξτε το PR πριν δοκιμάσετε ξανά.",
+      "persistenceFailed": "Δεν ήταν δυνατή η καταγραφή αυτής της ενέργειας. Δοκιμάστε ξανά αργότερα.",
+      "forbidden": "Απαγορεύεται"
+    }
   },
   "notifications": {
     "title": "Ειδοποιήσεις",
@@ -573,7 +664,8 @@
     "agents": "Πράκτορες",
     "profile": "Προφίλ",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, καρτέλα, {{position}} από {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -583,7 +675,7 @@
       "noInstancesDescription": "Ρυθμίστε μια παρουσία για να ξεκινήσετε τη συνομιλία.",
       "setUpKiloclaw": "Ρύθμιση KiloClaw",
       "currentInstance": "{{title}}, τρέχουσα",
-      "personal": "Προσωπικό"
+      "personal": "Προσωπικά"
     },
     "conversation": {
       "failedToLoad": "Δεν ήταν δυνατή η φόρτωση της συνομιλίας",
@@ -614,7 +706,7 @@
       "recent": "Πρόσφατα",
       "common": "Κοινά",
       "reactWith": "Αντίδραση με {{reaction}}",
-      "accessibility": "{{emoji}} αντίδραση, {{count}}"
+      "accessibility": "{{emoji}} αντίδραση, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "Απάντηση σε",
@@ -643,11 +735,21 @@
       "imageUnavailable": "Η εικόνα δεν είναι διαθέσιμη",
       "openFailed": "Δεν ήταν δυνατό το άνοιγμα του συνημμένου. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",
       "attachFailed": "Δεν ήταν δυνατή η επισύναψη του αρχείου",
-      "limit": "Μπορείτε να επισυνάψετε έως και {{count}} αρχεία.",
+      "limit": "Μπορείτε να επισυνάψετε έως και {{displayCount}} αρχεία.",
       "sizeRejection": "Το {{filename}} υπερβαίνει το όριο επισύναψης {{limit}}.",
       "unreadable": "Δεν ήταν δυνατή η ανάγνωση του {{filename}}.",
       "pastedImage": "η επικολλημένη εικόνα",
-      "defaultName": "Συνημμένο"
+      "defaultName": "Συνημμένο",
+      "classificationDenied": "Δεν είναι δυνατή η επισύναψη εκτελέσιμων αρχείων",
+      "classificationEmpty": "Το αρχείο είναι κενό",
+      "classificationTooLarge": "Τα αρχεία πρέπει να είναι 20 MB ή μικρότερα",
+      "classificationUnreadable": "Δεν ήταν δυνατή η ανάγνωση αυτού του αρχείου",
+      "announceUploaded": "Το συνημμένο μεταφορτώθηκε",
+      "cantUpload": "Αυτό το αρχείο δεν μπορεί να μεταφορτωθεί.",
+      "networkError": "Σφάλμα δικτύου",
+      "uploadFailed": "Η μεταφόρτωση απέτυχε",
+      "failedToUploadFile": "Δεν ήταν δυνατή η μεταφόρτωση του αρχείου: {{reason}}",
+      "nothingToPaste": "Δεν υπάρχει τίποτα για επικόλληση"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -661,7 +763,9 @@
       "moreActions": "Περισσότερες ενέργειες",
       "message": "Μήνυμα",
       "notDelivered": "Δεν παραδόθηκε",
-      "edited": "(επεξεργάστηκε)"
+      "edited": "(επεξεργάστηκε)",
+      "image": "Εικόνα",
+      "attachment": "Συνημμένο"
     },
     "messageActions": {
       "copied": "Αντιγράφηκε",
@@ -691,8 +795,9 @@
     },
     "typingIndicator": {
       "someone": "Κάποιος",
-      "oneTyping": "Ο/Η {{name}} πληκτρολογεί...",
-      "manyTyping": "Οι {{names}} πληκτρολογούν..."
+      "typing_one": "Ο/Η {{name}} πληκτρολογεί...",
+      "typing": "Οι {{names}} πληκτρολογούν...",
+      "typing_other": "Οι {{names}} πληκτρολογούν..."
     },
     "botStatus": {
       "online": "Σε σύνδεση",
@@ -702,6 +807,12 @@
       "loadingUser": "Φόρτωση χρήστη...",
       "waitingForStatus": "Αναμονή για κατάσταση bot...",
       "offlineMessage": "Το bot είναι εκτός σύνδεσης. Τα μηνύματα θα συνεχιστούν όταν επανασυνδεθεί."
+    },
+    "errors": {
+      "notAllowed": "Δεν επιτρέπεται",
+      "messageTooLong": "Το μήνυμα είναι πολύ μακρύ — κρατήστε το κάτω από {{limit}} χαρακτήρες",
+      "titleTooLong": "Ο τίτλος είναι πολύ μακρύς — κρατήστε τον κάτω από {{limit}} χαρακτήρες",
+      "messageEmpty": "Το μήνυμα δεν μπορεί να είναι κενό"
     }
   },
   "kiloclaw": {
@@ -710,10 +821,11 @@
     "billing": {
       "title": "Χρέωση",
       "continueMonthToMonth": "Συνέχεια μήνα με μήνα",
-      "plan": "Πλάνο",
+      "plan": "Σχέδιο",
       "finalTermEnds": "Η τελική περίοδος λήγει",
       "afterFinalTerm": "Μετά την τελική περίοδο",
       "remaining": "Υπόλοιπο",
+      "lessThanOneDay": "Λιγότερο από 1 ημέρα",
       "ends": "Λήγει",
       "expires": "Λήγει",
       "noActivePlan": "Κανένα ενεργό πλάνο",
@@ -722,23 +834,25 @@
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των πληροφοριών χρέωσης",
       "manageOnWeb": "Διαχείριση χρέωσης στον ιστό",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} ημέρες απομένουν",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Η τελική σας περίοδος Commit λήγει στις {{date}}. Συνεχίστε ως Standard στα {{price}}, διαφορετικά λήγει η φιλοξενία.",
       "freeTrial": "Δωρεάν δοκιμή",
       "hostingEnds": "Η φιλοξενία λήγει",
-      "oneDayLeft": "1 ημέρα απομένει",
       "renews": "Ανανεώνεται",
       "standardMonthToMonth": "Standard μήνα με μήνα",
       "standardStartsOn": "Το Standard ξεκινά στις {{date}} στα {{price}}.",
       "yourStandardMonthlyPrice": "η μηνιαία σας τιμή Standard",
       "perMonth": "/μήνα",
       "earlybirdAccessUntil": "Πρόσβαση Earlybird έως {{date}}",
-      "earlybirdEnding": "Η Earlybird λήγει: {{days}} ημέρες απομένουν",
+      "earlybirdEnding": "Η Earlybird λήγει: {{remaining}}",
       "paymentPastDue": "Εκπρόθεσμη πληρωμή. Ενημερώστε τη μέθοδο πληρωμής σας.",
       "subscriptionCancels": "Η συνδρομή ακυρώνεται στις {{date}}",
-      "trialDaysRemaining": "Δοκιμή: {{days}} ημέρες απομένουν",
-      "trialEndingSoon": "Η δοκιμή λήγει σύντομα: {{days}}"
+      "trialDaysRemaining": "Δοκιμή: {{remaining}} απομένουν",
+      "trialEndingSoon": "Η δοκιμή λήγει σύντομα: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "Τι νέο υπάρχει",
@@ -891,7 +1005,7 @@
       "start": "Εκκίνηση",
       "startMessage": "Είστε σίγουροι ότι θέλετε να ξεκινήσετε αυτό το instance;",
       "startTitle": "Εκκίνηση instance",
-      "starting": "Εκκίνηση...",
+      "starting": "Έναρξη…",
       "stop": "Διακοπή",
       "stopMessage": "Είστε σίγουροι ότι θέλετε να σταματήσετε αυτό το instance;",
       "stopTitle": "Διακοπή instance",
@@ -901,7 +1015,7 @@
       "finishingSetup": "Ολοκλήρωση ρύθμισης",
       "finishingSetupDescription": "Μια στιγμή, ολοκληρώνουμε τον λογαριασμό σας. Αυτό συνήθως διαρκεί λίγο.",
       "getStarted": "Ξεκινήστε",
-      "noInstances": "Κανένα KiloClaw instance",
+      "noInstances": "Δεν υπάρχουν παρουσίες KiloClaw",
       "noInstancesDescription": "Δημιουργήστε το πρώτο σας instance για να ξεκινήσετε την εκτέλεση coding agents."
     },
     "instance": {
@@ -990,7 +1104,7 @@
         "stalledTitle": "Κάτι κόλλησε",
         "stalledBody": "Δεν μπορέσαμε να ολοκληρώσουμε τη ρύθμιση του/της {{name}}. Δοκιμάστε ξανά ή στείλτε email στο hi@kilo.ai αν αυτό συνεχίζεται.",
         "timeoutTitle": "Διαρκεί περισσότερο από το αναμενόμενο",
-        "timeoutBody": "Η ρύθμιση του/της {{name}} διαρκεί περισσότερο από το συνηθισμένο (πάνω από {{minutes}} λεπτά).",
+        "timeoutBody": "Η ρύθμιση του/της {{name}} διαρκεί περισσότερο από το συνηθισμένο (πάνω από {{displayMinutes}} λεπτά).",
         "continueInBackground": "Συνέχεια στο παρασκήνιο",
         "settingUp": "Ρύθμιση του/της {{name}}",
         "finishingSetup": "Ολοκλήρωση ρύθμισης",
@@ -1015,12 +1129,13 @@
       "destroying": "ΚΑΤΑΣΤΡΟΦΗ",
       "provisioned": "ΠΑΡΕΧΕΤΑΙ",
       "restarting": "ΕΠΑΝΕΚΚΙΝΗΣΗ",
-      "running": "ΕΚΤΕΛΕΙΤΑΙ",
+      "running": "Σε εξέλιξη",
       "shuttingDown": "ΤΕΡΜΑΤΙΣΜΟΣ",
-      "starting": "ΕΚΚΙΝΗΣΗ",
+      "starting": "Έναρξη",
       "stopped": "ΣΤΑΜΑΤΗΜΕΝΟ",
       "stopping": "ΔΙΑΚΟΠΗ",
-      "unknown": "ΑΓΝΩΣΤΟ"
+      "unknown": "Άγνωστο",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1060,8 +1175,9 @@
     },
     "instanceCard": {
       "needsAttention": "Ο/Η {{name}} χρειάζεται προσοχή: {{label}}",
-      "openUnreadOne": "Άνοιγμα {{name}}, {{count}} μη αναγνωσμένο μήνυμα",
-      "openUnreadMany": "Άνοιγμα {{name}}, {{count}} μη αναγνωσμένα μηνύματα",
+      "openUnread_one": "Άνοιγμα {{name}}, {{displayCount}} μη αναγνωσμένο μήνυμα",
+      "openUnread": "Άνοιγμα {{name}}, {{displayCount}} μη αναγνωσμένα μηνύματα",
+      "openUnread_other": "Άνοιγμα {{name}}, {{displayCount}} μη αναγνωσμένα μηνύματα",
       "open": "Άνοιγμα {{name}}",
       "openSettings": "Άνοιγμα ρυθμίσεων για {{name}}",
       "fixOnKiloAi": "Διόρθωση στο kilo.ai: {{label}}"
@@ -1103,7 +1219,9 @@
       "sparkles": "Λάμψεις",
       "strongArm": "Δυνατό χέρι",
       "talisman": "Φυλαχτό"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "Αυτό το instance δεν μπορεί να λάβει αρχεία.",
+    "instanceSwitcherTitle": "Παρουσία KiloClaw"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1123,12 +1241,12 @@
       "placeholder": "π.χ. Επιβάλετε τις συμβάσεις διαχείρισης σφαλμάτων..."
     },
     "repos": {
-      "title": "Repositories",
-      "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των repositories",
+      "title": "Αποθετήρια",
+      "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των αποθετηρίων",
       "unavailable": "Τα repositories δεν είναι διαθέσιμα — ολοκληρώστε τη ρύθμιση του Bitbucket στο kilo.ai.",
       "finishSetup": "Ολοκλήρωση ρύθμισης",
       "manageAccess": "Διαχείριση πρόσβασης",
-      "allRepositories": "Όλα τα repositories",
+      "allRepositories": "Όλα τα αποθετήρια",
       "bitbucketNoRepositoriesDescription": "Δεν υπάρχουν διαθέσιμα repositories σε αυτόν τον χώρο εργασίας Bitbucket.",
       "bitbucketSetup": "Ρύθμιση Bitbucket",
       "couldNotOpenGithubSettings": "Δεν ήταν δυνατό το άνοιγμα των ρυθμίσεων της εφαρμογής GitHub",
@@ -1137,7 +1255,7 @@
       "installGithubAppDescription": "Παραχωρήστε στην εφαρμογή Kilo GitHub πρόσβαση στα repositories που θέλετε να αναθεωρηθούν.",
       "noRepositoriesFound": "Δεν βρέθηκαν repositories",
       "repositoryAccess": "πρόσβαση repository",
-      "selectedRepositories": "Επιλεγμένα repositories"
+      "selectedRepositories": "Επιλεγμένα αποθετήρια"
     },
     "style": {
       "title": "Στυλ αναθεώρησης",
@@ -1146,7 +1264,7 @@
       "roast": "Σκληρά ειλικρινές, με διασκέδαση",
       "strict": "Επισημάνετε τα πάντα, κρατήστε υψηλό επίπεδο"
     },
-    "title": "Code Reviewer",
+    "title": "Αναθεωρητής κώδικα",
     "reviewDetail": {
       "title": "Αναθεώρηση",
       "cancelTitle": "Ακύρωση αναθεώρησης;",
@@ -1170,9 +1288,9 @@
       "started": "Ξεκίνησε",
       "completed": "Ολοκληρώθηκε",
       "cost": "Κόστος",
-      "tokens": "Tokens",
+      "tokens": "διακριτικά",
       "tokensInOut": "{{input}} εισερχόμενα / {{output}} εξερχόμενα",
-      "openPullRequest": "Άνοιγμα pull request",
+      "openPullRequest": "Άνοιγμα αιτήματος έλξης",
       "council": "Συμβούλιο",
       "decision": "Απόφαση",
       "gate": "Πύλη",
@@ -1181,7 +1299,7 @@
       "checkRun": "Εκτέλεση ελέγχου",
       "status": "Κατάσταση",
       "threshold": "Κατώφλι",
-      "pullRequest": "pull request"
+      "pullRequest": "αίτημα έλξης"
     },
     "reviewMemory": {
       "title": "Μνήμη αναθεώρησης",
@@ -1205,7 +1323,7 @@
       "couldNotLoadProviders": "Δεν μπορέσαμε να φορτώσουμε τους συνδεδεμένους παρόχους σας. Δοκιμάστε ξανά.",
       "connectProvider": "Σύνδεση παρόχου",
       "connectProviderDescription": "Συνδέστε το GitHub για να ξεκινήσετε μια χειροκίνητη αναθεώρηση ενός pull request.",
-      "connectGitHub": "Σύνδεση GitHub",
+      "connectGitHub": "Σύνδεση στο GitHub",
       "platform": "Πλατφόρμα",
       "notConnected": "Δεν είναι συνδεδεμένο",
       "pullRequestUrl": "URL pull request",
@@ -1220,7 +1338,7 @@
     "webhookSetupDescription": "Ορισμένα repositories ενδέχεται να μην λαμβάνουν αυτόματες αναθεωρήσεις.",
     "autoReviews": "Αυτόματες αναθεωρήσεις",
     "selectRepository": "Επιλέξτε τουλάχιστον ένα repository για να ενεργοποιήσετε τις αυτόματες αναθεωρήσεις.",
-    "selectRepositories": "Επιλογή repositories",
+    "selectRepositories": "Επιλογή αποθετηρίων",
     "followReviewMd": "Ακολουθήστε το REVIEW.md",
     "followReviewMdSubtitle": "Σεβαστείτε τα αρχεία οδηγιών REVIEW.md ανά repository",
     "readOnlyDescription": "Μόνο οι ιδιοκτήτες οργανισμού και οι διαχειριστές χρέωσης μπορούν να αλλάξουν αυτές τις ρυθμίσεις.",
@@ -1241,7 +1359,7 @@
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των οργανισμών",
       "personalStillAvailable": "Τα προσωπικά repositories εξακολουθούν να είναι διαθέσιμα παρακάτω.",
       "personal": "Προσωπικά",
-      "personalSubtitle": "Τα δικά σας repositories",
+      "personalSubtitle": "Τα δικά σας αποθετήρια",
       "viewOnly": "Μόνο προβολή"
     },
     "reviewList": {
@@ -1263,7 +1381,7 @@
     },
     "providerConnect": {
       "githubApp": "Εφαρμογή GitHub",
-      "connectGitHub": "Σύνδεση GitHub",
+      "connectGitHub": "Σύνδεση στο GitHub",
       "githubError": "Δεν ήταν δυνατό το άνοιγμα της ρύθμισης GitHub. Δοκιμάστε ξανά.",
       "gitlabAccount": "Λογαριασμός GitLab",
       "connectGitLab": "Σύνδεση GitLab",
@@ -1278,9 +1396,9 @@
       "set": "Ορισμός",
       "model": "Μοντέλο",
       "mergeGate": "Πύλη συγχώνευσης",
-      "repositories": "Repositories",
-      "allRepositories": "Όλα τα repositories",
-      "nSelected": "{{count}} επιλεγμένα",
+      "repositories": "Αποθετήρια",
+      "allRepositories": "Όλα τα αποθετήρια",
+      "nSelected": "{{displayCount}} επιλεγμένα",
       "reviewMemory": "Μνήμη αναθεώρησης",
       "proposedReviewMdGuidance": "Προτεινόμενη οδηγία REVIEW.md"
     },
@@ -1290,7 +1408,71 @@
       "noDecision": "Καμία απόφαση",
       "noResult": "Κανένα αποτέλεσμα"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "Αναθεωρητής κώδικα",
+    "updateFailed": "Δεν ήταν δυνατή η ενημέρωση του αναθεωρητή",
+    "configSaveFailed": "Δεν ήταν δυνατή η αποθήκευση των ρυθμίσεων αναθεώρησης",
+    "status": {
+      "pending": "Σε εκκρεμότητα",
+      "queued": "Σε αναμονή",
+      "running": "Σε εξέλιξη",
+      "completed": "Ολοκληρώθηκε",
+      "failed": "Απέτυχε",
+      "cancelled": "Ακυρώθηκε",
+      "interrupted": "Διακόπηκε"
+    },
+    "reviewStyle": {
+      "strict": "Αυστηρή",
+      "balanced": "Ισορροπημένη",
+      "lenient": "Επιεικής",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "Ασφάλεια",
+      "performance": "Απόδοση",
+      "bugs": "Σφάλματα",
+      "style": "Στυλ",
+      "testing": "Δοκιμές",
+      "documentation": "Τεκμηρίωση"
+    },
+    "gateThreshold": {
+      "off": "Απενεργοποιημένο",
+      "all": "Όλα",
+      "warning": "Προειδοποίηση",
+      "critical": "Κρίσιμο"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Ο Code Reviewer χρειάζεται προσοχή",
+        "description": "Ο Code Reviewer απενεργοποιήθηκε επειδή το Kilo δεν μπορεί να αποκτήσει πρόσβαση σε αυτό το repository με ενεργή εγκατάσταση της εφαρμογής GitHub. Ενημερώστε την εγκατάσταση της εφαρμογής GitHub και ενεργοποιήστε ξανά τον Code Reviewer.",
+        "recoveryLabel": "Ενημέρωση εφαρμογής GitHub"
+      },
+      "githubIpAllowList": {
+        "title": "Ο Code Reviewer χρειάζεται προσοχή",
+        "description": "Ο Code Reviewer απενεργοποιήθηκε επειδή αυτός ο οργανισμός GitHub χρησιμοποιεί λίστα επιτρεπόμενων διευθύνσεων IP που αποκλείει το Kilo. Επικοινωνήστε με το hi@kilocode.ai για βοήθεια και ενεργοποιήστε ξανά τον Code Reviewer.",
+        "recoveryLabel": "Επικοινωνία με την υποστήριξη"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Ο Code Reviewer χρειάζεται προσοχή",
+        "description": "Ο Code Reviewer απενεργοποιήθηκε επειδή το Kilo δεν μπορεί να δημιουργήσει GitLab Project Access Token για αυτό το έργο. Παραχωρήστε πρόσβαση Maintainer ή ενεργοποιήστε τα Project Access Tokens και ενεργοποιήστε ξανά τον Code Reviewer.",
+        "recoveryLabel": "Ενημέρωση ενσωμάτωσης GitLab"
+      },
+      "byokInvalidKey": {
+        "title": "Ο Code Reviewer χρειάζεται προσοχή",
+        "description": "Ο Code Reviewer απενεργοποιήθηκε επειδή το επιλεγμένο κλειδί API BYOK είναι μη έγκυρο, έχει ανακληθεί ή δεν διαθέτει άδεια. Ενημερώστε το κλειδί ή επιλέξτε άλλο μοντέλο και ενεργοποιήστε ξανά τον Code Reviewer.",
+        "recoveryLabel": "Ενημέρωση ρυθμίσεων BYOK"
+      },
+      "selectedModelUnavailable": {
+        "title": "Ο Code Reviewer χρειάζεται προσοχή",
+        "description": "Ο Code Reviewer απενεργοποιήθηκε επειδή το επιλεγμένο μοντέλο δεν είναι διαθέσιμο για συνεδρίες cloud agent. Επιλέξτε ένα διαθέσιμο μοντέλο και ενεργοποιήστε ξανά τον Code Reviewer.",
+        "recoveryLabel": "Ενημέρωση ρυθμίσεων Code Reviewer"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Ο Code Reviewer χρειάζεται προσοχή",
+        "description": "Ο Code Reviewer απενεργοποιήθηκε μετά από τρεις λήξεις χρόνου κλωνοποίησης αποθετηρίου σήμερα. Επικοινωνήστε με το hi@kilocode.ai για βοήθεια και ενεργοποιήστε ξανά τον Code Reviewer.",
+        "recoveryLabel": "Επικοινωνία με την υποστήριξη"
+      }
+    },
+    "unknownError": "Άγνωστο σφάλμα"
   },
   "securityAgent": {
     "filter": {
@@ -1298,19 +1480,19 @@
       "noFiltersDescription": "Επιστρέψτε και ανοίξτε ξανά τα φίλτρα από τη λίστα ευρημάτων.",
       "title": "Φίλτρο ευρημάτων",
       "reset": "Επαναφορά",
-      "repository": "Repository",
+      "repository": "Αποθετήριο",
       "status": "Κατάσταση",
       "severity": "Σοβαρότητα",
       "outcome": "Έκβαση",
       "slaStatus": "Κατάσταση SLA",
       "sortBy": "Ταξινόμηση κατά",
-      "allRepositories": "Όλα τα repositories",
+      "allRepositories": "Όλα τα αποθετήρια",
       "all": "Όλα",
       "statusOpen": "Ανοιχτό",
       "fixed": "Διορθώθηκε",
       "statusIgnored": "Αγνοήθηκε",
       "statusClosed": "Κλειστό",
-      "severityCritical": "Κρίσιμο",
+      "severityCritical": "Κρίσιμη",
       "severityHigh": "Υψηλή",
       "severityMedium": "Μεσαία",
       "severityLow": "Χαμηλή",
@@ -1329,7 +1511,7 @@
       "overdueOnly": "Μόνο εκπρόθεσμα"
     },
     "automation": {
-      "title": "Αυτοματισμός",
+      "title": "Αυτοματοποίηση",
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των ρυθμίσεων αυτοματισμού",
       "autoAnalysis": "Αυτόματη ανάλυση",
       "autoRemediation": "Αυτόματη αποκατάσταση",
@@ -1351,8 +1533,9 @@
       "enableAutoRemediationConfirmTitle": "Ενεργοποίηση αυτόματης αποκατάστασης;",
       "enableAutoRemediationConfirmMessage": "Ο Security Agent θα ανοίγει αυτόματα PR αποκατάστασης για επιλέξιμα εκμεταλλεύσιμα ευρήματα.",
       "enable": "Ενεργοποίηση",
-      "queuedOne": "{{count}} υπάρχον εύρημα σε αναμονή για ανάλυση.",
-      "queuedMany": "{{count}} υπάρχοντα ευρήματα σε αναμονή για ανάλυση.",
+      "queued_one": "{{displayCount}} υπάρχον εύρημα σε αναμονή για ανάλυση.",
+      "queued": "{{displayCount}} υπάρχοντα ευρήματα σε αναμονή για ανάλυση.",
+      "queued_other": "{{displayCount}} υπάρχοντα ευρήματα σε αναμονή για ανάλυση.",
       "severityCriticalOnly": "Μόνο κρίσιμα",
       "severityHighAndAbove": "Υψηλά και άνω",
       "severityMediumAndAbove": "Μεσαία και άνω",
@@ -1377,20 +1560,20 @@
       "triageConfidence": "Βεβαιότητα διαλογής",
       "suggestedAction": "Προτεινόμενη ενέργεια",
       "triageReasoning": "Σκεπτικό διαλογής",
-      "exploitable": "Αξιοποιήσιμο",
+      "exploitable": "Εκμεταλλεύσιμο",
       "model": "Μοντέλο",
       "notRecorded": "Δεν καταγράφηκε",
       "analyzed": "Αναλύθηκε",
       "exploitabilityReasoning": "Σκεπτικό αξιοποίησης",
       "suggestedFix": "Προτεινόμενη διόρθωση",
-      "whereFound": "Πού βρέθηκε αυτό ({{count}})",
+      "whereFound": "Πού βρέθηκε αυτό ({{displayCount}})",
       "fullReport": "Πλήρης αναφορά που δημιουργήθηκε",
       "unknown": "Άγνωστο",
       "yes": "Ναι",
       "no": "Όχι"
     },
     "dashboard": {
-      "findingsCount": "{{count}} ευρήματα",
+      "findingsCount": "{{displayCount}} ευρήματα",
       "notMeasured": "Δεν μετρήθηκε",
       "actFirst": "Δράστε πρώτα",
       "slaPosture": "Στάση SLA",
@@ -1399,7 +1582,7 @@
       "repositoryActionPlan": "Σχέδιο δράσης αποθετηρίου",
       "noOpenFindings": "Κανένα ανοιχτό εύρημα δεν χρήζει προσοχής",
       "deadlineToday": "Η προθεσμία έφτασε σήμερα",
-      "daysOverdue": "{{count}} ημέρες εκπρόθεσμο",
+      "daysOverdue": "{{displayCount}} ημέρες εκπρόθεσμο",
       "withinDeadline": "Εντός προθεσμίας",
       "criticalOverdue": "Κρίσιμο εκπρόθεσμο",
       "highOverdue": "Υψηλό εκπρόθεσμο",
@@ -1408,7 +1591,7 @@
       "needsEvidenceReview": "Χρήζει ελέγχου αποδεικτικών στοιχείων",
       "analysisNotComplete": "Ανάλυση μη ολοκληρωμένη",
       "noImmediateAction": "Καμία άμεση ενέργεια",
-      "notExploitable": "Μη αξιοποιήσιμο",
+      "notExploitable": "Μη εκμεταλλεύσιμο",
       "needsYourReview": "Χρήζει της αναθεώρησής σας",
       "noSlaDeadline": "Δεν έχει εκχωρηθεί προθεσμία SLA",
       "noRepositoryData": "Δεν υπάρχουν ακόμα δεδομένα αποθετηρίου",
@@ -1426,6 +1609,27 @@
       "syncNow": "Συγχρονισμός τώρα",
       "syncQueued": "Συγχρονισμός σε αναμονή",
       "syncStatusUnavailable": "Η κατάσταση συγχρονισμού δεν είναι διαθέσιμη"
+    },
+    "dashboardMetrics": {
+      "openFindings": "Ανοιχτά ευρήματα",
+      "openFindingsDetail": "{{critical}} κρίσιμα, {{high}} υψηλά",
+      "confirmedExploitable": "Επιβεβαιωμένα αξιοποιήσιμο",
+      "confirmedExploitableDetail": "Ο κίνδυνος του έργου επιβεβαιώθηκε μέσω ανάλυσης",
+      "needsReview": "Χρήζει της αναθεώρησής σας",
+      "needsReviewDetail": "Απαιτείται ανθρώπινη απόφαση",
+      "analysisIncomplete": "Ανάλυση μη ολοκληρωμένη",
+      "analysisIncompleteDetail": "Ο κίνδυνος του έργου είναι ακόμη άγνωστος",
+      "slaCompliance": "Συμμόρφωση SLA",
+      "notMeasured": "Δεν μετρήθηκε",
+      "withinDeadlineDetail": "{{within}} από {{total}} εντός προθεσμίας",
+      "noDeadlineData": "Κανένα εύρημα δεν έχει προθεσμία SLA ακόμη",
+      "deadlinePassed": "Η προθεσμία παρήλθε",
+      "deadlinePassedDetail": "{{critical}} κρίσιμα, {{high}} υψηλά",
+      "dueThisWeek": "Λήγει αυτή την εβδομάδα",
+      "dueThisWeekDetail": "{{exploitable}} επιβεβαιωμένα αξιοποιήσιμα",
+      "noDeadline": "Χωρίς προθεσμία",
+      "reviewSlaAssignment": "Αναθεώρηση ανάθεσης SLA",
+      "allOpenFindingsTracked": "Όλα τα ανοιχτά ευρήματα παρακολουθούνται"
     },
     "dismiss": {
       "title": "Απόρριψη ευρήματος",
@@ -1469,21 +1673,32 @@
       "sourceRecord": "Εγγραφή πηγής",
       "source": "Πηγή",
       "sourceId": "Αναγνωριστικό πηγής",
-      "viewAdvisory": "Προβολή συμβουλευτικής στο GitHub"
+      "viewAdvisory": "Προβολή συμβουλευτικής στο GitHub",
+      "statusSuperseded": "Αντικαταστάθηκε",
+      "statusFixed": "Διορθώθηκε",
+      "statusOpen": "Ανοιχτό",
+      "sourceDependabot": "GitHub Dependabot",
+      "reasonFixStarted": "έχει ήδη ξεκινήσει μια διόρθωση",
+      "reasonNoBandwidth": "δεν υπάρχει διαθέσιμο περιθώριο",
+      "reasonTolerableRisk": "ο κίνδυνος είναι αποδεκτός",
+      "reasonInaccurate": "το εύρημα είναι ανακριβές",
+      "reasonNotUsed": "ο ευάλωτος κώδικας δεν χρησιμοποιείται",
+      "reasonAfterReview": "μετά την αναθεώρηση"
     },
     "settingsOverview": {
       "title": "Ρυθμίσεις",
       "couldNotLoadSettings": "Δεν ήταν δυνατή η φόρτωση των ρυθμίσεων του Security Agent",
       "couldNotLoadPermissions": "Δεν ήταν δυνατή η φόρτωση των δικαιωμάτων",
       "couldNotLoadRepositories": "Δεν ήταν δυνατή η φόρτωση των αποθετηρίων",
-      "securityAgent": "Security Agent",
-      "enabled": "Ενεργό",
-      "disabled": "Ανενεργό",
+      "securityAgent": "Πράκτορας ασφάλειας",
+      "enabled": "Ενεργοποιημένο",
+      "disabled": "Απενεργοποιημένο",
       "on": "Ενεργό",
-      "off": "Ανενεργό",
+      "off": "Απενεργοποιημένο",
       "allRepositories": "Όλα τα αποθετήρια",
-      "repositorySelected": "{{count}} επιλεγμένο αποθετήριο",
-      "repositoriesSelected": "{{count}} επιλεγμένα αποθετήρια",
+      "repositoriesCount_one": "{{displayCount}} επιλεγμένο αποθετήριο",
+      "repositoriesCount": "{{displayCount}} επιλεγμένα αποθετήρια",
+      "repositoriesCount_other": "{{displayCount}} επιλεγμένα αποθετήρια",
       "selectRepositories": "Επιλογή αποθετηρίων",
       "selectRepositoriesSubtitle": "Επιλέξτε ποια αποθετήρια παρακολουθεί ο Security Agent",
       "repositories": "Αποθετήρια",
@@ -1491,9 +1706,9 @@
       "analysisModeSubtitle": "Ανάλυση {{mode}}",
       "automation": "Αυτοματοποίηση",
       "automationAllOff": "Όλα ανενεργά",
-      "automationCount": "{{count}} από 3 ενεργά",
+      "automationCount": "{{displayCount}} από 3 ενεργά",
       "notifications": "Ειδοποιήσεις",
-      "notificationsCount": "{{count}} από 2 ενεργά",
+      "notificationsCount": "{{displayCount}} από 2 ενεργά",
       "slaPolicy": "Πολιτική SLA",
       "disabledNoManage": "Ο Security Agent είναι ανενεργός. Μόνο οι ιδιοκτήτες οργανισμού και οι διαχειριστές χρέωσης μπορούν να τον ενεργοποιήσουν.",
       "disabledNoRepo": "Επιλέξτε τουλάχιστον ένα αποθετήριο πριν ενεργοποιήσετε τον Security Agent.",
@@ -1502,7 +1717,7 @@
     "remediation": {
       "cancellationRequested": "Ζητήθηκε ακύρωση",
       "cancelled": "Η αποκατάσταση ακυρώθηκε",
-      "pullRequest": "pull request",
+      "pullRequest": "αίτημα έλξης",
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση της κατάστασης αποκατάστασης",
       "noAnalysisTitle": "Δεν υπάρχει ακόμα ανάλυση",
       "noAnalysisDescription": "Εκτελέστε μία από την καρτέλα Λεπτομέρειες",
@@ -1515,7 +1730,7 @@
       "openPullRequest": "Άνοιγμα pull request{{number}}",
       "openDraftPullRequest": "Άνοιγμα πρόχειρου pull request{{number}}",
       "progress": "Πρόοδος",
-      "attemptHistory": "Ιστορικό προσπαθειών ({{count}})",
+      "attemptHistory": "Ιστορικό προσπαθειών ({{displayCount}})",
       "attemptNumber": "Προσπάθεια #{{number}}",
       "startedBy": "Ξεκίνησε από",
       "model": "Μοντέλο",
@@ -1537,8 +1752,8 @@
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των ρυθμίσεων ανάλυσης",
       "permissionNote": "Μόνο οι ιδιοκτήτες οργανισμού και οι διαχειριστές χρέωσης μπορούν να αλλάξουν αυτές τις ρυθμίσεις.",
       "depth": "Βάθος ανάλυσης",
-      "modeAuto": "Αυτόματο",
-      "modeShallow": "Ρηχή",
+      "modeAuto": "Αυτόματη",
+      "modeShallow": "Επιφανειακή",
       "modeDeep": "Βαθιά",
       "couldNotLoadModels": "Δεν ήταν δυνατή η φόρτωση των μοντέλων",
       "triageModel": "Μοντέλο διαλογής",
@@ -1585,9 +1800,9 @@
       "clearFilters": "Απαλοιφή φίλτρων"
     },
     "scopeList": {
-      "title": "Security Agent",
+      "title": "Πράκτορας ασφάλειας",
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των οργανισμών",
-      "personal": "Προσωπικό",
+      "personal": "Προσωπικά",
       "personalSubtitle": "Τα δικά σας αποθετήρια"
     },
     "commandRetry": {
@@ -1600,7 +1815,7 @@
       "nextRemediationAvailable": "Διαθέσιμη αποκατάσταση",
       "retryAnalysis": "Επανάληψη ανάλυσης",
       "runAnalysis": "Εκτέλεση ανάλυσης",
-      "nextNeedsManualReview": "Χρήζει χειροκίνητης αναθεώρησης",
+      "nextNeedsManualReview": "Χρειάζεται χειροκίνητη αναθεώρηση",
       "nextViewDetails": "Προβολή λεπτομερειών",
       "viewPr": "Προβολή PR",
       "analyze": "Ανάλυση",
@@ -1681,7 +1896,140 @@
     },
     "queuedActionUntracked": "Δεν ήταν πλέον δυνατή η παρακολούθηση μιας ενέργειας σε αναμονή. Ανανεώστε για να δείτε την τελευταία κατάσταση.",
     "initialSyncAdmissionFailed": "Ο Security Agent ενεργοποιήθηκε, αλλά ο αρχικός συγχρονισμός δεν ήταν δυνατό να τεθεί σε αναμονή. Συγχρονίστε ξανά.",
-    "title": "Security Agent"
+    "title": "Πράκτορας ασφάλειας",
+    "commands": {
+      "findingAlreadyDismissed": "Το εύρημα έχει ήδη απορριφθεί",
+      "findingDismissed": "Το εύρημα απορρίφθηκε",
+      "noRemediationsQueued": "Δεν υπάρχουν υπάρχοντα ευρήματα στην ουρά",
+      "remediationsQueued": "Οι υπάρχουσες αποκαταστάσεις μπήκαν στην ουρά",
+      "analysisComplete": "Η ανάλυση ολοκληρώθηκε",
+      "syncComplete": "Ο συγχρονισμός ολοκληρώθηκε"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "Η υπηρεσία ασφαλείας δεν έχει διαμορφωθεί. Η εκ νέου υποβολή δεν μπορεί να επιτύχει έως ότου διορθωθεί αυτό.",
+      "syncMayNotHaveCompleted": "Ένας συγχρονισμός μπορεί να μην έχει ολοκληρωθεί. Δοκιμάστε ξανά για να τον επαναφέρετε ή απορρίψτε τον.",
+      "syncInProgress": "Ένας συγχρονισμός ασφαλείας είναι ήδη σε εξέλιξη. Δοκιμάστε ξανά.",
+      "dismissalInProgress": "Αυτή η απόρριψη είναι ήδη σε εξέλιξη. Δοκιμάστε ξανά.",
+      "couldNotReadPendingSyncs": "Δεν ήταν δυνατή η ανάγνωση των εκκρεμών συγχρονισμών. Δοκιμάστε ξανά."
+    },
+    "analysisState": {
+      "queued": "Ανάλυση σε αναμονή",
+      "queuedTitle": "Ανάλυση σε αναμονή",
+      "queuedDescription": "Αναμονή για διαθέσιμη χωρητικότητα ανάλυσης.",
+      "analyzing": "Ανάλυση σε εξέλιξη",
+      "analyzingTitle": "Ανάλυση σε εξέλιξη",
+      "analyzingDescription": "Έλεγχος αν ο κώδικας της εφαρμογής μπορεί να φτάσει στη σχετική λειτουργία.",
+      "failed": "Η ανάλυση απέτυχε",
+      "failedTitle": "Η ανάλυση απέτυχε",
+      "failedDescription": "Ο Security Agent δεν μπόρεσε να ολοκληρώσει την ανάλυση.",
+      "extractionFailed": "Χρειάζεται αναθεώρηση",
+      "extractionFailedTitle": "Χρειάζεται αναθεώρηση",
+      "extractionFailedDescription": "Η τεχνική αναφορά δεν μπόρεσε να μετατραπεί σε δομημένο αποτέλεσμα.",
+      "exploitable": "Εκμεταλλεύσιμο",
+      "exploitableTitle": "Εκμεταλλεύσιμο",
+      "exploitableDescription": "Ο κώδικας της εφαρμογής μπορεί να φτάσει στη σχετική λειτουργία.",
+      "notExploitable": "Μη προσεγγίσιμο",
+      "notExploitableTitle": "Μη προσεγγίσιμο",
+      "notExploitableDescription": "Δεν βρέθηκε προσεγγίσιμη διαδρομή σε αυτό το αποθετήριο.",
+      "unknown": "Χρειάζεται αναθεώρηση",
+      "unknownTitle": "Χρειάζεται αναθεώρηση",
+      "unknownDescription": "Η ανάλυση δεν μπόρεσε να επιβεβαιώσει αν η ευάλωτη λειτουργία είναι προσεγγίσιμη.",
+      "safeToDismiss": "Ασφαλές προς απόρριψη",
+      "safeToDismissTitle": "Ασφαλές προς απόρριψη",
+      "safeToDismissDescription": "Η διαλογή προσδιόρισε ότι αυτό μπορεί να απορριφθεί με ασφάλεια χωρίς ανάλυση της βάσης κώδικα.",
+      "manualReview": "Χρειάζεται αναθεώρηση",
+      "manualReviewTitle": "Χρειάζεται χειροκίνητη αναθεώρηση",
+      "manualReviewDescription": "Η διαλογή επισήμανε αυτό το εύρημα για χειροκίνητη αναθεώρηση.",
+      "analysisRequired": "Απαιτείται ανάλυση",
+      "analysisRequiredTitle": "Απαιτείται ανάλυση της βάσης κώδικα",
+      "analysisRequiredDescription": "Η διαλογή συνιστά την ανάλυση του αποθετηρίου πριν αποφασίσετε για την αντίδραση.",
+      "completed": "Αναλύθηκε",
+      "completedTitle": "Αναλύθηκε",
+      "completedDescription": "Η ανάλυση ολοκληρώθηκε χωρίς να καταγραφεί συγκεκριμένο αποτέλεσμα.",
+      "notAnalyzed": "Δεν αναλύθηκε",
+      "notAnalyzedTitle": "Δεν αναλύθηκε",
+      "notAnalyzedDescription": "Η ανάλυση της βάσης κώδικα δεν έχει εκτελεστεί ακόμα για αυτό το εύρημα."
+    },
+    "deadline": {
+      "fixedBeforeDeadline": "Διορθώθηκε πριν την προθεσμία",
+      "fixed": "Διορθώθηκε",
+      "fixedOn": "Διορθώθηκε στις {{date}}",
+      "resolutionRecorded": "Η λύση καταγράφηκε",
+      "superseded": "Αντικαταστάθηκε",
+      "dismissed": "Απορρίφθηκε",
+      "closedOn": "{{status}} {{date}}",
+      "deadlineNotSet": "Η προθεσμία δεν έχει οριστεί",
+      "noSlaDeadline": "Χωρίς προθεσμία SLA",
+      "dueOn": "Λήγει στις {{date}}",
+      "overdueNow": "Εκπρόθεσμο",
+      "overdue_one": "{{count}} ημέρα εκπρόθεσμο",
+      "overdue_other": "{{count}} ημέρες εκπρόθεσμο",
+      "dueToday": "Λήγει σήμερα",
+      "dueTomorrow": "Λήγει αύριο",
+      "dueInDays_one": "Λήγει σε {{count}} ημέρα",
+      "dueInDays_other": "Λήγει σε {{count}} ημέρες",
+      "overdue": "{{count}} ημέρες εκπρόθεσμο",
+      "dueInDays": "Λήγει σε {{count}} ημέρες"
+    },
+    "remediationStatus": {
+      "cancellationRequested": "Ζητήθηκε ακύρωση",
+      "notStarted": "Δεν ξεκίνησε",
+      "queued": "Σε αναμονή",
+      "starting": "Έναρξη",
+      "inProgress": "Σε εξέλιξη",
+      "draftPrOpened": "Ανοίχτηκε πρόχειρο PR",
+      "prOpened": "Ανοίχτηκε PR",
+      "blocked": "Μπλοκαρίστηκε",
+      "failed": "Απέτυχε",
+      "noChangesNeeded": "Δεν χρειάζονται αλλαγές",
+      "cancelled": "Ακυρώθηκε",
+      "originAutomaticPolicy": "Αυτόματη πολιτική",
+      "originIncludeExistingPolicy": "Συμπερίληψη υπάρχουσας πολιτικής",
+      "originManual": "Χειροκίνητο",
+      "validationCheck": "Έλεγχος επικύρωσης {{number}}"
+    },
+    "remediationUnavailable": {
+      "findingNotFound": "Το εύρημα ασφάλειας δεν υπάρχει πλέον.",
+      "approvalRequired": "Η αυτόματη αποκατάσταση απαιτεί έγκριση. Ξεκινήστε την αποκατάσταση χειροκίνητα για να την εγκρίνετε.",
+      "findingNotOpen": "Το εύρημα δεν είναι πλέον ανοιχτό.",
+      "repoNotInScope": "Το αποθετήριο δεν έχει επιλεγεί για τον Security Agent.",
+      "analysisRequired": "Εκτελέστε ανάλυση της βάσης κώδικα πριν ξεκινήσετε την αποκατάσταση.",
+      "sandboxAnalysisRequired": "Εκτελέστε ανάλυση της βάσης κώδικα πριν ξεκινήσετε την αποκατάσταση.",
+      "staleAnalysis": "Το εύρημα άλλαξε μετά την ανάλυση. Εκτελέστε ξανά την ανάλυση πριν ξεκινήσετε την αποκατάσταση.",
+      "notExploitable": "Η ανάλυση δεν βρήκε προσεγγίσιμη ευάλωτη διαδρομή. Η αυτόματη αποκατάσταση δεν είναι διαθέσιμη.",
+      "exploitabilityUnknown": "Η ανάλυση δεν μπόρεσε να επιβεβαιώσει την εκμεταλλευσιμότητα. Απαιτείται χειροκίνητη αναθεώρηση πριν από την αποκατάσταση με ένα κλικ.",
+      "manualReviewRequired": "Η ανάλυση συνιστά χειροκίνητη αναθεώρηση, επομένως η αποκατάσταση με ένα κλικ δεν είναι διαθέσιμη.",
+      "monitorRequired": "Η ανάλυση συνιστά παρακολούθηση αντί για άνοιγμα PR.",
+      "triageOnly": "Έχει ολοκληρωθεί μόνο η διαλογή. Εκτελέστε ανάλυση της βάσης κώδικα πριν ξεκινήσετε την αποκατάσταση.",
+      "actionNotConcrete": "Δεν υπάρχει διαθέσιμη συγκεκριμένη επιδιόρθωση εξάρτησης ή προτεινόμενη διόρθωση.",
+      "remediationActive": "Υπάρχει ήδη μια ενεργή προσπάθεια αποκατάστασης.",
+      "prAlreadyOpened": "Υπάρχει ήδη ανοιχτό PR αποκατάστασης.",
+      "duplicateAnalysisResult": "Αυτό το αποτέλεσμα ανάλυσης έχει ήδη δημιουργήσει εργασία αποκατάστασης.",
+      "retryNotAllowed": "Η επανάληψη δεν είναι διαθέσιμη για αυτή την προσπάθεια.",
+      "securityAgentDisabled": "Ο Security Agent είναι ανενεργός για αυτόν τον ιδιοκτήτη.",
+      "autoRemediationDisabled": "Η αυτόματη αποκατάσταση είναι ανενεργή. Η χειροκίνητη αποκατάσταση μπορεί ακόμα να ξεκινήσει όταν περάσουν οι έλεγχοι ασφάλειας.",
+      "includeExistingDisabled": "Τα υπάρχοντα ευρήματα εξαιρούνται από την αυτόματη αποκατάσταση.",
+      "belowThreshold": "Το εύρημα είναι κάτω από το αυτόματο όριο σοβαρότητας. Η χειροκίνητη αποκατάσταση μπορεί ακόμα να ξεκινήσει όταν περάσουν οι έλεγχοι ασφάλειας.",
+      "beforeEnablement": "Η ανάλυση ολοκληρώθηκε πριν ενεργοποιηθεί η αυτόματη αποκατάσταση. Η χειροκίνητη αποκατάσταση μπορεί ακόμα να ξεκινήσει όταν περάσουν οι έλεγχοι ασφάλειας.",
+      "generic": "Η αποκατάσταση δεν είναι διαθέσιμη για αυτό το εύρημα."
+    },
+    "commandFailure": {
+      "ownerCapReached": "Η χωρητικότητα ανάλυσης είναι πλήρης. Περιμένετε να ολοκληρωθεί μια ενεργή ανάλυση και δοκιμάστε ξανά.",
+      "githubTokenUnavailable": "Η εξουσιοδότηση GitHub χρειάζεται προσοχή. Εξουσιοδοτήστε ξανά την εφαρμογή GitHub και δοκιμάστε ξανά.",
+      "githubAuthInvalid": "Η εξουσιοδότηση GitHub χρειάζεται προσοχή. Εξουσιοδοτήστε ξανά την εφαρμογή GitHub και δοκιμάστε ξανά.",
+      "findingUnavailable": "Το εύρημα δεν είναι πλέον διαθέσιμο. Ανανεώστε τα ευρήματα και δοκιμάστε ξανά αν παραμένει ανοιχτό.",
+      "repositoryUnavailable": "Το αποθετήριο δεν είναι πλέον διαθέσιμο στην εφαρμογή GitHub. Ανανεώστε την πρόσβαση στο αποθετήριο και δοκιμάστε ξανά.",
+      "invalidDismissTarget": "Το εύρημα δεν μπορεί να απορριφθεί επειδή ο στόχος του Dependabot δεν είναι έγκυρος.",
+      "commandStalled": "Η ενέργεια στην αναμονή δεν ολοκληρώθηκε εγκαίρως. Επαναλάβετε την ενέργεια.",
+      "queueRetriesExhausted": "Η ενέργεια δεν μπόρεσε να ολοκληρωθεί μετά από πολλές προσπάθειες. Επαναλάβετε την ενέργεια.",
+      "queueAdmissionFailed": "Δεν ήταν δυνατή η εισαγωγή της ενέργειας στην αναμονή. Επαναλάβετε την ενέργεια.",
+      "generic": "Η ενέργεια στην αναμονή απέτυχε. Επαναλάβετε την ενέργεια."
+    },
+    "analysisMode": {
+      "auto": "Αυτόματη",
+      "shallow": "Επιφανειακή",
+      "deep": "Βαθιά"
+    }
   },
   "agents": {
     "activeNow": "Ενεργό τώρα",
@@ -1689,7 +2037,7 @@
       "searching": "Αναζήτηση",
       "searchSessions": "Αναζήτηση συνεδριών",
       "searchSessionsPlaceholder": "Αναζήτηση συνεδριών...",
-      "clearSearch": "Απαλοιφή αναζήτησης",
+      "clearSearch": "Εκκαθάριση αναζήτησης",
       "clearFilters": "Απαλοιφή φίλτρων"
     },
     "sessionList": {
@@ -1720,14 +2068,30 @@
       "sessionDeleted": "Η συνεδρία διαγράφηκε",
       "needsInput": "χρειάζεται είσοδο",
       "fromPlatform": "από {{platform}}",
-      "centOne": "σεντ",
-      "centOther": "σεντς",
-      "dollarOne": "δολάριο",
-      "dollarOther": "δολάρια"
+      "cent_one": "σεντ",
+      "cent": "σεντς",
+      "cent_other": "σεντς",
+      "dollar_one": "δολάριο",
+      "dollar": "δολάρια",
+      "dollar_other": "δολάρια",
+      "costSpoken": "κόστος {{cost}}",
+      "costSpokenWithTime": "κόστος {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Δεν ήταν δυνατό το άνοιγμα του GitHub",
-      "couldNotOpenMessage": "Δεν ήταν δυνατή η έναρξη της ρύθμισης της εφαρμογής GitHub. Δοκιμάστε ξανά."
+      "couldNotOpenMessage": "Δεν ήταν δυνατή η έναρξη της ρύθμισης της εφαρμογής GitHub. Δοκιμάστε ξανά.",
+      "installedTitle": "Το GitHub App εγκαταστάθηκε",
+      "installedMessage": "Τα αποθετήριά σας είναι πλέον συνδεδεμένα.",
+      "pendingTitle": "Εκκρεμεί έγκριση διαχειριστή",
+      "pendingMessage": "Ένας διαχειριστής οργανισμού πρέπει να εγκρίνει το αίτημα εγκατάστασης.",
+      "accountMismatchTitle": "Αναντιστοιχία λογαριασμού",
+      "accountMismatchMessage": "Αυτή η σύνδεση ξεκίνησε από την Kilo App με σύνδεση σε διαφορετικό λογαριασμό. Συνδεθείτε στον ιστό με αυτόν τον λογαριασμό ή ξεκινήστε ξανά από την εφαρμογή.",
+      "cannotCompleteTitle": "Δεν είναι δυνατή η ολοκλήρωση της εγκατάστασης",
+      "notAdminMessage": "Μόνο ένας διαχειριστής GitHub αυτού του λογαριασμού μπορεί να τον συνδέσει. Ζητήστε από έναν διαχειριστή οργανισμού να εγκαταστήσει τον Kilo.",
+      "alreadyClaimedMessage": "Αυτή η εγκατάσταση GitHub είναι ήδη συνδεδεμένη με άλλο λογαριασμό Kilo. Αποσυνδέστε την εκεί πρώτα.",
+      "didNotCompleteTitle": "Η εγκατάσταση δεν ολοκληρώθηκε",
+      "didNotCompleteMessage": "Η εγκατάσταση του GitHub App δεν ολοκληρώθηκε. Δοκιμάστε ξανά από την εφαρμογή."
     },
     "sessionExited": "Η συνεδρία τερματίστηκε",
     "remoteSpawnRetryable": "Δεν ήταν δυνατή η πρόσβαση στην παρουσία — μπορεί να αποσυνδέθηκε.",
@@ -1739,7 +2103,7 @@
       "title": "Συνεδρία",
       "copyErrorDetails": "Αντιγραφή λεπτομερειών σφάλματος",
       "backToSessions": "Επιστροφή στις συνεδρίες",
-      "accessDenied": "Απαγορευμένη πρόσβαση",
+      "accessDenied": "Η πρόσβαση απορρίφθηκε",
       "accessDeniedDescription": "Δεν έχετε δικαίωμα να δείτε αυτό.",
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση της συνεδρίας",
       "failedToLoadDetails": "Αποτυχία φόρτωσης λεπτομερειών συνεδρίας",
@@ -1760,7 +2124,12 @@
       "couldNotLoadThisSession": "Δεν ήταν δυνατή η φόρτωση αυτής της συνεδρίας",
       "cloneFailed": "Δεν ήταν δυνατή η κλωνοποίηση αυτής της συνεδρίας.",
       "cloneFailedRetry": "Δεν ήταν δυνατή η κλωνοποίηση αυτής της συνεδρίας. Δοκιμάστε ξανά.",
-      "connectRepositoryToContinue": "Συνδέστε ένα αποθετήριο για να συνεχίσετε."
+      "connectRepositoryToContinue": "Συνδέστε ένα αποθετήριο για να συνεχίσετε.",
+      "notEnoughCredits": "Δεν υπάρχουν αρκετά credits για εκτέλεση του Cloud Agent. Προσθέστε credits και δοκιμάστε ξανά.",
+      "previousTaskFinishing": "Η προηγούμενη εργασία ολοκληρώνεται ακόμα. Περιμένετε μια στιγμή.",
+      "serviceUnavailable": "Η υπηρεσία δεν είναι διαθέσιμη αυτή τη στιγμή. Δοκιμάστε ξανά.",
+      "connectionTrouble": "Πρόβλημα σύνδεσης. Δοκιμάστε ξανά σε λίγο.",
+      "modelUnavailable": "Αυτό το μοντέλο δεν είναι διαθέσιμο για το Cloud Agent. Επιλέξτε άλλο μοντέλο και δοκιμάστε ξανά."
     },
     "remoteSession": {
       "failedToCreate": "Αποτυχία δημιουργίας απομακρυσμένης συνεδρίας",
@@ -1770,7 +2139,10 @@
       "exitMessage": "Αυτό σταματά τη συνεδρία που εκτελείται, αλλά διατηρεί το ιστορικό της.",
       "keepSessionRunning": "Συνέχιση εκτέλεσης συνεδρίας",
       "exitSession": "Τερματισμός συνεδρίας",
-      "restartExitFailed": "Ξεκίνησε νέα συνεδρία. Η προηγούμενη συνεδρία είναι ακόμα ανοιχτή."
+      "restartExitFailed": "Ξεκίνησε νέα συνεδρία. Η προηγούμενη συνεδρία είναι ακόμα ανοιχτή.",
+      "exitNotSupported": "Η έξοδος από την απομακρυσμένη συνεδρία δεν υποστηρίζεται για την τρέχουσα συνεδρία",
+      "exitUnavailable": "Η έξοδος από την απομακρυσμένη συνεδρία δεν είναι διαθέσιμη για την τρέχουσα συνεδρία",
+      "exitNeedsNewerCli": "Οι εντολές με κάθετο για απομακρυσμένη συνεδρία απαιτούν νεότερη έκδοση του Kilo CLI. Ενημερώστε το Kilo CLI και συνδεθείτε ξανά."
     },
     "sessionConnection": {
       "connecting": "Σύνδεση…",
@@ -1814,11 +2186,13 @@
       "discardDraftMessage": "Το μήνυμά σας θα χαθεί.",
       "keepEditing": "Συνέχιση επεξεργασίας",
       "discard": "Απόρριψη",
-      "discardFailed": "Δεν ήταν δυνατή η απόρριψη του πρόχειρου. Δοκιμάστε ξανά."
+      "discardFailed": "Δεν ήταν δυνατή η απόρριψη του πρόχειρου. Δοκιμάστε ξανά.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
-      "updatedFile": "Ενημερώθηκε {{count}} αρχείο",
-      "updatedFiles": "Ενημερώθηκαν {{count}} αρχεία"
+      "updatedFileCount_one": "Ενημερώθηκε {{displayCount}} αρχείο",
+      "updatedFileCount": "Ενημερώθηκαν {{displayCount}} αρχεία",
+      "updatedFileCount_other": "Ενημερώθηκαν {{displayCount}} αρχεία"
     },
     "toolPatch": {
       "operationAdded": "Προστέθηκε",
@@ -1843,9 +2217,9 @@
       "toolTask": "εργασία",
       "readTodos": "Ανάγνωση εκκρεμοτήτων",
       "updateTodos": "Ενημέρωση εκκρεμοτήτων",
-      "linesBadge": "{{count}} γραμμές",
-      "filesBadge": "{{count}} αρχεία",
-      "matchesBadge": "{{count}} αντιστοιχίες"
+      "linesBadge": "{{displayCount}} γραμμές",
+      "filesBadge": "{{displayCount}} αρχεία",
+      "matchesBadge": "{{displayCount}} αντιστοιχίες"
     },
     "readToolMarkdown": {
       "linesTruncated": "γραμμές {{start}}–{{end}} (περικομμένες)",
@@ -1929,6 +2303,10 @@
       "reportAiResponseFailedTerminal": "Αυτή η απόκριση δεν μπορεί να αναφερθεί.",
       "reportAiResponseSubmitted": "Η αναφορά υποβλήθηκε. Απόδειξη {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "Οι λεπτομέρειες δεν είναι διαθέσιμες",
       "textDisplay": "Εμφάνιση κειμένου",
@@ -1987,7 +2365,7 @@
       "preparationComplete": "Η προετοιμασία ολοκληρώθηκε",
       "preparationFailed": "Η προετοιμασία απέτυχε",
       "setupCommand": "Εντολή ρύθμισης {{index}}",
-      "setupCommandOf": "Εντολή ρύθμισης {{index}} από {{count}}"
+      "setupCommandOf": "Εντολή ρύθμισης {{index}} από {{displayCount}}"
     },
     "permissionCard": {
       "title": "Απαιτείται άδεια",
@@ -2024,7 +2402,7 @@
       "submissionFailed": "Η υποβολή απέτυχε. Δοκιμάστε ξανά.",
       "questionAnnouncement": "Ο πράκτορας χρειάζεται την απάντησή σας. Ο σύνθετος είναι σε παύση όσο απαντάτε.",
       "permissionAnnouncement": "Ο πράκτορας χρειάζεται άδεια για να συνεχίσει. Ο σύνθετος είναι σε παύση όσο αποφασίζετε.",
-      "positionHint": "(1 από {{count}})",
+      "positionHint": "(1 από {{displayCount}})",
       "movedPastPrompt": "Ο πράκτορας προχώρησε πέρα από αυτό το μήνυμα. Αυτή η κάρτα θα κλείσει όταν συνεχιστεί η συνεδρία.",
       "waitingForAnswer": "Ο πράκτορας περιμένει την απάντησή σας. Όσο αυτή η ερώτηση είναι ανοιχτή, το μήνυμά σας προς τον πράκτορα είναι σε παύση.",
       "waitingForPermission": "Ο πράκτορας περιμένει άδεια. Όσο αυτό το αίτημα είναι ανοιχτό, το μήνυμά σας προς τον πράκτορα είναι σε παύση."
@@ -2059,8 +2437,9 @@
     "olderMessages": {
       "arrived": "Φορτώθηκαν προηγούμενα μηνύματα",
       "retryHint": "Επαναπροσπαθεί τη φόρτωση των προηγούμενων μηνυμάτων για αυτή τη συνεδρία.",
-      "omittedOne": "Ορισμένα προηγούμενα στοιχεία από αυτή τη συνεδρία δεν ήταν δυνατό να εμφανιστούν.",
-      "omittedMany": "{{count}} προηγούμενα στοιχεία από αυτή τη συνεδρία δεν ήταν δυνατό να εμφανιστούν.",
+      "omitted_one": "Ορισμένα προηγούμενα στοιχεία από αυτή τη συνεδρία δεν ήταν δυνατό να εμφανιστούν.",
+      "omitted": "{{displayCount}} προηγούμενα στοιχεία από αυτή τη συνεδρία δεν ήταν δυνατό να εμφανιστούν.",
+      "omitted_other": "{{displayCount}} προηγούμενα στοιχεία από αυτή τη συνεδρία δεν ήταν δυνατό να εμφανιστούν.",
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των προηγούμενων μηνυμάτων.",
       "unavailable": "Τα προηγούμενα μηνύματα δεν είναι διαθέσιμα.",
       "tooLarge": "Τα προηγούμενα μηνύματα είναι πολύ μεγάλα για φόρτωση."
@@ -2069,10 +2448,12 @@
       "viewTable": "Προβολή πίνακα",
       "title": "Πίνακας",
       "close": "Κλείσιμο πίνακα",
-      "column": "στήλη",
-      "columns": "στήλες",
-      "row": "γραμμή",
-      "rows": "γραμμές",
+      "columnCount_one": "στήλη",
+      "columnCount": "στήλες",
+      "columnCount_other": "στήλες",
+      "rowCount_one": "γραμμή",
+      "rowCount": "γραμμές",
+      "rowCount_other": "γραμμές",
       "opensFullScreen": "ανοίγει σε πλήρη οθόνη"
     },
     "sessionFilter": {
@@ -2103,7 +2484,10 @@
       "title": "Επιλογή μοντέλου",
       "searchPlaceholder": "Αναζήτηση μοντέλων...",
       "noModels": "Δεν υπάρχουν διαθέσιμα μοντέλα",
-      "noModelsDescription": "Δεν υπάρχουν διαθέσιμα μοντέλα για επιλογή."
+      "noModelsDescription": "Δεν υπάρχουν διαθέσιμα μοντέλα για επιλογή.",
+      "favorites": "Αγαπημένα",
+      "recommended": "Προτεινόμενο",
+      "allModels": "Όλα τα μοντέλα"
     },
     "modelSelector": {
       "model": "Μοντέλο",
@@ -2120,7 +2504,8 @@
       "addToFavorites": "Προσθήκη του {{name}} στα αγαπημένα",
       "removeFromFavorites": "Αφαίρεση του {{name}} από τα αγαπημένα",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "Μοντέλο συνεδρίας"
     },
     "attachmentPreview": {
       "openFailedRetry": "Αποτυχία ανοίγματος αρχείου. Δοκιμάστε ξανά.",
@@ -2137,12 +2522,12 @@
     },
     "attachmentPicker": {
       "camera": "Κάμερα",
-      "photoLibrary": "Βιβλιοθήκη φωτογραφιών",
+      "photoLibrary": "Φωτοθήκη",
       "files": "Αρχεία",
       "cameraAccessDisabled": "Η πρόσβαση στην κάμερα είναι απενεργοποιημένη",
-      "cameraAccessMessage": "Επιτρέψτε την πρόσβαση στην κάμερα στις Ρυθμίσεις για να τραβήξετε φωτογραφία.",
+      "cameraAccessMessage": "Επιτρέψτε την πρόσβαση στην κάμερα στις Ρυθμίσεις για λήψη φωτογραφίας.",
       "couldNotOpenPhotoPicker": "Δεν ήταν δυνατό το άνοιγμα του επιλογέα φωτογραφιών. Επανεκκινήστε το Kilo και δοκιμάστε ξανά.",
-      "maxFilesAllowed": "Επιτρέπονται έως {{count}} αρχεία",
+      "maxFilesAllowed": "Επιτρέπονται έως {{displayCount}} αρχεία",
       "onlyAddingFiles": "Προστίθενται μόνο {{accepted}} από τα {{total}} αρχεία (μέγιστο {{max}})"
     },
     "composer": {
@@ -2188,7 +2573,8 @@
       "delegatingWork": "Ανάθεση εργασίας",
       "askingQuestion": "Υποβολή ερώτησης",
       "consideringNextSteps": "Εξέταση επόμενων βημάτων",
-      "writingResponse": "Σύνταξη απάντησης"
+      "writingResponse": "Σύνταξη απάντησης",
+      "initializingSnapshot": "Αρχικοποίηση snapshot…"
     },
     "slashCommands": {
       "startNewSession": "Έναρξη νέας συνεδρίας",
@@ -2207,7 +2593,7 @@
       "costPrefix": "κόστος {{cost}}",
       "costSuffix": ", κόστος {{cost}}",
       "tokensWindowUnavailable": "Πλαίσιο {{used}} διακριτικών, παράθυρο μη διαθέσιμο",
-      "tokensUsage": "Πλαίσιο {{used}} από {{window}} διακριτικά, {{percentage}}% χρησιμοποιημένα",
+      "tokensUsage": "Πλαίσιο {{used}} από {{window}} διακριτικά, {{percentage}} χρησιμοποιημένα",
       "title": "Χρήση πλαισίου",
       "used": "Χρησιμοποιήθηκε",
       "remaining": "Υπόλοιπο",
@@ -2216,7 +2602,7 @@
       "usageReflectsLatest": "Η χρήση αντικατοπτρίζει την τελευταία ολοκληρωμένη απάντηση του βοηθού.",
       "tokenUsage": "Χρήση διακριτικών",
       "cacheRate": "Ρυθμός κρυφής μνήμης",
-      "modelsCount": "Μοντέλα ({{count}})",
+      "modelsCount": "Μοντέλα ({{displayCount}})",
       "tokenTotalsNote": "Τα σύνολα διακριτικών καλύπτουν μόνο αυτή τη συνεδρία και εξαιρούν τα διακριτικά υποπρακτόρων/παιδικών συνεδριών.",
       "subagents": "Υποπράκτορες",
       "subagentsDescription": "Υπολειπόμενο κόστος από παιδικές συνεδρίες",
@@ -2225,15 +2611,16 @@
       "ofWindowTokens": "από {{window}} διακριτικά",
       "tokens": "διακριτικά",
       "tokensWithPercentage": "διακριτικά ({{percentage}})",
-      "stepsCountOne": "{{steps}} βήμα",
-      "stepsCountMany": "{{steps}} βήματα",
+      "stepsCount_one": "{{steps}} βήμα",
+      "stepsCount": "{{steps}} βήματα",
+      "stepsCount_other": "{{steps}} βήματα",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
       "open": "ανοιχτό αίτημα έλξης",
       "closed": "κλειστό αίτημα έλξης",
       "merged": "συγχωνευμένο αίτημα έλξης",
-      "draft": "προσχέδιο αιτήματος έλξης",
+      "draft": "Πρόχειρο pull request",
       "updating": "Ενημέρωση, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "αίτημα έλξης"
@@ -2251,10 +2638,11 @@
   },
   "addCredits": {
     "cta": "Προσθήκη πιστώσεων",
-    "description": "Προσθέστε πιστώσεις για να συνεχίσει η χρήση."
+    "description": "Προσθέστε πιστώσεις για να συνεχίσει η χρήση.",
+    "billingPage": "σελίδα χρέωσης"
   },
   "deviceSessions": {
-    "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση συνεδριών",
+    "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση των συνεδριών",
     "couldNotLoadDescription": "Οι ενεργές συνεδρίες σας δεν είναι διαθέσιμες μέχρι να ολοκληρωθεί αυτή η φόρτωση.",
     "currentDeviceUnidentified": "Δεν ήταν δυνατός ο εντοπισμός της τρέχουσας συσκευής",
     "noSessions": "Δεν υπάρχουν ενεργές συνεδρίες",
@@ -2271,30 +2659,24 @@
     "signOutThisSessionTitle": "Αποσύνδεση από αυτή τη συνεδρία;",
     "signOutThisSessionMessage": "Το {{device}} θα αποσυνδεθεί. Μπορεί να διατηρήσει πρόσβαση API έως και μία ώρα.",
     "signOutConfirm": "Αποσύνδεση",
-    "signOutMessage": "Θα χρειαστεί να συνδεθείτε ξανά για πρόσβαση στον χώρο εργασίας σας."
+    "signOutMessage": "Θα χρειαστεί να συνδεθείτε ξανά για να αποκτήσετε πρόσβαση στον χώρο εργασίας σας.",
+    "webBrowser": "Πρόγραμμα περιήγησης ιστού"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Δεν ήταν δυνατό το άνοιγμα του καταστήματος εφαρμογών.",
     "description": "Μια νέα έκδοση του Kilo είναι διαθέσιμη. Ενημερώστε για να συνεχίσετε.",
     "title": "Απαιτείται ενημέρωση",
-    "updateNow": "Ενημέρωση τώρα"
+    "updateNow": "Ενημέρωση τώρα",
+    "appStorePage": "σελίδα καταστήματος εφαρμογών"
   },
   "home": {
     "couldNotLoadSessions": "Δεν ήταν δυνατή η φόρτωση συνεδριών",
     "couldNotLoadActiveSessions": "Δεν ήταν δυνατή η φόρτωση ενεργών συνεδριών",
-    "agentSessions": "Συνεδρίες πράκτορα",
-    "showingSavedSessions": "Εμφάνιση αποθηκευμένων συνεδριών — η ζωντανή κατάσταση ενδέχεται να είναι ξεπερασμένη",
-    "startNewAgentSession": "Έναρξη νέας συνεδρίας Kilo Agent",
-    "aiCodingSessions": "Συνεδρίες προγραμματισμού με AI",
-    "startCodingTaskFromPhone": "Ξεκινήστε μια εργασία προγραμματισμού από το τηλέφωνό σας ή συνεχίστε μια συνεδρία από το CLI σας.",
-    "tryIt": "Δοκιμάστε το",
+    "agentSessions": "Συνεδρίες πρακτόρων",
     "newCodingTask": "Νέα εργασία προγραμματισμού",
     "explore": "Εξερεύνηση",
     "seeAll": "Προβολή όλων",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "Καλημέρα",
-    "greetingAfternoon": "Καλησπέρα",
-    "greetingEvening": "Καλό βράδυ"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Κλείσιμο {{filename}}",
@@ -2307,8 +2689,8 @@
     "title": "Η σελίδα δεν βρέθηκε"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Το περιεχόμενο περικόπηκε",
-    "truncated": "Περικοπή",
+    "contentTruncated": "Περιεχόμενο περικομμένο",
+    "truncated": "Περικομμένο",
     "wrap": "Αναδίπλωση",
     "scroll": "Κύλιση"
   },
@@ -2322,9 +2704,9 @@
     "offlineTitle": "Αποτυχία φόρτωσης",
     "offlineDescription": "Κάτι πήγε στραβά",
     "permissionTitle": "Η πρόσβαση απορρίφθηκε",
-    "permissionDescription": "Δεν έχετε άδεια να δείτε αυτό.",
+    "permissionDescription": "Δεν έχετε δικαίωμα να δείτε αυτό.",
     "notFoundTitle": "Δεν βρέθηκε",
-    "notFoundDescription": "Αυτό το στοιχείο ενδέχεται να έχει αφαιρεθεί ή να μην είναι πλέον διαθέσιμο.",
+    "notFoundDescription": "Αυτό το στοιχείο μπορεί να έχει αφαιρεθεί ή να μην είναι πλέον διαθέσιμο.",
     "serverTitle": "Δεν ήταν δυνατή η φόρτωση",
     "serverDescription": "Κάτι πήγε στραβά από την πλευρά μας. Δοκιμάστε ξανά."
   },
@@ -2339,7 +2721,7 @@
     "optionsExpiredDescription": "Επιστρέψτε και ανοίξτε ξανά αυτόν τον επιλογέα από την προηγούμενη οθόνη."
   },
   "sessionRow": {
-    "needsInput": "ΧΡΕΙΑΖΕΤΑΙ ΕΙΣΟΔΟΣ"
+    "needsInput": "χρειάζεται είσοδο"
   },
   "voiceInput": {
     "listening": "Ακρόαση...",
@@ -2348,7 +2730,17 @@
     "onlineMessage": "Αυτή η συσκευή δεν μπορεί να μεταγράψει εκτός σύνδεσης. Η εγγραφή σας αποστέλλεται στο {{provider}} για μετατροπή σε κείμενο. Το Kilo δεν αποθηκεύει τον ήχο.",
     "allow": "Επιτρέπω",
     "start": "Έναρξη φωνητικής εισόδου",
-    "stop": "Διακοπή φωνητικής εισόδου"
+    "stop": "Διακοπή φωνητικής εισόδου",
+    "restricted": "Η φωνητική είσοδος είναι περιορισμένη σε αυτή τη συσκευή.",
+    "micRequired": "Απαιτείται πρόσβαση στο μικρόφωνο για τη φωνητική είσοδο.",
+    "micOff": "Η πρόσβαση στο μικρόφωνο είναι απενεργοποιημένη. Ενεργοποιήστε την στις Ρυθμίσεις για να χρησιμοποιήσετε τη φωνητική είσοδο.",
+    "micOffTitle": "Η πρόσβαση στο μικρόφωνο είναι απενεργοποιημένη",
+    "noSpeech": "Δεν εντοπίστηκε ομιλία. Πατήστε το μικρόφωνο για να δοκιμάσετε ξανά.",
+    "needsConnection": "Η φωνητική είσοδος χρειάζεται σύνδεση αυτή τη στιγμή. Δοκιμάστε ξανά.",
+    "busy": "Η φωνητική είσοδος είναι απασχολημένη. Δοκιμάστε ξανά.",
+    "stopped": "Η φωνητική είσοδος σταμάτησε. Πατήστε το μικρόφωνο για να δοκιμάσετε ξανά.",
+    "unavailableDevice": "Η φωνητική είσοδος δεν είναι διαθέσιμη σε αυτή τη συσκευή.",
+    "unavailableLanguage": "Η φωνητική είσοδος δεν είναι διαθέσιμη για τη γλώσσα αυτής της συσκευής."
   },
   "share": {
     "title": "Κοινή χρήση στο Kilo",
@@ -2360,7 +2752,7 @@
     "connectedCli": "Σε συνδεδεμένο CLI",
     "newSessionOn": "Νέα συνεδρία στο {{name}}",
     "noMatchingSessions": "Δεν υπάρχουν αντίστοιχες συνεδρίες.",
-    "onlyFirstFilesAttached": "Θα προσαρτηθούν μόνο τα πρώτα {{count}} αρχεία.",
+    "onlyFirstFilesAttached": "Θα προσαρτηθούν μόνο τα πρώτα {{displayCount}} αρχεία.",
     "staleMessage": "Αυτή η κοινή χρήση δεν είναι πλέον διαθέσιμη.",
     "retryableMessage": "Δεν ήταν δυνατή η φόρτωση των συνεδριών σας.",
     "emptyMessage": "Δεν υπάρχουν ακόμη συνεδρίες — ξεκινήστε μια νέα για να στείλετε αυτό.",
@@ -2393,7 +2785,7 @@
     "otherAccountCopy": "Το Kilo Pass σε αυτόν τον Λογαριασμό Apple ανήκει σε διαφορετικό λογαριασμό Kilo. Συνδεθείτε σε αυτόν τον λογαριασμό Kilo για να τον διαχειριστείτε.",
     "alreadySubscribed": "Έχετε ήδη συνδρομή στο Kilo Pass.",
     "purchaseUnavailable": "Η αγορά του Kilo Pass δεν είναι διαθέσιμη αυτή τη στιγμή.",
-    "tierCredits": "${{amount}} σε πιστώσεις",
+    "tierCredits": "{{amount}} σε πιστώσεις",
     "perMonth": "{{price}}/μήνα",
     "verifyPurchaseFailed": "Δεν ήταν δυνατή η επαλήθευση της αγοράς σας. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",
     "productsCouldNotLoad": "Δεν ήταν δυνατή η φόρτωση των προϊόντων Kilo Pass από το App Store.",
@@ -2404,7 +2796,7 @@
     "manageFailed": "Αποτυχία ανοίγματος της διαχείρισης συνδρομών του App Store.",
     "kiloPassSetup": "Ρύθμιση Kilo Pass",
     "subscriptionHeaderDescription": "Μια μηνιαία συνδρομή που προσθέτει πιστώσεις στο υπόλοιπό σας Kilo για την εκτέλεση συνεδριών προγραμματισμού με AI στην Εφαρμογή Kilo — Cloud Agents, απομακρυσμένες συνεδρίες και συνομιλίες KiloClaw.",
-    "tierDescription": "Πιστώσεις ${{price}} που προστίθενται μηνιαίως για χρήση της Εφαρμογής Kilo.",
+    "tierDescription": "Πιστώσεις {{price}} που προστίθενται μηνιαίως για χρήση της Εφαρμογής Kilo.",
     "subscribe": "Εγγραφή",
     "subscribeDescription": "Μηνιαίες πιστώσεις με πρόσθετη πρόοδο μπόνους",
     "manage": "Διαχείριση",
@@ -2412,7 +2804,7 @@
     "statusPending": "Το Kilo Pass εκκρεμεί",
     "statusCanceling": "Το Kilo Pass ακυρώνεται",
     "statusPastDue": "Το Kilo Pass είναι ληξιπρόθεσμο",
-    "monthlyCredits": "${{credits}} μηνιαίες πιστώσεις",
+    "monthlyCredits": "{{credits}} μηνιαίες πιστώσεις",
     "ends": "Λήγει {{date}}",
     "periodEnd": "τέλος περιόδου",
     "managedOnGooglePlay": "Διαχείριση στο Google Play",
@@ -2426,7 +2818,15 @@
     "webManagementDescription": "Αυτό το Kilo Pass διαχειρίζεται στον ιστό.",
     "legalDisclosure": "Το Kilo Pass είναι μια συνδρομή με αυτόματη ανανέωση σε μηνιαία βάση. Η πληρωμή χρεώνεται στο Apple ID σας κατά την επιβεβαίωση της αγοράς. Οι συνδρομές ανανεώνονται αυτόματα κάθε μήνα στην τιμή που εμφανίζεται, εκτός εάν ακυρωθούν τουλάχιστον 24 ώρες πριν από το τέλος της τρέχουσας περιόδου. Διαχειριστείτε ή ακυρώστε ανά πάσα στιγμή στις ρυθμίσεις του λογαριασμού σας στο App Store.",
     "legalPrivacyPolicy": "Πολιτική Απορρήτου",
-    "legalTermsOfUse": "Όροι Χρήσης (EULA)"
+    "legalTermsOfUse": "Όροι Χρήσης (EULA)",
+    "purchaseDifferentAccount": "Αυτή η αγορά από το App Store δεν συνδέεται με τον λογαριασμό σας στο Kilo. Συνδεθείτε με τον Λογαριασμό Apple που χρησιμοποιήθηκε για την αγορά και δοκιμάστε ξανά.",
+    "restoreFailed": "Δεν ήταν δυνατή η επαναφορά των αγορών. Δοκιμάστε ξανά.",
+    "purchaseFailed": "Δεν ήταν δυνατή η ολοκλήρωση της αγοράς.",
+    "purchaseStartFailed": "Δεν ήταν δυνατή η έναρξη της αγοράς από το App Store.",
+    "purchaseOwnedByAnotherAccount": "Το Kilo Pass σε αυτόν τον Λογαριασμό Apple ανήκει σε διαφορετικό λογαριασμό Kilo.",
+    "couldNotConnectToAppStore": "Δεν ήταν δυνατή η σύνδεση με το App Store. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",
+    "noMatchingProducts": "Το App Store δεν επέστρεψε προϊόντα Kilo Pass που να ταιριάζουν.",
+    "purchaseMissingSignedTransaction": "Η αγορά στο App Store δεν περιλάμβανε υπογεγραμμένη JWS συναλλαγής."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2514,15 +2914,10 @@
   "feedback": {
     "noEmailApp": "Δεν υπάρχει διαθέσιμη εφαρμογή email. Μπορείτε να επικοινωνήσετε μαζί μας στο {{email}}",
     "couldNotOpenStore": "Δεν ήταν δυνατό το άνοιγμα του καταστήματος.",
-    "promptTitle": "Πώς σας φαίνεται η εφαρμογή Kilo;",
-    "iLikeIt": "Μου αρέσει",
-    "gladTitle": "Χαιρόμαστε που το ακούμε!",
-    "gladMessage": "Μια κριτική στο κατάστημα θα μας βοηθούσε πάρα πολύ. Ευχαριστούμε που χρησιμοποιείτε το Kilo!",
-    "rateKilo": "Βαθμολογήστε το Kilo",
-    "needsWork": "Χρειάζεται βελτίωση",
-    "sorryTitle": "Λυπούμαστε που το ακούμε!",
-    "sorryMessage": "Παρακαλούμε ενημερώστε μας τι πρέπει να βελτιωθεί. Ο μηχανικός που είναι υπεύθυνος για την εφαρμογή διαβάζει κάθε αναφορά!",
-    "emailUs": "Στείλτε μας email"
+    "emailSubject": "σχόλια για την εφαρμογή για κινητά",
+    "neutralTitle": "Βαθμολογήστε την εφαρμογή Kilo",
+    "rateTheApp": "Βαθμολογήστε την εφαρμογή",
+    "sendFeedback": "Στείλτε σχόλια"
   },
   "organization": {
     "boundary": {
@@ -2532,14 +2927,26 @@
       "organizationUnavailable": "Ο οργανισμός δεν είναι διαθέσιμος",
       "selectDescription": "Επιλέξτε έναν οργανισμό από το προφίλ σας για να συνεχίσετε.",
       "selectOrganization": "Επιλογή οργανισμού",
-      "unavailableDescription": "Αυτός ο οργανισμός δεν είναι πλέον διαθέσιμος. Επιλέξτε έναν από το προφίλ σας για να συνεχίσετε."
+      "unavailableDescription": "Αυτός ο οργανισμός δεν είναι πλέον διαθέσιμος. Επιλέξτε έναν από το προφίλ σας για να συνεχίσετε.",
+      "accessDeniedTitle": "Η πρόσβαση απορρίφθηκε",
+      "accessDeniedDescription": "Δεν έχετε πρόσβαση σε αυτόν τον οργανισμό."
     },
     "creditActivity": {
       "emptyDescription": "Οι αγορές, η χρήση και οι προσαρμογές πιστώσεων για αυτόν τον οργανισμό θα εμφανίζονται εδώ καθώς πραγματοποιούνται.",
       "emptyTitle": "Καμία δραστηριότητα πιστώσεων",
       "expires": "Λήγει {{date}}",
       "title": "Δραστηριότητα πιστώσεων",
-      "transactionFallback": "Συναλλαγή πιστώσεων"
+      "transactionFallback": "Συναλλαγή πιστώσεων",
+      "category": {
+        "organization_custom": "Προσαρμοσμένο οργανισμού",
+        "parent_to_child_transfer_in": "Εισερχόμενη μεταφορά από γονικό σε θυγατρικό",
+        "parent_to_child_transfer_out": "Εξερχόμενη μεταφορά από γονικό σε θυγατρικό",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "Λογιστική προσαρμογή",
+        "credits_expired": "Ληγμένες πιστώσεις"
+      }
     },
     "inviteMember": {
       "emailError": "Εισαγάγετε μια έγκυρη διεύθυνση email",
@@ -2556,10 +2963,17 @@
       "emptyDescription": "Τα τιμολόγια δημιουργούνται αυτόματα κάθε κύκλο χρέωσης και θα εμφανίζονται εδώ μόλις χρεωθεί ο οργανισμός σας.",
       "emptyTitle": "Κανένα τιμολόγιο",
       "invoiceFallback": "Τιμολόγιο",
-      "statusOpen": "Ανοιχτό",
-      "statusPaid": "Πληρωμένο",
-      "statusVoid": "Άκυρο",
-      "title": "Τιμολόγια"
+      "title": "Τιμολόγια",
+      "downloadFailed": "Δεν ήταν δυνατή η λήψη του τιμολογίου. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",
+      "sharingUnavailable": "Η κοινή χρήση δεν είναι διαθέσιμη σε αυτή τη συσκευή.",
+      "status": {
+        "paid": "Πληρωμένο",
+        "open": "Ανοιχτό",
+        "void": "Άκυρο",
+        "draft": "Πρόχειρο",
+        "uncollectible": "Μη εισπράξιμο",
+        "unknown": "Άγνωστο"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2608,7 +3022,7 @@
         "billingManager": "Διαχειριστής χρέωσης"
       },
       "emailStatusFailed": "Το email απέτυχε",
-      "emailStatusPending": "Εκκρεμεί",
+      "emailStatusPending": "Σε εκκρεμότητα",
       "inviteCreated": "Η πρόσκληση δημιουργήθηκε",
       "pendingInvitations": "Εκκρεμείς προσκαλέσεις",
       "resendInvite": "Επαναποστολή πρόσκλησης",
@@ -2645,8 +3059,9 @@
       "manageHint": "Ανοίγει τη διαχείριση Kilo Pass στο διαδίκτυο.",
       "notSubscribed": "Χωρίς συνδρομή",
       "overallocated": "Οι αναθέσεις Pass υπερβαίνουν τις πληρωμένες θέσεις",
-      "paidSeatOne": "{{count}} πληρωμένη θέση",
-      "paidSeatOther": "{{count}} πληρωμένες θέσεις",
+      "paidSeat_one": "{{displayCount}} πληρωμένη θέση",
+      "paidSeat": "{{displayCount}} πληρωμένες θέσεις",
+      "paidSeat_other": "{{displayCount}} πληρωμένες θέσεις",
       "paymentNeedsAttention": "Η πληρωμή χρειάζεται προσοχή",
       "paymentPending": "Η πληρωμή εκκρεμεί",
       "processingBlocked": "Η επεξεργασία αποκλείστηκε",
@@ -2670,11 +3085,29 @@
     "invalidRequest": "Ελέγξτε τη διεύθυνση email σας και προσπαθήστε ξανά.",
     "emailDeliveryFailed": "Η παράδοση email δεν είναι προσωρινά διαθέσιμη. Προσπαθήστε ξανά αργότερα.",
     "admissionRequired": "Η συσκευή σας δεν μπορεί να επαληθευτεί. Χρησιμοποιήστε τις «$t(login.moreSignInOptions)» για να συνδεθείτε από άλλη συσκευή ή μέσω ιστού.",
-    "default": "Κάτι πήγε στραβά. Προσπαθήστε ξανά.",
-    "retryableAdmission": "Δεν μπορέσαμε να επαληθεύσουμε αυτή τη συσκευή. Ελέγξτε τη σύνδεσή σας και προσπαθήστε ξανά."
+    "default": "Κάτι πήγε στραβά. Δοκιμάστε ξανά.",
+    "retryableAdmission": "Δεν μπορέσαμε να επαληθεύσουμε αυτή τη συσκευή. Ελέγξτε τη σύνδεσή σας και προσπαθήστε ξανά.",
+    "startSignInFailed": "Δεν ήταν δυνατή η έναρξη της σύνδεσης. Δοκιμάστε ξανά.",
+    "couldNotOpenBrowser": "Δεν ήταν δυνατό το άνοιγμα του προγράμματος περιήγησης. Δοκιμάστε ξανά.",
+    "signInTimedOut": "Η σύνδεση έληξε. Δοκιμάστε ξανά.",
+    "signInFailed": "Η σύνδεση απέτυχε. Προσπαθήστε ξανά.",
+    "networkError": "Σφάλμα δικτύου. Δοκιμάστε ξανά.",
+    "accessDeniedByUser": "Η πρόσβαση απορρίφθηκε από τον χρήστη",
+    "codeExpired": "Ο κωδικός έληξε",
+    "tooManySignInAttempts": "Πάρα πολλές προσπάθειες σύνδεσης. Περιμένετε και δοκιμάστε ξανά."
   },
   "models": {
     "dataCollected": "Δεδομένα που συλλέγονται",
-    "free": "Δωρεάν"
+    "free": "Δωρεάν",
+    "couldNotUpdateFavorites": "Δεν ήταν δυνατή η ενημέρωση των αγαπημένων",
+    "thinkingEffort": {
+      "none": "Καμία",
+      "minimal": "Ελάχιστη",
+      "low": "Χαμηλή",
+      "medium": "Μεσαία",
+      "high": "Υψηλή",
+      "xhigh": "Πολύ υψηλή",
+      "max": "Μέγιστη"
+    }
   }
 }

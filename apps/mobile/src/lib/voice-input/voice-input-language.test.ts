@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __resetVoiceInputLanguageTagCacheForTests,
   pickSupportedVoiceInputLanguageTag,
-  resolveVoiceInputLanguageTag,
   resolveVoiceInputStartLanguageTag,
 } from './voice-input-language';
 
@@ -27,30 +26,6 @@ vi.mock('expo-speech-recognition', () => ({
     getSupportedLocales: getSupportedLocalesMock,
   },
 }));
-
-describe('resolveVoiceInputLanguageTag', () => {
-  it('falls back to en-US when the locales array is empty', () => {
-    expect(resolveVoiceInputLanguageTag([])).toBe('en-US');
-  });
-
-  it('falls back to en-US when the first locale has no languageTag', () => {
-    expect(resolveVoiceInputLanguageTag([{}])).toBe('en-US');
-  });
-
-  it('falls back to en-US when the first locale languageTag is empty', () => {
-    expect(resolveVoiceInputLanguageTag([{ languageTag: '' }])).toBe('en-US');
-  });
-
-  it('returns the first locale languageTag when it is populated', () => {
-    expect(resolveVoiceInputLanguageTag([{ languageTag: 'nl-NL' }])).toBe('nl-NL');
-  });
-
-  it('ignores later locales', () => {
-    expect(resolveVoiceInputLanguageTag([{ languageTag: 'fr-FR' }, { languageTag: 'de-DE' }])).toBe(
-      'fr-FR'
-    );
-  });
-});
 
 describe('pickSupportedVoiceInputLanguageTag', () => {
   it('returns the supported spelling on exact match (device en_US → supported en-US)', () => {
@@ -92,6 +67,46 @@ describe('pickSupportedVoiceInputLanguageTag', () => {
   it('underscore-form supported identifier returns the original spelling', () => {
     expect(pickSupportedVoiceInputLanguageTag(['en-DE'], ['en_US'])).toBe('en_US');
   });
+
+  it('keeps the device Chinese script when only a region differs', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['zh-Hant-TW'], ['zh-CN', 'zh-Hant'])).toBe(
+      'zh-Hant'
+    );
+  });
+
+  it('keeps the Traditional script when the device names a Traditional region', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['zh-Hant', 'zh-TW'], ['zh-CN', 'zh-TW'])).toBe(
+      'zh-TW'
+    );
+  });
+
+  it('maps a Simplified script tag onto the Simplified region', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['zh-Hans'], ['zh-TW', 'zh-CN'])).toBe('zh-CN');
+  });
+
+  it('maps the HK region to Traditional Chinese', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['zh-HK'], ['zh-CN', 'zh-TW'])).toBe('zh-TW');
+  });
+
+  it('maps the Simplified region zh-MY onto the Simplified script', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['zh-MY'], ['zh-TW', 'zh-CN'])).toBe('zh-CN');
+  });
+
+  it('maps the Serbian RS region onto Cyrillic', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['sr-RS'], ['sr-Latn', 'sr-Cyrl'])).toBe('sr-Cyrl');
+  });
+
+  it('maps the Punjabi PK region onto the Arabic script', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['pa-PK'], ['pa-Guru', 'pa-Arab'])).toBe('pa-Arab');
+  });
+
+  it('maps the Azerbaijani IR region onto the Arabic script', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['az-IR'], ['az-Latn', 'az-Arab'])).toBe('az-Arab');
+  });
+
+  it('keeps the old behavior for a non-Chinese tag', () => {
+    expect(pickSupportedVoiceInputLanguageTag(['de-AT'], ['de-DE', 'de-CH'])).toBe('de-DE');
+  });
 });
 
 describe('resolveVoiceInputStartLanguageTag', () => {
@@ -107,7 +122,7 @@ describe('resolveVoiceInputStartLanguageTag', () => {
       installedLocales: [],
     });
 
-    const tag = await resolveVoiceInputStartLanguageTag();
+    const tag = await resolveVoiceInputStartLanguageTag('nl');
     expect(tag).toBe('nl-NL');
   });
 
@@ -118,7 +133,7 @@ describe('resolveVoiceInputStartLanguageTag', () => {
       installedLocales: [],
     });
 
-    const tag = await resolveVoiceInputStartLanguageTag();
+    const tag = await resolveVoiceInputStartLanguageTag('en');
     expect(tag).toBe('en-US');
   });
 
@@ -126,8 +141,8 @@ describe('resolveVoiceInputStartLanguageTag', () => {
     localizationMock.getLocales.mockReturnValue([{ languageTag: 'en-DE' }]);
     getSupportedLocalesMock.mockResolvedValue({ locales: [], installedLocales: [] });
 
-    const tag = await resolveVoiceInputStartLanguageTag();
-    expect(tag).toBe('en-DE');
+    const tag = await resolveVoiceInputStartLanguageTag('en');
+    expect(tag).toBe('en');
   });
 
   it('returns the raw tag when getSupportedLocales rejects, and retries on a later call', async () => {
@@ -138,10 +153,10 @@ describe('resolveVoiceInputStartLanguageTag', () => {
       installedLocales: [],
     });
 
-    const first = await resolveVoiceInputStartLanguageTag();
-    expect(first).toBe('en-DE');
+    const first = await resolveVoiceInputStartLanguageTag('en');
+    expect(first).toBe('en');
 
-    const second = await resolveVoiceInputStartLanguageTag();
+    const second = await resolveVoiceInputStartLanguageTag('en');
     expect(second).toBe('en-US');
   });
 
@@ -151,15 +166,45 @@ describe('resolveVoiceInputStartLanguageTag', () => {
       throw new Error('package not found');
     });
 
-    const tag = await resolveVoiceInputStartLanguageTag();
-    expect(tag).toBe('en-DE');
+    const tag = await resolveVoiceInputStartLanguageTag('en');
+    expect(tag).toBe('en');
   });
 
   it('returns the raw tag as pass-through when no match in a non-empty list', async () => {
     localizationMock.getLocales.mockReturnValue([{ languageTag: 'fil-PH' }]);
     getSupportedLocalesMock.mockResolvedValue({ locales: ['en-US'], installedLocales: [] });
 
-    const tag = await resolveVoiceInputStartLanguageTag();
-    expect(tag).toBe('fil-PH');
+    const tag = await resolveVoiceInputStartLanguageTag('fil');
+    expect(tag).toBe('fil');
+  });
+
+  it('uses the selected app language before a different device language', async () => {
+    localizationMock.getLocales.mockReturnValue([{ languageTag: 'nl-NL' }]);
+    getSupportedLocalesMock.mockResolvedValue({
+      locales: ['nl-NL', 'fr-FR'],
+      installedLocales: [],
+    });
+
+    expect(await resolveVoiceInputStartLanguageTag('fr')).toBe('fr-FR');
+  });
+
+  it('uses the matching device region for the selected app language', async () => {
+    localizationMock.getLocales.mockReturnValue([{ languageTag: 'en-GB' }]);
+    getSupportedLocalesMock.mockResolvedValue({
+      locales: ['en-US', 'en-GB'],
+      installedLocales: [],
+    });
+
+    expect(await resolveVoiceInputStartLanguageTag('en')).toBe('en-GB');
+  });
+
+  it('keeps the selected Chinese script before a different device script', async () => {
+    localizationMock.getLocales.mockReturnValue([{ languageTag: 'zh-CN' }]);
+    getSupportedLocalesMock.mockResolvedValue({
+      locales: ['zh-CN', 'zh-Hant'],
+      installedLocales: [],
+    });
+
+    expect(await resolveVoiceInputStartLanguageTag('zh-Hant')).toBe('zh-Hant');
   });
 });

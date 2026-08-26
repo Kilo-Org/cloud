@@ -125,6 +125,53 @@ describe('SessionService.buildRuntimeEnv', () => {
     expect(runtimeEnv.HOME).toBe('/home/agent_test');
     expect(runtimeEnv.SESSION_HOME).toBe('/home/agent_test');
     expect(runtimeEnv[PNPM_STORE_ENV_VAR]).toBe(PNPM_STORE_DIR);
+    expect(runtimeEnv.GIT_CONFIG_COUNT).toBe('2');
+    expect(runtimeEnv.GIT_CONFIG_KEY_0).toBe('credential.helper');
+    expect(runtimeEnv.GIT_CONFIG_VALUE_0).toBe('/opt/kilo-cloud/kilo-git-credential');
+    expect(runtimeEnv.GIT_CONFIG_KEY_1).toBe('credential.useHttpPath');
+    expect(runtimeEnv.GIT_CONFIG_VALUE_1).toBe('false');
+    expect(runtimeEnv.GIT_TERMINAL_PROMPT).toBe('0');
+    expect(runtimeEnv.GIT_CONFIG_NOSYSTEM).toBeUndefined();
+    expect(runtimeEnv.GIT_CONFIG_GLOBAL).toBeUndefined();
+    expect(runtimeEnv.GIT_OPTIONAL_LOCKS).toBeUndefined();
+  });
+
+  it('wins over a profile that tries to override the git credential helper', () => {
+    const service = new SessionService();
+    const context = service.buildContext({
+      sandboxId: 'usr-test',
+      userId: 'user_test',
+      sessionId: 'agent_test',
+      envVars: {
+        GIT_CONFIG_COUNT: '99',
+        GIT_CONFIG_KEY_0: 'user.email',
+        GIT_CONFIG_VALUE_0: 'attacker@example.com',
+        GIT_CONFIG_KEY_1: 'credential.helper',
+        GIT_CONFIG_VALUE_1: '/tmp/evil-helper',
+        GIT_CONFIG_KEY_2: 'credential.helper',
+        GIT_CONFIG_VALUE_2: '/tmp/second-evil-helper',
+        GIT_CONFIG_GLOBAL: '/tmp/evil.gitconfig',
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_TERMINAL_PROMPT: '1',
+      },
+    });
+
+    const runtimeEnv = service.buildRuntimeEnv({
+      context,
+      env: createEnv(),
+      kiloCapability: 'kilo-token',
+    });
+
+    expect(runtimeEnv.GIT_CONFIG_COUNT).toBe('2');
+    expect(runtimeEnv.GIT_CONFIG_KEY_0).toBe('credential.helper');
+    expect(runtimeEnv.GIT_CONFIG_VALUE_0).toBe('/opt/kilo-cloud/kilo-git-credential');
+    expect(runtimeEnv.GIT_CONFIG_KEY_1).toBe('credential.useHttpPath');
+    expect(runtimeEnv.GIT_CONFIG_VALUE_1).toBe('false');
+    expect(runtimeEnv.GIT_TERMINAL_PROMPT).toBe('0');
+    expect(runtimeEnv.GIT_CONFIG_KEY_2).toBeUndefined();
+    expect(runtimeEnv.GIT_CONFIG_VALUE_2).toBeUndefined();
+    expect(runtimeEnv.GIT_CONFIG_GLOBAL).toBeUndefined();
+    expect(runtimeEnv.GIT_CONFIG_NOSYSTEM).toBeUndefined();
   });
 });
 
@@ -344,6 +391,12 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
         updateMetadata: vi.fn().mockResolvedValue(undefined),
       })),
     } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
+    SANDBOX_SESSION: {
+      idFromName: vi.fn(() => 'sandbox-session-do-id' as unknown as DurableObjectId),
+      get: vi.fn(() => ({
+        getMetadata: vi.fn().mockResolvedValue(null),
+      })),
+    } as unknown as PersistenceEnv['SANDBOX_SESSION'],
     SESSION_INGEST: {
       fetch: vi.fn(),
       createSessionForCloudAgent: vi.fn().mockResolvedValue(undefined),
@@ -2105,6 +2158,30 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kilo-token');
   });
 
+  it('forwards persisted GitHub integration identity to contained capability issuance', async () => {
+    const expectedIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+    const metadata = parseSessionMetadata({
+      ...createMetadata({
+        githubRepo: 'acme/repo',
+        gitUrl: undefined,
+        gitToken: undefined,
+        platform: 'github',
+      }),
+      repository: {
+        type: 'github',
+        repo: 'acme/repo',
+        githubIntegrationId: expectedIntegrationId,
+      },
+    });
+
+    await buildPromptWrapperRequests(metadata);
+
+    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ expectedIntegrationId })
+    );
+  });
+
   it('uses a managed GitHub capability for shared standard sandboxes', async () => {
     const result = await buildPromptWrapperRequests({
       ...createMetadata({
@@ -2718,6 +2795,57 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(opencodeConfig).toEqual(kiloConfig);
   });
 
+  it.each(['fake-deterministic', 'kilo/fake-deterministic'])(
+    'pins small_model and title model when the session model is %s',
+    async model => {
+      const service = new SessionService();
+      const env = createEnv();
+      env.WORKER_URL = 'https://cloud-agent.example.com';
+      const result = await service.buildWrapperSessionReadyAndPromptRequests({
+        env,
+        plan: {
+          scope: { sessionId: 'agent_test', userId: 'user_test' },
+          turn: {
+            type: 'prompt',
+            messageId: 'msg_018f1e2d3c4bFakeModelAAAAAA',
+            prompt: 'Do the work',
+          },
+          agent: { mode: 'code', model },
+          workspace: { sandboxId: 'ses-abcdef', metadata: createMetadata() },
+          wrapper: {
+            fence: {
+              wrapperRunId: 'wr_fake_model',
+              wrapperGeneration: 1,
+              wrapperConnectionId: 'conn_fake_model',
+            },
+          },
+        } satisfies FencedWrapperDispatchRequest,
+      });
+      const config = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+        model?: string;
+        small_model?: string;
+        agent?: { title?: { model?: string } };
+      };
+
+      expect(config.model).toBe('kilo/fake-deterministic');
+      expect(config.small_model).toBe('kilo/fake-deterministic');
+      expect(config.agent?.title?.model).toBe('kilo/fake-deterministic');
+    }
+  );
+
+  it('does not pin small_model or title model for real session models', async () => {
+    const result = await buildPromptWrapperRequests(createMetadata());
+    const config = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+      model?: string;
+      small_model?: string;
+      agent?: { title?: { model?: string } };
+    };
+
+    expect(config.model).toBe('kilo/test-model');
+    expect(config.small_model).toBeUndefined();
+    expect(config.agent?.title).toBeUndefined();
+  });
+
   it('passes canonical document attachments through signed wrapper prompt construction', async () => {
     const service = new SessionService();
     const env = createEnv();
@@ -2849,6 +2977,31 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       name: 'kiloconnect[bot]',
       email: 'bot@example.com',
     });
+  });
+
+  it('forwards persisted GitHub integration identity to direct token resolution', async () => {
+    const expectedIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+    const metadata = parseSessionMetadata({
+      ...createMetadata({
+        githubRepo: 'acme/repo',
+        gitUrl: undefined,
+        gitToken: undefined,
+        platform: 'github',
+        sandboxId: 'dind-abcdef',
+      }),
+      repository: {
+        type: 'github',
+        repo: 'acme/repo',
+        githubIntegrationId: expectedIntegrationId,
+      },
+    });
+
+    await buildPromptWrapperRequests(metadata);
+
+    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ expectedIntegrationId })
+    );
   });
 
   it('requests user GitHub auth eligibility for Slack bot sessions', async () => {
@@ -3270,14 +3423,17 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         `bb comments create 42 --input - < ${inputPath}`
       )
     ).toBe('allow');
+    expect(result.readyRequest.materialized.env).toMatchObject({
+      GIT_CONFIG_COUNT: '2',
+      GIT_CONFIG_KEY_0: 'credential.helper',
+      GIT_CONFIG_VALUE_0: '/opt/kilo-cloud/kilo-git-credential',
+      GIT_CONFIG_KEY_1: 'credential.useHttpPath',
+      GIT_CONFIG_VALUE_1: 'false',
+      GIT_TERMINAL_PROMPT: '0',
+    });
     for (const key of [
       'GIT_CONFIG_NOSYSTEM',
       'GIT_CONFIG_GLOBAL',
-      'GIT_CONFIG_COUNT',
-      'GIT_CONFIG_KEY_0',
-      'GIT_CONFIG_VALUE_0',
-      'GIT_CONFIG_KEY_1',
-      'GIT_CONFIG_VALUE_1',
       'GIT_CONFIG_KEY_2',
       'GIT_CONFIG_VALUE_2',
       'GIT_OPTIONAL_LOCKS',

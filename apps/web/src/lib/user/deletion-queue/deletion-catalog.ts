@@ -151,10 +151,17 @@ export const USER_DELETION_CATALOG_V2 = [
     allowsManualVerification: true,
   },
   {
+    stepKey: UserDeletionStepKey.CompletionEmail,
+    phase: UserDeletionPhase.Finalize,
+    maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
+    dependsOn: [...V2_TEARDOWN_KEYS, UserDeletionStepKey.Anonymize],
+    allowsManualVerification: true,
+  },
+  {
     stepKey: UserDeletionStepKey.PylonContact,
     phase: UserDeletionPhase.Finalize,
     maxOrdinaryAttempts: USER_DELETION_MAX_ORDINARY_ATTEMPTS,
-    dependsOn: [UserDeletionStepKey.PylonFinalize],
+    dependsOn: [UserDeletionStepKey.PylonFinalize, UserDeletionStepKey.CompletionEmail],
     allowsManualVerification: true,
   },
   {
@@ -181,6 +188,31 @@ export function catalogEntryFor(
     throw new Error(`Unknown user deletion step ${stepKey} for catalog version ${version}`);
   }
   return entry;
+}
+
+export function validateMaterializedStepKeys(
+  version: number,
+  stepKeys: readonly UserDeletionStepKey[]
+): void {
+  const seen = new Set<UserDeletionStepKey>();
+  for (const stepKey of stepKeys) {
+    if (seen.has(stepKey)) {
+      throw new Error(
+        `User deletion queue integrity error: duplicate step ${stepKey} for catalog version ${version}`
+      );
+    }
+    seen.add(stepKey);
+    catalogEntryFor(version, stepKey);
+  }
+
+  for (const { stepKey } of catalogForVersion(version)) {
+    if (seen.has(stepKey) || (version === 2 && stepKey === UserDeletionStepKey.CompletionEmail)) {
+      continue;
+    }
+    throw new Error(
+      `User deletion queue integrity error: missing required step ${stepKey} for catalog version ${version}`
+    );
+  }
 }
 
 export function teardownStepKeys(

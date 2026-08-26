@@ -79,7 +79,8 @@ jobs:
     with:
       target_environment: staging
       vercel_project_id_var: VERCEL_PROJECT_ID_APP
-    secrets: inherit
+    secrets:
+      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   deploy-global-app:
     needs: [check-staging-db-startup, run-migrations]
@@ -87,7 +88,8 @@ jobs:
     with:
       target_environment: staging
       vercel_project_id_var: VERCEL_PROJECT_ID_GLOBAL_APP
-    secrets: inherit
+    secrets:
+      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
 
   deploy-workers:
     needs: [check-staging-db-startup, run-migrations, deploy-app, deploy-global-app]

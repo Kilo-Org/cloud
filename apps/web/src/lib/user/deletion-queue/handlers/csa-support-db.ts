@@ -33,6 +33,8 @@ export const handleCsaSupportDb: DeletionHandler = async ({ request, context }) 
   };
   const actorEmail = request.requested_by_email?.trim();
   if (actorEmail) headers['X-Actor-Email'] = actorEmail;
+  const protectionBypass = getEnvVariable('CSA_VERCEL_PROTECTION_BYPASS').trim();
+  if (protectionBypass) headers['x-vercel-protection-bypass'] = protectionBypass;
 
   const result = await deletionFetch(context, `${baseUrl}/api/internal/cloud/users/gdpr-scrub`, {
     method: 'POST',

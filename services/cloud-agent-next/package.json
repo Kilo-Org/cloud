@@ -16,9 +16,9 @@
     "prestart": "pnpm run build:wrapper",
     "start": "scripts/dev-with-docker-proxy.sh",
     "types": "wrangler types",
-    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/cloud-agent-next/src services/cloud-agent-next/wrapper/src",
-    "format": "oxfmt src",
-    "format:check": "oxfmt --list-different src",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/cloud-agent-next/src services/cloud-agent-next/scripts services/cloud-agent-next/wrapper/src",
+    "format": "oxfmt src scripts",
+    "format:check": "oxfmt --list-different src scripts",
     "build:wrapper": "bun run --cwd wrapper build",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -27,6 +27,7 @@
     "test:wrapper": "pnpm -C wrapper run test",
     "test:all": "vitest run && vitest run --config vitest.workers.config.ts && pnpm run test:wrapper",
     "typecheck": "tsgo --noEmit && pnpm -C wrapper run typecheck",
+    "snapshot:vercel": "tsx scripts/vercel-snapshot.ts",
     "update-default-slash-commands": "node scripts/update-default-slash-commands.mjs"
   },
   "dependencies": {

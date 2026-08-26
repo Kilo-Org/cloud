@@ -591,6 +591,14 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       ...(event.attempts !== undefined ? { attempts: event.attempts } : {}),
     };
     pendingMessages.set(event.messageId, deliveryState);
+    // A preparation failure can arrive as a terminal message-delivery event
+    // without a separate preparing event. Do not leave the composer showing
+    // "Setting up environment" forever in that case. An interrupt is the user
+    // cancelling, not a failure, so it clears the stale status instead of
+    // raising an error banner.
+    if (cloudStatus?.type === 'preparing') {
+      cloudStatus = event.reason === 'interrupted' ? null : { type: 'error', message: event.error };
+    }
     if (event.reason === 'interrupted') {
       activity = { type: 'idle' };
       status = { type: 'interrupted' };

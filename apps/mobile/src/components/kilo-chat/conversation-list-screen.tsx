@@ -1,6 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { useBotStatus, useEventServiceClient } from '@kilocode/kilo-chat-hooks';
 import * as Haptics from 'expo-haptics';
+import { getCalendars } from 'expo-localization';
 import { type Href, useRouter } from 'expo-router';
 import { Plus, Settings2 } from '@/components/ui/icons';
 import { useCallback, useMemo } from 'react';
@@ -91,7 +92,8 @@ function flattenConversationGroups(
   nowMs: number
 ): ConversationListEntry[] {
   const entries: ConversationListEntry[] = [];
-  for (const group of groupConversationsByActivity(conversations, nowMs)) {
+  const firstWeekday = getCalendars()[0].firstWeekday ?? 1;
+  for (const group of groupConversationsByActivity(conversations, nowMs, firstWeekday)) {
     entries.push({ kind: 'header', label: group.label });
     for (const conversation of group.items) {
       entries.push({ kind: 'conversation', conversation });
@@ -298,7 +300,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
           accessibilityLabel={t('chat.conversationList.newConversation')}
           disabled={createConversation.isPending}
           onPress={handleCreateAndNavigate}
-          className="absolute h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg shadow-black/25 active:opacity-80 disabled:opacity-60"
+          className="absolute h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg shadow-[#00000040] active:opacity-80 disabled:opacity-60"
           style={createButtonStyle}
         >
           {createConversation.isPending ? (

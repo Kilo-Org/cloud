@@ -513,6 +513,7 @@ export const UserDeletionStepKey = {
   Anonymize: 'anonymize',
   PylonReply: 'pylon_reply',
   PylonFinalize: 'pylon_finalize',
+  CompletionEmail: 'completion_email',
   PylonContact: 'pylon_contact',
   CsaSupportDb: 'csa_support_db',
 } as const;
@@ -571,6 +572,16 @@ export const UserDeletionPylonReplyState = {
 export type UserDeletionPylonReplyState =
   (typeof UserDeletionPylonReplyState)[keyof typeof UserDeletionPylonReplyState];
 
+export const UserDeletionCompletionEmailState = {
+  NotSent: 'not_sent',
+  Sending: 'sending',
+  Sent: 'sent',
+  Ambiguous: 'ambiguous',
+} as const;
+
+export type UserDeletionCompletionEmailState =
+  (typeof UserDeletionCompletionEmailState)[keyof typeof UserDeletionCompletionEmailState];
+
 export type UserDeletionTaskProgress = {
   processed_count?: number;
   scanned_count?: number;
@@ -582,6 +593,7 @@ export type UserDeletionTaskProgress = {
   checkpoint_at?: string;
   reply_state?: UserDeletionPylonReplyState;
   reply_message_id?: string;
+  completion_email_state?: UserDeletionCompletionEmailState;
   close_confirmed?: boolean;
   verify_attempt_count?: number;
 };
@@ -993,6 +1005,13 @@ const OrganizationSettingsSchema = z.object({
   oss_credits_last_reset_at: z.string().nullable().optional(),
   // Full GitHub URL for OSS sponsored repos (e.g., https://github.com/org/repo)
   oss_github_url: z.string().url().nullable().optional(),
+  // Marks an organization as a sales demo org
+  is_sales_demo: z.boolean().optional(),
+  // When sales demo credits were last reset (ISO timestamp string)
+  sales_demo_last_reset_at: z.string().nullable().optional(),
+  // Seeded usage microdollars written by the sales demo populate step. Used to
+  // separate seeded usage from real spend when computing the ledger entry.
+  sales_demo_seeded_microdollars: z.number().optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;
@@ -1180,6 +1199,13 @@ export const AuditLogAction = z.enum([
   'organization.group.default_policy.remove',
   'organization.group.policy_type.enable', // Legacy action retained for existing audit rows.
   'organization.group.policy_type.disable', // Legacy action retained for existing audit rows.
+  // Collection-backed organization alerts. Messages carry the alert ID,
+  // recipient counts, and disclosure confirmation, never recipient addresses.
+  'organization.alert.create',
+  'organization.alert.update',
+  'organization.alert.enable',
+  'organization.alert.disable',
+  'organization.alert.archive',
   'organization.created', // ✅
   'organization.token.generate', // ✅
   'organization.funds.distribute_to_children', // ✅

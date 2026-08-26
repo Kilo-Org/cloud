@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
   type ActiveOrgMember,
@@ -37,7 +39,9 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
   });
   const currentLimit = member.dailyUsageLimitUsd;
 
-  const limitRef = useRef(currentLimit != null ? String(currentLimit) : '');
+  const initialValue =
+    currentLimit == null ? '' : formatNumber(currentLimit, i18n.language, { useGrouping: false });
+  const limitRef = useRef(initialValue);
   const [canSave, setCanSave] = useState(limitError(limitRef.current) == null);
 
   const onSaved = () => {
@@ -64,7 +68,7 @@ function MemberLimitForm({ memberId, organizationId, member }: MemberLimitFormPr
         required
         placeholder={t('organization.memberLimit.noLimitPlaceholder')}
         keyboardType="decimal-pad"
-        defaultValue={currentLimit != null ? String(currentLimit) : undefined}
+        defaultValue={initialValue || undefined}
         validate={limitError}
         onChangeText={value => {
           limitRef.current = value;
@@ -110,7 +114,7 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
 
   if (isResolving || orgWithMembers.isLoading) {
     return (
-      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+      <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
         <View className="gap-1">
           <Text className="text-center text-lg font-semibold text-foreground">
             {t('organization.memberLimit.title')}
@@ -131,7 +135,7 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
 
   if (orgWithMembers.isError && !orgWithMembers.data) {
     return (
-      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+      <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
         <Text className="text-center text-lg font-semibold text-foreground">
           {t('organization.memberLimit.title')}
         </Text>
@@ -146,7 +150,7 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
 
   if (!member) {
     return (
-      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+      <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
         <Text className="text-center text-lg font-semibold text-foreground">
           {t('organization.memberLimit.title')}
         </Text>
@@ -159,8 +163,8 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
 
   return (
     <ScrollView
-      className="flex-1 bg-background px-6"
-      contentContainerClassName="gap-6 pb-8 pt-4"
+      className="flex-1 bg-background"
+      contentContainerClassName="px-6 gap-6 pb-8 pt-4"
       automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
     >

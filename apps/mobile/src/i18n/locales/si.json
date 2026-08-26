@@ -22,7 +22,12 @@
     "copiedToClipboard": "පසුරු පුවරුවට පිටපත් කරන ලදී",
     "couldNotCopyToClipboard": "පසුරු පුවරුවට පිටපත් කිරීමට නොහැකි විය",
     "required": "අවශ්‍යයි",
-    "error": "දෝෂය: {{error}}"
+    "error": "දෝෂය: {{error}}",
+    "back": "ආපසු",
+    "somethingWentWrong": "යම් දෙයක් වැරදී ඇත",
+    "couldNotOpen": "{{label}} විවෘත කිරීමට නොහැකි විය",
+    "link": "සබැඳිය",
+    "takingLonger": "මෙය බලාපොරොත්තු වූවාට වඩා වැඩි කාලයක් ගනී. ඔබට මෙය වසා නැවත පරීක්ෂා කළ හැක."
   },
   "language": {
     "title": "භාෂාව",
@@ -33,7 +38,9 @@
     "retry": "නැවත උත්සාහ කරන්න",
     "search": "භාෂා සොයන්න",
     "noMatches": "ගැළපෙන භාෂා නොමැත",
-    "deviceLanguage": "උපාංග භාෂාව"
+    "deviceLanguage": "උපාංග භාෂාව",
+    "current": "වත්මන්",
+    "allLanguages": "සියලු භාෂා"
   },
   "login": {
     "welcome": "Kilo වෙත සාදරයෙන් පිළිගනිමු",
@@ -88,7 +95,7 @@
     "reviews": "සමාලෝචන",
     "prReview": "PR සමාලෝචනය",
     "prReviewSubtitle": "ජංගම දුරකථනයේ pull requests සමාලෝචනය කරන්න",
-    "organization": "ආයතනය",
+    "organization": "සංවිධානය",
     "couldNotLoadOrganization": "ආයතනය පූරණය කිරීමට නොහැකි විය",
     "couldNotLoadOrganizationDescription": "මෙය පූරණය වන තුරු ආයතන සහ නියෝජිත සැකසුම් ලබා ගත නොහැක.",
     "linkedAccounts": "සම්බන්ධිත ගිණුම්",
@@ -123,7 +130,7 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "විද්‍යුත් තැපෑල",
+    "providerEmail": "ඊමේල්",
     "providerTestAccount": "පරීක්ෂණ ගිණුම",
     "providerGithub": "GitHub",
     "providerGitlab": "GitLab",
@@ -143,7 +150,9 @@
     "appearanceSystem": "පද්ධතිය",
     "appearanceLight": "ආලෝකය",
     "appearanceDark": "අඳුරු",
-    "account": "ගිණුම"
+    "account": "ගිණුම",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ලබා ගත නොහැක",
@@ -206,11 +215,11 @@
       "loadingLines": "{{total}} න් {{loaded}} පේළි පූරණය වෙමින්…",
       "expandContext": "සන්දර්භය පුළුල් කරන්න",
       "expandMoreContext": "තව සන්දර්භය පුළුල් කරන්න",
-      "expandLines": "පේළි {{count}} පුළුල් කරන්න ({{start}}–{{end}})",
-      "expandMoreLines": "තව පේළි {{count}} පුළුල් කරන්න ({{start}}–{{end}})",
-      "expandLinesOfContext": "සන්දර්භ පේළි {{count}} පුළුල් කරන්න",
+      "expandLines": "පේළි {{displayCount}} පුළුල් කරන්න ({{start}}–{{end}})",
+      "expandMoreLines": "තව පේළි {{displayCount}} පුළුල් කරන්න ({{start}}–{{end}})",
+      "expandLinesOfContext": "සන්දර්භ පේළි {{displayCount}} පුළුල් කරන්න",
       "expandAll": "සියල්ල පුළුල් කරන්න",
-      "expandAllLines": "පේළි {{count}} සියල්ල පුළුල් කරන්න",
+      "expandAllLines": "පේළි {{displayCount}} සියල්ල පුළුල් කරන්න",
       "loadingMoreFiles": "තවත් ගොනු පූරණය වෙමින්…",
       "retryLoadingNextPage": "ඊළඟ පිටුව පූරණය නැවත උත්සාහ කරන්න",
       "failedToLoadMoreFiles": "තවත් ගොනු පූරණය කිරීමට අසමත් විය — නැවත උත්සාහ කිරීමට තට්ටු කරන්න",
@@ -219,10 +228,12 @@
       "loadedOfTotalFiles": "ගොනු {{total}} න් {{loaded}} පූරණය විය",
       "loadAllFiles": "සියලුම ගොනු පූරණය කරන්න",
       "loadAll": "සියල්ල පූරණය කරන්න",
-      "fileLoaded": "ගොනුව {{count}} පූරණය විය",
-      "filesLoaded": "ගොනු {{count}} පූරණය විය",
-      "fileLoadedOfTotal": "{{total}} න් ගොනුව {{count}} පූරණය විය",
-      "filesLoadedOfTotal": "{{total}} න් ගොනු {{count}} පූරණය විය",
+      "fileLoadedCount_one": "ගොනුව {{displayCount}} පූරණය විය",
+      "fileLoadedCount": "ගොනු {{displayCount}} පූරණය විය",
+      "fileLoadedCount_other": "ගොනු {{displayCount}} පූරණය විය",
+      "fileLoadedOfTotalCount_one": "{{total}} න් ගොනුව {{displayCount}} පූරණය විය",
+      "fileLoadedOfTotalCount": "{{total}} න් ගොනු {{displayCount}} පූරණය විය",
+      "fileLoadedOfTotalCount_other": "{{total}} න් ගොනු {{displayCount}} පූරණය විය",
       "filesStillLoading": "ගොනු තවමත් පූරණය වෙමින් පවතී. නැවුම් කිරීමට අදින්න.",
       "goToOverview": "දළ විශ්ලේෂණයට යන්න",
       "goToOverviewTab": "දළ විශ්ලේෂණ පටිත්තට යන්න"
@@ -278,7 +289,36 @@
         "body": "ශාඛාව මැකීමට නොහැකි විය: {{reason}}",
         "accessibility": "ඒකාබද්ධ කරන ලදී. ශාඛාව මැකීමට නොහැකි විය: {{reason}}"
       },
-      "loadFailedTitle": "ඒකාබද්ධ කිරීමේ විකල්ප පූරණය කිරීමට නොහැකි විය"
+      "loadFailedTitle": "ඒකාබද්ධ කිරීමේ විකල්ප පූරණය කිරීමට නොහැකි විය",
+      "blocked": {
+        "unknownStateTitle": "GitHub ඒකාබද්ධ කිරීමේ හැකියාව වාර්තා කර නොමැත",
+        "unknownStateDetail": "මොහොතකින් දළ විශ්ලේෂණය නැවුම් කිරීමට උත්සාහ කරන්න.",
+        "conflictsTitle": "ඒකාබද්ධ ගැටුම්",
+        "conflictsDetail": "ඒකාබද්ධ කිරීමට පෙර මෙම ශාඛාවේ ඒකාබද්ධ ගැටුම් විසඳන්න.",
+        "requiredReviewsTitle": "අවශ්‍ය සමාලෝචන නොමැත",
+        "requiredReviewsDetail": "අවශ්‍ය සමාලෝචකයන්ගේ අනුමැති නොමැත හෝ බලා සිටී.",
+        "failingChecksTitle": "අසමත් වන අවශ්‍ය පරීක්ෂා",
+        "failingChecksDetail": "අවශ්‍ය තත්ත්ව පරීක්ෂා අසමත් වෙමින් පවතී.",
+        "unstableTitle": "සමහර පරීක්ෂා අසමත් වෙමින් පවතී",
+        "unstableDetail": "අනිවාර්ය නොවන පරීක්ෂා අසමත් වෙමින් පවතී. ඒවා ඒකාබද්ධ කිරීම අවහිර නොකරයි.",
+        "draftTitle": "කෙටුම්පත් pull request",
+        "draftDetail": "ඒකාබද්ධ කිරීමට පෙර pull request එක සමාලෝචනයට සූදානම් ලෙස සලකුණු කරන්න.",
+        "behindTitle": "ශාඛාව යල් පැන ගොස් ඇත",
+        "behindDetailUpdatable": "ඒකාබද්ධ කිරීමට පෙර පාදයෙන් ශාඛාව යාවත්කාලීන කරන්න, නැතහොත් rebase කරන්න.",
+        "behindDetail": "Head ශාඛාව පාදයට වඩා පසුගාමී ය. ඒකාබද්ධ කිරීමට පෙර rebase කරන්න හෝ ශාඛාව යාවත්කාලීන කරන්න.",
+        "notMergeableTitle": "මෙම pull request තවමත් ඒකාබද්ධ කළ නොහැක",
+        "notMergeableDetail": "GitHub {{state}} ඒකාබද්ධ කිරීමේ තත්ත්වයක් වාර්තා කළේය."
+      },
+      "methodLabels": {
+        "merge": "ඒකාබද්ධ commit එකක් සාදන්න",
+        "squash": "Squash කර ඒකාබද්ධ කරන්න",
+        "rebase": "Rebase කර ඒකාබද්ධ කරන්න"
+      },
+      "methodDescriptions": {
+        "merge": "මෙම ශාඛාවේ සියලුම commits ඒකාබද්ධ commit එකක් සමඟ පාද ශාඛාවට ඒකාබද්ධ කරන්න.",
+        "squash": "මෙම ශාඛාවේ සියලුම commits පාද ශාඛාවේ තනි commit එකකට ඒකාබද්ධ කරන්න.",
+        "rebase": "ඒකාබද්ධ commit එකක් නොමැතිව මෙම ශාඛාවේ සියලුම commits පාද ශාඛාවට නැවත ධාවනය කරන්න."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "සාකච්ඡා නූල {{anchorLabel}}",
@@ -288,8 +328,9 @@
       "resolved": "විසඳන ලදී",
       "outdated": "යල් පැන ගිය",
       "file": "ගොනුව",
-      "oneComment": "අදහස් 1 ක්",
-      "commentCount": "අදහස් {{count}} ක්",
+      "comment_one": "අදහස් 1 ක්",
+      "comment": "අදහස් {{displayCount}} ක්",
+      "comment_other": "අදහස් {{displayCount}} ක්",
       "startedRelative": " · {{relative}} සිට ආරම්භ විය",
       "couldNotLoadMore": "තවත් අදහස් පූරණය කිරීමට නොහැකි විය.",
       "retryLoadingMore": "තවත් අදහස් පූරණය නැවත උත්සාහ කරන්න",
@@ -298,9 +339,10 @@
       "closeReactions": "ප්‍රතික්‍රියා වසන්න",
       "reactionsTitle": "ප්‍රතික්‍රියා",
       "addReaction": "ප්‍රතික්‍රියාවක් එක් කරන්න",
-      "reactionPill": "{{emoji}} ප්‍රතික්‍රියාව, {{count}} {{countLabel}}",
-      "reactionSingular": "ප්‍රතික්‍රියාව",
-      "reactionPlural": "ප්‍රතික්‍රියා",
+      "reactionPill": "{{emoji}} ප්‍රතික්‍රියාව, {{displayCount}} {{countLabel}}",
+      "reaction_one": "ප්‍රතික්‍රියාව",
+      "reaction": "ප්‍රතික්‍රියා",
+      "reaction_other": "ප්‍රතික්‍රියා",
       "commentActions": "අදහස් ක්‍රියා",
       "reportContent": "අන්තර්ගතය වාර්තා කරන්න",
       "reportUser": "පරිශීලකයා වාර්තා කරන්න",
@@ -349,12 +391,30 @@
       "noDiscussionDescription": "මෙම pull request මත සමාලෝචන නූල් හෝ සංවාද අදහස් නොමැත.",
       "reviewFiles": "ගොනු සමාලෝචනය කරන්න",
       "quotedDiffSnippet": "උපුටා දක්වන ලද diff කොටස",
-      "moreLinesAbove": "… ඉහළ තව පේළි {{count}} ක්",
+      "moreLinesAbove": "… ඉහළ තව පේළි {{displayCount}} ක්",
       "termsAcceptRequired": "පළ කිරීමට ඔබ සේවා නියමයන් පිළිගත යුතුය.",
       "termsOutdatedCopy": "සේවා නියමයන් වෙනස් විය. නවතම අනුවාදය පිළිගැනීමට මෙම තිරය නැවත විවෘත කරන්න.",
-      "termsCheckRetryCopy": "සේවා නියමයන් පරීක්ෂා කිරීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න."
+      "termsCheckRetryCopy": "සේවා නියමයන් පරීක්ෂා කිරීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "reactions": {
+        "thumbsUp": "මාපටැඟිල්ල උඩට",
+        "thumbsDown": "මාපටැඟිල්ල පහළට",
+        "laugh": "සිනහව",
+        "hooray": "හුරේ",
+        "confused": "ව්‍යාකූල",
+        "heart": "හදවත",
+        "rocket": "රොකට්ටුව",
+        "eyes": "ඇස්"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} හි ගොනු අදහස",
+        "fileComment": "ගොනු අදහස",
+        "outdatedOnPathLines": "{{path}} {{lines}} හි යල් පැන ගිය",
+        "outdatedOnLines": "{{lines}} හි යල් පැන ගිය",
+        "outdatedOnPath": "{{path}} හි යල් පැන ගිය"
+      },
+      "deletedUser": "මකා දැමූ පරිශීලකයා"
     },
-    "couldNotOpenGitHubAppSettings": "GitHub App සැකසුම් විවෘත කිරීමට නොහැකි විය",
+    "couldNotOpenGitHubAppSettings": "GitHub App සැකසුම් විවෘත කළ නොහැකි විය",
     "installKiloGitHubApp": "Kilo GitHub App ස්ථාපනය කරන්න",
     "connectionExpiredTitle": "GitHub සම්බන්ධතාවය කල් ඉකුත් විය",
     "connectionExpiredDescription": "ඔබේ GitHub සම්බන්ධතාවය තවදුරටත් වලංගු නොවේ. ඔබේ සම්බන්ධතාවය නැවත පරීක්ෂා කරන්න — අවශ්‍ය නම් නැවත සම්බන්ධ වීමට ඔබෙන් අසනු ඇත.",
@@ -391,13 +451,13 @@
       "retryChecks": "පරීක්ෂා නැවත උත්සාහ කරන්න",
       "viewOnGitHub": "GitHub හි PR බලන්න",
       "noChecksReported": "පරීක්ෂා වාර්තා වී නොමැත",
-      "passed": "{{count}} සමත් විය",
-      "failed": "{{count}} අසමත් විය",
-      "pending": "{{count}} බලා සිටී",
-      "skipped": "{{count}} මඟ හැරුණි",
-      "checksCount": "පරීක්ෂා {{count}} ක්",
+      "passed": "{{displayCount}} සමත් විය",
+      "failed": "{{displayCount}} අසමත් විය",
+      "pending": "{{displayCount}} බලා සිටී",
+      "skipped": "{{displayCount}} මඟ හැරුණි",
+      "checksCount": "පරීක්ෂා {{displayCount}} ක්",
       "checkDetails": "පරීක්ෂා විස්තර",
-      "pullRequest": "pull request"
+      "pullRequest": "ඉල්ලීම් ඇදීම"
     },
     "inbox": {
       "title": "එන ලිපි",
@@ -407,8 +467,8 @@
       "noReviewRequests": "සමාලෝචන ඉල්ලීම් නොමැත",
       "noReviewRequestsDescription": "ඔබේ සමාලෝචනය බලා සිටින Pull requests මෙහි දිස්වේ. ඔබට තවමත් ඕනෑම PR සබැඳියක් ඉහළින් ඇලවිය හැක.",
       "couldNotLoad": "එන ලිපි පූරණය කිරීමට නොහැකි විය",
-      "couldNotLoadMore": "තව පූරණය කිරීමට නොහැකි විය",
-      "retryLoadingMore": "තව පූරණය නැවත උත්සාහ කරන්න"
+      "couldNotLoadMore": "තවත් පූරණය කළ නොහැකි විය",
+      "retryLoadingMore": "තවත් පූරණය කිරීම නැවත උත්සාහ කරන්න"
     },
     "composer": {
       "commentBodyPlaceholder": "අදහසක් දක්වන්න",
@@ -423,8 +483,8 @@
       "loadFailedTitle": "අදහස් සම්පාදකය පූරණය කිරීමට නොහැකි විය",
       "discardTitle": "අදහස ඉවත දමන්නද?",
       "discardMessage": "ඔබේ කෙටුම්පත නැති වේ.",
-      "keepEditing": "සංස්කරණය දිගටම කරන්න",
-      "discard": "ඉවත දමන්න",
+      "keepEditing": "දිගටම සංස්කරණය කරන්න",
+      "discard": "ඉවතලන්න",
       "comment": "අදහස් දක්වන්න",
       "insertSuggestionA11y": "කේත යෝජනාවක් ඇතුළත් කරන්න",
       "insertSuggestion": "යෝජනාව ඇතුළත් කරන්න",
@@ -452,11 +512,14 @@
       "deletePendingMessage": "මෙම අදහස සමාලෝචන පෝලිමෙන් ඉවත් කරනු ඇත.",
       "delete": "මකන්න",
       "summaryOptional": "සාරාංශය (විකල්ප)",
-      "pendingCommentSingular": "අත්හිටුවන ලද අදහස",
-      "pendingCommentPlural": "අත්හිටුවන ලද අදහස්",
-      "submitCountOfTotal": "අදහස් {{totalCount}} න් {{freshCount}} ඉදිරිපත් කරන්න",
+      "pendingComment_one": "අත්හිටුවන ලද අදහස",
+      "pendingComment": "අත්හිටුවන ලද අදහස්",
+      "pendingComment_other": "අත්හිටුවන ලද අදහස්",
+      "submitCountOfTotal": "අදහස් {{displayTotalCount}} න් {{displayFreshCount}} ඉදිරිපත් කරන්න",
       "submitReview": "සමාලෝචනය ඉදිරිපත් කරන්න",
-      "partialPostedMessage": "අදහස් {{freshCount}} ක් පළ කරන ලදී. අදහස් {{staleCount}} ක් පැරණි commit එකක් දෙස බලා ඔබේ පෝලිමේ රැඳී ඇත."
+      "partialPostedMessage": "අදහස් {{displayFreshCount}} ක් පළ කරන ලදී. අදහස් {{displayStaleCount}} ක් පැරණි commit එකක් දෙස බලා ඔබේ පෝලිමේ රැඳී ඇත.",
+      "blockedRequestChanges": "වෙනස්කම් ඉල්ලීමට සාරාංශයක් හෝ අවම වශයෙන් එක් අදහසක් එක් කරන්න.",
+      "blockedComment": "අදහස් සමාලෝචනයක් පළ කිරීමට සාරාංශයක් හෝ අවම වශයෙන් එක් අදහසක් එක් කරන්න."
     },
     "reconnectNotice": {
       "title": "GitHub සම්බන්ධතාවය කල් ඉකුත් විය",
@@ -478,10 +541,12 @@
       "stateOpenReviewRequired": "විවෘත · සමාලෝචනය අවශ්‍යයි",
       "stateOpen": "විවෘත",
       "unknownAuthor": "නොදන්නා කතෘ",
-      "commitSingular": "commit",
-      "commitPlural": "commits",
-      "fileSingular": "ගොනුව",
-      "filePlural": "ගොනු"
+      "commit_one": "commit",
+      "commit": "commits",
+      "commit_other": "commits",
+      "file_one": "ගොනුව",
+      "file": "ගොනු",
+      "file_other": "ගොනු"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} මත යල් පැන ගිය අත්හිටුවන ලද අදහස සංස්කරණය කරන්න",
@@ -512,10 +577,36 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} තේරී ඇත, තේරීම වෙනස් කිරීමට තට්ටු කරන්න",
-      "tapToComment": "{{label}}, අදහස් දැක්වීමට තට්ටු කරන්න"
+      "tapToComment": "{{label}}, අදහස් දැක්වීමට තට්ටු කරන්න",
+      "truncationBanner": "වෙනස් කළ ගොනු {{total}} අතරින් පළමු {{limit}} පෙන්වයි — GitHub API සීමාව",
+      "statusAdded": "එකතු කරන ලදී",
+      "statusContext": "සන්දර්භය",
+      "statusDeleted": "මකා දමන ලදී",
+      "lineLabel": "{{status}} පේළිය {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(හිස්)"
     },
     "linkPasteClipboardEmpty": "පසුරු පුවරුව හිස් ය",
-    "linkPasteNotAPullRequest": "GitHub pull request සබැඳියක් නොවේ"
+    "linkPasteNotAPullRequest": "GitHub pull request සබැඳියක් නොවේ",
+    "announce": {
+      "commentPosted": "අදහස පළ කරන ලදී",
+      "reviewSubmitted": "සමාලෝචනය ඉදිරිපත් කරන ලදී",
+      "autoMergeEnabled": "ස්වයංක්‍රීය ඒකාබද්ධ කිරීම සක්‍රීය කර ඇත"
+    },
+    "mutationError": {
+      "commentNotPosted": "මෙම අදහස පළ කළ නොහැක. තෝරාගත් පේළිය වෙනස් වී තිබිය හැක, නැතහොත් PR යාවත්කාලීන කර තිබිය හැක.",
+      "reviewNotSubmitted": "මෙම සමාලෝචනය මෙලෙසම ඉදිරිපත් කළ නොහැක. PR වෙනස් වී තිබිය හැක, නැතහොත් ඔබට ඔබේම pull request එක සමාලෝචනය කළ නොහැක.",
+      "couldNotPostComment": "අදහස පළ කිරීමට නොහැකි විය.",
+      "couldNotSubmitReview": "සමාලෝචනය ඉදිරිපත් කිරීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න."
+    },
+    "operation": {
+      "couldNotReply": "පිළිතුරු දීමට නොහැකි විය.",
+      "couldNotCompleteAction": "මෙම ක්‍රියාව සම්පූර්ණ කිරීමට නොහැකි විය.",
+      "mergeResultDefaultError": "GitHub ඒකාබද්ධ කිරීම සම්පූර්ණ කළේ නැත.",
+      "ambiguous": "තහවුරු කිරීමට නොහැකි විය — නැවත උත්සාහ කිරීමට පෙර PR එක පරීක්ෂා කරන්න.",
+      "persistenceFailed": "මෙම ක්‍රියාව වාර්තා කිරීමට නොහැකි විය. කරුණාකර පසුව නැවත උත්සාහ කරන්න.",
+      "forbidden": "තහනම්"
+    }
   },
   "notifications": {
     "title": "දැනුම්දීම්",
@@ -573,13 +664,14 @@
     "agents": "නියෝජිතයන්",
     "profile": "පැතිකඩ",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, ටැබ්, මුළු {{total}} න් {{position}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Instance මාරු කරන්න",
       "couldNotLoadInstances": "Instances පූරණය කිරීමට නොහැකි විය",
-      "noInstances": "KiloClaw instances නොමැත",
+      "noInstances": "KiloClaw අවස්ථා නොමැත",
       "noInstancesDescription": "කතාබස් ආරම්භ කිරීමට instance එකක් සකසන්න.",
       "setUpKiloclaw": "KiloClaw සකසන්න",
       "currentInstance": "{{title}}, වත්මන්",
@@ -614,7 +706,7 @@
       "recent": "මෑත",
       "common": "පොදු",
       "reactWith": "{{reaction}} සමඟ ප්‍රතික්‍රියා කරන්න",
-      "accessibility": "{{emoji}} ප්‍රතික්‍රියාව, {{count}}"
+      "accessibility": "{{emoji}} ප්‍රතික්‍රියාව, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "පිළිතුරු දෙන්නේ",
@@ -640,14 +732,24 @@
     },
     "attachment": {
       "open": "{{filename}} විවෘත කරන්න",
-      "imageUnavailable": "රූපය නොමැත",
+      "imageUnavailable": "රූපය ලබා ගත නොහැක",
       "openFailed": "ඇමුණුම විවෘත කිරීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "attachFailed": "ගොනුව ඇමිණීමට අසමත් විය",
-      "limit": "ඔබට ගොනු {{count}} ක් දක්වා ඇමිණිය හැක.",
+      "limit": "ඔබට ගොනු {{displayCount}} ක් දක්වා ඇමිණිය හැක.",
       "sizeRejection": "{{filename}} {{limit}} ඇමුණුම් සීමාව ඉක්මවයි.",
       "unreadable": "{{filename}} කියවීමට නොහැකි විය.",
       "pastedImage": "අලවන ලද රූපය",
-      "defaultName": "ඇමුණුම"
+      "defaultName": "ඇමුණුම",
+      "classificationDenied": "ක්‍රියාත්මක කළ හැකි ගොනු ඇමිණිය නොහැක",
+      "classificationEmpty": "ගොනුව හිස් ය",
+      "classificationTooLarge": "ගොනු 20 MB හෝ ඊට අඩු විය යුතුය",
+      "classificationUnreadable": "මෙම ගොනුව කියවීමට නොහැකි විය",
+      "announceUploaded": "ඇමුණුම උඩුගත කරන ලදී",
+      "cantUpload": "මෙම ගොනුව උඩුගත කළ නොහැක.",
+      "networkError": "ජාල දෝෂය",
+      "uploadFailed": "උඩුගත කිරීම අසාර්ථකයි",
+      "failedToUploadFile": "ගොනුව උඩුගත කිරීමට අසමත් විය: {{reason}}",
+      "nothingToPaste": "ඇලවීමට කිසිවක් නැත"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -661,7 +763,9 @@
       "moreActions": "තවත් ක්‍රියා",
       "message": "පණිවිඩය",
       "notDelivered": "ලබා දී නොමැත",
-      "edited": "(සංස්කරණය කරන ලදී)"
+      "edited": "(සංස්කරණය කරන ලදී)",
+      "image": "රූපය",
+      "attachment": "ඇමුණුම"
     },
     "messageActions": {
       "copied": "පිටපත් කරන ලදී",
@@ -675,7 +779,7 @@
       "addReactionFailed": "ප්රතිචාරය එක් කිරීමට නොහැකි විය",
       "retrySend": "යැවීම නැවත උත්සාහ කරන්න",
       "moreReactions": "තවත් ප්රතිචාර",
-      "reply": "පිළිතුරු",
+      "reply": "පිළිතුරු දෙන්න",
       "edit": "සංස්කරණය",
       "sendFailed": "පණිවිඩය යැවීමට නොහැකි විය",
       "retrySendFailed": "යැවීම නැවත උත්සාහ කිරීමට නොහැකි විය",
@@ -686,13 +790,14 @@
       "takePhoto": "ඡායාරූපයක් ගන්න",
       "photoLibrary": "ඡායාරූප පුස්තකාලය",
       "files": "ගොනු",
-      "cameraAccessDisabled": "කැමරා ප්රවේශය අක්රීයයි",
-      "cameraAccessMessage": "ඡායාරූපයක් ගැනීමට සැකසුම් තුළ කැමරා ප්රවේශය ඉඩ දෙන්න."
+      "cameraAccessDisabled": "කැමරා ප්‍රවේශය අක්‍රීයයි",
+      "cameraAccessMessage": "ඡායාරූපයක් ගැනීමට සැකසුම් තුළ කැමරා ප්‍රවේශයට ඉඩ දෙන්න."
     },
     "typingIndicator": {
       "someone": "කෙනෙක්",
-      "oneTyping": "{{name}} ටයිප් කරමින්...",
-      "manyTyping": "{{names}} ටයිප් කරමින්..."
+      "typing_one": "{{name}} ටයිප් කරමින්...",
+      "typing": "{{names}} ටයිප් කරමින්...",
+      "typing_other": "{{names}} ටයිප් කරමින්..."
     },
     "botStatus": {
       "online": "මාර්ගගත",
@@ -702,6 +807,12 @@
       "loadingUser": "පරිශීලකයා පූරණය වෙමින්...",
       "waitingForStatus": "බොට් තත්ත්වය සඳහා රැඳී සිටීම...",
       "offlineMessage": "බොට් නොබැඳිය. එය නැවත සම්බන්ධ වූ විට පණිවිඩ නැවත ආරම්භ වේ."
+    },
+    "errors": {
+      "notAllowed": "අවසර නැත",
+      "messageTooLong": "පණිවිඩය ඉතා දිගුය — එය අක්ෂර {{limit}} ට වඩා අඩුවෙන් තබා ගන්න",
+      "titleTooLong": "ශීර්ෂකය ඉතා දිගුය — එය අක්ෂර {{limit}} ට වඩා අඩුවෙන් තබා ගන්න",
+      "messageEmpty": "පණිවිඩය හිස් විය නොහැක"
     }
   },
   "kiloclaw": {
@@ -714,6 +825,7 @@
       "finalTermEnds": "අවසාන කාලය අවසන් වේ",
       "afterFinalTerm": "අවසාන කාලයෙන් පසු",
       "remaining": "ඉතිරි",
+      "lessThanOneDay": "දින 1 ට වඩා අඩුය",
       "ends": "අවසන් වේ",
       "expires": "කල් ඉකුත් වේ",
       "noActivePlan": "සක්රීය සැලැස්මක් නොමැත",
@@ -722,23 +834,25 @@
       "couldNotLoad": "බිල්පත් තොරතුරු පූරණය කිරීමට නොහැකි විය",
       "manageOnWeb": "වෙබ් අඩවියේ බිල්පත් කළමනාකරණය කරන්න",
       "commitPlan": "Commit",
-      "daysLeft": "{{count}} දින ඉතිරියි",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "ඔබේ අවසන් Commit කාලය {{date}} දින අවසන් වේ. {{price}} මිලට Standard ලෙස දිගටම කරන්න, නැතහොත් hosting අවසන් වේ.",
       "freeTrial": "නොමිලේ අත්හදා බැලීම",
       "hostingEnds": "Hosting අවසන් වේ",
-      "oneDayLeft": "දින 1ක් ඉතිරියි",
       "renews": "අලුත් වේ",
       "standardMonthToMonth": "Standard මාසික",
       "standardStartsOn": "Standard {{date}} දින {{price}} මිලට ආරම්භ වේ.",
       "yourStandardMonthlyPrice": "ඔබේ Standard මාසික මිල",
       "perMonth": "/මස",
       "earlybirdAccessUntil": "{{date}} දක්වා Earlybird ප්රවේශය",
-      "earlybirdEnding": "Earlybird අවසන් වේ: {{days}} දින ඉතිරියි",
+      "earlybirdEnding": "Earlybird අවසන් වේ: {{remaining}} දින ඉතිරියි",
       "paymentPastDue": "ගෙවීම කල් ඉකුත් විය. කරුණාකර ඔබේ ගෙවීම් ක්රමය යාවත්කාලීන කරන්න.",
       "subscriptionCancels": "දායකත්වය {{date}} දින අවලංගු වේ",
-      "trialDaysRemaining": "අත්හදා බැලීම: {{days}} දින ඉතිරියි",
-      "trialEndingSoon": "අත්හදා බැලීම ඉක්මනින් අවසන් වේ: {{days}}"
+      "trialDaysRemaining": "අත්හදා බැලීම: {{remaining}} දින ඉතිරියි",
+      "trialEndingSoon": "අත්හදා බැලීම ඉක්මනින් අවසන් වේ: {{remaining}}",
+      "planName": {
+        "commit": "Commit",
+        "standard": "Standard"
+      }
     },
     "changelog": {
       "title": "අලුත් මොනවද",
@@ -811,13 +925,13 @@
       "gmailNotifications": "Gmail දැනුම්දීම්",
       "disconnect": "Google ගිණුම විසන්ධි කරන්න",
       "connected": "සම්බන්ධ විය",
-      "copied": "පිටපත් කළා!",
+      "copied": "පිටපත් කරන ලදී",
       "copyCommand": "විධානය පිටපත් කරන්න",
       "disabled": "අක්රීයයි",
       "disconnectConfirm": "විසන්ධි කරන්න",
       "disconnectMessage": "ඔබේ Google ගිණුම මෙම අවස්ථාවෙන් ඉවත් කරන්නද? මෙය Gmail දැනුම්දීම් අක්රීය කරයි. වෙනස්කම් යෙදීමට විසන්ධි කිරීමෙන් පසු නැවත බෙදාහරින්න.",
       "disconnectTitle": "Google විසන්ධි කරන්න",
-      "enabled": "සක්රීයයි",
+      "enabled": "සක්‍රීයයි",
       "notConnected": "සම්බන්ධ නොවීය"
     },
     "modelList": {
@@ -845,7 +959,7 @@
       "hide": "{{label}} සඟවන්න",
       "show": "{{label}} පෙන්වන්න",
       "allFieldsRequired": "{{label}} සම්බන්ධ කිරීමට සියලුම ක්ෂේත්ර අවශ්යයි.",
-      "setupGuideFallback": "sැකසුම් මාර්ගෝපදේශය",
+      "setupGuideFallback": "සැකසුම් මාර්ගෝපදේශය",
       "setupGuideA11y": "{{label}} සැකසුම් මාර්ගෝපදේශය",
       "setupGuide": "සැකසුම් මාර්ගෝපදේශය",
       "saving": "සුරැකෙමින්…",
@@ -956,7 +1070,7 @@
         "location": "ස්ථානය",
         "locationPlaceholder": "නගරය හෝ කලාපය (විකල්ප)",
         "useCurrentLocation": "දැනට පිහිටි ස්ථානය භාවිතා කරන්න",
-        "continue": "දිගටම කරන්න",
+        "continue": "ඉදිරියට",
         "locationDeniedTitle": "ස්ථාන ප්රවේශය ප්රතික්ෂේප විය",
         "locationDeniedMessage": "ඔබේ වර්තමාන ස්ථානය භාවිතා කිරීමට සැකසුම් තුළ ස්ථාන ප්රවේශය සක්රීය කරන්න.",
         "locationValidationFailed": "ස්ථානය වලංගු කළ නොහැකි විය.",
@@ -990,7 +1104,7 @@
         "stalledTitle": "යම් දෙයක් එල්ලී ඇත",
         "stalledBody": "අපට {{name}} සැකසීම අවසන් කළ නොහැකි විය. නැවත උත්සාහ කරන්න, නැතහොත් මෙය දිගටම සිදු වුවහොත් hi@kilo.ai වෙත විද්යුත් තැපෑලක් යවන්න.",
         "timeoutTitle": "බලාපොරොත්තු වූවාට වඩා වැඩි කාලයක් ගත වේ",
-        "timeoutBody": "{{name}} සඳහා සැකසුම සාමාන්යයෙන් වඩා වැඩි කාලයක් ගත වේ ({{minutes}} මිනිත්තුවකට වඩා).",
+        "timeoutBody": "{{name}} සඳහා සැකසුම සාමාන්යයෙන් වඩා වැඩි කාලයක් ගත වේ ({{displayMinutes}} මිනිත්තුවකට වඩා).",
         "continueInBackground": "පසුබිමේ දිගටම කරන්න",
         "settingUp": "{{name}} සැකසෙමින්",
         "finishingSetup": "සැකසුම අවසන් වෙමින්",
@@ -1020,7 +1134,8 @@
       "starting": "ආරම්භ වෙමින්",
       "stopped": "නතර කර ඇත",
       "stopping": "නවතිමින්",
-      "unknown": "නොදන්නා"
+      "unknown": "නොදන්නා",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1060,8 +1175,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} අවධානය අවශ්යයි: {{label}}",
-      "openUnreadOne": "{{name}} විවෘත කරන්න, {{count}} නොකියවූ පණිවිඩය",
-      "openUnreadMany": "{{name}} විවෘත කරන්න, {{count}} නොකියවූ පණිවිඩ",
+      "openUnread_one": "{{name}} විවෘත කරන්න, {{displayCount}} නොකියවූ පණිවිඩය",
+      "openUnread": "{{name}} විවෘත කරන්න, {{displayCount}} නොකියවූ පණිවිඩ",
+      "openUnread_other": "{{name}} විවෘත කරන්න, {{displayCount}} නොකියවූ පණිවිඩ",
       "open": "{{name}} විවෘත කරන්න",
       "openSettings": "{{name}} සඳහා සැකසුම් විවෘත කරන්න",
       "fixOnKiloAi": "kilo.ai හි විසඳන්න: {{label}}"
@@ -1103,7 +1219,9 @@
       "sparkles": "Sparkles",
       "strongArm": "Strong arm",
       "talisman": "Talisman"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "මෙම අවස්ථාවට ගොනු ලබා ගත නොහැක.",
+    "instanceSwitcherTitle": "KiloClaw අවස්ථාව"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1146,7 +1264,7 @@
       "roast": "අතිශයින් අවංක, විනෝදජනක ලෙස",
       "strict": "සියල්ල සලකුණු කරන්න, ඉහළ ප්රමිතියක් පවත්වන්න"
     },
-    "title": "Code Reviewer",
+    "title": "කේත සමාලෝචකයා",
     "reviewDetail": {
       "title": "සමාලෝචනය",
       "cancelTitle": "සමාලෝචනය අවලංගු කරන්නද?",
@@ -1159,7 +1277,7 @@
       "couldNotLoad": "සමාලෝචනය පූරණය කිරීමට නොහැකි විය",
       "couldNotGetLatest": "නවතම ලබා ගත නොහැකි විය.",
       "byline": "{{repo}} #{{number}} {{author}} විසින්",
-      "findings": "සොයා ගැනීම්",
+      "findings": "සොයාගැනීම්",
       "noFindings": "සොයා ගැනීම් නොමැත",
       "showMore": "තවත් පෙන්වන්න",
       "details": "විස්තර",
@@ -1170,7 +1288,7 @@
       "started": "ආරම්භ කරන ලදී",
       "completed": "සම්පූර්ණ කරන ලදී",
       "cost": "පිරිවැය",
-      "tokens": "Token",
+      "tokens": "ටෝකන",
       "tokensInOut": "{{input}} ඇතුළත / {{output}} පිටත",
       "openPullRequest": "Pull request විවෘත කරන්න",
       "council": "කවුන්සිලය",
@@ -1181,7 +1299,7 @@
       "checkRun": "පරීක්ෂණ ධාවනය",
       "status": "තත්ත්වය",
       "threshold": "සීමාව",
-      "pullRequest": "pull request"
+      "pullRequest": "ඉල්ලීම් ඇදීම"
     },
     "reviewMemory": {
       "title": "සමාලෝචන මතකය",
@@ -1238,7 +1356,7 @@
       "connect": "සම්බන්ධ කරන්න"
     },
     "scopeList": {
-      "couldNotLoad": "සංවිධාන පූරණය කිරීමට නොහැකි විය",
+      "couldNotLoad": "සංවිධාන පූරණය කළ නොහැක",
       "personalStillAvailable": "පුද්ගලික ගබඩා තවමත් පහතින් ලබා ගත හැක.",
       "personal": "පුද්ගලික",
       "personalSubtitle": "ඔබේම ගබඩා",
@@ -1280,7 +1398,7 @@
       "mergeGate": "Merge gate",
       "repositories": "ගබඩා",
       "allRepositories": "සියලුම ගබඩා",
-      "nSelected": "{{count}} තේරුවා",
+      "nSelected": "{{displayCount}} තේරුවා",
       "reviewMemory": "සමාලෝචන මතකය",
       "proposedReviewMdGuidance": "යෝජිත REVIEW.md මාර්ගෝපදේශ"
     },
@@ -1290,7 +1408,71 @@
       "noDecision": "තීරණයක් නොමැත",
       "noResult": "ප්රතිඵලයක් නොමැත"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "කේත සමාලෝචකයා",
+    "updateFailed": "සමාලෝචකයා යාවත්කාලීන කිරීම අසාර්ථකයි",
+    "configSaveFailed": "සමාලෝචන වින්‍යාසය සුරැකීම අසාර්ථකයි",
+    "status": {
+      "pending": "බලා සිටී",
+      "queued": "පෝලිම් කර ඇත",
+      "running": "ධාවනය වෙමින්",
+      "completed": "සම්පූර්ණ කරන ලදී",
+      "failed": "අසමත් විය",
+      "cancelled": "අවලංගු කර ඇත",
+      "interrupted": "බාධා විය"
+    },
+    "reviewStyle": {
+      "strict": "දැඩි",
+      "balanced": "සමතුලිත",
+      "lenient": "නම්‍යශීලී",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "ආරක්ෂාව",
+      "performance": "කාර්ය සාධනය",
+      "bugs": "දෝෂ",
+      "style": "විලාසය",
+      "testing": "පරීක්ෂාව",
+      "documentation": "ලේඛන"
+    },
+    "gateThreshold": {
+      "off": "ක්‍රියා විරහිතයි",
+      "all": "සියල්ල",
+      "warning": "අනතුරු ඇඟවීම",
+      "critical": "තීරණාත්මක"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer අවධානය අවශ්‍යයි",
+        "description": "Code Reviewer අක්‍රීය කර ඇත, මන්ද Kilo ට සක්‍රීය GitHub App ස්ථාපනයක් සමඟ මෙම ගබඩාවට ප්‍රවේශ විය නොහැක. GitHub App ස්ථාපනය යාවත්කාලීන කර, ඉන්පසු Code Reviewer නැවත සක්‍රීය කරන්න.",
+        "recoveryLabel": "GitHub App යාවත්කාලීන කරන්න"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer අවධානය අවශ්‍යයි",
+        "description": "Code Reviewer අක්‍රීය කර ඇත, මන්ද මෙම GitHub සංවිධානය Kilo අවහිර කරන IP අවසර ලැයිස්තුවක් භාවිතා කරයි. උපකාර සඳහා hi@kilocode.ai අමතන්න, ඉන්පසු Code Reviewer නැවත සක්‍රීය කරන්න.",
+        "recoveryLabel": "සහාය අමතන්න"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer අවධානය අවශ්‍යයි",
+        "description": "Code Reviewer අක්‍රීය කර ඇත, මන්ද Kilo ට මෙම ව්‍යාපෘතිය සඳහා GitLab Project Access Token එකක් සෑදිය නොහැක. Maintainer ප්‍රවේශය ලබා දෙන්න හෝ Project Access Tokens සක්‍රීය කරන්න, ඉන්පසු Code Reviewer නැවත සක්‍රීය කරන්න.",
+        "recoveryLabel": "GitLab ඒකාබද්ධතාව යාවත්කාලීන කරන්න"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer අවධානය අවශ්‍යයි",
+        "description": "Code Reviewer අක්‍රීය කර ඇත, මන්ද තෝරාගත් BYOK API යතුර අවලංගුය, ඉවත් කර ඇත, නැතහොත් අවසරයක් නොමැත. යතුර යාවත්කාලීන කරන්න හෝ වෙනත් මාදිලියක් තෝරන්න, ඉන්පසු Code Reviewer නැවත සක්‍රීය කරන්න.",
+        "recoveryLabel": "BYOK සැකසුම් යාවත්කාලීන කරන්න"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer අවධානය අවශ්‍යයි",
+        "description": "Code Reviewer අක්‍රීය කර ඇත, මන්ද තෝරාගත් මාදිලිය cloud agent සැසි සඳහා ලබා ගත නොහැක. පවතින මාදිලියක් තෝරන්න, ඉන්පසු Code Reviewer නැවත සක්‍රීය කරන්න.",
+        "recoveryLabel": "Code Reviewer සැකසුම් යාවත්කාලීන කරන්න"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer අවධානය අවශ්‍යයි",
+        "description": "අද දින ගබඩා ක්ලෝන කිරීමේ කාල අවසන් තුනකින් පසු Code Reviewer අක්‍රීය කර ඇත. උපකාර සඳහා hi@kilocode.ai අමතන්න, ඉන්පසු Code Reviewer නැවත සක්‍රීය කරන්න.",
+        "recoveryLabel": "සහාය අමතන්න"
+      }
+    },
+    "unknownError": "නොදන්නා දෝෂයක්"
   },
   "securityAgent": {
     "filter": {
@@ -1307,12 +1489,12 @@
       "allRepositories": "සියලුම ගබඩා",
       "all": "සියල්ල",
       "statusOpen": "විවෘත",
-      "fixed": "සවි කර ඇත",
+      "fixed": "නිවැරදි කර ඇත",
       "statusIgnored": "නොසලකා හැර ඇත",
       "statusClosed": "වසා ඇත",
       "severityCritical": "තීරණාත්මක",
       "severityHigh": "ඉහළ",
-      "severityMedium": "මධ්යම",
+      "severityMedium": "මධ්‍යම",
       "severityLow": "අඩු",
       "outcomeNotAnalyzed": "විශ්ලේෂණය නොකළ",
       "outcomeAnalyzing": "විශ්ලේෂණය වෙමින්",
@@ -1320,9 +1502,9 @@
       "outcomeExploitable": "සූරාකෑමට හැකි",
       "outcomeNotExploitable": "සූරාකෑමට නොහැකි",
       "outcomeSafeToDismiss": "ඉවත් කිරීමට ආරක්ෂිත",
-      "outcomeNeedsReview": "සමාලෝචනය අවශ්යයි",
+      "outcomeNeedsReview": "සමාලෝචනය අවශ්‍යයි",
       "outcomeTriageComplete": "Triage සම්පූර්ණයි",
-      "outcomeDismissed": "ඉවත් කර ඇත",
+      "outcomeDismissed": "ඉවතලා ඇත",
       "sortSeverityDesc": "බරපතලකම: ඉහළ සිට අඩු",
       "sortSeverityAsc": "බරපතලකම: අඩු සිට ඉහළ",
       "sortSlaDue": "SLA නියමිත දිනය",
@@ -1351,8 +1533,9 @@
       "enableAutoRemediationConfirmTitle": "ස්වයං-ප්රතිකර්මය සක්රීය කරන්නද?",
       "enableAutoRemediationConfirmMessage": "Security Agent සුදුසුකම් ලත් සූරාකෑමට හැකි සොයා ගැනීම් සඳහා ප්රතිකර්ම PR ස්වයංක්රීයව විවෘත කරයි.",
       "enable": "සක්රීය කරන්න",
-      "queuedOne": "{{count}} පවතින සොයාගැනීමක් විශ්ලේෂණය සඳහා පෝලිම් කර ඇත.",
-      "queuedMany": "{{count}} පවතින සොයාගැනීම් විශ්ලේෂණය සඳහා පෝලිම් කර ඇත.",
+      "queued_one": "{{displayCount}} පවතින සොයාගැනීමක් විශ්ලේෂණය සඳහා පෝලිම් කර ඇත.",
+      "queued": "{{displayCount}} පවතින සොයාගැනීම් විශ්ලේෂණය සඳහා පෝලිම් කර ඇත.",
+      "queued_other": "{{displayCount}} පවතින සොයාගැනීම් විශ්ලේෂණය සඳහා පෝලිම් කර ඇත.",
       "severityCriticalOnly": "Critical පමණයි",
       "severityHighAndAbove": "High සහ ඊට ඉහළ",
       "severityMediumAndAbove": "Medium සහ ඊට ඉහළ",
@@ -1383,14 +1566,14 @@
       "analyzed": "විශ්ලේෂණය කර ඇත",
       "exploitabilityReasoning": "සූරාකෑමේ හැකියාව පිළිබඳ හේතුව",
       "suggestedFix": "යෝජිත විසඳුම",
-      "whereFound": "මෙය සොයාගත් ස්ථානය ({{count}})",
+      "whereFound": "මෙය සොයාගත් ස්ථානය ({{displayCount}})",
       "fullReport": "සම්පූර්ණ උත්පාදිත වාර්තාව",
       "unknown": "නොදන්නා",
       "yes": "ඔව්",
       "no": "නැත"
     },
     "dashboard": {
-      "findingsCount": "{{count}} සොයාගැනීම්",
+      "findingsCount": "{{displayCount}} සොයාගැනීම්",
       "notMeasured": "මැන බලා නැත",
       "actFirst": "මුලින්ම ක්රියා කරන්න",
       "slaPosture": "SLA පිළිවෙළ",
@@ -1399,7 +1582,7 @@
       "repositoryActionPlan": "ගබඩා ක්රියා සැලැස්ම",
       "noOpenFindings": "අවධානය අවශ්ය විවෘත සොයාගැනීම් නැත",
       "deadlineToday": "අද දින නියමිත කාලය ළඟා විය",
-      "daysOverdue": "{{count}} දින ප්රමාද වී ඇත",
+      "daysOverdue": "{{displayCount}} දින ප්රමාද වී ඇත",
       "withinDeadline": "නියමිත කාලය තුළ",
       "criticalOverdue": "Critical ප්රමාදයි",
       "highOverdue": "High ප්රමාදයි",
@@ -1408,8 +1591,8 @@
       "needsEvidenceReview": "සාක්ෂි සමාලෝචනය අවශ්යයි",
       "analysisNotComplete": "විශ්ලේෂණය සම්පූර්ණ නැත",
       "noImmediateAction": "ක්ෂණික ක්රියාමාර්ගයක් නැත",
-      "notExploitable": "සූරාකෑමට හැකි නැත",
-      "needsYourReview": "ඔබගේ සමාලෝචනය අවශ්යයි",
+      "notExploitable": "සූරාකෑමට නොහැකි",
+      "needsYourReview": "ඔබගේ සමාලෝචනය අවශ්‍යයි",
       "noSlaDeadline": "SLA නියමිත කාලයක් පවරා නැත",
       "noRepositoryData": "තවම ගබඩා දත්ත නැත",
       "noRepositoryDataDescription": "සොයාගැනීම් සමමුහුර්ත වූ පසු ගබඩා ප්රමුඛතා දිස්වනු ඇත.",
@@ -1426,6 +1609,27 @@
       "syncNow": "දැන් සමමුහුර්ත කරන්න",
       "syncQueued": "සමමුහුර්තය පෝලිම් කර ඇත",
       "syncStatusUnavailable": "සමමුහුර්ත තත්වය ලබාගත නොහැක"
+    },
+    "dashboardMetrics": {
+      "openFindings": "විවෘත සොයාගැනීම්",
+      "openFindingsDetail": "{{critical}} Critical, {{high}} High",
+      "confirmedExploitable": "සූරාකෑමට හැකි බව තහවුරු කර ඇත",
+      "confirmedExploitableDetail": "විශ්ලේෂණයෙන් ව්යාපෘති අවදානම තහවුරු විය",
+      "needsReview": "ඔබගේ සමාලෝචනය අවශ්‍යයි",
+      "needsReviewDetail": "මානව තීරණයක් අවශ්‍යයි",
+      "analysisIncomplete": "විශ්ලේෂණය සම්පූර්ණ නැත",
+      "analysisIncompleteDetail": "ව්‍යාපෘති අවදානම තවමත් නොදනී",
+      "slaCompliance": "SLA අනුකූලතාව",
+      "notMeasured": "මැන බලා නැත",
+      "withinDeadlineDetail": "නියමිත කාලය තුළ {{total}} න් {{within}}",
+      "noDeadlineData": "කිසිදු සොයාගැනීමකට තවම SLA නියමිත කාලයක් නැත",
+      "deadlinePassed": "නියමිත කාලය ඉක්මවා ඇත",
+      "deadlinePassedDetail": "{{critical}} Critical, {{high}} High",
+      "dueThisWeek": "මෙම සතියේ නියමිතයි",
+      "dueThisWeekDetail": "{{exploitable}} සූරාකෑමට හැකි බව තහවුරුයි",
+      "noDeadline": "නියමිත කාලයක් නැත",
+      "reviewSlaAssignment": "SLA පැවරීම සමාලෝචනය කරන්න",
+      "allOpenFindingsTracked": "සියලුම විවෘත සොයාගැනීම් නිරීක්ෂණය වේ"
     },
     "dismiss": {
       "title": "සොයාගැනීම ඉවතලන්න",
@@ -1469,21 +1673,32 @@
       "sourceRecord": "මූලාශ්ර වාර්තාව",
       "source": "මූලාශ්රය",
       "sourceId": "මූලාශ්ර හැඳුනුම",
-      "viewAdvisory": "GitHub හි උපදෙස් බලන්න"
+      "viewAdvisory": "GitHub හි උපදෙස් බලන්න",
+      "statusSuperseded": "ප්‍රතිස්ථාපනය වී ඇත",
+      "statusFixed": "නිවැරදි කර ඇත",
+      "statusOpen": "විවෘත",
+      "sourceDependabot": "GitHub Dependabot",
+      "reasonFixStarted": "නිවැරදි කිරීමක් දැනටමත් ආරම්භ වී ඇත",
+      "reasonNoBandwidth": "කිසිදු ධාරිතාවක් ලබාගත නොහැක",
+      "reasonTolerableRisk": "අවදානම ඉවසිය හැකි ය",
+      "reasonInaccurate": "සොයාගැනීම අසත්ය වේ",
+      "reasonNotUsed": "අවදානම් කේතය භාවිතා නොකරයි",
+      "reasonAfterReview": "සමාලෝචනයෙන් පසුව"
     },
     "settingsOverview": {
       "title": "සැකසුම්",
       "couldNotLoadSettings": "Security Agent සැකසුම් පූරණය කළ නොහැක",
       "couldNotLoadPermissions": "අවසර පූරණය කළ නොහැක",
-      "couldNotLoadRepositories": "ගබඩා පූරණය කළ නොහැක",
-      "securityAgent": "Security Agent",
-      "enabled": "සක්රීයයි",
+      "couldNotLoadRepositories": "ගබඩා පූරණය කිරීමට නොහැකි විය",
+      "securityAgent": "ආරක්ෂක නියෝජිතයා",
+      "enabled": "සක්‍රීයයි",
       "disabled": "අක්රීයයි",
       "on": "ක්රියාත්මකයි",
       "off": "ක්රියා විරහිතයි",
-      "allRepositories": "සියලු ගබඩා",
-      "repositorySelected": "{{count}} ගබඩාවක් තේරුවා",
-      "repositoriesSelected": "{{count}} ගබඩා තේරුවා",
+      "allRepositories": "සියලුම ගබඩා",
+      "repositoriesCount_one": "{{displayCount}} ගබඩාවක් තේරුවා",
+      "repositoriesCount": "{{displayCount}} ගබඩා තේරුවා",
+      "repositoriesCount_other": "{{displayCount}} ගබඩා තේරුවා",
       "selectRepositories": "ගබඩා තෝරන්න",
       "selectRepositoriesSubtitle": "Security Agent නිරීක්ෂණය කරන ගබඩා මොනවාද යන්න තෝරන්න",
       "repositories": "ගබඩා",
@@ -1491,9 +1706,9 @@
       "analysisModeSubtitle": "{{mode}} විශ්ලේෂණය",
       "automation": "ස්වයංක්රීයකරණය",
       "automationAllOff": "සියල්ල අක්රීයයි",
-      "automationCount": "{{count}} න් 3 ක් සක්රීයයි",
+      "automationCount": "{{displayCount}} න් 3 ක් සක්රීයයි",
       "notifications": "දැනුම්දීම්",
-      "notificationsCount": "{{count}} න් 2 ක් සක්රීයයි",
+      "notificationsCount": "{{displayCount}} න් 2 ක් සක්රීයයි",
       "slaPolicy": "SLA ප්රතිපත්තිය",
       "disabledNoManage": "Security Agent අක්රීයයි. සංවිධාන හිමිකරුවන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණක් එය සක්රීය කළ හැක.",
       "disabledNoRepo": "Security Agent සක්රීය කිරීමට පෙර අවම වශයෙන් එක් ගබඩාවක් තෝරන්න.",
@@ -1502,7 +1717,7 @@
     "remediation": {
       "cancellationRequested": "අවලංගු කිරීමක් ඉල්ලා ඇත",
       "cancelled": "ප්රතිකර්මය අවලංගු කර ඇත",
-      "pullRequest": "pull request",
+      "pullRequest": "ඉල්ලීම් ඇදීම",
       "couldNotLoad": "ප්රතිකර්ම තත්වය පූරණය කළ නොහැක",
       "noAnalysisTitle": "තවම විශ්ලේෂණයක් නැත",
       "noAnalysisDescription": "Details ටැබයෙන් එකක් ධාවනය කරන්න",
@@ -1515,7 +1730,7 @@
       "openPullRequest": "Pull request{{number}} විවෘත කරන්න",
       "openDraftPullRequest": "කෙටුම්පත් pull request{{number}} විවෘත කරන්න",
       "progress": "ප්රගතිය",
-      "attemptHistory": "උත්සාහ ඉතිහාසය ({{count}})",
+      "attemptHistory": "උත්සාහ ඉතිහාසය ({{displayCount}})",
       "attemptNumber": "උත්සාහය #{{number}}",
       "startedBy": "ආරම්භ කළේ",
       "model": "ආකෘතිය",
@@ -1530,17 +1745,17 @@
         "noChangesNeeded": "වෙනස්කම් අවශ්ය නොවේ",
         "cancelled": "අවලංගු කර ඇත"
       },
-      "unavailable": "මෙම සොයාගැනීම සඳහා ප්රතිකර්මය ලබාගත නොහැක."
+      "unavailable": "මෙම සොයාගැනීම සඳහා ප්‍රතිකර්මය ලබා ගත නොහැක."
     },
     "analysisSettings": {
       "title": "ආකෘති සහ විශ්ලේෂණය",
       "couldNotLoad": "විශ්ලේෂණ සැකසුම් පූරණය කළ නොහැක",
       "permissionNote": "මෙම සැකසුම් වෙනස් කළ හැක්කේ සංවිධාන හිමිකරුවන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි.",
       "depth": "විශ්ලේෂණ ගැඹුර",
-      "modeAuto": "ස්වයංක්රීය",
+      "modeAuto": "ස්වයංක්‍රීය",
       "modeShallow": "මතුපිට",
       "modeDeep": "ගැඹුරු",
-      "couldNotLoadModels": "ආකෘති පූරණය කළ නොහැක",
+      "couldNotLoadModels": "ආකෘති පූරණය කිරීමට නොහැකි විය",
       "triageModel": "ප්රතිකාර ආකෘතිය",
       "analysisModel": "විශ්ලේෂණ ආකෘතිය",
       "remediationModel": "ප්රතිකර්ම ආකෘතිය"
@@ -1548,10 +1763,10 @@
     "sla": {
       "title": "SLA ප්රතිපත්තිය",
       "couldNotLoad": "SLA සැකසුම් පූරණය කළ නොහැක",
-      "critical": "Critical",
-      "high": "High",
-      "medium": "Medium",
-      "low": "Low",
+      "critical": "තීරණාත්මක",
+      "high": "ඉහළ",
+      "medium": "මධ්‍යම",
+      "low": "අඩු",
       "criticalDescription": "සත්යාපනයකින් තොරව දුරස්ථ සූරාකෑම.",
       "highDescription": "සැලකිය යුතු දත්ත කාන්දු වීමේ හැකියාව.",
       "mediumDescription": "සීමිත බලපෑමක් හෝ විශේෂිත කොන්දේසි.",
@@ -1566,7 +1781,7 @@
     },
     "findingDetail": {
       "title": "සොයාගැනීම",
-      "tabDetails": "Details",
+      "tabDetails": "විස්තර",
       "tabAnalysis": "Analysis",
       "tabRemediation": "Remediation",
       "notFound": "සොයාගැනීම හමු නොවීය",
@@ -1585,7 +1800,7 @@
       "clearFilters": "පෙරහන් ඉවත් කරන්න"
     },
     "scopeList": {
-      "title": "Security Agent",
+      "title": "ආරක්ෂක නියෝජිතයා",
       "couldNotLoad": "සංවිධාන පූරණය කළ නොහැක",
       "personal": "පුද්ගලික",
       "personalSubtitle": "ඔබේම ගබඩා"
@@ -1655,10 +1870,10 @@
       "title": "දැනුම්දීම්"
     },
     "repositories": {
-      "allRepositories": "සියලු ගබඩා",
+      "allRepositories": "සියලුම ගබඩා",
       "couldNotLoad": "ගබඩා සැකසුම් පූරණය කළ නොහැක",
-      "couldNotLoadRepositories": "ගබඩා පූරණය කළ නොහැක",
-      "couldNotOpenGithubSettings": "GitHub App සැකසුම් විවෘත කළ නොහැක",
+      "couldNotLoadRepositories": "ගබඩා පූරණය කිරීමට නොහැකි විය",
+      "couldNotOpenGithubSettings": "GitHub App සැකසුම් විවෘත කළ නොහැකි විය",
       "githubAppSettings": "GitHub App සැකසුම්",
       "manageAccess": "GitHub App ප්රවේශය කළමනාකරණය කරන්න",
       "noRepositories": "ගබඩා නැත",
@@ -1681,7 +1896,140 @@
     },
     "queuedActionUntracked": "පෝලිම් කළ ක්රියාවක් තවදුරටත් නිරීක්ෂණය කළ නොහැක. නවතම තත්වය බැලීමට නැවුම් කරන්න.",
     "initialSyncAdmissionFailed": "Security Agent සක්රීය කර ඇත, නමුත් ආරම්භක සමමුහුර්තය පෝලිම් කළ නොහැකි විය. නැවත සමමුහුර්ත කරන්න.",
-    "title": "Security Agent"
+    "title": "ආරක්ෂක නියෝජිතයා",
+    "commands": {
+      "findingAlreadyDismissed": "සොයාගැනීම දැනටමත් ඉවතලා ඇත",
+      "findingDismissed": "සොයාගැනීම ඉවතලා ඇත",
+      "noRemediationsQueued": "පවතින සොයා ගැනීම් පෝලිම් කර නොමැත",
+      "remediationsQueued": "පවතින ප්‍රතිකර්ම පෝලිම් කර ඇත",
+      "analysisComplete": "විශ්ලේෂණය සම්පූර්ණයි",
+      "syncComplete": "සමමුහුර්තය සම්පූර්ණයි"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "ආරක්ෂක සේවාව වින්‍යාස කර නොමැත. මෙය නිවැරදි කරන තෙක් නැවත ඉදිරිපත් කිරීම සාර්ථක විය නොහැක.",
+      "syncMayNotHaveCompleted": "සමමුහුර්තයක් සම්පූර්ණ නොවන්නට ඇත. එය ප්‍රතිසන්ධානය කිරීමට නැවත උත්සාහ කරන්න, නැතහොත් ඉවතලන්න.",
+      "syncInProgress": "ආරක්ෂක සමමුහුර්තයක් දැනටමත් සිදු වෙමින් පවතී. කරුණාකර නැවත උත්සාහ කරන්න.",
+      "dismissalInProgress": "මෙම ඉවතලීම දැනටමත් සිදු වෙමින් පවතී. කරුණාකර නැවත උත්සාහ කරන්න.",
+      "couldNotReadPendingSyncs": "අපේක්ෂිත සමමුහුර්ත කියවීමට නොහැකි විය. නැවත උත්සාහ කරන්න."
+    },
+    "analysisState": {
+      "queued": "විශ්ලේෂණය පෝලිම් කර ඇත",
+      "queuedTitle": "විශ්ලේෂණය පෝලිම් කර ඇත",
+      "queuedDescription": "විශ්ලේෂණ ධාරිතාව ලබා ගත හැකි වන තෙක් රැඳී සිටීම.",
+      "analyzing": "විශ්ලේෂණය වෙමින්",
+      "analyzingTitle": "විශ්ලේෂණය වෙමින්",
+      "analyzingDescription": "යෙදුම් කේතයට බලපෑමට ලක් වූ විශේෂාංගය වෙත ළඟා විය හැකිද යන්න පරීක්ෂා කිරීම.",
+      "failed": "විශ්ලේෂණය අසමත් විය",
+      "failedTitle": "විශ්ලේෂණය අසමත් විය",
+      "failedDescription": "Security Agent හට විශ්ලේෂණය සම්පූර්ණ කළ නොහැකි විය.",
+      "extractionFailed": "සමාලෝචනය අවශ්‍යයි",
+      "extractionFailedTitle": "සමාලෝචනය අවශ්‍යයි",
+      "extractionFailedDescription": "තාක්ෂණික වාර්තාව ව්‍යුහගත ප්‍රතිඵලයක් බවට පත් කළ නොහැකි විය.",
+      "exploitable": "සූරාකෑමට හැකි",
+      "exploitableTitle": "සූරාකෑමට හැකි",
+      "exploitableDescription": "යෙදුම් කේතයට බලපෑමට ලක් වූ විශේෂාංගය වෙත ළඟා විය හැක.",
+      "notExploitable": "ළඟා විය නොහැකි",
+      "notExploitableTitle": "ළඟා විය නොහැකි",
+      "notExploitableDescription": "මෙම ගබඩාවේ ළඟා විය හැකි මාර්ගයක් හමු නොවීය.",
+      "unknown": "සමාලෝචනය අවශ්‍යයි",
+      "unknownTitle": "සමාලෝචනය අවශ්‍යයි",
+      "unknownDescription": "අවදානමට ලක් වූ විශේෂාංගය ළඟා විය හැකිද යන්න විශ්ලේෂණයෙන් තහවුරු කළ නොහැකි විය.",
+      "safeToDismiss": "ඉවත් කිරීමට ආරක්ෂිත",
+      "safeToDismissTitle": "ඉවත් කිරීමට ආරක්ෂිත",
+      "safeToDismissDescription": "කේත පදනම විශ්ලේෂණයකින් තොරව මෙය ආරක්ෂිතව ඉවත් කළ හැකි බව Triage තීරණය කළේය.",
+      "manualReview": "සමාලෝචනය අවශ්‍යයි",
+      "manualReviewTitle": "අතින් සමාලෝචනය අවශ්යයි",
+      "manualReviewDescription": "Triage මෙම සොයාගැනීම අතින් සමාලෝචනය සඳහා සලකුණු කර ඇත.",
+      "analysisRequired": "විශ්ලේෂණය අවශ්‍යයි",
+      "analysisRequiredTitle": "කේත පදනම විශ්ලේෂණය අවශ්‍යයි",
+      "analysisRequiredDescription": "ප්‍රතිචාරයක් තීරණය කිරීමට පෙර ගබඩාව විශ්ලේෂණය කිරීමට Triage නිර්දේශ කරයි.",
+      "completed": "විශ්ලේෂණය කර ඇත",
+      "completedTitle": "විශ්ලේෂණය කර ඇත",
+      "completedDescription": "නිශ්චිත ප්‍රතිඵලයක් සටහන් නොකර විශ්ලේෂණය සම්පූර්ණ විය.",
+      "notAnalyzed": "විශ්ලේෂණය නොකළ",
+      "notAnalyzedTitle": "විශ්ලේෂණය නොකළ",
+      "notAnalyzedDescription": "මෙම සොයාගැනීම සඳහා කේත පදනම විශ්ලේෂණය තවමත් ධාවනය වී නොමැත."
+    },
+    "deadline": {
+      "fixedBeforeDeadline": "නියමිත කාලයට පෙර නිවැරදි කර ඇත",
+      "fixed": "නිවැරදි කර ඇත",
+      "fixedOn": "{{date}} දින නිවැරදි කර ඇත",
+      "resolutionRecorded": "විසඳුම සටහන් කර ඇත",
+      "superseded": "ප්‍රතිස්ථාපනය වී ඇත",
+      "dismissed": "ඉවතලා ඇත",
+      "closedOn": "{{status}} {{date}}",
+      "deadlineNotSet": "නියමිත කාලය සකසා නොමැත",
+      "noSlaDeadline": "SLA නියමිත කාලයක් නොමැත",
+      "dueOn": "{{date}} දින නියමිතයි",
+      "overdueNow": "ප්‍රමාදයි",
+      "dueToday": "අද නියමිතයි",
+      "dueTomorrow": "හෙට නියමිතයි",
+      "overdue_one": "දින {{count}} ක් ප්‍රමාදයි",
+      "overdue_other": "දින {{count}} ක් ප්‍රමාදයි",
+      "dueInDays_one": "දින {{count}} කින් නියමිතයි",
+      "dueInDays_other": "දින {{count}} කින් නියමිතයි",
+      "overdue": "දින {{count}} ක් ප්‍රමාදයි",
+      "dueInDays": "දින {{count}} කින් නියමිතයි"
+    },
+    "remediationStatus": {
+      "cancellationRequested": "අවලංගු කිරීමක් ඉල්ලා ඇත",
+      "notStarted": "ආරම්භ කර නොමැත",
+      "queued": "පෝලිම් කර ඇත",
+      "starting": "ආරම්භ වෙමින්",
+      "inProgress": "සිදු වෙමින් පවතී",
+      "draftPrOpened": "කෙටුම්පත් PR විවෘත කර ඇත",
+      "prOpened": "PR විවෘත කර ඇත",
+      "blocked": "අවහිර විය",
+      "failed": "අසමත් විය",
+      "noChangesNeeded": "වෙනස්කම් අවශ්ය නොවේ",
+      "cancelled": "අවලංගු කර ඇත",
+      "originAutomaticPolicy": "ස්වයංක්‍රීය ප්‍රතිපත්තිය",
+      "originIncludeExistingPolicy": "පවතින ප්‍රතිපත්තිය ඇතුළත් කරන්න",
+      "originManual": "අතින්",
+      "validationCheck": "වලංගුකරණ පරීක්ෂාව {{number}}"
+    },
+    "remediationUnavailable": {
+      "findingNotFound": "ආරක්ෂක සොයාගැනීම තවදුරටත් නොපවතී.",
+      "approvalRequired": "ස්වයං ප්‍රතිකර්මයට අනුමැතිය අවශ්‍යයි. එය අනුමත කිරීමට ප්‍රතිකර්මය අතින් ආරම්භ කරන්න.",
+      "findingNotOpen": "සොයාගැනීම තවදුරටත් විවෘත නොවේ.",
+      "repoNotInScope": "Security Agent සඳහා ගබඩාව තෝරා නොමැත.",
+      "analysisRequired": "ප්‍රතිකර්මය ආරම්භ කිරීමට පෙර කේත පදනම විශ්ලේෂණය ධාවනය කරන්න.",
+      "sandboxAnalysisRequired": "ප්‍රතිකර්මය ආරම්භ කිරීමට පෙර කේත පදනම විශ්ලේෂණය ධාවනය කරන්න.",
+      "staleAnalysis": "විශ්ලේෂණයෙන් පසු සොයාගැනීම වෙනස් විය. ප්‍රතිකර්මය ආරම්භ කිරීමට පෙර විශ්ලේෂණය නැවත ධාවනය කරන්න.",
+      "notExploitable": "විශ්ලේෂණයෙන් ළඟා විය හැකි අවදානම් මාර්ගයක් හමු නොවීය. ස්වයං ප්‍රතිකර්මය ලබා ගත නොහැක.",
+      "exploitabilityUnknown": "සූරාකෑමේ හැකියාව විශ්ලේෂණයෙන් තහවුරු කළ නොහැකි විය. එක්-ක්ලික් ප්‍රතිකර්මයකට පෙර අතින් සමාලෝචනය අවශ්‍යයි.",
+      "manualReviewRequired": "විශ්ලේෂණය අතින් සමාලෝචනය නිර්දේශ කරයි, එබැවින් එක්-ක්ලික් ප්‍රතිකර්මය ලබා ගත නොහැක.",
+      "monitorRequired": "PR විවෘත කිරීම වෙනුවට නිරීක්ෂණය කිරීමට විශ්ලේෂණය නිර්දේශ කරයි.",
+      "triageOnly": "Triage පමණක් සම්පූර්ණ වී ඇත. ප්‍රතිකර්මය ආරම්භ කිරීමට පෙර කේත පදනම විශ්ලේෂණය ධාවනය කරන්න.",
+      "actionNotConcrete": "සංයුක්ත යැපුම් පැච් එකක් හෝ යෝජිත විසඳුමක් නොමැත.",
+      "remediationActive": "ප්‍රතිකර්ම උත්සාහයක් දැනටමත් සක්‍රීයයි.",
+      "prAlreadyOpened": "ප්‍රතිකර්ම PR එකක් දැනටමත් විවෘතයි.",
+      "duplicateAnalysisResult": "මෙම විශ්ලේෂණ ප්‍රතිඵලය දැනටමත් ප්‍රතිකර්ම කාර්යයක් නිපදවා ඇත.",
+      "retryNotAllowed": "මෙම උත්සාහය සඳහා නැවත උත්සාහ කිරීම ලබා ගත නොහැක.",
+      "securityAgentDisabled": "මෙම හිමිකරු සඳහා Security Agent අක්‍රීය කර ඇත.",
+      "autoRemediationDisabled": "ස්වයං ප්‍රතිකර්මය අක්‍රීය කර ඇත. ආරක්ෂක ගේට්ටු සමත් වූ විට අතින් ප්‍රතිකර්මය තවමත් ආරම්භ කළ හැක.",
+      "includeExistingDisabled": "පවතින සොයාගැනීම් ස්වයංක්‍රීය ප්‍රතිකර්මයෙන් බැහැර කර ඇත.",
+      "belowThreshold": "සොයාගැනීම ස්වයංක්‍රීය බරපතලකම සීමාවට වඩා අඩුය. ආරක්ෂක ගේට්ටු සමත් වූ විට අතින් ප්‍රතිකර්මය තවමත් ආරම්භ කළ හැක.",
+      "beforeEnablement": "ස්වයං ප්‍රතිකර්මය සක්‍රීය කිරීමට පෙර විශ්ලේෂණය සම්පූර්ණ විය. ආරක්ෂක ගේට්ටු සමත් වූ විට අතින් ප්‍රතිකර්මය තවමත් ආරම්භ කළ හැක.",
+      "generic": "මෙම සොයාගැනීම සඳහා ප්‍රතිකර්මය ලබා ගත නොහැක."
+    },
+    "commandFailure": {
+      "ownerCapReached": "විශ්ලේෂණ ධාරිතාව පිරී ඇත. සක්‍රීය විශ්ලේෂණයක් අවසන් වන තෙක් රැඳී සිට, ඉන්පසු නැවත උත්සාහ කරන්න.",
+      "githubTokenUnavailable": "GitHub අවසරය අවධානය අවශ්‍යයි. GitHub App නැවත අවසර දෙන්න, ඉන්පසු නැවත උත්සාහ කරන්න.",
+      "githubAuthInvalid": "GitHub අවසරය අවධානය අවශ්‍යයි. GitHub App නැවත අවසර දෙන්න, ඉන්පසු නැවත උත්සාහ කරන්න.",
+      "findingUnavailable": "සොයාගැනීම තවදුරටත් ලබා ගත නොහැක. සොයාගැනීම් නැවුම් කර එය විවෘතව පැවතුනහොත් නැවත උත්සාහ කරන්න.",
+      "repositoryUnavailable": "ගබඩාව තවදුරටත් GitHub App සඳහා ලබා ගත නොහැක. ගබඩා ප්‍රවේශය නැවුම් කර, ඉන්පසු නැවත උත්සාහ කරන්න.",
+      "invalidDismissTarget": "සොයාගැනීම ඉවතලිය නොහැක, මන්ද එහි Dependabot ඉලක්කය අවලංගුය.",
+      "commandStalled": "පෝලිම් කළ ක්‍රියාව නියමිත වේලාවට අවසන් නොවීය. ක්‍රියාව නැවත උත්සාහ කරන්න.",
+      "queueRetriesExhausted": "උත්සාහ කිහිපයකින් පසු ක්‍රියාව සම්පූර්ණ කිරීමට නොහැකි විය. ක්‍රියාව නැවත උත්සාහ කරන්න.",
+      "queueAdmissionFailed": "පෝලිම් කළ ක්‍රියාව පිළිගැනීමට නොහැකි විය. ක්‍රියාව නැවත උත්සාහ කරන්න.",
+      "generic": "පෝලිම් කළ ක්‍රියාව අසාර්ථක විය. ක්‍රියාව නැවත උත්සාහ කරන්න."
+    },
+    "analysisMode": {
+      "auto": "ස්වයංක්‍රීය",
+      "shallow": "මතුපිට",
+      "deep": "ගැඹුරු"
+    }
   },
   "agents": {
     "activeNow": "දැන් සක්රීයයි",
@@ -1689,7 +2037,7 @@
       "searching": "සොයමින්",
       "searchSessions": "සැසි සොයන්න",
       "searchSessionsPlaceholder": "සැසි සොයන්න...",
-      "clearSearch": "සෙවීම ඉවත් කරන්න",
+      "clearSearch": "සෙවීම හිස් කරන්න",
       "clearFilters": "පෙරහන් ඉවත් කරන්න"
     },
     "sessionList": {
@@ -1720,14 +2068,30 @@
       "sessionDeleted": "සැසිය මකා ඇත",
       "needsInput": "ආදානය අවශ්යයි",
       "fromPlatform": "{{platform}} වෙතින්",
-      "centOne": "ශත",
-      "centOther": "ශත",
-      "dollarOne": "ඩොලරය",
-      "dollarOther": "ඩොලර්"
+      "cent_one": "ශත",
+      "cent": "ශත",
+      "cent_other": "ශත",
+      "dollar_one": "ඩොලරය",
+      "dollar": "ඩොලර්",
+      "dollar_other": "ඩොලර්",
+      "costSpoken": "පිරිවැය {{cost}}",
+      "costSpokenWithTime": "පිරිවැය {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub විවෘත කළ නොහැක",
-      "couldNotOpenMessage": "GitHub App සැකසුම ආරම්භ කිරීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න."
+      "couldNotOpenMessage": "GitHub App සැකසුම ආරම්භ කිරීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+      "installedTitle": "GitHub App ස්ථාපනය කරන ලදී",
+      "installedMessage": "ඔබේ ගබඩා දැන් සම්බන්ධ කර ඇත.",
+      "pendingTitle": "පරිපාලක අනුමැතිය බලාපොරොත්තුවෙන්",
+      "pendingMessage": "ස්ථාපන ඉල්ලීම අනුමත කළ යුත්තේ ආයතන පරිපාලකයෙකි.",
+      "accountMismatchTitle": "ගිණුම් නොගැලපීම",
+      "accountMismatchMessage": "මෙම සම්බන්ධතාවය ආරම්භ කර ඇත්තේ වෙනත් ගිණුමකින් පුරනය වී ඇති Kilo App එකෙනි. එම ගිණුමෙන් වෙබ් අඩවියට පුරනය වන්න, නැතහොත් යෙදුමෙන් නැවත ආරම්භ කරන්න.",
+      "cannotCompleteTitle": "ස්ථාපනය සම්පූර්ණ කළ නොහැක",
+      "notAdminMessage": "එම ගිණුමේ GitHub පරිපාලකයෙකුට පමණක් එය සම්බන්ධ කළ හැක. Kilo ස්ථාපනය කිරීමට ආයතන පරිපාලකයෙකුගෙන් ඉල්ලන්න.",
+      "alreadyClaimedMessage": "එම GitHub ස්ථාපනය දැනටමත් වෙනත් Kilo ගිණුමකට සම්බන්ධ කර ඇත. පළමුව එය එතැනින් විසන්ධි කරන්න.",
+      "didNotCompleteTitle": "ස්ථාපනය සම්පූර්ණ නොවීය",
+      "didNotCompleteMessage": "GitHub App ස්ථාපනය සම්පූර්ණ නොවීය. යෙදුමෙන් නැවත උත්සාහ කරන්න."
     },
     "sessionExited": "සැසියෙන් ඉවත් විය",
     "remoteSpawnRetryable": "අවස්ථාවට ළඟා විය නොහැකි විය — එය විසන්ධි වන්නට පුළුවන.",
@@ -1739,7 +2103,7 @@
       "title": "සැසිය",
       "copyErrorDetails": "දෝෂ විස්තර පිටපත් කරන්න",
       "backToSessions": "සැසි වෙත ආපසු",
-      "accessDenied": "ප්රවේශය ප්රතික්ෂේප විය",
+      "accessDenied": "ප්‍රවේශය ප්‍රතික්ෂේප විය",
       "accessDeniedDescription": "මෙය නැරඹීමට ඔබට අවසර නැත.",
       "couldNotLoad": "සැසිය පූරණය කළ නොහැක",
       "failedToLoadDetails": "සැසි විස්තර පූරණය කිරීමට අසාර්ථක විය",
@@ -1756,11 +2120,16 @@
       "renameAccessibility": "සැසිය නැවත නම් කරන්න: {{title}}",
       "connectRepository": "ගබඩාව සම්බන්ධ කරන්න",
       "cloningSession": "සැසිය ක්ලෝන කරමින්",
-      "continue": "දිගටම කරන්න",
+      "continue": "ඉදිරියට",
       "couldNotLoadThisSession": "මෙම සැසිය පූරණය කළ නොහැකි විය",
       "cloneFailed": "මෙම සැසිය ක්ලෝන කිරීමට නොහැකි විය.",
       "cloneFailedRetry": "මෙම සැසිය ක්ලෝන කිරීමට නොහැකි විය. නැවත උත්සාහ කරන්න.",
-      "connectRepositoryToContinue": "දිගටම කිරීමට ගබඩාවක් සම්බන්ධ කරන්න."
+      "connectRepositoryToContinue": "දිගටම කිරීමට ගබඩාවක් සම්බන්ධ කරන්න.",
+      "notEnoughCredits": "Cloud Agent ධාවනය කිරීමට ප්රමාණවත් ණය නොමැත. ණය එක් කර නැවත උත්සාහ කරන්න.",
+      "previousTaskFinishing": "පෙර කාර්යය තවමත් අවසන් වෙමින් පවතී. කරුණාකර මොහොතක් රැඳී සිටින්න.",
+      "serviceUnavailable": "සේවාව දැනට ලබා ගත නොහැක. කරුණාකර නැවත උත්සාහ කරන්න.",
+      "connectionTrouble": "සම්බන්ධතා ගැටලුවකි. කරුණාකර මොහොතකට පසු නැවත උත්සාහ කරන්න.",
+      "modelUnavailable": "මෙම මාදිලිය Cloud Agent සඳහා ලබා ගත නොහැක. වෙනත් මාදිලියක් තෝරා නැවත උත්සාහ කරන්න."
     },
     "remoteSession": {
       "failedToCreate": "දුරස්ථ සැසියක් සෑදීමට අසාර්ථක විය",
@@ -1770,7 +2139,10 @@
       "exitMessage": "මෙය ධාවනය වන සැසිය නවත්වන නමුත් එහි ඉතිහාසය තබා ගනී.",
       "keepSessionRunning": "සැසිය දිගටම ධාවනය කරන්න",
       "exitSession": "සැසියෙන් ඉවත් වන්න",
-      "restartExitFailed": "නව සැසියක් ආරම්භ කර ඇත. පෙර සැසිය තවමත් විවෘතයි."
+      "restartExitFailed": "නව සැසියක් ආරම්භ කර ඇත. පෙර සැසිය තවමත් විවෘතයි.",
+      "exitNotSupported": "වත්මන් සැසිය සඳහා දුරස්ථ සැසියෙන් පිටවීම සහාය නොදක්වයි",
+      "exitUnavailable": "වත්මන් සැසිය සඳහා දුරස්ථ සැසියෙන් පිටවීම ලබා ගත නොහැක",
+      "exitNeedsNewerCli": "දුරස්ථ ස්ලෑෂ් විධාන සඳහා නව Kilo CLI එකක් අවශ්ය වේ. Kilo CLI යාවත්කාලීන කර නැවත සම්බන්ධ වන්න."
     },
     "sessionConnection": {
       "connecting": "සම්බන්ධ වෙමින්…",
@@ -1814,15 +2186,17 @@
       "discardDraftMessage": "ඔබේ ඉල්ලීම අහිමි වනු ඇත.",
       "keepEditing": "දිගටම සංස්කරණය කරන්න",
       "discard": "ඉවතලන්න",
-      "discardFailed": "කටු සටහන ඉවතලිය නොහැක. කරුණාකර නැවත උත්සාහ කරන්න."
+      "discardFailed": "කටු සටහන ඉවතලිය නොහැක. කරුණාකර නැවත උත්සාහ කරන්න.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} ගොනුවක් යාවත්කාලීන කර ඇත",
-      "updatedFiles": "{{count}} ගොනු යාවත්කාලීන කර ඇත"
+      "updatedFileCount_one": "{{displayCount}} ගොනුවක් යාවත්කාලීන කර ඇත",
+      "updatedFileCount": "{{displayCount}} ගොනු යාවත්කාලීන කර ඇත",
+      "updatedFileCount_other": "{{displayCount}} ගොනු යාවත්කාලීන කර ඇත"
     },
     "toolPatch": {
-      "operationAdded": "එකතු කර ඇත",
-      "operationDeleted": "මකා ඇත",
+      "operationAdded": "එකතු කරන ලදී",
+      "operationDeleted": "මකා දමන ලදී",
       "operationUpdated": "යාවත්කාලීන කර ඇත"
     },
     "toolCard": {
@@ -1833,7 +2207,7 @@
       "contentTruncated": "අන්තර්ගතය කෙටි කර ඇත",
       "truncated": "කෙටි කර ඇත",
       "toolRead": "කියවන්න",
-      "toolEdit": "සංස්කරණය කරන්න",
+      "toolEdit": "සංස්කරණය",
       "toolWrite": "ලියන්න",
       "toolBash": "bash",
       "toolGlob": "glob",
@@ -1843,9 +2217,9 @@
       "toolTask": "කාර්යය",
       "readTodos": "කළ යුතු දේ කියවන්න",
       "updateTodos": "කළ යුතු දේ යාවත්කාලීන කරන්න",
-      "linesBadge": "{{count}} පේළි",
-      "filesBadge": "{{count}} ගොනු",
-      "matchesBadge": "{{count}} ගැළපීම්"
+      "linesBadge": "{{displayCount}} පේළි",
+      "filesBadge": "{{displayCount}} ගොනු",
+      "matchesBadge": "{{displayCount}} ගැළපීම්"
     },
     "readToolMarkdown": {
       "linesTruncated": "පේළි {{start}}–{{end}} (කෙටි කර ඇත)",
@@ -1883,7 +2257,7 @@
     },
     "modeOptions": {
       "code": "Code",
-      "plan": "Plan",
+      "plan": "සැලැස්ම",
       "debug": "Debug",
       "orchestrator": "Orchestrator",
       "ask": "Ask",
@@ -1927,7 +2301,11 @@
       "total": "මුළු",
       "reportAiResponseFailedRetryable": "මෙම ප්රතිචාරය වාර්තා කළ නොහැකි විය.",
       "reportAiResponseFailedTerminal": "මෙම ප්රතිචාරය වාර්තා කළ නොහැක.",
-      "reportAiResponseSubmitted": "වාර්තාව ඉදිරිපත් කර ඇත. රිසිට්පත {{receiptId}}"
+      "reportAiResponseSubmitted": "වාර්තාව ඉදිරිපත් කරන ලදී. රිසිට්පත {{receiptId}}"
+    },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
     },
     "partDetail": {
       "detailsUnavailable": "විස්තර ලබාගත නොහැක",
@@ -1957,7 +2335,7 @@
     "filePart": {
       "loadingImage": "රූපය පූරණය වෙමින්",
       "imageUnavailableRetry": "රූපය ලබාගත නොහැක, පූරණය නැවත උත්සාහ කරන්න",
-      "imageUnavailable": "රූපය ලබාගත නොහැක",
+      "imageUnavailable": "රූපය ලබා ගත නොහැක",
       "imageUnavailableWithAlt": "රූපය ලබාගත නොහැක {{alt}}",
       "imagePreviewUnavailableInSession": "මෙම සැසියේදී රූප පෙරදසුන ලබාගත නොහැක.",
       "viewImage": "රූපය බලන්න",
@@ -1987,7 +2365,7 @@
       "preparationComplete": "සූදානම සම්පූර්ණයි",
       "preparationFailed": "සූදානම අසාර්ථක විය",
       "setupCommand": "සැකසුම් විධානය {{index}}",
-      "setupCommandOf": "{{count}} න් සැකසුම් විධානය {{index}}"
+      "setupCommandOf": "{{displayCount}} න් සැකසුම් විධානය {{index}}"
     },
     "permissionCard": {
       "title": "අවසරය අවශ්ය වේ",
@@ -2024,7 +2402,7 @@
       "submissionFailed": "ඉදිරිපත් කිරීම අසාර්ථකයි. කරුණාකර නැවත උත්සාහ කරන්න.",
       "questionAnnouncement": "ඒජන්තයාට ඔබගේ ඇතුළත් කිරීම අවශ්‍යයි. ඔබ පිළිතුරු දෙන අතරතුර සංයුක්තකය විරාම කර ඇත.",
       "permissionAnnouncement": "ඒජන්තයාට ඉදිරියට යාමට අවසර අවශ්‍යයි. ඔබ තීරණය කරන අතරතුර සංයුක්තකය විරාම කර ඇත.",
-      "positionHint": "({{count}} න් 1)",
+      "positionHint": "({{displayCount}} න් 1)",
       "movedPastPrompt": "ඒජන්තයා මෙම ඉල්ලීම පසු කර ඇත. සැසිය ඉදිරියට යන විට මෙම කාඩ්පත වැසෙනු ඇත.",
       "waitingForAnswer": "ඒජන්තයා ඔබගේ පිළිතුර එනතුරු බලා සිටී. මෙම ප්‍රශ්නය විවෘතව ඇති අතරතුර, ඒජන්තයාට ඔබගේ පණිවිඩය විරාම කර ඇත.",
       "waitingForPermission": "ඒජන්තයා අවසරය එනතුරු බලා සිටී. මෙම ඉල්ලීම විවෘතව ඇති අතරතුර, ඒජන්තයාට ඔබගේ පණිවිඩය විරාම කර ඇත."
@@ -2050,7 +2428,7 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. නැවත උත්සාහ කිරීම ලබා ගත හැක.",
       "copyToComposer": "සංයුක්තකයට පිටපත් කරන්න",
-      "queued": "පෝලිමේ",
+      "queued": "පෝලිම් කර ඇත",
       "queuedAccessibility": "පණිවිඩය පෝලිමේ ඇත",
       "userMessage": "පරිශීලක පණිවිඩය",
       "assistantMessage": "සහායක පණිවිඩය",
@@ -2059,8 +2437,9 @@
     "olderMessages": {
       "arrived": "පෙර පණිවිඩ පූරණය විය",
       "retryHint": "මෙම සැසිය සඳහා පැරණි පණිවිඩ පූරණය නැවත උත්සාහ කරයි.",
-      "omittedOne": "මෙම සැසියෙන් සමහර පෙර අයිතම ප්‍රදර්ශනය කළ නොහැකි විය.",
-      "omittedMany": "මෙම සැසියෙන් පෙර අයිතම {{count}} ක් ප්‍රදර්ශනය කළ නොහැකි විය.",
+      "omitted_one": "මෙම සැසියෙන් සමහර පෙර අයිතම ප්‍රදර්ශනය කළ නොහැකි විය.",
+      "omitted": "මෙම සැසියෙන් පෙර අයිතම {{displayCount}} ක් ප්‍රදර්ශනය කළ නොහැකි විය.",
+      "omitted_other": "මෙම සැසියෙන් පෙර අයිතම {{displayCount}} ක් ප්‍රදර්ශනය කළ නොහැකි විය.",
       "couldNotLoad": "පෙර පණිවිඩ පූරණය කළ නොහැකි විය.",
       "unavailable": "පෙර පණිවිඩ ලබා ගත නොහැක.",
       "tooLarge": "පූරණය කිරීමට පෙර පණිවිඩ ඉතා විශාලය."
@@ -2069,17 +2448,19 @@
       "viewTable": "වගුව බලන්න",
       "title": "වගුව",
       "close": "වගුව වසන්න",
-      "column": "තීරුව",
-      "columns": "තීරු",
-      "row": "පේළිය",
-      "rows": "පේළි",
+      "columnCount_one": "තීරුව",
+      "columnCount": "තීරු",
+      "columnCount_other": "තීරු",
+      "rowCount_one": "පේළිය",
+      "rowCount": "පේළි",
+      "rowCount_other": "පේළි",
       "opensFullScreen": "සම්පූර්ණ තිරය විවෘත කරයි"
     },
     "sessionFilter": {
       "title": "සැසි පෙරහන් කරන්න",
-      "sortBy": "අනුපිළිවෙළ",
+      "sortBy": "අනුව වර්ග කරන්න",
       "sortLastUpdated": "අවසන් යාවත්කාලීනය",
-      "sortCreated": "සාදන ලද",
+      "sortCreated": "සාදන ලදී",
       "platform": "වේදිකාව",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
@@ -2101,12 +2482,15 @@
     },
     "modelPicker": {
       "title": "මාදිලිය තෝරන්න",
-      "searchPlaceholder": "මාදිලි සොයන්න...",
-      "noModels": "මාදිලි නොමැත",
-      "noModelsDescription": "තේරීමට මාදිලි නොමැත."
+      "searchPlaceholder": "ආකෘති සොයන්න...",
+      "noModels": "ආකෘති නොමැත",
+      "noModelsDescription": "තේරීමට මාදිලි නොමැත.",
+      "favorites": "ප්‍රියතම",
+      "recommended": "නිර්දේශිත",
+      "allModels": "සියලුම ආකෘති"
     },
     "modelSelector": {
-      "model": "මාදිලිය",
+      "model": "ආකෘතිය",
       "provider": "සැපයුම්කරු {{id}}",
       "modelId": "මාදිලිය {{id}}",
       "unavailable": "ලබා ගත නොහැක",
@@ -2120,7 +2504,8 @@
       "addToFavorites": "ප්‍රියතමයන්ට {{name}} එක් කරන්න",
       "removeFromFavorites": "ප්‍රියතමයන්ගෙන් {{name}} ඉවත් කරන්න",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "සැසියේ ආකෘතිය"
     },
     "attachmentPreview": {
       "openFailedRetry": "ගොනුව විවෘත කිරීම අසාර්ථකයි. කරුණාකර නැවත උත්සාහ කරන්න.",
@@ -2142,11 +2527,11 @@
       "cameraAccessDisabled": "කැමරා ප්‍රවේශය අක්‍රීයයි",
       "cameraAccessMessage": "ඡායාරූපයක් ගැනීමට සැකසුම් තුළ කැමරා ප්‍රවේශයට ඉඩ දෙන්න.",
       "couldNotOpenPhotoPicker": "ඡායාරූප තේරීම්කාරකය විවෘත කළ නොහැකි විය. Kilo නැවත ආරම්භ කර නැවත උත්සාහ කරන්න.",
-      "maxFilesAllowed": "උපරිම ගොනු {{count}} කට ඉඩ දෙනු ලැබේ",
+      "maxFilesAllowed": "උපරිම ගොනු {{displayCount}} කට ඉඩ දෙනු ලැබේ",
       "onlyAddingFiles": "ගොනු {{total}} න් {{accepted}} ක් පමණක් එක් කරමින් (උපරිම {{max}})"
     },
     "composer": {
-      "addAttachment": "ඇමුණුම එක් කරන්න",
+      "addAttachment": "ඇමුණුමක් එක් කරන්න",
       "removeOrRetryFailed": "අසාර්ථක ඇමුණුම් පළමුව ඉවත් කරන්න හෝ නැවත උත්සාහ කරන්න.",
       "attachmentsWithSlashCommands": "ස්ලෑෂ් විධාන සමඟ ඇමුණුම් යැවිය නොහැක.",
       "photoMetadataNotRemoved": "ඇමුණුමකින් ඡායාරූප පාරදත්ත ඉවත් කළ නොහැකි විය.",
@@ -2188,7 +2573,8 @@
       "delegatingWork": "කාර්යය පැවරීම",
       "askingQuestion": "ප්‍රශ්නයක් අසමින්",
       "consideringNextSteps": "ඊළඟ පියවර සලකා බලමින්",
-      "writingResponse": "ප්‍රතිචාරය ලියමින්"
+      "writingResponse": "ප්‍රතිචාරය ලියමින්",
+      "initializingSnapshot": "ස්නැප්ෂොට් එක ආරම්භ කරමින්…"
     },
     "slashCommands": {
       "startNewSession": "නව සැසියක් ආරම්භ කරන්න",
@@ -2207,7 +2593,7 @@
       "costPrefix": "පිරිවැය {{cost}}",
       "costSuffix": ", පිරිවැය {{cost}}",
       "tokensWindowUnavailable": "සන්දර්භය {{used}} ටෝකන, කවුළුව ලබා ගත නොහැක",
-      "tokensUsage": "සන්දර්භය {{used}}/{{window}} ටෝකන, {{percentage}}% භාවිතා කර ඇත",
+      "tokensUsage": "සන්දර්භය {{used}}/{{window}} ටෝකන, {{percentage}} භාවිතා කර ඇත",
       "title": "සන්දර්භ භාවිතය",
       "used": "භාවිතා කරන ලද",
       "remaining": "ඉතිරි",
@@ -2216,7 +2602,7 @@
       "usageReflectsLatest": "භාවිතය අවසන් සම්පූර්ණ කළ සහායක ප්‍රතිචාරය පිළිබිඹු කරයි.",
       "tokenUsage": "ටෝකන භාවිතය",
       "cacheRate": "හැඹිලි අනුපාතය",
-      "modelsCount": "මාදිලි ({{count}})",
+      "modelsCount": "මාදිලි ({{displayCount}})",
       "tokenTotalsNote": "ටෝකන එකතු මෙම සැසියට පමණක් අදාළ වන අතර උපඒජන්ත/ළමා සැසි ටෝකන බැහැර කරයි.",
       "subagents": "උපඒජන්තයන්",
       "subagentsDescription": "ළමා සැසි වලින් ඉතිරි පිරිවැය",
@@ -2225,15 +2611,16 @@
       "ofWindowTokens": "ටෝකන {{window}} න්",
       "tokens": "ටෝකන",
       "tokensWithPercentage": "ටෝකන ({{percentage}})",
-      "stepsCountOne": "පියවර {{steps}} ක්",
-      "stepsCountMany": "පියවර {{steps}} ක්",
+      "stepsCount_one": "පියවර {{steps}} ක්",
+      "stepsCount": "පියවර {{steps}} ක්",
+      "stepsCount_other": "පියවර {{steps}} ක්",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
       "open": "විවෘත ඉල්ලීම් ඇදීම",
       "closed": "වසා දැමූ ඉල්ලීම් ඇදීම",
       "merged": "ඒකාබද්ධ කළ ඉල්ලීම් ඇදීම",
-      "draft": "කෙටුම්පත් ඉල්ලීම් ඇදීම",
+      "draft": "කෙටුම්පත් pull request",
       "updating": "යාවත්කාලීන වෙමින්, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "ඉල්ලීම් ඇදීම"
@@ -2241,20 +2628,21 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "ඔබගේ ගිණුම පූරණය කළ නොහැකි විය",
-    "couldNotLoadAccountDescription": "ඔබගේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+    "couldNotLoadAccountDescription": "ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
     "couldNotLoadPrivacy": "රහස්‍යතා තේරීම් පූරණය කළ නොහැකි විය",
     "couldNotLoadPrivacyDescription": "ඔබගේ උපාංග ආරක්ෂක සැකසුම් පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
     "contentReady": "අන්තර්ගතය සූදානම්",
-    "signOut": "පිටවීම",
+    "signOut": "පිටවන්න",
     "retryLoadingAccount": "ගිණුම පූරණය කිරීම නැවත උත්සාහ කරන්න",
     "retryLoadingPrivacy": "රහස්‍යතා තේරීම් පූරණය කිරීම නැවත උත්සාහ කරන්න"
   },
   "addCredits": {
     "cta": "ණය එක් කරන්න",
-    "description": "භාවිතය ක්‍රියාත්මකව තබා ගැනීමට ණය එක් කරන්න."
+    "description": "භාවිතය ක්‍රියාත්මකව තබා ගැනීමට ණය එක් කරන්න.",
+    "billingPage": "බිල්පත් පිටුව"
   },
   "deviceSessions": {
-    "couldNotLoad": "සැසි පූරණය කළ නොහැකි විය",
+    "couldNotLoad": "සැසි පූරණය කළ නොහැක",
     "couldNotLoadDescription": "මෙය පූරණය වන තෙක් ඔබගේ ක්‍රියාකාරී සැසි ලබා ගත නොහැක.",
     "currentDeviceUnidentified": "වත්මන් උපාංගය හඳුනාගත නොහැකි විය",
     "noSessions": "ක්‍රියාකාරී සැසි නොමැත",
@@ -2270,31 +2658,25 @@
     "signOutThisDeviceTitle": "මෙම උපාංගයෙන් පිටවන්නද?",
     "signOutThisSessionTitle": "මෙම සැසියෙන් පිටවන්නද?",
     "signOutThisSessionMessage": "{{device}} පිටවනු ඇත. එයට පැයක් දක්වා API ප්‍රවේශය පැවතිය හැක.",
-    "signOutConfirm": "පිටවීම",
-    "signOutMessage": "ඔබගේ වැඩබිමට ප්‍රවේශ වීමට ඔබට නැවත පුරනය වීමට සිදුවේ."
+    "signOutConfirm": "පිටවන්න",
+    "signOutMessage": "ඔබේ වැඩබිමට ප්‍රවේශ වීමට නැවත පුරනය වීමට සිදුවේ.",
+    "webBrowser": "වෙබ් බ්රවුසරය"
   },
   "forceUpdate": {
     "couldNotOpenStore": "යෙදුම් වෙළඳසැල විවෘත කළ නොහැකි විය.",
     "description": "Kilo හි නව අනුවාදයක් ලබා ගත හැක. ඉදිරියට යාමට කරුණාකර යාවත්කාලීන කරන්න.",
     "title": "යාවත්කාලීනය අවශ්‍යයි",
-    "updateNow": "දැන් යාවත්කාලීන කරන්න"
+    "updateNow": "දැන් යාවත්කාලීන කරන්න",
+    "appStorePage": "යෙදුම් වෙළඳසැලේ පිටුව"
   },
   "home": {
     "couldNotLoadSessions": "සැසි පූරණය කළ නොහැකි විය",
     "couldNotLoadActiveSessions": "ක්‍රියාකාරී සැසි පූරණය කළ නොහැකි විය",
-    "agentSessions": "ඒජන්ත සැසි",
-    "showingSavedSessions": "සුරැකි සැසි පෙන්වමින් — සජීවී තත්ත්වය කල් ඉකුත් විය හැක",
-    "startNewAgentSession": "නව Kilo Agent සැසියක් ආරම්භ කරන්න",
-    "aiCodingSessions": "AI කේතීකරණ සැසි",
-    "startCodingTaskFromPhone": "ඔබගේ දුරකථනයෙන් කේතීකරණ කාර්යයක් ආරම්භ කරන්න හෝ ඔබගේ CLI වෙතින් සැසියක් දිගටම කරගෙන යන්න.",
-    "tryIt": "උත්සාහ කරන්න",
+    "agentSessions": "නියෝජිත සැසි",
     "newCodingTask": "නව කේතීකරණ කාර්යය",
     "explore": "ගවේෂණය",
     "seeAll": "සියල්ල බලන්න",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "සුබ උදෑසනක්",
-    "greetingAfternoon": "සුබ දවාලක්",
-    "greetingEvening": "සුබ සැන්දෑවක්"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} වසන්න",
@@ -2307,8 +2689,8 @@
     "title": "පිටුව හමු නොවීය"
   },
   "monoScrollBlock": {
-    "contentTruncated": "අන්තර්ගතය කෙටි කරන ලදී",
-    "truncated": "කෙටි කරන ලදී",
+    "contentTruncated": "අන්තර්ගතය කෙටි කර ඇත",
+    "truncated": "කෙටි කර ඇත",
     "wrap": "ඔතන්න",
     "scroll": "අනුචලනය"
   },
@@ -2317,14 +2699,14 @@
     "internetRestored": "අන්තර්ජාල සම්බන්ධතාවය ප්‍රතිස්ථාපනය විය"
   },
   "queryError": {
-    "neutralTitle": "යම් දෙයක් වැරදී ගියේය",
+    "neutralTitle": "යම් දෙයක් වැරදී ඇත",
     "neutralDescription": "කරුණාකර නැවත උත්සාහ කරන්න.",
     "offlineTitle": "පූරණය කිරීම අසාර්ථකයි",
-    "offlineDescription": "යම් දෙයක් වැරදී ගියේය",
+    "offlineDescription": "යම් දෙයක් වැරදී ඇත",
     "permissionTitle": "ප්‍රවේශය ප්‍රතික්ෂේප විය",
-    "permissionDescription": "මෙය බැලීමට ඔබට අවසර නොමැත.",
+    "permissionDescription": "මෙය නැරඹීමට ඔබට අවසර නැත.",
     "notFoundTitle": "හමු නොවීය",
-    "notFoundDescription": "මෙම අයිතමය ඉවත් කර තිබිය හැක හෝ තවදුරටත් ලබා ගත නොහැක.",
+    "notFoundDescription": "මෙම අයිතමය ඉවත් කර තිබිය හැක හෝ තවදුරටත් ලබාගත නොහැක.",
     "serverTitle": "පූරණය කළ නොහැකි විය",
     "serverDescription": "අපගේ පැත්තෙන් යම් දෙයක් වැරදී ගියේය. කරුණාකර නැවත උත්සාහ කරන්න."
   },
@@ -2339,7 +2721,7 @@
     "optionsExpiredDescription": "ආපසු ගොස් පෙර තිරයෙන් මෙම තේරීම්කාරකය නැවත විවෘත කරන්න."
   },
   "sessionRow": {
-    "needsInput": "ආදානය අවශ්‍යයි"
+    "needsInput": "ආදානය අවශ්යයි"
   },
   "voiceInput": {
     "listening": "සවන් දෙමින්...",
@@ -2348,7 +2730,17 @@
     "onlineMessage": "මෙම උපාංගයට නොබැඳිව සංකේතනය කළ නොහැක. එය පෙළ බවට පත් කිරීමට ඔබගේ පටිගත කිරීම {{provider}} වෙත යවනු ලැබේ. Kilo ශ්‍රව්‍යය ගබඩා නොකරයි.",
     "allow": "ඉඩ දෙන්න",
     "start": "හඬ ආදානය ආරම්භ කරන්න",
-    "stop": "හඬ ආදානය නවත්වන්න"
+    "stop": "හඬ ආදානය නවත්වන්න",
+    "restricted": "මෙම උපාංගයේ හඬ ආදානය සීමා කර ඇත.",
+    "micRequired": "හඬ ආදානය සඳහා මයික්‍රෆෝන ප්‍රවේශය අවශ්‍ය වේ.",
+    "micOff": "මයික්‍රෆෝන ප්‍රවේශය ක්‍රියා විරහිතයි. හඬ ආදානය භාවිතා කිරීමට සැකසුම් තුළ එය සක්‍රීය කරන්න.",
+    "micOffTitle": "මයික්‍රෆෝන ප්‍රවේශය ක්‍රියා විරහිතයි",
+    "noSpeech": "කථනයක් හඳුනාගත නොහැකි විය. නැවත උත්සාහ කිරීමට මයික්‍රෆෝනය තට්ටු කරන්න.",
+    "needsConnection": "හඬ ආදානයට දැන් සම්බන්ධතාවයක් අවශ්‍ය වේ. නැවත උත්සාහ කරන්න.",
+    "busy": "හඬ ආදානය කාර්යබහුලයි. නැවත උත්සාහ කරන්න.",
+    "stopped": "හඬ ආදානය නතර විය. නැවත උත්සාහ කිරීමට මයික්‍රෆෝනය තට්ටු කරන්න.",
+    "unavailableDevice": "මෙම උපාංගයේ හඬ ආදානය ලබා ගත නොහැක.",
+    "unavailableLanguage": "මෙම උපාංග භාෂාව සඳහා හඬ ආදානය ලබා ගත නොහැක."
   },
   "share": {
     "title": "Kilo වෙත බෙදාගන්න",
@@ -2360,7 +2752,7 @@
     "connectedCli": "සම්බන්ධිත CLI එකක",
     "newSessionOn": "{{name}} මත නව සැසිය",
     "noMatchingSessions": "ගැළපෙන සැසි නොමැත.",
-    "onlyFirstFilesAttached": "පළමු ගොනු {{count}} පමණක් අමුණනු ඇත.",
+    "onlyFirstFilesAttached": "පළමු ගොනු {{displayCount}} පමණක් අමුණනු ඇත.",
     "staleMessage": "මෙම බෙදාගැනීම තවදුරටත් ලබා ගත නොහැක.",
     "retryableMessage": "ඔබගේ සැසි පූරණය කළ නොහැකි විය.",
     "emptyMessage": "තවම සැසි නොමැත — මෙය යැවීමට නව එකක් ආරම්භ කරන්න.",
@@ -2393,7 +2785,7 @@
     "otherAccountCopy": "මෙම Apple ගිණුමේ Kilo Pass වෙනත් Kilo ගිණුමකට අයත් වේ. එය කළමනාකරණය කිරීමට එම Kilo ගිණුමට පුරනය වන්න.",
     "alreadySubscribed": "ඔබට දැනටමත් Kilo Pass දායකත්වයක් ඇත.",
     "purchaseUnavailable": "Kilo Pass මිලදී ගැනීම දැන් ලබා ගත නොහැක.",
-    "tierCredits": "ණය වශයෙන් ${{amount}}",
+    "tierCredits": "ණය වශයෙන් {{amount}}",
     "perMonth": "{{price}}/mo",
     "verifyPurchaseFailed": "ඔබගේ මිලදී ගැනීම සත්‍යාපනය කළ නොහැකි විය. ඔබගේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
     "productsCouldNotLoad": "App Store වෙතින් Kilo Pass නිෂ්පාදන පූරණය කළ නොහැකි විය.",
@@ -2404,7 +2796,7 @@
     "manageFailed": "App Store දායකත්ව කළමනාකරණය විවෘත කිරීම අසාර්ථකයි.",
     "kiloPassSetup": "Kilo Pass සැකසුම",
     "subscriptionHeaderDescription": "Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා — Cloud Agents, දුරස්ථ සැසි, සහ KiloClaw කතාබස් — ඔබගේ Kilo ශේෂයට ණය එක් කරන මාසික දායකත්වයක්.",
-    "tierDescription": "Kilo App භාවිතය සඳහා ${{price}} ගෙවූ ණය මාසිකව එක් වේ.",
+    "tierDescription": "Kilo App භාවිතය සඳහා {{price}} ගෙවූ ණය මාසිකව එක් වේ.",
     "subscribe": "දායක වන්න",
     "subscribeDescription": "ප්‍රසාද ප්‍රගතිය සමඟ මාසික ණය",
     "manage": "කළමනාකරණය",
@@ -2412,7 +2804,7 @@
     "statusPending": "Kilo Pass අපේක්ෂිතයි",
     "statusCanceling": "Kilo Pass අවලංගු වෙමින්",
     "statusPastDue": "Kilo Pass කල් ඉකුත් වී ඇත",
-    "monthlyCredits": "මාසික ණය ${{credits}}",
+    "monthlyCredits": "මාසික ණය {{credits}}",
     "ends": "අවසන් වන්නේ {{date}}",
     "periodEnd": "කාලසීමාව අවසානය",
     "managedOnGooglePlay": "Google Play මත කළමනාකරණය වේ",
@@ -2425,8 +2817,16 @@
     "unavailableDescription": "Android හි Kilo Pass යෙදුම තුළ මිලදී ගැනීමක් ලෙස ලබා ගත නොහැක. එය වෙබ් අඩවියේ කළමනාකරණය කරන්න.",
     "webManagementDescription": "මෙම Kilo Pass වෙබ් අඩවියේ කළමනාකරණය වේ.",
     "legalDisclosure": "Kilo Pass යනු ස්වයං-අලුත් කළ හැකි මාසික දායකත්වයකි. ගෙවීම ඔබේ Apple ID වෙත මිලදී ගැනීම තහවුරු වූ විට අය කෙරේ. දායකත්ව ස්වයංක්රීයව සෑම මාසයකම පෙන්වන මිලට අලුත් වේ. වත්මන් කාල සීමාව අවසන් වීමට අවම වශයෙන් පැය 24 කට පෙර අවලංගු නොකළහොත්. ඔබේ App Store ගිණුම් සැකසුම් තුළ ඕනෑම අවස්ථාවක කළමනාකරණය කරන්න හෝ අවලංගු කරන්න.",
-    "legalPrivacyPolicy": "රහස්යතා ප්රතිපත්තිය",
-    "legalTermsOfUse": "භාවිත කොන්දේසි (EULA)"
+    "legalPrivacyPolicy": "රහස්‍යතා ප්‍රතිපත්තිය",
+    "legalTermsOfUse": "භාවිත කොන්දේසි (EULA)",
+    "purchaseDifferentAccount": "මෙම App Store මිලදී ගැනීම ඔබේ Kilo ගිණුමට සම්බන්ධ කර නොමැත. මිලදී ගැනීම සඳහා භාවිතා කළ Apple ගිණුමට පුරනය වන්න, ඉන්පසු නැවත උත්සාහ කරන්න.",
+    "restoreFailed": "මිලදී ගැනීම් ප්‍රතිස්ථාපනය කිරීමට අසමත් විය. නැවත උත්සාහ කරන්න.",
+    "purchaseFailed": "මිලදී ගැනීම සම්පූර්ණ කිරීමට අසමත් විය.",
+    "purchaseStartFailed": "App Store මිලදී ගැනීම ආරම්භ කිරීමට අසමත් විය.",
+    "purchaseOwnedByAnotherAccount": "මෙම Apple ගිණුමේ Kilo Pass වෙනත් Kilo ගිණුමකට අයත් වේ.",
+    "couldNotConnectToAppStore": "App Store වෙත සම්බන්ධ වීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+    "noMatchingProducts": "App Store විසින් ගැළපෙන Kilo Pass නිෂ්පාදන ලබා දුන්නේ නැත.",
+    "purchaseMissingSignedTransaction": "App Store මිලදී ගැනීමේදී අත්සන් කළ JWS ගනුදෙනුවක් ඇතුළත් නොවීය."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2506,7 +2906,7 @@
     "voiceTranscriptionWho": "උපාංගයේ පමණක්, හෝ මෙම උපාංගයට නොබැඳිව සංකේතනය කළ නොහැකි විට Apple හෝ Google.",
     "installAttributionPromptTitle": "ස්ථාපන ආරෝපණයට ඉඩ දෙන්නද?",
     "installAttributionPromptMessage": "Kilo Apple හි ලුහුබැඳීමේ අවසරය භාවිතා කරන්නේ ඔබව ගෙන ආ නාලිකාව දැන ගැනීමට පමණි. ඔබගේ ප්‍රොම්ප්ට් සහ සංවාද කිසි විටෙක භාවිතා නොවේ.",
-    "continue": "ඉදිරියට යන්න",
+    "continue": "ඉදිරියට",
     "what": "කුමක්ද",
     "why": "ඇයි",
     "who": "කවුද"
@@ -2514,32 +2914,39 @@
   "feedback": {
     "noEmailApp": "ඊමේල් යෙදුමක් නොමැත. ඔබට {{email}} හිදී අප හා සම්බන්ධ විය හැක",
     "couldNotOpenStore": "වෙළඳසැල විවෘත කළ නොහැකි විය.",
-    "promptTitle": "ඔබ Kilo යෙදුමට කැමතිද?",
-    "iLikeIt": "මම කැමතියි",
-    "gladTitle": "එය ඇසීමට අපි සතුටු වෙමු!",
-    "gladMessage": "වෙළඳසැල සමාලෝචනයක් අපට බෙහෙවින් උපකාරී වනු ඇත. Kilo භාවිත කිරීමට ස්තූතියි!",
-    "rateKilo": "Kilo අගය කරන්න",
-    "needsWork": "වැඩිදියුණු කිරීම අවශ්‍යයි",
-    "sorryTitle": "එය ඇසීමට අපට කණගාටුයි!",
-    "sorryMessage": "වැඩිදියුණු කළ යුතු දේ අපට දන්වන්න. යෙදුමේ වගකිව යුතු ඉංජිනේරුවා සෑම වාර්තාවක්ම කියවයි!",
-    "emailUs": "අපට ඊමේල් කරන්න"
+    "emailSubject": "ජංගම යෙදුම් ප්‍රතිපෝෂණය",
+    "neutralTitle": "Kilo යෙදුම ඇගයීමට ලක් කරන්න",
+    "rateTheApp": "යෙදුම ඇගයීමට ලක් කරන්න",
+    "sendFeedback": "ප්‍රතිචාරය යවන්න"
   },
   "organization": {
     "boundary": {
       "backToProfile": "පැතිකඩට ආපසු",
-      "loadErrorMessage": "ඔබගේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "loadErrorMessage": "ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "loadErrorTitle": "ඔබගේ සංවිධාන පූරණය කළ නොහැකි විය",
       "organizationUnavailable": "සංවිධානය ලබා ගත නොහැක",
       "selectDescription": "ඉදිරියට යාමට ඔබගේ පැතිකඩෙන් සංවිධානයක් තෝරන්න.",
       "selectOrganization": "සංවිධානයක් තෝරන්න",
-      "unavailableDescription": "මෙම සංවිධානය තවදුරටත් ලබා ගත නොහැක. ඉදිරියට යාමට ඔබගේ පැතිකඩෙන් එකක් තෝරන්න."
+      "unavailableDescription": "මෙම සංවිධානය තවදුරටත් ලබා ගත නොහැක. ඉදිරියට යාමට ඔබගේ පැතිකඩෙන් එකක් තෝරන්න.",
+      "accessDeniedTitle": "ප්‍රවේශය ප්‍රතික්ෂේප විය",
+      "accessDeniedDescription": "ඔබට මෙම ආයතනයට ප්‍රවේශයක් නොමැත."
     },
     "creditActivity": {
       "emptyDescription": "මෙම සංවිධානය සඳහා මිලදී ගැනීම්, භාවිතය සහ ණය ගැලපීම් සිදු වන විට මෙහි දිස්වනු ඇත.",
       "emptyTitle": "ණය ක්‍රියාකාරකම් නොමැත",
       "expires": "කල් ඉකුත් වන්නේ {{date}}",
       "title": "ණය ක්‍රියාකාරකම්",
-      "transactionFallback": "ණය ගනුදෙනුව"
+      "transactionFallback": "ණය ගනුදෙනුව",
+      "category": {
+        "organization_custom": "සංවිධාන අභිරුචි",
+        "parent_to_child_transfer_in": "මාපිය සංවිධානයෙන් ලැබුණු මාරුව",
+        "parent_to_child_transfer_out": "දරු සංවිධානයට යවන ලද මාරුව",
+        "oss-sponsorship": "OSS අනුග්‍රහය",
+        "oss-monthly-reset": "OSS මාසික යළි සැකසීම",
+        "team-topup-bonus-2025": "2025 කණ්ඩායම් ඉහළ දැමීමේ ප්‍රසාදය",
+        "accounting_adjustment": "ගිණුම්කරණ ගැලපීම",
+        "credits_expired": "ණය කල් ඉකුත් විය"
+      }
     },
     "inviteMember": {
       "emailError": "වලංගු ඊමේල් ලිපිනයක් ඇතුළු කරන්න",
@@ -2556,10 +2963,17 @@
       "emptyDescription": "ඉන්වොයිසි සෑම බිල්පත් චක්‍රයකම ස්වයංක්‍රීයව ජනනය වන අතර ඔබගේ සංවිධානයට බිල් කළ පසු මෙහි දිස්වනු ඇත.",
       "emptyTitle": "ඉන්වොයිසි නොමැත",
       "invoiceFallback": "ඉන්වොයිසිය",
-      "statusOpen": "විවෘත",
-      "statusPaid": "ගෙවූ",
-      "statusVoid": "අවලංගු",
-      "title": "ඉන්වොයිසි"
+      "title": "ඉන්වොයිසි",
+      "downloadFailed": "ඉන්වොයිසිය බාගත කළ නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "sharingUnavailable": "මෙම උපාංගයේ බෙදාගැනීම ලබා ගත නොහැක.",
+      "status": {
+        "paid": "ගෙවූ",
+        "open": "විවෘත",
+        "void": "අවලංගු",
+        "draft": "කෙටුම්පත",
+        "uncollectible": "එකතු කළ නොහැකි",
+        "unknown": "නොදන්නා"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2608,7 +3022,7 @@
         "billingManager": "බිල්පත් කළමනාකරු"
       },
       "emailStatusFailed": "ඊමේල් අසාර්ථකයි",
-      "emailStatusPending": "අපේක්ෂිතයි",
+      "emailStatusPending": "බලා සිටී",
       "inviteCreated": "ආරාධනය සාදන ලදී",
       "pendingInvitations": "අපේක්ෂිත ආරාධනා",
       "resendInvite": "ආරාධනය නැවත යවන්න",
@@ -2645,8 +3059,9 @@
       "manageHint": "ජාලයේ Kilo Pass කළමනාකරණය විවෘත කරයි.",
       "notSubscribed": "දායක වී නොමැත",
       "overallocated": "Pass පැවරුම් ගෙවූ ආසන ඉක්මවයි",
-      "paidSeatOne": "ගෙවූ ආසනය {{count}} ක්",
-      "paidSeatOther": "ගෙවූ ආසන {{count}} ක්",
+      "paidSeat_one": "ගෙවූ ආසනය {{displayCount}} ක්",
+      "paidSeat": "ගෙවූ ආසන {{displayCount}} ක්",
+      "paidSeat_other": "ගෙවූ ආසන {{displayCount}} ක්",
       "paymentNeedsAttention": "ගෙවීමට අවධානය අවශ්‍යයි",
       "paymentPending": "ගෙවීම අපේක්ෂිතයි",
       "processingBlocked": "සැකසීම අවහිර විය",
@@ -2670,11 +3085,29 @@
     "invalidRequest": "ඔබේ ඊමේල් ලිපිනය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
     "emailDeliveryFailed": "ඊමේල් ලබා දීම තාවකාලිකව නොමැත. කරුණාකර පසුව නැවත උත්සාහ කරන්න.",
     "admissionRequired": "ඔබේ උපාංගය තහවුරු කළ නොහැක. වෙනත් උපාංගයකින් හෝ වෙබ් අඩවිය හරහා පිවිසීමට '$t(login.moreSignInOptions)' භාවිතා කරන්න.",
-    "default": "යම් දෙයක් වැරදී ගියේය. කරුණාකර නැවත උත්සාහ කරන්න.",
-    "retryableAdmission": "මෙම උපාංගය තහවුරු කළ නොහැකි විය. ඔබේ සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න."
+    "default": "යම් දෙයක් වැරදී ඇත. කරුණාකර නැවත උත්සාහ කරන්න.",
+    "retryableAdmission": "මෙම උපාංගය තහවුරු කළ නොහැකි විය. ඔබේ සම්බන්ධතාව පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+    "startSignInFailed": "පිවිසුම ආරම්භ කිරීමට අසමත් විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+    "couldNotOpenBrowser": "බ්‍රවුසරය විවෘත කිරීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+    "signInTimedOut": "පිවිසුම කාලය ඉකුත් විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+    "signInFailed": "පිවිසීම අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+    "networkError": "ජාල දෝෂයකි. කරුණාකර නැවත උත්සාහ කරන්න.",
+    "accessDeniedByUser": "පරිශීලකයා විසින් ප්‍රවේශය ප්‍රතික්ෂේප කරන ලදී",
+    "codeExpired": "කේතය කල් ඉකුත් විය",
+    "tooManySignInAttempts": "පුරනය වීමේ උත්සාහයන් බොහෝ වැඩිය. කරුණාකර රැඳී සිට නැවත උත්සාහ කරන්න."
   },
   "models": {
     "dataCollected": "එකතු කළ දත්ත",
-    "free": "නොමිලේ"
+    "free": "නොමිලේ",
+    "couldNotUpdateFavorites": "ප්‍රියතමයන් යාවත්කාලීන කිරීමට නොහැකි විය",
+    "thinkingEffort": {
+      "none": "කිසිවක් නොමැත",
+      "minimal": "අවම",
+      "low": "අඩු",
+      "medium": "මධ්‍යම",
+      "high": "ඉහළ",
+      "xhigh": "ඉතා ඉහළ",
+      "max": "උපරිම"
+    }
   }
 }

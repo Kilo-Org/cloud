@@ -2,7 +2,7 @@
   "common": {
     "cancel": "રદ કરો",
     "done": "થઈ ગયું",
-    "retry": "ફરી પ્રયત્ન કરો",
+    "retry": "ફરી પ્રયાસ કરો",
     "tryAgain": "ફરી પ્રયત્ન કરો",
     "continue": "ચાલુ રાખો",
     "notNow": "હવે નહીં",
@@ -22,7 +22,12 @@
     "copiedToClipboard": "ક્લિપબોર્ડ પર કૉપિ થઈ ગયું",
     "couldNotCopyToClipboard": "ક્લિપબોર્ડ પર કૉપિ કરી શકાયું નહીં",
     "required": "જરૂરી",
-    "error": "ભૂલ: {{error}}"
+    "error": "ભૂલ: {{error}}",
+    "back": "પાછળ",
+    "somethingWentWrong": "કંઈક ખોટું થયું",
+    "couldNotOpen": "{{label}} ખોલી શકાયું નહીં",
+    "link": "લિંક",
+    "takingLonger": "આ અપેક્ષા કરતાં વધુ સમય લઈ રહ્યું છે. તમે આ બંધ કરી શકો છો અને ફરી ચકાસી શકો છો."
   },
   "language": {
     "title": "ભાષા",
@@ -30,10 +35,12 @@
     "couldNotRestart": "પુનઃપ્રારંભ કરી શકાયું નહીં",
     "languageSaved": "તમારી ભાષા સાચવાઈ ગઈ છે.",
     "catalogLoadFailed": "ભાષા લોડ કરી શકાઈ નહીં. કૃપા કરીને ફરી પ્રયત્ન કરો.",
-    "retry": "ફરી પ્રયત્ન કરો",
+    "retry": "ફરી પ્રયાસ કરો",
     "search": "ભાષાઓ શોધો",
     "noMatches": "કોઈ ભાષા મળી નથી",
-    "deviceLanguage": "ઉપકરણની ભાષા"
+    "deviceLanguage": "ઉપકરણની ભાષા",
+    "current": "વર્તમાન",
+    "allLanguages": "બધી ભાષાઓ"
   },
   "login": {
     "welcome": "Kilo પર આપનું સ્વાગત છે",
@@ -71,7 +78,7 @@
     "sessionEnded": "તમારું સત્ર સમાપ્ત થઈ ગયું. કૃપા કરીને ફરી સાઇન ઇન કરો.",
     "signInCodeExpired": "તમારો સાઇન-ઇન કોડ સમાપ્ત થઈ ગયો છે. કૃપા કરીને ફરી પ્રયત્ન કરો.",
     "accessDenied": "પ્રવેશ નકારવામાં આવ્યો.",
-    "somethingWentWrong": "કંઈક ખોટું થયું. કૃપા કરીને ફરી પ્રયત્ન કરો.",
+    "somethingWentWrong": "કંઈક ખોટું થયું. કૃપા કરીને ફરી પ્રયાસ કરો.",
     "codeSent": "કોડ મોકલાયો",
     "accountCreated": "એકાઉન્ટ બનાવાયું. Kilo પર આપનું સ્વાગત છે.",
     "pleaseEnterEmail": "કૃપા કરીને તમારું ઇમેઇલ સરનામું દાખલ કરો.",
@@ -110,7 +117,7 @@
     "bonusCreditsExpiring": "{{date}} ને સમાપ્ત થતાં {{amount}} બોનસ ક્રેડિટ્સ",
     "creditBalanceEmpty": "તમારું ક્રેડિટ બેલેન્સ ખાલી છે. આ એકાઉન્ટ માટે ક્રેડિટ્સ iOS એપની બહાર સંચાલિત થાય છે.",
     "signOutTitle": "સાઇન આઉટ કરવું છે?",
-    "signOutMessage": "તમારા વર્કસ્પેસમાં પ્રવેશ મેળવવા તમારે ફરી સાઇન ઇન કરવું પડશે.",
+    "signOutMessage": "તમારા વર્કસ્પેસને ઍક્સેસ કરવા માટે તમારે ફરી સાઇન ઇન કરવું પડશે.",
     "signOutConfirm": "સાઇન આઉટ",
     "deleteAccountTitle": "એકાઉન્ટ કાઢી નાખવું છે?",
     "deleteAccountMessage": "આ કાયમી ધોરણે તમારું એકાઉન્ટ કાઢી નાખે છે અને તમને સાઇન આઉટ કરે છે. અમે પુષ્ટિકરણ કોડ ઇમેઇલ કરીશું.",
@@ -143,12 +150,14 @@
     "appearanceSystem": "સિસ્ટમ",
     "appearanceLight": "લાઇટ",
     "appearanceDark": "ડાર્ક",
-    "account": "એકાઉન્ટ"
+    "account": "એકાઉન્ટ",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "પુલ રિક્વેસ્ટ ઉપલબ્ધ નથી",
     "pullRequestUnavailableDescription": "આ PR ખોલી શકાતું નથી. તે કાઢી નાખવામાં આવ્યું હોઈ શકે છે, રિપોઝિટરી ખાનગી હોઈ શકે છે, અથવા Kilo GitHub એપ તેના પર ઇન્સ્ટોલ થયેલ નથી.",
-    "accessDenied": "પ્રવેશ નકારવામાં આવ્યો",
+    "accessDenied": "ઍક્સેસ નકારેલ",
     "accessDeniedDescription": "તમારી પાસે આ પુલ રિક્વેસ્ટ જોવાની પરવાનગી નથી.",
     "noFilesChanged": "કોઈ ફાઇલ બદલાઈ નથી",
     "noFilesChangedDescription": "આ પુલ રિક્વેસ્ટમાં કોઈ ફાઇલ ફેરફાર નથી.",
@@ -164,7 +173,7 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "ફાઇલો લોડ કરી શકાઈ નહીં",
-      "checkConnection": "તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
+      "checkConnection": "તમારું કનેક્શન ચકાસીને ફરી પ્રયાસ કરો.",
       "retryLoadingFiles": "ફાઇલો લોડ કરવાનો ફરી પ્રયત્ન કરો",
       "filterPlaceholder": "પાથ દ્વારા ફાઇલો ફિલ્ટર કરો",
       "viewedCount": "{{total}} માંથી {{viewed}} જોઈ",
@@ -206,11 +215,11 @@
       "loadingLines": "{{total}} માંથી {{loaded}} લીટીઓ લોડ થાય છે…",
       "expandContext": "સંદર્ભ વિસ્તૃત કરો",
       "expandMoreContext": "વધુ સંદર્ભ વિસ્તૃત કરો",
-      "expandLines": "{{count}} લીટીઓ વિસ્તૃત કરો ({{start}}–{{end}})",
-      "expandMoreLines": "વધુ {{count}} લીટીઓ વિસ્તૃત કરો ({{start}}–{{end}})",
-      "expandLinesOfContext": "{{count}} લીટીઓ સંદર્ભ વિસ્તૃત કરો",
+      "expandLines": "{{displayCount}} લીટીઓ વિસ્તૃત કરો ({{start}}–{{end}})",
+      "expandMoreLines": "વધુ {{displayCount}} લીટીઓ વિસ્તૃત કરો ({{start}}–{{end}})",
+      "expandLinesOfContext": "{{displayCount}} લીટીઓ સંદર્ભ વિસ્તૃત કરો",
       "expandAll": "બધું વિસ્તૃત કરો",
-      "expandAllLines": "બધી {{count}} લીટીઓ વિસ્તૃત કરો",
+      "expandAllLines": "બધી {{displayCount}} લીટીઓ વિસ્તૃત કરો",
       "loadingMoreFiles": "વધુ ફાઇલો લોડ થાય છે…",
       "retryLoadingNextPage": "આગલું પૃષ્ઠ લોડ કરવાનો ફરી પ્રયત્ન કરો",
       "failedToLoadMoreFiles": "વધુ ફાઇલો લોડ કરવામાં નિષ્ફળ — ફરી પ્રયત્ન કરવા ટેપ કરો",
@@ -219,10 +228,12 @@
       "loadedOfTotalFiles": "{{total}} માંથી {{loaded}} ફાઇલો લોડ થઈ",
       "loadAllFiles": "બધી ફાઇલો લોડ કરો",
       "loadAll": "બધું લોડ કરો",
-      "fileLoaded": "{{count}} ફાઇલ લોડ થઈ",
-      "filesLoaded": "{{count}} ફાઇલો લોડ થઈ",
-      "fileLoadedOfTotal": "{{total}} માંથી {{count}} ફાઇલ લોડ થઈ",
-      "filesLoadedOfTotal": "{{total}} માંથી {{count}} ફાઇલો લોડ થઈ",
+      "fileLoadedCount_one": "{{displayCount}} ફાઇલ લોડ થઈ",
+      "fileLoadedCount": "{{displayCount}} ફાઇલો લોડ થઈ",
+      "fileLoadedCount_other": "{{displayCount}} ફાઇલો લોડ થઈ",
+      "fileLoadedOfTotalCount_one": "{{total}} માંથી {{displayCount}} ફાઇલ લોડ થઈ",
+      "fileLoadedOfTotalCount": "{{total}} માંથી {{displayCount}} ફાઇલો લોડ થઈ",
+      "fileLoadedOfTotalCount_other": "{{total}} માંથી {{displayCount}} ફાઇલો લોડ થઈ",
       "filesStillLoading": "ફાઇલો હજી લોડ થઈ રહી છે. તાજું કરવા ખેંચો.",
       "goToOverview": "ઝાંખી પર જાઓ",
       "goToOverviewTab": "ઝાંખી ટેબ પર જાઓ"
@@ -278,7 +289,36 @@
         "body": "બ્રાન્ચ કાઢી નાખી શકાઈ નહીં: {{reason}}",
         "accessibility": "મર્જ થયું. બ્રાન્ચ કાઢી નાખી શકાઈ નહીં: {{reason}}"
       },
-      "loadFailedTitle": "મર્જ વિકલ્પો લોડ કરી શકાયાં નહીં"
+      "loadFailedTitle": "મર્જ વિકલ્પો લોડ કરી શકાયાં નહીં",
+      "blocked": {
+        "unknownStateTitle": "GitHub એ મર્જબિલિટી સ્થિતિ જાણ કરી નથી",
+        "unknownStateDetail": "થોડી ક્ષણમાં ઝાંખી તાજી કરવાનો પ્રયાસ કરો.",
+        "conflictsTitle": "મર્જ તકરાર",
+        "conflictsDetail": "મર્જ કરતા પહેલા આ બ્રાન્ચ પરની મર્જ તકરાર ઉકેલો.",
+        "requiredReviewsTitle": "જરૂરી સમીક્ષાઓ ખૂટે છે",
+        "requiredReviewsDetail": "જરૂરી સમીક્ષકો તરફથી મંજૂરીઓ ખૂટે છે અથવા બાકી છે.",
+        "failingChecksTitle": "નિષ્ફળ જતી જરૂરી તપાસો",
+        "failingChecksDetail": "જરૂરી સ્થિતિ તપાસો નિષ્ફળ રહી છે.",
+        "unstableTitle": "કેટલીક તપાસો નિષ્ફળ રહી છે",
+        "unstableDetail": "બિનજરૂરી તપાસો નિષ્ફળ રહી છે. તે મર્જને અવરોધશે નહીં.",
+        "draftTitle": "ડ્રાફ્ટ પુલ રિક્વેસ્ટ",
+        "draftDetail": "મર્જ કરતા પહેલા પુલ રિક્વેસ્ટને સમીક્ષા માટે તૈયાર તરીકે ચિહ્નિત કરો.",
+        "behindTitle": "બ્રાન્ચ જૂની છે",
+        "behindDetailUpdatable": "મર્જ કરતા પહેલા બેઝમાંથી બ્રાન્ચ અપડેટ કરો, અથવા રીબેઝ કરો.",
+        "behindDetail": "હેડ બ્રાન્ચ બેઝ કરતાં પાછળ છે. મર્જ કરતા પહેલા બ્રાન્ચ રીબેઝ કરો અથવા અપડેટ કરો.",
+        "notMergeableTitle": "આ પુલ રિક્વેસ્ટ હજુ મર્જ કરી શકાતી નથી",
+        "notMergeableDetail": "GitHub એ {{state}} મર્જબિલિટી સ્થિતિ જાણ કરી."
+      },
+      "methodLabels": {
+        "merge": "મર્જ કમિટ બનાવો",
+        "squash": "સ્ક્વોશ અને મર્જ",
+        "rebase": "રીબેઝ અને મર્જ"
+      },
+      "methodDescriptions": {
+        "merge": "આ બ્રાન્ચના બધા કમિટ્સને મર્જ કમિટ સાથે બેઝ બ્રાન્ચમાં ભેગા કરો.",
+        "squash": "આ બ્રાન્ચના બધા કમિટ્સને બેઝ બ્રાન્ચ પર એક જ કમિટમાં ભેગા કરો.",
+        "rebase": "આ બ્રાન્ચના બધા કમિટ્સને મર્જ કમિટ વિના બેઝ બ્રાન્ચ પર ફરી ચલાવો."
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "ચર્ચા થ્રેડ {{anchorLabel}}",
@@ -288,8 +328,9 @@
       "resolved": "ઉકેલાયું",
       "outdated": "જૂનું",
       "file": "ફાઇલ",
-      "oneComment": "1 ટિપ્પણી",
-      "commentCount": "{{count}} ટિપ્પણીઓ",
+      "comment_one": "1 ટિપ્પણી",
+      "comment": "{{displayCount}} ટિપ્પણીઓ",
+      "comment_other": "{{displayCount}} ટિપ્પણીઓ",
       "startedRelative": " · {{relative}} પર શરૂ થયું",
       "couldNotLoadMore": "વધુ ટિપ્પણીઓ લોડ કરી શકાઈ નહીં.",
       "retryLoadingMore": "વધુ ટિપ્પણીઓ લોડ કરવાનો ફરી પ્રયત્ન કરો",
@@ -298,22 +339,23 @@
       "closeReactions": "પ્રતિક્રિયાઓ બંધ કરો",
       "reactionsTitle": "પ્રતિક્રિયાઓ",
       "addReaction": "પ્રતિક્રિયા ઉમેરો",
-      "reactionPill": "{{emoji}} પ્રતિક્રિયા, {{count}} {{countLabel}}",
-      "reactionSingular": "પ્રતિક્રિયા",
-      "reactionPlural": "પ્રતિક્રિયાઓ",
+      "reactionPill": "{{emoji}} પ્રતિક્રિયા, {{displayCount}} {{countLabel}}",
+      "reaction_one": "પ્રતિક્રિયા",
+      "reaction": "પ્રતિક્રિયાઓ",
+      "reaction_other": "પ્રતિક્રિયાઓ",
       "commentActions": "ટિપ્પણી ક્રિયાઓ",
       "reportContent": "સામગ્રીની જાણ કરો",
       "reportUser": "વપરાશકર્તાની જાણ કરો",
       "mute": "મ્યુટ કરો",
       "block": "બ્લોક કરો",
       "somethingWentWrong": "કંઈક ખોટું થયું",
-      "reportSubmitted": "જાણ સબમિટ થઈ. રસીદ {{receiptId}}",
+      "reportSubmitted": "રિપોર્ટ સબમિટ થયેલ. રસીદ {{receiptId}}",
       "blockedUser": "{{login}} બ્લોક કર્યું",
       "mutedUser": "{{login}} મ્યુટ કર્યું",
       "replyPlaceholder": "જવાબ…",
       "replyBody": "જવાબનું મુખ્ય ભાગ",
       "submitReply": "જવાબ સબમિટ કરો",
-      "reply": "જવાબ",
+      "reply": "જવાબ આપો",
       "termsTitle": "સેવાની શરતો",
       "termsCopy": "પોસ્ટ કરવા તમારી ઉંમર 13 કે તેથી વધુ હોવી જોઈએ.",
       "termsAcceptRetry": "શરતો સ્વીકારી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
@@ -349,12 +391,30 @@
       "noDiscussionDescription": "આ પુલ રિક્વેસ્ટ પર કોઈ સમીક્ષા થ્રેડો અથવા વાતચીત ટિપ્પણીઓ નથી.",
       "reviewFiles": "ફાઇલોની સમીક્ષા કરો",
       "quotedDiffSnippet": "ક્વોટેડ diff સ્નિપેટ",
-      "moreLinesAbove": "… {{count}} વધુ લીટીઓ ઉપર",
+      "moreLinesAbove": "… {{displayCount}} વધુ લીટીઓ ઉપર",
       "termsAcceptRequired": "પોસ્ટ કરવા તમારે સેવાની શરતો સ્વીકારવી જોઈએ.",
       "termsOutdatedCopy": "સેવાની શરતો બદલાઈ. નવીનતમ સંસ્કરણ સ્વીકારવા આ સ્ક્રીન ફરી ખોલો.",
-      "termsCheckRetryCopy": "સેવાની શરતો તપાસી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો."
+      "termsCheckRetryCopy": "સેવાની શરતો તપાસી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
+      "reactions": {
+        "thumbsUp": "અંગૂઠો ઉપર",
+        "thumbsDown": "અંગૂઠો નીચે",
+        "laugh": "હાસ્ય",
+        "hooray": "વાહ",
+        "confused": "મૂંઝવણમાં",
+        "heart": "હૃદય",
+        "rocket": "રોકેટ",
+        "eyes": "આંખો"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} પર ફાઇલ ટિપ્પણી",
+        "fileComment": "ફાઇલ ટિપ્પણી",
+        "outdatedOnPathLines": "{{path}} {{lines}} પર જૂનું",
+        "outdatedOnLines": "{{lines}} પર જૂનું",
+        "outdatedOnPath": "{{path}} પર જૂનું"
+      },
+      "deletedUser": "કાઢી નાખેલ વપરાશકર્તા"
     },
-    "couldNotOpenGitHubAppSettings": "GitHub એપ સેટિંગ્સ ખોલી શકાઈ નહીં",
+    "couldNotOpenGitHubAppSettings": "GitHub ઍપ સેટિંગ્સ ખોલી શકાઈ નહીં",
     "installKiloGitHubApp": "Kilo GitHub એપ ઇન્સ્ટોલ કરો",
     "connectionExpiredTitle": "GitHub કનેક્શન સમાપ્ત થઈ ગયું",
     "connectionExpiredDescription": "તમારું GitHub કનેક્શન હવે માન્ય નથી. તમારું કનેક્શન ફરી તપાસો — જરૂર પડે તો તમને ફરી કનેક્ટ થવા કહેવામાં આવશે.",
@@ -372,7 +432,7 @@
       "noRecentPrs": "કોઈ તાજેતરની PRs નથી",
       "noRecentPrsDescription": "સમીક્ષા શરૂ કરવા ઉપર PR લિંક પેસ્ટ કરો — તે આગલી વખતે અહીં દેખાશે.",
       "couldNotLoad": "લોડ કરી શકાયું નહીં",
-      "remove": "કાઢી નાખો",
+      "remove": "દૂર કરો",
       "removeFromRecentsTitle": "તાજેતરમાંથી કાઢી નાખવું છે?",
       "removeFromRecentsMessage": "આ પુલ રિક્વેસ્ટ તમારા તાજેતરમાંથી કાઢી નાખવામાં આવશે.",
       "removeRecentAccessibility": "{{repo}} તાજેતરમાંથી કાઢી નાખો",
@@ -391,11 +451,11 @@
       "retryChecks": "તપાસો ફરી પ્રયત્ન કરો",
       "viewOnGitHub": "GitHub પર PR જુઓ",
       "noChecksReported": "કોઈ તપાસ નોંધાઈ નથી",
-      "passed": "{{count}} પસાર થઈ",
-      "failed": "{{count}} નિષ્ફળ",
-      "pending": "{{count}} બાકી",
-      "skipped": "{{count}} છોડી દીધી",
-      "checksCount": "{{count}} તપાસો",
+      "passed": "{{displayCount}} પસાર થઈ",
+      "failed": "{{displayCount}} નિષ્ફળ",
+      "pending": "{{displayCount}} બાકી",
+      "skipped": "{{displayCount}} છોડી દીધી",
+      "checksCount": "{{displayCount}} તપાસો",
       "checkDetails": "તપાસ વિગતો",
       "pullRequest": "પુલ રિક્વેસ્ટ"
     },
@@ -408,7 +468,7 @@
       "noReviewRequestsDescription": "તમારી સમીક્ષાની રાહ જોઈ રહેલી પુલ રિક્વેસ્ટ અહીં દેખાશે. તમે હજી ઉપર કોઈ પણ PR લિંક પેસ્ટ કરી શકો છો.",
       "couldNotLoad": "ઇનબોક્સ લોડ કરી શકાયું નહીં",
       "couldNotLoadMore": "વધુ લોડ કરી શકાયું નહીં",
-      "retryLoadingMore": "વધુ લોડ કરવાનો ફરી પ્રયત્ન કરો"
+      "retryLoadingMore": "વધુ લોડ કરવાનો ફરી પ્રયાસ કરો"
     },
     "composer": {
       "commentBodyPlaceholder": "ટિપ્પણી મૂકો",
@@ -452,11 +512,14 @@
       "deletePendingMessage": "આ ટિપ્પણી સમીક્ષા કતારમાંથી કાઢી નાખવામાં આવશે.",
       "delete": "કાઢી નાખો",
       "summaryOptional": "સારાંશ (વૈકલ્પિક)",
-      "pendingCommentSingular": "બાકી ટિપ્પણી",
-      "pendingCommentPlural": "બાકી ટિપ્પણીઓ",
-      "submitCountOfTotal": "{{totalCount}} માંથી {{freshCount}} ટિપ્પણીઓ સબમિટ કરો",
+      "pendingComment_one": "બાકી ટિપ્પણી",
+      "pendingComment": "બાકી ટિપ્પણીઓ",
+      "pendingComment_other": "બાકી ટિપ્પણીઓ",
+      "submitCountOfTotal": "{{displayTotalCount}} માંથી {{displayFreshCount}} ટિપ્પણીઓ સબમિટ કરો",
       "submitReview": "સમીક્ષા સબમિટ કરો",
-      "partialPostedMessage": "{{freshCount}} ટિપ્પણી(ઓ) પોસ્ટ થઈ. {{staleCount}} ટિપ્પણી(ઓ) જૂની કમિટ પર નિર્દેશ કરે છે અને તમારી કતારમાં રહી."
+      "partialPostedMessage": "{{displayFreshCount}} ટિપ્પણી(ઓ) પોસ્ટ થઈ. {{displayStaleCount}} ટિપ્પણી(ઓ) જૂની કમિટ પર નિર્દેશ કરે છે અને તમારી કતારમાં રહી.",
+      "blockedRequestChanges": "ફેરફારો માંગવા માટે સારાંશ અથવા ઓછામાં ઓછી એક ટિપ્પણી ઉમેરો.",
+      "blockedComment": "ટિપ્પણી સમીક્ષા સબમિટ કરવા માટે સારાંશ અથવા ઓછામાં ઓછી એક ટિપ્પણી ઉમેરો."
     },
     "reconnectNotice": {
       "title": "GitHub કનેક્શન સમાપ્ત થઈ ગયું",
@@ -478,10 +541,12 @@
       "stateOpenReviewRequired": "ખુલ્લું · સમીક્ષા જરૂરી",
       "stateOpen": "ખુલ્લું",
       "unknownAuthor": "અજાણ્યો લેખક",
-      "commitSingular": "કમિટ",
-      "commitPlural": "કમિટ્સ",
-      "fileSingular": "ફાઇલ",
-      "filePlural": "ફાઇલો"
+      "commit_one": "કમિટ",
+      "commit": "કમિટ્સ",
+      "commit_other": "કમિટ્સ",
+      "file_one": "ફાઇલ",
+      "file": "ફાઇલો",
+      "file_other": "ફાઇલો"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} પર જૂની બાકી ટિપ્પણી સંપાદિત કરો",
@@ -512,10 +577,36 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} પસંદ કર્યું, પસંદગી બદલવા ટેપ કરો",
-      "tapToComment": "{{label}}, ટિપ્પણી કરવા ટેપ કરો"
+      "tapToComment": "{{label}}, ટિપ્પણી કરવા ટેપ કરો",
+      "truncationBanner": "બદલાયેલી {{total}} ફાઇલોમાંથી પ્રથમ {{limit}} બતાવી રહ્યાં છીએ — GitHub API મર્યાદા",
+      "statusAdded": "ઉમેરાયું",
+      "statusContext": "સંદર્ભ",
+      "statusDeleted": "કાઢી નાખવામાં આવ્યું",
+      "lineLabel": "{{status}} પંક્તિ {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(ખાલી)"
     },
     "linkPasteClipboardEmpty": "ક્લિપબોર્ડ ખાલી છે",
-    "linkPasteNotAPullRequest": "આ GitHub પુલ રિક્વેસ્ટ લિંક નથી"
+    "linkPasteNotAPullRequest": "આ GitHub પુલ રિક્વેસ્ટ લિંક નથી",
+    "announce": {
+      "commentPosted": "ટિપ્પણી પોસ્ટ થઈ",
+      "reviewSubmitted": "સમીક્ષા સબમિટ થઈ",
+      "autoMergeEnabled": "ઓટો-મર્જ સક્ષમ થયું"
+    },
+    "mutationError": {
+      "commentNotPosted": "આ ટિપ્પણી પોસ્ટ કરી શકાતી નથી. પસંદ કરેલી લીટી બદલાઈ હોઈ શકે છે, અથવા PR અપડેટ થયું હોઈ શકે છે.",
+      "reviewNotSubmitted": "આ સમીક્ષા જેમ છે તેમ સબમિટ કરી શકાતી નથી. PR બદલાયું હોઈ શકે છે, અથવા તમે તમારી પોતાની પુલ રિક્વેસ્ટની સમીક્ષા કરી શકતા નથી.",
+      "couldNotPostComment": "ટિપ્પણી પોસ્ટ કરી શકાઈ નહીં.",
+      "couldNotSubmitReview": "સમીક્ષા સબમિટ કરી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો."
+    },
+    "operation": {
+      "couldNotReply": "જવાબ આપી શકાયો નહીં.",
+      "couldNotCompleteAction": "આ ક્રિયા પૂર્ણ કરી શકાઈ નહીં.",
+      "mergeResultDefaultError": "GitHub એ મર્જ પૂર્ણ કર્યું નથી.",
+      "ambiguous": "પુષ્ટિ કરી શકાઈ નહીં — ફરી પ્રયાસ કરતાં પહેલાં PR તપાસો.",
+      "persistenceFailed": "અમે આ ક્રિયા રેકોર્ડ કરી શક્યા નથી. કૃપા કરીને પછીથી ફરી પ્રયત્ન કરો.",
+      "forbidden": "પ્રતિબંધિત"
+    }
   },
   "notifications": {
     "title": "સૂચનાઓ",
@@ -573,7 +664,8 @@
     "agents": "એજન્ટ્સ",
     "profile": "પ્રોફાઇલ",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, ટેબ, {{position}} માંથી {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -614,7 +706,7 @@
       "recent": "તાજેતરના",
       "common": "સામાન્ય",
       "reactWith": "{{reaction}} સાથે પ્રતિક્રિયા આપો",
-      "accessibility": "{{emoji}} પ્રતિક્રિયા, {{count}}"
+      "accessibility": "{{emoji}} પ્રતિક્રિયા, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "જવાબ આપી રહ્યા છીએ",
@@ -643,11 +735,21 @@
       "imageUnavailable": "છબી ઉપલબ્ધ નથી",
       "openFailed": "જોડાણ ખોલી શકાયું નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
       "attachFailed": "ફાઇલ જોડવામાં નિષ્ફળ",
-      "limit": "તમે {{count}} જેટલી ફાઇલો જોડી શકો છો.",
+      "limit": "તમે {{displayCount}} જેટલી ફાઇલો જોડી શકો છો.",
       "sizeRejection": "{{filename}} {{limit}} જોડાણ મર્યાદા કરતાં વધી જાય છે.",
       "unreadable": "{{filename}} વાંચી શકાયું નહીં.",
       "pastedImage": "પેસ્ટ કરેલી છબી",
-      "defaultName": "જોડાણ"
+      "defaultName": "જોડાણ",
+      "classificationDenied": "એક્ઝેક્યુટેબલ ફાઇલો જોડી શકાતી નથી",
+      "classificationEmpty": "ફાઇલ ખાલી છે",
+      "classificationTooLarge": "ફાઇલો 20 MB કે તેથી નાની હોવી જોઈએ",
+      "classificationUnreadable": "આ ફાઇલ વાંચી શકાઈ નહીં",
+      "announceUploaded": "જોડાણ અપલોડ થયું",
+      "cantUpload": "આ ફાઇલ અપલોડ કરી શકાતી નથી.",
+      "networkError": "નેટવર્ક ભૂલ",
+      "uploadFailed": "અપલોડ નિષ્ફળ",
+      "failedToUploadFile": "ફાઇલ અપલોડ કરવામાં નિષ્ફળ: {{reason}}",
+      "nothingToPaste": "પેસ્ટ કરવા માટે કંઈ નથી"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -661,7 +763,9 @@
       "moreActions": "વધુ ક્રિયાઓ",
       "message": "સંદેશ",
       "notDelivered": "પહોંચાડાયો નહીં",
-      "edited": "(સંપાદિત)"
+      "edited": "(સંપાદિત)",
+      "image": "છબી",
+      "attachment": "જોડાણ"
     },
     "messageActions": {
       "copied": "કૉપિ થયું",
@@ -686,13 +790,14 @@
       "takePhoto": "ફોટો લો",
       "photoLibrary": "ફોટો લાઇબ્રેરી",
       "files": "ફાઇલો",
-      "cameraAccessDisabled": "કૅમેરા એક્સેસ અક્ષમ",
-      "cameraAccessMessage": "ફોટો લેવા માટે સેટિંગ્સમાં કૅમેરા એક્સેસને મંજૂરી આપો."
+      "cameraAccessDisabled": "કૅમેરા ઍક્સેસ અક્ષમ છે",
+      "cameraAccessMessage": "ફોટો લેવા માટે સેટિંગ્સમાં કૅમેરા ઍક્સેસની મંજૂરી આપો."
     },
     "typingIndicator": {
       "someone": "કોઈક",
-      "oneTyping": "{{name}} ટાઇપ કરી રહ્યા છે...",
-      "manyTyping": "{{names}} ટાઇપ કરી રહ્યા છે..."
+      "typing_one": "{{name}} ટાઇપ કરી રહ્યા છે...",
+      "typing": "{{names}} ટાઇપ કરી રહ્યા છે...",
+      "typing_other": "{{names}} ટાઇપ કરી રહ્યા છે..."
     },
     "botStatus": {
       "online": "ઑનલાઇન",
@@ -702,6 +807,12 @@
       "loadingUser": "વપરાશકર્તા લોડ થઈ રહ્યો છે...",
       "waitingForStatus": "બોટ સ્થિતિની રાહ જોઈ રહ્યા છીએ...",
       "offlineMessage": "બોટ ઑફલાઇન છે. તે ફરી જોડાય ત્યારે સંદેશા ફરી શરૂ થશે."
+    },
+    "errors": {
+      "notAllowed": "મંજૂર નથી",
+      "messageTooLong": "સંદેશ ખૂબ લાંબો છે — તેને {{limit}} અક્ષરોથી ઓછો રાખો",
+      "titleTooLong": "શીર્ષક ખૂબ લાંબું છે — તેને {{limit}} અક્ષરોથી ઓછું રાખો",
+      "messageEmpty": "સંદેશ ખાલી ન હોઈ શકે"
     }
   },
   "kiloclaw": {
@@ -722,23 +833,26 @@
       "couldNotLoad": "બિલિંગ માહિતી લોડ કરી શકાઈ નહીં",
       "manageOnWeb": "વેબ પર બિલિંગ સંચાલિત કરો",
       "commitPlan": "કમિટ",
-      "daysLeft": "{{count}} દિવસ બાકી",
       "earlybird": "અર્લીબર્ડ",
       "finalCommitTermEndsOn": "તમારી અંતિમ કમિટ મુદત {{date}} ના રોજ સમાપ્ત થાય છે. {{price}} પર સ્ટાન્ડર્ડ તરીકે ચાલુ રાખો, અન્યથા હોસ્ટિંગ સમાપ્ત થાય છે.",
       "freeTrial": "ફ્રી ટ્રાયલ",
       "hostingEnds": "હોસ્ટિંગ સમાપ્ત થાય છે",
-      "oneDayLeft": "1 દિવસ બાકી",
+      "lessThanOneDay": "1 દિવસ કરતાં ઓછું",
       "renews": "નવીકરણ થાય છે",
       "standardMonthToMonth": "માસિક સ્ટાન્ડર્ડ",
       "standardStartsOn": "સ્ટાન્ડર્ડ {{date}} ના રોજ {{price}} પર શરૂ થાય છે.",
       "yourStandardMonthlyPrice": "તમારી સ્ટાન્ડર્ડ માસિક કિંમત",
       "perMonth": "/મહિનો",
       "earlybirdAccessUntil": "{{date}} સુધી અર્લીબર્ડ એક્સેસ",
-      "earlybirdEnding": "અર્લીબર્ડ સમાપ્તિ: {{days}} દિવસ બાકી",
+      "earlybirdEnding": "અર્લીબર્ડ સમાપ્તિ: {{remaining}}",
       "paymentPastDue": "ચુકવણી મોડી છે. કૃપા કરીને તમારી ચુકવણી પદ્ધતિ અપડેટ કરો.",
       "subscriptionCancels": "સબ્સ્ક્રિપ્શન {{date}} ના રોજ રદ થાય છે",
-      "trialDaysRemaining": "ટ્રાયલ: {{days}} દિવસ બાકી",
-      "trialEndingSoon": "ટ્રાયલ ટૂંક સમયમાં સમાપ્ત: {{days}}"
+      "trialDaysRemaining": "ટ્રાયલ: {{remaining}} બાકી",
+      "trialEndingSoon": "ટ્રાયલ ટૂંક સમયમાં સમાપ્ત: {{remaining}}",
+      "planName": {
+        "commit": "કમિટ",
+        "standard": "સ્ટાન્ડર્ડ"
+      }
     },
     "changelog": {
       "title": "નવું શું છે",
@@ -811,7 +925,7 @@
       "gmailNotifications": "Gmail સૂચનાઓ",
       "disconnect": "Google એકાઉન્ટ ડિસ્કનેક્ટ કરો",
       "connected": "કનેક્ટેડ",
-      "copied": "નકલ થઈ!",
+      "copied": "કૉપિ થયું",
       "copyCommand": "આદેશ નકલ કરો",
       "disabled": "અક્ષમ",
       "disconnectConfirm": "ડિસ્કનેક્ટ કરો",
@@ -891,7 +1005,7 @@
       "start": "શરૂ કરો",
       "startMessage": "શું તમે ખરેખર આ ઇન્સ્ટન્સ શરૂ કરવા માંગો છો?",
       "startTitle": "ઇન્સ્ટન્સ શરૂ કરો",
-      "starting": "શરૂ કરી રહ્યા છીએ…",
+      "starting": "શરૂ થાય છે…",
       "stop": "રોકો",
       "stopMessage": "શું તમે ખરેખર આ ઇન્સ્ટન્સ રોકવા માંગો છો?",
       "stopTitle": "ઇન્સ્ટન્સ રોકો",
@@ -990,7 +1104,7 @@
         "stalledTitle": "કંઈક અટકી ગયું",
         "stalledBody": "અમે {{name}} નું સેટઅપ પૂરું કરી શક્યા નહીં. ફરી પ્રયાસ કરો, અથવા આવું વારંવાર થાય તો hi@kilo.ai પર ઈમેઇલ કરો.",
         "timeoutTitle": "અપેક્ષા કરતાં વધુ સમય લાગી રહ્યો છે",
-        "timeoutBody": "{{name}} નું સેટઅપ સામાન્ય કરતાં વધુ સમય લઈ રહ્યું છે ({{minutes}} મિનિટથી વધુ).",
+        "timeoutBody": "{{name}} નું સેટઅપ સામાન્ય કરતાં વધુ સમય લઈ રહ્યું છે ({{displayMinutes}} મિનિટથી વધુ).",
         "continueInBackground": "પૃષ્ઠભૂમિમાં ચાલુ રાખો",
         "settingUp": "{{name}} સેટ કરી રહ્યા છીએ",
         "finishingSetup": "સેટઅપ પૂરું કરી રહ્યા છીએ",
@@ -1020,7 +1134,8 @@
       "starting": "શરૂ થઈ રહ્યું છે",
       "stopped": "રોકાયેલ",
       "stopping": "રોકાઈ રહ્યું છે",
-      "unknown": "અજ્ઞાત"
+      "unknown": "અજ્ઞાત",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1060,8 +1175,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} ને ધ્યાનની જરૂર છે: {{label}}",
-      "openUnreadOne": "{{name}} ખોલો, {{count}} વાંચ્યા વગરનો સંદેશ",
-      "openUnreadMany": "{{name}} ખોલો, {{count}} વાંચ્યા વગરના સંદેશા",
+      "openUnread_one": "{{name}} ખોલો, {{displayCount}} વાંચ્યા વગરનો સંદેશ",
+      "openUnread": "{{name}} ખોલો, {{displayCount}} વાંચ્યા વગરના સંદેશા",
+      "openUnread_other": "{{name}} ખોલો, {{displayCount}} વાંચ્યા વગરના સંદેશા",
       "open": "{{name}} ખોલો",
       "openSettings": "{{name}} માટે સેટિંગ્સ ખોલો",
       "fixOnKiloAi": "kilo.ai પર ઠીક કરો: {{label}}"
@@ -1103,7 +1219,9 @@
       "sparkles": "ચમક",
       "strongArm": "મજબૂત હાથ",
       "talisman": "તાવીજ"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "આ ઇન્સ્ટન્સ ફાઇલો મેળવી શકતું નથી.",
+    "instanceSwitcherTitle": "KiloClaw ઇન્સ્ટન્સ"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1123,12 +1241,12 @@
       "placeholder": "દા.ત. અમારા ભૂલ-સંચાલન સંમેલનો લાગુ કરો…"
     },
     "repos": {
-      "title": "રિપોઝિટરીઝ",
-      "couldNotLoad": "રિપોઝિટરીઝ લોડ કરી શકાઈ નહીં",
+      "title": "રિપોઝિટરીઓ",
+      "couldNotLoad": "રિપોઝિટરીઓ લોડ થઈ શકી નથી",
       "unavailable": "રિપોઝિટરીઝ ઉપલબ્ધ નથી — kilo.ai પર Bitbucket સેટઅપ પૂરું કરો.",
       "finishSetup": "સેટઅપ પૂરું કરો",
       "manageAccess": "એક્સેસ સંચાલિત કરો",
-      "allRepositories": "બધી રિપોઝિટરીઝ",
+      "allRepositories": "બધી રિપોઝિટરીઓ",
       "bitbucketNoRepositoriesDescription": "આ Bitbucket વર્કસ્પેસમાં કોઈ રિપોઝિટરી ઉપલબ્ધ નથી.",
       "bitbucketSetup": "Bitbucket સેટઅપ",
       "couldNotOpenGithubSettings": "GitHub ઍપ સેટિંગ્સ ખોલી શકાઈ નહીં",
@@ -1278,9 +1396,9 @@
       "set": "સેટ કરો",
       "model": "મોડેલ",
       "mergeGate": "મર્જ ગેટ",
-      "repositories": "રિપોઝિટરીઝ",
-      "allRepositories": "બધી રિપોઝિટરીઝ",
-      "nSelected": "{{count}} પસંદ કરેલ",
+      "repositories": "રિપોઝિટરીઓ",
+      "allRepositories": "બધી રિપોઝિટરીઓ",
+      "nSelected": "{{displayCount}} પસંદ કરેલ",
       "reviewMemory": "સમીક્ષા મેમરી",
       "proposedReviewMdGuidance": "સૂચિત REVIEW.md માર્ગદર્શન"
     },
@@ -1290,7 +1408,71 @@
       "noDecision": "કોઈ નિર્ણય નથી",
       "noResult": "કોઈ પરિણામ નથી"
     },
-    "eyebrow": "કોડ સમીક્ષક"
+    "eyebrow": "કોડ સમીક્ષક",
+    "updateFailed": "સમીક્ષક અપડેટ કરવામાં નિષ્ફળ",
+    "configSaveFailed": "સમીક્ષા કોન્ફિગ સાચવવામાં નિષ્ફળ",
+    "status": {
+      "pending": "બાકી",
+      "queued": "કતારમાં છે",
+      "running": "ચાલી રહ્યું છે",
+      "completed": "પૂર્ણ કરેલ",
+      "failed": "નિષ્ફળ",
+      "cancelled": "રદ કરેલ",
+      "interrupted": "વિક્ષેપિત"
+    },
+    "reviewStyle": {
+      "strict": "કડક",
+      "balanced": "સંતુલિત",
+      "lenient": "ઉદાર",
+      "roast": "રોસ્ટ"
+    },
+    "focusArea": {
+      "security": "સુરક્ષા",
+      "performance": "પ્રદર્શન",
+      "bugs": "બગ્સ",
+      "style": "શૈલી",
+      "testing": "પરીક્ષણ",
+      "documentation": "દસ્તાવેજીકરણ"
+    },
+    "gateThreshold": {
+      "off": "બંધ",
+      "all": "બધા",
+      "warning": "ચેતવણી",
+      "critical": "ગંભીર"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "કોડ સમીક્ષકને ધ્યાનની જરૂર છે",
+        "description": "કોડ સમીક્ષક અક્ષમ કરવામાં આવ્યું કારણ કે Kilo સક્રિય GitHub ઍપ ઇન્સ્ટોલેશન સાથે આ રિપોઝિટરીને ઍક્સેસ કરી શકતું નથી. GitHub ઍપ ઇન્સ્ટોલેશન અપડેટ કરો, પછી કોડ સમીક્ષક ફરી સક્ષમ કરો.",
+        "recoveryLabel": "GitHub ઍપ અપડેટ કરો"
+      },
+      "githubIpAllowList": {
+        "title": "કોડ સમીક્ષકને ધ્યાનની જરૂર છે",
+        "description": "કોડ સમીક્ષક અક્ષમ કરવામાં આવ્યું કારણ કે આ GitHub સંસ્થા Kilo ને અવરોધતી IP અનુમતિ યાદી વાપરે છે. મદદ માટે hi@kilocode.ai નો સંપર્ક કરો, પછી કોડ સમીક્ષક ફરી સક્ષમ કરો.",
+        "recoveryLabel": "સપોર્ટનો સંપર્ક કરો"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "કોડ સમીક્ષકને ધ્યાનની જરૂર છે",
+        "description": "કોડ સમીક્ષક અક્ષમ કરવામાં આવ્યું કારણ કે Kilo આ પ્રોજેક્ટ માટે GitLab પ્રોજેક્ટ એક્સેસ ટોકન બનાવી શકતું નથી. મેન્ટેનર એક્સેસ આપો અથવા પ્રોજેક્ટ એક્સેસ ટોકન્સ સક્ષમ કરો, પછી કોડ સમીક્ષક ફરી સક્ષમ કરો.",
+        "recoveryLabel": "GitLab એકીકરણ અપડેટ કરો"
+      },
+      "byokInvalidKey": {
+        "title": "કોડ સમીક્ષકને ધ્યાનની જરૂર છે",
+        "description": "કોડ સમીક્ષક અક્ષમ કરવામાં આવ્યું કારણ કે પસંદ કરેલ BYOK API કી અમાન્ય, રદ કરેલ, અથવા પરવાનગી વગરની છે. કી અપડેટ કરો અથવા બીજું મોડલ પસંદ કરો, પછી કોડ સમીક્ષક ફરી સક્ષમ કરો.",
+        "recoveryLabel": "BYOK સેટિંગ્સ અપડેટ કરો"
+      },
+      "selectedModelUnavailable": {
+        "title": "કોડ સમીક્ષકને ધ્યાનની જરૂર છે",
+        "description": "કોડ સમીક્ષક અક્ષમ કરવામાં આવ્યું કારણ કે પસંદ કરેલ મોડલ ક્લાઉડ એજન્ટ સત્રો માટે ઉપલબ્ધ નથી. ઉપલબ્ધ મોડલ પસંદ કરો, પછી કોડ સમીક્ષક ફરી સક્ષમ કરો.",
+        "recoveryLabel": "કોડ સમીક્ષક સેટિંગ્સ અપડેટ કરો"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "કોડ સમીક્ષકને ધ્યાનની જરૂર છે",
+        "description": "ત્રણ રિપોઝિટરી ક્લોન ટાઇમઆઉટ પછી આજે કોડ સમીક્ષક અક્ષમ કરવામાં આવ્યું. મદદ માટે hi@kilocode.ai નો સંપર્ક કરો, પછી કોડ સમીક્ષક ફરી સક્ષમ કરો.",
+        "recoveryLabel": "સપોર્ટનો સંપર્ક કરો"
+      }
+    },
+    "unknownError": "અજ્ઞાત ભૂલ"
   },
   "securityAgent": {
     "filter": {
@@ -1304,13 +1486,13 @@
       "outcome": "પરિણામ",
       "slaStatus": "SLA સ્થિતિ",
       "sortBy": "ક્રમ આપો",
-      "allRepositories": "બધી રિપોઝિટરીઝ",
+      "allRepositories": "બધી રિપોઝિટરીઓ",
       "all": "બધા",
       "statusOpen": "ખુલ્લું",
       "fixed": "ઠીક કરેલ",
       "statusIgnored": "અવગણેલ",
       "statusClosed": "બંધ",
-      "severityCritical": "નિર્ણાયક",
+      "severityCritical": "ગંભીર",
       "severityHigh": "ઉચ્ચ",
       "severityMedium": "મધ્યમ",
       "severityLow": "નીચું",
@@ -1351,8 +1533,9 @@
       "enableAutoRemediationConfirmTitle": "ઓટો-સુધારણા સક્ષમ કરીએ?",
       "enableAutoRemediationConfirmMessage": "Security Agent લાયક શોષણક્ષમ શોધ માટે આપમેળે સુધારણા PR ખોલશે.",
       "enable": "સક્ષમ કરો",
-      "queuedOne": "{{count}} હાલનું શોધાયેલું વિશ્લેષણ માટે કતારમાં છે.",
-      "queuedMany": "{{count}} હાલનાં શોધાયેલાં વિશ્લેષણ માટે કતારમાં છે.",
+      "queued_one": "{{displayCount}} હાલનું શોધાયેલું વિશ્લેષણ માટે કતારમાં છે.",
+      "queued": "{{displayCount}} હાલનાં શોધાયેલાં વિશ્લેષણ માટે કતારમાં છે.",
+      "queued_other": "{{displayCount}} હાલનાં શોધાયેલાં વિશ્લેષણ માટે કતારમાં છે.",
       "severityCriticalOnly": "માત્ર ગંભીર",
       "severityHighAndAbove": "ઉચ્ચ અને તેનાથી ઉપર",
       "severityMediumAndAbove": "મધ્યમ અને તેનાથી ઉપર",
@@ -1378,19 +1561,19 @@
       "suggestedAction": "સૂચવેલ ક્રિયા",
       "triageReasoning": "ટ્રાયેજ તર્ક",
       "exploitable": "શોષણક્ષમ",
-      "model": "મોડલ",
+      "model": "મોડેલ",
       "notRecorded": "નોંધાયેલ નથી",
       "analyzed": "વિશ્લેષિત",
       "exploitabilityReasoning": "શોષણક્ષમતા તર્ક",
       "suggestedFix": "સૂચવેલ સુધારો",
-      "whereFound": "આ ક્યાં મળ્યું ({{count}})",
+      "whereFound": "આ ક્યાં મળ્યું ({{displayCount}})",
       "fullReport": "સંપૂર્ણ જનરેટ થયેલ રિપોર્ટ",
       "unknown": "અજ્ઞાત",
       "yes": "હા",
       "no": "ના"
     },
     "dashboard": {
-      "findingsCount": "{{count}} શોધો",
+      "findingsCount": "{{displayCount}} શોધો",
       "notMeasured": "માપેલ નથી",
       "actFirst": "પહેલા ક્રિયા કરો",
       "slaPosture": "SLA મુદ્રા",
@@ -1399,7 +1582,7 @@
       "repositoryActionPlan": "રિપોઝિટરી ક્રિયા યોજના",
       "noOpenFindings": "કોઈ ખુલ્લા શોધને ધ્યાનની જરૂર નથી",
       "deadlineToday": "આજે અંતિમ તારીખ પહોંચી",
-      "daysOverdue": "{{count}} દિવસ વિલંબિત",
+      "daysOverdue": "{{displayCount}} દિવસ વિલંબિત",
       "withinDeadline": "અંતિમ તારીખમાં",
       "criticalOverdue": "ગંભીર વિલંબિત",
       "highOverdue": "ઉચ્ચ વિલંબિત",
@@ -1416,7 +1599,7 @@
       "repoSummary": "{{open}} ખુલ્લા · {{critical}} ગંભીર · {{high}} ઉચ્ચ",
       "couldNotLoad": "ડેશબોર્ડ ડેટા લોડ થઈ શક્યો નથી",
       "filterByRepository": "રિપોઝિટરી દ્વારા ફિલ્ટર કરો",
-      "findings": "શોધો",
+      "findings": "શોધ",
       "lastSynced": "છેલ્લે સિંક થયું {{time}}",
       "manageRepositories": "રિપોઝિટરીઓ મેનેજ કરો",
       "notYetSynced": "હજુ સિંક થયેલ નથી",
@@ -1426,6 +1609,27 @@
       "syncNow": "હવે સિંક કરો",
       "syncQueued": "સિંક કતારમાં છે",
       "syncStatusUnavailable": "સિંક સ્થિતિ ઉપલબ્ધ નથી"
+    },
+    "dashboardMetrics": {
+      "openFindings": "ખુલ્લા શોધો",
+      "openFindingsDetail": "{{critical}} નિર્ણાયક, {{high}} ઉચ્ચ",
+      "confirmedExploitable": "પુષ્ટિ થયેલ શોષણક્ષમ",
+      "confirmedExploitableDetail": "વિશ્લેષણ દ્વારા પ્રોજેક્ટ જોખમની પુષ્ટિ થઈ",
+      "needsReview": "તમારી સમીક્ષાની જરૂર છે",
+      "needsReviewDetail": "માનવીય નિર્ણય જરૂરી",
+      "analysisIncomplete": "વિશ્લેષણ પૂર્ણ નથી",
+      "analysisIncompleteDetail": "પ્રોજેક્ટ જોખમ હજુ અજ્ઞાત છે",
+      "slaCompliance": "SLA પાલન",
+      "notMeasured": "માપેલ નથી",
+      "withinDeadlineDetail": "{{total}} માંથી {{within}} અંતિમ તારીખમાં",
+      "noDeadlineData": "હજુ કોઈ શોધની SLA અંતિમ તારીખ નથી",
+      "deadlinePassed": "અંતિમ તારીખ પસાર થઈ",
+      "deadlinePassedDetail": "{{critical}} નિર્ણાયક, {{high}} ઉચ્ચ",
+      "dueThisWeek": "આ અઠવાડિયે બાકી",
+      "dueThisWeekDetail": "{{exploitable}} પુષ્ટિ થયેલ શોષણક્ષમ",
+      "noDeadline": "કોઈ અંતિમ તારીખ નથી",
+      "reviewSlaAssignment": "SLA સોંપણીની સમીક્ષા કરો",
+      "allOpenFindingsTracked": "બધા ખુલ્લા શોધો ટ્રેક કરેલા"
     },
     "dismiss": {
       "title": "શોધ ખારિજ કરો",
@@ -1450,7 +1654,7 @@
     "findingDetails": {
       "supersededBy": "હાલના શોધ દ્વારા બદલાયેલ",
       "supersededByDescription": "સ્થિતિ, વિશ્લેષણ અને સુધારણા માટે હાલનો રેકોર્ડ ખોલવા ટેપ કરો.",
-      "dismissed": "ખારિજ કરેલ",
+      "dismissed": "કાઢી નાખેલ",
       "dismissedBecause": "કારણે ખારિજ કરેલ: {{reason}}.",
       "severityLabel": "{{severity}} ગંભીરતા",
       "package": "પેકેજ",
@@ -1463,37 +1667,48 @@
       "repository": "રિપોઝિટરી",
       "manifest": "મેનિફેસ્ટ",
       "detected": "શોધાયેલ",
-      "updated": "અપડેટ થયેલ",
-      "fixed": "સુધારેલ",
+      "updated": "અપડેટ કરેલ",
+      "fixed": "ઠીક કરેલ",
       "slaDeadline": "SLA અંતિમ તારીખ",
       "sourceRecord": "સ્ત્રોત રેકોર્ડ",
       "source": "સ્ત્રોત",
       "sourceId": "સ્ત્રોત ID",
-      "viewAdvisory": "GitHub પર સલાહ જુઓ"
+      "viewAdvisory": "GitHub પર સલાહ જુઓ",
+      "statusSuperseded": "બદલાયેલ",
+      "statusFixed": "ઠીક કરેલ",
+      "statusOpen": "ખુલ્લું",
+      "sourceDependabot": "GitHub Dependabot",
+      "reasonFixStarted": "સુધારો પહેલેથી શરૂ થયો છે",
+      "reasonNoBandwidth": "કોઈ ક્ષમતા ઉપલબ્ધ નથી",
+      "reasonTolerableRisk": "જોખમ સહનશીલ છે",
+      "reasonInaccurate": "શોધ અચોક્કસ છે",
+      "reasonNotUsed": "સંવેદનશીલ કોડનો ઉપયોગ નથી થયો",
+      "reasonAfterReview": "સમીક્ષા પછી"
     },
     "settingsOverview": {
       "title": "સેટિંગ્સ",
       "couldNotLoadSettings": "સિક્યુરિટી એજન્ટ સેટિંગ્સ લોડ થઈ શકી નથી",
       "couldNotLoadPermissions": "પરવાનગીઓ લોડ થઈ શકી નથી",
       "couldNotLoadRepositories": "રિપોઝિટરીઓ લોડ થઈ શકી નથી",
-      "securityAgent": "સિક્યુરિટી એજન્ટ",
+      "securityAgent": "સુરક્ષા એજન્ટ",
       "enabled": "સક્ષમ",
       "disabled": "અક્ષમ",
       "on": "ચાલુ",
       "off": "બંધ",
       "allRepositories": "બધી રિપોઝિટરીઓ",
-      "repositorySelected": "{{count}} રિપોઝિટરી પસંદ કરેલ",
-      "repositoriesSelected": "{{count}} રિપોઝિટરીઓ પસંદ કરેલ",
-      "selectRepositories": "રિપોઝિટરીઓ પસંદ કરો",
+      "repositoriesCount_one": "{{displayCount}} રિપોઝિટરી પસંદ કરેલ",
+      "repositoriesCount": "{{displayCount}} રિપોઝિટરીઓ પસંદ કરેલ",
+      "repositoriesCount_other": "{{displayCount}} રિપોઝિટરીઓ પસંદ કરેલ",
+      "selectRepositories": "રિપોઝિટરીઝ પસંદ કરો",
       "selectRepositoriesSubtitle": "સિક્યુરિટી એજન્ટ કઈ રિપોઝિટરીઓ પર નજર રાખે તે પસંદ કરો",
       "repositories": "રિપોઝિટરીઓ",
       "modelsAndAnalysis": "મોડલ અને વિશ્લેષણ",
       "analysisModeSubtitle": "{{mode}} વિશ્લેષણ",
       "automation": "ઓટોમેશન",
       "automationAllOff": "બધા બંધ",
-      "automationCount": "{{count}} માંથી 3 સક્ષમ",
+      "automationCount": "{{displayCount}} માંથી 3 સક્ષમ",
       "notifications": "સૂચનાઓ",
-      "notificationsCount": "{{count}} માંથી 2 સક્ષમ",
+      "notificationsCount": "{{displayCount}} માંથી 2 સક્ષમ",
       "slaPolicy": "SLA નીતિ",
       "disabledNoManage": "સિક્યુરિટી એજન્ટ અક્ષમ છે. માત્ર સંસ્થાના માલિકો અને બિલિંગ મેનેજરો તેને ચાલુ કરી શકે છે.",
       "disabledNoRepo": "સિક્યુરિટી એજન્ટ સક્ષમ કરતા પહેલા ઓછામાં ઓછી એક રિપોઝિટરી પસંદ કરો.",
@@ -1510,15 +1725,15 @@
       "retry": "સુધારણા ફરી પ્રયાસ કરો",
       "cancelTitle": "શું આ સુધારણા રદ કરવી?",
       "cancelMessage": "સિક્યુરિટી એજન્ટ ચાલુ સુધારણા પ્રયાસ બંધ કરશે.",
-      "keepRunning": "ચાલતું રાખો",
+      "keepRunning": "ચાલુ રાખો",
       "cancelRemediation": "સુધારણા રદ કરો",
       "openPullRequest": "પુલ રિક્વેસ્ટ ખોલો{{number}}",
       "openDraftPullRequest": "ડ્રાફ્ટ પુલ રિક્વેસ્ટ ખોલો{{number}}",
       "progress": "પ્રગતિ",
-      "attemptHistory": "પ્રયાસ ઇતિહાસ ({{count}})",
+      "attemptHistory": "પ્રયાસ ઇતિહાસ ({{displayCount}})",
       "attemptNumber": "પ્રયાસ #{{number}}",
       "startedBy": "દ્વારા શરૂ કરેલ",
-      "model": "મોડલ",
+      "model": "મોડેલ",
       "branch": "શાખા",
       "queued": "સુધારણા કતારમાં છે",
       "retryQueued": "સુધારણા ફરી પ્રયાસ કતારમાં છે",
@@ -1540,7 +1755,7 @@
       "modeAuto": "ઓટો",
       "modeShallow": "છીછરું",
       "modeDeep": "ઊંડું",
-      "couldNotLoadModels": "મોડલ લોડ થઈ શક્યા નથી",
+      "couldNotLoadModels": "મોડેલ લોડ કરી શકાયા નહીં",
       "triageModel": "ટ્રાયેજ મોડલ",
       "analysisModel": "વિશ્લેષણ મોડલ",
       "remediationModel": "સુધારણા મોડલ"
@@ -1575,7 +1790,7 @@
       "dismissA11y": "શોધ ખારિજ કરો"
     },
     "findingList": {
-      "title": "શોધો",
+      "title": "શોધ",
       "couldNotLoad": "શોધો લોડ થઈ શક્યા નથી",
       "couldNotLoadMore": "વધુ શોધો લોડ થઈ શક્યા નથી",
       "noMatchesTitle": "કોઈ શોધ ફિલ્ટર સાથે મેળ ખાતું નથી",
@@ -1585,10 +1800,10 @@
       "clearFilters": "ફિલ્ટર સાફ કરો"
     },
     "scopeList": {
-      "title": "સિક્યુરિટી એજન્ટ",
-      "couldNotLoad": "સંસ્થાઓ લોડ થઈ શકી નથી",
+      "title": "સુરક્ષા એજન્ટ",
+      "couldNotLoad": "સંસ્થાઓ લોડ કરી શકાઈ નહીં",
       "personal": "વ્યક્તિગત",
-      "personalSubtitle": "તમારી પોતાની રિપોઝિટરીઓ"
+      "personalSubtitle": "તમારી પોતાની રિપોઝિટરીઝ"
     },
     "commandRetry": {
       "discard": "કાઢી નાખો"
@@ -1623,7 +1838,7 @@
     "auditReport": {
       "couldNotLoad": "ઓડિટ રિપોર્ટ લોડ થઈ શક્યો નથી",
       "events": "ઘટનાઓ",
-      "findings": "શોધો",
+      "findings": "શોધ",
       "generated": "જનરેટ થયેલ {{generatedAt}}",
       "noActivity": "કોઈ નોંધાયેલ પ્રવૃત્તિ નથી",
       "noActivityDescription": "Kilo પાસે {{start}} થી {{end}} સુધી કોઈ રિપોર્ટ કરી શકાય તેવી સિક્યુરિટી ફાઇન્ડિંગ પ્રવૃત્તિ નથી.",
@@ -1658,14 +1873,14 @@
       "allRepositories": "બધી રિપોઝિટરીઓ",
       "couldNotLoad": "રિપોઝિટરી સેટિંગ્સ લોડ થઈ શકી નથી",
       "couldNotLoadRepositories": "રિપોઝિટરીઓ લોડ થઈ શકી નથી",
-      "couldNotOpenGithubSettings": "GitHub App સેટિંગ્સ ખોલી શકાયા નથી",
+      "couldNotOpenGithubSettings": "GitHub ઍપ સેટિંગ્સ ખોલી શકાઈ નહીં",
       "githubAppSettings": "GitHub App સેટિંગ્સ",
       "manageAccess": "GitHub App ઍક્સેસ મેનેજ કરો",
       "noRepositories": "કોઈ રિપોઝિટરીઓ નથી",
       "noRepositoriesDescription": "Kilo GitHub App ને રિપોઝિટરીઓની ઍક્સેસ આપો",
       "readOnly": "માત્ર સંસ્થાના માલિકો અને બિલિંગ મેનેજરો આ સેટિંગ્સ બદલી શકે છે.",
       "selectAtLeastOne": "ઓછામાં ઓછી એક રિપોઝિટરી પસંદ કરો.",
-      "selectedRepositories": "પસંદ કરેલ રિપોઝિટરીઓ",
+      "selectedRepositories": "પસંદ કરેલી રિપોઝિટરીઝ",
       "title": "રિપોઝિટરીઓ"
     },
     "scopeEntry": {
@@ -1681,7 +1896,140 @@
     },
     "queuedActionUntracked": "કતારમાં મૂકેલ ક્રિયા હવે ટ્રેક કરી શકાતી નથી. નવીનતમ સ્થિતિ જોવા રિફ્રેશ કરો.",
     "initialSyncAdmissionFailed": "સિક્યુરિટી એજન્ટ સક્ષમ થયું, પણ પ્રારંભિક સિંક કતારમાં મૂકી શકાયું નહીં. ફરી સિંક કરો.",
-    "title": "સિક્યુરિટી એજન્ટ"
+    "title": "સુરક્ષા એજન્ટ",
+    "commands": {
+      "findingAlreadyDismissed": "શોધ પહેલેથી ખારિજ થઈ ગઈ છે",
+      "findingDismissed": "શોધ ખારિજ થઈ",
+      "noRemediationsQueued": "કોઈ હાલની શોધ કતારમાં નથી",
+      "remediationsQueued": "હાલની સુધારણાઓ કતારમાં મૂકાઈ",
+      "analysisComplete": "વિશ્લેષણ પૂર્ણ",
+      "syncComplete": "સિંક પૂર્ણ"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "સુરક્ષા સેવા ગોઠવેલી નથી. આ સુધારાય ત્યાં સુધી ફરી સબમિટ કરવું સફળ થઈ શકશે નહીં.",
+      "syncMayNotHaveCompleted": "સિંક પૂર્ણ થયું ન હોઈ શકે. તેને સંતુલિત કરવા ફરી પ્રયત્ન કરો, અથવા કાઢી નાખો.",
+      "syncInProgress": "સુરક્ષા સિંક પહેલેથી ચાલુ છે. કૃપા કરીને ફરી પ્રયત્ન કરો.",
+      "dismissalInProgress": "આ ખારિજ કરવાની પ્રક્રિયા પહેલેથી ચાલુ છે. કૃપા કરીને ફરી પ્રયત્ન કરો.",
+      "couldNotReadPendingSyncs": "બાકી સિંક વાંચી શકાયા નહીં. ફરી પ્રયત્ન કરો."
+    },
+    "analysisState": {
+      "queued": "વિશ્લેષણ કતારમાં છે",
+      "queuedTitle": "વિશ્લેષણ કતારમાં છે",
+      "queuedDescription": "વિશ્લેષણ ક્ષમતા ઉપલબ્ધ થવાની રાહ જોવાઈ રહી છે.",
+      "analyzing": "વિશ્લેષણ કરી રહ્યા છીએ",
+      "analyzingTitle": "વિશ્લેષણ કરી રહ્યા છીએ",
+      "analyzingDescription": "એપ્લિકેશન કોડ પ્રભાવિત ફીચર સુધી પહોંચી શકે છે કે કેમ તે તપાસવામાં આવી રહ્યું છે.",
+      "failed": "વિશ્લેષણ નિષ્ફળ",
+      "failedTitle": "વિશ્લેષણ નિષ્ફળ",
+      "failedDescription": "સિક્યુરિટી એજન્ટ વિશ્લેષણ પૂર્ણ કરી શક્યું નહીં.",
+      "extractionFailed": "સમીક્ષાની જરૂર છે",
+      "extractionFailedTitle": "સમીક્ષાની જરૂર છે",
+      "extractionFailedDescription": "તકનીકી રિપોર્ટને રચનાત્મક પરિણામમાં ફેરવી શકાયું નહીં.",
+      "exploitable": "શોષણક્ષમ",
+      "exploitableTitle": "શોષણક્ષમ",
+      "exploitableDescription": "એપ્લિકેશન કોડ પ્રભાવિત ફીચર સુધી પહોંચી શકે છે.",
+      "notExploitable": "અપ્રાપ્ય",
+      "notExploitableTitle": "અપ્રાપ્ય",
+      "notExploitableDescription": "આ રિપોઝિટરીમાં કોઈ પહોંચી શકાય તેવો માર્ગ મળ્યો નથી.",
+      "unknown": "સમીક્ષાની જરૂર છે",
+      "unknownTitle": "સમીક્ષાની જરૂર છે",
+      "unknownDescription": "વિશ્લેષણ પુષ્ટિ કરી શક્યું નહીં કે સંવેદનશીલ ફીચર પહોંચી શકાય તેવું છે કે નહીં.",
+      "safeToDismiss": "કાઢી નાખવું સલામત",
+      "safeToDismissTitle": "કાઢી નાખવું સલામત",
+      "safeToDismissDescription": "ટ્રાયેજે કોડબેઝ વિશ્લેષણ વિના આ સુરક્ષિત રીતે કાઢી નાખી શકાય તેવું નક્કી કર્યું.",
+      "manualReview": "સમીક્ષાની જરૂર છે",
+      "manualReviewTitle": "મેન્યુઅલ સમીક્ષાની જરૂર છે",
+      "manualReviewDescription": "ટ્રાયેજે આ શોધ મેન્યુઅલ સમીક્ષા માટે ચિહ્નિત કરી.",
+      "analysisRequired": "વિશ્લેષણ જરૂરી",
+      "analysisRequiredTitle": "કોડબેઝ વિશ્લેષણ જરૂરી",
+      "analysisRequiredDescription": "ટ્રાયેજ જવાબ નક્કી કરતા પહેલા રિપોઝિટરીનું વિશ્લેષણ કરવાની ભલામણ કરે છે.",
+      "completed": "વિશ્લેષિત",
+      "completedTitle": "વિશ્લેષિત",
+      "completedDescription": "વિશ્લેષણ કોઈ ચોક્કસ પરિણામ નોંધાયા વિના પૂર્ણ થયું.",
+      "notAnalyzed": "વિશ્લેષણ નથી કરેલ",
+      "notAnalyzedTitle": "વિશ્લેષણ નથી કરેલ",
+      "notAnalyzedDescription": "આ શોધ માટે હજુ કોડબેઝ વિશ્લેષણ ચાલ્યું નથી."
+    },
+    "deadline": {
+      "fixedBeforeDeadline": "સમયમર્યાદા પહેલાં ઠીક કરેલ",
+      "fixed": "ઠીક કરેલ",
+      "fixedOn": "{{date}} ના રોજ ઠીક કરેલ",
+      "resolutionRecorded": "ઉકેલ નોંધાયેલ",
+      "superseded": "બદલાયેલ",
+      "dismissed": "કાઢી નાખેલ",
+      "closedOn": "{{status}} {{date}}",
+      "deadlineNotSet": "અંતિમ તારીખ સેટ નથી",
+      "noSlaDeadline": "કોઈ SLA અંતિમ તારીખ નથી",
+      "dueOn": "{{date}} સુધીમાં બાકી",
+      "overdueNow": "વિલંબિત",
+      "overdue_one": "{{count}} દિવસ વિલંબિત",
+      "overdue_other": "{{count}} દિવસ વિલંબિત",
+      "dueToday": "આજે બાકી",
+      "dueTomorrow": "કાલે બાકી",
+      "dueInDays_one": "{{count}} દિવસમાં બાકી",
+      "dueInDays_other": "{{count}} દિવસોમાં બાકી",
+      "overdue": "{{count}} દિવસ વિલંબિત",
+      "dueInDays": "{{count}} દિવસોમાં બાકી"
+    },
+    "remediationStatus": {
+      "cancellationRequested": "રદ કરવાની વિનંતી કરેલ",
+      "notStarted": "શરૂ કરેલ નથી",
+      "queued": "કતારમાં છે",
+      "starting": "શરૂ થઈ રહ્યું છે",
+      "inProgress": "ચાલુ છે",
+      "draftPrOpened": "ડ્રાફ્ટ PR ખોલેલ",
+      "prOpened": "PR ખોલેલ",
+      "blocked": "અવરોધિત",
+      "failed": "નિષ્ફળ",
+      "noChangesNeeded": "કોઈ ફેરફારની જરૂર નથી",
+      "cancelled": "રદ કરેલ",
+      "originAutomaticPolicy": "સ્વચાલિત નીતિ",
+      "originIncludeExistingPolicy": "હાલની નીતિ શામેલ કરો",
+      "originManual": "મેન્યુઅલ",
+      "validationCheck": "માન્યતા તપાસ {{number}}"
+    },
+    "remediationUnavailable": {
+      "findingNotFound": "સુરક્ષા શોધ હવે અસ્તિત્વમાં નથી.",
+      "approvalRequired": "ઓટો સુધારણા માટે મંજૂરી જરૂરી છે. મંજૂરી આપવા સુધારણા મેન્યુઅલ રીતે શરૂ કરો.",
+      "findingNotOpen": "શોધ હવે ખુલ્લી નથી.",
+      "repoNotInScope": "રિપોઝિટરી સિક્યુરિટી એજન્ટ માટે પસંદ કરેલી નથી.",
+      "analysisRequired": "સુધારણા શરૂ કરતા પહેલા કોડબેઝ વિશ્લેષણ ચલાવો.",
+      "sandboxAnalysisRequired": "સુધારણા શરૂ કરતા પહેલા કોડબેઝ વિશ્લેષણ ચલાવો.",
+      "staleAnalysis": "વિશ્લેષણ પછી શોધ બદલાઈ. સુધારણા શરૂ કરતા પહેલા વિશ્લેષણ ફરી ચલાવો.",
+      "notExploitable": "વિશ્લેષણમાં કોઈ પહોંચી શકાય તેવો સંવેદનશીલ માર્ગ મળ્યો નથી. ઓટો સુધારણા ઉપલબ્ધ નથી.",
+      "exploitabilityUnknown": "વિશ્લેષણ શોષણક્ષમતાની પુષ્ટિ કરી શક્યું નહીં. વન-ક્લિક સુધારણા પહેલા મેન્યુઅલ સમીક્ષા જરૂરી છે.",
+      "manualReviewRequired": "વિશ્લેષણ મેન્યુઅલ સમીક્ષાની ભલામણ કરે છે, તેથી વન-ક્લિક સુધારણા ઉપલબ્ધ નથી.",
+      "monitorRequired": "વિશ્લેષણ PR ખોલવાને બદલે મોનિટરિંગની ભલામણ કરે છે.",
+      "triageOnly": "માત્ર ટ્રાયેજ પૂર્ણ થયું છે. સુધારણા શરૂ કરતા પહેલા કોડબેઝ વિશ્લેષણ ચલાવો.",
+      "actionNotConcrete": "કોઈ નક્કર ડિપેન્ડન્સી પેચ અથવા સૂચવેલ સુધારો ઉપલબ્ધ નથી.",
+      "remediationActive": "સુધારણાનો પ્રયાસ પહેલેથી ચાલુ છે.",
+      "prAlreadyOpened": "સુધારણા PR પહેલેથી ખુલ્લો છે.",
+      "duplicateAnalysisResult": "આ વિશ્લેષણ પરિણામ પહેલેથી સુધારણા કાર્ય ઉત્પન્ન કર્યું છે.",
+      "retryNotAllowed": "આ પ્રયાસ માટે ફરી પ્રયત્ન ઉપલબ્ધ નથી.",
+      "securityAgentDisabled": "સિક્યુરિટી એજન્ટ આ માલિક માટે અક્ષમ છે.",
+      "autoRemediationDisabled": "ઓટો સુધારણા અક્ષમ છે. સલામતી ગેટ પસાર થાય ત્યારે મેન્યુઅલ સુધારણા હજુ શરૂ થઈ શકે છે.",
+      "includeExistingDisabled": "હાલની શોધ સ્વચાલિત સુધારણામાંથી બાકાત છે.",
+      "belowThreshold": "શોધ સ્વચાલિત ગંભીરતા થ્રેશોલ્ડથી નીચે છે. સલામતી ગેટ પસાર થાય ત્યારે મેન્યુઅલ સુધારણા હજુ શરૂ થઈ શકે છે.",
+      "beforeEnablement": "ઓટો સુધારણા સક્ષમ થતા પહેલા વિશ્લેષણ પૂર્ણ થયું. સલામતી ગેટ પસાર થાય ત્યારે મેન્યુઅલ સુધારણા હજુ શરૂ થઈ શકે છે.",
+      "generic": "આ શોધ માટે સુધારણા ઉપલબ્ધ નથી."
+    },
+    "commandFailure": {
+      "ownerCapReached": "વિશ્લેષણ ક્ષમતા ભરેલી છે. સક્રિય વિશ્લેષણ પૂરું થાય ત્યાં સુધી રાહ જુઓ, પછી ફરી પ્રયત્ન કરો.",
+      "githubTokenUnavailable": "GitHub અધિકૃતતાને ધ્યાનની જરૂર છે. GitHub ઍપ ફરી અધિકૃત કરો, પછી ફરી પ્રયત્ન કરો.",
+      "githubAuthInvalid": "GitHub અધિકૃતતાને ધ્યાનની જરૂર છે. GitHub ઍપ ફરી અધિકૃત કરો, પછી ફરી પ્રયત્ન કરો.",
+      "findingUnavailable": "શોધ હવે ઉપલબ્ધ નથી. શોધો તાજી કરો અને તે ખુલ્લી રહે તો ફરી પ્રયત્ન કરો.",
+      "repositoryUnavailable": "રિપોઝિટરી હવે GitHub ઍપ માટે ઉપલબ્ધ નથી. રિપોઝિટરી ઍક્સેસ તાજી કરો, પછી ફરી પ્રયત્ન કરો.",
+      "invalidDismissTarget": "તેનું Dependabot લક્ષ્ય અમાન્ય હોવાથી શોધને કાઢી નાખી શકાતી નથી.",
+      "commandStalled": "કતારમાં રહેલી ક્રિયા સમયસર પૂર્ણ થઈ નહીં. ક્રિયા ફરી પ્રયત્ન કરો.",
+      "queueRetriesExhausted": "ઘણા પ્રયત્નો પછી ક્રિયા પૂર્ણ કરી શકાઈ નહીં. ક્રિયા ફરી પ્રયત્ન કરો.",
+      "queueAdmissionFailed": "કતારમાં રહેલી ક્રિયા સ્વીકારી શકાઈ નહીં. ક્રિયા ફરી પ્રયત્ન કરો.",
+      "generic": "કતારમાં રહેલી ક્રિયા નિષ્ફળ થઈ. ક્રિયા ફરી પ્રયત્ન કરો."
+    },
+    "analysisMode": {
+      "auto": "ઓટો",
+      "shallow": "છીછરું",
+      "deep": "ઊંડું"
+    }
   },
   "agents": {
     "activeNow": "હવે સક્રિય",
@@ -1693,7 +2041,7 @@
       "clearFilters": "ફિલ્ટર સાફ કરો"
     },
     "sessionList": {
-      "couldNotLoad": "સત્રો લોડ થઈ શક્યા નથી",
+      "couldNotLoad": "સત્રો લોડ કરી શકાયા નહીં",
       "couldNotLoadActive": "સક્રિય સત્રો લોડ થઈ શક્યા નથી",
       "noSessionsYet": "હજુ કોઈ સત્ર નથી",
       "noSessionsYetDescription": "તમારા ફોન પરથી કોડિંગ કાર્ય શરૂ કરો. તમારા સત્રો અહીં દેખાશે.",
@@ -1718,16 +2066,32 @@
       "couldNotCopyId": "સત્ર ID નકલ થઈ શક્યું નથી",
       "untitled": "અનામી સત્ર",
       "sessionDeleted": "સત્ર કાઢી નાખેલ",
-      "needsInput": "ઇનપુટની જરૂર છે",
+      "needsInput": "ઇનપુટ જરૂરી",
       "fromPlatform": "{{platform}} માંથી",
-      "centOne": "સેન્ટ",
-      "centOther": "સેન્ટ",
-      "dollarOne": "ડૉલર",
-      "dollarOther": "ડૉલર"
+      "cent_one": "સેન્ટ",
+      "cent": "સેન્ટ",
+      "cent_other": "સેન્ટ",
+      "dollar_one": "ડૉલર",
+      "dollar": "ડૉલર",
+      "dollar_other": "ડૉલર",
+      "costSpoken": "કિંમત {{cost}}",
+      "costSpokenWithTime": "કિંમત {{cost}}, {{time}}",
+      "pullRequest": "પુલ રિક્વેસ્ટ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ખોલી શકાયું નથી",
-      "couldNotOpenMessage": "અમે GitHub App સેટઅપ શરૂ કરી શક્યા નથી. કૃપા કરીને ફરી પ્રયાસ કરો."
+      "couldNotOpenMessage": "અમે GitHub App સેટઅપ શરૂ કરી શક્યા નથી. કૃપા કરીને ફરી પ્રયાસ કરો.",
+      "installedTitle": "GitHub App ઇન્સ્ટોલ થયું",
+      "installedMessage": "તમારી રિપોઝિટરીઓ હવે કનેક્ટેડ છે.",
+      "pendingTitle": "એડમિન મંજૂરી બાકી છે",
+      "pendingMessage": "સંસ્થાના એડમિને ઇન્સ્ટોલેશન વિનંતીને મંજૂર કરવી જોઈએ.",
+      "accountMismatchTitle": "એકાઉન્ટ મેળ ખાતું નથી",
+      "accountMismatchMessage": "આ કનેક્શન Kilo ઍપમાંથી અલગ એકાઉન્ટ સાથે સાઇન ઇન કરીને શરૂ કરવામાં આવ્યું હતું. તે એકાઉન્ટ સાથે વેબ પર સાઇન ઇન કરો, અથવા ઍપમાંથી ફરી શરૂ કરો.",
+      "cannotCompleteTitle": "ઇન્સ્ટોલેશન પૂર્ણ કરી શકાતું નથી",
+      "notAdminMessage": "માત્ર તે એકાઉન્ટનો GitHub એડમિન જ તેને કનેક્ટ કરી શકે છે. Kilo ઇન્સ્ટોલ કરવા સંસ્થાના એડમિનને કહો.",
+      "alreadyClaimedMessage": "તે GitHub ઇન્સ્ટોલેશન પહેલેથી જ બીજા Kilo એકાઉન્ટ સાથે કનેક્ટેડ છે. પહેલા ત્યાં તેને ડિસ્કનેક્ટ કરો.",
+      "didNotCompleteTitle": "ઇન્સ્ટોલેશન પૂર્ણ થયું નથી",
+      "didNotCompleteMessage": "GitHub App નું ઇન્સ્ટોલેશન પૂર્ણ થયું નથી. ઍપમાંથી ફરી પ્રયાસ કરો."
     },
     "sessionExited": "સત્ર બહાર નીકળ્યું",
     "remoteSpawnRetryable": "ઇન્સ્ટન્સ સુધી પહોંચી શકાયું નહીં — તે ડિસ્કનેક્ટ થયું હોઈ શકે છે.",
@@ -1760,7 +2124,12 @@
       "couldNotLoadThisSession": "આ સત્ર લોડ થઈ શક્યું નથી",
       "cloneFailed": "આ સત્ર ક્લોન થઈ શક્યું નથી.",
       "cloneFailedRetry": "આ સત્ર ક્લોન થઈ શક્યું નથી. ફરી પ્રયાસ કરો.",
-      "connectRepositoryToContinue": "ચાલુ રાખવા રિપોઝિટરી કનેક્ટ કરો."
+      "connectRepositoryToContinue": "ચાલુ રાખવા રિપોઝિટરી કનેક્ટ કરો.",
+      "notEnoughCredits": "Cloud Agent ચલાવવા માટે પૂરતા ક્રેડિટ નથી. ક્રેડિટ ઉમેરીને ફરી પ્રયાસ કરો.",
+      "previousTaskFinishing": "પાછલું કાર્ય હજી પૂરું થઈ રહ્યું છે. થોડી રાહ જુઓ.",
+      "serviceUnavailable": "સેવા હાલ ઉપલબ્ધ નથી. ફરી પ્રયાસ કરો.",
+      "connectionTrouble": "કનેક્શન સમસ્યા. થોડી વાર પછી ફરી પ્રયાસ કરો.",
+      "modelUnavailable": "આ મૉડલ Cloud Agent માટે ઉપલબ્ધ નથી. બીજું મૉડલ પસંદ કરીને ફરી પ્રયાસ કરો."
     },
     "remoteSession": {
       "failedToCreate": "રિમોટ સત્ર બનાવવામાં નિષ્ફળ",
@@ -1770,7 +2139,10 @@
       "exitMessage": "આ ચાલુ સત્ર રોકશે પણ તેનો ઇતિહાસ રાખશે.",
       "keepSessionRunning": "સત્ર ચાલતું રાખો",
       "exitSession": "સત્રમાંથી બહાર નીકળો",
-      "restartExitFailed": "નવું સત્ર શરૂ થયું. પહેલું સત્ર હજુ ખુલ્લું છે."
+      "restartExitFailed": "નવું સત્ર શરૂ થયું. પહેલું સત્ર હજુ ખુલ્લું છે.",
+      "exitNotSupported": "વર્તમાન સત્ર માટે રિમોટ સત્રમાંથી બહાર નીકળવું સમર્થિત નથી",
+      "exitUnavailable": "વર્તમાન સત્ર માટે રિમોટ સત્રમાંથી બહાર નીકળવું ઉપલબ્ધ નથી",
+      "exitNeedsNewerCli": "રિમોટ સ્લેશ કમાન્ડ માટે નવા Kilo CLIની જરૂર છે. Kilo CLI અપડેટ કરો અને ફરી કનેક્ટ કરો."
     },
     "sessionConnection": {
       "connecting": "કનેક્ટ થઈ રહ્યું છે…",
@@ -1814,15 +2186,17 @@
       "discardDraftMessage": "તમારો પ્રોમ્પ્ટ ખોવાઈ જશે.",
       "keepEditing": "સંપાદન ચાલુ રાખો",
       "discard": "કાઢી નાખો",
-      "discardFailed": "ડ્રાફ્ટ કાઢી નાખી શકાયો નથી. કૃપા કરીને ફરી પ્રયાસ કરો."
+      "discardFailed": "ડ્રાફ્ટ કાઢી નાખી શકાયો નથી. કૃપા કરીને ફરી પ્રયાસ કરો.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} ફાઇલ અપડેટ કરેલ",
-      "updatedFiles": "{{count}} ફાઇલો અપડેટ કરેલ"
+      "updatedFileCount_one": "{{displayCount}} ફાઇલ અપડેટ કરેલ",
+      "updatedFileCount": "{{displayCount}} ફાઇલો અપડેટ કરેલ",
+      "updatedFileCount_other": "{{displayCount}} ફાઇલો અપડેટ કરેલ"
     },
     "toolPatch": {
-      "operationAdded": "ઉમેરેલ",
-      "operationDeleted": "કાઢી નાખેલ",
+      "operationAdded": "ઉમેરાયું",
+      "operationDeleted": "કાઢી નાખવામાં આવ્યું",
       "operationUpdated": "અપડેટ કરેલ"
     },
     "toolCard": {
@@ -1830,8 +2204,8 @@
       "accessibilityLabel": "{{name}} ટૂલ, {{status}}",
       "fileEmpty": "આ ફાઇલ ખાલી છે.",
       "noTasks": "કોઈ કાર્ય નથી.",
-      "contentTruncated": "સામગ્રી ટ્રંકેટેડ",
-      "truncated": "ટ્રંકેટેડ",
+      "contentTruncated": "સામગ્રી કાપી નાખી",
+      "truncated": "કાપેલું",
       "toolRead": "વાંચો",
       "toolEdit": "સંપાદિત કરો",
       "toolWrite": "લખો",
@@ -1843,9 +2217,9 @@
       "toolTask": "કાર્ય",
       "readTodos": "Todos વાંચો",
       "updateTodos": "Todos અપડેટ કરો",
-      "linesBadge": "{{count}} રેખાઓ",
-      "filesBadge": "{{count}} ફાઇલો",
-      "matchesBadge": "{{count}} મેચ"
+      "linesBadge": "{{displayCount}} રેખાઓ",
+      "filesBadge": "{{displayCount}} ફાઇલો",
+      "matchesBadge": "{{displayCount}} મેચ"
     },
     "readToolMarkdown": {
       "linesTruncated": "રેખાઓ {{start}}–{{end}} (ટ્રંકેટેડ)",
@@ -1881,9 +2255,13 @@
     "modeSelector": {
       "accessibility": "મોડ: {{label}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "modeOptions": {
       "code": "કોડ",
-      "plan": "યોજના",
+      "plan": "પ્લાન",
       "debug": "ડીબગ",
       "orchestrator": "ઓર્કેસ્ટ્રેટર",
       "ask": "પૂછો",
@@ -1916,7 +2294,7 @@
       "roleUser": "વપરાશકર્તા",
       "roleAssistant": "સહાયક",
       "sent": "મોકલેલ",
-      "model": "મોડલ",
+      "model": "મોડેલ",
       "costAndTokens": "કિંમત અને ટોકન્સ",
       "cost": "કિંમત",
       "input": "ઇનપુટ",
@@ -1987,7 +2365,7 @@
       "preparationComplete": "તૈયારી પૂર્ણ",
       "preparationFailed": "તૈયારી નિષ્ફળ",
       "setupCommand": "સેટઅપ કમાન્ડ {{index}}",
-      "setupCommandOf": "સેટઅપ કમાન્ડ {{index}} માંથી {{count}}"
+      "setupCommandOf": "સેટઅપ કમાન્ડ {{index}} માંથી {{displayCount}}"
     },
     "permissionCard": {
       "title": "પરવાનગી જરૂરી",
@@ -2024,7 +2402,7 @@
       "submissionFailed": "સબમિશન નિષ્ફળ. કૃપા કરીને ફરી પ્રયાસ કરો.",
       "questionAnnouncement": "એજન્ટને તમારા ઇનપુટની જરૂર છે. જ્યાં સુધી તમે જવાબ ન આપો ત્યાં સુધી કમ્પોઝર થંભેલું છે.",
       "permissionAnnouncement": "એજન્ટને ચાલુ રાખવા માટે પરવાનગીની જરૂર છે. જ્યાં સુધી તમે નિર્ણય ન કરો ત્યાં સુધી કમ્પોઝર થંભેલું છે.",
-      "positionHint": "({{count}} માંથી 1)",
+      "positionHint": "({{displayCount}} માંથી 1)",
       "movedPastPrompt": "એજન્ટ આ પ્રોમ્પ્ટથી આગળ વધી ગયો છે. જ્યારે સત્ર ચાલુ થશે ત્યારે આ કાર્ડ બંધ થશે.",
       "waitingForAnswer": "એજન્ટ તમારા જવાબની રાહ જોઈ રહ્યો છે. આ પ્રશ્ન ખુલ્લો હોય ત્યાં સુધી, એજન્ટને તમારો સંદેશ થંભેલો છે.",
       "waitingForPermission": "એજન્ટ પરવાનગીની રાહ જોઈ રહ્યો છે. આ વિનંતી ખુલ્લી હોય ત્યાં સુધી, એજન્ટને તમારો સંદેશ થંભેલો છે."
@@ -2050,7 +2428,7 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. ફરી પ્રયાસ ઉપલબ્ધ.",
       "copyToComposer": "કમ્પોઝરમાં કૉપિ કરો",
-      "queued": "કતારબદ્ધ",
+      "queued": "કતારમાં છે",
       "queuedAccessibility": "સંદેશ કતારબદ્ધ",
       "userMessage": "વપરાશકર્તા સંદેશ",
       "assistantMessage": "સહાયક સંદેશ",
@@ -2059,8 +2437,9 @@
     "olderMessages": {
       "arrived": "અગાઉના સંદેશાઓ લોડ થયા",
       "retryHint": "આ સત્ર માટે જૂના-સંદેશાઓ લોડ ફરી પ્રયાસ કરે છે.",
-      "omittedOne": "આ સત્રના કેટલાક અગાઉના આઇટમ્સ પ્રદર્શિત કરી શકાયા નહીં.",
-      "omittedMany": "આ સત્રના {{count}} અગાઉના આઇટમ્સ પ્રદર્શિત કરી શકાયા નહીં.",
+      "omitted_one": "આ સત્રના કેટલાક અગાઉના આઇટમ્સ પ્રદર્શિત કરી શકાયા નહીં.",
+      "omitted": "આ સત્રના {{displayCount}} અગાઉના આઇટમ્સ પ્રદર્શિત કરી શકાયા નહીં.",
+      "omitted_other": "આ સત્રના {{displayCount}} અગાઉના આઇટમ્સ પ્રદર્શિત કરી શકાયા નહીં.",
       "couldNotLoad": "અગાઉના સંદેશાઓ લોડ કરી શકાયા નહીં.",
       "unavailable": "અગાઉના સંદેશાઓ ઉપલબ્ધ નથી.",
       "tooLarge": "અગાઉના સંદેશાઓ લોડ કરવા માટે ખૂબ મોટા છે."
@@ -2069,17 +2448,19 @@
       "viewTable": "કોષ્ટક જુઓ",
       "title": "કોષ્ટક",
       "close": "કોષ્ટક બંધ કરો",
-      "column": "કૉલમ",
-      "columns": "કૉલમ્સ",
-      "row": "પંક્તિ",
-      "rows": "પંક્તિઓ",
+      "columnCount_one": "કૉલમ",
+      "columnCount": "કૉલમ્સ",
+      "columnCount_other": "કૉલમ્સ",
+      "rowCount_one": "પંક્તિ",
+      "rowCount": "પંક્તિઓ",
+      "rowCount_other": "પંક્તિઓ",
       "opensFullScreen": "ફુલ સ્ક્રીન ખોલે છે"
     },
     "sessionFilter": {
       "title": "સત્રો ફિલ્ટર કરો",
-      "sortBy": "આ પ્રમાણે ગોઠવો",
+      "sortBy": "ક્રમ આપો",
       "sortLastUpdated": "છેલ્લે અપડેટ",
-      "sortCreated": "બનાવ્યું",
+      "sortCreated": "બનાવેલ",
       "platform": "પ્લેટફોર્મ",
       "platformCloud": "ક્લાઉડ",
       "platformExtension": "એક્સટેન્શન",
@@ -2101,12 +2482,15 @@
     },
     "modelPicker": {
       "title": "મોડલ પસંદ કરો",
-      "searchPlaceholder": "મોડલ્સ શોધો...",
-      "noModels": "કોઈ મોડલ ઉપલબ્ધ નથી",
-      "noModelsDescription": "પસંદ કરવા માટે કોઈ મોડલ ઉપલબ્ધ નથી."
+      "searchPlaceholder": "મોડેલ શોધો...",
+      "noModels": "કોઈ મોડેલ ઉપલબ્ધ નથી",
+      "noModelsDescription": "પસંદ કરવા માટે કોઈ મોડલ ઉપલબ્ધ નથી.",
+      "favorites": "ફેવરિટ",
+      "recommended": "ભલામણ કરેલ",
+      "allModels": "બધા મોડેલ"
     },
     "modelSelector": {
-      "model": "મોડલ",
+      "model": "મોડેલ",
       "provider": "પ્રદાતા {{id}}",
       "modelId": "મોડલ {{id}}",
       "unavailable": "અનુપલબ્ધ",
@@ -2120,7 +2504,8 @@
       "addToFavorites": "{{name}} ફેવરિટમાં ઉમેરો",
       "removeFromFavorites": "{{name}} ફેવરિટમાંથી દૂર કરો",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med"
+      "thinkingEffortMedium": "Med",
+      "sessionModel": "સત્ર મોડલ"
     },
     "attachmentPreview": {
       "openFailedRetry": "ફાઇલ ખોલવામાં નિષ્ફળ. કૃપા કરીને ફરી પ્રયાસ કરો.",
@@ -2142,11 +2527,11 @@
       "cameraAccessDisabled": "કૅમેરા ઍક્સેસ અક્ષમ છે",
       "cameraAccessMessage": "ફોટો લેવા માટે સેટિંગ્સમાં કૅમેરા ઍક્સેસની મંજૂરી આપો.",
       "couldNotOpenPhotoPicker": "ફોટો પિકર ખોલી શકાયું નહીં. Kilo ફરી શરૂ કરીને ફરી પ્રયાસ કરો.",
-      "maxFilesAllowed": "મહત્તમ {{count}} ફાઇલોની મંજૂરી છે",
+      "maxFilesAllowed": "મહત્તમ {{displayCount}} ફાઇલોની મંજૂરી છે",
       "onlyAddingFiles": "કુલ {{total}} માંથી ફક્ત {{accepted}} ફાઇલો ઉમેરવામાં આવી રહી છે (મહત્તમ {{max}})"
     },
     "composer": {
-      "addAttachment": "એટેચમેન્ટ ઉમેરો",
+      "addAttachment": "જોડાણ ઉમેરો",
       "removeOrRetryFailed": "પહેલા નિષ્ફળ એટેચમેન્ટ્સ દૂર કરો અથવા ફરી પ્રયાસ કરો.",
       "attachmentsWithSlashCommands": "સ્લેશ કમાન્ડ સાથે એટેચમેન્ટ મોકલી શકાતા નથી.",
       "photoMetadataNotRemoved": "એટેચમેન્ટમાંથી ફોટો મેટાડેટા દૂર કરી શકાયું નહીં.",
@@ -2188,7 +2573,8 @@
       "delegatingWork": "કાર્ય સોંપી રહ્યું છે",
       "askingQuestion": "પ્રશ્ન પૂછી રહ્યું છે",
       "consideringNextSteps": "આગળના પગલાંઓ વિચારી રહ્યું છે",
-      "writingResponse": "જવાબ લખી રહ્યું છે"
+      "writingResponse": "જવાબ લખી રહ્યું છે",
+      "initializingSnapshot": "સ્નેપશોટ પ્રારંભ કરી રહ્યું છે…"
     },
     "slashCommands": {
       "startNewSession": "નવું સત્ર શરૂ કરો",
@@ -2207,7 +2593,7 @@
       "costPrefix": "કિંમત {{cost}}",
       "costSuffix": ", કિંમત {{cost}}",
       "tokensWindowUnavailable": "સંદર્ભ {{used}} ટોકન્સ, વિંડો અનુપલબ્ધ",
-      "tokensUsage": "સંદર્ભ {{window}} માંથી {{used}} ટોકન્સ, {{percentage}}% વપરાયેલ",
+      "tokensUsage": "સંદર્ભ {{window}} માંથી {{used}} ટોકન્સ, {{percentage}} વપરાયેલ",
       "title": "સંદર્ભ વપરાશ",
       "used": "વપરાયેલ",
       "remaining": "બાકી",
@@ -2216,7 +2602,7 @@
       "usageReflectsLatest": "વપરાશ સૌથી તાજેતરનો પૂર્ણ થયેલ સહાયક જવાબ દર્શાવે છે.",
       "tokenUsage": "ટોકન વપરાશ",
       "cacheRate": "કેશ દર",
-      "modelsCount": "મોડલ્સ ({{count}})",
+      "modelsCount": "મોડલ્સ ({{displayCount}})",
       "tokenTotalsNote": "ટોકન ટોટલ ફક્ત આ સત્રને આવરી લે છે અને સબએજન્ટ/ચાઈલ્ડ-સત્ર ટોકન્સ બાકાત રાખે છે.",
       "subagents": "સબએજન્ટ્સ",
       "subagentsDescription": "ચાઈલ્ડ સત્રોમાંથી બાકી કિંમત",
@@ -2225,8 +2611,9 @@
       "ofWindowTokens": "{{window}} ટોકન્સ માંથી",
       "tokens": "ટોકન્સ",
       "tokensWithPercentage": "ટોકન્સ ({{percentage}})",
-      "stepsCountOne": "{{steps}} પગલું",
-      "stepsCountMany": "{{steps}} પગલાંઓ",
+      "stepsCount_one": "{{steps}} પગલું",
+      "stepsCount": "{{steps}} પગલાંઓ",
+      "stepsCount_other": "{{steps}} પગલાંઓ",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
@@ -2241,7 +2628,7 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "તમારું ખાતું લોડ કરી શકાયું નહીં",
-    "couldNotLoadAccountDescription": "તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
+    "couldNotLoadAccountDescription": "તમારું કનેક્શન ચકાસીને ફરી પ્રયાસ કરો.",
     "couldNotLoadPrivacy": "ગોપનીયતા પસંદગીઓ લોડ કરી શકાઈ નહીં",
     "couldNotLoadPrivacyDescription": "તમારી ડિવાઇસ સુરક્ષા સેટિંગ્સ તપાસો અને ફરી પ્રયાસ કરો.",
     "contentReady": "સામગ્રી તૈયાર",
@@ -2251,7 +2638,8 @@
   },
   "addCredits": {
     "cta": "ક્રેડિટ ઉમેરો",
-    "description": "વપરાશ ચાલુ રાખવા માટે ક્રેડિટ ઉમેરો."
+    "description": "વપરાશ ચાલુ રાખવા માટે ક્રેડિટ ઉમેરો.",
+    "billingPage": "બિલિંગ પૃષ્ઠ"
   },
   "deviceSessions": {
     "couldNotLoad": "સત્રો લોડ કરી શકાયા નહીં",
@@ -2262,7 +2650,7 @@
     "onlyKiloAppSignIns": "ફક્ત Kilo એપ સાઇન-ઇન અહીં દેખાય છે. એડિટર અને CLI સાઇન-ઇન સૂચિબદ્ધ નથી.",
     "signedIn": "સાઇન ઇન {{signedIn}} · છેલ્લે જોવાયું {{lastSeen}}",
     "thisDevice": "આ ડિવાઇસ",
-    "title": "ડિવાઇસ સત્રો",
+    "title": "ઉપકરણ સત્રો",
     "viewProfile": "પ્રોફાઇલ જુઓ",
     "signOutThisDevice": "આ ડિવાઇસ સાઇન આઉટ કરો",
     "signOutThisSession": "આ સત્ર સાઇન આઉટ કરો",
@@ -2271,34 +2659,28 @@
     "signOutThisSessionTitle": "આ સત્ર સાઇન આઉટ કરવું છે?",
     "signOutThisSessionMessage": "{{device}} સાઇન આઉટ થશે. તે એક કલાક સુધી API ઍક્સેસ રાખી શકે છે.",
     "signOutConfirm": "સાઇન આઉટ",
-    "signOutMessage": "તમારા વર્કસ્પેસને ઍક્સેસ કરવા માટે તમારે ફરી સાઇન ઇન કરવું પડશે."
+    "signOutMessage": "તમારા વર્કસ્પેસને ઍક્સેસ કરવા માટે તમારે ફરી સાઇન ઇન કરવું પડશે.",
+    "webBrowser": "વેબ બ્રાઉઝર"
   },
   "forceUpdate": {
     "couldNotOpenStore": "એપ સ્ટોર ખોલી શકાયું નહીં.",
     "description": "Kilo નો નવો વર્ઝન ઉપલબ્ધ છે. ચાલુ રાખવા માટે કૃપા કરીને અપડેટ કરો.",
     "title": "અપડેટ જરૂરી",
-    "updateNow": "હમણાં અપડેટ કરો"
+    "updateNow": "હમણાં અપડેટ કરો",
+    "appStorePage": "એપ સ્ટોર પેજ"
   },
   "home": {
     "couldNotLoadSessions": "સત્રો લોડ કરી શકાયા નહીં",
     "couldNotLoadActiveSessions": "સક્રિય સત્રો લોડ કરી શકાયા નહીં",
     "agentSessions": "એજન્ટ સત્રો",
-    "showingSavedSessions": "સાચવેલા સત્રો બતાવી રહ્યા છીએ — લાઇવ સ્થિતિ જૂની હોઈ શકે છે",
-    "startNewAgentSession": "નવું Kilo એજન્ટ સત્ર શરૂ કરો",
-    "aiCodingSessions": "AI કોડિંગ સત્રો",
-    "startCodingTaskFromPhone": "તમારા ફોનથી કોડિંગ કાર્ય શરૂ કરો અથવા તમારા CLI માંથી સત્ર ચાલુ રાખો.",
-    "tryIt": "અજમાવો",
     "newCodingTask": "નવું કોડિંગ કાર્ય",
     "explore": "શોધો",
     "seeAll": "બધા જુઓ",
-    "kiloAgents": "Kilo એજન્ટ્સ",
-    "greetingMorning": "શુભ સવાર",
-    "greetingAfternoon": "શુભ બપોર",
-    "greetingEvening": "શુભ સાંજ"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} બંધ કરો",
-    "imageUnavailable": "ઇમેજ અનુપલબ્ધ",
+    "imageUnavailable": "છબી ઉપલબ્ધ નથી",
     "share": "{{filename}} શેર કરો"
   },
   "invalidRoute": {
@@ -2321,10 +2703,10 @@
     "neutralDescription": "કૃપા કરીને ફરી પ્રયાસ કરો.",
     "offlineTitle": "લોડ કરવામાં નિષ્ફળ",
     "offlineDescription": "કંઈક ખોટું થયું",
-    "permissionTitle": "ઍક્સેસ નકારી",
-    "permissionDescription": "તમને આ જોવાની પરવાનગી નથી.",
+    "permissionTitle": "ઍક્સેસ નકારેલ",
+    "permissionDescription": "તમારી પાસે આ જોવાની પરવાનગી નથી.",
     "notFoundTitle": "મળ્યું નથી",
-    "notFoundDescription": "આ આઇટમ દૂર કરવામાં આવી હોઈ શકે છે અથવા હવે ઉપલબ્ધ નથી.",
+    "notFoundDescription": "આ વસ્તુ દૂર કરવામાં આવી હોઈ શકે છે અથવા હવે ઉપલબ્ધ નથી.",
     "serverTitle": "લોડ કરી શકાયું નહીં",
     "serverDescription": "અમારા તરફથી કંઈક ખોટું થયું. કૃપા કરીને ફરી પ્રયાસ કરો."
   },
@@ -2348,7 +2730,17 @@
     "onlineMessage": "આ ડિવાઇસ ઑફલાઇન ટ્રાન્સક્રાઇબ કરી શકતું નથી. તમારી રેકોર્ડિંગ તેને ટેક્સ્ટમાં ફેરવવા માટે {{provider}} ને મોકલવામાં આવે છે. Kilo ઑડિઓ સંગ્રહિત કરતું નથી.",
     "allow": "મંજૂરી આપો",
     "start": "વૉઇસ ઇનપુટ શરૂ કરો",
-    "stop": "વૉઇસ ઇનપુટ બંધ કરો"
+    "stop": "વૉઇસ ઇનપુટ બંધ કરો",
+    "restricted": "આ ઉપકરણ પર વૉઇસ ઇનપુટ પ્રતિબંધિત છે.",
+    "micRequired": "વૉઇસ ઇનપુટ માટે માઇક્રોફોન પ્રવેશ જરૂરી છે.",
+    "micOff": "માઇક્રોફોન પ્રવેશ બંધ છે. વૉઇસ ઇનપુટ વાપરવા તેને સેટિંગ્સમાં સક્ષમ કરો.",
+    "micOffTitle": "માઇક્રોફોન પ્રવેશ બંધ છે",
+    "noSpeech": "કોઈ સ્પીચ મળી નથી. ફરી પ્રયત્ન કરવા માઇક્રોફોન ટેપ કરો.",
+    "needsConnection": "વૉઇસ ઇનપુટને હમણાં કનેક્શનની જરૂર છે. ફરી પ્રયત્ન કરો.",
+    "busy": "વૉઇસ ઇનપુટ વ્યસ્ત છે. ફરી પ્રયત્ન કરો.",
+    "stopped": "વૉઇસ ઇનપુટ બંધ થયું. ફરી પ્રયત્ન કરવા માઇક્રોફોન ટેપ કરો.",
+    "unavailableDevice": "આ ઉપકરણ પર વૉઇસ ઇનપુટ ઉપલબ્ધ નથી.",
+    "unavailableLanguage": "આ ઉપકરણની ભાષા માટે વૉઇસ ઇનપુટ ઉપલબ્ધ નથી."
   },
   "share": {
     "title": "Kilo પર શેર કરો",
@@ -2360,7 +2752,7 @@
     "connectedCli": "કનેક્ટેડ CLI પર",
     "newSessionOn": "{{name}} પર નવું સત્ર",
     "noMatchingSessions": "કોઈ મેળ ખાતું સત્ર નથી.",
-    "onlyFirstFilesAttached": "ફક્ત પહેલી {{count}} ફાઇલો એટેચ થશે.",
+    "onlyFirstFilesAttached": "ફક્ત પહેલી {{displayCount}} ફાઇલો એટેચ થશે.",
     "staleMessage": "આ શેર હવે ઉપલબ્ધ નથી.",
     "retryableMessage": "તમારા સત્રો લોડ કરી શકાયા નહીં.",
     "emptyMessage": "હજી કોઈ સત્ર નથી — આ મોકલવા માટે નવું શરૂ કરો.",
@@ -2393,7 +2785,7 @@
     "otherAccountCopy": "આ Apple ખાતા પરનું Kilo Pass એ અલગ Kilo ખાતા સાથે સંબંધિત છે. તેને મેનેજ કરવા માટે તે Kilo ખાતામાં સાઇન ઇન કરો.",
     "alreadySubscribed": "તમારી પાસે પહેલેથી જ Kilo Pass સબસ્ક્રિપ્શન છે.",
     "purchaseUnavailable": "Kilo Pass ખરીદી હમણાં ઉપલબ્ધ નથી.",
-    "tierCredits": "${{amount}} ક્રેડિટમાં",
+    "tierCredits": "{{amount}} ક્રેડિટમાં",
     "perMonth": "{{price}}/મહિને",
     "verifyPurchaseFailed": "તમારી ખરીદી ચકાસી શકાઈ નહીં. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
     "productsCouldNotLoad": "Kilo Pass ઉત્પાદનો App Store માંથી લોડ કરી શકાયા નહીં.",
@@ -2404,7 +2796,7 @@
     "manageFailed": "App Store સબસ્ક્રિપ્શન મેનેજમેન્ટ ખોલવામાં નિષ્ફળ.",
     "kiloPassSetup": "Kilo Pass સેટઅપ",
     "subscriptionHeaderDescription": "એક માસિક સબસ્ક્રિપ્શન જે Kilo એપમાં AI કોડિંગ સત્રો — ક્લાઉડ એજન્ટ્સ, રિમોટ સત્રો અને KiloClaw ચેટ્સ ચલાવવા માટે તમારી Kilo બેલેન્સમાં ક્રેડિટ ઉમેરે છે.",
-    "tierDescription": "Kilo એપ વપરાશ માટે ${{price}} ચૂકવેલી ક્રેડિટ માસિક ઉમેરાય છે.",
+    "tierDescription": "Kilo એપ વપરાશ માટે {{price}} ચૂકવેલી ક્રેડિટ માસિક ઉમેરાય છે.",
     "subscribe": "સબસ્ક્રાઇબ કરો",
     "subscribeDescription": "બોનસ પ્રોગ્રેસ સાથે માસિક ક્રેડિટ",
     "manage": "મેનેજ કરો",
@@ -2412,7 +2804,7 @@
     "statusPending": "Kilo Pass બાકી",
     "statusCanceling": "Kilo Pass રદ થઈ રહ્યું છે",
     "statusPastDue": "Kilo Pass મુદત ઉતરી ગયું",
-    "monthlyCredits": "${{credits}} માસિક ક્રેડિટ",
+    "monthlyCredits": "{{credits}} માસિક ક્રેડિટ",
     "ends": "{{date}} ને સમાપ્ત",
     "periodEnd": "સમયગાળાનો અંત",
     "managedOnGooglePlay": "Google Play પર મેનેજ થાય છે",
@@ -2426,7 +2818,15 @@
     "webManagementDescription": "આ Kilo Pass વેબ પર મેનેજ થાય છે.",
     "legalDisclosure": "Kilo Pass એ આપમેળે રિન્યુ થતું માસિક સબ્સ્ક્રિપ્શન છે. ખરીદીની પુષ્ટિ પર તમારા Apple ID પર ચુકવણી કરવામાં આવે છે. જ્યાં સુધી વર્તમાન સમયગાળાના અંતના 24 કલાક પહેલાં રદ ન કરવામાં આવે ત્યાં સુધી સબ્સ્ક્રિપ્શન દર મહિને દર્શાવેલ કિંમતે આપમેળે રિન્યુ થાય છે. તમારી App Store એકાઉન્ટ સેટિંગ્સમાં ગમે ત્યારે મેનેજ કરો અથવા રદ કરો.",
     "legalPrivacyPolicy": "ગોપનીયતા નીતિ",
-    "legalTermsOfUse": "ઉપયોગની શરતો (EULA)"
+    "legalTermsOfUse": "ઉપયોગની શરતો (EULA)",
+    "purchaseDifferentAccount": "આ App Store ખરીદી તમારા Kilo એકાઉન્ટ સાથે લિંક થયેલી નથી. ખરીદી માટે વપરાયેલા Apple એકાઉન્ટમાં સાઇન ઇન કરો, પછી ફરી પ્રયત્ન કરો.",
+    "restoreFailed": "ખરીદીઓ પુનઃસ્થાપિત કરવામાં નિષ્ફળ. ફરી પ્રયત્ન કરો.",
+    "purchaseFailed": "ખરીદી પૂર્ણ કરવામાં નિષ્ફળ.",
+    "purchaseStartFailed": "App Store ખરીદી શરૂ કરવામાં નિષ્ફળ.",
+    "purchaseOwnedByAnotherAccount": "આ Apple ખાતા પરનું Kilo Pass એ અલગ Kilo ખાતા સાથે સંબંધિત છે.",
+    "couldNotConnectToAppStore": "App Store થી કનેક્ટ થઈ શકાયું નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
+    "noMatchingProducts": "App Store દ્વારા કોઈ મેળ ખાતા Kilo Pass ઉત્પાદનો પરત આપવામાં આવ્યા નથી.",
+    "purchaseMissingSignedTransaction": "App Store ખરીદીમાં સહી કરેલ ટ્રાન્ઝેક્શન JWS સમાવિષ્ટ ન હતું."
   },
   "consent": {
     "kilo": "Kilo",
@@ -2514,32 +2914,39 @@
   "feedback": {
     "noEmailApp": "કોઈ ઇમેઇલ એપ ઉપલબ્ધ નથી. તમે અમને {{email}} પર પહોંચી શકો છો",
     "couldNotOpenStore": "સ્ટોર ખોલી શકાયું નહીં.",
-    "promptTitle": "Kilo એપ કેવી રીતે ગમી રહી છે?",
-    "iLikeIt": "મને ગમે છે",
-    "gladTitle": "આ સાંભળીને અમને આનંદ થયો!",
-    "gladMessage": "એક સ્ટોર સમીક્ષા અમને ખૂબ મદદ કરશે. Kilo વાપરવા બદલ આભાર!",
-    "rateKilo": "Kilo રેટ કરો",
-    "needsWork": "સુધારણાની જરૂર છે",
-    "sorryTitle": "આ સાંભળીને અમને દિલગીરી થઈ!",
-    "sorryMessage": "શું સુધારવાની જરૂર છે તે અમને જણાવો. એપ માટે જવાબદાર એન્જિનિયર દરેક રિપોર્ટ વાંચે છે!",
-    "emailUs": "અમને ઇમેઇલ કરો"
+    "emailSubject": "મોબાઇલ એપ પ્રતિસાદ",
+    "neutralTitle": "Kilo એપને રેટ કરો",
+    "rateTheApp": "એપને રેટ કરો",
+    "sendFeedback": "ફીડબેક મોકલો"
   },
   "organization": {
     "boundary": {
       "backToProfile": "પ્રોફાઇલ પર પાછા જાઓ",
-      "loadErrorMessage": "તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
+      "loadErrorMessage": "તમારું કનેક્શન ચકાસીને ફરી પ્રયાસ કરો.",
       "loadErrorTitle": "તમારા સંગઠનો લોડ કરી શકાયા નહીં",
       "organizationUnavailable": "સંગઠન અનુપલબ્ધ",
       "selectDescription": "ચાલુ રાખવા માટે તમારી પ્રોફાઇલમાંથી એક સંગઠન પસંદ કરો.",
       "selectOrganization": "એક સંગઠન પસંદ કરો",
-      "unavailableDescription": "આ સંગઠન હવે ઉપલબ્ધ નથી. ચાલુ રાખવા માટે તમારી પ્રોફાઇલમાંથી એક પસંદ કરો."
+      "unavailableDescription": "આ સંગઠન હવે ઉપલબ્ધ નથી. ચાલુ રાખવા માટે તમારી પ્રોફાઇલમાંથી એક પસંદ કરો.",
+      "accessDeniedTitle": "ઍક્સેસ નકારેલ",
+      "accessDeniedDescription": "તમારી પાસે આ સંસ્થાનો ઍક્સેસ નથી."
     },
     "creditActivity": {
       "emptyDescription": "આ સંગઠન માટે ખરીદીઓ, વપરાશ અને ક્રેડિટ ગોઠવણો અહીં થતાં જ દેખાશે.",
       "emptyTitle": "કોઈ ક્રેડિટ પ્રવૃત્તિ નથી",
       "expires": "{{date}} ને સમાપ્ત",
       "title": "ક્રેડિટ પ્રવૃત્તિ",
-      "transactionFallback": "ક્રેડિટ ટ્રાન્ઝેક્શન"
+      "transactionFallback": "ક્રેડિટ ટ્રાન્ઝેક્શન",
+      "category": {
+        "organization_custom": "સંગઠન કસ્ટમ",
+        "parent_to_child_transfer_in": "પેરન્ટથી ચાઇલ્ડમાં સ્થાનાંતરણ (ઇન)",
+        "parent_to_child_transfer_out": "પેરન્ટથી ચાઇલ્ડમાં સ્થાનાંતરણ (આઉટ)",
+        "oss-sponsorship": "OSS સ્પોન્સરશિપ",
+        "oss-monthly-reset": "OSS માસિક રીસેટ",
+        "team-topup-bonus-2025": "ટીમ ટોપઅપ બોનસ 2025",
+        "accounting_adjustment": "એકાઉન્ટિંગ ગોઠવણ",
+        "credits_expired": "ક્રેડિટ સમાપ્ત થઈ"
+      }
     },
     "inviteMember": {
       "emailError": "માન્ય ઇમેઇલ સરનામું દાખલ કરો",
@@ -2556,10 +2963,17 @@
       "emptyDescription": "ઇનવોઇસ દરેક બિલિંગ ચક્ર પર આપમેળે ઉત્પન્ન થાય છે અને તમારા સંગઠનને બિલ થતાં જ અહીં દેખાશે.",
       "emptyTitle": "કોઈ ઇનવોઇસ નથી",
       "invoiceFallback": "ઇનવોઇસ",
-      "statusOpen": "ખુલ્લું",
-      "statusPaid": "ચૂકવેલ",
-      "statusVoid": "રદ",
-      "title": "ઇનવોઇસ"
+      "title": "ઇનવોઇસ",
+      "downloadFailed": "ઇનવોઇસ ડાઉનલોડ કરી શકાયું નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
+      "sharingUnavailable": "આ ઉપકરણ પર શેરિંગ ઉપલબ્ધ નથી.",
+      "status": {
+        "paid": "ચૂકવેલ",
+        "open": "ખુલ્લું",
+        "void": "રદ",
+        "draft": "ડ્રાફ્ટ",
+        "uncollectible": "વસૂલ કરી ન શકાય તેવું",
+        "unknown": "અજ્ઞાત"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -2616,7 +3030,7 @@
     },
     "permissionDenied": {
       "back": "પાછળ",
-      "title": "ઍક્સેસ નકારી"
+      "title": "ઍક્સેસ નકારેલ"
     },
     "usageStats": {
       "cost": "કિંમત",
@@ -2626,7 +3040,7 @@
       "requests": "વિનંતીઓ"
     },
     "hub": {
-      "title": "સંગઠન",
+      "title": "સંસ્થા",
       "renameTitle": "સંગઠનનું નામ બદલો",
       "renamePlaceholder": "સંગઠનનું નામ દાખલ કરો",
       "balance": "બેલેન્સ",
@@ -2645,8 +3059,9 @@
       "manageHint": "વેબ પર Kilo Pass મેનેજમેન્ટ ખોલે છે.",
       "notSubscribed": "સબસ્ક્રાઇબ કરેલ નથી",
       "overallocated": "પાસ અસાઇનમેન્ટ ચૂકવેલી સીટો કરતા વધી ગયા",
-      "paidSeatOne": "{{count}} ચૂકવેલી સીટ",
-      "paidSeatOther": "{{count}} ચૂકવેલી સીટો",
+      "paidSeat_one": "{{displayCount}} ચૂકવેલી સીટ",
+      "paidSeat": "{{displayCount}} ચૂકવેલી સીટો",
+      "paidSeat_other": "{{displayCount}} ચૂકવેલી સીટો",
       "paymentNeedsAttention": "ચુકવણી ધ્યાનની જરૂર છે",
       "paymentPending": "ચુકવણી બાકી",
       "processingBlocked": "પ્રોસેસિંગ અવરોધિત",
@@ -2671,10 +3086,28 @@
     "emailDeliveryFailed": "ઇમેઇલ ડિલિવરી અસ્થાયી રૂપે ઉપલબ્ધ નથી. કૃપા કરીને પછીથી ફરી પ્રયાસ કરો.",
     "admissionRequired": "તમારા ઉપકરણની ચકાસણી થઈ શકતી નથી. બીજા ઉપકરણ પર અથવા વેબ દ્વારા સાઇન ઇન કરવા માટે '$t(login.moreSignInOptions)' વાપરો.",
     "default": "કંઈક ખોટું થયું. કૃપા કરીને ફરી પ્રયાસ કરો.",
-    "retryableAdmission": "અમે આ ઉપકરણ ચકાસી શક્યા નહીં. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો."
+    "retryableAdmission": "અમે આ ઉપકરણ ચકાસી શક્યા નહીં. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
+    "startSignInFailed": "સાઇન ઇન શરૂ કરવામાં નિષ્ફળ. કૃપા કરીને ફરી પ્રયાસ કરો.",
+    "couldNotOpenBrowser": "બ્રાઉઝર ખોલી શકાયું નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
+    "signInTimedOut": "સાઇન-ઇનનો સમય સમાપ્ત થયો. કૃપા કરીને ફરી પ્રયાસ કરો.",
+    "signInFailed": "સાઇન-ઇન નિષ્ફળ ગયું. કૃપા કરીને ફરી પ્રયાસ કરો.",
+    "networkError": "નેટવર્ક ભૂલ. કૃપા કરીને ફરી પ્રયાસ કરો.",
+    "accessDeniedByUser": "વપરાશકર્તા દ્વારા પ્રવેશ નકારાયો",
+    "codeExpired": "કોડ સમાપ્ત થયો",
+    "tooManySignInAttempts": "ખૂબ બધા સાઇન-ઇન પ્રયાસો. કૃપા કરીને રાહ જુઓ અને ફરી પ્રયત્ન કરો."
   },
   "models": {
     "dataCollected": "એકત્રિત ડેટા",
-    "free": "મફત"
+    "free": "મફત",
+    "couldNotUpdateFavorites": "ફેવરિટ અપડેટ કરી શકાયાં નહીં",
+    "thinkingEffort": {
+      "none": "કંઈ નહીં",
+      "minimal": "ન્યૂનતમ",
+      "low": "નીચું",
+      "medium": "મધ્યમ",
+      "high": "ઉચ્ચ",
+      "xhigh": "અતિ ઉચ્ચ",
+      "max": "મહત્તમ"
+    }
   }
 }

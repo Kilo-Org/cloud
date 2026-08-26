@@ -1,9 +1,10 @@
 import { relativeTimeFormat } from '@/lib/intl-cache';
-import { firstNonEmpty, formatDate, parseTimestamp } from '@kilocode/app-shared/utils';
+import { firstNonEmpty, parseTimestamp } from '@kilocode/app-shared/utils';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 import { i18n } from '@/i18n';
+import { firstGrapheme } from '@/lib/format';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -24,7 +25,8 @@ const RELATIVE_TIME_UNITS: readonly { unit: Intl.RelativeTimeFormatUnit; seconds
 /**
  * Returns a human-readable relative time string like "3 days ago". Uses
  * `Intl.RelativeTimeFormat` with the active i18n language (or the passed
- * locale) so the unit words and direction are localized. Sub-minute ages use
+ * locale) so the unit words and direction are localized. The shared formatter
+ * loads the Hermes polyfill and active locale on demand. Sub-minute ages use
  * the catalog's `common.justNow` because RelativeTimeFormat has no sub-minute
  * bucket.
  */
@@ -58,17 +60,8 @@ function pick<T extends object, K extends keyof T>(obj: T, keys: readonly K[]): 
 
 /** Uppercases the first letter, e.g. for enum-like values used as labels. */
 function capitalize(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
+  const first = firstGrapheme(value, i18n.language);
+  return first.toLocaleUpperCase(i18n.language) + value.slice(first.length);
 }
 
-export {
-  asyncNoop,
-  capitalize,
-  cn,
-  EMAIL_PATTERN,
-  firstNonEmpty,
-  formatDate,
-  parseTimestamp,
-  pick,
-  timeAgo,
-};
+export { asyncNoop, capitalize, cn, EMAIL_PATTERN, firstNonEmpty, parseTimestamp, pick, timeAgo };

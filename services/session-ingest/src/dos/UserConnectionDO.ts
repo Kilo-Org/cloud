@@ -42,6 +42,7 @@ type WSAttachment =
       role: 'cli';
       connectionId: string;
       sessions: HeartbeatSession[];
+      heartbeatAt?: number;
       // Undefined means no protocolVersion has been reported yet — either the
       // CLI hasn't sent its first heartbeat, or it's a legacy build that
       // predates this field entirely. Both cases fall back to legacy behavior.
@@ -313,7 +314,11 @@ export class UserConnectionDO extends DurableObject<Env> {
         for (const session of sessions) {
           this.sessionOwners.set(session.id, connectionId);
         }
-        this.lastHeartbeatAt.set(connectionId, Date.now());
+        const heartbeatAt = attachment.heartbeatAt ?? Date.now();
+        this.lastHeartbeatAt.set(connectionId, heartbeatAt);
+        if (attachment.heartbeatAt === undefined) {
+          ws.serializeAttachment({ ...attachment, heartbeatAt });
+        }
       } else {
         if (attachment.replaced) continue;
         webCount++;
@@ -360,15 +365,16 @@ export class UserConnectionDO extends DurableObject<Env> {
       const reconnect = this.closeStaleSocket(connectionId);
 
       const kiloUserId = url.searchParams.get('kiloUserId') ?? undefined;
+      const now = Date.now();
       const attachment: WSAttachment = {
         role: 'cli',
         connectionId,
         sessions: [],
+        heartbeatAt: now,
         kiloUserId,
       };
       this.ctx.acceptWebSocket(server, ['cli']);
       server.serializeAttachment(attachment);
-      const now = Date.now();
       this.lastHeartbeatAt.set(connectionId, now);
       this.scheduleNextAlarm(now);
 
@@ -648,6 +654,7 @@ export class UserConnectionDO extends DurableObject<Env> {
       role: 'cli',
       connectionId,
       sessions,
+      heartbeatAt: now,
       protocolVersion,
       capabilities,
       kiloUserId: attachment.kiloUserId,
@@ -1888,9 +1895,14 @@ export class UserConnectionDO extends DurableObject<Env> {
   getConnectedInstances(): { instances: ConnectedInstanceRow[] } {
     this.ensureState();
     const instances: ConnectedInstanceRow[] = [];
+    const now = Date.now();
     for (const ws of this.ctx.getWebSockets('cli')) {
       const att = ws.deserializeAttachment() as WSAttachment | null;
-      if (att?.role !== 'cli' || !att.instance) continue;
+      if (att?.role !== 'cli' || !att.instance || ws.readyState !== WebSocket.OPEN) continue;
+      const heartbeatAt = this.lastHeartbeatAt.get(att.connectionId);
+      if (heartbeatAt !== undefined && now - heartbeatAt >= UserConnectionDO.HEARTBEAT_TIMEOUT_MS) {
+        continue;
+      }
       instances.push({
         connectionId: att.connectionId,
         name: att.instance.name,

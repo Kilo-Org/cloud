@@ -12,6 +12,8 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -144,9 +146,10 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     if (result.existingFindingsQueuedCount) {
       const count = result.existingFindingsQueuedCount;
       toast.success(
-        count === 1
-          ? t('securityAgent.automation.queuedOne', { count })
-          : t('securityAgent.automation.queuedMany', { count })
+        t('securityAgent.automation.queued', {
+          count,
+          displayCount: formatNumber(count, i18n.language),
+        })
       );
     }
   };
@@ -209,7 +212,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           ) : undefined
         }
       />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('securityAgent.automation.autoAnalysis')}

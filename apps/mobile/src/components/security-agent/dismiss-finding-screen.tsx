@@ -15,7 +15,7 @@ import { useSecurityAgentCapability } from '@/lib/hooks/use-security-agent';
 import {
   isSecurityConfigurationError,
   isSecuritySyncRetryable,
-  SECURITY_CONFIGURATION_COPY,
+  securityConfigurationCopy,
 } from '@/lib/hooks/use-security-agent-mutations';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
 import { useDismissSecurityFinding, useSecurityFinding } from '@/lib/hooks/use-security-findings';
@@ -110,7 +110,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
             reason,
             comment,
             lastError: isSecurityConfigurationError(error)
-              ? SECURITY_CONFIGURATION_COPY
+              ? securityConfigurationCopy()
               : error.message,
             retryable: isSecuritySyncRetryable(error),
           });
@@ -227,8 +227,8 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
       <ScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-6 pb-8 pt-4"
+        className="flex-1"
+        contentContainerClassName="px-6 gap-6 pb-8 pt-4"
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >
@@ -268,7 +268,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         {dismissFinding.isError && (
           <Text className="text-sm text-destructive">
             {isSecurityConfigurationError(dismissFinding.error)
-              ? SECURITY_CONFIGURATION_COPY
+              ? securityConfigurationCopy()
               : dismissFinding.error.message}
           </Text>
         )}

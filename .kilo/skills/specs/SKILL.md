@@ -1,6 +1,6 @@
 ---
 name: specs
-description: Business-rule specs for KiloClaw billing/lifecycle/controller/data model/Composio, MCP Gateway auth, model experiments, Security Agent, subscription center, team/enterprise seat billing and spending thresholds, Impact affiliate/referrals, Kilo Pass, organization SSO, Stripe early fraud warnings, and coding plans. Load when you need context about the business requirements that guided the implementation.
+description: Business-rule specs for Cloud Agent session UX, KiloClaw billing/lifecycle/controller/data model/Composio, MCP Gateway auth, model experiments, Security Agent, subscription center, team/enterprise seat billing, organization spending alerts, Impact affiliate/referrals, Kilo Pass, organization SSO, Stripe early fraud warnings, and coding plans. Load when you need context about the business requirements that guided the implementation.
 ---
 
 # Business-Rule Specs
@@ -13,6 +13,7 @@ to the user if instructions or changes will cause deviations from the original i
 
 | Spec | Governs |
 |---|---|
+| `.specs/cloud-agent-session.md` | Cloud Agent chat as the user sees it — start, preparation, turns, composer, workspace, persistence, errors; the oracle for manual e2e testing |
 | `.specs/gastown-usage-based-billing.md` | Gastown container pricing, payer attribution, metering lifecycle, and budget enforcement |
 | `.specs/kiloclaw-billing.md` | KiloClaw billing, pricing, invoicing, usage metering, payment flows |
 | `.specs/kiloclaw-billing-lifecycle.md` | KiloClaw billing lifecycle — credit-renewal orchestration safety |
@@ -24,7 +25,7 @@ to the user if instructions or changes will cause deviations from the original i
 | `.specs/security-agent.md` | Security Agent Auto Remediation and finding/SLA notification guarantees |
 | `.specs/subscription-center.md` | Subscription Center ownership, states, and user-facing behavior |
 | `.specs/team-enterprise-seat-billing.md` | Team and Enterprise seat billing, subscription management |
-| `.specs/monthly-spending-thresholds.md` | Enterprise organization monthly AI usage spending thresholds, recipient rules, period semantics, and alert-only delivery guarantees |
+| `.specs/monthly-spending-thresholds.md` | Enterprise organization Alerts and monthly AI usage spending thresholds, lifecycle, recipient, period, and delivery guarantees |
 | `.specs/impact-affiliate-tracking.md` | Impact.com affiliate conversion tracking |
 | `.specs/impact-referrals.md` | Impact.com Advocate referral programs for KiloClaw and Kilo Pass |
 | `.specs/kilo-pass.md` | Kilo Pass states, provider support, credit amounts, eligibility, lifecycle |

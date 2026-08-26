@@ -3,6 +3,7 @@
 import { Sidebar, SidebarContent, SidebarHeader, SidebarRail } from '@/components/ui/sidebar';
 import { useUser } from '@/hooks/useUser';
 import {
+  Bell,
   Bot,
   Building,
   ChartColumnIncreasing,
@@ -325,6 +326,13 @@ export default function OrganizationAppSidebar({
             title: 'Invoices',
             icon: CreditCard,
             url: `/organizations/${organizationId}/payment-details`,
+          },
+          // Alerts is shown for every plan, so a downgraded organization can
+          // still reach and turn off what it configured.
+          {
+            title: 'Alerts',
+            icon: Bell,
+            url: `/organizations/${organizationId}/alerts`,
           },
           {
             title: 'Bring Your Own Key (BYOK)',

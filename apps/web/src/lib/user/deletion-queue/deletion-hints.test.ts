@@ -16,6 +16,17 @@ describe('deletionAttentionHint', () => {
     expect(deletionAttentionHint('usage_prefix_progress_invalid')?.action).not.toMatch(/Mark done/);
     expect(deletionAttentionHint('delete_ready_missing')?.action).toMatch(/delete-ready/);
     expect(deletionAttentionHint('csa_unauthorized')?.title).toMatch(/CSA/);
+    expect(deletionAttentionHint('csa_unauthorized')?.action).toMatch(
+      /CSA_VERCEL_PROTECTION_BYPASS/
+    );
+    expect(deletionAttentionHint('completion_email_unavailable')).toEqual({
+      title: 'Completion email provider is not configured',
+      action: 'Repair the Mailgun configuration, then use Retry to send the completion email.',
+    });
+    expect(deletionAttentionHint('completion_email_rejected')?.action).toMatch(/Mark done/);
+    expect(deletionAttentionHint('completion_email_ambiguous')?.action).toMatch(
+      /without resending/
+    );
   });
 
   it('falls back for other HTTP statuses', () => {

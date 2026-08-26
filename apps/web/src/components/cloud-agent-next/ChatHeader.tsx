@@ -17,46 +17,6 @@ import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
 import { FeedbackDialog } from './FeedbackDialog';
 import { buildRepoBrowseUrl, detectGitPlatform } from './utils/git-utils';
 import { useTRPC } from '@/lib/trpc/utils';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-
-function formatRate(microdollars: number | null): string {
-  return microdollars === null
-    ? 'pricing unavailable'
-    : `$${(microdollars / 1_000_000).toFixed(2)}/hour`;
-}
-
-export function computeBillingLabel(
-  computeStatus:
-    | {
-        billingMode: 'shadow' | 'paid' | null;
-        phase: 'idle' | 'active' | 'stopping' | 'settling' | 'unavailable';
-        attribution: 'payer_shared' | 'session';
-        estimatedHourlyRateMicrodollars: number | null;
-        estimatedIntervalAmountMicrodollars: number | null;
-      }
-    | null
-    | undefined
-): string | null {
-  if (computeStatus?.billingMode === 'shadow') {
-    return `Compute est. ${formatRate(computeStatus.estimatedHourlyRateMicrodollars)} · Not currently charged`;
-  }
-  if (computeStatus?.phase === 'active') {
-    const prefix =
-      computeStatus.attribution === 'payer_shared' ? 'Shared compute so far' : 'Compute so far';
-    return computeStatus.estimatedIntervalAmountMicrodollars === null
-      ? `${prefix} · pricing unavailable`
-      : `${prefix} · est. $${(computeStatus.estimatedIntervalAmountMicrodollars / 1_000_000).toFixed(2)}`;
-  }
-  if (computeStatus?.phase === 'stopping' || computeStatus?.phase === 'settling') {
-    return 'Saving and stopping compute';
-  }
-  if (computeStatus?.phase === 'idle') {
-    return computeStatus.estimatedHourlyRateMicrodollars === null
-      ? 'Compute pricing unavailable'
-      : `Compute est. ${formatRate(computeStatus.estimatedHourlyRateMicrodollars)}`;
-  }
-  return null;
-}
 
 export function computeBillingRefetchInterval(
   sessionActive: boolean,
@@ -119,7 +79,6 @@ export function ChatHeader({
     wasSessionActive.current = sessionActive;
   }, [computeQuery.refetch, sessionActive]);
   const computeStatus = computeQuery.data;
-  const computeLabel = computeBillingLabel(computeStatus);
 
   const browseUrl = buildRepoBrowseUrl(gitUrl);
   const repoUrl =
@@ -147,23 +106,6 @@ export function ChatHeader({
         repository={repository}
       />
       <div className="flex min-w-0 items-center gap-1">
-        {computeLabel && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="text-muted-foreground max-w-48 truncate px-1 font-mono text-xs tabular-nums">
-                {computeLabel}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{computeLabel}</p>
-              <p>
-                {computeStatus?.attribution === 'payer_shared'
-                  ? 'Based on how long the shared sandbox has run. It may include other sessions. Final after it stops.'
-                  : 'Based on how long this sandbox has run. Final after it stops.'}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        )}
         {onToggleSound && (
           <SoundToggleButton enabled={soundEnabled} onToggle={onToggleSound} size="sm" />
         )}

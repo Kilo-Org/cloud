@@ -45,6 +45,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `CUSTOMERIO_TRACK_BASE` - Optional Customer.io Track API base override for local user-deletion cleanup; defaults to `https://track.customer.io`. [SERVER]
 - `SUBSTACK_PUBLICATION_URL` - Substack publication origin used by user-deletion subscriber cleanup; defaults to `https://blog.kilo.ai`. Must be `blog.kilo.ai` or a `*.substack.com` host. The Substack admin search URL is hardcoded to `https://kilocode.substack.com/publish/subscribers`, not this publication. [SERVER]
 - `CSA_APP_BASE_URL` - CSA origin used by the Cloud deletion worker to call `POST /api/internal/cloud/users/gdpr-scrub`. Example: the production CSA app URL. [SERVER]
+- `CSA_VERCEL_PROTECTION_BYPASS` - CSA Vercel Deployment Protection automation bypass. Cloud sends it as the `x-vercel-protection-bypass` header on Cloud → CSA `POST /api/internal/cloud/users/gdpr-scrub`, never as a query parameter. Required when CSA has Vercel Authentication enabled; without it Vercel returns 401 before the CSA route. Distinct from `SUPPORT_API_SECRET`. `[SECRET]`
 - `SENTRY_ORG` - Sentry organization slug for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
 - `SENTRY_PROJECT` - Sentry project slug for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
 - `SENTRY_AUTH_TOKEN` - Sentry auth token for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
@@ -173,7 +174,6 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 ### Ablation / Experimentation
 
-- `NEXT_PUBLIC_CLOUD_AGENT_NEXT_ENABLE_LOCAL_FAKE_MODEL` - Feature flag for local fake model routing in the Cloud Agent Next UI. [PUBLIC]
 - `GLOBAL_KILO_BACKEND` - Override to select the global backend region/endpoint; used in `next.config.mjs`. [SERVER]
 - `ANALYZE` - Next.js bundle analyzer switch; enables `@next/bundle-analyzer` in `next.config.mjs`. [SERVER]
 
@@ -257,7 +257,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `INCEPTION_API_KEY` - Inception Labs API key; used in `apps/web/src/app/api/fim/completions/route.ts` and `apps/web/src/app/api/edit/completions/route.ts` as a fill-in-the-middle (FIM) provider, with endpoint `https://api.inceptionlabs.ai/v1/fim/completions`. Defined in `apps/web/src/lib/config.server.ts`. `[SECRET]`
 - `AI_ATTRIBUTION_ADMIN_SECRET` - Admin secret for the AI Attribution service (`apps/web/src/lib/ai-attribution-service.ts`); sent as `X-Admin-Secret` header. `[SECRET]`
 - `ARTIFICIAL_ANALYSIS_API_KEY` - API key for Artificial Analysis (`apps/web/src/lib/model-stats/sync-artificial-analysis.ts`); sent as `x-api-key` header for model benchmarking data sync. `[SECRET]`
-- `FAKE_LLM_URL` - URL for a fake/local LLM server used in `services/cloud-agent-next` E2E tests (`test/e2e/client.ts`, `test/e2e/fake-llm-server.ts`, `test/e2e/README.md`); defaults to `http://localhost:8811`. [SERVER]
+- `FAKE_LLM_URL` - Local-only URL for the fake-llm service. Next.js uses it in development to list and route `fake-deterministic` through the real gateway (`apps/web/.env.development.local.example`, `apps/web/src/lib/ai-gateway/local-fake-llm.ts`). The cloud-agent-next E2E driver uses the same var for `/test/*` side channels (`test/e2e/client.ts`, `test/e2e/fake-llm-server.ts`, `test/e2e/README.md`). Defaults to `http://localhost:8811`. Ignored on Vercel. [SERVER]
 
 ### Vector DBs
 
@@ -303,9 +303,10 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `IMPACT_AUTH_TOKEN` - Impact.com API auth token for affiliate/click events. `[SECRET]`
 - `IMPACT_ADVOCATE_ACCOUNT_SID` - Impact.com account SID for Advocate (referral) API. `[SECRET]`
 - `IMPACT_ADVOCATE_AUTH_TOKEN` - Impact.com Advocate API auth token. `[SECRET]`
-- `IMPACT_ADVOCATE_PROGRAM_ID` - Impact.com Advocate program ID. [SERVER]
+- `IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID` - Impact.com Advocate program ID for the Kilo Pass referral program. [SERVER]
+- `IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID` - Impact.com Advocate widget ID for the Kilo Pass referral program. [SERVER]
 - `IMPACT_ADVOCATE_TENANT_ALIAS` - Impact.com Advocate tenant alias. [SERVER]
-- `IMPACT_ADVOCATE_WIDGET_ID` - Impact.com Advocate widget ID. [SERVER]
+- `IMPACT_ADVOCATE_API_BASE_URL` - Impact.com Advocate API base URL. Defaults to `https://app.referralsaasquatch.com`. [SERVER]
 - `IMPACT_CAMPAIGN_ID` - Impact.com campaign ID for event tracking. [SERVER]
 ### Cloudflare Analytics
 
@@ -359,6 +360,8 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `KILO_BIN_PATH` - Path or name of the `kilo` CLI binary; used by `services/cloud-agent-next/scripts/update-default-slash-commands.mjs`. [SERVER]
 - `WORKSPACE_PATH` - Filesystem path of the agent workspace. [SERVER]
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]
+- `CONTROL_PLANE_IDS` - Comma-separated user or org IDs admitted to the call-home control plane at session creation. Empty admits nobody. `*` includes personal accounts. [SERVER]
+- `VERCEL_SANDBOX_ORG_IDS` - Comma-separated org IDs routed to Vercel sandboxes. Empty is off. `*` includes personal accounts. [SERVER]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]
 
 ### Gastown

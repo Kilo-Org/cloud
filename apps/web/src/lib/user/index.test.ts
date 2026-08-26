@@ -138,6 +138,7 @@ import {
   findUserById,
   findUsersByIds,
   createOrUpdateUser,
+  getAllUserProviders,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
@@ -288,6 +289,255 @@ describe('User', () => {
     await db.delete(platform_integrations);
     await db.delete(organizations);
     await db.delete(kilocode_users);
+  });
+
+  describe('getAllUserProviders', () => {
+    it('finds a linked-provider email case-insensitively and returns every provider', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'primary@example.com',
+        google_user_name: 'Provider Lookup User',
+      });
+      await db.insert(user_auth_provider).values([
+        {
+          kilo_user_id: user.id,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+          email: 'Primary@Example.com',
+          avatar_url: 'https://example.com/google-avatar.png',
+          hosted_domain: null,
+        },
+        {
+          kilo_user_id: user.id,
+          provider: 'github',
+          provider_account_id: `github-${user.id}`,
+          email: 'linked@example.com',
+          avatar_url: 'https://example.com/github-avatar.png',
+          hosted_domain: null,
+        },
+        {
+          kilo_user_id: user.id,
+          provider: 'workos',
+          provider_account_id: `workos-${user.id}`,
+          email: 'sso@example.com',
+          avatar_url: 'https://example.com/workos-avatar.png',
+          hosted_domain: 'example.com',
+        },
+      ]);
+
+      await expect(getAllUserProviders('  PRIMARY@example.com ')).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['google', 'github', 'workos'],
+          primaryEmail: 'primary@example.com',
+          workosHostedDomain: 'example.com',
+        },
+      });
+    });
+
+    it('treats multiple matching provider rows for one account as an exact match', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'shared@example.com',
+        google_user_name: 'Shared Provider Email User',
+      });
+      await db.insert(user_auth_provider).values([
+        {
+          kilo_user_id: user.id,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+          email: 'shared@example.com',
+          avatar_url: '',
+          hosted_domain: null,
+        },
+        {
+          kilo_user_id: user.id,
+          provider: 'email',
+          provider_account_id: `email-${user.id}`,
+          email: 'shared@example.com',
+          avatar_url: '',
+          hosted_domain: null,
+        },
+      ]);
+
+      await expect(getAllUserProviders('SHARED@example.com')).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['google', 'email'],
+          primaryEmail: 'shared@example.com',
+          workosHostedDomain: undefined,
+        },
+      });
+    });
+
+    it('fails closed when an exact provider email maps to multiple accounts', async () => {
+      const firstUser = await insertTestUser({
+        google_user_email: 'first@example.com',
+        google_user_name: 'First Ambiguous Provider User',
+      });
+      const secondUser = await insertTestUser({
+        google_user_email: 'second@example.com',
+        google_user_name: 'Second Ambiguous Provider User',
+        normalized_email: 'shared@example.com',
+      });
+      await db.insert(user_auth_provider).values([
+        {
+          kilo_user_id: firstUser.id,
+          provider: 'google',
+          provider_account_id: `google-${firstUser.id}`,
+          email: 'shared@example.com',
+          avatar_url: '',
+          hosted_domain: null,
+        },
+        {
+          kilo_user_id: secondUser.id,
+          provider: 'github',
+          provider_account_id: `github-${secondUser.id}`,
+          email: 'shared@example.com',
+          avatar_url: '',
+          hosted_domain: null,
+        },
+      ]);
+
+      await expect(getAllUserProviders('shared@example.com')).resolves.toEqual({
+        kind: 'ambiguous',
+      });
+    });
+
+    it('returns null for an email that is not linked to an account', async () => {
+      await expect(getAllUserProviders('no-match@example.com')).resolves.toEqual({
+        kind: 'not_found',
+      });
+    });
+
+    it('falls back to a normalized Gmail plus alias and returns all linked methods', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'first.last@gmail.com',
+        google_user_name: 'Normalized Gmail User',
+        normalized_email: 'firstlast@gmail.com',
+      });
+      await db.insert(user_auth_provider).values([
+        {
+          kilo_user_id: user.id,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+          email: 'first.last@gmail.com',
+          avatar_url: 'https://example.com/google-avatar.png',
+          hosted_domain: null,
+        },
+        {
+          kilo_user_id: user.id,
+          provider: 'email',
+          provider_account_id: `email-${user.id}`,
+          email: 'first.last@gmail.com',
+          avatar_url: '',
+          hosted_domain: null,
+        },
+      ]);
+
+      await expect(getAllUserProviders('first.last+sign-in@gmail.com')).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['google', 'email'],
+          primaryEmail: 'first.last@gmail.com',
+          workosHostedDomain: undefined,
+        },
+      });
+    });
+
+    it('falls back to Gmail dot and googlemail canonicalization', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'firstlast@gmail.com',
+        google_user_name: 'Canonical Gmail User',
+        normalized_email: 'firstlast@gmail.com',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: user.id,
+        provider: 'email',
+        provider_account_id: `email-${user.id}`,
+        email: 'firstlast@gmail.com',
+        avatar_url: '',
+        hosted_domain: null,
+      });
+
+      await expect(getAllUserProviders('first.last@googlemail.com')).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['email'],
+          primaryEmail: 'firstlast@gmail.com',
+          workosHostedDomain: undefined,
+        },
+      });
+    });
+
+    it('fails closed when normalized-email lookup finds multiple accounts', async () => {
+      await insertTestUser({
+        google_user_email: 'first@example.com',
+        google_user_name: 'First Normalized Collision User',
+        normalized_email: 'firstlast@gmail.com',
+      });
+      await insertTestUser({
+        google_user_email: 'second@example.com',
+        google_user_name: 'Second Normalized Collision User',
+        normalized_email: 'firstlast@gmail.com',
+      });
+
+      await expect(getAllUserProviders('first.last+tag@googlemail.com')).resolves.toEqual({
+        kind: 'ambiguous',
+      });
+    });
+
+    it('fails closed when exact and normalized email sources resolve different accounts', async () => {
+      const exactMatchUser = await insertTestUser({
+        google_user_email: 'exact@example.com',
+        google_user_name: 'Exact Source User',
+      });
+      await insertTestUser({
+        google_user_email: 'first.last@gmail.com',
+        google_user_name: 'Normalized Source User',
+        normalized_email: 'firstlast@gmail.com',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: exactMatchUser.id,
+        provider: 'google',
+        provider_account_id: `google-${exactMatchUser.id}`,
+        email: 'first.last+sign-in@gmail.com',
+        avatar_url: '',
+        hosted_domain: null,
+      });
+
+      await expect(getAllUserProviders('first.last+sign-in@gmail.com')).resolves.toEqual({
+        kind: 'ambiguous',
+      });
+    });
+
+    it('finds an account when exact and normalized email sources resolve that same account', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'first.last@gmail.com',
+        google_user_name: 'Shared Source User',
+        normalized_email: 'firstlast@gmail.com',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: user.id,
+        provider: 'google',
+        provider_account_id: `google-${user.id}`,
+        email: 'first.last+sign-in@gmail.com',
+        avatar_url: '',
+        hosted_domain: null,
+      });
+
+      await expect(getAllUserProviders('first.last+sign-in@gmail.com')).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['google'],
+          primaryEmail: 'first.last@gmail.com',
+          workosHostedDomain: undefined,
+        },
+      });
+    });
   });
 
   describe('createOrUpdateUser', () => {

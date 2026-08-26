@@ -45,6 +45,10 @@ RUN GLAB_VERSION="1.93.0" \
 	&& dpkg -i /tmp/glab.deb \
 	&& rm /tmp/glab.deb
 
+COPY scripts/kilo-git-credential /opt/kilo-cloud/kilo-git-credential
+RUN chmod +x /opt/kilo-cloud/kilo-git-credential \
+	&& ln -sf /opt/kilo-cloud/kilo-git-credential /usr/local/bin/kilo-git-credential
+
 # Generate locales to suppress setlocale warnings
 RUN apt-get update && apt-get install -y --no-install-recommends locales && \
 	   sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
@@ -67,9 +71,11 @@ COPY src/shared /tmp/wrapper-build/src/shared
 # Install wrapper dependencies (pnpm symlinks don't survive COPY) and build
 RUN cd /tmp/wrapper-build/wrapper && \
     bun install --production && \
+    ln -sfn /tmp/wrapper-build/wrapper/node_modules /tmp/wrapper-build/node_modules && \
     bun build src/main.ts --outfile=/usr/local/bin/kilocode-wrapper.js --target=bun --minify && \
     bun build src/restore-session.ts --outfile=/usr/local/bin/kilo-restore-session.js --target=bun --minify && \
     bun build src/bitbucket-review-cli.ts --outfile=/usr/local/bin/bb --target=bun --minify && \
+    bun build src/control/main.ts --outfile=/usr/local/bin/kilocode-control-wrapper.js --target=bun --minify && \
     chmod +x /usr/local/bin/bb && \
     rm -rf /tmp/wrapper-build
 

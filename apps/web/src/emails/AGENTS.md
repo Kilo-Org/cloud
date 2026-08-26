@@ -71,6 +71,7 @@ Every template must include this branding footer below the content table:
 | `magicLink.html` | `magic_link_url`, `email`, `expires_in`, `year` | `14` |
 | `signInCode.html` | `code`, `email`, `expires_in`, `year` | — |
 | `balanceAlert.html` | `minimum_balance`, `organization_url`, `year` | `16` |
+| `monthlySpendingAlert.html` | `organization_name`, `threshold_usd`, `spend_usd`, `period_label`, `alerts_url`, `year` | — |
 | `autoTopUpFailed.html` | `reason`, `credits_url`, `year` | `17` |
 | `codeReviewDisabled.html` | `reason`, `recovery_url`, `recovery_label`, `year` | — |
 | `ossInviteNewUser.html` | `tier_name`, `seats`, `seat_value`, `credits_section`, `accept_invite_url`, `integrations_url`, `code_reviews_url`, `year` | `18` |
@@ -95,6 +96,7 @@ Every template must include this branding footer below the content table:
 | `clawEarlybirdExpiresTomorrow.html` | `expiry_date`, `claw_url`, `year` | `30` |
 | `clawComplementaryInferenceEnded.html` | `claw_url`, `year` | — |
 | `accountDeletionRequest.html` | `email`, `year` | — |
+| `accountDeletionCompleted.html` | `completion_message`, `year` | — |
 | `userDataExportReady.html` | `data_exports_url`, `expiry_date`, `year` | — |
 | `dataExportDownloadCode.html` | `code`, `email`, `expires_in`, `year` | — |
 | `creditsTopUp.html` | `heading`, `intro`, `amount_usd`, `credits_usd`, `purchase_date`, `credits_url`, `receipt_section`, `year`. Org variants render org-specific copy into `intro` before template rendering; when provided, the organization name is interpolated there rather than passed as a separate template variable. | — |

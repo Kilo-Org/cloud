@@ -65,6 +65,11 @@ jobs:
       - name: Typecheck
         run: pnpm --filter kilo-app run typecheck
 
+      # The release preflight is the only other job that evaluates app.config.ts,
+      # and it runs nightly. Read the config here so a broken import fails the PR.
+      - name: Read Expo config
+        run: pnpm --filter kilo-app exec expo config --type public > /dev/null
+
   lint:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
@@ -116,6 +121,8 @@ jobs:
 
       - name: Check i18n catalogs and leftover copy
         run: pnpm --filter kilo-app run check:i18n
+      - name: Check for silently-dropped NativeWind classes
+        run: pnpm --filter kilo-app run check:classes
 
   format-check:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}

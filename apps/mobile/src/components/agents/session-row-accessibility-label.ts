@@ -1,4 +1,5 @@
 import { i18n } from '@/i18n';
+import { formatList, formatNumber } from '@/lib/format';
 import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -50,18 +51,22 @@ export function formatSpokenCost(microdollars: number | null | undefined): strin
       return null;
     }
     if (cents < 100) {
-      return `${cents} ${i18n.t(cents === 1 ? 'agents.sessionRow.centOne' : 'agents.sessionRow.centOther')}`;
+      return `${formatNumber(cents, i18n.language)} ${i18n.t('agents.sessionRow.cent', {
+        count: cents,
+      })}`;
     }
     const dollars = Math.floor(cents / 100);
     const remainder = cents % 100;
-    const dollarPart = `${dollars} ${i18n.t(
-      dollars === 1 ? 'agents.sessionRow.dollarOne' : 'agents.sessionRow.dollarOther'
+    const dollarPart = `${formatNumber(dollars, i18n.language)} ${i18n.t(
+      'agents.sessionRow.dollar',
+      { count: dollars }
     )}`;
     if (remainder === 0) {
       return dollarPart;
     }
-    return `${dollarPart} ${remainder} ${i18n.t(
-      remainder === 1 ? 'agents.sessionRow.centOne' : 'agents.sessionRow.centOther'
+    return `${dollarPart} ${formatNumber(remainder, i18n.language)} ${i18n.t(
+      'agents.sessionRow.cent',
+      { count: remainder }
     )}`;
   }
   // Sub-half-cent: fractional cents, 2 dp, trim trailing zeros.
@@ -70,8 +75,10 @@ export function formatSpokenCost(microdollars: number | null | undefined): strin
   if (rounded <= 0) {
     return null;
   }
-  const trimmed = String(rounded);
-  return `${trimmed} ${i18n.t('agents.sessionRow.centOther')}`;
+  return `${formatNumber(rounded, i18n.language, { maximumFractionDigits: 2 })} ${i18n.t(
+    'agents.sessionRow.cent',
+    { count: rounded }
+  )}`;
 }
 
 type SessionRowAccessibilityLabelInputs = {
@@ -93,6 +100,17 @@ type SessionRowAccessibilityLabelInputs = {
    */
   meta?: string | null;
   /**
+   * Branch provenance text visible below the title. Spoken after `title`
+   * (and `needs input` when set) and before the pull-request phrase.
+   */
+  subtitle?: string | null;
+  /**
+   * Associated pull-request number. When set, spoken as
+   * `pull request <number>` after the branch text. Callers omit it for
+   * rows that do not show the PR mark.
+   */
+  prNumber?: number | null;
+  /**
    * Backend `created_on_platform` string. When truthy, appended as the
    * FINAL spoken part (`from ${platformLabel(platform)}`). The caller
    * gates this: only pass when an icon is rendered, not needs-input, and
@@ -105,10 +123,11 @@ type SessionRowAccessibilityLabelInputs = {
 /**
  * Compose the screen-reader label for a `SessionRow`, mirroring its visible
  * content in the order the row renders parts: title, then `needs input`
- * (only when the needs-input eyebrow is shown), then the always-visible
- * left-eyebrow badge, then the meta text (only when the row visibly
- * renders meta), then an optional platform origin (`from <LABEL>`). Empty
- * parts are skipped; the order is fixed.
+ * (only when the needs-input eyebrow is shown), then the branch subtitle
+ * (when present), then the `pull request <number>` phrase (when `prNumber`
+ * is set), then the always-visible left-eyebrow badge, then the meta text
+ * (only when the row visibly renders meta), then an optional platform origin
+ * (`from <LABEL>`). Empty parts are skipped; the order is fixed.
  *
  * Three exclusive variants, aligned with `selectSessionRowEyebrowRight`:
  *   - **needs-input variant**  (`needs-input` eyebrow):
@@ -127,11 +146,19 @@ export function sessionRowAccessibilityLabel({
   needsInput,
   badge,
   meta,
+  subtitle,
+  prNumber,
   platform,
 }: SessionRowAccessibilityLabelInputs): string {
   const parts: string[] = [title];
   if (needsInput) {
     parts.push(i18n.t('agents.sessionRow.needsInput'));
+  }
+  if (subtitle) {
+    parts.push(subtitle);
+  }
+  if (prNumber != null) {
+    parts.push(i18n.t('agents.sessionRow.pullRequest', { number: prNumber }));
   }
   if (badge) {
     parts.push(badge);
@@ -142,5 +169,5 @@ export function sessionRowAccessibilityLabel({
   if (platform) {
     parts.push(i18n.t('agents.sessionRow.fromPlatform', { platform: platformLabel(platform) }));
   }
-  return parts.join(', ');
+  return formatList(parts, i18n.language);
 }

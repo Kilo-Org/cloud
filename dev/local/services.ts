@@ -53,6 +53,12 @@ const groups: ServiceGroup[] = [
   { id: 'mobile', label: 'Mobile', alwaysOn: false, sectionBreakBefore: true },
   { id: 'storybook', label: 'Storybook', alwaysOn: false, sectionBreakBefore: true },
   { id: 'deletion-mock', label: 'Deletion Mock', alwaysOn: false, sectionBreakBefore: true },
+  {
+    id: 'cloud-agent-public-tunnels',
+    label: 'Cloud Agent Public Tunnels',
+    alwaysOn: false,
+    sectionBreakBefore: true,
+  },
 ];
 
 type ServiceDef = {
@@ -133,6 +139,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: [],
     dir: 'services/cloud-agent-next/test/e2e',
   },
+  'cloud-agent-public-tunnels': { group: 'cloud-agent-public-tunnels', dependsOn: [] },
   // git-token-service (shared by cloud-agent, app-builder, gastown)
   'cloudflare-git-token-service': {
     group: 'git-token-service',
@@ -733,6 +740,29 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
+    if (name === 'cloud-agent-public-tunnels') {
+      const workerPort =
+        readWranglerPort(path.join(repoRoot, 'services/cloud-agent-next')) + portOffset;
+      const sessionIngestPort =
+        readWranglerPort(path.join(repoRoot, 'services/session-ingest')) + portOffset;
+      defs.push({
+        name,
+        type: 'process',
+        dir: '.',
+        port: 0,
+        dependsOn: meta.dependsOn,
+        command: [
+          'tsx',
+          'dev/local/scripts/start-public-tunnels.ts',
+          String(workerPort),
+          String(nextjsTargetPort),
+          String(sessionIngestPort),
+        ],
+        group: meta.group,
+      });
+      continue;
+    }
+
     // Worker — read port from wrangler.jsonc
     const basePort = readWranglerPort(path.join(repoRoot, dir));
     const port = basePort + portOffset;
@@ -783,7 +813,7 @@ export const shortcuts: Record<string, string[]> = {
     'cloudflare-app-builder',
   ],
   agents: ['cloud-agent-next', 'nextjs', 'cloudflare-session-ingest'],
-  all: serviceDefs.map(s => s.name),
+  all: serviceDefs.map(s => s.name).filter(name => name !== 'cloud-agent-public-tunnels'),
 };
 
 // Rebuild every port-derived service definition (ports, commands) for a new
@@ -795,7 +825,9 @@ export function applyPortOffset(offset: number): void {
   serviceDefs = buildServiceDefs();
   services.clear();
   for (const def of serviceDefs) services.set(def.name, def);
-  shortcuts.all = serviceDefs.map(s => s.name);
+  shortcuts.all = serviceDefs
+    .map(s => s.name)
+    .filter(name => name !== 'cloud-agent-public-tunnels');
 }
 
 // Successive +100 candidate offsets through the same (0, 5000] range the slug

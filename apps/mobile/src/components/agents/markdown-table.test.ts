@@ -46,6 +46,7 @@ vi.mock('react', async () => {
   };
 });
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   Modal: 'Modal',
   Pressable: 'Pressable',
   Text: 'Text',
@@ -273,7 +274,7 @@ describe('MarkdownTable table semantics', () => {
     });
 
     expect(accessibilityLabelOf(findFirst(element, isAccessibleLabelElement))).toBe(
-      'Name: John, Age: 30'
+      'Name: John and Age: 30'
     );
     const cells = findAll(element, isTableCell);
     expect(cells).toHaveLength(2);

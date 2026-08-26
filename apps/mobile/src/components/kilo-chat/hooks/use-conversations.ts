@@ -1,4 +1,4 @@
-import { formatKiloChatError, type KiloChatClient } from '@kilocode/kilo-chat';
+import { type KiloChatClient } from '@kilocode/kilo-chat';
 import {
   useConversationDetail,
   useConversations,
@@ -10,12 +10,14 @@ import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 
+import { formatMobileKiloChatError } from '../kilo-chat-error';
+
 export { useConversations, useConversationDetail };
 
 export function useCreateConversation(client: KiloChatClient) {
   return useSharedCreateConversation(client, {
     onError: err => {
-      toast.error(formatKiloChatError(err, i18n.t('chat.conversation.createFailed')));
+      toast.error(formatMobileKiloChatError(err, i18n.t('chat.conversation.createFailed')));
     },
   });
 }
@@ -29,7 +31,7 @@ export function useRenameConversation(client: KiloChatClient) {
 export function useLeaveConversation(client: KiloChatClient) {
   return useSharedLeaveConversation(client, {
     onError: err => {
-      toast.error(formatKiloChatError(err, i18n.t('chat.conversation.leaveFailed')));
+      toast.error(formatMobileKiloChatError(err, i18n.t('chat.conversation.leaveFailed')));
     },
   });
 }

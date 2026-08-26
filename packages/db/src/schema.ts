@@ -2524,6 +2524,9 @@ export const user_auth_provider = pgTable(
     primaryKey({ columns: [table.provider, table.provider_account_id] }),
     index('IDX_user_auth_provider_kilo_user_id').on(table.kilo_user_id),
     index('IDX_user_auth_provider_hosted_domain').on(table.hosted_domain),
+    index('IDX_user_auth_provider_lower_email')
+      .on(sql`lower(${table.email})`)
+      .concurrently(),
   ]
 );
 
@@ -3207,10 +3210,164 @@ export const organizations = pgTable(
     ),
     index('IDX_organizations_sso_domain').on(table.sso_domain),
     index('IDX_organizations_parent_organization_id').on(table.parent_organization_id),
+    uniqueIndex('UQ_organizations_live_sales_demo_per_owner')
+      .on(table.created_by_kilo_user_id)
+      .where(
+        sql`(${table.settings}->>'is_sales_demo')::boolean = true AND ${table.deleted_at} IS NULL`
+      ),
   ]
 );
 
 export type Organization = typeof organizations.$inferSelect;
+
+// Collection-backed organization alerts. Lifecycle actor attribution and audit
+// history live in `organization_audit_logs` (the organization audit surface,
+// already PII-managed by `softDeleteUser`), not in a bespoke per-alert log.
+export type MonthlySpendingAlertConfiguration = {
+  thresholdMicrodollars: number;
+  // Explicit, versioned period definition: monthly behavior is never inferred
+  // from a missing field, and a semantics change gets a new version.
+  period: {
+    type: 'calendar_month_utc';
+    version: 1;
+  };
+  recipients: string[];
+};
+
+export type OrganizationAlertConfiguration = MonthlySpendingAlertConfiguration;
+export type OrganizationAlertType = 'monthly_spending';
+export type OrganizationAlertStatus = 'enabled' | 'disabled' | 'archived';
+
+export const organization_alerts = pgTable(
+  'organization_alerts',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    type: text().notNull().$type<OrganizationAlertType>(),
+    status: text().notNull().$type<OrganizationAlertStatus>(),
+    configuration: jsonb().notNull().$type<OrganizationAlertConfiguration>(),
+    configuration_version: integer().notNull().default(1),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    archived_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    index('IDX_organization_alerts_organization_status_created_id').on(
+      table.organization_id,
+      table.status,
+      table.created_at,
+      table.id
+    ),
+    index('IDX_organization_alerts_enabled_organization_id')
+      .on(table.organization_id, table.id)
+      .where(sql`${table.status} = 'enabled'`),
+    check('organization_alerts_type_check', sql`${table.type} IN ('monthly_spending')`),
+    check(
+      'organization_alerts_status_check',
+      sql`${table.status} IN ('enabled', 'disabled', 'archived')`
+    ),
+    check(
+      'organization_alerts_configuration_version_check',
+      sql`${table.configuration_version} > 0`
+    ),
+    check(
+      'organization_alerts_archive_check',
+      sql`(${table.status} = 'archived') = (${table.archived_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type OrganizationAlert = typeof organization_alerts.$inferSelect;
+export type NewOrganizationAlert = typeof organization_alerts.$inferInsert;
+
+// One row per delivery claim: alert, period occurrence, keyed recipient identity
+// and channel. Creating the row admits that recipient toward the alert-period
+// recipient cap, so rows are retained (including `canceled`) for the period.
+// `pending` covers both never-attempted and retry-after-failure work; the retry
+// is scheduled by `next_attempt_at` and described by `attempt_count`.
+export type OrganizationAlertDeliveryStatus =
+  | 'pending'
+  | 'submitting'
+  | 'accepted'
+  | 'ambiguous'
+  | 'canceled';
+
+export const organization_alert_deliveries = pgTable(
+  'organization_alert_deliveries',
+  {
+    id: idPrimaryKeyColumn,
+    alert_id: uuid()
+      .notNull()
+      .references(() => organization_alerts.id, { onDelete: 'cascade' }),
+    period_occurrence_id: text().notNull(),
+    // Keyed digest of the normalized recipient. Never the address itself: the
+    // address is read from the alert configuration at dispatch time.
+    recipient_identity_hmac: text().notNull(),
+    channel: text().notNull().$type<'email'>(),
+    status: text().notNull().default('pending').$type<OrganizationAlertDeliveryStatus>(),
+    claimed_configuration_version: integer().notNull(),
+    // Fencing token: refreshing a claim for current configuration bumps it so a
+    // stale worker's compare-and-set can no longer submit that claim.
+    claim_version: integer().notNull().default(1),
+    threshold_microdollars: bigint({ mode: 'number' }).notNull(),
+    measured_spend_microdollars: bigint({ mode: 'number' }).notNull(),
+    attempt_count: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    submitting_at: timestamp({ withTimezone: true, mode: 'string' }),
+    provider_message_id: text(),
+    last_error_code: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_organization_alert_deliveries_identity').on(
+      table.alert_id,
+      table.period_occurrence_id,
+      table.recipient_identity_hmac,
+      table.channel
+    ),
+    index('IDX_organization_alert_deliveries_dispatch').on(
+      table.status,
+      table.next_attempt_at,
+      table.id
+    ),
+    check(
+      'organization_alert_deliveries_identity_fields_check',
+      sql`length(${table.period_occurrence_id}) > 0 AND length(${table.recipient_identity_hmac}) > 0`
+    ),
+    check('organization_alert_deliveries_channel_check', sql`${table.channel} = 'email'`),
+    check(
+      'organization_alert_deliveries_status_check',
+      sql`${table.status} IN ('pending', 'submitting', 'accepted', 'ambiguous', 'canceled')`
+    ),
+    check(
+      'organization_alert_deliveries_counters_check',
+      sql`${table.claimed_configuration_version} > 0 AND ${table.claim_version} > 0 AND ${table.attempt_count} >= 0`
+    ),
+    check(
+      'organization_alert_deliveries_spend_check',
+      sql`${table.threshold_microdollars} > 0 AND ${table.measured_spend_microdollars} >= ${table.threshold_microdollars}`
+    ),
+    // A lease exists exactly while a worker is submitting, and submission time is
+    // retained once submission has begun, including across pre-acceptance retries.
+    check(
+      'organization_alert_deliveries_submission_check',
+      sql`(${table.status} = 'submitting') = (${table.lease_expires_at} IS NOT NULL) AND (${table.status} NOT IN ('submitting', 'accepted', 'ambiguous') OR ${table.submitting_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type OrganizationAlertDelivery = typeof organization_alert_deliveries.$inferSelect;
+export type NewOrganizationAlertDelivery = typeof organization_alert_deliveries.$inferInsert;
 
 export const kilo_pass_org_term_versions = pgTable(
   'kilo_pass_org_term_versions',
@@ -4204,6 +4361,11 @@ export const platform_integrations = pgTable(
       .on(table.platform, table.github_app_type, table.platform_installation_id)
       .concurrently()
       .where(sql`${table.platform} = 'github' AND ${table.platform_installation_id} IS NOT NULL`),
+    uniqueIndex('UQ_platform_integrations_github_pending_target')
+      .on(table.platform, table.github_app_type, table.platform_account_id)
+      .where(
+        sql`${table.platform} = 'github' AND ${table.integration_status} = 'pending' AND ${table.platform_installation_id} IS NULL AND ${table.platform_account_id} IS NOT NULL`
+      ),
     uniqueIndex('UQ_platform_integrations_user_bitbucket')
       .on(table.owned_by_user_id)
       .where(sql`${table.platform} = 'bitbucket' AND ${table.owned_by_user_id} IS NOT NULL`),
@@ -5854,9 +6016,15 @@ export const cli_sessions_v2 = pgTable(
       .on(table.cloud_agent_session_id)
       .where(isNotNull(table.cloud_agent_session_id)),
     index('IDX_cli_sessions_v2_organization_id').on(table.organization_id),
-    index('IDX_cli_sessions_v2_kilo_user_id').on(table.kilo_user_id),
-    index('IDX_cli_sessions_v2_created_at').on(table.created_at),
     index('IDX_cli_sessions_v2_user_updated').on(table.kilo_user_id, table.updated_at),
+    // Mirror of the index above for `orderBy: 'created_at'`. Every list and
+    // search query filters on kilo_user_id first, so a bare created_at index
+    // makes the planner walk the global created_at order and discard other
+    // users' rows: 138 ms for a user with 152k sessions against 3.5 ms here.
+    // The dropped bare kilo_user_id index was a prefix of the pair above.
+    index('IDX_cli_sessions_v2_user_created')
+      .on(table.kilo_user_id, table.created_at)
+      .concurrently(),
     // Supports joins from github_branch_pull_requests on (git_url, git_branch).
     index('cli_sessions_v2_git_url_branch_idx').on(table.git_url, table.git_branch),
   ]
@@ -6112,6 +6280,13 @@ export const github_branch_pull_requests = pgTable(
     uniqueIndex('UQ_github_branch_prs_user')
       .on(table.git_url, table.git_branch, table.owned_by_user_id)
       .where(isNotNull(table.owned_by_user_id)),
+    // The session-to-PR LEFT JOIN matches (git_url, git_branch) and picks the
+    // tenant column with an OR. Neither partial unique index above can serve
+    // that join: the planner cannot prove `owned_by_*_id IS NOT NULL` per row,
+    // so it falls back to a hash join and sequentially scans this whole table
+    // on every session list and search. This plain index restores the nested
+    // loop (292 ms to 2.8 ms on a 1M-row cache).
+    index('IDX_github_branch_prs_url_branch').on(table.git_url, table.git_branch).concurrently(),
     check(
       'github_branch_pull_requests_owner_check',
       sql`(
@@ -10815,6 +10990,33 @@ export const compute_usage_charge = pgTable(
 
 export type ComputeUsageCharge = typeof compute_usage_charge.$inferSelect;
 export type NewComputeUsageCharge = typeof compute_usage_charge.$inferInsert;
+
+// Surviving record of the real spend a sales-demo reset discards. The reset
+// deletes the org's usage and credit rows, so a row here is the only remaining
+// proof that a demo cost money. `microdollars_used` records real spend, computed
+// as the org counter minus `coalesce(settings.sales_demo_seeded_microdollars, 0)`
+// at reset time, and it writes a row only when that difference is above zero.
+// It covers LLM, Exa, and compute spend. A reset with no spend writes nothing.
+export const sales_demo_spend_ledger = pgTable(
+  'sales_demo_spend_ledger',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'restrict' }),
+    // Null when the demo org has no creator, which `restoreSalesDemoOrganization` allows.
+    owner_kilo_user_id: text(),
+    period_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    period_end: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    microdollars_used: bigint({ mode: 'number' }).notNull(),
+  },
+  table => [check('sales_demo_spend_ledger_spend_positive', sql`${table.microdollars_used} > 0`)]
+);
+
+export type SalesDemoSpendLedgerEntry = typeof sales_demo_spend_ledger.$inferSelect;
 
 // Content moderation reports. `context_json` holds only minimized metadata
 // (surface, ids, model id, platform) — never a message or comment body.

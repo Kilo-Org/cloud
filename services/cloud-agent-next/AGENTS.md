@@ -32,6 +32,7 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 - `services/cloud-agent-next/test/e2e/README.md` is the source of truth for setup, fake-LLM routing, lifecycle directives, and troubleshooting.
 - Prefer focused scenario debugging first: `pnpm exec tsx services/cloud-agent-next/test/e2e/run.ts <lifecycle> <conversation>`.
 - Run the aggregate local regression matrix with `pnpm exec tsx services/cloud-agent-next/test/e2e/smoke.ts` when validating the full real Worker + DO + sandbox + wrapper path.
+- Leave `KILO_OPENROUTER_BASE` on Next.js. Selecting `kilo/fake-deterministic` routes through the gateway to fake-llm; no `.dev.vars` flip.
 - Non-zero `portOffset` sessions (the common case) require `WORKER_URL`/`FAKE_LLM_URL` env overrides on every driver invocation — see README "Running". Discover the offset with `pnpm dev:status --json`.
 - This harness is local/manual rather than part of normal `pnpm test` or CI; use `dev/logs/cloud-agent-next.log` and `dev/logs/fake-llm.log` when debugging it.
 - Read `services/cloud-agent-next/DEBUG.md` when correlating local Wrangler logs with Docker sandbox containers, wrapper log files, Kilo CLI logs, uploaded archives, or stuck session flows.
@@ -128,6 +129,7 @@ This pattern blocks API endpoints from running for external contributors who don
 - Session creation selects an explicit `ProfileResolutionPolicy` at the handler boundary. Implicit repository/default profile resolution is limited to the closed set of approved session origins; omitted, unknown, and non-approved automation origins fail closed unless they supply an explicit profile id.
 - Public `start` must authorize any supplied `kilocodeOrganizationId` against `organization_memberships` before resolving profile layers or creating session ownership state. Balance validation is billing-only and `x-skip-balance-check` must never bypass organization authorization.
 - Current wrapper identity is fenced `wrapperRunId` plus generation/connection; do not reintroduce execution-ID-only reconnect, supervision, or pending-drain blocking. Legacy endpoint/result/callback `executionId` fields remain boundary compatibility aliases only.
+- A control-plane session must remain recoverable after the physical sandbox dies. `SandboxControl.ensureReady()` reclaims `failed` → `stopped` (best-effort provider stop) and creates a replacement instance. Do not require a new `workspace_*` session. If reclaim or create fails again, terminalize that turn.
 - The DO should remain a durable coordinator: queue messages, persist metadata/events, fence wrapper connections, schedule alarms, prepare/restore sandbox state, and hand work to the wrapper.
 - Put Kilo/job behavior in `wrapper/` or Kilo SDK integration code when it does not require durable DO coordination.
 - Avoid growing `CloudAgentSession.ts` with product behavior that can live in the wrapper, Kilo SDK layer, or a small helper module.

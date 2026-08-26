@@ -21,6 +21,14 @@ export default function FocusAreasRoute() {
   const selected = data?.focusAreas ?? [];
   const disabled = data == null;
   const { t } = useTranslation();
+  const areaLabels = {
+    security: 'codeReviewer.focusArea.security',
+    performance: 'codeReviewer.focusArea.performance',
+    bugs: 'codeReviewer.focusArea.bugs',
+    style: 'codeReviewer.focusArea.style',
+    testing: 'codeReviewer.focusArea.testing',
+    documentation: 'codeReviewer.focusArea.documentation',
+  } as const;
 
   const toggleArea = (area: string) => {
     // Read the cache at call time, not the render-time snapshot above, so
@@ -36,14 +44,14 @@ export default function FocusAreasRoute() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('codeReviewer.focusAreas.title')} />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <Text variant="muted" className="mb-2 text-xs">
           {t('codeReviewer.focusAreas.hint')}
         </Text>
         {REVIEW_FOCUS_AREAS.map(area => (
           <ChoiceRow
             key={area}
-            label={area}
+            label={t(areaLabels[area])}
             multi
             selected={selected.includes(area)}
             disabled={disabled}

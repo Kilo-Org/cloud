@@ -22,7 +22,12 @@
     "copiedToClipboard": "क्लिपबोर्डमा प्रतिलिपि गरियो",
     "couldNotCopyToClipboard": "क्लिपबोर्डमा प्रतिलिपि गर्न सकिएन",
     "required": "आवश्यक",
-    "error": "त्रुटि: {{error}}"
+    "error": "त्रुटि: {{error}}",
+    "back": "पछाडि",
+    "somethingWentWrong": "केही गलत भयो",
+    "couldNotOpen": "{{label}} खोल्न सकिएन",
+    "link": "लिङ्क",
+    "takingLonger": "यो अपेक्षा गरिएभन्दा बढी समय लिइरहेको छ। तपाईं यसलाई बन्द गरेर फेरि जाँच्न सक्नुहुन्छ।"
   },
   "language": {
     "title": "भाषा",
@@ -33,7 +38,9 @@
     "retry": "पुनः प्रयास गर्नुहोस्",
     "search": "भाषा खोज्नुहोस्",
     "noMatches": "कुनै भाषा मिलेन",
-    "deviceLanguage": "यन्त्रको भाषा"
+    "deviceLanguage": "यन्त्रको भाषा",
+    "current": "हालको",
+    "allLanguages": "सबै भाषाहरू"
   },
   "login": {
     "welcome": "Kilo मा स्वागत छ",
@@ -60,7 +67,7 @@
     "codeArrivalHint": "यो ठेगाना योग्य भएमा, कोड एक मिनेटभित्र आउँछ।",
     "verifyCode": "कोड प्रमाणित गर्नुहोस्",
     "resendCode": "कोड पुनः पठाउनुहोस्",
-    "back": "फिर्ता",
+    "back": "पछाडि",
     "termsPrefix": "जारी राखेर तपाईं हाम्रा",
     "terms": "नियमहरू",
     "termsConnector": " र ",
@@ -88,7 +95,7 @@
     "reviews": "समीक्षाहरू",
     "prReview": "PR समीक्षा",
     "prReviewSubtitle": "मोबाइलमा पुल अनुरोध समीक्षा गर्नुहोस्",
-    "organization": "संस्था",
+    "organization": "संगठन",
     "couldNotLoadOrganization": "संस्था लोड गर्न सकिएन",
     "couldNotLoadOrganizationDescription": "यो लोड नभएसम्म संस्था र एजेन्ट सेटिङहरू उपलब्ध हुँदैनन्।",
     "linkedAccounts": "लिङ्क गरिएका खाताहरू",
@@ -110,7 +117,7 @@
     "bonusCreditsExpiring": "{{amount}} बोनस क्रेडिट {{date}} मा सकिँदैछ",
     "creditBalanceEmpty": "तपाईंको क्रेडिट ब्यालेन्स खाली छ। यो खाताको लागि क्रेडिटहरू iOS एप बाहिर व्यवस्थापन गरिन्छ।",
     "signOutTitle": "साइन आउट?",
-    "signOutMessage": "तपाईंको कार्यक्षेत्र पहुँच गर्न फेरि साइन इन गर्नुपर्नेछ।",
+    "signOutMessage": "तपाईंको कार्यक्षेत्रमा पहुँच गर्न फेरि साइन इन गर्नुपर्नेछ।",
     "signOutConfirm": "साइन आउट",
     "deleteAccountTitle": "खाता मेट्ने?",
     "deleteAccountMessage": "यसले तपाईंको खाता स्थायी रूपमा मेट्छ र तपाईंलाई साइन आउट गर्छ। हामी पुष्टिकरण कोड इमेल गर्नेछौं।",
@@ -143,12 +150,14 @@
     "appearanceSystem": "प्रणाली",
     "appearanceLight": "हल्का",
     "appearanceDark": "गाढा",
-    "account": "खाता"
+    "account": "खाता",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "पुल अनुरोध उपलब्ध छैन",
     "pullRequestUnavailableDescription": "यो PR खोल्न सकिँदैन। यो मेटिएको हुन सक्छ, भण्डार निजी हुन सक्छ, वा Kilo GitHub App यसमा स्थापित छैन।",
-    "accessDenied": "पहुँच अस्वीकार गरियो",
+    "accessDenied": "पहुँच अस्वीकृत",
     "accessDeniedDescription": "यो पुल अनुरोध हेर्ने अनुमति तपाईंसँग छैन।",
     "noFilesChanged": "कुनै फाइल परिवर्तन भएन",
     "noFilesChangedDescription": "यो पुल अनुरोधमा कुनै फाइल परिवर्तन छैन।",
@@ -164,7 +173,7 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "फाइलहरू लोड गर्न सकिएन",
-      "checkConnection": "तपाईंको जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+      "checkConnection": "तपाईंको जडान जाँच्नुहोस् र फेरि प्रयास गर्नुहोस्।",
       "retryLoadingFiles": "फाइलहरू लोड गर्न पुनः प्रयास गर्नुहोस्",
       "filterPlaceholder": "पथद्वारा फाइलहरू फिल्टर गर्नुहोस्",
       "viewedCount": "{{viewed}} / {{total}} हेरियो",
@@ -206,11 +215,11 @@
       "loadingLines": "{{loaded}} / {{total}} पङ्क्तिहरू लोड गर्दै…",
       "expandContext": "सन्दर्भ विस्तार गर्नुहोस्",
       "expandMoreContext": "थप सन्दर्भ विस्तार गर्नुहोस्",
-      "expandLines": "{{count}} पङ्क्तिहरू विस्तार गर्नुहोस् ({{start}}–{{end}})",
-      "expandMoreLines": "थप {{count}} पङ्क्तिहरू विस्तार गर्नुहोस् ({{start}}–{{end}})",
-      "expandLinesOfContext": "{{count}} पङ्क्तिहरूको सन्दर्भ विस्तार गर्नुहोस्",
+      "expandLines": "{{displayCount}} पङ्क्तिहरू विस्तार गर्नुहोस् ({{start}}–{{end}})",
+      "expandMoreLines": "थप {{displayCount}} पङ्क्तिहरू विस्तार गर्नुहोस् ({{start}}–{{end}})",
+      "expandLinesOfContext": "{{displayCount}} पङ्क्तिहरूको सन्दर्भ विस्तार गर्नुहोस्",
       "expandAll": "सबै विस्तार गर्नुहोस्",
-      "expandAllLines": "सबै {{count}} पङ्क्तिहरू विस्तार गर्नुहोस्",
+      "expandAllLines": "सबै {{displayCount}} पङ्क्तिहरू विस्तार गर्नुहोस्",
       "loadingMoreFiles": "थप फाइलहरू लोड गर्दै…",
       "retryLoadingNextPage": "अर्को पृष्ठ लोड गर्न पुनः प्रयास गर्नुहोस्",
       "failedToLoadMoreFiles": "थप फाइलहरू लोड गर्न असफल — पुनः प्रयास गर्न ट्याप गर्नुहोस्",
@@ -219,10 +228,12 @@
       "loadedOfTotalFiles": "{{loaded}} / {{total}} फाइलहरू लोड भयो",
       "loadAllFiles": "सबै फाइलहरू लोड गर्नुहोस्",
       "loadAll": "सबै लोड गर्नुहोस्",
-      "fileLoaded": "{{count}} फाइल लोड भयो",
-      "filesLoaded": "{{count}} फाइलहरू लोड भयो",
-      "fileLoadedOfTotal": "{{total}} मध्ये {{count}} फाइल लोड भयो",
-      "filesLoadedOfTotal": "{{total}} मध्ये {{count}} फाइलहरू लोड भयो",
+      "fileLoadedCount_one": "{{displayCount}} फाइल लोड भयो",
+      "fileLoadedCount": "{{displayCount}} फाइलहरू लोड भयो",
+      "fileLoadedCount_other": "{{displayCount}} फाइलहरू लोड भयो",
+      "fileLoadedOfTotalCount_one": "{{total}} मध्ये {{displayCount}} फाइल लोड भयो",
+      "fileLoadedOfTotalCount": "{{total}} मध्ये {{displayCount}} फाइलहरू लोड भयो",
+      "fileLoadedOfTotalCount_other": "{{total}} मध्ये {{displayCount}} फाइलहरू लोड भयो",
       "filesStillLoading": "फाइलहरू अझै लोड हुँदैछन्। ताजा गर्न तल तान्नुहोस्।",
       "goToOverview": "अवलोकनमा जानुहोस्",
       "goToOverviewTab": "अवलोकन ट्याबमा जानुहोस्"
@@ -278,7 +289,36 @@
         "body": "शाखा मेट्न सकिएन: {{reason}}",
         "accessibility": "मर्ज गरियो। शाखा मेट्न सकिएन: {{reason}}"
       },
-      "loadFailedTitle": "मर्ज विकल्पहरू लोड गर्न सकिएन"
+      "loadFailedTitle": "मर्ज विकल्पहरू लोड गर्न सकिएन",
+      "blocked": {
+        "unknownStateTitle": "GitHub ले मर्जयोग्य अवस्था रिपोर्ट गरेको छैन",
+        "unknownStateDetail": "केही क्षणमा सिंहावलोकन ताजा गर्ने प्रयास गर्नुहोस्।",
+        "conflictsTitle": "मर्ज द्वन्द्वहरू",
+        "conflictsDetail": "मर्ज गर्नु अघि यस शाखाका मर्ज द्वन्द्वहरू समाधान गर्नुहोस्।",
+        "requiredReviewsTitle": "आवश्यक समीक्षाहरू छैनन्",
+        "requiredReviewsDetail": "आवश्यक समीक्षकहरूका स्वीकृतिहरू छैनन् वा पर्खँदै छन्।",
+        "failingChecksTitle": "आवश्यक जाँचहरू असफल भइरहेका छन्",
+        "failingChecksDetail": "आवश्यक स्थिति जाँचहरू असफल भइरहेका छन्।",
+        "unstableTitle": "केही जाँचहरू असफल भइरहेका छन्",
+        "unstableDetail": "गैर-आवश्यक जाँचहरू असफल भइरहेका छन्। तिनीहरूले मर्ज रोक्ने छैनन्।",
+        "draftTitle": "मस्यौदा पुल अनुरोध",
+        "draftDetail": "मर्ज गर्नु अघि पुल अनुरोधलाई समीक्षाका लागि तयार भनी चिन्ह लगाउनुहोस्।",
+        "behindTitle": "शाखा पुरानो भएको छ",
+        "behindDetailUpdatable": "मर्ज गर्नु अघि शाखालाई आधारबाट अद्यावधिक गर्नुहोस्, वा रिबेस गर्नुहोस्।",
+        "behindDetail": "हेड शाखा आधारभन्दा पछाडि छ। मर्ज गर्नु अघि शाखालाई रिबेस वा अद्यावधिक गर्नुहोस्।",
+        "notMergeableTitle": "यो पुल अनुरोध अझै मर्जयोग्य छैन",
+        "notMergeableDetail": "GitHub ले {{state}} मर्जयोग्य अवस्था रिपोर्ट गरेको छ।"
+      },
+      "methodLabels": {
+        "merge": "मर्ज कमिट सिर्जना गर्नुहोस्",
+        "squash": "Squash गरेर मर्ज गर्नुहोस्",
+        "rebase": "Rebase गरेर मर्ज गर्नुहोस्"
+      },
+      "methodDescriptions": {
+        "merge": "यस शाखाका सबै कमिटहरूलाई मर्ज कमिटसँगै आधार शाखामा मिलाउनुहोस्।",
+        "squash": "यस शाखाका सबै कमिटहरूलाई आधार शाखामा एउटै कमिटमा मिलाउनुहोस्।",
+        "rebase": "यस शाखाका सबै कमिटहरूलाई मर्ज कमिट बिना आधार शाखामा पुनः लागू गर्नुहोस्।"
+      }
     },
     "discussion": {
       "threadAccessibilityLabel": "छलफल थ्रेड {{anchorLabel}}",
@@ -288,8 +328,9 @@
       "resolved": "समाधान भयो",
       "outdated": "पुरानो",
       "file": "फाइल",
-      "oneComment": "१ टिप्पणी",
-      "commentCount": "{{count}} टिप्पणीहरू",
+      "comment_one": "१ टिप्पणी",
+      "comment": "{{displayCount}} टिप्पणीहरू",
+      "comment_other": "{{displayCount}} टिप्पणीहरू",
       "startedRelative": " · {{relative}} मा सुरु भयो",
       "couldNotLoadMore": "थप टिप्पणीहरू लोड गर्न सकिएन।",
       "retryLoadingMore": "थप टिप्पणीहरू लोड गर्न पुनः प्रयास गर्नुहोस्",
@@ -298,9 +339,10 @@
       "closeReactions": "प्रतिक्रियाहरू बन्द गर्नुहोस्",
       "reactionsTitle": "प्रतिक्रियाहरू",
       "addReaction": "प्रतिक्रिया थप्नुहोस्",
-      "reactionPill": "{{emoji}} प्रतिक्रिया, {{count}} {{countLabel}}",
-      "reactionSingular": "प्रतिक्रिया",
-      "reactionPlural": "प्रतिक्रियाहरू",
+      "reactionPill": "{{emoji}} प्रतिक्रिया, {{displayCount}} {{countLabel}}",
+      "reaction_one": "प्रतिक्रिया",
+      "reaction": "प्रतिक्रियाहरू",
+      "reaction_other": "प्रतिक्रियाहरू",
       "commentActions": "टिप्पणी कार्यहरू",
       "reportContent": "सामग्री रिपोर्ट गर्नुहोस्",
       "reportUser": "प्रयोगकर्ता रिपोर्ट गर्नुहोस्",
@@ -349,12 +391,30 @@
       "noDiscussionDescription": "यो पुल अनुरोधमा कुनै समीक्षा थ्रेड वा कुराकानी टिप्पणीहरू छैनन्।",
       "reviewFiles": "फाइलहरू समीक्षा गर्नुहोस्",
       "quotedDiffSnippet": "उद्धृत diff स्निपेट",
-      "moreLinesAbove": "… {{count}} थप पङ्क्तिहरू माथि",
+      "moreLinesAbove": "… {{displayCount}} थप पङ्क्तिहरू माथि",
       "termsAcceptRequired": "पोस्ट गर्न तपाईंले सेवाका सर्तहरू स्वीकार गर्नुपर्छ।",
       "termsOutdatedCopy": "सेवाका सर्तहरू परिवर्तन भयो। नवीनतम संस्करण स्वीकार गर्न यो स्क्रिन फेरि खोल्नुहोस्।",
-      "termsCheckRetryCopy": "सेवाका सर्तहरू जाँच्न सकिएन। तपाईंको जडान जाँचेर फेरि प्रयास गर्नुहोस्।"
+      "termsCheckRetryCopy": "सेवाका सर्तहरू जाँच्न सकिएन। तपाईंको जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+      "reactions": {
+        "thumbsUp": "बुढीऔंला माथि",
+        "thumbsDown": "बुढीऔंला तल",
+        "laugh": "हाँसो",
+        "hooray": "हुर्रे",
+        "confused": "अलमल्ल",
+        "heart": "मुटु",
+        "rocket": "रकेट",
+        "eyes": "आँखाहरू"
+      },
+      "anchor": {
+        "fileCommentOnPath": "{{path}} मा फाइल टिप्पणी",
+        "fileComment": "फाइल टिप्पणी",
+        "outdatedOnPathLines": "{{path}} {{lines}} मा पुरानो",
+        "outdatedOnLines": "{{lines}} मा पुरानो",
+        "outdatedOnPath": "{{path}} मा पुरानो"
+      },
+      "deletedUser": "मेटिएको प्रयोगकर्ता"
     },
-    "couldNotOpenGitHubAppSettings": "GitHub App सेटिङ खोल्न सकिएन",
+    "couldNotOpenGitHubAppSettings": "GitHub App सेटिङहरू खोल्न सकिएन",
     "installKiloGitHubApp": "Kilo GitHub App स्थापना गर्नुहोस्",
     "connectionExpiredTitle": "GitHub जडानको म्याद सकियो",
     "connectionExpiredDescription": "तपाईंको GitHub जडान अब मान्य छैन। तपाईंको जडान फेरि जाँच्नुहोस् — आवश्यक परेमा फेरि जडान गर्न भनिनेछ।",
@@ -391,11 +451,11 @@
       "retryChecks": "जाँचहरू पुनः प्रयास गर्नुहोस्",
       "viewOnGitHub": "GitHub मा PR हेर्नुहोस्",
       "noChecksReported": "कुनै जाँच रिपोर्ट गरिएन",
-      "passed": "{{count}} पास भयो",
-      "failed": "{{count}} असफल भयो",
-      "pending": "{{count}} प्रतीक्षामा",
-      "skipped": "{{count}} छोडियो",
-      "checksCount": "{{count}} जाँचहरू",
+      "passed": "{{displayCount}} पास भयो",
+      "failed": "{{displayCount}} असफल भयो",
+      "pending": "{{displayCount}} प्रतीक्षामा",
+      "skipped": "{{displayCount}} छोडियो",
+      "checksCount": "{{displayCount}} जाँचहरू",
       "checkDetails": "जाँच विवरणहरू",
       "pullRequest": "पुल अनुरोध"
     },
@@ -424,7 +484,7 @@
       "discardTitle": "टिप्पणी त्याग्ने?",
       "discardMessage": "तपाईंको मस्यौदा हराउनेछ।",
       "keepEditing": "सम्पादन जारी राख्नुहोस्",
-      "discard": "त्याग्नुहोस्",
+      "discard": "खारेज गर्नुहोस्",
       "comment": "टिप्पणी",
       "insertSuggestionA11y": "कोड सुझाव घुसाउनुहोस्",
       "insertSuggestion": "सुझाव घुसाउनुहोस्",
@@ -452,11 +512,14 @@
       "deletePendingMessage": "यो टिप्पणी समीक्षा कतारबाट हटाइनेछ।",
       "delete": "मेट्नुहोस्",
       "summaryOptional": "सारांश (वैकल्पिक)",
-      "pendingCommentSingular": "प्रतीक्षामा रहेको टिप्पणी",
-      "pendingCommentPlural": "प्रतीक्षामा रहेका टिप्पणीहरू",
-      "submitCountOfTotal": "{{totalCount}} मध्ये {{freshCount}} टिप्पणीहरू पेश गर्नुहोस्",
+      "pendingComment_one": "प्रतीक्षामा रहेको टिप्पणी",
+      "pendingComment": "प्रतीक्षामा रहेका टिप्पणीहरू",
+      "pendingComment_other": "प्रतीक्षामा रहेका टिप्पणीहरू",
+      "submitCountOfTotal": "{{displayTotalCount}} मध्ये {{displayFreshCount}} टिप्पणीहरू पेश गर्नुहोस्",
       "submitReview": "समीक्षा पेश गर्नुहोस्",
-      "partialPostedMessage": "{{freshCount}} टिप्पणी(हरू) पेश गरियो। {{staleCount}} टिप्पणी(हरू) पुरानो कमिटमा औंल्याइएको छ र तपाईंको कतारमा रह्यो।"
+      "partialPostedMessage": "{{displayFreshCount}} टिप्पणी(हरू) पेश गरियो। {{displayStaleCount}} टिप्पणी(हरू) पुरानो कमिटमा औंल्याइएको छ र तपाईंको कतारमा रह्यो।",
+      "blockedRequestChanges": "परिवर्तनहरू अनुरोध गर्न सारांश वा कम्तीमा एउटा टिप्पणी थप्नुहोस्।",
+      "blockedComment": "टिप्पणी समीक्षा पेश गर्न सारांश वा कम्तीमा एउटा टिप्पणी थप्नुहोस्।"
     },
     "reconnectNotice": {
       "title": "GitHub जडानको म्याद सकियो",
@@ -478,10 +541,12 @@
       "stateOpenReviewRequired": "खुला · समीक्षा आवश्यक",
       "stateOpen": "खुला",
       "unknownAuthor": "अज्ञात लेखक",
-      "commitSingular": "कमिट",
-      "commitPlural": "कमिटहरू",
-      "fileSingular": "फाइल",
-      "filePlural": "फाइलहरू"
+      "commit_one": "कमिट",
+      "commit": "कमिटहरू",
+      "commit_other": "कमिटहरू",
+      "file_one": "फाइल",
+      "file": "फाइलहरू",
+      "file_other": "फाइलहरू"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} मा पुरानो प्रतीक्षामा रहेको टिप्पणी सम्पादन गर्नुहोस्",
@@ -512,10 +577,36 @@
     },
     "diff": {
       "selectedTapToChange": "{{label}} चयन गरियो, चयन परिवर्तन गर्न ट्याप गर्नुहोस्",
-      "tapToComment": "{{label}}, टिप्पणी गर्न ट्याप गर्नुहोस्"
+      "tapToComment": "{{label}}, टिप्पणी गर्न ट्याप गर्नुहोस्",
+      "truncationBanner": "कुल {{total}} परिवर्तन गरिएका फाइलहरूमध्ये पहिलो {{limit}} देखाइँदै — GitHub API सीमा",
+      "statusAdded": "थपियो",
+      "statusContext": "सन्दर्भ",
+      "statusDeleted": "मेटियो",
+      "lineLabel": "{{status}} पङ्क्ति {{line}}: {{text}}",
+      "lineLabelNoNumber": "{{status}}: {{text}}",
+      "emptyLine": "(खाली)"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली छ",
-    "linkPasteNotAPullRequest": "GitHub पुल रिक्वेस्ट लिंक होइन"
+    "linkPasteNotAPullRequest": "GitHub पुल रिक्वेस्ट लिंक होइन",
+    "announce": {
+      "commentPosted": "टिप्पणी पोस्ट गरियो",
+      "reviewSubmitted": "समीक्षा पेश गरियो",
+      "autoMergeEnabled": "स्वचालित मर्ज सक्षम गरियो"
+    },
+    "mutationError": {
+      "commentNotPosted": "यो टिप्पणी पोस्ट गर्न सकिँदैन। चयन गरिएको पङ्क्ति परिवर्तन भएको वा PR अद्यावधिक भएको हुन सक्छ।",
+      "reviewNotSubmitted": "यो समीक्षा जस्तो छ त्यस्तै पेश गर्न सकिँदैन। PR परिवर्तन भएको हुन सक्छ, वा तपाईं आफ्नै पुल अनुरोधको समीक्षा गर्न सक्नुहुन्न।",
+      "couldNotPostComment": "टिप्पणी पोस्ट गर्न सकिएन।",
+      "couldNotSubmitReview": "समीक्षा पेश गर्न सकिएन। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।"
+    },
+    "operation": {
+      "couldNotReply": "जवाफ दिन सकिएन।",
+      "couldNotCompleteAction": "यो कार्य पूरा गर्न सकिएन।",
+      "mergeResultDefaultError": "GitHub ले मर्ज पूरा गरेन।",
+      "ambiguous": "पुष्टि गर्न सकिएन — पुनः प्रयास गर्नुअघि PR जाँच्नुहोस्।",
+      "persistenceFailed": "हामीले यो कार्य रेकर्ड गर्न सकेनौं। कृपया पछि फेरि प्रयास गर्नुहोस्।",
+      "forbidden": "निषेध गरिएको"
+    }
   },
   "notifications": {
     "title": "सूचनाहरू",
@@ -573,13 +664,14 @@
     "agents": "एजेन्टहरू",
     "profile": "प्रोफाइल",
     "kiloclaw": "KiloClaw",
-    "kiloclawWrapped": "Kilo\nClaw"
+    "kiloclawWrapped": "Kilo\nClaw",
+    "position": "{{name}}, ट्याब, {{total}} मध्ये {{position}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "उदाहरण बदल्नुहोस्",
       "couldNotLoadInstances": "उदाहरणहरू लोड गर्न सकिएन",
-      "noInstances": "कुनै KiloClaw उदाहरणहरू छैनन्",
+      "noInstances": "कुनै KiloClaw इन्स्ट्यान्स छैन",
       "noInstancesDescription": "च्याट सुरु गर्न उदाहरण सेट अप गर्नुहोस्।",
       "setUpKiloclaw": "KiloClaw सेट अप गर्नुहोस्",
       "currentInstance": "{{title}}, वर्तमान",
@@ -602,7 +694,7 @@
       "couldNotSignIn": "च्याटमा साइन इन गर्न सकिएन",
       "couldNotRefreshMessages": "सन्देशहरू ताजा गर्न सकिएन",
       "couldNotLoadHistory": "कुराकानी इतिहास लोड गर्न सकिएन",
-      "rename": "पुन:नामकरण",
+      "rename": "नाम बदल्नुहोस्",
       "leave": "छोड्नुहोस्",
       "untitledConversation": "शीर्षकविहीन कुराकानी",
       "createFailed": "कुराकानी सिर्जना गर्न असफल",
@@ -614,7 +706,7 @@
       "recent": "हालैका",
       "common": "सामान्य",
       "reactWith": "{{reaction}} सँग प्रतिक्रिया दिनुहोस्",
-      "accessibility": "{{emoji}} प्रतिक्रिया, {{count}}"
+      "accessibility": "{{emoji}} प्रतिक्रिया, {{displayCount}}"
     },
     "composer": {
       "replyingTo": "जवाफ दिँदै",
@@ -643,11 +735,21 @@
       "imageUnavailable": "छवि उपलब्ध छैन",
       "openFailed": "संलग्न फाइल खोल्न सकिएन। तपाईंको जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
       "attachFailed": "फाइल संलग्न गर्न असफल",
-      "limit": "तपाईं {{count}} सम्म फाइलहरू संलग्न गर्न सक्नुहुन्छ।",
+      "limit": "तपाईं {{displayCount}} सम्म फाइलहरू संलग्न गर्न सक्नुहुन्छ।",
       "sizeRejection": "{{filename}} ले {{limit}} संलग्न सीमा नाघेको छ।",
       "unreadable": "{{filename}} पढ्न सकिएन।",
       "pastedImage": "टाँसिएको छवि",
-      "defaultName": "संलग्न"
+      "defaultName": "संलग्न",
+      "classificationDenied": "Executable फाइलहरू संलग्न गर्न सकिँदैन",
+      "classificationEmpty": "फाइल खाली छ",
+      "classificationTooLarge": "फाइलहरू 20 MB वा सानो हुनुपर्छ",
+      "classificationUnreadable": "यो फाइल पढ्न सकिएन",
+      "announceUploaded": "संलग्न फाइल अपलोड गरियो",
+      "cantUpload": "यो फाइल अपलोड गर्न सकिँदैन।",
+      "networkError": "नेटवर्क त्रुटि",
+      "uploadFailed": "अपलोड असफल भयो",
+      "failedToUploadFile": "फाइल अपलोड गर्न असफल: {{reason}}",
+      "nothingToPaste": "टाँस्न केही छैन"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -661,7 +763,9 @@
       "moreActions": "थप कार्यहरू",
       "message": "सन्देश",
       "notDelivered": "डेलिभर भएन",
-      "edited": "(सम्पादित)"
+      "edited": "(सम्पादित)",
+      "image": "छवि",
+      "attachment": "संलग्न"
     },
     "messageActions": {
       "copied": "प्रतिलिपि गरियो",
@@ -691,8 +795,9 @@
     },
     "typingIndicator": {
       "someone": "कोही",
-      "oneTyping": "{{name}} टाइप गर्दै छ...",
-      "manyTyping": "{{names}} टाइप गर्दै छन्..."
+      "typing_one": "{{name}} टाइप गर्दै छ...",
+      "typing": "{{names}} टाइप गर्दै छन्...",
+      "typing_other": "{{names}} टाइप गर्दै छन्..."
     },
     "botStatus": {
       "online": "अनलाइन",
@@ -702,6 +807,12 @@
       "loadingUser": "प्रयोगकर्ता लोड गर्दै...",
       "waitingForStatus": "बटको स्थिति पर्खदै...",
       "offlineMessage": "बट अफलाइन छ। यो पुनः जडान भएपछि सन्देशहरू जारी हुनेछन्।"
+    },
+    "errors": {
+      "notAllowed": "अनुमति छैन",
+      "messageTooLong": "सन्देश धेरै लामो छ — यसलाई {{limit}} अक्षरभन्दा कम राख्नुहोस्",
+      "titleTooLong": "शीर्षक धेरै लामो छ — यसलाई {{limit}} अक्षरभन्दा कम राख्नुहोस्",
+      "messageEmpty": "सन्देश खाली हुन सक्दैन"
     }
   },
   "kiloclaw": {
@@ -714,6 +825,7 @@
       "finalTermEnds": "अन्तिम अवधि समाप्त हुन्छ",
       "afterFinalTerm": "अन्तिम अवधि पछि",
       "remaining": "बाँकी",
+      "lessThanOneDay": "१ दिनभन्दा कम",
       "ends": "समाप्त हुन्छ",
       "expires": "म्याद सकिन्छ",
       "noActivePlan": "कुनै सक्रिय योजना छैन",
@@ -722,23 +834,25 @@
       "couldNotLoad": "बिलिङ जानकारी लोड गर्न सकिएन",
       "manageOnWeb": "वेबमा बिलिङ व्यवस्थापन गर्नुहोस्",
       "commitPlan": "कमिट",
-      "daysLeft": "{{count}} दिन बाँकी",
       "earlybird": "प्रारम्भिक",
       "finalCommitTermEndsOn": "तपाईंको अन्तिम कमिट अवधि {{date}} मा समाप्त हुन्छ। {{price}} मा स्ट्यान्डर्डको रूपमा जारी राख्नुहोस्, वा होस्टिङ समाप्त हुन्छ।",
       "freeTrial": "नि:शुल्क परीक्षण",
       "hostingEnds": "होस्टिङ समाप्त हुन्छ",
-      "oneDayLeft": "१ दिन बाँकी",
       "renews": "नवीकरण हुन्छ",
       "standardMonthToMonth": "स्ट्यान्डर्ड महिना-दर-महिना",
       "standardStartsOn": "स्ट्यान्डर्ड {{date}} मा {{price}} मा सुरु हुन्छ।",
       "yourStandardMonthlyPrice": "तपाईंको स्ट्यान्डर्ड मासिक मूल्य",
       "perMonth": "/महिना",
       "earlybirdAccessUntil": "{{date}} सम्म प्रारम्भिक पहुँच",
-      "earlybirdEnding": "प्रारम्भिक अवधि समाप्त हुँदै: {{days}} दिन बाँकी",
+      "earlybirdEnding": "प्रारम्भिक अवधि समाप्त हुँदै: {{remaining}}",
       "paymentPastDue": "भुक्तानी बक्यौता भयो। कृपया आफ्नो भुक्तानी विधि अद्यावधिक गर्नुहोस्।",
       "subscriptionCancels": "सदस्यता {{date}} मा रद्द हुन्छ",
-      "trialDaysRemaining": "परीक्षण: {{days}} दिन बाँकी",
-      "trialEndingSoon": "परीक्षण चाँडै समाप्त हुँदै: {{days}}"
+      "trialDaysRemaining": "परीक्षण: {{remaining}} बाँकी",
+      "trialEndingSoon": "परीक्षण चाँडै समाप्त हुँदै: {{remaining}}",
+      "planName": {
+        "commit": "कमिट",
+        "standard": "स्ट्यान्डर्ड"
+      }
     },
     "changelog": {
       "title": "के नयाँ छ",
@@ -811,7 +925,7 @@
       "gmailNotifications": "Gmail सूचनाहरू",
       "disconnect": "Google खाता विच्छेद गर्नुहोस्",
       "connected": "जडान भयो",
-      "copied": "कपी भयो!",
+      "copied": "प्रतिलिपि गरियो",
       "copyCommand": "कमाण्ड कपी गर्नुहोस्",
       "disabled": "असक्षम",
       "disconnectConfirm": "विच्छेद गर्नुहोस्",
@@ -990,7 +1104,7 @@
         "stalledTitle": "केही अड्कियो",
         "stalledBody": "हामी {{name}} को सेटअप समाप्त गर्न सकेनौं। फेरि प्रयास गर्नुहोस्, वा यो जारी रहेमा hi@kilo.ai मा इमेल गर्नुहोस्।",
         "timeoutTitle": "अपेक्षाभन्दा लामो समय लाग्दै",
-        "timeoutBody": "{{name}} को सेटअप सामान्यभन्दा लामो समय लाग्दै छ ({{minutes}} मिनेटभन्दा बढी)।",
+        "timeoutBody": "{{name}} को सेटअप सामान्यभन्दा लामो समय लाग्दै छ ({{displayMinutes}} मिनेटभन्दा बढी)।",
         "continueInBackground": "पृष्ठभूमिमा जारी राख्नुहोस्",
         "settingUp": "{{name}} सेटअप गर्दै",
         "finishingSetup": "सेटअप समाप्त गर्दै",
@@ -1020,7 +1134,8 @@
       "starting": "सुरु गर्दै",
       "stopped": "रोकियो",
       "stopping": "रोक्दै",
-      "unknown": "अज्ञात"
+      "unknown": "अज्ञात",
+      "vcpuValue": "{{value}} vCPU"
     },
     "modelPicker": {
       "kiloAuto": "Kilo Auto",
@@ -1060,8 +1175,9 @@
     },
     "instanceCard": {
       "needsAttention": "{{name}} लाई ध्यान चाहिन्छ: {{label}}",
-      "openUnreadOne": "{{name}} खोल्नुहोस्, {{count}} नपढेको सन्देश",
-      "openUnreadMany": "{{name}} खोल्नुहोस्, {{count}} नपढेका सन्देशहरू",
+      "openUnread_one": "{{name}} खोल्नुहोस्, {{displayCount}} नपढेको सन्देश",
+      "openUnread": "{{name}} खोल्नुहोस्, {{displayCount}} नपढेका सन्देशहरू",
+      "openUnread_other": "{{name}} खोल्नुहोस्, {{displayCount}} नपढेका सन्देशहरू",
       "open": "{{name}} खोल्नुहोस्",
       "openSettings": "{{name}} का लागि सेटिङ्स खोल्नुहोस्",
       "fixOnKiloAi": "kilo.ai मा समाधान गर्नुहोस्: {{label}}"
@@ -1103,7 +1219,9 @@
       "sparkles": "चम्किलाहरू",
       "strongArm": "बलियो पाखुरा",
       "talisman": "ताबीज"
-    }
+    },
+    "remoteSpawnFilesNotSupported": "यो instance ले फाइलहरू प्राप्त गर्न सक्दैन।",
+    "instanceSwitcherTitle": "KiloClaw इन्स्ट्यान्स"
   },
   "codeReviewer": {
     "focusAreas": {
@@ -1131,7 +1249,7 @@
       "allRepositories": "सबै रिपोजिटरीहरू",
       "bitbucketNoRepositoriesDescription": "यो Bitbucket वर्कस्पेसमा कुनै रिपोजिटरी उपलब्ध छैन।",
       "bitbucketSetup": "Bitbucket सेटअप",
-      "couldNotOpenGithubSettings": "GitHub App सेटिङ्स खोल्न सकिएन",
+      "couldNotOpenGithubSettings": "GitHub App सेटिङहरू खोल्न सकिएन",
       "gitlabNoRepositoriesDescription": "तपाईंले GitLab मा थप समूह वा प्रोजेक्टहरूमा पहुँच दिन आवश्यक हुन सक्छ।",
       "installGithubApp": "रिपोजिटरीहरूमा GitHub एप स्थापना गर्नुहोस्",
       "installGithubAppDescription": "तपाईंले समीक्षा गराउन चाहेका रिपोजिटरीहरूमा Kilo GitHub App लाई पहुँच दिनुहोस्।",
@@ -1146,7 +1264,7 @@
       "roast": "निर्दयी रूपमा इमानदार, मनोरञ्जनात्मक रूपमा",
       "strict": "सबै फ्ल्याग गर्नुहोस्, उच्च मापदण्ड राख्नुहोस्"
     },
-    "title": "Code Reviewer",
+    "title": "कोड समीक्षक",
     "reviewDetail": {
       "title": "समीक्षा",
       "cancelTitle": "समीक्षा रद्द गर्ने?",
@@ -1159,20 +1277,20 @@
       "couldNotLoad": "समीक्षा लोड गर्न सकिएन",
       "couldNotGetLatest": "पछिल्लो प्राप्त गर्न सकिएन।",
       "byline": "{{author}} द्वारा {{repo}} #{{number}}",
-      "findings": "फेला परेका कुराहरू",
+      "findings": "निष्कर्षहरू",
       "noFindings": "कुनै फेला परेन",
       "showMore": "थप देखाउनुहोस्",
-      "details": "विवरणहरू",
+      "details": "विवरण",
       "branch": "ब्रान्च",
       "platform": "प्लेटफर्म",
       "model": "मोडेल",
-      "created": "सिर्जना गरियो",
+      "created": "सिर्जना गरिएको",
       "started": "सुरु भयो",
-      "completed": "सम्पन्न भयो",
+      "completed": "सम्पन्न",
       "cost": "लागत",
       "tokens": "टोकनहरू",
       "tokensInOut": "{{input}} भित्र / {{output}} बाहिर",
-      "openPullRequest": "पुल रिक्वेस्ट खोल्नुहोस्",
+      "openPullRequest": "पुल अनुरोध खोल्नुहोस्",
       "council": "काउन्सिल",
       "decision": "निर्णय",
       "gate": "गेट",
@@ -1181,12 +1299,12 @@
       "checkRun": "जाँच चलाउनुहोस्",
       "status": "स्थिति",
       "threshold": "थ्रेसहोल्ड",
-      "pullRequest": "पुल रिक्वेस्ट"
+      "pullRequest": "पुल अनुरोध"
     },
     "reviewMemory": {
       "title": "समीक्षा मेमोरी",
       "couldNotLoadMore": "थप लोड गर्न सकिएन",
-      "retryLoadingMore": "थप लोड गर्न पुन: प्रयास गर्नुहोस्",
+      "retryLoadingMore": "थप लोड गर्न पुनः प्रयास गर्नुहोस्",
       "loading": "समीक्षा मेमोरी लोड गर्दै",
       "couldNotLoad": "समीक्षा मेमोरी लोड गर्न सकिएन",
       "off": "समीक्षा मेमोरी बन्द छ",
@@ -1257,7 +1375,7 @@
       "statusUnavailable": "स्थिति उपलब्ध छैन",
       "connected": "जडान भयो",
       "notConnected": "जडान भएको छैन",
-      "organization": "संस्था",
+      "organization": "संगठन",
       "platforms": "प्लेटफर्महरू",
       "activity": "गतिविधि"
     },
@@ -1280,7 +1398,7 @@
       "mergeGate": "मर्ज गेट",
       "repositories": "रिपोजिटरीहरू",
       "allRepositories": "सबै रिपोजिटरीहरू",
-      "nSelected": "{{count}} चयन गरियो",
+      "nSelected": "{{displayCount}} चयन गरियो",
       "reviewMemory": "समीक्षा मेमोरी",
       "proposedReviewMdGuidance": "प्रस्तावित REVIEW.md दिशानिर्देश"
     },
@@ -1290,7 +1408,71 @@
       "noDecision": "कुनै निर्णय छैन",
       "noResult": "कुनै नतिजा छैन"
     },
-    "eyebrow": "Code Reviewer"
+    "eyebrow": "कोड समीक्षक",
+    "updateFailed": "समीक्षक अद्यावधिक गर्न असफल भयो",
+    "configSaveFailed": "समीक्षा कन्फिगरेसन सुरक्षित गर्न असफल भयो",
+    "status": {
+      "pending": "प्रतीक्षामा",
+      "queued": "कतारमा",
+      "running": "चलिरहेको",
+      "completed": "सम्पन्न",
+      "failed": "असफल",
+      "cancelled": "रद्द गरियो",
+      "interrupted": "बाधित"
+    },
+    "reviewStyle": {
+      "strict": "कडा",
+      "balanced": "सन्तुलित",
+      "lenient": "नरम",
+      "roast": "Roast"
+    },
+    "focusArea": {
+      "security": "सुरक्षा",
+      "performance": "प्रदर्शन",
+      "bugs": "बगहरू",
+      "style": "शैली",
+      "testing": "परीक्षण",
+      "documentation": "दस्तावेज"
+    },
+    "gateThreshold": {
+      "off": "बन्द",
+      "all": "सबै",
+      "warning": "चेतावनी",
+      "critical": "क्रिटिकल"
+    },
+    "actionRequired": {
+      "githubInstallationRequired": {
+        "title": "Code Reviewer लाई ध्यान चाहिन्छ",
+        "description": "Kilo सक्रिय GitHub App स्थापनासहित यो भण्डारमा पहुँच गर्न नसक्ने भएकाले Code Reviewer असक्षम गरियो। GitHub App स्थापना अद्यावधिक गर्नुहोस्, त्यसपछि Code Reviewer फेरि सक्षम गर्नुहोस्।",
+        "recoveryLabel": "GitHub App अद्यावधिक गर्नुहोस्"
+      },
+      "githubIpAllowList": {
+        "title": "Code Reviewer लाई ध्यान चाहिन्छ",
+        "description": "यो GitHub संस्थाले Kilo लाई रोक्ने IP अनुमति सूची प्रयोग गर्ने भएकाले Code Reviewer असक्षम गरियो। मद्दतका लागि hi@kilocode.ai मा सम्पर्क गर्नुहोस्, त्यसपछि Code Reviewer फेरि सक्षम गर्नुहोस्।",
+        "recoveryLabel": "सहयोगलाई सम्पर्क गर्नुहोस्"
+      },
+      "gitlabProjectAccessRequired": {
+        "title": "Code Reviewer लाई ध्यान चाहिन्छ",
+        "description": "यो परियोजनाका लागि Kilo ले GitLab Project Access Token सिर्जना गर्न नसक्ने भएकाले Code Reviewer असक्षम गरियो। Maintainer पहुँच दिनुहोस् वा Project Access Tokens सक्षम गर्नुहोस्, त्यसपछि Code Reviewer फेरि सक्षम गर्नुहोस्।",
+        "recoveryLabel": "GitLab एकीकरण अद्यावधिक गर्नुहोस्"
+      },
+      "byokInvalidKey": {
+        "title": "Code Reviewer लाई ध्यान चाहिन्छ",
+        "description": "चयन गरिएको BYOK API कुञ्जी अवैध, फिर्ता लिइएको, वा अनुमति नभएको भएकाले Code Reviewer असक्षम गरियो। कुञ्जी अद्यावधिक गर्नुहोस् वा अर्को मोडेल छान्नुहोस्, त्यसपछि Code Reviewer फेरि सक्षम गर्नुहोस्।",
+        "recoveryLabel": "BYOK सेटिङहरू अद्यावधिक गर्नुहोस्"
+      },
+      "selectedModelUnavailable": {
+        "title": "Code Reviewer लाई ध्यान चाहिन्छ",
+        "description": "चयन गरिएको मोडेल क्लाउड एजेन्ट सत्रहरूका लागि उपलब्ध नभएको भएकाले Code Reviewer असक्षम गरियो। उपलब्ध मोडेल छान्नुहोस्, त्यसपछि Code Reviewer फेरि सक्षम गर्नुहोस्।",
+        "recoveryLabel": "Code Reviewer सेटिङहरू अद्यावधिक गर्नुहोस्"
+      },
+      "repeatedRepositoryCloneTimeout": {
+        "title": "Code Reviewer लाई ध्यान चाहिन्छ",
+        "description": "आज तीन पटक भण्डार क्लोन टाइमआउट भएपछि Code Reviewer असक्षम गरियो। मद्दतका लागि hi@kilocode.ai मा सम्पर्क गर्नुहोस्, त्यसपछि Code Reviewer फेरि सक्षम गर्नुहोस्।",
+        "recoveryLabel": "सहयोगलाई सम्पर्क गर्नुहोस्"
+      }
+    },
+    "unknownError": "अज्ञात त्रुटि"
   },
   "securityAgent": {
     "filter": {
@@ -1303,13 +1485,13 @@
       "severity": "गम्भीरता",
       "outcome": "नतिजा",
       "slaStatus": "SLA स्थिति",
-      "sortBy": "क्रमबद्ध गर्नुहोस्",
+      "sortBy": "क्रमबद्ध गर्ने आधार",
       "allRepositories": "सबै रिपोजिटरीहरू",
       "all": "सबै",
       "statusOpen": "खुला",
       "fixed": "समाधान भयो",
       "statusIgnored": "बेवास्ता गरियो",
-      "statusClosed": "बन्द गरियो",
+      "statusClosed": "बन्द",
       "severityCritical": "क्रिटिकल",
       "severityHigh": "उच्च",
       "severityMedium": "मध्यम",
@@ -1351,8 +1533,9 @@
       "enableAutoRemediationConfirmTitle": "स्वचालित सुधार सक्षम गर्ने?",
       "enableAutoRemediationConfirmMessage": "Security Agent ले योग्य शोषणयोग्य फेला परेका कुराहरूका लागि सुधार PRहरू स्वचालित रूपमा खोल्नेछ।",
       "enable": "सक्षम गर्नुहोस्",
-      "queuedOne": "{{count}} वटा अवस्थित निष्कर्ष विश्लेषणका लागि कतारमा राखियो।",
-      "queuedMany": "{{count}} वटा अवस्थित निष्कर्षहरू विश्लेषणका लागि कतारमा राखियो।",
+      "queued_one": "{{displayCount}} वटा अवस्थित निष्कर्ष विश्लेषणका लागि कतारमा राखियो।",
+      "queued": "{{displayCount}} वटा अवस्थित निष्कर्षहरू विश्लेषणका लागि कतारमा राखियो।",
+      "queued_other": "{{displayCount}} वटा अवस्थित निष्कर्षहरू विश्लेषणका लागि कतारमा राखियो।",
       "severityCriticalOnly": "केवल क्रिटिकल",
       "severityHighAndAbove": "उच्च र माथि",
       "severityMediumAndAbove": "मध्यम र माथि",
@@ -1383,14 +1566,14 @@
       "analyzed": "विश्लेषण गरिएको",
       "exploitabilityReasoning": "शोषणयोग्यता तर्क",
       "suggestedFix": "सुझाव गरिएको समाधान",
-      "whereFound": "यो कहाँ फेला पर्यो ({{count}})",
+      "whereFound": "यो कहाँ फेला पर्यो ({{displayCount}})",
       "fullReport": "पूर्ण जेनरेट गरिएको प्रतिवेदन",
       "unknown": "अज्ञात",
       "yes": "हो",
       "no": "होइन"
     },
     "dashboard": {
-      "findingsCount": "{{count}} निष्कर्षहरू",
+      "findingsCount": "{{displayCount}} निष्कर्षहरू",
       "notMeasured": "मापन गरिएको छैन",
       "actFirst": "पहिले कार्य गर्नुहोस्",
       "slaPosture": "SLA अवस्था",
@@ -1399,7 +1582,7 @@
       "repositoryActionPlan": "भण्डार कार्य योजना",
       "noOpenFindings": "ध्यान चाहिने कुनै खुला निष्कर्ष छैन",
       "deadlineToday": "सीमा आज पुग्यो",
-      "daysOverdue": "{{count}} दिन ढिलो",
+      "daysOverdue": "{{displayCount}} दिन ढिलो",
       "withinDeadline": "सीमाभित्र",
       "criticalOverdue": "क्रिटिकल ढिलो",
       "highOverdue": "उच्च ढिलो",
@@ -1427,6 +1610,27 @@
       "syncQueued": "सिंक कतारमा",
       "syncStatusUnavailable": "सिंक स्थिति उपलब्ध छैन"
     },
+    "dashboardMetrics": {
+      "openFindings": "खुला निष्कर्षहरू",
+      "openFindingsDetail": "{{critical}} क्रिटिकल, {{high}} उच्च",
+      "confirmedExploitable": "पुष्टि भएको शोषणयोग्य",
+      "confirmedExploitableDetail": "विश्लेषणद्वारा परियोजना जोखिम पुष्टि भयो",
+      "needsReview": "तपाईंको समीक्षा आवश्यक छ",
+      "needsReviewDetail": "मानव निर्णय आवश्यक छ",
+      "analysisIncomplete": "विश्लेषण पूरा भएको छैन",
+      "analysisIncompleteDetail": "परियोजना जोखिम अझै अज्ञात छ",
+      "slaCompliance": "SLA अनुपालन",
+      "notMeasured": "मापन गरिएको छैन",
+      "withinDeadlineDetail": "{{total}} मध्ये {{within}} सीमाभित्र",
+      "noDeadlineData": "कुनै निष्कर्षको SLA सीमा अझै छैन",
+      "deadlinePassed": "सीमा पार भयो",
+      "deadlinePassedDetail": "{{critical}} क्रिटिकल, {{high}} उच्च",
+      "dueThisWeek": "यस हप्ता सीमा",
+      "dueThisWeekDetail": "{{exploitable}} पुष्टि भएको शोषणयोग्य",
+      "noDeadline": "कुनै सीमा छैन",
+      "reviewSlaAssignment": "SLA असाइनमेन्ट समीक्षा",
+      "allOpenFindingsTracked": "सबै खुला निष्कर्षहरू ट्र्याक गरियो"
+    },
     "dismiss": {
       "title": "निष्कर्ष खारेज गर्नुहोस्",
       "submit": "निष्कर्ष खारेज गर्नुहोस्",
@@ -1450,7 +1654,7 @@
     "findingDetails": {
       "supersededBy": "हालको निष्कर्षद्वारा प्रतिस्थापित",
       "supersededByDescription": "स्थिति, विश्लेषण र सुधारका लागि हालको रेकर्ड खोल्न ट्याप गर्नुहोस्।",
-      "dismissed": "खारेज गरिएको",
+      "dismissed": "खारेज गरियो",
       "dismissedBecause": "{{reason}} भएर खारेज गरियो।",
       "severityLabel": "{{severity}} गम्भीरता",
       "package": "प्याकेज",
@@ -1460,40 +1664,51 @@
       "noPatchAvailable": "कुनै प्याच उपलब्ध छैन",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "भण्डार",
+      "repository": "रिपोजिटरी",
       "manifest": "म्यानिफेस्ट",
       "detected": "पत्ता लगाइएको",
-      "updated": "अद्यावधिक गरिएको",
-      "fixed": "समाधान गरिएको",
+      "updated": "अद्यावधिक गरियो",
+      "fixed": "समाधान भयो",
       "slaDeadline": "SLA सीमा",
       "sourceRecord": "स्रोत रेकर्ड",
       "source": "स्रोत",
       "sourceId": "स्रोत ID",
-      "viewAdvisory": "GitHub मा सल्लाह हेर्नुहोस्"
+      "viewAdvisory": "GitHub मा सल्लाह हेर्नुहोस्",
+      "statusSuperseded": "प्रतिस्थापित",
+      "statusFixed": "समाधान भयो",
+      "statusOpen": "खुला",
+      "sourceDependabot": "GitHub Dependabot",
+      "reasonFixStarted": "समाधान पहिले नै सुरु भइसकेको छ",
+      "reasonNoBandwidth": "कुनै क्षमता उपलब्ध छैन",
+      "reasonTolerableRisk": "जोखिम सहनयोग्य छ",
+      "reasonInaccurate": "निष्कर्ष गलत छ",
+      "reasonNotUsed": "कमजोर कोड प्रयोग गरिएको छैन",
+      "reasonAfterReview": "समीक्षापछि"
     },
     "settingsOverview": {
       "title": "सेटिङहरू",
       "couldNotLoadSettings": "सुरक्षा एजेन्ट सेटिङहरू लोड गर्न सकिएन",
       "couldNotLoadPermissions": "अनुमतिहरू लोड गर्न सकिएन",
-      "couldNotLoadRepositories": "भण्डारहरू लोड गर्न सकिएन",
+      "couldNotLoadRepositories": "रिपोजिटरीहरू लोड गर्न सकिएन",
       "securityAgent": "सुरक्षा एजेन्ट",
-      "enabled": "सक्षम गरिएको",
-      "disabled": "असक्षम गरिएको",
+      "enabled": "सक्षम",
+      "disabled": "असक्षम",
       "on": "चालू",
       "off": "बन्द",
-      "allRepositories": "सबै भण्डारहरू",
-      "repositorySelected": "{{count}} भण्डार चयन गरियो",
-      "repositoriesSelected": "{{count}} भण्डारहरू चयन गरियो",
-      "selectRepositories": "भण्डारहरू चयन गर्नुहोस्",
+      "allRepositories": "सबै रिपोजिटरीहरू",
+      "repositoriesCount_one": "{{displayCount}} भण्डार चयन गरियो",
+      "repositoriesCount": "{{displayCount}} भण्डारहरू चयन गरियो",
+      "repositoriesCount_other": "{{displayCount}} भण्डारहरू चयन गरियो",
+      "selectRepositories": "रिपोजिटरीहरू चयन गर्नुहोस्",
       "selectRepositoriesSubtitle": "सुरक्षा एजेन्टले कुन भण्डारहरू निगरानी गर्ने भनेर छान्नुहोस्",
-      "repositories": "भण्डारहरू",
+      "repositories": "रिपोजिटरीहरू",
       "modelsAndAnalysis": "मोडेल र विश्लेषण",
       "analysisModeSubtitle": "{{mode}} विश्लेषण",
       "automation": "स्वचालन",
       "automationAllOff": "सबै बन्द",
-      "automationCount": "{{count}} मध्ये ३ सक्षम",
+      "automationCount": "{{displayCount}} मध्ये ३ सक्षम",
       "notifications": "सूचनाहरू",
-      "notificationsCount": "{{count}} मध्ये २ सक्षम",
+      "notificationsCount": "{{displayCount}} मध्ये २ सक्षम",
       "slaPolicy": "SLA नीति",
       "disabledNoManage": "सुरक्षा एजेन्ट असक्षम छ। संगठन मालिक र बिलिङ प्रबन्धकले मात्र यसलाई चालू गर्न सक्छन्।",
       "disabledNoRepo": "सुरक्षा एजेन्ट सक्षम गर्नुअघि कम्तीमा एउटा भण्डार चयन गर्नुहोस्।",
@@ -1502,7 +1717,7 @@
     "remediation": {
       "cancellationRequested": "रद्दीकरण अनुरोध गरियो",
       "cancelled": "सुधार रद्द गरियो",
-      "pullRequest": "pull request",
+      "pullRequest": "पुल अनुरोध",
       "couldNotLoad": "सुधार स्थिति लोड गर्न सकिएन",
       "noAnalysisTitle": "अहिलेसम्म कुनै विश्लेषण छैन",
       "noAnalysisDescription": "विवरण ट्याबबाट एउटा चलाउनुहोस्",
@@ -1515,7 +1730,7 @@
       "openPullRequest": "Pull request खोल्नुहोस्{{number}}",
       "openDraftPullRequest": "ड्राफ्ट pull request खोल्नुहोस्{{number}}",
       "progress": "प्रगति",
-      "attemptHistory": "प्रयास इतिहास ({{count}})",
+      "attemptHistory": "प्रयास इतिहास ({{displayCount}})",
       "attemptNumber": "प्रयास #{{number}}",
       "startedBy": "द्वारा सुरु गरियो",
       "model": "मोडेल",
@@ -1528,9 +1743,9 @@
         "failed": "सुधार असफल भयो",
         "blocked": "सुधार अवरुद्ध भयो",
         "noChangesNeeded": "कुनै परिवर्तन आवश्यक छैन",
-        "cancelled": "रद्द गरिएको"
+        "cancelled": "रद्द गरियो"
       },
-      "unavailable": "यो निष्कर्षका लागि सुधार उपलब्ध छैन।"
+      "unavailable": "यस निष्कर्षका लागि सुधार उपलब्ध छैन।"
     },
     "analysisSettings": {
       "title": "मोडेल र विश्लेषण",
@@ -1586,9 +1801,9 @@
     },
     "scopeList": {
       "title": "सुरक्षा एजेन्ट",
-      "couldNotLoad": "संगठनहरू लोड गर्न सकिएन",
+      "couldNotLoad": "संस्थाहरू लोड गर्न सकिएन",
       "personal": "व्यक्तिगत",
-      "personalSubtitle": "तपाईंका आफ्नै भण्डारहरू"
+      "personalSubtitle": "तपाईंका आफ्नै रिपोजिटरीहरू"
     },
     "commandRetry": {
       "discard": "खारेज गर्नुहोस्"
@@ -1655,9 +1870,9 @@
       "title": "सूचनाहरू"
     },
     "repositories": {
-      "allRepositories": "सबै भण्डारहरू",
+      "allRepositories": "सबै रिपोजिटरीहरू",
       "couldNotLoad": "भण्डार सेटिङहरू लोड गर्न सकिएन",
-      "couldNotLoadRepositories": "भण्डारहरू लोड गर्न सकिएन",
+      "couldNotLoadRepositories": "रिपोजिटरीहरू लोड गर्न सकिएन",
       "couldNotOpenGithubSettings": "GitHub App सेटिङहरू खोल्न सकिएन",
       "githubAppSettings": "GitHub App सेटिङहरू",
       "manageAccess": "GitHub App पहुँच व्यवस्थापन गर्नुहोस्",
@@ -1665,8 +1880,8 @@
       "noRepositoriesDescription": "भण्डारहरूमा पहुँचका लागि Kilo GitHub App लाई अनुमति दिनुहोस्",
       "readOnly": "संगठन मालिक र बिलिङ प्रबन्धकले मात्र यी सेटिङहरू परिवर्तन गर्न सक्छन्।",
       "selectAtLeastOne": "कम्तीमा एउटा भण्डार चयन गर्नुहोस्।",
-      "selectedRepositories": "चयन गरिएका भण्डारहरू",
-      "title": "भण्डारहरू"
+      "selectedRepositories": "चयन गरिएका रिपोजिटरीहरू",
+      "title": "रिपोजिटरीहरू"
     },
     "scopeEntry": {
       "connectDescription": "Dependabot सतर्कताहरू स्वतः सिंक गर्न र तपाईंका भण्डारहरूभरि सुरक्षा निष्कर्षहरू व्यवस्थापन गर्न Kilo GitHub App स्थापना गर्नुहोस्।",
@@ -1681,7 +1896,140 @@
     },
     "queuedActionUntracked": "एउटा कतारमा राखिएको कार्य अब ट्र्याक गर्न सकिएन। नयाँ अवस्था हेर्न रिफ्रेस गर्नुहोस्।",
     "initialSyncAdmissionFailed": "सुरक्षा एजेन्ट सक्षम गरियो, तर प्रारम्भिक सिंक कतारमा राख्न सकिएन। फेरि सिंक गर्नुहोस्।",
-    "title": "सुरक्षा एजेन्ट"
+    "title": "सुरक्षा एजेन्ट",
+    "commands": {
+      "findingAlreadyDismissed": "फेला परेको कुरा पहिले नै खारेज गरिएको छ",
+      "findingDismissed": "फेला परेको कुरा खारेज गरियो",
+      "noRemediationsQueued": "कुनै अवस्थित फेला परेका कुराहरू कतारमा छैनन्",
+      "remediationsQueued": "अवस्थित सुधारहरू कतारमा राखियो",
+      "analysisComplete": "विश्लेषण पूरा भयो",
+      "syncComplete": "सिन्क पूरा भयो"
+    },
+    "mutations": {
+      "serviceNotConfiguredResubmit": "सुरक्षा सेवा कन्फिगर गरिएको छैन। यो समाधान नभएसम्म पुनः पेश गर्न सफल हुँदैन।",
+      "syncMayNotHaveCompleted": "सिंक पूरा नभएको हुन सक्छ। मिलाउन पुनः प्रयास गर्नुहोस्, वा खारेज गर्नुहोस्।",
+      "syncInProgress": "सुरक्षा सिंक पहिले नै भइरहेको छ। कृपया फेरि प्रयास गर्नुहोस्।",
+      "dismissalInProgress": "यो खारेजी पहिले नै भइरहेको छ। कृपया फेरि प्रयास गर्नुहोस्।",
+      "couldNotReadPendingSyncs": "पर्खाइमा रहेका सिंकहरू पढ्न सकिएन। फेरि प्रयास गर्नुहोस्।"
+    },
+    "analysisState": {
+      "queued": "विश्लेषण कतारमा",
+      "queuedTitle": "विश्लेषण कतारमा",
+      "queuedDescription": "विश्लेषण क्षमता उपलब्ध हुनको लागि प्रतीक्षा गर्दै।",
+      "analyzing": "विश्लेषण गर्दै",
+      "analyzingTitle": "विश्लेषण गर्दै",
+      "analyzingDescription": "अनुप्रयोग कोडले प्रभावित सुविधामा पुग्न सक्छ कि सक्दैन भनी जाँच्दै।",
+      "failed": "विश्लेषण असफल भयो",
+      "failedTitle": "विश्लेषण असफल भयो",
+      "failedDescription": "सुरक्षा एजेन्टले विश्लेषण पूरा गर्न सकेन।",
+      "extractionFailed": "समीक्षा आवश्यक",
+      "extractionFailedTitle": "समीक्षा आवश्यक",
+      "extractionFailedDescription": "प्राविधिक प्रतिवेदनलाई संरचित नतिजामा बदल्न सकिएन।",
+      "exploitable": "शोषणयोग्य",
+      "exploitableTitle": "शोषणयोग्य",
+      "exploitableDescription": "अनुप्रयोग कोडले प्रभावित सुविधामा पुग्न सक्छ।",
+      "notExploitable": "शोषणयोग्य छैन",
+      "notExploitableTitle": "शोषणयोग्य छैन",
+      "notExploitableDescription": "यस रिपोजिटरीमा कुनै पहुँचयोग्य मार्ग फेला परेन।",
+      "unknown": "समीक्षा आवश्यक",
+      "unknownTitle": "समीक्षा आवश्यक",
+      "unknownDescription": "विश्लेषणले कमजोर सुविधा पहुँचयोग्य छ कि छैन भनी पुष्टि गर्न सकेन।",
+      "safeToDismiss": "खारेज गर्न सुरक्षित",
+      "safeToDismissTitle": "खारेज गर्न सुरक्षित",
+      "safeToDismissDescription": "ट्राइएजले कोडबेस विश्लेषण बिना यो सुरक्षित रूपमा खारेज गर्न सकिने निर्धारण गर्यो।",
+      "manualReview": "समीक्षा आवश्यक",
+      "manualReviewTitle": "म्यानुअल समीक्षा आवश्यक छ",
+      "manualReviewDescription": "ट्राइएजले यो निष्कर्षलाई म्यानुअल समीक्षाका लागि चिन्ह लगायो।",
+      "analysisRequired": "विश्लेषण आवश्यक",
+      "analysisRequiredTitle": "कोडबेस विश्लेषण आवश्यक",
+      "analysisRequiredDescription": "ट्राइएजले प्रतिक्रिया निर्धारण गर्नु अघि रिपोजिटरी विश्लेषण गर्न सिफारिस गर्छ।",
+      "completed": "विश्लेषण गरिएको",
+      "completedTitle": "विश्लेषण गरिएको",
+      "completedDescription": "विश्लेषण कुनै विशेष नतिजा रेकर्ड नगरी पूरा भयो।",
+      "notAnalyzed": "विश्लेषण गरिएको छैन",
+      "notAnalyzedTitle": "विश्लेषण गरिएको छैन",
+      "notAnalyzedDescription": "यो निष्कर्षका लागि कोडबेस विश्लेषण अझै चलाइएको छैन।"
+    },
+    "deadline": {
+      "fixedBeforeDeadline": "सीमाभन्दा अघि समाधान गरियो",
+      "fixed": "समाधान भयो",
+      "fixedOn": "{{date}} मा समाधान गरियो",
+      "resolutionRecorded": "समाधान रेकर्ड गरियो",
+      "superseded": "प्रतिस्थापित",
+      "dismissed": "खारेज गरियो",
+      "closedOn": "{{status}} {{date}}",
+      "deadlineNotSet": "सीमा तोकिएको छैन",
+      "noSlaDeadline": "कुनै SLA सीमा छैन",
+      "dueOn": "{{date}} मा सीमा",
+      "overdueNow": "ढिलो",
+      "overdue_one": "{{count}} दिन ढिलो",
+      "overdue_other": "{{count}} दिन ढिलो",
+      "dueToday": "आज सीमा",
+      "dueTomorrow": "भोलि सीमा",
+      "dueInDays_one": "{{count}} दिनमा सीमा",
+      "dueInDays_other": "{{count}} दिनमा सीमा",
+      "overdue": "{{count}} दिन ढिलो",
+      "dueInDays": "{{count}} दिनमा सीमा"
+    },
+    "remediationStatus": {
+      "cancellationRequested": "रद्दीकरण अनुरोध गरियो",
+      "notStarted": "सुरु भएको छैन",
+      "queued": "कतारमा",
+      "starting": "सुरु गर्दै",
+      "inProgress": "चलिरहेको",
+      "draftPrOpened": "ड्राफ्ट PR खोलियो",
+      "prOpened": "PR खोलियो",
+      "blocked": "अवरुद्ध",
+      "failed": "असफल",
+      "noChangesNeeded": "कुनै परिवर्तन आवश्यक छैन",
+      "cancelled": "रद्द गरियो",
+      "originAutomaticPolicy": "स्वचालित नीति",
+      "originIncludeExistingPolicy": "अवस्थित नीति समावेश गर्नुहोस्",
+      "originManual": "म्यानुअल",
+      "validationCheck": "मान्यता जाँच {{number}}"
+    },
+    "remediationUnavailable": {
+      "findingNotFound": "सुरक्षा निष्कर्ष अब अवस्थित छैन।",
+      "approvalRequired": "स्वचालित सुधारका लागि स्वीकृति आवश्यक छ। स्वीकृत गर्न सुधार म्यानुअल रूपमा सुरु गर्नुहोस्।",
+      "findingNotOpen": "निष्कर्ष अब खुला छैन।",
+      "repoNotInScope": "यो रिपोजिटरी सुरक्षा एजेन्टका लागि चयन गरिएको छैन।",
+      "analysisRequired": "सुधार सुरु गर्नु अघि कोडबेस विश्लेषण चलाउनुहोस्।",
+      "sandboxAnalysisRequired": "सुधार सुरु गर्नु अघि कोडबेस विश्लेषण चलाउनुहोस्।",
+      "staleAnalysis": "विश्लेषण पछि निष्कर्ष परिवर्तन भयो। सुधार सुरु गर्नु अघि विश्लेषण फेरि चलाउनुहोस्।",
+      "notExploitable": "विश्लेषणले कुनै पहुँचयोग्य कमजोर मार्ग फेला पारेन। स्वचालित सुधार उपलब्ध छैन।",
+      "exploitabilityUnknown": "विश्लेषणले शोषणयोग्यता पुष्टि गर्न सकेन। एक-क्लिक सुधार अघि म्यानुअल समीक्षा आवश्यक छ।",
+      "manualReviewRequired": "विश्लेषणले म्यानुअल समीक्षा सिफारिस गर्छ, त्यसैले एक-क्लिक सुधार उपलब्ध छैन।",
+      "monitorRequired": "विश्लेषणले PR खोल्नुको सट्टा अनुगमन सिफारिस गर्छ।",
+      "triageOnly": "केवल ट्राइएज पूरा भएको छ। सुधार सुरु गर्नु अघि कोडबेस विश्लेषण चलाउनुहोस्।",
+      "actionNotConcrete": "कुनै ठोस निर्भरता प्याच वा सुझाव गरिएको समाधान उपलब्ध छैन।",
+      "remediationActive": "सुधार प्रयास पहिले नै सक्रिय छ।",
+      "prAlreadyOpened": "सुधार PR पहिले नै खुला छ।",
+      "duplicateAnalysisResult": "यस विश्लेषण नतिजाले पहिले नै सुधार कार्य उत्पादन गरिसकेको छ।",
+      "retryNotAllowed": "यस प्रयासका लागि पुन: प्रयास उपलब्ध छैन।",
+      "securityAgentDisabled": "यस मालिकका लागि सुरक्षा एजेन्ट असक्षम छ।",
+      "autoRemediationDisabled": "स्वचालित सुधार असक्षम छ। सुरक्षा गेटहरू पार भएमा म्यानुअल सुधार अझै सुरु हुन सक्छ।",
+      "includeExistingDisabled": "अवस्थित निष्कर्षहरू स्वचालित सुधारबाट बहिष्कृत छन्।",
+      "belowThreshold": "निष्कर्ष स्वचालित गम्भीरता थ्रेसहोल्डभन्दा तल छ। सुरक्षा गेटहरू पार भएमा म्यानुअल सुधार अझै सुरु हुन सक्छ।",
+      "beforeEnablement": "विश्लेषण स्वचालित सुधार सक्षम हुनु अघि पूरा भयो। सुरक्षा गेटहरू पार भएमा म्यानुअल सुधार अझै सुरु हुन सक्छ।",
+      "generic": "यस निष्कर्षका लागि सुधार उपलब्ध छैन।"
+    },
+    "commandFailure": {
+      "ownerCapReached": "विश्लेषण क्षमता भरिएको छ। सक्रिय विश्लेषण समाप्त हुन पर्खनुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+      "githubTokenUnavailable": "GitHub प्राधिकरणलाई ध्यान चाहिन्छ। GitHub App पुनः अधिकृत गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+      "githubAuthInvalid": "GitHub प्राधिकरणलाई ध्यान चाहिन्छ। GitHub App पुनः अधिकृत गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+      "findingUnavailable": "निष्कर्ष अब उपलब्ध छैन। निष्कर्षहरू ताजा गर्नुहोस् र यदि यो खुला रह्यो भने फेरि प्रयास गर्नुहोस्।",
+      "repositoryUnavailable": "भण्डार अब GitHub App का लागि उपलब्ध छैन। भण्डार पहुँच ताजा गर्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+      "invalidDismissTarget": "यसको Dependabot लक्ष्य अवैध भएकाले निष्कर्ष खारेज गर्न सकिँदैन।",
+      "commandStalled": "कतारमा राखिएको कार्य समयमै समाप्त भएन। कार्य फेरि प्रयास गर्नुहोस्।",
+      "queueRetriesExhausted": "धेरै प्रयासपछि कार्य पूरा गर्न सकिएन। कार्य फेरि प्रयास गर्नुहोस्।",
+      "queueAdmissionFailed": "कतारमा राखिएको कार्य स्वीकार गर्न सकिएन। कार्य फेरि प्रयास गर्नुहोस्।",
+      "generic": "कतारमा राखिएको कार्य असफल भयो। कार्य फेरि प्रयास गर्नुहोस्।"
+    },
+    "analysisMode": {
+      "auto": "स्वचालित",
+      "shallow": "सतही",
+      "deep": "गहिरो"
+    }
   },
   "agents": {
     "activeNow": "अहिले सक्रिय",
@@ -1709,7 +2057,7 @@
     "sessionRow": {
       "deleteTitle": "सत्र मेटाउने?",
       "deleteMessage": "यो पूर्ववत गर्न सकिँदैन।",
-      "delete": "मेटाउनुहोस्",
+      "delete": "मेट्नुहोस्",
       "deleteSession": "सत्र मेटाउनुहोस्",
       "rename": "नाम बदल्नुहोस्",
       "renameMessage": "यो सत्रका लागि नयाँ नाम प्रविष्ट गर्नुहोस्",
@@ -1720,16 +2068,32 @@
       "sessionDeleted": "सत्र मेटियो",
       "needsInput": "इनपुट चाहिन्छ",
       "fromPlatform": "{{platform}} बाट",
-      "centOne": "सेन्ट",
-      "centOther": "सेन्टहरू",
-      "dollarOne": "डलर",
-      "dollarOther": "डलरहरू"
+      "cent_one": "सेन्ट",
+      "cent": "सेन्टहरू",
+      "cent_other": "सेन्टहरू",
+      "dollar_one": "डलर",
+      "dollar": "डलरहरू",
+      "dollar_other": "डलरहरू",
+      "costSpoken": "लागत {{cost}}",
+      "costSpokenWithTime": "लागत {{cost}}, {{time}}",
+      "pullRequest": "पुल रिक्वेस्ट {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub खोल्न सकिएन",
-      "couldNotOpenMessage": "हामीले GitHub App सेटअप सुरु गर्न सकेनौं। फेरि प्रयास गर्नुहोस्।"
+      "couldNotOpenMessage": "हामीले GitHub App सेटअप सुरु गर्न सकेनौं। फेरि प्रयास गर्नुहोस्।",
+      "installedTitle": "GitHub App स्थापना भयो",
+      "installedMessage": "तपाईंका रिपोजिटरीहरू अब जडान भएका छन्।",
+      "pendingTitle": "प्रशासक स्वीकृति पर्खँदै",
+      "pendingMessage": "संस्थाका प्रशासकले स्थापना अनुरोध स्वीकृत गर्नुपर्छ।",
+      "accountMismatchTitle": "खाता मेल खाएन",
+      "accountMismatchMessage": "यो जडान फरक खाताबाट साइन इन गरिएको Kilo App बाट सुरु गरिएको थियो। त्यो खाताबाट वेबमा साइन इन गर्नुहोस्, वा एपबाट फेरि सुरु गर्नुहोस्।",
+      "cannotCompleteTitle": "स्थापना पूरा गर्न सकिएन",
+      "notAdminMessage": "त्यो खाताको GitHub प्रशासकले मात्र यसलाई जडान गर्न सक्छ। Kilo स्थापना गर्न संस्थाका प्रशासकलाई सोध्नुहोस्।",
+      "alreadyClaimedMessage": "त्यो GitHub स्थापना अर्को Kilo खातासँग पहिले नै जडान भएको छ। पहिले त्यहाँबाट विच्छेद गर्नुहोस्।",
+      "didNotCompleteTitle": "स्थापना पूरा भएन",
+      "didNotCompleteMessage": "GitHub App स्थापना पूरा भएन। एपबाट फेरि प्रयास गर्नुहोस्।"
     },
-    "sessionExited": "सत्र बाहिर निस्कियो",
+    "sessionExited": "सत्र बाहिरियो",
     "remoteSpawnRetryable": "इन्स्ट्यान्समा पुग्न सकिएन — यो विच्छेद भएको हुन सक्छ।",
     "remoteSpawnNonRetryable": "इन्स्ट्यान्सले सत्र सुरु गर्न असफल भयो — मेसिन जाँच्नुहोस् वा CLI अपडेट गर्नुहोस्।",
     "remoteSpawnInstanceDisconnected": "चयन गरिएको इन्स्ट्यान्स विच्छेद भयो। Cloud Agent मा सत्र सुरु गर्नुहोस् वा अर्को इन्स्ट्यान्स छान्नुहोस्।"
@@ -1760,7 +2124,12 @@
       "couldNotLoadThisSession": "यो सत्र लोड गर्न सकिएन",
       "cloneFailed": "यो सत्र क्लोन गर्न सकिएन।",
       "cloneFailedRetry": "यो सत्र क्लोन गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
-      "connectRepositoryToContinue": "जारी राख्न एउटा भण्डार जडान गर्नुहोस्।"
+      "connectRepositoryToContinue": "जारी राख्न एउटा भण्डार जडान गर्नुहोस्।",
+      "notEnoughCredits": "Cloud Agent चलाउन पर्याप्त क्रेडिट छैन। क्रेडिट थपेर फेरि प्रयास गर्नुहोस्।",
+      "previousTaskFinishing": "अघिल्लो कार्य अझै समाप्त हुँदैछ। कृपया एक क्षण पर्खनुहोस्।",
+      "serviceUnavailable": "सेवा अहिले उपलब्ध छैन। फेरि प्रयास गर्नुहोस्।",
+      "connectionTrouble": "जडान समस्या। कृपया केही क्षणमा फेरि प्रयास गर्नुहोस्।",
+      "modelUnavailable": "यो मोडेल Cloud Agent का लागि उपलब्ध छैन। अर्को मोडेल छानेर फेरि प्रयास गर्नुहोस्।"
     },
     "remoteSession": {
       "failedToCreate": "दूरस्थ सत्र सिर्जना गर्न असफल भयो",
@@ -1770,7 +2139,10 @@
       "exitMessage": "यसले चलिरहेको सत्र रोक्छ तर यसको इतिहास राख्छ।",
       "keepSessionRunning": "सत्र चलाइराख्नुहोस्",
       "exitSession": "सत्र बाहिरिनुहोस्",
-      "restartExitFailed": "नयाँ सत्र सुरु गरियो। अघिल्लो सत्र अझै खुला छ।"
+      "restartExitFailed": "नयाँ सत्र सुरु गरियो। अघिल्लो सत्र अझै खुला छ।",
+      "exitNotSupported": "वर्तमान सत्रका लागि दूरस्थ सत्रबाट बाहिरिने समर्थन छैन",
+      "exitUnavailable": "वर्तमान सत्रका लागि दूरस्थ सत्रबाट बाहिरिने उपलब्ध छैन",
+      "exitNeedsNewerCli": "दूरस्थ स्ल्यास कमाण्डहरूका लागि नयाँ Kilo CLI चाहिन्छ। Kilo CLI अद्यावधिक गरेर पुनः जडान गर्नुहोस्।"
     },
     "sessionConnection": {
       "connecting": "जडान गर्दै…",
@@ -1780,7 +2152,7 @@
     },
     "newSession": {
       "title": "नयाँ सत्र",
-      "repository": "भण्डार",
+      "repository": "रिपोजिटरी",
       "couldNotLoadRepositories": "भण्डारहरू लोड गर्न सकिएन",
       "connectGithub": "GitHub जडान गर्नुहोस्",
       "connectGithubDescription": "तपाईंको ब्राउजरमा GitHub जडान गर्नुहोस्, त्यसपछि भण्डार छान्न यहाँ फर्कनुहोस्।",
@@ -1814,11 +2186,13 @@
       "discardDraftMessage": "तपाईंको प्रम्प्ट हराउनेछ।",
       "keepEditing": "सम्पादन जारी राख्नुहोस्",
       "discard": "खारेज गर्नुहोस्",
-      "discardFailed": "ड्राफ्ट खारेज गर्न सकिएन। फेरि प्रयास गर्नुहोस्।"
+      "discardFailed": "ड्राफ्ट खारेज गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
-      "updatedFile": "{{count}} फाइल अद्यावधिक गरियो",
-      "updatedFiles": "{{count}} फाइलहरू अद्यावधिक गरियो"
+      "updatedFileCount_one": "{{displayCount}} फाइल अद्यावधिक गरियो",
+      "updatedFileCount": "{{displayCount}} फाइलहरू अद्यावधिक गरियो",
+      "updatedFileCount_other": "{{displayCount}} फाइलहरू अद्यावधिक गरियो"
     },
     "toolPatch": {
       "operationAdded": "थपियो",
@@ -1830,22 +2204,22 @@
       "accessibilityLabel": "{{name}} उपकरण, {{status}}",
       "fileEmpty": "यो फाइल खाली छ।",
       "noTasks": "कुनै कार्यहरू छैनन्।",
-      "contentTruncated": "सामग्री ट्रंकेट गरियो",
-      "truncated": "ट्रंकेट गरियो",
+      "contentTruncated": "सामग्री काटियो",
+      "truncated": "काटिएको",
       "toolRead": "read",
-      "toolEdit": "edit",
+      "toolEdit": "सम्पादन",
       "toolWrite": "write",
       "toolBash": "bash",
       "toolGlob": "glob",
       "toolGrep": "grep",
       "toolList": "list",
       "toolPatch": "patch",
-      "toolTask": "task",
+      "toolTask": "कार्य",
       "readTodos": "कामहरू पढ्नुहोस्",
       "updateTodos": "कामहरू अद्यावधिक गर्नुहोस्",
-      "linesBadge": "{{count}} पङ्क्तिहरू",
-      "filesBadge": "{{count}} फाइलहरू",
-      "matchesBadge": "{{count}} मेलहरू"
+      "linesBadge": "{{displayCount}} पङ्क्तिहरू",
+      "filesBadge": "{{displayCount}} फाइलहरू",
+      "matchesBadge": "{{displayCount}} मेलहरू"
     },
     "readToolMarkdown": {
       "linesTruncated": "पङ्क्तिहरू {{start}}–{{end}} (ट्रंकेट गरियो)",
@@ -1865,7 +2239,7 @@
       "couldNotLoad": "इन्स्ट्यान्सहरू लोड गर्न सकिएन",
       "couldNotLoadDescription": "तपाईंको जडान जाँच्नुहोस् र फेरि प्रयास गर्नुहोस्।",
       "cloudAgent": "क्लाउड एजेन्ट",
-      "loading": "लोड गर्दै…",
+      "loading": "लोड हुँदै…",
       "cloudAgentDescription": "Kilo को क्लाउड स्यान्डबक्समा चलाउनुहोस्",
       "noCliInstances": "कुनै CLI इन्स्ट्यान्सहरू जडान भएका छैनन्",
       "noCliInstancesDescription": "तपाईंको कम्प्युटरको एउटा प्रोजेक्टमा `kilo remote` चलाउनुहोस्, वा कुनै CLI पहिले नै चलिरहेको छ भने Kilo CLI अद्यावधिक गर्नुहोस्।",
@@ -1929,6 +2303,10 @@
       "reportAiResponseFailedTerminal": "यो प्रतिक्रिया रिपोर्ट गर्न सकिँदैन।",
       "reportAiResponseSubmitted": "रिपोर्ट पेश गरियो। रसिद {{receiptId}}"
     },
+    "modelCost": {
+      "lessThan": "<{{amount}}",
+      "perMillion": "{{inputLabel}} {{input}} · {{outputLabel}} {{output}} / {{million}} {{tokens}}"
+    },
     "partDetail": {
       "detailsUnavailable": "विवरण उपलब्ध छैन",
       "textDisplay": "पाठ प्रदर्शन",
@@ -1987,7 +2365,7 @@
       "preparationComplete": "तयारी पूरा भयो",
       "preparationFailed": "तयारी असफल भयो",
       "setupCommand": "सेटअप कमाण्ड {{index}}",
-      "setupCommandOf": "{{count}} मध्ये सेटअप कमाण्ड {{index}}"
+      "setupCommandOf": "{{displayCount}} मध्ये सेटअप कमाण्ड {{index}}"
     },
     "permissionCard": {
       "title": "अनुमति आवश्यक छ",
@@ -2024,7 +2402,7 @@
       "submissionFailed": "पेश गर्न असफल भयो। कृपया फेरि प्रयास गर्नुहोस्।",
       "questionAnnouncement": "एजेन्टलाई तपाईंको इनपुट चाहिन्छ। तपाईंले उत्तर नदिउँदासम्म कम्पोजर रोकिएको छ।",
       "permissionAnnouncement": "जारी राख्न एजेन्टलाई अनुमति चाहिन्छ। तपाईंले निर्णय नगर्दासम्म कम्पोजर रोकिएको छ।",
-      "positionHint": "({{count}} मध्ये 1)",
+      "positionHint": "({{displayCount}} मध्ये 1)",
       "movedPastPrompt": "एजेन्ट यो प्रम्प्टभन्दा अगाडि बढिसकेको छ। सत्र जारी हुँदा यो कार्ड बन्द हुनेछ।",
       "waitingForAnswer": "एजेन्ट तपाईंको उत्तरको पर्खाइमा छ। यो प्रश्न खुला हुँदा, एजेन्टलाई तपाईंको सन्देश रोकिएको छ।",
       "waitingForPermission": "एजेन्ट अनुमतिको पर्खाइमा छ। यो अनुरोध खुला हुँदा, एजेन्टलाई तपाईंको सन्देश रोकिएको छ।"
@@ -2050,7 +2428,7 @@
       "failure": "{{title}}।",
       "failureRetryAvailable": "{{title}}। पुनःप्रयास उपलब्ध छ।",
       "copyToComposer": "कम्पोजरमा प्रतिलिपि गर्नुहोस्",
-      "queued": "लाइनमा",
+      "queued": "कतारमा",
       "queuedAccessibility": "सन्देश लाइनमा राखियो",
       "userMessage": "प्रयोगकर्ता सन्देश",
       "assistantMessage": "सहायक सन्देश",
@@ -2059,8 +2437,9 @@
     "olderMessages": {
       "arrived": "पहिलेका सन्देशहरू लोड भयो",
       "retryHint": "यस सत्रका लागि पहिलेका सन्देशहरूको लोड पुनःप्रयास गर्छ।",
-      "omittedOne": "यस सत्रका केही पहिलेका वस्तुहरू प्रदर्शन गर्न सकिएन।",
-      "omittedMany": "यस सत्रका {{count}} पहिलेका वस्तुहरू प्रदर्शन गर्न सकिएन।",
+      "omitted_one": "यस सत्रका केही पहिलेका वस्तुहरू प्रदर्शन गर्न सकिएन।",
+      "omitted": "यस सत्रका {{displayCount}} पहिलेका वस्तुहरू प्रदर्शन गर्न सकिएन।",
+      "omitted_other": "यस सत्रका {{displayCount}} पहिलेका वस्तुहरू प्रदर्शन गर्न सकिएन।",
       "couldNotLoad": "पहिलेका सन्देशहरू लोड गर्न सकिएन।",
       "unavailable": "पहिलेका सन्देशहरू उपलब्ध छैनन्।",
       "tooLarge": "पहिलेका सन्देशहरू लोड गर्न धेरै ठूला छन्।"
@@ -2069,10 +2448,12 @@
       "viewTable": "तालिका हेर्नुहोस्",
       "title": "तालिका",
       "close": "तालिका बन्द गर्नुहोस्",
-      "column": "स्तम्भ",
-      "columns": "स्तम्भहरू",
-      "row": "पङ्क्ति",
-      "rows": "पङ्क्तिहरू",
+      "columnCount_one": "स्तम्भ",
+      "columnCount": "स्तम्भहरू",
+      "columnCount_other": "स्तम्भहरू",
+      "rowCount_one": "पङ्क्ति",
+      "rowCount": "पङ्क्तिहरू",
+      "rowCount_other": "पङ्क्तिहरू",
       "opensFullScreen": "पूर्ण स्क्रिनमा खोल्छ"
     },
     "sessionFilter": {
@@ -2102,8 +2483,11 @@
     "modelPicker": {
       "title": "मोडेल चयन गर्नुहोस्",
       "searchPlaceholder": "मोडेल खोज्नुहोस्...",
+      "allModels": "सबै मोडेलहरू",
+      "favorites": "मनपर्ने",
       "noModels": "कुनै मोडेल उपलब्ध छैन",
-      "noModelsDescription": "चयन गर्न कुनै मोडेल उपलब्ध छैन।"
+      "noModelsDescription": "चयन गर्न कुनै मोडेल उपलब्ध छैन।",
+      "recommended": "सिफारिस गरिएको"
     },
     "modelSelector": {
       "model": "मोडेल",
@@ -2120,7 +2504,8 @@
       "addToFavorites": "मनपर्नेमा {{name}} थप्नुहोस्",
       "removeFromFavorites": "मनपर्नेबाट {{name}} हटाउनुहोस्",
       "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "मध्यम"
+      "thinkingEffortMedium": "मध्यम",
+      "sessionModel": "सत्र मोडेल"
     },
     "attachmentPreview": {
       "openFailedRetry": "फाइल खोल्न असफल भयो। कृपया फेरि प्रयास गर्नुहोस्।",
@@ -2139,14 +2524,14 @@
       "camera": "क्यामेरा",
       "photoLibrary": "फोटो लाइब्रेरी",
       "files": "फाइलहरू",
-      "cameraAccessDisabled": "क्यामेरा पहुँच असक्षम गरियो",
-      "cameraAccessMessage": "फोटो खिच्न सेटिङ्स मा क्यामेरा पहुँच अनुमति दिनुहोस्।",
+      "cameraAccessDisabled": "क्यामेरा पहुँच असक्षम",
+      "cameraAccessMessage": "फोटो खिच्न सेटिङ्समा क्यामेरा पहुँच अनुमति दिनुहोस्।",
       "couldNotOpenPhotoPicker": "फोटो पिकर खोल्न सकिएन। Kilo पुनः सुरु गरेर फेरि प्रयास गर्नुहोस्।",
-      "maxFilesAllowed": "अधिकतम {{count}} फाइलहरू अनुमति छ",
+      "maxFilesAllowed": "अधिकतम {{displayCount}} फाइलहरू अनुमति छ",
       "onlyAddingFiles": "{{total}} फाइलमध्ये {{accepted}} मात्र थप्दै (अधिकतम {{max}})"
     },
     "composer": {
-      "addAttachment": "संलग्न थप्नुहोस्",
+      "addAttachment": "संलग्नक थप्नुहोस्",
       "removeOrRetryFailed": "पहिले असफल संलग्नहरू हटाउनुहोस् वा पुनःप्रयास गर्नुहोस्।",
       "attachmentsWithSlashCommands": "स्ल्यास कमाण्डहरूसँग संलग्न पठाउन सकिँदैन।",
       "photoMetadataNotRemoved": "संलग्नबाट फोटो मेटाडेटा हटाउन सकिएन।",
@@ -2165,7 +2550,7 @@
       "linkCopied": "लिंक प्रतिलिपि गरियो",
       "reviewPr": "PR समीक्षा गर्नुहोस्",
       "openLink": "लिंक खोल्नुहोस्",
-      "copyLink": "लिंक प्रतिलिपि गर्नुहोस्",
+      "copyLink": "लिङ्क प्रतिलिपि गर्नुहोस्",
       "shareLink": "लिंक साझेदारी गर्नुहोस्",
       "share": "साझेदारी",
       "prLinkActions": "PR लिंक कार्यहरू",
@@ -2188,7 +2573,8 @@
       "delegatingWork": "काम सुम्पिँदै",
       "askingQuestion": "प्रश्न सोध्दै",
       "consideringNextSteps": "अर्को चरणहरू विचार गर्दै",
-      "writingResponse": "प्रतिक्रिया लेख्दै"
+      "writingResponse": "प्रतिक्रिया लेख्दै",
+      "initializingSnapshot": "स्न्यापसट सुरु गर्दै…"
     },
     "slashCommands": {
       "startNewSession": "नयाँ सत्र सुरु गर्नुहोस्",
@@ -2207,7 +2593,7 @@
       "costPrefix": "लागत {{cost}}",
       "costSuffix": ", लागत {{cost}}",
       "tokensWindowUnavailable": "सन्दर्भ {{used}} टोकन, विन्डो अनुपलब्ध",
-      "tokensUsage": "सन्दर्भ {{used}} / {{window}} टोकन, {{percentage}}% प्रयोग भयो",
+      "tokensUsage": "सन्दर्भ {{used}} / {{window}} टोकन, {{percentage}} प्रयोग भयो",
       "title": "सन्दर्भ प्रयोग",
       "used": "प्रयोग गरिएको",
       "remaining": "बाँकी",
@@ -2216,7 +2602,7 @@
       "usageReflectsLatest": "प्रयोगले पछिल्लो पूर्ण सहायक प्रतिक्रिया झल्काउँछ।",
       "tokenUsage": "टोकन प्रयोग",
       "cacheRate": "क्यास दर",
-      "modelsCount": "मोडेलहरू ({{count}})",
+      "modelsCount": "मोडेलहरू ({{displayCount}})",
       "tokenTotalsNote": "टोकन कुलहरूले यो सत्र मात्र समेट्छन् र सबएजेन्ट/चाइल्ड-सत्र टोकनहरू बहिष्कार गर्छन्।",
       "subagents": "सबएजेन्टहरू",
       "subagentsDescription": "चाइल्ड सत्रहरूबाट अवशिष्ट लागत",
@@ -2225,15 +2611,16 @@
       "ofWindowTokens": "{{window}} टोकन मध्ये",
       "tokens": "टोकनहरू",
       "tokensWithPercentage": "टोकनहरू ({{percentage}})",
-      "stepsCountOne": "{{steps}} चरण",
-      "stepsCountMany": "{{steps}} चरणहरू",
+      "stepsCount_one": "{{steps}} चरण",
+      "stepsCount": "{{steps}} चरणहरू",
+      "stepsCount_other": "{{steps}} चरणहरू",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "prBadge": {
       "open": "खुला पुल अनुरोध",
       "closed": "बन्द पुल अनुरोध",
       "merged": "मर्ज गरिएको पुल अनुरोध",
-      "draft": "ड्राफ्ट पुल अनुरोध",
+      "draft": "मस्यौदा पुल अनुरोध",
       "updating": "अद्यावधिक हुँदै, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "पुल अनुरोध"
@@ -2241,7 +2628,7 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "तपाईंको खाता लोड गर्न सकिएन",
-    "couldNotLoadAccountDescription": "आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+    "couldNotLoadAccountDescription": "तपाईंको जडान जाँच्नुहोस् र फेरि प्रयास गर्नुहोस्।",
     "couldNotLoadPrivacy": "गोपनीयता छनोटहरू लोड गर्न सकिएन",
     "couldNotLoadPrivacyDescription": "आफ्नो यन्त्र सुरक्षा सेटिङहरू जाँचेर फेरि प्रयास गर्नुहोस्।",
     "contentReady": "सामग्री तयार छ",
@@ -2251,7 +2638,8 @@
   },
   "addCredits": {
     "cta": "क्रेडिट थप्नुहोस्",
-    "description": "प्रयोग जारी राख्न क्रेडिट थप्नुहोस्।"
+    "description": "प्रयोग जारी राख्न क्रेडिट थप्नुहोस्।",
+    "billingPage": "बिलिङ पृष्ठ"
   },
   "deviceSessions": {
     "couldNotLoad": "सत्रहरू लोड गर्न सकिएन",
@@ -2271,34 +2659,28 @@
     "signOutThisSessionTitle": "यो सत्रबाट साइन आउट गर्ने?",
     "signOutThisSessionMessage": "{{device}} साइन आउट गरिनेछ। यसले एक घण्टासम्म API पहुँच राख्न सक्छ।",
     "signOutConfirm": "साइन आउट",
-    "signOutMessage": "तपाईंको कार्यक्षेत्रमा पहुँच गर्न फेरि साइन इन गर्नुपर्नेछ।"
+    "signOutMessage": "तपाईंको कार्यक्षेत्रमा पहुँच गर्न फेरि साइन इन गर्नुपर्नेछ।",
+    "webBrowser": "वेब ब्राउजर"
   },
   "forceUpdate": {
     "couldNotOpenStore": "एप स्टोर खोल्न सकिएन।",
     "description": "Kilo को नयाँ संस्करण उपलब्ध छ। जारी राख्न कृपया अद्यावधिक गर्नुहोस्।",
     "title": "अद्यावधिक आवश्यक छ",
-    "updateNow": "अहिले अद्यावधिक गर्नुहोस्"
+    "updateNow": "अहिले अद्यावधिक गर्नुहोस्",
+    "appStorePage": "एप स्टोर पृष्ठ"
   },
   "home": {
     "couldNotLoadSessions": "सत्रहरू लोड गर्न सकिएन",
     "couldNotLoadActiveSessions": "सक्रिय सत्रहरू लोड गर्न सकिएन",
     "agentSessions": "एजेन्ट सत्रहरू",
-    "showingSavedSessions": "सुरक्षित सत्रहरू देखाइँदै — लाइभ स्थिति पुरानो हुन सक्छ",
-    "startNewAgentSession": "नयाँ Kilo Agent सत्र सुरु गर्नुहोस्",
-    "aiCodingSessions": "AI कोडिङ सत्रहरू",
-    "startCodingTaskFromPhone": "आफ्नो फोनबाट कोडिङ कार्य सुरु गर्नुहोस् वा आफ्नो CLI बाट सत्र जारी गर्नुहोस्।",
-    "tryIt": "प्रयास गर्नुहोस्",
     "newCodingTask": "नयाँ कोडिङ कार्य",
     "explore": "अन्वेषण",
     "seeAll": "सबै हेर्नुहोस्",
-    "kiloAgents": "Kilo Agents",
-    "greetingMorning": "शुभ बिहान",
-    "greetingAfternoon": "शुभ दिउँसो",
-    "greetingEvening": "शुभ साँझ"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} बन्द गर्नुहोस्",
-    "imageUnavailable": "छवि अनुपलब्ध",
+    "imageUnavailable": "छवि उपलब्ध छैन",
     "share": "{{filename}} साझेदारी गर्नुहोस्"
   },
   "invalidRoute": {
@@ -2324,14 +2706,14 @@
     "permissionTitle": "पहुँच अस्वीकृत",
     "permissionDescription": "तपाईंसँग यो हेर्ने अनुमति छैन।",
     "notFoundTitle": "फेला परेन",
-    "notFoundDescription": "यो वस्तु हटाइएको वा अब उपलब्ध नहुन सक्छ।",
+    "notFoundDescription": "यो वस्तु हटाइएको हुन सक्छ वा अब उपलब्ध छैन।",
     "serverTitle": "लोड गर्न सकिएन",
     "serverDescription": "हाम्रो तर्फबाट केही गलत भयो। कृपया फेरि प्रयास गर्नुहोस्।"
   },
   "screenHeader": {
     "openMenu": "मेनु खोल्नुहोस्",
     "openMenuFor": "{{title}} का लागि मेनु खोल्नुहोस्",
-    "close": "बन्द",
+    "close": "बन्द गर्नुहोस्",
     "goBack": "फिर्ता जानुहोस्"
   },
   "picker": {
@@ -2348,11 +2730,21 @@
     "onlineMessage": "यो यन्त्रले अनलाइन ट्रान्सक्रिप्ट गर्न सक्दैन। यसलाई पाठमा बदल्न तपाईंको रेकर्डिङ {{provider}} लाई पठाइन्छ। Kilo ले अडियो भण्डारण गर्दैन।",
     "allow": "अनुमति दिनुहोस्",
     "start": "भ्वाइस इनपुट सुरु गर्नुहोस्",
-    "stop": "भ्वाइस इनपुट रोक्नुहोस्"
+    "stop": "भ्वाइस इनपुट रोक्नुहोस्",
+    "restricted": "यो यन्त्रमा भ्वाइस इनपुट प्रतिबन्धित छ।",
+    "micRequired": "भ्वाइस इनपुटका लागि माइक्रोफोन पहुँच आवश्यक छ।",
+    "micOff": "माइक्रोफोन पहुँच बन्द छ। भ्वाइस इनपुट प्रयोग गर्न सेटिङ्समा यसलाई सक्षम गर्नुहोस्।",
+    "micOffTitle": "माइक्रोफोन पहुँच बन्द छ",
+    "noSpeech": "कुनै भाषण पत्ता लागेन। फेरि प्रयास गर्न माइक्रोफोनमा ट्याप गर्नुहोस्।",
+    "needsConnection": "भ्वाइस इनपुटलाई अहिले जडान चाहिन्छ। फेरि प्रयास गर्नुहोस्।",
+    "busy": "भ्वाइस इनपुट व्यस्त छ। फेरि प्रयास गर्नुहोस्।",
+    "stopped": "भ्वाइस इनपुट रोकियो। फेरि प्रयास गर्न माइक्रोफोनमा ट्याप गर्नुहोस्।",
+    "unavailableDevice": "यो यन्त्रमा भ्वाइस इनपुट उपलब्ध छैन।",
+    "unavailableLanguage": "यो यन्त्रको भाषाका लागि भ्वाइस इनपुट उपलब्ध छैन।"
   },
   "share": {
     "title": "Kilo मा साझेदारी गर्नुहोस्",
-    "close": "बन्द",
+    "close": "बन्द गर्नुहोस्",
     "reviewPr": "PR समीक्षा गर्नुहोस्",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "newSession": "नयाँ सत्र",
@@ -2360,7 +2752,7 @@
     "connectedCli": "जडान भएको CLI मा",
     "newSessionOn": "{{name}} मा नयाँ सत्र",
     "noMatchingSessions": "मिल्ने कुनै सत्र छैन।",
-    "onlyFirstFilesAttached": "पहिलो {{count}} फाइलहरू मात्र संलग्न हुनेछन्।",
+    "onlyFirstFilesAttached": "पहिलो {{displayCount}} फाइलहरू मात्र संलग्न हुनेछन्।",
     "staleMessage": "यो साझेदारी अब उपलब्ध छैन।",
     "retryableMessage": "तपाईंका सत्रहरू लोड गर्न सकिएन।",
     "emptyMessage": "अहिलेसम्म कुनै सत्र छैन — यो पठाउन नयाँ सुरु गर्नुहोस्।",
@@ -2393,7 +2785,7 @@
     "otherAccountCopy": "यो Apple खातामा रहेको Kilo Pass अर्को Kilo खातासँग सम्बन्धित छ। यसलाई व्यवस्थापन गर्न त्यो Kilo खातामा साइन इन गर्नुहोस्।",
     "alreadySubscribed": "तपाईंसँग पहिले नै Kilo Pass सदस्यता छ।",
     "purchaseUnavailable": "Kilo Pass खरिद अहिले उपलब्ध छैन।",
-    "tierCredits": "क्रेडिटमा ${{amount}}",
+    "tierCredits": "क्रेडिटमा {{amount}}",
     "perMonth": "{{price}}/महिना",
     "verifyPurchaseFailed": "तपाईंको खरिद प्रमाणित गर्न सकिएन। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
     "productsCouldNotLoad": "Kilo Pass उत्पादनहरू App Store बाट लोड गर्न सकिएन।",
@@ -2404,7 +2796,7 @@
     "manageFailed": "App Store सदस्यता व्यवस्थापन खोल्न असफल भयो।",
     "kiloPassSetup": "Kilo Pass सेटअप",
     "subscriptionHeaderDescription": "Kilo App मा AI कोडिङ सत्रहरू — Cloud Agents, रिमोट सत्रहरू, र KiloClaw च्याटहरू — चलाउन तपाईंको Kilo ब्यालेन्समा क्रेडिट थप्ने मासिक सदस्यता।",
-    "tierDescription": "Kilo App प्रयोगका लागि मासिक ${{price}} भुक्तान गरिएका क्रेडिट थपिन्छन्।",
+    "tierDescription": "Kilo App प्रयोगका लागि मासिक {{price}} भुक्तान गरिएका क्रेडिट थपिन्छन्।",
     "subscribe": "सदस्यता लिनुहोस्",
     "subscribeDescription": "बोनस प्रगतिसहित मासिक क्रेडिटहरू",
     "manage": "व्यवस्थापन",
@@ -2412,7 +2804,7 @@
     "statusPending": "Kilo Pass पर्खाइमा छ",
     "statusCanceling": "Kilo Pass रद्द हुँदै",
     "statusPastDue": "Kilo Pass बक्यौता",
-    "monthlyCredits": "${{credits}} मासिक क्रेडिटहरू",
+    "monthlyCredits": "{{credits}} मासिक क्रेडिटहरू",
     "ends": "{{date}} मा समाप्त हुन्छ",
     "periodEnd": "अवधि अन्त्य",
     "managedOnGooglePlay": "Google Play मा व्यवस्थापन गरियो",
@@ -2426,7 +2818,15 @@
     "webManagementDescription": "यो Kilo Pass वेबमा व्यवस्थापन गरिएको छ।",
     "legalDisclosure": "Kilo Pass स्वतः नवीकरण हुने मासिक सदस्यता हो। खरिद पुष्टि हुँदा भुक्तानी तपाईंको Apple ID बाट लिइन्छ। हालको अवधि समाप्त हुनु कम्तीमा २४ घण्टा अगाडि रद्द नगरेसम्म सदस्यता प्रत्येक महिना देखाइएको मूल्यमा स्वतः नवीकरण हुन्छ। आफ्नो App Store खाता सेटिङमा जुनसुकै बेला व्यवस्थापन वा रद्द गर्नुहोस्।",
     "legalPrivacyPolicy": "गोपनीयता नीति",
-    "legalTermsOfUse": "प्रयोगका सर्तहरू (EULA)"
+    "legalTermsOfUse": "प्रयोगका सर्तहरू (EULA)",
+    "purchaseDifferentAccount": "यो App Store खरिद तपाईंको Kilo खातासँग लिङ्क गरिएको छैन। खरिदका लागि प्रयोग गरिएको Apple खातामा साइन इन गरेर फेरि प्रयास गर्नुहोस्।",
+    "restoreFailed": "खरिदहरू पुनः स्थापित गर्न असफल भयो। फेरि प्रयास गर्नुहोस्।",
+    "purchaseFailed": "खरिद पूरा गर्न असफल भयो।",
+    "purchaseStartFailed": "App Store खरिद सुरु गर्न असफल भयो।",
+    "purchaseOwnedByAnotherAccount": "यो Apple खातामा रहेको Kilo Pass अर्को Kilo खातासँग सम्बन्धित छ।",
+    "couldNotConnectToAppStore": "App Store मा जडान गर्न सकिएन। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+    "noMatchingProducts": "App Store बाट कुनै मिल्ने Kilo Pass उत्पादनहरू फर्काइएन।",
+    "purchaseMissingSignedTransaction": "App Store खरिदमा हस्ताक्षरित लेनदेन JWS समावेश थिएन।"
   },
   "consent": {
     "kilo": "Kilo",
@@ -2463,7 +2863,7 @@
     "voiceTranscriptionTitle": "आवाज ट्रान्सक्रिप्शन",
     "retentionPrefix": "पूर्ण अवधारण अवधिहरू, तपाईंका अधिकारहरू, र सम्पर्क जानकारी यसमा छन्",
     "backToConsent": "सहमतिमा फिर्ता",
-    "back": "फिर्ता",
+    "back": "पछाडि",
     "revokeConsent": "सहमति फिर्ता लिनुहोस्",
     "revokeConsentTitle": "डेटा साझेदारी सहमति फिर्ता लिने?",
     "acceptAndContinue": "स्वीकार गरेर जारी राख्नुहोस्",
@@ -2514,32 +2914,39 @@
   "feedback": {
     "noEmailApp": "कुनै इमेल एप उपलब्ध छैन। तपाईं हामीलाई {{email}} मा सम्पर्क गर्न सक्नुहुन्छ",
     "couldNotOpenStore": "स्टोर खोल्न सकिएन।",
-    "promptTitle": "तपाईंलाई Kilo एप कस्तो लाग्दैछ?",
-    "iLikeIt": "मलाई मन पर्छ",
-    "gladTitle": "यो सुन्दा हामीलाई खुसी लाग्यो!",
-    "gladMessage": "स्टोर समीक्षाले हामीलाई धेरै मद्दत गर्नेछ। Kilo प्रयोग गर्नुभएकोमा धन्यवाद!",
-    "rateKilo": "Kilo लाई रेट गर्नुहोस्",
-    "needsWork": "सुधार चाहिन्छ",
-    "sorryTitle": "यो सुन्दा हामीलाई दुख लाग्यो!",
-    "sorryMessage": "के सुधार गर्नुपर्छ कृपया हामीलाई थाहा दिनुहोस्। एपको जिम्मेवार इन्जिनियरले हरेक रिपोर्ट पढ्छ!",
-    "emailUs": "हामीलाई इमेल गर्नुहोस्"
+    "emailSubject": "मोबाइल एप प्रतिक्रिया",
+    "neutralTitle": "Kilo एपलाई मूल्याङ्कन गर्नुहोस्",
+    "rateTheApp": "एपलाई मूल्याङ्कन गर्नुहोस्",
+    "sendFeedback": "प्रतिक्रिया पठाउनुहोस्"
   },
   "organization": {
     "boundary": {
       "backToProfile": "प्रोफाइलमा फिर्ता",
-      "loadErrorMessage": "आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+      "loadErrorMessage": "तपाईंको जडान जाँच्नुहोस् र फेरि प्रयास गर्नुहोस्।",
       "loadErrorTitle": "तपाईंका संगठनहरू लोड गर्न सकिएन",
       "organizationUnavailable": "संगठन अनुपलब्ध",
       "selectDescription": "जारी राख्न आफ्नो प्रोफाइलबाट संगठन छान्नुहोस्।",
       "selectOrganization": "संगठन चयन गर्नुहोस्",
-      "unavailableDescription": "यो संगठन अब उपलब्ध छैन। जारी राख्न आफ्नो प्रोफाइलबाट एउटा छान्नुहोस्।"
+      "unavailableDescription": "यो संगठन अब उपलब्ध छैन। जारी राख्न आफ्नो प्रोफाइलबाट एउटा छान्नुहोस्।",
+      "accessDeniedTitle": "पहुँच अस्वीकृत",
+      "accessDeniedDescription": "तपाईंसँग यो संस्थामा पहुँच छैन।"
     },
     "creditActivity": {
       "emptyDescription": "यस संगठनका खरिद, प्रयोग, र क्रेडिट समायोजनहरू हुँदा-हुँदै यहाँ देखिनेछन्।",
       "emptyTitle": "कुनै क्रेडिट गतिविधि छैन",
       "expires": "{{date}} मा समाप्त हुन्छ",
       "title": "क्रेडिट गतिविधि",
-      "transactionFallback": "क्रेडिट लेनदेन"
+      "transactionFallback": "क्रेडिट लेनदेन",
+      "category": {
+        "organization_custom": "संस्था अनुकूलित",
+        "parent_to_child_transfer_in": "अभिभावकबाट सन्तानमा स्थानान्तरण (भित्र)",
+        "parent_to_child_transfer_out": "सन्तानबाट अभिभावकमा स्थानान्तरण (बाहिर)",
+        "oss-sponsorship": "Oss-sponsorship",
+        "oss-monthly-reset": "Oss-monthly-reset",
+        "team-topup-bonus-2025": "Team-topup-bonus-2025",
+        "accounting_adjustment": "लेखा समायोजन",
+        "credits_expired": "म्याद सकिएका क्रेडिटहरू"
+      }
     },
     "inviteMember": {
       "emailError": "मान्य इमेल ठेगाना प्रविष्ट गर्नुहोस्",
@@ -2556,15 +2963,22 @@
       "emptyDescription": "इनभ्वाइसहरू प्रत्येक बिलिङ चक्रमा स्वचालित रूपमा उत्पन्न हुन्छन् र तपाईंको संगठन बिल भएपछि यहाँ देखिनेछन्।",
       "emptyTitle": "कुनै इनभ्वाइस छैन",
       "invoiceFallback": "इनभ्वाइस",
-      "statusOpen": "खुला",
-      "statusPaid": "भुक्तान गरिएको",
-      "statusVoid": "रद्द",
-      "title": "इनभ्वाइसहरू"
+      "title": "इनभ्वाइसहरू",
+      "downloadFailed": "इनभ्वाइस डाउनलोड गर्न सकिएन। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+      "sharingUnavailable": "यो यन्त्रमा साझेदारी उपलब्ध छैन।",
+      "status": {
+        "paid": "भुक्तान गरिएको",
+        "open": "खुला",
+        "void": "रद्द",
+        "draft": "मस्यौदा",
+        "uncollectible": "असुली नहुने",
+        "unknown": "अज्ञात"
+      }
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
       "enableA11y": "कम ब्यालेन्स सूचना सक्षम गर्नुहोस्",
-      "enabled": "सक्षम गरियो",
+      "enabled": "सक्षम",
       "notifyEmailsLabel": "सूचित गर्ने इमेलहरू",
       "permissionDenied": "बिलिङ सूचनाहरू व्यवस्थापन गर्ने अनुमति तपाईंसँग छैन।",
       "separateEmailsHint": "धेरै इमेलहरू कमाले छुट्याउनुहोस्।",
@@ -2608,14 +3022,14 @@
         "billingManager": "बिलिङ व्यवस्थापक"
       },
       "emailStatusFailed": "इमेल असफल भयो",
-      "emailStatusPending": "पर्खाइमा",
+      "emailStatusPending": "प्रतीक्षामा",
       "inviteCreated": "निम्तो सिर्जना गरियो",
       "pendingInvitations": "पर्खाइमा रहेका निम्तोहरू",
       "resendInvite": "निम्तो पुनः पठाउनुहोस्",
       "shareInviteLink": "निम्तो लिंक साझेदारी गर्नुहोस्"
     },
     "permissionDenied": {
-      "back": "फिर्ता",
+      "back": "पछाडि",
       "title": "पहुँच अस्वीकृत"
     },
     "usageStats": {
@@ -2645,13 +3059,14 @@
       "manageHint": "वेबमा Kilo Pass व्यवस्थापन खोल्छ।",
       "notSubscribed": "सदस्यता लिइएको छैन",
       "overallocated": "Pass असाइनमेन्टहरू भुक्तान गरिएका सीटहरूभन्दा बढी",
-      "paidSeatOne": "{{count}} भुक्तान गरिएको सीट",
-      "paidSeatOther": "{{count}} भुक्तान गरिएका सीटहरू",
+      "paidSeat_one": "{{displayCount}} भुक्तान गरिएको सीट",
+      "paidSeat": "{{displayCount}} भुक्तान गरिएका सीटहरू",
+      "paidSeat_other": "{{displayCount}} भुक्तान गरिएका सीटहरू",
       "paymentNeedsAttention": "भुक्तानीमा ध्यान चाहिन्छ",
       "paymentPending": "भुक्तानी पर्खाइमा",
       "processingBlocked": "प्रक्रिया रोकिएको",
       "processingNeedsReview": "प्रक्रियामा समीक्षा चाहिन्छ",
-      "retry": "पुनःप्रयास",
+      "retry": "पुनः प्रयास गर्नुहोस्",
       "retryHint": "Kilo Pass स्थिति लोड पुनःप्रयास गर्छ।",
       "setupHint": "वेबमा Kilo Pass सेटअप खोल्छ।"
     }
@@ -2665,16 +3080,34 @@
     "invalidCode": "त्यो कोड गलत छ। कृपया फेरि प्रयास गर्नुहोस्।",
     "codeInProgress": "तपाईंको कोड प्रक्रियामा छ। केही क्षण पर्खेर फेरि प्रयास गर्नुहोस्।",
     "tooManyAttempts": "धेरै प्रयास भयो। कृपया नयाँ कोड अनुरोध गर्नुहोस्।",
-    "invalidToken": "साइन-इन असफल भयो। कृपया फेरि प्रयास गर्नुहोस्।",
+    "invalidToken": "साइन इन असफल भयो। कृपया फेरि प्रयास गर्नुहोस्।",
     "invalidEmail": "यस ठेगानामा इमेल पुर्‍याउन सकिएन। कृपया फरक इमेल प्रयोग गर्नुहोस्।",
     "invalidRequest": "आफ्नो इमेल ठेगाना जाँचेर फेरि प्रयास गर्नुहोस्।",
     "emailDeliveryFailed": "इमेल डेलिभरी अस्थायी रूपमा उपलब्ध छैन। कृपया पछि फेरि प्रयास गर्नुहोस्।",
     "admissionRequired": "तपाईंको यन्त्र प्रमाणित गर्न सकिएन। अर्को यन्त्रमा वा वेबमार्फत साइन इन गर्न '$t(login.moreSignInOptions)' प्रयोग गर्नुहोस्।",
     "default": "केही गलत भयो। कृपया फेरि प्रयास गर्नुहोस्।",
-    "retryableAdmission": "हामीले यो यन्त्र प्रमाणित गर्न सकेनौं। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।"
+    "retryableAdmission": "हामीले यो यन्त्र प्रमाणित गर्न सकेनौं। आफ्नो जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+    "startSignInFailed": "साइन इन सुरु गर्न सकिएन। कृपया फेरि प्रयास गर्नुहोस्।",
+    "couldNotOpenBrowser": "ब्राउजर खोल्न सकिएन। कृपया फेरि प्रयास गर्नुहोस्।",
+    "signInTimedOut": "साइन इनको समय सकियो। कृपया फेरि प्रयास गर्नुहोस्।",
+    "signInFailed": "साइन इन असफल भयो। कृपया फेरि प्रयास गर्नुहोस्।",
+    "networkError": "नेटवर्क त्रुटि। कृपया फेरि प्रयास गर्नुहोस्।",
+    "accessDeniedByUser": "प्रयोगकर्ताद्वारा पहुँच अस्वीकार गरियो",
+    "codeExpired": "कोडको म्याद सकियो",
+    "tooManySignInAttempts": "धेरै साइन-इन प्रयास भयो। कृपया पर्खेर फेरि प्रयास गर्नुहोस्।"
   },
   "models": {
     "dataCollected": "सङ्कलन गरिएको डेटा",
-    "free": "नि:शुल्क"
+    "free": "नि:शुल्क",
+    "couldNotUpdateFavorites": "मनपर्नेहरू अद्यावधिक गर्न सकिएन",
+    "thinkingEffort": {
+      "none": "कुनै पनि होइन",
+      "minimal": "न्यूनतम",
+      "low": "कम",
+      "medium": "मध्यम",
+      "high": "उच्च",
+      "xhigh": "अति उच्च",
+      "max": "अधिकतम"
+    }
   }
 }

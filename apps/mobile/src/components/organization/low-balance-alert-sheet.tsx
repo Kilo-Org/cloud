@@ -18,6 +18,8 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
@@ -40,7 +42,9 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
 
   const [enabled, setEnabled] = useState(settings.minimum_balance !== undefined);
   const thresholdRef = useRef(
-    settings.minimum_balance != null ? String(settings.minimum_balance) : ''
+    settings.minimum_balance == null
+      ? ''
+      : formatNumber(settings.minimum_balance, i18n.language, { useGrouping: false })
   );
   // Default to the signer's own email when no alert email is stored yet, so
   // the field starts pre-filled with a real, savable value rather than a
@@ -169,7 +173,7 @@ export function LowBalanceAlertSheet() {
   // forever) falling through to OrganizationBoundary below.
   if (isResolving || (organizationId != null && orgWithMembers.isPending)) {
     return (
-      <ScrollView className="flex-1 bg-background px-6" contentContainerClassName="gap-6 pb-8 pt-4">
+      <ScrollView className="flex-1 bg-background" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
         <Skeleton className="h-[52px] rounded-lg" />
         <View className="gap-1.5">
           <Skeleton className="h-3.5 w-28 rounded" />
@@ -210,8 +214,8 @@ export function LowBalanceAlertSheet() {
 
   return (
     <ScrollView
-      className="flex-1 bg-background px-6"
-      contentContainerClassName="gap-6 pb-8 pt-4"
+      className="flex-1 bg-background"
+      contentContainerClassName="px-6 gap-6 pb-8 pt-4"
       automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
     >

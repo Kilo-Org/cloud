@@ -38,6 +38,8 @@ import { CommentRow } from '@/components/pr-review/discussion/comment-row';
 import { ReplyInput } from '@/components/pr-review/discussion/reply-input';
 import { ThreadDiffSnippet } from '@/components/pr-review/discussion/thread-diff-snippet';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import {
   type ReviewComment,
   type ReviewReactionContent,
@@ -246,9 +248,10 @@ function ThreadHeader({
           <Badge tone="muted" label={t('prReview.discussion.file')} />
         ) : null}
         <Text variant="muted" className="text-xs">
-          {commentCount === 1
-            ? t('prReview.discussion.oneComment')
-            : t('prReview.discussion.commentCount', { count: commentCount })}
+          {t('prReview.discussion.comment', {
+            count: commentCount,
+            displayCount: formatNumber(commentCount, i18n.language),
+          })}
           {relative ? t('prReview.discussion.startedRelative', { relative }) : ''}
         </Text>
       </View>

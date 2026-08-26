@@ -147,6 +147,7 @@ describe('Organizations', () => {
         [
           'balance',
           'created_at',
+          'isSalesDemo',
           'memberCount',
           'organizationId',
           'organizationName',
@@ -174,6 +175,25 @@ describe('Organizations', () => {
           role: 'owner',
         },
       ]);
+    });
+
+    test('prefers a sales demo org over an older non-demo org', async () => {
+      const user = await insertTestUser();
+      const older = await createOrganization('Older Org', user.id);
+      await db
+        .update(organizations)
+        .set({ created_at: '2020-01-01T00:00:00.000Z' })
+        .where(eq(organizations.id, older.id));
+
+      const demo = await createOrganization('Sales Demo Org', user.id);
+      await db
+        .update(organizations)
+        .set({ settings: { is_sales_demo: true } })
+        .where(eq(organizations.id, demo.id));
+
+      const result = await getProfileOrganizations(user.id);
+
+      expect(result.map(organization => organization.id)[0]).toBe(demo.id);
     });
 
     test('hides a parent when the user is also a member of its child', async () => {

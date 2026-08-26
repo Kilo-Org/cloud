@@ -7,11 +7,9 @@ import {
   MessageSquare,
   Smartphone,
 } from '@/components/ui/icons';
-import { useState } from 'react';
 import { Switch, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { LanguagePickerSheet } from '@/components/language-picker-sheet';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -26,6 +24,7 @@ import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { cn } from '@/lib/utils';
 import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { setLanguagePickerBridge } from '@/lib/picker-bridge';
 import {
   setThemePreference,
   type ThemePreference,
@@ -96,7 +95,6 @@ export function PreferencesScreen() {
   const { t } = useTranslation();
   const { userId } = useCurrentUserId();
   const { preference: languagePreference } = useLanguagePreference();
-  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
   const languageEndonym = LANGUAGE_ENDONYMS[getResolvedLanguage()];
   const languageSubtitle =
     languagePreference === 'device'
@@ -164,7 +162,14 @@ export function PreferencesScreen() {
             subtitle={languageSubtitle}
             className="rounded-lg bg-secondary px-3"
             onPress={() => {
-              setLanguagePickerOpen(true);
+              setLanguagePickerBridge({
+                onApplied: () => {
+                  if (userId) {
+                    void attemptPushRegistrationReconciliation(userId);
+                  }
+                },
+              });
+              router.push('/(app)/language-picker?returnTarget=preferences' as Href);
             }}
           />
           <ConfigureRow
@@ -196,18 +201,6 @@ export function PreferencesScreen() {
           />
         </View>
       </TabScreenScrollView>
-      <LanguagePickerSheet
-        visible={languagePickerOpen}
-        onClose={() => {
-          setLanguagePickerOpen(false);
-        }}
-        onApplied={() => {
-          if (userId) {
-            void attemptPushRegistrationReconciliation(userId);
-          }
-        }}
-        returnTarget="preferences"
-      />
     </View>
   );
 }

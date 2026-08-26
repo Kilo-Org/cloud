@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- The login screen keeps its device-auth branches, keyboard padding, and language picker together. */
 import * as Clipboard from 'expo-clipboard';
+import { type Href, useRouter } from 'expo-router';
 import { ExternalLink, Globe } from '@/components/ui/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +26,6 @@ import {
 } from '@/components/kilo-chat/app-aware-keyboard-padding-state';
 import { IdleAuth } from '@/components/login/idle-auth';
 import { errorMessage } from '@/components/login-screen-state';
-import { LanguagePickerSheet } from '@/components/language-picker-sheet';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -41,6 +41,7 @@ import {
   restoreLoginDrafts,
   type SsoRecoveryDraft,
 } from '@/lib/login-draft';
+import { setLanguagePickerBridge } from '@/lib/picker-bridge';
 
 function keyboardHeightFromEvent(event: KeyboardEvent): number {
   return event.endCoordinates.height;
@@ -48,6 +49,7 @@ function keyboardHeightFromEvent(event: KeyboardEvent): number {
 
 export function LoginScreen() {
   const { sessionEnded, signIn } = useAuth();
+  const router = useRouter();
   const {
     status,
     token,
@@ -66,7 +68,6 @@ export function LoginScreen() {
   const { t } = useTranslation();
   const [persistError, setPersistError] = useState<string | undefined>(undefined);
   const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
-  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
   const [authFormBusy, setAuthFormBusy] = useState(false);
   const [draft, setDraft] = useState<{
     email: string;
@@ -352,7 +353,8 @@ export function LoginScreen() {
         </ScrollView>
         <Pressable
           onPress={() => {
-            setLanguagePickerOpen(true);
+            setLanguagePickerBridge({ beforeReload: persistLoginDrafts });
+            router.push('/(auth)/language-picker?returnTarget=login' as Href);
           }}
           disabled={globeDisabled}
           hitSlop={8}
@@ -366,14 +368,6 @@ export function LoginScreen() {
           <Globe size={22} color={colors.foreground} />
         </Pressable>
       </View>
-      <LanguagePickerSheet
-        visible={languagePickerOpen}
-        onClose={() => {
-          setLanguagePickerOpen(false);
-        }}
-        returnTarget="login"
-        beforeReload={persistLoginDrafts}
-      />
     </KeyboardAvoidingView>
   );
 }

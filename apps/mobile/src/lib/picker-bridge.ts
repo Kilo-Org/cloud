@@ -72,10 +72,16 @@ type InstancePickerBridge = {
   onSelect: (instance: InstancePickerInstance | null) => void;
 };
 
+type LanguagePickerBridge = {
+  beforeReload?: () => Promise<void>;
+  onApplied?: () => void;
+};
+
 let modelBridge: ModelPickerBridge | null = null;
 let modeBridge: ModePickerBridge | null = null;
 let repoBridge: RepoPickerBridge | null = null;
 let instanceBridge: InstancePickerBridge | null = null;
+let languageBridge: LanguagePickerBridge | null = null;
 
 export function resolveModelPickerSelection(
   bridge: ModelPickerBridge,
@@ -149,4 +155,14 @@ export function getInstancePickerBridge() {
 }
 export function clearInstancePickerBridge() {
   instanceBridge = null;
+}
+
+export function setLanguagePickerBridge(bridge: LanguagePickerBridge) {
+  languageBridge = bridge;
+}
+export function getLanguagePickerBridge() {
+  return languageBridge;
+}
+export function clearLanguagePickerBridge() {
+  languageBridge = null;
 }

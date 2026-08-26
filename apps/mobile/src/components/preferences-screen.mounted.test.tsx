@@ -6,12 +6,15 @@ import { describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { PreferencesScreen } from '@/components/preferences-screen';
 
+const push = vi.hoisted(() => vi.fn());
+const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
+
 vi.mock('react-native', () => ({
   Switch: 'Switch',
   View: 'View',
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push }),
 }));
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
@@ -38,6 +41,9 @@ vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' })
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/picker-bridge', () => ({
+  setLanguagePickerBridge,
+}));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   useKeepScreenOnPreference: () => ({
     keepScreenOn: false,
@@ -94,6 +100,30 @@ describe('PreferencesScreen account rows', () => {
     expect(language[0]?.props.icon).toBe('Globe');
     expect(language[0]?.props.subtitle).toBe('Device · English');
     expect(deviceSessions).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('language row opens the app language picker with returnTarget preferences', async () => {
+    const renderer = await mountPreferences();
+
+    const rows = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'ConfigureRow'
+    );
+    const language = rows.find(row => row.props.title === 'Language');
+    if (!language) {
+      throw new Error('language row not found');
+    }
+
+    act(() => {
+      (language.props.onPress as () => void)();
+    });
+
+    expect(push).toHaveBeenCalledWith('/(app)/language-picker?returnTarget=preferences');
+    expect(setLanguagePickerBridge).toHaveBeenCalledTimes(1);
+    expect(setLanguagePickerBridge).toHaveBeenCalledWith({
+      onApplied: expect.any(Function),
+    });
 
     renderer.unmount();
   });

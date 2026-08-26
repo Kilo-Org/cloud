@@ -1,4 +1,5 @@
 import type { AgentSandboxProvider } from '../types.js';
+import { sessionPlaneFromId } from '../session-plane.js';
 
 export type ProviderCapabilities = {
   terminal: boolean;
@@ -11,4 +12,12 @@ export type ProviderCapabilities = {
  */
 export const PROVIDER_CAPABILITIES: Record<AgentSandboxProvider, ProviderCapabilities> = {
   cloudflare: { terminal: true, devcontainer: true },
+  vercel: { terminal: false, devcontainer: false },
 };
+
+export function sessionHasTerminal(
+  sessionId: string,
+  provider: AgentSandboxProvider = 'cloudflare'
+): boolean {
+  return sessionPlaneFromId(sessionId) !== 'control' && PROVIDER_CAPABILITIES[provider].terminal;
+}

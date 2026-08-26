@@ -1,193 +1,209 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  resolveRepositorySectionView,
-  shouldShowRepositoryError,
+  dedupeRepositoriesByPlatformAndFullName,
+  type NewSessionRepository,
+  type RepositoryGroup,
+  resolveBitbucketStatus,
+  resolveProviderStatus,
+  resolveRepositoryGroups,
 } from './new-session-repository-state';
 
-describe('shouldShowRepositoryError', () => {
-  it('keeps cached repositories visible after a background refetch error', () => {
-    expect(shouldShowRepositoryError({ isError: true, repositoryCount: 1 })).toBe(false);
-  });
-
-  it('shows the error when no cached repositories are available', () => {
-    expect(shouldShowRepositoryError({ isError: true, repositoryCount: 0 })).toBe(true);
-  });
-});
-
-describe('resolveRepositorySectionView', () => {
-  // ── loading ───────────────────────────────────────────────────────
-  it('returns loading first, regardless of other values', () => {
+describe('resolveProviderStatus', () => {
+  it('returns loading while the provider query is loading', () => {
     expect(
-      resolveRepositorySectionView({
+      resolveProviderStatus({
         isLoading: true,
         isError: false,
         integrationInstalled: true,
         repositoryCount: 5,
-        connectCheckFailed: false,
       })
     ).toBe('loading');
   });
 
-  it('returns loading even when error and connect fallback are present', () => {
+  it('returns error when the query failed with no cached repos', () => {
     expect(
-      resolveRepositorySectionView({
-        isLoading: true,
-        isError: true,
-        integrationInstalled: false,
-        repositoryCount: 0,
-        connectCheckFailed: true,
-      })
-    ).toBe('loading');
-  });
-
-  // ── error ─────────────────────────────────────────────────────────
-  it('returns error when query failed with no cached repos', () => {
-    expect(
-      resolveRepositorySectionView({
+      resolveProviderStatus({
         isLoading: false,
         isError: true,
         integrationInstalled: undefined,
         repositoryCount: 0,
-        connectCheckFailed: false,
       })
     ).toBe('error');
   });
 
-  it('does NOT return error when query failed but cached repos exist', () => {
+  it('keeps cached repos visible after a background refetch error', () => {
     expect(
-      resolveRepositorySectionView({
+      resolveProviderStatus({
         isLoading: false,
         isError: true,
         integrationInstalled: undefined,
         repositoryCount: 3,
-        connectCheckFailed: false,
       })
     ).toBe('repos');
   });
 
-  // ── connect-fallback ──────────────────────────────────────────────
-  it('returns connect-fallback when the flag is set', () => {
+  it('returns connect when the provider is not installed', () => {
     expect(
-      resolveRepositorySectionView({
+      resolveProviderStatus({
         isLoading: false,
         isError: false,
         integrationInstalled: false,
         repositoryCount: 0,
-        connectCheckFailed: true,
-      })
-    ).toBe('connect-fallback');
-  });
-
-  it('connect-fallback takes precedence over connect', () => {
-    expect(
-      resolveRepositorySectionView({
-        isLoading: false,
-        isError: false,
-        integrationInstalled: false,
-        repositoryCount: 0,
-        connectCheckFailed: true,
-      })
-    ).toBe('connect-fallback');
-  });
-
-  // ── connect ───────────────────────────────────────────────────────
-  it('returns connect when GitHub is not installed', () => {
-    expect(
-      resolveRepositorySectionView({
-        isLoading: false,
-        isError: false,
-        integrationInstalled: false,
-        repositoryCount: 0,
-        connectCheckFailed: false,
       })
     ).toBe('connect');
   });
 
-  it('returns repos when integrationInstalled is undefined (still loading)', () => {
+  it('returns connected-empty when installed but no repos are visible', () => {
     expect(
-      resolveRepositorySectionView({
-        isLoading: false,
-        isError: false,
-        integrationInstalled: undefined,
-        repositoryCount: 0,
-        connectCheckFailed: false,
-      })
-    ).toBe('repos');
-  });
-
-  // ── connected-empty ───────────────────────────────────────────────
-  it('returns connected-empty when installed but no repos visible', () => {
-    expect(
-      resolveRepositorySectionView({
+      resolveProviderStatus({
         isLoading: false,
         isError: false,
         integrationInstalled: true,
         repositoryCount: 0,
-        connectCheckFailed: false,
       })
     ).toBe('connected-empty');
   });
 
-  // ── repos (happy) ─────────────────────────────────────────────────
   it('returns repos when installed with repos visible', () => {
     expect(
-      resolveRepositorySectionView({
+      resolveProviderStatus({
         isLoading: false,
         isError: false,
         integrationInstalled: true,
         repositoryCount: 3,
-        connectCheckFailed: false,
       })
     ).toBe('repos');
   });
+});
 
-  // ── precedence boundaries ─────────────────────────────────────────
-  it('error beats connect-fallback', () => {
+describe('resolveBitbucketStatus', () => {
+  it('returns loading while the query is loading', () => {
     expect(
-      resolveRepositorySectionView({
-        isLoading: false,
-        isError: true,
-        integrationInstalled: false,
+      resolveBitbucketStatus({
+        isLoading: true,
+        isError: false,
+        status: undefined,
         repositoryCount: 0,
-        connectCheckFailed: true,
       })
-    ).toBe('error');
+    ).toBe('loading');
   });
 
-  it('connect-fallback beats connect', () => {
+  it('returns connect for a not_connected status', () => {
     expect(
-      resolveRepositorySectionView({
+      resolveBitbucketStatus({
         isLoading: false,
         isError: false,
-        integrationInstalled: false,
+        status: 'not_connected',
         repositoryCount: 0,
-        connectCheckFailed: true,
-      })
-    ).toBe('connect-fallback');
-  });
-
-  it('connect beats connected-empty', () => {
-    expect(
-      resolveRepositorySectionView({
-        isLoading: false,
-        isError: false,
-        integrationInstalled: false,
-        repositoryCount: 0,
-        connectCheckFailed: false,
       })
     ).toBe('connect');
   });
 
-  it('connected-empty beats repos', () => {
+  it('returns error for temporarily_unavailable', () => {
     expect(
-      resolveRepositorySectionView({
+      resolveBitbucketStatus({
         isLoading: false,
         isError: false,
-        integrationInstalled: true,
+        status: 'temporarily_unavailable',
         repositoryCount: 0,
-        connectCheckFailed: false,
+      })
+    ).toBe('error');
+  });
+
+  it('returns connected-empty when available with no repos', () => {
+    expect(
+      resolveBitbucketStatus({
+        isLoading: false,
+        isError: false,
+        status: 'available',
+        repositoryCount: 0,
       })
     ).toBe('connected-empty');
+  });
+
+  it('returns repos when available with repos', () => {
+    expect(
+      resolveBitbucketStatus({
+        isLoading: false,
+        isError: false,
+        status: 'available',
+        repositoryCount: 2,
+      })
+    ).toBe('repos');
+  });
+});
+
+const github = (fullName: string): NewSessionRepository => ({
+  platform: 'github',
+  fullName,
+  isPrivate: false,
+});
+const gitlab = (fullName: string): NewSessionRepository => ({
+  platform: 'gitlab',
+  fullName,
+  isPrivate: false,
+});
+
+describe('dedupeRepositoriesByPlatformAndFullName', () => {
+  it('keeps the same fullName on two platforms as two rows', () => {
+    const deduped = dedupeRepositoriesByPlatformAndFullName([
+      github('owner/repo'),
+      gitlab('owner/repo'),
+    ]);
+    expect(deduped).toHaveLength(2);
+    expect(deduped.map(repo => repo.platform)).toEqual(['github', 'gitlab']);
+  });
+
+  it('collapses duplicate rows that share platform and fullName', () => {
+    const deduped = dedupeRepositoriesByPlatformAndFullName([
+      github('owner/repo'),
+      github('owner/repo'),
+    ]);
+    expect(deduped).toHaveLength(1);
+  });
+});
+
+const group = (
+  key: RepositoryGroup['key'],
+  overrides: Partial<RepositoryGroup> = {}
+): RepositoryGroup => ({
+  key,
+  status: 'repos',
+  repositories: [],
+  ...overrides,
+});
+
+describe('resolveRepositoryGroups', () => {
+  const githubRow: NewSessionRepository = {
+    platform: 'github',
+    fullName: 'owner/repo',
+    isPrivate: false,
+  };
+
+  it('hides the Bitbucket group when no organization is set', () => {
+    const { groups } = resolveRepositoryGroups({
+      organizationId: undefined,
+      github: group('github', { repositories: [githubRow] }),
+      gitlab: group('gitlab', { status: 'connect' }),
+      bitbucket: group('bitbucket'),
+      recents: [],
+    });
+    expect(groups.map(g => g.key)).toEqual(['github', 'gitlab']);
+  });
+
+  it('keeps GitHub rows when the GitLab group errors', () => {
+    const { groups } = resolveRepositoryGroups({
+      organizationId: 'org-1',
+      github: group('github', { status: 'repos', repositories: [githubRow] }),
+      gitlab: group('gitlab', { status: 'error' }),
+      bitbucket: group('bitbucket', { status: 'connect' }),
+      recents: [],
+    });
+    const githubGroup = groups.find(g => g.key === 'github');
+    const gitlabGroup = groups.find(g => g.key === 'gitlab');
+    expect(githubGroup?.status).toBe('repos');
+    expect(githubGroup?.repositories).toEqual([githubRow]);
+    expect(gitlabGroup?.status).toBe('error');
   });
 });

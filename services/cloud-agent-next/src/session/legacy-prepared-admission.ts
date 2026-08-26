@@ -9,6 +9,7 @@ import { recordCloudAgentSessionFailure } from '../telemetry/session-reports.js'
 import type { Env } from '../types.js';
 import type { SessionId, UserId } from '../types/ids.js';
 import { withDORetry } from '../utils/do-retry.js';
+import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { projectAdmissionToPublicAck, throwAdmissionError } from './queue-message.js';
 
 export type LegacyPreparedInitialAdmissionInput = {
@@ -20,7 +21,6 @@ export async function replayLegacyPreparedInitialMessageIfAlreadyAdmitted(
   ctx: { env: Env; userId: string; botId?: string }
 ): Promise<QueueAckResponse | undefined> {
   const sessionId = input.cloudAgentSessionId as SessionId;
-  const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${sessionId}`);
   const request: LegacyRegisteredInitialAdmissionRequest = {
     userId: ctx.userId as UserId,
     botId: ctx.botId,
@@ -29,7 +29,7 @@ export async function replayLegacyPreparedInitialMessageIfAlreadyAdmitted(
     DurableObjectStub<CloudAgentSession>,
     SessionMessageAdmissionResult | undefined
   >(
-    () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
+    () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
     stub => stub.replayPreparedInitialMessage(request),
     'replayPreparedInitialMessage'
   );
@@ -64,7 +64,6 @@ export async function admitLegacyPreparedInitialMessage(
   ctx: { env: Env; userId: string; botId?: string }
 ): Promise<QueueAckResponse> {
   const sessionId = input.cloudAgentSessionId as SessionId;
-  const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${sessionId}`);
   const request: LegacyRegisteredInitialAdmissionRequest = {
     userId: ctx.userId as UserId,
     botId: ctx.botId,
@@ -72,7 +71,7 @@ export async function admitLegacyPreparedInitialMessage(
   let result: SessionMessageAdmissionResult;
   try {
     result = await withDORetry<DurableObjectStub<CloudAgentSession>, SessionMessageAdmissionResult>(
-      () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
+      () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
       stub => stub.admitPreparedInitialMessage(request),
       'admitPreparedInitialMessage'
     );

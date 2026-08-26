@@ -19,6 +19,7 @@ import type { Env } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { QueueAckResponse } from '../router/schemas.js';
 import { withDORetry } from '../utils/do-retry.js';
+import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { logger } from '../logger.js';
 import { preflightExistingPromptModel } from './model-preflight.js';
 
@@ -113,9 +114,8 @@ async function hasMessageAdmission(input: QueueMessageInput, ctx: QueueMessageCo
   if (messageId === undefined || messageId === null) return false;
 
   const sessionId = input.cloudAgentSessionId as SessionId;
-  const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${sessionId}`);
   return withDORetry<DurableObjectStub<CloudAgentSession>, boolean>(
-    () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
+    () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
     stub => stub.hasMessageAdmission(messageId),
     'hasMessageAdmission'
   );
@@ -153,8 +153,6 @@ export async function queueMessage(
   ctx: QueueMessageContext
 ): Promise<QueueAckResponse> {
   const sessionId = input.cloudAgentSessionId as SessionId;
-  const doKey = `${ctx.userId}:${sessionId}`;
-  const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(doKey);
   const request: SubmittedSessionMessageRequest = {
     userId: ctx.userId as UserId,
     botId: ctx.botId,
@@ -170,7 +168,7 @@ export async function queueMessage(
     DurableObjectStub<CloudAgentSession>,
     SessionMessageAdmissionResult
   >(
-    () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
+    () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
     stub => stub.admitSubmittedMessage(request),
     'admitSubmittedMessage'
   );

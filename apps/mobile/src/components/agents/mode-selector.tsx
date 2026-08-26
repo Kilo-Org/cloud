@@ -1,5 +1,5 @@
 import { Pressable } from 'react-native';
-import { type Href, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
 
@@ -14,7 +14,8 @@ import {
 } from '@/components/agents/mode-normalize';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { setModePickerBridge } from '@/lib/picker-bridge';
+import { parseParam } from '@/lib/route-params';
+import { modePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { cn } from '@/lib/utils';
 
 export type { AgentMode };
@@ -35,6 +36,7 @@ export function ModeSelector({
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { 'session-id': rawSessionId } = useLocalSearchParams<{ 'session-id'?: string }>();
   const selectedValue = normalizeAgentMode(value);
   const customOptionsDeduped = dedupeCustomModeOptions(customOptions);
   const selectedCustomOption = ensureSelectedCustomOption(customOptionsDeduped, selectedValue).find(
@@ -49,12 +51,13 @@ export function ModeSelector({
     if (disabled) {
       return;
     }
-    setModePickerBridge({
+    const routeKey = parseParam(rawSessionId) ?? UNFENCED_ROUTE_KEY;
+    modePickerSlot.set(routeKey, {
       currentValue: selectedValue,
       onSelect: onChange,
       customOptions,
     });
-    router.push('/(app)/agent-chat/mode-picker' as Href);
+    router.push(`/(app)/agent-chat/mode-picker?routeKey=${encodeURIComponent(routeKey)}` as Href);
   }
 
   return (

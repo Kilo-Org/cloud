@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   cloudStatusForPreparingEvent,
+  finalizeOtherRunningAttemptsForMessage,
   finalizePreparationAttempt,
   getPreparationSnapshots,
   materializePreparationEvent,
@@ -202,6 +203,34 @@ describe('finalizePreparationAttempt', () => {
       finalizePreparationAttempt(eventQueries, 'missing', { status: 'completed', timestamp: 9999 })
     ).toEqual([]);
     expect(readAttempt(eventQueries, attemptId)).toEqual(before);
+  });
+});
+
+describe('finalizeOtherRunningAttemptsForMessage', () => {
+  it('completes same-message extras and keeps the selected attempt running', () => {
+    const eventQueries = createMemoryEventQueries();
+    const seed = (attemptId: string, triggerMessageId: string) => {
+      materializePreparationEvent(eventQueries, storedEvent(1000), {
+        version: 2,
+        attemptId,
+        triggerMessageId,
+        revision: 1,
+        timestamp: 1000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+    };
+    seed('extra', 'message-1');
+    seed('kept', 'message-1');
+    seed('different', 'message-2');
+
+    const events = finalizeOtherRunningAttemptsForMessage(eventQueries, 'message-1', 'kept', 9000);
+
+    expect(readAttempt(eventQueries, 'extra').status).toBe('completed');
+    expect(readAttempt(eventQueries, 'kept').status).toBe('running');
+    expect(readAttempt(eventQueries, 'different').status).toBe('running');
+    expect(events).toHaveLength(1);
   });
 });
 

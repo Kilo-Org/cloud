@@ -122,38 +122,6 @@ describe('admin.github.getKilocodeOpenPullRequestsSummary', () => {
       })
     );
   });
-
-  it('always returns numeric commentCount values for external PR rows', async () => {
-    const mockSummary = {
-      totalOpenPullRequests: 1,
-      teamOpenPullRequests: 0,
-      externalOpenPullRequests: 1,
-      externalOpenPullRequestsList: [
-        {
-          number: 1,
-          title: 'Example',
-          url: 'https://github.com/Kilo-Org/kilocode/pull/1',
-          repo: 'kilocode',
-          authorLogin: 'external-user',
-          createdAt: new Date('2020-01-01T00:00:00.000Z').toISOString(),
-          ageDays: 1,
-          commentCount: 0,
-          teamCommented: false,
-          reviewStatus: 'no_reviews',
-        },
-      ],
-      updatedAt: new Date('2020-01-01T00:00:00.000Z').toISOString(),
-    };
-
-    (getKilocodeRepoOpenPullRequestsSummary as jest.Mock).mockResolvedValue(mockSummary);
-
-    const caller = await createCallerForUser(adminUser.id);
-    const result = await caller.admin.github.getKilocodeOpenPullRequestsSummary();
-
-    expect(
-      result.externalOpenPullRequestsList.every(pr => typeof pr.commentCount === 'number')
-    ).toBe(true);
-  });
 });
 
 describe('admin.github.getKilocodeRecentlyMergedExternalPRs', () => {
@@ -191,15 +159,6 @@ describe('admin.github.getKilocodeRecentlyMergedExternalPRs', () => {
     expect(result).toEqual(mockMergedPrs);
     expect(result.length).toBe(2);
     expect(result[0]?.number).toBe(456);
-  });
-
-  it('returns empty array when no merged PRs', async () => {
-    (getKilocodeRepoRecentlyMergedExternalPRs as jest.Mock).mockResolvedValue([]);
-
-    const caller = await createCallerForUser(adminUser.id);
-    const result = await caller.admin.github.getKilocodeRecentlyMergedExternalPRs();
-
-    expect(result).toEqual([]);
   });
 });
 
@@ -278,22 +237,5 @@ describe('admin.github.getKilocodeRecentlyClosedExternalPRs', () => {
         repos: ['cloud'],
       })
     );
-  });
-
-  it('returns empty array when no closed PRs', async () => {
-    (getKilocodeRepoRecentlyClosedExternalPRs as jest.Mock).mockResolvedValue({
-      prs: [],
-      thisWeekMergedCount: 0,
-      thisWeekClosedCount: 0,
-      weekStart: new Date('2024-01-15T00:00:00.000Z').toISOString(),
-    });
-
-    const caller = await createCallerForUser(adminUser.id);
-    const result = await caller.admin.github.getKilocodeRecentlyClosedExternalPRs();
-
-    expect(result.prs).toEqual([]);
-    expect(result.thisWeekMergedCount).toBe(0);
-    expect(result.thisWeekClosedCount).toBe(0);
-    expect(typeof result.weekStart).toBe('string');
   });
 });

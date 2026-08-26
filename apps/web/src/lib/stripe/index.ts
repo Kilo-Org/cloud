@@ -656,6 +656,7 @@ async function recordKiloclawEarlybirdPurchase(user: User, charge: Stripe.Charge
   }
 }
 
+// old form: array limit 100, no hasMore; remove when every client pages.
 export async function getStripeInvoices(
   stripeCustomerId: string,
   dateThreshold?: Date | null
@@ -675,7 +676,11 @@ export async function getStripeInvoices(
   const invoices = await client.invoices.list(listParams);
   const invoiceData: Stripe.Invoice[] = invoices.data;
 
-  return invoiceData.map(invoice => {
+  return mapStripeInvoicesToUnified(invoiceData);
+}
+
+function mapStripeInvoicesToUnified(invoices: Stripe.Invoice[]): UnifiedInvoice[] {
+  return invoices.map(invoice => {
     // Classify as 'seats' if any line item has seats metadata or a known paid seat price ID
     const isSeatInvoice =
       invoice.lines?.data?.some(line => {
@@ -701,6 +706,47 @@ export async function getStripeInvoices(
       description: firstLineDescription,
     };
   });
+}
+
+export type StripeInvoicesPage = {
+  entries: UnifiedInvoice[];
+  hasMore: boolean;
+  nextCursor: string | null;
+};
+
+export async function getStripeInvoicesPage(
+  stripeCustomerId: string,
+  dateThreshold?: Date | null,
+  startingAfter?: string | null
+): Promise<StripeInvoicesPage> {
+  const listParams: Stripe.InvoiceListParams = {
+    customer: stripeCustomerId,
+    limit: 25,
+    expand: ['data.payment_intent', 'data.lines.data'],
+  };
+
+  if (dateThreshold) {
+    listParams.created = {
+      gte: Math.floor(dateThreshold.getTime() / 1000), // Convert to Unix timestamp
+    };
+  }
+
+  if (startingAfter) {
+    listParams.starting_after = startingAfter;
+  }
+
+  const invoices = await client.invoices.list(listParams);
+  const entries = mapStripeInvoicesToUnified(invoices.data);
+  const lastInvoice = invoices.data[invoices.data.length - 1];
+
+  // Tie the cursor to Stripe's own continuation signal. A full final page has
+  // a last invoice but no next page, and advertising its id as a cursor makes
+  // the caller fetch an empty page it can never end on.
+  return {
+    entries,
+    hasMore: invoices.has_more,
+    nextCursor: invoices.has_more ? (lastInvoice?.id ?? null) : null,
+  };
 }
 
 async function handlePaymentMethodEvent(

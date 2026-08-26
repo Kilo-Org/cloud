@@ -6,8 +6,14 @@ import { CALLBACK_DELIVERY_MAX_ATTEMPTS } from './delivery.js';
 
 type QueueConsumer = { queue?: string; max_retries?: number };
 type WranglerConfig = {
+  vars?: Record<string, string>;
   queues?: { consumers?: QueueConsumer[] };
-  env?: { dev?: { queues?: { consumers?: QueueConsumer[] } } };
+  env?: {
+    dev?: {
+      vars?: Record<string, string>;
+      queues?: { consumers?: QueueConsumer[] };
+    };
+  };
 };
 
 const CONFIGURED_REDELIVERIES = CALLBACK_DELIVERY_MAX_ATTEMPTS - 1;
@@ -29,5 +35,14 @@ describe('callback queue retry configuration', () => {
 
     expect(production?.max_retries).toBe(CONFIGURED_REDELIVERIES);
     expect(dev?.max_retries).toBe(CONFIGURED_REDELIVERIES);
+  });
+
+  it('keeps Vercel sandbox enrollment disabled by default', () => {
+    const config = readWranglerConfig();
+
+    expect(config.vars?.VERCEL_SANDBOX_ORG_IDS).toBe('');
+    expect(config.vars?.CONTROL_PLANE_IDS).toBe('');
+    expect(config.env?.dev?.vars?.VERCEL_SANDBOX_ORG_IDS).toBe('');
+    expect(config.env?.dev?.vars?.CONTROL_PLANE_IDS).toBe('');
   });
 });

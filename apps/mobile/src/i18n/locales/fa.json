@@ -1386,7 +1386,8 @@
       "gitlabAccount": "حساب GitLab",
       "connectGitLab": "اتصال GitLab",
       "gitlabError": "باز کردن راه‌اندازی GitLab ناموفق بود. لطفاً دوباره تلاش کنید.",
-      "description": "برای بررسی خودکار pull requestها، Kilo {{label}} را متصل کنید."
+      "description": "برای بررسی خودکار pull requestها، Kilo {{label}} را متصل کنید.",
+      "bitbucketError": "باز کردن تنظیمات Bitbucket ممکن نشد. لطفاً دوباره تلاش کنید."
     },
     "overview": {
       "reviewStyle": "سبک بررسی",
@@ -2075,7 +2076,8 @@
       "dollar": "دلار",
       "dollar_other": "دلار",
       "costSpoken": "هزینه {{cost}}",
-      "costSpokenWithTime": "هزینه {{cost}}، {{time}}"
+      "costSpokenWithTime": "هزینه {{cost}}، {{time}}",
+      "pullRequest": "درخواست کشش {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "باز کردن GitHub ممکن نشد",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "جلسه جدید",
       "repository": "مخزن",
-      "couldNotLoadRepositories": "بارگذاری مخازن ممکن نشد",
       "connectGithub": "اتصال GitHub",
       "connectGithubDescription": "GitHub را در مرورگر خود وصل کنید، سپس برای انتخاب مخزن به اینجا برگردید.",
       "openGithub": "باز کردن GitHub",
       "refreshRepositories": "تازهسازی مخازن",
-      "githubConnectionNotVisible": "ما هنوز اتصال GitHub شما را نمیبینیم",
-      "githubConnectionNotVisibleDescription": "اگر GitHub App کیلا را نصب یا پیکربندی کردهاید، دوباره بررسی کنید — یا مطمئن شوید که برای این حساب/سازمان نصب شده است.",
-      "checkAgain": "دوباره بررسی کنید",
       "githubConnected": "GitHub وصل شد",
       "noRepositoriesVisible": "هیچ مخزنی قابل مشاهده نیست. دسترسی مخزن GitHub App کیلا را بررسی کنید، سپس تازهسازی کنید.",
       "runOnWithTarget": "اجرا بر روی: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "ادامه ویرایش",
       "discard": "دور انداختن",
       "discardFailed": "دور انداختن پیشنویس ممکن نشد. لطفاً دوباره تلاش کنید.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket متصل شد",
+      "connectBitbucket": "اتصال Bitbucket",
+      "connectBitbucketDescription": "در مرورگر خود به Bitbucket متصل شوید، سپس برای انتخاب مخزن به اینجا بازگردید.",
+      "connectGitlab": "اتصال GitLab",
+      "connectGitlabDescription": "در مرورگر خود به GitLab متصل شوید، سپس برای انتخاب مخزن به اینجا بازگردید.",
+      "couldNotLoadBitbucketRepositories": "بارگیری مخازن Bitbucket ممکن نشد",
+      "couldNotLoadGithubRepositories": "بارگیری مخازن GitHub ممکن نشد",
+      "couldNotLoadGitlabRepositories": "بارگیری مخازن GitLab ممکن نشد",
+      "gitlabConnected": "GitLab متصل شد",
+      "noRepositoriesVisibleBitbucket": "هیچ مخزنی قابل مشاهده نیست. دسترسی مخزن را برای Bitbucket بررسی کنید، سپس تازه‌سازی کنید.",
+      "noRepositoriesVisibleGitlab": "هیچ مخزنی قابل مشاهده نیست. دسترسی مخزن را برای GitLab بررسی کنید، سپس تازه‌سازی کنید.",
+      "openBitbucket": "باز کردن Bitbucket",
+      "openGitlab": "باز کردن GitLab",
+      "recentlyUsed": "اخیراً استفاده‌شده"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل بهروزرسانی شد",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "هیچ مخزنی به حساب شما وصل نیست.",
       "tryDifferentSearch": "عبارت جستجوی دیگری را امتحان کنید.",
       "loading": "در حال بارگذاری...",
-      "accessibility": "مخزن: {{label}}"
+      "accessibility": "مخزن: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "جزئیات پیام",
@@ -2925,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "هیچ برنامه ایمیلی در دسترس نیست. می‌توانید از {{email}} با ما تماس بگیرید.",
     "couldNotOpenStore": "باز کردن فروشگاه ممکن نشد.",
-    "promptTitle": "از برنامه Kilo چقدر راضی هستید؟",
-    "iLikeIt": "دوستش دارم",
-    "gladTitle": "از شنیدن این خوشحالیم!",
-    "gladMessage": "یک نظر در فروشگاه به ما خیلی کمک می‌کند. ممنون از استفاده شما از Kilo!",
-    "rateKilo": "امتیاز به Kilo",
-    "needsWork": "نیاز به بهبود دارد",
-    "sorryTitle": "از شنیدن این متأسفیم!",
-    "sorryMessage": "لطفاً به ما اطلاع دهید چه چیزی باید بهتر شود. مهندس مسئول برنامه هر گزارش را می‌خواند!",
-    "emailUs": "برای ما ایمیل بفرستید",
-    "emailSubject": "بازخورد برنامه موبایل"
+    "emailSubject": "بازخورد برنامه موبایل",
+    "neutralTitle": "به اپلیکیشن Kilo امتیاز دهید",
+    "rateTheApp": "به برنامه امتیاز دهید",
+    "sendFeedback": "ارسال بازخورد"
   },
   "organization": {
     "boundary": {
@@ -2944,7 +2953,9 @@
       "organizationUnavailable": "سازمان در دسترس نیست",
       "selectDescription": "برای ادامه از نمایه خود یک سازمان انتخاب کنید.",
       "selectOrganization": "انتخاب سازمان",
-      "unavailableDescription": "این سازمان دیگر در دسترس نیست. برای ادامه یکی را از نمایه خود انتخاب کنید."
+      "unavailableDescription": "این سازمان دیگر در دسترس نیست. برای ادامه یکی را از نمایه خود انتخاب کنید.",
+      "accessDeniedTitle": "دسترسی رد شد",
+      "accessDeniedDescription": "شما به این سازمان دسترسی ندارید."
     },
     "creditActivity": {
       "emptyDescription": "خریدها، استفاده و تنظیمات اعتبار این سازمان به محض وقوع در اینجا ظاهر می‌شوند.",
@@ -2961,7 +2972,10 @@
         "team-topup-bonus-2025": "پاداش شارژ تیم 2025",
         "accounting_adjustment": "تعدیل حسابداری",
         "credits_expired": "اعتبارها منقضی شدند"
-      }
+      },
+      "loadMore": "بارگذاری بیشتر",
+      "loadMoreFailed": "بارگذاری بیشتر ممکن نشد",
+      "truncated": "فعالیت اعتبار قدیمیتر در دسترس است."
     },
     "inviteMember": {
       "emailError": "یک آدرس ایمیل معتبر وارد کنید",
@@ -2988,7 +3002,10 @@
         "draft": "پیش‌نویس",
         "uncollectible": "وصول‌نشدنی",
         "unknown": "ناشناخته"
-      }
+      },
+      "loadMore": "بارگذاری بیشتر",
+      "loadMoreFailed": "بارگذاری بیشتر ممکن نشد",
+      "truncated": "فاکتورهای قدیمیتر در دسترس هستند."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

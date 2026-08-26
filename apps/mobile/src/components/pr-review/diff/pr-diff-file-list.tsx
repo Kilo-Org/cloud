@@ -116,7 +116,12 @@ export function PrReviewFileList({
   // pops the PR screen off the stack), drop the bridge so a stale
   // selection can never leak into the next mount. Re-mounting this
   // list always starts with no selection.
-  useEffect(() => clearDiffSelection, []);
+  useEffect(
+    () => () => {
+      clearDiffSelection({ owner, repo, number });
+    },
+    [owner, repo, number]
+  );
 
   // Measured floating-bar height (null until the first layout event).
   const [barHeight, setBarHeight] = useState<number | null>(null);

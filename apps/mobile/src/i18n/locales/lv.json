@@ -1395,7 +1395,8 @@
       "gitlabAccount": "GitLab konts",
       "connectGitLab": "Savienot GitLab",
       "gitlabError": "Neizdevās atvērt GitLab iestatīšanu. Lūdzu, mēģiniet vēlreiz.",
-      "description": "Savienojiet Kilo {{label}}, lai automātiski pārskatītu pull requests."
+      "description": "Savienojiet Kilo {{label}}, lai automātiski pārskatītu pull requests.",
+      "bitbucketError": "Neizdevās atvērt Bitbucket iestatīšanu. Lūdzu, mēģiniet vēlreiz."
     },
     "overview": {
       "reviewStyle": "Pārskatīšanas stils",
@@ -2090,7 +2091,8 @@
       "cent_zero": "centu",
       "dollar_zero": "dolāru",
       "costSpoken": "izmaksas {{cost}}",
-      "costSpokenWithTime": "izmaksas {{cost}}, {{time}}"
+      "costSpokenWithTime": "izmaksas {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Neizdevās atvērt GitHub",
@@ -2167,14 +2169,10 @@
     "newSession": {
       "title": "Jauna sesija",
       "repository": "Repozitorijs",
-      "couldNotLoadRepositories": "Neizdevās ielādēt repozitorijus",
       "connectGithub": "Savienot GitHub",
       "connectGithubDescription": "Savieno GitHub savā pārlūkā, tad atgriezies šeit, lai izvēlētos repozitoriju.",
       "openGithub": "Atvērt GitHub",
       "refreshRepositories": "Atsvaidzināt repozitorijus",
-      "githubConnectionNotVisible": "Mēs vēl neredzam tavu GitHub savienojumu",
-      "githubConnectionNotVisibleDescription": "Ja instalēji vai konfigurēji Kilo GitHub App, pārbaudi vēlreiz — vai pārliecinies, ka tas tika instalēts šim kontam/organizācijai.",
-      "checkAgain": "Pārbaudīt vēlreiz",
       "githubConnected": "GitHub savienots",
       "noRepositoriesVisible": "Nav redzamu repozitoriju. Pārbaudi repozitorija piekļuvi Kilo GitHub App, tad atsvaidzini.",
       "runOnWithTarget": "Palaist uz: {{target}}",
@@ -2201,7 +2199,21 @@
       "keepEditing": "Turpināt rediģēt",
       "discard": "Atmest",
       "discardFailed": "Neizdevās atmest melnrakstu. Lūdzu, mēģini vēlreiz.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "bitbucketConnected": "Bitbucket savienots",
+      "connectBitbucket": "Savienot Bitbucket",
+      "connectBitbucketDescription": "Savienojiet Bitbucket savā pārlūkprogrammā, pēc tam atgriezieties, lai izvēlētos repozitoriju.",
+      "connectGitlab": "Savienot GitLab",
+      "connectGitlabDescription": "Savienojiet GitLab savā pārlūkprogrammā, pēc tam atgriezieties, lai izvēlētos repozitoriju.",
+      "couldNotLoadBitbucketRepositories": "Neizdevās ielādēt Bitbucket repozitorijus",
+      "couldNotLoadGithubRepositories": "Neizdevās ielādēt GitHub repozitorijus",
+      "couldNotLoadGitlabRepositories": "Neizdevās ielādēt GitLab repozitorijus",
+      "gitlabConnected": "GitLab ir savienots",
+      "noRepositoriesVisibleBitbucket": "Nav redzamu repozitoriju. Pārbaudiet repozitoriju piekļuvi Bitbucket, pēc tam atsvaidziniet.",
+      "noRepositoriesVisibleGitlab": "Nav redzamu repozitoriju. Pārbaudiet repozitoriju piekļuvi GitLab, pēc tam atsvaidziniet.",
+      "openBitbucket": "Atvērt Bitbucket",
+      "openGitlab": "Atvērt GitLab",
+      "recentlyUsed": "Nesen lietots"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atjaunināts {{displayCount}} fails",
@@ -2291,7 +2303,10 @@
       "noRepositoriesDescription": "Tavam kontam nav savienotu repozitoriju.",
       "tryDifferentSearch": "Izmēģini citu meklēšanas vārdu.",
       "loading": "Ielādē...",
-      "accessibility": "Repozitorijs: {{label}}"
+      "accessibility": "Repozitorijs: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Ziņojuma detaļas",
@@ -2945,16 +2960,10 @@
   "feedback": {
     "noEmailApp": "Nav pieejama e-pasta lietotne. Vari sazināties ar mums: {{email}}",
     "couldNotOpenStore": "Neizdevās atvērt veikalu.",
-    "promptTitle": "Kā tev patīk Kilo lietotne?",
-    "iLikeIt": "Man patīk",
-    "gladTitle": "Mums ir prieks to dzirdēt!",
-    "gladMessage": "Veikala atsauksme mums ļoti palīdzētu. Paldies, ka izmanto Kilo!",
-    "rateKilo": "Novērtēt Kilo",
-    "needsWork": "Vajag uzlabojumus",
-    "sorryTitle": "Mums ir žēl to dzirdēt!",
-    "sorryMessage": "Lūdzu, ļauj mums uzzināt, kas jāuzlabo. Inženieris, kurš atbild par lietotni, izlasa katru ziņojumu!",
-    "emailUs": "Raksti mums",
-    "emailSubject": "mobilās lietotnes atsauksme"
+    "emailSubject": "mobilās lietotnes atsauksme",
+    "neutralTitle": "Novērtējiet Kilo lietotni",
+    "rateTheApp": "Novērtēt lietotni",
+    "sendFeedback": "Nosūtīt atsauksmi"
   },
   "organization": {
     "boundary": {
@@ -2964,7 +2973,9 @@
       "organizationUnavailable": "Organizācija nav pieejama",
       "selectDescription": "Izvēlies organizāciju no sava profila, lai turpinātu.",
       "selectOrganization": "Izvēlēties organizāciju",
-      "unavailableDescription": "Šī organizācija vairs nav pieejama. Izvēlies vienu no sava profila, lai turpinātu."
+      "unavailableDescription": "Šī organizācija vairs nav pieejama. Izvēlies vienu no sava profila, lai turpinātu.",
+      "accessDeniedTitle": "Piekļuve liegta",
+      "accessDeniedDescription": "Jums nav piekļuves šai organizācijai."
     },
     "creditActivity": {
       "emptyDescription": "Pirkumi, lietojums un kredītu korekcijas šai organizācijai parādīsies šeit, kad tās notiks.",
@@ -2981,7 +2992,10 @@
         "team-topup-bonus-2025": "Komandas papildinājuma bonuss 2025",
         "accounting_adjustment": "Grāmatvedības korekcija",
         "credits_expired": "Kredīti beigušies"
-      }
+      },
+      "loadMore": "Ielādēt vairāk",
+      "loadMoreFailed": "Neizdevās ielādēt vairāk",
+      "truncated": "Ir pieejama vecāka kredīta aktivitāte."
     },
     "inviteMember": {
       "emailError": "Ievadi derīgu e-pasta adresi",
@@ -3008,7 +3022,10 @@
         "draft": "Melnraksts",
         "uncollectible": "Nepiedzenams",
         "unknown": "Nezināms"
-      }
+      },
+      "loadMore": "Ielādēt vairāk",
+      "loadMoreFailed": "Neizdevās ielādēt vairāk",
+      "truncated": "Ir pieejami vecāki rēķini."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

@@ -704,3 +704,63 @@ test(
     }
   }
 );
+
+test(
+  'restartServiceInTmux relaunches promptly when only leftover shells remain',
+  { skip: !hasTmux },
+  async () => {
+    // The §1 repro: the service already exited and ctrl-c left a second login
+    // shell parented to the pane shell. Waiting on that shell made restart
+    // refuse to type for 60s, so wall-clock is part of the assertion.
+    const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
+    const serviceName = 'stripe';
+    const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
+
+    try {
+      tmux('new-session', '-d', '-s', sessionName, '-n', 'dashboard', 'sleep 120');
+      tmux('new-window', '-d', '-t', sessionName, '-n', serviceName, '/bin/sh');
+
+      const serviceWindow = listWindows(sessionName).find(window => window.name === serviceName);
+      assert.ok(serviceWindow);
+      const paneTarget = `${sessionName}:${serviceWindow.index}.0`;
+
+      // Leftover login shell, exactly what an interrupted service leaves behind.
+      tmux('send-keys', '-t', paneTarget, '/bin/sh -l', 'Enter');
+      let leftoverShellUp = false;
+      for (let i = 0; i < 40 && !leftoverShellUp; i++) {
+        const panePid = execFileSync(
+          'tmux',
+          ['display-message', '-p', '-t', paneTarget, '#{pane_pid}'],
+          { encoding: 'utf-8' }
+        ).trim();
+        try {
+          execFileSync('pgrep', ['-P', panePid], { stdio: 'ignore' });
+          leftoverShellUp = true;
+        } catch {
+          await sleep(50);
+        }
+      }
+      assert.ok(leftoverShellUp, 'leftover shell should be a child of the pane shell');
+
+      const startedAt = Date.now();
+      const outcome = await restartServiceInTmux(sessionName, serviceName);
+      const elapsedMs = Date.now() - startedAt;
+
+      assert.equal(outcome, 'relaunched');
+      assert.ok(elapsedMs < 10_000, `restart should not wait on idle shells, took ${elapsedMs}ms`);
+      const paneContent = execFileSync('tmux', ['capture-pane', '-p', '-J', '-t', paneTarget], {
+        encoding: 'utf-8',
+      });
+      assert.ok(
+        paneContent.includes(buildStartCommand(serviceName)),
+        'start command should be typed into the idle pane'
+      );
+    } finally {
+      try {
+        tmux('kill-session', '-t', sessionName);
+      } catch {
+        // Session may already be gone if tmux fails during setup.
+      }
+    }
+  }
+);

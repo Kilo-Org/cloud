@@ -115,6 +115,8 @@ type Repository = {
   fullName: string;
   private: boolean;
   workspaceUuid?: string;
+  platformIntegrationId?: string;
+  platformAccountLogin?: string;
 };
 
 type NewSessionPanelProps = {
@@ -206,6 +208,9 @@ export function NewSessionPanel({
   // ---------------------------------------------------------------------------
   const [prompt, setPrompt] = useState('');
   const [selectedRepo, setSelectedRepo] = useState('');
+  const [selectedGitHubIntegrationId, setSelectedGitHubIntegrationId] = useState<
+    string | undefined
+  >();
   const [selectedPlatform, setSelectedPlatform] = useState<RepositoryPlatform>('github');
   const [mode, setMode] = useState<AgentMode>('code');
   const [model, setModel] = useState<string>('');
@@ -510,6 +515,8 @@ export function NewSessionPanel({
       fullName: repo.fullName,
       private: repo.private,
       platform: 'github' as const,
+      platformIntegrationId: repo.platformIntegrationId,
+      platformAccountLogin: repo.platformAccountLogin,
     }));
     const gitlab = gitlabRepositories.map(repo => ({
       id: repo.id,
@@ -539,8 +546,8 @@ export function NewSessionPanel({
       if (!fullName || seen.has(fullName)) continue;
       seen.add(fullName);
 
-      const match = unifiedRepositories.find(r => r.fullName === fullName);
-      if (match) result.push(match);
+      const matches = unifiedRepositories.filter(r => r.fullName === fullName);
+      if (matches.length === 1) result.push(matches[0]);
     }
 
     return result;
@@ -554,11 +561,16 @@ export function NewSessionPanel({
   const handleRepoSelect = useCallback(
     (repo: RepositoryOption, userInitiated = true) => {
       setSelectedRepo(repo.fullName);
+      setSelectedGitHubIntegrationId(
+        repo.platform === 'github' ? repo.platformIntegrationId : undefined
+      );
       setShowRepositoryRequiredMessage(false);
       if (userInitiated) setIsRepoUserSelected(true);
       if (repo.platform) {
         setSelectedPlatform(repo.platform);
-        if (userInitiated) setLastUsedRepo(repo.fullName, repo.platform, organizationId);
+        if (userInitiated) {
+          setLastUsedRepo(repo.fullName, repo.platform, organizationId, repo.platformIntegrationId);
+        }
       }
     },
     [organizationId]
@@ -618,20 +630,17 @@ export function NewSessionPanel({
       const repoName = extractRepoFromGitUrl(url);
       if (!repoName) continue;
 
-      const match = unifiedRepositories.find(
-        r => r.fullName.toLowerCase() === repoName.toLowerCase()
-      );
-      if (!match) continue;
-
-      setSelectedRepo(match.fullName);
-      setShowRepositoryRequiredMessage(false);
       const platform = detectGitPlatform(url);
-      if (platform) {
-        setSelectedPlatform(platform);
-      }
+      const matches = unifiedRepositories.filter(
+        r =>
+          r.fullName.toLowerCase() === repoName.toLowerCase() &&
+          (platform === null || r.platform === platform)
+      );
+      if (matches.length !== 1) continue;
+      handleRepoSelect(matches[0], false);
       break;
     }
-  }, [prompt, isRepoUserSelected, unifiedRepositories]);
+  }, [prompt, isRepoUserSelected, unifiedRepositories, handleRepoSelect]);
 
   const repoError =
     githubRepoError || gitlabRepoError || (organizationId ? bitbucketRepoError : null);
@@ -873,20 +882,31 @@ export function NewSessionPanel({
   // ---------------------------------------------------------------------------
   const [repoPopoverOpen, setRepoPopoverOpen] = useState(false);
 
-  const recentFullNames = useMemo(() => new Set(recentRepos.map(r => r.fullName)), [recentRepos]);
+  const repositoryKey = (repo: RepositoryOption) =>
+    `${repo.platform ?? 'other'}:${repo.platformIntegrationId ?? ''}:${repo.id}`;
+  const isSelectedRepository = (repo: RepositoryOption) =>
+    repo.fullName === selectedRepo &&
+    repo.platform === selectedPlatform &&
+    (repo.platform !== 'github' || repo.platformIntegrationId === selectedGitHubIntegrationId);
+  const recentKeys = useMemo(() => new Set(recentRepos.map(repositoryKey)), [recentRepos]);
   const githubRepos = unifiedRepositories.filter(
-    r => r.platform === 'github' && !recentFullNames.has(r.fullName)
+    r => r.platform === 'github' && !recentKeys.has(repositoryKey(r))
   );
+  const githubRepoGroups = Object.groupBy(
+    githubRepos,
+    repo => repo.platformAccountLogin ?? 'GitHub'
+  );
+  const hasMultipleGitHubAccounts = Object.keys(githubRepoGroups).length > 1;
   const gitlabRepos = unifiedRepositories.filter(
-    r => r.platform === 'gitlab' && !recentFullNames.has(r.fullName)
+    r => r.platform === 'gitlab' && !recentKeys.has(repositoryKey(r))
   );
   const bitbucketRepos = unifiedRepositories.filter(
-    r => r.platform === 'bitbucket' && !recentFullNames.has(r.fullName)
+    r => r.platform === 'bitbucket' && !recentKeys.has(repositoryKey(r))
   );
   const otherRepos = unifiedRepositories.filter(
-    r => !r.platform && !recentFullNames.has(r.fullName)
+    r => !r.platform && !recentKeys.has(repositoryKey(r))
   );
-  const filteredUnifiedRepos = unifiedRepositories.filter(r => !recentFullNames.has(r.fullName));
+  const filteredUnifiedRepos = unifiedRepositories.filter(r => !recentKeys.has(repositoryKey(r)));
 
   const handleRepoPillSelect = useCallback(
     (repo: RepositoryOption) => {
@@ -976,7 +996,11 @@ export function NewSessionPanel({
       return;
     }
     const selectedRepository = unifiedRepositories.find(
-      repository => repository.fullName === selectedRepo && repository.platform === selectedPlatform
+      repository =>
+        repository.fullName === selectedRepo &&
+        repository.platform === selectedPlatform &&
+        (selectedPlatform !== 'github' ||
+          repository.platformIntegrationId === selectedGitHubIntegrationId)
     );
     if (
       selectedPlatform === 'bitbucket' &&
@@ -1064,6 +1088,7 @@ export function NewSessionPanel({
           result = await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
             ...baseInput,
             githubRepo: selectedRepo,
+            githubIntegrationId: selectedGitHubIntegrationId,
             organizationId,
           });
         }
@@ -1132,6 +1157,7 @@ export function NewSessionPanel({
     selectedPlatform,
     selectedProfileId,
     selectedRepo,
+    selectedGitHubIntegrationId,
     slashCommands,
     trpc.cliSessionsV2.list,
     trpcClient,
@@ -1618,43 +1644,37 @@ export function NewSessionPanel({
                       <CommandGroup heading="Recently used">
                         {recentRepos.map(repo => (
                           <RepoCommandItem
-                            key={`recent-${repo.id}`}
+                            key={`recent-${repositoryKey(repo)}`}
                             repo={repo}
-                            isSelected={
-                              repo.fullName === selectedRepo && repo.platform === selectedPlatform
-                            }
+                            isSelected={isSelectedRepository(repo)}
                             onSelect={handleRepoPillSelect}
                           />
                         ))}
                       </CommandGroup>
                     )}
-                    {hasMultiplePlatforms ? (
+                    {hasMultiplePlatforms || hasMultipleGitHubAccounts ? (
                       <>
-                        {githubRepos.length > 0 && (
-                          <CommandGroup heading="GitHub">
-                            {githubRepos.map(repo => (
-                              <RepoCommandItem
-                                key={repo.id}
-                                repo={repo}
-                                isSelected={
-                                  repo.fullName === selectedRepo &&
-                                  repo.platform === selectedPlatform
-                                }
-                                onSelect={handleRepoPillSelect}
-                              />
-                            ))}
-                          </CommandGroup>
+                        {Object.entries(githubRepoGroups).map(([accountLogin, repositories]) =>
+                          repositories?.length ? (
+                            <CommandGroup key={accountLogin} heading={accountLogin}>
+                              {repositories.map(repo => (
+                                <RepoCommandItem
+                                  key={repositoryKey(repo)}
+                                  repo={repo}
+                                  isSelected={isSelectedRepository(repo)}
+                                  onSelect={handleRepoPillSelect}
+                                />
+                              ))}
+                            </CommandGroup>
+                          ) : null
                         )}
                         {gitlabRepos.length > 0 && (
                           <CommandGroup heading="GitLab">
                             {gitlabRepos.map(repo => (
                               <RepoCommandItem
-                                key={repo.id}
+                                key={repositoryKey(repo)}
                                 repo={repo}
-                                isSelected={
-                                  repo.fullName === selectedRepo &&
-                                  repo.platform === selectedPlatform
-                                }
+                                isSelected={isSelectedRepository(repo)}
                                 onSelect={handleRepoPillSelect}
                               />
                             ))}
@@ -1664,12 +1684,9 @@ export function NewSessionPanel({
                           <CommandGroup heading="Bitbucket">
                             {bitbucketRepos.map(repo => (
                               <RepoCommandItem
-                                key={repo.id}
+                                key={repositoryKey(repo)}
                                 repo={repo}
-                                isSelected={
-                                  repo.fullName === selectedRepo &&
-                                  repo.platform === selectedPlatform
-                                }
+                                isSelected={isSelectedRepository(repo)}
                                 onSelect={handleRepoPillSelect}
                               />
                             ))}
@@ -1679,12 +1696,9 @@ export function NewSessionPanel({
                           <CommandGroup heading="Other">
                             {otherRepos.map(repo => (
                               <RepoCommandItem
-                                key={repo.id}
+                                key={repositoryKey(repo)}
                                 repo={repo}
-                                isSelected={
-                                  repo.fullName === selectedRepo &&
-                                  repo.platform === selectedPlatform
-                                }
+                                isSelected={isSelectedRepository(repo)}
                                 onSelect={handleRepoPillSelect}
                               />
                             ))}
@@ -1695,11 +1709,9 @@ export function NewSessionPanel({
                       <CommandGroup>
                         {filteredUnifiedRepos.map(repo => (
                           <RepoCommandItem
-                            key={repo.id}
+                            key={repositoryKey(repo)}
                             repo={repo}
-                            isSelected={
-                              repo.fullName === selectedRepo && repo.platform === selectedPlatform
-                            }
+                            isSelected={isSelectedRepository(repo)}
                             onSelect={handleRepoPillSelect}
                           />
                         ))}
@@ -1790,7 +1802,7 @@ function RepoCommandItem({
 }) {
   return (
     <CommandItem
-      value={repo.fullName}
+      value={`${repo.fullName} ${repo.platformAccountLogin ?? ''} ${repo.platformIntegrationId ?? ''}`}
       onSelect={() => onSelect(repo)}
       className="flex items-center gap-2"
     >

@@ -2,6 +2,7 @@ import { type Href, Stack, useLocalSearchParams } from 'expo-router';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { PrReviewConnectGate } from '@/components/pr-review/pr-review-connect-gate';
+import { privacyScreenLayout } from '@/components/privacy-cover-overlay';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import {
@@ -68,7 +69,7 @@ export default function PrReviewNumberLayout() {
         userId={userId}
         draftEntityKey={draftEntityKey}
       >
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack screenLayout={privacyScreenLayout} screenOptions={{ headerShown: false }}>
           <Stack.Screen name="comment-composer" options={sheetOptions} />
           <Stack.Screen name="review-submit" options={sheetOptions} />
           <Stack.Screen name="merge" options={sheetOptions} />

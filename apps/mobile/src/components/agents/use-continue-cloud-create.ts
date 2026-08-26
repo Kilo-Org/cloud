@@ -1,7 +1,5 @@
-// The cloud-agent leg of `useContinueSession`: one `prepareSession` call, its
-// hoisted operation key, and the contained post-success UI work. Split out of
-// `use-continue-session.ts` (which keeps destination resolution) so each file
-// stays under the max-lines limit.
+// Performs one `prepareSession` clone for the Cloud Agent Continue entry: a
+// hoisted operation key, a safe-retry outbox row, and post-success navigation.
 import { useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';

@@ -511,7 +511,6 @@ function NewSessionScreenBody() {
   function resolveStartDisabled(): boolean {
     if (isCloneEntry) {
       return resolveContinueStartDisabled({
-        hasPrompt,
         isCreating,
         isSubmitting,
         isSpawningRemote: remoteSpawn.isSpawningRemote,
@@ -520,7 +519,6 @@ function NewSessionScreenBody() {
         isRemoteTargetSelected,
         instanceCatalogLoading: instanceCatalog.isLoading,
         instanceHasSessionClone,
-        isProfileLoading,
         cloneImportFailureKey,
       });
     }

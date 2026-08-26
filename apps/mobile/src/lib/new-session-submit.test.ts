@@ -28,7 +28,6 @@ function continueInput(
   overrides: Partial<Parameters<typeof resolveContinueStartDisabled>[0]> = {}
 ) {
   return {
-    hasPrompt: false,
     isCreating: false,
     isSubmitting: false,
     isSpawningRemote: false,
@@ -37,7 +36,6 @@ function continueInput(
     isRemoteTargetSelected: false,
     instanceCatalogLoading: false,
     instanceHasSessionClone: true,
-    isProfileLoading: false,
     cloneImportFailureKey: null,
     ...overrides,
   };
@@ -172,21 +170,11 @@ describe('resolveNewSessionStartDisabled', () => {
 
 describe('resolveContinueStartDisabled', () => {
   it('clone Cloud with no prompt and a loaded repo/model is enabled', () => {
-    expect(
-      resolveContinueStartDisabled(continueInput({ hasPrompt: false, isProfileLoading: true }))
-    ).toBe(false);
+    expect(resolveContinueStartDisabled(continueInput())).toBe(false);
   });
 
   it('clone Cloud with no repository is disabled', () => {
     expect(resolveContinueStartDisabled(continueInput({ selectedRepo: '' }))).toBe(true);
-  });
-
-  it('clone Cloud ignores the profile loading gate', () => {
-    expect(resolveContinueStartDisabled(continueInput({ isProfileLoading: true }))).toBe(false);
-  });
-
-  it('clone Cloud ignores the empty prompt gate', () => {
-    expect(resolveContinueStartDisabled(continueInput({ hasPrompt: false }))).toBe(false);
   });
 
   it('clone Cloud is disabled while creating or submitting', () => {
@@ -202,14 +190,6 @@ describe('resolveContinueStartDisabled', () => {
     expect(
       resolveContinueStartDisabled(
         continueInput({ isRemoteTargetSelected: true, selectedRepo: '' })
-      )
-    ).toBe(false);
-  });
-
-  it('clone CLI ignores the empty prompt gate', () => {
-    expect(
-      resolveContinueStartDisabled(
-        continueInput({ isRemoteTargetSelected: true, hasPrompt: false })
       )
     ).toBe(false);
   });

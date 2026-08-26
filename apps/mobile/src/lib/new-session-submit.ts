@@ -116,13 +116,8 @@ export function resolveNewSessionStartDisabled(input: {
  *     `sessionClone` capability, or while a delivered clone/import failure is
  *     shown inline. Empty prompt, empty repository, and profile loading do NOT
  *     block.
- *
- * `hasPrompt` and `isProfileLoading` are accepted but deliberately ignored so
- * callers can reuse the same shape as the ordinary gate; the tests pin that
- * the clone path never falls back to the prompt/profile rules.
  */
 export function resolveContinueStartDisabled(input: {
-  hasPrompt: boolean;
   isCreating: boolean;
   isSubmitting: boolean;
   isSpawningRemote: boolean;
@@ -131,7 +126,6 @@ export function resolveContinueStartDisabled(input: {
   isRemoteTargetSelected: boolean;
   instanceCatalogLoading: boolean;
   instanceHasSessionClone: boolean;
-  isProfileLoading: boolean;
   cloneImportFailureKey: string | null;
 }): boolean {
   if (input.isRemoteTargetSelected) {

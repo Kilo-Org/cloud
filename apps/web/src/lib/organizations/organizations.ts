@@ -342,6 +342,7 @@ export async function addUserToOrganization(
       addUserToOrganization(organizationId, userId, role, tx)
     );
   }
+  await lockOrganizationMembershipMutation(txn, organizationId, userId);
   const result = await txn
     .insert(organization_memberships)
     .values({

@@ -450,6 +450,30 @@ describe('Organizations', () => {
       expect(member1Orgs[0].role).toBe('member');
       expect(member2Orgs[0].role).toBe('owner');
     });
+
+    test('should not create duplicate memberships when called concurrently for the same user', async () => {
+      const owner = await insertTestUser();
+      const member = await insertTestUser();
+      const organization = await createOrganization('Test Org', owner.id);
+
+      const results = await Promise.all([
+        addUserToOrganization(organization.id, member.id, 'member'),
+        addUserToOrganization(organization.id, member.id, 'member'),
+      ]);
+
+      expect(results.sort()).toEqual([false, true]);
+
+      const memberships = await db
+        .select()
+        .from(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.id),
+            eq(organization_memberships.kilo_user_id, member.id)
+          )
+        );
+      expect(memberships).toHaveLength(1);
+    });
   });
 
   describe('removeUserFromOrganization', () => {

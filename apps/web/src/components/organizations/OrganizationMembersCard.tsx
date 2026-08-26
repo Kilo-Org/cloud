@@ -70,7 +70,10 @@ function DailyUsageLimitDisplay({ member }: DailyUsageLimitDisplayProps) {
   return null;
 }
 
-const canManageMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
+// Exported (along with `canActOnMemberRole` and `canRemoveMember` below) for
+// reuse by the sub-organizations bulk-action wizards, which mirror these
+// same predictive checks per row instead of reimplementing them.
+export const canManageMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
   isKiloAdmin || canManageOrganization(role);
 
 const canInviteMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
@@ -81,7 +84,7 @@ const canInviteMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean
  * Owner management is reserved for owners, so an admin must not be offered
  * controls the server rejects with FORBIDDEN.
  */
-const canActOnMemberRole = (
+export const canActOnMemberRole = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean,
   targetRole: OrganizationRole
@@ -92,7 +95,7 @@ const canActOnMemberRole = (
 // - Owners can remove anyone except themselves
 // - Admins can remove anyone except themselves and owners
 // - Billing managers and members cannot remove anyone
-const canRemoveMember = (
+export const canRemoveMember = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean,
   isCurrentUser: boolean,

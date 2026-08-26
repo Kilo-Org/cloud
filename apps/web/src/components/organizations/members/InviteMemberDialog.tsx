@@ -44,7 +44,7 @@ const emailSchema = z.email();
  */
 export const INVITE_SUCCESS_MESSAGE = 'Invite created';
 
-const ROLE_LABELS = {
+export const ROLE_LABELS = {
   owner: 'Owner',
   admin: 'Admin',
   member: 'Member',
@@ -56,7 +56,7 @@ const ROLE_LABELS = {
 // - Admins can invite anyone except an owner
 // - Billing managers can invite members only
 // - Members cannot invite anyone
-const getAvailableInviteRoles = (
+export const getAvailableInviteRoles = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean
 ): OrganizationRole[] => {

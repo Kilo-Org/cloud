@@ -296,6 +296,12 @@ describe('organization sub-organizations router', () => {
       childA.id,
       childB.id,
     ]);
+    // owner has no direct membership in childA or childB — this exercises
+    // canManageMemberships via getOrganizationsAccessRoles' parent-inherited
+    // access, not a direct role.
+    expect(sharedPerson?.memberships.every(membership => membership.canManageMemberships)).toBe(
+      true
+    );
     expect(sharedPerson?.statuses).toEqual(['accepted']);
     expect(result.people.find(person => person.kiloUserId === owner.id)).toMatchObject({
       parentMembership: { role: 'owner', status: 'accepted' },
@@ -317,8 +323,39 @@ describe('organization sub-organizations router', () => {
         }),
       ],
     });
+    expect(
+      result.people.find(person => person.email.startsWith('pending-member-'))?.invitations[0]
+        ?.inviteId
+    ).toEqual(expect.any(String));
     expect(result.pageInfo).toMatchObject({ page: 1, pageSize: 25, total: 10, pageCount: 1 });
     expect(result.people.some(person => person.kiloUserId === bot.id)).toBe(false);
+  });
+
+  it('bases canManageMemberships on organization-manage authority, not billing authority', async () => {
+    // billing_manager has enough access to call `people` at all (it is one of
+    // ORGANIZATION_BILLING_ROLES, checked by organizationBillingProcedure), but
+    // is not one of ORGANIZATION_MANAGE_ROLES, so entries it cannot actually
+    // edit or remove must be flagged unmanageable. A plain parent `member`
+    // cannot call `people` at all (see "rejects a %s from every detail
+    // procedure" below), so billing_manager is the role that demonstrates the
+    // false case here.
+    const caller = await createCallerForUser(billingManager.id);
+
+    const result = await caller.organizations.subOrganizations.people({
+      organizationId: parent.id,
+    });
+
+    const sharedPerson = result.people.find(person => person.kiloUserId === childMember.id);
+    expect(sharedPerson?.memberships.map(membership => membership.organizationId)).toEqual([
+      childA.id,
+      childB.id,
+    ]);
+    expect(sharedPerson?.memberships.every(membership => !membership.canManageMemberships)).toBe(
+      true
+    );
+    expect(
+      result.people.find(person => person.kiloUserId === billingManager.id)?.parentMembership
+    ).toMatchObject({ role: 'billing_manager', canManageMemberships: false });
   });
 
   it('searches, filters, and orders aggregate people on the server', async () => {

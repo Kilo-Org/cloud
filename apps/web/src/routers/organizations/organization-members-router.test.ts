@@ -621,7 +621,7 @@ describe('organizations members trpc router', () => {
       }
     });
 
-    it('removes unselected child organization memberships regardless of role', async () => {
+    it('never removes an elevated (owner/billing_manager) child organization membership', async () => {
       const childOwner = await insertTestUser({
         google_user_email: `${crypto.randomUUID()}@elevated-child-owner.example.com`,
         google_user_name: 'Elevated Child Owner',
@@ -629,6 +629,41 @@ describe('organizations members trpc router', () => {
       });
       const child = await createChildOrganization('Elevated Child Members', childOwner.id);
       await addUserToOrganization(child.id, memberUser.id, 'owner');
+      jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+      const caller = await createCallerForUser(regularUser.id);
+
+      try {
+        const result = await caller.organizations.members.setChildMemberships({
+          organizationId: testOrganization.id,
+          memberId: memberUser.id,
+          childOrganizationIds: [],
+        });
+
+        expect(result).toEqual({ success: true, added: [], removed: [] });
+        expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalled();
+        const [membership] = await db
+          .select({ role: organization_memberships.role })
+          .from(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.organization_id, child.id),
+              eq(organization_memberships.kilo_user_id, memberUser.id)
+            )
+          );
+        expect(membership).toEqual({ role: 'owner' });
+      } finally {
+        await cleanupChildOrganizations([child.id]);
+      }
+    });
+
+    it('removes an unselected child organization membership when its role is member', async () => {
+      const childOwner = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@member-role-child-owner.example.com`,
+        google_user_name: 'Member Role Child Owner',
+        is_admin: false,
+      });
+      const child = await createChildOrganization('Member Role Child Members', childOwner.id);
+      await addUserToOrganization(child.id, memberUser.id, 'member');
       jest.mocked(invalidateOrganizationSessionAccess).mockClear();
       const caller = await createCallerForUser(regularUser.id);
 

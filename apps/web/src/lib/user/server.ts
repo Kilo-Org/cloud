@@ -25,7 +25,7 @@ import DiscordProvider from 'next-auth/providers/discord';
 import WorkOSProvider from 'next-auth/providers/workos';
 import AppleProvider from 'next-auth/providers/apple';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { allow_fake_login, ORGANIZATION_ID_HEADER } from '@/lib/constants';
+import { allow_fake_login, IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { redirect } from 'next/navigation';
@@ -563,8 +563,12 @@ type ExtendedProfile = Profile & {
 };
 
 const posthogClient = PostHogClient();
+// NextAuth calls a user-provided `debug` logger regardless of the `debug` option,
+// and its debug payloads contain sensitive data (tokens, secrets, provider config).
+// Only wire up the debug logger in local development.
+// https://next-auth.js.org/configuration/options
 const logger: LoggerInstance = {
-  debug: logExceptInTest,
+  debug: IS_DEVELOPMENT ? logExceptInTest : () => {},
   warn: sentryLogger('NEXTAUTH', 'warning'),
   error: sentryLogger('NEXTAUTH', 'error'),
 };

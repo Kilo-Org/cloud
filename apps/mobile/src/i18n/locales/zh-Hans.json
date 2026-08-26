@@ -2938,7 +2938,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "会计调整",
         "credits_expired": "积分已过期"
-      }
+      },
+      "loadMore": "加载更多",
+      "loadMoreFailed": "无法加载更多",
+      "truncated": "可查看更早的信用活动。"
     },
     "hub": {
       "balance": "余额",
@@ -2974,7 +2977,10 @@
         "draft": "草稿",
         "uncollectible": "无法收回",
         "unknown": "未知"
-      }
+      },
+      "loadMore": "加载更多",
+      "loadMoreFailed": "无法加载更多",
+      "truncated": "可查看更早的发票。"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

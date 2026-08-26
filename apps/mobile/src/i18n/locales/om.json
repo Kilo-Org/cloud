@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Sirreeffama herregaa",
         "credits_expired": "Kiriiditiin xumuramte"
-      }
+      },
+      "loadMore": "Dabalata fayyadami",
+      "loadMoreFailed": "Dabalataa fe'achuu hin dandeenye",
+      "truncated": "Sochii kireedii durii argachuun ni danda'ama."
     },
     "inviteMember": {
       "emailError": "Teessoo email sirrii seeni",
@@ -2973,7 +2976,10 @@
         "draft": "Daraftii",
         "uncollectible": "Kan walitti hin qabamne",
         "unknown": "Hin beekamu"
-      }
+      },
+      "loadMore": "Dabalata fayyadami",
+      "loadMoreFailed": "Dabalataa fe'achuu hin dandeenye",
+      "truncated": "Baallii durii argachuun ni danda'ama."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Bonus tambah nilai pasukan-2025",
         "accounting_adjustment": "Pelarasan perakaunan",
         "credits_expired": "Kredit tamat tempoh"
-      }
+      },
+      "loadMore": "Muatkan lagi",
+      "loadMoreFailed": "Tidak dapat memuatkan lagi",
+      "truncated": "Aktiviti kredit yang lebih lama tersedia."
     },
     "inviteMember": {
       "emailError": "Masukkan alamat e-mel yang sah",
@@ -2973,7 +2976,10 @@
         "draft": "Draf",
         "uncollectible": "Tidak boleh dituntut",
         "unknown": "Tidak diketahui"
-      }
+      },
+      "loadMore": "Muatkan lagi",
+      "loadMoreFailed": "Tidak dapat memuatkan lagi",
+      "truncated": "Invois yang lebih lama tersedia."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "nama@syarikat.com",

@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Team-påfyllnadsbonus 2025",
         "accounting_adjustment": "Redovisningsjustering",
         "credits_expired": "Krediter upphörde"
-      }
+      },
+      "loadMore": "Läs in mer",
+      "loadMoreFailed": "Kunde inte läsa in mer",
+      "truncated": "Äldre kreditaktivitet finns tillgänglig."
     },
     "inviteMember": {
       "emailError": "Ange en giltig e-postadress",
@@ -2973,7 +2976,10 @@
         "draft": "Utkast",
         "uncollectible": "Oindrivbar",
         "unknown": "Okänd"
-      }
+      },
+      "loadMore": "Läs in mer",
+      "loadMoreFailed": "Kunde inte läsa in mer",
+      "truncated": "Äldre fakturor finns tillgängliga."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

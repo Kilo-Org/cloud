@@ -2958,7 +2958,10 @@
         "team-topup-bonus-2025": "בונוס טופ-אפ של צוות 2025",
         "accounting_adjustment": "התאמה חשבונאית",
         "credits_expired": "הקרדיטים פגו"
-      }
+      },
+      "loadMore": "טען עוד",
+      "loadMoreFailed": "לא ניתן היה לטעון עוד",
+      "truncated": "קיימת פעילות אשראי ישנה יותר."
     },
     "hub": {
       "balance": "יתרה",
@@ -2994,7 +2997,10 @@
         "draft": "טיוטה",
         "uncollectible": "לא ניתן לגביה",
         "unknown": "לא ידוע"
-      }
+      },
+      "loadMore": "טען עוד",
+      "loadMoreFailed": "לא ניתן היה לטעון עוד",
+      "truncated": "קיימות חשבוניות ישנות יותר."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

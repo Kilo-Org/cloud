@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "ହିସାବ ସଂଶୋଧନ",
         "credits_expired": "କ୍ରେଡିଟ୍ ସମାପ୍ତ"
-      }
+      },
+      "loadMore": "ଅଧିକ ଲୋଡ୍ କରନ୍ତୁ",
+      "loadMoreFailed": "ଅଧିକ ଲୋଡ୍ କରାଯାଇ ପାରିଲା ନାହିଁ",
+      "truncated": "ପୁରୁଣା କ୍ରେଡିଟ୍ କାର୍ଯ୍ୟକଳାପ ଉପଲବ୍ଧ।"
     },
     "inviteMember": {
       "emailError": "ଏକ ବୈଧ ଇମେଲ୍ ଠିକଣା ପ୍ରବେଶ କରନ୍ତୁ",
@@ -2973,7 +2976,10 @@
         "draft": "ଡ୍ରାଫ୍ଟ",
         "uncollectible": "ଅସଂଗ୍ରହଣୀୟ",
         "unknown": "ଅଜଣା"
-      }
+      },
+      "loadMore": "ଅଧିକ ଲୋଡ୍ କରନ୍ତୁ",
+      "loadMoreFailed": "ଅଧିକ ଲୋଡ୍ କରାଯାଇ ପାରିଲା ନାହିଁ",
+      "truncated": "ପୁରୁଣା ଇନଭଏସ୍ ଉପଲବ୍ଧ।"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

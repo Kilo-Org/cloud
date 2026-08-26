@@ -2958,7 +2958,10 @@
         "team-topup-bonus-2025": "Bonus de rechargement d'équipe 2025",
         "accounting_adjustment": "Ajustement comptable",
         "credits_expired": "Crédits expirés"
-      }
+      },
+      "loadMore": "Charger plus",
+      "loadMoreFailed": "Impossible de charger plus",
+      "truncated": "L'activité de crédit plus ancienne est disponible."
     },
     "hub": {
       "balance": "Solde",
@@ -2994,7 +2997,10 @@
         "draft": "Brouillon",
         "uncollectible": "Irrecouvrable",
         "unknown": "Inconnu"
-      }
+      },
+      "loadMore": "Charger plus",
+      "loadMoreFailed": "Impossible de charger plus",
+      "truncated": "Les factures plus anciennes sont disponibles."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "nom@entreprise.com",

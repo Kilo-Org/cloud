@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Топты толтыру бонусы 2025",
         "accounting_adjustment": "Есептік түзету",
         "credits_expired": "Кредиттердің мерзімі аяқталды"
-      }
+      },
+      "loadMore": "Көбірек жүктеу",
+      "loadMoreFailed": "Қосымша жүктелмеді",
+      "truncated": "Ескі несие белсенділігі қолжетімді."
     },
     "inviteMember": {
       "emailError": "Жарамды электрондық пошта мекенжайын енгізіңіз",
@@ -2973,7 +2976,10 @@
         "draft": "Жоба",
         "uncollectible": "Өндіріп алу мүмкін емес",
         "unknown": "Белгісіз"
-      }
+      },
+      "loadMore": "Көбірек жүктеу",
+      "loadMoreFailed": "Қосымша жүктелмеді",
+      "truncated": "Ескі шот-фактуралар қолжетімді."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

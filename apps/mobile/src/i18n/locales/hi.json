@@ -2938,7 +2938,10 @@
         "team-topup-bonus-2025": "टीम टॉप-अप बोनस 2025",
         "accounting_adjustment": "लेखा समायोजन",
         "credits_expired": "क्रेडिट समाप्त हुए"
-      }
+      },
+      "loadMore": "और लोड करें",
+      "loadMoreFailed": "और लोड नहीं हो सका",
+      "truncated": "पुरानी क्रेडिट गतिविधि उपलब्ध है।"
     },
     "hub": {
       "balance": "बैलेंस",
@@ -2974,7 +2977,10 @@
         "draft": "ड्राफ़्ट",
         "uncollectible": "वसूली योग्य नहीं",
         "unknown": "अज्ञात"
-      }
+      },
+      "loadMore": "और लोड करें",
+      "loadMoreFailed": "और लोड नहीं हो सका",
+      "truncated": "पुराने चालान उपलब्ध हैं।"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

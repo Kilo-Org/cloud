@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Komanda doldurma bonusu-2025",
         "accounting_adjustment": "Mühasibat düzəlişi",
         "credits_expired": "Kreditlərin müddəti bitib"
-      }
+      },
+      "loadMore": "Daha çox yüklə",
+      "loadMoreFailed": "Daha çox yüklənə bilmədi",
+      "truncated": "Köhnə kredit fəaliyyəti mövcuddur."
     },
     "inviteMember": {
       "emailError": "Etibarlı e-poçt ünvanı daxil edin",
@@ -2973,7 +2976,10 @@
         "draft": "Qaralama",
         "uncollectible": "Yığıla bilməyən",
         "unknown": "Naməlum"
-      }
+      },
+      "loadMore": "Daha çox yüklə",
+      "loadMoreFailed": "Daha çox yüklənə bilmədi",
+      "truncated": "Köhnə qaimələr mövcuddur."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

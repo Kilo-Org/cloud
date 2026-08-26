@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Team top-up bonus 2025",
         "accounting_adjustment": "Pagsasaayos ng accounting",
         "credits_expired": "Nag-expire na credits"
-      }
+      },
+      "loadMore": "I-load pa",
+      "loadMoreFailed": "Hindi ma-load ang iba pa",
+      "truncated": "Magagamit ang mas lumang aktibidad ng kredito."
     },
     "inviteMember": {
       "emailError": "Maglagay ng wastong email address",
@@ -2973,7 +2976,10 @@
         "draft": "Draft",
         "uncollectible": "Hindi makokolekta",
         "unknown": "Hindi alam"
-      }
+      },
+      "loadMore": "I-load pa",
+      "loadMoreFailed": "Hindi ma-load ang iba pa",
+      "truncated": "Magagamit ang mas lumang mga invoice."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

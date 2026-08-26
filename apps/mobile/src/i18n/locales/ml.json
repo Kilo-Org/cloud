@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "ടീം-ടോപ്പ്-അപ്പ്-ബോണസ്-2025",
         "accounting_adjustment": "അക്കൗണ്ടിംഗ് ക്രമീകരണം",
         "credits_expired": "ക്രെഡിറ്റുകൾ കാലഹരണപ്പെട്ടു"
-      }
+      },
+      "loadMore": "കൂടുതൽ ലോഡ് ചെയ്യുക",
+      "loadMoreFailed": "കൂടുതൽ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
+      "truncated": "പഴയ ക്രെഡിറ്റ് പ്രവർത്തനങ്ങൾ ലഭ്യമാണ്."
     },
     "inviteMember": {
       "emailError": "സാധുവായ ഒരു ഇമെയിൽ വിലാസം നൽകുക",
@@ -2973,7 +2976,10 @@
         "draft": "ഡ്രാഫ്റ്റ്",
         "uncollectible": "ഈടാക്കാനാവാത്തത്",
         "unknown": "അജ്ഞാതം"
-      }
+      },
+      "loadMore": "കൂടുതൽ ലോഡ് ചെയ്യുക",
+      "loadMoreFailed": "കൂടുതൽ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
+      "truncated": "പഴയ ഇൻവോയ്സുകൾ ലഭ്യമാണ്."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

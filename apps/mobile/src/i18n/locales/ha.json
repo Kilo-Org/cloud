@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Kyautar Topup na Ƙungiya 2025",
         "accounting_adjustment": "Daidaitawar lissafin kuɗi",
         "credits_expired": "Credits sun ƙare"
-      }
+      },
+      "loadMore": "Ɗauki ƙari",
+      "loadMoreFailed": "Ba a iya ƙara ɗora ba",
+      "truncated": "Ayyukan bashi na baya suna nan."
     },
     "inviteMember": {
       "emailError": "Shigar da ingantacciyar adireshin imel",
@@ -2973,7 +2976,10 @@
         "draft": "Daftari",
         "uncollectible": "Ba za a iya karɓa ba",
         "unknown": "Ba a sani ba"
-      }
+      },
+      "loadMore": "Ɗauki ƙari",
+      "loadMoreFailed": "Ba a iya ƙara ɗora ba",
+      "truncated": "Lissafin kuɗi na baya suna nan."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

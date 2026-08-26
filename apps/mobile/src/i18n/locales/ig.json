@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Mmezi ndekọ ego",
         "credits_expired": "Kredit emebiwo"
-      }
+      },
+      "loadMore": "Bugo ọzọ",
+      "loadMoreFailed": "Enweghị ike ibugo ọzọ",
+      "truncated": "Ọrụ kredit ochie dị."
     },
     "inviteMember": {
       "emailError": "Tinye adres email ziri ezi",
@@ -2973,7 +2976,10 @@
         "draft": "Ihe odide",
         "uncollectible": "Enweghị ike ịnakọta",
         "unknown": "Amaghị"
-      }
+      },
+      "loadMore": "Bugo ọzọ",
+      "loadMoreFailed": "Enweghị ike ibugo ọzọ",
+      "truncated": "Akwụkwọ ọnụahịa ochie dị."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

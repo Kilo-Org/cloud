@@ -2938,7 +2938,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Boekhoudkundige correctie",
         "credits_expired": "Credits verlopen"
-      }
+      },
+      "loadMore": "Meer laden",
+      "loadMoreFailed": "Kon niet meer laden",
+      "truncated": "Oudere creditactiviteit is beschikbaar."
     },
     "hub": {
       "balance": "Saldo",
@@ -2974,7 +2977,10 @@
         "draft": "Concept",
         "uncollectible": "Oninbaar",
         "unknown": "Onbekend"
-      }
+      },
+      "loadMore": "Meer laden",
+      "loadMoreFailed": "Kon niet meer laden",
+      "truncated": "Oudere facturen zijn beschikbaar."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

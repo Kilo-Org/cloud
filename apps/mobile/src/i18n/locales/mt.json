@@ -3006,7 +3006,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Aġġustament tal-kontabilità",
         "credits_expired": "Krediti skaduti"
-      }
+      },
+      "loadMore": "Għabbi aktar",
+      "loadMoreFailed": "Ma stajniex nittellgħu aktar",
+      "truncated": "Attività ta' kreditu aktar antika hija disponibbli."
     },
     "inviteMember": {
       "emailError": "Daħħal indirizz ta' email validu",
@@ -3033,7 +3036,10 @@
         "draft": "Abbozz",
         "uncollectible": "Ma jistax jinġabar",
         "unknown": "Mhux magħruf"
-      }
+      },
+      "loadMore": "Għabbi aktar",
+      "loadMoreFailed": "Ma stajniex nittellgħu aktar",
+      "truncated": "Fatturi aktar antiki huma disponibbli."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

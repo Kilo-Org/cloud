@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "অ্যাকাউন্টিং সমন্বয়",
         "credits_expired": "ক্রেডিটের মেয়াদ শেষ"
-      }
+      },
+      "loadMore": "আরও লোড করুন",
+      "loadMoreFailed": "আরও লোড করা যায়নি",
+      "truncated": "পুরোনো ক্রেডিট কার্যকলাপ উপলব্ধ।"
     },
     "inviteMember": {
       "emailError": "একটি বৈধ ইমেইল ঠিকানা লিখুন",
@@ -2973,7 +2976,10 @@
         "draft": "খসড়া",
         "uncollectible": "আদায়যোগ্য নয়",
         "unknown": "অজানা"
-      }
+      },
+      "loadMore": "আরও লোড করুন",
+      "loadMoreFailed": "আরও লোড করা যায়নি",
+      "truncated": "পুরোনো ইনভয়েস উপলব্ধ।"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

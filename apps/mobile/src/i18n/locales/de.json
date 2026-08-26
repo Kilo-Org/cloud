@@ -2938,7 +2938,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Buchhaltungsanpassung",
         "credits_expired": "Abgelaufene Credits"
-      }
+      },
+      "loadMore": "Mehr laden",
+      "loadMoreFailed": "Mehr konnte nicht geladen werden",
+      "truncated": "Ältere Guthabenaktivität ist verfügbar."
     },
     "hub": {
       "balance": "Guthaben",
@@ -2974,7 +2977,10 @@
         "draft": "Entwurf",
         "uncollectible": "Nicht einziehbar",
         "unknown": "Unbekannt"
-      }
+      },
+      "loadMore": "Mehr laden",
+      "loadMoreFailed": "Mehr konnte nicht geladen werden",
+      "truncated": "Ältere Rechnungen sind verfügbar."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@firma.de",

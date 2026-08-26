@@ -2938,7 +2938,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Điều chỉnh kế toán",
         "credits_expired": "Tín dụng đã hết hạn"
-      }
+      },
+      "loadMore": "Tải thêm",
+      "loadMoreFailed": "Không thể tải thêm",
+      "truncated": "Hoạt động tín dụng cũ hơn có sẵn."
     },
     "hub": {
       "balance": "Số dư",
@@ -2974,7 +2977,10 @@
         "draft": "Bản nháp",
         "uncollectible": "Không thể thu hồi",
         "unknown": "Không xác định"
-      }
+      },
+      "loadMore": "Tải thêm",
+      "loadMoreFailed": "Không thể tải thêm",
+      "truncated": "Hóa đơn cũ hơn có sẵn."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

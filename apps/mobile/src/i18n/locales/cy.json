@@ -3026,7 +3026,10 @@
         "team-topup-bonus-2025": "Bonws ail-lenwi tîm 2025",
         "accounting_adjustment": "Addasiad cyfrifyddu",
         "credits_expired": "Credydau wedi dod i ben"
-      }
+      },
+      "loadMore": "Llwytho mwy",
+      "loadMoreFailed": "Ni ellid llwytho mwy",
+      "truncated": "Mae gweithgaredd credyd hŷn ar gael."
     },
     "inviteMember": {
       "emailError": "Nodwch gyfeiriad e-bost dilys",
@@ -3053,7 +3056,10 @@
         "draft": "Drafft",
         "uncollectible": "Anghasgladwy",
         "unknown": "Anhysbys"
-      }
+      },
+      "loadMore": "Llwytho mwy",
+      "loadMoreFailed": "Ni ellid llwytho mwy",
+      "truncated": "Mae anfonebau hŷn ar gael."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

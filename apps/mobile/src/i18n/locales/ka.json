@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "გუნდის შევსების ბონუსი 2025",
         "accounting_adjustment": "ბუღალტრული კორექტირება",
         "credits_expired": "ვადაგასული კრედიტები"
-      }
+      },
+      "loadMore": "მეტის ჩატვირთვა",
+      "loadMoreFailed": "მეტის ჩატვირთვა ვერ მოხერხდა",
+      "truncated": "უფრო ძველი კრედიტის აქტივობა ხელმისაწვდომია."
     },
     "inviteMember": {
       "emailError": "შეიყვანეთ მოქმედი ელფოსტის მისამართი",
@@ -2973,7 +2976,10 @@
         "draft": "მონახაზი",
         "uncollectible": "ამოუღებელი",
         "unknown": "უცნობი"
-      }
+      },
+      "loadMore": "მეტის ჩატვირთვა",
+      "loadMoreFailed": "მეტის ჩატვირთვა ვერ მოხერხდა",
+      "truncated": "უფრო ძველი ინვოისები ხელმისაწვდომია."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

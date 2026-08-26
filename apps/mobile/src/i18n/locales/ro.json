@@ -2966,7 +2966,10 @@
         "team-topup-bonus-2025": "Bonus pentru reîncărcarea echipei 2025",
         "accounting_adjustment": "Ajustare contabilă",
         "credits_expired": "Credite expirate"
-      }
+      },
+      "loadMore": "Încarcă mai mult",
+      "loadMoreFailed": "Nu s-a putut încărca mai mult",
+      "truncated": "Activitatea de credite mai veche este disponibilă."
     },
     "inviteMember": {
       "emailError": "Introdu o adresă de email validă",
@@ -2993,7 +2996,10 @@
         "draft": "Ciornă",
         "uncollectible": "Neîncasabilă",
         "unknown": "Necunoscut"
-      }
+      },
+      "loadMore": "Încarcă mai mult",
+      "loadMoreFailed": "Nu s-a putut încărca mai mult",
+      "truncated": "Sunt disponibile facturi mai vechi."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

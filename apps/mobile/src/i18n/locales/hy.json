@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Հաշվապահական ճշգրտում",
         "credits_expired": "Սպառված կրեդիտներ"
-      }
+      },
+      "loadMore": "Բեռնել ավելին",
+      "loadMoreFailed": "Չհաջողվեց բեռնել ավելին",
+      "truncated": "Հին վարկային գործունեությունը հասանելի է։"
     },
     "inviteMember": {
       "emailError": "Մուտքագրեք վավեր էլփոստի հասցե",
@@ -2973,7 +2976,10 @@
         "draft": "Սևագիր",
         "uncollectible": "Անվերականգնելի",
         "unknown": "Անհայտ"
-      }
+      },
+      "loadMore": "Բեռնել ավելին",
+      "loadMoreFailed": "Չհաջողվեց բեռնել ավելին",
+      "truncated": "Հին հաշիվ-ապրանքագրերը հասանելի են։"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

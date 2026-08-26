@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Te top-up bonus rōpū 2025",
         "accounting_adjustment": "Te whakatikatika kaute",
         "credits_expired": "Kua pau ngā whiwhinga"
-      }
+      },
+      "loadMore": "Uta anō",
+      "loadMoreFailed": "Kāore i taea te uta ētahi atu",
+      "truncated": "E wātea ana ngā mahi kirimana tawhito."
     },
     "inviteMember": {
       "emailError": "Whakaurua he wāhitau īmēra tika",
@@ -2973,7 +2976,10 @@
         "draft": "Hukitanga",
         "uncollectible": "Kāore e taea te kohi",
         "unknown": "Kāore e mōhiotia"
-      }
+      },
+      "loadMore": "Uta anō",
+      "loadMoreFailed": "Kāore i taea te uta ētahi atu",
+      "truncated": "E wātea ana ngā nama tawhito."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

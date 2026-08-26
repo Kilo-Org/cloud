@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Λογιστική προσαρμογή",
         "credits_expired": "Ληγμένες πιστώσεις"
-      }
+      },
+      "loadMore": "Φόρτωση περισσότερων",
+      "loadMoreFailed": "Δεν ήταν δυνατή η φόρτωση περισσότερων",
+      "truncated": "Παλαιότερη δραστηριότητα πιστώσεων είναι διαθέσιμη."
     },
     "inviteMember": {
       "emailError": "Εισαγάγετε μια έγκυρη διεύθυνση email",
@@ -2973,7 +2976,10 @@
         "draft": "Πρόχειρο",
         "uncollectible": "Μη εισπράξιμο",
         "unknown": "Άγνωστο"
-      }
+      },
+      "loadMore": "Φόρτωση περισσότερων",
+      "loadMoreFailed": "Δεν ήταν δυνατή η φόρτωση περισσότερων",
+      "truncated": "Παλαιότερα τιμολόγια είναι διαθέσιμα."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

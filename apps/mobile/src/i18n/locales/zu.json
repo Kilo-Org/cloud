@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Ibhonasi ye-team top-up 2025",
         "accounting_adjustment": "Ukulungiswa kwezimali",
         "credits_expired": "Amakhredithi aphelelwe yisikhathi"
-      }
+      },
+      "loadMore": "Layisha okwengeziwe",
+      "loadMoreFailed": "Asikwazanga ukulayisha okwengeziwe",
+      "truncated": "Umsebenzi wekhredithi omdala uyatholakala."
     },
     "inviteMember": {
       "emailError": "Faka ikheli le-imeyili elivumelekile",
@@ -2973,7 +2976,10 @@
         "draft": "Okusalungiswa",
         "uncollectible": "Okungakhokhiwa",
         "unknown": "Okungaziwa"
-      }
+      },
+      "loadMore": "Layisha okwengeziwe",
+      "loadMoreFailed": "Asikwazanga ukulayisha okwengeziwe",
+      "truncated": "Ama-invoyisi amadala ayatholakala."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

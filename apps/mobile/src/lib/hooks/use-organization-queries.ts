@@ -1,9 +1,13 @@
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
-import { useQuery } from '@tanstack/react-query';
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import { useAuth } from '@/lib/auth/auth-context';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
+
+type RouterOutputs = inferRouterOutputs<MobileRouter>;
 
 /**
  * The current user's role in the active organization. `trpc.organizations.list`
@@ -139,28 +143,61 @@ export function useOrgUsageStats(organizationId: string | null) {
   );
 }
 
-export function useOrgCreditTransactions(organizationId: string | null) {
+export type CreditTransaction =
+  RouterOutputs['organizations']['creditTransactionsPage']['entries'][number];
+
+/**
+ * Cursor-paginated credit transactions for an organization. Mirrors the legacy
+ * `useOrgCreditTransactions` surface (flat `entries`) but pages through
+ * `organizations.creditTransactionsPage` with `useInfiniteQuery` so the screen
+ * can offer "Load more" instead of scanning every row at once.
+ */
+export function useOrgCreditTransactionsPage(organizationId: string | null) {
   const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.creditTransactions.queryOptions(
+  const query = useInfiniteQuery(
+    trpc.organizations.creditTransactionsPage.infiniteQueryOptions(
       { organizationId: organizationId ?? '' },
-      { enabled: organizationId != null }
+      {
+        enabled: organizationId != null,
+        getNextPageParam: lastPage =>
+          lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,
+      }
     )
   );
+
+  const pages = query.data?.pages;
+  const entries = useMemo(() => (pages ?? []).flatMap(page => page.entries), [pages]);
+  const lastPage = pages != null && pages.length > 0 ? pages.at(-1) : undefined;
+  const hasMore = lastPage?.hasMore ?? false;
+
+  return { query, entries, hasMore };
 }
 
-export type CreditTransaction = NonNullable<
-  ReturnType<typeof useOrgCreditTransactions>['data']
->[number];
+export type OrgInvoice = RouterOutputs['organizations']['invoicesPage']['entries'][number];
 
-export function useOrgInvoices(organizationId: string | null) {
+/**
+ * Cursor-paginated invoices for an organization. Mirrors the legacy
+ * `useOrgInvoices` surface (flat `entries`) but pages through
+ * `organizations.invoicesPage` with `useInfiniteQuery` so the screen can offer
+ * "Load more" instead of loading every invoice at once.
+ */
+export function useOrgInvoicesPage(organizationId: string | null) {
   const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.invoices.queryOptions(
+  const query = useInfiniteQuery(
+    trpc.organizations.invoicesPage.infiniteQueryOptions(
       { organizationId: organizationId ?? '', period: 'year' },
-      { enabled: organizationId != null }
+      {
+        enabled: organizationId != null,
+        getNextPageParam: lastPage =>
+          lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,
+      }
     )
   );
-}
 
-export type OrgInvoice = NonNullable<ReturnType<typeof useOrgInvoices>['data']>[number];
+  const pages = query.data?.pages;
+  const entries = useMemo(() => (pages ?? []).flatMap(page => page.entries), [pages]);
+  const lastPage = pages != null && pages.length > 0 ? pages.at(-1) : undefined;
+  const hasMore = lastPage?.hasMore ?? false;
+
+  return { query, entries, hasMore };
+}

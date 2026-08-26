@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Hópáfyllingarbónus 2025",
         "accounting_adjustment": "Bókhaldsleiðrétting",
         "credits_expired": "Kredítur runnu út"
-      }
+      },
+      "loadMore": "Hlaða meira",
+      "loadMoreFailed": "Ekki tókst að hlaða meira",
+      "truncated": "Eldri kreditfærsla er í boði."
     },
     "inviteMember": {
       "emailError": "Sláðu inn gilt tölvupóstfang",
@@ -2973,7 +2976,10 @@
         "draft": "Drög",
         "uncollectible": "Óinnheimtanlegt",
         "unknown": "Óþekkt"
-      }
+      },
+      "loadMore": "Hlaða meira",
+      "loadMoreFailed": "Ekki tókst að hlaða meira",
+      "truncated": "Eldri reikningar eru í boði."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

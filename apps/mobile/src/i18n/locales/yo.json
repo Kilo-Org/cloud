@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Àtúnṣe ìṣirò-owó",
         "credits_expired": "Àwọn kíredìtì ti parí"
-      }
+      },
+      "loadMore": "Kojọ diẹ sii",
+      "loadMoreFailed": "Kò lè gbé síwájú síi",
+      "truncated": "Ìgbòkègbodò àwọn iṣẹ́ àwíjàre tó ti gbọjú wà."
     },
     "inviteMember": {
       "emailError": "Tẹ adirẹsi imeeli ti o wulo",
@@ -2973,7 +2976,10 @@
         "draft": "Àkọsílẹ̀",
         "uncollectible": "Àìlègbà",
         "unknown": "Àìmọ̀"
-      }
+      },
+      "loadMore": "Kojọ diẹ sii",
+      "loadMoreFailed": "Kò lè gbé síwájú síi",
+      "truncated": "Àwọn ìwé-owó tó ti gbọjú wà."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

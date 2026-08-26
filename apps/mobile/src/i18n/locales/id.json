@@ -2938,7 +2938,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Penyesuaian akuntansi",
         "credits_expired": "Kredit kedaluwarsa"
-      }
+      },
+      "loadMore": "Muat lebih banyak",
+      "loadMoreFailed": "Tidak dapat memuat lebih banyak",
+      "truncated": "Aktivitas kredit yang lebih lama tersedia."
     },
     "hub": {
       "balance": "Saldo",
@@ -2974,7 +2977,10 @@
         "draft": "Draf",
         "uncollectible": "Tidak tertagih",
         "unknown": "Tidak diketahui"
-      }
+      },
+      "loadMore": "Muat lebih banyak",
+      "loadMoreFailed": "Tidak dapat memuat lebih banyak",
+      "truncated": "Faktur yang lebih lama tersedia."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

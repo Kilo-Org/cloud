@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Taldearen topup-bonua 2025",
         "accounting_adjustment": "Kontabilitate-doikuntza",
         "credits_expired": "Kredituak iraungita"
-      }
+      },
+      "loadMore": "Kargatu gehiago",
+      "loadMoreFailed": "Ezin izan dira gehiago kargatu",
+      "truncated": "Kreditu-jarduera zaharragoa eskuragarri dago."
     },
     "inviteMember": {
       "emailError": "Sartu posta-helbide baliozko bat",
@@ -2973,7 +2976,10 @@
         "draft": "Zirriborroa",
         "uncollectible": "Kobratu ezina",
         "unknown": "Ezezaguna"
-      }
+      },
+      "loadMore": "Kargatu gehiago",
+      "loadMoreFailed": "Ezin izan dira gehiago kargatu",
+      "truncated": "Faktura zaharrak eskuragarri daude."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

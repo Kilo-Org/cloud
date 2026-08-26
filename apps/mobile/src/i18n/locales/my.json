@@ -2946,7 +2946,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "စာရင်းကိုင် ပြုပြင်မှု",
         "credits_expired": "သက်တမ်းကုန် ခရက်ဒစ်များ"
-      }
+      },
+      "loadMore": "နောက်ထပ်တင်ပါ",
+      "loadMoreFailed": "နောက်ထပ်တင်မရပါ",
+      "truncated": "ပိုဟောင်းသော ခရက်ဒစ်လုပ်ဆောင်ချက်များ ရနိုင်ပါသည်။"
     },
     "inviteMember": {
       "emailError": "မှန်ကန်သော အီးမေးလ် လိပ်စာ ထည့်ပါ",
@@ -2973,7 +2976,10 @@
         "draft": "အမူကြမ်း",
         "uncollectible": "ကောက်ခံ၍မရသော",
         "unknown": "အမည်မသိ"
-      }
+      },
+      "loadMore": "နောက်ထပ်တင်ပါ",
+      "loadMoreFailed": "နောက်ထပ်တင်မရပါ",
+      "truncated": "ပိုဟောင်းသော ငွေတောင်းခံလွှာများ ရနိုင်ပါသည်။"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

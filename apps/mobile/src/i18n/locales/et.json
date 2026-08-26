@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "Meeskonna täiendusboonus 2025",
         "accounting_adjustment": "Raamatupidamiskorrigeerimine",
         "credits_expired": "Krediidid aegusid"
-      }
+      },
+      "loadMore": "Laadi rohkem",
+      "loadMoreFailed": "Rohkem ei õnnestunud laadida.",
+      "truncated": "Varasem krediidiajalugu on saadaval."
     },
     "inviteMember": {
       "emailError": "Sisestage kehtiv e-posti aadress",
@@ -2971,7 +2974,10 @@
         "draft": "Mustand",
         "uncollectible": "Sissenõudmatu",
         "unknown": "Teadmata"
-      }
+      },
+      "loadMore": "Laadi rohkem",
+      "loadMoreFailed": "Rohkem ei õnnestunud laadida.",
+      "truncated": "Varasemad arved on saadaval."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

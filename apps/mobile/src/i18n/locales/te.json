@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "టీమ్ టాప్-అప్ బోనస్ 2025",
         "accounting_adjustment": "అకౌంటింగ్ సర్దుబాటు",
         "credits_expired": "క్రెడిట్లు గడువు ముగిశాయి"
-      }
+      },
+      "loadMore": "మరిన్ని లోడ్ చేయండి",
+      "loadMoreFailed": "మరిన్ని లోడ్ చేయలేకపోయాము.",
+      "truncated": "పాత క్రెడిట్ కార్యకలాపం అందుబాటులో ఉంది."
     },
     "inviteMember": {
       "emailError": "చెల్లుబాటు అయ్యే ఇమెయిల్ చిరునామాను నమోదు చేయండి",
@@ -2971,7 +2974,10 @@
         "draft": "డ్రాఫ్ట్",
         "uncollectible": "వసూలు చేయలేనిది",
         "unknown": "తెలియనిది"
-      }
+      },
+      "loadMore": "మరిన్ని లోడ్ చేయండి",
+      "loadMoreFailed": "మరిన్ని లోడ్ చేయలేకపోయాము.",
+      "truncated": "పాత ఇన్వాయిస్లు అందుబాటులో ఉన్నాయి."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

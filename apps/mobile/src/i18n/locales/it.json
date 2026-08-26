@@ -2950,7 +2950,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Rettifica contabile",
         "credits_expired": "Crediti scaduti"
-      }
+      },
+      "loadMore": "Carica altri",
+      "loadMoreFailed": "Impossibile caricare altri.",
+      "truncated": "Sono disponibili attività di credito più vecchie."
     },
     "hub": {
       "balance": "Saldo",
@@ -2986,7 +2989,10 @@
         "draft": "Bozza",
         "uncollectible": "Non riscuotibile",
         "unknown": "Sconosciuto"
-      }
+      },
+      "loadMore": "Carica altri",
+      "loadMoreFailed": "Impossibile caricare altri.",
+      "truncated": "Sono disponibili fatture più vecchie."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

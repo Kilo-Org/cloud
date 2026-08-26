@@ -2930,7 +2930,10 @@
         "team-topup-bonus-2025": "團隊加值獎勵 2025",
         "accounting_adjustment": "會計調整",
         "credits_expired": "點數已到期"
-      }
+      },
+      "loadMore": "載入更多",
+      "loadMoreFailed": "無法載入更多。",
+      "truncated": "可查看較舊的額度活動。"
     },
     "hub": {
       "balance": "餘額",
@@ -2966,7 +2969,10 @@
         "draft": "草稿",
         "uncollectible": "無法收回",
         "unknown": "未知"
-      }
+      },
+      "loadMore": "載入更多",
+      "loadMoreFailed": "無法載入更多。",
+      "truncated": "可查看較舊的發票。"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

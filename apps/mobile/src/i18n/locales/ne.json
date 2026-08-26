@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "लेखा समायोजन",
         "credits_expired": "म्याद सकिएका क्रेडिटहरू"
-      }
+      },
+      "loadMore": "थप लोड गर्नुहोस्",
+      "loadMoreFailed": "थप लोड गर्न सकिएन।",
+      "truncated": "पुरानो क्रेडिट गतिविधि उपलब्ध छ।"
     },
     "inviteMember": {
       "emailError": "मान्य इमेल ठेगाना प्रविष्ट गर्नुहोस्",
@@ -2971,7 +2974,10 @@
         "draft": "मस्यौदा",
         "uncollectible": "असुली नहुने",
         "unknown": "अज्ञात"
-      }
+      },
+      "loadMore": "थप लोड गर्नुहोस्",
+      "loadMoreFailed": "थप लोड गर्न सकिएन।",
+      "truncated": "पुराना इनभ्वाइसहरू उपलब्ध छन्।"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

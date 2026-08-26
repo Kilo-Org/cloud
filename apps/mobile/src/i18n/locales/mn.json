@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "Багийн топ-ап бонус-2025",
         "accounting_adjustment": "Нягтлан бодох бүртгэлийн тохируулга",
         "credits_expired": "Кредит дууссан"
-      }
+      },
+      "loadMore": "Цааш ачаалах",
+      "loadMoreFailed": "Цааш ачаалах боломжгүй.",
+      "truncated": "Хуучин кредит үйл ажиллагааг үзэх боломжтой."
     },
     "inviteMember": {
       "emailError": "Хүчинтэй имэйл хаяг оруулна уу",
@@ -2971,7 +2974,10 @@
         "draft": "Ноорог",
         "uncollectible": "Цуглуулах боломжгүй",
         "unknown": "Тодорхойгүй"
-      }
+      },
+      "loadMore": "Цааш ачаалах",
+      "loadMoreFailed": "Цааш ачаалах боломжгүй.",
+      "truncated": "Хуучин нэхэмжлэлийг үзэх боломжтой."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

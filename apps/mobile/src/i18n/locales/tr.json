@@ -2930,7 +2930,10 @@
         "team-topup-bonus-2025": "Ekip bakiye yükleme bonusu 2025",
         "accounting_adjustment": "Muhasebe düzeltmesi",
         "credits_expired": "Kredilerin süresi doldu"
-      }
+      },
+      "loadMore": "Daha fazla yükle",
+      "loadMoreFailed": "Daha fazla yüklenemedi.",
+      "truncated": "Daha eski kredi hareketleri mevcut."
     },
     "hub": {
       "balance": "Bakiye",
@@ -2966,7 +2969,10 @@
         "draft": "Taslak",
         "uncollectible": "Tahsil edilemez",
         "unknown": "Bilinmiyor"
-      }
+      },
+      "loadMore": "Daha fazla yükle",
+      "loadMoreFailed": "Daha fazla yüklenemedi.",
+      "truncated": "Daha eski faturalar mevcut."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

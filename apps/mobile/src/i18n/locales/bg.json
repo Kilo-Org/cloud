@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Счетоводна корекция",
         "credits_expired": "Изтекли кредити"
-      }
+      },
+      "loadMore": "Зареди още",
+      "loadMoreFailed": "Не можа да се зареди още.",
+      "truncated": "Налична е по-стара кредитна активност."
     },
     "inviteMember": {
       "emailError": "Въведете валиден имейл адрес",
@@ -2971,7 +2974,10 @@
         "draft": "Чернова",
         "uncollectible": "Несъбираема",
         "unknown": "Неизвестна"
-      }
+      },
+      "loadMore": "Зареди още",
+      "loadMoreFailed": "Не можа да се зареди още.",
+      "truncated": "Налични са по-стари фактури."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

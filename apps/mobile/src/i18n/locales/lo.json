@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "ໂບນັດເຕີມເງິນທີມ 2025",
         "accounting_adjustment": "ການປັບບັນຊີ",
         "credits_expired": "ເຄຣດິດໝົດອາຍຸ"
-      }
+      },
+      "loadMore": "ໂຫຼດເພີ່ມ",
+      "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມໄດ້.",
+      "truncated": "ກິດຈະກຳສິນເຊື່ອເກົ່າກວ່າມີໃຫ້."
     },
     "inviteMember": {
       "emailError": "ໃສ່ທີ່ຢູ່ອີເມວທີ່ຖືກຕ້ອງ",
@@ -2971,7 +2974,10 @@
         "draft": "ຮ່າງ",
         "uncollectible": "ເກັບບໍ່ໄດ້",
         "unknown": "ບໍ່ຮູ້"
-      }
+      },
+      "loadMore": "ໂຫຼດເພີ່ມ",
+      "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມໄດ້.",
+      "truncated": "ໃບແຈ້ງໜີ້ເກົ່າກວ່າມີໃຫ້."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

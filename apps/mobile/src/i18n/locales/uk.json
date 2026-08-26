@@ -2970,7 +2970,10 @@
         "team-topup-bonus-2025": "Командний бонус поповнення 2025",
         "accounting_adjustment": "Бухгалтерське коригування",
         "credits_expired": "Термін дії кредитів минув"
-      }
+      },
+      "loadMore": "Завантажити ще",
+      "loadMoreFailed": "Не вдалося завантажити ще.",
+      "truncated": "Доступна старіша активність за кредитами."
     },
     "hub": {
       "balance": "Баланс",
@@ -3006,7 +3009,10 @@
         "draft": "Чернетка",
         "uncollectible": "Безнадійний",
         "unknown": "Невідомо"
-      }
+      },
+      "loadMore": "Завантажити ще",
+      "loadMoreFailed": "Не вдалося завантажити ще.",
+      "truncated": "Доступні старіші рахунки-фактури."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

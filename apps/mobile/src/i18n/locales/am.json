@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "የቡድን ሙሌት ጉርሻ-2025",
         "accounting_adjustment": "የሂሳብ ማስተካከያ",
         "credits_expired": "ክሬዲቶች ጊዜያቸው አልፏል"
-      }
+      },
+      "loadMore": "ተጨማሪ ጫን",
+      "loadMoreFailed": "ተጨማሪ መጫን አልተቻለም።",
+      "truncated": "የቆዩ የክሬዲት እንቅስቃሴዎች ይገኛሉ።"
     },
     "inviteMember": {
       "emailError": "ትክክለኛ የኢሜይል አድራሻ ያስገቡ",
@@ -2971,7 +2974,10 @@
         "draft": "ረቂቅ",
         "uncollectible": "የማይሰበሰብ",
         "unknown": "የማይታወቅ"
-      }
+      },
+      "loadMore": "ተጨማሪ ጫን",
+      "loadMoreFailed": "ተጨማሪ መጫን አልተቻለም።",
+      "truncated": "የቆዩ ኢንቮይሶች ይገኛሉ።"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

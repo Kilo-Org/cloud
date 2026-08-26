@@ -2964,7 +2964,10 @@
         "team-topup-bonus-2025": "Bónus de carregamento da equipa 2025",
         "accounting_adjustment": "Ajuste contabilístico",
         "credits_expired": "Créditos expirados"
-      }
+      },
+      "loadMore": "Carregar mais",
+      "loadMoreFailed": "Não foi possível carregar mais.",
+      "truncated": "Está disponível atividade de crédito mais antiga."
     },
     "inviteMember": {
       "emailError": "Introduza um endereço de email válido",
@@ -2991,7 +2994,10 @@
         "draft": "Rascunho",
         "uncollectible": "Incobrável",
         "unknown": "Desconhecido"
-      }
+      },
+      "loadMore": "Carregar mais",
+      "loadMoreFailed": "Não foi possível carregar mais.",
+      "truncated": "Estão disponíveis faturas mais antigas."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "nome@empresa.com",

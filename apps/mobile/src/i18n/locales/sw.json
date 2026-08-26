@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "Bonasi ya kujaza timu 2025",
         "accounting_adjustment": "Marekebisho ya uhasibu",
         "credits_expired": "Mikopo imeisha"
-      }
+      },
+      "loadMore": "Pakia zaidi",
+      "loadMoreFailed": "Imeshindwa kupakia zaidi.",
+      "truncated": "Shughuli za zamani za mkopo zinapatikana."
     },
     "inviteMember": {
       "emailError": "Ingiza anwani halali ya barua pepe",
@@ -2971,7 +2974,10 @@
         "draft": "Rasimu",
         "uncollectible": "Isiyoweza kukusanywa",
         "unknown": "Isiyojulikana"
-      }
+      },
+      "loadMore": "Pakia zaidi",
+      "loadMoreFailed": "Imeshindwa kupakia zaidi.",
+      "truncated": "Ankara za zamani zinapatikana."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

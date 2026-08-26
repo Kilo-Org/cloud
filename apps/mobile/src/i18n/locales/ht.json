@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Ajisteman kontab",
         "credits_expired": "Kredi ekspire"
-      }
+      },
+      "loadMore": "Chaje plis",
+      "loadMoreFailed": "Nou pa t ka chaje plis.",
+      "truncated": "Gen plis aktivite kredi ki pi ansyen disponib."
     },
     "inviteMember": {
       "emailError": "Antre yon adrès imel valid",
@@ -2971,7 +2974,10 @@
         "draft": "Brouyon",
         "uncollectible": "Enkobrèb",
         "unknown": "Enkoni"
-      }
+      },
+      "loadMore": "Chaje plis",
+      "loadMoreFailed": "Nou pa t ka chaje plis.",
+      "truncated": "Gen plis fakti ki pi ansyen disponib."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

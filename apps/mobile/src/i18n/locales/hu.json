@@ -2944,7 +2944,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Számviteli kiigazítás",
         "credits_expired": "Lejárt kreditek"
-      }
+      },
+      "loadMore": "Továbbiak betöltése",
+      "loadMoreFailed": "A továbbiak betöltése nem sikerült.",
+      "truncated": "Korábbi hitelaktivitás érhető el."
     },
     "inviteMember": {
       "emailError": "Adj meg érvényes e-mail címet",
@@ -2971,7 +2974,10 @@
         "draft": "Piszkozat",
         "uncollectible": "Behajthatatlan",
         "unknown": "Ismeretlen"
-      }
+      },
+      "loadMore": "Továbbiak betöltése",
+      "loadMoreFailed": "A továbbiak betöltése nem sikerült.",
+      "truncated": "Korábbi számlák érhetők el."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",

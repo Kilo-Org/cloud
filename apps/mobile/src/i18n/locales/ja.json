@@ -38,7 +38,9 @@
     "catalogLoadFailed": "言語を読み込めませんでした。もう一度お試しください。",
     "search": "言語を検索",
     "noMatches": "一致する言語がありません",
-    "deviceLanguage": "端末の言語"
+    "deviceLanguage": "端末の言語",
+    "current": "現在",
+    "allLanguages": "すべての言語"
   },
   "login": {
     "welcome": "Kiloへようこそ",
@@ -88,7 +90,7 @@
     "agents": "エージェント",
     "codeReviewer": "コードレビュアー",
     "codeReviewerSubtitle": "自動PRレビュー",
-    "securityAgent": "セキュリティエージェント",
+    "securityAgent": "せきゅりてぃえーじぇんと",
     "securityAgentSubtitle": "脆弱性を検出して修正",
     "reviews": "レビュー",
     "prReview": "PRレビュー",
@@ -148,7 +150,9 @@
     "appearanceSystem": "システム",
     "appearanceLight": "ライト",
     "appearanceDark": "ダーク",
-    "account": "アカウント"
+    "account": "アカウント",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "通知",
@@ -243,7 +247,7 @@
       "leaveFailed": "会話を退出できませんでした"
     },
     "reactions": {
-      "title": "リアクション",
+      "title": "りあくしょん",
       "close": "リアクションを閉じる",
       "recent": "最近",
       "common": "共通",
@@ -310,7 +314,7 @@
       "attachment": "添付ファイル"
     },
     "messageActions": {
-      "copied": "コピーしました",
+      "copied": "こぴーしました",
       "copyFailed": "コピーに失敗しました",
       "title": "メッセージの操作",
       "deleteTitle": "メッセージを削除しますか？",
@@ -332,8 +336,8 @@
       "takePhoto": "写真を撮る",
       "photoLibrary": "フォトライブラリ",
       "files": "ファイル",
-      "cameraAccessDisabled": "カメラへのアクセスが無効です",
-      "cameraAccessMessage": "写真を撮るには、設定でカメラへのアクセスを許可してください。"
+      "cameraAccessDisabled": "かめらへのあくせすがむこうです",
+      "cameraAccessMessage": "しゃしんをとるには、せっていでかめらへのあくせすをきょかしてください。"
     },
     "typingIndicator": {
       "someone": "誰か",
@@ -375,7 +379,7 @@
       "managedByAdmin": "請求は組織の管理者が管理しています。",
       "couldNotLoad": "請求情報を読み込めませんでした",
       "manageOnWeb": "Webで請求を管理",
-      "commitPlan": "Commit",
+      "commitPlan": "こみっと",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "最後のCommit期間は{{date}}に終了します。{{price}}でStandardとして続行するか、ホスティングが終了します。",
       "freeTrial": "無料トライアル",
@@ -392,7 +396,7 @@
       "trialDaysRemaining": "トライアル: 残り{{remaining}}",
       "trialEndingSoon": "トライアル終了間近: {{remaining}}",
       "planName": {
-        "commit": "Commit",
+        "commit": "こみっと",
         "standard": "Standard"
       }
     },
@@ -467,7 +471,7 @@
       "gmailNotifications": "Gmail通知",
       "disconnect": "Googleアカウントを切断",
       "connected": "接続済み",
-      "copied": "コピーしました！",
+      "copied": "こぴーしました",
       "copyCommand": "コマンドをコピー",
       "disabled": "無効",
       "disconnectConfirm": "切断",
@@ -544,7 +548,7 @@
       "iosTitle": "iOSではKiloClawを利用できません",
       "multipleCurrentConflictBody": "アカウントに複数のアクティブなサブスクリプションが見つかったため、二重請求を避けるために処理を一時停止しました。",
       "multipleCurrentConflictCta": "kilo.aiで続行",
-      "multipleCurrentConflictTitle": "アカウントの確認が必要です",
+      "multipleCurrentConflictTitle": "あかうんとのれびゅーがひつようです",
       "nonCanonicalEarlybirdBody": "アーリーアクセスプランをモバイルで使用するには、手動での確認が必要です。",
       "nonCanonicalEarlybirdCta": "kilo.aiで続行",
       "nonCanonicalEarlybirdTitle": "従来のプランが検出されました",
@@ -607,7 +611,7 @@
         "subscriptionCanceled": "サブスクリプションが無効です。このインスタンスを使い続けるには再サブスクライブしてください",
         "subscriptionPastDue": "支払いに問題があります。このインスタンスを使い続けるには請求情報を更新してください",
         "quarantined": "インスタンスが隔離されました。手動レビューが必要です",
-        "multipleCurrentConflict": "アカウントのレビューが必要です",
+        "multipleCurrentConflict": "あかうんとのれびゅーがひつようです",
         "nonCanonicalEarlybird": "レガシープランのレビューが必要です"
       }
     },
@@ -622,7 +626,7 @@
       "frontierDescription": "最高の性能。推論付きのフロンティアモデルにルーティングします。",
       "frontierLabel": "フロンティア",
       "kiloAuto": "Kilo Auto",
-      "performance": "性能"
+      "performance": "せいのう"
     },
     "onboarding": {
       "complete": {
@@ -642,7 +646,7 @@
         "openKiloAi": "kilo.aiを開く",
         "provisioning": "プロビジョニング",
         "ready": "準備完了",
-        "review": "確認",
+        "review": "れびゅー",
         "settingUp": "セットアップ中…",
         "somethingWentWrong": "問題が発生しました"
       },
@@ -881,7 +885,7 @@
       "keepRunning": "実行を続ける",
       "model": "モデル",
       "noFindings": "所見はありません",
-      "openPullRequest": "プルリクエストを開く",
+      "openPullRequest": "ぷるりくえすとをひらく",
       "platform": "プラットフォーム",
       "retryMessage": "コードレビューが再実行されます。",
       "retryReview": "レビューを再試行",
@@ -890,7 +894,7 @@
       "started": "開始日時",
       "status": "ステータス",
       "threshold": "しきい値",
-      "title": "レビュー",
+      "title": "れびゅー",
       "tokens": "トークン",
       "tokensInOut": "{{input}}入力 / {{output}}出力",
       "pullRequest": "プルリクエスト"
@@ -955,7 +959,7 @@
     "configSaveFailed": "レビュー設定を保存できませんでした",
     "status": {
       "pending": "保留中",
-      "queued": "キュー待ち",
+      "queued": "きゅーまち",
       "running": "実行中",
       "completed": "完了",
       "failed": "失敗",
@@ -970,7 +974,7 @@
     },
     "focusArea": {
       "security": "セキュリティ",
-      "performance": "パフォーマンス",
+      "performance": "せいのう",
       "bugs": "バグ",
       "style": "スタイル",
       "testing": "テスト",
@@ -1028,7 +1032,7 @@
       "outcomeAnalyzing": "分析中",
       "outcomeDismissed": "却下済み",
       "outcomeExploitable": "悪用可能",
-      "outcomeFailed": "分析に失敗",
+      "outcomeFailed": "ぶんせきにしっぱい",
       "outcomeNeedsReview": "確認が必要",
       "outcomeNotAnalyzed": "未分析",
       "outcomeNotExploitable": "悪用可能ではない",
@@ -1048,9 +1052,9 @@
       "sortSeverityDesc": "重大度: 高から低",
       "sortSlaDue": "SLA期限",
       "status": "ステータス",
-      "statusClosed": "クローズ",
+      "statusClosed": "くろーずずみ",
       "statusIgnored": "無視",
-      "statusOpen": "未解決"
+      "statusOpen": "みかいけつ"
     },
     "analysis": {
       "analyzeRepository": "リポジトリを分析",
@@ -1258,12 +1262,12 @@
       "supersededBy": "現在の所見に置き換えられました",
       "supersededByDescription": "タップして、ステータス、分析、修復の現在のレコードを開きます。",
       "unknown": "不明",
-      "updated": "更新日時",
+      "updated": "こうしん",
       "viewAdvisory": "GitHubでアドバイザリを表示",
       "vulnerableVersions": "脆弱なバージョン",
       "statusSuperseded": "置き換え済み",
       "statusFixed": "修正済み",
-      "statusOpen": "未解決",
+      "statusOpen": "みかいけつ",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "修正がすでに開始されている",
       "reasonNoBandwidth": "対応する余裕がない",
@@ -1345,7 +1349,7 @@
       },
       "queued": "修復をキューに入れました",
       "retryQueued": "修復の再試行をキューに入れました",
-      "unavailable": "この検出には修復を利用できません。"
+      "unavailable": "このけんしゅつにはしゅうふくをりようできません。"
     },
     "repositories": {
       "allRepositories": "すべてのリポジトリ",
@@ -1376,7 +1380,7 @@
       "couldNotLoad": "組織を読み込めませんでした",
       "personal": "個人",
       "personalSubtitle": "自分のリポジトリ",
-      "title": "Security Agent"
+      "title": "せきゅりてぃえーじぇんと"
     },
     "settingsOverview": {
       "allRepositories": "すべてのリポジトリ",
@@ -1401,7 +1405,7 @@
       "repositoriesCount": "{{displayCount}}件のリポジトリを選択中",
       "repositoriesCount_other": "{{displayCount}}件のリポジトリを選択中",
       "repositoriesCount_one": "{{displayCount}}件のリポジトリを選択中",
-      "securityAgent": "Security Agent",
+      "securityAgent": "せきゅりてぃえーじぇんと",
       "selectRepositories": "リポジトリを選択",
       "selectRepositoriesSubtitle": "Security Agentが監視するリポジトリを選択します",
       "slaPolicy": "SLAポリシー",
@@ -1436,7 +1440,7 @@
       "remediationDeadlineA11y": "{{label}}の修復期限（日数）",
       "title": "SLAポリシー"
     },
-    "title": "Security Agent",
+    "title": "せきゅりてぃえーじぇんと",
     "initialSyncAdmissionFailed": "Security Agentは有効になりましたが、初回同期をキューに入れられませんでした。もう一度同期してください。",
     "queuedActionUntracked": "キューに入れたアクションを追跡できなくなりました。更新して最新の状態を確認してください。",
     "commands": {
@@ -1461,8 +1465,8 @@
       "analyzing": "分析中",
       "analyzingTitle": "分析中",
       "analyzingDescription": "アプリケーションコードが影響を受ける機能に到達できるかを確認しています。",
-      "failed": "分析に失敗しました",
-      "failedTitle": "分析に失敗しました",
+      "failed": "ぶんせきにしっぱいしました",
+      "failedTitle": "ぶんせきにしっぱいしました",
       "failedDescription": "Security Agentは分析を完了できませんでした。",
       "extractionFailed": "確認が必要",
       "extractionFailedTitle": "確認が必要",
@@ -1516,7 +1520,7 @@
     "remediationStatus": {
       "cancellationRequested": "キャンセルを要求しました",
       "notStarted": "未開始",
-      "queued": "キュー待ち",
+      "queued": "きゅーまち",
       "starting": "開始中",
       "inProgress": "進行中",
       "draftPrOpened": "ドラフトPRが開かれました",
@@ -1553,7 +1557,7 @@
       "includeExistingDisabled": "既存の所見は自動修復から除外されています。",
       "belowThreshold": "所見が自動修復の重大度しきい値を下回っています。安全ゲートを通過すれば、手動修復はまだ開始できます。",
       "beforeEnablement": "分析は自動修復が有効になる前に完了しました。安全ゲートを通過すれば、手動修復はまだ開始できます。",
-      "generic": "この所見では修復を利用できません。"
+      "generic": "このけんしゅつにはしゅうふくをりようできません。"
     },
     "commandFailure": {
       "ownerCapReached": "分析キャパシティがいっぱいです。アクティブな分析が終了するまで待ってから、再試行してください。",
@@ -1665,7 +1669,12 @@
       "couldNotLoadThisSession": "このセッションを読み込めませんでした",
       "cloneFailed": "このセッションを複製できませんでした。",
       "cloneFailedRetry": "このセッションを複製できませんでした。もう一度お試しください。",
-      "connectRepositoryToContinue": "続行するにはリポジトリを接続してください。"
+      "connectRepositoryToContinue": "続行するにはリポジトリを接続してください。",
+      "notEnoughCredits": "Cloud Agentを実行するクレジットが不足しています。クレジットを追加して再試行してください。",
+      "previousTaskFinishing": "前のタスクがまだ終わっていません。少々お待ちください。",
+      "serviceUnavailable": "サービスは現在利用できません。もう一度お試しください。",
+      "connectionTrouble": "接続に問題があります。しばらくしてから再試行してください。",
+      "modelUnavailable": "このモデルはCloud Agentではご利用いただけません。別のモデルを選んで、もう一度お試しください。"
     },
     "remoteSession": {
       "failedToCreate": "リモートセッションを作成できませんでした",
@@ -1722,7 +1731,8 @@
       "discardDraftMessage": "プロンプトは失われます。",
       "discardDraftTitle": "下書きを破棄しますか？",
       "discardFailed": "下書きを破棄できませんでした。もう一度お試しください。",
-      "keepEditing": "編集を続ける"
+      "keepEditing": "編集を続ける",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました",
@@ -1732,7 +1742,7 @@
     "toolPatch": {
       "operationAdded": "追加",
       "operationDeleted": "削除",
-      "operationUpdated": "更新"
+      "operationUpdated": "こうしん"
     },
     "toolCard": {
       "accessibility": "{{label}}ツール、{{status}}",
@@ -1963,7 +1973,7 @@
       "failure": "{{title}}。",
       "failureRetryAvailable": "{{title}}。再試行できます。",
       "copyToComposer": "コンポーザーにコピー",
-      "queued": "キューに追加済み",
+      "queued": "きゅーについかずみ",
       "queuedAccessibility": "メッセージがキューに追加されました",
       "userMessage": "ユーザーメッセージ",
       "assistantMessage": "アシスタントメッセージ",
@@ -2059,8 +2069,8 @@
       "camera": "カメラ",
       "photoLibrary": "フォトライブラリ",
       "files": "ファイル",
-      "cameraAccessDisabled": "カメラアクセスが無効です",
-      "cameraAccessMessage": "写真を撮るには設定でカメラアクセスを許可してください。",
+      "cameraAccessDisabled": "かめらへのあくせすがむこうです",
+      "cameraAccessMessage": "しゃしんをとるには、せっていでかめらへのあくせすをきょかしてください。",
       "couldNotOpenPhotoPicker": "写真ピッカーを開けませんでした。Kiloを再起動してもう一度お試しください。",
       "maxFilesAllowed": "最大{{displayCount}}個のファイルまで添付できます",
       "onlyAddingFiles": "{{total}}個中{{accepted}}個のファイルのみ追加します（最大{{max}}個）"
@@ -2152,10 +2162,10 @@
       "modelAccessibilityLabel": "{{name}}、{{provider}}、{{steps}}、{{cost}}"
     },
     "prBadge": {
-      "open": "開いているプルリクエスト",
+      "open": "ひらいているぷるりくえすと",
       "closed": "閉じているプルリクエスト",
       "merged": "マージ済みのプルリクエスト",
-      "draft": "下書きのプルリクエスト",
+      "draft": "したがきのぷるりくえすと",
       "updating": "更新中、{{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "プルリクエスト"
@@ -2208,15 +2218,10 @@
     "couldNotLoadSessions": "セッションを読み込めませんでした",
     "couldNotLoadActiveSessions": "アクティブなセッションを読み込めませんでした",
     "agentSessions": "エージェントセッション",
-    "showingSavedSessions": "保存されたセッションを表示中 — ライブステータスが古い場合があります",
-    "startNewAgentSession": "新しいKiloエージェントセッションを開始",
-    "aiCodingSessions": "AIコーディングセッション",
-    "startCodingTaskFromPhone": "スマートフォンからコーディングタスクを開始するか、CLIからセッションを続行します。",
-    "tryIt": "試す",
     "newCodingTask": "新しいコーディングタスク",
     "explore": "探索",
     "seeAll": "すべて表示",
-    "kiloAgents": "Kiloエージェント"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}}を閉じる",
@@ -2350,7 +2355,7 @@
     "managedOnGooglePlay": "Google Playで管理",
     "managedInAppStore": "App Storeで管理",
     "managedOnWeb": "このKilo Passはウェブで管理されています",
-    "opensManagementOnWeb": "ウェブでKilo Passの管理を開きます。",
+    "opensManagementOnWeb": "うぇぶでKilo Passのかんりをひらきます。",
     "opensAppStoreManagement": "App Storeのサブスクリプション管理を開きます。",
     "opensPlans": "Kilo Passのプランを開きます。",
     "tryAgainFromProfile": "プロフィールからもう一度お試しください。",
@@ -2553,10 +2558,10 @@
       "outdated": "古い",
       "quotedDiffSnippet": "引用されたdiffスニペット",
       "reactionPill": "{{emoji}}のリアクション、{{displayCount}}{{countLabel}}",
-      "reaction": "件",
-      "reaction_other": "件",
+      "reaction": "けん",
+      "reaction_other": "けん",
       "reaction_one": "件",
-      "reactionsTitle": "リアクション",
+      "reactionsTitle": "りあくしょん",
       "reply": "返信",
       "replyBadRequest": "この返信は投稿できません。スレッドが変更された可能性があります。",
       "replyBody": "返信本文",
@@ -2608,8 +2613,8 @@
       "eyebrow": "URLでプルリクエストを開く",
       "noRecentPrs": "最近のPRはありません",
       "noRecentPrsDescription": "上にPRリンクを貼り付けてレビューを開始すると、次回ここに表示されます。",
-      "open": "開く",
-      "openPullRequest": "プルリクエストを開く",
+      "open": "ひらく",
+      "openPullRequest": "ぷるりくえすとをひらく",
       "pasteLink": "プルリクエストリンクを貼り付け",
       "pastePrLink": "PRリンクを貼り付け",
       "remove": "削除",
@@ -2749,7 +2754,7 @@
       "partialSuccessBanner": {
         "accessibility": "マージしました。ブランチを削除できませんでした: {{reason}}",
         "body": "ブランチを削除できませんでした: {{reason}}",
-        "title": "マージしました"
+        "title": "まーじしました"
       },
       "refreshMergeability": "マージ可能性を更新",
       "terminal": {
@@ -2769,7 +2774,7 @@
         "failingChecksDetail": "必須のステータスチェックが失敗しています。",
         "unstableTitle": "一部のチェックが失敗しています",
         "unstableDetail": "必須ではないチェックが失敗しています。マージはブロックされません。",
-        "draftTitle": "ドラフトのプルリクエスト",
+        "draftTitle": "したがきのぷるりくえすと",
         "draftDetail": "マージする前にプルリクエストをレビュー可能としてマークしてください。",
         "behindTitle": "ブランチが古くなっています",
         "behindDetailUpdatable": "マージする前に、ベースからブランチを更新するか、リベースしてください。",
@@ -2794,14 +2799,14 @@
     "overview": {
       "commit": "コミット",
       "commit_other": "コミット",
-      "commit_one": "コミット",
+      "commit_one": "こみっと",
       "file": "ファイル",
       "file_other": "ファイル",
       "file_one": "ファイル",
-      "stateClosed": "クローズ済み",
+      "stateClosed": "くろーずずみ",
       "stateDraft": "下書き",
-      "stateMerged": "マージ済み",
-      "stateOpen": "オープン",
+      "stateMerged": "まーじずみ",
+      "stateOpen": "おーぷん",
       "stateOpenApproved": "オープン · 承認済み",
       "stateOpenChangesRequested": "オープン · 変更リクエストあり",
       "stateOpenReviewRequired": "オープン · レビューが必要",
@@ -2828,7 +2833,7 @@
       "message": "GitHub接続が無効になりました。接続を再確認してください。必要に応じて再接続を求められます。",
       "title": "GitHub接続の有効期限が切れました"
     },
-    "review": "レビュー",
+    "review": "れびゅー",
     "reviewPullRequest": "プルリクエストをレビュー",
     "screen": {
       "shareA11y": "プルリクエストを共有",
@@ -2862,7 +2867,7 @@
     "fileStatus": {
       "added": "追加",
       "changed": "変更",
-      "copied": "コピー",
+      "copied": "こぴー",
       "deleted": "削除",
       "modified": "変更",
       "renamed": "リネーム"
@@ -2961,7 +2966,7 @@
       "sharingUnavailable": "このデバイスでは共有は利用できません。",
       "status": {
         "paid": "支払い済み",
-        "open": "未払い",
+        "open": "みはらい",
         "void": "無効",
         "draft": "下書き",
         "uncollectible": "回収不能",
@@ -3040,7 +3045,7 @@
       "ended": "終了済み",
       "endsOn": "{{date}}に終了",
       "loading": "読み込み中…",
-      "manageHint": "WebでKilo Passの管理を開きます。",
+      "manageHint": "うぇぶでKilo Passのかんりをひらきます。",
       "notSubscribed": "未登録",
       "overallocated": "パスの割り当てが有料シート数を超えています",
       "paidSeat_one": "{{displayCount}}有料シート",

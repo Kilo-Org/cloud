@@ -1,8 +1,9 @@
 import * as Slot from '@rn-primitives/slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
-import { Text as RNText, type Role } from 'react-native';
+import { I18nManager, Text as RNText, type Role } from 'react-native';
 
+import { RTL_WRITING_DIRECTION } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 const textVariants = cva('text-foreground text-base font-medium', {
@@ -67,6 +68,7 @@ function Text({
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
+      style={I18nManager.isRTL ? [RTL_WRITING_DIRECTION, props.style] : props.style}
     />
   );
 }

@@ -77,6 +77,7 @@ const mockRecordOperationAcceptance = jest.fn<(...args: unknown[]) => Promise<un
 const mockSettleOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatus = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatuses = jest.fn<(...args: unknown[]) => Promise<unknown>>();
+const mockGetReauthorizeUrl = jest.fn<(installationId: string) => string>();
 
 jest.mock('../services/manual-sync-client', () => ({
   submitManualSecuritySync: mockSubmitManualSecuritySync,
@@ -102,7 +103,7 @@ jest.mock('@kilocode/db/operation-ledger', () => ({
 }));
 jest.mock('../github/permissions', () => ({
   hasSecurityReviewPermissions: () => true,
-  getReauthorizeUrl: jest.fn(),
+  getReauthorizeUrl: mockGetReauthorizeUrl,
 }));
 jest.mock('../github/dependabot-api', () => ({
   checkDependabotAlertsAvailability: mockCheckDependabotAlertsAvailability,
@@ -182,6 +183,9 @@ beforeEach(() => {
   mockRecordOperationAcceptance.mockResolvedValue({ status: 'admitted' });
   mockMarkReconcilePending.mockResolvedValue({ status: 'reconcile_pending' });
   mockSettleOperation.mockResolvedValue({ settled: true });
+  mockGetReauthorizeUrl.mockImplementation(
+    installationId => `https://github.com/apps/kilocode/installations/${installationId}`
+  );
 });
 
 function createHandlers() {
@@ -200,6 +204,30 @@ function createHandlers() {
         integration_status: 'active',
         platform_installation_id: 'installation-123',
         repositories: [{ id: 1, full_name: 'kilo/repo', name: 'repo', private: true }],
+      }) as never,
+    trackingExtras: () => ({}),
+  });
+}
+
+function createHandlersWithUnhealthyStatusIntegration() {
+  return createSecurityAgentHandlers({
+    resolveOwner: () => ({
+      type: 'org',
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      userId: 'user-123',
+    }),
+    resolveSecurityOwner: () => ({ organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }),
+    resolveResourceId: () => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    verifyFindingOwnership: () => true,
+    getIntegration: async () => null,
+    getStatusIntegration: async () =>
+      ({
+        id: 'integration-123',
+        integration_status: 'active',
+        platform_installation_id: 'installation-123',
+        permissions: { dependabot_alerts: 'read' },
+        auth_invalid_at: '2026-06-25 18:00:00+00',
+        auth_invalid_reason: 'installation_token_auth_failed',
       }) as never,
     trackingExtras: () => ({}),
   });
@@ -252,6 +280,25 @@ const context = {
     is_admin: false,
   },
 } as never;
+
+describe('getPermissionStatus', () => {
+  it('uses the status integration to preserve reauthorization details', async () => {
+    await expect(
+      createHandlersWithUnhealthyStatusIntegration().getPermissionStatus({
+        ctx: context,
+        input: {},
+      })
+    ).resolves.toEqual({
+      hasIntegration: true,
+      integrationId: 'integration-123',
+      hasPermissions: false,
+      reauthorizeUrl: 'https://github.com/apps/kilocode/installations/installation-123',
+      authInvalidAt: '2026-06-25 18:00:00+00',
+      authInvalidReason: 'installation_token_auth_failed',
+    });
+    expect(mockGetReauthorizeUrl).toHaveBeenCalledWith('installation-123');
+  });
+});
 
 describe('trackUiInteraction', () => {
   it('tracks an allowlisted interaction with authenticated personal identity', async () => {

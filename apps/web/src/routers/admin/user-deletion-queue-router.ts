@@ -62,6 +62,7 @@ const StepKeySchema = z.enum([
   UserDeletionStepKey.Anonymize,
   UserDeletionStepKey.PylonReply,
   UserDeletionStepKey.PylonFinalize,
+  UserDeletionStepKey.CompletionEmail,
   UserDeletionStepKey.PylonContact,
   UserDeletionStepKey.CsaSupportDb,
 ]);

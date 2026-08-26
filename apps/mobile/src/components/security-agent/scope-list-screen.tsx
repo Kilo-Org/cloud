@@ -67,7 +67,7 @@ export function ScopeListScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('securityAgent.scopeList.title')} />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <ConfigureRow
           icon={User}
           title={t('securityAgent.scopeList.personal')}

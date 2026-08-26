@@ -38,7 +38,9 @@
     "catalogLoadFailed": "تعذّر تحميل اللغة. يرجى المحاولة مرة أخرى.",
     "search": "البحث في اللغات",
     "noMatches": "لا توجد لغات مطابقة",
-    "deviceLanguage": "لغة الجهاز"
+    "deviceLanguage": "لغة الجهاز",
+    "current": "الحالية",
+    "allLanguages": "كل اللغات"
   },
   "login": {
     "welcome": "مرحبًا بك في Kilo",
@@ -148,7 +150,9 @@
     "appearanceSystem": "النظام",
     "appearanceLight": "فاتح",
     "appearanceDark": "داكن",
-    "account": "الحساب"
+    "account": "الحساب",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "الإشعارات",
@@ -310,7 +314,7 @@
       "attachment": "مرفق"
     },
     "messageActions": {
-      "copied": "تم النسخ",
+      "copied": "منسوخ",
       "copyFailed": "فشل النسخ",
       "title": "إجراءات الرسالة",
       "deleteTitle": "حذف الرسالة؟",
@@ -332,7 +336,7 @@
       "takePhoto": "التقاط صورة",
       "photoLibrary": "مكتبة الصور",
       "files": "الملفات",
-      "cameraAccessDisabled": "الوصول إلى الكاميرا معطل",
+      "cameraAccessDisabled": "الوصول إلى الكاميرا معطّل",
       "cameraAccessMessage": "اسمح بالوصول إلى الكاميرا في الإعدادات لالتقاط صورة."
     },
     "typingIndicator": {
@@ -471,13 +475,13 @@
       "gmailNotifications": "إشعارات Gmail",
       "disconnect": "فصل حساب Google",
       "connected": "متصل",
-      "copied": "تم النسخ!",
+      "copied": "منسوخ",
       "copyCommand": "نسخ الأمر",
       "disabled": "معطّل",
       "disconnectConfirm": "قطع الاتصال",
       "disconnectMessage": "إزالة حساب Google من هذا المثيل؟ سيؤدي هذا إلى تعطيل إشعارات Gmail. أعد النشر بعد قطع الاتصال لتطبيق التغييرات.",
       "disconnectTitle": "قطع اتصال Google",
-      "enabled": "ممكّن",
+      "enabled": "مفعّل",
       "notConnected": "غير متصل"
     },
     "modelList": {
@@ -503,7 +507,7 @@
       "removeTitle": "إزالة السر",
       "saved": "تم حفظ {{label}}",
       "allFieldsRequired": "جميع الحقول مطلوبة للاتصال بـ {{label}}.",
-      "connect": "اتصال",
+      "connect": "ربط",
       "connected": "متصل",
       "hide": "إخفاء {{label}}",
       "notConnected": "غير متصل",
@@ -898,7 +902,7 @@
       "started": "بدأت",
       "status": "الحالة",
       "threshold": "الحد",
-      "title": "المراجعة",
+      "title": "مراجعة",
       "tokens": "الرموز",
       "tokensInOut": "{{input}} إدخال / {{output}} إخراج",
       "pullRequest": "طلب سحب"
@@ -1051,7 +1055,7 @@
       "severityLow": "منخفضة",
       "severityMedium": "متوسطة",
       "slaStatus": "حالة SLA",
-      "sortBy": "الترتيب حسب",
+      "sortBy": "ترتيب حسب",
       "sortSeverityAsc": "الخطورة: من المنخفض إلى العالي",
       "sortSeverityDesc": "الخطورة: من العالي إلى المنخفض",
       "sortSlaDue": "تاريخ استحقاق SLA",
@@ -1270,7 +1274,7 @@
       "supersededBy": "تم استبدالها بنتيجة حالية",
       "supersededByDescription": "اضغط لفتح السجل الحالي للحالة والتحليل والمعالجة.",
       "unknown": "غير معروف",
-      "updated": "تم التحديث",
+      "updated": "محدّث",
       "viewAdvisory": "عرض الاستشارة على GitHub",
       "vulnerableVersions": "الإصدارات المعرّضة للثغرات",
       "statusSuperseded": "مستبدلة",
@@ -1336,14 +1340,14 @@
       "cancellationRequested": "تم طلب الإلغاء",
       "cancelled": "تم إلغاء المعالجة",
       "couldNotLoad": "تعذّر تحميل حالة المعالجة",
-      "keepRunning": "مواصلة التشغيل",
+      "keepRunning": "متابعة التشغيل",
       "model": "النموذج",
       "noAnalysisDescription": "شغّل واحدًا من تبويب التفاصيل",
       "noAnalysisTitle": "لا يوجد تحليل بعد",
       "openDraftPullRequest": "فتح مسودة طلب السحب{{number}}",
       "openPullRequest": "فتح طلب السحب{{number}}",
       "progress": "التقدم",
-      "pullRequest": "طلب السحب",
+      "pullRequest": "طلب سحب",
       "retry": "إعادة محاولة المعالجة",
       "start": "بدء المعالجة",
       "startedBy": "بدأها",
@@ -1414,7 +1418,7 @@
       "repositoriesCount_other": "تم تحديد {{displayCount}} مستودعًا",
       "repositoriesCount_one": "تم تحديد {{displayCount}} مستودع واحد",
       "securityAgent": "وكيل الأمان",
-      "selectRepositories": "اختيار المستودعات",
+      "selectRepositories": "تحديد المستودعات",
       "selectRepositoriesSubtitle": "اختر المستودعات التي يراقبها وكيل الأمان",
       "slaPolicy": "سياسة SLA",
       "title": "الإعدادات",
@@ -1697,7 +1701,12 @@
       "couldNotLoadThisSession": "تعذّر تحميل هذه الجلسة",
       "cloneFailed": "تعذّر استنساخ هذه الجلسة.",
       "cloneFailedRetry": "تعذّر استنساخ هذه الجلسة. حاول مرة أخرى.",
-      "connectRepositoryToContinue": "اربط مستودعًا للمتابعة."
+      "connectRepositoryToContinue": "اربط مستودعًا للمتابعة.",
+      "notEnoughCredits": "لا توجد ائتمانات كافية لتشغيل Cloud Agent. أضف ائتمانات وحاول مرة أخرى.",
+      "previousTaskFinishing": "لا تزال المهمة السابقة قيد الإنجاز. يرجى الانتظار لحظة.",
+      "serviceUnavailable": "الخدمة غير متاحة الآن. يرجى المحاولة مرة أخرى.",
+      "connectionTrouble": "مشكلة في الاتصال. يرجى إعادة المحاولة بعد لحظة.",
+      "modelUnavailable": "هذا النموذج غير متاح لـ Cloud Agent. اختر نموذجًا آخر وحاول مرة أخرى."
     },
     "remoteSession": {
       "failedToCreate": "تعذّر إنشاء الجلسة البعيدة",
@@ -1754,7 +1763,8 @@
       "discardDraftMessage": "ستفقد مطالبتك.",
       "discardDraftTitle": "تجاهل المسودة؟",
       "discardFailed": "تعذّر تجاهل المسودة. يرجى المحاولة مرة أخرى.",
-      "keepEditing": "متابعة التعديل"
+      "keepEditing": "متابعة التعديل",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "تم تحديث {{displayCount}} ملف",
@@ -1785,7 +1795,7 @@
       "toolGrep": "grep",
       "toolList": "سرد",
       "toolPatch": "patch",
-      "toolTask": "مهمة",
+      "toolTask": "المهمة",
       "readTodos": "قراءة المهام",
       "updateTodos": "تحديث المهام",
       "linesBadge": "{{displayCount}} أسطر",
@@ -1913,7 +1923,7 @@
       "viewImageWithAlt": "عرض الصورة {{alt}}",
       "imageOutput": "مخرجات الصورة",
       "imageOutputWithFilename": "مخرجات الصورة، {{filename}}",
-      "defaultName": "ملف",
+      "defaultName": "الملف",
       "openFullScreen": "فتح {{name}} بملء الشاشة",
       "preview": "معاينة {{name}}",
       "openFile": "فتح {{name}}",
@@ -2043,7 +2053,7 @@
       "title": "تصفية الجلسات",
       "sortBy": "ترتيب حسب",
       "sortLastUpdated": "آخر تحديث",
-      "sortCreated": "تاريخ الإنشاء",
+      "sortCreated": "تم الإنشاء",
       "platform": "المنصة",
       "platformCloud": "السحابة",
       "platformExtension": "الامتداد",
@@ -2066,10 +2076,10 @@
     "modelPicker": {
       "title": "اختيار النموذج",
       "searchPlaceholder": "البحث عن النماذج...",
-      "allModels": "كل النماذج",
+      "allModels": "جميع النماذج",
       "favorites": "المفضلة",
       "noModels": "لا توجد نماذج متاحة",
-      "recommended": "الموصى بها",
+      "recommended": "موصى به",
       "noModelsDescription": "لا توجد نماذج متاحة للاختيار."
     },
     "modelSelector": {
@@ -2192,7 +2202,7 @@
       "olderActivity": "نشاط أقدم",
       "olderActivityDescription": "تكلفة غير منسوبة إلى السجل المحمّل",
       "ofWindowTokens": "من {{window}} رمز",
-      "tokens": "رموز",
+      "tokens": "الرموز",
       "tokensWithPercentage": "رموز ({{percentage}})",
       "stepsCount_one": "{{steps}} خطوة",
       "stepsCount": "{{steps}} خطوات",
@@ -2260,15 +2270,10 @@
     "couldNotLoadSessions": "تعذّر تحميل الجلسات",
     "couldNotLoadActiveSessions": "تعذّر تحميل الجلسات النشطة",
     "agentSessions": "جلسات الوكيل",
-    "showingSavedSessions": "عرض الجلسات المحفوظة — قد تكون الحالة المباشرة قديمة",
-    "startNewAgentSession": "بدء جلسة Kilo Agent جديدة",
-    "aiCodingSessions": "جلسات البرمجة بالذكاء الاصطناعي",
-    "startCodingTaskFromPhone": "ابدأ مهمة برمجة من هاتفك أو تابع جلسة من CLI.",
-    "tryIt": "جرّبه",
     "newCodingTask": "مهمة برمجة جديدة",
     "explore": "استكشف",
     "seeAll": "عرض الكل",
-    "kiloAgents": "وكلاء Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "إغلاق {{filename}}",
@@ -2956,9 +2961,9 @@
       "selectedTapToChange": "تم تحديد {{label}}، اضغط لتغيير التحديد",
       "truncationBanner": "عرض أول {{limit}} من أصل {{total}} ملفًا تم تغييرها — حد GitHub API",
       "tapToComment": "{{label}}، اضغط للتعليق",
-      "statusAdded": "تمت الإضافة",
+      "statusAdded": "مضاف",
       "statusContext": "السياق",
-      "statusDeleted": "تم الحذف",
+      "statusDeleted": "محذوف",
       "lineLabel": "{{status}} سطر {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(فارغ)"
@@ -3095,7 +3100,7 @@
         "billingManager": "مدير الفوترة"
       },
       "emailStatusFailed": "فشل البريد الإلكتروني",
-      "emailStatusPending": "معلّق",
+      "emailStatusPending": "قيد الانتظار",
       "inviteCreated": "تم إنشاء الدعوة",
       "pendingInvitations": "دعوات معلّقة",
       "resendInvite": "إعادة إرسال الدعوة",

@@ -38,7 +38,9 @@
     "catalogLoadFailed": "无法加载语言。请重试。",
     "search": "搜索语言",
     "noMatches": "没有匹配的语言",
-    "deviceLanguage": "设备语言"
+    "deviceLanguage": "设备语言",
+    "current": "当前",
+    "allLanguages": "所有语言"
   },
   "login": {
     "welcome": "欢迎使用 Kilo",
@@ -148,7 +150,9 @@
     "appearanceSystem": "跟随系统",
     "appearanceLight": "浅色",
     "appearanceDark": "深色",
-    "account": "账户"
+    "account": "账户",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "通知",
@@ -570,7 +574,7 @@
       "start": "启动",
       "startMessage": "确定要启动此实例吗？",
       "startTitle": "启动实例",
-      "starting": "正在启动…",
+      "starting": "正在开始…",
       "stop": "停止",
       "stopMessage": "确定要停止此实例吗？",
       "stopTitle": "停止实例",
@@ -642,7 +646,7 @@
         "openKiloAi": "打开 kilo.ai",
         "provisioning": "正在配置",
         "ready": "就绪",
-        "review": "审核",
+        "review": "审查",
         "settingUp": "正在设置…",
         "somethingWentWrong": "出了点问题"
       },
@@ -871,7 +875,7 @@
       "couldNotGetLatest": "无法获取最新内容。",
       "couldNotLoad": "无法加载审查",
       "council": "委员会",
-      "created": "创建于",
+      "created": "创建时间",
       "decision": "决定",
       "details": "详情",
       "findings": "发现",
@@ -956,7 +960,7 @@
     "status": {
       "pending": "待处理",
       "queued": "已排队",
-      "running": "正在运行",
+      "running": "运行中",
       "completed": "已完成",
       "failed": "失败",
       "cancelled": "已取消",
@@ -1094,7 +1098,7 @@
       "triageModel": "分类模型"
     },
     "auditReport": {
-      "checkConnection": "请检查您的连接后重试。",
+      "checkConnection": "请检查连接后重试。",
       "couldNotLoad": "无法加载审计报告",
       "events": "事件",
       "findings": "发现",
@@ -1273,7 +1277,7 @@
       "reasonAfterReview": "审核后"
     },
     "findingList": {
-      "clearFilters": "清除筛选器",
+      "clearFilters": "清除筛选",
       "couldNotLoad": "无法加载发现",
       "couldNotLoadMore": "无法加载更多发现",
       "emptyDescription": "目前没有需要关注的未解决发现。",
@@ -1324,7 +1328,7 @@
       "cancellationRequested": "已请求取消",
       "cancelled": "修复已取消",
       "couldNotLoad": "无法加载修复状态",
-      "keepRunning": "继续运行",
+      "keepRunning": "保持运行",
       "model": "模型",
       "noAnalysisDescription": "从“详情”标签页运行一次",
       "noAnalysisTitle": "尚无分析",
@@ -1517,7 +1521,7 @@
       "cancellationRequested": "已请求取消",
       "notStarted": "未开始",
       "queued": "已排队",
-      "starting": "正在开始",
+      "starting": "正在启动",
       "inProgress": "进行中",
       "draftPrOpened": "草稿 PR 已开启",
       "prOpened": "PR 已开启",
@@ -1665,7 +1669,12 @@
       "couldNotLoadThisSession": "无法加载此会话",
       "cloneFailed": "无法克隆此会话。",
       "cloneFailedRetry": "无法克隆此会话。请重试。",
-      "connectRepositoryToContinue": "连接一个仓库以继续。"
+      "connectRepositoryToContinue": "连接一个仓库以继续。",
+      "notEnoughCredits": "运行 Cloud Agent 的积分不足。请添加积分后重试。",
+      "previousTaskFinishing": "上一个任务仍在进行中。请稍等片刻。",
+      "serviceUnavailable": "服务当前不可用。请重试。",
+      "connectionTrouble": "连接出现问题。请稍后重试。",
+      "modelUnavailable": "此模型不适用于 Cloud Agent。请选择其他模型重试。"
     },
     "remoteSession": {
       "failedToCreate": "创建远程会话失败",
@@ -1722,7 +1731,8 @@
       "discardDraftMessage": "您的提示词将会丢失。",
       "discardDraftTitle": "丢弃草稿？",
       "discardFailed": "无法丢弃草稿。请重试。",
-      "keepEditing": "继续编辑"
+      "keepEditing": "继续编辑",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件",
@@ -1792,7 +1802,7 @@
     },
     "modeOptions": {
       "code": "代码",
-      "plan": "规划",
+      "plan": "方案",
       "debug": "调试",
       "orchestrator": "编排器",
       "ask": "提问",
@@ -2060,7 +2070,7 @@
       "photoLibrary": "照片图库",
       "files": "文件",
       "cameraAccessDisabled": "相机访问已禁用",
-      "cameraAccessMessage": "在设置中允许相机访问以拍照。",
+      "cameraAccessMessage": "请在设置中允许相机访问以拍照。",
       "couldNotOpenPhotoPicker": "无法打开照片选择器。请重启 Kilo 后重试。",
       "maxFilesAllowed": "最多允许 {{displayCount}} 个文件",
       "onlyAddingFiles": "仅添加 {{accepted}} 个文件（共 {{total}} 个，最多 {{max}} 个）"
@@ -2208,15 +2218,10 @@
     "couldNotLoadSessions": "无法加载会话",
     "couldNotLoadActiveSessions": "无法加载活动会话",
     "agentSessions": "智能体会话",
-    "showingSavedSessions": "显示已保存的会话 — 实时状态可能已过时",
-    "startNewAgentSession": "开始新的 Kilo Agent 会话",
-    "aiCodingSessions": "AI 编程会话",
-    "startCodingTaskFromPhone": "从手机开始编程任务，或从 CLI 继续会话。",
-    "tryIt": "试一试",
     "newCodingTask": "新编程任务",
     "explore": "探索",
     "seeAll": "查看全部",
-    "kiloAgents": "Kilo 代理"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "关闭 {{filename}}",
@@ -2506,13 +2511,13 @@
     "connectionExpiredDescription": "您的 GitHub 连接已失效。请重新检查连接 — 如有需要，系统会提示您重新连接。",
     "connectionExpiredTitle": "GitHub 连接已过期",
     "couldNotLoadPullRequest": "无法加载拉取请求",
-    "couldNotOpenGitHubAppSettings": "无法打开 GitHub 应用设置",
+    "couldNotOpenGitHubAppSettings": "无法打开 GitHub App 设置",
     "description": "描述",
     "discussion": {
       "acceptTerms": "接受",
       "accessDeniedMessage": "您没有权限查看此 PR 的讨论。",
       "addReaction": "添加回应",
-      "block": "屏蔽",
+      "block": "阻止",
       "blockedUser": "已屏蔽 {{login}}",
       "closeReactions": "关闭回应",
       "collapseThread": "折叠话题",
@@ -2881,7 +2886,7 @@
       "statusDeleted": "已删除",
       "lineLabel": "{{status}} 行 {{line}}：{{text}}",
       "lineLabelNoNumber": "{{status}}：{{text}}",
-      "emptyLine": "(空)"
+      "emptyLine": "（空）"
     },
     "linkPasteClipboardEmpty": "剪贴板为空",
     "linkPasteNotAPullRequest": "不是 GitHub 拉取请求链接",
@@ -2908,7 +2913,7 @@
   "organization": {
     "boundary": {
       "backToProfile": "返回个人资料",
-      "loadErrorMessage": "请检查您的连接后重试。",
+      "loadErrorMessage": "请检查连接后重试。",
       "loadErrorTitle": "无法加载您的组织",
       "organizationUnavailable": "组织不可用",
       "selectDescription": "从您的个人资料中选择一个组织以继续。",
@@ -3038,7 +3043,7 @@
       "couldNotLoadStatus": "无法加载状态",
       "creditProcessingDelayed": "积分处理延迟 · 正在自动重试",
       "ended": "已结束",
-      "endsOn": "将于 {{date}} 结束",
+      "endsOn": "{{date}} 结束",
       "loading": "加载中…",
       "manageHint": "在网页上打开 Kilo Pass 管理。",
       "notSubscribed": "未订阅",

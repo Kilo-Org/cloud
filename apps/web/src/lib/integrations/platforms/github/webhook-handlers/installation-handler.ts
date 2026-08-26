@@ -33,7 +33,10 @@ import type { GitHubAppType } from '../app-selector';
  * Handles: created, deleted, suspend, unsuspend
  */
 
-export async function handleInstallationCreated(payload: InstallationCreatedPayload) {
+export async function handleInstallationCreated(
+  payload: InstallationCreatedPayload,
+  appType: GitHubAppType
+) {
   const { installation, requester } = payload;
   const requesterId = requester?.id?.toString();
 
@@ -48,26 +51,36 @@ export async function handleInstallationCreated(payload: InstallationCreatedPayl
     requester_login: requester?.login,
   });
 
-  // Simple 1:1 mapping: Find THE pending installation by this requester
-  if (!requesterId) {
-    // No requester ID - let callback handle (direct install flow)
-    logExceptInTest('No requester ID - callback will handle');
-    return NextResponse.json({ message: 'Installation recorded' }, { status: 200 });
-  }
-
-  // Direct indexed query - O(1) lookup using platform_requester_account_id column
-  const [pending] = await db
+  const targetMatches = await db
     .select()
     .from(platform_integrations)
     .where(
       and(
         eq(platform_integrations.platform, PLATFORM.GITHUB),
-        eq(platform_integrations.platform_requester_account_id, requesterId),
+        eq(platform_integrations.github_app_type, appType),
+        eq(platform_integrations.platform_account_id, installationData.account_id),
         eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
         isNull(platform_integrations.platform_installation_id)
       )
-    )
-    .limit(1);
+    );
+
+  let pending = targetMatches.length === 1 ? targetMatches[0] : undefined;
+  if (!pending && requesterId) {
+    const legacyMatches = await db
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          eq(platform_integrations.github_app_type, appType),
+          eq(platform_integrations.platform_requester_account_id, requesterId),
+          eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
+          isNull(platform_integrations.platform_installation_id),
+          isNull(platform_integrations.platform_account_id)
+        )
+      );
+    if (legacyMatches.length === 1) pending = legacyMatches[0];
+  }
 
   if (!pending) {
     // No pending - normal install via callback will handle
@@ -93,7 +106,6 @@ export async function handleInstallationCreated(payload: InstallationCreatedPayl
 
   // Auto-sync repositories on installation
   try {
-    const appType = pending.github_app_type || 'standard';
     const repos = await fetchGitHubRepositories(installationData.installation_id, appType);
     await updateRepositoriesForIntegration(pending.id, repos);
     logExceptInTest('Auto-synced repositories on installation', {

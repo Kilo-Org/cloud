@@ -6,6 +6,11 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearMarkdownImageConfirmMemory, confirmMarkdownImage } from './markdown-image-confirm';
+import {
+  clearMarkdownImageSrcMemory,
+  MEDIA_SOURCE_HEADER,
+  resolveMarkdownImageSrc,
+} from './markdown-image-src';
 import { MarkdownImage } from './markdown-image';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
@@ -26,6 +31,7 @@ vi.mock('@/lib/config', () => ({
 
 beforeEach(() => {
   clearMarkdownImageConfirmMemory();
+  clearMarkdownImageSrcMemory();
 });
 
 function ofType(
@@ -111,10 +117,12 @@ describe('MarkdownImage inert-until-load', () => {
       throw new Error('image not found');
     }
     const previewSource = image.props.source as { uri: string; headers?: Record<string, string> };
-    expect(previewSource.uri).toBe(
-      'https://api.test/api/media/proxy?url=https%3A%2F%2Fexample.com%2Fa.png'
-    );
-    expect(previewSource.headers).toEqual({ Authorization: 'Bearer test-token' });
+    expect(previewSource.uri).toBe(resolveMarkdownImageSrc('https://example.com/a.png'));
+    expect(previewSource.uri).not.toContain('example.com');
+    expect(previewSource.headers).toEqual({
+      Authorization: 'Bearer test-token',
+      [MEDIA_SOURCE_HEADER]: 'https://example.com/a.png',
+    });
 
     await unmount(renderer);
   });
@@ -277,11 +285,12 @@ describe('MarkdownImage inert-until-load', () => {
     if (!viewer) {
       throw new Error('viewer not found');
     }
-    expect(viewer.props.uri).toBe(
-      'https://api.test/api/media/proxy?url=https%3A%2F%2Fexample.com%2Fa.png'
-    );
+    expect(viewer.props.uri).toBe(resolveMarkdownImageSrc('https://example.com/a.png'));
     expect(viewer.props.uri).not.toContain('example.com/a.png');
-    expect(viewer.props.headers).toEqual({ Authorization: 'Bearer test-token' });
+    expect(viewer.props.headers).toEqual({
+      Authorization: 'Bearer test-token',
+      [MEDIA_SOURCE_HEADER]: 'https://example.com/a.png',
+    });
 
     await act(async () => {
       await Promise.resolve();

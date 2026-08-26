@@ -94,6 +94,11 @@ export function reapTempFiles({ all = false }: { all?: boolean } = {}): void {
       remaining.push(entry);
     }
   }
+  if (remaining.length === current.length) {
+    // Nothing expired. Skipping the write keeps every cold start and every
+    // foreground from rewriting the registry with identical content.
+    return;
+  }
   entries = remaining;
   persistEntries();
 }

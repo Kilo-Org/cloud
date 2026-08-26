@@ -283,29 +283,35 @@ describe('cloud-agent pending-upload ledger', () => {
     expect(sentCommands.map(command => command.input.Key)).toEqual([releasedKey]);
   });
 
-  it('leaves the row pending for the reaper when the R2 delete fails', async () => {
-    mockSend.mockRejectedValue(new Error('r2 down'));
+  it('claims the row before deleting its R2 object so a concurrent link cannot lose it', async () => {
     const kiloUserId = `ca-user-${crypto.randomUUID()}`;
     const messageUuid = crypto.randomUUID();
     const attachment = crypto.randomUUID();
+    const objectKey = buildObjectKey(kiloUserId, messageUuid, attachment);
     const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-    const rowId = await insertPendingRow({
+    await insertPendingRow({
       kiloUserId,
       messageUuid,
       attachmentId: attachment,
       expiresAt: future,
     });
 
-    await expect(
-      releasePendingUploads(kiloUserId, [buildObjectKey(kiloUserId, messageUuid, attachment)])
-    ).rejects.toThrow('r2 down');
+    // The row must already be claimed when the object delete runs. An
+    // unclaimed select would still show 'pending' here, leaving a window for
+    // linkPendingUploads to flip the row after the object is gone.
+    const statusesAtDelete: (string | undefined)[] = [];
+    mockSend.mockImplementation(async () => {
+      const rows = await db
+        .select({ status: cloud_agent_pending_uploads.status })
+        .from(cloud_agent_pending_uploads)
+        .where(eq(cloud_agent_pending_uploads.object_key, objectKey));
+      statusesAtDelete.push(rows[0]?.status);
+      return {};
+    });
 
-    const rows = await db
-      .select({ id: cloud_agent_pending_uploads.id, status: cloud_agent_pending_uploads.status })
-      .from(cloud_agent_pending_uploads)
-      .where(eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId));
-    expect(rows.map(row => row.id)).toEqual([rowId]);
-    expect(rows[0].status).toBe('pending');
+    await releasePendingUploads(kiloUserId, [objectKey]);
+
+    expect(statusesAtDelete).toEqual([undefined]);
   });
 });

@@ -159,9 +159,11 @@ export function SubOrganizationsPage({
   );
   const usageDataStatus: UsageDataStatus = thirtyDaySpend.data
     ? 'available'
-    : thirtyDaySpend.error || overview.error || thirtyDaySpend.fetchStatus === 'idle'
+    : thirtyDaySpend.error || overview.error
       ? 'unavailable'
-      : 'loading';
+      : overview.data && !hasChildren
+        ? 'available'
+        : 'loading';
   const selectedUsage = useMemo<UsageByOrganization>(() => {
     const costs = toMetricMap(usageCost.data?.breakdown);
     const requests = toMetricMap(usageRequests.data?.breakdown);

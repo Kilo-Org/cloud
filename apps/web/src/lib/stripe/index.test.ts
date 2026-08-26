@@ -4024,6 +4024,46 @@ describe('getStripeInvoicesPage', () => {
     }
   });
 
+  test('returns no cursor on a full final page', async () => {
+    const invoices = [
+      {
+        id: 'in_final',
+        object: 'invoice',
+        number: 'INV-9',
+        status: 'paid',
+        amount_due: 100,
+        currency: 'usd',
+        created: 1000,
+        hosted_invoice_url: null,
+        invoice_pdf: null,
+        lines: { data: [] },
+      },
+    ] as unknown as Stripe.Invoice[];
+
+    try {
+      jest.resetModules();
+      await jest.isolateModulesAsync(async () => {
+        const stripe = await import('@/lib/stripe');
+        const { client } = await import('@/lib/stripe-client');
+
+        const listSpy = jest.spyOn(client.invoices, 'list').mockResolvedValue({
+          data: invoices,
+          has_more: false,
+        } as unknown as Awaited<ReturnType<typeof client.invoices.list>>);
+
+        const result = await stripe.getStripeInvoicesPage('cus_page_test');
+
+        expect(result.hasMore).toBe(false);
+        expect(result.entries).toHaveLength(1);
+        expect(result.nextCursor).toBeNull();
+
+        listSpy.mockRestore();
+      });
+    } finally {
+      jest.resetModules();
+    }
+  });
+
   test('passes starting_after and date threshold through to Stripe', async () => {
     try {
       jest.resetModules();

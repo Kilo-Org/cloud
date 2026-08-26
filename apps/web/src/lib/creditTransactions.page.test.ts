@@ -52,7 +52,7 @@ describe('getCreditTransactionsForOrganizationPage', () => {
 
     expect(page.entries).toHaveLength(25);
     expect(page.hasMore).toBe(true);
-    expect(page.nextCursor).toBe(25);
+    expect(page.nextCursor).toBe(`${page.entries[24]!.created_at}|${page.entries[24]!.id}`);
     expect(page.entries.every(entry => !entry.credit_category?.startsWith('kpo:consumption'))).toBe(
       true
     );
@@ -113,5 +113,39 @@ describe('getCreditTransactionsForOrganizationPage', () => {
     expect(pageQuery!.params).toContain(26);
 
     querySpy.mockRestore();
+  });
+
+  // An OFFSET cursor breaks here: a row inserted at the head between the two
+  // requests shifts every later page, so page 2 repeats a page-1 row.
+  test('keeps page 2 disjoint from page 1 when a new transaction lands between requests', async () => {
+    const user = await insertTestUser();
+    const org = await createTestOrganization('stable page org', user.id, 0);
+
+    await db.insert(credit_transactions).values(
+      Array.from({ length: 30 }, (_, index) => ({
+        kilo_user_id: user.id,
+        organization_id: org.id,
+        is_free: false,
+        amount_microdollars: 1_000_000,
+        description: `purchase ${index}`,
+      }))
+    );
+
+    const first = await getCreditTransactionsForOrganizationPage(org.id);
+    expect(first.hasMore).toBe(true);
+
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      organization_id: org.id,
+      is_free: false,
+      amount_microdollars: 9_000_000,
+      description: 'inserted between pages',
+    });
+
+    const second = await getCreditTransactionsForOrganizationPage(org.id, first.nextCursor);
+
+    const firstIds = new Set(first.entries.map(entry => entry.id));
+    expect(second.entries.some(entry => firstIds.has(entry.id))).toBe(false);
+    expect(second.entries).toHaveLength(5);
   });
 });

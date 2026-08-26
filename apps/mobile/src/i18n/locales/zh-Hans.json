@@ -151,8 +151,8 @@
     "appearanceLight": "浅色",
     "appearanceDark": "深色",
     "account": "账户",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "在 PR 审查中添加应用署名",
+    "prReviewAttributionSubtitle": "提交审查时，追加 Reviewed via Kilo 页脚。"
   },
   "notifications": {
     "title": "通知",
@@ -1730,7 +1730,7 @@
       "discardDraftTitle": "丢弃草稿？",
       "discardFailed": "无法丢弃草稿。请重试。",
       "keepEditing": "继续编辑",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "在你的电脑上运行 `kilo remote`，或在正在运行的 CLI 会话中使用 `/remote`，以控制本地的 kilo 进程。",
       "bitbucketConnected": "Bitbucket 已连接",
       "connectBitbucket": "连接 Bitbucket",
       "connectBitbucketDescription": "在浏览器中连接 Bitbucket，然后返回此处选择仓库。",

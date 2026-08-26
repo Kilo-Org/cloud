@@ -151,8 +151,8 @@
     "appearanceLight": "लाइट",
     "appearanceDark": "डार्क",
     "account": "खाते",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR पुनरावलोकनांमध्ये अ‍ॅप श्रेय जोडा",
+    "prReviewAttributionSubtitle": "पुनरावलोकन सबमिट करताना Reviewed via Kilo फूटर जोडा"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट अनुपलब्ध",
@@ -2184,7 +2184,7 @@
       "keepEditing": "संपादन सुरू ठेवा",
       "discard": "टाकून द्या",
       "discardFailed": "मसुदा रद्द करता आला नाही. कृपया पुन्हा प्रयत्न करा.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "तुमच्या संगणकावर `kilo remote` चालवा, किंवा चालू असलेल्या CLI सत्रात `/remote`, स्थानिक kilo प्रक्रिया नियंत्रित करण्यासाठी.",
       "bitbucketConnected": "Bitbucket कनेक्ट झाले",
       "connectBitbucket": "Bitbucket कनेक्ट करा",
       "connectBitbucketDescription": "तुमच्या ब्राउझरमध्ये Bitbucket कनेक्ट करा, नंतर रिपॉझिटरी निवडण्यासाठी येथे परत या.",

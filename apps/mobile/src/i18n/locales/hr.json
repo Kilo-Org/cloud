@@ -151,8 +151,8 @@
     "appearanceLight": "Svijetlo",
     "appearanceDark": "Tamno",
     "account": "Račun",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Dodaj atribuciju aplikacije u preglede PR-a",
+    "prReviewAttributionSubtitle": "Dodajte potpis „Reviewed via Kilo\" kada podnesete pregled."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nedostupan",
@@ -2199,7 +2199,7 @@
       "keepEditing": "Nastavi s uređivanjem",
       "discard": "Odbaci",
       "discardFailed": "Nije moguće odbaciti nacrt. Pokušajte ponovno.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Pokrenite `kilo remote` na svom računalu ili `/remote` u pokrenutoj CLI sesiji da biste upravljali lokalnim kilo procesom.",
       "bitbucketConnected": "Bitbucket povezan",
       "connectBitbucket": "Poveži Bitbucket",
       "connectBitbucketDescription": "Poveži Bitbucket u pregledniku, a zatim se vrati ovdje da odabereš repozitorij.",

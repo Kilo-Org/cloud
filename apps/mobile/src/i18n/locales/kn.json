@@ -151,8 +151,8 @@
     "appearanceLight": "ಲೈಟ್",
     "appearanceDark": "ಡಾರ್ಕ್",
     "account": "ಖಾತೆ",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR ವಿಮರ್ಶೆಗಳಿಗೆ ಅಪ್ಲಿಕೇಶನ್ ಗುಣಲಕ್ಷಣವನ್ನು ಸೇರಿಸಿ",
+    "prReviewAttributionSubtitle": "ನೀವು ವಿಮರ್ಶೆ ಸಲ್ಲಿಸಿದಾಗ Kilo ಮೂಲಕ ವಿಮರ್ಶಿಸಲಾಗಿದೆ ಫೂಟರ್ ಅನ್ನು ಸೇರಿಸಿ."
   },
   "prReview": {
     "pullRequestUnavailable": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
@@ -2184,7 +2184,7 @@
       "keepEditing": "ಸಂಪಾದನೆಯನ್ನು ಮುಂದುವರಿಸಿ",
       "discard": "ತೆಗೆದುಹಾಕಿ",
       "discardFailed": "ಡ್ರಾಫ್ಟ್ ತೆಗೆದುಹಾಕಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "`kilo remote` ಅನ್ನು ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್‌ನಲ್ಲಿ ಚಲಾಯಿಸಿ, ಅಥವಾ ಚಾಲನೆಯಲ್ಲಿರುವ CLI ಸೆಶನ್‌ನಲ್ಲಿ `/remote` ಅನ್ನು ಬಳಸಿ, ಸ್ಥಳೀಯ kilo ಪ್ರಕ್ರಿಯೆಯನ್ನು ನಿಯಂತ್ರಿಸಲು.",
       "bitbucketConnected": "Bitbucket ಸಂಪರ್ಕಗೊಂಡಿದೆ",
       "connectBitbucket": "Bitbucket ಸಂಪರ್ಕಿಸಿ",
       "connectBitbucketDescription": "ನಿಮ್ಮ ಬ್ರೌಸರ್ನಲ್ಲಿ Bitbucket ಸಂಪರ್ಕಿಸಿ, ನಂತರ ರಿಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆ ಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.",

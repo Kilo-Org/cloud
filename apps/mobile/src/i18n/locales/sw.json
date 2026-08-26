@@ -151,8 +151,8 @@
     "appearanceLight": "Nyepesi",
     "appearanceDark": "Nyeusi",
     "account": "Akaunti",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Ongeza sifa ya app kwenye ukaguzi wa PR",
+    "prReviewAttributionSubtitle": "Ongeza 'Reviewed via Kilo' kwenye sehemu ya chini unapowasilisha ukaguzi."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request haipatikani",
@@ -2184,7 +2184,7 @@
       "keepEditing": "Endelea kuhariri",
       "discard": "Tupa",
       "discardFailed": "Haikuweza kutupa rasimu. Jaribu tena.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Endesha `kilo remote` kwenye kompyuta yako, au `/remote` katika kikao cha CLI kinachoendesha, ili kudhibiti mchakato wa kilo wa ndani.",
       "bitbucketConnected": "Bitbucket imeunganishwa",
       "connectBitbucket": "Unganisha Bitbucket",
       "connectBitbucketDescription": "Unganisha Bitbucket kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",

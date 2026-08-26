@@ -151,8 +151,8 @@
     "appearanceLight": "Svetlý",
     "appearanceDark": "Tmavý",
     "account": "Účet",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Pridať atribúciu aplikácie do kontrol PR",
+    "prReviewAttributionSubtitle": "Keď odošlete kontrolu, pridajte pätičku Reviewed via Kilo."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nie je dostupný",
@@ -2214,7 +2214,7 @@
       "keepEditing": "Pokračovať v úpravách",
       "discard": "Zahodiť",
       "discardFailed": "Koncept sa nepodarilo zahodiť. Skúste to znova.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Spustite `kilo remote` na svojom počítači alebo `/remote` v bežiacej relácii CLI, aby ste ovládali lokálny proces kilo.",
       "bitbucketConnected": "Bitbucket pripojený",
       "connectBitbucket": "Pripojiť Bitbucket",
       "connectBitbucketDescription": "Pripojte Bitbucket v prehliadači a potom sa sem vráťte a vyberte repozitár.",

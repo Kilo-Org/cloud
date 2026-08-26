@@ -151,8 +151,8 @@
     "appearanceLight": "লাইট",
     "appearanceDark": "ডার্ক",
     "account": "অ্যাকাউন্ট",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR পর্যালোচনায় অ্যাপ অ্যাট্রিবিউশন যোগ করুন",
+    "prReviewAttributionSubtitle": "আপনি একটি পর্যালোচনা জমা দিলে একটি Reviewed via Kilo ফুটার যুক্ত করুন।"
   },
   "prReview": {
     "pullRequestUnavailable": "পুল রিকোয়েস্ট অনুপলব্ধ",
@@ -2184,7 +2184,7 @@
       "keepEditing": "সম্পাদনা চালিয়ে যান",
       "discard": "বাতিল করুন",
       "discardFailed": "ড্রাফ্টটি বাতিল করা যায়নি। আবার চেষ্টা করুন।",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "আপনার কম্পিউটারে `kilo remote` চালান, বা একটি চলমান CLI সেশনে `/remote`, একটি স্থানীয় kilo প্রক্রিয়া নিয়ন্ত্রণ করতে।",
       "bitbucketConnected": "Bitbucket সংযুক্ত",
       "connectBitbucket": "Bitbucket সংযুক্ত করুন",
       "connectBitbucketDescription": "আপনার ব্রাউজারে Bitbucket সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",

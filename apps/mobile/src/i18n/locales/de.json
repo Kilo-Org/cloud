@@ -151,8 +151,8 @@
     "appearanceLight": "Hell",
     "appearanceDark": "Dunkel",
     "account": "Konto",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "App-Zuordnung zu PR-Reviews hinzufügen",
+    "prReviewAttributionSubtitle": "Hänge beim Einreichen eines Reviews eine „Reviewed via Kilo“-Fußzeile an."
   },
   "notifications": {
     "title": "Benachrichtigungen",
@@ -1730,7 +1730,7 @@
       "discardDraftTitle": "Entwurf verwerfen?",
       "discardFailed": "Der Entwurf konnte nicht verworfen werden. Bitte versuche es erneut.",
       "keepEditing": "Weiter bearbeiten",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Führe `kilo remote` auf deinem Computer aus oder `/remote` in einer laufenden CLI-Sitzung, um einen lokalen kilo-Prozess zu steuern.",
       "bitbucketConnected": "Bitbucket verbunden",
       "connectBitbucket": "Bitbucket verbinden",
       "connectBitbucketDescription": "Verbinde Bitbucket in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",

@@ -151,8 +151,8 @@
     "appearanceLight": "Ìhè",
     "appearanceDark": "Ọchịchịrị",
     "account": "Akaụntụ",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Tinye nzere ngwa na nyocha PR",
+    "prReviewAttributionSubtitle": "Gbakwunye nkebi 'Reviewed via Kilo' n'ala mgbe ị bipụtara nyocha."
   },
   "prReview": {
     "pullRequestUnavailable": "Arịrịọ dọrọ adịghị",
@@ -2184,7 +2184,7 @@
       "keepEditing": "Nọgide na-edezi",
       "discard": "Tụfuo",
       "discardFailed": "Enweghị ike ịtụfu akwụkwọ a na-ede. Biko nwaa ọzọ.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Gbaa `kilo remote` na kọmputa gị, ma ọ bụ `/remote` n'ime nnọkọ CLI na-agba ọsọ, iji chịkwaa usoro kilo dị n'ógbè.",
       "bitbucketConnected": "Bitbucket jikọrọ",
       "connectBitbucket": "Jikọọ Bitbucket",
       "connectBitbucketDescription": "Jikọọ Bitbucket na ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa.",

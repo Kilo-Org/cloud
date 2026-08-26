@@ -151,8 +151,8 @@
     "appearanceLight": "روشنی",
     "appearanceDark": "تاریک",
     "account": "اکاؤنٹ",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR جائزوں میں ایپ انتساب شامل کریں",
+    "prReviewAttributionSubtitle": "جائزہ جمع کرتے وقت Reviewed via Kilo فوٹر جوڑیں۔"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",
@@ -2184,7 +2184,7 @@
       "keepEditing": "ترمیم جاری رکھیں",
       "discard": "ضائع کریں",
       "discardFailed": "ڈرافٹ خارج نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "اپنے کمپیوٹر پر `kilo remote` چلائیں، یا چلتی CLI سیشن میں `/remote` چلائیں، مقامی kilo عمل کو کنٹرول کرنے کے لیے۔",
       "bitbucketConnected": "Bitbucket منسلک",
       "connectBitbucket": "Bitbucket منسلک کریں",
       "connectBitbucketDescription": "اپنے براؤزر میں Bitbucket سے جڑیں، پھر ذخیرہ منتخب کرنے کے لیے یہاں واپس آئیں۔",

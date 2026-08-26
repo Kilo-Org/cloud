@@ -151,8 +151,8 @@
     "appearanceLight": "Yorug'",
     "appearanceDark": "Qorong'i",
     "account": "Hisob",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR sharhlariga ilova atributini qo'shish",
+    "prReviewAttributionSubtitle": "Sharh yuborganingizda Reviewed via Kilo taglavhasini qo'shing."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request mavjud emas",
@@ -2184,7 +2184,7 @@
       "keepEditing": "Tahrirlashni davom ettirish",
       "discard": "Bekor qilish",
       "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Kompyuteringizda `kilo remote` buyrug'ini ishga tushiring yoki ishlayotgan CLI sessiyasida `/remote` buyrug'ini ishlatib, mahalliy kilo jarayonini boshqaring.",
       "bitbucketConnected": "Bitbucket ulandi",
       "connectBitbucket": "Bitbucketni ulash",
       "connectBitbucketDescription": "Bitbucket'ga brauzeringizda ulaning, keyin repozitoriy tanlash uchun bu yerga qayting.",

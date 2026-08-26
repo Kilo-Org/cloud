@@ -151,8 +151,8 @@
     "appearanceLight": "Світла",
     "appearanceDark": "Темна",
     "account": "Обліковий запис",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Додати атрибуцію застосунку до перевірок PR",
+    "prReviewAttributionSubtitle": "Додавати нижній колонтитул Reviewed via Kilo, коли надсилаєте перевірку."
   },
   "notifications": {
     "title": "Сповіщення",
@@ -1746,7 +1746,7 @@
       "discardDraftTitle": "Відкинути чернетку?",
       "discardFailed": "Не вдалося відкинути чернетку. Спробуйте ще раз.",
       "keepEditing": "Продовжити редагування",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Виконайте `kilo remote` на своєму комп'ютері або `/remote` у запущеному сеансі CLI, щоб керувати локальним процесом kilo.",
       "bitbucketConnected": "Bitbucket підключено",
       "connectBitbucket": "Підключити Bitbucket",
       "connectBitbucketDescription": "Підключіть Bitbucket у браузері, а потім поверніться сюди, щоб обрати репозиторій.",

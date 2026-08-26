@@ -151,8 +151,8 @@
     "appearanceLight": "Жарық",
     "appearanceDark": "Қараңғы",
     "account": "Тіркелгі",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR рецензияларына қосымшаның атрибуциясын қосу",
+    "prReviewAttributionSubtitle": "Рецензия жібергенде төменге Reviewed via Kilo жолын қосыңыз."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request қолжетімсіз",
@@ -2184,7 +2184,7 @@
       "keepEditing": "Өңдеуді жалғастыру",
       "discard": "Жою",
       "discardFailed": "Жобаны жою мүмкін болмады. Қайталап көріңіз.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Компьютеріңізде `kilo remote` пәрменін орындаңыз немесе іске қосылған CLI сессиясында `/remote` пәрменін пайдаланыңыз — жергілікті kilo процесін басқару үшін.",
       "bitbucketConnected": "Bitbucket қосылды",
       "connectBitbucket": "Bitbucket қосу",
       "connectBitbucketDescription": "Bitbucket-ті браузерде қосыңыз, содан кейін репозиторийді таңдау үшін осында оралыңыз.",

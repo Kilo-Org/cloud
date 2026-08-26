@@ -151,8 +151,8 @@
     "appearanceLight": "हल्का",
     "appearanceDark": "गहरा",
     "account": "खाता",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR समीक्षाओं में ऐप एट्रिब्यूशन जोड़ें",
+    "prReviewAttributionSubtitle": "समीक्षा सबमिट करने पर Reviewed via Kilo फ़ुटर जोड़ें।"
   },
   "notifications": {
     "title": "सूचनाएँ",
@@ -1730,7 +1730,7 @@
       "discardDraftTitle": "ड्राफ़्ट छोड़ें?",
       "discardFailed": "ड्राफ़्ट छोड़ा नहीं जा सका। कृपया फिर से कोशिश करें।",
       "keepEditing": "संपादन जारी रखें",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "अपने कंप्यूटर पर `kilo remote` चलाएं, या चल रहे CLI सत्र में `/remote` चलाएं, ताकि स्थानीय kilo प्रोसेस को नियंत्रित किया जा सके।",
       "bitbucketConnected": "Bitbucket कनेक्टेड",
       "connectBitbucket": "Bitbucket कनेक्ट करें",
       "connectBitbucketDescription": "अपने ब्राउज़र में Bitbucket कनेक्ट करें, फिर रिपॉज़िटरी चुनने के लिए यहाँ लौटें।",

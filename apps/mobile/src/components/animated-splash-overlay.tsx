@@ -12,7 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import logo from '@/../assets/images/logo.png';
+import logo from '@/../assets/images/logo-mark.png';
 import { Image } from '@/components/ui/image';
 import { SPLASH_CONTENT_OVERSCAN, splashContentScale } from '@/components/splash-reveal';
 import { isStartupComplete, subscribeStartupComplete } from '@/lib/startup-timing';
@@ -22,9 +22,8 @@ const LOGO_LOAD_SAFETY_MS = 500;
 
 // Reveal timeline. The logo dips, punches through the viewer and clears the
 // frame, and only then does a disc of the app's own background wipe the yellow
-// away and hand over to the live tree. The logo must finish before the disc
-// overtakes it: `logo.png` carries its own yellow tile, which would otherwise
-// show as a square against the revealed background.
+// away and hand over to the live tree. `logo-mark.png` is a transparent letter
+// mark, so a dropped frame cannot show a yellow or black tile.
 const DIP_MS = 100;
 const DIP_SCALE = 0.9;
 const PUNCH_DELAY_MS = 100;

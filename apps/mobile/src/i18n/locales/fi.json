@@ -151,8 +151,8 @@
     "appearanceLight": "Vaalea",
     "appearanceDark": "Tumma",
     "account": "Tili",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Lisää sovelluksen määrittäminen PR-arvosteluihin",
+    "prReviewAttributionSubtitle": "Liitä Reviewed via Kilo -alaviite, kun lähetät arvostelun."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole käytettävissä",
@@ -2184,7 +2184,7 @@
       "keepEditing": "Jatka muokkausta",
       "discard": "Hylkää",
       "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Suorita `kilo remote` tietokoneellasi tai `/remote` käynnissä olevassa CLI-istunnossa hallitaksesi paikallista kilo-prosessia.",
       "bitbucketConnected": "Bitbucket yhdistetty",
       "connectBitbucket": "Yhdistä Bitbucket",
       "connectBitbucketDescription": "Yhdistä Bitbucket selaimessa ja palaa sitten tähän valitsemaan repositorion.",

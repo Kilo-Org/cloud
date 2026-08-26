@@ -151,8 +151,8 @@
     "appearanceLight": "ਹਲਕਾ",
     "appearanceDark": "ਗੂੜ੍ਹਾ",
     "account": "ਖਾਤਾ",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR ਸਮੀਖਿਆਵਾਂ ਵਿੱਚ ਐਪ ਐਟ੍ਰੀਬਿਊਸ਼ਨ ਸ਼ਾਮਲ ਕਰੋ",
+    "prReviewAttributionSubtitle": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਕਰਨ ਵੇਲੇ Kilo ਰਾਹੀਂ ਸਮੀਖਿਆ ਕੀਤੀ ਫੁੱਟਰ ਜੋੜੋ।"
   },
   "prReview": {
     "pullRequestUnavailable": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ ਹੈ",
@@ -2184,7 +2184,7 @@
       "keepEditing": "ਸੰਪਾਦਨ ਜਾਰੀ ਰੱਖੋ",
       "discard": "ਰੱਦ ਕਰੋ",
       "discardFailed": "ਡਰਾਫਟ ਰੱਦ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "ਆਪਣੇ ਕੰਪਿਊਟਰ 'ਤੇ `kilo remote` ਚਲਾਓ, ਜਾਂ ਚੱਲ ਰਹੇ CLI ਸੈਸ਼ਨ ਵਿੱਚ `/remote` ਚਲਾਓ, ਤਾਂ ਜੋ ਇੱਕ ਸਥਾਨਕ kilo ਪ੍ਰਕਿਰਿਆ ਨੂੰ ਨਿਯੰਤਰਿਤ ਕੀਤਾ ਜਾ ਸਕੇ।",
       "bitbucketConnected": "Bitbucket ਕਨੈਕਟ ਹੋਇਆ",
       "connectBitbucket": "Bitbucket ਕਨੈਕਟ ਕਰੋ",
       "connectBitbucketDescription": "Bitbucket ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",

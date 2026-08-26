@@ -151,8 +151,8 @@
     "appearanceLight": "Licht",
     "appearanceDark": "Donker",
     "account": "Account",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "App-attributie aan PR-reviews toevoegen",
+    "prReviewAttributionSubtitle": "Voeg een 'Reviewed via Kilo'-voettekst toe wanneer je een review indient."
   },
   "notifications": {
     "channel": {
@@ -1730,7 +1730,7 @@
       "discardDraftTitle": "Concept weggooien?",
       "discardFailed": "Kon het concept niet weggooien. Probeer het opnieuw.",
       "keepEditing": "Blijven bewerken",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Voer `kilo remote` uit op je computer, of `/remote` in een actieve CLI-sessie, om een lokaal kilo-proces te besturen.",
       "bitbucketConnected": "Bitbucket verbonden",
       "connectBitbucket": "Bitbucket verbinden",
       "connectBitbucketDescription": "Verbind Bitbucket in uw browser en kom daarna hier terug om een repository te kiezen.",

@@ -151,8 +151,8 @@
     "appearanceLight": "Light",
     "appearanceDark": "Dark",
     "account": "အကောင့်",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR သုံးသပ်ချက်များတွင် app ရင်းမြစ် သတ်မှတ်ခြင်း ထည့်ပါ",
+    "prReviewAttributionSubtitle": "သင်သုံးသပ်ချက် တင်သွင်းသည့်အခါ Reviewed via Kilo footer ကို ထည့်ပါ။"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request မရနိုင်ပါ",
@@ -2184,7 +2184,7 @@
       "keepEditing": "ဆက်တည်းဖြတ်ပါ",
       "discard": "ပယ်ဖျက်ပါ",
       "discardFailed": "မူကြမ်းကို ပယ်ဖျက်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "သင့်ကွန်ပျူတာတွင် `kilo remote` ကို လုပ်ဆောင်ပါ၊ သို့မဟုတ် လည်ပတ်နေသော CLI session တွင် `/remote` ကို လုပ်ဆောင်ပါ။ ဤသည်မှာ local kilo process တစ်ခုကို ထိန်းချုပ်ရန် ဖြစ်သည်။",
       "bitbucketConnected": "Bitbucket ချိတ်ဆက်ပြီး",
       "connectBitbucket": "Bitbucket ချိတ်ဆက်ရန်",
       "connectBitbucketDescription": "သင့်ဘရောက်ဆာတွင် Bitbucket ကို ချိတ်ဆက်ပြီး၊ repository တစ်ခုရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",

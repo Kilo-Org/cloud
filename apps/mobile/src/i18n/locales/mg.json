@@ -151,8 +151,8 @@
     "appearanceLight": "Mazava",
     "appearanceDark": "Maizina",
     "account": "Kaonty",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Ampio ny attribution ny app amin'ny fandinihana PR",
+    "prReviewAttributionSubtitle": "Asio footer \"Reviewed via Kilo\" rehefa mandefa fandinihana ianao."
   },
   "prReview": {
     "pullRequestUnavailable": "Tsy misy ny pull request",
@@ -2184,7 +2184,7 @@
       "keepEditing": "Hanohy fanoratana",
       "discard": "Hanary",
       "discardFailed": "Tsy afaka nandao ny draft. Andramo indray azafady.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Andeha `kilo remote` amin'ny solosainao, na `/remote` ao amin'ny sessio CLI mandeha, mba hifehy ny fandaharana kilo eo an-toerana.",
       "bitbucketConnected": "Mifandray ny Bitbucket",
       "connectBitbucket": "Ampifandraiso ny Bitbucket",
       "connectBitbucketDescription": "Ampifandraiso amin'i Bitbucket ao amin'ny navigateur-nao, dia miverena eto mba hisafidy repository.",

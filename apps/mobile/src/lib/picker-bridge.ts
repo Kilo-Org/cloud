@@ -93,6 +93,13 @@ export type InstancePickerBridge = {
   onSelect: (instance: InstancePickerInstance | null) => void;
 };
 
+type LanguagePickerBridge = {
+  beforeReload?: () => Promise<void>;
+  onApplied?: () => void;
+};
+
+let languageBridge: LanguagePickerBridge | null = null;
+
 export function resolveModelPickerSelection(
   bridge: ModelPickerBridge,
   value: string,
@@ -125,4 +132,16 @@ export function commitModelPickerSelection(
 
   bridge.onSelect(selection);
   return true;
+}
+
+export function setLanguagePickerBridge(bridge: LanguagePickerBridge) {
+  languageBridge = bridge;
+}
+
+export function getLanguagePickerBridge() {
+  return languageBridge;
+}
+
+export function clearLanguagePickerBridge() {
+  languageBridge = null;
 }

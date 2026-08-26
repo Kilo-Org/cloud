@@ -151,8 +151,8 @@
     "appearanceLight": "Iftiin",
     "appearanceDark": "Madow",
     "account": "Xisaabta",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Ku dar astaanta app dib-u-eegista PR",
+    "prReviewAttributionSubtitle": "Ku dheji qoraal 'Reviewed via Kilo' oo hoose markaad gudbiso dib-u-eegis."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ma heli karo",
@@ -2184,7 +2184,7 @@
       "keepEditing": "Sii wad wax ka beddelka",
       "discard": "Tuur",
       "discardFailed": "Qabyada lama tuuri karin. Fadlan mar kale isku day.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Ku socodsii `kilo remote` kombyuutarkaaga, ama `/remote` kalfadhiga CLI ee socda, si aad u xakamayso nidaamka kilo ee maxalliga ah.",
       "bitbucketConnected": "Bitbucket waa ku xiran",
       "connectBitbucket": "Xiri Bitbucket",
       "connectBitbucketDescription": "Ku xiriiray Bitbucket browser-kaaga, ka dibna ku soo noqo halkan si aad u doorato keyd.",

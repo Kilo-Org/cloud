@@ -151,8 +151,8 @@
     "appearanceLight": "Ανοιχτό",
     "appearanceDark": "Σκούρο",
     "account": "Λογαριασμός",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Προσθήκη αναφοράς της εφαρμογής στις ανασκοπήσεις PR",
+    "prReviewAttributionSubtitle": "Προσθέστε μια υποσημείωση «Reviewed via Kilo» όταν υποβάλλετε μια ανασκόπηση."
   },
   "prReview": {
     "pullRequestUnavailable": "Το pull request δεν είναι διαθέσιμο",
@@ -2184,7 +2184,7 @@
       "keepEditing": "Συνέχιση επεξεργασίας",
       "discard": "Απόρριψη",
       "discardFailed": "Δεν ήταν δυνατή η απόρριψη του πρόχειρου. Δοκιμάστε ξανά.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Εκτελέστε το `kilo remote` στον υπολογιστή σας ή το `/remote` σε μια ενεργή συνεδρία CLI, για να ελέγξετε μια τοπική διαδικασία kilo.",
       "bitbucketConnected": "Το Bitbucket συνδέθηκε",
       "connectBitbucket": "Σύνδεση Bitbucket",
       "connectBitbucketDescription": "Συνδέστε το Bitbucket στο πρόγραμμα περιήγησης και μετά επιστρέψτε εδώ για να επιλέξετε ένα αποθετήριο.",

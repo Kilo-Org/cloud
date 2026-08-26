@@ -1722,7 +1722,7 @@
       "discardDraftTitle": "Scartare la bozza?",
       "discardFailed": "Impossibile scartare la bozza. Riprova.",
       "keepEditing": "Continua a modificare",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Esegui `kilo remote` sul tuo computer, oppure `/remote` in una sessione CLI attiva, per controllare un processo kilo locale.",
       "bitbucketConnected": "Bitbucket connesso",
       "connectBitbucket": "Connetti Bitbucket",
       "connectBitbucketDescription": "Connetti Bitbucket nel browser, poi torna qui per scegliere un repository.",
@@ -2218,8 +2218,8 @@
     "appearanceLight": "Chiaro",
     "appearanceDark": "Scuro",
     "account": "Account",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Aggiungi l'attribuzione dell'app alle revisioni PR",
+    "prReviewAttributionSubtitle": "Aggiungi un footer \"Recensito tramite Kilo\" quando invii una recensione."
   },
   "addCredits": {
     "cta": "Aggiungi crediti",

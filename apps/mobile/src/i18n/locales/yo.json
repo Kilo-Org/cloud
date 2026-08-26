@@ -151,8 +151,8 @@
     "appearanceLight": "Imọlẹ",
     "appearanceDark": "Dudu",
     "account": "Àkọọ́lẹ̀",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Fi àtọ̀tọ̀ app kun si àwọn àtúnyẹ̀wò PR",
+    "prReviewAttributionSubtitle": "Fi àtẹ̀lẹ̀ 'Reviewed via Kilo' kun nígbà tí o bá fi àtúnyẹ̀wò sílẹ̀."
   },
   "prReview": {
     "pullRequestUnavailable": "Ibeere fifa ko si",
@@ -2184,7 +2184,7 @@
       "keepEditing": "Tẹsiwaju ṣatunkọ",
       "discard": "Jù silẹ",
       "discardFailed": "Ko le fi osere silẹ. Jọwọ gbiyanju lẹẹkansi.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Ṣiṣẹ́ `kilo remote` lórí kọ̀mpútà rẹ, tàbí `/remote` nínú sẹ́siọ́n CLI tó ń lọ, láti ṣàkóso ìlànà kilo àdúgbò.",
       "bitbucketConnected": "Bitbucket ti sopọ̀",
       "connectBitbucket": "Sopọ̀ Bitbucket",
       "connectBitbucketDescription": "So Bitbucket pọ ninu browser rẹ, lẹhinna pada sibi lati yan ibi ipamọ data.",

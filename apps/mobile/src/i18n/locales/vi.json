@@ -151,8 +151,8 @@
     "appearanceLight": "Sáng",
     "appearanceDark": "Tối",
     "account": "Tài khoản",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Thêm ghi công ứng dụng vào các đánh giá PR",
+    "prReviewAttributionSubtitle": "Thêm chân trang Reviewed via Kilo khi bạn gửi đánh giá."
   },
   "notifications": {
     "title": "Thông báo",
@@ -1730,7 +1730,7 @@
       "discardDraftTitle": "Hủy bản nháp?",
       "discardFailed": "Không thể hủy bản nháp. Vui lòng thử lại.",
       "keepEditing": "Tiếp tục chỉnh sửa",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Chạy `kilo remote` trên máy tính của bạn, hoặc `/remote` trong một phiên CLI đang chạy, để điều khiển một tiến trình kilo cục bộ.",
       "bitbucketConnected": "Đã kết nối Bitbucket",
       "connectBitbucket": "Kết nối Bitbucket",
       "connectBitbucketDescription": "Kết nối Bitbucket trong trình duyệt của bạn, rồi quay lại đây để chọn một kho lưu trữ.",

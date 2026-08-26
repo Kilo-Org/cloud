@@ -8,6 +8,11 @@ describe('isPrivacyCoverRoute', () => {
     expect(isPrivacyCoverRoute(['(auth)', 'login'])).toBe(true);
   });
 
+  it('covers language pickers above login and preferences', () => {
+    expect(isPrivacyCoverRoute(['(auth)', 'language-picker'])).toBe(true);
+    expect(isPrivacyCoverRoute(['(app)', 'language-picker'])).toBe(true);
+  });
+
   it('covers the agent-chat route', () => {
     expect(isPrivacyCoverRoute(['agent-chat'])).toBe(true);
     expect(isPrivacyCoverRoute(['agent-chat', '[session-id]'])).toBe(true);

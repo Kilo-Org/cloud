@@ -151,8 +151,8 @@
     "appearanceLight": "Cerah",
     "appearanceDark": "Gelap",
     "account": "Akaun",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Tambahkan atribusi aplikasi kepada semakan PR",
+    "prReviewAttributionSubtitle": "Tambahkan pengaki Reviewed via Kilo apabila anda menghantar semakan."
   },
   "prReview": {
     "pullRequestUnavailable": "Permintaan tarik tidak tersedia",
@@ -2184,7 +2184,7 @@
       "keepEditing": "Teruskan mengedit",
       "discard": "Buang",
       "discardFailed": "Tidak dapat membuang draf. Sila cuba lagi.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Jalankan `kilo remote` pada komputer anda, atau `/remote` dalam sesi CLI yang berjalan, untuk mengawal proses kilo tempatan.",
       "bitbucketConnected": "Bitbucket disambungkan",
       "connectBitbucket": "Sambung Bitbucket",
       "connectBitbucketDescription": "Sambung Bitbucket dalam penyemak imbas anda, kemudian kembali ke sini untuk memilih repositori.",

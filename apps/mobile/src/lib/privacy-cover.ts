@@ -13,6 +13,7 @@ const HOME_SEGMENT = '(0_home)';
 const PROFILE_SEGMENT = '(3_profile)';
 const COVERED_TOKENS: ReadonlySet<string> = new Set([
   'login',
+  'language-picker',
   'agent-chat',
   'pr-review',
   'kilo-pass',

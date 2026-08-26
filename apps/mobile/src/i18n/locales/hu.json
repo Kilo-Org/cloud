@@ -151,8 +151,8 @@
     "appearanceLight": "Világos",
     "appearanceDark": "Sötét",
     "account": "Fiók",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Alkalmazás-hozzárendelés hozzáadása a PR-ellenőrzésekhez",
+    "prReviewAttributionSubtitle": "A 'Reviewed via Kilo' lábléc hozzáfűzése, amikor ellenőrzést küld el."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nem érhető el",
@@ -2184,7 +2184,7 @@
       "keepEditing": "Szerkesztés folytatása",
       "discard": "Elvetés",
       "discardFailed": "A piszkozat elvetése nem sikerült. Próbálja újra.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "A helyi kilo folyamat vezérléséhez futtassa a(z) `kilo remote` parancsot a számítógépén, vagy a(z) `/remote` parancsot egy futó CLI-munkamenetben.",
       "bitbucketConnected": "Bitbucket csatlakoztatva",
       "connectBitbucket": "Bitbucket csatlakoztatása",
       "connectBitbucketDescription": "Csatlakoztasd a Bitbucketet a böngésződben, majd térj vissza ide a tároló kiválasztásához.",

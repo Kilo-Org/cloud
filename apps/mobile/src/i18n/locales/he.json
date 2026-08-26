@@ -151,8 +151,8 @@
     "appearanceLight": "בהיר",
     "appearanceDark": "כהה",
     "account": "חשבון",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "הוסף שיוך אפליקציה לסקירות PR",
+    "prReviewAttributionSubtitle": "הוסף כותרת תחתונה של 'נסקר דרך Kilo' כשאתה שולח סקירה."
   },
   "notifications": {
     "title": "התראות",
@@ -1738,7 +1738,7 @@
       "discardDraftTitle": "לבטל את הטיוטה?",
       "discardFailed": "לא ניתן היה לבטל את הטיוטה. נסה שוב.",
       "keepEditing": "המשך לערוך",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "הרץ את `kilo remote` במחשב שלך, או `/remote` בהפעלת CLI פעילה, כדי לשלוט בתהליך kilo מקומי.",
       "bitbucketConnected": "Bitbucket מחובר",
       "connectBitbucket": "חבר את Bitbucket",
       "connectBitbucketDescription": "חבר את Bitbucket בדפדפן, ולאחר מכן חזור לכאן כדי לבחור מאגר.",

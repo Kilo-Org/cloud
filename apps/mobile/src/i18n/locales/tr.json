@@ -151,8 +151,8 @@
     "appearanceLight": "Açık",
     "appearanceDark": "Koyu",
     "account": "Hesap",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR incelemelerine uygulama atfı ekle",
+    "prReviewAttributionSubtitle": "İnceleme gönderdiğinde 'Kilo ile incelendi' alt bilgisi ekle"
   },
   "notifications": {
     "title": "Bildirimler",
@@ -1730,7 +1730,7 @@
       "discardDraftTitle": "Taslak silinsin mi?",
       "discardFailed": "Taslak silinemedi. Lütfen tekrar deneyin.",
       "keepEditing": "Düzenlemeye devam et",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Bilgisayarınızda `kilo remote` çalıştırın veya çalışan bir CLI oturumunda `/remote` kullanarak yerel bir kilo sürecini kontrol edin.",
       "bitbucketConnected": "Bitbucket bağlandı",
       "connectBitbucket": "Bitbucket'e bağlan",
       "connectBitbucketDescription": "Bitbucket'ı tarayıcınızda bağlayın, ardından bir depo seçmek için buraya dönün.",

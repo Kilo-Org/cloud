@@ -151,8 +151,8 @@
     "appearanceLight": "ライト",
     "appearanceDark": "ダーク",
     "account": "アカウント",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PRレビューにアプリの帰属を追加",
+    "prReviewAttributionSubtitle": "レビューを送信すると、Reviewed via Kiloフッターが追加されます。"
   },
   "notifications": {
     "title": "通知",
@@ -1730,7 +1730,7 @@
       "discardDraftTitle": "下書きを破棄しますか？",
       "discardFailed": "下書きを破棄できませんでした。もう一度お試しください。",
       "keepEditing": "編集を続ける",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "コンピューターで`kilo remote`を実行するか、実行中のCLIセッションで`/remote`を実行して、ローカルのkiloプロセスを制御します。",
       "bitbucketConnected": "Bitbucket接続済み",
       "connectBitbucket": "Bitbucketを接続",
       "connectBitbucketDescription": "ブラウザで Bitbucket に接続し、この画面に戻ってリポジトリを選択してください。",

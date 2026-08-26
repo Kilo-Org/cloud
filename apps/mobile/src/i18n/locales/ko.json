@@ -151,8 +151,8 @@
     "appearanceLight": "밝음",
     "appearanceDark": "어두움",
     "account": "계정",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR 리뷰에 앱 표시 정보 추가",
+    "prReviewAttributionSubtitle": "리뷰를 제출할 때 Reviewed via Kilo 푸터를 추가합니다."
   },
   "notifications": {
     "title": "알림",
@@ -1730,7 +1730,7 @@
       "discardDraftTitle": "초안을 삭제할까요?",
       "discardFailed": "초안을 삭제할 수 없습니다. 다시 시도하세요.",
       "keepEditing": "계속 수정",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "컴퓨터에서 `kilo remote`를 실행하거나 실행 중인 CLI 세션에서 `/remote`를 사용하여 로컬 kilo 프로세스를 제어하세요.",
       "bitbucketConnected": "Bitbucket 연결됨",
       "connectBitbucket": "Bitbucket 연결",
       "connectBitbucketDescription": "브라우저에서 Bitbucket을 연결한 후 여기로 돌아와 저장소를 선택하세요.",

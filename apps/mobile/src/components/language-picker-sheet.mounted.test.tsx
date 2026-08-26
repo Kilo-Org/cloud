@@ -1,12 +1,15 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as image-viewer-modal.mounted.test.tsx) */
-/* eslint-disable max-lines -- the apply and back-handler suites share one mock harness in this file */
+/* eslint-disable max-lines -- the apply and retry suites share one mock harness in this file */
 import { createElement, Fragment, type ReactNode } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { toast } from 'sonner-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { applyLanguagePreference } from '@/i18n/apply-language';
+import type * as ApplyLanguageModule from '@/i18n/apply-language';
 import { LanguagePickerSheet } from '@/components/language-picker-sheet';
+import { emitPrivacyCover } from '@/lib/privacy-cover-events';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -14,25 +17,13 @@ const reloadAppAsync = vi.hoisted(() => vi.fn());
 const setLanguagePreferenceAsync = vi.hoisted(() => vi.fn());
 const writeLanguageReturnTarget = vi.hoisted(() => vi.fn());
 const renameAndroidNotificationChannels = vi.hoisted(() => vi.fn());
-const platform = vi.hoisted(() => ({ OS: 'android' as 'android' | 'ios' }));
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
-const keyboard = vi.hoisted(() => {
-  const listeners = new Map<string, (event?: { endCoordinates: { height: number } }) => void>();
-  return {
-    listeners,
-    addListener: vi.fn(
-      (event: string, listener: (event?: { endCoordinates: { height: number } }) => void) => {
-        listeners.set(event, listener);
-        return { remove: vi.fn(() => listeners.delete(event)) };
-      }
-    ),
-  };
-});
 const i18nManager = vi.hoisted(() => ({
   allowRTL: vi.fn(),
   isRTL: false,
   forceRTL: vi.fn(),
 }));
+const navigation = vi.hoisted(() => ({ dispatch: vi.fn() }));
 // FlatList renders through a callback, so a host-string mock would drop every
 // row. This mock calls the render props so the row assertions still see rows.
 const flatListMock = vi.hoisted(
@@ -59,30 +50,39 @@ const flatListMock = vi.hoisted(
 );
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   FlatList: flatListMock,
-  Keyboard: keyboard,
-  Modal: 'Modal',
-  Platform: platform,
-  Pressable: 'Pressable',
-  ScrollView: 'ScrollView',
+  I18nManager: i18nManager,
   TextInput: 'TextInput',
   View: 'View',
-  I18nManager: i18nManager,
 }));
-vi.mock('react-native-reanimated', () => ({
-  default: { View: 'Animated.View' },
-  FadeIn: { duration: vi.fn() },
-  FadeOut: { duration: vi.fn() },
-  SlideInDown: { duration: vi.fn() },
-  SlideOutDown: { duration: vi.fn() },
-}));
+vi.mock('expo-router', async () => {
+  const { useEffect } = await import('react');
+  return {
+    useNavigation: () => navigation,
+    // Run the focus effect once on mount, like react-navigation's first focus.
+    useFocusEffect: (effect: () => void) => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- run the focus effect once on mount, like react-navigation's first focus
+      useEffect(effect, []);
+    },
+  };
+});
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
-vi.mock('@rn-primitives/portal', () => ({ Portal: 'Portal' }));
 vi.mock('expo', () => ({ reloadAppAsync }));
+vi.mock('@/lib/navigation/prevent-remove', () => ({
+  usePreventRemove: () => undefined,
+}));
+vi.mock('@/i18n/apply-language', async importOriginal => {
+  const actual = await importOriginal<typeof ApplyLanguageModule>();
+  return {
+    ...actual,
+    // Wrap the real implementation so the Cancel test can assert it never runs
+    // while every other suite still exercises the real outcomes.
+    applyLanguagePreference: vi.fn(actual.applyLanguagePreference),
+  };
+});
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/picker-sheet', () => ({ PickerSheet: 'PickerSheet' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
@@ -142,7 +142,6 @@ async function mountSheet(
   await act(async () => {
     ref.current = TestRenderer.create(
       createElement(LanguagePickerSheet, {
-        visible: true,
         onClose,
         returnTarget: 'login',
         beforeReload,
@@ -166,6 +165,7 @@ async function applySelection(
   act(() => {
     (findChoiceRow(renderer.root, endonym).props.onPress as () => void)();
   });
+  expect(applyLanguagePreference).not.toHaveBeenCalled();
   const sheet = findByType(renderer.root, 'PickerSheet')[0];
   if (!sheet) {
     throw new Error('PickerSheet not found');
@@ -188,64 +188,15 @@ describe('LanguagePickerSheet apply', () => {
     setLanguagePreferenceAsync.mockResolvedValue(true);
     reloadAppAsync.mockReset();
     writeLanguageReturnTarget.mockReset();
-    platform.OS = 'android';
     insets.bottom = 0;
-    keyboard.listeners.clear();
-    keyboard.addListener.mockClear();
     i18nManager.isRTL = false;
     i18nManager.forceRTL.mockReset();
+    vi.mocked(applyLanguagePreference).mockClear();
     vi.mocked(toast.error).mockClear();
   });
 
   afterEach(async () => {
     await i18n.changeLanguage('en');
-  });
-
-  it('keeps the Android sheet above the keyboard and navigation inset', async () => {
-    insets.bottom = 24;
-    const renderer = await mountSheet(vi.fn<() => void>());
-    const overlay = findByType(renderer.root, 'View').find(
-      node => node.props.className === 'flex-1 justify-end bg-[#00000066]'
-    );
-    if (!overlay) {
-      throw new Error('keyboard-aware sheet overlay not found');
-    }
-
-    expect(overlay.props.style).toEqual([undefined, { paddingBottom: 0 }]);
-    expect(keyboard.addListener).toHaveBeenCalledWith('keyboardDidShow', expect.any(Function));
-
-    act(() => {
-      keyboard.listeners.get('keyboardDidShow')?.({ endCoordinates: { height: 240 } });
-    });
-    expect(overlay.props.style).toEqual([undefined, { paddingBottom: 264 }]);
-
-    act(() => {
-      keyboard.listeners.get('keyboardDidHide')?.();
-    });
-    expect(overlay.props.style).toEqual([undefined, { paddingBottom: 0 }]);
-
-    renderer.unmount();
-  });
-
-  it('keeps the iOS sheet above the keyboard without adding its safe-area inset', async () => {
-    platform.OS = 'ios';
-    insets.bottom = 24;
-    const renderer = await mountSheet(vi.fn<() => void>());
-    const overlay = findByType(renderer.root, 'View').find(
-      node => node.props.className === 'flex-1 justify-end bg-[#00000066]'
-    );
-    if (!overlay) {
-      throw new Error('keyboard-aware sheet overlay not found');
-    }
-
-    expect(keyboard.addListener).toHaveBeenCalledWith('keyboardWillShow', expect.any(Function));
-
-    act(() => {
-      keyboard.listeners.get('keyboardWillShow')?.({ endCoordinates: { height: 240 } });
-    });
-    expect(overlay.props.style).toEqual([undefined, { paddingBottom: 240 }]);
-
-    renderer.unmount();
   });
 
   it('shows the standard empty state when the search matches no languages', async () => {
@@ -276,7 +227,19 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
-  it('applies an LTR language in place without reloading the app', async () => {
+  it('preserves horizontal padding and the safe-area inset', async () => {
+    insets.bottom = 24;
+    const renderer = await mountSheet(vi.fn<() => void>());
+    const list = renderer.root.findByType(flatListMock);
+
+    expect(list.props.contentContainerClassName).toBe('px-4 pb-4');
+    expect(list.props.contentContainerStyle).toBeUndefined();
+    expect(list.props.ListFooterComponent).toMatchObject({ props: { style: { height: 24 } } });
+
+    renderer.unmount();
+  });
+
+  it('applies an LTR language on Done without reloading the app', async () => {
     const onClose = vi.fn<() => void>();
     const renderer = await applySelection(onClose, 'Español');
 
@@ -284,6 +247,102 @@ describe('LanguagePickerSheet apply', () => {
     expect(i18n.language).toBe('es');
     expect(reloadAppAsync).not.toHaveBeenCalled();
     expect(i18nManager.forceRTL).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('waits for Done before applying a language that changes direction', async () => {
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+
+    act(() => {
+      (findChoiceRow(renderer.root, 'العربية').props.onPress as () => void)();
+    });
+
+    expect(applyLanguagePreference).not.toHaveBeenCalled();
+    expect(setLanguagePreferenceAsync).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!sheet) {
+      throw new Error('PickerSheet not found');
+    }
+    await act(async () => {
+      (sheet.props.onDone as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it.each(['Cancel', 'back/swipe'])(
+    '%s discards a same-direction language selection',
+    async dismissal => {
+      const onClose = vi.fn<() => void>();
+      const renderer = await mountSheet(onClose);
+
+      await act(async () => {
+        (findChoiceRow(renderer.root, 'Español').props.onPress as () => void)();
+        await Promise.resolve();
+      });
+
+      if (dismissal === 'Cancel') {
+        const sheet = findByType(renderer.root, 'PickerSheet')[0];
+        if (!sheet) {
+          throw new Error('PickerSheet not found');
+        }
+        act(() => {
+          (sheet.props.onCancel as () => void)();
+        });
+      }
+      act(() => {
+        renderer.unmount();
+      });
+
+      expect(onClose).toHaveBeenCalledTimes(dismissal === 'Cancel' ? 1 : 0);
+      expect(applyLanguagePreference).not.toHaveBeenCalled();
+      expect(setLanguagePreferenceAsync).not.toHaveBeenCalled();
+      expect(i18n.language).toBe('en');
+      expect(reloadAppAsync).not.toHaveBeenCalled();
+    }
+  );
+
+  it('closes once when privacy coverage interrupts a language change', async () => {
+    const pendingWrite = Promise.withResolvers<boolean>();
+    setLanguagePreferenceAsync.mockReturnValueOnce(pendingWrite.promise);
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+
+    act(() => {
+      (findChoiceRow(renderer.root, 'Español').props.onPress as () => void)();
+    });
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!sheet) {
+      throw new Error('PickerSheet not found');
+    }
+    await act(async () => {
+      (sheet.props.onDone as () => void)();
+      await Promise.resolve();
+    });
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es', 'en');
+    expect(onClose).not.toHaveBeenCalled();
+
+    act(() => {
+      emitPrivacyCover();
+      emitPrivacyCover();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      pendingWrite.resolve(true);
+      await pendingWrite.promise;
+    });
     expect(onClose).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
@@ -346,51 +405,6 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
-  it('lets Android back cancel the sheet when idle', async () => {
-    const onClose = vi.fn<() => void>();
-    const renderer = await mountSheet(onClose);
-
-    const modal = findByType(renderer.root, 'Modal')[0];
-    if (!modal) {
-      throw new Error('Modal not found');
-    }
-    act(() => {
-      (modal.props.onRequestClose as () => void)();
-    });
-    expect(onClose).toHaveBeenCalledTimes(1);
-
-    renderer.unmount();
-  });
-
-  it('keeps the back handler registered across an onClose identity change', async () => {
-    const onCloseFirst = vi.fn<() => void>();
-    const renderer = await mountSheet(onCloseFirst);
-
-    const onCloseSecond = vi.fn<() => void>();
-    await act(async () => {
-      renderer.update(
-        createElement(LanguagePickerSheet, {
-          visible: true,
-          onClose: onCloseSecond,
-          returnTarget: 'login',
-        })
-      );
-      await Promise.resolve();
-    });
-
-    const modal = findByType(renderer.root, 'Modal')[0];
-    if (!modal) {
-      throw new Error('Modal not found');
-    }
-    act(() => {
-      (modal.props.onRequestClose as () => void)();
-    });
-    expect(onCloseFirst).not.toHaveBeenCalled();
-    expect(onCloseSecond).toHaveBeenCalledTimes(1);
-
-    renderer.unmount();
-  });
-
   it('keeps Retry as the only action when the reload fails', async () => {
     reloadAppAsync.mockRejectedValue(new Error('reload failed'));
     const onClose = vi.fn<() => void>();
@@ -401,26 +415,6 @@ describe('LanguagePickerSheet apply', () => {
       throw new Error('PickerSheet not found');
     }
     expect(failedSheet.props.onCancel).toBeUndefined();
-
-    const backdrop = findByType(renderer.root, 'Pressable').find(
-      node => node.props.accessibilityLabel === 'Cancel'
-    );
-    if (!backdrop) {
-      throw new Error('backdrop Pressable not found');
-    }
-    act(() => {
-      (backdrop.props.onPress as () => void)();
-    });
-    expect(onClose).not.toHaveBeenCalled();
-
-    const modal = findByType(renderer.root, 'Modal')[0];
-    if (!modal) {
-      throw new Error('Modal not found');
-    }
-    act(() => {
-      (modal.props.onRequestClose as () => void)();
-    });
-    expect(onClose).not.toHaveBeenCalled();
 
     renderer.unmount();
   });
@@ -451,7 +445,7 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
-  it('applies a same-direction RTL language in place without reloading', async () => {
+  it('applies a same-direction RTL language on Done without reloading', async () => {
     i18nManager.isRTL = true;
     const onClose = vi.fn<() => void>();
     const renderer = await applySelection(onClose, 'العربية');

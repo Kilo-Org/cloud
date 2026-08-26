@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { applyLanguagePreference } from '@/i18n/apply-language';
+import type * as ApplyLanguageModule from '@/i18n/apply-language';
 import { LanguagePickerSheet } from '@/components/language-picker-sheet';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
@@ -59,6 +60,7 @@ vi.mock('expo-router', async () => {
     useNavigation: () => navigation,
     // Run the focus effect once on mount, like react-navigation's first focus.
     useFocusEffect: (effect: () => void) => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- run the focus effect once on mount, like react-navigation's first focus
       useEffect(effect, []);
     },
   };
@@ -72,7 +74,7 @@ vi.mock('@/lib/navigation/prevent-remove', () => ({
   usePreventRemove: () => undefined,
 }));
 vi.mock('@/i18n/apply-language', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/i18n/apply-language')>();
+  const actual = await importOriginal<typeof ApplyLanguageModule>();
   return {
     ...actual,
     // Wrap the real implementation so the Cancel test can assert it never runs

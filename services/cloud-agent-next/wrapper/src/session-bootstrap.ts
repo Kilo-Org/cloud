@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -332,23 +333,7 @@ function isHelperBackedRemote(
 ): boolean {
   if (repo.kind === 'github') return true;
   if (repo.platform === 'gitlab' || repo.platform === 'bitbucket') return true;
-  return repo.platform === 'github' && Boolean(env.GH_TOKEN);
-}
-
-function cloneGitUrl(
-  repo: NonNullable<WrapperSessionReadyRequest['repo']>,
-  env: WrapperSessionReadyRequest['materialized']['env']
-): string {
-  const canonical = canonicalGitUrl(repo);
-  if (isHelperBackedRemote(repo, env) || !repo.token) return canonical;
-  try {
-    const url = new URL(canonical);
-    url.username = 'x-access-token';
-    url.password = repo.token;
-    return url.toString();
-  } catch {
-    return canonical;
-  }
+  return Boolean(repo.token) || (repo.platform === 'github' && Boolean(env.GH_TOKEN));
 }
 
 async function exists(filePath: string): Promise<boolean> {
@@ -366,6 +351,55 @@ function gitBootstrapMarkerPath(workspacePath: string): string {
 
 function sessionAuthFilePath(sessionHome: string): string {
   return path.join(sessionHome, '.local/share/kilo/auth.json');
+}
+
+async function materializeRepositoryCredentials(
+  request: WrapperSessionReadyRequest
+): Promise<void> {
+  const credentialsPath = path.join(
+    request.workspace.sessionHome,
+    '.local/share/kilo/cloud-agent/git-credentials'
+  );
+  const repo = request.repo;
+  if (!repo?.token) {
+    await fs.rm(credentialsPath, { force: true });
+    return;
+  }
+
+  const repositoryUrl = repo.kind === 'github' ? new URL('https://github.com') : new URL(repo.url);
+  if (repositoryUrl.protocol !== 'https:' || !repositoryUrl.host) {
+    throw new Error('Repository Git credentials require an HTTPS URL');
+  }
+
+  const username =
+    repo.kind === 'git' && repo.platform === 'gitlab'
+      ? 'oauth2'
+      : repo.kind === 'git' && repo.platform === 'bitbucket'
+        ? 'x-token-auth'
+        : 'x-access-token';
+  const values = ['https', repositoryUrl.host, username, repo.token];
+  if (values.some(value => value.includes('\r') || value.includes('\n') || value.includes('\0'))) {
+    throw new Error('Repository Git credentials contain invalid characters');
+  }
+
+  const credentials = `protocol=https\nhost=${repositoryUrl.host}\nusername=${username}\npassword=${repo.token}\n`;
+  const credentialsDirectory = path.dirname(credentialsPath);
+  await fs.mkdir(credentialsDirectory, { recursive: true, mode: 0o700 });
+  await fs.chmod(credentialsDirectory, 0o700);
+  const temporaryPath = path.join(credentialsDirectory, `git-credentials.${randomUUID()}.tmp`);
+
+  try {
+    const handle = await fs.open(temporaryPath, 'wx', 0o600);
+    try {
+      await handle.writeFile(credentials, 'utf8');
+    } finally {
+      await handle.close();
+    }
+    await fs.rename(temporaryPath, credentialsPath);
+  } catch (error) {
+    await fs.rm(temporaryPath, { force: true }).catch(() => {});
+    throw error;
+  }
 }
 
 // The marker is removed before re-bootstrapping and written only after restore
@@ -430,9 +464,6 @@ function hasBitbucketReviewCapability(request: WrapperSessionReadyRequest): bool
 function isBloblessReviewCloneEligible(request: WrapperSessionReadyRequest): boolean {
   if (!isCodeReviewSession(request)) return false;
   const repo = request.repo;
-  // GitHub/GitLab and capability-backed Bitbucket authenticate lazy blob
-  // fetches via the credential helper. Other/unknown git remotes have no such
-  // guarantee, so they keep a full clone.
   if (repo?.kind === 'github') return true;
   if (repo?.kind === 'git' && repo.platform === 'gitlab') return true;
   return hasBitbucketReviewCapability(request);
@@ -449,7 +480,7 @@ async function cloneRepository(
     throw new Error('Session metadata is missing a repository source');
   }
 
-  const repoUrl = cloneGitUrl(repo, request.materialized.env);
+  const repoUrl = canonicalGitUrl(repo);
   const platform = repo.kind === 'git' ? repo.platform : 'github';
   // Code review reads changed files from the working tree and gets the PR diff
   // from the provider API or a local `git diff <prev>..HEAD`. It needs the full
@@ -1184,6 +1215,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
     }
 
     await ensureWorkspaceDirectories(request);
+    await materializeRepositoryCredentials(request);
     signal.throwIfAborted();
 
     if (workspaceNeedsBootstrap) {

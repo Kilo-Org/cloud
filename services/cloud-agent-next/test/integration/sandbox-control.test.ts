@@ -6,7 +6,13 @@ import {
   hashSandboxCredential,
 } from '../../src/sandbox-control/credential.js';
 import { DEADLINE_MS } from '../../src/sandbox-control/deadlines.js';
-import { loadDeadlines, saveDeadlines } from '../../src/sandbox-control/durable-state.js';
+import {
+  loadDeadlines,
+  loadRouteTable,
+  saveDeadlines,
+  saveRouteTable,
+} from '../../src/sandbox-control/durable-state.js';
+import { applyReportedSessionState } from '../../src/sandbox-control/session-routes.js';
 import type { SessionMessageRecord } from '../../src/sandbox-session/session-message-queue.js';
 import { createEventQueries } from '../../src/session/queries/index.js';
 import {
@@ -405,6 +411,44 @@ describe('SandboxControl durable remainder', () => {
     });
   });
 
+  it('rearms idle stop when its final active session is detached', async () => {
+    const stub = env.SANDBOX_CONTROL.getByName('sbx_control_detach_last_active');
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.initializeOwner('owner_1');
+      await instance.claimCreate('intent_detach_last_active');
+      await instance.confirmInstance('inst_1');
+      await instance.attachSession({
+        sessionId: 'workspace_last_active',
+        kiloSessionId: 'kilo_last_active',
+        directory: '/workspace/last-active',
+        ownerId: 'owner_1',
+      });
+      const routes = await loadRouteTable(state.storage);
+      applyReportedSessionState(
+        routes,
+        'kilo_last_active',
+        { state: 'active', idleForMs: 0 },
+        Date.now()
+      );
+      await saveRouteTable(state.storage, routes);
+      expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
+
+      const detachedAt = Date.now();
+      await expect(instance.detachSession('workspace_last_active')).resolves.toEqual({
+        existed: true,
+      });
+      const idleStop = (await loadDeadlines(state.storage)).idleStop;
+      expect(idleStop).toBeGreaterThanOrEqual(detachedAt + DEADLINE_MS.idleStop);
+      await expect(instance.listRoutes()).resolves.toEqual([]);
+      await expect(instance.getPhysicalRecord()).resolves.toMatchObject({ state: 'running' });
+
+      await expect(instance.detachSession('workspace_last_active')).resolves.toEqual({
+        existed: false,
+      });
+      expect((await loadDeadlines(state.storage)).idleStop).toBe(idleStop);
+    });
+  });
+
   it('projects shutting-down after beginStop and retains the tombstone without a ref', async () => {
     const stub = env.SANDBOX_CONTROL.getByName('sbx_control_stop_tombstone');
     await runInDurableObject(stub, async instance => {
@@ -645,6 +689,112 @@ describe('SandboxControl durable remainder', () => {
 });
 
 describe('SandboxSession control-plane regressions', () => {
+  it('aborts and detaches a deleted session without stopping active sibling work', async () => {
+    const userId = 'user_control_delete';
+    const sessionId = 'workspace_control_deleted';
+    const siblingSessionId = 'workspace_control_sibling';
+    const controlId = 'usr-de1e7ed';
+    const credential = generateSandboxCredential();
+    const control = env.SANDBOX_CONTROL.getByName(controlId);
+    await runInDurableObject(control, async (instance, state) => {
+      await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
+      await instance.initializeOwner(userId);
+      await instance.claimCreate('intent_shared_delete');
+      await instance.confirmInstance('inst_1');
+      await instance.attachSession({
+        sessionId,
+        kiloSessionId: 'kilo_deleted',
+        directory: '/workspace/deleted',
+        ownerId: userId,
+      });
+      await instance.attachSession({
+        sessionId: siblingSessionId,
+        kiloSessionId: 'kilo_sibling',
+        directory: '/workspace/sibling',
+        ownerId: userId,
+      });
+      const routes = await loadRouteTable(state.storage);
+      for (const kiloSessionId of ['kilo_deleted', 'kilo_sibling']) {
+        applyReportedSessionState(
+          routes,
+          kiloSessionId,
+          { state: 'active', idleForMs: 0 },
+          Date.now()
+        );
+      }
+      await saveRouteTable(state.storage, routes);
+    });
+
+    const session = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
+    await runInDurableObject(session, async (instance, state) => {
+      await instance.registerSession({
+        identity: { sessionId, userId },
+        auth: { kiloSessionId: 'kilo_deleted' },
+        agent: { mode: 'code', model: 'test' },
+        workspace: { sandboxId: controlId, workspacePath: '/workspace/deleted' },
+      });
+      await state.storage.put('session_messages', [
+        {
+          messageId: 'msg_deleted',
+          state: 'accepted',
+          acceptedAt: 1,
+          lastActivityAt: 1,
+        } satisfies SessionMessageRecord,
+      ]);
+    });
+
+    const ws = await connect(credential, controlId);
+    await completeHello(ws, 'hello-shared-delete');
+    const abortRequests: {
+      operation: string;
+      session: { sessionId: string; kiloSessionId: string; directory: string };
+    }[] = [];
+    ws.addEventListener('message', event => {
+      const request = JSON.parse(String(event.data)) as {
+        operation?: string;
+        requestId: string;
+        session: { sessionId: string; kiloSessionId: string; directory: string };
+      };
+      if (request.operation !== 'session.abort') return;
+      abortRequests.push({ operation: request.operation, session: request.session });
+      ws.send(
+        JSON.stringify({
+          type: 'response',
+          requestId: request.requestId,
+          ok: true,
+          result: { status: 'aborted' },
+        })
+      );
+    });
+
+    await runInDurableObject(session, instance => instance.deleteSession());
+    await runInDurableObject(control, async (instance, state) => {
+      await expect(instance.listRoutes()).resolves.toEqual([
+        expect.objectContaining({
+          sessionId: siblingSessionId,
+          kiloSessionId: 'kilo_sibling',
+          lastState: 'active',
+        }),
+      ]);
+      await expect(instance.getPhysicalRecord()).resolves.toMatchObject({ state: 'running' });
+      expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
+    });
+    await runInDurableObject(session, async instance => {
+      await expect(instance.getMetadata()).resolves.toBeNull();
+    });
+    expect(abortRequests).toEqual([
+      {
+        operation: 'session.abort',
+        session: {
+          sessionId,
+          kiloSessionId: 'kilo_deleted',
+          directory: '/workspace/deleted',
+        },
+      },
+    ]);
+    ws.close();
+  });
+
   it('preserves repository branches and structured initial and follow-up command turns', async () => {
     const userId = 'user_control_commands' as const;
     const sessionId = 'workspace_control_commands';

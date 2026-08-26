@@ -30,6 +30,8 @@ import { applyControlPlanePreparingEvent } from './control-plane-preparing.js';
 import { logger } from '../logger.js';
 import { sandboxControlRpc } from './control-rpc.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
+import { getSandboxControlStub } from '../sandbox-control/stub.js';
+import { withDORetry } from '../utils/do-retry.js';
 import { createMessageId } from '../session/message-id.js';
 import { buildSessionAttachPayload, fillAttachGitToken } from './attach-payload.js';
 import { getSandboxProvider } from '../persistence/session-metadata.js';
@@ -380,6 +382,17 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   async deleteSession(): Promise<void> {
+    const metadata = await this.getMetadata();
+    const sandboxId = metadata?.workspace?.sandboxId;
+    const sessionId = this.sessionId;
+    if (sandboxId && sessionId) {
+      await this.interruptExecution();
+      await withDORetry(
+        () => getSandboxControlStub(this.env, sandboxId),
+        control => control.detachSession(sessionId),
+        'detachSession'
+      );
+    }
     await this.ctx.storage.deleteAll();
   }
 

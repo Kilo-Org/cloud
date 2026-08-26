@@ -294,6 +294,12 @@ export class SandboxControl extends DurableObject<Env> {
     if (result.existed) {
       await this.appendLog(routeTransition(Date.now(), 'detach', sessionId));
     }
+    if (!hasActiveWork(result.table)) {
+      const physical = await loadPhysicalRecord(this.ctx.storage);
+      if (physical.state === 'running') {
+        await this.armDeadlineIfAbsent('idleStop', Date.now() + DEADLINE_MS.idleStop);
+      }
+    }
     return { existed: result.existed };
   }
 

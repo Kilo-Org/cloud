@@ -144,6 +144,7 @@ import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser, insertTestUserAndGoogleAuth } from '@/tests/helpers/user.helper';
+import { hosted_domain_specials } from '@/lib/auth/constants';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 import { randomUUID } from 'crypto';
@@ -407,6 +408,44 @@ describe('User', () => {
     it('returns null for an email that is not linked to an account', async () => {
       await expect(getAllUserProviders('no-match@example.com')).resolves.toEqual({
         kind: 'not_found',
+      });
+    });
+
+    it('uses the explicit legacy provider sentinel when provider rows are missing', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'legacy-provider@example.com',
+        google_user_name: 'Legacy Provider User',
+        normalized_email: 'legacy-provider@example.com',
+        hosted_domain: hosted_domain_specials.github,
+      });
+
+      await expect(getAllUserProviders('legacy-provider@example.com')).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['github'],
+          primaryEmail: 'legacy-provider@example.com',
+          workosHostedDomain: undefined,
+        },
+      });
+    });
+
+    it('does not infer a provider from an unknown legacy hosted domain', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'unknown-legacy@example.com',
+        google_user_name: 'Unknown Legacy User',
+        normalized_email: 'unknown-legacy@example.com',
+        hosted_domain: 'unknown.example.com',
+      });
+
+      await expect(getAllUserProviders('unknown-legacy@example.com')).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: [],
+          primaryEmail: 'unknown-legacy@example.com',
+          workosHostedDomain: undefined,
+        },
       });
     });
 

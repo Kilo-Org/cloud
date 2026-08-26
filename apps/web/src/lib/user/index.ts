@@ -124,6 +124,7 @@ import type { TRPCError } from '@trpc/server';
 import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
+import { hosted_domain_specials } from '@/lib/auth/constants';
 import {
   generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
@@ -1933,16 +1934,41 @@ async function getUserProviderInfo(user: User): Promise<UserProviderLookupResult
     .orderBy(user_auth_provider.created_at);
 
   const workosProvider = providers.find(p => p.provider === 'workos');
+  const discoveredProviders =
+    providers.length > 0 ? providers.map(p => p.provider) : legacyProviderFromHostedDomain(user);
 
   return {
     kind: 'found',
     user: {
       kiloUserId: user.id,
-      providers: providers.map(p => p.provider),
+      providers: discoveredProviders,
       primaryEmail: user.google_user_email,
       workosHostedDomain: workosProvider?.hosted_domain ?? undefined,
     },
   };
+}
+
+function legacyProviderFromHostedDomain(user: User): AuthProviderId[] {
+  switch (user.hosted_domain) {
+    case hosted_domain_specials.non_workspace_google_account:
+      return ['google'];
+    case hosted_domain_specials.anaconda:
+      return ['anaconda'];
+    case hosted_domain_specials.apple:
+      return ['apple'];
+    case hosted_domain_specials.github:
+      return ['github'];
+    case hosted_domain_specials.gitlab:
+      return ['gitlab'];
+    case hosted_domain_specials.linkedin:
+      return ['linkedin'];
+    case hosted_domain_specials.discord:
+      return ['discord'];
+    case hosted_domain_specials.email:
+      return ['email'];
+    default:
+      return [];
+  }
 }
 
 /**

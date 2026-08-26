@@ -294,16 +294,20 @@ describe('cloud-agent pending-upload ledger', () => {
     const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     const releasedAttachment = crypto.randomUUID();
+    const keptPendingAttachment = crypto.randomUUID();
     const linkedAttachment = crypto.randomUUID();
     const otherUserAttachment = crypto.randomUUID();
-    const releasedKey = buildObjectKey(kiloUserId, messageUuid, releasedAttachment);
-    const linkedKey = buildObjectKey(kiloUserId, messageUuid, linkedAttachment);
-    const otherUserKey = buildObjectKey(otherUserId, messageUuid, otherUserAttachment);
 
     const releasedRow = await insertPendingRow({
       kiloUserId,
       messageUuid,
       attachmentId: releasedAttachment,
+      expiresAt: future,
+    });
+    const keptPendingRow = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: keptPendingAttachment,
       expiresAt: future,
     });
     const linkedRow = await insertPendingRow({
@@ -321,11 +325,11 @@ describe('cloud-agent pending-upload ledger', () => {
     });
 
     await releasePendingUploads(kiloUserId, [
-      releasedKey,
+      buildObjectKey(kiloUserId, messageUuid, releasedAttachment),
       // Linked row belongs to the caller but must survive (status predicate).
-      linkedKey,
+      buildObjectKey(kiloUserId, messageUuid, linkedAttachment),
       // Other user's pending row must survive (owner predicate).
-      otherUserKey,
+      buildObjectKey(otherUserId, messageUuid, otherUserAttachment),
     ]);
 
     // The released object is gone from the bucket, and only its row leaves the
@@ -340,6 +344,7 @@ describe('cloud-agent pending-upload ledger', () => {
     const byId = new Map(remaining.map(row => [row.id, row.status]));
 
     expect(byId.get(releasedRow)).toBe('reaped');
+    expect(byId.get(keptPendingRow)).toBe('pending');
     expect(byId.get(linkedRow)).toBe('linked');
     expect(byId.get(otherUserRow)).toBe('pending');
   });

@@ -1,0 +1,2 @@
+ALTER TABLE "user_deletion_steps" DROP CONSTRAINT "user_deletion_steps_step_key_check";--> statement-breakpoint
+ALTER TABLE "user_deletion_steps" ADD CONSTRAINT "user_deletion_steps_step_key_check" CHECK ("user_deletion_steps"."step_key" IN ('kiloclaw_destroy', 'customerio', 'cli_v1_blobs', 'cli_v2_sessions', 'usage_prompt_prefixes', 'posthog', 'substack', 'anonymize', 'pylon_reply', 'pylon_finalize', 'completion_email', 'pylon_contact', 'csa_support_db'));

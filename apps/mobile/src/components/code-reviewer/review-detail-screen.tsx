@@ -78,7 +78,7 @@ export function ReviewDetailScreen({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
-        <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="pt-4">
+        <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
           <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
             <Skeleton className="h-14 w-full rounded-lg" />
             <Skeleton className="h-40 w-full rounded-lg" />
@@ -99,7 +99,7 @@ export function ReviewDetailScreen({
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
-          <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="flex-1 pt-4">
+          <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 flex-1 pt-4">
             <QueryError variant={errorCode === 'NOT_FOUND' ? 'not-found' : 'permission'} />
           </TabScreenScrollView>
         </View>
@@ -108,7 +108,7 @@ export function ReviewDetailScreen({
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
-        <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="flex-1 pt-4">
+        <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 flex-1 pt-4">
           <QueryError
             variant="server"
             title={t('codeReviewer.reviewDetail.couldNotLoad')}
@@ -138,7 +138,7 @@ export function ReviewDetailScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('codeReviewer.reviewDetail.title')} eyebrow={review.repo_full_name} />
-      <TabScreenScrollView className="flex-1 px-6" contentContainerClassName="gap-4 pt-4">
+      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-4">
         {/* A background poll failure must not blank out an already-loaded review. */}
         {isError && (
           <Text variant="muted" className="text-center text-xs">

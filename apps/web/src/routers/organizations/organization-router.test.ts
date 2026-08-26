@@ -436,6 +436,7 @@ describe('organizations trpc router', () => {
             'status',
             'inviteDate',
             'dailyUsageLimitUsd',
+            'imageUrl',
             'childOrganizationMemberships',
           ].sort()
         );
@@ -504,6 +505,7 @@ describe('organizations trpc router', () => {
             'inviteDate',
             'dailyUsageLimitUsd',
             'currentDailyUsageUsd',
+            'imageUrl',
             'childOrganizationMemberships',
           ].sort()
         );

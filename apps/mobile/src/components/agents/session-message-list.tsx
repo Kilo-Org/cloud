@@ -240,7 +240,7 @@ export function SessionMessageList<T>({
             accessibilityLabel={t('agentChat.session.scrollToBottom')}
             onPress={scrollToLatestAnimated}
             hitSlop={2}
-            className="h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-black/25 active:opacity-70"
+            className="h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-[#00000040] active:opacity-70"
           >
             <ChevronDown size={20} color={colors.foreground} />
           </Pressable>

@@ -121,6 +121,8 @@ jobs:
 
       - name: Check i18n catalogs and leftover copy
         run: pnpm --filter kilo-app run check:i18n
+      - name: Check for silently-dropped NativeWind classes
+        run: pnpm --filter kilo-app run check:classes
 
   format-check:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}

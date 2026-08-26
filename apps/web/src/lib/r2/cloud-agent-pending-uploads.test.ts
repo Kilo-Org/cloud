@@ -348,4 +348,65 @@ describe('cloud-agent pending-upload ledger', () => {
     expect(byId.get(linkedRow)).toBe('linked');
     expect(byId.get(otherUserRow)).toBe('pending');
   });
+
+  it('claims the row before deleting its R2 object so a concurrent link cannot lose it', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachment = crypto.randomUUID();
+    const objectKey = buildObjectKey(kiloUserId, messageUuid, attachment);
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: attachment,
+      expiresAt: future,
+    });
+
+    // The row must already be claimed when the object delete runs. An
+    // unclaimed select would still show 'pending' here, leaving a window for
+    // linkPendingUploads to flip the row after the object is gone.
+    const statusesAtDelete: (string | undefined)[] = [];
+    mockSend.mockImplementation(async () => {
+      const rows = await db
+        .select({ status: cloud_agent_pending_uploads.status })
+        .from(cloud_agent_pending_uploads)
+        .where(eq(cloud_agent_pending_uploads.object_key, objectKey));
+      statusesAtDelete.push(rows[0]?.status);
+      return {};
+    });
+
+    await releasePendingUploads(kiloUserId, [objectKey]);
+
+    expect(statusesAtDelete).toEqual(['reaped']);
+  });
+
+  it('puts a released row back to pending when its object delete fails', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachment = crypto.randomUUID();
+    const objectKey = buildObjectKey(kiloUserId, messageUuid, attachment);
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    const row = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: attachment,
+      expiresAt: future,
+    });
+
+    mockSend.mockRejectedValueOnce(new Error('R2 unavailable'));
+    await releasePendingUploads(kiloUserId, [objectKey]);
+
+    // The object survived the failed delete, so the row must stay reapable
+    // instead of leaving the object with no handle.
+    expect(
+      (
+        await db
+          .select({ status: cloud_agent_pending_uploads.status })
+          .from(cloud_agent_pending_uploads)
+          .where(eq(cloud_agent_pending_uploads.id, row))
+      )[0]?.status
+    ).toBe('pending');
+  });
 });

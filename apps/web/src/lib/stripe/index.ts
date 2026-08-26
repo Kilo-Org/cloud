@@ -676,32 +676,7 @@ export async function getStripeInvoices(
   const invoices = await client.invoices.list(listParams);
   const invoiceData: Stripe.Invoice[] = invoices.data;
 
-  return invoiceData.map(invoice => {
-    // Classify as 'seats' if any line item has seats metadata or a known paid seat price ID
-    const isSeatInvoice =
-      invoice.lines?.data?.some(line => {
-        const hasSeatsMetadata =
-          line.metadata != null && Object.prototype.hasOwnProperty.call(line.metadata, 'seats');
-        const priceId = line.pricing?.price_details?.price;
-        const hasSeatPriceId = priceId != null && KNOWN_SEAT_PRICE_IDS.has(priceId);
-        return hasSeatsMetadata || hasSeatPriceId;
-      }) ?? false;
-
-    const firstLineDescription = invoice.lines?.data?.[0]?.description || null;
-
-    return {
-      id: invoice.id || '',
-      number: invoice.number,
-      status: invoice.status || 'unknown',
-      amount_due: invoice.amount_due || 0,
-      currency: invoice.currency || 'usd',
-      created: invoice.created || 0,
-      hosted_invoice_url: invoice.hosted_invoice_url || null,
-      invoice_pdf: invoice.invoice_pdf || null,
-      invoice_type: isSeatInvoice ? 'seats' : 'topup',
-      description: firstLineDescription,
-    };
-  });
+  return mapStripeInvoicesToUnified(invoiceData);
 }
 
 function mapStripeInvoicesToUnified(invoices: Stripe.Invoice[]): UnifiedInvoice[] {

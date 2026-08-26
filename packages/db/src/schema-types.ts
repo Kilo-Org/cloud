@@ -1199,6 +1199,13 @@ export const AuditLogAction = z.enum([
   'organization.group.default_policy.remove',
   'organization.group.policy_type.enable', // Legacy action retained for existing audit rows.
   'organization.group.policy_type.disable', // Legacy action retained for existing audit rows.
+  // Collection-backed organization alerts. Messages carry the alert ID,
+  // recipient counts, and disclosure confirmation, never recipient addresses.
+  'organization.alert.create',
+  'organization.alert.update',
+  'organization.alert.enable',
+  'organization.alert.disable',
+  'organization.alert.archive',
   'organization.created', // ✅
   'organization.token.generate', // ✅
   'organization.funds.distribute_to_children', // ✅

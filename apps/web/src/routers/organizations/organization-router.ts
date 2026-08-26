@@ -77,10 +77,12 @@ import { organizationKiloclawRouter } from '@/routers/organizations/organization
 import { organizationBitbucketRouter } from '@/routers/organizations/organization-bitbucket-router';
 import { organizationFundsRouter } from '@/routers/organizations/organization-funds-router';
 import { organizationKiloPassRouter } from '@/routers/organizations/organization-kilo-pass-router';
+import { organizationAlertsRouter } from '@/routers/organizations/organization-alerts-router';
 import { organizationGroupsRouter } from '@/routers/organizations/organization-groups-router';
 import { organizationSubOrganizationsRouter } from '@/routers/organizations/organization-sub-organizations-router';
 import { organizationSalesDemoRouter } from '@/routers/organizations/organization-sales-demo-router';
 import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
+import { disableOrganizationAlertsForDowngrade } from '@/lib/organizations/alerts/alert-lifecycle';
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
@@ -149,6 +151,7 @@ export const organizationsRouter = createTRPCRouter({
   funds: organizationFundsRouter,
   kiloPass: organizationKiloPassRouter,
   groups: organizationGroupsRouter,
+  alerts: organizationAlertsRouter,
   subOrganizations: organizationSubOrganizationsRouter,
   salesDemo: organizationSalesDemoRouter,
 
@@ -523,6 +526,9 @@ export const organizationsRouter = createTRPCRouter({
           .update(organizations)
           .set({ plan: opts.input.plan })
           .where(eq(organizations.id, opts.input.organizationId));
+        if (opts.input.plan !== 'enterprise') {
+          await disableOrganizationAlertsForDowngrade(tx, opts.input.organizationId);
+        }
       });
       return {
         organization: {

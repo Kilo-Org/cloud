@@ -3220,6 +3220,155 @@ export const organizations = pgTable(
 
 export type Organization = typeof organizations.$inferSelect;
 
+// Collection-backed organization alerts. Lifecycle actor attribution and audit
+// history live in `organization_audit_logs` (the organization audit surface,
+// already PII-managed by `softDeleteUser`), not in a bespoke per-alert log.
+export type MonthlySpendingAlertConfiguration = {
+  thresholdMicrodollars: number;
+  // Explicit, versioned period definition: monthly behavior is never inferred
+  // from a missing field, and a semantics change gets a new version.
+  period: {
+    type: 'calendar_month_utc';
+    version: 1;
+  };
+  recipients: string[];
+};
+
+export type OrganizationAlertConfiguration = MonthlySpendingAlertConfiguration;
+export type OrganizationAlertType = 'monthly_spending';
+export type OrganizationAlertStatus = 'enabled' | 'disabled' | 'archived';
+
+export const organization_alerts = pgTable(
+  'organization_alerts',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    type: text().notNull().$type<OrganizationAlertType>(),
+    status: text().notNull().$type<OrganizationAlertStatus>(),
+    configuration: jsonb().notNull().$type<OrganizationAlertConfiguration>(),
+    configuration_version: integer().notNull().default(1),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    archived_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    index('IDX_organization_alerts_organization_status_created_id').on(
+      table.organization_id,
+      table.status,
+      table.created_at,
+      table.id
+    ),
+    index('IDX_organization_alerts_enabled_organization_id')
+      .on(table.organization_id, table.id)
+      .where(sql`${table.status} = 'enabled'`),
+    check('organization_alerts_type_check', sql`${table.type} IN ('monthly_spending')`),
+    check(
+      'organization_alerts_status_check',
+      sql`${table.status} IN ('enabled', 'disabled', 'archived')`
+    ),
+    check(
+      'organization_alerts_configuration_version_check',
+      sql`${table.configuration_version} > 0`
+    ),
+    check(
+      'organization_alerts_archive_check',
+      sql`(${table.status} = 'archived') = (${table.archived_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type OrganizationAlert = typeof organization_alerts.$inferSelect;
+export type NewOrganizationAlert = typeof organization_alerts.$inferInsert;
+
+// One row per delivery claim: alert, period occurrence, keyed recipient identity
+// and channel. Creating the row admits that recipient toward the alert-period
+// recipient cap, so rows are retained (including `canceled`) for the period.
+// `pending` covers both never-attempted and retry-after-failure work; the retry
+// is scheduled by `next_attempt_at` and described by `attempt_count`.
+export type OrganizationAlertDeliveryStatus =
+  | 'pending'
+  | 'submitting'
+  | 'accepted'
+  | 'ambiguous'
+  | 'canceled';
+
+export const organization_alert_deliveries = pgTable(
+  'organization_alert_deliveries',
+  {
+    id: idPrimaryKeyColumn,
+    alert_id: uuid()
+      .notNull()
+      .references(() => organization_alerts.id, { onDelete: 'cascade' }),
+    period_occurrence_id: text().notNull(),
+    // Keyed digest of the normalized recipient. Never the address itself: the
+    // address is read from the alert configuration at dispatch time.
+    recipient_identity_hmac: text().notNull(),
+    channel: text().notNull().$type<'email'>(),
+    status: text().notNull().default('pending').$type<OrganizationAlertDeliveryStatus>(),
+    claimed_configuration_version: integer().notNull(),
+    // Fencing token: refreshing a claim for current configuration bumps it so a
+    // stale worker's compare-and-set can no longer submit that claim.
+    claim_version: integer().notNull().default(1),
+    threshold_microdollars: bigint({ mode: 'number' }).notNull(),
+    measured_spend_microdollars: bigint({ mode: 'number' }).notNull(),
+    attempt_count: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    submitting_at: timestamp({ withTimezone: true, mode: 'string' }),
+    provider_message_id: text(),
+    last_error_code: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_organization_alert_deliveries_identity').on(
+      table.alert_id,
+      table.period_occurrence_id,
+      table.recipient_identity_hmac,
+      table.channel
+    ),
+    index('IDX_organization_alert_deliveries_dispatch').on(
+      table.status,
+      table.next_attempt_at,
+      table.id
+    ),
+    check(
+      'organization_alert_deliveries_identity_fields_check',
+      sql`length(${table.period_occurrence_id}) > 0 AND length(${table.recipient_identity_hmac}) > 0`
+    ),
+    check('organization_alert_deliveries_channel_check', sql`${table.channel} = 'email'`),
+    check(
+      'organization_alert_deliveries_status_check',
+      sql`${table.status} IN ('pending', 'submitting', 'accepted', 'ambiguous', 'canceled')`
+    ),
+    check(
+      'organization_alert_deliveries_counters_check',
+      sql`${table.claimed_configuration_version} > 0 AND ${table.claim_version} > 0 AND ${table.attempt_count} >= 0`
+    ),
+    check(
+      'organization_alert_deliveries_spend_check',
+      sql`${table.threshold_microdollars} > 0 AND ${table.measured_spend_microdollars} >= ${table.threshold_microdollars}`
+    ),
+    // A lease exists exactly while a worker is submitting, and submission time is
+    // retained once submission has begun, including across pre-acceptance retries.
+    check(
+      'organization_alert_deliveries_submission_check',
+      sql`(${table.status} = 'submitting') = (${table.lease_expires_at} IS NOT NULL) AND (${table.status} NOT IN ('submitting', 'accepted', 'ambiguous') OR ${table.submitting_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type OrganizationAlertDelivery = typeof organization_alert_deliveries.$inferSelect;
+export type NewOrganizationAlertDelivery = typeof organization_alert_deliveries.$inferInsert;
+
 export const kilo_pass_org_term_versions = pgTable(
   'kilo_pass_org_term_versions',
   {

@@ -39,12 +39,7 @@ import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
-import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
-import { clearMarkdownImageConfirmMemory } from '@/components/agents/markdown-image-confirm';
-import { clearToolCardImageCache } from '@/components/agents/tool-card-image-cache';
-import { clearFilePartCache } from '@/components/agents/file-part-cache';
-import { clearClipboardImages } from '@/lib/agent-attachments/clipboard-image';
-import { reapTempFiles } from '@/lib/temp-file-registry';
+import { clearSessionScopedState } from '@/lib/auth/session-scoped-state';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';

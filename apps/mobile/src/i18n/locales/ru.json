@@ -148,7 +148,9 @@
     "appearanceSystem": "Системная",
     "appearanceLight": "Светлая",
     "appearanceDark": "Темная",
-    "account": "Аккаунт"
+    "account": "Аккаунт",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "Уведомления",
@@ -1739,7 +1741,8 @@
       "discardDraftMessage": "Ваш запрос будет потерян.",
       "discardDraftTitle": "Отменить черновик?",
       "discardFailed": "Не удалось отменить черновик. Попробуйте снова.",
-      "keepEditing": "Продолжить редактирование"
+      "keepEditing": "Продолжить редактирование",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Обновлен {{displayCount}} файл",
@@ -2235,15 +2238,10 @@
     "couldNotLoadSessions": "Не удалось загрузить сеансы",
     "couldNotLoadActiveSessions": "Не удалось загрузить активные сеансы",
     "agentSessions": "Сеансы агента",
-    "showingSavedSessions": "Показаны сохранённые сеансы — актуальный статус может быть устаревшим",
-    "startNewAgentSession": "Начать новый сеанс агента Kilo",
-    "aiCodingSessions": "Сеансы ИИ-кодирования",
-    "startCodingTaskFromPhone": "Начните задачу кодирования с телефона или продолжите сеанс из CLI.",
-    "tryIt": "Попробовать",
     "newCodingTask": "Новая задача кодирования",
     "explore": "Исследовать",
     "seeAll": "Смотреть все",
-    "kiloAgents": "Агенты Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Закрыть {{filename}}",

@@ -148,7 +148,9 @@
     "appearanceSystem": "ระบบ",
     "appearanceLight": "สว่าง",
     "appearanceDark": "มืด",
-    "account": "บัญชี"
+    "account": "บัญชี",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "ไม่สามารถใช้ pull request ได้",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "ข้อความของคุณจะสูญหาย",
       "keepEditing": "แก้ไขต่อไป",
       "discard": "ทิ้ง",
-      "discardFailed": "ไม่สามารถทิ้งฉบับร่างได้ กรุณาลองอีกครั้ง"
+      "discardFailed": "ไม่สามารถทิ้งฉบับร่างได้ กรุณาลองอีกครั้ง",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "อัปเดต {{displayCount}} ไฟล์",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "โหลดเซสชันไม่สำเร็จ",
     "couldNotLoadActiveSessions": "โหลดเซสชันที่ใช้งานอยู่ไม่สำเร็จ",
     "agentSessions": "เซสชันเอเจนต์",
-    "showingSavedSessions": "กำลังแสดงเซสชันที่บันทึกไว้ — สถานะสดอาจไม่เป็นปัจจุบัน",
-    "startNewAgentSession": "เริ่มเซสชัน Kilo Agent ใหม่",
-    "aiCodingSessions": "เซสชันการเขียนโค้ด AI",
-    "startCodingTaskFromPhone": "เริ่มงานการเขียนโค้ดจากโทรศัพท์ของคุณ หรือดำเนินการต่อจากเซสชันใน CLI ของคุณ",
-    "tryIt": "ลองเลย",
     "newCodingTask": "งานการเขียนโค้ดใหม่",
     "explore": "สำรวจ",
     "seeAll": "ดูทั้งหมด",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "ปิด {{filename}}",

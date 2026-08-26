@@ -148,7 +148,9 @@
     "appearanceSystem": "سیسټم",
     "appearanceLight": "روښانه",
     "appearanceDark": "تیاره",
-    "account": "حساب"
+    "account": "حساب",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسټ شتون نلري",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "ستاسو پرامپټ به له لاسه ورکړل شي.",
       "keepEditing": "سمون ته دوام ورکړئ",
       "discard": "لغوه کړئ",
-      "discardFailed": "مسوده لغوه نه شوه. مهرباني وکړئ بیا هڅه وکړئ."
+      "discardFailed": "مسوده لغوه نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل تازه شو",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "غونډې نه شول پورته کېدلای",
     "couldNotLoadActiveSessions": "فعالې غونډې نه شول پورته کېدلای",
     "agentSessions": "د اجنټ غونډې",
-    "showingSavedSessions": "خوندي شوې غونډې ښودل کېږي — ژوندی حالت ممکن زوړ وي",
-    "startNewAgentSession": "د Kilo اجنټ نوې غونډه پیل کړئ",
-    "aiCodingSessions": "د AI کوډ کولو غونډې",
-    "startCodingTaskFromPhone": "له خپل تلیفون څخه د کوډ کولو دنده پیل کړئ یا له خپل CLI څخه یوه غونډه دوام ورکړئ.",
-    "tryIt": "هڅه یې وکړئ",
     "newCodingTask": "د کوډ کولو نوې دنده",
     "explore": "وپلټئ",
     "seeAll": "ټول وګورئ",
-    "kiloAgents": "د Kilo اجنټان"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} وتړئ",

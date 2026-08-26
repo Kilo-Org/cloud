@@ -148,7 +148,9 @@
     "appearanceSystem": "სისტემა",
     "appearanceLight": "ღია",
     "appearanceDark": "მუქი",
-    "account": "ანგარიში"
+    "account": "ანგარიში",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "პულ-რექვესთი მიუწვდომელია",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "თქვენი შეტყობინება დაიკარგება.",
       "keepEditing": "რედაქტირების გაგრძელება",
       "discard": "გაუქმება",
-      "discardFailed": "დრაფტის გაუქმება ვერ მოხერხდა. გთხოვთ, სცადეთ ხელახლა."
+      "discardFailed": "დრაფტის გაუქმება ვერ მოხერხდა. გთხოვთ, სცადეთ ხელახლა.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "სესიების ჩატვირთვა ვერ მოხერხდა",
     "couldNotLoadActiveSessions": "აქტიური სესიების ჩატვირთვა ვერ მოხერხდა",
     "agentSessions": "აგენტის სესიები",
-    "showingSavedSessions": "ნაჩვენებია შენახული სესიები — პირდაპირი სტატუსი შეიძლება მოძველებული იყოს",
-    "startNewAgentSession": "ახალი Kilo აგენტის სესიის დაწყება",
-    "aiCodingSessions": "AI კოდირების სესიები",
-    "startCodingTaskFromPhone": "დაიწყეთ კოდირების ამოცანა ტელეფონიდან ან გააგრძელეთ სესია CLI-დან.",
-    "tryIt": "სცადეთ",
     "newCodingTask": "ახალი კოდირების ამოცანა",
     "explore": "გამოკვლევა",
     "seeAll": "ყველას ნახვა",
-    "kiloAgents": "Kilo აგენტები"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} დახურვა",

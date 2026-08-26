@@ -148,7 +148,9 @@
     "appearanceSystem": "Системски",
     "appearanceLight": "Светло",
     "appearanceDark": "Темно",
-    "account": "Сметка"
+    "account": "Сметка",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Барањето за повлекување е недостапно",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "Твојот предлог ќе биде изгубен.",
       "keepEditing": "Продолжи со уредување",
       "discard": "Отфрли",
-      "discardFailed": "Не можеше да се отфрли нацртот. Обиди се повторно."
+      "discardFailed": "Не можеше да се отфрли нацртот. Обиди се повторно.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ажурирана {{displayCount}} датотека",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "Не можев да ги вчитам сесиите",
     "couldNotLoadActiveSessions": "Не можев да ги вчитам активните сесии",
     "agentSessions": "Сесии на агенти",
-    "showingSavedSessions": "Прикажани се зачуваните сесии — живиот статус може да е застарен",
-    "startNewAgentSession": "Започни нова сесија на Kilo Agent",
-    "aiCodingSessions": "AI сесии за кодирање",
-    "startCodingTaskFromPhone": "Започнете задача за кодирање од вашиот телефон или продолжете сесија од вашиот CLI.",
-    "tryIt": "Пробај",
     "newCodingTask": "Нова задача за кодирање",
     "explore": "Истражувај",
     "seeAll": "Види ги сите",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Затвори {{filename}}",

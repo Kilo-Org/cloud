@@ -148,7 +148,9 @@
     "appearanceSystem": "מערכת",
     "appearanceLight": "בהיר",
     "appearanceDark": "כהה",
-    "account": "חשבון"
+    "account": "חשבון",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "התראות",
@@ -1731,7 +1733,8 @@
       "discardDraftMessage": "ההנחיה שלך תאבד.",
       "discardDraftTitle": "לבטל את הטיוטה?",
       "discardFailed": "לא ניתן היה לבטל את הטיוטה. נסה שוב.",
-      "keepEditing": "המשך לערוך"
+      "keepEditing": "המשך לערוך",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "עודכן {{displayCount}} קובץ",
@@ -2222,15 +2225,10 @@
     "couldNotLoadSessions": "לא ניתן לטעון הפעלות",
     "couldNotLoadActiveSessions": "לא ניתן לטעון הפעלות פעילות",
     "agentSessions": "הפעלות סוכן",
-    "showingSavedSessions": "מציג הפעלות שמורות — המצב החי עשוי להיות לא מעודכן",
-    "startNewAgentSession": "התחל הפעלת Kilo Agent חדשה",
-    "aiCodingSessions": "הפעלות קידוד AI",
-    "startCodingTaskFromPhone": "התחל משימת קידוד מהטלפון שלך או המשך הפעלה מה-CLI שלך.",
-    "tryIt": "נסה זאת",
     "newCodingTask": "משימת קידוד חדשה",
     "explore": "חקור",
     "seeAll": "ראה הכל",
-    "kiloAgents": "סוכני Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "סגור את {{filename}}",

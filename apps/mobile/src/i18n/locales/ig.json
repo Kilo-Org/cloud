@@ -148,7 +148,9 @@
     "appearanceSystem": "Sistemụ",
     "appearanceLight": "Ìhè",
     "appearanceDark": "Ọchịchịrị",
-    "account": "Akaụntụ"
+    "account": "Akaụntụ",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Arịrịọ dọrọ adịghị",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "Ihe ị dere ga-efu.",
       "keepEditing": "Nọgide na-edezi",
       "discard": "Tụfuo",
-      "discardFailed": "Enweghị ike ịtụfu akwụkwọ a na-ede. Biko nwaa ọzọ."
+      "discardFailed": "Enweghị ike ịtụfu akwụkwọ a na-ede. Biko nwaa ọzọ.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Emelitere {{displayCount}} faịlụ",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "Enweghị ike ibutu nnọkọ",
     "couldNotLoadActiveSessions": "Enweghị ike ibutu nnọkọ na-arụ ọrụ",
     "agentSessions": "Nnọkọ onye nnọchite",
-    "showingSavedSessions": "Na-egosi nnọkọ echekwara — ọnọdụ ndụ nwere ike ịgafe oge",
-    "startNewAgentSession": "Malite nnọkọ Kilo Agent ọhụrụ",
-    "aiCodingSessions": "Nnọkọ ịde koodu AI",
-    "startCodingTaskFromPhone": "Malite ọrụ ịde koodu site na ekwentị gị ma ọ bụ gaa n'ihu na nnọkọ site na CLI gị.",
-    "tryIt": "Nwaa ya",
     "newCodingTask": "Ọrụ ịde koodu ọhụrụ",
     "explore": "Chọpụta",
     "seeAll": "Hụ niile",
-    "kiloAgents": "Ndị nnọchite Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Mechie {{filename}}",

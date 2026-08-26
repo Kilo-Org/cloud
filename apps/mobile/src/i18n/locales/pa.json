@@ -148,7 +148,9 @@
     "appearanceSystem": "ਸਿਸਟਮ",
     "appearanceLight": "ਹਲਕਾ",
     "appearanceDark": "ਗੂੜ੍ਹਾ",
-    "account": "ਖਾਤਾ"
+    "account": "ਖਾਤਾ",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ ਹੈ",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "ਤੁਹਾਡਾ ਪ੍ਰੋਂਪਟ ਗੁਆਚ ਜਾਵੇਗਾ।",
       "keepEditing": "ਸੰਪਾਦਨ ਜਾਰੀ ਰੱਖੋ",
       "discard": "ਰੱਦ ਕਰੋ",
-      "discardFailed": "ਡਰਾਫਟ ਰੱਦ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+      "discardFailed": "ਡਰਾਫਟ ਰੱਦ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ਫਾਈਲ ਅੱਪਡੇਟ ਕੀਤੀ ਗਈ",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",
     "couldNotLoadActiveSessions": "ਸਰਗਰਮ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",
     "agentSessions": "ਏਜੰਟ ਸੈਸ਼ਨ",
-    "showingSavedSessions": "ਸੇਵ ਕੀਤੇ ਸੈਸ਼ਨ ਦਿਖਾਏ ਜਾ ਰਹੇ ਹਨ — ਲਾਈਵ ਸਥਿਤੀ ਪੁਰਾਣੀ ਹੋ ਸਕਦੀ ਹੈ",
-    "startNewAgentSession": "ਨਵਾਂ Kilo ਏਜੰਟ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ",
-    "aiCodingSessions": "AI ਕੋਡਿੰਗ ਸੈਸ਼ਨ",
-    "startCodingTaskFromPhone": "ਆਪਣੇ ਫ਼ੋਨ ਤੋਂ ਕੋਡਿੰਗ ਕੰਮ ਸ਼ੁਰੂ ਕਰੋ ਜਾਂ ਆਪਣੇ CLI ਤੋਂ ਸੈਸ਼ਨ ਜਾਰੀ ਰੱਖੋ।",
-    "tryIt": "ਕੋਸ਼ਿਸ਼ ਕਰੋ",
     "newCodingTask": "ਨਵਾਂ ਕੋਡਿੰਗ ਕੰਮ",
     "explore": "ਪੜਚੋਲ ਕਰੋ",
     "seeAll": "ਸਭ ਵੇਖੋ",
-    "kiloAgents": "Kilo ਏਜੰਟ"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} ਬੰਦ ਕਰੋ",

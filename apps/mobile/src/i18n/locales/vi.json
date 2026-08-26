@@ -148,7 +148,9 @@
     "appearanceSystem": "Hệ thống",
     "appearanceLight": "Sáng",
     "appearanceDark": "Tối",
-    "account": "Tài khoản"
+    "account": "Tài khoản",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "Thông báo",
@@ -1723,7 +1725,8 @@
       "discardDraftMessage": "Lời nhắc của bạn sẽ bị mất.",
       "discardDraftTitle": "Hủy bản nháp?",
       "discardFailed": "Không thể hủy bản nháp. Vui lòng thử lại.",
-      "keepEditing": "Tiếp tục chỉnh sửa"
+      "keepEditing": "Tiếp tục chỉnh sửa",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp",
@@ -2209,15 +2212,10 @@
     "couldNotLoadSessions": "Không thể tải các phiên",
     "couldNotLoadActiveSessions": "Không thể tải các phiên đang hoạt động",
     "agentSessions": "Phiên tác nhân",
-    "showingSavedSessions": "Đang hiển thị các phiên đã lưu — trạng thái trực tiếp có thể đã cũ",
-    "startNewAgentSession": "Bắt đầu phiên Kilo Agent mới",
-    "aiCodingSessions": "Phiên lập trình AI",
-    "startCodingTaskFromPhone": "Bắt đầu tác vụ lập trình từ điện thoại hoặc tiếp tục phiên từ CLI của bạn.",
-    "tryIt": "Thử ngay",
     "newCodingTask": "Tác vụ lập trình mới",
     "explore": "Khám phá",
     "seeAll": "Xem tất cả",
-    "kiloAgents": "Tác nhân Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Đóng {{filename}}",

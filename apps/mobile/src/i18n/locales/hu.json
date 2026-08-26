@@ -148,7 +148,9 @@
     "appearanceSystem": "Rendszer",
     "appearanceLight": "Világos",
     "appearanceDark": "Sötét",
-    "account": "Fiók"
+    "account": "Fiók",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nem érhető el",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "A promptja el fog veszni.",
       "keepEditing": "Szerkesztés folytatása",
       "discard": "Elvetés",
-      "discardFailed": "A piszkozat elvetése nem sikerült. Próbálja újra."
+      "discardFailed": "A piszkozat elvetése nem sikerült. Próbálja újra.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fájl frissítve",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "A munkameneteket nem sikerült betölteni",
     "couldNotLoadActiveSessions": "Az aktív munkameneteket nem sikerült betölteni",
     "agentSessions": "Ügynök munkamenetek",
-    "showingSavedSessions": "Mentett munkamenetek megjelenítése — az élő állapot elavult lehet",
-    "startNewAgentSession": "Új Kilo Agent munkamenet indítása",
-    "aiCodingSessions": "AI kódolási munkamenetek",
-    "startCodingTaskFromPhone": "Indíts kódolási feladatot a telefonodról, vagy folytass egy munkamenetet a CLI-dből.",
-    "tryIt": "Kipróbálom",
     "newCodingTask": "Új kódolási feladat",
     "explore": "Felfedezés",
     "seeAll": "Összes megtekintése",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} bezárása",

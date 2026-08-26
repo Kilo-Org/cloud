@@ -148,7 +148,9 @@
     "appearanceSystem": "Järjestelmä",
     "appearanceLight": "Vaalea",
     "appearanceDark": "Tumma",
-    "account": "Tili"
+    "account": "Tili",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole käytettävissä",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "Kehotteesi menetetään.",
       "keepEditing": "Jatka muokkausta",
       "discard": "Hylkää",
-      "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen."
+      "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Päivitetty {{displayCount}} tiedosto",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "Istuntoja ei voitu ladata",
     "couldNotLoadActiveSessions": "Aktiivisia istuntoja ei voitu ladata",
     "agentSessions": "Agentti-istunnot",
-    "showingSavedSessions": "Näytetään tallennetut istunnot — reaaliaikainen tila voi olla vanhentunut",
-    "startNewAgentSession": "Aloita uusi Kilo Agent -istunto",
-    "aiCodingSessions": "AI-koodausistunnot",
-    "startCodingTaskFromPhone": "Aloita koodaustehtävä puhelimestasi tai jatka istuntoa CLI:stäsi.",
-    "tryIt": "Kokeile",
     "newCodingTask": "Uusi koodaustehtävä",
     "explore": "Tutustu",
     "seeAll": "Näytä kaikki",
-    "kiloAgents": "Kilo Agentit"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Sulje {{filename}}",

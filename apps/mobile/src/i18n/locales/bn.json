@@ -148,7 +148,9 @@
     "appearanceSystem": "সিস্টেম",
     "appearanceLight": "লাইট",
     "appearanceDark": "ডার্ক",
-    "account": "অ্যাকাউন্ট"
+    "account": "অ্যাকাউন্ট",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "পুল রিকোয়েস্ট অনুপলব্ধ",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "আপনার প্রম্পট হারিয়ে যাবে।",
       "keepEditing": "সম্পাদনা চালিয়ে যান",
       "discard": "বাতিল করুন",
-      "discardFailed": "ড্রাফ্টটি বাতিল করা যায়নি। আবার চেষ্টা করুন।"
+      "discardFailed": "ড্রাফ্টটি বাতিল করা যায়নি। আবার চেষ্টা করুন।",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}টি ফাইল আপডেট হয়েছে",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "সেশন লোড করা যায়নি",
     "couldNotLoadActiveSessions": "সক্রিয় সেশন লোড করা যায়নি",
     "agentSessions": "এজেন্ট সেশন",
-    "showingSavedSessions": "সংরক্ষিত সেশন দেখানো হচ্ছে — লাইভ স্ট্যাটাস পুরানো হতে পারে",
-    "startNewAgentSession": "একটি নতুন Kilo Agent সেশন শুরু করুন",
-    "aiCodingSessions": "AI কোডিং সেশন",
-    "startCodingTaskFromPhone": "আপনার ফোন থেকে একটি কোডিং কাজ শুরু করুন বা আপনার CLI থেকে একটি সেশন চালিয়ে যান।",
-    "tryIt": "চেষ্টা করুন",
     "newCodingTask": "নতুন কোডিং কাজ",
     "explore": "অন্বেষণ",
     "seeAll": "সব দেখুন",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} বন্ধ করুন",

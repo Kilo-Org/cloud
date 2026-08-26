@@ -148,7 +148,9 @@
     "appearanceSystem": "ስርዓት",
     "appearanceLight": "ብርሃን",
     "appearanceDark": "ጨለማ",
-    "account": "መለያ"
+    "account": "መለያ",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "የጎተራ ጥያቄ የለም",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "ጥያቄዎ ይጠፋል።",
       "keepEditing": "ማስተካከል ይቀጥሉ",
       "discard": "ያስወግዱ",
-      "discardFailed": "ረቂቁን ማስወገድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
+      "discardFailed": "ረቂቁን ማስወገድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ፋይል ተዘምኗል",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "ክፍለ-ጊዜዎችን መጫን አልተቻለም",
     "couldNotLoadActiveSessions": "ንቁ ክፍለ-ጊዜዎችን መጫን አልተቻለም",
     "agentSessions": "የወኪል ክፍለ-ጊዜዎች",
-    "showingSavedSessions": "የተቀመጡ ክፍለ-ጊዜዎችን በማሳየት ላይ — የቀጥታ ሁኔታ ጊዜው ያለፈ ሊሆን ይችላል",
-    "startNewAgentSession": "አዲስ የKilo Agent ክፍለ-ጊዜ ይጀምሩ",
-    "aiCodingSessions": "የAI ኮዲንግ ክፍለ-ጊዜዎች",
-    "startCodingTaskFromPhone": "ከስልክዎ የኮዲንግ ተግባር ይጀምሩ ወይም ከCLIዎ ክፍለ-ጊዜ ይቀጥሉ።",
-    "tryIt": "ይሞክሩት",
     "newCodingTask": "አዲስ የኮዲንግ ተግባር",
     "explore": "ይቃኙ",
     "seeAll": "ሁሉንም ይመልከቱ",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}}ን ይዝጉ",

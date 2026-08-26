@@ -148,7 +148,9 @@
     "appearanceSystem": "கணினி",
     "appearanceLight": "வெளிச்சம்",
     "appearanceDark": "இருள்",
-    "account": "கணக்கு"
+    "account": "கணக்கு",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "இழுப்பு கோரிக்கை கிடைக்கவில்லை",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "உங்கள் வினவல் இழக்கப்படும்.",
       "keepEditing": "தொடர்ந்து திருத்து",
       "discard": "நிராகரி",
-      "discardFailed": "வரைவை நிராகரிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
+      "discardFailed": "வரைவை நிராகரிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} கோப்பு புதுப்பிக்கப்பட்டது",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "அமர்வுகளை ஏற்ற முடியவில்லை",
     "couldNotLoadActiveSessions": "செயலில் உள்ள அமர்வுகளை ஏற்ற முடியவில்லை",
     "agentSessions": "முகவர் அமர்வுகள்",
-    "showingSavedSessions": "சேமித்த அமர்வுகளைக் காட்டுகிறது — நேரடி நிலை காலாவதியானதாக இருக்கலாம்",
-    "startNewAgentSession": "புதிய Kilo முகவர் அமர்வைத் தொடங்கு",
-    "aiCodingSessions": "AI குறியீட்டு அமர்வுகள்",
-    "startCodingTaskFromPhone": "உங்கள் தொலைபேசியிலிருந்து குறியீட்டு பணியைத் தொடங்கவும் அல்லது உங்கள் CLIயிலிருந்து ஒரு அமர்வைத் தொடரவும்.",
-    "tryIt": "முயற்சிக்கவும்",
     "newCodingTask": "புதிய குறியீட்டு பணி",
     "explore": "ஆராய்க",
     "seeAll": "அனைத்தையும் காண்க",
-    "kiloAgents": "Kilo முகவர்கள்"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} மூடு",

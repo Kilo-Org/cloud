@@ -148,7 +148,9 @@
     "appearanceSystem": "النظام",
     "appearanceLight": "فاتح",
     "appearanceDark": "داكن",
-    "account": "الحساب"
+    "account": "الحساب",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "الإشعارات",
@@ -1755,7 +1757,8 @@
       "discardDraftMessage": "ستفقد مطالبتك.",
       "discardDraftTitle": "تجاهل المسودة؟",
       "discardFailed": "تعذّر تجاهل المسودة. يرجى المحاولة مرة أخرى.",
-      "keepEditing": "متابعة التعديل"
+      "keepEditing": "متابعة التعديل",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "تم تحديث {{displayCount}} ملف",
@@ -2261,15 +2264,10 @@
     "couldNotLoadSessions": "تعذّر تحميل الجلسات",
     "couldNotLoadActiveSessions": "تعذّر تحميل الجلسات النشطة",
     "agentSessions": "جلسات الوكيل",
-    "showingSavedSessions": "عرض الجلسات المحفوظة — قد تكون الحالة المباشرة قديمة",
-    "startNewAgentSession": "بدء جلسة Kilo Agent جديدة",
-    "aiCodingSessions": "جلسات البرمجة بالذكاء الاصطناعي",
-    "startCodingTaskFromPhone": "ابدأ مهمة برمجة من هاتفك أو تابع جلسة من CLI.",
-    "tryIt": "جرّبه",
     "newCodingTask": "مهمة برمجة جديدة",
     "explore": "استكشف",
     "seeAll": "عرض الكل",
-    "kiloAgents": "وكلاء Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "إغلاق {{filename}}",

@@ -32,6 +32,7 @@ import { fetchModelPreferences } from '@/src/shared/model-preferences-client';
 import { isGatewayModelId } from '@/src/shared/model-picker-rows';
 import { getModelPreferencesQueryKey } from '@/src/shared/side-panel-query-options';
 import { thinkingEffortLabel } from '@/src/shared/kilo-api-client';
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
 import { useExtensionAgents } from './agents-provider';
 import { activeSessionsQueryKey, sessionHistoryQueryKey } from './agents-session-list';
@@ -43,7 +44,7 @@ import { useGatewayModels } from './use-gateway-models';
 // ---------------------------------------------------------------------------
 
 const PROMPT_MIN_LENGTH = 3;
-const PROMPT_MAX_LENGTH = 4000;
+const PROMPT_MAX_LENGTH = CLOUD_AGENT_PROMPT_MAX_LENGTH;
 const MODE = 'code' as const;
 
 /**

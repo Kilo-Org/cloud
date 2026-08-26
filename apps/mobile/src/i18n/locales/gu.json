@@ -148,7 +148,9 @@
     "appearanceSystem": "સિસ્ટમ",
     "appearanceLight": "લાઇટ",
     "appearanceDark": "ડાર્ક",
-    "account": "એકાઉન્ટ"
+    "account": "એકાઉન્ટ",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "પુલ રિક્વેસ્ટ ઉપલબ્ધ નથી",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "તમારો પ્રોમ્પ્ટ ખોવાઈ જશે.",
       "keepEditing": "સંપાદન ચાલુ રાખો",
       "discard": "કાઢી નાખો",
-      "discardFailed": "ડ્રાફ્ટ કાઢી નાખી શકાયો નથી. કૃપા કરીને ફરી પ્રયાસ કરો."
+      "discardFailed": "ડ્રાફ્ટ કાઢી નાખી શકાયો નથી. કૃપા કરીને ફરી પ્રયાસ કરો.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ફાઇલ અપડેટ કરેલ",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "સત્રો લોડ કરી શકાયા નહીં",
     "couldNotLoadActiveSessions": "સક્રિય સત્રો લોડ કરી શકાયા નહીં",
     "agentSessions": "એજન્ટ સત્રો",
-    "showingSavedSessions": "સાચવેલા સત્રો બતાવી રહ્યા છીએ — લાઇવ સ્થિતિ જૂની હોઈ શકે છે",
-    "startNewAgentSession": "નવું Kilo એજન્ટ સત્ર શરૂ કરો",
-    "aiCodingSessions": "AI કોડિંગ સત્રો",
-    "startCodingTaskFromPhone": "તમારા ફોનથી કોડિંગ કાર્ય શરૂ કરો અથવા તમારા CLI માંથી સત્ર ચાલુ રાખો.",
-    "tryIt": "અજમાવો",
     "newCodingTask": "નવું કોડિંગ કાર્ય",
     "explore": "શોધો",
     "seeAll": "બધા જુઓ",
-    "kiloAgents": "Kilo એજન્ટ્સ"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} બંધ કરો",

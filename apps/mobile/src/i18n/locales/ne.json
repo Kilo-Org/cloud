@@ -148,7 +148,9 @@
     "appearanceSystem": "प्रणाली",
     "appearanceLight": "हल्का",
     "appearanceDark": "गाढा",
-    "account": "खाता"
+    "account": "खाता",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "पुल अनुरोध उपलब्ध छैन",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "तपाईंको प्रम्प्ट हराउनेछ।",
       "keepEditing": "सम्पादन जारी राख्नुहोस्",
       "discard": "खारेज गर्नुहोस्",
-      "discardFailed": "ड्राफ्ट खारेज गर्न सकिएन। फेरि प्रयास गर्नुहोस्।"
+      "discardFailed": "ड्राफ्ट खारेज गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्यावधिक गरियो",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "सत्रहरू लोड गर्न सकिएन",
     "couldNotLoadActiveSessions": "सक्रिय सत्रहरू लोड गर्न सकिएन",
     "agentSessions": "एजेन्ट सत्रहरू",
-    "showingSavedSessions": "सुरक्षित सत्रहरू देखाइँदै — लाइभ स्थिति पुरानो हुन सक्छ",
-    "startNewAgentSession": "नयाँ Kilo Agent सत्र सुरु गर्नुहोस्",
-    "aiCodingSessions": "AI कोडिङ सत्रहरू",
-    "startCodingTaskFromPhone": "आफ्नो फोनबाट कोडिङ कार्य सुरु गर्नुहोस् वा आफ्नो CLI बाट सत्र जारी गर्नुहोस्।",
-    "tryIt": "प्रयास गर्नुहोस्",
     "newCodingTask": "नयाँ कोडिङ कार्य",
     "explore": "अन्वेषण",
     "seeAll": "सबै हेर्नुहोस्",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} बन्द गर्नुहोस्",

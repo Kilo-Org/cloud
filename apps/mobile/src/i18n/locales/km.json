@@ -148,7 +148,9 @@
     "appearanceSystem": "ប្រព័ន្ធ",
     "appearanceLight": "ភ្លឺ",
     "appearanceDark": "ងងឹត",
-    "account": "គណនី"
+    "account": "គណនី",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "សំណើទាញ (pull request) មិនអាចប្រើបានទេ",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "ប្រអប់បញ្ចូលរបស់អ្នកនឹងត្រូវបាត់បង់។",
       "keepEditing": "បន្តកែសម្រួល",
       "discard": "បោះបង់",
-      "discardFailed": "មិនអាចបោះបង់សេចក្តីព្រាងបានទេ។ សូមព្យាយាមម្តងទៀត។"
+      "discardFailed": "មិនអាចបោះបង់សេចក្តីព្រាងបានទេ។ សូមព្យាយាមម្តងទៀត។",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "បានធ្វើបច្ចុប្បន្នភាពឯកសារ {{displayCount}}",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "មិនអាចផ្ទុកវគ្គបានទេ",
     "couldNotLoadActiveSessions": "មិនអាចផ្ទុកវគ្គសកម្មបានទេ",
     "agentSessions": "វគ្គភ្នាក់ងារ",
-    "showingSavedSessions": "កំពុងបង្ហាញវគ្គដែលបានរក្សាទុក — ស្ថានភាពបន្តផ្ទាល់អាចហួសសម័យ",
-    "startNewAgentSession": "ចាប់ផ្តើមវគ្គ Kilo Agent ថ្មី",
-    "aiCodingSessions": "វគ្គសរសេរកូដ AI",
-    "startCodingTaskFromPhone": "ចាប់ផ្តើមកិច្ចការសរសេរកូដពីទូរសព្ទរបស់អ្នក ឬបន្តវគ្គពី CLI របស់អ្នក។",
-    "tryIt": "សាកល្បង",
     "newCodingTask": "កិច្ចការសរសេរកូដថ្មី",
     "explore": "ស្វែងយល់",
     "seeAll": "មើលទាំងអស់",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "បិទ {{filename}}",

@@ -148,7 +148,9 @@
     "appearanceSystem": "시스템",
     "appearanceLight": "밝음",
     "appearanceDark": "어두움",
-    "account": "계정"
+    "account": "계정",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "notifications": {
     "title": "알림",
@@ -1723,7 +1725,8 @@
       "discardDraftMessage": "프롬프트가 사라집니다.",
       "discardDraftTitle": "초안을 삭제할까요?",
       "discardFailed": "초안을 삭제할 수 없습니다. 다시 시도하세요.",
-      "keepEditing": "계속 수정"
+      "keepEditing": "계속 수정",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}개 파일 업데이트됨",
@@ -2209,15 +2212,10 @@
     "couldNotLoadSessions": "세션을 불러올 수 없습니다",
     "couldNotLoadActiveSessions": "활성 세션을 불러올 수 없습니다",
     "agentSessions": "에이전트 세션",
-    "showingSavedSessions": "저장된 세션 표시 중 — 실시간 상태가 오래되었을 수 있습니다",
-    "startNewAgentSession": "새 Kilo 에이전트 세션 시작",
-    "aiCodingSessions": "AI 코딩 세션",
-    "startCodingTaskFromPhone": "휴대폰에서 코딩 작업을 시작하거나 CLI에서 세션을 계속하세요.",
-    "tryIt": "사용해 보기",
     "newCodingTask": "새 코딩 작업",
     "explore": "탐색",
     "seeAll": "모두 보기",
-    "kiloAgents": "Kilo 에이전트"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} 닫기",

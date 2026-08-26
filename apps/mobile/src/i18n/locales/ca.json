@@ -148,7 +148,9 @@
     "appearanceSystem": "Sistema",
     "appearanceLight": "Clar",
     "appearanceDark": "Fosc",
-    "account": "Compte"
+    "account": "Compte",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request no disponible",
@@ -2192,7 +2194,8 @@
       "discardDraftMessage": "El teu missatge es perdrà.",
       "keepEditing": "Continua editant",
       "discard": "Descarta",
-      "discardFailed": "No s'ha pogut descartar l'esborrany. Torna-ho a provar."
+      "discardFailed": "No s'ha pogut descartar l'esborrany. Torna-ho a provar.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxer actualitzat",
@@ -2683,15 +2686,10 @@
     "couldNotLoadSessions": "No s'han pogut carregar les sessions",
     "couldNotLoadActiveSessions": "No s'han pogut carregar les sessions actives",
     "agentSessions": "Sessions d'agent",
-    "showingSavedSessions": "S'estan mostrant les sessions desades: l'estat en directe pot estar desactualitzat",
-    "startNewAgentSession": "Inicia una nova sessió d'agent Kilo",
-    "aiCodingSessions": "Sessions de programació d'IA",
-    "startCodingTaskFromPhone": "Inicia una tasca de programació des del teu telèfon o continua una sessió des del teu CLI.",
-    "tryIt": "Prova-ho",
     "newCodingTask": "Nova tasca de programació",
     "explore": "Explora",
     "seeAll": "Veure-ho tot",
-    "kiloAgents": "Agents de Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Tanca {{filename}}",

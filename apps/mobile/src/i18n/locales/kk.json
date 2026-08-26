@@ -148,7 +148,9 @@
     "appearanceSystem": "Жүйе",
     "appearanceLight": "Жарық",
     "appearanceDark": "Қараңғы",
-    "account": "Тіркелгі"
+    "account": "Тіркелгі",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request қолжетімсіз",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "Сұрағыңыз жоғалады.",
       "keepEditing": "Өңдеуді жалғастыру",
       "discard": "Жою",
-      "discardFailed": "Жобаны жою мүмкін болмады. Қайталап көріңіз."
+      "discardFailed": "Жобаны жою мүмкін болмады. Қайталап көріңіз.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл жаңартылды",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "Сессияларды жүктеу мүмкін болмады",
     "couldNotLoadActiveSessions": "Белсенді сессияларды жүктеу мүмкін болмады",
     "agentSessions": "Агент сессиялары",
-    "showingSavedSessions": "Сақталған сессиялар көрсетілуде — тірі күй ескіруі мүмкін",
-    "startNewAgentSession": "Жаңа Kilo Agent сессиясын бастау",
-    "aiCodingSessions": "AI бағдарламалау сессиялары",
-    "startCodingTaskFromPhone": "Телефоннан бағдарламалау тапсырмасын бастаңыз немесе CLI-ден сессияны жалғастырыңыз.",
-    "tryIt": "Көру",
     "newCodingTask": "Жаңа бағдарламалау тапсырмасы",
     "explore": "Зерттеу",
     "seeAll": "Барлығын қарау",
-    "kiloAgents": "Kilo Agent"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} жабу",

@@ -148,7 +148,9 @@
     "appearanceSystem": "Sirna",
     "appearanceLight": "Ifa",
     "appearanceDark": "Dukkana",
-    "account": "Herrega"
+    "account": "Herrega",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request hin jiraatu",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "Prompt kee dhabama.",
       "keepEditing": "Gulaaluu itti fufi",
       "discard": "Haqi",
-      "discardFailed": "Daaftarii haquu hin dandeenye. Mee deebi'ee yaali."
+      "discardFailed": "Daaftarii haquu hin dandeenye. Mee deebi'ee yaali.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Faayilii {{displayCount}} haaromfame",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "Shumarra fudhachuu hin danda'ine",
     "couldNotLoadActiveSessions": "Shumarra hojii fudhachuu hin danda'ine",
     "agentSessions": "Shumarra agent",
-    "showingSavedSessions": "Shumarra kuusame agarsiisaa jira — haalli lubbuu yeroo ittiin gadi aanaa ta'uu danda'a",
-    "startNewAgentSession": "Shumarra Kilo Agent haaraa jalqabi",
-    "aiCodingSessions": "Shumarra code AI",
-    "startCodingTaskFromPhone": "Hojii code bilbilaa kee irraa jalqabi ykn shumarra CLI kee itti fufi.",
-    "tryIt": "Yaali",
     "newCodingTask": "Hojii code haaraa",
     "explore": "Qoradhu",
     "seeAll": "Hunda ilaali",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "{{filename}} cufi",

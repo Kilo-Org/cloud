@@ -148,7 +148,9 @@
     "appearanceSystem": "سیستم",
     "appearanceLight": "روشن",
     "appearanceDark": "تیره",
-    "account": "حساب"
+    "account": "حساب",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "درخواست pull در دسترس نیست",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "پیام شما از بین خواهد رفت.",
       "keepEditing": "ادامه ویرایش",
       "discard": "دور انداختن",
-      "discardFailed": "دور انداختن پیشنویس ممکن نشد. لطفاً دوباره تلاش کنید."
+      "discardFailed": "دور انداختن پیشنویس ممکن نشد. لطفاً دوباره تلاش کنید.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل بهروزرسانی شد",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "جلسات بارگذاری نشدند",
     "couldNotLoadActiveSessions": "جلسات فعال بارگذاری نشدند",
     "agentSessions": "جلسات عامل",
-    "showingSavedSessions": "نمایش جلسات ذخیره‌شده — وضعیت زنده ممکن است به‌روز نباشد",
-    "startNewAgentSession": "شروع یک جلسه جدید Kilo Agent",
-    "aiCodingSessions": "جلسات کدنویسی هوش مصنوعی",
-    "startCodingTaskFromPhone": "از تلفن خود یک کار کدنویسی را شروع کنید یا جلسه را از CLI ادامه دهید.",
-    "tryIt": "امتحان کنید",
     "newCodingTask": "کار کدنویسی جدید",
     "explore": "کاوش",
     "seeAll": "مشاهده همه",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "بستن {{filename}}",

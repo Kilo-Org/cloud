@@ -1717,7 +1717,8 @@
       "discardDraftMessage": "Il tuo prompt andrà perso.",
       "discardDraftTitle": "Scartare la bozza?",
       "discardFailed": "Impossibile scartare la bozza. Riprova.",
-      "keepEditing": "Continua a modificare"
+      "keepEditing": "Continua a modificare",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aggiornato {{displayCount}} file",
@@ -2183,7 +2184,9 @@
     "appearanceSystem": "Sistema",
     "appearanceLight": "Chiaro",
     "appearanceDark": "Scuro",
-    "account": "Account"
+    "account": "Account",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "addCredits": {
     "cta": "Aggiungi crediti",
@@ -2222,15 +2225,10 @@
     "couldNotLoadSessions": "Impossibile caricare le sessioni",
     "couldNotLoadActiveSessions": "Impossibile caricare le sessioni attive",
     "agentSessions": "Sessioni agente",
-    "showingSavedSessions": "Visualizzazione delle sessioni salvate — lo stato live potrebbe non essere aggiornato",
-    "startNewAgentSession": "Avvia una nuova sessione Kilo Agent",
-    "aiCodingSessions": "Sessioni di codifica IA",
-    "startCodingTaskFromPhone": "Avvia un'attività di codifica dal telefono o continua una sessione dalla CLI.",
-    "tryIt": "Provalo",
     "newCodingTask": "Nuova attività di codifica",
     "explore": "Esplora",
     "seeAll": "Vedi tutto",
-    "kiloAgents": "Agenti Kilo"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Chiudi {{filename}}",

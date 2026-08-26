@@ -148,7 +148,9 @@
     "appearanceSystem": "System",
     "appearanceLight": "Golau",
     "appearanceDark": "Tywyll",
-    "account": "Cyfrif"
+    "account": "Cyfrif",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Ni ellir cael y cais tynnu",
@@ -2237,7 +2239,8 @@
       "discardDraftMessage": "Bydd eich anogiad yn cael ei golli.",
       "keepEditing": "Parhau i olygu",
       "discard": "Taflu",
-      "discardFailed": "Methwyd taflu'r drafft. Ceisiwch eto."
+      "discardFailed": "Methwyd taflu'r drafft. Ceisiwch eto.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Diweddarwyd {{displayCount}} ffeil",
@@ -2743,15 +2746,10 @@
     "couldNotLoadSessions": "Methwyd llwytho sesiynau",
     "couldNotLoadActiveSessions": "Methwyd llwytho sesiynau gweithredol",
     "agentSessions": "Sesiynau asiant",
-    "showingSavedSessions": "Yn dangos sesiynau wedi'u cadw — gall y statws byw fod yn hen",
-    "startNewAgentSession": "Dechrau sesiwn Kilo Agent newydd",
-    "aiCodingSessions": "Sesiynau codio AI",
-    "startCodingTaskFromPhone": "Dechreuwch dasg codio o'ch ffôn neu barhewch â sesiwn o'ch CLI.",
-    "tryIt": "Rhoi cynnig arno",
     "newCodingTask": "Tasg codio newydd",
     "explore": "Archwilio",
     "seeAll": "Gweld y cyfan",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Cau {{filename}}",

@@ -148,7 +148,9 @@
     "appearanceSystem": "System",
     "appearanceLight": "Light",
     "appearanceDark": "Dark",
-    "account": "Account"
+    "account": "Account",
+    "prReviewAttribution": "Add app attribution to PR reviews",
+    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
   },
   "prReview": {
     "pullRequestUnavailable": "Hindi available ang pull request",
@@ -2177,7 +2179,8 @@
       "discardDraftMessage": "Mawawala ang iyong prompt.",
       "keepEditing": "Patuloy na mag-edit",
       "discard": "I-discard",
-      "discardFailed": "Hindi ma-discard ang draft. Pakisubukang muli."
+      "discardFailed": "Hindi ma-discard ang draft. Pakisubukang muli.",
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
     },
     "partRenderer": {
       "updatedFileCount_one": "Na-update ang {{displayCount}} file",
@@ -2663,15 +2666,10 @@
     "couldNotLoadSessions": "Hindi ma-load ang mga session",
     "couldNotLoadActiveSessions": "Hindi ma-load ang mga aktibong session",
     "agentSessions": "Mga agent session",
-    "showingSavedSessions": "Ipinapakita ang mga naka-save na session — maaaring luma na ang live status",
-    "startNewAgentSession": "Magsimula ng bagong Kilo Agent session",
-    "aiCodingSessions": "Mga AI coding session",
-    "startCodingTaskFromPhone": "Magsimula ng coding task mula sa iyong telepono o magpatuloy ng session mula sa iyong CLI.",
-    "tryIt": "Subukan ito",
     "newCodingTask": "Bagong coding task",
     "explore": "Mag-explore",
     "seeAll": "Tingnan lahat",
-    "kiloAgents": "Kilo Agents"
+    "noLiveSessions": "Nothing running right now"
   },
   "imageViewer": {
     "close": "Isara ang {{filename}}",

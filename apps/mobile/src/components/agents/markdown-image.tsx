@@ -249,7 +249,6 @@ export function MarkdownImage({
         <ImageViewerModal
           visible={viewerVisible}
           uri={resolveMarkdownImageSrc(uri)}
-          headers={buildMarkdownImageHeaders(token.token, uri)}
           filename={filename}
           onClose={() => {
             setViewerVisible(false);

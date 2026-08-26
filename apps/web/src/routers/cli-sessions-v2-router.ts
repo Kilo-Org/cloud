@@ -79,6 +79,8 @@ function isSessionNotFoundError(err: unknown): boolean {
 
 const PAGE_SIZE = 10;
 const RECENT_DAYS_LIMIT = 200;
+/** Upper bound of PostgreSQL `integer`; a larger needle cannot be a `pr_number`. */
+const PG_MAX_INTEGER = 2_147_483_647;
 
 /**
  * If a refresh was performed within this window, the mutation short-circuits
@@ -381,7 +383,13 @@ const commonSessionFieldsWithPr = {
  * LEFT JOIN predicate that links a session to its per-tenant PR cache row,
  * matching `(git_url, git_branch)` plus the tenant column that corresponds to
  * the session's `organization_id` nullability. Identical shape to
- * `getWithRuntimeState` so the planner can reuse the partial unique indexes.
+ * `getWithRuntimeState`.
+ *
+ * The tenant `or(...)` stops the planner using either partial unique index on
+ * `github_branch_pull_requests`: it cannot prove `owned_by_*_id IS NOT NULL`
+ * per row. `IDX_github_branch_prs_url_branch` carries this join instead. Do
+ * not drop that index — without it every list and search hash-joins against a
+ * sequential scan of the whole cache table.
  */
 export const sessionPrJoinPredicate = and(
   eq(github_branch_pull_requests.git_url, cli_sessions_v2.git_url),
@@ -699,22 +707,6 @@ function joinWithAnd(fragments: SQL[]): SQL {
 }
 
 /**
- * Compute the cursor (next page offset) for search paging.
- *
- * Returns `null` on the last page or when the current page is empty.
- * An empty page with a stale `total` larger than `pageOffset` would return
- * the same cursor under the naive `nextOffset < total` formula and loop
- * loading. The `resultsLength > 0` guard prevents this.
- */
-export function computeSearchNextCursor(
-  resultsLength: number,
-  nextOffset: number,
-  total: number
-): number | null {
-  return resultsLength > 0 && nextOffset < total ? nextOffset : null;
-}
-
-/**
  * Router for cli_sessions_v2 table operations.
  * Used by cloud-agent-next for session storage and retrieval.
  *
@@ -858,50 +850,50 @@ export const cliSessionsV2Router = createTRPCRouter({
     if (needle.length === 0) {
       whereConditions.push(sql`false`);
     } else {
-      whereConditions.push(
-        sql`(
-          position(${needle} in lower(COALESCE(${cli_sessions_v2.title}, ''))) > 0
-          OR position(${needle} in lower(${cli_sessions_v2.session_id}::text)) > 0
-          OR position(${needle} in lower(COALESCE(${cli_sessions_v2.git_url}, ''))) > 0
-          OR position(${needle} in lower(COALESCE(${cli_sessions_v2.git_branch}, ''))) > 0
-          OR position(${needle} in lower(COALESCE(${github_branch_pull_requests.pr_title}, ''))) > 0
-          OR position(${needle} in lower(${github_branch_pull_requests.pr_number}::text)) > 0
-        )`
-      );
+      const matchArms: SQL[] = [
+        sql`position(${needle} in lower(COALESCE(${cli_sessions_v2.title}, ''))) > 0`,
+        sql`position(${needle} in lower(${cli_sessions_v2.session_id}::text)) > 0`,
+        sql`position(${needle} in lower(COALESCE(${cli_sessions_v2.git_url}, ''))) > 0`,
+        sql`position(${needle} in lower(COALESCE(${cli_sessions_v2.git_branch}, ''))) > 0`,
+        sql`position(${needle} in lower(COALESCE(${github_branch_pull_requests.pr_title}, ''))) > 0`,
+      ];
+      // `#1234` and a bare `1234` name one pull request; they are not a
+      // substring search over every stored number. An equality test on the
+      // integer column costs one comparison, while the previous
+      // `position(needle in pr_number::text)` cast the joined cache row for
+      // every session the user owns.
+      const prNumber = Number(needle);
+      if (/^\d+$/.test(needle) && prNumber <= PG_MAX_INTEGER) {
+        matchArms.push(eq(github_branch_pull_requests.pr_number, prNumber));
+      }
+      whereConditions.push(sql`(${sql.join(matchArms, sql` OR `)})`);
     }
 
     const baseWhere = and(...whereConditions);
 
-    const [rawResults, countResult] = await Promise.all([
-      db
-        .select(commonSessionFieldsWithPr)
-        .from(cli_sessions_v2)
-        .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
-        .where(baseWhere)
-        .orderBy(desc(orderColumn))
-        .limit(limit)
-        .offset(pageOffset),
-      // The COUNT mirrors the rows query LEFT JOIN so the provenance
-      // predicates can reference the cache table. The list join can already
-      // double-count a branch with two cache rows; this COUNT matches that
-      // form until the join is uniqued.
-      db
-        .select({ count: sql<string>`COUNT(*)` })
-        .from(cli_sessions_v2)
-        .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
-        .where(baseWhere),
-    ]);
+    // Fetch one row past the page to learn whether another page exists, the
+    // same way `list` does. The previous companion `COUNT(*)` had to walk and
+    // join every session the user owns on every keystroke — it could never
+    // stop early the way this ordered LIMIT does — and its `total` was never
+    // rendered anywhere.
+    const rawResults = await db
+      .select(commonSessionFieldsWithPr)
+      .from(cli_sessions_v2)
+      .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
+      .where(baseWhere)
+      .orderBy(desc(orderColumn))
+      .limit(limit + 1)
+      .offset(pageOffset);
 
-    const results = rawResults.map(projectAssociatedPr);
-    const total = countResult.length > 0 ? Number(countResult[0].count) : 0;
-    const nextOffset = pageOffset + results.length;
+    const hasMore = rawResults.length > limit;
+
+    const results = (hasMore ? rawResults.slice(0, limit) : rawResults).map(projectAssociatedPr);
 
     return {
       results,
-      total,
       limit,
       offset: pageOffset,
-      nextCursor: computeSearchNextCursor(results.length, nextOffset, total),
+      nextCursor: hasMore ? pageOffset + results.length : null,
     };
   }),
 

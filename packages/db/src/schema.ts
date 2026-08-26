@@ -5862,9 +5862,15 @@ export const cli_sessions_v2 = pgTable(
       .on(table.cloud_agent_session_id)
       .where(isNotNull(table.cloud_agent_session_id)),
     index('IDX_cli_sessions_v2_organization_id').on(table.organization_id),
-    index('IDX_cli_sessions_v2_kilo_user_id').on(table.kilo_user_id),
-    index('IDX_cli_sessions_v2_created_at').on(table.created_at),
     index('IDX_cli_sessions_v2_user_updated').on(table.kilo_user_id, table.updated_at),
+    // Mirror of the index above for `orderBy: 'created_at'`. Every list and
+    // search query filters on kilo_user_id first, so a bare created_at index
+    // makes the planner walk the global created_at order and discard other
+    // users' rows: 138 ms for a user with 152k sessions against 3.5 ms here.
+    // The dropped bare kilo_user_id index was a prefix of the pair above.
+    index('IDX_cli_sessions_v2_user_created')
+      .on(table.kilo_user_id, table.created_at)
+      .concurrently(),
     // Supports joins from github_branch_pull_requests on (git_url, git_branch).
     index('cli_sessions_v2_git_url_branch_idx').on(table.git_url, table.git_branch),
   ]
@@ -6120,6 +6126,13 @@ export const github_branch_pull_requests = pgTable(
     uniqueIndex('UQ_github_branch_prs_user')
       .on(table.git_url, table.git_branch, table.owned_by_user_id)
       .where(isNotNull(table.owned_by_user_id)),
+    // The session-to-PR LEFT JOIN matches (git_url, git_branch) and picks the
+    // tenant column with an OR. Neither partial unique index above can serve
+    // that join: the planner cannot prove `owned_by_*_id IS NOT NULL` per row,
+    // so it falls back to a hash join and sequentially scans this whole table
+    // on every session list and search. This plain index restores the nested
+    // loop (292 ms to 2.8 ms on a 1M-row cache).
+    index('IDX_github_branch_prs_url_branch').on(table.git_url, table.git_branch).concurrently(),
     check(
       'github_branch_pull_requests_owner_check',
       sql`(

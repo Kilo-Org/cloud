@@ -14,11 +14,7 @@ import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
 import { TRPCError } from '@trpc/server';
-import {
-  parseGitHubOwnerRepo,
-  parseGitHubPrUrl,
-  computeSearchNextCursor,
-} from '@/routers/cli-sessions-v2-router';
+import { parseGitHubOwnerRepo, parseGitHubPrUrl } from '@/routers/cli-sessions-v2-router';
 import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { captureException } from '@sentry/nextjs';
@@ -1091,7 +1087,6 @@ describe('cli-sessions-v2-router', () => {
       });
 
       expect(result.results).toEqual([]);
-      expect(result.total).toBe(0);
     });
 
     it('recentRepositories omits organization sessions after their creator loses membership', async () => {
@@ -2070,7 +2065,7 @@ describe('cli-sessions-v2-router', () => {
       expect(result.results.map(s => s.session_id)).toEqual([sessionByPr]);
     });
 
-    it('matches by pr_number 42 as text', async () => {
+    it('matches by exact pr_number 42', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.search({ search_string: '42' });
       expect(result.results.map(s => s.session_id)).toEqual([sessionByPr]);
@@ -2092,14 +2087,12 @@ describe('cli-sessions-v2-router', () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.search({ search_string: '#' });
       expect(result.results).toEqual([]);
-      expect(result.total).toBe(0);
     });
 
     it('returns no matches for a whitespace-only needle', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.search({ search_string: '  ' });
       expect(result.results).toEqual([]);
-      expect(result.total).toBe(0);
     });
   });
 
@@ -2638,7 +2631,6 @@ describe('cli-sessions-v2-router', () => {
       const result = await caller.cliSessionsV2.search({ search_string: needle, limit: 2 });
 
       expect(result.results).toHaveLength(2);
-      expect(result.total).toBe(3);
       expect(result.offset).toBe(0);
       expect(result.nextCursor).toBe(2);
       // Default sort is updated_at descending.
@@ -2657,7 +2649,6 @@ describe('cli-sessions-v2-router', () => {
       });
 
       expect(page2.results).toHaveLength(1);
-      expect(page2.total).toBe(3);
       expect(page2.offset).toBe(2);
       expect(page2.nextCursor).toBeNull();
       expect(page1Ids.has(page2.results[0].session_id)).toBe(false);
@@ -2686,28 +2677,21 @@ describe('cli-sessions-v2-router', () => {
       });
 
       expect(result.results).toHaveLength(2);
-      expect(result.total).toBe(3);
       expect(result.offset).toBe(0);
     });
 
-    it('returns null nextCursor on an empty page even when nextOffset < total', () => {
-      // Empty page: results.length === 0, nextOffset === pageOffset.
-      // When pageOffset (2) < total (3), the naive formula
-      //   nextOffset < total ? nextOffset : null
-      // returns 2 — a non-null cursor that would cause an infinite loop.
-      // The empty-results guard prevents this.
-      const resultsLength = 0;
-      const nextOffset = 2;
-      const total = 3;
+    it('returns null nextCursor on a page past the last row', async () => {
+      // A cursor beyond the result set yields an empty page. `hasMore` is
+      // false there, so paging stops instead of handing back the same cursor.
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: needle,
+        limit: 2,
+        cursor: 4,
+      });
 
-      const withGuard = computeSearchNextCursor(resultsLength, nextOffset, total);
-      expect(withGuard).toBeNull();
-
-      // Old formula:  nextOffset < total → truthy, returns nextOffset (wrong)
-      // Empty guard:  resultsLength > 0 → false → null (correct)
-      const oldFormula: number | null = nextOffset < total ? nextOffset : null;
-      expect(oldFormula).toBe(nextOffset);
-      expect(withGuard).not.toBe(oldFormula);
+      expect(result.results).toEqual([]);
+      expect(result.nextCursor).toBeNull();
     });
   });
 
@@ -2846,7 +2830,6 @@ describe('cli-sessions-v2-router', () => {
       });
 
       expect(result.results.map(session => session.session_id)).not.toContain(placeholderId);
-      expect(result.total).toBe(0);
     });
   });
 

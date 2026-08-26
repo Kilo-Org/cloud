@@ -1949,6 +1949,10 @@ async function getUserProviderInfo(user: User): Promise<UserProviderLookupResult
 }
 
 function legacyProviderFromHostedDomain(user: User): AuthProviderId[] {
+  if (user.id.startsWith('oauth/google:')) return ['google'];
+  if (user.id.startsWith('oauth/github:')) return ['github'];
+  if (user.id.startsWith('oauth/gitlab:')) return ['gitlab'];
+
   switch (user.hosted_domain) {
     case hosted_domain_specials.non_workspace_google_account:
       return ['google'];

@@ -1182,9 +1182,14 @@ export const AuditLogAction = z.enum([
   'organization.member.remove', // ✅
   'organization.member.change_role', // ✅
   'organization.member.admin_add',
+  'organization.member.auto_join',
   'organization.sso.auto_provision', // ✅
   'organization.sso.set_domain', // ✅
   'organization.sso.remove_domain', // ✅
+  'organization.domain_claim.create',
+  'organization.domain_claim.verify',
+  'organization.domain_claim.lose_verification',
+  'organization.domain_claim.remove',
   'organization.mode.create', // ✅
   'organization.mode.update', // ✅
   'organization.mode.delete', // ✅

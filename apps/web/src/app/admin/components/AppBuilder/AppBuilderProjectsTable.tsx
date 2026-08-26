@@ -34,9 +34,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, ChevronRight, X, Trash2, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
-import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import type { AdminAppBuilderProject } from '@/routers/admin-app-builder-router';
+import { formatAbsoluteTime, formatRelativeTime } from './format';
 
 type SortField = 'created_at' | 'last_message_at' | 'title';
 type SortOrder = 'asc' | 'desc';
@@ -50,11 +50,6 @@ function toSortedSearchParams(obj: Record<string, unknown>): URLSearchParams {
     if (value) params.set(key, String(value));
   }
   return params;
-}
-
-function formatRelativeTime(timestamp: string | null): string {
-  if (!timestamp) return 'Never';
-  return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
 }
 
 export function AppBuilderProjectsTable() {
@@ -331,7 +326,7 @@ export function AppBuilderProjectsTable() {
                   </TableCell>
                   <TableCell
                     className="text-muted-foreground text-sm"
-                    title={new Date(project.created_at).toLocaleString()}
+                    title={formatAbsoluteTime(project.created_at)}
                   >
                     {formatRelativeTime(project.created_at)}
                   </TableCell>
@@ -339,7 +334,7 @@ export function AppBuilderProjectsTable() {
                     className="text-muted-foreground text-sm"
                     title={
                       project.last_message_at
-                        ? new Date(project.last_message_at).toLocaleString()
+                        ? formatAbsoluteTime(project.last_message_at)
                         : undefined
                     }
                   >

@@ -11,8 +11,8 @@ import { TRPCError } from '@trpc/server';
 import { GeneratePortalLinkIntent, WorkOS, OrganizationDomainState } from '@workos-inc/node';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
-import { organizations } from '@kilocode/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { organization_domain_claims, organizations } from '@kilocode/db/schema';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { OrganizationSSODomainSchema } from '@/lib/organizations/organization-types';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { successResult } from '@/lib/maybe-result';
@@ -48,17 +48,20 @@ async function hasWorkOsConnections(organizationId: string) {
   return connections.data.length > 0;
 }
 
+function domainClaimForWorkOsOrganization(organizationId: string, workOsOrganizationId: string) {
+  return and(
+    eq(organization_domain_claims.organization_id, organizationId),
+    or(
+      eq(organization_domain_claims.workos_organization_id, workOsOrganizationId),
+      isNull(organization_domain_claims.workos_organization_id)
+    )
+  );
+}
+
 export const organizationSsoRouter = createTRPCRouter({
   createConfig: adminProcedure.input(OrgIdSchema).mutation(async opts => {
     const { organizationId } = opts.input;
     await ensureOrganizationAccess(opts.ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
-    const workOSOrg = await getWorkOsOrganizationByExternalId(organizationId);
-    if (workOSOrg) {
-      throw new TRPCError({
-        code: 'CONFLICT',
-        message: 'SSO is already configured for this organization',
-      });
-    }
     const org = await getOrganizationById(organizationId);
     if (!org) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
@@ -67,6 +70,18 @@ export const organizationSsoRouter = createTRPCRouter({
       throw new TRPCError({
         code: 'PRECONDITION_FAILED',
         message: 'Child organizations inherit SSO from their parent',
+      });
+    }
+    const workOSOrg = await getWorkOsOrganizationByExternalId(organizationId);
+    if (workOSOrg) {
+      const domainClaim = await db.query.organization_domain_claims.findFirst({
+        columns: { id: true },
+        where: domainClaimForWorkOsOrganization(organizationId, workOSOrg.id),
+      });
+      if (domainClaim) return workOSOrg;
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'SSO is already configured for this organization',
       });
     }
     const createdOrg = await workos.organizations.createOrganization({
@@ -106,7 +121,22 @@ export const organizationSsoRouter = createTRPCRouter({
     if (!workOSOrg) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'SSO configuration not found' });
     }
-    await workos.organizations.deleteOrganization(workOSOrg.id);
+    await db.transaction(async tx => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended('workos-organization:' || ${organizationId}, 0))`
+      );
+      const domainClaim = await tx.query.organization_domain_claims.findFirst({
+        columns: { id: true },
+        where: domainClaimForWorkOsOrganization(organizationId, workOSOrg.id),
+      });
+      if (domainClaim) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Remove verified domain claims before deleting SSO configuration',
+        });
+      }
+      await workos.organizations.deleteOrganization(workOSOrg.id);
+    });
     return successResult({ message: 'SSO configuration deleted successfully' });
   }),
   generateAdminPortalLink: adminProcedure.input(AdminPortalSchema).mutation(async opts => {

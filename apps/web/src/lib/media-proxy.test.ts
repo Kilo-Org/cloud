@@ -166,6 +166,53 @@ describe('media-proxy', () => {
       );
     });
 
+    it('passes an abort signal to every upstream fetch', async () => {
+      mockFetch.mockResolvedValue(
+        upstreamResponse(new Uint8Array([1]), 200, { 'content-type': 'image/png' })
+      );
+
+      await fetchSafeMedia('https://example.com/a.png');
+
+      expect(mockFetch.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it('rejects a body that exceeds the cap without buffering all of it', async () => {
+      const chunk = new Uint8Array(1024 * 1024);
+      let pulls = 0;
+      let cancelled = false;
+      const body = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          pulls += 1;
+          controller.enqueue(chunk);
+        },
+        cancel() {
+          cancelled = true;
+        },
+      });
+      mockFetch.mockResolvedValue(
+        upstreamResponse(body, 200, { 'content-type': 'image/png', 'content-length': '10' })
+      );
+
+      await expect(fetchSafeMedia('https://example.com/endless.png')).rejects.toThrow(
+        'exceeds the size limit'
+      );
+      expect(pulls).toBeLessThanOrEqual(16);
+      expect(cancelled).toBe(true);
+    });
+
+    it('rejects a Content-Length above the cap even when the body is small', async () => {
+      mockFetch.mockResolvedValue(
+        upstreamResponse(new Uint8Array([1]), 200, {
+          'content-type': 'image/png',
+          'content-length': String(10 * 1024 * 1024 + 1),
+        })
+      );
+
+      await expect(fetchSafeMedia('https://example.com/big.png')).rejects.toThrow(
+        'exceeds the size limit'
+      );
+    });
+
     it('rejects a body larger than 10 MiB', async () => {
       mockFetch.mockResolvedValue(
         upstreamResponse(new Uint8Array(10 * 1024 * 1024 + 1), 200, {

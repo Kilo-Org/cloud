@@ -3,13 +3,33 @@ import { createElement, type ReactElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { emitPrivacyCover } from '@/lib/privacy-cover-events';
+
 import { SessionPageSheet } from './session-page-sheet';
 
 // Mutated between tests so one suite can prove both platform branches and the
 // Android top-inset padding.
-const reactNativeMock = vi.hoisted(() => ({
-  Platform: { OS: 'ios' as string },
-}));
+const reactNativeMock = vi.hoisted(() => {
+  const listeners = new Set<(state: string) => void>();
+  return {
+    Platform: { OS: 'ios' as string },
+    AppState: {
+      addEventListener: (_event: string, listener: (state: string) => void) => {
+        listeners.add(listener);
+        return {
+          remove: () => {
+            listeners.delete(listener);
+          },
+        };
+      },
+    },
+    emitAppState: (state: string) => {
+      for (const listener of listeners) {
+        listener(state);
+      }
+    },
+  };
+});
 const safeAreaMock = vi.hoisted(() => ({
   useSafeAreaInsets: vi.fn(() => ({ top: 0, bottom: 0 })),
 }));
@@ -18,6 +38,7 @@ vi.mock('react-native', () => ({
   Modal: 'Modal',
   View: 'View',
   Platform: reactNativeMock.Platform,
+  AppState: reactNativeMock.AppState,
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: safeAreaMock.useSafeAreaInsets,
@@ -157,6 +178,32 @@ describe('SessionPageSheet mounted', () => {
       press(modal(renderer.root), 'onRequestClose');
     });
     expect(onClose).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('force-closes the Modal on the privacy cover even when onClose leaves it open', async () => {
+    // MessageDetailsSheet passes a stacked closer that only pops its inner
+    // select-text view, so `visible` stays true and the native Modal would
+    // otherwise stay in the Recents snapshot.
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet({ onClose });
+    expect(modal(renderer.root).props.visible).toBe(true);
+
+    await act(async () => {
+      await Promise.resolve();
+      emitPrivacyCover();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(modal(renderer.root).props.visible).toBe(false);
+
+    // The forced close releases on the next foreground, so the caller is not
+    // left holding a sheet that can never show again.
+    await act(async () => {
+      await Promise.resolve();
+      reactNativeMock.emitAppState('active');
+    });
+    expect(modal(renderer.root).props.visible).toBe(true);
 
     renderer.unmount();
   });

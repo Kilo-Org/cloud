@@ -419,6 +419,21 @@ describe('sign-out teardown ordering', () => {
     unmount();
   });
 
+  it('clears the trusted hosts and image confirmations on sign-in', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const trustedHosts = await import('@/lib/hooks/use-trusted-hosts');
+    const imageConfirm = await import('@/components/agents/markdown-image-confirm');
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    expect(trustedHosts.clearTrustedHosts).toHaveBeenCalled();
+    expect(imageConfirm.clearMarkdownImageConfirmMemory).toHaveBeenCalled();
+
+    unmount();
+  });
+
   it('clears the local preferences on sign-out', async () => {
     const { ctx } = await mountAndGetContext();
 

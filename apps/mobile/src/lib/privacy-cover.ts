@@ -2,7 +2,7 @@
  * Whether the active route must be hidden from OS snapshots (Recents / app
  * switcher) and from screen capture. Home and KiloClaw surfaces stay visible;
  * every other sensitive surface (profile, login, agent sessions, PR review,
- * Kilo Pass, device sessions) is covered.
+ * Kilo Pass, device sessions, the share gate) is covered.
  *
  * Consumes the raw tokens from expo-router's `useSegments()`: it reports
  * `login`, not `/login`, so these are token matches, not slash-prefixed paths.
@@ -17,6 +17,9 @@ const COVERED_TOKENS: ReadonlySet<string> = new Set([
   'pr-review',
   'kilo-pass',
   'device-sessions',
+  // Sibling formSheet of `(app)`: previews inbound share text, images and
+  // filenames, and at its half detent leaves the route under it on screen.
+  'share-gate',
 ]);
 
 export function isPrivacyCoverRoute(segments: readonly string[]): boolean {

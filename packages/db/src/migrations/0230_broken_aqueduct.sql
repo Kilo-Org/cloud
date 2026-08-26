@@ -12,4 +12,5 @@ CREATE TABLE "cloud_agent_pending_uploads" (
 	CONSTRAINT "cloud_agent_pending_uploads_status_check" CHECK ("cloud_agent_pending_uploads"."status" IN ('pending', 'linked', 'reaped'))
 );
 --> statement-breakpoint
-CREATE INDEX "IDX_cloud_agent_pending_uploads_user_message_status" ON "cloud_agent_pending_uploads" USING btree ("kilo_user_id","message_uuid","status");
+CREATE INDEX "IDX_cloud_agent_pending_uploads_user_message_status" ON "cloud_agent_pending_uploads" USING btree ("kilo_user_id","message_uuid","status");--> statement-breakpoint
+CREATE INDEX "IDX_cloud_agent_pending_uploads_expired" ON "cloud_agent_pending_uploads" USING btree ("expires_at") WHERE "cloud_agent_pending_uploads"."status" = 'pending';

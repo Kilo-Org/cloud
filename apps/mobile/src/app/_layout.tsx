@@ -537,7 +537,10 @@ function RootLayoutNav() {
   // error path. Calls go through resetShareIntentRef so the unstable context
   // function stays out of the deps.
   useEffect(() => {
-    if (!hasShareIntent) {
+    // Copy the shared files only once the shell can open the gate. Copying
+    // while signed out registers temp files that the sign-in reap in
+    // `clearSessionScopedState` deletes before the gate ever reads them.
+    if (!hasShareIntent || !isShellReady) {
       return undefined;
     }
 
@@ -576,7 +579,7 @@ function RootLayoutNav() {
     return () => {
       cancelled = true;
     };
-  }, [hasShareIntent, shareIntent]);
+  }, [hasShareIntent, shareIntent, isShellReady]);
 
   useEffect(() => {
     const decision = resolveBootstrapDecision({
@@ -891,9 +894,14 @@ function RootLayout() {
     };
   }, []);
 
-  // Reap expired temp files when the app returns to the foreground, deferred
-  // past the current interaction frame so a navigation never waits on it.
+  // Reap expired temp files at cold start and whenever the app returns to the
+  // foreground, deferred past the current interaction frame so a navigation
+  // never waits on it. AppState is already `active` at launch, so the change
+  // listener alone never reaps in a launch/use/kill cycle.
   useEffect(() => {
+    scheduleCacheMaintenance(() => {
+      reapTempFiles();
+    });
     const subscription = AppState.addEventListener('change', nextState => {
       if (nextState === 'active') {
         scheduleCacheMaintenance(() => {

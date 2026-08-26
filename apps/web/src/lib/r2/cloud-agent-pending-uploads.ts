@@ -11,6 +11,9 @@ import { cloud_agent_pending_uploads } from '@kilocode/db/schema';
 
 const CLOUD_AGENT_PENDING_UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;
 
+/** Objects purged per reaper run, so one cron invocation always finishes. */
+const CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH = 500;
+
 export type AdmitPendingUploadParams = {
   kiloUserId: string;
   messageUuid: string;
@@ -21,11 +24,11 @@ export type AdmitPendingUploadParams = {
 
 /**
  * Admit a presigned upload into the pending-upload ledger. Runs in one
- * transaction: count pending rows for this user + message, reject at the
- * file-count bound, reject oversized uploads, then insert the pending row
- * with a 24-hour lease. The inserted row is later flipped to 'linked' by
- * linkPendingUploads when the message is actually sent, or to 'reaped' by
- * reapAbandonedUploads once the lease lapses.
+ * transaction: take the per-(user, message) advisory lock, count pending rows,
+ * reject at the file-count bound, reject oversized uploads, then insert the
+ * pending row with a 24-hour lease. The inserted row is later flipped to
+ * 'linked' by linkPendingUploads when the message is actually sent, or to
+ * 'reaped' once its object is deleted.
  */
 export async function admitPendingUpload({
   kiloUserId,
@@ -35,6 +38,13 @@ export async function admitPendingUpload({
   byteSize,
 }: AdmitPendingUploadParams): Promise<void> {
   await db.transaction(async tx => {
+    // The composer presigns every attached file at once, so an unlocked
+    // count-then-insert lets parallel admits all read the same count and
+    // insert past the bound. The lock releases on commit or rollback.
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${`cloud-agent-pending-upload:${kiloUserId}:${messageUuid}`}))`
+    );
+
     const pendingRows = await tx
       .select({ pendingCount: count() })
       .from(cloud_agent_pending_uploads)
@@ -102,14 +112,65 @@ export type ReapAbandonedUploadsSummary = {
 };
 
 /**
+ * Delete these private objects one by one and report which keys succeeded and
+ * which failed. Deleting an absent key is a no-op, so a retry is safe.
+ */
+async function deletePendingUploadObjects(
+  objectKeys: string[]
+): Promise<{ deletedKeys: string[]; failedKeys: string[] }> {
+  const deletedKeys: string[] = [];
+  const failedKeys: string[] = [];
+  for (const objectKey of objectKeys) {
+    try {
+      await r2Client.send(
+        new DeleteObjectCommand({
+          Bucket: r2CloudAgentAttachmentsBucketName,
+          Key: objectKey,
+        })
+      );
+      deletedKeys.push(objectKey);
+    } catch (error) {
+      console.error('[cloud-agent] Failed to delete abandoned upload', objectKey, error);
+      failedKeys.push(objectKey);
+    }
+  }
+  return { deletedKeys, failedKeys };
+}
+
+/**
+ * Delete the private objects behind these pending rows, then mark the rows
+ * whose delete succeeded 'reaped'. Object first, row second: a failed delete
+ * or a run that is cut short leaves the row 'pending', so the next reaper run
+ * retries it instead of orphaning the object. Returns the number of rows marked.
+ */
+async function purgePendingUploadObjects(objectKeys: string[]): Promise<number> {
+  const { deletedKeys } = await deletePendingUploadObjects(objectKeys);
+
+  if (deletedKeys.length === 0) return 0;
+
+  const marked = await db
+    .update(cloud_agent_pending_uploads)
+    .set({ status: 'reaped' })
+    .where(
+      and(
+        eq(cloud_agent_pending_uploads.status, 'pending'),
+        inArray(cloud_agent_pending_uploads.object_key, deletedKeys)
+      )
+    )
+    .returning({ id: cloud_agent_pending_uploads.id });
+
+  return marked.length;
+}
+
+/**
  * Release a set of pending rows back out of the per-message quota when the
  * caller abandons the files before sending (e.g. removes them from the
- * composer). Only the caller's own 'pending' rows are released; 'linked' rows
- * (already sent) and other users' rows stay untouched. The claim is atomic,
- * like reapAbandonedUploads: a single DELETE removes the 'pending' rows and
- * returns their keys, so a link landing between the claim and the object
- * delete (or after it) can never have its sent object deleted -- the claim
- * only ever matches 'pending', and a link that loses the race updates no row.
+ * composer). The rows are claimed in one statement before the object delete:
+ * a link landing after the claim matches no 'pending' row, so an attachment
+ * that was actually sent can never lose its object. Only the caller's own
+ * 'pending' rows are claimed; 'linked' rows (already sent) and other users'
+ * rows stay untouched. A delete that fails puts its row back to 'pending' so
+ * the reaper retries it instead of orphaning the object.
  */
 export async function releasePendingUploads(
   kiloUserId: string,
@@ -118,7 +179,8 @@ export async function releasePendingUploads(
   if (objectKeys.length === 0) return;
 
   const claimed = await db
-    .delete(cloud_agent_pending_uploads)
+    .update(cloud_agent_pending_uploads)
+    .set({ status: 'reaped' })
     .where(
       and(
         eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
@@ -128,48 +190,57 @@ export async function releasePendingUploads(
     )
     .returning({ object_key: cloud_agent_pending_uploads.object_key });
 
-  for (const row of claimed) {
-    await r2Client.send(
-      new DeleteObjectCommand({
-        Bucket: r2CloudAgentAttachmentsBucketName,
-        Key: row.object_key,
-      })
-    );
+  if (claimed.length === 0) return;
+
+  const { failedKeys } = await deletePendingUploadObjects(claimed.map(row => row.object_key));
+
+  if (failedKeys.length > 0) {
+    await db
+      .update(cloud_agent_pending_uploads)
+      .set({ status: 'pending' })
+      .where(
+        and(
+          eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+          eq(cloud_agent_pending_uploads.status, 'reaped'),
+          inArray(cloud_agent_pending_uploads.object_key, failedKeys)
+        )
+      );
   }
 }
 
 /**
+ * Delete the private objects behind every pending upload this user admitted,
+ * so account deletion does not drop the only handle the reaper has on them.
+ */
+export async function purgeUserPendingUploads(kiloUserId: string): Promise<void> {
+  const rows = await db
+    .select({ object_key: cloud_agent_pending_uploads.object_key })
+    .from(cloud_agent_pending_uploads)
+    .where(
+      and(
+        eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+        eq(cloud_agent_pending_uploads.status, 'pending')
+      )
+    );
+
+  await purgePendingUploadObjects(rows.map(row => row.object_key));
+}
+
+/**
  * Delete the private R2 objects behind abandoned pending uploads whose
- * 24-hour lease has lapsed. The claim is atomic: a single UPDATE flips the
- * expired 'pending' rows to 'reaped' and returns their keys, so a link landing
- * between the select and the delete (or after) can never have its sent object
- * deleted — the claim only ever matches 'pending'. Single-key deletes are
- * enough here because the ledger already knows each object key; a delete of an
- * already-absent key is a no-op, so re-runs are safe.
+ * 24-hour lease has lapsed, one bounded batch per run.
  */
 export async function reapAbandonedUploads(): Promise<ReapAbandonedUploadsSummary> {
-  const claimed = await db
-    .update(cloud_agent_pending_uploads)
-    .set({ status: 'reaped' })
+  const expired = await db
+    .select({ object_key: cloud_agent_pending_uploads.object_key })
+    .from(cloud_agent_pending_uploads)
     .where(
       and(
         eq(cloud_agent_pending_uploads.status, 'pending'),
         sql`${cloud_agent_pending_uploads.expires_at} < now()`
       )
     )
-    .returning({
-      id: cloud_agent_pending_uploads.id,
-      object_key: cloud_agent_pending_uploads.object_key,
-    });
+    .limit(CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH);
 
-  for (const row of claimed) {
-    await r2Client.send(
-      new DeleteObjectCommand({
-        Bucket: r2CloudAgentAttachmentsBucketName,
-        Key: row.object_key,
-      })
-    );
-  }
-
-  return { reaped: claimed.length };
+  return { reaped: await purgePendingUploadObjects(expired.map(row => row.object_key)) };
 }

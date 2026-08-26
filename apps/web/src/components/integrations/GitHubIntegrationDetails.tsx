@@ -468,7 +468,7 @@ function GitHubIntegrationDetailsContent({
         destructive: true,
       })
     ) {
-      uninstallApp.mutate(input, {
+      uninstallApp.mutate(managementInput, {
         onSuccess: async () => {
           toast.success('GitHub App uninstalled');
           await refetch();
@@ -492,7 +492,7 @@ function GitHubIntegrationDetailsContent({
         destructive: true,
       })
     ) {
-      cancelPendingInstallation.mutate(input, {
+      cancelPendingInstallation.mutate(managementInput, {
         onSuccess: async () => {
           toast.success('Installation request cancelled');
           await refetch();
@@ -507,7 +507,7 @@ function GitHubIntegrationDetailsContent({
   };
 
   const handleRefresh = () => {
-    refreshInstallation.mutate(input, {
+    refreshInstallation.mutate(managementInput, {
       onSuccess: async () => {
         toast.success('Installation details refreshed', {
           description: 'Permissions and repositories have been updated from GitHub.',
@@ -542,6 +542,9 @@ function GitHubIntegrationDetailsContent({
   }
 
   const installation = installationData?.installation;
+  const managementInput = organizationId
+    ? { organizationId, integrationId: installation?.id }
+    : undefined;
   const status = installation?.status;
   const isPendingApproval = status === 'awaiting_installation';
 

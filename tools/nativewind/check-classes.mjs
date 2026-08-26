@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Tailwind classes that go wrong in a way nothing else reports.
+ * Mobile patterns that go wrong in a way nothing else reports.
  *
  * Two kinds. Some are dropped outright, so the element renders with no
  * background, no shadow, no alignment, and the build stays quiet — each of
@@ -95,6 +95,71 @@ function checkScrollPadding(relative, text) {
   }
 }
 
+/**
+ * `Text` from `react-native` renders without the shared component's RTL
+ * paragraph direction, so its copy stays left-aligned in Arabic, Farsi and
+ * Hebrew while everything beside it mirrors. Importing it under an alias is
+ * fine: `type Text as RNText` is how callers type a ref.
+ *
+ * The exemption is a hidden node measured for height. It must not inherit the
+ * shared component's base font classes, or the measurement stops matching the
+ * input it mirrors.
+ */
+const RAW_TEXT_IMPORT = /import\s*\{([^}]*)\}\s*from\s*'react-native'/gs;
+const RAW_TEXT_EXEMPT = new Set([
+  // A hidden node measured for height. It must not inherit the shared
+  // component's base font classes, or the measurement stops matching the
+  // input it mirrors.
+  'apps/mobile/src/components/agents/use-text-height.tsx',
+  // These two build the agent's markdown surface with their own computed
+  // styles, and a `mobile-pure` test reaches them — importing the shared
+  // component would pull @rn-primitives/slot's untransformed JSX into a node
+  // environment. Both apply `withRtlWritingDirection` from the same source.
+  'apps/mobile/src/components/agents/markdown-renderer.ts',
+  'apps/mobile/src/components/agents/markdown-table.tsx',
+]);
+
+function checkRawText(relative, text) {
+  if (RAW_TEXT_EXEMPT.has(relative) || relative.endsWith('components/ui/text.tsx')) {
+    return;
+  }
+  for (const match of text.matchAll(RAW_TEXT_IMPORT)) {
+    const bare = match[1].split(',').some(name => name.trim() === 'Text');
+    if (bare) {
+      const line = text.slice(0, match.index).split('\n').length;
+      fail(
+        `${relative}:${line}: imports Text from 'react-native'; use @/components/ui/text so the copy follows the RTL paragraph direction`
+      );
+    }
+  }
+}
+
+/**
+ * Formatting built here instead of through `@/lib/intl-cache` skips the tag
+ * normalisation every other surface shares — the reason a Serbian user read
+ * Latin copy beside a Cyrillic month name — and pins or ignores the locale.
+ * Scoped to the app: `packages/app-shared` is web's too, and its hardcoded
+ * `en-US` calls are a separate decision.
+ */
+const DIRECT_INTL = /new Intl\.\w+|\.toLocale(?:Date|Time|)String\s*\(/g;
+const DIRECT_INTL_DIR = join(ROOT, 'apps/mobile/src');
+
+function checkDirectIntl(relative, absolute, text) {
+  if (!absolute.startsWith(DIRECT_INTL_DIR) || relative.endsWith('lib/intl-cache.ts')) {
+    return;
+  }
+  for (const [index, line] of text.split('\n').entries()) {
+    if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) {
+      continue;
+    }
+    for (const match of line.matchAll(DIRECT_INTL)) {
+      fail(
+        `${relative}:${index + 1}: "${match[0]}" builds its own formatter; go through @/lib/intl-cache so the locale is normalised once`
+      );
+    }
+  }
+}
+
 function sourceFiles(dir, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
@@ -114,6 +179,8 @@ for (const dir of SOURCE_DIRS) {
     const text = readFileSync(file, 'utf8');
     const relative = file.slice(ROOT.length);
     checkScrollPadding(relative, text);
+    checkRawText(relative, text);
+    checkDirectIntl(relative, file, text);
     const lines = text.split('\n');
     for (const rule of RULES) {
       for (const [index, line] of lines.entries()) {
@@ -170,4 +237,4 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log('check-classes: no dropped or direction-dependent NativeWind classes');
+console.log('check-classes: no dropped classes, stray raw Text or hand-built formatters');

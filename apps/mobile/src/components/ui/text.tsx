@@ -3,6 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { I18nManager, Text as RNText, type Role } from 'react-native';
 
+import { RTL_WRITING_DIRECTION } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 const textVariants = cva('text-foreground text-base font-medium', {
@@ -48,15 +49,6 @@ const ARIA_LEVEL = {
 } satisfies Partial<Record<TextVariant, string>>;
 
 const TextClassContext = React.createContext<string | undefined>(undefined);
-
-// RN 0.86 does not resolve `textAlign: 'auto'` from the native layout
-// direction on iOS, so a full-width Text renders left-aligned in an RTL
-// interface. Naming the paragraph's base direction makes the natural
-// alignment resolve, and unlike `textAlign` it leaves `text-center` and
-// friends alone. Applied only in RTL so LTR rendering is untouched, and it
-// sits first so a caller's own `style` still wins (the language picker
-// forces each row into its own script's direction that way).
-const RTL_WRITING_DIRECTION = { writingDirection: 'rtl' } as const;
 
 function Text({
   className,

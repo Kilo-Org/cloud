@@ -30,6 +30,7 @@ import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanima
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { withRtlWritingDirection } from '@/lib/rtl-text';
 import { moveA11yFocus } from '@/lib/a11y/announce';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
@@ -218,11 +219,17 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
         <Table2 size={18} color={palette.textColor} />
         <View>
           {/* eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant text color */}
-          <Text className="text-sm font-medium" style={{ color: palette.textColor }}>
+          <Text
+            className="text-sm font-medium"
+            style={withRtlWritingDirection({ color: palette.textColor })}
+          >
             {t('agentChat.markdownTable.viewTable')}
           </Text>
           {/* eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant text color */}
-          <Text className="text-xs" style={{ color: palette.mutedTextColor }}>
+          <Text
+            className="text-xs"
+            style={withRtlWritingDirection({ color: palette.mutedTextColor })}
+          >
             {formatTableSummary(columnCount, rows.length)}
           </Text>
         </View>
@@ -250,6 +257,7 @@ export function MarkdownTable({ palette, header, rows }: Readonly<MarkdownTableP
               ref={titleRef}
               accessibilityRole="header"
               className="text-lg font-semibold text-foreground"
+              style={withRtlWritingDirection(undefined)}
             >
               {t('agentChat.markdownTable.title')}
             </Text>

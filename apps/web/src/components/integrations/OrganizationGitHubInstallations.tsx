@@ -8,7 +8,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { buildGitHubInstallState } from './github-install-state';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   DropdownMenu,
@@ -18,7 +18,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useConfirm } from '@/components/ui/confirm';
-import { cn } from '@/lib/utils';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 
 type OrganizationGitHubInstallationsProps = {
@@ -97,55 +96,68 @@ export function OrganizationGitHubInstallations({
   };
 
   if (query.isLoading) {
-    return <div className="h-40 animate-pulse rounded-xl border border-border bg-card" />;
+    return (
+      <Card className="overflow-hidden" aria-busy="true" aria-label="Loading GitHub organizations">
+        <div className="px-5 py-5 sm:px-6">
+          <div className="h-5 w-44 animate-pulse rounded bg-muted" />
+        </div>
+        <div className="border-border flex items-center gap-3 border-t px-4 py-5 sm:px-6">
+          <div className="size-5 animate-pulse rounded bg-muted" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+            <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+          </div>
+        </div>
+      </Card>
+    );
   }
 
   const installations = query.data?.installations ?? [];
   return (
-    <Card className="min-w-0 overflow-hidden">
-      <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1.5">
-          <CardTitle>GitHub organizations</CardTitle>
-          <CardDescription>
-            Connect the GitHub organizations whose repositories Kilo Cloud Agent and Code Reviewer
-            can use.
-          </CardDescription>
+    <section className="min-w-0" aria-labelledby="github-organizations-heading">
+      <Card className="overflow-hidden">
+        <div className="flex flex-col gap-3 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <h2 id="github-organizations-heading" className="type-heading">
+            GitHub organizations
+          </h2>
+          {query.data?.canAdd && (
+            <Button
+              onClick={startInstall}
+              disabled={starting}
+              className="min-h-11 w-full shrink-0 sm:min-h-0 sm:w-auto"
+            >
+              <Github className="size-4" />
+              {starting ? 'Opening GitHub...' : 'Connect GitHub'}
+            </Button>
+          )}
         </div>
-        {query.data?.canAdd && (
-          <Button onClick={startInstall} disabled={starting} className="shrink-0">
-            <Github className="size-4" />
-            {starting ? 'Opening GitHub...' : 'Connect GitHub'}
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent>
+
         {query.isError ? (
-          <p className="text-destructive text-sm">Could not load GitHub organizations.</p>
+          <p className="border-border border-t px-5 py-6 text-sm text-destructive sm:px-6">
+            Could not load GitHub organizations.
+          </p>
         ) : installations.length === 0 ? (
-          <div className="min-w-0 rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+          <p className="border-border border-t px-5 py-8 text-center text-sm text-muted-foreground sm:px-6">
             No GitHub organizations are connected yet. GitHub will let you choose an organization
             and repository access.
-          </div>
+          </p>
         ) : (
-          <div className="divide-y rounded-lg border">
+          <div className="divide-border border-border divide-y border-t">
             {installations.map(installation => {
               const selectedCount = installation.repositories.length;
               const repositoryScope =
                 installation.repositorySelection === 'all'
                   ? 'All repositories'
                   : `${selectedCount} selected ${selectedCount === 1 ? 'repository' : 'repositories'}`;
+              const accountName = installation.accountLogin ?? 'GitHub organization';
               return (
                 <Collapsible key={installation.id}>
-                  <div className="flex min-w-0 items-center gap-3 p-4">
-                    <Github className="size-5 shrink-0 text-muted-foreground" />
+                  <div className="flex min-w-0 items-center gap-3 px-4 py-4 sm:px-5">
+                    <Github className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="truncate font-medium">
-                          {installation.accountLogin ?? 'GitHub organization'}
-                        </span>
-                        <Badge
-                          variant={installation.status === 'connected' ? 'default' : 'secondary'}
-                        >
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <span className="max-w-full truncate font-medium">{accountName}</span>
+                        <Badge variant={installation.status === 'connected' ? 'new' : 'secondary'}>
                           {statusLabel[installation.status]}
                         </Badge>
                         {installation.isPrimary && installations.length > 1 && (
@@ -156,8 +168,13 @@ export function OrganizationGitHubInstallations({
                     </div>
                     {installation.repositorySelection === 'selected' && selectedCount > 0 && (
                       <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="group shrink-0">
-                          Repositories
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="group min-h-11 min-w-11 shrink-0 px-0 sm:min-h-0 sm:min-w-0 sm:px-3"
+                          aria-label={`Show repositories for ${accountName}`}
+                        >
+                          <span className="hidden sm:inline">Repositories</span>
                           <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
                         </Button>
                       </CollapsibleTrigger>
@@ -167,7 +184,8 @@ export function OrganizationGitHubInstallations({
                         <Button
                           variant="ghost"
                           size="icon"
-                          aria-label={`Manage ${installation.accountLogin ?? 'GitHub organization'}`}
+                          className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0"
+                          aria-label={`Manage ${accountName}`}
                         >
                           <MoreHorizontal className="size-4" />
                         </Button>
@@ -234,12 +252,12 @@ export function OrganizationGitHubInstallations({
                   </div>
                   {installation.repositorySelection === 'selected' && (
                     <CollapsibleContent>
-                      <div className="border-t bg-muted/30 px-4 py-3">
+                      <div className="border-border bg-muted/30 border-t px-4 py-3 sm:px-5">
                         <ul className="grid gap-1 sm:grid-cols-2">
                           {installation.repositories.map(repository => (
                             <li
                               key={repository.id}
-                              className={cn('truncate font-mono text-xs text-muted-foreground')}
+                              className="truncate font-mono text-xs text-muted-foreground"
                             >
                               {repository.full_name}
                             </li>
@@ -253,7 +271,7 @@ export function OrganizationGitHubInstallations({
             })}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </Card>
+    </section>
   );
 }

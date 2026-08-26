@@ -122,6 +122,23 @@ describe('reapTempFiles', () => {
     expect(readRegistry()).toEqual([{ uri: 'file:///cache/fresh.txt', createdAt: now }]);
   });
 
+  it('leaves the registry file untouched when nothing expired', () => {
+    // Every cold start and every foreground reaps. A rewrite with identical
+    // content is a pointless synchronous write on the JS thread.
+    const seeded = JSON.stringify(
+      [{ uri: 'file:///cache/fresh.txt', createdAt: Date.now() }],
+      null,
+      2
+    );
+    fileStore.set(REGISTRY_URI, seeded);
+    fileStore.set('file:///cache/fresh.txt', 'fresh');
+
+    reapTempFiles();
+
+    expect(fileStore.get(REGISTRY_URI)).toBe(seeded);
+    expect(fileStore.has('file:///cache/fresh.txt')).toBe(true);
+  });
+
   it('does not throw when a registered file is already missing', () => {
     registerTempFile('file:///cache/gone.txt');
     // The file is never written, so it is missing at reap time.

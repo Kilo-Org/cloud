@@ -16,6 +16,7 @@ import {
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 import {
+  composeSessionProvenanceSubtitle,
   composeStoredSessionSpokenMeta,
   composeStoredSessionVisibleMeta,
   formatMeta,
@@ -56,6 +57,7 @@ type StoredSessionRowProps = {
     status: string | null;
     status_updated_at: string | null;
     total_cost_microdollars: number | null;
+    associatedPr?: { number: number } | null;
   };
   /**
    * Which timestamp drives the row's relative meta label. The list
@@ -161,6 +163,18 @@ export function StoredSessionRow({
         formatSpokenTimeAgo(timestamp)
       );
 
+  // Provenance subtitle: list rows show "branch · #N", card rows keep the
+  // branch-only subtitle. The spoken label mirrors this: branch text plus
+  // the "pull request N" phrase, with the PR phrase only on the list variant.
+  const subtitle =
+    variant === 'card'
+      ? session.git_branch
+      : composeSessionProvenanceSubtitle({
+          branch: session.git_branch,
+          prNumber: session.associatedPr?.number,
+        });
+  const spokenPrNumber = variant === 'card' ? null : (session.associatedPr?.number ?? null);
+
   // Platform icon only on the Agents list variant. Home cards stay
   // byte-identical (platformIcon defaults to undefined).
   const { iconKind: platformIconKind, spokenPlatform: a11yPlatform } =
@@ -192,6 +206,8 @@ export function StoredSessionRow({
           needsInput,
           badge: agentLabel,
           meta: spokenMeta,
+          subtitle: session.git_branch,
+          prNumber: spokenPrNumber,
           platform: a11yPlatform,
         })}
         className="active:opacity-70"
@@ -199,7 +215,7 @@ export function StoredSessionRow({
         <SessionRow
           agentLabel={agentLabel}
           title={title}
-          subtitle={session.git_branch}
+          subtitle={subtitle}
           meta={visibleMeta}
           live={live}
           metaWhileLive={metaWhileLive}

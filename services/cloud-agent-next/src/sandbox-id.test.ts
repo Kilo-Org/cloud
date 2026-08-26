@@ -62,6 +62,47 @@ describe('generateSandboxId', () => {
       expect(id1).toBe(id2);
     });
 
+    it('keeps control-plane and legacy shared IDs disjoint for the same owner', async () => {
+      const uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+      const legacy = await generateSandboxId(undefined, 'org-id', 'user-id', `agent_${uuid}`);
+      const control = await generateSandboxId(undefined, 'org-id', 'user-id', `workspace_${uuid}`);
+      expect(legacy).not.toBe(control);
+      expect(legacy.startsWith('org-')).toBe(true);
+      expect(control.startsWith('org-')).toBe(true);
+    });
+
+    it('keeps control-plane and legacy isolated IDs disjoint', async () => {
+      const uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+      const legacy = await generateSandboxId('*', 'org-id', 'user-id', `agent_${uuid}`);
+      const control = await generateSandboxId('*', 'org-id', 'user-id', `workspace_${uuid}`);
+      expect(legacy).not.toBe(control);
+      expect(legacy.startsWith('ses-')).toBe(true);
+      expect(control.startsWith('ses-')).toBe(true);
+    });
+
+    it('derives disjoint shared IDs from control-plane versus legacy route keys', async () => {
+      const uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+      const legacyRoute = await generateSandboxRoutingTarget(
+        undefined,
+        'org-id',
+        'user-id',
+        `agent_${uuid}`
+      );
+      const controlRoute = await generateSandboxRoutingTarget(
+        undefined,
+        'org-id',
+        'user-id',
+        `workspace_${uuid}`
+      );
+      expect(legacyRoute.kind).toBe('shared');
+      expect(controlRoute.kind).toBe('shared');
+      if (legacyRoute.kind !== 'shared' || controlRoute.kind !== 'shared') return;
+      expect(legacyRoute.routeKey).not.toBe(controlRoute.routeKey);
+      expect(await deriveSharedSandboxId(legacyRoute.routeKey, 'a')).not.toBe(
+        await deriveSharedSandboxId(controlRoute.routeKey, 'a')
+      );
+    });
+
     it.each([
       [
         'org',
@@ -426,6 +467,20 @@ describe('generateSandboxId', () => {
 });
 
 describe('selectSandboxForNewSession', () => {
+  const completeVercelConfiguration = {
+    VERCEL_SANDBOX_ORG_IDS: 'org-id',
+    VERCEL_TOKEN: 'token',
+    VERCEL_TEAM_ID: 'team-id',
+    VERCEL_PROJECT_ID: 'project-id',
+    VERCEL_SANDBOX_SNAPSHOT_ID: 'snapshot-id',
+    VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'build-id',
+    VERCEL_SANDBOX_RUNTIME: 'node24',
+    VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
+    VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
+  };
+  const controlSessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
+  const legacySessionId = 'agent_12345678-1234-1234-1234-123456789abc';
+
   it('selects Cloudflare by default while preserving shared sandbox allocation', async () => {
     const selection = await selectSandboxForNewSession({
       env: {},
@@ -438,9 +493,128 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^org-/);
   });
 
-  it('selects Cloudflare for isolated per-session organizations', async () => {
+  it('selects Vercel for an enabled, allowlisted, isolated control-plane session', async () => {
     const selection = await selectSandboxForNewSession({
-      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id' },
+      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', ...completeVercelConfiguration },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: controlSessionId,
+    });
+
+    expect(selection.provider).toBe('vercel');
+    expect(selection.sandboxId).toMatch(/^ses-/);
+  });
+
+  it('keeps an enrolled isolated legacy session on Cloudflare', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', ...completeVercelConfiguration },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: legacySessionId,
+    });
+
+    expect(selection.provider).toBe('cloudflare');
+    expect(selection.sandboxId).toMatch(/^ses-/);
+  });
+
+  it('keeps an enrolled organization on Cloudflare when it is not isolated', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: { ...completeVercelConfiguration },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: 'session-id',
+    });
+
+    expect(selection.provider).toBe('cloudflare');
+    expect(selection.sandboxId).toMatch(/^org-/);
+  });
+
+  it.each(Object.keys(completeVercelConfiguration))(
+    'keeps partial Vercel configuration on Cloudflare when %s is absent',
+    async missingKey => {
+      const configuration = { ...completeVercelConfiguration };
+      delete configuration[missingKey as keyof typeof configuration];
+      const selection = await selectSandboxForNewSession({
+        env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', ...configuration },
+        orgId: 'org-id',
+        userId: 'user-id',
+        sessionId: 'session-id',
+      });
+
+      expect(selection.provider).toBe('cloudflare');
+      expect(selection.sandboxId).toMatch(/^ses-/);
+    }
+  );
+
+  it('keeps organizations outside the explicit Vercel allowlist on Cloudflare', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: {
+        PER_SESSION_SANDBOX_ORG_IDS: 'org-id',
+        ...completeVercelConfiguration,
+        VERCEL_SANDBOX_ORG_IDS: 'other-org',
+      },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: 'session-id',
+    });
+
+    expect(selection.provider).toBe('cloudflare');
+    expect(selection.sandboxId).toMatch(/^ses-/);
+  });
+
+  it('selects Vercel for any isolated control-plane organization when enrollment is wildcarded', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: {
+        PER_SESSION_SANDBOX_ORG_IDS: '*',
+        ...completeVercelConfiguration,
+        VERCEL_SANDBOX_ORG_IDS: '*',
+      },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: controlSessionId,
+    });
+
+    expect(selection.provider).toBe('vercel');
+    expect(selection.sandboxId).toMatch(/^ses-/);
+  });
+
+  it('keeps personal legacy sessions on Cloudflare even when Vercel enrollment is wildcarded', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: {
+        PER_SESSION_SANDBOX_ORG_IDS: '*',
+        ...completeVercelConfiguration,
+        VERCEL_SANDBOX_ORG_IDS: '*',
+      },
+      userId: 'user-id',
+      sessionId: legacySessionId,
+    });
+
+    expect(selection.provider).toBe('cloudflare');
+    expect(selection.sandboxId).toMatch(/^ses-/);
+  });
+
+  it('selects Vercel for personal isolated control-plane sessions when enrollment is wildcarded', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: {
+        PER_SESSION_SANDBOX_ORG_IDS: '*',
+        ...completeVercelConfiguration,
+        VERCEL_SANDBOX_ORG_IDS: '*',
+      },
+      userId: 'user-id',
+      sessionId: controlSessionId,
+    });
+
+    expect(selection.provider).toBe('vercel');
+    expect(selection.sandboxId).toMatch(/^ses-/);
+  });
+
+  it('keeps invalid operational configuration on Cloudflare', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: {
+        PER_SESSION_SANDBOX_ORG_IDS: 'org-id',
+        ...completeVercelConfiguration,
+        VERCEL_SANDBOX_RUNTIME: 'node22',
+      },
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: 'session-id',
@@ -452,7 +626,7 @@ describe('selectSandboxForNewSession', () => {
 
   it('keeps devcontainer sessions on Cloudflare DIND allocation', async () => {
     const selection = await selectSandboxForNewSession({
-      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id' },
+      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', ...completeVercelConfiguration },
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: 'session-id',

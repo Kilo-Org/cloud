@@ -12,7 +12,15 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Keyboard, Platform, ScrollView, type TextInput, View } from 'react-native';
+import {
+  Alert,
+  InteractionManager,
+  Keyboard,
+  Platform,
+  ScrollView,
+  type TextInput,
+  View,
+} from 'react-native';
 
 import {
   PrFormSheetFooter,
@@ -44,7 +52,9 @@ import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 import { type PendingReviewItem, usePendingReview } from '@/lib/pr-review/pending-review-provider';
 import { partitionPendingItems } from '@/lib/pr-review/partition-pending-items';
 import { useSubmitReviewMutation } from '@/lib/pr-review/use-pr-review-mutations';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
+import { maybeAskAfterSuccessfulOutcome } from '@/lib/feedback';
 import { buildReviewFooter } from '@/lib/pr-review/review-footer';
 import {
   selectPartialSubmitMessage,
@@ -69,6 +79,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const pending = usePendingReview();
   const { t } = useTranslation();
   const submitReview = useSubmitReviewMutation({ owner, repo, number });
+  const { userId } = useCurrentUserId();
   const { prReviewFooter, hasLoaded: prReviewFooterLoaded } = usePrReviewFooterPreference();
 
   const [event, setEvent] = useState<ReviewEvent>('COMMENT');
@@ -192,6 +203,10 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         );
       } else {
         onDismiss();
+        // eslint-disable-next-line typescript-eslint/no-deprecated -- InteractionManager.runAfterInteractions is the documented API for deferring work past the current interaction frame.
+        InteractionManager.runAfterInteractions(() => {
+          void maybeAskAfterSuccessfulOutcome(userId);
+        });
       }
     } catch {
       // Classified into inlineError by the effect above.

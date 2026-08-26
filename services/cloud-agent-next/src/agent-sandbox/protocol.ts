@@ -6,13 +6,19 @@ import type {
   FencedWrapperDispatchRequest,
   WorkspaceReady,
 } from '../execution/types.js';
+import type {
+  SandboxCreateIntent,
+  SandboxCreateIntentInput,
+  SandboxProviderRuntimeInput,
+  SandboxWrapperLaunchIntent,
+} from './runtime-intents.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { SandboxBillingAdmissionResult } from '../container-usage-context.js';
 import type { SandboxClassName } from '../container-usage-context.js';
 import type { BillingContext } from '@kilocode/container-usage';
 import type { SandboxId } from '../types.js';
 
-export type SandboxDeleteReason = 'explicit' | 'retention-expired' | 'recovery';
+export type SandboxDeleteReason = 'explicit' | 'retention-expired' | 'recovery' | 'late-create';
 
 export type SessionDeletionIntent = {
   reason: Extract<SandboxDeleteReason, 'explicit' | 'retention-expired'>;
@@ -129,6 +135,27 @@ export type EnsuredWrapper =
       kiloSessionId: string;
     };
 
+export type AgentSandboxRuntimeContext = {
+  getCreateIntent(): Promise<SandboxCreateIntent | undefined>;
+  beginCreate(input: SandboxCreateIntentInput): Promise<SandboxCreateIntent>;
+  clearCreateIntent(operationId: string): Promise<void>;
+  persistRuntimeOnce(input: SandboxProviderRuntimeInput): Promise<void>;
+  getWrapperLaunchIntent(): Promise<SandboxWrapperLaunchIntent | undefined>;
+  clearWrapperLaunchIntent(launchId: string): Promise<void>;
+  beginWrapperLaunch(input: {
+    sessionId: string;
+    instance: WrapperInstanceLease;
+  }): Promise<SandboxWrapperLaunchIntent>;
+  persistWrapperProcessOnce(input: {
+    sessionId: string;
+    launchId: string;
+    commandId: string;
+    instance: WrapperInstanceLease;
+  }): Promise<void>;
+  clearWrapperProcess(input: { sessionId: string; commandId: string }): Promise<void>;
+  isDeletionPending(): Promise<boolean>;
+};
+
 /**
  * Product-specific runtime seam for one Cloud Agent session.
  * Provider process, filesystem, and raw sandbox APIs remain private to adapters.
@@ -181,6 +208,7 @@ export type ProviderDeletionPlan =
  */
 export type AgentSandboxLifecycleHost = {
   storage: DurableObjectStorage;
+  runtimeContext: AgentSandboxRuntimeContext;
   scheduleAlarmAtOrBefore(deadline: number): Promise<void>;
   eraseDurableObjectState(): Promise<void>;
   purgeDeletedSessionPayload(): Promise<void>;

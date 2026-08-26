@@ -2075,7 +2075,8 @@
       "dollar": "dólares",
       "dollar_other": "dólares",
       "costSpoken": "custo {{cost}}",
-      "costSpokenWithTime": "custo {{cost}}, {{time}}"
+      "costSpokenWithTime": "custo {{cost}}, {{time}}",
+      "pullRequest": "solicitude de extracción {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Non se puido abrir GitHub",
@@ -2913,16 +2914,10 @@
   "feedback": {
     "noEmailApp": "Non hai ningunha app de correo dispoñible. Podes contactar connosco en {{email}}",
     "couldNotOpenStore": "Non se puido abrir a tenda.",
-    "promptTitle": "Que che está parecendo a app de Kilo?",
-    "iLikeIt": "Gústame",
-    "gladTitle": "Alegrámonos de que che guste!",
-    "gladMessage": "Unha valoración na tenda axudaríanos enormemente. Grazas por usar Kilo!",
-    "rateKilo": "Valorar Kilo",
-    "needsWork": "Necesita melloras",
-    "sorryTitle": "Sentímolo!",
-    "sorryMessage": "Por favor, dínos que precisa mellorar. A persoa enxeñeira responsable da app le cada un dos informes!",
-    "emailUs": "Escríbenos",
-    "emailSubject": "comentarios sobre a app móbil"
+    "emailSubject": "comentarios sobre a app móbil",
+    "neutralTitle": "Valora a aplicación Kilo",
+    "rateTheApp": "Valora a aplicación",
+    "sendFeedback": "Envía comentarios"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2927,9 @@
       "organizationUnavailable": "Organización non dispoñible",
       "selectDescription": "Escolle unha organización desde o teu perfil para continuar.",
       "selectOrganization": "Seleccionar unha organización",
-      "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar."
+      "unavailableDescription": "Esta organización xa non está dispoñible. Escolle unha desde o teu perfil para continuar.",
+      "accessDeniedTitle": "Acceso denegado",
+      "accessDeniedDescription": "Non tes acceso a esta organización."
     },
     "creditActivity": {
       "emptyDescription": "As compras, o uso e os axustes de crédito desta organización aparecerán aquí segundo ocorran.",

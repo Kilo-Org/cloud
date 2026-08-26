@@ -1,8 +1,14 @@
 import { describe, expect, it, jest, beforeAll, afterEach } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
+import { and, eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
-import { organizations, organization_memberships } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  github_branch_pull_requests,
+  organizations,
+  organization_memberships,
+} from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
 import type { createCallerForUser as CreateCallerForUser } from '@/routers/test-utils';
 
@@ -299,6 +305,99 @@ describe('active-sessions-router', () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.activeSessions.list();
       expect(result).toEqual({ sessions: [] });
+    });
+  });
+
+  describe('list enrichment associatedPr', () => {
+    const sessionWithPr = 'ses_active_pr_present_0001';
+    const sessionWithoutPr = 'ses_active_pr_absent_0001';
+    const CACHE_GIT_URL = 'https://github.com/kilo/active-provenance-repo';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: sessionWithPr,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          title: 'active with PR',
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/active-x',
+        },
+        {
+          session_id: sessionWithoutPr,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          title: 'active without PR',
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/active-y',
+        },
+      ]);
+      await db.insert(github_branch_pull_requests).values({
+        git_url: CACHE_GIT_URL,
+        git_branch: 'feature/active-x',
+        owned_by_user_id: regularUser.id,
+        pr_url: 'https://github.com/kilo/active-provenance-repo/pull/42',
+        pr_number: 42,
+        pr_state: 'open',
+        pr_title: 'Active PR title',
+        pr_head_sha: 'beefcafe',
+      });
+    });
+
+    afterEach(async () => {
+      await db
+        .delete(github_branch_pull_requests)
+        .where(
+          and(
+            eq(github_branch_pull_requests.git_url, CACHE_GIT_URL),
+            eq(github_branch_pull_requests.owned_by_user_id, regularUser.id)
+          )
+        );
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.kilo_user_id, regularUser.id),
+            eq(cli_sessions_v2.git_url, CACHE_GIT_URL)
+          )
+        );
+    });
+
+    async function mockHeartbeats(sessionIds: string[]) {
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            sessions: sessionIds.map(id => ({
+              id,
+              status: 'live',
+              title: `heartbeat ${id}`,
+              connectionId: `conn-${id}`,
+            })),
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+    }
+
+    it('includes associatedPr number and title for a joined cache PR', async () => {
+      await mockHeartbeats([sessionWithPr, sessionWithoutPr]);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list();
+
+      const withPr = result.sessions.find(s => s.id === sessionWithPr);
+      expect(withPr?.associatedPr).toMatchObject({ number: 42, title: 'Active PR title' });
+    });
+
+    it('omits associatedPr for a row without a cache PR', async () => {
+      await mockHeartbeats([sessionWithPr, sessionWithoutPr]);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list();
+
+      const withoutPr = result.sessions.find(s => s.id === sessionWithoutPr);
+      expect(withoutPr).toBeDefined();
+      expect(withoutPr).not.toHaveProperty('associatedPr');
     });
   });
 });

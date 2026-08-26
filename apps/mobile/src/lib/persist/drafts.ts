@@ -65,6 +65,18 @@ export function agentComposerDraftKey(sessionId: string): string {
 /** New-session prompt draft entity key. */
 export const NEW_SESSION_DRAFT_KEY = 'agent-composer:new';
 
+/** Durable pending share-intent payloads (map + insertion order) entity key. */
+export const SHARE_PAYLOADS_DRAFT_KEY = 'share-payloads';
+
+/** Durable pending share-navigation queue entity key. */
+export const SHARE_NAV_DRAFT_KEY = 'share-navigation';
+
+/** Durable pending (not-yet-delivered) share id entity key. */
+export const PENDING_SHARE_ID_DRAFT_KEY = 'pending-share-id';
+
+/** Agents session-list search query draft entity key. */
+export const SESSION_SEARCH_DRAFT_KEY = 'session-search-query';
+
 /** Pending-review draft entity key, unique per pull request. */
 export function prReviewDraftKey(owner: string, repo: string, number: number): string {
   return `pr-review:${owner}/${repo}#${number}`;
@@ -108,6 +120,38 @@ const mergeDraftSchema = z.object({
 /** Runtime shape guard for a merge-sheet draft ({ title, message }). */
 export function isMergeDraft(value: unknown): value is { title: string; message: string } {
   return mergeDraftSchema.safeParse(value).success;
+}
+
+const sharePayloadsDraftSchema = z.object({
+  order: z.array(z.string()),
+  entries: z.record(
+    z.string(),
+    z.object({
+      text: z.string(),
+      files: z.array(z.object({ name: z.string(), uri: z.string() })),
+      failedFiles: z.array(z.string()),
+    })
+  ),
+});
+
+/** Shape of the persisted share payloads map (order + per-id entries). */
+export type SharePayloadsDraft = z.infer<typeof sharePayloadsDraftSchema>;
+
+/** Runtime shape guard for a persisted share payloads map. */
+export function isSharePayloadsDraft(value: unknown): value is SharePayloadsDraft {
+  return sharePayloadsDraftSchema.safeParse(value).success;
+}
+
+const shareNavigationDraftSchema = z.array(
+  z.object({ href: z.string(), shareId: z.string().nullable() })
+);
+
+/** Shape of the persisted share navigation queue. */
+export type ShareNavigationDraft = z.infer<typeof shareNavigationDraftSchema>;
+
+/** Runtime shape guard for a persisted share navigation queue. */
+export function isShareNavigationDraft(value: unknown): value is ShareNavigationDraft {
+  return shareNavigationDraftSchema.safeParse(value).success;
 }
 
 /** Security dismiss draft entity key, unique per scope and finding. */
@@ -353,6 +397,38 @@ export async function clearDraft(userId: string, entityKey: string): Promise<boo
   } catch (error) {
     reportDraftFailure(error, 'clear');
     return false;
+  }
+}
+
+/**
+ * Conditionally removes a draft entry only when its settled persisted value
+ * still equals `expectedSerialized` (the exact stored raw string). Unlike
+ * `clearDraft`, this never cancels a pending debounced write, and the compare
+ * runs inside the serialized chain, so it sees the final value after any
+ * in-flight write settles. A newer value therefore always wins: a clear that
+ * is registered after a newer write sees the newer value and skips, and a
+ * clear registered before leaves the newer write intact. Remove failures are
+ * reported to Sentry and swallowed. Used by the pending share id, where
+ * clearing an older id must never delete a just-written id.
+ */
+export async function clearDraftIfStill(
+  userId: string,
+  entityKey: string,
+  expectedSerialized: string
+): Promise<void> {
+  if (!userId) {
+    return;
+  }
+  const key = fullKey(userId, entityKey);
+  try {
+    await chainSave(key, async () => {
+      const current = await encryptedKv.getItem(draftScope(userId), entityKey);
+      if (current === expectedSerialized) {
+        await encryptedKv.removeItem(draftScope(userId), entityKey);
+      }
+    });
+  } catch (error) {
+    reportDraftFailure(error, 'clear');
   }
 }
 

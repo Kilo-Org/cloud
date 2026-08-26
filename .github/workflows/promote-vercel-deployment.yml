@@ -18,8 +18,8 @@ on:
         type: string
         default: 'kilocode-app'
     secrets:
-      VERCEL_PROJECT_TOKEN:
-        description: 'Vercel token scoped to the project being promoted'
+      VERCEL_TOKEN:
+        description: 'Vercel token used to promote the deployment'
         required: true
       AXIOM_ANNOTATION_TOKEN:
         description: 'Optional Axiom token used to annotate the deployment'
@@ -35,14 +35,14 @@ jobs:
     environment: production
 
     env:
-      VERCEL_VERSION: '53.3.1'
+      VERCEL_VERSION: '59.5.0'
 
     steps:
       - name: Install Vercel CLI
         run: npm install -g vercel@${{ env.VERCEL_VERSION }}
 
       - name: Promote Vercel deployment
-        run: vercel promote "${{ inputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_PROJECT_TOKEN }}
+        run: vercel promote "${{ inputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Annotate production deployment in Axiom
         if: inputs.axiom_annotation_dataset != ''
@@ -55,7 +55,7 @@ jobs:
           AXIOM_ORG_ID: kilo-code-nvjh
           DEPLOYMENT_URL: ${{ inputs.deployment_url }}
           EXPECTED_PROJECT: ${{ inputs.axiom_expected_project }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_PROJECT_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           if [ -z "$AXIOM_ANNOTATION_TOKEN" ]; then
             echo "::warning::Skipping deployment annotation because AXIOM_ANNOTATION_TOKEN is not configured"

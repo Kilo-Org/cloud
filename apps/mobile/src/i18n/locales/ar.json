@@ -1653,7 +1653,8 @@
       "dollar_few": "دولارات",
       "dollar_many": "دولارًا",
       "costSpoken": "التكلفة {{cost}}",
-      "costSpokenWithTime": "التكلفة {{cost}}، {{time}}"
+      "costSpokenWithTime": "التكلفة {{cost}}، {{time}}",
+      "pullRequest": "طلب سحب {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "تعذّر بدء إعداد تطبيق GitHub. يرجى المحاولة مرة أخرى.",
@@ -2998,7 +2999,9 @@
       "organizationUnavailable": "المؤسسة غير متاحة",
       "selectDescription": "اختر مؤسسة من ملفك الشخصي للمتابعة.",
       "selectOrganization": "اختيار مؤسسة",
-      "unavailableDescription": "لم تعد هذه المؤسسة متاحة. اختر واحدة من ملفك الشخصي للمتابعة."
+      "unavailableDescription": "لم تعد هذه المؤسسة متاحة. اختر واحدة من ملفك الشخصي للمتابعة.",
+      "accessDeniedTitle": "تم رفض الوصول",
+      "accessDeniedDescription": "ليس لديك حق الوصول إلى هذه المؤسسة."
     },
     "creditActivity": {
       "emptyDescription": "ستظهر هنا المشتريات والاستخدام وتعديلات الرصيد لهذه المؤسسة فور حدوثها.",
@@ -3146,17 +3149,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "تعذّر فتح المتجر.",
-    "emailUs": "راسلنا عبر البريد الإلكتروني",
-    "gladMessage": "سيساعدنا تقييم المتجر كثيرًا. شكرًا لاستخدامك Kilo!",
-    "gladTitle": "يسعدنا سماع ذلك!",
-    "iLikeIt": "أعجبني",
-    "needsWork": "يحتاج إلى تحسين",
     "noEmailApp": "لا يتوفر تطبيق بريد إلكتروني. يمكنك التواصل معنا عبر {{email}}",
-    "promptTitle": "ما رأيك في تطبيق Kilo؟",
-    "rateKilo": "قيّم Kilo",
-    "sorryMessage": "يرجى إخبارنا بما يحتاج إلى تحسين. المهندس المسؤول عن التطبيق يقرأ كل تقرير!",
-    "sorryTitle": "نأسف لسماع ذلك!",
-    "emailSubject": "ملاحظات حول تطبيق الجوال"
+    "emailSubject": "ملاحظات حول تطبيق الجوال",
+    "neutralTitle": "قيّم تطبيق Kilo",
+    "rateTheApp": "قيّم التطبيق",
+    "sendFeedback": "أرسل ملاحظات"
   },
   "authErrors": {
     "emailAlreadyUsed": "يوجد حساب بهذا البريد الإلكتروني مسجل بطريقة تسجيل دخول مختلفة. جرّب طريقة أخرى أو استخدم \"$t(login.moreSignInOptions)\".",

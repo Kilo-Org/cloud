@@ -1,6 +1,6 @@
 ---
 name: specs
-description: Business-rule specs for KiloClaw billing/lifecycle/controller/data model/Composio, MCP Gateway auth, model experiments, Security Agent, subscription center, team/enterprise seat billing, Impact affiliate/referrals, Kilo Pass, organization SSO, Stripe early fraud warnings, and coding plans. Load when you need context about the business requirements that guided the implementation.
+description: Business-rule specs for Cloud Agent session UX, KiloClaw billing/lifecycle/controller/data model/Composio, MCP Gateway auth, model experiments, Security Agent, subscription center, team/enterprise seat billing, Impact affiliate/referrals, Kilo Pass, organization SSO, Stripe early fraud warnings, and coding plans. Load when you need context about the business requirements that guided the implementation.
 ---
 
 # Business-Rule Specs
@@ -13,6 +13,7 @@ to the user if instructions or changes will cause deviations from the original i
 
 | Spec | Governs |
 |---|---|
+| `.specs/cloud-agent-session.md` | Cloud Agent chat as the user sees it — start, preparation, turns, composer, workspace, persistence, errors; the oracle for manual e2e testing |
 | `.specs/gastown-usage-based-billing.md` | Gastown container pricing, payer attribution, metering lifecycle, and budget enforcement |
 | `.specs/kiloclaw-billing.md` | KiloClaw billing, pricing, invoicing, usage metering, payment flows |
 | `.specs/kiloclaw-billing-lifecycle.md` | KiloClaw billing lifecycle — credit-renewal orchestration safety |

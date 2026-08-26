@@ -316,17 +316,19 @@ export class VercelAgentSandbox implements AgentSandbox {
     }
     const persisted = this.persistedRuntime?.wrapper;
     if (persisted) {
-      if (
-        persisted.instanceId !== instance.instanceId ||
-        persisted.instanceGeneration !== instance.instanceGeneration
-      ) {
-        throw new AgentSandboxUnavailableError(
-          'Persisted Vercel wrapper belongs to a different physical lease',
-          'runtime_infrastructure_failed'
-        );
-      }
       const command = await this.observeCommand(sessionId, persisted.commandId);
-      if (command) return command;
+      if (command) {
+        if (
+          persisted.instanceId !== instance.instanceId ||
+          persisted.instanceGeneration !== instance.instanceGeneration
+        ) {
+          throw new AgentSandboxUnavailableError(
+            'Persisted Vercel wrapper belongs to a different physical lease',
+            'runtime_infrastructure_failed'
+          );
+        }
+        return command;
+      }
       await context.clearWrapperProcess({ sessionId, commandId: persisted.commandId });
       this.wrapperProcess = undefined;
     }
@@ -435,8 +437,39 @@ export class VercelAgentSandbox implements AgentSandbox {
 
   async discoverSessionWrappers(): Promise<WrapperObservation> {
     const runtime = this.persistedRuntime;
-    if (!runtime?.wrapper) return { status: 'absent' };
+    if (!runtime) return { status: 'absent' };
     try {
+      if (!runtime.wrapper) {
+        const intent = await this.runtimeContext?.getWrapperLaunchIntent();
+        if (!intent) return { status: 'absent' };
+        if (intent.sessionId !== runtime.sessionId) {
+          throw new Error('Vercel wrapper launch intent targets a different session');
+        }
+        const matches = (await this.restClient.listCommands(runtime.sessionId)).filter(
+          command =>
+            command.exitCode === null && this.commandMatchesLaunch(command, intent.launchId)
+        );
+        if (matches.length > 1) {
+          throw new Error('Vercel wrapper launch matched multiple commands during discovery');
+        }
+        const command = matches[0];
+        if (command) {
+          return {
+            status: 'present',
+            observed: [
+              observedWrapper(command, {
+                instanceId: intent.instanceId,
+                instanceGeneration: intent.instanceGeneration,
+              }),
+            ],
+          };
+        }
+        if (this.now() - intent.startedAt < WRAPPER_LAUNCH_SETTLE_MS) {
+          throw new Error('Vercel wrapper launch is still settling during discovery');
+        }
+        await this.runtimeContext?.clearWrapperLaunchIntent(intent.launchId);
+        return { status: 'absent' };
+      }
       const command = await this.observeCommand(runtime.sessionId, runtime.wrapper.commandId);
       if (!command) {
         await this.runtimeContext?.clearWrapperProcess({

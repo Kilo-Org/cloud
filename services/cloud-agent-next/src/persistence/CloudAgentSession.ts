@@ -918,7 +918,17 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       beginWrapperLaunch: async input => {
         if (await this.hasDeletionIntent()) throw new Error('Session deletion is pending');
         const existing = await this.ctx.storage.get(VERCEL_WRAPPER_LAUNCH_INTENT_KEY);
-        if (existing !== undefined) return parseVercelWrapperLaunchIntent(existing);
+        if (existing !== undefined) {
+          const intent = parseVercelWrapperLaunchIntent(existing);
+          if (
+            intent.sessionId !== input.sessionId ||
+            intent.instanceId !== input.instance.instanceId ||
+            intent.instanceGeneration !== input.instance.instanceGeneration
+          ) {
+            throw new Error('Vercel wrapper launch intent does not match the current lease');
+          }
+          return intent;
+        }
         const intent = parseVercelWrapperLaunchIntent({
           sessionId: input.sessionId,
           launchId: crypto.randomUUID(),
@@ -1053,7 +1063,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           ) {
             return { status: 'absent' };
           }
-          return createAgentSandbox(this.env, metadata).observeWrappersWithoutWaking();
+          return createAgentSandbox(
+            this.env,
+            metadata,
+            this.getAgentSandboxRuntimeContext()
+          ).observeWrappersWithoutWaking();
         },
         recordSharedSandboxFailover: routeKey =>
           this.sharedSandboxFailoverRecorder

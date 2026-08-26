@@ -286,6 +286,79 @@ describe('VercelAgentSandbox', () => {
     expect(client.listCommands).toHaveBeenCalledWith('session-1');
   });
 
+  it('relaunches a dead wrapper when a delivery-plan snapshot contains an older lease', async () => {
+    const context = runtimeContext();
+    const client = restClient();
+    client.getCommand.mockResolvedValue(command({ id: 'command-old', exitCode: 1 }));
+    const snapshot = metadata({
+      provider: 'vercel',
+      sessionId: 'session-1',
+      wrapper: {
+        launchId: 'launch-old',
+        commandId: 'command-old',
+        instanceId: 'instance-old',
+        instanceGeneration: 1,
+      },
+    });
+    const previous = new VercelAgentSandbox(snapshot, config, context, {
+      restClient: asRestClient(client),
+    });
+    const replacement = new VercelAgentSandbox(snapshot, config, context, {
+      restClient: asRestClient(client),
+    });
+    vi.spyOn(Object.getPrototypeOf(replacement), 'wrapperClient').mockReturnValue({
+      health: vi.fn().mockResolvedValue({
+        healthy: true,
+        version: WRAPPER_VERSION,
+        wrapperInstanceId: 'instance-1',
+        wrapperInstanceGeneration: 2,
+      }),
+    });
+
+    await expect(previous.discoverSessionWrappers()).resolves.toEqual({ status: 'absent' });
+    await expect(replacement.ensureWrapper(ensureRequest())).resolves.toMatchObject({
+      status: 'wrapper-running',
+    });
+
+    expect(context.clearWrapperProcess).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      commandId: 'command-old',
+    });
+    expect(context.persistWrapperProcessOnce).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      launchId: 'launch-1',
+      commandId: 'command-1',
+      instance: { instanceId: 'instance-1', instanceGeneration: 2 },
+    });
+  });
+
+  it('does not replace a live wrapper belonging to another physical lease', async () => {
+    const context = runtimeContext();
+    const client = restClient();
+    client.getCommand.mockResolvedValue(command({ id: 'command-old' }));
+    const sandbox = new VercelAgentSandbox(
+      metadata({
+        provider: 'vercel',
+        sessionId: 'session-1',
+        wrapper: {
+          launchId: 'launch-old',
+          commandId: 'command-old',
+          instanceId: 'instance-old',
+          instanceGeneration: 1,
+        },
+      }),
+      config,
+      context,
+      { restClient: asRestClient(client) }
+    );
+
+    await expect(sandbox.ensureWrapper(ensureRequest())).rejects.toThrow(
+      'Persisted Vercel wrapper belongs to a different physical lease'
+    );
+    expect(context.clearWrapperProcess).not.toHaveBeenCalled();
+    expect(context.beginWrapperLaunch).not.toHaveBeenCalled();
+  });
+
   it('does not launch from a cached runtime after deletion is fenced', async () => {
     const context = runtimeContext();
     context.isDeletionPending.mockResolvedValue(true);
@@ -459,6 +532,155 @@ describe('VercelAgentSandbox', () => {
     ).resolves.toEqual({ status: 'absent' });
     expect(client.listCommands).not.toHaveBeenCalled();
     expect(context.persistWrapperProcessOnce).not.toHaveBeenCalled();
+    expect(context.clearWrapperLaunchIntent).not.toHaveBeenCalled();
+  });
+
+  it('observes an interrupted wrapper launch without replacing its lease or intent', async () => {
+    const context = runtimeContext();
+    context.getWrapperLaunchIntent.mockResolvedValue({
+      sessionId: 'session-1',
+      launchId: 'launch-old',
+      instanceId: 'instance-old',
+      instanceGeneration: 1,
+      startedAt: 1,
+    });
+    const client = restClient();
+    client.listCommands.mockResolvedValue([
+      command({ id: 'command-old', args: ['kilo-launch:launch-old'] }),
+    ]);
+    const sandbox = new VercelAgentSandbox(
+      metadata({ provider: 'vercel', sessionId: 'session-1' }),
+      config,
+      context,
+      { restClient: asRestClient(client) }
+    );
+
+    await expect(sandbox.observeWrappersWithoutWaking()).resolves.toEqual({
+      status: 'present',
+      observed: [
+        {
+          representation: 'process',
+          id: 'command-old',
+          instanceId: 'instance-old',
+          instanceGeneration: 1,
+        },
+      ],
+    });
+    expect(context.clearWrapperLaunchIntent).not.toHaveBeenCalled();
+    expect(context.persistWrapperProcessOnce).not.toHaveBeenCalled();
+  });
+
+  it('clears a settled absent launch before starting a wrapper under the current lease', async () => {
+    const context = runtimeContext();
+    context.getWrapperLaunchIntent.mockResolvedValueOnce({
+      sessionId: 'session-1',
+      launchId: 'launch-old',
+      instanceId: 'instance-old',
+      instanceGeneration: 1,
+      startedAt: 1,
+    });
+    const client = restClient();
+    const sandbox = new VercelAgentSandbox(
+      metadata({ provider: 'vercel', sessionId: 'session-1' }),
+      config,
+      context,
+      { restClient: asRestClient(client), now: () => 30_001 }
+    );
+    vi.spyOn(Object.getPrototypeOf(sandbox), 'wrapperClient').mockReturnValue({
+      health: vi.fn().mockResolvedValue({
+        healthy: true,
+        version: WRAPPER_VERSION,
+        wrapperInstanceId: 'instance-1',
+        wrapperInstanceGeneration: 2,
+      }),
+    });
+
+    await expect(sandbox.discoverSessionWrappers()).resolves.toEqual({ status: 'absent' });
+    await expect(sandbox.ensureWrapper(ensureRequest())).resolves.toMatchObject({
+      status: 'wrapper-running',
+    });
+
+    expect(context.clearWrapperLaunchIntent).toHaveBeenCalledWith('launch-old');
+    expect(context.beginWrapperLaunch).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      instance: { instanceId: 'instance-1', instanceGeneration: 2 },
+    });
+  });
+
+  it('does not clear an interrupted launch while its command may still appear', async () => {
+    const context = runtimeContext();
+    context.getWrapperLaunchIntent.mockResolvedValue({
+      sessionId: 'session-1',
+      launchId: 'launch-old',
+      instanceId: 'instance-old',
+      instanceGeneration: 1,
+      startedAt: 1,
+    });
+    const client = restClient();
+    const sandbox = new VercelAgentSandbox(
+      metadata({ provider: 'vercel', sessionId: 'session-1' }),
+      config,
+      context,
+      { restClient: asRestClient(client), now: () => 30_000 }
+    );
+
+    await expect(sandbox.discoverSessionWrappers()).resolves.toMatchObject({
+      status: 'inspection-failed',
+      error: expect.stringContaining('Vercel wrapper launch is still settling'),
+    });
+    expect(context.clearWrapperLaunchIntent).not.toHaveBeenCalled();
+  });
+
+  it('fails discovery closed when an interrupted launch has multiple live commands', async () => {
+    const context = runtimeContext();
+    context.getWrapperLaunchIntent.mockResolvedValue({
+      sessionId: 'session-1',
+      launchId: 'launch-old',
+      instanceId: 'instance-old',
+      instanceGeneration: 1,
+      startedAt: 1,
+    });
+    const client = restClient();
+    client.listCommands.mockResolvedValue([
+      command({ id: 'command-old-1', args: ['kilo-launch:launch-old'] }),
+      command({ id: 'command-old-2', args: ['kilo-launch:launch-old'] }),
+    ]);
+    const sandbox = new VercelAgentSandbox(
+      metadata({ provider: 'vercel', sessionId: 'session-1' }),
+      config,
+      context,
+      { restClient: asRestClient(client) }
+    );
+
+    await expect(sandbox.discoverSessionWrappers()).resolves.toMatchObject({
+      status: 'inspection-failed',
+      error: expect.stringContaining('Vercel wrapper launch matched multiple commands'),
+    });
+    expect(context.clearWrapperLaunchIntent).not.toHaveBeenCalled();
+  });
+
+  it('does not inspect an interrupted launch belonging to another runtime session', async () => {
+    const context = runtimeContext();
+    context.getWrapperLaunchIntent.mockResolvedValue({
+      sessionId: 'session-other',
+      launchId: 'launch-old',
+      instanceId: 'instance-old',
+      instanceGeneration: 1,
+      startedAt: 1,
+    });
+    const client = restClient();
+    const sandbox = new VercelAgentSandbox(
+      metadata({ provider: 'vercel', sessionId: 'session-1' }),
+      config,
+      context,
+      { restClient: asRestClient(client) }
+    );
+
+    await expect(sandbox.discoverSessionWrappers()).resolves.toMatchObject({
+      status: 'inspection-failed',
+      error: expect.stringContaining('Vercel wrapper launch intent targets a different session'),
+    });
+    expect(client.listCommands).not.toHaveBeenCalled();
     expect(context.clearWrapperLaunchIntent).not.toHaveBeenCalled();
   });
 

@@ -117,11 +117,70 @@ export function buildAppReturnOutcomeView(input: {
   };
 }
 
+function GitHubIntegrationOutcomeToasts({
+  success,
+  userConnectionSuccess,
+  error,
+  pendingApproval,
+  existingPendingOrg,
+}: Pick<
+  GitHubIntegrationDetailsProps,
+  'success' | 'userConnectionSuccess' | 'error' | 'pendingApproval' | 'existingPendingOrg'
+>) {
+  useEffect(() => {
+    if (success) {
+      toast.success('GitHub App installed successfully!');
+    }
+    if (userConnectionSuccess) {
+      toast.success('GitHub identity connected');
+    }
+    if (pendingApproval) {
+      toast.info('Installation pending admin approval');
+    }
+    if (error === 'pending_installation_exists' && existingPendingOrg) {
+      toast.error('Cannot create installation request', {
+        description: `You already have a pending GitHub installation in another organization. Please complete or cancel that installation first.`,
+        duration: 8000,
+      });
+    } else if (error === 'not_installation_admin') {
+      toast.error(
+        'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.',
+        { duration: 8000 }
+      );
+    } else if (error === 'installation_already_claimed') {
+      toast.error(
+        'That GitHub installation is already connected to another Kilo account. Disconnect it there first.',
+        { duration: 8000 }
+      );
+    } else if (error === 'github_authorization_required') {
+      toast.error('GitHub did not return an authorization. Start the connection again.', {
+        duration: 8000,
+      });
+    } else if (error === 'already_connected_to_another_account') {
+      toast.error('This GitHub identity is already connected to another Kilo account.');
+    } else if (error === 'disconnect_existing_identity_first') {
+      toast.error('Disconnect your current GitHub identity before connecting another account.');
+    } else if (error === 'install_state_user_mismatch') {
+      // Handled by the fromApp fallback card or non-app mismatch landing.
+    } else if (error) {
+      toast.error(`GitHub connection failed: ${error}`);
+    }
+  }, [success, userConnectionSuccess, error, pendingApproval, existingPendingOrg]);
+
+  return null;
+}
+
 export function GitHubIntegrationDetails(props: GitHubIntegrationDetailsProps) {
-  if (props.organizationId && !props.appReturnPath) {
-    return <OrganizationGitHubInstallations organizationId={props.organizationId} />;
-  }
-  return <GitHubIntegrationDetailsContent {...props} />;
+  return (
+    <>
+      <GitHubIntegrationOutcomeToasts {...props} />
+      {props.organizationId && !props.appReturnPath ? (
+        <OrganizationGitHubInstallations organizationId={props.organizationId} />
+      ) : (
+        <GitHubIntegrationDetailsContent {...props} />
+      )}
+    </>
+  );
 }
 
 function GitHubIntegrationDetailsContent({
@@ -129,10 +188,8 @@ function GitHubIntegrationDetailsContent({
   installState,
   fromApp,
   success,
-  userConnectionSuccess,
   error,
   pendingApproval,
-  existingPendingOrg,
   appReturnPath,
   onInstallationDetected,
 }: GitHubIntegrationDetailsProps) {
@@ -302,47 +359,6 @@ function GitHubIntegrationDetailsContent({
     installationDetectedRef.current = true;
     onInstallationDetected?.();
   }, [appReturnPath, isInstalled, onInstallationDetected]);
-
-  // Show success/error/pending toasts
-  useEffect(() => {
-    if (success) {
-      toast.success('GitHub App installed successfully!');
-    }
-    if (userConnectionSuccess) {
-      toast.success('GitHub identity connected');
-    }
-    if (pendingApproval) {
-      toast.info('Installation pending admin approval');
-    }
-    if (error === 'pending_installation_exists' && existingPendingOrg) {
-      toast.error('Cannot create installation request', {
-        description: `You already have a pending GitHub installation in another organization. Please complete or cancel that installation first.`,
-        duration: 8000,
-      });
-    } else if (error === 'not_installation_admin') {
-      toast.error(
-        'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.',
-        { duration: 8000 }
-      );
-    } else if (error === 'installation_already_claimed') {
-      toast.error(
-        'That GitHub installation is already connected to another Kilo account. Disconnect it there first.',
-        { duration: 8000 }
-      );
-    } else if (error === 'github_authorization_required') {
-      toast.error('GitHub did not return an authorization. Start the connection again.', {
-        duration: 8000,
-      });
-    } else if (error === 'already_connected_to_another_account') {
-      toast.error('This GitHub identity is already connected to another Kilo account.');
-    } else if (error === 'disconnect_existing_identity_first') {
-      toast.error('Disconnect your current GitHub identity before connecting another account.');
-    } else if (error === 'install_state_user_mismatch') {
-      // Handled by the fromApp fallback card — no toast needed.
-    } else if (error) {
-      toast.error(`GitHub connection failed: ${error}`);
-    }
-  }, [success, userConnectionSuccess, error, pendingApproval, existingPendingOrg]);
 
   const handleModelChange = (modelSlug: string) => {
     setSelectedModel(modelSlug);

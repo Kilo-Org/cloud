@@ -190,6 +190,7 @@ describe('wrapper batch admission', () => {
     const sendToIngest = vi.fn();
     state.setSendToIngestFn(sendToIngest);
     await bindSessionContext(binding, config, deps);
+    state.setLogUploader(null);
     state.acceptMessage('message-1', { autoCommit: false, condenseOnComplete: false });
     const lifecycle = createLifecycleManager(
       { workspacePath: '/workspace' },
@@ -240,6 +241,7 @@ describe('wrapper batch admission', () => {
     const sendToIngest = vi.fn();
     state.setSendToIngestFn(sendToIngest);
     await bindSessionContext(binding, config, deps);
+    state.setLogUploader(null);
     let resolvePrompt: (() => void) | undefined;
     vi.mocked(deps.kiloClient.sendPromptAsync).mockImplementationOnce(
       () =>

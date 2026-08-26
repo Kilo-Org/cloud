@@ -15,6 +15,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import Link from 'next/link';
 import { Info, SquareArrowOutUpRight, Webhook } from 'lucide-react';
 import { createHash } from 'crypto';
+import { getProviderById, type AuthProviderId } from '@/lib/auth/provider-metadata';
+import { Badge } from '@/components/ui/badge';
 
 function getGravatarUrl(email: string, size: number = 80): string {
   const hash = createHash('md5').update(email.toLowerCase().trim()).digest('hex');
@@ -109,6 +111,9 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
           <Field label="Email">
             {user.google_user_email} <CopyTextButton text={user.google_user_email} />
           </Field>
+          <Field label="Login Methods">
+            <UserLoginMethods providers={user.login_methods} />
+          </Field>
           <Field label="Normalized Email">
             {user.normalized_email ?? <span className="text-muted-foreground">N/A</span>}
             {user.normalized_email ? <CopyTextButton text={user.normalized_email} /> : null}
@@ -167,6 +172,27 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
       </CardContent>
     </Card>
   );
+}
+
+export function UserLoginMethods({ providers }: { providers: AuthProviderId[] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {getLoginMethods(providers).map(metadata => {
+        return (
+          <Badge key={metadata.id} variant="secondary" className="gap-1.5 font-normal">
+            <span className="flex size-3.5 items-center justify-center [&>svg]:size-3.5">
+              {metadata.icon}
+            </span>
+            {metadata.name}
+          </Badge>
+        );
+      })}
+    </div>
+  );
+}
+
+export function getLoginMethods(providers: AuthProviderId[]) {
+  return providers.map(getProviderById);
 }
 
 function Field({

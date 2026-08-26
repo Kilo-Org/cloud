@@ -29,7 +29,8 @@ jobs:
     with:
       target_environment: production
       vercel_project_id_var: VERCEL_PROJECT_ID_APP
-    secrets: inherit
+    secrets:
+      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   stage-global-app:
     needs: verify-main
@@ -37,7 +38,8 @@ jobs:
     with:
       target_environment: production
       vercel_project_id_var: VERCEL_PROJECT_ID_GLOBAL_APP
-    secrets: inherit
+    secrets:
+      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
 
   promote-app:
     needs: stage-app
@@ -45,11 +47,14 @@ jobs:
     with:
       deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
       axiom_annotation_dataset: kilocode-app
-    secrets: inherit
+    secrets:
+      AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
+      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   promote-global-app:
     needs: stage-global-app
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}
-    secrets: inherit
+    secrets:
+      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}

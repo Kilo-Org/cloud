@@ -184,6 +184,8 @@ type GetTokenForRepoResult =
         | 'database_not_configured'
         | 'invalid_repo_format'
         | 'no_installation_found'
+        | 'repository_not_installed'
+        | 'integration_mismatch'
         | 'invalid_org_id';
     };
 
@@ -205,6 +207,7 @@ type ManagedGitHubAuthParams = {
   githubRepo: string;
   userId: string;
   orgId?: string;
+  expectedIntegrationId?: string;
   allowUserAuthorization: boolean;
 };
 
@@ -227,6 +230,7 @@ type GetCloudAgentAuthForRepoResult =
         | 'invalid_repo_format'
         | 'no_installation_found'
         | 'repository_not_installed'
+        | 'integration_mismatch'
         | 'invalid_org_id';
     };
 
@@ -249,6 +253,7 @@ type IssueGitHubSessionCapabilityResult =
         | 'invalid_repo_format'
         | 'no_installation_found'
         | 'repository_not_installed'
+        | 'integration_mismatch'
         | 'invalid_org_id'
         | 'capability_configuration_error';
     };
@@ -267,7 +272,8 @@ type RedeemGitHubSessionCapabilityResult =
         | 'repository_mismatch'
         | 'invalid_upstream_request'
         | 'source_unavailable'
-        | 'identity_mismatch';
+        | 'identity_mismatch'
+        | 'integration_mismatch';
     };
 
 type GetGitLabTokenFailureReason =
@@ -422,6 +428,7 @@ export type GitTokenService = {
     githubRepo: string;
     userId: string;
     orgId?: string;
+    expectedIntegrationId?: string;
   }): Promise<GetTokenForRepoResult>;
   getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
   getCloudAgentAuthForRepo?(

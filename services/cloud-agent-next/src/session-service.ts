@@ -1735,6 +1735,9 @@ export class SessionService {
         githubRepo: github.repo,
         userId: metadata.identity.userId,
         orgId: metadata.identity.orgId,
+        ...(github.githubIntegrationId
+          ? { expectedIntegrationId: github.githubIntegrationId }
+          : {}),
         allowUserAuthorization:
           metadata.identity.createdOnPlatform === 'cloud-agent-web' ||
           metadata.identity.createdOnPlatform === 'slack',

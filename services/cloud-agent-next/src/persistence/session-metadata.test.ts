@@ -98,6 +98,7 @@ describe('session metadata boundary', () => {
         type: 'github' as const,
         repo: 'acme/repo',
         token: 'github-token',
+        githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
         githubInstallationId: '987',
         githubAppType: 'standard' as const,
         upstreamBranch: 'main',
@@ -148,6 +149,20 @@ describe('session metadata boundary', () => {
     expect(parseSessionMetadata(current)).toEqual(current);
     expect(serializeSessionMetadata(current)).toEqual(current);
     expect(CurrentSessionMetadataSchema.parse(current)).toEqual(current);
+  });
+
+  it('keeps existing GitHub metadata valid when the integration id is omitted', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_legacy_github', userId: 'user_legacy_github' },
+      auth: {},
+      repository: { type: 'github' as const, repo: 'acme/repo' },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
+    expect(parseSessionMetadata(current).repository).not.toHaveProperty('githubIntegrationId');
   });
 
   it('parses and serializes clone source metadata', () => {

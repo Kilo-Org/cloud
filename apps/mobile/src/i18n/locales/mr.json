@@ -2076,7 +2076,8 @@
       "dollar": "डॉलर",
       "dollar_other": "डॉलर",
       "costSpoken": "खर्च {{cost}}",
-      "costSpokenWithTime": "खर्च {{cost}}, {{time}}"
+      "costSpokenWithTime": "खर्च {{cost}}, {{time}}",
+      "pullRequest": "पुल रिक्वेस्ट {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub उघडता आले नाही",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "कोणतेही ईमेल अ‍ॅप उपलब्ध नाही. तुम्ही आमच्याशी {{email}} वर संपर्क करू शकता",
     "couldNotOpenStore": "स्टोअर उघडता आले नाही.",
-    "promptTitle": "तुम्हाला Kilo अ‍ॅप कसा आवडत आहे?",
-    "iLikeIt": "मला आवडते",
-    "gladTitle": "हे ऐकून आम्हाला आनंद झाला!",
-    "gladMessage": "स्टोअर रिव्ह्यू आम्हाला खूप मदत करेल. Kilo वापरल्याबद्दल धन्यवाद!",
-    "rateKilo": "Kilo ला रेट करा",
-    "needsWork": "सुधारणा आवश्यक",
-    "sorryTitle": "हे ऐकून आम्हाला वाईट वाटते!",
-    "sorryMessage": "कृपया काय सुधारणे आवश्यक आहे ते कळवा. अ‍ॅपचा प्रभारी अभियंता प्रत्येक रिपोर्ट वाचतो!",
-    "emailUs": "आम्हाला ईमेल करा",
-    "emailSubject": "मोबाइल अॅप अभिप्राय"
+    "emailSubject": "मोबाइल अॅप अभिप्राय",
+    "neutralTitle": "किलो ॲपला रेट करा",
+    "rateTheApp": "ॲपला रेट करा",
+    "sendFeedback": "अभिप्राय पाठवा"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "संस्था अनुपलब्ध",
       "selectDescription": "सुरू ठेवण्यासाठी तुमच्या प्रोफाइलमधून संस्था निवडा.",
       "selectOrganization": "संस्था निवडा",
-      "unavailableDescription": "ही संस्था यापुढे उपलब्ध नाही. सुरू ठेवण्यासाठी तुमच्या प्रोफाइलमधून एक निवडा."
+      "unavailableDescription": "ही संस्था यापुढे उपलब्ध नाही. सुरू ठेवण्यासाठी तुमच्या प्रोफाइलमधून एक निवडा.",
+      "accessDeniedTitle": "प्रवेश नाकारला",
+      "accessDeniedDescription": "तुम्हाला या संस्थेमध्ये प्रवेश नाही."
     },
     "creditActivity": {
       "emptyDescription": "या संस्थेसाठी खरेदी, वापर आणि क्रेडिट समायोजने घडत असताना येथे दिसतील.",

@@ -2076,7 +2076,8 @@
       "dollar": "доллар",
       "dollar_other": "доллар",
       "costSpoken": "құны {{cost}}",
-      "costSpokenWithTime": "құны {{cost}}, {{time}}"
+      "costSpokenWithTime": "құны {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ашу мүмкін болмады",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "Қолжетімді электрондық пошта қосымшасы жоқ. Бізге {{email}} мекенжайына хабарласа аласыз",
     "couldNotOpenStore": "Дүкенді ашу мүмкін болмады.",
-    "promptTitle": "Kilo қосымшасын қалай ұнатасыз?",
-    "iLikeIt": "Ұнатамын",
-    "gladTitle": "Мұны естігенімізге қуаныштымыз!",
-    "gladMessage": "Дүкендегі пікір бізге қатты көмектеседі. Kilo қолданғаныңызға рахмет!",
-    "rateKilo": "Kilo-ны бағалау",
-    "needsWork": "Жақсарту қажет",
-    "sorryTitle": "Мұны естігенімізге өкінеміз!",
-    "sorryMessage": "Не жақсарту керектігін айтыңыз. Қосымшаға жауапты инженер әрбір есепті оқиды!",
-    "emailUs": "Бізге жазыңыз",
-    "emailSubject": "мобильді қосымша туралы кері байланыс"
+    "emailSubject": "мобильді қосымша туралы кері байланыс",
+    "neutralTitle": "Kilo қосымшасын бағалаңыз",
+    "rateTheApp": "Қосымшаны бағалаңыз",
+    "sendFeedback": "Пікір жіберу"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "Ұйым қолжетімсіз",
       "selectDescription": "Жалғастыру үшін профильден ұйымды таңдаңыз.",
       "selectOrganization": "Ұйымды таңдау",
-      "unavailableDescription": "Бұл ұйым енді қолжетімсіз. Жалғастыру үшін профильден біреуін таңдаңыз."
+      "unavailableDescription": "Бұл ұйым енді қолжетімсіз. Жалғастыру үшін профильден біреуін таңдаңыз.",
+      "accessDeniedTitle": "Қолжетімділікке тыйым салынды",
+      "accessDeniedDescription": "Сізде бұл ұйымға қолжетімділік жоқ."
     },
     "creditActivity": {
       "emptyDescription": "Осы ұйымның сатып алулары, пайдалануы және кредит түзетулері болған сайын осында көрсетіледі.",

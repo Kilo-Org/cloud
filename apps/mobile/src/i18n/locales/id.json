@@ -1622,7 +1622,8 @@
       "dollar": "dolar",
       "dollar_other": "dolar",
       "costSpoken": "biaya {{cost}}",
-      "costSpokenWithTime": "biaya {{cost}}, {{time}}"
+      "costSpokenWithTime": "biaya {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Kami tidak dapat memulai penyiapan Aplikasi GitHub. Silakan coba lagi.",
@@ -2932,7 +2933,9 @@
       "organizationUnavailable": "Organisasi tidak tersedia",
       "selectDescription": "Pilih organisasi dari profil Anda untuk melanjutkan.",
       "selectOrganization": "Pilih organisasi",
-      "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih salah satu dari profil Anda untuk melanjutkan."
+      "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih salah satu dari profil Anda untuk melanjutkan.",
+      "accessDeniedTitle": "Akses ditolak",
+      "accessDeniedDescription": "Anda tidak memiliki akses ke organisasi ini."
     },
     "creditActivity": {
       "emptyDescription": "Pembelian, penggunaan, dan penyesuaian kredit untuk organisasi ini akan muncul di sini seiring terjadinya.",
@@ -3082,17 +3085,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "Tidak dapat membuka toko.",
-    "emailUs": "Email kami",
-    "gladMessage": "Ulasan toko akan sangat membantu kami. Terima kasih telah menggunakan Kilo!",
-    "gladTitle": "Kami senang mendengarnya!",
-    "iLikeIt": "Saya menyukainya",
-    "needsWork": "Perlu perbaikan",
     "noEmailApp": "Tidak ada aplikasi email tersedia. Anda dapat menghubungi kami di {{email}}",
-    "promptTitle": "Bagaimana pendapat Anda tentang aplikasi Kilo?",
-    "rateKilo": "Beri Nilai Kilo",
-    "sorryMessage": "Beri tahu kami apa yang perlu diperbaiki. Insinyur yang menangani aplikasi membaca setiap laporan!",
-    "sorryTitle": "Kami menyesal mendengarnya!",
-    "emailSubject": "umpan balik aplikasi seluler"
+    "emailSubject": "umpan balik aplikasi seluler",
+    "neutralTitle": "Nilai aplikasi Kilo",
+    "rateTheApp": "Nilai aplikasinya",
+    "sendFeedback": "Kirim masukan"
   },
   "authErrors": {
     "emailAlreadyUsed": "Akun dengan email ini sudah ada dengan metode masuk yang berbeda. Coba metode lain atau gunakan '$t(login.moreSignInOptions)'.",

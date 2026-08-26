@@ -1638,7 +1638,8 @@
       "dollar_few": "dolary",
       "dollar_many": "dolarów",
       "costSpoken": "koszt {{cost}}",
-      "costSpokenWithTime": "koszt {{cost}}, {{time}}"
+      "costSpokenWithTime": "koszt {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Nie udało się rozpocząć konfiguracji aplikacji GitHub. Spróbuj ponownie.",
@@ -2972,7 +2973,9 @@
       "organizationUnavailable": "Organizacja niedostępna",
       "selectDescription": "Wybierz organizację ze swojego profilu, aby kontynuować.",
       "selectOrganization": "Wybierz organizację",
-      "unavailableDescription": "Ta organizacja nie jest już dostępna. Wybierz inną ze swojego profilu, aby kontynuować."
+      "unavailableDescription": "Ta organizacja nie jest już dostępna. Wybierz inną ze swojego profilu, aby kontynuować.",
+      "accessDeniedTitle": "Odmowa dostępu",
+      "accessDeniedDescription": "Nie masz dostępu do tej organizacji."
     },
     "creditActivity": {
       "emptyDescription": "Zakupy, wykorzystanie i korekty kredytów dla tej organizacji pojawią się tutaj na bieżąco.",
@@ -3124,17 +3127,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "Nie udało się otworzyć sklepu.",
-    "emailUs": "Napisz do nas",
-    "gladMessage": "Recenzja w sklepie bardzo by nam pomogła. Dziękujemy za korzystanie z Kilo!",
-    "gladTitle": "Miło nam to słyszeć!",
-    "iLikeIt": "Podoba mi się",
-    "needsWork": "Wymaga poprawy",
     "noEmailApp": "Brak dostępnej aplikacji e-mail. Możesz się z nami skontaktować pod adresem {{email}}",
-    "promptTitle": "Jak podoba Ci się aplikacja Kilo?",
-    "rateKilo": "Oceń Kilo",
-    "sorryMessage": "Daj nam znać, co należy poprawić. Inżynier odpowiedzialny za aplikację czyta każde zgłoszenie!",
-    "sorryTitle": "Przykro nam to słyszeć!",
-    "emailSubject": "opinia o aplikacji mobilnej"
+    "emailSubject": "opinia o aplikacji mobilnej",
+    "neutralTitle": "Oceń aplikację Kilo",
+    "rateTheApp": "Oceń aplikację",
+    "sendFeedback": "Wyślij opinię"
   },
   "authErrors": {
     "emailAlreadyUsed": "Konto z tym adresem e-mail już istnieje i używa innej metody logowania. Spróbuj innej metody lub użyj „$t(login.moreSignInOptions)”.",

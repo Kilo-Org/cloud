@@ -2076,7 +2076,8 @@
       "dollar": "doolarro",
       "dollar_other": "doolarro",
       "costSpoken": "qiimaha {{cost}}",
-      "costSpokenWithTime": "qiimaha {{cost}}, {{time}}"
+      "costSpokenWithTime": "qiimaha {{cost}}, {{time}}",
+      "pullRequest": "codsi jiid {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Lama furi karin GitHub",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "Ma jiro app email ah. Waxaad nagala soo xiriiri kartaa {{email}}",
     "couldNotOpenStore": "Dukaanka lama furi karin.",
-    "promptTitle": "Sidee bay app-ka Kilo kuugu qalmaan?",
-    "iLikeIt": "Waan jeclahay",
-    "gladTitle": "Waxaan ku faraxsanahay inaad taan tiri!",
-    "gladMessage": "Dib-u-eegis dukaanka ayaa naga caawinaysa si aad u badan. Mahadsanid isticmaalka Kilo!",
-    "rateKilo": "Qiimee Kilo",
-    "needsWork": "Waa loo baahan yahay hagaajin",
-    "sorryTitle": "Waxaan ka xunnahay inaad taan tiri!",
-    "sorryMessage": "Fadlan noo sheeg waxa loo baahan yahay in la wanaajiyo. Injineerka mas'uulka ka ah app-ka ayaa akhriya warbixin kasta!",
-    "emailUs": "Noo e-mayl",
-    "emailSubject": "jawaab-celinta app-ka mobilada"
+    "emailSubject": "jawaab-celinta app-ka mobilada",
+    "neutralTitle": "Qiimee app-ka Kilo",
+    "rateTheApp": "Qiimee app-ka",
+    "sendFeedback": "Soo dir rabitaankaaga"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "Ururku ma heli karo",
       "selectDescription": "Dooro urur profile-kaaga si aad u sii socoto.",
       "selectOrganization": "Dooro urur",
-      "unavailableDescription": "Ururkani mar dambe ma heli karo. Dooro mid profile-kaaga ah si aad u sii socoto."
+      "unavailableDescription": "Ururkani mar dambe ma heli karo. Dooro mid profile-kaaga ah si aad u sii socoto.",
+      "accessDeniedTitle": "Gelitaanka waa la diiday",
+      "accessDeniedDescription": "Ma haysatid gelitaanka ururkan."
     },
     "creditActivity": {
       "emptyDescription": "Iibsashada, isticmaalka, iyo hagaajinta credits-ka ee ururkan ayaa halkan ka soo muuqan doona siday u dhacaan.",

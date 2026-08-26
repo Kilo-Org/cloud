@@ -2106,7 +2106,8 @@
       "dollar_two": "dolarja",
       "dollar_few": "dolarji",
       "costSpoken": "strošek {{cost}}",
-      "costSpokenWithTime": "stroški {{cost}}, {{time}}"
+      "costSpokenWithTime": "stroški {{cost}}, {{time}}",
+      "pullRequest": "povleci zahtevo {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ni bilo mogoče odpreti",
@@ -2967,16 +2968,10 @@
   "feedback": {
     "noEmailApp": "Ni na voljo aplikacije za e-pošto. Dosežeš nas na {{email}}",
     "couldNotOpenStore": "Trgovine ni bilo mogoče odpreti.",
-    "promptTitle": "Kako ti je všeč aplikacija Kilo?",
-    "iLikeIt": "Všeč mi je",
-    "gladTitle": "Veseli nas, da si to slišali!",
-    "gladMessage": "Ocena v trgovini bi nam zelo pomagala. Hvala za uporabo Kilo!",
-    "rateKilo": "Oceni Kilo",
-    "needsWork": "Potrebuje izboljšave",
-    "sorryTitle": "Žal nam je, da si to slišali!",
-    "sorryMessage": "Prosimo, povej nam, kaj je treba izboljšati. Inženir, odgovoren za aplikacijo, prebere vsako posamezno poročilo!",
-    "emailUs": "Piši nam",
-    "emailSubject": "povratne informacije o mobilni aplikaciji"
+    "emailSubject": "povratne informacije o mobilni aplikaciji",
+    "neutralTitle": "Ocenite aplikacijo Kilo",
+    "rateTheApp": "Ocenite aplikacijo",
+    "sendFeedback": "Pošlji povratne informacije"
   },
   "organization": {
     "boundary": {
@@ -2986,7 +2981,9 @@
       "organizationUnavailable": "Organizacija ni na voljo",
       "selectDescription": "Za nadaljevanje izberi organizacijo iz svojega profila.",
       "selectOrganization": "Izberi organizacijo",
-      "unavailableDescription": "Ta organizacija ni več na voljo. Za nadaljevanje izberi eno iz svojega profila."
+      "unavailableDescription": "Ta organizacija ni več na voljo. Za nadaljevanje izberi eno iz svojega profila.",
+      "accessDeniedTitle": "Dostop zavrnjen",
+      "accessDeniedDescription": "Nimate dostopa do te organizacije."
     },
     "creditActivity": {
       "emptyDescription": "Nakupi, poraba in prilagoditve kreditov za to organizacijo bodo tukaj prikazani, ko bodo nastali.",

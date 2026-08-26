@@ -19,6 +19,7 @@ import { OrganizationInvoicesScreen } from './invoices-screen';
 const pageQuery = vi.hoisted(() => ({
   isPending: false,
   isError: false,
+  isFetchNextPageError: false,
   isFetching: false,
   isFetchingNextPage: false,
   data: null as unknown,
@@ -190,6 +191,7 @@ async function renderScreen(): Promise<string[]> {
 beforeEach(() => {
   pageQuery.isPending = false;
   pageQuery.isError = false;
+  pageQuery.isFetchNextPageError = false;
   pageQuery.isFetching = false;
   pageQuery.isFetchingNextPage = false;
   pageQuery.data = null;
@@ -300,6 +302,7 @@ describe('OrganizationInvoicesScreen pagination', () => {
 
   it('keeps rows and shows a Retry footer when a later page fails', async () => {
     pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageQuery.isFetchNextPageError = true;
     pageQuery.isError = true;
     pageQuery.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
     pageHook.entries = [INVOICE];
@@ -322,6 +325,7 @@ describe('OrganizationInvoicesScreen pagination', () => {
 
   it('marks Retry busy while the next page is loading after a later-page failure', async () => {
     pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageQuery.isFetchNextPageError = true;
     pageQuery.isError = true;
     pageQuery.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
     pageQuery.isFetchingNextPage = true;
@@ -334,4 +338,18 @@ describe('OrganizationInvoicesScreen pagination', () => {
     expect(retry).toBeDefined();
     expect(retry?.loading).toBe(true);
   });
+
+  it('keeps Load more when a background refetch fails after pages loaded', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageQuery.isError = true;
+    pageQuery.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    pageHook.entries = [INVOICE];
+    pageHook.hasMore = true;
+
+    const texts = await renderScreen();
+
+    expect(texts).toContain('INV-0001');
+    expect(texts).toContain('Older invoices are available.');
+    expect(texts).not.toContain("Couldn't load more.");
+    expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);  });
 });

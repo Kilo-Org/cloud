@@ -2106,7 +2106,8 @@
       "dollar_few": "dolary",
       "dollar_many": "dolarů",
       "costSpoken": "cena {{cost}}",
-      "costSpokenWithTime": "náklady {{cost}}, {{time}}"
+      "costSpokenWithTime": "náklady {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub se nepodařilo otevřít",
@@ -2967,16 +2968,10 @@
   "feedback": {
     "noEmailApp": "Žádná aplikace e-mailu není k dispozici. Můžete nás kontaktovat na {{email}}",
     "couldNotOpenStore": "Obchod se nepodařilo otevřít.",
-    "promptTitle": "Jak se vám líbí aplikace Kilo?",
-    "iLikeIt": "Líbí se mi",
-    "gladTitle": "Jsme rádi, že to slyšíme!",
-    "gladMessage": "Recenze v obchodě by nám nesmírně pomohla. Díky, že používáte Kilo!",
-    "rateKilo": "Ohodnotit Kilo",
-    "needsWork": "Vyžaduje zlepšení",
-    "sorryTitle": "Je nám líto, že to slyšíme!",
-    "sorryMessage": "Dejte nám prosím vědět, co by mělo být lepší. Inženýr odpovědný za aplikaci čte každou jednotlivou zprávu!",
-    "emailUs": "Napište nám e-mail",
-    "emailSubject": "zpětná vazba k mobilní aplikaci"
+    "emailSubject": "zpětná vazba k mobilní aplikaci",
+    "neutralTitle": "Ohodnoťte aplikaci Kilo",
+    "rateTheApp": "Ohodnoťte aplikaci",
+    "sendFeedback": "Odeslat zpětnou vazbu"
   },
   "organization": {
     "boundary": {
@@ -2986,7 +2981,9 @@
       "organizationUnavailable": "Organizace není k dispozici",
       "selectDescription": "Pro pokračování vyberte organizaci ze svého profilu.",
       "selectOrganization": "Vyberte organizaci",
-      "unavailableDescription": "Tato organizace již není k dispozici. Pro pokračování vyberte jednu ze svého profilu."
+      "unavailableDescription": "Tato organizace již není k dispozici. Pro pokračování vyberte jednu ze svého profilu.",
+      "accessDeniedTitle": "Přístup zamítnut",
+      "accessDeniedDescription": "Nemáte přístup do této organizace."
     },
     "creditActivity": {
       "emptyDescription": "Nákupy, využití a úpravy kreditů pro tuto organizaci se zde zobrazí, jakmile nastanou.",

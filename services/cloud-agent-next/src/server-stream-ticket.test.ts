@@ -93,6 +93,14 @@ vi.mock('./persistence/CloudAgentSession.js', () => ({
   CloudAgentSession: class CloudAgentSession {},
 }));
 
+vi.mock('./persistence/SandboxControl.js', () => ({
+  SandboxControl: class SandboxControl {},
+}));
+
+vi.mock('./sandbox-session/SandboxSession.js', () => ({
+  SandboxSession: class SandboxSession {},
+}));
+
 vi.mock('@kilocode/db/client', () => ({
   getWorkerDb: () => ({
     select: () => ({
@@ -123,6 +131,13 @@ type MockEnv = {
     idFromName: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
   };
+  SANDBOX_CONTROL: {
+    getByName: ReturnType<typeof vi.fn>;
+  };
+  SANDBOX_SESSION: {
+    idFromName: ReturnType<typeof vi.fn>;
+    get: ReturnType<typeof vi.fn>;
+  };
 };
 
 function createEnv(): MockEnv {
@@ -136,6 +151,13 @@ function createEnv(): MockEnv {
       get: vi.fn(),
     },
     STREAM_TICKET_NONCE_DO: {
+      idFromName: vi.fn(),
+      get: vi.fn(),
+    },
+    SANDBOX_CONTROL: {
+      getByName: vi.fn(),
+    },
+    SANDBOX_SESSION: {
       idFromName: vi.fn(),
       get: vi.fn(),
     },
@@ -277,6 +299,29 @@ describe('server /stream ticket nonce consume', () => {
     expect(response.status).toBe(200);
     expect(env.STREAM_TICKET_NONCE_DO.idFromName).toHaveBeenCalledWith('nonce-1');
     expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('user-1:session-1');
+    expect(doFetch).toHaveBeenCalledOnce();
+  });
+
+  it('forwards workspace_ stream tickets to SANDBOX_SESSION', async () => {
+    const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const env = createEnv();
+    installNonceStore(env);
+    const doFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: doFetch });
+    const ticket = signStreamTicket({ cloudAgentSessionId: sessionId });
+
+    const response = await fetchWorker(
+      new Request(
+        `http://worker.test/stream?cloudAgentSessionId=${sessionId}&ticket=${encodeURIComponent(ticket)}`,
+        { headers: { Upgrade: 'websocket' } }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(env.SANDBOX_SESSION.idFromName).toHaveBeenCalledWith(`user-1:${sessionId}`);
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
     expect(doFetch).toHaveBeenCalledOnce();
   });
 

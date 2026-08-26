@@ -2076,7 +2076,8 @@
       "dollar": "dollar",
       "dollar_other": "dollar",
       "costSpoken": "kostnad {{cost}}",
-      "costSpokenWithTime": "kostnad {{cost}}, {{time}}"
+      "costSpokenWithTime": "kostnad {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunde inte öppna GitHub",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "Ingen e-postapp tillgänglig. Du når oss på {{email}}",
     "couldNotOpenStore": "Det gick inte att öppna butiken.",
-    "promptTitle": "Hur tycker du om Kilo-appen?",
-    "iLikeIt": "Jag gillar den",
-    "gladTitle": "Vi är glada att höra det!",
-    "gladMessage": "En butiksrecension skulle hjälpa oss enormt. Tack för att du använder Kilo!",
-    "rateKilo": "Betygsätt Kilo",
-    "needsWork": "Behöver förbättras",
-    "sorryTitle": "Vi är ledsna att höra det!",
-    "sorryMessage": "Berätta gärna vad som behöver bli bättre. Ingenjören som ansvarar för appen läser varje enskild rapport!",
-    "emailUs": "E-posta oss",
-    "emailSubject": "feedback om mobilappen"
+    "emailSubject": "feedback om mobilappen",
+    "neutralTitle": "Betygsätt Kilo-appen",
+    "rateTheApp": "Betygsätt appen",
+    "sendFeedback": "Skicka feedback"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "Organisationen är inte tillgänglig",
       "selectDescription": "Välj en organisation från din profil för att fortsätta.",
       "selectOrganization": "Välj en organisation",
-      "unavailableDescription": "Denna organisation är inte längre tillgänglig. Välj en från din profil för att fortsätta."
+      "unavailableDescription": "Denna organisation är inte längre tillgänglig. Välj en från din profil för att fortsätta.",
+      "accessDeniedTitle": "Åtkomst nekad",
+      "accessDeniedDescription": "Du har inte åtkomst till denna organisation."
     },
     "creditActivity": {
       "emptyDescription": "Köp, användning och kreditjusteringar för denna organisation visas här allteftersom de sker.",

@@ -2076,7 +2076,8 @@
       "dollar": "دۆلار",
       "dollar_other": "دۆلار",
       "costSpoken": "تێچوون {{cost}}",
-      "costSpokenWithTime": "تێچووی {{cost}}، {{time}}"
+      "costSpokenWithTime": "تێچووی {{cost}}، {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "نەتوانرا GitHub بکرێتەوە",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "هیچ ئەپێکی ئیمەیڵ بەردەست نییە. دەتوانیت لە {{email}} پەیوەندیمان پێوە بکەیت",
     "couldNotOpenStore": "نەتوانرا دوکانەکە بکرێتەوە.",
-    "promptTitle": "چۆن ئەپی Kilo بەدڵتە؟",
-    "iLikeIt": "بەدڵمە",
-    "gladTitle": "دڵخۆشین بە بیستنی ئەوە!",
-    "gladMessage": "پێداچوونەوەیەک لە دوکانەکە زۆر یارمەتیمان دەدات. سوپاس بۆ بەکارهێنانی Kilo!",
-    "rateKilo": "نرخدان بە Kilo",
-    "needsWork": "پێویستی بە کارە",
-    "sorryTitle": "دڵگرانین بە بیستنی ئەوە!",
-    "sorryMessage": "تکایە ڕای بگەیەنە کە چی پێویستە باشتر بێت. ئەندازیارێک کە بەرپرسە لە ئەپ هەر ڕاپۆرتێک دەخوێنێتەوە!",
-    "emailUs": "ئیمەیڵمان بۆ بنێرە",
-    "emailSubject": "بۆچوونی ئەپی مۆبایل"
+    "emailSubject": "بۆچوونی ئەپی مۆبایل",
+    "neutralTitle": "هەڵسەنگاندنی ئەپی Kilo",
+    "rateTheApp": "هەڵسەنگاندنی ئەپەکە",
+    "sendFeedback": "ناردنی تێبینی"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "ڕێکخراوە بەردەست نییە",
       "selectDescription": "لە پڕۆفایلەکەتەوە ڕێکخراوێک هەڵبژێرە بۆ بەردەوامبوون.",
       "selectOrganization": "هەڵبژاردنی ڕێکخراوێک",
-      "unavailableDescription": "ئەم ڕێکخراوە چیتر بەردەست نییە. لە پڕۆفایلەکەتەوە یەکێک هەڵبژێرە بۆ بەردەوامبوون."
+      "unavailableDescription": "ئەم ڕێکخراوە چیتر بەردەست نییە. لە پڕۆفایلەکەتەوە یەکێک هەڵبژێرە بۆ بەردەوامبوون.",
+      "accessDeniedTitle": "دەستگەیشتن ڕەتکرایەوە",
+      "accessDeniedDescription": "تۆ ڕێگەپێدراو نیت بۆ ئەم ڕێکخراوە."
     },
     "creditActivity": {
       "emptyDescription": "کڕینەکان، بەکارهێنان و ڕێکخستنەکانی کرێدت بۆ ئەم ڕێکخراوە لێرەدا دەردەکەون کاتێک ڕوودەدەن.",

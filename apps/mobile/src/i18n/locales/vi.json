@@ -1622,7 +1622,8 @@
       "dollar": "đô la",
       "dollar_other": "đô la",
       "costSpoken": "chi phí {{cost}}",
-      "costSpokenWithTime": "chi phí {{cost}}, {{time}}"
+      "costSpokenWithTime": "chi phí {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Chúng tôi không thể bắt đầu thiết lập ứng dụng GitHub. Vui lòng thử lại.",
@@ -2932,7 +2933,9 @@
       "organizationUnavailable": "Tổ chức không khả dụng",
       "selectDescription": "Chọn một tổ chức từ hồ sơ của bạn để tiếp tục.",
       "selectOrganization": "Chọn một tổ chức",
-      "unavailableDescription": "Tổ chức này không còn khả dụng. Hãy chọn một tổ chức từ hồ sơ của bạn để tiếp tục."
+      "unavailableDescription": "Tổ chức này không còn khả dụng. Hãy chọn một tổ chức từ hồ sơ của bạn để tiếp tục.",
+      "accessDeniedTitle": "Truy cập bị từ chối",
+      "accessDeniedDescription": "Bạn không có quyền truy cập vào tổ chức này."
     },
     "creditActivity": {
       "emptyDescription": "Các giao dịch mua, mức sử dụng và điều chỉnh tín dụng của tổ chức này sẽ xuất hiện tại đây khi phát sinh.",
@@ -3082,17 +3085,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "Không thể mở cửa hàng.",
-    "emailUs": "Gửi email cho chúng tôi",
-    "gladMessage": "Một đánh giá trên cửa hàng sẽ giúp chúng tôi rất nhiều. Cảm ơn bạn đã dùng Kilo!",
-    "gladTitle": "Chúng tôi rất vui khi nghe điều đó!",
-    "iLikeIt": "Tôi thích",
-    "needsWork": "Cần cải thiện",
     "noEmailApp": "Không có ứng dụng email khả dụng. Bạn có thể liên hệ chúng tôi qua {{email}}",
-    "promptTitle": "Bạn thấy ứng dụng Kilo thế nào?",
-    "rateKilo": "Đánh giá Kilo",
-    "sorryMessage": "Vui lòng cho chúng tôi biết điều cần cải thiện. Kỹ sư phụ trách ứng dụng đọc từng báo cáo một!",
-    "sorryTitle": "Chúng tôi rất tiếc khi nghe điều đó!",
-    "emailSubject": "phản hồi ứng dụng di động"
+    "emailSubject": "phản hồi ứng dụng di động",
+    "neutralTitle": "Đánh giá ứng dụng Kilo",
+    "rateTheApp": "Đánh giá ứng dụng",
+    "sendFeedback": "Gửi phản hồi"
   },
   "authErrors": {
     "emailAlreadyUsed": "Đã có tài khoản với email này nhưng sử dụng phương thức đăng nhập khác. Hãy thử phương thức khác hoặc dùng '$t(login.moreSignInOptions)'.",

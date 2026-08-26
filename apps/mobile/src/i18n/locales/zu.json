@@ -2076,7 +2076,8 @@
       "dollar": "amadola",
       "dollar_other": "amadola",
       "costSpoken": "izindleko {{cost}}",
-      "costSpokenWithTime": "izindleko {{cost}}, {{time}}"
+      "costSpokenWithTime": "izindleko {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Akukwazanga ukuvula i-GitHub",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "Akukho app ye-imeyili etholakalayo. Ungasithola ku-{{email}}",
     "couldNotOpenStore": "Ayikwazanga ukuvula isitolo.",
-    "promptTitle": "Uyithanda kanjani i-app ye-Kilo?",
-    "iLikeIt": "Ngiyayithanda",
-    "gladTitle": "Siyajabula ukukuzwa lokho!",
-    "gladMessage": "Ukubuyekeza esitolo kungasisiza kakhulu. Siyabonga ngokusebenzisa i-Kilo!",
-    "rateKilo": "Kala i-Kilo",
-    "needsWork": "Kudinga umsebenzi",
-    "sorryTitle": "Siyaxolisa ukukuzwa lokho!",
-    "sorryMessage": "Sicela usazise ukuthi yini edinga ukuthuthuka. Unjiniyela ophethe i-app ufunda yonke imibiko!",
-    "emailUs": "Sithumele i-imeyili",
-    "emailSubject": "Impendulo ye-mobile app"
+    "emailSubject": "Impendulo ye-mobile app",
+    "neutralTitle": "Linganisa uhlelo lokusebenza lwe-Kilo",
+    "rateTheApp": "Linganisa uhlelo lokusebenza",
+    "sendFeedback": "Thumela impendulo"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "Inhlangano ayitholakali",
       "selectDescription": "Khetha inhlangano kusukela kuphrofayili yakho ukuze uqhubeke.",
       "selectOrganization": "Khetha inhlangano",
-      "unavailableDescription": "Le nhlangano ayisatholakali. Khetha enye kusukela kuphrofayili yakho ukuze uqhubeke."
+      "unavailableDescription": "Le nhlangano ayisatholakali. Khetha enye kusukela kuphrofayili yakho ukuze uqhubeke.",
+      "accessDeniedTitle": "Ukufinyelela kunqatshiwe",
+      "accessDeniedDescription": "Awunakho ukufinyelela kule nhlangano."
     },
     "creditActivity": {
       "emptyDescription": "Ukuthenga, ukusetshenziswa, nokulungiswa kwamakhredithi kwaleli nhlangano kuzovela lapha njengoba kwenzeka.",

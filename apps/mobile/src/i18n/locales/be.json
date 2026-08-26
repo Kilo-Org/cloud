@@ -2106,7 +2106,8 @@
       "dollar_few": "долары",
       "dollar_many": "долараў",
       "costSpoken": "кошт {{cost}}",
-      "costSpokenWithTime": "кошт {{cost}}, {{time}}"
+      "costSpokenWithTime": "кошт {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не атрымалася адкрыць GitHub",
@@ -2967,16 +2968,10 @@
   "feedback": {
     "noEmailApp": "Няма даступнага паштовага дадатка. Вы можаце звязацца з намі: {{email}}",
     "couldNotOpenStore": "Не ўдалося адкрыць краму.",
-    "promptTitle": "Як вам падабаецца дадатак Kilo?",
-    "iLikeIt": "Падабаецца",
-    "gladTitle": "Рады гэта чуць!",
-    "gladMessage": "Водгук у краме вельмі дапамог бы нам. Дзякуй за карыстанне Kilo!",
-    "rateKilo": "Ацаніць Kilo",
-    "needsWork": "Трэба папрацаваць",
-    "sorryTitle": "Шкада гэта чуць!",
-    "sorryMessage": "Калі ласка, паведаміце нам, што трэба палепшыць. Інжынер, які адказвае за дадатак, чытае кожную справаздачу!",
-    "emailUs": "Напішыце нам",
-    "emailSubject": "водгук аб мабільным дадатку"
+    "emailSubject": "водгук аб мабільным дадатку",
+    "neutralTitle": "Ацаніце дадатак Kilo",
+    "rateTheApp": "Ацаніце дадатак",
+    "sendFeedback": "Адправіць водгук"
   },
   "organization": {
     "boundary": {
@@ -2986,7 +2981,9 @@
       "organizationUnavailable": "Арганізацыя недаступная",
       "selectDescription": "Выберыце арганізацыю з вашага профілю, каб працягнуць.",
       "selectOrganization": "Выбраць арганізацыю",
-      "unavailableDescription": "Гэтая арганізацыя больш недаступная. Выберыце адну з вашага профілю, каб працягнуць."
+      "unavailableDescription": "Гэтая арганізацыя больш недаступная. Выберыце адну з вашага профілю, каб працягнуць.",
+      "accessDeniedTitle": "Доступ забаронены",
+      "accessDeniedDescription": "Вы не маеце доступу да гэтай арганізацыі."
     },
     "creditActivity": {
       "emptyDescription": "Пакупкі, карыстанне і карэкціроўкі крэдытаў для гэтай арганізацыі будуць з'яўляцца тут па меры іх узнікнення.",

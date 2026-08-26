@@ -2091,7 +2091,8 @@
       "cent_zero": "centu",
       "dollar_zero": "dolāru",
       "costSpoken": "izmaksas {{cost}}",
-      "costSpokenWithTime": "izmaksas {{cost}}, {{time}}"
+      "costSpokenWithTime": "izmaksas {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Neizdevās atvērt GitHub",
@@ -2947,16 +2948,10 @@
   "feedback": {
     "noEmailApp": "Nav pieejama e-pasta lietotne. Vari sazināties ar mums: {{email}}",
     "couldNotOpenStore": "Neizdevās atvērt veikalu.",
-    "promptTitle": "Kā tev patīk Kilo lietotne?",
-    "iLikeIt": "Man patīk",
-    "gladTitle": "Mums ir prieks to dzirdēt!",
-    "gladMessage": "Veikala atsauksme mums ļoti palīdzētu. Paldies, ka izmanto Kilo!",
-    "rateKilo": "Novērtēt Kilo",
-    "needsWork": "Vajag uzlabojumus",
-    "sorryTitle": "Mums ir žēl to dzirdēt!",
-    "sorryMessage": "Lūdzu, ļauj mums uzzināt, kas jāuzlabo. Inženieris, kurš atbild par lietotni, izlasa katru ziņojumu!",
-    "emailUs": "Raksti mums",
-    "emailSubject": "mobilās lietotnes atsauksme"
+    "emailSubject": "mobilās lietotnes atsauksme",
+    "neutralTitle": "Novērtējiet Kilo lietotni",
+    "rateTheApp": "Novērtēt lietotni",
+    "sendFeedback": "Nosūtīt atsauksmi"
   },
   "organization": {
     "boundary": {
@@ -2966,7 +2961,9 @@
       "organizationUnavailable": "Organizācija nav pieejama",
       "selectDescription": "Izvēlies organizāciju no sava profila, lai turpinātu.",
       "selectOrganization": "Izvēlēties organizāciju",
-      "unavailableDescription": "Šī organizācija vairs nav pieejama. Izvēlies vienu no sava profila, lai turpinātu."
+      "unavailableDescription": "Šī organizācija vairs nav pieejama. Izvēlies vienu no sava profila, lai turpinātu.",
+      "accessDeniedTitle": "Piekļuve liegta",
+      "accessDeniedDescription": "Jums nav piekļuves šai organizācijai."
     },
     "creditActivity": {
       "emptyDescription": "Pirkumi, lietojums un kredītu korekcijas šai organizācijai parādīsies šeit, kad tās notiks.",

@@ -2076,7 +2076,8 @@
       "dollar": "dollar",
       "dollar_other": "dollar",
       "costSpoken": "gastos {{cost}}",
-      "costSpokenWithTime": "gastos {{cost}}, {{time}}"
+      "costSpokenWithTime": "gastos {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Hindi mabuksan ang GitHub",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "Walang available na email app. Maaari mo kaming kontakin sa {{email}}",
     "couldNotOpenStore": "Hindi mabuksan ang store.",
-    "promptTitle": "Paano mo nasasaya ang Kilo app?",
-    "iLikeIt": "Gusto ko ito",
-    "gladTitle": "Natutuwa kaming marinig iyan!",
-    "gladMessage": "Malaki ang maitutulong sa amin ng store review. Salamat sa paggamit ng Kilo!",
-    "rateKilo": "I-rate ang Kilo",
-    "needsWork": "Kailangan pang ayusin",
-    "sorryTitle": "Nalulungkot kaming marinig iyan!",
-    "sorryMessage": "Mangyaring ipaalam sa amin kung ano ang kailangang pagbutihin. Binabasa ng engineer na namamahala sa app ang bawat report!",
-    "emailUs": "I-email kami",
-    "emailSubject": "feedback sa mobile app"
+    "emailSubject": "feedback sa mobile app",
+    "neutralTitle": "I-rate ang Kilo app",
+    "rateTheApp": "I-rate ang app",
+    "sendFeedback": "Magpadala ng feedback"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "Hindi available ang organization",
       "selectDescription": "Pumili ng organization mula sa iyong profile para magpatuloy.",
       "selectOrganization": "Pumili ng organization",
-      "unavailableDescription": "Hindi na available ang organization na ito. Pumili ng isa mula sa iyong profile para magpatuloy."
+      "unavailableDescription": "Hindi na available ang organization na ito. Pumili ng isa mula sa iyong profile para magpatuloy.",
+      "accessDeniedTitle": "Tinanggihan ang pag-access",
+      "accessDeniedDescription": "Wala kang access sa organisasyong ito."
     },
     "creditActivity": {
       "emptyDescription": "Lalabas dito ang mga purchase, paggamit, at pagsasaayos ng credit para sa organization na ito habang nangyayari ang mga ito.",

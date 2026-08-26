@@ -2091,7 +2091,8 @@
       "cent_few": "centa",
       "dollar_few": "dolara",
       "costSpoken": "Trošak {{cost}}",
-      "costSpokenWithTime": "Trošak {{cost}}, {{time}}"
+      "costSpokenWithTime": "Trošak {{cost}}, {{time}}",
+      "pullRequest": "zahtjev za povlačenje {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nije moguće otvoriti GitHub",
@@ -2947,16 +2948,10 @@
   "feedback": {
     "noEmailApp": "Nema dostupne aplikacije za e-poštu. Možete nas kontaktirati na {{email}}",
     "couldNotOpenStore": "Nije moguće otvoriti trgovinu.",
-    "promptTitle": "Kako vam se sviđa aplikacija Kilo?",
-    "iLikeIt": "Sviđa mi se",
-    "gladTitle": "Drago nam je to čuti!",
-    "gladMessage": "Ocjena u trgovini mnogo bi nam pomogla. Hvala na korištenju Kiloa!",
-    "rateKilo": "Ocijeni Kilo",
-    "needsWork": "Treba poboljšanja",
-    "sorryTitle": "Žao nam je to čuti!",
-    "sorryMessage": "Javite nam što treba poboljšati. Inženjer zadužen za aplikaciju čita svako pojedino izvješće!",
-    "emailUs": "Pošaljite nam e-poštu",
-    "emailSubject": "povratne informacije iz mobilne aplikacije"
+    "emailSubject": "povratne informacije iz mobilne aplikacije",
+    "neutralTitle": "Ocijenite aplikaciju Kilo",
+    "rateTheApp": "Ocijenite aplikaciju",
+    "sendFeedback": "Pošaljite povratne informacije"
   },
   "organization": {
     "boundary": {
@@ -2966,7 +2961,9 @@
       "organizationUnavailable": "Organizacija nedostupna",
       "selectDescription": "Odaberite organizaciju iz svog profila za nastavak.",
       "selectOrganization": "Odaberite organizaciju",
-      "unavailableDescription": "Ova organizacija više nije dostupna. Odaberite jednu iz svog profila za nastavak."
+      "unavailableDescription": "Ova organizacija više nije dostupna. Odaberite jednu iz svog profila za nastavak.",
+      "accessDeniedTitle": "Pristup odbijen",
+      "accessDeniedDescription": "Nemate pristup ovoj organizaciji."
     },
     "creditActivity": {
       "emptyDescription": "Kupnje, korištenje i usklađivanja kredita za ovu organizaciju pojavit će se ovdje kada se dogode.",

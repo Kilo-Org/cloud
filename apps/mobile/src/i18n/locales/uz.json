@@ -2076,7 +2076,8 @@
       "dollar": "dollar",
       "dollar_other": "dollar",
       "costSpoken": "xarajat {{cost}}",
-      "costSpokenWithTime": "xarajat {{cost}}, {{time}}"
+      "costSpokenWithTime": "xarajat {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub'ni ochib bo'lmadi",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "Email ilovasi mavjud emas. Bizga {{email}} manzilida yozishingiz mumkin",
     "couldNotOpenStore": "Do'konni ochib bo'lmadi.",
-    "promptTitle": "Kilo ilovasini qanchalik yoqtiryapsiz?",
-    "iLikeIt": "Yoqdi",
-    "gladTitle": "Buni eshitganimizdan xursandmiz!",
-    "gladMessage": "Do'kondagi sharh bizga juda katta yordam beradi. Kilodan foydalanganingiz uchun rahmat!",
-    "rateKilo": "Kiloni baholang",
-    "needsWork": "Yaxshilash kerak",
-    "sorryTitle": "Buni eshitganimizdan afsusdamiz!",
-    "sorryMessage": "Iltimos, nimani yaxshilash kerakligini aytib bering. Ilova uchun mas'ul muhandis har bir hisobotni o'qiydi!",
-    "emailUs": "Bizga email yozing",
-    "emailSubject": "mobil ilova fikr-mulohazasi"
+    "emailSubject": "mobil ilova fikr-mulohazasi",
+    "neutralTitle": "Kilo ilovasini baholang",
+    "rateTheApp": "Ilovani baholang",
+    "sendFeedback": "Fikr-mulohaza yuborish"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "Tashkilot mavjud emas",
       "selectDescription": "Davom etish uchun profilingizdan tashkilotni tanlang.",
       "selectOrganization": "Tashkilotni tanlang",
-      "unavailableDescription": "Bu tashkilot endi mavjud emas. Davom etish uchun profilingizdan birini tanlang."
+      "unavailableDescription": "Bu tashkilot endi mavjud emas. Davom etish uchun profilingizdan birini tanlang.",
+      "accessDeniedTitle": "Kirish rad etildi",
+      "accessDeniedDescription": "Sizda ushbu tashkilotga kirish huquqi yo'q."
     },
     "creditActivity": {
       "emptyDescription": "Bu tashkilot uchun xaridlar, foydalanish va kredit tuzatishlari sodir bo'lganda shu yerda ko'rinadi.",

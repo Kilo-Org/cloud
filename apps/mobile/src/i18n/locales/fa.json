@@ -2076,7 +2076,8 @@
       "dollar": "دلار",
       "dollar_other": "دلار",
       "costSpoken": "هزینه {{cost}}",
-      "costSpokenWithTime": "هزینه {{cost}}، {{time}}"
+      "costSpokenWithTime": "هزینه {{cost}}، {{time}}",
+      "pullRequest": "درخواست کشش {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "باز کردن GitHub ممکن نشد",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "هیچ برنامه ایمیلی در دسترس نیست. می‌توانید از {{email}} با ما تماس بگیرید.",
     "couldNotOpenStore": "باز کردن فروشگاه ممکن نشد.",
-    "promptTitle": "از برنامه Kilo چقدر راضی هستید؟",
-    "iLikeIt": "دوستش دارم",
-    "gladTitle": "از شنیدن این خوشحالیم!",
-    "gladMessage": "یک نظر در فروشگاه به ما خیلی کمک می‌کند. ممنون از استفاده شما از Kilo!",
-    "rateKilo": "امتیاز به Kilo",
-    "needsWork": "نیاز به بهبود دارد",
-    "sorryTitle": "از شنیدن این متأسفیم!",
-    "sorryMessage": "لطفاً به ما اطلاع دهید چه چیزی باید بهتر شود. مهندس مسئول برنامه هر گزارش را می‌خواند!",
-    "emailUs": "برای ما ایمیل بفرستید",
-    "emailSubject": "بازخورد برنامه موبایل"
+    "emailSubject": "بازخورد برنامه موبایل",
+    "neutralTitle": "به اپلیکیشن Kilo امتیاز دهید",
+    "rateTheApp": "به برنامه امتیاز دهید",
+    "sendFeedback": "ارسال بازخورد"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "سازمان در دسترس نیست",
       "selectDescription": "برای ادامه از نمایه خود یک سازمان انتخاب کنید.",
       "selectOrganization": "انتخاب سازمان",
-      "unavailableDescription": "این سازمان دیگر در دسترس نیست. برای ادامه یکی را از نمایه خود انتخاب کنید."
+      "unavailableDescription": "این سازمان دیگر در دسترس نیست. برای ادامه یکی را از نمایه خود انتخاب کنید.",
+      "accessDeniedTitle": "دسترسی رد شد",
+      "accessDeniedDescription": "شما به این سازمان دسترسی ندارید."
     },
     "creditActivity": {
       "emptyDescription": "خریدها، استفاده و تنظیمات اعتبار این سازمان به محض وقوع در اینجا ظاهر می‌شوند.",

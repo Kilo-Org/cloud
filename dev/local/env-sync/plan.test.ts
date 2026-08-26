@@ -928,6 +928,39 @@ test('preserves host.docker.internal in @url defaults for useLanIp services', ()
   }
 });
 
+test('does not overwrite existing public sandbox tunnel URLs', () => {
+  const repo = createRepo({
+    '.env.local': '',
+    [`${workerDir}/package.json`]: JSON.stringify(
+      { scripts: { dev: "wrangler dev --env 'dev'" } },
+      null,
+      2
+    ),
+    [`${workerDir}/wrangler.jsonc`]: '{ "dev": { "port": 8794 } }',
+    [`${workerDir}/.dev.vars.example`]: [
+      '# @url nextjs',
+      'KILOCODE_BACKEND_BASE_URL=http://localhost:3000',
+      '# @url nextjs/api',
+      'KILO_OPENROUTER_BASE=http://localhost:3000/api',
+      '',
+    ].join('\n'),
+    [`${workerDir}/.dev.vars`]: [
+      'KILOCODE_BACKEND_BASE_URL=https://backend.trycloudflare.com',
+      'KILO_OPENROUTER_BASE=https://backend.trycloudflare.com/api',
+      '',
+    ].join('\n'),
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['cloud-agent-next']));
+    assert.equal(plan.missingEnvLocal, false);
+    const change = plan.devVarsChanges.find(item => item.workerDir === workerDir);
+    assert.ok(!change?.keyChanges.some(item => item.key === 'KILOCODE_BACKEND_BASE_URL'));
+    assert.ok(!change?.keyChanges.some(item => item.key === 'KILO_OPENROUTER_BASE'));
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('preserves localhost in worker-side @url defaults for useLanIp services', () => {
   const repo = createRepo({
     '.env.local': '',

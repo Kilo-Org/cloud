@@ -2076,7 +2076,8 @@
       "dollar": "დოლარი",
       "dollar_other": "დოლარი",
       "costSpoken": "ღირებულება {{cost}}",
-      "costSpokenWithTime": "ღირებულება {{cost}}, {{time}}"
+      "costSpokenWithTime": "ღირებულება {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ის გახსნა ვერ მოხერხდა",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "ელფოსტის აპლიკაცია ხელმისაწვდომი არ არის. დაგვიკავშირდით: {{email}}",
     "couldNotOpenStore": "მაღაზიის გახსნა ვერ მოხერხდა.",
-    "promptTitle": "როგორ მოგწონთ Kilo აპი?",
-    "iLikeIt": "მომწონს",
-    "gladTitle": "მოხარულები ვართ, რომ ეს გვესმის!",
-    "gladMessage": "მაღაზიის მიმოხილვა ძალიან დაგვეხმარებოდა. გმადლობთ, რომ იყენებთ Kilo-ს!",
-    "rateKilo": "შეაფასეთ Kilo",
-    "needsWork": "გასაუმჯობესებელია",
-    "sorryTitle": "ბოდიშს ვიხდით, რომ ეს გვესმის!",
-    "sorryMessage": "გთხოვთ, გვითხრათ, რა უნდა გაუმჯობესდეს. აპზე პასუხისმგებელი ინჟინერი ყველა ანგარიშს კითხულობს!",
-    "emailUs": "მოგვწერეთ",
-    "emailSubject": "მობილური აპლიკაციის გამოხმაურება"
+    "emailSubject": "მობილური აპლიკაციის გამოხმაურება",
+    "neutralTitle": "შეაფასეთ Kilo აპი",
+    "rateTheApp": "აპის შეფასება",
+    "sendFeedback": "გამოხმაურების გაგზავნა"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "ორგანიზაცია მიუწვდომელია",
       "selectDescription": "გასაგრძელებლად აირჩიეთ ორგანიზაცია თქვენი პროფილიდან.",
       "selectOrganization": "აირჩიეთ ორგანიზაცია",
-      "unavailableDescription": "ეს ორგანიზაცია აღარ არის ხელმისაწვდომი. გასაგრძელებლად აირჩიეთ ერთი თქვენი პროფილიდან."
+      "unavailableDescription": "ეს ორგანიზაცია აღარ არის ხელმისაწვდომი. გასაგრძელებლად აირჩიეთ ერთი თქვენი პროფილიდან.",
+      "accessDeniedTitle": "წვდომა აკრძალულია",
+      "accessDeniedDescription": "თქვენ არ გაქვთ წვდომა ამ ორგანიზაციაზე."
     },
     "creditActivity": {
       "emptyDescription": "ამ ორგანიზაციის შესყიდვები, გამოყენება და კრედიტის კორექტირებები აქ გამოჩნდება მათი წარმოქმნისას.",

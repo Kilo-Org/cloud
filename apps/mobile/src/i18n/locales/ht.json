@@ -2076,7 +2076,8 @@
       "dollar": "dola",
       "dollar_other": "dola",
       "costSpoken": "kout {{cost}}",
-      "costSpokenWithTime": "Pri {{cost}}, {{time}}"
+      "costSpokenWithTime": "Pri {{cost}}, {{time}}",
+      "pullRequest": "demann pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Pa t 'kapab louvri GitHub",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "Pa gen aplikasyon imel disponib. Ou ka kontakte nou nan {{email}}",
     "couldNotOpenStore": "Pa t ka louvri magazen an.",
-    "promptTitle": "Kijan ou renmen aplikasyon Kilo a?",
-    "iLikeIt": "Mwen renmen li",
-    "gladTitle": "Nou kontan tande sa!",
-    "gladMessage": "Yon revizyon magazen ta ede nou anpil. Mèsi paske w ap itilize Kilo!",
-    "rateKilo": "Evalye Kilo",
-    "needsWork": "Gen travay pou fè",
-    "sorryTitle": "Nou regrèt tande sa!",
-    "sorryMessage": "Tanpri fè nou konnen kisa ki bezwen pi byen. Enjenyè ki responsab aplikasyon an li chak rapò!",
-    "emailUs": "Imel nou",
-    "emailSubject": "kòmantè sou aplikasyon mobil"
+    "emailSubject": "kòmantè sou aplikasyon mobil",
+    "neutralTitle": "Evalye aplikasyon Kilo a",
+    "rateTheApp": "Evalye aplikasyon an",
+    "sendFeedback": "Voye fidbak"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "Òganizasyon pa disponib",
       "selectDescription": "Chwazi yon òganizasyon nan pwofil ou pou kontinye.",
       "selectOrganization": "Chwazi yon òganizasyon",
-      "unavailableDescription": "Òganizasyon sa a pa disponib ankò. Chwazi yon youn nan pwofil ou pou kontinye."
+      "unavailableDescription": "Òganizasyon sa a pa disponib ankò. Chwazi yon youn nan pwofil ou pou kontinye.",
+      "accessDeniedTitle": "Aksè refize",
+      "accessDeniedDescription": "Ou pa gen aksè nan òganizasyon sa a."
     },
     "creditActivity": {
       "emptyDescription": "Acha, itilizasyon, ak ajisteman kredi pou òganizasyon sa a ap parèt isit la jan yo rive.",

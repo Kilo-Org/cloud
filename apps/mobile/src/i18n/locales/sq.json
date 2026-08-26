@@ -2076,7 +2076,8 @@
       "dollar": "dollarë",
       "dollar_other": "dollarë",
       "costSpoken": "kostoja {{cost}}",
-      "costSpokenWithTime": "kostoja {{cost}}, {{time}}"
+      "costSpokenWithTime": "kostoja {{cost}}, {{time}}",
+      "pullRequest": "kërkesë tërheqjeje {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nuk u hap GitHub",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "Nuk ka aplikacion email-i të disponueshëm. Mund të na kontaktoni në {{email}}",
     "couldNotOpenStore": "Dyqani nuk mund të hapej.",
-    "promptTitle": "Si po ju pëlqen aplikacioni Kilo?",
-    "iLikeIt": "Më pëlqen",
-    "gladTitle": "Kënaqemi ta dëgjojmë këtë!",
-    "gladMessage": "Një rishikim në dyqan do të na ndihmonte jashtëzakonisht shumë. Faleminderit që përdorni Kilo!",
-    "rateKilo": "Vlerëso Kilo",
-    "needsWork": "Ka nevojë për përmirësim",
-    "sorryTitle": "Na vjen keq ta dëgjojmë këtë!",
-    "sorryMessage": "Ju lutemi na tregoni se çfarë duhet të përmirësohet. Inxhinieri përgjegjës për aplikacionin e lexon çdo raport!",
-    "emailUs": "Na dërgoni email",
-    "emailSubject": "përshtypjet për aplikacionin celular"
+    "emailSubject": "përshtypjet për aplikacionin celular",
+    "neutralTitle": "Vlerëso aplikacionin Kilo",
+    "rateTheApp": "Vlerëso aplikacionin",
+    "sendFeedback": "Dërgo përshtypje"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "Organizata e padisponueshme",
       "selectDescription": "Zgjidhni një organizatë nga profili juaj për të vazhduar.",
       "selectOrganization": "Zgjidh një organizatë",
-      "unavailableDescription": "Kjo organizatë nuk është më e disponueshme. Zgjidhni një nga profili juaj për të vazhduar."
+      "unavailableDescription": "Kjo organizatë nuk është më e disponueshme. Zgjidhni një nga profili juaj për të vazhduar.",
+      "accessDeniedTitle": "Qasja u refuzua",
+      "accessDeniedDescription": "Ju nuk keni qasje në këtë organizatë."
     },
     "creditActivity": {
       "emptyDescription": "Blerjet, përdorimi dhe rregullimet e krediteve për këtë organizatë do të shfaqen këtu ndërsa ndodhin.",

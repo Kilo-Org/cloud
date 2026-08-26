@@ -1630,7 +1630,8 @@
       "cent_two": "סנטים",
       "dollar_two": "דולרים",
       "costSpoken": "עלות {{cost}}",
-      "costSpokenWithTime": "עלות {{cost}}, {{time}}"
+      "costSpokenWithTime": "עלות {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "לא ניתן היה להתחיל את הגדרת אפליקציית GitHub. נסה שוב.",
@@ -2952,7 +2953,9 @@
       "organizationUnavailable": "הארגון אינו זמין",
       "selectDescription": "בחר ארגון מהפרופיל שלך כדי להמשיך.",
       "selectOrganization": "בחר ארגון",
-      "unavailableDescription": "ארגון זה אינו זמין עוד. בחר אחד מהפרופיל שלך כדי להמשיך."
+      "unavailableDescription": "ארגון זה אינו זמין עוד. בחר אחד מהפרופיל שלך כדי להמשיך.",
+      "accessDeniedTitle": "הגישה נדחתה",
+      "accessDeniedDescription": "אין לך גישה לארגון זה."
     },
     "creditActivity": {
       "emptyDescription": "רכישות, שימוש והתאמות קרדיטים עבור ארגון זה יופיעו כאן כשיתרחשו.",
@@ -3103,17 +3106,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "לא ניתן היה לפתוח את החנות.",
-    "emailUs": "שלח לנו דוא״ל",
-    "gladMessage": "ביקורת בחנות תעזור לנו מאוד. תודה על השימוש ב-Kilo!",
-    "gladTitle": "אנחנו שמחים לשמוע את זה!",
-    "iLikeIt": "אהבתי את זה",
-    "needsWork": "דורש שיפור",
     "noEmailApp": "אין אפליקציית דוא״ל זמינה. תוכל לפנות אלינו בכתובת {{email}}",
-    "promptTitle": "מה דעתך על אפליקציית Kilo?",
-    "rateKilo": "דרג את Kilo",
-    "sorryMessage": "ספר לנו מה צריך להשתפר. המהנדס האחראי על האפליקציה קורא כל דוח!",
-    "sorryTitle": "אנחנו מצטערים לשמוע את זה!",
-    "emailSubject": "משוב על אפליקציית המובייל"
+    "emailSubject": "משוב על אפליקציית המובייל",
+    "neutralTitle": "דרג את אפליקציית Kilo",
+    "rateTheApp": "דרג את האפליקציה",
+    "sendFeedback": "שלח משוב"
   },
   "authErrors": {
     "emailAlreadyUsed": "חשבון עם כתובת דוא\"ל זו כבר קיים בשיטת התחברות אחרת. נסה שיטה אחרת או השתמש ב'$t(login.moreSignInOptions)'.",

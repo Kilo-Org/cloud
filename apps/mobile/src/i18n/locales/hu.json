@@ -2076,7 +2076,8 @@
       "dollar": "dollár",
       "dollar_other": "dollár",
       "costSpoken": "költség {{cost}}",
-      "costSpokenWithTime": "költség {{cost}}, {{time}}"
+      "costSpokenWithTime": "költség {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "A GitHub megnyitása nem sikerült",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "Nincs elérhető e-mail alkalmazás. Elérsz minket a következő címen: {{email}}",
     "couldNotOpenStore": "Az áruház nem nyitható meg.",
-    "promptTitle": "Mennyire tetszik a Kilo alkalmazás?",
-    "iLikeIt": "Tetszik",
-    "gladTitle": "Örülünk, hogy ezt halljuk!",
-    "gladMessage": "Egy áruházi értékelés nagyon sokat segítene nekünk. Köszönjük, hogy a Kilo-t használod!",
-    "rateKilo": "Kilo értékelése",
-    "needsWork": "Javításra szorul",
-    "sorryTitle": "Sajnáljuk, hogy ezt halljuk!",
-    "sorryMessage": "Kérjük, tudasd velünk, min kellene javítani. Az alkalmazásért felelős mérnök minden egyes jelentést elolvas!",
-    "emailUs": "Írj nekünk e-mailt",
-    "emailSubject": "mobilalkalmazás-visszajelzés"
+    "emailSubject": "mobilalkalmazás-visszajelzés",
+    "neutralTitle": "Értékelje a Kilo alkalmazást",
+    "rateTheApp": "Értékelje az alkalmazást",
+    "sendFeedback": "Visszajelzés küldése"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "A szervezet nem érhető el",
       "selectDescription": "A folytatáshoz válassz szervezetet a profilodból.",
       "selectOrganization": "Szervezet kiválasztása",
-      "unavailableDescription": "Ez a szervezet már nem érhető el. A folytatáshoz válassz egyet a profilodból."
+      "unavailableDescription": "Ez a szervezet már nem érhető el. A folytatáshoz válassz egyet a profilodból.",
+      "accessDeniedTitle": "Hozzáférés megtagadva",
+      "accessDeniedDescription": "Nincs hozzáférése ehhez a szervezethez."
     },
     "creditActivity": {
       "emptyDescription": "A szervezet vásárlásai, használata és kreditmódosításai itt jelennek meg, ahogy történnek.",

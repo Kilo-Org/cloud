@@ -112,11 +112,14 @@ COPY src/shared /tmp/wrapper-build/src/shared
 RUN mkdir -p /opt/kilo-cloud \
     && cd /tmp/wrapper-build/wrapper \
     && bun install --production \
+    && ln -sfn /tmp/wrapper-build/wrapper/node_modules /tmp/wrapper-build/node_modules \
     && bun build src/main.ts --outfile=/opt/kilo-cloud/kilocode-wrapper.js --target=bun --minify \
     && bun build src/restore-session.ts --outfile=/opt/kilo-cloud/kilo-restore-session.js --target=bun --minify \
     && bun build src/bitbucket-review-cli.ts --outfile=/opt/kilo-cloud/bb --target=bun --minify \
+    && bun build src/control/main.ts --outfile=/opt/kilo-cloud/kilocode-control-wrapper.js --target=bun --minify \
     && chmod +x /opt/kilo-cloud/bb \
     && ln -sf /opt/kilo-cloud/kilocode-wrapper.js /usr/local/bin/kilocode-wrapper.js \
+    && ln -sf /opt/kilo-cloud/kilocode-control-wrapper.js /usr/local/bin/kilocode-control-wrapper.js \
     && ln -sf /opt/kilo-cloud/kilo-restore-session.js /usr/local/bin/kilo-restore-session.js \
     && ln -sf /opt/kilo-cloud/bb /usr/local/bin/bb \
     && rm -rf /tmp/wrapper-build

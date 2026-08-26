@@ -2076,7 +2076,8 @@
       "dollar": "դոլար",
       "dollar_other": "դոլար",
       "costSpoken": "Արժեք {{cost}}",
-      "costSpokenWithTime": "Արժեք {{cost}}, {{time}}"
+      "costSpokenWithTime": "Արժեք {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Չհաջողվեց բացել GitHub-ը",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "Էլփոստի հավելված հասանելի չէ: Կարող եք կապվել մեզ հետ {{email}} հասցեով",
     "couldNotOpenStore": "Հնարավոր չեղավ բացել խանութը:",
-    "promptTitle": "Ինչպե՞ս եք գնահատում Kilo հավելվածը:",
-    "iLikeIt": "Հավանում եմ",
-    "gladTitle": "Մենք ուրախ ենք դա լսել:",
-    "gladMessage": "Խանութում ակնարկը շատ կօգնի մեզ: Շնորհակալություն Kilo-ն օգտագործելու համար:",
-    "rateKilo": "Գնահատել Kilo-ն",
-    "needsWork": "Բարելավման կարիք ունի",
-    "sorryTitle": "Ցավում ենք դա լսել:",
-    "sorryMessage": "Խնդրում ենք հայտնել մեզ, թե ինչն է պետք բարելավել: Հավելվածի պատասխանատու ինժեները կարդում է յուրաքանչյուր հաշվետվություն:",
-    "emailUs": "Էլփոստ ուղարկեք մեզ",
-    "emailSubject": "շարժական հավելվածի հետադարձ կապ"
+    "emailSubject": "շարժական հավելվածի հետադարձ կապ",
+    "neutralTitle": "Գնահատեք Kilo հավելվածը",
+    "rateTheApp": "Գնահատեք հավելվածը",
+    "sendFeedback": "Ուղարկեք կարծիք"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "Կազմակերպությունը հասանելի չէ",
       "selectDescription": "Ընտրեք կազմակերպություն ձեր պրոֆիլից՝ շարունակելու համար:",
       "selectOrganization": "Ընտրել կազմակերպություն",
-      "unavailableDescription": "Այս կազմակերպությունն այլևս հասանելի չէ: Ընտրեք մեկը ձեր պրոֆիլից՝ շարունակելու համար:"
+      "unavailableDescription": "Այս կազմակերպությունն այլևս հասանելի չէ: Ընտրեք մեկը ձեր պրոֆիլից՝ շարունակելու համար:",
+      "accessDeniedTitle": "Մուտքը մերժված է",
+      "accessDeniedDescription": "Դուք մուտք չունեք այս կազմակերպություն։"
     },
     "creditActivity": {
       "emptyDescription": "Այս կազմակերպության գնումները, օգտագործումը և կրեդիտների ճշգրտումները կհայտնվեն այստեղ՝ իրենց կատարման պահին:",

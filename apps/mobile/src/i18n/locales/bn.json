@@ -2076,7 +2076,8 @@
       "dollar": "ডলার",
       "dollar_other": "ডলার",
       "costSpoken": "খরচ {{cost}}",
-      "costSpokenWithTime": "খরচ {{cost}}, {{time}}"
+      "costSpokenWithTime": "খরচ {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub খোলা যায়নি",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "কোনো ইমেইল অ্যাপ উপলব্ধ নেই। আপনি {{email}}-এ আমাদের সাথে যোগাযোগ করতে পারেন",
     "couldNotOpenStore": "স্টোর খোলা যায়নি।",
-    "promptTitle": "Kilo অ্যাপটি কেমন লাগছে?",
-    "iLikeIt": "আমার ভালো লাগছে",
-    "gladTitle": "এটা শুনে আমরা খুশি!",
-    "gladMessage": "একটি স্টোর রিভিউ আমাদের অনেক সাহায্য করবে। Kilo ব্যবহার করার জন্য ধন্যবাদ!",
-    "rateKilo": "Kilo রেট করুন",
-    "needsWork": "উন্নতি প্রয়োজন",
-    "sorryTitle": "এটা শুনে আমরা দুঃখিত!",
-    "sorryMessage": "কী উন্নত করতে হবে তা আমাদের জানান। অ্যাপের দায়িত্বে থাকা ইঞ্জিনিয়ার প্রতিটি রিপোর্ট পড়েন!",
-    "emailUs": "আমাদের ইমেইল করুন",
-    "emailSubject": "মোবাইল অ্যাপ ফিডব্যাক"
+    "emailSubject": "মোবাইল অ্যাপ ফিডব্যাক",
+    "neutralTitle": "Kilo অ্যাপ রেট করুন",
+    "rateTheApp": "অ্যাপ রেট করুন",
+    "sendFeedback": "মতামত পাঠান"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "সংস্থা অনুপলব্ধ",
       "selectDescription": "চালিয়ে যেতে আপনার প্রোফাইল থেকে একটি সংস্থা বেছে নিন।",
       "selectOrganization": "একটি সংস্থা নির্বাচন করুন",
-      "unavailableDescription": "এই সংস্থাটি আর উপলব্ধ নয়। চালিয়ে যেতে আপনার প্রোফাইল থেকে একটি বেছে নিন।"
+      "unavailableDescription": "এই সংস্থাটি আর উপলব্ধ নয়। চালিয়ে যেতে আপনার প্রোফাইল থেকে একটি বেছে নিন।",
+      "accessDeniedTitle": "অ্যাক্সেস অস্বীকৃত",
+      "accessDeniedDescription": "আপনার এই সংস্থায় অ্যাক্সেস নেই।"
     },
     "creditActivity": {
       "emptyDescription": "এই সংস্থার ক্রয়, ব্যবহার এবং ক্রেডিট সমন্বয় এখানে প্রদর্শিত হবে।",

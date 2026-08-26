@@ -2076,7 +2076,8 @@
       "dollar": "dollaria",
       "dollar_other": "dollaria",
       "costSpoken": "hinta {{cost}}",
-      "costSpokenWithTime": "hinta {{cost}}, {{time}}"
+      "costSpokenWithTime": "hinta {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubia ei voitu avata",
@@ -2927,16 +2928,10 @@
   "feedback": {
     "noEmailApp": "Sähköpostisovellusta ei ole käytettävissä. Tavoitat meidät osoitteesta {{email}}",
     "couldNotOpenStore": "Kauppaa ei voitu avata.",
-    "promptTitle": "Miten Kilo-sovellus on maistunut?",
-    "iLikeIt": "Pidän siitä",
-    "gladTitle": "Kiva kuulla se!",
-    "gladMessage": "Kauppa-arvostelu auttaisi meitä valtavasti. Kiitos Kilo-sovelluksen käytöstä!",
-    "rateKilo": "Arvioi Kilo",
-    "needsWork": "Vaatii parannuksia",
-    "sorryTitle": "Ikävä kuulla se!",
-    "sorryMessage": "Kerro meille, mitä pitäisi parantaa. Sovelluksesta vastaava insinööri lukee jokaisen raportin!",
-    "emailUs": "Lähetä sähköpostia",
-    "emailSubject": "mobiilisovelluksen palaute"
+    "emailSubject": "mobiilisovelluksen palaute",
+    "neutralTitle": "Arvioi Kilo-sovellus",
+    "rateTheApp": "Arvioi sovellus",
+    "sendFeedback": "Lähetä palautetta"
   },
   "organization": {
     "boundary": {
@@ -2946,7 +2941,9 @@
       "organizationUnavailable": "Organisaatio ei käytettävissä",
       "selectDescription": "Valitse organisaatio profiilistasi jatkaaksesi.",
       "selectOrganization": "Valitse organisaatio",
-      "unavailableDescription": "Tämä organisaatio ei ole enää käytettävissä. Valitse yksi profiilistasi jatkaaksesi."
+      "unavailableDescription": "Tämä organisaatio ei ole enää käytettävissä. Valitse yksi profiilistasi jatkaaksesi.",
+      "accessDeniedTitle": "Pääsy evätty",
+      "accessDeniedDescription": "Sinulla ei ole pääsyä tähän organisaatioon."
     },
     "creditActivity": {
       "emptyDescription": "Tämän organisaation ostokset, käyttö ja krediittimuutokset näkyvät täällä niiden tapahtuessa.",

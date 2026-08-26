@@ -69,6 +69,24 @@ describe('registerTempFile', () => {
 
     expect(readRegistry()).toHaveLength(1);
   });
+
+  it('refreshes createdAt when the same uri is rewritten', () => {
+    // A download reuses a deterministic cache filename, so re-sharing the same
+    // file overwrites this uri. The TTL must run from the newest write, or the
+    // next reap deletes a copy the receiving app is still reading.
+    const stale = Date.now() - TEMP_FILE_TTL_MS - 1;
+    fileStore.set(
+      REGISTRY_URI,
+      JSON.stringify([{ uri: 'file:///cache/dup.txt', createdAt: stale }])
+    );
+    fileStore.set('file:///cache/dup.txt', 'fresh copy');
+
+    registerTempFile('file:///cache/dup.txt');
+    reapTempFiles();
+
+    expect(fileStore.has('file:///cache/dup.txt')).toBe(true);
+    expect(readRegistry()).toHaveLength(1);
+  });
 });
 
 describe('reapTempFiles', () => {

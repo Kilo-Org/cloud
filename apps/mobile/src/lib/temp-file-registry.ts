@@ -60,15 +60,20 @@ function deleteRegisteredFile(uri: string): void {
 }
 
 /**
- * Register an app-owned temp file for later reaping. Idempotent per URI:
- * a second registration keeps the original `createdAt`.
+ * Register an app-owned temp file for later reaping. Idempotent per URI, but
+ * a second registration refreshes `createdAt`: downloads reuse a deterministic
+ * cache filename, so re-sharing the same file rewrites that URI and the TTL
+ * must run from the newest write. Keeping the first timestamp would let the
+ * next reap delete a copy the receiving app is still reading.
  */
 export function registerTempFile(uri: string): void {
   const current = loadEntries();
-  if (current.some(entry => entry.uri === uri)) {
-    return;
+  const existing = current.find(entry => entry.uri === uri);
+  if (existing) {
+    existing.createdAt = Date.now();
+  } else {
+    current.push({ uri, createdAt: Date.now() });
   }
-  current.push({ uri, createdAt: Date.now() });
   persistEntries();
 }
 

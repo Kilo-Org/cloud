@@ -263,6 +263,7 @@ export async function getSessionContainerInfo(
     scope: !sandboxId
       ? 'unknown'
       : sandboxId.startsWith('ses-') ||
+          sandboxId.startsWith('istd-') ||
           sandboxId.startsWith('crv-') ||
           sandboxId.startsWith('dind-')
         ? 'isolated'

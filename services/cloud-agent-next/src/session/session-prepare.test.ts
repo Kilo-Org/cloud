@@ -1991,6 +1991,43 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     expect(admitOperationMock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    {
+      name: 'devcontainer',
+      runtime: { devcontainer: true, sandboxAllocation: 'isolated-standard' } as const,
+      billingOrigin: 'cloud-agent',
+    },
+    {
+      name: 'code review',
+      runtime: { sandboxAllocation: 'isolated-standard' } as const,
+      billingOrigin: 'code-review',
+    },
+  ])(
+    'rejects isolated Standard allocation with $name routing before external effects',
+    async input => {
+      const doStub = makeDoStub();
+      const ctx = makeContext(doStub);
+
+      await expect(
+        createSessionWithLedger(
+          makeRequest({
+            runtime: input.runtime,
+            options: { operationKey: OPERATION_KEY },
+          }),
+          ctx,
+          { ...CREATE_OPTIONS, billingOrigin: input.billingOrigin }
+        )
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'Isolated Standard allocation is incompatible with specialized sandbox routing',
+      });
+
+      expect(admitOperationMock).not.toHaveBeenCalled();
+      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    }
+  );
+
   it('surfaces BAD_REQUEST session_clone_failed when the clone is rejected', async () => {
     createCliSessionMock.mockResolvedValue({ status: 'rejected', code: 'source_access_denied' });
     const doStub = makeDoStub();

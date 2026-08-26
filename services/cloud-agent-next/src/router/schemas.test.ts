@@ -231,6 +231,21 @@ describe('legacy live attachment input compatibility', () => {
     expect(PrepareSessionInput.safeParse({ ...input, sandboxAllocation: 'standard' }).success).toBe(
       false
     );
+    expect(
+      PrepareSessionInput.safeParse({
+        ...input,
+        devcontainer: true,
+        autoInitiate: true,
+        sandboxAllocation: 'isolated-standard',
+      }).success
+    ).toBe(false);
+    expect(
+      PrepareSessionInput.safeParse({
+        ...input,
+        createdOnPlatform: 'code-review',
+        sandboxAllocation: 'isolated-standard',
+      }).success
+    ).toBe(false);
   });
 
   it('accepts a GitHub integration id only with a legacy GitHub repository', () => {

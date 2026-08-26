@@ -70,8 +70,18 @@ type SharedSandboxRouteMetadata = NonNullable<
 
 function assertSupportedSandboxAllocation(
   input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
 ): void {
+  if (
+    input.runtime?.sandboxAllocation === 'isolated-standard' &&
+    (input.runtime.devcontainer === true || options?.billingOrigin === 'code-review')
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Isolated Standard allocation is incompatible with specialized sandbox routing',
+    });
+  }
   if (
     input.runtime?.sandboxAllocation === 'isolated-standard' &&
     sessionPlaneForNewOwner(ctx.env, {
@@ -807,7 +817,7 @@ export async function registerNewSession(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): Promise<SessionRegistrationResult> {
-  assertSupportedSandboxAllocation(input, ctx);
+  assertSupportedSandboxAllocation(input, ctx, options);
   const allocation = await allocateNewSession(input, ctx, options);
   const stub = resolveSessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId);
   let registerResult: Awaited<ReturnType<typeof stub.registerSession>>;
@@ -1062,6 +1072,7 @@ export async function startNewSession(
   options?: { billingOrigin?: string },
   ledger?: SessionCreationLedgerHooks
 ): Promise<StartedSessionResult> {
+  assertSupportedSandboxAllocation(input, ctx, options);
   const allocation = await allocateSessionForCreate(input, ctx, options, ledger);
   return registerAndAdmitInitialTurn(input, ctx, options, allocation, ledger);
 }
@@ -1272,7 +1283,7 @@ export async function createSessionWithLedger(
   ctx: SessionRegistrationContext,
   options: SessionLedgerCreateOptions
 ): Promise<LedgerSessionCreateResult> {
-  assertSupportedSandboxAllocation(input, ctx);
+  assertSupportedSandboxAllocation(input, ctx, { billingOrigin: options.billingOrigin });
   const db = getPgDb(ctx.env);
   const admission = await admitOperation(db, {
     userId: ctx.userId,

@@ -646,6 +646,24 @@ export const PrepareSessionInput = z
     path: ['githubRepo'],
   })
   .superRefine((data, ctx) => {
+    if (data.sandboxAllocation === 'isolated-standard' && data.devcontainer) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['sandboxAllocation'],
+        message: 'Isolated Standard allocation cannot be combined with devcontainer',
+      });
+    }
+    if (
+      data.sandboxAllocation === 'isolated-standard' &&
+      data.createdOnPlatform === 'code-review'
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['sandboxAllocation'],
+        message: 'Isolated Standard allocation cannot be combined with code review',
+      });
+    }
+
     if (data.githubIntegrationId !== undefined && data.githubRepo === undefined) {
       ctx.addIssue({
         code: 'custom',

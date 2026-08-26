@@ -159,7 +159,7 @@ export function SubOrganizationsPage({
   );
   const usageDataStatus: UsageDataStatus = thirtyDaySpend.data
     ? 'available'
-    : thirtyDaySpend.error
+    : thirtyDaySpend.error || overview.error || thirtyDaySpend.fetchStatus === 'idle'
       ? 'unavailable'
       : 'loading';
   const selectedUsage = useMemo<UsageByOrganization>(() => {

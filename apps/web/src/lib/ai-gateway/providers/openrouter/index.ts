@@ -24,6 +24,7 @@ import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/provid
 import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/terminal-bench';
+import { enkryptFor, getEnkryptBenchmarks } from '@/lib/model-stats/enkrypt';
 import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
 import { addMonths } from 'date-fns';
@@ -114,7 +115,10 @@ async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const endpointsMetadata = await getOpenRouterModelsMetadataFromDatabase();
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
-  const summaries = await getTerminalBenchSummaries();
+  const [summaries, enkryptBenchmarks] = await Promise.all([
+    getTerminalBenchSummaries(),
+    getEnkryptBenchmarks(),
+  ]);
   const enhancedModels = await Promise.all(
     models
       .filter(
@@ -150,6 +154,10 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           .filter(m => m.status === 'public')
           .map(model => convertFromKiloExclusiveModel(model))
       )
+      .map(model => {
+        const enkrypt = enkryptFor(enkryptBenchmarks, model.id);
+        return { ...model, ...(enkrypt && { enkrypt }) };
+      })
       .concat(autoModels)
       .map(applyCustomPricingToModel)
       .map(async (model: OpenRouterModel) => {

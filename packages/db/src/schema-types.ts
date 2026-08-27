@@ -1980,6 +1980,32 @@ export const NormalizedOpenRouterResponse = z.object({
   generated_at: z.string(),
 });
 
+export const EnkryptScoreSchema = z.object({
+  model_name: z.string().min(1),
+  provider: z.string().min(1),
+  source: z.string().min(1),
+  risk_score: z.number().nullable().optional(),
+  bias_score: z.number().nullable().optional(),
+  cbrn_score: z.number().nullable().optional(),
+  harmful_score: z.number().nullable().optional(),
+  insecure_code_score: z.number().nullable().optional(),
+  toxicity_score: z.number().nullable().optional(),
+  robustness_score: z.number().nullable().optional(),
+  jailbreak_score: z.number().nullable().optional(),
+  evasion_score: z.number().nullable().optional(),
+  safety_score: z.number().nullable().optional(),
+  nist_score: z.number().nullable().optional(),
+  owasp_score: z.number().nullable().optional(),
+});
+
+export type EnkryptScore = z.infer<typeof EnkryptScoreSchema>;
+
+export const EnkryptBenchmarkSchema = EnkryptScoreSchema.extend({
+  lastUpdated: z.string().datetime(),
+});
+
+export type EnkryptBenchmark = z.infer<typeof EnkryptBenchmarkSchema>;
+
 export const OpenCodePromptSchema = z.enum([
   'codex',
   'gemini',

@@ -162,6 +162,7 @@ export const BYOK_ENCRYPTION_KEY = requireEnv(
 
 // Artificial Analysis API
 export const ARTIFICIAL_ANALYSIS_API_KEY = getEnvVariable('ARTIFICIAL_ANALYSIS_API_KEY');
+export const ENKRYPT_API_KEY = getEnvVariable('ENKRYPT_API_KEY');
 
 // Cron jobs
 export const CRON_SECRET = getEnvVariable('CRON_SECRET');

@@ -120,6 +120,7 @@ import {
   MCPGatewayAuthorizationRequestStatus,
   MCPGatewayPendingProviderAuthorizationStatus,
   MCPGatewayAuditOutcome,
+  EnkryptBenchmarkSchema,
 } from './schema-types';
 import type {
   UserDeletionTaskProgress,
@@ -5076,6 +5077,7 @@ export type WebhookEvent = typeof webhook_events.$inferSelect;
 // Zod schemas for runtime validation of JSONB data
 export const ModelStatsBenchmarksSchema = z
   .object({
+    enkrypt: EnkryptBenchmarkSchema.optional(),
     artificialAnalysis: z
       .object({
         codingIndex: z.number().optional(),

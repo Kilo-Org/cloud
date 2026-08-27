@@ -3225,6 +3225,7 @@
     },
     "working": "Qed jaħdem",
     "historyRetry": "Ma setgħux jitgħabbew l-istorja taċ-chat.",
-    "catalogRetry": "Ma setgħux jittellgħu l-mudelli"
+    "catalogRetry": "Ma setgħux jittellgħu l-mudelli",
+    "sendError": "Ma setax jintbagħat il-messaġġ. Erġa' pprova."
   }
 }

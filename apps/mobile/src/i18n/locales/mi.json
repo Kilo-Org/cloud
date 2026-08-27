@@ -3162,6 +3162,7 @@
     },
     "working": "Kei te mahi",
     "historyRetry": "Kāore i taea te uta te hītori kōrero.",
-    "catalogRetry": "Kāore i taea te uta i ngā tauira"
+    "catalogRetry": "Kāore i taea te uta i ngā tauira",
+    "sendError": "I rahua te tuku karere. Whakamātau anō."
   }
 }

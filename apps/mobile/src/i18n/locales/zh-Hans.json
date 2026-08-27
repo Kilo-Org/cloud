@@ -3162,6 +3162,7 @@
     },
     "working": "工作中",
     "historyRetry": "无法加载聊天历史。",
-    "catalogRetry": "无法加载模型"
+    "catalogRetry": "无法加载模型",
+    "sendError": "无法发送消息。请重试。"
   }
 }

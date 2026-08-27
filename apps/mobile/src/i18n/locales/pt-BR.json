@@ -3183,6 +3183,7 @@
     },
     "working": "Trabalhando",
     "historyRetry": "Não foi possível carregar o histórico do chat.",
-    "catalogRetry": "Não foi possível carregar os modelos"
+    "catalogRetry": "Não foi possível carregar os modelos",
+    "sendError": "Não foi possível enviar a mensagem. Tente novamente."
   }
 }

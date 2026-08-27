@@ -97,6 +97,14 @@ export function QuickChatScreen() {
   const tabBarBottomPadding = useTabBarBottomPadding();
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
   const composerScope = `${authEpoch}:${organizationId ?? 'personal'}`;
+  // A scope switch remounts the composer (`key={composerScope}`) but would
+  // leave the picked model id in place, so the chip would keep the prior org's
+  // model and send that stale id. Reset the pick so the chip falls back to the
+  // new catalog default.
+  useEffect(() => {
+    setPickedModel(null);
+    setPickedVariant('');
+  }, [composerScope]);
   const composerBottomPadding = keyboardVisible ? 0 : tabBarBottomPadding;
   // Passthrough aliases keep the JSX handler values in the `handle*` convention.
   const handleSend = chat.onSend;

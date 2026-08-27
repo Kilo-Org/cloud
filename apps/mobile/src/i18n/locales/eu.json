@@ -3162,6 +3162,7 @@
     },
     "working": "Lanean",
     "historyRetry": "Ezin izan da txat-historia kargatu.",
-    "catalogRetry": "Modeloak ezin izan dira kargatu"
+    "catalogRetry": "Modeloak ezin izan dira kargatu",
+    "sendError": "Ezin izan da mezua bidali. Saiatu berriro."
   }
 }

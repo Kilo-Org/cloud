@@ -15,6 +15,7 @@
 // in-flight stream.
 
 import { createElement } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -67,6 +68,7 @@ const quickChatFlagEnabled = vi.hoisted(() => ({ value: true }));
 const kiloclawVisible = vi.hoisted(() => ({ value: false }));
 const focusedSegments = vi.hoisted(() => ({ value: ['(app)', '(tabs)', '(0_home)'] }));
 const orgLoaded = vi.hoisted(() => ({ value: true }));
+const organizationId = vi.hoisted(() => ({ value: null as string | null }));
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -109,7 +111,7 @@ vi.mock('@/lib/auth/token-owner', () => ({
   getAuthTokenForRequest: () => 'token-1',
 }));
 vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: null, isLoaded: orgLoaded.value }),
+  useOrganization: () => ({ organizationId: organizationId.value, isLoaded: orgLoaded.value }),
 }));
 vi.mock('@/lib/analytics/posthog', () => ({
   FEATURE_FLAG_QUICK_CHAT: 'mobile-quick-chat',
@@ -232,6 +234,14 @@ const modelOption = {
   isPreferred: false,
 };
 
+const secondModelOption = {
+  id: 'm2',
+  name: 'Model 2',
+  displayId: 'm2',
+  variants: [],
+  isPreferred: false,
+};
+
 /** A stream that never completes on its own: the hook's abort must end it. */
 async function* hangingStream(): AsyncGenerator<string> {
   await new Promise<void>(() => undefined);
@@ -283,6 +293,7 @@ beforeEach(() => {
   kiloclawVisible.value = false;
   focusedSegments.value = ['(app)', '(tabs)', '(0_home)'];
   orgLoaded.value = true;
+  organizationId.value = null;
 
   getOrCreateThreadMutate.mockResolvedValue({
     id: 'thread-1',
@@ -414,7 +425,7 @@ describe('QuickChatScreen send', () => {
     await waitFor(() => toastError.mock.calls.length > 0);
     await waitFor(() => latestComposer()?.isStreaming === false);
 
-    expect(toastError).toHaveBeenCalledWith('stream boom');
+    expect(toastError).toHaveBeenCalledWith(i18n.t('quickChat.sendError'));
     const userBubbles = transcriptItems().filter(item => item.info.role === 'user');
     expect(userBubbles).toHaveLength(1);
     expect(userBubbles[0]?.parts[0]?.text).toBe('hello');
@@ -579,6 +590,39 @@ describe('QuickChatScreen org hydration', () => {
     expect(appendMessagesMutate).not.toHaveBeenCalled();
     expect(streamMock).not.toHaveBeenCalled();
     expect(transcriptItems()).toHaveLength(0);
+  });
+
+  it('resets the picked model to the new catalog default when the org scope changes', async () => {
+    modelOptionsState.options = [modelOption, secondModelOption];
+    organizationId.value = 'org-1';
+
+    const { renderer, queryClient } = await mountScreen();
+    await waitFor(() => composerRenders.list.length > 0);
+
+    // Pick a non-default model through the composer's model select handler.
+    await act(async () => {
+      const onModelSelect = latestComposer()?.onModelSelect as
+        | ((modelId: string, variantId: string) => void)
+        | undefined;
+      onModelSelect?.('m2', 'v2');
+      await Promise.resolve();
+    });
+
+    expect(latestComposer()?.model).toBe('m2');
+
+    // Switch the org scope; the composer remounts and the picked model must fall
+    // back to the new catalog default, not the stale prior id.
+    await act(async () => {
+      organizationId.value = 'org-2';
+      renderer.update(
+        createElement(QueryClientProvider, { client: queryClient }, createElement(QuickChatScreen))
+      );
+      await Promise.resolve();
+    });
+
+    await waitFor(() => latestComposer()?.model === 'm1');
+    expect(latestComposer()?.model).toBe('m1');
+    expect(latestComposer()?.variant).toBe('');
   });
 });
 

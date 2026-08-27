@@ -3162,6 +3162,7 @@
     },
     "working": "Çalışıyor",
     "historyRetry": "Sohbet geçmişi yüklenemedi.",
-    "catalogRetry": "Modeller yüklenemedi"
+    "catalogRetry": "Modeller yüklenemedi",
+    "sendError": "Mesaj gönderilemedi. Lütfen tekrar deneyin."
   }
 }

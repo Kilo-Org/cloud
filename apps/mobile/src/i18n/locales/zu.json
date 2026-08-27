@@ -3162,6 +3162,7 @@
     },
     "working": "Iyasebenza",
     "historyRetry": "Asikwazanga ukulayisha umlando wengxoxo.",
-    "catalogRetry": "Akukwazanga ukulayisha amamodeli"
+    "catalogRetry": "Akukwazanga ukulayisha amamodeli",
+    "sendError": "Asikwazanga ukuthumela umlayezo. Uzama futhi."
   }
 }

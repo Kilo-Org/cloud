@@ -3162,6 +3162,7 @@
     },
     "working": "Mengerjakan",
     "historyRetry": "Tidak dapat memuat riwayat obrolan.",
-    "catalogRetry": "Tidak dapat memuat model"
+    "catalogRetry": "Tidak dapat memuat model",
+    "sendError": "Tidak dapat mengirim pesan. Coba lagi."
   }
 }

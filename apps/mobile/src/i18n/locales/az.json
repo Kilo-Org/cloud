@@ -3162,6 +3162,7 @@
     },
     "working": "İşlənir",
     "historyRetry": "Söhbət tarixçəsi yüklənə bilmədi.",
-    "catalogRetry": "Modellər yüklənə bilmədi"
+    "catalogRetry": "Modellər yüklənə bilmədi",
+    "sendError": "Mesaj göndərilə bilmədi. Yenidən cəhd edin."
   }
 }

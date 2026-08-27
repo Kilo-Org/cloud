@@ -3204,6 +3204,7 @@
     },
     "working": "Pracuje sa",
     "historyRetry": "Históriu chatu sa nepodarilo načítať.",
-    "catalogRetry": "Modely sa nepodarilo načítať"
+    "catalogRetry": "Modely sa nepodarilo načítať",
+    "sendError": "Nepodarilo sa odoslať správu. Skúste to znova."
   }
 }

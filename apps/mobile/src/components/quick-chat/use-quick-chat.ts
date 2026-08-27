@@ -202,9 +202,11 @@ export function useQuickChat(model: string) {
     try {
       await trpcClient.quickChat.appendMessages.mutate({ organizationId, messages: outgoing });
       void listQuery.refetch();
-    } catch (error) {
-      // Keep the local rows; the merge keeps the turn visible on retry.
-      toast.error(error instanceof Error ? error.message : i18n.t('quickChat.historyRetry'));
+    } catch {
+      // Keep the local rows; the merge keeps the turn visible on retry. The
+      // failure copy is localized and generic: the gateway's raw error strings
+      // are technical and never user-facing.
+      toast.error(i18n.t('quickChat.sendError'));
     }
   }
 
@@ -254,12 +256,14 @@ export function useQuickChat(model: string) {
           );
         }
         void appendTurn(clientId, userRow.content, assistantText);
-      } catch (error) {
+      } catch {
         // On an explicit Stop the signal is aborted: keep the user bubble and
         // any partial assistant text, no error toast. Any other failure keeps
-        // the user bubble too (the draft is never restored), and toasts.
+        // the user bubble too (the draft is never restored), and toasts a
+        // localized, generic message (the gateway's raw error strings are
+        // technical and never user-facing).
         if (!controller.signal.aborted) {
-          toast.error(error instanceof Error ? error.message : i18n.t('quickChat.historyRetry'));
+          toast.error(i18n.t('quickChat.sendError'));
         }
       } finally {
         // Only the stream that still owns the ref clears it and the streaming

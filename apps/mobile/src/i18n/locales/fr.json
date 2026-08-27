@@ -3183,6 +3183,7 @@
     },
     "working": "En cours",
     "historyRetry": "Impossible de charger l'historique de la conversation.",
-    "catalogRetry": "Impossible de charger les modèles"
+    "catalogRetry": "Impossible de charger les modèles",
+    "sendError": "Impossible d'envoyer le message. Veuillez réessayer."
   }
 }

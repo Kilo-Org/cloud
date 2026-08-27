@@ -3162,6 +3162,7 @@
     },
     "working": "Arbetar",
     "historyRetry": "Det gick inte att läsa in chatthistoriken.",
-    "catalogRetry": "Kunde inte läsa in modeller"
+    "catalogRetry": "Kunde inte läsa in modeller",
+    "sendError": "Kunde inte skicka meddelandet. Försök igen."
   }
 }

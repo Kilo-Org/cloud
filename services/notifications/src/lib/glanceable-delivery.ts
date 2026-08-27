@@ -10,6 +10,7 @@
 import {
   genericPushContentForPushData,
   resolvePushLocale,
+  type GlanceableLiveActivityContentState,
   type PushData,
 } from '@kilocode/notifications';
 
@@ -17,8 +18,19 @@ import type { LiveActivityEvent } from './apns-live-activity';
 import type { ExpoPushMessage } from './expo-push';
 
 export type ActiveAgentsGlanceable = Extract<PushData, { type: 'active_agents_glanceable' }>;
-/** The APNs `content-state` is the snapshot without the `type` discriminator and without `accountEpoch`. */
-export type GlanceableContentState = Omit<ActiveAgentsGlanceable, 'type'>;
+
+/** Matches the first argument to `createLiveActivity` in the widget extension. */
+const ACTIVE_AGENTS_LIVE_ACTIVITY_NAME = 'ActiveAgentsLiveActivity';
+
+/**
+ * The APNs Live Activity `content-state`. expo-widgets wraps the renderable
+ * props in a JSON string under `props` and routes on `name`, so iOS decodes
+ * `{ name, props }` into the widget extension's `LiveActivityAttributes`.
+ */
+export type GlanceableApnsContentState = {
+  name: string;
+  props: string;
+};
 
 export type IosActivityToken = { token: string; kind: 'ios_activity' | 'ios_push_to_start' };
 export type AndroidPushToken = { token: string; locale: string | null };
@@ -27,9 +39,20 @@ export function apnsEventForTokenKind(kind: IosActivityToken['kind']): LiveActiv
   return kind === 'ios_push_to_start' ? 'start' : 'update';
 }
 
-export function toGlanceableContentState(snapshot: ActiveAgentsGlanceable): GlanceableContentState {
-  const { type: _type, ...contentState } = snapshot;
-  return contentState;
+export function toGlanceableContentState(
+  snapshot: ActiveAgentsGlanceable
+): GlanceableApnsContentState {
+  const contentState: GlanceableLiveActivityContentState = {
+    status: snapshot.status,
+    running: snapshot.running,
+    needsInput: snapshot.needsInput,
+    reconnecting: snapshot.reconnecting,
+    eligibleStartedAt: snapshot.eligibleStartedAt,
+  };
+  return {
+    name: ACTIVE_AGENTS_LIVE_ACTIVITY_NAME,
+    props: JSON.stringify(contentState),
+  };
 }
 
 export function buildAndroidGlanceableMessages(
@@ -71,7 +94,7 @@ export type GlanceableDeliveryDeps = {
   ) => Promise<IosActivityToken[]>;
   sendIosLiveActivity: (
     tokens: readonly { token: string; event: LiveActivityEvent }[],
-    contentState: GlanceableContentState
+    contentState: GlanceableApnsContentState
   ) => Promise<void>;
   listAndroidExpoTokens: (
     userId: string,

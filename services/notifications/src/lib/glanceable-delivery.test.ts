@@ -7,6 +7,7 @@ import {
   deliverGlanceableSnapshot,
   toGlanceableContentState,
   type ActiveAgentsGlanceable,
+  type GlanceableApnsContentState,
   type GlanceableDeliveryDeps,
   type IosActivityToken,
 } from './glanceable-delivery';
@@ -60,22 +61,31 @@ describe('apnsEventForTokenKind', () => {
 });
 
 describe('toGlanceableContentState', () => {
-  it('strips the type discriminator and keeps every content-state field', () => {
+  it('wraps the renderable counts + status in the expo-widgets name/props envelope', () => {
     const contentState = toGlanceableContentState(snapshot);
-    expect(contentState).not.toHaveProperty('type');
-    expect(contentState).toEqual({
-      schemaVersion: 1,
-      revision: 3,
-      scopeKey: 'deadbeef',
-      organizationBound: false,
+    expect(contentState.name).toBe('ActiveAgentsLiveActivity');
+    const props = JSON.parse(contentState.props) as Record<string, unknown>;
+    expect(props).toEqual({
       status: 'happy',
       running: 2,
       needsInput: 1,
       reconnecting: 0,
-      updatedAt: '2026-08-27T10:00:00.000Z',
-      expiresAt: '2026-08-27T18:00:00.000Z',
       eligibleStartedAt: '2026-08-27T09:00:00.000Z',
     });
+  });
+
+  it('never leaks snapshot bookkeeping, ids, or titles into the pushed content-state', () => {
+    const contentState = toGlanceableContentState(snapshot);
+    const raw = JSON.stringify(contentState);
+    expect(raw).not.toContain('schemaVersion');
+    expect(raw).not.toContain('revision');
+    expect(raw).not.toContain('scopeKey');
+    expect(raw).not.toContain('deadbeef');
+    expect(raw).not.toContain('organizationBound');
+    expect(raw).not.toContain('updatedAt');
+    expect(raw).not.toContain('expiresAt');
+    expect(raw).not.toContain('accountEpoch');
+    expect(raw).not.toContain('title');
   });
 });
 
@@ -129,15 +139,21 @@ describe('deliverGlanceableSnapshot', () => {
     expect(calls.iosSends).toHaveLength(1);
     const [tokens, contentState] = calls.iosSends[0] as [
       { token: string; event: string }[],
-      Record<string, unknown>,
+      GlanceableApnsContentState,
     ];
     expect(tokens).toEqual([
       { token: 'ptt-token', event: 'start' },
       { token: 'activity-token', event: 'update' },
     ]);
-    expect(contentState).not.toHaveProperty('type');
-    expect(contentState).not.toHaveProperty('accountEpoch');
-    expect(contentState.revision).toBe(3);
+    expect(contentState.name).toBe('ActiveAgentsLiveActivity');
+    const props = JSON.parse(contentState.props) as Record<string, unknown>;
+    expect(props.status).toBe('happy');
+    expect(props.running).toBe(2);
+    expect(props.needsInput).toBe(1);
+    expect(props.reconnecting).toBe(0);
+    expect(props).not.toHaveProperty('type');
+    expect(props).not.toHaveProperty('accountEpoch');
+    expect(props).not.toHaveProperty('scopeKey');
     expect(calls.androidSends).toHaveLength(0);
   });
 

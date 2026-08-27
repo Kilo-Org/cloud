@@ -5,6 +5,7 @@ import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { GlanceablePublisher } from '@/lib/glanceable/publisher';
@@ -151,7 +152,7 @@ describe('iosSink start and update', () => {
       Date.parse(newer.updatedAt)
     );
     expect(
-      (mockState.ended[0]?.props as GlanceableViewProps | undefined)?.countLines[0]?.count
+      (mockState.ended[0]?.props as GlanceableLiveActivityContentState | undefined)?.running
     ).toBe(1);
   });
 
@@ -312,25 +313,27 @@ describe('iosSink widget publish', () => {
   });
 });
 
-describe('iosSink Live Activity copy', () => {
-  it('mirrors empty copy onto the Live Activity without starting a second one', () => {
+describe('iosSink Live Activity content-state', () => {
+  it('mirrors the empty content-state without starting a second activity', () => {
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
     iosSink.publish(snapshotFor([], 1));
 
     expect(mockState.started.length).toBe(1);
-    const updated = mockState.updated.at(-1) as GlanceableViewProps | undefined;
-    expect(updated?.statusLine).toBe('No work in progress');
-    expect(updated?.countLines).toEqual([]);
+    const updated = mockState.updated.at(-1) as GlanceableLiveActivityContentState | undefined;
+    expect(updated?.status).toBe('empty');
+    expect(updated?.running).toBe(0);
+    expect(updated?.needsInput).toBe(0);
+    expect(updated?.reconnecting).toBe(0);
   });
 
-  it('mirrors stale copy with counts onto the Live Activity', () => {
+  it('mirrors the stale content-state with counts onto the Live Activity', () => {
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
     iosSink.publish(snapshotFor([{ status: 'busy' }], 1, 'stale'));
 
     expect(mockState.started.length).toBe(1);
-    const updated = mockState.updated.at(-1) as GlanceableViewProps | undefined;
-    expect(updated?.statusLine).toBe("Can't update now");
-    expect(updated?.countLines).toHaveLength(1);
+    const updated = mockState.updated.at(-1) as GlanceableLiveActivityContentState | undefined;
+    expect(updated?.status).toBe('stale');
+    expect(updated?.running).toBe(1);
   });
 
   it('adopts and updates a leftover activity from publish when the handle is null', () => {
@@ -339,8 +342,8 @@ describe('iosSink Live Activity copy', () => {
     iosSink.publish(snapshotFor([], 1, 'empty'));
 
     expect(mockState.started.length).toBe(0);
-    const updated = mockState.updated.at(-1) as GlanceableViewProps | undefined;
-    expect(updated?.statusLine).toBe('No work in progress');
+    const updated = mockState.updated.at(-1) as GlanceableLiveActivityContentState | undefined;
+    expect(updated?.status).toBe('empty');
     expect(delivery.registerTokens).not.toHaveBeenCalled();
   });
 });

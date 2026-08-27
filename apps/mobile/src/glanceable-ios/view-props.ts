@@ -1,4 +1,5 @@
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
 import {
   glanceableCountLines,
@@ -60,5 +61,22 @@ export function buildGlanceableViewProps(
     accessibilityLabel: glanceableSpokenLabelKeys(snapshot, flags)
       .map(key => translate(key))
       .join(', '),
+  };
+}
+
+/**
+ * Build the Live Activity content-state from a snapshot. The server pushes the
+ * same raw shape, so the widget extension's `active-agents-live-activity.tsx`
+ * renders it directly with inlined English copy (the server cannot translate).
+ */
+export function buildGlanceableLiveActivityContentState(
+  snapshot: GlanceableAgentsSnapshot
+): GlanceableLiveActivityContentState {
+  return {
+    status: snapshot.status,
+    running: snapshot.running,
+    needsInput: snapshot.needsInput,
+    reconnecting: snapshot.reconnecting,
+    eligibleStartedAt: snapshot.eligibleStartedAt,
   };
 }

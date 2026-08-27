@@ -2,6 +2,7 @@ import {
   type GlanceableAgentsSnapshot,
   isEligibleGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 import { type LiveActivity } from 'expo-widgets';
 
 import { i18n } from '@/i18n';
@@ -9,18 +10,22 @@ import { getGlanceableDelivery, type GlanceableSink } from '@/lib/glanceable/sin
 
 import { ActiveAgentsLiveActivity } from './active-agents-live-activity';
 import { ActiveAgentsWidget } from './active-agents-widget';
-import { buildGlanceableViewProps, type GlanceableViewProps } from './view-props';
+import {
+  buildGlanceableLiveActivityContentState,
+  buildGlanceableViewProps,
+  type GlanceableViewProps,
+} from './view-props';
 
 /** Open-agents destination, kept in step with the inlined widget URL. */
 const OPEN_AGENTS_URL = '/(app)/(tabs)/(2_agents)';
 
-type Activity = LiveActivity<Partial<GlanceableViewProps>>;
+type Activity = LiveActivity<Partial<GlanceableLiveActivityContentState>>;
 
 let activityKitDeniedState = false;
 let activity: Activity | null = null;
 let revision = 0;
 let lastUpdatedAt: string | null = null;
-let lastProps: Partial<GlanceableViewProps> | null = null;
+let lastProps: Partial<GlanceableLiveActivityContentState> | null = null;
 
 function translate(key: string): string {
   return i18n.t(key);
@@ -118,8 +123,8 @@ export const iosSink: GlanceableSink = {
     activity ??= adoptExistingActivity();
     if (activity !== null) {
       lastUpdatedAt = snapshot.updatedAt;
-      lastProps = props;
-      void activity.update(props);
+      lastProps = buildGlanceableLiveActivityContentState(snapshot);
+      void activity.update(lastProps);
     }
   },
 
@@ -128,7 +133,7 @@ export const iosSink: GlanceableSink = {
       return;
     }
 
-    const props = buildGlanceableViewProps(snapshot, {}, translate);
+    const contentState = buildGlanceableLiveActivityContentState(snapshot);
 
     if (activity === null) {
       // Adopt the newest existing instance before starting a second one, so a
@@ -152,7 +157,7 @@ export const iosSink: GlanceableSink = {
 
       if (activity === null) {
         try {
-          activity = ActiveAgentsLiveActivity.start(props, OPEN_AGENTS_URL);
+          activity = ActiveAgentsLiveActivity.start(contentState, OPEN_AGENTS_URL);
         } catch (error) {
           // Only ActivityKit unavailability is permanent; a transient
           // StartLiveActivityException leaves denial unset so a later emit retries.
@@ -165,11 +170,11 @@ export const iosSink: GlanceableSink = {
       }
 
       lastUpdatedAt = snapshot.updatedAt;
-      lastProps = props;
+      lastProps = contentState;
       revision = snapshot.revision;
       getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId);
       if (adopted) {
-        void activity.update(props);
+        void activity.update(contentState);
       }
       return;
     }
@@ -180,8 +185,8 @@ export const iosSink: GlanceableSink = {
       return;
     }
     lastUpdatedAt = snapshot.updatedAt;
-    lastProps = props;
-    void activity.update(props);
+    lastProps = contentState;
+    void activity.update(contentState);
     revision = snapshot.revision;
   },
 

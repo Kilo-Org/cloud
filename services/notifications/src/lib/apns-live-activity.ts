@@ -19,6 +19,12 @@ const APNS_BASE_URL = 'https://api.push.apple.com';
 const APNS_KEY_PREFIX = '-----BEGIN PRIVATE KEY-----';
 const APNS_KEY_SUFFIX = '-----END PRIVATE KEY-----';
 
+/**
+ * The `ActivityAttributes` type name the widget extension declares. Push-to-start
+ * uses this as `attributes-type` so iOS knows which activity to create.
+ */
+const LIVE_ACTIVITY_ATTRIBUTES_TYPE = 'LiveActivityAttributes';
+
 const encoder = new TextEncoder();
 
 function base64Url(bytes: Uint8Array): string {
@@ -91,6 +97,11 @@ export function buildLiveActivityApnsRequest(params: {
       aps: {
         timestamp: params.timestampSeconds,
         event: params.event,
+        // Push-to-start must name the attributes type and supply its values so
+        // iOS can create the activity. Updates only replace the content-state.
+        ...(params.event === 'start'
+          ? { 'attributes-type': LIVE_ACTIVITY_ATTRIBUTES_TYPE, attributes: {} }
+          : {}),
         'content-state': params.contentState,
       },
     }),

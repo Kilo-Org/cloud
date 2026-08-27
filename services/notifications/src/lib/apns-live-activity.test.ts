@@ -46,11 +46,47 @@ describe('buildLiveActivityApnsRequest', () => {
     });
 
     const body = JSON.parse(request.body) as {
-      aps: { timestamp: number; event: string; 'content-state': Record<string, unknown> };
+      aps: {
+        timestamp: number;
+        event: string;
+        'content-state': Record<string, unknown>;
+        'attributes-type'?: string;
+        attributes?: Record<string, unknown>;
+      };
     };
     expect(body.aps.timestamp).toBe(1_750_000_000);
     expect(body.aps.event).toBe('update');
     expect(body.aps['content-state']).toEqual({ revision: 7, running: 1 });
+    expect(body.aps['attributes-type']).toBeUndefined();
+    expect(body.aps.attributes).toBeUndefined();
+  });
+
+  it('adds attributes-type and attributes to a push-to-start payload', () => {
+    const request = buildLiveActivityApnsRequest({
+      token: 'device-token-1',
+      event: 'start',
+      contentState: { name: 'ActiveAgentsLiveActivity', props: '{"running":1}' },
+      credentials: { teamId: TEAM_ID, keyId: KEY_ID, privateKeyPem: 'pem', topic: TOPIC },
+      authorizationJwt: 'header.payload.sig',
+      timestampSeconds: 1_750_000_000,
+    });
+
+    const body = JSON.parse(request.body) as {
+      aps: {
+        timestamp: number;
+        event: string;
+        'content-state': Record<string, unknown>;
+        'attributes-type'?: string;
+        attributes?: Record<string, unknown>;
+      };
+    };
+    expect(body.aps.event).toBe('start');
+    expect(body.aps['attributes-type']).toBe('LiveActivityAttributes');
+    expect(body.aps.attributes).toEqual({});
+    expect(body.aps['content-state']).toEqual({
+      name: 'ActiveAgentsLiveActivity',
+      props: '{"running":1}',
+    });
   });
 });
 

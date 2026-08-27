@@ -75,8 +75,22 @@ describe('quickChatRouter', () => {
     const result = await caller.quickChat.listMessages({ organizationId: null });
     expect(result.messages).toHaveLength(2);
     expect(result.messages.map(message => message.content)).toEqual(['hello', 'hi']);
-    expect(result.messages.map(message => message.role)).toEqual(['user', 'assistant']);
+    const roles: ('user' | 'assistant')[] = result.messages.map(message => message.role);
+    expect(roles).toEqual(['user', 'assistant']);
     expect(result.messages[1]?.clientId).toBe('client-1');
+  });
+
+  it('rejects an invalid stored message role', async () => {
+    const user = await insertTestUser();
+    const caller = createCaller({ user });
+    const thread = await caller.quickChat.getOrCreateThread({ organizationId: null });
+    await db.insert(quick_chat_messages).values({
+      thread_id: thread.id,
+      role: 'tool',
+      content: 'Invalid role',
+    });
+
+    await expect(caller.quickChat.listMessages({ organizationId: null })).rejects.toThrow();
   });
 
   it('pages older messages through nextCursor', async () => {

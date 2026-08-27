@@ -55,6 +55,7 @@ type GitTokenService = {
     githubRepo: string;
     userId: string;
     orgId?: string;
+    expectedIntegrationId?: string;
   }): Promise<GetTokenForRepoResult>;
 
   /**
@@ -173,6 +174,7 @@ export type GitHubSourceConfig = {
   githubRepo: string; // "owner/repo" format
   userId: string; // Kilo user ID for token lookup
   orgId?: string; // Kilo org ID (if org-owned project)
+  platformIntegrationId?: string;
 };
 
 /**

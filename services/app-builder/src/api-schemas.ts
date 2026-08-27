@@ -141,19 +141,28 @@ export type DeleteErrorResponse = z.infer<typeof DeleteErrorResponseSchema>;
 
 export const MigrateToGithubRequestSchema = z.object({
   githubRepo: z.string().regex(/^[^/]+\/[^/]+$/, 'Must be in "owner/repo" format'),
-  userId: z.string().uuid(),
+  userId: z.string().min(1),
   orgId: z.string().uuid().optional(),
+  expectedPlatformIntegrationId: z.string().uuid().optional(),
 });
 
 export type MigrateToGithubRequest = z.infer<typeof MigrateToGithubRequestSchema>;
 
 export const MigrateToGithubSuccessResponseSchema = z.object({
   success: z.literal(true),
+  platformIntegrationId: z.string().uuid(),
 });
 
 export const MigrateToGithubErrorResponseSchema = z.object({
   success: z.literal(false),
-  error: z.enum(['invalid_request', 'internal_error', 'token_failed', 'push_failed']),
+  error: z.enum([
+    'invalid_request',
+    'internal_error',
+    'token_failed',
+    'repo_not_found',
+    'repo_not_empty',
+    'push_failed',
+  ]),
   message: z.string(),
 });
 

@@ -7,7 +7,6 @@ import { eq, and, isNull } from 'drizzle-orm';
 import {
   fetchGitHubInstallationDetails,
   fetchGitHubRepositories,
-  getRepositoryDetails,
   getInstallationSettingsUrl,
 } from '@/lib/integrations/platforms/github/adapter';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
@@ -189,80 +188,55 @@ export async function migrateProjectToGitHub(
   }
 
   try {
-    // 2. Get GitHub integration for the owner
-    const integration = await getIntegrationForOwner(
-      owner,
-      PLATFORM.GITHUB,
-      INTEGRATION_STATUS.ACTIVE
-    );
-
-    if (!integration || !integration.platform_installation_id) {
-      throw new MigrationError('github_app_not_installed');
-    }
-
-    // 3. Validate the target repo exists, is accessible, and is empty
-    let repoDetails: {
-      fullName: string;
-      cloneUrl: string;
-      htmlUrl: string;
-      isEmpty: boolean;
-      isPrivate: boolean;
-    } | null;
-
-    try {
-      repoDetails = await getRepositoryDetails(integration.platform_installation_id, repoFullName);
-    } catch (error) {
-      throw new MigrationError('internal_error', { cause: error });
-    }
-
-    if (!repoDetails) {
-      throw new MigrationError('repo_not_found');
-    }
-
-    if (!repoDetails.isEmpty) {
-      throw new MigrationError('repo_not_empty');
-    }
-
-    // 4. Migrate on the worker (push + preview switch + schedule repo deletion)
+    // 2. Resolve access authoritatively and migrate on the Worker that performs the Git push.
+    let platformIntegrationId: string;
     try {
       const migrateResult = await appBuilderClient.migrateToGithub(projectId, {
-        githubRepo: repoDetails.fullName,
+        githubRepo: repoFullName,
         userId,
         orgId: owner.type === 'org' ? owner.id : undefined,
+        expectedPlatformIntegrationId: params.expectedPlatformIntegrationId,
       });
 
       if (!migrateResult.success) {
-        throw new MigrationError('push_failed', { cause: migrateResult });
+        const error =
+          migrateResult.error === 'repo_not_found' ||
+          migrateResult.error === 'repo_not_empty' ||
+          migrateResult.error === 'internal_error'
+            ? migrateResult.error
+            : 'push_failed';
+        throw new MigrationError(error, { cause: migrateResult });
       }
+      platformIntegrationId = migrateResult.platformIntegrationId;
     } catch (error) {
       if (error instanceof MigrationError) throw error;
       throw new MigrationError('push_failed', { cause: error });
     }
 
-    // 5. Update deployment if exists
+    // 3. Update deployment if exists
     if (project.deployment_id) {
       await db
         .update(deployments)
         .set({
           source_type: 'github',
-          repository_source: repoDetails.fullName,
-          platform_integration_id: integration.id,
+          repository_source: repoFullName,
+          platform_integration_id: platformIntegrationId,
         })
         .where(eq(deployments.id, project.deployment_id));
     }
 
-    // 6. Finalize project record (migrated_at already set by the atomic claim)
+    // 4. Finalize project record (migrated_at already set by the atomic claim)
     await db
       .update(app_builder_projects)
       .set({
-        git_repo_full_name: repoDetails.fullName,
-        git_platform_integration_id: integration.id,
+        git_repo_full_name: repoFullName,
+        git_platform_integration_id: platformIntegrationId,
       })
       .where(eq(app_builder_projects.id, projectId));
 
     return {
       success: true,
-      githubRepoUrl: repoDetails.htmlUrl,
+      githubRepoUrl: `https://github.com/${repoFullName}`,
       newSessionId: project.session_id ?? '',
     };
   } catch (error) {

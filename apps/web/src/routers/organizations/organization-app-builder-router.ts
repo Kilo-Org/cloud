@@ -281,6 +281,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
         owner,
         userId: ctx.user.id,
         repoFullName: input.repoFullName,
+        expectedPlatformIntegrationId: input.expectedPlatformIntegrationId,
       });
     }),
 });

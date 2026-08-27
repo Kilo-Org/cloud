@@ -137,6 +137,7 @@ export type MigrateToGitHubInput = {
   /** Kilo user ID - needed by preview DO to resolve GitHub tokens */
   userId: string;
   repoFullName: string; // e.g., "org/my-repo" - user-created repo
+  expectedPlatformIntegrationId?: string;
 };
 
 /**

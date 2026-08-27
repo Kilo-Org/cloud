@@ -54,6 +54,7 @@ export const legacySessionMessagesBaseSchema = z.object({
 // User-created repository approach: users provide full repo name (owner/repo)
 export const migrateToGitHubSchema = z.object({
   projectId: z.uuid(),
+  expectedPlatformIntegrationId: z.uuid().optional(),
   repoFullName: z
     .string()
     .min(3)

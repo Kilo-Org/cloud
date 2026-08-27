@@ -57,10 +57,15 @@ export async function handleMigrateToGithub(
       );
     }
 
-    const { githubRepo, userId, orgId } = result.data;
+    const { githubRepo, userId, orgId, expectedPlatformIntegrationId } = result.data;
 
     // 1. Fetch a GitHub token via git-token-service
-    const tokenResult = await env.GIT_TOKEN_SERVICE.getTokenForRepo({ githubRepo, userId, orgId });
+    const tokenResult = await env.GIT_TOKEN_SERVICE.getTokenForRepo({
+      githubRepo,
+      userId,
+      orgId,
+      expectedIntegrationId: expectedPlatformIntegrationId,
+    });
     if (!tokenResult.success) {
       logger.error({ source: 'MigrateToGithubHandler', appId }, 'Failed to get GitHub token', {
         reason: tokenResult.reason,
@@ -72,6 +77,75 @@ export async function handleMigrateToGithub(
           message: `Failed to get GitHub token: ${tokenResult.reason}`,
         }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const [repoOwner, repoName] = githubRepo.split('/');
+    if (!repoOwner || !repoName) {
+      return Response.json(
+        {
+          success: false,
+          error: 'invalid_request',
+          message: 'Invalid repository name',
+        },
+        { status: 400 }
+      );
+    }
+    try {
+      const commitsResponse = await fetch(
+        `https://api.github.com/repos/${encodeURIComponent(repoOwner)}/${encodeURIComponent(repoName)}/commits?per_page=1`,
+        {
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${tokenResult.token}`,
+            'User-Agent': 'Kilo-App-Builder',
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+        }
+      );
+
+      if (commitsResponse.status === 404) {
+        return Response.json(
+          {
+            success: false,
+            error: 'repo_not_found',
+            message: 'Repository not found',
+          },
+          { status: 200 }
+        );
+      }
+      if (commitsResponse.status !== 409) {
+        if (!commitsResponse.ok) {
+          throw new Error(`GitHub returned ${commitsResponse.status}`);
+        }
+        const commits: unknown = await commitsResponse.json();
+        if (!Array.isArray(commits)) {
+          throw new Error('GitHub returned an invalid commits response');
+        }
+        if (commits.length > 0) {
+          return Response.json(
+            {
+              success: false,
+              error: 'repo_not_empty',
+              message: 'Repository is not empty',
+            },
+            { status: 200 }
+          );
+        }
+      }
+    } catch (error) {
+      logger.error(
+        { source: 'MigrateToGithubHandler', appId },
+        'Failed to validate GitHub repository',
+        formatError(error)
+      );
+      return Response.json(
+        {
+          success: false,
+          error: 'internal_error',
+          message: 'Failed to validate GitHub repository',
+        },
+        { status: 200 }
       );
     }
 
@@ -123,17 +197,28 @@ export async function handleMigrateToGithub(
     const previewId = env.PREVIEW.idFromName(appId);
     const previewStub = env.PREVIEW.get(previewId);
 
-    await previewStub.setGitHubSource({ githubRepo, userId, orgId });
+    await previewStub.setGitHubSource({
+      githubRepo,
+      userId,
+      orgId,
+      platformIntegrationId: tokenResult.platformIntegrationId,
+    });
 
     // Schedule internal git repo deletion after a 7-day grace period (for rollback safety)
     await gitStub.scheduleDelete(7 * 24 * 60 * 60 * 1000);
 
     logger.info({ source: 'MigrateToGithubHandler', appId }, 'Successfully migrated to GitHub');
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        platformIntegrationId: tokenResult.platformIntegrationId,
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
   } catch (error) {
     logger.error(
       { source: 'MigrateToGithubHandler' },

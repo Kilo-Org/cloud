@@ -78,6 +78,22 @@ describe('mapGooglePlayKiloPassPurchase', () => {
     );
   });
 
+  it('rejects a non-finite start time', () => {
+    const { mapGooglePlayKiloPassPurchase } = loadVerifier();
+
+    expect(() => mapGooglePlayKiloPassPurchase(decoded({ startTimeMs: NaN }))).toThrow(
+      'Google Play subscription purchase has invalid timestamps'
+    );
+  });
+
+  it('rejects a non-finite expiry time', () => {
+    const { mapGooglePlayKiloPassPurchase } = loadVerifier();
+
+    expect(() => mapGooglePlayKiloPassPurchase(decoded({ expiryTimeMs: NaN }))).toThrow(
+      'Google Play subscription purchase has invalid timestamps'
+    );
+  });
+
   it('rejects expired subscriptions', () => {
     const { mapGooglePlayKiloPassPurchase } = loadVerifier();
 

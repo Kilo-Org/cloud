@@ -166,6 +166,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `APPLE_ROOT_CERTIFICATES_PEM` - Apple root CA certs (PEM) for validating IAP receipts. [SERVER]
 - `GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON` - Service account JSON for the Android Publisher API (subscriptions v2 get). `[SECRET]`
 - `GOOGLE_PLAY_RTDN_PUSH_AUDIENCE` - Expected OIDC audience for Play Real-time Developer Notification Pub/Sub push (the HTTPS URL of POST /api/kilo-pass/play/notifications). `[SERVER]`
+- `GOOGLE_PLAY_RTDN_PUSH_SERVICE_ACCOUNT_EMAIL` - Expected service-account email for the Play RTDN Pub/Sub push OIDC token; the token `email` claim must match it. [SERVER]
 - `APPLE_APP_BUNDLE_ID` - iOS app bundle ID for Apple App Attest and Sign In verification. [SERVER]
 - `NATIVE_ADMISSION_MODE` - Native admission enforcement mode: `off` (default), `report`, or `enforce`. [SERVER]
 - `NATIVE_ADMISSION_SIMULATOR_BYPASS` - When `true` in non-production, bypasses Play Integrity API verification. [SERVER]

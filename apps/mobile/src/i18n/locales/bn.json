@@ -151,8 +151,8 @@
     "appearanceLight": "লাইট",
     "appearanceDark": "ডার্ক",
     "account": "অ্যাকাউন্ট",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR পর্যালোচনায় অ্যাপ অ্যাট্রিবিউশন যোগ করুন",
+    "prReviewAttributionSubtitle": "আপনি একটি পর্যালোচনা জমা দিলে একটি Reviewed via Kilo ফুটার যুক্ত করুন।"
   },
   "prReview": {
     "pullRequestUnavailable": "পুল রিকোয়েস্ট অনুপলব্ধ",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "এখন সক্রিয়",
     "search": {
       "searching": "খোঁজা হচ্ছে",
       "searchSessions": "সেশন খুঁজুন",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "সেশন লোড করা যায়নি",
       "couldNotLoadActive": "সক্রিয় সেশন লোড করা যায়নি",
-      "noSessionsYet": "এখনো কোনো সেশন নেই",
       "noSessionsYetDescription": "আপনার ফোন থেকে একটি কোডিং কাজ শুরু করুন। আপনার সেশন এখানে দেখাবে।",
       "noMatches": "কোনো সেশন মেলে না",
       "tryDifferentSearch": "একটি ভিন্ন অনুসন্ধান শব্দ চেষ্টা করুন।",
       "tryAdjustFilters": "আপনার ফিল্টার সামঞ্জস্য বা পরিষ্কার করার চেষ্টা করুন।",
       "couldNotSearch": "সেশন খোঁজা যায়নি",
-      "allActive": "সব সেশন সক্রিয়",
       "completedWillAppear": "সম্পন্ন সেশন এখানে দেখাবে।",
       "noPastSessions": "কোনো অতীত সেশন নেই",
       "live": "LIVE"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "নিচে স্ক্রল করুন",
       "emptyTitle": "এখনো কোনো বার্তা নেই",
       "renameAccessibility": "সেশনের নাম পরিবর্তন করুন: {{title}}",
-      "connectRepository": "রিপোজিটরি সংযোগ করুন",
       "cloningSession": "সেশন ক্লোন হচ্ছে",
       "continue": "চালিয়ে যান",
       "couldNotLoadThisSession": "এই সেশনটি লোড করা যায়নি",
-      "cloneFailed": "এই সেশনটি ক্লোন করা যায়নি।",
       "cloneFailedRetry": "এই সেশনটি ক্লোন করা যায়নি। আবার চেষ্টা করুন।",
-      "connectRepositoryToContinue": "চালিয়ে যেতে একটি রিপোজিটরি সংযোগ করুন।",
       "notEnoughCredits": "Cloud Agent চালানোর জন্য পর্যাপ্ত ক্রেডিট নেই। ক্রেডিট যোগ করে আবার চেষ্টা করুন।",
       "previousTaskFinishing": "আগের কাজটি এখনও শেষ হচ্ছে। একটু অপেক্ষা করুন।",
       "serviceUnavailable": "সেবাটি এখন অনুপলব্ধ। আবার চেষ্টা করুন।",
@@ -2184,7 +2178,7 @@
       "keepEditing": "সম্পাদনা চালিয়ে যান",
       "discard": "বাতিল করুন",
       "discardFailed": "ড্রাফ্টটি বাতিল করা যায়নি। আবার চেষ্টা করুন।",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "আপনার কম্পিউটারে `kilo remote` চালান, বা একটি চলমান CLI সেশনে `/remote`, একটি স্থানীয় kilo প্রক্রিয়া নিয়ন্ত্রণ করতে।",
       "bitbucketConnected": "Bitbucket সংযুক্ত",
       "connectBitbucket": "Bitbucket সংযুক্ত করুন",
       "connectBitbucketDescription": "আপনার ব্রাউজারে Bitbucket সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "কোনো রিপোজিটরি দেখা যাচ্ছে না। GitLab-এর জন্য রিপোজিটরি অ্যাক্সেস পরীক্ষা করুন, তারপর রিফ্রেশ করুন।",
       "openBitbucket": "Bitbucket খুলুন",
       "openGitlab": "GitLab খুলুন",
-      "recentlyUsed": "সম্প্রতি ব্যবহৃত"
+      "recentlyUsed": "সম্প্রতি ব্যবহৃত",
+      "continueFrom": "{{title}} চালিয়ে যাওয়া হচ্ছে",
+      "importingSession": "সেশন আমদানি হচ্ছে",
+      "cliCannotContinue": "এই CLI একটি সেশন চালিয়ে যেতে পারে না। Cloud Agent বা অন্য একটি CLI বেছে নিন।",
+      "importFailed": "এই সেশনটি আমদানি করা যায়নি।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}টি ফাইল আপডেট হয়েছে",

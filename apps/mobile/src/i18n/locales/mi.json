@@ -151,8 +151,8 @@
     "appearanceLight": "Mārama",
     "appearanceDark": "Pōuri",
     "account": "Pūkete",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Tāpiri te tautohu taupānga ki ngā arotake PR",
+    "prReviewAttributionSubtitle": "Tāpiri he hiku 'Kua arotakea mā Kilo' ina tuku koe i tētahi arotake."
   },
   "prReview": {
     "pullRequestUnavailable": "Kāore i te wātea te tono huna",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Kei te mahi ināianei",
     "search": {
       "searching": "Kei te rapu",
       "searchSessions": "Rapu ngā wātūtū",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Kāore i taea te uta ngā wātū",
       "couldNotLoadActive": "Kāore i taea te uta ngā wātūtū mahi",
-      "noSessionsYet": "Kāore anō he wātūtū",
       "noSessionsYetDescription": "Tīmatatia tētahi mahi whakawaehere mai i tō waea. Ka puta ō wātūtū ki konei.",
       "noMatches": "Kāore he wātūtū e hāngai ana",
       "tryDifferentSearch": "Whakamātauhia tētahi kupu rapu rerekē.",
       "tryAdjustFilters": "Whakamātauhia te whakatika, te whakakore rānei i ō tātari.",
       "couldNotSearch": "Kāore i taea te rapu ngā wātūtū",
-      "allActive": "Kei te mahi katoa ngā wātūtū",
       "completedWillAppear": "Ka puta ngā wātūtū kua oti ki konei.",
       "noPastSessions": "Kāore he wātūtū o mua",
       "live": "ORA"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Huri ki raro",
       "emptyTitle": "Kāore anō he karere",
       "renameAccessibility": "Huri ingoa i te wātūtū: {{title}}",
-      "connectRepository": "Hono i te pūranga",
       "cloningSession": "Kei te tārua te wātūtū",
       "continue": "Haere tonu",
       "couldNotLoadThisSession": "Kāore i taea te uta tēnei wātūtū",
-      "cloneFailed": "Kāore i taea te tārua tēnei wātūtū.",
       "cloneFailedRetry": "Kāore i taea te tārua tēnei wātūtū. Whakamātau anō.",
-      "connectRepositoryToContinue": "Hono i tētahi pūranga kia haere tonu.",
       "notEnoughCredits": "Kāore i rawa ngā moni hei whakahaere i a Cloud Agent. Tāpirihia he moni, ka whakamātau anō.",
       "previousTaskFinishing": "Kei te oti tonu te mahi o mua. Tatari kia iti.",
       "serviceUnavailable": "Kāore te ratonga e wātea ana ināianei. Whakamātau anō.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Me whakatika tonu",
       "discard": "Whakarere",
       "discardFailed": "Kāore i taea te whakarere i te tauira. Tēnā whakamātau anō.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Whakahaere `kilo remote` i tō rorohiko, rānei `/remote` i roto i tētahi huinga CLI e rere ana, hei whakahaere i tētahi tukanga kilo ā-rohe.",
       "bitbucketConnected": "Kua hono a Bitbucket",
       "connectBitbucket": "Hono Bitbucket",
       "connectBitbucketDescription": "Hono atu ki Bitbucket i tō pūtirotiro, kātahi hoki mai ki konei ki te kōwhiri pūputunga.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Kāore he pūputunga e kitea ana. Tirohia te uru pūputunga mō GitLab, kātahi whakahōu.",
       "openBitbucket": "Whakatuwhera Bitbucket",
       "openGitlab": "Whakatuwhera GitLab",
-      "recentlyUsed": "Kua whakamahia tata nei"
+      "recentlyUsed": "Kua whakamahia tata nei",
+      "cliCannotContinue": "Kāore e taea e tēnei CLI te haere tonu i tētahi wātū. Kōwhiria te Cloud Agent, tētahi atu CLI rānei.",
+      "continueFrom": "Kei te haere tonu {{title}}",
+      "importFailed": "Kāore i taea te kawemai i tēnei wātū.",
+      "importingSession": "Kei te kawemai i te wātū"
     },
     "partRenderer": {
       "updatedFileCount_one": "Kua whakahoutia {{displayCount}} kōnae",

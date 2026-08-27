@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
+import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
+import { envVarsSchema } from '../types.js';
 import { buildSessionAttachPayload, fillAttachGitToken } from './attach-payload.js';
 
 describe('buildSessionAttachPayload', () => {
@@ -53,6 +55,60 @@ describe('buildSessionAttachPayload', () => {
       preparation: { attemptId: 'att_1', triggerMessageId: 'msg_1' },
     });
   });
+
+  for (const key of CONTROL_RUNTIME_RESERVED_ENV_VARS) {
+    it(`rejects ${key} in public session environment variables`, () => {
+      const result = envVarsSchema.safeParse({ [key]: 'user-controlled-secret' });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.message).toContain(key);
+        expect(result.error.message).not.toContain('user-controlled-secret');
+      }
+    });
+
+    it(`rejects persisted profile environment variable ${key} before attach`, () => {
+      const metadata = parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: {
+          sessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          userId: 'user-1',
+        },
+        auth: { kiloSessionId: 'kilo_1' },
+        profile: { envVars: { [key]: 'user-controlled-secret' } },
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+
+      expect(() => buildSessionAttachPayload(metadata)).toThrow(
+        `Reserved control runtime environment variable: ${key}`
+      );
+    });
+
+    it(`rejects persisted encrypted secret name ${key} before attach`, () => {
+      const metadata = parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: {
+          sessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          userId: 'user-1',
+        },
+        auth: { kiloSessionId: 'kilo_1' },
+        profile: {
+          encryptedSecrets: {
+            [key]: {
+              encryptedData: 'encrypted-secret-value',
+              encryptedDEK: 'encrypted-data-key',
+              algorithm: 'rsa-aes-256-gcm',
+              version: 1,
+            },
+          },
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+
+      expect(() => buildSessionAttachPayload(metadata)).toThrow(
+        `Reserved control runtime environment variable: ${key}`
+      );
+    });
+  }
 
   it('fills a GitHub token from git-token-service when metadata has none', async () => {
     const metadata = parseSessionMetadata({

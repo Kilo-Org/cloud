@@ -151,8 +151,8 @@
     "appearanceLight": "Haske",
     "appearanceDark": "Duhu",
     "account": "Asusu",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Ƙara asalin app a cikin bitar PR",
+    "prReviewAttributionSubtitle": "Ƙara rubutun ƙasa na \"An bita ta Kilo\" lokacin da ka ƙaddamar da bita."
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar jan ba ta samuwa",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Yana aiki a yanzu",
     "search": {
       "searching": "Ana nema",
       "searchSessions": "Nemo zaman",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "An kasa loda zaman",
       "couldNotLoadActive": "An kasa loda zaman da ke aiki",
-      "noSessionsYet": "Babu zaman har yanzu",
       "noSessionsYetDescription": "Fara aikin coding daga wayarka. Zamanka za su bayyana a nan.",
       "noMatches": "Babu zaman da ya dace",
       "tryDifferentSearch": "Gwada wani kalmar bincike dabam.",
       "tryAdjustFilters": "Gwada gyara ko share tacewarka.",
       "couldNotSearch": "An kasa nemo zaman",
-      "allActive": "Duk zaman suna aiki",
       "completedWillAppear": "Zaman da suka gama za su bayyana a nan.",
       "noPastSessions": "Babu zaman da suka gabata",
       "live": "RAYA"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Gungura zuwa ƙasa",
       "emptyTitle": "Babu saƙonni har yanzu",
       "renameAccessibility": "Sake sunan zaman: {{title}}",
-      "connectRepository": "Haɗa ma'ajiya",
       "cloningSession": "Ana kwafa zaman",
       "continue": "Ci gaba",
       "couldNotLoadThisSession": "An kasa loda wannan zaman",
-      "cloneFailed": "An kasa kwafa wannan zaman.",
       "cloneFailedRetry": "An kasa kwafa wannan zaman. Sake gwadawa.",
-      "connectRepositoryToContinue": "Haɗa ma'ajiya domin ci gaba.",
       "notEnoughCredits": "Ba isassun kiredit don gudanar da Cloud Agent ba. Ƙara kiredit ka sake gwadawa.",
       "previousTaskFinishing": "Aikin da ya gabata har yanzu yana ƙarewa. Da fatan za ka jira ɗan lokaci.",
       "serviceUnavailable": "Sabis ɗin ba ya aiki a yanzu. Da fatan za ka sake gwadawa.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Ci gaba da gyarawa",
       "discard": "Watsi",
       "discardFailed": "An kasa watsi da daftarin. Da fatan za a sake gwadawa.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Gudanar da `kilo remote` a kan kwamfutarka, ko `/remote` a zaman CLI mai aiki, don sarrafa tsarin kilo na gida.",
       "bitbucketConnected": "An haɗa Bitbucket",
       "connectBitbucket": "Haɗa Bitbucket",
       "connectBitbucketDescription": "Haɗa Bitbucket a cikin burauzar ka, sannan ka dawo nan don zaɓar ma'ajiya.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Babu ma'ajiya da ake gani. Duba samun damar ma'ajiya na GitLab, sannan ka sabunta.",
       "openBitbucket": "Buɗe Bitbucket",
       "openGitlab": "Buɗe GitLab",
-      "recentlyUsed": "Waɗanda aka yi amfani da su kwanan nan"
+      "recentlyUsed": "Waɗanda aka yi amfani da su kwanan nan",
+      "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zama ba. Zaɓi Cloud Agent ko wani CLI.",
+      "continueFrom": "Ci gaba da {{title}}",
+      "importFailed": "An kasa shigo da wannan zaman.",
+      "importingSession": "Ana shigo da zama"
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta {{displayCount}} fayil",

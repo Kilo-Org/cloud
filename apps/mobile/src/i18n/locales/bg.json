@@ -151,8 +151,8 @@
     "appearanceLight": "Светъл",
     "appearanceDark": "Тъмен",
     "account": "Акаунт",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Добави приписване на приложението към прегледите на PR",
+    "prReviewAttributionSubtitle": "Добави футър „Reviewed via Kilo“, когато изпратиш преглед."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request-ът е недостъпен",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Активен сега",
     "search": {
       "searching": "Търсене",
       "searchSessions": "Търсене на сесии",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Не може да се заредят сесиите",
       "couldNotLoadActive": "Не може да се заредят активните сесии",
-      "noSessionsYet": "Все още няма сесии",
       "noSessionsYetDescription": "Започни задача за кодиране от телефона си. Сесиите ти ще се появят тук.",
       "noMatches": "Няма съвпадащи сесии",
       "tryDifferentSearch": "Опитай с различен термин за търсене.",
       "tryAdjustFilters": "Опитай да промениш или изчистиш филтрите си.",
       "couldNotSearch": "Не може да се търсят сесии",
-      "allActive": "Всички сесии са активни",
       "completedWillAppear": "Завършените сесии ще се появят тук.",
       "noPastSessions": "Няма минали сесии",
       "live": "НА ЖИВО"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Превърти до дъното",
       "emptyTitle": "Все още няма съобщения",
       "renameAccessibility": "Преименувай сесията: {{title}}",
-      "connectRepository": "Свържи хранилище",
       "cloningSession": "Клониране на сесия",
       "continue": "Продължи",
       "couldNotLoadThisSession": "Не можа да се зареди тази сесия",
-      "cloneFailed": "Не можа да се клонира тази сесия.",
       "cloneFailedRetry": "Не можа да се клонира тази сесия. Опитай отново.",
-      "connectRepositoryToContinue": "Свържи хранилище, за да продължиш.",
       "notEnoughCredits": "Няма достатъчно кредити за стартиране на Cloud Agent. Добавете кредити и опитайте отново.",
       "previousTaskFinishing": "Предишната задача все още приключва. Моля, изчакайте момент.",
       "serviceUnavailable": "Услугата в момента е недостъпна. Моля, опитайте отново.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Продължи редактирането",
       "discard": "Отхвърли",
       "discardFailed": "Не можа да се отхвърли черновата. Моля, опитай отново.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Изпълни `kilo remote` на компютъра си или `/remote` в работеща CLI сесия, за да управляваш локален kilo процес.",
       "bitbucketConnected": "Bitbucket е свързан",
       "connectBitbucket": "Свържи Bitbucket",
       "connectBitbucketDescription": "Свържете Bitbucket в браузъра си, след което се върнете тук, за да изберете хранилище.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Няма видими хранилища. Проверете достъпа до хранилищата за GitLab, след което опреснете.",
       "openBitbucket": "Отваряне на Bitbucket",
       "openGitlab": "Отваряне на GitLab",
-      "recentlyUsed": "Наскоро използвани"
+      "recentlyUsed": "Наскоро използвани",
+      "continueFrom": "Продължаване на {{title}}",
+      "importingSession": "Импортиране на сесията",
+      "cliCannotContinue": "Този CLI не може да продължи сесия. Избери Cloud Agent или друг CLI.",
+      "importFailed": "Тази сесия не можа да бъде импортирана."
     },
     "partRenderer": {
       "updatedFileCount_one": "Актуализиран {{displayCount}} файл",

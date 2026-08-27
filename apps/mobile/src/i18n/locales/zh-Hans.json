@@ -151,8 +151,8 @@
     "appearanceLight": "浅色",
     "appearanceDark": "深色",
     "account": "账户",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "在 PR 审查中添加应用署名",
+    "prReviewAttributionSubtitle": "提交审查时，追加 Reviewed via Kilo 页脚。"
   },
   "notifications": {
     "title": "通知",
@@ -1579,7 +1579,6 @@
     }
   },
   "agents": {
-    "activeNow": "当前活跃",
     "search": {
       "searching": "正在搜索",
       "searchSessions": "搜索会话",
@@ -1590,13 +1589,11 @@
     "sessionList": {
       "couldNotLoad": "无法加载会话",
       "couldNotLoadActive": "无法加载活动会话",
-      "noSessionsYet": "暂无会话",
       "noSessionsYetDescription": "从您的手机开始编程任务。您的会话将显示在这里。",
       "noMatches": "没有匹配的会话",
       "tryDifferentSearch": "请尝试其他搜索词。",
       "tryAdjustFilters": "请尝试调整或清除您的筛选条件。",
       "couldNotSearch": "无法搜索会话",
-      "allActive": "所有会话均处于活动状态",
       "completedWillAppear": "已完成的会话将显示在这里。",
       "noPastSessions": "没有过去的会话",
       "live": "实时"
@@ -1665,13 +1662,10 @@
       "scrollToBottom": "滚动到底部",
       "emptyTitle": "暂无消息",
       "renameAccessibility": "重命名会话：{{title}}",
-      "connectRepository": "连接仓库",
       "cloningSession": "正在克隆会话",
       "continue": "继续",
       "couldNotLoadThisSession": "无法加载此会话",
-      "cloneFailed": "无法克隆此会话。",
       "cloneFailedRetry": "无法克隆此会话。请重试。",
-      "connectRepositoryToContinue": "连接一个仓库以继续。",
       "notEnoughCredits": "运行 Cloud Agent 的积分不足。请添加积分后重试。",
       "previousTaskFinishing": "上一个任务仍在进行中。请稍等片刻。",
       "serviceUnavailable": "服务当前不可用。请重试。",
@@ -1730,7 +1724,7 @@
       "discardDraftTitle": "丢弃草稿？",
       "discardFailed": "无法丢弃草稿。请重试。",
       "keepEditing": "继续编辑",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "在你的电脑上运行 `kilo remote`，或在正在运行的 CLI 会话中使用 `/remote`，以控制本地的 kilo 进程。",
       "bitbucketConnected": "Bitbucket 已连接",
       "connectBitbucket": "连接 Bitbucket",
       "connectBitbucketDescription": "在浏览器中连接 Bitbucket，然后返回此处选择仓库。",
@@ -1744,7 +1738,11 @@
       "noRepositoriesVisibleGitlab": "没有可见的仓库。请检查 GitLab 的仓库访问权限，然后刷新。",
       "openBitbucket": "打开 Bitbucket",
       "openGitlab": "打开 GitLab",
-      "recentlyUsed": "最近使用"
+      "recentlyUsed": "最近使用",
+      "continueFrom": "正在继续 {{title}}",
+      "importingSession": "正在导入会话",
+      "cliCannotContinue": "此 CLI 无法继续会话。请选择云端代理或其他 CLI。",
+      "importFailed": "无法导入此会话。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件",

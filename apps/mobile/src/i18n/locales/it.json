@@ -1569,7 +1569,6 @@
     }
   },
   "agents": {
-    "activeNow": "Attivo ora",
     "search": {
       "searching": "Ricerca",
       "searchSessions": "Cerca sessioni",
@@ -1580,13 +1579,11 @@
     "sessionList": {
       "couldNotLoad": "Impossibile caricare le sessioni",
       "couldNotLoadActive": "Impossibile caricare le sessioni attive",
-      "noSessionsYet": "Ancora nessuna sessione",
       "noSessionsYetDescription": "Avvia un'attività di codifica dal telefono. Le tue sessioni appariranno qui.",
       "noMatches": "Nessuna sessione corrisponde",
       "tryDifferentSearch": "Prova un termine di ricerca diverso.",
       "tryAdjustFilters": "Prova a modificare o cancellare i filtri.",
       "couldNotSearch": "Impossibile cercare le sessioni",
-      "allActive": "Tutte le sessioni sono attive",
       "completedWillAppear": "Le sessioni completate appariranno qui.",
       "noPastSessions": "Nessuna sessione passata",
       "live": "LIVE"
@@ -1657,13 +1654,10 @@
       "scrollToBottom": "Scorri in basso",
       "emptyTitle": "Nessun messaggio",
       "renameAccessibility": "Rinomina sessione: {{title}}",
-      "connectRepository": "Collega repository",
       "cloningSession": "Clonazione sessione",
       "continue": "Continua",
       "couldNotLoadThisSession": "Impossibile caricare questa sessione",
-      "cloneFailed": "Impossibile clonare questa sessione.",
       "cloneFailedRetry": "Impossibile clonare questa sessione. Riprova.",
-      "connectRepositoryToContinue": "Collega un repository per continuare.",
       "notEnoughCredits": "Crediti insufficienti per eseguire Cloud Agent. Aggiungi crediti e riprova.",
       "previousTaskFinishing": "L'attività precedente sta ancora terminando. Attendere un momento.",
       "serviceUnavailable": "Il servizio non è disponibile al momento. Riprova.",
@@ -1722,7 +1716,7 @@
       "discardDraftTitle": "Scartare la bozza?",
       "discardFailed": "Impossibile scartare la bozza. Riprova.",
       "keepEditing": "Continua a modificare",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Esegui `kilo remote` sul tuo computer, oppure `/remote` in una sessione CLI attiva, per controllare un processo kilo locale.",
       "bitbucketConnected": "Bitbucket connesso",
       "connectBitbucket": "Connetti Bitbucket",
       "connectBitbucketDescription": "Connetti Bitbucket nel browser, poi torna qui per scegliere un repository.",
@@ -1736,7 +1730,11 @@
       "noRepositoriesVisibleGitlab": "Nessun repository visibile. Controlla l'accesso ai repository per GitLab, poi aggiorna.",
       "openBitbucket": "Apri Bitbucket",
       "openGitlab": "Apri GitLab",
-      "recentlyUsed": "Usati di recente"
+      "recentlyUsed": "Usati di recente",
+      "continueFrom": "Continuazione di {{title}}",
+      "importingSession": "Importazione della sessione",
+      "cliCannotContinue": "Questa CLI non può continuare una sessione. Scegli Cloud Agent o un'altra CLI.",
+      "importFailed": "Impossibile importare questa sessione."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aggiornato {{displayCount}} file",
@@ -2218,8 +2216,8 @@
     "appearanceLight": "Chiaro",
     "appearanceDark": "Scuro",
     "account": "Account",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Aggiungi l'attribuzione dell'app alle revisioni PR",
+    "prReviewAttributionSubtitle": "Aggiungi un footer \"Recensito tramite Kilo\" quando invii una recensione."
   },
   "addCredits": {
     "cta": "Aggiungi crediti",

@@ -151,8 +151,8 @@
     "appearanceLight": "Ìhè",
     "appearanceDark": "Ọchịchịrị",
     "account": "Akaụntụ",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Tinye nzere ngwa na nyocha PR",
+    "prReviewAttributionSubtitle": "Gbakwunye nkebi 'Reviewed via Kilo' n'ala mgbe ị bipụtara nyocha."
   },
   "prReview": {
     "pullRequestUnavailable": "Arịrịọ dọrọ adịghị",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Na-arụ ọrụ ugbu a",
     "search": {
       "searching": "Na-achọ",
       "searchSessions": "Chọọ nzukọ",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Enweghị ike ibudata nzukọ",
       "couldNotLoadActive": "Enweghị ike ibudata nzukọ na-arụ ọrụ",
-      "noSessionsYet": "Enweghị nzukọ aka",
       "noSessionsYetDescription": "Malite ọrụ koodu site na ekwentị gị. Nzukọ gị ga-apụta ebe a.",
       "noMatches": "Enweghị nzukọ dabara",
       "tryDifferentSearch": "Nwaa okwu ọchụchọ dị iche.",
       "tryAdjustFilters": "Nwaa ịhazigharị ma ọ bụ kpochapụ nzacha gị.",
       "couldNotSearch": "Enweghị ike ịchọ nzukọ",
-      "allActive": "Nzukọ niile na-arụ ọrụ",
       "completedWillAppear": "Nzukọ ndị emechara ga-apụta ebe a.",
       "noPastSessions": "Enweghị nzukọ gara aga",
       "live": "LIVE"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Pịgharịa ruo n'ala",
       "emptyTitle": "Enweghị ozi aka",
       "renameAccessibility": "Gbanwee aha nzukọ: {{title}}",
-      "connectRepository": "Jikọọ ebe nchekwa",
       "cloningSession": "Na-emepụta oyiri nzukọ",
       "continue": "Gaa n'ihu",
       "couldNotLoadThisSession": "Enweghị ike ibudata nzukọ a",
-      "cloneFailed": "Enweghị ike imepụta oyiri nzukọ a.",
       "cloneFailedRetry": "Enweghị ike imepụta oyiri nzukọ a. Nwaa ọzọ.",
-      "connectRepositoryToContinue": "Jikọọ ebe nchekwa iji gaa n'ihu.",
       "notEnoughCredits": "Kredit ezughị ezu ịgba Cloud Agent. Tinye kredit ma nwaa ọzọ.",
       "previousTaskFinishing": "Ọrụ gara aga ka na-agwụcha. Biko chere obere oge.",
       "serviceUnavailable": "Ọrụ ahụ adịghị ugbu a. Biko nwaa ọzọ.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Nọgide na-edezi",
       "discard": "Tụfuo",
       "discardFailed": "Enweghị ike ịtụfu akwụkwọ a na-ede. Biko nwaa ọzọ.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Gbaa `kilo remote` na kọmputa gị, ma ọ bụ `/remote` n'ime nnọkọ CLI na-agba ọsọ, iji chịkwaa usoro kilo dị n'ógbè.",
       "bitbucketConnected": "Bitbucket jikọrọ",
       "connectBitbucket": "Jikọọ Bitbucket",
       "connectBitbucketDescription": "Jikọọ Bitbucket na ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Ọ dịghị ebe nchekwa a na-ahụ. Lelee ohere ebe nchekwa maka GitLab, wee melite.",
       "openBitbucket": "Meghee Bitbucket",
       "openGitlab": "Meghee GitLab",
-      "recentlyUsed": "Ejiri ya nso nso a"
+      "recentlyUsed": "Ejiri ya nso nso a",
+      "cliCannotContinue": "CLI a enweghị ike ịga n'ihu na nnọkọ. Họrọ Cloud Agent ma ọ bụ CLI ọzọ.",
+      "continueFrom": "Na-aga n'ihu na {{title}}",
+      "importFailed": "Enweghị ike ibubata nnọkọ a.",
+      "importingSession": "Na-ebubata nnọkọ"
     },
     "partRenderer": {
       "updatedFileCount_one": "Emelitere {{displayCount}} faịlụ",

@@ -151,8 +151,8 @@
     "appearanceLight": "ආලෝකය",
     "appearanceDark": "අඳුරු",
     "account": "ගිණුම",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR සමාලෝචන සඳහා යෙදුම් ආරෝපණය එක් කරන්න",
+    "prReviewAttributionSubtitle": "සමාලෝචනයක් ඉදිරිපත් කරන විට Kilo හරහා සමාලෝචනය යන පාදකය එකතු කරන්න"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ලබා ගත නොහැක",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "දැන් සක්රීයයි",
     "search": {
       "searching": "සොයමින්",
       "searchSessions": "සැසි සොයන්න",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "සැසි පූරණය කළ නොහැක",
       "couldNotLoadActive": "සක්රීය සැසි පූරණය කළ නොහැක",
-      "noSessionsYet": "තවම සැසි නැත",
       "noSessionsYetDescription": "ඔබගේ දුරකථනයෙන් කේතීකරණ කාර්යයක් ආරම්භ කරන්න. ඔබේ සැසි මෙහි දිස්වනු ඇත.",
       "noMatches": "සැසි ගැළපෙන්නේ නැත",
       "tryDifferentSearch": "වෙනස් සෙවුම් පදයක් උත්සාහ කරන්න.",
       "tryAdjustFilters": "පෙරහන් සීරුමාරු කිරීමට හෝ ඉවත් කිරීමට උත්සාහ කරන්න.",
       "couldNotSearch": "සැසි සෙවීමට නොහැකි විය",
-      "allActive": "සියලු සැසි සක්රීයයි",
       "completedWillAppear": "සම්පූර්ණ කළ සැසි මෙහි දිස්වනු ඇත.",
       "noPastSessions": "පසුගිය සැසි නැත",
       "live": "සජීවී"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "පහළට අනුචලනය කරන්න",
       "emptyTitle": "තවම පණිවිඩ නැත",
       "renameAccessibility": "සැසිය නැවත නම් කරන්න: {{title}}",
-      "connectRepository": "ගබඩාව සම්බන්ධ කරන්න",
       "cloningSession": "සැසිය ක්ලෝන කරමින්",
       "continue": "ඉදිරියට",
       "couldNotLoadThisSession": "මෙම සැසිය පූරණය කළ නොහැකි විය",
-      "cloneFailed": "මෙම සැසිය ක්ලෝන කිරීමට නොහැකි විය.",
       "cloneFailedRetry": "මෙම සැසිය ක්ලෝන කිරීමට නොහැකි විය. නැවත උත්සාහ කරන්න.",
-      "connectRepositoryToContinue": "දිගටම කිරීමට ගබඩාවක් සම්බන්ධ කරන්න.",
       "notEnoughCredits": "Cloud Agent ධාවනය කිරීමට ප්රමාණවත් ණය නොමැත. ණය එක් කර නැවත උත්සාහ කරන්න.",
       "previousTaskFinishing": "පෙර කාර්යය තවමත් අවසන් වෙමින් පවතී. කරුණාකර මොහොතක් රැඳී සිටින්න.",
       "serviceUnavailable": "සේවාව දැනට ලබා ගත නොහැක. කරුණාකර නැවත උත්සාහ කරන්න.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "දිගටම සංස්කරණය කරන්න",
       "discard": "ඉවතලන්න",
       "discardFailed": "කටු සටහන ඉවතලිය නොහැක. කරුණාකර නැවත උත්සාහ කරන්න.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "ඔබේ පරිගණකයේ `kilo remote` ධාවනය කරන්න, නැතහොත් ධාවනය වන CLI සැසියක `/remote`, දේශීය kilo ක්‍රියාවලියක් පාලනය කිරීමට",
       "bitbucketConnected": "Bitbucket සම්බන්ධ විය",
       "connectBitbucket": "Bitbucket සම්බන්ධ කරන්න",
       "connectBitbucketDescription": "ඔබේ බ්‍රවුසරයේ Bitbucket සම්බන්ධ කර, පසුව ගබඩාවක් තේරීමට මෙහි ආපසු එන්න.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "ගබඩා නොපෙනේ. GitLab සඳහා ගබඩා ප්‍රවේශය පරීක්ෂා කර, පසුව නැවුම් කරන්න.",
       "openBitbucket": "Bitbucket විවෘත කරන්න",
       "openGitlab": "GitLab විවෘත කරන්න",
-      "recentlyUsed": "මෑතකදී භාවිතා කළ"
+      "recentlyUsed": "මෑතකදී භාවිතා කළ",
+      "cliCannotContinue": "මෙම CLI සැසියක් දිගටම කරගෙන යා නොහැක. Cloud Agent හෝ වෙනත් CLI එකක් තෝරන්න.",
+      "continueFrom": "{{title}} දිගටම කරගෙන යමින්",
+      "importFailed": "මෙම සැසිය ආයාත කළ නොහැකි විය.",
+      "importingSession": "සැසිය ආයාත කරමින්"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ගොනුවක් යාවත්කාලීන කර ඇත",

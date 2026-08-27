@@ -151,8 +151,8 @@
     "appearanceLight": "Licht",
     "appearanceDark": "Donker",
     "account": "Account",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "App-attributie aan PR-reviews toevoegen",
+    "prReviewAttributionSubtitle": "Voeg een 'Reviewed via Kilo'-voettekst toe wanneer je een review indient."
   },
   "notifications": {
     "channel": {
@@ -1579,7 +1579,6 @@
     }
   },
   "agents": {
-    "activeNow": "Nu actief",
     "search": {
       "searching": "Zoeken",
       "searchSessions": "Sessies zoeken",
@@ -1590,13 +1589,11 @@
     "sessionList": {
       "couldNotLoad": "Kon sessies niet laden",
       "couldNotLoadActive": "Kon actieve sessies niet laden",
-      "noSessionsYet": "Nog geen sessies",
       "noSessionsYetDescription": "Start een codeertaak vanaf je telefoon. Je sessies verschijnen hier.",
       "noMatches": "Geen sessies komen overeen",
       "tryDifferentSearch": "Probeer een andere zoekterm.",
       "tryAdjustFilters": "Probeer je filters aan te passen of te wissen.",
       "couldNotSearch": "Kon sessies niet doorzoeken",
-      "allActive": "Alle sessies zijn actief",
       "completedWillAppear": "Voltooide sessies verschijnen hier.",
       "noPastSessions": "Geen eerdere sessies",
       "live": "LIVE"
@@ -1665,13 +1662,10 @@
       "scrollToBottom": "Naar beneden scrollen",
       "emptyTitle": "Nog geen berichten",
       "renameAccessibility": "Sessie hernoemen: {{title}}",
-      "connectRepository": "Repository verbinden",
       "cloningSession": "Sessie klonen",
       "continue": "Doorgaan",
       "couldNotLoadThisSession": "Deze sessie kon niet worden geladen",
-      "cloneFailed": "Deze sessie kon niet worden gekloond.",
       "cloneFailedRetry": "Deze sessie kon niet worden gekloond. Probeer het opnieuw.",
-      "connectRepositoryToContinue": "Verbind een repository om door te gaan.",
       "notEnoughCredits": "Niet genoeg credits om Cloud Agent te starten. Voeg credits toe en probeer opnieuw.",
       "previousTaskFinishing": "De vorige taak is nog bezig. Even geduld.",
       "serviceUnavailable": "De service is momenteel niet beschikbaar. Probeer het opnieuw.",
@@ -1730,7 +1724,7 @@
       "discardDraftTitle": "Concept weggooien?",
       "discardFailed": "Kon het concept niet weggooien. Probeer het opnieuw.",
       "keepEditing": "Blijven bewerken",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Voer `kilo remote` uit op je computer, of `/remote` in een actieve CLI-sessie, om een lokaal kilo-proces te besturen.",
       "bitbucketConnected": "Bitbucket verbonden",
       "connectBitbucket": "Bitbucket verbinden",
       "connectBitbucketDescription": "Verbind Bitbucket in uw browser en kom daarna hier terug om een repository te kiezen.",
@@ -1744,7 +1738,11 @@
       "noRepositoriesVisibleGitlab": "Geen repositories zichtbaar. Controleer de repositorytoegang voor GitLab en vernieuw daarna.",
       "openBitbucket": "Bitbucket openen",
       "openGitlab": "GitLab openen",
-      "recentlyUsed": "Recent gebruikt"
+      "recentlyUsed": "Recent gebruikt",
+      "continueFrom": "Doorgaan met {{title}}",
+      "importingSession": "Sessie importeren",
+      "cliCannotContinue": "Deze CLI kan een sessie niet voortzetten. Kies Cloud Agent of een andere CLI.",
+      "importFailed": "Deze sessie kan niet worden geïmporteerd."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} bestand bijgewerkt",

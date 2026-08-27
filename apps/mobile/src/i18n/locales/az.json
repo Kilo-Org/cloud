@@ -151,8 +151,8 @@
     "appearanceLight": "İşıq",
     "appearanceDark": "Qaranlıq",
     "account": "Hesab",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR icmallarına proqram atribusiyası əlavə et",
+    "prReviewAttributionSubtitle": "İcmal təqdim edərkən 'Reviewed via Kilo' altbilgisini əlavə et."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request əlçatan deyil",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Hal-hazırda aktiv",
     "search": {
       "searching": "Axtarılır",
       "searchSessions": "Sessiyaları axtarın",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Sessiyalar yüklənə bilmədi",
       "couldNotLoadActive": "Aktiv sessiyalar yüklənə bilmədi",
-      "noSessionsYet": "Hələ sessiya yoxdur",
       "noSessionsYetDescription": "Telefonunuzdan kodlaşdırma tapşırığı başladın. Sessiyalarınız burada görünəcək.",
       "noMatches": "Heç bir sessiya uyğun gəlmir",
       "tryDifferentSearch": "Fərqli axtarış termini cəhd edin.",
       "tryAdjustFilters": "Filtrlərinizi tənzimləyin və ya təmizləyin.",
       "couldNotSearch": "Sessiyalar axtarıla bilmədi",
-      "allActive": "Bütün sessiyalar aktivdir",
       "completedWillAppear": "Tamamlanmış sessiyalar burada görünəcək.",
       "noPastSessions": "Keçmiş sessiya yoxdur",
       "live": "CANLI"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Aşağı sürüşdür",
       "emptyTitle": "Hələ mesaj yoxdur",
       "renameAccessibility": "Sessiyanın adını dəyişin: {{title}}",
-      "connectRepository": "Repozitoriyaya qoşul",
       "cloningSession": "Sessiya klonlanır",
       "continue": "Davam et",
       "couldNotLoadThisSession": "Bu sessiya yüklənə bilmədi",
-      "cloneFailed": "Bu sessiya klonlana bilmədi.",
       "cloneFailedRetry": "Bu sessiya klonlana bilmədi. Yenidən cəhd edin.",
-      "connectRepositoryToContinue": "Davam etmək üçün repozitoriyaya qoşulun.",
       "notEnoughCredits": "Cloud Agent işə salmaq üçün kifayət qədər kredit yoxdur. Kredit əlavə edin və yenidən cəhd edin.",
       "previousTaskFinishing": "Əvvəlki tapşırıq hələ də tamamlanır. Bir an gözləyin.",
       "serviceUnavailable": "Xidmət hazırda əlçatan deyil. Yenidən cəhd edin.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Redaktəyə davam et",
       "discard": "Ləğv et",
       "discardFailed": "Qaralama ləğv edilə bilmədi. Zəhmət olmasa yenidən cəhd edin.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "`kilo remote` komandasını kompüterinizdə işə salın və ya işləyən CLI sessiyasında `/remote` istifadə edin ki, yerli kilo prosesini idarə edəsiniz.",
       "bitbucketConnected": "Bitbucket qoşulub",
       "connectBitbucket": "Bitbucket-u qoş",
       "connectBitbucketDescription": "Depo seçmək üçün brauzerdə Bitbucket-a qoşulun, sonra buraya qayıdın.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Depo görünmür. GitLab üçün depo girişini yoxlayın, sonra yeniləyin.",
       "openBitbucket": "Bitbucket-ı aç",
       "openGitlab": "GitLab-ı aç",
-      "recentlyUsed": "Son istifadə olunanlar"
+      "recentlyUsed": "Son istifadə olunanlar",
+      "continueFrom": "{{title}} davam etdirilir",
+      "importingSession": "Sessiya idxal edilir",
+      "cliCannotContinue": "Bu CLI sessiyanı davam etdirə bilmir. Cloud Agent və ya başqa CLI seçin.",
+      "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl yeniləndi",

@@ -151,8 +151,8 @@
     "appearanceLight": "Világos",
     "appearanceDark": "Sötét",
     "account": "Fiók",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Alkalmazás-hozzárendelés hozzáadása a PR-ellenőrzésekhez",
+    "prReviewAttributionSubtitle": "A 'Reviewed via Kilo' lábléc hozzáfűzése, amikor ellenőrzést küld el."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nem érhető el",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Most aktív",
     "search": {
       "searching": "Keresés",
       "searchSessions": "Munkamenetek keresése",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "A munkamenetek betöltése nem sikerült",
       "couldNotLoadActive": "Az aktív munkamenetek betöltése nem sikerült",
-      "noSessionsYet": "Még nincs munkamenet",
       "noSessionsYetDescription": "Indítson egy kódolási feladatot a telefonjáról. A munkamenetei itt jelennek meg.",
       "noMatches": "Nincs egyező munkamenet",
       "tryDifferentSearch": "Próbáljon másik keresőszót.",
       "tryAdjustFilters": "Próbálja módosítani vagy törölni a szűrőket.",
       "couldNotSearch": "A munkamenetek keresése nem sikerült",
-      "allActive": "Minden munkamenet aktív",
       "completedWillAppear": "A befejezett munkamenetek itt jelennek meg.",
       "noPastSessions": "Nincs korábbi munkamenet",
       "live": "ÉLŐ"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Görgetés az aljára",
       "emptyTitle": "Még nincs üzenet",
       "renameAccessibility": "Munkamenet átnevezése: {{title}}",
-      "connectRepository": "Adattár csatlakoztatása",
       "cloningSession": "Munkamenet klónozása",
       "continue": "Folytatás",
       "couldNotLoadThisSession": "Ennek a munkamenetnek a betöltése nem sikerült",
-      "cloneFailed": "Ennek a munkamenetnek a klónozása nem sikerült.",
       "cloneFailedRetry": "Ennek a munkamenetnek a klónozása nem sikerült. Próbálja újra.",
-      "connectRepositoryToContinue": "Csatlakoztasson egy adattárat a folytatáshoz.",
       "notEnoughCredits": "Nincs elég kredit a Cloud Agent futtatásához. Adjon hozzá krediteket, és próbálja újra.",
       "previousTaskFinishing": "Az előző feladat még befejeződik. Kérjük, várjon egy pillanatot.",
       "serviceUnavailable": "A szolgáltatás jelenleg nem érhető el. Kérjük, próbálja újra.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Szerkesztés folytatása",
       "discard": "Elvetés",
       "discardFailed": "A piszkozat elvetése nem sikerült. Próbálja újra.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "A helyi kilo folyamat vezérléséhez futtassa a(z) `kilo remote` parancsot a számítógépén, vagy a(z) `/remote` parancsot egy futó CLI-munkamenetben.",
       "bitbucketConnected": "Bitbucket csatlakoztatva",
       "connectBitbucket": "Bitbucket csatlakoztatása",
       "connectBitbucketDescription": "Csatlakoztasd a Bitbucketet a böngésződben, majd térj vissza ide a tároló kiválasztásához.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Nincs látható tároló. Ellenőrizd a GitLab-tárolókhoz való hozzáférést, majd frissíts.",
       "openBitbucket": "Bitbucket megnyitása",
       "openGitlab": "GitLab megnyitása",
-      "recentlyUsed": "Legutóbb használt"
+      "recentlyUsed": "Legutóbb használt",
+      "continueFrom": "Folytatás {{title}}",
+      "importingSession": "Munkamenet importálása",
+      "cliCannotContinue": "Ez a CLI nem tudja folytatni a munkamenetet. Válasszon Cloud Agentet vagy másik CLI-t.",
+      "importFailed": "Nem sikerült importálni ezt a munkamenetet."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fájl frissítve",

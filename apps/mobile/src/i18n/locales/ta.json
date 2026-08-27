@@ -151,8 +151,8 @@
     "appearanceLight": "வெளிச்சம்",
     "appearanceDark": "இருள்",
     "account": "கணக்கு",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR மதிப்பாய்வுகளில் பயன்பாட்டு பங்களிப்பைச் சேர்க்கவும்",
+    "prReviewAttributionSubtitle": "நீங்கள் ஒரு மதிப்பாய்வை சமர்ப்பிக்கும்போது Reviewed via Kilo அடிக்குறிப்பைச் சேர்க்கவும்"
   },
   "prReview": {
     "pullRequestUnavailable": "இழுப்பு கோரிக்கை கிடைக்கவில்லை",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "இப்போது செயலில் உள்ளது",
     "search": {
       "searching": "தேடுகிறது",
       "searchSessions": "அமர்வுகளைத் தேடு",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "அமர்வுகளை ஏற்ற முடியவில்லை",
       "couldNotLoadActive": "செயலில் உள்ள அமர்வுகளை ஏற்ற முடியவில்லை",
-      "noSessionsYet": "இன்னும் அமர்வுகள் இல்லை",
       "noSessionsYetDescription": "உங்கள் மொபைலில் இருந்து ஒரு குறியீட்டு பணியைத் தொடங்கவும். உங்கள் அமர்வுகள் இங்கே தோன்றும்.",
       "noMatches": "பொருந்தும் அமர்வுகள் இல்லை",
       "tryDifferentSearch": "வேறு தேடல் சொல்லை முயற்சிக்கவும்.",
       "tryAdjustFilters": "உங்கள் வடிகட்டிகளை சரிசெய்யவும் அல்லது அழிக்கவும்.",
       "couldNotSearch": "அமர்வுகளைத் தேட முடியவில்லை",
-      "allActive": "அனைத்து அமர்வுகளும் செயலில் உள்ளன",
       "completedWillAppear": "நிறைவடைந்த அமர்வுகள் இங்கே தோன்றும்.",
       "noPastSessions": "கடந்த அமர்வுகள் இல்லை",
       "live": "நேரலை"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "கீழே உருட்டு",
       "emptyTitle": "இன்னும் செய்திகள் இல்லை",
       "renameAccessibility": "அமர்வை மறுபெயரிடு: {{title}}",
-      "connectRepository": "களஞ்சியத்தை இணை",
       "cloningSession": "அமர்வை குளோன் செய்கிறது",
       "continue": "தொடரவும்",
       "couldNotLoadThisSession": "இந்த அமர்வை ஏற்ற முடியவில்லை",
-      "cloneFailed": "இந்த அமர்வை குளோன் செய்ய முடியவில்லை.",
       "cloneFailedRetry": "இந்த அமர்வை குளோன் செய்ய முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-      "connectRepositoryToContinue": "தொடர ஒரு களஞ்சியத்தை இணைக்கவும்.",
       "notEnoughCredits": "Cloud Agent ஐ இயக்க போதுமான கிரெடிட்கள் இல்லை. கிரெடிட்களைச் சேர்த்து மீண்டும் முயற்சிக்கவும்.",
       "previousTaskFinishing": "முந்தைய பணி இன்னும் முடிவடைந்து கொண்டிருக்கிறது. சிறிது காத்திருக்கவும்.",
       "serviceUnavailable": "சேவை இப்போது கிடைக்கவில்லை. மீண்டும் முயற்சிக்கவும்.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "தொடர்ந்து திருத்து",
       "discard": "நிராகரி",
       "discardFailed": "வரைவை நிராகரிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "உங்கள் கணினியில் `kilo remote` ஐ இயக்கவும், அல்லது இயங்கும் CLI அமர்வில் `/remote` ஐ இயக்கவும், ஒரு உள்ளூர் kilo செயல்முறையைக் கட்டுப்படுத்தவும்",
       "bitbucketConnected": "Bitbucket இணைக்கப்பட்டது",
       "connectBitbucket": "Bitbucket ஐ இணை",
       "connectBitbucketDescription": "உங்கள் உலாவியில் பிட்பக்கெட்டை இணைக்கவும், பின்னர் ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "களஞ்சியங்கள் எதுவும் காணப்படவில்லை. GitLab-க்கான களஞ்சிய அணுகலைச் சரிபார்த்து, பின்னர் புதுப்பிக்கவும்.",
       "openBitbucket": "பிட்பக்கெட்டைத் திறக்கவும்",
       "openGitlab": "GitLab-ஐத் திறக்கவும்",
-      "recentlyUsed": "சமீபத்தில் பயன்படுத்தியவை"
+      "recentlyUsed": "சமீபத்தில் பயன்படுத்தியவை",
+      "cliCannotContinue": "இந்த CLI ஒரு அமர்வைத் தொடர முடியாது. Cloud Agent அல்லது மற்றொரு CLIஐ தேர்ந்தெடுக்கவும்.",
+      "continueFrom": "{{title}} தொடர்கிறது",
+      "importFailed": "இந்த அமர்வை இறக்குமதி செய்ய முடியவில்லை.",
+      "importingSession": "அமர்வை இறக்குமதி செய்கிறது"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} கோப்பு புதுப்பிக்கப்பட்டது",

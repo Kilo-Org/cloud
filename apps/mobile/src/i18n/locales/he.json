@@ -151,8 +151,8 @@
     "appearanceLight": "בהיר",
     "appearanceDark": "כהה",
     "account": "חשבון",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "הוסף שיוך אפליקציה לסקירות PR",
+    "prReviewAttributionSubtitle": "הוסף כותרת תחתונה של 'נסקר דרך Kilo' כשאתה שולח סקירה."
   },
   "notifications": {
     "title": "התראות",
@@ -1585,7 +1585,6 @@
     }
   },
   "agents": {
-    "activeNow": "פעיל כעת",
     "search": {
       "searching": "מחפש",
       "searchSessions": "חפש הפעלות",
@@ -1596,13 +1595,11 @@
     "sessionList": {
       "couldNotLoad": "לא ניתן היה לטעון הפעלות",
       "couldNotLoadActive": "לא ניתן היה לטעון הפעלות פעילות",
-      "noSessionsYet": "אין עדיין הפעלות",
       "noSessionsYetDescription": "התחל משימת קידוד מהטלפון שלך. ההפעלות שלך יופיעו כאן.",
       "noMatches": "אין הפעלות תואמות",
       "tryDifferentSearch": "נסה מונח חיפוש אחר.",
       "tryAdjustFilters": "נסה להתאים או לנקות את המסננים שלך.",
       "couldNotSearch": "לא ניתן היה לחפש הפעלות",
-      "allActive": "כל ההפעלות פעילות",
       "completedWillAppear": "הפעלות שהושלמו יופיעו כאן.",
       "noPastSessions": "אין הפעלות עבר",
       "live": "חי"
@@ -1673,13 +1670,10 @@
       "scrollToBottom": "גלול לתחתית",
       "emptyTitle": "אין עדיין הודעות",
       "renameAccessibility": "שינוי שם הסשן: {{title}}",
-      "connectRepository": "חיבור מאגר",
       "cloningSession": "משכפל סשן",
       "continue": "המשך",
       "couldNotLoadThisSession": "לא ניתן היה לטעון הפעלה זו",
-      "cloneFailed": "לא ניתן היה לשכפל הפעלה זו.",
       "cloneFailedRetry": "לא ניתן היה לשכפל הפעלה זו. נסה שוב.",
-      "connectRepositoryToContinue": "חבר מאגר כדי להמשיך.",
       "notEnoughCredits": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent. הוסף קרדיטים ונסה שוב.",
       "previousTaskFinishing": "המשימה הקודמת עדיין מסתיימת. אנא המתן רגע.",
       "serviceUnavailable": "השירות אינו זמין כרגע. אנא נסה שוב.",
@@ -1738,7 +1732,7 @@
       "discardDraftTitle": "לבטל את הטיוטה?",
       "discardFailed": "לא ניתן היה לבטל את הטיוטה. נסה שוב.",
       "keepEditing": "המשך לערוך",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "הרץ את `kilo remote` במחשב שלך, או `/remote` בהפעלת CLI פעילה, כדי לשלוט בתהליך kilo מקומי.",
       "bitbucketConnected": "Bitbucket מחובר",
       "connectBitbucket": "חבר את Bitbucket",
       "connectBitbucketDescription": "חבר את Bitbucket בדפדפן, ולאחר מכן חזור לכאן כדי לבחור מאגר.",
@@ -1752,7 +1746,11 @@
       "noRepositoriesVisibleGitlab": "אין מאגרים גלויים. בדוק את הגישה למאגרים של GitLab, ואז רענן.",
       "openBitbucket": "פתח את Bitbucket",
       "openGitlab": "פתח את GitLab",
-      "recentlyUsed": "בשימוש לאחרונה"
+      "recentlyUsed": "בשימוש לאחרונה",
+      "cliCannotContinue": "CLI זה אינו יכול להמשיך הפעלה. בחר Cloud Agent או CLI אחר.",
+      "continueFrom": "ממשיך {{title}}",
+      "importFailed": "לא ניתן היה לייבא את ההפעלה הזו.",
+      "importingSession": "מייבא הפעלה"
     },
     "partRenderer": {
       "updatedFileCount_one": "עודכן {{displayCount}} קובץ",

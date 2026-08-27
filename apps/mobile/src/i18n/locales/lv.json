@@ -151,8 +151,8 @@
     "appearanceLight": "Gaišs",
     "appearanceDark": "Tumšs",
     "account": "Konts",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Pievienot lietotnes attiecinājumu PR pārskatiem",
+    "prReviewAttributionSubtitle": "Pievienot \"Reviewed via Kilo\" kājeni, kad iesniedzat pārskatu."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nav pieejams",
@@ -2046,7 +2046,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktīvs tagad",
     "search": {
       "searching": "Meklē",
       "searchSessions": "Meklēt sesijas",
@@ -2057,13 +2056,11 @@
     "sessionList": {
       "couldNotLoad": "Neizdevās ielādēt sesijas",
       "couldNotLoadActive": "Neizdevās ielādēt aktīvās sesijas",
-      "noSessionsYet": "Sesiju vēl nav",
       "noSessionsYetDescription": "Sāc kodēšanas uzdevumu no sava tālruņa. Tavas sesijas parādīsies šeit.",
       "noMatches": "Neviena sesija neatbilst",
       "tryDifferentSearch": "Izmēģini citu meklēšanas vārdu.",
       "tryAdjustFilters": "Mēģini pielāgot vai notīrīt savus filtrus.",
       "couldNotSearch": "Neizdevās meklēt sesijas",
-      "allActive": "Visas sesijas ir aktīvas",
       "completedWillAppear": "Pabeigtās sesijas parādīsies šeit.",
       "noPastSessions": "Nav pagājušo sesiju",
       "live": "TIŠRAIDĒ"
@@ -2134,13 +2131,10 @@
       "scrollToBottom": "Ritināt līdz apakšai",
       "emptyTitle": "Ziņojumu vēl nav",
       "renameAccessibility": "Pārdēvēt sesiju: {{title}}",
-      "connectRepository": "Savienot repozitoriju",
       "cloningSession": "Klonē sesiju",
       "continue": "Turpināt",
       "couldNotLoadThisSession": "Neizdevās ielādēt šo sesiju",
-      "cloneFailed": "Neizdevās klonēt šo sesiju.",
       "cloneFailedRetry": "Neizdevās klonēt šo sesiju. Mēģini vēlreiz.",
-      "connectRepositoryToContinue": "Savieno repozitoriju, lai turpinātu.",
       "notEnoughCredits": "Nepietiek kredītu, lai palaistu Cloud Agent. Pievieno kredītus un mēģini vēlreiz.",
       "previousTaskFinishing": "Iepriekšējais uzdevums joprojām tiek pabeigts. Lūdzu, uzgaidi mirkli.",
       "serviceUnavailable": "Pakalpojums šobrīd nav pieejams. Lūdzu, mēģini vēlreiz.",
@@ -2199,7 +2193,7 @@
       "keepEditing": "Turpināt rediģēt",
       "discard": "Atmest",
       "discardFailed": "Neizdevās atmest melnrakstu. Lūdzu, mēģini vēlreiz.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Palaižiet `kilo remote` savā datorā vai `/remote` darbojošā CLI sesijā, lai kontrolētu lokālu kilo procesu.",
       "bitbucketConnected": "Bitbucket savienots",
       "connectBitbucket": "Savienot Bitbucket",
       "connectBitbucketDescription": "Savienojiet Bitbucket savā pārlūkprogrammā, pēc tam atgriezieties, lai izvēlētos repozitoriju.",
@@ -2213,7 +2207,11 @@
       "noRepositoriesVisibleGitlab": "Nav redzamu repozitoriju. Pārbaudiet repozitoriju piekļuvi GitLab, pēc tam atsvaidziniet.",
       "openBitbucket": "Atvērt Bitbucket",
       "openGitlab": "Atvērt GitLab",
-      "recentlyUsed": "Nesen lietots"
+      "recentlyUsed": "Nesen lietots",
+      "continueFrom": "Turpina {{title}}",
+      "importingSession": "Importē sesiju",
+      "cliCannotContinue": "Šis CLI nevar turpināt sesiju. Izvēlieties Cloud Agent vai citu CLI.",
+      "importFailed": "Neizdevās importēt šo sesiju."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atjaunināts {{displayCount}} fails",

@@ -206,7 +206,7 @@ const config: ExpoConfig = {
     [
       'expo-splash-screen',
       {
-        image: './assets/images/logo.png',
+        image: './assets/images/logo-mark.png',
         backgroundColor: '#FAF74F',
         imageWidth: 100,
       },

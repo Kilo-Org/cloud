@@ -151,8 +151,8 @@
     "appearanceLight": "Hell",
     "appearanceDark": "Dunkel",
     "account": "Konto",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "App-Zuordnung zu PR-Reviews hinzufügen",
+    "prReviewAttributionSubtitle": "Hänge beim Einreichen eines Reviews eine „Reviewed via Kilo“-Fußzeile an."
   },
   "notifications": {
     "title": "Benachrichtigungen",
@@ -1579,7 +1579,6 @@
     }
   },
   "agents": {
-    "activeNow": "Jetzt aktiv",
     "search": {
       "searching": "Suchen",
       "searchSessions": "Sitzungen suchen",
@@ -1590,13 +1589,11 @@
     "sessionList": {
       "couldNotLoad": "Sitzungen konnten nicht geladen werden",
       "couldNotLoadActive": "Aktive Sitzungen konnten nicht geladen werden",
-      "noSessionsYet": "Noch keine Sitzungen",
       "noSessionsYetDescription": "Starte eine Codieraufgabe von deinem Telefon. Deine Sitzungen erscheinen hier.",
       "noMatches": "Keine Sitzungen gefunden",
       "tryDifferentSearch": "Versuche einen anderen Suchbegriff.",
       "tryAdjustFilters": "Versuche, deine Filter anzupassen oder zu löschen.",
       "couldNotSearch": "Sitzungen konnten nicht durchsucht werden",
-      "allActive": "Alle Sitzungen sind aktiv",
       "completedWillAppear": "Abgeschlossene Sitzungen erscheinen hier.",
       "noPastSessions": "Keine vergangenen Sitzungen",
       "live": "LIVE"
@@ -1665,13 +1662,10 @@
       "scrollToBottom": "Nach unten scrollen",
       "emptyTitle": "Noch keine Nachrichten",
       "renameAccessibility": "Sitzung umbenennen: {{title}}",
-      "connectRepository": "Repository verbinden",
       "cloningSession": "Sitzung wird geklont",
       "continue": "Weiter",
       "couldNotLoadThisSession": "Diese Sitzung konnte nicht geladen werden",
-      "cloneFailed": "Diese Sitzung konnte nicht geklont werden.",
       "cloneFailedRetry": "Diese Sitzung konnte nicht geklont werden. Versuche es erneut.",
-      "connectRepositoryToContinue": "Verbinde ein Repository, um fortzufahren.",
       "notEnoughCredits": "Nicht genug Credits zum Ausführen von Cloud Agent. Füge Credits hinzu und versuche es erneut.",
       "previousTaskFinishing": "Die vorherige Aufgabe wird noch abgeschlossen. Bitte warte einen Moment.",
       "serviceUnavailable": "Der Dienst ist gerade nicht verfügbar. Bitte versuche es erneut.",
@@ -1730,7 +1724,7 @@
       "discardDraftTitle": "Entwurf verwerfen?",
       "discardFailed": "Der Entwurf konnte nicht verworfen werden. Bitte versuche es erneut.",
       "keepEditing": "Weiter bearbeiten",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Führe `kilo remote` auf deinem Computer aus oder `/remote` in einer laufenden CLI-Sitzung, um einen lokalen kilo-Prozess zu steuern.",
       "bitbucketConnected": "Bitbucket verbunden",
       "connectBitbucket": "Bitbucket verbinden",
       "connectBitbucketDescription": "Verbinde Bitbucket in deinem Browser und kehre dann hierher zurück, um ein Repository auszuwählen.",
@@ -1744,7 +1738,11 @@
       "noRepositoriesVisibleGitlab": "Keine Repositorys sichtbar. Prüfe den Repository-Zugriff für GitLab und aktualisiere.",
       "openBitbucket": "Bitbucket öffnen",
       "openGitlab": "GitLab öffnen",
-      "recentlyUsed": "Zuletzt verwendet"
+      "recentlyUsed": "Zuletzt verwendet",
+      "continueFrom": "{{title}} wird fortgesetzt",
+      "importingSession": "Sitzung wird importiert",
+      "cliCannotContinue": "Diese CLI kann keine Sitzung fortsetzen. Wähle Cloud Agent oder eine andere CLI.",
+      "importFailed": "Diese Sitzung konnte nicht importiert werden."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} Datei aktualisiert",

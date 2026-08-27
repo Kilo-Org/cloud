@@ -151,8 +151,8 @@
     "appearanceLight": "Жарық",
     "appearanceDark": "Қараңғы",
     "account": "Тіркелгі",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR рецензияларына қосымшаның атрибуциясын қосу",
+    "prReviewAttributionSubtitle": "Рецензия жібергенде төменге Reviewed via Kilo жолын қосыңыз."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request қолжетімсіз",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Қазір белсенді",
     "search": {
       "searching": "Ізделуде",
       "searchSessions": "Сессияларды іздеу",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Сессияларды жүктеу мүмкін болмады",
       "couldNotLoadActive": "Белсенді сессияларды жүктеу мүмкін болмады",
-      "noSessionsYet": "Әзірге сессиялар жоқ",
       "noSessionsYetDescription": "Телефоныңыздан кодтау тапсырмасын бастаңыз. Сессияларыңыз осында пайда болады.",
       "noMatches": "Сессиялар сәйкес келмейді",
       "tryDifferentSearch": "Басқа іздеу сөзін қолданып көріңіз.",
       "tryAdjustFilters": "Сүзгілерді реттеп немесе тазалап көріңіз.",
       "couldNotSearch": "Сессияларды іздеу мүмкін болмады",
-      "allActive": "Барлық сессиялар белсенді",
       "completedWillAppear": "Аяқталған сессиялар осында пайда болады.",
       "noPastSessions": "Өткен сессиялар жоқ",
       "live": "ТІКІ"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Төменге айналдыру",
       "emptyTitle": "Әзірге хабарламалар жоқ",
       "renameAccessibility": "Сессияның атын өзгерту: {{title}}",
-      "connectRepository": "Репозиторийді қосу",
       "cloningSession": "Сессияны клондау",
       "continue": "Жалғастыру",
       "couldNotLoadThisSession": "Бұл сессияны жүктеу мүмкін болмады",
-      "cloneFailed": "Бұл сессияны клондау мүмкін болмады.",
       "cloneFailedRetry": "Бұл сессияны клондау мүмкін болмады. Қайталап көріңіз.",
-      "connectRepositoryToContinue": "Жалғастыру үшін репозиторийді қосыңыз.",
       "notEnoughCredits": "Cloud Agent іске қосуға кредит жеткіліксіз. Кредит қосып, қайта көріңіз.",
       "previousTaskFinishing": "Алдыңғы тапсырма әлі аяқталуда. Сәл күте тұрыңыз.",
       "serviceUnavailable": "Қызмет қазір қолжетімсіз. Қайталап көріңіз.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Өңдеуді жалғастыру",
       "discard": "Жою",
       "discardFailed": "Жобаны жою мүмкін болмады. Қайталап көріңіз.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Компьютеріңізде `kilo remote` пәрменін орындаңыз немесе іске қосылған CLI сессиясында `/remote` пәрменін пайдаланыңыз — жергілікті kilo процесін басқару үшін.",
       "bitbucketConnected": "Bitbucket қосылды",
       "connectBitbucket": "Bitbucket қосу",
       "connectBitbucketDescription": "Bitbucket-ті браузерде қосыңыз, содан кейін репозиторийді таңдау үшін осында оралыңыз.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Репозиторийлер көрінбейді. GitLab үшін репозиторий қолжетімділігін тексеріңіз, содан кейін жаңартыңыз.",
       "openBitbucket": "Bitbucket-ті ашу",
       "openGitlab": "GitLab-ді ашу",
-      "recentlyUsed": "Жақында қолданылған"
+      "recentlyUsed": "Жақында қолданылған",
+      "continueFrom": "Жалғастыру {{title}}",
+      "importingSession": "Сессияны импорттау",
+      "cliCannotContinue": "Бұл CLI сессияны жалғастыра алмайды. Cloud Agent немесе басқа CLI таңдаңыз.",
+      "importFailed": "Бұл сессияны импорттау мүмкін болмады."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл жаңартылды",

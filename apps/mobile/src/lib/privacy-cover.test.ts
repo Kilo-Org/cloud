@@ -3,6 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { isPrivacyCoverRoute } from './privacy-cover';
 
 describe('isPrivacyCoverRoute', () => {
+  it('leaves language pickers above login and preferences uncovered', () => {
+    expect(isPrivacyCoverRoute(['(auth)', 'language-picker'])).toBe(false);
+    expect(isPrivacyCoverRoute(['(app)', 'language-picker'])).toBe(false);
+  });
+
   it('covers the profile tab group', () => {
     expect(isPrivacyCoverRoute(['(app)', '(tabs)', '(3_profile)'])).toBe(true);
     expect(

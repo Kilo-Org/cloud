@@ -151,8 +151,8 @@
     "appearanceLight": "Yorug'",
     "appearanceDark": "Qorong'i",
     "account": "Hisob",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR sharhlariga ilova atributini qo'shish",
+    "prReviewAttributionSubtitle": "Sharh yuborganingizda Reviewed via Kilo taglavhasini qo'shing."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request mavjud emas",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Hozir faol",
     "search": {
       "searching": "Qidirilmoqda",
       "searchSessions": "Sessiyalarni qidirish",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Sessiyalarni yuklab bo'lmadi",
       "couldNotLoadActive": "Faol sessiyalar yuklab olinmadi",
-      "noSessionsYet": "Hali sessiyalar yo'q",
       "noSessionsYetDescription": "Telefoningizdan kodlash vazifasini boshlang. Sessiyalaringiz shu yerda paydo bo'ladi.",
       "noMatches": "Sessiyalar mos kelmadi",
       "tryDifferentSearch": "Boshqa qidiruv so'zini sinab ko'ring.",
       "tryAdjustFilters": "Filtrlaringizni sozlab yoki tozalab ko'ring.",
       "couldNotSearch": "Sessiyalarni qidirib bo'lmadi",
-      "allActive": "Barcha sessiyalar faol",
       "completedWillAppear": "Tugallangan sessiyalar shu yerda paydo bo'ladi.",
       "noPastSessions": "O'tgan sessiyalar yo'q",
       "live": "JO'N"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Pastga aylantirish",
       "emptyTitle": "Hali xabarlar yo'q",
       "renameAccessibility": "Sessiyani qayta nomlash: {{title}}",
-      "connectRepository": "Repozitoriyaga ulanish",
       "cloningSession": "Sessiya klonlanmoqda",
       "continue": "Davom etish",
       "couldNotLoadThisSession": "Ushbu sessiyani yuklab bo'lmadi",
-      "cloneFailed": "Ushbu sessiyani klonlab bo'lmadi.",
       "cloneFailedRetry": "Ushbu sessiyani klonlab bo'lmadi. Qayta urinib ko'ring.",
-      "connectRepositoryToContinue": "Davom etish uchun repozitoriyaga ulaning.",
       "notEnoughCredits": "Cloud Agent ishga tushirish uchun kredit yetarli emas. Kredit qo'shing va qayta urinib ko'ring.",
       "previousTaskFinishing": "Oldingi vazifa hali ham tugamoqda. Iltimos, bir oz kuting.",
       "serviceUnavailable": "Xizmat hozir mavjud emas. Iltimos, qayta urinib ko'ring.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Tahrirlashni davom ettirish",
       "discard": "Bekor qilish",
       "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Kompyuteringizda `kilo remote` buyrug'ini ishga tushiring yoki ishlayotgan CLI sessiyasida `/remote` buyrug'ini ishlatib, mahalliy kilo jarayonini boshqaring.",
       "bitbucketConnected": "Bitbucket ulandi",
       "connectBitbucket": "Bitbucketni ulash",
       "connectBitbucketDescription": "Bitbucket'ga brauzeringizda ulaning, keyin repozitoriy tanlash uchun bu yerga qayting.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Hech qanday repozitoriy ko'rinmayapti. GitLab uchun repozitoriy kirishini tekshiring, keyin yangilang.",
       "openBitbucket": "Bitbucket'ni ochish",
       "openGitlab": "GitLab'ni ochish",
-      "recentlyUsed": "Yaqinda ishlatilgan"
+      "recentlyUsed": "Yaqinda ishlatilgan",
+      "continueFrom": "{{title}} ni davom ettirish",
+      "importingSession": "Sessiyani import qilish",
+      "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent yoki boshqa CLI'ni tanlang.",
+      "importFailed": "Bu sessiyani import qilib bo'lmadi."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi",

@@ -151,8 +151,8 @@
     "appearanceLight": "Svijetlo",
     "appearanceDark": "Tamno",
     "account": "Nalog",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Dodajte atribuciju aplikacije PR pregledima.",
+    "prReviewAttributionSubtitle": "Dodajte podnožje \"Pregledano putem Kilo-a\" kada pošaljete pregled."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nedostupan",
@@ -2046,7 +2046,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktivan sada",
     "search": {
       "searching": "Pretraživanje",
       "searchSessions": "Pretraži sesije",
@@ -2057,13 +2056,11 @@
     "sessionList": {
       "couldNotLoad": "Nije moguće učitati sesije",
       "couldNotLoadActive": "Nije moguće učitati aktivne sesije",
-      "noSessionsYet": "Još nema sesija",
       "noSessionsYetDescription": "Započnite zadatak kodiranja s telefona. Vaše sesije pojavit će se ovdje.",
       "noMatches": "Nijedna sesija se ne podudara",
       "tryDifferentSearch": "Pokušajte drugi pojam pretrage.",
       "tryAdjustFilters": "Pokušajte prilagoditi ili očistiti filtre.",
       "couldNotSearch": "Nije moguće pretražiti sesije",
-      "allActive": "Sve sesije su aktivne",
       "completedWillAppear": "Dovršene sesije pojavit će se ovdje.",
       "noPastSessions": "Nema prošlih sesija",
       "live": "UŽIVO"
@@ -2134,13 +2131,10 @@
       "scrollToBottom": "Pomakni na dno",
       "emptyTitle": "Još nema poruka",
       "renameAccessibility": "Preimenuj sesiju: {{title}}",
-      "connectRepository": "Poveži repozitorij",
       "cloningSession": "Kloniranje sesije",
       "continue": "Nastavi",
       "couldNotLoadThisSession": "Nije moguće učitati ovu sesiju",
-      "cloneFailed": "Nije moguće klonirati ovu sesiju.",
       "cloneFailedRetry": "Nije moguće klonirati ovu sesiju. Pokušajte ponovo.",
-      "connectRepositoryToContinue": "Povežite repozitorij za nastavak.",
       "notEnoughCredits": "Nedovoljno kredita za pokretanje Cloud Agent. Dodajte kredite i pokušajte ponovo.",
       "previousTaskFinishing": "Prethodni zadatak se još uvijek završava. Pričekajte trenutak.",
       "serviceUnavailable": "Usluga trenutno nije dostupna. Pokušajte ponovo.",
@@ -2199,7 +2193,7 @@
       "keepEditing": "Nastavi uređivati",
       "discard": "Odbaci",
       "discardFailed": "Nije moguće odbaciti nacrt. Pokušajte ponovo.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Pokrenite `kilo remote` na računalu ili `/remote` u pokrenutoj CLI sesiji da biste upravljali lokalnim kilo procesom.",
       "bitbucketConnected": "Bitbucket povezan",
       "connectBitbucket": "Poveži Bitbucket",
       "connectBitbucketDescription": "Poveži Bitbucket u pregledniku, zatim se vrati ovdje da odabereš spremište.",
@@ -2213,7 +2207,11 @@
       "noRepositoriesVisibleGitlab": "Nema vidljivih spremišta. Provjeri pristup spremištima za GitLab, zatim osvježi.",
       "openBitbucket": "Otvori Bitbucket",
       "openGitlab": "Otvori GitLab",
-      "recentlyUsed": "Nedavno korišteno"
+      "recentlyUsed": "Nedavno korišteno",
+      "continueFrom": "Nastavljanje {{title}}",
+      "importingSession": "Uvoz sesije",
+      "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberite Cloud Agent ili drugi CLI.",
+      "importFailed": "Nije moguće uvesti ovu sesiju."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirano {{displayCount}} datoteka",

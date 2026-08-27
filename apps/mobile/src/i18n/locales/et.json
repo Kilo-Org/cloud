@@ -151,8 +151,8 @@
     "appearanceLight": "Heledas",
     "appearanceDark": "Tumedas",
     "account": "Konto",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Lisa rakenduse viide PR-ülevaatustesse",
+    "prReviewAttributionSubtitle": "Kui esitad ülevaate, lisa jalusesse 'Reviewed via Kilo'."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ei ole saadaval",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiivne praegu",
     "search": {
       "searching": "Otsimine",
       "searchSessions": "Otsi seansse",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Seansse ei õnnestunud laadida",
       "couldNotLoadActive": "Aktiivseid seansse ei õnnestunud laadida",
-      "noSessionsYet": "Seansse pole veel",
       "noSessionsYetDescription": "Alusta oma telefonis kodeerimisülesannet. Sinu seansid ilmuvad siia.",
       "noMatches": "Ükski seanss ei vasta",
       "tryDifferentSearch": "Proovi teistsugust otsingusõna.",
       "tryAdjustFilters": "Proovi filtreid kohandada või tühjendada.",
       "couldNotSearch": "Seansside otsimine ebaõnnestus",
-      "allActive": "Kõik seansid on aktiivsed",
       "completedWillAppear": "Lõpetatud seansid ilmuvad siia.",
       "noPastSessions": "Minevikuseansse pole",
       "live": "OTSE"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Kerige alla",
       "emptyTitle": "Sõnumeid pole veel",
       "renameAccessibility": "Nimeta seanss ümber: {{title}}",
-      "connectRepository": "Ühenda hoidla",
       "cloningSession": "Seanssi kloonitakse",
       "continue": "Jätka",
       "couldNotLoadThisSession": "Seda seanssi ei õnnestunud laadida",
-      "cloneFailed": "Seda seanssi ei õnnestunud kloonida.",
       "cloneFailedRetry": "Seda seanssi ei õnnestunud kloonida. Proovi uuesti.",
-      "connectRepositoryToContinue": "Jätkamiseks ühenda hoidla.",
       "notEnoughCredits": "Cloud Agent käivitamiseks ei jätku krediiti. Lisa krediiti ja proovi uuesti.",
       "previousTaskFinishing": "Eelmine ülesanne on veel lõpetamisel. Palun oota hetk.",
       "serviceUnavailable": "Teenus pole praegu saadaval. Palun proovi uuesti.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Jätka muutmist",
       "discard": "Loobu",
       "discardFailed": "Mustandist loobumine ebaõnnestus. Proovi uuesti.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Käivita `kilo remote` oma arvutis või `/remote` käivitatavas CLI-seansis, et juhtida kohalikku kilo protsessi.",
       "bitbucketConnected": "Bitbucket on ühendatud",
       "connectBitbucket": "Ühenda Bitbucket",
       "connectBitbucketDescription": "Ühenda Bitbucket brauseris ja naase siia, et valida hoidla.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Hoidlaid pole nähtaval. Kontrolli GitLabi hoidlate juurdepääsu ja värskenda.",
       "openBitbucket": "Ava Bitbucket",
       "openGitlab": "Ava GitLab",
-      "recentlyUsed": "Hiljuti kasutatud"
+      "recentlyUsed": "Hiljuti kasutatud",
+      "cliCannotContinue": "See CLI ei saa seanssi jätkata. Valige Cloud Agent või mõni muu CLI.",
+      "continueFrom": "Jätkatakse {{title}}",
+      "importFailed": "Seda seanssi ei õnnestunud importida.",
+      "importingSession": "Imporditakse seanssi"
     },
     "partRenderer": {
       "updatedFileCount_one": "Uuendatud {{displayCount}} fail",

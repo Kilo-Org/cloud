@@ -39,9 +39,14 @@ import {
   KILO_FACADE_USER_ID_HEADER,
 } from './kilo-facade/user-kilo-facade.js';
 import { getSandboxControlStub, isSandboxControlId } from './sandbox-control/stub.js';
-import { resolveSessionStub } from './sandbox-session/session-stub.js';
+import { getSandboxSessionStub, resolveSessionStub } from './sandbox-session/session-stub.js';
 import { sessionPlaneFromId } from './session-plane.js';
-import { generateSandboxCredential, hashSandboxCredential } from './sandbox-control/credential.js';
+import {
+  generateSandboxCredential,
+  hashSandboxCredential,
+  parseBearerCredential,
+} from './sandbox-control/credential.js';
+import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 
 const app = new Hono<HonoContext>();
 
@@ -52,6 +57,27 @@ function isAllowedWebSocketOrigin(env: Env, origin: string | undefined): boolean
     .filter(Boolean);
   const isRealOrigin = origin !== undefined && origin !== 'null';
   return allowedOrigins.length === 0 || !isRealOrigin || allowedOrigins.includes(origin);
+}
+
+function createTerminalForwardRequest(
+  request: Request,
+  pathname: '/terminal/browser' | '/terminal/wrapper',
+  ptyId: string,
+  authorization?: string
+): Request {
+  const url = new URL(request.url);
+  url.pathname = pathname;
+  url.search = '';
+  url.searchParams.set('ptyId', ptyId);
+
+  const headers = new Headers();
+  for (const name of ['Upgrade', 'Connection', 'Sec-WebSocket-Key', 'Sec-WebSocket-Version']) {
+    const value = request.headers.get(name);
+    if (value !== null) headers.set(name, value);
+  }
+  if (authorization !== undefined) headers.set('Authorization', authorization);
+
+  return new Request(url, { method: 'GET', headers });
 }
 
 // TODO: the name is not very clear. I thought it is a termination of a websocket, not that websocket is for PTY
@@ -68,14 +94,14 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     return new Response('Missing cloudAgentSessionId parameter', { status: 400 });
   }
 
-  if (sessionPlaneFromId(cloudAgentSessionId) === 'control') {
-    return new Response('Terminal is not available for this session', { status: 412 });
-  }
-
   const ptyId = url.searchParams.get('ptyId');
   if (!ptyId) {
     logger.withFields({ cloudAgentSessionId }).warn('/terminal: Missing ptyId parameter');
     return new Response('Missing ptyId parameter', { status: 400 });
+  }
+  if (!PtyIdSchema.safeParse(ptyId).success) {
+    logger.withFields({ cloudAgentSessionId }).warn('/terminal: Invalid ptyId parameter');
+    return new Response('Invalid ptyId parameter', { status: 400 });
   }
 
   if (!isAllowedWebSocketOrigin(env, request.headers.get('Origin') ?? undefined)) {
@@ -152,6 +178,11 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
 
   logger.withFields({ cloudAgentSessionId, userId, ptyId }).info('/terminal: WebSocket authorized');
 
+  if (sessionPlaneFromId(cloudAgentSessionId) === 'control') {
+    const stub = getSandboxSessionStub(env, userId, cloudAgentSessionId);
+    return stub.fetch(createTerminalForwardRequest(request, '/terminal/browser', ptyId));
+  }
+
   const stub = resolveSessionStub(env, userId, cloudAgentSessionId);
   const metadata = await stub.getMetadata();
   const terminal = await resolveTerminalWrapperClient({
@@ -222,6 +253,39 @@ app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
 
   const stub = getSandboxControlStub(c.env, sandboxId);
   return stub.fetch(c.req.raw);
+});
+
+app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoContext>) => {
+  if (c.req.header('Upgrade')?.toLowerCase() !== 'websocket') {
+    return c.text('Expected WebSocket upgrade', 426);
+  }
+
+  const ownerId = c.req.param('ownerId');
+  const sessionId = c.req.param('sessionId');
+  const ptyId = c.req.param('ptyId');
+  if (!ownerId) {
+    return c.text('Invalid ownerId', 400);
+  }
+  if (
+    !sessionId ||
+    !sessionIdSchema.safeParse(sessionId).success ||
+    sessionPlaneFromId(sessionId) !== 'control'
+  ) {
+    return c.text('Invalid sessionId', 400);
+  }
+  if (!ptyId || !PtyIdSchema.safeParse(ptyId).success) {
+    return c.text('Invalid ptyId', 400);
+  }
+
+  const authorization = c.req.header('Authorization');
+  if (!authorization || parseBearerCredential(authorization) === null) {
+    return c.text('Invalid or missing Authorization header', 401);
+  }
+
+  const stub = getSandboxSessionStub(c.env, ownerId, sessionId);
+  return stub.fetch(
+    createTerminalForwardRequest(c.req.raw, '/terminal/wrapper', ptyId, authorization)
+  );
 });
 
 function createSanitizedForwardRequest(

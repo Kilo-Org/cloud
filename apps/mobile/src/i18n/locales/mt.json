@@ -151,8 +151,8 @@
     "appearanceLight": "Dawl",
     "appearanceDark": "Skur",
     "account": "Kont",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Żid attribuzzjoni tal-app mar-reviżjonijiet tal-PR",
+    "prReviewAttributionSubtitle": "Żid footer 'Reviewed via Kilo' meta tissottometti reviżjoni."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request mhux disponibbli",
@@ -2072,7 +2072,6 @@
     }
   },
   "agents": {
-    "activeNow": "Attiv issa",
     "search": {
       "searching": "Qed infittex",
       "searchSessions": "Fittex sessjonijiet",
@@ -2083,13 +2082,11 @@
     "sessionList": {
       "couldNotLoad": "Ma setgħux jitgħabbew is-sessjonijiet",
       "couldNotLoadActive": "Ma setgħux jintgħabbu s-sessjonijiet attivi",
-      "noSessionsYet": "L-ebda sessjoni s'issa",
       "noSessionsYetDescription": "Ibda biċċa xogħol ta' kodifikazzjoni mit-telefon tiegħek. Is-sessjonijiet tiegħek se jidhru hawn.",
       "noMatches": "L-ebda sessjoni ma taqbel",
       "tryDifferentSearch": "Ipprova terminu ta' tfittxija differenti.",
       "tryAdjustFilters": "Ipprova aġġusta jew neħħi l-filtri tiegħek.",
       "couldNotSearch": "Ma setgħux jinstabu s-sessjonijiet",
-      "allActive": "Is-sessjonijiet kollha huma attivi",
       "completedWillAppear": "Is-sessjonijiet kompluti se jidhru hawn.",
       "noPastSessions": "L-ebda sessjoni tal-passat",
       "live": "DIRETT"
@@ -2164,13 +2161,10 @@
       "scrollToBottom": "Skrollja sal-qiegħ",
       "emptyTitle": "L-ebda messaġġ s'issa",
       "renameAccessibility": "Erġa' semmi s-sessjoni: {{title}}",
-      "connectRepository": "Ikkonnettja r-repożitorju",
       "cloningSession": "Qed jiġi kklonjat is-sessjoni",
       "continue": "Kompli",
       "couldNotLoadThisSession": "Ma setgħetx titgħabba din is-sessjoni",
-      "cloneFailed": "Ma setgħetx tiġi kklonjata din is-sessjoni.",
       "cloneFailedRetry": "Ma setgħetx tiġi kklonjata din is-sessjoni. Erġa' pprova.",
-      "connectRepositoryToContinue": "Ikkonnettja repożitorju biex tkompli.",
       "notEnoughCredits": "Kreditu mhux biżżejjed biex tħaddem Cloud Agent. Żid il-kreditu u erġa' pprova.",
       "previousTaskFinishing": "Il-kompitu preċedenti għadu qed jintemm. Jekk jogħġbok stenna mument.",
       "serviceUnavailable": "Is-servizz mhux disponibbli bħalissa. Jekk jogħġbok erġa' pprova.",
@@ -2229,7 +2223,7 @@
       "keepEditing": "Kompli jeditja",
       "discard": "Warrab",
       "discardFailed": "Ma setax jintrema l-abbozz. Jekk jogħġbok erġa' pprova.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Mexxi `kilo remote` fuq il-kompjuter tiegħek, jew `/remote` f'sessjoni CLI li qed taħdem, biex tikkontrolla proċess kilo lokali.",
       "bitbucketConnected": "Bitbucket imqabbad",
       "connectBitbucket": "Ikkonnettja Bitbucket",
       "connectBitbucketDescription": "Qabbad Bitbucket fil-browser tiegħek, imbagħad erġa' lura hawn biex tagħżel repository.",
@@ -2243,7 +2237,11 @@
       "noRepositoriesVisibleGitlab": "L-ebda repository mhux viżibbli. Iċċekkja l-aċċess tar-repositories għal GitLab, imbagħad aġġorna.",
       "openBitbucket": "Iftaħ Bitbucket",
       "openGitlab": "Iftaħ GitLab",
-      "recentlyUsed": "Użati reċentement"
+      "recentlyUsed": "Użati reċentement",
+      "continueFrom": "Qed tkompli {{title}}",
+      "importingSession": "Qed timporta s-sessjoni",
+      "cliCannotContinue": "Dan il-CLI ma jistax ikompli sessjoni. Agħżel Cloud Agent jew CLI ieħor.",
+      "importFailed": "Ma setgħetx timporta din is-sessjoni."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aġġornat {{displayCount}} fajl",

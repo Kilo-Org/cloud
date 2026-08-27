@@ -151,8 +151,8 @@
     "appearanceLight": "Svetlo",
     "appearanceDark": "Temno",
     "account": "Račun",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Dodaj pripis aplikacije k pregledom PR",
+    "prReviewAttributionSubtitle": "K oddaji pregleda dodaj nogo »Reviewed via Kilo«."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ni na voljo",
@@ -2059,7 +2059,6 @@
     }
   },
   "agents": {
-    "activeNow": "Trenutno aktivno",
     "search": {
       "searching": "Iskanje",
       "searchSessions": "Išči seje",
@@ -2070,13 +2069,11 @@
     "sessionList": {
       "couldNotLoad": "Sej ni bilo mogoče naložiti",
       "couldNotLoadActive": "Aktivnih sej ni bilo mogoče naložiti",
-      "noSessionsYet": "Še ni sej",
       "noSessionsYetDescription": "Začni nalogo kodiranja s telefona. Tvoje seje bodo prikazane tukaj.",
       "noMatches": "Nobena seja se ne ujema",
       "tryDifferentSearch": "Poskusi z drugim iskalnim izrazom.",
       "tryAdjustFilters": "Poskusi prilagoditi ali počistiti filtre.",
       "couldNotSearch": "Sej ni bilo mogoče iskati",
-      "allActive": "Vse seje so aktivne",
       "completedWillAppear": "Dokončane seje bodo prikazane tukaj.",
       "noPastSessions": "Ni preteklih sej",
       "live": "V ŽIVO"
@@ -2149,13 +2146,10 @@
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Še ni sporočil",
       "renameAccessibility": "Preimenuj sejo: {{title}}",
-      "connectRepository": "Poveži skladišče",
       "cloningSession": "Kloniranje seje",
       "continue": "Nadaljuj",
       "couldNotLoadThisSession": "Te seje ni bilo mogoče naložiti",
-      "cloneFailed": "Te seje ni bilo mogoče klonirati.",
       "cloneFailedRetry": "Te seje ni bilo mogoče klonirati. Poskusi znova.",
-      "connectRepositoryToContinue": "Poveži skladišče za nadaljevanje.",
       "notEnoughCredits": "Premalo kreditov za zagon Cloud Agent. Dodajte kredite in poskusite znova.",
       "previousTaskFinishing": "Prejšnja naloga se še dokončuje. Počakajte trenutek.",
       "serviceUnavailable": "Storitev trenutno ni na voljo. Poskusite znova.",
@@ -2214,7 +2208,7 @@
       "keepEditing": "Nadaljuj z urejanjem",
       "discard": "Zavrzi",
       "discardFailed": "Osnutka ni bilo mogoče zavreči. Poskusi znova.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Zaženite `kilo remote` na svojem računalniku ali `/remote` v tekoči seji CLI za upravljanje lokalnega procesa kilo.",
       "bitbucketConnected": "Bitbucket je povezan",
       "connectBitbucket": "Poveži Bitbucket",
       "connectBitbucketDescription": "Poveži Bitbucket v brskalniku, nato se vrni sem in izberi skladišče.",
@@ -2228,7 +2222,11 @@
       "noRepositoriesVisibleGitlab": "Ni vidnih skladišč. Preveri dostop do skladišč za GitLab in osveži.",
       "openBitbucket": "Odpri Bitbucket",
       "openGitlab": "Odpri GitLab",
-      "recentlyUsed": "Nedavno uporabljeno"
+      "recentlyUsed": "Nedavno uporabljeno",
+      "cliCannotContinue": "Ta CLI ne more nadaljevati seje. Izberite Cloud Agent ali drug CLI.",
+      "continueFrom": "Nadaljujem {{title}}",
+      "importFailed": "Te seje ni bilo mogoče uvoziti.",
+      "importingSession": "Uvažam sejo"
     },
     "partRenderer": {
       "updatedFileCount_one": "Posodobljena {{displayCount}} datoteka",

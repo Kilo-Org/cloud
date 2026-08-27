@@ -151,8 +151,8 @@
     "appearanceLight": "สว่าง",
     "appearanceDark": "มืด",
     "account": "บัญชี",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "เพิ่มการระบุแหล่งที่มาของแอปในรีวิว PR",
+    "prReviewAttributionSubtitle": "ผนวกส่วนท้าย \"Reviewed via Kilo\" เมื่อคุณส่งรีวิว"
   },
   "prReview": {
     "pullRequestUnavailable": "ไม่สามารถใช้ pull request ได้",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "กำลังทำงานอยู่",
     "search": {
       "searching": "กำลังค้นหา",
       "searchSessions": "ค้นหา sessions",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "ไม่สามารถโหลดเซสชันได้",
       "couldNotLoadActive": "ไม่สามารถโหลด sessions ที่ทำงานอยู่ได้",
-      "noSessionsYet": "ยังไม่มี sessions",
       "noSessionsYetDescription": "เริ่มงานเขียนโค้ดจากโทรศัพท์ของคุณ sessions ของคุณจะปรากฏที่นี่",
       "noMatches": "ไม่มี sessions ที่ตรงกัน",
       "tryDifferentSearch": "ลองใช้คำค้นหาอื่น",
       "tryAdjustFilters": "ลองปรับหรือล้างตัวกรองของคุณ",
       "couldNotSearch": "ไม่สามารถค้นหา sessions ได้",
-      "allActive": "sessions ทั้งหมดกำลังทำงานอยู่",
       "completedWillAppear": "sessions ที่เสร็จแล้วจะปรากฏที่นี่",
       "noPastSessions": "ไม่มี sessions ในอดีต",
       "live": "LIVE"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "เลื่อนไปด้านล่าง",
       "emptyTitle": "ยังไม่มีข้อความ",
       "renameAccessibility": "เปลี่ยนชื่อ session: {{title}}",
-      "connectRepository": "เชื่อมต่อ repository",
       "cloningSession": "กำลังคัดลอก session",
       "continue": "ดำเนินการต่อ",
       "couldNotLoadThisSession": "ไม่สามารถโหลด session นี้ได้",
-      "cloneFailed": "ไม่สามารถคัดลอก session นี้ได้",
       "cloneFailedRetry": "ไม่สามารถคัดลอก session นี้ได้ ลองอีกครั้ง",
-      "connectRepositoryToContinue": "เชื่อมต่อ repository เพื่อดำเนินการต่อ",
       "notEnoughCredits": "เครดิตไม่เพียงพอสำหรับเรียกใช้ Cloud Agent โปรดเพิ่มเครดิตแล้วลองอีกครั้ง",
       "previousTaskFinishing": "งานก่อนหน้ายังไม่เสร็จสิ้น โปรดรอสักครู่",
       "serviceUnavailable": "ขณะนี้บริการไม่พร้อมใช้งาน โปรดลองอีกครั้ง",
@@ -2184,7 +2178,7 @@
       "keepEditing": "แก้ไขต่อไป",
       "discard": "ละทิ้ง",
       "discardFailed": "ไม่สามารถทิ้งฉบับร่างได้ กรุณาลองอีกครั้ง",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "รัน `kilo remote` บนคอมพิวเตอร์ของคุณ หรือ `/remote` ในเซสชัน CLI ที่กำลังรันอยู่ เพื่อควบคุมกระบวนการ kilo ภายในเครื่อง",
       "bitbucketConnected": "เชื่อมต่อ Bitbucket แล้ว",
       "connectBitbucket": "เชื่อมต่อ Bitbucket",
       "connectBitbucketDescription": "เชื่อมต่อ Bitbucket ในเบราว์เซอร์ของคุณ แล้วกลับมาที่นี่เพื่อเลือกที่เก็บ",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "ไม่พบที่เก็บที่แสดง ตรวจสอบสิทธิ์การเข้าถึงที่เก็บสำหรับ GitLab แล้วรีเฟรช",
       "openBitbucket": "เปิด Bitbucket",
       "openGitlab": "เปิด GitLab",
-      "recentlyUsed": "ใช้ล่าสุด"
+      "recentlyUsed": "ใช้ล่าสุด",
+      "continueFrom": "กำลังดำเนินการต่อ {{title}}",
+      "importingSession": "กำลังนำเข้าเซสชัน",
+      "cliCannotContinue": "CLI นี้ไม่สามารถดำเนินการต่อเซสชันได้ เลือก Cloud Agent หรือ CLI อื่น",
+      "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้"
     },
     "partRenderer": {
       "updatedFileCount_one": "อัปเดต {{displayCount}} ไฟล์",

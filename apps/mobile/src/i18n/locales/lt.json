@@ -151,8 +151,8 @@
     "appearanceLight": "Šviesi",
     "appearanceDark": "Tamsi",
     "account": "Paskyra",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Pridėti programėlės atribuciją prie PR peržiūrų",
+    "prReviewAttributionSubtitle": "Kai pateikiate peržiūrą, apačioje pridėkite poraštę „Peržiūrėta per Kilo“."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request nepasiekiamas",
@@ -2059,7 +2059,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktyvus dabar",
     "search": {
       "searching": "Ieškoma",
       "searchSessions": "Ieškoti sesijų",
@@ -2070,13 +2069,11 @@
     "sessionList": {
       "couldNotLoad": "Nepavyko įkelti sesijų",
       "couldNotLoadActive": "Nepavyko įkelti aktyvių sesijų",
-      "noSessionsYet": "Sesijų dar nėra",
       "noSessionsYetDescription": "Pradėkite kodavimo užduotį iš savo telefono. Jūsų sesijos bus rodomos čia.",
       "noMatches": "Sesijų neatitikimų nėra",
       "tryDifferentSearch": "Pabandykite kitą paieškos terminą.",
       "tryAdjustFilters": "Pabandykite pakoreguoti arba išvalyti filtrus.",
       "couldNotSearch": "Nepavyko ieškoti sesijų",
-      "allActive": "Visos sesijos aktyvios",
       "completedWillAppear": "Baigtos sesijos bus rodomos čia.",
       "noPastSessions": "Nėra ankstesnių sesijų",
       "live": "TIESIOGIAI"
@@ -2149,13 +2146,10 @@
       "scrollToBottom": "Slinkti žemyn",
       "emptyTitle": "Žinučių dar nėra",
       "renameAccessibility": "Pervadinti sesiją: {{title}}",
-      "connectRepository": "Prijungti saugyklą",
       "cloningSession": "Klonuojama sesija",
       "continue": "Tęsti",
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos",
-      "cloneFailed": "Nepavyko klonuoti šios sesijos.",
       "cloneFailedRetry": "Nepavyko klonuoti šios sesijos. Bandykite dar kartą.",
-      "connectRepositoryToContinue": "Prijunkite saugyklą, kad tęstumėte.",
       "notEnoughCredits": "Nepakanka kreditų paleisti Cloud Agent. Pridėkite kreditų ir bandykite dar kartą.",
       "previousTaskFinishing": "Ankstesnė užduotis dar baigiama. Palaukite akimirką.",
       "serviceUnavailable": "Paslauga šiuo metu nepasiekiama. Bandykite dar kartą.",
@@ -2214,7 +2208,7 @@
       "keepEditing": "Tęsti redagavimą",
       "discard": "Atmesti",
       "discardFailed": "Nepavyko atmesti juodraščio. Bandykite dar kartą.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Savo kompiuteryje paleiskite `kilo remote` arba `/remote` veikiančioje CLI sesijoje, kad valdytumėte vietinį kilo procesą.",
       "bitbucketConnected": "Bitbucket prijungtas",
       "connectBitbucket": "Prijungti Bitbucket",
       "connectBitbucketDescription": "Prijunkite Bitbucket naršyklėje, tada grįžkite čia ir pasirinkite saugyklą.",
@@ -2228,7 +2222,11 @@
       "noRepositoriesVisibleGitlab": "Saugyklų nematyti. Patikrinkite saugyklų prieigą GitLab ir atnaujinkite.",
       "openBitbucket": "Atidaryti Bitbucket",
       "openGitlab": "Atidaryti GitLab",
-      "recentlyUsed": "Panaudota neseniai"
+      "recentlyUsed": "Panaudota neseniai",
+      "continueFrom": "Tęsiama {{title}}",
+      "importingSession": "Importuojama sesija",
+      "cliCannotContinue": "Šis CLI negali tęsti sesijos. Pasirinkite Cloud Agent arba kitą CLI.",
+      "importFailed": "Nepavyko importuoti šios sesijos."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujinta {{displayCount}} rinkmena",

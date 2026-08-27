@@ -151,8 +151,8 @@
     "appearanceLight": "Iftiin",
     "appearanceDark": "Madow",
     "account": "Xisaabta",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Ku dar astaanta app dib-u-eegista PR",
+    "prReviewAttributionSubtitle": "Ku dheji qoraal 'Reviewed via Kilo' oo hoose markaad gudbiso dib-u-eegis."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ma heli karo",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Hadda firfircoon",
     "search": {
       "searching": "Raadin",
       "searchSessions": "Raadi kalfadhiyada",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Kalfadhiyada lama soo dejin karin",
       "couldNotLoadActive": "Lama xiri karin kalfadhiyada firfircoon",
-      "noSessionsYet": "Weli ma jiraan kalfadhiyo",
       "noSessionsYetDescription": "Ka bilow hawsha coding-ga taleefankaaga. Kalfadhiyadaagu halkan ayay soo muuqan doonaan.",
       "noMatches": "Ma jiraan kalfadhiyo u dhigma",
       "tryDifferentSearch": "Isku day erey raadin oo kala duwan.",
       "tryAdjustFilters": "Isku day inaad hagaajiso ama baabi'iso shaandhadaada.",
       "couldNotSearch": "Lama raadin karin kalfadhiyada",
-      "allActive": "Dhammaan kalfadhiyadu waa firfircoon yihiin",
       "completedWillAppear": "Kalfadhiyada la dhammaystiray halkan ayay soo muuqan doonaan.",
       "noPastSessions": "Ma jiraan kalfadhiyo hore",
       "live": "TOOS AH"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "U dhaadhac xagga hoose",
       "emptyTitle": "Weli ma jiraan farriimo",
       "renameAccessibility": "Beddel magaca kalfadhiga: {{title}}",
-      "connectRepository": "Ku xidh kaydka",
       "cloningSession": "Kalfadhiga waa la nuqulayaa",
       "continue": "Sii wad",
       "couldNotLoadThisSession": "Kalfadhigan lama shubay",
-      "cloneFailed": "Kalfadhigan lama nuqulin.",
       "cloneFailedRetry": "Kalfadhigan lama nuqulin. Mar kale isku day.",
-      "connectRepositoryToContinue": "Ku xidh kayd si aad u sii waddo.",
       "notEnoughCredits": "Kuma filna dheeraadka si loo shideeyo Cloud Agent. Ku dar dheeraadka oo mar kale isku day.",
       "previousTaskFinishing": "Hawsha hore weli way dhammaanaysaa. Fadlan sug daqiiqad.",
       "serviceUnavailable": "Adeeggu hadda ma jiro. Fadlan mar kale isku day.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Sii wad wax ka beddelka",
       "discard": "Tuur",
       "discardFailed": "Qabyada lama tuuri karin. Fadlan mar kale isku day.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Ku socodsii `kilo remote` kombyuutarkaaga, ama `/remote` kalfadhiga CLI ee socda, si aad u xakamayso nidaamka kilo ee maxalliga ah.",
       "bitbucketConnected": "Bitbucket waa ku xiran",
       "connectBitbucket": "Xiri Bitbucket",
       "connectBitbucketDescription": "Ku xiriiray Bitbucket browser-kaaga, ka dibna ku soo noqo halkan si aad u doorato keyd.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Ma jiraan keyd la arki karo. Hubi gelitaanka keydka ee GitLab, ka dibna cusbooneysii.",
       "openBitbucket": "Fur Bitbucket",
       "openGitlab": "Fur GitLab",
-      "recentlyUsed": "Markii dhaw la isticmaalay"
+      "recentlyUsed": "Markii dhaw la isticmaalay",
+      "continueFrom": "Sii wadaya {{title}}",
+      "importingSession": "Soo dejinta kalfadhiga",
+      "cliCannotContinue": "CLI-kan kuma sii wadi karo kalfadhi. Dooro Cloud Agent ama CLI kale.",
+      "importFailed": "Kalfadhigan lama soo dejin karin."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl ayaa la cusboonaysiiyay",

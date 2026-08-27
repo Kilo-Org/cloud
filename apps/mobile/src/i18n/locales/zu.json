@@ -151,8 +151,8 @@
     "appearanceLight": "Ukukhanya",
     "appearanceDark": "Ubumnyama",
     "account": "Akhawunti",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Engeza ukukhonjwa kohlelo lokusebenza ezibuyekezweni ze-PR",
+    "prReviewAttributionSubtitle": "Engeza umugqa 'Reviewed via Kilo' uma uthumela isibuyekezo."
   },
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokudonsa asitholakali",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Kusebenzayo manje",
     "search": {
       "searching": "Kusesha",
       "searchSessions": "Sesha iziseshini",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Akukwazanga ukulayisha iziseshini",
       "couldNotLoadActive": "Akukwazanga ukulayisha iziseshini ezisebenzayo",
-      "noSessionsYet": "Akukho ziseshini okwamanje",
       "noSessionsYetDescription": "Qala umsebenzi wokufaka ikhodi kusukela kufoni yakho. Iziseshini zakho zizovela lapha.",
       "noMatches": "Akukho ziseshini ezihambisanayo",
       "tryDifferentSearch": "Zama igama lokusesha elihlukile.",
       "tryAdjustFilters": "Zama ukulungisa noma ukusula izihlungi zakho.",
       "couldNotSearch": "Akukwazanga ukusesha iziseshini",
-      "allActive": "Zonke iziseshini ziyasebenza",
       "completedWillAppear": "Iziseshini eziqediwe zizovela lapha.",
       "noPastSessions": "Akukho ziseshini ezidlule",
       "live": "LIVE"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Skrolela phansi",
       "emptyTitle": "Akukho mlayezo okwamanje",
       "renameAccessibility": "Qamba kabusha iseshini: {{title}}",
-      "connectRepository": "Xhuma i-repository",
       "cloningSession": "Iklonywa iseshini",
       "continue": "Qhubeka",
       "couldNotLoadThisSession": "Akukwazanga ukulayisha lesi seshini",
-      "cloneFailed": "Akukwazanga ukuklona lesi seshini.",
       "cloneFailedRetry": "Akukwazanga ukuklona lesi seshini. Zama futhi.",
-      "connectRepositoryToContinue": "Xhuma i-repository ukuze uqhubeke.",
       "notEnoughCredits": "Azikho amakhredithi anele ukusebenzisa i-Cloud Agent. Engeza amakhredithi bese uzama futhi.",
       "previousTaskFinishing": "Umsebenzi wangaphambilini usaqhubeka. Uyacelwa ukuthi ulinde isikhashana.",
       "serviceUnavailable": "Inkonzo ayitholakali njengamanje. Uyacelwa ukuthi uzame futhi.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Qhubeka uhlela",
       "discard": "Lahla",
       "discardFailed": "Akukwazanga ukulahla idrafuthi. Sicela uzame futhi.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Sebenzisa i-`kilo remote` kukhompyutha yakho, noma i-`/remote` kuseshini ye-CLI esebenzayo, ukuze ulawule inqubo ye-kilo yasendaweni.",
       "bitbucketConnected": "I-Bitbucket ixhunyiwe",
       "connectBitbucket": "Xhuma i-Bitbucket",
       "connectBitbucketDescription": "Xhuma i-Bitbucket kusiphequluli sakho, bese ubuya lapha ukuze ukhethe irepository.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Awekho ama-repository abonakalayo. Bheka ukufinyelela kwe-repository ye-GitLab, bese uvuselela.",
       "openBitbucket": "Vula i-Bitbucket",
       "openGitlab": "Vula i-GitLab",
-      "recentlyUsed": "Esetshenziswe muva nje"
+      "recentlyUsed": "Esetshenziswe muva nje",
+      "continueFrom": "Ukuqhubeka {{title}}",
+      "importingSession": "Ukungenisa iseshini",
+      "cliCannotContinue": "Le CLI ayikwazi ukuqhubeka iseshini. Khetha I-Cloud Agent noma enye i-CLI.",
+      "importFailed": "Ayikwazanga ukungenisa lesi seshini."
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}",

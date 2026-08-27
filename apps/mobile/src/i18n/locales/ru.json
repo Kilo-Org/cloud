@@ -151,8 +151,8 @@
     "appearanceLight": "Светлая",
     "appearanceDark": "Темная",
     "account": "Аккаунт",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Добавить атрибуцию приложения в проверки PR",
+    "prReviewAttributionSubtitle": "Добавлять нижний колонтитул «Проверено с помощью Kilo» при отправке проверки."
   },
   "notifications": {
     "title": "Уведомления",
@@ -1591,7 +1591,6 @@
     }
   },
   "agents": {
-    "activeNow": "Активен сейчас",
     "search": {
       "searching": "Поиск",
       "searchSessions": "Поиск сеансов",
@@ -1602,13 +1601,11 @@
     "sessionList": {
       "couldNotLoad": "Не удалось загрузить сеансы",
       "couldNotLoadActive": "Не удалось загрузить активные сеансы",
-      "noSessionsYet": "Сеансов пока нет",
       "noSessionsYetDescription": "Начните задачу кодирования с телефона. Ваши сеансы появятся здесь.",
       "noMatches": "Нет подходящих сеансов",
       "tryDifferentSearch": "Попробуйте другой поисковый запрос.",
       "tryAdjustFilters": "Попробуйте изменить или очистить фильтры.",
       "couldNotSearch": "Не удалось выполнить поиск сеансов",
-      "allActive": "Все сеансы активны",
       "completedWillAppear": "Завершенные сеансы появятся здесь.",
       "noPastSessions": "Нет прошлых сеансов",
       "live": "LIVE"
@@ -1681,13 +1678,10 @@
       "scrollToBottom": "Прокрутить вниз",
       "emptyTitle": "Сообщений пока нет",
       "renameAccessibility": "Переименовать сессию: {{title}}",
-      "connectRepository": "Подключить репозиторий",
       "cloningSession": "Клонирование сессии",
       "continue": "Продолжить",
       "couldNotLoadThisSession": "Не удалось загрузить эту сессию",
-      "cloneFailed": "Не удалось клонировать эту сессию.",
       "cloneFailedRetry": "Не удалось клонировать эту сессию. Попробуйте снова.",
-      "connectRepositoryToContinue": "Подключите репозиторий, чтобы продолжить.",
       "notEnoughCredits": "Недостаточно кредитов для запуска Cloud Agent. Добавьте кредиты и попробуйте снова.",
       "previousTaskFinishing": "Предыдущая задача ещё завершается. Подождите немного.",
       "serviceUnavailable": "Сервис сейчас недоступен. Попробуйте ещё раз.",
@@ -1746,7 +1740,7 @@
       "discardDraftTitle": "Отменить черновик?",
       "discardFailed": "Не удалось отменить черновик. Попробуйте снова.",
       "keepEditing": "Продолжить редактирование",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Запустите `kilo remote` на вашем компьютере или `/remote` в запущенном CLI-сеансе, чтобы управлять локальным процессом kilo.",
       "bitbucketConnected": "Bitbucket подключен",
       "connectBitbucket": "Подключить Bitbucket",
       "connectBitbucketDescription": "Подключите Bitbucket в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
@@ -1760,7 +1754,11 @@
       "noRepositoriesVisibleGitlab": "Репозитории не отображаются. Проверьте доступ к репозиториям GitLab, затем обновите.",
       "openBitbucket": "Открыть Bitbucket",
       "openGitlab": "Открыть GitLab",
-      "recentlyUsed": "Недавно использованные"
+      "recentlyUsed": "Недавно использованные",
+      "cliCannotContinue": "Этот CLI не может продолжить сеанс. Выберите Cloud Agent или другой CLI.",
+      "continueFrom": "Продолжение {{title}}",
+      "importFailed": "Не удалось импортировать этот сеанс.",
+      "importingSession": "Импорт сеанса"
     },
     "partRenderer": {
       "updatedFileCount_one": "Обновлен {{displayCount}} файл",

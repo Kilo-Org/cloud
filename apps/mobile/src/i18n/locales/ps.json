@@ -151,8 +151,8 @@
     "appearanceLight": "روښانه",
     "appearanceDark": "تیاره",
     "account": "حساب",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "د PR بیاکتنو ته د ایپ انتساب اضافه کړئ",
+    "prReviewAttributionSubtitle": "کله چې تاسو یوه بیاکتنه وړاندې کوئ، د Reviewed via Kilo فوټر اضافه کړئ."
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسټ شتون نلري",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "اوس فعال",
     "search": {
       "searching": "لټون روان دی",
       "searchSessions": "ناستې وپلټئ",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "ناستې بار نه شوې",
       "couldNotLoadActive": "فعالې ناستې بار نه شوې",
-      "noSessionsYet": "تر اوسه ناستې نشته",
       "noSessionsYetDescription": "له خپل تلیفون څخه د کوډ کولو دنده پیل کړئ. ستاسو ناستې به دلته ښکاره شي.",
       "noMatches": "هیڅ ناسته سمون نه خوري",
       "tryDifferentSearch": "مختلف لټون شرط هڅه کړئ.",
       "tryAdjustFilters": "فلټرونه تنظیم یا پاک کړئ.",
       "couldNotSearch": "ناستې پلټل نشو",
-      "allActive": "ټولې ناستې فعالې دي",
       "completedWillAppear": "بشپړې شوې ناستې به دلته ښکاره شي.",
       "noPastSessions": "هیڅ تېرې ناستې نشته",
       "live": "ژوندۍ"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "لاندې ته ځغلول",
       "emptyTitle": "تر اوسه پیغامونه نشته",
       "renameAccessibility": "ناسته بیا نومول: {{title}}",
-      "connectRepository": "ذخیره وصل کړئ",
       "cloningSession": "ناسته کلون کېږي",
       "continue": "ادامه ورکړئ",
       "couldNotLoadThisSession": "دا ناسته بار نه شوه",
-      "cloneFailed": "دا ناسته کلون نه شوه.",
       "cloneFailedRetry": "دا ناسته کلون نه شوه. بیا هڅه وکړئ.",
-      "connectRepositoryToContinue": "د دوام لپاره یوه ذخیره وصل کړئ.",
       "notEnoughCredits": "د Cloud Agent د چلولو لپاره کافي کریډیټ نشته. کریډیټ اضافه کړئ او بیا هڅه وکړئ.",
       "previousTaskFinishing": "مخکینی کار لا هم روان دی. مهرباني وکړئ یوه شېبه انتظار وکړئ.",
       "serviceUnavailable": "خدمت اوس مهال شتون نلري. مهرباني وکړئ بیا هڅه وکړئ.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "سمون ته دوام ورکړئ",
       "discard": "لغوه کړئ",
       "discardFailed": "مسوده لغوه نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "په خپل کمپیوټر کې `kilo remote` چل کړئ، یا په یوه روان CLI ناسته کې `/remote`، ترڅو د یوه محلي kilo پروسې کنټرول وکړئ.",
       "bitbucketConnected": "Bitbucket وصل شو",
       "connectBitbucket": "Bitbucket وصل کول",
       "connectBitbucketDescription": "Bitbucket په خپل براوزر کې ونښلئ، بیا دلته راګرځئ تر څو یو ریپوزیټري غوره کړئ.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "کوم ریپوزیټري نه لیدل کیږي. د GitLab لپاره د ریپوزیټري لاسرسی وګورئ، بیا تازه یې کړئ.",
       "openBitbucket": "Bitbucket پرانیزئ",
       "openGitlab": "GitLab پرانیزئ",
-      "recentlyUsed": "وروستي کارول شوي"
+      "recentlyUsed": "وروستي کارول شوي",
+      "continueFrom": "د {{title}} ادامه",
+      "importingSession": "ناسته استورول",
+      "cliCannotContinue": "دا CLI نشي کولای یوه ناسته ادامه کړي. Cloud Agent یا بل CLI غوره کړئ.",
+      "importFailed": "دا ناسته استوره نه شوه."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل تازه شو",

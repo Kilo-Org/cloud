@@ -258,6 +258,32 @@ describe('CLIOutboundMessageSchema capabilities', () => {
     const result = CLIOutboundMessageSchema.safeParse(msg);
     expect(result.success).toBe(false);
   });
+
+  it('accepts capabilities.sessionClone: true on a heartbeat', () => {
+    const msg = {
+      type: 'heartbeat',
+      capabilities: { sessionClone: true },
+      sessions: [baseSession],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toEqual({ sessionClone: true });
+    }
+  });
+
+  it('accepts an absent sessionClone flag (legacy CLI)', () => {
+    const msg = {
+      type: 'heartbeat',
+      capabilities: { attachments: true },
+      sessions: [baseSession],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.capabilities).toEqual({ attachments: true });
+    }
+  });
 });
 
 describe('CLIOutboundMessageSchema prLink', () => {

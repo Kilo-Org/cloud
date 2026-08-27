@@ -46,12 +46,16 @@ function buildCreateSessionWireData(input?: CreateRemoteSessionInput): {
   agent?: string;
   model?: { providerID: string; modelID: string; variant?: string };
   orgId?: string;
+  cloneFromKiloSessionId?: string;
 } {
   return {
     protocolVersion: 1,
     ...(input?.agent !== undefined ? { agent: input.agent } : {}),
     ...(input?.model !== undefined ? { model: input.model } : {}),
     ...(input?.orgId !== undefined ? { orgId: input.orgId } : {}),
+    ...(input?.cloneFromKiloSessionId !== undefined
+      ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
+      : {}),
   };
 }
 
@@ -882,13 +886,18 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           wireData.agent !== undefined ||
           wireData.model !== undefined ||
           wireData.orgId !== undefined;
+        const hasCloneField = input?.cloneFromKiloSessionId !== undefined;
         let result: unknown;
         try {
           result = await sendCommand('create_session', wireData, mutationId);
         } catch (error) {
           // Only bare-retry when extended fields made the original wire differ
           // from `{ protocolVersion: 1 }`; otherwise the retry is identical.
+          // Old form is one bare protocolVersion 1 retry for extended fields;
+          // a clone id must never use that fallback because it would create a
+          // fresh session.
           if (
+            !hasCloneField &&
             hasExtendedFields &&
             error instanceof CommandDeliveredError &&
             error.message === INVALID_CREATE_SESSION_COMMAND

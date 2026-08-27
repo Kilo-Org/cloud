@@ -151,8 +151,8 @@
     "appearanceLight": "Ifa",
     "appearanceDark": "Dukkana",
     "account": "Herrega",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "App attribution PR sakatta'ootti dabali",
+    "prReviewAttributionSubtitle": "Kilo ttiin 'Reviewed via Kilo' footar dabali, sakatta'a yeroo galchitu."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request hin jiraatu",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Amma hojjechaa jira",
     "search": {
       "searching": "Barbaachaa jira",
       "searchSessions": "Xalayyii barbaadi",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Shumarra fudhachuu hin danda'ine",
       "couldNotLoadActive": "Xalayyii hojjechaa jiran dhiisuu hin dandeenye",
-      "noSessionsYet": "Xalayyiin hamma ammaatti hin jiru",
       "noSessionsYetDescription": "Bilbila kee irraa hojii koodingii jalqabi. Xalayyiin kee as ni mul'atu.",
       "noMatches": "Xalayyiin wal hin qabne",
       "tryDifferentSearch": "Jecha barbaaduu adda ta'e yaali.",
       "tryAdjustFilters": "Fildarii kee jijjiiru ykn haquu yaali.",
       "couldNotSearch": "Xalayyii barbaaduu hin dandeenye",
-      "allActive": "Xalayyiin hunda hojjechaa jiran",
       "completedWillAppear": "Xalayyiin xumuraman as ni mul'atu.",
       "noPastSessions": "Xalayyiin darbe hin jiru",
       "live": "LIVE"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Gadi jala deem",
       "emptyTitle": "Ergaa hamma ammaatti hin jiru",
       "renameAccessibility": "Xalayyii maqaa jijjiiri: {{title}}",
-      "connectRepository": "Repository wal qabsi",
       "cloningSession": "Xalayyii kopii godhachaa jira",
       "continue": "Itti fufi",
       "couldNotLoadThisSession": "Xalayyii kana dhiisuu hin dandeenyne",
-      "cloneFailed": "Xalayyii kana kopii godhuu hin dandeenyne.",
       "cloneFailedRetry": "Xalayyii kana kopii godhuu hin dandeenyne. Deebi'ee yaali.",
-      "connectRepositoryToContinue": "Itti fufuuf repository wal qabsi.",
       "notEnoughCredits": "Cloud Agenti hojii irra oolchuuf kireedii gahaa hin qabdu. Kireedii itti dabaliitii deebi'ii yaali.",
       "previousTaskFinishing": "Hojii duraan ture amma iyyuu xumurameera. Mee yeroo xinnoo eegi.",
       "serviceUnavailable": "Tajaajilli amma hin jiraatu. Mee deebi'ii yaali.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Gulaala itti fufi",
       "discard": "Haqi",
       "discardFailed": "Daaftarii haquu hin dandeenye. Mee deebi'ee yaali.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "`kilo remote` kompuutara kee irratti baasi, ykn saffata CLI keessa jiru keessatti `/remote` baasi, kiloo lokalii to'achuuf.",
       "bitbucketConnected": "Bitbucket walqabateera",
       "connectBitbucket": "Bitbucket walqabi",
       "connectBitbucketDescription": "Bitbucket brauzarii keessan keessatti qindeessaa, sana booda asitti deebi'aa repo tokko filachuuf.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Repository tokko iyyuu hin mul'atu. GitLab irratti argachuu repo keessan ilaalaa, sana booda haaromsi.",
       "openBitbucket": "Bitbucket bani",
       "openGitlab": "GitLab bani",
-      "recentlyUsed": "Yeroo dhihoo itti fayyadamame"
+      "recentlyUsed": "Yeroo dhihoo itti fayyadamame",
+      "cliCannotContinue": "CLI kuni shumarra itti fufuu hin danda'u. Cloud Agent ykn CLI biraa filadhu.",
+      "continueFrom": "{{title}} itti fufaa jira",
+      "importFailed": "Shumarra kana galchuu hin danda'ine.",
+      "importingSession": "Shumarra galchaa jira"
     },
     "partRenderer": {
       "updatedFileCount_one": "Faayilii {{displayCount}} haaromfame",

@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation, useMutationState } from '@tanstack/react-query';
 import { useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -11,7 +11,8 @@ import { extractRepoFromGitUrl } from './utils/git-utils';
 import { ChatSidebar } from './ChatSidebar';
 import { useSidebarSessions } from './hooks/useSidebarSessions';
 import { useActiveSessions } from './hooks/useActiveSessions';
-import { deleteSessionFromStoreAtom } from './store/db-session-atoms';
+import { dbSessionsAtom, deleteSessionFromStoreAtom } from './store/db-session-atoms';
+import { invalidateSessionQueries, removeDeletedSession } from './session-deletion';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
   AlertDialog,
@@ -59,7 +60,6 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
     initializeWithValue: false,
   });
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
-  const [deletingSessionId, setDeletingSessionId] = useState<string>();
   const [sessionPendingDeletion, setSessionPendingDeletion] = useState<string>();
   const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 30)).toISOString(), []);
 
@@ -108,64 +108,55 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
       .filter(r => r.displayName);
   }, [recentReposData?.repositories]);
   const queryClient = useQueryClient();
+  const setDbSessions = useSetAtom(dbSessionsAtom);
   const deleteSessionFromStore = useSetAtom(deleteSessionFromStoreAtom);
 
-  const { mutateAsync: deleteCliSessionV2 } = useMutation(
-    trpc.cliSessionsV2.delete.mutationOptions()
+  const { mutate: deleteCliSessionV2 } = useMutation(
+    trpc.cliSessionsV2.delete.mutationOptions({
+      onSuccess: async (_data, { session_id: sessionId }) => {
+        await removeDeletedSession({
+          sessionId,
+          queryClient,
+          trpc,
+          setDbSessions,
+          deleteSessionFromStore,
+        });
+        toast('Session deleted successfully');
+        await invalidateSessionQueries({ queryClient, trpc });
+      },
+      onError: error => {
+        console.error('Error calling session deletion API:', error);
+        toast.error('Failed to delete session. Please try again.');
+        void invalidateSessionQueries({ queryClient, trpc });
+      },
+    })
   );
+  const deletingSessionIds = useMutationState({
+    filters: { mutationKey: trpc.cliSessionsV2.delete.mutationKey(), status: 'pending' },
+    select: mutation =>
+      (mutation.state.variables as Parameters<typeof deleteCliSessionV2>[0]).session_id,
+  });
   const { mutateAsync: renameCliSessionV2 } = useMutation(
     trpc.cliSessionsV2.rename.mutationOptions()
   );
 
-  const handleDeleteSession = useCallback(
-    async (sessionId: string) => {
-      setDeletingSessionId(sessionId);
-      try {
-        await deleteCliSessionV2({ session_id: sessionId });
-      } catch (error) {
-        console.error('Error calling session deletion API:', error);
-        toast.error('Failed to delete session');
-        return false;
-      } finally {
-        setDeletingSessionId(undefined);
-      }
+  const handleConfirmDelete = useCallback(() => {
+    if (!sessionPendingDeletion || deletingSessionIds.includes(sessionPendingDeletion)) return;
 
-      try {
-        await deleteSessionFromStore(sessionId);
-      } catch (error) {
-        console.error('Error deleting session from IndexedDB:', error);
-      }
-
-      if (sessionId === currentSessionId) {
-        const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
-        router.push(basePath);
-      }
-
-      toast('Session deleted successfully');
-      void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
-      refetchSessions();
-      return true;
-    },
-    [
-      currentSessionId,
-      organizationId,
-      router,
-      deleteSessionFromStore,
-      deleteCliSessionV2,
-      queryClient,
-      trpc,
-      refetchSessions,
-    ]
-  );
-
-  const handleConfirmDelete = useCallback(async () => {
-    if (!sessionPendingDeletion) return;
-
-    const wasDeleted = await handleDeleteSession(sessionPendingDeletion);
-    if (wasDeleted) {
-      setSessionPendingDeletion(undefined);
+    setSessionPendingDeletion(undefined);
+    deleteCliSessionV2({ session_id: sessionPendingDeletion });
+    if (sessionPendingDeletion === currentSessionId) {
+      const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
+      router.replace(basePath);
     }
-  }, [handleDeleteSession, sessionPendingDeletion]);
+  }, [
+    sessionPendingDeletion,
+    deletingSessionIds,
+    deleteCliSessionV2,
+    currentSessionId,
+    organizationId,
+    router,
+  ]);
 
   const handleRenameSession = useCallback(
     async (sessionId: string, title: string) => {
@@ -194,10 +185,10 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
               currentSessionId={currentSessionId}
               organizationId={organizationId}
               onDeleteSession={setSessionPendingDeletion}
-              deletingSessionId={deletingSessionId}
               onRenameSession={handleRenameSession}
               isInSheet
               activeSessions={activeSessions}
+              deletingSessionIds={deletingSessionIds}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               platformFilter={platformFilter}
@@ -217,9 +208,9 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
             currentSessionId={currentSessionId}
             organizationId={organizationId}
             onDeleteSession={setSessionPendingDeletion}
-            deletingSessionId={deletingSessionId}
             onRenameSession={handleRenameSession}
             activeSessions={activeSessions}
+            deletingSessionIds={deletingSessionIds}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             platformFilter={platformFilter}
@@ -236,7 +227,7 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
       <AlertDialog
         open={sessionPendingDeletion !== undefined}
         onOpenChange={open => {
-          if (!open && !deletingSessionId) {
+          if (!open) {
             setSessionPendingDeletion(undefined);
           }
         }}
@@ -249,13 +240,9 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletingSessionId !== undefined}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              disabled={deletingSessionId !== undefined}
-              onClick={handleConfirmDelete}
-            >
-              {deletingSessionId ? 'Deleting...' : 'Delete session'}
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleConfirmDelete}>
+              Delete session
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

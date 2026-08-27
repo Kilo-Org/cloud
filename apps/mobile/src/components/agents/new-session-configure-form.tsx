@@ -1,5 +1,5 @@
 import { type ReactNode, type RefObject } from 'react';
-import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { InstanceSelector } from '@/components/agents/instance-selector';
@@ -10,6 +10,7 @@ import {
   type RepositoryGroup,
   type RepositoryPlatform,
 } from '@/components/agents/new-session-repository-state';
+import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { type ModeOption } from '@/components/agents/mode-normalize';
@@ -22,7 +23,6 @@ import {
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
@@ -61,6 +61,10 @@ type NewSessionConfigureFormProps = {
   isLoadingInstances: boolean;
   onChangeRunOnInstance: (next: InstancePickerInstance | null) => void;
   showInstanceDisconnectedNote: boolean;
+  /** Continue-form inline reason shown under "Run on" (e.g. an incapable CLI or a failed clone/import). */
+  runOnInlineNote?: string | null;
+  /** True for the Continue clone entry: hides Changes and Environment. */
+  isCloneEntry?: boolean;
   // Repository (Cloud Agent only).
   groups: RepositoryGroup[];
   isRetrying: boolean;
@@ -121,6 +125,8 @@ export function NewSessionConfigureForm({
   isLoadingInstances,
   onChangeRunOnInstance,
   showInstanceDisconnectedNote,
+  runOnInlineNote,
+  isCloneEntry = false,
   groups,
   isRetrying,
   onChangeRepo,
@@ -139,10 +145,12 @@ export function NewSessionConfigureForm({
   isStartDisabled,
   onStartSession,
 }: Readonly<NewSessionConfigureFormProps>) {
-  const colors = useThemeColors();
   const { t } = useTranslation();
   const isRemote = runOnInstance !== null;
   const isStarting = isRemote ? isSpawningRemote : isCreating;
+  const runOnNote =
+    runOnInlineNote ??
+    (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
   const targetLabel = isRemote ? `${runOnInstance.name} · ${runOnInstance.projectName}` : null;
   let runTargetBlock: ReactNode = null;
   if (showRunOnSelector) {
@@ -255,6 +263,7 @@ export function NewSessionConfigureForm({
         shareId={shareId}
         voiceInputSettlerRef={voiceInputSettlerRef}
         initialPrompt={initialPrompt}
+        isCloneEntry={isCloneEntry}
       />
 
       {runTargetBlock}
@@ -263,11 +272,7 @@ export function NewSessionConfigureForm({
         {t('agentChat.newSession.remoteHint')}
       </Text>
 
-      {showInstanceDisconnectedNote ? (
-        <Text className="mt-2 text-sm text-muted-foreground">
-          {remoteSpawnInstanceDisconnectedNote()}
-        </Text>
-      ) : null}
+      {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
 
       {!isRemote ? (
         <NewSessionRepositorySection
@@ -283,7 +288,7 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
-      {!isRemote ? (
+      {!isRemote && !isCloneEntry ? (
         <View className="mt-5">
           <Text className="mb-2 text-sm font-medium text-muted-foreground">
             {t('agentChat.newSession.changes')}
@@ -302,15 +307,15 @@ export function NewSessionConfigureForm({
         </View>
       ) : null}
 
-      {!isRemote ? renderProfileRow() : null}
+      {!isRemote && !isCloneEntry ? renderProfileRow() : null}
 
-      <Button size="lg" className="mt-6" disabled={isStartDisabled} onPress={onStartSession}>
-        {isStarting ? (
-          <ActivityIndicator size="small" color={colors.primaryForeground} />
-        ) : (
-          <Text>{t('agentChat.newSession.startSession')}</Text>
-        )}
-      </Button>
+      <NewSessionStartButton
+        isCloneEntry={isCloneEntry}
+        isRemote={isRemote}
+        isStartDisabled={isStartDisabled}
+        isStarting={isStarting}
+        onStartSession={onStartSession}
+      />
     </ScrollView>
   );
 }

@@ -151,8 +151,8 @@
     "appearanceLight": "Claro",
     "appearanceDark": "Escuro",
     "account": "Conta",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Engadir atribución da app ás revisións de PR",
+    "prReviewAttributionSubtitle": "Engade un pé de páxina \"Reviewed via Kilo\" cando envíes unha revisión."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request non dispoñible",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Activo agora",
     "search": {
       "searching": "Buscando",
       "searchSessions": "Buscar sesións",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Non se puideron cargar as sesións",
       "couldNotLoadActive": "Non se puido cargar as sesións activas",
-      "noSessionsYet": "Aínda non hai sesións",
       "noSessionsYetDescription": "Inicia unha tarefa de codificación desde o teu teléfono. As túas sesións aparecerán aquí.",
       "noMatches": "Ningunha sesión coincide",
       "tryDifferentSearch": "Probas un termo de busca diferente.",
       "tryAdjustFilters": "Probas axustar ou borrar os teus filtros.",
       "couldNotSearch": "Non se puido buscar nas sesións",
-      "allActive": "Todas as sesións están activas",
       "completedWillAppear": "As sesións completadas aparecerán aquí.",
       "noPastSessions": "Sen sesións pasadas",
       "live": "EN DIRECTO"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Desprazarse ata o final",
       "emptyTitle": "Aínda non hai mensaxes",
       "renameAccessibility": "Renomear sesión: {{title}}",
-      "connectRepository": "Conectar repositorio",
       "cloningSession": "Clonando sesión",
       "continue": "Continuar",
       "couldNotLoadThisSession": "Non se puido cargar esta sesión",
-      "cloneFailed": "Non se puido clonar esta sesión.",
       "cloneFailedRetry": "Non se puido clonar esta sesión. Téntao de novo.",
-      "connectRepositoryToContinue": "Conecta un repositorio para continuar.",
       "notEnoughCredits": "Créditos insuficientes para executar Cloud Agent. Engade créditos e téntao de novo.",
       "previousTaskFinishing": "A tarefa anterior aínda está a rematar. Agarda un momento.",
       "serviceUnavailable": "O servizo non está dispoñible agora mesmo. Téntao de novo.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Seguir editando",
       "discard": "Descartar",
       "discardFailed": "Non se puido descartar o borrador. Téntao de novo.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Executa `kilo remote` no teu computador, ou `/remote` nunha sesión CLI activa, para controlar un proceso kilo local.",
       "bitbucketConnected": "Bitbucket conectado",
       "connectBitbucket": "Conectar Bitbucket",
       "connectBitbucketDescription": "Conecta Bitbucket no teu navegador e despois volve aquí para escoller un repositorio.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Non hai repositorios visibles. Comproba o acceso aos repositorios de GitLab e refresca.",
       "openBitbucket": "Abrir Bitbucket",
       "openGitlab": "Abrir GitLab",
-      "recentlyUsed": "Usados recentemente"
+      "recentlyUsed": "Usados recentemente",
+      "continueFrom": "Continuando {{title}}",
+      "importingSession": "Importando a sesión",
+      "cliCannotContinue": "Este CLI non pode continuar unha sesión. Escolle Cloud Agent ou outro CLI.",
+      "importFailed": "Non se puido importar esta sesión."
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizouse {{displayCount}} ficheiro",

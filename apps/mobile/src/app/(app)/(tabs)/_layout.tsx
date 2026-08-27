@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
+import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -169,8 +170,10 @@ export default function TabsLayout() {
           ),
         }}
         listeners={{
-          tabPress: () => {
+          tabPress: event => {
             void Haptics.selectionAsync();
+            event.preventDefault();
+            router.navigate(PROFILE_TAB_ROOT);
           },
         }}
       />

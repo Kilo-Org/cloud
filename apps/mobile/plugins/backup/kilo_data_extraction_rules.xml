@@ -12,13 +12,11 @@
     <exclude domain="sharedpref" path="SecureStore"/>
     <exclude domain="sharedpref" path="appsflyer-data"/>
     <exclude domain="sharedpref" path="appsflyer-purchase-data"/>
-    <exclude domain="database" path="afpurchases.db"/>
   </cloud-backup>
   <device-transfer>
     <include domain="sharedpref" path="."/>
     <exclude domain="sharedpref" path="SecureStore"/>
     <exclude domain="sharedpref" path="appsflyer-data"/>
     <exclude domain="sharedpref" path="appsflyer-purchase-data"/>
-    <exclude domain="database" path="afpurchases.db"/>
   </device-transfer>
 </data-extraction-rules>

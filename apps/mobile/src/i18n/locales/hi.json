@@ -151,8 +151,8 @@
     "appearanceLight": "हल्का",
     "appearanceDark": "गहरा",
     "account": "खाता",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR समीक्षाओं में ऐप एट्रिब्यूशन जोड़ें",
+    "prReviewAttributionSubtitle": "समीक्षा सबमिट करने पर Reviewed via Kilo फ़ुटर जोड़ें।"
   },
   "notifications": {
     "title": "सूचनाएँ",
@@ -1579,7 +1579,6 @@
     }
   },
   "agents": {
-    "activeNow": "अभी सक्रिय",
     "search": {
       "clearFilters": "फ़िल्टर साफ़ करें",
       "clearSearch": "खोज साफ़ करें",
@@ -1588,14 +1587,12 @@
       "searching": "खोज रहा है"
     },
     "sessionList": {
-      "allActive": "सभी सत्र सक्रिय हैं",
       "completedWillAppear": "पूर्ण सत्र यहाँ दिखाई देंगे।",
       "couldNotLoad": "सत्र लोड नहीं हो सके",
       "couldNotLoadActive": "सक्रिय सत्र लोड नहीं हो सके",
       "couldNotSearch": "सत्र खोजे नहीं जा सके",
       "noMatches": "कोई सत्र मेल नहीं खाता",
       "noPastSessions": "कोई पिछले सत्र नहीं",
-      "noSessionsYet": "अभी कोई सत्र नहीं",
       "noSessionsYetDescription": "अपने फ़ोन से कोडिंग कार्य शुरू करें। आपके सत्र यहाँ दिखाई देंगे।",
       "tryAdjustFilters": "अपने फ़िल्टर समायोजित करने या साफ़ करने का प्रयास करें।",
       "tryDifferentSearch": "कोई दूसरा खोज शब्द आज़माएँ।",
@@ -1665,13 +1662,10 @@
       "transcriptAccessibility": "सत्र ट्रांसक्रिप्ट",
       "emptyTitle": "अभी कोई संदेश नहीं",
       "renameAccessibility": "सत्र का नाम बदलें: {{title}}",
-      "connectRepository": "रेपॉज़िटरी कनेक्ट करें",
       "cloningSession": "सत्र क्लोन किया जा रहा है",
       "continue": "जारी रखें",
       "couldNotLoadThisSession": "यह सत्र लोड नहीं हो सका",
-      "cloneFailed": "यह सत्र क्लोन नहीं हो सका।",
       "cloneFailedRetry": "यह सत्र क्लोन नहीं हो सका। फिर से कोशिश करें।",
-      "connectRepositoryToContinue": "जारी रखने के लिए एक रिपॉज़िटरी कनेक्ट करें।",
       "notEnoughCredits": "Cloud Agent चलाने के लिए पर्याप्त क्रेडिट नहीं हैं. क्रेडिट जोड़ें और फिर से प्रयास करें.",
       "previousTaskFinishing": "पिछला कार्य अभी भी पूरा हो रहा है. कृपया थोड़ा इंतज़ार करें.",
       "serviceUnavailable": "सेवा अभी उपलब्ध नहीं है. कृपया फिर से प्रयास करें.",
@@ -1730,7 +1724,7 @@
       "discardDraftTitle": "ड्राफ़्ट छोड़ें?",
       "discardFailed": "ड्राफ़्ट छोड़ा नहीं जा सका। कृपया फिर से कोशिश करें।",
       "keepEditing": "संपादन जारी रखें",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "अपने कंप्यूटर पर `kilo remote` चलाएं, या चल रहे CLI सत्र में `/remote` चलाएं, ताकि स्थानीय kilo प्रोसेस को नियंत्रित किया जा सके।",
       "bitbucketConnected": "Bitbucket कनेक्टेड",
       "connectBitbucket": "Bitbucket कनेक्ट करें",
       "connectBitbucketDescription": "अपने ब्राउज़र में Bitbucket कनेक्ट करें, फिर रिपॉज़िटरी चुनने के लिए यहाँ लौटें।",
@@ -1744,7 +1738,11 @@
       "noRepositoriesVisibleGitlab": "कोई रिपॉज़िटरी दिखाई नहीं दे रही। GitLab के लिए रिपॉज़िटरी एक्सेस जाँचें, फिर रिफ़्रेश करें।",
       "openBitbucket": "Bitbucket खोलें",
       "openGitlab": "GitLab खोलें",
-      "recentlyUsed": "हाल में उपयोग की गईं"
+      "recentlyUsed": "हाल में उपयोग की गईं",
+      "cliCannotContinue": "यह CLI सत्र जारी नहीं रख सकता। Cloud Agent या कोई अन्य CLI चुनें।",
+      "continueFrom": "{{title}} जारी रखा जा रहा है",
+      "importFailed": "यह सत्र आयात नहीं हो सका।",
+      "importingSession": "सत्र आयात किया जा रहा है"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फ़ाइल अपडेट की गई",

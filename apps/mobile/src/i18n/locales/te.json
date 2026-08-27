@@ -151,8 +151,8 @@
     "appearanceLight": "లైట్",
     "appearanceDark": "డార్క్",
     "account": "ఖాతా",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR సమీక్షలకు యాప్ ఆపాదనను జోడించండి",
+    "prReviewAttributionSubtitle": "మీరు సమీక్షను సమర్పించినప్పుడు Kilo ద్వారా సమీక్షించబడింది అనే ఫుటర్ను జోడించండి."
   },
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "ఇప్పుడు చురుకుగా ఉంది",
     "search": {
       "searching": "వెతుకుతోంది",
       "searchSessions": "సెషన్‌లను శోధించండి",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "సెషన్‌లను లోడ్ చేయలేకపోయింది",
       "couldNotLoadActive": "చురుకైన సెషన్‌లను లోడ్ చేయలేకపోయింది",
-      "noSessionsYet": "ఇంకా సెషన్‌లు లేవు",
       "noSessionsYetDescription": "మీ ఫోన్ నుండి కోడింగ్ టాస్క్ ప్రారంభించండి. మీ సెషన్‌లు ఇక్కడ కనిపిస్తాయి.",
       "noMatches": "ఏ సెషన్‌లు సరిపోలలేదు",
       "tryDifferentSearch": "వేరే శోధన పదాన్ని ప్రయత్నించండి.",
       "tryAdjustFilters": "మీ ఫిల్టర్‌లను సర్దుబాటు చేయండి లేదా క్లియర్ చేయండి.",
       "couldNotSearch": "సెషన్‌లను శోధించలేకపోయింది",
-      "allActive": "అన్ని సెషన్‌లు చురుకుగా ఉన్నాయి",
       "completedWillAppear": "పూర్తయిన సెషన్‌లు ఇక్కడ కనిపిస్తాయి.",
       "noPastSessions": "గత సెషన్‌లు లేవు",
       "live": "ప్రత్యక్ష"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "క్రిందికి స్క్రోల్ చేయండి",
       "emptyTitle": "ఇంకా సందేశాలు లేవు",
       "renameAccessibility": "సెషన్‌ను పేరు మార్చండి: {{title}}",
-      "connectRepository": "రిపోజిటరీని కనెక్ట్ చేయండి",
       "cloningSession": "సెషన్ క్లోన్ చేస్తోంది",
       "continue": "కొనసాగించండి",
       "couldNotLoadThisSession": "ఈ సెషన్‌ను లోడ్ చేయలేకపోయింది",
-      "cloneFailed": "ఈ సెషన్‌ను క్లోన్ చేయలేకపోయింది.",
       "cloneFailedRetry": "ఈ సెషన్‌ను క్లోన్ చేయలేకపోయింది. మళ్ళీ ప్రయత్నించండి.",
-      "connectRepositoryToContinue": "కొనసాగించడానికి రిపోజిటరీని కనెక్ట్ చేయండి.",
       "notEnoughCredits": "Cloud Agentను అమలు చేయడానికి తగినంత క్రెడిట్లు లేవు. క్రెడిట్లను జోడించి మళ్లీ ప్రయత్నించండి.",
       "previousTaskFinishing": "మునుపటి పని ఇంకా పూర్తవుతోంది. దయచేసి కాసేపు వేచి ఉండండి.",
       "serviceUnavailable": "సేవ ప్రస్తుతం అందుబాటులో లేదు. దయచేసి మళ్లీ ప్రయత్నించండి.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "సవరించడం కొనసాగించండి",
       "discard": "విస్మరించండి",
       "discardFailed": "డ్రాఫ్ట్‌ను విస్మరించలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "మీ కంప్యూటర్‌లో `kilo remote` అమలు చేయండి, లేదా నడుస్తున్న CLI సెషన్‌లో `/remote`, స్థానిక kilo ప్రాసెస్‌ను నియంత్రించడానికి.",
       "bitbucketConnected": "Bitbucket కనెక్ట్ అయింది",
       "connectBitbucket": "Bitbucketను కనెక్ట్ చేయండి",
       "connectBitbucketDescription": "మీ బ్రౌజర్‌లో బిట్‌బకెట్ కనెక్ట్ చేయండి, ఆపై రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడకు తిరిగి వెళ్ళండి.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "రిపోజిటరీలు కనిపించడం లేదు. గిట్‌ల్యాబ్ కోసం రిపోజిటరీ యాక్సెస్ తనిఖీ చేయండి, ఆపై రిఫ్రెష్ చేయండి.",
       "openBitbucket": "బిట్‌బకెట్ తెరవండి",
       "openGitlab": "గిట్‌ల్యాబ్ తెరవండి",
-      "recentlyUsed": "ఇటీవల ఉపయోగించినవి"
+      "recentlyUsed": "ఇటీవల ఉపయోగించినవి",
+      "continueFrom": "{{title}}ను కొనసాగిస్తోంది",
+      "importingSession": "సెషన్ను దిగుమతి చేస్తోంది",
+      "cliCannotContinue": "ఈ CLI సెషన్ను కొనసాగించదు. Cloud Agent లేదా మరొక CLIని ఎంచుకోండి.",
+      "importFailed": "ఈ సెషన్ను దిగుమతి చేయలేకపోయాం."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్ నవీకరించబడింది",

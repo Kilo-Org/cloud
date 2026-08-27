@@ -19,6 +19,7 @@ vi.mock('react-native-reanimated', () => ({
   withSequence: (...values: unknown[]) => values.at(-1),
   makeMutable: (v: unknown) => ({ value: v }),
   Easing: { out: (v: unknown) => v, in: (v: unknown) => v, quad: 0, cubic: 0 },
+  useFrameCallback: () => ({ setActive: () => undefined }),
   // Reduced motion keeps animation callbacks out of the test.
   useReducedMotion: () => true,
 }));
@@ -33,7 +34,7 @@ vi.mock('@sentry/react-native', () => ({ TimeToFullDisplay: () => null }));
 // String host so findByType works and props.onLoad stays callable.
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 // No Vitest project transforms .png.
-vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
+vi.mock('@/../assets/images/logo-mark.png', () => ({ default: 1 }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

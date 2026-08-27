@@ -58,13 +58,21 @@ function nextMessage(ws: WebSocket): Promise<string> {
   });
 }
 
-async function completeHello(ws: WebSocket, requestId: string): Promise<void> {
+async function completeHello(
+  ws: WebSocket,
+  requestId: string,
+  identity: { providerInstanceId?: string; wrapperInstanceId?: string } = {}
+): Promise<void> {
   ws.send(
     JSON.stringify({
       type: 'request',
       requestId,
       operation: 'sandbox.hello',
-      payload: { protocolVersion: 1, providerInstanceId: 'inst_1' },
+      payload: {
+        protocolVersion: 1,
+        providerInstanceId: identity.providerInstanceId ?? 'inst_1',
+        ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
+      },
     })
   );
   await expect(nextMessage(ws)).resolves.toBe(
@@ -88,6 +96,80 @@ async function completeHello(ws: WebSocket, requestId: string): Promise<void> {
       ok: true,
     })
   );
+}
+
+type TerminalRuntimeFixture = {
+  sandboxId: `usr-${string}`;
+  ownerId: string;
+  sessionId: `workspace_${string}`;
+  wrapperInstanceId?: string;
+};
+
+async function initializeTerminalRuntime(fixture: TerminalRuntimeFixture) {
+  const credential = generateSandboxCredential();
+  await seedCredential(credential, fixture.sandboxId);
+  const control = env.SANDBOX_CONTROL.getByName(fixture.sandboxId);
+  await runInDurableObject(control, async instance => {
+    await instance.initializeOwner(fixture.ownerId);
+    await instance.claimCreate(`intent_${fixture.sandboxId}`);
+    await instance.attachSession({
+      sessionId: fixture.sessionId,
+      kiloSessionId: 'kilo_terminal',
+      directory: '/workspace/terminal',
+      ownerId: fixture.ownerId,
+    });
+  });
+  const socket = await connect(credential, fixture.sandboxId);
+  await completeHello(socket, `hello_${fixture.sandboxId}`, {
+    providerInstanceId: fixture.sandboxId,
+    ...(fixture.wrapperInstanceId ? { wrapperInstanceId: fixture.wrapperInstanceId } : {}),
+  });
+  return { control, credential, socket };
+}
+
+function signalWrapperReady(socket: WebSocket): void {
+  socket.send(
+    JSON.stringify({
+      type: 'event',
+      event: 'sandbox.ready',
+      payload: { kiloReady: true, globalFeedAttached: true },
+    })
+  );
+}
+
+async function waitForWrapperReady(fixture: TerminalRuntimeFixture): Promise<void> {
+  const control = env.SANDBOX_CONTROL.getByName(fixture.sandboxId);
+  await vi.waitFor(async () => {
+    const status = await runInDurableObject(control, instance => instance.getStatus());
+    expect(status).toMatchObject({
+      connection: 'ready',
+      ...(fixture.wrapperInstanceId ? { wrapperInstanceId: fixture.wrapperInstanceId } : {}),
+    });
+  });
+}
+
+async function seedTerminalSession(fixture: TerminalRuntimeFixture, ptyId = 'pty_original') {
+  if (!fixture.wrapperInstanceId) throw new Error('Terminal fixture requires wrapper identity');
+  const session = env.SANDBOX_SESSION.getByName(`${fixture.ownerId}:${fixture.sessionId}`);
+  await runInDurableObject(session, async (instance, state) => {
+    await instance.registerSession({
+      identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+      auth: { kiloSessionId: 'kilo_terminal' },
+      agent: {},
+      workspace: { sandboxId: fixture.sandboxId },
+    });
+    const attachment = {
+      ownerId: fixture.ownerId,
+      sessionId: fixture.sessionId,
+      kiloSessionId: 'kilo_terminal',
+      directory: '/workspace/terminal',
+      sandboxId: fixture.sandboxId,
+      wrapperInstanceId: fixture.wrapperInstanceId,
+    };
+    state.storage.kv.put('terminal_attached_session', attachment);
+    state.storage.kv.put(`terminal:${ptyId}`, { ...attachment, ptyId, state: 'running' });
+  });
+  return session;
 }
 
 describe('SandboxControl in the Workers runtime', () => {
@@ -755,14 +837,25 @@ describe('SandboxSession control-plane regressions', () => {
         requestId: string;
         session: { sessionId: string; kiloSessionId: string; directory: string };
       };
-      if (request.operation !== 'session.abort') return;
-      abortRequests.push({ operation: request.operation, session: request.session });
+      if (request.operation === 'session.abort') {
+        abortRequests.push({ operation: request.operation, session: request.session });
+        ws.send(
+          JSON.stringify({
+            type: 'response',
+            requestId: request.requestId,
+            ok: true,
+            result: { status: 'aborted' },
+          })
+        );
+        return;
+      }
+      if (request.operation !== 'session.detach') return;
       ws.send(
         JSON.stringify({
           type: 'response',
           requestId: request.requestId,
           ok: true,
-          result: { status: 'aborted' },
+          result: { detached: true },
         })
       );
     });
@@ -923,4 +1016,336 @@ describe('SandboxSession control-plane regressions', () => {
       });
     }
   );
+});
+
+describe('SandboxControl terminal runtime coordination', () => {
+  it('exposes a wrapper instance only for the ready current connection', async () => {
+    const fixture: TerminalRuntimeFixture = {
+      sandboxId: 'usr-a001',
+      ownerId: 'owner_wrapper_readiness',
+      sessionId: 'workspace_wrapper_readiness',
+      wrapperInstanceId: 'b40b8d7b-789f-4c2a-82ce-0c5c9aed4621',
+    };
+    const { control, credential, socket } = await initializeTerminalRuntime(fixture);
+
+    await runInDurableObject(control, async instance => {
+      const status = await instance.getStatus();
+      expect(status).toMatchObject({ physical: 'running', connection: 'connected' });
+      expect(status).not.toHaveProperty('wrapperInstanceId');
+    });
+
+    signalWrapperReady(socket);
+    await waitForWrapperReady(fixture);
+    await runInDurableObject(control, async (_instance, state) => {
+      const persisted = await state.storage.get<{
+        connectionId: string;
+        readyConnectionId?: string;
+        wrapperInstanceId?: string;
+      }>('active_wrapper_runtime');
+      expect(persisted).toMatchObject({ wrapperInstanceId: fixture.wrapperInstanceId });
+      expect(persisted?.readyConnectionId).toBe(persisted?.connectionId);
+    });
+
+    const replacement = await connect(credential, fixture.sandboxId);
+    await completeHello(replacement, 'hello_same_wrapper', {
+      providerInstanceId: fixture.sandboxId,
+      wrapperInstanceId: fixture.wrapperInstanceId,
+    });
+    await runInDurableObject(control, async (instance, state) => {
+      const status = await instance.getStatus();
+      expect(status.connection).toBe('connected');
+      expect(status).not.toHaveProperty('wrapperInstanceId');
+      expect(
+        await state.storage.get<{ readyConnectionId?: string }>('active_wrapper_runtime')
+      ).not.toHaveProperty('readyConnectionId');
+      expect(await state.storage.get('wrapper_ready_at')).toBeUndefined();
+      expect(await state.storage.get('deadlines')).not.toHaveProperty('heartbeatExpiry');
+    });
+
+    signalWrapperReady(replacement);
+    await waitForWrapperReady(fixture);
+    replacement.close();
+  });
+
+  it('preserves ready chat for older wrappers without granting terminal capability', async () => {
+    const fixture: TerminalRuntimeFixture = {
+      sandboxId: 'usr-a002',
+      ownerId: 'owner_legacy_wrapper',
+      sessionId: 'workspace_legacy_wrapper',
+    };
+    const { control, socket } = await initializeTerminalRuntime(fixture);
+    signalWrapperReady(socket);
+    await waitForWrapperReady(fixture);
+
+    await runInDurableObject(control, async instance => {
+      const status = await instance.getStatus();
+      expect(status).toMatchObject({ physical: 'running', connection: 'ready' });
+      expect(status).not.toHaveProperty('wrapperInstanceId');
+      await expect(
+        instance.validateTerminalAccess({
+          sessionId: fixture.sessionId,
+          ownerId: fixture.ownerId,
+          wrapperInstanceId: '27cbf2d6-aeef-42d0-8992-1a61e83e95a5',
+        })
+      ).resolves.toEqual({ allowed: false, reason: 'terminal_not_supported' });
+    });
+    socket.close();
+  });
+
+  it('validates the current session route, owner, and wrapper incarnation', async () => {
+    const fixture: TerminalRuntimeFixture = {
+      sandboxId: 'usr-a003',
+      ownerId: 'owner_terminal_access',
+      sessionId: 'workspace_terminal_access',
+      wrapperInstanceId: '22c38b5a-5394-4a71-9c88-e3e998565fdb',
+    };
+    const { control, socket } = await initializeTerminalRuntime(fixture);
+    signalWrapperReady(socket);
+    await waitForWrapperReady(fixture);
+
+    await runInDurableObject(control, async instance => {
+      const input = {
+        sessionId: fixture.sessionId,
+        ownerId: fixture.ownerId,
+        wrapperInstanceId: fixture.wrapperInstanceId ?? '',
+      };
+      await expect(instance.validateTerminalAccess(input)).resolves.toEqual({ allowed: true });
+      await expect(
+        instance.validateTerminalAccess({ ...input, ownerId: 'owner_other' })
+      ).resolves.toEqual({ allowed: false, reason: 'owner_mismatch' });
+      await expect(
+        instance.validateTerminalAccess({ ...input, sessionId: 'workspace_other' })
+      ).resolves.toEqual({ allowed: false, reason: 'session_not_attached' });
+      await expect(
+        instance.validateTerminalAccess({
+          ...input,
+          wrapperInstanceId: 'd4e4d7ee-4456-4038-b64d-a564e96e054d',
+        })
+      ).resolves.toEqual({ allowed: false, reason: 'wrapper_instance_mismatch' });
+      await expect(instance.detachSession(fixture.sessionId)).resolves.toEqual({ existed: true });
+      await expect(instance.validateTerminalAccess(input)).resolves.toEqual({
+        allowed: false,
+        reason: 'session_not_attached',
+      });
+    });
+    socket.close();
+  });
+
+  it('never provisions or wakes a stopped runtime for terminal access or activity', async () => {
+    const control = env.SANDBOX_CONTROL.getByName('usr-a00a');
+    const input = {
+      sessionId: 'workspace_stopped_access',
+      ownerId: 'owner_stopped_access',
+      wrapperInstanceId: '594b4020-64a5-42d4-bcf0-7915af4a099d',
+    };
+
+    await runInDurableObject(control, async instance => {
+      await instance.initializeOwner(input.ownerId);
+      await instance.attachSession({
+        sessionId: input.sessionId,
+        kiloSessionId: 'kilo_terminal',
+        directory: '/workspace/terminal',
+        ownerId: input.ownerId,
+      });
+      await expect(instance.validateTerminalAccess(input)).resolves.toEqual({
+        allowed: false,
+        reason: 'runtime_not_running',
+      });
+      await expect(instance.recordTerminalActivity(input)).resolves.toEqual({
+        allowed: false,
+        reason: 'runtime_not_running',
+      });
+      await expect(instance.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'stopped',
+        providerRef: null,
+        createIntent: null,
+      });
+    });
+  });
+
+  it('preserves PTYs on same-wrapper reconnect and invalidates only replaced runtimes', async () => {
+    const fixture: TerminalRuntimeFixture = {
+      sandboxId: 'usr-a004',
+      ownerId: 'owner_runtime_replacement',
+      sessionId: 'workspace_runtime_replacement',
+      wrapperInstanceId: '2ece7e1a-6f7f-40b3-a4d8-307304eaaf93',
+    };
+    const { control, credential, socket } = await initializeTerminalRuntime(fixture);
+    const session = await seedTerminalSession(fixture);
+    signalWrapperReady(socket);
+    await waitForWrapperReady(fixture);
+
+    const sameWrapper = await connect(credential, fixture.sandboxId);
+    await completeHello(sameWrapper, 'hello_preserved_runtime', {
+      providerInstanceId: fixture.sandboxId,
+      wrapperInstanceId: fixture.wrapperInstanceId,
+    });
+    await runInDurableObject(session, (_instance, state) => {
+      expect(state.storage.kv.get<{ state: string }>('terminal:pty_original')).toMatchObject({
+        state: 'running',
+      });
+    });
+
+    const newWrapperInstanceId = '0acff5cd-f58d-49fa-8f70-3182940194f5';
+    const newWrapper = await connect(credential, fixture.sandboxId);
+    await completeHello(newWrapper, 'hello_replacement_runtime', {
+      providerInstanceId: fixture.sandboxId,
+      wrapperInstanceId: newWrapperInstanceId,
+    });
+    await runInDurableObject(session, (_instance, state) => {
+      expect(state.storage.kv.get<{ state: string }>('terminal:pty_original')).toMatchObject({
+        state: 'ended',
+      });
+      expect(state.storage.kv.get('terminal_attached_session')).toBeUndefined();
+    });
+    await runInDurableObject(control, async instance => {
+      expect(await instance.getStatus()).not.toHaveProperty('wrapperInstanceId');
+    });
+
+    const replacementFixture = { ...fixture, wrapperInstanceId: newWrapperInstanceId };
+    signalWrapperReady(newWrapper);
+    await waitForWrapperReady(replacementFixture);
+    await seedTerminalSession(replacementFixture, 'pty_current');
+    await runInDurableObject(session, async (instance, state) => {
+      await instance.invalidateTerminalRuntime({
+        sandboxId: fixture.sandboxId,
+        wrapperInstanceId: fixture.wrapperInstanceId ?? '',
+        confirmed: true,
+      });
+      expect(state.storage.kv.get<{ state: string }>('terminal:pty_current')).toMatchObject({
+        state: 'running',
+      });
+    });
+    newWrapper.close();
+  });
+
+  it('keeps PTY ownership on uncertain physical observations', async () => {
+    const fixture: TerminalRuntimeFixture = {
+      sandboxId: 'usr-a005',
+      ownerId: 'owner_uncertain_runtime',
+      sessionId: 'workspace_uncertain_runtime',
+      wrapperInstanceId: '6d1a1a6c-1153-4856-b07b-58b5b4f245aa',
+    };
+    const { control, socket } = await initializeTerminalRuntime(fixture);
+    const session = await seedTerminalSession(fixture);
+    signalWrapperReady(socket);
+    await waitForWrapperReady(fixture);
+
+    await runInDurableObject(control, async instance => {
+      await expect(instance.observeProvider('unknown')).resolves.toMatchObject({
+        state: 'unknown',
+      });
+      expect(await instance.getStatus()).not.toHaveProperty('wrapperInstanceId');
+    });
+    await runInDurableObject(session, (_instance, state) => {
+      expect(state.storage.kv.get<{ state: string }>('terminal:pty_original')).toMatchObject({
+        state: 'running',
+      });
+    });
+    socket.close();
+  });
+
+  it('invalidates active PTYs when the physical runtime fails', async () => {
+    const fixture: TerminalRuntimeFixture = {
+      sandboxId: 'usr-a008',
+      ownerId: 'owner_failed_runtime',
+      sessionId: 'workspace_failed_runtime',
+      wrapperInstanceId: '84114e6b-77c0-4792-88b9-2db90d789fe1',
+    };
+    const { control, socket } = await initializeTerminalRuntime(fixture);
+    const session = await seedTerminalSession(fixture);
+    signalWrapperReady(socket);
+    await waitForWrapperReady(fixture);
+
+    await runInDurableObject(control, async instance => {
+      await expect(instance.markFailed()).resolves.toMatchObject({ state: 'failed' });
+      expect(await instance.getStatus()).not.toHaveProperty('wrapperInstanceId');
+    });
+    await runInDurableObject(session, (_instance, state) => {
+      expect(state.storage.kv.get<{ state: string }>('terminal:pty_original')).toMatchObject({
+        state: 'ended',
+      });
+    });
+  });
+
+  it('invalidates active PTYs when a physical stop is confirmed', async () => {
+    const fixture: TerminalRuntimeFixture = {
+      sandboxId: 'usr-a009',
+      ownerId: 'owner_stopped_runtime',
+      sessionId: 'workspace_stopped_runtime',
+      wrapperInstanceId: '78de88a1-a906-4e4f-bd9e-2447c21e6472',
+    };
+    const { control, socket } = await initializeTerminalRuntime(fixture);
+    const session = await seedTerminalSession(fixture);
+    signalWrapperReady(socket);
+    await waitForWrapperReady(fixture);
+
+    await runInDurableObject(control, async instance => {
+      await instance.beginStop('test');
+      await expect(instance.confirmStopped()).resolves.toMatchObject({ state: 'stopped' });
+      expect(await instance.getStatus()).not.toHaveProperty('wrapperInstanceId');
+    });
+    await runInDurableObject(session, (_instance, state) => {
+      expect(state.storage.kv.get<{ state: string }>('terminal:pty_original')).toMatchObject({
+        state: 'ended',
+      });
+    });
+  });
+
+  it('invalidates active PTYs when wrapper credentials rotate', async () => {
+    const fixture: TerminalRuntimeFixture = {
+      sandboxId: 'usr-a006',
+      ownerId: 'owner_credential_rotation',
+      sessionId: 'workspace_credential_rotation',
+      wrapperInstanceId: 'bf73c60f-fd06-43f1-a93e-3412790a5ca4',
+    };
+    const { control, socket } = await initializeTerminalRuntime(fixture);
+    const session = await seedTerminalSession(fixture);
+    signalWrapperReady(socket);
+    await waitForWrapperReady(fixture);
+
+    await seedCredential(generateSandboxCredential(), fixture.sandboxId);
+    await runInDurableObject(session, (_instance, state) => {
+      expect(state.storage.kv.get<{ state: string }>('terminal:pty_original')).toMatchObject({
+        state: 'ended',
+      });
+    });
+    await runInDurableObject(control, async instance => {
+      expect(await instance.getStatus()).not.toHaveProperty('wrapperInstanceId');
+    });
+  });
+
+  it('extends idle deadlines monotonically for authorized Cloudflare terminal activity', async () => {
+    const fixture: TerminalRuntimeFixture = {
+      sandboxId: 'usr-a007',
+      ownerId: 'owner_terminal_activity',
+      sessionId: 'workspace_terminal_activity',
+      wrapperInstanceId: '5d1e54ed-31db-4646-a478-4864e87162c3',
+    };
+    const { control, socket } = await initializeTerminalRuntime(fixture);
+    signalWrapperReady(socket);
+    await waitForWrapperReady(fixture);
+
+    await runInDurableObject(control, async (instance, state) => {
+      const current = (await state.storage.get<{ idleStop?: number }>('deadlines')) ?? {};
+      const later = Date.now() + 10 * 60_000;
+      await state.storage.put('deadlines', { ...current, idleStop: later });
+      const activity = {
+        sessionId: fixture.sessionId,
+        ownerId: fixture.ownerId,
+        wrapperInstanceId: fixture.wrapperInstanceId ?? '',
+      };
+      await expect(
+        instance.recordTerminalActivity({
+          ...activity,
+          wrapperInstanceId: '513ea14b-e0b7-4bd8-b6d3-76a05c509c11',
+        })
+      ).resolves.toEqual({ allowed: false, reason: 'wrapper_instance_mismatch' });
+      expect((await state.storage.get<{ idleStop?: number }>('deadlines'))?.idleStop).toBe(later);
+      await expect(instance.recordTerminalActivity(activity)).resolves.toEqual({ allowed: true });
+      const after = await state.storage.get<{ idleStop?: number }>('deadlines');
+      expect(after?.idleStop).toBeGreaterThanOrEqual(later);
+    });
+    socket.close();
+  });
 });

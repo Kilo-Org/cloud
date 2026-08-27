@@ -151,8 +151,8 @@
     "appearanceLight": "E çelët",
     "appearanceDark": "E errët",
     "account": "Llogaria",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Shtoni atributin e aplikacionit në rishikimet PR",
+    "prReviewAttributionSubtitle": "Shtoni një fundshënim \"Reviewed via Kilo\" kur paraqisni një rishikim."
   },
   "prReview": {
     "pullRequestUnavailable": "Kërkesa e tërheqjes e padisponueshme",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiv tani",
     "search": {
       "searching": "Kërkim në vazhdim",
       "searchSessions": "Kërko seancat",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Nuk u ngarkuan seancat",
       "couldNotLoadActive": "Nuk u ngarkuan seancat aktive",
-      "noSessionsYet": "Ende pa seanca",
       "noSessionsYetDescription": "Filloni një detyrë kodimi nga telefoni juaj. Seancat tuaja do të shfaqen këtu.",
       "noMatches": "Asnjë seancë nuk përputhet",
       "tryDifferentSearch": "Provoni një term tjetër kërkimi.",
       "tryAdjustFilters": "Provoni t'i rregulloni ose pastroni filtrat tuaj.",
       "couldNotSearch": "Nuk u kërkuan seancat",
-      "allActive": "Të gjitha seancat janë aktive",
       "completedWillAppear": "Seancat e përfunduara do të shfaqen këtu.",
       "noPastSessions": "Asnjë seancë e kaluar",
       "live": "DREJTPËRDREJT"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Shko në fund",
       "emptyTitle": "Ende pa mesazhe",
       "renameAccessibility": "Riemërto seancën: {{title}}",
-      "connectRepository": "Lidh depon",
       "cloningSession": "Duke klonuar seancën",
       "continue": "Vazhdo",
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë",
-      "cloneFailed": "Nuk u klonua kjo seancë.",
       "cloneFailedRetry": "Nuk u klonua kjo seancë. Provoni përsëri.",
-      "connectRepositoryToContinue": "Lidhni një depo për të vazhduar.",
       "notEnoughCredits": "Kredi të pamjaftueshme për të ekzekutuar Cloud Agent. Shtoni kredi dhe provoni përsëri.",
       "previousTaskFinishing": "Detyra e mëparshme ende po përfundon. Ju lutemi prisni një moment.",
       "serviceUnavailable": "Shërbimi nuk është i disponueshëm tani. Ju lutemi provoni përsëri.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Vazhdo redaktimin",
       "discard": "Hidhe",
       "discardFailed": "Nuk u hoq drafti. Ju lutemi provoni përsëri.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Ekzekutoni `kilo remote` në kompjuterin tuaj, ose `/remote` në një sesion CLI që po ekzekutohet, për të kontrolluar një proces lokal kilo.",
       "bitbucketConnected": "Bitbucket i lidhur",
       "connectBitbucket": "Lidh Bitbucket",
       "connectBitbucketDescription": "Lidhu me Bitbucket në shfletuesin tënd, pastaj kthehu këtu për të zgjedhur një depo.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Nuk ka depo të dukshme. Kontrollo aksesin e depove për GitLab, pastaj rifresko.",
       "openBitbucket": "Hap Bitbucket",
       "openGitlab": "Hap GitLab",
-      "recentlyUsed": "Të përdorura së fundmi"
+      "recentlyUsed": "Të përdorura së fundmi",
+      "continueFrom": "Duke vazhduar {{title}}",
+      "importingSession": "Duke importuar seancë",
+      "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidhni Cloud Agent ose një CLI tjetër.",
+      "importFailed": "Nuk u arrit të importohej kjo seancë."
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar",

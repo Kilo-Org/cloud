@@ -10,6 +10,7 @@ import type { describePaymentMethods } from '@/lib/admin-utils-serverside';
 import { OrganizationSchema } from '@/lib/organizations/organization-types';
 import { type BalanceForUser } from '@/lib/user/balance';
 import type { PaginationMetadata } from '@/types/pagination';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
 
 export type PaymentMethodStatus = Awaited<ReturnType<typeof describePaymentMethods>>;
 
@@ -35,11 +36,15 @@ export type HasAutoTopUpConfig = {
 export type HasSSOProtectedDomain = {
   is_sso_protected_domain: boolean;
 };
+export type HasLoginMethods = {
+  login_methods: AuthProviderId[];
+};
 export type UserDetailProps = UserTableProps &
   HasCreditInfo &
   UserOrganizationMembershipProps &
   HasAutoTopUpConfig &
-  HasSSOProtectedDomain;
+  HasSSOProtectedDomain &
+  HasLoginMethods;
 export type UsersApiResponse = {
   users: UserTableProps[];
   pagination: PaginationMetadata;

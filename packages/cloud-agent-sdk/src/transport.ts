@@ -28,6 +28,11 @@ type CreateRemoteSessionInput = {
     variant?: string;
   };
   orgId?: string;
+  /**
+   * Kilo session id to clone from. Old clients omit it; producer must omit
+   * it when the instance lacks sessionClone.
+   */
+  cloneFromKiloSessionId?: string;
 };
 
 /**
@@ -136,8 +141,10 @@ type Transport = {
    * connectionId fences the request to the active CLI. Optional inheritance
    * fields ride `protocolVersion: 1`; on a delivered `invalid create_session
    * command` the transport retries once with bare `{protocolVersion: 1}`
-   * (old-CLI degradation). Other failures are hard rejects. The caller does
-   * NOT switch the active session as a side effect.
+   * (old-CLI degradation) only when no clone id is present. A clone id never
+   * bare-retries, because a bare retry would create a fresh session. Other
+   * failures are hard rejects. The caller does NOT switch the active session
+   * as a side effect.
    */
   createSession?: (input?: CreateRemoteSessionInput) => Promise<KiloSessionId>;
   exitSession?: () => Promise<void>;

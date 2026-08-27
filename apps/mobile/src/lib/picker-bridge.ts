@@ -84,7 +84,7 @@ export type InstancePickerInstance = {
   projectName: string;
   version?: string;
   /** Optional capability map carried through from the tRPC row. */
-  capabilities?: { attachments?: boolean };
+  capabilities?: { attachments?: boolean; sessionClone?: boolean };
 };
 
 export type InstancePickerBridge = {
@@ -92,6 +92,13 @@ export type InstancePickerBridge = {
   currentValue: InstancePickerInstance | null;
   onSelect: (instance: InstancePickerInstance | null) => void;
 };
+
+type LanguagePickerBridge = {
+  beforeReload?: () => Promise<void>;
+  onApplied?: () => void;
+};
+
+let languageBridge: LanguagePickerBridge | null = null;
 
 export function resolveModelPickerSelection(
   bridge: ModelPickerBridge,
@@ -125,4 +132,16 @@ export function commitModelPickerSelection(
 
   bridge.onSelect(selection);
   return true;
+}
+
+export function setLanguagePickerBridge(bridge: LanguagePickerBridge) {
+  languageBridge = bridge;
+}
+
+export function getLanguagePickerBridge() {
+  return languageBridge;
+}
+
+export function clearLanguagePickerBridge() {
+  languageBridge = null;
 }

@@ -80,8 +80,17 @@ describe('profile tab anchor', () => {
     new URL('../app/(app)/(tabs)/(3_profile)/_layout.tsx', import.meta.url)
   );
   const layoutSource = readFileSync(layoutPath, 'utf8');
+  const tabsLayoutPath = fileURLToPath(new URL('../app/(app)/(tabs)/_layout.tsx', import.meta.url));
+  const tabsLayoutSource = readFileSync(tabsLayoutPath, 'utf8');
 
   it("declares initialRouteName: 'index'", () => {
     expect(layoutSource).toMatch(/initialRouteName:\s*'index'/);
+  });
+
+  it('returns to the profile root when the profile tab is pressed', () => {
+    const profileTab = tabsLayoutSource.split('name="(3_profile)"')[1];
+
+    expect(profileTab).toContain('event.preventDefault()');
+    expect(profileTab).toContain('router.navigate(PROFILE_TAB_ROOT)');
   });
 });

@@ -151,8 +151,8 @@
     "appearanceLight": "Ljust",
     "appearanceDark": "Mörkt",
     "account": "Konto",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Lägg till appattribution i PR-granskningar",
+    "prReviewAttributionSubtitle": "Lägg till en Reviewed via Kilo-sidfot när du skickar en granskning."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request inte tillgänglig",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiv nu",
     "search": {
       "searching": "Söker",
       "searchSessions": "Sök sessioner",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Det gick inte att läsa in sessioner",
       "couldNotLoadActive": "Kunde inte läsa in aktiva sessioner",
-      "noSessionsYet": "Inga sessioner ännu",
       "noSessionsYetDescription": "Starta en kodningsuppgift från din telefon. Dina sessioner visas här.",
       "noMatches": "Inga sessioner matchar",
       "tryDifferentSearch": "Prova en annan sökterm.",
       "tryAdjustFilters": "Försök att justera eller rensa dina filter.",
       "couldNotSearch": "Kunde inte söka i sessioner",
-      "allActive": "Alla sessioner är aktiva",
       "completedWillAppear": "Slutförda sessioner visas här.",
       "noPastSessions": "Inga tidigare sessioner",
       "live": "LIVE"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Rulla till botten",
       "emptyTitle": "Inga meddelanden ännu",
       "renameAccessibility": "Byt namn på session: {{title}}",
-      "connectRepository": "Anslut arkiv",
       "cloningSession": "Klonar session",
       "continue": "Fortsätt",
       "couldNotLoadThisSession": "Kunde inte läsa in den här sessionen",
-      "cloneFailed": "Kunde inte klona den här sessionen.",
       "cloneFailedRetry": "Kunde inte klona den här sessionen. Försök igen.",
-      "connectRepositoryToContinue": "Anslut ett arkiv för att fortsätta.",
       "notEnoughCredits": "Inte tillräckligt med krediter för att köra Cloud Agent. Lägg till krediter och försök igen.",
       "previousTaskFinishing": "Den föregående uppgiften håller fortfarande på att avslutas. Vänta en stund.",
       "serviceUnavailable": "Tjänsten är inte tillgänglig just nu. Försök igen.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Fortsätt redigera",
       "discard": "Kassera",
       "discardFailed": "Kunde inte ignorera utkastet. Försök igen.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Kör `kilo remote` på din dator, eller `/remote` i en aktiv CLI-session, för att styra en lokal kilo-process.",
       "bitbucketConnected": "Bitbucket ansluten",
       "connectBitbucket": "Anslut Bitbucket",
       "connectBitbucketDescription": "Anslut Bitbucket i webbläsaren och kom sedan tillbaka för att välja ett arkiv.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Inga arkiv visas. Kontrollera arkivåtkomsten för GitLab och uppdatera sedan.",
       "openBitbucket": "Öppna Bitbucket",
       "openGitlab": "Öppna GitLab",
-      "recentlyUsed": "Nyligen använda"
+      "recentlyUsed": "Nyligen använda",
+      "cliCannotContinue": "Denna CLI kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI.",
+      "continueFrom": "Fortsätter {{title}}",
+      "importFailed": "Det gick inte att importera denna session.",
+      "importingSession": "Importerar session"
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppdaterade {{displayCount}} fil",

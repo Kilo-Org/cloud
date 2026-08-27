@@ -151,8 +151,8 @@
     "appearanceLight": "Nyepesi",
     "appearanceDark": "Nyeusi",
     "account": "Akaunti",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Ongeza sifa ya app kwenye ukaguzi wa PR",
+    "prReviewAttributionSubtitle": "Ongeza 'Reviewed via Kilo' kwenye sehemu ya chini unapowasilisha ukaguzi."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request haipatikani",
@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Inafanya kazi sasa",
     "search": {
       "searching": "Inatafuta",
       "searchSessions": "Tafuta vikao",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Haikuweza kupakia vikao",
       "couldNotLoadActive": "Haikuweza kupakia vikao vinavyofanya kazi",
-      "noSessionsYet": "Hakuna vikao bado",
       "noSessionsYetDescription": "Anza kazi ya kuandika msimbo kutoka kwenye simu yako. Vikao vyako vitaonekana hapa.",
       "noMatches": "Hakuna vikao vinavyolingana",
       "tryDifferentSearch": "Jaribu neno lingine la utafutaji.",
       "tryAdjustFilters": "Jaribu kurekebisha au kuondoa vichujio vyako.",
       "couldNotSearch": "Haikuweza kutafuta vikao",
-      "allActive": "Vikao vyote vinafanya kazi",
       "completedWillAppear": "Vikao vilivyokamilika vitaonekana hapa.",
       "noPastSessions": "Hakuna vikao vya zamani",
       "live": "LIVE"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Tembeza hadi chini",
       "emptyTitle": "Hakuna ujumbe bado",
       "renameAccessibility": "Badilisha jina la kikao: {{title}}",
-      "connectRepository": "Unganisha hazina",
       "cloningSession": "Inanakili kikao",
       "continue": "Endelea",
       "couldNotLoadThisSession": "Haikuweza kupakia kikao hiki",
-      "cloneFailed": "Haikuweza kunakili kikao hiki.",
       "cloneFailedRetry": "Haikuweza kunakili kikao hiki. Jaribu tena.",
-      "connectRepositoryToContinue": "Unganisha hazina kuendelea.",
       "notEnoughCredits": "Salio hazitoshi kuendesha Cloud Agent. Ongeza salio na ujaribu tena.",
       "previousTaskFinishing": "Kazi iliyotangulia bado inakamilika. Tafadhali subiri kidogo.",
       "serviceUnavailable": "Huduma haipatikani sasa hivi. Tafadhali jaribu tena.",
@@ -2184,7 +2178,7 @@
       "keepEditing": "Endelea kuhariri",
       "discard": "Tupa",
       "discardFailed": "Haikuweza kutupa rasimu. Jaribu tena.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Endesha `kilo remote` kwenye kompyuta yako, au `/remote` katika kikao cha CLI kinachoendesha, ili kudhibiti mchakato wa kilo wa ndani.",
       "bitbucketConnected": "Bitbucket imeunganishwa",
       "connectBitbucket": "Unganisha Bitbucket",
       "connectBitbucketDescription": "Unganisha Bitbucket kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Hakuna hazina zinazoonekana. Angalia ufikiaji wa hazina kwa GitLab, kisha onyesha upya.",
       "openBitbucket": "Fungua Bitbucket",
       "openGitlab": "Fungua GitLab",
-      "recentlyUsed": "Zilizotumika hivi karibuni"
+      "recentlyUsed": "Zilizotumika hivi karibuni",
+      "cliCannotContinue": "CLI hii haiwezi kuendelea na kikao. Chagua Cloud Agent au CLI nyingine.",
+      "continueFrom": "Endelea na {{title}}",
+      "importFailed": "Haikuweza kuingiza kikao hiki.",
+      "importingSession": "Inaingiza kikao"
     },
     "partRenderer": {
       "updatedFileCount_one": "Imesasisha faili {{displayCount}}",

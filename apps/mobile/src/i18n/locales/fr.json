@@ -1588,13 +1588,10 @@
       "scrollToBottom": "Défiler vers le bas",
       "emptyTitle": "Aucun message pour l'instant",
       "renameAccessibility": "Renommer la session : {{title}}",
-      "connectRepository": "Connecter le dépôt",
       "cloningSession": "Clonage de la session",
       "continue": "Continuer",
       "couldNotLoadThisSession": "Impossible de charger cette session",
-      "cloneFailed": "Impossible de cloner cette session.",
       "cloneFailedRetry": "Impossible de cloner cette session. Réessayez.",
-      "connectRepositoryToContinue": "Connectez un dépôt pour continuer.",
       "notEnoughCredits": "Crédits insuffisants pour exécuter Cloud Agent. Ajoutez des crédits et réessayez.",
       "previousTaskFinishing": "La tâche précédente est encore en cours. Veuillez patienter un instant.",
       "serviceUnavailable": "Le service est indisponible pour le moment. Veuillez réessayer.",
@@ -1653,7 +1650,7 @@
       "discardDraftTitle": "Abandonner le brouillon ?",
       "discardFailed": "Impossible d'abandonner le brouillon. Veuillez réessayer.",
       "keepEditing": "Continuer à modifier",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Exécutez `kilo remote` sur votre ordinateur, ou `/remote` dans une session CLI en cours d'exécution, pour contrôler un processus kilo local.",
       "bitbucketConnected": "Bitbucket connecté",
       "connectBitbucket": "Connecter Bitbucket",
       "connectBitbucketDescription": "Connectez Bitbucket dans votre navigateur, puis revenez ici pour choisir un dépôt.",
@@ -1667,7 +1664,11 @@
       "noRepositoriesVisibleGitlab": "Aucun dépôt visible. Vérifiez l'accès aux dépôts pour GitLab, puis actualisez.",
       "openBitbucket": "Ouvrir Bitbucket",
       "openGitlab": "Ouvrir GitLab",
-      "recentlyUsed": "Utilisés récemment"
+      "recentlyUsed": "Utilisés récemment",
+      "cliCannotContinue": "Cette CLI ne peut pas continuer une session. Choisissez Cloud Agent ou une autre CLI.",
+      "continueFrom": "Continuation de {{title}}",
+      "importFailed": "Impossible d'importer cette session.",
+      "importingSession": "Importation de la session"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fichier mis à jour",
@@ -2149,8 +2150,8 @@
     "appearanceLight": "Clair",
     "appearanceDark": "Sombre",
     "account": "Compte",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Ajouter l'attribution de l'application aux revues de PR",
+    "prReviewAttributionSubtitle": "Ajouter un pied de page « Revue via Kilo » lorsque vous soumettez une revue."
   },
   "addCredits": {
     "cta": "Ajouter des crédits",
@@ -2422,7 +2423,6 @@
     "installAttributionPromptTitle": "Autoriser l'attribution de l'installation ?"
   },
   "agents": {
-    "activeNow": "Actif maintenant",
     "search": {
       "searching": "Recherche",
       "searchSessions": "Rechercher des sessions",
@@ -2433,13 +2433,11 @@
     "sessionList": {
       "couldNotLoad": "Impossible de charger les sessions",
       "couldNotLoadActive": "Impossible de charger les sessions actives",
-      "noSessionsYet": "Aucune session pour le moment",
       "noSessionsYetDescription": "Démarrez une tâche de codage depuis votre téléphone. Vos sessions apparaîtront ici.",
       "noMatches": "Aucune session ne correspond",
       "tryDifferentSearch": "Essayez un autre terme de recherche.",
       "tryAdjustFilters": "Essayez d'ajuster ou d'effacer vos filtres.",
       "couldNotSearch": "Impossible de rechercher des sessions",
-      "allActive": "Toutes les sessions sont actives",
       "completedWillAppear": "Les sessions terminées apparaîtront ici.",
       "noPastSessions": "Aucune session passée",
       "live": "EN DIRECT"

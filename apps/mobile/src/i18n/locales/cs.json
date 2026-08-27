@@ -151,8 +151,8 @@
     "appearanceLight": "Světlý",
     "appearanceDark": "Tmavý",
     "account": "Účet",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Přidat atribuci aplikace k recenzím PR",
+    "prReviewAttributionSubtitle": "Při odeslání recenze přidejte zápatí „Reviewed via Kilo“."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request není dostupný",
@@ -2059,7 +2059,6 @@
     }
   },
   "agents": {
-    "activeNow": "Nyní aktivní",
     "search": {
       "searching": "Hledání",
       "searchSessions": "Hledat relace",
@@ -2070,13 +2069,11 @@
     "sessionList": {
       "couldNotLoad": "Relace se nepodařilo načíst",
       "couldNotLoadActive": "Aktivní relace se nepodařilo načíst",
-      "noSessionsYet": "Zatím žádné relace",
       "noSessionsYetDescription": "Spusťte programátorskou úlohu z telefonu. Vaše relace se zde zobrazí.",
       "noMatches": "Žádné relace neodpovídají",
       "tryDifferentSearch": "Zkuste jiný hledaný výraz.",
       "tryAdjustFilters": "Zkuste upravit nebo vymazat své filtry.",
       "couldNotSearch": "Relace se nepodařilo vyhledat",
-      "allActive": "Všechny relace jsou aktivní",
       "completedWillAppear": "Dokončené relace se zde zobrazí.",
       "noPastSessions": "Žádné minulé relace",
       "live": "ŽIVĚ"
@@ -2149,13 +2146,10 @@
       "scrollToBottom": "Posunout dolů",
       "emptyTitle": "Zatím žádné zprávy",
       "renameAccessibility": "Přejmenovat relaci: {{title}}",
-      "connectRepository": "Připojit repozitář",
       "cloningSession": "Klonování relace",
       "continue": "Pokračovat",
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst",
-      "cloneFailed": "Tuto relaci se nepodařilo klonovat.",
       "cloneFailedRetry": "Tuto relaci se nepodařilo klonovat. Zkuste to znovu.",
-      "connectRepositoryToContinue": "Pro pokračování připojte repozitář.",
       "notEnoughCredits": "Nemáte dost kreditů ke spuštění Cloud Agent. Přidejte kredity a zkuste to znovu.",
       "previousTaskFinishing": "Předchozí úloha stále běží. Počkejte prosím chvíli.",
       "serviceUnavailable": "Služba je právě nedostupná. Zkuste to prosím znovu.",
@@ -2214,7 +2208,7 @@
       "keepEditing": "Pokračovat v úpravách",
       "discard": "Zahodit",
       "discardFailed": "Koncept se nepodařilo zahodit. Zkuste to znovu.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Spusťte `kilo remote` na svém počítači nebo `/remote` v běžící relaci CLI pro ovládání místního procesu kilo.",
       "bitbucketConnected": "Bitbucket připojen",
       "connectBitbucket": "Připojit Bitbucket",
       "connectBitbucketDescription": "Připojte Bitbucket v prohlížeči a pak se sem vraťte pro výběr úložiště.",
@@ -2228,7 +2222,11 @@
       "noRepositoriesVisibleGitlab": "Nebyla viditelná žádná úložiště. Zkontrolujte přístup k úložištím pro GitLab a pak obnovte.",
       "openBitbucket": "Otevřít Bitbucket",
       "openGitlab": "Otevřít GitLab",
-      "recentlyUsed": "Nedávno použité"
+      "recentlyUsed": "Nedávno použité",
+      "cliCannotContinue": "Toto CLI nemůže pokračovat v relaci. Vyberte Cloud Agent nebo jiné CLI.",
+      "continueFrom": "Pokračování {{title}}",
+      "importFailed": "Tuto relaci se nepodařilo importovat.",
+      "importingSession": "Importování relace"
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizován {{displayCount}} soubor",

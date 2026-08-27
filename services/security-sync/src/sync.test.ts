@@ -135,7 +135,14 @@ function createGitTokenService() {
         orgId?: string;
         expectedIntegrationId?: string;
       }) => Promise<GitTokenForRepoResult>
-    >(async () => ({ success: false, reason: 'repository_not_installed' })),
+    >(async () => ({
+      success: true,
+      token: 'github-token',
+      platformIntegrationId: 'integration-1',
+      installationId: 'installation-1',
+      accountLogin: 'acme',
+      appType: 'standard',
+    })),
   };
 }
 
@@ -215,6 +222,25 @@ describe('Worker GitHub repository integration planning', () => {
       ],
     });
     const gitTokenService = createGitTokenService();
+    gitTokenService.getTokenForRepo.mockImplementation(async ({ githubRepo }) =>
+      githubRepo === 'other/api'
+        ? {
+            success: true,
+            token: 'lite-token',
+            platformIntegrationId: 'integration-lite',
+            installationId: 'installation-lite',
+            accountLogin: 'other',
+            appType: 'lite',
+          }
+        : {
+            success: true,
+            token: 'standard-token',
+            platformIntegrationId: 'integration-standard',
+            installationId: 'installation-standard',
+            accountLogin: 'acme',
+            appType: 'standard',
+          }
+    );
     const fetchStub = stubFetch(() => new Response(JSON.stringify([]), { status: 200 }));
 
     await expect(
@@ -226,13 +252,17 @@ describe('Worker GitHub repository integration planning', () => {
       })
     ).resolves.toMatchObject({ errors: 0, remainingRepoCount: 0 });
 
-    expect(gitTokenService.getToken).toHaveBeenNthCalledWith(
-      1,
-      'installation-standard',
-      'standard'
-    );
-    expect(gitTokenService.getToken).toHaveBeenNthCalledWith(2, 'installation-lite', 'lite');
-    expect(gitTokenService.getTokenForRepo).not.toHaveBeenCalled();
+    expect(gitTokenService.getTokenForRepo).toHaveBeenNthCalledWith(1, {
+      githubRepo: 'acme/widgets',
+      userId: 'user-1',
+      orgId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    });
+    expect(gitTokenService.getTokenForRepo).toHaveBeenNthCalledWith(2, {
+      githubRepo: 'other/api',
+      userId: 'user-1',
+      orgId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    });
+    expect(gitTokenService.getToken).not.toHaveBeenCalled();
     expect(fetchStub).toHaveBeenCalledTimes(2);
   });
 
@@ -254,6 +284,14 @@ describe('Worker GitHub repository integration planning', () => {
       ],
     });
     const gitTokenService = createGitTokenService();
+    gitTokenService.getTokenForRepo.mockResolvedValue({
+      success: true,
+      token: 'lite-token',
+      platformIntegrationId: exactIntegrationId,
+      installationId: 'installation-lite',
+      accountLogin: 'acme',
+      appType: 'lite',
+    });
     stubFetch(new Response(JSON.stringify([]), { status: 200 }));
 
     await syncOwner({
@@ -273,8 +311,13 @@ describe('Worker GitHub repository integration planning', () => {
       ],
     });
 
-    expect(gitTokenService.getToken).toHaveBeenCalledWith('installation-lite', 'lite');
-    expect(gitTokenService.getTokenForRepo).not.toHaveBeenCalled();
+    expect(gitTokenService.getTokenForRepo).toHaveBeenCalledWith({
+      githubRepo: 'acme/widgets',
+      userId: 'user-1',
+      orgId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      expectedIntegrationId: exactIntegrationId,
+    });
+    expect(gitTokenService.getToken).not.toHaveBeenCalled();
   });
 
   it('uses authoritative Git Token Service resolution for an unpinned legacy repository', async () => {
@@ -332,6 +375,25 @@ describe('Worker GitHub repository integration planning', () => {
       ],
     });
     const gitTokenService = createGitTokenService();
+    gitTokenService.getTokenForRepo.mockImplementation(async ({ githubRepo }) =>
+      githubRepo === 'other/api'
+        ? {
+            success: true,
+            token: 'healthy-token',
+            platformIntegrationId: 'integration-healthy',
+            installationId: 'installation-healthy',
+            accountLogin: 'other',
+            appType: 'lite',
+          }
+        : {
+            success: true,
+            token: 'invalid-token',
+            platformIntegrationId: 'integration-invalid',
+            installationId: 'installation-invalid',
+            accountLogin: 'acme',
+            appType: 'standard',
+          }
+    );
     const fetchStub = vi
       .fn()
       .mockResolvedValueOnce(new Response('Bad credentials', { status: 401 }))
@@ -352,8 +414,107 @@ describe('Worker GitHub repository integration planning', () => {
     });
 
     expect(fetchStub).toHaveBeenCalledTimes(2);
-    expect(gitTokenService.getToken).toHaveBeenNthCalledWith(1, 'installation-invalid', 'standard');
-    expect(gitTokenService.getToken).toHaveBeenNthCalledWith(2, 'installation-healthy', 'lite');
+    expect(gitTokenService.getToken).not.toHaveBeenCalled();
+    expect(gitTokenService.getTokenForRepo).toHaveBeenCalledTimes(3);
+  });
+
+  it('uses persisted composite selections as expected integration constraints', async () => {
+    const firstIntegrationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const secondIntegrationId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const { db } = createFakeDb({
+      config: {
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [1],
+        selected_repositories: [
+          { repositoryId: 1, platformIntegrationId: firstIntegrationId },
+          { repositoryId: 1, platformIntegrationId: secondIntegrationId },
+        ],
+      },
+      integrations: [
+        {
+          id: firstIntegrationId,
+          installationId: 'installation-standard',
+          repositories: [{ id: 1, fullName: 'acme/widgets' }],
+        },
+        {
+          id: secondIntegrationId,
+          installationId: 'installation-lite',
+          appType: 'lite',
+          repositories: [{ id: 1, fullName: 'acme/widgets' }],
+        },
+      ],
+    });
+    const gitTokenService = createGitTokenService();
+    gitTokenService.getTokenForRepo.mockImplementation(async ({ expectedIntegrationId }) => ({
+      success: true,
+      token: expectedIntegrationId === firstIntegrationId ? 'standard-token' : 'lite-token',
+      platformIntegrationId: expectedIntegrationId ?? firstIntegrationId,
+      installationId:
+        expectedIntegrationId === firstIntegrationId
+          ? 'installation-standard'
+          : 'installation-lite',
+      accountLogin: 'acme',
+      appType: expectedIntegrationId === firstIntegrationId ? 'standard' : 'lite',
+    }));
+    const fetchStub = stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+
+    await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { organizationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' },
+      runId: 'run-composite-selection',
+    });
+
+    expect(gitTokenService.getTokenForRepo).toHaveBeenNthCalledWith(1, {
+      githubRepo: 'acme/widgets',
+      userId: 'user-1',
+      orgId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      expectedIntegrationId: firstIntegrationId,
+    });
+    expect(gitTokenService.getTokenForRepo).toHaveBeenNthCalledWith(2, {
+      githubRepo: 'acme/widgets',
+      userId: 'user-1',
+      orgId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      expectedIntegrationId: secondIntegrationId,
+    });
+    expect(fetchStub).toHaveBeenNthCalledWith(
+      1,
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer standard-token' }),
+      })
+    );
+    expect(fetchStub).toHaveBeenNthCalledWith(
+      2,
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer lite-token' }),
+      })
+    );
+  });
+
+  it('does not prune a repository when authoritative lookup cannot find an installation', async () => {
+    const { db, sets } = createFakeDb({
+      config: { repository_selection_mode: 'selected', selected_repository_ids: [1] },
+    });
+    const gitTokenService = createGitTokenService();
+    gitTokenService.getTokenForRepo.mockResolvedValue({
+      success: false,
+      reason: 'no_installation_found',
+    });
+    stubFetch(new Response('unexpected'));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-lookup-failure',
+      })
+    ).resolves.toMatchObject({ staleRepos: [], commandResultCode: 'REPOSITORY_UNAVAILABLE' });
+    expect(sets).not.toContainEqual(
+      expect.objectContaining({ config: expect.objectContaining({ selected_repository_ids: [] }) })
+    );
   });
 
   it('does not prune a selected repository that exists only on a suspended sibling', async () => {
@@ -378,6 +539,14 @@ describe('Worker GitHub repository integration planning', () => {
       ],
     });
     const gitTokenService = createGitTokenService();
+    gitTokenService.getTokenForRepo.mockResolvedValue({
+      success: true,
+      token: 'healthy-token',
+      platformIntegrationId: 'integration-healthy',
+      installationId: 'installation-healthy',
+      accountLogin: 'other',
+      appType: 'standard',
+    });
     stubFetch(new Response(JSON.stringify([]), { status: 200 }));
 
     await syncOwner({
@@ -387,8 +556,8 @@ describe('Worker GitHub repository integration planning', () => {
       runId: 'run-suspended-sibling',
     });
 
-    expect(gitTokenService.getToken).toHaveBeenCalledOnce();
-    expect(gitTokenService.getToken).toHaveBeenCalledWith('installation-healthy', 'standard');
+    expect(gitTokenService.getToken).not.toHaveBeenCalled();
+    expect(gitTokenService.getTokenForRepo).toHaveBeenCalledOnce();
     expect(sets).not.toContainEqual(
       expect.objectContaining({
         config: expect.objectContaining({ selected_repository_ids: [2] }),
@@ -412,6 +581,15 @@ describe('Worker GitHub repository integration planning', () => {
       ],
     });
     const gitTokenService = createGitTokenService();
+    gitTokenService.getTokenForRepo.mockImplementation(async ({ githubRepo }) => ({
+      success: true,
+      token: 'github-token',
+      platformIntegrationId:
+        githubRepo === 'other/api' ? 'integration-healthy' : 'integration-invalid',
+      installationId: githubRepo === 'other/api' ? 'installation-healthy' : 'installation-invalid',
+      accountLogin: githubRepo === 'other/api' ? 'other' : 'acme',
+      appType: 'standard',
+    }));
     const fetchStub = stubFetch(new Response('Bad credentials', { status: 401 }));
 
     await expect(
@@ -481,7 +659,8 @@ describe('Worker GitHub auth-invalid sync', () => {
     });
 
     expect(fetchStub).toHaveBeenCalledTimes(1);
-    expect(gitTokenService.getToken).toHaveBeenCalledTimes(1);
+    expect(gitTokenService.getToken).not.toHaveBeenCalled();
+    expect(gitTokenService.getTokenForRepo).toHaveBeenCalledTimes(2);
     expect(sets).toContainEqual(
       expect.objectContaining({ auth_invalid_reason: 'github_dependabot_401' })
     );

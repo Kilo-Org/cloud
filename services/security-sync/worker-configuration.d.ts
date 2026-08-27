@@ -24,8 +24,36 @@ declare type Queue<T> = {
 };
 
 declare type GitTokenService = {
+  getTokenForRepo?(params: {
+    githubRepo: string;
+    userId: string;
+    orgId?: string;
+    expectedIntegrationId?: string;
+  }): Promise<GitTokenForRepoResult>;
   getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
 };
+
+declare type GitTokenForRepoResult =
+  | {
+      success: true;
+      token: string;
+      platformIntegrationId: string;
+      installationId: string;
+      accountLogin: string;
+      appType: 'standard' | 'lite';
+    }
+  | {
+      success: false;
+      reason:
+        | 'database_not_configured'
+        | 'invalid_repo_format'
+        | 'no_installation_found'
+        | 'repository_not_installed'
+        | 'ambiguous_installation'
+        | 'temporarily_unavailable'
+        | 'invalid_org_id'
+        | 'integration_mismatch';
+    };
 
 declare type SecretBinding = {
   get(): Promise<string>;

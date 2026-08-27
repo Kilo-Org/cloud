@@ -1,6 +1,7 @@
 import { type FilePart } from '@kilocode/cloud-agent-sdk';
 import { useEffect } from 'react';
 
+import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { trpcClient } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -9,6 +10,7 @@ import {
   clearFilePartResolveFailed,
   type FilePartCacheEntry,
   getFilePartCacheEntry,
+  getFilePartCacheGeneration,
   isUsableFilePartUrl,
   listFilePartCacheEntries,
   markFilePartRenewing,
@@ -25,7 +27,7 @@ const RENEW_INTERVAL_MS = 30_000;
 
 /** Part IDs with an on-demand presign in flight. Dedupes a StrictMode
  *  double-mount, a leave/reopen during the mutate, and the renewal sweep. */
-const inFlight = new Set<string>();
+const inFlight = new Map<string, () => boolean>();
 
 // One module-level sweeper serves every mounted subscriber across the app.
 let renewSubscribers = 0;
@@ -46,19 +48,51 @@ export type ResolvedFilePartUrl = {
 /** Presign one attachment and store the signed URL with its expiry. */
 async function presignAttachment(
   partId: string,
-  ref: CloudAgentAttachmentRef,
-  entry: Readonly<{ mime: string; filename?: string }>
-): Promise<void> {
-  const result = await trpcClient.cloudAgentNext.getAttachmentDownloadUrl.mutate({
-    messageUuid: ref.messageUuid,
-    filename: ref.filename,
-  });
-  overwriteFilePartCacheEntry(partId, {
-    url: result.signedUrl,
-    mime: entry.mime,
-    ...(entry.filename ? { filename: entry.filename } : {}),
-    urlExpiresAt: parseTimestamp(result.expiresAt).getTime(),
-  });
+  entry: Readonly<FilePartCacheEntry & { attachmentRef: CloudAgentAttachmentRef }>,
+  renewing = false
+): Promise<boolean> {
+  if (inFlight.get(partId)?.()) {
+    return false;
+  }
+  const generation = getFilePartCacheGeneration();
+  const epoch = currentAuthEpoch();
+  const isCurrent = (): boolean =>
+    generation === getFilePartCacheGeneration() &&
+    isCurrentAuthEpoch(epoch) &&
+    inFlight.get(partId) === isCurrent;
+  inFlight.set(partId, isCurrent);
+  if (renewing) {
+    markFilePartRenewing(partId);
+  }
+  try {
+    const result = await trpcClient.cloudAgentNext.getAttachmentDownloadUrl.mutate({
+      messageUuid: entry.attachmentRef.messageUuid,
+      filename: entry.attachmentRef.filename,
+    });
+    if (!isCurrent()) {
+      return false;
+    }
+    overwriteFilePartCacheEntry(partId, {
+      url: result.signedUrl,
+      mime: entry.mime,
+      ...(entry.filename ? { filename: entry.filename } : {}),
+      urlExpiresAt: parseTimestamp(result.expiresAt).getTime(),
+    });
+    return true;
+  } catch {
+    if (isCurrent()) {
+      if (renewing) {
+        clearFilePartRenewing(partId);
+      } else {
+        markFilePartResolveFailed(partId);
+      }
+    }
+    return false;
+  } finally {
+    if (inFlight.get(partId) === isCurrent) {
+      inFlight.delete(partId);
+    }
+  }
 }
 
 /** True when a presigned entry needs a renew now: a ref and URL exist and the
@@ -71,32 +105,12 @@ function isRenewDue(entry: FilePartCacheEntry, now: number): boolean {
   );
 }
 
-/** Re-presign a cached attachment ref, keeping the last-good URL visible. */
-async function renewAttachment(
-  partId: string,
-  ref: CloudAgentAttachmentRef,
-  entry: Readonly<{ mime: string; filename?: string }>
-): Promise<void> {
-  if (inFlight.has(partId)) {
-    return;
-  }
-  inFlight.add(partId);
-  markFilePartRenewing(partId);
-  try {
-    await presignAttachment(partId, ref, entry);
-  } catch {
-    clearFilePartRenewing(partId);
-  } finally {
-    inFlight.delete(partId);
-  }
-}
-
 function renewDueEntries(): void {
   const now = Date.now();
   for (const { partId, entry } of listFilePartCacheEntries()) {
     const ref = entry.attachmentRef;
-    if (ref !== undefined && !inFlight.has(partId) && isRenewDue(entry, now)) {
-      void renewAttachment(partId, ref, entry);
+    if (ref !== undefined && isRenewDue(entry, now)) {
+      void presignAttachment(partId, { ...entry, attachmentRef: ref }, true);
     }
   }
 }
@@ -154,23 +168,14 @@ export function useResolvedFilePartUrl(part: FilePart): ResolvedFilePartUrl {
       return;
     }
     const attachmentRef = entry?.attachmentRef ?? parseCloudAgentAttachmentUrl(part.url);
-    if (!attachmentRef || inFlight.has(part.id)) {
+    if (!attachmentRef) {
       return;
     }
-    // First presign: no URL yet, so nothing to keep on failure.
-    inFlight.add(part.id);
-    void (async () => {
-      try {
-        await presignAttachment(part.id, attachmentRef, {
-          mime: part.mime,
-          filename: part.filename,
-        });
-      } catch {
-        markFilePartResolveFailed(part.id);
-      } finally {
-        inFlight.delete(part.id);
-      }
-    })();
+    void presignAttachment(part.id, {
+      attachmentRef,
+      mime: part.mime,
+      filename: part.filename,
+    });
   }, [part.id, part.url, part.mime, part.filename, cached]);
 
   // Renew-on-read: kick a due re-presign when this subscriber first mounts.
@@ -180,13 +185,13 @@ export function useResolvedFilePartUrl(part: FilePart): ResolvedFilePartUrl {
   useEffect(() => {
     const entry = getFilePartCacheEntry(part.id);
     const attachmentRef = entry?.attachmentRef;
-    if (!entry || !attachmentRef || entry.url === undefined || inFlight.has(part.id)) {
+    if (!entry || !attachmentRef || entry.url === undefined) {
       return;
     }
     if (!isRenewDue(entry, Date.now())) {
       return;
     }
-    void renewAttachment(part.id, attachmentRef, entry);
+    void presignAttachment(part.id, { ...entry, attachmentRef }, true);
   }, [part.id]);
 
   if (url !== undefined) {
@@ -222,23 +227,10 @@ export async function refreshFilePartUrl(partId: string): Promise<boolean> {
   if (!entry || !ref) {
     return false;
   }
-  if (inFlight.has(partId)) {
-    return false;
-  }
-  markFilePartRenewing(partId);
-  inFlight.add(partId);
-  try {
-    await presignAttachment(partId, ref, entry);
-    return true;
-  } catch {
-    clearFilePartRenewing(partId);
-    return false;
-  } finally {
-    inFlight.delete(partId);
-  }
+  const refreshed = await presignAttachment(partId, { ...entry, attachmentRef: ref }, true);
+  return refreshed;
 }
 
-/** Test-only: clear the in-flight set, sweeper, and subscriber count. */
 export function __resetFilePartUrlResolverForTests(): void {
   inFlight.clear();
   renewSubscribers = 0;

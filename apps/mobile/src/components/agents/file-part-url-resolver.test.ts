@@ -26,9 +26,12 @@ vi.mock('@/lib/share-remote-file', () => ({
   getSafeCacheFilename: ({ id, filename }: { id: string; filename: string }) => `${id}-${filename}`,
 }));
 
+import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+
 import {
   __resetFilePartCacheForTests,
   cacheFilePart,
+  clearFilePartCache,
   getFilePartCacheEntry,
   overwriteFilePartCacheEntry,
 } from './file-part-cache';
@@ -114,6 +117,45 @@ function advance(ms: number): void {
   act(() => {
     vi.advanceTimersByTime(ms);
   });
+}
+
+type PresignPath = 'initial' | 'renew-on-read' | 'sweep' | 'refresh';
+type PresignResult = { signedUrl: string; key: string; expiresAt: string };
+
+async function startPendingPresign(path: PresignPath) {
+  const uuid = '11111111-1111-4111-8111-111111111111';
+  const part = makeFilePart('part-1', uuid, 'a.png');
+  cacheFilePart(part.id, part);
+  if (path !== 'initial') {
+    cacheRenewableEntry(
+      part.id,
+      { uuid, filename: 'a.png' },
+      { urlExpiresAt: Date.now() + (path === 'sweep' ? 130_000 : -1000) }
+    );
+  }
+  if (path === 'refresh') {
+    return { refresh: refreshFilePartUrl(part.id) };
+  }
+  const renderer = await mountProbe(part);
+  if (path === 'sweep') {
+    advance(30_000);
+  }
+  act(() => {
+    renderer.unmount();
+  });
+  return { refresh: undefined };
+}
+
+function settlePresign(
+  request: PromiseWithResolvers<PresignResult>,
+  outcome: 'success' | 'failure',
+  signedUrl: string
+): void {
+  if (outcome === 'failure') {
+    request.reject(new Error('presign failed'));
+    return;
+  }
+  request.resolve({ signedUrl, key: 'k', expiresAt: '2099-01-01T00:00:00Z' });
 }
 
 beforeEach(() => {
@@ -376,4 +418,138 @@ describe('refreshFilePartUrl', () => {
     expect(getFilePartCacheEntry('part-1')).not.toHaveProperty('renewing');
     expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(1);
   });
+});
+
+describe.each(['initial', 'renew-on-read', 'sweep', 'refresh'] as const)(
+  '%s presign across a cache clear',
+  path => {
+    it.each(['success', 'failure'] as const)(
+      'discards stale %s and allows a subsequent request for the same file',
+      async outcome => {
+        const stale = Promise.withResolvers<PresignResult>();
+        getAttachmentDownloadUrlMutate.mockReturnValueOnce(stale.promise);
+        const previous = await startPendingPresign(path);
+        expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(1);
+
+        clearFilePartCache();
+        settlePresign(stale, outcome, 'https://r2.example/stale');
+        await flushMicrotasks();
+
+        expect(getFilePartCacheEntry('part-1')).toBeUndefined();
+        if (previous.refresh) {
+          await expect(previous.refresh).resolves.toBe(false);
+        }
+        const next = await startPendingPresign(path);
+        await flushMicrotasks();
+
+        expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(2);
+        expect(getFilePartCacheEntry('part-1')?.url).toBe('https://r2.example/signed');
+        expect(getFilePartCacheEntry('part-1')).not.toHaveProperty('resolveFailed');
+        expect(getFilePartCacheEntry('part-1')).not.toHaveProperty('renewing');
+        if (next.refresh) {
+          await expect(next.refresh).resolves.toBe(true);
+        }
+      }
+    );
+
+    it.each(['success', 'failure'] as const)(
+      'keeps a newer request pending when stale %s settles',
+      async outcome => {
+        const stale = Promise.withResolvers<PresignResult>();
+        const fresh = Promise.withResolvers<PresignResult>();
+        getAttachmentDownloadUrlMutate
+          .mockReturnValueOnce(stale.promise)
+          .mockReturnValueOnce(fresh.promise);
+        const previous = await startPendingPresign(path);
+
+        clearFilePartCache();
+        const next = await startPendingPresign(path);
+        expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(2);
+        const pendingEntry = getFilePartCacheEntry('part-1');
+
+        settlePresign(stale, outcome, 'https://r2.example/stale');
+        await flushMicrotasks();
+
+        expect(getFilePartCacheEntry('part-1')).toBe(pendingEntry);
+        if (previous.refresh) {
+          await expect(previous.refresh).resolves.toBe(false);
+        }
+        await expect(refreshFilePartUrl('part-1')).resolves.toBe(false);
+        expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(2);
+
+        settlePresign(fresh, 'success', 'https://r2.example/fresh');
+        await flushMicrotasks();
+
+        expect(getFilePartCacheEntry('part-1')?.url).toBe('https://r2.example/fresh');
+        expect(getFilePartCacheEntry('part-1')).not.toHaveProperty('resolveFailed');
+        expect(getFilePartCacheEntry('part-1')).not.toHaveProperty('renewing');
+        if (next.refresh) {
+          await expect(next.refresh).resolves.toBe(true);
+        }
+      }
+    );
+
+    it.each(['success', 'failure'] as const)(
+      'preserves a newer result when stale %s settles last',
+      async outcome => {
+        const stale = Promise.withResolvers<PresignResult>();
+        const fresh = Promise.withResolvers<PresignResult>();
+        getAttachmentDownloadUrlMutate
+          .mockReturnValueOnce(stale.promise)
+          .mockReturnValueOnce(fresh.promise);
+        const previous = await startPendingPresign(path);
+
+        clearFilePartCache();
+        const next = await startPendingPresign(path);
+        expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(2);
+        settlePresign(fresh, 'success', 'https://r2.example/fresh');
+        await flushMicrotasks();
+        const currentEntry = getFilePartCacheEntry('part-1');
+        expect(currentEntry?.url).toBe('https://r2.example/fresh');
+
+        settlePresign(stale, outcome, 'https://r2.example/stale');
+        await flushMicrotasks();
+
+        expect(getFilePartCacheEntry('part-1')).toBe(currentEntry);
+        if (previous.refresh) {
+          await expect(previous.refresh).resolves.toBe(false);
+        }
+        if (next.refresh) {
+          await expect(next.refresh).resolves.toBe(true);
+        }
+        await expect(refreshFilePartUrl('part-1')).resolves.toBe(true);
+        expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(3);
+      }
+    );
+  }
+);
+
+describe('refreshFilePartUrl across an authentication epoch change', () => {
+  it.each(['success', 'failure'] as const)(
+    'ignores stale %s without modifying or releasing a newer request',
+    async outcome => {
+      const stale = Promise.withResolvers<PresignResult>();
+      const fresh = Promise.withResolvers<PresignResult>();
+      getAttachmentDownloadUrlMutate
+        .mockReturnValueOnce(stale.promise)
+        .mockReturnValueOnce(fresh.promise);
+      const previous = await startPendingPresign('refresh');
+
+      bumpAuthEpoch();
+      const next = refreshFilePartUrl('part-1');
+      expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(2);
+      const pendingEntry = getFilePartCacheEntry('part-1');
+      settlePresign(stale, outcome, 'https://r2.example/stale');
+      await flushMicrotasks();
+
+      expect(getFilePartCacheEntry('part-1')).toBe(pendingEntry);
+      await expect(previous.refresh).resolves.toBe(false);
+      await expect(refreshFilePartUrl('part-1')).resolves.toBe(false);
+      expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(2);
+
+      settlePresign(fresh, 'success', 'https://r2.example/fresh');
+      await expect(next).resolves.toBe(true);
+      expect(getFilePartCacheEntry('part-1')?.url).toBe('https://r2.example/fresh');
+    }
+  );
 });

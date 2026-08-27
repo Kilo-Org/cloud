@@ -30,6 +30,7 @@ export type FilePartCacheEntry = {
 /** Reactive map of partId → captured FilePart entry. First write wins. */
 const entriesByPartId = new Map<string, FilePartCacheEntry>();
 const listeners = new Set<() => void>();
+let cacheGeneration = 0;
 
 function emitChange(): void {
   for (const listener of listeners) {
@@ -188,6 +189,10 @@ export function getFilePartCacheEntry(partId: string): FilePartCacheEntry | unde
   return entriesByPartId.get(partId);
 }
 
+export function getFilePartCacheGeneration(): number {
+  return cacheGeneration;
+}
+
 /** Copy of the in-memory map for the resolver's renewal sweep. */
 export function listFilePartCacheEntries(): readonly {
   partId: string;
@@ -228,12 +233,14 @@ export function clearFilePartCache(): void {
   } catch {
     // Best-effort cache hygiene; ignore delete failures.
   }
+  cacheGeneration += 1;
   entriesByPartId.clear();
   emitChange();
 }
 
 /** Test-only: clear in-memory state between cases. */
 export function __resetFilePartCacheForTests(): void {
+  cacheGeneration += 1;
   entriesByPartId.clear();
   emitChange();
 }

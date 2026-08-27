@@ -1309,7 +1309,11 @@
       "checkRun": "Execució de comprovació",
       "status": "Estat",
       "threshold": "Llindar",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "S'espera la transcripció de la revisió.",
+      "transcriptEmpty": "No hi ha transcripció per a aquesta revisió.",
+      "transcriptRetry": "No s'ha pogut carregar la transcripció de la revisió.",
+      "transcriptLive": "EN DIRECTE"
     },
     "reviewMemory": {
       "title": "Memòria de revisió",

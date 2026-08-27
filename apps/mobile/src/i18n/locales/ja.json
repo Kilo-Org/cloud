@@ -899,7 +899,11 @@
       "title": "れびゅー",
       "tokens": "トークン",
       "tokensInOut": "{{input}}入力 / {{output}}出力",
-      "pullRequest": "プルリクエスト"
+      "pullRequest": "プルリクエスト",
+      "transcriptWaiting": "レビューのトランスクリプトを待っています。",
+      "transcriptEmpty": "このレビューのトランスクリプトはありません。",
+      "transcriptRetry": "レビューのトランスクリプトを読み込めませんでした。",
+      "transcriptLive": "ライブ"
     },
     "reviewList": {
       "configureProvider": "プロバイダーを設定",

@@ -901,7 +901,11 @@
       "title": "Revisión",
       "tokens": "Tokens",
       "tokensInOut": "{{input}} entrada / {{output}} salida",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Esperando la transcripción de la revisión.",
+      "transcriptEmpty": "No hay transcripción para esta revisión.",
+      "transcriptRetry": "No se pudo cargar la transcripción de la revisión.",
+      "transcriptLive": "EN VIVO"
     },
     "reviewList": {
       "configureProvider": "Configurar proveedor",

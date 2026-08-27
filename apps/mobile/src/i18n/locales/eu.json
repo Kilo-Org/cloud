@@ -1300,7 +1300,11 @@
       "checkRun": "Egiaztapen-exekuzioa",
       "status": "Egoera",
       "threshold": "Atalasea",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Berrikuspenaren transkripzioaren zain.",
+      "transcriptEmpty": "Berrikuspen honetarako transkripziorik ez.",
+      "transcriptRetry": "Ezin izan da berrikuspenaren transkripzioa kargatu.",
+      "transcriptLive": "ZUZENEAN"
     },
     "reviewMemory": {
       "title": "Berrikuspen-memoria",

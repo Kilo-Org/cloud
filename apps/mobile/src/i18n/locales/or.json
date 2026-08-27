@@ -1300,7 +1300,11 @@
       "checkRun": "ଚେକ୍ ରନ୍",
       "status": "ସ୍ଥିତି",
       "threshold": "ସୀମା",
-      "pullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ"
+      "pullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
+      "transcriptWaiting": "ସମୀକ୍ଷା ଟ୍ରାନ୍ସକ୍ରିପସନ୍ ପାଇଁ ଅପେକ୍ଷା କରୁଛି।",
+      "transcriptEmpty": "ଏହି ସମୀକ୍ଷା ପାଇଁ କୌଣସି ଟ୍ରାନ୍ସକ୍ରିପସନ୍ ନାହିଁ।",
+      "transcriptRetry": "ସମୀକ୍ଷା ଟ୍ରାନ୍ସକ୍ରିପସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "transcriptLive": "ଲାଇଭ୍"
     },
     "reviewMemory": {
       "title": "ସମୀକ୍ଷା ସ୍ମୃତି",

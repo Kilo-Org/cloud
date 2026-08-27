@@ -1300,7 +1300,11 @@
       "checkRun": "ການແລ່ນກວດ",
       "status": "ສະຖານະ",
       "threshold": "ຂອບເຂດ",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "ກຳລັງລໍຖ້າການຖອດຄວາມຂອງການທົບທວນ.",
+      "transcriptEmpty": "ບໍ່ມີການຖອດຄວາມຂອງການທົບທວນນີ້.",
+      "transcriptRetry": "ບໍ່ສາມາດໂຫຼດການຖອດຄວາມຂອງການທົບທວນ.",
+      "transcriptLive": "LIVE"
     },
     "reviewMemory": {
       "title": "ຄວາມຈຳການທົບທວນ",

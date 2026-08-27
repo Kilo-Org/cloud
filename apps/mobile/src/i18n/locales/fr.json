@@ -885,7 +885,11 @@
       "title": "Revue",
       "tokens": "Jetons",
       "tokensInOut": "{{input}} en entrée / {{output}} en sortie",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "En attente de la transcription de la revue.",
+      "transcriptEmpty": "Aucune transcription pour cette revue.",
+      "transcriptRetry": "Impossible de charger la transcription de la revue.",
+      "transcriptLive": "En direct"
     },
     "reviewList": {
       "configureProvider": "Configurer le fournisseur",

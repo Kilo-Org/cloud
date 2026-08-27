@@ -907,7 +907,11 @@
       "title": "مراجعة",
       "tokens": "الرموز",
       "tokensInOut": "{{input}} إدخال / {{output}} إخراج",
-      "pullRequest": "طلب سحب"
+      "pullRequest": "طلب سحب",
+      "transcriptWaiting": "في انتظار نص المراجعة.",
+      "transcriptEmpty": "لا يوجد نص لهذه المراجعة.",
+      "transcriptRetry": "تعذّر تحميل نص المراجعة.",
+      "transcriptLive": "مباشر"
     },
     "reviewList": {
       "configureProvider": "تهيئة المزوّد",

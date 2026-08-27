@@ -1300,7 +1300,11 @@
       "checkRun": "Tjekkørsel",
       "status": "Status",
       "threshold": "Tærskel",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Venter på gennemgangens transskription.",
+      "transcriptEmpty": "Ingen transskription for denne gennemgang.",
+      "transcriptRetry": "Kunne ikke indlæse gennemgangens transskription.",
+      "transcriptLive": "LIVE"
     },
     "reviewMemory": {
       "title": "Gennemgangshukommelse",

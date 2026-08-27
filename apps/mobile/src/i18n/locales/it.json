@@ -885,7 +885,11 @@
       "title": "Revisione",
       "tokens": "Token",
       "tokensInOut": "{{input}} in / {{output}} out",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "In attesa della trascrizione della revisione.",
+      "transcriptEmpty": "Nessuna trascrizione per questa revisione.",
+      "transcriptRetry": "Impossibile caricare la trascrizione della revisione.",
+      "transcriptLive": "LIVE"
     },
     "reviewList": {
       "configureProvider": "Configura provider",

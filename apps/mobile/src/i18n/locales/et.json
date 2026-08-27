@@ -1300,7 +1300,11 @@
       "checkRun": "Kontrollikäit",
       "status": "Olek",
       "threshold": "Lävi",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptEmpty": "Selle ülevaate jaoks transkriptsiooni pole.",
+      "transcriptLive": "OTSE",
+      "transcriptRetry": "Ülevaate transkriptsiooni laadimine ebaõnnestus.",
+      "transcriptWaiting": "Oodatakse ülevaate transkriptsiooni."
     },
     "reviewMemory": {
       "title": "Ülevaate mälu",

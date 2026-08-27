@@ -1,4 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
+/* eslint-disable max-lines -- the spectator describe adds a transcript-state suite on top of the existing outcome-first contract; they share one mock harness */
 
 // Outcome-first detail-screen contract: the screen leads with the conclusion
 // (status + error), then findings, council, gate, and metadata. A null council
@@ -28,9 +29,40 @@ const buttons = vi.hoisted(() => ({
   rendered: [] as { children?: unknown; onPress?: () => void }[],
 }));
 
+const viewRenders = vi.hoisted(() => ({
+  list: [] as { style?: unknown; children?: unknown }[],
+}));
+const sessionListRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
+const composerRenders = vi.hoisted(() => ({ list: [] as Record<string, unknown>[] }));
+const spectatorQueries = vi.hoisted(() => ({
+  streamInfo: {
+    isLoading: false,
+    isError: false,
+    data: null as unknown,
+    refetch: vi.fn(),
+  },
+  sessionMessages: {
+    isLoading: false,
+    isError: false,
+    data: null as unknown,
+    refetch: vi.fn(),
+  },
+}));
+const statusHelpers = vi.hoisted(() => ({
+  cancellable: false,
+  retriggerable: false,
+}));
+const spectatorStream = vi.hoisted(() => ({
+  createReviewSpectatorStream: vi.fn(),
+}));
+
 vi.mock('react-native', () => ({
-  View: 'View',
+  View: (props: { style?: unknown; children?: unknown }) => {
+    viewRenders.list.push(props);
+    return createElement('View', null, props.children);
+  },
   Alert: { alert: vi.fn() },
+  useWindowDimensions: () => ({ height: 800, width: 400, fontScale: 1, scale: 1 }),
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
@@ -45,8 +77,10 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Warning: 'warning', Success: 'success' },
 }));
 vi.mock('@kilocode/app-shared/code-review', () => ({
-  isCancellableReviewStatus: () => false,
-  isRetriggerableReviewStatus: () => false,
+  isCancellableReviewStatus: () => statusHelpers.cancellable,
+  isRetriggerableReviewStatus: () => statusHelpers.retriggerable,
+  isInFlightReviewStatus: (status: string) =>
+    status === 'pending' || status === 'queued' || status === 'running',
 }));
 vi.mock('@kilocode/app-shared/utils', () => ({
   fromMicrodollars: (value: unknown) => value,
@@ -96,6 +130,45 @@ vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
   parseTimestamp: (value: unknown) => value,
   timeAgo: () => 'now',
+}));
+
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    codeReviews: {
+      getReviewStreamInfo: {
+        queryOptions: () => ({ queryKey: ['codeReviews.getReviewStreamInfo'] }),
+      },
+      getSessionMessages: {
+        queryOptions: () => ({ queryKey: ['codeReviews.getSessionMessages'] }),
+      },
+    },
+  }),
+}));
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: (options: { queryKey?: unknown[] }) => {
+    const key = options.queryKey?.[0];
+    return key === 'codeReviews.getReviewStreamInfo'
+      ? spectatorQueries.streamInfo
+      : spectatorQueries.sessionMessages;
+  },
+}));
+vi.mock('@/components/code-reviewer/review-spectator-stream', () => ({
+  createReviewSpectatorStream: spectatorStream.createReviewSpectatorStream,
+}));
+vi.mock('@/components/agents/session-message-list', () => ({
+  SessionMessageList: (props: Record<string, unknown>) => {
+    sessionListRenders.list.push(props);
+    return null;
+  },
+}));
+vi.mock('@/components/agents/session-detail-skeleton', () => ({
+  SessionSkeletonMessages: () => null,
+}));
+vi.mock('@/components/agents/chat-composer', () => ({
+  ChatComposer: (props: Record<string, unknown>) => {
+    composerRenders.list.push(props);
+    return null;
+  },
 }));
 
 function collectText(node: unknown): string[] {
@@ -162,6 +235,32 @@ beforeEach(() => {
   detail.refetch.mockClear();
   queryErrors.errors = [];
   buttons.rendered = [];
+  viewRenders.list = [];
+  sessionListRenders.list = [];
+  composerRenders.list = [];
+  statusHelpers.cancellable = false;
+  statusHelpers.retriggerable = false;
+  spectatorQueries.streamInfo.isLoading = false;
+  spectatorQueries.streamInfo.isError = false;
+  spectatorQueries.streamInfo.data = {
+    success: true,
+    status: 'completed',
+    agentVersion: 'v2',
+    cloudAgentSessionId: null,
+    organizationId: undefined,
+  };
+  spectatorQueries.streamInfo.refetch.mockClear();
+  spectatorQueries.sessionMessages.isLoading = false;
+  spectatorQueries.sessionMessages.isError = false;
+  spectatorQueries.sessionMessages.data = { success: true, entries: [] };
+  spectatorQueries.sessionMessages.refetch.mockClear();
+  spectatorStream.createReviewSpectatorStream.mockReset();
+  spectatorStream.createReviewSpectatorStream.mockResolvedValue({
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    retryReconnect: vi.fn(),
+    destroy: vi.fn(),
+  });
 });
 
 describe('ReviewDetailScreen outcome-first order', () => {
@@ -333,5 +432,202 @@ describe('ReviewDetailScreen error states', () => {
     expect(queryErrors.errors).toHaveLength(1);
     expect(queryErrors.errors[0]?.variant).toBe('server');
     expect(queryErrors.errors[0]?.onRetry).toBeDefined();
+  });
+});
+
+function makeStreamInfo(over: Record<string, unknown> = {}) {
+  return {
+    success: true,
+    status: 'running',
+    agentVersion: 'v2',
+    cloudAgentSessionId: null,
+    organizationId: undefined,
+    ...over,
+  };
+}
+
+function buttonText(button: { children?: unknown }) {
+  return (button.children as { props?: { children?: unknown } } | null)?.props?.children;
+}
+
+describe('ReviewDetailScreen spectator transcript', () => {
+  it('renders no composer (no reply controls) beside the transcript', () => {
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'running' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    renderScreen();
+
+    expect(composerRenders.list).toHaveLength(0);
+  });
+
+  it('keeps cancel and retry mounted when the status helpers allow them', () => {
+    statusHelpers.cancellable = true;
+    statusHelpers.retriggerable = true;
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'running' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    renderScreen();
+
+    expect(buttons.rendered.some(button => buttonText(button) === 'Cancel review')).toBe(true);
+    expect(buttons.rendered.some(button => buttonText(button) === 'Retry review')).toBe(true);
+  });
+
+  it('shows waiting copy for a running review without a session', () => {
+    spectatorQueries.streamInfo.data = makeStreamInfo({ status: 'running' });
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'running' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    expect(texts).toContain('Waiting for the review transcript.');
+  });
+
+  it('shows empty copy for a completed review without a session', () => {
+    spectatorQueries.streamInfo.data = makeStreamInfo({ status: 'completed' });
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'completed' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    expect(texts).toContain('No transcript for this review.');
+  });
+
+  it('shows Retry when stream info fails', () => {
+    spectatorQueries.streamInfo.data = { success: false, error: 'boom' };
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'running' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    renderScreen();
+
+    const spectatorError = queryErrors.errors.find(
+      error => error.title === 'Could not load the review transcript.'
+    );
+    expect(spectatorError).toBeDefined();
+    expect(spectatorError?.onRetry).toBeDefined();
+  });
+
+  it('wraps the transcript list in an explicit height when rows exist', () => {
+    spectatorQueries.streamInfo.data = makeStreamInfo({ status: 'completed' });
+    spectatorQueries.sessionMessages.data = {
+      success: true,
+      entries: [{ timestamp: 't1', message: 'm1', eventType: 'text' }],
+    };
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'completed' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    renderScreen();
+
+    expect(sessionListRenders.list).toHaveLength(1);
+    const items = sessionListRenders.list[0]?.items as
+      | { key?: string; message?: string }[]
+      | undefined;
+    expect(items).toHaveLength(1);
+    expect(items?.[0]?.message).toBe('m1');
+    expect(items?.[0]?.key).toBe('t1m10');
+
+    const heightView = viewRenders.list.find(view => {
+      const style = view.style as { height?: unknown } | undefined;
+      return style && typeof style.height === 'number';
+    });
+    expect(heightView).toBeDefined();
+    const heightStyle = heightView?.style as { height: number } | undefined;
+    expect(heightStyle?.height).toBe(280);
+  });
+
+  it('shows QueryError plus Retry when the session snapshot fails', () => {
+    spectatorQueries.streamInfo.data = makeStreamInfo({ status: 'completed' });
+    spectatorQueries.sessionMessages.data = { success: false };
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'completed' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    renderScreen();
+
+    const snapshotError = queryErrors.errors.find(
+      error => error.title === 'Could not load the review transcript.'
+    );
+    expect(snapshotError).toBeDefined();
+    expect(snapshotError?.onRetry).toBeDefined();
+
+    act(() => {
+      snapshotError?.onRetry?.();
+    });
+    expect(spectatorQueries.sessionMessages.refetch).toHaveBeenCalledTimes(1);
+    expect(spectatorQueries.streamInfo.refetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps live rows and shows Retry after a websocket drop', () => {
+    const captured: {
+      onEvent?: (event: unknown) => void;
+      onDisconnected?: () => void;
+    } = {};
+    spectatorStream.createReviewSpectatorStream.mockImplementation(
+      (input: { onEvent: (event: unknown) => void; onDisconnected: () => void }) => {
+        captured.onEvent = input.onEvent;
+        captured.onDisconnected = input.onDisconnected;
+        return {
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+          retryReconnect: vi.fn(),
+          destroy: vi.fn(),
+        };
+      }
+    );
+    spectatorQueries.streamInfo.data = makeStreamInfo({
+      status: 'running',
+      cloudAgentSessionId: 'agent-1',
+    });
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'running' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    renderScreen();
+
+    expect(captured.onEvent).toBeDefined();
+    act(() => {
+      captured.onEvent?.({
+        eventId: 1,
+        sessionId: 's-1',
+        streamEventType: 'started',
+        timestamp: 't1',
+        data: null,
+      });
+    });
+    const liveList = sessionListRenders.list.at(-1);
+    const liveItems = liveList?.items as { message?: string }[] | undefined;
+    expect(liveItems).toHaveLength(1);
+    expect(liveItems?.[0]?.message).toBe('Execution started');
+
+    expect(captured.onDisconnected).toBeDefined();
+    act(() => {
+      captured.onDisconnected?.();
+    });
+
+    expect(buttons.rendered.some(button => buttonText(button) === 'Retry')).toBe(true);
+    const afterDrop = sessionListRenders.list.at(-1);
+    const afterDropItems = afterDrop?.items as { message?: string }[] | undefined;
+    expect(afterDropItems?.[0]?.message).toBe('Execution started');
   });
 });

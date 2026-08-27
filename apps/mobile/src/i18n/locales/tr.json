@@ -899,7 +899,11 @@
       "title": "İnceleme",
       "tokens": "Jetonlar",
       "tokensInOut": "{{input}} giriş / {{output}} çıkış",
-      "pullRequest": "çekme isteği"
+      "pullRequest": "çekme isteği",
+      "transcriptWaiting": "İnceleme dökümü bekleniyor.",
+      "transcriptEmpty": "Bu incelemeye ait döküm yok.",
+      "transcriptRetry": "İnceleme dökümü yüklenemedi.",
+      "transcriptLive": "CANLI"
     },
     "reviewList": {
       "configureProvider": "Sağlayıcıyı yapılandır",

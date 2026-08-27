@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- the screen keeps every existing detail section plus the read-only transcript slot */
+
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -12,6 +14,7 @@ import {
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { statusMeta } from '@/components/code-reviewer/review-list-screen';
 import { flattenCouncilFindings } from '@/components/code-reviewer/review-detail-helpers';
+import { ReviewSpectator } from '@/components/code-reviewer/review-spectator';
 import {
   CouncilSection,
   FindingCard,
@@ -138,6 +141,12 @@ export function ReviewDetailScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('codeReviewer.reviewDetail.title')} eyebrow={review.repo_full_name} />
+      <ReviewSpectator
+        reviewId={reviewId}
+        status={review.status}
+        prTitle={review.pr_title}
+        statusLabel={meta.label}
+      />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-4">
         {/* A background poll failure must not blank out an already-loaded review. */}
         {isError && (

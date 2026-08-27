@@ -901,7 +901,11 @@
       "title": "סקירה",
       "tokens": "אסימונים",
       "tokensInOut": "{{input}} קלט / {{output}} פלט",
-      "pullRequest": "בקשת משיכה"
+      "pullRequest": "בקשת משיכה",
+      "transcriptWaiting": "ממתין לתמליל הסקירה.",
+      "transcriptEmpty": "אין תמליל לסקירה זו.",
+      "transcriptRetry": "לא ניתן היה לטעון את תמליל הסקירה.",
+      "transcriptLive": "חי"
     },
     "reviewList": {
       "configureProvider": "הגדר ספק",

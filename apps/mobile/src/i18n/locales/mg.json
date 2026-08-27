@@ -1300,7 +1300,11 @@
       "checkRun": "Fihazakazahana fanamarinana",
       "status": "Sata",
       "threshold": "Vola fetra",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptEmpty": "Tsy misy transcript ho an'ity review ity.",
+      "transcriptLive": "LIVE",
+      "transcriptRetry": "Tsy afaka namaky ny transcript an'ny review.",
+      "transcriptWaiting": "Miandry ny transcript an'ny review."
     },
     "reviewMemory": {
       "title": "Fahatsiarovana fanamarinana",

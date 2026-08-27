@@ -899,7 +899,11 @@
       "title": "Tinjauan",
       "tokens": "Token",
       "tokensInOut": "{{input}} masuk / {{output}} keluar",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Menunggu transkrip tinjauan.",
+      "transcriptEmpty": "Tidak ada transkrip untuk tinjauan ini.",
+      "transcriptRetry": "Tidak dapat memuat transkrip tinjauan.",
+      "transcriptLive": "Langsung"
     },
     "reviewList": {
       "configureProvider": "Konfigurasikan penyedia",

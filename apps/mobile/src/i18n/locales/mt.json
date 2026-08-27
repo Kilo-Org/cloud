@@ -1327,7 +1327,11 @@
       "checkRun": "Check run",
       "status": "Status",
       "threshold": "Limitu",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Qed nistenna t-traskrizzjoni tar-reviżjoni.",
+      "transcriptEmpty": "L-ebda traskrizzjoni għal din ir-reviżjoni.",
+      "transcriptRetry": "Ma setgħetx titgħabba t-traskrizzjoni tar-reviżjoni.",
+      "transcriptLive": "DIRETT"
     },
     "reviewMemory": {
       "title": "Memorja tar-reviżjoni",

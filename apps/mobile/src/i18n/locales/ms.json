@@ -1300,7 +1300,11 @@
       "checkRun": "Jalankan semakan",
       "status": "Status",
       "threshold": "Ambang",
-      "pullRequest": "permintaan tarik"
+      "pullRequest": "permintaan tarik",
+      "transcriptWaiting": "Menunggu transkrip semakan.",
+      "transcriptEmpty": "Tiada transkrip untuk semakan ini.",
+      "transcriptRetry": "Tidak dapat memuatkan transkrip semakan.",
+      "transcriptLive": "LANGSUNG"
     },
     "reviewMemory": {
       "title": "Memori semakan",

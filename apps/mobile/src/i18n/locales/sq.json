@@ -1300,7 +1300,11 @@
       "checkRun": "Ekzekutimi i kontrollit",
       "status": "Statusi",
       "threshold": "Pragu",
-      "pullRequest": "kërkesë për tërheqje"
+      "pullRequest": "kërkesë për tërheqje",
+      "transcriptWaiting": "Duke pritur transkriptin e shqyrtimit.",
+      "transcriptEmpty": "Asnjë transkript për këtë shqyrtim.",
+      "transcriptRetry": "Nuk u arrit të ngarkohej transkripti i shqyrtimit.",
+      "transcriptLive": "Drejtpërdrejt"
     },
     "reviewMemory": {
       "title": "Kujtesa e shqyrtimit",

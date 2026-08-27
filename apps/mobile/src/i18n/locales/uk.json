@@ -903,7 +903,11 @@
       "title": "Перевірка",
       "tokens": "Токени",
       "tokensInOut": "{{input}} вхід / {{output}} вихід",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Очікування транскрипту перевірки.",
+      "transcriptEmpty": "Немає транскрипту для цієї перевірки.",
+      "transcriptRetry": "Не вдалося завантажити транскрипт перевірки.",
+      "transcriptLive": "НАЖИВО"
     },
     "reviewList": {
       "configureProvider": "Налаштувати провайдера",

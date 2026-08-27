@@ -1300,7 +1300,11 @@
       "checkRun": "Tarkistusajo",
       "status": "Tila",
       "threshold": "Kynnysarvo",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Odotetaan tarkistuksen transkriptiota.",
+      "transcriptEmpty": "Ei transkriptiota tälle tarkistukselle.",
+      "transcriptRetry": "Tarkistuksen transkriptiota ei voitu ladata.",
+      "transcriptLive": "LIVE"
     },
     "reviewMemory": {
       "title": "Arviointimuisti",

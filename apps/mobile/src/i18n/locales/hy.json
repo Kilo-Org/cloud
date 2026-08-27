@@ -1300,7 +1300,11 @@
       "checkRun": "Ստուգման գործարկում",
       "status": "Կարգավիճակ",
       "threshold": "Շեմ",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Սպասում ենք ստուգման արձանագրությանը:",
+      "transcriptEmpty": "Այս ստուգման համար արձանագրություն չկա:",
+      "transcriptRetry": "Հնարավոր չեղավ բեռնել ստուգման արձանագրությունը:",
+      "transcriptLive": "Ուղիղ"
     },
     "reviewMemory": {
       "title": "Ստուգման հիշողություն",

@@ -1300,7 +1300,11 @@
       "checkRun": "ਚੈੱਕ ਚਲਾਓ",
       "status": "ਸਥਿਤੀ",
       "threshold": "ਸੀਮਾ",
-      "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ"
+      "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ",
+      "transcriptWaiting": "ਸਮੀਖਿਆ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਦੀ ਉਡੀਕ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ।",
+      "transcriptEmpty": "ਇਸ ਸਮੀਖਿਆ ਲਈ ਕੋਈ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਨਹੀਂ ਹੈ।",
+      "transcriptRetry": "ਸਮੀਖਿਆ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਲੋਡ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
+      "transcriptLive": "ਲਾਈਵ"
     },
     "reviewMemory": {
       "title": "ਸਮੀਖਿਆ ਮੈਮੋਰੀ",

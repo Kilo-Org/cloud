@@ -1336,7 +1336,11 @@
       "checkRun": "Rhedeg gwiriad",
       "status": "Statws",
       "threshold": "Trothwy",
-      "pullRequest": "cais tynnu"
+      "pullRequest": "cais tynnu",
+      "transcriptWaiting": "Yn aros am drawsgrifiad yr adolygiad.",
+      "transcriptEmpty": "Dim trawsgrifiad ar gyfer yr adolygiad hwn.",
+      "transcriptRetry": "Ni ellid llwytho trawsgrifiad yr adolygiad.",
+      "transcriptLive": "BYW"
     },
     "reviewMemory": {
       "title": "Cof adolygu",

@@ -1300,7 +1300,11 @@
       "checkRun": "შემოწმების გაშვება",
       "status": "სტატუსი",
       "threshold": "ზღვარი",
-      "pullRequest": "პულ-რექვესთი"
+      "pullRequest": "პულ-რექვესთი",
+      "transcriptEmpty": "ამ მიმოხილვისთვის ტრანსკრიფცია არ არის.",
+      "transcriptLive": "პირდაპირი",
+      "transcriptRetry": "მიმოხილვის ტრანსკრიფციის ჩატვირთვა ვერ მოხერხდა.",
+      "transcriptWaiting": "ველოდებით მიმოხილვის ტრანსკრიფციას."
     },
     "reviewMemory": {
       "title": "მიმოხილვის მეხსიერება",

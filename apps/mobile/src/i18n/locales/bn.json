@@ -1300,7 +1300,11 @@
       "checkRun": "চেক রান",
       "status": "স্থিতি",
       "threshold": "সীমা",
-      "pullRequest": "পুল রিকোয়েস্ট"
+      "pullRequest": "পুল রিকোয়েস্ট",
+      "transcriptWaiting": "পর্যালোচনার ট্রান্সক্রিপ্টের জন্য অপেক্ষা করছে।",
+      "transcriptEmpty": "এই পর্যালোচনার জন্য কোনো ট্রান্সক্রিপ্ট নেই।",
+      "transcriptRetry": "পর্যালোচনার ট্রান্সক্রিপ্ট লোড করা যায়নি।",
+      "transcriptLive": "LIVE"
     },
     "reviewMemory": {
       "title": "পর্যালোচনা মেমরি",

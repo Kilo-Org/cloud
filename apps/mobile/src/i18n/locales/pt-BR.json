@@ -885,7 +885,11 @@
       "title": "Revisão",
       "tokens": "Tokens",
       "tokensInOut": "{{input}} de entrada / {{output}} de saída",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Aguardando a transcrição da revisão.",
+      "transcriptEmpty": "Nenhuma transcrição para esta revisão.",
+      "transcriptRetry": "Não foi possível carregar a transcrição da revisão.",
+      "transcriptLive": "AO VIVO"
     },
     "reviewList": {
       "configureProvider": "Configurar provedor",

@@ -1300,7 +1300,11 @@
       "checkRun": "Kontrollkörning",
       "status": "Status",
       "threshold": "Tröskel",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Väntar på granskningstranskriptet.",
+      "transcriptEmpty": "Inget transkript för denna granskning.",
+      "transcriptRetry": "Det gick inte att läsa in granskningstranskriptet.",
+      "transcriptLive": "LIVE"
     },
     "reviewMemory": {
       "title": "Granskningsminne",

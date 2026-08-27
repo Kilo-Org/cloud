@@ -1300,7 +1300,11 @@
       "checkRun": "Ṣiṣẹ́ ṣíṣayẹ̀wò",
       "status": "Ipò",
       "threshold": "Ìpele",
-      "pullRequest": "ìbéèrè ìfa"
+      "pullRequest": "ìbéèrè ìfa",
+      "transcriptWaiting": "Ndúró fún ìkọwe àtúnyẹ̀wò náà.",
+      "transcriptEmpty": "Kò sí ìkọwe fún àtúnyẹ̀wò yìí.",
+      "transcriptRetry": "Kò lè gbé ìkọwe àtúnyẹ̀wò náà.",
+      "transcriptLive": "LIVE"
     },
     "reviewMemory": {
       "title": "Ìrántí àtúnyẹ̀wò",

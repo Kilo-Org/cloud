@@ -899,7 +899,11 @@
       "title": "리뷰",
       "tokens": "토큰",
       "tokensInOut": "{{input}} 입력 / {{output}} 출력",
-      "pullRequest": "풀 리퀘스트"
+      "pullRequest": "풀 리퀘스트",
+      "transcriptWaiting": "리뷰 대화록을 기다리는 중입니다.",
+      "transcriptEmpty": "이 리뷰에 대한 대화록이 없습니다.",
+      "transcriptRetry": "리뷰 대화록을 불러올 수 없습니다.",
+      "transcriptLive": "LIVE"
     },
     "reviewList": {
       "configureProvider": "제공업체 구성",

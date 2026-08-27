@@ -899,7 +899,11 @@
       "title": "審查",
       "tokens": "Token",
       "tokensInOut": "{{input}} 輸入 / {{output}} 輸出",
-      "pullRequest": "拉取請求"
+      "pullRequest": "拉取請求",
+      "transcriptWaiting": "正在等待審閱逐字稿。",
+      "transcriptEmpty": "此審閱沒有逐字稿。",
+      "transcriptRetry": "無法載入審閱逐字稿。",
+      "transcriptLive": "即時"
     },
     "reviewList": {
       "configureProvider": "設定供應商",

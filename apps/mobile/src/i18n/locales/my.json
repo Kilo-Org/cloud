@@ -1300,7 +1300,11 @@
       "checkRun": "Check run",
       "status": "အခြေအနေ",
       "threshold": "အဆင့်သတ်မှတ်ချက်",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "သုံးသပ်ချက် မှတ်တမ်းကို စောင့်နေသည်။",
+      "transcriptEmpty": "ဤသုံးသပ်ချက်အတွက် မှတ်တမ်း မရှိပါ။",
+      "transcriptRetry": "သုံးသပ်ချက် မှတ်တမ်းကို တင်မရပါ။",
+      "transcriptLive": "LIVE"
     },
     "reviewMemory": {
       "title": "စစ်ဆေးမှု မှတ်ဉာဏ်",

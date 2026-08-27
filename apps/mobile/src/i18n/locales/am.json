@@ -1300,7 +1300,11 @@
       "checkRun": "የቼክ ሂደት",
       "status": "ሁኔታ",
       "threshold": "ደረጃ",
-      "pullRequest": "የመጎተቻ ጥያቄ"
+      "pullRequest": "የመጎተቻ ጥያቄ",
+      "transcriptWaiting": "የግምገማ ግልባጩን በመጠበቅ ላይ።",
+      "transcriptEmpty": "ለዚህ ግምገማ ግልባጭ የለም።",
+      "transcriptRetry": "የግምገማ ግልባጩን መጫን አልተቻለም።",
+      "transcriptLive": "ቀጥታ"
     },
     "reviewMemory": {
       "title": "የግምገማ ትውስታ",

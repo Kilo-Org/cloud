@@ -1300,7 +1300,11 @@
       "checkRun": "Изпълнение на проверката",
       "status": "Статус",
       "threshold": "Праг",
-      "pullRequest": "заявка за сливане"
+      "pullRequest": "заявка за сливане",
+      "transcriptWaiting": "Изчакване на препис на прегледа.",
+      "transcriptEmpty": "Няма препис за този преглед.",
+      "transcriptRetry": "Не можа да се зареди преписът на прегледа.",
+      "transcriptLive": "НА ЖИВО"
     },
     "reviewMemory": {
       "title": "Памет за прегледа",

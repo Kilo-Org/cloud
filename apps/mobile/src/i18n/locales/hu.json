@@ -1300,7 +1300,11 @@
       "checkRun": "Ellenőrzés futtatása",
       "status": "Állapot",
       "threshold": "Küszöb",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptEmpty": "Ehhez az áttekintéshez nincs átirat.",
+      "transcriptLive": "ÉLŐ",
+      "transcriptRetry": "Nem sikerült betölteni az áttekintés átiratát.",
+      "transcriptWaiting": "Várakozás az áttekintés átiratára."
     },
     "reviewMemory": {
       "title": "Áttekintési memória",

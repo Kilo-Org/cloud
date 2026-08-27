@@ -1300,7 +1300,11 @@
       "checkRun": "ചെക്ക് റൺ",
       "status": "നില",
       "threshold": "പരിധി",
-      "pullRequest": "പുൾ റിക്വസ്റ്റ്"
+      "pullRequest": "പുൾ റിക്വസ്റ്റ്",
+      "transcriptWaiting": "അവലോകന ട്രാൻസ്ക്രിപ്റ്റിനായി കാത്തിരിക്കുന്നു.",
+      "transcriptEmpty": "ഈ അവലോകനത്തിന് ട്രാൻസ്ക്രിപ്റ്റ് ഇല്ല.",
+      "transcriptRetry": "അവലോകന ട്രാൻസ്ക്രിപ്റ്റ് ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
+      "transcriptLive": "LIVE"
     },
     "reviewMemory": {
       "title": "അവലോകന മെമ്മറി",

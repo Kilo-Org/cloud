@@ -1300,7 +1300,11 @@
       "checkRun": "Sakatta'a hojii",
       "status": "Haala",
       "threshold": "Gatihoo",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Galmee xalayyii sakatta'aa eeggachaa jira.",
+      "transcriptEmpty": "Sakatta'a kanaaf galmee xalayyii hin jiru.",
+      "transcriptRetry": "Galmee xalayyii sakatta'aa fudhachuu hin danda'ine.",
+      "transcriptLive": "LIVE"
     },
     "reviewMemory": {
       "title": "Yaadannoo sakatta'aa",

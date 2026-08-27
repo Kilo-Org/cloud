@@ -1300,7 +1300,11 @@
       "checkRun": "Gudanar da duba",
       "status": "Hali",
       "threshold": "Matakin",
-      "pullRequest": "buƙatar jan"
+      "pullRequest": "buƙatar jan",
+      "transcriptWaiting": "Jiran rubutun zaman na bita.",
+      "transcriptEmpty": "Babu rubutun zaman ga wannan bita.",
+      "transcriptRetry": "An kasa ɗora rubutun zaman na bita.",
+      "transcriptLive": "RAYA"
     },
     "reviewMemory": {
       "title": "Ƙwaƙwalwar bita",

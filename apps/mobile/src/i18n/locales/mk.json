@@ -1300,7 +1300,11 @@
       "checkRun": "Проверка на извршување",
       "status": "Статус",
       "threshold": "Праг",
-      "pullRequest": "барање за повлекување"
+      "pullRequest": "барање за повлекување",
+      "transcriptWaiting": "Чекање на записот од прегледот.",
+      "transcriptEmpty": "Нема запис за овој преглед.",
+      "transcriptRetry": "Не можев да го вчитам записот од прегледот.",
+      "transcriptLive": "ВОЖИВО"
     },
     "reviewMemory": {
       "title": "Меморија на прегледи",

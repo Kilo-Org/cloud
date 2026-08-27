@@ -1300,7 +1300,11 @@
       "checkRun": "Tchek kouri",
       "status": "Estati",
       "threshold": "Seuy",
-      "pullRequest": "demann tiray"
+      "pullRequest": "demann tiray",
+      "transcriptWaiting": "Ap tann transkripsyon revizyon an.",
+      "transcriptEmpty": "Pa gen transkripsyon pou revizyon sa a.",
+      "transcriptRetry": "Pa t ka chaje transkripsyon revizyon an.",
+      "transcriptLive": "AN DIRÈK"
     },
     "reviewMemory": {
       "title": "Memwa revizyon",

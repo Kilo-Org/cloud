@@ -1327,7 +1327,11 @@
       "checkRun": "Rith seiceála",
       "status": "Stádas",
       "threshold": "Tairseach",
-      "pullRequest": "iarratas tarraingthe"
+      "pullRequest": "iarratas tarraingthe",
+      "transcriptWaiting": "Ag fanacht le hathscríbhinn an athbhreithnithe.",
+      "transcriptEmpty": "Níl aon athscríbhinn don athbhreithniú seo.",
+      "transcriptRetry": "Níorbh fhéidir athscríbhinn an athbhreithnithe a lódáil.",
+      "transcriptLive": "BEO"
     },
     "reviewMemory": {
       "title": "Cuimhne athbhreithnithe",

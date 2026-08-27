@@ -1300,7 +1300,11 @@
       "checkRun": "Check run",
       "status": "Status",
       "threshold": "Threshold",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Naghihintay sa transcript ng pagsusuri.",
+      "transcriptEmpty": "Walang transcript para sa pagsusuring ito.",
+      "transcriptRetry": "Hindi maload ang transcript ng pagsusuri.",
+      "transcriptLive": "Live"
     },
     "reviewMemory": {
       "title": "Review memory",

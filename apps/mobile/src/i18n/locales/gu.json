@@ -1300,7 +1300,11 @@
       "checkRun": "ચેક રન",
       "status": "સ્થિતિ",
       "threshold": "થ્રેશોલ્ડ",
-      "pullRequest": "પુલ રિક્વેસ્ટ"
+      "pullRequest": "પુલ રિક્વેસ્ટ",
+      "transcriptWaiting": "સમીક્ષા ટ્રાન્સક્રિપ્ટની રાહ જોઈ રહ્યું છે.",
+      "transcriptEmpty": "આ સમીક્ષા માટે કોઈ ટ્રાન્સક્રિપ્ટ નથી.",
+      "transcriptRetry": "સમીક્ષા ટ્રાન્સક્રિપ્ટ લોડ કરી શકાઈ નહીં.",
+      "transcriptLive": "લાઇવ"
     },
     "reviewMemory": {
       "title": "સમીક્ષા મેમરી",

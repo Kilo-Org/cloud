@@ -1309,7 +1309,11 @@
       "checkRun": "Pārbaudes palaišana",
       "status": "Statuss",
       "threshold": "Slieksnis",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Gaida pārskata stenogrammu.",
+      "transcriptEmpty": "Šim pārskatam nav stenogrammas.",
+      "transcriptRetry": "Neizdevās ielādēt pārskata stenogrammu.",
+      "transcriptLive": "TIŠRAIDĒ"
     },
     "reviewMemory": {
       "title": "Pārskata atmiņa",

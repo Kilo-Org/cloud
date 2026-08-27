@@ -903,7 +903,11 @@
       "title": "Проверка",
       "tokens": "Токены",
       "tokensInOut": "{{input}} вх. / {{output}} исх.",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Ожидание протокола проверки.",
+      "transcriptEmpty": "Для этой проверки нет протокола.",
+      "transcriptRetry": "Не удалось загрузить протокол проверки.",
+      "transcriptLive": "LIVE"
     },
     "reviewList": {
       "configureProvider": "Настроить провайдера",

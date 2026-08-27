@@ -1318,7 +1318,11 @@
       "checkRun": "Запуск праверкі",
       "status": "Статус",
       "threshold": "Парогавае значэнне",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Чаканне стэнаграмы праверкі.",
+      "transcriptEmpty": "Няма стэнаграмы для гэтай праверкі.",
+      "transcriptRetry": "Не ўдалося загрузіць стэнаграму праверкі.",
+      "transcriptLive": "LIVE"
     },
     "reviewMemory": {
       "title": "Памяць праверкі",

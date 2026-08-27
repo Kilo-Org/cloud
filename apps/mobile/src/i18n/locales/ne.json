@@ -1300,7 +1300,11 @@
       "checkRun": "जाँच चलाउनुहोस्",
       "status": "स्थिति",
       "threshold": "थ्रेसहोल्ड",
-      "pullRequest": "पुल अनुरोध"
+      "pullRequest": "पुल अनुरोध",
+      "transcriptWaiting": "समीक्षा ट्रान्सक्रिप्टको पर्खाइमा।",
+      "transcriptEmpty": "यस समीक्षाको लागि कुनै ट्रान्सक्रिप्ट छैन।",
+      "transcriptRetry": "समीक्षा ट्रान्सक्रिप्ट लोड गर्न सकिएन।",
+      "transcriptLive": "LIVE"
     },
     "reviewMemory": {
       "title": "समीक्षा मेमोरी",

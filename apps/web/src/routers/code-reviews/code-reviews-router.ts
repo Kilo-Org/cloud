@@ -852,6 +852,7 @@ export const codeReviewRouter = createTRPCRouter({
         }
 
         const cliSessionId = attempt?.cli_session_id ?? review.cli_session_id;
+        // old both-missing form; keep while any client depends on empty entries.
         if (!cliSessionId) {
           return successResult({ entries: [] });
         }
@@ -868,18 +869,9 @@ export const codeReviewRouter = createTRPCRouter({
             return successResult({ entries: [] });
           }
 
-          let snapshot;
-          try {
-            snapshot = await fetchSessionSnapshot(cliSessionId, session.kilo_user_id);
-          } catch (snapshotError) {
-            // Network errors (e.g. session-ingest worker unreachable) should not
-            // bubble up as a hard failure â return empty entries instead.
-            logExceptInTest(
-              `[getSessionMessages] Failed to fetch session snapshot for ${cliSessionId}:`,
-              snapshotError
-            );
-            return successResult({ entries: [] });
-          }
+          // old swallow returned empty entries on snapshot failure; web ignores
+          // a failed success flag; remove when web shows this error.
+          const snapshot = await fetchSessionSnapshot(cliSessionId, session.kilo_user_id);
           if (!snapshot) {
             return successResult({ entries: [] });
           }

@@ -899,7 +899,11 @@
       "title": "Review",
       "tokens": "Tokens",
       "tokensInOut": "{{input}} rein / {{output}} raus",
-      "pullRequest": "Pull-Request"
+      "pullRequest": "Pull-Request",
+      "transcriptWaiting": "Warten auf das Review-Sitzungsprotokoll.",
+      "transcriptEmpty": "Kein Sitzungsprotokoll für dieses Review.",
+      "transcriptRetry": "Das Review-Sitzungsprotokoll konnte nicht geladen werden.",
+      "transcriptLive": "LIVE"
     },
     "reviewList": {
       "configureProvider": "Anbieter konfigurieren",

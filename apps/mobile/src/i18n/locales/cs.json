@@ -1318,7 +1318,11 @@
       "checkRun": "Kontrola běhu",
       "status": "Stav",
       "threshold": "Práh",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Čeká se na přepis kontroly.",
+      "transcriptEmpty": "Pro tuto kontrolu neexistuje přepis.",
+      "transcriptRetry": "Nepodařilo se načíst přepis kontroly.",
+      "transcriptLive": "ŽIVĚ"
     },
     "reviewMemory": {
       "title": "Paměť kontroly",

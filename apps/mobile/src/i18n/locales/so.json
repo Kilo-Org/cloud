@@ -1300,7 +1300,11 @@
       "checkRun": "Hubinta socodka",
       "status": "Heerka",
       "threshold": "Heerka",
-      "pullRequest": "codsiga isku-dhafka"
+      "pullRequest": "codsiga isku-dhafka",
+      "transcriptWaiting": "Sugaya qoraalka dib-u-eegista.",
+      "transcriptEmpty": "Qoraal kama jiro dib-u-eegistan.",
+      "transcriptRetry": "Qoraalka dib-u-eegista lama soo dejin karin.",
+      "transcriptLive": "TOOS AH"
     },
     "reviewMemory": {
       "title": "Xusuusta dib-u-eegista",

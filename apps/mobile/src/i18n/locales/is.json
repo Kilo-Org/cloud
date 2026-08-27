@@ -1300,7 +1300,11 @@
       "checkRun": "Athugunarkeyrsla",
       "status": "Staða",
       "threshold": "Þröskuldur",
-      "pullRequest": "pull-beiðni"
+      "pullRequest": "pull-beiðni",
+      "transcriptWaiting": "Bíða eftir úttektarafritinu.",
+      "transcriptEmpty": "Ekkert afrit fyrir þessa úttekt.",
+      "transcriptRetry": "Ekki tókst að hlaða úttektarafritið.",
+      "transcriptLive": "BEIN"
     },
     "reviewMemory": {
       "title": "Yfirferðarminni",

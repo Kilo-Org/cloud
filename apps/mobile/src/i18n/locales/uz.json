@@ -1300,7 +1300,11 @@
       "checkRun": "Tekshiruv ishlovi",
       "status": "Holat",
       "threshold": "Chegara",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Ko'rib chiqish transkripti kutilmoqda.",
+      "transcriptEmpty": "Bu ko'rib chiqish uchun transkript yo'q.",
+      "transcriptRetry": "Ko'rib chiqish transkriptini yuklab bo'lmadi.",
+      "transcriptLive": "JO'N"
     },
     "reviewMemory": {
       "title": "Ko'rib chiqish xotirasi",

@@ -899,7 +899,11 @@
       "title": "समीक्षा",
       "tokens": "टोकन",
       "tokensInOut": "{{input}} इन / {{output}} आउट",
-      "pullRequest": "पुल रिक्वेस्ट"
+      "pullRequest": "पुल रिक्वेस्ट",
+      "transcriptWaiting": "समीक्षा प्रतिलेख की प्रतीक्षा की जा रही है।",
+      "transcriptEmpty": "इस समीक्षा के लिए कोई प्रतिलेख नहीं है।",
+      "transcriptRetry": "समीक्षा प्रतिलेख लोड नहीं किया जा सका।",
+      "transcriptLive": "लाइव"
     },
     "reviewList": {
       "configureProvider": "प्रदाता कॉन्फ़िगर करें",

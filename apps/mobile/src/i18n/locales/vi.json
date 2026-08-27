@@ -899,7 +899,11 @@
       "title": "Đánh giá",
       "tokens": "Token",
       "tokensInOut": "{{input}} vào / {{output}} ra",
-      "pullRequest": "yêu cầu hợp nhất"
+      "pullRequest": "yêu cầu hợp nhất",
+      "transcriptWaiting": "Đang chờ bản ghi phiên đánh giá.",
+      "transcriptEmpty": "Không có bản ghi phiên cho đánh giá này.",
+      "transcriptRetry": "Không thể tải bản ghi phiên đánh giá.",
+      "transcriptLive": "TRỰC TIẾP"
     },
     "reviewList": {
       "configureProvider": "Cấu hình nhà cung cấp",

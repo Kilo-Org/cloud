@@ -1300,7 +1300,11 @@
       "checkRun": "चेक रन",
       "status": "स्थिती",
       "threshold": "मर्यादा",
-      "pullRequest": "पुल रिक्वेस्ट"
+      "pullRequest": "पुल रिक्वेस्ट",
+      "transcriptWaiting": "पुनरावलोकन उताराची वाट पाहत आहे.",
+      "transcriptEmpty": "या पुनरावलोकनासाठी उतारा नाही.",
+      "transcriptRetry": "पुनरावलोकन उतारा लोड करता आला नाही.",
+      "transcriptLive": "LIVE"
     },
     "reviewMemory": {
       "title": "पुनरावलोकन मेमरी",

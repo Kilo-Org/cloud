@@ -899,7 +899,11 @@
       "title": "审查",
       "tokens": "令牌",
       "tokensInOut": "输入 {{input}} / 输出 {{output}}",
-      "pullRequest": "拉取请求"
+      "pullRequest": "拉取请求",
+      "transcriptWaiting": "正在等待审查转录。",
+      "transcriptEmpty": "此审查没有转录。",
+      "transcriptRetry": "无法加载审查转录。",
+      "transcriptLive": "实时"
     },
     "reviewList": {
       "configureProvider": "配置提供商",

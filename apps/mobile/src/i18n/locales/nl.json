@@ -899,7 +899,11 @@
       "title": "Review",
       "tokens": "Tokens",
       "tokensInOut": "{{input}} in / {{output}} uit",
-      "pullRequest": "pull-aanvraag"
+      "pullRequest": "pull-aanvraag",
+      "transcriptWaiting": "Wachten op het reviewtranscript.",
+      "transcriptEmpty": "Geen transcript voor deze review.",
+      "transcriptRetry": "Het reviewtranscript kon niet worden geladen.",
+      "transcriptLive": "Live"
     },
     "reviewList": {
       "configureProvider": "Provider configureren",

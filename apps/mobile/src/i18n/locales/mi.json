@@ -1300,7 +1300,11 @@
       "checkRun": "Te oma tirotiro",
       "status": "Tūnga",
       "threshold": "Paepae",
-      "pullRequest": "tono huna"
+      "pullRequest": "tono huna",
+      "transcriptWaiting": "Kei te tatari mō te tuhinga arotake.",
+      "transcriptEmpty": "Kāore he tuhinga mō tēnei arotake.",
+      "transcriptRetry": "Kāore i taea te uta te tuhinga arotake.",
+      "transcriptLive": "ORA"
     },
     "reviewMemory": {
       "title": "Te mahara arotake",

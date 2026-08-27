@@ -1318,7 +1318,11 @@
       "checkRun": "Spustenie kontroly",
       "status": "Stav",
       "threshold": "Prah",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Čaká sa na prepis kontroly.",
+      "transcriptEmpty": "Žiadny prepis pre túto kontrolu.",
+      "transcriptRetry": "Prepis kontroly sa nepodarilo načítať.",
+      "transcriptLive": "NAŽIVO"
     },
     "reviewMemory": {
       "title": "Pamäť preskúmaní",

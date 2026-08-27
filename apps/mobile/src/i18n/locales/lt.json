@@ -1318,7 +1318,11 @@
       "checkRun": "Patikros paleidimas",
       "status": "Būsena",
       "threshold": "Slenkstis",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptEmpty": "Šiai peržiūrai transkripto nėra.",
+      "transcriptLive": "Tiesiogiai",
+      "transcriptRetry": "Nepavyko įkelti peržiūros transkripto.",
+      "transcriptWaiting": "Laukiama peržiūros transkripto."
     },
     "reviewMemory": {
       "title": "Peržiūros atmintis",

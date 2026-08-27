@@ -1300,7 +1300,11 @@
       "checkRun": "اجرای بررسی",
       "status": "وضعیت",
       "threshold": "آستانه",
-      "pullRequest": "درخواست pull"
+      "pullRequest": "درخواست pull",
+      "transcriptWaiting": "در انتظار متن گفتوگوی بازبینی.",
+      "transcriptEmpty": "متن گفتوگویی برای این بازبینی وجود ندارد.",
+      "transcriptRetry": "بارگذاری متن گفتوگوی بازبینی ممکن نشد.",
+      "transcriptLive": "زنده"
     },
     "reviewMemory": {
       "title": "حافظه بررسی",

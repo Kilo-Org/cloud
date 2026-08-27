@@ -1300,7 +1300,11 @@
       "checkRun": "Check run",
       "status": "Ọnọdụ",
       "threshold": "Ọkwa",
-      "pullRequest": "arịrịọ ndọrọ"
+      "pullRequest": "arịrịọ ndọrọ",
+      "transcriptWaiting": "Na-echere Nsụgharị nyocha.",
+      "transcriptEmpty": "Enweghị Nsụgharị maka nyocha a.",
+      "transcriptRetry": "Enweghị ike ibudata Nsụgharị nyocha.",
+      "transcriptLive": "LIVE"
     },
     "reviewMemory": {
       "title": "Ebe nchekwa nyocha",

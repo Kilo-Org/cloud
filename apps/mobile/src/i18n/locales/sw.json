@@ -1300,7 +1300,11 @@
       "checkRun": "Endesha ukaguzi",
       "status": "Hali",
       "threshold": "Kizingiti",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Inasubiri nakala ya ukaguzi.",
+      "transcriptEmpty": "Hakuna nakala ya ukaguzi huu.",
+      "transcriptRetry": "Haikuweza kupakia nakala ya ukaguzi.",
+      "transcriptLive": "LIVE"
     },
     "reviewMemory": {
       "title": "Kumbukumbu ya ukaguzi",

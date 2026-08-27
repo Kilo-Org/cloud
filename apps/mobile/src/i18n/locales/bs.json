@@ -1309,7 +1309,11 @@
       "checkRun": "Provera izvođenja",
       "status": "Status",
       "threshold": "Prag",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Čeka se transkript pregleda.",
+      "transcriptEmpty": "Nema transkripta za ovaj pregled.",
+      "transcriptRetry": "Nije moguće učitati transkript pregleda.",
+      "transcriptLive": "UŽIVO"
     },
     "reviewMemory": {
       "title": "Pamćenje pregleda",

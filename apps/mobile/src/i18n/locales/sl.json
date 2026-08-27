@@ -1318,7 +1318,11 @@
       "checkRun": "Preverjanje izvajanja",
       "status": "Stanje",
       "threshold": "Prag",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptEmpty": "Za ta pregled ni prepiseka.",
+      "transcriptLive": "V živo",
+      "transcriptRetry": "Prepiseka pregleda ni bilo mogoče naložiti.",
+      "transcriptWaiting": "Čakanje na prepisek pregleda."
     },
     "reviewMemory": {
       "title": "Pomnilnik pregleda",

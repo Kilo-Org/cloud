@@ -1300,7 +1300,11 @@
       "checkRun": "ដំណើរការពិនិត្យ",
       "status": "ស្ថានភាព",
       "threshold": "កម្រិតកំណត់",
-      "pullRequest": "សំណើទាញ"
+      "pullRequest": "សំណើទាញ",
+      "transcriptWaiting": "កំពុងរង់ចាំការចម្លងនៃការពិនិត្យ។",
+      "transcriptEmpty": "មិនមានការចម្លងសម្រាប់ការពិនិត្យនេះទេ។",
+      "transcriptRetry": "មិនអាចផ្ទុកការចម្លងនៃការពិនិត្យបានទេ។",
+      "transcriptLive": "LIVE"
     },
     "reviewMemory": {
       "title": "អង្គចងចាំត្រួតពិនិត្យ",

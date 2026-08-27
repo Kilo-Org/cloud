@@ -1300,7 +1300,11 @@
       "checkRun": "පරීක්ෂණ ධාවනය",
       "status": "තත්ත්වය",
       "threshold": "සීමාව",
-      "pullRequest": "ඉල්ලීම් ඇදීම"
+      "pullRequest": "ඉල්ලීම් ඇදීම",
+      "transcriptWaiting": "සමාලෝචන පිටපත එනතුරු බලා සිටිමින්.",
+      "transcriptEmpty": "මෙම සමාලෝචනයට පිටපතක් නොමැත.",
+      "transcriptRetry": "සමාලෝචන පිටපත පූරණය කළ නොහැකි විය.",
+      "transcriptLive": "සජීවී"
     },
     "reviewMemory": {
       "title": "සමාලෝචන මතකය",

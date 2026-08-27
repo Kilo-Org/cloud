@@ -1300,7 +1300,11 @@
       "checkRun": "Шалгалтын ажиллагаа",
       "status": "Статус",
       "threshold": "Босго",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Шалгалтын бичлэгийг хүлээж байна.",
+      "transcriptEmpty": "Энэ шалгалтын бичлэг байхгүй.",
+      "transcriptRetry": "Шалгалтын бичлэгийг ачаалж чадсангүй.",
+      "transcriptLive": "ШУУД"
     },
     "reviewMemory": {
       "title": "Шалгалтын санах ой",

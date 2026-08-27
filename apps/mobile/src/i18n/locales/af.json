@@ -1300,7 +1300,11 @@
       "checkRun": "Ondersoekloop",
       "status": "Status",
       "threshold": "Drempel",
-      "pullRequest": "trekversoek"
+      "pullRequest": "trekversoek",
+      "transcriptWaiting": "Wag vir die hersieningtranskripsie.",
+      "transcriptEmpty": "Geen transkripsie vir hierdie hersiening nie.",
+      "transcriptRetry": "Kon nie die hersieningtranskripsie laai nie.",
+      "transcriptLive": "LEWEND"
     },
     "reviewMemory": {
       "title": "Hersieningsgeheue",

@@ -903,7 +903,11 @@
       "title": "Przegląd",
       "tokens": "Tokeny",
       "tokensInOut": "{{input}} wejście / {{output}} wyjście",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Oczekiwanie na transkrypt przeglądu.",
+      "transcriptEmpty": "Brak transkryptu tego przeglądu.",
+      "transcriptRetry": "Nie udało się załadować transkryptu przeglądu.",
+      "transcriptLive": "NA ŻYWO"
     },
     "reviewList": {
       "configureProvider": "Skonfiguruj dostawcę",

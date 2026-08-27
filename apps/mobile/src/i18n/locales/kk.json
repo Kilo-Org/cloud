@@ -1300,7 +1300,11 @@
       "checkRun": "Тексеруді орындау",
       "status": "Күй",
       "threshold": "Шек",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Шолу транскрипті күтілуде.",
+      "transcriptEmpty": "Бұл шолу үшін транскрипт жоқ.",
+      "transcriptRetry": "Шолу транскриптін жүктеу мүмкін болмады.",
+      "transcriptLive": "ТІКІ"
     },
     "reviewMemory": {
       "title": "Шолу жады",

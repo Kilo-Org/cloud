@@ -1300,7 +1300,11 @@
       "checkRun": "Execución da comprobación",
       "status": "Estado",
       "threshold": "Limiar",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Agardando pola transcrición da revisión.",
+      "transcriptEmpty": "Non hai transcrición para esta revisión.",
+      "transcriptRetry": "Non se puido cargar a transcrición da revisión.",
+      "transcriptLive": "EN DIRECTO"
     },
     "reviewMemory": {
       "title": "Memoria de revisión",

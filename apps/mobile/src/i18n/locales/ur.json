@@ -1300,7 +1300,11 @@
       "checkRun": "چیک رن",
       "status": "حالت",
       "threshold": "حد",
-      "pullRequest": "پل ریکویسٹ"
+      "pullRequest": "پل ریکویسٹ",
+      "transcriptWaiting": "جائزہ ٹرانسکرپٹ کا انتظار ہے۔",
+      "transcriptEmpty": "اس جائزے کے لیے کوئی ٹرانسکرپٹ نہیں۔",
+      "transcriptRetry": "جائزہ ٹرانسکرپٹ لوڈ نہیں ہو سکا۔",
+      "transcriptLive": "لائیو"
     },
     "reviewMemory": {
       "title": "جائزہ میموری",

@@ -1309,7 +1309,11 @@
       "checkRun": "Execução de verificação",
       "status": "Estado",
       "threshold": "Limiar",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "A aguardar a transcrição da revisão.",
+      "transcriptEmpty": "Sem transcrição para esta revisão.",
+      "transcriptRetry": "Não foi possível carregar a transcrição da revisão.",
+      "transcriptLive": "AO VIVO"
     },
     "reviewMemory": {
       "title": "Memória de revisão",

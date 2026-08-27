@@ -1300,7 +1300,11 @@
       "checkRun": "Ukuhlolwa kwerejista",
       "status": "Isimo",
       "threshold": "Umkhawulo",
-      "pullRequest": "isicelo sokudonsa"
+      "pullRequest": "isicelo sokudonsa",
+      "transcriptEmpty": "Awukho umbhalo walokhu kubuyekezwa.",
+      "transcriptLive": "LIVE",
+      "transcriptRetry": "Ayikwazanga ukulayisha umbhalo wokubuyekezwa.",
+      "transcriptWaiting": "Ilinde umbhalo wokubuyekezwa."
     },
     "reviewMemory": {
       "title": "Inkumbulo yokubuyekeza",

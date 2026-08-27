@@ -1300,7 +1300,11 @@
       "checkRun": "Yoxlama işi",
       "status": "Status",
       "threshold": "Hədd",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "İcmal transkripti gözlənilir.",
+      "transcriptEmpty": "Bu icmal üçün transkript yoxdur.",
+      "transcriptRetry": "İcmal transkripti yüklənə bilmədi.",
+      "transcriptLive": "CANLI"
     },
     "reviewMemory": {
       "title": "Nəzərdən keçirmə yaddaşı",

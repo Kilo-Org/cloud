@@ -1300,7 +1300,11 @@
       "checkRun": "చెక్ రన్",
       "status": "స్థితి",
       "threshold": "థ్రెషోల్డ్",
-      "pullRequest": "పుల్ రిక్వెస్ట్"
+      "pullRequest": "పుల్ రిక్వెస్ట్",
+      "transcriptWaiting": "సమీక్ష ట్రాన్స్క్రిప్షన్ కోసం వేచి ఉంది.",
+      "transcriptEmpty": "ఈ సమీక్షకు ట్రాన్స్క్రిప్షన్ లేదు.",
+      "transcriptRetry": "సమీక్ష ట్రాన్స్క్రిప్షన్ను లోడ్ చేయలేకపోయాము.",
+      "transcriptLive": "ప్రత్యక్ష"
     },
     "reviewMemory": {
       "title": "సమీక్ష మెమరీ",

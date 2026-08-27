@@ -61,6 +61,7 @@ type SecurityAgentContextValue = {
         slaEnabled: boolean;
         repositorySelectionMode: 'all' | 'selected';
         selectedRepositoryIds: number[];
+        selectedRepositories: Array<{ repositoryId: number; platformIntegrationId: string }>;
         modelSlug?: string;
         triageModelSlug?: string;
         analysisModelSlug?: string;
@@ -103,6 +104,7 @@ type SecurityAgentContextValue = {
       slaEnabled: boolean;
       repositorySelectionMode: 'all' | 'selected';
       selectedRepositoryIds: number[];
+      selectedRepositories: Array<{ repositoryId: number; platformIntegrationId: string }>;
       triageModelSlug: string;
       analysisModelSlug: string;
       modelSlug?: string;
@@ -130,6 +132,7 @@ type SecurityAgentContextValue = {
     repositorySelection: {
       repositorySelectionMode: 'all' | 'selected';
       selectedRepositoryIds: number[];
+      selectedRepositories: Array<{ repositoryId: number; platformIntegrationId: string }>;
     }
   ) => void;
   handleStartAnalysis: (
@@ -1175,6 +1178,7 @@ function useSecurityAgentProviderValue(
         slaEnabled: boolean;
         repositorySelectionMode: 'all' | 'selected';
         selectedRepositoryIds: number[];
+        selectedRepositories: Array<{ repositoryId: number; platformIntegrationId: string }>;
         triageModelSlug: string;
         analysisModelSlug: string;
         modelSlug?: string;
@@ -1216,6 +1220,7 @@ function useSecurityAgentProviderValue(
             slaEnabled: config.slaEnabled,
             repositorySelectionMode: config.repositorySelectionMode,
             selectedRepositoryIds: config.selectedRepositoryIds,
+            selectedRepositories: config.selectedRepositories,
             analysisMode: config.analysisMode,
             autoDismissEnabled: config.autoDismissEnabled,
             autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
@@ -1246,6 +1251,7 @@ function useSecurityAgentProviderValue(
             slaEnabled: config.slaEnabled,
             repositorySelectionMode: config.repositorySelectionMode,
             selectedRepositoryIds: config.selectedRepositoryIds,
+            selectedRepositories: config.selectedRepositories,
             analysisMode: config.analysisMode,
             autoDismissEnabled: config.autoDismissEnabled,
             autoDismissConfidenceThreshold: config.autoDismissConfidenceThreshold,
@@ -1276,6 +1282,7 @@ function useSecurityAgentProviderValue(
       repositorySelection: {
         repositorySelectionMode: 'all' | 'selected';
         selectedRepositoryIds: number[];
+        selectedRepositories: Array<{ repositoryId: number; platformIntegrationId: string }>;
       }
     ) => {
       if (toggleEnabledInFlightRef.current) return;
@@ -1384,13 +1391,22 @@ function useSecurityAgentProviderValue(
   const allRepositories = reposData ?? EMPTY_REPOSITORIES;
   const repositorySelectionMode = configData?.repositorySelectionMode ?? 'selected';
   const selectedRepositoryIds = configData?.selectedRepositoryIds ?? EMPTY_REPOSITORY_IDS;
+  const selectedRepositories = configData?.selectedRepositories ?? [];
 
   const filteredRepositories = useMemo(
     () =>
       repositorySelectionMode === 'all'
         ? allRepositories
-        : allRepositories.filter(repo => selectedRepositoryIds.includes(repo.id)),
-    [repositorySelectionMode, allRepositories, selectedRepositoryIds]
+        : allRepositories.filter(repo =>
+            selectedRepositories.length > 0
+              ? selectedRepositories.some(
+                  selection =>
+                    selection.repositoryId === repo.id &&
+                    selection.platformIntegrationId === repo.integrationId
+                )
+              : selectedRepositoryIds.includes(repo.id)
+          ),
+    [repositorySelectionMode, allRepositories, selectedRepositoryIds, selectedRepositories]
   );
 
   const triageModelSlug = getOptionalStringField(configData, 'triageModelSlug');
@@ -1416,6 +1432,7 @@ function useSecurityAgentProviderValue(
             slaEnabled: configData.slaEnabled ?? true,
             repositorySelectionMode: configData.repositorySelectionMode ?? 'selected',
             selectedRepositoryIds: configData.selectedRepositoryIds ?? [],
+            selectedRepositories: configData.selectedRepositories ?? [],
             triageModelSlug,
             analysisModelSlug,
             analysisMode: configData.analysisMode ?? 'auto',

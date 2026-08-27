@@ -55,6 +55,14 @@ export const SaveSecurityConfigInputSchema = z.object({
   autoSyncEnabled: z.boolean().optional(),
   repositorySelectionMode: RepositorySelectionModeSchema.optional(),
   selectedRepositoryIds: z.array(z.number()).optional(),
+  selectedRepositories: z
+    .array(
+      z.object({
+        repositoryId: z.number().int().positive(),
+        platformIntegrationId: z.string().uuid(),
+      })
+    )
+    .optional(),
   modelSlug: z.string().optional(),
   triageModelSlug: z.string().optional(),
   analysisModelSlug: z.string().optional(),
@@ -126,6 +134,14 @@ export const SetEnabledInputSchema = z.object({
   isEnabled: z.boolean(),
   repositorySelectionMode: RepositorySelectionModeSchema.optional(),
   selectedRepositoryIds: z.array(z.number()).optional(),
+  selectedRepositories: z
+    .array(
+      z.object({
+        repositoryId: z.number().int().positive(),
+        platformIntegrationId: z.string().uuid(),
+      })
+    )
+    .optional(),
 });
 
 export const AnalysisStatusSchema = z.enum(['pending', 'running', 'completed', 'failed']);

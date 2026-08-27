@@ -21,7 +21,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
-import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { trpcClient } from '@/lib/trpc';
@@ -37,33 +36,14 @@ import {
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
 import { type FlattenedSecurityAgentConfig, type SecurityAgentConfig } from '@/lib/security-agent';
+import {
+  installationStatusLabel,
+  RepositorySettingsSkeleton,
+  toggleRepositorySelection,
+} from './repository-settings-support';
 
 type RepositorySelectionMode = SecurityAgentConfig['repositorySelectionMode'];
-
-function installationStatusLabel(input: { active: boolean; hasPermissions: boolean }): string {
-  if (!input.active) {
-    return i18n.t('securityAgent.dashboard.syncStatusUnavailable');
-  }
-  return input.hasPermissions
-    ? i18n.t('securityAgent.settingsOverview.enabled')
-    : i18n.t('securityAgent.scopeEntry.reauthorizeTitle');
-}
-
-function RepositorySettingsSkeleton() {
-  const { t } = useTranslation();
-  return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.repositories.title')} />
-      <View className="gap-3 px-6 pt-4">
-        <Skeleton className="h-11 w-full rounded-lg" />
-        <Skeleton className="h-11 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
-        <Skeleton className="h-12 w-full rounded-lg" />
-      </View>
-    </View>
-  );
-}
-
+type SelectedRepository = SecurityAgentConfig['selectedRepositories'][number];
 export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   const canManage = useSecurityAgentCapability(scope).canManage;
@@ -73,31 +53,36 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const save = useSaveSecurityAgentConfig(scope);
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectedRepositories, setSelectedRepositories] = useState<SelectedRepository[]>([]);
   const hydratedRef = useRef(false);
   const initialConfigRef = useRef<Partial<FlattenedSecurityAgentConfig>>({});
 
-  // Local state initialized from the loaded config exactly once — later
-  // config refetches (e.g. after this screen's own save) shouldn't clobber
-  // in-progress edits.
   useEffect(() => {
-    if (hydratedRef.current || !config.data) {
+    if (hydratedRef.current || !config.data || !repositories.data) {
       return;
     }
     hydratedRef.current = true;
     initialConfigRef.current = config.data;
     setMode(config.data.repositorySelectionMode);
-    setSelectedIds(config.data.selectedRepositoryIds);
-  }, [config.data]);
+    setSelectedRepositories(
+      config.data.selectedRepositories.length > 0
+        ? config.data.selectedRepositories
+        : repositories.data
+            .filter(repository => config.data.selectedRepositoryIds.includes(repository.id))
+            .map(repository => ({
+              repositoryId: repository.id,
+              platformIntegrationId: repository.integrationId,
+            }))
+    );
+  }, [config.data, repositories.data]);
 
-  // The repositories screen stays reachable while the agent is disabled so a
-  // user with integration repos but no effective selection can pick repos and
-  // then enable (the overview's "Select repositories" CTA lands here). Opt out
-  // of the disabled-state redirect; every other sub-screen keeps it.
   useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, true);
 
-  const valid = mode === 'all' || selectedIds.length > 0;
-  const patch = { repositorySelectionMode: mode, selectedRepositoryIds: selectedIds };
+  const selectedRepositoryIds = [
+    ...new Set(selectedRepositories.map(selection => selection.repositoryId)),
+  ];
+  const valid = mode === 'all' || selectedRepositories.length > 0;
+  const patch = { repositorySelectionMode: mode, selectedRepositoryIds, selectedRepositories };
   const dirty =
     hydratedRef.current &&
     getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
@@ -127,9 +112,9 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
     setMode(option);
   };
 
-  const toggleRepo = (id: number) => {
-    setSelectedIds(current =>
-      current.includes(id) ? current.filter(existing => existing !== id) : [...current, id]
+  const toggleRepo = (repositoryId: number, platformIntegrationId: string) => {
+    setSelectedRepositories(current =>
+      toggleRepositorySelection(current, repositoryId, platformIntegrationId)
     );
   };
   const repositoryGroups = new Map<
@@ -294,11 +279,15 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
                     <RepoToggleRow
                       key={`${integrationId}:${repo.id}`}
                       repo={repo}
-                      selected={selectedIds.includes(repo.id)}
+                      selected={selectedRepositories.some(
+                        selection =>
+                          selection.repositoryId === repo.id &&
+                          selection.platformIntegrationId === integrationId
+                      )}
                       disabled={!canManage}
                       className="border-b-[0.5px] border-hair-soft"
                       onPress={() => {
-                        toggleRepo(repo.id);
+                        toggleRepo(repo.id, integrationId);
                       }}
                     />
                   ))}
@@ -307,7 +296,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
             {!repositories.isLoading &&
               !repositories.isError &&
               (repositories.data?.length ?? 0) > 0 &&
-              selectedIds.length === 0 && (
+              selectedRepositories.length === 0 && (
                 <Text className="pt-2 text-xs text-destructive">
                   {t('securityAgent.repositories.selectAtLeastOne')}
                 </Text>

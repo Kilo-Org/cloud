@@ -61,6 +61,14 @@ export const SecurityAgentConfigSchema = z
     auto_sync_enabled: z.boolean().default(true),
     repository_selection_mode: z.enum(['all', 'selected']).default('all'),
     selected_repository_ids: z.array(z.number()).optional(),
+    selected_repositories: z
+      .array(
+        z.object({
+          repositoryId: z.number().int().positive(),
+          platformIntegrationId: z.string().uuid(),
+        })
+      )
+      .optional(),
     model_slug: z.string().optional(),
     triage_model_slug: z.string().optional(),
     analysis_model_slug: z.string().optional(),

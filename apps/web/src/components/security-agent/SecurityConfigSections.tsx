@@ -336,17 +336,33 @@ export function RepositorySection({
   repositories: SecurityRepository[];
   isLoading?: boolean;
 }) {
-  const dependabotAlertsByRepositoryId = new Map(
-    repositories.map(repository => [repository.id, repository.dependabotAlerts])
+  const repositoryKey = (repository: SecurityRepository) =>
+    `${repository.integrationId}:${repository.id}`;
+  const dependabotAlertsByRepositoryKey = new Map(
+    repositories.map(repository => [repositoryKey(repository), repository.dependabotAlerts])
   );
   const disabledRepositories = repositories.filter(
     repository => repository.dependabotAlerts === 'disabled'
   );
-  const selectedRepositoryIds = new Set(state.selectedRepositoryIds);
+  const selectedRepositoryKeys = new Set(
+    state.selectedRepositories.map(
+      selection => `${selection.platformIntegrationId}:${selection.repositoryId}`
+    )
+  );
+  const usesCompositeSelection = state.selectedRepositories.length > 0;
+  const selectedRepositoryOptionKeys = usesCompositeSelection
+    ? [...selectedRepositoryKeys]
+    : repositories
+        .filter(repository => state.selectedRepositoryIds.includes(repository.id))
+        .map(repositoryKey);
   const selectedDisabledRepositories =
     state.repositorySelectionMode === 'all'
       ? disabledRepositories
-      : disabledRepositories.filter(repository => selectedRepositoryIds.has(repository.id));
+      : disabledRepositories.filter(repository =>
+          usesCompositeSelection
+            ? selectedRepositoryKeys.has(repositoryKey(repository))
+            : state.selectedRepositoryIds.includes(repository.id)
+        );
   const displayedDisabledRepositories = selectedDisabledRepositories.slice(0, 5);
   const additionalDisabledRepositoryCount =
     selectedDisabledRepositories.length - displayedDisabledRepositories.length;
@@ -417,13 +433,28 @@ export function RepositorySection({
               <div className="space-y-2">
                 <Label>Repositories</Label>
                 <RepositoryMultiSelect
-                  repositories={toRepositoryOptions(repositories)}
-                  selectedIds={state.selectedRepositoryIds}
-                  onSelectionChange={selectedRepositoryIds =>
-                    setState(current => ({ ...current, selectedRepositoryIds }))
+                  repositories={toRepositoryOptions(repositories).map(repository => ({
+                    ...repository,
+                    id: `${repository.group?.id}:${repository.id}`,
+                  }))}
+                  selectedIds={selectedRepositoryOptionKeys}
+                  onSelectionChange={selectedRepositoryKeys =>
+                    setState(current => {
+                      const selectedRepositories = selectedRepositoryKeys.map(key => {
+                        const [platformIntegrationId, repositoryId] = key.split(':');
+                        return { repositoryId: Number(repositoryId), platformIntegrationId };
+                      });
+                      return {
+                        ...current,
+                        selectedRepositories,
+                        selectedRepositoryIds: [
+                          ...new Set(selectedRepositories.map(selection => selection.repositoryId)),
+                        ],
+                      };
+                    })
                   }
                   renderRepositoryAccessory={repository => {
-                    if (dependabotAlertsByRepositoryId.get(repository.id) !== 'disabled') {
+                    if (dependabotAlertsByRepositoryKey.get(repository.id) !== 'disabled') {
                       return null;
                     }
 

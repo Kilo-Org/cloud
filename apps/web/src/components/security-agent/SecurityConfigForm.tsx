@@ -78,7 +78,7 @@ type SecurityConfigFormProps = {
     enabled: boolean,
     repositorySelection: Pick<
       SecurityConfigFormState,
-      'repositorySelectionMode' | 'selectedRepositoryIds'
+      'repositorySelectionMode' | 'selectedRepositoryIds' | 'selectedRepositories'
     >
   ) => void;
 };
@@ -103,6 +103,7 @@ const DEFAULT_FORM_CONFIG: SecurityConfigFormState = {
   slaEnabled: true,
   repositorySelectionMode: 'selected',
   selectedRepositoryIds: [],
+  selectedRepositories: [],
   triageModelSlug: DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
   analysisModelSlug: DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
   analysisMode: 'auto',
@@ -132,6 +133,9 @@ function configFingerprint(config: SecurityConfigFormState) {
     config.slaEnabled,
     config.repositorySelectionMode,
     sortedIds(config.selectedRepositoryIds),
+    config.selectedRepositories
+      .map(selection => `${selection.platformIntegrationId}:${selection.repositoryId}`)
+      .toSorted(),
     config.triageModelSlug,
     config.analysisModelSlug,
     config.analysisMode,
@@ -265,7 +269,7 @@ export function SecurityConfigForm({
   const repositoryCount =
     state.repositorySelectionMode === 'all'
       ? repositories.length
-      : state.selectedRepositoryIds.length;
+      : state.selectedRepositories.length || state.selectedRepositoryIds.length;
   const stateProps = { state, setState };
 
   const handleSave = (options?: { onSuccess?: () => void; onError?: () => void }) => {
@@ -408,6 +412,7 @@ export function SecurityConfigForm({
                       ...DEFAULT_FORM_CONFIG,
                       slaConfig: { ...DEFAULT_FORM_CONFIG.slaConfig },
                       selectedRepositoryIds: [],
+                      selectedRepositories: [],
                     })
                   }
                   disabled={isSaving}
@@ -448,6 +453,7 @@ export function SecurityConfigForm({
               onToggleEnabled(nextEnabled, {
                 repositorySelectionMode: state.repositorySelectionMode,
                 selectedRepositoryIds: state.selectedRepositoryIds,
+                selectedRepositories: state.selectedRepositories,
               })
             }
           />

@@ -21,6 +21,7 @@ export type RepositoryMultiSelectProps<TId extends RepositoryId = number> = {
   repositories: Repository<TId>[];
   selectedIds: TId[];
   onSelectionChange: (selectedIds: TId[]) => void;
+  getRepositoryKey?: (repository: Repository<TId>) => TId;
   renderRepositoryAccessory?: (repository: Repository<TId>) => React.ReactNode;
 };
 
@@ -28,6 +29,7 @@ export function RepositoryMultiSelect<TId extends RepositoryId = number>({
   repositories,
   selectedIds,
   onSelectionChange,
+  getRepositoryKey = repository => repository.id,
   renderRepositoryAccessory,
 }: RepositoryMultiSelectProps<TId>) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,14 +60,16 @@ export function RepositoryMultiSelect<TId extends RepositoryId = number>({
   };
 
   const handleSelectAll = () => {
-    onSelectionChange(repositories.map(repo => repo.id));
+    onSelectionChange(repositories.map(getRepositoryKey));
   };
 
   const handleDeselectAll = () => {
     onSelectionChange([]);
   };
 
-  const isAllSelected = selectedIds.length === repositories.length && repositories.length > 0;
+  const isAllSelected =
+    repositories.length > 0 &&
+    repositories.every(repository => selectedIds.includes(getRepositoryKey(repository)));
   const isNoneSelected = selectedIds.length === 0;
 
   return (
@@ -119,23 +123,24 @@ export function RepositoryMultiSelect<TId extends RepositoryId = number>({
                   </div>
                 ) : null}
                 {group.repositories.map(repo => {
-                  const isChecked = selectedIds.includes(repo.id);
+                  const repositoryKey = getRepositoryKey(repo);
+                  const isChecked = selectedIds.includes(repositoryKey);
 
                   return (
                     <div
-                      key={repo.id}
+                      key={String(repositoryKey)}
                       className={cn(
                         'hover:bg-accent flex items-center gap-3 rounded-md p-2 transition-colors',
                         isChecked && 'bg-accent text-accent-foreground'
                       )}
                     >
                       <Checkbox
-                        id={`repo-${repo.id}`}
+                        id={`repo-${repositoryKey}`}
                         checked={isChecked}
-                        onCheckedChange={() => handleToggle(repo.id)}
+                        onCheckedChange={() => handleToggle(repositoryKey)}
                       />
                       <label
-                        htmlFor={`repo-${repo.id}`}
+                        htmlFor={`repo-${repositoryKey}`}
                         className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-sm"
                       >
                         {repo.private ? (

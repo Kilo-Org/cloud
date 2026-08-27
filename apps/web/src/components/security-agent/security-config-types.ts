@@ -19,6 +19,10 @@ export type AutoAnalysisMinSeverity = 'critical' | 'high' | 'medium' | 'all';
 export type AutoRemediationMinSeverity = 'critical' | 'high' | 'medium' | 'all';
 export type NotificationMinSeverity = 'critical' | 'high' | 'medium' | 'low';
 export type RepositorySelectionMode = 'all' | 'selected';
+export type SelectedSecurityRepository = {
+  repositoryId: number;
+  platformIntegrationId: string;
+};
 
 export type SecurityRepository = {
   id: number;
@@ -45,6 +49,7 @@ export type SecurityConfigFormState = {
   slaEnabled: boolean;
   repositorySelectionMode: RepositorySelectionMode;
   selectedRepositoryIds: number[];
+  selectedRepositories: SelectedSecurityRepository[];
   triageModelSlug: string;
   analysisModelSlug: string;
   analysisMode: AnalysisMode;
@@ -79,6 +84,7 @@ export type SecurityConfigFormSource = {
   slaEnabled?: boolean;
   repositorySelectionMode?: RepositorySelectionMode;
   selectedRepositoryIds?: number[];
+  selectedRepositories?: SelectedSecurityRepository[];
   triageModelSlug?: string;
   analysisModelSlug?: string;
   modelSlug?: string;
@@ -113,6 +119,7 @@ export function buildSecurityConfigFormState(
     slaEnabled: configData?.slaEnabled ?? true,
     repositorySelectionMode: configData?.repositorySelectionMode ?? 'selected',
     selectedRepositoryIds: configData?.selectedRepositoryIds ?? [],
+    selectedRepositories: configData?.selectedRepositories ?? [],
     triageModelSlug:
       configData?.triageModelSlug ?? configData?.modelSlug ?? DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
     analysisModelSlug:
@@ -150,6 +157,7 @@ export function buildSecurityConfigSavePayload(
     slaEnabled: state.slaEnabled,
     repositorySelectionMode: state.repositorySelectionMode,
     selectedRepositoryIds: state.selectedRepositoryIds,
+    selectedRepositories: state.selectedRepositories,
     triageModelSlug: state.triageModelSlug,
     analysisModelSlug: state.analysisModelSlug,
     modelSlug: state.analysisModelSlug,

@@ -11,6 +11,7 @@ const baseFormState: SecurityConfigFormState = {
   slaEnabled: true,
   repositorySelectionMode: 'selected',
   selectedRepositoryIds: [],
+  selectedRepositories: [],
   triageModelSlug: 'triage-model',
   analysisModelSlug: 'analysis-model',
   analysisMode: 'auto',
@@ -70,5 +71,21 @@ describe('SecurityConfigForm config round-trip', () => {
         group: { id: 'integration-labs', label: 'acme-labs' },
       }),
     ]);
+  });
+
+  it('round trips duplicate repository IDs from separate installations', () => {
+    const selectedRepositories = [
+      { repositoryId: 42, platformIntegrationId: 'integration-core' },
+      { repositoryId: 42, platformIntegrationId: 'integration-labs' },
+    ];
+    const state = buildSecurityConfigFormState({
+      selectedRepositoryIds: [42],
+      selectedRepositories,
+    });
+
+    expect(buildSecurityConfigSavePayload(state)).toMatchObject({
+      selectedRepositoryIds: [42],
+      selectedRepositories,
+    });
   });
 });

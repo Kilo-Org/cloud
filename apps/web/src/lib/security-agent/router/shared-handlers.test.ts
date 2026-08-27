@@ -585,6 +585,71 @@ describe('multi-installation selection', () => {
       })
     ).resolves.toMatchObject({ success: true });
   });
+
+  it('distinguishes duplicate repository IDs by installation', async () => {
+    mockSubmitManualSecuritySync.mockResolvedValue({
+      accepted: true,
+      commandId,
+      runId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      messageId: 'enable-sync-message-123',
+    });
+    const handlers = createSecurityAgentHandlers({
+      resolveOwner: () => ({ type: 'org', id: 'org-1', userId: 'user-123' }),
+      resolveSecurityOwner: () => ({ organizationId: 'org-1' }),
+      resolveResourceId: () => 'org-1',
+      verifyFindingOwnership: () => true,
+      getIntegration: async () => null,
+      getIntegrations: async () =>
+        [
+          {
+            id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            integration_status: 'active',
+            platform_installation_id: 'installation-1',
+            permissions: { vulnerability_alerts: 'read' },
+            suspended_at: null,
+            auth_invalid_at: null,
+            repositories: [{ id: 22, full_name: 'acme-core/app', name: 'app', private: true }],
+          },
+          {
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            integration_status: 'active',
+            platform_installation_id: 'installation-2',
+            permissions: { vulnerability_alerts: 'read' },
+            suspended_at: null,
+            auth_invalid_at: null,
+            repositories: [{ id: 22, full_name: 'acme-labs/app', name: 'app', private: false }],
+          },
+        ] as never,
+      trackingExtras: () => ({}),
+    });
+    const selectedRepositories = [
+      {
+        repositoryId: 22,
+        platformIntegrationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      },
+    ];
+
+    await expect(
+      handlers.setEnabled.handler({
+        ctx: context,
+        input: {
+          isEnabled: true,
+          repositorySelectionMode: 'selected',
+          selectedRepositoryIds: [22],
+          selectedRepositories,
+        },
+      })
+    ).resolves.toMatchObject({ success: true });
+
+    expect(mockUpsertSecurityAgentConfig).toHaveBeenCalledWith(
+      { type: 'org', id: 'org-1', userId: 'user-123' },
+      expect.objectContaining({
+        selected_repository_ids: [22],
+        selected_repositories: selectedRepositories,
+      }),
+      'user-123'
+    );
+  });
 });
 
 describe('getConfig', () => {
@@ -749,6 +814,34 @@ describe('setEnabled', () => {
 });
 
 describe('saveConfig', () => {
+  it('persists composite selections alongside compatibility IDs', async () => {
+    const selectedRepositories = [
+      {
+        repositoryId: 22,
+        platformIntegrationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      },
+    ];
+
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: {
+        expectedRevision: null,
+        repositorySelectionMode: 'selected',
+        selectedRepositoryIds: [22],
+        selectedRepositories,
+      },
+    });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          selected_repository_ids: [22],
+          selected_repositories: selectedRepositories,
+        }),
+      })
+    );
+  });
+
   it('delegates to the CAS save and returns the queued count', async () => {
     mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({
       newRevision: 2,

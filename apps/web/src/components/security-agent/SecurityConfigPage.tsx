@@ -59,6 +59,7 @@ export function SecurityConfigPage() {
     slaEnabled: configData?.slaEnabled ?? true,
     repositorySelectionMode: configData?.repositorySelectionMode ?? 'selected',
     selectedRepositoryIds: configData?.selectedRepositoryIds ?? [],
+    selectedRepositories: configData?.selectedRepositories ?? [],
     triageModelSlug:
       configData?.triageModelSlug ?? configData?.modelSlug ?? DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
     analysisModelSlug:

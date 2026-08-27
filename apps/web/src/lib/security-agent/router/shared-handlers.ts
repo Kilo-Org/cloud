@@ -168,13 +168,34 @@ type SecurityAgentDeps<TExtra = {}> = {
 
 function getRepoFullNamesInScope(
   integrations: Integration[],
-  config: { repository_selection_mode?: 'all' | 'selected'; selected_repository_ids?: number[] }
+  config: {
+    repository_selection_mode?: 'all' | 'selected';
+    selected_repository_ids?: number[];
+    selected_repositories?: Array<{ repositoryId: number; platformIntegrationId: string }>;
+  }
 ): string[] {
-  const repositories = integrations.flatMap(
-    integration => requireNumericPlatformRepositories(integration.repositories) ?? []
+  const repositories = integrations.flatMap(integration =>
+    (requireNumericPlatformRepositories(integration.repositories) ?? []).map(repository => ({
+      ...repository,
+      platformIntegrationId: integration.id,
+    }))
   );
   if (config.repository_selection_mode === 'all') {
     return repositories.map(repo => repo.full_name).filter((name): name is string => !!name);
+  }
+  const selectedRepositories = config.selected_repositories;
+  if (selectedRepositories !== undefined) {
+    const selectedKeys = new Set(
+      selectedRepositories.map(
+        selection => `${selection.repositoryId}:${selection.platformIntegrationId}`
+      )
+    );
+    return repositories
+      .filter(repository =>
+        selectedKeys.has(`${repository.id}:${repository.platformIntegrationId}`)
+      )
+      .map(repository => repository.full_name)
+      .filter((name): name is string => !!name);
   }
   const selectedIds = new Set(config.selected_repository_ids ?? []);
   return repositories
@@ -814,6 +835,10 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           autoSyncEnabled: true,
           repositorySelectionMode: 'selected' as const,
           selectedRepositoryIds: [] as number[],
+          selectedRepositories: [] as Array<{
+            repositoryId: number;
+            platformIntegrationId: string;
+          }>,
           modelSlug: DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
           triageModelSlug: DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
           analysisModelSlug: DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
@@ -867,6 +892,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         autoSyncEnabled: result.config.auto_sync_enabled,
         repositorySelectionMode: result.config.repository_selection_mode || 'selected',
         selectedRepositoryIds: result.config.selected_repository_ids || [],
+        selectedRepositories: result.config.selected_repositories || [],
         modelSlug: result.config.model_slug || analysisModelSlug,
         triageModelSlug,
         analysisModelSlug,
@@ -940,6 +966,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
               analysisModelSlug: existingAnalysisModelSlug,
               repositorySelectionMode: existingConfig.config.repository_selection_mode,
               selectedRepositoryIds: existingConfig.config.selected_repository_ids,
+              selectedRepositories: existingConfig.config.selected_repositories,
               slaCriticalDays: existingConfig.config.sla_critical_days,
               slaHighDays: existingConfig.config.sla_high_days,
               slaMediumDays: existingConfig.config.sla_medium_days,
@@ -1032,6 +1059,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             auto_sync_enabled: input.autoSyncEnabled,
             repository_selection_mode: input.repositorySelectionMode,
             selected_repository_ids: input.selectedRepositoryIds,
+            selected_repositories: input.selectedRepositories,
             model_slug: modelSlug,
             triage_model_slug: triageModelSlug,
             analysis_model_slug: analysisModelSlug,
@@ -1197,6 +1225,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           'selected';
         const selectedIds =
           input.selectedRepositoryIds ?? existingConfig?.config.selected_repository_ids ?? [];
+        const selectedRepositories =
+          input.selectedRepositories ?? existingConfig?.config.selected_repositories;
 
         // Refuse enabling with an empty effective repo set: no repository would
         // be synced or analyzed, so an enabled state would be misleading.
@@ -1204,6 +1234,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           const effectiveRepos = getRepoFullNamesInScope(integrations, {
             repository_selection_mode: selectionMode,
             selected_repository_ids: selectedIds,
+            selected_repositories: selectedRepositories,
           });
           if (effectiveRepos.length === 0) {
             throw new TRPCError({
@@ -1220,6 +1251,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
             {
               repository_selection_mode: selectionMode,
               selected_repository_ids: selectedIds,
+              selected_repositories: selectedRepositories,
             },
             ctx.user.id
           );

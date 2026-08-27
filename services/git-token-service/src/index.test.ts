@@ -576,7 +576,7 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
     expect(serviceMocks.getToken).not.toHaveBeenCalled();
   });
 
-  it('preserves an ambiguous installation result', async () => {
+  it('maps an ambiguous installation to the legacy no-installation result', async () => {
     serviceMocks.findInstallationId.mockResolvedValue({
       success: false,
       reason: 'ambiguous_installation',
@@ -587,7 +587,7 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
       userId: 'user-1',
     });
 
-    expect(result).toEqual({ success: false, reason: 'ambiguous_installation' });
+    expect(result).toEqual({ success: false, reason: 'no_installation_found' });
     expect(serviceMocks.findRefreshCandidates).not.toHaveBeenCalled();
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
   });
@@ -607,7 +607,7 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
   });
 
-  it('fails closed when scoped minting is indeterminate', async () => {
+  it('preserves the legacy thrown failure when scoped minting is indeterminate', async () => {
     serviceMocks.findInstallationId.mockResolvedValue({
       success: true,
       installationId: '123',
@@ -620,7 +620,7 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
 
     await expect(
       createService().getTokenForRepo({ githubRepo: 'renamed-owner/repository', userId: 'user-1' })
-    ).resolves.toEqual({ success: false, reason: 'temporarily_unavailable' });
+    ).rejects.toThrow('GitHub repository authorization is temporarily unavailable');
     expect(serviceMocks.getToken).not.toHaveBeenCalled();
   });
 
@@ -697,7 +697,7 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
 
     await expect(
       createService().getTokenForRepo({ githubRepo: 'acme/repository', userId: 'user-1' })
-    ).resolves.toEqual({ success: false, reason: 'ambiguous_installation' });
+    ).resolves.toEqual({ success: false, reason: 'no_installation_found' });
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
   });
 
@@ -742,7 +742,7 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
     ).resolves.toEqual({ success: false, reason: 'repository_not_installed' });
   });
 
-  it('fails closed when provider uncertainty could hide another live match', async () => {
+  it('keeps provider uncertainty on the legacy thrown retry path', async () => {
     const candidate = {
       success: true as const,
       integrationId: '00000000-0000-4000-8000-000000000001',
@@ -764,7 +764,7 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
 
     await expect(
       createService().getTokenForRepo({ githubRepo: 'acme/repository', userId: 'user-1' })
-    ).resolves.toEqual({ success: false, reason: 'temporarily_unavailable' });
+    ).rejects.toThrow('GitHub repository authorization is temporarily unavailable');
   });
 
   it('resolves the exact expected integration', async () => {

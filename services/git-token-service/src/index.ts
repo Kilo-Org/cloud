@@ -784,7 +784,14 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
    */
   async getTokenForRepo(params: GetTokenForRepoParams): Promise<GetTokenForRepoResult> {
     const resolved = await this.resolveAuthoritativeInstallation(params);
-    if (!resolved.success) return resolved;
+    if (!resolved.success) {
+      if (resolved.reason === 'temporarily_unavailable') {
+        throw new Error('GitHub repository authorization is temporarily unavailable');
+      }
+      return resolved.reason === 'ambiguous_installation'
+        ? { success: false, reason: 'no_installation_found' }
+        : resolved;
+    }
     const { installation } = resolved;
 
     return {
@@ -801,7 +808,14 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     params: GetCloudAgentAuthForRepoParams
   ): Promise<GetCloudAgentAuthForRepoResult> {
     const resolved = await this.resolveAuthoritativeInstallation(params);
-    if (!resolved.success) return resolved;
+    if (!resolved.success) {
+      if (resolved.reason === 'temporarily_unavailable') {
+        throw new Error('GitHub repository authorization is temporarily unavailable');
+      }
+      return resolved.reason === 'ambiguous_installation'
+        ? { success: false, reason: 'no_installation_found' }
+        : resolved;
+    }
     const { installation } = resolved;
 
     const installationAuthor = this.getInstallationAuthor(installation.githubAppType);

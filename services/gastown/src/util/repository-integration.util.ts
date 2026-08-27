@@ -1,9 +1,13 @@
+import { parseGitUrl } from '@kilocode/worker-utils/git-url';
+
 export type RepositoryIntegrationResolution =
   | { success: true; platformIntegrationId?: string }
   | { success: false; reason: GetTokenForRepoFailure['reason'] | 'service_unavailable' };
 
-function extractGithubRepo(gitUrl: string): string | null {
-  return gitUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/)?.[1] ?? null;
+export function extractGitHubRepo(gitUrl: string): string | undefined {
+  const coordinates = parseGitUrl(gitUrl);
+  if (coordinates?.platform !== 'github') return undefined;
+  return `${coordinates.owner}/${coordinates.repo}`;
 }
 
 export async function resolveRepositoryIntegration(
@@ -15,7 +19,7 @@ export async function resolveRepositoryIntegration(
     expectedIntegrationId?: string;
   }
 ): Promise<RepositoryIntegrationResolution> {
-  const githubRepo = extractGithubRepo(input.gitUrl);
+  const githubRepo = extractGitHubRepo(input.gitUrl);
   if (!githubRepo) return { success: true };
   if (!env.GIT_TOKEN_SERVICE) return { success: false, reason: 'service_unavailable' };
 

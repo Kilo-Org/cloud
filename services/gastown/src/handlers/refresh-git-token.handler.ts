@@ -5,6 +5,7 @@ import { getTownDOStub } from '../dos/Town.do';
 import { verifyContainerJWT } from '../util/jwt.util';
 import { resolveSecret } from '../util/secret.util';
 import { resSuccess, resError } from '../util/res.util';
+import { extractGitHubRepo } from '../util/repository-integration.util';
 import { resolveGitHubToken } from '../dos/town/town-scm';
 
 /**
@@ -48,7 +49,7 @@ export async function handleRefreshGitToken(
     return c.json(resError('Rig not found'), 404);
   }
   const townConfig = await town.getTownConfig();
-  const githubRepo = rigConfig.gitUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/)?.[1];
+  const githubRepo = extractGitHubRepo(rigConfig.gitUrl);
 
   const freshToken = await resolveGitHubToken({
     env: c.env,

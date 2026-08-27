@@ -1024,7 +1024,9 @@ export function ChatComposer({
     return staticChips;
   }, [sessionState]);
   const showStarters =
-    !hasText && !isSending && (!disabled || sessionState === 'preparing' || sessionState === 'finalizing');
+    !hasText &&
+    !isSending &&
+    (!disabled || sessionState === 'preparing' || sessionState === 'finalizing');
 
   async function submit() {
     // Commit any coalesced derived state (hasText, measure, slash command)

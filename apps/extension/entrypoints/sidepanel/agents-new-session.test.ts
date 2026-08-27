@@ -4,6 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildPrepareSessionInput,
   buildSubmitInput,
+  filterRepoOptions,
+  getRepoOptionKey,
+  groupRepoOptions,
   isModelPreferencesGetResult,
   MODE,
   PROMPT_MAX_LENGTH,
@@ -133,11 +136,61 @@ describe('buildSubmitInput helper', () => {
     const result = buildSubmitInput(baseParams);
     expect(result).not.toHaveProperty('organizationId');
   });
+
+  it('includes repository integration provenance when available', () => {
+    const result = buildSubmitInput({ ...baseParams, githubIntegrationId: 'integration-1' });
+    expect(result['githubIntegrationId']).toBe('integration-1');
+  });
+
+  it('omits repository integration provenance for legacy responses', () => {
+    expect(buildSubmitInput(baseParams)).not.toHaveProperty('githubIntegrationId');
+  });
 });
 
-// ---------------------------------------------------------------------------
-// BuildPrepareSessionInput
-// ---------------------------------------------------------------------------
+describe('repository selector helpers', () => {
+  const acmeRepository = {
+    fullName: 'acme/widgets',
+    id: 1,
+    name: 'widgets',
+    platformAccountLogin: 'Acme',
+    platformIntegrationId: 'integration-1',
+    private: true,
+  };
+  const securityRepository = {
+    fullName: 'acme/widgets',
+    id: 2,
+    name: 'widgets',
+    platformAccountLogin: 'Acme Security',
+    platformIntegrationId: 'integration-2',
+    private: true,
+  };
+  const legacyRepository = {
+    fullName: 'octocat/Hello-World',
+    id: 3,
+    name: 'Hello-World',
+    private: false,
+  };
+  const repositories = [acmeRepository, securityRepository, legacyRepository];
+
+  it('uses integration-qualified keys while retaining the legacy full-name fallback', () => {
+    expect(getRepoOptionKey(acmeRepository)).toBe('integration-1:acme/widgets');
+    expect(getRepoOptionKey(securityRepository)).toBe('integration-2:acme/widgets');
+    expect(getRepoOptionKey(legacyRepository)).toBe('octocat/Hello-World');
+  });
+
+  it('searches canonical names and GitHub accounts case-insensitively', () => {
+    expect(filterRepoOptions(repositories, 'hello')).toStrictEqual([legacyRepository]);
+    expect(filterRepoOptions(repositories, 'SECURITY')).toStrictEqual([securityRepository]);
+  });
+
+  it('groups by GitHub account and keeps repositories without provenance in a legacy group', () => {
+    expect(groupRepoOptions(repositories)).toStrictEqual([
+      ['Acme', [acmeRepository]],
+      ['Acme Security', [securityRepository]],
+      [undefined, [legacyRepository]],
+    ]);
+  });
+});
 
 describe('buildPrepareSessionInput helper', () => {
   const baseInput = {

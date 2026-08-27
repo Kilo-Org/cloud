@@ -336,12 +336,30 @@ describe('iosSink Live Activity copy', () => {
   it('adopts and updates a leftover activity from publish when the handle is null', () => {
     mockState.instances = [{ update: (next: unknown) => mockState.updated.push(next) }];
 
-    iosSink.publish(snapshotFor([], 1, 'empty'));
+    iosSink.publish(snapshotFor([{ status: 'busy' }], 1));
 
     expect(mockState.started.length).toBe(0);
+    expect(mockState.ended.length).toBe(0);
     const updated = mockState.updated.at(-1) as GlanceableViewProps | undefined;
-    expect(updated?.statusLine).toBe('No work in progress');
+    expect(updated?.countLines).toHaveLength(1);
     expect(delivery.registerTokens).not.toHaveBeenCalled();
+  });
+
+  it('ends an adopted leftover activity when publish receives ineligible work', () => {
+    mockState.instances = [
+      {
+        update: (next: unknown) => mockState.updated.push(next),
+        end: (policy: unknown, props?: unknown, contentDate?: unknown) =>
+          mockState.ended.push({ policy, props, contentDate }),
+      },
+    ];
+
+    iosSink.publish(snapshotFor([], 1, 'empty'));
+
+    expect(mockState.ended.length).toBe(1);
+    expect(mockState.ended[0]?.policy).toBe('immediate');
+    expect(mockState.updated.length).toBe(0);
+    expect(delivery.unregisterTokens).toHaveBeenCalledTimes(1);
   });
 });
 

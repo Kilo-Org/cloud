@@ -183,6 +183,9 @@ importers:
       ink:
         specifier: 6.8.0
         version: 6.8.0(@types/react@19.2.14)(bufferutil@4.1.0)(react-devtools-core@6.1.5(bufferutil@4.1.0)(utf-8-validate@6.0.6))(react@19.2.6)(utf-8-validate@6.0.6)
+      js-yaml:
+        specifier: 4.3.1
+        version: 4.3.1
       oxfmt:
         specifier: 0.40.0
         version: 0.40.0

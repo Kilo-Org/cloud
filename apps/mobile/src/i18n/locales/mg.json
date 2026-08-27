@@ -665,7 +665,8 @@
     "profile": "Momba ahy",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tabilao, {{position}} amin'ny {{total}}"
+    "position": "{{name}}, tabilao, {{position}} amin'ny {{total}}",
+    "chat": "Resaka"
   },
   "chat": {
     "instancePicker": {
@@ -3149,5 +3150,18 @@
     "emptyDescription": "Raha itokisanao ny mpisakafoana amin'ny rohy iray, dia sokafana izany tsy misy fanontaniana intsony.",
     "revoke": "Esory {{host}}",
     "backToPreferences": "Miverina any amin'ny safidinao"
+  },
+  "quickChat": {
+    "title": "Resaka",
+    "composer": {
+      "placeholder": "Hafatra"
+    },
+    "empty": {
+      "title": "Atombohy resaka",
+      "description": "Mandefasa hafatra mba hiresaka amin'ny Modely."
+    },
+    "working": "Miasa",
+    "historyRetry": "Tsy afaka nampidirina ny tantaran'ny resaka.",
+    "catalogRetry": "Tsy afaka namaky ny modely"
   }
 }

@@ -686,7 +686,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} minn {{total}}"
+    "position": "{{name}}, tab, {{position}} minn {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -3212,5 +3213,18 @@
     "emptyDescription": "Meta tafda l-host ta' link, jinfetaħ mingħajr ma jistaqsi għal darb'oħra.",
     "revoke": "Irrevoka {{host}}",
     "backToPreferences": "Lura għall-preferenzi"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Messaġġ"
+    },
+    "empty": {
+      "title": "Ibda chat",
+      "description": "Ibgħat messaġġ biex tikkellem ma' mudell."
+    },
+    "working": "Qed jaħdem",
+    "historyRetry": "Ma setgħux jitgħabbew l-istorja taċ-chat.",
+    "catalogRetry": "Ma setgħux jittellgħu l-mudelli"
   }
 }

@@ -211,7 +211,8 @@
     "profile": "Профіль",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, вкладка, {{position}} з {{total}}"
+    "position": "{{name}}, вкладка, {{position}} з {{total}}",
+    "chat": "Чат"
   },
   "chat": {
     "instancePicker": {
@@ -3191,5 +3192,18 @@
     "emptyDescription": "Коли ви довіряєте хосту посилання, воно відкривається без повторного запиту.",
     "revoke": "Відкликати {{host}}",
     "backToPreferences": "Назад до налаштувань"
+  },
+  "quickChat": {
+    "title": "Чат",
+    "composer": {
+      "placeholder": "Повідомлення"
+    },
+    "empty": {
+      "title": "Розпочніть чат",
+      "description": "Надішліть повідомлення, щоб поговорити з моделлю."
+    },
+    "working": "Працює",
+    "historyRetry": "Не вдалося завантажити історію чату.",
+    "catalogRetry": "Не вдалося завантажити моделі"
   }
 }

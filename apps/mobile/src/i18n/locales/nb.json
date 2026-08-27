@@ -665,7 +665,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, fane, {{position}} av {{total}}"
+    "position": "{{name}}, fane, {{position}} av {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -3149,5 +3150,18 @@
     "emptyDescription": "Når du stoler på en lenkes vert, åpnes den uten å spørre igjen.",
     "revoke": "Fjern {{host}}",
     "backToPreferences": "Tilbake til innstillinger"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Melding"
+    },
+    "empty": {
+      "title": "Start en chat",
+      "description": "Send en melding for å snakke med en modell."
+    },
+    "working": "Jobber",
+    "historyRetry": "Kunne ikke laste inn chathistorikken.",
+    "catalogRetry": "Kunne ikke laste modeller"
   }
 }

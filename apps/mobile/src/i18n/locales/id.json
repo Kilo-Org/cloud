@@ -211,7 +211,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} dari {{total}}"
+    "position": "{{name}}, tab, {{position}} dari {{total}}",
+    "chat": "Obrolan"
   },
   "chat": {
     "instancePicker": {
@@ -3149,5 +3150,18 @@
     "emptyDescription": "Saat Anda mempercayai host suatu tautan, tautan tersebut dibuka tanpa bertanya lagi.",
     "revoke": "Cabut {{host}}",
     "backToPreferences": "Kembali ke preferensi"
+  },
+  "quickChat": {
+    "title": "Obrolan",
+    "composer": {
+      "placeholder": "Pesan"
+    },
+    "empty": {
+      "title": "Mulai obrolan",
+      "description": "Kirim pesan untuk berbicara dengan model."
+    },
+    "working": "Mengerjakan",
+    "historyRetry": "Tidak dapat memuat riwayat obrolan.",
+    "catalogRetry": "Tidak dapat memuat model"
   }
 }

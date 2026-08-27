@@ -665,7 +665,8 @@
     "profile": "Профил",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, таб, {{position}} од {{total}}"
+    "position": "{{name}}, таб, {{position}} од {{total}}",
+    "chat": "Пораки во разговор"
   },
   "chat": {
     "instancePicker": {
@@ -3149,5 +3150,18 @@
     "emptyDescription": "Кога ќе му верувате на домаќинот на врската, таа се отвора без да праша повторно.",
     "revoke": "Одземете {{host}}",
     "backToPreferences": "Назад до поставки"
+  },
+  "quickChat": {
+    "title": "Пораки во разговор",
+    "composer": {
+      "placeholder": "Порака"
+    },
+    "empty": {
+      "title": "Започнете разговор",
+      "description": "Испратете порака за да разговарате со модел."
+    },
+    "working": "Работи",
+    "historyRetry": "Не можев да ја вчитам историјата на разговорот.",
+    "catalogRetry": "Не можеше да се вчитаат моделите"
   }
 }

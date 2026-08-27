@@ -665,7 +665,8 @@
     "profile": "Profiil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, vaheleht, {{position}}/{{total}}"
+    "position": "{{name}}, vaheleht, {{position}}/{{total}}",
+    "chat": "Vestlus"
   },
   "chat": {
     "instancePicker": {
@@ -3149,5 +3150,18 @@
     "emptyDescription": "Kui usaldad lingi hosti, avaneb see ilma uuesti küsimata.",
     "revoke": "Tühista {{host}}",
     "backToPreferences": "Tagasi eelistuste juurde"
+  },
+  "quickChat": {
+    "title": "Vestlus",
+    "composer": {
+      "placeholder": "Sõnum"
+    },
+    "empty": {
+      "title": "Alusta vestlust",
+      "description": "Mudeliga vestlemiseks saada sõnum."
+    },
+    "working": "Töötamine",
+    "historyRetry": "Vestluse ajaloo laadimine ei õnnestunud.",
+    "catalogRetry": "Mudeleid ei õnnestunud laadida"
   }
 }

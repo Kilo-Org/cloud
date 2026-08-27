@@ -679,7 +679,8 @@
     "profile": "Profilis",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, skirtukas, {{position}} iš {{total}}"
+    "position": "{{name}}, skirtukas, {{position}} iš {{total}}",
+    "chat": "Pokalbis"
   },
   "chat": {
     "instancePicker": {
@@ -3191,5 +3192,18 @@
     "emptyDescription": "Kai pasitikite nuorodos serveriu, ji atidaroma be pakartotino klausimo.",
     "revoke": "Atšaukti {{host}}",
     "backToPreferences": "Grįžti į nuostatas"
+  },
+  "quickChat": {
+    "title": "Pokalbis",
+    "composer": {
+      "placeholder": "Žinutė"
+    },
+    "empty": {
+      "title": "Pradėti pokalbį",
+      "description": "Siųskite žinutę, kad pakalbėtumėte su modeliu."
+    },
+    "working": "Vykdoma",
+    "historyRetry": "Nepavyko įkelti pokalbio istorijos.",
+    "catalogRetry": "Nepavyko įkelti modelių"
   }
 }

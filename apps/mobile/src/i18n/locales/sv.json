@@ -665,7 +665,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, flik, {{position}} av {{total}}"
+    "position": "{{name}}, flik, {{position}} av {{total}}",
+    "chat": "Chatt"
   },
   "chat": {
     "instancePicker": {
@@ -3149,5 +3150,18 @@
     "emptyDescription": "När du litar på en länks värd öppnas den utan att fråga igen.",
     "revoke": "Återkalla {{host}}",
     "backToPreferences": "Tillbaka till inställningar"
+  },
+  "quickChat": {
+    "title": "Chatt",
+    "composer": {
+      "placeholder": "Meddelande"
+    },
+    "empty": {
+      "title": "Starta en chatt",
+      "description": "Skicka ett meddelande för att prata med en modell."
+    },
+    "working": "Arbetar",
+    "historyRetry": "Det gick inte att läsa in chatthistoriken.",
+    "catalogRetry": "Kunde inte läsa in modeller"
   }
 }

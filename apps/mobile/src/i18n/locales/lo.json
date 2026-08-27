@@ -665,7 +665,8 @@
     "profile": "ໂປຣຟາຍ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ແຖບ, {{position}} ຈາກ {{total}}"
+    "position": "{{name}}, ແຖບ, {{position}} ຈາກ {{total}}",
+    "chat": "ສົນທະນາ"
   },
   "chat": {
     "instancePicker": {
@@ -3149,5 +3150,18 @@
     "emptyDescription": "ເມື່ອທ່ານໄວ້ໃຈໂຮສຂອງລິ້ງ, ມັນຈະເປີດໂດຍບໍ່ຖາມອີກ.",
     "revoke": "ຖອນ {{host}}",
     "backToPreferences": "ກັບໄປທີ່ການຕັ້ງຄ່າ"
+  },
+  "quickChat": {
+    "title": "ສົນທະນາ",
+    "composer": {
+      "placeholder": "ຂໍ້ຄວາມ"
+    },
+    "empty": {
+      "title": "ເລີ່ມການສົນທະນາ",
+      "description": "ສົ່ງຂໍ້ຄວາມເພື່ອສົນທະນາກັບໂມເດວ."
+    },
+    "working": "ກຳລັງດຳເນີນການ",
+    "historyRetry": "ບໍ່ສາມາດໂຫຼດປະຫວັດການສົນທະນາໄດ້.",
+    "catalogRetry": "ບໍ່ສາມາດໂຫຼດໂມເດວ"
   }
 }

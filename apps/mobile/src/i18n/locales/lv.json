@@ -672,7 +672,8 @@
     "profile": "Profils",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, cilne, {{position}} no {{total}}"
+    "position": "{{name}}, cilne, {{position}} no {{total}}",
+    "chat": "Tērzēšana"
   },
   "chat": {
     "instancePicker": {
@@ -3170,5 +3171,18 @@
     "emptyDescription": "Kad uzticaties saites resursdatoram, tā tiek atvērta bez atkārtotas jautāšanas.",
     "revoke": "Atsaukt {{host}}",
     "backToPreferences": "Atpakaļ uz iestatījumiem"
+  },
+  "quickChat": {
+    "title": "Tērzēšana",
+    "composer": {
+      "placeholder": "Ziņojums"
+    },
+    "empty": {
+      "title": "Sākt tērzēšanu",
+      "description": "Nosūti ziņojumu, lai sarunātos ar modeli."
+    },
+    "working": "Apstrādā",
+    "historyRetry": "Neizdevās ielādēt tērzēšanas vēsturi.",
+    "catalogRetry": "Neizdevās ielādēt modeļus"
   }
 }

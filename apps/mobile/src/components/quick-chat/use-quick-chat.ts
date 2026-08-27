@@ -1,0 +1,304 @@
+import { useQuery } from '@tanstack/react-query';
+import { type OlderMessagesError, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner-native';
+import { ulid } from 'ulid';
+
+import { i18n } from '@/i18n';
+import { useAuth } from '@/lib/auth/auth-context';
+import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
+import { useOrganization } from '@/lib/organization-context';
+import { trpcClient, useTRPC } from '@/lib/trpc';
+
+import { type QuickChatGatewayMessage, streamQuickChatCompletion } from './quick-chat-gateway';
+import {
+  adaptQuickChatRow,
+  type LocalTurn,
+  mergeQuickChatRows,
+  type QuickChatRow,
+} from './quick-chat-messages';
+
+/** One locally-accepted turn: the user row plus, once streaming starts, the assistant reply. */
+type HookLocalTurn = {
+  clientId: string;
+  user: QuickChatRow;
+  assistant: QuickChatRow | null;
+};
+
+/**
+ * Data layer for the quick-chat tab. Owns the `listMessages` query, older-page
+ * paging, the locally-accepted turns, and the gateway stream/append pipeline.
+ * All local state is torn down and in-flight streams aborted when the auth
+ * epoch or organization changes, so no stale account data survives a scope
+ * switch.
+ */
+export function useQuickChat(model: string) {
+  const { organizationId, isLoaded: orgLoaded } = useOrganization();
+  const { authEpoch } = useAuth();
+  const trpc = useTRPC();
+
+  const [localTurns, setLocalTurns] = useState<HookLocalTurn[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [olderRows, setOlderRows] = useState<QuickChatRow[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+  const [olderError, setOlderError] = useState<OlderMessagesError | null>(null);
+
+  const abortRef = useRef<AbortController | null>(null);
+  const nextCursorRef = useRef<string | null>(null);
+  const olderLoadingRef = useRef(false);
+  // Bumped every time the newest page resets (or the scope changes), so an
+  // older-page load that raced the reset can drop its now-stale result instead
+  // of prepending rows contiguous with the old first page.
+  const pageResetRef = useRef(0);
+
+  const listQueryOptions = trpc.quickChat.listMessages.queryOptions({ organizationId });
+  const listQuery = useQuery({
+    ...listQueryOptions,
+    // Key the page by the auth epoch so a sign-in can never render the previous
+    // account's cached page, and keep it disabled until the org scope hydrates
+    // (the context starts as null while SecureStore loads, so an early fetch
+    // would resolve the personal thread first and then swap when the stored org
+    // arrives).
+    queryKey: [...listQueryOptions.queryKey, authEpoch],
+    enabled: orgLoaded,
+  });
+
+  const scopeKey = `${authEpoch}:${organizationId ?? 'personal'}`;
+  const scopeKeyRef = useRef(scopeKey);
+
+  // Remount all local state and drop any in-flight stream when the account or
+  // organization scope changes.
+  useEffect(() => {
+    if (scopeKeyRef.current === scopeKey) {
+      return;
+    }
+    scopeKeyRef.current = scopeKey;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setLocalTurns([]);
+    setIsStreaming(false);
+    setThreadId(null);
+    setOlderRows([]);
+    setNextCursor(null);
+    nextCursorRef.current = null;
+    setOlderError(null);
+    setIsLoadingOlder(false);
+    pageResetRef.current += 1;
+  }, [scopeKey]);
+
+  // Resolve the thread id for the transcript list's reset key. The id is
+  // cosmetic: listMessages/appendMessages resolve the thread server-side.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const thread = await trpcClient.quickChat.getOrCreateThread.mutate({ organizationId });
+        // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition -- `cancelled` flips in the cleanup when the scope changes mid-flight
+        if (!cancelled) {
+          setThreadId(thread.id);
+        }
+      } catch {
+        // Keep `threadId` null; the screen falls back to the "pending" key.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [scopeKey, organizationId]);
+
+  // A first-page refetch (send → append → refetch, or Retry) shifts the newest
+  // window, so the older rows and the cursor must reset together: keeping old
+  // `olderRows` while overwriting the cursor would leave a gap where the rows
+  // that fell off the first page live, and a later older load would prepend
+  // overlapping ids. Reset both so the next older load starts contiguous with
+  // the new first page.
+  useEffect(() => {
+    const data = listQuery.data;
+    // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition -- `data` is undefined while the query is disabled before the org scope hydrates
+    if (data) {
+      pageResetRef.current += 1;
+      setOlderRows([]);
+      nextCursorRef.current = data.nextCursor;
+      setNextCursor(data.nextCursor);
+    }
+  }, [listQuery.data]);
+
+  const onLoadOlderMessages = () => {
+    const cursor = nextCursorRef.current;
+    if (cursor === null || olderLoadingRef.current) {
+      return;
+    }
+    const resetGen = pageResetRef.current;
+    olderLoadingRef.current = true;
+    setIsLoadingOlder(true);
+    setOlderError(null);
+    void (async () => {
+      try {
+        const result = await trpcClient.quickChat.listMessages.query({ organizationId, cursor });
+        // If a newest-page refetch or scope change reset the page since this
+        // load started, the row window moved: prepending these rows would leave
+        // a gap or duplicate ids. Drop the stale page.
+        // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition -- a dropped page must not mix into the newer window
+        if (pageResetRef.current !== resetGen) {
+          return;
+        }
+        setOlderRows(prev => [...result.messages, ...prev]);
+        nextCursorRef.current = result.nextCursor;
+        setNextCursor(result.nextCursor);
+      } catch {
+        // A stale page's failure is not the current window's failure.
+        if (pageResetRef.current !== resetGen) {
+          return;
+        }
+        setOlderError({ kind: 'retryable' });
+      } finally {
+        olderLoadingRef.current = false;
+        setIsLoadingOlder(false);
+      }
+    })();
+  };
+
+  const mergedRows = useMemo<QuickChatRow[]>(() => {
+    // oxlint-disable-next-line typescript-eslint/no-unnecessary-condition -- `listQuery.data` is undefined until the first page resolves
+    const serverRows = [...olderRows, ...(listQuery.data?.messages ?? [])];
+    const turns: LocalTurn[] = localTurns.map(turn => ({
+      clientId: turn.clientId,
+      rows: turn.assistant ? [turn.user, turn.assistant] : [turn.user],
+    }));
+    return mergeQuickChatRows(serverRows, turns);
+  }, [olderRows, listQuery.data, localTurns]);
+
+  const messages = useMemo<StoredMessage[]>(
+    () => mergedRows.map(row => adaptQuickChatRow(row, threadId ?? 'pending')),
+    [mergedRows, threadId]
+  );
+
+  function gatewayHistory(): QuickChatGatewayMessage[] {
+    return mergedRows.map(row => ({ role: row.role, content: row.content }));
+  }
+
+  async function appendTurn(clientId: string, userContent: string, assistantContent: string) {
+    const outgoing: { role: 'user' | 'assistant'; content: string; clientId?: string }[] = [
+      { role: 'user', content: userContent, clientId },
+    ];
+    if (assistantContent.trim() !== '') {
+      outgoing.push({ role: 'assistant', content: assistantContent });
+    }
+    try {
+      await trpcClient.quickChat.appendMessages.mutate({ organizationId, messages: outgoing });
+      void listQuery.refetch();
+    } catch (error) {
+      // Keep the local rows; the merge keeps the turn visible on retry.
+      toast.error(error instanceof Error ? error.message : i18n.t('quickChat.historyRetry'));
+    }
+  }
+
+  function startStream(
+    clientId: string,
+    userRow: QuickChatRow,
+    history: QuickChatGatewayMessage[]
+  ) {
+    // A send while a stream is in flight must not start a second unstoppable
+    // stream: abort the previous completion first, then own the ref.
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setIsStreaming(true);
+    const assistantId = `local-${clientId}-assistant`;
+
+    void (async () => {
+      let assistantText = '';
+      try {
+        const authToken = await getAuthTokenForRequest();
+        if (!authToken) {
+          throw new Error('Missing auth token');
+        }
+        for await (const delta of streamQuickChatCompletion({
+          model,
+          messages: [...history, { role: 'user', content: userRow.content }],
+          organizationId,
+          authToken,
+          signal: controller.signal,
+        })) {
+          assistantText += delta;
+          const content = assistantText;
+          setLocalTurns(prev =>
+            prev.map(turn =>
+              turn.clientId === clientId
+                ? {
+                    ...turn,
+                    assistant: {
+                      id: assistantId,
+                      role: 'assistant',
+                      content,
+                      createdAt: userRow.createdAt,
+                    },
+                  }
+                : turn
+            )
+          );
+        }
+        void appendTurn(clientId, userRow.content, assistantText);
+      } catch (error) {
+        // On an explicit Stop the signal is aborted: keep the user bubble and
+        // any partial assistant text, no error toast. Any other failure keeps
+        // the user bubble too (the draft is never restored), and toasts.
+        if (!controller.signal.aborted) {
+          toast.error(error instanceof Error ? error.message : i18n.t('quickChat.historyRetry'));
+        }
+      } finally {
+        // Only the stream that still owns the ref clears it and the streaming
+        // flag: a superseded stream's finally must not clobber the newer
+        // controller (or clear a newer stream's `isStreaming`).
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setIsStreaming(false);
+        }
+      }
+    })();
+  }
+
+  function onSend(text: string): void {
+    if (!model) {
+      toast.error(i18n.t('quickChat.catalogRetry'));
+      throw new Error('No model selected');
+    }
+    const clientId = ulid();
+    const now = new Date().toISOString();
+    const userRow: QuickChatRow = {
+      id: `local-${clientId}`,
+      role: 'user',
+      content: text,
+      createdAt: now,
+      clientId,
+    };
+    const history = gatewayHistory();
+    setLocalTurns(prev => [...prev, { clientId, user: userRow, assistant: null }]);
+    startStream(clientId, userRow, history);
+  }
+
+  function onStop(): void {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsStreaming(false);
+  }
+
+  return {
+    threadId,
+    messages,
+    isLoading: listQuery.isLoading,
+    isError: listQuery.isError,
+    error: listQuery.error,
+    refetch: listQuery.refetch,
+    hasOlderMessages: nextCursor !== null,
+    isLoadingOlderMessages: isLoadingOlder,
+    olderMessagesError: olderError,
+    olderMessagesOmittedItemCount: 0,
+    onLoadOlderMessages,
+    isStreaming,
+    onSend,
+    onStop,
+  };
+}

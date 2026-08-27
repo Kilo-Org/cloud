@@ -665,7 +665,8 @@
     "profile": "Προφίλ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, καρτέλα, {{position}} από {{total}}"
+    "position": "{{name}}, καρτέλα, {{position}} από {{total}}",
+    "chat": "Συνομιλία"
   },
   "chat": {
     "instancePicker": {
@@ -3149,5 +3150,18 @@
     "emptyDescription": "Όταν εμπιστεύεστε τον κεντρικό υπολογιστή ενός συνδέσμου, ανοίγει χωρίς να ρωτά ξανά.",
     "revoke": "Ανάκληση {{host}}",
     "backToPreferences": "Επιστροφή στις προτιμήσεις"
+  },
+  "quickChat": {
+    "title": "Συνομιλία",
+    "composer": {
+      "placeholder": "Μήνυμα"
+    },
+    "empty": {
+      "title": "Ξεκινήστε μια συνομιλία",
+      "description": "Στείλτε ένα μήνυμα για να συνομιλήσετε με ένα μοντέλο."
+    },
+    "working": "Εργασία",
+    "historyRetry": "Δεν ήταν δυνατή η φόρτωση του ιστορικού συνομιλίας.",
+    "catalogRetry": "Δεν ήταν δυνατή η φόρτωση των μοντέλων"
   }
 }

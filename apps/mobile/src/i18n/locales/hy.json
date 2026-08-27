@@ -665,7 +665,8 @@
     "profile": "Պրոֆիլ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ներդիր, {{position}} / {{total}}"
+    "position": "{{name}}, ներդիր, {{position}} / {{total}}",
+    "chat": "Զրույց"
   },
   "chat": {
     "instancePicker": {
@@ -3149,5 +3150,18 @@
     "emptyDescription": "Երբ վստահում եք հղման հոսթին, այն բացվում է առանց կրկին հարցնելու։",
     "revoke": "Հեռացնել {{host}}",
     "backToPreferences": "Վերադառնալ կարգավորումներ"
+  },
+  "quickChat": {
+    "title": "Զրույց",
+    "composer": {
+      "placeholder": "Հաղորդագրություն"
+    },
+    "empty": {
+      "title": "Սկսել զրույց",
+      "description": "Ուղարկեք հաղորդագրություն մոդելի հետ խոսելու համար."
+    },
+    "working": "Մշակվում է",
+    "historyRetry": "Հնարավոր չեղավ բեռնել զրույցի պատմությունը.",
+    "catalogRetry": "Հնարավոր չեղավ բեռնել մոդելները"
   }
 }

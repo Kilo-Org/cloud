@@ -665,7 +665,8 @@
     "profile": "Profila",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, fitxa, {{position}} / {{total}}"
+    "position": "{{name}}, fitxa, {{position}} / {{total}}",
+    "chat": "Txata"
   },
   "chat": {
     "instancePicker": {
@@ -3149,5 +3150,18 @@
     "emptyDescription": "Esteka baten ostalariari konfiantza ematean, berriro galdetu gabe irekiko da.",
     "revoke": "Baliogabetu {{host}}",
     "backToPreferences": "Itzuli hobespenetara"
+  },
+  "quickChat": {
+    "title": "Txata",
+    "composer": {
+      "placeholder": "Mezua"
+    },
+    "empty": {
+      "title": "Hasi txat bat",
+      "description": "Bidali mezu bat modelo batekin hitz egiteko."
+    },
+    "working": "Lanean",
+    "historyRetry": "Ezin izan da txat-historia kargatu.",
+    "catalogRetry": "Modeloak ezin izan dira kargatu"
   }
 }

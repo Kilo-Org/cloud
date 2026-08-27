@@ -672,7 +672,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, filă, {{position}} din {{total}}"
+    "position": "{{name}}, filă, {{position}} din {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -3170,5 +3171,18 @@
     "emptyDescription": "Când ai încredere în gazda unui link, acesta se deschide fără a te mai întreba.",
     "revoke": "Revocă {{host}}",
     "backToPreferences": "Înapoi la preferințe"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Mesaj"
+    },
+    "empty": {
+      "title": "Începe un chat",
+      "description": "Trimite un mesaj pentru a vorbi cu un model."
+    },
+    "working": "Se procesează",
+    "historyRetry": "Nu s-a putut încărca istoricul de chat.",
+    "catalogRetry": "Modelele nu au putut fi încărcate"
   }
 }

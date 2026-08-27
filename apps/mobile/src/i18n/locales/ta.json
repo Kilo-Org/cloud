@@ -665,7 +665,8 @@
     "profile": "சுயவிவரம்",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, தாவல், மொத்தம் {{total}} இல் {{position}}"
+    "position": "{{name}}, தாவல், மொத்தம் {{total}} இல் {{position}}",
+    "chat": "அரட்டை"
   },
   "chat": {
     "instancePicker": {
@@ -3149,5 +3150,18 @@
     "emptyDescription": "ஒரு இணைப்பின் ஹோஸ்டை நீங்கள் நம்பும்போது, அது மீண்டும் கேட்காமல் திறக்கும்.",
     "revoke": "{{host}} ஐ திரும்பப் பெறு",
     "backToPreferences": "விருப்பங்களுக்குத் திரும்பு"
+  },
+  "quickChat": {
+    "title": "அரட்டை",
+    "composer": {
+      "placeholder": "செய்தி"
+    },
+    "empty": {
+      "title": "அரட்டையைத் தொடங்கு",
+      "description": "ஒரு மாதிரியுடன் பேசுவதற்கு ஒரு செய்தியை அனுப்பவும்."
+    },
+    "working": "வேலை செய்கிறது",
+    "historyRetry": "அரட்டை வரலாற்றை ஏற்ற முடியவில்லை.",
+    "catalogRetry": "மாதிரிகளை ஏற்ற முடியவில்லை"
   }
 }

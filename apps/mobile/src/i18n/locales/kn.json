@@ -665,7 +665,8 @@
     "profile": "ಪ್ರೊಫೈಲ್",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ಟ್ಯಾಬ್, {{total}} ರಲ್ಲಿ {{position}}"
+    "position": "{{name}}, ಟ್ಯಾಬ್, {{total}} ರಲ್ಲಿ {{position}}",
+    "chat": "ಚಾಟ್"
   },
   "chat": {
     "instancePicker": {
@@ -3149,5 +3150,18 @@
     "emptyDescription": "ನೀವು ಲಿಂಕ್ನ ಹೋಸ್ಟ್ ಅನ್ನು ವಿಶ್ವಾಸಿಸಿದಾಗ, ಅದು ಮತ್ತೆ ಕೇಳದೆ ತೆರೆಯುತ್ತದೆ.",
     "revoke": "{{host}} ರದ್ದುಗೊಳಿಸಿ",
     "backToPreferences": "ಆದ್ಯತೆಗಳಿಗೆ ಹಿಂತಿರುಗಿ"
+  },
+  "quickChat": {
+    "title": "ಚಾಟ್",
+    "composer": {
+      "placeholder": "ಸಂದೇಶ"
+    },
+    "empty": {
+      "title": "ಚಾಟ್ ಪ್ರಾರಂಭಿಸಿ",
+      "description": "ಮಾಡೆಲ್‌ನೊಂದಿಗೆ ಮಾತನಾಡಲು ಸಂದೇಶ ಕಳುಹಿಸಿ."
+    },
+    "working": "ಕೆಲಸ ಮಾಡುತ್ತಿದೆ",
+    "historyRetry": "ಚಾಟ್ ಇತಿಹಾಸವನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "catalogRetry": "ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ"
   }
 }

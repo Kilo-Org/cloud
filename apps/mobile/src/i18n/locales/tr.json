@@ -211,7 +211,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, sekme, {{position}} / {{total}}"
+    "position": "{{name}}, sekme, {{position}} / {{total}}",
+    "chat": "Sohbet"
   },
   "chat": {
     "instancePicker": {
@@ -3149,5 +3150,18 @@
     "emptyDescription": "Bir bağlantının sunucusuna güvendiğinizde, bir daha sormadan açılır.",
     "revoke": "{{host}} güvenini kaldır",
     "backToPreferences": "Tercihlere dön"
+  },
+  "quickChat": {
+    "title": "Sohbet",
+    "composer": {
+      "placeholder": "Mesaj"
+    },
+    "empty": {
+      "title": "Bir sohbet başlat",
+      "description": "Bir modelle konuşmak için mesaj gönder."
+    },
+    "working": "Çalışıyor",
+    "historyRetry": "Sohbet geçmişi yüklenemedi.",
+    "catalogRetry": "Modeller yüklenemedi"
   }
 }

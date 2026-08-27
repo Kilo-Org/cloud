@@ -665,7 +665,8 @@
     "profile": "প্রোফাইল",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ট্যাব, {{total}}-এর মধ্যে {{position}}"
+    "position": "{{name}}, ট্যাব, {{total}}-এর মধ্যে {{position}}",
+    "chat": "চ্যাট"
   },
   "chat": {
     "instancePicker": {
@@ -3149,5 +3150,18 @@
     "emptyDescription": "আপনি কোনো লিঙ্কের হোস্ট বিশ্বাস করলে তা আবার জিজ্ঞেস না করেই খোলে।",
     "revoke": "{{host}} প্রত্যাহার করুন",
     "backToPreferences": "পছন্দে ফিরুন"
+  },
+  "quickChat": {
+    "title": "চ্যাট",
+    "composer": {
+      "placeholder": "বার্তা"
+    },
+    "empty": {
+      "title": "চ্যাট শুরু করুন",
+      "description": "মডেলের সাথে কথা বলতে একটি বার্তা পাঠান।"
+    },
+    "working": "কাজ চলছে",
+    "historyRetry": "চ্যাট ইতিহাস লোড করা যায়নি।",
+    "catalogRetry": "মডেল লোড করা যায়নি"
   }
 }

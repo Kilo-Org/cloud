@@ -672,7 +672,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, kartica, {{position}} od {{total}}"
+    "position": "{{name}}, kartica, {{position}} od {{total}}",
+    "chat": "Ćaskanje"
   },
   "chat": {
     "instancePicker": {
@@ -3170,5 +3171,18 @@
     "emptyDescription": "Kada veruješ hostu veze, ona se otvara bez ponovnog pitanja.",
     "revoke": "Opozovi {{host}}",
     "backToPreferences": "Nazad na podešavanja"
+  },
+  "quickChat": {
+    "title": "Ćaskanje",
+    "composer": {
+      "placeholder": "Poruka"
+    },
+    "empty": {
+      "title": "Započnite ćaskanje",
+      "description": "Pošaljite poruku da razgovarate sa modelom."
+    },
+    "working": "Radim…",
+    "historyRetry": "Nije moguće učitati istoriju ćaskanja.",
+    "catalogRetry": "Nije moguće učitati modele"
   }
 }

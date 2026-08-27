@@ -388,7 +388,8 @@ export function NewSessionScreenBody() {
     });
   }, []);
 
-  const { addCandidates, removeAttachment, retryAttachment } = attachments;
+  const { addCandidates, removeAttachment, retryAttachment, moveAttachment, reorderAttachments } =
+    attachments;
 
   useAndroidPendingPickerRecovery({
     surface: 'agent-new',
@@ -476,6 +477,8 @@ export function NewSessionScreenBody() {
         onAddAttachment={() => void handleAddAttachment()}
         onRemoveAttachment={handleRemoveAttachment}
         onRetryAttachment={handleRetryAttachment}
+        onMoveAttachment={moveAttachment}
+        onReorderAttachments={reorderAttachments}
         onRefetchModels={() => void refetchModels()}
         onPrefillAttachments={addCandidates}
         shareId={shareId}

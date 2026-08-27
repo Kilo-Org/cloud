@@ -143,6 +143,8 @@ const FAKE_ATTACHMENTS: CreatorInput['attachments'] = {
   addCandidates: vi.fn(async () => undefined),
   removeAttachment: vi.fn(() => undefined),
   retryAttachment: vi.fn(() => undefined),
+  moveAttachment: vi.fn(() => undefined),
+  reorderAttachments: vi.fn(() => undefined),
   reset: vi.fn(() => undefined),
   releaseUnclaimedUploads: vi.fn(() => undefined),
   isUploading: false,

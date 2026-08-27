@@ -566,11 +566,17 @@ describe('useAgentAttachmentUpload — attachment reorder (attachment reorder)',
   }
 
   async function pendingResult(): Promise<Awaited<ReturnType<HookApi['uploadPending']>>> {
-    let result: Awaited<ReturnType<HookApi['uploadPending']>> | undefined = undefined;
+    const resultRef: { current: Awaited<ReturnType<HookApi['uploadPending']>> | undefined } = {
+      current: undefined,
+    };
     await act(async () => {
-      result = await hookApi().uploadPending();
+      resultRef.current = await hookApi().uploadPending();
     });
-    return result as Awaited<ReturnType<HookApi['uploadPending']>>;
+    const result = resultRef.current;
+    if (result === undefined) {
+      throw new Error('uploadPending did not resolve');
+    }
+    return result;
   }
 
   it('moves a chip one slot and keeps submission order in sync', async () => {

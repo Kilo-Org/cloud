@@ -54,6 +54,12 @@ ModuleWithLoad._load = (request: string, parent: NodeJS.Module | null, isMain: b
   if (request === 'react-native-svg') {
     return { default: 'Svg', Svg: 'Svg', Path: 'Path', G: 'G', Rect: 'Rect', Circle: 'Circle' };
   }
+  // The renderer's table() fallback lazily requires ./markdown-table; stub it
+  // to a string host type so the renderer-props and nested-table suites can
+  // assert the chip without mounting the real modal chrome.
+  if (request === './markdown-table') {
+    return { MarkdownTable: 'MarkdownTable' };
+  }
   return originalLoad(request, parent, isMain);
 };
 vi.mock('react-native', () => rnStub);
@@ -151,11 +157,21 @@ describe('MarkdownRenderer key stability', () => {
     const second = keySequence(renderer, 5);
     expect(first).not.toEqual(second);
   });
-  it('table() returns null (tables render through splitMarkdownTables)', async () => {
+  it('table() returns a MarkdownTable chip for nested tables', async () => {
     const renderer = await createRenderer();
     const header: ReactNode[][] = [['H']];
     const rows: ReactNode[][][] = [[['r1']]];
-    expect(renderer.table(header, rows, undefined, undefined, undefined)).toBeNull();
+    const element = renderer.table(header, rows, undefined, undefined, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    expect(element.type).toBe('MarkdownTable');
+    expect(element.props).toMatchObject({
+      tableKey: 'md-table-0',
+      columnCount: 1,
+      rowCount: 1,
+      header,
+      rows,
+    });
   });
   it('image() host keys are ordinal in call order', async () => {
     const renderer = await createRenderer();
@@ -756,5 +772,45 @@ describe('MarkdownRenderer list marker alignment', () => {
     expect(blockquoteStyle.marginVertical).toBe(4);
     expect(blockquoteStyle.marginTop).toBeUndefined();
     await unmountMarkdown(mounted);
+  });
+});
+
+describe('MarkdownRenderer nested table fallback', () => {
+  it('renders a blockquote-wrapped table as a chip instead of dropping it', async () => {
+    const { useMarkdown } = await import('react-native-marked');
+    const { getMarkdownStyles } = await import('./markdown-palette');
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const { View: StubView } = await import('react-native');
+    const renderer = new RendererClass(palette, true, {});
+    const styles = getMarkdownStyles(palette);
+    function Host() {
+      const elements = useMarkdown('> | a | b |\n> |---|---|\n> | 1 | 2 |', {
+        styles,
+        renderer,
+        colorScheme: 'light',
+      });
+      return createElement(StubView, null, elements);
+    }
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      await Promise.resolve();
+      rendererRef.current = TestRenderer.create(createElement(Host));
+    });
+    const mounted = rendererRef.current;
+    if (!mounted) {
+      throw new Error('renderer was not created');
+    }
+    const tables = mounted.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'MarkdownTable'
+    );
+    expect(tables).toHaveLength(1);
+    expect(tables[0]?.props.columnCount).toBe(2);
+    expect(tables[0]?.props.rowCount).toBe(1);
+    await act(async () => {
+      await Promise.resolve();
+      mounted.unmount();
+    });
   });
 });

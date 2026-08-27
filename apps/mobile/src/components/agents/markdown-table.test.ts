@@ -645,6 +645,37 @@ describe('MarkdownTable table semantics', () => {
   });
 });
 
+describe('MarkdownTable eager body (nested table fallback)', () => {
+  it('renders the provided cell trees and never re-parses raw', () => {
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    act(() => {
+      rendererRef.current = TestRenderer.create(
+        createElement(MarkdownTable, {
+          palette: mockPalette,
+          tableKey: 'md-table-0',
+          columnCount: 1,
+          rowCount: 1,
+          selectable: true,
+          header: [['Column 1']],
+          rows: [[['Row 1']]],
+        })
+      );
+    });
+    const renderer = rendererRef.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    expect(chipNode(renderer)).toBeTruthy();
+    expect(useMarkdown).not.toHaveBeenCalled();
+    openTable(renderer);
+    // The eager path renders TableRow directly; it never calls useMarkdown.
+    expect(useMarkdown).not.toHaveBeenCalled();
+    expect(renderer.root.findAll(node => node.type === TableRow)).toHaveLength(2);
+  });
+});
+
 describe('MarkdownTable cell inline press path (real parser)', () => {
   // Every other suite mocks useMarkdown and asserts its return value, so a
   // cell link built by a regression to the library Renderer (Linking.openURL,

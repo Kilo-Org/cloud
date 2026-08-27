@@ -61,12 +61,16 @@ const ZOOM_DEFAULT = 1;
 type MarkdownTableProps = {
   palette: MarkdownPalette;
   /** The table token's raw markdown source, parsed only while the modal is open. */
-  raw: string;
+  raw?: string;
   /** Stable `md-table-N` ordinal key from splitMarkdownTables. */
   tableKey: string;
   columnCount: number;
   rowCount: number;
   selectable: boolean;
+  /** Parser-built cell trees for a nested table (the renderer fallback path). */
+  header?: ReactNode[][];
+  /** Parser-built row trees for a nested table (the renderer fallback path). */
+  rows?: ReactNode[][][];
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
 };
@@ -102,6 +106,8 @@ export function MarkdownTable({
   columnCount,
   rowCount,
   selectable,
+  header,
+  rows,
   onLongPressLink,
   onPressLink,
 }: Readonly<MarkdownTableProps>) {
@@ -316,15 +322,24 @@ export function MarkdownTable({
                         // eslint-disable-next-line react-native/no-inline-styles -- animated transform + transformOrigin
                         style={[tableStyle, { transformOrigin: 'top left' }]}
                       >
-                        <MarkdownTableBody
-                          palette={palette}
-                          raw={raw}
-                          columnCount={columnCount}
-                          rowCount={rowCount}
-                          selectable={selectable}
-                          onLongPressLink={onLongPressLink}
-                          onPressLink={onPressLink}
-                        />
+                        {raw !== undefined ? (
+                          <MarkdownTableBody
+                            palette={palette}
+                            raw={raw}
+                            columnCount={columnCount}
+                            rowCount={rowCount}
+                            selectable={selectable}
+                            onLongPressLink={onLongPressLink}
+                            onPressLink={onPressLink}
+                          />
+                        ) : (
+                          <MarkdownTableCells
+                            palette={palette}
+                            header={header ?? []}
+                            rows={rows ?? []}
+                            columnCount={columnCount}
+                          />
+                        )}
                       </Animated.View>
                     </View>
                   </GestureDetector>
@@ -335,6 +350,62 @@ export function MarkdownTable({
         </Modal>
       ) : null}
     </>
+  );
+}
+
+type MarkdownTableCellsProps = {
+  palette: MarkdownPalette;
+  header: ReactNode[][];
+  rows: ReactNode[][][];
+  columnCount: number;
+};
+
+// A nested table (inside a blockquote or list item) is not extracted by
+// splitMarkdownTables, so the base MarkdownRenderer.table() fallback already
+// built these cell trees. Render them directly here with TableRow instead of
+// re-parsing raw, reusing MarkdownTableBody's column-width formula.
+function MarkdownTableCells({
+  palette,
+  header,
+  rows,
+  columnCount,
+}: Readonly<MarkdownTableCellsProps>) {
+  const { width: windowWidth } = useWindowDimensions();
+  const columnWidth = Math.max(
+    MODAL_COLUMN_MIN_WIDTH,
+    Math.floor((windowWidth - MODAL_HORIZONTAL_PADDING * 2) / Math.max(columnCount, 1))
+  );
+  const headerTexts = header.map(node => extractNodeText(node));
+  return (
+    <View
+      className="self-start overflow-hidden rounded-md border"
+      // eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant colors
+      style={{
+        borderColor: palette.borderColor,
+        backgroundColor: palette.surfaceColor,
+      }}
+    >
+      <TableRow
+        palette={palette}
+        cells={header}
+        columnCount={columnCount}
+        columnWidth={columnWidth}
+        isHeader
+        isLastRow={rows.length === 0}
+        headerTexts={headerTexts}
+      />
+      {rows.map((row, rowIdx) => (
+        <TableRow
+          key={rowIdx}
+          palette={palette}
+          cells={row}
+          columnCount={columnCount}
+          columnWidth={columnWidth}
+          isLastRow={rows.length - 1 === rowIdx}
+          headerTexts={headerTexts}
+        />
+      ))}
+    </View>
   );
 }
 

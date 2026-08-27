@@ -42,7 +42,9 @@ describe('Gastown onboarding repository selection', () => {
       defaultBranch: 'trunk',
       platformIntegrationId: secondIntegrationId,
     });
-    expect(selected && buildGastownRepositoryRigInput(selected)).toEqual({
+    expect(
+      selected && buildGastownRepositoryRigInput(selected, undefined, [first, duplicate])
+    ).toEqual({
       gitUrl: 'https://github.com/acme/widgets.git',
       defaultBranch: 'trunk',
       platformIntegrationId: secondIntegrationId,
@@ -52,7 +54,7 @@ describe('Gastown onboarding repository selection', () => {
 });
 
 describe('Gastown later rig repository selection', () => {
-  it('keeps the integration ID needed by the createRig mutation', () => {
+  it('omits the integration ID for authoritative resolution of a unique repository', () => {
     const selected = findGastownRepository(
       [githubRepository()],
       gastownRepositoryKey(githubRepository())
@@ -61,7 +63,6 @@ describe('Gastown later rig repository selection', () => {
     expect(selected && buildGastownRepositoryRigInput(selected)).toEqual({
       gitUrl: 'https://github.com/acme/widgets.git',
       defaultBranch: 'trunk',
-      platformIntegrationId: firstIntegrationId,
     });
   });
 

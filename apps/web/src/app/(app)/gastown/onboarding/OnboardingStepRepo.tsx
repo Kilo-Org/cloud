@@ -118,7 +118,7 @@ export function OnboardingStepRepo() {
       }
       const gitlabInstanceUrl = (gitlabReposQuery.data as { instanceUrl?: string } | undefined)
         ?.instanceUrl;
-      const rigInput = buildGastownRepositoryRigInput(repo, gitlabInstanceUrl);
+      const rigInput = buildGastownRepositoryRigInput(repo, gitlabInstanceUrl, unifiedRepositories);
       if (!rigInput) return;
 
       // Auto-derive town name from repo name, but only if the user hasn't explicitly edited it

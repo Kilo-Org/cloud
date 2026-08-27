@@ -132,7 +132,10 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
     if (!selectedRepository) return '';
     const instanceUrl = (gitlabReposQuery.data as { instanceUrl?: string } | undefined)
       ?.instanceUrl;
-    return buildGastownRepositoryRigInput(selectedRepository, instanceUrl)?.gitUrl ?? '';
+    return (
+      buildGastownRepositoryRigInput(selectedRepository, instanceUrl, unifiedRepositories)
+        ?.gitUrl ?? ''
+    );
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -142,7 +145,8 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
     const repositoryInput = selectedRepository
       ? buildGastownRepositoryRigInput(
           selectedRepository,
-          (gitlabReposQuery.data as { instanceUrl?: string } | undefined)?.instanceUrl
+          (gitlabReposQuery.data as { instanceUrl?: string } | undefined)?.instanceUrl,
+          unifiedRepositories
         )
       : null;
     createRig.mutate({

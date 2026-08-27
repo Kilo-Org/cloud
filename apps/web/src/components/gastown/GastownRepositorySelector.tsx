@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Check, ChevronsUpDown, Lock, Unlock } from 'lucide-react';
 
 import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
@@ -111,7 +111,8 @@ export function GastownRepositoryOptionLabel({
 
 export function buildGastownRepositoryRigInput(
   repository: GastownRepositoryOption,
-  gitlabInstanceUrl?: string
+  gitlabInstanceUrl?: string,
+  repositories: GastownRepositoryOption[] = [repository]
 ): {
   gitUrl: string;
   defaultBranch: string;
@@ -127,7 +128,9 @@ export function buildGastownRepositoryRigInput(
   return {
     gitUrl,
     defaultBranch: repository.defaultBranch || 'main',
-    ...(repository.platformIntegrationId
+    ...(repository.platformIntegrationId &&
+    (repository.platform !== 'github' ||
+      duplicateRepositoryNames(repositories).has(repository.fullName))
       ? { platformIntegrationId: repository.platformIntegrationId }
       : {}),
   };

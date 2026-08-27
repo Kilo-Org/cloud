@@ -18,16 +18,17 @@ const COMPOSER_INPUT_BORDER_WIDTH = 1;
 export const SESSION_HEADER_HEIGHT = 92;
 
 /**
- * Starter-chip row: a starter chip min height ~48 on Android plus the row's
- * 8px bottom padding. Kept out of the input's remaining-space budget so the
- * input stays clear of the keyboard with starters shown.
+ * Starter chips: the empty session shows four chips that wrap to two rows.
+ * Budget two rows of ~48 min height each plus the 8px gap and 8px bottom
+ * padding (112). Kept out of the input's remaining-space budget so the input
+ * stays clear of the keyboard with starters shown.
  */
-export const STARTER_ROW_HEIGHT = 56;
+export const STARTER_ROW_HEIGHT = 112;
 
 /**
  * Composer chrome other than the input itself, kept out of the input's
  * remaining-space budget: the control-row padding (20), the toolbar (44), the
- * counter (16), the starter row (56), and a reserve for the attachment strip
+ * counter (16), the starter rows (112), and a reserve for the attachment strip
  * (40). Conservative so the input stays clear of the keyboard at every Dynamic
  * Type scale.
  */

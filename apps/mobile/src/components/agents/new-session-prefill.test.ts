@@ -243,6 +243,14 @@ describe('resolvePrefillRepo', () => {
     expect(result).toBe('Kilo-Org/cloud');
   });
 
+  it('returns null when multiple options match case-insensitively', () => {
+    const result = resolvePrefillRepo(
+      [{ fullName: 'Kilo-Org/cloud' }, { fullName: 'kilo-org/CLOUD' }],
+      { mode: 'code', repo: 'KILO-ORG/cloud' }
+    );
+    expect(result).toBeNull();
+  });
+
   it.each([
     { repo: 'other/repo', reposOverride: undefined, desc: 'no match' },
     { repo: 'Kilo-Org/cloud', reposOverride: [] as { fullName: string }[], desc: 'empty list' },
@@ -265,12 +273,12 @@ describe('resolvePrefillRepoSelection', () => {
     { platform: 'github', fullName: 'Kilo-Org/cloud' },
   ];
 
-  it('selects the GitHub row and never a same-named GitLab/Bitbucket row', () => {
+  it('returns a personal or legacy GitHub row key without provenance', () => {
     const result = resolvePrefillRepoSelection(repos, { mode: 'code', repo: 'kilo-org/cloud' });
     expect(result).toBe('github:Kilo-Org/cloud');
   });
 
-  it('returns the GitHub row when only the GitLab row shares the name', () => {
+  it('returns the GitHub row key when only other providers share the name', () => {
     const result = resolvePrefillRepoSelection(
       [
         { platform: 'gitlab', fullName: 'owner/repo' },
@@ -289,9 +297,37 @@ describe('resolvePrefillRepoSelection', () => {
     expect(result).toBeNull();
   });
 
-  it('matches case-insensitively and returns the canonical GitHub casing', () => {
-    const result = resolvePrefillRepoSelection(repos, { mode: 'code', repo: 'kilo-Org/Cloud' });
-    expect(result).toBe('github:Kilo-Org/cloud');
+  it('matches case-insensitively and returns organization provenance with canonical casing', () => {
+    const result = resolvePrefillRepoSelection(
+      [
+        {
+          platform: 'github',
+          fullName: 'Kilo-Org/Cloud',
+          platformIntegrationId: 'integration-1',
+        },
+      ],
+      { mode: 'code', repo: 'kilo-org/cloud' }
+    );
+    expect(result).toBe('github:integration-1:Kilo-Org/Cloud');
+  });
+
+  it('returns null for duplicate GitHub names with explicit integration ids', () => {
+    const result = resolvePrefillRepoSelection(
+      [
+        {
+          platform: 'github',
+          fullName: 'Kilo-Org/cloud',
+          platformIntegrationId: 'integration-1',
+        },
+        {
+          platform: 'github',
+          fullName: 'kilo-org/CLOUD',
+          platformIntegrationId: 'integration-2',
+        },
+      ],
+      { mode: 'code', repo: 'KILO-ORG/cloud' }
+    );
+    expect(result).toBeNull();
   });
 
   it.each([

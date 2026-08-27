@@ -1,6 +1,7 @@
 import { type AgentMode, normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { i18n } from '@/i18n';
+import { getRepoOptionKey } from '@/lib/picker-bridge';
 
 export type NewSessionPrefillParams = {
   repo?: string;
@@ -160,8 +161,8 @@ export function resolvePrefillModel(
 /**
  * Resolve a prefill repository against the loaded repository list.
  * Match is **case-insensitive**; returns the **matched entry's
- * `fullName`** (GitHub's canonical casing). Returns `null` when
- * `prefill.repo` is absent or nothing matches.
+ * `fullName`** (GitHub's canonical casing). Returns `null` unless exactly
+ * one entry matches.
  */
 export function resolvePrefillRepo(
   repositories: { fullName: string }[],
@@ -172,20 +173,19 @@ export function resolvePrefillRepo(
   }
 
   const lower = prefill.repo.toLowerCase();
-  const match = repositories.find(r => r.fullName.toLowerCase() === lower);
-  return match?.fullName ?? null;
+  const matches = repositories.filter(repository => repository.fullName.toLowerCase() === lower);
+  return matches.length === 1 ? (matches[0]?.fullName ?? null) : null;
 }
 
 /**
- * Resolve a prefill repository to a platform-qualified picker key
- * `platform:fullName`. Continuation prefill is GitHub-only (see
+ * Resolve a prefill repository to its exact picker key. Continuation prefill is GitHub-only (see
  * `buildContinuePrefillParams` + `isGitHubUrl`), so only a GitHub row may
  * satisfy it: a same-named GitLab/Bitbucket row must never be selected.
  * Kept separate from `resolvePrefillRepo`, which returns the bare matched
  * `fullName` and is still used by `continuation-seed.ts`.
  */
 export function resolvePrefillRepoSelection(
-  repositories: { platform: string; fullName: string }[],
+  repositories: { platform: string; fullName: string; platformIntegrationId?: string }[],
   prefill: NewSessionPrefill
 ): string | null {
   if (!prefill.repo) {
@@ -193,10 +193,19 @@ export function resolvePrefillRepoSelection(
   }
 
   const lower = prefill.repo.toLowerCase();
-  const match = repositories.find(
+  const matches = repositories.filter(
     repository => repository.platform === 'github' && repository.fullName.toLowerCase() === lower
   );
-  return match ? `github:${match.fullName}` : null;
+  const match = matches[0];
+  return matches.length === 1 && match
+    ? getRepoOptionKey({
+        platform: 'github',
+        fullName: match.fullName,
+        ...(match.platformIntegrationId
+          ? { platformIntegrationId: match.platformIntegrationId }
+          : {}),
+      })
+    : null;
 }
 
 /**

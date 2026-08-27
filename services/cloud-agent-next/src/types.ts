@@ -181,6 +181,7 @@ type GetTokenForRepoResult =
   | {
       success: true;
       token: string;
+      platformIntegrationId: string;
       installationId: string;
       accountLogin: string;
       appType: 'standard' | 'lite';
@@ -192,6 +193,8 @@ type GetTokenForRepoResult =
         | 'invalid_repo_format'
         | 'no_installation_found'
         | 'repository_not_installed'
+        | 'ambiguous_installation'
+        | 'temporarily_unavailable'
         | 'integration_mismatch'
         | 'invalid_org_id';
     };
@@ -222,6 +225,7 @@ type GetCloudAgentAuthForRepoResult =
   | {
       success: true;
       githubToken: string;
+      platformIntegrationId: string;
       installationId: string;
       accountLogin: string;
       appType: 'standard' | 'lite';
@@ -237,6 +241,8 @@ type GetCloudAgentAuthForRepoResult =
         | 'invalid_repo_format'
         | 'no_installation_found'
         | 'repository_not_installed'
+        | 'ambiguous_installation'
+        | 'temporarily_unavailable'
         | 'integration_mismatch'
         | 'invalid_org_id';
     };
@@ -245,6 +251,7 @@ type IssueGitHubSessionCapabilityResult =
   | {
       success: true;
       capability: string;
+      platformIntegrationId: string;
       installationId: string;
       accountLogin: string;
       appType: 'standard' | 'lite';
@@ -260,6 +267,8 @@ type IssueGitHubSessionCapabilityResult =
         | 'invalid_repo_format'
         | 'no_installation_found'
         | 'repository_not_installed'
+        | 'ambiguous_installation'
+        | 'temporarily_unavailable'
         | 'integration_mismatch'
         | 'invalid_org_id'
         | 'capability_configuration_error';

@@ -31,13 +31,14 @@ interface __BaseEnv_Env {
 type GetTokenForRepoSuccess = {
 	success: true;
 	token: string;
+	platformIntegrationId: string;
 	installationId: string;
 	accountLogin: string;
 	appType: 'standard' | 'lite';
 };
 type GetTokenForRepoFailure = {
 	success: false;
-	reason: 'database_not_configured' | 'invalid_repo_format' | 'no_installation_found' | 'invalid_org_id';
+	reason: 'database_not_configured' | 'invalid_repo_format' | 'no_installation_found' | 'repository_not_installed' | 'ambiguous_installation' | 'temporarily_unavailable' | 'integration_mismatch' | 'invalid_org_id';
 };
 type GetTokenForRepoResult = GetTokenForRepoSuccess | GetTokenForRepoFailure;
 type GitTokenService = {

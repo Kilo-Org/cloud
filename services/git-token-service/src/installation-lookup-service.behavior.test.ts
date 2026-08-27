@@ -43,7 +43,19 @@ function createDb(rows: InstallationRow[], updatedRows = [{ id: 'integration-1' 
 }
 
 function createService(rows: InstallationRow[]) {
-  vi.mocked(getWorkerDb).mockReturnValue(createDb(rows) as never);
+  vi.mocked(getWorkerDb).mockReturnValue(
+    createDb(
+      rows.map((row, index) => ({
+        id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+        integration_status: 'active',
+        owned_by_user_id: 'user-1',
+        repository_access: null,
+        repositories: null,
+        permissions: null,
+        ...row,
+      }))
+    ) as never
+  );
   return new InstallationLookupService({
     HYPERDRIVE: { connectionString: 'postgres://test' },
   } as CloudflareEnv);
@@ -126,6 +138,63 @@ describe('InstallationLookupService', () => {
     expect(db.updateQuery.where).toHaveBeenCalled();
   });
 
+  it('prioritizes a selected-repository cache match without dropping other candidates', async () => {
+    const service = createService([
+      {
+        platform_installation_id: '100',
+        platform_account_login: 'acme',
+        github_app_type: 'standard',
+        owned_by_organization_id: null,
+        repository_access: 'all',
+      },
+      {
+        platform_installation_id: '200',
+        platform_account_login: 'stale-owner',
+        github_app_type: 'lite',
+        owned_by_organization_id: null,
+        repository_access: 'selected',
+        repositories: [{ full_name: 'acme/repository' }],
+      },
+    ]);
+
+    const result = await service.findAuthorizedInstallationsForRepo({
+      githubRepo: 'acme/repository',
+      userId: 'user-1',
+    });
+
+    expect(result.success && result.candidates.map(candidate => candidate.installationId)).toEqual([
+      '200',
+      '100',
+    ]);
+  });
+
+  it('keeps stale selected caches and all-repository caches as live-validation candidates', async () => {
+    const service = createService([
+      {
+        platform_installation_id: '100',
+        platform_account_login: 'stale-owner',
+        github_app_type: 'standard',
+        owned_by_organization_id: null,
+        repository_access: 'selected',
+        repositories: [{ full_name: 'acme/other' }],
+      },
+      {
+        platform_installation_id: '200',
+        platform_account_login: 'acme',
+        github_app_type: 'lite',
+        owned_by_organization_id: null,
+        repository_access: 'all',
+      },
+    ]);
+
+    const result = await service.findAuthorizedInstallationsForRepo({
+      githubRepo: 'acme/repository',
+      userId: 'user-1',
+    });
+
+    expect(result.success && result.candidates).toHaveLength(2);
+  });
+
   it('reports when refreshed account login metadata no longer has a target row', async () => {
     const db = createDb([], []);
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
@@ -156,6 +225,7 @@ describe('InstallationLookupService', () => {
 
     expect(result).toEqual({
       success: true,
+      integrationId: '00000000-0000-4000-8000-000000000001',
       installationId: '100',
       accountLogin: 'renamed-owner',
       githubAppType: 'standard',
@@ -260,6 +330,7 @@ describe('InstallationLookupService', () => {
       })
     ).resolves.toEqual({
       success: true,
+      integrationId,
       installationId: '100',
       accountLogin: 'renamed-owner',
       githubAppType: 'standard',
@@ -273,10 +344,6 @@ describe('InstallationLookupService', () => {
     ['personal row', { owned_by_organization_id: null, owned_by_user_id: 'user-1' }],
     ['suspended row', { integration_status: 'suspended' }],
     ['repository owner mismatch', { platform_account_login: 'other-owner' }],
-    [
-      'selected repository mismatch',
-      { repositories: [{ full_name: 'renamed-owner/other-repository' }] },
-    ],
   ])('rejects an expected integration with %s', async (_reason, override) => {
     const integrationId = '00000000-0000-4000-8000-000000000002';
     const orgId = '00000000-0000-4000-8000-000000000001';
@@ -306,7 +373,7 @@ describe('InstallationLookupService', () => {
     ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
   });
 
-  it('does not accept an expected integration without an organization', async () => {
+  it('returns integration_mismatch when an expected personal integration is unavailable', async () => {
     const service = createService([]);
 
     await expect(
@@ -316,7 +383,7 @@ describe('InstallationLookupService', () => {
         expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
       })
     ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
-    expect(getWorkerDb).not.toHaveBeenCalled();
+    expect(getWorkerDb).toHaveBeenCalledOnce();
   });
 
   it('returns integration_mismatch when the expected row is not visible to the fenced query', async () => {

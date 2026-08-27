@@ -15,15 +15,14 @@ export type FindInstallationParams = {
 };
 
 const InstallationLookupResultSchema = z.object({
+  id: z.string(),
   platform_installation_id: z.string(),
   platform_account_login: z.string().nullable(),
   github_app_type: z.enum(['standard', 'lite']).nullable().optional(),
   owned_by_organization_id: z.string().nullable(),
 });
 
-const InstallationRefreshCandidateSchema = InstallationLookupResultSchema.extend({
-  id: z.string(),
-});
+const InstallationRefreshCandidateSchema = InstallationLookupResultSchema;
 
 const ManagedInstallationLookupResultSchema = InstallationLookupResultSchema.extend({
   repository_access: z.string().nullable(),
@@ -47,6 +46,7 @@ const MAX_INSTALLATION_LOGIN_REFRESH_CANDIDATES = 10;
 
 export type InstallationLookupSuccess = {
   success: true;
+  integrationId: string;
   installationId: string;
   accountLogin: string;
   githubAppType: 'standard' | 'lite';
@@ -81,6 +81,15 @@ export type ManagedInstallationLookupSuccess = InstallationLookupSuccess & {
   permissions: Record<string, unknown> | null;
 };
 
+export type AuthorizedInstallationCandidate = ManagedInstallationLookupSuccess & {
+  repositoryAccess: string | null;
+  repositories: { full_name: string }[] | null;
+};
+
+export type AuthorizedInstallationCandidatesResult =
+  | { success: true; candidates: AuthorizedInstallationCandidate[] }
+  | InstallationLookupFailure;
+
 export type ManagedInstallationLookupResult =
   | ManagedInstallationLookupSuccess
   | InstallationLookupFailure
@@ -112,14 +121,19 @@ function buildAuthorizedInstallationsQuery(
   const exactIntegrationOwner =
     params.expectedIntegrationId === undefined
       ? undefined
-      : params.orgId === undefined
-        ? sql`false`
-        : and(
-            eq(platform_integrations.id, params.expectedIntegrationId),
-            eq(platform_integrations.owned_by_organization_id, params.orgId),
-            isNull(platform_integrations.owned_by_user_id),
-            isNotNull(organization_memberships.id)
-          );
+      : and(
+          eq(platform_integrations.id, params.expectedIntegrationId),
+          params.orgId === undefined
+            ? and(
+                eq(platform_integrations.owned_by_user_id, params.userId),
+                isNull(platform_integrations.owned_by_organization_id)
+              )
+            : and(
+                eq(platform_integrations.owned_by_organization_id, params.orgId),
+                isNull(platform_integrations.owned_by_user_id),
+                isNotNull(organization_memberships.id)
+              )
+        );
   const legacyAuthorizedOwner =
     params.expectedIntegrationId === undefined
       ? or(
@@ -168,6 +182,7 @@ function buildAuthorizedInstallationsQuery(
         eq(platform_integrations.platform, 'github'),
         eq(platform_integrations.integration_type, 'app'),
         eq(platform_integrations.integration_status, 'active'),
+        isNull(platform_integrations.auth_invalid_at),
         accountLoginFilter,
         isNotNull(platform_integrations.platform_installation_id),
         requestedOrganizationMembership,
@@ -182,9 +197,7 @@ function buildAuthorizedInstallationsQuery(
 
 export function buildInstallationLookupQuery(db: WorkerDb, params: FindInstallationParams) {
   const [repoOwner = ''] = params.githubRepo.split('/');
-  return buildAuthorizedInstallationsQuery(db, params, repoOwner).limit(
-    params.expectedIntegrationId === undefined ? 2 : 1
-  );
+  return buildAuthorizedInstallationsQuery(db, params, repoOwner);
 }
 
 export function buildInstallationRefreshCandidatesQuery(
@@ -198,9 +211,14 @@ export function buildInstallationRefreshCandidatesQuery(
 
 export function buildManagedInstallationLookupQuery(db: WorkerDb, params: FindInstallationParams) {
   const [repoOwner = ''] = params.githubRepo.split('/');
-  return buildAuthorizedInstallationsQuery(db, params, repoOwner).limit(
-    params.expectedIntegrationId === undefined ? 2 : 1
-  );
+  return buildAuthorizedInstallationsQuery(db, params, repoOwner);
+}
+
+export function buildAuthorizedInstallationCandidatesQuery(
+  db: WorkerDb,
+  params: FindInstallationParams
+) {
+  return buildAuthorizedInstallationsQuery(db, params);
 }
 
 export class InstallationLookupService {
@@ -228,8 +246,7 @@ export class InstallationLookupService {
 
     if (
       params.expectedIntegrationId !== undefined &&
-      (params.orgId === undefined ||
-        !z.string().uuid().safeParse(params.expectedIntegrationId).success)
+      !z.string().uuid().safeParse(params.expectedIntegrationId).success
     ) {
       return { success: false, reason: 'integration_mismatch' };
     }
@@ -258,6 +275,7 @@ export class InstallationLookupService {
 
       return {
         success: true,
+        integrationId: selected.data.id,
         installationId: selected.data.platform_installation_id,
         accountLogin: selected.data.platform_account_login ?? '',
         githubAppType: selected.data.github_app_type ?? 'standard',
@@ -284,6 +302,7 @@ export class InstallationLookupService {
 
     return {
       success: true,
+      integrationId: selected.id,
       installationId: selected.platform_installation_id,
       accountLogin: selected.platform_account_login ?? '',
       githubAppType: selected.github_app_type ?? 'standard',
@@ -348,6 +367,7 @@ export class InstallationLookupService {
 
       return {
         success: true,
+        integrationId: selected.data.id,
         installationId: selected.data.platform_installation_id,
         accountLogin: selected.data.platform_account_login ?? '',
         githubAppType: selected.data.github_app_type ?? 'standard',
@@ -385,12 +405,58 @@ export class InstallationLookupService {
 
     return {
       success: true,
+      integrationId: selected.id,
       installationId: selected.platform_installation_id,
       accountLogin: selected.platform_account_login ?? '',
       githubAppType: selected.github_app_type ?? 'standard',
       repoName,
       permissions: selected.permissions,
     };
+  }
+
+  async findAuthorizedInstallationsForRepo(
+    params: FindInstallationParams
+  ): Promise<AuthorizedInstallationCandidatesResult> {
+    const validationFailure = this.validateParams(params);
+    if (validationFailure) return validationFailure;
+
+    const [, repoName] = params.githubRepo.split('/');
+    if (!repoName) return { success: false, reason: 'invalid_repo_format' };
+
+    const rows = await buildAuthorizedInstallationCandidatesQuery(this.getDb(), params);
+    if (rows.length === 0) {
+      return {
+        success: false,
+        reason: params.expectedIntegrationId ? 'integration_mismatch' : 'no_installation_found',
+      };
+    }
+
+    const candidates = rows.map(row => {
+      const parsed = ExactManagedInstallationLookupResultSchema.parse(row);
+      return {
+        success: true as const,
+        integrationId: parsed.id,
+        installationId: parsed.platform_installation_id,
+        accountLogin: parsed.platform_account_login ?? '',
+        githubAppType: parsed.github_app_type ?? 'standard',
+        repoName,
+        permissions: parsed.permissions,
+        repositoryAccess: parsed.repository_access,
+        repositories: parsed.repositories,
+      };
+    });
+    const normalizedRepo = params.githubRepo.toLowerCase();
+    candidates.sort((left, right) => {
+      const cachedForRepo = (candidate: AuthorizedInstallationCandidate) =>
+        candidate.repositoryAccess === 'selected' &&
+        candidate.repositories?.some(
+          repository => repository.full_name.toLowerCase() === normalizedRepo
+        )
+          ? 0
+          : 1;
+      return cachedForRepo(left) - cachedForRepo(right);
+    });
+    return { success: true, candidates };
   }
 
   private matchesExpectedIntegration(
@@ -400,20 +466,14 @@ export class InstallationLookupService {
     if (
       selected.id !== params.expectedIntegrationId ||
       selected.integration_status !== 'active' ||
-      selected.owned_by_organization_id !== params.orgId ||
-      selected.owned_by_user_id !== null ||
       selected.platform_account_login?.toLowerCase() !==
         params.githubRepo.split('/')[0]?.toLowerCase()
     ) {
       return false;
     }
 
-    if (selected.repository_access === 'all') return true;
-    if (selected.repository_access !== 'selected') return false;
-    return Boolean(
-      selected.repositories?.some(
-        repository => repository.full_name.toLowerCase() === params.githubRepo.toLowerCase()
-      )
-    );
+    return params.orgId === undefined
+      ? selected.owned_by_user_id === params.userId && selected.owned_by_organization_id === null
+      : selected.owned_by_organization_id === params.orgId && selected.owned_by_user_id === null;
   }
 }

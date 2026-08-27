@@ -13,6 +13,7 @@ type GitTokenServiceEnv = {
 
 export type ResolvedGitHubToken = {
   token: string;
+  platformIntegrationId: string;
   installationId: string;
   appType: 'standard' | 'lite';
   accountLogin: string;
@@ -54,6 +55,7 @@ export async function resolveGitHubTokenForRepo(
         success: true,
         value: {
           token: result.token,
+          platformIntegrationId: result.platformIntegrationId,
           installationId: result.installationId,
           appType: result.appType,
           accountLogin: result.accountLogin,
@@ -82,6 +84,7 @@ export async function resolveGitHubTokenForRepo(
 
 export type ResolvedCloudAgentGitHubAuth = {
   githubToken: string;
+  platformIntegrationId: string;
   installationId: string;
   appType: 'standard' | 'lite';
   accountLogin: string;
@@ -93,6 +96,7 @@ export type ResolvedCloudAgentGitHubAuth = {
 
 export type ResolvedCloudAgentGitHubCapability = {
   capability: string;
+  platformIntegrationId: string;
   installationId: string;
   appType: 'standard' | 'lite';
   accountLogin: string;
@@ -137,6 +141,7 @@ async function resolveLegacyInstallationAuthForRepo(
     success: true,
     value: {
       githubToken: result.value.token,
+      platformIntegrationId: result.value.platformIntegrationId,
       installationId: result.value.installationId,
       appType: result.value.appType,
       accountLogin: result.value.accountLogin,
@@ -192,6 +197,7 @@ export async function resolveCloudAgentGitHubAuthForRepo(
       success: true,
       value: {
         githubToken: result.githubToken,
+        platformIntegrationId: result.platformIntegrationId,
         installationId: result.installationId,
         appType: result.appType,
         accountLogin: result.accountLogin,
@@ -267,6 +273,7 @@ export async function issueCloudAgentGitHubSessionCapability(
       success: true,
       value: {
         capability: result.capability,
+        platformIntegrationId: result.platformIntegrationId,
         installationId: result.installationId,
         appType: result.appType,
         accountLogin: result.accountLogin,

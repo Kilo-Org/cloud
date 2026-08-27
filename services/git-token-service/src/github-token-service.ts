@@ -20,6 +20,11 @@ type GitHubAppCredentials = {
  */
 export type GitHubAppType = 'standard' | 'lite';
 
+export type GitHubRepositoryTokenResult =
+  | { status: 'available'; token: string }
+  | { status: 'not_installed' }
+  | { status: 'temporarily_unavailable' };
+
 const CACHE_TTL_MS = 30 * 60 * 1000;
 const CACHE_KEY_PREFIX = 'gh-token:';
 const MIN_TTL_SECONDS = 60;
@@ -32,6 +37,16 @@ const GitHubInstallationAccountSchema = z.object({
     login: z.string().min(1),
   }),
 });
+
+class GitHubTokenGenerationError extends Error {
+  constructor(
+    message: string,
+    readonly status: number | null
+  ) {
+    super(message);
+    this.name = 'GitHubTokenGenerationError';
+  }
+}
 
 export class GitHubTokenService {
   constructor(private env: CloudflareEnv) {}
@@ -68,6 +83,43 @@ export class GitHubTokenService {
     await this.cacheToken(cacheKey, token, expiresAt);
 
     return token;
+  }
+
+  async tryGetTokenForRepo(
+    installationId: string,
+    githubRepo: string,
+    appType: GitHubAppType = 'standard'
+  ): Promise<GitHubRepositoryTokenResult> {
+    const [owner, repoName] = githubRepo.split('/');
+    if (!owner || !repoName) return { status: 'temporarily_unavailable' };
+    try {
+      const numericId = this.validateInstallationId(installationId);
+      const credentials = this.getCredentials(appType);
+      const { token, expiresAt } = await this.generateToken(numericId, credentials, [repoName]);
+      const response = await fetch(
+        `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}`,
+        {
+          method: 'GET',
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${token}`,
+            'User-Agent': 'Kilo-Git-Token-Service',
+          },
+        }
+      );
+      await response.body?.cancel();
+      if (response.status === 404) return { status: 'not_installed' };
+      if (!response.ok) return { status: 'temporarily_unavailable' };
+      await this.cacheToken(`${installationId}:${appType}:${repoName}`, token, expiresAt);
+      return {
+        status: 'available',
+        token,
+      };
+    } catch (error) {
+      const status = this.getProviderStatus(error);
+      if (status === 404 || status === 422) return { status: 'not_installed' };
+      return { status: 'temporarily_unavailable' };
+    }
   }
 
   async refreshInstallationAccountLoginIfDue(
@@ -174,6 +226,11 @@ export class GitHubTokenService {
     return numericId;
   }
 
+  private getProviderStatus(error: unknown): number | null {
+    if (typeof error !== 'object' || error === null || !('status' in error)) return null;
+    return typeof error.status === 'number' ? error.status : null;
+  }
+
   private async getCachedToken(cacheKey: string): Promise<string | null> {
     if (!this.env.TOKEN_CACHE) {
       return null;
@@ -222,7 +279,10 @@ export class GitHubTokenService {
         })
       );
       const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to generate GitHub installation token: ${message}`);
+      throw new GitHubTokenGenerationError(
+        `Failed to generate GitHub installation token: ${message}`,
+        this.getProviderStatus(error)
+      );
     }
   }
 

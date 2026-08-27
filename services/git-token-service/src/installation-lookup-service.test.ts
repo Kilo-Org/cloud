@@ -29,6 +29,7 @@ describe('buildInstallationLookupQuery', () => {
     const query = buildQuery();
 
     expect(query.sql).toContain('"platform_integrations"."platform_installation_id" is not null');
+    expect(query.sql).toContain('"platform_integrations"."auth_invalid_at" is null');
     expect(query.sql).toContain('"kilocode_users"."blocked_reason" is null');
     expect(query.sql).toContain('"organization_memberships"."kilo_user_id" =');
     expect(query.sql).toContain('"organization_memberships"."id" is not null');
@@ -36,7 +37,7 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.sql).toContain('"platform_integrations"."owned_by_user_id" =');
     expect(query.params.filter(param => param === 'user-1')).toHaveLength(4);
     expect(query.params).toContain('00000000-0000-4000-8000-000000000001');
-    expect(query.params).toContain(2);
+    expect(query.sql).not.toContain(' limit ');
   });
 
   it('requires current membership for every organization-scoped credential candidate', () => {
@@ -74,6 +75,6 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.params).toContain(expectedIntegrationId);
     expect(query.params).toContain(params.orgId);
     expect(query.params).toContain('renamed-owner');
-    expect(query.params).toContain(1);
+    expect(query.sql).not.toContain(' limit ');
   });
 });

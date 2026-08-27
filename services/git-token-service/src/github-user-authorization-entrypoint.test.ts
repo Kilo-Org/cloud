@@ -7,9 +7,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const serviceMocks = vi.hoisted(() => ({
   findManagedInstallationForRepo: vi.fn(),
+  findAuthorizedInstallationsForRepo: vi.fn(),
   findRefreshCandidates: vi.fn(),
   updateAccountLogin: vi.fn(),
   getTokenForRepo: vi.fn(),
+  tryGetTokenForRepo: vi.fn(),
   refreshInstallationAccountLoginIfDue: vi.fn(),
   selectUserAuthorization: vi.fn(),
   disconnectUserAuthorization: vi.fn(),
@@ -29,6 +31,7 @@ vi.mock('cloudflare:workers', () => ({
 vi.mock('./github-token-service.js', () => ({
   GitHubTokenService: class GitHubTokenService {
     getTokenForRepo = serviceMocks.getTokenForRepo;
+    tryGetTokenForRepo = serviceMocks.tryGetTokenForRepo;
     refreshInstallationAccountLoginIfDue = serviceMocks.refreshInstallationAccountLoginIfDue;
   },
 }));
@@ -36,6 +39,7 @@ vi.mock('./github-token-service.js', () => ({
 vi.mock('./installation-lookup-service.js', () => ({
   InstallationLookupService: class InstallationLookupService {
     findManagedInstallationForRepo = serviceMocks.findManagedInstallationForRepo;
+    findAuthorizedInstallationsForRepo = serviceMocks.findAuthorizedInstallationsForRepo;
     findRefreshCandidates = serviceMocks.findRefreshCandidates;
     updateAccountLogin = serviceMocks.updateAccountLogin;
   },
@@ -77,6 +81,35 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
       permissions: { contents: 'write', pull_requests: 'write' },
     });
     serviceMocks.getTokenForRepo.mockResolvedValue('installation-token');
+    serviceMocks.findAuthorizedInstallationsForRepo.mockImplementation(async params => {
+      const result = await serviceMocks.findManagedInstallationForRepo(params);
+      if (!result?.success) return result;
+      return {
+        success: true,
+        candidates: [
+          {
+            ...result,
+            integrationId:
+              result.integrationId ??
+              params.expectedIntegrationId ??
+              '00000000-0000-4000-8000-000000000099',
+            repositoryAccess: 'all',
+            repositories: null,
+            repoName: result.repoName ?? params.githubRepo.split('/')[1],
+          },
+        ],
+      };
+    });
+    serviceMocks.tryGetTokenForRepo.mockImplementation(
+      async (installationId, githubRepo, appType) => ({
+        status: 'available',
+        token: await serviceMocks.getTokenForRepo(
+          installationId,
+          githubRepo.split('/')[1],
+          appType
+        ),
+      })
+    );
     serviceMocks.selectUserAuthorization.mockResolvedValue({
       selected: true,
       token: 'user-token',
@@ -125,7 +158,7 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
     });
 
     expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
-    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+    expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
     expect(result).toMatchObject({
       success: true,
       githubToken: 'user-token',
@@ -138,7 +171,7 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
     });
   });
 
-  it('repairs stale login metadata before resolving fenced Cloud Agent auth', async () => {
+  it('preserves an exact integration fence for Cloud Agent auth', async () => {
     const params = {
       githubRepo: 'acme/repo',
       userId: 'user_1',
@@ -146,42 +179,28 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
       expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
       allowUserAuthorization: true,
     };
-    serviceMocks.findManagedInstallationForRepo
-      .mockResolvedValueOnce({ success: false, reason: 'integration_mismatch' })
-      .mockResolvedValueOnce({
-        success: true,
-        installationId: '123',
-        accountLogin: 'acme',
-        githubAppType: 'standard',
-        repoName: 'repo',
-        permissions: { contents: 'write', pull_requests: 'write' },
-      });
-    serviceMocks.findRefreshCandidates.mockResolvedValue({
+    serviceMocks.findAuthorizedInstallationsForRepo.mockResolvedValue({
       success: true,
       candidates: [
         {
           integrationId: params.expectedIntegrationId,
           installationId: '123',
-          accountLogin: 'old-acme',
+          accountLogin: 'acme',
           githubAppType: 'standard',
+          repoName: 'repo',
+          permissions: { contents: 'write', pull_requests: 'write' },
+          repositoryAccess: 'selected',
+          repositories: [{ full_name: 'acme/repo' }],
         },
       ],
     });
-    serviceMocks.refreshInstallationAccountLoginIfDue.mockResolvedValue('acme');
-    serviceMocks.updateAccountLogin.mockResolvedValue(true);
-    vi.spyOn(console, 'log').mockImplementation(() => {});
 
     await expect(createService().getCloudAgentAuthForRepo(params)).resolves.toMatchObject({
       success: true,
       source: 'user',
       githubToken: 'user-token',
     });
-    expect(serviceMocks.findManagedInstallationForRepo).toHaveBeenCalledTimes(2);
-    expect(serviceMocks.findRefreshCandidates).toHaveBeenCalledWith(params);
-    expect(serviceMocks.updateAccountLogin).toHaveBeenCalledWith(
-      params.expectedIntegrationId,
-      'acme'
-    );
+    expect(serviceMocks.findAuthorizedInstallationsForRepo).toHaveBeenCalledWith(params);
   });
 
   it.each(['credential_unreadable', 'credential_configuration_error'] as const)(

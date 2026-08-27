@@ -32,6 +32,7 @@ describe('GitHubTokenService', () => {
     vi.mocked(createAppAuth).mockReset();
     vi.mocked(Octokit).mockReset();
     mockGetInstallation.mockReset();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 200 })));
     vi.mocked(Octokit).mockImplementation(function MockOctokit() {
       return { apps: { getInstallation: mockGetInstallation } } as unknown as Octokit;
     });
@@ -147,5 +148,68 @@ describe('GitHubTokenService', () => {
       })
     );
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain('sensitive-upstream-data');
+  });
+
+  it.each([404, 422])(
+    'classifies provider status %s as definitive repository non-access',
+    async status => {
+      vi.mocked(createAppAuth).mockReturnValue(
+        vi
+          .fn()
+          .mockRejectedValue(
+            Object.assign(new Error('not installed'), { status })
+          ) as unknown as ReturnType<typeof createAppAuth>
+      );
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const service = new GitHubTokenService({
+        GITHUB_APP_ID: 'app-id',
+        GITHUB_APP_PRIVATE_KEY: 'private-key',
+      } as CloudflareEnv);
+
+      await expect(service.tryGetTokenForRepo('123', 'acme/repository')).resolves.toEqual({
+        status: 'not_installed',
+      });
+    }
+  );
+
+  it('classifies provider and configuration uncertainty as temporary unavailability', async () => {
+    vi.mocked(createAppAuth).mockReturnValue(
+      vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error('unavailable'), { status: 503 })
+        ) as unknown as ReturnType<typeof createAppAuth>
+    );
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const service = new GitHubTokenService({
+      GITHUB_APP_ID: 'app-id',
+      GITHUB_APP_PRIVATE_KEY: 'private-key',
+    } as CloudflareEnv);
+
+    await expect(service.tryGetTokenForRepo('123', 'acme/repository')).resolves.toEqual({
+      status: 'temporarily_unavailable',
+    });
+  });
+
+  it('requires the minted token to access the exact owner and repository', async () => {
+    vi.mocked(createAppAuth).mockReturnValue(
+      vi.fn().mockResolvedValue({
+        token: 'scoped-token',
+        expiresAt: new Date(Date.now() + 60_000),
+      }) as unknown as ReturnType<typeof createAppAuth>
+    );
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 404 }));
+    const service = new GitHubTokenService({
+      GITHUB_APP_ID: 'app-id',
+      GITHUB_APP_PRIVATE_KEY: 'private-key',
+    } as CloudflareEnv);
+
+    await expect(service.tryGetTokenForRepo('123', 'acme/repository')).resolves.toEqual({
+      status: 'not_installed',
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.github.com/repos/acme/repository',
+      expect.objectContaining({ method: 'GET' })
+    );
   });
 });

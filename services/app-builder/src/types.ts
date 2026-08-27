@@ -24,6 +24,7 @@ export type GetTokenForRepoResult =
   | {
       success: true;
       token: string;
+      platformIntegrationId: string;
       installationId: string;
       accountLogin: string;
       appType: 'standard' | 'lite';
@@ -34,6 +35,10 @@ export type GetTokenForRepoResult =
         | 'database_not_configured'
         | 'invalid_repo_format'
         | 'no_installation_found'
+        | 'repository_not_installed'
+        | 'ambiguous_installation'
+        | 'temporarily_unavailable'
+        | 'integration_mismatch'
         | 'invalid_org_id';
     };
 

@@ -11,7 +11,8 @@ export function sessionPlaneFromId(sessionId: string): SessionPlane {
 }
 
 export function sessionSupportsTerminal(sessionId: string): boolean {
-  return sessionPlaneFromId(sessionId) !== 'control';
+  const plane = sessionPlaneFromId(sessionId);
+  return plane === 'legacy' || plane === 'control';
 }
 
 export function generateSessionId(plane: SessionPlane = 'legacy'): SessionId {

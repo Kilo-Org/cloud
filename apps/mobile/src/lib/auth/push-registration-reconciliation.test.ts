@@ -7,6 +7,7 @@ const logoutMock = vi.hoisted(() => ({
 }));
 
 const notificationsMock = vi.hoisted(() => ({
+  emitNotificationTokenUpdated: vi.fn(),
   getDevicePushTokenOutcome: vi.fn(),
   getPlatform: vi.fn(),
 }));

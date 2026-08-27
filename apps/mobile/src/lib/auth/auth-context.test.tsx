@@ -28,6 +28,13 @@ const hoisted = vi.hoisted(() => {
     discardPostHog: vi.fn().mockImplementation(async () => {
       callOrder.push('discardPostHog');
     }),
+    captureEvent: vi.fn().mockImplementation(() => {
+      callOrder.push('captureEvent');
+    }),
+    // eslint-disable-next-line require-await -- mock returning a resolved promise
+    flushLastPostHogEvent: vi.fn().mockImplementation(async () => {
+      callOrder.push('flushLastPostHogEvent');
+    }),
   };
 
   const appsflyer = {
@@ -94,6 +101,12 @@ const logoutCleanupMock = vi.hoisted(() => ({
   unregisterActivityTokensAndTombstone: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Hoisted so sign-out can assert the queued consent outcome is cleared during
+// teardown without loading the consent module's SecureStore/PostHog chain.
+const consentMock = vi.hoisted(() => ({
+  clearPendingConsentOutcome: vi.fn(),
+}));
+
 // ---- all vi.mock calls ----
 
 vi.mock('expo-secure-store', () => ({
@@ -112,6 +125,9 @@ vi.mock('@sentry/react-native', () => ({
 
 vi.mock('@/lib/analytics/posthog', () => ({
   discardPostHog: hoisted.posthog.discardPostHog,
+  captureEvent: hoisted.posthog.captureEvent,
+  flushLastPostHogEvent: hoisted.posthog.flushLastPostHogEvent,
+  LOGOUT_EVENT: 'logout',
 }));
 
 vi.mock('@/lib/appsflyer', () => ({
@@ -139,6 +155,10 @@ vi.mock('@/lib/query-client', () => ({
 vi.mock('@/lib/persist/read-cache', () => readCacheMock);
 
 vi.mock('@/lib/auth/logout-cleanup', () => logoutCleanupMock);
+
+vi.mock('@/lib/consent', () => ({
+  clearPendingConsentOutcome: consentMock.clearPendingConsentOutcome,
+}));
 
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({
   setTrpcUnauthorizedHandler: vi.fn(),
@@ -314,7 +334,7 @@ describe('sign-out teardown ordering', () => {
     hoisted.secureStore.getItemAsync.mockResolvedValue(null);
   });
 
-  it('calls clearTelemetryDecision and Sentry.setUser first, synchronously', async () => {
+  it('orders capture, cleanup, flush, clearTelemetryDecision, then Sentry.setUser', async () => {
     const { ctx, unmount } = await mountAndGetContext();
 
     await act(async () => {
@@ -326,9 +346,51 @@ describe('sign-out teardown ordering', () => {
     // Sentry.setUser must be called
     expect(hoisted.sentry.setUser).toHaveBeenCalledWith(null);
 
-    // The first two calls in order must be clearTelemetryDecision then Sentry.setUser
-    expect(hoisted.callOrder[0]).toBe('clearTelemetryDecision');
-    expect(hoisted.callOrder[1]).toBe('Sentry.setUser');
+    const capture = hoisted.posthog.captureEvent.mock.invocationCallOrder[0];
+    const cleanup = logoutCleanupMock.runLogoutCleanup.mock.invocationCallOrder[0];
+    const flush = hoisted.posthog.flushLastPostHogEvent.mock.invocationCallOrder[0];
+    const clear = hoisted.controller.clearTelemetryDecision.mock.invocationCallOrder[0];
+    const sentry = hoisted.sentry.setUser.mock.invocationCallOrder[0];
+
+    expect(capture).toBeLessThan(cleanup);
+    expect(cleanup).toBeLessThan(flush);
+    expect(flush).toBeLessThan(clear);
+    expect(clear).toBeLessThan(sentry);
+
+    unmount();
+  });
+
+  it('clears a queued consent outcome during sign-out before discarding PostHog', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    expect(consentMock.clearPendingConsentOutcome).toHaveBeenCalledTimes(1);
+
+    const clearConsent = consentMock.clearPendingConsentOutcome.mock.invocationCallOrder[0];
+    const discard = hoisted.posthog.discardPostHog.mock.invocationCallOrder[0];
+    expect(clearConsent).toBeLessThan(discard);
+
+    unmount();
+  });
+
+  it('captures logout, then flushes, then discards PostHog', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    expect(hoisted.posthog.captureEvent).toHaveBeenCalledWith('logout');
+    expect(hoisted.posthog.flushLastPostHogEvent).toHaveBeenCalledTimes(1);
+
+    const capture = hoisted.posthog.captureEvent.mock.invocationCallOrder[0];
+    const flush = hoisted.posthog.flushLastPostHogEvent.mock.invocationCallOrder[0];
+    const discard = hoisted.posthog.discardPostHog.mock.invocationCallOrder[0];
+    expect(capture).toBeLessThan(flush);
+    expect(flush).toBeLessThan(discard);
 
     unmount();
   });
@@ -348,9 +410,13 @@ describe('sign-out teardown ordering', () => {
     expect(hoisted.posthogStorage.purgePostHogPersistence).toHaveBeenCalled();
 
     // SDK teardown calls must appear before any SecureStore delete.
-    // The first 5 synchronous calls must be in this exact order.
-    const expectedPreamble = hoisted.callOrder.slice(0, 5);
+    // The first 7 calls must be in this exact order (logout capture and flush
+    // precede the teardown steps; remote cleanup is awaited between them but
+    // pushes no callOrder entry).
+    const expectedPreamble = hoisted.callOrder.slice(0, 7);
     expect(expectedPreamble).toEqual([
+      'captureEvent',
+      'flushLastPostHogEvent',
       'clearTelemetryDecision',
       'Sentry.setUser',
       'resetAppsFlyerState',

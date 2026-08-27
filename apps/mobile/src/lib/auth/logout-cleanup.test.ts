@@ -36,6 +36,7 @@ vi.mock('@/lib/glanceable/sink-registry', () => ({
 }));
 
 vi.mock('@/lib/notifications', () => ({
+  emitNotificationTokenUpdated: vi.fn(),
   getDevicePushTokenOutcome: vi.fn(),
 }));
 

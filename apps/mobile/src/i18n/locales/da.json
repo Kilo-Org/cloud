@@ -665,7 +665,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, fane, {{position}} af {{total}}"
+    "position": "{{name}}, fane, {{position}} af {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Tjekkørsel",
       "status": "Status",
       "threshold": "Tærskel",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Venter på gennemgangens transskription.",
+      "transcriptEmpty": "Ingen transskription for denne gennemgang.",
+      "transcriptRetry": "Kunne ikke indlæse gennemgangens transskription.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "Agent inaktiv",
+      "agentWorking": "Agent arbejder...",
+      "anErrorOccurred": "Der opstod en fejl",
+      "errorWithMessage": "Fejl: {{message}}",
+      "executionStarted": "Udførelse startet",
+      "reviewCompleted": "Gennemgang fuldført",
+      "reviewInterrupted": "Gennemgang afbrudt",
+      "sessionError": "Sessionsfejl: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Værktøj: {{name}}",
+      "toolNameError": "Værktøj: {{name}} — fejl",
+      "unknownError": "Ukendt fejl"
     },
     "reviewMemory": {
       "title": "Gennemgangshukommelse",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiv nu",
     "search": {
       "searching": "Søger",
       "searchSessions": "Søg i sessioner",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Kunne ikke indlæse sessioner",
       "couldNotLoadActive": "Kunne ikke indlæse aktive sessioner",
-      "noSessionsYet": "Ingen sessioner endnu",
       "noSessionsYetDescription": "Start en kodningsopgave fra din telefon. Dine sessioner vises her.",
       "noMatches": "Ingen sessioner matcher",
       "tryDifferentSearch": "Prøv et andet søgeord.",
       "tryAdjustFilters": "Prøv at justere eller fjerne dine filtre.",
       "couldNotSearch": "Kunne ikke søge i sessioner",
-      "allActive": "Alle sessioner er aktive",
       "completedWillAppear": "Fuldførte sessioner vises her.",
       "noPastSessions": "Ingen tidligere sessioner",
       "live": "LIVE"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Rul til bunden",
       "emptyTitle": "Ingen beskeder endnu",
       "renameAccessibility": "Omdøb session: {{title}}",
-      "connectRepository": "Tilslut repository",
       "cloningSession": "Kloner session",
       "continue": "Fortsæt",
       "couldNotLoadThisSession": "Kunne ikke indlæse denne session",
-      "cloneFailed": "Kunne ikke klone denne session.",
       "cloneFailedRetry": "Kunne ikke klone denne session. Prøv igen.",
-      "connectRepositoryToContinue": "Tilslut et repository for at fortsætte.",
       "notEnoughCredits": "Ikke nok kreditter til at køre Cloud Agent. Tilføj kreditter og prøv igen.",
       "previousTaskFinishing": "Den forrige opgave er stadig i gang. Vent et øjeblik.",
       "serviceUnavailable": "Tjenesten er ikke tilgængelig lige nu. Prøv igen.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Ingen repositories synlige. Kontrollér adgangen til GitLab-repositories, og opdater derefter.",
       "openBitbucket": "Åbn Bitbucket",
       "openGitlab": "Åbn GitLab",
-      "recentlyUsed": "Senest brugt"
+      "recentlyUsed": "Senest brugt",
+      "cliCannotContinue": "Denne CLI kan ikke fortsætte en session. Vælg Cloud Agent eller en anden CLI.",
+      "continueFrom": "Fortsætter {{title}}",
+      "importFailed": "Kunne ikke importere denne session.",
+      "importingSession": "Importerer session"
     },
     "partRenderer": {
       "updatedFileCount_one": "Opdaterede {{displayCount}} fil",
@@ -2462,6 +2477,8 @@
       "viewTable": "Vis tabel",
       "title": "Tabel",
       "close": "Luk tabel",
+      "loading": "Indlæser tabel",
+      "empty": "Denne tabel har ingen rækker.",
       "columnCount_one": "kolonne",
       "columnCount": "kolonner",
       "columnCount_other": "kolonner",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Dette link åbner {{host}} i din browser.",
       "open": "Åbn",
       "trustThisHost": "Stol på denne host"
+    },
+    "folderPicker": {
+      "fieldLabel": "Mappe",
+      "accessibility": "Mappe: {{label}}",
+      "tapToListHint": "Tryk på en mappe for at vise dens indhold",
+      "emptyTitle": "Ingen mapper indeni",
+      "emptyDescription": "Færdig bruger denne mappe.",
+      "retryableTitle": "Kunne ikke vise mapper",
+      "retryableDescription": "Tjek din forbindelse, og tryk på Prøv igen. Færdig bekræfter stadig denne mappe.",
+      "unsupportedTitle": "Kan ikke vise mapper",
+      "unsupportedDescription": "Denne CLI kan ikke vise mapper. Færdig beholder startmappen, og Start session starter der."
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Når du stoler på et links host, åbnes det uden at spørge igen.",
     "revoke": "Tilbagekald {{host}}",
     "backToPreferences": "Tilbage til indstillinger"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Besked"
+    },
+    "empty": {
+      "title": "Start en chat",
+      "description": "Send en besked for at tale med en model."
+    },
+    "working": "Arbejder",
+    "historyRetry": "Kunne ikke indlæse chathistorik.",
+    "catalogRetry": "Kunne ikke indlæse modeller",
+    "sendError": "Kunne ikke sende beskeden. Prøv igen."
   }
 }

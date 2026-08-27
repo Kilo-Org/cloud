@@ -33,7 +33,6 @@ import {
   cloneGitHubRepo,
   cloneGitRepo,
   updateGitAuthor,
-  updateGitRemoteToken,
   updateGitRemoteUrl,
   checkDiskSpace,
   checkDiskAndCleanBeforeSetup,
@@ -500,176 +499,105 @@ describe('disk space checking', () => {
   describe('cloneGitHubRepo', () => {
     it('should clone repository (disk space check is separate)', async () => {
       mockExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
-
-      // Mock gitCheckout to succeed
-      mockGitCheckout.mockResolvedValue({
-        success: true,
-        exitCode: 0,
-      });
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
 
       await cloneGitHubRepo(fakeSession, '/workspace', 'org/repo');
 
-      // Verify clone was called
-      expect(mockGitCheckout).toHaveBeenCalled();
+      expect(String(mockExec.mock.calls[0]?.[0])).toBe(
+        "'git' 'clone' '--progress' 'https://github.com/org/repo.git' '/workspace'"
+      );
+      expect(mockGitCheckout).not.toHaveBeenCalled();
     });
   });
 
   describe('cloneGitRepo', () => {
     it('should clone repository (disk space check is separate)', async () => {
       mockExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
-
-      // Mock gitCheckout to succeed
-      mockGitCheckout.mockResolvedValue({
-        success: true,
-        exitCode: 0,
-      });
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
 
       await cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
 
-      // Verify clone was called
-      expect(mockGitCheckout).toHaveBeenCalled();
+      expect(String(mockExec.mock.calls[0]?.[0])).toBe(
+        "'git' 'clone' '--progress' 'https://example.com/repo.git' '/workspace'"
+      );
+      expect(mockGitCheckout).not.toHaveBeenCalled();
     });
 
-    it('should include token in URL when provided', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
-
-      // Mock gitCheckout to succeed
-      mockGitCheckout.mockResolvedValue({
-        success: true,
-        exitCode: 0,
-      });
-
-      await cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git', 'test-token');
-
-      // Verify gitCheckout was called with URL containing token
-      expect(mockGitCheckout).toHaveBeenCalledWith(
-        expect.stringContaining('x-access-token:test-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('should use oauth2 username for gitlab platform', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
-
-      mockGitCheckout.mockResolvedValue({
-        success: true,
-        exitCode: 0,
-      });
-
-      await cloneGitRepo(
-        fakeSession,
-        '/workspace',
-        'https://gitlab.com/repo.git',
-        'test-token',
-        undefined,
-        {
-          platform: 'gitlab',
-        }
-      );
-
-      expect(mockGitCheckout).toHaveBeenCalledWith(
-        expect.stringContaining('oauth2:test-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('should use x-token-auth username for bitbucket platform', async () => {
+    it('embeds a generic token only when the host has no helper rule', async () => {
       mockExec
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
         .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
-      mockGitCheckout.mockResolvedValue({ success: true, exitCode: 0 });
+
+      await cloneGitRepo(fakeSession, '/workspace', 'https://git.example.com/repo.git', undefined, {
+        token: 'generic-git-token',
+      });
+
+      const expected = new URL('https://git.example.com/repo.git');
+      expected.username = 'x-access-token';
+      expected.password = 'generic-git-token';
+      expect(String(mockExec.mock.calls[0]?.[0])).toContain(expected.toString());
+    });
+
+    it('clones the canonical URL without embedding a token', async () => {
+      mockExec
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
+
+      await cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
+
+      const command = String(mockExec.mock.calls[0]?.[0]);
+      expect(command).toBe(
+        "'git' 'clone' '--progress' 'https://example.com/repo.git' '/workspace'"
+      );
+      expect(command).not.toContain('@');
+      expect(mockGitCheckout).not.toHaveBeenCalled();
+    });
+
+    it('clones a GitLab URL without embedding the token', async () => {
+      mockExec
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
+
+      await cloneGitRepo(fakeSession, '/workspace', 'https://gitlab.com/repo.git', undefined, {
+        platform: 'gitlab',
+        token: 'gitlab-token',
+      });
+
+      expect(String(mockExec.mock.calls[0]?.[0])).toBe(
+        "'git' 'clone' '--progress' 'https://gitlab.com/repo.git' '/workspace'"
+      );
+    });
+
+    it('clones a Bitbucket URL without embedding the token', async () => {
+      mockExec
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
 
       await cloneGitRepo(
         fakeSession,
         '/workspace',
         'https://bitbucket.org/acme/repo.git',
-        'test-token',
         undefined,
-        { platform: 'bitbucket' }
+        { platform: 'bitbucket', token: 'bitbucket-token' }
       );
 
-      expect(mockGitCheckout).toHaveBeenCalledWith(
-        expect.stringContaining('x-token-auth:test-token'),
-        expect.any(Object)
+      expect(String(mockExec.mock.calls[0]?.[0])).toBe(
+        "'git' 'clone' '--progress' 'https://bitbucket.org/acme/repo.git' '/workspace'"
       );
-    });
-
-    it('should use x-access-token username for github platform', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
-
-      mockGitCheckout.mockResolvedValue({
-        success: true,
-        exitCode: 0,
-      });
-
-      await cloneGitRepo(
-        fakeSession,
-        '/workspace',
-        'https://example.com/repo.git',
-        'test-token',
-        undefined,
-        {
-          platform: 'github',
-        }
-      );
-
-      expect(mockGitCheckout).toHaveBeenCalledWith(
-        expect.stringContaining('x-access-token:test-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('should use x-access-token username when platform is undefined', async () => {
-      mockExec
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // git config user.name
-        .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }); // git config user.email
-
-      mockGitCheckout.mockResolvedValue({
-        success: true,
-        exitCode: 0,
-      });
-
-      await cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git', 'test-token');
-
-      expect(mockGitCheckout).toHaveBeenCalledWith(
-        expect.stringContaining('x-access-token:test-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('logs sdk timeout when gitCheckout rejects with clone timeout', async () => {
-      mockGitCheckout.mockRejectedValueOnce(new Error('Git clone timed out after 120000ms'));
-
-      await expect(
-        cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git')
-      ).rejects.toThrow('Failed to clone repository from https://example.com/repo.git');
-
-      expect(mockTimeoutWithTags).toHaveBeenCalledWith({ logTag: 'sandbox-operation-timeout' });
-      expect(mockTimeoutWithFields).toHaveBeenCalledWith(
-        expect.objectContaining({
-          operation: 'git.clone',
-          timeoutMs: 120000,
-          timeoutLayer: 'sdk',
-          error: 'Git clone timed out after 120000ms',
-        })
-      );
-      expect(mockTimeoutWarn).toHaveBeenCalledWith('Sandbox operation timed out');
     });
 
     it('preserves sandbox 500 errors for recovery handling', async () => {
       const error = new Error('HTTP error! status: 500');
       Object.assign(error, { name: 'SandboxError' });
-      mockGitCheckout.mockRejectedValueOnce(error);
+      mockExec.mockRejectedValueOnce(error);
 
       await expect(
         cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git')
@@ -677,34 +605,24 @@ describe('disk space checking', () => {
     });
 
     it('throws GitRepositoryNotFoundError when git stderr says repository not found', async () => {
-      mockGitCheckout.mockRejectedValueOnce(
-        new Error(
-          "remote: Repository not found.\nfatal: repository 'https://example.com/repo' not found"
-        )
-      );
+      mockExec.mockResolvedValueOnce({
+        exitCode: 128,
+        stdout: '',
+        stderr:
+          "remote: Repository not found.\nfatal: repository 'https://example.com/repo' not found",
+      });
 
       const promise = cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
       await expect(promise).rejects.toBeInstanceOf(GitRepositoryNotFoundError);
       await expect(promise).rejects.toThrow('Repository not found: https://example.com/repo.git');
     });
 
-    it('throws GitRepositoryNotFoundError when stderr field on the SDK error contains the pattern', async () => {
-      const sdkError = Object.assign(new Error('Git checkout failed'), {
-        name: 'GitCheckoutError',
-        stderr: "remote: Repository not found.\nfatal: repository '...' not found",
-      });
-      mockGitCheckout.mockRejectedValueOnce(sdkError);
-
-      const promise = cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
-      await expect(promise).rejects.toBeInstanceOf(GitRepositoryNotFoundError);
-    });
-
     it('throws GitCloneFailedError for LFS smudge failures (not repo-not-found)', async () => {
-      mockGitCheckout.mockRejectedValueOnce(
-        new Error(
-          "error: external filter 'git-lfs filter-process' failed: smudge filter lfs failed"
-        )
-      );
+      mockExec.mockResolvedValueOnce({
+        exitCode: 128,
+        stdout: '',
+        stderr: "error: external filter 'git-lfs filter-process' failed: smudge filter lfs failed",
+      });
 
       const promise = cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
       await expect(promise).rejects.toBeInstanceOf(GitCloneFailedError);
@@ -713,17 +631,17 @@ describe('disk space checking', () => {
       );
     });
 
-    it('throws GitCloneFailedError when gitCheckout returns success=false', async () => {
-      mockGitCheckout.mockResolvedValue({ success: false, exitCode: 128 });
-
-      const promise = cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
-      await expect(promise).rejects.toBeInstanceOf(GitCloneFailedError);
-    });
-
     it('sanitizes tokens out of GitCloneFailedError reason', async () => {
-      mockGitCheckout.mockRejectedValueOnce(
-        new Error('clone failed at https://x-access-token:secret123@example.com/repo.git')
-      );
+      mockExec.mockResolvedValueOnce({
+        exitCode: 128,
+        stdout: '',
+        stderr: `clone failed at ${(() => {
+          const url = new URL('https://example.com/repo.git');
+          url.username = 'x-access-token';
+          url.password = 'secret123';
+          return url.toString();
+        })()}`,
+      });
 
       try {
         await cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git');
@@ -763,84 +681,24 @@ describe('disk space checking', () => {
     it('replaces a tokenized origin with the credential-free canonical URL', async () => {
       mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
 
-      await updateGitRemoteUrl(
-        fakeSession,
-        '/workspace',
-        'https://x-token-auth:managed-token@bitbucket.org/acme/repo.git'
-      );
+      const leftover = new URL('https://bitbucket.org/acme/repo.git');
+      leftover.username = 'x-token-auth';
+      leftover.password = 'managed-token';
+      await updateGitRemoteUrl(fakeSession, '/workspace', leftover.toString());
 
       const command = String(mockExec.mock.calls[0]?.[0]);
       expect(command).toContain("git remote set-url origin 'https://bitbucket.org/acme/repo.git'");
       expect(command).not.toContain('managed-token');
       expect(command).not.toContain('@bitbucket.org');
     });
-  });
 
-  describe('updateGitRemoteToken', () => {
-    it('should use oauth2 username for gitlab platform', async () => {
+    it('leaves SCP-style remotes unchanged', async () => {
       mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
 
-      await updateGitRemoteToken(
-        fakeSession,
-        '/workspace',
-        'https://gitlab.com/repo.git',
-        'new-token',
-        'gitlab'
-      );
+      await updateGitRemoteUrl(fakeSession, '/workspace', 'git@gitlab.com:acme/repo.git');
 
-      expect(mockExec).toHaveBeenCalledWith(
-        expect.stringContaining('oauth2:new-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('should use x-token-auth username for bitbucket platform', async () => {
-      mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
-
-      await updateGitRemoteToken(
-        fakeSession,
-        '/workspace',
-        'https://bitbucket.org/acme/repo.git',
-        'new-token',
-        'bitbucket'
-      );
-
-      expect(mockExec).toHaveBeenCalledWith(
-        expect.stringContaining('x-token-auth:new-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('should use x-access-token username for github platform', async () => {
-      mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
-
-      await updateGitRemoteToken(
-        fakeSession,
-        '/workspace',
-        'https://example.com/repo.git',
-        'new-token',
-        'github'
-      );
-
-      expect(mockExec).toHaveBeenCalledWith(
-        expect.stringContaining('x-access-token:new-token'),
-        expect.any(Object)
-      );
-    });
-
-    it('should use x-access-token username when platform is undefined', async () => {
-      mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
-
-      await updateGitRemoteToken(
-        fakeSession,
-        '/workspace',
-        'https://example.com/repo.git',
-        'new-token'
-      );
-
-      expect(mockExec).toHaveBeenCalledWith(
-        expect.stringContaining('x-access-token:new-token'),
-        expect.any(Object)
+      expect(String(mockExec.mock.calls[0]?.[0])).toContain(
+        "git remote set-url origin 'git@gitlab.com:acme/repo.git'"
       );
     });
   });

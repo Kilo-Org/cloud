@@ -32,7 +32,7 @@ const INVALID_LIST_MODELS_COMMAND = 'invalid list_models command';
  * structured relay error repeats identically on retry, so it must not be
  * retried.
  */
-const RETRYABLE_RELAY_CODES = new Set([
+export const RETRYABLE_RELAY_CODES = new Set([
   'SESSION_OWNER_CHANGED',
   'CATALOG_REQUEST_PENDING',
   'COMMAND_EXPIRED',

@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => {
     getItemAsync: vi.fn(),
     defineTask: vi.fn(),
     registerTaskAsync: vi.fn(),
+    captureEvent: vi.fn(),
   };
 });
 
@@ -88,6 +89,10 @@ vi.mock('@/lib/deep-link-launch', () => ({
 
 vi.mock('@/lib/notification-path', () => ({
   notificationPathForData: mocks.notificationPathForData,
+}));
+
+vi.mock('@/lib/analytics/posthog', () => ({
+  captureEvent: mocks.captureEvent,
 }));
 
 // Each test re-imports the module so the module-level single-flight promise
@@ -605,5 +610,60 @@ describe('setupNotificationBackgroundHandler', () => {
     expect(sink.publish).not.toHaveBeenCalled();
 
     unregisterGlanceableSink(sink);
+  });
+});
+
+describe('notification permission and token events', () => {
+  it('emits granted when a live permission request is granted', async () => {
+    mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
+    mocks.requestPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    const { registerForPushNotifications } = await loadNotifications();
+
+    await registerForPushNotifications();
+
+    expect(mocks.captureEvent).toHaveBeenCalledWith('notification_permission_responded', {
+      outcome: 'granted',
+    });
+  });
+
+  it('emits denied when a live permission request is denied', async () => {
+    mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
+    mocks.requestPermissionsAsync.mockResolvedValue({ status: 'denied' });
+    const { registerForPushNotifications } = await loadNotifications();
+
+    await registerForPushNotifications();
+
+    expect(mocks.captureEvent).toHaveBeenCalledWith('notification_permission_responded', {
+      outcome: 'denied',
+    });
+  });
+
+  it('does not emit a permission outcome when already granted', async () => {
+    mocks.getPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    const { registerForPushNotifications } = await loadNotifications();
+
+    await registerForPushNotifications();
+
+    expect(mocks.captureEvent).not.toHaveBeenCalled();
+  });
+
+  it('emits a registered token action', async () => {
+    const { emitNotificationTokenUpdated } = await loadNotifications();
+
+    emitNotificationTokenUpdated('registered');
+
+    expect(mocks.captureEvent).toHaveBeenCalledWith('notification_token_updated', {
+      action: 'registered',
+    });
+  });
+
+  it('emits an unregistered token action', async () => {
+    const { emitNotificationTokenUpdated } = await loadNotifications();
+
+    emitNotificationTokenUpdated('unregistered');
+
+    expect(mocks.captureEvent).toHaveBeenCalledWith('notification_token_updated', {
+      action: 'unregistered',
+    });
   });
 });

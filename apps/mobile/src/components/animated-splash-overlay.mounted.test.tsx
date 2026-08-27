@@ -19,6 +19,7 @@ vi.mock('react-native-reanimated', () => ({
   withSequence: (...values: unknown[]) => values.at(-1),
   makeMutable: (v: unknown) => ({ value: v }),
   Easing: { out: (v: unknown) => v, in: (v: unknown) => v, quad: 0, cubic: 0 },
+  useFrameCallback: () => ({ setActive: () => undefined }),
   // Reduced motion keeps animation callbacks out of the test.
   useReducedMotion: () => true,
 }));

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER, VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { User } from '@kilocode/db/schema';
 
@@ -110,4 +110,16 @@ describe('getProvider local fake deterministic routing', () => {
     });
     missingUrl.restore();
   });
+
+  test.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
+    'routes %s through Vercel AI Gateway',
+    async model => {
+      expect(await getProvider(providerInput(model))).toEqual({
+        kind: 'provider',
+        provider: VERCEL_AI_GATEWAY,
+        userByok: null,
+        bypassAccessCheck: false,
+      });
+    }
+  );
 });

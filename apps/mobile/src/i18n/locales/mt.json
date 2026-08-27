@@ -686,7 +686,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} minn {{total}}"
+    "position": "{{name}}, tab, {{position}} minn {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -1326,7 +1327,23 @@
       "checkRun": "Check run",
       "status": "Status",
       "threshold": "Limitu",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Qed nistenna t-traskrizzjoni tar-reviżjoni.",
+      "transcriptEmpty": "L-ebda traskrizzjoni għal din ir-reviżjoni.",
+      "transcriptRetry": "Ma setgħetx titgħabba t-traskrizzjoni tar-reviżjoni.",
+      "transcriptLive": "DIRETT",
+      "agentIdle": "Aġent idle",
+      "agentWorking": "Aġent qed jaħdem...",
+      "anErrorOccurred": "Ġara żball",
+      "errorWithMessage": "Żball: {{message}}",
+      "executionStarted": "L-eżekuzzjoni bdiet",
+      "reviewCompleted": "Ir-reviżjoni tlestiet",
+      "reviewInterrupted": "Ir-reviżjoni ġiet interrotta",
+      "sessionError": "Żball tas-sessjoni: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Għodda: {{name}}",
+      "toolNameError": "Għodda: {{name}} — żball",
+      "unknownError": "Żball mhux magħruf"
     },
     "reviewMemory": {
       "title": "Memorja tar-reviżjoni",
@@ -2072,7 +2089,6 @@
     }
   },
   "agents": {
-    "activeNow": "Attiv issa",
     "search": {
       "searching": "Qed infittex",
       "searchSessions": "Fittex sessjonijiet",
@@ -2083,13 +2099,11 @@
     "sessionList": {
       "couldNotLoad": "Ma setgħux jitgħabbew is-sessjonijiet",
       "couldNotLoadActive": "Ma setgħux jintgħabbu s-sessjonijiet attivi",
-      "noSessionsYet": "L-ebda sessjoni s'issa",
       "noSessionsYetDescription": "Ibda biċċa xogħol ta' kodifikazzjoni mit-telefon tiegħek. Is-sessjonijiet tiegħek se jidhru hawn.",
       "noMatches": "L-ebda sessjoni ma taqbel",
       "tryDifferentSearch": "Ipprova terminu ta' tfittxija differenti.",
       "tryAdjustFilters": "Ipprova aġġusta jew neħħi l-filtri tiegħek.",
       "couldNotSearch": "Ma setgħux jinstabu s-sessjonijiet",
-      "allActive": "Is-sessjonijiet kollha huma attivi",
       "completedWillAppear": "Is-sessjonijiet kompluti se jidhru hawn.",
       "noPastSessions": "L-ebda sessjoni tal-passat",
       "live": "DIRETT"
@@ -2164,13 +2178,10 @@
       "scrollToBottom": "Skrollja sal-qiegħ",
       "emptyTitle": "L-ebda messaġġ s'issa",
       "renameAccessibility": "Erġa' semmi s-sessjoni: {{title}}",
-      "connectRepository": "Ikkonnettja r-repożitorju",
       "cloningSession": "Qed jiġi kklonjat is-sessjoni",
       "continue": "Kompli",
       "couldNotLoadThisSession": "Ma setgħetx titgħabba din is-sessjoni",
-      "cloneFailed": "Ma setgħetx tiġi kklonjata din is-sessjoni.",
       "cloneFailedRetry": "Ma setgħetx tiġi kklonjata din is-sessjoni. Erġa' pprova.",
-      "connectRepositoryToContinue": "Ikkonnettja repożitorju biex tkompli.",
       "notEnoughCredits": "Kreditu mhux biżżejjed biex tħaddem Cloud Agent. Żid il-kreditu u erġa' pprova.",
       "previousTaskFinishing": "Il-kompitu preċedenti għadu qed jintemm. Jekk jogħġbok stenna mument.",
       "serviceUnavailable": "Is-servizz mhux disponibbli bħalissa. Jekk jogħġbok erġa' pprova.",
@@ -2243,7 +2254,11 @@
       "noRepositoriesVisibleGitlab": "L-ebda repository mhux viżibbli. Iċċekkja l-aċċess tar-repositories għal GitLab, imbagħad aġġorna.",
       "openBitbucket": "Iftaħ Bitbucket",
       "openGitlab": "Iftaħ GitLab",
-      "recentlyUsed": "Użati reċentement"
+      "recentlyUsed": "Użati reċentement",
+      "continueFrom": "Qed tkompli {{title}}",
+      "importingSession": "Qed timporta s-sessjoni",
+      "cliCannotContinue": "Dan il-CLI ma jistax ikompli sessjoni. Agħżel Cloud Agent jew CLI ieħor.",
+      "importFailed": "Ma setgħetx timporta din is-sessjoni."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aġġornat {{displayCount}} fajl",
@@ -2513,6 +2528,8 @@
       "viewTable": "Ara t-tabella",
       "title": "Tabella",
       "close": "Agħlaq it-tabella",
+      "loading": "Qed jillowdja t-tabella",
+      "empty": "Din it-tabella m'għandhiex ringieli",
       "columnCount_one": "kolonna",
       "columnCount": "kolonni",
       "columnCount_other": "kolonni",
@@ -2710,6 +2727,17 @@
       "hostConfirmMessage": "Dan il-link jiftaħ {{host}} fil-browser tiegħek.",
       "open": "Iftaħ",
       "trustThisHost": "Afda f'dan il-host"
+    },
+    "folderPicker": {
+      "accessibility": "Folder: {{label}}",
+      "emptyDescription": "Lest juża dan il-folder.",
+      "emptyTitle": "L-ebda folder ġewwa",
+      "fieldLabel": "Folder",
+      "retryableDescription": "Iċċekkja l-konnessjoni tiegħek u Erġa' pprova. Lest xorta jikkonferma dan il-folder.",
+      "retryableTitle": "Ma setax jelenka l-folders",
+      "tapToListHint": "Agħfas fuq folder biex jelenka l-kontenut tiegħu",
+      "unsupportedDescription": "Dan il-CLI ma jistax jelenka l-folders. Lest iżomm il-folder tat-tnedija u Ibda s-sessjoni jibda minn hemm.",
+      "unsupportedTitle": "Ma jistax jelenka l-folders"
     }
   },
   "bootstrap": {
@@ -3212,5 +3240,19 @@
     "emptyDescription": "Meta tafda l-host ta' link, jinfetaħ mingħajr ma jistaqsi għal darb'oħra.",
     "revoke": "Irrevoka {{host}}",
     "backToPreferences": "Lura għall-preferenzi"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Messaġġ"
+    },
+    "empty": {
+      "title": "Ibda chat",
+      "description": "Ibgħat messaġġ biex tikkellem ma' mudell."
+    },
+    "working": "Qed jaħdem",
+    "historyRetry": "Ma setgħux jitgħabbew l-istorja taċ-chat.",
+    "catalogRetry": "Ma setgħux jittellgħu l-mudelli",
+    "sendError": "Ma setax jintbagħat il-messaġġ. Erġa' pprova."
   }
 }

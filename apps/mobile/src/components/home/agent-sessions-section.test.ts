@@ -1,10 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount the section in the node vitest environment (same pattern as the mounted tests) */
+import { createElement } from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { buildRows } from '@/components/home/agent-sessions-section';
+import { AgentSessionsSection, buildRows } from '@/components/home/agent-sessions-section';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 
+const navigateSpy = vi.hoisted(() => vi.fn());
+const dismissToSpy = vi.hoisted(() => vi.fn());
+
 vi.mock('expo-router', () => ({
-  useRouter: vi.fn(),
+  useRouter: () => ({ navigate: navigateSpy, dismissTo: dismissToSpy }),
   useFocusEffect: vi.fn(),
 }));
 
@@ -13,7 +19,7 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('@/components/home/section-header', () => ({
-  SectionHeader: () => null,
+  SectionHeader: 'SectionHeader',
 }));
 
 vi.mock('@/components/agents/remote-session-row', () => ({
@@ -26,6 +32,10 @@ vi.mock('@/components/ui/text', () => ({
 
 vi.mock('@/components/agents/session-row', () => ({
   StoredSessionRow: () => null,
+}));
+
+vi.mock('@/components/agents/use-agent-session-navigator', () => ({
+  useAgentSessionNavigator: () => vi.fn(),
 }));
 
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
@@ -122,5 +132,50 @@ describe('buildRows', () => {
       activeSessionIds: new Set(['on1']),
     });
     expect(rows.map(row => row.key)).toEqual(['stored:on1']);
+  });
+});
+
+describe('Home See-all navigation', () => {
+  beforeEach(() => {
+    navigateSpy.mockClear();
+    dismissToSpy.mockClear();
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  });
+
+  it('switches to the Agents index and dismisses the history subpage', async () => {
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      await Promise.resolve();
+      rendererRef.current = TestRenderer.create(
+        createElement(AgentSessionsSection, { organizationId: 'org-1' })
+      );
+    });
+    const renderer = rendererRef.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+
+    const header = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'SectionHeader'
+    );
+    const onActionPress = header.props.onActionPress as () => void;
+    expect(onActionPress).toBeTypeOf('function');
+
+    onActionPress();
+    expect(navigateSpy).toHaveBeenCalledTimes(1);
+    expect(dismissToSpy).toHaveBeenCalledTimes(1);
+    const href = navigateSpy.mock.calls[0]?.[0] as string;
+    const dismissHref = dismissToSpy.mock.calls[0]?.[0] as string;
+    expect(href).toBe('/(app)/(tabs)/(2_agents)/');
+    expect(href).not.toContain('history');
+    expect(dismissHref).toBe('/(app)/(tabs)/(2_agents)/');
+    expect(dismissHref).not.toContain('history');
+    expect(navigateSpy.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
+      dismissToSpy.mock.invocationCallOrder[0] ?? 0
+    );
+
+    renderer.unmount();
   });
 });

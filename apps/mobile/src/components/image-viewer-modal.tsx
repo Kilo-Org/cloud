@@ -40,6 +40,16 @@ export function ImageViewerModal({
   const { t } = useTranslation();
 
   const [imageError, setImageError] = useState(false);
+  // Reset a prior decode error in render when the URL changes. A successful
+  // renew writes a NEW signed URL; the reset must land in the same commit so
+  // the refreshed image, not the "Image unavailable" row, renders. A failed
+  // renew keeps the same URL, so `imageError` survives and the row stays until
+  // a new URL lands.
+  const [previousUri, setPreviousUri] = useState(uri);
+  if (uri !== previousUri) {
+    setPreviousUri(uri);
+    setImageError(false);
+  }
 
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -72,7 +82,7 @@ export function ImageViewerModal({
   // A new image (or a reopen) retries the decode from a clean slate.
   useEffect(() => {
     setImageError(false);
-  }, [visible, uri]);
+  }, [visible]);
 
   // Close when the privacy cover fires (app backgrounds on a covered route):
   // a native Modal renders above the overlay, so it must close itself.

@@ -665,7 +665,8 @@
     "profile": "Kaardii",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, taabii, {{total}} keessaa {{position}}"
+    "position": "{{name}}, taabii, {{total}} keessaa {{position}}",
+    "chat": "Chaat"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Sakatta'a hojii",
       "status": "Haala",
       "threshold": "Gatihoo",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Galmee xalayyii sakatta'aa eeggachaa jira.",
+      "transcriptEmpty": "Sakatta'a kanaaf galmee xalayyii hin jiru.",
+      "transcriptRetry": "Galmee xalayyii sakatta'aa fudhachuu hin danda'ine.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "Eejentii hojii irraa boqachaa",
+      "agentWorking": "Eejentii hojachaa jira...",
+      "anErrorOccurred": "Dogoggorri uumame",
+      "errorWithMessage": "Dogoggora: {{message}}",
+      "executionStarted": "Hojiirra oolchuun jalqabe",
+      "reviewCompleted": "Ilalloon xumurame",
+      "reviewInterrupted": "Ilalloon citatte",
+      "sessionError": "Dogoggora xalayyii: {{error}}",
+      "statusWithValue": "Haala: {{status}}",
+      "toolName": "Meeshaa: {{name}}",
+      "toolNameError": "Meeshaa: {{name}} — dogoggora",
+      "unknownError": "Dogoggora hin beekamne"
     },
     "reviewMemory": {
       "title": "Yaadannoo sakatta'aa",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Amma hojjechaa jira",
     "search": {
       "searching": "Barbaachaa jira",
       "searchSessions": "Xalayyii barbaadi",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Shumarra fudhachuu hin danda'ine",
       "couldNotLoadActive": "Xalayyii hojjechaa jiran dhiisuu hin dandeenye",
-      "noSessionsYet": "Xalayyiin hamma ammaatti hin jiru",
       "noSessionsYetDescription": "Bilbila kee irraa hojii koodingii jalqabi. Xalayyiin kee as ni mul'atu.",
       "noMatches": "Xalayyiin wal hin qabne",
       "tryDifferentSearch": "Jecha barbaaduu adda ta'e yaali.",
       "tryAdjustFilters": "Fildarii kee jijjiiru ykn haquu yaali.",
       "couldNotSearch": "Xalayyii barbaaduu hin dandeenye",
-      "allActive": "Xalayyiin hunda hojjechaa jiran",
       "completedWillAppear": "Xalayyiin xumuraman as ni mul'atu.",
       "noPastSessions": "Xalayyiin darbe hin jiru",
       "live": "LIVE"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Gadi jala deem",
       "emptyTitle": "Ergaa hamma ammaatti hin jiru",
       "renameAccessibility": "Xalayyii maqaa jijjiiri: {{title}}",
-      "connectRepository": "Repository wal qabsi",
       "cloningSession": "Xalayyii kopii godhachaa jira",
       "continue": "Itti fufi",
       "couldNotLoadThisSession": "Xalayyii kana dhiisuu hin dandeenyne",
-      "cloneFailed": "Xalayyii kana kopii godhuu hin dandeenyne.",
       "cloneFailedRetry": "Xalayyii kana kopii godhuu hin dandeenyne. Deebi'ee yaali.",
-      "connectRepositoryToContinue": "Itti fufuuf repository wal qabsi.",
       "notEnoughCredits": "Cloud Agenti hojii irra oolchuuf kireedii gahaa hin qabdu. Kireedii itti dabaliitii deebi'ii yaali.",
       "previousTaskFinishing": "Hojii duraan ture amma iyyuu xumurameera. Mee yeroo xinnoo eegi.",
       "serviceUnavailable": "Tajaajilli amma hin jiraatu. Mee deebi'ii yaali.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Repository tokko iyyuu hin mul'atu. GitLab irratti argachuu repo keessan ilaalaa, sana booda haaromsi.",
       "openBitbucket": "Bitbucket bani",
       "openGitlab": "GitLab bani",
-      "recentlyUsed": "Yeroo dhihoo itti fayyadamame"
+      "recentlyUsed": "Yeroo dhihoo itti fayyadamame",
+      "cliCannotContinue": "CLI kuni shumarra itti fufuu hin danda'u. Cloud Agent ykn CLI biraa filadhu.",
+      "continueFrom": "{{title}} itti fufaa jira",
+      "importFailed": "Shumarra kana galchuu hin danda'ine.",
+      "importingSession": "Shumarra galchaa jira"
     },
     "partRenderer": {
       "updatedFileCount_one": "Faayilii {{displayCount}} haaromfame",
@@ -2462,6 +2477,8 @@
       "viewTable": "Taabala ilaali",
       "title": "Taabala",
       "close": "Taabala cufi",
+      "loading": "Taabala fe'amaa jira",
+      "empty": "Taabala kun tartiba hin qabu",
       "columnCount_one": "haatara",
       "columnCount": "haataraawwan",
       "columnCount_other": "haataraawwan",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Liinkiin kun {{host}} brawzarii kee keessatti bana.",
       "open": "Bani",
       "trustThisHost": "Hosii kana amani"
+    },
+    "folderPicker": {
+      "accessibility": "Falduru: {{label}}",
+      "emptyDescription": "Xumure falduru kana fayyadama.",
+      "emptyTitle": "Keessaa falduru hin jiru",
+      "fieldLabel": "Falduru",
+      "retryableDescription": "Walqabxii kee sakatta'iitii Irra deebi'i. Xumure falduru kana amma iyyuu mirkaneessa.",
+      "retryableTitle": "Faldurrota tarreefachuu hin dandeenye",
+      "tapToListHint": "Falduru tokko tuqii wantoota isaa tarreefachuuf",
+      "unsupportedDescription": "CLI kun faldurrota tarreefachuu hin danda'u. Xumure faldura jalqabaa qaba, Xalayyii jalqabi achitti jalqaba.",
+      "unsupportedTitle": "Faldurrota tarreefachuu hin danda'u"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Yeroo hostii liinkii amantu, gaafachuu malee deebi'ee bana.",
     "revoke": "Haqi {{host}}",
     "backToPreferences": "Gara filatootaatti deebi'i"
+  },
+  "quickChat": {
+    "title": "Chaat",
+    "composer": {
+      "placeholder": "Ergaa"
+    },
+    "empty": {
+      "title": "Chaat jalqabi",
+      "description": "Modeelii wajjin haasa'uuf ergaa ergi."
+    },
+    "working": "Hojachaa jira",
+    "historyRetry": "Seenaa chaat fudhachuu hin dandeenye.",
+    "catalogRetry": "Modeeloota fe'achuu hin dandeenye",
+    "sendError": "Ergaa erguu hin dandeenye. Ammas yaali."
   }
 }

@@ -9,7 +9,11 @@ import {
   awaitLogoutReconciliationSettled,
 } from '@/lib/auth/logout-reconciliation';
 import { getResolvedLanguage } from '@/lib/hooks/use-language-preference';
-import { getDevicePushTokenOutcome, getPlatform } from '@/lib/notifications';
+import {
+  emitNotificationTokenUpdated,
+  getDevicePushTokenOutcome,
+  getPlatform,
+} from '@/lib/notifications';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient } from '@/lib/trpc';
 
@@ -165,6 +169,8 @@ async function runReconciliation(locale: string): Promise<PushRegistrationOutcom
     // result so a stale reconciliation never invalidates for the wrong user.
     return { kind: 'register-failed' };
   }
+
+  emitNotificationTokenUpdated('registered');
 
   // Set only on an outcome that proves the server row holds this locale. A
   // failed attempt leaves it stale on purpose, so the next attempt bypasses

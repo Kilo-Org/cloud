@@ -665,7 +665,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, yorliq, {{total}} tadan {{position}}"
+    "position": "{{name}}, yorliq, {{total}} tadan {{position}}",
+    "chat": "Suhbat"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Tekshiruv ishlovi",
       "status": "Holat",
       "threshold": "Chegara",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Ko'rib chiqish transkripti kutilmoqda.",
+      "transcriptEmpty": "Bu ko'rib chiqish uchun transkript yo'q.",
+      "transcriptRetry": "Ko'rib chiqish transkriptini yuklab bo'lmadi.",
+      "transcriptLive": "JO'N",
+      "agentIdle": "Agent bo'sh",
+      "agentWorking": "Agent ishlamoqda...",
+      "anErrorOccurred": "Xatolik yuz berdi",
+      "errorWithMessage": "Xato: {{message}}",
+      "executionStarted": "Bajarish boshlandi",
+      "reviewCompleted": "Ko'rib chiqish yakunlandi",
+      "reviewInterrupted": "Ko'rib chiqish to'xtatildi",
+      "sessionError": "Sessiya xatosi: {{error}}",
+      "statusWithValue": "Holat: {{status}}",
+      "toolName": "Asbob: {{name}}",
+      "toolNameError": "Asbob: {{name}} — xato",
+      "unknownError": "Noma'lum xato"
     },
     "reviewMemory": {
       "title": "Ko'rib chiqish xotirasi",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Hozir faol",
     "search": {
       "searching": "Qidirilmoqda",
       "searchSessions": "Sessiyalarni qidirish",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Sessiyalarni yuklab bo'lmadi",
       "couldNotLoadActive": "Faol sessiyalar yuklab olinmadi",
-      "noSessionsYet": "Hali sessiyalar yo'q",
       "noSessionsYetDescription": "Telefoningizdan kodlash vazifasini boshlang. Sessiyalaringiz shu yerda paydo bo'ladi.",
       "noMatches": "Sessiyalar mos kelmadi",
       "tryDifferentSearch": "Boshqa qidiruv so'zini sinab ko'ring.",
       "tryAdjustFilters": "Filtrlaringizni sozlab yoki tozalab ko'ring.",
       "couldNotSearch": "Sessiyalarni qidirib bo'lmadi",
-      "allActive": "Barcha sessiyalar faol",
       "completedWillAppear": "Tugallangan sessiyalar shu yerda paydo bo'ladi.",
       "noPastSessions": "O'tgan sessiyalar yo'q",
       "live": "JO'N"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Pastga aylantirish",
       "emptyTitle": "Hali xabarlar yo'q",
       "renameAccessibility": "Sessiyani qayta nomlash: {{title}}",
-      "connectRepository": "Repozitoriyaga ulanish",
       "cloningSession": "Sessiya klonlanmoqda",
       "continue": "Davom etish",
       "couldNotLoadThisSession": "Ushbu sessiyani yuklab bo'lmadi",
-      "cloneFailed": "Ushbu sessiyani klonlab bo'lmadi.",
       "cloneFailedRetry": "Ushbu sessiyani klonlab bo'lmadi. Qayta urinib ko'ring.",
-      "connectRepositoryToContinue": "Davom etish uchun repozitoriyaga ulaning.",
       "notEnoughCredits": "Cloud Agent ishga tushirish uchun kredit yetarli emas. Kredit qo'shing va qayta urinib ko'ring.",
       "previousTaskFinishing": "Oldingi vazifa hali ham tugamoqda. Iltimos, bir oz kuting.",
       "serviceUnavailable": "Xizmat hozir mavjud emas. Iltimos, qayta urinib ko'ring.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Hech qanday repozitoriy ko'rinmayapti. GitLab uchun repozitoriy kirishini tekshiring, keyin yangilang.",
       "openBitbucket": "Bitbucket'ni ochish",
       "openGitlab": "GitLab'ni ochish",
-      "recentlyUsed": "Yaqinda ishlatilgan"
+      "recentlyUsed": "Yaqinda ishlatilgan",
+      "continueFrom": "{{title}} ni davom ettirish",
+      "importingSession": "Sessiyani import qilish",
+      "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent yoki boshqa CLI'ni tanlang.",
+      "importFailed": "Bu sessiyani import qilib bo'lmadi."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi",
@@ -2462,6 +2477,8 @@
       "viewTable": "Jadvalni ko'rish",
       "title": "Jadval",
       "close": "Jadvalni yopish",
+      "loading": "Jadval yuklanmoqda",
+      "empty": "Bu jadvalda qatorlar yo'q.",
       "columnCount_one": "ustun",
       "columnCount": "ustunlar",
       "columnCount_other": "ustunlar",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Bu havola {{host}} sahifasini brauzeringizda ochadi.",
       "open": "Ochish",
       "trustThisHost": "Bu xostga ishonish"
+    },
+    "folderPicker": {
+      "accessibility": "Jild: {{label}}",
+      "emptyDescription": "Tayyor bu jilddan foydalanadi.",
+      "emptyTitle": "Ichida jildlar yo'q",
+      "fieldLabel": "Jild",
+      "retryableDescription": "Ulanishni tekshiring va qayta urinish. Tayyor baribir bu jildni tasdiqlaydi.",
+      "retryableTitle": "Jildlarni ro'yxatlab bo'lmadi",
+      "tapToListHint": "Tarkibini ko'rish uchun jildga teging",
+      "unsupportedDescription": "Bu CLI jildlarni ro'yxatlay olmaydi. Tayyor ishga tushirish jildini saqlaydi va Sessiyani boshlash o'sha yerda boshlanadi.",
+      "unsupportedTitle": "Jildlarni ro'yxatlab bo'lmaydi"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Havolaning xostiga ishonsangiz, u yana so'rovsiz ochiladi.",
     "revoke": "{{host}} ruxsatini bekor qilish",
     "backToPreferences": "Sozlamalarga qaytish"
+  },
+  "quickChat": {
+    "title": "Suhbat",
+    "composer": {
+      "placeholder": "Xabar"
+    },
+    "empty": {
+      "title": "Suhbatni boshlang",
+      "description": "Model bilan gaplashish uchun xabar yuboring."
+    },
+    "working": "Ishlamoqda",
+    "historyRetry": "Suhbat tarixini yuklab bo'lmadi.",
+    "catalogRetry": "Modellarni yuklab bo'lmadi",
+    "sendError": "Xabarni yuborib bo'lmadi. Iltimos, qayta urinib ko'ring."
   }
 }

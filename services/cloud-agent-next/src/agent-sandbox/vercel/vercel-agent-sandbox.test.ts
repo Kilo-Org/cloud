@@ -5,9 +5,10 @@ import { WRAPPER_VERSION } from '../../shared/wrapper-version.js';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import { VercelAgentSandbox } from './vercel-agent-sandbox.js';
 import type { VercelSandboxRuntimeConfig } from './vercel-runtime-config.js';
-import type {
-  VercelSandboxCommand,
-  VercelSandboxRestClient,
+import {
+  VercelSandboxRestError,
+  type VercelSandboxCommand,
+  type VercelSandboxRestClient,
 } from './vercel-sandbox-rest-client.js';
 
 const config: VercelSandboxRuntimeConfig = {
@@ -45,6 +46,21 @@ function command(overrides: Partial<VercelSandboxCommand> = {}): VercelSandboxCo
     exitCode: null,
     startedAt: 1,
     ...overrides,
+  };
+}
+
+function persistedWrapperRuntime(): NonNullable<
+  NonNullable<SessionMetadata['workspace']>['providerRuntime']
+> {
+  return {
+    provider: 'vercel',
+    sessionId: 'session-1',
+    wrapper: {
+      launchId: 'launch-1',
+      commandId: 'command-1',
+      instanceId: 'instance-1',
+      instanceGeneration: 2,
+    },
   };
 }
 
@@ -125,6 +141,170 @@ function ensureRequest() {
 
 describe('VercelAgentSandbox', () => {
   afterEach(() => vi.restoreAllMocks());
+
+  it('rejects unsupported billing admission without creating or inspecting compute', async () => {
+    const context = runtimeContext();
+    const client = restClient();
+    const sandbox = new VercelAgentSandbox(metadata(), config, context, {
+      restClient: asRestClient(client),
+    });
+
+    await expect(sandbox.ensureBillingAdmission()).resolves.toEqual({
+      success: false,
+      code: 'meter_unavailable',
+      message: 'Container billing admission is unavailable for Vercel sandbox sessions',
+    });
+    expect(context.beginCreate).not.toHaveBeenCalled();
+    expect(client.createSandbox).not.toHaveBeenCalled();
+    expect(client.getSession).not.toHaveBeenCalled();
+  });
+
+  it('fails enforced billing checks closed without blocking unenforced sessions', async () => {
+    const sandbox = new VercelAgentSandbox(metadata(), config);
+
+    await expect(sandbox.isBillingBlocked()).resolves.toBe(false);
+    await expect(sandbox.isBillingBlocked(false)).resolves.toBe(false);
+    await expect(sandbox.isBillingBlocked(true)).resolves.toBe(true);
+  });
+
+  it('reports billing runtime status unavailable without inspecting provider state', async () => {
+    const client = restClient();
+    const sandbox = new VercelAgentSandbox(metadata(persistedWrapperRuntime()), config, undefined, {
+      restClient: asRestClient(client),
+    });
+
+    await expect(sandbox.getBillingRuntimeStatus()).resolves.toBeUndefined();
+    expect(client.getSession).not.toHaveBeenCalled();
+    expect(client.getCommand).not.toHaveBeenCalled();
+  });
+
+  it('observes absent persisted runtimes and wrappers without provider calls or reconciliation', async () => {
+    const context = runtimeContext();
+    const client = restClient();
+    const uncreated = new VercelAgentSandbox(metadata(), config, context, {
+      restClient: asRestClient(client),
+    });
+    const withoutWrapper = new VercelAgentSandbox(
+      metadata({ provider: 'vercel', sessionId: 'session-1' }),
+      config,
+      context,
+      { restClient: asRestClient(client) }
+    );
+
+    await expect(uncreated.observeWrappersWithoutWaking()).resolves.toEqual({ status: 'absent' });
+    await expect(withoutWrapper.observeWrappersWithoutWaking()).resolves.toEqual({
+      status: 'absent',
+    });
+    expect(context.beginCreate).not.toHaveBeenCalled();
+    expect(context.getWrapperLaunchIntent).not.toHaveBeenCalled();
+    expect(client.getSession).not.toHaveBeenCalled();
+    expect(client.getCommand).not.toHaveBeenCalled();
+  });
+
+  it.each(['stopped', 'failed', 'aborted'] as const)(
+    'does not inspect commands or mutate persisted state for a %s runtime',
+    async status => {
+      const context = runtimeContext();
+      const client = restClient();
+      client.getSession.mockResolvedValue({ session: { status }, routes: [] });
+      const sandbox = new VercelAgentSandbox(metadata(persistedWrapperRuntime()), config, context, {
+        restClient: asRestClient(client),
+      });
+
+      await expect(sandbox.observeWrappersWithoutWaking()).resolves.toEqual({ status: 'absent' });
+      expect(client.getSession).toHaveBeenCalledWith('session-1', 'ses-abcdef');
+      expect(client.getCommand).not.toHaveBeenCalled();
+      expect(client.executeCommand).not.toHaveBeenCalled();
+      expect(context.clearWrapperProcess).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['pending', 'stopping', 'snapshotting'] as const)(
+    'retains uncertainty without inspecting commands for a %s runtime',
+    async status => {
+      const context = runtimeContext();
+      const client = restClient();
+      client.getSession.mockResolvedValue({ session: { status }, routes: [] });
+      const sandbox = new VercelAgentSandbox(metadata(persistedWrapperRuntime()), config, context, {
+        restClient: asRestClient(client),
+      });
+
+      await expect(sandbox.observeWrappersWithoutWaking()).resolves.toEqual({
+        status: 'inspection-failed',
+        error: `Vercel sandbox runtime is ${status}`,
+      });
+      expect(client.getCommand).not.toHaveBeenCalled();
+      expect(context.clearWrapperProcess).not.toHaveBeenCalled();
+    }
+  );
+
+  it('observes an active wrapper by persisted session and command without mutating its lease', async () => {
+    const context = runtimeContext();
+    const client = restClient();
+    const sandbox = new VercelAgentSandbox(metadata(persistedWrapperRuntime()), config, context, {
+      restClient: asRestClient(client),
+    });
+
+    await expect(sandbox.observeWrappersWithoutWaking()).resolves.toEqual({
+      status: 'present',
+      observed: [
+        {
+          representation: 'process',
+          id: 'command-1',
+          instanceId: 'instance-1',
+          instanceGeneration: 2,
+        },
+      ],
+    });
+    expect(client.getSession).toHaveBeenCalledWith('session-1', 'ses-abcdef');
+    expect(client.getCommand).toHaveBeenCalledWith('session-1', 'command-1');
+    expect(context.clearWrapperProcess).not.toHaveBeenCalled();
+  });
+
+  it('reports an exited wrapper absent without clearing or mutating its persisted lease', async () => {
+    const context = runtimeContext();
+    const client = restClient();
+    client.getCommand.mockResolvedValue(command({ exitCode: 143 }));
+    const sandbox = new VercelAgentSandbox(metadata(persistedWrapperRuntime()), config, context, {
+      restClient: asRestClient(client),
+    });
+
+    await expect(sandbox.observeWrappersWithoutWaking()).resolves.toEqual({ status: 'absent' });
+    await expect(sandbox.observeWrappersWithoutWaking()).resolves.toEqual({ status: 'absent' });
+    expect(client.getCommand).toHaveBeenCalledTimes(2);
+    expect(context.clearWrapperProcess).not.toHaveBeenCalled();
+  });
+
+  it('treats a missing exact runtime session as absent without probing its command', async () => {
+    const context = runtimeContext();
+    const client = restClient();
+    client.getSession.mockRejectedValue(
+      new VercelSandboxRestError('request_failed', 'get-session', 404)
+    );
+    const sandbox = new VercelAgentSandbox(metadata(persistedWrapperRuntime()), config, context, {
+      restClient: asRestClient(client),
+    });
+
+    await expect(sandbox.observeWrappersWithoutWaking()).resolves.toEqual({ status: 'absent' });
+    expect(client.getCommand).not.toHaveBeenCalled();
+    expect(context.clearWrapperProcess).not.toHaveBeenCalled();
+  });
+
+  it('retains provider observation failures without modifying persisted wrapper state', async () => {
+    const context = runtimeContext();
+    const client = restClient();
+    client.getSession.mockRejectedValue(new Error('provider unavailable'));
+    const sandbox = new VercelAgentSandbox(metadata(persistedWrapperRuntime()), config, context, {
+      restClient: asRestClient(client),
+    });
+
+    await expect(sandbox.observeWrappersWithoutWaking()).resolves.toEqual({
+      status: 'inspection-failed',
+      error: 'Error: provider unavailable',
+    });
+    expect(client.getCommand).not.toHaveBeenCalled();
+    expect(context.clearWrapperProcess).not.toHaveBeenCalled();
+  });
 
   it('persists create intent and exact runtime before validating and launching the wrapper', async () => {
     const context = runtimeContext();
@@ -555,7 +735,7 @@ describe('VercelAgentSandbox', () => {
       { restClient: asRestClient(client) }
     );
 
-    await expect(sandbox.observeWrappersWithoutWaking()).resolves.toEqual({
+    await expect(sandbox.discoverSessionWrappers()).resolves.toEqual({
       status: 'present',
       observed: [
         {
@@ -742,14 +922,11 @@ describe('VercelAgentSandbox', () => {
     expect(client.stopSession).not.toHaveBeenCalled();
   });
 
-  it('admits billing as a no-op and observes wrappers through discover', async () => {
+  it('observes wrappers through discover without inspecting billing state', async () => {
     const sandbox = new VercelAgentSandbox(metadata(), config, undefined, {
       restClient: asRestClient(restClient()),
     });
 
-    await expect(sandbox.ensureBillingAdmission()).resolves.toEqual({ success: true });
-    await expect(sandbox.isBillingBlocked()).resolves.toBe(false);
-    await expect(sandbox.isBillingBlocked(true)).resolves.toBe(false);
     await expect(sandbox.getBillingRuntimeStatus()).resolves.toBeUndefined();
     await expect(sandbox.observeWrappersWithoutWaking()).resolves.toEqual({ status: 'absent' });
   });

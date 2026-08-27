@@ -12,6 +12,7 @@ export function PickerSheet({
   onDone,
   onCancel,
   doneLabel,
+  cancelLabel,
   children,
   expired = false,
   scrollable = true,
@@ -21,6 +22,8 @@ export function PickerSheet({
   onDone: () => void;
   onCancel?: () => void;
   doneLabel?: string;
+  /** Overrides the leading control's text and accessibility label (nested Back). */
+  cancelLabel?: string;
   children?: ReactNode;
   /** Set when the caller's data source (picker bridge) is gone — renders the standard "Options expired" empty state instead of children. */
   expired?: boolean;
@@ -56,6 +59,7 @@ export function PickerSheet({
         onDone={onDone}
         onCancel={onCancel}
         doneLabel={doneLabel}
+        cancelLabel={cancelLabel}
         disabled={disabled}
       />
       {scrollable ? (

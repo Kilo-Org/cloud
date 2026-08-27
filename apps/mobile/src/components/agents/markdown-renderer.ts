@@ -33,7 +33,7 @@ import {
   resolveLinkAccessibilityLabel,
 } from './markdown-link';
 import { type MarkdownPalette } from './markdown-palette';
-import { MarkdownTable } from './markdown-table';
+import { type MarkdownTable as MarkdownTableComponent } from './markdown-table';
 
 export type MarkdownLinkLongPressHandler = (href: string, event?: GestureResponderEvent) => void;
 
@@ -127,10 +127,10 @@ export class MarkdownRenderer extends Renderer {
   private readonly selectable: boolean;
   private readonly onLongPressLink?: MarkdownLinkLongPressHandler;
   private readonly onPressLink?: MarkdownLinkPressHandler;
-  // Ordinal host key: Parser parses every header/body cell (each consuming
+  // Ordinal host key: the parser builds every header/body cell (each consuming
   // getKey()) before table() returns, so a slugger-based host key would shift
   // as rows/cells grow. A fresh renderer per parse restarts this counter, so
-  // the k-th table keeps `md-table-(k-1)` across re-parses regardless of size.
+  // the k-th nested table keeps `md-table-(k-1)` across re-parses.
   private tableIndex = 0;
   private imageIndex = 0;
 
@@ -390,13 +390,32 @@ export class MarkdownRenderer extends Renderer {
     _rowStyle: ViewStyle | undefined,
     _cellStyle: ViewStyle | undefined
   ): ReactNode {
+    // Top-level tables are extracted by splitMarkdownTables before useMarkdown;
+    // a table nested inside a blockquote or list item is not, so its raw stays
+    // in the markdown segment and the parser builds these cell trees here.
+    // Render them behind a MarkdownTable chip instead of dropping them. The
+    // require is lazy to break the module cycle with markdown-table (which
+    // extends this renderer for its body parser): a top-level import would
+    // evaluate MarkdownTable before MarkdownRenderer exists.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy require breaks the renderer <-> table module cycle
+    const { MarkdownTable } = require('./markdown-table') as {
+      MarkdownTable: typeof MarkdownTableComponent;
+    };
     const key = `md-table-${this.tableIndex}`;
     this.tableIndex += 1;
+    const columnCount = Math.max(header.length, ...rows.map(row => row.length));
+    const rowCount = rows.length;
     return createElement(MarkdownTable, {
       key,
       palette: this.palette,
+      selectable: this.selectable,
+      tableKey: key,
+      columnCount,
+      rowCount,
       header,
       rows,
+      onLongPressLink: this.onLongPressLink,
+      onPressLink: this.onPressLink,
     });
   }
 }

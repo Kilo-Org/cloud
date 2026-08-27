@@ -138,6 +138,9 @@ overrides:
   # and constructs its own WebClient, so the versions must agree. 7.x is the
   # ceiling until @chat-adapter/slack moves to @slack/web-api 8.
   '@slack/web-api': 7.19.0
+  # Direct `@expo/ui@57.0.12` (expo-widgets peer) and expo-router's `^57.0.9`
+  # otherwise resolve to two native-module copies. Force one version.
+  '@expo/ui': 57.0.12
 packageExtensions:
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
   # under pnpm's isolated linker (autoInstallPeers is false).

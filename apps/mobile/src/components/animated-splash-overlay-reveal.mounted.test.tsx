@@ -138,6 +138,31 @@ describe('AnimatedSplashOverlay reveal start', () => {
     vi.useRealTimers();
   });
 
+  it('stays armed when the logo-waive timer re-renders after the handover', async () => {
+    const renderer = await mountAndReachHandover();
+
+    // The 500ms logo-waive timer fires whether or not the logo loaded, so it
+    // re-renders after the handover. That must not disarm the reveal.
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(reanimated.active).toBe(true);
+
+    const frame = reanimated.frame;
+    if (!frame) {
+      throw new Error('the frame callback was not registered');
+    }
+    act(() => {
+      frame({ timeSincePreviousFrame: 16 });
+    });
+    expect(reanimated.sequences).toBe(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+    vi.useRealTimers();
+  });
+
   it('starts the reveal anyway when no healthy frame ever arrives', async () => {
     const renderer = await mountAndReachHandover();
     expect(reanimated.sequences).toBe(0);

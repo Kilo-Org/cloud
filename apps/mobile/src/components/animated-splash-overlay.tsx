@@ -58,6 +58,7 @@ export function AnimatedSplashOverlay() {
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [logoWaived, setLogoWaived] = useState(false);
   const exitStartedRef = useRef(false);
+  const revealSafetyRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const reducedMotion = useReducedMotion();
   const overlayOpacity = useSharedValue(1);
   const discScale = useSharedValue(0);
@@ -120,9 +121,8 @@ export function AnimatedSplashOverlay() {
 
   useEffect(() => {
     if (!complete || dismissed || !(logoLoaded || logoWaived) || exitStartedRef.current) {
-      return undefined;
+      return;
     }
-    let safety: ReturnType<typeof setTimeout> | undefined = undefined;
 
     async function hideAndExit() {
       try {
@@ -147,7 +147,7 @@ export function AnimatedSplashOverlay() {
       frameCallback.setActive(true);
       // A device that never reports a healthy frame must not strand the
       // overlay on screen.
-      safety = setTimeout(() => {
+      revealSafetyRef.current = setTimeout(() => {
         if (!revealStarted.value) {
           revealStarted.value = true;
           startReveal();
@@ -157,10 +157,6 @@ export function AnimatedSplashOverlay() {
 
     exitStartedRef.current = true;
     void hideAndExit();
-    return () => {
-      clearTimeout(safety);
-      frameCallback.setActive(false);
-    };
   }, [
     complete,
     dismissed,
@@ -171,6 +167,17 @@ export function AnimatedSplashOverlay() {
     revealStarted,
     startReveal,
   ]);
+
+  // Teardown is keyed on the overlay being gone, not on the handover effect's
+  // deps: the logo-load and logo-waive flags can still flip after the handover,
+  // and a cleanup on those would disarm the reveal before it ever starts.
+  useEffect(() => {
+    if (!dismissed) {
+      return;
+    }
+    clearTimeout(revealSafetyRef.current);
+    frameCallback.setActive(false);
+  }, [dismissed, frameCallback]);
 
   const overlayStyle = useAnimatedStyle(() => ({ opacity: overlayOpacity.value }));
   const discStyle = useAnimatedStyle(() => ({ transform: [{ scale: discScale.value }] }));

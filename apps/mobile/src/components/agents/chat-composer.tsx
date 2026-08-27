@@ -607,6 +607,7 @@ export function ChatComposer({
     isFocused,
     isSending,
     isUploading: upload.isUploading,
+    hasFailedAttachments: upload.hasFailedAttachments,
     voiceInputActive: voiceInput.isActive,
   });
 

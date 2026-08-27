@@ -173,4 +173,16 @@ describe('ChatComposerInputRow mounted — iOS writing-tools lock', () => {
 
     renderer.unmount();
   });
+
+  it('renders the mic at the lg size so it reaches the 48dp Android target', async () => {
+    const renderer = await renderRow({
+      inputEditable: true,
+      voiceInputAvailable: true,
+    });
+
+    const [mic] = findAllByType(renderer.root, 'VoiceInputButton');
+    expect(mic?.props.size).toBe('lg');
+
+    renderer.unmount();
+  });
 });

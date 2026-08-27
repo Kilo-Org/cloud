@@ -9,6 +9,7 @@ import { isNeedsInputStatus } from '../dos/session-ingest-attention';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { SessionStatusSchema } from '../types/user-connection-protocol';
 import { isDefaultSessionTitle } from './default-session-title';
+import { isWorktreeDeleting } from '../services/worktree-deletion';
 
 /** Stored status written when a CLI disconnects while the session is waiting on input. */
 export const CLI_DISCONNECT_ATTENTION_RESET_STATUS = 'retry' as const;
@@ -95,6 +96,7 @@ export async function applyMetadataChanges(
           parentSessionId: cli_sessions_v2.parent_session_id,
           cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
           cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
+          worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
           gitUrl: cli_sessions_v2.git_url,
         })
         .from(cli_sessions_v2)
@@ -132,7 +134,11 @@ export async function applyMetadataChanges(
     }
 
     const [currentRow] = await selectCurrentRow().for('update');
-    if (!currentRow) return null;
+    if (
+      !currentRow ||
+      (currentRow.worktreeId && (await isWorktreeDeleting(tx, currentRow.worktreeId)))
+    )
+      return null;
     const cloudAgentSessionScopeId = currentRow.cloudAgentSessionScopeId;
     const hasCloudAgentSessionScope = cloudAgentSessionScopeId != null;
     const isCloudAgentManagedSession =
@@ -300,7 +306,9 @@ export async function applyMetadataChanges(
           .where(
             and(
               eq(cli_sessions_v2.session_id, parentSessionId),
-              eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+              sql`${cli_sessions_v2.cloud_agent_session_scope_id} IS NULL`,
+              sql`${cli_sessions_v2.cloud_agent_worktree_id} IS NULL`
             )
           )
           .limit(1);
@@ -358,6 +366,7 @@ export async function applyMetadataChanges(
         git_url: cli_sessions_v2.git_url,
         git_branch: cli_sessions_v2.git_branch,
         parent_session_id: cli_sessions_v2.parent_session_id,
+        cloud_agent_worktree_id: cli_sessions_v2.cloud_agent_worktree_id,
         status: cli_sessions_v2.status,
         status_updated_at: cli_sessions_v2.status_updated_at,
       })
@@ -506,6 +515,7 @@ export async function resetAttentionStatusOnCliDisconnect(
         git_url: cli_sessions_v2.git_url,
         git_branch: cli_sessions_v2.git_branch,
         parent_session_id: cli_sessions_v2.parent_session_id,
+        cloud_agent_worktree_id: cli_sessions_v2.cloud_agent_worktree_id,
         status: cli_sessions_v2.status,
         status_updated_at: cli_sessions_v2.status_updated_at,
       })

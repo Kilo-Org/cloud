@@ -12,7 +12,9 @@ import {
 } from '@kilocode/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
+import type { KiloSdkStoredMessage } from '@kilocode/session-ingest-contracts';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
+import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
 import { parseGitHubOwnerRepo, parseGitHubPrUrl } from '@/routers/cli-sessions-v2-router';
 import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
@@ -21,10 +23,12 @@ import { captureException } from '@sentry/nextjs';
 
 // Mock the cloud agent client for watermark and runtime-state tests.
 const mockGetSession = jest.fn().mockRejectedValue(new Error('not mocked'));
+const mockDeleteCloudAgentSession = jest.fn().mockResolvedValue({ success: true });
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(() => ({
     getSession: mockGetSession,
+    deleteSession: mockDeleteCloudAgentSession,
   })),
   rethrowAsPaymentRequired: jest.fn(),
   InsufficientCreditsError: class InsufficientCreditsError extends Error {
@@ -124,6 +128,7 @@ describe('cli-sessions-v2-router', () => {
   beforeEach(() => {
     afterCallbacks.length = 0;
     mockedNotifyCliSessionRenamed.mockReset().mockResolvedValue({ delivered: true });
+    mockDeleteCloudAgentSession.mockReset().mockResolvedValue({ success: true });
     mockedCaptureException.mockClear();
   });
 
@@ -209,6 +214,154 @@ describe('cli-sessions-v2-router', () => {
       });
     });
 
+    it('projects every grouped snapshot path into the distinct public chat directory', async () => {
+      const privateDirectory = '/srv/runtime/private/worktrees/worktree-secret';
+      const publicDirectory = `/cloud-agent/sessions/${sessionId}`;
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            info: {
+              id: sessionId,
+              directory: privateDirectory,
+              path: `${privateDirectory}/session.json`,
+              summary: { diffs: [{ file: `${privateDirectory}/src/app.ts` }] },
+              permission: [{ pattern: `${privateDirectory}/src` }],
+            },
+            messages: [
+              {
+                info: {
+                  id: 'msg_assistant',
+                  role: 'assistant',
+                  path: { cwd: privateDirectory, root: privateDirectory },
+                },
+                parts: [
+                  {
+                    id: 'prt_file',
+                    type: 'file',
+                    url: `file://${privateDirectory}/attachment.txt`,
+                    source: { type: 'file', path: `${privateDirectory}/attachment.txt` },
+                  },
+                  {
+                    id: 'prt_tool',
+                    type: 'tool',
+                    state: {
+                      status: 'completed',
+                      attachments: [
+                        {
+                          id: 'prt_nested',
+                          type: 'file',
+                          url: `file://${privateDirectory}/nested.txt`,
+                          source: { type: 'symbol', path: `${privateDirectory}/nested.ts` },
+                        },
+                      ],
+                    },
+                  },
+                  {
+                    id: 'prt_patch',
+                    type: 'patch',
+                    files: [`${privateDirectory}/src/app.ts`, 'relative.ts'],
+                  },
+                ],
+              },
+              {
+                info: {
+                  id: 'msg_user',
+                  role: 'user',
+                  editorContext: {
+                    visibleFiles: [`${privateDirectory}/visible.ts`],
+                    openTabs: [`${privateDirectory}/open.ts`],
+                    activeFile: `${privateDirectory}/active.ts`,
+                  },
+                  summary: { diffs: [{ file: `${privateDirectory}/summary.ts` }] },
+                },
+                parts: [],
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+      const caller = await createCallerForUser(regularUser.id);
+
+      const result = await caller.cliSessionsV2.getSessionMessages({ session_id: sessionId });
+
+      expect(result.info).toMatchObject({
+        directory: publicDirectory,
+        summary: { diffs: [{ file: publicDirectory }] },
+        permission: [{ pattern: publicDirectory }],
+      });
+      expect(result.messages[0]).toMatchObject({
+        info: { path: { cwd: publicDirectory, root: publicDirectory } },
+        parts: [
+          { url: '', source: { path: publicDirectory } },
+          { state: { attachments: [{ url: '', source: { path: publicDirectory } }] } },
+          { files: [publicDirectory, 'relative.ts'] },
+        ],
+      });
+      expect(result.messages[1]).toMatchObject({
+        info: {
+          editorContext: {
+            visibleFiles: [publicDirectory],
+            openTabs: [publicDirectory],
+            activeFile: publicDirectory,
+          },
+          summary: { diffs: [{ file: publicDirectory }] },
+        },
+      });
+      expect(JSON.stringify(result)).not.toContain(privateDirectory);
+    });
+
+    it('preserves private-path fields unchanged for legacy ungrouped snapshots', async () => {
+      const privateDirectory = '/legacy/unchanged/workspace';
+      const snapshot = {
+        info: { id: sessionId, directory: privateDirectory },
+        messages: [
+          {
+            info: {
+              id: 'msg_legacy',
+              role: 'assistant',
+              path: { cwd: privateDirectory, root: privateDirectory },
+            },
+            parts: [
+              {
+                id: 'prt_legacy',
+                type: 'file',
+                url: `file://${privateDirectory}/legacy.txt`,
+              },
+            ],
+          },
+        ],
+      };
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify(snapshot), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessages({ session_id: sessionId })
+      ).resolves.toEqual(snapshot);
+    });
+
+    it('keeps a grouped sibling without persisted history blank and writable', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      fetchSpy.mockResolvedValueOnce(new Response(null, { status: 404 }));
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessages({ session_id: sessionId })
+      ).resolves.toEqual({ info: {}, messages: [] });
+    });
+
     it('does not fetch a snapshot for a session owned by another user', async () => {
       const caller = await createCallerForUser(otherUser.id);
 
@@ -221,7 +374,55 @@ describe('cli-sessions-v2-router', () => {
 
   describe('getSessionMessagesPage', () => {
     const sessionId = 'ses_messages_page_test_1234';
+    const privateDirectory = '/srv/runtime/private/worktrees/grouped-history';
     let fetchSessionMessagesPage: jest.MockedFunction<typeof FetchSessionMessagesPageType>;
+
+    function privateAssistantMessage(): KiloSdkStoredMessage {
+      return {
+        info: {
+          id: 'msg_assistant_01',
+          sessionID: sessionId,
+          role: 'assistant',
+          time: { created: 1761000000100 },
+          parentID: 'msg_user_01',
+          modelID: 'kilo/test-model',
+          providerID: 'openrouter',
+          mode: 'code',
+          agent: 'code',
+          path: { cwd: privateDirectory, root: privateDirectory },
+          cost: 0,
+          tokens: {
+            input: 1,
+            output: 1,
+            reasoning: 0,
+            cache: { read: 0, write: 0 },
+          },
+        },
+        parts: [
+          {
+            id: 'prt_file_01',
+            sessionID: sessionId,
+            messageID: 'msg_assistant_01',
+            type: 'file',
+            mime: 'text/plain',
+            url: `file://${privateDirectory}/attachment.txt`,
+            source: {
+              type: 'file',
+              text: { value: 'attachment', start: 0, end: 10 },
+              path: `${privateDirectory}/attachment.txt`,
+            },
+          },
+          {
+            id: 'prt_patch_01',
+            sessionID: sessionId,
+            messageID: 'msg_assistant_01',
+            type: 'patch',
+            hash: 'patch',
+            files: [`${privateDirectory}/src/app.ts`, 'relative.ts'],
+          },
+        ],
+      };
+    }
 
     beforeEach(async () => {
       const { fetchSessionMessagesPage: imported } = jest.requireMock(
@@ -290,6 +491,72 @@ describe('cli-sessions-v2-router', () => {
       expect(fetchSessionMessagesPage).toHaveBeenCalledWith(sessionId, regularUser.id, {
         limit: 50,
       });
+    });
+
+    it('projects grouped paginated assistant and attachment paths into their own public directory', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      fetchSessionMessagesPage.mockResolvedValueOnce({
+        kiloSessionId: sessionId,
+        history: {
+          messages: [privateAssistantMessage()],
+          nextCursor: null,
+          omittedItemCount: 0,
+        },
+      });
+      const caller = await createCallerForUser(regularUser.id);
+      const publicDirectory = `/cloud-agent/sessions/${sessionId}`;
+
+      const result = await caller.cliSessionsV2.getSessionMessagesPage({
+        session_id: sessionId,
+        limit: 50,
+      });
+
+      expect(result).toMatchObject({
+        kiloSessionId: sessionId,
+        history: {
+          messages: [
+            {
+              info: { path: { cwd: publicDirectory, root: publicDirectory } },
+              parts: [
+                { url: '', source: { path: publicDirectory } },
+                { files: [publicDirectory, 'relative.ts'] },
+              ],
+            },
+          ],
+          nextCursor: null,
+          omittedItemCount: 0,
+        },
+        watermarkEventId: null,
+      });
+      expect(JSON.stringify(result)).not.toContain(privateDirectory);
+    });
+
+    it('preserves private-path fields unchanged for ungrouped paginated history', async () => {
+      const message = privateAssistantMessage();
+      const history = { messages: [message], nextCursor: null, omittedItemCount: 0 };
+      fetchSessionMessagesPage.mockResolvedValueOnce({ kiloSessionId: sessionId, history });
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 50 })
+      ).resolves.toEqual({ kiloSessionId: sessionId, history, watermarkEventId: null });
+    });
+
+    it('preserves grouped typed history failures without fabricating a transcript', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      const history = { kind: 'retryable_failure' as const, phase: 'page_parts' as const };
+      fetchSessionMessagesPage.mockResolvedValueOnce({ kiloSessionId: sessionId, history });
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({ session_id: sessionId, limit: 50 })
+      ).resolves.toEqual({ kiloSessionId: sessionId, history, watermarkEventId: null });
     });
 
     it('forwards the continuation cursor to the client', async () => {
@@ -750,6 +1017,79 @@ describe('cli-sessions-v2-router', () => {
         expect(result.watermarkEventId).toBe(99);
         expect(pageResolved).toBe(true);
       });
+    });
+  });
+
+  describe('runtime session deletion', () => {
+    const sessionId = 'ses_runtime_delete_grouped_1234';
+    const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+    let fetchSpy: jest.SpyInstance;
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        cloud_agent_session_id: cloudAgentSessionId,
+        cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc',
+        created_on_platform: 'cloud-agent-web',
+      });
+      fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+    });
+
+    afterEach(async () => {
+      fetchSpy.mockRestore();
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it.each([
+      [
+        'reports unsuccessful deletion',
+        () => mockDeleteCloudAgentSession.mockResolvedValueOnce({ success: false }),
+      ],
+      [
+        'throws an operational failure',
+        () => mockDeleteCloudAgentSession.mockRejectedValueOnce(new Error('Worker unavailable')),
+      ],
+    ])('preserves the real ownership row when the Worker %s', async (_, failDeletion) => {
+      failDeletion();
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to clean up cloud-agent session',
+      });
+
+      const [persisted] = await db
+        .select({ sessionId: cli_sessions_v2.session_id })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      expect(persisted?.sessionId).toBe(sessionId);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('continues idempotent ownership cleanup after a typed runtime NOT_FOUND', async () => {
+      const error = new TRPCClientError('Runtime session not found', {
+        result: {
+          error: {
+            code: -32004,
+            message: 'Runtime session not found',
+            data: { code: 'NOT_FOUND', httpStatus: 404 },
+          },
+        },
+      });
+      mockDeleteCloudAgentSession.mockRejectedValueOnce(error);
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(caller.cliSessionsV2.delete({ session_id: sessionId })).resolves.toEqual({
+        success: true,
+        session_id: sessionId,
+      });
+
+      expect(mockDeleteCloudAgentSession).toHaveBeenCalledWith(cloudAgentSessionId);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `https://test-ingest.example.com/api/session/${encodeURIComponent(sessionId)}`,
+        expect.objectContaining({ method: 'DELETE' })
+      );
     });
   });
 

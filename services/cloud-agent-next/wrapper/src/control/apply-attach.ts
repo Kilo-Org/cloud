@@ -37,6 +37,7 @@ import {
   type WorktreeKiloAttachment,
   type WorktreeKiloRuntimes,
 } from './worktree-runtime.js';
+import { runDirectoryOperation } from './worktree-operations';
 
 const BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
 const SETUP_COMMAND_INACTIVITY_TIMEOUT_MS = 4 * 60_000;
@@ -152,7 +153,7 @@ async function serializeWorkspacePreparation(
   const run = () => {
     signal.removeEventListener('abort', onAbort);
     signal.throwIfAborted();
-    return prepare();
+    return runDirectoryOperation(directory, prepare);
   };
   const previous = workspacePreparations.get(directory) ?? Promise.resolve();
   const current = previous.then(run, run).finally(() => {
@@ -251,10 +252,26 @@ export async function applySessionAttach(
   ) {
     return fail('protocol_error', 'Reserved control runtime environment variable', false);
   }
-  if (!attach.kilo) return fail('protocol_error', 'Kilo auth context is required', false);
+  const kilo = attach.kilo;
+  if (!kilo) return fail('protocol_error', 'Kilo auth context is required', false);
   const directory = attach.directory ?? session.directory;
   if (directory !== session.directory)
     return fail('protocol_error', 'Attachment directory mismatch', false);
+  try {
+    return await runDirectoryOperation(directory, () =>
+      executeSessionAttach(session, { ...attach, kilo }, deps, directory)
+    );
+  } catch {
+    return fail('not_ready', 'Worktree is being deleted', false);
+  }
+}
+
+async function executeSessionAttach(
+  session: SessionRequestIdentity,
+  attach: SessionAttachPayload & { kilo: NonNullable<SessionAttachPayload['kilo']> },
+  deps: ApplyAttachDeps,
+  directory: string
+): Promise<ControlHandlerResult> {
   const existingDirectory = directoryForSession(session.kiloSessionId);
   if (existingDirectory && existingDirectory !== directory) {
     return fail('unauthorized', 'Session directory mismatch', false);

@@ -71,6 +71,7 @@ export class ControlTerminalRuntimeError extends Error {
 export type ControlTerminalRuntime = {
   rememberAttachedSession(identity: SessionRequestIdentity): void;
   detachSession(identity: SessionRequestIdentity): Promise<void>;
+  detachDirectory(directory: string): Promise<void>;
   create(
     identity: SessionRequestIdentity,
     payload: SessionTerminalCreatePayload
@@ -370,6 +371,37 @@ export function createControlTerminalRuntime(options: {
     }
   }
 
+  async function detachSession(identity: SessionRequestIdentity): Promise<void> {
+    const attached = attachedSessions.get(identity.sessionId);
+    if (!attached) return;
+    if (!sameSession(attached, identity)) {
+      throw new ControlTerminalRuntimeError(
+        'unauthorized',
+        'Terminal session ownership mismatch',
+        false
+      );
+    }
+
+    attachedSessions.delete(identity.sessionId);
+
+    const pending: Promise<unknown>[] = [];
+    for (const [operationId, operation] of operations) {
+      if (!sameSession(operation, attached)) continue;
+      operations.delete(operationId);
+      pending.push(operation.promise);
+    }
+
+    for (const [ptyId, terminal] of terminals) {
+      if (!sameSession(terminal, attached)) continue;
+      const bridge = bridges.get(ptyId);
+      if (bridge) closeBridge(bridge, 1000, 'PTY session ended');
+      terminals.delete(ptyId);
+      pending.push(terminal.kiloRuntime.kiloClient.deletePty(ptyId, terminal.directory));
+    }
+
+    await Promise.allSettled(pending);
+  }
+
   return {
     rememberAttachedSession(identity) {
       const kiloRuntime = options.getKiloRuntime(identity.directory);
@@ -411,35 +443,13 @@ export function createControlTerminalRuntime(options: {
       attachedSessions.set(identity.sessionId, { ...identity, wrapperInstanceId, kiloRuntime });
     },
 
-    async detachSession(identity) {
-      const attached = attachedSessions.get(identity.sessionId);
-      if (!attached) return;
-      if (!sameSession(attached, identity)) {
-        throw new ControlTerminalRuntimeError(
-          'unauthorized',
-          'Terminal session ownership mismatch',
-          false
-        );
-      }
+    detachSession,
 
-      attachedSessions.delete(identity.sessionId);
-
-      const pending: Promise<unknown>[] = [];
-      for (const [operationId, operation] of operations) {
-        if (!sameSession(operation, attached)) continue;
-        operations.delete(operationId);
-        pending.push(operation.promise);
-      }
-
-      for (const [ptyId, terminal] of terminals) {
-        if (!sameSession(terminal, attached)) continue;
-        const bridge = bridges.get(ptyId);
-        if (bridge) closeBridge(bridge, 1000, 'PTY session ended');
-        terminals.delete(ptyId);
-        pending.push(terminal.kiloRuntime.kiloClient.deletePty(ptyId, terminal.directory));
-      }
-
-      await Promise.allSettled(pending);
+    async detachDirectory(directory) {
+      const sessions = [...attachedSessions.values()].filter(
+        session => session.directory === directory
+      );
+      await Promise.all(sessions.map(detachSession));
     },
 
     async create(identity, payload) {

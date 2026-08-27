@@ -5,6 +5,7 @@ import {
   parseSandboxBillingInput,
   type MeteredSandboxInstance,
 } from '../container-usage-context.js';
+import { cleanWorktreeRuntime } from './worktree-deletion.js';
 import {
   createCloudflareProviderAdapter,
   decodeCloudflareProviderRef,
@@ -12,7 +13,13 @@ import {
   type CloudflareSandboxHandle,
 } from './cloudflare-provider.js';
 import { DEADLINE_MS } from './deadlines.js';
-import { WORKTREE_CREDENTIAL_CONTAINMENT } from './physical-lifecycle.js';
+import {
+  beginStop,
+  confirmStopped,
+  recordStopAttempt,
+  WORKTREE_CREDENTIAL_CONTAINMENT,
+  type PhysicalRecord,
+} from './physical-lifecycle.js';
 import { deriveSandboxAllocationId } from '../sandbox-id.js';
 
 const PROVIDER_REF = encodeCloudflareProviderRef({
@@ -54,6 +61,90 @@ const billing = parseSandboxBillingInput({
 afterEach(() => vi.useRealTimers());
 
 describe('cloudflare provider adapter', () => {
+  it.each([true, false])(
+    'cleans the exact physical allocation only after confirmed stop: %s',
+    async confirmed => {
+      const providerRef = encodeCloudflareProviderRef({
+        sandboxId: intent.allocationName,
+        containment: true,
+        instanceId: intent.intentId,
+      });
+      let physical: PhysicalRecord = {
+        state: 'running',
+        providerRef,
+        createIntent: intent,
+        stopTombstone: null,
+        resumable: false,
+        containment: { ...WORKTREE_CREDENTIAL_CONTAINMENT, providerRef },
+      };
+      const values = new Map<string, unknown>([['physical_record', physical]]);
+      const storage = {
+        get: async (key: string) => values.get(key),
+        put: async (key: string, value: unknown) => {
+          values.set(key, value);
+        },
+      };
+      const destroy = vi.fn(async () => {
+        if (!confirmed) throw new Error('Native stop unavailable');
+      });
+      const getSandbox = vi.fn(() => fakeSandbox());
+      const provider = createCloudflareProviderAdapter({
+        sandboxId: intent.allocationName,
+        destroy,
+        getSandbox,
+      });
+      const create = vi.spyOn(provider, 'create');
+      const launch = vi.spyOn(provider, 'launch');
+      const stopRuntime = vi.fn(async () => {
+        physical = recordStopAttempt(beginStop(physical, 'worktree_deleted', 2_000));
+        await storage.put('physical_record', physical);
+        const result = await provider.stop(physical.providerRef, physical.createIntent);
+        if (result === 'terminal') physical = confirmStopped(physical);
+        await storage.put('physical_record', physical);
+        return physical;
+      });
+      const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+      const cleanup = cleanWorktreeRuntime({
+        request: {
+          worktreeId,
+          kiloUserId: 'oauth/test',
+          location: { sandboxId: logicalId, provider: 'cloudflare' },
+          sessionIds: ['ses_00000000000000000000000001'],
+        },
+        directory: `/workspace/owner/worktrees/${worktreeId}`,
+        storage: storage as never,
+        getProvider: async () => provider,
+        stopRuntime,
+        exclusive: true,
+        hasConnection: () => false,
+        sendRequest: async () => {
+          throw new Error('No wrapper call expected');
+        },
+      });
+      if (confirmed) {
+        await expect(cleanup).resolves.toMatchObject({ destroyed: true, resourcesCleaned: true });
+        expect(physical.state).toBe('stopped');
+      } else {
+        await expect(cleanup).rejects.toThrow('Worktree provider stop is unconfirmed');
+        expect(physical).toMatchObject({
+          state: 'stopping',
+          providerRef,
+          stopTombstone: { attempts: 1, createdAt: 2_000 },
+        });
+        expect(values.get(`worktree_deletion/${worktreeId}`)).toMatchObject({
+          destroyed: false,
+          resourcesCleaned: false,
+          completed: false,
+        });
+      }
+      expect(stopRuntime).toHaveBeenCalledOnce();
+      expect(destroy).toHaveBeenCalledExactlyOnceWith(intent.allocationName, { containment: true });
+      expect(getSandbox).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
+      expect(launch).not.toHaveBeenCalled();
+    }
+  );
+
   it('returns the physical identity without waking, then launches against that identity', async () => {
     const startProcess = vi.fn().mockResolvedValue({ id: 'proc_1' });
     const setOutboundHandler = vi.fn().mockResolvedValue(undefined);

@@ -313,6 +313,42 @@ describe('session metadata boundary', () => {
     expect(parseSessionMetadata(current).repository).not.toHaveProperty('githubIntegrationId');
   });
 
+  it('preserves a validated worktree ID and its canonical workspace path', () => {
+    const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: {
+        sessionId: 'workspace_420ae020-e3c4-4e67-878b-66672c3d997e',
+        userId: 'oauth/google:1234',
+      },
+      auth: {},
+      workspace: {
+        worktreeId,
+        workspacePath: `/workspace/oauth-google-1234/worktrees/${worktreeId}`,
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(parseSessionMetadata(current))).toEqual(current);
+  });
+
+  it.each([
+    'worktree_invalid',
+    'worktree_../outside',
+    'workspace_420ae020-e3c4-4e67-878b-66672c3d997e',
+  ])('rejects malformed persisted worktree ID %s', worktreeId => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_test', userId: 'user_test' },
+        auth: {},
+        workspace: { worktreeId },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
   it.each([undefined, '2026-08-29T10:00:00.000Z'])(
     'round-trips clone metadata without inventing a reporting creation time (%s)',
     reportingCreatedAt => {

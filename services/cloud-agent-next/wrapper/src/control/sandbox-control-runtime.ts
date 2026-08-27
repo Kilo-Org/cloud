@@ -153,12 +153,13 @@ export function maybeStartSandboxControlClient(
   }
 
   const createClient = options.createClient ?? createSandboxControlClient;
-  let heartbeat: ReturnType<typeof setInterval> | null = null;
+  let heartbeat: ReturnType<typeof setTimeout> | null = null;
+  let heartbeatInFlight = false;
   let closed = false;
 
   function stopHeartbeat(): void {
     if (!heartbeat) return;
-    clearInterval(heartbeat);
+    clearTimeout(heartbeat);
     heartbeat = null;
   }
 
@@ -169,15 +170,35 @@ export function maybeStartSandboxControlClient(
     options.onDisconnected?.();
   }
 
-  function sendHeartbeat(active: SandboxControlClient): void {
+  async function sendHeartbeat(active: SandboxControlClient): Promise<void> {
+    if (
+      closed ||
+      heartbeatInFlight ||
+      options.isReady?.() === false ||
+      !options.getHeartbeatPayload
+    )
+      return;
+    heartbeatInFlight = true;
     try {
-      if (!active.sendEvent?.('sandbox.heartbeat', options.getHeartbeatPayload?.())) {
+      const payload = await options.getHeartbeatPayload();
+      if (closed || options.isReady?.() === false) return;
+      try {
+        if (!active.sendEvent?.('sandbox.heartbeat', payload)) handleDisconnected();
+      } catch {
         handleDisconnected();
       }
     } catch {
-      handleDisconnected();
+      if (!closed) log('sandbox control heartbeat failed');
+    } finally {
+      heartbeatInFlight = false;
+      if (!closed && options.isReady?.() !== false) {
+        heartbeat = setTimeout(() => {
+          heartbeat = null;
+          void sendHeartbeat(active);
+        }, HEARTBEAT_INTERVAL_MS);
+        heartbeat.unref();
+      }
     }
-    if (options.isReady?.() === false) stopHeartbeat();
   }
 
   function handleConnected(active: SandboxControlClient): void {
@@ -188,10 +209,7 @@ export function maybeStartSandboxControlClient(
     }
     if (options.getHeartbeatPayload) {
       stopHeartbeat();
-      sendHeartbeat(active);
-      if (closed) return;
-      heartbeat = setInterval(() => sendHeartbeat(active), HEARTBEAT_INTERVAL_MS);
-      heartbeat.unref();
+      void sendHeartbeat(active);
     }
     options.onConnected?.(active);
   }

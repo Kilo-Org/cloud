@@ -47,6 +47,7 @@ export type RestoreSessionOptions = {
 
 const KILO_IMPORT_TIMEOUT_MS = 120_000;
 const EMPTY_SESSION_INGEST_EXPORT = '{"info":{},"messages":[],"sessionDiff":[]}';
+const MAX_EMPTY_SNAPSHOT_BYTES = 1_024;
 const JQ_SANITIZE_TOKEN_COUNTS_FILTER =
   'walk(if type == "object" and ((.tokens? | type) == "object") then .tokens |= walk(if type == "number" and . < 0 then 0 else . end) else . end)';
 // Drop leftover CLI UI progress parts (metadata.kilocode.lifecycle == "transient").
@@ -385,6 +386,7 @@ async function validateInfoObject(reader: JsonCharReader): Promise<InfoObjectVal
 
 async function validateSnapshotInfoId(
   snapshotPath: string,
+  bytesWritten: number,
   signal?: AbortSignal
 ): Promise<SnapshotInfoValidationResult> {
   const reader = createJsonCharReader(snapshotPath, signal);
@@ -395,6 +397,7 @@ async function validateSnapshotInfoId(
     let infoIsEmpty = false;
     let messagesIsEmpty = false;
     let sessionDiffIsEmpty = false;
+    let subagentsAreEmpty = true;
     let sawInfo = false;
     let sawMessages = false;
     let sawSessionDiff = false;
@@ -430,7 +433,7 @@ async function validateSnapshotInfoId(
             infoId = undefined;
             infoIsEmpty = false;
           }
-        } else if (key === 'messages' || key === 'sessionDiff') {
+        } else if (key === 'messages' || key === 'sessionDiff' || key === 'subagents') {
           const valueStart = await nextNonWhitespace(reader);
           if (valueStart === null) return { validation: 'invalid' };
           let valueIsEmpty = false;
@@ -446,9 +449,11 @@ async function validateSnapshotInfoId(
           if (key === 'messages') {
             sawMessages = true;
             messagesIsEmpty = valueIsEmpty;
-          } else {
+          } else if (key === 'sessionDiff') {
             sawSessionDiff = true;
             sessionDiffIsEmpty = valueIsEmpty;
+          } else {
+            subagentsAreEmpty = valueIsEmpty;
           }
         } else if (!(await skipJsonValue(reader))) {
           return { validation: 'invalid' };
@@ -468,6 +473,7 @@ async function validateSnapshotInfoId(
 
     if ((await nextNonWhitespace(reader)) !== null) return { validation: 'invalid' };
     if (
+      bytesWritten <= MAX_EMPTY_SNAPSHOT_BYTES &&
       infoId === undefined &&
       sawInfo &&
       sawMessages &&
@@ -475,6 +481,7 @@ async function validateSnapshotInfoId(
       infoIsEmpty &&
       messagesIsEmpty &&
       sessionDiffIsEmpty &&
+      subagentsAreEmpty &&
       !hasUnexpectedTopLevelField
     ) {
       return { validation: 'empty' };
@@ -816,7 +823,11 @@ export async function restoreSession(
         // kilo with a cryptic `undefined is not an object (evaluating 'info2.id')`
         // and exit 1. Stream only the top-level metadata guardrail instead of
         // materializing the full export in the wrapper heap.
-        const snapshotInfoValidation = await validateSnapshotInfoId(tmpPath, options.signal);
+        const snapshotInfoValidation = await validateSnapshotInfoId(
+          tmpPath,
+          bytesWritten,
+          options.signal
+        );
         log(
           `snapshot metadata validated status=${snapshotInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${snapshotInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${snapshotInfoValidation.infoId === kiloSessionId} bytes=${bytesWritten}`
         );
@@ -826,7 +837,7 @@ export async function restoreSession(
         }
         if (snapshotInfoValidation.validation === 'empty') {
           log('snapshot is an empty session export; treating it as not found');
-          return fail('snapshot not found (empty export)', 404, 'download');
+          return fail('snapshot not found (404)', 404, 'download');
         }
         if (snapshotInfoValidation.validation === 'missing') {
           const result = fail(
@@ -850,7 +861,11 @@ export async function restoreSession(
     } else {
       log(`using provided file=${filePath}`);
       try {
-        const providedInfoValidation = await validateSnapshotInfoId(tmpPath, options.signal);
+        const providedInfoValidation = await validateSnapshotInfoId(
+          tmpPath,
+          fs.statSync(tmpPath).size,
+          options.signal
+        );
         log(
           `provided snapshot metadata inspected status=${providedInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${providedInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${providedInfoValidation.infoId === kiloSessionId}`
         );

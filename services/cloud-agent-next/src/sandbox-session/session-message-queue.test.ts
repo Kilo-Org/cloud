@@ -477,6 +477,42 @@ describe('freezeLegacyQueuedMessages', () => {
     const frozen = freezeLegacyQueuedMessages([msg('missing', 'queued')], defaultAgent);
     expect(frozen).toEqual([{ messageId: 'missing', state: 'queued', legacyIntentInvalid: true }]);
   });
+
+  it('preserves unversioned intents and freezes legacy finalization before defaults change', () => {
+    const existing: SessionMessageRecord = {
+      messageId: commandTurn.messageId,
+      state: 'queued',
+      intent: {
+        turn: commandTurn,
+        agent: { mode: 'reviewer' },
+        finalization: { autoCommit: false },
+      },
+    };
+    const frozen = freezeLegacyQueuedMessages(
+      [
+        existing,
+        {
+          messageId: promptTurn.messageId,
+          state: 'queued',
+          turn: promptTurn,
+          finalization: { condenseOnComplete: false },
+        },
+      ],
+      defaultAgent,
+      { autoCommit: false, condenseOnComplete: true }
+    );
+    expect(frozen).toEqual([
+      existing,
+      createSessionMessageRecord({
+        turn: promptTurn,
+        agent: defaultAgent,
+        finalization: { autoCommit: false, condenseOnComplete: false },
+      }),
+    ]);
+    expect(
+      freezeLegacyQueuedMessages(frozen, { model: 'other-model' }, { autoCommit: true })
+    ).toEqual(frozen);
+  });
 });
 
 describe('nextQueuedMessageId', () => {
@@ -578,7 +614,7 @@ describe('acceptQueuedMessage', () => {
     });
   });
 
-  it('preserves structured prompt attachments and command arguments', () => {
+  it('preserves upstream turns and durable intents with attachments, commands, and finalization', () => {
     const prompt = {
       type: 'prompt' as const,
       messageId: 'a',
@@ -591,13 +627,37 @@ describe('acceptQueuedMessage', () => {
       command: 'review',
       arguments: '--all changes',
     };
+    const messages: SessionMessageRecord[] = [
+      { messageId: prompt.messageId, state: 'queued', turn: prompt },
+      { messageId: command.messageId, state: 'queued', turn: command },
+      {
+        messageId: prompt.messageId,
+        state: 'queued',
+        intent: {
+          turn: prompt,
+          agent: { mode: 'debug', model: 'attachment-model', variant: 'focused' },
+          finalization: { autoCommit: false, condenseOnComplete: true },
+        },
+      },
+      {
+        messageId: command.messageId,
+        state: 'queued',
+        intent: {
+          turn: command,
+          agent: { mode: 'plan', model: 'command-model' },
+          finalization: { autoCommit: true, condenseOnComplete: false },
+        },
+      },
+    ];
 
-    expect(
-      acceptQueuedMessage([{ messageId: 'a', state: 'queued', turn: prompt }], 'a', 10)?.[0]
-    ).toMatchObject({ state: 'accepted', turn: prompt });
-    expect(
-      acceptQueuedMessage([{ messageId: 'b', state: 'queued', turn: command }], 'b', 20)?.[0]
-    ).toMatchObject({ state: 'accepted', turn: command });
+    for (const message of messages) {
+      expect(acceptQueuedMessage([message], message.messageId, 10)?.[0]).toEqual({
+        ...message,
+        state: 'accepted',
+        acceptedAt: 10,
+        lastActivityAt: 10,
+      });
+    }
   });
 
   it('does not resurrect a cancelled message after interrupt', () => {
@@ -687,7 +747,7 @@ describe('streamQueuedSnapshots', () => {
     ]);
   });
 
-  it('surfaces queued and accepted legacy prompts for /stream catch-up', () => {
+  it('marks accepted legacy prompts as sent without changing genuinely queued snapshots', () => {
     expect(
       streamQueuedSnapshots(
         [
@@ -703,7 +763,7 @@ describe('streamQueuedSnapshots', () => {
     ]);
   });
 
-  it('renders structured prompts and commands for queued-message reconnect', () => {
+  it('renders upstream structured turns and durable command or attachment intents on reconnect', () => {
     expect(
       streamQueuedSnapshots(
         [
@@ -723,6 +783,33 @@ describe('streamQueuedSnapshots', () => {
             state: 'queued',
             turn: { type: 'command', messageId: 'c', command: 'status', arguments: '' },
           },
+          {
+            messageId: 'command',
+            state: 'queued',
+            intent: {
+              turn: {
+                type: 'command',
+                messageId: 'command',
+                command: 'compact',
+                arguments: '--aggressive',
+              },
+              agent: { mode: 'plan', model: 'override-model' },
+            },
+          },
+          {
+            messageId: 'attachment',
+            state: 'queued',
+            intent: {
+              turn: {
+                type: 'prompt',
+                messageId: 'attachment',
+                prompt: 'inspect attachment',
+                attachments: { path: 'attachment-path', files: ['document.pdf'] },
+              },
+              agent: { mode: 'debug', model: 'attachment-model' },
+              finalization: { autoCommit: false },
+            },
+          },
         ],
         99
       )
@@ -730,6 +817,80 @@ describe('streamQueuedSnapshots', () => {
       { messageId: 'a', content: 'hello', timestamp: 20, delivery: 'sent' },
       { messageId: 'b', content: '/review --all', timestamp: 99 },
       { messageId: 'c', content: '/status', timestamp: 99 },
+      { messageId: 'command', content: '/compact --aggressive', timestamp: 99 },
+      { messageId: 'attachment', content: 'inspect attachment', timestamp: 99 },
+    ]);
+  });
+
+  it('prefers the canonical durable turn over stale upstream turns and compatibility prompts', () => {
+    expect(
+      streamQueuedSnapshots(
+        [
+          {
+            messageId: 'prompt',
+            state: 'accepted',
+            prompt: 'stale compatibility text',
+            turn: { type: 'prompt', messageId: 'prompt', prompt: 'stale upstream text' },
+            intent: {
+              turn: { type: 'prompt', messageId: 'prompt', prompt: 'canonical text' },
+              agent: { mode: 'code', model: 'selected-model' },
+            },
+          },
+        ],
+        50
+      )
+    ).toEqual([
+      { messageId: 'prompt', content: 'canonical text', timestamp: 50, delivery: 'sent' },
+    ]);
+  });
+
+  it('keeps failed snapshots on their existing queued-then-terminal delivery path', () => {
+    expect(
+      streamQueuedSnapshots(
+        [
+          {
+            messageId: 'queued_failure',
+            state: 'failed',
+            prompt: 'never sent',
+            failedReason: 'preparation_failed',
+          },
+          {
+            messageId: 'accepted_failure',
+            state: 'failed',
+            prompt: 'already sent',
+            acceptedAt: 20,
+            failedReason: 'wrapper_failed',
+          },
+        ],
+        99
+      )
+    ).toEqual([
+      {
+        messageId: 'queued_failure',
+        content: 'never sent',
+        timestamp: 99,
+        terminalFailure: {
+          messageId: 'queued_failure',
+          status: 'failed',
+          delivery: 'queued',
+          accepted: false,
+          reason: 'preparation_failed',
+          timestamp: 99,
+        },
+      },
+      {
+        messageId: 'accepted_failure',
+        content: 'already sent',
+        timestamp: 20,
+        terminalFailure: {
+          messageId: 'accepted_failure',
+          status: 'failed',
+          delivery: 'sent',
+          accepted: true,
+          reason: 'wrapper_failed',
+          timestamp: 20,
+        },
+      },
     ]);
   });
 });
@@ -2569,6 +2730,7 @@ describe('SandboxSession orchestration', () => {
     const fixture = sessionFixture();
     fixture.values.delete('session_metadata');
     const finalization = { autoCommit: true, condenseOnComplete: true };
+    const messageId = 'msg_123456789abcABCDEFGHIJKLMN';
     await expect(
       fixture.session.createSessionWithInitialAdmission({
         identity: fixture.metadata.identity,
@@ -2576,11 +2738,14 @@ describe('SandboxSession orchestration', () => {
         agent: fixture.metadata.agent,
         workspace: fixture.metadata.workspace,
         finalization,
-        message: { initialTurn: { type: 'prompt', messageId: 'a', prompt: 'Initial web prompt' } },
+        message: { initialTurn: { type: 'prompt', messageId, prompt: 'Initial web prompt' } },
       })
     ).resolves.toMatchObject({ success: true });
     await fixture.flush();
-    expect(fixture.record('a')).toMatchObject({ state: 'accepted', intent: { finalization } });
+    expect(fixture.record(messageId)).toMatchObject({
+      state: 'accepted',
+      intent: { finalization },
+    });
     expect((await fixture.session.getMetadata())?.finalization).toEqual(finalization);
     expect(fixture.control.request).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -2739,6 +2904,9 @@ describe('SandboxSession orchestration', () => {
 describe('streamCloudStatus', () => {
   it('is ready for accepted work even with queued followers', () => {
     expect(streamCloudStatus([msg('a', 'queued')])).toEqual({ type: 'preparing' });
+    expect(streamCloudStatus([msg('a', 'completed'), msg('b', 'queued')])).toEqual({
+      type: 'preparing',
+    });
     expect(streamCloudStatus([msg('a', 'accepted'), msg('b', 'queued')])).toEqual({
       type: 'ready',
     });

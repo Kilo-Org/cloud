@@ -18,7 +18,13 @@ export const SANDBOX_CONTROL_ATTACH_TIMEOUT_MS = 8 * 60_000;
 
 export const SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS = 60 * 60_000;
 
-export const SANDBOX_OPERATIONS = ['sandbox.hello', 'sandbox.status', 'sandbox.shutdown'] as const;
+export const SANDBOX_OPERATIONS = [
+  'sandbox.hello',
+  'sandbox.status',
+  'sandbox.shutdown',
+  'worktree.prepareDeletion',
+  'worktree.delete',
+] as const;
 
 export const SESSION_OPERATIONS = [
   'session.attach',
@@ -192,6 +198,31 @@ export const sandboxShutdownResultSchema = z
     shuttingDown: z.literal(true),
   })
   .strict();
+
+export const worktreeDeletePayloadSchema = z
+  .object({
+    worktreeId: z.templateLiteral(['worktree_', z.uuid()]),
+    directory: z.string().min(1).max(1024),
+    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+  })
+  .strict();
+
+export const worktreePrepareDeletionResultSchema = z
+  .object({
+    prepared: z.literal(true),
+    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+  })
+  .strict();
+
+export const worktreeDeleteResultSchema = z
+  .object({
+    deleted: z.literal(true),
+    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+  })
+  .strict();
+
+export type WorktreeDeletePayload = z.infer<typeof worktreeDeletePayloadSchema>;
+export type WorktreeDeleteResult = z.infer<typeof worktreeDeleteResultSchema>;
 
 export const sessionAttachPayloadSchema = z
   .object({

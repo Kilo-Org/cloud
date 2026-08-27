@@ -7,6 +7,7 @@ import {
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
+import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { generateCloudAgentToken } from '@/lib/tokens';
 import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
@@ -19,6 +20,8 @@ import { orderRepositoriesByUsage } from '@/lib/cloud-agent/order-repositories';
 import {
   personalPrepareSessionNextSchema,
   basePrepareSessionNextOutputSchema,
+  baseCreateWorktreeChatNextSchema,
+  baseCreateWorktreeChatNextOutputSchema,
   baseInitiateFromPreparedSessionNextSchema,
   baseInitiateSessionNextOutputSchema,
   baseSendMessageNextSchema,
@@ -57,6 +60,7 @@ import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session
 import { TRPCError } from '@trpc/server';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import { getBalanceForUser } from '@/lib/user/balance';
+import { isMobileClient } from '@/lib/trpc/min-version';
 import { buildCloudAgentNextEligibility } from './cloud-agent-next-eligibility';
 
 function buildTerminalUrl(params: {
@@ -178,6 +182,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
           ...gitParams,
           attachments: attachments ?? images,
           createdOnPlatform: 'cloud-agent-web',
+          clientProvenance: isMobileClient(ctx.headersList) ? 'mobile' : 'browser',
         });
 
         // New-session flows (mobile, continue-cloud-create) call prepareSession
@@ -199,6 +204,18 @@ export const cloudAgentNextRouter = createTRPCRouter({
         throw error;
       }
     }),
+
+  createWorktreeChat: baseProcedure
+    .input(baseCreateWorktreeChatNextSchema)
+    .output(baseCreateWorktreeChatNextOutputSchema)
+    .mutation(({ ctx, input }) =>
+      createWorktreeChat({
+        user: ctx.user,
+        headersList: ctx.headersList,
+        sourceKiloSessionId: input.sourceKiloSessionId,
+        operationKey: input.operationKey,
+      })
+    ),
 
   /**
    * Initiate a prepared session (V2 - WebSocket-based).

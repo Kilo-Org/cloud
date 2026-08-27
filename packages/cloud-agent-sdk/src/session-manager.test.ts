@@ -503,6 +503,66 @@ describe('createSessionManager', () => {
       expect(atomValue<string | null>(config.store, mgr.atoms.sessionId)).toBe('agent-1');
     });
 
+    it('preserves an optional worktree identity without replacing chat identities', async () => {
+      const worktreeId = 'worktree_12345678-1234-4234-8234-123456789abc';
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({ ...defaultFetchedSession, worktreeId }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      expect(
+        atomValue<FetchedSessionData>(config.store, mgr.atoms.fetchedSessionData)
+      ).toMatchObject({
+        kiloSessionId: 'ses-1',
+        cloudAgentSessionId: 'agent-1',
+        worktreeId,
+      });
+      expect(atomValue<string | null>(config.store, mgr.atoms.sessionId)).toBe('agent-1');
+    });
+
+    it('does not carry a worktree identity into an ungrouped session', async () => {
+      const config = createMockConfig({
+        fetchSession: jest
+          .fn()
+          .mockResolvedValueOnce({
+            ...defaultFetchedSession,
+            worktreeId: 'worktree_12345678-1234-4234-8234-123456789abc',
+          })
+          .mockResolvedValueOnce(defaultFetchedSession),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.switchSession(kiloId('ses-2'));
+
+      expect(
+        atomValue<FetchedSessionData>(config.store, mgr.atoms.fetchedSessionData).worktreeId
+      ).toBeUndefined();
+    });
+
+    it('opens a blank grouped sibling without preparing or initiating another turn', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          kiloSessionId: kiloId('ses-sibling'),
+          worktreeId: 'worktree_12345678-1234-4234-8234-123456789abc',
+          isInitiated: false,
+          prompt: null,
+          initialMessageId: null,
+        }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-sibling'));
+
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toEqual([]);
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(config.prepare).not.toHaveBeenCalled();
+      expect(config.initiate).not.toHaveBeenCalled();
+    });
+
     it('clears error on start', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

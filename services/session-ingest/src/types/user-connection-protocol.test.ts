@@ -655,6 +655,53 @@ describe('SessionEventPayloadSchema', () => {
     }
   });
 
+  it.each(['session.created', 'session.updated'] as const)(
+    'preserves a worktree ID in %s events',
+    type => {
+      const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+      const result = SessionEventPayloadSchema.parse({
+        type,
+        data: {
+          source: 'v2',
+          session: { ...session, worktreeId },
+          changedAt: session.updatedAt,
+        },
+      });
+
+      expect(result.data).toHaveProperty('session.worktreeId', worktreeId);
+    }
+  );
+
+  it('preserves a worktree ID in full-row status events', () => {
+    const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const result = SessionEventPayloadSchema.parse({
+      type: 'session.status.updated',
+      data: {
+        source: 'v2',
+        session: { ...session, worktreeId },
+        previousStatus: null,
+        status: 'idle',
+        statusUpdatedAt: null,
+        changedAt: session.updatedAt,
+      },
+    });
+
+    expect(result.data).toHaveProperty('session.worktreeId', worktreeId);
+  });
+
+  it.each([null, undefined])('accepts legacy sessions with worktree ID %s', worktreeId => {
+    const result = SessionEventPayloadSchema.parse({
+      type: 'session.created',
+      data: {
+        source: 'v2',
+        session: { ...session, ...(worktreeId === undefined ? {} : { worktreeId }) },
+        changedAt: session.updatedAt,
+      },
+    });
+
+    expect('session' in result.data ? result.data.session.worktreeId : undefined).toBe(worktreeId);
+  });
+
   it('parses lightweight status update payloads during rollout compatibility', () => {
     const result = SessionEventPayloadSchema.safeParse({
       type: 'session.status.updated',

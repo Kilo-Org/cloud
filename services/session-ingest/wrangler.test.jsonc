@@ -32,6 +32,10 @@
         "name": "CONNECTION_TICKET_DO",
         "class_name": "ConnectionTicketDO",
       },
+      {
+        "name": "USER_CONNECTION_DO",
+        "class_name": "UserConnectionDO",
+      },
     ],
   },
 

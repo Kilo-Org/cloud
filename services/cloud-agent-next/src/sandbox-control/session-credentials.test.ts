@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import { logger } from '../logger.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { Env, GitTokenService } from '../types.js';
@@ -144,7 +145,7 @@ function environment(broker?: GitTokenService): CredentialEnv {
 
 function metadata(
   overrides: Partial<SessionMetadata> = {},
-  scopeId: string | null = 'worktree-a'
+  scopeId: CloudAgentWorktreeId | null = 'worktree_11111111-1111-4111-8111-111111111111'
 ): SessionMetadata {
   return {
     metadataSchemaVersion: 2,
@@ -211,7 +212,10 @@ function resolve(
   });
 }
 
-function vercelMetadata(overrides: Partial<SessionMetadata> = {}, scopeId = 'worktree-a') {
+function vercelMetadata(
+  overrides: Partial<SessionMetadata> = {},
+  scopeId: CloudAgentWorktreeId = 'worktree_11111111-1111-4111-8111-111111111111'
+) {
   return metadata(
     {
       ...overrides,
@@ -247,7 +251,7 @@ describe('trusted worktree credential preparation', () => {
 
     expect(grant.kilo.token).toBe(token);
     expect(payload.kilo).toEqual({
-      scopeId: 'worktree-a',
+      scopeId: 'worktree_11111111-1111-4111-8111-111111111111',
       token: grant.kilo.alias,
       targets: grant.kilo.targets,
     });
@@ -509,7 +513,7 @@ describe('trusted worktree credential preparation', () => {
             auth: { kiloSessionId: SECOND_ROOT_ID, kilocodeToken: KILO_TOKEN },
             identity: { ...metadata().identity, sessionId: SECOND_SESSION_ID },
           },
-          'other-worktree'
+          'worktree_22222222-2222-4222-8222-222222222222'
         ),
     ],
     [
@@ -1050,7 +1054,10 @@ describe('credential resolution boundaries', () => {
     const first = await prepare(env);
     const sibling = await prepare(
       env,
-      metadata({ workspace: { workspacePath: '/workspace/other' } }, 'worktree-other')
+      metadata(
+        { workspace: { workspacePath: '/workspace/other' } },
+        'worktree_22222222-2222-4222-8222-222222222222'
+      )
     );
     expect(sibling.grant.kilo.alias).not.toBe(first.grant.kilo.alias);
     for (const overrides of [
@@ -1095,7 +1102,10 @@ describe('credential resolution boundaries', () => {
     const second = await prepare(env, secondRoot(), first.grant);
     const sibling = await prepare(
       env,
-      metadata({ workspace: { workspacePath: '/workspace/other' } }, 'worktree-other')
+      metadata(
+        { workspace: { workspacePath: '/workspace/other' } },
+        'worktree_22222222-2222-4222-8222-222222222222'
+      )
     );
     const grants = removeSessionCredentialMembership(
       [second.grant, sibling.grant],
@@ -1162,7 +1172,7 @@ describe('native Vercel worktree policies', () => {
           workspace: { workspacePath: '/workspace/sibling' },
           repository: { type: 'github', repo: 'acme/another' },
         },
-        'worktree-sibling'
+        'worktree_33333333-3333-4333-8333-333333333333'
       )
     );
     const policy = buildControlNetworkPolicy([second.grant, sibling.grant]);

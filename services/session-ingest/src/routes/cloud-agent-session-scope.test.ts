@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as WorkerUtils from '@kilocode/worker-utils';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class DurableObject {},
@@ -64,6 +66,7 @@ function persistedRow(overrides: Record<string, unknown> = {}) {
     organization_id: '11111111-1111-4111-8111-111111111111',
     cloud_agent_session_id: null,
     cloud_agent_session_scope_id: cloudAgentSessionId,
+    cloud_agent_worktree_id: null,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
     title: null,
@@ -76,15 +79,20 @@ function persistedRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeDb(selectResults: unknown[][], insertResult: unknown[]) {
+function makeDb(selectResults: unknown[][], insertResult: unknown[], updateResult: unknown[] = []) {
   const updateSets: unknown[] = [];
   const insertedValues: unknown[] = [];
+  const selectConditions: SQL[] = [];
 
   const select = {
     from: vi.fn(() => select),
-    where: vi.fn(() => select),
+    where: vi.fn((condition: SQL) => {
+      selectConditions.push(condition);
+      return select;
+    }),
     limit: vi.fn(() => select),
     for: vi.fn(async () => selectResults.shift() ?? []),
+    then: (resolve: (rows: unknown[]) => unknown) => resolve(selectResults.shift() ?? []),
   };
   const update = {
     set: vi.fn(values => {
@@ -92,6 +100,7 @@ function makeDb(selectResults: unknown[][], insertResult: unknown[]) {
       return update;
     }),
     where: vi.fn(() => update),
+    returning: vi.fn(async () => updateResult),
     then: vi.fn(resolve => resolve(undefined)),
   };
   const insert = {
@@ -110,7 +119,7 @@ function makeDb(selectResults: unknown[][], insertResult: unknown[]) {
   const db = {
     transaction: vi.fn(async callback => callback(tx)),
   };
-  return { db, insertedValues, updateSets };
+  return { db, insertedValues, updateSets, selectConditions };
 }
 
 describe('Cloud Agent session scope routes', () => {
@@ -159,6 +168,35 @@ describe('Cloud Agent session scope routes', () => {
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
+  it('rejects a late descendant registration when its locked root belongs to a deleting worktree', async () => {
+    const { db, insertedValues } = makeDb(
+      [
+        [
+          {
+            sessionId: rootSessionId,
+            organizationId: null,
+            cloudAgentSessionScopeId: cloudAgentSessionId,
+            worktreeId: 'worktree_11111111-1111-4111-8111-111111111111',
+          },
+        ],
+        [{ started: '2026-08-27 01:00:00+00' }],
+      ],
+      []
+    );
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const response = await makeApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: assertionHeaders(),
+        body: JSON.stringify({ sessionId: childSessionId }),
+      }),
+      env
+    );
+    expect(response.status).toBe(404);
+    expect(insertedValues).toEqual([]);
+    expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
+  });
+
   it('atomically heals the root and creates a session-scoped child', async () => {
     const child = persistedRow();
     const { db, insertedValues, updateSets } = makeDb(
@@ -203,6 +241,208 @@ describe('Cloud Agent session scope routes', () => {
     });
   });
 
+  it('persists engine-created child lineage before its first turn when public bootstrap won the race', async () => {
+    const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const child = persistedRow({
+      organization_id: null,
+      parent_session_id: null,
+      cloud_agent_session_scope_id: null,
+      cloud_agent_worktree_id: null,
+      status: null,
+    });
+    const linked = {
+      ...child,
+      parent_session_id: rootSessionId,
+      cloud_agent_session_scope_id: cloudAgentSessionId,
+      cloud_agent_worktree_id: worktreeId,
+    };
+    const { db, updateSets } = makeDb(
+      [
+        [
+          {
+            sessionId: rootSessionId,
+            organizationId: null,
+            cloudAgentSessionScopeId: cloudAgentSessionId,
+            worktreeId,
+          },
+        ],
+        [],
+        [child],
+      ],
+      [],
+      [linked]
+    );
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const putValidated = vi.fn(async () => undefined);
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue({ putValidated } as never);
+
+    const response = await makeApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: assertionHeaders(),
+        body: JSON.stringify({ sessionId: childSessionId, parentSessionId: rootSessionId }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateSets).toContainEqual({
+      parent_session_id: rootSessionId,
+      cloud_agent_session_scope_id: cloudAgentSessionId,
+      cloud_agent_worktree_id: worktreeId,
+    });
+    expect(putValidated).toHaveBeenCalledWith({
+      sessionId: childSessionId,
+      organizationId: null,
+      cloudAgentSessionScopeId: cloudAgentSessionId,
+    });
+  });
+
+  it.each([
+    ['organization', { organization_id: '22222222-2222-4222-8222-222222222222' }],
+    ['root scope', { cloud_agent_session_scope_id: 'another-root' }],
+    ['worktree', { cloud_agent_worktree_id: 'worktree_22222222-2222-4222-8222-222222222222' }],
+    ['cloud root', { cloud_agent_session_id: 'another-root' }],
+    ['parent', { parent_session_id: 'ses_cccccccccccccccccccccccccc' }],
+  ])('refuses to overwrite established %s when adopting an orphan', async (_name, overrides) => {
+    const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const organizationId = '11111111-1111-4111-8111-111111111111';
+    const child = persistedRow({
+      parent_session_id: null,
+      cloud_agent_session_scope_id: null,
+      ...overrides,
+    });
+    const { db, updateSets } = makeDb(
+      [
+        [
+          {
+            sessionId: rootSessionId,
+            organizationId,
+            cloudAgentSessionScopeId: cloudAgentSessionId,
+            worktreeId,
+          },
+        ],
+        [],
+        [child],
+      ],
+      []
+    );
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const response = await makeApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: assertionHeaders(),
+        body: JSON.stringify({ sessionId: childSessionId, parentSessionId: rootSessionId }),
+      }),
+      env
+    );
+    expect(response.status).toBe(409);
+    expect(updateSets).toEqual([]);
+    expect(getSessionAccessCacheDO).not.toHaveBeenCalled();
+  });
+
+  it('requires a nested parent in the same authenticated owner, organization, root scope, and worktree', async () => {
+    const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const organizationId = '11111111-1111-4111-8111-111111111111';
+    const parentSessionId = 'ses_cccccccccccccccccccccccccc';
+    const { db, insertedValues, selectConditions } = makeDb(
+      [
+        [
+          {
+            sessionId: rootSessionId,
+            organizationId,
+            cloudAgentSessionScopeId: cloudAgentSessionId,
+            worktreeId,
+          },
+        ],
+        [],
+        [],
+      ],
+      []
+    );
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const response = await makeApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: assertionHeaders(),
+        body: JSON.stringify({ sessionId: childSessionId, parentSessionId }),
+      }),
+      env
+    );
+    expect(response.status).toBe(409);
+    expect(insertedValues).toEqual([]);
+    const condition = selectConditions.at(-1);
+    if (!condition) throw new Error('Expected parent authorization');
+    const query = new PgDialect().sqlToQuery(condition);
+    expect(query.params).toEqual([
+      parentSessionId,
+      'usr_test',
+      cloudAgentSessionId,
+      organizationId,
+      worktreeId,
+    ]);
+    expect(query.sql).toContain('"kilo_user_id"');
+    expect(query.sql).toContain('"organization_id"');
+    expect(query.sql).toContain('"cloud_agent_session_scope_id"');
+    expect(query.sql).toContain('"cloud_agent_worktree_id"');
+  });
+
+  it('does not create a child when the asserted root belongs to another user or root scope', async () => {
+    const { db, insertedValues, selectConditions } = makeDb([[]], []);
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const response = await makeApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: assertionHeaders(),
+        body: JSON.stringify({ sessionId: childSessionId, parentSessionId: rootSessionId }),
+      }),
+      env
+    );
+    expect(response.status).toBe(404);
+    expect(insertedValues).toEqual([]);
+    const query = new PgDialect().sqlToQuery(selectConditions[0]);
+    expect(query.params).toEqual(
+      expect.arrayContaining([rootSessionId, 'usr_test', cloudAgentSessionId])
+    );
+    expect(query.sql).toContain('"kilo_user_id"');
+    expect(query.sql).toContain('"cloud_agent_session_id"');
+  });
+
+  it('heals missing worktree membership for an already-authorized legacy child without changing its root', async () => {
+    const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const child = persistedRow({ organization_id: null });
+    const { db, updateSets } = makeDb(
+      [
+        [
+          {
+            sessionId: rootSessionId,
+            organizationId: null,
+            cloudAgentSessionScopeId: cloudAgentSessionId,
+            worktreeId,
+          },
+        ],
+        [],
+        [child],
+      ],
+      [],
+      [{ ...child, cloud_agent_worktree_id: worktreeId }]
+    );
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue({
+      putValidated: async () => undefined,
+    } as never);
+    const response = await makeApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: assertionHeaders(),
+        body: JSON.stringify({ sessionId: childSessionId }),
+      }),
+      env
+    );
+    expect(response.status).toBe(200);
+    expect(updateSets).toEqual([{ cloud_agent_worktree_id: worktreeId }]);
+  });
+
   it('does not claim an existing unmarked session', async () => {
     const { db } = makeDb(
       [
@@ -232,7 +472,7 @@ describe('Cloud Agent session scope routes', () => {
   });
 
   it('treats an existing child in the same session scope as an idempotent bootstrap', async () => {
-    const existing = persistedRow();
+    const existing = persistedRow({ organization_id: null, cloud_agent_worktree_id: null });
     const { db } = makeDb(
       [
         [

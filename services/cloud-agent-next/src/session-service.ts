@@ -41,7 +41,11 @@ import {
   updateGitRemoteUrl,
 } from './workspace.js';
 import { logger, WithLogTags } from './logger.js';
-import type { CreateSessionForCloudAgentResult } from '@kilocode/session-ingest-contracts';
+import type {
+  CloudAgentWorktreeId,
+  CloudAgentWorktreeLocation,
+  CreateSessionForCloudAgentResult,
+} from '@kilocode/session-ingest-contracts';
 import { timedExec } from './sandbox-timeout-logging.js';
 import type {
   PersistenceEnv,
@@ -2069,7 +2073,10 @@ export class SessionService {
     const devcontainerRequested =
       metadata.workspace?.devcontainerRequested === true || metadata.devcontainer !== undefined;
     const resolvedTokens = await this.resolveWorkspaceTokens(env, metadata, sandboxId as SandboxId);
-    const workspacePath = getSessionWorkspacePath(orgId, userId, sessionId);
+    const workspacePath =
+      metadata.workspace?.worktreeId && metadata.workspace.workspacePath
+        ? metadata.workspace.workspacePath
+        : getSessionWorkspacePath(orgId, userId, sessionId);
     const sessionHome = getSessionHomePath(sessionId);
     const branchName =
       metadata.workspace?.branchName ??
@@ -2338,7 +2345,10 @@ export class SessionService {
     logger.setTags({ sessionId, sandboxId, orgId, userId, botId: metadata.identity.botId });
     logger.info('Preparing workspace');
 
-    const workspacePath = getSessionWorkspacePath(orgId, userId, sessionId);
+    const workspacePath =
+      metadata.workspace?.worktreeId && metadata.workspace.workspacePath
+        ? metadata.workspace.workspacePath
+        : getSessionWorkspacePath(orgId, userId, sessionId);
     const sessionHome = getSessionHomePath(sessionId);
     const branchName =
       metadata.workspace?.branchName ??
@@ -2404,7 +2414,7 @@ export class SessionService {
     // mkdir-idempotent setup + createSession is still required to hand back a
     // usable ExecutionSession to the caller.
     if (await this.workspaceHasGit(sandbox, workspacePath)) {
-      await setupWorkspace(sandbox, userId, orgId, sessionId);
+      await setupWorkspace(sandbox, userId, orgId, sessionId, metadata.workspace?.worktreeId);
       const session = await this.buildSessionForContext(
         sandbox,
         context,
@@ -2472,7 +2482,7 @@ export class SessionService {
     });
 
     onProgress?.('workspace_setup', 'Setting up workspace…');
-    await setupWorkspace(sandbox, userId, orgId, sessionId);
+    await setupWorkspace(sandbox, userId, orgId, sessionId, metadata.workspace?.worktreeId);
 
     const session = await this.buildSessionForContext(
       sandbox,
@@ -2947,7 +2957,9 @@ export class SessionService {
     createdOnPlatform: string,
     title?: string,
     gitUrl?: string,
-    cloneFromKiloSessionId?: string
+    cloneFromKiloSessionId?: string,
+    cloudAgentWorktreeId?: CloudAgentWorktreeId,
+    cloudAgentWorktreeLocation?: CloudAgentWorktreeLocation
   ): Promise<CreateSessionForCloudAgentResult | undefined> {
     try {
       return await env.SESSION_INGEST.createSessionForCloudAgent({
@@ -2959,6 +2971,8 @@ export class SessionService {
         title,
         gitUrl,
         cloneFromKiloSessionId,
+        ...(cloudAgentWorktreeId ? { cloudAgentWorktreeId } : {}),
+        ...(cloudAgentWorktreeLocation ? { cloudAgentWorktreeLocation } : {}),
       });
     } catch (error) {
       logger

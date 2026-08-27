@@ -14,6 +14,10 @@ function fakeClient(): SandboxControlClient {
   };
 }
 
+async function flushAsyncWork(): Promise<void> {
+  await new Promise<void>(resolve => setImmediate(resolve));
+}
+
 describe('maybeStartSandboxControlClient', () => {
   it('returns null when env is missing', () => {
     const created: SandboxControlClientOptions[] = [];
@@ -126,8 +130,7 @@ describe('maybeStartSandboxControlClient', () => {
 
     expect(started).toBe(client);
     expect(received?.onRequest).toBe(onRequest);
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushAsyncWork();
     expect(events).toEqual([
       { event: 'sandbox.ready', payload: { kiloReady: true, globalFeedAttached: true } },
     ]);
@@ -164,8 +167,7 @@ describe('maybeStartSandboxControlClient', () => {
       }
     );
 
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushAsyncWork();
     expect(events).toEqual([
       { event: 'sandbox.ready', payload: { kiloReady: true, globalFeedAttached: true } },
       { event: 'sandbox.heartbeat', payload: heartbeatPayload },
@@ -205,8 +207,7 @@ describe('maybeStartSandboxControlClient', () => {
       }
     );
 
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushAsyncWork();
     expect(events).toEqual([]);
 
     received?.onDisconnected?.();
@@ -247,8 +248,7 @@ describe('maybeStartSandboxControlClient', () => {
       }
     );
 
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushAsyncWork();
     received?.onDisconnected?.();
     expect(connected).toEqual([client]);
     expect(events).toEqual([
@@ -257,6 +257,233 @@ describe('maybeStartSandboxControlClient', () => {
     ]);
     client.close();
   });
+
+  it.each(['readiness', 'close', 'disconnect'] as const)(
+    'discards an asynchronous status poll after %s is lost',
+    async loss => {
+      const timers = spyOn(globalThis, 'setTimeout');
+      const events: Array<{ event: string; payload: unknown }> = [];
+      const pending = Promise.withResolvers<unknown>();
+      let ready = true;
+      let polls = 0;
+      let disconnected = 0;
+      let received: SandboxControlClientOptions | undefined;
+      const started = maybeStartSandboxControlClient(
+        {
+          SANDBOX_CONTROL_URL: 'wss://example.test/sandbox-control/sbx_1',
+          SANDBOX_CONTROL_CREDENTIAL: 'secret',
+          PROVIDER_INSTANCE_ID: 'inst_1',
+        },
+        () => {},
+        {
+          wrapperVersion: '2.4.0',
+          isReady: () => ready,
+          onDisconnected: () => {
+            disconnected++;
+          },
+          getHeartbeatPayload: async () => {
+            polls++;
+            return pending.promise;
+          },
+          createClient: options => {
+            received = options;
+            return {
+              connect: async () => {},
+              close: () => {},
+              sendEvent: (event, payload) => {
+                events.push({ event, payload });
+                return true;
+              },
+            };
+          },
+        }
+      );
+      try {
+        await flushAsyncWork();
+        expect(polls).toBe(1);
+        expect(events).toEqual([
+          { event: 'sandbox.ready', payload: { kiloReady: true, globalFeedAttached: true } },
+        ]);
+        if (loss === 'readiness') ready = false;
+        else if (loss === 'close') started?.close();
+        else received?.onDisconnected?.();
+        pending.resolve({ state: 'active' });
+        await flushAsyncWork();
+        expect(events).toEqual([
+          { event: 'sandbox.ready', payload: { kiloReady: true, globalFeedAttached: true } },
+        ]);
+        expect(polls).toBe(1);
+        expect(disconnected).toBe(loss === 'disconnect' ? 1 : 0);
+        expect(timers.mock.calls.filter(([, ms]) => ms === 30_000)).toHaveLength(0);
+      } finally {
+        started?.close();
+        pending.resolve({ state: 'idle' });
+        await flushAsyncWork();
+        timers.mockRestore();
+      }
+    }
+  );
+
+  it('awaits status results and permits at most one heartbeat poll at a time', async () => {
+    const timers = spyOn(globalThis, 'setTimeout');
+    const events: Array<{ event: string; payload: unknown }> = [];
+    const pending = Promise.withResolvers<unknown>();
+    let polls = 0;
+    const started = maybeStartSandboxControlClient(
+      {
+        SANDBOX_CONTROL_URL: 'wss://example.test/sandbox-control/sbx_1',
+        SANDBOX_CONTROL_CREDENTIAL: 'secret',
+        PROVIDER_INSTANCE_ID: 'inst_1',
+      },
+      () => {},
+      {
+        wrapperVersion: '2.4.0',
+        getHeartbeatPayload: async () => {
+          polls++;
+          return polls === 1 ? { state: 'idle', poll: 1 } : pending.promise;
+        },
+        createClient: () => ({
+          connect: async () => {},
+          close: () => {},
+          sendEvent: (event, payload) => {
+            events.push({ event, payload });
+            return true;
+          },
+        }),
+      }
+    );
+    try {
+      await flushAsyncWork();
+      expect(events).toEqual([
+        { event: 'sandbox.ready', payload: { kiloReady: true, globalFeedAttached: true } },
+        { event: 'sandbox.heartbeat', payload: { state: 'idle', poll: 1 } },
+      ]);
+      const tick = timers.mock.calls.find(([, ms]) => ms === 30_000)?.[0];
+      if (typeof tick !== 'function') throw new Error('Missing heartbeat timer');
+      tick();
+      tick();
+      await flushAsyncWork();
+      expect(polls).toBe(2);
+      expect(events).toHaveLength(2);
+      pending.resolve({ state: 'active', poll: 2 });
+      await flushAsyncWork();
+      expect(events.filter(item => item.event === 'sandbox.heartbeat')).toEqual([
+        { event: 'sandbox.heartbeat', payload: { state: 'idle', poll: 1 } },
+        { event: 'sandbox.heartbeat', payload: { state: 'active', poll: 2 } },
+      ]);
+      started?.close();
+      tick();
+      await flushAsyncWork();
+      expect(polls).toBe(2);
+    } finally {
+      started?.close();
+      pending.resolve({ state: 'idle' });
+      await flushAsyncWork();
+      timers.mockRestore();
+    }
+  });
+
+  it('retries failed status polling without emitting fabricated idle state or logging private errors', async () => {
+    const timers = spyOn(globalThis, 'setTimeout');
+    const events: Array<{ event: string; payload: unknown }> = [];
+    const logs: string[] = [];
+    let polls = 0;
+    let disconnected = 0;
+    const started = maybeStartSandboxControlClient(
+      {
+        SANDBOX_CONTROL_URL: 'wss://example.test/sandbox-control/sbx_1',
+        SANDBOX_CONTROL_CREDENTIAL: 'secret',
+        PROVIDER_INSTANCE_ID: 'inst_1',
+      },
+      message => logs.push(message),
+      {
+        wrapperVersion: '2.4.0',
+        onDisconnected: () => {
+          disconnected++;
+        },
+        getHeartbeatPayload: () => {
+          if (++polls === 1) {
+            const failed = Promise.reject(new Error('private-status-credential'));
+            void failed.catch(() => {});
+            return failed;
+          }
+          return Promise.resolve({
+            state: 'active',
+            sessions: [{ kiloSessionId: 'kilo_1', state: 'finalizing' }],
+          });
+        },
+        createClient: () => ({
+          connect: async () => {},
+          close: () => {},
+          sendEvent: (event, payload) => {
+            events.push({ event, payload });
+            return true;
+          },
+        }),
+      }
+    );
+    try {
+      await flushAsyncWork();
+      expect(events).toEqual([
+        { event: 'sandbox.ready', payload: { kiloReady: true, globalFeedAttached: true } },
+      ]);
+      expect(disconnected).toBe(0);
+      const tick = timers.mock.calls.find(([, ms]) => ms === 30_000)?.[0];
+      if (typeof tick !== 'function') throw new Error('Missing heartbeat retry');
+      tick();
+      await flushAsyncWork();
+      expect(polls).toBe(2);
+      expect(events.at(-1)).toEqual({
+        event: 'sandbox.heartbeat',
+        payload: { state: 'active', sessions: [{ kiloSessionId: 'kilo_1', state: 'finalizing' }] },
+      });
+      expect(disconnected).toBe(0);
+      expect(logs.join('\n')).not.toContain('private-status-credential');
+    } finally {
+      started?.close();
+      timers.mockRestore();
+    }
+  });
+
+  it.each(['false', 'throw'] as const)(
+    'retires the connection when an awaited heartbeat delivery returns %s',
+    async failure => {
+      const timers = spyOn(globalThis, 'setTimeout');
+      let disconnected = 0;
+      const started = maybeStartSandboxControlClient(
+        {
+          SANDBOX_CONTROL_URL: 'wss://example.test/sandbox-control/sbx_1',
+          SANDBOX_CONTROL_CREDENTIAL: 'secret',
+          PROVIDER_INSTANCE_ID: 'inst_1',
+        },
+        () => {},
+        {
+          wrapperVersion: '2.4.0',
+          getHeartbeatPayload: async () => ({ state: 'idle' }),
+          onDisconnected: () => {
+            disconnected++;
+          },
+          createClient: () => ({
+            connect: async () => {},
+            close: () => {},
+            sendEvent: event => {
+              if (event !== 'sandbox.heartbeat') return true;
+              if (failure === 'throw') throw new Error('private transport error');
+              return false;
+            },
+          }),
+        }
+      );
+      try {
+        await flushAsyncWork();
+        expect(disconnected).toBe(1);
+        expect(timers.mock.calls.filter(([, ms]) => ms === 30_000)).toHaveLength(0);
+      } finally {
+        started?.close();
+        timers.mockRestore();
+      }
+    }
+  );
 
   it('clears reconnect after close and omits credentials from connect failure logs', async () => {
     const credential = 'super-secret-token';
@@ -290,8 +517,7 @@ describe('maybeStartSandboxControlClient', () => {
       }
     );
 
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushAsyncWork();
     started?.close();
     received?.onDisconnected?.();
     received?.log?.('sandbox control reconnect scheduled in 0ms (socket closed)');
@@ -336,8 +562,7 @@ describe('startSandboxControlEventFeed', () => {
       started = true;
     });
 
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushAsyncWork();
     expect(started).toBe(false);
     expect(received).toEqual([]);
 

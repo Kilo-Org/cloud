@@ -17,3 +17,11 @@ export const cloudAgentSessionScopeAssertionSchema = z.object({
 });
 
 export type CloudAgentSessionScopeAssertion = z.infer<typeof cloudAgentSessionScopeAssertionSchema>;
+
+export const cloudAgentChildSessionLineageSchema = z
+  .object({
+    sessionId: containedKiloSessionIdSchema,
+    parentSessionId: containedKiloSessionIdSchema,
+  })
+  .strict();
+export type CloudAgentChildSessionLineage = z.infer<typeof cloudAgentChildSessionLineageSchema>;

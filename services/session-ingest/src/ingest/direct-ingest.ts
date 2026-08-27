@@ -316,7 +316,9 @@ async function legacy(
   options: LegacyOptions
 ): Promise<DirectIngestResponse> {
   try {
-    await stageAndEnqueue(request.env, legacyQueueParams(request, r2Key), body);
+    if (!(await stageAndEnqueue(request.env, legacyQueueParams(request, r2Key), body))) {
+      return { status: 404, body: { success: false, error: 'session_not_found' } };
+    }
   } catch (error) {
     logEvent('warn', {
       event: 'direct_ingest_legacy',
@@ -344,7 +346,9 @@ async function fallbackAfterDirectFailure(
   directError: unknown
 ): Promise<DirectIngestResponse> {
   try {
-    await stageAndEnqueue(request.env, directFallbackQueueParams(request, r2Key), bytes);
+    if (!(await stageAndEnqueue(request.env, directFallbackQueueParams(request, r2Key), bytes))) {
+      return { status: 404, body: { success: false, error: 'session_not_found' } };
+    }
   } catch (error) {
     logFallback(request, metrics, startedAt, error, undefined, directError);
     throw error;

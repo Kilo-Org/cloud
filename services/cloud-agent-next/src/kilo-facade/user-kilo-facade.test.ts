@@ -5,8 +5,13 @@ import {
 import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { preflightExistingPromptModelMock } = vi.hoisted(() => ({
+const { getPgDbMock, preflightExistingPromptModelMock } = vi.hoisted(() => ({
+  getPgDbMock: vi.fn(),
   preflightExistingPromptModelMock: vi.fn(),
+}));
+
+vi.mock('../db/pg.js', () => ({
+  getPgDb: getPgDbMock,
 }));
 
 vi.mock('../session/model-preflight.js', () => ({
@@ -43,7 +48,56 @@ import {
 import type { LiveWrapperResolution, SessionKiloFacadeDecision } from './session-proxy';
 
 const kiloSessionId = 'ses_12345678901234567890123456';
+const siblingKiloSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
+const groupedOwnerId = 'oauth/google:1234';
+const groupedOrganizationId = '11111111-1111-4111-8111-111111111111';
+const groupedWorktreeId = 'worktree_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const firstWorkspaceSessionId = 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const siblingWorkspaceSessionId = 'workspace_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
 type ContainerFetch = (request: Request, port: number) => Promise<Response>;
+type PendingOwnershipFixture = {
+  kiloSessionId: string;
+  cloudAgentSessionId: string;
+  userId: string;
+  organizationId: string | null;
+  organizationMembershipId: string | null;
+  worktreeId: string | null;
+  cloudAgentSessionScopeId: string | null;
+  title: string | null;
+  repositoryUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function pendingOwnershipFixture(
+  overrides: Partial<PendingOwnershipFixture> = {}
+): PendingOwnershipFixture {
+  return {
+    kiloSessionId,
+    cloudAgentSessionId: firstWorkspaceSessionId,
+    userId: groupedOwnerId,
+    organizationId: groupedOrganizationId,
+    organizationMembershipId: 'membership_grouped_owner',
+    worktreeId: groupedWorktreeId,
+    cloudAgentSessionScopeId: firstWorkspaceSessionId,
+    title: 'Grouped session',
+    repositoryUrl: 'https://github.com/acme/shared.git',
+    createdAt: '2026-04-29 01:16:12.945+00',
+    updatedAt: '2026-04-29 01:17:13.123+00',
+    ...overrides,
+  };
+}
+
+function mockPendingOwnershipRows(results: PendingOwnershipFixture[][]) {
+  const limit = vi.fn(async () => results.shift() ?? []);
+  const where = vi.fn(() => ({ limit }));
+  const leftJoin = vi.fn(() => ({ where }));
+  const from = vi.fn(() => ({ leftJoin }));
+  const select = vi.fn(() => ({ from }));
+  getPgDbMock.mockReturnValue({ select });
+  return { select, from, leftJoin, where, limit };
+}
 
 function envStub(): Env {
   return {
@@ -915,6 +969,233 @@ describe('handleKiloFacadeRequest', () => {
     });
   });
 
+  it('projects distinct lazy grouped roots from authorized ownership without touching the sandbox', async () => {
+    const env = envStub();
+    const firstOwnership = pendingOwnershipFixture({ title: 'First grouped chat' });
+    const siblingOwnership = pendingOwnershipFixture({
+      kiloSessionId: siblingKiloSessionId,
+      cloudAgentSessionId: siblingWorkspaceSessionId,
+      cloudAgentSessionScopeId: siblingWorkspaceSessionId,
+      title: null,
+      updatedAt: '2026-04-29 01:18:14.456+00',
+    });
+    const ownershipQuery = mockPendingOwnershipRows([[firstOwnership], [siblingOwnership]]);
+    vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockImplementation(
+      async ({ kiloSessionId: requestedKiloSessionId }) => ({
+        kiloSessionId: requestedKiloSessionId,
+        cloudAgentSessionId:
+          requestedKiloSessionId === kiloSessionId
+            ? firstWorkspaceSessionId
+            : siblingWorkspaceSessionId,
+        snapshot: { kind: 'pending' },
+      })
+    );
+    const resolveRootSessionForKiloSession = vi.fn(
+      async ({ kiloSessionId: requestedKiloSessionId }: { kiloSessionId: string }) => ({
+        cloudAgentSessionId:
+          requestedKiloSessionId === kiloSessionId
+            ? firstWorkspaceSessionId
+            : siblingWorkspaceSessionId,
+      })
+    );
+    const resolveLiveWrapper = vi.fn();
+
+    const firstResponse = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
+      env,
+      userId: groupedOwnerId,
+      deps: { resolveRootSessionForKiloSession, resolveLiveWrapper },
+    });
+    const siblingResponse = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${siblingKiloSessionId}`),
+      env,
+      userId: groupedOwnerId,
+      deps: { resolveRootSessionForKiloSession, resolveLiveWrapper },
+    });
+
+    expect(firstResponse.status).toBe(200);
+    expect(siblingResponse.status).toBe(200);
+    const firstSession = await firstResponse.json();
+    const siblingSession = await siblingResponse.json();
+    expect(firstSession).toEqual({
+      id: kiloSessionId,
+      slug: kiloSessionId,
+      projectID: 'cloud-agent',
+      directory: publicCloudAgentDirectory(kiloSessionId),
+      title: 'First grouped chat',
+      version: 'cloud-agent',
+      time: {
+        created: new Date(firstOwnership.createdAt).getTime(),
+        updated: new Date(firstOwnership.updatedAt).getTime(),
+      },
+    });
+    expect(siblingSession).toEqual({
+      id: siblingKiloSessionId,
+      slug: siblingKiloSessionId,
+      projectID: 'cloud-agent',
+      directory: publicCloudAgentDirectory(siblingKiloSessionId),
+      title: 'acme/shared',
+      version: 'cloud-agent',
+      time: {
+        created: new Date(siblingOwnership.createdAt).getTime(),
+        updated: new Date(siblingOwnership.updatedAt).getTime(),
+      },
+    });
+    expect(firstSession).not.toMatchObject({
+      directory: publicCloudAgentDirectory(siblingKiloSessionId),
+    });
+    expect(JSON.stringify([firstSession, siblingSession])).not.toContain('/workspace/');
+    expect(JSON.stringify([firstSession, siblingSession])).not.toContain(groupedOrganizationId);
+    expect(ownershipQuery.leftJoin).toHaveBeenCalledTimes(2);
+    expect(resolveLiveWrapper).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['ungrouped workspace sessions', { worktreeId: null }],
+    ['invalid worktree identities', { worktreeId: 'worktree_invalid' }],
+    ['mismatched root ownership scopes', { cloudAgentSessionScopeId: siblingWorkspaceSessionId }],
+  ])('preserves the pending snapshot response for %s', async (_description, overrides) => {
+    const env = envStub();
+    mockPendingOwnershipRows([[pendingOwnershipFixture(overrides)]]);
+    vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockResolvedValue({
+      kiloSessionId,
+      cloudAgentSessionId: firstWorkspaceSessionId,
+      snapshot: { kind: 'pending' },
+    });
+    const resolveLiveWrapper = vi.fn(async () => null);
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
+      env,
+      userId: groupedOwnerId,
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: firstWorkspaceSessionId,
+        })),
+        resolveLiveWrapper,
+      },
+    });
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('1');
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'KILO_SESSION_SNAPSHOT_PENDING',
+    });
+    expect(resolveLiveWrapper).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['another owner', { userId: 'oauth/google:another-owner' }],
+    ['a revoked organization membership', { organizationMembershipId: null }],
+  ])('denies a pending grouped session belonging to %s', async (_description, overrides) => {
+    const env = envStub();
+    mockPendingOwnershipRows([[pendingOwnershipFixture(overrides)]]);
+    vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockResolvedValue({
+      kiloSessionId,
+      cloudAgentSessionId: firstWorkspaceSessionId,
+      snapshot: { kind: 'pending' },
+    });
+    const resolveLiveWrapper = vi.fn();
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
+      env,
+      userId: groupedOwnerId,
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: firstWorkspaceSessionId,
+        })),
+        resolveLiveWrapper,
+      },
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ error: 'KILO_SESSION_NOT_FOUND' });
+    expect(resolveLiveWrapper).not.toHaveBeenCalled();
+  });
+
+  it('denies a foreign grouped root before reading its snapshot or ownership', async () => {
+    const env = envStub();
+    vi.mocked(env.SESSION_INGEST.resolveCloudAgentRootSessionForKiloSession).mockResolvedValue(
+      null
+    );
+    const resolveLiveWrapper = vi.fn();
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
+      env,
+      userId: 'oauth/google:foreign-owner',
+      deps: { resolveLiveWrapper },
+    });
+
+    expect(response.status).toBe(404);
+    expect(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).not.toHaveBeenCalled();
+    expect(getPgDbMock).not.toHaveBeenCalled();
+    expect(resolveLiveWrapper).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'file:///workspace/private/shared',
+    'https://username:password@github.com/acme/shared.git',
+  ])('does not expose unsafe repository metadata from %s', async repositoryUrl => {
+    const env = envStub();
+    mockPendingOwnershipRows([[pendingOwnershipFixture({ title: null, repositoryUrl })]]);
+    vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockResolvedValue({
+      kiloSessionId,
+      cloudAgentSessionId: firstWorkspaceSessionId,
+      snapshot: { kind: 'pending' },
+    });
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
+      env,
+      userId: groupedOwnerId,
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: firstWorkspaceSessionId,
+        })),
+        resolveLiveWrapper: vi.fn(),
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const session = await response.json();
+    expect(session).toMatchObject({ title: '' });
+    expect(JSON.stringify(session)).not.toContain('/workspace/private');
+    expect(JSON.stringify(session)).not.toContain('password');
+  });
+
+  it('rejects invalid grouped ownership timestamps without touching the sandbox', async () => {
+    const env = envStub();
+    mockPendingOwnershipRows([
+      [pendingOwnershipFixture({ createdAt: 'not-a-postgresql-timestamp' })],
+    ]);
+    vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockResolvedValue({
+      kiloSessionId,
+      cloudAgentSessionId: firstWorkspaceSessionId,
+      snapshot: { kind: 'pending' },
+    });
+    const resolveLiveWrapper = vi.fn();
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(`http://worker.test/kilo/session/${kiloSessionId}`),
+      env,
+      userId: groupedOwnerId,
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: firstWorkspaceSessionId,
+        })),
+        resolveLiveWrapper,
+      },
+    });
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'KILO_UPSTREAM_RESPONSE_INVALID',
+    });
+    expect(resolveLiveWrapper).not.toHaveBeenCalled();
+  });
+
   it('returns a stable pending response for a cold detail read without a materialized snapshot', async () => {
     const env = envStub();
     vi.mocked(env.SESSION_INGEST.getCloudAgentRootSessionSnapshot).mockResolvedValue({
@@ -940,6 +1221,7 @@ describe('handleKiloFacadeRequest', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: 'KILO_SESSION_SNAPSHOT_PENDING',
     });
+    expect(getPgDbMock).not.toHaveBeenCalled();
   });
 
   it('maps an oversized cold session snapshot to stable 413', async () => {

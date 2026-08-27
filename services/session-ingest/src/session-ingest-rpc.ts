@@ -4,6 +4,12 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
 import {
   createSessionForCloudAgentSchema,
+  cloudAgentWorktreeDeletionSchema,
+  recordCloudAgentWorktreeCleanupSchema,
+  canDestroyCloudAgentWorktreeSandboxSchema,
+  type CloudAgentWorktreeDeletionParams,
+  type RecordCloudAgentWorktreeCleanupParams,
+  type CanDestroyCloudAgentWorktreeSandboxParams,
   deleteSessionForCloudAgentSchema,
   getCloudAgentRootSessionMessagesSchema,
   getSessionMessagesSchema,
@@ -39,6 +45,16 @@ import {
   canCreateCliSessionForUser,
   USER_SESSION_ADMISSION_ERROR,
 } from './services/user-session-admission';
+
+import {
+  beginWorktreeDeletion,
+  recordWorktreeCleanup,
+  completeWorktreeDeletion,
+  canDestroyWorktreeSandbox,
+  registerCloudAgentWorktree,
+  isWorktreeSessionDeleting,
+  WORKTREE_DELETING,
+} from './services/worktree-deletion';
 
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
@@ -76,6 +92,7 @@ function destinationIdentityConflicts(
     | 'parent_session_id'
     | 'cloud_agent_session_id'
     | 'cloud_agent_session_scope_id'
+    | 'cloud_agent_worktree_id'
     | 'organization_id'
   >,
   parsed: CreateSessionForCloudAgentParams
@@ -85,11 +102,31 @@ function destinationIdentityConflicts(
     existing.cloud_agent_session_id !== parsed.cloudAgentSessionId ||
     (existing.cloud_agent_session_scope_id !== null &&
       existing.cloud_agent_session_scope_id !== parsed.cloudAgentSessionId) ||
-    existing.organization_id !== (parsed.organizationId ?? null)
+    existing.organization_id !== (parsed.organizationId ?? null) ||
+    (existing.cloud_agent_worktree_id ?? null) !== (parsed.cloudAgentWorktreeId ?? null)
   );
 }
 
 export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIngestRpcMethods {
+  async beginCloudAgentWorktreeDeletion(params: CloudAgentWorktreeDeletionParams) {
+    return beginWorktreeDeletion(this.env, cloudAgentWorktreeDeletionSchema.parse(params));
+  }
+
+  async recordCloudAgentWorktreeCleanup(params: RecordCloudAgentWorktreeCleanupParams) {
+    return recordWorktreeCleanup(this.env, recordCloudAgentWorktreeCleanupSchema.parse(params));
+  }
+
+  async completeCloudAgentWorktreeDeletion(params: CloudAgentWorktreeDeletionParams) {
+    return completeWorktreeDeletion(this.env, cloudAgentWorktreeDeletionSchema.parse(params));
+  }
+
+  async canDestroyCloudAgentWorktreeSandbox(params: CanDestroyCloudAgentWorktreeSandboxParams) {
+    return canDestroyWorktreeSandbox(
+      this.env,
+      canDestroyCloudAgentWorktreeSandboxSchema.parse(params)
+    );
+  }
+
   // Delegate HTTP requests to the Hono app so callers using the service
   // binding can `.fetch()` against this entrypoint (not just call RPC methods).
   fetch(request: Request): Response | Promise<Response> {
@@ -167,8 +204,12 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         // Never clear that other session's Durable Object data.
         return { status: 'rejected', code: 'destination_conflict' };
       }
-      if (await this.findMatchingCommittedRootSession(parsed)) {
+      const committedRootSession = await this.reconcileCommittedRootSession(parsed);
+      if (committedRootSession === 'matching') {
         return { status: 'ready', clone: { sessionId: parsed.sessionId, copiedItemCount } };
+      }
+      if (committedRootSession === 'conflict') {
+        return { status: 'rejected', code: 'destination_conflict' };
       }
       // The insert did not commit: reset the unpublished destination clone and
       // its R2 objects, then rethrow so the caller treats it as retryable.
@@ -261,6 +302,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       if (!(await canCreateCliSessionForUser(tx, parsed.kiloUserId))) {
         throw new Error(USER_SESSION_ADMISSION_ERROR);
       }
+      await registerCloudAgentWorktree(tx, parsed);
 
       const [created] = await tx
         .insert(cli_sessions_v2)
@@ -269,6 +311,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
           kilo_user_id: parsed.kiloUserId,
           cloud_agent_session_id: parsed.cloudAgentSessionId,
           cloud_agent_session_scope_id: parsed.cloudAgentSessionId,
+          cloud_agent_worktree_id: parsed.cloudAgentWorktreeId ?? null,
           organization_id: parsed.organizationId ?? null,
           created_on_platform: parsed.createdOnPlatform,
           ...(parsed.title !== undefined ? { title: parsed.title } : {}),
@@ -328,22 +371,29 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
    * insert (e.g. a transient error after the write). Used to keep same-source
    * retries idempotent across clone finalization and row insertion.
    */
-  private async findMatchingCommittedRootSession(
+  private async reconcileCommittedRootSession(
     parsed: CreateSessionForCloudAgentParams
-  ): Promise<boolean> {
+  ): Promise<'matching' | 'conflict' | 'missing'> {
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     const rows = await db
-      .select({ sessionId: cli_sessions_v2.session_id })
+      .select({
+        parent_session_id: cli_sessions_v2.parent_session_id,
+        cloud_agent_session_id: cli_sessions_v2.cloud_agent_session_id,
+        cloud_agent_session_scope_id: cli_sessions_v2.cloud_agent_session_scope_id,
+        cloud_agent_worktree_id: cli_sessions_v2.cloud_agent_worktree_id,
+        organization_id: cli_sessions_v2.organization_id,
+      })
       .from(cli_sessions_v2)
       .where(
         and(
           eq(cli_sessions_v2.session_id, parsed.sessionId),
-          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId),
-          eq(cli_sessions_v2.cloud_agent_session_id, parsed.cloudAgentSessionId)
+          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
         )
       )
       .limit(1);
-    return rows.length > 0;
+    const existing = rows[0];
+    if (!existing) return 'missing';
+    return destinationIdentityConflicts(existing, parsed) ? 'conflict' : 'matching';
   }
 
   async resolveCloudAgentRootSessionForKiloSession(
@@ -569,6 +619,15 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
    */
   async deleteSessionForCloudAgent(params: DeleteSessionForCloudAgentParams): Promise<void> {
     const parsed = deleteSessionForCloudAgentSchema.parse(params);
+    if (
+      await isWorktreeSessionDeleting(
+        getWorkerDb(this.env.HYPERDRIVE.connectionString),
+        parsed.kiloUserId,
+        parsed.sessionId
+      )
+    ) {
+      throw new Error(WORKTREE_DELETING);
+    }
 
     if (parsed.cloneSourceSessionId !== undefined) {
       const cloneSourceSessionId = parsed.cloneSourceSessionId;

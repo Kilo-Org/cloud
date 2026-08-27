@@ -20,6 +20,7 @@ import {
   type SessionCredentialGrant,
 } from '../../src/sandbox-control/session-credentials.js';
 import { getSandboxSessionStub } from '../../src/sandbox-session/session-stub.js';
+import { createMessageId } from '../../src/session/message-id.js';
 import {
   requestFrameSchema,
   responseFrameSchema,
@@ -475,7 +476,7 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
       agent: { mode: 'code', model: 'test-model' },
       workspace: { sandboxId, sandboxProvider: 'cloudflare' },
       message: {
-        initialTurn: { messageId: `msg_${identity}`, type: 'prompt', prompt: 'Prepare workspace' },
+        initialTurn: { messageId: createMessageId(), type: 'prompt', prompt: 'Prepare workspace' },
       },
     })
   );

@@ -1,5 +1,8 @@
 import * as z from 'zod';
-import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
+import {
+  cloudAgentWorktreeIdSchema,
+  sessionIdSchema as kiloSessionIdSchema,
+} from '@kilocode/session-ingest-contracts';
 
 import { PROVIDER_CAPABILITIES } from '../agent-sandbox/capabilities.js';
 import { isGeneratedSharedSandboxId, isValidSandboxId } from '../sandbox-id.js';
@@ -236,11 +239,8 @@ const MetadataWorkspaceSchema = z
     sandboxRoute: MetadataSharedSandboxRouteSchema.optional(),
     sandboxProvider: SandboxProviderSchema.optional(),
     providerRuntime: ProviderRuntimeSchema.optional(),
+    worktreeId: cloudAgentWorktreeIdSchema.optional(),
     workspacePath: z.string().optional(),
-    worktreeId: z
-      .string()
-      .regex(/^worktree_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
-      .optional(),
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
     shallow: z.boolean().optional(),

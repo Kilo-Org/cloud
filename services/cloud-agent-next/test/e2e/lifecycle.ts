@@ -6,34 +6,65 @@
  */
 
 import { execFile } from 'node:child_process';
+import { createHash, randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
 import {
+  and,
+  cli_sessions_v2,
+  computeDatabaseUrl,
+  createDrizzleClient,
+  eq,
+  inArray,
+} from '@kilocode/db';
+import { createKiloClient, type Message, type Part } from '@kilocode/sdk/v2';
+import {
+  answerQuestion,
+  createWorktreeChat,
+  deleteSession,
   fetchFakeRequests,
+  fetchFakeScenarioStatus,
   fetchFakeWaiters,
   getMessageResult,
+  getSessionSnapshot,
   interruptSession,
   isMessageCompleted,
   messageIdFromEvent,
   openStream,
+  prepareBrowserSession,
   releaseGate,
   sendMessage,
   startSession,
   waitForGateEngaged,
   type ApiVersion,
   type DriverConfig,
+  type StreamConnection,
   type StreamEvent,
+  type WorktreeSessionResult,
 } from './client.js';
+import { mintApiToken } from './auth.js';
 import { startCallbackServer, type CallbackServerHandle } from './callback-server.js';
+import { createMessageId } from '../../src/session/message-id.js';
+import { generateKiloSessionId } from '../../src/utils/kilo-session-id.js';
 import {
+  controlPlaneKiloRootExists,
+  importControlPlaneKiloRoot,
+  inspectControlPlaneKiloRoot,
+  inspectControlPlaneQuestions,
+  inspectControlPlaneWorkspaceFile,
   killSandboxFamily,
   listSandboxContainers,
   listSandboxesForAgentSession,
+  promptControlPlaneKiloRoot,
   sandboxFamilyKey,
+  stopOwnedControlPlaneSandbox,
   readKiloCliLog,
   readWrapperLog,
   tailLines,
+  waitForControlPlaneKiloCompletion,
+  waitForControlPlaneKiloRuntime,
   waitForNewSandboxPresent,
   waitForSandboxFamilyGone,
+  type ControlPlaneKiloRuntime,
   type SandboxContainer,
 } from './sandbox-control.js';
 
@@ -200,6 +231,925 @@ async function snapshotSandboxIds(): Promise<Set<string>> {
   return new Set(containers.map(container => container.id));
 }
 
+export async function lifecycleGateZero(args: LifecycleArgs): Promise<LifecycleResult> {
+  const startedAt = Date.now();
+  const { config, conversation, timeoutMs = 120_000, api = 'unified' } = args;
+  const kiloConfig = { ...config, model: config.model.replace(/^kilo\//, '') };
+  const runId = randomUUID();
+  const rootAGate = `root-a-${runId}`;
+  const rootBGate = `root-b-${runId}`;
+  let session: Awaited<ReturnType<typeof startSession>> | undefined;
+  let stream: ReturnType<typeof openStream> | undefined;
+  let ownedSandbox: SandboxContainer | undefined;
+  let finished = false;
+
+  try {
+    if (api !== 'unified') {
+      throw new Error('Gate 0 requires the unified control-plane session creation boundary');
+    }
+
+    session = await startSession(kiloConfig, { prompt: fakeDirective(`gate:${rootAGate}`) }, api);
+    if (!/^workspace_[0-9a-f-]{36}$/i.test(session.cloudAgentSessionId)) {
+      throw new Error(
+        `expected a control-plane workspace_* session, got ${session.cloudAgentSessionId}; enroll the driver owner in CONTROL_PLANE_IDS`
+      );
+    }
+    if (!/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/.test(session.kiloSessionId)) {
+      throw new Error(`expected a generated root ses_* ID, got ${session.kiloSessionId}`);
+    }
+
+    stream = openStream(config, session.cloudAgentSessionId, { replay: false });
+    const [locatedRuntime, rootAEngaged] = await Promise.all([
+      waitForControlPlaneKiloRuntime(session.kiloSessionId, timeoutMs, sandbox => {
+        ownedSandbox = sandbox;
+      }),
+      waitForGateEngaged(config, rootAGate, timeoutMs),
+    ]);
+    if (!locatedRuntime) {
+      throw new Error('no per-directory Kilo listener proved ownership of root A');
+    }
+    if (!rootAEngaged) {
+      throw new Error(`root A gate ${rootAGate} did not engage`);
+    }
+
+    const rootA = await inspectControlPlaneKiloRoot(locatedRuntime, session.kiloSessionId);
+    if (
+      rootA.processId !== locatedRuntime.processId ||
+      rootA.directory !== locatedRuntime.directory
+    ) {
+      throw new Error('root A did not resolve to its discovered prepared Kilo runtime');
+    }
+
+    const rootBId = generateKiloSessionId();
+    if (rootBId === rootA.id) {
+      throw new Error('Gate 0 generated the same Kilo session ID for both roots');
+    }
+    const rootB = await importControlPlaneKiloRoot(locatedRuntime, rootBId);
+    if (rootB.processId !== rootA.processId || rootB.directory !== rootA.directory) {
+      throw new Error('imported root B did not resolve to root A’s Kilo process and directory');
+    }
+
+    const rootBMessageId = createMessageId();
+    await promptControlPlaneKiloRoot(locatedRuntime, {
+      kiloSessionId: rootB.id,
+      messageId: rootBMessageId,
+      gateTag: rootBGate,
+      model: kiloConfig.model,
+    });
+    if (!(await waitForGateEngaged(config, rootBGate, Math.min(timeoutMs, 40_000)))) {
+      throw new Error(`root B gate ${rootBGate} did not engage while root A remained parked`);
+    }
+
+    const [rootAGateEngaged, rootBGateEngaged, confirmedRootA, confirmedRootB] = await Promise.all([
+      waitForGateEngaged(config, rootAGate, 1_000),
+      waitForGateEngaged(config, rootBGate, 1_000),
+      inspectControlPlaneKiloRoot(locatedRuntime, rootA.id),
+      inspectControlPlaneKiloRoot(locatedRuntime, rootB.id),
+    ]);
+    if (!rootAGateEngaged || !rootBGateEngaged) {
+      throw new Error(
+        `gates were not engaged simultaneously: rootA=${rootAGateEngaged}, rootB=${rootBGateEngaged}`
+      );
+    }
+    if (
+      confirmedRootA.processId !== confirmedRootB.processId ||
+      confirmedRootA.processId !== locatedRuntime.processId ||
+      confirmedRootA.directory !== confirmedRootB.directory ||
+      confirmedRootA.directory !== locatedRuntime.directory
+    ) {
+      throw new Error('simultaneously running roots did not share one Kilo process and directory');
+    }
+
+    await releaseGate(config.fakeLlmUrl, rootBGate);
+    const rootBCompletion = await waitForControlPlaneKiloCompletion(locatedRuntime, {
+      kiloSessionId: rootB.id,
+      messageId: rootBMessageId,
+      timeoutMs: Math.min(timeoutMs, 25_000),
+    });
+    const rootAEngagedAfterB = await waitForGateEngaged(config, rootAGate, 1_000);
+    if (!rootAEngagedAfterB) {
+      throw new Error('root A stopped running when only root B was released');
+    }
+
+    await releaseGate(config.fakeLlmUrl, rootAGate);
+    const rootACompletion = await waitForControlPlaneKiloCompletion(locatedRuntime, {
+      kiloSessionId: rootA.id,
+      messageId: session.messageId,
+      timeoutMs: Math.min(timeoutMs, 25_000),
+    });
+    const [finalRootA, finalRootB, waiters] = await Promise.all([
+      inspectControlPlaneKiloRoot(locatedRuntime, rootA.id),
+      inspectControlPlaneKiloRoot(locatedRuntime, rootB.id),
+      fetchFakeWaiters(config.fakeLlmUrl),
+    ]);
+    if (
+      finalRootA.processId !== finalRootB.processId ||
+      finalRootA.processId !== locatedRuntime.processId ||
+      finalRootA.directory !== finalRootB.directory
+    ) {
+      throw new Error(
+        'completed roots no longer resolve to the original Kilo process and directory'
+      );
+    }
+    const ownedWaiters = waiters.tags.filter(
+      waiter => (waiter.tag === rootAGate || waiter.tag === rootBGate) && waiter.count > 0
+    );
+    if (ownedWaiters.length > 0) {
+      throw new Error('Gate 0 left an owned fake-model gate engaged after completion');
+    }
+
+    finished = true;
+    const directoryFingerprint = createHash('sha256')
+      .update(locatedRuntime.directory)
+      .digest('hex')
+      .slice(0, 16);
+    return {
+      name: 'gate-0',
+      conversation,
+      ok: true,
+      message: [
+        `workspace=${session.cloudAgentSessionId}`,
+        `rootA=${rootA.id}`,
+        `rootB=${rootB.id}`,
+        `container=${locatedRuntime.container.id}`,
+        `kiloPid=${locatedRuntime.processId}`,
+        `directoryFingerprint=${directoryFingerprint}`,
+        ...(locatedRuntime.logPath ? [`controlLog=${locatedRuntime.logPath}`] : []),
+        `simultaneousGates=${rootAGateEngaged}/${rootBGateEngaged}`,
+        `rootAEngagedAfterB=${rootAEngagedAfterB}`,
+        `completedB=${rootBCompletion.assistantMessageId}`,
+        `completedA=${rootACompletion.assistantMessageId}`,
+      ].join('; '),
+      events: [...stream.events],
+      durationMs: Date.now() - startedAt,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      name: 'gate-0',
+      conversation,
+      ok: false,
+      message: session
+        ? `threw: ${message}; workspace=${session.cloudAgentSessionId}; rootA=${session.kiloSessionId}`
+        : `threw: ${message}`,
+      events: stream ? [...stream.events] : [],
+      durationMs: Date.now() - startedAt,
+    };
+  } finally {
+    stream?.close();
+    await Promise.all([
+      releaseGate(config.fakeLlmUrl, rootAGate).catch(() => undefined),
+      releaseGate(config.fakeLlmUrl, rootBGate).catch(() => undefined),
+    ]);
+    if (!finished && session) {
+      await interruptSession(config, session.cloudAgentSessionId).catch(() => undefined);
+    }
+    if (ownedSandbox && session) {
+      const sandbox = ownedSandbox;
+      await stopOwnedControlPlaneSandbox(sandbox, session.kiloSessionId).catch(error => {
+        const message = error instanceof Error ? error.message : 'unknown Docker error';
+        console.warn(`gate-0 owned sandbox cleanup failed (${sandbox.id}): ${message}`);
+      });
+    }
+  }
+}
+
+type WorktreeOwnershipRow = {
+  sessionId: string;
+  userId: string;
+  organizationId: string | null;
+  parentSessionId: string | null;
+  cloudAgentSessionId: string | null;
+  cloudAgentSessionScopeId: string | null;
+  worktreeId: string | null;
+};
+
+type PublicTranscriptEntry = { info: Message; parts: Part[] };
+
+type PublicKiloClient = ReturnType<typeof createKiloClient>;
+
+async function readWorktreeOwnership(
+  config: DriverConfig,
+  kiloSessionIds: string[]
+): Promise<WorktreeOwnershipRow[]> {
+  const driver = createDrizzleClient({
+    connectionString: process.env.DATABASE_URL ?? computeDatabaseUrl(),
+    poolConfig: { application_name: 'cloud-agent-next-worktree-e2e', max: 1 },
+  });
+  try {
+    return await driver.db
+      .select({
+        sessionId: cli_sessions_v2.session_id,
+        userId: cli_sessions_v2.kilo_user_id,
+        organizationId: cli_sessions_v2.organization_id,
+        parentSessionId: cli_sessions_v2.parent_session_id,
+        cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
+        cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
+        worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
+      })
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.kilo_user_id, config.user.id),
+          inArray(cli_sessions_v2.session_id, kiloSessionIds)
+        )
+      );
+  } finally {
+    await driver.pool.end();
+  }
+}
+
+function requireWorktreeSessionIdentity(session: WorktreeSessionResult, label: string): void {
+  if (!/^workspace_[0-9a-f-]{36}$/i.test(session.cloudAgentSessionId)) {
+    throw new Error(`${label} did not receive a control-plane workspace_* identity`);
+  }
+  if (!/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/.test(session.kiloSessionId)) {
+    throw new Error(`${label} did not receive a valid root ses_* identity`);
+  }
+}
+
+async function requireWorktreeGate(
+  config: DriverConfig,
+  tag: string,
+  timeoutMs: number,
+  stream?: StreamConnection
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  const firstEvent = stream?.events.length ?? 0;
+  while (Date.now() < deadline) {
+    const [engaged, status] = await Promise.all([
+      waitForGateEngaged(config, tag, 200, 50),
+      fetchFakeScenarioStatus(config.fakeLlmUrl, tag),
+    ]);
+    if (status.unsupportedToolSchema) {
+      throw new Error(`unsupported real Kilo tool schema for fake directive ${tag}`);
+    }
+    if (engaged) return;
+    const failure = stream?.events
+      .slice(firstEvent)
+      .find(event =>
+        ['error', 'interrupted', 'cloud.message.failed'].includes(event.streamEventType)
+      );
+    if (failure) {
+      throw new Error(
+        `fake directive ${tag} terminated as ${failure.streamEventType} before gating`
+      );
+    }
+  }
+  const status = await fetchFakeScenarioStatus(config.fakeLlmUrl, tag);
+  if (status.requests > 0 && Object.values(status.toolCalls).every(count => count === 0)) {
+    throw new Error(`required real Kilo tool schema was not advertised for fake directive ${tag}`);
+  }
+  throw new Error(
+    `fake directive ${tag} did not engage within ${timeoutMs}ms; requests=${status.requests}; toolCalls=${JSON.stringify(status.toolCalls)}; toolResults=${JSON.stringify(status.toolResults)}`
+  );
+}
+
+async function requirePublicSessionProjection(
+  client: PublicKiloClient,
+  kiloSessionId: string,
+  privateDirectory: string
+): Promise<string> {
+  const result = await client.session.get({ sessionID: kiloSessionId });
+  if (result.error !== undefined || result.data === undefined) {
+    throw new Error(`public SDK session ${kiloSessionId} returned HTTP ${result.response.status}`);
+  }
+  const expectedDirectory = `/cloud-agent/sessions/${kiloSessionId}`;
+  if (result.data.id !== kiloSessionId || result.data.directory !== expectedDirectory) {
+    throw new Error(`public SDK session ${kiloSessionId} did not expose its synthetic directory`);
+  }
+  const serialized = JSON.stringify(result.data);
+  if (serialized.includes(privateDirectory) || result.data.path !== undefined) {
+    throw new Error(`public SDK session ${kiloSessionId} exposed private checkout data`);
+  }
+  return expectedDirectory;
+}
+
+function publicAssistantText(entry: PublicTranscriptEntry): string {
+  return entry.parts
+    .filter(part => part.type === 'text')
+    .map(part => part.text)
+    .join('');
+}
+
+async function waitForPublicTranscript(
+  client: PublicKiloClient,
+  kiloSessionId: string,
+  marker: string,
+  timeoutMs: number
+): Promise<PublicTranscriptEntry[]> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const result = await client.session.messages({ sessionID: kiloSessionId, limit: 100 });
+    if (result.error === undefined && result.data !== undefined) {
+      const entries = result.data;
+      if (
+        entries.some(
+          entry =>
+            entry.info.role === 'assistant' &&
+            entry.info.sessionID === kiloSessionId &&
+            publicAssistantText(entry).includes(marker)
+        )
+      ) {
+        return entries;
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 150));
+  }
+  throw new Error(`persisted transcript ${kiloSessionId} did not contain its completion marker`);
+}
+
+function questionFromEvent(
+  event: StreamEvent,
+  kiloSessionId: string
+): { id: string; sessionId: string } | null {
+  if (event.streamEventType !== 'kilocode') return null;
+  const data = event.data;
+  if (data.type !== 'question.asked' && data.event !== 'question.asked') return null;
+  const properties = data.properties;
+  if (typeof properties !== 'object' || properties === null) return null;
+  if (!('id' in properties) || !('sessionID' in properties)) return null;
+  if (typeof properties.id !== 'string' || properties.sessionID !== kiloSessionId) return null;
+  return { id: properties.id, sessionId: kiloSessionId };
+}
+
+async function waitForWorktreeQuestion(
+  config: DriverConfig,
+  stream: StreamConnection,
+  kiloSessionId: string,
+  tag: string,
+  timeoutMs: number
+): Promise<{ id: string; sessionId: string } | 'unsupported'> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const existing = stream.events
+      .map(event => questionFromEvent(event, kiloSessionId))
+      .find(question => question !== null);
+    if (existing) return existing;
+    const status = await fetchFakeScenarioStatus(config.fakeLlmUrl, tag);
+    if (status.unsupportedToolSchema) return 'unsupported';
+    const matching = await stream.waitFor(
+      event => questionFromEvent(event, kiloSessionId) !== null,
+      Math.min(250, deadline - Date.now())
+    );
+    if (matching) {
+      const question = questionFromEvent(matching, kiloSessionId);
+      if (question) return question;
+    }
+  }
+  const status = await fetchFakeScenarioStatus(config.fakeLlmUrl, tag);
+  if (status.toolCalls.question === 0) return 'unsupported';
+  throw new Error(`root-scoped question ${tag} did not reach its owning stream`);
+}
+
+async function waitForOwnedCompletion(
+  runtime: ControlPlaneKiloRuntime,
+  session: WorktreeSessionResult,
+  messageId: string,
+  marker: string,
+  timeoutMs = 15_000
+): Promise<void> {
+  await waitForControlPlaneKiloCompletion(runtime, {
+    kiloSessionId: session.kiloSessionId,
+    messageId,
+    expectedText: marker,
+    timeoutMs,
+  });
+}
+
+export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<LifecycleResult> {
+  const startedAt = Date.now();
+  const { config, conversation, api = 'unified', timeoutMs = 120_000 } = args;
+  const kiloConfig = { ...config, model: config.model.replace(/^kilo\//, '') };
+  const runId = randomUUID();
+  const ownerTags = new Set<string>();
+  const events: StreamEvent[] = [];
+  const streams = new Set<StreamConnection>();
+  const initialTag = `a-share-${runId}`;
+  const siblingTag = `b-share-${runId}`;
+  const filename = `worktree-e2e-${runId}.txt`;
+  const originalContents = `original-${runId}`;
+  const replacementContents = `edited-${runId}`;
+  const initialMarker = `done-${initialTag}`;
+  const siblingMarker = `done-${siblingTag}`;
+  let rootA: WorktreeSessionResult | undefined;
+  let rootB: WorktreeSessionResult | undefined;
+  let ownedSandbox: SandboxContainer | undefined;
+
+  function connect(sessionId: string): StreamConnection {
+    const stream = openStream(config, sessionId, { onEvent: event => events.push(event) });
+    streams.add(stream);
+    return stream;
+  }
+
+  async function releaseOwned(tag: string): Promise<void> {
+    await releaseGate(config.fakeLlmUrl, tag);
+    ownerTags.delete(tag);
+  }
+
+  try {
+    if (api !== 'unified') {
+      throw new Error('worktree-shared requires the trusted browser-equivalent creation boundary');
+    }
+
+    const createOperationKey = randomUUID();
+    const bootstrapMarker = `bootstrap-${runId}`;
+    const bootstrapPrompt = fakeDirective(`echo:${bootstrapMarker}`);
+    rootA = await prepareBrowserSession(kiloConfig, {
+      prompt: bootstrapPrompt,
+      operationKey: createOperationKey,
+    });
+    requireWorktreeSessionIdentity(rootA, 'first chat');
+    const streamA = connect(rootA.cloudAgentSessionId);
+    const runtime = await waitForControlPlaneKiloRuntime(
+      rootA.kiloSessionId,
+      Math.min(timeoutMs, 75_000),
+      sandbox => {
+        ownedSandbox = sandbox;
+      }
+    );
+    if (!runtime) {
+      throw new Error('first chat did not resolve to its owned prepared control-plane sandbox');
+    }
+
+    const firstMetadata = await getSessionSnapshot(config, rootA.cloudAgentSessionId);
+    const initialMessageId = firstMetadata.initialMessageId;
+    if (
+      firstMetadata.userId !== config.user.id ||
+      firstMetadata.kiloSessionId !== rootA.kiloSessionId ||
+      firstMetadata.autoCommit !== false ||
+      typeof initialMessageId !== 'string'
+    ) {
+      throw new Error('first chat did not preserve ownership and authoritative auto-commit policy');
+    }
+    await waitForOwnedCompletion(runtime, rootA, initialMessageId, bootstrapMarker, 20_000);
+    const replayedFirstChat = await prepareBrowserSession(kiloConfig, {
+      prompt: bootstrapPrompt,
+      operationKey: createOperationKey,
+    });
+    if (
+      replayedFirstChat.cloudAgentSessionId !== rootA.cloudAgentSessionId ||
+      replayedFirstChat.kiloSessionId !== rootA.kiloSessionId
+    ) {
+      throw new Error(
+        'same-key browser creation did not replay its canonical first-chat identities'
+      );
+    }
+    const firstOwnership = await readWorktreeOwnership(config, [rootA.kiloSessionId]);
+    const sourceRow = firstOwnership[0];
+    if (
+      firstOwnership.length !== 1 ||
+      !sourceRow ||
+      sourceRow.worktreeId !== rootA.cloudAgentSessionId.replace(/^workspace_/, 'worktree_') ||
+      sourceRow.parentSessionId !== null ||
+      sourceRow.cloudAgentSessionScopeId !== rootA.cloudAgentSessionId ||
+      !runtime.directory.endsWith(`/worktrees/${sourceRow.worktreeId}`)
+    ) {
+      throw new Error('first chat did not persist one canonical root ownership/worktree record');
+    }
+    ownerTags.add(initialTag);
+    const firstSharedMessage = await sendMessage(kiloConfig, {
+      cloudAgentSessionId: rootA.cloudAgentSessionId,
+      prompt: fakeDirective(`write-then-gate:${initialTag}:${filename}:${originalContents}`),
+    });
+    await requireWorktreeGate(config, initialTag, 20_000, streamA);
+    const writtenFile = await inspectControlPlaneWorkspaceFile(runtime, {
+      kiloSessionId: rootA.kiloSessionId,
+      filePath: filename,
+    });
+    if (!writtenFile.exists || writtenFile.contents !== originalContents || !writtenFile.dirty) {
+      throw new Error('first chat did not create the dirty shared file through its real Kilo tool');
+    }
+
+    const requestsBeforeSibling = await fetchFakeRequests(config.fakeLlmUrl);
+    const siblingOperationKey = randomUUID();
+    rootB = await createWorktreeChat(kiloConfig, {
+      sourceKiloSessionId: rootA.kiloSessionId,
+      sourceCloudAgentSessionId: rootA.cloudAgentSessionId,
+      operationKey: siblingOperationKey,
+    });
+    requireWorktreeSessionIdentity(rootB, 'sibling chat');
+    if (
+      rootB.cloudAgentSessionId === rootA.cloudAgentSessionId ||
+      rootB.kiloSessionId === rootA.kiloSessionId ||
+      rootB.worktreeId !== sourceRow.worktreeId
+    ) {
+      throw new Error('sibling chat did not receive distinct identities in the source worktree');
+    }
+    const requestsAfterSibling = await fetchFakeRequests(config.fakeLlmUrl);
+    if (requestsAfterSibling.chatCompletions !== requestsBeforeSibling.chatCompletions) {
+      throw new Error('lazy sibling creation unexpectedly invoked the model');
+    }
+    if (await controlPlaneKiloRootExists(runtime, rootB.kiloSessionId)) {
+      throw new Error('lazy sibling creation unexpectedly attached its Kilo root');
+    }
+    if (!(await waitForGateEngaged(config, initialTag, 500))) {
+      throw new Error('sibling creation interrupted the active first chat');
+    }
+
+    const siblingReplay = await createWorktreeChat(kiloConfig, {
+      sourceKiloSessionId: rootA.kiloSessionId,
+      sourceCloudAgentSessionId: rootA.cloudAgentSessionId,
+      operationKey: siblingOperationKey,
+    });
+    if (
+      siblingReplay.cloudAgentSessionId !== rootB.cloudAgentSessionId ||
+      siblingReplay.kiloSessionId !== rootB.kiloSessionId ||
+      siblingReplay.worktreeId !== rootB.worktreeId
+    ) {
+      throw new Error('same-key sibling creation did not replay its canonical identities');
+    }
+
+    const ownership = await readWorktreeOwnership(config, [
+      rootA.kiloSessionId,
+      rootB.kiloSessionId,
+    ]);
+    const siblingRow = ownership.find(row => row.sessionId === rootB?.kiloSessionId);
+    if (
+      ownership.length !== 2 ||
+      !siblingRow ||
+      siblingRow.userId !== sourceRow.userId ||
+      siblingRow.organizationId !== sourceRow.organizationId ||
+      siblingRow.worktreeId !== sourceRow.worktreeId ||
+      siblingRow.parentSessionId !== null ||
+      siblingRow.cloudAgentSessionId !== rootB.cloudAgentSessionId ||
+      siblingRow.cloudAgentSessionScopeId !== rootB.cloudAgentSessionId ||
+      siblingRow.cloudAgentSessionScopeId === sourceRow.cloudAgentSessionScopeId
+    ) {
+      throw new Error(
+        'siblings did not retain independent root ownership and authorization scopes'
+      );
+    }
+    const siblingMetadata = await getSessionSnapshot(config, rootB.cloudAgentSessionId);
+    if (
+      !firstMetadata.sandboxId ||
+      siblingMetadata.sandboxId !== firstMetadata.sandboxId ||
+      siblingMetadata.userId !== firstMetadata.userId ||
+      siblingMetadata.orgId !== firstMetadata.orgId ||
+      siblingMetadata.gitUrl !== firstMetadata.gitUrl ||
+      siblingMetadata.githubRepo !== firstMetadata.githubRepo ||
+      siblingMetadata.platform !== firstMetadata.platform ||
+      siblingMetadata.upstreamBranch !== firstMetadata.upstreamBranch ||
+      siblingMetadata.autoCommit !== false
+    ) {
+      throw new Error(
+        'sibling runtime metadata did not preserve the source physical route and policy'
+      );
+    }
+
+    const publicClient = createKiloClient({
+      baseUrl: `${config.workerUrl.replace(/\/$/, '')}/kilo`,
+      headers: { Authorization: `Bearer ${mintApiToken(config.user, config.nextAuthSecret)}` },
+    });
+    const [publicDirectoryA, publicDirectoryB] = await Promise.all([
+      requirePublicSessionProjection(publicClient, rootA.kiloSessionId, runtime.directory),
+      requirePublicSessionProjection(publicClient, rootB.kiloSessionId, runtime.directory),
+    ]);
+    if (publicDirectoryA === publicDirectoryB) {
+      throw new Error('sibling public SDK directory projections were not independently scoped');
+    }
+
+    let streamB = connect(rootB.cloudAgentSessionId);
+    ownerTags.add(siblingTag);
+    const siblingMessage = await sendMessage(kiloConfig, {
+      cloudAgentSessionId: rootB.cloudAgentSessionId,
+      prompt: fakeDirective(`read-edit-then-gate:${siblingTag}:${filename}:${replacementContents}`),
+    });
+    await requireWorktreeGate(config, siblingTag, 40_000, streamB);
+    const [gateA, gateB, inspectedA, inspectedB, writerStatus, readerStatus] = await Promise.all([
+      waitForGateEngaged(config, initialTag, 500),
+      waitForGateEngaged(config, siblingTag, 500),
+      inspectControlPlaneKiloRoot(runtime, rootA.kiloSessionId),
+      inspectControlPlaneKiloRoot(runtime, rootB.kiloSessionId),
+      fetchFakeScenarioStatus(config.fakeLlmUrl, initialTag),
+      fetchFakeScenarioStatus(config.fakeLlmUrl, siblingTag),
+    ]);
+    if (
+      !gateA ||
+      !gateB ||
+      inspectedA.processId !== inspectedB.processId ||
+      inspectedA.processId !== runtime.processId ||
+      inspectedA.directory !== inspectedB.directory ||
+      writerStatus.toolCalls.write < 1 ||
+      writerStatus.toolResults.write < 1 ||
+      readerStatus.toolCalls.read < 1 ||
+      readerStatus.toolResults.read < 1 ||
+      readerStatus.toolCalls.edit < 1 ||
+      readerStatus.toolResults.edit < 1
+    ) {
+      throw new Error(
+        'siblings did not simultaneously execute genuine file tools in one Kilo process'
+      );
+    }
+    const [activeA, activeB, editedFile] = await Promise.all([
+      getSessionSnapshot(config, rootA.cloudAgentSessionId),
+      getSessionSnapshot(config, rootB.cloudAgentSessionId),
+      inspectControlPlaneWorkspaceFile(runtime, {
+        kiloSessionId: rootB.kiloSessionId,
+        filePath: filename,
+      }),
+    ]);
+    if (
+      activeA.execution?.status !== 'running' ||
+      activeB.execution?.status !== 'running' ||
+      editedFile.contents !== replacementContents ||
+      !editedFile.dirty ||
+      editedFile.head !== writtenFile.head
+    ) {
+      throw new Error('shared file/runtime state did not show two active uncommitted root turns');
+    }
+
+    await releaseOwned(siblingTag);
+    await waitForOwnedCompletion(runtime, rootB, siblingMessage.messageId, siblingMarker);
+    if (!(await waitForGateEngaged(config, initialTag, 500))) {
+      throw new Error('completing the sibling unexpectedly interrupted the first chat');
+    }
+    await releaseOwned(initialTag);
+    await waitForOwnedCompletion(runtime, rootA, firstSharedMessage.messageId, initialMarker);
+
+    const [transcriptA, transcriptB] = await Promise.all([
+      waitForPublicTranscript(publicClient, rootA.kiloSessionId, initialMarker, 15_000),
+      waitForPublicTranscript(publicClient, rootB.kiloSessionId, siblingMarker, 15_000),
+    ]);
+    if (
+      transcriptA.some(entry => publicAssistantText(entry).includes(siblingMarker)) ||
+      transcriptB.some(entry => publicAssistantText(entry).includes(initialMarker)) ||
+      JSON.stringify(transcriptA).includes(runtime.directory) ||
+      JSON.stringify(transcriptB).includes(runtime.directory) ||
+      transcriptA.some(
+        entry =>
+          entry.info.role === 'assistant' &&
+          (entry.info.path.cwd !== publicDirectoryA || entry.info.path.root !== publicDirectoryA)
+      ) ||
+      transcriptB.some(
+        entry =>
+          entry.info.role === 'assistant' &&
+          (entry.info.path.cwd !== publicDirectoryB || entry.info.path.root !== publicDirectoryB)
+      ) ||
+      !transcriptA.some(entry =>
+        entry.parts.some(part => part.type === 'tool' && part.state.status === 'completed')
+      ) ||
+      !transcriptB.some(entry =>
+        entry.parts.some(part => part.type === 'tool' && part.state.status === 'completed')
+      )
+    ) {
+      throw new Error(
+        'durable sibling transcripts leaked attribution or omitted completed real tools'
+      );
+    }
+
+    const questionGate = `a-question-${runId}`;
+    const questionTag = `b-question-${runId}`;
+    const questionMarker = `done-${questionTag}`;
+    ownerTags.add(questionGate);
+    const gatedQuestion = await sendMessage(kiloConfig, {
+      cloudAgentSessionId: rootA.cloudAgentSessionId,
+      prompt: fakeDirective(`gate:${questionGate}:done-${questionGate}`),
+    });
+    await requireWorktreeGate(config, questionGate, 12_000, streamA);
+    const questionMessage = await sendMessage(kiloConfig, {
+      cloudAgentSessionId: rootB.cloudAgentSessionId,
+      prompt: fakeDirective(`question:${questionTag}:Choose the isolated sibling answer`),
+    });
+    const pendingQuestion = await waitForWorktreeQuestion(
+      config,
+      streamB,
+      rootB.kiloSessionId,
+      questionTag,
+      12_000
+    );
+    let questionCoverage = 'unsupported-tool-schema';
+    let questionRefresh = 'unsupported';
+    if (pendingQuestion !== 'unsupported') {
+      const questionVisibility = await inspectControlPlaneQuestions(runtime, {
+        kiloSessionId: rootB.kiloSessionId,
+        questionId: pendingQuestion.id,
+      });
+      if (!questionVisibility.scoped.matchingQuestion) {
+        throw new Error(
+          `owning Kilo question is not visible in its checkout; unscoped=${questionVisibility.unscoped.count}; scoped=${questionVisibility.scoped.count}`
+        );
+      }
+      if (
+        streamA.events.some(event => questionFromEvent(event, rootB?.kiloSessionId ?? '') !== null)
+      ) {
+        throw new Error('the sibling question appeared on the first root stream');
+      }
+      let wrongRootRejected = false;
+      try {
+        const result = await answerQuestion(config, rootA.cloudAgentSessionId, pendingQuestion.id, [
+          ['Continue'],
+        ]);
+        wrongRootRejected = result.success !== true;
+      } catch {
+        wrongRootRejected = true;
+      }
+      if (!wrongRootRejected) {
+        throw new Error('the first root was allowed to answer the sibling question');
+      }
+
+      const requestsBeforeRefresh = await fetchFakeScenarioStatus(config.fakeLlmUrl, questionTag);
+      streamB.close();
+      streams.delete(streamB);
+      streamB = connect(rootB.cloudAgentSessionId);
+      const refreshed = await streamB.waitFor(
+        event => questionFromEvent(event, rootB?.kiloSessionId ?? '')?.id === pendingQuestion.id,
+        4_000
+      );
+      const requestsAfterRefresh = await fetchFakeScenarioStatus(config.fakeLlmUrl, questionTag);
+      if (requestsAfterRefresh.requests !== requestsBeforeRefresh.requests) {
+        throw new Error(
+          'reconnecting the sibling question unexpectedly started another model turn'
+        );
+      }
+      if (!refreshed) {
+        throw new Error('the owning root did not replay its still-open question after refresh');
+      }
+      questionRefresh = 'replayed';
+      const answer = await answerQuestion(config, rootB.cloudAgentSessionId, pendingQuestion.id, [
+        ['Continue'],
+      ]);
+      if (!answer.success) {
+        throw new Error('the owning sibling could not resolve its real Kilo question');
+      }
+      await waitForOwnedCompletion(
+        runtime,
+        rootB,
+        questionMessage.messageId,
+        questionMarker,
+        10_000
+      );
+      questionCoverage = 'isolated';
+    } else {
+      throw new Error('the real Kilo question tool is unavailable or its schema is unsupported');
+    }
+    if (!(await waitForGateEngaged(config, questionGate, 500))) {
+      throw new Error('sibling question handling unexpectedly settled the first root');
+    }
+    await releaseOwned(questionGate);
+    await waitForOwnedCompletion(runtime, rootA, gatedQuestion.messageId, `done-${questionGate}`);
+
+    const cancellationGateA = `a-cancel-${runId}`;
+    const cancellationGateB = `b-cancel-${runId}`;
+    ownerTags.add(cancellationGateA);
+    ownerTags.add(cancellationGateB);
+    const cancelTurnA = await sendMessage(kiloConfig, {
+      cloudAgentSessionId: rootA.cloudAgentSessionId,
+      prompt: fakeDirective(`gate:${cancellationGateA}:done-${cancellationGateA}`),
+    });
+    await requireWorktreeGate(config, cancellationGateA, 12_000, streamA);
+    await sendMessage(kiloConfig, {
+      cloudAgentSessionId: rootB.cloudAgentSessionId,
+      prompt: fakeDirective(`gate:${cancellationGateB}:done-${cancellationGateB}`),
+    });
+    await requireWorktreeGate(config, cancellationGateB, 12_000, streamB);
+    if (!(await waitForGateEngaged(config, cancellationGateA, 500))) {
+      throw new Error('cancellation gates did not engage simultaneously');
+    }
+    const cancellationEventStart = streamB.events.length;
+    const interruptedPromise = streamB.waitFor(
+      event =>
+        streamB.events.indexOf(event) >= cancellationEventStart &&
+        ['interrupted', 'cloud.message.failed'].includes(event.streamEventType),
+      5_000
+    );
+    const interruption = await interruptSession(config, rootB.cloudAgentSessionId);
+    if (!interruption.success) {
+      throw new Error('targeted sibling cancellation was not accepted');
+    }
+    const interrupted = await interruptedPromise;
+    if (!interrupted || !(await waitForGateEngaged(config, cancellationGateA, 500))) {
+      throw new Error('targeted cancellation did not preserve the active first root');
+    }
+    await releaseOwned(cancellationGateA);
+    await waitForOwnedCompletion(
+      runtime,
+      rootA,
+      cancelTurnA.messageId,
+      `done-${cancellationGateA}`
+    );
+
+    const [persistedA, persistedB] = await Promise.all([
+      getSessionSnapshot(config, rootA.cloudAgentSessionId),
+      getSessionSnapshot(config, rootB.cloudAgentSessionId),
+    ]);
+    if (
+      typeof persistedA.latestEventId !== 'number' ||
+      typeof persistedB.latestEventId !== 'number' ||
+      persistedA.latestEventId < 1 ||
+      persistedB.latestEventId < 1
+    ) {
+      throw new Error(
+        'sibling Durable Objects did not expose independent persisted event watermarks'
+      );
+    }
+
+    const deletionGate = `a-delete-${runId}`;
+    ownerTags.add(deletionGate);
+    const deleteTurn = await sendMessage(kiloConfig, {
+      cloudAgentSessionId: rootA.cloudAgentSessionId,
+      prompt: fakeDirective(`gate:${deletionGate}:done-${deletionGate}`),
+    });
+    await requireWorktreeGate(config, deletionGate, 12_000, streamA);
+    const deleted = await deleteSession(config, rootB.cloudAgentSessionId);
+    if (!deleted.success) {
+      throw new Error('targeted sibling runtime deletion returned success: false');
+    }
+    let deletedMetadataRejected = false;
+    try {
+      await getSessionSnapshot(config, rootB.cloudAgentSessionId);
+    } catch {
+      deletedMetadataRejected = true;
+    }
+    if (!deletedMetadataRejected || !(await waitForGateEngaged(config, deletionGate, 500))) {
+      throw new Error('sibling deletion removed the first root or left sibling runtime metadata');
+    }
+    const survivingRoot = await inspectControlPlaneKiloRoot(runtime, rootA.kiloSessionId);
+    if (survivingRoot.processId !== runtime.processId) {
+      throw new Error('sibling deletion replaced or detached the surviving Kilo runtime');
+    }
+    await releaseOwned(deletionGate);
+    await waitForOwnedCompletion(runtime, rootA, deleteTurn.messageId, `done-${deletionGate}`);
+    const afterDelete = await sendMessage(kiloConfig, {
+      cloudAgentSessionId: rootA.cloudAgentSessionId,
+      prompt: fakeDirective(`echo:survived-${runId}`),
+    });
+    await waitForOwnedCompletion(runtime, rootA, afterDelete.messageId, `survived-${runId}`);
+    const finalFile = await inspectControlPlaneWorkspaceFile(runtime, {
+      kiloSessionId: rootA.kiloSessionId,
+      filePath: filename,
+    });
+    if (
+      finalFile.contents !== replacementContents ||
+      !finalFile.dirty ||
+      finalFile.head !== writtenFile.head
+    ) {
+      throw new Error('grouped turns committed or lost the shared agent-edited checkout file');
+    }
+
+    const directoryFingerprint = createHash('sha256')
+      .update(runtime.directory)
+      .digest('hex')
+      .slice(0, 16);
+    return {
+      name: 'worktree-shared',
+      conversation,
+      ok: true,
+      message: [
+        `worktree=${sourceRow.worktreeId}`,
+        `workspaceA=${rootA.cloudAgentSessionId}`,
+        `workspaceB=${rootB.cloudAgentSessionId}`,
+        `rootA=${rootA.kiloSessionId}`,
+        `rootB=${rootB.kiloSessionId}`,
+        `sandbox=${firstMetadata.sandboxId}`,
+        `container=${runtime.container.id}`,
+        `kiloPid=${runtime.processId}`,
+        `directoryFingerprint=${directoryFingerprint}`,
+        `file=${filename}`,
+        'lazySibling=true',
+        'simultaneousGates=true',
+        'realFileTools=true',
+        `question=${questionCoverage}`,
+        `questionRefresh=${questionRefresh}`,
+        'targetedCancellation=true',
+        'targetedRuntimeDeletion=true',
+        `eventWatermarks=${persistedA.latestEventId}/${persistedB.latestEventId}`,
+        'publicDirectories=isolated',
+        'autoCommit=false',
+      ].join('; '),
+      events,
+      durationMs: Date.now() - startedAt,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      name: 'worktree-shared',
+      conversation,
+      ok: false,
+      message: `threw: ${message}`,
+      events,
+      durationMs: Date.now() - startedAt,
+    };
+  } finally {
+    for (const stream of streams) stream.close();
+    await Promise.all(
+      [...ownerTags].map(tag => releaseGate(config.fakeLlmUrl, tag).catch(() => undefined))
+    );
+    if (rootB) {
+      await interruptSession(config, rootB.cloudAgentSessionId).catch(() => undefined);
+    }
+    if (rootA) {
+      await interruptSession(config, rootA.cloudAgentSessionId).catch(() => undefined);
+    }
+    if (ownedSandbox && rootA) {
+      await stopOwnedControlPlaneSandbox(ownedSandbox, rootA.kiloSessionId).catch(error => {
+        const message = error instanceof Error ? error.message : 'unknown Docker error';
+        console.warn(`worktree-shared owned sandbox cleanup failed: ${message}`);
+      });
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Scenarios
 // ---------------------------------------------------------------------------
@@ -270,6 +1220,16 @@ export async function lifecycleCold(args: LifecycleArgs): Promise<LifecycleResul
         conversation,
         ok: false,
         message: `no terminal event within ${timeoutMs}ms`,
+        events,
+        durationMs: Date.now() - start,
+      };
+    }
+    if (terminal.streamEventType !== 'complete') {
+      return {
+        name: 'cold',
+        conversation,
+        ok: false,
+        message: `cold start terminated without completion: ${terminal.streamEventType}`,
         events,
         durationMs: Date.now() - start,
       };
@@ -2139,6 +3099,8 @@ export const LIFECYCLE_SCENARIOS: Record<
   string,
   (args: LifecycleArgs) => Promise<LifecycleResult>
 > = {
+  'gate-0': lifecycleGateZero,
+  'worktree-shared': lifecycleWorktreeShared,
   cold: lifecycleCold,
   hot: lifecycleHot,
   followup: lifecycleFollowup,

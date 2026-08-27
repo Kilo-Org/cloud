@@ -18,6 +18,7 @@ import {
 } from '../kilo-api.js';
 import { withTimeoutAndAbort } from '../utils.js';
 import { unfilteredKiloEvents } from './feed.js';
+import { forgetAttachedRoot, rememberAttachedRoot } from './session-directories.js';
 import { startSandboxControlEventFeed } from './sandbox-control-runtime.js';
 
 export type WorktreeKiloAuth = NonNullable<SessionAttachPayload['kilo']>;
@@ -44,6 +45,7 @@ export type WorktreeKiloRuntimes = {
     env?: Record<string, string>
   ): WorktreeKiloAttachment;
   detach(identity: SessionRequestIdentity): boolean;
+  deleteDirectory(directory: string): Promise<void>;
   get(directory: string): WorktreeKiloRuntime | undefined;
   isHealthy(): boolean;
   shutdown(): void;
@@ -62,6 +64,8 @@ type ServerOptions = {
   timeoutMs?: number;
 };
 
+type WorktreeKiloServerHandle = KiloServerHandle & { stopped?: Promise<void> };
+
 type RuntimeEntry = {
   kilo: WorktreeKiloAuth;
   directory: string;
@@ -71,6 +75,7 @@ type RuntimeEntry = {
   runtime?: WorktreeKiloRuntime;
   feed?: Awaited<ReturnType<typeof startSandboxControlEventFeed>>;
   starting?: Promise<WorktreeKiloRuntime>;
+  stopped?: Promise<void>;
   retiring?: Promise<void>;
 };
 
@@ -171,12 +176,17 @@ export function buildWorktreeKiloEnvironment(
   };
 }
 
-export async function startWorktreeKiloServer(options: ServerOptions): Promise<KiloServerHandle> {
+export async function startWorktreeKiloServer(
+  options: ServerOptions
+): Promise<WorktreeKiloServerHandle & { stopped: Promise<void> }> {
   options.signal.throwIfAborted();
   const proc = spawn('kilo', ['serve', '--hostname=127.0.0.1', '--port=0'], {
     cwd: options.directory,
     env: options.env,
     stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  const stopped = new Promise<void>(resolve => {
+    proc.once('close', () => resolve());
   });
   let closed = false;
   const close = (): void => {
@@ -221,9 +231,10 @@ export async function startWorktreeKiloServer(options: ServerOptions): Promise<K
     });
     proc.stdout.resume();
     proc.once('exit', close);
-    return { url, close };
+    return { url, close, stopped };
   } catch {
     close();
+    await stopped;
     throw new Error('Kilo server failed to start');
   }
 }
@@ -241,13 +252,15 @@ function sameAuth(left: WorktreeKiloAuth, right: WorktreeKiloAuth): boolean {
 export function createWorktreeKiloRuntimes(options: {
   homeRoot?: string;
   inheritedEnv?: NodeJS.ProcessEnv;
-  startServer?: (options: ServerOptions) => Promise<KiloServerHandle>;
+  startServer?: (options: ServerOptions) => Promise<WorktreeKiloServerHandle>;
   onEvent?: (runtime: WorktreeKiloRuntime, event: WorktreeKiloEvent) => void;
   onUnexpectedClose: () => void;
 }): WorktreeKiloRuntimes {
   const entries = new Map<string, RuntimeEntry>();
   const directoriesByScope = new Map<string, string>();
   const roots = new Map<string, RootAttachment>();
+  const homesByDirectory = new Map<string, Set<string>>();
+  const deletedDirectories = new Set<string>();
   let closed = false;
 
   function findRoot(identity: SessionRequestIdentity): RootAttachment | undefined {
@@ -270,13 +283,15 @@ export function createWorktreeKiloRuntimes(options: {
     return undefined;
   }
 
-  function retire(entry: RuntimeEntry): void {
-    if (entry.retiring) return;
+  function retire(entry: RuntimeEntry): Promise<void> {
+    if (entry.retiring) return entry.retiring;
     entry.retiring = Promise.resolve(entry.starting)
       .catch(() => undefined)
+      .then(() => entry.stopped)
       .then(() => {
         if (entries.get(entry.directory) === entry) entries.delete(entry.directory);
       });
+    void entry.retiring.catch(() => {});
     if (
       entries.get(entry.directory) === entry &&
       directoriesByScope.get(entry.kilo.scopeId) === entry.directory
@@ -284,14 +299,16 @@ export function createWorktreeKiloRuntimes(options: {
       directoriesByScope.delete(entry.kilo.scopeId);
     }
     entry.abort.abort();
+    return entry.retiring;
   }
 
   function removeRoot(root: RootAttachment): void {
     if (roots.get(root.identity.kiloSessionId) !== root) return;
     roots.delete(root.identity.kiloSessionId);
     root.entry.roots.delete(root);
+    forgetAttachedRoot(root.identity.kiloSessionId, root.identity.directory);
     root.abort.abort();
-    if (root.entry.roots.size === 0) retire(root.entry);
+    if (root.entry.roots.size === 0) void retire(root.entry);
   }
 
   async function start(
@@ -299,7 +316,7 @@ export function createWorktreeKiloRuntimes(options: {
     retiring: Promise<void> | undefined
   ): Promise<WorktreeKiloRuntime> {
     const { abort } = entry;
-    let server: KiloServerHandle | undefined;
+    let server: WorktreeKiloServerHandle | undefined;
     let serverClosed = false;
     const closeServer = (): void => {
       if (!server || serverClosed) return;
@@ -323,6 +340,7 @@ export function createWorktreeKiloRuntimes(options: {
         env: entry.env,
         signal: abort.signal,
       });
+      entry.stopped = server.stopped;
       abort.signal.throwIfAborted();
       const client = createKiloClient({ baseUrl: server.url, directory: entry.directory });
       const runtime: WorktreeKiloRuntime = {
@@ -375,6 +393,9 @@ export function createWorktreeKiloRuntimes(options: {
       if (!path.isAbsolute(directory) || path.resolve(directory) !== directory) {
         throw new WorktreeKiloRuntimeError('protocol_error', 'Invalid worktree directory', false);
       }
+      if (deletedDirectories.has(directory)) {
+        throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktree is deleted', false);
+      }
       let root = findRoot(identity);
       const scopeDirectory = directoriesByScope.get(kilo.scopeId);
       const previous = entries.get(directory);
@@ -415,6 +436,9 @@ export function createWorktreeKiloRuntimes(options: {
           abort: new AbortController(),
           roots: new Set(),
         };
+        const homes = homesByDirectory.get(directory) ?? new Set<string>();
+        homes.add(home);
+        homesByDirectory.set(directory, homes);
         entries.set(directory, entry);
         directoriesByScope.set(kilo.scopeId, directory);
       }
@@ -428,6 +452,7 @@ export function createWorktreeKiloRuntimes(options: {
         };
         roots.set(identity.kiloSessionId, root);
         entry.roots.add(root);
+        rememberAttachedRoot(identity.kiloSessionId, directory);
       }
       const attachedRoot = root;
       const attempt = Symbol();
@@ -456,6 +481,24 @@ export function createWorktreeKiloRuntimes(options: {
       removeRoot(root);
       return true;
     },
+    async deleteDirectory(directory) {
+      deletedDirectories.add(directory);
+      const entry = entries.get(directory);
+      for (const root of roots.values()) {
+        if (root.identity.directory === directory) removeRoot(root);
+      }
+      if (entry) {
+        await withTimeoutAndAbort(retire(entry), {
+          timeoutMs: KILO_STARTUP_TIMEOUT_MS,
+          timeoutMessage: 'Kilo worktree retirement timed out',
+          abortMessage: 'Kilo worktree retirement cancelled',
+        });
+      }
+      for (const home of homesByDirectory.get(directory) ?? []) {
+        await fs.rm(home, { recursive: true, force: true });
+      }
+      homesByDirectory.delete(directory);
+    },
     get(directory) {
       const runtime = entries.get(directory)?.runtime;
       return !closed && runtime && !runtime.signal.aborted ? runtime : undefined;
@@ -473,10 +516,8 @@ export function createWorktreeKiloRuntimes(options: {
     shutdown() {
       if (closed) return;
       closed = true;
-      for (const root of roots.values()) root.abort.abort();
-      roots.clear();
-      for (const entry of entries.values()) retire(entry);
-      entries.clear();
+      for (const root of roots.values()) removeRoot(root);
+      for (const entry of entries.values()) void retire(entry);
       directoriesByScope.clear();
     },
   };

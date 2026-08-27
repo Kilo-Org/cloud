@@ -1,10 +1,33 @@
+import { z } from 'zod';
 import { logger } from '../logger.js';
 import {
   cloudAgentSessionScopeHeaders,
   cloudAgentSessionScopeProtocolVersion,
+  containedKiloSessionIdSchema,
+  type CloudAgentChildSessionLineage,
 } from '@kilocode/session-ingest-contracts';
 
 export type IngestItem = { type: string; data: unknown };
+
+const childSessionInfoSchema = z.object({
+  id: containedKiloSessionIdSchema,
+  parentID: containedKiloSessionIdSchema,
+  directory: z.string().min(1),
+});
+
+export function childSessionLineage(
+  info: unknown,
+  directory: string
+): CloudAgentChildSessionLineage | undefined {
+  const parsed = childSessionInfoSchema.safeParse(info);
+  if (
+    !parsed.success ||
+    parsed.data.id === parsed.data.parentID ||
+    parsed.data.directory !== directory
+  )
+    return undefined;
+  return { sessionId: parsed.data.id, parentSessionId: parsed.data.parentID };
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -39,6 +62,22 @@ export function controlEventToIngestItems(
   if ((type === 'session.updated' || type === 'session.created') && isRecord(properties.info)) {
     return [{ type: 'session', data: properties.info }];
   }
+  if (type === 'session.status' && isRecord(properties.status)) {
+    const sessionId = properties.sessionID;
+    if (
+      typeof sessionId !== 'string' ||
+      sessionId.length === 0 ||
+      (typeof properties.sessionId === 'string' && properties.sessionId !== sessionId)
+    ) {
+      return [];
+    }
+    const status = properties.status.type;
+    if (status === 'busy' || status === 'idle' || status === 'retry' || status === 'offline') {
+      return [
+        { type: 'session_status', data: { status: status === 'offline' ? 'retry' : status } },
+      ];
+    }
+  }
   return [];
 }
 
@@ -48,6 +87,7 @@ export async function publishControlPlaneSessionIngest(params: {
   rootKiloSessionId: string;
   eventKiloSessionId?: string;
   cloudAgentSessionId: string;
+  directory?: string;
   internalSecret?: string;
   items: IngestItem[];
 }): Promise<void> {
@@ -62,6 +102,22 @@ export async function publishControlPlaneSessionIngest(params: {
       })
       .warn('Control-plane child session ingest skipped; internal secret unavailable');
     return;
+  }
+
+  let lineage: CloudAgentChildSessionLineage | undefined;
+  if (isChild && params.directory) {
+    for (const item of params.items) {
+      if (
+        item.type !== 'session' ||
+        !isRecord(item.data) ||
+        (!('parentID' in item.data) && !('directory' in item.data))
+      )
+        continue;
+      const candidate = childSessionLineage(item.data, params.directory);
+      if (!candidate || candidate.sessionId !== eventKiloSessionId) return;
+      if (lineage && lineage.parentSessionId !== candidate.parentSessionId) return;
+      lineage = candidate;
+    }
   }
 
   const headers = new Headers({
@@ -79,6 +135,8 @@ export async function publishControlPlaneSessionIngest(params: {
   }
 
   const body = JSON.stringify({ data: params.items });
+  const ingestHeaders = new Headers(headers);
+  ingestHeaders.set('Content-Length', String(new TextEncoder().encode(body).byteLength));
   const ingestUrl = isChild
     ? `https://session-ingest/internal/cloud-agent/v1/session/${encodeURIComponent(eventKiloSessionId)}/ingest?v=2`
     : `https://session-ingest/api/session/${encodeURIComponent(params.rootKiloSessionId)}/ingest?v=2`;
@@ -88,7 +146,10 @@ export async function publishControlPlaneSessionIngest(params: {
         new Request('https://session-ingest/internal/cloud-agent/v1/session', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ sessionId: eventKiloSessionId }),
+          body: JSON.stringify({
+            sessionId: eventKiloSessionId,
+            ...(lineage ? { parentSessionId: lineage.parentSessionId } : {}),
+          }),
         })
       );
       if (!createResponse.ok) {
@@ -106,7 +167,7 @@ export async function publishControlPlaneSessionIngest(params: {
     const response = await params.fetchIngest(
       new Request(ingestUrl, {
         method: 'POST',
-        headers,
+        headers: ingestHeaders,
         body,
       })
     );

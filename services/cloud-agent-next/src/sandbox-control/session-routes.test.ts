@@ -13,6 +13,8 @@ import {
 } from './session-routes.js';
 
 const OWNER = 'owner_1';
+const WORKTREE_A = 'worktree_11111111-1111-4111-8111-111111111111';
+const WORKTREE_B = 'worktree_22222222-2222-4222-8222-222222222222';
 
 const attachInput = {
   sessionId: 'ses_1',
@@ -35,6 +37,21 @@ function sharedDirectoryTable() {
     OWNER
   );
   return { table, first, second };
+}
+
+function groupedTable() {
+  const first = attachRoute(emptyRouteTable(), { ...attachInput, worktreeId: WORKTREE_A }, OWNER);
+  const second = attachRoute(
+    first.table,
+    {
+      ...attachInput,
+      sessionId: 'ses_2',
+      kiloSessionId: 'kilo_2',
+      worktreeId: WORKTREE_A,
+    },
+    OWNER
+  );
+  return { table: first.table, first: first.route, second: second.route };
 }
 
 describe('session routes', () => {
@@ -182,6 +199,29 @@ describe('session routes', () => {
     expect([...table.values()]).toEqual([route]);
   });
 
+  it('allows different worktrees in different directories', () => {
+    const { table } = attachRoute(
+      emptyRouteTable(),
+      { ...attachInput, worktreeId: WORKTREE_A },
+      OWNER
+    );
+
+    const next = attachRoute(
+      table,
+      {
+        ...attachInput,
+        sessionId: 'ses_2',
+        kiloSessionId: 'kilo_2',
+        directory: '/workspace/b',
+        worktreeId: WORKTREE_B,
+      },
+      OWNER
+    );
+
+    expect(next.changed).toBe(true);
+    expect(table.size).toBe(2);
+  });
+
   it('rejects a kiloSessionId already attached to another session', () => {
     const { table } = attachedTable();
     expect(() =>
@@ -195,6 +235,18 @@ describe('session routes', () => {
         },
         OWNER
       )
+    ).toThrow('Kilo session already attached');
+  });
+
+  it('rejects a duplicate root even when its worktree and directory match', () => {
+    const { table } = attachRoute(
+      emptyRouteTable(),
+      { ...attachInput, worktreeId: WORKTREE_A },
+      OWNER
+    );
+
+    expect(() =>
+      attachRoute(table, { ...attachInput, sessionId: 'ses_2', worktreeId: WORKTREE_A }, OWNER)
     ).toThrow('Kilo session already attached');
   });
 
@@ -268,6 +320,30 @@ describe('session routes', () => {
     applyReportedSessionState(table, 'kilo_1', { state: 'idle', idleForMs: 0 }, 3000);
     expect(second.lastStateAt).toBe(2000);
     expect(hasActiveWork(table)).toBe(false);
+  });
+
+  it('detaches and reattaches one root without disturbing its sibling', () => {
+    const { table, first, second } = groupedTable();
+
+    expect(detachRoute(table, second.sessionId)).toEqual({ table, existed: true });
+    expect(getRouteByDirectory(table, first.directory)).toBe(first);
+    expect(getRouteByKiloSessionId(table, second.kiloSessionId)).toBeUndefined();
+
+    const reattached = attachRoute(
+      table,
+      {
+        sessionId: second.sessionId,
+        kiloSessionId: second.kiloSessionId,
+        directory: second.directory,
+        ownerId: OWNER,
+        worktreeId: WORKTREE_A,
+      },
+      OWNER
+    );
+
+    expect(reattached.changed).toBe(true);
+    expect(getRouteBySessionId(table, first.sessionId)).toBe(first);
+    expect(getRouteByDirectory(table, first.directory)).toBeUndefined();
   });
 
   it('applies a repeated session state without marking changed', () => {
@@ -386,16 +462,19 @@ describe('resolveSessionEventRoute', () => {
     { kiloSessionId: 'kilo_2' },
     { rootKiloSessionId: 'kilo_2' },
     { kiloSessionId: 'kilo_child', rootKiloSessionId: 'kilo_2' },
-  ])('prefers explicit identity %j over a different directory route', identity => {
+  ])('rejects explicit identity %j conflicting with a different attached directory', identity => {
     const { table } = attachedTable();
     const { route } = attachRoute(
       table,
       { ...attachInput, sessionId: 'ses_2', kiloSessionId: 'kilo_2', directory: '/workspace/b' },
       OWNER
     );
-    expect(resolveSessionEventRoute(table, { directory: attachInput.directory, ...identity })).toBe(
-      route
-    );
+    expect(
+      resolveSessionEventRoute(table, { directory: attachInput.directory, ...identity })
+    ).toBeNull();
+    expect(
+      resolveSessionEventRoute(table, { directory: '/workspace/unclaimed-child', ...identity })
+    ).toBe(route);
   });
 
   it('rejects conflicting explicit roots even when the directory has only one route', () => {
@@ -472,6 +551,86 @@ describe('resolveSessionEventRoute', () => {
         rootKiloSessionId: 'kilo_1',
       })
     ).toBe(route);
+  });
+
+  it('rejects ambiguous directory-only events from grouped siblings', () => {
+    const { table } = groupedTable();
+
+    expect(resolveSessionEventRoute(table, { directory: '/workspace/a' })).toBeNull();
+    expect(
+      resolveSessionEventRoute(table, {
+        directory: '/workspace/a',
+        kiloSessionId: 'kilo_unknown_child',
+      })
+    ).toBeNull();
+  });
+
+  it('resolves the exact root before an ambiguous shared directory', () => {
+    const { table, second } = groupedTable();
+
+    expect(
+      resolveSessionEventRoute(table, {
+        directory: '/workspace/a',
+        kiloSessionId: 'kilo_child',
+        rootKiloSessionId: second.kiloSessionId,
+      })
+    ).toBe(second);
+  });
+
+  it('resolves an exact root kiloSessionId when root lineage is absent', () => {
+    const { table, second } = groupedTable();
+
+    expect(
+      resolveSessionEventRoute(table, {
+        directory: '/workspace/a',
+        kiloSessionId: second.kiloSessionId,
+      })
+    ).toBe(second);
+  });
+
+  it('rejects contradictory root and exact root-session identities', () => {
+    const { table, first, second } = groupedTable();
+
+    expect(
+      resolveSessionEventRoute(table, {
+        directory: '/workspace/a',
+        kiloSessionId: second.kiloSessionId,
+        rootKiloSessionId: first.kiloSessionId,
+      })
+    ).toBeNull();
+  });
+
+  it('rejects an unknown root even when the kiloSessionId identifies an attached root', () => {
+    const { table, first } = groupedTable();
+
+    expect(
+      resolveSessionEventRoute(table, {
+        directory: '/workspace/a',
+        kiloSessionId: first.kiloSessionId,
+        rootKiloSessionId: 'kilo_unknown',
+      })
+    ).toBeNull();
+  });
+
+  it('rejects exact identities contradicted by a different attached directory', () => {
+    const { table } = attachedTable();
+    attachRoute(
+      table,
+      {
+        sessionId: 'ses_2',
+        kiloSessionId: 'kilo_2',
+        directory: '/workspace/b',
+        ownerId: OWNER,
+      },
+      OWNER
+    );
+
+    expect(
+      resolveSessionEventRoute(table, {
+        directory: '/workspace/b',
+        rootKiloSessionId: 'kilo_1',
+      })
+    ).toBeNull();
   });
 
   it('returns null for an unknown directory', () => {

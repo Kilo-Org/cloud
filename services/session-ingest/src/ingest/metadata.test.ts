@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class {
@@ -20,13 +22,20 @@ vi.mock('../dos/SessionAccessCacheDO', () => ({
 }));
 
 vi.mock('../session-events', () => ({
-  mapSessionEventRow: vi.fn((row: { session_id: string; status: string | null }) => ({
-    source: 'v2' as const,
-    sessionId: row.session_id,
-    status: row.status,
-    statusUpdatedAt: '2026-07-25T00:00:00.000Z',
-    updatedAt: '2026-07-25T00:00:00.000Z',
-  })),
+  mapSessionEventRow: vi.fn(
+    (row: {
+      session_id: string;
+      status: string | null;
+      cloud_agent_worktree_id?: string | null;
+    }) => ({
+      source: 'v2' as const,
+      sessionId: row.session_id,
+      worktreeId: row.cloud_agent_worktree_id ?? null,
+      status: row.status,
+      statusUpdatedAt: '2026-07-25T00:00:00.000Z',
+      updatedAt: '2026-07-25T00:00:00.000Z',
+    })
+  ),
   notifyUserSessionEvent: vi.fn(),
 }));
 
@@ -44,6 +53,7 @@ type StatusRow = { status: string | null };
 
 function createTransactionDb(options: {
   initialStatus: string | null;
+  cloudAgentWorktreeId?: string | null;
   /** After the conditional update, status read-back (simulates concurrent overwrite). */
   persistedStatus?: string | null;
   rowMissing?: boolean;
@@ -79,6 +89,7 @@ function createTransactionDb(options: {
         git_url: null,
         git_branch: null,
         parent_session_id: null,
+        cloud_agent_worktree_id: options.cloudAgentWorktreeId ?? null,
         status,
         status_updated_at: '2026-07-25T00:00:00.000Z',
       },
@@ -113,10 +124,13 @@ type ApplyMetadataDbOptions = {
   membershipRows?: number;
   /** When set, the next non-lock session select is treated as a parent lookup. */
   parentExists?: boolean;
+  parentCloudAgentScopeId?: string;
+  parentWorktreeId?: string;
   initialStatus?: string | null;
   rowMissing?: boolean;
   cloudAgentSessionScopeId?: string | null;
   cloudAgentSessionId?: string | null;
+  cloudAgentWorktreeId?: string | null;
   parentSessionId?: string | null;
   createsCycle?: boolean;
   scopeRootMissing?: boolean;
@@ -150,6 +164,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
   let initialReadDone = false;
   let parentLookupDone = false;
   let lockCount = 0;
+  let lastCondition: SQL | undefined;
 
   function currentSessionState() {
     return {
@@ -173,6 +188,7 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
       git_url: options.initialGitUrl ?? null,
       git_branch: null,
       parent_session_id: null,
+      cloud_agent_worktree_id: options.cloudAgentWorktreeId ?? null,
       status: options.initialStatus ?? 'idle',
       status_updated_at: '2026-07-25T00:00:00.000Z',
     };
@@ -191,6 +207,13 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
       if (options.parentExists !== undefined && !parentLookupDone) {
         parentLookupDone = true;
         queryLog.push('parent');
+        const querySql = lastCondition ? new PgDialect().sqlToQuery(lastCondition).sql : '';
+        if (
+          (options.parentCloudAgentScopeId &&
+            /"cloud_agent_session_scope_id" IS NULL/i.test(querySql)) ||
+          (options.parentWorktreeId && /"cloud_agent_worktree_id" IS NULL/i.test(querySql))
+        )
+          return [];
         return options.parentExists ? [{ sessionId: 'ses_parent' }] : [];
       }
       queryLog.push('read-back');
@@ -228,9 +251,10 @@ function createApplyMetadataDb(options: ApplyMetadataDbOptions = {}) {
           }),
         })),
       })),
-      where: vi.fn(() => ({
-        limit: vi.fn(() => sessionLimitResult()),
-      })),
+      where: vi.fn((condition: SQL) => {
+        lastCondition = condition;
+        return { limit: vi.fn(() => sessionLimitResult()) };
+      }),
     })),
   }));
 
@@ -280,6 +304,27 @@ describe('resetAttentionStatusOnCliDisconnect', () => {
         data: expect.objectContaining({
           previousStatus: 'question',
           status: CLI_DISCONNECT_ATTENTION_RESET_STATUS,
+        }),
+      }),
+      undefined
+    );
+  });
+
+  it('preserves the worktree ID when resetting an attention status', async () => {
+    const cloudAgentWorktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const db = createTransactionDb({ initialStatus: 'question', cloudAgentWorktreeId });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } } as never;
+    await resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1');
+
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      env,
+      'usr_1',
+      expect.objectContaining({
+        type: 'session.status.updated',
+        data: expect.objectContaining({
+          session: expect.objectContaining({ worktreeId: cloudAgentWorktreeId }),
         }),
       }),
       undefined
@@ -373,6 +418,20 @@ describe('applyMetadataChanges', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
 
+  it.each([
+    { parentCloudAgentScopeId: 'workspace_root' },
+    { parentWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111' },
+  ])('does not let public parent metadata claim a Cloud Agent root: %j', identity => {
+    const db = createApplyMetadataDb({ parentExists: true, ...identity });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    return applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_parent']])).then(
+      () => {
+        expect(db.updateSets).toEqual([]);
+        expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+      }
+    );
+  });
+
   it('persists organization_id and invalidates access cache when the user is a member', async () => {
     const db = createApplyMetadataDb({ membershipRows: 1 });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
@@ -400,6 +459,26 @@ describe('applyMetadataChanges', () => {
       env,
       'usr_1',
       expect.objectContaining({ type: 'session.updated' }),
+      undefined
+    );
+  });
+
+  it('preserves the worktree ID when broadcasting metadata updates', async () => {
+    const cloudAgentWorktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const db = createApplyMetadataDb({ cloudAgentWorktreeId });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['title', 'Updated']]));
+
+    expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+      env,
+      'usr_1',
+      expect.objectContaining({
+        type: 'session.updated',
+        data: expect.objectContaining({
+          session: expect.objectContaining({ worktreeId: cloudAgentWorktreeId }),
+        }),
+      }),
       undefined
     );
   });

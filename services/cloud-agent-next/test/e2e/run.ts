@@ -20,6 +20,7 @@
  * the session port offset is non-zero.
  */
 
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureTestUser, loadDevVars, loadRepoEnvFiles, DRIVER_USER_EMAIL_SUFFIX } from './auth.js';
@@ -148,7 +149,9 @@ async function main(): Promise<void> {
   loadRepoEnvFiles(SERVICE_PACKAGE_DIR);
   const devVars = loadDevVars(SERVICE_PACKAGE_DIR);
   const email =
-    process.env.E2E_USER_EMAIL ?? `kilo-e2e-driver-${Date.now()}${DRIVER_USER_EMAIL_SUFFIX}`;
+    lifecycle === 'worktree-shared'
+      ? `kilo-worktree-e2e-${randomUUID()}${DRIVER_USER_EMAIL_SUFFIX}`
+      : (process.env.E2E_USER_EMAIL ?? `kilo-e2e-driver-${Date.now()}${DRIVER_USER_EMAIL_SUFFIX}`);
   const user = await ensureTestUser(process.env.DATABASE_URL, email, {
     funded: process.env.E2E_FUNDED === '1',
   });

@@ -158,12 +158,17 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
 
       api: {
         send: async input => {
+          const activeSession = managerRef.current
+            ? storeRef.current.get(managerRef.current.atoms.fetchedSessionData)
+            : null;
+          const autoCommit =
+            activeSession?.cloudAgentSessionId !== input.sessionId || !activeSession.worktreeId;
           if (organizationId) {
             return trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
               {
                 cloudAgentSessionId: input.sessionId,
                 payload: input.payload,
-                autoCommit: true,
+                autoCommit,
                 organizationId,
                 messageId: input.messageId,
                 attachments: input.attachments ?? input.images,
@@ -175,7 +180,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
             {
               cloudAgentSessionId: input.sessionId,
               payload: input.payload,
-              autoCommit: true,
+              autoCommit,
               messageId: input.messageId,
               attachments: input.attachments ?? input.images,
             },
@@ -311,6 +316,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           organizationId: sessionResult.organization_id,
           gitUrl: sessionResult.git_url,
           gitBranch: rs?.upstreamBranch ?? sessionResult.git_branch,
+          worktreeId: sessionResult.cloud_agent_worktree_id ?? null,
           mode: normalizeAlias(rs?.mode),
           model: rs?.model ?? null,
           variant: rs?.variant ?? null,

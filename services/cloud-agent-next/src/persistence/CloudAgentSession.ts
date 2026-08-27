@@ -13,6 +13,10 @@ import {
   serializeSessionMetadata,
   type SessionMetadata,
 } from './session-metadata.js';
+import {
+  sessionRuntimeLocator,
+  type SessionRuntimeLocator,
+} from '../sandbox-control/worktree-ownership.js';
 import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
 import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
@@ -1661,6 +1665,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async getMetadata(): Promise<SessionMetadata | null> {
     if (await this.hasDeletionIntent()) return null;
     return this.getStoredMetadata();
+  }
+
+  async getRuntimeLocation(): Promise<SessionRuntimeLocator | null> {
+    const metadata = await this.getStoredMetadata();
+    return metadata ? sessionRuntimeLocator(metadata) : null;
   }
 
   async validateKiloGlobalFeedProducer(params: {

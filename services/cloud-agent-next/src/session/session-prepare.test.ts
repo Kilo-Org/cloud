@@ -20,6 +20,7 @@ import type * as SandboxIdModule from '../sandbox-id.js';
 import type * as SharedSandboxRouteModule from '../shared-sandbox-route.js';
 import type * as MessageIdModule from './message-id.js';
 import {
+  assertSessionOperationIdentity,
   createSessionWithLedger,
   registerNewSession,
   sessionCreateIntentFingerprint,
@@ -123,7 +124,8 @@ const OPERATION_KEY = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 const USER_ID = 'test-user-123';
 const AUTH_TOKEN = 'test-auth-token';
 const CLOUD_AGENT_SESSION_ID = 'agent_12345678-1234-1234-1234-123456789abc';
-const WORKSPACE_SESSION_ID = 'workspace_12345678-1234-1234-1234-123456789abc';
+const WORKSPACE_SESSION_ID = 'workspace_420ae020-e3c4-4e67-878b-66672c3d997e';
+const WORKTREE_ID = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
 const KILO_SESSION_ID = 'ses_12345678901234567890123456';
 const INITIAL_MESSAGE_ID = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const ROW_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
@@ -256,6 +258,50 @@ function settleOptions(index: number): SettleOptions | undefined {
   if (!call) return undefined;
   return call[1] as SettleOptions | undefined;
 }
+
+describe('assertSessionOperationIdentity', () => {
+  it('accepts matching first-create and sibling operation identities', () => {
+    expect(() =>
+      assertSessionOperationIdentity(makeLedgerRow(), {
+        userId: USER_ID,
+        intent: 'create_cloud',
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      assertSessionOperationIdentity(
+        makeLedgerRow({
+          intent: 'create_worktree_chat',
+          organization_id: 'organization-1',
+          resource_key: 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e',
+        }),
+        {
+          userId: USER_ID,
+          intent: 'create_worktree_chat',
+          organizationId: 'organization-1',
+          resourceKey: 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e',
+        }
+      )
+    ).not.toThrow();
+  });
+
+  it.each([
+    ['domain', { domain: 'other' }],
+    ['owner', { kilo_user_id: 'another-user' }],
+    ['intent', { intent: 'create_worktree_chat' }],
+    ['organization', { organization_id: 'organization-1' }],
+    ['resource', { resource_key: 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e' }],
+  ] as const)('rejects a mismatched %s before operation handling', (_field, overrides) => {
+    expect(() =>
+      assertSessionOperationIdentity(makeLedgerRow(overrides), {
+        userId: USER_ID,
+        intent: 'create_cloud',
+      })
+    ).toThrow(
+      expect.objectContaining({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' })
+    );
+  });
+});
 
 describe('createSessionWithLedger admission ladder', () => {
   beforeEach(() => {
@@ -497,6 +543,282 @@ describe('createSessionWithLedger admission ladder', () => {
           sandboxAllocation: 'isolated-standard',
         }),
       })
+    );
+  });
+
+  it.each([
+    'admitted',
+    'duplicate_settled',
+    'duplicate_in_flight',
+    'duplicate_reconcile_in_progress',
+    'takeover',
+    'duplicate_reconcile_pending',
+  ] as const)(
+    'rejects a sibling-intent collision before handling %s admission',
+    async admission => {
+      admitOperationMock.mockResolvedValueOnce({
+        admission,
+        row: makeLedgerRow({ intent: 'create_worktree_chat', resource_key: WORKTREE_ID }),
+      });
+      const doStub = makeDoStub();
+
+      await expect(runCreate(makeContext(doStub))).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'operation_key_reuse_mismatch',
+      });
+
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+      expect(doStub.getMetadata).not.toHaveBeenCalled();
+      expect(doStub.getMessageResult).not.toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(recordOperationProgressMock).not.toHaveBeenCalled();
+      expect(settleOperationMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('derives the first browser worktree from its workspace ID before ownership and admission', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = '*';
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo', branch: 'main' },
+      finalization: { autoCommit: true, condenseOnComplete: true },
+      options: {
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'cloud-agent-web',
+        clientProvenance: 'browser',
+      },
+    });
+
+    const result = await runCreate(ctx, request);
+
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      KILO_SESSION_ID,
+      WORKSPACE_SESSION_ID,
+      USER_ID,
+      expect.any(Object),
+      undefined,
+      'cloud-agent-web',
+      expect.any(String),
+      'https://github.com/acme/repo',
+      undefined,
+      WORKTREE_ID,
+      { sandboxId: 'sb-test-123', provider: 'cloudflare' }
+    );
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repository: expect.objectContaining({ branch: 'main' }),
+        finalization: { autoCommit: false, condenseOnComplete: true },
+        workspace: expect.objectContaining({
+          worktreeId: WORKTREE_ID,
+          workspacePath: `/workspace/${USER_ID}/worktrees/${WORKTREE_ID}`,
+          sandboxId: 'sb-test-123',
+          sandboxProvider: 'cloudflare',
+        }),
+      })
+    );
+    expect(recordOperationProgressMock).toHaveBeenNthCalledWith(
+      1,
+      expect.any(Object),
+      ROW_ID,
+      expect.objectContaining({
+        cloudAgentSessionId: WORKSPACE_SESSION_ID,
+        createIntentFingerprint: await sessionCreateIntentFingerprint({
+          ...request,
+          finalization: { autoCommit: false, condenseOnComplete: true },
+        }),
+      })
+    );
+    expect(result).toEqual({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+    });
+  });
+
+  it('replays browser creates using their effective disabled auto-commit fingerprint', async () => {
+    const request = makeRequest({
+      finalization: { autoCommit: true },
+      options: {
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'cloud-agent-web',
+        clientProvenance: 'browser',
+      },
+    });
+    const effectiveRequest = { ...request, finalization: { autoCommit: false } };
+    admitOperationMock.mockResolvedValue({
+      admission: 'duplicate_settled',
+      row: makeLedgerRow({
+        status: 'completed',
+        canonical_result: {
+          cloudAgentSessionId: WORKSPACE_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+          [SESSION_CREATE_INTENT_FINGERPRINT_KEY]:
+            await sessionCreateIntentFingerprint(effectiveRequest),
+        },
+      }),
+    });
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = '*';
+
+    await expect(runCreate(ctx, request)).resolves.toEqual({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    await expect(runCreate(ctx, effectiveRequest)).resolves.toEqual({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
+  it('keeps organization worktrees scoped to arbitrary OAuth owner IDs', async () => {
+    const organizationId = '33c8c114-791f-463c-9f7f-fe74b284cfcf';
+    const userId = 'oauth/google:1234';
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: makeLedgerRow({ kilo_user_id: userId, organization_id: organizationId }),
+    });
+    const doStub = makeDoStub();
+    const ctx = { ...makeContext(doStub), userId };
+    ctx.env.CONTROL_PLANE_IDS = organizationId;
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        finalization: { autoCommit: true },
+        options: {
+          operationKey: OPERATION_KEY,
+          kilocodeOrganizationId: organizationId,
+          createdOnPlatform: 'cloud-agent-web',
+          clientProvenance: 'browser',
+        },
+      })
+    );
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ userId, orgId: organizationId }),
+        workspace: expect.objectContaining({
+          worktreeId: WORKTREE_ID,
+          workspacePath: `/workspace/${organizationId}/oauth-google-1234/worktrees/${WORKTREE_ID}`,
+        }),
+        finalization: { autoCommit: false },
+      })
+    );
+  });
+
+  it.each([
+    ['missing provenance', undefined, 'cloud-agent-web'],
+    ['mobile provenance', 'mobile', 'cloud-agent-web'],
+    ['automation origin', 'browser', 'scheduled'],
+    ['integration origin', 'browser', 'slack'],
+  ] as const)(
+    'leaves %s control-plane sessions ungrouped with their requested auto-commit',
+    async (_label, clientProvenance, createdOnPlatform) => {
+      const doStub = makeDoStub();
+      const ctx = makeContext(doStub);
+      ctx.env.CONTROL_PLANE_IDS = '*';
+      generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+
+      await runCreate(
+        ctx,
+        makeRequest({
+          finalization: { autoCommit: true },
+          options: { operationKey: OPERATION_KEY, createdOnPlatform, clientProvenance },
+        })
+      );
+
+      expect(createCliSessionMock.mock.calls[0]).toHaveLength(9);
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          finalization: { autoCommit: true },
+          workspace: expect.not.objectContaining({
+            worktreeId: expect.anything(),
+            workspacePath: expect.anything(),
+          }),
+        })
+      );
+    }
+  );
+
+  it.each([
+    ['devcontainer', { devcontainer: true }, undefined],
+    ['bot identity', undefined, 'bot_123'],
+  ] as const)(
+    'leaves %s browser sessions ungrouped with their requested auto-commit',
+    async (_label, runtime, botId) => {
+      const doStub = makeDoStub();
+      const ctx = { ...makeContext(doStub), ...(botId ? { botId } : {}) };
+      ctx.env.CONTROL_PLANE_IDS = '*';
+      generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+
+      await runCreate(
+        ctx,
+        makeRequest({
+          runtime,
+          finalization: { autoCommit: true },
+          options: {
+            operationKey: OPERATION_KEY,
+            createdOnPlatform: 'cloud-agent-web',
+            clientProvenance: 'browser',
+          },
+        })
+      );
+
+      expect(createCliSessionMock.mock.calls[0]).toHaveLength(9);
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          finalization: { autoCommit: true },
+          workspace: expect.not.objectContaining({ worktreeId: expect.anything() }),
+        })
+      );
+    }
+  );
+
+  it('does not group browser requests without a stable request operation key', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = '*';
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        finalization: { autoCommit: true },
+        options: { createdOnPlatform: 'cloud-agent-web', clientProvenance: 'browser' },
+      })
+    );
+
+    expect(createCliSessionMock.mock.calls[0]).toHaveLength(9);
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({ finalization: { autoCommit: true } })
+    );
+  });
+
+  it('keeps browser requests on the legacy plane ungrouped', async () => {
+    const doStub = makeDoStub();
+
+    await runCreate(
+      makeContext(doStub),
+      makeRequest({
+        finalization: { autoCommit: true },
+        options: {
+          operationKey: OPERATION_KEY,
+          createdOnPlatform: 'cloud-agent-web',
+          clientProvenance: 'browser',
+        },
+      })
+    );
+
+    expect(createCliSessionMock.mock.calls[0]).toHaveLength(9);
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({ finalization: { autoCommit: true } })
     );
   });
 
@@ -1597,6 +1919,325 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
   });
 });
 
+describe('createSessionWithLedger grouped first-create ownership reconciliation', () => {
+  const sandboxId = 'ses-0123456789abcdef';
+  const sharedSandboxId = 'usr-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+    generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
+    generateSandboxRoutingTargetMock.mockResolvedValue({ kind: 'isolated', sandboxId });
+    admitOperationMock.mockResolvedValue({ admission: 'admitted', row: makeLedgerRow() });
+    settleOperationMock.mockResolvedValue({ settled: true });
+    markReconcilePendingMock.mockResolvedValue({});
+    recordOperationProgressMock.mockResolvedValue(undefined);
+    createCliSessionMock.mockReset().mockResolvedValue(undefined);
+    recordSessionFailureMock.mockResolvedValue(undefined);
+  });
+
+  function request(overrides: Partial<SessionCreateRequest> = {}): SessionCreateRequest {
+    return makeRequest({
+      finalization: { autoCommit: true, condenseOnComplete: true },
+      options: {
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'cloud-agent-web',
+        clientProvenance: 'browser',
+      },
+      ...overrides,
+    });
+  }
+
+  function context(doStub: ReturnType<typeof makeDoStub>): SessionRegistrationContext {
+    const ctx = makeContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = '*';
+    return ctx;
+  }
+
+  function ownershipRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      sessionId: KILO_SESSION_ID,
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      cloudAgentSessionScopeId: WORKSPACE_SESSION_ID,
+      organizationId: null,
+      worktreeId: WORKTREE_ID,
+      ...overrides,
+    };
+  }
+
+  async function canonicalProgress(
+    input: SessionCreateRequest,
+    overrides: Record<string, unknown> = {}
+  ): Promise<Record<string, unknown>> {
+    const effective = {
+      ...input,
+      finalization: { ...input.finalization, autoCommit: false },
+    };
+    return {
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      initialMessageId: INITIAL_MESSAGE_ID,
+      sandboxId,
+      sandboxProvider: 'cloudflare',
+      [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(effective),
+      ...overrides,
+    };
+  }
+
+  it('recovers committed ownership after a lost ingest response without reallocating or duplicating the initial turn', async () => {
+    const input = request();
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = context(doStub);
+    let ownershipCommitted = false;
+    createCliSessionMock.mockImplementationOnce(async () => {
+      ownershipCommitted = true;
+      throw new Error('ownership response lost after commit');
+    });
+
+    await expect(runCreate(ctx, input)).rejects.toThrow('ownership response lost after commit');
+
+    expect(ownershipCommitted).toBe(true);
+    expect(markReconcilePendingMock).toHaveBeenCalledWith(expect.any(Object), { rowId: ROW_ID });
+    expect(settleOperationMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(deleteCliSessionMock).not.toHaveBeenCalled();
+
+    const storedProgress = Object.assign(
+      {},
+      ...recordOperationProgressMock.mock.calls.map(call => call[2])
+    );
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({ status: 'reconcile_pending', canonical_result: storedProgress }),
+    });
+    getPgDbMock.mockReturnValue(makeDb([[ownershipRow()], [{ email: 'test@example.com' }]]));
+    const initialTurn = input.initialTurn;
+    if (!initialTurn || initialTurn.type !== 'prompt') throw new Error('Expected a prompt');
+
+    const result = await runCreate(ctx, {
+      ...input,
+      initialTurn: { ...initialTurn, id: 'msg_retry_original_identity' },
+    });
+
+    expect(result).toEqual({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+    expect(createCliSessionMock).toHaveBeenCalledTimes(1);
+    expect(generateSessionIdMock).toHaveBeenCalledTimes(1);
+    expect(generateKiloSessionIdMock).toHaveBeenCalledTimes(1);
+    expect(generateSandboxRoutingTargetMock).toHaveBeenCalledTimes(1);
+    expect(createSessionReportMock).toHaveBeenCalledTimes(1);
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID, userId: USER_ID }),
+        auth: expect.objectContaining({ kiloSessionId: KILO_SESSION_ID }),
+        finalization: { autoCommit: false, condenseOnComplete: true },
+        workspace: expect.objectContaining({
+          sandboxId,
+          sandboxProvider: 'cloudflare',
+          worktreeId: WORKTREE_ID,
+          workspacePath: `/workspace/${USER_ID}/worktrees/${WORKTREE_ID}`,
+        }),
+        message: {
+          initialTurn: expect.objectContaining({
+            messageId: INITIAL_MESSAGE_ID,
+            prompt: 'Build the feature',
+          }),
+        },
+      })
+    );
+    expect(settleOperationMock).toHaveBeenCalledTimes(1);
+    expect(settleOperationMock).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        rowId: ROW_ID,
+        status: 'completed',
+        canonicalResult: {
+          cloudAgentSessionId: WORKSPACE_SESSION_ID,
+          kiloSessionId: KILO_SESSION_ID,
+        },
+      })
+    );
+    expect(deleteCliSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('retries an uncommitted ownership write with the original workspace, session, worktree, and sandbox', async () => {
+    const input = request();
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = context(doStub);
+    createCliSessionMock.mockRejectedValueOnce(new Error('ownership request interrupted'));
+
+    await expect(runCreate(ctx, input)).rejects.toThrow('ownership request interrupted');
+    expect(markReconcilePendingMock).toHaveBeenCalledTimes(1);
+    expect(settleOperationMock).not.toHaveBeenCalled();
+
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({
+        status: 'reconcile_pending',
+        canonical_result: await canonicalProgress(input),
+      }),
+    });
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+    createCliSessionMock.mockResolvedValueOnce({
+      status: 'ready',
+      clone: { sessionId: KILO_SESSION_ID, copiedItemCount: 0 },
+    });
+
+    await expect(runCreate(ctx, input)).resolves.toEqual({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      replayed: true,
+    });
+
+    expect(createCliSessionMock).toHaveBeenCalledTimes(2);
+    for (const call of createCliSessionMock.mock.calls) {
+      expect(call[0]).toBe(KILO_SESSION_ID);
+      expect(call[1]).toBe(WORKSPACE_SESSION_ID);
+      expect(call[2]).toBe(USER_ID);
+      expect(call[9]).toBe(WORKTREE_ID);
+    }
+    expect(generateSessionIdMock).toHaveBeenCalledTimes(1);
+    expect(generateKiloSessionIdMock).toHaveBeenCalledTimes(1);
+    expect(generateSandboxRoutingTargetMock).toHaveBeenCalledTimes(1);
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
+    expect(deleteCliSessionMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      label: 'isolated Vercel sandbox',
+      storedSandboxId: 'ses-fedcba9876543210',
+      provider: 'vercel' as const,
+      route: undefined,
+    },
+    {
+      label: 'shared Cloudflare sandbox route',
+      storedSandboxId: sharedSandboxId,
+      provider: 'cloudflare' as const,
+      route: { kind: 'shared' as const, routeKey: sharedSandboxId },
+    },
+  ])(
+    'restores the recorded $label without recomputing routing',
+    async ({ storedSandboxId, provider, route }) => {
+      const input = request();
+      const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+      const ctx = context(doStub);
+      const legacyGet = vi.fn(() => doStub);
+      const controlGet = vi.fn(() => doStub);
+      ctx.env.CLOUD_AGENT_SESSION = {
+        idFromName: vi.fn((name: string) => ({ toString: () => name })),
+        get: legacyGet,
+      } as unknown as Env['CLOUD_AGENT_SESSION'];
+      ctx.env.SANDBOX_SESSION = {
+        idFromName: vi.fn((name: string) => ({ toString: () => name })),
+        get: controlGet,
+      } as unknown as Env['SANDBOX_SESSION'];
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_reconcile_pending',
+        row: makeLedgerRow({
+          status: 'reconcile_pending',
+          canonical_result: await canonicalProgress(input, {
+            sandboxId: storedSandboxId,
+            sandboxProvider: provider,
+            ...(route ? { sandboxRoute: route } : {}),
+          }),
+        }),
+      });
+      getPgDbMock.mockReturnValue(makeDb([[ownershipRow()], [{ email: 'test@example.com' }]]));
+
+      await expect(runCreate(ctx, input)).resolves.toEqual({
+        cloudAgentSessionId: WORKSPACE_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+        replayed: true,
+      });
+
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspace: expect.objectContaining({
+            sandboxId: storedSandboxId,
+            sandboxProvider: provider,
+            worktreeId: WORKTREE_ID,
+            ...(route ? { sandboxRoute: route } : {}),
+          }),
+        })
+      );
+      expect(controlGet).toHaveBeenCalled();
+      expect(legacyGet).not.toHaveBeenCalled();
+      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+      expect(generateSessionIdMock).not.toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    ['workspace', { cloudAgentSessionId: 'workspace_00000000-0000-4000-8000-000000000000' }],
+    ['ingest scope', { cloudAgentSessionScopeId: null }],
+    ['organization', { organizationId: 'another-organization' }],
+    ['worktree', { worktreeId: 'worktree_00000000-0000-4000-8000-000000000000' }],
+  ] as const)('rejects committed ownership with a mismatched %s', async (_label, overrides) => {
+    const input = request();
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = context(doStub);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({
+        status: 'reconcile_pending',
+        canonical_result: await canonicalProgress(input),
+      }),
+    });
+    getPgDbMock.mockReturnValue(makeDb([[ownershipRow(overrides)]]));
+
+    await expect(runCreate(ctx, input)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+
+    expect(doStub.getMetadata).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(settleOperationMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a changed first-chat intent before recovering committed ownership', async () => {
+    const input = request();
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = context(doStub);
+    createCliSessionMock.mockRejectedValueOnce(new Error('ownership response lost after commit'));
+
+    await expect(runCreate(ctx, input)).rejects.toThrow('ownership response lost after commit');
+
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({
+        status: 'reconcile_pending',
+        canonical_result: await canonicalProgress(input),
+      }),
+    });
+    getPgDbMock.mockReturnValue(makeDb([[ownershipRow()]]));
+
+    await expect(
+      runCreate(ctx, {
+        ...input,
+        initialTurn: { type: 'prompt', prompt: 'Create a different session' },
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'session_creation_failed',
+    });
+
+    expect(createCliSessionMock).toHaveBeenCalledTimes(1);
+    expect(doStub.getMetadata).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(settleOperationMock).not.toHaveBeenCalled();
+    expect(deleteCliSessionMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('createSessionWithLedger changed-intent rejection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1609,7 +2250,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     });
     admitOperationMock.mockResolvedValue({
       admission: 'admitted',
-      row: makeLedgerRow({}),
+      row: makeLedgerRow({ organization_id: ORIGINAL_OPTIONS.kilocodeOrganizationId }),
     });
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
@@ -1632,6 +2273,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
   async function completedRowFor(request: SessionCreateRequest): Promise<OperationLedgerRow> {
     return makeLedgerRow({
       status: 'completed',
+      organization_id: request.options?.kilocodeOrganizationId ?? null,
       canonical_result: {
         cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
         kiloSessionId: KILO_SESSION_ID,
@@ -1642,14 +2284,18 @@ describe('createSessionWithLedger changed-intent rejection', () => {
   }
 
   /** Asserts the request is rejected with the typed error and no effect runs. */
-  async function expectRejectedWithoutEffects(request: SessionCreateRequest) {
+  async function expectRejectedWithoutEffects(
+    request: SessionCreateRequest,
+    identityConflict = false
+  ) {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    await expect(runCreate(ctx, request)).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-      message: 'session_creation_failed',
-    });
+    await expect(runCreate(ctx, request)).rejects.toMatchObject(
+      identityConflict
+        ? { code: 'CONFLICT', message: 'operation_key_reuse_mismatch' }
+        : { code: 'BAD_REQUEST', message: 'session_creation_failed' }
+    );
 
     // Rejected before replay, reconciliation, or any external effect.
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
@@ -1698,6 +2344,27 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     expect(settleOperationMock).not.toHaveBeenCalled();
   });
 
+  it('preserves absent and mobile create fingerprints while distinguishing browser provenance', async () => {
+    const withoutProvenance = makeRequest({
+      options: { operationKey: OPERATION_KEY, createdOnPlatform: 'cloud-agent-web' },
+    });
+    const mobile = {
+      ...withoutProvenance,
+      options: { ...withoutProvenance.options, clientProvenance: 'mobile' as const },
+    };
+    const browser = {
+      ...withoutProvenance,
+      options: { ...withoutProvenance.options, clientProvenance: 'browser' as const },
+    };
+
+    expect(await sessionCreateIntentFingerprint(mobile)).toBe(
+      await sessionCreateIntentFingerprint(withoutProvenance)
+    );
+    expect(await sessionCreateIntentFingerprint(browser)).not.toBe(
+      await sessionCreateIntentFingerprint(withoutProvenance)
+    );
+  });
+
   /**
    * One case per create input covered by the intent fingerprint. Each case
    * changes exactly one input on the retry; every one must reject before any
@@ -1707,6 +2374,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     name: string;
     admission?: 'duplicate_settled' | 'takeover' | 'duplicate_reconcile_pending';
     original?: SessionCreateRequest;
+    identityConflict?: boolean;
     retry: SessionCreateRequest;
   }> = [
     {
@@ -1748,6 +2416,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     },
     {
       name: 'the organization',
+      identityConflict: true,
       retry: makeRequest({
         options: { operationKey: OPERATION_KEY, kilocodeOrganizationId: 'org-xyz' },
       }),
@@ -1892,7 +2561,8 @@ describe('createSessionWithLedger changed-intent rejection', () => {
 
   it.each(changedIntentCases)(
     'rejects a same-key retry that changes $name',
-    async ({ admission = 'duplicate_settled', original, retry }) => {
+    async ({ admission = 'duplicate_settled', original, identityConflict, retry }) => {
+      const originalIntent = original ?? originalRequest();
       const status =
         admission === 'duplicate_settled'
           ? 'completed'
@@ -1903,17 +2573,17 @@ describe('createSessionWithLedger changed-intent rejection', () => {
         admission,
         row: makeLedgerRow({
           status,
+          organization_id: originalIntent.options?.kilocodeOrganizationId ?? null,
           canonical_result: {
             cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
             kiloSessionId: KILO_SESSION_ID,
             initialMessageId: INITIAL_MESSAGE_ID,
-            [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(
-              original ?? originalRequest()
-            ),
+            [SESSION_CREATE_INTENT_FINGERPRINT_KEY]:
+              await sessionCreateIntentFingerprint(originalIntent),
           },
         }),
       });
-      await expectRejectedWithoutEffects(retry);
+      await expectRejectedWithoutEffects(retry, identityConflict);
     }
   );
 
@@ -1996,6 +2666,7 @@ describe('createSessionWithLedger changed-intent rejection', () => {
       admission: 'duplicate_settled',
       row: makeLedgerRow({
         status: 'completed',
+        organization_id: ORIGINAL_OPTIONS.kilocodeOrganizationId,
         canonical_result: {
           cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
           kiloSessionId: KILO_SESSION_ID,

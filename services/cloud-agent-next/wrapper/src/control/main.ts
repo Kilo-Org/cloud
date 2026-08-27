@@ -7,16 +7,12 @@ import {
 import {
   buildHeartbeatPayload,
   cancelControlTasks,
+  createSessionActivityRegistry,
+  refreshHeartbeatPayload,
   handleControlRequest,
   type HandlerDeps,
 } from './sandbox-control-handlers';
-import {
-  childFromSessionCreated,
-  eventKiloSessionId,
-  sessionEventIdentity,
-  updateSessionSnapshots,
-} from './feed';
-import { rememberChildSession } from './session-directories';
+import { eventKiloSessionId, sessionEventIdentity, updateSessionSnapshots } from './feed';
 import { createControlTerminalRuntime } from './terminal-runtime';
 import { createWorktreeKiloRuntimes } from './worktree-runtime';
 
@@ -34,17 +30,20 @@ function main(): void {
   let control: ReturnType<typeof maybeStartSandboxControlClient> = null;
   let shuttingDown = false;
   const kiloRuntimes = createWorktreeKiloRuntimes({
-    onEvent: (_runtime, event) => {
-      if (event.type === 'session.created') {
-        const child = childFromSessionCreated(event.properties);
-        if (child) rememberChildSession(child);
-      }
-      updateSessionSnapshots(event, deps.sessions);
+    onEvent: (runtime, event) => {
       const identity = sessionEventIdentity({
+        ...event,
         sessionId: eventKiloSessionId(event.properties),
-        directory: event.directory,
+        runtimeDirectory: runtime.directory,
       });
       if (!identity?.rootKiloSessionId) return;
+      updateSessionSnapshots(event, deps.sessions);
+      deps.activity?.observeEvent(
+        event.type,
+        identity.kiloSessionId,
+        identity.rootKiloSessionId,
+        event.properties
+      );
       if (
         !control?.sendEvent?.(
           'session.event',
@@ -72,6 +71,7 @@ function main(): void {
     },
     sessions: [],
     tasks: new Map(),
+    activity: createSessionActivityRegistry(),
     signal: abort.signal,
     ...(terminalRuntime ? { terminalRuntime } : {}),
     emitSessionEvent: (session, payload) => {
@@ -131,7 +131,7 @@ function main(): void {
           }
         },
       }),
-    getHeartbeatPayload: () => buildHeartbeatPayload(deps),
+    getHeartbeatPayload: () => refreshHeartbeatPayload(deps),
   });
 
   logToFile(`control-plane wrapper ready callHome=${Boolean(control)}`);

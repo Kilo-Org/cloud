@@ -16,11 +16,15 @@ import { handleDirectIngestRequest } from '../ingest/direct-ingest';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
 import { resolveAccessibleKiloSession } from '../services/session-access';
 import { canCreateCliSessionForUser } from '../services/user-session-admission';
+import { isWorktreeDeleting } from '../services/worktree-deletion';
 import type { ApiContext } from './api';
 
-const createScopedSessionSchema = z.object({
-  sessionId: containedKiloSessionIdSchema,
-});
+const createScopedSessionSchema = z
+  .object({
+    sessionId: containedKiloSessionIdSchema,
+    parentSessionId: containedKiloSessionIdSchema.optional(),
+  })
+  .strict();
 
 const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
 
@@ -78,6 +82,7 @@ cloudAgentSessionScopeApi.post('/session', zodJsonValidator(createScopedSessionS
         sessionId: cli_sessions_v2.session_id,
         organizationId: cli_sessions_v2.organization_id,
         cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
+        worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
       })
       .from(cli_sessions_v2)
       .where(
@@ -95,7 +100,9 @@ cloudAgentSessionScopeApi.post('/session', zodJsonValidator(createScopedSessionS
       .limit(1)
       .for('update');
 
-    if (!root) return { status: 'root_not_found' } as const;
+    if (!root || (root.worktreeId && (await isWorktreeDeleting(tx, root.worktreeId)))) {
+      return { status: 'root_not_found' } as const;
+    }
     if (
       root.organizationId !== null &&
       !(await hasOrganizationAccess(tx, {
@@ -119,15 +126,39 @@ cloudAgentSessionScopeApi.post('/session', zodJsonValidator(createScopedSessionS
         );
     }
 
+    const parentSessionId = body.parentSessionId ?? assertion.data.rootKiloSessionId;
+    if (parentSessionId === body.sessionId) return { status: 'conflict' } as const;
+    if (parentSessionId !== assertion.data.rootKiloSessionId) {
+      const [parent] = await tx
+        .select({ sessionId: cli_sessions_v2.session_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, parentSessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+            eq(cli_sessions_v2.cloud_agent_session_scope_id, assertion.data.cloudAgentSessionId),
+            root.organizationId === null
+              ? isNull(cli_sessions_v2.organization_id)
+              : eq(cli_sessions_v2.organization_id, root.organizationId),
+            root.worktreeId
+              ? eq(cli_sessions_v2.cloud_agent_worktree_id, root.worktreeId)
+              : isNull(cli_sessions_v2.cloud_agent_worktree_id)
+          )
+        )
+        .limit(1);
+      if (!parent) return { status: 'conflict' } as const;
+    }
+
     const [created] = await tx
       .insert(cli_sessions_v2)
       .values({
         session_id: body.sessionId,
         kilo_user_id: kiloUserId,
-        parent_session_id: assertion.data.rootKiloSessionId,
+        parent_session_id: parentSessionId,
         organization_id: root.organizationId,
         cloud_agent_session_id: null,
         cloud_agent_session_scope_id: assertion.data.cloudAgentSessionId,
+        cloud_agent_worktree_id: root.worktreeId,
       })
       .onConflictDoNothing({
         target: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
@@ -148,11 +179,46 @@ cloudAgentSessionScopeApi.post('/session', zodJsonValidator(createScopedSessionS
       .limit(1)
       .for('update');
 
+    if (!existing || existing.cloud_agent_session_id !== null) {
+      return { status: 'conflict' } as const;
+    }
     if (
-      !existing ||
-      existing.cloud_agent_session_id !== null ||
+      body.parentSessionId !== undefined &&
+      existing.cloud_agent_session_scope_id === null &&
+      existing.cloud_agent_worktree_id === null &&
+      (existing.parent_session_id === null || existing.parent_session_id === parentSessionId) &&
+      (existing.organization_id === null || existing.organization_id === root.organizationId)
+    ) {
+      const [adopted] = await tx
+        .update(cli_sessions_v2)
+        .set({
+          parent_session_id: parentSessionId,
+          cloud_agent_session_scope_id: assertion.data.cloudAgentSessionId,
+          cloud_agent_worktree_id: root.worktreeId ?? null,
+          ...(existing.organization_id !== root.organizationId
+            ? { organization_id: root.organizationId }
+            : {}),
+        })
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, body.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+            isNull(cli_sessions_v2.cloud_agent_session_id),
+            isNull(cli_sessions_v2.cloud_agent_session_scope_id),
+            isNull(cli_sessions_v2.cloud_agent_worktree_id)
+          )
+        )
+        .returning();
+      return adopted
+        ? ({ status: 'adopted', row: adopted } as const)
+        : ({ status: 'conflict' } as const);
+    }
+    if (
       existing.parent_session_id === null ||
-      existing.cloud_agent_session_scope_id !== assertion.data.cloudAgentSessionId
+      existing.cloud_agent_session_scope_id !== assertion.data.cloudAgentSessionId ||
+      existing.organization_id !== root.organizationId ||
+      (existing.cloud_agent_worktree_id != null &&
+        existing.cloud_agent_worktree_id !== (root.worktreeId ?? null))
     ) {
       return { status: 'conflict' } as const;
     }
@@ -164,6 +230,23 @@ cloudAgentSessionScopeApi.post('/session', zodJsonValidator(createScopedSessionS
       }))
     ) {
       return { status: 'root_not_found' } as const;
+    }
+    if (root.worktreeId && existing.cloud_agent_worktree_id === null) {
+      const [healed] = await tx
+        .update(cli_sessions_v2)
+        .set({ cloud_agent_worktree_id: root.worktreeId })
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, body.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+            eq(cli_sessions_v2.cloud_agent_session_scope_id, assertion.data.cloudAgentSessionId),
+            isNull(cli_sessions_v2.cloud_agent_worktree_id)
+          )
+        )
+        .returning();
+      return healed
+        ? ({ status: 'adopted', row: healed } as const)
+        : ({ status: 'conflict' } as const);
     }
     return { status: 'existing', row: existing } as const;
   });
@@ -197,13 +280,13 @@ cloudAgentSessionScopeApi.post('/session', zodJsonValidator(createScopedSessionS
     });
   }
 
-  if (result.status === 'created') {
+  if (result.status === 'created' || result.status === 'adopted') {
     const session = mapSessionEventRow(result.row);
     notifyUserSessionEvent(
       c.env,
       kiloUserId,
       {
-        type: 'session.created',
+        type: result.status === 'created' ? 'session.created' : 'session.updated',
         data: { source: 'v2', session, changedAt: session.updatedAt },
       },
       getOptionalExecutionContext(c)

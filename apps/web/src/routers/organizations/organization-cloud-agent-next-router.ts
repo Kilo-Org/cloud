@@ -7,6 +7,7 @@ import {
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
+import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { generateCloudAgentToken } from '@/lib/tokens';
 import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import {
@@ -27,6 +28,8 @@ import { orderRepositoriesByUsage } from '@/lib/cloud-agent/order-repositories';
 import {
   basePrepareSessionNextSchema,
   basePrepareSessionNextOutputSchema,
+  baseCreateWorktreeChatNextSchema,
+  baseCreateWorktreeChatNextOutputSchema,
   baseInitiateFromPreparedSessionNextSchema,
   baseInitiateSessionNextOutputSchema,
   baseSendMessageNextSchema,
@@ -63,6 +66,7 @@ import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-
 import { TRPCError } from '@trpc/server';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import { getBalanceForOrganizationUser } from '@/lib/organizations/organization-usage';
+import { isMobileClient } from '@/lib/trpc/min-version';
 import { buildCloudAgentNextEligibility } from '../cloud-agent-next-eligibility';
 
 function buildTerminalUrl(params: {
@@ -129,6 +133,10 @@ const PrepareSessionInput = basePrepareSessionNextSchema.and(
     organizationId: z.uuid(),
   })
 );
+
+const CreateWorktreeChatInput = baseCreateWorktreeChatNextSchema.extend({
+  organizationId: z.uuid(),
+});
 
 const InitiateFromPreparedSessionInput = baseInitiateFromPreparedSessionNextSchema.extend({
   organizationId: z.uuid(),
@@ -296,6 +304,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           attachments: attachments ?? images,
           createdOnPlatform: 'cloud-agent-web',
           kilocodeOrganizationId: organizationId,
+          clientProvenance: isMobileClient(ctx.headersList) ? 'mobile' : 'browser',
         });
 
         // New-session flows call prepareSession without a follow-up
@@ -317,6 +326,19 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         throw error;
       }
     }),
+
+  createWorktreeChat: organizationMemberMutationProcedure
+    .input(CreateWorktreeChatInput)
+    .output(baseCreateWorktreeChatNextOutputSchema)
+    .mutation(({ ctx, input }) =>
+      createWorktreeChat({
+        user: ctx.user,
+        headersList: ctx.headersList,
+        sourceKiloSessionId: input.sourceKiloSessionId,
+        operationKey: input.operationKey,
+        organizationId: input.organizationId,
+      })
+    ),
 
   /**
    * Initiate a prepared session (V2 - WebSocket-based, organization context).

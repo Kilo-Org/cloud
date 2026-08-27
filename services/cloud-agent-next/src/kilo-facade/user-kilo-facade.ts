@@ -1,9 +1,12 @@
+import { cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
 import {
+  cloudAgentWorktreeIdSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   validateKiloSdkMessagesCursor,
 } from '@kilocode/session-ingest-contracts';
 import { DurableObject } from 'cloudflare:workers';
 import { TRPCError } from '@trpc/server';
+import { and, eq, isNotNull, isNull, or } from 'drizzle-orm';
 import type {
   GetCloudAgentRootSessionMessagesParams,
   KiloSdkSessionInfo,
@@ -20,6 +23,7 @@ import type {
   SubmittedSessionMessageRequest,
   SessionMessageAdmissionResult,
 } from '../execution/types.js';
+import { getPgDb } from '../db/pg.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { UserId } from '../types/ids.js';
 import type { Env } from '../types.js';
@@ -70,6 +74,7 @@ const MAX_KILO_SESSION_JSON_BYTES = 8 * 1024 * 1024;
 const MAX_KILO_ERROR_JSON_BYTES = 64 * 1024;
 const MAX_KILO_PROMPT_JSON_BYTES = 256 * 1024;
 const MAX_TIMESTAMP_MILLISECONDS = 8_640_000_000_000_000;
+const MAX_PUBLIC_SESSION_TITLE_CHARACTERS = 512;
 const PUBLIC_VIRTUAL_SERVER_DIRECTORY = '/cloud-agent';
 
 type KiloEventPayload = Record<string, unknown> & {
@@ -946,6 +951,107 @@ async function persistedSessionDetailResponse(params: {
   }
 }
 
+function publicRepositoryTitle(repositoryUrl: string | null): string | null {
+  if (!repositoryUrl) return null;
+  try {
+    const repository = new URL(repositoryUrl);
+    if (repository.protocol !== 'https:' || repository.username || repository.password) return null;
+    const title = repository.pathname.split('/').filter(Boolean).slice(-2).join('/');
+    return title.replace(/\.git$/, '') || null;
+  } catch {
+    return null;
+  }
+}
+
+async function groupedPendingSessionDetailResponse(params: {
+  env: Env;
+  userId: string;
+  kiloSessionId: string;
+  cloudAgentSessionId: string;
+}): Promise<Response | null> {
+  const snapshot = await params.env.SESSION_INGEST.getCloudAgentRootSessionSnapshot({
+    kiloUserId: params.userId,
+    kiloSessionId: params.kiloSessionId,
+  });
+  if (
+    !snapshot ||
+    snapshot.kiloSessionId !== params.kiloSessionId ||
+    snapshot.cloudAgentSessionId !== params.cloudAgentSessionId
+  ) {
+    return missingRootKiloSessionResponse();
+  }
+  if (snapshot.snapshot.kind !== 'pending') return null;
+
+  const [ownership] = await getPgDb(params.env)
+    .select({
+      kiloSessionId: cli_sessions_v2.session_id,
+      cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
+      userId: cli_sessions_v2.kilo_user_id,
+      organizationId: cli_sessions_v2.organization_id,
+      organizationMembershipId: organization_memberships.id,
+      worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
+      cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
+      title: cli_sessions_v2.title,
+      repositoryUrl: cli_sessions_v2.git_url,
+      createdAt: cli_sessions_v2.created_at,
+      updatedAt: cli_sessions_v2.updated_at,
+    })
+    .from(cli_sessions_v2)
+    .leftJoin(
+      organization_memberships,
+      and(
+        eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
+        eq(organization_memberships.kilo_user_id, params.userId)
+      )
+    )
+    .where(
+      and(
+        eq(cli_sessions_v2.session_id, params.kiloSessionId),
+        eq(cli_sessions_v2.kilo_user_id, params.userId),
+        eq(cli_sessions_v2.cloud_agent_session_id, params.cloudAgentSessionId),
+        isNull(cli_sessions_v2.parent_session_id),
+        or(isNull(cli_sessions_v2.organization_id), isNotNull(organization_memberships.id))
+      )
+    )
+    .limit(1);
+
+  if (
+    !ownership ||
+    ownership.userId !== params.userId ||
+    ownership.kiloSessionId !== params.kiloSessionId ||
+    ownership.cloudAgentSessionId !== params.cloudAgentSessionId ||
+    (ownership.organizationId !== null && ownership.organizationMembershipId === null)
+  ) {
+    return missingRootKiloSessionResponse();
+  }
+  if (
+    ownership.cloudAgentSessionScopeId !== params.cloudAgentSessionId ||
+    !cloudAgentWorktreeIdSchema.safeParse(ownership.worktreeId).success
+  ) {
+    return null;
+  }
+
+  const created = new Date(ownership.createdAt).getTime();
+  const updated = new Date(ownership.updatedAt).getTime();
+  if (!Number.isFinite(created) || !Number.isFinite(updated)) {
+    return invalidPersistedSessionDataResponse('session');
+  }
+
+  return Response.json(
+    projectPublicListedSession({
+      kiloSessionId: ownership.kiloSessionId,
+      cloudAgentSessionId: params.cloudAgentSessionId,
+      title:
+        (ownership.title ?? publicRepositoryTitle(ownership.repositoryUrl))?.slice(
+          0,
+          MAX_PUBLIC_SESSION_TITLE_CHARACTERS
+        ) ?? null,
+      created,
+      updated,
+    })
+  );
+}
+
 async function persistedSessionMessagesResponse(params: {
   env: Env;
   userId: string;
@@ -1136,6 +1242,16 @@ async function proxyOwnedKiloSessionRequest(params: {
   persistedRead: PersistedSessionRead | null;
 }): Promise<Response> {
   const { request, env, userId, deps, url, kiloPath, kiloSessionId, cloudAgentSessionId } = params;
+  if (params.persistedRead?.kind === 'detail' && cloudAgentSessionId.startsWith('workspace_')) {
+    const pendingResponse = await groupedPendingSessionDetailResponse({
+      env,
+      userId,
+      kiloSessionId,
+      cloudAgentSessionId,
+    });
+    if (pendingResponse) return pendingResponse;
+  }
+
   const persistedFallback = () =>
     params.persistedRead
       ? persistedSessionReadResponse({

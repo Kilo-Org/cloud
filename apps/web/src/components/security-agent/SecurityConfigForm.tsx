@@ -51,6 +51,7 @@ import {
 import type {
   SecurityConfigFormState,
   SecurityConfigSavePayload,
+  SecurityInstallationStatus,
   SecurityRepository,
   SlaConfig,
 } from './security-config-types';
@@ -62,6 +63,7 @@ type SecurityConfigFormProps = {
   organizationId?: string;
   initialConfig: SecurityConfigFormState;
   repositories: SecurityRepository[];
+  installationStatuses: SecurityInstallationStatus[];
   viewState: {
     enabled: boolean;
     isLoadingRepositories?: boolean;
@@ -218,6 +220,7 @@ export function SecurityConfigForm({
   organizationId,
   initialConfig,
   repositories,
+  installationStatuses,
   viewState,
   onSave,
   onToggleEnabled,
@@ -440,6 +443,7 @@ export function SecurityConfigForm({
             availableRepositoryCount={repositories.length}
             repositoryCount={repositoryCount}
             slaEnabled={state.slaEnabled}
+            installationStatuses={installationStatuses}
             onToggle={nextEnabled =>
               onToggleEnabled(nextEnabled, {
                 repositorySelectionMode: state.repositorySelectionMode,

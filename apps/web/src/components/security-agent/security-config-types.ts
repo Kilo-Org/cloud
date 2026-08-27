@@ -26,6 +26,18 @@ export type SecurityRepository = {
   name: string;
   private: boolean;
   dependabotAlerts: DependabotAlertsAvailability;
+  integrationId: string;
+  accountLogin: string | null;
+};
+
+export type SecurityInstallationStatus = {
+  integrationId: string;
+  accountLogin: string | null;
+  active: boolean;
+  hasPermissions: boolean;
+  reauthorizeUrl: string | null;
+  authInvalidAt: string | null;
+  authInvalidReason: string | null;
 };
 
 export type SecurityConfigFormState = {
@@ -166,5 +178,9 @@ export function toRepositoryOptions(repositories: SecurityRepository[]): Reposit
     name: repository.name,
     full_name: repository.fullName,
     private: repository.private,
+    group: {
+      id: repository.integrationId,
+      label: repository.accountLogin ?? 'GitHub account',
+    },
   }));
 }

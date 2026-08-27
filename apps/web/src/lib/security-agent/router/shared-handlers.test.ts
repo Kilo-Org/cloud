@@ -102,7 +102,11 @@ jest.mock('@kilocode/db/operation-ledger', () => ({
   settleOperation: mockSettleOperation,
 }));
 jest.mock('../github/permissions', () => ({
-  hasSecurityReviewPermissions: () => true,
+  hasSecurityReviewPermissions: (integration: { permissions?: Record<string, string> }) => {
+    if (!integration.permissions) return true;
+    const permission = integration.permissions.vulnerability_alerts;
+    return permission === 'read' || permission === 'write';
+  },
   getReauthorizeUrl: mockGetReauthorizeUrl,
 }));
 jest.mock('../github/dependabot-api', () => ({
@@ -203,6 +207,10 @@ function createHandlers() {
         id: 'integration-123',
         integration_status: 'active',
         platform_installation_id: 'installation-123',
+        platform_account_login: 'kilo',
+        permissions: { vulnerability_alerts: 'read' },
+        suspended_at: null,
+        auth_invalid_at: null,
         repositories: [{ id: 1, full_name: 'kilo/repo', name: 'repo', private: true }],
       }) as never,
     trackingExtras: () => ({}),
@@ -295,8 +303,80 @@ describe('getPermissionStatus', () => {
       reauthorizeUrl: 'https://github.com/apps/kilocode/installations/installation-123',
       authInvalidAt: '2026-06-25 18:00:00+00',
       authInvalidReason: 'installation_token_auth_failed',
+      installations: [
+        {
+          integrationId: 'integration-123',
+          accountLogin: null,
+          active: true,
+          hasPermissions: false,
+          reauthorizeUrl: 'https://github.com/apps/kilocode/installations/installation-123',
+          authInvalidAt: '2026-06-25 18:00:00+00',
+          authInvalidReason: 'installation_token_auth_failed',
+        },
+      ],
     });
     expect(mockGetReauthorizeUrl).toHaveBeenCalledWith('installation-123');
+  });
+
+  it('keeps the aggregate ready when an unhealthy sibling needs reauthorization', async () => {
+    const handlers = createSecurityAgentHandlers({
+      resolveOwner: () => ({ type: 'org', id: 'org-1', userId: 'user-123' }),
+      resolveSecurityOwner: () => ({ organizationId: 'org-1' }),
+      resolveResourceId: () => 'org-1',
+      verifyFindingOwnership: () => true,
+      getIntegration: async () => null,
+      getIntegrations: async () =>
+        [
+          {
+            id: 'healthy',
+            integration_status: 'active',
+            platform_installation_id: 'installation-1',
+            platform_account_login: 'acme-core',
+            permissions: { vulnerability_alerts: 'read' },
+            suspended_at: null,
+            auth_invalid_at: null,
+          },
+          {
+            id: 'unhealthy',
+            integration_status: 'active',
+            platform_installation_id: 'installation-2',
+            platform_account_login: 'acme-labs',
+            permissions: { vulnerability_alerts: 'read' },
+            suspended_at: null,
+            auth_invalid_at: '2026-08-20 12:00:00+00',
+            auth_invalid_reason: 'github_dependabot_401',
+          },
+          {
+            id: 'missing-permission',
+            integration_status: 'active',
+            platform_installation_id: 'installation-3',
+            platform_account_login: 'acme-public',
+            permissions: {},
+            suspended_at: null,
+            auth_invalid_at: null,
+          },
+        ] as never,
+      trackingExtras: () => ({}),
+    });
+
+    await expect(handlers.getPermissionStatus({ ctx: context, input: {} })).resolves.toMatchObject({
+      hasIntegration: true,
+      hasPermissions: true,
+      integrationId: 'healthy',
+      installations: [
+        expect.objectContaining({ integrationId: 'healthy', hasPermissions: true }),
+        expect.objectContaining({
+          integrationId: 'unhealthy',
+          hasPermissions: false,
+          reauthorizeUrl: 'https://github.com/apps/kilocode/installations/installation-2',
+        }),
+        expect.objectContaining({
+          integrationId: 'missing-permission',
+          hasPermissions: false,
+          reauthorizeUrl: 'https://github.com/apps/kilocode/installations/installation-3',
+        }),
+      ],
+    });
   });
 });
 
@@ -365,6 +445,8 @@ describe('getRepositories', () => {
         fullName: 'kilo/repo',
         name: 'repo',
         private: true,
+        integrationId: 'integration-123',
+        accountLogin: 'kilo',
         dependabotAlerts: 'disabled',
       },
     ]);
@@ -378,6 +460,8 @@ describe('getRepositories', () => {
           fullName: 'kilo/repo',
           name: 'repo',
           private: true,
+          integrationId: 'integration-123',
+          accountLogin: 'kilo',
         },
       ]
     );
@@ -389,6 +473,117 @@ describe('getRepositories', () => {
     await expect(createHandlers().getRepositories({ ctx: context, input: {} })).resolves.toEqual([
       expect.objectContaining({ id: 1, dependabotAlerts: 'unknown' }),
     ]);
+  });
+
+  it('groups repositories by healthy installation and ignores an unhealthy sibling', async () => {
+    const handlers = createSecurityAgentHandlers({
+      resolveOwner: () => ({ type: 'org', id: 'org-1', userId: 'user-123' }),
+      resolveSecurityOwner: () => ({ organizationId: 'org-1' }),
+      resolveResourceId: () => 'org-1',
+      verifyFindingOwnership: () => true,
+      getIntegration: async () => null,
+      getIntegrations: async () =>
+        [
+          {
+            id: 'healthy-1',
+            platform: 'github',
+            integration_status: 'active',
+            platform_installation_id: 'installation-1',
+            platform_account_login: 'acme-core',
+            permissions: { vulnerability_alerts: 'read' },
+            suspended_at: null,
+            auth_invalid_at: null,
+            repositories: [{ id: 11, full_name: 'acme-core/api', name: 'api', private: true }],
+          },
+          {
+            id: 'healthy-2',
+            platform: 'github',
+            integration_status: 'active',
+            platform_installation_id: 'installation-2',
+            platform_account_login: 'acme-labs',
+            permissions: { vulnerability_alerts: 'write' },
+            suspended_at: null,
+            auth_invalid_at: null,
+            repositories: [{ id: 22, full_name: 'acme-labs/app', name: 'app', private: false }],
+          },
+          {
+            id: 'unhealthy',
+            platform: 'github',
+            integration_status: 'active',
+            platform_installation_id: 'installation-3',
+            platform_account_login: 'acme-old',
+            permissions: { vulnerability_alerts: 'read' },
+            suspended_at: null,
+            auth_invalid_at: '2026-08-20 12:00:00+00',
+            repositories: [{ id: 33, full_name: 'acme-old/legacy', name: 'legacy', private: true }],
+          },
+        ] as never,
+      trackingExtras: () => ({}),
+    });
+
+    await expect(handlers.getRepositories({ ctx: context, input: {} })).resolves.toEqual([
+      expect.objectContaining({
+        id: 11,
+        integrationId: 'healthy-1',
+        accountLogin: 'acme-core',
+      }),
+      expect.objectContaining({
+        id: 22,
+        integrationId: 'healthy-2',
+        accountLogin: 'acme-labs',
+      }),
+    ]);
+  });
+});
+
+describe('multi-installation selection', () => {
+  it('accepts a selected repository from a secondary healthy installation', async () => {
+    mockSubmitManualSecuritySync.mockResolvedValue({
+      accepted: true,
+      commandId,
+      runId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      messageId: 'enable-sync-message-123',
+    });
+    const handlers = createSecurityAgentHandlers({
+      resolveOwner: () => ({ type: 'org', id: 'org-1', userId: 'user-123' }),
+      resolveSecurityOwner: () => ({ organizationId: 'org-1' }),
+      resolveResourceId: () => 'org-1',
+      verifyFindingOwnership: () => true,
+      getIntegration: async () => null,
+      getIntegrations: async () =>
+        [
+          {
+            id: 'primary',
+            integration_status: 'active',
+            platform_installation_id: 'installation-1',
+            permissions: { vulnerability_alerts: 'read' },
+            suspended_at: null,
+            auth_invalid_at: null,
+            repositories: [{ id: 11, full_name: 'acme-core/api', name: 'api', private: true }],
+          },
+          {
+            id: 'secondary',
+            integration_status: 'active',
+            platform_installation_id: 'installation-2',
+            permissions: { vulnerability_alerts: 'read' },
+            suspended_at: null,
+            auth_invalid_at: null,
+            repositories: [{ id: 22, full_name: 'acme-labs/app', name: 'app', private: false }],
+          },
+        ] as never,
+      trackingExtras: () => ({}),
+    });
+
+    await expect(
+      handlers.setEnabled.handler({
+        ctx: context,
+        input: {
+          isEnabled: true,
+          repositorySelectionMode: 'selected',
+          selectedRepositoryIds: [22],
+        },
+      })
+    ).resolves.toMatchObject({ success: true });
   });
 });
 

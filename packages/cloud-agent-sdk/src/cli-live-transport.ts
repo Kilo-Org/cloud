@@ -46,6 +46,7 @@ function buildCreateSessionWireData(input?: CreateRemoteSessionInput): {
   agent?: string;
   model?: { providerID: string; modelID: string; variant?: string };
   orgId?: string;
+  directory?: string;
   cloneFromKiloSessionId?: string;
 } {
   return {
@@ -53,6 +54,7 @@ function buildCreateSessionWireData(input?: CreateRemoteSessionInput): {
     ...(input?.agent !== undefined ? { agent: input.agent } : {}),
     ...(input?.model !== undefined ? { model: input.model } : {}),
     ...(input?.orgId !== undefined ? { orgId: input.orgId } : {}),
+    ...(input?.directory !== undefined ? { directory: input.directory } : {}),
     ...(input?.cloneFromKiloSessionId !== undefined
       ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
       : {}),
@@ -885,7 +887,8 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         const hasExtendedFields =
           wireData.agent !== undefined ||
           wireData.model !== undefined ||
-          wireData.orgId !== undefined;
+          wireData.orgId !== undefined ||
+          wireData.directory !== undefined;
         const hasCloneField = input?.cloneFromKiloSessionId !== undefined;
         let result: unknown;
         try {

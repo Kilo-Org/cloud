@@ -2554,6 +2554,33 @@ describe('CliLiveTransport createSession', () => {
     transport.destroy();
   });
 
+  it('sends directory in create_session wire data and bare-retries it for an old CLI', async () => {
+    const connection = createConnection();
+    const { transport, userWebConnection } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest
+      .mocked(userWebConnection.sendCommand)
+      .mockRejectedValueOnce(new CommandDeliveredError('invalid create_session command'))
+      .mockResolvedValueOnce({ protocolVersion: 1, sessionID: NEW_KILO_SESSION_ID });
+
+    const result = await transport.createSession?.({ directory: 'child' });
+    expect(result).toBe(NEW_KILO_SESSION_ID);
+    const createCalls = jest
+      .mocked(userWebConnection.sendCommand)
+      .mock.calls.filter(([, command]) => command === 'create_session');
+    expect(createCalls).toHaveLength(2);
+    expect(createCalls[0]?.[2]).toEqual({ protocolVersion: 1, directory: 'child' });
+    expect(createCalls[1]?.[2]).toEqual({ protocolVersion: 1 });
+    transport.destroy();
+  });
+
   it('retries once with bare protocolVersion on exact invalid create_session command', async () => {
     const connection = createConnection();
     const { transport, userWebConnection } = createTransportWithSinks({ connection });

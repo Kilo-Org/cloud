@@ -3220,6 +3220,7 @@
     },
     "working": "Pracuję",
     "historyRetry": "Nie udało się wczytać historii czatu.",
-    "catalogRetry": "Nie można załadować modeli"
+    "catalogRetry": "Nie można załadować modeli",
+    "sendError": "Nie udało się wysłać wiadomości. Spróbuj ponownie."
   }
 }

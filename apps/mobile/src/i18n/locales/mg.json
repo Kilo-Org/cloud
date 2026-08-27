@@ -3178,6 +3178,7 @@
     },
     "working": "Miasa",
     "historyRetry": "Tsy afaka nampidirina ny tantaran'ny resaka.",
-    "catalogRetry": "Tsy afaka namaky ny modely"
+    "catalogRetry": "Tsy afaka namaky ny modely",
+    "sendError": "Tsy afaka nalefa ny hafatra. Andramo indray."
   }
 }

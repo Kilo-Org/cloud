@@ -3178,6 +3178,7 @@
     },
     "working": "處理中",
     "historyRetry": "無法載入聊天記錄。",
-    "catalogRetry": "無法載入模型"
+    "catalogRetry": "無法載入模型",
+    "sendError": "無法傳送訊息。請再試一次。"
   }
 }

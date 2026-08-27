@@ -3199,6 +3199,7 @@
     },
     "working": "Treballant",
     "historyRetry": "No s'ha pogut carregar l'historial del xat.",
-    "catalogRetry": "No s'han pogut carregar els models"
+    "catalogRetry": "No s'han pogut carregar els models",
+    "sendError": "No s'ha pogut enviar el missatge. Torna-ho a provar."
   }
 }

@@ -3199,6 +3199,7 @@
     },
     "working": "Apstrādā",
     "historyRetry": "Neizdevās ielādēt tērzēšanas vēsturi.",
-    "catalogRetry": "Neizdevās ielādēt modeļus"
+    "catalogRetry": "Neizdevās ielādēt modeļus",
+    "sendError": "Neizdevās nosūtīt ziņojumu. Mēģini vēlreiz."
   }
 }

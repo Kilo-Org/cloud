@@ -3199,6 +3199,7 @@
     },
     "working": "U toku",
     "historyRetry": "Nije moguće učitati istoriju razgovora.",
-    "catalogRetry": "Nije moguće učitati modele"
+    "catalogRetry": "Nije moguće učitati modele",
+    "sendError": "Poruka nije mogla biti poslana. Pokušajte ponovo."
   }
 }

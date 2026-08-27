@@ -3178,6 +3178,7 @@
     },
     "working": "Duke punuar",
     "historyRetry": "Nuk u arrit të ngarkohej historia e bisedës.",
-    "catalogRetry": "Nuk u ngarkuan modelet"
+    "catalogRetry": "Nuk u ngarkuan modelet",
+    "sendError": "Mesazhi nuk u dërgua. Provoni përsëri."
   }
 }

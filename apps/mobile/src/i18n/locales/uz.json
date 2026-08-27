@@ -3178,6 +3178,7 @@
     },
     "working": "Ishlamoqda",
     "historyRetry": "Suhbat tarixini yuklab bo'lmadi.",
-    "catalogRetry": "Modellarni yuklab bo'lmadi"
+    "catalogRetry": "Modellarni yuklab bo'lmadi",
+    "sendError": "Xabarni yuborib bo'lmadi. Iltimos, qayta urinib ko'ring."
   }
 }

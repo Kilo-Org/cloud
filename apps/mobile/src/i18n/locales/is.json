@@ -3178,6 +3178,7 @@
     },
     "working": "Vinnur",
     "historyRetry": "Ekki tókst að hlaða samtalsferilinn.",
-    "catalogRetry": "Ekki tókst að hlaða líkön"
+    "catalogRetry": "Ekki tókst að hlaða líkön",
+    "sendError": "Ekki tókst að senda skilaboðin. Reyndu aftur."
   }
 }

@@ -3199,6 +3199,7 @@
     },
     "working": "Se procesează",
     "historyRetry": "Nu s-a putut încărca istoricul de chat.",
-    "catalogRetry": "Modelele nu au putut fi încărcate"
+    "catalogRetry": "Modelele nu au putut fi încărcate",
+    "sendError": "Mesajul nu a putut fi trimis. Încercați din nou."
   }
 }

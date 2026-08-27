@@ -3178,6 +3178,7 @@
     },
     "working": "Inafanya kazi",
     "historyRetry": "Haikuweza kupakia historia ya mazungumzo.",
-    "catalogRetry": "Imeshindwa kupakia miundo"
+    "catalogRetry": "Imeshindwa kupakia miundo",
+    "sendError": "Haikuweza kutuma ujumbe. Jaribu tena."
   }
 }

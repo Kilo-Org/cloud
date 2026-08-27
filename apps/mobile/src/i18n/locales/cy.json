@@ -3262,6 +3262,7 @@
     },
     "working": "Yn gweithio",
     "historyRetry": "Ni ellid llwytho hanes y sgwrs.",
-    "catalogRetry": "Methodd llwytho modelau"
+    "catalogRetry": "Methodd llwytho modelau",
+    "sendError": "Methodd anfon neges. Ceisiwch eto."
   }
 }

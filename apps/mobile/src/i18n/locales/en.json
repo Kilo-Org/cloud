@@ -679,7 +679,8 @@
     },
     "working": "Working",
     "historyRetry": "Could not load chat history.",
-    "catalogRetry": "Could not load models"
+    "catalogRetry": "Could not load models",
+    "sendError": "Could not send the message. Try again."
   },
   "chat": {
     "instancePicker": {

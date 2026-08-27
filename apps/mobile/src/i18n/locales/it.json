@@ -3199,6 +3199,7 @@
     },
     "working": "In corso",
     "historyRetry": "Impossibile caricare la cronologia della chat.",
-    "catalogRetry": "Impossibile caricare i modelli"
+    "catalogRetry": "Impossibile caricare i modelli",
+    "sendError": "Impossibile inviare il messaggio. Riprova."
   }
 }

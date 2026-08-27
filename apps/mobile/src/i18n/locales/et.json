@@ -3178,6 +3178,7 @@
     },
     "working": "Töötamine",
     "historyRetry": "Vestluse ajaloo laadimine ei õnnestunud.",
-    "catalogRetry": "Mudeleid ei õnnestunud laadida"
+    "catalogRetry": "Mudeleid ei õnnestunud laadida",
+    "sendError": "Sõnumi saatmine ebaõnnestus. Proovi uuesti."
   }
 }

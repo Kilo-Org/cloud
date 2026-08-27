@@ -3178,6 +3178,7 @@
     },
     "working": "Työstetään",
     "historyRetry": "Keskusteluhistoriaa ei voitu ladata.",
-    "catalogRetry": "Malleja ei voitu ladata"
+    "catalogRetry": "Malleja ei voitu ladata",
+    "sendError": "Viestiä ei voitu lähettää. Yritä uudelleen."
   }
 }

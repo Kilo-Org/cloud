@@ -3178,6 +3178,7 @@
     },
     "working": "Waa shaqaynayaa",
     "historyRetry": "Taariikhda wada sheekaysiga lama soo gelin karin.",
-    "catalogRetry": "Moodeelada lama soo dejin karin"
+    "catalogRetry": "Moodeelada lama soo dejin karin",
+    "sendError": "Fariinta lama diri karin. Mar kale isku day."
   }
 }

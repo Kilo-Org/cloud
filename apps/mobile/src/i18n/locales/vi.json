@@ -3178,6 +3178,7 @@
     },
     "working": "Đang xử lý",
     "historyRetry": "Không thể tải lịch sử trò chuyện.",
-    "catalogRetry": "Không thể tải các mô hình"
+    "catalogRetry": "Không thể tải các mô hình",
+    "sendError": "Không thể gửi tin nhắn. Vui lòng thử lại."
   }
 }

@@ -3178,6 +3178,7 @@
     },
     "working": "Arbejder",
     "historyRetry": "Kunne ikke indlæse chathistorik.",
-    "catalogRetry": "Kunne ikke indlæse modeller"
+    "catalogRetry": "Kunne ikke indlæse modeller",
+    "sendError": "Kunne ikke sende beskeden. Prøv igen."
   }
 }

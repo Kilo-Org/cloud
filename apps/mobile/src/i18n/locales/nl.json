@@ -3178,6 +3178,7 @@
     },
     "working": "Bezig",
     "historyRetry": "Kon de chatgeschiedenis niet laden.",
-    "catalogRetry": "Kon modellen niet laden"
+    "catalogRetry": "Kon modellen niet laden",
+    "sendError": "Kan het bericht niet verzenden. Probeer het opnieuw."
   }
 }

@@ -3199,6 +3199,7 @@
     },
     "working": "Radim",
     "historyRetry": "Nije moguće učitati povijest razgovora.",
-    "catalogRetry": "Učitavanje modela nije uspjelo"
+    "catalogRetry": "Učitavanje modela nije uspjelo",
+    "sendError": "Nije moguće poslati poruku. Pokušajte ponovno."
   }
 }

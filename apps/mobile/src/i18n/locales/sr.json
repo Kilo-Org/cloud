@@ -3199,6 +3199,7 @@
     },
     "working": "Radim…",
     "historyRetry": "Nije moguće učitati istoriju ćaskanja.",
-    "catalogRetry": "Nije moguće učitati modele"
+    "catalogRetry": "Nije moguće učitati modele",
+    "sendError": "Slanje poruke nije uspelo. Pokušajte ponovo."
   }
 }

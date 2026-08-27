@@ -3220,6 +3220,7 @@
     },
     "working": "Pracuji",
     "historyRetry": "Historie chatu se nepodařila načíst.",
-    "catalogRetry": "Modely se nepodařilo načíst"
+    "catalogRetry": "Modely se nepodařilo načíst",
+    "sendError": "Zprávu se nepodařilo odeslat. Zkuste to prosím znovu."
   }
 }

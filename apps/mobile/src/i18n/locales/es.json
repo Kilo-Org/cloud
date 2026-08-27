@@ -3199,6 +3199,7 @@
     },
     "working": "Trabajando",
     "historyRetry": "No se pudo cargar el historial del chat.",
-    "catalogRetry": "No se pudieron cargar los modelos"
+    "catalogRetry": "No se pudieron cargar los modelos",
+    "sendError": "No se pudo enviar el mensaje. Inténtalo de nuevo."
   }
 }

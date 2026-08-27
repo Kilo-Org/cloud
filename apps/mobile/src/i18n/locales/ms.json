@@ -3178,6 +3178,7 @@
     },
     "working": "Memproses…",
     "historyRetry": "Tidak dapat memuatkan sejarah sembang.",
-    "catalogRetry": "Tidak dapat memuatkan model"
+    "catalogRetry": "Tidak dapat memuatkan model",
+    "sendError": "Mesej tidak dapat dihantar. Cuba lagi."
   }
 }

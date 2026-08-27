@@ -3220,6 +3220,7 @@
     },
     "working": "Delam",
     "historyRetry": "Zgodovine klepeta ni bilo mogoče naložiti.",
-    "catalogRetry": "Nalaganje modelov ni uspelo"
+    "catalogRetry": "Nalaganje modelov ni uspelo",
+    "sendError": "Sporočila ni bilo mogoče poslati. Poskusite znova."
   }
 }

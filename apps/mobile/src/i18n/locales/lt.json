@@ -3220,6 +3220,7 @@
     },
     "working": "Vykdoma",
     "historyRetry": "Nepavyko įkelti pokalbio istorijos.",
-    "catalogRetry": "Nepavyko įkelti modelių"
+    "catalogRetry": "Nepavyko įkelti modelių",
+    "sendError": "Nepavyko išsiųsti žinutės. Bandykite dar kartą."
   }
 }

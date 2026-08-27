@@ -3178,6 +3178,7 @@
     },
     "working": "Werk",
     "historyRetry": "Kon nie kletsgeskiedenis laai nie.",
-    "catalogRetry": "Kon nie modelle laai nie"
+    "catalogRetry": "Kon nie modelle laai nie",
+    "sendError": "Kon nie die boodskap stuur nie. Probeer asseblief weer."
   }
 }

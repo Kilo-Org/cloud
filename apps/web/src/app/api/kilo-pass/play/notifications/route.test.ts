@@ -28,6 +28,7 @@ const mockGetEnvVariable = jest.mocked(getEnvVariable);
 }));
 
 const AUDIENCE = 'https://app.example.com/api/kilo-pass/play/notifications';
+const SERVICE_ACCOUNT_EMAIL = 'play-rtdn-push@example.iam.gserviceaccount.com';
 
 function request(body: unknown, token?: string) {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -46,8 +47,14 @@ describe('POST /api/kilo-pass/play/notifications', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockProcess.mockResolvedValue({ processed: true });
-    mockVerifyIdToken.mockResolvedValue({});
-    mockGetEnvVariable.mockReturnValue(AUDIENCE);
+    mockVerifyIdToken.mockResolvedValue({
+      getPayload: () => ({ email: SERVICE_ACCOUNT_EMAIL, email_verified: true }),
+    });
+    mockGetEnvVariable.mockImplementation(name => {
+      if (name === 'GOOGLE_PLAY_RTDN_PUSH_AUDIENCE') return AUDIENCE;
+      if (name === 'GOOGLE_PLAY_RTDN_PUSH_SERVICE_ACCOUNT_EMAIL') return SERVICE_ACCOUNT_EMAIL;
+      return '';
+    });
   });
 
   it('returns 401 when the Authorization bearer is missing', async () => {
@@ -73,7 +80,58 @@ describe('POST /api/kilo-pass/play/notifications', () => {
   });
 
   it('returns 401 when GOOGLE_PLAY_RTDN_PUSH_AUDIENCE is not configured', async () => {
-    mockGetEnvVariable.mockReturnValue('');
+    mockGetEnvVariable.mockImplementation(name =>
+      name === 'GOOGLE_PLAY_RTDN_PUSH_AUDIENCE' ? '' : SERVICE_ACCOUNT_EMAIL
+    );
+
+    const response = await POST(request({ message: { data: 'payload' } }, 'valid-token'));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Unauthorized' });
+    expect(mockProcess).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when GOOGLE_PLAY_RTDN_PUSH_SERVICE_ACCOUNT_EMAIL is not configured', async () => {
+    mockGetEnvVariable.mockImplementation(name =>
+      name === 'GOOGLE_PLAY_RTDN_PUSH_AUDIENCE' ? AUDIENCE : ''
+    );
+
+    const response = await POST(request({ message: { data: 'payload' } }, 'valid-token'));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Unauthorized' });
+    expect(mockVerifyIdToken).not.toHaveBeenCalled();
+    expect(mockProcess).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when the token email does not match the service account', async () => {
+    mockVerifyIdToken.mockResolvedValueOnce({
+      getPayload: () => ({ email: 'attacker@example.com', email_verified: true }),
+    });
+
+    const response = await POST(request({ message: { data: 'payload' } }, 'valid-token'));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Unauthorized' });
+    expect(mockProcess).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when the token email is not verified', async () => {
+    mockVerifyIdToken.mockResolvedValueOnce({
+      getPayload: () => ({ email: SERVICE_ACCOUNT_EMAIL, email_verified: false }),
+    });
+
+    const response = await POST(request({ message: { data: 'payload' } }, 'valid-token'));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Unauthorized' });
+    expect(mockProcess).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when the token payload lacks an email', async () => {
+    mockVerifyIdToken.mockResolvedValueOnce({
+      getPayload: () => ({ email_verified: true }),
+    });
 
     const response = await POST(request({ message: { data: 'payload' } }, 'valid-token'));
 

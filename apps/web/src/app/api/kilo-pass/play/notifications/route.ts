@@ -17,8 +17,19 @@ async function verifyGooglePlayRtdnToken(idToken: string): Promise<void> {
   if (!audience) {
     throw new Error('GOOGLE_PLAY_RTDN_PUSH_AUDIENCE is not set');
   }
+  const expectedEmail = getEnvVariable('GOOGLE_PLAY_RTDN_PUSH_SERVICE_ACCOUNT_EMAIL');
+  if (!expectedEmail) {
+    throw new Error('GOOGLE_PLAY_RTDN_PUSH_SERVICE_ACCOUNT_EMAIL is not set');
+  }
   const client = new OAuth2Client();
-  await client.verifyIdToken({ idToken, audience });
+  const ticket = await client.verifyIdToken({ idToken, audience });
+  const payload = ticket.getPayload();
+  if (!payload?.email || payload.email_verified !== true) {
+    throw new Error('Play RTDN push token email is not verified');
+  }
+  if (payload.email !== expectedEmail) {
+    throw new Error('Play RTDN push token email does not match the configured service account');
+  }
 }
 
 export async function POST(request: Request) {

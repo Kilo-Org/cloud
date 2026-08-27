@@ -25,6 +25,9 @@ export function mapGooglePlayKiloPassPurchase(
   if (!decoded.purchaseToken || !decoded.productId || !decoded.latestOrderId) {
     throw new Error('Google Play purchase payload missing required identifiers');
   }
+  if (!Number.isFinite(decoded.startTimeMs) || !Number.isFinite(decoded.expiryTimeMs)) {
+    throw new Error('Google Play subscription purchase has invalid timestamps');
+  }
   // Called only from the tRPC purchase-completion path; renewals and refunds enter via
   // the Play notifications handler, which intentionally allows expired purchases.
   if (decoded.expiryTimeMs <= Date.now()) {

@@ -9,7 +9,7 @@ import { MarkedLexer as markedLexer, type Tokens } from 'react-native-marked';
 // table modal opens (see MarkdownTableBody).
 
 /** One extracted GFM table, rendered behind the table chip. */
-export type MarkdownTableExtract = {
+type MarkdownTableExtract = {
   type: 'table';
   raw: string;
   /** Stable ordinal key `md-table-${n}` matching the renderer's old host key. */
@@ -19,7 +19,7 @@ export type MarkdownTableExtract = {
 };
 
 /** A run of non-table markdown between tables, rendered by the markdown path. */
-export type MarkdownTextExtract = {
+type MarkdownTextExtract = {
   type: 'markdown';
   raw: string;
 };

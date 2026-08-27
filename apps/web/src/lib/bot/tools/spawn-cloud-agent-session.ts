@@ -4,10 +4,7 @@ import {
   type PrepareSessionInput,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type { RunSessionInput } from '@/lib/cloud-agent-next/run-session';
-import {
-  getGitHubTokenForOrganization,
-  getGitHubTokenForUser,
-} from '@/lib/cloud-agent/github-integration-helpers';
+import { getGitHubTokenForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import {
   getGitLabTokenForOrganization,
   getGitLabTokenForUser,
@@ -59,6 +56,16 @@ export const spawnCloudAgentInputSchema = z.object({
     .string()
     .regex(/^[-a-zA-Z0-9_.]+\/[-a-zA-Z0-9_.]+$/)
     .describe('The GitHub repository in owner/repo format (e.g., "facebook/react")')
+    .optional(),
+  githubAccount: z
+    .string()
+    .min(1)
+    .describe('Optional account hint shown with an explicitly selected repository entry')
+    .optional(),
+  githubIntegrationId: z
+    .string()
+    .uuid()
+    .describe('Optional integration ID for an explicit choice between duplicate repository entries')
     .optional(),
   gitlabProject: z
     .string()
@@ -183,13 +190,11 @@ export default async function spawnCloudAgentSession(
       attachments: options?.attachments,
     };
   } else {
-    // GitHub path: get token, use githubRepo/githubToken
-    const githubToken =
-      owner.type === 'org'
-        ? await getGitHubTokenForOrganization(owner.id)
-        : await getGitHubTokenForUser(owner.id);
+    // Cloud Agent resolves organization repository access and persists its canonical identity.
+    // Personal sessions keep their existing token path.
+    const githubToken = owner.type === 'user' ? await getGitHubTokenForUser(owner.id) : undefined;
 
-    if (!githubToken) {
+    if (owner.type === 'user' && !githubToken) {
       return {
         response:
           'Error: No GitHub token available. Please ensure a GitHub integration is connected in your Kilo Code settings.',
@@ -198,10 +203,11 @@ export default async function spawnCloudAgentSession(
 
     prepareInput = {
       githubRepo: args.githubRepo,
+      githubIntegrationId: args.githubIntegrationId,
       prompt,
       mode,
       model,
-      githubToken,
+      ...(githubToken ? { githubToken } : {}),
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,
       callbackTarget,

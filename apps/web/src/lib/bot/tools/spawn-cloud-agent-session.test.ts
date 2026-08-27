@@ -2,10 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals
 import type { PlatformIntegration } from '@kilocode/db';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { createCloudAgentNextClient as CreateCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import type {
-  getGitHubTokenForOrganization as GetGitHubTokenForOrganization,
-  getGitHubTokenForUser as GetGitHubTokenForUser,
-} from '@/lib/cloud-agent/github-integration-helpers';
+import type { getGitHubTokenForUser as GetGitHubTokenForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import type {
   buildGitLabCloneUrl as BuildGitLabCloneUrl,
   getGitLabInstanceUrlForUser as GetGitLabInstanceUrlForUser,
@@ -26,8 +23,11 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
 }));
 
 jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
-  getGitHubTokenForOrganization: jest.fn(),
   getGitHubTokenForUser: jest.fn(),
+}));
+
+jest.mock('@/lib/bot-users/bot-user-service', () => ({
+  getBotUserId: jest.fn(),
 }));
 
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
@@ -50,6 +50,7 @@ const organizationIntegration = {
   owned_by_organization_id: 'organization-1',
   owned_by_user_id: null,
 } as PlatformIntegration;
+const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
 const attachments: CloudAgentAttachments = {
   path: 'message-attachments',
   files: ['image.png', 'requirements.md'],
@@ -68,7 +69,6 @@ const mockPrepareSession =
 const mockInitiateFromPreparedSession = jest.fn<(input: unknown) => Promise<unknown>>();
 let spawnCloudAgentSession: typeof SpawnCloudAgentSession;
 let mockCreateCloudAgentNextClient: jest.MockedFunction<typeof CreateCloudAgentNextClient>;
-let mockGetGitHubTokenForOrganization: jest.MockedFunction<typeof GetGitHubTokenForOrganization>;
 let mockGetGitHubTokenForUser: jest.MockedFunction<typeof GetGitHubTokenForUser>;
 let mockGetGitLabTokenForUser: jest.MockedFunction<typeof GetGitLabTokenForUser>;
 let mockGetGitLabInstanceUrlForUser: jest.MockedFunction<typeof GetGitLabInstanceUrlForUser>;
@@ -82,7 +82,6 @@ describe('spawnCloudAgentSession delegation', () => {
     const spawn = await import('./spawn-cloud-agent-session');
 
     mockCreateCloudAgentNextClient = jest.mocked(client.createCloudAgentNextClient);
-    mockGetGitHubTokenForOrganization = jest.mocked(github.getGitHubTokenForOrganization);
     mockGetGitHubTokenForUser = jest.mocked(github.getGitHubTokenForUser);
     mockGetGitLabTokenForUser = jest.mocked(gitlab.getGitLabTokenForUser);
     mockGetGitLabInstanceUrlForUser = jest.mocked(gitlab.getGitLabInstanceUrlForUser);
@@ -101,7 +100,6 @@ describe('spawnCloudAgentSession delegation', () => {
       kiloSessionId: 'kilo-session-1',
     });
     mockInitiateFromPreparedSession.mockResolvedValue({});
-    mockGetGitHubTokenForOrganization.mockResolvedValue('organization-github-token');
     mockGetGitHubTokenForUser.mockResolvedValue('github-token');
     mockGetGitLabTokenForUser.mockResolvedValue('gitlab-token');
     mockGetGitLabInstanceUrlForUser.mockResolvedValue('https://gitlab.com');
@@ -112,7 +110,13 @@ describe('spawnCloudAgentSession delegation', () => {
     const onSessionReady = jest.fn();
 
     await spawnCloudAgentSession(
-      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      {
+        githubRepo: 'owner/repo',
+        githubAccount: 'owner',
+        githubIntegrationId,
+        prompt: 'Use the files',
+        mode: 'code',
+      },
       'model',
       organizationIntegration,
       'auth-token',
@@ -125,7 +129,7 @@ describe('spawnCloudAgentSession delegation', () => {
     expect(prepareInput).toEqual(
       expect.objectContaining({
         githubRepo: 'owner/repo',
-        githubToken: 'organization-github-token',
+        githubIntegrationId,
         kilocodeOrganizationId: 'organization-1',
         createdOnPlatform: 'slack',
         attachments,
@@ -136,6 +140,8 @@ describe('spawnCloudAgentSession delegation', () => {
       })
     );
     expect(prepareInput).not.toHaveProperty('images');
+    expect(prepareInput).not.toHaveProperty('githubToken');
+    expect(mockGetGitHubTokenForUser).not.toHaveBeenCalled();
     for (const field of profileDerivedInlineFields) {
       expect(prepareInput).not.toHaveProperty(field);
     }

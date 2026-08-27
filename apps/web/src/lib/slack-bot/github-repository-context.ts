@@ -4,75 +4,109 @@ import {
   type PlatformRepository,
 } from '@/lib/integrations/core/types';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
+import {
+  getIntegrationForOwner,
+  getIntegrationsByOrganization,
+} from '@/lib/integrations/db/platform-integrations';
 
-export type GitHubRepositoryContext = {
+export type GitHubInstallationRepositoryContext = {
+  platformIntegrationId: string;
   accountLogin: string | null;
   repositoryAccess: string | null;
   repositoriesSyncedAt: string | null;
   repositories: PlatformRepository[] | null;
 };
 
-/**
- * Get GitHub repository context for an owner from their GitHub integration.
- * This does not perform extra API requests; it uses data stored on the integration row.
- */
-export async function getGitHubRepositoryContext(owner: Owner): Promise<GitHubRepositoryContext> {
-  const integration = await getIntegrationForOwner(owner, PLATFORM.GITHUB);
-  if (!integration) {
-    return {
-      accountLogin: null,
-      repositoryAccess: null,
-      repositoriesSyncedAt: null,
-      repositories: null,
-    };
-  }
+export type GitHubRepositoryContext = {
+  installations: GitHubInstallationRepositoryContext[];
+};
 
-  const repositories = requireNumericPlatformRepositories(integration.repositories);
+type GitHubRepositoryContextLoaders = {
+  getIntegrationForOwner: typeof getIntegrationForOwner;
+  getIntegrationsByOrganization: typeof getIntegrationsByOrganization;
+};
+
+function toInstallationContext(
+  integration: Awaited<ReturnType<typeof getIntegrationForOwner>>
+): GitHubInstallationRepositoryContext | null {
+  if (!integration) return null;
 
   return {
+    platformIntegrationId: integration.id,
     accountLogin: integration.platform_account_login,
     repositoryAccess: integration.repository_access,
     repositoriesSyncedAt: integration.repositories_synced_at,
-    repositories,
+    repositories: requireNumericPlatformRepositories(integration.repositories),
+  };
+}
+
+/**
+ * Get GitHub repository context for an owner from their GitHub integrations.
+ * This does not perform extra API requests; it uses data stored on the integration row.
+ */
+export async function getGitHubRepositoryContext(
+  owner: Owner,
+  loaders: GitHubRepositoryContextLoaders = {
+    getIntegrationForOwner,
+    getIntegrationsByOrganization,
+  }
+): Promise<GitHubRepositoryContext> {
+  const integrations =
+    owner.type === 'org'
+      ? (await loaders.getIntegrationsByOrganization(owner.id, PLATFORM.GITHUB)).filter(
+          isPlatformIntegrationHealthy
+        )
+      : [await loaders.getIntegrationForOwner(owner, PLATFORM.GITHUB)];
+
+  return {
+    installations: integrations
+      .map(toInstallationContext)
+      .filter((integration): integration is GitHubInstallationRepositoryContext => !!integration),
   };
 }
 
 export function formatGitHubRepositoriesForPrompt(context: GitHubRepositoryContext): string {
-  const headerLines: string[] = ['\n\nGitHub repository context for this workspace:'];
-
-  if (context.accountLogin) {
-    headerLines.push(`- Installation account: ${context.accountLogin}`);
-  }
-  if (context.repositoryAccess) {
-    headerLines.push(`- Repository access: ${context.repositoryAccess}`);
-  }
-  if (context.repositoriesSyncedAt) {
-    headerLines.push(`- Repositories synced at: ${context.repositoriesSyncedAt}`);
+  const header = '\n\nGitHub repository context for this workspace:';
+  if (context.installations.length === 0) {
+    return `${header}\n- No GitHub installations are connected.`;
   }
 
-  const header = headerLines.join('\n');
-
-  if (!context.repositories || context.repositories.length === 0) {
-    if (context.repositoryAccess === 'all') {
-      return `${header}
-- Repository list: not stored for "all" access (no repo list to show without extra requests).
-
-When the user asks you to work on code, ask them to specify the repository explicitly in owner/repo format.`;
+  const installations = context.installations.map(installation => {
+    const account = installation.accountLogin ?? 'unknown';
+    const lines = [
+      `Installation account: ${account}`,
+      `- platformIntegrationId: ${installation.platformIntegrationId}`,
+    ];
+    if (installation.repositoryAccess) {
+      lines.push(`- Repository access: ${installation.repositoryAccess}`);
+    }
+    if (installation.repositoriesSyncedAt) {
+      lines.push(`- Repositories synced at: ${installation.repositoriesSyncedAt}`);
     }
 
-    return `${header}
-- No GitHub repositories are currently connected. The user will need to specify a repository manually.`;
-  }
+    if (!installation.repositories?.length) {
+      lines.push(
+        installation.repositoryAccess === 'all'
+          ? '- Repository list: not stored for "all" access. Ask for the repository in owner/repo format.'
+          : '- No repositories are currently connected through this installation.'
+      );
+      return lines.join('\n');
+    }
 
-  const repoList = context.repositories
-    .map(repo => `- ${repo.full_name}${repo.private ? ' (private)' : ''} [id: ${repo.id}]`)
-    .join('\n');
+    lines.push(
+      '- Available repositories:',
+      ...installation.repositories.map(
+        repository =>
+          `  - ${repository.full_name}${repository.private ? ' (private)' : ''} [repositoryId: ${repository.id}; account: ${account}; platformIntegrationId: ${installation.platformIntegrationId}]`
+      )
+    );
+    return lines.join('\n');
+  });
 
   return `${header}
 
-Available repositories:
-${repoList}
+${installations.join('\n\n')}
 
-When the user asks you to work on code without specifying a repository, try to infer the correct repository from context or ask them to clarify which repository they want to use.`;
+Use this context to choose a repository, not to authorize access. Submit owner/repo and let Cloud Agent resolve and authorize it. Only include githubIntegrationId when preserving an explicit choice between duplicate repository entries. If no repository is specified, infer an unambiguous listed repository or ask for clarification.`;
 }

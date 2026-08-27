@@ -115,13 +115,13 @@ Today's date: ${currentDate}
 ## Context you may receive
 Additional context may be appended to this prompt:
 - Conversation context (recent messages, thread context)
-${githubContext.repositories ? '- Available GitHub repositories for this integration' : ''}
+${githubContext.installations.some(installation => installation.repositories?.length) ? '- Available GitHub repositories for this integration' : ''}
 ${gitlabContext.repositories ? '- Available GitLab projects for this integration' : ''}
 
 ${formatGitHubRepositoriesForPrompt(githubContext)}
 ${formatGitLabRepositoriesForPrompt(gitlabContext)}
 
-Treat this context as authoritative. Prefer selecting a repo from the provided repository list. If the user requests work on a repo that isn't in the list, ask them to confirm the exact owner/repo (or group/project for GitLab) and ensure it's accessible to the integration. Never invent repository names.
+Use this context to select repositories, not to authorize access. Prefer selecting a repo from the provided repository list. If the user requests work on a repo that isn't in the list, ask them to confirm the exact owner/repo (or group/project for GitLab). Cloud Agent resolves and authorizes GitHub repositories. Never invent repository names.
 
 ## Cloud Agent tool
 If the user asks you to analyze or act on an attached image or file (PDF, Markdown, text, CSV), you must use the spawnCloudAgentSession tool to start a Cloud Agent session that will process the attachment.

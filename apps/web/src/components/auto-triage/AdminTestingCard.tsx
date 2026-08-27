@@ -9,7 +9,17 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ShieldCheck, Play, AlertCircle } from 'lucide-react';
+
+const GITHUB_ISSUE_URL_PATTERN =
+  /^https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/issues\/\d+(?:[/?#].*)?$/;
 
 type Props =
   | {
@@ -33,6 +43,7 @@ export function AdminTestingCard(props: Props) {
   const queryClient = useQueryClient();
 
   const [issueUrl, setIssueUrl] = useState('');
+  const [selectedIntegrationId, setSelectedIntegrationId] = useState('');
   const { data: repositoriesData } = useQuery(
     props.owner.type === 'org'
       ? trpc.organizations.autoTriage.listGitHubRepositories.queryOptions({
@@ -40,6 +51,14 @@ export function AdminTestingCard(props: Props) {
         })
       : trpc.personalAutoTriage.listGitHubRepositories.queryOptions()
   );
+  const match = issueUrl.trim().match(GITHUB_ISSUE_URL_PATTERN);
+  const repoFullName = match ? `${match[1]}/${match[2]}` : null;
+  const matchingRepositories = repoFullName
+    ? (repositoriesData?.repositories.filter(
+        repository => repository.fullName.toLowerCase() === repoFullName.toLowerCase()
+      ) ?? [])
+    : [];
+  const requiresIntegrationSelection = matchingRepositories.length > 1;
 
   const mutation = useMutation(
     trpc.autoTriage.adminSubmitForTriage.mutationOptions({
@@ -69,17 +88,10 @@ export function AdminTestingCard(props: Props) {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const match = issueUrl
-      .trim()
-      .match(/^https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/issues\/\d+(?:[/?#].*)?$/);
-    const repoFullName = match ? `${match[1]}/${match[2]}` : null;
-    const matchingRepositories = repoFullName
-      ? (repositoriesData?.repositories.filter(
-          repository => repository.fullName.toLowerCase() === repoFullName.toLowerCase()
-        ) ?? [])
-      : [];
     const platformIntegrationId =
-      matchingRepositories.length === 1 ? matchingRepositories[0].platformIntegrationId : undefined;
+      matchingRepositories.length === 1
+        ? matchingRepositories[0].platformIntegrationId
+        : selectedIntegrationId || undefined;
 
     mutation.mutate({
       issueUrl,
@@ -117,13 +129,49 @@ export function AdminTestingCard(props: Props) {
               type="url"
               placeholder="https://github.com/owner/repo/issues/123"
               value={issueUrl}
-              onChange={e => setIssueUrl(e.target.value)}
+              onChange={e => {
+                setIssueUrl(e.target.value);
+                setSelectedIntegrationId('');
+              }}
               disabled={mutation.isPending}
               required
             />
           </div>
+          {requiresIntegrationSelection && (
+            <div className="space-y-2">
+              <Label htmlFor="admin-triage-github-integration">GitHub connection</Label>
+              <Select value={selectedIntegrationId} onValueChange={setSelectedIntegrationId}>
+                <SelectTrigger id="admin-triage-github-integration" className="w-full">
+                  <SelectValue placeholder="Choose the connection for this repository" />
+                </SelectTrigger>
+                <SelectContent>
+                  {matchingRepositories.map(repository => (
+                    <SelectItem
+                      key={repository.platformIntegrationId}
+                      value={repository.platformIntegrationId ?? ''}
+                    >
+                      {repository.platformAccountLogin ?? repository.fullName} (
+                      {repository.platformIntegrationId})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-xs">
+                This repository appears in multiple GitHub connections. Choose the exact connection
+                to use.
+              </p>
+            </div>
+          )}
           <div className="flex items-center gap-2">
-            <Button type="submit" size="sm" disabled={mutation.isPending || !issueUrl.trim()}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={
+                mutation.isPending ||
+                !issueUrl.trim() ||
+                (requiresIntegrationSelection && !selectedIntegrationId)
+              }
+            >
               <Play className="mr-2 h-3 w-3" />
               {mutation.isPending ? 'Dispatching…' : 'Dispatch triage'}
             </Button>

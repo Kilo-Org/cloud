@@ -41,7 +41,6 @@ import {
   getGitHubIntegrationById,
 } from '@/lib/integrations/db/platform-integrations';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
-import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 
@@ -382,17 +381,6 @@ export const autoTriageRouter = createTRPCRouter({
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
           message: 'The selected GitHub integration is missing its installation ID.',
-        });
-      }
-      const repositories = requireNumericPlatformRepositories(integration.repositories);
-      if (
-        !repositories?.some(
-          repository => repository.full_name.toLowerCase() === parsedUrl.repoFullName.toLowerCase()
-        )
-      ) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'The selected GitHub App installation does not include this repository.',
         });
       }
 

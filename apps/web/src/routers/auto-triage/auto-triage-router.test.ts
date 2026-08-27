@@ -96,7 +96,7 @@ describe('adminSubmitForTriage integration selection', () => {
     );
   });
 
-  it('rejects a selected integration whose repository cache does not contain the issue repository', async () => {
+  it('lets the live issue fetch prove access instead of cached repository membership', async () => {
     mockGetGitHubIntegrationById.mockResolvedValue(
       integration({
         repositories: [{ id: 8, name: 'other', full_name: 'acme/other', private: true }],
@@ -109,11 +109,16 @@ describe('adminSubmitForTriage integration selection', () => {
         platformIntegrationId: integrationId,
         owner,
       })
-    ).rejects.toMatchObject({
-      code: 'PRECONDITION_FAILED',
-      message: 'The selected GitHub App installation does not include this repository.',
-    });
-    expect(mockGenerateGitHubInstallationToken).not.toHaveBeenCalled();
+    ).resolves.toMatchObject({ success: true, ticketId: 'ticket-1' });
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'https://api.github.com/repos/acme/widgets/issues/7',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer github-token' }),
+      })
+    );
+    expect(mockCreateTriageTicket).toHaveBeenCalledWith(
+      expect.objectContaining({ platformIntegrationId: integrationId })
+    );
   });
 
   it('fails closed for legacy input when multiple healthy integrations exist', async () => {

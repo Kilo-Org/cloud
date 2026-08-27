@@ -5,7 +5,7 @@ import {
   upsertAgentConfigForOwner,
   setAgentEnabledForOwner,
 } from '@/lib/agent-config/db/agent-configs';
-import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
+import { fetchAllGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import { createAutoTriageRouter } from '@/lib/auto-triage/application/routers/shared-router-factory';
 
 const sharedHandlers = createAutoTriageRouter({
@@ -32,7 +32,7 @@ const sharedHandlers = createAutoTriageRouter({
         errorMessage: 'Invalid owner type',
       };
     }
-    return await fetchGitHubRepositoriesForUser(owner.id);
+    return await fetchAllGitHubRepositoriesForUser(owner.id);
   },
 
   agentConfigGetter: async (owner, agentType, platform) => {

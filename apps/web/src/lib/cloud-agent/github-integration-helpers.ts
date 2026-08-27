@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import {
+  getAllIntegrationsForOwner,
   getIntegrationsByOrganization,
   getIntegrationForOrganization,
   getIntegrationForOwner,
@@ -194,6 +195,17 @@ export async function fetchAllGitHubRepositoriesForOrganization(
   const integrations = (
     await getIntegrationsByOrganization(organizationId, PLATFORM.GITHUB)
   ).filter(isPlatformIntegrationHealthy);
+  return fetchRepositoriesForIntegrations(integrations, forceRefresh);
+}
+
+export async function fetchAllGitHubRepositoriesForUser(
+  userId: string,
+  forceRefresh: boolean = false
+): Promise<GitHubRepositoriesResult> {
+  const integrations = (await getAllIntegrationsForOwner({ type: 'user', id: userId })).filter(
+    integration =>
+      integration.platform === PLATFORM.GITHUB && isPlatformIntegrationHealthy(integration)
+  );
   return fetchRepositoriesForIntegrations(integrations, forceRefresh);
 }
 

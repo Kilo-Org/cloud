@@ -13,6 +13,7 @@ const mockUpdateRepositoriesForIntegration =
   jest.fn<(integrationId: string, repositories: unknown[]) => Promise<void>>();
 const mockGetIntegrationsByOrganization =
   jest.fn<(organizationId: string, platform: string) => Promise<PlatformIntegration[]>>();
+const mockGetAllIntegrationsForOwner = jest.fn<(owner: Owner) => Promise<PlatformIntegration[]>>();
 const mockFetchGitHubRepositories =
   jest.fn<(installationId: string, appType: string) => Promise<unknown[]>>();
 const mockGenerateGitHubInstallationToken =
@@ -33,6 +34,7 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getIntegrationForOwner: mockGetIntegrationForOwner,
   getPrimaryGitHubIntegrationForOrganization: mockGetPrimaryGitHubIntegrationForOrganization,
   getIntegrationsByOrganization: mockGetIntegrationsByOrganization,
+  getAllIntegrationsForOwner: mockGetAllIntegrationsForOwner,
   updateRepositoriesForIntegration: mockUpdateRepositoriesForIntegration,
 }));
 
@@ -152,6 +154,39 @@ describe('github-integration-helpers', () => {
       ]);
       expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-1', [
         { id: 2, name: 'fresh', full_name: 'org/fresh', private: true },
+      ]);
+    });
+  });
+
+  describe('fetchAllGitHubRepositoriesForUser', () => {
+    it('preserves exact integration identity for every healthy personal installation', async () => {
+      mockGetAllIntegrationsForOwner.mockResolvedValue([
+        buildIntegration({ platform_account_login: 'acme' }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          platform_account_login: 'acme',
+        }),
+        buildIntegration({
+          id: 'integration-3',
+          platform: 'gitlab',
+        }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForUser('user-123');
+
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          fullName: 'org/repo',
+          platformIntegrationId: 'integration-1',
+          platformAccountLogin: 'acme',
+        }),
+        expect.objectContaining({
+          fullName: 'org/repo',
+          platformIntegrationId: 'integration-2',
+          platformAccountLogin: 'acme',
+        }),
       ]);
     });
   });

@@ -290,14 +290,14 @@ beforeEach(async () => {
   // Reset stripe mocks
   stripeMock.checkout.sessions.create.mockReset();
   stripeMock.checkout.sessions.list.mockReset();
-  stripeMock.checkout.sessions.list.mockResolvedValue({ data: [] });
+  stripeMock.checkout.sessions.list.mockResolvedValue({ data: [], has_more: false });
   stripeMock.checkout.sessions.expire.mockReset();
   stripeMock.checkout.sessions.expire.mockResolvedValue({});
   stripeMock.billingPortal.sessions.create.mockReset();
   stripeMock.subscriptions.retrieve.mockReset();
   stripeMock.subscriptions.update.mockReset();
   stripeMock.subscriptions.list.mockReset();
-  stripeMock.subscriptions.list.mockResolvedValue({ data: [] });
+  stripeMock.subscriptions.list.mockResolvedValue({ data: [], has_more: false });
   stripeMock.subscriptionSchedules.create.mockReset();
   stripeMock.subscriptionSchedules.update.mockReset();
   stripeMock.subscriptionSchedules.release.mockReset();
@@ -2780,6 +2780,50 @@ describe('createSubscriptionCheckout', () => {
 });
 
 describe('createKiloPassUpsellCheckout', () => {
+  it('shares checkout coordination with the generic Kilo Pass entrypoint', async () => {
+    const instance = await createKiloclawInstance(user.id);
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+      kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
+    });
+    let createdSession: Record<string, unknown> | undefined;
+    stripeMock.checkout.sessions.create.mockImplementation(async input => {
+      createdSession = {
+        id: 'cs_shared_kilo_pass',
+        status: 'open',
+        url: 'https://checkout.stripe.com/shared',
+        metadata: input.metadata,
+      };
+      return createdSession;
+    });
+    stripeMock.checkout.sessions.list.mockImplementation(async () => ({
+      data: createdSession ? [createdSession] : [],
+      has_more: false,
+    }));
+
+    const caller = await createCallerForUser(user.id);
+    const results = await Promise.all([
+      caller.kiloPass.createCheckoutSession({ tier: 'tier_19', cadence: 'monthly' }),
+      caller.kiloclaw.createKiloPassUpsellCheckout({
+        instanceId: instance.id,
+        tier: '19',
+        cadence: 'monthly',
+        hostingPlan: 'standard',
+      }),
+    ]);
+
+    expect(results).toEqual([
+      { url: 'https://checkout.stripe.com/shared' },
+      { url: 'https://checkout.stripe.com/shared' },
+    ]);
+    expect(stripeMock.checkout.sessions.create).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects Commit hosting intent after the cutoff before creating Kilo Pass checkout', async () => {
     jest.useFakeTimers({
       doNotFake: [

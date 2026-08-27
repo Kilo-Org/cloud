@@ -108,6 +108,7 @@ import { KiloPassTier, KiloPassCadence, KiloPassPaymentProvider } from '@/lib/ki
 import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
+import { createOrReuseKiloPassCheckoutSession } from '@/lib/kilo-pass/checkout-session';
 import { ensureAutoIntroSchedule, resolvePhasePrice } from '@/lib/kiloclaw/stripe-handlers';
 import {
   getKiloClawEarlybirdStateForUser,
@@ -5219,15 +5220,6 @@ export const kiloclawRouter = createTRPCRouter({
         });
       }
 
-      // Reject if user already has an active Kilo Pass subscription
-      const existingKiloPass = await getKiloPassStateForUser(db, ctx.user.id);
-      if (existingKiloPass && !isStripeSubscriptionEnded(existingKiloPass.status)) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'You already have an active Kilo Pass subscription.',
-        });
-      }
-
       const kiloPassTier = KILO_PASS_UPSELL_TIER_MAP[input.tier];
       const kiloPassCadence = KILO_PASS_UPSELL_CADENCE_MAP[input.cadence];
       const intendedPriceVersion = resolveKiloClawEnrollmentPriceVersion(
@@ -5300,29 +5292,32 @@ export const kiloclawRouter = createTRPCRouter({
         kiloclawPriceVersion: intendedPriceVersion,
       };
 
-      const session = await stripe.checkout.sessions.create({
-        mode: 'subscription',
-        customer: stripeCustomerId,
-        allow_promotion_codes: true,
-        billing_address_collection: 'required',
-        line_items: [{ price: priceId, quantity: 1 }],
-        customer_update: {
-          name: 'auto',
-          address: 'auto',
-        },
-        tax_id_collection: {
-          enabled: true,
-          required: 'never',
-        },
-        success_url: `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${APP_URL}/claw?checkout=cancelled`,
-        subscription_data: {
-          metadata: sessionMetadata,
-        },
-        metadata: sessionMetadata,
+      return createOrReuseKiloPassCheckoutSession({
+        userId: ctx.user.id,
+        stripeCustomerId,
+        createSession: () =>
+          stripe.checkout.sessions.create({
+            mode: 'subscription',
+            customer: stripeCustomerId,
+            allow_promotion_codes: true,
+            billing_address_collection: 'required',
+            line_items: [{ price: priceId, quantity: 1 }],
+            customer_update: {
+              name: 'auto',
+              address: 'auto',
+            },
+            tax_id_collection: {
+              enabled: true,
+              required: 'never',
+            },
+            success_url: `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${APP_URL}/claw?checkout=cancelled`,
+            subscription_data: {
+              metadata: sessionMetadata,
+            },
+            metadata: sessionMetadata,
+          }),
       });
-
-      return { url: typeof session.url === 'string' ? session.url : null };
     }),
 
   cancelSubscription: baseProcedure.mutation(async ({ ctx }) => {

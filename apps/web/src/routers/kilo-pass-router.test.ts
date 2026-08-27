@@ -68,6 +68,7 @@ let mockKiloPassNowIso: string | null = null;
 
 type StripeMock = {
   subscriptions: {
+    list: ReturnType<typeof jest.fn>;
     retrieve: ReturnType<typeof jest.fn>;
     update: ReturnType<typeof jest.fn>;
   };
@@ -80,6 +81,7 @@ type StripeMock = {
   checkout: {
     sessions: {
       create: ReturnType<typeof jest.fn>;
+      list: ReturnType<typeof jest.fn>;
       retrieve: ReturnType<typeof jest.fn>;
     };
   };
@@ -355,6 +357,7 @@ jest.mock('@/lib/kilo-pass/dayjs', () => {
 jest.mock('@/lib/stripe-client', () => {
   const stripeMock = {
     subscriptions: {
+      list: jest.fn(),
       retrieve: jest.fn(),
       update: jest.fn(),
     },
@@ -367,6 +370,7 @@ jest.mock('@/lib/stripe-client', () => {
     checkout: {
       sessions: {
         create: jest.fn(),
+        list: jest.fn(),
         retrieve: jest.fn(),
       },
     },
@@ -683,6 +687,8 @@ describe('kiloPassRouter', () => {
 
   beforeEach(() => {
     const stripeMock = getStripeMock();
+    stripeMock.subscriptions.list.mockReset();
+    stripeMock.subscriptions.list.mockResolvedValue({ data: [], has_more: false });
     stripeMock.subscriptions.retrieve.mockReset();
     stripeMock.subscriptions.update.mockReset();
     stripeMock.subscriptionSchedules.create.mockReset();
@@ -690,6 +696,8 @@ describe('kiloPassRouter', () => {
     stripeMock.subscriptionSchedules.release.mockReset();
     stripeMock.subscriptionSchedules.retrieve.mockReset();
     stripeMock.checkout.sessions.create.mockReset();
+    stripeMock.checkout.sessions.list.mockReset();
+    stripeMock.checkout.sessions.list.mockResolvedValue({ data: [] });
     stripeMock.checkout.sessions.retrieve.mockReset();
     stripeMock.billingPortal.sessions.create.mockReset();
     stripeMock.invoices.list.mockReset();
@@ -5295,6 +5303,176 @@ describe('kiloPassRouter', () => {
           cadence: KiloPassCadence.Monthly,
         })
       ).rejects.toThrow('You already have an active Kilo Pass subscription.');
+    });
+
+    it('reuses one open Stripe session for concurrent initial checkout requests', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-create-session-concurrent@example.com',
+      });
+      const session = {
+        status: 'open',
+        url: 'https://stripe.example.test/checkout/concurrent',
+        metadata: {
+          type: 'kilo-pass',
+          kiloUserId: user.id,
+        },
+      };
+      stripeMock.checkout.sessions.create.mockResolvedValue(session);
+      stripeMock.checkout.sessions.list.mockImplementation(async () => ({
+        data: stripeMock.checkout.sessions.create.mock.calls.length > 0 ? [session] : [],
+      }));
+      const caller = await createCallerForUser(user.id);
+
+      const results = await Promise.all([
+        caller.kiloPass.createCheckoutSession({
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+        }),
+        caller.kiloPass.createCheckoutSession({
+          tier: KiloPassTier.Tier49,
+          cadence: KiloPassCadence.Yearly,
+        }),
+      ]);
+
+      expect(results).toEqual([{ url: session.url }, { url: session.url }]);
+      expect(stripeMock.checkout.sessions.create).toHaveBeenCalledTimes(1);
+      expect(stripeMock.checkout.sessions.list).toHaveBeenCalledTimes(2);
+    });
+
+    it('finds an open Kilo Pass session on a later Stripe page', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-create-session-paginated@example.com',
+      });
+      stripeMock.checkout.sessions.list
+        .mockResolvedValueOnce({
+          data: [{ id: 'cs_other', metadata: {}, status: 'open', url: 'https://example.test' }],
+          has_more: true,
+        })
+        .mockResolvedValueOnce({
+          data: [
+            {
+              id: 'cs_kilo_pass',
+              metadata: { type: 'kilo-pass', kiloUserId: user.id },
+              status: 'open',
+              url: 'https://stripe.example.test/checkout/existing',
+            },
+          ],
+          has_more: false,
+        });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        caller.kiloPass.createCheckoutSession({
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+        })
+      ).resolves.toEqual({ url: 'https://stripe.example.test/checkout/existing' });
+      expect(stripeMock.checkout.sessions.list).toHaveBeenNthCalledWith(2, {
+        customer: user.stripe_customer_id,
+        status: 'open',
+        limit: 100,
+        starting_after: 'cs_other',
+      });
+      expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects checkout while a live Stripe subscription is awaiting webhook persistence', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-create-session-completed@example.com',
+      });
+      stripeMock.subscriptions.list.mockResolvedValue({
+        data: [
+          {
+            status: 'active',
+            metadata: { type: 'kilo-pass', kiloUserId: user.id },
+          },
+        ],
+        has_more: false,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        caller.kiloPass.createCheckoutSession({
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+        })
+      ).rejects.toThrow('You already have an active Kilo Pass subscription.');
+      expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
+    });
+
+    it('finds a live Kilo Pass subscription on a later Stripe page', async () => {
+      const stripeMock = getStripeMock();
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-create-session-subscription-page@example.com',
+      });
+      stripeMock.subscriptions.list
+        .mockResolvedValueOnce({
+          data: [{ id: 'sub_other', status: 'active', metadata: {} }],
+          has_more: true,
+        })
+        .mockResolvedValueOnce({
+          data: [
+            {
+              id: 'sub_kilo_pass',
+              status: 'active',
+              metadata: { type: 'kilo-pass', kiloUserId: user.id },
+            },
+          ],
+          has_more: false,
+        });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        caller.kiloPass.createCheckoutSession({
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+        })
+      ).rejects.toThrow('You already have an active Kilo Pass subscription.');
+      expect(stripeMock.subscriptions.list).toHaveBeenNthCalledWith(2, {
+        customer: user.stripe_customer_id,
+        status: 'all',
+        limit: 100,
+        starting_after: 'sub_other',
+      });
+      expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
+    });
+
+    it('allows checkout after the Stripe subscription has ended', async () => {
+      const stripeMock = getStripeMock();
+      stripeMock.checkout.sessions.create.mockResolvedValue({
+        url: 'https://stripe.example.test/checkout/resubscribe',
+      });
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-create-session-resubscribe@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_completed_then_ended',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'canceled',
+      });
+      stripeMock.subscriptions.list.mockResolvedValue({
+        data: [
+          {
+            status: 'canceled',
+            metadata: { type: 'kilo-pass', kiloUserId: user.id },
+          },
+        ],
+        has_more: false,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(
+        caller.kiloPass.createCheckoutSession({
+          tier: KiloPassTier.Tier49,
+          cadence: KiloPassCadence.Monthly,
+        })
+      ).resolves.toEqual({ url: 'https://stripe.example.test/checkout/resubscribe' });
+      expect(stripeMock.checkout.sessions.create).toHaveBeenCalledTimes(1);
     });
 
     it('creates a checkout session with empty affiliate metadata when attribution is absent', async () => {

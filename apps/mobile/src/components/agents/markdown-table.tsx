@@ -62,7 +62,6 @@ type MarkdownTableProps = {
   palette: MarkdownPalette;
   /** The table token's raw markdown source, parsed only while the modal is open. */
   raw?: string;
-  /** Stable `md-table-N` ordinal key from splitMarkdownTables. */
   tableKey: string;
   columnCount: number;
   rowCount: number;

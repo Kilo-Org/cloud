@@ -1,18 +1,10 @@
 import { MarkedLexer as markedLexer, type Tokens } from 'react-native-marked';
 
-// Splits a markdown value into table and non-table segments before the
-// renderer runs. `react-native-marked`'s Parser always builds every cell's
-// ReactNode tree before it calls `table()`, so a chat transcript that streams
-// a large table pays the cell parse on every keystroke even while the table
-// stays behind a chip. Lexing here instead gives each table its raw source,
-// shape, and a stable ordinal key up front; the cells are parsed only when the
-// table modal opens (see MarkdownTableBody).
-
 /** One extracted GFM table, rendered behind the table chip. */
 type MarkdownTableExtract = {
   type: 'table';
   raw: string;
-  /** Stable ordinal key `md-table-${n}` matching the renderer's old host key. */
+  offset: number;
   key: string;
   columnCount: number;
   rowCount: number;
@@ -26,11 +18,24 @@ type MarkdownTextExtract = {
 
 export type MarkdownSplitSegment = MarkdownTextExtract | MarkdownTableExtract;
 
-export function splitMarkdownTables(value: string): MarkdownSplitSegment[] {
+type MarkdownSnapshot = {
+  value: string;
+  segments: readonly MarkdownSplitSegment[];
+};
+
+export function splitMarkdownTables(
+  value: string,
+  previous?: MarkdownSnapshot
+): MarkdownSplitSegment[] {
   const tokens = markedLexer(value, { gfm: true });
   const segments: MarkdownSplitSegment[] = [];
+  const previousTables = previous?.segments.filter(segment => segment.type === 'table') ?? [];
   let markdown = '';
+  let offset = 0;
   let tableIndex = 0;
+  for (const table of previousTables) {
+    tableIndex = Math.max(tableIndex, Number(table.key.replace('md-table-', '')) + 1);
+  }
 
   for (const token of tokens) {
     if (token.type === 'table') {
@@ -48,6 +53,7 @@ export function splitMarkdownTables(value: string): MarkdownSplitSegment[] {
       segments.push({
         type: 'table',
         raw: table.raw,
+        offset,
         key: `md-table-${tableIndex}`,
         columnCount,
         rowCount: table.rows.length,
@@ -56,10 +62,46 @@ export function splitMarkdownTables(value: string): MarkdownSplitSegment[] {
     } else {
       markdown += token.raw;
     }
+    offset += token.raw.length;
   }
 
   if (markdown.length > 0) {
     segments.push({ type: 'markdown', raw: markdown });
+  }
+
+  const tables = segments.filter(segment => segment.type === 'table');
+  if (previous && (value.startsWith(previous.value) || previous.value.startsWith(value))) {
+    for (const [index, table] of tables.entries()) {
+      const prior = previousTables[index];
+      if (prior?.offset === table.offset) {
+        const raw = table.raw.trimEnd();
+        const before = prior.raw.trimEnd();
+        if (before.startsWith(raw) || raw.startsWith(before)) {
+          table.key = prior.key;
+        }
+      }
+    }
+    return segments;
+  }
+
+  const unmatched = new Set(tables);
+  const available = new Set(previousTables);
+  for (const exact of [true, false]) {
+    for (const table of unmatched) {
+      const raw = table.raw.trimEnd();
+      const match = previousTables.find(candidate => {
+        if (!available.has(candidate)) {
+          return false;
+        }
+        const before = candidate.raw.trimEnd();
+        return exact ? before === raw : before.startsWith(raw) || raw.startsWith(before);
+      });
+      if (match) {
+        table.key = match.key;
+        available.delete(match);
+        unmatched.delete(table);
+      }
+    }
   }
 
   return segments;

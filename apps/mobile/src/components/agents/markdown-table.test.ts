@@ -676,7 +676,11 @@ describe('MarkdownTable eager body (nested table fallback)', () => {
   });
 });
 
-describe('MarkdownTable cell inline press path (real parser)', () => {
+function tableMarkdown(rows: string[]): string {
+  return rows.map(row => `| Name |\n| --- |\n| ${row} |`).join('\n\n');
+}
+
+describe('MarkdownTable streaming and press paths (real parser)', () => {
   // Every other suite mocks useMarkdown and asserts its return value, so a
   // cell link built by a regression to the library Renderer (Linking.openURL,
   // no host confirm) would still pass. This suite un-mocks react-native-marked
@@ -686,6 +690,119 @@ describe('MarkdownTable cell inline press path (real parser)', () => {
   beforeEach(() => {
     vi.doUnmock('react-native-marked');
     vi.resetModules();
+  });
+
+  it.each([
+    {
+      change: 'inserts a preceding table',
+      before: ['Earlier', 'Target'],
+      after: ['New', 'Earlier', 'Target'],
+    },
+    { change: 'removes a preceding table', before: ['Earlier', 'Target'], after: ['Target'] },
+    {
+      change: 'replaces a preceding table',
+      before: ['Earlier', 'Target'],
+      after: ['New', 'Target'],
+    },
+    {
+      change: 'inserts a table with the same prefix',
+      before: ['Earlier', 'Target'],
+      after: ['Target |\n| More', 'Earlier', 'Target'],
+    },
+    {
+      change: 'streams rows while inserting a preceding table',
+      before: ['Earlier', 'Target'],
+      after: ['New', 'Earlier', 'Target |\n| More'],
+    },
+    {
+      change: 'streams rows while removing a preceding table',
+      before: ['Earlier', 'Target'],
+      after: ['Target |\n| More'],
+    },
+    {
+      change: 'appends a copy after extending the open table',
+      before: ['Target'],
+      after: ['Target |\n| More', 'Target'],
+      afterIndex: 0,
+    },
+  ])(
+    'keeps the same modal and table when streaming $change',
+    async ({ before, after, afterIndex = -1 }) => {
+      const { MarkdownText } = await import('./markdown-text');
+      const { MarkdownTable: Table } = await import('./markdown-table');
+      const renderer = renderTable();
+      try {
+        act(() => {
+          renderer.update(createElement(MarkdownText, { value: tableMarkdown(before) }));
+        });
+        const table = renderer.root
+          .findAllByType(Table)
+          .find(
+            node => (node.props.raw as string).trimEnd() === tableMarkdown([before.at(-1) ?? ''])
+          );
+        if (!table) {
+          throw new Error('target table missing');
+        }
+        act(() => {
+          (table.findByProps({ testID: table.props.tableKey }).props.onPress as () => void)();
+        });
+        const modal = table.findByProps({ animationType: 'slide' });
+
+        for (const [rows, index] of [
+          [after, afterIndex],
+          [before, -1],
+        ] as const) {
+          act(() => {
+            renderer.update(createElement(MarkdownText, { value: tableMarkdown(rows) }));
+          });
+
+          const updated = renderer.root
+            .findAllByType(Table)
+            .find(
+              node => (node.props.raw as string).trimEnd() === tableMarkdown([rows.at(index) ?? ''])
+            );
+          expect(updated).toBe(table);
+          expect(updated?.findByProps({ animationType: 'slide' })).toBe(modal);
+          expect(renderer.root.findAllByProps({ animationType: 'slide' })).toHaveLength(1);
+        }
+      } finally {
+        act(() => {
+          renderer.unmount();
+        });
+      }
+    }
+  );
+
+  it('does not move an open modal to the next table when its table is removed', async () => {
+    const { MarkdownText } = await import('./markdown-text');
+    const { MarkdownTable: Table } = await import('./markdown-table');
+    const remaining = '| Name |\n| --- |\n| Remaining |';
+    const renderer = renderTable();
+    try {
+      act(() => {
+        renderer.update(
+          createElement(MarkdownText, { value: `| Name |\n| --- |\n| Removed |\n\n${remaining}` })
+        );
+      });
+      const table = renderer.root.findAllByType(Table)[0];
+      if (!table) {
+        throw new Error('first table missing');
+      }
+      act(() => {
+        (table.findByProps({ testID: table.props.tableKey }).props.onPress as () => void)();
+      });
+      expect(renderer.root.findAllByProps({ animationType: 'slide' })).toHaveLength(1);
+
+      act(() => {
+        renderer.update(createElement(MarkdownText, { value: remaining }));
+      });
+
+      expect(renderer.root.findAllByProps({ animationType: 'slide' })).toHaveLength(0);
+    } finally {
+      act(() => {
+        renderer.unmount();
+      });
+    }
   });
 
   it('a cell link press runs the confirm handler, never Linking.openURL', async () => {

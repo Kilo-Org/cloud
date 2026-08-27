@@ -136,6 +136,22 @@ describe('splitMarkdownTables', () => {
     spy.mockRestore();
   });
 
+  it.each(['A', 'B'])(
+    'does not transfer an invalidated table key to a new %s table',
+    async header => {
+      const splitMarkdownTables = await loadSplitter();
+      const value = '| A |\n| --- |';
+      const previous = { value, segments: splitMarkdownTables(value) };
+      const next = splitMarkdownTables(`${value}x\n\n| ${header} |\n| --- |\n| new |`, previous);
+      const oldTable = previous.segments.find(segment => segment.type === 'table');
+      const newTable = next.find(segment => segment.type === 'table');
+
+      expect(oldTable).toBeDefined();
+      expect(newTable).toMatchObject({ columnCount: 1, rowCount: 1 });
+      expect(newTable?.key).not.toBe(oldTable?.key);
+    }
+  );
+
   it('returns an empty array for table-free markdown', async () => {
     const splitMarkdownTables = await loadSplitter();
     expect(splitMarkdownTables('Just a paragraph.')).toEqual([

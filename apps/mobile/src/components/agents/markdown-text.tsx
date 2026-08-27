@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useColorScheme, View } from 'react-native';
 import { useMarkdown } from 'react-native-marked';
 
@@ -45,7 +45,12 @@ export function MarkdownText({
 
   // Tables are extracted before any renderer runs: each table becomes a chip
   // (parsed on open), and the remaining markdown runs render through useMarkdown.
-  const segments = useMemo(() => splitMarkdownTables(value), [value]);
+  const [snapshot, setSnapshot] = useState(() => ({ value, segments: splitMarkdownTables(value) }));
+  const segments =
+    snapshot.value === value ? snapshot.segments : splitMarkdownTables(value, snapshot);
+  if (snapshot.value !== value) {
+    setSnapshot({ value, segments });
+  }
 
   return (
     <View>

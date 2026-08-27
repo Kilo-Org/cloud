@@ -6,7 +6,7 @@ import { parseTimestamp } from '@/lib/utils';
  * The stored quick-chat row contract, matching `listMessages` / `appendMessages`
  * serialization from `apps/web/src/routers/quick-chat-router.ts`.
  */
-export type QuickChatMessageRole = 'user' | 'assistant';
+type QuickChatMessageRole = 'user' | 'assistant';
 
 export type QuickChatRow = {
   id: string;

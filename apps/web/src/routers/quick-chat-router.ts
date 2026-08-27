@@ -43,7 +43,7 @@ function serializeThread(thread: QuickChatThread) {
 function serializeMessage(message: QuickChatMessage) {
   return {
     id: message.id,
-    role: message.role,
+    role: messageInput.shape.role.parse(message.role),
     content: message.content,
     clientId: message.client_id,
     createdAt: new Date(message.created_at).toISOString(),

@@ -14,7 +14,7 @@
 // hydrates (showing the skeleton, not EmptyState), and a send must abort an
 // in-flight stream.
 
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -23,6 +23,7 @@ import TabsLayout from '@/app/(app)/(tabs)/_layout';
 import { i18n } from '@/i18n';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
+import { type QuickChatRow } from './quick-chat-messages';
 import { QuickChatScreen } from './quick-chat-screen';
 
 const listMessagesQueryFn = vi.hoisted(() => vi.fn());
@@ -69,6 +70,7 @@ const kiloclawVisible = vi.hoisted(() => ({ value: false }));
 const focusedSegments = vi.hoisted(() => ({ value: ['(app)', '(tabs)', '(0_home)'] }));
 const orgLoaded = vi.hoisted(() => ({ value: true }));
 const organizationId = vi.hoisted(() => ({ value: null as string | null }));
+const authEpoch = vi.hoisted(() => ({ value: 0 }));
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -105,7 +107,7 @@ vi.mock('@/lib/utils', () => ({
   parseTimestamp: (value: string) => new Date(value),
 }));
 vi.mock('@/lib/auth/auth-context', () => ({
-  useAuth: () => ({ authEpoch: 0, token: 'token' }),
+  useAuth: () => ({ authEpoch: authEpoch.value, token: 'token' }),
 }));
 vi.mock('@/lib/auth/token-owner', () => ({
   getAuthTokenForRequest: () => 'token-1',
@@ -142,17 +144,17 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     quickChat: {
       listMessages: {
-        queryOptions: (input: unknown) => ({
-          queryKey: ['quickChat.listMessages', input],
-          queryFn: () => listMessagesQueryFn(input),
-        }),
+        queryKey: (input: unknown) => [['quickChat', 'listMessages'], { input, type: 'query' }],
       },
     },
   }),
   trpcClient: {
     quickChat: {
       getOrCreateThread: { mutate: getOrCreateThreadMutate },
-      listMessages: { query: listMessagesQuery },
+      listMessages: {
+        query: (input: { cursor?: string }) =>
+          input.cursor ? listMessagesQuery(input) : listMessagesQueryFn(input),
+      },
       appendMessages: { mutate: appendMessagesMutate },
     },
   },
@@ -212,7 +214,7 @@ vi.mock('@/components/query-error', () => ({
   },
 }));
 vi.mock('@/components/ui/button', () => ({
-  Button: (props: { onPress?: () => void; accessibilityLabel?: string; children?: unknown }) => {
+  Button: (props: { onPress?: () => void; accessibilityLabel?: string; children?: ReactNode }) => {
     buttonRenders.list.push(props);
     return createElement('View', null, props.children);
   },
@@ -306,6 +308,7 @@ beforeEach(() => {
   focusedSegments.value = ['(app)', '(tabs)', '(0_home)'];
   orgLoaded.value = true;
   organizationId.value = null;
+  authEpoch.value = 0;
 
   getOrCreateThreadMutate.mockResolvedValue({
     id: 'thread-1',
@@ -497,15 +500,114 @@ describe('QuickChatScreen send', () => {
     });
 
     expect(streamSignal.value?.aborted).toBe(true);
+    expect(appendMessagesMutate).toHaveBeenCalledTimes(1);
   });
 
-  it('aborts the in-flight stream on unmount', async () => {
+  it('persists a prompt stopped before authentication settles without starting the gateway', async () => {
+    modelOptionsState.options = [modelOption];
+    const { unmount } = await mountScreen();
+
+    await act(async () => {
+      pressSend('Stop immediately');
+      (latestComposer()?.onStop as (() => void) | undefined)?.();
+      await Promise.resolve();
+    });
+
+    expect(streamMock).not.toHaveBeenCalled();
+    expect(appendMessagesMutate).toHaveBeenCalledTimes(1);
+    expect(appendMessagesMutate).toHaveBeenCalledWith({
+      organizationId: null,
+      messages: [{ role: 'user', content: 'Stop immediately', clientId: expect.any(String) }],
+    });
+    expect(toastError).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it.each([
+    { partial: '', abortThrows: true },
+    { partial: 'Partial reply', abortThrows: true },
+    { partial: 'Partial reply', abortThrows: false },
+  ])('persists a stopped turn across remounts: %j', async ({ partial, abortThrows }) => {
+    modelOptionsState.options = [modelOption];
+    const saved: QuickChatRow[] = [];
+    listMessagesQueryFn.mockImplementation(() => ({ messages: [...saved], nextCursor: null }));
+    appendMessagesMutate.mockImplementation(
+      (input: { messages: Pick<QuickChatRow, 'role' | 'content' | 'clientId'>[] }) => {
+        const rows = input.messages.map((message, index) => ({
+          ...message,
+          id: `saved-${index}`,
+          createdAt: '2024-01-01T00:00:00.000Z',
+        }));
+        saved.push(...rows);
+        return rows;
+      }
+    );
+    let waitingForStop = false;
+    streamMock.mockImplementation(async function* stoppedStream(input: { signal: AbortSignal }) {
+      if (partial) {
+        yield partial;
+      }
+      await new Promise<void>((resolve, reject) => {
+        waitingForStop = true;
+        input.signal.addEventListener(
+          'abort',
+          () => {
+            if (abortThrows) {
+              reject(new Error('Aborted'));
+            } else {
+              resolve();
+            }
+          },
+          { once: true }
+        );
+      });
+      yield 'late delta';
+    });
+
+    const { unmount } = await mountScreen();
+    await act(async () => {
+      pressSend('Keep this prompt');
+      await Promise.resolve();
+    });
+    await waitFor(() => waitingForStop);
+
+    await act(async () => {
+      (latestComposer()?.onStop as (() => void) | undefined)?.();
+      (latestComposer()?.onStop as (() => void) | undefined)?.();
+      await Promise.resolve();
+    });
+
+    expect(appendMessagesMutate).toHaveBeenCalledTimes(1);
+    expect(latestComposer()?.isStreaming).toBe(false);
+    expect(toastError).not.toHaveBeenCalled();
+    unmount();
+    sessionListRenders.list = [];
+
+    const remounted = await mountScreen();
+    await waitFor(() => transcriptItems().length === (partial ? 2 : 1));
+    expect(transcriptItems().map(item => [item.info.role, item.parts[0]?.text])).toEqual([
+      ['user', 'Keep this prompt'],
+      ...(partial ? [['assistant', partial]] : []),
+    ]);
+    remounted.unmount();
+  });
+
+  it('aborts the in-flight stream on unmount without persisting late data', async () => {
     modelOptionsState.options = [modelOption];
 
     const streamSignal = { value: undefined as AbortSignal | undefined };
-    streamMock.mockImplementation((input: { signal?: AbortSignal }) => {
+    streamMock.mockImplementation(async function* unmountedStream(input: { signal: AbortSignal }) {
       streamSignal.value = input.signal;
-      return hangingStream();
+      await new Promise<void>(resolve => {
+        input.signal.addEventListener(
+          'abort',
+          () => {
+            resolve();
+          },
+          { once: true }
+        );
+      });
+      yield 'late delta';
     });
 
     const { unmount } = await mountScreen();
@@ -518,9 +620,14 @@ describe('QuickChatScreen send', () => {
 
     expect(streamSignal.value?.aborted).toBe(false);
 
-    unmount();
+    await act(async () => {
+      unmount();
+      await Promise.resolve();
+    });
 
     expect(streamSignal.value?.aborted).toBe(true);
+    expect(appendMessagesMutate).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
   });
 });
 
@@ -572,7 +679,7 @@ describe('QuickChatScreen history errors', () => {
       Object.assign(new Error('boom'), { data: { code: 'INTERNAL_SERVER_ERROR' } })
     );
     await act(async () => {
-      await queryClient.invalidateQueries({ queryKey: ['quickChat.listMessages'] });
+      await queryClient.invalidateQueries({ queryKey: [['quickChat', 'listMessages']] });
     });
     await waitFor(() => buttonRenders.list.length > 0);
 
@@ -631,7 +738,7 @@ describe('QuickChatScreen older-page paging', () => {
     // must release the lock so pagination is not stuck behind the stale load.
     listMessagesQueryFn.mockResolvedValue({ messages: [firstPageRow], nextCursor: 'c2' });
     await act(async () => {
-      await queryClient.invalidateQueries({ queryKey: ['quickChat.listMessages'] });
+      await queryClient.invalidateQueries({ queryKey: [['quickChat', 'listMessages']] });
     });
     await waitFor(() => olderList()?.isLoadingOlderMessages === false);
 
@@ -670,6 +777,57 @@ describe('QuickChatScreen empty state', () => {
 });
 
 describe('QuickChatScreen org hydration', () => {
+  it.each(['account', 'organization'])(
+    'never renders the prior %s transcript during a scope change',
+    async scope => {
+      modelOptionsState.options = [modelOption];
+      const historyRow: QuickChatRow = {
+        id: 'history',
+        role: 'user',
+        content: 'Private history',
+        createdAt: '2024-01-01T00:00:00.000Z',
+      };
+      listMessagesQueryFn.mockResolvedValue({ messages: [historyRow], nextCursor: 'older' });
+      listMessagesQuery.mockResolvedValue({
+        messages: [{ ...historyRow, id: 'older', content: 'Private older history' }],
+        nextCursor: null,
+      });
+      streamMock.mockReturnValue(hangingStream());
+      const { renderer, queryClient, unmount } = await mountScreen();
+      await waitFor(() => transcriptItems().length === 1);
+      await act(async () => {
+        (sessionListRenders.list.at(-1)?.onLoadOlderMessages as (() => void) | undefined)?.();
+        pressSend('Private local prompt');
+        await Promise.resolve();
+      });
+      await waitFor(() => transcriptItems().length === 3);
+
+      listMessagesQueryFn.mockReturnValue(new Promise(() => undefined));
+      getOrCreateThreadMutate.mockReturnValue(new Promise(() => undefined));
+      sessionListRenders.list = [];
+      skeletonRenders.count = 0;
+      await act(async () => {
+        if (scope === 'account') {
+          authEpoch.value += 1;
+        } else {
+          organizationId.value = 'org-2';
+        }
+        renderer.update(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(QuickChatScreen)
+          )
+        );
+        await Promise.resolve();
+      });
+
+      expect(sessionListRenders.list).toHaveLength(0);
+      expect(skeletonRenders.count).toBeGreaterThan(0);
+      unmount();
+    }
+  );
+
   it('does not fetch history until the organization scope is loaded', async () => {
     orgLoaded.value = false;
 

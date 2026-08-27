@@ -9,6 +9,7 @@ import { SessionMessageList } from '@/components/agents/session-message-list';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import {
   appendSpectatorRow,
+  formatSpectatorTime,
   type SpectatorRow,
   spectatorRowsFromEntries,
   toSpectatorRow,
@@ -17,6 +18,7 @@ import {
   type Connection,
   createReviewSpectatorStream,
 } from '@/components/code-reviewer/review-spectator-stream';
+import { useRefetchSessionMessagesOnTerminal } from '@/components/code-reviewer/review-spectator-terminal-refetch';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -27,7 +29,7 @@ const TERMINAL_REVIEW_STATUSES = new Set(['completed', 'failed', 'cancelled', 'i
 const renderSpectatorRow: ListRenderItem<SpectatorRow> = ({ item }) => (
   <View className="gap-1 px-4 py-1">
     <Text variant="muted" className="text-xs">
-      {item.timestamp}
+      {formatSpectatorTime(item.timestamp)}
     </Text>
     <Text className="text-xs">{item.message}</Text>
     {item.content ? (
@@ -104,6 +106,8 @@ export function ReviewSpectator({
     ...trpc.codeReviews.getSessionMessages.queryOptions({ reviewId }),
     enabled: Boolean(info) && shouldLoadHistory,
   });
+
+  useRefetchSessionMessagesOnTerminal(isTerminal, shouldLoadHistory, sessionMessages.refetch);
 
   useEffect(() => {
     // Each effect run owns its dispose flag: a shared flag is reset at entry by

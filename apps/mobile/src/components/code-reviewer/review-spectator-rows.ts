@@ -1,5 +1,9 @@
 import { type CloudAgentEvent } from '@kilocode/cloud-agent-sdk';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+
+import { i18n } from '@/i18n';
+import { dateTimeFormat } from '@/lib/intl-cache';
+import { parseTimestamp } from '@/lib/utils';
 import { type TFunction } from 'i18next';
 
 type GetSessionMessagesResult =
@@ -266,4 +270,18 @@ export function spectatorRowsFromEntries(entries: readonly SessionMessageEntry[]
     eventType: entry.eventType,
     key: `${entry.timestamp}${entry.message}${index}`,
   }));
+}
+
+/**
+ * Format a transcript timestamp as a localized clock time. The backend emits
+ * PostgreSQL/ISO strings that Hermes cannot parse with `new Date`, so the value
+ * goes through `parseTimestamp` first; an unusable value falls back to the raw
+ * string rather than throwing.
+ */
+export function formatSpectatorTime(timestamp: string): string {
+  const date = parseTimestamp(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return timestamp;
+  }
+  return dateTimeFormat(i18n.language, { timeStyle: 'short' }).format(date);
 }

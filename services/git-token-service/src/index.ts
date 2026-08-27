@@ -417,6 +417,48 @@ function validateGitHubCapabilityUpstream(
   return null;
 }
 
+function validateUserGitHubCapabilityUpstream(
+  requestMethod: string,
+  requestUrl: string,
+  repository: { owner: string; repo: string }
+): RedeemGitHubSessionCapabilityFailureReason | null {
+  let url: URL;
+  try {
+    url = new URL(requestUrl);
+  } catch {
+    return 'invalid_upstream_url';
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || url.hash) {
+    return 'invalid_upstream_url';
+  }
+  if (url.port !== '') return 'upstream_host_not_allowed';
+
+  if (url.hostname === 'github.com') {
+    return validateLegacyGitHubCapabilityUpstream(requestMethod, requestUrl, repository);
+  }
+  if (url.hostname !== 'api.github.com' && url.hostname !== 'uploads.github.com') {
+    return 'upstream_host_not_allowed';
+  }
+
+  const method = requestMethod.toUpperCase();
+  if (!['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    return 'invalid_upstream_request';
+  }
+  const decodedPathname = decodePathnameIteratively(url.pathname);
+  if (
+    decodedPathname === null ||
+    decodedPathname.includes('\\') ||
+    /(?:^|\/)\.{1,2}(?:\/|$)/.test(decodedPathname)
+  ) {
+    return 'invalid_upstream_url';
+  }
+  const repositoryApiPath = `/repos/${repository.owner}/${repository.repo}`.toLowerCase();
+  const path = url.pathname.toLowerCase();
+  return path === repositoryApiPath || path.startsWith(`${repositoryApiPath}/`)
+    ? null
+    : 'repository_mismatch';
+}
+
 function validateLegacyGitHubCapabilityUpstream(
   requestMethod: string,
   requestUrl: string,
@@ -784,7 +826,14 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
    */
   async getTokenForRepo(params: GetTokenForRepoParams): Promise<GetTokenForRepoResult> {
     const resolved = await this.resolveAuthoritativeInstallation(params);
-    if (!resolved.success) return resolved;
+    if (!resolved.success) {
+      if (resolved.reason === 'temporarily_unavailable') {
+        throw new Error('GitHub repository authorization is temporarily unavailable');
+      }
+      return resolved.reason === 'ambiguous_installation'
+        ? { success: false, reason: 'no_installation_found' }
+        : resolved;
+    }
     const { installation } = resolved;
 
     return {
@@ -801,7 +850,14 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     params: GetCloudAgentAuthForRepoParams
   ): Promise<GetCloudAgentAuthForRepoResult> {
     const resolved = await this.resolveAuthoritativeInstallation(params);
-    if (!resolved.success) return resolved;
+    if (!resolved.success) {
+      if (resolved.reason === 'temporarily_unavailable') {
+        throw new Error('GitHub repository authorization is temporarily unavailable');
+      }
+      return resolved.reason === 'ambiguous_installation'
+        ? { success: false, reason: 'no_installation_found' }
+        : resolved;
+    }
     const { installation } = resolved;
 
     const installationAuthor = this.getInstallationAuthor(installation.githubAppType);
@@ -906,9 +962,11 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     }
 
     const upstreamFailure =
-      claims.version === 2
-        ? validateGitHubCapabilityUpstream(params.requestUrl)
-        : validateLegacyGitHubCapabilityUpstream(params.requestMethod, params.requestUrl, claims);
+      claims.version === 2 && claims.source === 'user'
+        ? validateUserGitHubCapabilityUpstream(params.requestMethod, params.requestUrl, claims)
+        : claims.version === 2
+          ? validateGitHubCapabilityUpstream(params.requestUrl)
+          : validateLegacyGitHubCapabilityUpstream(params.requestMethod, params.requestUrl, claims);
     if (upstreamFailure) return { success: false, reason: upstreamFailure };
 
     const authParams = {

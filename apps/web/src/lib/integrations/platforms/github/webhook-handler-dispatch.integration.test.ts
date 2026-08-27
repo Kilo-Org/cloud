@@ -191,6 +191,7 @@ describe('handleGitHubWebhook — pull_request dispatch to upsertCliSessionPullR
     const afterOpened = await readRow('feature/merge-me');
     expect(afterOpened).toHaveLength(1);
     expect(afterOpened[0].pr_state).toBe('open');
+    expect(afterOpened[0].platform_integration_id).toBe(integrationId);
 
     // Now the critical case: `closed` short-circuits before `handlePullRequest`
     // is invoked, but the upsert side-effect must still run.
@@ -233,6 +234,7 @@ describe('handleGitHubWebhook — pull_request dispatch to upsertCliSessionPullR
 
     const rows = await readRow('feature/abandon');
     expect(rows[0].pr_state).toBe('closed');
+    expect(rows[0].platform_integration_id).toBe(integrationId);
   });
 
   it('deduplicates redelivered pull_request webhooks before the upsert runs', async () => {

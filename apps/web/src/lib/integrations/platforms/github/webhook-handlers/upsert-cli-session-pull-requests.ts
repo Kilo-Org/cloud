@@ -14,8 +14,8 @@ import { REVIEW_DECISION_SUPPORTED_PLATFORMS } from './supported-platforms';
  * populate PR metadata read by another tenant.
  */
 export type WebhookInstallationOwner =
-  | { kind: 'organization'; organizationId: string }
-  | { kind: 'user'; userId: string };
+  | { kind: 'organization'; organizationId: string; platformIntegrationId?: string }
+  | { kind: 'user'; userId: string; platformIntegrationId?: string };
 
 /**
  * Result of the matching-session gate check.
@@ -179,6 +179,9 @@ export async function upsertCliSessionPullRequestsFromWebhook(
     const reviewDecisionPendingSet = REVIEW_DECISION_PENDING_ACTIONS.has(action)
       ? sql`true`
       : github_branch_pull_requests.review_decision_pending;
+    const platformIntegrationIdSet = owner.platformIntegrationId
+      ? sql`excluded.platform_integration_id`
+      : github_branch_pull_requests.platform_integration_id;
 
     const ownerValues =
       owner.kind === 'organization'
@@ -209,6 +212,7 @@ export async function upsertCliSessionPullRequestsFromWebhook(
         git_url: gitUrl,
         git_branch: branch,
         ...ownerValues,
+        platform_integration_id: owner.platformIntegrationId,
         pr_url: prUrl,
         pr_number: pull_request.number,
         pr_state: state,
@@ -222,6 +226,7 @@ export async function upsertCliSessionPullRequestsFromWebhook(
         target: conflictTarget,
         targetWhere: conflictTargetWhere,
         set: {
+          platform_integration_id: platformIntegrationIdSet,
           pr_url: sql`excluded.pr_url`,
           pr_number: sql`excluded.pr_number`,
           pr_state: prStateSet,

@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Duke pritur transkriptin e shqyrtimit.",
       "transcriptEmpty": "Asnjë transkript për këtë shqyrtim.",
       "transcriptRetry": "Nuk u arrit të ngarkohej transkripti i shqyrtimit.",
-      "transcriptLive": "Drejtpërdrejt"
+      "transcriptLive": "Drejtpërdrejt",
+      "agentIdle": "Agjenti i papunë",
+      "agentWorking": "Agjenti duke punuar...",
+      "anErrorOccurred": "Ndodhi një gabim",
+      "errorWithMessage": "Gabim: {{message}}",
+      "executionStarted": "Ekzekutimi filloi",
+      "reviewCompleted": "Rishikimi u përfundua",
+      "reviewInterrupted": "Rishikimi u ndërpre",
+      "sessionError": "Gabim sesioni: {{error}}",
+      "statusWithValue": "Statusi: {{status}}",
+      "toolName": "Mjeti: {{name}}",
+      "toolNameError": "Mjeti: {{name}} — gabim",
+      "unknownError": "Gabim i panjohur"
     },
     "reviewMemory": {
       "title": "Kujtesa e shqyrtimit",

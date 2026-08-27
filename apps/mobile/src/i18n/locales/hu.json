@@ -1304,7 +1304,19 @@
       "transcriptEmpty": "Ehhez az áttekintéshez nincs átirat.",
       "transcriptLive": "ÉLŐ",
       "transcriptRetry": "Nem sikerült betölteni az áttekintés átiratát.",
-      "transcriptWaiting": "Várakozás az áttekintés átiratára."
+      "transcriptWaiting": "Várakozás az áttekintés átiratára.",
+      "agentIdle": "Ügynök tétlen",
+      "agentWorking": "Ügynök feldolgozás...",
+      "anErrorOccurred": "Hiba történt",
+      "errorWithMessage": "Hiba: {{message}}",
+      "executionStarted": "Végrehajtás elindítva",
+      "reviewCompleted": "Áttekintés befejezve",
+      "reviewInterrupted": "Áttekintés megszakítva",
+      "sessionError": "Munkamenet hiba: {{error}}",
+      "statusWithValue": "Állapot: {{status}}",
+      "toolName": "Eszköz: {{name}}",
+      "toolNameError": "Eszköz: {{name}} — hiba",
+      "unknownError": "Ismeretlen hiba"
     },
     "reviewMemory": {
       "title": "Áttekintési memória",

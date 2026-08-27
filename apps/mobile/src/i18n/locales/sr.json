@@ -1313,7 +1313,19 @@
       "transcriptWaiting": "Čekanje na transkript pregleda.",
       "transcriptEmpty": "Nema transkripta za ovaj pregled.",
       "transcriptRetry": "Učitavanje transkripta pregleda nije uspelo.",
-      "transcriptLive": "UŽIVO"
+      "transcriptLive": "UŽIVO",
+      "agentIdle": "Agent je neaktivan",
+      "agentWorking": "Agent radi...",
+      "anErrorOccurred": "Došlo je do greške",
+      "errorWithMessage": "Greška: {{message}}",
+      "executionStarted": "Izvršavanje je počelo",
+      "reviewCompleted": "Pregled je završen",
+      "reviewInterrupted": "Pregled je prekinut",
+      "sessionError": "Greška sesije: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Alat: {{name}}",
+      "toolNameError": "Alat: {{name}} — greška",
+      "unknownError": "Nepoznata greška"
     },
     "reviewMemory": {
       "title": "Memorija pregleda",

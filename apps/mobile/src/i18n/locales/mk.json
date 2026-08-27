@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Чекање на записот од прегледот.",
       "transcriptEmpty": "Нема запис за овој преглед.",
       "transcriptRetry": "Не можев да го вчитам записот од прегледот.",
-      "transcriptLive": "ВОЖИВО"
+      "transcriptLive": "ВОЖИВО",
+      "agentIdle": "Агентот е неактивен",
+      "agentWorking": "Агентот работи...",
+      "anErrorOccurred": "Се појави грешка",
+      "errorWithMessage": "Грешка: {{message}}",
+      "executionStarted": "Извршувањето започна",
+      "reviewCompleted": "Прегледот е завршен",
+      "reviewInterrupted": "Прегледот е прекинат",
+      "sessionError": "Грешка на сесијата: {{error}}",
+      "statusWithValue": "Статус: {{status}}",
+      "toolName": "Алатка: {{name}}",
+      "toolNameError": "Алатка: {{name}} — грешка",
+      "unknownError": "Непозната грешка"
     },
     "reviewMemory": {
       "title": "Меморија на прегледи",

@@ -903,7 +903,19 @@
       "transcriptWaiting": "Menunggu transkrip tinjauan.",
       "transcriptEmpty": "Tidak ada transkrip untuk tinjauan ini.",
       "transcriptRetry": "Tidak dapat memuat transkrip tinjauan.",
-      "transcriptLive": "Langsung"
+      "transcriptLive": "Langsung",
+      "agentIdle": "Agen menganggur",
+      "agentWorking": "Agen sedang bekerja...",
+      "anErrorOccurred": "Terjadi kesalahan",
+      "errorWithMessage": "Kesalahan: {{message}}",
+      "executionStarted": "Eksekusi dimulai",
+      "reviewCompleted": "Tinjauan selesai",
+      "reviewInterrupted": "Tinjauan terganggu",
+      "sessionError": "Kesalahan sesi: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Alat: {{name}}",
+      "toolNameError": "Alat: {{name}} — kesalahan",
+      "unknownError": "Kesalahan tidak dikenal"
     },
     "reviewList": {
       "configureProvider": "Konfigurasikan penyedia",

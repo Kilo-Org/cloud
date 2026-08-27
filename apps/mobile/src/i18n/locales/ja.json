@@ -903,7 +903,19 @@
       "transcriptWaiting": "レビューのトランスクリプトを待っています。",
       "transcriptEmpty": "このレビューのトランスクリプトはありません。",
       "transcriptRetry": "レビューのトランスクリプトを読み込めませんでした。",
-      "transcriptLive": "ライブ"
+      "transcriptLive": "ライブ",
+      "agentIdle": "エージェント待機中",
+      "agentWorking": "エージェント作業中…",
+      "anErrorOccurred": "エラーが発生しました",
+      "errorWithMessage": "エラー: {{message}}",
+      "executionStarted": "実行を開始しました",
+      "reviewCompleted": "レビューが完了しました",
+      "reviewInterrupted": "レビューが中断されました",
+      "sessionError": "セッションエラー: {{error}}",
+      "statusWithValue": "ステータス: {{status}}",
+      "toolName": "ツール: {{name}}",
+      "toolNameError": "ツール: {{name}} — エラー",
+      "unknownError": "不明なエラー"
     },
     "reviewList": {
       "configureProvider": "プロバイダーを設定",

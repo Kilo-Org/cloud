@@ -911,7 +911,19 @@
       "transcriptWaiting": "في انتظار نص المراجعة.",
       "transcriptEmpty": "لا يوجد نص لهذه المراجعة.",
       "transcriptRetry": "تعذّر تحميل نص المراجعة.",
-      "transcriptLive": "مباشر"
+      "transcriptLive": "مباشر",
+      "agentIdle": "الوكيل خامل",
+      "agentWorking": "الوكيل يعمل...",
+      "anErrorOccurred": "حدث خطأ",
+      "errorWithMessage": "خطأ: {{message}}",
+      "executionStarted": "بدأ التنفيذ",
+      "reviewCompleted": "اكتملت المراجعة",
+      "reviewInterrupted": "توقفت المراجعة",
+      "sessionError": "خطأ في الجلسة: {{error}}",
+      "statusWithValue": "الحالة: {{status}}",
+      "toolName": "الأداة: {{name}}",
+      "toolNameError": "الأداة: {{name}} — خطأ",
+      "unknownError": "خطأ غير معروف"
     },
     "reviewList": {
       "configureProvider": "تهيئة المزوّد",

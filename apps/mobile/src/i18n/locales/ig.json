@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Na-echere Nsụgharị nyocha.",
       "transcriptEmpty": "Enweghị Nsụgharị maka nyocha a.",
       "transcriptRetry": "Enweghị ike ibudata Nsụgharị nyocha.",
-      "transcriptLive": "LIVE"
+      "transcriptLive": "LIVE",
+      "agentIdle": "Onye nnọchite na-ezu ike",
+      "agentWorking": "Onye nnọchite na-arụ ọrụ...",
+      "anErrorOccurred": "Njehie mere",
+      "errorWithMessage": "Njehie: {{message}}",
+      "executionStarted": "Mmezu malitere",
+      "reviewCompleted": "Nyocha gwụchara",
+      "reviewInterrupted": "Nyocha kwụsịrị",
+      "sessionError": "Njehie nnọkọ: {{error}}",
+      "statusWithValue": "Ọnọdụ: {{status}}",
+      "toolName": "Ngwa ọrụ: {{name}}",
+      "toolNameError": "Ngwa ọrụ: {{name}} — njehie",
+      "unknownError": "Njehie a na-amaghị"
     },
     "reviewMemory": {
       "title": "Ebe nchekwa nyocha",

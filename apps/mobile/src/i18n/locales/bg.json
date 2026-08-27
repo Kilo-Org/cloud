@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Изчакване на препис на прегледа.",
       "transcriptEmpty": "Няма препис за този преглед.",
       "transcriptRetry": "Не можа да се зареди преписът на прегледа.",
-      "transcriptLive": "НА ЖИВО"
+      "transcriptLive": "НА ЖИВО",
+      "agentIdle": "Агентът е неактивен",
+      "agentWorking": "Агентът работи...",
+      "anErrorOccurred": "Възникна грешка",
+      "errorWithMessage": "Грешка: {{message}}",
+      "executionStarted": "Изпълнението започна",
+      "reviewCompleted": "Прегледът завърши",
+      "reviewInterrupted": "Прегледът беше прекъснат",
+      "sessionError": "Грешка в сесията: {{error}}",
+      "statusWithValue": "Статус: {{status}}",
+      "toolName": "Инструмент: {{name}}",
+      "toolNameError": "Инструмент: {{name}} — грешка",
+      "unknownError": "Неизвестна грешка"
     },
     "reviewMemory": {
       "title": "Памет за прегледа",

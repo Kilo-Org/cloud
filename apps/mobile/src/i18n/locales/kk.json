@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Шолу транскрипті күтілуде.",
       "transcriptEmpty": "Бұл шолу үшін транскрипт жоқ.",
       "transcriptRetry": "Шолу транскриптін жүктеу мүмкін болмады.",
-      "transcriptLive": "ТІКІ"
+      "transcriptLive": "ТІКІ",
+      "agentIdle": "Агент бос тұр",
+      "agentWorking": "Агент орындалуда...",
+      "anErrorOccurred": "Қате орын алды",
+      "errorWithMessage": "Қате: {{message}}",
+      "executionStarted": "Орындалу басталды",
+      "reviewCompleted": "Шолу аяқталды",
+      "reviewInterrupted": "Шолу үзілді",
+      "sessionError": "Сессия қатесі: {{error}}",
+      "statusWithValue": "Күй: {{status}}",
+      "toolName": "Құрал: {{name}}",
+      "toolNameError": "Құрал: {{name}} — қате",
+      "unknownError": "Белгісіз қате"
     },
     "reviewMemory": {
       "title": "Шолу жады",

@@ -889,7 +889,19 @@
       "transcriptWaiting": "Aguardando a transcrição da revisão.",
       "transcriptEmpty": "Nenhuma transcrição para esta revisão.",
       "transcriptRetry": "Não foi possível carregar a transcrição da revisão.",
-      "transcriptLive": "AO VIVO"
+      "transcriptLive": "AO VIVO",
+      "agentIdle": "Agente ocioso",
+      "agentWorking": "Agente trabalhando...",
+      "anErrorOccurred": "Ocorreu um erro",
+      "errorWithMessage": "Erro: {{message}}",
+      "executionStarted": "Execução iniciada",
+      "reviewCompleted": "Revisão concluída",
+      "reviewInterrupted": "Revisão interrompida",
+      "sessionError": "Erro de sessão: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Ferramenta: {{name}}",
+      "toolNameError": "Ferramenta: {{name}} — erro",
+      "unknownError": "Erro desconhecido"
     },
     "reviewList": {
       "configureProvider": "Configurar provedor",

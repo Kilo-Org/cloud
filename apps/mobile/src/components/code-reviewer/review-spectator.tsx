@@ -86,11 +86,15 @@ export function ReviewSpectator({
     },
   });
 
+  const [liveRows, setLiveRows] = useState<SpectatorRow[]>([]);
+  const [liveError, setLiveError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
+
   const info = streamInfo.data?.success ? streamInfo.data : null;
   const effectiveStatus = info?.status ?? status;
   const isTerminal = TERMINAL_REVIEW_STATUSES.has(effectiveStatus);
   const isHistorical = info !== null && info.agentVersion !== 'v2';
-  const shouldLoadHistory = info !== null && (isHistorical || isTerminal);
+  const shouldLoadHistory = info !== null && (isHistorical || isTerminal) && liveRows.length === 0;
   const cloudAgentSessionId = info?.cloudAgentSessionId ?? null;
   const isLiveCloud =
     info !== null && !isTerminal && info.agentVersion === 'v2' && cloudAgentSessionId !== null;
@@ -100,10 +104,6 @@ export function ReviewSpectator({
     ...trpc.codeReviews.getSessionMessages.queryOptions({ reviewId }),
     enabled: Boolean(info) && shouldLoadHistory,
   });
-
-  const [liveRows, setLiveRows] = useState<SpectatorRow[]>([]);
-  const [liveError, setLiveError] = useState(false);
-  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     // Each effect run owns its dispose flag: a shared flag is reset at entry by
@@ -126,7 +126,7 @@ export function ReviewSpectator({
             if (disposed) {
               return;
             }
-            const row = toSpectatorRow(event);
+            const row = toSpectatorRow(event, t);
             if (row !== null) {
               const keyedRow =
                 row.key === undefined ? { ...row, key: `event-${event.eventId}` } : row;
@@ -168,7 +168,7 @@ export function ReviewSpectator({
       disposed = true;
       connection?.destroy();
     };
-  }, [liveCloudId, info?.organizationId, retryNonce]);
+  }, [liveCloudId, info?.organizationId, retryNonce, t]);
 
   const historicalRows = useMemo(
     () =>
@@ -233,10 +233,29 @@ export function ReviewSpectator({
       return renderSkeletonSlot();
     }
     if (streamInfo.isError || (streamInfo.data && !streamInfo.data.success)) {
+      if (liveRows.length > 0) {
+        return (
+          <View>
+            {renderRowsSlot()}
+            <View className="items-center px-4 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onPress={() => {
+                  void streamInfo.refetch();
+                }}
+              >
+                <Text>{t('common.retry')}</Text>
+              </Button>
+            </View>
+          </View>
+        );
+      }
       return (
         <QueryError
           variant="server"
           title={t('codeReviewer.reviewDetail.transcriptRetry')}
+          placement="top"
           onRetry={() => {
             void streamInfo.refetch();
           }}
@@ -253,6 +272,7 @@ export function ReviewSpectator({
           <QueryError
             variant="server"
             title={t('codeReviewer.reviewDetail.transcriptRetry')}
+            placement="top"
             onRetry={() => {
               void sessionMessages.refetch();
             }}
@@ -282,6 +302,7 @@ export function ReviewSpectator({
         <QueryError
           variant="server"
           title={t('codeReviewer.reviewDetail.transcriptRetry')}
+          placement="top"
           onRetry={() => {
             setLiveError(false);
             setRetryNonce(count => count + 1);

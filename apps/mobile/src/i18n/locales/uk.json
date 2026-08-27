@@ -907,7 +907,19 @@
       "transcriptWaiting": "Очікування транскрипту перевірки.",
       "transcriptEmpty": "Немає транскрипту для цієї перевірки.",
       "transcriptRetry": "Не вдалося завантажити транскрипт перевірки.",
-      "transcriptLive": "НАЖИВО"
+      "transcriptLive": "НАЖИВО",
+      "agentIdle": "Агент бездіє",
+      "agentWorking": "Агент працює…",
+      "anErrorOccurred": "Сталася помилка",
+      "errorWithMessage": "Помилка: {{message}}",
+      "executionStarted": "Виконання розпочато",
+      "reviewCompleted": "Перевірку завершено",
+      "reviewInterrupted": "Перевірку перервано",
+      "sessionError": "Помилка сеансу: {{error}}",
+      "statusWithValue": "Стан: {{status}}",
+      "toolName": "Інструмент: {{name}}",
+      "toolNameError": "Інструмент: {{name}} — помилка",
+      "unknownError": "Невідома помилка"
     },
     "reviewList": {
       "configureProvider": "Налаштувати провайдера",

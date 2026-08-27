@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Jiran rubutun zaman na bita.",
       "transcriptEmpty": "Babu rubutun zaman ga wannan bita.",
       "transcriptRetry": "An kasa ɗora rubutun zaman na bita.",
-      "transcriptLive": "RAYA"
+      "transcriptLive": "RAYA",
+      "agentIdle": "Wakili baya aiki",
+      "agentWorking": "Wakili yana aiki...",
+      "anErrorOccurred": "An sami kuskure",
+      "errorWithMessage": "Kuskure: {{message}}",
+      "executionStarted": "An fara aiwatarwa",
+      "reviewCompleted": "An kammala bita",
+      "reviewInterrupted": "An katse bita",
+      "sessionError": "Kuskuren zama: {{error}}",
+      "statusWithValue": "Hali: {{status}}",
+      "toolName": "Kayan aiki: {{name}}",
+      "toolNameError": "Kayan aiki: {{name}} — kuskure",
+      "unknownError": "Kuskuren da ba a sani ba"
     },
     "reviewMemory": {
       "title": "Ƙwaƙwalwar bita",

@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "የግምገማ ግልባጩን በመጠበቅ ላይ።",
       "transcriptEmpty": "ለዚህ ግምገማ ግልባጭ የለም።",
       "transcriptRetry": "የግምገማ ግልባጩን መጫን አልተቻለም።",
-      "transcriptLive": "ቀጥታ"
+      "transcriptLive": "ቀጥታ",
+      "agentIdle": "ወኪል በስራ ፈት",
+      "agentWorking": "ወኪል በመስራት ላይ...",
+      "anErrorOccurred": "ስህተት ተከስቷል",
+      "errorWithMessage": "ስህተት: {{message}}",
+      "executionStarted": "አፈጻጸም ተጀምሯል",
+      "reviewCompleted": "ግምገማ ተጠናቋል",
+      "reviewInterrupted": "ግምገማ ተቋርጧል",
+      "sessionError": "የክፍለ-ጊዜ ስህተት: {{error}}",
+      "statusWithValue": "ሁኔታ: {{status}}",
+      "toolName": "መሳሪያ: {{name}}",
+      "toolNameError": "መሳሪያ: {{name}} — ስህተት",
+      "unknownError": "የማይታወቅ ስህተት"
     },
     "reviewMemory": {
       "title": "የግምገማ ትውስታ",

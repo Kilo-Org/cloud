@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Sugaya qoraalka dib-u-eegista.",
       "transcriptEmpty": "Qoraal kama jiro dib-u-eegistan.",
       "transcriptRetry": "Qoraalka dib-u-eegista lama soo dejin karin.",
-      "transcriptLive": "TOOS AH"
+      "transcriptLive": "TOOS AH",
+      "agentIdle": "Wakiilku waa fadhiisan",
+      "agentWorking": "Wakiilku wuu shaqaynayaa...",
+      "anErrorOccurred": "Khalad baa dhacay",
+      "errorWithMessage": "Khalad: {{message}}",
+      "executionStarted": "Fulinta waa la bilaabay",
+      "reviewCompleted": "Dib-u-eegista waa la dhammeeyay",
+      "reviewInterrupted": "Dib-u-eegista waa la joojiyay",
+      "sessionError": "Khalad kalfadhi: {{error}}",
+      "statusWithValue": "Heerka: {{status}}",
+      "toolName": "Qalab: {{name}}",
+      "toolNameError": "Qalab: {{name}} — khalad",
+      "unknownError": "Khalad aan la aqoon"
     },
     "reviewMemory": {
       "title": "Xusuusta dib-u-eegista",

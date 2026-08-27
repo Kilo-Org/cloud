@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Menunggu transkrip semakan.",
       "transcriptEmpty": "Tiada transkrip untuk semakan ini.",
       "transcriptRetry": "Tidak dapat memuatkan transkrip semakan.",
-      "transcriptLive": "LANGSUNG"
+      "transcriptLive": "LANGSUNG",
+      "agentIdle": "Ejen melahu",
+      "agentWorking": "Ejen bekerja...",
+      "anErrorOccurred": "Ralat berlaku",
+      "errorWithMessage": "Ralat: {{message}}",
+      "executionStarted": "Pelaksanaan dimulakan",
+      "reviewCompleted": "Semakan selesai",
+      "reviewInterrupted": "Semakan terganggu",
+      "sessionError": "Ralat sesi: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Alat: {{name}}",
+      "toolNameError": "Alat: {{name}} — ralat",
+      "unknownError": "Ralat tidak diketahui"
     },
     "reviewMemory": {
       "title": "Memori semakan",

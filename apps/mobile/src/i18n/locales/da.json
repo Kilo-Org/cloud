@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Venter på gennemgangens transskription.",
       "transcriptEmpty": "Ingen transskription for denne gennemgang.",
       "transcriptRetry": "Kunne ikke indlæse gennemgangens transskription.",
-      "transcriptLive": "LIVE"
+      "transcriptLive": "LIVE",
+      "agentIdle": "Agent inaktiv",
+      "agentWorking": "Agent arbejder...",
+      "anErrorOccurred": "Der opstod en fejl",
+      "errorWithMessage": "Fejl: {{message}}",
+      "executionStarted": "Udførelse startet",
+      "reviewCompleted": "Gennemgang fuldført",
+      "reviewInterrupted": "Gennemgang afbrudt",
+      "sessionError": "Sessionsfejl: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Værktøj: {{name}}",
+      "toolNameError": "Værktøj: {{name}} — fejl",
+      "unknownError": "Ukendt fejl"
     },
     "reviewMemory": {
       "title": "Gennemgangshukommelse",

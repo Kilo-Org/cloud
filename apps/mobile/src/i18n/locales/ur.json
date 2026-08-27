@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "جائزہ ٹرانسکرپٹ کا انتظار ہے۔",
       "transcriptEmpty": "اس جائزے کے لیے کوئی ٹرانسکرپٹ نہیں۔",
       "transcriptRetry": "جائزہ ٹرانسکرپٹ لوڈ نہیں ہو سکا۔",
-      "transcriptLive": "لائیو"
+      "transcriptLive": "لائیو",
+      "agentIdle": "ایجنٹ غیر مصروف",
+      "agentWorking": "ایجنٹ کام جاری ہے...",
+      "anErrorOccurred": "ایک خرابی پیش آئی",
+      "errorWithMessage": "خرابی: {{message}}",
+      "executionStarted": "عمل شروع ہو گیا",
+      "reviewCompleted": "جائزہ مکمل ہو گیا",
+      "reviewInterrupted": "جائزہ روکا گیا",
+      "sessionError": "سیشن کی خرابی: {{error}}",
+      "statusWithValue": "حالت: {{status}}",
+      "toolName": "ٹول: {{name}}",
+      "toolNameError": "ٹول: {{name}} — خرابی",
+      "unknownError": "نامعلوم خرابی"
     },
     "reviewMemory": {
       "title": "جائزہ میموری",

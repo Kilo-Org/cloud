@@ -1317,7 +1317,19 @@
       "checkRun": "Check run",
       "status": "Status",
       "threshold": "Threshold",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "toolName": "Tool: {{name}}",
+      "toolNameError": "Tool: {{name}} — error",
+      "agentIdle": "Agent idle",
+      "agentWorking": "Agent working...",
+      "sessionError": "Session error: {{error}}",
+      "unknownError": "Unknown error",
+      "executionStarted": "Execution started",
+      "reviewCompleted": "Review completed",
+      "reviewInterrupted": "Review interrupted",
+      "errorWithMessage": "Error: {{message}}",
+      "anErrorOccurred": "An error occurred",
+      "statusWithValue": "Status: {{status}}"
     },
     "reviewMemory": {
       "title": "Review memory",

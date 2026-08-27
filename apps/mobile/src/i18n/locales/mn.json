@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Шалгалтын бичлэгийг хүлээж байна.",
       "transcriptEmpty": "Энэ шалгалтын бичлэг байхгүй.",
       "transcriptRetry": "Шалгалтын бичлэгийг ачаалж чадсангүй.",
-      "transcriptLive": "ШУУД"
+      "transcriptLive": "ШУУД",
+      "agentIdle": "Агент идэвхгүй",
+      "agentWorking": "Агент ажиллаж байна...",
+      "anErrorOccurred": "Алдаа гарлаа",
+      "errorWithMessage": "Алдаа: {{message}}",
+      "executionStarted": "Гүйцэтгэл эхэлсэн",
+      "reviewCompleted": "Шалгалт дууссан",
+      "reviewInterrupted": "Шалгалт тасарсан",
+      "sessionError": "Сессийн алдаа: {{error}}",
+      "statusWithValue": "Статус: {{status}}",
+      "toolName": "Хэрэгсэл: {{name}}",
+      "toolNameError": "Хэрэгсэл: {{name}} — алдаа",
+      "unknownError": "Тодорхойгүй алдаа"
     },
     "reviewMemory": {
       "title": "Шалгалтын санах ой",

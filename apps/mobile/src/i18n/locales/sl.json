@@ -1322,7 +1322,19 @@
       "transcriptEmpty": "Za ta pregled ni prepiseka.",
       "transcriptLive": "V živo",
       "transcriptRetry": "Prepiseka pregleda ni bilo mogoče naložiti.",
-      "transcriptWaiting": "Čakanje na prepisek pregleda."
+      "transcriptWaiting": "Čakanje na prepisek pregleda.",
+      "agentIdle": "Agent miruje",
+      "agentWorking": "Agent dela...",
+      "anErrorOccurred": "Prišlo je do napake",
+      "errorWithMessage": "Napaka: {{message}}",
+      "executionStarted": "Izvedba se je začela",
+      "reviewCompleted": "Pregled dokončan",
+      "reviewInterrupted": "Pregled prekinjen",
+      "sessionError": "Napaka seje: {{error}}",
+      "statusWithValue": "Stanje: {{status}}",
+      "toolName": "Orodje: {{name}}",
+      "toolNameError": "Orodje: {{name}} — napaka",
+      "unknownError": "Neznana napaka"
     },
     "reviewMemory": {
       "title": "Pomnilnik pregleda",

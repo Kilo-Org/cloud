@@ -903,7 +903,19 @@
       "transcriptWaiting": "正在等待审查转录。",
       "transcriptEmpty": "此审查没有转录。",
       "transcriptRetry": "无法加载审查转录。",
-      "transcriptLive": "实时"
+      "transcriptLive": "实时",
+      "agentIdle": "代理空闲",
+      "agentWorking": "代理工作中...",
+      "anErrorOccurred": "发生错误",
+      "errorWithMessage": "错误：{{message}}",
+      "executionStarted": "执行已开始",
+      "reviewCompleted": "审查已完成",
+      "reviewInterrupted": "审查已中断",
+      "sessionError": "会话错误：{{error}}",
+      "statusWithValue": "状态：{{status}}",
+      "toolName": "工具：{{name}}",
+      "toolNameError": "工具：{{name}} — 错误",
+      "unknownError": "未知错误"
     },
     "reviewList": {
       "configureProvider": "配置提供商",

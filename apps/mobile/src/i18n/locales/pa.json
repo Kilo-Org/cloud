@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "ਸਮੀਖਿਆ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਦੀ ਉਡੀਕ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ।",
       "transcriptEmpty": "ਇਸ ਸਮੀਖਿਆ ਲਈ ਕੋਈ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਨਹੀਂ ਹੈ।",
       "transcriptRetry": "ਸਮੀਖਿਆ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਲੋਡ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
-      "transcriptLive": "ਲਾਈਵ"
+      "transcriptLive": "ਲਾਈਵ",
+      "agentIdle": "ਏਜੰਟ ਨਿਸ਼ਕ੍ਰਿਅ",
+      "agentWorking": "ਏਜੰਟ ਕੰਮ ਕਰ ਰਿਹਾ ਹੈ…",
+      "anErrorOccurred": "ਇੱਕ ਗਲਤੀ ਆਈ",
+      "errorWithMessage": "ਗਲਤੀ: {{message}}",
+      "executionStarted": "ਕਾਰਜ ਸ਼ੁਰੂ ਹੋਇਆ",
+      "reviewCompleted": "ਸਮੀਖਿਆ ਪੂਰੀ ਹੋਈ",
+      "reviewInterrupted": "ਸਮੀਖਿਆ ਵਿਘਨ ਪਾਈ ਗਈ",
+      "sessionError": "ਸੈਸ਼ਨ ਗਲਤੀ: {{error}}",
+      "statusWithValue": "ਸਥਿਤੀ: {{status}}",
+      "toolName": "ਟੂਲ: {{name}}",
+      "toolNameError": "ਟੂਲ: {{name}} — ਗਲਤੀ",
+      "unknownError": "ਅਣਜਾਣ ਗਲਤੀ"
     },
     "reviewMemory": {
       "title": "ਸਮੀਖਿਆ ਮੈਮੋਰੀ",

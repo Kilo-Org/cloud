@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Wag vir die hersieningtranskripsie.",
       "transcriptEmpty": "Geen transkripsie vir hierdie hersiening nie.",
       "transcriptRetry": "Kon nie die hersieningtranskripsie laai nie.",
-      "transcriptLive": "LEWEND"
+      "transcriptLive": "LEWEND",
+      "agentIdle": "Agent ledig",
+      "agentWorking": "Agent werk...",
+      "anErrorOccurred": "'n Fout het voorgekom",
+      "errorWithMessage": "Fout: {{message}}",
+      "executionStarted": "Uitvoering het begin",
+      "reviewCompleted": "Hersiening voltooi",
+      "reviewInterrupted": "Hersiening onderbreek",
+      "sessionError": "Sessiefout: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Instrument: {{name}}",
+      "toolNameError": "Instrument: {{name}} — fout",
+      "unknownError": "Onbekende fout"
     },
     "reviewMemory": {
       "title": "Hersieningsgeheue",

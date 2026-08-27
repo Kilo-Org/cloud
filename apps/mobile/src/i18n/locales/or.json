@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "ସମୀକ୍ଷା ଟ୍ରାନ୍ସକ୍ରିପସନ୍ ପାଇଁ ଅପେକ୍ଷା କରୁଛି।",
       "transcriptEmpty": "ଏହି ସମୀକ୍ଷା ପାଇଁ କୌଣସି ଟ୍ରାନ୍ସକ୍ରିପସନ୍ ନାହିଁ।",
       "transcriptRetry": "ସମୀକ୍ଷା ଟ୍ରାନ୍ସକ୍ରିପସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-      "transcriptLive": "ଲାଇଭ୍"
+      "transcriptLive": "ଲାଇଭ୍",
+      "agentIdle": "ଏଜେଣ୍ଟ ନିଷ୍କ୍ରିୟ",
+      "agentWorking": "ଏଜେଣ୍ଟ କାମ କରୁଛି...",
+      "anErrorOccurred": "ଏକ ତ୍ରୁଟି ଘଟିଲା",
+      "errorWithMessage": "ତ୍ରୁଟି: {{message}}",
+      "executionStarted": "ଏକ୍ସିକ୍ୟୁସନ ଆରମ୍ଭ ହୋଇଛି",
+      "reviewCompleted": "ସମୀକ୍ଷା ସମାପ୍ତ",
+      "reviewInterrupted": "ସମୀକ୍ଷା ବ୍ୟାହତ",
+      "sessionError": "ସେସନ୍ ତ୍ରୁଟି: {{error}}",
+      "statusWithValue": "ସ୍ଥିତି: {{status}}",
+      "toolName": "ଟୁଲ୍: {{name}}",
+      "toolNameError": "ଟୁଲ୍: {{name}} — ତ୍ରୁଟି",
+      "unknownError": "ଅଜଣା ତ୍ରୁଟି"
     },
     "reviewMemory": {
       "title": "ସମୀକ୍ଷା ସ୍ମୃତି",

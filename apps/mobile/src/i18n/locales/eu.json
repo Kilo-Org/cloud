@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Berrikuspenaren transkripzioaren zain.",
       "transcriptEmpty": "Berrikuspen honetarako transkripziorik ez.",
       "transcriptRetry": "Ezin izan da berrikuspenaren transkripzioa kargatu.",
-      "transcriptLive": "ZUZENEAN"
+      "transcriptLive": "ZUZENEAN",
+      "agentIdle": "Agentea geldirik",
+      "agentWorking": "Agentea lanean...",
+      "anErrorOccurred": "Errore bat gertatu da",
+      "errorWithMessage": "Errorea: {{message}}",
+      "executionStarted": "Exekuzioa hasita",
+      "reviewCompleted": "Berrikuspena osatuta",
+      "reviewInterrupted": "Berrikuspena etena",
+      "sessionError": "Saioaren errorea: {{error}}",
+      "statusWithValue": "Egoera: {{status}}",
+      "toolName": "Tresna: {{name}}",
+      "toolNameError": "Tresna: {{name}} — errorea",
+      "unknownError": "Errore ezezaguna"
     },
     "reviewMemory": {
       "title": "Berrikuspen-memoria",

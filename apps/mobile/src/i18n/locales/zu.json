@@ -1304,7 +1304,19 @@
       "transcriptEmpty": "Awukho umbhalo walokhu kubuyekezwa.",
       "transcriptLive": "LIVE",
       "transcriptRetry": "Ayikwazanga ukulayisha umbhalo wokubuyekezwa.",
-      "transcriptWaiting": "Ilinde umbhalo wokubuyekezwa."
+      "transcriptWaiting": "Ilinde umbhalo wokubuyekezwa.",
+      "agentIdle": "I-agent ibanga",
+      "agentWorking": "I-agent iyasebenza...",
+      "anErrorOccurred": "Kwenzeke iphutha",
+      "errorWithMessage": "Iphutha: {{message}}",
+      "executionStarted": "Ukusetshenziswa kuqalwe",
+      "reviewCompleted": "Ukubuyekeza kupheliwe",
+      "reviewInterrupted": "Ukubuyekeza kuphazamisekile",
+      "sessionError": "Iphutha leseshini: {{error}}",
+      "statusWithValue": "Isimo: {{status}}",
+      "toolName": "Ithuluzi: {{name}}",
+      "toolNameError": "Ithuluzi: {{name}} — iphutha",
+      "unknownError": "Iphutha elingaziwa"
     },
     "reviewMemory": {
       "title": "Inkumbulo yokubuyekeza",

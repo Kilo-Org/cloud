@@ -1313,7 +1313,19 @@
       "transcriptWaiting": "Se așteaptă transcrierea revizuirii.",
       "transcriptEmpty": "Nu există o transcriere pentru această revizuire.",
       "transcriptRetry": "Nu s-a putut încărca transcrierea revizuirii.",
-      "transcriptLive": "LIVE"
+      "transcriptLive": "LIVE",
+      "agentIdle": "Agent inactiv",
+      "agentWorking": "Agent lucrează...",
+      "anErrorOccurred": "A apărut o eroare",
+      "errorWithMessage": "Eroare: {{message}}",
+      "executionStarted": "Execuție începută",
+      "reviewCompleted": "Revizuire finalizată",
+      "reviewInterrupted": "Revizuire întreruptă",
+      "sessionError": "Eroare de sesiune: {{error}}",
+      "statusWithValue": "Stare: {{status}}",
+      "toolName": "Unealtă: {{name}}",
+      "toolNameError": "Unealtă: {{name}} — eroare",
+      "unknownError": "Eroare necunoscută"
     },
     "reviewMemory": {
       "title": "Memorie de revizuire",

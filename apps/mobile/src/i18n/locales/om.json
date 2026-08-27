@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Galmee xalayyii sakatta'aa eeggachaa jira.",
       "transcriptEmpty": "Sakatta'a kanaaf galmee xalayyii hin jiru.",
       "transcriptRetry": "Galmee xalayyii sakatta'aa fudhachuu hin danda'ine.",
-      "transcriptLive": "LIVE"
+      "transcriptLive": "LIVE",
+      "agentIdle": "Eejentii hojii irraa boqachaa",
+      "agentWorking": "Eejentii hojachaa jira...",
+      "anErrorOccurred": "Dogoggorri uumame",
+      "errorWithMessage": "Dogoggora: {{message}}",
+      "executionStarted": "Hojiirra oolchuun jalqabe",
+      "reviewCompleted": "Ilalloon xumurame",
+      "reviewInterrupted": "Ilalloon citatte",
+      "sessionError": "Dogoggora xalayyii: {{error}}",
+      "statusWithValue": "Haala: {{status}}",
+      "toolName": "Meeshaa: {{name}}",
+      "toolNameError": "Meeshaa: {{name}} — dogoggora",
+      "unknownError": "Dogoggora hin beekamne"
     },
     "reviewMemory": {
       "title": "Yaadannoo sakatta'aa",

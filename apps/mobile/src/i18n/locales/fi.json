@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Odotetaan tarkistuksen transkriptiota.",
       "transcriptEmpty": "Ei transkriptiota tälle tarkistukselle.",
       "transcriptRetry": "Tarkistuksen transkriptiota ei voitu ladata.",
-      "transcriptLive": "LIVE"
+      "transcriptLive": "LIVE",
+      "agentIdle": "Agentti vapaalla",
+      "agentWorking": "Agentti työstää...",
+      "anErrorOccurred": "Tapahtui virhe",
+      "errorWithMessage": "Virhe: {{message}}",
+      "executionStarted": "Suoritus aloitettu",
+      "reviewCompleted": "Tarkistus valmistui",
+      "reviewInterrupted": "Tarkistus keskeytetty",
+      "sessionError": "Istuntovirhe: {{error}}",
+      "statusWithValue": "Tila: {{status}}",
+      "toolName": "Työkalu: {{name}}",
+      "toolNameError": "Työkalu: {{name}} — virhe",
+      "unknownError": "Tuntematon virhe"
     },
     "reviewMemory": {
       "title": "Arviointimuisti",

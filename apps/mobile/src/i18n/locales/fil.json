@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Naghihintay sa transcript ng pagsusuri.",
       "transcriptEmpty": "Walang transcript para sa pagsusuring ito.",
       "transcriptRetry": "Hindi maload ang transcript ng pagsusuri.",
-      "transcriptLive": "Live"
+      "transcriptLive": "Live",
+      "agentIdle": "Naka-idle ang agent",
+      "agentWorking": "Gumagawa ang agent...",
+      "anErrorOccurred": "May naganap na error",
+      "errorWithMessage": "Error: {{message}}",
+      "executionStarted": "Nagsimula ang execution",
+      "reviewCompleted": "Natapos ang review",
+      "reviewInterrupted": "Naantala ang review",
+      "sessionError": "Error sa session: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Tool: {{name}}",
+      "toolNameError": "Tool: {{name}} — error",
+      "unknownError": "Hindi kilalang error"
     },
     "reviewMemory": {
       "title": "Review memory",

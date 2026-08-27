@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Bíða eftir úttektarafritinu.",
       "transcriptEmpty": "Ekkert afrit fyrir þessa úttekt.",
       "transcriptRetry": "Ekki tókst að hlaða úttektarafritið.",
-      "transcriptLive": "BEIN"
+      "transcriptLive": "BEIN",
+      "agentIdle": "Umboð í bið",
+      "agentWorking": "Umboð að vinna...",
+      "anErrorOccurred": "Villa kom upp",
+      "errorWithMessage": "Villa: {{message}}",
+      "executionStarted": "Framkvæmd hafin",
+      "reviewCompleted": "Úttekt lokið",
+      "reviewInterrupted": "Úttekt rofin",
+      "sessionError": "Fundarvilla: {{error}}",
+      "statusWithValue": "Staða: {{status}}",
+      "toolName": "Tól: {{name}}",
+      "toolNameError": "Tól: {{name}} — villa",
+      "unknownError": "Óþekkt villa"
     },
     "reviewMemory": {
       "title": "Yfirferðarminni",

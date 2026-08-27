@@ -1331,7 +1331,19 @@
       "transcriptWaiting": "Qed nistenna t-traskrizzjoni tar-reviżjoni.",
       "transcriptEmpty": "L-ebda traskrizzjoni għal din ir-reviżjoni.",
       "transcriptRetry": "Ma setgħetx titgħabba t-traskrizzjoni tar-reviżjoni.",
-      "transcriptLive": "DIRETT"
+      "transcriptLive": "DIRETT",
+      "agentIdle": "Aġent idle",
+      "agentWorking": "Aġent qed jaħdem...",
+      "anErrorOccurred": "Ġara żball",
+      "errorWithMessage": "Żball: {{message}}",
+      "executionStarted": "L-eżekuzzjoni bdiet",
+      "reviewCompleted": "Ir-reviżjoni tlestiet",
+      "reviewInterrupted": "Ir-reviżjoni ġiet interrotta",
+      "sessionError": "Żball tas-sessjoni: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Għodda: {{name}}",
+      "toolNameError": "Għodda: {{name}} — żball",
+      "unknownError": "Żball mhux magħruf"
     },
     "reviewMemory": {
       "title": "Memorja tar-reviżjoni",

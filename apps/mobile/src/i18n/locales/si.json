@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "සමාලෝචන පිටපත එනතුරු බලා සිටිමින්.",
       "transcriptEmpty": "මෙම සමාලෝචනයට පිටපතක් නොමැත.",
       "transcriptRetry": "සමාලෝචන පිටපත පූරණය කළ නොහැකි විය.",
-      "transcriptLive": "සජීවී"
+      "transcriptLive": "සජීවී",
+      "agentIdle": "නියෝජිතයා නිෂ්ක්රීයයි",
+      "agentWorking": "නියෝජිතයා වැඩ කරමින්...",
+      "anErrorOccurred": "දෝෂයක් සිදු විය",
+      "errorWithMessage": "දෝෂය: {{message}}",
+      "executionStarted": "ක්රියාත්මක කිරීම ආරම්භ විය",
+      "reviewCompleted": "සමාලෝචනය සම්පූර්ණයි",
+      "reviewInterrupted": "සමාලෝචනය බාධා විය",
+      "sessionError": "සැසි දෝෂය: {{error}}",
+      "statusWithValue": "තත්ත්වය: {{status}}",
+      "toolName": "මෙවලම: {{name}}",
+      "toolNameError": "මෙවලම: {{name}} — දෝෂය",
+      "unknownError": "නොදන්නා දෝෂයක්"
     },
     "reviewMemory": {
       "title": "සමාලෝචන මතකය",

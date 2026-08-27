@@ -1322,7 +1322,19 @@
       "transcriptWaiting": "Čeká se na přepis kontroly.",
       "transcriptEmpty": "Pro tuto kontrolu neexistuje přepis.",
       "transcriptRetry": "Nepodařilo se načíst přepis kontroly.",
-      "transcriptLive": "ŽIVĚ"
+      "transcriptLive": "ŽIVĚ",
+      "agentIdle": "Agent nečinný",
+      "agentWorking": "Agent pracuje…",
+      "anErrorOccurred": "Došlo k chybě",
+      "errorWithMessage": "Chyba: {{message}}",
+      "executionStarted": "Provádění spuštěno",
+      "reviewCompleted": "Recenze dokončena",
+      "reviewInterrupted": "Recenze přerušena",
+      "sessionError": "Chyba relace: {{error}}",
+      "statusWithValue": "Stav: {{status}}",
+      "toolName": "Nástroj: {{name}}",
+      "toolNameError": "Nástroj: {{name}} — chyba",
+      "unknownError": "Neznámá chyba"
     },
     "reviewMemory": {
       "title": "Paměť kontroly",

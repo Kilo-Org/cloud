@@ -1340,7 +1340,19 @@
       "transcriptWaiting": "Yn aros am drawsgrifiad yr adolygiad.",
       "transcriptEmpty": "Dim trawsgrifiad ar gyfer yr adolygiad hwn.",
       "transcriptRetry": "Ni ellid llwytho trawsgrifiad yr adolygiad.",
-      "transcriptLive": "BYW"
+      "transcriptLive": "BYW",
+      "agentIdle": "Asiant yn segur",
+      "agentWorking": "Asiant yn gweithio...",
+      "anErrorOccurred": "Digwyddodd gwall",
+      "errorWithMessage": "Gwall: {{message}}",
+      "executionStarted": "Dechreuodd y gweithrediad",
+      "reviewCompleted": "Adolygiad wedi'i gwblhau",
+      "reviewInterrupted": "Adolygiad wedi'i amharu",
+      "sessionError": "Gwall sesiwn: {{error}}",
+      "statusWithValue": "Statws: {{status}}",
+      "toolName": "Offeryn: {{name}}",
+      "toolNameError": "Offeryn: {{name}} — gwall",
+      "unknownError": "Gwall anhysbys"
     },
     "reviewMemory": {
       "title": "Cof adolygu",

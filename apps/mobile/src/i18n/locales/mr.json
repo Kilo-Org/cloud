@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "पुनरावलोकन उताराची वाट पाहत आहे.",
       "transcriptEmpty": "या पुनरावलोकनासाठी उतारा नाही.",
       "transcriptRetry": "पुनरावलोकन उतारा लोड करता आला नाही.",
-      "transcriptLive": "LIVE"
+      "transcriptLive": "LIVE",
+      "agentIdle": "एजंट निष्क्रिय",
+      "agentWorking": "एजंट काम करत आहे...",
+      "anErrorOccurred": "एक त्रुटी आली",
+      "errorWithMessage": "त्रुटी: {{message}}",
+      "executionStarted": "कार्यान्वयन सुरू झाले",
+      "reviewCompleted": "पुनरावलोकन पूर्ण झाले",
+      "reviewInterrupted": "पुनरावलोकन व्यत्यय आला",
+      "sessionError": "सत्र त्रुटी: {{error}}",
+      "statusWithValue": "स्थिती: {{status}}",
+      "toolName": "टूल: {{name}}",
+      "toolNameError": "टूल: {{name}} — त्रुटी",
+      "unknownError": "अज्ञात त्रुटी"
     },
     "reviewMemory": {
       "title": "पुनरावलोकन मेमरी",

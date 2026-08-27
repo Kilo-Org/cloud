@@ -1322,7 +1322,19 @@
       "transcriptWaiting": "Čaká sa na prepis kontroly.",
       "transcriptEmpty": "Žiadny prepis pre túto kontrolu.",
       "transcriptRetry": "Prepis kontroly sa nepodarilo načítať.",
-      "transcriptLive": "NAŽIVO"
+      "transcriptLive": "NAŽIVO",
+      "agentIdle": "Agent nečinný",
+      "agentWorking": "Agent pracuje...",
+      "anErrorOccurred": "Vyskytla sa chyba",
+      "errorWithMessage": "Chyba: {{message}}",
+      "executionStarted": "Spustenie sa začalo",
+      "reviewCompleted": "Preskúmanie dokončené",
+      "reviewInterrupted": "Preskúmanie prerušené",
+      "sessionError": "Chyba relácie: {{error}}",
+      "statusWithValue": "Stav: {{status}}",
+      "toolName": "Nástroj: {{name}}",
+      "toolNameError": "Nástroj: {{name}} — chyba",
+      "unknownError": "Neznáma chyba"
     },
     "reviewMemory": {
       "title": "Pamäť preskúmaní",

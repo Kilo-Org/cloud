@@ -1,5 +1,6 @@
 import { type CloudAgentEvent } from '@kilocode/cloud-agent-sdk';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import { type TFunction } from 'i18next';
 
 type GetSessionMessagesResult =
   inferRouterOutputs<MobileRouter>['codeReviews']['getSessionMessages'];
@@ -110,7 +111,8 @@ export function appendSpectatorRow(rows: SpectatorRow[], next: SpectatorRow): Sp
 
 function toRowFromKilocode(
   timestamp: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  t: TFunction
 ): SpectatorRow | null {
   const type = asString(payload.type);
   const properties = asRecord(payload.properties);
@@ -144,13 +146,19 @@ function toRowFromKilocode(
       if (status === 'error') {
         return {
           timestamp,
-          message: `Tool: ${toolName} — error`,
+          message: t('codeReviewer.reviewDetail.toolNameError', { name: toolName }),
           content: detail,
           eventType: 'error',
           key,
         };
       }
-      return { timestamp, message: `Tool: ${toolName}`, content: detail, eventType: 'tool', key };
+      return {
+        timestamp,
+        message: t('codeReviewer.reviewDetail.toolName', { name: toolName }),
+        content: detail,
+        eventType: 'tool',
+        key,
+      };
     }
 
     if (partType === 'text') {
@@ -172,47 +180,75 @@ function toRowFromKilocode(
   if (type === 'session.status') {
     const status = sessionStatusLabel(properties.status);
     if (status === 'idle') {
-      return { timestamp, message: 'Agent idle', eventType: 'status' };
+      return { timestamp, message: t('codeReviewer.reviewDetail.agentIdle'), eventType: 'status' };
     }
     if (status === 'busy') {
-      return { timestamp, message: 'Agent working...', eventType: 'status' };
+      return {
+        timestamp,
+        message: t('codeReviewer.reviewDetail.agentWorking'),
+        eventType: 'status',
+      };
     }
     return null;
   }
 
   if (type === 'session.error') {
-    const error = asString(properties.error);
-    return { timestamp, message: `Session error: ${error ?? 'Unknown error'}`, eventType: 'error' };
+    const error = asString(properties.error) ?? t('codeReviewer.reviewDetail.unknownError');
+    return {
+      timestamp,
+      message: t('codeReviewer.reviewDetail.sessionError', { error }),
+      eventType: 'error',
+    };
   }
 
   return null;
 }
 
 /** Map a live cloud-agent stream event to a transcript row (field rules copied from apps/web's `toCodeReviewDisplayEvent`). */
-export function toSpectatorRow(event: CloudAgentEvent): SpectatorRow | null {
+export function toSpectatorRow(event: CloudAgentEvent, t: TFunction): SpectatorRow | null {
   const { streamEventType, timestamp, data } = event;
   const payload = asRecord(data);
 
   if (streamEventType === 'started') {
-    return { timestamp, message: 'Execution started', eventType: streamEventType };
+    return {
+      timestamp,
+      message: t('codeReviewer.reviewDetail.executionStarted'),
+      eventType: streamEventType,
+    };
   }
   if (streamEventType === 'complete') {
-    return { timestamp, message: 'Review completed', eventType: streamEventType };
+    return {
+      timestamp,
+      message: t('codeReviewer.reviewDetail.reviewCompleted'),
+      eventType: streamEventType,
+    };
   }
   if (streamEventType === 'interrupted') {
-    return { timestamp, message: 'Review interrupted', eventType: streamEventType };
+    return {
+      timestamp,
+      message: t('codeReviewer.reviewDetail.reviewInterrupted'),
+      eventType: streamEventType,
+    };
   }
   if (streamEventType === 'error') {
-    const errorMsg = asString(payload?.message) ?? 'An error occurred';
-    return { timestamp, message: `Error: ${errorMsg}`, eventType: streamEventType };
+    const errorMsg = asString(payload?.message) ?? t('codeReviewer.reviewDetail.anErrorOccurred');
+    return {
+      timestamp,
+      message: t('codeReviewer.reviewDetail.errorWithMessage', { message: errorMsg }),
+      eventType: streamEventType,
+    };
   }
   if (streamEventType === 'kilocode' && payload !== undefined) {
-    return toRowFromKilocode(timestamp, payload);
+    return toRowFromKilocode(timestamp, payload, t);
   }
   if (streamEventType === 'status') {
     const status = asString(payload?.status);
     if (status) {
-      return { timestamp, message: `Status: ${status}`, eventType: streamEventType };
+      return {
+        timestamp,
+        message: t('codeReviewer.reviewDetail.statusWithValue', { status }),
+        eventType: streamEventType,
+      };
     }
   }
   return null;

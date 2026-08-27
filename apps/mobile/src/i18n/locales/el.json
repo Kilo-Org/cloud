@@ -1304,7 +1304,19 @@
       "transcriptEmpty": "Δεν υπάρχει απομαγνητοφώνηση για αυτή την αναθεώρηση.",
       "transcriptLive": "ΖΩΝΤΑΝΑ",
       "transcriptRetry": "Δεν ήταν δυνατή η φόρτωση της απομαγνητοφώνησης της αναθεώρησης.",
-      "transcriptWaiting": "Αναμονή για την απομαγνητοφώνηση της αναθεώρησης."
+      "transcriptWaiting": "Αναμονή για την απομαγνητοφώνηση της αναθεώρησης.",
+      "agentIdle": "Πράκτορας σε αναμονή",
+      "agentWorking": "Ο πράκτορας εργάζεται...",
+      "anErrorOccurred": "Παρουσιάστηκε σφάλμα",
+      "errorWithMessage": "Σφάλμα: {{message}}",
+      "executionStarted": "Ξεκίνησε η εκτέλεση",
+      "reviewCompleted": "Ολοκληρώθηκε η αναθεώρηση",
+      "reviewInterrupted": "Η αναθεώρηση διακόπηκε",
+      "sessionError": "Σφάλμα περιόδου λειτουργίας: {{error}}",
+      "statusWithValue": "Κατάσταση: {{status}}",
+      "toolName": "Εργαλείο: {{name}}",
+      "toolNameError": "Εργαλείο: {{name}} — σφάλμα",
+      "unknownError": "Άγνωστο σφάλμα"
     },
     "reviewMemory": {
       "title": "Μνήμη αναθεώρησης",

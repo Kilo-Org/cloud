@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "چاوەڕوانی تۆماری پێداچوونەوە",
       "transcriptEmpty": "هیچ تۆمارێک نییە بۆ ئەم پێداچوونەوەیە",
       "transcriptRetry": "نەتوانرا تۆماری پێداچوونەوە باربکرێت",
-      "transcriptLive": "ڕاستەوخۆ"
+      "transcriptLive": "ڕاستەوخۆ",
+      "agentIdle": "ئەجێنت بێکارە",
+      "agentWorking": "ئەجێنت کار دەکات...",
+      "anErrorOccurred": "هەڵەیەک ڕوویدا",
+      "errorWithMessage": "هەڵە: {{message}}",
+      "executionStarted": "جێبەجێکردن دەستی پێکرد",
+      "reviewCompleted": "پێداچوونەوە تەواو بوو",
+      "reviewInterrupted": "پێداچوونەوە وەستا",
+      "sessionError": "هەڵەی سێشن: {{error}}",
+      "statusWithValue": "دۆخ: {{status}}",
+      "toolName": "ئامراز: {{name}}",
+      "toolNameError": "ئامراز: {{name}} — هەڵە",
+      "unknownError": "هەڵەی نەزانراو"
     },
     "reviewMemory": {
       "title": "بیرگەی پێداچوونەوە",

@@ -1313,7 +1313,19 @@
       "transcriptWaiting": "Gaida pārskata stenogrammu.",
       "transcriptEmpty": "Šim pārskatam nav stenogrammas.",
       "transcriptRetry": "Neizdevās ielādēt pārskata stenogrammu.",
-      "transcriptLive": "TIŠRAIDĒ"
+      "transcriptLive": "TIŠRAIDĒ",
+      "agentIdle": "Aģents dīkstāvē",
+      "agentWorking": "Aģents strādā...",
+      "anErrorOccurred": "Radās kļūda",
+      "errorWithMessage": "Kļūda: {{message}}",
+      "executionStarted": "Izpilde sākta",
+      "reviewCompleted": "Pārskats pabeigts",
+      "reviewInterrupted": "Pārskats pārtraukts",
+      "sessionError": "Sesijas kļūda: {{error}}",
+      "statusWithValue": "Statuss: {{status}}",
+      "toolName": "Rīks: {{name}}",
+      "toolNameError": "Rīks: {{name}} — kļūda",
+      "unknownError": "Nezināma kļūda"
     },
     "reviewMemory": {
       "title": "Pārskata atmiņa",

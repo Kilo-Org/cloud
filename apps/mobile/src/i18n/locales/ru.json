@@ -907,7 +907,19 @@
       "transcriptWaiting": "Ожидание протокола проверки.",
       "transcriptEmpty": "Для этой проверки нет протокола.",
       "transcriptRetry": "Не удалось загрузить протокол проверки.",
-      "transcriptLive": "LIVE"
+      "transcriptLive": "LIVE",
+      "agentIdle": "Агент простаивает",
+      "agentWorking": "Агент работает...",
+      "anErrorOccurred": "Произошла ошибка",
+      "errorWithMessage": "Ошибка: {{message}}",
+      "executionStarted": "Выполнение начато",
+      "reviewCompleted": "Проверка завершена",
+      "reviewInterrupted": "Проверка прервана",
+      "sessionError": "Ошибка сеанса: {{error}}",
+      "statusWithValue": "Статус: {{status}}",
+      "toolName": "Инструмент: {{name}}",
+      "toolNameError": "Инструмент: {{name}} — ошибка",
+      "unknownError": "Неизвестная ошибка"
     },
     "reviewList": {
       "configureProvider": "Настроить провайдера",

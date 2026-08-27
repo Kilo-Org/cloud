@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "അവലോകന ട്രാൻസ്ക്രിപ്റ്റിനായി കാത്തിരിക്കുന്നു.",
       "transcriptEmpty": "ഈ അവലോകനത്തിന് ട്രാൻസ്ക്രിപ്റ്റ് ഇല്ല.",
       "transcriptRetry": "അവലോകന ട്രാൻസ്ക്രിപ്റ്റ് ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "transcriptLive": "LIVE"
+      "transcriptLive": "LIVE",
+      "agentIdle": "ഏജന്റ് നിഷ്ക്രിയം",
+      "agentWorking": "ഏജന്റ് പ്രവർത്തിക്കുന്നു...",
+      "anErrorOccurred": "ഒരു പിശക് സംഭവിച്ചു",
+      "errorWithMessage": "പിശക്: {{message}}",
+      "executionStarted": "എക്സിക്യൂഷൻ ആരംഭിച്ചു",
+      "reviewCompleted": "അവലോകനം പൂർത്തിയായി",
+      "reviewInterrupted": "അവലോകനം തടസ്സപ്പെട്ടു",
+      "sessionError": "സെഷൻ പിശക്: {{error}}",
+      "statusWithValue": "നില: {{status}}",
+      "toolName": "ടൂൾ: {{name}}",
+      "toolNameError": "ടൂൾ: {{name}} — പിശക്",
+      "unknownError": "അജ്ഞാത പിശക്"
     },
     "reviewMemory": {
       "title": "അവലോകന മെമ്മറി",

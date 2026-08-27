@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "સમીક્ષા ટ્રાન્સક્રિપ્ટની રાહ જોઈ રહ્યું છે.",
       "transcriptEmpty": "આ સમીક્ષા માટે કોઈ ટ્રાન્સક્રિપ્ટ નથી.",
       "transcriptRetry": "સમીક્ષા ટ્રાન્સક્રિપ્ટ લોડ કરી શકાઈ નહીં.",
-      "transcriptLive": "લાઇવ"
+      "transcriptLive": "લાઇવ",
+      "agentIdle": "એજન્ટ નિષ્ક્રિય",
+      "agentWorking": "એજન્ટ કામ કરી રહ્યું છે...",
+      "anErrorOccurred": "ભૂલ થઈ",
+      "errorWithMessage": "ભૂલ: {{message}}",
+      "executionStarted": "એક્ઝેક્યુશન શરૂ થયું",
+      "reviewCompleted": "સમીક્ષા પૂર્ણ",
+      "reviewInterrupted": "સમીક્ષા વિક્ષિપ્ત થઈ",
+      "sessionError": "સત્ર ભૂલ: {{error}}",
+      "statusWithValue": "સ્થિતિ: {{status}}",
+      "toolName": "ટૂલ: {{name}}",
+      "toolNameError": "ટૂલ: {{name}} — ભૂલ",
+      "unknownError": "અજ્ઞાત ભૂલ"
     },
     "reviewMemory": {
       "title": "સમીક્ષા મેમરી",

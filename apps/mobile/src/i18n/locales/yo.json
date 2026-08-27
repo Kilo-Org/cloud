@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Ndúró fún ìkọwe àtúnyẹ̀wò náà.",
       "transcriptEmpty": "Kò sí ìkọwe fún àtúnyẹ̀wò yìí.",
       "transcriptRetry": "Kò lè gbé ìkọwe àtúnyẹ̀wò náà.",
-      "transcriptLive": "LIVE"
+      "transcriptLive": "LIVE",
+      "agentIdle": "Aṣoju ń sinmi",
+      "agentWorking": "Aṣoju ń ṣiṣẹ́...",
+      "anErrorOccurred": "Àṣìṣe kan ṣẹlẹ̀",
+      "errorWithMessage": "Àṣìṣe: {{message}}",
+      "executionStarted": "Ìmúṣẹ́ tí a bẹ̀rẹ̀",
+      "reviewCompleted": "Àtúnyẹ̀wò tí a parí",
+      "reviewInterrupted": "Àtúnyẹ̀wò ti dá dúró",
+      "sessionError": "Àṣìṣe sẹ́ṣiọ́n: {{error}}",
+      "statusWithValue": "Ipò: {{status}}",
+      "toolName": "Irinṣẹ́: {{name}}",
+      "toolNameError": "Irinṣẹ́: {{name}} — àṣìṣe",
+      "unknownError": "Àṣìṣe àìmọ̀"
     },
     "reviewMemory": {
       "title": "Ìrántí àtúnyẹ̀wò",

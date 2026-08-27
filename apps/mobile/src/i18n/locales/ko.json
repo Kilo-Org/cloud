@@ -903,7 +903,19 @@
       "transcriptWaiting": "리뷰 대화록을 기다리는 중입니다.",
       "transcriptEmpty": "이 리뷰에 대한 대화록이 없습니다.",
       "transcriptRetry": "리뷰 대화록을 불러올 수 없습니다.",
-      "transcriptLive": "LIVE"
+      "transcriptLive": "LIVE",
+      "agentIdle": "에이전트 대기 중",
+      "agentWorking": "에이전트 작업 중...",
+      "anErrorOccurred": "오류가 발생했습니다",
+      "errorWithMessage": "오류: {{message}}",
+      "executionStarted": "실행 시작됨",
+      "reviewCompleted": "리뷰 완료됨",
+      "reviewInterrupted": "리뷰 중단됨",
+      "sessionError": "세션 오류: {{error}}",
+      "statusWithValue": "상태: {{status}}",
+      "toolName": "도구: {{name}}",
+      "toolNameError": "도구: {{name}} — 오류",
+      "unknownError": "알 수 없는 오류"
     },
     "reviewList": {
       "configureProvider": "제공업체 구성",

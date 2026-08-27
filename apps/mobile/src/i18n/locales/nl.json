@@ -903,7 +903,19 @@
       "transcriptWaiting": "Wachten op het reviewtranscript.",
       "transcriptEmpty": "Geen transcript voor deze review.",
       "transcriptRetry": "Het reviewtranscript kon niet worden geladen.",
-      "transcriptLive": "Live"
+      "transcriptLive": "Live",
+      "agentIdle": "Agent inactief",
+      "agentWorking": "Agent bezig...",
+      "anErrorOccurred": "Er is een fout opgetreden",
+      "errorWithMessage": "Fout: {{message}}",
+      "executionStarted": "Uitvoering gestart",
+      "reviewCompleted": "Review voltooid",
+      "reviewInterrupted": "Review onderbroken",
+      "sessionError": "Sessiefout: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Tool: {{name}}",
+      "toolNameError": "Tool: {{name}} — fout",
+      "unknownError": "Onbekende fout"
     },
     "reviewList": {
       "configureProvider": "Provider configureren",

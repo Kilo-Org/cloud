@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "در انتظار متن گفتوگوی بازبینی.",
       "transcriptEmpty": "متن گفتوگویی برای این بازبینی وجود ندارد.",
       "transcriptRetry": "بارگذاری متن گفتوگوی بازبینی ممکن نشد.",
-      "transcriptLive": "زنده"
+      "transcriptLive": "زنده",
+      "agentIdle": "عامل بیکار",
+      "agentWorking": "عامل در حال کار...",
+      "anErrorOccurred": "خطایی رخ داد",
+      "errorWithMessage": "خطا: {{message}}",
+      "executionStarted": "اجرا شروع شد",
+      "reviewCompleted": "بررسی تکمیل شد",
+      "reviewInterrupted": "بررسی قطع شد",
+      "sessionError": "خطای جلسه: {{error}}",
+      "statusWithValue": "وضعیت: {{status}}",
+      "toolName": "ابزار: {{name}}",
+      "toolNameError": "ابزار: {{name}} — خطا",
+      "unknownError": "خطای ناشناخته"
     },
     "reviewMemory": {
       "title": "حافظه بررسی",

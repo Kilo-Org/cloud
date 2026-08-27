@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "ກຳລັງລໍຖ້າການຖອດຄວາມຂອງການທົບທວນ.",
       "transcriptEmpty": "ບໍ່ມີການຖອດຄວາມຂອງການທົບທວນນີ້.",
       "transcriptRetry": "ບໍ່ສາມາດໂຫຼດການຖອດຄວາມຂອງການທົບທວນ.",
-      "transcriptLive": "LIVE"
+      "transcriptLive": "LIVE",
+      "agentIdle": "ເອເຈນວ່າງ",
+      "agentWorking": "ເອເຈນກຳລັງເຮັດວຽກ...",
+      "anErrorOccurred": "ເກີດຂໍ້ຜິດພາດ",
+      "errorWithMessage": "ຂໍ້ຜິດພາດ: {{message}}",
+      "executionStarted": "ການດຳເນີນງານເລີ່ມຂຶ້ນ",
+      "reviewCompleted": "ການກວດສອບສຳເລັດ",
+      "reviewInterrupted": "ການກວດສອບຖືກຂັດຈັງຫວະ",
+      "sessionError": "ຂໍ້ຜິດພາດເຊດຊັນ: {{error}}",
+      "statusWithValue": "ສະຖານະ: {{status}}",
+      "toolName": "ເຄື່ອງມື: {{name}}",
+      "toolNameError": "ເຄື່ອງມື: {{name}} — ຂໍ້ຜິດພາດ",
+      "unknownError": "ຂໍ້ຜິດພາດທີ່ບໍ່ຮູ້ຈັກ"
     },
     "reviewMemory": {
       "title": "ຄວາມຈຳການທົບທວນ",

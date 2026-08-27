@@ -1322,7 +1322,19 @@
       "transcriptWaiting": "Чаканне стэнаграмы праверкі.",
       "transcriptEmpty": "Няма стэнаграмы для гэтай праверкі.",
       "transcriptRetry": "Не ўдалося загрузіць стэнаграму праверкі.",
-      "transcriptLive": "LIVE"
+      "transcriptLive": "LIVE",
+      "agentIdle": "Агент бяздзейнічае",
+      "agentWorking": "Агент працуе...",
+      "anErrorOccurred": "Узнікла памылка",
+      "errorWithMessage": "Памылка: {{message}}",
+      "executionStarted": "Выкананне пачата",
+      "reviewCompleted": "Прагляд завершаны",
+      "reviewInterrupted": "Прагляд перапынены",
+      "sessionError": "Памылка сеанса: {{error}}",
+      "statusWithValue": "Статус: {{status}}",
+      "toolName": "Інструмент: {{name}}",
+      "toolNameError": "Інструмент: {{name}} — памылка",
+      "unknownError": "Невядомая памылка"
     },
     "reviewMemory": {
       "title": "Памяць праверкі",

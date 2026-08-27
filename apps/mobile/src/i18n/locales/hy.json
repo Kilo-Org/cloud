@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Սպասում ենք ստուգման արձանագրությանը:",
       "transcriptEmpty": "Այս ստուգման համար արձանագրություն չկա:",
       "transcriptRetry": "Հնարավոր չեղավ բեռնել ստուգման արձանագրությունը:",
-      "transcriptLive": "Ուղիղ"
+      "transcriptLive": "Ուղիղ",
+      "agentIdle": "Գործակալը պարապ է",
+      "agentWorking": "Գործակալն աշխատում է...",
+      "anErrorOccurred": "Սխալ է տեղի ունեցել",
+      "errorWithMessage": "Սխալ: {{message}}",
+      "executionStarted": "Կատարումը սկսվել է",
+      "reviewCompleted": "Ստուգումն ավարտված է",
+      "reviewInterrupted": "Ստուգումն ընդհատվել է",
+      "sessionError": "Նիստի սխալ: {{error}}",
+      "statusWithValue": "Կարգավիճակ: {{status}}",
+      "toolName": "Գործիք: {{name}}",
+      "toolNameError": "Գործիք: {{name}} — սխալ",
+      "unknownError": "Անհայտ սխալ"
     },
     "reviewMemory": {
       "title": "Ստուգման հիշողություն",

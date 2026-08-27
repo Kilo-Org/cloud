@@ -907,7 +907,19 @@
       "transcriptWaiting": "Oczekiwanie na transkrypt przeglądu.",
       "transcriptEmpty": "Brak transkryptu tego przeglądu.",
       "transcriptRetry": "Nie udało się załadować transkryptu przeglądu.",
-      "transcriptLive": "NA ŻYWO"
+      "transcriptLive": "NA ŻYWO",
+      "agentIdle": "Agent bezczynny",
+      "agentWorking": "Agent pracuje...",
+      "anErrorOccurred": "Wystąpił błąd",
+      "errorWithMessage": "Błąd: {{message}}",
+      "executionStarted": "Rozpoczęto wykonywanie",
+      "reviewCompleted": "Przegląd ukończony",
+      "reviewInterrupted": "Przegląd przerwany",
+      "sessionError": "Błąd sesji: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Narzędzie: {{name}}",
+      "toolNameError": "Narzędzie: {{name}} — błąd",
+      "unknownError": "Nieznany błąd"
     },
     "reviewList": {
       "configureProvider": "Skonfiguruj dostawcę",

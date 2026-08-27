@@ -1304,7 +1304,19 @@
       "transcriptEmpty": "Selle ülevaate jaoks transkriptsiooni pole.",
       "transcriptLive": "OTSE",
       "transcriptRetry": "Ülevaate transkriptsiooni laadimine ebaõnnestus.",
-      "transcriptWaiting": "Oodatakse ülevaate transkriptsiooni."
+      "transcriptWaiting": "Oodatakse ülevaate transkriptsiooni.",
+      "agentIdle": "Agent on jõude",
+      "agentWorking": "Agent töötab...",
+      "anErrorOccurred": "Juhtus viga",
+      "errorWithMessage": "Viga: {{message}}",
+      "executionStarted": "Täitmine alustatud",
+      "reviewCompleted": "Ülevaade lõpetatud",
+      "reviewInterrupted": "Ülevaade katkestatud",
+      "sessionError": "Seansi viga: {{error}}",
+      "statusWithValue": "Olek: {{status}}",
+      "toolName": "Tööriist: {{name}}",
+      "toolNameError": "Tööriist: {{name}} — viga",
+      "unknownError": "Tundmatu viga"
     },
     "reviewMemory": {
       "title": "Ülevaate mälu",

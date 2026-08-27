@@ -1304,7 +1304,19 @@
       "transcriptWaiting": "Venter på gjennomgangsutskriften.",
       "transcriptEmpty": "Ingen utskrift for denne gjennomgangen.",
       "transcriptRetry": "Kunne ikke laste gjennomgangsutskriften.",
-      "transcriptLive": "LIVE"
+      "transcriptLive": "LIVE",
+      "agentIdle": "Agenten er inaktiv",
+      "agentWorking": "Agenten jobber...",
+      "anErrorOccurred": "Det oppstod en feil",
+      "errorWithMessage": "Feil: {{message}}",
+      "executionStarted": "Kjøringen startet",
+      "reviewCompleted": "Gjennomgang fullført",
+      "reviewInterrupted": "Gjennomgang avbrutt",
+      "sessionError": "Øktfeil: {{error}}",
+      "statusWithValue": "Status: {{status}}",
+      "toolName": "Verktøy: {{name}}",
+      "toolNameError": "Verktøy: {{name}} — feil",
+      "unknownError": "Ukjent feil"
     },
     "reviewMemory": {
       "title": "Gjennomgangsminne",

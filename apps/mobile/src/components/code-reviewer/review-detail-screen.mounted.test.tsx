@@ -6,7 +6,7 @@
 // result renders "No findings" (not a success checkmark). A permanent error
 // (NOT_FOUND/FORBIDDEN/UNAUTHORIZED) shows no Retry; a transient error does.
 
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -62,7 +62,7 @@ const spectatorStream = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({
-  View: (props: { style?: unknown; children?: unknown }) => {
+  View: (props: { style?: unknown; children?: ReactNode }) => {
     viewRenders.list.push(props);
     return createElement('View', null, props.children);
   },

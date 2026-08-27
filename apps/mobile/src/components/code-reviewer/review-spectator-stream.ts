@@ -11,13 +11,6 @@ export type { Connection };
 
 type StreamTicket = { ticket: string; expiresAt: number };
 
-export type ReviewSpectatorStreamCallbacks = {
-  onEvent: (event: CloudAgentEvent) => void;
-  onConnected: () => void;
-  onDisconnected: () => void;
-  onError: (error: StreamError) => void;
-};
-
 /** Decode an untrusted wire value into a record, or undefined. */
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   // oxlint-disable-next-line anti-slop/no-runtime-typeof -- the stream-ticket body is untrusted; typeof is the entry-boundary decode
@@ -56,7 +49,7 @@ function parseTicket(data: unknown): StreamTicket {
  * `mobile-session-manager.ts` (same route, headers, and response contract)
  * without importing that module.
  */
-export async function postReviewSpectatorStreamTicket(
+async function postReviewSpectatorStreamTicket(
   cloudAgentSessionId: string,
   organizationId?: string
 ): Promise<StreamTicket> {
@@ -81,7 +74,7 @@ export async function postReviewSpectatorStreamTicket(
 }
 
 /** Build the raw `/stream` websocket URL. `createConnection` appends `ticket`. */
-export function buildSpectatorStreamUrl(cloudAgentSessionId: string): URL {
+function buildSpectatorStreamUrl(cloudAgentSessionId: string): URL {
   const url = new URL('/stream', CLOUD_AGENT_WS_URL);
   url.searchParams.set('cloudAgentSessionId', cloudAgentSessionId);
   return url;

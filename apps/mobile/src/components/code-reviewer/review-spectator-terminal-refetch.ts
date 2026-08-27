@@ -7,10 +7,10 @@ import { useEffect, useRef } from 'react';
  * its own. The completed transcript may have gained rows the in-flight
  * snapshot does not show, so the flip triggers one refetch.
  */
-export function useRefetchSessionMessagesOnTerminal(
+export function useRefetchSessionMessagesOnTerminal<T>(
   isTerminal: boolean,
   shouldLoadHistory: boolean,
-  refetch: () => Promise<void>
+  refetch: () => Promise<T>
 ): void {
   const wasTerminalRef = useRef(isTerminal);
   useEffect(() => {

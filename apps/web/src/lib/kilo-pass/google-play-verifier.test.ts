@@ -4,7 +4,7 @@ import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import { KiloPassCadence, KiloPassPaymentProvider, KiloPassTier } from './enums';
 import type * as GooglePlayVerifier from './google-play-verifier';
 
-const mockGetGooglePlaySubscriptionPurchase = jest.fn();
+const mockGetGooglePlaySubscriptionPurchase = jest.fn<Promise<androidpublisher_v3.Schema$SubscriptionPurchaseV2>, [string]>();
 
 jest.mock('./google-play-sdk', () => ({
   getGooglePlaySubscriptionPurchase: mockGetGooglePlaySubscriptionPurchase,

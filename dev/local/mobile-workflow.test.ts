@@ -5,22 +5,26 @@ import test from 'node:test';
 test('tab layout derives accessibility labels from the visible tab count', () => {
   const layout = fs.readFileSync('apps/mobile/src/app/(app)/(tabs)/_layout.tsx', 'utf8');
 
-  assert.match(layout, /const tabCount = showKiloClawTab \? 4 : 3;/);
+  assert.match(layout, /const tabCount = visibleTabCount\(showKiloClawTab, showQuickChatTab\);/);
   assert.match(
     layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(t\('tabs\.home'\), 1, tabCount\)/
+    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('tabs\.home'\),\s*tabBarPosition\('home', tabFlags\) \?\? 1,\s*tabCount\s*\)/
   );
   assert.match(
     layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(t\('tabs\.kiloclaw'\), 2, tabCount\)/
+    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('tabs\.kiloclaw'\),\s*tabBarPosition\('kiloclaw', tabFlags\) \?\? 2,\s*tabCount\s*\)/
   );
   assert.match(
     layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('tabs\.agents'\),\s*showKiloClawTab \? 3 : 2,\s*tabCount\s*\)/
+    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('tabs\.agents'\),\s*tabBarPosition\('agents', tabFlags\) \?\? 2,\s*tabCount\s*\)/
   );
   assert.match(
     layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('tabs\.profile'\),\s*showKiloClawTab \? 4 : 3,\s*tabCount\s*\)/
+    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('tabs\.chat'\),\s*tabBarPosition\('chat', tabFlags\) \?\? 3,\s*tabCount\s*\)/
+  );
+  assert.match(
+    layout,
+    /tabBarAccessibilityLabel: tabAccessibilityLabel\(t\('tabs\.profile'\), tabCount, tabCount\)/
   );
 });
 

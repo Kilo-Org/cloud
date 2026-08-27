@@ -126,6 +126,8 @@ import {
   user_moderation_blocks,
   user_moderation_mutes,
   user_terms_acceptances,
+  quick_chat_threads,
+  quick_chat_messages,
   user_deletion_requests,
   user_deletion_steps,
   cloud_agent_pending_uploads,
@@ -302,6 +304,8 @@ describe('User', () => {
     await db.delete(platform_oauth_credentials);
     await db.delete(platform_access_token_credentials);
     await db.delete(platform_integrations);
+    await db.delete(quick_chat_messages);
+    await db.delete(quick_chat_threads);
     await db.delete(organizations);
     await db.delete(kilocode_users);
   });
@@ -1395,6 +1399,55 @@ describe('User', () => {
           .select()
           .from(cloud_agent_pending_uploads)
           .where(eq(cloud_agent_pending_uploads.id, otherPending.id))
+      ).toHaveLength(1);
+    });
+
+    it('deletes quick chat threads and messages for the user and leaves other users intact', async () => {
+      const user = await insertTestUser({ google_user_email: 'quick-chat-user@example.com' });
+      const otherUser = await insertTestUser();
+
+      const [thread] = await db
+        .insert(quick_chat_threads)
+        .values({ user_id: user.id, organization_id: null })
+        .returning();
+      const [otherThread] = await db
+        .insert(quick_chat_threads)
+        .values({ user_id: otherUser.id, organization_id: null })
+        .returning();
+      if (!thread || !otherThread) throw new Error('Failed to seed quick chat threads');
+
+      const [message] = await db
+        .insert(quick_chat_messages)
+        .values({ thread_id: thread.id, role: 'user', content: 'hello' })
+        .returning();
+      const [otherMessage] = await db
+        .insert(quick_chat_messages)
+        .values({ thread_id: otherThread.id, role: 'user', content: 'keep me' })
+        .returning();
+      if (!message || !otherMessage) throw new Error('Failed to seed quick chat messages');
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(quick_chat_messages)
+          .where(eq(quick_chat_messages.thread_id, thread.id))
+      ).toHaveLength(0);
+      expect(
+        await db.select().from(quick_chat_threads).where(eq(quick_chat_threads.user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(quick_chat_threads)
+          .where(eq(quick_chat_threads.user_id, otherUser.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(quick_chat_messages)
+          .where(eq(quick_chat_messages.thread_id, otherThread.id))
       ).toHaveLength(1);
     });
 

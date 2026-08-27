@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { gatewayModelIdCases } from '../../test/fixtures/gateway-model-ids.js';
 import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
   SANDBOX_CONTROL_PROTOCOL_VERSION,
@@ -165,6 +166,77 @@ describe('sandbox control frames', () => {
         label: 'cloning',
       }).ok
     ).toBe(true);
+  });
+
+  it.each([...new Set(gatewayModelIdCases.map(testCase => testCase.gatewayModelId))])(
+    'preserves gateway model %s in prompt and legacy command frames',
+    gatewayModelId => {
+      for (const turn of [
+        { type: 'prompt', prompt: 'hello' },
+        { type: 'command', command: 'review', arguments: '--all changes' },
+      ]) {
+        const payload = {
+          messageId: 'msg_1',
+          turn,
+          agent: { mode: 'architect', model: gatewayModelId, variant: 'high' },
+          finalization: { autoCommit: true, condenseOnComplete: false },
+        };
+        expect(parseOperationPayload('session.prompt', payload)).toEqual({ ok: true, payload });
+      }
+    }
+  );
+
+  it('allows model omission only for command turns without adding a default', () => {
+    const payload = {
+      messageId: 'msg_command',
+      turn: { type: 'command', command: 'review', arguments: '' },
+      agent: { mode: 'reviewer', variant: 'high' },
+    };
+    expect(parseOperationPayload('session.prompt', payload)).toEqual({ ok: true, payload });
+    expect(
+      parseOperationPayload('session.prompt', {
+        ...payload,
+        turn: { type: 'prompt', prompt: 'hello' },
+      })
+    ).toEqual({
+      ok: false,
+      error: { code: 'protocol_error', message: 'Invalid session.prompt payload' },
+    });
+  });
+
+  it.each(['', ' \t\n ', '\u00a0', null, 1, 'a'.repeat(257)])(
+    'rejects invalid explicit model %j for prompt and command turns',
+    model => {
+      for (const turn of [
+        { type: 'prompt', prompt: 'hello' },
+        { type: 'command', command: 'review', arguments: '' },
+      ]) {
+        expect(
+          parseOperationPayload('session.prompt', {
+            messageId: 'msg_1',
+            turn,
+            agent: { mode: 'code', model },
+          }).ok
+        ).toBe(false);
+      }
+    }
+  );
+
+  it('retains strict selection and turn schemas for model-less commands', () => {
+    const payload = {
+      messageId: 'msg_command',
+      turn: { type: 'command', command: 'review', arguments: '' },
+      agent: { mode: 'code' },
+    };
+    for (const invalidPayload of [
+      { ...payload, agent: {} },
+      { ...payload, agent: { ...payload.agent, provider: 'anthropic' } },
+      { ...payload, turn: { ...payload.turn, type: 'shell' } },
+      { ...payload, turn: { ...payload.turn, prompt: 'hello' } },
+      { ...payload, unexpected: true },
+    ]) {
+      expect(parseOperationPayload('session.prompt', invalidPayload).ok).toBe(false);
+    }
   });
 
   it('accepts a full sandbox.heartbeat payload', () => {

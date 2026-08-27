@@ -1,23 +1,500 @@
 import { describe, expect, it } from 'vitest';
+import type {
+  AcceptedCommandTurn,
+  AcceptedPromptTurn,
+  AgentSelection,
+  AgentSelectionOverride,
+} from '../execution/types.js';
 import {
   acceptQueuedMessage,
   assignPreparationAttemptId,
   cancelActiveMessages,
+  createSessionMessageRecord,
   failQueuedMessage,
+  freezeLegacyQueuedMessages,
+  getSessionMessageTurn,
   hasAcceptedMessage,
   hasInterruptibleWork,
+  matchesSessionMessageReplay,
   nextQueuedMessageId,
   recordAcceptedMessageActivity,
+  resolveSessionMessageIntent,
   streamCloudStatus,
   streamQueuedSnapshots,
   terminalizeAcceptedMessages,
   userTurnTerminalState,
+  type ControlSessionMessageInput,
+  type ControlSessionMessageIntent,
   type SessionMessageRecord,
 } from './session-message-queue.js';
 
 function msg(messageId: string, state: SessionMessageRecord['state']): SessionMessageRecord {
   return { messageId, state };
 }
+
+const promptTurn: AcceptedPromptTurn = {
+  type: 'prompt',
+  messageId: 'a',
+  prompt: 'inspect attachment',
+  attachments: { path: 'attachment-path', files: ['document.pdf', 'image.png'] },
+};
+const commandTurn: AcceptedCommandTurn = {
+  type: 'command',
+  messageId: 'b',
+  command: 'review',
+  arguments: '--all changes',
+};
+const defaultAgent: AgentSelection = {
+  mode: 'code',
+  model: 'kilo/anthropic/claude-sonnet-4',
+  variant: 'high',
+};
+
+const invalidModels = ['', '   ', 'kilo/', ' kilo/  '];
+
+describe('resolveSessionMessageIntent', () => {
+  it('inherits the admitted selection without converting the stored Cloud token', () => {
+    expect(resolveSessionMessageIntent({ turn: promptTurn }, defaultAgent)).toEqual({
+      turn: promptTurn,
+      agent: defaultAgent,
+    });
+    expect(resolveSessionMessageIntent({ turn: commandTurn }, defaultAgent)).toEqual({
+      turn: commandTurn,
+      agent: defaultAgent,
+    });
+  });
+
+  it.each(['anthropic/claude-sonnet-4', ' kilo/anthropic/claude-sonnet-4 '])(
+    'retains the same-model variant for the explicit alias %j',
+    model => {
+      expect(
+        resolveSessionMessageIntent({ turn: promptTurn, agent: { model } }, defaultAgent)?.agent
+      ).toEqual({ ...defaultAgent, model });
+    }
+  );
+
+  it('clears the inherited variant when the effective model changes', () => {
+    expect(
+      resolveSessionMessageIntent(
+        { turn: promptTurn, agent: { model: 'kilo/openai/gpt-4.1' } },
+        defaultAgent
+      )?.agent
+    ).toEqual({ mode: 'code', model: 'kilo/openai/gpt-4.1' });
+    expect(defaultAgent.variant).toBe('high');
+  });
+
+  it.each(['low', ''])('preserves explicit mode and variant %j on a changed model', variant => {
+    const agent = { mode: 'architect', model: 'google/gemini-2.5-pro', variant };
+    expect(resolveSessionMessageIntent({ turn: promptTurn, agent }, defaultAgent)?.agent).toEqual(
+      agent
+    );
+  });
+
+  it('uses an already resolved creation agent without needing registered defaults', () => {
+    expect(resolveSessionMessageIntent({ turn: promptTurn, agent: defaultAgent })).toEqual({
+      turn: promptTurn,
+      agent: defaultAgent,
+    });
+  });
+
+  it.each([
+    'kilo/kilo/example',
+    'kilo/kilo-auto/free',
+    'openrouter/free',
+    'vendor/team/Model:free~alias',
+  ])('keeps the opaque Cloud token %j unchanged', model => {
+    expect(resolveSessionMessageIntent({ turn: promptTurn, agent: { model } })?.agent).toEqual({
+      mode: 'code',
+      model,
+    });
+  });
+
+  it('does not treat two levels of kilo qualification as the same catalog ID', () => {
+    expect(
+      resolveSessionMessageIntent(
+        { turn: promptTurn, agent: { model: 'kilo/example' } },
+        { model: 'kilo/kilo/example', variant: 'high' }
+      )?.agent
+    ).toEqual({ mode: 'code', model: 'kilo/example' });
+  });
+
+  it.each(invalidModels)('rejects explicit invalid model %j rather than inheriting', model => {
+    for (const turn of [promptTurn, commandTurn]) {
+      expect(resolveSessionMessageIntent({ turn, agent: { model } }, defaultAgent)).toBeUndefined();
+    }
+  });
+
+  it.each([undefined, ...invalidModels])(
+    'rejects a prompt with invalid default model %j',
+    model => {
+      expect(resolveSessionMessageIntent({ turn: promptTurn }, { model })).toBeUndefined();
+    }
+  );
+
+  it('allows a command with no model while preserving explicit mode and variant', () => {
+    expect(
+      resolveSessionMessageIntent({
+        turn: commandTurn,
+        agent: { mode: 'reviewer', variant: 'low' },
+      })
+    ).toEqual({ turn: commandTurn, agent: { mode: 'reviewer', variant: 'low' } });
+    expect(resolveSessionMessageIntent({ turn: commandTurn })).toEqual({
+      turn: commandTurn,
+      agent: { mode: 'code' },
+    });
+  });
+
+  it('snapshots the input before defaults, attachments, or finalization can change', () => {
+    const defaults = { ...defaultAgent };
+    const turn = structuredClone(promptTurn);
+    const finalization = { autoCommit: true, condenseOnComplete: false };
+    const intent = resolveSessionMessageIntent({ turn, finalization }, defaults);
+    defaults.model = 'kilo/openai/gpt-4.1';
+    defaults.mode = 'architect';
+    defaults.variant = 'low';
+    turn.attachments?.files.push('later.pdf');
+    finalization.autoCommit = false;
+
+    expect(intent).toEqual({
+      turn: promptTurn,
+      agent: defaultAgent,
+      finalization: { autoCommit: true, condenseOnComplete: false },
+    });
+  });
+});
+
+describe('createSessionMessageRecord', () => {
+  it('writes only a nested V2 intent and isolates it from later input mutations', () => {
+    const intent: ControlSessionMessageIntent = {
+      turn: structuredClone(promptTurn),
+      agent: { ...defaultAgent },
+      finalization: { autoCommit: true },
+    };
+    const original = structuredClone(intent);
+    const record = createSessionMessageRecord(intent);
+    intent.agent.model = 'kilo/openai/gpt-4.1';
+    intent.turn.attachments?.files.push('later.pdf');
+
+    expect(record).toEqual({
+      version: 2,
+      messageId: promptTurn.messageId,
+      state: 'queued',
+      intent: original,
+    });
+    expect(record).not.toHaveProperty('turn');
+    expect(record).not.toHaveProperty('prompt');
+  });
+
+  it('keeps a model-less command model-less through acceptance, activity, and completion', () => {
+    const record = createSessionMessageRecord({ turn: commandTurn, agent: { mode: 'code' } });
+    const accepted = acceptQueuedMessage([record], commandTurn.messageId, 10) ?? [];
+    const active = recordAcceptedMessageActivity(accepted, 20) ?? [];
+    const completed = terminalizeAcceptedMessages(active, 'completed');
+
+    expect(completed).toEqual([
+      {
+        ...record,
+        state: 'completed',
+        acceptedAt: 10,
+        lastActivityAt: 20,
+      },
+    ]);
+    expect(completed[0].intent).toBe(record.intent);
+    expect(completed[0].intent?.agent).not.toHaveProperty('model');
+  });
+});
+
+describe('matchesSessionMessageReplay', () => {
+  const promptRecord = createSessionMessageRecord({
+    turn: promptTurn,
+    agent: defaultAgent,
+    finalization: { autoCommit: true, condenseOnComplete: false },
+  });
+
+  it('uses stored selection for omitted overrides on queued and accepted retries', () => {
+    expect(matchesSessionMessageReplay(promptRecord, { turn: promptTurn })).toBe(true);
+    expect(
+      matchesSessionMessageReplay(
+        { ...promptRecord, state: 'accepted', acceptedAt: 10 },
+        { turn: promptTurn }
+      )
+    ).toBe(true);
+    expect(promptRecord.intent.agent).toEqual(defaultAgent);
+  });
+
+  it.each(['anthropic/claude-sonnet-4', ' kilo/anthropic/claude-sonnet-4 '])(
+    'accepts an equivalent explicit gateway alias %j',
+    model => {
+      expect(
+        matchesSessionMessageReplay(promptRecord, { turn: promptTurn, agent: { model } })
+      ).toBe(true);
+      expect(promptRecord.intent.agent.model).toBe(defaultAgent.model);
+    }
+  );
+
+  it.each([
+    ['model', { model: 'openai/gpt-4.1' }],
+    ['mode', { mode: 'architect' }],
+    ['variant', { variant: 'low' }],
+    ['blank variant', { variant: '' }],
+    ...invalidModels.map((model): [string, AgentSelectionOverride] => ['invalid model', { model }]),
+  ] satisfies [string, AgentSelectionOverride][])(
+    'rejects a conflicting explicit %s',
+    (_field, agent) => {
+      expect(matchesSessionMessageReplay(promptRecord, { turn: promptTurn, agent })).toBe(false);
+    }
+  );
+
+  it.each([
+    ['message ID', { ...promptTurn, messageId: 'other' }],
+    ['prompt', { ...promptTurn, prompt: 'different request' }],
+    ['removed attachments', { type: 'prompt', messageId: 'a', prompt: promptTurn.prompt }],
+    [
+      'attachment path',
+      { ...promptTurn, attachments: { path: 'other-path', files: ['document.pdf', 'image.png'] } },
+    ],
+    [
+      'attachment files',
+      { ...promptTurn, attachments: { path: 'attachment-path', files: ['other.pdf'] } },
+    ],
+    [
+      'attachment order',
+      {
+        ...promptTurn,
+        attachments: { path: 'attachment-path', files: ['image.png', 'document.pdf'] },
+      },
+    ],
+  ] satisfies [string, AcceptedPromptTurn][])(
+    'rejects changed immutable turn data: %s',
+    (_field, turn) => {
+      expect(matchesSessionMessageReplay(promptRecord, { turn })).toBe(false);
+    }
+  );
+
+  it('compares canonical prompt fields independently of object property order', () => {
+    expect(
+      matchesSessionMessageReplay(promptRecord, {
+        turn: {
+          attachments: { files: ['document.pdf', 'image.png'], path: 'attachment-path' },
+          prompt: promptTurn.prompt,
+          messageId: 'a',
+          type: 'prompt',
+        },
+      })
+    ).toBe(true);
+  });
+
+  it.each([{ autoCommit: false }, { condenseOnComplete: true }])(
+    'rejects conflicting finalization %j',
+    finalization => {
+      expect(matchesSessionMessageReplay(promptRecord, { turn: promptTurn, finalization })).toBe(
+        false
+      );
+    }
+  );
+
+  it('compares command name, arguments, and turn type, not just rendered content', () => {
+    const record = createSessionMessageRecord({ turn: commandTurn, agent: defaultAgent });
+    expect(
+      matchesSessionMessageReplay(record, {
+        turn: commandTurn,
+        agent: { model: 'anthropic/claude-sonnet-4' },
+      })
+    ).toBe(true);
+    for (const turn of [
+      { ...commandTurn, command: 'status' },
+      { ...commandTurn, arguments: '--staged' },
+      { type: 'prompt', messageId: commandTurn.messageId, prompt: '/review --all changes' },
+    ] satisfies ControlSessionMessageInput['turn'][]) {
+      expect(matchesSessionMessageReplay(record, { turn })).toBe(false);
+    }
+  });
+
+  it('does not let a replay select a model for a frozen model-less command', () => {
+    const record = createSessionMessageRecord({ turn: commandTurn, agent: { mode: 'code' } });
+    expect(matchesSessionMessageReplay(record, { turn: commandTurn })).toBe(true);
+    expect(
+      matchesSessionMessageReplay(record, {
+        turn: commandTurn,
+        agent: { model: defaultAgent.model },
+      })
+    ).toBe(false);
+  });
+
+  it('compares catalog identity after removing at most one outer qualifier', () => {
+    const record = createSessionMessageRecord({
+      turn: promptTurn,
+      agent: { mode: 'code', model: 'kilo/kilo/example' },
+    });
+    expect(
+      matchesSessionMessageReplay(record, {
+        turn: promptTurn,
+        agent: { model: ' kilo/kilo/example ' },
+      })
+    ).toBe(true);
+    expect(
+      matchesSessionMessageReplay(record, { turn: promptTurn, agent: { model: 'kilo/example' } })
+    ).toBe(false);
+  });
+
+  it.each(['completed', 'failed', 'cancelled'] as const)(
+    'rejects terminal %s IDs in all formats',
+    state => {
+      for (const record of [
+        { ...promptRecord, state },
+        { messageId: promptTurn.messageId, state, turn: promptTurn },
+        { messageId: promptTurn.messageId, state, prompt: promptTurn.prompt },
+      ]) {
+        const original = structuredClone(record);
+        expect(matchesSessionMessageReplay(record, { turn: promptTurn })).toBe(false);
+        expect(record).toEqual(original);
+      }
+    }
+  );
+
+  it.each([promptTurn, commandTurn])(
+    'checks legacy accepted $type content without inventing unknown selection',
+    turn => {
+      const record: SessionMessageRecord = {
+        messageId: turn.messageId,
+        state: 'accepted',
+        acceptedAt: 10,
+        turn,
+      };
+      expect(
+        matchesSessionMessageReplay(record, { turn, agent: { model: 'openai/gpt-4.1' } })
+      ).toBe(true);
+      expect(record).not.toHaveProperty('intent');
+      expect(record.state).toBe('accepted');
+    }
+  );
+
+  it('checks legacy prompt-only content without reconstructing a command', () => {
+    const record: SessionMessageRecord = {
+      messageId: 'b',
+      state: 'accepted',
+      prompt: '/review --all changes',
+    };
+    expect(
+      matchesSessionMessageReplay(record, {
+        turn: { type: 'prompt', messageId: 'b', prompt: '/review --all changes' },
+      })
+    ).toBe(true);
+    expect(matchesSessionMessageReplay(record, { turn: commandTurn })).toBe(false);
+    expect(record).not.toHaveProperty('intent');
+  });
+});
+
+describe('freezeLegacyQueuedMessages', () => {
+  it('freezes both legacy formats against pre-update defaults without changing history', () => {
+    const current = createSessionMessageRecord({
+      turn: { type: 'prompt', messageId: 'current', prompt: 'new model' },
+      agent: { mode: 'architect', model: 'kilo/openai/gpt-4.1' },
+    });
+    const history: SessionMessageRecord[] = [
+      {
+        messageId: 'accepted',
+        state: 'accepted',
+        turn: { ...promptTurn, messageId: 'accepted' },
+        acceptedAt: 10,
+      },
+      { messageId: 'completed', state: 'completed', prompt: 'done' },
+      { messageId: 'failed', state: 'failed', prompt: 'failed', failedReason: 'prompt_exhausted' },
+      {
+        messageId: 'cancelled',
+        state: 'cancelled',
+        turn: { ...commandTurn, messageId: 'cancelled' },
+      },
+    ];
+    const messages: SessionMessageRecord[] = [
+      {
+        messageId: promptTurn.messageId,
+        state: 'queued',
+        turn: promptTurn,
+        prompt: 'stale compatibility content',
+        attachFailures: 1,
+        promptFailures: 2,
+        preparationAttemptId: 'attempt-1',
+      },
+      { messageId: commandTurn.messageId, state: 'queued', turn: commandTurn },
+      { messageId: 'old', state: 'queued', prompt: 'old prompt' },
+      current,
+      ...history,
+    ];
+    const original = structuredClone(messages);
+    const frozen = freezeLegacyQueuedMessages(messages, defaultAgent);
+
+    expect(frozen.slice(0, 3)).toEqual([
+      {
+        ...createSessionMessageRecord({ turn: promptTurn, agent: defaultAgent }),
+        attachFailures: 1,
+        promptFailures: 2,
+        preparationAttemptId: 'attempt-1',
+      },
+      createSessionMessageRecord({ turn: commandTurn, agent: defaultAgent }),
+      createSessionMessageRecord({
+        turn: { type: 'prompt', messageId: 'old', prompt: 'old prompt' },
+        agent: defaultAgent,
+      }),
+    ]);
+    expect(frozen[3]).toBe(current);
+    for (const [index, record] of history.entries()) {
+      expect(frozen[index + 4]).toBe(record);
+      expect(record).not.toHaveProperty('intent');
+    }
+    expect(messages).toEqual(original);
+    const restored = structuredClone(frozen);
+    expect(
+      freezeLegacyQueuedMessages(restored, { mode: 'architect', model: 'kilo/openai/gpt-4.1' })
+    ).toEqual(frozen);
+  });
+
+  it('freezes a model-less legacy command without inheriting a later model', () => {
+    const frozen = freezeLegacyQueuedMessages([
+      { messageId: commandTurn.messageId, state: 'queued', turn: commandTurn },
+    ]);
+    expect(frozen[0].intent).toEqual({ turn: commandTurn, agent: { mode: 'code' } });
+    expect(freezeLegacyQueuedMessages(frozen, defaultAgent)[0]).toBe(frozen[0]);
+    expect(frozen[0].intent?.agent).not.toHaveProperty('model');
+  });
+
+  it.each([undefined, ...invalidModels])(
+    'keeps legacy queued prompts fail-able when the pre-update model is %j',
+    model => {
+      const messages: SessionMessageRecord[] = [
+        { messageId: 'a', state: 'queued', turn: promptTurn },
+        { messageId: 'old', state: 'queued', prompt: 'old prompt' },
+      ];
+      const frozen = freezeLegacyQueuedMessages(messages, { model });
+      expect(frozen).toEqual(messages.map(message => ({ ...message, legacyIntentInvalid: true })));
+      expect(freezeLegacyQueuedMessages(frozen, defaultAgent)).toEqual(frozen);
+      expect(frozen.every(message => message.intent === undefined)).toBe(true);
+      expect(getSessionMessageTurn(frozen[0])).toEqual(promptTurn);
+      expect(matchesSessionMessageReplay(frozen[0], { turn: promptTurn })).toBe(false);
+      expect(failQueuedMessage(frozen, 'a')?.[0]).toEqual({ ...frozen[0], state: 'failed' });
+    }
+  );
+
+  it('does not invent missing turn content or reinterpret old command-like prompt text', () => {
+    const frozen = freezeLegacyQueuedMessages(
+      [
+        { messageId: 'missing', state: 'queued' },
+        { messageId: 'old-command', state: 'queued', prompt: '/review --all' },
+      ],
+      defaultAgent
+    );
+    expect(frozen[0]).toEqual({
+      messageId: 'missing',
+      state: 'queued',
+      legacyIntentInvalid: true,
+    });
+    expect(frozen[1].intent?.turn).toEqual({
+      type: 'prompt',
+      messageId: 'old-command',
+      prompt: '/review --all',
+    });
+  });
+});
 
 describe('nextQueuedMessageId', () => {
   it('returns the oldest queued message when none are accepted', () => {
@@ -238,6 +715,89 @@ describe('hasInterruptibleWork', () => {
 });
 
 describe('streamQueuedSnapshots', () => {
+  it.each(['intent', 'turn', 'prompt'] as const)(
+    'reconnects prompt and command content from the %s format',
+    format => {
+      const fixtures = [
+        { turn: promptTurn, content: 'inspect attachment' },
+        { turn: commandTurn, content: '/review --all changes' },
+        {
+          turn: { type: 'command', messageId: 'c', command: 'status', arguments: '' },
+          content: '/status',
+        },
+      ] satisfies { turn: ControlSessionMessageInput['turn']; content: string }[];
+      const records = fixtures.map(({ turn, content }): SessionMessageRecord => {
+        const lifecycle =
+          turn.type === 'prompt'
+            ? { state: 'accepted' as const, acceptedAt: 20 }
+            : { state: 'queued' as const };
+        if (format === 'intent') {
+          return {
+            ...createSessionMessageRecord(
+              turn.type === 'prompt'
+                ? { turn, agent: defaultAgent }
+                : { turn, agent: { mode: 'code' } }
+            ),
+            ...lifecycle,
+          };
+        }
+        return {
+          messageId: turn.messageId,
+          ...lifecycle,
+          ...(format === 'turn' ? { turn } : { prompt: content }),
+        };
+      });
+
+      expect(streamQueuedSnapshots(records, 99)).toEqual([
+        { messageId: 'a', content: 'inspect attachment', timestamp: 20 },
+        { messageId: 'b', content: '/review --all changes', timestamp: 99 },
+        { messageId: 'c', content: '/status', timestamp: 99 },
+      ]);
+    }
+  );
+
+  it('prefers nested intent over stale turn and prompt compatibility fields', () => {
+    const record = Object.assign(
+      createSessionMessageRecord({ turn: commandTurn, agent: defaultAgent }),
+      {
+        turn: { type: 'prompt', messageId: commandTurn.messageId, prompt: 'stale turn' },
+        prompt: 'stale prompt',
+      }
+    );
+    expect(getSessionMessageTurn(record)).toEqual(commandTurn);
+    expect(streamQueuedSnapshots([record], 99)).toEqual([
+      { messageId: commandTurn.messageId, content: '/review --all changes', timestamp: 99 },
+    ]);
+  });
+
+  it('preserves terminal failure delivery semantics for nested intent and excludes settled history', () => {
+    const record = createSessionMessageRecord({ turn: promptTurn, agent: defaultAgent });
+    expect(
+      streamQueuedSnapshots(
+        [
+          { ...record, state: 'failed', acceptedAt: 20, failedReason: 'prompt_exhausted' },
+          { ...record, state: 'completed' },
+          { ...record, state: 'cancelled' },
+        ],
+        99
+      )
+    ).toEqual([
+      {
+        messageId: promptTurn.messageId,
+        content: promptTurn.prompt,
+        timestamp: 20,
+        terminalFailure: {
+          messageId: promptTurn.messageId,
+          status: 'failed',
+          delivery: 'sent',
+          accepted: true,
+          reason: 'prompt_exhausted',
+          timestamp: 20,
+        },
+      },
+    ]);
+  });
+
   it('surfaces queued and accepted legacy prompts for /stream catch-up', () => {
     expect(
       streamQueuedSnapshots(

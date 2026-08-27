@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { gatewayModelIdCases } from '../../../test/fixtures/gateway-model-ids.js';
 import type { WrapperKiloClient, WrapperPty } from '../kilo-api';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
 import {
@@ -7,6 +8,8 @@ import {
   type HandlerDeps,
 } from './sandbox-control-handlers';
 import { ControlTerminalRuntimeError, type ControlTerminalRuntime } from './terminal-runtime';
+
+const gatewayModelIds = [...new Set(gatewayModelIdCases.map(testCase => testCase.gatewayModelId))];
 
 const session = {
   sessionId: 'ses_1',
@@ -81,7 +84,7 @@ describe('handleControlRequest', () => {
     });
   });
 
-  it('calls sendPromptAsync with kiloSessionId and messageId', async () => {
+  it.each(gatewayModelIds)('forwards prompt gateway model %s unchanged', async gatewayModelId => {
     const calls: unknown[] = [];
     const kiloClient = fakeKilo({
       sendPromptAsync: async opts => {
@@ -95,7 +98,7 @@ describe('handleControlRequest', () => {
       {
         messageId: 'msg_1',
         turn: { type: 'prompt', prompt: 'hello' },
-        agent: { mode: 'code', model: 'kilo-model' },
+        agent: { mode: 'architect', model: gatewayModelId, variant: 'high' },
       },
       deps({ kiloClient })
     );
@@ -106,13 +109,14 @@ describe('handleControlRequest', () => {
         sessionId: 'kilo_1',
         messageId: 'msg_1',
         prompt: 'hello',
-        agent: 'code',
-        model: { modelID: 'kilo-model' },
+        agent: 'architect',
+        model: { providerID: 'kilo', modelID: gatewayModelId },
+        variant: 'high',
       },
     ]);
   });
 
-  it('calls sendCommand with the structured command and messageId', async () => {
+  it.each(gatewayModelIds)('forwards command gateway model %s unchanged', async gatewayModelId => {
     const commands: unknown[] = [];
     const prompts: unknown[] = [];
     const kiloClient = fakeKilo({
@@ -130,7 +134,7 @@ describe('handleControlRequest', () => {
       {
         messageId: 'msg_command',
         turn: { type: 'command', command: 'review', arguments: '--all changes' },
-        agent: { mode: 'code', model: 'kilo-model' },
+        agent: { mode: 'architect', model: gatewayModelId, variant: 'high' },
       },
       deps({ kiloClient })
     );
@@ -142,10 +146,121 @@ describe('handleControlRequest', () => {
         command: 'review',
         args: '--all changes',
         messageId: 'msg_command',
+        agent: 'architect',
+        model: { providerID: 'kilo', modelID: gatewayModelId },
+        variant: 'high',
       },
     ]);
     expect(prompts).toEqual([]);
   });
+
+  it.each([undefined, 'high'])(
+    'preserves command model omission with variant %s',
+    async variant => {
+      const commands: unknown[] = [];
+      const prompts: unknown[] = [];
+      const kiloClient = fakeKilo({
+        sendCommand: async opts => {
+          commands.push(opts);
+        },
+        sendPromptAsync: async opts => {
+          prompts.push(opts);
+        },
+      });
+
+      const result = await handleControlRequest(
+        'session.prompt',
+        session,
+        {
+          messageId: 'msg_command',
+          turn: { type: 'command', command: 'review', arguments: '' },
+          agent: { mode: 'reviewer', ...(variant ? { variant } : {}) },
+        },
+        deps({ kiloClient })
+      );
+
+      expect(result).toEqual({
+        ok: true,
+        result: { messageId: 'msg_command', status: 'accepted' },
+      });
+      expect(commands).toEqual([
+        {
+          sessionId: 'kilo_1',
+          command: 'review',
+          args: '',
+          messageId: 'msg_command',
+          agent: 'reviewer',
+          ...(variant ? { variant } : {}),
+        },
+      ]);
+      expect(commands[0]).not.toHaveProperty('model');
+      expect(prompts).toEqual([]);
+    }
+  );
+
+  it.each([undefined, '', ' \t\n ', null])(
+    'rejects invalid prompt model %j before Kilo',
+    async model => {
+      const calls: unknown[] = [];
+      const kiloClient = fakeKilo({
+        sendPromptAsync: async opts => {
+          calls.push(opts);
+        },
+        sendCommand: async opts => {
+          calls.push(opts);
+        },
+      });
+
+      const result = await handleControlRequest(
+        'session.prompt',
+        session,
+        {
+          messageId: 'msg_1',
+          turn: { type: 'prompt', prompt: 'hello' },
+          agent: { mode: 'code', ...(model !== undefined ? { model } : {}) },
+        },
+        deps({ kiloClient })
+      );
+
+      expect(result).toEqual({
+        ok: false,
+        error: { code: 'protocol_error', message: 'Invalid payload', retryable: false },
+      });
+      expect(calls).toEqual([]);
+    }
+  );
+
+  it.each(['', ' \t\n ', null])(
+    'rejects invalid explicit command model %j before Kilo',
+    async model => {
+      const calls: unknown[] = [];
+      const kiloClient = fakeKilo({
+        sendPromptAsync: async opts => {
+          calls.push(opts);
+        },
+        sendCommand: async opts => {
+          calls.push(opts);
+        },
+      });
+
+      const result = await handleControlRequest(
+        'session.prompt',
+        session,
+        {
+          messageId: 'msg_command',
+          turn: { type: 'command', command: 'review', arguments: '' },
+          agent: { mode: 'code', model },
+        },
+        deps({ kiloClient })
+      );
+
+      expect(result).toEqual({
+        ok: false,
+        error: { code: 'protocol_error', message: 'Invalid payload', retryable: false },
+      });
+      expect(calls).toEqual([]);
+    }
+  );
 
   it('returns protocol_error for session.prompt without session', async () => {
     const result = await handleControlRequest(

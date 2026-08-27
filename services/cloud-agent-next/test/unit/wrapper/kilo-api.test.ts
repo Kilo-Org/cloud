@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createWrapperKiloClient, type KiloEvent } from '../../../wrapper/src/kilo-api.js';
+import { gatewayModelIdCases } from '../../fixtures/gateway-model-ids.js';
 import type { KiloClient as SDKClient } from '@kilocode/sdk';
 
 function createSdkClient(): SDKClient {
@@ -35,6 +36,116 @@ describe('createWrapperKiloClient prompt handoff', () => {
     await expect(
       client.sendCommand({ sessionId: 'kilo_sess', command: 'compact', messageId: 'msg_command' })
     ).rejects.toThrow('Command for session kilo_sess failed: command rejected');
+  });
+
+  it.each([...new Set(gatewayModelIdCases.map(testCase => testCase.gatewayModelId))])(
+    'serializes gateway model %s through the pinned prompt, command, and summarize SDK requests',
+    async gatewayModelId => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(new Response(null, { status: 204 }))
+        .mockResolvedValueOnce(Response.json({}))
+        .mockResolvedValueOnce(Response.json(true));
+      vi.stubGlobal('fetch', fetchMock);
+      const client = createWrapperKiloClient(
+        createSdkClient(),
+        'http://127.0.0.1:0',
+        workspacePath
+      );
+      const model = { providerID: 'kilo', modelID: gatewayModelId };
+
+      await client.sendPromptAsync({
+        sessionId: 'kilo_sess',
+        messageId: 'msg_prompt',
+        prompt: 'hello',
+        model,
+        agent: 'architect',
+        variant: 'high',
+      });
+      await client.sendCommand({
+        sessionId: 'kilo_sess',
+        messageId: 'msg_command',
+        command: 'review',
+        args: '--all changes',
+        model,
+        agent: 'architect',
+        variant: 'high',
+      });
+      await expect(
+        client.summarizeSession({ sessionId: 'kilo_sess', model, auto: false })
+      ).resolves.toBe(true);
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      const requests = fetchMock.mock.calls.map(([request]) => {
+        expect(request).toBeInstanceOf(Request);
+        return request as Request;
+      });
+      expect(requests.map(request => [request.method, new URL(request.url).pathname])).toEqual([
+        ['POST', '/session/kilo_sess/prompt_async'],
+        ['POST', '/session/kilo_sess/command'],
+        ['POST', '/session/kilo_sess/summarize'],
+      ]);
+      await expect(Promise.all(requests.map(request => request.clone().json()))).resolves.toEqual([
+        {
+          messageID: 'msg_prompt',
+          parts: [{ type: 'text', text: 'hello' }],
+          model: { providerID: 'kilo', modelID: gatewayModelId },
+          agent: 'architect',
+          variant: 'high',
+        },
+        {
+          messageID: 'msg_command',
+          command: 'review',
+          arguments: '--all changes',
+          model: `kilo/${gatewayModelId}`,
+          agent: 'architect',
+          variant: 'high',
+        },
+        { providerID: 'kilo', modelID: gatewayModelId, auto: false },
+      ]);
+    }
+  );
+
+  it('defaults a selected command model to the Kilo provider without stripping an inner kilo prefix', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({}));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+
+    await client.sendCommand({
+      sessionId: 'kilo_sess',
+      command: 'review',
+      model: { modelID: 'kilo/example' },
+    });
+
+    const request = fetchMock.mock.calls[0]?.[0];
+    expect(request).toBeInstanceOf(Request);
+    await expect((request as Request).clone().json()).resolves.toEqual({
+      command: 'review',
+      arguments: '',
+      model: 'kilo/kilo/example',
+    });
+  });
+
+  it('leaves the command model absent when only agent and variant are selected', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({}));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+
+    await client.sendCommand({
+      sessionId: 'kilo_sess',
+      command: 'review',
+      agent: 'reviewer',
+      variant: 'high',
+    });
+
+    const request = fetchMock.mock.calls[0]?.[0];
+    expect(request).toBeInstanceOf(Request);
+    await expect((request as Request).clone().json()).resolves.toEqual({
+      command: 'review',
+      arguments: '',
+      agent: 'reviewer',
+      variant: 'high',
+    });
   });
 
   it('summarizes sessions through the dedicated Kilo endpoint', async () => {

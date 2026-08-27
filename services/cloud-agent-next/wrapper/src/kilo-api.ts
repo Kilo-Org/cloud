@@ -255,6 +255,9 @@ export type WrapperKiloClient = {
     command: string;
     args?: string;
     messageId?: string;
+    agent?: string;
+    model?: { providerID?: string; modelID: string };
+    variant?: string;
     snapshotInitialization?: 'wait';
   }) => Promise<unknown>;
   /** Fetch the full slash command catalog from kilo, trimmed to wire shape. */
@@ -456,6 +459,11 @@ export function createWrapperKiloClient(
         command: opts.command,
         arguments: opts.args ?? '',
         ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
+        ...(opts.agent ? { agent: opts.agent } : {}),
+        ...(opts.model
+          ? { model: `${opts.model.providerID ?? 'kilo'}/${opts.model.modelID}` }
+          : {}),
+        ...(opts.variant ? { variant: opts.variant } : {}),
         ...(opts.snapshotInitialization
           ? { snapshotInitialization: opts.snapshotInitialization }
           : {}),

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  gatewayModelIdCases,
+  invalidCloudModelIds,
+} from '../../test/fixtures/gateway-model-ids.js';
+import {
   dispatchedKilocodeModelId,
   isLocalFakeDeterministicModel,
   normalizeKilocodeModel,
@@ -29,19 +33,19 @@ describe('normalizeKilocodeModel', () => {
 });
 
 describe('dispatchedKilocodeModelId', () => {
-  it('returns the model ID sent to the kilo provider', () => {
-    expect(dispatchedKilocodeModelId('anthropic/claude-sonnet-4')).toBe(
-      'anthropic/claude-sonnet-4'
-    );
-    expect(dispatchedKilocodeModelId('kilo/anthropic/claude-sonnet-4')).toBe(
-      'anthropic/claude-sonnet-4'
-    );
-    expect(dispatchedKilocodeModelId('kilo-auto/free')).toBe('kilo-auto/free');
+  it.each(gatewayModelIdCases)(
+    'converts $cloudModel to the opaque gateway ID $gatewayModelId',
+    ({ cloudModel, gatewayModelId }) => {
+      expect(dispatchedKilocodeModelId(cloudModel)).toBe(gatewayModelId);
+    }
+  );
+
+  it.each([undefined, null])('returns undefined for omitted input %s', model => {
+    expect(dispatchedKilocodeModelId(model)).toBeUndefined();
   });
 
-  it('returns undefined for empty input', () => {
-    expect(dispatchedKilocodeModelId(undefined)).toBeUndefined();
-    expect(dispatchedKilocodeModelId('   ')).toBeUndefined();
+  it.each(invalidCloudModelIds)('does not produce a usable gateway ID for %j', model => {
+    expect(dispatchedKilocodeModelId(model)).toBeFalsy();
   });
 });
 

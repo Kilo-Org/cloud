@@ -254,13 +254,14 @@ async function handlePrompt(
   try {
     const { messageId, turn, agent } = parsed.data;
     if (turn.type === 'prompt') {
+      if (agent.model === undefined) return fail('protocol_error', 'Invalid payload', false);
       await kiloClient.sendPromptAsync({
         sessionId: session.kiloSessionId,
         messageId,
         prompt: turn.prompt,
         ...(turn.parts ? { parts: turn.parts } : {}),
         agent: agent.mode,
-        model: { modelID: agent.model },
+        model: { providerID: 'kilo', modelID: agent.model },
         ...(agent.variant ? { variant: agent.variant } : {}),
       });
     } else {
@@ -269,6 +270,11 @@ async function handlePrompt(
         command: turn.command,
         args: turn.arguments,
         messageId,
+        agent: agent.mode,
+        ...(agent.model !== undefined
+          ? { model: { providerID: 'kilo', modelID: agent.model } }
+          : {}),
+        ...(agent.variant ? { variant: agent.variant } : {}),
       });
     }
     return ok({ messageId, status: 'accepted' });

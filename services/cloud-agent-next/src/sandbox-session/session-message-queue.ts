@@ -1,23 +1,185 @@
-import { renderExecutionTurnContent, type AcceptedExecutionTurn } from '../execution/types.js';
+import {
+  renderExecutionTurnContent,
+  type AcceptedCommandTurn,
+  type AcceptedExecutionTurn,
+  type AcceptedPromptTurn,
+  type AgentSelection,
+  type AgentSelectionOverride,
+  type SessionMessageIntent,
+} from '../execution/types.js';
+import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
 
 export type SessionMessageState = 'queued' | 'accepted' | 'completed' | 'failed' | 'cancelled';
 
-export type SessionMessageRecord = {
+export type ControlCommandAgentSelection = Omit<AgentSelection, 'model'> & { model?: string };
+
+export type ControlSessionMessageIntent =
+  | (SessionMessageIntent & { turn: AcceptedPromptTurn })
+  | (Omit<SessionMessageIntent, 'turn' | 'agent'> & {
+      turn: AcceptedCommandTurn;
+      agent: ControlCommandAgentSelection;
+    });
+
+export type ControlSessionMessageInput = Pick<SessionMessageIntent, 'turn' | 'finalization'> & {
+  agent?: AgentSelectionOverride;
+};
+
+type SessionMessageLifecycle = {
   messageId: string;
   state: SessionMessageState;
   acceptedAt?: number;
   lastActivityAt?: number;
-  turn?: AcceptedExecutionTurn;
-  prompt?: string;
   failedReason?: string;
   attachFailures?: number;
   promptFailures?: number;
   preparationAttemptId?: string;
 };
 
+export type SessionMessageRecordV2 = SessionMessageLifecycle & {
+  readonly version: 2;
+  readonly intent: ControlSessionMessageIntent;
+  turn?: never;
+  prompt?: never;
+  legacyIntentInvalid?: never;
+};
+
+type LegacySessionMessageRecord = SessionMessageLifecycle & {
+  version?: undefined;
+  intent?: undefined;
+  turn?: AcceptedExecutionTurn;
+  prompt?: string;
+  legacyIntentInvalid?: true;
+};
+
+export type SessionMessageRecord = SessionMessageRecordV2 | LegacySessionMessageRecord;
+
 export const ATTACH_FAILURE_LIMIT = 2;
 export const PROMPT_FAILURE_LIMIT = 5;
+
+export function resolveSessionMessageIntent(
+  input: ControlSessionMessageInput,
+  defaults?: AgentSelectionOverride
+): ControlSessionMessageIntent | undefined {
+  const model = input.agent?.model !== undefined ? input.agent.model : defaults?.model;
+  const modelId = dispatchedKilocodeModelId(model);
+  if (model !== undefined && !modelId) return undefined;
+
+  const mode = input.agent?.mode ?? defaults?.mode ?? 'code';
+  const variant =
+    input.agent?.variant ??
+    (modelId === dispatchedKilocodeModelId(defaults?.model) ? defaults?.variant : undefined);
+  const agent = {
+    mode,
+    ...(model !== undefined ? { model } : {}),
+    ...(variant !== undefined ? { variant } : {}),
+  };
+  const finalization = input.finalization
+    ? {
+        autoCommit: input.finalization.autoCommit,
+        condenseOnComplete: input.finalization.condenseOnComplete,
+      }
+    : undefined;
+  if (input.turn.type === 'prompt') {
+    if (model === undefined) return undefined;
+    return {
+      turn: structuredClone(input.turn),
+      agent: { ...agent, model },
+      ...(finalization ? { finalization } : {}),
+    };
+  }
+  return {
+    turn: structuredClone(input.turn),
+    agent,
+    ...(finalization ? { finalization } : {}),
+  };
+}
+
+export function createSessionMessageRecord(
+  intent: ControlSessionMessageIntent
+): SessionMessageRecordV2 {
+  return {
+    version: 2,
+    messageId: intent.turn.messageId,
+    state: 'queued',
+    intent: structuredClone(intent),
+  };
+}
+
+export function getSessionMessageTurn(
+  message: SessionMessageRecord
+): AcceptedExecutionTurn | undefined {
+  return (
+    message.intent?.turn ??
+    message.turn ??
+    (message.prompt !== undefined
+      ? { type: 'prompt', messageId: message.messageId, prompt: message.prompt }
+      : undefined)
+  );
+}
+
+function sameExecutionTurn(left: AcceptedExecutionTurn, right: AcceptedExecutionTurn): boolean {
+  if (left.messageId !== right.messageId) return false;
+  if (left.type === 'command') {
+    return (
+      right.type === 'command' &&
+      left.command === right.command &&
+      left.arguments === right.arguments
+    );
+  }
+  return (
+    right.type === 'prompt' &&
+    left.prompt === right.prompt &&
+    left.attachments?.path === right.attachments?.path &&
+    JSON.stringify(left.attachments?.files) === JSON.stringify(right.attachments?.files)
+  );
+}
+
+export function matchesSessionMessageReplay(
+  message: SessionMessageRecord,
+  input: ControlSessionMessageInput
+): boolean {
+  if (message.state !== 'queued' && message.state !== 'accepted') return false;
+  if (message.messageId !== input.turn.messageId || message.legacyIntentInvalid) return false;
+  const turn = getSessionMessageTurn(message);
+  if (turn && !sameExecutionTurn(turn, input.turn)) return false;
+  const requestedModelId = dispatchedKilocodeModelId(input.agent?.model);
+  if (input.agent?.model !== undefined && !requestedModelId) return false;
+  const intent = message.intent;
+  if (!intent) return true;
+  return (
+    (input.agent?.model === undefined ||
+      requestedModelId === dispatchedKilocodeModelId(intent.agent.model)) &&
+    (input.agent?.mode === undefined || input.agent.mode === intent.agent.mode) &&
+    (input.agent?.variant === undefined || input.agent.variant === intent.agent.variant) &&
+    (input.finalization?.autoCommit === undefined ||
+      input.finalization.autoCommit === intent.finalization?.autoCommit) &&
+    (input.finalization?.condenseOnComplete === undefined ||
+      input.finalization.condenseOnComplete === intent.finalization?.condenseOnComplete)
+  );
+}
+
+export function freezeLegacyQueuedMessages(
+  messages: readonly SessionMessageRecord[],
+  defaults?: AgentSelectionOverride
+): SessionMessageRecord[] {
+  return messages.map((message): SessionMessageRecord => {
+    if (message.state !== 'queued' || message.intent) return message;
+    const { turn, prompt, legacyIntentInvalid, ...record } = message;
+    if (legacyIntentInvalid) return message;
+    const legacyTurn =
+      turn ??
+      (prompt !== undefined
+        ? { type: 'prompt' as const, messageId: message.messageId, prompt }
+        : undefined);
+    const intent = legacyTurn
+      ? resolveSessionMessageIntent({ turn: legacyTurn }, defaults)
+      : undefined;
+    return intent
+      ? { ...record, ...createSessionMessageRecord(intent) }
+      : { ...message, legacyIntentInvalid: true };
+  });
+}
 
 export function assignPreparationAttemptId(
   messages: readonly SessionMessageRecord[],
@@ -217,14 +379,17 @@ export function streamQueuedSnapshots(
       message =>
         message.state === 'queued' || message.state === 'accepted' || message.state === 'failed'
     )
-    .map(message => ({
-      messageId: message.messageId,
-      content: message.turn ? renderExecutionTurnContent(message.turn) : (message.prompt ?? ''),
-      timestamp: message.acceptedAt ?? now,
-      ...(message.state === 'failed'
-        ? { terminalFailure: failedMessageSnapshot(message, now) }
-        : {}),
-    }));
+    .map(message => {
+      const turn = getSessionMessageTurn(message);
+      return {
+        messageId: message.messageId,
+        content: turn ? renderExecutionTurnContent(turn) : '',
+        timestamp: message.acceptedAt ?? now,
+        ...(message.state === 'failed'
+          ? { terminalFailure: failedMessageSnapshot(message, now) }
+          : {}),
+      };
+    });
 }
 
 export function streamCloudStatus(

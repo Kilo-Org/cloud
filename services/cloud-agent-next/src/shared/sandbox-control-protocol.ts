@@ -259,17 +259,17 @@ export const sessionPromptTurnSchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 
-export const sessionPromptPayloadSchema = z
+const sessionPromptAgentSchema = z
+  .object({
+    mode: z.string().min(1).max(64),
+    model: z.string().min(1).max(256).regex(/\S/),
+    variant: z.string().min(1).max(64).optional(),
+  })
+  .strict();
+
+const sessionPromptPayloadBaseSchema = z
   .object({
     messageId: z.string().min(1).max(128),
-    turn: sessionPromptTurnSchema,
-    agent: z
-      .object({
-        mode: z.string().min(1).max(64),
-        model: z.string().min(1).max(256),
-        variant: z.string().min(1).max(64).optional(),
-      })
-      .strict(),
     finalization: z
       .object({
         autoCommit: z.boolean().optional(),
@@ -279,6 +279,17 @@ export const sessionPromptPayloadSchema = z
       .optional(),
   })
   .strict();
+
+export const sessionPromptPayloadSchema = z.union([
+  sessionPromptPayloadBaseSchema.extend({
+    turn: sessionPromptTurnSchema.options[0],
+    agent: sessionPromptAgentSchema,
+  }),
+  sessionPromptPayloadBaseSchema.extend({
+    turn: sessionPromptTurnSchema.options[1],
+    agent: sessionPromptAgentSchema.partial({ model: true }),
+  }),
+]);
 
 export const sessionPromptResultSchema = z
   .object({

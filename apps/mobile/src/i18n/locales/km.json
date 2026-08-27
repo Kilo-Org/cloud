@@ -2460,6 +2460,8 @@
       "viewTable": "មើលតារាង",
       "title": "តារាង",
       "close": "បិទតារាង",
+      "loading": "កំពុងផ្ទុកតារាង",
+      "empty": "តារាងនេះគ្មានជួរទេ។",
       "columnCount_one": "ជួរឈរ",
       "columnCount": "ជួរឈរ",
       "columnCount_other": "ជួរឈរ",

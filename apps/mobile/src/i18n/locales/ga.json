@@ -2511,6 +2511,8 @@
       "viewTable": "Féach ar an tábla",
       "title": "Tábla",
       "close": "Dún an tábla",
+      "loading": "Ag lódáil an tábla",
+      "empty": "Níl aon ró sa tábla seo.",
       "columnCount_one": "colún",
       "columnCount": "colúin",
       "columnCount_other": "colúin",

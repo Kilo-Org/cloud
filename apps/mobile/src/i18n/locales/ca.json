@@ -2477,6 +2477,8 @@
       "viewTable": "Mostra la taula",
       "title": "Taula",
       "close": "Tanca la taula",
+      "loading": "Carregant la taula",
+      "empty": "Aquesta taula no té cap fila.",
       "columnCount_one": "columna",
       "columnCount": "columnes",
       "columnCount_other": "columnes",

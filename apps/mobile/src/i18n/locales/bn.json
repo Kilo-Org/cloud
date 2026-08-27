@@ -2460,6 +2460,8 @@
       "viewTable": "টেবিল দেখুন",
       "title": "টেবিল",
       "close": "টেবিল বন্ধ করুন",
+      "loading": "টেবিল লোড হচ্ছে",
+      "empty": "এই টেবিলে কোনো সারি নেই।",
       "columnCount_one": "কলাম",
       "columnCount": "কলাম",
       "columnCount_other": "কলাম",

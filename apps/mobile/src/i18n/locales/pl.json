@@ -2026,6 +2026,8 @@
       "viewTable": "Wyświetl tabelę",
       "title": "Tabela",
       "close": "Zamknij tabelę",
+      "loading": "Wczytywanie tabeli",
+      "empty": "Ta tabela nie ma wierszy.",
       "columnCount_one": "kolumna",
       "columnCount": "kolumny",
       "columnCount_other": "kolumny",

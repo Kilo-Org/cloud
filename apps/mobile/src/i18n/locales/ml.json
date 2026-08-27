@@ -2460,6 +2460,8 @@
       "viewTable": "പട്ടിക കാണുക",
       "title": "പട്ടിക",
       "close": "പട്ടിക അടയ്ക്കുക",
+      "loading": "പട്ടിക ലോഡുചെയ്യുന്നു",
+      "empty": "ഈ പട്ടികയിൽ വരികളൊന്നുമില്ല.",
       "columnCount_one": "നിര",
       "columnCount": "നിരകൾ",
       "columnCount_other": "നിരകൾ",

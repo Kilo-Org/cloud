@@ -2460,6 +2460,8 @@
       "viewTable": "Näytä taulukko",
       "title": "Taulukko",
       "close": "Sulje taulukko",
+      "loading": "Ladataan taulukkoa",
+      "empty": "Tässä taulukossa ei ole rivejä.",
       "columnCount_one": "sarake",
       "columnCount": "sarakkeet",
       "columnCount_other": "sarakkeet",

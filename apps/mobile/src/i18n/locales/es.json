@@ -2016,6 +2016,8 @@
       "viewTable": "Ver tabla",
       "title": "Tabla",
       "close": "Cerrar tabla",
+      "loading": "Cargando tabla",
+      "empty": "Esta tabla no tiene filas.",
       "columnCount_one": "columna",
       "columnCount": "columnas",
       "columnCount_other": "columnas",

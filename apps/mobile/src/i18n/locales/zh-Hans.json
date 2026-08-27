@@ -2006,6 +2006,8 @@
       "viewTable": "查看表格",
       "title": "表格",
       "close": "关闭表格",
+      "loading": "正在加载表格",
+      "empty": "此表格没有任何行。",
       "columnCount_one": "列",
       "columnCount": "列",
       "columnCount_other": "列",

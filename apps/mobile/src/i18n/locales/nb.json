@@ -2460,6 +2460,8 @@
       "viewTable": "Vis tabell",
       "title": "Tabell",
       "close": "Lukk tabell",
+      "loading": "Laster tabell",
+      "empty": "Denne tabellen har ingen rader.",
       "columnCount_one": "kolonne",
       "columnCount": "kolonner",
       "columnCount_other": "kolonner",

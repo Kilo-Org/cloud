@@ -2460,6 +2460,8 @@
       "viewTable": "Vaata tabelit",
       "title": "Tabel",
       "close": "Sulge tabel",
+      "loading": "Laadin tabelit",
+      "empty": "Selles tabelis ei ole ridu.",
       "columnCount_one": "veerg",
       "columnCount": "veerud",
       "columnCount_other": "veerud",

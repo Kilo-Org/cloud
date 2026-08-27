@@ -2460,6 +2460,8 @@
       "viewTable": "ເບິ່ງຕາຕະລາງ",
       "title": "ຕາຕະລາງ",
       "close": "ປິດຕາຕະລາງ",
+      "loading": "ກຳລັງໂຫຼດຕາຕະລາງ",
+      "empty": "ຕາຕະລາງນີ້ບໍ່ມີແຖວ",
       "columnCount_one": "ຖັນ",
       "columnCount": "ຖັນ",
       "columnCount_other": "ຖັນ",

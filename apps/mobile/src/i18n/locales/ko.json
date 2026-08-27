@@ -2006,6 +2006,8 @@
       "viewTable": "표 보기",
       "title": "표",
       "close": "표 닫기",
+      "loading": "표 불러오는 중",
+      "empty": "이 표에는 행이 없습니다.",
       "columnCount_one": "열",
       "columnCount": "열",
       "columnCount_other": "열",

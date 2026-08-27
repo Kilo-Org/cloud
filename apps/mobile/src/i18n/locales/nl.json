@@ -2006,6 +2006,8 @@
       "viewTable": "Tabel bekijken",
       "title": "Tabel",
       "close": "Tabel sluiten",
+      "loading": "Tabel laden",
+      "empty": "Deze tabel bevat geen rijen.",
       "columnCount_one": "kolom",
       "columnCount": "kolommen",
       "columnCount_other": "kolommen",

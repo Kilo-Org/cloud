@@ -2006,6 +2006,8 @@
       "viewTable": "Tabelle ansehen",
       "title": "Tabelle",
       "close": "Tabelle schließen",
+      "loading": "Tabelle wird geladen",
+      "empty": "Diese Tabelle hat keine Zeilen.",
       "columnCount_one": "Spalte",
       "columnCount": "Spalten",
       "columnCount_other": "Spalten",

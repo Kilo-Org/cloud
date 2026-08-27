@@ -2460,6 +2460,8 @@
       "viewTable": "بینینی خشتەکە",
       "title": "خشتە",
       "close": "داخستنی خشتەکە",
+      "loading": "بارکردنی خشتەکە",
+      "empty": "ئەم خشتەیە هیچ ڕیزێکی نییە.",
       "columnCount_one": "ئەستوون",
       "columnCount": "ئەستوونەکان",
       "columnCount_other": "ئەستوونەکان",

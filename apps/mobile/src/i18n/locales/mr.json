@@ -2460,6 +2460,8 @@
       "viewTable": "टेबल पहा",
       "title": "टेबल",
       "close": "टेबल बंद करा",
+      "loading": "टेबल लोड होत आहे",
+      "empty": "या टेबलमध्ये कोणत्याही पंक्ती नाहीत.",
       "columnCount_one": "स्तंभ",
       "columnCount": "स्तंभ",
       "columnCount_other": "स्तंभ",

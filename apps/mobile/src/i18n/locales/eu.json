@@ -2460,6 +2460,8 @@
       "viewTable": "Ikusi taula",
       "title": "Taula",
       "close": "Itxi taula",
+      "loading": "Taula kargatzen",
+      "empty": "Taula honek ez du ilararik.",
       "columnCount_one": "zutabea",
       "columnCount": "zutabeak",
       "columnCount_other": "zutabeak",

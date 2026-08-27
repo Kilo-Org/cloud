@@ -2476,6 +2476,8 @@
       "viewTable": "View table",
       "title": "Table",
       "close": "Close table",
+      "loading": "Loading table",
+      "empty": "This table has no rows.",
       "columnCount_one": "column",
       "columnCount": "columns",
       "columnCount_other": "columns",

@@ -2460,6 +2460,8 @@
       "viewTable": "Taabala ilaali",
       "title": "Taabala",
       "close": "Taabala cufi",
+      "loading": "Taabala fe'amaa jira",
+      "empty": "Taabala kun tartiba hin qabu",
       "columnCount_one": "haatara",
       "columnCount": "haataraawwan",
       "columnCount_other": "haataraawwan",

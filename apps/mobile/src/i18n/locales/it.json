@@ -2000,6 +2000,8 @@
       "viewTable": "Visualizza tabella",
       "title": "Tabella",
       "close": "Chiudi tabella",
+      "loading": "Caricamento tabella",
+      "empty": "Questa tabella non ha righe.",
       "columnCount_one": "colonna",
       "columnCount": "colonne",
       "columnCount_other": "colonne",

@@ -2494,6 +2494,8 @@
       "viewTable": "Zobrazit tabulku",
       "title": "Tabulka",
       "close": "Zavřít tabulku",
+      "loading": "Načítání tabulky",
+      "empty": "Tato tabulka nemá žádné řádky.",
       "columnCount_one": "sloupec",
       "columnCount": "sloupce",
       "columnCount_other": "sloupce",

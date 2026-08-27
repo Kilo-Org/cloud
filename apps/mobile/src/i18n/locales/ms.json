@@ -2460,6 +2460,8 @@
       "viewTable": "Lihat jadual",
       "title": "Jadual",
       "close": "Tutup jadual",
+      "loading": "Memuat jadual",
+      "empty": "Jadual ini tiada baris.",
       "columnCount_one": "lajur",
       "columnCount": "lajur",
       "columnCount_other": "lajur",

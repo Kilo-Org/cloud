@@ -2460,6 +2460,8 @@
       "viewTable": "Skoða töflu",
       "title": "Tafla",
       "close": "Loka töflu",
+      "loading": "Hleð töflu",
+      "empty": "Þessi tafla hefur engar línur.",
       "columnCount_one": "dálkur",
       "columnCount": "dálkar",
       "columnCount_other": "dálkar",

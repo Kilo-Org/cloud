@@ -2006,6 +2006,8 @@
       "viewTable": "Xem bảng",
       "title": "Bảng",
       "close": "Đóng bảng",
+      "loading": "Đang tải bảng",
+      "empty": "Bảng này không có hàng nào.",
       "columnCount_one": "cột",
       "columnCount": "các cột",
       "columnCount_other": "các cột",

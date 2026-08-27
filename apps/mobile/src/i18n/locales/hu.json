@@ -2460,6 +2460,8 @@
       "viewTable": "Táblázat megtekintése",
       "title": "Táblázat",
       "close": "Táblázat bezárása",
+      "loading": "Táblázat betöltése",
+      "empty": "A táblázat nem tartalmaz sorokat.",
       "columnCount_one": "oszlop",
       "columnCount": "oszlop",
       "columnCount_other": "oszlop",

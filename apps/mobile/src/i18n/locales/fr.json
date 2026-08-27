@@ -1934,6 +1934,8 @@
       "viewTable": "Voir le tableau",
       "title": "Tableau",
       "close": "Fermer le tableau",
+      "loading": "Chargement du tableau",
+      "empty": "Ce tableau ne contient aucune ligne.",
       "columnCount_one": "colonne",
       "columnCount": "colonnes",
       "columnCount_other": "colonnes",

@@ -2460,6 +2460,8 @@
       "viewTable": "ሰንጠረዥ ይመልከቱ",
       "title": "ሰንጠረዥ",
       "close": "ሰንጠረዥ ይዝጉ",
+      "loading": "ሰንጠረዥ በመጫን ላይ",
+      "empty": "ይህ ሰንጠረዥ ምንም ረድፍ የለውም።",
       "columnCount_one": "ዓምድ",
       "columnCount": "ዓምዶች",
       "columnCount_other": "ዓምዶች",

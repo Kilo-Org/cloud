@@ -2460,6 +2460,8 @@
       "viewTable": "ცხრილის ნახვა",
       "title": "ცხრილი",
       "close": "ცხრილის დახურვა",
+      "loading": "ცხრილის ჩატვირთვა",
+      "empty": "ამ ცხრილს სტრიქონები არ აქვს.",
       "columnCount_one": "სვეტი",
       "columnCount": "სვეტი",
       "columnCount_other": "სვეტი",

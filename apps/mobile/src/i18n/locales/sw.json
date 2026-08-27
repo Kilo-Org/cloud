@@ -2460,6 +2460,8 @@
       "viewTable": "Tazama jedwali",
       "title": "Jedwali",
       "close": "Funga jedwali",
+      "loading": "Inapakia jedwali",
+      "empty": "Jedwali hili halina safu mlalo",
       "columnCount_one": "safu",
       "columnCount": "safu",
       "columnCount_other": "safu",

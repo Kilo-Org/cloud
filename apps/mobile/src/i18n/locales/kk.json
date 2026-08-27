@@ -2460,6 +2460,8 @@
       "viewTable": "Кестені қарау",
       "title": "Кесте",
       "close": "Кестені жабу",
+      "loading": "Кестені жүктеу",
+      "empty": "Бұл кестеде жолдар жоқ.",
       "columnCount_one": "баған",
       "columnCount": "баған",
       "columnCount_other": "баған",

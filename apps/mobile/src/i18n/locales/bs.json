@@ -2477,6 +2477,8 @@
       "viewTable": "Pogledaj tabelu",
       "title": "Tabela",
       "close": "Zatvori tabelu",
+      "loading": "Učitavanje tabele",
+      "empty": "Ova tabela nema redova.",
       "columnCount_one": "kolona",
       "columnCount": "kolone",
       "columnCount_other": "kolone",

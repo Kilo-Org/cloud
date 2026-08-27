@@ -2477,6 +2477,8 @@
       "viewTable": "Skatīt tabulu",
       "title": "Tabula",
       "close": "Aizvērt tabulu",
+      "loading": "Ielādē tabulu",
+      "empty": "Šajā tabulā nav rindu.",
       "columnCount_one": "kolonna",
       "columnCount": "kolonnas",
       "columnCount_other": "kolonnas",

@@ -2460,6 +2460,8 @@
       "viewTable": "કોષ્ટક જુઓ",
       "title": "કોષ્ટક",
       "close": "કોષ્ટક બંધ કરો",
+      "loading": "કોષ્ટક લોડ થઈ રહ્યું છે",
+      "empty": "આ કોષ્ટકમાં કોઈ પંક્તિઓ નથી.",
       "columnCount_one": "કૉલમ",
       "columnCount": "કૉલમ્સ",
       "columnCount_other": "કૉલમ્સ",

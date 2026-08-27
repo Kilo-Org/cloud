@@ -2460,6 +2460,8 @@
       "viewTable": "Tingnan ang table",
       "title": "Table",
       "close": "Isara ang table",
+      "loading": "Niloload ang table",
+      "empty": "Walang row ang table na ito.",
       "columnCount_one": "column",
       "columnCount": "mga column",
       "columnCount_other": "mga column",

@@ -2460,6 +2460,8 @@
       "viewTable": "Duba tebur",
       "title": "Tebur",
       "close": "Rufe tebur",
+      "loading": "Ana lodin tebur",
+      "empty": "Wannan tebur ba shi da layuka.",
       "columnCount_one": "shafi",
       "columnCount": "shafuka",
       "columnCount_other": "shafuka",

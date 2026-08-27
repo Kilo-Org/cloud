@@ -2006,6 +2006,8 @@
       "viewTable": "Lihat tabel",
       "title": "Tabel",
       "close": "Tutup tabel",
+      "loading": "Memuat tabel",
+      "empty": "Tabel ini tidak memiliki baris.",
       "columnCount_one": "kolom",
       "columnCount": "kolom",
       "columnCount_other": "kolom",

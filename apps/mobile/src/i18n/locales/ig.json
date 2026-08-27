@@ -2460,6 +2460,8 @@
       "viewTable": "Lelee tebụl",
       "title": "Tebụl",
       "close": "Mechi tebụl",
+      "loading": "Na-ebunye tebụl",
+      "empty": "Tebụl a enweghị ahịrị.",
       "columnCount_one": "ogidi",
       "columnCount": "ogidi",
       "columnCount_other": "ogidi",

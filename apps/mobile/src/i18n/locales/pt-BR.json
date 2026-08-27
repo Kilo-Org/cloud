@@ -2000,6 +2000,8 @@
       "viewTable": "Ver tabela",
       "title": "Tabela",
       "close": "Fechar tabela",
+      "loading": "Carregando tabela",
+      "empty": "Esta tabela não tem linhas.",
       "columnCount_one": "coluna",
       "columnCount": "colunas",
       "columnCount_other": "colunas",

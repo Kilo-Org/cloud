@@ -2006,6 +2006,8 @@
       "viewTable": "テーブルを表示",
       "title": "テーブル",
       "close": "テーブルを閉じる",
+      "loading": "テーブルを読み込み中",
+      "empty": "このテーブルには行がありません。",
       "columnCount_one": "列",
       "columnCount": "列",
       "columnCount_other": "列",

@@ -1,76 +1,10 @@
 import { DarkTheme, DefaultTheme } from 'expo-router';
 import { useColorScheme } from 'react-native';
 
-// These values must stay in sync with src/global.css design tokens.
-// They exist as raw strings because React Navigation header/tab options
-// and Lucide icons require plain color values (not Tailwind classes).
-export const lightColors = {
-  background: '#FBFAF5',
-  foreground: '#14130F',
-  primary: '#4F5A10',
-  primaryForeground: '#FFFFFF',
-  secondary: '#F0EEE6',
-  secondaryForeground: '#14130F',
-  muted: '#F0EEE6',
-  mutedForeground: '#6F6A61',
-  destructive: '#B0483A',
-  destructiveForeground: '#FFFFFF',
-  border: 'rgba(20, 15, 10, 0.09)',
-  card: '#FFFFFF',
+// generated from src/global.css; do not edit by hand.
+import { darkColors, lightColors } from './theme-colors.generated';
 
-  // Focus-only
-  ink2: '#3C382F',
-  mutedSoft: '#A9A39A',
-  hairSoft: 'rgba(20, 15, 10, 0.05)',
-  accentSoft: '#E8F27A',
-  accentSoftForeground: '#1A1A10',
-  good: '#24784A',
-  warn: '#956011',
-  warnForeground: '#FFFFFF',
-  info: '#2260EB',
-
-  // Per-agent hues (full-opacity only — tile bg/border live in CSS tokens)
-  agentYuki: '#6B4FD6',
-  agentWorkclaw: '#4F5A10',
-  agentCloud: '#2F9A5F',
-  agentKilocode: '#B27214',
-  agentCoral: '#C25647',
-  agentSky: '#2C7FB0',
-} as const;
-
-export const darkColors = {
-  background: '#0E0E10',
-  foreground: '#F2F0EB',
-  primary: '#E8F27A',
-  primaryForeground: '#1A1A10',
-  secondary: '#1F1F24',
-  secondaryForeground: '#F2F0EB',
-  muted: '#1F1F24',
-  mutedForeground: '#8A8680',
-  destructive: '#F28B7A',
-  destructiveForeground: '#1A1A10',
-  border: 'rgba(255, 255, 255, 0.07)',
-  card: '#17171A',
-
-  // Focus-only
-  ink2: '#C4C1B8',
-  mutedSoft: '#56544F',
-  hairSoft: 'rgba(255, 255, 255, 0.04)',
-  accentSoft: '#E8F27A',
-  accentSoftForeground: '#1A1A10',
-  good: '#5FCB8E',
-  warn: '#F2B05F',
-  warnForeground: '#1A1A10',
-  info: '#60A5FA',
-
-  // Per-agent hues
-  agentYuki: '#A78BFA',
-  agentWorkclaw: '#E8F27A',
-  agentCloud: '#5FCB8E',
-  agentKilocode: '#F2B05F',
-  agentCoral: '#F28B7A',
-  agentSky: '#6BB5E0',
-} as const;
+export { darkColors, lightColors };
 
 export type ThemeColors = { readonly [K in keyof typeof lightColors]: string };
 

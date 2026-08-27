@@ -2460,6 +2460,8 @@
       "viewTable": "Cədvələ bax",
       "title": "Cədvəl",
       "close": "Cədvəli bağla",
+      "loading": "Cədvəl yüklənir",
+      "empty": "Bu cədvəldə sətir yoxdur.",
       "columnCount_one": "sütun",
       "columnCount": "sütun",
       "columnCount_other": "sütun",

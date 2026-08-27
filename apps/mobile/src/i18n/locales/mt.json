@@ -2511,6 +2511,8 @@
       "viewTable": "Ara t-tabella",
       "title": "Tabella",
       "close": "Agħlaq it-tabella",
+      "loading": "Qed jillowdja t-tabella",
+      "empty": "Din it-tabella m'għandhiex ringieli",
       "columnCount_one": "kolonna",
       "columnCount": "kolonni",
       "columnCount_other": "kolonni",

@@ -2460,6 +2460,8 @@
       "viewTable": "Jadvalni ko'rish",
       "title": "Jadval",
       "close": "Jadvalni yopish",
+      "loading": "Jadval yuklanmoqda",
+      "empty": "Bu jadvalda qatorlar yo'q.",
       "columnCount_one": "ustun",
       "columnCount": "ustunlar",
       "columnCount_other": "ustunlar",

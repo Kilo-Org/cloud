@@ -1979,6 +1979,8 @@
       "viewTable": "तालिका देखें",
       "title": "तालिका",
       "close": "तालिका बंद करें",
+      "loading": "तालिका लोड हो रही है",
+      "empty": "इस तालिका में कोई पंक्ति नहीं है।",
       "columnCount_one": "कॉलम",
       "columnCount": "कॉलम",
       "columnCount_other": "कॉलम",

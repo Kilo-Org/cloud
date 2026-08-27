@@ -2460,6 +2460,8 @@
       "viewTable": "වගුව බලන්න",
       "title": "වගුව",
       "close": "වගුව වසන්න",
+      "loading": "වගුව පූරණය වෙමින්",
+      "empty": "මෙම වගුවේ පේළි නොමැත.",
       "columnCount_one": "තීරුව",
       "columnCount": "තීරු",
       "columnCount_other": "තීරු",

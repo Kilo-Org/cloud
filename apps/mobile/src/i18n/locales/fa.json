@@ -2460,6 +2460,8 @@
       "viewTable": "مشاهده جدول",
       "title": "جدول",
       "close": "بستن جدول",
+      "loading": "در حال بارگذاری جدول",
+      "empty": "این جدول هیچ ردیفی ندارد.",
       "columnCount_one": "ستون",
       "columnCount": "ستون‌ها",
       "columnCount_other": "ستون‌ها",

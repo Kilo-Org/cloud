@@ -2460,6 +2460,8 @@
       "viewTable": "Tirohia te tēpu",
       "title": "Tēpu",
       "close": "Katia te tēpu",
+      "loading": "Ka uta te tēpu",
+      "empty": "Kāore he rārangi o tēnei tēpu.",
       "columnCount_one": "tīwae",
       "columnCount": "ngā tīwae",
       "columnCount_other": "ngā tīwae",

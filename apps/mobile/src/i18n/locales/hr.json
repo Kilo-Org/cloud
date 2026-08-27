@@ -2477,6 +2477,8 @@
       "viewTable": "Prikaži tablicu",
       "title": "Tablica",
       "close": "Zatvori tablicu",
+      "loading": "Učitavanje tablice",
+      "empty": "Ova tablica nema redaka.",
       "columnCount_one": "stupac",
       "columnCount": "stupci",
       "columnCount_other": "stupci",

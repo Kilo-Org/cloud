@@ -2494,6 +2494,8 @@
       "viewTable": "Prikaži tabelo",
       "title": "Tabela",
       "close": "Zapri tabelo",
+      "loading": "Nalaganje tabele",
+      "empty": "Ta tabela nima vrstic.",
       "columnCount_one": "stolpec",
       "columnCount": "stolpci",
       "columnCount_other": "stolpci",

@@ -2528,6 +2528,8 @@
       "viewTable": "Gweld y tabl",
       "title": "Tabl",
       "close": "Cau'r tabl",
+      "loading": "Yn llwytho'r tabl",
+      "empty": "Nid oes rhesi yn y tabl hwn.",
       "columnCount_one": "colofn",
       "columnCount": "colofnau",
       "columnCount_other": "colofnau",

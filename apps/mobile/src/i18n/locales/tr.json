@@ -2006,6 +2006,8 @@
       "viewTable": "Tabloyu görüntüle",
       "title": "Tablo",
       "close": "Tabloyu kapat",
+      "loading": "Tablo yükleniyor",
+      "empty": "Bu tabloda hiç satır yok.",
       "columnCount_one": "sütun",
       "columnCount": "sütunlar",
       "columnCount_other": "sütunlar",

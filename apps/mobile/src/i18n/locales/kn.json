@@ -2460,6 +2460,8 @@
       "viewTable": "ಟೇಬಲ್ ವೀಕ್ಷಿಸಿ",
       "title": "ಟೇಬಲ್",
       "close": "ಟೇಬಲ್ ಮುಚ್ಚಿ",
+      "loading": "ಟೇಬಲ್ ಲೋಡ್ ಆಗುತ್ತಿದೆ",
+      "empty": "ಈ ಟೇಬಲ್‌ನಲ್ಲಿ ಸಾಲುಗಳಿಲ್ಲ.",
       "columnCount_one": "ಕಾಲಮ್",
       "columnCount": "ಕಾಲಮ್ಗಳು",
       "columnCount_other": "ಕಾಲಮ್ಗಳು",

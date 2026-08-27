@@ -2460,6 +2460,8 @@
       "viewTable": "ဇယားကြည့်ရန်",
       "title": "ဇယား",
       "close": "ဇယားပိတ်ရန်",
+      "loading": "ဇယားဖွင့်နေသည်",
+      "empty": "ဤဇယားတွင် အတန်းများမရှိပါ။",
       "columnCount_one": "ကော်လံ",
       "columnCount": "ကော်လံများ",
       "columnCount_other": "ကော်လံများ",

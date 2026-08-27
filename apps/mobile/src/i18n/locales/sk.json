@@ -2494,6 +2494,8 @@
       "viewTable": "Zobraziť tabuľku",
       "title": "Tabuľka",
       "close": "Zavrieť tabuľku",
+      "loading": "Načítava sa tabuľka",
+      "empty": "Táto tabuľka nemá žiadne riadky.",
       "columnCount_one": "stĺpec",
       "columnCount": "stĺpce",
       "columnCount_other": "stĺpce",

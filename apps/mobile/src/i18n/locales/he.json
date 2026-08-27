@@ -2016,6 +2016,8 @@
       "viewTable": "צפה בטבלה",
       "title": "טבלה",
       "close": "סגור טבלה",
+      "loading": "טוען טבלה",
+      "empty": "לטבלה זו אין שורות.",
       "columnCount_one": "עמודה",
       "columnCount": "עמודות",
       "columnCount_other": "עמודות",

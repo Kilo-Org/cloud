@@ -44,9 +44,17 @@ vi.mock('react', async () => {
 
 // ── react-native ────────────────────────────────────────────────────
 vi.mock('react-native', () => ({
+  AccessibilityInfo: {
+    announceForAccessibility: vi.fn(),
+  },
+  Keyboard: {
+    addListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
+  Text: 'Text',
   TextInput: 'TextInput',
+  useWindowDimensions: () => ({ fontScale: 1, height: 800, scale: 1, width: 400 }),
   View: 'View',
 }));
 
@@ -54,6 +62,10 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn() },
   FadeOut: { duration: vi.fn() },
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
 }));
 
 // ── icons ──────────────────────────────────────────────────────────
@@ -72,6 +84,10 @@ vi.mock('sonner-native', () => ({
 // ── sub-components ─────────────────────────────────────────────────
 vi.mock('@/components/agents/attachment-preview-strip', () => ({
   AttachmentPreviewStrip: () => null,
+}));
+
+vi.mock('@/components/ui/accessible-status', () => ({
+  AccessibleStatus: () => null,
 }));
 
 vi.mock('@/components/agents/chat-toolbar', () => ({
@@ -115,6 +131,14 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     foreground: '#000',
     mutedForeground: '#666',
     primaryForeground: '#fff',
+  }),
+}));
+
+vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
+  useReturnSendsMessagePreference: () => ({
+    returnSendsMessage: false,
+    hasLoaded: true,
+    setReturnSendsMessage: vi.fn(),
   }),
 }));
 

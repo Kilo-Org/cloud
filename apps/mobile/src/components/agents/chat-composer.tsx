@@ -1212,7 +1212,12 @@ export function ChatComposer({
 
       {characterCount > 0 ? (
         <View className="flex-row justify-end px-4 pb-1">
-          <Text className="text-xs text-muted-foreground">
+          <Text
+            className="text-xs text-muted-foreground"
+            accessibilityLabel={i18n.t('agentChat.composer.charactersRemaining', {
+              count: CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount,
+            })}
+          >
             {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount}
           </Text>
         </View>

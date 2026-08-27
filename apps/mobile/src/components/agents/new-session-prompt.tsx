@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import {
   type ComposerSelection,
@@ -369,6 +370,13 @@ export function NewSessionPrompt({
         onMove={onMoveAttachment}
         onReorder={onReorderAttachments}
       />
+      {attachments.some(attachment => attachment.metadataStripFailed === true) ? (
+        <AccessibleStatus
+          tone="error"
+          message={t('agentChat.composer.photoMetadataNotRemoved')}
+          className="mb-2 px-4 text-xs"
+        />
+      ) : null}
       <View className="px-2 pt-2">
         {promptMeasure.measureElement}
         <RNTextInput
@@ -423,7 +431,12 @@ export function NewSessionPrompt({
         ) : null}
         {promptCharacterCount > 0 ? (
           <View className="flex-row justify-end px-1 pb-1">
-            <Text className="text-xs text-muted-foreground">
+            <Text
+              className="text-xs text-muted-foreground"
+              accessibilityLabel={t('agentChat.composer.charactersRemaining', {
+                count: PROMPT_INPUT_MAX_CHARS - promptCharacterCount,
+              })}
+            >
               {PROMPT_INPUT_MAX_CHARS - promptCharacterCount}
             </Text>
           </View>

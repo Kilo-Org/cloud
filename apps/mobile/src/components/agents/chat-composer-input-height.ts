@@ -18,20 +18,28 @@ const COMPOSER_INPUT_BORDER_WIDTH = 1;
 export const SESSION_HEADER_HEIGHT = 92;
 
 /**
+ * Starter-chip row: a starter chip min height ~48 on Android plus the row's
+ * 8px bottom padding. Kept out of the input's remaining-space budget so the
+ * input stays clear of the keyboard with starters shown.
+ */
+export const STARTER_ROW_HEIGHT = 56;
+
+/**
  * Composer chrome other than the input itself, kept out of the input's
  * remaining-space budget: the control-row padding (20), the toolbar (44), the
- * counter (16), and a reserve for the attachment strip (40). Conservative so
- * the input stays clear of the keyboard at every Dynamic Type scale.
+ * counter (16), the starter row (56), and a reserve for the attachment strip
+ * (40). Conservative so the input stays clear of the keyboard at every Dynamic
+ * Type scale.
  */
-export const COMPOSER_CHROME_HEIGHT = 120;
+export const COMPOSER_CHROME_HEIGHT = 120 + STARTER_ROW_HEIGHT;
 
 /**
  * New-session prompt chrome other than the input: the control row + toolbar +
- * attachment strip + Start button. The prompt lives in a scrollable form, so
- * the cap is a soft bound that keeps the input from pushing the Start control
- * off-screen at large text.
+ * attachment strip + Start button + starter row. The prompt lives in a
+ * scrollable form, so the cap is a soft bound that keeps the input from
+ * pushing the Start control off-screen at large text.
  */
-export const NEW_SESSION_PROMPT_CHROME_HEIGHT = 176;
+export const NEW_SESSION_PROMPT_CHROME_HEIGHT = 176 + STARTER_ROW_HEIGHT;
 
 /**
  * Width of the real text area inside the composer input row.

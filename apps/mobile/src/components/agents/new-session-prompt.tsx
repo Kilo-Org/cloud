@@ -346,6 +346,7 @@ export function NewSessionPrompt({
       return;
     }
     if (isAnyAttachmentUploading(attachments)) {
+      toast.error(t('agentChat.composer.waitForUploads'));
       return;
     }
     onStartSession?.();

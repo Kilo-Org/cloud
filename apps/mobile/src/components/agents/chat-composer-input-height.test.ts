@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  COMPOSER_CHROME_HEIGHT,
   COMPOSER_INPUT_PADDING_HORIZONTAL,
+  NEW_SESSION_PROMPT_CHROME_HEIGHT,
   resolveComposerMaxHeight,
   resolveComposerTextContentWidth,
   shouldEnableComposerInputScroll,
+  STARTER_ROW_HEIGHT,
 } from './chat-composer-input-height';
 
 const MIN = 44;
@@ -38,6 +41,14 @@ describe('resolveComposerTextContentWidth', () => {
     expect(resolveComposerTextContentWidth(300)).toBeLessThan(
       300 - COMPOSER_INPUT_PADDING_HORIZONTAL * 2
     );
+  });
+});
+
+describe('composer chrome budgets', () => {
+  it('reserve the starter-row height inside both chrome budgets', () => {
+    // 120 (composer chrome) + 56 (starter row) = 176, and 176 + 56 = 232.
+    expect(COMPOSER_CHROME_HEIGHT - STARTER_ROW_HEIGHT).toBe(120);
+    expect(NEW_SESSION_PROMPT_CHROME_HEIGHT - STARTER_ROW_HEIGHT).toBe(176);
   });
 });
 

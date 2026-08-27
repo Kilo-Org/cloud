@@ -498,6 +498,30 @@ describe('QuickChatScreen send', () => {
 
     expect(streamSignal.value?.aborted).toBe(true);
   });
+
+  it('aborts the in-flight stream on unmount', async () => {
+    modelOptionsState.options = [modelOption];
+
+    const streamSignal = { value: undefined as AbortSignal | undefined };
+    streamMock.mockImplementation((input: { signal?: AbortSignal }) => {
+      streamSignal.value = input.signal;
+      return hangingStream();
+    });
+
+    const { unmount } = await mountScreen();
+    await waitFor(() => composerRenders.list.length > 0);
+
+    await act(async () => {
+      pressSend('hello');
+      await Promise.resolve();
+    });
+
+    expect(streamSignal.value?.aborted).toBe(false);
+
+    unmount();
+
+    expect(streamSignal.value?.aborted).toBe(true);
+  });
 });
 
 describe('QuickChatScreen history errors', () => {
@@ -558,6 +582,79 @@ describe('QuickChatScreen history errors', () => {
     expect(buttonRenders.list.length).toBeGreaterThan(0);
     const retryButton = buttonRenders.list.find(button => typeof button.onPress === 'function');
     expect(retryButton?.accessibilityLabel).toBe(i18n.t('quickChat.historyRetry'));
+  });
+});
+
+describe('QuickChatScreen older-page paging', () => {
+  it('releases the older-page lock on a first-page reset and ignores a stale load finally', async () => {
+    modelOptionsState.options = [modelOption];
+    const firstPageRow = {
+      id: 's1',
+      role: 'user',
+      content: 'first',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      clientId: null,
+    };
+    listMessagesQueryFn.mockResolvedValueOnce({ messages: [firstPageRow], nextCursor: 'c1' });
+
+    let resolveStale:
+      | ((value: { messages: unknown[]; nextCursor: string | null }) => void)
+      | undefined = undefined;
+    const stalePromise = new Promise<{ messages: unknown[]; nextCursor: string | null }>(
+      _resolve => {
+        resolveStale = _resolve;
+      }
+    );
+    let resolveFresh:
+      | ((value: { messages: unknown[]; nextCursor: string | null }) => void)
+      | undefined = undefined;
+    const freshPromise = new Promise<{ messages: unknown[]; nextCursor: string | null }>(
+      _resolve => {
+        resolveFresh = _resolve;
+      }
+    );
+    listMessagesQuery.mockReturnValueOnce(stalePromise).mockReturnValueOnce(freshPromise);
+
+    const { queryClient } = await mountScreen();
+    await waitFor(() => transcriptItems().length > 0);
+
+    const olderList = () => sessionListRenders.list.at(-1);
+
+    // Start the first older-page load and hold it in flight.
+    await act(async () => {
+      (olderList()?.onLoadOlderMessages as (() => void) | undefined)?.();
+      await Promise.resolve();
+    });
+    expect(olderList()?.isLoadingOlderMessages).toBe(true);
+
+    // Reset the first page while the older load is still in flight. The reset
+    // must release the lock so pagination is not stuck behind the stale load.
+    listMessagesQueryFn.mockResolvedValue({ messages: [firstPageRow], nextCursor: 'c2' });
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: ['quickChat.listMessages'] });
+    });
+    await waitFor(() => olderList()?.isLoadingOlderMessages === false);
+
+    // Start a newer older-page load; it now owns the lock.
+    await act(async () => {
+      (olderList()?.onLoadOlderMessages as (() => void) | undefined)?.();
+      await Promise.resolve();
+    });
+    expect(olderList()?.isLoadingOlderMessages).toBe(true);
+
+    // Resolve the stale load: its finally must not clear the newer load's lock.
+    await act(async () => {
+      resolveStale?.({ messages: [], nextCursor: null });
+      await Promise.resolve();
+    });
+    expect(olderList()?.isLoadingOlderMessages).toBe(true);
+
+    // Resolve the fresh load: it releases the lock normally.
+    await act(async () => {
+      resolveFresh?.({ messages: [], nextCursor: null });
+      await Promise.resolve();
+    });
+    expect(olderList()?.isLoadingOlderMessages).toBe(false);
   });
 });
 

@@ -71,6 +71,10 @@ jest.mock('@/lib/code-reviews/review-memory/github-feedback', () => ({
   handleGitHubReviewCommentReply: (input: unknown) => mockHandleGitHubReviewCommentReply(input),
 }));
 
+jest.mock('@/lib/utils.server', () => ({
+  logExceptInTest: jest.fn(),
+}));
+
 jest.mock('next/server', () => {
   const actual = jest.requireActual('next/server');
   return {
@@ -86,6 +90,7 @@ const integration = {
   owned_by_organization_id: 'org_1',
   owned_by_user_id: null,
   platform_installation_id: '98765',
+  github_app_type: 'standard',
   suspended_at: null,
 };
 
@@ -384,7 +389,58 @@ describe('handleGitHubWebhook', () => {
     );
   });
 
-  it('allows only Auto Fix review comments through a secondary installation', async () => {
+  it('runs Auto Fix and records reply feedback through the exact secondary installation', async () => {
+    const secondaryIntegration = {
+      ...integration,
+      id: 'secondary',
+      github_app_type: 'lite',
+    };
+    const payload = reviewCommentPayload({
+      comment: {
+        ...reviewCommentPayload().comment,
+        in_reply_to_id: 455,
+      },
+    });
+    mockFindIntegrationByInstallationId.mockResolvedValue(secondaryIntegration);
+    mockGetIntegrationForOrganization.mockResolvedValue({ ...integration, id: 'primary' });
+    mockHandleGitHubReviewCommentReply.mockResolvedValue({ recorded: true, eventId: 'evt_1' });
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request_review_comment', payload),
+      'lite'
+    );
+
+    expect(response.status).toBe(200);
+    await waitForAfterTask();
+    expect(mockHandlePRReviewComment).toHaveBeenCalledTimes(1);
+    expect(mockHandlePRReviewComment).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      secondaryIntegration
+    );
+    expect(mockHandlePRReviewComment.mock.calls[0]?.[1]).toBe(secondaryIntegration);
+    expect(mockHandleGitHubReviewCommentReply).toHaveBeenCalledTimes(1);
+    expect(mockHandleGitHubReviewCommentReply).toHaveBeenCalledWith({
+      payload: expect.objectContaining(payload),
+      integration: secondaryIntegration,
+      deliveryId: 'delivery-pull_request_review_comment',
+    });
+    expect(mockHandleGitHubReviewCommentReply.mock.calls[0]?.[0].integration).toBe(
+      secondaryIntegration
+    );
+    expect(mockHandleGitHubReviewCommentReply.mock.calls[0]?.[0].integration.github_app_type).toBe(
+      'lite'
+    );
+    expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
+      'we_1',
+      expect.objectContaining({
+        handlers_triggered: ['pr_review_comment_fix', 'review_memory_feedback'],
+      })
+    );
+  });
+
+  it('runs Auto Fix without recording feedback for a secondary non-reply comment', async () => {
+    const secondaryIntegration = { ...integration, id: 'secondary' };
+    mockFindIntegrationByInstallationId.mockResolvedValue(secondaryIntegration);
     mockGetIntegrationForOrganization.mockResolvedValue({ ...integration, id: 'primary' });
 
     const response = await handleGitHubWebhook(
@@ -394,8 +450,12 @@ describe('handleGitHubWebhook', () => {
 
     expect(response.status).toBe(200);
     await waitForAfterTask();
-    expect(mockHandlePRReviewComment).toHaveBeenCalledWith(expect.anything(), integration);
-    expect(mockHandleGitHubReviewCommentReply).not.toHaveBeenCalled();
+    expect(mockHandlePRReviewComment).toHaveBeenCalledTimes(1);
+    expect(mockHandleGitHubReviewCommentReply).toHaveBeenCalledTimes(1);
+    expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
+      'we_1',
+      expect.objectContaining({ handlers_triggered: ['pr_review_comment_fix'] })
+    );
   });
 
   it('allows labeled Auto Fix issues but suppresses other issues on a secondary installation', async () => {

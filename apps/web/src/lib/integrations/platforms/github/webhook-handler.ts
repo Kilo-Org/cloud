@@ -702,14 +702,12 @@ export async function handleGitHubWebhook(
         try {
           await handlePRReviewComment(parseResult.data, integration);
           try {
-            if (!isSecondaryOrganizationInstallation) {
-              const reviewMemoryResult = await handleGitHubReviewCommentReply({
-                payload: parseResult.data,
-                integration,
-                deliveryId: eventSignature,
-              });
-              if (reviewMemoryResult.recorded) handlersTriggered.push('review_memory_feedback');
-            }
+            const reviewMemoryResult = await handleGitHubReviewCommentReply({
+              payload: parseResult.data,
+              integration,
+              deliveryId: eventSignature,
+            });
+            if (reviewMemoryResult.recorded) handlersTriggered.push('review_memory_feedback');
           } catch (error) {
             logExceptInTest(`Error handling review memory feedback${logSuffix}:`, error);
             captureException(error, {

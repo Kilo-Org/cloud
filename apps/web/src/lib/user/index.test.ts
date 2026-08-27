@@ -140,6 +140,7 @@ import {
   findUsersByIds,
   createOrUpdateUser,
   getAllUserProviders,
+  getCrossAccountEmailConflicts,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
@@ -417,6 +418,56 @@ describe('User', () => {
       await expect(getAllUserProviders('shared@example.com')).resolves.toEqual({
         kind: 'ambiguous',
       });
+      await expect(
+        getCrossAccountEmailConflicts(['shared@example.com'], firstUser.id)
+      ).resolves.toEqual(new Map([['shared@example.com', true]]));
+      await expect(
+        getCrossAccountEmailConflicts(['shared@example.com'], secondUser.id)
+      ).resolves.toEqual(new Map([['shared@example.com', true]]));
+    });
+
+    it('does not report a conflict when provider emails resolve to one account', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'primary-only@example.com',
+        google_user_name: 'Single Account User',
+        normalized_email: 'primary-only@example.com',
+      });
+      await db.insert(user_auth_provider).values({
+        kilo_user_id: user.id,
+        provider: 'github',
+        provider_account_id: `github-${user.id}`,
+        email: 'different-provider@example.com',
+        avatar_url: '',
+        hosted_domain: null,
+      });
+
+      await expect(
+        getCrossAccountEmailConflicts(
+          [' DIFFERENT-PROVIDER@example.com ', 'primary-only@example.com'],
+          user.id
+        )
+      ).resolves.toEqual(
+        new Map([
+          [' DIFFERENT-PROVIDER@example.com ', false],
+          ['primary-only@example.com', false],
+        ])
+      );
+    });
+
+    it('reports normalized-primary conflicts without a provider email match', async () => {
+      const currentUser = await insertTestUser({
+        google_user_email: 'current@example.com',
+        google_user_name: 'Current User',
+      });
+      await insertTestUser({
+        google_user_email: 'normalized-owner@example.com',
+        google_user_name: 'Normalized Owner',
+        normalized_email: 'normalized-conflict@example.com',
+      });
+
+      await expect(
+        getCrossAccountEmailConflicts(['normalized-conflict@example.com'], currentUser.id)
+      ).resolves.toEqual(new Map([['normalized-conflict@example.com', true]]));
     });
 
     it('returns null for an email that is not linked to an account', async () => {

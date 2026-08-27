@@ -114,7 +114,7 @@ import {
   user_moderation_mutes,
   user_terms_acceptances,
 } from '@kilocode/db/schema';
-import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
+import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count, ne } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
@@ -1888,11 +1888,8 @@ export type UserProviderLookupResult =
   | { kind: 'not_found' }
   | { kind: 'ambiguous' };
 
-export async function getAllUserProviders(email: string): Promise<UserProviderLookupResult> {
+async function getEmailAccountCandidates(email: string) {
   const lowerEmail = email.toLowerCase().trim();
-
-  // A submitted email only determines discovery options; provider callbacks
-  // and magic-link verification remain the authentication authority.
   const linkedProviders = await db
     .selectDistinct({ kilo_user_id: user_auth_provider.kilo_user_id })
     .from(user_auth_provider)
@@ -1915,6 +1912,69 @@ export async function getAllUserProviders(email: string): Promise<UserProviderLo
     ...linkedProviders.map(provider => provider.kilo_user_id),
     ...normalizedUsers.map(user => user.id),
   ]);
+
+  return { candidateUserIds, normalizedUsers };
+}
+
+export async function getCrossAccountEmailConflicts(
+  emails: string[],
+  currentUserId: string
+): Promise<Map<string, boolean>> {
+  const uniqueEmails = [...new Set(emails)];
+  if (uniqueEmails.length === 0) return new Map();
+
+  const lowerEmails = [...new Set(uniqueEmails.map(email => email.toLowerCase().trim()))];
+  const normalizedEmails = [...new Set(uniqueEmails.map(normalizeEmail))];
+  const [linkedProviderMatches, primaryEmailMatches] = await Promise.all([
+    db
+      .select({ email: user_auth_provider.email })
+      .from(user_auth_provider)
+      .where(
+        and(
+          inArray(sql`lower(${user_auth_provider.email})`, lowerEmails),
+          ne(user_auth_provider.kilo_user_id, currentUserId)
+        )
+      ),
+    db
+      .select({
+        normalizedEmail: kilocode_users.normalized_email,
+        primaryEmail: kilocode_users.google_user_email,
+      })
+      .from(kilocode_users)
+      .where(
+        and(
+          ne(kilocode_users.id, currentUserId),
+          or(
+            inArray(kilocode_users.normalized_email, normalizedEmails),
+            and(
+              isNull(kilocode_users.normalized_email),
+              inArray(sql`lower(${kilocode_users.google_user_email})`, lowerEmails)
+            )
+          )
+        )
+      ),
+  ]);
+
+  return new Map(
+    uniqueEmails.map(email => {
+      const lowerEmail = email.toLowerCase().trim();
+      const normalizedEmail = normalizeEmail(email);
+      const hasConflict =
+        linkedProviderMatches.some(match => match.email.toLowerCase() === lowerEmail) ||
+        primaryEmailMatches.some(match =>
+          match.normalizedEmail
+            ? match.normalizedEmail === normalizedEmail
+            : match.primaryEmail.toLowerCase() === lowerEmail
+        );
+      return [email, hasConflict];
+    })
+  );
+}
+
+export async function getAllUserProviders(email: string): Promise<UserProviderLookupResult> {
+  // A submitted email only determines discovery options; provider callbacks
+  // and magic-link verification remain the authentication authority.
+  const { candidateUserIds, normalizedUsers } = await getEmailAccountCandidates(email);
   if (candidateUserIds.size > 1) {
     return { kind: 'ambiguous' };
   }

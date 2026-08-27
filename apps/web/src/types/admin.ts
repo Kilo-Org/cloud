@@ -41,6 +41,7 @@ export type HasLoginMethods = {
     provider: AuthProviderId;
     email: string;
     source: 'linked' | 'inferred';
+    email_relation: 'primary' | 'different' | 'conflict';
   }[];
 };
 export type UserDetailProps = UserTableProps &

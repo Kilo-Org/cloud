@@ -2116,13 +2116,10 @@
       "scrollToBottom": "Превърти до дъното",
       "emptyTitle": "Все още няма съобщения",
       "renameAccessibility": "Преименувай сесията: {{title}}",
-      "connectRepository": "Свържи хранилище",
       "cloningSession": "Клониране на сесия",
       "continue": "Продължи",
       "couldNotLoadThisSession": "Не можа да се зареди тази сесия",
-      "cloneFailed": "Не можа да се клонира тази сесия.",
       "cloneFailedRetry": "Не можа да се клонира тази сесия. Опитай отново.",
-      "connectRepositoryToContinue": "Свържи хранилище, за да продължиш.",
       "notEnoughCredits": "Няма достатъчно кредити за стартиране на Cloud Agent. Добавете кредити и опитайте отново.",
       "previousTaskFinishing": "Предишната задача все още приключва. Моля, изчакайте момент.",
       "serviceUnavailable": "Услугата в момента е недостъпна. Моля, опитайте отново.",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Няма видими хранилища. Проверете достъпа до хранилищата за GitLab, след което опреснете.",
       "openBitbucket": "Отваряне на Bitbucket",
       "openGitlab": "Отваряне на GitLab",
-      "recentlyUsed": "Наскоро използвани"
+      "recentlyUsed": "Наскоро използвани",
+      "continueFrom": "Продължаване на {{title}}",
+      "importingSession": "Импортиране на сесията",
+      "cliCannotContinue": "Този CLI не може да продължи сесия. Избери Cloud Agent или друг CLI.",
+      "importFailed": "Тази сесия не можа да бъде импортирана."
     },
     "partRenderer": {
       "updatedFileCount_one": "Актуализиран {{displayCount}} файл",

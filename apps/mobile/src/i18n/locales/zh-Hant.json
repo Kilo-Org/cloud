@@ -1662,13 +1662,10 @@
       "scrollToBottom": "捲動到底部",
       "emptyTitle": "尚無訊息",
       "renameAccessibility": "重新命名工作階段：{{title}}",
-      "connectRepository": "連線存放庫",
       "cloningSession": "正在複製工作階段",
       "continue": "繼續",
       "couldNotLoadThisSession": "無法載入此工作階段",
-      "cloneFailed": "無法複製此工作階段。",
       "cloneFailedRetry": "無法複製此工作階段。請重試。",
-      "connectRepositoryToContinue": "連接一個存放庫以繼續。",
       "notEnoughCredits": "執行 Cloud Agent 的額度不足。請新增額度後重試。",
       "previousTaskFinishing": "上一個工作仍在進行中。請稍等片刻。",
       "serviceUnavailable": "服務目前無法使用。請重試。",
@@ -1741,7 +1738,11 @@
       "noRepositoriesVisibleGitlab": "沒有可見的儲存庫。檢查 GitLab 的儲存庫存取權限，然後重新整理。",
       "openBitbucket": "開啟 Bitbucket",
       "openGitlab": "開啟 GitLab",
-      "recentlyUsed": "最近使用"
+      "recentlyUsed": "最近使用",
+      "continueFrom": "正在繼續 {{title}}",
+      "importingSession": "正在匯入工作階段",
+      "cliCannotContinue": "此 CLI 無法繼續工作階段。請選擇 Cloud Agent 或其他 CLI。",
+      "importFailed": "無法匯入此工作階段。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 個檔案",

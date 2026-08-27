@@ -2116,13 +2116,10 @@
       "scrollToBottom": "Vieritä alareunaan",
       "emptyTitle": "Ei viestejä vielä",
       "renameAccessibility": "Nimeä istunto uudelleen: {{title}}",
-      "connectRepository": "Yhdistä arkisto",
       "cloningSession": "Kloonataan istuntoa",
       "continue": "Jatka",
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
-      "cloneFailed": "Tätä istuntoa ei voitu kloonata.",
       "cloneFailedRetry": "Tätä istuntoa ei voitu kloonata. Yritä uudelleen.",
-      "connectRepositoryToContinue": "Yhdistä arkisto jatkaaksesi.",
       "notEnoughCredits": "Ei riittävästi krediittejä Cloud Agentin käyttämiseen. Lisää krediittejä ja yritä uudelleen.",
       "previousTaskFinishing": "Edellinen tehtävä on vielä viimeistelyssä. Odota hetki.",
       "serviceUnavailable": "Palvelu ei ole tällä hetkellä käytettävissä. Yritä uudelleen.",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Repositorioita ei näy. Tarkista repositorion käyttöoikeus GitLabiin ja päivitä sitten.",
       "openBitbucket": "Avaa Bitbucket",
       "openGitlab": "Avaa GitLab",
-      "recentlyUsed": "Äskettäin käytetyt"
+      "recentlyUsed": "Äskettäin käytetyt",
+      "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
+      "continueFrom": "Jatketaan {{title}}",
+      "importFailed": "Tätä istuntoa ei voitu tuoda.",
+      "importingSession": "Tuodaan istuntoa"
     },
     "partRenderer": {
       "updatedFileCount_one": "Päivitetty {{displayCount}} tiedosto",

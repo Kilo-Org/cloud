@@ -2161,13 +2161,10 @@
       "scrollToBottom": "Scrollaigh go bun",
       "emptyTitle": "Níl aon teachtaireachtaí fós",
       "renameAccessibility": "Athainmnigh seisiún: {{title}}",
-      "connectRepository": "Ceangail stór",
       "cloningSession": "Ag clónáil seisiúin",
       "continue": "Lean ar aghaidh",
       "couldNotLoadThisSession": "Níorbh fhéidir an seisiún seo a lódáil",
-      "cloneFailed": "Níorbh fhéidir an seisiún seo a chlónáil.",
       "cloneFailedRetry": "Níorbh fhéidir an seisiún seo a chlónáil. Bain triail as arís.",
-      "connectRepositoryToContinue": "Ceangail stór chun leanúint ar aghaidh.",
       "notEnoughCredits": "Níl go leor creidmheasanna agat chun Cloud Agent a rith. Cuir creidmheasanna leis agus bain triail as arís.",
       "previousTaskFinishing": "Tá an tasc roimhe seo fós ag críochnú. Fan nóiméad le do thoil.",
       "serviceUnavailable": "Níl an tseirbhís ar fáil faoi láthair. Bain triail as arís le do thoil.",
@@ -2240,7 +2237,11 @@
       "noRepositoriesVisibleGitlab": "Níl aon stórtha le feiceáil. Seiceáil rochtain ar stórtha do GitLab, agus ansin athnuaigh.",
       "openBitbucket": "Oscail Bitbucket",
       "openGitlab": "Oscail GitLab",
-      "recentlyUsed": "A úsáideadh le déanaí"
+      "recentlyUsed": "A úsáideadh le déanaí",
+      "cliCannotContinue": "Ní féidir leis an CLI seo seisiún a leanúint ar aghaidh. Roghnaigh Cloud Agent nó CLI eile.",
+      "continueFrom": "Ag leanúint ar aghaidh le {{title}}",
+      "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil.",
+      "importingSession": "Ag iompórtáil seisiúin"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nuashonraíodh {{displayCount}} comhad",

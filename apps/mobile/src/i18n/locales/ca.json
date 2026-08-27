@@ -2131,13 +2131,10 @@
       "scrollToBottom": "Desplaça't al final",
       "emptyTitle": "Encara no hi ha missatges",
       "renameAccessibility": "Reanomena la sessió: {{title}}",
-      "connectRepository": "Connecta un repositori",
       "cloningSession": "Clonant la sessió",
       "continue": "Continua",
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió",
-      "cloneFailed": "No s'ha pogut clonar aquesta sessió.",
       "cloneFailedRetry": "No s'ha pogut clonar aquesta sessió. Torna-ho a provar.",
-      "connectRepositoryToContinue": "Connecta un repositori per continuar.",
       "notEnoughCredits": "No tens prou crèdits per executar Cloud Agent. Afegeix crèdits i torna-ho a provar.",
       "previousTaskFinishing": "La tasca anterior encara s'està acabant. Espera un moment.",
       "serviceUnavailable": "El servei no està disponible ara mateix. Torna-ho a provar.",
@@ -2210,7 +2207,11 @@
       "noRepositoriesVisibleGitlab": "No hi ha repositoris visibles. Comprova l'accés als repositoris de GitLab i actualitza.",
       "openBitbucket": "Obre Bitbucket",
       "openGitlab": "Obre GitLab",
-      "recentlyUsed": "Utilitzats recentment"
+      "recentlyUsed": "Utilitzats recentment",
+      "cliCannotContinue": "Aquest CLI no pot continuar una sessió. Trieu Cloud Agent o un altre CLI.",
+      "continueFrom": "Continuant {{title}}",
+      "importFailed": "No s'ha pogut importar aquesta sessió.",
+      "importingSession": "Important la sessió"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxer actualitzat",

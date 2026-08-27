@@ -2116,13 +2116,10 @@
       "scrollToBottom": "Rulla till botten",
       "emptyTitle": "Inga meddelanden ännu",
       "renameAccessibility": "Byt namn på session: {{title}}",
-      "connectRepository": "Anslut arkiv",
       "cloningSession": "Klonar session",
       "continue": "Fortsätt",
       "couldNotLoadThisSession": "Kunde inte läsa in den här sessionen",
-      "cloneFailed": "Kunde inte klona den här sessionen.",
       "cloneFailedRetry": "Kunde inte klona den här sessionen. Försök igen.",
-      "connectRepositoryToContinue": "Anslut ett arkiv för att fortsätta.",
       "notEnoughCredits": "Inte tillräckligt med krediter för att köra Cloud Agent. Lägg till krediter och försök igen.",
       "previousTaskFinishing": "Den föregående uppgiften håller fortfarande på att avslutas. Vänta en stund.",
       "serviceUnavailable": "Tjänsten är inte tillgänglig just nu. Försök igen.",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Inga arkiv visas. Kontrollera arkivåtkomsten för GitLab och uppdatera sedan.",
       "openBitbucket": "Öppna Bitbucket",
       "openGitlab": "Öppna GitLab",
-      "recentlyUsed": "Nyligen använda"
+      "recentlyUsed": "Nyligen använda",
+      "cliCannotContinue": "Denna CLI kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI.",
+      "continueFrom": "Fortsätter {{title}}",
+      "importFailed": "Det gick inte att importera denna session.",
+      "importingSession": "Importerar session"
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppdaterade {{displayCount}} fil",

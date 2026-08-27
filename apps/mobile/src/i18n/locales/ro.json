@@ -2131,13 +2131,10 @@
       "scrollToBottom": "Derulează la final",
       "emptyTitle": "Încă niciun mesaj",
       "renameAccessibility": "Redenumește sesiunea: {{title}}",
-      "connectRepository": "Conectează depozitul",
       "cloningSession": "Se clonează sesiunea",
       "continue": "Continuă",
       "couldNotLoadThisSession": "Nu s-a putut încărca această sesiune",
-      "cloneFailed": "Nu s-a putut clona această sesiune.",
       "cloneFailedRetry": "Nu s-a putut clona această sesiune. Încearcă din nou.",
-      "connectRepositoryToContinue": "Conectează un depozit pentru a continua.",
       "notEnoughCredits": "Credite insuficiente pentru a rula Cloud Agent. Adaugă credite și încearcă din nou.",
       "previousTaskFinishing": "Sarcina anterioară încă se finalizează. Te rugăm să aștepți un moment.",
       "serviceUnavailable": "Serviciul nu este disponibil acum. Te rugăm să încerci din nou.",
@@ -2210,7 +2207,11 @@
       "noRepositoriesVisibleGitlab": "Niciun depozit vizibil. Verifică accesul la depozite pentru GitLab, apoi actualizează.",
       "openBitbucket": "Deschide Bitbucket",
       "openGitlab": "Deschide GitLab",
-      "recentlyUsed": "Folosite recent"
+      "recentlyUsed": "Folosite recent",
+      "continueFrom": "Continuare {{title}}",
+      "importingSession": "Se importă sesiunea",
+      "cliCannotContinue": "Acest CLI nu poate continua o sesiune. Alege Cloud Agent sau alt CLI.",
+      "importFailed": "Nu s-a putut importa această sesiune."
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizat {{displayCount}} fișier",

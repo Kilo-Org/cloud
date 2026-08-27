@@ -111,3 +111,53 @@ export function resolveNewSessionStartDisabled(input: {
     input.isProfileLoading
   );
 }
+
+/**
+ * Whether the continue-form Start button is disabled. Distinct from the
+ * ordinary new-session gate: a clone carries no prompt and no profile
+ * requirement.
+ *
+ *   - Clone Cloud Agent: disabled while creating, submitting, without a model,
+ *     or without a repository. Empty prompt and profile loading do NOT block.
+ *   - Clone live CLI: disabled while spawning, submitting, without a model,
+ *     while the instance catalog is loading, when the instance lacks the
+ *     `sessionClone` capability, or while a delivered clone/import failure is
+ *     shown inline. Empty prompt, empty repository, and profile loading do NOT
+ *     block.
+ */
+export function resolveContinueStartDisabled(input: {
+  isCreating: boolean;
+  isSubmitting: boolean;
+  isSpawningRemote: boolean;
+  model: string;
+  selectedRepo: string;
+  selectedRepositoryResolved: boolean;
+  isRemoteTargetSelected: boolean;
+  instanceCatalogLoading: boolean;
+  instanceHasSessionClone: boolean;
+  cloneImportFailureKey: string | null;
+  isModelUnavailable: boolean;
+}): boolean {
+  if (input.isRemoteTargetSelected) {
+    return (
+      input.isSpawningRemote ||
+      input.isSubmitting ||
+      input.model === '' ||
+      input.isModelUnavailable ||
+      input.instanceCatalogLoading ||
+      !input.instanceHasSessionClone ||
+      input.cloneImportFailureKey !== null
+    );
+  }
+  // A selected picker key that no longer resolves to a row must not submit:
+  // the clone prepare body would carry no repository field and the server
+  // would reject it. Mirrors `resolveNewSessionStartDisabled`'s stale gate.
+  const staleSelection = input.selectedRepo !== '' && !input.selectedRepositoryResolved;
+  return (
+    input.isCreating ||
+    input.isSubmitting ||
+    input.model === '' ||
+    input.selectedRepo === '' ||
+    staleSelection
+  );
+}

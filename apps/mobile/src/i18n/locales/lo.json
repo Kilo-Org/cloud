@@ -2116,13 +2116,10 @@
       "scrollToBottom": "ເລື່ອນໄປລຸ່ມ",
       "emptyTitle": "ຍັງບໍ່ມີຂໍ້ຄວາມ",
       "renameAccessibility": "ປ່ຽນຊື່ເຊດຊັນ: {{title}}",
-      "connectRepository": "ເຊື່ອມຕໍ່ບ່ອນເກັບລະຫັດ",
       "cloningSession": "ກຳລັງສຳເນົາເຊດຊັນ",
       "continue": "ສືບຕໍ່",
       "couldNotLoadThisSession": "ບໍ່ສາມາດໂຫຼດເຊດຊັນນີ້",
-      "cloneFailed": "ບໍ່ສາມາດສຳເນົາເຊດຊັນນີ້.",
       "cloneFailedRetry": "ບໍ່ສາມາດສຳເນົາເຊດຊັນນີ້. ລອງໃໝ່.",
-      "connectRepositoryToContinue": "ເຊື່ອມຕໍ່ບ່ອນເກັບລະຫັດເພື່ອສືບຕໍ່.",
       "notEnoughCredits": "ບໍ່ມີເຄຣດິດພຽງພໍທີ່ຈະໃຊ້ Cloud Agent. ເພີ່ມເຄຣດິດແລ້ວລອງໃໝ່.",
       "previousTaskFinishing": "ວຽກກ່ອນໜ້າຍັງບໍ່ທັນສຳເລັດ. ກະລຸນາລໍຖ້າເລັກນ້ອຍ.",
       "serviceUnavailable": "ບໍລິການບໍ່ສາມາດໃຊ້ໄດ້ໃນຕອນນີ້. ກະລຸນາລອງໃໝ່.",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "ບໍ່ມີ repositories ທີ່ເຫັນ. ກວດເບິ່ງການເຂົ້າເຖິງ repository ສຳລັບ GitLab, ຈາກນັ້ນ refresh.",
       "openBitbucket": "ເປີດ Bitbucket",
       "openGitlab": "ເປີດ GitLab",
-      "recentlyUsed": "ຫຼ້າສຸດທີ່ໃຊ້"
+      "recentlyUsed": "ຫຼ້າສຸດທີ່ໃຊ້",
+      "continueFrom": "ກຳລັງສືບຕໍ່ {{title}}",
+      "importingSession": "ກຳລັງນຳເຂົ້າເຊດຊັນ",
+      "cliCannotContinue": "CLI ນີ້ບໍ່ສາມາດສືບຕໍ່ເຊດຊັນໄດ້. ເລືອກ Cloud Agent ຫຼື CLI ອື່ນ.",
+      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້."
     },
     "partRenderer": {
       "updatedFileCount_one": "ອັບເດດ {{displayCount}} ໄຟລ໌",

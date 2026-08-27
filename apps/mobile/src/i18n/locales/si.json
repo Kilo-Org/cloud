@@ -2116,13 +2116,10 @@
       "scrollToBottom": "පහළට අනුචලනය කරන්න",
       "emptyTitle": "තවම පණිවිඩ නැත",
       "renameAccessibility": "සැසිය නැවත නම් කරන්න: {{title}}",
-      "connectRepository": "ගබඩාව සම්බන්ධ කරන්න",
       "cloningSession": "සැසිය ක්ලෝන කරමින්",
       "continue": "ඉදිරියට",
       "couldNotLoadThisSession": "මෙම සැසිය පූරණය කළ නොහැකි විය",
-      "cloneFailed": "මෙම සැසිය ක්ලෝන කිරීමට නොහැකි විය.",
       "cloneFailedRetry": "මෙම සැසිය ක්ලෝන කිරීමට නොහැකි විය. නැවත උත්සාහ කරන්න.",
-      "connectRepositoryToContinue": "දිගටම කිරීමට ගබඩාවක් සම්බන්ධ කරන්න.",
       "notEnoughCredits": "Cloud Agent ධාවනය කිරීමට ප්රමාණවත් ණය නොමැත. ණය එක් කර නැවත උත්සාහ කරන්න.",
       "previousTaskFinishing": "පෙර කාර්යය තවමත් අවසන් වෙමින් පවතී. කරුණාකර මොහොතක් රැඳී සිටින්න.",
       "serviceUnavailable": "සේවාව දැනට ලබා ගත නොහැක. කරුණාකර නැවත උත්සාහ කරන්න.",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "ගබඩා නොපෙනේ. GitLab සඳහා ගබඩා ප්‍රවේශය පරීක්ෂා කර, පසුව නැවුම් කරන්න.",
       "openBitbucket": "Bitbucket විවෘත කරන්න",
       "openGitlab": "GitLab විවෘත කරන්න",
-      "recentlyUsed": "මෑතකදී භාවිතා කළ"
+      "recentlyUsed": "මෑතකදී භාවිතා කළ",
+      "cliCannotContinue": "මෙම CLI සැසියක් දිගටම කරගෙන යා නොහැක. Cloud Agent හෝ වෙනත් CLI එකක් තෝරන්න.",
+      "continueFrom": "{{title}} දිගටම කරගෙන යමින්",
+      "importFailed": "මෙම සැසිය ආයාත කළ නොහැකි විය.",
+      "importingSession": "සැසිය ආයාත කරමින්"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ගොනුවක් යාවත්කාලීන කර ඇත",

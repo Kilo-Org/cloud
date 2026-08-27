@@ -2116,13 +2116,10 @@
       "scrollToBottom": "نیچے تک سکرول کریں",
       "emptyTitle": "ابھی کوئی پیغام نہیں",
       "renameAccessibility": "سیشن کا نام تبدیل کریں: {{title}}",
-      "connectRepository": "ریپوزٹری جڑیں",
       "cloningSession": "سیشن کلون کر رہے ہیں",
       "continue": "جاری رکھیں",
       "couldNotLoadThisSession": "یہ سیشن لوڈ نہیں ہو سکا",
-      "cloneFailed": "یہ سیشن کلون نہیں ہو سکا۔",
       "cloneFailedRetry": "یہ سیشن کلون نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
-      "connectRepositoryToContinue": "جاری رکھنے کے لیے ریپوزٹری جڑیں۔",
       "notEnoughCredits": "Cloud Agent چلانے کے لیے کافی کریڈٹس نہیں ہیں۔ کریڈٹس شامل کریں اور دوبارہ کوشش کریں۔",
       "previousTaskFinishing": "پچھلا کام ابھی مکمل ہو رہا ہے۔ براہ کرم ایک لمحہ انتظار کریں۔",
       "serviceUnavailable": "سروس اس وقت دستیاب نہیں ہے۔ براہ کرم دوبارہ کوشش کریں۔",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "کوئی ذخیرہ نظر نہیں آ رہا۔ GitLab کے لیے ذخیرہ رسائی چیک کریں، پھر تازہ کریں۔",
       "openBitbucket": "Bitbucket کھولیں",
       "openGitlab": "GitLab کھولیں",
-      "recentlyUsed": "حال ہی میں استعمال شدہ"
+      "recentlyUsed": "حال ہی میں استعمال شدہ",
+      "continueFrom": "{{title}} جاری کیا جا رہا ہے",
+      "importingSession": "سیشن درآمد ہو رہا ہے",
+      "cliCannotContinue": "یہ CLI سیشن جاری نہیں رکھ سکتا۔ Cloud Agent یا کوئی اور CLI منتخب کریں۔",
+      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فائل اپ ڈیٹ ہوئی",

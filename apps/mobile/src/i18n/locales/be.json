@@ -2146,13 +2146,10 @@
       "scrollToBottom": "Пракруціць уніз",
       "emptyTitle": "Паведамленняў яшчэ няма",
       "renameAccessibility": "Перайменаваць сеанс: {{title}}",
-      "connectRepository": "Падключыць рэпазіторый",
       "cloningSession": "Кланаванне сеанса",
       "continue": "Працягнуць",
       "couldNotLoadThisSession": "Не атрымалася загрузіць гэты сеанс",
-      "cloneFailed": "Не атрымалася кланаваць гэты сеанс.",
       "cloneFailedRetry": "Не атрымалася кланаваць гэты сеанс. Паспрабуйце зноў.",
-      "connectRepositoryToContinue": "Падключыце рэпазіторый, каб працягнуць.",
       "notEnoughCredits": "Недастаткова крэдытаў для запуску Cloud Agent. Дадайце крэдыты і паспрабуйце зноў.",
       "previousTaskFinishing": "Папярэдняя задача ўсё яшчэ выконваецца. Пачакайце імгненне.",
       "serviceUnavailable": "Сэрвіс зараз недаступны. Паспрабуйце зноў.",
@@ -2225,7 +2222,11 @@
       "noRepositoriesVisibleGitlab": "Няма бачных рэпазіторыяў. Праверце доступ да рэпазіторыяў GitLab і абнавіце.",
       "openBitbucket": "Адкрыць Bitbucket",
       "openGitlab": "Адкрыць GitLab",
-      "recentlyUsed": "Нядаўна выкарыстаныя"
+      "recentlyUsed": "Нядаўна выкарыстаныя",
+      "continueFrom": "Працяг {{title}}",
+      "importingSession": "Імпартаванне сеанса",
+      "cliCannotContinue": "Гэты CLI не можа працягнуць сеанс. Выберыце Cloud Agent або іншы CLI.",
+      "importFailed": "Не атрымалася імпартаваць гэты сеанс."
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл",

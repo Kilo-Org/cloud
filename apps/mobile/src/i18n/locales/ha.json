@@ -2116,13 +2116,10 @@
       "scrollToBottom": "Gungura zuwa ƙasa",
       "emptyTitle": "Babu saƙonni har yanzu",
       "renameAccessibility": "Sake sunan zaman: {{title}}",
-      "connectRepository": "Haɗa ma'ajiya",
       "cloningSession": "Ana kwafa zaman",
       "continue": "Ci gaba",
       "couldNotLoadThisSession": "An kasa loda wannan zaman",
-      "cloneFailed": "An kasa kwafa wannan zaman.",
       "cloneFailedRetry": "An kasa kwafa wannan zaman. Sake gwadawa.",
-      "connectRepositoryToContinue": "Haɗa ma'ajiya domin ci gaba.",
       "notEnoughCredits": "Ba isassun kiredit don gudanar da Cloud Agent ba. Ƙara kiredit ka sake gwadawa.",
       "previousTaskFinishing": "Aikin da ya gabata har yanzu yana ƙarewa. Da fatan za ka jira ɗan lokaci.",
       "serviceUnavailable": "Sabis ɗin ba ya aiki a yanzu. Da fatan za ka sake gwadawa.",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Babu ma'ajiya da ake gani. Duba samun damar ma'ajiya na GitLab, sannan ka sabunta.",
       "openBitbucket": "Buɗe Bitbucket",
       "openGitlab": "Buɗe GitLab",
-      "recentlyUsed": "Waɗanda aka yi amfani da su kwanan nan"
+      "recentlyUsed": "Waɗanda aka yi amfani da su kwanan nan",
+      "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zama ba. Zaɓi Cloud Agent ko wani CLI.",
+      "continueFrom": "Ci gaba da {{title}}",
+      "importFailed": "An kasa shigo da wannan zaman.",
+      "importingSession": "Ana shigo da zama"
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta {{displayCount}} fayil",

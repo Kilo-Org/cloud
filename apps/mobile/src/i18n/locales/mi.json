@@ -2116,13 +2116,10 @@
       "scrollToBottom": "Huri ki raro",
       "emptyTitle": "Kāore anō he karere",
       "renameAccessibility": "Huri ingoa i te wātūtū: {{title}}",
-      "connectRepository": "Hono i te pūranga",
       "cloningSession": "Kei te tārua te wātūtū",
       "continue": "Haere tonu",
       "couldNotLoadThisSession": "Kāore i taea te uta tēnei wātūtū",
-      "cloneFailed": "Kāore i taea te tārua tēnei wātūtū.",
       "cloneFailedRetry": "Kāore i taea te tārua tēnei wātūtū. Whakamātau anō.",
-      "connectRepositoryToContinue": "Hono i tētahi pūranga kia haere tonu.",
       "notEnoughCredits": "Kāore i rawa ngā moni hei whakahaere i a Cloud Agent. Tāpirihia he moni, ka whakamātau anō.",
       "previousTaskFinishing": "Kei te oti tonu te mahi o mua. Tatari kia iti.",
       "serviceUnavailable": "Kāore te ratonga e wātea ana ināianei. Whakamātau anō.",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Kāore he pūputunga e kitea ana. Tirohia te uru pūputunga mō GitLab, kātahi whakahōu.",
       "openBitbucket": "Whakatuwhera Bitbucket",
       "openGitlab": "Whakatuwhera GitLab",
-      "recentlyUsed": "Kua whakamahia tata nei"
+      "recentlyUsed": "Kua whakamahia tata nei",
+      "cliCannotContinue": "Kāore e taea e tēnei CLI te haere tonu i tētahi wātū. Kōwhiria te Cloud Agent, tētahi atu CLI rānei.",
+      "continueFrom": "Kei te haere tonu {{title}}",
+      "importFailed": "Kāore i taea te kawemai i tēnei wātū.",
+      "importingSession": "Kei te kawemai i te wātū"
     },
     "partRenderer": {
       "updatedFileCount_one": "Kua whakahoutia {{displayCount}} kōnae",

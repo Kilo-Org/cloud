@@ -2116,13 +2116,10 @@
       "scrollToBottom": "క్రిందికి స్క్రోల్ చేయండి",
       "emptyTitle": "ఇంకా సందేశాలు లేవు",
       "renameAccessibility": "సెషన్‌ను పేరు మార్చండి: {{title}}",
-      "connectRepository": "రిపోజిటరీని కనెక్ట్ చేయండి",
       "cloningSession": "సెషన్ క్లోన్ చేస్తోంది",
       "continue": "కొనసాగించండి",
       "couldNotLoadThisSession": "ఈ సెషన్‌ను లోడ్ చేయలేకపోయింది",
-      "cloneFailed": "ఈ సెషన్‌ను క్లోన్ చేయలేకపోయింది.",
       "cloneFailedRetry": "ఈ సెషన్‌ను క్లోన్ చేయలేకపోయింది. మళ్ళీ ప్రయత్నించండి.",
-      "connectRepositoryToContinue": "కొనసాగించడానికి రిపోజిటరీని కనెక్ట్ చేయండి.",
       "notEnoughCredits": "Cloud Agentను అమలు చేయడానికి తగినంత క్రెడిట్లు లేవు. క్రెడిట్లను జోడించి మళ్లీ ప్రయత్నించండి.",
       "previousTaskFinishing": "మునుపటి పని ఇంకా పూర్తవుతోంది. దయచేసి కాసేపు వేచి ఉండండి.",
       "serviceUnavailable": "సేవ ప్రస్తుతం అందుబాటులో లేదు. దయచేసి మళ్లీ ప్రయత్నించండి.",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "రిపోజిటరీలు కనిపించడం లేదు. గిట్‌ల్యాబ్ కోసం రిపోజిటరీ యాక్సెస్ తనిఖీ చేయండి, ఆపై రిఫ్రెష్ చేయండి.",
       "openBitbucket": "బిట్‌బకెట్ తెరవండి",
       "openGitlab": "గిట్‌ల్యాబ్ తెరవండి",
-      "recentlyUsed": "ఇటీవల ఉపయోగించినవి"
+      "recentlyUsed": "ఇటీవల ఉపయోగించినవి",
+      "continueFrom": "{{title}}ను కొనసాగిస్తోంది",
+      "importingSession": "సెషన్ను దిగుమతి చేస్తోంది",
+      "cliCannotContinue": "ఈ CLI సెషన్ను కొనసాగించదు. Cloud Agent లేదా మరొక CLIని ఎంచుకోండి.",
+      "importFailed": "ఈ సెషన్ను దిగుమతి చేయలేకపోయాం."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్ నవీకరించబడింది",

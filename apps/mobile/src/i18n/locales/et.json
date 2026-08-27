@@ -2116,13 +2116,10 @@
       "scrollToBottom": "Kerige alla",
       "emptyTitle": "Sõnumeid pole veel",
       "renameAccessibility": "Nimeta seanss ümber: {{title}}",
-      "connectRepository": "Ühenda hoidla",
       "cloningSession": "Seanssi kloonitakse",
       "continue": "Jätka",
       "couldNotLoadThisSession": "Seda seanssi ei õnnestunud laadida",
-      "cloneFailed": "Seda seanssi ei õnnestunud kloonida.",
       "cloneFailedRetry": "Seda seanssi ei õnnestunud kloonida. Proovi uuesti.",
-      "connectRepositoryToContinue": "Jätkamiseks ühenda hoidla.",
       "notEnoughCredits": "Cloud Agent käivitamiseks ei jätku krediiti. Lisa krediiti ja proovi uuesti.",
       "previousTaskFinishing": "Eelmine ülesanne on veel lõpetamisel. Palun oota hetk.",
       "serviceUnavailable": "Teenus pole praegu saadaval. Palun proovi uuesti.",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Hoidlaid pole nähtaval. Kontrolli GitLabi hoidlate juurdepääsu ja värskenda.",
       "openBitbucket": "Ava Bitbucket",
       "openGitlab": "Ava GitLab",
-      "recentlyUsed": "Hiljuti kasutatud"
+      "recentlyUsed": "Hiljuti kasutatud",
+      "cliCannotContinue": "See CLI ei saa seanssi jätkata. Valige Cloud Agent või mõni muu CLI.",
+      "continueFrom": "Jätkatakse {{title}}",
+      "importFailed": "Seda seanssi ei õnnestunud importida.",
+      "importingSession": "Imporditakse seanssi"
     },
     "partRenderer": {
       "updatedFileCount_one": "Uuendatud {{displayCount}} fail",

@@ -2116,13 +2116,10 @@
       "scrollToBottom": "Desann jis anba",
       "emptyTitle": "Pa gen mesaj ankò",
       "renameAccessibility": "Chanje non sesyon: {{title}}",
-      "connectRepository": "Konekte repo",
       "cloningSession": "Ap klone sesyon an",
       "continue": "Kontinye",
       "couldNotLoadThisSession": "Pa t 'kapab chaje sesyon sa a",
-      "cloneFailed": "Pa t 'kapab klone sesyon sa a.",
       "cloneFailedRetry": "Pa t 'kapab klone sesyon sa a. Eseye ankò.",
-      "connectRepositoryToContinue": "Konekte yon repo pou kontinye.",
       "notEnoughCredits": "Pa gen ase kredi pou kouri Cloud Agent. Ajoute kredi epi eseye ankò.",
       "previousTaskFinishing": "Travay anvan an poko fini. Tanpri tann yon ti moman.",
       "serviceUnavailable": "Sèvis la pa disponib kounye a. Tanpri eseye ankò.",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Pa gen depo ki vizib. Tcheke aksè depo pou GitLab, apre sa rafrechi.",
       "openBitbucket": "Louvri Bitbucket",
       "openGitlab": "Louvri GitLab",
-      "recentlyUsed": "Itilize dènyèman"
+      "recentlyUsed": "Itilize dènyèman",
+      "continueFrom": "Ap kontinye {{title}}",
+      "importingSession": "Ap enpòte sesyon",
+      "cliCannotContinue": "CLI sa a pa ka kontinye yon sesyon. Chwazi Cloud Agent oswa yon lòt CLI.",
+      "importFailed": "Pa t ka enpòte sesyon sa a."
     },
     "partRenderer": {
       "updatedFileCount_one": "Miz ajou {{displayCount}} fichye",

@@ -1662,13 +1662,10 @@
       "scrollToBottom": "Naar beneden scrollen",
       "emptyTitle": "Nog geen berichten",
       "renameAccessibility": "Sessie hernoemen: {{title}}",
-      "connectRepository": "Repository verbinden",
       "cloningSession": "Sessie klonen",
       "continue": "Doorgaan",
       "couldNotLoadThisSession": "Deze sessie kon niet worden geladen",
-      "cloneFailed": "Deze sessie kon niet worden gekloond.",
       "cloneFailedRetry": "Deze sessie kon niet worden gekloond. Probeer het opnieuw.",
-      "connectRepositoryToContinue": "Verbind een repository om door te gaan.",
       "notEnoughCredits": "Niet genoeg credits om Cloud Agent te starten. Voeg credits toe en probeer opnieuw.",
       "previousTaskFinishing": "De vorige taak is nog bezig. Even geduld.",
       "serviceUnavailable": "De service is momenteel niet beschikbaar. Probeer het opnieuw.",
@@ -1741,7 +1738,11 @@
       "noRepositoriesVisibleGitlab": "Geen repositories zichtbaar. Controleer de repositorytoegang voor GitLab en vernieuw daarna.",
       "openBitbucket": "Bitbucket openen",
       "openGitlab": "GitLab openen",
-      "recentlyUsed": "Recent gebruikt"
+      "recentlyUsed": "Recent gebruikt",
+      "continueFrom": "Doorgaan met {{title}}",
+      "importingSession": "Sessie importeren",
+      "cliCannotContinue": "Deze CLI kan een sessie niet voortzetten. Kies Cloud Agent of een andere CLI.",
+      "importFailed": "Deze sessie kan niet worden geïmporteerd."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} bestand bijgewerkt",

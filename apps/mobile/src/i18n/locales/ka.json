@@ -2116,13 +2116,10 @@
       "scrollToBottom": "ქვემოთ გადახვევა",
       "emptyTitle": "შეტყობინებები ჯერ არ არის",
       "renameAccessibility": "სესიის გადარქმევა: {{title}}",
-      "connectRepository": "რეპოზიტორის დაკავშირება",
       "cloningSession": "სესიის კლონირება",
       "continue": "გაგრძელება",
       "couldNotLoadThisSession": "ეს სესია ვერ ჩაირთო",
-      "cloneFailed": "ეს სესია ვერ დაიკლონა.",
       "cloneFailedRetry": "ეს სესია ვერ დაიკლონა. სცადეთ ხელახლა.",
-      "connectRepositoryToContinue": "გასაგრძელებლად დააკავშირეთ რეპოზიტორი.",
       "notEnoughCredits": "Cloud Agent-ის გასაშვებად კრედიტი არ არის საკმარისი. დაამატეთ კრედიტი და სცადეთ თავიდან.",
       "previousTaskFinishing": "წინა დავალება ჯერ კიდევ სრულდება. გთხოვთ, ცოტა ხანს დაელოდოთ.",
       "serviceUnavailable": "სერვისი ამ დროისთვის მიუწვდომელია. გთხოვთ, სცადოთ თავიდან.",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "რეპოზიტორები არ ჩანს. შეამოწმეთ GitLab-ის რეპოზიტორებზე წვდომა, შემდეგ განაახლეთ.",
       "openBitbucket": "Bitbucket-ის გახსნა",
       "openGitlab": "GitLab-ის გახსნა",
-      "recentlyUsed": "ბოლოს გამოყენებული"
+      "recentlyUsed": "ბოლოს გამოყენებული",
+      "cliCannotContinue": "ამ CLI-ს სესიის გაგრძელება არ შეუძლია. აირჩიეთ Cloud Agent ან სხვა CLI.",
+      "continueFrom": "ვაგრძელებთ {{title}}",
+      "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა.",
+      "importingSession": "სესიის იმპორტირება"
     },
     "partRenderer": {
       "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი",

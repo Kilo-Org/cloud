@@ -2116,13 +2116,10 @@
       "scrollToBottom": "Scroll to bottom",
       "emptyTitle": "No messages yet",
       "renameAccessibility": "Rename session: {{title}}",
-      "connectRepository": "Connect repository",
       "cloningSession": "Cloning session",
       "continue": "Continue",
       "couldNotLoadThisSession": "Couldn't load this session",
-      "cloneFailed": "Couldn't clone this session.",
       "cloneFailedRetry": "Couldn't clone this session. Try again.",
-      "connectRepositoryToContinue": "Connect a repository to continue.",
       "notEnoughCredits": "Not enough credits to run Cloud Agent. Add credits and try again.",
       "previousTaskFinishing": "The previous task is still finishing. Please wait a moment.",
       "serviceUnavailable": "The service is unavailable right now. Please try again.",
@@ -2195,7 +2192,11 @@
       "keepEditing": "Keep editing",
       "discard": "Discard",
       "discardFailed": "Could not discard the draft. Please try again.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "continueFrom": "Continuing {{title}}",
+      "importingSession": "Importing session",
+      "cliCannotContinue": "This CLI cannot continue a session. Pick Cloud Agent or another CLI.",
+      "importFailed": "Couldn't import this session."
     },
     "partRenderer": {
       "updatedFileCount_one": "Updated {{displayCount}} file",

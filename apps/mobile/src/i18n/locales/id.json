@@ -1662,13 +1662,10 @@
       "scrollToBottom": "Gulir ke bawah",
       "emptyTitle": "Belum ada pesan",
       "renameAccessibility": "Ganti nama sesi: {{title}}",
-      "connectRepository": "Hubungkan repositori",
       "cloningSession": "Mengkloning sesi",
       "continue": "Lanjutkan",
       "couldNotLoadThisSession": "Tidak dapat memuat sesi ini",
-      "cloneFailed": "Tidak dapat mengkloning sesi ini.",
       "cloneFailedRetry": "Tidak dapat mengkloning sesi ini. Coba lagi.",
-      "connectRepositoryToContinue": "Hubungkan repositori untuk melanjutkan.",
       "notEnoughCredits": "Kredit tidak cukup untuk menjalankan Cloud Agent. Tambah kredit dan coba lagi.",
       "previousTaskFinishing": "Tugas sebelumnya masih selesai. Tunggu sebentar.",
       "serviceUnavailable": "Layanan tidak tersedia saat ini. Coba lagi.",
@@ -1741,7 +1738,11 @@
       "noRepositoriesVisibleGitlab": "Tidak ada repositori yang terlihat. Periksa akses repositori untuk GitLab, lalu muat ulang.",
       "openBitbucket": "Buka Bitbucket",
       "openGitlab": "Buka GitLab",
-      "recentlyUsed": "Baru digunakan"
+      "recentlyUsed": "Baru digunakan",
+      "continueFrom": "Melanjutkan {{title}}",
+      "importingSession": "Mengimpor sesi",
+      "cliCannotContinue": "CLI ini tidak dapat melanjutkan sesi. Pilih Cloud Agent atau CLI lain.",
+      "importFailed": "Tidak dapat mengimpor sesi ini."
     },
     "partRenderer": {
       "updatedFileCount_one": "Memperbarui {{displayCount}} file",

@@ -2116,13 +2116,10 @@
       "scrollToBottom": "Görgetés az aljára",
       "emptyTitle": "Még nincs üzenet",
       "renameAccessibility": "Munkamenet átnevezése: {{title}}",
-      "connectRepository": "Adattár csatlakoztatása",
       "cloningSession": "Munkamenet klónozása",
       "continue": "Folytatás",
       "couldNotLoadThisSession": "Ennek a munkamenetnek a betöltése nem sikerült",
-      "cloneFailed": "Ennek a munkamenetnek a klónozása nem sikerült.",
       "cloneFailedRetry": "Ennek a munkamenetnek a klónozása nem sikerült. Próbálja újra.",
-      "connectRepositoryToContinue": "Csatlakoztasson egy adattárat a folytatáshoz.",
       "notEnoughCredits": "Nincs elég kredit a Cloud Agent futtatásához. Adjon hozzá krediteket, és próbálja újra.",
       "previousTaskFinishing": "Az előző feladat még befejeződik. Kérjük, várjon egy pillanatot.",
       "serviceUnavailable": "A szolgáltatás jelenleg nem érhető el. Kérjük, próbálja újra.",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Nincs látható tároló. Ellenőrizd a GitLab-tárolókhoz való hozzáférést, majd frissíts.",
       "openBitbucket": "Bitbucket megnyitása",
       "openGitlab": "GitLab megnyitása",
-      "recentlyUsed": "Legutóbb használt"
+      "recentlyUsed": "Legutóbb használt",
+      "continueFrom": "Folytatás {{title}}",
+      "importingSession": "Munkamenet importálása",
+      "cliCannotContinue": "Ez a CLI nem tudja folytatni a munkamenetet. Válasszon Cloud Agentet vagy másik CLI-t.",
+      "importFailed": "Nem sikerült importálni ezt a munkamenetet."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fájl frissítve",

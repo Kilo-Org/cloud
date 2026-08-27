@@ -2131,13 +2131,10 @@
       "scrollToBottom": "Ritināt līdz apakšai",
       "emptyTitle": "Ziņojumu vēl nav",
       "renameAccessibility": "Pārdēvēt sesiju: {{title}}",
-      "connectRepository": "Savienot repozitoriju",
       "cloningSession": "Klonē sesiju",
       "continue": "Turpināt",
       "couldNotLoadThisSession": "Neizdevās ielādēt šo sesiju",
-      "cloneFailed": "Neizdevās klonēt šo sesiju.",
       "cloneFailedRetry": "Neizdevās klonēt šo sesiju. Mēģini vēlreiz.",
-      "connectRepositoryToContinue": "Savieno repozitoriju, lai turpinātu.",
       "notEnoughCredits": "Nepietiek kredītu, lai palaistu Cloud Agent. Pievieno kredītus un mēģini vēlreiz.",
       "previousTaskFinishing": "Iepriekšējais uzdevums joprojām tiek pabeigts. Lūdzu, uzgaidi mirkli.",
       "serviceUnavailable": "Pakalpojums šobrīd nav pieejams. Lūdzu, mēģini vēlreiz.",
@@ -2210,7 +2207,11 @@
       "noRepositoriesVisibleGitlab": "Nav redzamu repozitoriju. Pārbaudiet repozitoriju piekļuvi GitLab, pēc tam atsvaidziniet.",
       "openBitbucket": "Atvērt Bitbucket",
       "openGitlab": "Atvērt GitLab",
-      "recentlyUsed": "Nesen lietots"
+      "recentlyUsed": "Nesen lietots",
+      "continueFrom": "Turpina {{title}}",
+      "importingSession": "Importē sesiju",
+      "cliCannotContinue": "Šis CLI nevar turpināt sesiju. Izvēlieties Cloud Agent vai citu CLI.",
+      "importFailed": "Neizdevās importēt šo sesiju."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atjaunināts {{displayCount}} fails",

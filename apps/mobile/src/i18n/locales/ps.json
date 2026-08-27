@@ -2116,13 +2116,10 @@
       "scrollToBottom": "لاندې ته ځغلول",
       "emptyTitle": "تر اوسه پیغامونه نشته",
       "renameAccessibility": "ناسته بیا نومول: {{title}}",
-      "connectRepository": "ذخیره وصل کړئ",
       "cloningSession": "ناسته کلون کېږي",
       "continue": "ادامه ورکړئ",
       "couldNotLoadThisSession": "دا ناسته بار نه شوه",
-      "cloneFailed": "دا ناسته کلون نه شوه.",
       "cloneFailedRetry": "دا ناسته کلون نه شوه. بیا هڅه وکړئ.",
-      "connectRepositoryToContinue": "د دوام لپاره یوه ذخیره وصل کړئ.",
       "notEnoughCredits": "د Cloud Agent د چلولو لپاره کافي کریډیټ نشته. کریډیټ اضافه کړئ او بیا هڅه وکړئ.",
       "previousTaskFinishing": "مخکینی کار لا هم روان دی. مهرباني وکړئ یوه شېبه انتظار وکړئ.",
       "serviceUnavailable": "خدمت اوس مهال شتون نلري. مهرباني وکړئ بیا هڅه وکړئ.",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "کوم ریپوزیټري نه لیدل کیږي. د GitLab لپاره د ریپوزیټري لاسرسی وګورئ، بیا تازه یې کړئ.",
       "openBitbucket": "Bitbucket پرانیزئ",
       "openGitlab": "GitLab پرانیزئ",
-      "recentlyUsed": "وروستي کارول شوي"
+      "recentlyUsed": "وروستي کارول شوي",
+      "continueFrom": "د {{title}} ادامه",
+      "importingSession": "ناسته استورول",
+      "cliCannotContinue": "دا CLI نشي کولای یوه ناسته ادامه کړي. Cloud Agent یا بل CLI غوره کړئ.",
+      "importFailed": "دا ناسته استوره نه شوه."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل تازه شو",

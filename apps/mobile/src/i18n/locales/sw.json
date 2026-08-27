@@ -2116,13 +2116,10 @@
       "scrollToBottom": "Tembeza hadi chini",
       "emptyTitle": "Hakuna ujumbe bado",
       "renameAccessibility": "Badilisha jina la kikao: {{title}}",
-      "connectRepository": "Unganisha hazina",
       "cloningSession": "Inanakili kikao",
       "continue": "Endelea",
       "couldNotLoadThisSession": "Haikuweza kupakia kikao hiki",
-      "cloneFailed": "Haikuweza kunakili kikao hiki.",
       "cloneFailedRetry": "Haikuweza kunakili kikao hiki. Jaribu tena.",
-      "connectRepositoryToContinue": "Unganisha hazina kuendelea.",
       "notEnoughCredits": "Salio hazitoshi kuendesha Cloud Agent. Ongeza salio na ujaribu tena.",
       "previousTaskFinishing": "Kazi iliyotangulia bado inakamilika. Tafadhali subiri kidogo.",
       "serviceUnavailable": "Huduma haipatikani sasa hivi. Tafadhali jaribu tena.",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Hakuna hazina zinazoonekana. Angalia ufikiaji wa hazina kwa GitLab, kisha onyesha upya.",
       "openBitbucket": "Fungua Bitbucket",
       "openGitlab": "Fungua GitLab",
-      "recentlyUsed": "Zilizotumika hivi karibuni"
+      "recentlyUsed": "Zilizotumika hivi karibuni",
+      "cliCannotContinue": "CLI hii haiwezi kuendelea na kikao. Chagua Cloud Agent au CLI nyingine.",
+      "continueFrom": "Endelea na {{title}}",
+      "importFailed": "Haikuweza kuingiza kikao hiki.",
+      "importingSession": "Inaingiza kikao"
     },
     "partRenderer": {
       "updatedFileCount_one": "Imesasisha faili {{displayCount}}",

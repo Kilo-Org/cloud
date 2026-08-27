@@ -1678,13 +1678,10 @@
       "scrollToBottom": "Прокрутити вниз",
       "emptyTitle": "Повідомлень ще немає",
       "renameAccessibility": "Перейменувати сесію: {{title}}",
-      "connectRepository": "Підключити репозиторій",
       "cloningSession": "Клонування сесії",
       "continue": "Продовжити",
       "couldNotLoadThisSession": "Не вдалося завантажити цей сеанс",
-      "cloneFailed": "Не вдалося клонувати цей сеанс.",
       "cloneFailedRetry": "Не вдалося клонувати цей сеанс. Спробуйте ще раз.",
-      "connectRepositoryToContinue": "Підключіть репозиторій, щоб продовжити.",
       "notEnoughCredits": "Недостатньо кредитів для запуску Cloud Agent. Додайте кредити та спробуйте ще раз.",
       "previousTaskFinishing": "Попереднє завдання ще завершується. Зачекайте, будь ласка.",
       "serviceUnavailable": "Сервіс зараз недоступний. Спробуйте ще раз, будь ласка.",
@@ -1757,7 +1754,11 @@
       "noRepositoriesVisibleGitlab": "Репозиторіїв не видно. Перевірте доступ до репозиторіїв GitLab, а потім оновіть.",
       "openBitbucket": "Відкрити Bitbucket",
       "openGitlab": "Відкрити GitLab",
-      "recentlyUsed": "Нещодавно використані"
+      "recentlyUsed": "Нещодавно використані",
+      "cliCannotContinue": "Цей CLI не може продовжити сеанс. Виберіть Хмарний агент або інший CLI.",
+      "continueFrom": "Продовження {{title}}",
+      "importFailed": "Не вдалося імпортувати цей сеанс.",
+      "importingSession": "Імпортування сеансу"
     },
     "partRenderer": {
       "updatedFileCount_one": "Оновлено {{displayCount}} файл",

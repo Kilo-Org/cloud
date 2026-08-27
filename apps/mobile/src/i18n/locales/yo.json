@@ -2116,13 +2116,10 @@
       "scrollToBottom": "Yi lọ si isalẹ",
       "emptyTitle": "Ko si awọn ifiranṣẹ sibẹsibẹ",
       "renameAccessibility": "Fun akoko lorukọ: {{title}}",
-      "connectRepository": "So ibi ipamọ pọ",
       "cloningSession": "Ti n daakọ akoko",
       "continue": "Tẹ̀síwájú",
       "couldNotLoadThisSession": "Ko le ṣe ikojọpọ akoko yii",
-      "cloneFailed": "Ko le daakọ akoko yii.",
       "cloneFailedRetry": "Ko le daakọ akoko yii. Gbiyanju lẹẹkansi.",
-      "connectRepositoryToContinue": "So ibi ipamọ pọ lati tesiwaju.",
       "notEnoughCredits": "Ko si kirẹditi to lati ṣiṣẹ Cloud Agent. Ṣafikun kirẹditi ki o tun gbiyanju.",
       "previousTaskFinishing": "Iṣẹ́ ti o ti kọja ṣì ń pari. Jọwọ duro diẹ.",
       "serviceUnavailable": "Iṣẹ naa ko si lọwọlọwọ. Jọwọ tun gbiyanju.",
@@ -2195,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Ko si ibi ipamọ data ti o han. Ṣayẹwo iwọle ibi ipamọ data fun GitLab, lẹhinna tunse.",
       "openBitbucket": "Ṣii Bitbucket",
       "openGitlab": "Ṣii GitLab",
-      "recentlyUsed": "Ti a lo laipẹ"
+      "recentlyUsed": "Ti a lo laipẹ",
+      "continueFrom": "Tẹ̀síwájú {{title}}",
+      "importingSession": "Gbigbe igba-ijiroro wọle",
+      "cliCannotContinue": "CLI yii ko le tẹ̀síwájú igba-ijiroro. Yan Cloud Agent tabi CLI miiran.",
+      "importFailed": "Ko le gbe igba-ijiroro yii wọle."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ti ṣe imudojuiwọn {{displayCount}} faili",

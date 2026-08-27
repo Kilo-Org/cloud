@@ -1662,13 +1662,10 @@
       "scrollToBottom": "一番下までスクロール",
       "emptyTitle": "メッセージはまだありません",
       "renameAccessibility": "セッション名を変更: {{title}}",
-      "connectRepository": "リポジトリを接続",
       "cloningSession": "セッションをクローン中",
       "continue": "続行",
       "couldNotLoadThisSession": "このセッションを読み込めませんでした",
-      "cloneFailed": "このセッションを複製できませんでした。",
       "cloneFailedRetry": "このセッションを複製できませんでした。もう一度お試しください。",
-      "connectRepositoryToContinue": "続行するにはリポジトリを接続してください。",
       "notEnoughCredits": "Cloud Agentを実行するクレジットが不足しています。クレジットを追加して再試行してください。",
       "previousTaskFinishing": "前のタスクがまだ終わっていません。少々お待ちください。",
       "serviceUnavailable": "サービスは現在利用できません。もう一度お試しください。",
@@ -1741,7 +1738,11 @@
       "noRepositoriesVisibleGitlab": "表示できるリポジトリがありません。GitLab のリポジトリへのアクセスを確認し、更新してください。",
       "openBitbucket": "Bitbucket を開く",
       "openGitlab": "GitLab を開く",
-      "recentlyUsed": "最近使用した項目"
+      "recentlyUsed": "最近使用した項目",
+      "cliCannotContinue": "このCLIはセッションを続行できません。Cloud Agentまたは別のCLIを選択してください。",
+      "continueFrom": "{{title}}を続行しています",
+      "importFailed": "このセッションをインポートできませんでした。",
+      "importingSession": "セッションをインポートしています"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました",

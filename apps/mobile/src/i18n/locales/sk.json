@@ -2146,13 +2146,10 @@
       "scrollToBottom": "Posunúť nadol",
       "emptyTitle": "Zatiaľ žiadne správy",
       "renameAccessibility": "Premenovať sedenie: {{title}}",
-      "connectRepository": "Pripojiť repozitár",
       "cloningSession": "Klonuje sa sedenie",
       "continue": "Pokračovať",
       "couldNotLoadThisSession": "Toto sedenie sa nepodarilo načítať",
-      "cloneFailed": "Toto sedenie sa nepodarilo naklonovať.",
       "cloneFailedRetry": "Toto sedenie sa nepodarilo naklonovať. Skúste to znova.",
-      "connectRepositoryToContinue": "Na pokračovanie pripojte repozitár.",
       "notEnoughCredits": "Nemáte dosť kreditov na spustenie Cloud Agent. Pridajte kredity a skúste znova.",
       "previousTaskFinishing": "Predchádzajúca úloha sa ešte dokončuje. Počkajte chvíľu.",
       "serviceUnavailable": "Služba je momentálne nedostupná. Skúste to znova.",
@@ -2225,7 +2222,11 @@
       "noRepositoriesVisibleGitlab": "Nie sú viditeľné žiadne repozitáre. Skontrolujte prístup k repozitárom pre GitLab a potom obnovte.",
       "openBitbucket": "Otvoriť Bitbucket",
       "openGitlab": "Otvoriť GitLab",
-      "recentlyUsed": "Naposledy použité"
+      "recentlyUsed": "Naposledy použité",
+      "continueFrom": "Pokračovať v {{title}}",
+      "importingSession": "Importuje sa relácia",
+      "cliCannotContinue": "Tento CLI nemôže pokračovať v relácii. Vyberte Cloud Agent alebo iný CLI.",
+      "importFailed": "Túto reláciu sa nepodarilo importovať."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizovaný {{displayCount}} súbor",

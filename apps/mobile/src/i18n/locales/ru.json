@@ -1678,13 +1678,10 @@
       "scrollToBottom": "Прокрутить вниз",
       "emptyTitle": "Сообщений пока нет",
       "renameAccessibility": "Переименовать сессию: {{title}}",
-      "connectRepository": "Подключить репозиторий",
       "cloningSession": "Клонирование сессии",
       "continue": "Продолжить",
       "couldNotLoadThisSession": "Не удалось загрузить эту сессию",
-      "cloneFailed": "Не удалось клонировать эту сессию.",
       "cloneFailedRetry": "Не удалось клонировать эту сессию. Попробуйте снова.",
-      "connectRepositoryToContinue": "Подключите репозиторий, чтобы продолжить.",
       "notEnoughCredits": "Недостаточно кредитов для запуска Cloud Agent. Добавьте кредиты и попробуйте снова.",
       "previousTaskFinishing": "Предыдущая задача ещё завершается. Подождите немного.",
       "serviceUnavailable": "Сервис сейчас недоступен. Попробуйте ещё раз.",
@@ -1757,7 +1754,11 @@
       "noRepositoriesVisibleGitlab": "Репозитории не отображаются. Проверьте доступ к репозиториям GitLab, затем обновите.",
       "openBitbucket": "Открыть Bitbucket",
       "openGitlab": "Открыть GitLab",
-      "recentlyUsed": "Недавно использованные"
+      "recentlyUsed": "Недавно использованные",
+      "cliCannotContinue": "Этот CLI не может продолжить сеанс. Выберите Cloud Agent или другой CLI.",
+      "continueFrom": "Продолжение {{title}}",
+      "importFailed": "Не удалось импортировать этот сеанс.",
+      "importingSession": "Импорт сеанса"
     },
     "partRenderer": {
       "updatedFileCount_one": "Обновлен {{displayCount}} файл",

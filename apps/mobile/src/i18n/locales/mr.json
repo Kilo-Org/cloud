@@ -665,7 +665,8 @@
     "profile": "प्रोफाइल",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, टॅब, एकूण {{total}} पैकी {{position}}"
+    "position": "{{name}}, टॅब, एकूण {{total}} पैकी {{position}}",
+    "chat": "चॅट"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "जेव्हा तुम्ही लिंकच्या होस्टवर विश्वास ठेवता, तेव्हा ती पुन्हा न विचारता उघडते.",
     "revoke": "{{host}} रद्द करा",
     "backToPreferences": "प्राधान्यांवर परत जा"
+  },
+  "quickChat": {
+    "title": "चॅट",
+    "composer": {
+      "placeholder": "संदेश"
+    },
+    "empty": {
+      "title": "चॅट सुरू करा",
+      "description": "मॉडेलशी बोलण्यासाठी संदेश पाठवा."
+    },
+    "working": "कार्यरत",
+    "historyRetry": "चॅट इतिहास लोड करता आला नाही.",
+    "catalogRetry": "मॉडेल लोड करता आले नाहीत",
+    "sendError": "संदेश पाठवण्यात अयशस्वी. कृपया पुन्हा प्रयत्न करा."
   }
 }

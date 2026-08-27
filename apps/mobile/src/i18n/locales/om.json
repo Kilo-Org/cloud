@@ -665,7 +665,8 @@
     "profile": "Kaardii",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, taabii, {{total}} keessaa {{position}}"
+    "position": "{{name}}, taabii, {{total}} keessaa {{position}}",
+    "chat": "Chaat"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "Yeroo hostii liinkii amantu, gaafachuu malee deebi'ee bana.",
     "revoke": "Haqi {{host}}",
     "backToPreferences": "Gara filatootaatti deebi'i"
+  },
+  "quickChat": {
+    "title": "Chaat",
+    "composer": {
+      "placeholder": "Ergaa"
+    },
+    "empty": {
+      "title": "Chaat jalqabi",
+      "description": "Modeelii wajjin haasa'uuf ergaa ergi."
+    },
+    "working": "Hojachaa jira",
+    "historyRetry": "Seenaa chaat fudhachuu hin dandeenye.",
+    "catalogRetry": "Modeeloota fe'achuu hin dandeenye",
+    "sendError": "Ergaa erguu hin dandeenye. Ammas yaali."
   }
 }

@@ -195,7 +195,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, onglet, {{position}} sur {{total}}"
+    "position": "{{name}}, onglet, {{position}} sur {{total}}",
+    "chat": "Discussion"
   },
   "chat": {
     "instancePicker": {
@@ -3181,5 +3182,19 @@
     "emptyDescription": "Lorsque vous faites confiance à l'hôte d'un lien, il s'ouvre sans redemander.",
     "revoke": "Révoquer {{host}}",
     "backToPreferences": "Retour aux préférences"
+  },
+  "quickChat": {
+    "title": "Discussion",
+    "composer": {
+      "placeholder": "Message"
+    },
+    "empty": {
+      "title": "Démarrer une discussion",
+      "description": "Envoyez un message pour discuter avec un modèle."
+    },
+    "working": "En cours",
+    "historyRetry": "Impossible de charger l'historique de la conversation.",
+    "catalogRetry": "Impossible de charger les modèles",
+    "sendError": "Impossible d'envoyer le message. Veuillez réessayer."
   }
 }

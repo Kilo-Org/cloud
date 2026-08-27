@@ -211,7 +211,8 @@
     "profile": "Профиль",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, вкладка, {{position}} из {{total}}"
+    "position": "{{name}}, вкладка, {{position}} из {{total}}",
+    "chat": "Чат"
   },
   "chat": {
     "instancePicker": {
@@ -3202,5 +3203,19 @@
     "emptyDescription": "Когда вы доверяете хосту ссылки, он открывается без повторного запроса.",
     "revoke": "Отозвать {{host}}",
     "backToPreferences": "Назад к настройкам"
+  },
+  "quickChat": {
+    "title": "Чат",
+    "composer": {
+      "placeholder": "Сообщение"
+    },
+    "empty": {
+      "title": "Начать чат",
+      "description": "Отправьте сообщение, чтобы поговорить с моделью."
+    },
+    "working": "Работаю...",
+    "historyRetry": "Не удалось загрузить историю чата.",
+    "catalogRetry": "Не удалось загрузить модели",
+    "sendError": "Не удалось отправить сообщение. Попробуйте еще раз."
   }
 }

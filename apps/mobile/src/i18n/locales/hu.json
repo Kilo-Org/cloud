@@ -665,7 +665,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, fül, {{position}} a {{total}} közül"
+    "position": "{{name}}, fül, {{position}} a {{total}} közül",
+    "chat": "Csevegés"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "Ha megbízik egy link hostjában, az a továbbiakban kérdezés nélkül megnyílik.",
     "revoke": "Visszavonás ({{host}})",
     "backToPreferences": "Vissza a beállításokhoz"
+  },
+  "quickChat": {
+    "title": "Csevegés",
+    "composer": {
+      "placeholder": "Üzenet"
+    },
+    "empty": {
+      "title": "Kezdjen csevegést",
+      "description": "Küldjön egy üzenetet, hogy beszélgessen egy modellel."
+    },
+    "working": "Feldolgozás",
+    "historyRetry": "Nem sikerült betölteni a csevegés előzményeit.",
+    "catalogRetry": "Nem sikerült betölteni a modelleket",
+    "sendError": "Az üzenet küldése nem sikerült. Próbálja újra."
   }
 }

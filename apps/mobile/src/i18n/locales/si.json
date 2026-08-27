@@ -665,7 +665,8 @@
     "profile": "පැතිකඩ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ටැබ්, මුළු {{total}} න් {{position}}"
+    "position": "{{name}}, ටැබ්, මුළු {{total}} න් {{position}}",
+    "chat": "කතා"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "ඔබ සබැඳියක ධාරකය විශ්වාස කළ විට, එය නැවත අසා නොගෙන විවෘත වේ.",
     "revoke": "{{host}} අවලංගු කරන්න",
     "backToPreferences": "මනාප වෙත ආපසු"
+  },
+  "quickChat": {
+    "title": "කතා",
+    "composer": {
+      "placeholder": "පණිවිඩය"
+    },
+    "empty": {
+      "title": "කතාවක් ආරම්භ කරන්න",
+      "description": "ආකෘතියක් සමඟ කතා කිරීමට පණිවිඩයක් යවන්න."
+    },
+    "working": "වැඩ කරමින්",
+    "historyRetry": "සංවාද ඉතිහාසය පූරණය කළ නොහැකි විය.",
+    "catalogRetry": "ආකෘති පූරණය කිරීමට නොහැකි විය",
+    "sendError": "පණිවිඩය යැවිය නොහැකි විය. නැවත උත්සාහ කරන්න."
   }
 }

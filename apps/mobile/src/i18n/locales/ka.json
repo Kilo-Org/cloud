@@ -665,7 +665,8 @@
     "profile": "პროფილი",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ჩანართი, {{position}} {{total}}-დან"
+    "position": "{{name}}, ჩანართი, {{position}} {{total}}-დან",
+    "chat": "ჩატი"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "როდესაც ენდობით ბმულის ჰოსტს, ის იხსნება ხელახლა კითხვის გარეშე.",
     "revoke": "გაუქმება {{host}}",
     "backToPreferences": "დაბრუნება პარამეტრებში"
+  },
+  "quickChat": {
+    "title": "ჩატი",
+    "composer": {
+      "placeholder": "შეტყობინება"
+    },
+    "empty": {
+      "title": "დაიწყეთ ჩატი",
+      "description": "გაგზავნეთ შეტყობინება მოდელთან სასაუბროდ."
+    },
+    "working": "მუშავდება",
+    "historyRetry": "ჩატის ისტორიის ჩატვირთვა ვერ მოხერხდა.",
+    "catalogRetry": "მოდელების ჩატვირთვა ვერ მოხერხდა",
+    "sendError": "შეტყობინების გაგზავნა ვერ მოხერხდა. სცადეთ ხელახლა."
   }
 }

@@ -662,10 +662,25 @@
   "tabs": {
     "home": "Home",
     "agents": "Agents",
+    "chat": "Chat",
     "profile": "Profile",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, tab, {{position}} of {{total}}"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Message"
+    },
+    "empty": {
+      "title": "Start a chat",
+      "description": "Send a message to talk to a model."
+    },
+    "working": "Working",
+    "historyRetry": "Could not load chat history.",
+    "catalogRetry": "Could not load models",
+    "sendError": "Could not send the message. Try again."
   },
   "chat": {
     "instancePicker": {

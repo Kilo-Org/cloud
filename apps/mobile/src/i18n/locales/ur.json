@@ -665,7 +665,8 @@
     "profile": "پروفائل",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}، ٹیب، {{total}} میں سے {{position}}"
+    "position": "{{name}}، ٹیب، {{total}} میں سے {{position}}",
+    "chat": "چیٹ"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "جب آپ کسی لنک کے ہوسٹ پر بھروسہ کرتے ہیں، تو یہ دوبارہ بغیر پوچھے کھل جاتا ہے۔",
     "revoke": "{{host}} کو منسوخ کریں",
     "backToPreferences": "ترجیحات پر واپس جائیں"
+  },
+  "quickChat": {
+    "title": "چیٹ",
+    "composer": {
+      "placeholder": "پیغام"
+    },
+    "empty": {
+      "title": "چیٹ شروع کریں",
+      "description": "کسی ماڈل سے بات کرنے کے لیے پیغام بھیجیں۔"
+    },
+    "working": "کام جاری ہے",
+    "historyRetry": "چیٹ کی سرگزشت لوڈ نہیں ہو سکی۔",
+    "catalogRetry": "ماڈلز لوڈ نہیں ہو سکے",
+    "sendError": "پیغام نہیں بھیجا جا سکا۔ دوبارہ کوشش کریں۔"
   }
 }

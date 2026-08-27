@@ -679,7 +679,8 @@
     "profile": "Профіль",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, укладка, {{position}} з {{total}}"
+    "position": "{{name}}, укладка, {{position}} з {{total}}",
+    "chat": "Чат"
   },
   "chat": {
     "instancePicker": {
@@ -3202,5 +3203,19 @@
     "emptyDescription": "Калі вы даверыцеся хосту спасылкі, яна адкрыецца без наступных запытаў.",
     "revoke": "Адабраць {{host}}",
     "backToPreferences": "Назад да наладаў"
+  },
+  "quickChat": {
+    "title": "Чат",
+    "composer": {
+      "placeholder": "Паведамленне"
+    },
+    "empty": {
+      "title": "Пачаць чат",
+      "description": "Адпраўце паведамленне, каб паразмаўляць з мадэллю."
+    },
+    "working": "Працуе",
+    "historyRetry": "Не атрымалася загрузіць гісторыю чата.",
+    "catalogRetry": "Не атрымалася загрузіць мадэлі",
+    "sendError": "Не атрымалася адправіць паведамленне. Паспрабуйце яшчэ раз."
   }
 }

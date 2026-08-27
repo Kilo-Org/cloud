@@ -665,7 +665,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} daripada {{total}}"
+    "position": "{{name}}, tab, {{position}} daripada {{total}}",
+    "chat": "Sembang"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "Apabila anda mempercayai hos pautan, ia dibuka tanpa bertanya lagi.",
     "revoke": "Tarik balik {{host}}",
     "backToPreferences": "Kembali ke keutamaan"
+  },
+  "quickChat": {
+    "title": "Sembang",
+    "composer": {
+      "placeholder": "Mesej"
+    },
+    "empty": {
+      "title": "Mulakan sembang",
+      "description": "Hantar mesej untuk bercakap dengan model."
+    },
+    "working": "Memproses…",
+    "historyRetry": "Tidak dapat memuatkan sejarah sembang.",
+    "catalogRetry": "Tidak dapat memuatkan model",
+    "sendError": "Mesej tidak dapat dihantar. Cuba lagi."
   }
 }

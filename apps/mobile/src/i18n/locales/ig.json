@@ -665,7 +665,8 @@
     "profile": "Profaịlụ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} nke {{total}}"
+    "position": "{{name}}, tab, {{position}} nke {{total}}",
+    "chat": "Nkata"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "Mgbe ị tụkwasịrị obi n'onye nlekọta njikọ, ọ na-emeghe na-enweghị ịjụ ọzọ.",
     "revoke": "Weghachite {{host}}",
     "backToPreferences": "Laghachi na mmasị"
+  },
+  "quickChat": {
+    "title": "Nkata",
+    "composer": {
+      "placeholder": "Ozi"
+    },
+    "empty": {
+      "title": "Malite nkata",
+      "description": "Ziga ozi ka ị soro ihe nlereanya kparịta ụka."
+    },
+    "working": "Na-arụ ọrụ",
+    "historyRetry": "Enweghị ike ibutu akụkọ nkata.",
+    "catalogRetry": "Enweghị ike ibunye ụdị",
+    "sendError": "Enweghị ike izipu ozi ahụ. Nwaa ọzọ."
   }
 }

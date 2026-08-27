@@ -665,7 +665,8 @@
     "profile": "प्रोफाइल",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ट्याब, {{total}} मध्ये {{position}}"
+    "position": "{{name}}, ट्याब, {{total}} मध्ये {{position}}",
+    "chat": "कुराकानी"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "जब तपाईं लिंकको होस्टलाई भरोसा गर्नुहुन्छ, यो फेरि नसोधी खुल्छ।",
     "revoke": "खारेज गर्नुहोस् {{host}}",
     "backToPreferences": "प्राथमिकताहरूमा फर्कनुहोस्"
+  },
+  "quickChat": {
+    "title": "कुराकानी",
+    "composer": {
+      "placeholder": "सन्देश"
+    },
+    "empty": {
+      "title": "कुराकानी सुरु गर्नुहोस्",
+      "description": "मोडेलसँग कुरा गर्न सन्देश पठाउनुहोस्।"
+    },
+    "working": "काम गर्दै",
+    "historyRetry": "कुराकानी इतिहास लोड गर्न सकिएन।",
+    "catalogRetry": "मोडेलहरू लोड गर्न सकिएन",
+    "sendError": "सन्देश पठाउन सकिएन। फेरि प्रयास गर्नुहोस्।"
   }
 }

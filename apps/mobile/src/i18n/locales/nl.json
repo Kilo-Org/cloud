@@ -211,7 +211,8 @@
     "profile": "Profiel",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tabblad, {{position}} van {{total}}"
+    "position": "{{name}}, tabblad, {{position}} van {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "Wanneer u de host van een link vertrouwt, wordt deze zonder opnieuw te vragen geopend.",
     "revoke": "{{host}} intrekken",
     "backToPreferences": "Terug naar voorkeuren"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Bericht"
+    },
+    "empty": {
+      "title": "Start een chat",
+      "description": "Stuur een bericht om met een model te praten."
+    },
+    "working": "Bezig",
+    "historyRetry": "Kon de chatgeschiedenis niet laden.",
+    "catalogRetry": "Kon modellen niet laden",
+    "sendError": "Kan het bericht niet verzenden. Probeer het opnieuw."
   }
 }

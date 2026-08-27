@@ -665,7 +665,8 @@
     "profile": "โปรไฟล์",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, แท็บ, {{position}} จาก {{total}}"
+    "position": "{{name}}, แท็บ, {{position}} จาก {{total}}",
+    "chat": "แชท"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "เมื่อคุณเชื่อถือโฮสต์ของลิงก์ มันจะเปิดโดยไม่ถามอีก",
     "revoke": "เพิกถอน {{host}}",
     "backToPreferences": "กลับไปที่การตั้งค่า"
+  },
+  "quickChat": {
+    "title": "แชท",
+    "composer": {
+      "placeholder": "ข้อความ"
+    },
+    "empty": {
+      "title": "เริ่มแชท",
+      "description": "ส่งข้อความเพื่อพูดคุยกับโมเดล"
+    },
+    "working": "กำลังทำงาน",
+    "historyRetry": "ไม่สามารถโหลดประวัติแชทได้",
+    "catalogRetry": "ไม่สามารถโหลดโมเดลได้",
+    "sendError": "ไม่สามารถส่งข้อความได้ ลองอีกครั้ง"
   }
 }

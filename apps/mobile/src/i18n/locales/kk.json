@@ -665,7 +665,8 @@
     "profile": "Профиль",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, қойынды, {{total}} ішінде {{position}}"
+    "position": "{{name}}, қойынды, {{total}} ішінде {{position}}",
+    "chat": "Чат"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "Сілтеме хостына сенсеңіз, ол қайта сұрамай ашылады.",
     "revoke": "{{host}} кері қайтару",
     "backToPreferences": "Баптауларға оралу"
+  },
+  "quickChat": {
+    "title": "Чат",
+    "composer": {
+      "placeholder": "Хабарлама"
+    },
+    "empty": {
+      "title": "Чатты бастаңыз",
+      "description": "Модельмен сөйлесу үшін хабарлама жіберіңіз."
+    },
+    "working": "Орындалуда",
+    "historyRetry": "Чат тарихын жүктеу мүмкін болмады.",
+    "catalogRetry": "Модельдерді жүктеу мүмкін болмады",
+    "sendError": "Хабарламаны жіберу мүмкін болмады. Қайта көріңіз."
   }
 }

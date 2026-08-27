@@ -211,7 +211,8 @@
     "profile": "프로필",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, 탭, {{total}} 중 {{position}}"
+    "position": "{{name}}, 탭, {{total}} 중 {{position}}",
+    "chat": "채팅"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "링크의 호스트를 신뢰하면 다시 묻지 않고 열립니다.",
     "revoke": "{{host}} 신뢰 해제",
     "backToPreferences": "기본 설정으로 돌아가기"
+  },
+  "quickChat": {
+    "title": "채팅",
+    "composer": {
+      "placeholder": "메시지"
+    },
+    "empty": {
+      "title": "채팅 시작하기",
+      "description": "모델과 대화하려면 메시지를 보내세요."
+    },
+    "working": "작업 중",
+    "historyRetry": "채팅 기록을 불러올 수 없습니다.",
+    "catalogRetry": "모델을 불러올 수 없습니다",
+    "sendError": "메시지를 보낼 수 없습니다. 다시 시도하세요."
   }
 }

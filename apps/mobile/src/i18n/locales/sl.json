@@ -679,7 +679,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, zavihek, {{position}} od {{total}}"
+    "position": "{{name}}, zavihek, {{position}} od {{total}}",
+    "chat": "Sporočila klepeta"
   },
   "chat": {
     "instancePicker": {
@@ -3202,5 +3203,19 @@
     "emptyDescription": "Ko zaupaš gostitelju povezave, se odpre brez ponovnega vprašanja.",
     "revoke": "Prekliči {{host}}",
     "backToPreferences": "Nazaj na nastavitve"
+  },
+  "quickChat": {
+    "title": "Sporočila klepeta",
+    "composer": {
+      "placeholder": "Sporočilo"
+    },
+    "empty": {
+      "title": "Začni klepet",
+      "description": "Pošlji sporočilo za pogovor z modelom."
+    },
+    "working": "Delam",
+    "historyRetry": "Zgodovine klepeta ni bilo mogoče naložiti.",
+    "catalogRetry": "Nalaganje modelov ni uspelo",
+    "sendError": "Sporočila ni bilo mogoče poslati. Poskusite znova."
   }
 }

@@ -665,7 +665,8 @@
     "profile": "ပရိုဖိုင်",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}၊ tab၊ {{total}} အနက် {{position}}"
+    "position": "{{name}}၊ tab၊ {{total}} အနက် {{position}}",
+    "chat": "စကားဝိုင်း"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "လင့်တစ်ခု၏ host ကို သင်ယုံကြည်သောအခါ ၎င်းကို ထပ်မံမေးစရာမလိုဘဲ ဖွင့်ပါသည်။",
     "revoke": "{{host}} ကို ပယ်ဖျက်မည်",
     "backToPreferences": "နှစ်သက်မှုများသို့ ပြန်သွားမည်"
+  },
+  "quickChat": {
+    "title": "စကားဝိုင်း",
+    "composer": {
+      "placeholder": "မက်ဆေ့ချ်"
+    },
+    "empty": {
+      "title": "စကားဝိုင်းစတင်ပါ",
+      "description": "မော်ဒယ်တစ်ခုနှင့် စကားပြောရန် မက်ဆေ့ချ်ပို့ပါ။"
+    },
+    "working": "လုပ်ဆောင်နေသည်",
+    "historyRetry": "စကားဝိုင်းသမိုင်းကို တင်မရပါ။",
+    "catalogRetry": "မော်ဒယ်များ ဖွင့်၍ မရပါ",
+    "sendError": "မက်ဆေ့ခ်ျ ပို့ရန် မအောင်မြင်ခဲ့ပါ။ ထပ်ကြိုးစားပါ။"
   }
 }

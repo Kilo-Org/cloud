@@ -665,7 +665,8 @@
     "profile": "Profili",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, skedë, {{position}} nga {{total}}"
+    "position": "{{name}}, skedë, {{position}} nga {{total}}",
+    "chat": "Bisedë"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "Kur i beson hostit të një lidhjeje, ajo hapet pa pyetur përsëri.",
     "revoke": "Heq besimin për {{host}}",
     "backToPreferences": "Kthehu te preferencat"
+  },
+  "quickChat": {
+    "title": "Bisedë",
+    "composer": {
+      "placeholder": "Mesazh"
+    },
+    "empty": {
+      "title": "Filloni një bisedë",
+      "description": "Dërgo një mesazh për të biseduar me një model."
+    },
+    "working": "Duke punuar",
+    "historyRetry": "Nuk u arrit të ngarkohej historia e bisedës.",
+    "catalogRetry": "Nuk u ngarkuan modelet",
+    "sendError": "Mesazhi nuk u dërgua. Provoni përsëri."
   }
 }

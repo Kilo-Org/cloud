@@ -665,7 +665,8 @@
     "profile": "પ્રોફાઇલ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ટેબ, {{position}} માંથી {{total}}"
+    "position": "{{name}}, ટેબ, {{position}} માંથી {{total}}",
+    "chat": "ચેટ"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "જ્યારે તમે લિંકના હોસ્ટ પર ભરોસો રાખો છો, ત્યારે તે ફરીથી પૂછ્યા વિના ખુલે છે.",
     "revoke": "{{host}} રદ કરો",
     "backToPreferences": "પસંદગીઓ પર પાછા જાઓ"
+  },
+  "quickChat": {
+    "title": "ચેટ",
+    "composer": {
+      "placeholder": "સંદેશ"
+    },
+    "empty": {
+      "title": "વાતચીત શરૂ કરો",
+      "description": "મોડેલ સાથે વાત કરવા સંદેશ મોકલો."
+    },
+    "working": "કામ થઈ રહ્યું છે",
+    "historyRetry": "વાતચીત ઇતિહાસ લોડ કરી શકાયો નહીં.",
+    "catalogRetry": "મોડેલ લોડ કરી શકાયા નહીં",
+    "sendError": "સંદેશો મોકલી શકાયો નથી. ફરી પ્રયાસ કરો."
   }
 }

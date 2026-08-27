@@ -679,7 +679,8 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, karta, {{position}} z {{total}}"
+    "position": "{{name}}, karta, {{position}} z {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -3202,5 +3203,19 @@
     "emptyDescription": "Když důvěřujete hostiteli odkazu, otevře se bez dalšího dotázání.",
     "revoke": "Odebrat {{host}}",
     "backToPreferences": "Zpět na předvolby"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Zpráva"
+    },
+    "empty": {
+      "title": "Začněte chatovat",
+      "description": "Pošlete zprávu, abyste si popovídali s modelem."
+    },
+    "working": "Pracuji",
+    "historyRetry": "Historie chatu se nepodařila načíst.",
+    "catalogRetry": "Modely se nepodařilo načíst",
+    "sendError": "Zprávu se nepodařilo odeslat. Zkuste to prosím znovu."
   }
 }

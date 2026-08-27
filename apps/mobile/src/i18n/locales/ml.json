@@ -665,7 +665,8 @@
     "profile": "പ്രൊഫൈൽ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ടാബ്, {{total}} ഇൽ {{position}}"
+    "position": "{{name}}, ടാബ്, {{total}} ഇൽ {{position}}",
+    "chat": "ചാറ്റ്"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "നിങ്ങൾ ഒരു ലിങ്കിന്റെ ഹോസ്റ്റിനെ വിശ്വസിച്ചാൽ, അത് വീണ്ടും ചോദിക്കാതെ തുറക്കും.",
     "revoke": "{{host}} പിൻവലിക്കുക",
     "backToPreferences": "മുൻഗണനകളിലേക്ക് മടങ്ങുക"
+  },
+  "quickChat": {
+    "title": "ചാറ്റ്",
+    "composer": {
+      "placeholder": "സന്ദേശം"
+    },
+    "empty": {
+      "title": "ഒരു ചാറ്റ് ആരംഭിക്കുക",
+      "description": "ഒരു മോഡലുമായി സംസാരിക്കാൻ സന്ദേശം അയയ്ക്കുക."
+    },
+    "working": "പ്രവർത്തിക്കുന്നു",
+    "historyRetry": "ചാറ്റ് ചരിത്രം ലോഡ് ചെയ്യാനായില്ല.",
+    "catalogRetry": "മോഡലുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
+    "sendError": "സന്ദേശം അയയ്ക്കാൻ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക."
   }
 }

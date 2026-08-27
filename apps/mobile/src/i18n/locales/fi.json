@@ -665,7 +665,8 @@
     "profile": "Profiili",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, välilehti, {{position}}/{{total}}"
+    "position": "{{name}}, välilehti, {{position}}/{{total}}",
+    "chat": "Keskustelu"
   },
   "chat": {
     "instancePicker": {
@@ -3160,5 +3161,19 @@
     "emptyDescription": "Kun luotat linkin isäntään, se avataan kysymättä uudelleen.",
     "revoke": "Peruuta {{host}}",
     "backToPreferences": "Takaisin asetuksiin"
+  },
+  "quickChat": {
+    "title": "Keskustelu",
+    "composer": {
+      "placeholder": "Viesti"
+    },
+    "empty": {
+      "title": "Aloita keskustelu",
+      "description": "Lähetä viesti keskustellaksesi mallin kanssa."
+    },
+    "working": "Työstetään",
+    "historyRetry": "Keskusteluhistoriaa ei voitu ladata.",
+    "catalogRetry": "Malleja ei voitu ladata",
+    "sendError": "Viestiä ei voitu lähettää. Yritä uudelleen."
   }
 }

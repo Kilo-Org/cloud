@@ -61,7 +61,7 @@ export const ActiveAgentsWidget = createWidget<Partial<GlanceableViewProps>>(
       return (
         <Text
           modifiers={[
-            widgetURL('/(app)/(tabs)/(2_agents)'),
+            widgetURL('kiloapp:///cloud/sessions'),
             font({ textStyle: 'headline', weight: 'bold' }),
             primaryForeground,
             ...a11y,
@@ -77,7 +77,7 @@ export const ActiveAgentsWidget = createWidget<Partial<GlanceableViewProps>>(
         alignment="leading"
         spacing={4}
         modifiers={[
-          widgetURL('/(app)/(tabs)/(2_agents)'),
+          widgetURL('kiloapp:///cloud/sessions'),
           containerBackground(PlatformColor('systemBackground'), 'widget'),
           ...a11y,
         ]}

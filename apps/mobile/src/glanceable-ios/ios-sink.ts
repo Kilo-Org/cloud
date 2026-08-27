@@ -12,7 +12,7 @@ import { ActiveAgentsWidget } from './active-agents-widget';
 import { buildGlanceableViewProps, type GlanceableViewProps } from './view-props';
 
 /** Open-agents destination, kept in step with the inlined widget URL. */
-const OPEN_AGENTS_URL = '/(app)/(tabs)/(2_agents)';
+const OPEN_AGENTS_URL = 'kiloapp:///cloud/sessions';
 
 type Activity = LiveActivity<Partial<GlanceableViewProps>>;
 
@@ -115,10 +115,19 @@ export const iosSink: GlanceableSink = {
     // this update (ActivityKit ignores an end older than the last update).
     // Adopt a leftover instance first: after a process restart the JS handle is
     // null while ActivityKit still holds the activity.
+    const adopted = activity === null;
     activity ??= adoptExistingActivity();
     if (activity !== null) {
       lastUpdatedAt = snapshot.updatedAt;
       lastProps = props;
+      if (adopted && !isEligibleGlanceableWork(snapshot)) {
+        // The publisher's process-local `activityStarted` is false on a fresh
+        // process, so an ineligible snapshot only reaches `publish` and the
+        // terminal `endImmediate` never fires for it. End the adopted leftover
+        // instead of mirroring it onto the Lock Screen.
+        endNow();
+        return;
+      }
       void activity.update(props);
     }
   },

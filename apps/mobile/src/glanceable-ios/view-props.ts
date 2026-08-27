@@ -10,7 +10,7 @@ import {
 } from '@/lib/glanceable/presentation';
 
 /** One translated count line. */
-export type GlanceableCount = { label: string; count: number };
+type GlanceableCount = { label: string; count: number };
 
 /**
  * The props every iOS surface renders. The builder below is the only producer,

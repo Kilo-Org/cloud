@@ -1,2 +1,0 @@
-ALTER TABLE "github_branch_pull_requests" ADD COLUMN "platform_integration_id" uuid;--> statement-breakpoint
-ALTER TABLE "github_branch_pull_requests" ADD CONSTRAINT "github_branch_pull_requests_platform_integration_id_platform_integrations_id_fk" FOREIGN KEY ("platform_integration_id") REFERENCES "public"."platform_integrations"("id") ON DELETE set null ON UPDATE no action;

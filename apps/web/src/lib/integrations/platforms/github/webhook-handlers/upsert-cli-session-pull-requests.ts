@@ -96,8 +96,8 @@ export async function checkMatchingSession(
  * actions and at least one cli_sessions_v2 row on a supported platform in this
  * tenant references the same `(git_url, git_branch)`, upsert a single row into
  * `github_branch_pull_requests` keyed on `(normalized git_url, git_branch,
- * tenant)`. One delivery = one row written, regardless of how many sessions
- * reference the same `(repo, branch)`.
+ * tenant, integration)`. Legacy callers without an integration remain scoped
+ * to the separate null-integration key.
  *
  * The review decision is NOT fetched here. Instead `review_decision_pending` is
  * flipped to `true` for actions that can affect it (opened, reopened,
@@ -179,32 +179,27 @@ export async function upsertCliSessionPullRequestsFromWebhook(
     const reviewDecisionPendingSet = REVIEW_DECISION_PENDING_ACTIONS.has(action)
       ? sql`true`
       : github_branch_pull_requests.review_decision_pending;
-    const platformIntegrationIdSet = owner.platformIntegrationId
-      ? sql`excluded.platform_integration_id`
-      : github_branch_pull_requests.platform_integration_id;
-
     const ownerValues =
       owner.kind === 'organization'
         ? { owned_by_organization_id: owner.organizationId, owned_by_user_id: null }
         : { owned_by_organization_id: null, owned_by_user_id: owner.userId };
 
-    const conflictTarget =
+    const ownerColumn =
       owner.kind === 'organization'
-        ? [
-            github_branch_pull_requests.git_url,
-            github_branch_pull_requests.git_branch,
-            github_branch_pull_requests.owned_by_organization_id,
-          ]
-        : [
-            github_branch_pull_requests.git_url,
-            github_branch_pull_requests.git_branch,
-            github_branch_pull_requests.owned_by_user_id,
-          ];
+        ? github_branch_pull_requests.owned_by_organization_id
+        : github_branch_pull_requests.owned_by_user_id;
+    const conflictTarget = owner.platformIntegrationId
+      ? [
+          github_branch_pull_requests.git_url,
+          github_branch_pull_requests.git_branch,
+          ownerColumn,
+          github_branch_pull_requests.platform_integration_id,
+        ]
+      : [github_branch_pull_requests.git_url, github_branch_pull_requests.git_branch, ownerColumn];
 
-    const conflictTargetWhere =
-      owner.kind === 'organization'
-        ? sql`${github_branch_pull_requests.owned_by_organization_id} IS NOT NULL`
-        : sql`${github_branch_pull_requests.owned_by_user_id} IS NOT NULL`;
+    const conflictTargetWhere = owner.platformIntegrationId
+      ? sql`${ownerColumn} IS NOT NULL AND ${github_branch_pull_requests.platform_integration_id} IS NOT NULL`
+      : sql`${ownerColumn} IS NOT NULL AND ${github_branch_pull_requests.platform_integration_id} IS NULL`;
 
     await db
       .insert(github_branch_pull_requests)
@@ -226,7 +221,6 @@ export async function upsertCliSessionPullRequestsFromWebhook(
         target: conflictTarget,
         targetWhere: conflictTargetWhere,
         set: {
-          platform_integration_id: platformIntegrationIdSet,
           pr_url: sql`excluded.pr_url`,
           pr_number: sql`excluded.pr_number`,
           pr_state: prStateSet,

@@ -79,9 +79,9 @@ describe('PrivacyCoverOverlay screen capture', () => {
     const renderer = await render(['(app)', '(tabs)', '(0_home)']);
     expect(captureMock.calls).toEqual([]);
 
-    await update(renderer, ['(app)', 'agent-chat', '[session-id]']);
+    await update(renderer, ['(app)', '(tabs)', '(3_profile)']);
     await update(renderer, ['(app)', '(tabs)', '(0_home)']);
-    await update(renderer, ['(app)', 'pr-review', '[owner]']);
+    await update(renderer, ['(app)', '(tabs)', '(3_profile)', 'organization']);
 
     // The last call must be `prevent`: the route is covered, so a trailing
     // `allow` would leave FLAG_SECURE off on a sensitive screen.
@@ -96,7 +96,7 @@ describe('PrivacyCoverOverlay screen capture', () => {
 
   it('never touches screen capture on iOS', async () => {
     reactNativeMock.Platform.OS = 'ios';
-    const renderer = await render(['(app)', 'kilo-pass']);
+    const renderer = await render(['(app)', '(tabs)', '(3_profile)']);
     expect(captureMock.calls).toEqual([]);
 
     await act(async () => {

@@ -211,7 +211,8 @@
     "profile": "प्रोफ़ाइल",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, टैब, {{position}} में से {{total}}"
+    "position": "{{name}}, टैब, {{position}} में से {{total}}",
+    "chat": "चैट"
   },
   "chat": {
     "instancePicker": {
@@ -898,7 +899,23 @@
       "title": "समीक्षा",
       "tokens": "टोकन",
       "tokensInOut": "{{input}} इन / {{output}} आउट",
-      "pullRequest": "पुल रिक्वेस्ट"
+      "pullRequest": "पुल रिक्वेस्ट",
+      "transcriptWaiting": "समीक्षा प्रतिलेख की प्रतीक्षा की जा रही है।",
+      "transcriptEmpty": "इस समीक्षा के लिए कोई प्रतिलेख नहीं है।",
+      "transcriptRetry": "समीक्षा प्रतिलेख लोड नहीं किया जा सका।",
+      "transcriptLive": "लाइव",
+      "agentIdle": "एजेंट निष्क्रिय",
+      "agentWorking": "एजेंट कार्य कर रहा है...",
+      "anErrorOccurred": "एक त्रुटि हुई",
+      "errorWithMessage": "त्रुटि: {{message}}",
+      "executionStarted": "निष्पादन प्रारंभ हुआ",
+      "reviewCompleted": "समीक्षा पूर्ण हुई",
+      "reviewInterrupted": "समीक्षा बाधित हुई",
+      "sessionError": "सत्र त्रुटि: {{error}}",
+      "statusWithValue": "स्थिति: {{status}}",
+      "toolName": "उपकरण: {{name}}",
+      "toolNameError": "उपकरण: {{name}} — त्रुटि",
+      "unknownError": "अज्ञात त्रुटि"
     },
     "reviewList": {
       "configureProvider": "प्रदाता कॉन्फ़िगर करें",
@@ -1579,7 +1596,6 @@
     }
   },
   "agents": {
-    "activeNow": "अभी सक्रिय",
     "search": {
       "clearFilters": "फ़िल्टर साफ़ करें",
       "clearSearch": "खोज साफ़ करें",
@@ -1588,14 +1604,12 @@
       "searching": "खोज रहा है"
     },
     "sessionList": {
-      "allActive": "सभी सत्र सक्रिय हैं",
       "completedWillAppear": "पूर्ण सत्र यहाँ दिखाई देंगे।",
       "couldNotLoad": "सत्र लोड नहीं हो सके",
       "couldNotLoadActive": "सक्रिय सत्र लोड नहीं हो सके",
       "couldNotSearch": "सत्र खोजे नहीं जा सके",
       "noMatches": "कोई सत्र मेल नहीं खाता",
       "noPastSessions": "कोई पिछले सत्र नहीं",
-      "noSessionsYet": "अभी कोई सत्र नहीं",
       "noSessionsYetDescription": "अपने फ़ोन से कोडिंग कार्य शुरू करें। आपके सत्र यहाँ दिखाई देंगे।",
       "tryAdjustFilters": "अपने फ़िल्टर समायोजित करने या साफ़ करने का प्रयास करें।",
       "tryDifferentSearch": "कोई दूसरा खोज शब्द आज़माएँ।",
@@ -1665,13 +1679,10 @@
       "transcriptAccessibility": "सत्र ट्रांसक्रिप्ट",
       "emptyTitle": "अभी कोई संदेश नहीं",
       "renameAccessibility": "सत्र का नाम बदलें: {{title}}",
-      "connectRepository": "रेपॉज़िटरी कनेक्ट करें",
       "cloningSession": "सत्र क्लोन किया जा रहा है",
       "continue": "जारी रखें",
       "couldNotLoadThisSession": "यह सत्र लोड नहीं हो सका",
-      "cloneFailed": "यह सत्र क्लोन नहीं हो सका।",
       "cloneFailedRetry": "यह सत्र क्लोन नहीं हो सका। फिर से कोशिश करें।",
-      "connectRepositoryToContinue": "जारी रखने के लिए एक रिपॉज़िटरी कनेक्ट करें।",
       "notEnoughCredits": "Cloud Agent चलाने के लिए पर्याप्त क्रेडिट नहीं हैं. क्रेडिट जोड़ें और फिर से प्रयास करें.",
       "previousTaskFinishing": "पिछला कार्य अभी भी पूरा हो रहा है. कृपया थोड़ा इंतज़ार करें.",
       "serviceUnavailable": "सेवा अभी उपलब्ध नहीं है. कृपया फिर से प्रयास करें.",
@@ -1744,7 +1755,11 @@
       "noRepositoriesVisibleGitlab": "कोई रिपॉज़िटरी दिखाई नहीं दे रही। GitLab के लिए रिपॉज़िटरी एक्सेस जाँचें, फिर रिफ़्रेश करें।",
       "openBitbucket": "Bitbucket खोलें",
       "openGitlab": "GitLab खोलें",
-      "recentlyUsed": "हाल में उपयोग की गईं"
+      "recentlyUsed": "हाल में उपयोग की गईं",
+      "cliCannotContinue": "यह CLI सत्र जारी नहीं रख सकता। Cloud Agent या कोई अन्य CLI चुनें।",
+      "continueFrom": "{{title}} जारी रखा जा रहा है",
+      "importFailed": "यह सत्र आयात नहीं हो सका।",
+      "importingSession": "सत्र आयात किया जा रहा है"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फ़ाइल अपडेट की गई",
@@ -1981,6 +1996,8 @@
       "viewTable": "तालिका देखें",
       "title": "तालिका",
       "close": "तालिका बंद करें",
+      "loading": "तालिका लोड हो रही है",
+      "empty": "इस तालिका में कोई पंक्ति नहीं है।",
       "columnCount_one": "कॉलम",
       "columnCount": "कॉलम",
       "columnCount_other": "कॉलम",
@@ -2196,6 +2213,17 @@
       "hostConfirmMessage": "यह लिंक आपके ब्राउज़र में {{host}} खोलता है।",
       "open": "खोलें",
       "trustThisHost": "इस होस्ट पर भरोसा करें"
+    },
+    "folderPicker": {
+      "accessibility": "फ़ोल्डर: {{label}}",
+      "emptyDescription": "हो गया इस फ़ोल्डर का उपयोग करता है।",
+      "emptyTitle": "अंदर कोई फ़ोल्डर नहीं",
+      "fieldLabel": "फ़ोल्डर",
+      "retryableDescription": "अपना कनेक्शन जाँचें और फिर से प्रयास करें। हो गया अब भी इस फ़ोल्डर की पुष्टि करता है।",
+      "retryableTitle": "फ़ोल्डर सूचीबद्ध नहीं हो सके",
+      "tapToListHint": "इसकी सामग्री सूचीबद्ध करने के लिए फ़ोल्डर टैप करें",
+      "unsupportedDescription": "यह CLI फ़ोल्डर सूचीबद्ध नहीं कर सकता। हो गया लॉन्च फ़ोल्डर रखता है और सत्र शुरू करें वहीं से शुरू होता है।",
+      "unsupportedTitle": "फ़ोल्डर सूचीबद्ध नहीं किए जा सकते"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "जब आप किसी लिंक के होस्ट पर भरोसा करते हैं, तो यह बिना फिर से पूछे खुलता है।",
     "revoke": "हटाएँ {{host}}",
     "backToPreferences": "प्राथमिकताओं पर वापस जाएँ"
+  },
+  "quickChat": {
+    "title": "चैट",
+    "composer": {
+      "placeholder": "संदेश"
+    },
+    "empty": {
+      "title": "चैट शुरू करें",
+      "description": "किसी मॉडल से बात करने के लिए संदेश भेजें।"
+    },
+    "working": "काम कर रहा है",
+    "historyRetry": "चैट इतिहास लोड नहीं किया जा सका।",
+    "catalogRetry": "मॉडल लोड नहीं हो सके",
+    "sendError": "संदेश भेजा नहीं जा सका। फिर से कोशिश करें।"
   }
 }

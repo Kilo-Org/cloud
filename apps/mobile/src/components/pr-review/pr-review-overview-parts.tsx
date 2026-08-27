@@ -13,7 +13,7 @@ import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 type PrStateChipTone = 'good' | 'warn' | 'muted' | 'destructive';
@@ -79,12 +79,22 @@ const TONE_FG_CLASS = {
   muted: 'text-muted-foreground',
 } satisfies Record<PrStateChipTone, string>;
 
+// Lucide icons do not take a `className` color, so the icon reads its tone
+// from the theme color token instead of a Tailwind text class.
+const TONE_FG_COLOR = {
+  good: 'good',
+  warn: 'warn',
+  destructive: 'destructive',
+  muted: 'mutedForeground',
+} satisfies Record<PrStateChipTone, keyof ThemeColors>;
+
 export function PrStateChip({ descriptor }: Readonly<{ descriptor: PrStateChipDescriptor }>) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const Icon = descriptor.icon;
   return (
     <View className="flex-row items-center gap-1.5 self-start rounded-full bg-secondary px-2.5 py-1">
-      <Icon size={12} className={TONE_FG_CLASS[descriptor.tone]} />
+      <Icon size={12} color={colors[TONE_FG_COLOR[descriptor.tone]]} />
       <Text className={cn('text-xs font-medium', TONE_FG_CLASS[descriptor.tone])}>
         {t(descriptor.labelKey)}
       </Text>

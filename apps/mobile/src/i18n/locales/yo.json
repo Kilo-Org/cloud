@@ -665,7 +665,8 @@
     "profile": "Àkójọpọ̀",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, taabu, {{position}} nínú {{total}}"
+    "position": "{{name}}, taabu, {{position}} nínú {{total}}",
+    "chat": "Iwiregbe"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Ṣiṣẹ́ ṣíṣayẹ̀wò",
       "status": "Ipò",
       "threshold": "Ìpele",
-      "pullRequest": "ìbéèrè ìfa"
+      "pullRequest": "ìbéèrè ìfa",
+      "transcriptWaiting": "Ndúró fún ìkọwe àtúnyẹ̀wò náà.",
+      "transcriptEmpty": "Kò sí ìkọwe fún àtúnyẹ̀wò yìí.",
+      "transcriptRetry": "Kò lè gbé ìkọwe àtúnyẹ̀wò náà.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "Aṣoju ń sinmi",
+      "agentWorking": "Aṣoju ń ṣiṣẹ́...",
+      "anErrorOccurred": "Àṣìṣe kan ṣẹlẹ̀",
+      "errorWithMessage": "Àṣìṣe: {{message}}",
+      "executionStarted": "Ìmúṣẹ́ tí a bẹ̀rẹ̀",
+      "reviewCompleted": "Àtúnyẹ̀wò tí a parí",
+      "reviewInterrupted": "Àtúnyẹ̀wò ti dá dúró",
+      "sessionError": "Àṣìṣe sẹ́ṣiọ́n: {{error}}",
+      "statusWithValue": "Ipò: {{status}}",
+      "toolName": "Irinṣẹ́: {{name}}",
+      "toolNameError": "Irinṣẹ́: {{name}} — àṣìṣe",
+      "unknownError": "Àṣìṣe àìmọ̀"
     },
     "reviewMemory": {
       "title": "Ìrántí àtúnyẹ̀wò",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Ti n ṣiṣẹ lọwọ bayi",
     "search": {
       "searching": "Ti n wa",
       "searchSessions": "Wa awọn akoko",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Ko le ṣagbewọ awọn igba-ijiroro",
       "couldNotLoadActive": "Ko le ṣe ikojọpọ awọn akoko to n ṣiṣẹ",
-      "noSessionsYet": "Ko si awọn akoko sibẹsibẹ",
       "noSessionsYetDescription": "Bẹrẹ iṣẹ-ṣiṣe coding lati foonu rẹ. Awọn akoko rẹ yoo han nibi.",
       "noMatches": "Ko si awọn akoko ti o ba mu",
       "tryDifferentSearch": "Gbiyanju ọrọ wiwa ti o yatọ.",
       "tryAdjustFilters": "Gbiyanju lati ṣatunṣe tabi paarẹ awọn àlẹ̀ rẹ.",
       "couldNotSearch": "Ko le wa awọn akoko",
-      "allActive": "Gbogbo awọn akoko ti n ṣiṣẹ",
       "completedWillAppear": "Awọn akoko ti o pari yoo han nibi.",
       "noPastSessions": "Ko si awọn akoko ti o kọja",
       "live": "LIVE"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Yi lọ si isalẹ",
       "emptyTitle": "Ko si awọn ifiranṣẹ sibẹsibẹ",
       "renameAccessibility": "Fun akoko lorukọ: {{title}}",
-      "connectRepository": "So ibi ipamọ pọ",
       "cloningSession": "Ti n daakọ akoko",
       "continue": "Tẹ̀síwájú",
       "couldNotLoadThisSession": "Ko le ṣe ikojọpọ akoko yii",
-      "cloneFailed": "Ko le daakọ akoko yii.",
       "cloneFailedRetry": "Ko le daakọ akoko yii. Gbiyanju lẹẹkansi.",
-      "connectRepositoryToContinue": "So ibi ipamọ pọ lati tesiwaju.",
       "notEnoughCredits": "Ko si kirẹditi to lati ṣiṣẹ Cloud Agent. Ṣafikun kirẹditi ki o tun gbiyanju.",
       "previousTaskFinishing": "Iṣẹ́ ti o ti kọja ṣì ń pari. Jọwọ duro diẹ.",
       "serviceUnavailable": "Iṣẹ naa ko si lọwọlọwọ. Jọwọ tun gbiyanju.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Ko si ibi ipamọ data ti o han. Ṣayẹwo iwọle ibi ipamọ data fun GitLab, lẹhinna tunse.",
       "openBitbucket": "Ṣii Bitbucket",
       "openGitlab": "Ṣii GitLab",
-      "recentlyUsed": "Ti a lo laipẹ"
+      "recentlyUsed": "Ti a lo laipẹ",
+      "continueFrom": "Tẹ̀síwájú {{title}}",
+      "importingSession": "Gbigbe igba-ijiroro wọle",
+      "cliCannotContinue": "CLI yii ko le tẹ̀síwájú igba-ijiroro. Yan Cloud Agent tabi CLI miiran.",
+      "importFailed": "Ko le gbe igba-ijiroro yii wọle."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ti ṣe imudojuiwọn {{displayCount}} faili",
@@ -2462,6 +2477,8 @@
       "viewTable": "Wo tabili",
       "title": "Tabili",
       "close": "Pa tabili",
+      "loading": "Ṣiṣẹ́ tabili",
+      "empty": "Tabili yìí kò ní ìlà kankan.",
       "columnCount_one": "iwe-ẹsẹ",
       "columnCount": "awọn iwe-ẹsẹ",
       "columnCount_other": "awọn iwe-ẹsẹ",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Ọna asopọ yii yoo ṣii {{host}} ninu aṣawakiri rẹ.",
       "open": "Ṣii",
       "trustThisHost": "Gbẹkẹle agbalejo yii"
+    },
+    "folderPicker": {
+      "accessibility": "Àpótí: {{label}}",
+      "emptyDescription": "Ṣe máa ń lo àpótí yìí.",
+      "emptyTitle": "Kò sí àwọn àpótí inú rẹ̀",
+      "fieldLabel": "Àpótí",
+      "retryableDescription": "Ṣààyẹ̀wò àṣopọ̀ rẹ kí o sì Gbìyànjú lẹẹkansi. Ṣe ṣì ń fìdí àpótí yìí múlẹ̀.",
+      "retryableTitle": "Kò lè ṣe àkójọ àwọn àpótí",
+      "tapToListHint": "Tẹ àpótí kan láti ṣe àkójọ àwọn ohun inú rẹ̀",
+      "unsupportedDescription": "CLI yìí kò lè ṣe àkójọ àwọn àpótí. Ṣe ń pa àpótí ìbẹ̀rẹ̀ mọ́, Bẹrẹ akoko sì ń bẹ̀rẹ̀ níbẹ̀.",
+      "unsupportedTitle": "Kò lè ṣe àkójọ àwọn àpótí"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Nigbati o ba gbẹkẹle agbalejo ti ọna asopọ kan, yoo ṣii laisi béèrè lẹẹkansi.",
     "revoke": "Fagilee {{host}}",
     "backToPreferences": "Pada si awọn ayanfẹ"
+  },
+  "quickChat": {
+    "title": "Iwiregbe",
+    "composer": {
+      "placeholder": "Ifiranṣẹ"
+    },
+    "empty": {
+      "title": "Bẹ̀rẹ̀ iwiregbe kan",
+      "description": "Fi ifiranṣẹ ranṣẹ láti bá awoṣe kan sọ̀rọ̀."
+    },
+    "working": "Nṣiṣẹ́",
+    "historyRetry": "Kò lè ṣagbewọ ìtàn iwiregbe.",
+    "catalogRetry": "Kò lè gbé àwọn àwoṣe",
+    "sendError": "Kò lè ran ifiranṣẹ náà. Jọ̀wọ́ tún gbìyànjú."
   }
 }

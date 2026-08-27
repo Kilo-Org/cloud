@@ -665,7 +665,8 @@
     "profile": "ಪ್ರೊಫೈಲ್",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ಟ್ಯಾಬ್, {{total}} ರಲ್ಲಿ {{position}}"
+    "position": "{{name}}, ಟ್ಯಾಬ್, {{total}} ರಲ್ಲಿ {{position}}",
+    "chat": "ಚಾಟ್"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "ಚೆಕ್ ಚಲಾಯಿಸಿ",
       "status": "ಸ್ಥಿತಿ",
       "threshold": "ಮಿತಿ",
-      "pullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್"
+      "pullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್",
+      "transcriptWaiting": "ವಿಮರ್ಶೆ ಟ್ರಾನ್ಸ್‌ಕ್ರಿಪ್ಟ್ ಗಾಗಿ ಕಾಯುತ್ತಿದೆ.",
+      "transcriptEmpty": "ಈ ವಿಮರ್ಶೆಗೆ ಯಾವುದೇ ಟ್ರಾನ್ಸ್‌ಕ್ರಿಪ್ಟ್ ಇಲ್ಲ.",
+      "transcriptRetry": "ವಿಮರ್ಶೆ ಟ್ರಾನ್ಸ್‌ಕ್ರಿಪ್ಟ್ ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "transcriptLive": "LIVE",
+      "agentIdle": "ಏಜೆಂಟ್ ನಿಷ್ಕ್ರಿಯ",
+      "agentWorking": "ಏಜೆಂಟ್ ಕೆಲಸ ಮಾಡುತ್ತಿದೆ...",
+      "anErrorOccurred": "ದೋಷ ಸಂಭವಿಸಿದೆ",
+      "errorWithMessage": "ದೋಷ: {{message}}",
+      "executionStarted": "ಕಾರ್ಯಗತಗೊಳಿಸುವಿಕೆ ಪ್ರಾರಂಭವಾಗಿದೆ",
+      "reviewCompleted": "ವಿಮರ್ಶೆ ಪೂರ್ಣಗೊಂಡಿದೆ",
+      "reviewInterrupted": "ವಿಮರ್ಶೆ ಅಡಚಣೆಯಾಗಿದೆ",
+      "sessionError": "ಸೆಷನ್ ದೋಷ: {{error}}",
+      "statusWithValue": "ಸ್ಥಿತಿ: {{status}}",
+      "toolName": "ಟೂಲ್: {{name}}",
+      "toolNameError": "ಟೂಲ್: {{name}} — ದೋಷ",
+      "unknownError": "ಅಪರಿಚಿತ ದೋಷ"
     },
     "reviewMemory": {
       "title": "ಪರಿಶೀಲನೆ ಮೆಮೊರಿ",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "ಈಗ ಸಕ್ರಿಯ",
     "search": {
       "searching": "ಹುಡುಕುತ್ತಿದೆ",
       "searchSessions": "ಸೆಶನ್ಗಳನ್ನು ಹುಡುಕಿ",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "ಸೆಶನ್ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
       "couldNotLoadActive": "ಸಕ್ರಿಯ ಸೆಶನ್ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
-      "noSessionsYet": "ಇನ್ನೂ ಯಾವುದೇ ಸೆಶನ್ಗಳಿಲ್ಲ",
       "noSessionsYetDescription": "ನಿಮ್ಮ ಫೋನ್ನಿಂದ ಕೋಡಿಂಗ್ ಕಾರ್ಯವನ್ನು ಪ್ರಾರಂಭಿಸಿ. ನಿಮ್ಮ ಸೆಶನ್ಗಳು ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
       "noMatches": "ಯಾವುದೇ ಸೆಶನ್ಗಳು ಹೊಂದಿಕೆಯಾಗಿಲ್ಲ",
       "tryDifferentSearch": "ಬೇರೆ ಹುಡುಕಾಟ ಪದವನ್ನು ಪ್ರಯತ್ನಿಸಿ.",
       "tryAdjustFilters": "ಫಿಲ್ಟರ್ಗಳನ್ನು ಸರಿಹೊಂದಿಸಿ ಅಥವಾ ತೆರವುಗೊಳಿಸಿ ಪ್ರಯತ್ನಿಸಿ.",
       "couldNotSearch": "ಸೆಶನ್ಗಳನ್ನು ಹುಡುಕಲಾಗಲಿಲ್ಲ",
-      "allActive": "ಎಲ್ಲಾ ಸೆಶನ್ಗಳು ಸಕ್ರಿಯವಾಗಿವೆ",
       "completedWillAppear": "ಪೂರ್ಣಗೊಂಡ ಸೆಶನ್ಗಳು ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
       "noPastSessions": "ಯಾವುದೇ ಹಿಂದಿನ ಸೆಶನ್ಗಳಿಲ್ಲ",
       "live": "LIVE"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "ಕೆಳಗೆ ಸ್ಕ್ರಾಲ್ ಮಾಡಿ",
       "emptyTitle": "ಇನ್ನೂ ಯಾವುದೇ ಸಂದೇಶಗಳಿಲ್ಲ",
       "renameAccessibility": "ಸೆಶನ್ ಮರುಹೆಸರಿಸಿ: {{title}}",
-      "connectRepository": "ರೆಪೊಸಿಟರಿಯನ್ನು ಸಂಪರ್ಕಿಸಿ",
       "cloningSession": "ಸೆಶನ್ ಕ್ಲೋನ್ ಮಾಡುತ್ತಿದೆ",
       "continue": "ಮುಂದುವರಿಸಿ",
       "couldNotLoadThisSession": "ಈ ಸೆಶನ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
-      "cloneFailed": "ಈ ಸೆಶನ್ ಅನ್ನು ಕ್ಲೋನ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "cloneFailedRetry": "ಈ ಸೆಶನ್ ಅನ್ನು ಕ್ಲೋನ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-      "connectRepositoryToContinue": "ಮುಂದುವರಿಯಲು ರೆಪೊಸಿಟರಿಯನ್ನು ಸಂಪರ್ಕಿಸಿ.",
       "notEnoughCredits": "Cloud Agent ಅನ್ನು ಚಲಾಯಿಸಲು ಸಾಕಷ್ಟು ಕ್ರೆಡಿಟ್ಗಳಿಲ್ಲ. ಕ್ರೆಡಿಟ್ಗಳನ್ನು ಸೇರಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "previousTaskFinishing": "ಹಿಂದಿನ ಕಾರ್ಯ ಇನ್ನೂ ಮುಗಿಯುತ್ತಿದೆ. ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಕಾಯಿರಿ.",
       "serviceUnavailable": "ಸೇವೆ ಈಗ ಲಭ್ಯವಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "ಯಾವುದೇ ರಿಪೊಸಿಟರಿಗಳು ಕಾಣಿಸುತ್ತಿಲ್ಲ. GitLab ಗಾಗಿ ರಿಪೊಸಿಟರಿ ಪ್ರವೇಶವನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ರಿಫ್ರೆಶ್ ಮಾಡಿ.",
       "openBitbucket": "Bitbucket ತೆರೆಯಿರಿ",
       "openGitlab": "GitLab ತೆರೆಯಿರಿ",
-      "recentlyUsed": "ಇತ್ತೀಚೆಗೆ ಬಳಸಲಾಗಿದೆ"
+      "recentlyUsed": "ಇತ್ತೀಚೆಗೆ ಬಳಸಲಾಗಿದೆ",
+      "continueFrom": "ಮುಂದುವರಿಸುತ್ತಿದೆ {{title}}",
+      "importingSession": "ಸೆಷನ್ ಆಮದು ಮಾಡುತ್ತಿದೆ",
+      "cliCannotContinue": "ಈ CLI ಒಂದು ಸೆಷನ್ ಅನ್ನು ಮುಂದುವರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. Cloud Agent ಅಥವಾ ಮತ್ತೊಂದು CLI ಅನ್ನು ಆಯ್ಕೆ ಮಾಡಿ.",
+      "importFailed": "ಈ ಸೆಷನ್ ಅನ್ನು ಆಮದು ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ಫೈಲ್ ನವೀಕರಿಸಲಾಗಿದೆ",
@@ -2462,6 +2477,8 @@
       "viewTable": "ಟೇಬಲ್ ವೀಕ್ಷಿಸಿ",
       "title": "ಟೇಬಲ್",
       "close": "ಟೇಬಲ್ ಮುಚ್ಚಿ",
+      "loading": "ಟೇಬಲ್ ಲೋಡ್ ಆಗುತ್ತಿದೆ",
+      "empty": "ಈ ಟೇಬಲ್‌ನಲ್ಲಿ ಸಾಲುಗಳಿಲ್ಲ.",
       "columnCount_one": "ಕಾಲಮ್",
       "columnCount": "ಕಾಲಮ್ಗಳು",
       "columnCount_other": "ಕಾಲಮ್ಗಳು",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "ಈ ಲಿಂಕ್ ನಿಮ್ಮ ಬ್ರೌಸರ್ನಲ್ಲಿ {{host}} ತೆರೆಯುತ್ತದೆ.",
       "open": "ತೆರೆಯಿರಿ",
       "trustThisHost": "ಈ ಹೋಸ್ಟ್ ಅನ್ನು ವಿಶ್ವಾಸಿಸಿ"
+    },
+    "folderPicker": {
+      "fieldLabel": "ಫೋಲ್ಡರ್",
+      "accessibility": "ಫೋಲ್ಡರ್: {{label}}",
+      "tapToListHint": "ಅದರ ವಿಷಯಗಳನ್ನು ಪಟ್ಟಿ ಮಾಡಲು ಫೋಲ್ಡರ್ ಅನ್ನು ಟ್ಯಾಪ್ ಮಾಡಿ",
+      "emptyTitle": "ಒಳಗೆ ಯಾವುದೇ ಫೋಲ್ಡರ್ಗಳಿಲ್ಲ",
+      "emptyDescription": "ಮುಗಿದಿದೆ ಈ ಫೋಲ್ಡರ್ ಅನ್ನು ಬಳಸುತ್ತದೆ.",
+      "retryableTitle": "ಫೋಲ್ಡರ್ಗಳನ್ನು ಪಟ್ಟಿ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+      "retryableDescription": "ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ. ಮುಗಿದಿದೆ ಇನ್ನೂ ಈ ಫೋಲ್ಡರ್ ಅನ್ನು ದೃಢೀಕರಿಸುತ್ತದೆ.",
+      "unsupportedTitle": "ಫೋಲ್ಡರ್ಗಳನ್ನು ಪಟ್ಟಿ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ",
+      "unsupportedDescription": "ಈ CLI ಫೋಲ್ಡರ್ಗಳನ್ನು ಪಟ್ಟಿ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ಮುಗಿದಿದೆ ಪ್ರಾರಂಭ ಫೋಲ್ಡರ್ ಅನ್ನು ಇರಿಸುತ್ತದೆ ಮತ್ತು ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ ಅಲ್ಲಿ ಪ್ರಾರಂಭವಾಗುತ್ತದೆ."
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "ನೀವು ಲಿಂಕ್ನ ಹೋಸ್ಟ್ ಅನ್ನು ವಿಶ್ವಾಸಿಸಿದಾಗ, ಅದು ಮತ್ತೆ ಕೇಳದೆ ತೆರೆಯುತ್ತದೆ.",
     "revoke": "{{host}} ರದ್ದುಗೊಳಿಸಿ",
     "backToPreferences": "ಆದ್ಯತೆಗಳಿಗೆ ಹಿಂತಿರುಗಿ"
+  },
+  "quickChat": {
+    "title": "ಚಾಟ್",
+    "composer": {
+      "placeholder": "ಸಂದೇಶ"
+    },
+    "empty": {
+      "title": "ಚಾಟ್ ಪ್ರಾರಂಭಿಸಿ",
+      "description": "ಮಾಡೆಲ್‌ನೊಂದಿಗೆ ಮಾತನಾಡಲು ಸಂದೇಶ ಕಳುಹಿಸಿ."
+    },
+    "working": "ಕೆಲಸ ಮಾಡುತ್ತಿದೆ",
+    "historyRetry": "ಚಾಟ್ ಇತಿಹಾಸವನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "catalogRetry": "ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
+    "sendError": "ಸಂದೇಶವನ್ನು ಕಳುಹಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
   }
 }

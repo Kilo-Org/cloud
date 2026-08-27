@@ -1,5 +1,7 @@
-import { env } from 'cloudflare:test';
+import { env, runInDurableObject } from 'cloudflare:test';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { describe, it, expect } from 'vitest';
+import { triggerConfig } from '../../src/db/sqlite-schema';
 
 describe('TriggerDO', () => {
   const testUserId = 'user123';
@@ -9,6 +11,111 @@ describe('TriggerDO', () => {
   const testOrgNamespace = `org/${testOrgId}`;
 
   describe('configure', () => {
+    it('round-trips an omitted variant as undefined', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/variant-omitted`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, 'variant-omitted', {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      expect((await stub.getConfig())?.variant).toBeUndefined();
+      await runInDurableObject(stub, async (_instance, state) => {
+        const row = drizzle(state.storage)
+          .select({ variant: triggerConfig.variant })
+          .from(triggerConfig)
+          .get();
+        expect(row?.variant).toBeNull();
+      });
+    });
+
+    it('round-trips a configured variant and clears it on update', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/variant-set`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, 'variant-set', {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        variant: 'high',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      expect((await stub.getConfig())?.variant).toBe('high');
+      await runInDurableObject(stub, async (_instance, state) => {
+        const row = drizzle(state.storage)
+          .select({ variant: triggerConfig.variant })
+          .from(triggerConfig)
+          .get();
+        expect(row?.variant).toBe('high');
+      });
+      await stub.updateConfig({ promptTemplate: 'Updated {{body}}' });
+      expect((await stub.getConfig())?.variant).toBe('high');
+      await runInDurableObject(stub, async (_instance, state) => {
+        const row = drizzle(state.storage)
+          .select({ variant: triggerConfig.variant })
+          .from(triggerConfig)
+          .get();
+        expect(row?.variant).toBe('high');
+      });
+      await stub.updateConfig({ variant: null });
+      expect((await stub.getConfig())?.variant).toBeUndefined();
+      await runInDurableObject(stub, async (_instance, state) => {
+        const row = drizzle(state.storage)
+          .select({ variant: triggerConfig.variant })
+          .from(triggerConfig)
+          .get();
+        expect(row?.variant).toBeNull();
+      });
+    });
+
+    it('preserves existing columns and leaves variant unset for a legacy-shaped row', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/variant-legacy`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        drizzle(state.storage)
+          .insert(triggerConfig)
+          .values({
+            trigger_id: 'variant-legacy',
+            namespace: testUserNamespace,
+            user_id: testUserId,
+            org_id: null,
+            created_at: '2026-01-01T00:00:00.000Z',
+            is_active: 1,
+            target_type: 'cloud_agent',
+            github_repo: 'owner/repo',
+            mode: 'code',
+            model: 'openai/gpt-4.1',
+            prompt_template: 'Process {{body}}',
+            profile_id: 'profile-id',
+            auto_commit: 1,
+            condense_on_complete: 0,
+            activation_mode: 'scheduled',
+            cron_expression: '* * * * *',
+            cron_timezone: 'UTC',
+            last_scheduled_at: '2026-01-01T00:00:00.000Z',
+            next_scheduled_at: '2026-01-01T00:01:00.000Z',
+          })
+          .run();
+      });
+
+      await expect(stub.getConfig()).resolves.toMatchObject({
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        autoCommit: true,
+        condenseOnComplete: false,
+        activationMode: 'scheduled',
+        cronExpression: '* * * * *',
+        cronTimezone: 'UTC',
+      });
+      expect((await stub.getConfig())?.variant).toBeUndefined();
+    });
+
     it('should return config for user namespace', async () => {
       const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);
       const stub = env.TRIGGER_DO.get(id);

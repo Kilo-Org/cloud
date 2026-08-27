@@ -20,7 +20,7 @@
     "check:unused": "node --env-file=.env node_modules/knip/bin/knip.js --no-config-hints",
     "check:i18n": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.i18n.json apps/mobile/src packages/app-shared/src && node ../../tools/i18n/check-catalogs.mjs",
     "check:classes": "node ../../tools/nativewind/check-classes.mjs",
-    "test": "vitest run",
+    "test": "node scripts/assert-theme-colors.mjs && vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -131,6 +131,7 @@
     "drizzle-kit": "catalog:",
     "eslint-plugin-sonarjs": "4.2.0",
     "knip": "6.29.0",
+    "postcss": "8.5.23",
     "react-test-renderer": "^19.2.7",
     "typescript": "~6.0.3",
     "vitest": "catalog:"

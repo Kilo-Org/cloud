@@ -7,7 +7,26 @@ import {
   formatActivityDetail,
   parseDeletionEntries,
   parseDeletionQueueTab,
+  parseHistoricalDeletionUserIds,
 } from './deletion-queue-format';
+
+describe('parseHistoricalDeletionUserIds', () => {
+  it('preserves opaque case-sensitive IDs and deduplicates pasted lines', () => {
+    expect(
+      parseHistoricalDeletionUserIds(
+        ' oauth/GitHub/User+42 \r\noauth/github/user+42\noauth/GitHub/User+42\nexternal|Opaque ID:42\n'
+      )
+    ).toEqual(['oauth/GitHub/User+42', 'oauth/github/user+42', 'external|Opaque ID:42']);
+  });
+
+  it('does not interpret IDs as emails or ticket references', () => {
+    expect(parseHistoricalDeletionUserIds('1234\ncustom,id;value')).toEqual([
+      '1234',
+      'custom,id;value',
+    ]);
+    expect(parseHistoricalDeletionUserIds(' \n\r\n')).toEqual([]);
+  });
+});
 
 describe('parseDeletionEntries', () => {
   it('parses one email per line', () => {
@@ -149,6 +168,25 @@ describe('deletionPreflightProgress', () => {
 });
 
 describe('deletionNotifyChannel', () => {
+  it.each([null, '#1001'])(
+    'has no notification channel for v1 tasks even with ticket %p',
+    pylonTicket => {
+      expect(
+        deletionNotifyChannel({
+          pylonTicket,
+          tasks: [
+            { stepKey: 'customerio', status: 'not_applicable' },
+            { stepKey: 'anonymize', status: 'pending' },
+          ],
+        })
+      ).toBe('none');
+      expect(deletionNotifyStepSkipped('completion_email', 'none')).toBe(true);
+      expect(deletionNotifyStepSkipped('pylon_reply', 'none')).toBe(true);
+      expect(deletionNotifyStepSkipped('pylon_finalize', 'none')).toBe(true);
+      expect(deletionNotifyStepSkipped('anonymize', 'none')).toBe(false);
+    }
+  );
+
   it('uses the Pylon path when a ticket is present', () => {
     expect(
       deletionNotifyChannel({

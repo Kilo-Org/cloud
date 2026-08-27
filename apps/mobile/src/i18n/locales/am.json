@@ -665,7 +665,8 @@
     "profile": "መገለጫ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}፣ ትር፣ {{position}} ከ{{total}}"
+    "position": "{{name}}፣ ትር፣ {{position}} ከ{{total}}",
+    "chat": "ውይይት"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "የቼክ ሂደት",
       "status": "ሁኔታ",
       "threshold": "ደረጃ",
-      "pullRequest": "የመጎተቻ ጥያቄ"
+      "pullRequest": "የመጎተቻ ጥያቄ",
+      "transcriptWaiting": "የግምገማ ግልባጩን በመጠበቅ ላይ።",
+      "transcriptEmpty": "ለዚህ ግምገማ ግልባጭ የለም።",
+      "transcriptRetry": "የግምገማ ግልባጩን መጫን አልተቻለም።",
+      "transcriptLive": "ቀጥታ",
+      "agentIdle": "ወኪል በስራ ፈት",
+      "agentWorking": "ወኪል በመስራት ላይ...",
+      "anErrorOccurred": "ስህተት ተከስቷል",
+      "errorWithMessage": "ስህተት: {{message}}",
+      "executionStarted": "አፈጻጸም ተጀምሯል",
+      "reviewCompleted": "ግምገማ ተጠናቋል",
+      "reviewInterrupted": "ግምገማ ተቋርጧል",
+      "sessionError": "የክፍለ-ጊዜ ስህተት: {{error}}",
+      "statusWithValue": "ሁኔታ: {{status}}",
+      "toolName": "መሳሪያ: {{name}}",
+      "toolNameError": "መሳሪያ: {{name}} — ስህተት",
+      "unknownError": "የማይታወቅ ስህተት"
     },
     "reviewMemory": {
       "title": "የግምገማ ትውስታ",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "አሁን ንቁ",
     "search": {
       "searching": "በመፈለግ ላይ",
       "searchSessions": "ክፍለ ጊዜዎችን ይፈልጉ",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "ክፍለ-ጊዜዎችን መጫን አልተቻለም",
       "couldNotLoadActive": "ንቁ ክፍለ ጊዜዎችን ማግኘት አልተቻለም",
-      "noSessionsYet": "እስካሁን ክፍለ ጊዜዎች የሉም",
       "noSessionsYetDescription": "ከስልክዎ የኮዲንግ ተግባር ይጀምሩ። ክፍለ ጊዜዎችዎ እዚህ ይታያሉ።",
       "noMatches": "ምንም ክፍለ ጊዜ አይዛመድም",
       "tryDifferentSearch": "የተለየ የፍለጋ ቃል ይሞክሩ።",
       "tryAdjustFilters": "ማጣሪያዎችዎን ለማስተካከል ወይም ለማጽዳት ይሞክሩ።",
       "couldNotSearch": "ክፍለ ጊዜዎችን መፈለግ አልተቻለም",
-      "allActive": "ሁሉም ክፍለ ጊዜዎች ንቁ ናቸው",
       "completedWillAppear": "የተጠናቀቁ ክፍለ ጊዜዎች እዚህ ይታያሉ።",
       "noPastSessions": "ምንም ያለፉ ክፍለ ጊዜዎች የሉም",
       "live": "ቀጥታ"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "ወደ ታች ይሸብልሉ",
       "emptyTitle": "እስካሁን ምንም መልእክቶች የሉም",
       "renameAccessibility": "ክፍለ ጊዜውን እንደገና ይሰይሙ: {{title}}",
-      "connectRepository": "ማከማቻውን ያገናኙ",
       "cloningSession": "ክፍለ ጊዜውን በመቀንጠር ላይ",
       "continue": "ቀጥል",
       "couldNotLoadThisSession": "ይህን ክፍለ ጊዜ ማግኘት አልተቻለም",
-      "cloneFailed": "ይህን ክፍለ ጊዜ መቀንጠር አልተቻለም።",
       "cloneFailedRetry": "ይህን ክፍለ ጊዜ መቀንጠር አልተቻለም። እንደገና ይሞክሩ።",
-      "connectRepositoryToContinue": "ለመቀጠል ማከማቻ ያገናኙ።",
       "notEnoughCredits": "Cloud Agent ለማስኬድ በቂ ክሬዲት የለዎትም። ክሬዲት ጨምረው እንደገና ይሞክሩ።",
       "previousTaskFinishing": "የቀደመው ተግባር አሁንም እያለቀ ነው። እባክዎ ጠብቅ።",
       "serviceUnavailable": "አገልግሎቱ አሁን አይገኝም። እባክዎ እንደገና ይሞክሩ።",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "ምንም የሚታዩ ማከማቻዎች የሉም። የGitLab ማከማቻ መዳረሻን ያረጋግጡ፣ ከዚያ ያድሱ።",
       "openBitbucket": "Bitbucket ይክፈቱ",
       "openGitlab": "GitLab ይክፈቱ",
-      "recentlyUsed": "በቅርቡ ጥቅም ላይ የዋሉ"
+      "recentlyUsed": "በቅርቡ ጥቅም ላይ የዋሉ",
+      "cliCannotContinue": "ይህ CLI ክፍለ-ጊዜ መቀጠል አይችልም። Cloud Agent ወይም ሌላ CLI ይምረጡ።",
+      "continueFrom": "{{title}}ን በመቀጠል ላይ",
+      "importFailed": "ይህን ክፍለ-ጊዜ ማስመጣት አልተቻለም።",
+      "importingSession": "ክፍለ-ጊዜን በማስመጣት ላይ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ፋይል ተዘምኗል",
@@ -2462,6 +2477,8 @@
       "viewTable": "ሰንጠረዥ ይመልከቱ",
       "title": "ሰንጠረዥ",
       "close": "ሰንጠረዥ ይዝጉ",
+      "loading": "ሰንጠረዥ በመጫን ላይ",
+      "empty": "ይህ ሰንጠረዥ ምንም ረድፍ የለውም።",
       "columnCount_one": "ዓምድ",
       "columnCount": "ዓምዶች",
       "columnCount_other": "ዓምዶች",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "ይህ አገናኝ {{host}} በአሳሽዎ ይከፍታል።",
       "open": "ክፈት",
       "trustThisHost": "ይህን አስተናጋጅ እመኑ"
+    },
+    "folderPicker": {
+      "fieldLabel": "አቃፊ",
+      "accessibility": "አቃፊ፦ {{label}}",
+      "tapToListHint": "ዝርዝሩን ለማየት አቃፊ ይንኩ",
+      "emptyTitle": "በውስጥ አቃፊ የለም",
+      "emptyDescription": "ተከናውኗል ይህን አቃፊ ይጠቀማል።",
+      "retryableTitle": "አቃፊዎችን መዘርዘር አልተቻለም",
+      "retryableDescription": "ግንኙነትዎን ያረጋግጡ እና ደግሞ ሞክር። ተከናውኗል አሁንም ይህን አቃፊ ያረጋግጣል።",
+      "unsupportedTitle": "አቃፊዎችን መዘርዘር አይቻልም",
+      "unsupportedDescription": "ይህ CLI አቃፊዎችን መዘርዘር አይችልም። ተከናውኗል የመነሻ አቃፊውን ይይዛል እና ክፍለ ጊዜውን ያስጀምሩ እዚያ ይጀምራል።"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "የአገናኝ አስተናጋጅ ስትመን፣ እንደገና ሳይጠይቅ ይከፈታል።",
     "revoke": "{{host}} አስቀር",
     "backToPreferences": "ወደ ምርጫዎች ተመለስ"
+  },
+  "quickChat": {
+    "title": "ውይይት",
+    "composer": {
+      "placeholder": "መልእክት"
+    },
+    "empty": {
+      "title": "ውይይት ጀምር",
+      "description": "ከሞዴል ጋር ለመወያየት መልእክት ይላኩ።"
+    },
+    "working": "በመስራት ላይ",
+    "historyRetry": "የውይይት ታሪክ መጫን አልተቻለም።",
+    "catalogRetry": "ሞዴሎችን መጫን አልተቻለም",
+    "sendError": "መልእክቱን መላክ አልተቻለም። እንደገና ይሞክሩ።"
   }
 }

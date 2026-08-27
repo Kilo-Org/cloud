@@ -665,7 +665,8 @@
     "profile": "Perfil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, lapela, {{position}} de {{total}}"
+    "position": "{{name}}, lapela, {{position}} de {{total}}",
+    "chat": "Chat"
   },
   "chat": {
     "instancePicker": {
@@ -1299,7 +1300,23 @@
       "checkRun": "Execución da comprobación",
       "status": "Estado",
       "threshold": "Limiar",
-      "pullRequest": "pull request"
+      "pullRequest": "pull request",
+      "transcriptWaiting": "Agardando pola transcrición da revisión.",
+      "transcriptEmpty": "Non hai transcrición para esta revisión.",
+      "transcriptRetry": "Non se puido cargar a transcrición da revisión.",
+      "transcriptLive": "EN DIRECTO",
+      "agentIdle": "Axente inactivo",
+      "agentWorking": "Axente traballando...",
+      "anErrorOccurred": "Ocorreu un erro",
+      "errorWithMessage": "Erro: {{message}}",
+      "executionStarted": "Execución iniciada",
+      "reviewCompleted": "Revisión completada",
+      "reviewInterrupted": "Revisión interrompida",
+      "sessionError": "Erro de sesión: {{error}}",
+      "statusWithValue": "Estado: {{status}}",
+      "toolName": "Ferramenta: {{name}}",
+      "toolNameError": "Ferramenta: {{name}} — erro",
+      "unknownError": "Erro descoñecido"
     },
     "reviewMemory": {
       "title": "Memoria de revisión",
@@ -2033,7 +2050,6 @@
     }
   },
   "agents": {
-    "activeNow": "Activo agora",
     "search": {
       "searching": "Buscando",
       "searchSessions": "Buscar sesións",
@@ -2044,13 +2060,11 @@
     "sessionList": {
       "couldNotLoad": "Non se puideron cargar as sesións",
       "couldNotLoadActive": "Non se puido cargar as sesións activas",
-      "noSessionsYet": "Aínda non hai sesións",
       "noSessionsYetDescription": "Inicia unha tarefa de codificación desde o teu teléfono. As túas sesións aparecerán aquí.",
       "noMatches": "Ningunha sesión coincide",
       "tryDifferentSearch": "Probas un termo de busca diferente.",
       "tryAdjustFilters": "Probas axustar ou borrar os teus filtros.",
       "couldNotSearch": "Non se puido buscar nas sesións",
-      "allActive": "Todas as sesións están activas",
       "completedWillAppear": "As sesións completadas aparecerán aquí.",
       "noPastSessions": "Sen sesións pasadas",
       "live": "EN DIRECTO"
@@ -2119,13 +2133,10 @@
       "scrollToBottom": "Desprazarse ata o final",
       "emptyTitle": "Aínda non hai mensaxes",
       "renameAccessibility": "Renomear sesión: {{title}}",
-      "connectRepository": "Conectar repositorio",
       "cloningSession": "Clonando sesión",
       "continue": "Continuar",
       "couldNotLoadThisSession": "Non se puido cargar esta sesión",
-      "cloneFailed": "Non se puido clonar esta sesión.",
       "cloneFailedRetry": "Non se puido clonar esta sesión. Téntao de novo.",
-      "connectRepositoryToContinue": "Conecta un repositorio para continuar.",
       "notEnoughCredits": "Créditos insuficientes para executar Cloud Agent. Engade créditos e téntao de novo.",
       "previousTaskFinishing": "A tarefa anterior aínda está a rematar. Agarda un momento.",
       "serviceUnavailable": "O servizo non está dispoñible agora mesmo. Téntao de novo.",
@@ -2198,7 +2209,11 @@
       "noRepositoriesVisibleGitlab": "Non hai repositorios visibles. Comproba o acceso aos repositorios de GitLab e refresca.",
       "openBitbucket": "Abrir Bitbucket",
       "openGitlab": "Abrir GitLab",
-      "recentlyUsed": "Usados recentemente"
+      "recentlyUsed": "Usados recentemente",
+      "continueFrom": "Continuando {{title}}",
+      "importingSession": "Importando a sesión",
+      "cliCannotContinue": "Este CLI non pode continuar unha sesión. Escolle Cloud Agent ou outro CLI.",
+      "importFailed": "Non se puido importar esta sesión."
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizouse {{displayCount}} ficheiro",
@@ -2462,6 +2477,8 @@
       "viewTable": "Ver a táboa",
       "title": "Táboa",
       "close": "Pechar a táboa",
+      "loading": "Cargando a táboa",
+      "empty": "Esta táboa non ten filas.",
       "columnCount_one": "columna",
       "columnCount": "columnas",
       "columnCount_other": "columnas",
@@ -2650,6 +2667,17 @@
       "hostConfirmMessage": "Esta ligazón abre {{host}} no teu navegador.",
       "open": "Abrir",
       "trustThisHost": "Confiar neste servidor"
+    },
+    "folderPicker": {
+      "accessibility": "Cartafol: {{label}}",
+      "emptyDescription": "Feito usa este cartafol.",
+      "emptyTitle": "Non hai cartafoles dentro",
+      "fieldLabel": "Cartafol",
+      "retryableDescription": "Comproba a túa conexión e Reintentar. Feito aínda confirma este cartafol.",
+      "retryableTitle": "Non se puideron listar os cartafoles",
+      "tapToListHint": "Toca un cartafol para ver o seu contido",
+      "unsupportedDescription": "Este CLI non pode listar cartafoles. Feito mantén o cartafol de inicio e Iniciar sesión comeza alí.",
+      "unsupportedTitle": "Non se poden listar os cartafoles"
     }
   },
   "bootstrap": {
@@ -3149,5 +3177,19 @@
     "emptyDescription": "Cando confías nun servidor de ligazón, ábrese sen volver preguntar.",
     "revoke": "Revogar {{host}}",
     "backToPreferences": "Volver ás preferencias"
+  },
+  "quickChat": {
+    "title": "Chat",
+    "composer": {
+      "placeholder": "Mensaxe"
+    },
+    "empty": {
+      "title": "Inicia un chat",
+      "description": "Envía unha mensaxe para falar cun modelo."
+    },
+    "working": "Traballando",
+    "historyRetry": "Non se puido cargar o historial do chat.",
+    "catalogRetry": "Non se puideron cargar os modelos",
+    "sendError": "Non se puido enviar a mensaxe. Téntao de novo."
   }
 }

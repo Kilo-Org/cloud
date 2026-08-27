@@ -10,6 +10,7 @@ import { USER_DELETION_DEFAULT_POSTHOG_HOST } from '@/lib/user/deletion-queue/de
 import { encryptDeletionResourceIds } from '@/lib/user/deletion-queue/deletion-crypto';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { hmacResourceRef } from '@/lib/user/deletion-queue/deletion-hmac';
+import { enqueueHistoricalUserDeletion } from '@/lib/user/deletion-queue/deletion-legacy-backfill';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
 import {
   getPostHogPersonsSearchUrl,
@@ -21,6 +22,7 @@ const PERSON_A = 'person-a';
 const PERSON_B = 'person-b';
 const ENVIRONMENT_ID = 'proj-test';
 const NUMERIC_ID = '999';
+const KILO_USER_ID = 'oauth/GitHub/CaseSensitive+42';
 
 describe('getPostHogPersonsSearchUrl', () => {
   const originalHost = process.env.POSTHOG_HOST;
@@ -71,6 +73,147 @@ describe('handlePosthog', () => {
     if (originalHost === undefined) delete process.env.POSTHOG_HOST;
     else process.env.POSTHOG_HOST = originalHost;
   });
+
+  it('deletes an exact user-ID match without requiring or looking up an email', async () => {
+    const { request, step, context } = await setupUserIdRequest();
+    const fetchSpy = mockPosthogFetch({
+      email: 'former@example.com',
+      persons: [
+        {
+          uuid: PERSON_A,
+          id: NUMERIC_ID,
+          emails: ['former@example.com'],
+          distinctIds: [KILO_USER_ID, 'former@example.com'],
+        },
+      ],
+    });
+
+    await expect(
+      handlePosthog({ request: { ...request, target_email: null }, step, context })
+    ).resolves.toMatchObject({ kind: 'succeeded' });
+
+    const lookupUrls = fetchSpy.mock.calls
+      .map(call => String(call[0]))
+      .filter(url => new URL(url).pathname.endsWith('/persons/'));
+    expect(lookupUrls).toEqual([
+      `${USER_DELETION_DEFAULT_POSTHOG_HOST}/api/environments/${ENVIRONMENT_ID}/persons/?distinct_id=${encodeURIComponent(KILO_USER_ID)}`,
+    ]);
+    const submit = fetchSpy.mock.calls.find(call =>
+      String(call[0]).endsWith('/persons/bulk_delete/')
+    );
+    expect(JSON.parse(String(submit?.[1]?.body))).toEqual({
+      ids: [PERSON_A],
+      delete_events: true,
+      delete_recordings: true,
+      keep_person: false,
+    });
+  });
+
+  it.each([null, KILO_USER_ID.toLowerCase(), 'unrelated-user'])(
+    'skips absent or nonmatching user IDs without email fallback: %p',
+    async distinctId => {
+      const { request, step, context, email } = await setupUserIdRequest();
+      const fetchSpy = mockPosthogFetch({
+        email,
+        persons:
+          distinctId === null
+            ? []
+            : [{ uuid: PERSON_A, emails: [email], distinctIds: [distinctId] }],
+      });
+
+      await expect(handlePosthog({ request, step, context })).resolves.toEqual({
+        kind: 'not_applicable',
+      });
+      expect(fetchSpy.mock.calls.map(call => String(call[0]))).toEqual([
+        `${USER_DELETION_DEFAULT_POSTHOG_HOST}/api/environments/${ENVIRONMENT_ID}/persons/?distinct_id=${encodeURIComponent(KILO_USER_ID)}`,
+      ]);
+    }
+  );
+
+  it('requires the user ID for an ID-only request instead of falling back to email', async () => {
+    const { request, step, context } = await setupUserIdRequest();
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+
+    await expect(
+      handlePosthog({ request: { ...request, user_id: null }, step, context })
+    ).resolves.toEqual({ kind: 'needs_attention', errorCode: 'user_missing' });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { results: [null] },
+    { results: [{ uuid: PERSON_A }] },
+    { results: [{ uuid: PERSON_A, distinct_ids: [null] }] },
+    { results: [{ uuid: PERSON_A, distinct_ids: [KILO_USER_ID, null] }] },
+    {
+      results: [
+        { uuid: PERSON_A, distinct_ids: [KILO_USER_ID] },
+        { uuid: PERSON_B, distinct_ids: [null] },
+      ],
+    },
+    { results: [], next: 'https://posthog.test/persons/?offset=100' },
+  ])('does not treat an incomplete user-ID lookup as absence: %j', async payload => {
+    const { request, step, context } = await setupUserIdRequest();
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(payload));
+
+    await expect(handlePosthog({ request, step, context })).resolves.toEqual({
+      kind: 'needs_attention',
+      errorCode: 'posthog_lookup_incomplete',
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires a UUID for a person matched by user ID', async () => {
+    const { request, step, context } = await setupUserIdRequest();
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        jsonResponse({ results: [{ id: NUMERIC_ID, distinct_ids: [KILO_USER_ID] }] })
+      );
+
+    await expect(handlePosthog({ request, step, context })).resolves.toEqual({
+      kind: 'manual_action_required',
+      errorCode: 'posthog_manual_required',
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['reserved', 'submitted'])(
+    'resumes an ID-only %s checkpoint without another deletion',
+    async providerRef => {
+      const { request, step, context } = await setupSubmittedEffect([PERSON_A], {
+        providerRef,
+        userIdOnly: true,
+      });
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith('/persons/')) {
+          expect(url.searchParams.get('distinct_id')).toBe(KILO_USER_ID);
+          expect(url.searchParams.has('email')).toBe(false);
+          return jsonResponse({ results: [] });
+        }
+        if (url.pathname.endsWith(`/persons/${PERSON_A}/`)) {
+          return new Response(null, { status: 404 });
+        }
+        if (url.pathname.endsWith('/persons/deletion_status/')) {
+          expect(url.searchParams.get('person_uuid')).toBe(PERSON_A);
+          return completedDeletionStatus(PERSON_A);
+        }
+        throw new Error(`unexpected fetch ${url.pathname}`);
+      });
+
+      await expect(handlePosthog({ request, step, context })).resolves.toMatchObject({
+        kind: 'succeeded',
+      });
+      expect(
+        fetchSpy.mock.calls.some(call => String(call[0]).endsWith('/persons/bulk_delete/'))
+      ).toBe(false);
+      const lookups = fetchSpy.mock.calls.filter(call =>
+        new URL(String(call[0])).pathname.endsWith('/persons/')
+      );
+      expect(lookups).toHaveLength(providerRef === 'reserved' ? 1 : 0);
+    }
+  );
 
   it('looks up by distinct_id and email on environments URLs with trailing slashes', async () => {
     const { request, step, context, email } = await setupLookupRequest();
@@ -300,6 +443,7 @@ type MockPerson = {
   uuid: string;
   id?: string;
   emails: string[];
+  distinctIds?: string[];
 };
 
 type AcceptanceBody = {
@@ -353,7 +497,7 @@ function personsLookupResponse(persons: MockPerson[]): Response {
     results: persons.map(person => ({
       uuid: person.uuid,
       id: person.id ?? person.uuid,
-      distinct_ids: person.emails,
+      distinct_ids: person.distinctIds ?? person.emails,
       properties: { email: person.emails[0] },
     })),
   });
@@ -398,8 +542,30 @@ async function setupLookupRequest() {
   return { request, step, context, email: user.google_user_email };
 }
 
-async function setupSubmittedEffect(personIds: string[], options: { providerRef?: string } = {}) {
-  const { request, context, email } = await setupLookupRequest();
+async function setupUserIdRequest() {
+  const admin = await insertTestUser({ is_admin: true });
+  const user = await insertTestUser({
+    id: KILO_USER_ID,
+    google_user_email: `deleted+${KILO_USER_ID}@deleted.invalid`,
+    blocked_reason: 'soft-deleted at 2026-08-26T00:00:00.000Z',
+  });
+  const result = await enqueueHistoricalUserDeletion({
+    userId: user.id,
+    adminUserId: admin.id,
+    execute: true,
+  });
+  if (result.status !== 'enqueued') throw new Error(`expected enqueued, got ${result.status}`);
+  const { request, step, context } = await loadRunningStep(result.requestId);
+  return { request, step, context, email: user.google_user_email };
+}
+
+async function setupSubmittedEffect(
+  personIds: string[],
+  options: { providerRef?: string; userIdOnly?: boolean } = {}
+) {
+  const { request, context, email } = await (options.userIdOnly
+    ? setupUserIdRequest()
+    : setupLookupRequest());
   await db
     .update(user_deletion_steps)
     .set({

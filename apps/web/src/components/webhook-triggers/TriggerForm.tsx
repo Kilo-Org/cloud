@@ -12,6 +12,7 @@ import { ProfileSelector } from '@/components/cloud-agent/ProfileSelector';
 import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import { ModeCombobox } from '@/components/shared/ModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
 import {
   Dialog,
@@ -42,6 +43,7 @@ export type TriggerFormData = {
   githubRepo: string;
   mode: AgentMode;
   model: string;
+  variant?: string | null;
   promptTemplate: string;
   profileId: string;
   autoCommit?: boolean;
@@ -65,6 +67,7 @@ export type TriggerFormProps = {
     githubRepo: string;
     mode: AgentMode;
     model: string;
+    variant?: string;
     promptTemplate: string;
     profileId?: string;
     autoCommit?: boolean;
@@ -129,6 +132,15 @@ export function TriggerForm({
   const [githubRepo, setGithubRepo] = useState(initialData?.githubRepo ?? '');
   const [agentMode, setAgentMode] = useState<AgentMode>((initialData?.mode as AgentMode) ?? 'ask');
   const [model, setModel] = useState(initialData?.model ?? '');
+  const [variant, setVariant] = useState(initialData?.variant);
+  const modelVariants = models.find(option => option.id === model)?.variants ?? [];
+
+  const handleModelChange = (nextModel: string) => {
+    if (nextModel === model) return;
+    setModel(nextModel);
+    const nextVariants = models.find(option => option.id === nextModel)?.variants ?? [];
+    setVariant(current => (current && nextVariants.includes(current) ? current : undefined));
+  };
   const WEBHOOK_DEFAULT_PROMPT = 'Describe this webhook request payload:\n\n{{body}}';
   const SCHEDULED_DEFAULT_PROMPT = 'Run the scheduled task. Triggered at {{scheduledTime}}.';
   const [promptTemplate, setPromptTemplate] = useState(
@@ -158,6 +170,7 @@ export function TriggerForm({
       setGithubRepo(initialData.githubRepo);
       setAgentMode(initialData.mode ?? 'ask');
       setModel(initialData.model);
+      setVariant(initialData.variant);
       setPromptTemplate(initialData.promptTemplate);
       setProfileId(initialData.profileId ?? null);
       setAutoCommit(initialData.autoCommit ?? false);
@@ -319,6 +332,12 @@ export function TriggerForm({
             }
           : { enabled: false };
 
+      const submittedVariant = isEditMode
+        ? variant === initialData?.variant
+          ? undefined
+          : (variant ?? null)
+        : variant;
+
       await onSubmit({
         triggerId,
         activationMode,
@@ -327,6 +346,7 @@ export function TriggerForm({
         githubRepo,
         mode: agentMode,
         model,
+        ...(submittedVariant !== undefined ? { variant: submittedVariant } : {}),
         promptTemplate: promptTemplate.trim(),
         profileId,
         autoCommit,
@@ -347,6 +367,8 @@ export function TriggerForm({
       githubRepo,
       agentMode,
       model,
+      variant,
+      initialData?.variant,
       promptTemplate,
       autoCommit,
       condenseOnComplete,
@@ -493,23 +515,51 @@ export function TriggerForm({
               )}
             </div>
 
-            {/* Mode and Model Row */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <ModeCombobox
-                label="Mode"
-                value={agentMode}
-                onValueChange={setAgentMode}
-                disabled={isLoading}
-              />
-              <ModelCombobox
-                label="Model"
-                models={models}
-                value={model}
-                onValueChange={setModel}
-                isLoading={isLoadingModels}
-                required
-                disabled={isLoading}
-              />
+            <div className="space-y-2">
+              <div
+                className={cn(
+                  'grid grid-cols-1 gap-4',
+                  modelVariants.length > 0 || variant
+                    ? 'lg:grid-cols-[1fr_2fr_1fr]'
+                    : 'md:grid-cols-2'
+                )}
+              >
+                <ModeCombobox
+                  label="Mode"
+                  value={agentMode}
+                  onValueChange={setAgentMode}
+                  disabled={isLoading}
+                />
+                <ModelCombobox
+                  label="Model"
+                  models={models}
+                  value={model}
+                  onValueChange={handleModelChange}
+                  isLoading={isLoadingModels}
+                  required
+                  disabled={isLoading}
+                />
+                {(modelVariants.length > 0 || variant) && (
+                  <div className="min-w-0 space-y-2">
+                    <Label>Reasoning Effort</Label>
+                    <VariantCombobox
+                      variants={modelVariants}
+                      value={variant}
+                      onValueChange={setVariant}
+                      onClear={() => setVariant(undefined)}
+                      disabled={isLoading || isLoadingModels}
+                      triggerAriaLabel="Reasoning Effort"
+                      className="w-full"
+                    />
+                  </div>
+                )}
+              </div>
+              {(modelVariants.length > 0 || variant) && (
+                <p className="text-muted-foreground text-xs">
+                  Default uses the model&apos;s default reasoning effort, preserving existing
+                  trigger behavior.
+                </p>
+              )}
             </div>
 
             {/* Prompt Template */}

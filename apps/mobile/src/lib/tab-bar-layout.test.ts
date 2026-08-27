@@ -10,6 +10,8 @@ import {
   TAB_ICON_FORWARD_FONT_SCALE,
   TAB_LABEL_WRAP_FONT_SCALE,
   tabAccessibilityLabel,
+  tabBarPosition,
+  visibleTabCount,
 } from '@/lib/tab-bar-layout';
 
 describe('getTabBarOverlayHeight', () => {
@@ -139,5 +141,64 @@ describe('tabAccessibilityLabel', () => {
 
   it('reports the position and total for three tabs', () => {
     expect(tabAccessibilityLabel('Profile', 3, 3)).toBe('Profile, tab, 3 of 3');
+  });
+});
+
+describe('visibleTabCount', () => {
+  it('counts three base tabs when both flagged tabs are hidden', () => {
+    expect(visibleTabCount(false, false)).toBe(3);
+  });
+
+  it('adds the KiloClaw tab only', () => {
+    expect(visibleTabCount(true, false)).toBe(4);
+  });
+
+  it('adds the Chat tab only', () => {
+    expect(visibleTabCount(false, true)).toBe(4);
+  });
+
+  it('adds both flagged tabs', () => {
+    expect(visibleTabCount(true, true)).toBe(5);
+  });
+});
+
+describe('tabBarPosition', () => {
+  const noFlags = { showKiloClaw: false, showQuickChat: false };
+  const kiloclawOnly = { showKiloClaw: true, showQuickChat: false };
+  const chatOnly = { showKiloClaw: false, showQuickChat: true };
+  const both = { showKiloClaw: true, showQuickChat: true };
+
+  it('positions Home at 1 in every combination', () => {
+    expect(tabBarPosition('home', noFlags)).toBe(1);
+    expect(tabBarPosition('home', both)).toBe(1);
+  });
+
+  it('returns null for a hidden KiloClaw tab', () => {
+    expect(tabBarPosition('kiloclaw', noFlags)).toBeNull();
+    expect(tabBarPosition('kiloclaw', chatOnly)).toBeNull();
+  });
+
+  it('positions KiloClaw at 2 when shown', () => {
+    expect(tabBarPosition('kiloclaw', kiloclawOnly)).toBe(2);
+    expect(tabBarPosition('kiloclaw', both)).toBe(2);
+  });
+
+  it('positions Agents after KiloClaw', () => {
+    expect(tabBarPosition('agents', noFlags)).toBe(2);
+    expect(tabBarPosition('agents', kiloclawOnly)).toBe(3);
+  });
+
+  it('returns null for a hidden Chat tab and positions it after Agents when shown', () => {
+    expect(tabBarPosition('chat', noFlags)).toBeNull();
+    expect(tabBarPosition('chat', kiloclawOnly)).toBeNull();
+    expect(tabBarPosition('chat', chatOnly)).toBe(3);
+    expect(tabBarPosition('chat', both)).toBe(4);
+  });
+
+  it('positions Profile last in every combination', () => {
+    expect(tabBarPosition('profile', noFlags)).toBe(3);
+    expect(tabBarPosition('profile', kiloclawOnly)).toBe(4);
+    expect(tabBarPosition('profile', chatOnly)).toBe(4);
+    expect(tabBarPosition('profile', both)).toBe(5);
   });
 });

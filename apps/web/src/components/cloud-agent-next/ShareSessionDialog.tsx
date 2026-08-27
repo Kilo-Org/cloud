@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -17,11 +17,17 @@ import { toast } from 'sonner';
 type ShareSessionDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: ComponentProps<typeof DialogContent>['onCloseAutoFocus'];
   /** The Kilo session ID (UUID from cli_sessions_v2.session_id) */
   kiloSessionId?: string;
 };
 
-export function ShareSessionDialog({ open, onOpenChange, kiloSessionId }: ShareSessionDialogProps) {
+export function ShareSessionDialog({
+  open,
+  onOpenChange,
+  onCloseAutoFocus,
+  kiloSessionId,
+}: ShareSessionDialogProps) {
   const [isSharing, setIsSharing] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
@@ -73,7 +79,7 @@ export function ShareSessionDialog({ open, onOpenChange, kiloSessionId }: ShareS
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>Share Session</DialogTitle>
           <DialogDescription>

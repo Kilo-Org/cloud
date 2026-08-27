@@ -211,7 +211,8 @@
     "profile": "פרופיל",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, טאב, {{position}} מתוך {{total}}"
+    "position": "{{name}}, טאב, {{position}} מתוך {{total}}",
+    "chat": "שיחה"
   },
   "chat": {
     "instancePicker": {
@@ -900,7 +901,23 @@
       "title": "סקירה",
       "tokens": "אסימונים",
       "tokensInOut": "{{input}} קלט / {{output}} פלט",
-      "pullRequest": "בקשת משיכה"
+      "pullRequest": "בקשת משיכה",
+      "transcriptWaiting": "ממתין לתמליל הסקירה.",
+      "transcriptEmpty": "אין תמליל לסקירה זו.",
+      "transcriptRetry": "לא ניתן היה לטעון את תמליל הסקירה.",
+      "transcriptLive": "חי",
+      "agentIdle": "הסוכן בטל",
+      "agentWorking": "הסוכן עובד...",
+      "anErrorOccurred": "אירעה שגיאה",
+      "errorWithMessage": "שגיאה: {{message}}",
+      "executionStarted": "הביצוע התחיל",
+      "reviewCompleted": "הסקירה הושלמה",
+      "reviewInterrupted": "הסקירה הופסקה",
+      "sessionError": "שגיאת הפעלה: {{error}}",
+      "statusWithValue": "סטטוס: {{status}}",
+      "toolName": "כלי: {{name}}",
+      "toolNameError": "כלי: {{name}} — שגיאה",
+      "unknownError": "שגיאה לא ידועה"
     },
     "reviewList": {
       "configureProvider": "הגדר ספק",
@@ -1585,7 +1602,6 @@
     }
   },
   "agents": {
-    "activeNow": "פעיל כעת",
     "search": {
       "searching": "מחפש",
       "searchSessions": "חפש הפעלות",
@@ -1596,13 +1612,11 @@
     "sessionList": {
       "couldNotLoad": "לא ניתן היה לטעון הפעלות",
       "couldNotLoadActive": "לא ניתן היה לטעון הפעלות פעילות",
-      "noSessionsYet": "אין עדיין הפעלות",
       "noSessionsYetDescription": "התחל משימת קידוד מהטלפון שלך. ההפעלות שלך יופיעו כאן.",
       "noMatches": "אין הפעלות תואמות",
       "tryDifferentSearch": "נסה מונח חיפוש אחר.",
       "tryAdjustFilters": "נסה להתאים או לנקות את המסננים שלך.",
       "couldNotSearch": "לא ניתן היה לחפש הפעלות",
-      "allActive": "כל ההפעלות פעילות",
       "completedWillAppear": "הפעלות שהושלמו יופיעו כאן.",
       "noPastSessions": "אין הפעלות עבר",
       "live": "חי"
@@ -1673,13 +1687,10 @@
       "scrollToBottom": "גלול לתחתית",
       "emptyTitle": "אין עדיין הודעות",
       "renameAccessibility": "שינוי שם הסשן: {{title}}",
-      "connectRepository": "חיבור מאגר",
       "cloningSession": "משכפל סשן",
       "continue": "המשך",
       "couldNotLoadThisSession": "לא ניתן היה לטעון הפעלה זו",
-      "cloneFailed": "לא ניתן היה לשכפל הפעלה זו.",
       "cloneFailedRetry": "לא ניתן היה לשכפל הפעלה זו. נסה שוב.",
-      "connectRepositoryToContinue": "חבר מאגר כדי להמשיך.",
       "notEnoughCredits": "אין מספיק קרדיטים כדי להפעיל את Cloud Agent. הוסף קרדיטים ונסה שוב.",
       "previousTaskFinishing": "המשימה הקודמת עדיין מסתיימת. אנא המתן רגע.",
       "serviceUnavailable": "השירות אינו זמין כרגע. אנא נסה שוב.",
@@ -1752,7 +1763,11 @@
       "noRepositoriesVisibleGitlab": "אין מאגרים גלויים. בדוק את הגישה למאגרים של GitLab, ואז רענן.",
       "openBitbucket": "פתח את Bitbucket",
       "openGitlab": "פתח את GitLab",
-      "recentlyUsed": "בשימוש לאחרונה"
+      "recentlyUsed": "בשימוש לאחרונה",
+      "cliCannotContinue": "CLI זה אינו יכול להמשיך הפעלה. בחר Cloud Agent או CLI אחר.",
+      "continueFrom": "ממשיך {{title}}",
+      "importFailed": "לא ניתן היה לייבא את ההפעלה הזו.",
+      "importingSession": "מייבא הפעלה"
     },
     "partRenderer": {
       "updatedFileCount_one": "עודכן {{displayCount}} קובץ",
@@ -2018,6 +2033,8 @@
       "viewTable": "צפה בטבלה",
       "title": "טבלה",
       "close": "סגור טבלה",
+      "loading": "טוען טבלה",
+      "empty": "לטבלה זו אין שורות.",
       "columnCount_one": "עמודה",
       "columnCount": "עמודות",
       "columnCount_other": "עמודות",
@@ -2209,6 +2226,17 @@
       "hostConfirmMessage": "קישור זה פותח את {{host}} בדפדפן שלך.",
       "open": "פתח",
       "trustThisHost": "בטח במארח זה"
+    },
+    "folderPicker": {
+      "accessibility": "תיקייה: {{label}}",
+      "emptyDescription": "סיום משתמש בתיקייה זו.",
+      "emptyTitle": "אין תיקיות בפנים",
+      "fieldLabel": "תיקייה",
+      "retryableDescription": "בדוק את החיבור ונסה שוב. סיום עדיין מאשר את התיקייה הזו.",
+      "retryableTitle": "לא ניתן היה לרשום את התיקיות",
+      "tapToListHint": "הקש על תיקייה כדי לרשום את תוכנה",
+      "unsupportedDescription": "CLI זה לא יכול לרשום תיקיות. סיום שומר על תיקיית ההשקה והתחל הפעלה מתחיל שם.",
+      "unsupportedTitle": "לא ניתן לרשום תיקיות"
     }
   },
   "bootstrap": {
@@ -3170,5 +3198,19 @@
     "emptyDescription": "כשאתה בוטח במארח של קישור, הוא נפתח ללא שאלה נוספת.",
     "revoke": "בטל אמון ב{{host}}",
     "backToPreferences": "חזור להעדפות"
+  },
+  "quickChat": {
+    "title": "שיחה",
+    "composer": {
+      "placeholder": "הודעה"
+    },
+    "empty": {
+      "title": "התחל שיחה",
+      "description": "שלח הודעה כדי לשוחח עם מודל."
+    },
+    "working": "עובד",
+    "historyRetry": "לא ניתן היה לטעון את היסטוריית השיחה.",
+    "catalogRetry": "לא ניתן לטעון דגמים",
+    "sendError": "לא ניתן היה לשלוח את ההודעה. נסה שוב."
   }
 }

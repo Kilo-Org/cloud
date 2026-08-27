@@ -409,7 +409,13 @@ function MarkdownTableBody({
   }
 
   if (rowCount === 0) {
-    return <AccessibleStatus className="px-4 py-4" message={t('agentChat.markdownTable.empty')} />;
+    return (
+      <AccessibleStatus
+        className="px-4 py-4"
+        message={t('agentChat.markdownTable.empty')}
+        tone="status"
+      />
+    );
   }
 
   return (

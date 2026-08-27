@@ -426,6 +426,7 @@ describe('MarkdownTable open path', () => {
     );
     expect(status).toHaveLength(1);
     expect(status[0]?.props.message).toBe('This table has no rows.');
+    expect(status[0]?.props.tone).toBe('status');
     expect(closeNode(renderer)).toBeTruthy();
   });
 

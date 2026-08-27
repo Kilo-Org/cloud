@@ -308,6 +308,7 @@ export function FilePartRenderer({ part }: Readonly<FilePartRendererProps>) {
               }}
               sharing={sharing}
               shareError={shareError}
+              renewing={resolved.renewing === true}
               onClose={closeViewer}
             />
           )}

@@ -23,6 +23,8 @@ type ImageViewerModalProps = {
   sharing?: boolean;
   /** Share failure message. Rendered inline — the toast layer sits behind this modal. */
   shareError?: string | null;
+  /** While a background renew is in flight, suppress onError so the last-good image stays. */
+  renewing?: boolean;
   onClose: () => void;
 };
 
@@ -32,6 +34,7 @@ export function ImageViewerModal({
   filename,
   sharing = false,
   shareError = null,
+  renewing = false,
   onClose,
   onShare,
 }: ImageViewerModalProps) {
@@ -171,7 +174,9 @@ export function ImageViewerModal({
                     className="h-full w-full"
                     contentFit="contain"
                     onError={() => {
-                      setImageError(true);
+                      if (!renewing) {
+                        setImageError(true);
+                      }
                     }}
                   />
                 </Animated.View>

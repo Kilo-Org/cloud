@@ -296,4 +296,36 @@ describe('refreshFilePartUrl', () => {
     expect(getFilePartCacheEntry('part-1')).not.toHaveProperty('renewing');
     expect(getFilePartCacheEntry('part-1')?.url).toBe('https://r2.example/new');
   });
+
+  it('shares one in-flight set with the sweep so a retry presign is not duplicated', async () => {
+    const uuid = '11111111-1111-4111-8111-111111111111';
+    cacheRenewableEntry(
+      'part-1',
+      { uuid, filename: 'a.png' },
+      { url: 'https://r2.example/old', urlExpiresAt: Date.now() - 1000 }
+    );
+    // Mount an unrelated, non-due part so the shared sweeper starts without
+    // touching part-1.
+    cacheRenewableEntry(
+      'part-2',
+      { uuid: '22222222-2222-4222-8222-222222222222', filename: 'b.png' },
+      { url: 'https://r2.example/old2', urlExpiresAt: Date.now() + 900_000 }
+    );
+    await mountProbe(makeFilePart('part-2', '22222222-2222-4222-8222-222222222222', 'b.png'));
+
+    // A retry presign that stays in flight across the sweep tick.
+    getAttachmentDownloadUrlMutate.mockReturnValue(new Promise<never>(() => undefined));
+
+    act(() => {
+      void refreshFilePartUrl('part-1');
+    });
+
+    expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(1);
+    expect(getFilePartCacheEntry('part-1')?.renewing).toBe(true);
+
+    advance(30_000);
+
+    expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(1);
+    expect(getFilePartCacheEntry('part-1')?.renewing).toBe(true);
+  });
 });

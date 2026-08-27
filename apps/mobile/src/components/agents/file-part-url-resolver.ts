@@ -223,6 +223,7 @@ export async function refreshFilePartUrl(partId: string): Promise<boolean> {
     return false;
   }
   markFilePartRenewing(partId);
+  inFlight.add(partId);
   try {
     const result = await trpcClient.cloudAgentNext.getAttachmentDownloadUrl.mutate({
       messageUuid: ref.messageUuid,
@@ -238,6 +239,8 @@ export async function refreshFilePartUrl(partId: string): Promise<boolean> {
   } catch {
     clearFilePartRenewing(partId);
     return false;
+  } finally {
+    inFlight.delete(partId);
   }
 }
 

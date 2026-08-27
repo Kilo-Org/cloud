@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Hal-hazırda aktiv",
     "search": {
       "searching": "Axtarılır",
       "searchSessions": "Sessiyaları axtarın",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "Sessiyalar yüklənə bilmədi",
       "couldNotLoadActive": "Aktiv sessiyalar yüklənə bilmədi",
-      "noSessionsYet": "Hələ sessiya yoxdur",
       "noSessionsYetDescription": "Telefonunuzdan kodlaşdırma tapşırığı başladın. Sessiyalarınız burada görünəcək.",
       "noMatches": "Heç bir sessiya uyğun gəlmir",
       "tryDifferentSearch": "Fərqli axtarış termini cəhd edin.",
       "tryAdjustFilters": "Filtrlərinizi tənzimləyin və ya təmizləyin.",
       "couldNotSearch": "Sessiyalar axtarıla bilmədi",
-      "allActive": "Bütün sessiyalar aktivdir",
       "completedWillAppear": "Tamamlanmış sessiyalar burada görünəcək.",
       "noPastSessions": "Keçmiş sessiya yoxdur",
       "live": "CANLI"

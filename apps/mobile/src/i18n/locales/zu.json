@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Kusebenzayo manje",
     "search": {
       "searching": "Kusesha",
       "searchSessions": "Sesha iziseshini",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "Akukwazanga ukulayisha iziseshini",
       "couldNotLoadActive": "Akukwazanga ukulayisha iziseshini ezisebenzayo",
-      "noSessionsYet": "Akukho ziseshini okwamanje",
       "noSessionsYetDescription": "Qala umsebenzi wokufaka ikhodi kusukela kufoni yakho. Iziseshini zakho zizovela lapha.",
       "noMatches": "Akukho ziseshini ezihambisanayo",
       "tryDifferentSearch": "Zama igama lokusesha elihlukile.",
       "tryAdjustFilters": "Zama ukulungisa noma ukusula izihlungi zakho.",
       "couldNotSearch": "Akukwazanga ukusesha iziseshini",
-      "allActive": "Zonke iziseshini ziyasebenza",
       "completedWillAppear": "Iziseshini eziqediwe zizovela lapha.",
       "noPastSessions": "Akukho ziseshini ezidlule",
       "live": "LIVE"

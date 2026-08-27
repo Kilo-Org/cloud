@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "ເຄື່ອນໄຫວຕອນນີ້",
     "search": {
       "searching": "ກຳລັງຄົ້ນຫາ",
       "searchSessions": "ຄົ້ນຫາເຊດຊັນ",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດເຊດຊັນ",
       "couldNotLoadActive": "ບໍ່ສາມາດໂຫຼດເຊດຊັນທີ່ເຄື່ອນໄຫວ",
-      "noSessionsYet": "ຍັງບໍ່ມີເຊດຊັນ",
       "noSessionsYetDescription": "ເລີ່ມວຽກການຂຽນລະຫັດຈາກໂທລະສັບຂອງທ່ານ. ເຊດຊັນຂອງທ່ານຈະປາກົດຢູ່ນີ້.",
       "noMatches": "ບໍ່ມີເຊດຊັນທີ່ກົງກັນ",
       "tryDifferentSearch": "ລອງຄຳຄົ້ນຫາທີ່ແຕກຕ່າງ.",
       "tryAdjustFilters": "ລອງປັບ ຫຼື ລ້າງຕົວກັ່ນຕອງຂອງທ່ານ.",
       "couldNotSearch": "ບໍ່ສາມາດຄົ້ນຫາເຊດຊັນ",
-      "allActive": "ທຸກເຊດຊັນເຄື່ອນໄຫວຢູ່",
       "completedWillAppear": "ເຊດຊັນທີ່ສຳເລັດຈະປາກົດຢູ່ນີ້.",
       "noPastSessions": "ບໍ່ມີເຊດຊັນທີ່ຜ່ານມາ",
       "live": "LIVE"

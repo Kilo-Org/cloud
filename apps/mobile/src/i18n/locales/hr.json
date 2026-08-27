@@ -2045,7 +2045,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktivno sada",
     "search": {
       "searching": "Tražim",
       "searchSessions": "Pretraži sesije",
@@ -2056,13 +2055,11 @@
     "sessionList": {
       "couldNotLoad": "Nije moguće učitati sesije",
       "couldNotLoadActive": "Nije moguće učitati aktivne sesije",
-      "noSessionsYet": "Još nema sesija",
       "noSessionsYetDescription": "Započnite zadatak kodiranja s telefona. Vaše sesije pojavit će se ovdje.",
       "noMatches": "Nijedna sesija ne odgovara",
       "tryDifferentSearch": "Pokušajte drugi pojam pretrage.",
       "tryAdjustFilters": "Pokušajte prilagoditi ili ukloniti svoje filtre.",
       "couldNotSearch": "Nije moguće pretražiti sesije",
-      "allActive": "Sve sesije su aktivne",
       "completedWillAppear": "Dovršene sesije pojavit će se ovdje.",
       "noPastSessions": "Nema prošlih sesija",
       "live": "UŽIVO"

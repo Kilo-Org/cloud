@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiv nu",
     "search": {
       "searching": "Søger",
       "searchSessions": "Søg i sessioner",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "Kunne ikke indlæse sessioner",
       "couldNotLoadActive": "Kunne ikke indlæse aktive sessioner",
-      "noSessionsYet": "Ingen sessioner endnu",
       "noSessionsYetDescription": "Start en kodningsopgave fra din telefon. Dine sessioner vises her.",
       "noMatches": "Ingen sessioner matcher",
       "tryDifferentSearch": "Prøv et andet søgeord.",
       "tryAdjustFilters": "Prøv at justere eller fjerne dine filtre.",
       "couldNotSearch": "Kunne ikke søge i sessioner",
-      "allActive": "Alle sessioner er aktive",
       "completedWillAppear": "Fuldførte sessioner vises her.",
       "noPastSessions": "Ingen tidligere sessioner",
       "live": "LIVE"

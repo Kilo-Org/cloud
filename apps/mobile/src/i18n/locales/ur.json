@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "ابھی فعال",
     "search": {
       "searching": "تلاش کر رہے ہیں",
       "searchSessions": "سیشنز تلاش کریں",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "سیشنز لوڈ نہیں ہو سکے",
       "couldNotLoadActive": "فعال سیشنز لوڈ نہیں ہو سکے",
-      "noSessionsYet": "ابھی کوئی سیشن نہیں",
       "noSessionsYetDescription": "اپنے فون سے کوڈنگ کا کام شروع کریں۔ آپ کے سیشن یہاں ظاہر ہوں گے۔",
       "noMatches": "کوئی سیشن مماثل نہیں",
       "tryDifferentSearch": "کوئی مختلف تلاش کا لفظ آزمائیں۔",
       "tryAdjustFilters": "اپنے فلٹرز ایڈجسٹ یا صاف کرنے کی کوشش کریں۔",
       "couldNotSearch": "سیشنز تلاش نہیں ہو سکے",
-      "allActive": "تمام سیشنز فعال ہیں",
       "completedWillAppear": "مکمل شدہ سیشنز یہاں ظاہر ہوں گے۔",
       "noPastSessions": "کوئی ماضی کے سیشن نہیں",
       "live": "لائیو"

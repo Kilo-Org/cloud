@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "សកម្មឥឡូវនេះ",
     "search": {
       "searching": "កំពុងស្វែងរក",
       "searchSessions": "ស្វែងរកវគ្គ",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "មិនអាចផ្ទុកវគ្គបានទេ",
       "couldNotLoadActive": "មិនអាចផ្ទុកវគ្គសកម្ម",
-      "noSessionsYet": "មិនទាន់មានវគ្គ",
       "noSessionsYetDescription": "ចាប់ផ្តើមកិច្ចការកូដពីទូរស័ព្ទរបស់អ្នក។ វគ្គរបស់អ្នកនឹងបង្ហាញនៅទីនេះ។",
       "noMatches": "គ្មានវគ្គដែលត្រូវគ្នា",
       "tryDifferentSearch": "សាកល្បងពាក្យស្វែងរកផ្សេង។",
       "tryAdjustFilters": "សាកល្បងកែតម្រូវ ឬសម្អាតតម្រងរបស់អ្នក។",
       "couldNotSearch": "មិនអាចស្វែងរកវគ្គ",
-      "allActive": "វគ្គទាំងអស់កំពុងសកម្ម",
       "completedWillAppear": "វគ្គដែលបានបញ្ចប់នឹងបង្ហាញនៅទីនេះ។",
       "noPastSessions": "គ្មានវគ្គកន្លងមក",
       "live": "LIVE"

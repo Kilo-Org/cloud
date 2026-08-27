@@ -2045,7 +2045,6 @@
     }
   },
   "agents": {
-    "activeNow": "Activ acum",
     "search": {
       "searching": "Caută",
       "searchSessions": "Caută sesiuni",
@@ -2056,13 +2055,11 @@
     "sessionList": {
       "couldNotLoad": "Nu s-au putut încărca sesiunile",
       "couldNotLoadActive": "Nu s-au putut încărca sesiunile active",
-      "noSessionsYet": "Încă nicio sesiune",
       "noSessionsYetDescription": "Începe o sarcină de codare de pe telefon. Sesiunile tale vor apărea aici.",
       "noMatches": "Nicio sesiune nu corespunde",
       "tryDifferentSearch": "Încearcă un alt termen de căutare.",
       "tryAdjustFilters": "Încearcă să ajustezi sau să ștergi filtrele.",
       "couldNotSearch": "Nu s-au putut căuta sesiunile",
-      "allActive": "Toate sesiunile sunt active",
       "completedWillAppear": "Sesiunile finalizate vor apărea aici.",
       "noPastSessions": "Nicio sesiune trecută",
       "live": "LIVE"

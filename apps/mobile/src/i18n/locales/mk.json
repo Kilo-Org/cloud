@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Активно сега",
     "search": {
       "searching": "Пребарување",
       "searchSessions": "Пребарувај сесии",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "Не можеше да се вчитаат сесиите",
       "couldNotLoadActive": "Не можеше да се вчитаат активните сесии",
-      "noSessionsYet": "Сè уште нема сесии",
       "noSessionsYetDescription": "Започни задача за кодирање од твојот телефон. Твоите сесии ќе се појават тука.",
       "noMatches": "Нема соодветни сесии",
       "tryDifferentSearch": "Обиди се со различен поим за пребарување.",
       "tryAdjustFilters": "Обиди се да ги прилагодиш или исчистиш филтрите.",
       "couldNotSearch": "Не можеше да се пребаруваат сесиите",
-      "allActive": "Сите сесии се активни",
       "completedWillAppear": "Завршените сесии ќе се појават тука.",
       "noPastSessions": "Нема минати сесии",
       "live": "ВОЖИВО"

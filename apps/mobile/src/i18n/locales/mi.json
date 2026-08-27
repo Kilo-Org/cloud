@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Kei te mahi ināianei",
     "search": {
       "searching": "Kei te rapu",
       "searchSessions": "Rapu ngā wātūtū",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "Kāore i taea te uta ngā wātū",
       "couldNotLoadActive": "Kāore i taea te uta ngā wātūtū mahi",
-      "noSessionsYet": "Kāore anō he wātūtū",
       "noSessionsYetDescription": "Tīmatatia tētahi mahi whakawaehere mai i tō waea. Ka puta ō wātūtū ki konei.",
       "noMatches": "Kāore he wātūtū e hāngai ana",
       "tryDifferentSearch": "Whakamātauhia tētahi kupu rapu rerekē.",
       "tryAdjustFilters": "Whakamātauhia te whakatika, te whakakore rānei i ō tātari.",
       "couldNotSearch": "Kāore i taea te rapu ngā wātūtū",
-      "allActive": "Kei te mahi katoa ngā wātūtū",
       "completedWillAppear": "Ka puta ngā wātūtū kua oti ki konei.",
       "noPastSessions": "Kāore he wātūtū o mua",
       "live": "ORA"

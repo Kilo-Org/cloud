@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Hadda firfircoon",
     "search": {
       "searching": "Raadin",
       "searchSessions": "Raadi kalfadhiyada",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "Kalfadhiyada lama soo dejin karin",
       "couldNotLoadActive": "Lama xiri karin kalfadhiyada firfircoon",
-      "noSessionsYet": "Weli ma jiraan kalfadhiyo",
       "noSessionsYetDescription": "Ka bilow hawsha coding-ga taleefankaaga. Kalfadhiyadaagu halkan ayay soo muuqan doonaan.",
       "noMatches": "Ma jiraan kalfadhiyo u dhigma",
       "tryDifferentSearch": "Isku day erey raadin oo kala duwan.",
       "tryAdjustFilters": "Isku day inaad hagaajiso ama baabi'iso shaandhadaada.",
       "couldNotSearch": "Lama raadin karin kalfadhiyada",
-      "allActive": "Dhammaan kalfadhiyadu waa firfircoon yihiin",
       "completedWillAppear": "Kalfadhiyada la dhammaystiray halkan ayay soo muuqan doonaan.",
       "noPastSessions": "Ma jiraan kalfadhiyo hore",
       "live": "TOOS AH"

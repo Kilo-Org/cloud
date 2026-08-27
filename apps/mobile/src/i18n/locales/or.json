@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "ବର୍ତ୍ତମାନ ସକ୍ରିୟ",
     "search": {
       "searching": "ଖୋଜୁଛି",
       "searchSessions": "ସେସନ୍ ଖୋଜନ୍ତୁ",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
       "couldNotLoadActive": "ସକ୍ରିୟ ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
-      "noSessionsYet": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସେସନ୍ ନାହିଁ",
       "noSessionsYetDescription": "ଆପଣଙ୍କ ଫୋନରୁ ଏକ କୋଡିଂ କାର୍ଯ୍ୟ ଆରମ୍ଭ କରନ୍ତୁ। ଆପଣଙ୍କ ସେସନ୍ ଏଠାରେ ଦେଖାଯିବ।",
       "noMatches": "କୌଣସି ସେସନ୍ ମେଳ ଖାଉନାହିଁ",
       "tryDifferentSearch": "ଏକ ଭିନ୍ନ ଖୋଜ ଶବ୍ଦ ଚେଷ୍ଟା କରନ୍ତୁ।",
       "tryAdjustFilters": "ଫିଲ୍ଟରଗୁଡ଼ିକୁ ସଜାଡ଼ିବା କିମ୍ବା ପରିଷ୍କାର କରିବାକୁ ଚେଷ୍ଟା କରନ୍ତୁ।",
       "couldNotSearch": "ସେସନ୍ ଖୋଜାଯାଇପାରିଲା ନାହିଁ",
-      "allActive": "ସମସ୍ତ ସେସନ୍ ସକ୍ରିୟ",
       "completedWillAppear": "ସମାପ୍ତ ସେସନ୍ ଏଠାରେ ଦେଖାଯିବ।",
       "noPastSessions": "କୌଣସି ପୁରୁଣା ସେସନ୍ ନାହିଁ",
       "live": "ଲାଇଭ୍"

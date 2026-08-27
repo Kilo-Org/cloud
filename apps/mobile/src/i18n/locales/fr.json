@@ -2396,7 +2396,6 @@
     "installAttributionPromptTitle": "Autoriser l'attribution de l'installation ?"
   },
   "agents": {
-    "activeNow": "Actif maintenant",
     "search": {
       "searching": "Recherche",
       "searchSessions": "Rechercher des sessions",
@@ -2407,13 +2406,11 @@
     "sessionList": {
       "couldNotLoad": "Impossible de charger les sessions",
       "couldNotLoadActive": "Impossible de charger les sessions actives",
-      "noSessionsYet": "Aucune session pour le moment",
       "noSessionsYetDescription": "Démarrez une tâche de codage depuis votre téléphone. Vos sessions apparaîtront ici.",
       "noMatches": "Aucune session ne correspond",
       "tryDifferentSearch": "Essayez un autre terme de recherche.",
       "tryAdjustFilters": "Essayez d'ajuster ou d'effacer vos filtres.",
       "couldNotSearch": "Impossible de rechercher des sessions",
-      "allActive": "Toutes les sessions sont actives",
       "completedWillAppear": "Les sessions terminées apparaîtront ici.",
       "noPastSessions": "Aucune session passée",
       "live": "EN DIRECT"

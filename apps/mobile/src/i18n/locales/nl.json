@@ -1578,7 +1578,6 @@
     }
   },
   "agents": {
-    "activeNow": "Nu actief",
     "search": {
       "searching": "Zoeken",
       "searchSessions": "Sessies zoeken",
@@ -1589,13 +1588,11 @@
     "sessionList": {
       "couldNotLoad": "Kon sessies niet laden",
       "couldNotLoadActive": "Kon actieve sessies niet laden",
-      "noSessionsYet": "Nog geen sessies",
       "noSessionsYetDescription": "Start een codeertaak vanaf je telefoon. Je sessies verschijnen hier.",
       "noMatches": "Geen sessies komen overeen",
       "tryDifferentSearch": "Probeer een andere zoekterm.",
       "tryAdjustFilters": "Probeer je filters aan te passen of te wissen.",
       "couldNotSearch": "Kon sessies niet doorzoeken",
-      "allActive": "Alle sessies zijn actief",
       "completedWillAppear": "Voltooide sessies verschijnen hier.",
       "noPastSessions": "Geen eerdere sessies",
       "live": "LIVE"

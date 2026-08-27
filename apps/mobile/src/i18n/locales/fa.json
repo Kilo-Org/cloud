@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "اکنون فعال",
     "search": {
       "searching": "در حال جستجو",
       "searchSessions": "جستجوی نشستها",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "جلسات بارگذاری نشدند",
       "couldNotLoadActive": "بارگذاری نشستهای فعال ممکن نشد",
-      "noSessionsYet": "هنوز نشستی وجود ندارد",
       "noSessionsYetDescription": "از تلفن خود یک کار کدنویسی شروع کنید. نشستهای شما اینجا ظاهر میشوند.",
       "noMatches": "هیچ نشستی مطابقت ندارد",
       "tryDifferentSearch": "عبارت جستجوی دیگری را امتحان کنید.",
       "tryAdjustFilters": "فیلترهای خود را تنظیم یا پاک کنید.",
       "couldNotSearch": "جستجوی نشستها ممکن نشد",
-      "allActive": "همه نشستها فعال هستند",
       "completedWillAppear": "نشستهای تکمیلشده اینجا ظاهر میشوند.",
       "noPastSessions": "هیچ نشست گذشته وجود ندارد",
       "live": "زنده"

@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "აქტიურია ახლა",
     "search": {
       "searching": "ძიება",
       "searchSessions": "სესიების ძიება",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "სესიების ჩატვირთვა ვერ მოხერხდა",
       "couldNotLoadActive": "აქტიური სესიები ვერ ჩაირთო",
-      "noSessionsYet": "სესიები ჯერ არ არის",
       "noSessionsYetDescription": "დაიწყეთ კოდირების დავალება თქვენი ტელეფონიდან. თქვენი სესიები აქ გამოჩნდება.",
       "noMatches": "არცერთი სესია არ ემთხვევა",
       "tryDifferentSearch": "სცადეთ სხვა საძიებო სიტყვა.",
       "tryAdjustFilters": "სცადეთ ფილტრების შეცვლა ან გასუფთავება.",
       "couldNotSearch": "სესიების ძიება ვერ მოხერხდა",
-      "allActive": "ყველა სესია აქტიურია",
       "completedWillAppear": "დასრულებული სესიები აქ გამოჩნდება.",
       "noPastSessions": "წარსული სესიები არ არის",
       "live": "პირდაპირი"

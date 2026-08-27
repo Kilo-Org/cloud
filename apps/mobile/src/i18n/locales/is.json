@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Virkur núna",
     "search": {
       "searching": "Leitar",
       "searchSessions": "Leita í lotum",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "Ekki tókst að hlaða lotur",
       "couldNotLoadActive": "Ekki tókst að hlaða virkar lotur",
-      "noSessionsYet": "Engar lotur ennþá",
       "noSessionsYetDescription": "Byrjaðu kóðunarverkefni frá símanum þínum. Loturnar þínar birtast hér.",
       "noMatches": "Engar lotur passa",
       "tryDifferentSearch": "Prófaðu annað leitarorð.",
       "tryAdjustFilters": "Reyndu að breyta eða hreinsa síurnar þínar.",
       "couldNotSearch": "Ekki tókst að leita í lotum",
-      "allActive": "Allar lotur eru virkar",
       "completedWillAppear": "Lokið lotur birtast hér.",
       "noPastSessions": "Engar fyrri lotur",
       "live": "BEIN"

@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Այժմ ակտիվ",
     "search": {
       "searching": "Որոնում",
       "searchSessions": "Որոնել նիստեր",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "Չհաջողվեց բեռնել նիստերը",
       "couldNotLoadActive": "Չհաջողվեց բեռնել ակտիվ նիստերը",
-      "noSessionsYet": "Դեռևս նիստեր չկան",
       "noSessionsYetDescription": "Սկսեք ծածկագրման առաջադրանք ձեր հեռախոսից։ Ձեր նիստերը կհայտնվեն այստեղ։",
       "noMatches": "Ոչ մի նիստ չի համապատասխանում",
       "tryDifferentSearch": "Փորձեք որոնման այլ տերմին։",
       "tryAdjustFilters": "Փորձեք ճշգրտել կամ մաքրել ձեր զտիչները։",
       "couldNotSearch": "Չհաջողվեց որոնել նիստերը",
-      "allActive": "Բոլոր նիստերն ակտիվ են",
       "completedWillAppear": "Ավարտված նիստերը կհայտնվեն այստեղ։",
       "noPastSessions": "Անցյալի նիստեր չկան",
       "live": "ՈՒՂԻՂ"

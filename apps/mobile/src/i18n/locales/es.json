@@ -1584,7 +1584,6 @@
     }
   },
   "agents": {
-    "activeNow": "Activo ahora",
     "search": {
       "searching": "Buscando",
       "searchSessions": "Buscar sesiones",
@@ -1595,13 +1594,11 @@
     "sessionList": {
       "couldNotLoad": "No se pudieron cargar las sesiones",
       "couldNotLoadActive": "No se pudieron cargar las sesiones activas",
-      "noSessionsYet": "Aún no hay sesiones",
       "noSessionsYetDescription": "Inicia una tarea de codificación desde tu teléfono. Tus sesiones aparecerán aquí.",
       "noMatches": "Ninguna sesión coincide",
       "tryDifferentSearch": "Prueba con otro término de búsqueda.",
       "tryAdjustFilters": "Prueba a ajustar o borrar tus filtros.",
       "couldNotSearch": "No se pudieron buscar las sesiones",
-      "allActive": "Todas las sesiones están activas",
       "completedWillAppear": "Las sesiones completadas aparecerán aquí.",
       "noPastSessions": "No hay sesiones pasadas",
       "live": "EN VIVO"

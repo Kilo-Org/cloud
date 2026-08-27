@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Orain aktibo",
     "search": {
       "searching": "Bilatzen",
       "searchSessions": "Bilatu saioak",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "Ezin dira saioak kargatu",
       "couldNotLoadActive": "Ezin dira saio aktiboak kargatu",
-      "noSessionsYet": "Oraindik ez dago saiorik",
       "noSessionsYetDescription": "Hasi kodetze-lan bat zure telefonotik. Zure saioak hemen agertuko dira.",
       "noMatches": "Ez dago bat datorren saiorik",
       "tryDifferentSearch": "Saiatu bilaketa-termino desberdin batekin.",
       "tryAdjustFilters": "Saiatu iragazkiak doitzen edo ezabatzen.",
       "couldNotSearch": "Ezin dira saioak bilatu",
-      "allActive": "Saio guztiak aktibo daude",
       "completedWillAppear": "Amaitutako saioak hemen agertuko dira.",
       "noPastSessions": "Ez dago iraganeko saiorik",
       "live": "ZUZENEAN"

@@ -2045,7 +2045,6 @@
     }
   },
   "agents": {
-    "activeNow": "Actius ara",
     "search": {
       "searching": "Cercant",
       "searchSessions": "Cercar sessions",
@@ -2056,13 +2055,11 @@
     "sessionList": {
       "couldNotLoad": "No s'han pogut carregar les sessions",
       "couldNotLoadActive": "No s'han pogut carregar les sessions actives",
-      "noSessionsYet": "Encara no hi ha sessions",
       "noSessionsYetDescription": "Inicia una tasca de codificació des del telèfon. Les sessions apareixeran aquí.",
       "noMatches": "Cap sessió no coincideix",
       "tryDifferentSearch": "Prova amb un altre terme de cerca.",
       "tryAdjustFilters": "Prova d'ajustar o esborrar els filtres.",
       "couldNotSearch": "No s'han pogut cercar les sessions",
-      "allActive": "Totes les sessions estan actives",
       "completedWillAppear": "Les sessions completades apareixeran aquí.",
       "noPastSessions": "Cap sessió anterior",
       "live": "EN DIRECTE"

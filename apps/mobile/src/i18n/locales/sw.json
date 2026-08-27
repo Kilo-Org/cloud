@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Inafanya kazi sasa",
     "search": {
       "searching": "Inatafuta",
       "searchSessions": "Tafuta vikao",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "Haikuweza kupakia vikao",
       "couldNotLoadActive": "Haikuweza kupakia vikao vinavyofanya kazi",
-      "noSessionsYet": "Hakuna vikao bado",
       "noSessionsYetDescription": "Anza kazi ya kuandika msimbo kutoka kwenye simu yako. Vikao vyako vitaonekana hapa.",
       "noMatches": "Hakuna vikao vinavyolingana",
       "tryDifferentSearch": "Jaribu neno lingine la utafutaji.",
       "tryAdjustFilters": "Jaribu kurekebisha au kuondoa vichujio vyako.",
       "couldNotSearch": "Haikuweza kutafuta vikao",
-      "allActive": "Vikao vyote vinafanya kazi",
       "completedWillAppear": "Vikao vilivyokamilika vitaonekana hapa.",
       "noPastSessions": "Hakuna vikao vya zamani",
       "live": "LIVE"

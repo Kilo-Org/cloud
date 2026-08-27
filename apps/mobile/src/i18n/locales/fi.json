@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktiivinen nyt",
     "search": {
       "searching": "Haetaan",
       "searchSessions": "Hae istuntoja",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "Istuntoja ei voitu ladata",
       "couldNotLoadActive": "Aktiivisia istuntoja ei voitu ladata",
-      "noSessionsYet": "Ei istuntoja vielä",
       "noSessionsYetDescription": "Aloita koodaustehtävä puhelimellasi. Istunnot näkyvät tässä.",
       "noMatches": "Mikään istunto ei vastaa",
       "tryDifferentSearch": "Kokeile toista hakusanaa.",
       "tryAdjustFilters": "Yritä muuttaa tai poistaa suodattimesi.",
       "couldNotSearch": "Istuntoja ei voitu hakea",
-      "allActive": "Kaikki istunnot ovat aktiivisia",
       "completedWillAppear": "Valmistuneet istunnot näkyvät tässä.",
       "noPastSessions": "Ei aiempia istuntoja",
       "live": "LIVE"

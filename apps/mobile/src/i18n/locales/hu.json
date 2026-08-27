@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Most aktív",
     "search": {
       "searching": "Keresés",
       "searchSessions": "Munkamenetek keresése",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "A munkamenetek betöltése nem sikerült",
       "couldNotLoadActive": "Az aktív munkamenetek betöltése nem sikerült",
-      "noSessionsYet": "Még nincs munkamenet",
       "noSessionsYetDescription": "Indítson egy kódolási feladatot a telefonjáról. A munkamenetei itt jelennek meg.",
       "noMatches": "Nincs egyező munkamenet",
       "tryDifferentSearch": "Próbáljon másik keresőszót.",
       "tryAdjustFilters": "Próbálja módosítani vagy törölni a szűrőket.",
       "couldNotSearch": "A munkamenetek keresése nem sikerült",
-      "allActive": "Minden munkamenet aktív",
       "completedWillAppear": "A befejezett munkamenetek itt jelennek meg.",
       "noPastSessions": "Nincs korábbi munkamenet",
       "live": "ÉLŐ"

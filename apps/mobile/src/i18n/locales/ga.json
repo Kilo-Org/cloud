@@ -2071,7 +2071,6 @@
     }
   },
   "agents": {
-    "activeNow": "Gníomhach anois",
     "search": {
       "searching": "Ag cuardach",
       "searchSessions": "Cuardaigh seisiúin",
@@ -2082,13 +2081,11 @@
     "sessionList": {
       "couldNotLoad": "Níorbh fhéidir seisiúin a lódáil",
       "couldNotLoadActive": "Níorbh fhéidir seisiúin ghníomhacha a lódáil",
-      "noSessionsYet": "Níl aon seisiún fós",
       "noSessionsYetDescription": "Tosaigh tasc códaithe ó do ghuthán. Beidh do sheisiúin le feiceáil anseo.",
       "noMatches": "Ní mheaitseálann aon seisiún",
       "tryDifferentSearch": "Bain triail as téarma cuardaigh eile.",
       "tryAdjustFilters": "Bain triail as do scagairí a choigeartú nó a ghlanadh.",
       "couldNotSearch": "Níorbh fhéidir seisiúin a chuardach",
-      "allActive": "Tá na seisiúin go léir gníomhach",
       "completedWillAppear": "Beidh seisiúin chríochnaithe le feiceáil anseo.",
       "noPastSessions": "Níl aon seisiúin roimhe seo",
       "live": "BEO"

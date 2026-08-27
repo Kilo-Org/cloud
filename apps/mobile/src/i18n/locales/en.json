@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Active now",
     "search": {
       "searching": "Searching",
       "searchSessions": "Search sessions",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "Could not load sessions",
       "couldNotLoadActive": "Could not load active sessions",
-      "noSessionsYet": "No sessions yet",
       "noSessionsYetDescription": "Start a coding task from your phone. Your sessions will appear here.",
       "noMatches": "No sessions match",
       "tryDifferentSearch": "Try a different search term.",
       "tryAdjustFilters": "Try adjusting or clearing your filters.",
       "couldNotSearch": "Could not search sessions",
-      "allActive": "All sessions are active",
       "completedWillAppear": "Completed sessions will appear here.",
       "noPastSessions": "No past sessions",
       "live": "LIVE"

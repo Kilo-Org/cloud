@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Yana aiki a yanzu",
     "search": {
       "searching": "Ana nema",
       "searchSessions": "Nemo zaman",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "An kasa loda zaman",
       "couldNotLoadActive": "An kasa loda zaman da ke aiki",
-      "noSessionsYet": "Babu zaman har yanzu",
       "noSessionsYetDescription": "Fara aikin coding daga wayarka. Zamanka za su bayyana a nan.",
       "noMatches": "Babu zaman da ya dace",
       "tryDifferentSearch": "Gwada wani kalmar bincike dabam.",
       "tryAdjustFilters": "Gwada gyara ko share tacewarka.",
       "couldNotSearch": "An kasa nemo zaman",
-      "allActive": "Duk zaman suna aiki",
       "completedWillAppear": "Zaman da suka gama za su bayyana a nan.",
       "noPastSessions": "Babu zaman da suka gabata",
       "live": "RAYA"

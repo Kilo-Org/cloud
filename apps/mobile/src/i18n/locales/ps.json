@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "اوس فعال",
     "search": {
       "searching": "لټون روان دی",
       "searchSessions": "ناستې وپلټئ",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "ناستې بار نه شوې",
       "couldNotLoadActive": "فعالې ناستې بار نه شوې",
-      "noSessionsYet": "تر اوسه ناستې نشته",
       "noSessionsYetDescription": "له خپل تلیفون څخه د کوډ کولو دنده پیل کړئ. ستاسو ناستې به دلته ښکاره شي.",
       "noMatches": "هیڅ ناسته سمون نه خوري",
       "tryDifferentSearch": "مختلف لټون شرط هڅه کړئ.",
       "tryAdjustFilters": "فلټرونه تنظیم یا پاک کړئ.",
       "couldNotSearch": "ناستې پلټل نشو",
-      "allActive": "ټولې ناستې فعالې دي",
       "completedWillAppear": "بشپړې شوې ناستې به دلته ښکاره شي.",
       "noPastSessions": "هیڅ تېرې ناستې نشته",
       "live": "ژوندۍ"

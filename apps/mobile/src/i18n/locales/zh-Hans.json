@@ -1578,7 +1578,6 @@
     }
   },
   "agents": {
-    "activeNow": "当前活跃",
     "search": {
       "searching": "正在搜索",
       "searchSessions": "搜索会话",
@@ -1589,13 +1588,11 @@
     "sessionList": {
       "couldNotLoad": "无法加载会话",
       "couldNotLoadActive": "无法加载活动会话",
-      "noSessionsYet": "暂无会话",
       "noSessionsYetDescription": "从您的手机开始编程任务。您的会话将显示在这里。",
       "noMatches": "没有匹配的会话",
       "tryDifferentSearch": "请尝试其他搜索词。",
       "tryAdjustFilters": "请尝试调整或清除您的筛选条件。",
       "couldNotSearch": "无法搜索会话",
-      "allActive": "所有会话均处于活动状态",
       "completedWillAppear": "已完成的会话将显示在这里。",
       "noPastSessions": "没有过去的会话",
       "live": "实时"

@@ -1584,7 +1584,6 @@
     }
   },
   "agents": {
-    "activeNow": "פעיל כעת",
     "search": {
       "searching": "מחפש",
       "searchSessions": "חפש הפעלות",
@@ -1595,13 +1594,11 @@
     "sessionList": {
       "couldNotLoad": "לא ניתן היה לטעון הפעלות",
       "couldNotLoadActive": "לא ניתן היה לטעון הפעלות פעילות",
-      "noSessionsYet": "אין עדיין הפעלות",
       "noSessionsYetDescription": "התחל משימת קידוד מהטלפון שלך. ההפעלות שלך יופיעו כאן.",
       "noMatches": "אין הפעלות תואמות",
       "tryDifferentSearch": "נסה מונח חיפוש אחר.",
       "tryAdjustFilters": "נסה להתאים או לנקות את המסננים שלך.",
       "couldNotSearch": "לא ניתן היה לחפש הפעלות",
-      "allActive": "כל ההפעלות פעילות",
       "completedWillAppear": "הפעלות שהושלמו יופיעו כאן.",
       "noPastSessions": "אין הפעלות עבר",
       "live": "חי"

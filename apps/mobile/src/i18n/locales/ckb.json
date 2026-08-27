@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "ئێستا چالاکە",
     "search": {
       "searching": "گەڕان",
       "searchSessions": "گەڕان لە سێشنەکان",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "نەتوانرا دانیشتنەکان باربکرێن",
       "couldNotLoadActive": "نەتوانرا سێشنە چالاکەکان بار بکرێن",
-      "noSessionsYet": "هێشتا هیچ سێشنێک نییە",
       "noSessionsYetDescription": "لە مۆبایلەکەتەوە کارێکی کۆدنووسین دەستپێبکە. سێشنەکانت لێرە دەردەکەون.",
       "noMatches": "هیچ سێشنێک ناگونجێت",
       "tryDifferentSearch": "وشەیەکی گەڕانی جیاواز تاقی بکەرەوە.",
       "tryAdjustFilters": "هەوڵ بدە فلتەرەکانت بگۆڕیت یان بسڕیتەوە.",
       "couldNotSearch": "نەتوانرا گەڕان لە سێشنەکان بکرێت",
-      "allActive": "هەموو سێشنەکان چالاکە",
       "completedWillAppear": "سێشنە تەواوکراوەکان لێرە دەردەکەون.",
       "noPastSessions": "هیچ سێشنێکی ڕابردوو نییە",
       "live": "ڕاستەوخۆ"

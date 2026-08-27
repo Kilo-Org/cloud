@@ -1590,7 +1590,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktywne teraz",
     "search": {
       "searching": "Wyszukiwanie",
       "searchSessions": "Szukaj sesji",
@@ -1601,13 +1600,11 @@
     "sessionList": {
       "couldNotLoad": "Nie udało się załadować sesji",
       "couldNotLoadActive": "Nie udało się załadować aktywnych sesji",
-      "noSessionsYet": "Nie ma jeszcze sesji",
       "noSessionsYetDescription": "Rozpocznij zadanie kodowania z telefonu. Twoje sesje pojawią się tutaj.",
       "noMatches": "Brak pasujących sesji",
       "tryDifferentSearch": "Spróbuj użyć innego hasła wyszukiwania.",
       "tryAdjustFilters": "Spróbuj dostosować lub wyczyścić filtry.",
       "couldNotSearch": "Nie udało się wyszukać sesji",
-      "allActive": "Wszystkie sesje są aktywne",
       "completedWillAppear": "Ukończone sesje pojawią się tutaj.",
       "noPastSessions": "Brak poprzednich sesji",
       "live": "NA ŻYWO"

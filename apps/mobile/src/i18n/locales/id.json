@@ -1578,7 +1578,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktif sekarang",
     "search": {
       "searching": "Mencari",
       "searchSessions": "Cari sesi",
@@ -1589,13 +1588,11 @@
     "sessionList": {
       "couldNotLoad": "Tidak dapat memuat sesi",
       "couldNotLoadActive": "Tidak dapat memuat sesi aktif",
-      "noSessionsYet": "Belum ada sesi",
       "noSessionsYetDescription": "Mulai tugas coding dari ponsel Anda. Sesi Anda akan muncul di sini.",
       "noMatches": "Tidak ada sesi yang cocok",
       "tryDifferentSearch": "Coba istilah pencarian lain.",
       "tryAdjustFilters": "Coba sesuaikan atau hapus filter Anda.",
       "couldNotSearch": "Tidak dapat mencari sesi",
-      "allActive": "Semua sesi aktif",
       "completedWillAppear": "Sesi yang selesai akan muncul di sini.",
       "noPastSessions": "Tidak ada sesi sebelumnya",
       "live": "LANGSUNG"

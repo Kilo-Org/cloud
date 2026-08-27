@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktif sekarang",
     "search": {
       "searching": "Mencari",
       "searchSessions": "Cari sesi",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "Tidak dapat memuatkan sesi",
       "couldNotLoadActive": "Tidak dapat memuatkan sesi aktif",
-      "noSessionsYet": "Belum ada sesi",
       "noSessionsYetDescription": "Mulakan tugasan pengekodan dari telefon anda. Sesi anda akan muncul di sini.",
       "noMatches": "Tiada sesi sepadan",
       "tryDifferentSearch": "Cuba istilah carian yang berbeza.",
       "tryAdjustFilters": "Cuba laraskan atau kosongkan penapis anda.",
       "couldNotSearch": "Tidak dapat mencari sesi",
-      "allActive": "Semua sesi aktif",
       "completedWillAppear": "Sesi yang selesai akan muncul di sini.",
       "noPastSessions": "Tiada sesi lalu",
       "live": "LANGSUNG"

@@ -1602,7 +1602,6 @@
     }
   },
   "agents": {
-    "activeNow": "نشط الآن",
     "search": {
       "searching": "جارٍ البحث",
       "searchSessions": "البحث في الجلسات",
@@ -1613,13 +1612,11 @@
     "sessionList": {
       "couldNotLoad": "تعذّر تحميل الجلسات",
       "couldNotLoadActive": "تعذّر تحميل الجلسات النشطة",
-      "noSessionsYet": "لا توجد جلسات بعد",
       "noSessionsYetDescription": "ابدأ مهمة برمجة من هاتفك. ستظهر جلساتك هنا.",
       "noMatches": "لا توجد جلسات مطابقة",
       "tryDifferentSearch": "جرّب مصطلح بحث مختلف.",
       "tryAdjustFilters": "جرّب تعديل عوامل التصفية أو مسحها.",
       "couldNotSearch": "تعذّر البحث في الجلسات",
-      "allActive": "جميع الجلسات نشطة",
       "completedWillAppear": "ستظهر الجلسات المكتملة هنا.",
       "noPastSessions": "لا توجد جلسات سابقة",
       "live": "مباشر"

@@ -2032,7 +2032,6 @@
     }
   },
   "agents": {
-    "activeNow": "Na-arụ ọrụ ugbu a",
     "search": {
       "searching": "Na-achọ",
       "searchSessions": "Chọọ nzukọ",
@@ -2043,13 +2042,11 @@
     "sessionList": {
       "couldNotLoad": "Enweghị ike ibudata nzukọ",
       "couldNotLoadActive": "Enweghị ike ibudata nzukọ na-arụ ọrụ",
-      "noSessionsYet": "Enweghị nzukọ aka",
       "noSessionsYetDescription": "Malite ọrụ koodu site na ekwentị gị. Nzukọ gị ga-apụta ebe a.",
       "noMatches": "Enweghị nzukọ dabara",
       "tryDifferentSearch": "Nwaa okwu ọchụchọ dị iche.",
       "tryAdjustFilters": "Nwaa ịhazigharị ma ọ bụ kpochapụ nzacha gị.",
       "couldNotSearch": "Enweghị ike ịchọ nzukọ",
-      "allActive": "Nzukọ niile na-arụ ọrụ",
       "completedWillAppear": "Nzukọ ndị emechara ga-apụta ebe a.",
       "noPastSessions": "Enweghị nzukọ gara aga",
       "live": "LIVE"

@@ -1963,6 +1963,7 @@ export function inferRowlessAuthProviders(
 ): AuthProviderId[] {
   const legacyOAuthProvider = parseLegacyOAuthProvider(user.id);
   if (legacyOAuthProvider) return [legacyOAuthProvider];
+  if (isUuidUserId(user.id)) return ['email'];
 
   switch (user.hosted_domain) {
     case hosted_domain_specials.non_workspace_google_account:
@@ -1982,7 +1983,7 @@ export function inferRowlessAuthProviders(
     case hosted_domain_specials.email:
       return ['email'];
     default:
-      return isUuidUserId(user.id) ? ['email'] : [];
+      return [];
   }
 }
 

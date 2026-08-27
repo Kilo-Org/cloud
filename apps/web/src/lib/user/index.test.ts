@@ -539,6 +539,26 @@ describe('User', () => {
       });
     });
 
+    it('treats a rowless UUID account as Email despite a stale provider sentinel', async () => {
+      const user = await insertTestUser({
+        id: randomUUID(),
+        google_user_email: 'reset-email@example.com',
+        google_user_name: 'Reset Email User',
+        normalized_email: 'reset-email@example.com',
+        hosted_domain: hosted_domain_specials.github,
+      });
+
+      await expect(getAllUserProviders('reset-email@example.com')).resolves.toEqual({
+        kind: 'found',
+        user: {
+          kiloUserId: user.id,
+          providers: ['email'],
+          primaryEmail: 'reset-email@example.com',
+          workosHostedDomain: undefined,
+        },
+      });
+    });
+
     it('uses the canonical UUID validator for rowless Email recovery', async () => {
       const email = 'nil-uuid-email@example.com';
       const user = await insertTestUser({

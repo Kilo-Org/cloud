@@ -779,7 +779,6 @@ export async function processGooglePlayKiloPassNotification(params: {
         captureException(error, {
           tags: { area: 'kilo-pass', operation: 'reverse-google-play-refund-credits' },
           extra: {
-            purchaseToken,
             latestOrderId: decoded.latestOrderId,
           },
         });

@@ -1,4 +1,4 @@
-import { type RepoPlatform } from '@/lib/picker-bridge';
+import { getRepoOptionKey, type RepoPlatform } from '@/lib/picker-bridge';
 
 export type RepositoryPlatform = RepoPlatform;
 
@@ -12,9 +12,49 @@ export type NewSessionRepository = {
   platform: RepositoryPlatform;
   fullName: string;
   isPrivate: boolean;
+  platformIntegrationId?: string;
+  platformAccountLogin?: string;
   workspaceUuid?: string;
   repositoryUuid?: string;
 };
+
+export function toNewSessionGitHubRepository(repository: {
+  fullName: string;
+  private: boolean;
+  platformIntegrationId?: string;
+  platformAccountLogin?: string;
+}): NewSessionRepository {
+  const result: NewSessionRepository = {
+    platform: 'github',
+    fullName: repository.fullName,
+    isPrivate: repository.private,
+  };
+  if (repository.platformIntegrationId) {
+    result.platformIntegrationId = repository.platformIntegrationId;
+  }
+  if (repository.platformAccountLogin) {
+    result.platformAccountLogin = repository.platformAccountLogin;
+  }
+  return result;
+}
+
+/**
+ * Preserve an explicit installation choice only when the repository name is
+ * ambiguous. Unique names are resolved live by Cloud Agent at submission.
+ */
+export function resolveGitHubIntegrationIdForSubmission(
+  repository: NewSessionRepository | null,
+  repositories: readonly NewSessionRepository[]
+): string | undefined {
+  if (repository?.platform !== 'github' || !repository.platformIntegrationId) {
+    return undefined;
+  }
+  const normalizedFullName = repository.fullName.toLowerCase();
+  const matchingOptions = repositories.filter(
+    option => option.platform === 'github' && option.fullName.toLowerCase() === normalizedFullName
+  );
+  return matchingOptions.length > 1 ? repository.platformIntegrationId : undefined;
+}
 
 export type RepositoryProviderStatus =
   | 'loading'
@@ -110,20 +150,17 @@ export function resolveBitbucketStatus({
 
 // ── Dedup and grouping ───────────────────────────────────────────────
 
-const repositoryKey = (repository: NewSessionRepository): string =>
-  `${repository.platform}/${repository.fullName}`;
-
 /**
- * Deduplicate repository rows by `platform + fullName`, so the same
- * `fullName` on two platforms stays two rows.
+ * Deduplicate repository rows by their picker identity. GitHub rows with the
+ * same full name remain distinct when they came from different integrations.
  */
-export function dedupeRepositoriesByPlatformAndFullName(
+export function dedupeRepositoriesByIdentity(
   repositories: readonly NewSessionRepository[]
 ): NewSessionRepository[] {
   const seen = new Set<string>();
   const result: NewSessionRepository[] = [];
   for (const repository of repositories) {
-    const key = repositoryKey(repository);
+    const key = getRepoOptionKey(repository);
     if (!seen.has(key)) {
       seen.add(key);
       result.push(repository);

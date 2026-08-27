@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
+import { resolveGitHubIntegrationIdForSubmission } from '@/components/agents/new-session-repository-state';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
 import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
@@ -36,7 +37,11 @@ import {
 } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
-import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
+import {
+  type InstancePickerInstance,
+  type ModelPickerSelection,
+  resolveRepoOptionByKey,
+} from '@/lib/picker-bridge';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { peekSharePayload } from '@/lib/share-payload';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
@@ -168,20 +173,18 @@ export function NewSessionScreenBody() {
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
   });
 
-  // The picker reports a `platform:fullName` key; resolve it to the full row so
-  // the creator can send the platform-specific repository field. The prefill
-  // seeds the same platform-qualified key, so no bare-fullName fallback is
-  // needed (and one would bind a same-named GitLab/Bitbucket row).
+  // Resolve the picker identity back to the full row and preserve a GitHub
+  // installation fence only for an explicit choice among duplicate names.
   const selectedRepository = useMemo(() => {
     if (!selectedRepo) {
       return null;
     }
-    return (
-      repositories.find(
-        repository => `${repository.platform}:${repository.fullName}` === selectedRepo
-      ) ?? null
-    );
+    return resolveRepoOptionByKey(repositories, selectedRepo);
   }, [repositories, selectedRepo]);
+  const githubIntegrationId = useMemo(
+    () => resolveGitHubIntegrationIdForSubmission(selectedRepository, repositories),
+    [repositories, selectedRepository]
+  );
 
   const {
     profile,
@@ -243,6 +246,7 @@ export function NewSessionScreenBody() {
     model: displayModel,
     organizationId,
     onCreated: handleCreated,
+    githubIntegrationId,
     selectedRepository,
     setIsCreating,
     variant: displayVariant,

@@ -31,6 +31,8 @@ type UseNewSessionCreatorInput = {
   organizationId?: string;
   /** Invoked on the success path before navigation; failures never fire it. */
   onCreated?: () => void;
+  /** Exact GitHub installation fence for an explicit ambiguous selection. */
+  githubIntegrationId?: string;
   selectedRepository: NewSessionRepository | null;
   setIsCreating: (value: boolean) => void;
   variant: string;
@@ -48,6 +50,7 @@ type PrepareSessionInput = {
   variant: string | undefined;
   /** Exactly one repository field is set, matching the selected row's platform. */
   githubRepo?: string;
+  githubIntegrationId?: string;
   gitlabProject?: string;
   bitbucketRepo?: { fullName: string; workspaceUuid: string; repositoryUuid: string };
   autoCommit: boolean;
@@ -75,6 +78,7 @@ export function useNewSessionCreator({
   model,
   organizationId,
   onCreated,
+  githubIntegrationId,
   selectedRepository,
   setIsCreating,
   variant,
@@ -139,7 +143,7 @@ export function useNewSessionCreator({
       mode,
       model,
       variant: variant || undefined,
-      repo: resolveRepoFingerprint(selectedRepository),
+      repo: resolveRepoFingerprint(selectedRepository, githubIntegrationId),
       autoCommit,
       organizationId: organizationId ?? null,
       profileId: profileId ?? null,
@@ -150,7 +154,7 @@ export function useNewSessionCreator({
     // intents fall back to the legacy bare-name lookup: two same-named
     // GitLab/Bitbucket rows must never share the stale retry key.
     const legacyIntentFingerprint =
-      selectedRepository?.platform === 'github'
+      selectedRepository?.platform === 'github' && !githubIntegrationId
         ? JSON.stringify({
             prompt,
             mode,
@@ -200,7 +204,7 @@ export function useNewSessionCreator({
         autoInitiate: true,
         operationKey,
       };
-      setRepositoryField(baseInput, selectedRepository);
+      setRepositoryField(baseInput, selectedRepository, githubIntegrationId);
       if (profileId) {
         baseInput.profileId = profileId;
       }
@@ -283,6 +287,7 @@ export function useNewSessionCreator({
     }
   }, [
     selectedRepository,
+    githubIntegrationId,
     model,
     mode,
     variant,
@@ -311,9 +316,13 @@ export function useNewSessionCreator({
  * same-named repos on different providers mint distinct retry keys, and the
  * Bitbucket workspace/repository uuids so a workspace rename cannot collide.
  */
-function resolveRepoFingerprint(repository: NewSessionRepository | null): {
+function resolveRepoFingerprint(
+  repository: NewSessionRepository | null,
+  githubIntegrationId: string | undefined
+): {
   platform: RepositoryPlatform;
   fullName: string;
+  platformIntegrationId?: string;
   workspaceUuid?: string | null;
   repositoryUuid?: string | null;
 } | null {
@@ -328,6 +337,13 @@ function resolveRepoFingerprint(repository: NewSessionRepository | null): {
       repositoryUuid: repository.repositoryUuid ?? null,
     };
   }
+  if (repository.platform === 'github') {
+    return {
+      platform: repository.platform,
+      fullName: repository.fullName,
+      ...(githubIntegrationId ? { platformIntegrationId: githubIntegrationId } : {}),
+    };
+  }
   return { platform: repository.platform, fullName: repository.fullName };
 }
 
@@ -339,13 +355,17 @@ function resolveRepoFingerprint(repository: NewSessionRepository | null): {
  */
 function setRepositoryField(
   input: PrepareSessionInput,
-  repository: NewSessionRepository | null
+  repository: NewSessionRepository | null,
+  githubIntegrationId: string | undefined
 ): void {
   if (!repository) {
     return;
   }
   if (repository.platform === 'github') {
     input.githubRepo = repository.fullName;
+    if (githubIntegrationId) {
+      input.githubIntegrationId = githubIntegrationId;
+    }
     return;
   }
   if (repository.platform === 'gitlab') {

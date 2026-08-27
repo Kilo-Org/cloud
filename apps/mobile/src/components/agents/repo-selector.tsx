@@ -7,11 +7,14 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   type RepoOption as BridgeRepoOption,
+  getRepoOptionKey,
   REPO_PLATFORM_LABEL_KEYS,
   type RepoPickerSection,
   type RepoPlatform,
+  resolveRepoOptionByKey,
 } from '@/lib/picker-bridge';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
+import { groupRepoPickerOptions } from '@/lib/repo-picker-filter';
 import { cn } from '@/lib/utils';
 
 type RepoOption = {
@@ -19,6 +22,8 @@ type RepoOption = {
   isPrivate: boolean;
   /** Provider platform; omitted rows are treated as GitHub until d1 fills it. */
   platform?: RepoPlatform;
+  platformIntegrationId?: string;
+  platformAccountLogin?: string;
   workspaceUuid?: string;
   repositoryUuid?: string;
 };
@@ -33,18 +38,17 @@ type RepoSelectorProps = {
   disabled?: boolean;
 };
 
-function isRepoPlatform(platform: string): platform is RepoPlatform {
-  return platform === 'github' || platform === 'gitlab' || platform === 'bitbucket';
-}
-
-/** Constant order for provider sections (Bitbucket only when its rows exist, i.e. an org is set). */
-const PROVIDER_SECTION_ORDER: readonly RepoPlatform[] = ['github', 'gitlab', 'bitbucket'];
-
 function toBridgeRepo(repo: RepoOption): BridgeRepoOption {
   return {
     platform: repo.platform ?? 'github',
     fullName: repo.fullName,
     isPrivate: repo.isPrivate,
+    ...(repo.platformIntegrationId !== undefined
+      ? { platformIntegrationId: repo.platformIntegrationId }
+      : {}),
+    ...(repo.platformAccountLogin !== undefined
+      ? { platformAccountLogin: repo.platformAccountLogin }
+      : {}),
     ...(repo.workspaceUuid !== undefined ? { workspaceUuid: repo.workspaceUuid } : {}),
     ...(repo.repositoryUuid !== undefined ? { repositoryUuid: repo.repositoryUuid } : {}),
   };
@@ -63,9 +67,7 @@ function buildRepoSections({
   repositories: RepoOption[];
   recents: RepoOption[];
 }): RepoPickerSection[] {
-  const recentKeys = new Set(
-    recents.map(repo => `${repo.platform ?? 'github'}/${repo.fullName.toLowerCase()}`)
-  );
+  const recentKeys = new Set(recents.map(repo => getRepoOptionKey(toBridgeRepo(repo))));
   const sections: RepoPickerSection[] = [];
   if (recents.length > 0) {
     sections.push({
@@ -74,23 +76,13 @@ function buildRepoSections({
       repos: recents.map(repo => toBridgeRepo(repo)),
     });
   }
-  for (const platform of PROVIDER_SECTION_ORDER) {
-    const repos = repositories.filter(repo => {
-      const repoPlatform = repo.platform ?? 'github';
-      return (
-        repoPlatform === platform &&
-        !recentKeys.has(`${repoPlatform}/${repo.fullName.toLowerCase()}`)
-      );
-    });
-    if (repos.length > 0) {
-      sections.push({
-        key: platform,
-        titleKey: REPO_PLATFORM_LABEL_KEYS[platform],
-        repos: repos.map(repo => toBridgeRepo(repo)),
-      });
-    }
-  }
-  return sections;
+  const nonRecentRepositories = repositories.filter(
+    repo => !recentKeys.has(getRepoOptionKey(toBridgeRepo(repo)))
+  );
+  return [
+    ...sections,
+    ...groupRepoPickerOptions(nonRecentRepositories.map(repo => toBridgeRepo(repo))),
+  ];
 }
 
 export function RepoSelector({
@@ -106,23 +98,21 @@ export function RepoSelector({
   const { t } = useTranslation();
   const effectivelyDisabled = disabled || isLoading || repositories.length === 0;
 
-  // The selection value is `platform:fullName`; show the platform name next to
-  // the fullName so two same-name repos on different providers stay distinct in
-  // the closed state. A bare fullName (legacy prefill) falls back to the
-  // matching row's platform.
-  const colonIndex = value.indexOf(':');
-  const rawPlatform = colonIndex !== -1 ? value.slice(0, colonIndex) : '';
-  const selectedPlatform: RepoPlatform | undefined =
-    colonIndex !== -1 && isRepoPlatform(rawPlatform)
-      ? rawPlatform
-      : repositories.find(repo => repo.fullName === value)?.platform;
-  const displayValue = colonIndex !== -1 ? value.slice(colonIndex + 1) : value;
-  const platformName = selectedPlatform ? t(REPO_PLATFORM_LABEL_KEYS[selectedPlatform]) : undefined;
-  let label = displayValue;
+  const selectedRepository = resolveRepoOptionByKey(
+    repositories.map(repo => toBridgeRepo(repo)),
+    value
+  );
+  const selectedPlatform = selectedRepository?.platform ?? 'github';
+  const platformName = selectedRepository
+    ? t(REPO_PLATFORM_LABEL_KEYS[selectedPlatform])
+    : undefined;
+  let label = selectedRepository?.fullName ?? '';
   if (!label) {
     label = isLoading ? t('agentChat.repoPicker.loading') : t('agentChat.repoPicker.title');
   } else if (platformName) {
-    label = `${platformName} · ${displayValue}`;
+    label = [platformName, selectedRepository?.platformAccountLogin, label]
+      .filter(Boolean)
+      .join(' · ');
   }
 
   function handlePress() {

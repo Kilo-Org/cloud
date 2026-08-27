@@ -1,13 +1,88 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  dedupeRepositoriesByPlatformAndFullName,
+  dedupeRepositoriesByIdentity,
   type NewSessionRepository,
   type RepositoryGroup,
   resolveBitbucketStatus,
+  resolveGitHubIntegrationIdForSubmission,
   resolveProviderStatus,
   resolveRepositoryGroups,
+  toNewSessionGitHubRepository,
 } from './new-session-repository-state';
+
+describe('toNewSessionGitHubRepository', () => {
+  it('preserves integration provenance from the tRPC DTO', () => {
+    expect(
+      toNewSessionGitHubRepository({
+        fullName: 'owner/repo',
+        private: true,
+        platformIntegrationId: 'integration-1',
+        platformAccountLogin: 'owner',
+      })
+    ).toEqual({
+      platform: 'github',
+      fullName: 'owner/repo',
+      isPrivate: true,
+      platformIntegrationId: 'integration-1',
+      platformAccountLogin: 'owner',
+    });
+  });
+
+  it('supports older tRPC responses without provenance', () => {
+    expect(toNewSessionGitHubRepository({ fullName: 'owner/repo', private: false })).toEqual({
+      platform: 'github',
+      fullName: 'owner/repo',
+      isPrivate: false,
+    });
+  });
+});
+
+describe('resolveGitHubIntegrationIdForSubmission', () => {
+  const selected = {
+    platform: 'github' as const,
+    fullName: 'Owner/Repo',
+    isPrivate: false,
+    platformIntegrationId: 'integration-1',
+  };
+
+  it('uses central live resolution for a unique repository name', () => {
+    expect(resolveGitHubIntegrationIdForSubmission(selected, [selected])).toBeUndefined();
+  });
+
+  it('does not treat a same-name repository on another provider as ambiguous', () => {
+    expect(
+      resolveGitHubIntegrationIdForSubmission(selected, [
+        selected,
+        { platform: 'gitlab', fullName: 'owner/repo', isPrivate: false },
+      ])
+    ).toBeUndefined();
+  });
+
+  it('preserves the selected integration for case-insensitive duplicate names', () => {
+    expect(
+      resolveGitHubIntegrationIdForSubmission(selected, [
+        selected,
+        {
+          ...selected,
+          fullName: 'owner/repo',
+          platformIntegrationId: 'integration-2',
+        },
+      ])
+    ).toBe('integration-1');
+  });
+
+  it('does not fence a provenance-free duplicate selection', () => {
+    const provenanceFree = {
+      platform: 'github' as const,
+      fullName: 'owner/repo',
+      isPrivate: false,
+    };
+    expect(
+      resolveGitHubIntegrationIdForSubmission(provenanceFree, [selected, provenanceFree])
+    ).toBeUndefined();
+  });
+});
 
 describe('resolveProviderStatus', () => {
   it('returns loading while the provider query is loading', () => {
@@ -145,22 +220,25 @@ const gitlab = (fullName: string): NewSessionRepository => ({
   isPrivate: false,
 });
 
-describe('dedupeRepositoriesByPlatformAndFullName', () => {
+describe('dedupeRepositoriesByIdentity', () => {
   it('keeps the same fullName on two platforms as two rows', () => {
-    const deduped = dedupeRepositoriesByPlatformAndFullName([
-      github('owner/repo'),
-      gitlab('owner/repo'),
-    ]);
+    const deduped = dedupeRepositoriesByIdentity([github('owner/repo'), gitlab('owner/repo')]);
     expect(deduped).toHaveLength(2);
     expect(deduped.map(repo => repo.platform)).toEqual(['github', 'gitlab']);
   });
 
   it('collapses duplicate rows that share platform and fullName', () => {
-    const deduped = dedupeRepositoriesByPlatformAndFullName([
-      github('owner/repo'),
-      github('owner/repo'),
-    ]);
+    const deduped = dedupeRepositoriesByIdentity([github('owner/repo'), github('owner/repo')]);
     expect(deduped).toHaveLength(1);
+  });
+
+  it('keeps same-name GitHub rows from separate integrations', () => {
+    const deduped = dedupeRepositoriesByIdentity([
+      { ...github('owner/repo'), platformIntegrationId: 'integration-1' },
+      { ...github('owner/repo'), platformIntegrationId: 'integration-2' },
+    ]);
+
+    expect(deduped).toHaveLength(2);
   });
 });
 

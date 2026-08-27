@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from 'react';
 import * as WebBrowser from 'expo-web-browser';
+import { useFocusEffect } from 'expo-router';
 import { Alert, Platform } from 'react-native';
 
 import { i18n } from '@/i18n';
@@ -11,6 +12,7 @@ import {
   type GitHubInstallReturnOutcome,
   subscribeToGitHubInstallReturnOutcome,
 } from '@/lib/github-install-return';
+import { showActivityKitDisabledAlertOnce } from '@/lib/glanceable/activity-kit-prompt';
 import { trpcClient } from '@/lib/trpc';
 
 export type GitHubInstallOutcomeAlertButton = {
@@ -134,6 +136,15 @@ export default function AgentSessionList() {
     consumeReturnOutcome();
     return subscribeToGitHubInstallReturnOutcome(consumeReturnOutcome);
   }, [consumeReturnOutcome]);
+
+  // Show the one-time "turn on Live Activities" alert when the Agents tab
+  // regains focus and ActivityKit is unavailable. Never auto-alerts from the
+  // publisher; this tab focus is the single prompt site.
+  useFocusEffect(
+    useCallback(() => {
+      showActivityKitDisabledAlertOnce();
+    }, [])
+  );
 
   return <AgentSessionListScreen />;
 }

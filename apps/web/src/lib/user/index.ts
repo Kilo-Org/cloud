@@ -79,6 +79,7 @@ import {
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
   user_push_tokens,
+  user_activity_tokens,
   user_notification_preferences,
   contributor_champion_events,
   contributor_champion_memberships,
@@ -1454,6 +1455,10 @@ export async function anonymizeCloudUserData(
     );
   // Locale is account-adjacent and is removed with the token row.
   await tx.delete(user_push_tokens).where(eq(user_push_tokens.user_id, userId));
+  // Activity tokens (Live Activity / push-to-start / Android ongoing) are
+  // account-owned device identifiers; a signed-out or deleted user must stop
+  // receiving glanceable deliveries.
+  await tx.delete(user_activity_tokens).where(eq(user_activity_tokens.user_id, userId));
   await tx
     .delete(user_notification_preferences)
     .where(eq(user_notification_preferences.user_id, userId));

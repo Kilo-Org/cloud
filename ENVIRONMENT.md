@@ -322,6 +322,13 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 
 ## Services
 
+### Notifications Worker
+
+- `APNS_TEAM_ID` - Apple Developer team ID for the token-based APNs key used to send Live Activity pushes. [SERVER]
+- `APNS_KEY_ID` - APNs key identifier (`kid`) for the Live Activity push key. [SERVER]
+- `APNS_PRIVATE_KEY` - PKCS#8 ES256 `.p8` private key contents for APNs provider-token signing. `[SECRET]`
+- `APNS_TOPIC` - iOS app bundle id (`com.kilocode.kiloapp`); Live Activity pushes use `<topic>.push-type.liveactivity`. [SERVER]
+
 ### KiloClaw Controller
 
 - `KILOCODE_API_KEY` - API key used by the KiloClaw controller for internal gateway identity. `[SECRET]`

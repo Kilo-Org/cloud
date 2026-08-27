@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/react-native';
 import * as z from 'zod';
 
 import { getDevicePushTokenOutcome } from '@/lib/notifications';
+import { getGlanceableDelivery } from '@/lib/glanceable/sink-registry';
 import { readCachedUserId } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
 import { LOGOUT_CLEANUP_TOMBSTONE_KEY } from '@/lib/storage-keys';
@@ -109,6 +110,12 @@ export async function runLogoutCleanup(): Promise<void> {
         ? trpcClient.user.unregisterPushToken.mutate({ token: pushToken })
         : Promise.resolve(),
     ]);
+
+    // Unregister activity tokens (Live Activity / push-to-start) before the
+    // epoch bump. Best-effort: the delivery re-registers tokens on the next
+    // activity start, so a failed unregister is not tombstoned — a tombstone
+    // has no reconciliation retry for activity tokens.
+    getGlanceableDelivery().unregisterTokens();
 
     const unregister = results[1];
 

@@ -76,6 +76,26 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     remediationId: nonEmptyStringSchema.optional(),
     prUrl: nonEmptyStringSchema.optional(),
   }),
+  // Aggregate glanceable snapshot for the Active Agents Live Activity / widget
+  // / Android ongoing. Carries generic status, counts, safe timestamps, and an
+  // opaque scope key only — no titles, ids, or accountEpoch (the client sets
+  // its local epoch). `status` mirrors the shared glanceable status enum.
+  // Old clients omit this type; remove the send gate when every client is past
+  // this release.
+  z.object({
+    type: z.literal('active_agents_glanceable'),
+    schemaVersion: z.literal(1),
+    revision: z.number().int().min(1),
+    scopeKey: nonEmptyStringSchema,
+    organizationBound: z.boolean(),
+    status: z.enum(['waiting', 'empty', 'happy', 'stale', 'expired', 'signed_out', 'privacy']),
+    running: z.number().int().min(0),
+    needsInput: z.number().int().min(0),
+    reconnecting: z.number().int().min(0),
+    updatedAt: z.string(),
+    expiresAt: z.string(),
+    eligibleStartedAt: z.string().nullable(),
+  }),
 ]);
 
 export type PushData = z.infer<typeof pushDataSchema>;

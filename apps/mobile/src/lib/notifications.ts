@@ -10,7 +10,15 @@ import {
   type PushData,
   pushDataSchema,
 } from '@kilocode/notifications';
+import {
+  type GlanceableAgentsSnapshot,
+  isEligibleGlanceableWork,
+  shouldDiscardGlanceableRevision,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { getLastGlanceableSnapshot, getLocalScopeKey } from '@/lib/glanceable/persist';
+import { getGlanceableSinks } from '@/lib/glanceable/sink-registry';
 import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
 import { notificationPathForData } from './notification-path';
@@ -46,6 +54,47 @@ export function parseNotificationData(data: unknown): PushData | null {
   return parsed.success ? parsed.data : null;
 }
 
+/**
+ * Apply an `active_agents_glanceable` background push to the glanceable sinks
+ * (widgets, Android ongoing, iOS Live Activity). Returns false when the push
+ * must be dropped: its opaque scope key does not match the persisted local
+ * scope key, or its revision is older than the last applied snapshot.
+ *
+ * The server omits `accountEpoch`, so it is set to the current local epoch
+ * before publishing. Never opens a session chat.
+ */
+export function applyGlanceablePushData(
+  data: Extract<PushData, { type: 'active_agents_glanceable' }>
+): boolean {
+  if (data.scopeKey !== getLocalScopeKey()) {
+    return false;
+  }
+
+  const { type: _type, ...fields } = data;
+  const snapshot: GlanceableAgentsSnapshot = {
+    ...fields,
+    accountEpoch: currentAuthEpoch(),
+  };
+
+  const current = getLastGlanceableSnapshot();
+  if (current !== null && shouldDiscardGlanceableRevision(snapshot, current)) {
+    return false;
+  }
+
+  const ctx = { organizationId: null };
+  if (isEligibleGlanceableWork(snapshot)) {
+    for (const sink of getGlanceableSinks()) {
+      sink.publish(snapshot);
+      sink.startOrUpdate(snapshot, ctx);
+    }
+  } else {
+    for (const sink of getGlanceableSinks()) {
+      sink.publish(snapshot);
+    }
+  }
+  return true;
+}
+
 const shown = {
   shouldPlaySound: true,
   shouldSetBadge: true,
@@ -65,6 +114,14 @@ export function setupNotificationHandler() {
     // eslint-disable-next-line require-await -- expo-notifications requires async callback type but logic is synchronous
     handleNotification: async notification => {
       const data = parseNotificationData(notification.request.content.data);
+
+      if (data?.type === 'active_agents_glanceable') {
+        // The aggregate glanceable push is a data carrier for the ongoing
+        // notification/widgets, never a visible banner: the local ongoing owns
+        // the display. Apply it to the sinks regardless of the discard outcome.
+        applyGlanceablePushData(data);
+        return suppressed;
+      }
 
       if (
         data?.type === 'chat.message' &&
@@ -158,6 +215,7 @@ const CHANNEL_NAME_KEYS = {
   kiloclaw: 'notifications.channel.kiloclaw',
   balance: 'notifications.channel.balance',
   security: 'notifications.channel.security',
+  'active-agents': 'glanceable.channelName',
 } as const satisfies Record<AndroidNotificationChannelId, string>;
 
 /**

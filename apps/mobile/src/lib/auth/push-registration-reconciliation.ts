@@ -13,6 +13,10 @@ import { getDevicePushTokenOutcome, getPlatform } from '@/lib/notifications';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient } from '@/lib/trpc';
 
+// Import side effect: registers the iOS activity-token delivery with the
+// glanceable sink registry so the publisher can register/unregister tokens.
+import '@/lib/glanceable/delivery-registration';
+
 const trpcOptions = createTRPCOptionsProxy<MobileRouter>({ client: trpcClient, queryClient });
 
 /**

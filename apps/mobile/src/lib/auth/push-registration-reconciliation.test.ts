@@ -49,6 +49,11 @@ vi.mock('@/lib/query-client', () => ({
   queryClient: queryClientMock,
 }));
 vi.mock('@/lib/hooks/use-language-preference', () => languageMock);
+// The slice's side-effect import registers iOS activity-token delivery and
+// transitively loads expo-widgets / @expo/ui; this suite exercises
+// push-token reconciliation only, so stub the side effect instead of
+// mocking every iOS native module.
+vi.mock('@/lib/glanceable/delivery-registration', () => ({}));
 vi.mock('expo-notifications', () => ({
   addPushTokenListener: expoNotificationsMock.addPushTokenListener,
 }));

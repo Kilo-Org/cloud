@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -13,7 +13,12 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
+import {
+  buildGastownRepositoryRigInput,
+  findGastownRepository,
+  GastownRepositorySelector,
+  type GastownRepositoryOption,
+} from '@/components/gastown/GastownRepositorySelector';
 import { toast } from 'sonner';
 
 type CreateRigDialogProps = {
@@ -31,8 +36,7 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
   const [gitUrl, setGitUrl] = useState('');
   const [defaultBranch, setDefaultBranch] = useState('main');
   const [mode, setMode] = useState<RepoMode>('integration');
-  const [selectedRepo, setSelectedRepo] = useState('');
-  const [selectedPlatform, setSelectedPlatform] = useState<'github' | 'gitlab' | null>(null);
+  const [selectedRepoKey, setSelectedRepoKey] = useState('');
   const trpc = useGastownTRPC();
   const mainTrpc = useTRPC();
   const queryClient = useQueryClient();
@@ -58,12 +62,15 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
     enabled: isOpen && mode === 'integration',
   });
 
-  const unifiedRepositories = useMemo<RepositoryOption[]>(() => {
+  const unifiedRepositories = useMemo<GastownRepositoryOption[]>(() => {
     const github = (githubReposQuery.data?.repositories ?? []).map(repo => ({
       id: repo.id,
       fullName: repo.fullName,
       private: repo.private,
       platform: 'github' as const,
+      defaultBranch: repo.defaultBranch,
+      platformIntegrationId: repo.platformIntegrationId,
+      platformAccountLogin: repo.platformAccountLogin,
     }));
     const gitlab = (gitlabReposQuery.data?.repositories ?? []).map(repo => ({
       id: repo.id,
@@ -73,12 +80,18 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
     }));
     return [...github, ...gitlab];
   }, [githubReposQuery.data, gitlabReposQuery.data]);
+  const selectedRepository = findGastownRepository(unifiedRepositories, selectedRepoKey);
 
   const hasIntegrations =
     (githubReposQuery.data?.repositories?.length ?? 0) > 0 ||
     (gitlabReposQuery.data?.repositories?.length ?? 0) > 0;
 
   const isLoadingRepos = githubReposQuery.isLoading || gitlabReposQuery.isLoading;
+
+  useEffect(() => {
+    if (isLoadingRepos || !selectedRepoKey || selectedRepository) return;
+    setSelectedRepoKey('');
+  }, [isLoadingRepos, selectedRepoKey, selectedRepository]);
 
   const createRig = useMutation(
     trpc.gastown.createRig.mutationOptions({
@@ -98,53 +111,53 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
     setName('');
     setGitUrl('');
     setDefaultBranch('main');
-    setSelectedRepo('');
-    setSelectedPlatform(null);
+    setSelectedRepoKey('');
   }
 
-  function handleRepoSelect(fullName: string) {
-    setSelectedRepo(fullName);
-    // Determine platform from the selection
-    const repo = unifiedRepositories.find(r => r.fullName === fullName);
+  function handleRepoSelect(selectionKey: string) {
+    setSelectedRepoKey(selectionKey);
+    const repo = findGastownRepository(unifiedRepositories, selectionKey);
     // TODO: Add Bitbucket support to Gastown.
-    if (repo?.platform && repo.platform !== 'bitbucket') {
-      setSelectedPlatform(repo.platform);
-    }
+    if (!repo || repo.platform === 'bitbucket') return;
     // Auto-fill name from repo name
-    const repoName = fullName.split('/').pop() ?? fullName;
+    const repoName = repo.fullName.split('/').pop() ?? repo.fullName;
     if (!name) {
       setName(repoName);
     }
+    setDefaultBranch(repo.defaultBranch || 'main');
   }
 
   function resolveGitUrl(): string {
     if (mode === 'manual') return gitUrl.trim();
-    if (!selectedRepo) return '';
-    if (selectedPlatform === 'gitlab') {
-      const instanceUrl =
-        (gitlabReposQuery.data as { instanceUrl?: string } | undefined)?.instanceUrl ??
-        'https://gitlab.com';
-      return `${instanceUrl.replace(/\/+$/, '')}/${selectedRepo}.git`;
-    }
-    return `https://github.com/${selectedRepo}.git`;
+    if (!selectedRepository) return '';
+    const instanceUrl = (gitlabReposQuery.data as { instanceUrl?: string } | undefined)
+      ?.instanceUrl;
+    return buildGastownRepositoryRigInput(selectedRepository, instanceUrl)?.gitUrl ?? '';
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const resolvedUrl = resolveGitUrl();
     if (!name.trim() || !resolvedUrl) return;
+    const repositoryInput = selectedRepository
+      ? buildGastownRepositoryRigInput(
+          selectedRepository,
+          (gitlabReposQuery.data as { instanceUrl?: string } | undefined)?.instanceUrl
+        )
+      : null;
     createRig.mutate({
       townId,
       name: name.trim(),
       gitUrl: resolvedUrl,
       defaultBranch: defaultBranch.trim() || 'main',
-      // platformIntegrationId is auto-resolved server-side from the git URL
-      // when not provided, so we don't need to pass it here.
+      ...(mode === 'integration' && repositoryInput?.platformIntegrationId
+        ? { platformIntegrationId: repositoryInput.platformIntegrationId }
+        : {}),
     });
   };
 
   const canSubmit =
-    name.trim() && (mode === 'manual' ? gitUrl.trim() : selectedRepo) && !createRig.isPending;
+    name.trim() && (mode === 'manual' ? gitUrl.trim() : selectedRepository) && !createRig.isPending;
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
@@ -210,15 +223,12 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
                     first, or use Manual URL.
                   </div>
                 ) : (
-                  <RepositoryCombobox
+                  <GastownRepositorySelector
                     repositories={unifiedRepositories}
-                    value={selectedRepo}
+                    value={selectedRepoKey}
                     onValueChange={handleRepoSelect}
                     isLoading={isLoadingRepos}
                     placeholder="Select a repository..."
-                    searchPlaceholder="Search repositories..."
-                    groupByPlatform
-                    hideLabel
                   />
                 )}
               </div>
@@ -252,7 +262,7 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
               Cancel
             </Button>
             <Button variant="default" type="submit" disabled={!canSubmit}>
-              {createRig.isPending ? 'Creating...' : 'Create'}
+              {createRig.isPending ? 'Creating rig...' : 'Create rig'}
             </Button>
           </DialogFooter>
         </form>

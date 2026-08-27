@@ -151,8 +151,8 @@
     "appearanceLight": "Ifa",
     "appearanceDark": "Dukkana",
     "account": "Herrega",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "App attribution PR sakatta'ootti dabali",
+    "prReviewAttributionSubtitle": "Kilo ttiin 'Reviewed via Kilo' footar dabali, sakatta'a yeroo galchitu."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request hin jiraatu",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Herrega GitLab",
       "connectGitLab": "GitLab walqabi",
       "gitlabError": "Qophii GitLab banaa uffachuu hin dandeenye. Maaloo irra deebi'ii yaali.",
-      "description": "Pull request of-rakkoo sakatta'uuf Kilo {{label}} walqabi."
+      "description": "Pull request of-rakkoo sakatta'uuf Kilo {{label}} walqabi.",
+      "bitbucketError": "Irra deebi'ii yaali. Qindeessaa Bitbucket banuu hin dandeenye."
     },
     "overview": {
       "reviewStyle": "Haala Sakatta'aa",
@@ -2075,7 +2076,8 @@
       "dollar": "doolaara",
       "dollar_other": "doolaara",
       "costSpoken": "gatii {{cost}}",
-      "costSpokenWithTime": "gatii {{cost}}, {{time}}"
+      "costSpokenWithTime": "gatii {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub banuu hin dandeenye",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Shumarra haaraa",
       "repository": "Repository",
-      "couldNotLoadRepositories": "Repositorylee dhiisuu hin dandeenyne",
       "connectGithub": "GitHub walqabi",
       "connectGithubDescription": "Browser kee keessatti GitHub wal qabsi, sana booda repository filachuuf as deebi'i.",
       "openGithub": "GitHub bani",
       "refreshRepositories": "Repositorylee haaromsi",
-      "githubConnectionNotVisible": "Walqabxii GitHub kee hamma ammaatti hin arginu",
-      "githubConnectionNotVisibleDescription": "Yoo Kilo GitHub App feene ykn qindeesse, deebi'ee ilaali — ykn akka account/dhaabbata kanaaf fe'ame mirkaneessi.",
-      "checkAgain": "Deebi'ee ilaali",
       "githubConnected": "GitHub wal qabame",
       "noRepositoriesVisible": "Repository mul'atu hin jiru. Kilo GitHub App'tti argama repository ilaaliitii haaromsi.",
       "runOnWithTarget": "Irratti hojjedhu: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Gulaala itti fufi",
       "discard": "Haqi",
       "discardFailed": "Daaftarii haquu hin dandeenye. Mee deebi'ee yaali.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "`kilo remote` kompuutara kee irratti baasi, ykn saffata CLI keessa jiru keessatti `/remote` baasi, kiloo lokalii to'achuuf.",
+      "bitbucketConnected": "Bitbucket walqabateera",
+      "connectBitbucket": "Bitbucket walqabi",
+      "connectBitbucketDescription": "Bitbucket brauzarii keessan keessatti qindeessaa, sana booda asitti deebi'aa repo tokko filachuuf.",
+      "connectGitlab": "GitLab walqabi",
+      "connectGitlabDescription": "GitLab brauzarii keessan keessatti qindeessaa, sana booda asitti deebi'aa repo tokko filachuuf.",
+      "couldNotLoadBitbucketRepositories": "Repositorywwan Bitbucket fudhachuu hin dandeenye",
+      "couldNotLoadGithubRepositories": "Repositorywwan GitHub fudhachuu hin dandeenye",
+      "couldNotLoadGitlabRepositories": "Repositorywwan GitLab fudhachuu hin dandeenye",
+      "gitlabConnected": "GitLab walqabateera",
+      "noRepositoriesVisibleBitbucket": "Repository tokko iyyuu hin mul'atu. Bitbucket irratti argachuu repo keessan ilaalaa, sana booda haaromsi.",
+      "noRepositoriesVisibleGitlab": "Repository tokko iyyuu hin mul'atu. GitLab irratti argachuu repo keessan ilaalaa, sana booda haaromsi.",
+      "openBitbucket": "Bitbucket bani",
+      "openGitlab": "GitLab bani",
+      "recentlyUsed": "Yeroo dhihoo itti fayyadamame"
     },
     "partRenderer": {
       "updatedFileCount_one": "Faayilii {{displayCount}} haaromfame",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Repository akkauntaa kee wajjin wal qabatan hin jiran.",
       "tryDifferentSearch": "Jecha barbaaduu adda ta'e yaali.",
       "loading": "Fe'eessaa jira...",
-      "accessibility": "Repository: {{label}}"
+      "accessibility": "Repository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Ibsa ergaa",
@@ -2623,6 +2638,18 @@
       "updating": "Fooyyachaa jira, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Feedi",
+      "loadWithHost": "Feedi {{host}}",
+      "httpsOnly": "Suuraalee HTTPS qofa"
+    },
+    "markdownLink": {
+      "invalidLink": "Liinkiin kun banamuu hin danda'u.",
+      "hostConfirmTitle": "Liinkii alaa bannee?",
+      "hostConfirmMessage": "Liinkiin kun {{host}} brawzarii kee keessatti bana.",
+      "open": "Bani",
+      "trustThisHost": "Hosii kana amani"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "App email hin jiru. Nu geessuu ni dandeessa {{email}}",
     "couldNotOpenStore": "Suuqa banuu hin danda'ine.",
-    "promptTitle": "App Kilo akkamitti jaalatta?",
-    "iLikeIt": "Natti tola",
-    "gladTitle": "Nuf gammachuu dha!",
-    "gladMessage": "Madaallii suuqaa waan baay'ee nu gargaara. Kilo fayyadamuuf galatoomi!",
-    "rateKilo": "Kilo madaali",
-    "needsWork": "Fooyyessuu barbaada",
-    "sorryTitle": "Nuf gaabbii dha!",
-    "sorryMessage": "Maaloo waan fooyyessuu qabu nutti himi. Injinariin app irratti itti gaafatamu gabaasa hundumaa ni dubbisa!",
-    "emailUs": "Email nuu ergi",
-    "emailSubject": "yaada app mobaayilaati"
+    "emailSubject": "yaada app mobaayilaati",
+    "neutralTitle": "App Kilo galmeessi",
+    "rateTheApp": "App galmeessi",
+    "sendFeedback": "Yaada ergi"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "Dhaabbiin hin argamu",
       "selectDescription": "Itti fufuuf profile kee irraa dhaabbii filadhu.",
       "selectOrganization": "Dhaabbii filadhu",
-      "unavailableDescription": "Dhaabbiin kuni si'a kana hin argamu. Itti fufuuf profile kee irraa tokko filadhu."
+      "unavailableDescription": "Dhaabbiin kuni si'a kana hin argamu. Itti fufuuf profile kee irraa tokko filadhu.",
+      "accessDeniedTitle": "Dheedhumaan dhowatame",
+      "accessDeniedDescription": "Dhaabbata kanaaf mirga hin qabdu."
     },
     "creditActivity": {
       "emptyDescription": "Bittaan, fayyadamuun, fi jijjiiramni kiriiditii dhaabbiichaaf yeroo uumannutti asitti mul'ata.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Sirreeffama herregaa",
         "credits_expired": "Kiriiditiin xumuramte"
-      }
+      },
+      "loadMore": "Dabalata fayyadami",
+      "loadMoreFailed": "Dabalataa fe'achuu hin dandeenye",
+      "truncated": "Sochii kireedii durii argachuun ni danda'ama."
     },
     "inviteMember": {
       "emailError": "Teessoo email sirrii seeni",
@@ -2976,7 +3002,10 @@
         "draft": "Daraftii",
         "uncollectible": "Kan walitti hin qabamne",
         "unknown": "Hin beekamu"
-      }
+      },
+      "loadMore": "Dabalata fayyadami",
+      "loadMoreFailed": "Dabalataa fe'achuu hin dandeenye",
+      "truncated": "Baallii durii argachuun ni danda'ama."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "Baay'ee ol-aanaa",
       "max": "Hamma olaanaa"
     }
+  },
+  "trustedHosts": {
+    "title": "Hostoonni amanamoo",
+    "subtitle": "Hostoonni gaafachuu malee banuuf amantu",
+    "emptyTitle": "Hostoonni amanamoon hin jiran",
+    "emptyDescription": "Yeroo hostii liinkii amantu, gaafachuu malee deebi'ee bana.",
+    "revoke": "Haqi {{host}}",
+    "backToPreferences": "Gara filatootaatti deebi'i"
   }
 }

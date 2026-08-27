@@ -13,6 +13,7 @@ import {
   PERSONAL_SCOPE,
   type ReviewConfigData,
   type ReviewerPlatform,
+  toPersonalPlatform,
 } from '@/lib/code-reviewer-config';
 import {
   isLatestMutationGeneration,
@@ -22,7 +23,7 @@ import { chainSave } from '@/lib/hooks/save-chain';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { pick } from '@/lib/utils';
 
-export { PERSONAL_SCOPE };
+export { PERSONAL_SCOPE, toPersonalPlatform };
 
 export function isPersonal(scope: string) {
   return scope === PERSONAL_SCOPE;
@@ -33,14 +34,6 @@ export function isPersonal(scope: string) {
 // for the previous one on the same key to settle before running (see
 // save-chain.ts). It's module-level there (not per-hook-instance) so it
 // holds across remounts of the same screen.
-
-// The personal router only serves github/gitlab (bitbucket is org-only by UI
-// construction). This narrows a ReviewerPlatform down to what the personal
-// procedures accept, without an `as` cast — the 'bitbucket' branch is dead
-// whenever scope is actually personal.
-export function toPersonalPlatform(platform: ReviewerPlatform): 'github' | 'gitlab' {
-  return platform === 'bitbucket' ? 'github' : platform;
-}
 
 /**
  * Narrows a mixed `number | string` id array down to numeric ids. The
@@ -125,7 +118,10 @@ export function useReviewConfig(
   const trpc = useTRPC();
   const personal = useQuery({
     ...trpc.personalReviewAgent.getReviewConfig.queryOptions({
-      platform: toPersonalPlatform(platform),
+      // toPersonalPlatform throws on bitbucket, so only invoke it for the
+      // actually-active personal scope. The personal query under an org scope
+      // is disabled and never sent; its input is a harmless default.
+      platform: isPersonal(scope) ? toPersonalPlatform(platform) : 'github',
     }),
     enabled: isPersonal(scope),
   });

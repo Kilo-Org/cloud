@@ -106,3 +106,38 @@ export function createSessionSearchController({
     hasPending: () => pending !== null,
   };
 }
+
+/** The seed applied when a durable search draft finishes restoring. */
+export type SearchRestoreDecision = {
+  /** True when the input should be seeded from the restored value. */
+  shouldSeed: boolean;
+  /** The query to seed (empty string when nothing was stored). */
+  query: string;
+  /** Whether the seeded text is non-empty (in-field X + list filter). */
+  hasText: boolean;
+  /** True when the uncontrolled input must remount to show the seeded text. */
+  shouldRemount: boolean;
+};
+
+/**
+ * Decides whether a restored search draft should seed the input. Seeds only
+ * after the load settles AND only when the user has not typed yet. A settled
+ * empty value (including the empty string persisted by a clear) seeds an empty
+ * query, so a previously committed non-empty query is never reloaded.
+ */
+export function resolveSearchRestoreDecision(input: {
+  settled: boolean;
+  hasTyped: boolean;
+  restoredQuery: string | null;
+}): SearchRestoreDecision {
+  if (!input.settled || input.hasTyped) {
+    return { shouldSeed: false, query: '', hasText: false, shouldRemount: false };
+  }
+  const query = input.restoredQuery ?? '';
+  return {
+    shouldSeed: true,
+    query,
+    hasText: query.length > 0,
+    shouldRemount: query.length > 0,
+  };
+}

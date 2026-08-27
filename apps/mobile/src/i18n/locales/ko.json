@@ -151,8 +151,8 @@
     "appearanceLight": "밝음",
     "appearanceDark": "어두움",
     "account": "계정",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR 리뷰에 앱 표시 정보 추가",
+    "prReviewAttributionSubtitle": "리뷰를 제출할 때 Reviewed via Kilo 푸터를 추가합니다."
   },
   "notifications": {
     "title": "알림",
@@ -860,7 +860,8 @@
       "githubApp": "GitHub 앱",
       "githubError": "GitHub 설정을 열 수 없습니다. 다시 시도하세요.",
       "gitlabAccount": "GitLab 계정",
-      "gitlabError": "GitLab 설정을 열 수 없습니다. 다시 시도하세요."
+      "gitlabError": "GitLab 설정을 열 수 없습니다. 다시 시도하세요.",
+      "bitbucketError": "Bitbucket 설정을 열 수 없습니다. 다시 시도하세요."
     },
     "readOnlyDescription": "조직 소유자와 결제 관리자만 이 설정을 변경할 수 있습니다.",
     "reviewDetail": {
@@ -1621,7 +1622,8 @@
       "dollar": "달러",
       "dollar_other": "달러",
       "costSpoken": "비용 {{cost}}",
-      "costSpokenWithTime": "비용 {{cost}}, {{time}}"
+      "costSpokenWithTime": "비용 {{cost}}, {{time}}",
+      "pullRequest": "Pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub 앱 설정을 시작할 수 없습니다. 다시 시도하세요.",
@@ -1698,14 +1700,10 @@
     "newSession": {
       "title": "새 세션",
       "repository": "저장소",
-      "couldNotLoadRepositories": "리포지토리를 불러올 수 없습니다",
       "connectGithub": "GitHub 연결",
       "connectGithubDescription": "브라우저에서 GitHub를 연결한 다음 여기로 돌아와 리포지토리를 선택하세요.",
       "openGithub": "GitHub 열기",
       "refreshRepositories": "리포지토리 새로고침",
-      "githubConnectionNotVisible": "아직 GitHub 연결을 확인할 수 없습니다",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub 앱을 설치하거나 구성했다면 다시 확인하세요. 또는 이 계정/조직에 설치되었는지 확인하세요.",
-      "checkAgain": "다시 확인",
       "githubConnected": "GitHub 연결됨",
       "noRepositoriesVisible": "표시되는 리포지토리가 없습니다. Kilo GitHub 앱의 리포지토리 액세스를 확인한 다음 새로고침하세요.",
       "runOnWithTarget": "실행 위치: {{target}}",
@@ -1732,7 +1730,21 @@
       "discardDraftTitle": "초안을 삭제할까요?",
       "discardFailed": "초안을 삭제할 수 없습니다. 다시 시도하세요.",
       "keepEditing": "계속 수정",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "컴퓨터에서 `kilo remote`를 실행하거나 실행 중인 CLI 세션에서 `/remote`를 사용하여 로컬 kilo 프로세스를 제어하세요.",
+      "bitbucketConnected": "Bitbucket 연결됨",
+      "connectBitbucket": "Bitbucket 연결",
+      "connectBitbucketDescription": "브라우저에서 Bitbucket을 연결한 후 여기로 돌아와 저장소를 선택하세요.",
+      "connectGitlab": "GitLab 연결",
+      "connectGitlabDescription": "브라우저에서 GitLab을 연결한 후 여기로 돌아와 저장소를 선택하세요.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket 저장소를 불러올 수 없습니다",
+      "couldNotLoadGithubRepositories": "GitHub 저장소를 불러올 수 없습니다",
+      "couldNotLoadGitlabRepositories": "GitLab 저장소를 불러올 수 없습니다",
+      "gitlabConnected": "GitLab 연결됨",
+      "noRepositoriesVisibleBitbucket": "표시된 저장소가 없습니다. Bitbucket의 저장소 접근 권한을 확인한 후 새로고침하세요.",
+      "noRepositoriesVisibleGitlab": "표시된 저장소가 없습니다. GitLab의 저장소 접근 권한을 확인한 후 새로고침하세요.",
+      "openBitbucket": "Bitbucket 열기",
+      "openGitlab": "GitLab 열기",
+      "recentlyUsed": "최근 사용"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}개 파일 업데이트됨",
@@ -1821,7 +1833,10 @@
       "noRepositoriesDescription": "계정에 연결된 저장소가 없습니다.",
       "tryDifferentSearch": "다른 검색어를 사용해 보세요.",
       "loading": "로드 중...",
-      "accessibility": "리포지토리: {{label}}"
+      "accessibility": "리포지토리: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "메시지 세부 정보",
@@ -2169,6 +2184,18 @@
       "updating": "업데이트 중, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "풀 리퀘스트"
+    },
+    "markdownImage": {
+      "load": "불러오기",
+      "loadWithHost": "불러오기 {{host}}",
+      "httpsOnly": "HTTPS 이미지만"
+    },
+    "markdownLink": {
+      "invalidLink": "이 링크를 열 수 없습니다.",
+      "hostConfirmTitle": "외부 링크를 여시겠습니까?",
+      "hostConfirmMessage": "이 링크는 브라우저에서 {{host}}를 엽니다.",
+      "open": "열기",
+      "trustThisHost": "이 호스트 신뢰"
     }
   },
   "bootstrap": {
@@ -2918,7 +2945,9 @@
       "organizationUnavailable": "조직을 사용할 수 없음",
       "selectDescription": "계속하려면 프로필에서 조직을 선택하세요.",
       "selectOrganization": "조직 선택",
-      "unavailableDescription": "이 조직은 더 이상 사용할 수 없습니다. 계속하려면 프로필에서 하나를 선택하세요."
+      "unavailableDescription": "이 조직은 더 이상 사용할 수 없습니다. 계속하려면 프로필에서 하나를 선택하세요.",
+      "accessDeniedTitle": "액세스가 거부되었습니다",
+      "accessDeniedDescription": "이 조직에 대한 액세스 권한이 없습니다."
     },
     "creditActivity": {
       "emptyDescription": "이 조직의 구매, 사용량, 크레딧 조정이 발생하면 여기에 표시됩니다.",
@@ -2935,7 +2964,10 @@
         "team-topup-bonus-2025": "팀 충전 보너스 2025",
         "accounting_adjustment": "회계 조정",
         "credits_expired": "크레딧 만료"
-      }
+      },
+      "loadMore": "더 불러오기",
+      "loadMoreFailed": "더 불러올 수 없습니다",
+      "truncated": "이전 크레딧 활동을 확인할 수 있습니다."
     },
     "hub": {
       "balance": "잔액",
@@ -2971,7 +3003,10 @@
         "draft": "초안",
         "uncollectible": "회수 불가",
         "unknown": "알 수 없음"
-      }
+      },
+      "loadMore": "더 불러오기",
+      "loadMoreFailed": "더 불러올 수 없습니다",
+      "truncated": "이전 인보이스를 확인할 수 있습니다."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3062,17 +3097,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "스토어를 열 수 없습니다.",
-    "emailUs": "이메일 보내기",
-    "gladMessage": "스토어 리뷰가 큰 도움이 됩니다. Kilo를 사용해 주셔서 감사합니다!",
-    "gladTitle": "좋은 소식이네요!",
-    "iLikeIt": "마음에 들어요",
-    "needsWork": "개선이 필요해요",
     "noEmailApp": "사용 가능한 이메일 앱이 없습니다. {{email}}로 문의하세요.",
-    "promptTitle": "Kilo 앱은 어떠신가요?",
-    "rateKilo": "Kilo 평가하기",
-    "sorryMessage": "무엇을 개선해야 하는지 알려주세요. 앱 담당 엔지니어가 모든 보고를 읽습니다!",
-    "sorryTitle": "안타깝네요!",
-    "emailSubject": "모바일 앱 피드백"
+    "emailSubject": "모바일 앱 피드백",
+    "neutralTitle": "Kilo 앱 평가하기",
+    "rateTheApp": "앱 평가하기",
+    "sendFeedback": "피드백 보내기"
   },
   "authErrors": {
     "emailAlreadyUsed": "이 이메일로 된 계정이 다른 로그인 방식으로 이미 존재합니다. 다른 방식을 시도하거나 '$t(login.moreSignInOptions)'을 사용하세요.",
@@ -3112,5 +3141,13 @@
       "xhigh": "매우 높음",
       "max": "최대"
     }
+  },
+  "trustedHosts": {
+    "title": "신뢰하는 호스트",
+    "subtitle": "묻지 않고 열도록 신뢰하는 호스트",
+    "emptyTitle": "신뢰하는 호스트 없음",
+    "emptyDescription": "링크의 호스트를 신뢰하면 다시 묻지 않고 열립니다.",
+    "revoke": "{{host}} 신뢰 해제",
+    "backToPreferences": "기본 설정으로 돌아가기"
   }
 }

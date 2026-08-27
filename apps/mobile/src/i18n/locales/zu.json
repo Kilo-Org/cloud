@@ -151,8 +151,8 @@
     "appearanceLight": "Ukukhanya",
     "appearanceDark": "Ubumnyama",
     "account": "Akhawunti",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Engeza ukukhonjwa kohlelo lokusebenza ezibuyekezweni ze-PR",
+    "prReviewAttributionSubtitle": "Engeza umugqa 'Reviewed via Kilo' uma uthumela isibuyekezo."
   },
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokudonsa asitholakali",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "I-akhawunti ye-GitLab",
       "connectGitLab": "Xhuma i-GitLab",
       "gitlabError": "Ayikwazanga ukuvula ukusetha kwe-GitLab. Uyacelwa uzame futhi.",
-      "description": "Xhuma i-Kilo {{label}} ukuze ibuyekeze izicelo zokudonsa ngokuzenzakalelayo."
+      "description": "Xhuma i-Kilo {{label}} ukuze ibuyekeze izicelo zokudonsa ngokuzenzakalelayo.",
+      "bitbucketError": "I-akhile ukuvula ukulungiswa kwe-Bitbucket. Sicela uzame futhi."
     },
     "overview": {
       "reviewStyle": "Isitayela Sokubuyekeza",
@@ -2075,7 +2076,8 @@
       "dollar": "amadola",
       "dollar_other": "amadola",
       "costSpoken": "izindleko {{cost}}",
-      "costSpokenWithTime": "izindleko {{cost}}, {{time}}"
+      "costSpokenWithTime": "izindleko {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Akukwazanga ukuvula i-GitHub",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Iseshini entsha",
       "repository": "IRepository",
-      "couldNotLoadRepositories": "Akukwazanga ukulayisha ama-repository",
       "connectGithub": "Xhuma i-GitHub",
       "connectGithubDescription": "Xhuma ku-GitHub kusibukeli sakho, bese ubuyela lapha ukukhetha i-repository.",
       "openGithub": "Vula i-GitHub",
       "refreshRepositories": "Vuselela ama-repository",
-      "githubConnectionNotVisible": "Asikwazi ukubona ukuxhumana kwakho kwe-GitHub okwamanje",
-      "githubConnectionNotVisibleDescription": "Uma ufake noma ulungise i-Kilo GitHub App, bheka futhi — noma qinisekisa ukuthi yafakelwa le akhawunti/inhlangano.",
-      "checkAgain": "Bheka futhi",
       "githubConnected": "I-GitHub ixhunyiwe",
       "noRepositoriesVisible": "Akukho ma-repository abonakalayo. Bheka ukufinyelela kwe-repository ye-Kilo GitHub App, bese uvuselela.",
       "runOnWithTarget": "Sebenza ku: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Qhubeka uhlela",
       "discard": "Lahla",
       "discardFailed": "Akukwazanga ukulahla idrafuthi. Sicela uzame futhi.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Sebenzisa i-`kilo remote` kukhompyutha yakho, noma i-`/remote` kuseshini ye-CLI esebenzayo, ukuze ulawule inqubo ye-kilo yasendaweni.",
+      "bitbucketConnected": "I-Bitbucket ixhunyiwe",
+      "connectBitbucket": "Xhuma i-Bitbucket",
+      "connectBitbucketDescription": "Xhuma i-Bitbucket kusiphequluli sakho, bese ubuya lapha ukuze ukhethe irepository.",
+      "connectGitlab": "Xhuma i-GitLab",
+      "connectGitlabDescription": "Xhuma i-GitLab kusiphequluli sakho, bese ubuya lapha ukuze ukhethe irepository.",
+      "couldNotLoadBitbucketRepositories": "I-akhile ukulayisha ama-repository e-Bitbucket",
+      "couldNotLoadGithubRepositories": "I-akhile ukulayisha ama-repository e-GitHub",
+      "couldNotLoadGitlabRepositories": "I-akhile ukulayisha ama-repository e-GitLab",
+      "gitlabConnected": "I-GitLab ixhumekile",
+      "noRepositoriesVisibleBitbucket": "Awekho ama-repository abonakalayo. Bheka ukufinyelela kwe-repository ye-Bitbucket, bese uvuselela.",
+      "noRepositoriesVisibleGitlab": "Awekho ama-repository abonakalayo. Bheka ukufinyelela kwe-repository ye-GitLab, bese uvuselela.",
+      "openBitbucket": "Vula i-Bitbucket",
+      "openGitlab": "Vula i-GitLab",
+      "recentlyUsed": "Esetshenziswe muva nje"
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Akukho ma-repository axhunyiwe kwi-akhawunti yakho.",
       "tryDifferentSearch": "Zama igama lokusesha elihlukile.",
       "loading": "Iyathanda...",
-      "accessibility": "IRepository: {{label}}"
+      "accessibility": "IRepository: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Imininingwane yomlayezo",
@@ -2623,6 +2638,18 @@
       "updating": "Iyabuyekezwa, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "isicelo sokudonsa"
+    },
+    "markdownImage": {
+      "load": "Layisha",
+      "loadWithHost": "Layisha {{host}}",
+      "httpsOnly": "Izithombe ze-HTTPS kuphela"
+    },
+    "markdownLink": {
+      "invalidLink": "Leli isixhumanisi alikwazi ukuvulwa.",
+      "hostConfirmTitle": "Vula isixhumanisi sangaphandle?",
+      "hostConfirmMessage": "Leli isixhumanisi livula {{host}} kubrawuza yakho.",
+      "open": "Vula",
+      "trustThisHost": "Themba leli host"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Akukho app ye-imeyili etholakalayo. Ungasithola ku-{{email}}",
     "couldNotOpenStore": "Ayikwazanga ukuvula isitolo.",
-    "promptTitle": "Uyithanda kanjani i-app ye-Kilo?",
-    "iLikeIt": "Ngiyayithanda",
-    "gladTitle": "Siyajabula ukukuzwa lokho!",
-    "gladMessage": "Ukubuyekeza esitolo kungasisiza kakhulu. Siyabonga ngokusebenzisa i-Kilo!",
-    "rateKilo": "Kala i-Kilo",
-    "needsWork": "Kudinga umsebenzi",
-    "sorryTitle": "Siyaxolisa ukukuzwa lokho!",
-    "sorryMessage": "Sicela usazise ukuthi yini edinga ukuthuthuka. Unjiniyela ophethe i-app ufunda yonke imibiko!",
-    "emailUs": "Sithumele i-imeyili",
-    "emailSubject": "Impendulo ye-mobile app"
+    "emailSubject": "Impendulo ye-mobile app",
+    "neutralTitle": "Linganisa uhlelo lokusebenza lwe-Kilo",
+    "rateTheApp": "Linganisa uhlelo lokusebenza",
+    "sendFeedback": "Thumela impendulo"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "Inhlangano ayitholakali",
       "selectDescription": "Khetha inhlangano kusukela kuphrofayili yakho ukuze uqhubeke.",
       "selectOrganization": "Khetha inhlangano",
-      "unavailableDescription": "Le nhlangano ayisatholakali. Khetha enye kusukela kuphrofayili yakho ukuze uqhubeke."
+      "unavailableDescription": "Le nhlangano ayisatholakali. Khetha enye kusukela kuphrofayili yakho ukuze uqhubeke.",
+      "accessDeniedTitle": "Ukufinyelela kunqatshiwe",
+      "accessDeniedDescription": "Awunakho ukufinyelela kule nhlangano."
     },
     "creditActivity": {
       "emptyDescription": "Ukuthenga, ukusetshenziswa, nokulungiswa kwamakhredithi kwaleli nhlangano kuzovela lapha njengoba kwenzeka.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Ibhonasi ye-team top-up 2025",
         "accounting_adjustment": "Ukulungiswa kwezimali",
         "credits_expired": "Amakhredithi aphelelwe yisikhathi"
-      }
+      },
+      "loadMore": "Layisha okwengeziwe",
+      "loadMoreFailed": "Asikwazanga ukulayisha okwengeziwe",
+      "truncated": "Umsebenzi wekhredithi omdala uyatholakala."
     },
     "inviteMember": {
       "emailError": "Faka ikheli le-imeyili elivumelekile",
@@ -2976,7 +3002,10 @@
         "draft": "Okusalungiswa",
         "uncollectible": "Okungakhokhiwa",
         "unknown": "Okungaziwa"
-      }
+      },
+      "loadMore": "Layisha okwengeziwe",
+      "loadMoreFailed": "Asikwazanga ukulayisha okwengeziwe",
+      "truncated": "Ama-invoyisi amadala ayatholakala."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "Okuphezulu kakhulu",
       "max": "Okuphezulu kunakho konke"
     }
+  },
+  "trustedHosts": {
+    "title": "Ama-host athenjwayo",
+    "subtitle": "Ama-host owathembayo ukuvula ngaphandle kokubuza",
+    "emptyTitle": "Awekho ama-host athenjwayo",
+    "emptyDescription": "Uma uthemba i-host yesixhumanisi, ivula ngaphandle kokubuza futhi.",
+    "revoke": "Hlehlisa {{host}}",
+    "backToPreferences": "Buyela kokuthandwayo"
   }
 }

@@ -151,8 +151,8 @@
     "appearanceLight": "Haske",
     "appearanceDark": "Duhu",
     "account": "Asusu",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Ƙara asalin app a cikin bitar PR",
+    "prReviewAttributionSubtitle": "Ƙara rubutun ƙasa na \"An bita ta Kilo\" lokacin da ka ƙaddamar da bita."
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar jan ba ta samuwa",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Asusun GitLab",
       "connectGitLab": "Haɗa GitLab",
       "gitlabError": "An kasa buɗe saitin GitLab. Da fatan sake gwadawa.",
-      "description": "Haɗa Kilo {{label}} don bitar buƙatun jawo ta atomatik."
+      "description": "Haɗa Kilo {{label}} don bitar buƙatun jawo ta atomatik.",
+      "bitbucketError": "Ba a iya buɗe saitin Bitbucket ba. Don Allah a sake gwadawa."
     },
     "overview": {
       "reviewStyle": "Salon Bita",
@@ -2075,7 +2076,8 @@
       "dollar": "daloli",
       "dollar_other": "daloli",
       "costSpoken": "Farashi {{cost}}",
-      "costSpokenWithTime": "Farashi {{cost}}, {{time}}"
+      "costSpokenWithTime": "Farashi {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "An kasa buɗe GitHub",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Sabon zama",
       "repository": "Ma'ajiya",
-      "couldNotLoadRepositories": "An kasa loda ma'ajiyoyi",
       "connectGithub": "Haɗa GitHub",
       "connectGithubDescription": "Haɗa GitHub a cikin burauzarka, sannan ka dawo nan domin zaɓar ma'ajiya.",
       "openGithub": "Buɗe GitHub",
       "refreshRepositories": "Sabunta ma'ajiyoyi",
-      "githubConnectionNotVisible": "Ba mu ga haɗin GitHub ɗinka ba har yanzu",
-      "githubConnectionNotVisibleDescription": "Idan ka shigar ko ka tsara GitHub App na Kilo, sake duba — ko ka tabbatar an shigar da shi domin wannan asusu/kungiya.",
-      "checkAgain": "Sake duba",
       "githubConnected": "An haɗa GitHub",
       "noRepositoriesVisible": "Babu ma'ajiyoyi da ake gani. Duba damar ma'ajiya ga GitHub App na Kilo, sannan sabunta.",
       "runOnWithTarget": "Gudanar a: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Ci gaba da gyarawa",
       "discard": "Watsi",
       "discardFailed": "An kasa watsi da daftarin. Da fatan za a sake gwadawa.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Gudanar da `kilo remote` a kan kwamfutarka, ko `/remote` a zaman CLI mai aiki, don sarrafa tsarin kilo na gida.",
+      "bitbucketConnected": "An haɗa Bitbucket",
+      "connectBitbucket": "Haɗa Bitbucket",
+      "connectBitbucketDescription": "Haɗa Bitbucket a cikin burauzar ka, sannan ka dawo nan don zaɓar ma'ajiya.",
+      "connectGitlab": "Haɗa GitLab",
+      "connectGitlabDescription": "Haɗa GitLab a cikin burauzar ka, sannan ka dawo nan don zaɓar ma'ajiya.",
+      "couldNotLoadBitbucketRepositories": "Ba a iya loda ma'ajin Bitbucket ba",
+      "couldNotLoadGithubRepositories": "Ba a iya loda ma'ajin GitHub ba",
+      "couldNotLoadGitlabRepositories": "Ba a iya loda ma'ajin GitLab ba",
+      "gitlabConnected": "An haɗa GitLab",
+      "noRepositoriesVisibleBitbucket": "Babu ma'ajiya da ake gani. Duba samun damar ma'ajiya na Bitbucket, sannan ka sabunta.",
+      "noRepositoriesVisibleGitlab": "Babu ma'ajiya da ake gani. Duba samun damar ma'ajiya na GitLab, sannan ka sabunta.",
+      "openBitbucket": "Buɗe Bitbucket",
+      "openGitlab": "Buɗe GitLab",
+      "recentlyUsed": "Waɗanda aka yi amfani da su kwanan nan"
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta {{displayCount}} fayil",
@@ -2279,7 +2291,10 @@
       "noRepositoriesDescription": "Babu ma'ajiyoyi da aka haɗa da asusunka.",
       "tryDifferentSearch": "Gwada wani kalmar bincike dabam.",
       "loading": "Ana loda...",
-      "accessibility": "Ma'ajiya: {{label}}"
+      "accessibility": "Ma'ajiya: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Cikakkun bayanan saƙo",
@@ -2623,6 +2638,18 @@
       "updating": "Ana sabuntawa, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "buƙatar jan"
+    },
+    "markdownImage": {
+      "load": "Ɗauka",
+      "loadWithHost": "Ɗauka {{host}}",
+      "httpsOnly": "Hotunan HTTPS kawai"
+    },
+    "markdownLink": {
+      "invalidLink": "Ba za a iya buɗe wannan hanyar ba.",
+      "hostConfirmTitle": "Buɗe hanyar waje?",
+      "hostConfirmMessage": "Wannan hanyar tana buɗe {{host}} a cikin burauzar ka.",
+      "open": "Buɗe",
+      "trustThisHost": "Amince da wannan mazaba"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Babu app ɗin imel da ke nan. Za ka iya tuntuɓar mu a {{email}}",
     "couldNotOpenStore": "Ba a iya buɗe kantin ba.",
-    "promptTitle": "Yaya kake jin daɗin app ɗin Kilo?",
-    "iLikeIt": "Ina son shi",
-    "gladTitle": "Mun ji daɗin jin haka!",
-    "gladMessage": "Wani bita a cikin kantin zai taimaka mana sosai. Na gode da amfani da Kilo!",
-    "rateKilo": "Ƙimar Kilo",
-    "needsWork": "Yana buƙatar ingantawa",
-    "sorryTitle": "Mun yi nadamar jin haka!",
-    "sorryMessage": "Da fatan za a sanar da mu abin da ya kamata a inganta. Injiniyan da ke kula da app ɗin yana karanta kowane rahoto!",
-    "emailUs": "Aiko mana imel",
-    "emailSubject": "ra'ayin app ɗin wayar hannu"
+    "emailSubject": "ra'ayin app ɗin wayar hannu",
+    "neutralTitle": "Yi ƙimar app na Kilo",
+    "rateTheApp": "Yi ƙimar app",
+    "sendFeedback": "Aika ra'ayi"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "Ƙungiyar ba ta nan",
       "selectDescription": "Zaɓi ƙungiya daga bayanan martabarka don ci gaba.",
       "selectOrganization": "Zaɓi ƙungiya",
-      "unavailableDescription": "Wannan ƙungiyar ba ta nan. Zaɓi ɗaya daga bayanan martabarka don ci gaba."
+      "unavailableDescription": "Wannan ƙungiyar ba ta nan. Zaɓi ɗaya daga bayanan martabarka don ci gaba.",
+      "accessDeniedTitle": "An hana shiga",
+      "accessDeniedDescription": "Ba ku da izinin shiga wannan ƙungiya."
     },
     "creditActivity": {
       "emptyDescription": "Sayayya, amfani, da gyare-gyaren credits na wannan ƙungiyar za su bayyana a nan yayin da suke faruwa.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Kyautar Topup na Ƙungiya 2025",
         "accounting_adjustment": "Daidaitawar lissafin kuɗi",
         "credits_expired": "Credits sun ƙare"
-      }
+      },
+      "loadMore": "Ɗauki ƙari",
+      "loadMoreFailed": "Ba a iya ƙara ɗora ba",
+      "truncated": "Ayyukan bashi na baya suna nan."
     },
     "inviteMember": {
       "emailError": "Shigar da ingantacciyar adireshin imel",
@@ -2976,7 +3002,10 @@
         "draft": "Daftari",
         "uncollectible": "Ba za a iya karɓa ba",
         "unknown": "Ba a sani ba"
-      }
+      },
+      "loadMore": "Ɗauki ƙari",
+      "loadMoreFailed": "Ba a iya ƙara ɗora ba",
+      "truncated": "Lissafin kuɗi na baya suna nan."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "Babba sosai",
       "max": "Mafi girma"
     }
+  },
+  "trustedHosts": {
+    "title": "Mazabun da aka amince",
+    "subtitle": "Mazabun da ka amince su buɗe ba tare da tambaya ba",
+    "emptyTitle": "Babu mazabun da aka amince",
+    "emptyDescription": "Idan ka amince da mazabar hanyar, za ta buɗe ba tare da sake tambaya ba.",
+    "revoke": "Soke {{host}}",
+    "backToPreferences": "Koma ga zaɓuɓɓuka"
   }
 }

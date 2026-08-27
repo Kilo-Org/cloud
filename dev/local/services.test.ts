@@ -155,6 +155,22 @@ test('skips NEXTAUTH_URL when the web app is not being started', () => {
   assert.equal(url, undefined);
 });
 
+test('keeps public tunnels out of default and agents starts', () => {
+  const service = getService('cloud-agent-public-tunnels');
+  assert.equal(service.group, 'cloud-agent-public-tunnels');
+  assert.equal(service.type, 'process');
+  assert.equal(service.port, 0);
+  assert.match(service.command.join(' '), /start-public-tunnels\.ts/);
+  assert.equal(service.command.includes(String(8811 + portOffset)), false);
+
+  const alwaysOn = resolveGroups(getAlwaysOnGroupIds());
+  assert.ok(!alwaysOn.includes('cloud-agent-public-tunnels'));
+  assert.ok(!resolveTargets(['agents']).includes('cloud-agent-public-tunnels'));
+  assert.ok(!resolveTargets(['cloud-agent']).includes('cloud-agent-public-tunnels'));
+  assert.ok(!resolveTargets(['all']).includes('cloud-agent-public-tunnels'));
+  assert.ok(resolveTargets(['cloud-agent-public-tunnels']).includes('cloud-agent-public-tunnels'));
+});
+
 test('keeps auto routing workers in their own opt-in group', () => {
   const service = getService('auto-routing');
 

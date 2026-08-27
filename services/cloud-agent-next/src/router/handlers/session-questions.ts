@@ -9,12 +9,18 @@ import { protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
 import type { WrapperClient } from '../../kilo/wrapper-client.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
+import { sessionPlaneFromId } from '../../session-plane.js';
+import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 
-async function resolveWrapperClient(opts: {
+type InteractiveSessionTarget =
+  | { kind: 'control'; stub: ReturnType<typeof getSandboxSessionStub> }
+  | { kind: 'legacy'; wrapper: WrapperClient };
+
+async function resolveInteractiveSession(opts: {
   sessionId: SessionId;
   userId: string;
   env: Env;
-}): Promise<WrapperClient> {
+}): Promise<InteractiveSessionTarget> {
   const { sessionId, userId, env } = opts;
   await requireCurrentSessionAccess({
     env,
@@ -24,6 +30,10 @@ async function resolveWrapperClient(opts: {
   const metadata = await fetchSessionMetadata(env, userId, sessionId);
   if (!metadata) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+  }
+
+  if (sessionPlaneFromId(sessionId) === 'control') {
+    return { kind: 'control', stub: getSandboxSessionStub(env, userId, sessionId) };
   }
 
   let wrapperClient: WrapperClient | null;
@@ -38,7 +48,7 @@ async function resolveWrapperClient(opts: {
   if (!wrapperClient) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'No wrapper found for session' });
   }
-  return wrapperClient;
+  return { kind: 'legacy', wrapper: wrapperClient };
 }
 
 export function createSessionQuestionHandlers() {
@@ -58,8 +68,14 @@ export function createSessionQuestionHandlers() {
 
           logger.setTags({ userId, sessionId });
           try {
-            const wrapperClient = await resolveWrapperClient({ sessionId, userId, env });
-            const result = await wrapperClient.answerQuestion(input.questionId, input.answers);
+            const target = await resolveInteractiveSession({ sessionId, userId, env });
+            const result =
+              target.kind === 'control'
+                ? await target.stub.answerQuestion({
+                    questionId: input.questionId,
+                    answers: input.answers,
+                  })
+                : await target.wrapper.answerQuestion(input.questionId, input.answers);
             logger
               .withFields({ questionId: input.questionId, success: result.success })
               .info('Question answer forwarded to wrapper');
@@ -90,8 +106,11 @@ export function createSessionQuestionHandlers() {
 
           logger.setTags({ userId, sessionId });
           try {
-            const wrapperClient = await resolveWrapperClient({ sessionId, userId, env });
-            const result = await wrapperClient.rejectQuestion(input.questionId);
+            const target = await resolveInteractiveSession({ sessionId, userId, env });
+            const result =
+              target.kind === 'control'
+                ? await target.stub.rejectQuestion({ questionId: input.questionId })
+                : await target.wrapper.rejectQuestion(input.questionId);
             logger
               .withFields({ questionId: input.questionId, success: result.success })
               .info('Question rejection forwarded to wrapper');
@@ -124,8 +143,14 @@ export function createSessionQuestionHandlers() {
 
           logger.setTags({ userId, sessionId });
           try {
-            const wrapperClient = await resolveWrapperClient({ sessionId, userId, env });
-            const result = await wrapperClient.answerPermission(input.permissionId, input.response);
+            const target = await resolveInteractiveSession({ sessionId, userId, env });
+            const result =
+              target.kind === 'control'
+                ? await target.stub.answerPermission({
+                    permissionId: input.permissionId,
+                    response: input.response,
+                  })
+                : await target.wrapper.answerPermission(input.permissionId, input.response);
             logger
               .withFields({ permissionId: input.permissionId, success: result.success })
               .info('Permission answer forwarded to wrapper');

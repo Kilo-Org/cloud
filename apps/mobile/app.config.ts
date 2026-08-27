@@ -149,6 +149,10 @@ const config: ExpoConfig = {
       {
         android: {
           enableMinifyInReleaseBuilds: true,
+          // Old release AABs shipped without resource shrinking. Keep this on so
+          // the unused kilo_shrink_sentinel_unused raw resource is stripped and
+          // the inspector contract can catch a shrink regression before it lands.
+          enableShrinkResourcesInReleaseBuilds: true,
           usePrecompiledHeaders: true,
         },
         ios: {
@@ -202,7 +206,7 @@ const config: ExpoConfig = {
     [
       'expo-splash-screen',
       {
-        image: './assets/images/logo.png',
+        image: './assets/images/logo-mark.png',
         backgroundColor: '#FAF74F',
         imageWidth: 100,
       },

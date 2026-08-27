@@ -3,6 +3,8 @@ import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
+import type { SandboxControl } from './persistence/SandboxControl.js';
+import type { SandboxSession } from './sandbox-session/SandboxSession.js';
 import type { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 import type { CallbackJob } from './callbacks/index.js';
 import type { NotificationsBinding } from './notifications-binding.js';
@@ -121,15 +123,16 @@ export type SandboxId =
   | `bot-${string}`
   | `ubt-${string}`
   | `ses-${string}`
+  | `istd-${string}`
   | `crv-${string}`
   | `dind-${string}`
   | `${string}__${string}`
   | `${string}__${string}__${string}`;
 
-export type AgentSandboxProvider = 'cloudflare';
+export type AgentSandboxProvider = 'cloudflare' | 'vercel';
 
 /** Unique identifier for a session within a sandbox */
-export type SessionId = `agent_${string}`;
+export type SessionId = `agent_${string}` | `workspace_${string}`;
 
 export type SessionContext = {
   sandboxId: SandboxId;
@@ -184,6 +187,8 @@ type GetTokenForRepoResult =
         | 'database_not_configured'
         | 'invalid_repo_format'
         | 'no_installation_found'
+        | 'repository_not_installed'
+        | 'integration_mismatch'
         | 'invalid_org_id';
     };
 
@@ -205,6 +210,7 @@ type ManagedGitHubAuthParams = {
   githubRepo: string;
   userId: string;
   orgId?: string;
+  expectedIntegrationId?: string;
   allowUserAuthorization: boolean;
 };
 
@@ -227,6 +233,7 @@ type GetCloudAgentAuthForRepoResult =
         | 'invalid_repo_format'
         | 'no_installation_found'
         | 'repository_not_installed'
+        | 'integration_mismatch'
         | 'invalid_org_id';
     };
 
@@ -249,6 +256,7 @@ type IssueGitHubSessionCapabilityResult =
         | 'invalid_repo_format'
         | 'no_installation_found'
         | 'repository_not_installed'
+        | 'integration_mismatch'
         | 'invalid_org_id'
         | 'capability_configuration_error';
     };
@@ -267,7 +275,8 @@ type RedeemGitHubSessionCapabilityResult =
         | 'repository_mismatch'
         | 'invalid_upstream_request'
         | 'source_unavailable'
-        | 'identity_mismatch';
+        | 'identity_mismatch'
+        | 'integration_mismatch';
     };
 
 type GetGitLabTokenFailureReason =
@@ -422,6 +431,7 @@ export type GitTokenService = {
     githubRepo: string;
     userId: string;
     orgId?: string;
+    expectedIntegrationId?: string;
   }): Promise<GetTokenForRepoResult>;
   getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
   getCloudAgentAuthForRepo?(
@@ -516,6 +526,10 @@ export type Env = {
   SandboxCodeReviewContainment: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
+  /** Durable Object namespace for sandbox-scoped wrapper call-home control */
+  SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
+  /** Durable Object namespace for control-plane sessions */
+  SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
   /** Durable Object namespace for per-user Kilo SDK facade coordination */
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   /** Durable Object namespace for one-time stream/terminal ticket nonce consumption */
@@ -577,6 +591,8 @@ export type Env = {
   GITHUB_APP_BOT_USER_ID?: string;
   /** Comma-separated org IDs that use per-session Cloudflare sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
+  /** Comma-separated user or org IDs admitted to the call-home control plane. `*` includes personal. */
+  CONTROL_PLANE_IDS?: string;
   /** Comma-separated org IDs whose GitHub token uses credential containment, or `*` for all orgs */
   GITHUB_TOKEN_CONTAINMENT_ORG_IDS?: string;
   /** Comma-separated org IDs whose GitLab token uses credential containment, or `*` for all orgs */
@@ -600,6 +616,16 @@ export type Env = {
   TOOL_CGROUP_OOM_GROUP?: string;
   TOOL_CGROUP_CPU_WEIGHT?: string;
   TOOL_CGROUP_SERVER_CPU_WEIGHT?: string;
+  VERCEL_TOKEN?: string;
+  VERCEL_TEAM_ID?: string;
+  VERCEL_PROJECT_ID?: string;
+  VERCEL_SANDBOX_SNAPSHOT_ID?: string;
+  VERCEL_SANDBOX_RUNTIME_BUILD_ID?: string;
+  VERCEL_SANDBOX_RUNTIME?: string;
+  VERCEL_SANDBOX_INITIAL_TIMEOUT_MS?: string;
+  VERCEL_SANDBOX_EXTEND_DURATION_MS?: string;
+  /** Comma-separated org IDs routed to Vercel. Empty is off. `*` includes personal. */
+  VERCEL_SANDBOX_ORG_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

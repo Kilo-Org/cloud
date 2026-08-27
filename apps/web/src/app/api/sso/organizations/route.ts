@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { captureException, captureMessage } from '@sentry/nextjs';
+import { captureException } from '@sentry/nextjs';
 import { sentryLogger } from '@/lib/utils.server';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
-import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
+import { getLowerDomainFromEmail } from '@/lib/utils';
 import { getAllUserProviders, getWorkOSOrganization } from '@/lib/user';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 import {
@@ -10,19 +10,10 @@ import {
   SignInDiscoveryResponseSchema,
   type SignInDiscoveryResponse,
 } from '@/lib/schemas/sso-organizations';
-import { checkRateLimit } from '@vercel/firewall';
-import { createHmac } from 'node:crypto';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { isNewAccountEligibleForMagicLink } from '@/lib/auth/email-signin-eligibility';
 import { ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
 
 const warnInSentry = sentryLogger('sso-organizations', 'warning');
-const DISCOVERY_IP_RATE_LIMIT_ID = 'sign-in-discovery-ip';
-const DISCOVERY_EMAIL_RATE_LIMIT_ID = 'sign-in-discovery-email';
-
-export function discoveryEmailRateLimitKey(email: string): string {
-  return createHmac('sha256', NEXTAUTH_SECRET).update(normalizeEmail(email)).digest('base64url');
-}
 
 function discoveryResponse(response: SignInDiscoveryResponse, init?: ResponseInit): NextResponse {
   return NextResponse.json(SignInDiscoveryResponseSchema.parse(response), init);
@@ -57,28 +48,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Invalid email address.' }, { status: 400 });
     }
     const { email } = parsedRequest.data;
-
-    const [ipLimit, emailLimit] = await Promise.all([
-      checkRateLimit(DISCOVERY_IP_RATE_LIMIT_ID, { request }),
-      checkRateLimit(DISCOVERY_EMAIL_RATE_LIMIT_ID, {
-        request,
-        rateLimitKey: discoveryEmailRateLimitKey(email),
-      }),
-    ]);
-    if (ipLimit.rateLimited || emailLimit.rateLimited) {
-      return NextResponse.json({ error: 'Please try again later.' }, { status: 429 });
-    }
-    if (ipLimit.error || emailLimit.error) {
-      captureMessage('Sign-in discovery rate limit unavailable', {
-        level: 'error',
-        tags: { source: 'sso-organizations-rate-limit' },
-        extra: {
-          ipLimiterUnavailable: Boolean(ipLimit.error),
-          emailLimiterUnavailable: Boolean(emailLimit.error),
-        },
-      });
-      return NextResponse.json({ error: 'Please try again later.' }, { status: 503 });
-    }
 
     const providerLookup = await getAllUserProviders(email);
     if (providerLookup.kind === 'ambiguous') {

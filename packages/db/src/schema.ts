@@ -3220,6 +3220,57 @@ export const organizations = pgTable(
 
 export type Organization = typeof organizations.$inferSelect;
 
+export type OrganizationDomainClaimStatus = 'pending' | 'verified';
+
+export const organization_domain_claims = pgTable(
+  'organization_domain_claims',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    domain: text().notNull(),
+    status: text().$type<OrganizationDomainClaimStatus>().notNull().default('pending'),
+    workos_organization_id: text(),
+    workos_domain_id: text(),
+    verified_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_organization_domain_claims_organization_domain').on(
+      table.organization_id,
+      table.domain
+    ),
+    uniqueIndex('UQ_organization_domain_claims_verified_domain')
+      .on(table.domain)
+      .where(sql`${table.status} = 'verified'`),
+    uniqueIndex('UQ_organization_domain_claims_workos_domain_id')
+      .on(table.workos_domain_id)
+      .where(sql`${table.workos_domain_id} IS NOT NULL`),
+    index('IDX_organization_domain_claims_organization_id').on(table.organization_id),
+    check(
+      'organization_domain_claims_canonical_domain_check',
+      sql`length(${table.domain}) BETWEEN 1 AND 253 AND ${table.domain} = lower(btrim(${table.domain}))`
+    ),
+    check(
+      'organization_domain_claims_status_check',
+      sql`${table.status} IN ('pending', 'verified')`
+    ),
+    check(
+      'organization_domain_claims_verification_shape_check',
+      sql`(${table.status} = 'pending' AND ${table.verified_at} IS NULL)
+        OR (${table.status} = 'verified' AND ${table.verified_at} IS NOT NULL AND ${table.workos_organization_id} IS NOT NULL AND ${table.workos_domain_id} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type OrganizationDomainClaim = typeof organization_domain_claims.$inferSelect;
+export type NewOrganizationDomainClaim = typeof organization_domain_claims.$inferInsert;
+
 export const kilo_pass_org_term_versions = pgTable(
   'kilo_pass_org_term_versions',
   {
@@ -4212,6 +4263,11 @@ export const platform_integrations = pgTable(
       .on(table.platform, table.github_app_type, table.platform_installation_id)
       .concurrently()
       .where(sql`${table.platform} = 'github' AND ${table.platform_installation_id} IS NOT NULL`),
+    uniqueIndex('UQ_platform_integrations_github_pending_target')
+      .on(table.platform, table.github_app_type, table.platform_account_id)
+      .where(
+        sql`${table.platform} = 'github' AND ${table.integration_status} = 'pending' AND ${table.platform_installation_id} IS NULL AND ${table.platform_account_id} IS NOT NULL`
+      ),
     uniqueIndex('UQ_platform_integrations_user_bitbucket')
       .on(table.owned_by_user_id)
       .where(sql`${table.platform} = 'bitbucket' AND ${table.owned_by_user_id} IS NOT NULL`),
@@ -5862,9 +5918,15 @@ export const cli_sessions_v2 = pgTable(
       .on(table.cloud_agent_session_id)
       .where(isNotNull(table.cloud_agent_session_id)),
     index('IDX_cli_sessions_v2_organization_id').on(table.organization_id),
-    index('IDX_cli_sessions_v2_kilo_user_id').on(table.kilo_user_id),
-    index('IDX_cli_sessions_v2_created_at').on(table.created_at),
     index('IDX_cli_sessions_v2_user_updated').on(table.kilo_user_id, table.updated_at),
+    // Mirror of the index above for `orderBy: 'created_at'`. Every list and
+    // search query filters on kilo_user_id first, so a bare created_at index
+    // makes the planner walk the global created_at order and discard other
+    // users' rows: 138 ms for a user with 152k sessions against 3.5 ms here.
+    // The dropped bare kilo_user_id index was a prefix of the pair above.
+    index('IDX_cli_sessions_v2_user_created')
+      .on(table.kilo_user_id, table.created_at)
+      .concurrently(),
     // Supports joins from github_branch_pull_requests on (git_url, git_branch).
     index('cli_sessions_v2_git_url_branch_idx').on(table.git_url, table.git_branch),
   ]
@@ -5970,6 +6032,47 @@ export const cloud_agent_sessions = pgTable(
 
 export type CloudAgentSession = typeof cloud_agent_sessions.$inferSelect;
 export type NewCloudAgentSession = typeof cloud_agent_sessions.$inferInsert;
+
+/**
+ * Pending-upload ledger for cloud agent attachments. A presign admits a row in
+ * status 'pending'; send-time finalization flips the matching rows to 'linked'
+ * in one transaction; a cron reaper deletes the R2 objects behind abandoned
+ * 'pending' rows whose lease has expired and records them as 'reaped'.
+ * kilo_user_id is text() because user IDs are not always UUIDs (OAuth users).
+ */
+export const cloud_agent_pending_uploads = pgTable(
+  'cloud_agent_pending_uploads',
+  {
+    id: text().primaryKey().notNull(),
+    kilo_user_id: text().notNull(),
+    object_key: text().notNull().unique(),
+    message_uuid: text().notNull(),
+    attachment_id: text().notNull(),
+    byte_size: integer().notNull(),
+    status: text().notNull().default('pending'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+  },
+  table => [
+    index('IDX_cloud_agent_pending_uploads_user_message_status').on(
+      table.kilo_user_id,
+      table.message_uuid,
+      table.status
+    ),
+    // The hourly reaper scans `status = 'pending' AND expires_at < now()`,
+    // which the composite index above cannot serve.
+    index('IDX_cloud_agent_pending_uploads_expired')
+      .on(table.expires_at)
+      .where(sql`${table.status} = 'pending'`),
+    check(
+      'cloud_agent_pending_uploads_status_check',
+      sql`${table.status} IN ('pending', 'linked', 'reaped')`
+    ),
+  ]
+);
+
+export type CloudAgentPendingUpload = typeof cloud_agent_pending_uploads.$inferSelect;
+export type NewCloudAgentPendingUpload = typeof cloud_agent_pending_uploads.$inferInsert;
 
 export type CloudAgentSessionRunStatus =
   | 'queued'
@@ -6120,6 +6223,13 @@ export const github_branch_pull_requests = pgTable(
     uniqueIndex('UQ_github_branch_prs_user')
       .on(table.git_url, table.git_branch, table.owned_by_user_id)
       .where(isNotNull(table.owned_by_user_id)),
+    // The session-to-PR LEFT JOIN matches (git_url, git_branch) and picks the
+    // tenant column with an OR. Neither partial unique index above can serve
+    // that join: the planner cannot prove `owned_by_*_id IS NOT NULL` per row,
+    // so it falls back to a hash join and sequentially scans this whole table
+    // on every session list and search. This plain index restores the nested
+    // loop (292 ms to 2.8 ms on a 1M-row cache).
+    index('IDX_github_branch_prs_url_branch').on(table.git_url, table.git_branch).concurrently(),
     check(
       'github_branch_pull_requests_owner_check',
       sql`(

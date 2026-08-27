@@ -151,8 +151,8 @@
     "appearanceLight": "हल्का",
     "appearanceDark": "गाढा",
     "account": "खाता",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR समीक्षाहरूमा एप विशेषता थप्नुहोस्",
+    "prReviewAttributionSubtitle": "समीक्षा पेश गर्दा Reviewed via Kilo फुटर थप्नुहोस्।"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल अनुरोध उपलब्ध छैन",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab खाता",
       "connectGitLab": "GitLab जडान गर्नुहोस्",
       "gitlabError": "GitLab सेटअप खोल्न सकिएन। कृपया फेरि प्रयास गर्नुहोस्।",
-      "description": "पुल रिक्वेस्टहरू स्वचालित रूपमा समीक्षा गर्न Kilo {{label}} जडान गर्नुहोस्।"
+      "description": "पुल रिक्वेस्टहरू स्वचालित रूपमा समीक्षा गर्न Kilo {{label}} जडान गर्नुहोस्।",
+      "bitbucketError": "बिटबकेट सेटअप खोल्न सकिएन। कृपया फेरि प्रयास गर्नुहोस्।"
     },
     "overview": {
       "reviewStyle": "समीक्षा शैली",
@@ -2075,7 +2076,8 @@
       "dollar": "डलरहरू",
       "dollar_other": "डलरहरू",
       "costSpoken": "लागत {{cost}}",
-      "costSpokenWithTime": "लागत {{cost}}, {{time}}"
+      "costSpokenWithTime": "लागत {{cost}}, {{time}}",
+      "pullRequest": "पुल रिक्वेस्ट {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub खोल्न सकिएन",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "नयाँ सत्र",
       "repository": "रिपोजिटरी",
-      "couldNotLoadRepositories": "भण्डारहरू लोड गर्न सकिएन",
       "connectGithub": "GitHub जडान गर्नुहोस्",
       "connectGithubDescription": "तपाईंको ब्राउजरमा GitHub जडान गर्नुहोस्, त्यसपछि भण्डार छान्न यहाँ फर्कनुहोस्।",
       "openGithub": "GitHub खोल्नुहोस्",
       "refreshRepositories": "भण्डारहरू रिफ्रेस गर्नुहोस्",
-      "githubConnectionNotVisible": "हामीले तपाईंको GitHub जडान अहिलेसम्म देख्न सक्दैनौं",
-      "githubConnectionNotVisibleDescription": "यदि तपाईंले Kilo GitHub App स्थापना वा कन्फिगर गर्नुभयो भने, फेरि जाँच्नुहोस् — वा यो यो खाता/संगठनका लागि स्थापना भएको सुनिश्चित गर्नुहोस्।",
-      "checkAgain": "फेरि जाँच्नुहोस्",
       "githubConnected": "GitHub जडान भयो",
       "noRepositoriesVisible": "कुनै भण्डार देखिँदैन। Kilo GitHub App का लागि भण्डार पहुँच जाँच्नुहोस्, त्यसपछि रिफ्रेस गर्नुहोस्।",
       "runOnWithTarget": "मा चलाउनुहोस्: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "सम्पादन जारी राख्नुहोस्",
       "discard": "खारेज गर्नुहोस्",
       "discardFailed": "ड्राफ्ट खारेज गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "आफ्नो कम्प्युटरमा `kilo remote` चलाउनुहोस्, वा चलिरहेको CLI सत्रमा `/remote` प्रयोग गरेर स्थानीय kilo प्रक्रिया नियन्त्रण गर्नुहोस्।",
+      "bitbucketConnected": "Bitbucket जडान भयो",
+      "connectBitbucket": "Bitbucket जडान गर्नुहोस्",
+      "connectBitbucketDescription": "आफ्नो ब्राउजरमा बिटबकेट जडान गर्नुहोस्, त्यसपछि रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
+      "connectGitlab": "GitLab जडान गर्नुहोस्",
+      "connectGitlabDescription": "आफ्नो ब्राउजरमा गिटल्याब जडान गर्नुहोस्, त्यसपछि रिपोजिटरी छान्न यहाँ फर्कनुहोस्।",
+      "couldNotLoadBitbucketRepositories": "बिटबकेट रिपोजिटरीहरू लोड गर्न सकिएन",
+      "couldNotLoadGithubRepositories": "गिथहब रिपोजिटरीहरू लोड गर्न सकिएन",
+      "couldNotLoadGitlabRepositories": "गिटल्याब रिपोजिटरीहरू लोड गर्न सकिएन",
+      "gitlabConnected": "गिटल्याब जडान भयो",
+      "noRepositoriesVisibleBitbucket": "कुनै रिपोजिटरी देखिएन। बिटबकेटको लागि रिपोजिटरी पहुँच जाँच्नुहोस्, त्यसपछि रिफ्रेस गर्नुहोस्।",
+      "noRepositoriesVisibleGitlab": "कुनै रिपोजिटरी देखिएन। गिटल्याबको लागि रिपोजिटरी पहुँच जाँच्नुहोस्, त्यसपछि रिफ्रेस गर्नुहोस्।",
+      "openBitbucket": "बिटबकेट खोल्नुहोस्",
+      "openGitlab": "गिटल्याब खोल्नुहोस्",
+      "recentlyUsed": "हालै प्रयोग गरिएका"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्यावधिक गरियो",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "कुनै भण्डारहरू तपाईंको खातामा जडान भएका छैनन्।",
       "tryDifferentSearch": "फरक खोज शब्द प्रयास गर्नुहोस्।",
       "loading": "लोड गर्दै...",
-      "accessibility": "भण्डार: {{label}}"
+      "accessibility": "भण्डार: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "सन्देश विवरण",
@@ -2623,6 +2638,18 @@
       "updating": "अद्यावधिक हुँदै, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "पुल अनुरोध"
+    },
+    "markdownImage": {
+      "load": "लोड गर्नुहोस्",
+      "loadWithHost": "लोड गर्नुहोस् {{host}}",
+      "httpsOnly": "HTTPS छविहरू मात्र"
+    },
+    "markdownLink": {
+      "invalidLink": "यो लिंक खोल्न सकिँदैन।",
+      "hostConfirmTitle": "बाह्य लिंक खोल्ने?",
+      "hostConfirmMessage": "यो लिंकले {{host}} तपाईंको ब्राउजरमा खोल्छ।",
+      "open": "खोल्नुहोस्",
+      "trustThisHost": "यो होस्टलाई भरोसा गर्नुहोस्"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "कुनै इमेल एप उपलब्ध छैन। तपाईं हामीलाई {{email}} मा सम्पर्क गर्न सक्नुहुन्छ",
     "couldNotOpenStore": "स्टोर खोल्न सकिएन।",
-    "promptTitle": "तपाईंलाई Kilo एप कस्तो लाग्दैछ?",
-    "iLikeIt": "मलाई मन पर्छ",
-    "gladTitle": "यो सुन्दा हामीलाई खुसी लाग्यो!",
-    "gladMessage": "स्टोर समीक्षाले हामीलाई धेरै मद्दत गर्नेछ। Kilo प्रयोग गर्नुभएकोमा धन्यवाद!",
-    "rateKilo": "Kilo लाई रेट गर्नुहोस्",
-    "needsWork": "सुधार चाहिन्छ",
-    "sorryTitle": "यो सुन्दा हामीलाई दुख लाग्यो!",
-    "sorryMessage": "के सुधार गर्नुपर्छ कृपया हामीलाई थाहा दिनुहोस्। एपको जिम्मेवार इन्जिनियरले हरेक रिपोर्ट पढ्छ!",
-    "emailUs": "हामीलाई इमेल गर्नुहोस्",
-    "emailSubject": "मोबाइल एप प्रतिक्रिया"
+    "emailSubject": "मोबाइल एप प्रतिक्रिया",
+    "neutralTitle": "Kilo एपलाई मूल्याङ्कन गर्नुहोस्",
+    "rateTheApp": "एपलाई मूल्याङ्कन गर्नुहोस्",
+    "sendFeedback": "प्रतिक्रिया पठाउनुहोस्"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "संगठन अनुपलब्ध",
       "selectDescription": "जारी राख्न आफ्नो प्रोफाइलबाट संगठन छान्नुहोस्।",
       "selectOrganization": "संगठन चयन गर्नुहोस्",
-      "unavailableDescription": "यो संगठन अब उपलब्ध छैन। जारी राख्न आफ्नो प्रोफाइलबाट एउटा छान्नुहोस्।"
+      "unavailableDescription": "यो संगठन अब उपलब्ध छैन। जारी राख्न आफ्नो प्रोफाइलबाट एउटा छान्नुहोस्।",
+      "accessDeniedTitle": "पहुँच अस्वीकृत",
+      "accessDeniedDescription": "तपाईंसँग यो संस्थामा पहुँच छैन।"
     },
     "creditActivity": {
       "emptyDescription": "यस संगठनका खरिद, प्रयोग, र क्रेडिट समायोजनहरू हुँदा-हुँदै यहाँ देखिनेछन्।",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "लेखा समायोजन",
         "credits_expired": "म्याद सकिएका क्रेडिटहरू"
-      }
+      },
+      "loadMore": "थप लोड गर्नुहोस्",
+      "loadMoreFailed": "थप लोड गर्न सकिएन",
+      "truncated": "पुरानो क्रेडिट गतिविधि उपलब्ध छ।"
     },
     "inviteMember": {
       "emailError": "मान्य इमेल ठेगाना प्रविष्ट गर्नुहोस्",
@@ -2976,7 +3002,10 @@
         "draft": "मस्यौदा",
         "uncollectible": "असुली नहुने",
         "unknown": "अज्ञात"
-      }
+      },
+      "loadMore": "थप लोड गर्नुहोस्",
+      "loadMoreFailed": "थप लोड गर्न सकिएन",
+      "truncated": "पुराना इनभ्वाइसहरू उपलब्ध छन्।"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "अति उच्च",
       "max": "अधिकतम"
     }
+  },
+  "trustedHosts": {
+    "title": "भरोसा गरिएका होस्टहरू",
+    "subtitle": "तपाईंले सोध्नुबिना खोल्न भरोसा गर्ने होस्टहरू",
+    "emptyTitle": "भरोसा गरिएका होस्टहरू छैनन्",
+    "emptyDescription": "जब तपाईं लिंकको होस्टलाई भरोसा गर्नुहुन्छ, यो फेरि नसोधी खुल्छ।",
+    "revoke": "खारेज गर्नुहोस् {{host}}",
+    "backToPreferences": "प्राथमिकताहरूमा फर्कनुहोस्"
   }
 }

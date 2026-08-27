@@ -34,14 +34,21 @@ import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { CredentialContainment, SessionMetadata } from '../persistence/session-metadata.js';
 import { logger } from '../logger.js';
 import { withDORetry } from '../utils/do-retry.js';
+import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { getPgDb } from '../db/pg.js';
 import { generateSessionId, SessionService } from '../session-service.js';
+import { sessionPlaneForNewOwner } from '../session-plane.js';
 import {
   createCloudAgentSessionReport,
   recordCloudAgentSandboxIdentity,
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
-import { generateSandboxRoutingTarget, isOrgInList, type SandboxSelection } from '../sandbox-id.js';
+import {
+  generateSandboxRoutingTarget,
+  isOrgInList,
+  selectSandboxProvider,
+  type SandboxSelection,
+} from '../sandbox-id.js';
 import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { sha256Hex } from '../utils/sha256.js';
@@ -60,6 +67,34 @@ export type SessionRegistrationInput = SessionCreateRequest;
 type SharedSandboxRouteMetadata = NonNullable<
   NonNullable<SessionMetadata['workspace']>['sandboxRoute']
 >;
+
+function assertSupportedSandboxAllocation(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
+): void {
+  if (
+    input.runtime?.sandboxAllocation === 'isolated-standard' &&
+    (input.runtime.devcontainer === true || options?.billingOrigin === 'code-review')
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Isolated Standard allocation is incompatible with specialized sandbox routing',
+    });
+  }
+  if (
+    input.runtime?.sandboxAllocation === 'isolated-standard' &&
+    sessionPlaneForNewOwner(ctx.env, {
+      userId: ctx.userId,
+      orgId: input.options?.kilocodeOrganizationId,
+    }) === 'control'
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Isolated Standard allocation is not supported for control-plane sessions',
+    });
+  }
+}
 
 export type SessionRegistrationContext = {
   env: Env;
@@ -409,7 +444,10 @@ async function allocateNewSession(
 ): Promise<NewSessionAllocation> {
   const sessionService = new SessionService();
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
-  const cloudAgentSessionId = generateSessionId();
+  const orgId = input.options?.kilocodeOrganizationId;
+  const cloudAgentSessionId = generateSessionId(
+    sessionPlaneForNewOwner(ctx.env, { userId: ctx.userId, orgId })
+  );
   const kiloSessionId = generateKiloSessionId();
   const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
 
@@ -441,7 +479,6 @@ async function allocateNewSession(
     rethrowAllocationFailure(ledger, 'report', error);
   }
 
-  const orgId = input.options?.kilocodeOrganizationId;
   const credentialContainment = computeCredentialContainment(input, ctx);
   let sandboxId: SandboxId;
   let sandboxRoute: SharedSandboxRouteMetadata | undefined;
@@ -456,6 +493,7 @@ async function allocateNewSession(
       {
         devcontainer: input.runtime?.devcontainer,
         createdOnPlatform: options?.billingOrigin === 'code-review' ? 'code-review' : undefined,
+        sandboxAllocation: input.runtime?.sandboxAllocation,
       }
     );
     if (target.kind === 'shared') {
@@ -471,7 +509,13 @@ async function allocateNewSession(
       };
     } else {
       sandboxId = target.sandboxId;
-      sandboxProvider = 'cloudflare';
+      sandboxProvider = selectSandboxProvider({
+        env: ctx.env,
+        orgId,
+        sandboxId,
+        sessionId: cloudAgentSessionId,
+        devcontainer: input.runtime?.devcontainer,
+      });
     }
   } catch (error) {
     await recordPostSetupFailure(() =>
@@ -651,8 +695,7 @@ function rebuildCloneAllocation(
     kiloSessionId.length === 0 ||
     typeof sandboxId !== 'string' ||
     sandboxId.length === 0 ||
-    typeof sandboxProvider !== 'string' ||
-    sandboxProvider !== 'cloudflare'
+    (sandboxProvider !== 'cloudflare' && sandboxProvider !== 'vercel')
   ) {
     throw creationInProgressError();
   }
@@ -687,7 +730,7 @@ function rebuildCloneAllocation(
     kiloSessionId,
     sandboxId: sandboxId as SandboxId,
     sandboxRoute: route,
-    sandboxProvider: sandboxProvider as SandboxSelection['provider'],
+    sandboxProvider,
     initialTurn,
     credentialContainment: computeCredentialContainment(input, ctx),
     sessionService,
@@ -755,6 +798,9 @@ function buildSessionRegistrationCommand(
       ...(allocation.sandboxRoute ? { sandboxRoute: allocation.sandboxRoute } : {}),
       credentialContainment: allocation.credentialContainment,
       ...(input.runtime?.devcontainer ? { devcontainerRequested: true } : {}),
+      ...(input.runtime?.sandboxAllocation
+        ? { sandboxAllocation: input.runtime.sandboxAllocation }
+        : {}),
     },
   };
 }
@@ -771,11 +817,9 @@ export async function registerNewSession(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): Promise<SessionRegistrationResult> {
+  assertSupportedSandboxAllocation(input, ctx, options);
   const allocation = await allocateNewSession(input, ctx, options);
-  const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(
-    `${ctx.userId}:${allocation.cloudAgentSessionId}`
-  );
-  const stub = ctx.env.CLOUD_AGENT_SESSION.get(doId);
+  const stub = resolveSessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId);
   let registerResult: Awaited<ReturnType<typeof stub.registerSession>>;
   try {
     registerResult = await stub.registerSession(
@@ -836,16 +880,13 @@ async function registerAndAdmitInitialTurn(
     // turn; clone-only creates register through `registerAllocatedSession`.
     throw new Error('registerAndAdmitInitialTurn requires an initial turn');
   }
-  const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(
-    `${ctx.userId}:${allocation.cloudAgentSessionId}`
-  );
   let admission: SessionMessageAdmissionResult;
   try {
     admission = await withDORetry<
       DurableObjectStub<CloudAgentSession>,
       SessionMessageAdmissionResult
     >(
-      () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
+      () => resolveSessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId),
       stub =>
         stub.createSessionWithInitialAdmission({
           ...buildSessionRegistrationCommand(input, ctx, allocation, options),
@@ -945,16 +986,13 @@ async function registerAllocatedSession(
   allocation: NewSessionAllocation,
   ledger: SessionCreationLedgerHooks | undefined
 ): Promise<{ cloudAgentSessionId: string; kiloSessionId: string }> {
-  const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(
-    `${ctx.userId}:${allocation.cloudAgentSessionId}`
-  );
   let registerResult: Awaited<ReturnType<CloudAgentSession['registerSession']>>;
   try {
     registerResult = await withDORetry<
       DurableObjectStub<CloudAgentSession>,
       Awaited<ReturnType<CloudAgentSession['registerSession']>>
     >(
-      () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
+      () => resolveSessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId),
       stub =>
         stub.registerSession(buildSessionRegistrationCommand(input, ctx, allocation, options)),
       'registerSession'
@@ -1034,6 +1072,7 @@ export async function startNewSession(
   options?: { billingOrigin?: string },
   ledger?: SessionCreationLedgerHooks
 ): Promise<StartedSessionResult> {
+  assertSupportedSandboxAllocation(input, ctx, options);
   const allocation = await allocateSessionForCreate(input, ctx, options, ledger);
   return registerAndAdmitInitialTurn(input, ctx, options, allocation, ledger);
 }
@@ -1084,7 +1123,12 @@ function canonicalJson(value: unknown): string {
 function repositoryCreateIntent(repository: SessionRepositoryRequest): Record<string, unknown> {
   switch (repository.type) {
     case 'github':
-      return { type: 'github', repo: repository.repo, branch: repository.branch };
+      return {
+        type: 'github',
+        repo: repository.repo,
+        githubIntegrationId: repository.githubIntegrationId,
+        branch: repository.branch,
+      };
     case 'gitlab':
       return { type: 'gitlab', url: repository.url, branch: repository.branch };
     case 'bitbucket':
@@ -1188,7 +1232,14 @@ export async function sessionCreateIntentFingerprint(
       },
       repository: repositoryCreateIntent(input.repository),
       finalization: input.finalization,
-      runtime: input.runtime?.devcontainer ? { devcontainer: true } : undefined,
+      runtime: input.runtime
+        ? {
+            ...(input.runtime.devcontainer ? { devcontainer: true } : {}),
+            ...(input.runtime.sandboxAllocation
+              ? { sandboxAllocation: input.runtime.sandboxAllocation }
+              : {}),
+          }
+        : undefined,
       options: input.options
         ? {
             kilocodeOrganizationId: input.options.kilocodeOrganizationId || undefined,
@@ -1232,6 +1283,7 @@ export async function createSessionWithLedger(
   ctx: SessionRegistrationContext,
   options: SessionLedgerCreateOptions
 ): Promise<LedgerSessionCreateResult> {
+  assertSupportedSandboxAllocation(input, ctx, { billingOrigin: options.billingOrigin });
   const db = getPgDb(ctx.env);
   const admission = await admitOperation(db, {
     userId: ctx.userId,
@@ -1533,11 +1585,11 @@ async function resumeCloneCreate(
  */
 async function readSessionMetadata(
   ctx: SessionRegistrationContext,
-  doId: DurableObjectId
+  sessionId: string
 ): Promise<SessionMetadata | null> {
   try {
     return await withDORetry(
-      () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
+      () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
       s => s.getMetadata(),
       'getMetadata'
     );
@@ -1609,13 +1661,11 @@ async function reconcileLedgerCreate(
     return executeLedgerCreate(input, ctx, options, db, row, 'takeover');
   }
 
-  const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${ids.cloudAgentSessionId}`);
   const confirm = () =>
     confirmInitialMessageAdmitted({
       ctx,
       db,
       row,
-      doId,
       ids,
       initialMessageId: row.canonical_result?.initialMessageId,
       startedAt: options.startedAt,
@@ -1623,11 +1673,11 @@ async function reconcileLedgerCreate(
     });
 
   // (c) Ownership present → read the DO state.
-  if (!(await readSessionMetadata(ctx, doId))) {
+  if (!(await readSessionMetadata(ctx, ids.cloudAgentSessionId))) {
     // A single null metadata read is NOT proof of no registration (a transient
     // read or a pending deletion intent can hide committed metadata), so read
     // once more before treating the ownership row as stale.
-    if (await readSessionMetadata(ctx, doId)) {
+    if (await readSessionMetadata(ctx, ids.cloudAgentSessionId)) {
       return confirm();
     }
 
@@ -1694,13 +1744,12 @@ async function confirmInitialMessageAdmitted(args: {
   ctx: SessionRegistrationContext;
   db: WorkerDb;
   row: OperationLedgerRow;
-  doId: DurableObjectId;
   ids: { cloudAgentSessionId: string; kiloSessionId: string };
   initialMessageId: unknown;
   startedAt: number;
   inOrganization: boolean;
 }): Promise<LedgerSessionCreateResult> {
-  const { ctx, db, row, doId, ids, initialMessageId } = args;
+  const { ctx, db, row, ids, initialMessageId } = args;
   if (typeof initialMessageId !== 'string' || initialMessageId.length === 0) {
     throw creationInProgressError();
   }
@@ -1711,7 +1760,7 @@ async function confirmInitialMessageAdmitted(args: {
       DurableObjectStub<CloudAgentSession>,
       MessageResultRPCResponse
     >(
-      () => ctx.env.CLOUD_AGENT_SESSION.get(doId),
+      () => resolveSessionStub(ctx.env, ctx.userId, ids.cloudAgentSessionId),
       stub => stub.getMessageResult(initialMessageId),
       'getMessageResult'
     );

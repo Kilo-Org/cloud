@@ -148,6 +148,27 @@ export const cloudAgentGetAttachmentDownloadUrlSchema = z.object({
   filename: cloudAgentRelaxedAttachmentFilenameSchema,
 });
 
+/**
+ * Send-time finalization input for the pending-upload ledger. The object keys
+ * are full R2 keys produced by the upload presign; the server scopes the link
+ * to the caller's own rows, so the array needs no per-key structure beyond a
+ * length cap that reuses the landed attachment-count constant.
+ */
+export const cloudAgentLinkPendingUploadsSchema = z.object({
+  messageUuid: z.uuid(),
+  objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
+});
+
+/**
+ * Release-time input for the pending-upload ledger. A removed composer file
+ * releases its admitted row so it stops consuming the per-message quota. The
+ * keys are full R2 keys scoped to the caller; only 'pending' rows are released,
+ * so a row already linked (or reaped) is never disturbed.
+ */
+export const cloudAgentReleasePendingUploadsSchema = z.object({
+  objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
+});
+
 function hasOnlyOneAttachmentField(data: { images?: unknown; attachments?: unknown }): boolean {
   return data.images === undefined || data.attachments === undefined;
 }
@@ -345,6 +366,7 @@ const PrepareSessionSharedFields = {
     .string()
     .regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/, 'Invalid repository format')
     .optional(),
+  githubIntegrationId: z.uuid().optional(),
   gitlabProject: z
     .string()
     .regex(
@@ -430,6 +452,10 @@ export const basePrepareSessionNextSchema = z
       path: ['githubRepo'],
     }
   )
+  .refine(data => data.githubIntegrationId === undefined || data.githubRepo !== undefined, {
+    message: 'GitHub integration requires a GitHub repository',
+    path: ['githubIntegrationId'],
+  })
   .refine(hasOnlyOneAttachmentField, {
     message: 'Must not provide both attachments and images',
     path: ['attachments'],

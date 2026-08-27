@@ -151,8 +151,8 @@
     "appearanceLight": "İşıq",
     "appearanceDark": "Qaranlıq",
     "account": "Hesab",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR icmallarına proqram atribusiyası əlavə et",
+    "prReviewAttributionSubtitle": "İcmal təqdim edərkən 'Reviewed via Kilo' altbilgisini əlavə et."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request əlçatan deyil",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab hesabı",
       "connectGitLab": "GitLab-ı qoş",
       "gitlabError": "GitLab quraşdırması açıla bilmədi. Zəhmət olmasa yenidən cəhd edin.",
-      "description": "Pull request-ləri avtomatik nəzərdən keçirmək üçün Kilo {{label}} qoşun."
+      "description": "Pull request-ləri avtomatik nəzərdən keçirmək üçün Kilo {{label}} qoşun.",
+      "bitbucketError": "Bitbucket quraşdırması açıla bilmədi. Yenidən cəhd edin."
     },
     "overview": {
       "reviewStyle": "Nəzərdən keçirmə Üslubu",
@@ -2075,7 +2076,8 @@
       "dollar": "dollar",
       "dollar_other": "dollar",
       "costSpoken": "xərc {{cost}}",
-      "costSpokenWithTime": "xərc {{cost}}, {{time}}"
+      "costSpokenWithTime": "xərc {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub açıla bilmədi",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Yeni sessiya",
       "repository": "Repozitoriya",
-      "couldNotLoadRepositories": "Repozitoriyalar yüklənə bilmədi",
       "connectGithub": "GitHub-u qoş",
       "connectGithubDescription": "Brauzerinizdə GitHub-a qoşulun, sonra repozitoriya seçmək üçün buraya qayıdın.",
       "openGithub": "GitHub-u aç",
       "refreshRepositories": "Repozitoriyaları yenilə",
-      "githubConnectionNotVisible": "Hələ GitHub əlaqənizi görə bilmirik",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub App quraşdırıb və ya konfiqurasiya edibsəsiniz, yenidən yoxlayın — ya da bu hesab/təşkilat üçün quraşdırıldığından əmin olun.",
-      "checkAgain": "Yenidən yoxla",
       "githubConnected": "GitHub qoşuldu",
       "noRepositoriesVisible": "Görünən repozitoriya yoxdur. Kilo GitHub App üçün repozitoriya girişini yoxlayın, sonra yeniləyin.",
       "runOnWithTarget": "İşə salın: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Redaktəyə davam et",
       "discard": "Ləğv et",
       "discardFailed": "Qaralama ləğv edilə bilmədi. Zəhmət olmasa yenidən cəhd edin.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "`kilo remote` komandasını kompüterinizdə işə salın və ya işləyən CLI sessiyasında `/remote` istifadə edin ki, yerli kilo prosesini idarə edəsiniz.",
+      "bitbucketConnected": "Bitbucket qoşulub",
+      "connectBitbucket": "Bitbucket-u qoş",
+      "connectBitbucketDescription": "Depo seçmək üçün brauzerdə Bitbucket-a qoşulun, sonra buraya qayıdın.",
+      "connectGitlab": "GitLab-ı qoş",
+      "connectGitlabDescription": "Depo seçmək üçün brauzerdə GitLab-a qoşulun, sonra buraya qayıdın.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket depoları yüklənə bilmədi",
+      "couldNotLoadGithubRepositories": "GitHub depoları yüklənə bilmədi",
+      "couldNotLoadGitlabRepositories": "GitLab depoları yüklənə bilmədi",
+      "gitlabConnected": "GitLab qoşuldu",
+      "noRepositoriesVisibleBitbucket": "Depo görünmür. Bitbucket üçün depo girişini yoxlayın, sonra yeniləyin.",
+      "noRepositoriesVisibleGitlab": "Depo görünmür. GitLab üçün depo girişini yoxlayın, sonra yeniləyin.",
+      "openBitbucket": "Bitbucket-ı aç",
+      "openGitlab": "GitLab-ı aç",
+      "recentlyUsed": "Son istifadə olunanlar"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl yeniləndi",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Hesabınıza qoşulmuş repozitoriya yoxdur.",
       "tryDifferentSearch": "Fərqli axtarış termini cəhd edin.",
       "loading": "Yüklənir...",
-      "accessibility": "Repozitoriya: {{label}}"
+      "accessibility": "Repozitoriya: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Mesaj detalları",
@@ -2623,6 +2638,18 @@
       "updating": "Yenilənir, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Yüklə",
+      "loadWithHost": "Yüklə {{host}}",
+      "httpsOnly": "Yalnız HTTPS şəkilləri"
+    },
+    "markdownLink": {
+      "invalidLink": "Bu link açıla bilmir.",
+      "hostConfirmTitle": "Xarici link açılsın?",
+      "hostConfirmMessage": "Bu link {{host}} səhifəsini brauzerinizdə açır.",
+      "open": "Aç",
+      "trustThisHost": "Bu hosta etibar et"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Mövcud e-poçt tətbiqi yoxdur. Bizə {{email}} ünvanında müraciət edə bilərsiniz",
     "couldNotOpenStore": "Mağaza açıla bilmədi.",
-    "promptTitle": "Kilo tətbiqini necə bəyənirsiniz?",
-    "iLikeIt": "Bəyənirəm",
-    "gladTitle": "Bunu eşitdiyimizə sevindik!",
-    "gladMessage": "Mağaza rəyi bizə çox kömək edərdi. Kilo istifadə etdiyiniz üçün təşəkkürlər!",
-    "rateKilo": "Kilo-ya qiymət ver",
-    "needsWork": "Təkmilləşdirmə lazımdır",
-    "sorryTitle": "Bunu eşitdiyimizə təəssüflənirik!",
-    "sorryMessage": "Zəhmət olmasa nəyin yaxşılaşdırılması lazım olduğunu bizə bildirin. Tətbiqə cavabdeh olan mühəndis hər hesabatı oxuyur!",
-    "emailUs": "Bizə e-poçt göndərin",
-    "emailSubject": "mobil tətbiq rəyi"
+    "emailSubject": "mobil tətbiq rəyi",
+    "neutralTitle": "Kilo tətbiqini qiymətləndirin",
+    "rateTheApp": "Tətbiqi qiymətləndirin",
+    "sendFeedback": "Rəy göndərin"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "Təşkilat mövcud deyil",
       "selectDescription": "Davam etmək üçün profilinizdən bir təşkilat seçin.",
       "selectOrganization": "Təşkilat seçin",
-      "unavailableDescription": "Bu təşkilat artıq mövcud deyil. Davam etmək üçün profilinizdən birini seçin."
+      "unavailableDescription": "Bu təşkilat artıq mövcud deyil. Davam etmək üçün profilinizdən birini seçin.",
+      "accessDeniedTitle": "Giriş rədd edildi",
+      "accessDeniedDescription": "Bu təşkilata girişiniz yoxdur."
     },
     "creditActivity": {
       "emptyDescription": "Bu təşkilat üçün alışlar, istifadə və kredit düzəlişləri baş verdikcə burada görünəcək.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Komanda doldurma bonusu-2025",
         "accounting_adjustment": "Mühasibat düzəlişi",
         "credits_expired": "Kreditlərin müddəti bitib"
-      }
+      },
+      "loadMore": "Daha çox yüklə",
+      "loadMoreFailed": "Daha çox yüklənə bilmədi",
+      "truncated": "Köhnə kredit fəaliyyəti mövcuddur."
     },
     "inviteMember": {
       "emailError": "Etibarlı e-poçt ünvanı daxil edin",
@@ -2976,7 +3002,10 @@
         "draft": "Qaralama",
         "uncollectible": "Yığıla bilməyən",
         "unknown": "Naməlum"
-      }
+      },
+      "loadMore": "Daha çox yüklə",
+      "loadMoreFailed": "Daha çox yüklənə bilmədi",
+      "truncated": "Köhnə qaimələr mövcuddur."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "Çox yüksək",
       "max": "Maksimum"
     }
+  },
+  "trustedHosts": {
+    "title": "Etibarlı hostlar",
+    "subtitle": "Sorğusuz açılmasına etibar etdiyiniz hostlar",
+    "emptyTitle": "Etibarlı host yoxdur",
+    "emptyDescription": "Bir linkin hostuna etibar etdikdə, link yenidən sorğusuz açılır.",
+    "revoke": "{{host}} üçün etibarı ləğv et",
+    "backToPreferences": "Tənzimləmələrə qayıt"
   }
 }

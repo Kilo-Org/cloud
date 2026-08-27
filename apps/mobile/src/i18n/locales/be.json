@@ -151,8 +151,8 @@
     "appearanceLight": "Светлая",
     "appearanceDark": "Цёмная",
     "account": "Уліковы запіс",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Дадаваць атрыбуцыю дадатку да рэцэнзій PR",
+    "prReviewAttributionSubtitle": "Дадаваць футэр «Reviewed via Kilo» пры адпраўцы рэцэнзіі."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request недаступны",
@@ -1404,7 +1404,8 @@
       "gitlabAccount": "Уліковы запіс GitLab",
       "connectGitLab": "Падключыць GitLab",
       "gitlabError": "Не атрымалася адкрыць наладку GitLab. Паспрабуйце яшчэ раз.",
-      "description": "Падключыце Kilo {{label}}, каб аўтаматычна правяраць pull requests."
+      "description": "Падключыце Kilo {{label}}, каб аўтаматычна правяраць pull requests.",
+      "bitbucketError": "Не атрымалася адкрыць налады Bitbucket. Паспрабуйце яшчэ раз."
     },
     "overview": {
       "reviewStyle": "Стыль праверкі",
@@ -2105,7 +2106,8 @@
       "dollar_few": "долары",
       "dollar_many": "долараў",
       "costSpoken": "кошт {{cost}}",
-      "costSpokenWithTime": "кошт {{cost}}, {{time}}"
+      "costSpokenWithTime": "кошт {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Не атрымалася адкрыць GitHub",
@@ -2182,14 +2184,10 @@
     "newSession": {
       "title": "Новы сеанс",
       "repository": "Рэпазіторый",
-      "couldNotLoadRepositories": "Не атрымалася загрузіць рэпазіторыі",
       "connectGithub": "Падключыць GitHub",
       "connectGithubDescription": "Падключыце GitHub у браўзеры, затым вярніцеся сюды, каб выбраць рэпазіторый.",
       "openGithub": "Адкрыць GitHub",
       "refreshRepositories": "Абнавіць рэпазіторыі",
-      "githubConnectionNotVisible": "Мы пакуль не бачым ваша падключэнне да GitHub",
-      "githubConnectionNotVisibleDescription": "Калі вы ўсталявалі або наладзілі Kilo GitHub App, праверце зноў — або пераканайцеся, што ён усталяваны для гэтага акаўнта/арганізацыі.",
-      "checkAgain": "Праверыць зноў",
       "githubConnected": "GitHub падключаны",
       "noRepositoriesVisible": "Няма бачных рэпазіторыяў. Праверце доступ да рэпазіторыяў для Kilo GitHub App, затым абнавіце.",
       "runOnWithTarget": "Запуск на: {{target}}",
@@ -2216,7 +2214,21 @@
       "keepEditing": "Працягваць рэдагаванне",
       "discard": "Адхіліць",
       "discardFailed": "Не атрымалася адхіліць чарнавік. Паспрабуйце зноў.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Запусціце `kilo remote` на вашым камп'ютары або `/remote` у працуючым сеансе CLI, каб кіраваць лакальным працэсам kilo.",
+      "bitbucketConnected": "Bitbucket падключаны",
+      "connectBitbucket": "Падключыць Bitbucket",
+      "connectBitbucketDescription": "Падключыце Bitbucket у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
+      "connectGitlab": "Падключыць GitLab",
+      "connectGitlabDescription": "Падключыце GitLab у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
+      "couldNotLoadBitbucketRepositories": "Не атрымалася загрузіць рэпазіторыі Bitbucket",
+      "couldNotLoadGithubRepositories": "Не атрымалася загрузіць рэпазіторыі GitHub",
+      "couldNotLoadGitlabRepositories": "Не атрымалася загрузіць рэпазіторыі GitLab",
+      "gitlabConnected": "GitLab падключаны",
+      "noRepositoriesVisibleBitbucket": "Няма бачных рэпазіторыяў. Праверце доступ да рэпазіторыяў Bitbucket і абнавіце.",
+      "noRepositoriesVisibleGitlab": "Няма бачных рэпазіторыяў. Праверце доступ да рэпазіторыяў GitLab і абнавіце.",
+      "openBitbucket": "Адкрыць Bitbucket",
+      "openGitlab": "Адкрыць GitLab",
+      "recentlyUsed": "Нядаўна выкарыстаныя"
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл",
@@ -2307,7 +2319,10 @@
       "noRepositoriesDescription": "Да вашага акаўнта не падключаны рэпазіторыі.",
       "tryDifferentSearch": "Паспрабуйце іншы пошукавы запыт.",
       "loading": "Загрузка...",
-      "accessibility": "Рэпазіторый: {{label}}"
+      "accessibility": "Рэпазіторый: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Падрабязнасці паведамлення",
@@ -2663,6 +2678,18 @@
       "updating": "Абнаўленне, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Загрузіць",
+      "loadWithHost": "Загрузіць {{host}}",
+      "httpsOnly": "Толькі HTTPS-выявы"
+    },
+    "markdownLink": {
+      "invalidLink": "Гэтую спасылку нельга адкрыць.",
+      "hostConfirmTitle": "Адкрыць вонкавую спасылку?",
+      "hostConfirmMessage": "Гэтая спасылка адкрые {{host}} у вашым браўзеры.",
+      "open": "Адкрыць",
+      "trustThisHost": "Давяраць гэтаму хосту"
     }
   },
   "bootstrap": {
@@ -2953,16 +2980,10 @@
   "feedback": {
     "noEmailApp": "Няма даступнага паштовага дадатка. Вы можаце звязацца з намі: {{email}}",
     "couldNotOpenStore": "Не ўдалося адкрыць краму.",
-    "promptTitle": "Як вам падабаецца дадатак Kilo?",
-    "iLikeIt": "Падабаецца",
-    "gladTitle": "Рады гэта чуць!",
-    "gladMessage": "Водгук у краме вельмі дапамог бы нам. Дзякуй за карыстанне Kilo!",
-    "rateKilo": "Ацаніць Kilo",
-    "needsWork": "Трэба папрацаваць",
-    "sorryTitle": "Шкада гэта чуць!",
-    "sorryMessage": "Калі ласка, паведаміце нам, што трэба палепшыць. Інжынер, які адказвае за дадатак, чытае кожную справаздачу!",
-    "emailUs": "Напішыце нам",
-    "emailSubject": "водгук аб мабільным дадатку"
+    "emailSubject": "водгук аб мабільным дадатку",
+    "neutralTitle": "Ацаніце дадатак Kilo",
+    "rateTheApp": "Ацаніце дадатак",
+    "sendFeedback": "Адправіць водгук"
   },
   "organization": {
     "boundary": {
@@ -2972,7 +2993,9 @@
       "organizationUnavailable": "Арганізацыя недаступная",
       "selectDescription": "Выберыце арганізацыю з вашага профілю, каб працягнуць.",
       "selectOrganization": "Выбраць арганізацыю",
-      "unavailableDescription": "Гэтая арганізацыя больш недаступная. Выберыце адну з вашага профілю, каб працягнуць."
+      "unavailableDescription": "Гэтая арганізацыя больш недаступная. Выберыце адну з вашага профілю, каб працягнуць.",
+      "accessDeniedTitle": "Доступ забаронены",
+      "accessDeniedDescription": "Вы не маеце доступу да гэтай арганізацыі."
     },
     "creditActivity": {
       "emptyDescription": "Пакупкі, карыстанне і карэкціроўкі крэдытаў для гэтай арганізацыі будуць з'яўляцца тут па меры іх узнікнення.",
@@ -2989,7 +3012,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Бухгалтарская карэкціроўка",
         "credits_expired": "Крэдыты скончыліся"
-      }
+      },
+      "loadMore": "Загрузіць больш",
+      "loadMoreFailed": "Не атрымалася загрузіць больш",
+      "truncated": "Даступная больш ранняя актыўнасць па крэдыту."
     },
     "inviteMember": {
       "emailError": "Увядзіце сапраўдны адрас электроннай пошты",
@@ -3016,7 +3042,10 @@
         "draft": "Чарнавік",
         "uncollectible": "Неспагнаны",
         "unknown": "Невядомы"
-      }
+      },
+      "loadMore": "Загрузіць больш",
+      "loadMoreFailed": "Не атрымалася загрузіць больш",
+      "truncated": "Даступныя больш раннія рахункі."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3154,5 +3183,13 @@
       "xhigh": "Вельмі высокае",
       "max": "Максімум"
     }
+  },
+  "trustedHosts": {
+    "title": "Давераныя хасты",
+    "subtitle": "Хасты, якім вы давяраеце адкрываць без запыту",
+    "emptyTitle": "Няма давераных хастаў",
+    "emptyDescription": "Калі вы даверыцеся хосту спасылкі, яна адкрыецца без наступных запытаў.",
+    "revoke": "Адабраць {{host}}",
+    "backToPreferences": "Назад да наладаў"
   }
 }

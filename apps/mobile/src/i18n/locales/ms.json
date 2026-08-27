@@ -151,8 +151,8 @@
     "appearanceLight": "Cerah",
     "appearanceDark": "Gelap",
     "account": "Akaun",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Tambahkan atribusi aplikasi kepada semakan PR",
+    "prReviewAttributionSubtitle": "Tambahkan pengaki Reviewed via Kilo apabila anda menghantar semakan."
   },
   "prReview": {
     "pullRequestUnavailable": "Permintaan tarik tidak tersedia",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Akaun GitLab",
       "connectGitLab": "Sambung GitLab",
       "gitlabError": "Tidak dapat membuka persediaan GitLab. Sila cuba lagi.",
-      "description": "Sambung Kilo {{label}} untuk menyemak permintaan tarik secara automatik."
+      "description": "Sambung Kilo {{label}} untuk menyemak permintaan tarik secara automatik.",
+      "bitbucketError": "Tidak dapat membuka persediaan Bitbucket. Sila cuba lagi."
     },
     "overview": {
       "reviewStyle": "Gaya Semakan",
@@ -2075,7 +2076,8 @@
       "dollar": "dolar",
       "dollar_other": "dolar",
       "costSpoken": "kos {{cost}}",
-      "costSpokenWithTime": "kos {{cost}}, {{time}}"
+      "costSpokenWithTime": "kos {{cost}}, {{time}}",
+      "pullRequest": "permintaan tarik {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Tidak dapat membuka GitHub",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Sesi baharu",
       "repository": "Repositori",
-      "couldNotLoadRepositories": "Tidak dapat memuatkan repositori",
       "connectGithub": "Sambungkan GitHub",
       "connectGithubDescription": "Sambungkan GitHub dalam pelayar anda, kemudian kembali ke sini untuk memilih repositori.",
       "openGithub": "Buka GitHub",
       "refreshRepositories": "Segarkan repositori",
-      "githubConnectionNotVisible": "Kami belum dapat melihat sambungan GitHub anda",
-      "githubConnectionNotVisibleDescription": "Jika anda telah memasang atau mengkonfigurasi GitHub App Kilo, semak semula — atau pastikan ia dipasang untuk akaun/organisasi ini.",
-      "checkAgain": "Semak semula",
       "githubConnected": "GitHub disambungkan",
       "noRepositoriesVisible": "Tiada repositori kelihatan. Semak akses repositori untuk GitHub App Kilo, kemudian segarkan.",
       "runOnWithTarget": "Jalankan pada: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Teruskan mengedit",
       "discard": "Buang",
       "discardFailed": "Tidak dapat membuang draf. Sila cuba lagi.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Jalankan `kilo remote` pada komputer anda, atau `/remote` dalam sesi CLI yang berjalan, untuk mengawal proses kilo tempatan.",
+      "bitbucketConnected": "Bitbucket disambungkan",
+      "connectBitbucket": "Sambung Bitbucket",
+      "connectBitbucketDescription": "Sambung Bitbucket dalam penyemak imbas anda, kemudian kembali ke sini untuk memilih repositori.",
+      "connectGitlab": "Sambung GitLab",
+      "connectGitlabDescription": "Sambung GitLab dalam penyemak imbas anda, kemudian kembali ke sini untuk memilih repositori.",
+      "couldNotLoadBitbucketRepositories": "Gagal memuatkan repositori Bitbucket",
+      "couldNotLoadGithubRepositories": "Gagal memuatkan repositori GitHub",
+      "couldNotLoadGitlabRepositories": "Gagal memuatkan repositori GitLab",
+      "gitlabConnected": "GitLab disambungkan",
+      "noRepositoriesVisibleBitbucket": "Tiada repositori kelihatan. Semak akses repositori untuk Bitbucket, kemudian muat semula.",
+      "noRepositoriesVisibleGitlab": "Tiada repositori kelihatan. Semak akses repositori untuk GitLab, kemudian muat semula.",
+      "openBitbucket": "Buka Bitbucket",
+      "openGitlab": "Buka GitLab",
+      "recentlyUsed": "Baru digunakan"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fail dikemas kini",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Tiada repositori disambungkan ke akaun anda.",
       "tryDifferentSearch": "Cuba istilah carian yang berbeza.",
       "loading": "Memuatkan...",
-      "accessibility": "Repositori: {{label}}"
+      "accessibility": "Repositori: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Butiran mesej",
@@ -2623,6 +2638,18 @@
       "updating": "Mengemas kini, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "permintaan tarik"
+    },
+    "markdownImage": {
+      "load": "Muat",
+      "loadWithHost": "Muat {{host}}",
+      "httpsOnly": "Imej HTTPS sahaja"
+    },
+    "markdownLink": {
+      "invalidLink": "Pautan ini tidak boleh dibuka.",
+      "hostConfirmTitle": "Buka pautan luaran?",
+      "hostConfirmMessage": "Pautan ini membuka {{host}} dalam pelayar anda.",
+      "open": "Buka",
+      "trustThisHost": "Percayai hos ini"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Tiada apl e-mel tersedia. Anda boleh hubungi kami di {{email}}",
     "couldNotOpenStore": "Tidak dapat membuka gedung.",
-    "promptTitle": "Macam mana perasaan anda tentang apl Kilo?",
-    "iLikeIt": "Saya sukakannya",
-    "gladTitle": "Kami gembira mendengarnya!",
-    "gladMessage": "Ulasan gedung akan banyak membantu kami. Terima kasih kerana menggunakan Kilo!",
-    "rateKilo": "Nilaikan Kilo",
-    "needsWork": "Perlu diperbaiki",
-    "sorryTitle": "Kami minta maaf mendengarnya!",
-    "sorryMessage": "Sila beritahu kami apa yang perlu diperbaiki. Jurutera yang bertanggungjawab ke atas apl membaca setiap laporan!",
-    "emailUs": "E-mel kami",
-    "emailSubject": "maklum balas apl mudah alih"
+    "emailSubject": "maklum balas apl mudah alih",
+    "neutralTitle": "Nilaikan aplikasi Kilo",
+    "rateTheApp": "Nilaikan aplikasi",
+    "sendFeedback": "Hantar maklum balas"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "Organisasi tidak tersedia",
       "selectDescription": "Pilih organisasi daripada profil anda untuk meneruskan.",
       "selectOrganization": "Pilih organisasi",
-      "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih satu daripada profil anda untuk meneruskan."
+      "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih satu daripada profil anda untuk meneruskan.",
+      "accessDeniedTitle": "Akses ditolak",
+      "accessDeniedDescription": "Anda tidak mempunyai akses kepada organisasi ini."
     },
     "creditActivity": {
       "emptyDescription": "Pembelian, penggunaan, dan pelarasan kredit untuk organisasi ini akan muncul di sini apabila ia berlaku.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Bonus tambah nilai pasukan-2025",
         "accounting_adjustment": "Pelarasan perakaunan",
         "credits_expired": "Kredit tamat tempoh"
-      }
+      },
+      "loadMore": "Muatkan lagi",
+      "loadMoreFailed": "Tidak dapat memuatkan lagi",
+      "truncated": "Aktiviti kredit yang lebih lama tersedia."
     },
     "inviteMember": {
       "emailError": "Masukkan alamat e-mel yang sah",
@@ -2976,7 +3002,10 @@
         "draft": "Draf",
         "uncollectible": "Tidak boleh dituntut",
         "unknown": "Tidak diketahui"
-      }
+      },
+      "loadMore": "Muatkan lagi",
+      "loadMoreFailed": "Tidak dapat memuatkan lagi",
+      "truncated": "Invois yang lebih lama tersedia."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "nama@syarikat.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "Sangat Tinggi",
       "max": "Maksimum"
     }
+  },
+  "trustedHosts": {
+    "title": "Hos yang dipercayai",
+    "subtitle": "Hos yang anda percayai untuk dibuka tanpa bertanya",
+    "emptyTitle": "Tiada hos yang dipercayai",
+    "emptyDescription": "Apabila anda mempercayai hos pautan, ia dibuka tanpa bertanya lagi.",
+    "revoke": "Tarik balik {{host}}",
+    "backToPreferences": "Kembali ke keutamaan"
   }
 }

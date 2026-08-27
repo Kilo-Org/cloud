@@ -59,6 +59,7 @@ export type CloudAgentPrepareSessionInput = {
   callbackTarget?: CallbackTarget;
   createdOnPlatform?: string;
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  sandboxAllocation?: 'isolated-standard';
   runtimeSkills?: Array<{
     name: string;
     rawMarkdown: string;

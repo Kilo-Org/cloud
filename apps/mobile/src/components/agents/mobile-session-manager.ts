@@ -27,6 +27,7 @@ import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-conn
 import { cacheToolAttachment } from '@/components/agents/tool-card-image-cache';
 import { cacheFilePart } from '@/components/agents/file-part-cache';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import * as z from 'zod';
 import { i18n } from '@/i18n';
 
 type SessionWithRuntimeState =
@@ -58,6 +59,18 @@ const CLOUD_PREPARE_TRANSIENT_CODES = new Set([
 
 /** Stable message the ledger returns on a same-key in-flight duplicate (plan P1-A-08b). */
 const CLOUD_PREPARE_IN_PROGRESS_MESSAGE = 'creation_in_progress';
+
+/**
+ * Wire contract for the cloud-agent stream-ticket endpoint. `expiresAt` is the
+ * Unix-epoch number `signStreamTicket` returns. All fields are optional here;
+ * the required-field check below rejects an otherwise-valid object missing
+ * `ticket` or `expiresAt`.
+ */
+export const StreamTicketResponseSchema = z.object({
+  ticket: z.string().optional(),
+  expiresAt: z.number().optional(),
+  error: z.string().optional(),
+});
 
 /**
  * True when a `prepareSession` failure may be retried with the SAME
@@ -207,11 +220,7 @@ export function createMobileAgentSessionManager({
             body: JSON.stringify(body),
           }
         );
-        const data = (await response.json()) as {
-          ticket?: string;
-          expiresAt?: number;
-          error?: string;
-        };
+        const data = StreamTicketResponseSchema.parse(await response.json());
         if (!response.ok) {
           throw new Error(data.error ?? 'Failed to get stream ticket');
         }

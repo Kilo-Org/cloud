@@ -1,4 +1,3 @@
-import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
@@ -6,17 +5,14 @@ import { getAllUserProviders, getWorkOSOrganization } from '@/lib/user';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 import { isNewAccountEligibleForMagicLink } from '@/lib/auth/email-signin-eligibility';
 
-jest.mock('@vercel/firewall');
 jest.mock('@sentry/nextjs');
 jest.mock('@/lib/auth/verify-turnstile-jwt');
 jest.mock('@/lib/user');
 jest.mock('@/lib/organizations/organization-sso-policy');
 jest.mock('@/lib/auth/email-signin-eligibility');
-jest.mock('@/lib/config.server', () => ({ NEXTAUTH_SECRET: 'test-secret' }));
 
-import { discoveryEmailRateLimitKey, POST } from './route';
+import { POST } from './route';
 
-const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockCaptureMessage = jest.mocked(captureMessage);
 const mockVerifyTurnstileJWT = jest.mocked(verifyTurnstileJWT);
 const mockGetAllUserProviders = jest.mocked(getAllUserProviders);
@@ -37,7 +33,6 @@ describe('POST /api/sso/organizations', () => {
     mockVerifyTurnstileJWT.mockResolvedValue({ success: true, token: {} } as Awaited<
       ReturnType<typeof verifyTurnstileJWT>
     >);
-    mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
     mockGetAllUserProviders.mockResolvedValue({ kind: 'not_found' });
     mockIsNewAccountEligibleForMagicLink.mockResolvedValue(true);
     mockResolveSsoAuthorityForDomain.mockImplementation(async domain => ({
@@ -54,7 +49,7 @@ describe('POST /api/sso/organizations', () => {
 
     const response = await POST(request({ email: 'user@example.com' }));
     expect(response.status).toBe(401);
-    expect(mockCheckRateLimit).not.toHaveBeenCalled();
+    expect(mockGetAllUserProviders).not.toHaveBeenCalled();
   });
 
   it('rejects invalid request email', async () => {
@@ -120,6 +115,27 @@ describe('POST /api/sso/organizations', () => {
       kind: 'sso',
       organizationId: 'workos-org-1',
     });
+  });
+
+  it('enforces required SSO for a discovered legacy Google Workspace account', async () => {
+    mockGetAllUserProviders.mockResolvedValue({
+      kind: 'found',
+      user: {
+        kiloUserId: 'oauth/google:synthetic-account',
+        providers: ['google'],
+        primaryEmail: 'legacy-workspace@example.com',
+      },
+    });
+    mockResolveSsoAuthorityForDomain.mockResolvedValue({
+      status: 'required',
+      domain: 'example.com',
+      sourceOrganizationId: 'organization-1',
+    });
+    mockGetWorkOSOrganization.mockResolvedValue({ id: 'workos-organization-1' } as never);
+
+    await expect(
+      (await POST(request({ email: 'legacy-workspace@example.com' }))).json()
+    ).resolves.toEqual({ kind: 'sso', organizationId: 'workos-organization-1' });
   });
 
   it('returns server-authorized account-creation choices for an eligible unknown email', async () => {
@@ -198,61 +214,5 @@ describe('POST /api/sso/organizations', () => {
 
     expect((await POST(request({ email: 'first.last+tag@gmail.com' }))).status).toBe(503);
     expect(mockIsNewAccountEligibleForMagicLink).not.toHaveBeenCalled();
-  });
-
-  it('uses one HMAC rate-limit key for normalized Gmail equivalents', async () => {
-    const emailForms = [
-      'first.last+tag@gmail.com',
-      'firstlast@gmail.com',
-      'first.last@googlemail.com',
-    ];
-
-    expect(emailForms.map(discoveryEmailRateLimitKey)).toEqual([
-      discoveryEmailRateLimitKey('firstlast@gmail.com'),
-      discoveryEmailRateLimitKey('firstlast@gmail.com'),
-      discoveryEmailRateLimitKey('firstlast@gmail.com'),
-    ]);
-
-    for (const email of emailForms) {
-      await POST(request({ email }));
-    }
-
-    const emailLimitKeys = mockCheckRateLimit.mock.calls
-      .filter(([id]) => id === 'sign-in-discovery-email')
-      .map(([, options]) => options?.rateLimitKey);
-    expect(new Set(emailLimitKeys)).toEqual(
-      new Set([discoveryEmailRateLimitKey('firstlast@gmail.com')])
-    );
-  });
-
-  it('rejects a rate-limited discovery request', async () => {
-    mockCheckRateLimit
-      .mockResolvedValueOnce({ rateLimited: true })
-      .mockResolvedValueOnce({ rateLimited: false });
-
-    expect((await POST(request({ email: 'user@example.com' }))).status).toBe(429);
-    expect(mockGetAllUserProviders).not.toHaveBeenCalled();
-  });
-
-  it('fails closed when a rate-limit policy is unavailable', async () => {
-    mockCheckRateLimit
-      .mockResolvedValueOnce({ rateLimited: false, error: 'not-found' })
-      .mockResolvedValueOnce({
-        rateLimited: false,
-        error: 'blocked',
-      });
-
-    expect((await POST(request({ email: 'user@example.com' }))).status).toBe(503);
-    expect(mockGetAllUserProviders).not.toHaveBeenCalled();
-    expect(mockCaptureMessage).toHaveBeenCalledWith('Sign-in discovery rate limit unavailable', {
-      level: 'error',
-      tags: { source: 'sso-organizations-rate-limit' },
-      extra: {
-        ipLimiterUnavailable: true,
-        emailLimiterUnavailable: true,
-      },
-    });
-    expect(JSON.stringify(mockCaptureMessage.mock.calls)).not.toContain('not-found');
-    expect(JSON.stringify(mockCaptureMessage.mock.calls)).not.toContain('blocked');
   });
 });

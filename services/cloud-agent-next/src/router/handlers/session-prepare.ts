@@ -27,6 +27,7 @@ import {
 } from '@kilocode/cloud-agent-profile';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import { logger, withLogTags } from '../../logger.js';
+import { resolveSessionStub } from '../../sandbox-session/session-stub.js';
 
 import { internalApiProtectedProcedure } from '../auth.js';
 import {
@@ -46,7 +47,7 @@ import type { Env } from '../../types.js';
 import type { SessionProfileBundle } from '../../session-profile.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
-import { assertBitbucketRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
+import { assertRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
 import { assertOrganizationMembership } from './organization-membership.js';
 
 type SessionPrepareHandlers = {
@@ -207,6 +208,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
     repository = {
       type: 'github',
       repo: input.githubRepo,
+      ...(input.githubIntegrationId ? { githubIntegrationId: input.githubIntegrationId } : {}),
       branch: input.upstreamBranch,
     };
   } else {
@@ -271,7 +273,13 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       variant: input.variant,
     },
     repository,
-    runtime: input.devcontainer ? { devcontainer: true } : undefined,
+    runtime:
+      input.devcontainer || input.sandboxAllocation
+        ? {
+            ...(input.devcontainer ? { devcontainer: true } : {}),
+            ...(input.sandboxAllocation ? { sandboxAllocation: input.sandboxAllocation } : {}),
+          }
+        : undefined,
     clone: input.cloneFromKiloSessionId
       ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
       : undefined,
@@ -331,7 +339,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
           input.kilocodeOrganizationId
         );
       }
-      await assertBitbucketRepositoryAccessBeforeSessionCreation({
+      await assertRepositoryAccessBeforeSessionCreation({
         env: ctx.env,
         userId: ctx.userId,
         orgId: input.kilocodeOrganizationId,
@@ -425,10 +433,7 @@ const updateSessionHandler = internalApiProtectedProcedure
       });
       logger.info('Updating session');
 
-      const doId = ctx.env.CLOUD_AGENT_SESSION.idFromName(
-        `${ctx.userId}:${input.cloudAgentSessionId}`
-      );
-      const stub = ctx.env.CLOUD_AGENT_SESSION.get(doId);
+      const stub = resolveSessionStub(ctx.env, ctx.userId, input.cloudAgentSessionId);
 
       const result = await stub.tryUpdate({ callbackTarget: input.callbackTarget });
 

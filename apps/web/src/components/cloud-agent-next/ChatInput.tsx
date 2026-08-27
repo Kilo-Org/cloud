@@ -1,7 +1,7 @@
 'use client';
 
 import type { KeyboardEvent } from 'react';
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Button as UIButton } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover';
@@ -135,6 +135,12 @@ export function ChatInput({
     setValue(nextValue);
   }, []);
 
+  /** Ref for the synchronous re-entry guard, state for the disabled UI. */
+  const setAttachmentSubmissionPending = useCallback((pending: boolean) => {
+    attachmentSubmissionPendingRef.current = pending;
+    setIsAttachmentSubmissionPending(pending);
+  }, []);
+
   const attachmentUpload = useCloudAgentAttachmentUpload(attachmentUploadOptions);
   const isAttachmentLimitReached =
     attachmentUpload.attachments.length >= CLOUD_AGENT_ATTACHMENT_MAX_COUNT;
@@ -183,13 +189,10 @@ export function ChatInput({
       if (attachmentSubmissionPendingRef.current) return false;
       if (attachmentsEnabled && attachmentUpload.hasUploadingAttachments) return false;
 
-      const attachmentsData = attachmentsEnabled
-        ? attachmentUpload.getAttachmentsData()
-        : undefined;
-      const submittedAttachments = attachmentsEnabled ? attachmentUpload.attachments : [];
-      const submitsAttachments = hasSubmissionAttachmentPayload(attachmentsData);
-
-      // Re-match against the trimmed value at submit time
+      // Re-match against the trimmed value at submit time, and reject a slash
+      // command carrying files BEFORE finalizing the attachment ledger: a
+      // client-rejected send must leave its rows pending so the reaper can
+      // delete the orphaned objects.
       let accepted = false;
       const slashMatch = onSendCommand
         ? /^\s*\/([\w.-]+)(?:\s+([\s\S]*))?\s*$/.exec(trimmed)
@@ -212,9 +215,28 @@ export function ChatInput({
         return false;
       }
 
-      if (submitsAttachments) {
-        attachmentSubmissionPendingRef.current = true;
-        setIsAttachmentSubmissionPending(true);
+      let attachmentsData: CloudAgentAttachments | undefined;
+      if (attachmentsEnabled) {
+        // Take the in-flight guard BEFORE the link RPC: while finalize awaits,
+        // the send button stays enabled and Enter still reaches sendMessage,
+        // so an unguarded await lets a second submit start its own
+        // finalize + send.
+        setAttachmentSubmissionPending(true);
+        try {
+          attachmentsData = await attachmentUpload.finalizeAttachments();
+        } catch (error) {
+          setAttachmentSubmissionPending(false);
+          toast.error('Failed to attach files. Please try again.', {
+            description: String(error instanceof Error ? error.message : ''),
+          });
+          return false;
+        }
+      }
+      const submittedAttachments = attachmentsEnabled ? attachmentUpload.attachments : [];
+      const submitsAttachments = hasSubmissionAttachmentPayload(attachmentsData);
+
+      if (!submitsAttachments) {
+        setAttachmentSubmissionPending(false);
       }
       setInputValue('');
       if (textareaRef.current) {
@@ -236,8 +258,7 @@ export function ChatInput({
         return true;
       } finally {
         if (submitsAttachments) {
-          attachmentSubmissionPendingRef.current = false;
-          setIsAttachmentSubmissionPending(false);
+          setAttachmentSubmissionPending(false);
         }
         if (!accepted && valueRef.current === '') {
           setInputValue(trimmed);
@@ -251,6 +272,7 @@ export function ChatInput({
       disabled,
       onSend,
       onSendCommand,
+      setAttachmentSubmissionPending,
       setInputValue,
       slashCommands,
     ]

@@ -104,6 +104,22 @@ export async function readClipboardText(): Promise<string> {
 export type ClipboardImageFile = { uri: string; name: string; mimeType: string };
 
 /**
+ * Delete the `clipboard-images` cache directory (if present). Called on
+ * sign-out and account switch so a prior account's pasted images never
+ * leak to the next session. Best-effort and never throws.
+ */
+export function clearClipboardImages(): void {
+  try {
+    const directory = new Directory(Paths.cache, 'clipboard-images');
+    if (directory.exists) {
+      directory.delete();
+    }
+  } catch {
+    // Best-effort cache hygiene; ignore delete failures.
+  }
+}
+
+/**
  * Read the clipboard image into a cache file.
  *
  * 1. Requests a PNG (`format: 'png'`) from the clipboard.

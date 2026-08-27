@@ -151,8 +151,8 @@
     "appearanceLight": "ღია",
     "appearanceDark": "მუქი",
     "account": "ანგარიში",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "აპლიკაციის მითითების დამატება PR რეცენზიებში",
+    "prReviewAttributionSubtitle": "დაამატეთ „განხილულია Kilo-ს მეშვეობით“ ქვედა წარწერა, როცა რეცენზიას გაგზავნით."
   },
   "prReview": {
     "pullRequestUnavailable": "პულ-რექვესთი მიუწვდომელია",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab ანგარიში",
       "connectGitLab": "GitLab-ის დაკავშირება",
       "gitlabError": "GitLab-ის დაყენების გახსნა ვერ მოხერხდა. გთხოვთ, სცადოთ ხელახლა.",
-      "description": "დააკავშირეთ Kilo {{label}}, რომ ავტომატურად მიმოიხილოთ პულ რექვესტები."
+      "description": "დააკავშირეთ Kilo {{label}}, რომ ავტომატურად მიმოიხილოთ პულ რექვესტები.",
+      "bitbucketError": "Bitbucket-ის დაყენების გახსნა ვერ მოხერხდა. გთხოვთ, სცადოთ კიდევ."
     },
     "overview": {
       "reviewStyle": "მიმოხილვის სტილი",
@@ -2075,7 +2076,8 @@
       "dollar": "დოლარი",
       "dollar_other": "დოლარი",
       "costSpoken": "ღირებულება {{cost}}",
-      "costSpokenWithTime": "ღირებულება {{cost}}, {{time}}"
+      "costSpokenWithTime": "ღირებულება {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ის გახსნა ვერ მოხერხდა",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "ახალი სესია",
       "repository": "რეპოზიტორი",
-      "couldNotLoadRepositories": "რეპოზიტორები ვერ ჩაირთო",
       "connectGithub": "GitHub-თან დაკავშირება",
       "connectGithubDescription": "დააკავშირეთ GitHub თქვენს ბრაუზერში, შემდეგ დაბრუნდით აქ რეპოზიტორის ასარჩევად.",
       "openGithub": "GitHub-ის გახსნა",
       "refreshRepositories": "რეპოზიტორების განახლება",
-      "githubConnectionNotVisible": "თქვენს GitHub კავშირს ჯერ ვერ ვხედავთ",
-      "githubConnectionNotVisibleDescription": "თუ დააინსტალირეთ ან კონფიგურაცია გაუკეთეთ Kilo GitHub App-ს, შეამოწმეთ ხელახლა — ან დარწმუნდით, რომ იგი დაყენებულია ამ ანგარიშის/ორგანიზაციისთვის.",
-      "checkAgain": "ხელახლა შემოწმება",
       "githubConnected": "GitHub დაკავშირებულია",
       "noRepositoriesVisible": "რეპოზიტორები არ ჩანს. შეამოწმეთ რეპოზიტორის წვდომა Kilo GitHub App-ისთვის, შემდეგ განაახლეთ.",
       "runOnWithTarget": "გაშვება: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "რედაქტირების გაგრძელება",
       "discard": "გაუქმება",
       "discardFailed": "დრაფტის გაუქმება ვერ მოხერხდა. გთხოვთ, სცადეთ ხელახლა.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "გაუშვით `kilo remote` თქვენს კომპიუტერზე, ან `/remote` მიმდინარე CLI სესიაში, ლოკალური kilo პროცესის სამართავად.",
+      "bitbucketConnected": "Bitbucket დაკავშირებულია",
+      "connectBitbucket": "Bitbucket-ის დაკავშირება",
+      "connectBitbucketDescription": "დაუკავშირდით Bitbucket-ს თქვენს ბრაუზერში, შემდეგ დაბრუნდით აქ რეპოზიტორის ასარჩევად.",
+      "connectGitlab": "GitLab-ის დაკავშირება",
+      "connectGitlabDescription": "დაუკავშირდით GitLab-ს თქვენს ბრაუზერში, შემდეგ დაბრუნდით აქ რეპოზიტორის ასარჩევად.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket-ის რეპოზიტორების ჩატვირთვა ვერ მოხერხდა",
+      "couldNotLoadGithubRepositories": "GitHub-ის რეპოზიტორების ჩატვირთვა ვერ მოხერხდა",
+      "couldNotLoadGitlabRepositories": "GitLab-ის რეპოზიტორების ჩატვირთვა ვერ მოხერხდა",
+      "gitlabConnected": "GitLab დაკავშირებულია",
+      "noRepositoriesVisibleBitbucket": "რეპოზიტორები არ ჩანს. შეამოწმეთ Bitbucket-ის რეპოზიტორებზე წვდომა, შემდეგ განაახლეთ.",
+      "noRepositoriesVisibleGitlab": "რეპოზიტორები არ ჩანს. შეამოწმეთ GitLab-ის რეპოზიტორებზე წვდომა, შემდეგ განაახლეთ.",
+      "openBitbucket": "Bitbucket-ის გახსნა",
+      "openGitlab": "GitLab-ის გახსნა",
+      "recentlyUsed": "ბოლოს გამოყენებული"
     },
     "partRenderer": {
       "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "თქვენს ანგარიშთან დაკავშირებული რეპოზიტორები არ არის.",
       "tryDifferentSearch": "სცადეთ სხვა საძიებო სიტყვა.",
       "loading": "ჩატვირთვა...",
-      "accessibility": "რეპოზიტორი: {{label}}"
+      "accessibility": "რეპოზიტორი: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "შეტყობინების დეტალები",
@@ -2623,6 +2638,18 @@
       "updating": "განახლდება, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "პულ-რექვესთი"
+    },
+    "markdownImage": {
+      "load": "ჩატვირთვა",
+      "loadWithHost": "ჩატვირთვა {{host}}",
+      "httpsOnly": "მხოლოდ HTTPS სურათები"
+    },
+    "markdownLink": {
+      "invalidLink": "ამ ბმულის გახსნა შეუძლებელია.",
+      "hostConfirmTitle": "გავხსნათ გარე ბმული?",
+      "hostConfirmMessage": "ეს ბმული ხსნის {{host}}-ს თქვენს ბრაუზერში.",
+      "open": "გახსნა",
+      "trustThisHost": "ამ ჰოსტის ნდობა"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "ელფოსტის აპლიკაცია ხელმისაწვდომი არ არის. დაგვიკავშირდით: {{email}}",
     "couldNotOpenStore": "მაღაზიის გახსნა ვერ მოხერხდა.",
-    "promptTitle": "როგორ მოგწონთ Kilo აპი?",
-    "iLikeIt": "მომწონს",
-    "gladTitle": "მოხარულები ვართ, რომ ეს გვესმის!",
-    "gladMessage": "მაღაზიის მიმოხილვა ძალიან დაგვეხმარებოდა. გმადლობთ, რომ იყენებთ Kilo-ს!",
-    "rateKilo": "შეაფასეთ Kilo",
-    "needsWork": "გასაუმჯობესებელია",
-    "sorryTitle": "ბოდიშს ვიხდით, რომ ეს გვესმის!",
-    "sorryMessage": "გთხოვთ, გვითხრათ, რა უნდა გაუმჯობესდეს. აპზე პასუხისმგებელი ინჟინერი ყველა ანგარიშს კითხულობს!",
-    "emailUs": "მოგვწერეთ",
-    "emailSubject": "მობილური აპლიკაციის გამოხმაურება"
+    "emailSubject": "მობილური აპლიკაციის გამოხმაურება",
+    "neutralTitle": "შეაფასეთ Kilo აპი",
+    "rateTheApp": "აპის შეფასება",
+    "sendFeedback": "გამოხმაურების გაგზავნა"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "ორგანიზაცია მიუწვდომელია",
       "selectDescription": "გასაგრძელებლად აირჩიეთ ორგანიზაცია თქვენი პროფილიდან.",
       "selectOrganization": "აირჩიეთ ორგანიზაცია",
-      "unavailableDescription": "ეს ორგანიზაცია აღარ არის ხელმისაწვდომი. გასაგრძელებლად აირჩიეთ ერთი თქვენი პროფილიდან."
+      "unavailableDescription": "ეს ორგანიზაცია აღარ არის ხელმისაწვდომი. გასაგრძელებლად აირჩიეთ ერთი თქვენი პროფილიდან.",
+      "accessDeniedTitle": "წვდომა აკრძალულია",
+      "accessDeniedDescription": "თქვენ არ გაქვთ წვდომა ამ ორგანიზაციაზე."
     },
     "creditActivity": {
       "emptyDescription": "ამ ორგანიზაციის შესყიდვები, გამოყენება და კრედიტის კორექტირებები აქ გამოჩნდება მათი წარმოქმნისას.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "გუნდის შევსების ბონუსი 2025",
         "accounting_adjustment": "ბუღალტრული კორექტირება",
         "credits_expired": "ვადაგასული კრედიტები"
-      }
+      },
+      "loadMore": "მეტის ჩატვირთვა",
+      "loadMoreFailed": "მეტის ჩატვირთვა ვერ მოხერხდა",
+      "truncated": "უფრო ძველი კრედიტის აქტივობა ხელმისაწვდომია."
     },
     "inviteMember": {
       "emailError": "შეიყვანეთ მოქმედი ელფოსტის მისამართი",
@@ -2976,7 +3002,10 @@
         "draft": "მონახაზი",
         "uncollectible": "ამოუღებელი",
         "unknown": "უცნობი"
-      }
+      },
+      "loadMore": "მეტის ჩატვირთვა",
+      "loadMoreFailed": "მეტის ჩატვირთვა ვერ მოხერხდა",
+      "truncated": "უფრო ძველი ინვოისები ხელმისაწვდომია."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "ძალიან მაღალი",
       "max": "მაქსიმალური"
     }
+  },
+  "trustedHosts": {
+    "title": "სანდო ჰოსტები",
+    "subtitle": "ჰოსტები, რომლებსაც ენდობით და ისინი იხსნება კითხვის გარეშე",
+    "emptyTitle": "სანდო ჰოსტები არ არის",
+    "emptyDescription": "როდესაც ენდობით ბმულის ჰოსტს, ის იხსნება ხელახლა კითხვის გარეშე.",
+    "revoke": "გაუქმება {{host}}",
+    "backToPreferences": "დაბრუნება პარამეტრებში"
   }
 }

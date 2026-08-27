@@ -8,6 +8,7 @@ const {
   generateSessionIdMock,
   generateSandboxRoutingTargetMock,
   selectSandboxForNewSessionMock,
+  selectSandboxProviderMock,
   createCliSessionMock,
   deleteCliSessionMock,
   createSessionReportMock,
@@ -29,6 +30,7 @@ const {
     sandboxId: 'sb-test-123',
     provider: 'cloudflare',
   }),
+  selectSandboxProviderMock: vi.fn(() => 'cloudflare'),
   createCliSessionMock: vi.fn().mockResolvedValue({ created: true }),
   deleteCliSessionMock: vi.fn().mockResolvedValue({ deleted: true }),
   createSessionReportMock: vi.fn().mockResolvedValue(undefined),
@@ -72,6 +74,7 @@ vi.mock('./sandbox-id.js', async importOriginal => {
     ...actual,
     generateSandboxRoutingTarget: generateSandboxRoutingTargetMock,
     selectSandboxForNewSession: selectSandboxForNewSessionMock,
+    selectSandboxProvider: selectSandboxProviderMock,
     getSandboxNamespace: vi.fn(),
   };
 });
@@ -166,6 +169,7 @@ function createInternalApiContext(options: {
   requestInternalApiKey?: string | null;
   skipBalanceCheck?: boolean;
   doStub?: ReturnType<typeof createMockDOStub>;
+  getTokenForRepo?: ReturnType<typeof vi.fn>;
   getBitbucketToken?: ReturnType<typeof vi.fn>;
   githubTokenContainmentOrgIds?: string;
   gitlabTokenContainmentOrgIds?: string;
@@ -224,6 +228,15 @@ function createInternalApiContext(options: {
       R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
       CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
       GIT_TOKEN_SERVICE: {
+        getTokenForRepo:
+          options.getTokenForRepo ??
+          vi.fn().mockResolvedValue({
+            success: true,
+            token: 'managed-github-token',
+            installationId: '123',
+            accountLogin: 'acme',
+            appType: 'standard',
+          }),
         getBitbucketToken:
           options.getBitbucketToken ??
           vi.fn().mockResolvedValue({ success: true, token: 'managed-bitbucket-token' }),
@@ -275,6 +288,7 @@ describe('prepareSession endpoint', () => {
       sandboxId: 'sb-test-123',
       provider: 'cloudflare',
     });
+    selectSandboxProviderMock.mockReturnValue('cloudflare');
     createCliSessionMock.mockResolvedValue({ created: true });
     deleteCliSessionMock.mockResolvedValue({ deleted: true });
     createSessionReportMock.mockResolvedValue(undefined);
@@ -1303,6 +1317,7 @@ describe('start endpoint', () => {
       sandboxId: 'sb-test-123',
       provider: 'cloudflare',
     });
+    selectSandboxProviderMock.mockReturnValue('cloudflare');
     createCliSessionMock.mockResolvedValue({ created: true });
     deleteCliSessionMock.mockResolvedValue({ deleted: true });
     createSessionReportMock.mockResolvedValue(undefined);
@@ -1391,6 +1406,36 @@ describe('start endpoint', () => {
         workspace: expect.objectContaining({
           credentialContainment: { github: true, gitlab: false, bitbucket: false, kilocode: false },
         }),
+      })
+    );
+  });
+
+  it('preflights and registers grouped starts with exact GitHub integration identity', async () => {
+    const doStub = createMockDOStub();
+    const getTokenForRepo = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'managed-github-token',
+      installationId: '123',
+      accountLogin: 'acme',
+      appType: 'standard',
+    });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub, getTokenForRepo }));
+    const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+
+    await caller.start({
+      message: { prompt: 'Use the selected GitHub installation' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo', githubIntegrationId },
+    });
+
+    expect(getTokenForRepo).toHaveBeenCalledWith({
+      githubRepo: 'acme/repo',
+      userId: 'test-user-123',
+      expectedIntegrationId: githubIntegrationId,
+    });
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repository: { type: 'github', repo: 'acme/repo', githubIntegrationId },
       })
     );
   });
@@ -1772,6 +1817,61 @@ describe('start endpoint', () => {
         failure: { stage: 'registration', code: 'do_registration_rejected' },
       }),
       expect.any(Object)
+    );
+  });
+
+  it('forwards Vercel enrollment configuration and persists only the selected identity', async () => {
+    generateSandboxRoutingTargetMock.mockResolvedValueOnce({
+      kind: 'isolated',
+      sandboxId: 'ses-abcdef',
+    });
+    selectSandboxProviderMock.mockReturnValueOnce('vercel');
+    const doStub = createMockDOStub();
+    const context = createInternalApiContext({ doStub });
+    Object.assign(context.env, {
+      PER_SESSION_SANDBOX_ORG_IDS: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      VERCEL_SANDBOX_ORG_IDS: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      VERCEL_TOKEN: 'private-vercel-token',
+      VERCEL_TEAM_ID: 'team-id',
+      VERCEL_PROJECT_ID: 'project-id',
+      VERCEL_SANDBOX_SNAPSHOT_ID: 'snapshot-id',
+      VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'runtime-build-id',
+      VERCEL_SANDBOX_RUNTIME: 'node24',
+      VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
+      VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
+    });
+    const caller = appRouter.createCaller(context);
+
+    await caller.start({
+      message: { prompt: 'Use the enrolled provider' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' },
+    });
+
+    expect(selectSandboxProviderMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sandboxId: 'ses-abcdef',
+        sessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+        orgId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+        env: expect.objectContaining({
+          VERCEL_SANDBOX_ORG_IDS: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+          VERCEL_TOKEN: 'private-vercel-token',
+          VERCEL_SANDBOX_SNAPSHOT_ID: 'snapshot-id',
+          VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'runtime-build-id',
+        }),
+      })
+    );
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({
+          sandboxId: 'ses-abcdef',
+          sandboxProvider: 'vercel',
+        }),
+      })
+    );
+    expect(JSON.stringify(doStub.createSessionWithInitialAdmission.mock.calls)).not.toContain(
+      'private-vercel-token'
     );
   });
 

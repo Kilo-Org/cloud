@@ -5,13 +5,12 @@ import {
   Globe,
   type LucideIcon,
   MessageSquare,
+  Shield,
   Smartphone,
 } from '@/components/ui/icons';
-import { useState } from 'react';
 import { Switch, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { LanguagePickerSheet } from '@/components/language-picker-sheet';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -23,9 +22,11 @@ import { getResolvedLanguage, useLanguagePreference } from '@/lib/hooks/use-lang
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
+import { useTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { cn } from '@/lib/utils';
 import { LANGUAGE_ENDONYMS } from '@/i18n/languages';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { setLanguagePickerBridge } from '@/lib/picker-bridge';
 import {
   setThemePreference,
   type ThemePreference,
@@ -96,7 +97,7 @@ export function PreferencesScreen() {
   const { t } = useTranslation();
   const { userId } = useCurrentUserId();
   const { preference: languagePreference } = useLanguagePreference();
-  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
+  const { hasLoaded: trustedHostsLoaded } = useTrustedHosts();
   const languageEndonym = LANGUAGE_ENDONYMS[getResolvedLanguage()];
   const languageSubtitle =
     languagePreference === 'device'
@@ -164,7 +165,24 @@ export function PreferencesScreen() {
             subtitle={languageSubtitle}
             className="rounded-lg bg-secondary px-3"
             onPress={() => {
-              setLanguagePickerOpen(true);
+              setLanguagePickerBridge({
+                onApplied: () => {
+                  if (userId) {
+                    void attemptPushRegistrationReconciliation(userId);
+                  }
+                },
+              });
+              router.push('/(app)/language-picker' as Href);
+            }}
+          />
+          <ConfigureRow
+            icon={Shield}
+            title={t('trustedHosts.title')}
+            subtitle={t('trustedHosts.subtitle')}
+            className="rounded-lg bg-secondary px-3"
+            disabled={!trustedHostsLoaded}
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/trusted-hosts' as Href);
             }}
           />
           <ConfigureRow
@@ -196,18 +214,6 @@ export function PreferencesScreen() {
           />
         </View>
       </TabScreenScrollView>
-      <LanguagePickerSheet
-        visible={languagePickerOpen}
-        onClose={() => {
-          setLanguagePickerOpen(false);
-        }}
-        onApplied={() => {
-          if (userId) {
-            void attemptPushRegistrationReconciliation(userId);
-          }
-        }}
-        returnTarget="preferences"
-      />
     </View>
   );
 }

@@ -5,8 +5,12 @@ import { useTranslation } from 'react-i18next';
 import { InstanceSelector } from '@/components/agents/instance-selector';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
+import {
+  type NewSessionRepository,
+  type RepositoryGroup,
+  type RepositoryPlatform,
+} from '@/components/agents/new-session-repository-state';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
-import { type RepositorySectionView } from '@/components/agents/new-session-repository-state';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { type ModeOption } from '@/components/agents/mode-normalize';
@@ -57,20 +61,19 @@ type NewSessionConfigureFormProps = {
   isLoadingInstances: boolean;
   onChangeRunOnInstance: (next: InstancePickerInstance | null) => void;
   showInstanceDisconnectedNote: boolean;
-  /**
-   * Continue-form inline reason shown under "Run on" (e.g. an incapable CLI or
-   * a failed clone/import). The route computes and translates it.
-   */
+  /** Continue-form inline reason shown under "Run on" (e.g. an incapable CLI or a failed clone/import). */
   runOnInlineNote?: string | null;
   /** True for the Continue clone entry: hides Changes and Environment. */
   isCloneEntry?: boolean;
   // Repository (Cloud Agent only).
-  view: RepositorySectionView;
+  groups: RepositoryGroup[];
   isRetrying: boolean;
   onChangeRepo: (fullName: string) => void;
-  onOpenGitHubIntegration: () => void;
+  onConnectProvider: (platform: RepositoryPlatform) => void;
   onRefreshRepos: () => void;
-  repositories: { fullName: string; isPrivate: boolean }[];
+  repositories: NewSessionRepository[];
+  /** Recently used rows, threaded to the picker's "Recently used" section. */
+  recents: NewSessionRepository[];
   selectedRepo: string;
   // Environment profile (Cloud Agent only).
   profile: EffectiveAgentProfile | null;
@@ -124,12 +127,13 @@ export function NewSessionConfigureForm({
   showInstanceDisconnectedNote,
   runOnInlineNote,
   isCloneEntry = false,
-  view,
+  groups,
   isRetrying,
   onChangeRepo,
-  onOpenGitHubIntegration,
+  onConnectProvider,
   onRefreshRepos,
   repositories,
+  recents,
   selectedRepo,
   profile,
   isProfileLoading,
@@ -144,10 +148,10 @@ export function NewSessionConfigureForm({
   const { t } = useTranslation();
   const isRemote = runOnInstance !== null;
   const isStarting = isRemote ? isSpawningRemote : isCreating;
-  const targetLabel = isRemote ? `${runOnInstance.name} · ${runOnInstance.projectName}` : null;
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
+  const targetLabel = isRemote ? `${runOnInstance.name} · ${runOnInstance.projectName}` : null;
   let runTargetBlock: ReactNode = null;
   if (showRunOnSelector) {
     runTargetBlock = (
@@ -273,12 +277,13 @@ export function NewSessionConfigureForm({
       {!isRemote ? (
         <NewSessionRepositorySection
           disabled={isCreating}
-          view={view}
+          groups={groups}
           isRetrying={isRetrying}
           onChange={onChangeRepo}
-          onOpenGitHubIntegration={onOpenGitHubIntegration}
+          onConnect={onConnectProvider}
           onRefreshRepos={onRefreshRepos}
           repositories={repositories}
+          recents={recents}
           value={selectedRepo}
         />
       ) : null}

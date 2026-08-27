@@ -151,8 +151,8 @@
     "appearanceLight": "ಲೈಟ್",
     "appearanceDark": "ಡಾರ್ಕ್",
     "account": "ಖಾತೆ",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR ವಿಮರ್ಶೆಗಳಿಗೆ ಅಪ್ಲಿಕೇಶನ್ ಗುಣಲಕ್ಷಣವನ್ನು ಸೇರಿಸಿ",
+    "prReviewAttributionSubtitle": "ನೀವು ವಿಮರ್ಶೆ ಸಲ್ಲಿಸಿದಾಗ Kilo ಮೂಲಕ ವಿಮರ್ಶಿಸಲಾಗಿದೆ ಫೂಟರ್ ಅನ್ನು ಸೇರಿಸಿ."
   },
   "prReview": {
     "pullRequestUnavailable": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab ಖಾತೆ",
       "connectGitLab": "GitLab ಸಂಪರ್ಕಿಸಿ",
       "gitlabError": "GitLab ಸೆಟಪ್ ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-      "description": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ಗಳನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಪರಿಶೀಲಿಸಲು Kilo {{label}} ಸಂಪರ್ಕಿಸಿ."
+      "description": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ಗಳನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಪರಿಶೀಲಿಸಲು Kilo {{label}} ಸಂಪರ್ಕಿಸಿ.",
+      "bitbucketError": "Bitbucket ಸೆಟಪ್ ತೆರೆಯಲಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
     "overview": {
       "reviewStyle": "ಪರಿಶೀಲನೆ ಶೈಲಿ",
@@ -2075,7 +2076,8 @@
       "dollar": "ಡಾಲರ್ಗಳು",
       "dollar_other": "ಡಾಲರ್ಗಳು",
       "costSpoken": "ವೆಚ್ಚ {{cost}}",
-      "costSpokenWithTime": "ವೆಚ್ಚ {{cost}}, {{time}}"
+      "costSpokenWithTime": "ವೆಚ್ಚ {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "ಹೊಸ ಸೆಶನ್",
       "repository": "ರೆಪೊಸಿಟರಿ",
-      "couldNotLoadRepositories": "ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "connectGithub": "GitHub ಸಂಪರ್ಕಿಸಿ",
       "connectGithubDescription": "ನಿಮ್ಮ ಬ್ರೌಸರ್ನಲ್ಲಿ GitHub ಸಂಪರ್ಕಿಸಿ, ನಂತರ ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆ ಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.",
       "openGithub": "GitHub ತೆರೆಯಿರಿ",
       "refreshRepositories": "ರೆಪೊಸಿಟರಿಗಳನ್ನು ರಿಫ್ರೆಶ್ ಮಾಡಿ",
-      "githubConnectionNotVisible": "ನಿಮ್ಮ GitHub ಸಂಪರ್ಕವನ್ನು ನಾವು ಇನ್ನೂ ನೋಡಲು ಸಾಧ್ಯವಿಲ್ಲ",
-      "githubConnectionNotVisibleDescription": "ನೀವು Kilo GitHub App ಅನ್ನು ಸ್ಥಾಪಿಸಿದ್ದರೆ ಅಥವಾ ಕಾನ್ಫಿಗರ್ ಮಾಡಿದ್ದರೆ, ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ — ಅಥವಾ ಅದನ್ನು ಈ ಖಾತೆ/ಸಂಸ್ಥೆಗೆ ಸ್ಥಾಪಿಸಲಾಗಿದೆ ಎಂದು ಖಚಿತಪಡಿಸಿ.",
-      "checkAgain": "ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ",
       "githubConnected": "GitHub ಸಂಪರ್ಕಗೊಂಡಿದೆ",
       "noRepositoriesVisible": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಗೋಚರಿಸುವುದಿಲ್ಲ. Kilo GitHub App ಗಾಗಿ ರೆಪೊಸಿಟರಿ ಪ್ರವೇಶವನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ರಿಫ್ರೆಶ್ ಮಾಡಿ.",
       "runOnWithTarget": "ಇದರ ಮೇಲೆ ಚಲಾಯಿಸಿ: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "ಸಂಪಾದನೆಯನ್ನು ಮುಂದುವರಿಸಿ",
       "discard": "ತೆಗೆದುಹಾಕಿ",
       "discardFailed": "ಡ್ರಾಫ್ಟ್ ತೆಗೆದುಹಾಕಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "`kilo remote` ಅನ್ನು ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್‌ನಲ್ಲಿ ಚಲಾಯಿಸಿ, ಅಥವಾ ಚಾಲನೆಯಲ್ಲಿರುವ CLI ಸೆಶನ್‌ನಲ್ಲಿ `/remote` ಅನ್ನು ಬಳಸಿ, ಸ್ಥಳೀಯ kilo ಪ್ರಕ್ರಿಯೆಯನ್ನು ನಿಯಂತ್ರಿಸಲು.",
+      "bitbucketConnected": "Bitbucket ಸಂಪರ್ಕಗೊಂಡಿದೆ",
+      "connectBitbucket": "Bitbucket ಸಂಪರ್ಕಿಸಿ",
+      "connectBitbucketDescription": "ನಿಮ್ಮ ಬ್ರೌಸರ್ನಲ್ಲಿ Bitbucket ಸಂಪರ್ಕಿಸಿ, ನಂತರ ರಿಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆ ಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.",
+      "connectGitlab": "GitLab ಸಂಪರ್ಕಿಸಿ",
+      "connectGitlabDescription": "ನಿಮ್ಮ ಬ್ರೌಸರ್ನಲ್ಲಿ GitLab ಸಂಪರ್ಕಿಸಿ, ನಂತರ ರಿಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆ ಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket ರಿಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
+      "couldNotLoadGithubRepositories": "GitHub ರಿಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
+      "couldNotLoadGitlabRepositories": "GitLab ರಿಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
+      "gitlabConnected": "GitLab ಸಂಪರ್ಕಗೊಂಡಿದೆ",
+      "noRepositoriesVisibleBitbucket": "ಯಾವುದೇ ರಿಪೊಸಿಟರಿಗಳು ಕಾಣಿಸುತ್ತಿಲ್ಲ. Bitbucket ಗಾಗಿ ರಿಪೊಸಿಟರಿ ಪ್ರವೇಶವನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ರಿಫ್ರೆಶ್ ಮಾಡಿ.",
+      "noRepositoriesVisibleGitlab": "ಯಾವುದೇ ರಿಪೊಸಿಟರಿಗಳು ಕಾಣಿಸುತ್ತಿಲ್ಲ. GitLab ಗಾಗಿ ರಿಪೊಸಿಟರಿ ಪ್ರವೇಶವನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ರಿಫ್ರೆಶ್ ಮಾಡಿ.",
+      "openBitbucket": "Bitbucket ತೆರೆಯಿರಿ",
+      "openGitlab": "GitLab ತೆರೆಯಿರಿ",
+      "recentlyUsed": "ಇತ್ತೀಚೆಗೆ ಬಳಸಲಾಗಿದೆ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ಫೈಲ್ ನವೀಕರಿಸಲಾಗಿದೆ",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "ನಿಮ್ಮ ಖಾತೆಗೆ ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ.",
       "tryDifferentSearch": "ಬೇರೆ ಹುಡುಕಾಟ ಪದವನ್ನು ಪ್ರಯತ್ನಿಸಿ.",
       "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
-      "accessibility": "ರೆಪೊಸಿಟರಿ: {{label}}"
+      "accessibility": "ರೆಪೊಸಿಟರಿ: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "ಸಂದೇಶ ವಿವರಗಳು",
@@ -2623,6 +2638,18 @@
       "updating": "ನವೀಕರಿಸುತ್ತಿದೆ, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್"
+    },
+    "markdownImage": {
+      "load": "ಲೋಡ್",
+      "loadWithHost": "ಲೋಡ್ {{host}}",
+      "httpsOnly": "HTTPS ಚಿತ್ರಗಳು ಮಾತ್ರ"
+    },
+    "markdownLink": {
+      "invalidLink": "ಈ ಲಿಂಕ್ ತೆರೆಯಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+      "hostConfirmTitle": "ಬಾಹ್ಯ ಲಿಂಕ್ ತೆರೆಯುವುದೇ?",
+      "hostConfirmMessage": "ಈ ಲಿಂಕ್ ನಿಮ್ಮ ಬ್ರೌಸರ್ನಲ್ಲಿ {{host}} ತೆರೆಯುತ್ತದೆ.",
+      "open": "ತೆರೆಯಿರಿ",
+      "trustThisHost": "ಈ ಹೋಸ್ಟ್ ಅನ್ನು ವಿಶ್ವಾಸಿಸಿ"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "ಯಾವುದೇ ಇಮೇಲ್ ಅಪ್ ಲಭ್ಯವಿಲ್ಲ. ನೀವು {{email}} ನಲ್ಲಿ ನಮ್ಮನ್ನು ಸಂಪರ್ಕಿಸಬಹುದು",
     "couldNotOpenStore": "ಸ್ಟೋರ್ ಅನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-    "promptTitle": "ನೀವು Kilo ಅಪ್ ಅನ್ನು ಹೇಗೆ ಇಷ್ಟಪಡುತ್ತಿದ್ದೀರಿ?",
-    "iLikeIt": "ನಾನು ಇಷ್ಟಪಡುತ್ತೇನೆ",
-    "gladTitle": "ಅದನ್ನು ಕೇಳಿ ನಮಗೆ ಸಂತೋಷವಾಗಿದೆ!",
-    "gladMessage": "ಸ್ಟೋರ್ ರಿವ್ಯೂ ನಮಗೆ ತುಂಬಾ ಸಹಾಯ ಮಾಡುತ್ತದೆ. Kilo ಬಳಸಿದ್ದಕ್ಕಾಗಿ ಧನ್ಯವಾದಗಳು!",
-    "rateKilo": "Kilo ರೇಟ್ ಮಾಡಿ",
-    "needsWork": "ಸುಧಾರಣೆ ಬೇಕು",
-    "sorryTitle": "ಅದನ್ನು ಕೇಳಿ ನಮಗೆ ವಿಷಾದವಾಗಿದೆ!",
-    "sorryMessage": "ಏನನ್ನು ಸುಧಾರಿಸಬೇಕು ಎಂದು ದಯವಿಟ್ಟು ನಮಗೆ ತಿಳಿಸಿ. ಅಪ್‌ನ ಉಸ್ತುವಾರಿ ಎಂಜಿನಿಯರ್ ಪ್ರತಿ ವರದಿಯನ್ನು ಓದುತ್ತಾರೆ!",
-    "emailUs": "ನಮಗೆ ಇಮೇಲ್ ಮಾಡಿ",
-    "emailSubject": "ಮೊಬೈಲ್ ಅಪ್ಲಿಕೇಶನ್ ಪ್ರತಿಕ್ರಿಯೆ"
+    "emailSubject": "ಮೊಬೈಲ್ ಅಪ್ಲಿಕೇಶನ್ ಪ್ರತಿಕ್ರಿಯೆ",
+    "neutralTitle": "Kilo ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ರೇಟ್ ಮಾಡಿ",
+    "rateTheApp": "ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ರೇಟ್ ಮಾಡಿ",
+    "sendFeedback": "ಪ್ರತಿಕ್ರಿಯೆ ಕಳುಹಿಸಿ"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "ಸಂಸ್ಥೆ ಲಭ್ಯವಿಲ್ಲ",
       "selectDescription": "ಮುಂದುವರಿಯಲು ನಿಮ್ಮ ಪ್ರೊಫೈಲ್‌ನಿಂದ ಸಂಸ್ಥೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
       "selectOrganization": "ಸಂಸ್ಥೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
-      "unavailableDescription": "ಈ ಸಂಸ್ಥೆ ಇನ್ನು ಮುಂದೆ ಲಭ್ಯವಿಲ್ಲ. ಮುಂದುವರಿಯಲು ನಿಮ್ಮ ಪ್ರೊಫೈಲ್‌ನಿಂದ ಒಂದನ್ನು ಆಯ್ಕೆಮಾಡಿ."
+      "unavailableDescription": "ಈ ಸಂಸ್ಥೆ ಇನ್ನು ಮುಂದೆ ಲಭ್ಯವಿಲ್ಲ. ಮುಂದುವರಿಯಲು ನಿಮ್ಮ ಪ್ರೊಫೈಲ್‌ನಿಂದ ಒಂದನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+      "accessDeniedTitle": "ಪ್ರವೇಶ ನಿರಾಕರಿಸಲಾಗಿದೆ",
+      "accessDeniedDescription": "ಈ ಸಂಸ್ಥೆಗೆ ನಿಮಗೆ ಪ್ರವೇಶವಿಲ್ಲ."
     },
     "creditActivity": {
       "emptyDescription": "ಈ ಸಂಸ್ಥೆಯ ಖರೀದಿಗಳು, ಬಳಕೆ, ಮತ್ತು ಕ್ರೆಡಿಟ್ ಹೊಂದಾಣಿಕೆಗಳು ಸಂಭವಿಸಿದಂತೆ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "ತಂಡದ ಟಾಪ್-ಅಪ್ ಬೋನಸ್ 2025",
         "accounting_adjustment": "ಲೆಕ್ಕಪತ್ರ ಹೊಂದಾಣಿಕೆ",
         "credits_expired": "ಕ್ರೆಡಿಟ್‌ಗಳು ಅವಧಿ ಮುಗಿದವು"
-      }
+      },
+      "loadMore": "ಹೆಚ್ಚು ಲೋಡ್ ಮಾಡಿ",
+      "loadMoreFailed": "ಹೆಚ್ಚು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+      "truncated": "ಹಳೆಯ ಕ್ರೆಡಿಟ್ ಚಟುವಟಿಕೆ ಲಭ್ಯವಿದೆ."
     },
     "inviteMember": {
       "emailError": "ಮಾನ್ಯ ಇಮೇಲ್ ವಿಳಾಸವನ್ನು ನಮೂದಿಸಿ",
@@ -2976,7 +3002,10 @@
         "draft": "ಡ್ರಾಫ್ಟ್",
         "uncollectible": "ವಸೂಲಿ ಮಾಡಲಾಗದ",
         "unknown": "ತಿಳಿದಿಲ್ಲ"
-      }
+      },
+      "loadMore": "ಹೆಚ್ಚು ಲೋಡ್ ಮಾಡಿ",
+      "loadMoreFailed": "ಹೆಚ್ಚು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+      "truncated": "ಹಳೆಯ ಇನ್ವಾಯ್ಸ್ಗಳು ಲಭ್ಯವಿದೆ."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "ಹೆಚ್ಚುವರಿ ಹೆಚ್ಚಿನ",
       "max": "ಗರಿಷ್ಠ"
     }
+  },
+  "trustedHosts": {
+    "title": "ವಿಶ್ವಾಸಿಸಿದ ಹೋಸ್ಟ್ಗಳು",
+    "subtitle": "ಕೇಳದೆ ತೆರೆಯಲು ನೀವು ವಿಶ್ವಾಸಿಸುವ ಹೋಸ್ಟ್ಗಳು",
+    "emptyTitle": "ವಿಶ್ವಾಸಿಸಿದ ಹೋಸ್ಟ್ಗಳಿಲ್ಲ",
+    "emptyDescription": "ನೀವು ಲಿಂಕ್ನ ಹೋಸ್ಟ್ ಅನ್ನು ವಿಶ್ವಾಸಿಸಿದಾಗ, ಅದು ಮತ್ತೆ ಕೇಳದೆ ತೆರೆಯುತ್ತದೆ.",
+    "revoke": "{{host}} ರದ್ದುಗೊಳಿಸಿ",
+    "backToPreferences": "ಆದ್ಯತೆಗಳಿಗೆ ಹಿಂತಿರುಗಿ"
   }
 }

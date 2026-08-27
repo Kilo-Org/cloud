@@ -442,6 +442,11 @@ const PrepareSessionSharedFields = {
   githubRepo: githubRepoSchema
     .optional()
     .describe('GitHub repository in format org/repo (mutually exclusive with gitUrl)'),
+  githubIntegrationId: z
+    .string()
+    .uuid()
+    .optional()
+    .describe('GitHub platform integration ID that must authorize the selected repository'),
   githubToken: z
     .string()
     .optional()
@@ -567,6 +572,10 @@ const PrepareSessionSharedFields = {
     .describe(
       'When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes'
     ),
+  sandboxAllocation: z
+    .literal('isolated-standard')
+    .optional()
+    .describe('Allocate a dedicated Standard Cloudflare container for this session'),
 };
 
 const PrepareSessionNonCloneVariant = z.object({
@@ -637,6 +646,32 @@ export const PrepareSessionInput = z
     path: ['githubRepo'],
   })
   .superRefine((data, ctx) => {
+    if (data.sandboxAllocation === 'isolated-standard' && data.devcontainer) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['sandboxAllocation'],
+        message: 'Isolated Standard allocation cannot be combined with devcontainer',
+      });
+    }
+    if (
+      data.sandboxAllocation === 'isolated-standard' &&
+      data.createdOnPlatform === 'code-review'
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['sandboxAllocation'],
+        message: 'Isolated Standard allocation cannot be combined with code review',
+      });
+    }
+
+    if (data.githubIntegrationId !== undefined && data.githubRepo === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['githubIntegrationId'],
+        message: 'GitHub integration identity is only valid for GitHub repositories',
+      });
+    }
+
     const hasBitbucketIds =
       data.bitbucketWorkspaceUuid !== undefined && data.bitbucketRepositoryUuid !== undefined;
     if (
@@ -767,11 +802,17 @@ export const RepositoryInputSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('github'),
     repo: githubRepoSchema.describe('GitHub repository in org/repo format'),
+    githubIntegrationId: z
+      .string()
+      .uuid()
+      .optional()
+      .describe('GitHub platform integration ID that must authorize the selected repository'),
     branch: branchNameSchema.optional().describe('Branch to checkout'),
   }),
   z.object({
     type: z.literal('gitlab'),
     url: gitUrlSchema.describe('GitLab repository HTTPS URL'),
+    githubIntegrationId: z.never().optional(),
     branch: branchNameSchema.optional().describe('Branch to checkout'),
   }),
   z.object({
@@ -780,12 +821,14 @@ export const RepositoryInputSchema = z.discriminatedUnion('type', [
     workspaceUuid: z.string().uuid(),
     repositoryUuid: z.string().uuid(),
     bitbucketIntegrationId: z.string().uuid().optional(),
+    githubIntegrationId: z.never().optional(),
     branch: branchNameSchema.optional().describe('Branch to checkout'),
   }),
   z.object({
     type: z.literal('git'),
     url: gitUrlSchema.describe('Git repository HTTPS URL'),
     token: z.string().optional().describe('Git authentication token'),
+    githubIntegrationId: z.never().optional(),
     branch: branchNameSchema.optional().describe('Branch to checkout'),
   }),
 ]);

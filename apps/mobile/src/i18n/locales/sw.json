@@ -151,8 +151,8 @@
     "appearanceLight": "Nyepesi",
     "appearanceDark": "Nyeusi",
     "account": "Akaunti",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Ongeza sifa ya app kwenye ukaguzi wa PR",
+    "prReviewAttributionSubtitle": "Ongeza 'Reviewed via Kilo' kwenye sehemu ya chini unapowasilisha ukaguzi."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request haipatikani",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "Akaunti ya GitLab",
       "connectGitLab": "Unganisha GitLab",
       "gitlabError": "Haikuweza kufungua usanidi wa GitLab. Tafadhali jaribu tena.",
-      "description": "Unganisha Kilo {{label}} ili kukagua maombi ya kuunganisha kiotomatiki."
+      "description": "Unganisha Kilo {{label}} ili kukagua maombi ya kuunganisha kiotomatiki.",
+      "bitbucketError": "Haikuweza kufungua usanidi wa Bitbucket. Tafadhali jaribu tena."
     },
     "overview": {
       "reviewStyle": "Mtindo wa Ukaguzi",
@@ -2075,7 +2076,8 @@
       "dollar": "dola",
       "dollar_other": "dola",
       "costSpoken": "gharama {{cost}}",
-      "costSpokenWithTime": "gharama {{cost}}, {{time}}"
+      "costSpokenWithTime": "gharama {{cost}}, {{time}}",
+      "pullRequest": "ombi la mabadiliko {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Haikuweza kufungua GitHub",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Kikao kipya",
       "repository": "Hazina",
-      "couldNotLoadRepositories": "Haikuweza kupakia hazina",
       "connectGithub": "Unganisha GitHub",
       "connectGithubDescription": "Unganisha GitHub kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
       "openGithub": "Fungua GitHub",
       "refreshRepositories": "Sasisha hazina",
-      "githubConnectionNotVisible": "Hatuwezi kuona muunganisho wako wa GitHub bado",
-      "githubConnectionNotVisibleDescription": "Ikiwa umesakinisha au kusanidi Kilo GitHub App, angalia tena — au hakikisha ilisakinishwa kwa akaunti/shirika hili.",
-      "checkAgain": "Angalia tena",
       "githubConnected": "GitHub imeunganishwa",
       "noRepositoriesVisible": "Hakuna hazina zinazoonekana. Angalia ufikiaji wa hazina kwa Kilo GitHub App, kisha sasisha.",
       "runOnWithTarget": "Endesha kwenye: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Endelea kuhariri",
       "discard": "Tupa",
       "discardFailed": "Haikuweza kutupa rasimu. Jaribu tena.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Endesha `kilo remote` kwenye kompyuta yako, au `/remote` katika kikao cha CLI kinachoendesha, ili kudhibiti mchakato wa kilo wa ndani.",
+      "bitbucketConnected": "Bitbucket imeunganishwa",
+      "connectBitbucket": "Unganisha Bitbucket",
+      "connectBitbucketDescription": "Unganisha Bitbucket kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
+      "connectGitlab": "Unganisha GitLab",
+      "connectGitlabDescription": "Unganisha GitLab kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
+      "couldNotLoadBitbucketRepositories": "Haikuweza kupakia hazina za Bitbucket",
+      "couldNotLoadGithubRepositories": "Haikuweza kupakia hazina za GitHub",
+      "couldNotLoadGitlabRepositories": "Haikuweza kupakia hazina za GitLab",
+      "gitlabConnected": "GitLab imeunganishwa",
+      "noRepositoriesVisibleBitbucket": "Hakuna hazina zinazoonekana. Angalia ufikiaji wa hazina kwa Bitbucket, kisha onyesha upya.",
+      "noRepositoriesVisibleGitlab": "Hakuna hazina zinazoonekana. Angalia ufikiaji wa hazina kwa GitLab, kisha onyesha upya.",
+      "openBitbucket": "Fungua Bitbucket",
+      "openGitlab": "Fungua GitLab",
+      "recentlyUsed": "Zilizotumika hivi karibuni"
     },
     "partRenderer": {
       "updatedFileCount_one": "Imesasisha faili {{displayCount}}",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Hakuna hazina zilizounganishwa kwenye akaunti yako.",
       "tryDifferentSearch": "Jaribu neno lingine la utafutaji.",
       "loading": "Inapakia...",
-      "accessibility": "Hazina: {{label}}"
+      "accessibility": "Hazina: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Maelezo ya ujumbe",
@@ -2623,6 +2638,18 @@
       "updating": "Inasasisha, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Pakua",
+      "loadWithHost": "Pakua {{host}}",
+      "httpsOnly": "Picha za HTTPS pekee"
+    },
+    "markdownLink": {
+      "invalidLink": "Kiungo hiki hakiwezi kufunguliwa.",
+      "hostConfirmTitle": "Fungua kiungo cha nje?",
+      "hostConfirmMessage": "Kiungo hiki kinafungua {{host}} kwenye kivinjari chako.",
+      "open": "Fungua",
+      "trustThisHost": "Amini mwenyeji huyu"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Hakuna app ya barua pepe inayopatikana. Unaweza kutuwasiliana kwa {{email}}",
     "couldNotOpenStore": "Haikuweza kufungua duka.",
-    "promptTitle": "Unaipendaje app ya Kilo?",
-    "iLikeIt": "Ninaipenda",
-    "gladTitle": "Tunafurahi kusikia hivyo!",
-    "gladMessage": "Tathmini ya duka ingetusaidia sana. Asante kwa kutumia Kilo!",
-    "rateKilo": "Pima Kilo",
-    "needsWork": "Inahitaji kazi",
-    "sorryTitle": "Tunasikitika kusikia hivyo!",
-    "sorryMessage": "Tafadhali tujulishe kile kinachohitaji kuboreshwa. Mhandisi anayesimamia app husoma kila ripoti!",
-    "emailUs": "Tuandikie barua pepe",
-    "emailSubject": "maoni ya programu ya simu"
+    "emailSubject": "maoni ya programu ya simu",
+    "neutralTitle": "Pima programu ya Kilo",
+    "rateTheApp": "Pima programu",
+    "sendFeedback": "Tuma maoni"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "Shirika halipatikani",
       "selectDescription": "Chagua shirika kutoka kwenye wasifu wako ili uendelee.",
       "selectOrganization": "Chagua shirika",
-      "unavailableDescription": "Shirika hili halipatikani tena. Chagua moja kutoka kwenye wasifu wako ili uendelee."
+      "unavailableDescription": "Shirika hili halipatikani tena. Chagua moja kutoka kwenye wasifu wako ili uendelee.",
+      "accessDeniedTitle": "Ufikiaji umekataliwa",
+      "accessDeniedDescription": "Huna ufikiaji wa shirika hili."
     },
     "creditActivity": {
       "emptyDescription": "Ununuzi, matumizi, na marekebisho ya salio kwa shirika hili yataonekana hapa yanapotokea.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Bonasi ya kujaza timu 2025",
         "accounting_adjustment": "Marekebisho ya uhasibu",
         "credits_expired": "Mikopo imeisha"
-      }
+      },
+      "loadMore": "Pakia zaidi",
+      "loadMoreFailed": "Imeshindwa kupakia zaidi",
+      "truncated": "Shughuli za zamani za mkopo zinapatikana."
     },
     "inviteMember": {
       "emailError": "Ingiza anwani halali ya barua pepe",
@@ -2976,7 +3002,10 @@
         "draft": "Rasimu",
         "uncollectible": "Isiyoweza kukusanywa",
         "unknown": "Isiyojulikana"
-      }
+      },
+      "loadMore": "Pakia zaidi",
+      "loadMoreFailed": "Imeshindwa kupakia zaidi",
+      "truncated": "Ankara za zamani zinapatikana."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "Juu zaidi",
       "max": "Upeo"
     }
+  },
+  "trustedHosts": {
+    "title": "Wenyeji wanaoaminika",
+    "subtitle": "Wenyeji unaowaamini kufunguka bila kuuliza",
+    "emptyTitle": "Hakuna wenyeji wanaoaminika",
+    "emptyDescription": "Unapoamini mwenyeji wa kiungo, hufunguka bila kuuliza tena.",
+    "revoke": "Ondoa {{host}}",
+    "backToPreferences": "Rudi kwenye mapendeleo"
   }
 }

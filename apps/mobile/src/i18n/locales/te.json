@@ -151,8 +151,8 @@
     "appearanceLight": "లైట్",
     "appearanceDark": "డార్క్",
     "account": "ఖాతా",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR సమీక్షలకు యాప్ ఆపాదనను జోడించండి",
+    "prReviewAttributionSubtitle": "మీరు సమీక్షను సమర్పించినప్పుడు Kilo ద్వారా సమీక్షించబడింది అనే ఫుటర్ను జోడించండి."
   },
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab ఖాతా",
       "connectGitLab": "GitLabను కనెక్ట్ చేయండి",
       "gitlabError": "GitLab సెటప్ను తెరవలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి.",
-      "description": "పుల్ రిక్వెస్ట్లను ఆటోమేటిక్గా సమీక్షించడానికి Kilo {{label}}ను కనెక్ట్ చేయండి."
+      "description": "పుల్ రిక్వెస్ట్లను ఆటోమేటిక్గా సమీక్షించడానికి Kilo {{label}}ను కనెక్ట్ చేయండి.",
+      "bitbucketError": "బిట్‌బకెట్ సెటప్‌ను తెరవలేకపోయాము. దయచేసి మళ్ళీ ప్రయత్నించండి."
     },
     "overview": {
       "reviewStyle": "సమీక్ష శైలి",
@@ -2075,7 +2076,8 @@
       "dollar": "డాలర్లు",
       "dollar_other": "డాలర్లు",
       "costSpoken": "ఖర్చు {{cost}}",
-      "costSpokenWithTime": "ఖర్చు {{cost}}, {{time}}"
+      "costSpokenWithTime": "ఖర్చు {{cost}}, {{time}}",
+      "pullRequest": "పుల్ రిక్వెస్ట్ {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHubను తెరవలేకపోయింది",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "కొత్త సెషన్",
       "repository": "రిపోజిటరీ",
-      "couldNotLoadRepositories": "రిపోజిటరీలను లోడ్ చేయలేకపోయింది",
       "connectGithub": "GitHubను కనెక్ట్ చేయండి",
       "connectGithubDescription": "మీ బ్రౌజర్‌లో GitHubను కనెక్ట్ చేయండి, ఆపై రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడకు తిరిగి రండి.",
       "openGithub": "GitHub తెరవండి",
       "refreshRepositories": "రిపోజిటరీలను రిఫ్రెష్ చేయండి",
-      "githubConnectionNotVisible": "మీ GitHub కనెక్షన్ మాకు ఇంకా కనిపించడం లేదు",
-      "githubConnectionNotVisibleDescription": "మీరు Kilo GitHub Appను ఇన్‌స్టాల్ చేసిన లేదా కాన్ఫిగర్ చేసినట్లయితే, మళ్ళీ తనిఖీ చేయండి — లేదా అది ఈ ఖాతా/సంస్థ కోసం ఇన్‌స్టాల్ చేయబడిందని నిర్ధారించుకోండి.",
-      "checkAgain": "మళ్ళీ తనిఖీ చేయండి",
       "githubConnected": "GitHub కనెక్ట్ అయింది",
       "noRepositoriesVisible": "రిపోజిటరీలు కనిపించడం లేదు. Kilo GitHub App కోసం రిపోజిటరీ యాక్సెస్‌ను తనిఖీ చేయండి, ఆపై రిఫ్రెష్ చేయండి.",
       "runOnWithTarget": "అమలు చేయండి: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "సవరించడం కొనసాగించండి",
       "discard": "విస్మరించండి",
       "discardFailed": "డ్రాఫ్ట్‌ను విస్మరించలేకపోయింది. దయచేసి మళ్ళీ ప్రయత్నించండి.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "మీ కంప్యూటర్‌లో `kilo remote` అమలు చేయండి, లేదా నడుస్తున్న CLI సెషన్‌లో `/remote`, స్థానిక kilo ప్రాసెస్‌ను నియంత్రించడానికి.",
+      "bitbucketConnected": "Bitbucket కనెక్ట్ అయింది",
+      "connectBitbucket": "Bitbucketను కనెక్ట్ చేయండి",
+      "connectBitbucketDescription": "మీ బ్రౌజర్‌లో బిట్‌బకెట్ కనెక్ట్ చేయండి, ఆపై రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడకు తిరిగి వెళ్ళండి.",
+      "connectGitlab": "GitLabను కనెక్ట్ చేయండి",
+      "connectGitlabDescription": "మీ బ్రౌజర్‌లో గిట్‌ల్యాబ్ కనెక్ట్ చేయండి, ఆపై రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడకు తిరిగి వెళ్ళండి.",
+      "couldNotLoadBitbucketRepositories": "బిట్‌బకెట్ రిపోజిటరీలను లోడ్ చేయలేకపోయాము",
+      "couldNotLoadGithubRepositories": "గిట్‌హబ్ రిపోజిటరీలను లోడ్ చేయలేకపోయాము",
+      "couldNotLoadGitlabRepositories": "గిట్‌ల్యాబ్ రిపోజిటరీలను లోడ్ చేయలేకపోయాము",
+      "gitlabConnected": "గిట్‌ల్యాబ్ కనెక్ట్ అయింది",
+      "noRepositoriesVisibleBitbucket": "రిపోజిటరీలు కనిపించడం లేదు. బిట్‌బకెట్ కోసం రిపోజిటరీ యాక్సెస్ తనిఖీ చేయండి, ఆపై రిఫ్రెష్ చేయండి.",
+      "noRepositoriesVisibleGitlab": "రిపోజిటరీలు కనిపించడం లేదు. గిట్‌ల్యాబ్ కోసం రిపోజిటరీ యాక్సెస్ తనిఖీ చేయండి, ఆపై రిఫ్రెష్ చేయండి.",
+      "openBitbucket": "బిట్‌బకెట్ తెరవండి",
+      "openGitlab": "గిట్‌ల్యాబ్ తెరవండి",
+      "recentlyUsed": "ఇటీవల ఉపయోగించినవి"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్ నవీకరించబడింది",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "మీ ఖాతాకు ఏ రిపోజిటరీలు కనెక్ట్ చేయబడలేదు.",
       "tryDifferentSearch": "వేరే శోధన పదాన్ని ప్రయత్నించండి.",
       "loading": "లోడ్ అవుతోంది...",
-      "accessibility": "రిపోజిటరీ: {{label}}"
+      "accessibility": "రిపోజిటరీ: {{label}}",
+      "platformBitbucket": "బిట్‌బకెట్",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "సందేశ వివరాలు",
@@ -2623,6 +2638,18 @@
       "updating": "నవీకరిస్తోంది, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "పుల్ రిక్వెస్ట్"
+    },
+    "markdownImage": {
+      "load": "లోడ్",
+      "loadWithHost": "లోడ్ {{host}}",
+      "httpsOnly": "HTTPS చిత్రాలు మాత్రమే"
+    },
+    "markdownLink": {
+      "invalidLink": "ఈ లింక్ను తెరవలేము.",
+      "hostConfirmTitle": "బాహ్య లింక్ను తెరవాలా?",
+      "hostConfirmMessage": "ఈ లింక్ మీ బ్రౌజర్లో {{host}}ని తెరుస్తుంది.",
+      "open": "తెరువు",
+      "trustThisHost": "ఈ హోస్ట్ను విశ్వసించండి"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "ఇమెయిల్ యాప్ అందుబాటులో లేదు. మీరు {{email}}లో మమ్మల్ని సంప్రదించవచ్చు",
     "couldNotOpenStore": "స్టోర్ను తెరవలేకపోయాము.",
-    "promptTitle": "మీరు Kilo యాప్ను ఎలా ఇష్టపడుతున్నారు?",
-    "iLikeIt": "నాకు ఇష్టం",
-    "gladTitle": "మేము విని సంతోషించాము!",
-    "gladMessage": "స్టోర్ సమీక్ష మాకు ఎంతో సహాయం చేస్తుంది. Kilo ఉపయోగించినందుకు ధన్యవాదాలు!",
-    "rateKilo": "Kiloకి రేటింగ్ ఇవ్వండి",
-    "needsWork": "మెరుగుదల అవసరం",
-    "sorryTitle": "విని మేము విచారిస్తున్నాము!",
-    "sorryMessage": "ఏమి మెరుగుపరచాలో దయచేసి మాకు తెలియజేయండి. యాప్ బాధ్యత వహించే ఇంజనీర్ ప్రతి రిపోర్ట్ను చదువుతారు!",
-    "emailUs": "మాకు ఇమెయిల్ చేయండి",
-    "emailSubject": "మొబైల్ యాప్ ఫీడ్బ్యాక్"
+    "emailSubject": "మొబైల్ యాప్ ఫీడ్బ్యాక్",
+    "neutralTitle": "Kilo యాప్‌కి రేటింగ్ ఇవ్వండి",
+    "rateTheApp": "యాప్‌కి రేటింగ్ ఇవ్వండి",
+    "sendFeedback": "అభిప్రాయాన్ని పంపండి"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "ఆర్గనైజేషన్ అందుబాటులో లేదు",
       "selectDescription": "కొనసాగించడానికి మీ ప్రొఫైల్ నుండి ఆర్గనైజేషన్ను ఎంచుకోండి.",
       "selectOrganization": "ఆర్గనైజేషన్ను ఎంచుకోండి",
-      "unavailableDescription": "ఈ ఆర్గనైజేషన్ ఇక అందుబాటులో లేదు. కొనసాగించడానికి మీ ప్రొఫైల్ నుండి ఒకదాన్ని ఎంచుకోండి."
+      "unavailableDescription": "ఈ ఆర్గనైజేషన్ ఇక అందుబాటులో లేదు. కొనసాగించడానికి మీ ప్రొఫైల్ నుండి ఒకదాన్ని ఎంచుకోండి.",
+      "accessDeniedTitle": "యాక్సెస్ నిరాకరించబడింది",
+      "accessDeniedDescription": "మీకు ఈ సంస్థకు యాక్సెస్ లేదు."
     },
     "creditActivity": {
       "emptyDescription": "ఈ ఆర్గనైజేషన్ కోసం కొనుగోళ్లు, వినియోగం మరియు క్రెడిట్ సర్దుబాట్లు జరిగినప్పుడు ఇక్కడ కనిపిస్తాయి.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "టీమ్ టాప్-అప్ బోనస్ 2025",
         "accounting_adjustment": "అకౌంటింగ్ సర్దుబాటు",
         "credits_expired": "క్రెడిట్లు గడువు ముగిశాయి"
-      }
+      },
+      "loadMore": "మరింత లోడ్ చేయండి",
+      "loadMoreFailed": "మరిన్ని లోడ్ చేయలేకపోయాము",
+      "truncated": "పాత క్రెడిట్ కార్యకలాపం అందుబాటులో ఉంది."
     },
     "inviteMember": {
       "emailError": "చెల్లుబాటు అయ్యే ఇమెయిల్ చిరునామాను నమోదు చేయండి",
@@ -2976,7 +3002,10 @@
         "draft": "డ్రాఫ్ట్",
         "uncollectible": "వసూలు చేయలేనిది",
         "unknown": "తెలియదు"
-      }
+      },
+      "loadMore": "మరింత లోడ్ చేయండి",
+      "loadMoreFailed": "మరిన్ని లోడ్ చేయలేకపోయాము",
+      "truncated": "పాత ఇన్వాయిస్లు అందుబాటులో ఉన్నాయి."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "అత్యధికం",
       "max": "గరిష్టం"
     }
+  },
+  "trustedHosts": {
+    "title": "విశ్వసించిన హోస్ట్లు",
+    "subtitle": "అడగకుండా తెరవడానికి మీరు విశ్వసించే హోస్ట్లు",
+    "emptyTitle": "విశ్వసించిన హోస్ట్లు లేవు",
+    "emptyDescription": "మీరు లింక్ యొక్క హోస్ట్ను విశ్వసించినప్పుడు, అది మళ్లీ అడగకుండా తెరుచుకుంటుంది.",
+    "revoke": "{{host}}ను రద్దు చేయండి",
+    "backToPreferences": "ప్రాధాన్యతలకు తిరిగి వెళ్లండి"
   }
 }

@@ -151,8 +151,8 @@
     "appearanceLight": "Argia",
     "appearanceDark": "Iluna",
     "account": "Kontua",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Gehitu aplikazioaren atribuzioa PR berrikuspenetan",
+    "prReviewAttributionSubtitle": "Erantsi 'Kilo-ren bidez berrikusia' orri-oina berrikuspen bat bidaltzen duzunean."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request-a ez dago eskuragarri",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab kontua",
       "connectGitLab": "Konektatu GitLab",
       "gitlabError": "GitLab konfigurazioa ezin izan da ireki. Saiatu berriro.",
-      "description": "Konektatu Kilo {{label}} pull request-ak automatikoki berrikusteko."
+      "description": "Konektatu Kilo {{label}} pull request-ak automatikoki berrikusteko.",
+      "bitbucketError": "Ezin izan da Bitbucket-en konfigurazioa ireki. Mesedez, saiatu berriro."
     },
     "overview": {
       "reviewStyle": "Berrikuspen-estiloa",
@@ -2075,7 +2076,8 @@
       "dollar": "dolar",
       "dollar_other": "dolar",
       "costSpoken": "kostua {{cost}}",
-      "costSpokenWithTime": "kostua {{cost}}, {{time}}"
+      "costSpokenWithTime": "kostua {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ezin da GitHub ireki",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Saio berria",
       "repository": "Biltegia",
-      "couldNotLoadRepositories": "Ezin dira biltegiak kargatu",
       "connectGithub": "Konektatu GitHub",
       "connectGithubDescription": "Konektatu GitHub zure arakatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
       "openGithub": "Ireki GitHub",
       "refreshRepositories": "Freskatu biltegiak",
-      "githubConnectionNotVisible": "Oraindik ezin dugu zure GitHub konexioa ikusi",
-      "githubConnectionNotVisibleDescription": "Kilo GitHub App instalatu edo konfiguratu baduzu, egiaztatu berriro — edo ziurtatu kontu/erakunde honetarako instalatu zela.",
-      "checkAgain": "Egiaztatu berriro",
       "githubConnected": "GitHub konektatuta",
       "noRepositoriesVisible": "Ez dago biltegi ikusgarririk. Egiaztatu Kilo GitHub App-aren biltegi-sarbidea, eta gero freskatu.",
       "runOnWithTarget": "Exekutatu honetan: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Jarraitu editatzen",
       "discard": "Baztertu",
       "discardFailed": "Ezin da zirriborroa baztertu. Saiatu berriro.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Exekutatu `kilo remote` zure ordenagailuan, edo `/remote` exekutatzen ari den CLI saio batean, tokiko kilo prozesu bat kontrolatzeko.",
+      "bitbucketConnected": "Bitbucket konektatuta",
+      "connectBitbucket": "Konektatu Bitbucket",
+      "connectBitbucketDescription": "Konektatu Bitbucket-era zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
+      "connectGitlab": "Konektatu GitLab",
+      "connectGitlabDescription": "Konektatu GitLab-era zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
+      "couldNotLoadBitbucketRepositories": "Ezin izan dira Bitbucket-eko biltegiak kargatu",
+      "couldNotLoadGithubRepositories": "Ezin izan dira GitHub-eko biltegiak kargatu",
+      "couldNotLoadGitlabRepositories": "Ezin izan dira GitLab-eko biltegiak kargatu",
+      "gitlabConnected": "GitLab konektatuta",
+      "noRepositoriesVisibleBitbucket": "Ez dago biltegirik ikusgai. Egiaztatu Bitbucket-erako biltegien sarbidea, eta gero freskatu.",
+      "noRepositoriesVisibleGitlab": "Ez dago biltegirik ikusgai. Egiaztatu GitLab-erako biltegien sarbidea, eta gero freskatu.",
+      "openBitbucket": "Ireki Bitbucket",
+      "openGitlab": "Ireki GitLab",
+      "recentlyUsed": "Azken erabiliak"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxategi eguneratu da",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Ez dago biltegirik zure kontuarekin konektatuta.",
       "tryDifferentSearch": "Saiatu bilaketa-termino desberdin batekin.",
       "loading": "Kargatzen...",
-      "accessibility": "Biltegia: {{label}}"
+      "accessibility": "Biltegia: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Mezuaren xehetasunak",
@@ -2623,6 +2638,18 @@
       "updating": "Eguneratzen, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Kargatu",
+      "loadWithHost": "Kargatu {{host}}",
+      "httpsOnly": "HTTPS irudiak soilik"
+    },
+    "markdownLink": {
+      "invalidLink": "Esteka hau ezin da ireki.",
+      "hostConfirmTitle": "Kanpoko esteka ireki?",
+      "hostConfirmMessage": "Esteka honek {{host}} irekitzen du zure arakatzailean.",
+      "open": "Ireki",
+      "trustThisHost": "Konfiantza eman ostalari honi"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Ez daude posta-aplikaziorik erabilgarri. {{email}} helbidean harremanetan jar zaitezke gurekin",
     "couldNotOpenStore": "Ezin izan da denda ireki.",
-    "promptTitle": "Nola gustatzen zaizu Kilo aplikazioa?",
-    "iLikeIt": "Gustatzen zait",
-    "gladTitle": "Pozten gara entzuteagatik!",
-    "gladMessage": "Dendako iritzi batek asko lagunduko liguke. Mila esker Kilo erabiltzeagatik!",
-    "rateKilo": "Baloratu Kilo",
-    "needsWork": "Hobetu behar du",
-    "sorryTitle": "Sentitzen dugu entzuteagatik!",
-    "sorryMessage": "Mesedez, esan iezaguzu zer hobetu behar den. Aplikazioaren arduradunak irakurtzen du txosten bakoitza!",
-    "emailUs": "Bidali iezaguzu posta",
-    "emailSubject": "mugikorreko aplikazioaren feedbacka"
+    "emailSubject": "mugikorreko aplikazioaren feedbacka",
+    "neutralTitle": "Kalifikatu Kilo aplikazioa",
+    "rateTheApp": "Kalifikatu aplikazioa",
+    "sendFeedback": "Bidali iritzia"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "Erakundea ez erabilgarri",
       "selectDescription": "Aukeratu erakunde bat zure profiletik jarraitzeko.",
       "selectOrganization": "Hautatu erakunde bat",
-      "unavailableDescription": "Erakunde hau jada ez daude erabilgarri. Aukeratu bat zure profiletik jarraitzeko."
+      "unavailableDescription": "Erakunde hau jada ez daude erabilgarri. Aukeratu bat zure profiletik jarraitzeko.",
+      "accessDeniedTitle": "Sarbidea ukatu da",
+      "accessDeniedDescription": "Ez duzu erakunde honetarako sarbiderik."
     },
     "creditActivity": {
       "emptyDescription": "Erakunde honen erosketak, erabilerak eta kreditu-doikuntzak hemen agertuko dira gertatzen diren heinean.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Taldearen topup-bonua 2025",
         "accounting_adjustment": "Kontabilitate-doikuntza",
         "credits_expired": "Kredituak iraungita"
-      }
+      },
+      "loadMore": "Kargatu gehiago",
+      "loadMoreFailed": "Ezin izan dira gehiago kargatu",
+      "truncated": "Kreditu-jarduera zaharragoa eskuragarri dago."
     },
     "inviteMember": {
       "emailError": "Sartu posta-helbide baliozko bat",
@@ -2976,7 +3002,10 @@
         "draft": "Zirriborroa",
         "uncollectible": "Kobratu ezina",
         "unknown": "Ezezaguna"
-      }
+      },
+      "loadMore": "Kargatu gehiago",
+      "loadMoreFailed": "Ezin izan dira gehiago kargatu",
+      "truncated": "Faktura zaharrak eskuragarri daude."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "Oso altua",
       "max": "Gehienez"
     }
+  },
+  "trustedHosts": {
+    "title": "Konfiantzako ostalariak",
+    "subtitle": "Galdetu gabe irekitzeko konfiantza duzun ostalariak",
+    "emptyTitle": "Konfiantzako ostalaririk ez",
+    "emptyDescription": "Esteka baten ostalariari konfiantza ematean, berriro galdetu gabe irekiko da.",
+    "revoke": "Baliogabetu {{host}}",
+    "backToPreferences": "Itzuli hobespenetara"
   }
 }

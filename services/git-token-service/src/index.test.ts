@@ -705,6 +705,49 @@ describe('GitTokenRPCEntrypoint.getTokenForRepo', () => {
     ).rejects.toThrow('repository not accessible');
     expect(serviceMocks.getToken).not.toHaveBeenCalled();
   });
+
+  it('repairs stale login metadata within the expected integration fence', async () => {
+    const params = {
+      githubRepo: 'acme/repository',
+      userId: 'user-1',
+      orgId: '00000000-0000-4000-8000-000000000001',
+      expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
+    };
+    serviceMocks.findInstallationId
+      .mockResolvedValueOnce({ success: false, reason: 'integration_mismatch' })
+      .mockResolvedValueOnce({
+        success: true,
+        installationId: '123',
+        accountLogin: 'acme',
+        githubAppType: 'standard',
+      });
+    serviceMocks.findRefreshCandidates.mockResolvedValue({
+      success: true,
+      candidates: [
+        {
+          integrationId: params.expectedIntegrationId,
+          installationId: '123',
+          accountLogin: 'old-acme',
+          githubAppType: 'standard',
+        },
+      ],
+    });
+    serviceMocks.refreshInstallationAccountLoginIfDue.mockResolvedValue('acme');
+    serviceMocks.updateAccountLogin.mockResolvedValue(true);
+    serviceMocks.getTokenForRepo.mockResolvedValue('scoped-token');
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await expect(createService().getTokenForRepo(params)).resolves.toMatchObject({
+      success: true,
+      token: 'scoped-token',
+    });
+    expect(serviceMocks.findInstallationId).toHaveBeenCalledTimes(2);
+    expect(serviceMocks.findRefreshCandidates).toHaveBeenCalledWith(params);
+    expect(serviceMocks.updateAccountLogin).toHaveBeenCalledWith(
+      params.expectedIntegrationId,
+      'acme'
+    );
+  });
 });
 
 const outboundContainerId = 'outbound-container-1';
@@ -763,6 +806,80 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     expect(result.capability).not.toContain('installation-token');
     expect(result).not.toHaveProperty('githubToken');
     expect(result).not.toHaveProperty('token');
+  });
+
+  it('preserves an expected integration fence through capability redemption', async () => {
+    const expectedIntegrationId = '00000000-0000-4000-8000-000000000002';
+    const orgId = '00000000-0000-4000-8000-000000000001';
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      orgId,
+      expectedIntegrationId,
+      outboundContainerId,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    expect(serviceMocks.findManagedInstallationForRepo).toHaveBeenLastCalledWith({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      orgId,
+      expectedIntegrationId,
+      outboundContainerId,
+    });
+    serviceMocks.findManagedInstallationForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'GET',
+        requestUrl: 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack',
+      })
+    ).resolves.toMatchObject({ success: true });
+    expect(serviceMocks.findManagedInstallationForRepo).toHaveBeenLastCalledWith({
+      userId: 'user_1',
+      orgId,
+      expectedIntegrationId,
+      githubRepo: 'acme/repo',
+    });
+  });
+
+  it('returns integration_mismatch when repair cannot restore a capability fence', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      orgId: '00000000-0000-4000-8000-000000000001',
+      expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
+      outboundContainerId,
+      allowUserAuthorization: true,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.getTokenForRepo.mockClear();
+    serviceMocks.findManagedInstallationForRepo.mockClear();
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValue({
+      success: false,
+      reason: 'integration_mismatch',
+    });
+    serviceMocks.findRefreshCandidates.mockResolvedValue({ success: true, candidates: [] });
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'GET',
+        requestUrl: 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack',
+      })
+    ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+    expect(serviceMocks.findManagedInstallationForRepo).toHaveBeenCalledTimes(2);
+    expect(serviceMocks.findRefreshCandidates).toHaveBeenCalledWith({
+      userId: 'user_1',
+      orgId: '00000000-0000-4000-8000-000000000001',
+      expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
+      githubRepo: 'acme/repo',
+    });
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
   });
 
   it('returns a sanitized declared failure when capability key configuration is invalid', async () => {

@@ -53,12 +53,12 @@ export function useDiffSelection({
     if (isTablet && viewMode === 'side-by-side') {
       setSelectionState(prev => {
         if (prev) {
-          clearDiffSelection();
+          clearDiffSelection({ owner, repo, number });
         }
         return null;
       });
     }
-  }, [isTablet, viewMode]);
+  }, [isTablet, viewMode, owner, repo, number]);
 
   // Diff-line tap producer: build the per-side line-number → text map
   // for this hunk, run the reducer, mirror to the bridge, and store

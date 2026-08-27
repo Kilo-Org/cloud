@@ -151,8 +151,8 @@
     "appearanceLight": "Lig",
     "appearanceDark": "Donker",
     "account": "Rekening",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Voeg app-toeskrywing by PR-hersienings toe",
+    "prReviewAttributionSubtitle": "Voeg 'n \"Reviewed via Kilo\"-voetskrif by wanneer jy 'n hersiening indien"
   },
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab-rekening",
       "connectGitLab": "Koppel GitLab",
       "gitlabError": "Kon nie GitLab-opstel oopmaak nie. Probeer asseblief weer.",
-      "description": "Koppel die Kilo {{label}} om pull requests outomaties te hersien."
+      "description": "Koppel die Kilo {{label}} om pull requests outomaties te hersien.",
+      "bitbucketError": "Kon nie Bitbucket-opstelling oopmaak nie. Probeer asseblief weer."
     },
     "overview": {
       "reviewStyle": "Hersieningstyl",
@@ -2075,7 +2076,8 @@
       "dollar": "dollars",
       "dollar_other": "dollars",
       "costSpoken": "koste {{cost}}",
-      "costSpokenWithTime": "koste {{cost}}, {{time}}"
+      "costSpokenWithTime": "koste {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kon GitHub nie oopmaak nie",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Nuwe sessie",
       "repository": "Bewaarplek",
-      "couldNotLoadRepositories": "Kon bewaarplekke nie laai nie",
       "connectGithub": "Koppel GitHub",
       "connectGithubDescription": "Koppel GitHub in jou blaaier, en keer dan hier terug om 'n bewaarplek te kies.",
       "openGithub": "Maak GitHub oop",
       "refreshRepositories": "Verfris bewaarplekke",
-      "githubConnectionNotVisible": "Ons kan jou GitHub-verbinding nog nie sien nie",
-      "githubConnectionNotVisibleDescription": "As jy die Kilo GitHub App geïnstalleer of gekonfigureer het, kyk weer — of maak seker dit is vir hierdie rekening/organisasie geïnstalleer.",
-      "checkAgain": "Kyk weer",
       "githubConnected": "GitHub gekoppel",
       "noRepositoriesVisible": "Geen bewaarplekke sigbaar nie. Kontroleer bewaarplektoegang vir die Kilo GitHub App, en verfris dan.",
       "runOnWithTarget": "Loop op: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Bly redigeer",
       "discard": "Gooi weg",
       "discardFailed": "Kon die konsep nie weggooi nie. Probeer asseblief weer.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Voer `kilo remote` op jou rekenaar uit, of `/remote` in 'n lopende CLI-sessie, om 'n plaaslike kilo-proses te beheer",
+      "bitbucketConnected": "Bitbucket gekoppel",
+      "connectBitbucket": "Koppel Bitbucket",
+      "connectBitbucketDescription": "Koppel Bitbucket in jou blaaier, en keer dan hier terug om 'n bewaarplek te kies.",
+      "connectGitlab": "Koppel GitLab",
+      "connectGitlabDescription": "Koppel GitLab in jou blaaier, en keer dan hier terug om 'n bewaarplek te kies.",
+      "couldNotLoadBitbucketRepositories": "Kon nie Bitbucket-bewaarplekke laai nie",
+      "couldNotLoadGithubRepositories": "Kon nie GitHub-bewaarplekke laai nie",
+      "couldNotLoadGitlabRepositories": "Kon nie GitLab-bewaarplekke laai nie",
+      "gitlabConnected": "GitLab is gekoppel",
+      "noRepositoriesVisibleBitbucket": "Geen bewaarplekke sigbaar nie. Gaan Bitbucket-bewaarplektoegang na, en verfris dan.",
+      "noRepositoriesVisibleGitlab": "Geen bewaarplekke sigbaar nie. Gaan GitLab-bewaarplektoegang na, en verfris dan.",
+      "openBitbucket": "Maak Bitbucket oop",
+      "openGitlab": "Maak GitLab oop",
+      "recentlyUsed": "Onlangs gebruik"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer bygewerk",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Geen bewaarplekke is aan jou rekening gekoppel nie.",
       "tryDifferentSearch": "Probeer 'n ander soekterm.",
       "loading": "Laai...",
-      "accessibility": "Bewaarplek: {{label}}"
+      "accessibility": "Bewaarplek: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Boodskapbesonderhede",
@@ -2623,6 +2638,18 @@
       "updating": "Werk op, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "trekversoek"
+    },
+    "markdownImage": {
+      "load": "Laai",
+      "loadWithHost": "Laai {{host}}",
+      "httpsOnly": "Slegs HTTPS-beelde"
+    },
+    "markdownLink": {
+      "invalidLink": "Hierdie skakel kan nie oopgemaak word nie.",
+      "hostConfirmTitle": "Eksterne skakel oopmaak?",
+      "hostConfirmMessage": "Hierdie skakel maak {{host}} in jou blaaier oop.",
+      "open": "Maak oop",
+      "trustThisHost": "Vertrou hierdie gasheer"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Geen e-posapp beskikbaar nie. Jy kan ons bereik by {{email}}",
     "couldNotOpenStore": "Kon nie die winkel oopmaak nie.",
-    "promptTitle": "Hoe hou jy van die Kilo-app?",
-    "iLikeIt": "Ek hou daarvan",
-    "gladTitle": "Ons is bly om dit te hoor!",
-    "gladMessage": "'n Winkelresensie sal ons geweldig help. Dankie dat jy Kilo gebruik!",
-    "rateKilo": "Gradeer Kilo",
-    "needsWork": "Moet werk",
-    "sorryTitle": "Ons is jammer om dit te hoor!",
-    "sorryMessage": "Laat ons asseblief weet wat beter moet word. Die ingenieur in beheer van die app lees elke verslag!",
-    "emailUs": "E-pos ons",
-    "emailSubject": "terugvoer oor mobiele app"
+    "emailSubject": "terugvoer oor mobiele app",
+    "neutralTitle": "Gradeer die Kilo-app",
+    "rateTheApp": "Gradeer die app",
+    "sendFeedback": "Stuur terugvoer"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "Organisasie onbeskikbaar",
       "selectDescription": "Kies 'n organisasie uit jou profiel om voort te gaan.",
       "selectOrganization": "Kies 'n organisasie",
-      "unavailableDescription": "Hierdie organisasie is nie meer beskikbaar nie. Kies een uit jou profiel om voort te gaan."
+      "unavailableDescription": "Hierdie organisasie is nie meer beskikbaar nie. Kies een uit jou profiel om voort te gaan.",
+      "accessDeniedTitle": "Toegang geweier",
+      "accessDeniedDescription": "Jy het nie toegang tot hierdie organisasie nie."
     },
     "creditActivity": {
       "emptyDescription": "Aankope, gebruik en kredietaanpassings vir hierdie organisasie sal hier verskyn soos dit gebeur.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Span-hervulling-bonus-2025",
         "accounting_adjustment": "Rekeningkundige aanpassing",
         "credits_expired": "Krediete verval"
-      }
+      },
+      "loadMore": "Laai meer",
+      "loadMoreFailed": "Kon nie meer laai nie",
+      "truncated": "Ouer kredietaktiwiteit is beskikbaar."
     },
     "inviteMember": {
       "emailError": "Voer 'n geldige e-posadres in",
@@ -2976,7 +3002,10 @@
         "draft": "Konsep",
         "uncollectible": "Oninbaar",
         "unknown": "Onbekend"
-      }
+      },
+      "loadMore": "Laai meer",
+      "loadMoreFailed": "Kon nie meer laai nie",
+      "truncated": "Ouer faktuur is beskikbaar."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "Ekstra hoog",
       "max": "Maksimum"
     }
+  },
+  "trustedHosts": {
+    "title": "Vertroude gashere",
+    "subtitle": "Gashere wat jy vertrou om sonder om te vra oop te maak",
+    "emptyTitle": "Geen vertroude gashere nie",
+    "emptyDescription": "Wanneer jy 'n skakel se gasheer vertrou, maak dit oop sonder om weer te vra.",
+    "revoke": "Herroep {{host}}",
+    "backToPreferences": "Terug na voorkeure"
   }
 }

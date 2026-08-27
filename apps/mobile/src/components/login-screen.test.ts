@@ -11,7 +11,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { parseDeviceAuthTokenResponse } from '@/lib/auth/native-auth-contract';
 import '@/i18n';
-import { clearPersistedLoginDrafts, restoreLoginDrafts } from '@/lib/login-draft';
+import {
+  clearPersistedLoginDrafts,
+  persistLoginDrafts,
+  restoreLoginDrafts,
+} from '@/lib/login-draft';
 import { LoginScreen } from './login-screen';
 import { errorMessage } from './login-screen-state';
 
@@ -26,6 +30,12 @@ const deviceAuth = vi.hoisted(() => ({
   error: undefined as string | undefined,
   verificationUrl: undefined as string | undefined,
   resumed: false,
+}));
+const push = vi.hoisted(() => vi.fn());
+const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
+
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push }),
 }));
 
 vi.mock('react-native', () => ({
@@ -50,9 +60,6 @@ vi.mock('@/components/kilo-chat/app-aware-keyboard-padding-state', () => ({
   resolveKeyboardPaddingEventsForPlatform: () => null,
 }));
 vi.mock('@/components/login/idle-auth', () => ({ IdleAuth: 'IdleAuth' }));
-vi.mock('@/components/language-picker-sheet', () => ({
-  LanguagePickerSheet: 'LanguagePickerSheet',
-}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -85,6 +92,9 @@ vi.mock('@/lib/login-draft', () => ({
   clearPersistedLoginDrafts: vi.fn(),
   persistLoginDrafts: vi.fn(),
   restoreLoginDrafts: vi.fn().mockResolvedValue(null),
+}));
+vi.mock('@/lib/picker-bridge', () => ({
+  setLanguagePickerBridge,
 }));
 
 // ── Mounted globe helpers ──────────────────────────────────────────────────
@@ -265,6 +275,8 @@ describe('login-screen language globe', () => {
     deviceAuth.error = undefined;
     deviceAuth.verificationUrl = undefined;
     deviceAuth.resumed = false;
+    push.mockClear();
+    setLanguagePickerBridge.mockClear();
   });
 
   it('renders the globe and names it Language', async () => {
@@ -311,6 +323,22 @@ describe('login-screen language globe', () => {
 
     expect(globe.props.disabled).toBe(true);
     expect(globe.props.accessibilityState).toEqual({ disabled: true });
+
+    renderer.unmount();
+  });
+
+  it('globe press sets the language bridge and opens the auth language picker', async () => {
+    const renderer = await mountLoginScreen();
+    const globe = findGlobe(renderer.root);
+
+    act(() => {
+      (globe.props.onPress as () => void)();
+    });
+
+    expect(setLanguagePickerBridge).toHaveBeenCalledTimes(1);
+    expect(setLanguagePickerBridge).toHaveBeenCalledWith({ beforeReload: persistLoginDrafts });
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith('/(auth)/language-picker');
 
     renderer.unmount();
   });

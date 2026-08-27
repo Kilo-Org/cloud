@@ -157,6 +157,7 @@ jest.mock('@/lib/organizations/organization-usage', () => ({
 
 jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
   fetchGitHubRepositoriesForOrganization: mockFetchGitHubRepositoriesForOrganization,
+  fetchAllGitHubRepositoriesForOrganization: mockFetchGitHubRepositoriesForOrganization,
 }));
 
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({

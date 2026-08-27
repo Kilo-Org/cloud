@@ -63,7 +63,7 @@ const hoisted = vi.hoisted(() => {
   };
 
   const deepLinkLaunch = {
-    clearPendingDeepLink: vi.fn(),
+    clearAccountBoundPendingDeepLink: vi.fn(),
     setCurrentDeepLinkUserId: vi.fn(),
   };
 
@@ -119,7 +119,7 @@ vi.mock('@/lib/appsflyer', () => ({
 }));
 
 vi.mock('@/lib/deep-link-launch', () => ({
-  clearPendingDeepLink: hoisted.deepLinkLaunch.clearPendingDeepLink,
+  clearAccountBoundPendingDeepLink: hoisted.deepLinkLaunch.clearAccountBoundPendingDeepLink,
   setCurrentDeepLinkUserId: hoisted.deepLinkLaunch.setCurrentDeepLinkUserId,
 }));
 
@@ -156,6 +156,36 @@ const { clearKeepScreenOnPreference, clearReasoningPreference, clearPrReviewFoot
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({ clearKeepScreenOnPreference }));
 
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference }));
+
+// These imported session-clear modules pull in native bindings that crash the
+// node test environment: use-trusted-hosts -> secure-store-preference ->
+// sonner-native -> react-native (Flow `import typeof`), and the cache/file
+// modules -> expo-file-system / expo-clipboard / expo-crypto. Mock them the
+// same way use-persisted-agent-model is, since this suite only asserts the
+// teardown ordering of the modules it lists as tracked mocks.
+vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
+  clearTrustedHosts: vi.fn(),
+}));
+
+vi.mock('@/components/agents/markdown-image-confirm', () => ({
+  clearMarkdownImageConfirmMemory: vi.fn(),
+}));
+
+vi.mock('@/components/agents/tool-card-image-cache', () => ({
+  clearToolCardImageCache: vi.fn(),
+}));
+
+vi.mock('@/components/agents/file-part-cache', () => ({
+  clearFilePartCache: vi.fn(),
+}));
+
+vi.mock('@/lib/agent-attachments/clipboard-image', () => ({
+  clearClipboardImages: vi.fn(),
+}));
+
+vi.mock('@/lib/temp-file-registry', () => ({
+  reapTempFiles: vi.fn(),
+}));
 
 vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({ clearPrReviewFooterPreference }));
 
@@ -360,7 +390,7 @@ describe('sign-out teardown ordering', () => {
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('session-filters');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('notification-prompt-seen');
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('pending-deep-link');
-    expect(hoisted.deepLinkLaunch.clearPendingDeepLink).toHaveBeenCalled();
+    expect(hoisted.deepLinkLaunch.clearAccountBoundPendingDeepLink).toHaveBeenCalled();
 
     unmount();
   });
@@ -385,6 +415,21 @@ describe('sign-out teardown ordering', () => {
     });
 
     expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).toHaveBeenCalledWith('user-1');
+
+    unmount();
+  });
+
+  it('clears the trusted hosts and image confirmations on sign-in', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const trustedHosts = await import('@/lib/hooks/use-trusted-hosts');
+    const imageConfirm = await import('@/components/agents/markdown-image-confirm');
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    expect(trustedHosts.clearTrustedHosts).toHaveBeenCalled();
+    expect(imageConfirm.clearMarkdownImageConfirmMemory).toHaveBeenCalled();
 
     unmount();
   });
@@ -870,6 +915,28 @@ describe('bootstrap and foreground race fencing', () => {
     expect(tokenOwner.getActiveToken()).toBeNull();
     expect(getCtx().token).toBeUndefined();
     expect(getCtx().sessionEnded).toBe(true);
+
+    unmount();
+  });
+
+  it('binds the deep-link user id from the restored session during bootstrap', async () => {
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    // Mock queue consumed by the bootstrap load: preloadedToken,
+    // preloadedRefreshToken, the bootstrap expiry read, then the bootstrap
+    // credential re-read (unchanged, so the main restore publishes the token).
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce(storedToken)
+      .mockResolvedValueOnce('stored-refresh')
+      .mockResolvedValueOnce('9999999999999')
+      .mockResolvedValueOnce(storedToken);
+
+    const { getCtx, unmount } = await mountProvider();
+
+    // The restored session owns the user id: a destination captured while this
+    // account is signed in drops on sign-out because the pending slot's
+    // stash-time user id is non-null.
+    expect(getCtx().token).toBe(storedToken);
+    expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).toHaveBeenCalledWith('user-1');
 
     unmount();
   });

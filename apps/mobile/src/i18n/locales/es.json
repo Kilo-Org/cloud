@@ -151,8 +151,8 @@
     "appearanceLight": "Claro",
     "appearanceDark": "Oscuro",
     "account": "Cuenta",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Añadir atribución de la app a las revisiones de PR",
+    "prReviewAttributionSubtitle": "Añade un pie de página Revisado vía Kilo cuando envías una revisión."
   },
   "notifications": {
     "channel": {
@@ -862,7 +862,8 @@
       "githubApp": "GitHub App",
       "githubError": "No se pudo abrir la configuración de GitHub. Inténtalo de nuevo.",
       "gitlabAccount": "Cuenta de GitLab",
-      "gitlabError": "No se pudo abrir la configuración de GitLab. Inténtalo de nuevo."
+      "gitlabError": "No se pudo abrir la configuración de GitLab. Inténtalo de nuevo.",
+      "bitbucketError": "No se pudo abrir la configuración de Bitbucket. Inténtalo de nuevo."
     },
     "readOnlyDescription": "Solo los propietarios de la organización y los administradores de facturación pueden cambiar estos ajustes.",
     "reviewDetail": {
@@ -1629,7 +1630,8 @@
       "cent_many": "céntimos",
       "dollar_many": "dólares",
       "costSpoken": "coste {{cost}}",
-      "costSpokenWithTime": "coste {{cost}}, {{time}}"
+      "costSpokenWithTime": "coste {{cost}}, {{time}}",
+      "pullRequest": "solicitud de extracción {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "No pudimos iniciar la configuración de la GitHub App. Inténtalo de nuevo.",
@@ -1706,14 +1708,10 @@
     "newSession": {
       "title": "Nueva sesión",
       "repository": "Repositorio",
-      "couldNotLoadRepositories": "No se pudieron cargar los repositorios",
       "connectGithub": "Conectar GitHub",
       "connectGithubDescription": "Conecta GitHub en tu navegador y vuelve aquí para elegir un repositorio.",
       "openGithub": "Abrir GitHub",
       "refreshRepositories": "Actualizar repositorios",
-      "githubConnectionNotVisible": "Aún no vemos tu conexión de GitHub",
-      "githubConnectionNotVisibleDescription": "Si instalaste o configuraste la Kilo GitHub App, compruébalo de nuevo o asegúrate de que se instaló para esta cuenta u organización.",
-      "checkAgain": "Comprobar de nuevo",
       "githubConnected": "GitHub conectado",
       "noRepositoriesVisible": "No hay repositorios visibles. Comprueba el acceso a repositorios de la Kilo GitHub App y actualiza.",
       "runOnWithTarget": "Ejecutar en: {{target}}",
@@ -1740,7 +1738,21 @@
       "discardDraftTitle": "¿Descartar borrador?",
       "discardFailed": "No se pudo descartar el borrador. Inténtalo de nuevo.",
       "keepEditing": "Seguir editando",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Ejecuta `kilo remote` en tu ordenador, o `/remote` en una sesión CLI en ejecución, para controlar un proceso kilo local.",
+      "bitbucketConnected": "Bitbucket conectado",
+      "connectBitbucket": "Conectar Bitbucket",
+      "connectBitbucketDescription": "Conecta Bitbucket en tu navegador y vuelve aquí para elegir un repositorio.",
+      "connectGitlab": "Conectar GitLab",
+      "connectGitlabDescription": "Conecta GitLab en tu navegador y vuelve aquí para elegir un repositorio.",
+      "couldNotLoadBitbucketRepositories": "No se pudieron cargar los repositorios de Bitbucket",
+      "couldNotLoadGithubRepositories": "No se pudieron cargar los repositorios de GitHub",
+      "couldNotLoadGitlabRepositories": "No se pudieron cargar los repositorios de GitLab",
+      "gitlabConnected": "GitLab conectado",
+      "noRepositoriesVisibleBitbucket": "No hay repositorios visibles. Comprueba el acceso a los repositorios de Bitbucket y actualiza.",
+      "noRepositoriesVisibleGitlab": "No hay repositorios visibles. Comprueba el acceso a los repositorios de GitLab y actualiza.",
+      "openBitbucket": "Abrir Bitbucket",
+      "openGitlab": "Abrir GitLab",
+      "recentlyUsed": "Usados recientemente"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} archivo actualizado",
@@ -1830,7 +1842,10 @@
       "noRepositoriesDescription": "No hay repositorios conectados a tu cuenta.",
       "tryDifferentSearch": "Prueba con otro término de búsqueda.",
       "loading": "Cargando...",
-      "accessibility": "Repositorio: {{label}}"
+      "accessibility": "Repositorio: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Detalles del mensaje",
@@ -2182,6 +2197,18 @@
       "updating": "Actualizando, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Cargar",
+      "loadWithHost": "Cargar {{host}}",
+      "httpsOnly": "Solo imágenes HTTPS"
+    },
+    "markdownLink": {
+      "invalidLink": "Este enlace no se puede abrir.",
+      "hostConfirmTitle": "¿Abrir enlace externo?",
+      "hostConfirmMessage": "Este enlace abre {{host}} en tu navegador.",
+      "open": "Abrir",
+      "trustThisHost": "Confiar en este host"
     }
   },
   "bootstrap": {
@@ -2938,7 +2965,9 @@
       "organizationUnavailable": "Organización no disponible",
       "selectDescription": "Elige una organización de tu perfil para continuar.",
       "selectOrganization": "Seleccionar una organización",
-      "unavailableDescription": "Esta organización ya no está disponible. Elige una de tu perfil para continuar."
+      "unavailableDescription": "Esta organización ya no está disponible. Elige una de tu perfil para continuar.",
+      "accessDeniedTitle": "Acceso denegado",
+      "accessDeniedDescription": "No tienes acceso a esta organización."
     },
     "creditActivity": {
       "emptyDescription": "Las compras, el uso y los ajustes de créditos de esta organización aparecerán aquí a medida que ocurran.",
@@ -2955,7 +2984,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Ajuste contable",
         "credits_expired": "Créditos caducados"
-      }
+      },
+      "loadMore": "Cargar más",
+      "loadMoreFailed": "No se pudo cargar más",
+      "truncated": "Hay actividad de crédito más antigua disponible."
     },
     "hub": {
       "balance": "Saldo",
@@ -2991,7 +3023,10 @@
         "draft": "Borrador",
         "uncollectible": "No cobrable",
         "unknown": "Desconocido"
-      }
+      },
+      "loadMore": "Cargar más",
+      "loadMoreFailed": "No se pudo cargar más",
+      "truncated": "Hay facturas más antiguas disponibles."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "nombre@empresa.com",
@@ -3083,17 +3118,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "No se pudo abrir la tienda.",
-    "emailUs": "Envíanos un correo",
-    "gladMessage": "Una reseña en la tienda nos ayudaría muchísimo. ¡Gracias por usar Kilo!",
-    "gladTitle": "¡Nos alegra saberlo!",
-    "iLikeIt": "Me gusta",
-    "needsWork": "Necesita mejoras",
     "noEmailApp": "No hay ninguna app de correo disponible. Puedes escribirnos a {{email}}",
-    "promptTitle": "¿Qué te parece la app de Kilo?",
-    "rateKilo": "Valora Kilo",
-    "sorryMessage": "Cuéntanos qué se puede mejorar. ¡El ingeniero responsable de la app lee todos los informes!",
-    "sorryTitle": "¡Lamentamos oírlo!",
-    "emailSubject": "comentarios sobre la aplicación móvil"
+    "emailSubject": "comentarios sobre la aplicación móvil",
+    "neutralTitle": "Valora la app de Kilo",
+    "rateTheApp": "Valora la app",
+    "sendFeedback": "Enviar comentarios"
   },
   "authErrors": {
     "emailAlreadyUsed": "Ya existe una cuenta con este correo, pero con otro método de inicio de sesión. Prueba otro método o usa '$t(login.moreSignInOptions)'.",
@@ -3133,5 +3162,13 @@
       "xhigh": "Muy alto",
       "max": "Máximo"
     }
+  },
+  "trustedHosts": {
+    "title": "Hosts de confianza",
+    "subtitle": "Hosts en los que confías para abrir sin preguntar",
+    "emptyTitle": "Sin hosts de confianza",
+    "emptyDescription": "Cuando confías en el host de un enlace, se abre sin volver a preguntar.",
+    "revoke": "Revocar {{host}}",
+    "backToPreferences": "Volver a preferencias"
   }
 }

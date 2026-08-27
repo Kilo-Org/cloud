@@ -223,6 +223,29 @@ export function resolvePrefillRepo(
 }
 
 /**
+ * Resolve a prefill repository to a platform-qualified picker key
+ * `platform:fullName`. Continuation prefill is GitHub-only (see
+ * `buildContinuePrefillParams` + `isGitHubUrl`), so only a GitHub row may
+ * satisfy it: a same-named GitLab/Bitbucket row must never be selected.
+ * Kept separate from `resolvePrefillRepo`, which returns the bare matched
+ * `fullName` and is still used by `continuation-seed.ts`.
+ */
+export function resolvePrefillRepoSelection(
+  repositories: { platform: string; fullName: string }[],
+  prefill: NewSessionPrefill
+): string | null {
+  if (!prefill.repo) {
+    return null;
+  }
+
+  const lower = prefill.repo.toLowerCase();
+  const match = repositories.find(
+    repository => repository.platform === 'github' && repository.fullName.toLowerCase() === lower
+  );
+  return match ? `github:${match.fullName}` : null;
+}
+
+/**
  * Describe what could not be carried over, if anything.
  *
  * `settled` means "the list finished loading, without error, and is

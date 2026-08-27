@@ -151,8 +151,8 @@
     "appearanceLight": "Світла",
     "appearanceDark": "Темна",
     "account": "Обліковий запис",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Додати атрибуцію застосунку до перевірок PR",
+    "prReviewAttributionSubtitle": "Додавати нижній колонтитул Reviewed via Kilo, коли надсилаєте перевірку."
   },
   "notifications": {
     "title": "Сповіщення",
@@ -864,7 +864,8 @@
       "githubApp": "Застосунок GitHub",
       "githubError": "Не вдалося відкрити налаштування GitHub. Спробуйте ще раз.",
       "gitlabAccount": "Обліковий запис GitLab",
-      "gitlabError": "Не вдалося відкрити налаштування GitLab. Спробуйте ще раз."
+      "gitlabError": "Не вдалося відкрити налаштування GitLab. Спробуйте ще раз.",
+      "bitbucketError": "Не вдалося відкрити налаштування Bitbucket. Спробуйте ще раз."
     },
     "readOnlyDescription": "Змінювати ці налаштування можуть лише власники організації та менеджери з оплати.",
     "reviewDetail": {
@@ -1637,7 +1638,8 @@
       "dollar_few": "долари",
       "dollar_many": "доларів",
       "costSpoken": "вартість {{cost}}",
-      "costSpokenWithTime": "вартість {{cost}}, {{time}}"
+      "costSpokenWithTime": "вартість {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Не вдалося розпочати налаштування застосунку GitHub. Спробуйте ще раз.",
@@ -1714,14 +1716,10 @@
     "newSession": {
       "title": "Новий сеанс",
       "repository": "Репозиторій",
-      "couldNotLoadRepositories": "Не вдалося завантажити репозиторії",
       "connectGithub": "Підключити GitHub",
       "connectGithubDescription": "Підключіть GitHub у браузері, потім поверніться сюди, щоб вибрати репозиторій.",
       "openGithub": "Відкрити GitHub",
       "refreshRepositories": "Оновити репозиторії",
-      "githubConnectionNotVisible": "Ми поки не бачимо ваше підключення GitHub",
-      "githubConnectionNotVisibleDescription": "Якщо ви встановили або налаштували застосунок Kilo GitHub, перевірте ще раз — або переконайтеся, що його встановлено для цього облікового запису/організації.",
-      "checkAgain": "Перевірити ще раз",
       "githubConnected": "GitHub підключено",
       "noRepositoriesVisible": "Репозиторіїв не видно. Перевірте доступ до репозиторіїв для застосунку Kilo GitHub, потім оновіть.",
       "runOnWithTarget": "Запустити на: {{target}}",
@@ -1748,7 +1746,21 @@
       "discardDraftTitle": "Відкинути чернетку?",
       "discardFailed": "Не вдалося відкинути чернетку. Спробуйте ще раз.",
       "keepEditing": "Продовжити редагування",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Виконайте `kilo remote` на своєму комп'ютері або `/remote` у запущеному сеансі CLI, щоб керувати локальним процесом kilo.",
+      "bitbucketConnected": "Bitbucket підключено",
+      "connectBitbucket": "Підключити Bitbucket",
+      "connectBitbucketDescription": "Підключіть Bitbucket у браузері, а потім поверніться сюди, щоб обрати репозиторій.",
+      "connectGitlab": "Підключити GitLab",
+      "connectGitlabDescription": "Підключіть GitLab у браузері, а потім поверніться сюди, щоб обрати репозиторій.",
+      "couldNotLoadBitbucketRepositories": "Не вдалося завантажити репозиторії Bitbucket",
+      "couldNotLoadGithubRepositories": "Не вдалося завантажити репозиторії GitHub",
+      "couldNotLoadGitlabRepositories": "Не вдалося завантажити репозиторії GitLab",
+      "gitlabConnected": "GitLab підключено",
+      "noRepositoriesVisibleBitbucket": "Репозиторіїв не видно. Перевірте доступ до репозиторіїв Bitbucket, а потім оновіть.",
+      "noRepositoriesVisibleGitlab": "Репозиторіїв не видно. Перевірте доступ до репозиторіїв GitLab, а потім оновіть.",
+      "openBitbucket": "Відкрити Bitbucket",
+      "openGitlab": "Відкрити GitLab",
+      "recentlyUsed": "Нещодавно використані"
     },
     "partRenderer": {
       "updatedFileCount_one": "Оновлено {{displayCount}} файл",
@@ -1839,7 +1851,10 @@
       "noRepositoriesDescription": "До вашого облікового запису не підключено жодних репозиторіїв.",
       "tryDifferentSearch": "Спробуйте інший пошуковий запит.",
       "loading": "Завантаження...",
-      "accessibility": "Репозиторій: {{label}}"
+      "accessibility": "Репозиторій: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Відомості про повідомлення",
@@ -2195,6 +2210,18 @@
       "updating": "Оновлення, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Завантажити",
+      "loadWithHost": "Завантажити {{host}}",
+      "httpsOnly": "Тільки HTTPS-зображення"
+    },
+    "markdownLink": {
+      "invalidLink": "Це посилання не можна відкрити.",
+      "hostConfirmTitle": "Відкрити зовнішнє посилання?",
+      "hostConfirmMessage": "Це посилання відкриває {{host}} у вашому браузері.",
+      "open": "Відкрити",
+      "trustThisHost": "Довіряти цьому хосту"
     }
   },
   "bootstrap": {
@@ -2958,7 +2985,9 @@
       "organizationUnavailable": "Організація недоступна",
       "selectDescription": "Виберіть організацію зі свого профілю, щоб продовжити.",
       "selectOrganization": "Вибрати організацію",
-      "unavailableDescription": "Ця організація більше недоступна. Виберіть іншу зі свого профілю, щоб продовжити."
+      "unavailableDescription": "Ця організація більше недоступна. Виберіть іншу зі свого профілю, щоб продовжити.",
+      "accessDeniedTitle": "Доступ заборонено",
+      "accessDeniedDescription": "У вас немає доступу до цієї організації."
     },
     "creditActivity": {
       "emptyDescription": "Покупки, використання та коригування кредитів для цієї організації з'являться тут у міру їх виникнення.",
@@ -2975,7 +3004,10 @@
         "team-topup-bonus-2025": "Командний бонус поповнення 2025",
         "accounting_adjustment": "Бухгалтерське коригування",
         "credits_expired": "Термін дії кредитів минув"
-      }
+      },
+      "loadMore": "Завантажити більше",
+      "loadMoreFailed": "Не вдалося завантажити більше",
+      "truncated": "Доступна старіша активність за кредитами."
     },
     "hub": {
       "balance": "Баланс",
@@ -3011,7 +3043,10 @@
         "draft": "Чернетка",
         "uncollectible": "Безнадійний",
         "unknown": "Невідомо"
-      }
+      },
+      "loadMore": "Завантажити більше",
+      "loadMoreFailed": "Не вдалося завантажити більше",
+      "truncated": "Доступні старіші рахунки-фактури."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3104,17 +3139,11 @@
   },
   "feedback": {
     "couldNotOpenStore": "Не вдалося відкрити магазин.",
-    "emailUs": "Напишіть нам",
-    "gladMessage": "Відгук у магазині нам дуже допоможе. Дякуємо, що користуєтеся Kilo!",
-    "gladTitle": "Раді це чути!",
-    "iLikeIt": "Мені подобається",
-    "needsWork": "Потребує доопрацювання",
     "noEmailApp": "Немає доступного поштового застосунку. Ви можете написати нам на {{email}}",
-    "promptTitle": "Як вам застосунок Kilo?",
-    "rateKilo": "Оцінити Kilo",
-    "sorryMessage": "Розкажіть, що варто покращити. Інженер, відповідальний за застосунок, читає кожен звіт!",
-    "sorryTitle": "Нам шкода це чути!",
-    "emailSubject": "відгук про мобільний застосунок"
+    "emailSubject": "відгук про мобільний застосунок",
+    "neutralTitle": "Оцініть застосунок Kilo",
+    "rateTheApp": "Оцінити застосунок",
+    "sendFeedback": "Надіслати відгук"
   },
   "authErrors": {
     "emailAlreadyUsed": "Обліковий запис із цією електронною поштою вже існує з іншим способом входу. Спробуйте інший спосіб або скористайтеся пунктом «$t(login.moreSignInOptions)».",
@@ -3154,5 +3183,13 @@
       "xhigh": "Дуже високий",
       "max": "Максимальний"
     }
+  },
+  "trustedHosts": {
+    "title": "Довірені хости",
+    "subtitle": "Хости, яким ви довіряєте відкриватися без запиту",
+    "emptyTitle": "Немає довірених хостів",
+    "emptyDescription": "Коли ви довіряєте хосту посилання, воно відкривається без повторного запиту.",
+    "revoke": "Відкликати {{host}}",
+    "backToPreferences": "Назад до налаштувань"
   }
 }

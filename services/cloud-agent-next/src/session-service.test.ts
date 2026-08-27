@@ -391,6 +391,12 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
         updateMetadata: vi.fn().mockResolvedValue(undefined),
       })),
     } as unknown as PersistenceEnv['CLOUD_AGENT_SESSION'],
+    SANDBOX_SESSION: {
+      idFromName: vi.fn(() => 'sandbox-session-do-id' as unknown as DurableObjectId),
+      get: vi.fn(() => ({
+        getMetadata: vi.fn().mockResolvedValue(null),
+      })),
+    } as unknown as PersistenceEnv['SANDBOX_SESSION'],
     SESSION_INGEST: {
       fetch: vi.fn(),
       createSessionForCloudAgent: vi.fn().mockResolvedValue(undefined),
@@ -2152,6 +2158,30 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kilo-token');
   });
 
+  it('forwards persisted GitHub integration identity to contained capability issuance', async () => {
+    const expectedIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+    const metadata = parseSessionMetadata({
+      ...createMetadata({
+        githubRepo: 'acme/repo',
+        gitUrl: undefined,
+        gitToken: undefined,
+        platform: 'github',
+      }),
+      repository: {
+        type: 'github',
+        repo: 'acme/repo',
+        githubIntegrationId: expectedIntegrationId,
+      },
+    });
+
+    await buildPromptWrapperRequests(metadata);
+
+    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ expectedIntegrationId })
+    );
+  });
+
   it('uses a managed GitHub capability for shared standard sandboxes', async () => {
     const result = await buildPromptWrapperRequests({
       ...createMetadata({
@@ -2947,6 +2977,31 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       name: 'kiloconnect[bot]',
       email: 'bot@example.com',
     });
+  });
+
+  it('forwards persisted GitHub integration identity to direct token resolution', async () => {
+    const expectedIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+    const metadata = parseSessionMetadata({
+      ...createMetadata({
+        githubRepo: 'acme/repo',
+        gitUrl: undefined,
+        gitToken: undefined,
+        platform: 'github',
+        sandboxId: 'dind-abcdef',
+      }),
+      repository: {
+        type: 'github',
+        repo: 'acme/repo',
+        githubIntegrationId: expectedIntegrationId,
+      },
+    });
+
+    await buildPromptWrapperRequests(metadata);
+
+    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ expectedIntegrationId })
+    );
   });
 
   it('requests user GitHub auth eligibility for Slack bot sessions', async () => {

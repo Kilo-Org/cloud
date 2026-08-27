@@ -20,6 +20,7 @@ export type SessionRepositoryRequest =
   | {
       type: 'github';
       repo: string;
+      githubIntegrationId?: string;
       branch?: string;
     }
   | {
@@ -44,6 +45,7 @@ export type SessionRepositoryRequest =
 
 export type SessionRuntimeIntent = {
   devcontainer?: boolean;
+  sandboxAllocation?: 'isolated-standard';
 };
 
 export type SessionCreateRequest = {

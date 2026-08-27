@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 
+import { privacyScreenLayout } from '@/components/privacy-cover-overlay';
 import { useFormSheetDetents } from '@/lib/form-sheet';
 
 export default function OrganizationLayout() {
@@ -13,7 +14,7 @@ export default function OrganizationLayout() {
   };
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenLayout={privacyScreenLayout} screenOptions={{ headerShown: false }}>
       <Stack.Screen name="invite-member" options={sheetOptions} />
       <Stack.Screen name="member-limit" options={sheetOptions} />
       <Stack.Screen name="low-balance-alert" options={sheetOptions} />

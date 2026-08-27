@@ -29,7 +29,12 @@ import {
 } from './server';
 import { db } from '@/lib/drizzle';
 import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';
-import { kilocode_users, organization_seats_purchases, organizations } from '@kilocode/db/schema';
+import {
+  kilocode_users,
+  organization_domain_claims,
+  organization_seats_purchases,
+  organizations,
+} from '@kilocode/db/schema';
 import type { Organization, User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -853,6 +858,25 @@ describe('getProfileRedirectPath', () => {
     });
 
     await expect(getProfileRedirectPath(user)).resolves.toBe(`/organizations/${demoOrg.id}`);
+  });
+
+  test('prefers a permitted verified-domain organization over unrelated memberships', async () => {
+    const user = await insertTestUser({
+      google_user_name: 'Verified Domain Redirect User',
+      google_user_email: 'person@redirect-preferred.example.com',
+    });
+    await createTestOrganization('Unrelated Redirect Org', user.id, 100_000);
+    const preferred = await createTestOrganization('Preferred Redirect Org', user.id, 100_000);
+    await db.insert(organization_domain_claims).values({
+      organization_id: preferred.id,
+      domain: 'redirect-preferred.example.com',
+      status: 'verified',
+      workos_organization_id: `workos-org-${crypto.randomUUID()}`,
+      workos_domain_id: `workos-domain-${crypto.randomUUID()}`,
+      verified_at: new Date().toISOString(),
+    });
+
+    await expect(getProfileRedirectPath(user)).resolves.toBe(`/organizations/${preferred.id}`);
   });
 
   describe('users with personal account disabled', () => {

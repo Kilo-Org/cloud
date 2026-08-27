@@ -7,14 +7,13 @@ import type {
 } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/schema';
 import { classifyCloudAgentFailure } from '@kilocode/worker-utils/cloud-agent-failure';
+import { SESSION_ID_RE } from '../shared/protocol.js';
 
 export const CLOUD_AGENT_REPORT_RETENTION_DAYS = 90;
 const CLOUD_AGENT_ERROR_RETENTION_DAYS = 30;
 
 const isoTimestampSchema = z.string().datetime({ offset: true });
-const cloudAgentSessionIdSchema = z
-  .string()
-  .regex(/^agent_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+const cloudAgentSessionIdSchema = z.string().regex(SESSION_ID_RE);
 const kiloSessionIdSchema = z.string().startsWith('ses_').length(30);
 const diagnosticSchema = z.object({
   errorMessageRedacted: z.string().min(1).max(4096),

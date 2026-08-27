@@ -151,8 +151,8 @@
     "appearanceLight": "Гэрэлтэй",
     "appearanceDark": "Харанхуй",
     "account": "Бүртгэл",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR хяналтуудад аппын хамааралыг нэмэх",
+    "prReviewAttributionSubtitle": "Үнэлгээ илгээхдээ 'Kilo-гаар хянасан' тайлбарыг нэмнэ."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request боломжгүй",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab бүртгэл",
       "connectGitLab": "GitLab-г холбох",
       "gitlabError": "GitLab тохиргоог нээж чадсангүй. Дахин оролдоно уу.",
-      "description": "Pull request-уудыг автоматаар шалгахын тулд Kilo {{label}}-г холбоорой."
+      "description": "Pull request-уудыг автоматаар шалгахын тулд Kilo {{label}}-г холбоорой.",
+      "bitbucketError": "Bitbucket тохиргоог нээж чадсангүй. Дахин оролдоно уу."
     },
     "overview": {
       "reviewStyle": "Шалгалтын хэв маяг",
@@ -2075,7 +2076,8 @@
       "dollar": "доллар",
       "dollar_other": "доллар",
       "costSpoken": "зардал {{cost}}",
-      "costSpokenWithTime": "зардал {{cost}}, {{time}}"
+      "costSpokenWithTime": "зардал {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ыг нээх боломжгүй",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Шинэ сесс",
       "repository": "Репозитори",
-      "couldNotLoadRepositories": "Репозиториудыг ачаалж чадсангүй",
       "connectGithub": "GitHub-г холбох",
       "connectGithubDescription": "GitHub-ыг хөтөчдөө холбоод, репозитори сонгохын тулд энд буцаж ирнэ үү.",
       "openGithub": "GitHub-ыг нээх",
       "refreshRepositories": "Репозиториудыг сэргээх",
-      "githubConnectionNotVisible": "Бид таны GitHub холболтыг хараахан харж чадахгүй байна",
-      "githubConnectionNotVisibleDescription": "Хэрэв та Kilo GitHub App-ийг суулгасан эсвэл тохируулсан бол дахин шалгана уу — эсвэл энэ бүртгэл/байгууллагад суулгагдсан эсэхийг шалгана уу.",
-      "checkAgain": "Дахин шалгах",
       "githubConnected": "GitHub холбогдсон",
       "noRepositoriesVisible": "Үзэгдэх репозитори байхгүй. Kilo GitHub App-ийн репозиторийн хандалтыг шалгаад, сэргээнэ үү.",
       "runOnWithTarget": "Дээр ажиллуулах: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Засахыг үргэлжлүүлэх",
       "discard": "Хаях",
       "discardFailed": "Нооргийг хаях боломжгүй. Дахин оролдоно уу.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Компьютер дээрээ `kilo remote`, эсвэл ажиллаж буй CLI сессэд `/remote` командыг ажиллуулж, локал kilo процессыг удирдана.",
+      "bitbucketConnected": "Bitbucket холбогдсон",
+      "connectBitbucket": "Bitbucket холбох",
+      "connectBitbucketDescription": "Bitbucket-ыг хөтөчөөрөө холбож, буцаж ирээд repository сонгоно уу.",
+      "connectGitlab": "GitLab-г холбох",
+      "connectGitlabDescription": "GitLab-ыг хөтөчөөрөө холбож, буцаж ирээд repository сонгоно уу.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket repository-уудыг ачаалж чадсангүй",
+      "couldNotLoadGithubRepositories": "GitHub repository-уудыг ачаалж чадсангүй",
+      "couldNotLoadGitlabRepositories": "GitLab repository-уудыг ачаалж чадсангүй",
+      "gitlabConnected": "GitLab холбогдсон",
+      "noRepositoriesVisibleBitbucket": "Харагдах repository байхгүй. Bitbucket-ийн repository хандалтыг шалгаад, шинэчилнэ үү.",
+      "noRepositoriesVisibleGitlab": "Харагдах repository байхгүй. GitLab-ийн repository хандалтыг шалгаад, шинэчилнэ үү.",
+      "openBitbucket": "Bitbucket нээх",
+      "openGitlab": "GitLab нээх",
+      "recentlyUsed": "Сүүлд ашигласан"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл шинэчлэгдсэн",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "Таны бүртгэлд холбогдсон репозитори байхгүй.",
       "tryDifferentSearch": "Өөр хайлтын нэр томьёо туршиж үзнэ үү.",
       "loading": "Ачаалж байна...",
-      "accessibility": "Репозитори: {{label}}"
+      "accessibility": "Репозитори: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Мессежийн мэдээлэл",
@@ -2623,6 +2638,18 @@
       "updating": "Шинэчилж байна, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Ачаалах",
+      "loadWithHost": "Ачаалах {{host}}",
+      "httpsOnly": "Зөвхөн HTTPS зургууд"
+    },
+    "markdownLink": {
+      "invalidLink": "Энэ холбоосыг нээх боломжгүй.",
+      "hostConfirmTitle": "Гадаад холбоос нээх үү?",
+      "hostConfirmMessage": "Энэ холбоос {{host}}-ыг таны хөтөч дээр нээнэ.",
+      "open": "Нээх",
+      "trustThisHost": "Энэ хостыг итгэмжлэх"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Имэйл апп байхгүй. Та бидэнтэй {{email}} хаягаар холбогдож болно",
     "couldNotOpenStore": "Дэлгүүрийг нээж чадсангүй.",
-    "promptTitle": "Kilo апп танд хэр таалагдаж байна вэ?",
-    "iLikeIt": "Надад таалагдаж байна",
-    "gladTitle": "Сонсоход баяртай байна!",
-    "gladMessage": "Дэлгүүрийн үнэлгээ бидэнд маш их туслах болно. Kilo ашигласанд баярлалаа!",
-    "rateKilo": "Kilo үнэлэх",
-    "needsWork": "Сайжруулах шаардлагатай",
-    "sorryTitle": "Сонсоход харамсалтай байна!",
-    "sorryMessage": "Юуг сайжруулах шаардлагатайг бидэнд мэдэгдэнэ үү. Аппыг хариуцсан инженер тайлан бүрийг уншдаг!",
-    "emailUs": "Бидэнд имэйл илгээх",
-    "emailSubject": "гар утасны апп-ын санал хүсэлт"
+    "emailSubject": "гар утасны апп-ын санал хүсэлт",
+    "neutralTitle": "Kilo апп-ыг үнэлэх",
+    "rateTheApp": "Апп-ыг үнэлэх",
+    "sendFeedback": "Санал хүсэлт илгээх"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "Байгууллага боломжгүй",
       "selectDescription": "Үргэлжлүүлэхийн тулд профайлаасаа байгууллага сонгоно уу.",
       "selectOrganization": "Байгууллага сонгох",
-      "unavailableDescription": "Энэ байгууллага цаашид боломжгүй. Үргэлжлүүлэхийн тулд профайлаасаа нэгийг сонгоно уу."
+      "unavailableDescription": "Энэ байгууллага цаашид боломжгүй. Үргэлжлүүлэхийн тулд профайлаасаа нэгийг сонгоно уу.",
+      "accessDeniedTitle": "Хандалт татгалзсан",
+      "accessDeniedDescription": "Танд энэ байгууллагад хандах эрх байхгүй."
     },
     "creditActivity": {
       "emptyDescription": "Энэ байгууллагын худалдан авалт, ашиглалт, кредитийн тохируулгууд гарсан үедээ энд харагдана.",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Багийн топ-ап бонус-2025",
         "accounting_adjustment": "Нягтлан бодох бүртгэлийн тохируулга",
         "credits_expired": "Кредит дууссан"
-      }
+      },
+      "loadMore": "Нэмэлт ачаалах",
+      "loadMoreFailed": "Нэмэлт ачаалж чадсангүй",
+      "truncated": "Хуучин кредит үйл ажиллагааг үзэх боломжтой."
     },
     "inviteMember": {
       "emailError": "Хүчинтэй имэйл хаяг оруулна уу",
@@ -2976,7 +3002,10 @@
         "draft": "Ноорог",
         "uncollectible": "Цуглуулах боломжгүй",
         "unknown": "Тодорхойгүй"
-      }
+      },
+      "loadMore": "Нэмэлт ачаалах",
+      "loadMoreFailed": "Нэмэлт ачаалж чадсангүй",
+      "truncated": "Хуучин нэхэмжлэлийг үзэх боломжтой."
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "Маш өндөр",
       "max": "Дээд"
     }
+  },
+  "trustedHosts": {
+    "title": "Итгэмжлэгдсэн хостууд",
+    "subtitle": "Асуултгүй нээхэд итгэмжлэгдсэн хостууд",
+    "emptyTitle": "Итгэмжлэгдсэн хостууд байхгүй",
+    "emptyDescription": "Холбоосын хостыг итгэмжлэхэд дахин асуултгүй нээгдэнэ.",
+    "revoke": "{{host}} цуцлах",
+    "backToPreferences": "Тохиргоо руу буцах"
   }
 }

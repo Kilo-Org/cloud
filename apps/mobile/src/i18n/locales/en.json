@@ -1386,6 +1386,7 @@
       "gitlabAccount": "GitLab account",
       "connectGitLab": "Connect GitLab",
       "gitlabError": "Could not open GitLab setup. Please try again.",
+      "bitbucketError": "Could not open Bitbucket setup. Please try again.",
       "description": "Connect the Kilo {{label}} to review pull requests automatically."
     },
     "overview": {
@@ -2075,7 +2076,8 @@
       "dollar": "dollars",
       "dollar_other": "dollars",
       "costSpoken": "cost {{cost}}",
-      "costSpokenWithTime": "cost {{cost}}, {{time}}"
+      "costSpokenWithTime": "cost {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Could not open GitHub",
@@ -2152,16 +2154,26 @@
     "newSession": {
       "title": "New session",
       "repository": "Repository",
-      "couldNotLoadRepositories": "Couldn't load repositories",
+      "recentlyUsed": "Recently used",
+      "couldNotLoadGithubRepositories": "Couldn't load GitHub repositories",
+      "couldNotLoadGitlabRepositories": "Couldn't load GitLab repositories",
+      "couldNotLoadBitbucketRepositories": "Couldn't load Bitbucket repositories",
       "connectGithub": "Connect GitHub",
       "connectGithubDescription": "Connect GitHub in your browser, then return here to pick a repository.",
+      "connectGitlab": "Connect GitLab",
+      "connectGitlabDescription": "Connect GitLab in your browser, then return here to pick a repository.",
+      "connectBitbucket": "Connect Bitbucket",
+      "connectBitbucketDescription": "Connect Bitbucket in your browser, then return here to pick a repository.",
       "openGithub": "Open GitHub",
+      "openGitlab": "Open GitLab",
+      "openBitbucket": "Open Bitbucket",
       "refreshRepositories": "Refresh repositories",
-      "githubConnectionNotVisible": "We can't see your GitHub connection yet",
-      "githubConnectionNotVisibleDescription": "If you installed or configured the Kilo GitHub App, check again — or make sure it was installed for this account/organization.",
-      "checkAgain": "Check again",
       "githubConnected": "GitHub connected",
+      "gitlabConnected": "GitLab connected",
+      "bitbucketConnected": "Bitbucket connected",
       "noRepositoriesVisible": "No repositories visible. Check repository access for the Kilo GitHub App, then refresh.",
+      "noRepositoriesVisibleGitlab": "No repositories visible. Check repository access for GitLab, then refresh.",
+      "noRepositoriesVisibleBitbucket": "No repositories visible. Check repository access for Bitbucket, then refresh.",
       "runOnWithTarget": "Run on: {{target}}",
       "environment": "Environment",
       "couldNotLoadEnvironment": "Couldn't load your environment",
@@ -2272,6 +2284,9 @@
     },
     "repoPicker": {
       "title": "Select repository",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab",
+      "platformBitbucket": "Bitbucket",
       "searchLabel": "Search repositories",
       "searchPlaceholder": "Search repositories...",
       "noMatches": "No matches",
@@ -2360,6 +2375,11 @@
       "shareFailedRetry": "Failed to share file. Please try again.",
       "openAsText": "Open as text",
       "openInExternalApp": "Open in external app"
+    },
+    "markdownImage": {
+      "load": "Load",
+      "loadWithHost": "Load {{host}}",
+      "httpsOnly": "HTTPS images only"
     },
     "preparation": {
       "exitCode": "Exit code: {{code}}",
@@ -2563,6 +2583,13 @@
       "opensInBrowser": "Opens in browser",
       "showLinkActions": "Show link actions"
     },
+    "markdownLink": {
+      "invalidLink": "This link can't be opened.",
+      "hostConfirmTitle": "Open external link?",
+      "hostConfirmMessage": "This link opens {{host}} in your browser.",
+      "open": "Open",
+      "trustThisHost": "Trust this host"
+    },
     "compaction": {
       "contextCompacted": "Context compacted"
     },
@@ -2664,6 +2691,14 @@
     "signOutConfirm": "Sign out",
     "signOutMessage": "You will need to sign in again to access your workspace.",
     "webBrowser": "Web browser"
+  },
+  "trustedHosts": {
+    "title": "Trusted hosts",
+    "subtitle": "Hosts you trust to open without asking",
+    "emptyTitle": "No trusted hosts",
+    "emptyDescription": "When you trust a link's host, it opens without asking again.",
+    "revoke": "Revoke {{host}}",
+    "backToPreferences": "Back to preferences"
   },
   "forceUpdate": {
     "couldNotOpenStore": "Could not open the app store.",
@@ -2917,19 +2952,15 @@
   "feedback": {
     "noEmailApp": "No email app available. You can reach us at {{email}}",
     "couldNotOpenStore": "Could not open the store.",
-    "promptTitle": "How are you liking the Kilo app?",
-    "iLikeIt": "I like it",
-    "gladTitle": "We're glad to hear that!",
-    "gladMessage": "A store review would help us out immensely. Thanks for using Kilo!",
-    "rateKilo": "Rate Kilo",
-    "needsWork": "Needs work",
-    "sorryTitle": "We're sorry to hear that!",
-    "sorryMessage": "Please let us know what needs to be better. The engineer in charge of the app reads every single report!",
-    "emailUs": "Email us",
-    "emailSubject": "mobile app feedback"
+    "emailSubject": "mobile app feedback",
+    "neutralTitle": "Rate the Kilo app",
+    "rateTheApp": "Rate the app",
+    "sendFeedback": "Send feedback"
   },
   "organization": {
     "boundary": {
+      "accessDeniedTitle": "Access denied",
+      "accessDeniedDescription": "You do not have access to this organization.",
       "backToProfile": "Back to profile",
       "loadErrorMessage": "Check your connection and try again.",
       "loadErrorTitle": "Couldn't load your organizations",
@@ -2942,8 +2973,11 @@
       "emptyDescription": "Purchases, usage, and credit adjustments for this organization will appear here as they happen.",
       "emptyTitle": "No credit activity",
       "expires": "Expires {{date}}",
+      "loadMore": "Load more",
+      "loadMoreFailed": "Couldn't load more.",
       "title": "Credit activity",
       "transactionFallback": "Credit transaction",
+      "truncated": "Older credit activity is available.",
       "category": {
         "organization_custom": "Organization custom",
         "parent_to_child_transfer_in": "Parent to child transfer in",
@@ -2970,6 +3004,9 @@
       "emptyDescription": "Invoices are generated automatically each billing cycle and will appear here once your organization is billed.",
       "emptyTitle": "No invoices",
       "invoiceFallback": "Invoice",
+      "loadMore": "Load more",
+      "loadMoreFailed": "Couldn't load more.",
+      "truncated": "Older invoices are available.",
       "title": "Invoices",
       "downloadFailed": "Couldn't download invoice. Check your connection and try again.",
       "sharingUnavailable": "Sharing is not available on this device.",

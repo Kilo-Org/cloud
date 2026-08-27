@@ -2,6 +2,7 @@ import { type Href, Stack, useLocalSearchParams } from 'expo-router';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { PrReviewConnectGate } from '@/components/pr-review/pr-review-connect-gate';
+import { privacyScreenLayout } from '@/components/privacy-cover-overlay';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import {
@@ -9,7 +10,7 @@ import {
   PendingReviewProvider,
 } from '@/lib/pr-review/pending-review-provider';
 import { useFormSheetDetents } from '@/lib/form-sheet';
-import { parseParam } from '@/lib/route-params';
+import { parseParam, parsePositiveIntParam } from '@/lib/route-params';
 
 type Params = {
   owner: string;
@@ -36,13 +37,12 @@ export default function PrReviewNumberLayout() {
   const params = useLocalSearchParams<Params>();
   const owner = parseParam(params.owner);
   const repo = parseParam(params.repo);
-  const rawNumber = parseParam(params.number);
-  const number = rawNumber ? Number.parseInt(rawNumber, 10) : Number.NaN;
+  const number = parsePositiveIntParam(params.number);
   const { fullSheetDetent } = useFormSheetDetents();
   const { userId } = useCurrentUserId();
   useRouteForegroundRefresh([[['githubPrReview']]]);
 
-  if (!owner || !repo || !Number.isInteger(number) || number <= 0) {
+  if (!owner || !repo || number === null) {
     return <InvalidRouteState backTo={'/(app)/pr-review' as Href} />;
   }
 
@@ -68,7 +68,7 @@ export default function PrReviewNumberLayout() {
         userId={userId}
         draftEntityKey={draftEntityKey}
       >
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack screenLayout={privacyScreenLayout} screenOptions={{ headerShown: false }}>
           <Stack.Screen name="comment-composer" options={sheetOptions} />
           <Stack.Screen name="review-submit" options={sheetOptions} />
           <Stack.Screen name="merge" options={sheetOptions} />

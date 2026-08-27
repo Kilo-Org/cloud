@@ -151,8 +151,8 @@
     "appearanceLight": "Բաց",
     "appearanceDark": "Մուգ",
     "account": "Հաշիվ",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "Ավելացնել հավելվածի վերագրումը PR ակնարկներին",
+    "prReviewAttributionSubtitle": "Ավելացնել «Վերանայվել է Kilo-ի միջոցով» ստորագիրը, երբ ներկայացնում եք ակնարկ:"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request-ը հասանելի չէ",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab հաշիվ",
       "connectGitLab": "Միացնել GitLab-ը",
       "gitlabError": "Հնարավոր չեղավ բացել GitLab կարգավորումը: Խնդրում ենք կրկին փորձել:",
-      "description": "Միացրեք Kilo {{label}}-ը՝ pull requests-ները ավտոմատ ստուգելու համար:"
+      "description": "Միացրեք Kilo {{label}}-ը՝ pull requests-ները ավտոմատ ստուգելու համար:",
+      "bitbucketError": "Չհաջողվեց բացել Bitbucket-ի կարգավորումը: Խնդրում ենք փորձել կրկին:"
     },
     "overview": {
       "reviewStyle": "Ստուգման ոճ",
@@ -2075,7 +2076,8 @@
       "dollar": "դոլար",
       "dollar_other": "դոլար",
       "costSpoken": "Արժեք {{cost}}",
-      "costSpokenWithTime": "Արժեք {{cost}}, {{time}}"
+      "costSpokenWithTime": "Արժեք {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Չհաջողվեց բացել GitHub-ը",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "Նոր նիստ",
       "repository": "Պահոց",
-      "couldNotLoadRepositories": "Չհաջողվեց բեռնել պահոցները",
       "connectGithub": "Միացնել GitHub-ը",
       "connectGithubDescription": "Միացրեք GitHub-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
       "openGithub": "Բացել GitHub-ը",
       "refreshRepositories": "Թարմացնել պահոցները",
-      "githubConnectionNotVisible": "Մենք դեռ չենք տեսնում ձեր GitHub կապը",
-      "githubConnectionNotVisibleDescription": "Եթե տեղադրել կամ կարգավորել եք Kilo GitHub App-ը, նորից ստուգեք — կամ համոզվեք, որ այն տեղադրված է այս հաշվի/կազմակերպության համար։",
-      "checkAgain": "Կրկին ստուգել",
       "githubConnected": "GitHub-ը միացված է",
       "noRepositoriesVisible": "Պահոցներ չեն երևում։ Ստուգեք Kilo GitHub App-ի պահոցի հասանելիությունը, ապա թարմացրեք։",
       "runOnWithTarget": "Գործարկել՝ {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "Շարունակել խմբագրել",
       "discard": "Մերժել",
       "discardFailed": "Չհաջողվեց մերժել սևագիրը։ Խնդրում ենք կրկին փորձել։",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "Գործարկեք `kilo remote` ձեր համակարգչում կամ `/remote` գործող CLI նստաշրջանում՝ տեղական kilo գործընթացը կառավարելու համար:",
+      "bitbucketConnected": "Bitbucket-ը միացված է",
+      "connectBitbucket": "Միացնել Bitbucket-ը",
+      "connectBitbucketDescription": "Միացրեք Bitbucket-ը ձեր բրաուզերում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար:",
+      "connectGitlab": "Միացնել GitLab-ը",
+      "connectGitlabDescription": "Միացրեք GitLab-ը ձեր բրաուզերում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար:",
+      "couldNotLoadBitbucketRepositories": "Չհաջողվեց բեռնել Bitbucket-ի պահոցները",
+      "couldNotLoadGithubRepositories": "Չհաջողվեց բեռնել GitHub-ի պահոցները",
+      "couldNotLoadGitlabRepositories": "Չհաջողվեց բեռնել GitLab-ի պահոցները",
+      "gitlabConnected": "GitLab-ը միացված է",
+      "noRepositoriesVisibleBitbucket": "Պահոցներ չեն երևում: Ստուգեք Bitbucket-ի պահոցների հասանելիությունը, ապա թարմացրեք:",
+      "noRepositoriesVisibleGitlab": "Պահոցներ չեն երևում: Ստուգեք GitLab-ի պահոցների հասանելիությունը, ապա թարմացրեք:",
+      "openBitbucket": "Բացել Bitbucket",
+      "openGitlab": "Բացել GitLab",
+      "recentlyUsed": "Վերջերս օգտագործված"
     },
     "partRenderer": {
       "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ",
@@ -2279,7 +2291,10 @@
       "noRepositoriesDescription": "Ձեր հաշվին միացված պահոցներ չկան։",
       "tryDifferentSearch": "Փորձեք որոնման այլ տերմին։",
       "loading": "Բեռնում...",
-      "accessibility": "Պահոց՝ {{label}}"
+      "accessibility": "Պահոց՝ {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "Հաղորդագրության մանրամասներ",
@@ -2623,6 +2638,18 @@
       "updating": "Թարմացվում է, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "pull request"
+    },
+    "markdownImage": {
+      "load": "Բեռնել",
+      "loadWithHost": "Բեռնել {{host}}",
+      "httpsOnly": "Միայն HTTPS պատկերներ"
+    },
+    "markdownLink": {
+      "invalidLink": "Այս հղումը հնարավոր չէ բացել։",
+      "hostConfirmTitle": "Բացել արտաքին հղումը։",
+      "hostConfirmMessage": "Այս հղումը ձեր զննարկչում բացում է {{host}}։",
+      "open": "Բացել",
+      "trustThisHost": "Վստահել այս հոսթին"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "Էլփոստի հավելված հասանելի չէ: Կարող եք կապվել մեզ հետ {{email}} հասցեով",
     "couldNotOpenStore": "Հնարավոր չեղավ բացել խանութը:",
-    "promptTitle": "Ինչպե՞ս եք գնահատում Kilo հավելվածը:",
-    "iLikeIt": "Հավանում եմ",
-    "gladTitle": "Մենք ուրախ ենք դա լսել:",
-    "gladMessage": "Խանութում ակնարկը շատ կօգնի մեզ: Շնորհակալություն Kilo-ն օգտագործելու համար:",
-    "rateKilo": "Գնահատել Kilo-ն",
-    "needsWork": "Բարելավման կարիք ունի",
-    "sorryTitle": "Ցավում ենք դա լսել:",
-    "sorryMessage": "Խնդրում ենք հայտնել մեզ, թե ինչն է պետք բարելավել: Հավելվածի պատասխանատու ինժեները կարդում է յուրաքանչյուր հաշվետվություն:",
-    "emailUs": "Էլփոստ ուղարկեք մեզ",
-    "emailSubject": "շարժական հավելվածի հետադարձ կապ"
+    "emailSubject": "շարժական հավելվածի հետադարձ կապ",
+    "neutralTitle": "Գնահատեք Kilo հավելվածը",
+    "rateTheApp": "Գնահատեք հավելվածը",
+    "sendFeedback": "Ուղարկեք կարծիք"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "Կազմակերպությունը հասանելի չէ",
       "selectDescription": "Ընտրեք կազմակերպություն ձեր պրոֆիլից՝ շարունակելու համար:",
       "selectOrganization": "Ընտրել կազմակերպություն",
-      "unavailableDescription": "Այս կազմակերպությունն այլևս հասանելի չէ: Ընտրեք մեկը ձեր պրոֆիլից՝ շարունակելու համար:"
+      "unavailableDescription": "Այս կազմակերպությունն այլևս հասանելի չէ: Ընտրեք մեկը ձեր պրոֆիլից՝ շարունակելու համար:",
+      "accessDeniedTitle": "Մուտքը մերժված է",
+      "accessDeniedDescription": "Դուք մուտք չունեք այս կազմակերպություն։"
     },
     "creditActivity": {
       "emptyDescription": "Այս կազմակերպության գնումները, օգտագործումը և կրեդիտների ճշգրտումները կհայտնվեն այստեղ՝ իրենց կատարման պահին:",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "Հաշվապահական ճշգրտում",
         "credits_expired": "Սպառված կրեդիտներ"
-      }
+      },
+      "loadMore": "Բեռնել ավելին",
+      "loadMoreFailed": "Չհաջողվեց բեռնել ավելին",
+      "truncated": "Հին վարկային գործունեությունը հասանելի է։"
     },
     "inviteMember": {
       "emailError": "Մուտքագրեք վավեր էլփոստի հասցե",
@@ -2976,7 +3002,10 @@
         "draft": "Սևագիր",
         "uncollectible": "Անվերականգնելի",
         "unknown": "Անհայտ"
-      }
+      },
+      "loadMore": "Բեռնել ավելին",
+      "loadMoreFailed": "Չհաջողվեց բեռնել ավելին",
+      "truncated": "Հին հաշիվ-ապրանքագրերը հասանելի են։"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "Շատ բարձր",
       "max": "Առավելագույն"
     }
+  },
+  "trustedHosts": {
+    "title": "Վստահելի հոսթեր",
+    "subtitle": "Հոսթեր, որոնք բացվում են առանց հարցնելու",
+    "emptyTitle": "Վստահելի հոսթեր չկան",
+    "emptyDescription": "Երբ վստահում եք հղման հոսթին, այն բացվում է առանց կրկին հարցնելու։",
+    "revoke": "Հեռացնել {{host}}",
+    "backToPreferences": "Վերադառնալ կարգավորումներ"
   }
 }

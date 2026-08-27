@@ -151,8 +151,8 @@
     "appearanceLight": "লাইট",
     "appearanceDark": "ডার্ক",
     "account": "অ্যাকাউন্ট",
-    "prReviewAttribution": "Add app attribution to PR reviews",
-    "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review."
+    "prReviewAttribution": "PR পর্যালোচনায় অ্যাপ অ্যাট্রিবিউশন যোগ করুন",
+    "prReviewAttributionSubtitle": "আপনি একটি পর্যালোচনা জমা দিলে একটি Reviewed via Kilo ফুটার যুক্ত করুন।"
   },
   "prReview": {
     "pullRequestUnavailable": "পুল রিকোয়েস্ট অনুপলব্ধ",
@@ -1386,7 +1386,8 @@
       "gitlabAccount": "GitLab অ্যাকাউন্ট",
       "connectGitLab": "GitLab সংযুক্ত করুন",
       "gitlabError": "GitLab সেটআপ খোলা যায়নি। আবার চেষ্টা করুন।",
-      "description": "পুল রিকোয়েস্ট স্বয়ংক্রিয়ভাবে পর্যালোচনা করতে Kilo {{label}} সংযুক্ত করুন।"
+      "description": "পুল রিকোয়েস্ট স্বয়ংক্রিয়ভাবে পর্যালোচনা করতে Kilo {{label}} সংযুক্ত করুন।",
+      "bitbucketError": "Bitbucket সেটআপ খোলা যায়নি। আবার চেষ্টা করুন।"
     },
     "overview": {
       "reviewStyle": "পর্যালোচনার ধরন",
@@ -2075,7 +2076,8 @@
       "dollar": "ডলার",
       "dollar_other": "ডলার",
       "costSpoken": "খরচ {{cost}}",
-      "costSpokenWithTime": "খরচ {{cost}}, {{time}}"
+      "costSpokenWithTime": "খরচ {{cost}}, {{time}}",
+      "pullRequest": "pull request {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub খোলা যায়নি",
@@ -2152,14 +2154,10 @@
     "newSession": {
       "title": "নতুন সেশন",
       "repository": "রিপোজিটরি",
-      "couldNotLoadRepositories": "রিপোজিটরি লোড করা যায়নি",
       "connectGithub": "GitHub সংযোগ করুন",
       "connectGithubDescription": "আপনার ব্রাউজারে GitHub সংযোগ করুন, তারপর রিপোজিটরি বাছাই করতে এখানে ফিরে আসুন।",
       "openGithub": "GitHub খুলুন",
       "refreshRepositories": "রিপোজিটরি রিফ্রেশ করুন",
-      "githubConnectionNotVisible": "আমরা এখনও আপনার GitHub সংযোগ দেখতে পাচ্ছি না",
-      "githubConnectionNotVisibleDescription": "আপনি কিলো GitHub অ্যাপ ইনস্টল বা কনফিগার করলে আবার পরীক্ষা করুন — অথবা নিশ্চিত করুন এটি এই অ্যাকাউন্ট/সংস্থার জন্য ইনস্টল করা হয়েছে।",
-      "checkAgain": "আবার পরীক্ষা করুন",
       "githubConnected": "GitHub সংযুক্ত",
       "noRepositoriesVisible": "কোনো রিপোজিটরি দৃশ্যমান নেই। কিলো GitHub অ্যাপের জন্য রিপোজিটরি অ্যাক্সেস পরীক্ষা করুন, তারপর রিফ্রেশ করুন।",
       "runOnWithTarget": "চলবে: {{target}}",
@@ -2186,7 +2184,21 @@
       "keepEditing": "সম্পাদনা চালিয়ে যান",
       "discard": "বাতিল করুন",
       "discardFailed": "ড্রাফ্টটি বাতিল করা যায়নি। আবার চেষ্টা করুন।",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process."
+      "remoteHint": "আপনার কম্পিউটারে `kilo remote` চালান, বা একটি চলমান CLI সেশনে `/remote`, একটি স্থানীয় kilo প্রক্রিয়া নিয়ন্ত্রণ করতে।",
+      "bitbucketConnected": "Bitbucket সংযুক্ত",
+      "connectBitbucket": "Bitbucket সংযুক্ত করুন",
+      "connectBitbucketDescription": "আপনার ব্রাউজারে Bitbucket সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
+      "connectGitlab": "GitLab সংযুক্ত করুন",
+      "connectGitlabDescription": "আপনার ব্রাউজারে GitLab সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
+      "couldNotLoadBitbucketRepositories": "Bitbucket রিপোজিটরি লোড করা যায়নি",
+      "couldNotLoadGithubRepositories": "GitHub রিপোজিটরি লোড করা যায়নি",
+      "couldNotLoadGitlabRepositories": "GitLab রিপোজিটরি লোড করা যায়নি",
+      "gitlabConnected": "GitLab সংযুক্ত",
+      "noRepositoriesVisibleBitbucket": "কোনো রিপোজিটরি দেখা যাচ্ছে না। Bitbucket-এর জন্য রিপোজিটরি অ্যাক্সেস পরীক্ষা করুন, তারপর রিফ্রেশ করুন।",
+      "noRepositoriesVisibleGitlab": "কোনো রিপোজিটরি দেখা যাচ্ছে না। GitLab-এর জন্য রিপোজিটরি অ্যাক্সেস পরীক্ষা করুন, তারপর রিফ্রেশ করুন।",
+      "openBitbucket": "Bitbucket খুলুন",
+      "openGitlab": "GitLab খুলুন",
+      "recentlyUsed": "সম্প্রতি ব্যবহৃত"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}টি ফাইল আপডেট হয়েছে",
@@ -2275,7 +2287,10 @@
       "noRepositoriesDescription": "আপনার অ্যাকাউন্টে কোনো রিপোজিটরি সংযুক্ত নেই।",
       "tryDifferentSearch": "একটি ভিন্ন অনুসন্ধান শব্দ চেষ্টা করুন।",
       "loading": "লোড হচ্ছে...",
-      "accessibility": "রিপোজিটরি: {{label}}"
+      "accessibility": "রিপোজিটরি: {{label}}",
+      "platformBitbucket": "Bitbucket",
+      "platformGithub": "GitHub",
+      "platformGitlab": "GitLab"
     },
     "messageDetails": {
       "title": "বার্তার বিস্তারিত",
@@ -2623,6 +2638,18 @@
       "updating": "আপডেট হচ্ছে, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}",
       "externalLinkLabel": "পুল রিকোয়েস্ট"
+    },
+    "markdownImage": {
+      "load": "লোড",
+      "loadWithHost": "লোড {{host}}",
+      "httpsOnly": "শুধুমাত্র HTTPS ছবি"
+    },
+    "markdownLink": {
+      "invalidLink": "এই লিঙ্কটি খোলা যাবে না।",
+      "hostConfirmTitle": "বাহ্যিক লিঙ্ক খুলবেন?",
+      "hostConfirmMessage": "এই লিঙ্কটি আপনার ব্রাউজারে {{host}} খোলে।",
+      "open": "খুলুন",
+      "trustThisHost": "এই হোস্ট বিশ্বাস করুন"
     }
   },
   "bootstrap": {
@@ -2913,16 +2940,10 @@
   "feedback": {
     "noEmailApp": "কোনো ইমেইল অ্যাপ উপলব্ধ নেই। আপনি {{email}}-এ আমাদের সাথে যোগাযোগ করতে পারেন",
     "couldNotOpenStore": "স্টোর খোলা যায়নি।",
-    "promptTitle": "Kilo অ্যাপটি কেমন লাগছে?",
-    "iLikeIt": "আমার ভালো লাগছে",
-    "gladTitle": "এটা শুনে আমরা খুশি!",
-    "gladMessage": "একটি স্টোর রিভিউ আমাদের অনেক সাহায্য করবে। Kilo ব্যবহার করার জন্য ধন্যবাদ!",
-    "rateKilo": "Kilo রেট করুন",
-    "needsWork": "উন্নতি প্রয়োজন",
-    "sorryTitle": "এটা শুনে আমরা দুঃখিত!",
-    "sorryMessage": "কী উন্নত করতে হবে তা আমাদের জানান। অ্যাপের দায়িত্বে থাকা ইঞ্জিনিয়ার প্রতিটি রিপোর্ট পড়েন!",
-    "emailUs": "আমাদের ইমেইল করুন",
-    "emailSubject": "মোবাইল অ্যাপ ফিডব্যাক"
+    "emailSubject": "মোবাইল অ্যাপ ফিডব্যাক",
+    "neutralTitle": "Kilo অ্যাপ রেট করুন",
+    "rateTheApp": "অ্যাপ রেট করুন",
+    "sendFeedback": "মতামত পাঠান"
   },
   "organization": {
     "boundary": {
@@ -2932,7 +2953,9 @@
       "organizationUnavailable": "সংস্থা অনুপলব্ধ",
       "selectDescription": "চালিয়ে যেতে আপনার প্রোফাইল থেকে একটি সংস্থা বেছে নিন।",
       "selectOrganization": "একটি সংস্থা নির্বাচন করুন",
-      "unavailableDescription": "এই সংস্থাটি আর উপলব্ধ নয়। চালিয়ে যেতে আপনার প্রোফাইল থেকে একটি বেছে নিন।"
+      "unavailableDescription": "এই সংস্থাটি আর উপলব্ধ নয়। চালিয়ে যেতে আপনার প্রোফাইল থেকে একটি বেছে নিন।",
+      "accessDeniedTitle": "অ্যাক্সেস অস্বীকৃত",
+      "accessDeniedDescription": "আপনার এই সংস্থায় অ্যাক্সেস নেই।"
     },
     "creditActivity": {
       "emptyDescription": "এই সংস্থার ক্রয়, ব্যবহার এবং ক্রেডিট সমন্বয় এখানে প্রদর্শিত হবে।",
@@ -2949,7 +2972,10 @@
         "team-topup-bonus-2025": "Team-topup-bonus-2025",
         "accounting_adjustment": "অ্যাকাউন্টিং সমন্বয়",
         "credits_expired": "ক্রেডিটের মেয়াদ শেষ"
-      }
+      },
+      "loadMore": "আরও লোড করুন",
+      "loadMoreFailed": "আরও লোড করা যায়নি",
+      "truncated": "পুরোনো ক্রেডিট কার্যকলাপ উপলব্ধ।"
     },
     "inviteMember": {
       "emailError": "একটি বৈধ ইমেইল ঠিকানা লিখুন",
@@ -2976,7 +3002,10 @@
         "draft": "খসড়া",
         "uncollectible": "আদায়যোগ্য নয়",
         "unknown": "অজানা"
-      }
+      },
+      "loadMore": "আরও লোড করুন",
+      "loadMoreFailed": "আরও লোড করা যায়নি",
+      "truncated": "পুরোনো ইনভয়েস উপলব্ধ।"
     },
     "lowBalanceAlert": {
       "emailPlaceholder": "name@company.com",
@@ -3112,5 +3141,13 @@
       "xhigh": "অতিরিক্ত উচ্চ",
       "max": "সর্বোচ্চ"
     }
+  },
+  "trustedHosts": {
+    "title": "বিশ্বস্ত হোস্ট",
+    "subtitle": "যেসব হোস্ট জিজ্ঞেস না করেই খুলবেন",
+    "emptyTitle": "কোনো বিশ্বস্ত হোস্ট নেই",
+    "emptyDescription": "আপনি কোনো লিঙ্কের হোস্ট বিশ্বাস করলে তা আবার জিজ্ঞেস না করেই খোলে।",
+    "revoke": "{{host}} প্রত্যাহার করুন",
+    "backToPreferences": "পছন্দে ফিরুন"
   }
 }

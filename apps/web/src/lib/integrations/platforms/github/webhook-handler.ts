@@ -535,9 +535,14 @@ export async function handleGitHubWebhook(
           ? ({
               kind: 'organization',
               organizationId: integration.owned_by_organization_id,
+              platformIntegrationId: integration.id,
             } as const)
           : integration.owned_by_user_id
-            ? ({ kind: 'user', userId: integration.owned_by_user_id } as const)
+            ? ({
+                kind: 'user',
+                userId: integration.owned_by_user_id,
+                platformIntegrationId: integration.id,
+              } as const)
             : null;
 
       // `closed` events are not routed to the code-review pipeline.

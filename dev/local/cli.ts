@@ -44,7 +44,6 @@ import {
   isTmuxAvailable,
   findServicePane,
   paneHasRunningService,
-  paneHasRunningChild,
   captureServicePane,
   pipeServicePane,
 } from './tmux';
@@ -379,7 +378,7 @@ const CAPTURE_TIMEOUT_MS = 30_000;
 
 function isCaptureServiceRunning(sessionName: string, serviceName: string): boolean {
   const pane = findServicePane(sessionName, serviceName);
-  return pane !== undefined && paneHasRunningChild(sessionName, pane);
+  return pane !== undefined && paneHasRunningService(sessionName, pane);
 }
 
 // ---------------------------------------------------------------------------

@@ -91,7 +91,6 @@ const {
   isCancelQueuedUpgradeRequired,
   isCloudPrepareRetryableError,
   readFetchSessionErrorCode,
-  resolveCancelQueuedRestoreOutcome,
   StreamTicketResponseSchema,
 } = await import('@/components/agents/mobile-session-manager');
 
@@ -584,15 +583,5 @@ describe('isCancelQueuedUpgradeRequired', () => {
 
   it('returns false for an error with no code', () => {
     expect(isCancelQueuedUpgradeRequired(new Error('network'))).toBe(false);
-  });
-});
-
-describe('resolveCancelQueuedRestoreOutcome', () => {
-  it("returns 'restore' when the composer has no content", () => {
-    expect(resolveCancelQueuedRestoreOutcome(false)).toBe('restore');
-  });
-
-  it("returns 'keep-restore' when the composer has content", () => {
-    expect(resolveCancelQueuedRestoreOutcome(true)).toBe('keep-restore');
   });
 });

@@ -193,6 +193,7 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
     removeAttachment: vi.fn(() => undefined),
     retryAttachment: vi.fn(() => undefined),
     reset: vi.fn(() => undefined),
+    commitSent: vi.fn(() => undefined),
     isUploading: false,
     hasFailedAttachments: false,
     uploadPending: vi.fn(async () => ({

@@ -194,6 +194,7 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
     retryAttachment: vi.fn(() => undefined),
     reset: vi.fn(() => undefined),
     releaseUnclaimedUploads: vi.fn(() => undefined),
+    commitSent: vi.fn(() => undefined),
     isUploading: uploadState.isUploading,
     hasFailedAttachments: uploadState.attachments.some(attachment => attachment.status === 'error'),
     hasUnclaimedAttachments: uploadState.attachments.some(

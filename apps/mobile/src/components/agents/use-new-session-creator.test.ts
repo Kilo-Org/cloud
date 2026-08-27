@@ -150,6 +150,7 @@ const FAKE_ATTACHMENTS: CreatorInput['attachments'] = {
   restoreFileParts: vi.fn(() => undefined),
   clearOptimistic: vi.fn(() => undefined),
   restoreChips: vi.fn(() => undefined),
+  commitSent: vi.fn(() => undefined),
   isUploading: false,
   hasFailedAttachments: false,
   hasUnclaimedAttachments: false,

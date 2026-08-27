@@ -853,6 +853,10 @@ export function ChatComposer({
                   setIsSending(false);
                 },
               });
+              // The optimistic clear keeps the path so a failed-send restore
+              // can retry under it. Only a completed send rotates the upload
+              // path and submission messageUuid for the next message.
+              upload.commitSent();
             } catch (error) {
               // Transport failure: restore only when the composer is still
               // empty, so a newer draft is never overwritten.

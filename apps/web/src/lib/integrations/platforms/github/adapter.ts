@@ -63,10 +63,12 @@ export function verifyGitHubWebhookSignature(
 /**
  * Generates GitHub App installation token
  * @param appType - The type of GitHub App to use (defaults to 'standard')
+ * @param repositoryName - Optional repository name to scope the token to
  */
 export async function generateGitHubInstallationToken(
   installationId: string,
-  appType: GitHubAppType = 'standard'
+  appType: GitHubAppType = 'standard',
+  repositoryName?: string
 ): Promise<InstallationToken> {
   const credentials = getGitHubAppCredentials(appType);
 
@@ -80,7 +82,10 @@ export async function generateGitHubInstallationToken(
     installationId,
   });
 
-  const authResult = await auth({ type: 'installation' });
+  const authResult = await auth({
+    type: 'installation',
+    ...(repositoryName ? { repositoryNames: [repositoryName] } : {}),
+  });
 
   return {
     token: authResult.token,

@@ -36,6 +36,7 @@ import { encryptAuthToken, decryptAuthToken } from './auth-token-encryption';
 import { hasUserEverPaid, hasOrganizationEverPaid } from '@/lib/creditTransactions';
 import { slugSchema } from './validation';
 import { DispatcherSlugTakenError, dispatcherClient } from './dispatcher-client';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 
 type PaymentCheckResult = { hasPaid: true } | { hasPaid: false };
 
@@ -364,33 +365,54 @@ export async function redeployByDeploymentId(deploymentId: string, owner: Owner)
   await redeploy(deployment[0]);
 }
 
-async function getGithubTokenFromIntegrationId(
-  platformIntegrationId: string
-): Promise<string | undefined> {
-  const integration = await db
+async function mintGitHubRepositoryToken(
+  owner: Owner,
+  platformIntegrationId: string,
+  repositoryFullName: string
+): Promise<string> {
+  const ownershipCondition =
+    owner.type === 'user'
+      ? eq(platform_integrations.owned_by_user_id, owner.id)
+      : eq(platform_integrations.owned_by_organization_id, owner.id);
+  const [integration] = await db
     .select()
     .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.id, platformIntegrationId),
-        eq(platform_integrations.integration_status, 'active')
-      )
-    )
+    .where(and(eq(platform_integrations.id, platformIntegrationId), ownershipCondition))
     .limit(1);
 
-  if (
-    integration.length > 0 &&
-    integration[0].platform === 'github' &&
-    integration[0].platform_installation_id
-  ) {
-    const tokenData = await generateGitHubInstallationToken(
-      integration[0].platform_installation_id,
-      integration[0].github_app_type ?? 'standard'
-    );
-    return tokenData.token;
+  if (!integration) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Platform integration not found' });
+  }
+  if (integration.platform !== 'github' || integration.integration_type !== 'app') {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Platform integration is not a GitHub App installation',
+    });
+  }
+  if (!isPlatformIntegrationHealthy(integration)) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'GitHub App installation is not active',
+    });
+  }
+  if (!integration.platform_installation_id) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'GitHub App installation ID not found',
+    });
   }
 
-  return undefined;
+  const repositoryParts = repositoryFullName.split('/');
+  if (repositoryParts.length !== 2 || !repositoryParts[0] || !repositoryParts[1]) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid GitHub repository name' });
+  }
+
+  const tokenData = await generateGitHubInstallationToken(
+    integration.platform_installation_id,
+    integration.github_app_type ?? 'standard',
+    repositoryParts[1]
+  );
+  return tokenData.token;
 }
 
 export async function redeploy(deployment: Deployment) {
@@ -414,10 +436,19 @@ export async function redeploy(deployment: Deployment) {
     if (!deployment.platform_integration_id) {
       throw new Error('Platform integration ID is required for GitHub redeployment');
     }
-    accessToken = await getGithubTokenFromIntegrationId(deployment.platform_integration_id);
-    if (!accessToken) {
-      throw new Error('GitHub token is required for redeployment');
+    const owner = deployment.owned_by_organization_id
+      ? { type: 'org' as const, id: deployment.owned_by_organization_id }
+      : deployment.owned_by_user_id
+        ? { type: 'user' as const, id: deployment.owned_by_user_id }
+        : null;
+    if (!owner) {
+      throw new Error('Deployment owner is required for GitHub redeployment');
     }
+    accessToken = await mintGitHubRepositoryToken(
+      owner,
+      deployment.platform_integration_id,
+      deployment.repository_source
+    );
     provider = 'github';
   }
 
@@ -513,55 +544,16 @@ async function resolveGitHubSource(
 ): Promise<ResolvedSourceDetails> {
   const { platformIntegrationId, repositoryFullName } = source;
 
-  // Verify platform integration exists and belongs to the owner
-  const ownershipCondition =
-    owner.type === 'user'
-      ? eq(platform_integrations.owned_by_user_id, owner.id)
-      : eq(platform_integrations.owned_by_organization_id, owner.id);
-
-  const [platformIntegration] = await db
-    .select()
-    .from(platform_integrations)
-    .where(and(eq(platform_integrations.id, platformIntegrationId), ownershipCondition))
-    .limit(1);
-
-  if (!platformIntegration) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Platform integration not found',
-    });
-  }
-
-  if (!platformIntegration.platform_installation_id) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Platform installation ID not found',
-    });
-  }
-
-  // Verify repository access for selected repositories
-  if (platformIntegration.repository_access === 'selected') {
-    const repositories = platformIntegration.repositories || [];
-    const hasAccess = repositories.some(repo => repo.full_name === repositoryFullName);
-
-    if (!hasAccess) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'Repository not accessible by this integration',
-      });
-    }
-  }
-
-  // Generate GitHub installation token
-  const tokenData = await generateGitHubInstallationToken(
-    platformIntegration.platform_installation_id,
-    platformIntegration.github_app_type ?? 'standard'
+  const authToken = await mintGitHubRepositoryToken(
+    owner,
+    platformIntegrationId,
+    repositoryFullName
   );
 
   return {
     repositorySource: repositoryFullName,
     repoName: repositoryFullName.split('/')[1],
-    authToken: tokenData.token,
+    authToken,
     encryptedToken: null, // GitHub tokens are regenerated, not stored
     platformIntegrationId,
     sourceType: 'github',

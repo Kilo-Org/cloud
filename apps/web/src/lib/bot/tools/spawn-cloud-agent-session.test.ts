@@ -21,6 +21,10 @@ jest.mock('@/lib/constants', () => ({
   APP_URL: 'https://app.example.test',
 }));
 
+jest.mock('@/lib/bot-users/bot-user-service', () => ({
+  getBotUserId: jest.fn(),
+}));
+
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(),
 }));
@@ -28,6 +32,12 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
 jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
   getGitHubTokenForOrganization: jest.fn(),
   getGitHubTokenForUser: jest.fn(),
+}));
+
+const mockGenerateGitHubInstallationToken =
+  jest.fn<(...args: unknown[]) => Promise<{ token: string }>>();
+jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
+  generateGitHubInstallationToken: mockGenerateGitHubInstallationToken,
 }));
 
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
@@ -47,6 +57,14 @@ const userIntegration = {
   owned_by_user_id: 'owner-1',
 } as PlatformIntegration;
 const organizationIntegration = {
+  owned_by_organization_id: 'organization-1',
+  owned_by_user_id: null,
+} as PlatformIntegration;
+const secondaryGitHubIntegration = {
+  id: '10000000-0000-4000-8000-000000000002',
+  platform: 'github',
+  platform_installation_id: 'secondary-installation',
+  github_app_type: 'standard',
   owned_by_organization_id: 'organization-1',
   owned_by_user_id: null,
 } as PlatformIntegration;
@@ -101,6 +119,7 @@ describe('spawnCloudAgentSession delegation', () => {
       kiloSessionId: 'kilo-session-1',
     });
     mockInitiateFromPreparedSession.mockResolvedValue({});
+    mockGenerateGitHubInstallationToken.mockResolvedValue({ token: 'secondary-github-token' });
     mockGetGitHubTokenForOrganization.mockResolvedValue('organization-github-token');
     mockGetGitHubTokenForUser.mockResolvedValue('github-token');
     mockGetGitLabTokenForUser.mockResolvedValue('gitlab-token');
@@ -177,6 +196,29 @@ describe('spawnCloudAgentSession delegation', () => {
     for (const field of profileDerivedInlineFields) {
       expect(prepareInput).not.toHaveProperty(field);
     }
+  });
+
+  it('uses the triggering secondary GitHub integration for the session input', async () => {
+    await spawnCloudAgentSession(
+      { githubRepo: 'owner/secondary-repo', prompt: 'Fix the issue', mode: 'code' },
+      'model',
+      secondaryGitHubIntegration,
+      'auth-token',
+      'request-secondary'
+    );
+
+    expect(mockGenerateGitHubInstallationToken).toHaveBeenCalledWith(
+      'secondary-installation',
+      'standard'
+    );
+    expect(mockGetGitHubTokenForOrganization).not.toHaveBeenCalled();
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        githubRepo: 'owner/secondary-repo',
+        githubIntegrationId: secondaryGitHubIntegration.id,
+        githubToken: 'secondary-github-token',
+      })
+    );
   });
 
   it.each(['slack', 'github', 'linear'])(

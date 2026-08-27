@@ -17,6 +17,7 @@ import { slackAdapter } from '@/lib/bot/slack-adapter';
 import { botPlatforms } from '@/lib/bot/platforms';
 import { createLinearWebhookHandler } from '@/lib/bot/platforms/linear-webhook';
 import { createSlackWebhookHandler } from '@/lib/bot/platforms/slack-webhook';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 
 function createKiloBot(
   slackAdapter: SlackAdapter,
@@ -44,7 +45,10 @@ function createKiloBot(
     const botPlatform = botPlatforms.requireByAdapter(thread.adapter);
     const identity = await botPlatform.getIdentity({ thread, message });
     const [platformIntegration, kiloUserId] = await Promise.all([
-      getPlatformIntegration(identity),
+      getPlatformIntegration(
+        identity,
+        identity.platform === PLATFORM.GITHUB ? 'standard' : undefined
+      ),
       resolveKiloUserId(chatBot.getState(), identity),
     ]);
 

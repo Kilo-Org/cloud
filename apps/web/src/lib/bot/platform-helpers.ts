@@ -3,12 +3,22 @@ import { db } from '@/lib/drizzle';
 import { eq, and, sql } from 'drizzle-orm';
 import { platform_integrations, type PlatformIntegration } from '@kilocode/db';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
+import { findIntegrationByInstallationId } from '@/lib/integrations/db/platform-integrations';
+import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 
 /**
- * Look up the platform integration row for a given identity.
- * Platform-agnostic: queries by identity.platform + identity.teamId.
+ * Look up the platform integration row for a given identity. GitHub callers
+ * that know their app type must supply it because installation IDs can collide
+ * between the standard and lite apps.
  */
-export async function getPlatformIntegration(identity: PlatformIdentity) {
+export async function getPlatformIntegration(
+  identity: PlatformIdentity,
+  githubAppType?: GitHubAppType
+) {
+  if (identity.platform === 'github' && githubAppType) {
+    return await findIntegrationByInstallationId(identity.platform, identity.teamId, githubAppType);
+  }
+
   const [integration] = await db
     .select()
     .from(platform_integrations)

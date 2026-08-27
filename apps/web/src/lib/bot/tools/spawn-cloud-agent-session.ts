@@ -8,6 +8,7 @@ import {
   getGitHubTokenForOrganization,
   getGitHubTokenForUser,
 } from '@/lib/cloud-agent/github-integration-helpers';
+import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import {
   getGitLabTokenForOrganization,
   getGitLabTokenForUser,
@@ -26,6 +27,7 @@ import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
 import z from 'zod';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 
 /**
  * Derive a per-request callback token so the dedicated callback HMAC secret
@@ -184,8 +186,17 @@ export default async function spawnCloudAgentSession(
     };
   } else {
     // GitHub path: get token, use githubRepo/githubToken
-    const githubToken =
-      owner.type === 'org'
+    const isGitHubBotSession = platformIntegration.platform === PLATFORM.GITHUB;
+    const githubToken = isGitHubBotSession
+      ? platformIntegration.platform_installation_id
+        ? (
+            await generateGitHubInstallationToken(
+              platformIntegration.platform_installation_id,
+              platformIntegration.github_app_type ?? 'standard'
+            )
+          ).token
+        : undefined
+      : owner.type === 'org'
         ? await getGitHubTokenForOrganization(owner.id)
         : await getGitHubTokenForUser(owner.id);
 
@@ -198,6 +209,7 @@ export default async function spawnCloudAgentSession(
 
     prepareInput = {
       githubRepo: args.githubRepo,
+      githubIntegrationId: isGitHubBotSession ? platformIntegration.id : undefined,
       prompt,
       mode,
       model,

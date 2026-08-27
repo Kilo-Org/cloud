@@ -1,5 +1,6 @@
 const mockLimit = jest.fn();
 const mockIsOrganizationMember = jest.fn();
+const mockFindIntegrationByInstallationId = jest.fn();
 
 jest.mock('@/lib/drizzle', () => ({
   db: {
@@ -16,6 +17,10 @@ jest.mock('@/lib/organizations/organizations', () => ({
   isOrganizationMember: (organizationId: string, kiloUserId: string) =>
     mockIsOrganizationMember(organizationId, kiloUserId),
 }));
+jest.mock('@/lib/integrations/db/platform-integrations', () => ({
+  findIntegrationByInstallationId: (...args: unknown[]) =>
+    mockFindIntegrationByInstallationId(...args),
+}));
 
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -30,6 +35,7 @@ describe('platform helpers', () => {
   beforeEach(() => {
     mockLimit.mockReset();
     mockIsOrganizationMember.mockReset();
+    mockFindIntegrationByInstallationId.mockReset();
   });
 
   it('returns the platform integration for a given identity', async () => {
@@ -59,6 +65,28 @@ describe('platform helpers', () => {
     });
 
     expect(result).toBeNull();
+  });
+
+  it('selects the GitHub integration by installation ID and app type', async () => {
+    const standardIntegration = { id: 'pi_standard', github_app_type: 'standard' };
+    const liteIntegration = { id: 'pi_lite', github_app_type: 'lite' };
+    mockFindIntegrationByInstallationId.mockImplementation(
+      (_platform: string, _installationId: string, appType: string) =>
+        appType === 'standard' ? standardIntegration : liteIntegration
+    );
+
+    const result = await getPlatformIntegration(
+      { platform: 'github', teamId: 'shared-installation', userId: '123' },
+      'standard'
+    );
+
+    expect(result).toBe(standardIntegration);
+    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith(
+      'github',
+      'shared-installation',
+      'standard'
+    );
+    expect(mockLimit).not.toHaveBeenCalled();
   });
 
   it('returns the platform integration for a given id', async () => {

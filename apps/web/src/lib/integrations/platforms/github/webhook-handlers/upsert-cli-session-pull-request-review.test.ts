@@ -1,5 +1,9 @@
 import { db } from '@/lib/drizzle';
-import { cli_sessions_v2, github_branch_pull_requests } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  github_branch_pull_requests,
+  platform_integrations,
+} from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { PullRequestReviewPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
@@ -51,6 +55,8 @@ function makeReviewPayload(overrides: {
 describe('upsertCliSessionPullRequestReviewFromWebhook', () => {
   let testUserId: string;
   let testOwner: WebhookInstallationOwner;
+  let integrationId: string;
+  let otherIntegrationId: string;
   const userIdsToCleanup: string[] = [];
   const sessionIdsToCleanup: string[] = [];
   let sessionCounter = 0;
@@ -71,12 +77,17 @@ describe('upsertCliSessionPullRequestReviewFromWebhook', () => {
   async function seedPrCacheRow(
     branch: string,
     userId: string,
-    opts?: { reviewDecision?: string; reviewDecisionPending?: boolean }
+    opts?: {
+      reviewDecision?: string;
+      reviewDecisionPending?: boolean;
+      integrationId?: string;
+    }
   ) {
     await db.insert(github_branch_pull_requests).values({
       git_url: NORMALIZED_GIT_URL,
       git_branch: branch,
       owned_by_user_id: userId,
+      platform_integration_id: opts?.integrationId,
       pr_url: `https://github.com/${REPO}/pull/1`,
       pr_number: 1,
       pr_state: 'open',
@@ -102,7 +113,38 @@ describe('upsertCliSessionPullRequestReviewFromWebhook', () => {
   beforeAll(async () => {
     const user = await insertTestUser();
     testUserId = user.id;
-    testOwner = { kind: 'user', userId: testUserId };
+    const [integration, otherIntegration] = await db
+      .insert(platform_integrations)
+      .values([
+        {
+          owned_by_user_id: testUserId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: `review-${crypto.randomUUID()}`,
+          platform_account_login: 'acme',
+          repository_access: 'all',
+          github_app_type: 'standard',
+          integration_status: 'active',
+        },
+        {
+          owned_by_user_id: testUserId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: `review-${crypto.randomUUID()}`,
+          platform_account_login: 'acme',
+          repository_access: 'all',
+          github_app_type: 'lite',
+          integration_status: 'active',
+        },
+      ])
+      .returning({ id: platform_integrations.id });
+    integrationId = integration.id;
+    otherIntegrationId = otherIntegration.id;
+    testOwner = {
+      kind: 'user',
+      userId: testUserId,
+      platformIntegrationId: integrationId,
+    };
     userIdsToCleanup.push(testUserId);
   });
 
@@ -117,6 +159,9 @@ describe('upsertCliSessionPullRequestReviewFromWebhook', () => {
         .delete(github_branch_pull_requests)
         .where(inArray(github_branch_pull_requests.owned_by_user_id, userIdsToCleanup));
     }
+    await db
+      .delete(platform_integrations)
+      .where(inArray(platform_integrations.id, [integrationId, otherIntegrationId]));
   });
 
   it('returns 0 when no matching session exists', async () => {
@@ -159,7 +204,9 @@ describe('upsertCliSessionPullRequestReviewFromWebhook', () => {
   it('sets review_decision_pending=true when a supported-platform session and cache row both exist', async () => {
     const branch = 'feature/update-review';
     await seedSession(branch, 'cloud-agent-web');
-    await seedPrCacheRow(branch, testUserId);
+    await seedPrCacheRow(branch, testUserId, {
+      integrationId: testOwner.platformIntegrationId,
+    });
 
     const result = await upsertCliSessionPullRequestReviewFromWebhook(
       makeReviewPayload({ prNumber: 1, branch }),
@@ -174,7 +221,10 @@ describe('upsertCliSessionPullRequestReviewFromWebhook', () => {
   it('does not overwrite existing pr_review_decision (lazy fetch handles it)', async () => {
     const branch = 'feature/review-no-overwrite';
     await seedSession(branch, 'cloud-agent-web');
-    await seedPrCacheRow(branch, testUserId, { reviewDecision: 'approved' });
+    await seedPrCacheRow(branch, testUserId, {
+      reviewDecision: 'approved',
+      integrationId: testOwner.platformIntegrationId,
+    });
 
     await upsertCliSessionPullRequestReviewFromWebhook(
       makeReviewPayload({ prNumber: 1, branch }),
@@ -184,6 +234,22 @@ describe('upsertCliSessionPullRequestReviewFromWebhook', () => {
     const rows = await readRow(branch, testUserId);
     expect(rows[0].pr_review_decision).toBe('approved');
     expect(rows[0].review_decision_pending).toBe(true);
+  });
+
+  it('does not flag a cache row pinned to another installation', async () => {
+    const branch = 'feature/review-other-installation';
+    await seedSession(branch, 'cloud-agent-web');
+    await seedPrCacheRow(branch, testUserId, {
+      integrationId: otherIntegrationId,
+    });
+
+    const result = await upsertCliSessionPullRequestReviewFromWebhook(
+      makeReviewPayload({ prNumber: 1, branch }),
+      testOwner
+    );
+
+    expect(result).toBe(0);
+    expect((await readRow(branch, testUserId))[0]?.review_decision_pending).toBe(false);
   });
 
   it('does not match sessions belonging to a different tenant', async () => {
@@ -216,7 +282,9 @@ describe('upsertCliSessionPullRequestReviewFromWebhook', () => {
     async action => {
       const branch = `feature/action-${action}-review`;
       await seedSession(branch, 'cloud-agent-web');
-      await seedPrCacheRow(branch, testUserId);
+      await seedPrCacheRow(branch, testUserId, {
+        integrationId: testOwner.platformIntegrationId,
+      });
 
       const result = await upsertCliSessionPullRequestReviewFromWebhook(
         makeReviewPayload({ prNumber: 1, branch, action }),
@@ -232,7 +300,9 @@ describe('upsertCliSessionPullRequestReviewFromWebhook', () => {
   it('slack platform is supported', async () => {
     const branch = 'feature/slack-platform';
     await seedSession(branch, 'slack');
-    await seedPrCacheRow(branch, testUserId);
+    await seedPrCacheRow(branch, testUserId, {
+      integrationId: testOwner.platformIntegrationId,
+    });
 
     const result = await upsertCliSessionPullRequestReviewFromWebhook(
       makeReviewPayload({ prNumber: 1, branch }),

@@ -4,9 +4,11 @@ import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
 import { github_branch_pull_requests } from '@kilocode/db/schema';
 import { fetchBatchedReviewDecisions } from '@/lib/integrations/platforms/github/adapter';
-import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
-import { PLATFORM } from '@/lib/integrations/core/constants';
-import { logExceptInTest } from '@/lib/utils.server';
+import {
+  getPinnedCliSessionGitHubIntegration,
+  resolveLegacyCliSessionGitHubIntegration,
+  type CliSessionGitHubIntegration,
+} from './cli-session-integration';
 
 export type TenantOwner = {
   userId: string;
@@ -29,6 +31,7 @@ type ClaimedRow = {
   pr_number: number | null;
   owned_by_organization_id: string | null;
   owned_by_user_id: string | null;
+  platform_integration_id: string | null;
   review_decision_fetching_at: string | null;
 };
 
@@ -63,6 +66,7 @@ async function claimPendingReviewRows(owner: TenantOwner): Promise<ClaimedRow[]>
       pr_number: github_branch_pull_requests.pr_number,
       owned_by_organization_id: github_branch_pull_requests.owned_by_organization_id,
       owned_by_user_id: github_branch_pull_requests.owned_by_user_id,
+      platform_integration_id: github_branch_pull_requests.platform_integration_id,
       review_decision_fetching_at: github_branch_pull_requests.review_decision_fetching_at,
     });
 }
@@ -72,6 +76,7 @@ type FlushedRow = {
   git_branch: string;
   owned_by_organization_id: string | null;
   owned_by_user_id: string | null;
+  platform_integration_id: string | null;
   fetching_at: string;
   decision: string | null;
 };
@@ -121,6 +126,9 @@ async function flushBatchResults(results: FlushedRow[]): Promise<void> {
             eq(github_branch_pull_requests.git_url, row.git_url),
             eq(github_branch_pull_requests.git_branch, row.git_branch),
             tenantPredicate,
+            row.platform_integration_id
+              ? eq(github_branch_pull_requests.platform_integration_id, row.platform_integration_id)
+              : isNull(github_branch_pull_requests.platform_integration_id),
             // TOCTOU guard: only clear the flag if we still hold the claim.
             // A concurrent webhook that re-set review_decision_pending=true will
             // have bumped review_decision_fetching_at via a new claim, so this
@@ -137,6 +145,7 @@ type AbandonedRow = {
   git_branch: string;
   owned_by_organization_id: string | null;
   owned_by_user_id: string | null;
+  platform_integration_id: string | null;
   fetching_at: string;
 };
 
@@ -170,6 +179,9 @@ async function abandonClaimedRows(rows: AbandonedRow[]): Promise<void> {
             eq(github_branch_pull_requests.git_url, row.git_url),
             eq(github_branch_pull_requests.git_branch, row.git_branch),
             tenantPredicate,
+            row.platform_integration_id
+              ? eq(github_branch_pull_requests.platform_integration_id, row.platform_integration_id)
+              : isNull(github_branch_pull_requests.platform_integration_id),
             // Same TOCTOU guard as flushBatchResults: a concurrent webhook
             // that re-flagged the row will have a different fetching_at,
             // so we leave it pending for the next batch.
@@ -189,6 +201,7 @@ function abandonRowsFromClaimed(rows: ClaimedRow[]): AbandonedRow[] {
       git_branch: row.git_branch,
       owned_by_organization_id: row.owned_by_organization_id,
       owned_by_user_id: row.owned_by_user_id,
+      platform_integration_id: row.platform_integration_id,
       fetching_at: row.review_decision_fetching_at,
     });
   }
@@ -206,49 +219,21 @@ export async function executeBatchReviewDecisionFetch(owner: TenantOwner): Promi
 
   if (claimed.length === 0) return;
 
-  let integration: {
-    platform_installation_id: string | null;
-    github_app_type: string | null;
-  } | null;
-  try {
-    integration = await getIntegrationForOwner(
-      owner.organizationId !== null
-        ? { type: 'org', id: owner.organizationId }
-        : { type: 'user', id: owner.userId },
-      PLATFORM.GITHUB
-    );
-  } catch (error) {
-    captureException(error, { tags: { source: 'batch_review_decision_get_integration' } });
-    return;
-  }
-
-  if (!integration?.platform_installation_id) {
-    logExceptInTest('batch review decision: no GitHub integration, abandoning claimed rows', {
-      userId: owner.userId,
-      organizationId: owner.organizationId,
-      claimedCount: claimed.length,
-    });
-    try {
-      await abandonClaimedRows(abandonRowsFromClaimed(claimed));
-    } catch (error) {
-      captureException(error, { tags: { source: 'batch_review_decision_abandon_no_integration' } });
-    }
-    return;
-  }
-
-  const installationId = integration.platform_installation_id;
-  const appType = (integration.github_app_type as 'standard' | 'lite' | null) ?? 'standard';
-
   type BatchEntry = {
     alias: string;
     owner: string;
     repo: string;
     number: number;
     row: ClaimedRow;
+    integration: CliSessionGitHubIntegration;
   };
 
   const batchEntries: BatchEntry[] = [];
   const unactionableRows: ClaimedRow[] = [];
+  const integrationOwner =
+    owner.organizationId !== null
+      ? ({ type: 'org', id: owner.organizationId } as const)
+      : ({ type: 'user', id: owner.userId } as const);
   for (let i = 0; i < claimed.length; i++) {
     const row = claimed[i];
     const parsed = row.git_url ? parseGitHubOwnerRepo(row.git_url) : null;
@@ -258,12 +243,34 @@ export async function executeBatchReviewDecisionFetch(owner: TenantOwner): Promi
       unactionableRows.push(row);
       continue;
     }
+    let integration: CliSessionGitHubIntegration | null;
+    try {
+      integration = row.platform_integration_id
+        ? await getPinnedCliSessionGitHubIntegration({
+            owner: integrationOwner,
+            repositoryFullName: `${parsed.owner}/${parsed.repo}`,
+            integrationId: row.platform_integration_id,
+          })
+        : await resolveLegacyCliSessionGitHubIntegration({
+            owner: integrationOwner,
+            repositoryFullName: `${parsed.owner}/${parsed.repo}`,
+          });
+    } catch (error) {
+      captureException(error, { tags: { source: 'batch_review_decision_get_integration' } });
+      unactionableRows.push(row);
+      continue;
+    }
+    if (!integration) {
+      unactionableRows.push(row);
+      continue;
+    }
     batchEntries.push({
       alias: `pr${i}`,
       owner: parsed.owner,
       repo: parsed.repo,
       number: row.pr_number,
       row,
+      integration,
     });
   }
 
@@ -277,36 +284,44 @@ export async function executeBatchReviewDecisionFetch(owner: TenantOwner): Promi
 
   if (batchEntries.length === 0) return;
 
-  let decisions: Map<string, string | null>;
-  try {
-    decisions = await fetchBatchedReviewDecisions({
-      installationId,
-      prs: batchEntries.map(({ alias, owner, repo, number }) => ({
-        alias,
-        owner,
-        repo,
-        number,
-      })),
-      appType,
-    });
-  } catch (error) {
-    captureException(error, { tags: { source: 'batch_review_decision_graphql' } });
-    return;
-  }
-
   const toFlush: FlushedRow[] = [];
-  for (const { alias, row } of batchEntries) {
-    // claimPendingReviewRows always sets review_decision_fetching_at to now();
-    // skip the row if a concurrent writer somehow cleared it.
-    if (!row.review_decision_fetching_at) continue;
-    toFlush.push({
-      git_url: row.git_url,
-      git_branch: row.git_branch,
-      owned_by_organization_id: row.owned_by_organization_id,
-      owned_by_user_id: row.owned_by_user_id,
-      fetching_at: row.review_decision_fetching_at,
-      decision: decisions.get(alias) ?? null,
-    });
+  const batches = new Map<string, BatchEntry[]>();
+  for (const entry of batchEntries) {
+    const key = JSON.stringify([
+      entry.integration.id,
+      entry.integration.platform_installation_id,
+      entry.integration.github_app_type ?? 'standard',
+    ]);
+    const batch = batches.get(key);
+    if (batch) batch.push(entry);
+    else batches.set(key, [entry]);
+  }
+  for (const entries of batches.values()) {
+    const integration = entries[0]?.integration;
+    if (!integration) continue;
+    let decisions: Map<string, string | null>;
+    try {
+      decisions = await fetchBatchedReviewDecisions({
+        installationId: integration.platform_installation_id,
+        prs: entries.map(({ alias, owner, repo, number }) => ({ alias, owner, repo, number })),
+        appType: integration.github_app_type ?? 'standard',
+      });
+    } catch (error) {
+      captureException(error, { tags: { source: 'batch_review_decision_graphql' } });
+      continue;
+    }
+    for (const { alias, row } of entries) {
+      if (!row.review_decision_fetching_at) continue;
+      toFlush.push({
+        git_url: row.git_url,
+        git_branch: row.git_branch,
+        owned_by_organization_id: row.owned_by_organization_id,
+        owned_by_user_id: row.owned_by_user_id,
+        platform_integration_id: row.platform_integration_id,
+        fetching_at: row.review_decision_fetching_at,
+        decision: decisions.get(alias) ?? null,
+      });
+    }
   }
 
   try {

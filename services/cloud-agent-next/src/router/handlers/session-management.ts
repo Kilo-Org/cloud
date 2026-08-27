@@ -38,6 +38,7 @@ import { SANDBOX_USAGE_SKUS } from '../../container-usage-context.js';
 
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
+  githubIntegrationId?: string;
   gitUrl?: string;
   platform?: 'github' | 'gitlab' | 'bitbucket';
 } {
@@ -45,7 +46,11 @@ function publicRepositoryFields(metadata: CloudAgentSessionState): {
   if (!repository) return {};
   switch (repository.type) {
     case 'github':
-      return { githubRepo: repository.repo, platform: repository.platform ?? 'github' };
+      return {
+        githubRepo: repository.repo,
+        githubIntegrationId: repository.githubIntegrationId,
+        platform: repository.platform ?? 'github',
+      };
     case 'gitlab':
       return { gitUrl: repository.url, platform: 'gitlab' };
     case 'bitbucket':
@@ -336,6 +341,7 @@ export function createSessionManagementHandlers() {
             sandboxId,
 
             githubRepo: repositoryFields.githubRepo,
+            githubIntegrationId: repositoryFields.githubIntegrationId,
             gitUrl: repositoryFields.gitUrl,
             platform: repositoryFields.platform,
             // githubToken: OMITTED

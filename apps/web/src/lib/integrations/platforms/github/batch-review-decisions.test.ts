@@ -1,5 +1,9 @@
 import { db } from '@/lib/drizzle';
-import { cli_sessions_v2, github_branch_pull_requests } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  github_branch_pull_requests,
+  platform_integrations,
+} from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -12,20 +16,11 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   fetchBatchedReviewDecisions: jest.fn(),
 }));
 
-jest.mock('@/lib/integrations/db/platform-integrations', () => ({
-  getIntegrationForOwner: jest.fn(),
-}));
-
 import { fetchBatchedReviewDecisions } from '@/lib/integrations/platforms/github/adapter';
-import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 
 const mockFetchBatch = fetchBatchedReviewDecisions as jest.MockedFunction<
   typeof fetchBatchedReviewDecisions
 >;
-const mockGetIntegration = getIntegrationForOwner as jest.MockedFunction<
-  typeof getIntegrationForOwner
->;
-
 const REPO = 'acme/batch-test';
 const GIT_URL = `https://github.com/${REPO}`;
 
@@ -34,6 +29,8 @@ describe('batch-review-decisions', () => {
   let testOwner: TenantOwner;
   const userIdsToCleanup: string[] = [];
   const sessionIdsToCleanup: string[] = [];
+  const integrationIdsToCleanup: string[] = [];
+  let integrationId: string;
   let counter = 0;
 
   async function seedSession(branch: string) {
@@ -52,12 +49,14 @@ describe('batch-review-decisions', () => {
   async function seedPrRow(
     branch: string,
     prNumber: number,
-    opts: { pending?: boolean; fetchingAt?: string } = {}
+    opts: { pending?: boolean; fetchingAt?: string; integrationId?: string | null } = {}
   ) {
     await db.insert(github_branch_pull_requests).values({
       git_url: GIT_URL,
       git_branch: branch,
       owned_by_user_id: testUserId,
+      platform_integration_id:
+        opts.integrationId === undefined ? integrationId : opts.integrationId,
       pr_number: prNumber,
       pr_state: 'open',
       review_decision_pending: opts.pending ?? true,
@@ -79,11 +78,25 @@ describe('batch-review-decisions', () => {
     return rows[0] ?? null;
   }
 
-  function fakeIntegration(installationId = '42') {
-    return {
-      platform_installation_id: installationId,
-      github_app_type: 'standard',
-    } as ReturnType<typeof getIntegrationForOwner> extends Promise<infer T> ? T : never;
+  async function seedIntegration(input: {
+    installationId: string;
+    appType: 'standard' | 'lite';
+  }): Promise<string> {
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: testUserId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: input.installationId,
+        platform_account_login: 'acme',
+        repository_access: 'all',
+        github_app_type: input.appType,
+        integration_status: 'active',
+      })
+      .returning({ id: platform_integrations.id });
+    integrationIdsToCleanup.push(integration.id);
+    return integration.id;
   }
 
   beforeAll(async () => {
@@ -94,20 +107,36 @@ describe('batch-review-decisions', () => {
   });
 
   afterAll(async () => {
-    if (sessionIdsToCleanup.length > 0) {
-      await db
-        .delete(cli_sessions_v2)
-        .where(inArray(cli_sessions_v2.session_id, sessionIdsToCleanup));
-    }
-    if (userIdsToCleanup.length > 0) {
-      await db
-        .delete(github_branch_pull_requests)
-        .where(inArray(github_branch_pull_requests.owned_by_user_id, userIdsToCleanup));
-    }
+    await db
+      .delete(github_branch_pull_requests)
+      .where(inArray(github_branch_pull_requests.owned_by_user_id, userIdsToCleanup));
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  beforeEach(async () => {
+    integrationId = await seedIntegration({
+      installationId: `42-${counter++}`,
+      appType: 'standard',
+    });
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(github_branch_pull_requests)
+      .where(eq(github_branch_pull_requests.owned_by_user_id, testUserId));
+    if (sessionIdsToCleanup.length > 0) {
+      await db
+        .delete(cli_sessions_v2)
+        .where(inArray(cli_sessions_v2.session_id, sessionIdsToCleanup.splice(0)));
+    }
+    if (integrationIdsToCleanup.length > 0) {
+      await db
+        .delete(platform_integrations)
+        .where(inArray(platform_integrations.id, integrationIdsToCleanup.splice(0)));
+    }
   });
 
   describe('executeBatchReviewDecisionFetch', () => {
@@ -126,8 +155,7 @@ describe('batch-review-decisions', () => {
       await seedSession(branch);
       await seedPrRow(branch, 2, { pending: true });
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mockGetIntegration.mockResolvedValue(null as any);
+      await db.delete(platform_integrations).where(eq(platform_integrations.id, integrationId));
 
       await executeBatchReviewDecisionFetch(testOwner);
 
@@ -145,7 +173,6 @@ describe('batch-review-decisions', () => {
       await seedSession(branch);
       await seedPrRow(branch, 10, { pending: true });
 
-      mockGetIntegration.mockResolvedValue(fakeIntegration());
       mockFetchBatch.mockResolvedValue(new Map([['pr0', 'approved']]));
 
       await executeBatchReviewDecisionFetch(testOwner);
@@ -161,7 +188,6 @@ describe('batch-review-decisions', () => {
       await seedSession(branch);
       await seedPrRow(branch, 11, { pending: true });
 
-      mockGetIntegration.mockResolvedValue(fakeIntegration());
       mockFetchBatch.mockResolvedValue(new Map([['pr0', null]]));
 
       await executeBatchReviewDecisionFetch(testOwner);
@@ -186,8 +212,6 @@ describe('batch-review-decisions', () => {
         review_decision_pending: true,
       });
 
-      mockGetIntegration.mockResolvedValue(fakeIntegration());
-
       await executeBatchReviewDecisionFetch(testOwner);
 
       // fetchBatch not called because no row with a pr_number was batch-able.
@@ -202,7 +226,6 @@ describe('batch-review-decisions', () => {
       await seedSession(branch);
       await seedPrRow(branch, 20, { pending: true });
 
-      mockGetIntegration.mockResolvedValue(fakeIntegration());
       mockFetchBatch.mockResolvedValue(new Map([['pr0', 'approved']]));
 
       // First call claims the row
@@ -223,7 +246,6 @@ describe('batch-review-decisions', () => {
       const olderFetchingAt = new Date(Date.now() - 60_000).toISOString();
       await seedPrRow(branch, 30, { pending: true, fetchingAt: olderFetchingAt });
 
-      mockGetIntegration.mockResolvedValue(fakeIntegration());
       // fetchBatch won't be called because the claim UPDATE won't match:
       // fetching_at is recent (< 2 minutes ago) so it's not stale, so claim skips it
       await executeBatchReviewDecisionFetch(testOwner);
@@ -234,14 +256,51 @@ describe('batch-review-decisions', () => {
       // pending still true, fetching_at unchanged
       expect(row?.review_decision_pending).toBe(true);
     });
+
+    it('groups two installations by exact integration and app type', async () => {
+      const standardBranch = 'batch/two-installations-standard';
+      const liteBranch = 'batch/two-installations-lite';
+      const liteIntegrationId = await seedIntegration({
+        installationId: '84',
+        appType: 'lite',
+      });
+      await seedSession(standardBranch);
+      await seedSession(liteBranch);
+      await seedPrRow(standardBranch, 41, { integrationId });
+      await seedPrRow(liteBranch, 42, { integrationId: liteIntegrationId });
+      mockFetchBatch.mockImplementation(
+        async ({ prs, appType }) =>
+          new Map(prs.map(pr => [pr.alias, appType === 'lite' ? 'changes_requested' : 'approved']))
+      );
+
+      await executeBatchReviewDecisionFetch(testOwner);
+
+      expect(mockFetchBatch).toHaveBeenCalledTimes(2);
+      expect(mockFetchBatch).toHaveBeenCalledWith(expect.objectContaining({ appType: 'standard' }));
+      expect(mockFetchBatch).toHaveBeenCalledWith(
+        expect.objectContaining({ installationId: '84', appType: 'lite' })
+      );
+      expect((await readRow(standardBranch))?.pr_review_decision).toBe('approved');
+      expect((await readRow(liteBranch))?.pr_review_decision).toBe('changes_requested');
+    });
+
+    it('fails closed for an old unpinned row when installations overlap', async () => {
+      const branch = 'batch/legacy-overlap';
+      await seedIntegration({ installationId: 'overlap-lite', appType: 'lite' });
+      await seedSession(branch);
+      await seedPrRow(branch, 43, { integrationId: null });
+
+      await executeBatchReviewDecisionFetch(testOwner);
+
+      expect(mockFetchBatch).not.toHaveBeenCalled();
+      expect((await readRow(branch))?.review_decision_pending).toBe(false);
+    });
   });
 
   describe('triggerBatchReviewDecisionFetchIfNeeded', () => {
     it('does not call executeBatch when hasPendingRows=false', () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mockGetIntegration.mockResolvedValue(null as any);
       triggerBatchReviewDecisionFetchIfNeeded(false, testOwner);
-      expect(mockGetIntegration).not.toHaveBeenCalled();
+      expect(mockFetchBatch).not.toHaveBeenCalled();
     });
 
     // Flaky in CI due to setTimeout(0)-based wait for fire-and-forget async work.
@@ -256,7 +315,6 @@ describe('batch-review-decisions', () => {
       await seedSession(branch);
       await seedPrRow(branch, 40, { pending: true });
 
-      mockGetIntegration.mockResolvedValue(fakeIntegration());
       mockFetchBatch.mockResolvedValue(new Map([['pr0', 'review_required']]));
 
       triggerBatchReviewDecisionFetchIfNeeded(true, testOwner);
@@ -264,7 +322,7 @@ describe('batch-review-decisions', () => {
       // Give it a tick for any resolved promises
       await new Promise(r => setTimeout(r, 0));
 
-      expect(mockGetIntegration).toHaveBeenCalled();
+      expect(mockFetchBatch).toHaveBeenCalled();
     });
   });
 });

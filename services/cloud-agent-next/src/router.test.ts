@@ -1063,6 +1063,24 @@ describe('router sessionId validation', () => {
           expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
         });
 
+        it('returns the GitHub integration pinned to a current session', async () => {
+          const sessionId: SessionId = 'agent_12345678-1234-1234-1234-123456789abd';
+          const githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+          mockGetMetadata.mockResolvedValue(
+            parseSessionMetadata({
+              metadataSchemaVersion: 2,
+              identity: { sessionId, userId: 'test-user-123' },
+              auth: {},
+              repository: { type: 'github', repo: 'acme/repo', githubIntegrationId },
+              lifecycle: { version: 1, timestamp: 1 },
+            })
+          );
+
+          const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+          expect(result.githubIntegrationId).toBe(githubIntegrationId);
+        });
+
         it('returns only the logical sandbox identity for Vercel-pinned sessions', async () => {
           const sessionId: SessionId = 'agent_10101010-1010-1010-1010-101010101011';
           mockGetMetadata.mockResolvedValue(

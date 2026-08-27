@@ -48,12 +48,14 @@ import {
   fetchPullRequestReviewDecision,
   GitHubRateLimitError,
 } from '@/lib/integrations/platforms/github/adapter';
-import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
-import { PLATFORM } from '@/lib/integrations/core/constants';
 import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
 import { triggerBatchReviewDecisionFetchIfNeeded } from '@/lib/integrations/platforms/github/batch-review-decisions';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { after } from 'next/server';
+import {
+  getPinnedCliSessionGitHubIntegration,
+  resolveLegacyCliSessionGitHubIntegration,
+} from '@/lib/integrations/platforms/github/cli-session-integration';
 
 /**
  * Check if an error indicates the session was not found in the cloud-agent DO.
@@ -1290,6 +1292,7 @@ export const cliSessionsV2Router = createTRPCRouter({
           pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
           pr_review_decision: github_branch_pull_requests.pr_review_decision,
           review_decision_pending: github_branch_pull_requests.review_decision_pending,
+          platform_integration_id: github_branch_pull_requests.platform_integration_id,
         })
         .from(cli_sessions_v2)
         .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
@@ -1347,10 +1350,55 @@ export const cliSessionsV2Router = createTRPCRouter({
         return { associatedPr: formatAssociatedPr(sessionPr, cacheRow) };
       }
 
-      // Throttle: skip the fetch only when the cache row already matches the
-      // session's stored link and was synced recently. A mismatched cache row
-      // must not short-circuit.
+      const integrationOwner = session.organization_id
+        ? ({ type: 'org', id: session.organization_id } as const)
+        : ({ type: 'user', id: ctx.user.id } as const);
+      const repositoryFullName = `${parsed.owner}/${parsed.repo}`;
+      let pinnedIntegrationId: string | undefined;
+      if (session.cloud_agent_session_id) {
+        try {
+          const authToken = generateApiToken(ctx.user);
+          const cloudSession = await createCloudAgentNextClient(authToken).getSession(
+            session.cloud_agent_session_id
+          );
+          pinnedIntegrationId = cloudSession.githubIntegrationId;
+        } catch (error) {
+          captureException(error, {
+            tags: {
+              source: 'cli-sessions-v2-router',
+              endpoint: 'refreshAssociatedPullRequest',
+              operation: 'resolveCloudAgentIntegration',
+            },
+            extra: { sessionId },
+          });
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Could not resolve the GitHub installation pinned to this Cloud Agent session',
+          });
+        }
+      }
+
+      const integration = pinnedIntegrationId
+        ? await getPinnedCliSessionGitHubIntegration({
+            owner: integrationOwner,
+            repositoryFullName,
+            integrationId: pinnedIntegrationId,
+          })
+        : await resolveLegacyCliSessionGitHubIntegration({
+            owner: integrationOwner,
+            repositoryFullName,
+          });
+
+      if (!integration?.platform_installation_id) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Could not uniquely resolve a GitHub installation for this session',
+        });
+      }
+
+      // Only a cache row from this exact integration may satisfy the throttle.
       if (
+        row.platform_integration_id === integration.id &&
         cacheRow.pr_url !== null &&
         samePullRequest(sessionPrUrl, cacheRow.pr_url) &&
         cacheRow.pr_last_synced_at !== null
@@ -1359,27 +1407,6 @@ export const cliSessionsV2Router = createTRPCRouter({
         if (Number.isFinite(lastSyncedMs) && Date.now() - lastSyncedMs < REFRESH_THROTTLE_MS) {
           return { associatedPr: formatAssociatedPr(sessionPr, cacheRow) };
         }
-      }
-
-      // Resolve the GitHub installation for this session's owner.
-      let integration;
-      if (session.organization_id) {
-        integration = await getIntegrationForOwner(
-          { type: 'org', id: session.organization_id },
-          PLATFORM.GITHUB
-        );
-      } else {
-        integration = await getIntegrationForOwner(
-          { type: 'user', id: ctx.user.id },
-          PLATFORM.GITHUB
-        );
-      }
-
-      if (!integration?.platform_installation_id) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'No GitHub integration configured for this session',
-        });
       }
 
       const installationId = Number(integration.platform_installation_id);
@@ -1517,6 +1544,7 @@ export const cliSessionsV2Router = createTRPCRouter({
             git_url: normalizedGitUrl,
             git_branch: branch,
             ...ownerValues,
+            platform_integration_id: integration.id,
             ...prColumns,
             review_decision_pending: hasPrToRefresh && !reviewDecisionFetched,
             review_decision_fetching_at: null,
@@ -1527,6 +1555,7 @@ export const cliSessionsV2Router = createTRPCRouter({
             targetWhere: conflictTargetWhere,
             set: {
               pr_url: sql`excluded.pr_url`,
+              platform_integration_id: sql`excluded.platform_integration_id`,
               pr_number: sql`excluded.pr_number`,
               pr_state: sql`excluded.pr_state`,
               pr_title: sql`excluded.pr_title`,

@@ -131,6 +131,7 @@ export function resolveContinueStartDisabled(input: {
   isSpawningRemote: boolean;
   model: string;
   selectedRepo: string;
+  selectedRepositoryResolved: boolean;
   isRemoteTargetSelected: boolean;
   instanceCatalogLoading: boolean;
   instanceHasSessionClone: boolean;
@@ -148,5 +149,15 @@ export function resolveContinueStartDisabled(input: {
       input.cloneImportFailureKey !== null
     );
   }
-  return input.isCreating || input.isSubmitting || input.model === '' || input.selectedRepo === '';
+  // A selected picker key that no longer resolves to a row must not submit:
+  // the clone prepare body would carry no repository field and the server
+  // would reject it. Mirrors `resolveNewSessionStartDisabled`'s stale gate.
+  const staleSelection = input.selectedRepo !== '' && !input.selectedRepositoryResolved;
+  return (
+    input.isCreating ||
+    input.isSubmitting ||
+    input.model === '' ||
+    input.selectedRepo === '' ||
+    staleSelection
+  );
 }

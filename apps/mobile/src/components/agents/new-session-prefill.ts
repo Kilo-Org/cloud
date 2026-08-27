@@ -228,7 +228,7 @@ export function resolvePrefillRepo(
  * `buildContinuePrefillParams` + `isGitHubUrl`), so only a GitHub row may
  * satisfy it: a same-named GitLab/Bitbucket row must never be selected.
  * Kept separate from `resolvePrefillRepo`, which returns the bare matched
- * `fullName` and is still used by `continuation-seed.ts`.
+ * `fullName` and is used where a bare fullName is needed.
  */
 export function resolvePrefillRepoSelection(
   repositories: { platform: string; fullName: string }[],

@@ -33,6 +33,7 @@ function continueInput(
     isSpawningRemote: false,
     model: 'claude-opus-4-7',
     selectedRepo: 'org/repo',
+    selectedRepositoryResolved: true,
     isRemoteTargetSelected: false,
     instanceCatalogLoading: false,
     instanceHasSessionClone: true,
@@ -192,6 +193,22 @@ describe('resolveContinueStartDisabled', () => {
 
   it('clone Cloud with no repository is disabled', () => {
     expect(resolveContinueStartDisabled(continueInput({ selectedRepo: '' }))).toBe(true);
+  });
+
+  it('clone Cloud with a stale picker key (selected but unresolvable) is disabled', () => {
+    expect(
+      resolveContinueStartDisabled(
+        continueInput({ selectedRepo: 'github:owner/repo', selectedRepositoryResolved: false })
+      )
+    ).toBe(true);
+  });
+
+  it('clone Cloud with a resolved picker key stays enabled', () => {
+    expect(
+      resolveContinueStartDisabled(
+        continueInput({ selectedRepo: 'github:owner/repo', selectedRepositoryResolved: true })
+      )
+    ).toBe(false);
   });
 
   it('clone Cloud is disabled while creating or submitting', () => {

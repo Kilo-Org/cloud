@@ -6,7 +6,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import * as Haptics from 'expo-haptics';
 
-import { normalizeAgentMode } from '@/components/agents/mode-normalize';
+import { type AgentMode, normalizeAgentMode } from '@/components/agents/mode-normalize';
+import {
+  type NewSessionRepository,
+  type RepositoryPlatform,
+} from '@/components/agents/new-session-repository-state';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
 import { i18n } from '@/i18n';
@@ -22,7 +26,7 @@ export function useContinueCloudCreate(
   onCreated?: () => void
 ): (
   sessionId: KiloSessionId,
-  dest: { repo: string; model: string; variant: string },
+  dest: { repository: NewSessionRepository | null; model: string; variant: string },
   mode: string
 ) => Promise<void> {
   const router = useRouter();
@@ -43,12 +47,12 @@ export function useContinueCloudCreate(
   return useCallback(
     async (
       sessionId: KiloSessionId,
-      dest: { repo: string; model: string; variant: string },
+      dest: { repository: NewSessionRepository | null; model: string; variant: string },
       mode: string
     ) => {
       const intentFingerprint = JSON.stringify({
         cloneFromKiloSessionId: sessionId,
-        repo: dest.repo,
+        repo: resolveRepoFingerprint(dest.repository),
         model: dest.model,
         variant: dest.variant || undefined,
         mode,
@@ -68,16 +72,16 @@ export function useContinueCloudCreate(
         getStoredOperationKey(intentFingerprint) ?? cloudOperationKey.getKey(intentFingerprint);
       // The clone-only prepare schema forbids `prompt` and `initialMessageId`;
       // the clone carries no synthetic turn.
-      const baseInput = {
+      const baseInput: ContinuePrepareInput = {
         mode: normalizeAgentMode(mode),
         model: dest.model,
         variant: dest.variant || undefined,
-        githubRepo: dest.repo,
         autoCommit: false,
-        autoInitiate: true as const,
+        autoInitiate: true,
         operationKey,
         cloneFromKiloSessionId: sessionId,
       };
+      setRepositoryField(baseInput, dest.repository);
       try {
         // Persist the safe-retry row BEFORE the mutate so a crash mid-flight
         // reuses the same key on relaunch instead of minting a duplicate.
@@ -154,4 +158,76 @@ export function useContinueCloudCreate(
       onCreated,
     ]
   );
+}
+
+/** Clone-only prepare body. Mirrors the ordinary create path's repository fields. */
+type ContinuePrepareInput = {
+  mode: AgentMode;
+  model: string;
+  variant: string | undefined;
+  githubRepo?: string;
+  gitlabProject?: string;
+  bitbucketRepo?: { fullName: string; workspaceUuid: string; repositoryUuid: string };
+  autoCommit: boolean;
+  autoInitiate: true;
+  operationKey: string;
+  cloneFromKiloSessionId: KiloSessionId;
+};
+
+/**
+ * The retry fingerprint's repository identity. Mirrors the ordinary create
+ * path: includes the platform so two same-named repos on different providers
+ * mint distinct retry keys, and the Bitbucket workspace/repository uuids so a
+ * workspace rename cannot collide.
+ */
+function resolveRepoFingerprint(repository: NewSessionRepository | null): {
+  platform: RepositoryPlatform;
+  fullName: string;
+  workspaceUuid?: string | null;
+  repositoryUuid?: string | null;
+} | null {
+  if (!repository) {
+    return null;
+  }
+  if (repository.platform === 'bitbucket') {
+    return {
+      platform: repository.platform,
+      fullName: repository.fullName,
+      workspaceUuid: repository.workspaceUuid ?? null,
+      repositoryUuid: repository.repositoryUuid ?? null,
+    };
+  }
+  return { platform: repository.platform, fullName: repository.fullName };
+}
+
+/**
+ * Write exactly one repository field into the clone prepare body, matching
+ * the selected row's platform. Mirrors the ordinary create path's
+ * `setRepositoryField`: a picker key (`platform:fullName`) must never reach
+ * `githubRepo`. Bitbucket requires workspace + repository uuids, so it
+ * contributes nothing when those are missing (which cannot happen for a row
+ * that came from `listBitbucketRepositories`).
+ */
+function setRepositoryField(
+  input: ContinuePrepareInput,
+  repository: NewSessionRepository | null
+): void {
+  if (!repository) {
+    return;
+  }
+  if (repository.platform === 'github') {
+    input.githubRepo = repository.fullName;
+    return;
+  }
+  if (repository.platform === 'gitlab') {
+    input.gitlabProject = repository.fullName;
+    return;
+  }
+  if (repository.workspaceUuid && repository.repositoryUuid) {
+    input.bitbucketRepo = {
+      fullName: repository.fullName,
+      workspaceUuid: repository.workspaceUuid,
+      repositoryUuid: repository.repositoryUuid,
+    };
+  }
 }

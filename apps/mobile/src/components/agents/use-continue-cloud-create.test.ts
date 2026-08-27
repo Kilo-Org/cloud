@@ -5,6 +5,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
+import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
 import { useContinueCloudCreate } from './use-continue-cloud-create';
 
 const prepareSessionMutate = vi.hoisted(() => vi.fn());
@@ -116,7 +117,20 @@ function mountContinue(organizationId?: string, onCreated?: () => void): RunCont
 }
 
 const SOURCE_SESSION = 'ses_source' as KiloSessionId;
-const DEST = { repo: 'owner/repo', model: 'claude-x', variant: 'high' };
+// The resolved repository row, never the `platform:fullName` picker key. The
+// happy-path assertion pins `githubRepo` to the bare fullName, so a regression
+// that reintroduces a picker key (`github:owner/repo`) fails.
+const GITHUB_REPO: NewSessionRepository = {
+  platform: 'github',
+  fullName: 'owner/repo',
+  isPrivate: false,
+};
+const GITLAB_REPO: NewSessionRepository = {
+  platform: 'gitlab',
+  fullName: 'group/project',
+  isPrivate: false,
+};
+const DEST = { repository: GITHUB_REPO, model: 'claude-x', variant: 'high' };
 const SESSION_RESULT = { kiloSessionId: 'ses_12345678901234567890123456' };
 
 function creationInProgressError(): Error {
@@ -174,6 +188,18 @@ describe('useContinueCloudCreate', () => {
     });
     expect(input).not.toHaveProperty('prompt');
     expect(input).not.toHaveProperty('initialMessageId');
+  });
+
+  it('writes gitlabProject (never githubRepo) for a GitLab repository', async () => {
+    const run = mountContinue('org-1');
+
+    await act(async () => {
+      await run(SOURCE_SESSION, { ...DEST, repository: GITLAB_REPO }, 'code');
+    });
+
+    const input = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input).toMatchObject({ gitlabProject: 'group/project' });
+    expect(input).not.toHaveProperty('githubRepo');
   });
 
   it('rethrows a retryable prepare error without rotating the key or removing the row (route toasts cloneFailedRetry and re-enables)', async () => {

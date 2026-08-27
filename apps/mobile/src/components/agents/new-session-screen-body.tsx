@@ -518,6 +518,7 @@ export function NewSessionScreenBody() {
         isSpawningRemote: remoteSpawn.isSpawningRemote,
         model: isRemoteTargetSelected ? modelView.selectedValue : displayModel,
         selectedRepo,
+        selectedRepositoryResolved: selectedRepository !== null,
         isRemoteTargetSelected,
         instanceCatalogLoading: instanceCatalog.isLoading,
         instanceHasSessionClone,
@@ -566,7 +567,7 @@ export function NewSessionScreenBody() {
         try {
           await runCloudCreate(
             cloneFromKiloSessionId as KiloSessionId,
-            { repo: selectedRepo, model: displayModel, variant: displayVariant },
+            { repository: selectedRepository, model: displayModel, variant: displayVariant },
             mode
           );
         } catch (error) {
@@ -593,7 +594,7 @@ export function NewSessionScreenBody() {
     isCloneEntry,
     runOnInstance,
     cloneFromKiloSessionId,
-    selectedRepo,
+    selectedRepository,
     displayModel,
     displayVariant,
     mode,

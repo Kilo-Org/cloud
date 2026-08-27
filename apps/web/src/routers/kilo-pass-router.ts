@@ -93,7 +93,6 @@ import {
   PURCHASE_PRODUCTS,
   PURCHASE_STATUS_CLASSES,
   PURCHASE_STOREFRONTS,
-  isNativeIapMutationAllowed,
 } from '@kilocode/app-shared/commerce';
 import { verifyAppleKiloPassTransactionJws } from '@/lib/kilo-pass/apple-store-verifier';
 import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
@@ -1286,12 +1285,12 @@ export const kiloPassRouter = createTRPCRouter({
     )
     .output(CompleteStorePurchaseOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      // `isNativeIapMutationAllowed` now also admits Android Play. This mutation stays
+      // App Store, so require the exact App Store combination.
       if (
-        !isNativeIapMutationAllowed({
-          platform: input.platform,
-          storefront: input.storefront,
-          product: input.product,
-        })
+        input.platform !== 'ios' ||
+        input.storefront !== 'app_store' ||
+        input.product !== 'kilo_pass'
       ) {
         throw new TRPCError({
           code: 'FORBIDDEN',

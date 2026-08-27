@@ -1,12 +1,18 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+/* eslint-disable max-lines -- one cohesive notification suite sharing the glanceable sink and native module mock harness. */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   _resetGlanceablePersistForTests,
   _setLastGlanceableSnapshotForTests,
+  _setSecureStoreForTests,
 } from '@/lib/glanceable/persist';
 import { registerGlanceableSink, unregisterGlanceableSink } from '@/lib/glanceable/sink-registry';
-import { applyGlanceablePushData } from './notifications';
+import {
+  _setGlanceableSinksLoaderForTests,
+  applyGlanceablePushData,
+  setupNotificationBackgroundHandler,
+} from './notifications';
 
 const mocks = vi.hoisted(() => {
   const platform = { OS: 'android' as string };
@@ -23,6 +29,8 @@ const mocks = vi.hoisted(() => {
     setPendingDeepLink: vi.fn(),
     safeParse: vi.fn(),
     getItemAsync: vi.fn(),
+    defineTask: vi.fn(),
+    registerTaskAsync: vi.fn(),
   };
 });
 
@@ -39,8 +47,14 @@ vi.mock('expo-notifications', () => ({
   addNotificationResponseReceivedListener: mocks.addNotificationResponseReceivedListener,
   getLastNotificationResponse: vi.fn(),
   clearLastNotificationResponse: mocks.clearLastNotificationResponse,
+  registerTaskAsync: mocks.registerTaskAsync,
+  BackgroundNotificationTaskResult: { NewData: 0, NoData: 1, Failed: 2 },
   AndroidImportance: { HIGH: 4, DEFAULT: 3 },
   PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
+}));
+
+vi.mock('expo-task-manager', () => ({
+  defineTask: mocks.defineTask,
 }));
 
 vi.mock('@sentry/react-native', () => ({
@@ -292,6 +306,22 @@ function makeFakeSink() {
   };
 }
 
+// Map-backed SecureStore surface for the persist module's restore path. The
+// persist module lazy-`require`s `expo-secure-store` (a native module), which
+// cannot load in the pure-vitest suite, so the restore tests inject this store
+// through the test-only setter — the same pattern persist.test.ts uses.
+const secureStore = new Map<string, string>();
+const secureStoreMock = {
+  setItemAsync: vi.fn(async (key: string, value: string) => {
+    secureStore.set(key, value);
+    await Promise.resolve();
+  }),
+  getItemAsync: vi.fn(async (key: string) => {
+    await Promise.resolve();
+    return secureStore.get(key) ?? null;
+  }),
+};
+
 describe('applyGlanceablePushData', () => {
   beforeEach(() => {
     _resetGlanceablePersistForTests();
@@ -346,6 +376,120 @@ describe('applyGlanceablePushData', () => {
     expect(sink.startOrUpdate).toHaveBeenCalledWith(expect.objectContaining({ revision: 4 }), {
       organizationId: 'org-9',
     });
+
+    unregisterGlanceableSink(sink);
+  });
+});
+
+describe('setupNotificationBackgroundHandler', () => {
+  type HeadlessExecutor = (body: {
+    data: unknown;
+    error: unknown;
+    executionInfo: unknown;
+  }) => Promise<unknown>;
+
+  function executorFor(mock: typeof mocks.defineTask): HeadlessExecutor {
+    const firstCall = mock.mock.calls[0];
+    if (!firstCall) {
+      throw new Error('defineTask was not called before executorFor');
+    }
+    return firstCall[1] as HeadlessExecutor;
+  }
+
+  beforeEach(() => {
+    _resetGlanceablePersistForTests();
+    _setSecureStoreForTests(secureStoreMock);
+    secureStore.clear();
+    mocks.getItemAsync.mockResolvedValue(null);
+    mocks.defineTask.mockReset();
+    mocks.registerTaskAsync.mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    _resetGlanceablePersistForTests();
+    secureStore.clear();
+  });
+
+  it('restores the persisted fence then applies a glanceable push via applyGlanceablePushData', async () => {
+    // Leave in-memory state empty and persist the fence in SecureStore instead,
+    // exactly as a killed process finds it. The executor must call
+    // `restorePersistedGlanceable` before applying; without it the scope-key
+    // fence discards the push and the sink never publishes.
+    const persisted = glanceableSnapshot({
+      scopeKey: 'scope-1',
+      revision: 1,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    secureStore.set('glanceable-snapshot', JSON.stringify(persisted));
+    secureStore.set('glanceable-scope-key', 'scope-1');
+    mocks.safeParse.mockImplementation((data: unknown) => ({ success: true, data }));
+    _setGlanceableSinksLoaderForTests(() => undefined);
+
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+
+    setupNotificationBackgroundHandler();
+
+    expect(mocks.defineTask).toHaveBeenCalledTimes(1);
+    expect(mocks.defineTask).toHaveBeenCalledWith(
+      'active-agents-glanceable-background-task',
+      expect.any(Function)
+    );
+    expect(mocks.registerTaskAsync).toHaveBeenCalledWith(
+      'active-agents-glanceable-background-task'
+    );
+
+    const executor = executorFor(mocks.defineTask);
+    const result = await executor({
+      data: {
+        notification: null,
+        data: {
+          dataString: JSON.stringify(
+            activeGlanceablePush({
+              scopeKey: 'scope-1',
+              updatedAt: '2026-01-02T00:00:00.000Z',
+              organizationBound: true,
+            })
+          ),
+        },
+      },
+      error: null,
+      executionInfo: { eventId: 'e1', taskName: 'active-agents-glanceable-background-task' },
+    });
+
+    // A successful apply delivered new sink data, so the executor reports
+    // NewData (0), not NoData (1), which throttles iOS content-available wakes.
+    expect(result).toBe(0);
+    // The rebased revision proves the restored fence and the single apply code
+    // path ran, not a duplicated one.
+    expect(sink.publish).toHaveBeenCalledWith(expect.objectContaining({ revision: 2 }));
+    expect(sink.startOrUpdate).toHaveBeenCalledWith(expect.objectContaining({ revision: 2 }), {
+      organizationId: null,
+    });
+
+    unregisterGlanceableSink(sink);
+  });
+
+  it('ignores a headless payload that is not a glanceable push', async () => {
+    mocks.safeParse.mockImplementation((data: unknown) => ({ success: true, data }));
+    _setGlanceableSinksLoaderForTests(() => undefined);
+
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+
+    setupNotificationBackgroundHandler();
+
+    const executor = executorFor(mocks.defineTask);
+    await executor({
+      data: {
+        notification: null,
+        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+      },
+      error: null,
+      executionInfo: { eventId: 'e2', taskName: 'active-agents-glanceable-background-task' },
+    });
+
+    expect(sink.publish).not.toHaveBeenCalled();
 
     unregisterGlanceableSink(sink);
   });

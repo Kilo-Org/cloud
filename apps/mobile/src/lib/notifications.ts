@@ -1,6 +1,8 @@
+/* eslint-disable max-lines -- notification wiring: foreground/background handlers, channels, and push-token plumbing are kept together. */
 import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
+import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 import { z } from 'zod';
 
@@ -17,8 +19,13 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
-import { getLastGlanceableSnapshot, getLocalScopeKey } from '@/lib/glanceable/persist';
-import { getGlanceableSinks } from '@/lib/glanceable/sink-registry';
+import {
+  getLastGlanceableSnapshot,
+  getLocalScopeKey,
+  persistGlanceableSink,
+  restorePersistedGlanceable,
+} from '@/lib/glanceable/persist';
+import { getGlanceableSinks, registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
@@ -157,6 +164,119 @@ export function setupNotificationHandler() {
       return shown;
     },
   });
+}
+
+const GLANCEABLE_BACKGROUND_TASK = 'active-agents-glanceable-background-task';
+
+// Expo wraps the data payload of a background notification in a JSON string on
+// both platforms; decode that envelope before parsing the push data itself.
+const headlessTaskDataSchema = z.object({ dataString: z.string() });
+
+// Test-only override so the background-handler suite never loads the platform
+// sink register files (expo-widgets / react-native-android-widget native loads).
+let glanceableSinksLoaderForTests: (() => void) | null = null;
+
+export function _setGlanceableSinksLoaderForTests(loader: (() => void) | null): void {
+  glanceableSinksLoaderForTests = loader;
+}
+
+/**
+ * Register the persist sink and the platform sinks so a headless apply has
+ * somewhere to publish. The root layout imports the platform register files in
+ * the foreground; the headless task context loads only this module, so the
+ * sinks must be registered here before `applyGlanceablePushData` runs.
+ */
+function ensureGlanceableSinksLoaded(): void {
+  if (glanceableSinksLoaderForTests) {
+    glanceableSinksLoaderForTests();
+    return;
+  }
+  registerGlanceableSink(persistGlanceableSink);
+  // Side-effect imports register the platform sinks.
+  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy platform sink load
+  require('@/glanceable-ios/register');
+  try {
+    // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy platform sink load
+    require('@/glanceable-android/register');
+  } catch {
+    // react-native-android-widget is absent on iOS; the iOS sink still loaded.
+  }
+}
+
+/** Recover the typed push data from the headless payload envelope. */
+function parseHeadlessPushData(data: unknown): PushData | null {
+  const envelope = headlessTaskDataSchema.safeParse(data);
+  if (!envelope.success) {
+    return parseNotificationData(data);
+  }
+  try {
+    return parseNotificationData(JSON.parse(envelope.data.dataString));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Headless background-notification executor. Runs when a data-only push is
+ * delivered while the app is backgrounded or killed. Reuses
+ * `applyGlanceablePushData` so the scope-key fence, revision discard, and org
+ * re-register behave identically to the foreground path.
+ */
+async function handleBackgroundNotificationTask(
+  body: TaskManager.TaskManagerTaskBody<Notifications.NotificationTaskPayload>
+): Promise<Notifications.BackgroundNotificationTaskResult> {
+  const { data, error } = body;
+  if (error) {
+    return Notifications.BackgroundNotificationTaskResult.Failed;
+  }
+  // A notification *response* (a tap) is not a delivered push; the glanceable
+  // apply runs only for a delivered data-only push.
+  if ('actionIdentifier' in data) {
+    return Notifications.BackgroundNotificationTaskResult.NoData;
+  }
+
+  const pushData = parseHeadlessPushData(data.data);
+  if (pushData?.type !== 'active_agents_glanceable') {
+    return Notifications.BackgroundNotificationTaskResult.NoData;
+  }
+
+  // The headless process is fresh: restore the persisted snapshot and scope key
+  // so the fence and revision discard below compare against durable state.
+  await restorePersistedGlanceable();
+  const applied = await applyGlanceablePushData(pushData);
+  // A successful apply delivered new sink data: report NewData so iOS does not
+  // throttle later content-available wakes (repeated NoData reduces them).
+  return applied
+    ? Notifications.BackgroundNotificationTaskResult.NewData
+    : Notifications.BackgroundNotificationTaskResult.NoData;
+}
+
+async function registerBackgroundNotificationTask(): Promise<void> {
+  try {
+    await Notifications.registerTaskAsync(GLANCEABLE_BACKGROUND_TASK);
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: {
+        'error.subsystem': 'notifications',
+        'error.operation': 'register_background_task',
+      },
+    });
+  }
+}
+
+/**
+ * Register the background notification task so a data-only
+ * `active_agents_glanceable` push is applied while the app is backgrounded or
+ * killed. `defineTask` must run at module scope of the root layout, not inside
+ * a React effect.
+ */
+export function setupNotificationBackgroundHandler(): void {
+  ensureGlanceableSinksLoaded();
+  TaskManager.defineTask<Notifications.NotificationTaskPayload>(
+    GLANCEABLE_BACKGROUND_TASK,
+    handleBackgroundNotificationTask
+  );
+  void registerBackgroundNotificationTask();
 }
 
 export function setupNotificationResponseHandler() {

@@ -458,12 +458,23 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
           });
         }
       },
+      listIosExpoTokens: async userId => {
+        const rows = await getDbForCall()
+          .select({ token: user_push_tokens.token, locale: user_push_tokens.locale })
+          .from(user_push_tokens)
+          .where(and(eq(user_push_tokens.user_id, userId), eq(user_push_tokens.platform, 'ios')));
+        return rows.map(row => ({ token: row.token, locale: row.locale }));
+      },
       listAndroidExpoTokens: async userId => {
         const rows = await getDbForCall()
           .select({ token: user_push_tokens.token, locale: user_push_tokens.locale })
           .from(user_push_tokens)
           .where(
-            and(eq(user_push_tokens.user_id, userId), isNotNull(user_push_tokens.app_version))
+            and(
+              eq(user_push_tokens.user_id, userId),
+              eq(user_push_tokens.platform, 'android'),
+              isNotNull(user_push_tokens.app_version)
+            )
           );
         return rows.map(row => ({ token: row.token, locale: row.locale }));
       },
@@ -485,7 +496,7 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
           .limit(1);
         return row !== undefined;
       },
-      sendAndroidPush: async messages => {
+      sendExpoPush: async messages => {
         const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();
         await sendPushNotifications(messages, accessToken);
       },

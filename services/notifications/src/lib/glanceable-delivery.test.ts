@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ExpoPushMessage } from './expo-push';
 import {
   apnsEventForTokenKind,
-  buildAndroidGlanceableMessages,
+  buildGlanceableExpoMessages,
   deliverGlanceableSnapshot,
   toGlanceableContentState,
   type ActiveAgentsGlanceable,
@@ -29,9 +29,9 @@ const snapshot: ActiveAgentsGlanceable = {
 
 function fakeDeps(overrides: Partial<GlanceableDeliveryDeps> = {}): {
   deps: GlanceableDeliveryDeps;
-  calls: { iosSends: unknown[][]; androidSends: ExpoPushMessage[][] };
+  calls: { iosSends: unknown[][]; expoSends: ExpoPushMessage[][] };
 } {
-  const calls = { iosSends: [] as unknown[][], androidSends: [] as ExpoPushMessage[][] };
+  const calls = { iosSends: [] as unknown[][], expoSends: [] as ExpoPushMessage[][] };
 
   const deps: GlanceableDeliveryDeps = {
     buildSnapshot: vi.fn(async () => snapshot),
@@ -39,10 +39,11 @@ function fakeDeps(overrides: Partial<GlanceableDeliveryDeps> = {}): {
     sendIosLiveActivity: vi.fn(async (_tokens, _contentState) => {
       calls.iosSends.push([_tokens, _contentState]);
     }),
+    listIosExpoTokens: vi.fn(async () => []),
     listAndroidExpoTokens: vi.fn(async () => []),
     hasAndroidOngoingToken: vi.fn(async () => false),
-    sendAndroidPush: vi.fn(async messages => {
-      calls.androidSends.push(messages);
+    sendExpoPush: vi.fn(async messages => {
+      calls.expoSends.push(messages);
     }),
     ...overrides,
   };
@@ -89,9 +90,9 @@ describe('toGlanceableContentState', () => {
   });
 });
 
-describe('buildAndroidGlanceableMessages', () => {
-  it('emits one low-interruption, tag-collapsed message per Expo token', () => {
-    const messages = buildAndroidGlanceableMessages(
+describe('buildGlanceableExpoMessages', () => {
+  it('emits one data-only, tag-collapsed message per Expo token', () => {
+    const messages = buildGlanceableExpoMessages(
       [
         { token: 'ExponentPushToken[aaa]', locale: null },
         { token: 'ExponentPushToken[bbb]', locale: 'es' },
@@ -102,12 +103,13 @@ describe('buildAndroidGlanceableMessages', () => {
     expect(messages).toHaveLength(2);
     for (const message of messages) {
       expect(message.data).toEqual(snapshot);
+      expect(message._contentAvailable).toBe(true);
+      expect(message.title).toBeUndefined();
+      expect(message.body).toBeUndefined();
       expect(message.sound).toBeNull();
       expect(message.priority).toBe('default');
       expect(message.channelId).toBe('active-agents');
       expect(message.tag).toBe('deadbeef');
-      expect(typeof message.title).toBe('string');
-      expect(typeof message.body).toBe('string');
     }
     expect(messages.map(m => m.to)).toEqual(['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]']);
   });
@@ -120,9 +122,10 @@ describe('deliverGlanceableSnapshot', () => {
     await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
 
     expect(deps.listIosActivityTokens).not.toHaveBeenCalled();
+    expect(deps.listIosExpoTokens).not.toHaveBeenCalled();
     expect(deps.hasAndroidOngoingToken).not.toHaveBeenCalled();
     expect(calls.iosSends).toHaveLength(0);
-    expect(calls.androidSends).toHaveLength(0);
+    expect(calls.expoSends).toHaveLength(0);
   });
 
   it('delivers the content-state to iOS tokens with the right start/update events', async () => {
@@ -154,7 +157,7 @@ describe('deliverGlanceableSnapshot', () => {
     expect(props).not.toHaveProperty('type');
     expect(props).not.toHaveProperty('accountEpoch');
     expect(props).not.toHaveProperty('scopeKey');
-    expect(calls.androidSends).toHaveLength(0);
+    expect(calls.expoSends).toHaveLength(0);
   });
 
   it('skips Android when no android_ongoing activity token exists', async () => {
@@ -166,7 +169,7 @@ describe('deliverGlanceableSnapshot', () => {
     await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
 
     expect(deps.listAndroidExpoTokens).not.toHaveBeenCalled();
-    expect(calls.androidSends).toHaveLength(0);
+    expect(calls.expoSends).toHaveLength(0);
   });
 
   it('sends the Android Expo push only when an ongoing token and Expo tokens both exist', async () => {
@@ -177,10 +180,11 @@ describe('deliverGlanceableSnapshot', () => {
 
     await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
 
-    expect(calls.androidSends).toHaveLength(1);
-    expect(calls.androidSends[0]).toHaveLength(1);
-    expect(calls.androidSends[0][0].to).toBe('ExponentPushToken[aaa]');
-    expect(calls.androidSends[0][0].tag).toBe('deadbeef');
+    expect(calls.expoSends).toHaveLength(1);
+    expect(calls.expoSends[0]).toHaveLength(1);
+    expect(calls.expoSends[0][0].to).toBe('ExponentPushToken[aaa]');
+    expect(calls.expoSends[0][0].tag).toBe('deadbeef');
+    expect(calls.expoSends[0][0]._contentAvailable).toBe(true);
   });
 
   it('sends nothing on Android when the user has no Expo tokens even with an ongoing token', async () => {
@@ -191,7 +195,24 @@ describe('deliverGlanceableSnapshot', () => {
 
     await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
 
-    expect(deps.sendAndroidPush).not.toHaveBeenCalled();
-    expect(calls.androidSends).toHaveLength(0);
+    expect(deps.sendExpoPush).not.toHaveBeenCalled();
+    expect(calls.expoSends).toHaveLength(0);
+  });
+
+  it('sends the data-only iOS Expo push regardless of the android_ongoing token', async () => {
+    const { deps, calls } = fakeDeps({
+      hasAndroidOngoingToken: vi.fn(async () => false),
+      listIosExpoTokens: vi.fn(async () => [{ token: 'ExponentPushToken[ios]', locale: null }]),
+    });
+
+    await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
+
+    expect(deps.listIosExpoTokens).toHaveBeenCalledWith('u1', null);
+    expect(calls.expoSends).toHaveLength(1);
+    expect(calls.expoSends[0]).toHaveLength(1);
+    expect(calls.expoSends[0][0].to).toBe('ExponentPushToken[ios]');
+    expect(calls.expoSends[0][0]._contentAvailable).toBe(true);
+    expect(calls.expoSends[0][0].title).toBeUndefined();
+    expect(calls.expoSends[0][0].body).toBeUndefined();
   });
 });

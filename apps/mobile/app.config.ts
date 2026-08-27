@@ -190,6 +190,10 @@ const config: ExpoConfig = {
       {
         icon: './assets/images/android-notification-icon.png',
         color: '#FAF74F',
+        // iOS requires `remote-notification` in UIBackgroundModes for the
+        // headless background task (`registerTaskAsync`) to deliver a data-only
+        // `active_agents_glanceable` push while the app is not in the foreground.
+        enableBackgroundRemoteNotifications: true,
       },
     ],
     'expo-web-browser',

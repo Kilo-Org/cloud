@@ -3,16 +3,11 @@
  * widgets, and Android ongoing notification. Runs after a cloud-agent session
  * notification send: it fetches the fresh snapshot from the web internal route,
  * then pushes it to the registered iOS activity tokens over APNs and to the
- * user's Expo tokens on Android. Pure orchestrator — all IO is injected via
- * `deps` so tests substitute in-memory fakes.
+ * user's Expo tokens on iOS and Android. Pure orchestrator — all IO is injected
+ * via `deps` so tests substitute in-memory fakes.
  */
 
-import {
-  genericPushContentForPushData,
-  resolvePushLocale,
-  type GlanceableLiveActivityContentState,
-  type PushData,
-} from '@kilocode/notifications';
+import { type GlanceableLiveActivityContentState, type PushData } from '@kilocode/notifications';
 
 import type { LiveActivityEvent } from './apns-live-activity';
 import type { ExpoPushMessage } from './expo-push';
@@ -33,7 +28,7 @@ export type GlanceableApnsContentState = {
 };
 
 export type IosActivityToken = { token: string; kind: 'ios_activity' | 'ios_push_to_start' };
-export type AndroidPushToken = { token: string; locale: string | null };
+export type ExpoPushToken = { token: string; locale: string | null };
 
 export function apnsEventForTokenKind(kind: IosActivityToken['kind']): LiveActivityEvent {
   return kind === 'ios_push_to_start' ? 'start' : 'update';
@@ -55,27 +50,29 @@ export function toGlanceableContentState(
   };
 }
 
-export function buildAndroidGlanceableMessages(
-  tokens: readonly AndroidPushToken[],
+export function buildGlanceableExpoMessages(
+  tokens: readonly ExpoPushToken[],
   snapshot: ActiveAgentsGlanceable
 ): ExpoPushMessage[] {
-  return tokens.map(({ token, locale }) => {
-    const { title, body } = genericPushContentForPushData(snapshot, resolvePushLocale(locale));
-    return {
-      to: token,
-      title,
-      body,
-      data: snapshot,
-      // The aggregate push is a data carrier for the ongoing notification, so
-      // it never rings or interrupts: no sound, default (not high) priority.
-      sound: null,
-      priority: 'default',
-      channelId: 'active-agents',
-      // Android collapse key = the opaque scope key, so every aggregate update
-      // for one user+org collapses into the same ongoing notification.
-      tag: snapshot.scopeKey,
-    } satisfies ExpoPushMessage;
-  });
+  return tokens.map(
+    ({ token }) =>
+      ({
+        to: token,
+        data: snapshot,
+        // Data-only wake: `_contentAvailable` makes the OS deliver the message to
+        // the background task while the app is backgrounded/killed, and omitting
+        // title/body keeps it from becoming a visible FCM notification that skips
+        // the task. The ongoing notification and widget content come from the local
+        // `applyGlanceablePushData` path, so the push never rings or interrupts.
+        _contentAvailable: true,
+        sound: null,
+        priority: 'default',
+        channelId: 'active-agents',
+        // Android collapse key = the opaque scope key, so every aggregate update
+        // for one user+org collapses into the same ongoing notification.
+        tag: snapshot.scopeKey,
+      }) satisfies ExpoPushMessage
+  );
 }
 
 export type GlanceableDeliveryDeps = {
@@ -96,12 +93,13 @@ export type GlanceableDeliveryDeps = {
     tokens: readonly { token: string; event: LiveActivityEvent }[],
     contentState: GlanceableApnsContentState
   ) => Promise<void>;
+  listIosExpoTokens: (userId: string, organizationId: string | null) => Promise<ExpoPushToken[]>;
   listAndroidExpoTokens: (
     userId: string,
     organizationId: string | null
-  ) => Promise<AndroidPushToken[]>;
+  ) => Promise<ExpoPushToken[]>;
   hasAndroidOngoingToken: (userId: string, organizationId: string | null) => Promise<boolean>;
-  sendAndroidPush: (messages: ExpoPushMessage[]) => Promise<void>;
+  sendExpoPush: (messages: ExpoPushMessage[]) => Promise<void>;
 };
 
 export async function deliverGlanceableSnapshot(
@@ -122,10 +120,17 @@ export async function deliverGlanceableSnapshot(
     );
   }
 
+  // iOS Expo tokens always need the data-only wake: it drives the widget
+  // timeline through the background task while the app is not foregrounded.
+  const iosExpoTokens = await deps.listIosExpoTokens(params.userId, params.organizationId);
+  if (iosExpoTokens.length > 0) {
+    await deps.sendExpoPush(buildGlanceableExpoMessages(iosExpoTokens, snapshot));
+  }
+
   if (await deps.hasAndroidOngoingToken(params.userId, params.organizationId)) {
     const expoTokens = await deps.listAndroidExpoTokens(params.userId, params.organizationId);
     if (expoTokens.length > 0) {
-      await deps.sendAndroidPush(buildAndroidGlanceableMessages(expoTokens, snapshot));
+      await deps.sendExpoPush(buildGlanceableExpoMessages(expoTokens, snapshot));
     }
   }
 }

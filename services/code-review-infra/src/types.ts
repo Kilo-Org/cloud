@@ -20,6 +20,8 @@ export type CodeReviewStatus = 'queued' | 'running' | 'completed' | 'failed' | '
 export interface SessionInput {
   /** GitHub repo in format "owner/repo" (for GitHub platform) */
   githubRepo?: string;
+  /** Exact GitHub integration selected by the review webhook. */
+  githubIntegrationId?: string;
   /** Full git URL for cloning (for GitLab and other platforms) */
   gitUrl?: string;
   kilocodeOrganizationId?: string;

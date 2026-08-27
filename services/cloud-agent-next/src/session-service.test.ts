@@ -1796,6 +1796,42 @@ describe('SessionService.prepareWorkspace', () => {
     );
   });
 
+  it('refreshes a warm code-review pull ref', async () => {
+    const session = createSession(true);
+    const sandbox = createSandbox(session, true);
+    const metadata = createMetadata({
+      createdOnPlatform: 'code-review',
+      githubRepo: 'acme/repo',
+      githubInstallationId: '123',
+      githubAppType: 'standard',
+      gitUrl: undefined,
+      gitToken: undefined,
+      platform: 'github',
+      upstreamBranch: 'refs/pull/42/head',
+      workspacePath: '/workspace/user/sessions/agent_test',
+      sessionHome: '/home/agent_test',
+      branchName: 'refs/pull/42/head',
+      sandboxId: 'ses-abcdef',
+    });
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'ses-abcdef',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(workspaceMocks.manageBranch).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'refs/pull/42/head',
+      true
+    );
+  });
+
   it('refreshes the warm fast path GitLab remote with direct managed authentication', async () => {
     const session = createSession(true);
     const sandbox = createSandbox(session, true);

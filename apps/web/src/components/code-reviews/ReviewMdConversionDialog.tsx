@@ -17,6 +17,7 @@ import {
 export type ConvertibleRepository = {
   id: number | string;
   full_name: string;
+  platformIntegrationId?: string;
 };
 
 type ReviewMdConversionDialogProps = {
@@ -27,10 +28,11 @@ type ReviewMdConversionDialogProps = {
   repositories: ConvertibleRepository[];
 };
 
-function buildConversionHref(input: {
+export function buildConversionHref(input: {
   organizationId?: string;
   platform: 'github' | 'gitlab';
   repoFullName: string;
+  platformIntegrationId?: string;
 }): string {
   const params = new URLSearchParams({
     platform: input.platform,
@@ -39,7 +41,14 @@ function buildConversionHref(input: {
   if (input.organizationId) {
     params.set('organizationId', input.organizationId);
   }
+  if (input.platformIntegrationId) {
+    params.set('platformIntegrationId', input.platformIntegrationId);
+  }
   return `/cloud-agent-fork/review-md?${params.toString()}`;
+}
+
+function repositorySelectionKey(repository: ConvertibleRepository): string {
+  return `${repository.id}:${repository.platformIntegrationId ?? ''}`;
 }
 
 /**
@@ -67,7 +76,9 @@ export function ReviewMdConversionDialog({
     [repositories]
   );
 
-  const selectedRepositories = sortedRepositories.filter(repo => selectedIds.has(String(repo.id)));
+  const selectedRepositories = sortedRepositories.filter(repo =>
+    selectedIds.has(repositorySelectionKey(repo))
+  );
   // Count only currently-selected repos that were started, so deselecting a started repo (or
   // selecting a new unstarted one) doesn't leave the progress text overstating "N started".
   const startedSelectedCount = selectedRepositories.filter(repo =>
@@ -107,7 +118,7 @@ export function ReviewMdConversionDialog({
           <div className="space-y-4">
             <div className="max-h-64 space-y-1 overflow-y-auto rounded-md border p-2">
               {sortedRepositories.map(repo => {
-                const repositoryId = String(repo.id);
+                const repositoryId = repositorySelectionKey(repo);
                 const isSelected = selectedIds.has(repositoryId);
                 const isStarted = startedIds.has(repositoryId);
 
@@ -138,6 +149,7 @@ export function ReviewMdConversionDialog({
                           organizationId,
                           platform,
                           repoFullName: repo.full_name,
+                          platformIntegrationId: repo.platformIntegrationId,
                         })}
                         target="_blank"
                         rel="noopener noreferrer"

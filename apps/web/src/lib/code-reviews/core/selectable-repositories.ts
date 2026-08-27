@@ -18,6 +18,7 @@ export type FetchedRepository = {
   name: string;
   fullName: string;
   private: boolean;
+  platformIntegrationId?: string;
 };
 
 export type ManuallyAddedRepository = {
@@ -32,6 +33,7 @@ export type SelectableRepository = {
   name: string;
   full_name: string;
   private: boolean;
+  platformIntegrationId?: string;
 };
 
 /** The deduped repository list offered for review config / conversion (fetched + legacy manual). */
@@ -44,6 +46,7 @@ export function buildSelectableRepositories(
     name: repo.name,
     full_name: repo.fullName,
     private: repo.private,
+    platformIntegrationId: repo.platformIntegrationId,
   }));
   const seenIds = new Set(canonical.map(repo => repo.id));
   const legacy = manuallyAdded.filter(repo => !seenIds.has(repo.id));

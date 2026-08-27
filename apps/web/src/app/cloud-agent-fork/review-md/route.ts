@@ -30,9 +30,9 @@ import {
 } from '@/lib/code-reviews/core/constants';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { buildReviewMdConversionPrompt } from '@/lib/code-reviews/prompts/review-md-conversion-prompt';
+import { buildAllowedRepositoryFullNames } from '@/lib/code-reviews/core/selectable-repositories';
 import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import { redisClient } from '@/lib/redis';
-import { buildAllowedRepositoryFullNames } from '@/lib/code-reviews/core/selectable-repositories';
 
 const createCaller = createCallerFactory(rootRouter);
 
@@ -51,6 +51,7 @@ const QuerySchema = z.object({
       'Invalid repository path'
     ),
   organizationId: z.uuid().optional(),
+  platformIntegrationId: z.uuid().optional(),
 });
 
 /**
@@ -110,13 +111,17 @@ export async function GET(request: NextRequest) {
     platform: url.searchParams.get('platform') ?? undefined,
     repo: url.searchParams.get('repo') ?? undefined,
     organizationId: url.searchParams.get('organizationId') ?? undefined,
+    platformIntegrationId: url.searchParams.get('platformIntegrationId') ?? undefined,
   });
 
   if (!parsed.success) {
     return redirectToError(undefined, 'invalid_conversion_request');
   }
 
-  const { platform, repo, organizationId } = parsed.data;
+  const { platform, repo, organizationId, platformIntegrationId } = parsed.data;
+  if (platform !== 'github' && platformIntegrationId) {
+    return redirectToError(organizationId, 'invalid_conversion_request');
+  }
 
   // CSRF defense for this mutating, credit-spending GET. Fail CLOSED: allow only same-origin dialog
   // clicks (`same-origin`/`same-site`) and deliberate direct navigation (`none`, e.g. typing the URL
@@ -169,28 +174,17 @@ export async function GET(request: NextRequest) {
       return redirectToError(organizationId, 'conversion_rate_limited');
     }
 
-    // Authorize the repo against the caller's FETCHED integration repositories only. Manually-added
-    // config entries are client-supplied and only shape-validated at save time (no proof the
-    // integration actually covers them), so they must NOT gate this credit-spending, PR-opening
-    // action — otherwise a user could add an arbitrary full_name to their config and pass this
-    // check. The worker enforces installation scope regardless; this keeps the fail-fast honest.
-    const repositoryList = organizationId
-      ? platform === 'gitlab'
+    if (platform === 'gitlab') {
+      const repositoryList = organizationId
         ? await caller.organizations.reviewAgent.listGitLabRepositories({
             organizationId,
             forceRefresh: false,
           })
-        : await caller.organizations.reviewAgent.listGitHubRepositories({
-            organizationId,
-            forceRefresh: false,
-          })
-      : platform === 'gitlab'
-        ? await caller.personalReviewAgent.listGitLabRepositories({ forceRefresh: false })
-        : await caller.personalReviewAgent.listGitHubRepositories({ forceRefresh: false });
-
-    const allowedRepoFullNames = buildAllowedRepositoryFullNames(repositoryList.repositories, []);
-    if (!allowedRepoFullNames.has(repo)) {
-      return redirectToError(organizationId, 'repository_not_allowed');
+        : await caller.personalReviewAgent.listGitLabRepositories({ forceRefresh: false });
+      const allowedRepoFullNames = buildAllowedRepositoryFullNames(repositoryList.repositories, []);
+      if (!allowedRepoFullNames.has(repo)) {
+        return redirectToError(organizationId, 'repository_not_allowed');
+      }
     }
 
     const customInstructions = config.customInstructions?.trim();
@@ -199,7 +193,9 @@ export async function GET(request: NextRequest) {
     }
 
     const sessionInput = {
-      ...(platform === 'gitlab' ? { gitlabProject: repo } : { githubRepo: repo }),
+      ...(platform === 'gitlab'
+        ? { gitlabProject: repo }
+        : { githubRepo: repo, githubIntegrationId: platformIntegrationId }),
       prompt: buildReviewMdConversionPrompt({
         platform,
         repoFullName: repo,

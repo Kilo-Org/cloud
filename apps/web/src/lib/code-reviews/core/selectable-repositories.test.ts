@@ -16,6 +16,20 @@ describe('buildSelectableRepositories', () => {
     const result = buildSelectableRepositories(fetched, manual);
     expect(result.map(repo => repo.full_name)).toEqual(['org/a', 'org/b']);
   });
+
+  it('preserves authoritative integration identity from fetched repositories', () => {
+    expect(
+      buildSelectableRepositories(
+        [
+          {
+            ...fetched[0],
+            platformIntegrationId: '00000000-0000-4000-8000-000000000001',
+          },
+        ],
+        []
+      )[0]
+    ).toMatchObject({ platformIntegrationId: '00000000-0000-4000-8000-000000000001' });
+  });
 });
 
 describe('buildAllowedRepositoryFullNames', () => {

@@ -71,6 +71,18 @@ vi.mock('react-native-gesture-handler', () => ({
   GestureDetector: () => null,
 }));
 
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({ dispatch: vi.fn() }),
+}));
+
+vi.mock('@/lib/navigation/prevent-remove', () => ({
+  usePreventRemove: vi.fn(),
+}));
+
+vi.mock('@/components/ui/accessible-status', () => ({
+  AccessibleStatus: () => null,
+}));
+
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },

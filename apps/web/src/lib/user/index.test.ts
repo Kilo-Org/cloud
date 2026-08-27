@@ -134,6 +134,7 @@ import {
 import { eq, count, inArray, sql } from 'drizzle-orm';
 import {
   softDeleteUser,
+  anonymizeCloudUserData,
   assertUserCanBeSoftDeleted,
   SoftDeletePreconditionError,
   findUserById,
@@ -1410,6 +1411,92 @@ describe('User', () => {
     });
   });
 
+  describe('anonymizeCloudUserData', () => {
+    const userId = 'oauth/google/Legacy.User';
+    const deletedEmail = `deleted+${userId}@deleted.invalid`;
+
+    it.each([null, deletedEmail, 'deleted@deleted.invalid'])(
+      'preserves deletion history and scrubs new PII on replay with normalized_email %p',
+      async normalizedEmail => {
+        const blockedReason = 'soft-deleted at 2026-08-11T01:16:12.945+02:00';
+        const user = await insertTestUser({
+          id: userId,
+          google_user_email: deletedEmail,
+          normalized_email: normalizedEmail,
+          blocked_reason: blockedReason,
+          google_user_name: 'Reintroduced Name',
+          signup_ip: '203.0.113.10',
+        });
+        const [paymentMethod] = await db
+          .insert(payment_methods)
+          .values({
+            ...createTestPaymentMethod(user.id),
+            deleted_at: '2026-08-10 01:16:12.945+00',
+            name: 'Reintroduced Name',
+            address_city: 'NYC',
+            http_x_forwarded_for: '203.0.113.10',
+          })
+          .returning();
+        await db.insert(user_auth_provider).values({
+          kilo_user_id: user.id,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+          email: 'reintroduced@example.com',
+          avatar_url: 'https://example.com/avatar.png',
+        });
+        await db.insert(enrichment_data).values({
+          user_id: user.id,
+          github_enrichment_data: { login: 'reintroduced-user', email: 'reintroduced@example.com' },
+        });
+        await db.insert(analytics_event_outbox).values({
+          event_uuid: randomUUID(),
+          event_name: 'session_create_settled',
+          distinct_id: user.id,
+          properties: { email: 'reintroduced@example.com' },
+        });
+
+        await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+        expect(await findUserById(user.id)).toMatchObject({
+          google_user_email: deletedEmail,
+          normalized_email: null,
+          blocked_reason: blockedReason,
+          google_user_name: 'Deleted User',
+          google_user_image_url: '',
+          signup_ip: null,
+        });
+        expect(
+          await db.select().from(payment_methods).where(eq(payment_methods.user_id, user.id))
+        ).toEqual([
+          expect.objectContaining({
+            id: paymentMethod.id,
+            deleted_at: paymentMethod.deleted_at,
+            name: null,
+            address_city: null,
+            http_x_forwarded_for: null,
+            stripe_fingerprint: paymentMethod.stripe_fingerprint,
+          }),
+        ]);
+        expect(
+          await db
+            .select()
+            .from(user_auth_provider)
+            .where(eq(user_auth_provider.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db.select().from(enrichment_data).where(eq(enrichment_data.user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(analytics_event_outbox)
+            .where(eq(analytics_event_outbox.distinct_id, user.id))
+        ).toHaveLength(0);
+        expect(await db.select().from(deleted_user_email_tombstones)).toEqual([]);
+      }
+    );
+  });
+
   describe('softDeleteUser', () => {
     it('deletes operation ledger rows by user id and analytics outbox rows by either identity', async () => {
       const user = await insertTestUser({ google_user_email: 'ledger-user@example.com' });
@@ -2290,6 +2377,7 @@ describe('User', () => {
         signup_ip: '203.0.113.10',
         api_token_pepper: 'api-token-pepper',
         web_session_pepper: 'web-session-pepper',
+        blocked_reason: 'manual block',
         blocked_at: '2026-01-15T12:00:00.000Z',
         blocked_by_kilo_user_id: 'admin-user-id',
         is_admin: true,
@@ -2842,17 +2930,24 @@ describe('User', () => {
       );
     });
 
-    it('falls back to google_user_email when normalized_email is null', async () => {
+    it('tombstones a legacy real email once when normalized_email is null', async () => {
       // Pre-0090 users can have NULL normalized_email but a real google_user_email.
       // Soft-delete must still record a tombstone so a re-registration of the
       // same email cannot bypass the previously-deleted-referee guard.
       const legacyUser = await insertTestUser({
         google_user_email: 'legacy-no-normalized@example.com',
         normalized_email: null,
+        blocked_reason: 'deletion-in-progress at 2026-08-26T12:00:00.000Z',
       });
 
       await softDeleteUser(legacyUser.id);
 
+      const deletedUser = await findUserById(legacyUser.id);
+      expect(deletedUser).toMatchObject({
+        google_user_email: `deleted+${legacyUser.id}@deleted.invalid`,
+        normalized_email: null,
+        blocked_reason: expect.stringMatching(/^soft-deleted at \d{4}-\d{2}-\d{2}T/),
+      });
       const [tombstone] = await db
         .select()
         .from(deleted_user_email_tombstones)
@@ -2863,6 +2958,11 @@ describe('User', () => {
           )
         );
       expect(tombstone).toBeDefined();
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, legacyUser.id));
+
+      expect((await findUserById(legacyUser.id))?.blocked_reason).toBe(deletedUser?.blocked_reason);
+      expect(await db.select().from(deleted_user_email_tombstones)).toEqual([tombstone]);
     });
 
     it('should delete auth providers', async () => {

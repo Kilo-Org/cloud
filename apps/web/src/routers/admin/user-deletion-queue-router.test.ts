@@ -1,13 +1,25 @@
 import { eq, inArray, sql } from 'drizzle-orm';
 import {
   kilocode_users,
+  kiloclaw_subscriptions,
+  user_deletion_audit_events,
   user_deletion_requests,
   user_deletion_steps,
   type User,
 } from '@kilocode/db/schema';
-import { UserDeletionRequestStatus } from '@kilocode/db/schema-types';
+import {
+  UserDeletionAuditEventType,
+  UserDeletionCloudSubjectResolution,
+  UserDeletionRequestStatus,
+  UserDeletionStepKey,
+  UserDeletionStepStatus,
+} from '@kilocode/db/schema-types';
 import { db } from '@/lib/drizzle';
-import { USER_DELETION_CATALOG_VERSION } from '@/lib/user/deletion-queue/deletion-constants';
+import { findUserById } from '@/lib/user';
+import {
+  USER_DELETION_CATALOG_VERSION,
+  USER_DELETION_ID_ONLY_CATALOG_VERSION,
+} from '@/lib/user/deletion-queue/deletion-constants';
 import { catalogForVersion } from '@/lib/user/deletion-queue/deletion-catalog';
 import { scrubControlPlanePii } from '@/lib/user/deletion-queue/deletion-enqueue';
 import type { inferRouterInputs } from '@trpc/server';
@@ -27,6 +39,30 @@ describe('adminUserDeletionQueueRouter', () => {
   let regularUser: User;
   let targetUser: User;
   let requestIds: string[] = [];
+  let historicalUserIds: string[] = [];
+
+  async function historicalUser(id = `oauth/GitHub/CaseSensitive+${crypto.randomUUID()}`) {
+    const user = await insertTestUser({
+      id,
+      google_user_email: `deleted+${id}@deleted.invalid`,
+      blocked_reason: 'soft-deleted at 2026-08-26T00:00:00.000Z',
+      api_token_pepper: 'historical-api-pepper',
+      web_session_pepper: 'historical-web-pepper',
+    });
+    historicalUserIds.push(user.id);
+    return user;
+  }
+
+  async function queueState() {
+    return {
+      requests: await db.select().from(user_deletion_requests).orderBy(user_deletion_requests.id),
+      steps: await db.select().from(user_deletion_steps).orderBy(user_deletion_steps.id),
+      audits: await db
+        .select()
+        .from(user_deletion_audit_events)
+        .orderBy(user_deletion_audit_events.id),
+    };
+  }
 
   beforeAll(async () => {
     const suffix = `${Date.now()}-${crypto.randomUUID()}`;
@@ -43,9 +79,17 @@ describe('adminUserDeletionQueueRouter', () => {
   });
 
   afterEach(async () => {
+    jest.restoreAllMocks();
     if (requestIds.length > 0) {
       await db.delete(user_deletion_requests).where(inArray(user_deletion_requests.id, requestIds));
       requestIds = [];
+    }
+    if (historicalUserIds.length > 0) {
+      await db
+        .delete(kiloclaw_subscriptions)
+        .where(inArray(kiloclaw_subscriptions.user_id, historicalUserIds));
+      await db.delete(kilocode_users).where(inArray(kilocode_users.id, historicalUserIds));
+      historicalUserIds = [];
     }
   });
 
@@ -236,5 +280,287 @@ describe('adminUserDeletionQueueRouter', () => {
 
     const detail = await caller.admin.userDeletionQueue.detail({ requestId: enqueued.requestId });
     expect(detail.request).not.toHaveProperty('pausedAt');
+  });
+
+  describe('historical users', () => {
+    beforeEach(() => {
+      jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Unexpected external request'));
+    });
+
+    describe.each(['previewHistoricalUsers', 'submitHistoricalUsers'] as const)('%s', method => {
+      it('requires admin access', async () => {
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.admin.userDeletionQueue[method]({ userIds: [targetUser.id] })
+        ).rejects.toThrow('Admin access required');
+      });
+
+      it('rejects invalid batches before writing any queue records', async () => {
+        const user = await historicalUser();
+        const caller = await createCallerForUser(admin.id);
+        const before = await queueState();
+        const invalidIds = [
+          '',
+          '   ',
+          'x'.repeat(1025),
+          '\nuser',
+          'user\n',
+          'user\r\nother',
+          'user\tother',
+          'user\u0000other',
+          'user\u001fother',
+          'user\u007fother',
+          'user\u0085other',
+          'user\u009fother',
+          'user\u2028other',
+          'user\u2029other',
+        ];
+        const invalidBatches = [
+          [],
+          Array<string>(101).fill(user.id),
+          ...invalidIds.map(id => [user.id, id]),
+        ];
+        for (const userIds of invalidBatches) {
+          await expect(caller.admin.userDeletionQueue[method]({ userIds })).rejects.toMatchObject({
+            code: 'BAD_REQUEST',
+          });
+        }
+        expect(await queueState()).toEqual(before);
+        expect(fetch).not.toHaveBeenCalled();
+      });
+
+      it('rejects caller-supplied admin IDs, catalogues, steps, and execution flags', async () => {
+        const user = await historicalUser();
+        const caller = await createCallerForUser(admin.id);
+        const before = await queueState();
+        for (const overrides of [
+          { adminUserId: regularUser.id },
+          { catalogVersion: 2 },
+          { stepKeys: [UserDeletionStepKey.CompletionEmail] },
+          { execute: true },
+        ]) {
+          const input = { userIds: [user.id], ...overrides };
+          await expect(caller.admin.userDeletionQueue[method](input)).rejects.toMatchObject({
+            code: 'BAD_REQUEST',
+          });
+        }
+        expect(await queueState()).toEqual(before);
+      });
+
+      it('accepts 100 input IDs and a 1024-character opaque ID', async () => {
+        const caller = await createCallerForUser(admin.id);
+        const userId = 'oauth/Provider/'.padEnd(1024, 'x');
+        await expect(
+          caller.admin.userDeletionQueue[method]({ userIds: Array<string>(100).fill(userId) })
+        ).resolves.toEqual([{ userId, status: 'refused', code: 'user_not_found' }]);
+      });
+    });
+
+    it('preview exposes eligible, refused, and terminal existing results without writes or providers', async () => {
+      const user = await historicalUser();
+      const completedUser = await historicalUser();
+      const caller = await createCallerForUser(admin.id);
+      const [enqueued] = await caller.admin.userDeletionQueue.submitHistoricalUsers({
+        userIds: [completedUser.id],
+      });
+      if (enqueued?.status !== 'enqueued') throw new Error('expected enqueued');
+      requestIds.push(enqueued.requestId);
+      await db.transaction(tx =>
+        scrubControlPlanePii(tx, enqueued.requestId, UserDeletionRequestStatus.Completed)
+      );
+      const before = await queueState();
+
+      const result = await caller.admin.userDeletionQueue.previewHistoricalUsers({
+        userIds: [user.id, regularUser.id, completedUser.id],
+      });
+      expect(result).toEqual([
+        { userId: user.id, status: 'eligible' },
+        { userId: regularUser.id, status: 'refused', code: 'not_canonical_soft_deleted_user' },
+        {
+          userId: completedUser.id,
+          status: 'existing',
+          requestId: enqueued.requestId,
+          requestStatus: UserDeletionRequestStatus.Completed,
+        },
+      ]);
+      expect(await queueState()).toEqual(before);
+      expect(await findUserById(user.id)).toEqual(user);
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('submit attributes one V3 user-ID-only request to the authenticated admin without notifications', async () => {
+      const user = await historicalUser();
+      const caller = await createCallerForUser(admin.id);
+      const result = await caller.admin.userDeletionQueue.submitHistoricalUsers({
+        userIds: [user.id, ` ${user.id} `, user.id],
+      });
+      const [enqueued] = result;
+      if (enqueued?.status !== 'enqueued') throw new Error('expected enqueued');
+      requestIds.push(enqueued.requestId);
+      expect(result).toEqual([
+        { userId: user.id, status: 'enqueued', requestId: enqueued.requestId },
+      ]);
+
+      const requests = await db
+        .select()
+        .from(user_deletion_requests)
+        .where(eq(user_deletion_requests.user_id, user.id));
+      expect(requests).toHaveLength(1);
+      expect(requests[0]).toMatchObject({
+        id: enqueued.requestId,
+        user_id: user.id,
+        target_email: user.google_user_email,
+        requested_by_kilo_user_id: admin.id,
+        status: UserDeletionRequestStatus.InProgress,
+        catalog_version: USER_DELETION_ID_ONLY_CATALOG_VERSION,
+        cloud_subject_resolution: UserDeletionCloudSubjectResolution.CurrentUser,
+        pylon_ticket_ref: null,
+      });
+      const steps = await db
+        .select()
+        .from(user_deletion_steps)
+        .where(eq(user_deletion_steps.request_id, enqueued.requestId));
+      expect(steps).toHaveLength(6);
+      expect(
+        steps
+          .filter(step => step.status === UserDeletionStepStatus.Pending)
+          .map(step => step.step_key)
+          .sort()
+      ).toEqual(
+        [
+          UserDeletionStepKey.KiloclawDestroy,
+          UserDeletionStepKey.CliV1Blobs,
+          UserDeletionStepKey.CliV2Sessions,
+          UserDeletionStepKey.UsagePromptPrefixes,
+          UserDeletionStepKey.Posthog,
+          UserDeletionStepKey.Anonymize,
+        ].sort()
+      );
+      const audits = await db
+        .select()
+        .from(user_deletion_audit_events)
+        .where(eq(user_deletion_audit_events.request_id, enqueued.requestId));
+      expect(audits).toEqual([
+        expect.objectContaining({
+          event_type: UserDeletionAuditEventType.RequestCreated,
+          actor_kilo_user_id: admin.id,
+          details_json: {
+            catalog_version: USER_DELETION_ID_ONLY_CATALOG_VERSION,
+            code: 'user_id_only_backfill_2026_08_26',
+          },
+        }),
+      ]);
+      expect(await findUserById(user.id)).toEqual(user);
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('trims and deduplicates IDs without folding case or removing internal spaces', async () => {
+      const user = await historicalUser();
+      const differentlyCased = await historicalUser(user.id.toLowerCase());
+      const opaqueUser = await historicalUser(`external|Opaque ID:${crypto.randomUUID()}`);
+      const caller = await createCallerForUser(admin.id);
+      await expect(
+        caller.admin.userDeletionQueue.previewHistoricalUsers({
+          userIds: [` ${user.id} `, user.id, differentlyCased.id, ` ${opaqueUser.id} `],
+        })
+      ).resolves.toEqual([
+        { userId: user.id, status: 'eligible' },
+        { userId: differentlyCased.id, status: 'eligible' },
+        { userId: opaqueUser.id, status: 'eligible' },
+      ]);
+    });
+
+    it('submit revalidates subscriptions added after preview', async () => {
+      const user = await historicalUser();
+      const caller = await createCallerForUser(admin.id);
+      await expect(
+        caller.admin.userDeletionQueue.previewHistoricalUsers({ userIds: [user.id] })
+      ).resolves.toEqual([{ userId: user.id, status: 'eligible' }]);
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        plan: 'standard',
+        status: 'active',
+        cancel_at_period_end: true,
+      });
+      const before = await queueState();
+      await expect(
+        caller.admin.userDeletionQueue.submitHistoricalUsers({ userIds: [user.id] })
+      ).resolves.toEqual([{ userId: user.id, status: 'refused', code: 'live_subscription' }]);
+      expect(await queueState()).toEqual(before);
+      expect(await findUserById(user.id)).toEqual(user);
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it.each([{ is_admin: false }, { blocked_reason: 'blocked' }])(
+      'rechecks the authenticated admin against current database state: %j',
+      async overrides => {
+        const user = await historicalUser();
+        const caller = await createCallerForUser(admin.id);
+        await expect(
+          caller.admin.userDeletionQueue.previewHistoricalUsers({ userIds: [user.id] })
+        ).resolves.toEqual([{ userId: user.id, status: 'eligible' }]);
+        const before = await queueState();
+        await db.update(kilocode_users).set(overrides).where(eq(kilocode_users.id, admin.id));
+        try {
+          for (const method of ['previewHistoricalUsers', 'submitHistoricalUsers'] as const) {
+            await expect(
+              caller.admin.userDeletionQueue[method]({ userIds: [user.id] })
+            ).resolves.toEqual([
+              { userId: user.id, status: 'refused', code: 'active_admin_required' },
+            ]);
+          }
+          expect(await queueState()).toEqual(before);
+        } finally {
+          await db
+            .update(kilocode_users)
+            .set({ is_admin: admin.is_admin, blocked_reason: admin.blocked_reason })
+            .where(eq(kilocode_users.id, admin.id));
+        }
+      }
+    );
+
+    it('submit isolates unexpected failures and preserves sequential partial outcomes without logging errors', async () => {
+      const firstUser = await historicalUser();
+      const failedUser = await historicalUser();
+      const lastUser = await historicalUser();
+      const caller = await createCallerForUser(admin.id);
+      const transaction = db.transaction.bind(db);
+      const order: string[] = [];
+      jest
+        .spyOn(db, 'transaction')
+        .mockImplementationOnce(async (...args) => {
+          const result = await transaction(...args);
+          order.push('first_completed');
+          return result;
+        })
+        .mockImplementationOnce(async () => {
+          order.push('second_failed');
+          throw new Error('Private database failure details');
+        });
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const results = await caller.admin.userDeletionQueue.submitHistoricalUsers({
+        userIds: [firstUser.id, failedUser.id, regularUser.id, lastUser.id],
+      });
+      for (const result of results) {
+        if (result.status === 'enqueued') requestIds.push(result.requestId);
+      }
+      expect(results).toEqual([
+        { userId: firstUser.id, status: 'enqueued', requestId: expect.any(String) },
+        { userId: failedUser.id, status: 'failed' },
+        { userId: regularUser.id, status: 'refused', code: 'not_canonical_soft_deleted_user' },
+        { userId: lastUser.id, status: 'enqueued', requestId: expect.any(String) },
+      ]);
+      const requests = await db
+        .select({ userId: user_deletion_requests.user_id })
+        .from(user_deletion_requests)
+        .where(inArray(user_deletion_requests.user_id, historicalUserIds));
+      expect(requests.map(request => request.userId).sort()).toEqual(
+        [firstUser.id, lastUser.id].sort()
+      );
+      expect(order).toEqual(['first_completed', 'second_failed']);
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+    });
   });
 });

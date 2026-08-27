@@ -7,7 +7,10 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { WORKOS_API_KEY } from '@/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
-import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
+import {
+  createSoftDeletedBlockedReason,
+  isSoftDeletedBlockedReason,
+} from '@kilocode/db/user-soft-delete';
 import { reportAuthEvent, reportEvents } from '@/lib/ai-gateway/abuse-service';
 import {
   payment_methods,
@@ -1069,6 +1072,7 @@ export async function anonymizeCloudUserData(
   if (!user) return;
 
   const originalEmail = user.google_user_email;
+  const deletedEmail = `deleted+${userId}@deleted.invalid`;
   const originalAppStoreAccountToken = user.app_store_account_token;
 
   // ── Precondition checks (inside tx to avoid TOCTOU races) ──────────
@@ -1090,10 +1094,12 @@ export async function anonymizeCloudUserData(
   // Fall back to google_user_email so the tombstone hash still gets recorded
   // before the row below anonymizes both columns; otherwise a previously
   // deleted user could re-register and qualify as a referee.
-  await createDeletedUserEmailTombstone({
-    database: tx,
-    normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
-  });
+  if (originalEmail !== deletedEmail) {
+    await createDeletedUserEmailTombstone({
+      database: tx,
+      normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
+    });
+  }
 
   // ── Gateway cleanup ───────────────────────────────────────────────────
   await revokeGatewayStateForUser(tx, userId);
@@ -1116,7 +1122,7 @@ export async function anonymizeCloudUserData(
   await tx
     .update(kilocode_users)
     .set({
-      google_user_email: `deleted+${userId}@deleted.invalid`,
+      google_user_email: deletedEmail,
       normalized_email: null,
       email_domain: null,
       google_user_name: 'Deleted User',
@@ -1129,7 +1135,9 @@ export async function anonymizeCloudUserData(
       web_session_pepper: randomUUID(),
       app_store_account_token: randomUUID(),
       default_model: null,
-      blocked_reason: createSoftDeletedBlockedReason(),
+      blocked_reason: isSoftDeletedBlockedReason(user.blocked_reason)
+        ? user.blocked_reason
+        : createSoftDeletedBlockedReason(),
       blocked_at: null,
       blocked_by_kilo_user_id: null,
       auto_top_up_enabled: false,
@@ -1596,7 +1604,7 @@ export async function anonymizeCloudUserData(
   await tx
     .update(payment_methods)
     .set({
-      deleted_at: sql`now()`,
+      deleted_at: sql`coalesce(${payment_methods.deleted_at}, now())`,
       name: null,
       address_line1: null,
       address_line2: null,

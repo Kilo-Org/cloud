@@ -78,7 +78,7 @@ export function deletionStepDescription(stepKey: string): string {
   return STEP_LABELS[stepKey]?.description ?? '';
 }
 
-export type DeletionNotifyChannel = 'pylon' | 'email';
+export type DeletionNotifyChannel = 'pylon' | 'email' | 'none';
 
 const USED_NOTIFY_STATUSES = new Set([
   'succeeded',
@@ -93,10 +93,10 @@ export function deletionNotifyChannel(input: {
   pylonTicket: string | null;
   tasks: readonly { stepKey: string; status: string }[];
 }): DeletionNotifyChannel {
-  if (input.pylonTicket) return 'pylon';
-
   const reply = input.tasks.find(task => task.stepKey === 'pylon_reply');
   const email = input.tasks.find(task => task.stepKey === 'completion_email');
+  if (!reply && !email) return 'none';
+  if (input.pylonTicket) return 'pylon';
   if (email?.status === 'not_applicable' && reply) return 'pylon';
   if (reply?.status === 'not_applicable' && email) return 'email';
   if (reply && USED_NOTIFY_STATUSES.has(reply.status)) return 'pylon';
@@ -109,6 +109,7 @@ export function deletionNotifyStepSkipped(
   channel: DeletionNotifyChannel
 ): boolean {
   if (channel === 'pylon') return stepKey === 'completion_email';
+  if (channel === 'none' && stepKey === 'completion_email') return true;
   return stepKey === 'pylon_reply' || stepKey === 'pylon_finalize';
 }
 
@@ -217,6 +218,17 @@ const EMAIL_EXTRACT = /[^\s@,;()<>"[\]{}]+@[^\s@,;()<>"[\]{}]+\.[A-Za-z]{2,}/g;
 const PYLON_URL =
   /(?:https?:\/\/app\.usepylon\.com[^\s]*\/issues\/|issues\/)(iss_[a-zA-Z0-9]+|\d+)/i;
 const PYLON_TICKET = /(?:^|[\s#(,])(\d{1,8}|iss_[a-zA-Z0-9]+)(?:[\s),;]|$)/i;
+
+export function parseHistoricalDeletionUserIds(text: string): string[] {
+  return [
+    ...new Set(
+      text
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean)
+    ),
+  ];
+}
 
 export function parseDeletionEntries(text: string): Array<{ email: string; pylonTicket?: string }> {
   const segments = text

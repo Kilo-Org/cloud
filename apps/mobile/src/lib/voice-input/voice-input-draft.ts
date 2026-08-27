@@ -74,6 +74,19 @@ function isWhitespace(char: string | undefined): boolean {
   return char === ' ' || char === '\n' || char === '\t' || char === '\r';
 }
 
+/** Inputs for `resolveVoiceInsertion`. */
+export type ResolveVoiceInsertionOptions = {
+  baseDraft: string;
+  baseSelection: VoiceInputSelection | null;
+  transcript: string;
+  maxLength?: number;
+};
+
+export type ResolvedVoiceInsertion = {
+  draft: string;
+  selection: VoiceInputSelection;
+};
+
 /**
  * Splices `transcript` into `baseDraft` at the selection captured when the
  * voice session started. The selected range is replaced (an empty selection
@@ -84,12 +97,12 @@ function isWhitespace(char: string | undefined): boolean {
  * the returned caret sits just after the inserted text. A null selection
  * inserts at the draft's end.
  */
-export function resolveVoiceInsertion(
-  baseDraft: string,
-  baseSelection: VoiceInputSelection | null,
-  transcript: string,
-  maxLength: number | undefined
-): { draft: string; selection: VoiceInputSelection } {
+export function resolveVoiceInsertion({
+  baseDraft,
+  baseSelection,
+  transcript,
+  maxLength,
+}: ResolveVoiceInsertionOptions): ResolvedVoiceInsertion {
   const fallback = { start: baseDraft.length, end: baseDraft.length };
   const reported = baseSelection ?? fallback;
   const start = clampSelection(reported.start, baseDraft.length);
@@ -166,7 +179,7 @@ export function applyVoiceDraftAtSelection({
     return { kind: 'aborted' };
   }
   const transcript = resolveVoiceTranscriptDelta(baseDraft, mergedDraft);
-  const next = resolveVoiceInsertion(baseDraft, baseSelection, transcript, maxLength);
+  const next = resolveVoiceInsertion({ baseDraft, baseSelection, transcript, maxLength });
   input?.setNativeProps({ text: next.draft, selection: next.selection });
   onChangeText(next.draft);
   return { kind: 'inserted', draft: next.draft, selection: next.selection };

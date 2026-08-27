@@ -163,28 +163,48 @@ describe('resolveVoiceTranscriptDelta', () => {
 
 describe('resolveVoiceInsertion', () => {
   it('inserts at the caret and lands the caret after the inserted text', () => {
-    const result = resolveVoiceInsertion('hello world', { start: 5, end: 5 }, 'there', undefined);
+    const result = resolveVoiceInsertion({
+      baseDraft: 'hello world',
+      baseSelection: { start: 5, end: 5 },
+      transcript: 'there',
+      maxLength: undefined,
+    });
 
     expect(result.draft).toBe('hello there world');
     expect(result.selection).toEqual({ start: 11, end: 11 });
   });
 
   it('replaces the selected range', () => {
-    const result = resolveVoiceInsertion('hello world', { start: 5, end: 11 }, 'there', undefined);
+    const result = resolveVoiceInsertion({
+      baseDraft: 'hello world',
+      baseSelection: { start: 5, end: 11 },
+      transcript: 'there',
+      maxLength: undefined,
+    });
 
     expect(result.draft).toBe('hello there');
     expect(result.selection).toEqual({ start: 11, end: 11 });
   });
 
   it('inserts at the draft end when no selection was reported', () => {
-    const result = resolveVoiceInsertion('hello', null, 'world', undefined);
+    const result = resolveVoiceInsertion({
+      baseDraft: 'hello',
+      baseSelection: null,
+      transcript: 'world',
+      maxLength: undefined,
+    });
 
     expect(result.draft).toBe('hello world');
     expect(result.selection).toEqual({ start: 11, end: 11 });
   });
 
   it('truncates the transcript, not the surrounding text, at maxLength', () => {
-    const result = resolveVoiceInsertion('hello world', { start: 5, end: 5 }, 'there', 14);
+    const result = resolveVoiceInsertion({
+      baseDraft: 'hello world',
+      baseSelection: { start: 5, end: 5 },
+      transcript: 'there',
+      maxLength: 14,
+    });
 
     expect(result.draft).toBe('hello th world');
     expect(result.selection).toEqual({ start: 8, end: 8 });

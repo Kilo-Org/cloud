@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Ti n ṣiṣẹ lọwọ bayi",
     "search": {
       "searching": "Ti n wa",
       "searchSessions": "Wa awọn akoko",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Ko le ṣagbewọ awọn igba-ijiroro",
       "couldNotLoadActive": "Ko le ṣe ikojọpọ awọn akoko to n ṣiṣẹ",
-      "noSessionsYet": "Ko si awọn akoko sibẹsibẹ",
       "noSessionsYetDescription": "Bẹrẹ iṣẹ-ṣiṣe coding lati foonu rẹ. Awọn akoko rẹ yoo han nibi.",
       "noMatches": "Ko si awọn akoko ti o ba mu",
       "tryDifferentSearch": "Gbiyanju ọrọ wiwa ti o yatọ.",
       "tryAdjustFilters": "Gbiyanju lati ṣatunṣe tabi paarẹ awọn àlẹ̀ rẹ.",
       "couldNotSearch": "Ko le wa awọn akoko",
-      "allActive": "Gbogbo awọn akoko ti n ṣiṣẹ",
       "completedWillAppear": "Awọn akoko ti o pari yoo han nibi.",
       "noPastSessions": "Ko si awọn akoko ti o kọja",
       "live": "LIVE"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Yi lọ si isalẹ",
       "emptyTitle": "Ko si awọn ifiranṣẹ sibẹsibẹ",
       "renameAccessibility": "Fun akoko lorukọ: {{title}}",
-      "connectRepository": "So ibi ipamọ pọ",
       "cloningSession": "Ti n daakọ akoko",
       "continue": "Tẹ̀síwájú",
       "couldNotLoadThisSession": "Ko le ṣe ikojọpọ akoko yii",
-      "cloneFailed": "Ko le daakọ akoko yii.",
       "cloneFailedRetry": "Ko le daakọ akoko yii. Gbiyanju lẹẹkansi.",
-      "connectRepositoryToContinue": "So ibi ipamọ pọ lati tesiwaju.",
       "notEnoughCredits": "Ko si kirẹditi to lati ṣiṣẹ Cloud Agent. Ṣafikun kirẹditi ki o tun gbiyanju.",
       "previousTaskFinishing": "Iṣẹ́ ti o ti kọja ṣì ń pari. Jọwọ duro diẹ.",
       "serviceUnavailable": "Iṣẹ naa ko si lọwọlọwọ. Jọwọ tun gbiyanju.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Ko si ibi ipamọ data ti o han. Ṣayẹwo iwọle ibi ipamọ data fun GitLab, lẹhinna tunse.",
       "openBitbucket": "Ṣii Bitbucket",
       "openGitlab": "Ṣii GitLab",
-      "recentlyUsed": "Ti a lo laipẹ"
+      "recentlyUsed": "Ti a lo laipẹ",
+      "continueFrom": "Tẹ̀síwájú {{title}}",
+      "importingSession": "Gbigbe igba-ijiroro wọle",
+      "cliCannotContinue": "CLI yii ko le tẹ̀síwájú igba-ijiroro. Yan Cloud Agent tabi CLI miiran.",
+      "importFailed": "Ko le gbe igba-ijiroro yii wọle."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ti ṣe imudojuiwọn {{displayCount}} faili",

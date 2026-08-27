@@ -1579,7 +1579,6 @@
     }
   },
   "agents": {
-    "activeNow": "Şu anda etkin",
     "search": {
       "searching": "Aranıyor",
       "searchSessions": "Oturumları ara",
@@ -1590,13 +1589,11 @@
     "sessionList": {
       "couldNotLoad": "Oturumlar yüklenemedi",
       "couldNotLoadActive": "Etkin oturumlar yüklenemedi",
-      "noSessionsYet": "Henüz oturum yok",
       "noSessionsYetDescription": "Telefonunuzdan bir kodlama görevi başlatın. Oturumlarınız burada görünecek.",
       "noMatches": "Eşleşen oturum yok",
       "tryDifferentSearch": "Farklı bir arama terimi deneyin.",
       "tryAdjustFilters": "Filtrelerinizi ayarlamayı veya temizlemeyi deneyin.",
       "couldNotSearch": "Oturumlar aranamadı",
-      "allActive": "Tüm oturumlar etkin",
       "completedWillAppear": "Tamamlanan oturumlar burada görünecek.",
       "noPastSessions": "Geçmiş oturum yok",
       "live": "CANLI"
@@ -1665,13 +1662,10 @@
       "scrollToBottom": "En alta kaydır",
       "emptyTitle": "Henüz mesaj yok",
       "renameAccessibility": "Oturumu yeniden adlandır: {{title}}",
-      "connectRepository": "Depoyu bağla",
       "cloningSession": "Oturum klonlanıyor",
       "continue": "Devam et",
       "couldNotLoadThisSession": "Bu oturum yüklenemedi",
-      "cloneFailed": "Bu oturum kopyalanamadı.",
       "cloneFailedRetry": "Bu oturum kopyalanamadı. Tekrar deneyin.",
-      "connectRepositoryToContinue": "Devam etmek için bir depo bağlayın.",
       "notEnoughCredits": "Cloud Agent'i çalıştırmak için yeterli kredi yok. Kredi ekleyip tekrar deneyin.",
       "previousTaskFinishing": "Önceki görev hâlâ tamamlanıyor. Lütfen bir dakika bekleyin.",
       "serviceUnavailable": "Hizmet şu anda kullanılamıyor. Lütfen tekrar deneyin.",
@@ -1744,7 +1738,11 @@
       "noRepositoriesVisibleGitlab": "Görünür depo yok. GitLab için depo erişimini kontrol edin, ardından yenileyin.",
       "openBitbucket": "Bitbucket'ı Aç",
       "openGitlab": "GitLab'ı Aç",
-      "recentlyUsed": "Son kullanılanlar"
+      "recentlyUsed": "Son kullanılanlar",
+      "continueFrom": "{{title}} devam ediliyor",
+      "importingSession": "Oturum içe aktarılıyor",
+      "cliCannotContinue": "Bu CLI bir oturuma devam edemez. Bulut Ajanı veya başka bir CLI seçin.",
+      "importFailed": "Bu oturum içe aktarılamadı."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} dosya güncellendi",

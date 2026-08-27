@@ -2059,7 +2059,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktyvus dabar",
     "search": {
       "searching": "Ieškoma",
       "searchSessions": "Ieškoti sesijų",
@@ -2070,13 +2069,11 @@
     "sessionList": {
       "couldNotLoad": "Nepavyko įkelti sesijų",
       "couldNotLoadActive": "Nepavyko įkelti aktyvių sesijų",
-      "noSessionsYet": "Sesijų dar nėra",
       "noSessionsYetDescription": "Pradėkite kodavimo užduotį iš savo telefono. Jūsų sesijos bus rodomos čia.",
       "noMatches": "Sesijų neatitikimų nėra",
       "tryDifferentSearch": "Pabandykite kitą paieškos terminą.",
       "tryAdjustFilters": "Pabandykite pakoreguoti arba išvalyti filtrus.",
       "couldNotSearch": "Nepavyko ieškoti sesijų",
-      "allActive": "Visos sesijos aktyvios",
       "completedWillAppear": "Baigtos sesijos bus rodomos čia.",
       "noPastSessions": "Nėra ankstesnių sesijų",
       "live": "TIESIOGIAI"
@@ -2149,13 +2146,10 @@
       "scrollToBottom": "Slinkti žemyn",
       "emptyTitle": "Žinučių dar nėra",
       "renameAccessibility": "Pervadinti sesiją: {{title}}",
-      "connectRepository": "Prijungti saugyklą",
       "cloningSession": "Klonuojama sesija",
       "continue": "Tęsti",
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos",
-      "cloneFailed": "Nepavyko klonuoti šios sesijos.",
       "cloneFailedRetry": "Nepavyko klonuoti šios sesijos. Bandykite dar kartą.",
-      "connectRepositoryToContinue": "Prijunkite saugyklą, kad tęstumėte.",
       "notEnoughCredits": "Nepakanka kreditų paleisti Cloud Agent. Pridėkite kreditų ir bandykite dar kartą.",
       "previousTaskFinishing": "Ankstesnė užduotis dar baigiama. Palaukite akimirką.",
       "serviceUnavailable": "Paslauga šiuo metu nepasiekiama. Bandykite dar kartą.",
@@ -2228,7 +2222,11 @@
       "noRepositoriesVisibleGitlab": "Saugyklų nematyti. Patikrinkite saugyklų prieigą GitLab ir atnaujinkite.",
       "openBitbucket": "Atidaryti Bitbucket",
       "openGitlab": "Atidaryti GitLab",
-      "recentlyUsed": "Panaudota neseniai"
+      "recentlyUsed": "Panaudota neseniai",
+      "continueFrom": "Tęsiama {{title}}",
+      "importingSession": "Importuojama sesija",
+      "cliCannotContinue": "Šis CLI negali tęsti sesijos. Pasirinkite Cloud Agent arba kitą CLI.",
+      "importFailed": "Nepavyko importuoti šios sesijos."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujinta {{displayCount}} rinkmena",

@@ -141,8 +141,9 @@ export function OrganizationGitHubInstallations({
           </p>
         ) : installations.length === 0 ? (
           <p className="border-border border-t px-5 py-8 text-center text-sm text-muted-foreground sm:px-6">
-            No GitHub organizations are connected yet. GitHub will let you choose an organization
-            and repository access.
+            {query.data?.canAdd
+              ? 'No GitHub organizations are connected yet. GitHub will let you choose an organization and repository access.'
+              : 'No GitHub organizations are connected yet. Ask an organization owner or admin to connect one.'}
           </p>
         ) : (
           <div className="divide-border border-border divide-y border-t">

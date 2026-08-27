@@ -13,6 +13,17 @@ vi.mock('expo-secure-store', () => ({
   }),
 }));
 
+// `./consent` pulls `@/lib/analytics/posthog` (and its expo-application /
+// expo-device / react-native chain) into this pure-node suite. Mock it with
+// the exports `consent.ts` references so the import stays in node land.
+vi.mock('@/lib/analytics/posthog', () => ({
+  captureEvent: vi.fn(),
+  CONSENT_OUTCOME_EVENT: 'consent_outcome',
+  flushLastPostHogEvent: vi.fn().mockResolvedValue(undefined),
+  isPostHogReady: vi.fn(() => false),
+  subscribeToPostHogReady: vi.fn(),
+}));
+
 describe('consent gate', () => {
   beforeEach(() => {
     store.clear();

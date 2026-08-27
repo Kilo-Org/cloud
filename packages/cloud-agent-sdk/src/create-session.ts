@@ -85,6 +85,9 @@ export async function createRemoteSessionOnConnection(
     ...(input?.model !== undefined ? { model: input.model } : {}),
     ...(input?.orgId !== undefined ? { orgId: input.orgId } : {}),
     ...(input?.directory !== undefined ? { directory: input.directory } : {}),
+    ...(input?.cloneFromKiloSessionId !== undefined
+      ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
+      : {}),
   };
   // `directory` is an extended field; the `:bare` retry omits it for old CLIs.
   // Remove `:bare` when every supported CLI accepts it.
@@ -93,6 +96,7 @@ export async function createRemoteSessionOnConnection(
     data.model !== undefined ||
     data.orgId !== undefined ||
     data.directory !== undefined;
+  const hasCloneField = input?.cloneFromKiloSessionId !== undefined;
   const logicalKey = input?.mutationId;
   const extendedMutationId = logicalKey === undefined ? undefined : `${logicalKey}:ext`;
   const bareMutationId = logicalKey === undefined ? undefined : `${logicalKey}:bare`;
@@ -106,7 +110,11 @@ export async function createRemoteSessionOnConnection(
   } catch (error) {
     // Only bare-retry when extended fields made the original wire differ from
     // `{ protocolVersion: 1 }`; otherwise the retry is byte-identical noise.
+    // Old form is one bare protocolVersion 1 retry for extended fields; a
+    // clone id must never use that fallback because it would create a fresh
+    // session.
     if (
+      !hasCloneField &&
       hasExtendedFields &&
       error instanceof CommandDeliveredError &&
       error.message === INVALID_CREATE_SESSION_COMMAND

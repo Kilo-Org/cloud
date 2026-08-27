@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Nou aktief",
     "search": {
       "searching": "Soek",
       "searchSessions": "Soek sessies",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Kon sessies nie laai nie",
       "couldNotLoadActive": "Kon aktiewe sessies nie laai nie",
-      "noSessionsYet": "Nog geen sessies nie",
       "noSessionsYetDescription": "Begin 'n koderings taak vanaf jou foon. Jou sessies sal hier verskyn.",
       "noMatches": "Geen sessies pas nie",
       "tryDifferentSearch": "Probeer 'n ander soekterm.",
       "tryAdjustFilters": "Probeer jou filters aanpas of uitvee.",
       "couldNotSearch": "Kon sessies nie soek nie",
-      "allActive": "Alle sessies is aktief",
       "completedWillAppear": "Voltooide sessies sal hier verskyn.",
       "noPastSessions": "Geen vorige sessies nie",
       "live": "LEWEND"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Rolleer na onder",
       "emptyTitle": "Nog geen boodskappe nie",
       "renameAccessibility": "Hernoem sessie: {{title}}",
-      "connectRepository": "Koppel bewaarplek",
       "cloningSession": "Sessie kloning",
       "continue": "Gaan voort",
       "couldNotLoadThisSession": "Kon hierdie sessie nie laai nie",
-      "cloneFailed": "Kon hierdie sessie nie klone nie.",
       "cloneFailedRetry": "Kon hierdie sessie nie klone nie. Probeer weer.",
-      "connectRepositoryToContinue": "Koppel 'n bewaarplek om voort te gaan.",
       "notEnoughCredits": "Nie genoeg krediete om Cloud Agent te laat loop nie. Voeg krediete by en probeer weer.",
       "previousTaskFinishing": "Die vorige taak is nog besig. Wag asseblief 'n oomblik.",
       "serviceUnavailable": "Die diens is tans onbeskikbaar. Probeer asseblief weer.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Geen bewaarplekke sigbaar nie. Gaan GitLab-bewaarplektoegang na, en verfris dan.",
       "openBitbucket": "Maak Bitbucket oop",
       "openGitlab": "Maak GitLab oop",
-      "recentlyUsed": "Onlangs gebruik"
+      "recentlyUsed": "Onlangs gebruik",
+      "continueFrom": "Gaan voort met {{title}}",
+      "importingSession": "Sessie word ingevoer",
+      "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortgaan nie. Kies Cloud Agent of 'n ander CLI.",
+      "importFailed": "Kon hierdie sessie nie invoer nie."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer bygewerk",

@@ -37,6 +37,21 @@ type UseNewSessionShareRemoteArgs = {
    * to re-arm the discard confirm after a failed spawn.
    */
   onSpawnFailed?: () => void;
+  /**
+   * Kilo session id the continue form clones from. Forwarded to
+   * `useRemoteSpawnDispatch` so the CLI import carries it on the wire.
+   */
+  cloneFromKiloSessionId?: string | null;
+  /**
+   * Invoked with an inline failure i18n key when a clone/import spawn fails
+   * non-retryably. Forwarded to `useRemoteSpawnDispatch`.
+   */
+  onCloneImportFailure?: (key: string) => void;
+  /**
+   * Invoked right before a clone/import spawn navigates on success. Forwarded
+   * to `useRemoteSpawnDispatch`; the route arms its busy leave-lock bypass here.
+   */
+  onSpawnReady?: () => void;
 };
 
 /**
@@ -57,6 +72,9 @@ export function useNewSessionShareRemote({
   selection,
   onSpawnAdmitted,
   onSpawnFailed,
+  cloneFromKiloSessionId,
+  onCloneImportFailure,
+  onSpawnReady,
 }: UseNewSessionShareRemoteArgs) {
   // Render-time ref assignment, the same pattern `share-prefill.ts:80` and
   // `share-gate-sheet.tsx:91` use, so the snapshot callback stays stable
@@ -66,11 +84,16 @@ export function useNewSessionShareRemote({
 
   const getSubmitPayload = useCallback(
     () =>
-      buildComposerSharePayload({
-        text: promptRef.current,
-        attachments: attachmentsRef.current,
-      }),
-    [promptRef]
+      // Clone entry (a Continue form) has no composer: the submit payload must
+      // be null so the CLI import's success navigation carries no shareId or
+      // autoSend. The ordinary remote spawn keeps the composer snapshot.
+      cloneFromKiloSessionId
+        ? null
+        : buildComposerSharePayload({
+            text: promptRef.current,
+            attachments: attachmentsRef.current,
+          }),
+    [promptRef, cloneFromKiloSessionId]
   );
 
   const remoteSpawn = useRemoteSpawnDispatch({
@@ -85,6 +108,9 @@ export function useNewSessionShareRemote({
     getSubmitPayload,
     onSpawnAdmitted,
     onSpawnFailed,
+    cloneFromKiloSessionId,
+    onCloneImportFailure,
+    onSpawnReady,
   });
 
   return { remoteSpawn, handleRunOnInstanceChange: remoteSpawn.onChangeRunOnInstance };

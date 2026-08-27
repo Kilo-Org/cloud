@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Virkur núna",
     "search": {
       "searching": "Leitar",
       "searchSessions": "Leita í lotum",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Ekki tókst að hlaða lotur",
       "couldNotLoadActive": "Ekki tókst að hlaða virkar lotur",
-      "noSessionsYet": "Engar lotur ennþá",
       "noSessionsYetDescription": "Byrjaðu kóðunarverkefni frá símanum þínum. Loturnar þínar birtast hér.",
       "noMatches": "Engar lotur passa",
       "tryDifferentSearch": "Prófaðu annað leitarorð.",
       "tryAdjustFilters": "Reyndu að breyta eða hreinsa síurnar þínar.",
       "couldNotSearch": "Ekki tókst að leita í lotum",
-      "allActive": "Allar lotur eru virkar",
       "completedWillAppear": "Lokið lotur birtast hér.",
       "noPastSessions": "Engar fyrri lotur",
       "live": "BEIN"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Skruna til botns",
       "emptyTitle": "Engin skilaboð ennþá",
       "renameAccessibility": "Endurnefna lotu: {{title}}",
-      "connectRepository": "Tengja geymslu",
       "cloningSession": "Klónar lotu",
       "continue": "Halda áfram",
       "couldNotLoadThisSession": "Ekki tókst að hlaða þessa lotu",
-      "cloneFailed": "Ekki tókst að klóna þessa lotu.",
       "cloneFailedRetry": "Ekki tókst að klóna þessa lotu. Reyndu aftur.",
-      "connectRepositoryToContinue": "Tengdu geymslu til að halda áfram.",
       "notEnoughCredits": "Ekki næg kredit til að keyra Cloud Agent. Bættu við kredit og reyndu aftur.",
       "previousTaskFinishing": "Fyrra verkefni er enn að klárast. Bíddu augnablik.",
       "serviceUnavailable": "Þjónustan er ekki tiltæk núna. Reyndu aftur.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Engar geymslur sjáanlegar. Athugaðu geymsluaðgang að GitLab og endurnýjaðu.",
       "openBitbucket": "Opna Bitbucket",
       "openGitlab": "Opna GitLab",
-      "recentlyUsed": "Nýlega notað"
+      "recentlyUsed": "Nýlega notað",
+      "continueFrom": "Halda áfram með {{title}}",
+      "importingSession": "Flytur inn lotu",
+      "cliCannotContinue": "Þetta CLI getur ekki haldið áfram með lotu. Veldu Cloud Agent eða annað CLI.",
+      "importFailed": "Ekki tókst að flytja inn þessa lotu."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uppfærði {{displayCount}} skrá",

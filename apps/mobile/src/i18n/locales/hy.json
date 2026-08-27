@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Այժմ ակտիվ",
     "search": {
       "searching": "Որոնում",
       "searchSessions": "Որոնել նիստեր",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Չհաջողվեց բեռնել նիստերը",
       "couldNotLoadActive": "Չհաջողվեց բեռնել ակտիվ նիստերը",
-      "noSessionsYet": "Դեռևս նիստեր չկան",
       "noSessionsYetDescription": "Սկսեք ծածկագրման առաջադրանք ձեր հեռախոսից։ Ձեր նիստերը կհայտնվեն այստեղ։",
       "noMatches": "Ոչ մի նիստ չի համապատասխանում",
       "tryDifferentSearch": "Փորձեք որոնման այլ տերմին։",
       "tryAdjustFilters": "Փորձեք ճշգրտել կամ մաքրել ձեր զտիչները։",
       "couldNotSearch": "Չհաջողվեց որոնել նիստերը",
-      "allActive": "Բոլոր նիստերն ակտիվ են",
       "completedWillAppear": "Ավարտված նիստերը կհայտնվեն այստեղ։",
       "noPastSessions": "Անցյալի նիստեր չկան",
       "live": "ՈՒՂԻՂ"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Ոլորել մինչև ներքև",
       "emptyTitle": "Դեռևս հաղորդագրություններ չկան",
       "renameAccessibility": "Վերանվանել նիստը՝ {{title}}",
-      "connectRepository": "Միացնել պահոցը",
       "cloningSession": "Նիստի կլոնավորում",
       "continue": "Շարունակել",
       "couldNotLoadThisSession": "Չհաջողվեց բեռնել այս նիստը",
-      "cloneFailed": "Չհաջողվեց կլոնավորել այս նիստը։",
       "cloneFailedRetry": "Չհաջողվեց կլոնավորել այս նիստը։ Կրկին փորձեք։",
-      "connectRepositoryToContinue": "Միացրեք պահոցը՝ շարունակելու համար։",
       "notEnoughCredits": "Cloud Agent-ը գործարկելու համար բավարար կրեդիտ չկա։ Ավելացրեք կրեդիտ և փորձեք կրկին։",
       "previousTaskFinishing": "Նախորդ առաջադրանքը դեռ ավարտվում է։ Խնդրում ենք սպասել մի պահ։",
       "serviceUnavailable": "Ծառայությունն այս պահին հասանելի չէ։ Խնդրում ենք փորձեք կրկին։",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Պահոցներ չեն երևում: Ստուգեք GitLab-ի պահոցների հասանելիությունը, ապա թարմացրեք:",
       "openBitbucket": "Բացել Bitbucket",
       "openGitlab": "Բացել GitLab",
-      "recentlyUsed": "Վերջերս օգտագործված"
+      "recentlyUsed": "Վերջերս օգտագործված",
+      "continueFrom": "Շարունակվում է {{title}}",
+      "importingSession": "Ներմուծվում է նիստ",
+      "cliCannotContinue": "Այս CLI-ն չի կարող շարունակել նիստը: Ընտրեք Ամպային գործակալ կամ մեկ այլ CLI:",
+      "importFailed": "Չհաջողվեց ներմուծել այս նիստը:"
     },
     "partRenderer": {
       "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ",

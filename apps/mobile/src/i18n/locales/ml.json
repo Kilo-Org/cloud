@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "ഇപ്പോൾ സജീവം",
     "search": {
       "searching": "തിരയുന്നു",
       "searchSessions": "സെഷനുകൾ തിരയുക",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "സെഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "couldNotLoadActive": "സജീവ സെഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
-      "noSessionsYet": "ഇതുവരെ സെഷനുകളൊന്നുമില്ല",
       "noSessionsYetDescription": "നിങ്ങളുടെ ഫോണിൽ നിന്ന് ഒരു കോഡിംഗ് ജോലി ആരംഭിക്കുക. നിങ്ങളുടെ സെഷനുകൾ ഇവിടെ ദൃശ്യമാകും.",
       "noMatches": "പൊരുത്തപ്പെടുന്ന സെഷനുകളൊന്നുമില്ല",
       "tryDifferentSearch": "മറ്റൊരു തിരയൽ പദം ശ്രമിക്കുക.",
       "tryAdjustFilters": "നിങ്ങളുടെ ഫിൽട്ടറുകൾ ക്രമീകരിക്കുകയോ മായ്ക്കുകയോ ചെയ്യുക.",
       "couldNotSearch": "സെഷനുകൾ തിരയാൻ കഴിഞ്ഞില്ല",
-      "allActive": "എല്ലാ സെഷനുകളും സജീവമാണ്",
       "completedWillAppear": "പൂർത്തിയായ സെഷനുകൾ ഇവിടെ ദൃശ്യമാകും.",
       "noPastSessions": "മുൻകാല സെഷനുകളൊന്നുമില്ല",
       "live": "LIVE"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "ചുവടെയേക്ക് സ്ക്രോൾ ചെയ്യുക",
       "emptyTitle": "ഇതുവരെ സന്ദേശങ്ങളൊന്നുമില്ല",
       "renameAccessibility": "സെഷൻ പുനർനാമകരണം ചെയ്യുക: {{title}}",
-      "connectRepository": "റിപ്പോസിറ്ററി കണക്റ്റ് ചെയ്യുക",
       "cloningSession": "സെഷൻ ക്ലോൺ ചെയ്യുന്നു",
       "continue": "തുടരുക",
       "couldNotLoadThisSession": "ഈ സെഷൻ ലോഡ് ചെയ്യാനായില്ല",
-      "cloneFailed": "ഈ സെഷൻ ക്ലോൺ ചെയ്യാനായില്ല.",
       "cloneFailedRetry": "ഈ സെഷൻ ക്ലോൺ ചെയ്യാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",
-      "connectRepositoryToContinue": "തുടരാൻ ഒരു റിപ്പോസിറ്ററി കണക്റ്റ് ചെയ്യുക.",
       "notEnoughCredits": "Cloud Agent പ്രവർത്തിപ്പിക്കാൻ ക്രെഡിറ്റുകൾ മതിയാകുന്നില്ല. ക്രെഡിറ്റുകൾ ചേർത്ത് വീണ്ടും ശ്രമിക്കുക.",
       "previousTaskFinishing": "മുൻ ജോലി ഇപ്പോഴും പൂർത്തിയാകുന്നു. ഒരു നിമിഷം കാത്തിരിക്കുക.",
       "serviceUnavailable": "സേവനം ഇപ്പോൾ ലഭ്യമല്ല. വീണ്ടും ശ്രമിക്കുക.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "റിപ്പോസിറ്ററികൾ ദൃശ്യമല്ല. GitLab-നുള്ള റിപ്പോസിറ്ററി ആക്സസ് പരിശോധിക്കുക, തുടർന്ന് റിഫ്രഷ് ചെയ്യുക.",
       "openBitbucket": "Bitbucket തുറക്കുക",
       "openGitlab": "GitLab തുറക്കുക",
-      "recentlyUsed": "അടുത്തിടെ ഉപയോഗിച്ചവ"
+      "recentlyUsed": "അടുത്തിടെ ഉപയോഗിച്ചവ",
+      "continueFrom": "{{title}} തുടരുന്നു",
+      "importingSession": "സെഷൻ ഇറക്കുമതി ചെയ്യുന്നു",
+      "cliCannotContinue": "ഈ CLI-യ്ക്ക് ഒരു സെഷൻ തുടരാൻ കഴിയില്ല. Cloud Agent അല്ലെങ്കിൽ മറ്റൊരു CLI തിരഞ്ഞെടുക്കുക.",
+      "importFailed": "ഈ സെഷൻ ഇറക്കുമതി ചെയ്യാനായില്ല."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ഫയൽ അപ്ഡേറ്റ് ചെയ്തു",

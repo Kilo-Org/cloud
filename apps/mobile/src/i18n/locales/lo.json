@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "ເຄື່ອນໄຫວຕອນນີ້",
     "search": {
       "searching": "ກຳລັງຄົ້ນຫາ",
       "searchSessions": "ຄົ້ນຫາເຊດຊັນ",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດເຊດຊັນ",
       "couldNotLoadActive": "ບໍ່ສາມາດໂຫຼດເຊດຊັນທີ່ເຄື່ອນໄຫວ",
-      "noSessionsYet": "ຍັງບໍ່ມີເຊດຊັນ",
       "noSessionsYetDescription": "ເລີ່ມວຽກການຂຽນລະຫັດຈາກໂທລະສັບຂອງທ່ານ. ເຊດຊັນຂອງທ່ານຈະປາກົດຢູ່ນີ້.",
       "noMatches": "ບໍ່ມີເຊດຊັນທີ່ກົງກັນ",
       "tryDifferentSearch": "ລອງຄຳຄົ້ນຫາທີ່ແຕກຕ່າງ.",
       "tryAdjustFilters": "ລອງປັບ ຫຼື ລ້າງຕົວກັ່ນຕອງຂອງທ່ານ.",
       "couldNotSearch": "ບໍ່ສາມາດຄົ້ນຫາເຊດຊັນ",
-      "allActive": "ທຸກເຊດຊັນເຄື່ອນໄຫວຢູ່",
       "completedWillAppear": "ເຊດຊັນທີ່ສຳເລັດຈະປາກົດຢູ່ນີ້.",
       "noPastSessions": "ບໍ່ມີເຊດຊັນທີ່ຜ່ານມາ",
       "live": "LIVE"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "ເລື່ອນໄປລຸ່ມ",
       "emptyTitle": "ຍັງບໍ່ມີຂໍ້ຄວາມ",
       "renameAccessibility": "ປ່ຽນຊື່ເຊດຊັນ: {{title}}",
-      "connectRepository": "ເຊື່ອມຕໍ່ບ່ອນເກັບລະຫັດ",
       "cloningSession": "ກຳລັງສຳເນົາເຊດຊັນ",
       "continue": "ສືບຕໍ່",
       "couldNotLoadThisSession": "ບໍ່ສາມາດໂຫຼດເຊດຊັນນີ້",
-      "cloneFailed": "ບໍ່ສາມາດສຳເນົາເຊດຊັນນີ້.",
       "cloneFailedRetry": "ບໍ່ສາມາດສຳເນົາເຊດຊັນນີ້. ລອງໃໝ່.",
-      "connectRepositoryToContinue": "ເຊື່ອມຕໍ່ບ່ອນເກັບລະຫັດເພື່ອສືບຕໍ່.",
       "notEnoughCredits": "ບໍ່ມີເຄຣດິດພຽງພໍທີ່ຈະໃຊ້ Cloud Agent. ເພີ່ມເຄຣດິດແລ້ວລອງໃໝ່.",
       "previousTaskFinishing": "ວຽກກ່ອນໜ້າຍັງບໍ່ທັນສຳເລັດ. ກະລຸນາລໍຖ້າເລັກນ້ອຍ.",
       "serviceUnavailable": "ບໍລິການບໍ່ສາມາດໃຊ້ໄດ້ໃນຕອນນີ້. ກະລຸນາລອງໃໝ່.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "ບໍ່ມີ repositories ທີ່ເຫັນ. ກວດເບິ່ງການເຂົ້າເຖິງ repository ສຳລັບ GitLab, ຈາກນັ້ນ refresh.",
       "openBitbucket": "ເປີດ Bitbucket",
       "openGitlab": "ເປີດ GitLab",
-      "recentlyUsed": "ຫຼ້າສຸດທີ່ໃຊ້"
+      "recentlyUsed": "ຫຼ້າສຸດທີ່ໃຊ້",
+      "continueFrom": "ກຳລັງສືບຕໍ່ {{title}}",
+      "importingSession": "ກຳລັງນຳເຂົ້າເຊດຊັນ",
+      "cliCannotContinue": "CLI ນີ້ບໍ່ສາມາດສືບຕໍ່ເຊດຊັນໄດ້. ເລືອກ Cloud Agent ຫຼື CLI ອື່ນ.",
+      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້."
     },
     "partRenderer": {
       "updatedFileCount_one": "ອັບເດດ {{displayCount}} ໄຟລ໌",

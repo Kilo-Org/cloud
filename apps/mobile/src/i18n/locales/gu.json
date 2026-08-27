@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "હવે સક્રિય",
     "search": {
       "searching": "શોધી રહ્યું છે",
       "searchSessions": "સત્રો શોધો",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "સત્રો લોડ કરી શકાયા નહીં",
       "couldNotLoadActive": "સક્રિય સત્રો લોડ થઈ શક્યા નથી",
-      "noSessionsYet": "હજુ કોઈ સત્ર નથી",
       "noSessionsYetDescription": "તમારા ફોન પરથી કોડિંગ કાર્ય શરૂ કરો. તમારા સત્રો અહીં દેખાશે.",
       "noMatches": "કોઈ સત્ર મેળ ખાતું નથી",
       "tryDifferentSearch": "અલગ શોધ શબ્દ અજમાવો.",
       "tryAdjustFilters": "તમારા ફિલ્ટર ગોઠવવાનો અથવા સાફ કરવાનો પ્રયાસ કરો.",
       "couldNotSearch": "સત્રો શોધી શકાયા નથી",
-      "allActive": "બધા સત્રો સક્રિય છે",
       "completedWillAppear": "પૂર્ણ થયેલ સત્રો અહીં દેખાશે.",
       "noPastSessions": "કોઈ ભૂતકાળના સત્ર નથી",
       "live": "લાઇવ"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "નીચે સ્ક્રોલ કરો",
       "emptyTitle": "હજુ કોઈ સંદેશ નથી",
       "renameAccessibility": "સત્રનું નામ બદલો: {{title}}",
-      "connectRepository": "રિપોઝિટરી કનેક્ટ કરો",
       "cloningSession": "સત્ર ક્લોન કરી રહ્યું છે",
       "continue": "ચાલુ રાખો",
       "couldNotLoadThisSession": "આ સત્ર લોડ થઈ શક્યું નથી",
-      "cloneFailed": "આ સત્ર ક્લોન થઈ શક્યું નથી.",
       "cloneFailedRetry": "આ સત્ર ક્લોન થઈ શક્યું નથી. ફરી પ્રયાસ કરો.",
-      "connectRepositoryToContinue": "ચાલુ રાખવા રિપોઝિટરી કનેક્ટ કરો.",
       "notEnoughCredits": "Cloud Agent ચલાવવા માટે પૂરતા ક્રેડિટ નથી. ક્રેડિટ ઉમેરીને ફરી પ્રયાસ કરો.",
       "previousTaskFinishing": "પાછલું કાર્ય હજી પૂરું થઈ રહ્યું છે. થોડી રાહ જુઓ.",
       "serviceUnavailable": "સેવા હાલ ઉપલબ્ધ નથી. ફરી પ્રયાસ કરો.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "કોઈ રિપોઝિટરી દેખાતી નથી. GitLab માટે રિપોઝિટરી એક્સેસ તપાસો, પછી રિફ્રેશ કરો.",
       "openBitbucket": "Bitbucket ખોલો",
       "openGitlab": "GitLab ખોલો",
-      "recentlyUsed": "તાજેતરમાં ઉપયોગમાં લેવાયેલું"
+      "recentlyUsed": "તાજેતરમાં ઉપયોગમાં લેવાયેલું",
+      "continueFrom": "{{title}} ચાલુ કરી રહ્યાં છીએ",
+      "importingSession": "સત્ર આયાત કરી રહ્યાં છીએ",
+      "cliCannotContinue": "આ CLI સત્ર ચાલુ રાખી શકતું નથી. Cloud Agent અથવા બીજું CLI પસંદ કરો.",
+      "importFailed": "આ સત્ર આયાત કરી શક્યા નથી."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ફાઇલ અપડેટ કરેલ",

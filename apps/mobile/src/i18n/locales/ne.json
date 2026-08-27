@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "अहिले सक्रिय",
     "search": {
       "searching": "खोज्दै",
       "searchSessions": "सत्रहरू खोज्नुहोस्",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "सत्रहरू लोड गर्न सकिएन",
       "couldNotLoadActive": "सक्रिय सत्रहरू लोड गर्न सकिएन",
-      "noSessionsYet": "अहिलेसम्म कुनै सत्रहरू छैनन्",
       "noSessionsYetDescription": "तपाईंको फोनबाट कोडिङ कार्य सुरु गर्नुहोस्। तपाईंका सत्रहरू यहाँ देखा पर्नेछन्।",
       "noMatches": "कुनै सत्र मेल खाएन",
       "tryDifferentSearch": "फरक खोज शब्द प्रयास गर्नुहोस्।",
       "tryAdjustFilters": "फिल्टरहरू समायोजन वा खाली गर्ने प्रयास गर्नुहोस्।",
       "couldNotSearch": "सत्रहरू खोज्न सकिएन",
-      "allActive": "सबै सत्रहरू सक्रिय छन्",
       "completedWillAppear": "पूरा भएका सत्रहरू यहाँ देखा पर्नेछन्।",
       "noPastSessions": "कुनै पुराना सत्रहरू छैनन्",
       "live": "LIVE"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "तल स्क्रोल गर्नुहोस्",
       "emptyTitle": "अहिलेसम्म कुनै सन्देशहरू छैनन्",
       "renameAccessibility": "सत्रको नाम बदल्नुहोस्: {{title}}",
-      "connectRepository": "भण्डार जडान गर्नुहोस्",
       "cloningSession": "सत्र क्लोन गर्दै",
       "continue": "जारी राख्नुहोस्",
       "couldNotLoadThisSession": "यो सत्र लोड गर्न सकिएन",
-      "cloneFailed": "यो सत्र क्लोन गर्न सकिएन।",
       "cloneFailedRetry": "यो सत्र क्लोन गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
-      "connectRepositoryToContinue": "जारी राख्न एउटा भण्डार जडान गर्नुहोस्।",
       "notEnoughCredits": "Cloud Agent चलाउन पर्याप्त क्रेडिट छैन। क्रेडिट थपेर फेरि प्रयास गर्नुहोस्।",
       "previousTaskFinishing": "अघिल्लो कार्य अझै समाप्त हुँदैछ। कृपया एक क्षण पर्खनुहोस्।",
       "serviceUnavailable": "सेवा अहिले उपलब्ध छैन। फेरि प्रयास गर्नुहोस्।",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "कुनै रिपोजिटरी देखिएन। गिटल्याबको लागि रिपोजिटरी पहुँच जाँच्नुहोस्, त्यसपछि रिफ्रेस गर्नुहोस्।",
       "openBitbucket": "बिटबकेट खोल्नुहोस्",
       "openGitlab": "गिटल्याब खोल्नुहोस्",
-      "recentlyUsed": "हालै प्रयोग गरिएका"
+      "recentlyUsed": "हालै प्रयोग गरिएका",
+      "continueFrom": "{{title}} जारी राख्दै",
+      "importingSession": "सत्र आयात गर्दै",
+      "cliCannotContinue": "यो CLI ले सत्र जारी राख्न सक्दैन। Cloud Agent वा अर्को CLI छान्नुहोस्।",
+      "importFailed": "यो सत्र आयात गर्न सकिएन।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्यावधिक गरियो",

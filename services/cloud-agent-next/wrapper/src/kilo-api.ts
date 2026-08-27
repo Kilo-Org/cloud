@@ -291,8 +291,8 @@ export type WrapperKiloClient = {
     title: string;
     env: Record<string, string>;
   }) => Promise<WrapperPty>;
-  resizePty: (ptyId: string, size: WrapperPtySize) => Promise<WrapperPty>;
-  deletePty: (ptyId: string) => Promise<boolean>;
+  resizePty: (ptyId: string, size: WrapperPtySize, directory?: string) => Promise<WrapperPty>;
+  deletePty: (ptyId: string, directory?: string) => Promise<boolean>;
 
   /**
    * Subscribe to kilo events. The stream yields typed events until the abort
@@ -579,10 +579,10 @@ export function createWrapperKiloClient(
       return result.data as WrapperPty;
     },
 
-    resizePty: async (ptyId, size) => {
+    resizePty: async (ptyId, size, directory = workspacePath) => {
       const result = await v2Client.pty.update({
         ptyID: ptyId,
-        directory: workspacePath,
+        directory,
         size,
       });
       if (!result.data) {
@@ -591,10 +591,10 @@ export function createWrapperKiloClient(
       return result.data as WrapperPty;
     },
 
-    deletePty: async ptyId => {
+    deletePty: async (ptyId, directory = workspacePath) => {
       const result = await v2Client.pty.remove({
         ptyID: ptyId,
-        directory: workspacePath,
+        directory,
       });
       return Boolean(result.data);
     },

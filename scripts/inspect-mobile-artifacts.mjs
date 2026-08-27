@@ -52,6 +52,23 @@ const JS_BUNDLE_RE = /\.(jsbundle|bundle|hbc)$/i;
 const GRAMMAR_RE = /highlight\.js|lowlight|refractor|prism|shiki|grammar/i;
 const GRAMMAR_FILE_RE = /\.(c|m)?js$/i;
 
+// Markers that must be compiled into every signed JS bundle. A missing marker
+// fails the inspect, because each one proves a privacy or analytics gate is
+// present in the shipped bundle.
+export const INSPECT_JS_NEEDLES = [
+  // maskAll* from Sentry mobileReplayIntegration in the extracted sentry-init module.
+  'maskAllText',
+  'maskAllImages',
+  'maskAllVectors',
+  // consent-accepted- from CONSENT_USER_KEY_PREFIX in apps/mobile/src/lib/storage-keys.ts
+  // (proves consent storage is compiled in; runtime gating is the transport-spy suite).
+  'consent-accepted-',
+  // PostHog US host from initPostHog.
+  'us.i.posthog.com',
+  // app_startup from APP_STARTUP_EVENT.
+  'app_startup',
+];
+
 const failures = [];
 
 function check(condition, message) {
@@ -352,6 +369,58 @@ function measureArtifactSizes(artifactPath, label) {
   return rows;
 }
 
+export function bundleBufferContains(buffer, needle) {
+  return buffer.toString('utf8').includes(needle) || buffer.toString('utf16le').includes(needle);
+}
+
+// `getSentryExpoConfig` in apps/mobile/metro.config.js injects a Sentry debug-id
+// into the JS bundle; it is the symbolication signal, so either marker must be
+// present. Do not check IPA dSYM files.
+export function bundleBufferHasDebugId(buffer) {
+  return bundleBufferContains(buffer, 'debugId') || bundleBufferContains(buffer, 'debug_id');
+}
+
+export function inspectJsBundles(artifactPath) {
+  const needlesFound = [];
+  let hasDebugId = false;
+  const work = mkdtempSync(join(tmpdir(), 'kilo-inspect-js-'));
+  try {
+    const extractDir = join(work, 'extracted');
+    mkdirSync(extractDir, { recursive: true });
+    try {
+      run('unzip', ['-q', '-o', artifactPath, '-d', extractDir]);
+    } catch (error) {
+      console.error(`JS bundle inspection: cannot unzip ${artifactPath}: ${error.message}`);
+      return { needlesFound, hasDebugId };
+    }
+    for (const { fullPath, relPath } of walkFiles(extractDir)) {
+      if (!JS_BUNDLE_RE.test(relPath)) {
+        continue;
+      }
+      const buffer = readFileSync(fullPath);
+      for (const needle of INSPECT_JS_NEEDLES) {
+        if (!needlesFound.includes(needle) && bundleBufferContains(buffer, needle)) {
+          needlesFound.push(needle);
+        }
+      }
+      if (!hasDebugId && bundleBufferHasDebugId(buffer)) {
+        hasDebugId = true;
+      }
+    }
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+  return { needlesFound, hasDebugId };
+}
+
+export function assertJsBundlePrivacy(artifactPath, label) {
+  const { needlesFound, hasDebugId } = inspectJsBundles(artifactPath);
+  for (const needle of INSPECT_JS_NEEDLES) {
+    check(needlesFound.includes(needle), `${label} JS bundle is missing needle: ${needle}`);
+  }
+  check(hasDebugId, `${label} JS bundle must contain a Sentry debug-id marker`);
+}
+
 function printSizeTable(ipaPath, aabPath) {
   const rows = [
     ...measureArtifactSizes(ipaPath, basename(ipaPath)),
@@ -400,6 +469,8 @@ function main() {
   inspectAndroid(aabPath);
   checkSymbols(aabPath);
   check(checkResourceShrinking(aabPath), 'unused shrink sentinel still in the AAB');
+  assertJsBundlePrivacy(ipaPath, 'IPA');
+  assertJsBundlePrivacy(aabPath, 'AAB');
   printSizeTable(ipaPath, aabPath);
   reportAndExit();
 }

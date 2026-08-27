@@ -333,6 +333,40 @@ describe('createWrapperKiloClient PTY endpoints', () => {
     expect(requestedUrls[0]?.searchParams.get('directory')).toBe(workspacePath);
   });
 
+  it('resizes PTYs within an explicitly supplied session directory', async () => {
+    const sessionDirectory = '/workspace/control-session';
+    const requestedUrls: URL[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(input => {
+        const requestUrl = input instanceof Request ? input.url : String(input);
+        requestedUrls.push(new URL(requestUrl));
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: 'pty_resize_control',
+              title: 'Workspace terminal',
+              command: '/bin/bash',
+              args: [],
+              cwd: sessionDirectory,
+              status: 'running',
+              pid: 43,
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } }
+          )
+        );
+      })
+    );
+
+    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+
+    await client.resizePty('pty_resize_control', { cols: 100, rows: 35 }, sessionDirectory);
+
+    expect(requestedUrls).toHaveLength(1);
+    expect(requestedUrls[0]?.pathname).toBe('/pty/pty_resize_control');
+    expect(requestedUrls[0]?.searchParams.get('directory')).toBe(sessionDirectory);
+  });
+
   it('deletes PTYs within the configured workspace directory', async () => {
     const requestedUrls: URL[] = [];
     vi.stubGlobal(
@@ -355,5 +389,31 @@ describe('createWrapperKiloClient PTY endpoints', () => {
 
     expect(requestedUrls).toHaveLength(1);
     expect(requestedUrls[0]?.searchParams.get('directory')).toBe(workspacePath);
+  });
+
+  it('deletes PTYs within an explicitly supplied session directory', async () => {
+    const sessionDirectory = '/workspace/another-control-session';
+    const requestedUrls: URL[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(input => {
+        const requestUrl = input instanceof Request ? input.url : String(input);
+        requestedUrls.push(new URL(requestUrl));
+        return Promise.resolve(
+          new Response(JSON.stringify(true), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        );
+      })
+    );
+
+    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+
+    await client.deletePty('pty_delete_control', sessionDirectory);
+
+    expect(requestedUrls).toHaveLength(1);
+    expect(requestedUrls[0]?.pathname).toBe('/pty/pty_delete_control');
+    expect(requestedUrls[0]?.searchParams.get('directory')).toBe(sessionDirectory);
   });
 });

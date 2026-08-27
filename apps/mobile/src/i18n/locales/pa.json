@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "ਹੁਣ ਕਿਰਿਆਸ਼ੀਲ",
     "search": {
       "searching": "ਖੋਜ ਰਿਹਾ ਹੈ",
       "searchSessions": "ਸੈਸ਼ਨ ਖੋਜੋ",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ",
       "couldNotLoadActive": "ਕਿਰਿਆਸ਼ੀਲ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ",
-      "noSessionsYet": "ਅਜੇ ਕੋਈ ਸੈਸ਼ਨ ਨਹੀਂ",
       "noSessionsYetDescription": "ਆਪਣੇ ਫ਼ੋਨ ਤੋਂ ਕੋਡਿੰਗ ਕੰਮ ਸ਼ੁਰੂ ਕਰੋ। ਤੁਹਾਡੇ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
       "noMatches": "ਕੋਈ ਸੈਸ਼ਨ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
       "tryDifferentSearch": "ਵੱਖਰਾ ਖੋਜ ਸ਼ਬਦ ਅਜ਼ਮਾਓ।",
       "tryAdjustFilters": "ਆਪਣੇ ਫਿਲਟਰ ਵਿਵਸਥਿਤ ਜਾਂ ਸਾਫ਼ ਕਰਨ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "couldNotSearch": "ਸੈਸ਼ਨ ਖੋਜੇ ਨਹੀਂ ਜਾ ਸਕੇ",
-      "allActive": "ਸਾਰੇ ਸੈਸ਼ਨ ਕਿਰਿਆਸ਼ੀਲ ਹਨ",
       "completedWillAppear": "ਮੁਕੰਮਲ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
       "noPastSessions": "ਕੋਈ ਪਿਛਲੇ ਸੈਸ਼ਨ ਨਹੀਂ",
       "live": "ਲਾਈਵ"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "ਹੇਠਾਂ ਸਕ੍ਰੋਲ ਕਰੋ",
       "emptyTitle": "ਅਜੇ ਕੋਈ ਸੁਨੇਹਾ ਨਹੀਂ",
       "renameAccessibility": "ਸੈਸ਼ਨ ਦਾ ਨਾਮ ਬਦਲੋ: {{title}}",
-      "connectRepository": "ਰਿਪੋਜ਼ਟਰੀ ਕਨੈਕਟ ਕਰੋ",
       "cloningSession": "ਸੈਸ਼ਨ ਕਲੋਨ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
       "continue": "ਜਾਰੀ ਰੱਖੋ",
       "couldNotLoadThisSession": "ਇਹ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
-      "cloneFailed": "ਇਹ ਸੈਸ਼ਨ ਕਲੋਨ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "cloneFailedRetry": "ਇਹ ਸੈਸ਼ਨ ਕਲੋਨ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "connectRepositoryToContinue": "ਜਾਰੀ ਰੱਖਣ ਲਈ ਇੱਕ ਰਿਪੋਜ਼ਟਰੀ ਕਨੈਕਟ ਕਰੋ।",
       "notEnoughCredits": "Cloud Agent ਚਲਾਉਣ ਲਈ ਕਾਫ਼ੀ ਕ੍ਰੈਡਿਟ ਨਹੀਂ ਹਨ। ਕ੍ਰੈਡਿਟ ਜੋੜੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "previousTaskFinishing": "ਪਿਛਲਾ ਕੰਮ ਅਜੇ ਖਤਮ ਹੋ ਰਿਹਾ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਪਲ ਉਡੀਕੋ।",
       "serviceUnavailable": "ਸੇਵਾ ਇਸ ਸਮੇਂ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦਿੰਦੀ। GitLab ਲਈ ਰਿਪੋਜ਼ਟਰੀ ਪਹੁੰਚ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫ੍ਰੈਸ਼ ਕਰੋ।",
       "openBitbucket": "Bitbucket ਖੋਲ੍ਹੋ",
       "openGitlab": "GitLab ਖੋਲ੍ਹੋ",
-      "recentlyUsed": "ਹਾਲ ਹੀ ਵਿੱਚ ਵਰਤੇ ਗਏ"
+      "recentlyUsed": "ਹਾਲ ਹੀ ਵਿੱਚ ਵਰਤੇ ਗਏ",
+      "cliCannotContinue": "ਇਹ CLI ਸੈਸ਼ਨ ਜਾਰੀ ਨਹੀਂ ਰੱਖ ਸਕਦਾ। ਕਲਾਉਡ ਏਜੰਟ ਜਾਂ ਕੋਈ ਹੋਰ CLI ਚੁਣੋ।",
+      "continueFrom": "{{title}} ਜਾਰੀ ਰੱਖ ਰਿਹਾ ਹੈ",
+      "importFailed": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਆਯਾਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
+      "importingSession": "ਸੈਸ਼ਨ ਆਯਾਤ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ਫਾਈਲ ਅੱਪਡੇਟ ਕੀਤੀ ਗਈ",

@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "आता सक्रिय",
     "search": {
       "searching": "शोधत आहे",
       "searchSessions": "सत्रे शोधा",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "सत्रे लोड करता आली नाहीत",
       "couldNotLoadActive": "सक्रिय सत्रे लोड करता आली नाहीत",
-      "noSessionsYet": "अजून सत्रे नाहीत",
       "noSessionsYetDescription": "तुमच्या फोनवरून कोडिंग कार्य सुरू करा. तुमची सत्रे येथे दिसतील.",
       "noMatches": "जुळणारी सत्रे नाहीत",
       "tryDifferentSearch": "भिन्न शोध संज्ञा वापरून पहा.",
       "tryAdjustFilters": "तुमचे फिल्टर समायोजित किंवा साफ करून पहा.",
       "couldNotSearch": "सत्रे शोधता आली नाहीत",
-      "allActive": "सर्व सत्रे सक्रिय आहेत",
       "completedWillAppear": "पूर्ण झालेली सत्रे येथे दिसतील.",
       "noPastSessions": "भूतकाळातील सत्रे नाहीत",
       "live": "LIVE"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "तळाशी स्क्रोल करा",
       "emptyTitle": "अजून संदेश नाहीत",
       "renameAccessibility": "सत्राचे नाव बदला: {{title}}",
-      "connectRepository": "भांडार कनेक्ट करा",
       "cloningSession": "सत्र क्लोन करत आहे",
       "continue": "सुरू ठेवा",
       "couldNotLoadThisSession": "हे सत्र लोड करता आले नाही",
-      "cloneFailed": "हे सत्र क्लोन करता आले नाही.",
       "cloneFailedRetry": "हे सत्र क्लोन करता आले नाही. पुन्हा प्रयत्न करा.",
-      "connectRepositoryToContinue": "सुरू ठेवण्यासाठी भांडार कनेक्ट करा.",
       "notEnoughCredits": "Cloud Agent चालवण्यासाठी पुरेसे क्रेडिट नाहीत. क्रेडिट जोडून पुन्हा प्रयत्न करा.",
       "previousTaskFinishing": "मागील कार्य अजून पूर्ण होत आहे. कृपया क्षणभर थांबा.",
       "serviceUnavailable": "सेवा सध्या अनुपलब्ध आहे. पुन्हा प्रयत्न करा.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "कोणतीही रिपॉझिटरी दिसत नाही. GitLab साठी रिपॉझिटरी प्रवेश तपासा, नंतर रिफ्रेश करा.",
       "openBitbucket": "Bitbucket उघडा",
       "openGitlab": "GitLab उघडा",
-      "recentlyUsed": "अलीकडे वापरलेले"
+      "recentlyUsed": "अलीकडे वापरलेले",
+      "continueFrom": "सुरू ठेवत आहोत {{title}}",
+      "importingSession": "सत्र आयात करत आहोत",
+      "cliCannotContinue": "हे CLI सत्र सुरू ठेवू शकत नाही. Cloud Agent किंवा दुसरे CLI निवडा.",
+      "importFailed": "हे सत्र आयात करता आले नाही."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्ययावत केली",

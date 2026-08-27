@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "Mavitrika izao",
     "search": {
       "searching": "Mitady",
       "searchSessions": "Mitady sessions",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "Tsy afaka namaky ny sessions",
       "couldNotLoadActive": "Tsy afaka namaky ny sessions mavitrika",
-      "noSessionsYet": "Mbola tsy misy sessions",
       "noSessionsYetDescription": "Atombohy asa fandaharana avy amin'ny findainao. Hisetra eto ny sessions-nao.",
       "noMatches": "Tsy misy sessions mifanaraka",
       "tryDifferentSearch": "Andramo teny fikarohana hafa.",
       "tryAdjustFilters": "Andramo manitsy na manala ny sivanao.",
       "couldNotSearch": "Tsy afaka nanao fikarohana sessions",
-      "allActive": "Mavitrika daholo ny sessions",
       "completedWillAppear": "Hiseho eto ny sessions vita.",
       "noPastSessions": "Tsy misy sessions taloha",
       "live": "LIVE"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "Mihadia ho any ambany",
       "emptyTitle": "Mbola tsy misy hafatra",
       "renameAccessibility": "Avereno anarana ny session: {{title}}",
-      "connectRepository": "Ampifandraiso ny repository",
       "cloningSession": "Mitahiry dika ny session",
       "continue": "Tohizo",
       "couldNotLoadThisSession": "Tsy afaka namaky ity session ity",
-      "cloneFailed": "Tsy afaka nitahiry dika ity session ity.",
       "cloneFailedRetry": "Tsy afaka nitahiry dika ity session ity. Andramo indray.",
-      "connectRepositoryToContinue": "Ampifandraiso repository mba hanohizana.",
       "notEnoughCredits": "Tsy ampy ny crédit handefasana ny Cloud Agent. Ampidiro crédit ary andramo indray.",
       "previousTaskFinishing": "Ny asa teo aloha mbola vita. Andraso kely azafady.",
       "serviceUnavailable": "Tsy misy ny serivisy amin'izao fotoana izao. Andramo indray azafady.",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "Tsy misy repository hita. Hamarino ny fahafahana miditra amin'ny repository an'i GitLab, dia avereno.",
       "openBitbucket": "Sokafy ny Bitbucket",
       "openGitlab": "Sokafy ny GitLab",
-      "recentlyUsed": "Ampiasaina vao haingana"
+      "recentlyUsed": "Ampiasaina vao haingana",
+      "continueFrom": "Manohy ny {{title}}",
+      "importingSession": "Mampiditra session",
+      "cliCannotContinue": "Ity CLI ity tsy afaka manohy session. Fidio ny Cloud Agent na CLI hafa.",
+      "importFailed": "Tsy afaka nampidirina ity session ity."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nohavaozina ny rakitra {{displayCount}}",

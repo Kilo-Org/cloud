@@ -1591,7 +1591,6 @@
     }
   },
   "agents": {
-    "activeNow": "Aktywne teraz",
     "search": {
       "searching": "Wyszukiwanie",
       "searchSessions": "Szukaj sesji",
@@ -1602,13 +1601,11 @@
     "sessionList": {
       "couldNotLoad": "Nie udało się załadować sesji",
       "couldNotLoadActive": "Nie udało się załadować aktywnych sesji",
-      "noSessionsYet": "Nie ma jeszcze sesji",
       "noSessionsYetDescription": "Rozpocznij zadanie kodowania z telefonu. Twoje sesje pojawią się tutaj.",
       "noMatches": "Brak pasujących sesji",
       "tryDifferentSearch": "Spróbuj użyć innego hasła wyszukiwania.",
       "tryAdjustFilters": "Spróbuj dostosować lub wyczyścić filtry.",
       "couldNotSearch": "Nie udało się wyszukać sesji",
-      "allActive": "Wszystkie sesje są aktywne",
       "completedWillAppear": "Ukończone sesje pojawią się tutaj.",
       "noPastSessions": "Brak poprzednich sesji",
       "live": "NA ŻYWO"
@@ -1681,13 +1678,10 @@
       "scrollToBottom": "Przewiń na dół",
       "emptyTitle": "Brak wiadomości",
       "renameAccessibility": "Zmień nazwę sesji: {{title}}",
-      "connectRepository": "Połącz repozytorium",
       "cloningSession": "Klonowanie sesji",
       "continue": "Kontynuuj",
       "couldNotLoadThisSession": "Nie udało się załadować tej sesji",
-      "cloneFailed": "Nie udało się sklonować tej sesji.",
       "cloneFailedRetry": "Nie udało się sklonować tej sesji. Spróbuj ponownie.",
-      "connectRepositoryToContinue": "Połącz repozytorium, aby kontynuować.",
       "notEnoughCredits": "Za mało kredytów, aby uruchomić Cloud Agent. Dodaj kredyty i spróbuj ponownie.",
       "previousTaskFinishing": "Poprzednie zadanie wciąż się kończy. Proszę chwilę poczekać.",
       "serviceUnavailable": "Usługa jest teraz niedostępna. Spróbuj ponownie.",
@@ -1760,7 +1754,11 @@
       "noRepositoriesVisibleGitlab": "Brak widocznych repozytoriów. Sprawdź dostęp do repozytoriów GitLab, a następnie odśwież.",
       "openBitbucket": "Otwórz Bitbucket",
       "openGitlab": "Otwórz GitLab",
-      "recentlyUsed": "Ostatnio używane"
+      "recentlyUsed": "Ostatnio używane",
+      "continueFrom": "Kontynuowanie {{title}}",
+      "importingSession": "Importowanie sesji",
+      "cliCannotContinue": "To CLI nie może kontynuować sesji. Wybierz Cloud Agent lub inne CLI.",
+      "importFailed": "Nie udało się zaimportować tej sesji."
     },
     "partRenderer": {
       "updatedFileCount_one": "Zaktualizowano {{displayCount}} plik",

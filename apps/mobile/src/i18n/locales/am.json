@@ -2033,7 +2033,6 @@
     }
   },
   "agents": {
-    "activeNow": "አሁን ንቁ",
     "search": {
       "searching": "በመፈለግ ላይ",
       "searchSessions": "ክፍለ ጊዜዎችን ይፈልጉ",
@@ -2044,13 +2043,11 @@
     "sessionList": {
       "couldNotLoad": "ክፍለ-ጊዜዎችን መጫን አልተቻለም",
       "couldNotLoadActive": "ንቁ ክፍለ ጊዜዎችን ማግኘት አልተቻለም",
-      "noSessionsYet": "እስካሁን ክፍለ ጊዜዎች የሉም",
       "noSessionsYetDescription": "ከስልክዎ የኮዲንግ ተግባር ይጀምሩ። ክፍለ ጊዜዎችዎ እዚህ ይታያሉ።",
       "noMatches": "ምንም ክፍለ ጊዜ አይዛመድም",
       "tryDifferentSearch": "የተለየ የፍለጋ ቃል ይሞክሩ።",
       "tryAdjustFilters": "ማጣሪያዎችዎን ለማስተካከል ወይም ለማጽዳት ይሞክሩ።",
       "couldNotSearch": "ክፍለ ጊዜዎችን መፈለግ አልተቻለም",
-      "allActive": "ሁሉም ክፍለ ጊዜዎች ንቁ ናቸው",
       "completedWillAppear": "የተጠናቀቁ ክፍለ ጊዜዎች እዚህ ይታያሉ።",
       "noPastSessions": "ምንም ያለፉ ክፍለ ጊዜዎች የሉም",
       "live": "ቀጥታ"
@@ -2119,13 +2116,10 @@
       "scrollToBottom": "ወደ ታች ይሸብልሉ",
       "emptyTitle": "እስካሁን ምንም መልእክቶች የሉም",
       "renameAccessibility": "ክፍለ ጊዜውን እንደገና ይሰይሙ: {{title}}",
-      "connectRepository": "ማከማቻውን ያገናኙ",
       "cloningSession": "ክፍለ ጊዜውን በመቀንጠር ላይ",
       "continue": "ቀጥል",
       "couldNotLoadThisSession": "ይህን ክፍለ ጊዜ ማግኘት አልተቻለም",
-      "cloneFailed": "ይህን ክፍለ ጊዜ መቀንጠር አልተቻለም።",
       "cloneFailedRetry": "ይህን ክፍለ ጊዜ መቀንጠር አልተቻለም። እንደገና ይሞክሩ።",
-      "connectRepositoryToContinue": "ለመቀጠል ማከማቻ ያገናኙ።",
       "notEnoughCredits": "Cloud Agent ለማስኬድ በቂ ክሬዲት የለዎትም። ክሬዲት ጨምረው እንደገና ይሞክሩ።",
       "previousTaskFinishing": "የቀደመው ተግባር አሁንም እያለቀ ነው። እባክዎ ጠብቅ።",
       "serviceUnavailable": "አገልግሎቱ አሁን አይገኝም። እባክዎ እንደገና ይሞክሩ።",
@@ -2198,7 +2192,11 @@
       "noRepositoriesVisibleGitlab": "ምንም የሚታዩ ማከማቻዎች የሉም። የGitLab ማከማቻ መዳረሻን ያረጋግጡ፣ ከዚያ ያድሱ።",
       "openBitbucket": "Bitbucket ይክፈቱ",
       "openGitlab": "GitLab ይክፈቱ",
-      "recentlyUsed": "በቅርቡ ጥቅም ላይ የዋሉ"
+      "recentlyUsed": "በቅርቡ ጥቅም ላይ የዋሉ",
+      "cliCannotContinue": "ይህ CLI ክፍለ-ጊዜ መቀጠል አይችልም። Cloud Agent ወይም ሌላ CLI ይምረጡ።",
+      "continueFrom": "{{title}}ን በመቀጠል ላይ",
+      "importFailed": "ይህን ክፍለ-ጊዜ ማስመጣት አልተቻለም።",
+      "importingSession": "ክፍለ-ጊዜን በማስመጣት ላይ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ፋይል ተዘምኗል",

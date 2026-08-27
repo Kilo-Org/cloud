@@ -42,19 +42,33 @@ export type SandboxControlOutboundRequest = {
   timeoutMs?: number;
 };
 
+export type SandboxControlConnectionIdentity = {
+  connectionId: string;
+  providerInstanceId: string;
+  wrapperInstanceId?: string;
+};
+
 export type SandboxControlSocketHooks = {
-  onHandshakeComplete?(providerInstanceId: string): void | Promise<void>;
-  onReady?(): void | Promise<void>;
-  onHeartbeat?(payload: SandboxHeartbeatPayload): void | Promise<void>;
+  onHandshakeComplete?(identity: SandboxControlConnectionIdentity): void | Promise<void>;
+  onReady?(identity: SandboxControlConnectionIdentity): void | Promise<void>;
+  onHeartbeat?(
+    payload: SandboxHeartbeatPayload,
+    identity: SandboxControlConnectionIdentity
+  ): void | Promise<void>;
   onSessionEvent?(
-    identity: SessionEventIdentity | undefined,
-    payload: SessionEventPayload
+    sessionIdentity: SessionEventIdentity | undefined,
+    payload: SessionEventPayload,
+    identity: SandboxControlConnectionIdentity
   ): void | Promise<void>;
   onSessionPreparing?(
-    identity: SessionEventIdentity | undefined,
-    payload: SessionPreparingPayload
+    sessionIdentity: SessionEventIdentity | undefined,
+    payload: SessionPreparingPayload,
+    identity: SandboxControlConnectionIdentity
   ): void | Promise<void>;
-  onSocketClosed?(handshakeComplete: boolean): void | Promise<void>;
+  onSocketClosed?(
+    handshakeComplete: boolean,
+    identity?: SandboxControlConnectionIdentity
+  ): void | Promise<void>;
 };
 
 export type SandboxControlSocketHandler = {
@@ -65,6 +79,7 @@ export type SandboxControlSocketHandler = {
   closeHandshakenSockets(code: number, reason: string): void;
   sendRequest(input: SandboxControlOutboundRequest): Promise<ResponseFrame>;
   hasHandshakenSocket(): boolean;
+  getConnectionIdentity(): SandboxControlConnectionIdentity | null;
   closeProvisionalSockets(): void;
 };
 
@@ -86,19 +101,107 @@ function closeSocket(ws: WebSocket, code: number, reason: string): void {
   }
 }
 
-function currentHandshakenSocket(state: SandboxControlSocketState): WebSocket | null {
+type HandshakenSandboxControlSocket = {
+  socket: WebSocket;
+  identity: SandboxControlConnectionIdentity;
+};
+
+function readConnectionIdentity(
+  attachment: SandboxControlSocketAttachment | null
+): SandboxControlConnectionIdentity | null {
+  if (
+    !attachment?.handshakeComplete ||
+    !attachment.connectionId ||
+    !attachment.providerInstanceId
+  ) {
+    return null;
+  }
+
+  return {
+    connectionId: attachment.connectionId,
+    providerInstanceId: attachment.providerInstanceId,
+    ...(attachment.wrapperInstanceId ? { wrapperInstanceId: attachment.wrapperInstanceId } : {}),
+  };
+}
+
+function currentHandshakenSocket(
+  state: SandboxControlSocketState
+): HandshakenSandboxControlSocket | null {
   let current: WebSocket | null = null;
-  let acceptedAt = -1;
+  let legacy: WebSocket | null = null;
+  let ambiguousLegacy = false;
+
   for (const ws of state.getWebSockets(SANDBOX_CONTROL_WS_TAG)) {
     if (ws.readyState !== 1) continue;
     const attachment = readAttachment(ws);
-    if (!attachment?.handshakeComplete) continue;
-    if (attachment.acceptedAt >= acceptedAt) {
+    if (!attachment?.handshakeComplete || !attachment.providerInstanceId) continue;
+    if (attachment.connectionId) {
+      if (current) return null;
       current = ws;
-      acceptedAt = attachment.acceptedAt;
+      continue;
     }
+    if (legacy) {
+      ambiguousLegacy = true;
+      continue;
+    }
+    legacy = ws;
   }
-  return current;
+
+  if (current) {
+    const identity = readConnectionIdentity(readAttachment(current));
+    return identity ? { socket: current, identity } : null;
+  }
+
+  if (!legacy || ambiguousLegacy) return null;
+  const attachment = readAttachment(legacy);
+  if (!attachment?.handshakeComplete || !attachment.providerInstanceId || legacy.readyState !== 1) {
+    return null;
+  }
+
+  const upgraded: SandboxControlSocketAttachment = {
+    ...attachment,
+    connectionId: crypto.randomUUID(),
+  };
+  legacy.serializeAttachment(upgraded);
+  const identity = readConnectionIdentity(upgraded);
+  return identity ? { socket: legacy, identity } : null;
+}
+
+function isProvisionalSocket(
+  state: SandboxControlSocketState,
+  ws: WebSocket,
+  attachment: SandboxControlSocketAttachment | null
+): attachment is SandboxControlSocketAttachment & { connectionId: string } {
+  if (
+    ws.readyState !== 1 ||
+    !attachment ||
+    attachment.handshakeComplete ||
+    !attachment.connectionId
+  ) {
+    return false;
+  }
+
+  let original = false;
+  for (const candidate of state.getWebSockets(SANDBOX_CONTROL_WS_TAG)) {
+    const candidateAttachment = readAttachment(candidate);
+    if (candidateAttachment?.connectionId !== attachment.connectionId) continue;
+    if (candidate !== ws || original) return false;
+    original = true;
+  }
+  return original;
+}
+
+function isCurrentConnection(
+  state: SandboxControlSocketState,
+  ws: WebSocket,
+  identity: SandboxControlConnectionIdentity
+): boolean {
+  const current = currentHandshakenSocket(state);
+  return (
+    ws.readyState === 1 &&
+    current?.socket === ws &&
+    current.identity.connectionId === identity.connectionId
+  );
 }
 
 export function createSandboxControlSocketHandler(
@@ -107,9 +210,15 @@ export function createSandboxControlSocketHandler(
   waiters: ControlRequestWaiters = createControlRequestWaiters(),
   hooks: SandboxControlSocketHooks = {}
 ): SandboxControlSocketHandler {
+  const activatingConnections = new Set<string>();
+
   return {
     hasHandshakenSocket(): boolean {
       return currentHandshakenSocket(state) !== null;
+    },
+
+    getConnectionIdentity(): SandboxControlConnectionIdentity | null {
+      return currentHandshakenSocket(state)?.identity ?? null;
     },
 
     closeProvisionalSockets(): void {
@@ -138,6 +247,7 @@ export function createSandboxControlSocketHandler(
       const attachment: SandboxControlSocketAttachment = {
         handshakeComplete: false,
         acceptedAt: Date.now(),
+        connectionId: crypto.randomUUID(),
       };
       state.acceptWebSocket(server, [SANDBOX_CONTROL_WS_TAG]);
       server.serializeAttachment(attachment);
@@ -146,6 +256,8 @@ export function createSandboxControlSocketHandler(
     },
 
     async handleMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+      if (ws.readyState !== 1) return;
+
       const attachment = readAttachment(ws);
       if (
         attachment &&
@@ -167,16 +279,125 @@ export function createSandboxControlSocketHandler(
       }
 
       const frame = parsed.frame;
+      if (frame.type === 'request' && frame.operation === 'sandbox.hello') {
+        if (!isProvisionalSocket(state, ws, attachment)) {
+          sendJson(
+            ws,
+            errorResponse(
+              frame.requestId,
+              'protocol_error',
+              'sandbox.hello requires an unconsumed provisional connection'
+            )
+          );
+          if (!attachment?.handshakeComplete || currentHandshakenSocket(state)?.socket !== ws) {
+            closeSocket(ws, 1008, 'invalid_handshake');
+          }
+          return;
+        }
+
+        const payload = parseSandboxHelloPayload(frame.payload);
+        if (!payload) {
+          sendJson(
+            ws,
+            errorResponse(frame.requestId, 'protocol_error', 'Invalid sandbox.hello payload')
+          );
+          return;
+        }
+
+        const identity: SandboxControlConnectionIdentity = {
+          connectionId: attachment.connectionId,
+          providerInstanceId: payload.providerInstanceId,
+          ...(payload.wrapperInstanceId ? { wrapperInstanceId: payload.wrapperInstanceId } : {}),
+        };
+        const completed: SandboxControlSocketAttachment = {
+          handshakeComplete: true,
+          acceptedAt: attachment.acceptedAt,
+          connectionId: identity.connectionId,
+          protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+          providerInstanceId: identity.providerInstanceId,
+          ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
+        };
+        const superseded: WebSocket[] = [];
+        let replaced = false;
+
+        const provisionals: WebSocket[] = [];
+        for (const existing of state.getWebSockets(SANDBOX_CONTROL_WS_TAG)) {
+          if (existing === ws) continue;
+          const existingAttachment = readAttachment(existing);
+          if (existingAttachment) {
+            replaced ||= existingAttachment.handshakeComplete;
+            existing.serializeAttachment({
+              handshakeComplete: false,
+              acceptedAt: existingAttachment.acceptedAt,
+            } satisfies SandboxControlSocketAttachment);
+          }
+          if (existingAttachment?.handshakeComplete) {
+            superseded.push(existing);
+          } else {
+            provisionals.push(existing);
+          }
+        }
+
+        ws.serializeAttachment(completed);
+        if (replaced) waiters.rejectAll('Wrapper socket replaced');
+        for (const existing of superseded) {
+          closeSocket(existing, 4000, 'Replaced by new handshake');
+        }
+        for (const existing of provisionals) {
+          closeSocket(existing, 1008, 'handshake_required');
+        }
+
+        activatingConnections.add(identity.connectionId);
+        try {
+          const activation = hooks.onHandshakeComplete?.(identity);
+          if (activation) await activation;
+        } finally {
+          activatingConnections.delete(identity.connectionId);
+        }
+
+        if (!isCurrentConnection(state, ws, identity)) return;
+        sendJson(ws, okResponse(frame.requestId, helloResult()));
+        sendJson(ws, {
+          type: 'request',
+          requestId: crypto.randomUUID(),
+          operation: 'sandbox.status',
+          payload: {},
+        });
+        logger.withFields({ sandboxId }).info('Sandbox control handshake complete');
+        return;
+      }
+
+      if (!attachment?.handshakeComplete) {
+        if (frame.type === 'request') {
+          sendJson(
+            ws,
+            errorResponse(frame.requestId, 'handshake_required', 'sandbox.hello is required first')
+          );
+        } else {
+          closeSocket(ws, 1008, 'handshake_required');
+        }
+        return;
+      }
+
+      const current = currentHandshakenSocket(state);
+      const identity = readConnectionIdentity(readAttachment(ws));
+      if (
+        !current ||
+        current.socket !== ws ||
+        !identity ||
+        current.identity.connectionId !== identity.connectionId
+      ) {
+        closeSocket(ws, 1008, 'stale_connection');
+        return;
+      }
+      if (activatingConnections.has(identity.connectionId)) return;
+
       if (frame.type === 'response') {
         waiters.settle(frame);
         return;
       }
 
       if (frame.type === 'event') {
-        if (!attachment?.handshakeComplete) {
-          closeSocket(ws, 1008, 'handshake_required');
-          return;
-        }
         if (!isControlEvent(frame.event)) return;
         const eventPayload = parseEventPayload(frame.event, frame.payload);
         if (!eventPayload.ok) {
@@ -190,66 +411,22 @@ export function createSandboxControlSocketHandler(
           return;
         }
         if (frame.event === 'sandbox.ready') {
-          await hooks.onReady?.();
+          await hooks.onReady?.(identity);
         } else if (frame.event === 'sandbox.heartbeat') {
-          await hooks.onHeartbeat?.(eventPayload.payload as SandboxHeartbeatPayload);
+          await hooks.onHeartbeat?.(eventPayload.payload as SandboxHeartbeatPayload, identity);
         } else if (frame.event === 'session.event') {
-          await hooks.onSessionEvent?.(frame.session, eventPayload.payload as SessionEventPayload);
+          await hooks.onSessionEvent?.(
+            frame.session,
+            eventPayload.payload as SessionEventPayload,
+            identity
+          );
         } else if (frame.event === 'session.preparing') {
           await hooks.onSessionPreparing?.(
             frame.session,
-            eventPayload.payload as SessionPreparingPayload
+            eventPayload.payload as SessionPreparingPayload,
+            identity
           );
         }
-        return;
-      }
-
-      if (frame.operation === 'sandbox.hello') {
-        const payload = parseSandboxHelloPayload(frame.payload);
-        if (!payload) {
-          sendJson(
-            ws,
-            errorResponse(frame.requestId, 'protocol_error', 'Invalid sandbox.hello payload')
-          );
-          return;
-        }
-
-        const completed: SandboxControlSocketAttachment = {
-          handshakeComplete: true,
-          acceptedAt: attachment?.acceptedAt ?? Date.now(),
-          protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
-          providerInstanceId: payload.providerInstanceId,
-        };
-        ws.serializeAttachment(completed);
-
-        let replaced = false;
-        for (const existing of state.getWebSockets(SANDBOX_CONTROL_WS_TAG)) {
-          if (existing === ws) continue;
-          const existingAttachment = readAttachment(existing);
-          if (existingAttachment?.handshakeComplete) {
-            closeSocket(existing, 4000, 'Replaced by new handshake');
-            replaced = true;
-          }
-        }
-        if (replaced) waiters.rejectAll('Wrapper socket replaced');
-
-        sendJson(ws, okResponse(frame.requestId, helloResult()));
-        sendJson(ws, {
-          type: 'request',
-          requestId: crypto.randomUUID(),
-          operation: 'sandbox.status',
-          payload: {},
-        });
-        logger.withFields({ sandboxId }).info('Sandbox control handshake complete');
-        await hooks.onHandshakeComplete?.(payload.providerInstanceId);
-        return;
-      }
-
-      if (!attachment?.handshakeComplete) {
-        sendJson(
-          ws,
-          errorResponse(frame.requestId, 'handshake_required', 'sandbox.hello is required first')
-        );
         return;
       }
 
@@ -288,12 +465,19 @@ export function createSandboxControlSocketHandler(
         })
         .info('Sandbox control socket closed');
       if (!handshakeComplete) return;
-      const remaining = state
-        .getWebSockets(SANDBOX_CONTROL_WS_TAG)
-        .some(other => other !== ws && readAttachment(other)?.handshakeComplete === true);
+
+      const current = currentHandshakenSocket(state);
+      if (current && current.socket !== ws) return;
+      const remaining = state.getWebSockets(SANDBOX_CONTROL_WS_TAG).some(other => {
+        if (other === ws || other.readyState !== 1) return false;
+        return readAttachment(other)?.handshakeComplete === true;
+      });
       if (remaining) return;
+
+      const identity = readConnectionIdentity(readAttachment(ws)) ?? undefined;
+      if (identity) activatingConnections.delete(identity.connectionId);
       waiters.rejectAll('Wrapper socket closed');
-      await hooks.onSocketClosed?.(true);
+      await hooks.onSocketClosed?.(true, identity);
     },
 
     closeAll(reason: string): void {
@@ -315,8 +499,12 @@ export function createSandboxControlSocketHandler(
         throw new Error('session identity is required');
       }
 
-      const ws = currentHandshakenSocket(state);
-      if (!ws || ws.readyState !== 1) {
+      const current = currentHandshakenSocket(state);
+      if (
+        !current ||
+        current.socket.readyState !== 1 ||
+        activatingConnections.has(current.identity.connectionId)
+      ) {
         throw new SandboxControlConnectionError('No ready wrapper socket');
       }
 
@@ -329,7 +517,7 @@ export function createSandboxControlSocketHandler(
         ...(input.session ? { session: input.session } : {}),
       };
       const pending = waiters.wait(requestId, input.timeoutMs);
-      sendJson(ws, frame);
+      sendJson(current.socket, frame);
       return pending;
     },
   };
